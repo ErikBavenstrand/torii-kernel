@@ -1,0 +1,25 @@
+# Games the compatibility test runs. This list (roms/games.toml) is
+# git-ignored, like the ROMs: `just game-add PATH...` creates it from
+# roms/games.example.toml and lists ROM files or whole folders, which stay
+# where they are (folders outside roms/ go in roms/library.txt).
+# Games whose file can't be found are skipped.
+#
+# file   name of the ROM in roms/
+# sha1   SHA-1 of the ROM, so a different dump is not mistaken for this one
+# system gba, gbc or gb (GB and GBC games run in the kernel's built-in
+#        emulator)
+# code   game code from the ROM header (GB/GBC: system + header checksum)
+# save   save chip the game needs: none, sram32k, eeprom512, eeprom8k,
+#        flash64k or flash128k; battery for GB/GBC games that save
+# rtc    true if the game uses the cart's clock
+# hardware  other cartridge hardware (rumble, gyro, tilt, light sensor,
+#        e-reader), which the emulated cart doesn't have
+# skip   why the test leaves this ROM out (a ROM hack runs the original
+#        game's code; a kernel plugin isn't a game); add it by hand
+#
+# `just compat` tests one game per set of requirements (system, save chip,
+# kernel save mode, ROM size, clock, other hardware); `just compat --all`
+# tests every game.
+#
+# An optional starting save, roms/<file name without .gba>.sav, lets the test
+# continue a game instead of starting a new one.

@@ -27,7 +27,7 @@ the kernel on, and tests.
 | `just dev` | like `play`, rebuilding whenever `source/` changes |
 | `just test` | kernel unit tests, then homebrew games through the kernel: boot, every save type across power cycles, crash reports and save states |
 | `just cart-add game.gba` | copies a file onto the emulated SD card |
-| `just game-add PATH...` | lists games you own (files or whole folders, left in place) in `roms/games.toml` |
+| `just game-add PATH...` | lists games you own (files or whole folders, left in place) in the git-ignored `roms/games.toml` |
 | `just test-kernel` | builds a test kernel that runs the unit tests in `tests/kernel` at boot (also part of `just test`) |
 | `just compat` | plays each listed game through the kernel and checks it boots, gets the right save type and clock, and keeps its saves; prints a table and writes `dist/compat/index.html` with screenshots |
 | `just size` | kernel size against the 1 MB kernel area, IWRAM and EWRAM, plus the largest symbols; fails if anything is over |
@@ -67,7 +67,8 @@ the ROM, a clock game must find the clock on, and the save must reach
 doesn't save on its own). `dist/compat/index.html` shows the results, what
 changed since each game's previous run, coverage by requirement, and
 screenshots. List your games with `just game-add ~/path/to/roms` (folders
-stay where they are); ROM hacks and kernel plugins are marked `skip`.
+stay where they are) into `roms/games.toml`, which stays local (git-ignored);
+mark ROMs to leave out with `skip = "why"`.
 
 When code running headlessly hits an illegal opcode or jumps somewhere that
 can't run code, `mgba-shot` stops with exit status 3 and prints a crash report:

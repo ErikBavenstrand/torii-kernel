@@ -6,6 +6,7 @@
 
 usage: games.py add PATH...   (ROM files, or folders searched for .gba/.gbc/.gb)
 
+The list is git-ignored; it starts as a copy of roms/games.example.toml.
 ROMs stay where they are: a folder outside roms/ is remembered in the
 git-ignored roms/library.txt, which `just compat` mounts read-only. For each
 ROM the list records the file name, SHA-1, system, title and game code, the
@@ -162,9 +163,9 @@ def main() -> int:
         print(__doc__, file=sys.stderr)
         return 2
     table, hardware = kernel_table(), mgba_hardware()
-    games = (
-        tomllib.loads(MANIFEST.read_text()).get("game", []) if MANIFEST.exists() else []
-    )
+    if not MANIFEST.exists():
+        MANIFEST.write_text(Path("roms/games.example.toml").read_text())
+    games = tomllib.loads(MANIFEST.read_text()).get("game", [])
     known = {g["sha1"] for g in games}
     roms_dir = Path("roms").resolve()
     added = 0

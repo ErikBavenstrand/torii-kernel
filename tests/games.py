@@ -576,6 +576,9 @@ def print_summary(results: list[Result], run_file: Path) -> None:
 
 
 def main() -> int:
+    if not (ROMS / "games.toml").exists():
+        print("no roms/games.toml yet: list your games with `just game-add PATH...`")
+        return 1
     games = tomllib.loads((ROMS / "games.toml").read_text()).get("game", [])
     every = "--all" in sys.argv[1:]
     filters = [a for a in sys.argv[1:] if a != "--all"]

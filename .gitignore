@@ -19,9 +19,10 @@ emu/build-native/
 tests/roms/*/*.elf
 tests/roms/*/*.gba
 
-# Your own game ROMs and saves; only the list of games is committed
+# Your own games, saves and list of games (roms/games.toml); only the
+# empty example list is committed
 roms/*
-!roms/games.toml
+!roms/games.example.toml
 __pycache__/
 
 # clangd (just compile-commands)
