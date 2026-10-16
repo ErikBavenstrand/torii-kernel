@@ -1,7 +1,7 @@
 # Games the compatibility test runs. This list (roms/games.toml) is
 # git-ignored, like the ROMs: `just game-add PATH...` creates it from
-# roms/games.example.toml and lists ROM files or whole folders, which stay
-# where they are (folders outside roms/ go in roms/library.txt).
+# roms/games.example.toml, copies ROM files or whole folders of them into
+# roms/ (never their saves) and lists them. Tests read only roms/.
 # Games whose file can't be found are skipped.
 #
 # file   name of the ROM in roms/

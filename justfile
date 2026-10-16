@@ -124,18 +124,7 @@ test: build emu-headless test-roms _test-kernel-build
 # games by code, system, save chip or file name, e.g. `just compat gbc` or `just compat Pokemon`
 [positional-arguments]
 compat *filters: build emu-headless
-    #!/usr/bin/env bash
-    set -euo pipefail
-    # Library folders from roms/library.txt, mounted read-only under /library
-    mounts=() library=""
-    i=0
-    while IFS= read -r dir; do
-      [ -n "$dir" ] || continue
-      mounts+=(-v "$dir:/library/$i:ro")
-      library="$library:/library/$i"
-      i=$((i + 1))
-    done < <(cat roms/library.txt 2>/dev/null || true)
-    docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/src -w /src "${mounts[@]}" -e TORII_LIBRARY="${library#:}" {{emu_image}} python3 tests/games.py "$@"
+    {{emu_docker}} python3 tests/games.py "$@"
 
 # Build the test kernel (ezkerneltest.gba) with tests/kernel and run its unit tests headlessly
 test-kernel: emu-headless _test-kernel-build
@@ -180,7 +169,7 @@ _cart-copy mode +files:
     {{fresh}} sync --all dist/.cart-add
     {{emu_docker}} tools/cart_copy.sh {{mode}} {{cart}}/sd.img dist/.cart-add/*; status=$?; rm -rf dist/.cart-add; exit $status
 
-# List games (files or folders, left where they are) in roms/games.toml, e.g. `just game-add ~/roms`
+# Copy games (files or whole folders) into roms/ and list them in roms/games.toml, e.g. `just game-add ~/roms`
 [positional-arguments]
 game-add +paths:
     python3 tools/games.py add "$@"

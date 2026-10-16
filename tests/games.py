@@ -31,16 +31,13 @@ Checks, each pass, fail, untested (the run didn't get that far) or n/a:
   for a game that didn't save during the run, a test pattern put in the
   cart's save memory makes the same trip
 
-A game with a starting save and a key script (tests/games/<code>.keys)
-plays that script instead, saves in-game and is
-relaunched to save again; Pokémon generation 3 save counters must go up.
-Other starting saves (a .sav next to the ROM, or in a SAVER folder of the
-library) are put on the card so the game starts from them.
+A game with a starting save (roms/<name>.sav, .esv for GB/GBC) and a key
+script (tests/games/<code>.keys) plays that script instead, saves in-game and
+is relaunched to save again; Pokémon generation 3 save counters must go up.
 
 Results go to dist/compat/runs/<time>.json and the report to
 dist/compat/index.html (tests/compat_report.py). Runs inside the torii-emu
-container, with the library folders of roms/library.txt mounted under
-/library (see `just compat`).
+container and reads ROMs only from roms/, where `just game-add` copies them.
 """
 
 import hashlib
@@ -99,12 +96,12 @@ class Failure(Exception):
 
 
 def library_roots() -> list[Path]:
-    env = os.environ.get("TORII_LIBRARY", "")
-    return [ROMS] + [Path(p) for p in env.split(":") if p]
+    # Only the copies in roms/: tests never read the folders games came from.
+    return [ROMS]
 
 
 def rom_index() -> dict[str, Path]:
-    """SHA-1 to path for every ROM under roms/ and the library (cached)."""
+    """SHA-1 to path for every ROM under roms/ (cached)."""
     cache = json.loads(INDEX.read_text()) if INDEX.exists() else {}
     fresh, index = {}, {}
     for root in library_roots():
@@ -125,7 +122,7 @@ def rom_index() -> dict[str, Path]:
 
 
 def save_index() -> dict[str, Path]:
-    """Starting saves by file stem: next to ROMs or in SAVER folders."""
+    """Starting saves by file stem, from roms/ only."""
     saves = {}
     for root in library_roots():
         for path in [*root.rglob("*.sav"), *root.rglob("*.esv")]:

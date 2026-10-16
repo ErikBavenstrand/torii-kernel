@@ -7,8 +7,9 @@
 usage: games.py add PATH...   (ROM files, or folders searched for .gba/.gbc/.gb)
 
 The list is git-ignored; it starts as a copy of roms/games.example.toml.
-ROMs stay where they are: a folder outside roms/ is remembered in the
-git-ignored roms/library.txt, which `just compat` mounts read-only. For each
+Each ROM is copied into roms/ (git-ignored), so tests never read or change
+the folders it came from; a name already taken by a different ROM gets the
+start of its SHA-1 added. Saves are never copied. For each
 ROM the list records the file name, SHA-1, system, title and game code, the
 save chip the game needs, whether it uses the clock, and any other cartridge
 hardware. For GBA games the save chip and clock come from the library strings
@@ -22,12 +23,12 @@ GBC games they come from the cartridge header. A game already in the list
 import hashlib
 import json
 import re
+import shutil
 import sys
 import tomllib
 from pathlib import Path
 
 MANIFEST = Path("roms/games.toml")
-LIBRARY = Path("roms/library.txt")
 KERNEL_TABLE = Path("source/saveMODE.h")
 MGBA_TABLE = Path("emu/mgba/src/gba/overrides.c")
 SUFFIXES = {".gba": "gba", ".gbc": "gbc", ".gb": "gb"}
@@ -121,29 +122,24 @@ def describe(path: Path, rom: bytes, table: dict, hardware: dict) -> dict:
     }
 
 
-def library_roots() -> list[Path]:
-    if not LIBRARY.exists():
-        return []
-    return [
-        Path(line.strip()) for line in LIBRARY.read_text().splitlines() if line.strip()
-    ]
+def copy_in(source: Path, sha1: str) -> Path:
+    """Copy a ROM into roms/ unless it is already there; return the copy."""
+    roms = Path("roms").resolve()
+    if roms in source.parents:
+        return source
+    target = roms / source.name
+    if target.exists() and hashlib.sha1(target.read_bytes()).hexdigest() != sha1:
+        target = roms / f"{source.stem} [{sha1[:8]}]{source.suffix}"
+    if not target.exists():
+        shutil.copyfile(source, target)
+    return target
 
 
-def remember(root: Path) -> None:
-    """Add a folder to roms/library.txt unless a listed folder holds it."""
-    roots = library_roots()
-    if any(root == r or r in root.parents for r in roots):
-        return
-    roots = [r for r in roots if root not in r.parents] + [root]
-    LIBRARY.write_text("".join(f"{r}\n" for r in roots))
-    print(f"library: {root}")
-
-
-def toml_entry(path: Path, sha1: str, info: dict) -> str:
+def toml_entry(path: Path, sha1: str, info: dict, plugin: bool) -> str:
     q = json.dumps  # JSON strings are valid TOML basic strings
     # Plugins the kernel loads for other file types (e.g. System/PLUG) are .gba
     # files too, but not games.
-    skip = 'skip = "kernel plugin, not a game"\n' if "PLUG" in path.parts else ""
+    skip = 'skip = "kernel plugin, not a game"\n' if plugin else ""
     return (
         "\n[[game]]\n"
         f"file = {q(path.name)}\n"
@@ -167,7 +163,6 @@ def main() -> int:
         MANIFEST.write_text(Path("roms/games.example.toml").read_text())
     games = tomllib.loads(MANIFEST.read_text()).get("game", [])
     known = {g["sha1"] for g in games}
-    roms_dir = Path("roms").resolve()
     added = 0
     entries = []
     for arg in sys.argv[2:]:
@@ -181,8 +176,6 @@ def main() -> int:
         if not files:
             print(f"no games in {arg}", file=sys.stderr)
             continue
-        if roms_dir not in path.parents and path != roms_dir:
-            remember(path if path.is_dir() else path.parent)
         for rom_path in files:
             rom = rom_path.read_bytes()
             sha1 = hashlib.sha1(rom).hexdigest()
@@ -190,7 +183,9 @@ def main() -> int:
                 continue
             known.add(sha1)
             info = describe(rom_path, rom, table, hardware)
-            entries.append(toml_entry(rom_path, sha1, info))
+            plugin = "PLUG" in rom_path.parts  # listed as skipped, not copied
+            copy = rom_path if plugin else copy_in(rom_path, sha1)
+            entries.append(toml_entry(copy, sha1, info, plugin))
             added += 1
     with MANIFEST.open("a") as f:
         f.writelines(entries)
