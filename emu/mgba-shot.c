@@ -9,6 +9,12 @@
 //                    (# starts a comment), for long input scripts
 //   -g PORT          wait for gdb on PORT (all addresses) before running
 //   -y SYMFILE       symbols for crash reports (default: the ROM's .sym)
+//   -m FRAME:ADDR:LEN  after FRAME, print LEN bytes of memory from ADDR (hex)
+//   -r FRAME         after FRAME, print the CPU registers
+//   -h FRAME         after FRAME, print a hash of the screen (same picture,
+//                    same hash), to compare runs without saving PNGs
+//   -p FRAME:ADDR:VALUE  before FRAME, write a 32-bit VALUE to ADDR
+//   -u TEXT          stop after the frame in which the kernel logs TEXT
 //
 // If the CPU hits an illegal opcode or jumps to an invalid address, it prints
 // a crash report (registers, and code addresses found on the stack with their
@@ -83,6 +89,9 @@ static const char* symbolize(uint32_t address) {
 	return out;
 }
 
+static const char* until_text;
+static int until_hit;
+
 static struct mCore* crash_core;
 static int crashed;
 static char crash_reason[256];
@@ -140,9 +149,12 @@ static void quiet_log(struct mLogger* logger, int category, enum mLogLevel level
 		return;  // The crash report has it, and it repeats until the frame ends.
 	}
 	if (!strcmp(id, "gba.debug")) {
-		fputs(level & (mLOG_FATAL | mLOG_ERROR) ? "kernel error: " : "kernel: ", stderr);
-		vfprintf(stderr, format, args);
-		fputc('\n', stderr);
+		char line[512];
+		vsnprintf(line, sizeof(line), format, args);
+		fprintf(stderr, "%s%s\n", level & (mLOG_FATAL | mLOG_ERROR) ? "kernel error: " : "kernel: ", line);
+		if (until_text && strstr(line, until_text)) {
+			until_hit = 1;
+		}
 		return;
 	}
 	if (level & (mLOG_FATAL | mLOG_ERROR)) {
@@ -203,6 +215,11 @@ static void add_event(struct events* events, const char* spec) {
 struct options {
 	struct events keys;
 	struct events shots;
+	struct events dumps;
+	struct events regs;
+	struct events hashes;
+	struct events pokes;
+	const char* until;
 	unsigned frames;
 	const char* saveOut;
 	unsigned gdbPort;
@@ -251,6 +268,20 @@ static void parse_options(struct options* opts, int argc, char** argv) {
 			opts->saveOut = argv[++i];
 		} else if (!strcmp(argv[i], "-s")) {
 			add_event(&opts->shots, argv[++i]);
+		} else if (!strcmp(argv[i], "-m")) {
+			add_event(&opts->dumps, argv[++i]);
+		} else if (!strcmp(argv[i], "-r")) {
+			char* spec = malloc(strlen(argv[++i]) + 2);
+			sprintf(spec, "%s:", argv[i]);
+			add_event(&opts->regs, spec);
+		} else if (!strcmp(argv[i], "-h")) {
+			char* spec = malloc(strlen(argv[++i]) + 2);
+			sprintf(spec, "%s:", argv[i]);
+			add_event(&opts->hashes, spec);
+		} else if (!strcmp(argv[i], "-p")) {
+			add_event(&opts->pokes, argv[++i]);
+		} else if (!strcmp(argv[i], "-u")) {
+			opts->until = argv[++i];
 		} else if (!strcmp(argv[i], "-y")) {
 			opts->symFile = argv[++i];
 		} else if (!strcmp(argv[i], "-g")) {
@@ -262,6 +293,52 @@ static void parse_options(struct options* opts, int argc, char** argv) {
 			exit(2);
 		}
 	}
+}
+
+static void print_registers(struct mCore* core, unsigned frame) {
+	struct ARMCore* cpu = core->cpu;
+	printf("regs frame %u:", frame);
+	for (int i = 0; i < 16; ++i) {
+		printf(" r%d=%08X", i, cpu->gprs[i]);
+	}
+	printf(" cpsr=%08X\n", cpu->cpsr.packed);
+}
+
+static void dump_memory(struct mCore* core, unsigned frame, const char* spec) {
+	uint32_t address = strtoul(spec, NULL, 0);
+	const char* colon = strchr(spec, ':');
+	uint32_t length = colon ? strtoul(colon + 1, NULL, 0) : 16;
+	for (uint32_t i = 0; i < length; i += 16) {
+		printf("mem frame %u %08X:", frame, address + i);
+		for (uint32_t j = i; j < i + 16 && j < length; ++j) {
+			printf(" %02X", core->rawRead8(core, address + j, -1));
+		}
+		putchar('\n');
+	}
+}
+
+static void poke_memory(struct mCore* core, const char* spec) {
+	uint32_t address = strtoul(spec, NULL, 0);
+	const char* colon = strchr(spec, ':');
+	uint32_t value = colon ? strtoul(colon + 1, NULL, 0) : 0;
+	core->busWrite32(core, address, value);  // Like a CPU store, so the renderer sees it
+}
+
+// FNV-1a over the screen's pixels.
+static uint64_t hash_screen(const color_t* pixels, unsigned width, unsigned height) {
+	uint64_t hash = 0xCBF29CE484222325ULL;
+	const uint8_t* bytes = (const uint8_t*) pixels;
+	for (size_t i = 0; i < (size_t) width * height * BYTES_PER_PIXEL; ++i) {
+		hash = (hash ^ bytes[i]) * 0x100000001B3ULL;
+	}
+	return hash;
+}
+
+static unsigned last_frame(const struct events* events, unsigned frames) {
+	for (size_t i = 0; i < events->count; ++i) {
+		frames = events->list[i].frame > frames ? events->list[i].frame : frames;
+	}
+	return frames;
 }
 
 static int save_png(const char* path, const color_t* pixels, unsigned width, unsigned height) {
@@ -294,6 +371,14 @@ int main(int argc, char** argv) {
 	}
 	for (size_t i = 0; i < nshots; ++i) {
 		frames = shots[i].frame > frames ? shots[i].frame : frames;
+	}
+	frames = last_frame(&opts.dumps, frames);
+	frames = last_frame(&opts.regs, frames);
+	frames = last_frame(&opts.hashes, frames);
+	frames = last_frame(&opts.pokes, frames);
+	until_text = opts.until;
+	if (until_text && !opts.frames) {
+		frames = frames > 36000 ? frames : 36000;  // Give up after 10 minutes of game time.
 	}
 
 	static struct mLogger logger = {.log = quiet_log};
@@ -354,6 +439,11 @@ int main(int argc, char** argv) {
 				core->setKeys(core, parse_keys(keys[i].arg));
 			}
 		}
+		for (size_t i = 0; i < opts.pokes.count; ++i) {
+			if (opts.pokes.list[i].frame == frame) {
+				poke_memory(core, opts.pokes.list[i].arg);
+			}
+		}
 		if (debugger) {
 			mDebuggerRunFrame(debugger);
 			if (debugger->state == DEBUGGER_SHUTDOWN) {
@@ -367,6 +457,21 @@ int main(int argc, char** argv) {
 			status = 3;
 			break;
 		}
+		for (size_t i = 0; i < opts.dumps.count; ++i) {
+			if (opts.dumps.list[i].frame == frame) {
+				dump_memory(core, frame, opts.dumps.list[i].arg);
+			}
+		}
+		for (size_t i = 0; i < opts.regs.count; ++i) {
+			if (opts.regs.list[i].frame == frame) {
+				print_registers(core, frame);
+			}
+		}
+		for (size_t i = 0; i < opts.hashes.count; ++i) {
+			if (opts.hashes.list[i].frame == frame) {
+				printf("hash frame %u: %016llX\n", frame, (unsigned long long) hash_screen(buffer, width, height));
+			}
+		}
 		for (size_t i = 0; i < nshots; ++i) {
 			if (shots[i].frame == frame) {
 				if (save_png(shots[i].arg, buffer, width, height)) {
@@ -376,6 +481,10 @@ int main(int argc, char** argv) {
 					status = 1;
 				}
 			}
+		}
+		if (until_hit) {
+			printf("stopped at frame %u\n", frame);
+			break;
 		}
 	}
 

@@ -82,6 +82,11 @@ shot frame="300" *keys: build emu-headless cart
     mkdir -p dist/shots
     {{emu_docker}} env OMEGA_DIR={{cart}} emu/build-linux/mgba-shot dist/ezkernelnew.bin {{ prepend("-k ", keys) }} -s {{frame}}:dist/shots/shot.png
 
+# Run the emulated cart headlessly with mgba-shot options, e.g. `just run -u 'launch' -r 0 -m 0:0x02000000:64`
+[positional-arguments]
+run *args: build emu-headless cart
+    {{emu_docker}} env OMEGA_DIR={{cart}} OMEGA_TRACE emu/build-linux/mgba-shot dist/ezkernelnew.bin "$@"
+
 # Boot test ROMs through the kernel and check every save type survives power cycles
 test: build emu-headless test-roms
     {{emu_docker}} tests/smoke.sh
