@@ -51,6 +51,10 @@ switches, clock use) to stderr.
 save (`roms/<name>.sav`) and a key script (`tests/games/<code>.keys`) goes
 through a full save cycle; the others are only launched.
 
+To step through the kernel, run `just debug` (it waits with a black screen)
+and `just gdb` in a second terminal. gdb has the kernel's symbols and
+source, so `break main`, `continue`, `next` and `bt` work as usual.
+
 Not modelled yet: the in-game menu's real-time saves, and firmware updates.
 
 ## Research

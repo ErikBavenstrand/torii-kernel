@@ -13,6 +13,9 @@ mgba := "emu/build-native/sdl/mgba"
 # Emulator window size as a multiple of 240x160, e.g. `just scale=3 play`
 scale := "4"
 cart := "dist/cart"
+# How a container reaches mGBA's GDB stub, which listens on the host's loopback
+gdb_net := if os() == "linux" { "--network host" } else { "--add-host=host.docker.internal:host-gateway" }
+gdb_host := if os() == "linux" { "127.0.0.1" } else { "host.docker.internal" }
 
 # Build the flashable upgrade file: dist/ezkernelnew.bin
 build: emu-image
@@ -27,6 +30,16 @@ build: emu-image
 play *roms: build emu cart
     if [ $# -gt 0 ]; then {{just_executable()}} cart={{cart}} _cart-copy keep "$@"; fi
     OMEGA_DIR={{cart}} {{mgba}} -{{scale}} dist/ezkernelnew.bin
+
+# Like play, but mGBA waits for a debugger on port 2345; attach with `just gdb`
+[positional-arguments]
+debug *roms: build emu cart
+    if [ $# -gt 0 ]; then {{just_executable()}} cart={{cart}} _cart-copy keep "$@"; fi
+    OMEGA_DIR={{cart}} {{mgba}} -{{scale}} -g dist/ezkernelnew.bin
+
+# Attach devkitARM's gdb, with the kernel's symbols, to a running `just debug`
+gdb:
+    docker run --rm -it --platform linux/amd64 {{gdb_net}} -u $(id -u):$(id -g) -v "$PWD":/src -w /src {{kernel_image}} /opt/devkitpro/devkitARM/bin/arm-none-eabi-gdb -q -ex 'target remote {{gdb_host}}:2345' ezkernelnew.elf
 
 # Rebuild and relaunch the emulated cart whenever source/ changes
 dev: emu cart
