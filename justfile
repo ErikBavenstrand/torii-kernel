@@ -33,6 +33,10 @@ play *roms: build emu cart
     if [ $# -gt 0 ]; then {{just_executable()}} cart={{cart}} _cart-copy keep "$@"; fi
     OMEGA_DIR={{cart}} {{mgba}} -{{scale}} dist/ezkernelnew.bin
 
+# Kernel size against the cart and GBA memory limits, and the largest symbols
+size count="12": build
+    {{kernel_docker}} tools/size.sh ezkernelnew.elf ezkernelnew.gba {{count}}
+
 # Like play, but mGBA waits for a debugger on port 2345; attach with `just gdb`
 [positional-arguments]
 debug *roms: build emu cart
