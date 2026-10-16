@@ -100,7 +100,7 @@ u16 gl_color_cheat_black  = RGB(00,00,00);
 u16 gl_color_NORFULL      = RGB(31,00,00);
 u16 gl_color_btn_clean    = RGB(00,00,31);
 */
-u16 SAV_info_buffer [0x200]EWRAM_BSS;
+u16 SAV_info_buffer [0x200];//Torii: IWRAM, so EWRAM data fits in 256 KB
 //******************************************************************************
 void delay(u32 R0)
 {

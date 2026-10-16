@@ -9,7 +9,7 @@ Torii is a custom kernel for the EZ-Flash Omega DE, forked from EZ-Flash's offic
   Edit them as bytes, decoding and encoding with `gbk`; a UTF-8 round trip corrupts the strings.
 - Language strings live in `source/lang.c` as `en_*` and `zh_*` pairs, wired up in `LoadEnglish` and `LoadChinese`. Add both.
 - Log from kernel code with `tlog()` and `TLOG_ASSERT()` from `source/tlog.h`. Lines print as `kernel: ...` from `mgba-shot` and as `GBA Debug: ...` from `just play`; on real hardware they cost nothing. A failed assert fails `just compat`.
-- `just size` checks the kernel against the 1 MB kernel area, IWRAM and EWRAM. The official 1.06 source already overflows EWRAM by 616 bytes: `pNorFS` ends at `0x02040268` and wraps onto `SET_info_buffer`.
+- `just size` checks the kernel against the 1 MB kernel area, IWRAM and EWRAM. EWRAM has about 400 bytes left; past its end, data wraps onto its start. The deepest stack measured is about 1.7 KB, so keep IWRAM free space well above that.
 - Build only with `just build`. It pins devkitARM r54 because newer GCC rejects the unmodified source.
 - After changing toolchains or seeing odd link sizes, run `just clean`; stale objects in `build/` get reused.
 

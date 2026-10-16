@@ -9,6 +9,7 @@ void test_get_save_mode(void);
 void test_save_file_size(void);
 void test_save_mode_table(void);
 void test_file_type(void);
+void test_nor_info_stays_in_bounds(void);
 
 static const struct {
 	const char *name;
@@ -19,6 +20,7 @@ static const struct {
 	{"save_file_size", test_save_file_size},
 	{"save_mode_table", test_save_mode_table},
 	{"file_type", test_file_type},
+	{"nor_info_stays_in_bounds", test_nor_info_stays_in_bounds},
 };
 
 void torii_run_tests(void)

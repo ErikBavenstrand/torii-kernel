@@ -15,9 +15,6 @@ jobs:
       - name: Build and test
         run: just test
       - name: Size
-        # The official 1.06 source already overflows EWRAM by 616 bytes, so
-        # this reports without failing the run until that is fixed.
-        continue-on-error: true
         run: just size
       - name: Keep screenshots
         if: always()
