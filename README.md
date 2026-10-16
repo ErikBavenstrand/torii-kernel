@@ -23,7 +23,7 @@ the kernel on, and tests.
 | `just sd /Volumes/OMEGA [game.gba...]` | copies the kernel (and games) to a real SD card and ejects it; hold R while switching on to install |
 | `just play [game.gba...]` | runs the kernel on an emulated cart, first copying any games given onto its SD card unless they are already there |
 | `just dev` | like `play`, rebuilding whenever `source/` changes |
-| `just test` | checks games boot and every save type survives power cycles |
+| `just test` | kernel unit tests, then homebrew games through the kernel: boot, every save type across power cycles, crash reports and save states |
 | `just cart-add game.gba` | copies a file onto the emulated SD card |
 | `just game-add game.gba` | copies a game you own into the git-ignored `roms/` and lists it in `roms/games.toml` |
 | `just test-kernel` | builds a test kernel that runs the unit tests in `tests/kernel` at boot (also part of `just test`) |
