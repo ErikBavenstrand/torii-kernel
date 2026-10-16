@@ -28,3 +28,6 @@ compile_commands.json
 .cache/
 tests/roms/*/*.sym
 tests/roms/*/*.nm
+ezkerneltest.gba
+ezkerneltest.elf
+build-test/

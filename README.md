@@ -26,6 +26,7 @@ the kernel on, and tests.
 | `just test` | checks games boot and every save type survives power cycles |
 | `just cart-add game.gba` | copies a file onto the emulated SD card |
 | `just game-add game.gba` | copies a game you own into the git-ignored `roms/` and lists it in `roms/games.toml` |
+| `just test-kernel` | builds a test kernel that runs the unit tests in `tests/kernel` at boot (also part of `just test`) |
 | `just compat` | plays each listed game through the kernel and checks it boots, gets the right save type and clock, and keeps its saves; prints a table and writes `dist/compat/index.html` with screenshots |
 | `just size` | kernel size against the 1 MB kernel area, IWRAM and EWRAM, plus the largest symbols; fails if anything is over |
 | `just compile-commands` | writes `compile_commands.json` so clangd (editors, agents) can jump to definitions and show errors |

@@ -45,3 +45,8 @@ void tlog_error(const char *format, ...)
 	tlog_send(LEVEL_ERROR, format, args);
 	va_end(args);
 }
+
+// The test kernel (just test-kernel) replaces this to run tests/kernel at boot.
+__attribute__((weak)) void torii_run_tests(void)
+{
+}

@@ -1900,6 +1900,7 @@ int main(void) {
 
 	tlog_init();
 	tlog("Torii kernel boot");
+	torii_run_tests();
 	irqInit();
 	irqEnable(IRQ_VBLANK);
 

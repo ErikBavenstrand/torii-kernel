@@ -9,6 +9,9 @@ void tlog_init(void);
 void tlog(const char *format, ...) __attribute__((format(printf, 1, 2)));
 void tlog_error(const char *format, ...) __attribute__((format(printf, 1, 2)));
 
+// Runs the kernel unit tests in the test kernel; does nothing otherwise.
+void torii_run_tests(void);
+
 // Logs the failed condition as an error; just compat and the tests fail on it.
 #define TLOG_ASSERT(cond) \
 	do { \

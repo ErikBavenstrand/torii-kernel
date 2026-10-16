@@ -16,6 +16,7 @@ Torii is a custom kernel for the EZ-Flash Omega DE, forked from EZ-Flash's offic
 ## Checking changes
 
 1. Run `just test`. Every line should start with `PASS`.
+   Unit-test kernel functions in `tests/kernel/` (`CHECK`, `CHECK_EQ` from `torii_test.h`; list each test in `run.c`). They run inside a test build of the kernel, so they can call any kernel function.
    For changes to launching, saves or the cart model, also run `just compat` (games you own, listed in `roms/games.toml`; missing ones are skipped).
 2. For anything visible, run `just shot FRAME KEYS...` and read `dist/shots/shot.png`.
    The menu appears around frame 100. Press a key as `N:A`, release it as `N+6:-`, and leave about 8 frames between presses.

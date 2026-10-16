@@ -100,7 +100,7 @@ run *args: build emu-headless cart
     {{emu_docker}} env OMEGA_DIR={{cart}} OMEGA_TRACE emu/build-linux/mgba-shot dist/ezkernelnew.bin "$@"
 
 # Boot test ROMs through the kernel and check every save type survives power cycles
-test: build emu-headless test-roms
+test: build emu-headless test-roms test-kernel
     {{emu_docker}} tests/smoke.sh
     {{emu_docker}} tests/save_types.sh
     {{emu_docker}} tests/crash.sh
@@ -109,6 +109,11 @@ test: build emu-headless test-roms
 # Play the games listed in roms/games.toml through the kernel, e.g. `just compat BPEE`
 compat *codes: build emu-headless
     {{emu_docker}} python3 tests/games.py {{codes}}
+
+# Build the test kernel (ezkerneltest.gba) with tests/kernel and run its unit tests headlessly
+test-kernel: emu-headless
+    {{kernel_docker}} make TARGET=ezkerneltest BUILD=build-test SOURCES="source source/ff15 tests/kernel" -j8
+    {{emu_docker}} tests/kernel.sh
 
 test-roms:
     {{kernel_docker}} make -C tests/roms/hello
