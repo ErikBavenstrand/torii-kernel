@@ -43,8 +43,8 @@ def main() -> int:
                 "checks": game["checks"],
             }
     games = []
-    for game in latest["games"]:
-        game = dict(game)
+    for entry in latest["games"]:
+        game = dict(entry)
         game["shots"] = [embed(s) for s in game["shots"]]
         game["previous"] = previous.get(game["key"])
         games.append(game)

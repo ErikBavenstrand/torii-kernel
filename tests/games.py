@@ -178,9 +178,9 @@ def mash() -> list[tuple[int, str]]:
 def read_keys(path: Path) -> list[tuple[int, str]]:
     keys = []
     for line in path.read_text().splitlines():
-        line = line.split("#", 1)[0].split()
-        if line:
-            keys.append((int(line[0]), line[1]))
+        words = line.split("#", 1)[0].split()
+        if words:
+            keys.append((int(words[0]), words[1]))
     return keys
 
 
@@ -331,7 +331,7 @@ def check_boot(result: Result, trace: str, out: str, shots: list[Path]) -> bool:
         for line in out.splitlines()
         if line.startswith("hash frame ")
     ]
-    in_game = [h for f, h in zip(frames, hashes) if f >= GAME_START]
+    in_game = [h for f, h in zip(frames, hashes, strict=True) if f >= GAME_START]
     result.metrics["distinct screens"] = len(set(in_game))
     modes = lines(trace, ": mode ")
     if crash:
@@ -408,7 +408,9 @@ def run_game(result: Result, roms: dict, saves: dict) -> None:
     frames = max(keys[-1][0] + 60, RUN_FRAMES) if scripted else RUN_FRAMES
     shot_frames = (SHOTS[0], frames // 2, frames) if scripted else SHOTS
     shots = [shots_dir / f"{i + 1}.png" for i in range(len(shot_frames))]
-    extra = [a for f, p in zip(shot_frames, shots) for a in ("-s", f"{f}:{p}")]
+    extra = [
+        a for f, p in zip(shot_frames, shots, strict=True) for a in ("-s", f"{f}:{p}")
+    ]
     extra += [a for f in range(60, frames + 1, 60) for a in ("-h", str(f))]
     out, trace = power_on(cart, LAUNCH + keys, frames, extra)
     result.shots = [str(p.relative_to(REPORT)) for p in shots if p.exists()]

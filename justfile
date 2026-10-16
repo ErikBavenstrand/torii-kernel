@@ -120,6 +120,14 @@ run *args: build emu-headless cart
 test: build emu-headless test-roms _test-kernel-build
     {{emu_docker}} tests/all.sh
 
+# Lint and format-check the Python, shell scripts and CI workflows (pinned versions)
+lint:
+    uvx ruff@0.17.1 check tools tests
+    uvx ruff@0.17.1 format --check tools tests
+    uvx --from shellcheck-py@0.11.0.1 shellcheck tests/*.sh tools/*.sh emu/*.sh
+    uvx --from shfmt-py@4.2.0 shfmt -d -i 2 tests/*.sh tools/*.sh emu/*.sh
+    uvx --from actionlint-py@1.7.12.25 actionlint .github/workflows/*.yml
+
 # Play the listed games through the kernel and write dist/compat/index.html. Filters pick
 # games by code, system, save chip or file name, e.g. `just compat gbc` or `just compat Pokemon`
 [positional-arguments]

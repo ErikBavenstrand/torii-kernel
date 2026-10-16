@@ -37,16 +37,24 @@ def main() -> int:
             if arg == "-MF":
                 skip = True
                 continue
-            out.append(arg.replace("/opt/devkitpro", devkitpro).replace("/src", root, 1))
+            out.append(
+                arg.replace("/opt/devkitpro", devkitpro).replace("/src", root, 1)
+            )
         source = out[out.index("-c") + 1]
         command = [
             "clang",
             "--target=arm-none-eabi",
             "-isystem",
             f"{devkitpro}/devkitARM/arm-none-eabi/include",
-            *[a for a in out if not a.startswith(("-mcpu", "-mtune", "-mthumb-interwork"))],
+            *[
+                a
+                for a in out
+                if not a.startswith(("-mcpu", "-mtune", "-mthumb-interwork"))
+            ],
         ]
-        entries.append({"directory": f"{root}/build", "file": source, "arguments": command})
+        entries.append(
+            {"directory": f"{root}/build", "file": source, "arguments": command}
+        )
     Path("compile_commands.json").write_text(json.dumps(entries, indent=1) + "\n")
     print(f"compile_commands.json: {len(entries)} files")
     return 0

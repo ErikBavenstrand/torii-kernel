@@ -1,0 +1,5 @@
+# Lint and format rules for the Python tools and tests (`just lint`).
+target-version = "py311"
+
+[lint]
+extend-select = ["B", "BLE", "EXE", "I", "PLW", "SIM", "UP"]

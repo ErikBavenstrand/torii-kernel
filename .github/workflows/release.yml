@@ -1,0 +1,50 @@
+# Publishes a GitHub Release when a version tag (v0.1.0, ...) is pushed: the
+# kernel is built and tested, then ezkernelnew.bin is attached with install
+# steps and the newest CHANGELOG.md section as notes (tools/release_notes.sh).
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v2
+      - name: Run all tests (builds ezkernelnew.bin)
+        run: just test
+      - name: Check size against the cart and GBA memory
+        run: just size
+      - name: Upload ezkernelnew.bin
+        uses: actions/upload-artifact@v4
+        with:
+          name: ezkernelnew
+          path: dist/ezkernelnew.bin
+          if-no-files-found: error
+
+  publish:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ezkernelnew
+      - name: Write release notes
+        run: tools/release_notes.sh > release-notes.md
+      - name: Create the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ezkernelnew.bin
+          body_path: release-notes.md
