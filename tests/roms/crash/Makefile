@@ -2,7 +2,7 @@
 PREFIX := /opt/devkitpro/devkitARM/bin/arm-none-eabi-
 CFLAGS := -O2 -mthumb -mthumb-interwork -mcpu=arm7tdmi -Wall
 
-all: crash.gba crash.sym
+all: crash.gba crash.nm
 
 crash.gba: crash.elf
 	$(PREFIX)objcopy -O binary $< $@
@@ -11,8 +11,8 @@ crash.gba: crash.elf
 crash.elf: main.c
 	$(PREFIX)gcc $(CFLAGS) -specs=gba.specs -o $@ $<
 
-crash.sym: crash.elf
-	../../../tools/elf_to_sym.sh $< $@
+crash.nm: crash.elf
+	$(PREFIX)nm -n $< > $@
 
 clean:
-	rm -f crash.elf crash.gba crash.sym
+	rm -f crash.elf crash.gba crash.nm crash.sym

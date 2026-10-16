@@ -27,3 +27,4 @@ __pycache__/
 compile_commands.json
 .cache/
 tests/roms/*/*.sym
+tests/roms/*/*.nm

@@ -23,7 +23,8 @@ build: emu-image
     mkdir -p dist
     {{kernel_docker}} make TARGET=ezkernelnew -j8
     {{emu_docker}} python3 tools/omega_image.py ezkernelnew.gba image.bin dist/ezkernelnew.bin
-    {{kernel_docker}} tools/elf_to_sym.sh ezkernelnew.elf dist/ezkernelnew.sym
+    {{kernel_docker}} sh -c '/opt/devkitpro/devkitARM/bin/arm-none-eabi-nm -n ezkernelnew.elf > dist/ezkernelnew.nm'
+    {{emu_docker}} python3 tools/nm_to_sym.py dist/ezkernelnew.nm dist/ezkernelnew.sym
 
 # Games given are copied onto the SD card unless a file of that name is
 # already there, so their saves are kept.
@@ -101,6 +102,7 @@ test-roms:
     {{kernel_docker}} make -C tests/roms/hello
     {{kernel_docker}} make -C tests/roms/savetest
     {{kernel_docker}} make -C tests/roms/crash all
+    {{emu_docker}} python3 tools/nm_to_sym.py tests/roms/crash/crash.nm tests/roms/crash/crash.sym
 
 # Create the emulated cart (SD image from emu/sd) if it does not exist
 cart: emu-image
