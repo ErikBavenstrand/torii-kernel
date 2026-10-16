@@ -17,6 +17,9 @@
 //   -u TEXT          stop after the frame in which the kernel logs TEXT
 //   -x FRAME:PATH    after FRAME, write a save state (with the cart's state)
 //   -l PATH          load a save state before the first frame
+//   -L SCRIPT        run a Lua script (mGBA's scripting API: emu, callbacks,
+//                    socket, console); with -L and no -f, run until killed
+//   -t               run at the GBA's real speed instead of as fast as possible
 //
 // If the CPU hits an illegal opcode or jumps to an invalid address, it prints
 // a crash report (registers, and code addresses found on the stack with their
@@ -25,6 +28,10 @@
 #include <mgba/core/core.h>
 #include <mgba/core/log.h>
 #include <mgba/core/serialize.h>
+#ifdef ENABLE_SCRIPTING
+#include <mgba/core/scripting.h>
+#include <mgba/script/context.h>
+#endif
 #include <mgba/internal/arm/arm.h>
 #include <mgba-util/png-io.h>
 #include <mgba-util/vfs.h>
@@ -36,6 +43,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 struct event {
 	unsigned frame;
@@ -151,6 +159,12 @@ static void quiet_log(struct mLogger* logger, int category, enum mLogLevel level
 		note_crash(format, args);
 		return;  // The crash report has it, and it repeats until the frame ends.
 	}
+	if (!strcmp(id, "script")) {  // console:log and friends from -L scripts
+		fputs("script: ", stderr);
+		vfprintf(stderr, format, args);
+		fputc('\n', stderr);
+		return;
+	}
 	if (!strcmp(id, "gba.debug")) {
 		char line[512];
 		vsnprintf(line, sizeof(line), format, args);
@@ -224,6 +238,9 @@ struct options {
 	struct events pokes;
 	struct events states;
 	const char* loadState;
+	const char* scripts[16];
+	size_t nscripts;
+	int realtime;
 	const char* until;
 	unsigned frames;
 	const char* saveOut;
@@ -261,7 +278,7 @@ static void parse_file(struct options* opts, const char* path) {
 
 static void parse_options(struct options* opts, int argc, char** argv) {
 	for (int i = 0; i < argc; ++i) {
-		if (i + 1 >= argc) {
+		if (i + 1 >= argc && strcmp(argv[i], "-t")) {
 			fprintf(stderr, "missing value for %s\n", argv[i]);
 			exit(2);
 		}
@@ -287,6 +304,10 @@ static void parse_options(struct options* opts, int argc, char** argv) {
 			add_event(&opts->pokes, argv[++i]);
 		} else if (!strcmp(argv[i], "-x")) {
 			add_event(&opts->states, argv[++i]);
+		} else if (!strcmp(argv[i], "-t")) {
+			opts->realtime = 1;
+		} else if (!strcmp(argv[i], "-L") && opts->nscripts < 16) {
+			opts->scripts[opts->nscripts++] = argv[++i];
 		} else if (!strcmp(argv[i], "-l")) {
 			opts->loadState = argv[++i];
 		} else if (!strcmp(argv[i], "-u")) {
@@ -410,6 +431,34 @@ int main(int argc, char** argv) {
 	}
 	core->reset(core);
 	crash_core = core;
+#ifdef ENABLE_SCRIPTING
+	static struct mScriptContext scriptContext;
+	static struct mLogger scriptLogger = {.log = quiet_log};
+	if (opts.nscripts) {
+		mScriptContextInit(&scriptContext);
+		mScriptContextAttachStdlib(&scriptContext);
+		mScriptContextAttachSocket(&scriptContext);
+		mScriptContextRegisterEngines(&scriptContext);
+		mScriptContextAttachLogger(&scriptContext, &scriptLogger);
+		mScriptContextAttachCore(&scriptContext, core);
+		struct mScriptEngineContext* lua = HashTableLookup(&scriptContext.engines, "lua");
+		for (size_t i = 0; i < opts.nscripts; ++i) {
+			if (!lua || !mScriptContextLoadFile(&scriptContext, opts.scripts[i]) || !lua->run(lua)) {
+				fprintf(stderr, "cannot run script %s\n", opts.scripts[i]);
+				return 1;
+			}
+		}
+		if (!opts.frames) {
+			frames = frames > 0xFFFFFFF0u ? frames : 0xFFFFFFF0u;
+		}
+		mScriptContextTriggerCallback(&scriptContext, "start");
+	}
+#else
+	if (opts.nscripts) {
+		fprintf(stderr, "built without scripting\n");
+		return 1;
+	}
+#endif
 	if (opts.loadState) {
 		struct VFile* vf = VFileOpen(opts.loadState, O_RDONLY);
 		if (!vf || !mCoreLoadStateNamed(core, vf, SAVESTATE_SAVEDATA | SAVESTATE_RTC)) {
@@ -469,6 +518,26 @@ int main(int argc, char** argv) {
 			}
 		} else {
 			core->runFrame(core);
+		}
+#ifdef ENABLE_SCRIPTING
+		if (opts.nscripts) {
+			mScriptContextTriggerCallback(&scriptContext, "frame");
+		}
+#endif
+		if (opts.realtime) {
+			// 59.7275 frames per second.
+			static struct timespec next;
+			struct timespec now;
+			clock_gettime(CLOCK_MONOTONIC, &now);
+			if (!next.tv_sec) {
+				next = now;
+			}
+			next.tv_nsec += 16742706;
+			if (next.tv_nsec >= 1000000000) {
+				next.tv_nsec -= 1000000000;
+				++next.tv_sec;
+			}
+			clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &next, NULL);
 		}
 		if (crashed) {
 			print_crash(frame);

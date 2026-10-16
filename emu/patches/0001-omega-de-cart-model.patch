@@ -1330,3 +1330,58 @@ index 1079932..63e453e 100644
  		mLOG(GBA_STATE, WARN, "Savestate created using a differently sized version of the ROM");
  		error = true;
  	}
+diff --git a/src/platform/sdl/main.c b/src/platform/sdl/main.c
+index 96a7979..9b57750 100644
+--- a/src/platform/sdl/main.c
++++ b/src/platform/sdl/main.c
+@@ -15,6 +15,7 @@
+ #endif
+ #ifdef ENABLE_SCRIPTING
+ #include <mgba/core/scripting.h>
++#include <mgba/script/context.h>
+ 
+ #ifdef ENABLE_PYTHON
+ #include "platform/python/engine.h"
+@@ -271,6 +272,32 @@ int mSDLRun(struct mSDLRenderer* renderer, struct mArguments* args) {
+ 	renderer->audio.sampleRate = 44100;
+ 	thread.logger.logger = &_logger.d;
+ 
++#ifdef ENABLE_SCRIPTING
++	// Torii: MGBA_SCRIPT=a.lua[:b.lua...] runs Lua scripts, as mGBA's Qt
++	// frontend can, with the core, sockets and the console log available.
++	struct mScriptContext scriptContext;
++	const char* scripts = getenv("MGBA_SCRIPT");
++	bool scripting = scripts && *scripts;
++	if (scripting) {
++		mScriptContextInit(&scriptContext);
++		mScriptContextAttachStdlib(&scriptContext);
++		mScriptContextAttachSocket(&scriptContext);
++		mScriptContextRegisterEngines(&scriptContext);
++		mScriptContextAttachLogger(&scriptContext, &_logger.d);
++		mScriptContextAttachCore(&scriptContext, renderer->core);
++		struct mScriptEngineContext* lua = HashTableLookup(&scriptContext.engines, "lua");
++		char* list = strdup(scripts);
++		for (char* path = strtok(list, ":"); path; path = strtok(NULL, ":")) {
++			// Loading compiles the script; running it executes its top level.
++			if (!lua || !mScriptContextLoadFile(&scriptContext, path) || !lua->run(lua)) {
++				printf("Could not run script %s\n", path);
++			}
++		}
++		free(list);
++		thread.scriptContext = &scriptContext;
++	}
++#endif
++
+ 	bool didFail = !mCoreThreadStart(&thread);
+ 
+ 	if (!didFail) {
+@@ -319,6 +346,9 @@ int mSDLRun(struct mSDLRenderer* renderer, struct mArguments* args) {
+ 
+ #ifdef ENABLE_SCRIPTING
+ 	mScriptBridgeDestroy(bridge);
++	if (scripting) {
++		mScriptContextDeinit(&scriptContext);
++	}
+ #endif
+ 
+ 	return didFail;

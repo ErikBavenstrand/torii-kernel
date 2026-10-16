@@ -13,7 +13,7 @@ the kernel on, and tests.
 - Docker and [just](https://github.com/casey/just). On macOS, start Docker
   with `colima start`.
 - To run the emulator: CMake, pkg-config and SDL2
-  (`brew install cmake pkgconf sdl2`, or `apt install cmake pkg-config libsdl2-dev`).
+  (`brew install cmake pkgconf sdl2 lua@5.4`, or `apt install cmake pkg-config libsdl2-dev liblua5.4-dev libedit-dev`).
 
 ## Use
 
@@ -80,6 +80,19 @@ Save states include the cart: its registers, data port, PSRAM and SRAM (the
 NOR chips and SD card are left as they are, like disks). With `mgba-shot`,
 `-x FRAME:PATH` saves one and `-l PATH` starts from one, so a test can jump
 straight to a point in a game.
+
+To drive the emulator from a script or an AI agent, `just play-remote` (window)
+and `just remote` (headless, at real speed) load `tools/remote.lua`, which
+takes one command per line on `127.0.0.1:8888`: `press A`, `wait 60`,
+`r32 0x02000000`, `screenshot dist/s.png`, `save dist/s.ss` and more (listed
+at the top of the script). For example:
+
+```bash
+printf 'press START\nwait 30\nscreenshot dist/s.png\n' | nc 127.0.0.1 8888
+```
+
+Any mGBA Lua script also runs with `MGBA_SCRIPT=script.lua` in the window or
+`mgba-shot -L script.lua` headlessly.
 
 Not modelled yet: the in-game menu's real-time saves, and firmware updates.
 
