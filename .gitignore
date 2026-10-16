@@ -22,3 +22,7 @@ tests/roms/*/*.gba
 roms/*
 !roms/games.toml
 __pycache__/
+
+# clangd (just compile-commands)
+compile_commands.json
+.cache/

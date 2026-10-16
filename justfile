@@ -33,6 +33,13 @@ play *roms: build emu cart
     if [ $# -gt 0 ]; then {{just_executable()}} cart={{cart}} _cart-copy keep "$@"; fi
     OMEGA_DIR={{cart}} {{mgba}} -{{scale}} dist/ezkernelnew.bin
 
+# Write compile_commands.json for clangd (devkitPro's headers go to dist/devkitpro)
+compile-commands: emu-image
+    mkdir -p dist
+    {{kernel_docker}} sh -c 'make TARGET=ezkernelnew -B -n > dist/make-dry-run.txt 2>/dev/null; cd /opt && cp -r --parents devkitpro/libgba/include devkitpro/devkitARM/arm-none-eabi/include /src/dist/'
+    {{emu_docker}} python3 tools/compile_commands.py dist/make-dry-run.txt "$PWD"
+    rm dist/make-dry-run.txt
+
 # Kernel size against the cart and GBA memory limits, and the largest symbols
 size count="12": build
     {{kernel_docker}} tools/size.sh ezkernelnew.elf ezkernelnew.gba {{count}}
