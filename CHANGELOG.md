@@ -6,6 +6,9 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** the kernel builds on Linux (`c04ca5e`). `draw.c` included
+  `hzk12.h`, but the file is `HZK12.h`; only case-insensitive file systems
+  found it.
 - **Fixed:** booting no longer overwrites settings and cheat memory
   (`b029fad`). `Read_NOR_info` copied twice the NOR game list's size, and
   the EWRAM data was 616 bytes over 256 KB. Both wrapped onto
