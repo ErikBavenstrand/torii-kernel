@@ -1,7 +1,11 @@
-# Omega Remix
+# Torii
 
-Tooling for the EZ-Flash Omega Definitive Edition kernel: a reproducible
-build, an emulated cart to run it on, and tests. Not affiliated with EZ-Flash.
+A custom kernel for the EZ-Flash Omega Definitive Edition, in the making.
+Named after the shrine gate you pass through into another world, like every
+game you launch. Not affiliated with EZ-Flash.
+
+So far this is the groundwork: a reproducible build, an emulated cart to run
+the kernel on, and tests.
 
 The kernel source in this repository is the official 1.06 release,
 unmodified: every file from the official repository is byte-identical to

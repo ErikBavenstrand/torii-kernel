@@ -1,4 +1,4 @@
-# Builds hello.gba with devkitARM (run inside the omega-remix-build container).
+# Builds hello.gba with devkitARM (run inside the devkitARM container, see the justfile).
 PREFIX := /opt/devkitpro/devkitARM/bin/arm-none-eabi-
 CFLAGS := -O2 -mthumb -mthumb-interwork -mcpu=arm7tdmi -Wall
 

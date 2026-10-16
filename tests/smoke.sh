@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Smoke test on the emulated cart: boot the kernel, launch the hello test ROM
 # from SD, power-cycle so the kernel writes the save back to SD, and launch it
-# again to check the save came back. Runs inside the omega-remix-emu container
+# again to check the save came back. Runs inside the torii-emu container
 # after `just build` and `just emu-headless`.
 set -euo pipefail
 

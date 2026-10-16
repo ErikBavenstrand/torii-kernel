@@ -1,4 +1,4 @@
-# Builds one save test ROM per save chip (run inside the omega-remix-build container).
+# Builds one save test ROM per save chip (run inside the devkitARM container, see the justfile).
 PREFIX := /opt/devkitpro/devkitARM/bin/arm-none-eabi-
 CFLAGS := -O2 -mthumb -mthumb-interwork -mcpu=arm7tdmi -Wall
 VARIANTS := flash128 flash64 eeprom8k eeprom512

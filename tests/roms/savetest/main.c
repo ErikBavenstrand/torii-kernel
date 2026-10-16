@@ -1,4 +1,4 @@
-// Omega Remix save test ROM. Built once per save chip (SAVE_FLASH128,
+// Torii save test ROM. Built once per save chip (SAVE_FLASH128,
 // SAVE_FLASH64, SAVE_EEPROM8K, SAVE_EEPROM512): talks to the chip with the
 // real protocol, counts boots in it, and draws one bar per boot.
 //

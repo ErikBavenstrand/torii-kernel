@@ -1,4 +1,4 @@
-// Omega Remix test ROM: proves a game booted from the cart and that SRAM
+// Torii test ROM: proves a game booted from the cart and that SRAM
 // saves persist. Draws one bar per boot (stored in SRAM) on a blue screen.
 #include <stdint.h>
 

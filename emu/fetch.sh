@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fetch mGBA at the pinned release and apply the Omega Remix patches.
+# Fetch mGBA at the pinned release and apply the Torii patches.
 # Re-running is a no-op once emu/mgba exists; delete it to start over.
 set -euo pipefail
 cd "$(dirname "$0")"

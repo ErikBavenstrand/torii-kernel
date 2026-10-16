@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build the patched mGBA library and the mgba-shot runner (headless, Linux).
-# Runs inside the omega-remix-emu container from the repository root.
+# Runs inside the torii-emu container from the repository root.
 set -euo pipefail
 
 cmake -Wno-author -Wno-deprecated -S emu/mgba -B emu/build-linux -DCMAKE_BUILD_TYPE=Release \

@@ -1,10 +1,10 @@
 diff --git a/include/mgba/internal/gba/cart/omega.h b/include/mgba/internal/gba/cart/omega.h
 new file mode 100644
-index 0000000..24aeef6
+index 0000000..6f0d57d
 --- /dev/null
 +++ b/include/mgba/internal/gba/cart/omega.h
 @@ -0,0 +1,109 @@
-+/* Copyright (c) 2026 Omega Remix contributors
++/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
 + * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -147,11 +147,11 @@ index 4bf354f..fd3e023 100644
  	cheats/codebreaker.c
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..41a9239
+index 0000000..a76be86
 --- /dev/null
 +++ b/src/gba/cart/omega.c
 @@ -0,0 +1,687 @@
-+/* Copyright (c) 2026 Omega Remix contributors
++/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
 + * License, v. 2.0. If a copy of the MPL was not distributed with this

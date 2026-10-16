@@ -1,4 +1,4 @@
-# Omega Remix build commands. Needs Docker and just; `play` and `dev` also need
+# Torii build commands. Needs Docker and just; `play` and `dev` also need
 # CMake, pkg-config and SDL2 to build the patched mGBA natively.
 #
 # The kernel source is the official 1.06 release, unmodified. It is built with
@@ -6,7 +6,7 @@
 # compiles it without changes, pinned by digest. It runs under amd64 emulation.
 
 kernel_image := "devkitpro/devkitarm@sha256:1acab59884288115af0e70782a9b69017a8cc6bad69542b24e8652233f215c56"
-emu_image := "omega-remix-emu"
+emu_image := "torii-emu"
 kernel_docker := "docker run --rm --platform linux/amd64 -u $(id -u):$(id -g) -v \"$PWD\":/src -w /src -e LIBGBA=/opt/devkitpro/libgba " + kernel_image
 emu_docker := "docker run --rm -u $(id -u):$(id -g) -v \"$PWD\":/src " + emu_image
 mgba := "emu/build-native/sdl/mgba"

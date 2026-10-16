@@ -2,7 +2,7 @@
 # Save chip test on the emulated cart: for each save type, launch the matching
 # save test ROM with that type picked in the kernel menu, power-cycle so the
 # kernel writes the save to SD, and launch again to check the save came back.
-# Runs inside the omega-remix-emu container after `just build`,
+# Runs inside the torii-emu container after `just build`,
 # `just emu-headless` and building tests/roms/savetest.
 set -euo pipefail
 
