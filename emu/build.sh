@@ -8,7 +8,7 @@ cmake -Wno-author -Wno-deprecated -S emu/mgba -B emu/build-linux -DCMAKE_BUILD_T
   -DUSE_FFMPEG=OFF -DUSE_LIBZIP=OFF -DUSE_MINIZIP=OFF -DUSE_SQLITE3=OFF \
   -DUSE_ELF=OFF -DUSE_LUA=OFF -DUSE_EPOXY=OFF -DBUILD_GL=OFF -DBUILD_GLES2=OFF \
   -DBUILD_GLES3=OFF -DUSE_DISCORD_RPC=OFF -DUSE_EDITLINE=OFF -DUSE_LZMA=OFF \
-  -DUSE_DEBUGGERS=OFF -DUSE_GDB_STUB=OFF -DBUILD_PERF=OFF -DBUILD_TEST=OFF \
+  -DUSE_DEBUGGERS=ON -DUSE_GDB_STUB=ON -DBUILD_PERF=OFF -DBUILD_TEST=OFF \
   -DBUILD_SUITE=OFF -DBUILD_EXAMPLE=OFF >/dev/null
 cmake --build emu/build-linux -j"$(nproc)" -- --no-print-directory | grep -E 'error|warning' || true
 gcc -O2 -Wall -DUSE_PNG -Iemu/mgba/include -Iemu/build-linux/include \

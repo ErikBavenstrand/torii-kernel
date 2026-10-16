@@ -7,10 +7,16 @@
 //   -S PATH          write the emulated save chip's contents when done
 //   -i FILE          read more options from FILE, whitespace-separated
 //                    (# starts a comment), for long input scripts
+//   -g PORT          wait for gdb on PORT (all addresses) before running
+#include <mgba/flags.h>
 #include <mgba/core/core.h>
 #include <mgba/core/log.h>
 #include <mgba-util/png-io.h>
 #include <mgba-util/vfs.h>
+#ifdef USE_GDB_STUB
+#include <mgba/debugger/debugger.h>
+#include <mgba/internal/debugger/gdb-stub.h>
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -93,6 +99,7 @@ struct options {
 	struct events shots;
 	unsigned frames;
 	const char* saveOut;
+	unsigned gdbPort;
 };
 
 static void parse_options(struct options* opts, int argc, char** argv);
@@ -137,6 +144,8 @@ static void parse_options(struct options* opts, int argc, char** argv) {
 			opts->saveOut = argv[++i];
 		} else if (!strcmp(argv[i], "-s")) {
 			add_event(&opts->shots, argv[++i]);
+		} else if (!strcmp(argv[i], "-g")) {
+			opts->gdbPort = (unsigned) strtoul(argv[++i], NULL, 10);
 		} else if (!strcmp(argv[i], "-i")) {
 			parse_file(opts, argv[++i]);
 		} else {
@@ -161,7 +170,7 @@ static int save_png(const char* path, const color_t* pixels, unsigned width, uns
 
 int main(int argc, char** argv) {
 	if (argc < 2) {
-		fprintf(stderr, "usage: %s ROM [-f FRAMES] [-k FRAME:KEYS]... [-s FRAME:OUT.png]... [-S SAVE] [-i FILE]\n", argv[0]);
+		fprintf(stderr, "usage: %s ROM [-f FRAMES] [-k FRAME:KEYS]... [-s FRAME:OUT.png]... [-S SAVE] [-i FILE] [-g PORT]\n", argv[0]);
 		return 2;
 	}
 	struct options opts = {0};
@@ -197,6 +206,26 @@ int main(int argc, char** argv) {
 	}
 	core->reset(core);
 
+	struct mDebugger* debugger = NULL;
+	if (opts.gdbPort) {
+#ifdef USE_GDB_STUB
+		static struct GDBStub gdb;
+		GDBStubCreate(&gdb);
+		struct Address any = {.version = IPV4, .ipv4 = 0};
+		if (!GDBStubListen(&gdb, opts.gdbPort, &any, GDB_WATCHPOINT_STANDARD_LOGIC)) {
+			fprintf(stderr, "cannot listen for gdb on port %u\n", opts.gdbPort);
+			return 1;
+		}
+		debugger = &gdb.d;
+		mDebuggerAttach(debugger, core);
+		mDebuggerEnter(debugger, DEBUGGER_ENTER_MANUAL, NULL);
+		fprintf(stderr, "waiting for gdb on port %u\n", opts.gdbPort);
+#else
+		fprintf(stderr, "built without the gdb stub\n");
+		return 1;
+#endif
+	}
+
 	int status = 0;
 	for (unsigned frame = 1; frame <= frames; ++frame) {
 		for (size_t i = 0; i < nkeys; ++i) {
@@ -204,7 +233,14 @@ int main(int argc, char** argv) {
 				core->setKeys(core, parse_keys(keys[i].arg));
 			}
 		}
-		core->runFrame(core);
+		if (debugger) {
+			mDebuggerRunFrame(debugger);
+			if (debugger->state == DEBUGGER_SHUTDOWN) {
+				break;
+			}
+		} else {
+			core->runFrame(core);
+		}
 		for (size_t i = 0; i < nshots; ++i) {
 			if (shots[i].frame == frame) {
 				if (save_png(shots[i].arg, buffer, width, height)) {
@@ -231,6 +267,11 @@ int main(int argc, char** argv) {
 		free(save);
 	}
 
+#ifdef USE_GDB_STUB
+	if (debugger) {
+		GDBStubShutdown((struct GDBStub*) debugger);
+	}
+#endif
 	mCoreConfigDeinit(&core->config);
 	core->deinit(core);
 	free(buffer);

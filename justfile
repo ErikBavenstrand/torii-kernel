@@ -23,6 +23,7 @@ build: emu-image
     mkdir -p dist
     {{kernel_docker}} make TARGET=ezkernelnew -j8
     {{emu_docker}} python3 tools/omega_image.py ezkernelnew.gba image.bin dist/ezkernelnew.bin
+    {{kernel_docker}} tools/elf_to_sym.sh ezkernelnew.elf dist/ezkernelnew.sym
 
 # Games given are copied onto the SD card unless a file of that name is
 # already there, so their saves are kept.
@@ -38,9 +39,23 @@ debug *roms: build emu cart
     if [ $# -gt 0 ]; then {{just_executable()}} cart={{cart}} _cart-copy keep "$@"; fi
     OMEGA_DIR={{cart}} {{mgba}} -{{scale}} -g dist/ezkernelnew.bin
 
-# Attach devkitARM's gdb, with the kernel's symbols, to a running `just debug`
-gdb:
-    docker run --rm -it --platform linux/amd64 {{gdb_net}} -u $(id -u):$(id -g) -v "$PWD":/src -w /src {{kernel_image}} /opt/devkitpro/devkitARM/bin/arm-none-eabi-gdb -q -ex 'target remote {{gdb_host}}:2345' ezkernelnew.elf
+# Like play, with mGBA's command-line debugger in this terminal (kernel symbols loaded)
+[positional-arguments]
+debug-cli *roms: build emu cart
+    if [ $# -gt 0 ]; then {{just_executable()}} cart={{cart}} _cart-copy keep "$@"; fi
+    OMEGA_DIR={{cart}} {{mgba}} -{{scale}} -d dist/ezkernelnew.bin
+
+# Headless run that waits for `just gdb`; takes mgba-shot options, e.g. `just debug-shot -f 600`
+debug-shot *args: build emu-headless cart
+    docker rm -f torii-debug >/dev/null 2>&1 || true
+    docker run --rm --name torii-debug -u $(id -u):$(id -g) -v "$PWD":/src -w /src -e OMEGA_DIR={{cart}} -e OMEGA_TRACE {{emu_image}} emu/build-linux/mgba-shot dist/ezkernelnew.bin -g 2345 {{args}}
+
+# Extra arguments go to gdb, e.g. `just gdb -batch -ex 'break main' -ex continue -ex bt`
+# Attach devkitARM's gdb, with the kernel's symbols, to `just debug` or `just debug-shot`
+[positional-arguments]
+gdb *args:
+    if docker ps -q -f name=^torii-debug$ | grep -q .; then net="--network container:torii-debug" host=127.0.0.1; else net="{{gdb_net}}" host={{gdb_host}}; fi; \
+    docker run --rm $([ -t 0 ] && echo -it || echo -i) --platform linux/amd64 $net -u $(id -u):$(id -g) -v "$PWD":/src -w /src {{kernel_image}} /opt/devkitpro/devkitARM/bin/arm-none-eabi-gdb -q -ex "target remote $host:2345" "$@" ezkernelnew.elf
 
 # Rebuild and relaunch the emulated cart whenever source/ changes
 dev: emu cart
@@ -94,7 +109,7 @@ game-add +roms: emu-image
 # Build the patched mGBA natively (SDL frontend) for `play` and `dev`
 emu:
     emu/fetch.sh
-    cmake -Wno-author -Wno-deprecated -S emu/mgba -B emu/build-native -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=Release -DBUILD_QT=OFF -DBUILD_SDL=ON -DSDL_VERSION=2 -DUSE_FFMPEG=OFF -DUSE_LIBZIP=OFF -DUSE_MINIZIP=OFF -DUSE_SQLITE3=OFF -DUSE_ELF=OFF -DUSE_LUA=OFF -DUSE_EPOXY=OFF -DUSE_DISCORD_RPC=OFF -DUSE_EDITLINE=OFF -DUSE_LZMA=OFF -DBUILD_PERF=OFF -DBUILD_TEST=OFF -DBUILD_SUITE=OFF -DBUILD_EXAMPLE=OFF >/dev/null
+    cmake -Wno-author -Wno-deprecated -S emu/mgba -B emu/build-native -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_BUILD_TYPE=Release -DBUILD_QT=OFF -DBUILD_SDL=ON -DSDL_VERSION=2 -DUSE_FFMPEG=OFF -DUSE_LIBZIP=OFF -DUSE_MINIZIP=OFF -DUSE_SQLITE3=OFF -DUSE_ELF=OFF -DUSE_LUA=OFF -DUSE_EPOXY=OFF -DUSE_DISCORD_RPC=OFF -DUSE_EDITLINE=ON -DUSE_LZMA=OFF -DBUILD_PERF=OFF -DBUILD_TEST=OFF -DBUILD_SUITE=OFF -DBUILD_EXAMPLE=OFF >/dev/null
     cmake --build emu/build-native -j8 -- --no-print-directory 2>&1 | grep -E 'error|warning: .*omega' || true
 
 # Build the patched mGBA and the mgba-shot runner headlessly in Docker

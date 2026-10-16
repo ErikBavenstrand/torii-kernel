@@ -55,9 +55,17 @@ switches, clock use) to stderr.
 save (`roms/<name>.sav`) and a key script (`tests/games/<code>.keys`) goes
 through a full save cycle; the others are only launched.
 
-To step through the kernel, run `just debug` (it waits with a black screen)
-and `just gdb` in a second terminal. gdb has the kernel's symbols and
-source, so `break main`, `continue`, `next` and `bt` work as usual.
+To step through the kernel:
+
+- `just debug` opens the window and waits; `just gdb` in a second terminal
+  attaches gdb with the kernel's symbols and source (`break main`,
+  `continue`, `next`, `bt`, `watch`).
+- `just debug-shot -f 600` does the same headlessly, taking `mgba-shot`
+  options (keys, screenshots); `just gdb -batch -ex 'break tlog' -ex
+  continue -ex bt` scripts a session.
+- `just debug-cli` uses mGBA's own debugger in the terminal instead
+  (`break main`, `watch/w ADDR`, `x/4 ADDR`, `trace 20`, `help`). `just
+  build` writes `dist/ezkernelnew.sym`, which mGBA loads for symbol names.
 
 Not modelled yet: the in-game menu's real-time saves, and firmware updates.
 
