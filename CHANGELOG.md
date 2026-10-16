@@ -4,7 +4,7 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.1.0 (2026-10-17)
 
 - **Fixed:** the kernel builds on Linux (`c04ca5e`). `draw.c` included
   `hzk12.h`, but the file is `HZK12.h`; only case-insensitive file systems
