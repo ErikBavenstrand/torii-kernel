@@ -20,8 +20,12 @@ build: emu-image
     {{kernel_docker}} make TARGET=ezkernelnew -j8
     {{emu_docker}} python3 tools/omega_image.py ezkernelnew.gba image.bin dist/ezkernelnew.bin
 
-# Run the kernel on the emulated Omega DE cart (cart files in dist/cart)
-play: build emu cart
+# Games given are copied onto the SD card unless a file of that name is
+# already there, so their saves are kept.
+# Run the kernel on the emulated cart (dist/cart), e.g. `just play ~/roms/game.gba`
+[positional-arguments]
+play *roms: build emu cart
+    if [ $# -gt 0 ]; then {{just_executable()}} cart={{cart}} _cart-copy keep "$@"; fi
     OMEGA_DIR={{cart}} {{mgba}} -{{scale}} dist/ezkernelnew.bin
 
 # Rebuild and relaunch the emulated cart whenever source/ changes
@@ -52,8 +56,16 @@ cart-reset:
     just cart
 
 # Copy files onto the emulated cart's SD card, e.g. `just cart-add ~/roms/game.gba`
+[positional-arguments]
 cart-add +files: cart
-    for f in {{files}}; do cp "$f" dist/.cart-add-tmp && {{emu_docker}} mcopy -o -i {{cart}}/sd.img dist/.cart-add-tmp "::/$(basename "$f")"; done; rm -f dist/.cart-add-tmp
+    {{just_executable()}} cart={{cart}} _cart-copy overwrite "$@"
+
+# Copy files to the SD card's root (mode: overwrite or keep). They are staged
+# in dist/ because the container only sees the repo.
+[positional-arguments]
+_cart-copy mode +files:
+    rm -rf dist/.cart-add && mkdir -p dist/.cart-add && shift && cp "$@" dist/.cart-add/
+    {{emu_docker}} tools/cart_copy.sh {{mode}} {{cart}}/sd.img dist/.cart-add/*; status=$?; rm -rf dist/.cart-add; exit $status
 
 # Build the patched mGBA natively (SDL frontend) for `play` and `dev`
 emu:
