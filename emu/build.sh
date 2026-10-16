@@ -3,7 +3,7 @@
 # Runs inside the omega-remix-emu container from the repository root.
 set -euo pipefail
 
-cmake -S emu/mgba -B emu/build-linux -DCMAKE_BUILD_TYPE=Release \
+cmake -Wno-author -Wno-deprecated -S emu/mgba -B emu/build-linux -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_QT=OFF -DBUILD_SDL=OFF -DBUILD_SHARED=OFF -DBUILD_STATIC=ON \
   -DUSE_FFMPEG=OFF -DUSE_LIBZIP=OFF -DUSE_MINIZIP=OFF -DUSE_SQLITE3=OFF \
   -DUSE_ELF=OFF -DUSE_LUA=OFF -DUSE_EPOXY=OFF -DBUILD_GL=OFF -DBUILD_GLES2=OFF \
