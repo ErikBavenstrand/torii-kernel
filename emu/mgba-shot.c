@@ -23,9 +23,16 @@ struct event {
 
 static const char* KEY_NAMES[] = {"A", "B", "SELECT", "START", "RIGHT", "LEFT", "UP", "DOWN", "R", "L"};
 
+// Prints errors, and every line the kernel logs with tlog (category
+// gba.debug) as "kernel: ..." or "kernel error: ...".
 static void quiet_log(struct mLogger* logger, int category, enum mLogLevel level, const char* format, va_list args) {
 	(void) logger;
-	(void) category;
+	if (!strcmp(mLogCategoryId(category), "gba.debug")) {
+		fputs(level & (mLOG_FATAL | mLOG_ERROR) ? "kernel error: " : "kernel: ", stderr);
+		vfprintf(stderr, format, args);
+		fputc('\n', stderr);
+		return;
+	}
 	if (level & (mLOG_FATAL | mLOG_ERROR)) {
 		vfprintf(stderr, format, args);
 		fputc('\n', stderr);

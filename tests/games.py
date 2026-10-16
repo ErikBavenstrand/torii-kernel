@@ -198,6 +198,10 @@ class Result:
 def launch_problems(trace: str, game: dict, shot: Path) -> dict[str, str]:
     """Problems with a launch, by check; an empty string means it passed."""
     problems = {"boots": "", "save type": "", "clock": ""}
+    errors = [line for line in trace.splitlines() if line.startswith("kernel error: ")]
+    if errors:
+        problems["boots"] = errors[0]
+        return problems
     launches = [line for line in trace.splitlines() if ": launch: " in line]
     if not launches:
         problems["boots"] = "the kernel never launched the game"

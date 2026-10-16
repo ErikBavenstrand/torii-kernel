@@ -9,7 +9,8 @@ kernel_image := "devkitpro/devkitarm@sha256:1acab59884288115af0e70782a9b69017a8c
 emu_image := "torii-emu"
 kernel_docker := "docker run --rm --platform linux/amd64 -u $(id -u):$(id -g) -v \"$PWD\":/src -w /src -e LIBGBA=/opt/devkitpro/libgba " + kernel_image
 emu_docker := "docker run --rm -u $(id -u):$(id -g) -v \"$PWD\":/src " + emu_image
-mgba := "emu/build-native/sdl/mgba"
+# The SDL emulator, printing the kernel's tlog lines ("GBA Debug: ...")
+mgba := "emu/build-native/sdl/mgba -C logLevel.gba.debug=31"
 # Emulator window size as a multiple of 240x160, e.g. `just scale=3 play`
 scale := "4"
 cart := "dist/cart"

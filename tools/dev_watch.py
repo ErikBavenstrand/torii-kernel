@@ -24,7 +24,9 @@ def launch() -> subprocess.Popen:
     mgba = ROOT / "emu" / "build-native" / "sdl" / "mgba"
     rom = ROOT / "dist" / "ezkernelnew.bin"
     scale = os.environ.get("OMEGA_SCALE", "4")
-    return subprocess.Popen([str(mgba), f"-{scale}", str(rom)], env=env)
+    return subprocess.Popen(
+        [str(mgba), "-C", "logLevel.gba.debug=31", f"-{scale}", str(rom)], env=env
+    )
 
 
 def snapshot() -> dict:

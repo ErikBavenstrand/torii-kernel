@@ -43,6 +43,10 @@ card, NOR and SRAM live in `dist/cart/` and persist between runs.
 Keys: arrows, X = A, Z = B, A = L, S = R, Enter = Start, Backspace = Select.
 The window opens at 4×; `just scale=3 play` changes it.
 
+Kernel code can log with `tlog("...")` (`source/tlog.h`), which writes to
+mGBA's debug console: the lines show in the terminal under `just play` and as
+`kernel: ...` from the headless runner.
+
 Run with `OMEGA_TRACE=1` to log what the kernel and games do with the cart
 (register writes, launches with their save type, SD reads and writes, mode
 switches, clock use) to stderr.

@@ -17,6 +17,7 @@
 #include "Ezcard_OP.h"
 #include "saveMODE.h"
 #include "RTC.h"
+#include "tlog.h"
 #include "NORflash_OP.h"
 #include "lang.h"
 #include "GBApatch.h"
@@ -1897,6 +1898,8 @@ void Set_saveMODE(BYTE saveMODE)
 //---------------------------------------------------------------------------------
 int main(void) {
 
+	tlog_init();
+	tlog("Torii kernel boot");
 	irqInit();
 	irqEnable(IRQ_VBLANK);
 
@@ -2831,6 +2834,7 @@ re_show_menu:
 	//check
 	
 	SAVEMODE = Get_saveMODE(Save_num,gamefilesize);			
+	tlog("launch %s: code %.4s, %lu bytes, save mode %02X", pfilename, GAMECODE, (unsigned long)gamefilesize, SAVEMODE);
 	if(MENU_line<2){//work for psram
 		if(gamefilesize > 0x2000000){
 			ShowbootProgress(gl_file_overflow);	

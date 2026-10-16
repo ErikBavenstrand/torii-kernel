@@ -8,6 +8,7 @@ Torii is a custom kernel for the EZ-Flash Omega DE, forked from EZ-Flash's offic
 - `source/ezkernelnew.c`, `source/lang.c`, `source/GBApatch.c` and `source/gba_rts_patch.s` contain GBK-encoded Chinese strings.
   Edit them as bytes, decoding and encoding with `gbk`; a UTF-8 round trip corrupts the strings.
 - Language strings live in `source/lang.c` as `en_*` and `zh_*` pairs, wired up in `LoadEnglish` and `LoadChinese`. Add both.
+- Log from kernel code with `tlog()` and `TLOG_ASSERT()` from `source/tlog.h`. Lines print as `kernel: ...` from `mgba-shot` and as `GBA Debug: ...` from `just play`; on real hardware they cost nothing. A failed assert fails `just compat`.
 - Build only with `just build`. It pins devkitARM r54 because newer GCC rejects the unmodified source.
 - After changing toolchains or seeing odd link sizes, run `just clean`; stale objects in `build/` get reused.
 
