@@ -25,7 +25,7 @@ the kernel on, and tests.
 | `just test` | checks games boot and every save type survives power cycles |
 | `just cart-add game.gba` | copies a file onto the emulated SD card |
 | `just game-add game.gba` | copies a game you own into the git-ignored `roms/` and lists it in `roms/games.toml` |
-| `just compat` | plays each listed game through the kernel and checks it boots, gets the right save type and clock, and keeps its saves |
+| `just compat` | plays each listed game through the kernel and checks it boots, gets the right save type and clock, and keeps its saves; prints a table and writes `dist/compat/index.html` with screenshots |
 
 `just --list` shows the rest.
 
