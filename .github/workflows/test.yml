@@ -1,0 +1,28 @@
+# Builds the kernel and runs the homebrew tests on the emulated cart. Games you
+# own (just compat) stay local: their ROMs are never in the repository.
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v2
+      - name: Build and test
+        run: just test
+      - name: Size
+        # The official 1.06 source already overflows EWRAM by 616 bytes, so
+        # this reports without failing the run until that is fixed.
+        continue-on-error: true
+        run: just size
+      - name: Keep screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shots
+          path: dist/shots
+          if-no-files-found: ignore
