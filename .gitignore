@@ -1,0 +1,19 @@
+# Build outputs
+build/
+build-sim/
+dist/
+*.elf
+ezkernelnew.gba
+ezkernelsim.gba
+
+# FPGA bitstreams extracted from image.bin for research (reproducible, not ours)
+bitstreams/
+
+# Patched mGBA checkout and builds (recreate with `just emu` / `just emu-headless`)
+emu/mgba/
+emu/build-linux/
+emu/build-native/
+
+# Test ROM build outputs
+tests/roms/*/*.elf
+tests/roms/*/*.gba

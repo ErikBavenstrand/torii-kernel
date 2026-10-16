@@ -1,0 +1,1011 @@
+diff --git a/include/mgba/internal/gba/cart/omega.h b/include/mgba/internal/gba/cart/omega.h
+new file mode 100644
+index 0000000..24aeef6
+--- /dev/null
++++ b/include/mgba/internal/gba/cart/omega.h
+@@ -0,0 +1,109 @@
++/* Copyright (c) 2026 Omega Remix contributors
++ *
++ * This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++#ifndef GBA_CART_OMEGA_H
++#define GBA_CART_OMEGA_H
++
++#include <mgba-util/common.h>
++
++CXX_GUARD_START
++
++#include <mgba/core/log.h>
++
++mLOG_DECLARE_CATEGORY(GBA_OMEGA);
++
++// Model of the EZ-Flash Omega Definitive Edition cart, as driven by its
++// open-source kernel: register unlock, kernel/game NOR, PSRAM, SD card,
++// FPGA ROM loading and banked SRAM. Enabled with the "omega.dir" config
++// value (or OMEGA_DIR), a folder holding the cart's backing files.
++
++#define OMEGA_KERNEL_NOR_SIZE 0x00800000
++#define OMEGA_GAME_NOR_SIZE 0x04000000
++#define OMEGA_PSRAM_SIZE 0x02000000
++#define OMEGA_SRAM_SIZE 0x00080000
++#define OMEGA_PORT_SIZE 0x1000
++
++enum GBAOmegaNorState {
++	OMEGA_NOR_READ = 0,
++	OMEGA_NOR_UNLOCK1,
++	OMEGA_NOR_UNLOCK2,
++	OMEGA_NOR_ERASE_UNLOCK0,
++	OMEGA_NOR_ERASE_UNLOCK1,
++	OMEGA_NOR_ERASE_UNLOCK2,
++	OMEGA_NOR_PROGRAM,
++	OMEGA_NOR_AUTOSELECT,
++	OMEGA_NOR_BUFFER_COUNT,
++	OMEGA_NOR_BUFFER_DATA,
++};
++
++struct GBAOmegaNor {
++	uint8_t* data;
++	size_t size;
++	uint16_t id;
++	enum GBAOmegaNorState state;
++	uint32_t bufferBase;
++	int bufferRemaining;
++	struct VFile* vf;
++};
++
++struct GBA;
++struct VFile;
++
++struct GBAOmega {
++	bool enabled;
++
++	struct GBAOmegaNor kernelNor;
++	struct GBAOmegaNor gameNor;
++	uint8_t* psram;
++	uint8_t* sram;
++	struct VFile* sramVf;
++	struct VFile* sd;
++
++	int unlockStep;
++	bool unlocked;
++	uint16_t sdControl;
++	uint16_t bufferControl;
++	uint16_t spiControl;
++	uint16_t spiWrite;
++	uint16_t rtcStatus;
++	uint16_t ledControl;
++	uint16_t rom64Flag;
++	uint16_t psramPage;
++	uint16_t romPage;
++	uint16_t ramPage;
++	uint32_t sdLba;
++	int flashCmdStep;
++
++	// Save type and size the kernel sent for the next game (FAT table
++	// parameter word 0x1FC: type << 24 | size).
++	uint8_t saveMode;
++	uint32_t saveSize;
++	uint32_t gameSize;
++	// True while a game runs with mGBA's savedata emulating its save chip;
++	// its contents go back into the cart SRAM at power-off.
++	bool gameSaveActive;
++	// GPIO pins (RTC) overlaid on ROM 0xC4-0xC9, kept apart from the ROM data.
++	uint16_t gpio[4];
++
++	uint8_t port[OMEGA_PORT_SIZE];
++
++	uint32_t* originalRom;
++	size_t originalRomSize;
++	uint32_t originalRomMask;
++};
++
++void GBAOmegaInit(struct GBAOmega*);
++bool GBAOmegaEnable(struct GBA*, const char* dir);
++void GBAOmegaDisable(struct GBA*);
++
++uint16_t GBAOmegaRead16(struct GBA*, uint32_t address);
++void GBAOmegaWrite16(struct GBA*, uint32_t address, uint16_t value);
++bool GBAOmegaOwnsSRAM(const struct GBA*);
++uint8_t GBAOmegaReadSRAM(struct GBA*, uint32_t address);
++void GBAOmegaWriteSRAM(struct GBA*, uint32_t address, uint8_t value);
++
++CXX_GUARD_END
++
++#endif
+diff --git a/include/mgba/internal/gba/memory.h b/include/mgba/internal/gba/memory.h
+index a11c7e1..28ea10b 100644
+--- a/include/mgba/internal/gba/memory.h
++++ b/include/mgba/internal/gba/memory.h
+@@ -18,6 +18,7 @@ CXX_GUARD_START
+ #include <mgba/internal/gba/cart/ereader.h>
+ #include <mgba/internal/gba/cart/gpio.h>
+ #include <mgba/internal/gba/cart/matrix.h>
++#include <mgba/internal/gba/cart/omega.h>
+ #include <mgba/internal/gba/cart/vfame.h>
+ 
+ enum GBAMemoryRegion {
+@@ -110,6 +111,7 @@ struct GBAMemory {
+ 	struct GBASavedata savedata;
+ 	struct GBAVFameCart vfame;
+ 	struct GBAMatrix matrix;
++	struct GBAOmega omega;
+ 	struct GBACartEReader ereader;
+ 	size_t romSize;
+ 	uint32_t romMask;
+diff --git a/src/gba/CMakeLists.txt b/src/gba/CMakeLists.txt
+index 4bf354f..fd3e023 100644
+--- a/src/gba/CMakeLists.txt
++++ b/src/gba/CMakeLists.txt
+@@ -6,6 +6,7 @@ set(SOURCE_FILES
+ 	cart/ereader.c
+ 	cart/gpio.c
+ 	cart/matrix.c
++	cart/omega.c
+ 	cart/vfame.c
+ 	cheats.c
+ 	cheats/codebreaker.c
+diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
+new file mode 100644
+index 0000000..41a9239
+--- /dev/null
++++ b/src/gba/cart/omega.c
+@@ -0,0 +1,687 @@
++/* Copyright (c) 2026 Omega Remix contributors
++ *
++ * This Source Code Form is subject to the terms of the Mozilla Public
++ * License, v. 2.0. If a copy of the MPL was not distributed with this
++ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
++#include <mgba/internal/gba/cart/omega.h>
++
++#include <mgba/internal/arm/arm.h>
++#include <mgba/internal/gba/gba.h>
++#include <mgba/internal/gba/memory.h>
++#include <mgba/internal/gba/savedata.h>
++#include <mgba-util/memory.h>
++#include <mgba-util/vfs.h>
++
++mLOG_DEFINE_CATEGORY(GBA_OMEGA, "GBA Omega DE", "gba.omega");
++
++// Offsets within the 32 MB cart space (address & 0x01FFFFFF).
++#define WINDOW_SIZE 0x00800000
++#define PSRAM_WINDOW 0x00800000
++#define GAME_NOR_WINDOW 0x01000000
++#define PORT_BASE 0x01E00000
++#define PORT_END (PORT_BASE + 0x20000)
++
++#define REG_UNLOCK 0x01FE0000
++#define REG_LOCK 0x01FC0000
++#define REG_SD_CONTROL 0x01400000
++#define REG_BUFFER_CONTROL 0x01420000
++#define REG_SD_LBA_LO 0x01600000
++#define REG_SD_LBA_HI 0x01620000
++#define REG_SD_COUNT 0x01640000
++#define REG_SPI_CONTROL 0x01660000
++#define REG_SPI_WRITE 0x01680000
++#define REG_RTC 0x016A0000
++#define REG_AUTOSAVE 0x016C0000
++#define REG_LED 0x016E0000
++#define REG_ROM64 0x01700000
++#define REG_PSRAM_PAGE 0x01860000
++#define REG_ROM_PAGE 0x01880000
++#define REG_RAM_PAGE 0x01C00000
++
++#define ROM_PAGE_KERNEL 0x8000
++#define ROM_PAGE_PSRAM 0x200
++#define ROM_PAGE_BOOT 0x8002
++// Save info, NOR game index and settings start here in the kernel NOR.
++#define OMEGA_KERNEL_SETTINGS 0x790000
++
++#define SECTOR_SIZE 512
++#define FAT_SIZE_INDEX (0x1F0 / 4)
++#define FAT_PARAM_INDEX (0x1F4 / 4)
++#define FAT_SAVE_INDEX (0x1FC / 4)
++#define FAT_SET_PARAMETER_MODE 2
++#define GPIO_FIRST 0xC4
++#define GPIO_LAST 0xC9
++// Rev.B cart (Spartan-6 LX16) on firmware 7, matching the shipped kernel.
++#define FPGA_VERSION 0xB007
++
++static bool _isKernelMode(const struct GBAOmega* omega) {
++	return omega->romPage & ROM_PAGE_KERNEL;
++}
++
++static uint16_t _openBus(uint32_t address) {
++	return (address >> 1) & 0xFFFF;
++}
++
++static uint16_t _read16(const uint8_t* data, size_t size, uint32_t offset) {
++	offset &= ~1;
++	if (offset + 2 > size) {
++		return 0xFFFF;
++	}
++	return data[offset] | (data[offset + 1] << 8);
++}
++
++// --- Backing files ---------------------------------------------------------
++
++static uint8_t* _mapFile(struct VFile** vfOut, const char* dir, const char* name, size_t size, uint8_t fill) {
++	char path[PATH_MAX];
++	snprintf(path, sizeof(path), "%s" PATH_SEP "%s", dir, name);
++	struct VFile* vf = VFileOpen(path, O_RDWR | O_CREAT);
++	if (!vf) {
++		mLOG(GBA_OMEGA, ERROR, "Cannot open %s", path);
++		return NULL;
++	}
++	ssize_t oldSize = vf->size(vf);
++	if (oldSize < (ssize_t) size) {
++		vf->truncate(vf, size);
++	}
++	uint8_t* data = vf->map(vf, size, MAP_WRITE);
++	if (!data) {
++		mLOG(GBA_OMEGA, ERROR, "Cannot map %s", path);
++		vf->close(vf);
++		return NULL;
++	}
++	if (oldSize < (ssize_t) size) {
++		memset(&data[oldSize > 0 ? oldSize : 0], fill, size - (oldSize > 0 ? oldSize : 0));
++	}
++	*vfOut = vf;
++	return data;
++}
++
++static void _unmapFile(struct VFile** vf, uint8_t** data, size_t size) {
++	if (*vf) {
++		if (*data) {
++			(*vf)->sync(*vf, *data, size);
++			(*vf)->unmap(*vf, *data, size);
++		}
++		(*vf)->close(*vf);
++	}
++	*vf = NULL;
++	*data = NULL;
++}
++
++// --- NOR flash (AMD/Spansion command set) ----------------------------------
++
++static void _norProgram(struct GBAOmegaNor* nor, uint32_t offset, uint16_t value) {
++	offset &= ~1;
++	if (offset + 2 > nor->size) {
++		return;
++	}
++	// Programming can only clear bits.
++	nor->data[offset] &= value;
++	nor->data[offset + 1] &= value >> 8;
++}
++
++static uint32_t _norSectorSize(const struct GBAOmegaNor* nor, uint32_t offset) {
++	if (nor->size == OMEGA_GAME_NOR_SIZE) {
++		// 128 KB sectors, with 32 KB boot sectors in the first and last 128 KB.
++		if (offset < 0x20000 || offset >= nor->size - 0x20000) {
++			return 0x8000;
++		}
++		return 0x20000;
++	}
++	return 0x10000;
++}
++
++static void _norErase(struct GBAOmegaNor* nor, uint32_t offset) {
++	uint32_t sector = _norSectorSize(nor, offset);
++	offset &= ~(sector - 1);
++	if (offset < nor->size) {
++		memset(&nor->data[offset], 0xFF, sector);
++	}
++}
++
++static uint16_t _norRead(const struct GBAOmegaNor* nor, uint32_t offset) {
++	if (nor->state == OMEGA_NOR_AUTOSELECT) {
++		switch ((offset >> 1) & 0xFF) {
++		case 0x00:
++			return 0x0001;
++		case 0x01:
++			return 0x227E;
++		case 0x0E:
++			return nor->id;
++		case 0x0F:
++			return 0x2201;
++		default:
++			return 0x0000;
++		}
++	}
++	return _read16(nor->data, nor->size, offset);
++}
++
++static void _norWrite(struct GBAOmegaNor* nor, uint32_t offset, uint16_t value) {
++	uint32_t command = offset & 0xFFF;
++	uint8_t byte = value;
++	switch (nor->state) {
++	case OMEGA_NOR_READ:
++	case OMEGA_NOR_AUTOSELECT:
++		if (byte == 0xF0) {
++			nor->state = OMEGA_NOR_READ;
++		} else if (command == 0xAAA && byte == 0xAA) {
++			nor->state = OMEGA_NOR_UNLOCK1;
++		}
++		break;
++	case OMEGA_NOR_UNLOCK1:
++		nor->state = (command == 0x554 && byte == 0x55) ? OMEGA_NOR_UNLOCK2 : OMEGA_NOR_READ;
++		break;
++	case OMEGA_NOR_UNLOCK2:
++		if (byte == 0x25) {
++			nor->bufferBase = offset;
++			nor->state = OMEGA_NOR_BUFFER_COUNT;
++			break;
++		}
++		nor->state = OMEGA_NOR_READ;
++		if (command != 0xAAA) {
++			break;
++		}
++		switch (byte) {
++		case 0xA0:
++			nor->state = OMEGA_NOR_PROGRAM;
++			break;
++		case 0x90:
++			nor->state = OMEGA_NOR_AUTOSELECT;
++			break;
++		case 0x80:
++			nor->state = OMEGA_NOR_ERASE_UNLOCK0;
++			break;
++		}
++		break;
++	case OMEGA_NOR_ERASE_UNLOCK0:
++		nor->state = (command == 0xAAA && byte == 0xAA) ? OMEGA_NOR_ERASE_UNLOCK1 : OMEGA_NOR_READ;
++		break;
++	case OMEGA_NOR_ERASE_UNLOCK1:
++		nor->state = (command == 0x554 && byte == 0x55) ? OMEGA_NOR_ERASE_UNLOCK2 : OMEGA_NOR_READ;
++		break;
++	case OMEGA_NOR_ERASE_UNLOCK2:
++		if (byte == 0x30) {
++			_norErase(nor, offset);
++		} else if (byte == 0x10) {
++			memset(nor->data, 0xFF, nor->size);
++		}
++		nor->state = OMEGA_NOR_READ;
++		break;
++	case OMEGA_NOR_PROGRAM:
++		_norProgram(nor, offset, value);
++		nor->state = OMEGA_NOR_READ;
++		break;
++	case OMEGA_NOR_BUFFER_COUNT:
++		nor->bufferRemaining = (value & 0xFF) + 1;
++		nor->state = OMEGA_NOR_BUFFER_DATA;
++		break;
++	case OMEGA_NOR_BUFFER_DATA:
++		if (nor->bufferRemaining > 0) {
++			_norProgram(nor, offset, value);
++			--nor->bufferRemaining;
++		} else {
++			// 0x29 confirms the buffer; programming already happened.
++			nor->state = OMEGA_NOR_READ;
++		}
++		break;
++	}
++}
++
++// --- SD card and FPGA data port --------------------------------------------
++
++static void _sdTransfer(struct GBAOmega* omega, uint16_t count) {
++	bool write = count & 0x8000;
++	unsigned sectors = count & 0xFF;
++	if (sectors * SECTOR_SIZE > OMEGA_PORT_SIZE) {
++		sectors = OMEGA_PORT_SIZE / SECTOR_SIZE;
++	}
++	if (!omega->sd) {
++		if (!write) {
++			memset(omega->port, 0, sectors * SECTOR_SIZE);
++		}
++		return;
++	}
++	omega->sd->seek(omega->sd, (off_t) omega->sdLba * SECTOR_SIZE, SEEK_SET);
++	if (write) {
++		omega->sd->write(omega->sd, omega->port, sectors * SECTOR_SIZE);
++	} else {
++		ssize_t got = omega->sd->read(omega->sd, omega->port, sectors * SECTOR_SIZE);
++		if (got < (ssize_t) (sectors * SECTOR_SIZE)) {
++			memset(&omega->port[got > 0 ? got : 0], 0, sectors * SECTOR_SIZE - (got > 0 ? got : 0));
++		}
++	}
++}
++
++static uint32_t _portWord(const struct GBAOmega* omega, unsigned index) {
++	const uint8_t* p = &omega->port[index * 4];
++	return p[0] | (p[1] << 8) | (p[2] << 16) | ((uint32_t) p[3] << 24);
++}
++
++// The kernel sends the game's cluster runs as [sector offset, start sector]
++// pairs ending with 0xFFFFFFFF, and the FPGA copies the file into PSRAM.
++static void _loadRomFromFatTable(struct GBAOmega* omega) {
++	if (!omega->sd) {
++		return;
++	}
++	unsigned i;
++	for (i = 0; i + 1 < FAT_PARAM_INDEX; i += 2) {
++		uint32_t fileSector = _portWord(omega, i);
++		uint32_t sdSector = _portWord(omega, i + 1);
++		if (fileSector == 0xFFFFFFFF) {
++			break;
++		}
++		uint32_t nextFileSector = _portWord(omega, i + 2);
++		uint64_t start = (uint64_t) fileSector * SECTOR_SIZE;
++		uint64_t end = nextFileSector == 0xFFFFFFFF ? OMEGA_PSRAM_SIZE : (uint64_t) nextFileSector * SECTOR_SIZE;
++		if (start >= OMEGA_PSRAM_SIZE) {
++			break;
++		}
++		if (end > OMEGA_PSRAM_SIZE) {
++			end = OMEGA_PSRAM_SIZE;
++		}
++		omega->sd->seek(omega->sd, (off_t) sdSector * SECTOR_SIZE, SEEK_SET);
++		omega->sd->read(omega->sd, &omega->psram[start], end - start);
++	}
++	mLOG(GBA_OMEGA, INFO, "Loaded ROM into PSRAM from %u cluster runs", i / 2);
++}
++
++static uint16_t _portRead(struct GBAOmega* omega, uint32_t offset) {
++	if (omega->spiControl) {
++		return FPGA_VERSION;
++	}
++	if (omega->spiWrite) {
++		return 0;  // Firmware page written
++	}
++	if (omega->bufferControl == 3 || omega->sdControl == 3) {
++		return 2;  // Operation finished
++	}
++	return _read16(omega->port, OMEGA_PORT_SIZE, offset);
++}
++
++static bool _portActive(const struct GBAOmega* omega) {
++	return _isKernelMode(omega) || omega->sdControl || omega->bufferControl || omega->spiControl || omega->spiWrite;
++}
++
++// --- Game saves and RTC ----------------------------------------------------
++
++// Save chip the FPGA emulates for a kernel save mode (Get_saveMODE).
++static enum SavedataType _saveType(uint8_t mode, uint32_t size) {
++	switch (mode) {
++	case 0x11:
++		return size > SIZE_CART_SRAM ? SAVEDATA_SRAM512 : SAVEDATA_SRAM;
++	case 0x21:
++		return SAVEDATA_EEPROM512;
++	case 0x22:
++	case 0x23:
++		return SAVEDATA_EEPROM;
++	case 0x31:
++		return SAVEDATA_FLASH1M;
++	case 0x32:
++	case 0x33:
++		return SAVEDATA_FLASH512;
++	default:
++		return SAVEDATA_FORCE_NONE;
++	}
++}
++
++// Entering game mode: let mGBA's save chip emulation serve the game, seeded
++// with the save the kernel loaded into the cart SRAM.
++static void _startGameSave(struct GBA* gba) {
++	struct GBAOmega* omega = &gba->memory.omega;
++	enum SavedataType type = _saveType(omega->saveMode, omega->saveSize);
++	if (type == SAVEDATA_FORCE_NONE) {
++		return;
++	}
++	struct GBASavedata* savedata = &gba->memory.savedata;
++	GBASavedataForceType(savedata, type);
++	size_t size = GBASavedataSize(savedata);
++	if (size > OMEGA_SRAM_SIZE) {
++		size = OMEGA_SRAM_SIZE;
++	}
++	if (savedata->data && size) {
++		memcpy(savedata->data, omega->sram, size);
++	}
++	omega->gameSaveActive = true;
++	mLOG(GBA_OMEGA, INFO, "Game save: mode %02X, %zu bytes", omega->saveMode, size);
++}
++
++// Power-off: the save chip's contents are what the cart SRAM holds.
++static void _stopGameSave(struct GBA* gba) {
++	struct GBAOmega* omega = &gba->memory.omega;
++	if (!omega->gameSaveActive) {
++		return;
++	}
++	struct GBASavedata* savedata = &gba->memory.savedata;
++	size_t size = GBASavedataSize(savedata);
++	if (size > OMEGA_SRAM_SIZE) {
++		size = OMEGA_SRAM_SIZE;
++	}
++	if (savedata->data && size && omega->sram) {
++		memcpy(omega->sram, savedata->data, size);
++	}
++	omega->gameSaveActive = false;
++}
++
++static bool _rtcActive(const struct GBAOmega* omega) {
++	return _isKernelMode(omega) || omega->rtcStatus;
++}
++
++static bool _isGpio(uint32_t address) {
++	uint32_t offset = address & 0x01FFFFFF;
++	return (address >> 24) == 0x08 && offset >= GPIO_FIRST && offset <= GPIO_LAST;
++}
++
++static bool _isEeprom(const struct GBA* gba, uint32_t address) {
++	const struct GBAOmega* omega = &gba->memory.omega;
++	enum SavedataType type = gba->memory.savedata.type;
++	if (!omega->gameSaveActive || (type != SAVEDATA_EEPROM && type != SAVEDATA_EEPROM512)) {
++		return false;
++	}
++	if ((address >> 24) != 0x0D) {
++		return false;
++	}
++	// Games over 16 MB (save mode 0x23) keep ROM in 0x0D000000 and only map
++	// EEPROM at the top.
++	bool large = omega->saveMode == 0x23 || omega->gameSize > 0x01000000;
++	return !large || (address & 0x00FFFFFF) >= 0x00FFFF00;
++}
++
++// --- Mapping ---------------------------------------------------------------
++
++static void _remap(struct GBA* gba) {
++	struct GBAOmega* omega = &gba->memory.omega;
++	struct GBAMemory* memory = &gba->memory;
++	if (_isKernelMode(omega)) {
++		memory->rom = (uint32_t*) omega->kernelNor.data;
++		memory->romSize = OMEGA_KERNEL_NOR_SIZE;
++		memory->romMask = OMEGA_KERNEL_NOR_SIZE - 1;
++	} else if ((omega->romPage & 0x3FF) >= ROM_PAGE_PSRAM) {
++		memory->rom = (uint32_t*) omega->psram;
++		memory->romSize = OMEGA_PSRAM_SIZE;
++		memory->romMask = OMEGA_PSRAM_SIZE - 1;
++	} else {
++		uint32_t offset = (omega->romPage & 0x1FF) << 17;
++		memory->rom = (uint32_t*) &omega->gameNor.data[offset];
++		memory->romSize = OMEGA_GAME_NOR_SIZE - offset;
++		if (memory->romSize > OMEGA_PSRAM_SIZE) {
++			memory->romSize = OMEGA_PSRAM_SIZE;
++		}
++		memory->romMask = OMEGA_PSRAM_SIZE - 1;
++	}
++	if (!_isKernelMode(omega) && !omega->gameSaveActive) {
++		_startGameSave(gba);
++	}
++	// Refresh instruction fetch in case the CPU is running from the cart.
++	memory->activeRegion = -1;
++	gba->cpu->memory.setActiveRegion(gba->cpu, gba->cpu->gprs[ARM_PC]);
++	mLOG(GBA_OMEGA, DEBUG, "ROM page %04X", omega->romPage);
++}
++
++// --- Registers -------------------------------------------------------------
++
++static bool _writeRegister(struct GBA* gba, uint32_t offset, uint16_t value) {
++	struct GBAOmega* omega = &gba->memory.omega;
++	switch (offset) {
++	case REG_SD_CONTROL:
++		omega->sdControl = value;
++		break;
++	case REG_BUFFER_CONTROL:
++		omega->bufferControl = value;
++		if (value == 3) {
++			uint32_t save = _portWord(omega, FAT_SAVE_INDEX);
++			omega->saveMode = save >> 24;
++			omega->saveSize = save & 0x00FFFFFF;
++			omega->gameSize = _portWord(omega, FAT_SIZE_INDEX);
++			if (_portWord(omega, FAT_PARAM_INDEX) != FAT_SET_PARAMETER_MODE) {
++				_loadRomFromFatTable(omega);
++			}
++		}
++		break;
++	case REG_SD_LBA_LO:
++		omega->sdLba = (omega->sdLba & 0xFFFF0000) | value;
++		break;
++	case REG_SD_LBA_HI:
++		omega->sdLba = (omega->sdLba & 0x0000FFFF) | (value << 16);
++		break;
++	case REG_SD_COUNT:
++		_sdTransfer(omega, value);
++		break;
++	case REG_SPI_CONTROL:
++		omega->spiControl = value;
++		break;
++	case REG_SPI_WRITE:
++		omega->spiWrite = value;
++		break;
++	case REG_RTC:
++		omega->rtcStatus = value;
++		break;
++	case REG_AUTOSAVE:
++		break;
++	case REG_LED:
++		omega->ledControl = value;
++		break;
++	case REG_ROM64:
++		omega->rom64Flag = value;
++		break;
++	case REG_PSRAM_PAGE:
++		omega->psramPage = value;
++		break;
++	case REG_ROM_PAGE:
++		omega->romPage = value;
++		_remap(gba);
++		break;
++	case REG_RAM_PAGE:
++		omega->ramPage = value;
++		break;
++	default:
++		return false;
++	}
++	return true;
++}
++
++// --- Public interface ------------------------------------------------------
++
++void GBAOmegaInit(struct GBAOmega* omega) {
++	memset(omega, 0, sizeof(*omega));
++}
++
++bool GBAOmegaEnable(struct GBA* gba, const char* dir) {
++	struct GBAOmega* omega = &gba->memory.omega;
++	GBAOmegaDisable(gba);
++	if (!gba->memory.rom) {
++		return false;
++	}
++
++	omega->kernelNor.data = _mapFile(&omega->kernelNor.vf, dir, "kernel-nor.bin", OMEGA_KERNEL_NOR_SIZE, 0xFF);
++	omega->gameNor.data = _mapFile(&omega->gameNor.vf, dir, "game-nor.bin", OMEGA_GAME_NOR_SIZE, 0xFF);
++	omega->sram = _mapFile(&omega->sramVf, dir, "sram.bin", OMEGA_SRAM_SIZE, 0xFF);
++	omega->psram = anonymousMemoryMap(OMEGA_PSRAM_SIZE);
++	if (!omega->kernelNor.data || !omega->gameNor.data || !omega->sram || !omega->psram) {
++		GBAOmegaDisable(gba);
++		return false;
++	}
++	omega->kernelNor.size = OMEGA_KERNEL_NOR_SIZE;
++	omega->kernelNor.id = 0x2202;  // S29PL064: word programming
++	omega->gameNor.size = OMEGA_GAME_NOR_SIZE;
++	omega->gameNor.id = 0x2228;
++
++	char path[PATH_MAX];
++	snprintf(path, sizeof(path), "%s" PATH_SEP "sd.img", dir);
++	omega->sd = VFileOpen(path, O_RDWR);
++	if (!omega->sd) {
++		mLOG(GBA_OMEGA, WARN, "No SD card image at %s", path);
++	}
++
++	// The loaded ROM is the kernel upgrade file; flash it over the kernel
++	// NOR but keep the settings the kernel stores above it. memory.romSize
++	// can include padding, so use the file's real size.
++	size_t kernelSize = gba->pristineRomSize ? gba->pristineRomSize : gba->memory.romSize;
++	if (kernelSize > OMEGA_KERNEL_SETTINGS) {
++		mLOG(GBA_OMEGA, WARN, "Kernel image overlaps the settings area; truncating");
++		kernelSize = OMEGA_KERNEL_SETTINGS;
++	}
++	memcpy(omega->kernelNor.data, gba->memory.rom, kernelSize);
++
++	// Saves belong to the cart SRAM until a game starts.
++	GBASavedataForceType(&gba->memory.savedata, SAVEDATA_FORCE_NONE);
++	// The cart has an RTC on the GPIO pins. Keep pin state in our own buffer
++	// so it never overwrites the NOR or PSRAM contents underneath.
++	GBAHardwareInitRTC(&gba->memory.hw);
++	gba->memory.hw.gpioBase = omega->gpio;
++	gba->memory.hw.readWrite = GPIO_WRITE_ONLY;
++
++	omega->originalRom = gba->memory.rom;
++	omega->originalRomSize = gba->memory.romSize;
++	omega->originalRomMask = gba->memory.romMask;
++	omega->romPage = ROM_PAGE_BOOT;
++	omega->enabled = true;
++	_remap(gba);
++	mLOG(GBA_OMEGA, INFO, "Omega DE cart enabled from %s", dir);
++	return true;
++}
++
++void GBAOmegaDisable(struct GBA* gba) {
++	struct GBAOmega* omega = &gba->memory.omega;
++	if (omega->enabled) {
++		_stopGameSave(gba);
++		gba->memory.hw.devices &= ~HW_RTC;
++		gba->memory.hw.gpioBase = &((uint16_t*) omega->originalRom)[GPIO_REG_DATA >> 1];
++		gba->memory.rom = omega->originalRom;
++		gba->memory.romSize = omega->originalRomSize;
++		gba->memory.romMask = omega->originalRomMask;
++		gba->memory.activeRegion = -1;
++	}
++	_unmapFile(&omega->kernelNor.vf, &omega->kernelNor.data, OMEGA_KERNEL_NOR_SIZE);
++	_unmapFile(&omega->gameNor.vf, &omega->gameNor.data, OMEGA_GAME_NOR_SIZE);
++	_unmapFile(&omega->sramVf, &omega->sram, OMEGA_SRAM_SIZE);
++	if (omega->psram) {
++		mappedMemoryFree(omega->psram, OMEGA_PSRAM_SIZE);
++	}
++	if (omega->sd) {
++		omega->sd->close(omega->sd);
++	}
++	GBAOmegaInit(omega);
++}
++
++uint16_t GBAOmegaRead16(struct GBA* gba, uint32_t address) {
++	struct GBAOmega* omega = &gba->memory.omega;
++	uint32_t offset = address & 0x01FFFFFF;
++	if (_isEeprom(gba, address)) {
++		return GBASavedataReadEEPROM(&gba->memory.savedata);
++	}
++	if (_isGpio(address) && gba->memory.hw.readWrite && _rtcActive(omega)) {
++		return omega->gpio[(offset - GPIO_FIRST) >> 1];
++	}
++	if (offset >= PORT_BASE && offset < PORT_END && _portActive(omega)) {
++		return _portRead(omega, offset - PORT_BASE);
++	}
++	if (!_isKernelMode(omega)) {
++		if (offset < gba->memory.romSize) {
++			return _read16((const uint8_t*) gba->memory.rom, gba->memory.romSize, offset);
++		}
++		return _openBus(address);
++	}
++	if (offset < PSRAM_WINDOW) {
++		return _norRead(&omega->kernelNor, offset);
++	}
++	if (offset < GAME_NOR_WINDOW) {
++		uint32_t psram = (((omega->psramPage >> 12) * WINDOW_SIZE) + offset - PSRAM_WINDOW) & (OMEGA_PSRAM_SIZE - 1);
++		return _read16(omega->psram, OMEGA_PSRAM_SIZE, psram);
++	}
++	if (offset < GAME_NOR_WINDOW + WINDOW_SIZE) {
++		uint32_t nor = ((omega->romPage >> 12) & 7) * WINDOW_SIZE + offset - GAME_NOR_WINDOW;
++		return _norRead(&omega->gameNor, nor);
++	}
++	return _openBus(address);
++}
++
++void GBAOmegaWrite16(struct GBA* gba, uint32_t address, uint16_t value) {
++	struct GBAOmega* omega = &gba->memory.omega;
++	uint32_t offset = address & 0x01FFFFFE;
++
++	if (_isGpio(address)) {
++		if (_rtcActive(omega)) {
++			GBAHardwareGPIOWrite(&gba->memory.hw, offset, value);
++		}
++		return;
++	}
++	if (offset == REG_UNLOCK) {
++		omega->unlockStep = value == 0xD200 ? 1 : 0;
++		return;
++	}
++	if (offset == REG_LOCK) {
++		omega->unlocked = false;
++		omega->unlockStep = 0;
++		return;
++	}
++	if (omega->unlockStep == 1 && offset == 0x00000000 && value == 0x1500) {
++		omega->unlockStep = 2;
++	} else if (omega->unlockStep == 2 && offset == 0x00020000 && value == 0xD200) {
++		omega->unlockStep = 3;
++	} else if (omega->unlockStep == 3 && offset == 0x00040000 && value == 0x1500) {
++		omega->unlocked = true;
++		omega->unlockStep = 0;
++		return;
++	}
++	if (omega->unlocked && _writeRegister(gba, offset, value)) {
++		return;
++	}
++	if (offset >= PORT_BASE && offset < PORT_BASE + OMEGA_PORT_SIZE && _portActive(omega)) {
++		omega->port[offset - PORT_BASE] = value;
++		omega->port[offset - PORT_BASE + 1] = value >> 8;
++		return;
++	}
++	if (!_isKernelMode(omega)) {
++		return;  // Game mode: the game's ROM is read-only.
++	}
++	if (offset < PSRAM_WINDOW) {
++		_norWrite(&omega->kernelNor, offset, value);
++	} else if (offset < GAME_NOR_WINDOW) {
++		uint32_t psram = (((omega->psramPage >> 12) * WINDOW_SIZE) + offset - PSRAM_WINDOW) & (OMEGA_PSRAM_SIZE - 1);
++		omega->psram[psram] = value;
++		omega->psram[psram + 1] = value >> 8;
++	} else if (offset < GAME_NOR_WINDOW + WINDOW_SIZE) {
++		uint32_t nor = ((omega->romPage >> 12) & 7) * WINDOW_SIZE + offset - GAME_NOR_WINDOW;
++		_norWrite(&omega->gameNor, nor, value);
++	}
++}
++
++bool GBAOmegaOwnsSRAM(const struct GBA* gba) {
++	return gba->memory.omega.enabled && !gba->memory.omega.gameSaveActive;
++}
++
++static uint32_t _sramOffset(const struct GBAOmega* omega, uint32_t address) {
++	return (((uint32_t) omega->ramPage << 12) + (address & 0xFFFF)) & (OMEGA_SRAM_SIZE - 1);
++}
++
++uint8_t GBAOmegaReadSRAM(struct GBA* gba, uint32_t address) {
++	struct GBAOmega* omega = &gba->memory.omega;
++	return omega->sram[_sramOffset(omega, address)];
++}
++
++void GBAOmegaWriteSRAM(struct GBA* gba, uint32_t address, uint8_t value) {
++	struct GBAOmega* omega = &gba->memory.omega;
++	uint32_t offset = address & 0xFFFF;
++	// Flash-style bank switch: 5555=AA, 2AAA=55, 5555=B0, 0000=bank.
++	switch (omega->flashCmdStep) {
++	case 0:
++		omega->flashCmdStep = (offset == 0x5555 && value == 0xAA) ? 1 : 0;
++		break;
++	case 1:
++		omega->flashCmdStep = (offset == 0x2AAA && value == 0x55) ? 2 : 0;
++		break;
++	case 2:
++		omega->flashCmdStep = (offset == 0x5555 && value == 0xB0) ? 3 : 0;
++		break;
++	case 3:
++		omega->flashCmdStep = 0;
++		if (offset == 0x0000) {
++			omega->ramPage = value << 4;
++			return;
++		}
++		break;
++	}
++	omega->sram[_sramOffset(omega, address)] = value;
++}
+diff --git a/src/gba/core.c b/src/gba/core.c
+index 5401c12..9a75d34 100644
+--- a/src/gba/core.c
++++ b/src/gba/core.c
+@@ -593,6 +593,9 @@ static void _GBACoreChecksum(const struct mCore* core, void* data, enum mCoreChe
+ static void _GBACoreReset(struct mCore* core) {
+ 	struct GBACore* gbacore = (struct GBACore*) core;
+ 	struct GBA* gba = (struct GBA*) core->board;
++	// Power-cycling the Omega DE cart: store the running game's save in the
++	// cart SRAM before reset reconfigures savedata.
++	GBAOmegaDisable(gba);
+ 	bool value;
+ 	UNUSED(value);
+ 	if (gbacore->renderer.outputBuffer
+@@ -699,6 +702,14 @@ static void _GBACoreReset(struct mCore* core) {
+ 	}
+ #endif
+ 
++	const char* omegaDir = mCoreConfigGetValue(&core->config, "omega.dir");
++	if (!omegaDir) {
++		omegaDir = getenv("OMEGA_DIR");
++	}
++	if (omegaDir && omegaDir[0]) {
++		GBAOmegaEnable(gba, omegaDir);
++	}
++
+ 	ARMReset(core->cpu);
+ 	bool forceSkip = gba->mbVf || (core->opts.skipBios && (gba->romVf || gba->memory.rom));
+ 	if (!forceSkip && (gba->romVf || gba->memory.rom) && gba->pristineRomSize >= 0xA0 && gba->biosVf) {
+diff --git a/src/gba/gba.c b/src/gba/gba.c
+index 26c2058..59c6107 100644
+--- a/src/gba/gba.c
++++ b/src/gba/gba.c
+@@ -132,6 +132,7 @@ static void GBAInit(void* cpu, struct mCPUComponent* component) {
+ }
+ 
+ void GBAUnloadROM(struct GBA* gba) {
++	GBAOmegaDisable(gba);
+ 	GBAMemoryClearAGBPrint(gba);
+ 	if (gba->memory.rom && !gba->isPristine) {
+ 		if (gba->yankedRomSize) {
+diff --git a/src/gba/memory.c b/src/gba/memory.c
+index 5bb5182..fa7ac0d 100644
+--- a/src/gba/memory.c
++++ b/src/gba/memory.c
+@@ -94,6 +94,7 @@ void GBAMemoryInit(struct GBA* gba) {
+ 
+ 	GBADMAInit(gba);
+ 	GBAVFameInit(&gba->memory.vfame);
++	GBAOmegaInit(&gba->memory.omega);
+ 
+ 	gba->memory.ereader.p = gba;
+ 	gba->memory.ereader.dots = NULL;
+@@ -101,6 +102,7 @@ void GBAMemoryInit(struct GBA* gba) {
+ }
+ 
+ void GBAMemoryDeinit(struct GBA* gba) {
++	GBAOmegaDisable(gba);
+ 	mappedMemoryFree(gba->memory.wram, SIZE_WORKING_RAM + SIZE_WORKING_IRAM);
+ 	if (gba->memory.rom) {
+ 		mappedMemoryFree(gba->memory.rom, gba->memory.romSize);
+@@ -409,7 +411,10 @@ static void GBASetActiveRegion(struct ARMCore* cpu, uint32_t address) {
+ 
+ #define LOAD_CART \
+ 	wait += waitstatesRegion[address >> BASE_OFFSET]; \
+-	if ((address & (SIZE_CART0 - 1)) < memory->romSize) { \
++	if (memory->omega.enabled) { \
++		value = GBAOmegaRead16(gba, address & ~3); \
++		value |= GBAOmegaRead16(gba, (address & ~3) + 2) << 16; \
++	} else if ((address & (SIZE_CART0 - 1)) < memory->romSize) { \
+ 		LOAD_32(value, address & (SIZE_CART0 - 4), memory->rom); \
+ 	} else if (memory->vfame.cartType) { \
+ 		value = GBAVFameGetPatternValue(address, 32); \
+@@ -574,7 +579,9 @@ uint32_t GBALoad16(struct ARMCore* cpu, uint32_t address, int* cycleCounter) {
+ 	case REGION_CART1_EX:
+ 	case REGION_CART2:
+ 		wait = memory->waitstatesNonseq16[address >> BASE_OFFSET];
+-		if ((address & (SIZE_CART0 - 1)) < memory->romSize) {
++		if (memory->omega.enabled) {
++			value = GBAOmegaRead16(gba, address);
++		} else if ((address & (SIZE_CART0 - 1)) < memory->romSize) {
+ 			LOAD_16(value, address & (SIZE_CART0 - 2), memory->rom);
+ 		} else if (memory->vfame.cartType) {
+ 			value = GBAVFameGetPatternValue(address, 16);
+@@ -595,7 +602,9 @@ uint32_t GBALoad16(struct ARMCore* cpu, uint32_t address, int* cycleCounter) {
+ 		break;
+ 	case REGION_CART2_EX:
+ 		wait = memory->waitstatesNonseq16[address >> BASE_OFFSET];
+-		if (memory->savedata.type == SAVEDATA_EEPROM || memory->savedata.type == SAVEDATA_EEPROM512) {
++		if (memory->omega.enabled) {
++			value = GBAOmegaRead16(gba, address);
++		} else if (memory->savedata.type == SAVEDATA_EEPROM || memory->savedata.type == SAVEDATA_EEPROM512) {
+ 			value = GBASavedataReadEEPROM(&memory->savedata);
+ 		} else if ((address & 0x0DFC0000) >= 0x0DF80000 && memory->hw.devices & HW_EREADER) {
+ 			value = GBACartEReaderRead(&memory->ereader, address);
+@@ -690,7 +699,9 @@ uint32_t GBALoad8(struct ARMCore* cpu, uint32_t address, int* cycleCounter) {
+ 	case REGION_CART2:
+ 	case REGION_CART2_EX:
+ 		wait = memory->waitstatesNonseq16[address >> BASE_OFFSET];
+-		if ((address & (SIZE_CART0 - 1)) < memory->romSize) {
++		if (memory->omega.enabled) {
++			value = (GBAOmegaRead16(gba, address) >> ((address & 1) * 8)) & 0xFF;
++		} else if ((address & (SIZE_CART0 - 1)) < memory->romSize) {
+ 			value = ((uint8_t*) memory->rom)[address & (SIZE_CART0 - 1)];
+ 		} else if (memory->vfame.cartType) {
+ 			value = GBAVFameGetPatternValue(address, 8);
+@@ -702,6 +713,10 @@ uint32_t GBALoad8(struct ARMCore* cpu, uint32_t address, int* cycleCounter) {
+ 	case REGION_CART_SRAM:
+ 	case REGION_CART_SRAM_MIRROR:
+ 		wait = memory->waitstatesNonseq16[address >> BASE_OFFSET];
++		if (GBAOmegaOwnsSRAM(gba)) {
++			value = GBAOmegaReadSRAM(gba, address);
++			break;
++		}
+ 		if (memory->savedata.type == SAVEDATA_AUTODETECT) {
+ 			mLOG(GBA_MEM, INFO, "Detected SRAM savegame");
+ 			GBASavedataInitSRAM(&memory->savedata);
+@@ -795,11 +810,15 @@ uint32_t GBALoad8(struct ARMCore* cpu, uint32_t address, int* cycleCounter) {
+ 
+ #define STORE_CART \
+ 	wait += waitstatesRegion[address >> BASE_OFFSET]; \
+-	if (memory->matrix.size && (address & 0x01FFFF00) == 0x00800100) { \
++	if (memory->omega.enabled) { \
++		/* if/else rather than break: STM_LOOP expands this inside a for loop */ \
++		GBAOmegaWrite16(gba, address & ~3, value); \
++		GBAOmegaWrite16(gba, (address & ~3) + 2, value >> 16); \
++	} else if (memory->matrix.size && (address & 0x01FFFF00) == 0x00800100) { \
+ 		GBAMatrixWrite(gba, address & 0x3C, value); \
+-		break; \
+-	} \
+-	mLOG(GBA_MEM, STUB, "Unimplemented memory Store32: 0x%08X", address);
++	} else { \
++		mLOG(GBA_MEM, STUB, "Unimplemented memory Store32: 0x%08X", address); \
++	}
+ 
+ #define STORE_SRAM \
+ 	if (address & 0x3) { \
+@@ -920,6 +939,10 @@ void GBAStore16(struct ARMCore* cpu, uint32_t address, int16_t value, int* cycle
+ 		}
+ 		break;
+ 	case REGION_CART0:
++		if (memory->omega.enabled) {
++			GBAOmegaWrite16(gba, address, value);
++			break;
++		}
+ 		if (IS_GPIO_REGISTER(address & 0xFFFFFE)) {
+ 			if (memory->hw.devices == HW_NONE) {
+ 				mLOG(GBA_HW, WARN, "Write to GPIO address %08X on cartridge without GPIO", address);
+@@ -935,6 +958,10 @@ void GBAStore16(struct ARMCore* cpu, uint32_t address, int16_t value, int* cycle
+ 		}
+ 		// Fall through
+ 	case REGION_CART0_EX:
++		if (memory->omega.enabled) {
++			GBAOmegaWrite16(gba, address, value);
++			break;
++		}
+ 		if ((address & 0x00FFFFFF) >= AGB_PRINT_BASE) {
+ 			uint32_t agbPrintAddr = address & 0x00FFFFFF;
+ 			if (agbPrintAddr == AGB_PRINT_PROTECT) {
+@@ -1050,6 +1077,11 @@ void GBAStore8(struct ARMCore* cpu, uint32_t address, int8_t value, int* cycleCo
+ 		break;
+ 	case REGION_CART_SRAM:
+ 	case REGION_CART_SRAM_MIRROR:
++		if (GBAOmegaOwnsSRAM(gba)) {
++			GBAOmegaWriteSRAM(gba, address, value);
++			wait = memory->waitstatesNonseq16[REGION_CART_SRAM];
++			break;
++		}
+ 		if (memory->savedata.type == SAVEDATA_AUTODETECT) {
+ 			if (address == SAVEDATA_FLASH_BASE) {
+ 				mLOG(GBA_MEM, INFO, "Detected Flash savegame");
