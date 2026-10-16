@@ -57,6 +57,12 @@ switches, clock use) to stderr.
 save (`roms/<name>.sav`) and a key script (`tests/games/<code>.keys`) goes
 through a full save cycle; the others are only launched.
 
+When code running headlessly hits an illegal opcode or jumps somewhere that
+can't run code, `mgba-shot` stops with exit status 3 and prints a crash report:
+the registers and the code addresses on the stack, named from
+`dist/ezkernelnew.sym` (or the ROM's own `.sym`). `just compat` counts a
+crash as a failure.
+
 To step through the kernel:
 
 - `just debug` opens the window and waits; `just gdb` in a second terminal

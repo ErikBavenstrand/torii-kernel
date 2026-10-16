@@ -95,6 +95,8 @@ def power_on(cart: Path, keys: list[tuple[int, str]], frames: int, shot: Path) -
             args += ["-k", f"{frame + 6}:-"]
     env = dict(os.environ, OMEGA_DIR=str(cart), OMEGA_TRACE="1")
     run = subprocess.run(args, env=env, capture_output=True, text=True, check=False)
+    if run.returncode == 3:  # crashed; the report is in the trace
+        return run.stderr
     if run.returncode:
         raise Failure(f"mgba-shot failed: {run.stderr.strip()[-300:]}")
     return run.stderr
@@ -198,7 +200,11 @@ class Result:
 def launch_problems(trace: str, game: dict, shot: Path) -> dict[str, str]:
     """Problems with a launch, by check; an empty string means it passed."""
     problems = {"boots": "", "save type": "", "clock": ""}
-    errors = [line for line in trace.splitlines() if line.startswith("kernel error: ")]
+    errors = [
+        line
+        for line in trace.splitlines()
+        if line.startswith(("kernel error: ", "crash at frame "))
+    ]
     if errors:
         problems["boots"] = errors[0]
         return problems

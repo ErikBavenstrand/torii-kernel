@@ -8,9 +8,15 @@
 //   -i FILE          read more options from FILE, whitespace-separated
 //                    (# starts a comment), for long input scripts
 //   -g PORT          wait for gdb on PORT (all addresses) before running
+//   -y SYMFILE       symbols for crash reports (default: the ROM's .sym)
+//
+// If the CPU hits an illegal opcode or jumps to an invalid address, it prints
+// a crash report (registers, and code addresses found on the stack with their
+// symbols) and exits with status 3.
 #include <mgba/flags.h>
 #include <mgba/core/core.h>
 #include <mgba/core/log.h>
+#include <mgba/internal/arm/arm.h>
 #include <mgba-util/png-io.h>
 #include <mgba-util/vfs.h>
 #ifdef USE_GDB_STUB
@@ -29,11 +35,111 @@ struct event {
 
 static const char* KEY_NAMES[] = {"A", "B", "SELECT", "START", "RIGHT", "LEFT", "UP", "DOWN", "R", "L"};
 
+// --- Crash reports ---------------------------------------------------------
+
+struct symbol {
+	uint32_t address;
+	char* name;
+};
+
+static struct symbol* symbols;
+static size_t nsymbols;
+
+// Reads an armips symbol file (ADDRESS NAME per line, sorted by address).
+static void load_symbols(const char* path) {
+	FILE* f = fopen(path, "r");
+	if (!f) {
+		return;
+	}
+	size_t cap = 0;
+	char line[512], name[480];
+	unsigned address;
+	while (fgets(line, sizeof(line), f)) {
+		if (sscanf(line, "%x %479s", &address, name) != 2) {
+			continue;
+		}
+		if (nsymbols == cap) {
+			cap = cap ? cap * 2 : 1024;
+			symbols = realloc(symbols, cap * sizeof(*symbols));
+		}
+		symbols[nsymbols].address = address;
+		symbols[nsymbols].name = strdup(name);
+		++nsymbols;
+	}
+	fclose(f);
+}
+
+// "name+0xOFFSET" for the symbol at or below address, or "" if none is close.
+static const char* symbolize(uint32_t address) {
+	static char out[512];
+	const struct symbol* best = NULL;
+	for (size_t i = 0; i < nsymbols && symbols[i].address <= address; ++i) {
+		best = &symbols[i];
+	}
+	if (!best || address - best->address > 0x10000) {
+		return "";
+	}
+	snprintf(out, sizeof(out), " (%s+0x%X)", best->name, address - best->address);
+	return out;
+}
+
+static struct mCore* crash_core;
+static int crashed;
+static char crash_reason[256];
+static uint32_t crash_regs[16], crash_cpsr;
+
+static void note_crash(const char* format, va_list args) {
+	if (crashed || !crash_core) {
+		return;
+	}
+	crashed = 1;
+	vsnprintf(crash_reason, sizeof(crash_reason), format, args);
+	struct ARMCore* cpu = crash_core->cpu;
+	memcpy(crash_regs, cpu->gprs, sizeof(crash_regs));
+	crash_cpsr = cpu->cpsr.packed;
+}
+
+static int is_code(uint32_t address) {
+	address &= ~1u;
+	return (address >= 0x08000000 && address < 0x0A000000) || (address >= 0x03000000 && address < 0x03008000) ||
+	       (address >= 0x02000000 && address < 0x02040000);
+}
+
+static void print_crash(unsigned frame) {
+	fprintf(stderr, "crash at frame %u: %s\n", frame, crash_reason);
+	for (int i = 0; i < 13; i += 4) {
+		for (int j = i; j < i + 4 && j < 13; ++j) {
+			fprintf(stderr, "  r%-2d %08X", j, crash_regs[j]);
+		}
+		fputc('\n', stderr);
+	}
+	fprintf(stderr, "  sp  %08X  cpsr %08X (%s)\n", crash_regs[ARM_SP], crash_cpsr,
+	        crash_cpsr & 0x20 ? "thumb" : "arm");
+	fprintf(stderr, "  lr  %08X%s\n", crash_regs[ARM_LR], symbolize(crash_regs[ARM_LR] & ~1u));
+	fprintf(stderr, "  pc  %08X%s\n", crash_regs[ARM_PC], symbolize(crash_regs[ARM_PC] & ~1u));
+	fprintf(stderr, "  code addresses on the stack:\n");
+	int shown = 0;
+	for (uint32_t sp = crash_regs[ARM_SP] & ~3u; sp < 0x03008000 && sp < (crash_regs[ARM_SP] & ~3u) + 0x400 && shown < 16;
+	     sp += 4) {
+		uint32_t word = crash_core->busRead32(crash_core, sp);
+		if (is_code(word) && (word & 1)) {  // Thumb return addresses
+			fprintf(stderr, "    [%08X] %08X%s\n", sp, word, symbolize(word & ~1u));
+			++shown;
+		}
+	}
+}
+
 // Prints errors, and every line the kernel logs with tlog (category
 // gba.debug) as "kernel: ..." or "kernel error: ...".
 static void quiet_log(struct mLogger* logger, int category, enum mLogLevel level, const char* format, va_list args) {
 	(void) logger;
-	if (!strcmp(mLogCategoryId(category), "gba.debug")) {
+	const char* id = mLogCategoryId(category);
+	if ((!strcmp(id, "gba.memory") && (level & (mLOG_GAME_ERROR | mLOG_FATAL)) && strstr(format, "invalid address")) ||
+	    (!strcmp(id, "gba") && !strncmp(format, "Illegal opcode", 14))) {
+		note_crash(format, args);
+		return;  // The crash report has it, and it repeats until the frame ends.
+	}
+	if (!strcmp(id, "gba.debug")) {
 		fputs(level & (mLOG_FATAL | mLOG_ERROR) ? "kernel error: " : "kernel: ", stderr);
 		vfprintf(stderr, format, args);
 		fputc('\n', stderr);
@@ -100,6 +206,7 @@ struct options {
 	unsigned frames;
 	const char* saveOut;
 	unsigned gdbPort;
+	const char* symFile;
 };
 
 static void parse_options(struct options* opts, int argc, char** argv);
@@ -144,6 +251,8 @@ static void parse_options(struct options* opts, int argc, char** argv) {
 			opts->saveOut = argv[++i];
 		} else if (!strcmp(argv[i], "-s")) {
 			add_event(&opts->shots, argv[++i]);
+		} else if (!strcmp(argv[i], "-y")) {
+			opts->symFile = argv[++i];
 		} else if (!strcmp(argv[i], "-g")) {
 			opts->gdbPort = (unsigned) strtoul(argv[++i], NULL, 10);
 		} else if (!strcmp(argv[i], "-i")) {
@@ -205,6 +314,18 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 	core->reset(core);
+	crash_core = core;
+	if (opts.symFile) {
+		load_symbols(opts.symFile);
+	} else {
+		char path[1024];
+		snprintf(path, sizeof(path), "%s", argv[1]);
+		char* dot = strrchr(path, '.');
+		if (dot && dot > strrchr(path, '/')) {
+			strcpy(dot, ".sym");
+			load_symbols(path);
+		}
+	}
 
 	struct mDebugger* debugger = NULL;
 	if (opts.gdbPort) {
@@ -240,6 +361,11 @@ int main(int argc, char** argv) {
 			}
 		} else {
 			core->runFrame(core);
+		}
+		if (crashed) {
+			print_crash(frame);
+			status = 3;
+			break;
 		}
 		for (size_t i = 0; i < nshots; ++i) {
 			if (shots[i].frame == frame) {

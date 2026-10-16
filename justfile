@@ -81,6 +81,7 @@ shot frame="300" *keys: build emu-headless cart
 test: build emu-headless test-roms
     {{emu_docker}} tests/smoke.sh
     {{emu_docker}} tests/save_types.sh
+    {{emu_docker}} tests/crash.sh
 
 # Play the games listed in roms/games.toml through the kernel, e.g. `just compat BPEE`
 compat *codes: build emu-headless
@@ -89,6 +90,7 @@ compat *codes: build emu-headless
 test-roms:
     {{kernel_docker}} make -C tests/roms/hello
     {{kernel_docker}} make -C tests/roms/savetest
+    {{kernel_docker}} make -C tests/roms/crash all
 
 # Create the emulated cart (SD image from emu/sd) if it does not exist
 cart: emu-image
