@@ -197,8 +197,8 @@ emu-save-patch:
 # Every recipe that runs a container comes through here: make sure the torii
 # VM runs and that containers see the latest edits.
 emu-image: _vm
-    @{{fresh}} sync source Makefile image.bin tests tools emu/mgba/src emu/mgba/include emu/mgba-shot.c emu/build.sh docker
     @{{fresh}} check emu-image -- docker/emu.Dockerfile && docker image inspect {{emu_image}} >/dev/null 2>&1 || { docker build -q -t {{emu_image}} -f docker/emu.Dockerfile docker >/dev/null && {{fresh}} record emu-image -- docker/emu.Dockerfile; }
+    @{{fresh}} sync source Makefile image.bin tests tools emu/mgba/src emu/mgba/include emu/mgba-shot.c emu/build.sh docker
 
 # Start the torii colima VM on macOS if it isn't running
 _vm:

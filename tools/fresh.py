@@ -95,6 +95,8 @@ def container_view(files: list[str]) -> dict[str, tuple[str, int]]:
 
 
 def sync(paths: list[str]) -> int:
+    if sys.platform != "darwin":
+        return 0  # Linux bind mounts show edits at once; the lag is colima's
     everything = paths[0] == "--all"
     host = recent_files(paths[1:] if everything else paths, everything)
     if not host:
