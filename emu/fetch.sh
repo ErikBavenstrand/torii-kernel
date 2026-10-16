@@ -10,7 +10,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 MGBA_TAG=0.10.5
-stamp=.mgba-patches  # hash of the patches the checkout was made or saved from
+stamp=.mgba-patches # hash of the patches the checkout was made or saved from
 
 patches_hash() { cat patches/*.patch | sha256sum | cut -d' ' -f1; }
 checkout_hash() { git -C mgba add -A && git -C mgba diff --cached | sha256sum | cut -d' ' -f1; }
