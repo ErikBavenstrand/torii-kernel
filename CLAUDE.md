@@ -27,4 +27,4 @@ Torii is a custom kernel for the EZ-Flash Omega DE, forked from EZ-Flash's offic
 ## Environment
 
 - On macOS, Docker runs through colima (`colima start`). Its containers only see paths under your home folder, so keep worktrees and temporary build folders inside the repo, for example in `dist/`.
-- Test with the homebrew ROMs in `tests/roms/`. Commercial ROMs are the user's to supply.
+- Test with the homebrew ROMs in `tests/roms/`. Commercial ROMs are the user's to supply: they go in the git-ignored `roms/`, listed in `roms/games.toml` by `just game-add`.

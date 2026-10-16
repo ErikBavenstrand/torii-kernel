@@ -67,6 +67,12 @@ _cart-copy mode +files:
     rm -rf dist/.cart-add && mkdir -p dist/.cart-add && shift && cp "$@" dist/.cart-add/
     {{emu_docker}} tools/cart_copy.sh {{mode}} {{cart}}/sd.img dist/.cart-add/*; status=$?; rm -rf dist/.cart-add; exit $status
 
+# Copy games into roms/ and add them to roms/games.toml, e.g. `just game-add ~/roms/game.gba`
+[positional-arguments]
+game-add +roms: emu-image
+    cp -n "$@" roms/
+    for f in "$@"; do printf 'roms/%s\0' "$(basename "$f")"; done | xargs -0 {{emu_docker}} python3 tools/games.py add
+
 # Build the patched mGBA natively (SDL frontend) for `play` and `dev`
 emu:
     emu/fetch.sh

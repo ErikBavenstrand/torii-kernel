@@ -17,3 +17,7 @@ emu/build-native/
 # Test ROM build outputs
 tests/roms/*/*.elf
 tests/roms/*/*.gba
+
+# Your own game ROMs and saves; only the list of games is committed
+roms/*
+!roms/games.toml

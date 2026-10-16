@@ -24,6 +24,7 @@ the kernel on, and tests.
 | `just dev` | like `play`, rebuilding whenever `source/` changes |
 | `just test` | checks games boot and every save type survives power cycles |
 | `just cart-add game.gba` | copies a file onto the emulated SD card |
+| `just game-add game.gba` | copies a game you own into the git-ignored `roms/` and lists it in `roms/games.toml` |
 
 `just --list` shows the rest.
 
