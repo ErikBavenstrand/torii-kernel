@@ -520,12 +520,14 @@ def requirements(game: dict, size: int, table: dict) -> str:
 
 
 def pick(games: list[dict], roms: dict, table: dict) -> list[tuple[dict, list[dict]]]:
-    """One game per set of requirements, with the games it stands for."""
-    groups: dict[str, list[dict]] = {}
-    for game in games:
+    """One game per set of requirements, with the games it stands for.
+
+    Copies of the same game (same system, code and title, e.g. one padded to
+    32 MB) count once, before grouping by requirements."""
+
+    def size(game: dict) -> int:
         rom = roms.get(game["sha1"])
-        size = rom.stat().st_size if rom else 0
-        groups.setdefault(requirements(game, size, table), []).append(game)
+        return rom.stat().st_size if rom else 0
 
     def preference(game: dict) -> tuple:
         rom = roms.get(game["sha1"])
@@ -533,13 +535,29 @@ def pick(games: list[dict], roms: dict, table: dict) -> list[tuple[dict, list[di
             not (KEYS / f"{game['code']}.keys").exists(),
             not (rom and rom.with_suffix(".sav").exists()),
             rom is None,
+            size(game),
             game["file"],
+        )
+
+    copies: dict[tuple, list[dict]] = {}
+    for game in games:
+        copies.setdefault(
+            (game.get("system", "gba"), game["code"], game["title"]), []
+        ).append(game)
+    groups: dict[str, list[tuple[dict, list[dict]]]] = {}
+    for same in copies.values():
+        same.sort(key=preference)
+        kept = same[0]
+        groups.setdefault(requirements(kept, size(kept), table), []).append(
+            (kept, same[1:])
         )
 
     picked = []
     for group in groups.values():
-        group.sort(key=preference)
-        picked.append((group[0], group[1:]))
+        group.sort(key=lambda entry: preference(entry[0]))
+        chosen, chosen_copies = group[0]
+        alike = chosen_copies + [g for kept, extra in group[1:] for g in (kept, *extra)]
+        picked.append((chosen, alike))
     return picked
 
 
