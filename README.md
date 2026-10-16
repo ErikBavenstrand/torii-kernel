@@ -20,6 +20,7 @@ the kernel on, and tests.
 | Command | Result |
 |---|---|
 | `just build` | `dist/ezkernelnew.bin`, the file you flash to the cart |
+| `just sd /Volumes/OMEGA [game.gba...]` | copies the kernel (and games) to a real SD card and ejects it; hold R while switching on to install |
 | `just play [game.gba...]` | runs the kernel on an emulated cart, first copying any games given onto its SD card unless they are already there |
 | `just dev` | like `play`, rebuilding whenever `source/` changes |
 | `just test` | checks games boot and every save type survives power cycles |

@@ -33,6 +33,11 @@ play *roms: build emu cart
     if [ $# -gt 0 ]; then {{just_executable()}} cart={{cart}} _cart-copy keep "$@"; fi
     OMEGA_DIR={{cart}} {{mgba}} -{{scale}} dist/ezkernelnew.bin
 
+# Copy the kernel (and any games given) to a real SD card and eject it, e.g. `just sd /Volumes/OMEGA`
+[positional-arguments]
+sd card *games: build
+    tools/sd_copy.sh "$@"
+
 # Write compile_commands.json for clangd (devkitPro's headers go to dist/devkitpro)
 compile-commands: emu-image
     mkdir -p dist
