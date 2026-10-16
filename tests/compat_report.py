@@ -168,7 +168,7 @@ let statusFilter = "";
 const t = DATA.time;
 const covered = DATA.games.reduce((n, g) => n + 1 + (g.alike || []).length, 0);
 $("meta").textContent = `Run ${t.slice(0, 4)}-${t.slice(4, 6)}-${t.slice(6, 8)} ${t.slice(9, 11)}:${t.slice(11, 13)} UTC · kernel ${DATA.kernel} · ${DATA.games.length} games tested, standing for ${covered}` +
-  (DATA.listed ? ` of ${DATA.listed} listed (${DATA["left out"]} ROM hacks and plugins left out)` : "") +
+  (DATA.listed ? ` of ${DATA.listed} listed (${DATA["left out"]} marked skip: ROM hacks, plugins, test ROMs)` : "") +
   (DATA.filters.length ? ` · filter: ${DATA.filters.join(", ")}` : "") + ` · ${DATA.runs} run(s) recorded`;
 
 const counts = Object.fromEntries(STATUSES.map((s) => [s, DATA.games.filter((g) => g.status === s).length]));
