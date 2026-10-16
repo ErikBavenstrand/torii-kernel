@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Run the test scripts in parallel, then print each one's output in order.
+# Exits 1 if any failed. Runs inside the torii-emu container (see `just test`).
+set -uo pipefail
+
+jobs=(
+  "tests/kernel.sh"
+  "tests/smoke.sh"
+  "tests/save_types.sh flash128"
+  "tests/save_types.sh flash64"
+  "tests/save_types.sh eeprom8k"
+  "tests/save_types.sh eeprom512"
+  "tests/crash.sh"
+  "tests/state.sh"
+)
+
+logs=$(mktemp -d)
+pids=()
+for i in "${!jobs[@]}"; do
+  ${jobs[$i]} >"$logs/$i" 2>&1 &
+  pids+=($!)
+done
+
+failed=0
+for i in "${!jobs[@]}"; do
+  wait "${pids[$i]}" || failed=1
+  cat "$logs/$i"
+done
+rm -rf "$logs"
+exit $failed

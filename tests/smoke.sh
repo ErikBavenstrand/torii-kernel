@@ -13,7 +13,8 @@ mkfs.fat -C -F 32 -n SMOKE "$cart/sd.img" 65536 >/dev/null
 mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/Hello.gba
 
 boot() {
-  OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin "$@" >/dev/null
+  # Errors still show; the kernel's tlog lines don't.
+  OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin "$@" 2>&1 >/dev/null | { grep -v '^kernel: ' || true; } >&2
 }
 
 fail() {

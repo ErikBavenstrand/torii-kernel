@@ -8,24 +8,33 @@ usage: fresh.py sync [--all] PATH...   wait until containers see recent edits
        fresh.py stamp DIR KEY FILE...  empty DIR if the build settings changed
        fresh.py track DIR OUTPUT... -- PATH...
                                        drop objects whose inputs changed
+       fresh.py check NAME OUTPUT... -- PATH...
+                                       exit 0 if NAME can be skipped
+       fresh.py record NAME -- PATH...  note that NAME was built from PATH
 
-sync: colima shares the repo with containers over sshfs, which caches file
-attributes for about a second. A build started right after an edit can see
-the old timestamp, or even old content, and skip or botch a rebuild. For
-files under PATH changed in the last few seconds, this waits until a
-container sees the same size and timestamp as the host. Build outputs
+sync: the torii colima VM shares the repo over virtiofs, which caches file
+attributes for about a second. Right after an edit a container can see the
+old size and timestamp, and a file git replaced can read as its old content.
+For files under PATH changed in the last two seconds, this waits (at most
+about a second) until a container sees the same size and timestamp. Build outputs
 (.o, .gba, ...) are skipped unless --all is given, e.g. for folders of games.
 
 stamp: make only compares source timestamps, so a changed Makefile or
 toolchain leaves old objects behind. This hashes KEY and the FILEs and, if
 the result differs from the one recorded in DIR, deletes DIR's contents.
 
-track: sshfs reports whole-second timestamps, so a file edited in the same
-second a build finished looks no newer than its object, and make keeps the
-old object. This hashes every file under PATH and compares with the hashes
+track: make trusts timestamps, and a timestamp seen through the share can be
+a second old, so make could keep an object built from the old file. This hashes every file under PATH and compares with the hashes
 recorded in DIR at the last build. For each changed file it deletes the
 objects whose dependency files (.d, written by gcc -MMD) name it, and then
 the OUTPUTs (linked files), so they are rebuilt whatever the timestamps say.
+
+check/record: skip a whole step when nothing it reads has changed. record
+saves one hash over every file under PATH (and its name) after the step
+succeeds; check exits 0 when the hash still matches and every OUTPUT exists,
+so `fresh.py check ... || { build; fresh.py record ...; }` builds only when
+needed. A path that is not a file or folder counts as a literal key, such as
+a toolchain image. Records live in dist/.fresh.
 """
 
 import hashlib
@@ -36,14 +45,14 @@ import sys
 import time
 from pathlib import Path
 
-RECENT = 5.0  # seconds; sshfs caches attributes for about one
-TIMEOUT = 15.0
+RECENT = 2.0  # seconds; virtiofs caches attributes for about one
+TIMEOUT = 5.0
 IMAGE = "torii-emu"
 # Written by the builds in containers, so containers see them as written.
 OUTPUTS = {".o", ".d", ".a", ".elf", ".gba", ".nm", ".sym", ".map", ".png"}
 
 
-def recent_files(paths: list[str], everything: bool) -> dict[str, tuple[int, int]]:
+def recent_files(paths: list[str], everything: bool) -> dict[str, tuple[str, int]]:
     now = time.time()
     found = {}
     for root in paths:
@@ -53,11 +62,12 @@ def recent_files(paths: list[str], everything: bool) -> dict[str, tuple[int, int
                 continue
             st = path.stat()
             if now - st.st_mtime < RECENT:
-                found[str(path)] = (int(st.st_mtime), st.st_size)
+                ns = st.st_mtime_ns
+                found[str(path)] = (f"{ns // 10**9}.{ns % 10**9:09d}", st.st_size)
     return found
 
 
-def container_view(files: list[str]) -> dict[str, tuple[int, int]]:
+def container_view(files: list[str]) -> dict[str, tuple[str, int]]:
     out = subprocess.run(
         [
             "docker",
@@ -70,7 +80,7 @@ def container_view(files: list[str]) -> dict[str, tuple[int, int]]:
             IMAGE,
             "stat",
             "-c",
-            "%Y %s %n",
+            "%.9Y %s %n",
             *files,
         ],
         capture_output=True,
@@ -80,7 +90,7 @@ def container_view(files: list[str]) -> dict[str, tuple[int, int]]:
     view = {}
     for line in out.splitlines():
         mtime, size, name = line.split(" ", 2)
-        view[name] = (int(mtime), int(size))
+        view[name] = (mtime, int(size))
     return view
 
 
@@ -135,6 +145,43 @@ def file_hashes(paths: list[str]) -> dict[str, str]:
     return hashes
 
 
+RECORDS = Path("dist/.fresh")
+
+
+def inputs_hash(paths: list[str]) -> str:
+    digest = hashlib.sha256()
+    for root in paths:
+        if not Path(root).exists():
+            digest.update(f"key {root}\n".encode())
+            continue
+        for name, file_digest in sorted(file_hashes([root]).items()):
+            digest.update(f"{name} {file_digest}\n".encode())
+    return digest.hexdigest()
+
+
+def check(name: str, outputs: list[str], paths: list[str]) -> int:
+    current = inputs_hash(paths)
+    record = RECORDS / name
+    outputs_exist = all(Path(o).exists() for o in outputs)
+    if record.exists() and outputs_exist and record.read_text().strip() == current:
+        return 0
+    # Remember what this build starts from: an edit made while it runs must
+    # not be recorded as built.
+    RECORDS.mkdir(parents=True, exist_ok=True)
+    (RECORDS / f"{name}.pending").write_text(current + "\n")
+    return 1
+
+
+def record(name: str, paths: list[str]) -> int:
+    RECORDS.mkdir(parents=True, exist_ok=True)
+    pending = RECORDS / f"{name}.pending"
+    if pending.exists():
+        pending.replace(RECORDS / name)
+    else:
+        (RECORDS / name).write_text(inputs_hash(paths) + "\n")
+    return 0
+
+
 def track(directory: str, outputs: list[str], paths: list[str]) -> int:
     target = Path(directory)
     record = target / ".fresh-hashes"
@@ -165,6 +212,11 @@ def track(directory: str, outputs: list[str], paths: list[str]) -> int:
 
 
 def main() -> int:
+    if len(sys.argv) >= 4 and sys.argv[1] in ("check", "record") and "--" in sys.argv:
+        split = sys.argv.index("--")
+        if sys.argv[1] == "record":
+            return record(sys.argv[2], sys.argv[split + 1 :])
+        return check(sys.argv[2], sys.argv[3:split], sys.argv[split + 1 :])
     if len(sys.argv) >= 4 and sys.argv[1] == "track" and "--" in sys.argv:
         split = sys.argv.index("--")
         return track(sys.argv[2], sys.argv[3:split], sys.argv[split + 1 :])

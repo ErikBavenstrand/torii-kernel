@@ -33,6 +33,7 @@ import subprocess
 import sys
 import tomllib
 import zlib
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 KERNEL = "dist/ezkernelnew.bin"
@@ -393,17 +394,17 @@ figcaption {{ font-size: 12px; color: var(--muted); }}
 def main() -> int:
     games = tomllib.loads((ROMS / "games.toml").read_text()).get("game", [])
     wanted = set(sys.argv[1:])
-    results = []
-    for game in games:
-        if wanted and game["code"] not in wanted:
-            continue
-        result = Result(game)
-        print(f"{game['code']} {game['title']}...", file=sys.stderr, flush=True)
+    results = [Result(g) for g in games if not wanted or g["code"] in wanted]
+
+    def play(result: Result) -> None:
         try:
             run_game(result)
         except Failure as e:
             result.fail_next(str(e))
-        results.append(result)
+
+    # Each game has its own cart, so they run side by side.
+    with ThreadPoolExecutor(max_workers=os.cpu_count() or 4) as pool:
+        list(pool.map(play, results))
     print_table(results)
     page = write_report(results)
     print(

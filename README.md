@@ -10,8 +10,10 @@ the kernel on, and tests.
 
 ## Setup
 
-- Docker and [just](https://github.com/casey/just). On macOS, start Docker
-  with `colima start`.
+- Docker and [just](https://github.com/casey/just). On macOS, install
+  [colima](https://github.com/abiosoft/colima): the recipes start a VM of
+  their own, `torii`, that shares the repo over virtiofs, so containers see
+  edits at once (colima's default sshfs shows them up to 20 seconds late).
 - To run the emulator: CMake, pkg-config and SDL2
   (`brew install cmake pkgconf sdl2 lua@5.4`, or `apt install cmake pkg-config libsdl2-dev liblua5.4-dev libedit-dev`).
 

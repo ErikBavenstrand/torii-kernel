@@ -5,8 +5,17 @@
 # devkitARM r54 (GCC 10.1), the closest release to the r53 EZ-Flash used that
 # compiles it without changes, pinned by digest. It runs under amd64 emulation.
 
+# On macOS, containers run in a colima VM of their own, "torii", which shares
+# the repo over virtiofs (colima's default sshfs shows edits up to 20 s late).
+export DOCKER_CONTEXT := if os() == "macos" { "colima-torii" } else { env("DOCKER_CONTEXT", "default") }
+
 # Run before every build in a container, see tools/fresh.py
 fresh := "python3 tools/fresh.py"
+# What each build reads; a step is skipped while these are unchanged
+kernel_inputs := "source Makefile image.bin tools/omega_image.py tools/nm_to_sym.py " + kernel_image
+test_kernel_inputs := "source tests/kernel Makefile " + kernel_image
+emu_inputs := "emu/mgba/src emu/mgba/include emu/mgba/CMakeLists.txt emu/mgba/cmake emu/mgba-shot.c emu/build.sh docker/emu.Dockerfile"
+test_rom_outputs := "tests/roms/hello/hello.gba tests/roms/crash/crash.gba tests/roms/crash/crash.sym tests/roms/savetest/flash128.gba tests/roms/savetest/eeprom512.gba"
 kernel_image := "devkitpro/devkitarm@sha256:1acab59884288115af0e70782a9b69017a8cc6bad69542b24e8652233f215c56"
 emu_image := "torii-emu"
 kernel_docker := "docker run --rm --platform linux/amd64 -u $(id -u):$(id -g) -v \"$PWD\":/src -w /src -e LIBGBA=/opt/devkitpro/libgba " + kernel_image
@@ -22,14 +31,17 @@ gdb_host := if os() == "linux" { "127.0.0.1" } else { "host.docker.internal" }
 
 # Build the flashable upgrade file: dist/ezkernelnew.bin
 build: emu-image
-    mkdir -p dist
+    @mkdir -p dist
+    @{{fresh}} check kernel dist/ezkernelnew.bin dist/ezkernelnew.sym ezkernelnew.elf -- {{kernel_inputs}} || {{just_executable()}} _build-kernel
+
+_build-kernel:
     {{fresh}} stamp build "{{kernel_image}}" Makefile
-    {{fresh}} sync source Makefile
     {{fresh}} track build ezkernelnew.elf ezkernelnew.gba -- source Makefile
     {{kernel_docker}} make TARGET=ezkernelnew -j8
     {{emu_docker}} python3 tools/omega_image.py ezkernelnew.gba image.bin dist/ezkernelnew.bin
     {{kernel_docker}} sh -c '/opt/devkitpro/devkitARM/bin/arm-none-eabi-nm -n ezkernelnew.elf > dist/ezkernelnew.nm'
     {{emu_docker}} python3 tools/nm_to_sym.py dist/ezkernelnew.nm dist/ezkernelnew.sym
+    {{fresh}} record kernel -- {{kernel_inputs}}
 
 # Games given are copied onto the SD card unless a file of that name is
 # already there, so their saves are kept.
@@ -105,30 +117,33 @@ run *args: build emu-headless cart
     {{emu_docker}} env OMEGA_DIR={{cart}} OMEGA_TRACE emu/build-linux/mgba-shot dist/ezkernelnew.bin "$@"
 
 # Boot test ROMs through the kernel and check every save type survives power cycles
-test: build emu-headless test-roms test-kernel
-    {{emu_docker}} tests/smoke.sh
-    {{emu_docker}} tests/save_types.sh
-    {{emu_docker}} tests/crash.sh
-    {{emu_docker}} tests/state.sh
+test: build emu-headless test-roms _test-kernel-build
+    {{emu_docker}} tests/all.sh
 
 # Play the games listed in roms/games.toml through the kernel, e.g. `just compat BPEE`
 compat *codes: build emu-headless
     {{emu_docker}} python3 tests/games.py {{codes}}
 
 # Build the test kernel (ezkerneltest.gba) with tests/kernel and run its unit tests headlessly
-test-kernel: emu-headless
-    {{fresh}} stamp build-test "{{kernel_image}} tests/kernel" Makefile
-    {{fresh}} sync source tests/kernel Makefile
-    {{fresh}} track build-test ezkerneltest.elf ezkerneltest.gba -- source tests/kernel Makefile
-    {{kernel_docker}} make TARGET=ezkerneltest BUILD=build-test SOURCES="source source/ff15 tests/kernel" -j8
+test-kernel: emu-headless _test-kernel-build
     {{emu_docker}} tests/kernel.sh
 
+_test-kernel-build: emu-image
+    @{{fresh}} check test-kernel ezkerneltest.gba -- {{test_kernel_inputs}} || {{just_executable()}} _build-test-kernel
+
+_build-test-kernel:
+    {{fresh}} stamp build-test "{{kernel_image}} tests/kernel" Makefile
+    {{fresh}} track build-test ezkerneltest.elf ezkerneltest.gba -- source tests/kernel Makefile
+    {{kernel_docker}} make TARGET=ezkerneltest BUILD=build-test SOURCES="source source/ff15 tests/kernel" -j8
+    {{fresh}} record test-kernel -- {{test_kernel_inputs}}
+
 test-roms: emu-image
-    {{fresh}} sync tests/roms
-    {{kernel_docker}} make -B -C tests/roms/hello
-    {{kernel_docker}} make -B -C tests/roms/savetest
-    {{kernel_docker}} make -B -C tests/roms/crash all
+    @{{fresh}} check test-roms {{test_rom_outputs}} -- tests/roms || {{just_executable()}} _build-test-roms
+
+_build-test-roms:
+    {{kernel_docker}} sh -c 'make -B -C tests/roms/hello && make -B -C tests/roms/savetest && make -B -C tests/roms/crash all'
     {{emu_docker}} python3 tools/nm_to_sym.py tests/roms/crash/crash.nm tests/roms/crash/crash.sym
+    {{fresh}} record test-roms -- tests/roms
 
 # Create the emulated cart (SD image from emu/sd) if it does not exist
 cart: emu-image
@@ -167,17 +182,27 @@ emu:
 
 # Build the patched mGBA and the mgba-shot runner headlessly in Docker
 emu-headless: emu-image
-    emu/fetch.sh
-    {{fresh}} sync emu/mgba/src emu/mgba/include emu/mgba-shot.c emu/build.sh
+    @emu/fetch.sh
+    @{{fresh}} check emu-headless emu/build-linux/mgba-shot -- {{emu_inputs}} || {{just_executable()}} _build-emu-headless
+
+_build-emu-headless:
     {{fresh}} track emu/build-linux emu/build-linux/libmgba.a -- emu/mgba/src emu/mgba/include
     {{emu_docker}} emu/build.sh
+    {{fresh}} record emu-headless -- {{emu_inputs}}
 
 # Save changes made in emu/mgba back into emu/patches
 emu-save-patch:
     emu/save-patch.sh
 
-emu-image:
-    @docker build -q -t {{emu_image}} -f docker/emu.Dockerfile docker >/dev/null
+# Every recipe that runs a container comes through here: make sure the torii
+# VM runs and that containers see the latest edits.
+emu-image: _vm
+    @{{fresh}} sync source Makefile image.bin tests tools emu/mgba/src emu/mgba/include emu/mgba-shot.c emu/build.sh docker
+    @{{fresh}} check emu-image -- docker/emu.Dockerfile && docker image inspect {{emu_image}} >/dev/null 2>&1 || { docker build -q -t {{emu_image}} -f docker/emu.Dockerfile docker >/dev/null && {{fresh}} record emu-image -- docker/emu.Dockerfile; }
+
+# Start the torii colima VM on macOS if it isn't running
+_vm:
+    @if [ "$(uname)" = Darwin ] && ! colima status -p torii >/dev/null 2>&1; then colima start -p torii --vm-type vz --mount-type virtiofs --vz-rosetta --cpu 4 --memory 6 && docker context use colima >/dev/null 2>&1 || true; fi
 
 # Remove build outputs (keeps the emulated cart in dist/cart)
 clean:
