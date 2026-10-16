@@ -193,6 +193,17 @@ Emerald (`BPEE`, `BPEJ`) are all `0x31`.
 **RTC:** a GPIO RTC at `0x080000C4` (S-3511 protocol), used by the menu clock
 in kernel mode and by games when register `0x096A0000` is 1.
 
+**Verified with a commercial game:** Pokémon Emerald (`BPEE`, 16 MB, Flash
+128K, RTC) runs the whole cycle on the emulated cart, launched from SD: new
+game, in-game save, power-cycle with the kernel's "Save sav?" prompt writing
+`SAVER/Emerald.sav` (identical to the first 128 KB of cart SRAM), and
+Continue on the next launch. The game's save sits in cart SRAM as plain
+bytes in Emerald's own layout (4 KB sections, signature `0x08012025`); the
+kernel copies it without interpreting it. The kernel sets `0x096A0000` for
+this game: with game-mode RTC disabled in the model, Emerald says "The
+internal battery has run dry" after the title screen; with it enabled, it
+doesn't.
+
 ## 5. Save prompt behaviour
 
 On power-on, if a game ran since the last save, the kernel asks "Save sav?".

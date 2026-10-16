@@ -5,6 +5,8 @@
 //   -k FRAME:KEYS    from FRAME on, hold KEYS (A+B+START, UP, ... or - for none)
 //   -s FRAME:PATH    write a PNG of the screen after FRAME
 //   -S PATH          write the emulated save chip's contents when done
+//   -i FILE          read more options from FILE, whitespace-separated
+//                    (# starts a comment), for long input scripts
 #include <mgba/core/core.h>
 #include <mgba/core/log.h>
 #include <mgba-util/png-io.h>
@@ -65,6 +67,78 @@ static struct event parse_event(const char* spec) {
 	return ev;
 }
 
+struct events {
+	struct event* list;
+	size_t count;
+	size_t cap;
+};
+
+static void add_event(struct events* events, const char* spec) {
+	if (events->count == events->cap) {
+		events->cap = events->cap ? events->cap * 2 : 64;
+		events->list = realloc(events->list, events->cap * sizeof(*events->list));
+	}
+	events->list[events->count++] = parse_event(spec);
+}
+
+struct options {
+	struct events keys;
+	struct events shots;
+	unsigned frames;
+	const char* saveOut;
+};
+
+static void parse_options(struct options* opts, int argc, char** argv);
+
+static void parse_file(struct options* opts, const char* path) {
+	FILE* f = fopen(path, "r");
+	if (!f) {
+		fprintf(stderr, "cannot read %s\n", path);
+		exit(2);
+	}
+	size_t cap = 64, argc = 0;
+	char** argv = malloc(cap * sizeof(*argv));
+	char line[1024];
+	while (fgets(line, sizeof(line), f)) {
+		char* hash = strchr(line, '#');
+		if (hash) {
+			*hash = '\0';
+		}
+		for (char* tok = strtok(line, " \t\r\n"); tok; tok = strtok(NULL, " \t\r\n")) {
+			if (argc == cap) {
+				cap *= 2;
+				argv = realloc(argv, cap * sizeof(*argv));
+			}
+			argv[argc++] = strdup(tok);
+		}
+	}
+	fclose(f);
+	parse_options(opts, (int) argc, argv);
+}
+
+static void parse_options(struct options* opts, int argc, char** argv) {
+	for (int i = 0; i < argc; ++i) {
+		if (i + 1 >= argc) {
+			fprintf(stderr, "missing value for %s\n", argv[i]);
+			exit(2);
+		}
+		if (!strcmp(argv[i], "-f")) {
+			opts->frames = (unsigned) strtoul(argv[++i], NULL, 10);
+		} else if (!strcmp(argv[i], "-k")) {
+			add_event(&opts->keys, argv[++i]);
+		} else if (!strcmp(argv[i], "-S")) {
+			opts->saveOut = argv[++i];
+		} else if (!strcmp(argv[i], "-s")) {
+			add_event(&opts->shots, argv[++i]);
+		} else if (!strcmp(argv[i], "-i")) {
+			parse_file(opts, argv[++i]);
+		} else {
+			fprintf(stderr, "unknown option: %s\n", argv[i]);
+			exit(2);
+		}
+	}
+}
+
 static int save_png(const char* path, const color_t* pixels, unsigned width, unsigned height) {
 	struct VFile* vf = VFileOpen(path, O_CREAT | O_TRUNC | O_WRONLY);
 	if (!vf) {
@@ -80,31 +154,16 @@ static int save_png(const char* path, const color_t* pixels, unsigned width, uns
 
 int main(int argc, char** argv) {
 	if (argc < 2) {
-		fprintf(stderr, "usage: %s ROM [-f FRAMES] [-k FRAME:KEYS]... [-s FRAME:OUT.png]...\n", argv[0]);
+		fprintf(stderr, "usage: %s ROM [-f FRAMES] [-k FRAME:KEYS]... [-s FRAME:OUT.png]... [-S SAVE] [-i FILE]\n", argv[0]);
 		return 2;
 	}
-	struct event keys[64], shots[64];
-	size_t nkeys = 0, nshots = 0;
-	unsigned frames = 0;
-	const char* saveOut = NULL;
-	for (int i = 2; i < argc; ++i) {
-		if (i + 1 >= argc) {
-			fprintf(stderr, "missing value for %s\n", argv[i]);
-			return 2;
-		}
-		if (!strcmp(argv[i], "-f")) {
-			frames = (unsigned) strtoul(argv[++i], NULL, 10);
-		} else if (!strcmp(argv[i], "-k") && nkeys < 64) {
-			keys[nkeys++] = parse_event(argv[++i]);
-		} else if (!strcmp(argv[i], "-S")) {
-			saveOut = argv[++i];
-		} else if (!strcmp(argv[i], "-s") && nshots < 64) {
-			shots[nshots++] = parse_event(argv[++i]);
-		} else {
-			fprintf(stderr, "unknown option: %s\n", argv[i]);
-			return 2;
-		}
-	}
+	struct options opts = {0};
+	parse_options(&opts, argc - 2, argv + 2);
+	struct event* keys = opts.keys.list;
+	struct event* shots = opts.shots.list;
+	size_t nkeys = opts.keys.count, nshots = opts.shots.count;
+	unsigned frames = opts.frames;
+	const char* saveOut = opts.saveOut;
 	for (size_t i = 0; i < nkeys; ++i) {
 		frames = keys[i].frame > frames ? keys[i].frame : frames;
 	}
