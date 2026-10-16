@@ -76,6 +76,11 @@ To step through the kernel:
   (`break main`, `watch/w ADDR`, `x/4 ADDR`, `trace 20`, `help`). `just
   build` writes `dist/ezkernelnew.sym`, which mGBA loads for symbol names.
 
+Save states include the cart: its registers, data port, PSRAM and SRAM (the
+NOR chips and SD card are left as they are, like disks). With `mgba-shot`,
+`-x FRAME:PATH` saves one and `-l PATH` starts from one, so a test can jump
+straight to a point in a game.
+
 Not modelled yet: the in-game menu's real-time saves, and firmware updates.
 
 ## Research

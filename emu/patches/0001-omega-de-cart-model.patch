@@ -1,9 +1,21 @@
+diff --git a/include/mgba/core/serialize.h b/include/mgba/core/serialize.h
+index 59ca1c1..1dd19c0 100644
+--- a/include/mgba/core/serialize.h
++++ b/include/mgba/core/serialize.h
+@@ -16,6 +16,7 @@ enum mStateExtdataTag {
+ 	EXTDATA_SAVEDATA = 2,
+ 	EXTDATA_CHEATS = 3,
+ 	EXTDATA_RTC = 4,
++	EXTDATA_OMEGA = 5,  // Torii: EZ-Flash Omega DE cart state
+ 	EXTDATA_META_TIME = 0x101,
+ 	EXTDATA_META_CREATOR = 0x102,
+ 	EXTDATA_MAX
 diff --git a/include/mgba/internal/gba/cart/omega.h b/include/mgba/internal/gba/cart/omega.h
 new file mode 100644
-index 0000000..ec95e19
+index 0000000..30929a0
 --- /dev/null
 +++ b/include/mgba/internal/gba/cart/omega.h
-@@ -0,0 +1,114 @@
+@@ -0,0 +1,121 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -112,6 +124,13 @@ index 0000000..ec95e19
 +uint16_t GBAOmegaRead16(struct GBA*, uint32_t address);
 +void GBAOmegaWrite16(struct GBA*, uint32_t address, uint16_t value);
 +bool GBAOmegaOwnsSRAM(const struct GBA*);
++
++// Save states: the cart's registers, data port, PSRAM (up to its last used
++// byte) and SRAM. The NOR chips and SD card are the cart's disks and stay as
++// they are, like the files of a real card would.
++struct mStateExtdataItem;
++bool GBAOmegaSerialize(const struct GBA*, struct mStateExtdataItem*);
++bool GBAOmegaDeserialize(struct GBA*, const struct mStateExtdataItem*);
 +uint8_t GBAOmegaReadSRAM(struct GBA*, uint32_t address);
 +void GBAOmegaWriteSRAM(struct GBA*, uint32_t address, uint8_t value);
 +
@@ -138,6 +157,51 @@ index a11c7e1..28ea10b 100644
  	struct GBACartEReader ereader;
  	size_t romSize;
  	uint32_t romMask;
+diff --git a/src/core/serialize.c b/src/core/serialize.c
+index 19b3225..67ff6e5 100644
+--- a/src/core/serialize.c
++++ b/src/core/serialize.c
+@@ -9,6 +9,10 @@
+ #include <mgba/core/cheats.h>
+ #include <mgba/core/interface.h>
+ #include <mgba/core/version.h>
++#ifdef M_CORE_GBA
++#include <mgba/internal/gba/gba.h>
++#include <mgba/internal/gba/cart/omega.h>
++#endif
+ #include <mgba-util/memory.h>
+ #include <mgba-util/vfs.h>
+ 
+@@ -427,6 +431,14 @@ bool mCoreSaveStateNamed(struct mCore* core, struct VFile* vf, int flags) {
+ 			mStateExtdataPut(&extdata, EXTDATA_CHEATS, &item);
+ 		}
+ 	}
++#ifdef M_CORE_GBA
++	if (core->platform(core) == mPLATFORM_GBA) {
++		struct mStateExtdataItem item;
++		if (GBAOmegaSerialize(core->board, &item)) {
++			mStateExtdataPut(&extdata, EXTDATA_OMEGA, &item);
++		}
++	}
++#endif
+ 	if (flags & SAVESTATE_RTC) {
+ 		struct mStateExtdataItem item;
+ 		if (core->rtc.d.serialize) {
+@@ -547,6 +559,14 @@ bool mCoreLoadStateNamed(struct mCore* core, struct VFile* vf, int flags) {
+ 			}
+ 		}
+ 	}
++#ifdef M_CORE_GBA
++	if (core->platform(core) == mPLATFORM_GBA && mStateExtdataGet(&extdata, EXTDATA_OMEGA, &item)) {
++		mLOG(SAVESTATE, INFO, "Loading Omega DE cart state");
++		if (!GBAOmegaDeserialize(core->board, &item)) {
++			mLOG(SAVESTATE, WARN, "Failed to load the Omega DE cart state");
++		}
++	}
++#endif
+ 	if (flags & SAVESTATE_RTC && mStateExtdataGet(&extdata, EXTDATA_RTC, &item)) {
+ 		mLOG(SAVESTATE, INFO, "Loading RTC");
+ 		if (core->rtc.d.deserialize) {
 diff --git a/src/gba/CMakeLists.txt b/src/gba/CMakeLists.txt
 index 4bf354f..fd3e023 100644
 --- a/src/gba/CMakeLists.txt
@@ -152,10 +216,10 @@ index 4bf354f..fd3e023 100644
  	cheats/codebreaker.c
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..0e6e526
+index 0000000..e4b3b8f
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,735 @@
+@@ -0,0 +1,890 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -167,6 +231,7 @@ index 0000000..0e6e526
 +#include <mgba/internal/gba/gba.h>
 +#include <mgba/internal/gba/memory.h>
 +#include <mgba/internal/gba/savedata.h>
++#include <mgba/core/serialize.h>
 +#include <mgba-util/memory.h>
 +#include <mgba-util/vfs.h>
 +
@@ -769,6 +834,160 @@ index 0000000..0e6e526
 +	GBAOmegaInit(omega);
 +}
 +
++// --- Save states -------------------------------------------------------------
++
++#define OMEGA_STATE_MAGIC 0x31474D4F  // "OMG1"
++
++struct GBAOmegaNorSnapshot {
++	uint32_t state;
++	uint32_t bufferBase;
++	int32_t bufferRemaining;
++};
++
++// Fixed-size part of the cart state, followed by the data port, the cart SRAM
++// and psramUsed bytes of PSRAM.
++struct GBAOmegaStateHeader {
++	uint32_t magic;
++	uint32_t psramUsed;
++	int32_t unlockStep;
++	int32_t flashCmdStep;
++	uint32_t sdLba;
++	uint32_t saveSize;
++	uint32_t gameSize;
++	uint16_t sdControl;
++	uint16_t bufferControl;
++	uint16_t spiControl;
++	uint16_t spiWrite;
++	uint16_t rtcStatus;
++	uint16_t ledControl;
++	uint16_t rom64Flag;
++	uint16_t psramPage;
++	uint16_t romPage;
++	uint16_t ramPage;
++	uint16_t gpio[4];
++	uint8_t saveMode;
++	uint8_t unlocked;
++	uint8_t gameSaveActive;
++	uint8_t rtcTraced;
++	struct GBAOmegaNorSnapshot kernelNor;
++	struct GBAOmegaNorSnapshot gameNor;
++};
++
++static void _saveNorState(const struct GBAOmegaNor* nor, struct GBAOmegaNorSnapshot* out) {
++	out->state = nor->state;
++	out->bufferBase = nor->bufferBase;
++	out->bufferRemaining = nor->bufferRemaining;
++}
++
++static void _loadNorState(struct GBAOmegaNor* nor, const struct GBAOmegaNorSnapshot* in) {
++	nor->state = in->state;
++	nor->bufferBase = in->bufferBase;
++	nor->bufferRemaining = in->bufferRemaining;
++}
++
++bool GBAOmegaSerialize(const struct GBA* gba, struct mStateExtdataItem* item) {
++	const struct GBAOmega* omega = &gba->memory.omega;
++	if (!omega->enabled) {
++		return false;
++	}
++	uint32_t psramUsed = OMEGA_PSRAM_SIZE;
++	while (psramUsed && !omega->psram[psramUsed - 1]) {
++		--psramUsed;
++	}
++	size_t size = sizeof(struct GBAOmegaStateHeader) + OMEGA_PORT_SIZE + OMEGA_SRAM_SIZE + psramUsed;
++	uint8_t* data = malloc(size);
++	if (!data) {
++		return false;
++	}
++	struct GBAOmegaStateHeader header = {
++		.magic = OMEGA_STATE_MAGIC,
++		.psramUsed = psramUsed,
++		.unlockStep = omega->unlockStep,
++		.flashCmdStep = omega->flashCmdStep,
++		.sdLba = omega->sdLba,
++		.saveSize = omega->saveSize,
++		.gameSize = omega->gameSize,
++		.sdControl = omega->sdControl,
++		.bufferControl = omega->bufferControl,
++		.spiControl = omega->spiControl,
++		.spiWrite = omega->spiWrite,
++		.rtcStatus = omega->rtcStatus,
++		.ledControl = omega->ledControl,
++		.rom64Flag = omega->rom64Flag,
++		.psramPage = omega->psramPage,
++		.romPage = omega->romPage,
++		.ramPage = omega->ramPage,
++		.saveMode = omega->saveMode,
++		.unlocked = omega->unlocked,
++		.gameSaveActive = omega->gameSaveActive,
++		.rtcTraced = omega->rtcTraced,
++	};
++	memcpy(header.gpio, omega->gpio, sizeof(header.gpio));
++	_saveNorState(&omega->kernelNor, &header.kernelNor);
++	_saveNorState(&omega->gameNor, &header.gameNor);
++
++	uint8_t* p = data;
++	memcpy(p, &header, sizeof(header));
++	p += sizeof(header);
++	memcpy(p, omega->port, OMEGA_PORT_SIZE);
++	p += OMEGA_PORT_SIZE;
++	memcpy(p, omega->sram, OMEGA_SRAM_SIZE);
++	p += OMEGA_SRAM_SIZE;
++	memcpy(p, omega->psram, psramUsed);
++
++	item->size = size;
++	item->data = data;
++	item->clean = free;
++	return true;
++}
++
++bool GBAOmegaDeserialize(struct GBA* gba, const struct mStateExtdataItem* item) {
++	struct GBAOmega* omega = &gba->memory.omega;
++	struct GBAOmegaStateHeader header;
++	if (!omega->enabled || item->size < (int32_t) sizeof(header)) {
++		return false;
++	}
++	memcpy(&header, item->data, sizeof(header));
++	size_t size = sizeof(header) + OMEGA_PORT_SIZE + OMEGA_SRAM_SIZE + (size_t) header.psramUsed;
++	if (header.magic != OMEGA_STATE_MAGIC || header.psramUsed > OMEGA_PSRAM_SIZE || (size_t) item->size != size) {
++		return false;
++	}
++	const uint8_t* p = (const uint8_t*) item->data + sizeof(header);
++	memcpy(omega->port, p, OMEGA_PORT_SIZE);
++	p += OMEGA_PORT_SIZE;
++	memcpy(omega->sram, p, OMEGA_SRAM_SIZE);
++	p += OMEGA_SRAM_SIZE;
++	memcpy(omega->psram, p, header.psramUsed);
++	memset(&omega->psram[header.psramUsed], 0, OMEGA_PSRAM_SIZE - header.psramUsed);
++
++	omega->unlockStep = header.unlockStep;
++	omega->flashCmdStep = header.flashCmdStep;
++	omega->sdLba = header.sdLba;
++	omega->saveSize = header.saveSize;
++	omega->gameSize = header.gameSize;
++	omega->sdControl = header.sdControl;
++	omega->bufferControl = header.bufferControl;
++	omega->spiControl = header.spiControl;
++	omega->spiWrite = header.spiWrite;
++	omega->rtcStatus = header.rtcStatus;
++	omega->ledControl = header.ledControl;
++	omega->rom64Flag = header.rom64Flag;
++	omega->psramPage = header.psramPage;
++	omega->romPage = header.romPage;
++	omega->ramPage = header.ramPage;
++	omega->saveMode = header.saveMode;
++	omega->unlocked = header.unlocked;
++	omega->gameSaveActive = header.gameSaveActive;
++	omega->rtcTraced = header.rtcTraced;
++	memcpy(omega->gpio, header.gpio, sizeof(header.gpio));
++	_loadNorState(&omega->kernelNor, &header.kernelNor);
++	_loadNorState(&omega->gameNor, &header.gameNor);
++	// The save chip came back with the core state; map the ROM to match.
++	_remap(gba);
++	_trace(gba, "state loaded: %s", _isKernelMode(omega) ? "kernel mode" : "game mode");
++	return true;
++}
++
 +uint16_t GBAOmegaRead16(struct GBA* gba, uint32_t address) {
 +	struct GBAOmega* omega = &gba->memory.omega;
 +	uint32_t offset = address & 0x01FFFFFF;
@@ -1062,3 +1281,52 @@ index 5bb5182..fa7ac0d 100644
  		if (memory->savedata.type == SAVEDATA_AUTODETECT) {
  			if (address == SAVEDATA_FLASH_BASE) {
  				mLOG(GBA_MEM, INFO, "Detected Flash savegame");
+diff --git a/src/gba/serialize.c b/src/gba/serialize.c
+index 1079932..63e453e 100644
+--- a/src/gba/serialize.c
++++ b/src/gba/serialize.c
+@@ -24,6 +24,15 @@ struct GBABundledState {
+ 	struct mStateExtdata* extdata;
+ };
+ 
++// With the Omega DE cart, the mapped ROM changes between the kernel and the
++// game it launched; states name the loaded file (the kernel) instead.
++static const struct GBACartridge* _stateRom(const struct GBA* gba) {
++	if (gba->memory.omega.enabled) {
++		return (const struct GBACartridge*) gba->memory.omega.originalRom;
++	}
++	return (const struct GBACartridge*) gba->memory.rom;
++}
++
+ void GBASerialize(struct GBA* gba, struct GBASerializedState* state) {
+ 	STORE_32(GBASavestateMagic + GBASavestateVersion, 0, &state->versionMagic);
+ 	STORE_32(gba->biosChecksum, 0, &state->biosChecksum);
+@@ -32,8 +41,8 @@ void GBASerialize(struct GBA* gba, struct GBASerializedState* state) {
+ 	STORE_64LE(gba->timing.globalCycles, 0, &state->globalCycles);
+ 
+ 	if (gba->memory.rom) {
+-		state->id = ((struct GBACartridge*) gba->memory.rom)->id;
+-		memcpy(state->title, ((struct GBACartridge*) gba->memory.rom)->title, sizeof(state->title));
++		state->id = _stateRom(gba)->id;
++		memcpy(state->title, _stateRom(gba)->title, sizeof(state->title));
+ 	} else {
+ 		state->id = 0;
+ 		memset(state->title, 0, sizeof(state->title));
+@@ -106,7 +115,7 @@ bool GBADeserialize(struct GBA* gba, const struct GBASerializedState* state) {
+ 			error = true;
+ 		}
+ 	}
+-	if (gba->memory.rom && (state->id != ((struct GBACartridge*) gba->memory.rom)->id || memcmp(state->title, ((struct GBACartridge*) gba->memory.rom)->title, sizeof(state->title)))) {
++	if (gba->memory.rom && (state->id != _stateRom(gba)->id || memcmp(state->title, _stateRom(gba)->title, sizeof(state->title)))) {
+ 		mLOG(GBA_STATE, WARN, "Savestate is for a different game");
+ 		error = true;
+ 	} else if (!gba->memory.rom && state->id != 0) {
+@@ -128,7 +137,7 @@ bool GBADeserialize(struct GBA* gba, const struct GBASerializedState* state) {
+ 	}
+ 	LOAD_32(check, ARM_PC * sizeof(state->cpu.gprs[0]), state->cpu.gprs);
+ 	int region = (check >> BASE_OFFSET);
+-	if ((region == REGION_CART0 || region == REGION_CART1 || region == REGION_CART2) && ((check - WORD_SIZE_ARM) & SIZE_CART0) >= gba->memory.romSize - WORD_SIZE_ARM) {
++	if (!gba->memory.omega.enabled && (region == REGION_CART0 || region == REGION_CART1 || region == REGION_CART2) && ((check - WORD_SIZE_ARM) & SIZE_CART0) >= gba->memory.romSize - WORD_SIZE_ARM) {
+ 		mLOG(GBA_STATE, WARN, "Savestate created using a differently sized version of the ROM");
+ 		error = true;
+ 	}

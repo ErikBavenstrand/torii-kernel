@@ -15,6 +15,8 @@
 //                    same hash), to compare runs without saving PNGs
 //   -p FRAME:ADDR:VALUE  before FRAME, write a 32-bit VALUE to ADDR
 //   -u TEXT          stop after the frame in which the kernel logs TEXT
+//   -x FRAME:PATH    after FRAME, write a save state (with the cart's state)
+//   -l PATH          load a save state before the first frame
 //
 // If the CPU hits an illegal opcode or jumps to an invalid address, it prints
 // a crash report (registers, and code addresses found on the stack with their
@@ -22,6 +24,7 @@
 #include <mgba/flags.h>
 #include <mgba/core/core.h>
 #include <mgba/core/log.h>
+#include <mgba/core/serialize.h>
 #include <mgba/internal/arm/arm.h>
 #include <mgba-util/png-io.h>
 #include <mgba-util/vfs.h>
@@ -219,6 +222,8 @@ struct options {
 	struct events regs;
 	struct events hashes;
 	struct events pokes;
+	struct events states;
+	const char* loadState;
 	const char* until;
 	unsigned frames;
 	const char* saveOut;
@@ -280,6 +285,10 @@ static void parse_options(struct options* opts, int argc, char** argv) {
 			add_event(&opts->hashes, spec);
 		} else if (!strcmp(argv[i], "-p")) {
 			add_event(&opts->pokes, argv[++i]);
+		} else if (!strcmp(argv[i], "-x")) {
+			add_event(&opts->states, argv[++i]);
+		} else if (!strcmp(argv[i], "-l")) {
+			opts->loadState = argv[++i];
 		} else if (!strcmp(argv[i], "-u")) {
 			opts->until = argv[++i];
 		} else if (!strcmp(argv[i], "-y")) {
@@ -376,6 +385,7 @@ int main(int argc, char** argv) {
 	frames = last_frame(&opts.regs, frames);
 	frames = last_frame(&opts.hashes, frames);
 	frames = last_frame(&opts.pokes, frames);
+	frames = last_frame(&opts.states, frames);
 	until_text = opts.until;
 	if (until_text && !opts.frames) {
 		frames = frames > 36000 ? frames : 36000;  // Give up after 10 minutes of game time.
@@ -400,6 +410,14 @@ int main(int argc, char** argv) {
 	}
 	core->reset(core);
 	crash_core = core;
+	if (opts.loadState) {
+		struct VFile* vf = VFileOpen(opts.loadState, O_RDONLY);
+		if (!vf || !mCoreLoadStateNamed(core, vf, SAVESTATE_SAVEDATA | SAVESTATE_RTC)) {
+			fprintf(stderr, "cannot load state %s\n", opts.loadState);
+			return 1;
+		}
+		vf->close(vf);
+	}
 	if (opts.symFile) {
 		load_symbols(opts.symFile);
 	} else {
@@ -456,6 +474,20 @@ int main(int argc, char** argv) {
 			print_crash(frame);
 			status = 3;
 			break;
+		}
+		for (size_t i = 0; i < opts.states.count; ++i) {
+			if (opts.states.list[i].frame == frame) {
+				struct VFile* vf = VFileOpen(opts.states.list[i].arg, O_CREAT | O_TRUNC | O_RDWR);
+				if (vf && mCoreSaveStateNamed(core, vf, SAVESTATE_SAVEDATA | SAVESTATE_RTC)) {
+					printf("state frame %u -> %s\n", frame, opts.states.list[i].arg);
+				} else {
+					fprintf(stderr, "cannot write state %s\n", opts.states.list[i].arg);
+					status = 1;
+				}
+				if (vf) {
+					vf->close(vf);
+				}
+			}
 		}
 		for (size_t i = 0; i < opts.dumps.count; ++i) {
 			if (opts.dumps.list[i].frame == frame) {

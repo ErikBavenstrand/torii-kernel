@@ -93,6 +93,7 @@ test: build emu-headless test-roms
     {{emu_docker}} tests/smoke.sh
     {{emu_docker}} tests/save_types.sh
     {{emu_docker}} tests/crash.sh
+    {{emu_docker}} tests/state.sh
 
 # Play the games listed in roms/games.toml through the kernel, e.g. `just compat BPEE`
 compat *codes: build emu-headless
