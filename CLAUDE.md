@@ -12,7 +12,7 @@ Torii is a custom kernel for the EZ-Flash Omega DE, forked from EZ-Flash's offic
 - Log from kernel code with `tlog()` and `TLOG_ASSERT()` from `source/tlog.h`. Lines print as `kernel: ...` from `mgba-shot` and as `GBA Debug: ...` from `just play`; on real hardware they cost nothing. A failed assert fails `just compat`.
 - `just size` checks the kernel against the 1 MB kernel area, IWRAM and EWRAM. EWRAM has about 400 bytes left; past its end, data wraps onto its start. The deepest stack measured is about 1.7 KB, so keep IWRAM free space well above that.
 - Build only with `just build`. It pins devkitARM r54 because newer GCC rejects the unmodified source.
-- After changing toolchains or seeing odd link sizes, run `just clean`; stale objects in `build/` get reused.
+- Builds guard against stale objects themselves (`tools/fresh.py`): colima's sshfs mount shows edits to containers up to a second late, with whole-second timestamps, so make alone can reuse old objects. Build through the `just` recipes, never `make` directly.
 
 ## Checking changes
 

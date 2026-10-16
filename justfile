@@ -5,6 +5,8 @@
 # devkitARM r54 (GCC 10.1), the closest release to the r53 EZ-Flash used that
 # compiles it without changes, pinned by digest. It runs under amd64 emulation.
 
+# Run before every build in a container, see tools/fresh.py
+fresh := "python3 tools/fresh.py"
 kernel_image := "devkitpro/devkitarm@sha256:1acab59884288115af0e70782a9b69017a8cc6bad69542b24e8652233f215c56"
 emu_image := "torii-emu"
 kernel_docker := "docker run --rm --platform linux/amd64 -u $(id -u):$(id -g) -v \"$PWD\":/src -w /src -e LIBGBA=/opt/devkitpro/libgba " + kernel_image
@@ -21,6 +23,9 @@ gdb_host := if os() == "linux" { "127.0.0.1" } else { "host.docker.internal" }
 # Build the flashable upgrade file: dist/ezkernelnew.bin
 build: emu-image
     mkdir -p dist
+    {{fresh}} stamp build "{{kernel_image}}" Makefile
+    {{fresh}} sync source Makefile
+    {{fresh}} track build ezkernelnew.elf ezkernelnew.gba -- source Makefile
     {{kernel_docker}} make TARGET=ezkernelnew -j8
     {{emu_docker}} python3 tools/omega_image.py ezkernelnew.gba image.bin dist/ezkernelnew.bin
     {{kernel_docker}} sh -c '/opt/devkitpro/devkitARM/bin/arm-none-eabi-nm -n ezkernelnew.elf > dist/ezkernelnew.nm'
@@ -112,13 +117,17 @@ compat *codes: build emu-headless
 
 # Build the test kernel (ezkerneltest.gba) with tests/kernel and run its unit tests headlessly
 test-kernel: emu-headless
+    {{fresh}} stamp build-test "{{kernel_image}} tests/kernel" Makefile
+    {{fresh}} sync source tests/kernel Makefile
+    {{fresh}} track build-test ezkerneltest.elf ezkerneltest.gba -- source tests/kernel Makefile
     {{kernel_docker}} make TARGET=ezkerneltest BUILD=build-test SOURCES="source source/ff15 tests/kernel" -j8
     {{emu_docker}} tests/kernel.sh
 
-test-roms:
-    {{kernel_docker}} make -C tests/roms/hello
-    {{kernel_docker}} make -C tests/roms/savetest
-    {{kernel_docker}} make -C tests/roms/crash all
+test-roms: emu-image
+    {{fresh}} sync tests/roms
+    {{kernel_docker}} make -B -C tests/roms/hello
+    {{kernel_docker}} make -B -C tests/roms/savetest
+    {{kernel_docker}} make -B -C tests/roms/crash all
     {{emu_docker}} python3 tools/nm_to_sym.py tests/roms/crash/crash.nm tests/roms/crash/crash.sym
 
 # Create the emulated cart (SD image from emu/sd) if it does not exist
@@ -140,12 +149,14 @@ cart-add +files: cart
 [positional-arguments]
 _cart-copy mode +files:
     rm -rf dist/.cart-add && mkdir -p dist/.cart-add && shift && cp "$@" dist/.cart-add/
+    {{fresh}} sync --all dist/.cart-add
     {{emu_docker}} tools/cart_copy.sh {{mode}} {{cart}}/sd.img dist/.cart-add/*; status=$?; rm -rf dist/.cart-add; exit $status
 
 # Copy games into roms/ and add them to roms/games.toml, e.g. `just game-add ~/roms/game.gba`
 [positional-arguments]
 game-add +roms: emu-image
     cp -n "$@" roms/
+    {{fresh}} sync --all roms
     for f in "$@"; do printf 'roms/%s\0' "$(basename "$f")"; done | xargs -0 {{emu_docker}} python3 tools/games.py add
 
 # Build the patched mGBA natively (SDL frontend) for `play` and `dev`
@@ -157,6 +168,8 @@ emu:
 # Build the patched mGBA and the mgba-shot runner headlessly in Docker
 emu-headless: emu-image
     emu/fetch.sh
+    {{fresh}} sync emu/mgba/src emu/mgba/include emu/mgba-shot.c emu/build.sh
+    {{fresh}} track emu/build-linux emu/build-linux/libmgba.a -- emu/mgba/src emu/mgba/include
     {{emu_docker}} emu/build.sh
 
 # Save changes made in emu/mgba back into emu/patches

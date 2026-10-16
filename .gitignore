@@ -11,6 +11,7 @@ bitstreams/
 
 # Patched mGBA checkout and builds (recreate with `just emu` / `just emu-headless`)
 emu/mgba/
+emu/.mgba-patches
 emu/build-linux/
 emu/build-native/
 
