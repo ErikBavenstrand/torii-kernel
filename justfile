@@ -42,6 +42,10 @@ test: build emu-headless test-roms
     {{emu_docker}} tests/smoke.sh
     {{emu_docker}} tests/save_types.sh
 
+# Play the games listed in roms/games.toml through the kernel, e.g. `just compat BPEE`
+compat *codes: build emu-headless
+    {{emu_docker}} python3 tests/games.py {{codes}}
+
 test-roms:
     {{kernel_docker}} make -C tests/roms/hello
     {{kernel_docker}} make -C tests/roms/savetest

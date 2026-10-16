@@ -1,9 +1,9 @@
 diff --git a/include/mgba/internal/gba/cart/omega.h b/include/mgba/internal/gba/cart/omega.h
 new file mode 100644
-index 0000000..6f0d57d
+index 0000000..ec95e19
 --- /dev/null
 +++ b/include/mgba/internal/gba/cart/omega.h
-@@ -0,0 +1,109 @@
+@@ -0,0 +1,114 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -93,6 +93,11 @@ index 0000000..6f0d57d
 +	// GPIO pins (RTC) overlaid on ROM 0xC4-0xC9, kept apart from the ROM data.
 +	uint16_t gpio[4];
 +
++	// OMEGA_TRACE=1: log cart events to stderr. rtcTraced keeps the clock
++	// from being logged more than once per game launch.
++	bool trace;
++	bool rtcTraced;
++
 +	uint8_t port[OMEGA_PORT_SIZE];
 +
 +	uint32_t* originalRom;
@@ -147,10 +152,10 @@ index 4bf354f..fd3e023 100644
  	cheats/codebreaker.c
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..a76be86
+index 0000000..0e6e526
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,687 @@
+@@ -0,0 +1,735 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -164,6 +169,9 @@ index 0000000..a76be86
 +#include <mgba/internal/gba/savedata.h>
 +#include <mgba-util/memory.h>
 +#include <mgba-util/vfs.h>
++
++#include <stdarg.h>
++#include <stdio.h>
 +
 +mLOG_DEFINE_CATEGORY(GBA_OMEGA, "GBA Omega DE", "gba.omega");
 +
@@ -206,6 +214,20 @@ index 0000000..a76be86
 +#define GPIO_LAST 0xC9
 +// Rev.B cart (Spartan-6 LX16) on firmware 7, matching the shipped kernel.
 +#define FPGA_VERSION 0xB007
++
++// One line per cart event on stderr, prefixed with the frame number, when
++// OMEGA_TRACE=1. Tests read it to see what the kernel told the cart.
++static void _trace(const struct GBA* gba, const char* format, ...) {
++	if (!gba->memory.omega.trace) {
++		return;
++	}
++	va_list args;
++	va_start(args, format);
++	fprintf(stderr, "omega %u: ", gba->video.frameCounter);
++	vfprintf(stderr, format, args);
++	fputc('\n', stderr);
++	va_end(args);
++}
 +
 +static bool _isKernelMode(const struct GBAOmega* omega) {
 +	return omega->romPage & ROM_PAGE_KERNEL;
@@ -384,12 +406,14 @@ index 0000000..a76be86
 +
 +// --- SD card and FPGA data port --------------------------------------------
 +
-+static void _sdTransfer(struct GBAOmega* omega, uint16_t count) {
++static void _sdTransfer(struct GBA* gba, uint16_t count) {
++	struct GBAOmega* omega = &gba->memory.omega;
 +	bool write = count & 0x8000;
 +	unsigned sectors = count & 0xFF;
 +	if (sectors * SECTOR_SIZE > OMEGA_PORT_SIZE) {
 +		sectors = OMEGA_PORT_SIZE / SECTOR_SIZE;
 +	}
++	_trace(gba, "sd %s sector %u count %u", write ? "write" : "read", omega->sdLba, sectors);
 +	if (!omega->sd) {
 +		if (!write) {
 +			memset(omega->port, 0, sectors * SECTOR_SIZE);
@@ -497,7 +521,9 @@ index 0000000..a76be86
 +		memcpy(savedata->data, omega->sram, size);
 +	}
 +	omega->gameSaveActive = true;
++	omega->rtcTraced = false;
 +	mLOG(GBA_OMEGA, INFO, "Game save: mode %02X, %zu bytes", omega->saveMode, size);
++	_trace(gba, "game save: mode %02X, %zu bytes", omega->saveMode, size);
 +}
 +
 +// Power-off: the save chip's contents are what the cart SRAM holds.
@@ -519,6 +545,16 @@ index 0000000..a76be86
 +
 +static bool _rtcActive(const struct GBAOmega* omega) {
 +	return _isKernelMode(omega) || omega->rtcStatus;
++}
++
++// Log the first time a game touches the clock pins after launch.
++static void _traceClock(struct GBA* gba, bool active) {
++	struct GBAOmega* omega = &gba->memory.omega;
++	if (_isKernelMode(omega) || omega->rtcTraced) {
++		return;
++	}
++	omega->rtcTraced = true;
++	_trace(gba, active ? "game uses the clock" : "game uses the clock, but in-game RTC is off");
 +}
 +
 +static bool _isGpio(uint32_t address) {
@@ -570,12 +606,22 @@ index 0000000..a76be86
 +	memory->activeRegion = -1;
 +	gba->cpu->memory.setActiveRegion(gba->cpu, gba->cpu->gprs[ARM_PC]);
 +	mLOG(GBA_OMEGA, DEBUG, "ROM page %04X", omega->romPage);
++	if (_isKernelMode(omega)) {
++		_trace(gba, "mode kernel");
++	} else if ((omega->romPage & 0x3FF) >= ROM_PAGE_PSRAM) {
++		_trace(gba, "mode game from PSRAM");
++	} else {
++		_trace(gba, "mode game from NOR offset %06X", (omega->romPage & 0x1FF) << 17);
++	}
 +}
 +
 +// --- Registers -------------------------------------------------------------
 +
 +static bool _writeRegister(struct GBA* gba, uint32_t offset, uint16_t value) {
 +	struct GBAOmega* omega = &gba->memory.omega;
++	if (offset != REG_SD_LBA_LO && offset != REG_SD_LBA_HI && offset != REG_SD_COUNT) {
++		_trace(gba, "register %08X = %04X", 0x08000000 | offset, value);
++	}
 +	switch (offset) {
 +	case REG_SD_CONTROL:
 +		omega->sdControl = value;
@@ -587,6 +633,9 @@ index 0000000..a76be86
 +			omega->saveMode = save >> 24;
 +			omega->saveSize = save & 0x00FFFFFF;
 +			omega->gameSize = _portWord(omega, FAT_SIZE_INDEX);
++			_trace(gba, "launch: save mode %02X size %X, game size %X, %s", omega->saveMode, omega->saveSize,
++			       omega->gameSize,
++			       _portWord(omega, FAT_PARAM_INDEX) == FAT_SET_PARAMETER_MODE ? "parameters only" : "load ROM");
 +			if (_portWord(omega, FAT_PARAM_INDEX) != FAT_SET_PARAMETER_MODE) {
 +				_loadRomFromFatTable(omega);
 +			}
@@ -599,7 +648,7 @@ index 0000000..a76be86
 +		omega->sdLba = (omega->sdLba & 0x0000FFFF) | (value << 16);
 +		break;
 +	case REG_SD_COUNT:
-+		_sdTransfer(omega, value);
++		_sdTransfer(gba, value);
 +		break;
 +	case REG_SPI_CONTROL:
 +		omega->spiControl = value;
@@ -689,6 +738,8 @@ index 0000000..a76be86
 +	omega->originalRomSize = gba->memory.romSize;
 +	omega->originalRomMask = gba->memory.romMask;
 +	omega->romPage = ROM_PAGE_BOOT;
++	const char* trace = getenv("OMEGA_TRACE");
++	omega->trace = trace && *trace && strcmp(trace, "0");
 +	omega->enabled = true;
 +	_remap(gba);
 +	mLOG(GBA_OMEGA, INFO, "Omega DE cart enabled from %s", dir);
@@ -725,6 +776,7 @@ index 0000000..a76be86
 +		return GBASavedataReadEEPROM(&gba->memory.savedata);
 +	}
 +	if (_isGpio(address) && gba->memory.hw.readWrite && _rtcActive(omega)) {
++		_traceClock(gba, true);
 +		return omega->gpio[(offset - GPIO_FIRST) >> 1];
 +	}
 +	if (offset >= PORT_BASE && offset < PORT_END && _portActive(omega)) {
@@ -755,6 +807,7 @@ index 0000000..a76be86
 +	uint32_t offset = address & 0x01FFFFFE;
 +
 +	if (_isGpio(address)) {
++		_traceClock(gba, _rtcActive(omega));
 +		if (_rtcActive(omega)) {
 +			GBAHardwareGPIOWrite(&gba->memory.hw, offset, value);
 +		}

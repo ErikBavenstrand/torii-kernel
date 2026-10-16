@@ -25,6 +25,7 @@ the kernel on, and tests.
 | `just test` | checks games boot and every save type survives power cycles |
 | `just cart-add game.gba` | copies a file onto the emulated SD card |
 | `just game-add game.gba` | copies a game you own into the git-ignored `roms/` and lists it in `roms/games.toml` |
+| `just compat` | plays each listed game through the kernel and checks it boots, gets the right save type and clock, and keeps its saves |
 
 `just --list` shows the rest.
 
@@ -41,6 +42,14 @@ card, NOR and SRAM live in `dist/cart/` and persist between runs.
 
 Keys: arrows, X = A, Z = B, A = L, S = R, Enter = Start, Backspace = Select.
 The window opens at 4×; `just scale=3 play` changes it.
+
+Run with `OMEGA_TRACE=1` to log what the kernel and games do with the cart
+(register writes, launches with their save type, SD reads and writes, mode
+switches, clock use) to stderr.
+
+`just compat` plays the games in `roms/games.toml`. A game with a starting
+save (`roms/<name>.sav`) and a key script (`tests/games/<code>.keys`) goes
+through a full save cycle; the others are only launched.
 
 Not modelled yet: the in-game menu's real-time saves, and firmware updates.
 

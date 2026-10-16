@@ -1,0 +1,21 @@
+# Pokémon Emerald, from a starting save made in the moving truck.
+# FRAME KEYS: press at FRAME, release 6 frames later. The kernel launches
+# the game by frame 200.
+
+# Skip the intro, pass the title screen, choose CONTINUE.
+600 A
+720 A
+840 A
+960 A
+
+# START menu: BAG, <player>, SAVE. Save, and overwrite the existing file.
+1400 START
+1460 DOWN
+1500 DOWN
+1540 A
+1700 A
+2100 A
+
+# Saving takes about 600 frames; then close the message.
+3000 A
+3200 -
