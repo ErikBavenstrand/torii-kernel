@@ -4,33 +4,54 @@
 # ///
 """Play the games in roms/games.toml through the kernel on the emulated cart.
 
-usage: tests/games.py [CODE...]    (default: every listed game)
+usage: tests/games.py [--all] [FILTER...]
 
-Each game gets a fresh cart in dist/cart-games/<code>. With a starting save
-(roms/<name>.sav) and a key script (tests/games/<code>.keys) it runs the whole
-cycle: launch and save in-game, power-cycle so the kernel writes the save to
-SD, launch and save again. Without them it only launches the game. Checks:
+Games share requirements: Ruby and Sapphire need exactly the same of the
+kernel. So by default one game runs per set of requirements (system, save
+chip, kernel save mode, ROM size class, clock, other hardware), preferring
+one with a key script or a starting save; the report lists the games each
+one stands for. --all runs every game. A FILTER keeps games whose code,
+system (gba, gbc, gb), save chip or file name contains it. Games marked
+`skip` in games.toml (ROM hacks, kernel plugins) never run. Each game gets a
+fresh cart and three power-ons:
 
-- boots: the cart ends in game mode with a picture on screen
-- save type: the kernel sent the save chip the game needs
-- clock: a game that uses the clock finds it on
-- save cycle: the game saved, the save reached SAVER/ unchanged, and the
-  game loaded it back (it saved again, and for Pokémon generation 3 games
-  the save counter went up each time)
+1. Launch it from the kernel menu, press START and A now and then for about
+   40 seconds of game time, and watch the screen.
+2. If the game wrote its save chip, power on again: the kernel must copy
+   the save to SAVER/.
+3. Launch it again: the kernel must load that save back into the cart.
 
-Runs inside the torii-emu container after
-`just build` and `just emu-headless`. Prints a table and writes the report,
-with screenshots, to dist/compat/index.html.
+Checks, each pass, fail, untested (the run didn't get that far) or n/a:
+
+- boots: the game left the kernel and its screen changed; a crash, kernel
+  error, blank or frozen screen fails
+- save type: the kernel sent the save chip the ROM's SDK strings ask for
+- clock: a game that uses the clock read it, with the cart's clock on
+- save cycle: what the game wrote reached SAVER/ and came back on relaunch;
+  for a game that didn't save during the run, a test pattern put in the
+  cart's save memory makes the same trip
+
+A game with a starting save and a key script (tests/games/<code>.keys)
+plays that script instead, saves in-game and is
+relaunched to save again; Pokémon generation 3 save counters must go up.
+Other starting saves (a .sav next to the ROM, or in a SAVER folder of the
+library) are put on the card so the game starts from them.
+
+Results go to dist/compat/runs/<time>.json and the report to
+dist/compat/index.html (tests/compat_report.py). Runs inside the torii-emu
+container, with the library folders of roms/library.txt mounted under
+/library (see `just compat`).
 """
 
-import base64
 import hashlib
-import html
+import json
 import os
+import re
 import shutil
 import struct
 import subprocess
 import sys
+import time
 import tomllib
 import zlib
 from concurrent.futures import ThreadPoolExecutor
@@ -42,6 +63,7 @@ ROMS = Path("roms")
 KEYS = Path("tests/games")
 CARTS = Path("dist/cart-games")
 REPORT = Path("dist/compat")
+INDEX = Path("dist/.fresh/rom-index.json")
 
 SAVE_SIZE = {
     "sram32k": 0x8000,
@@ -49,6 +71,7 @@ SAVE_SIZE = {
     "eeprom8k": 0x2000,
     "flash64k": 0x10000,
     "flash128k": 0x20000,
+    "battery": 0x10000,  # GB/GBC saves: the kernel gives its emulator 64 KB
 }
 # Kernel save modes (FAT table word 0x1FC) by the names in games.toml.
 KERNEL_SAVE = {
@@ -60,13 +83,58 @@ KERNEL_SAVE = {
     0x32: "flash64k",
     0x33: "flash64k",
 }
+CHECKS = ["boots", "save type", "clock", "save cycle"]
 # The SAVER folder sorts before the game, so: down, open, CLEAN BOOT.
 LAUNCH = [(100, "DOWN"), (120, "A"), (180, "A")]
-BOOT_FRAMES = 3000
+GAME_START = 300  # the kernel has handed over to the game by now
+RUN_FRAMES = 2400
+SHOTS = (600, 1500, RUN_FRAMES)
 
 
 class Failure(Exception):
     pass
+
+
+# --- Finding ROMs and saves ---------------------------------------------------
+
+
+def library_roots() -> list[Path]:
+    env = os.environ.get("TORII_LIBRARY", "")
+    return [ROMS] + [Path(p) for p in env.split(":") if p]
+
+
+def rom_index() -> dict[str, Path]:
+    """SHA-1 to path for every ROM under roms/ and the library (cached)."""
+    cache = json.loads(INDEX.read_text()) if INDEX.exists() else {}
+    fresh, index = {}, {}
+    for root in library_roots():
+        for path in root.rglob("*"):
+            if path.suffix.lower() not in (".gba", ".gbc", ".gb") or not path.is_file():
+                continue
+            st = path.stat()
+            key = str(path)
+            entry = cache.get(key)
+            if not entry or entry[:2] != [st.st_size, st.st_mtime_ns]:
+                sha1 = hashlib.sha1(path.read_bytes()).hexdigest()
+                entry = [st.st_size, st.st_mtime_ns, sha1]
+            fresh[key] = entry
+            index.setdefault(entry[2], path)
+    INDEX.parent.mkdir(parents=True, exist_ok=True)
+    INDEX.write_text(json.dumps(fresh))
+    return index
+
+
+def save_index() -> dict[str, Path]:
+    """Starting saves by file stem: next to ROMs or in SAVER folders."""
+    saves = {}
+    for root in library_roots():
+        for path in [*root.rglob("*.sav"), *root.rglob("*.esv")]:
+            stem = re.sub(r"\(\d+\)$", "", path.stem).strip()
+            saves.setdefault(stem, path)
+    return saves
+
+
+# --- Running the cart ----------------------------------------------------------
 
 
 def mtools(*args: str) -> bytes:
@@ -82,25 +150,32 @@ def make_cart(cart: Path, rom: Path, sd_name: str, start_save: Path | None) -> N
     mtools("mcopy", "-i", img, str(rom), f"::/{sd_name}")
     mtools("mmd", "-i", img, "::/SAVER")
     if start_save:
-        mtools(
-            "mcopy", "-i", img, str(start_save), f"::/SAVER/{Path(sd_name).stem}.sav"
-        )
+        mtools("mcopy", "-i", img, str(start_save), f"::/SAVER/{save_name(sd_name)}")
 
 
-def power_on(cart: Path, keys: list[tuple[int, str]], frames: int, shot: Path) -> str:
-    """Run the cart once from power-on; return the cart trace."""
-    args = [SHOT, KERNEL, "-f", str(frames), "-s", f"{frames}:{shot}"]
+def power_on(cart: Path, keys, frames: int, extra: list[str] = ()) -> tuple[str, str]:
+    """Run the cart once from power-on; return (stdout, cart trace)."""
+    args = [SHOT, KERNEL, "-f", str(frames), *extra]
     for frame, key in keys:
         args += ["-k", f"{frame}:{key}"]
         if key != "-":
             args += ["-k", f"{frame + 6}:-"]
     env = dict(os.environ, OMEGA_DIR=str(cart), OMEGA_TRACE="1")
-    run = subprocess.run(args, env=env, capture_output=True, text=True, check=False)
-    if run.returncode == 3:  # crashed; the report is in the trace
-        return run.stderr
-    if run.returncode:
+    run = subprocess.run(
+        args, env=env, capture_output=True, text=True, errors="replace", check=False
+    )
+    if run.returncode not in (0, 3):  # 3: crashed, the report is in the trace
         raise Failure(f"mgba-shot failed: {run.stderr.strip()[-300:]}")
-    return run.stderr
+    return run.stdout, run.stderr
+
+
+def mash() -> list[tuple[int, str]]:
+    """START past title screens, then A and START now and then."""
+    keys, frame = [], 600
+    while frame < RUN_FRAMES - 200:
+        keys.append((frame, "START" if (frame // 120) % 3 == 0 else "A"))
+        frame += 120
+    return keys
 
 
 def read_keys(path: Path) -> list[tuple[int, str]]:
@@ -110,6 +185,24 @@ def read_keys(path: Path) -> list[tuple[int, str]]:
         if line:
             keys.append((int(line[0]), line[1]))
     return keys
+
+
+def save_name(sd_name: str) -> str:
+    """The kernel saves GBA games as .sav, its emulator's games as .esv."""
+    stem, ext = sd_name.rsplit(".", 1)
+    return f"{stem}.{'sav' if ext == 'gba' else 'esv'}"
+
+
+def sd_save(cart: Path, sd_name: str) -> bytes | None:
+    try:
+        return mtools(
+            "mtype", "-i", str(cart / "sd.img"), f"::/SAVER/{save_name(sd_name)}"
+        )
+    except subprocess.CalledProcessError:
+        return None
+
+
+# --- Reading results -------------------------------------------------------------
 
 
 def png_is_blank(path: Path) -> bool:
@@ -166,251 +259,382 @@ def gen3_counter(save: bytes) -> int | None:
     return max(counters) if counters else None
 
 
-CHECKS = ["boots", "save type", "clock", "save cycle"]
+def lines(trace: str, marker: str) -> list[str]:
+    return [line for line in trace.splitlines() if marker in line]
+
+
+# --- One game ----------------------------------------------------------------------
 
 
 class Result:
-    """Outcome of each check for one game: pass, fail, n/a or not run."""
-
     def __init__(self, game: dict):
         self.game = game
-        self.checks = {name: ("not run", "") for name in CHECKS}
+        self.checks = {name: ["untested", ""] for name in CHECKS}
         self.skipped = ""
-        self.note = ""
-        self.shots: list[Path] = []
+        self.notes: list[str] = []
+        self.shots: list[str] = []
+        self.metrics: dict = {}
+        self.trace_tail = ""
+        self.requirements = ""
+        self.alike: list[str] = []
 
     def set(self, check: str, status: str, detail: str = "") -> None:
-        self.checks[check] = (status, detail)
-
-    def fail_next(self, detail: str) -> None:
-        """Fail the first check that has not run yet."""
-        for name, (status, _) in self.checks.items():
-            if status == "not run":
-                self.set(name, "fail", detail)
-                return
+        self.checks[check] = [status, detail]
 
     @property
     def status(self) -> str:
         if self.skipped:
             return "skip"
-        if any(status == "fail" for status, _ in self.checks.values()):
+        states = [s for s, _ in self.checks.values()]
+        if "fail" in states:
             return "fail"
-        return "pass"
+        return "partial" if "untested" in states else "pass"
+
+    def to_json(self) -> dict:
+        g = self.game
+        return {
+            "key": key_of(g),
+            "file": g["file"],
+            "title": g["title"],
+            "code": g["code"],
+            "system": g.get("system", "gba"),
+            "save": g["save"],
+            "rtc": g["rtc"],
+            "hardware": g.get("hardware", []),
+            "size": self.metrics.get("size"),
+            "status": self.status,
+            "skipped": self.skipped,
+            "checks": self.checks,
+            "notes": self.notes,
+            "metrics": self.metrics,
+            "shots": self.shots,
+            "trace": self.trace_tail,
+            "requirements": self.requirements,
+            "alike": self.alike,
+        }
 
 
-def launch_problems(trace: str, game: dict, shot: Path) -> dict[str, str]:
-    """Problems with a launch, by check; an empty string means it passed."""
-    problems = {"boots": "", "save type": "", "clock": ""}
-    errors = [
-        line
-        for line in trace.splitlines()
-        if line.startswith(("kernel error: ", "crash at frame "))
+def key_of(game: dict) -> str:
+    return game["sha1"][:10]
+
+
+def check_boot(result: Result, trace: str, out: str, shots: list[Path]) -> bool:
+    """Record boots, save type and clock from the first power-on."""
+    g = result.game
+    crash = lines(trace, "crash at frame ")
+    errors = lines(trace, "kernel error: ")
+    launches = lines(trace, ": launch: ")
+    hashes = [
+        line.split(": ")[1]
+        for line in out.splitlines()
+        if line.startswith("hash frame ")
     ]
-    if errors:
-        problems["boots"] = errors[0]
-        return problems
-    launches = [line for line in trace.splitlines() if ": launch: " in line]
-    if not launches:
-        problems["boots"] = "the kernel never launched the game"
-        return problems
-    mode = int(launches[-1].split("save mode ")[1].split()[0], 16)
-    sent = KERNEL_SAVE.get(mode, f"unknown ({mode:#x})")
-    if game["save"] != "none" and sent != game["save"]:
-        problems["save type"] = f"kernel sent {sent}, game needs {game['save']}"
-    modes = [line for line in trace.splitlines() if ": mode " in line]
-    if not modes or ": mode game" not in modes[-1]:
-        problems["boots"] = "did not stay in game mode"
-    elif png_is_blank(shot):
-        problems["boots"] = "blank screen at the end"
-    if game["rtc"]:
-        if "game uses the clock, but" in trace:
-            problems["clock"] = "the game uses the clock, but in-game RTC is off"
-        elif "game uses the clock" not in trace:
-            problems["clock"] = "the game never read the clock"
-    return problems
+    frames = [
+        int(line.split()[2].rstrip(":"))
+        for line in out.splitlines()
+        if line.startswith("hash frame ")
+    ]
+    in_game = [h for f, h in zip(frames, hashes) if f >= GAME_START]
+    result.metrics["distinct screens"] = len(set(in_game))
+    modes = lines(trace, ": mode ")
+    if crash:
+        result.set("boots", "fail", crash[0])
+        result.trace_tail = "\n".join(trace.splitlines()[-40:])
+    elif errors:
+        result.set("boots", "fail", errors[0])
+    elif not launches:
+        result.set("boots", "fail", "the kernel never launched the game")
+    elif not modes or ": mode game" not in modes[-1]:
+        result.set("boots", "fail", "never left kernel mode")
+    elif all(png_is_blank(s) for s in shots):
+        result.set("boots", "fail", "blank screen throughout")
+    elif len(set(in_game)) <= 1:
+        result.set("boots", "fail", "frozen: the screen never changed")
+    else:
+        result.set("boots", "pass", f"{len(set(in_game))} different screens")
 
-
-def check_launch(result: Result, trace: str, shot: Path) -> bool:
-    """Record the launch checks; True if they all passed."""
-    problems = launch_problems(trace, result.game, shot)
-    for check, problem in problems.items():
-        if check == "clock" and not result.game["rtc"]:
-            result.set(check, "n/a")
+    if launches:
+        mode = int(launches[-1].split("save mode ")[1].split()[0], 16)
+        result.metrics["kernel save mode"] = f"{mode:02X}"
+        if g.get("system", "gba") != "gba" or g["save"] == "none":
+            result.set("save type", "n/a")
         else:
-            result.set(check, "fail" if problem else "pass", problem)
-    return not any(problems.values())
+            sent = KERNEL_SAVE.get(mode, f"unknown ({mode:#x})")
+            ok = sent == g["save"]
+            result.set(
+                "save type",
+                "pass" if ok else "fail",
+                "" if ok else f"kernel sent {sent}, game needs {g['save']}",
+            )
+
+    if not g["rtc"]:
+        result.set("clock", "n/a")
+    elif "game uses the clock, but" in trace:
+        result.set("clock", "fail", "the game uses the clock, but in-game RTC is off")
+    elif "game uses the clock" in trace:
+        result.set("clock", "pass")
+    else:
+        result.set("clock", "untested", "the game didn't read the clock in this run")
+    return result.checks["boots"][0] == "pass"
 
 
-def sd_save(cart: Path, sd_name: str) -> bytes:
-    return mtools(
-        "mtype", "-i", str(cart / "sd.img"), f"::/SAVER/{Path(sd_name).stem}.sav"
+def run_game(result: Result, roms: dict, saves: dict) -> None:
+    g = result.game
+    rom = roms.get(g["sha1"])
+    if not rom:
+        result.skipped = f"no file with this game's SHA-1 ({g['file']})"
+        return
+    result.metrics["size"] = rom.stat().st_size
+    key = key_of(g)
+    cart, shots_dir = CARTS / key, REPORT / "shots" / key
+    shutil.rmtree(shots_dir, ignore_errors=True)
+    shots_dir.mkdir(parents=True)
+    system = g.get("system", "gba")
+    sd_name = f"{re.sub(r'[^A-Za-z0-9]', '', g['code'])[:8] or 'GAME'}.{system}"
+    start_save = (
+        rom.with_suffix(".sav")
+        if rom.with_suffix(".sav").exists()
+        else saves.get(rom.stem)
     )
+    key_file = KEYS / f"{g['code']}.keys"
+    scripted = key_file.exists() and start_save is not None
+    make_cart(cart, rom, sd_name, start_save)
+    if start_save:
+        result.notes.append(f"starts from {start_save.name}")
+    for hw in g.get("hardware", []):
+        result.notes.append(f"{hw} not emulated")
+    size = SAVE_SIZE.get(g["save"])
+    started = time.time()
 
-
-def run_game(result: Result) -> None:
-    game = result.game
-    rom = ROMS / game["file"]
-    if not rom.exists():
-        result.skipped = f"no {rom}"
+    # Power-on 1: launch, then play (a key script, or mashing).
+    keys = read_keys(key_file) if scripted else mash()
+    frames = max(keys[-1][0] + 60, RUN_FRAMES) if scripted else RUN_FRAMES
+    shot_frames = (SHOTS[0], frames // 2, frames) if scripted else SHOTS
+    shots = [shots_dir / f"{i + 1}.png" for i in range(len(shot_frames))]
+    extra = [a for f, p in zip(shot_frames, shots) for a in ("-s", f"{f}:{p}")]
+    extra += [a for f in range(60, frames + 1, 60) for a in ("-h", str(f))]
+    out, trace = power_on(cart, LAUNCH + keys, frames, extra)
+    result.shots = [str(p.relative_to(REPORT)) for p in shots if p.exists()]
+    if not check_boot(result, trace, out, [p for p in shots if p.exists()]):
+        result.metrics["seconds"] = round(time.time() - started, 1)
         return
-    if hashlib.sha1(rom.read_bytes()).hexdigest() != game["sha1"]:
-        result.skipped = f"{rom} is a different dump than listed"
-        return
-    code = game["code"]
-    cart, shots = CARTS / code, REPORT / code
-    shutil.rmtree(shots, ignore_errors=True)
-    shots.mkdir(parents=True)
-    sd_name = f"{code}.gba"  # short name, so the menu row is predictable
-    start_save = rom.with_suffix(".sav")
-    key_file = KEYS / f"{code}.keys"
-    full = start_save.exists() and key_file.exists()
-    make_cart(cart, rom, sd_name, start_save if full else None)
-
-    def play(name: str, keys: list[tuple[int, str]], frames: int) -> str:
-        shot = shots / name
-        trace = power_on(cart, keys, frames, shot)
-        result.shots.append(shot)
-        return trace
-
-    if not full:
-        trace = play("1-game.png", LAUNCH, BOOT_FRAMES)
-        check_launch(result, trace, shots / "1-game.png")
-        missing = [str(p) for p in (start_save, key_file) if not p.exists()]
-        result.note = "launch only; no " + " or ".join(missing)
+    if size is None:
+        result.set("save cycle", "n/a")
+        result.metrics["seconds"] = round(time.time() - started, 1)
         return
 
-    keys = read_keys(key_file)
-    frames = keys[-1][0] + 60
-    size = SAVE_SIZE[game["save"]]
-    start = start_save.read_bytes()[:size]
-
-    # Power-on 1: launch, continue, save in-game.
-    trace = play("1-play.png", LAUNCH + keys, frames)
-    if not check_launch(result, trace, shots / "1-play.png"):
-        return
-    first = (cart / "sram.bin").read_bytes()[:size]
-    if first == start:
-        raise Failure("the game did not save in-game (cart SRAM unchanged)")
+    loaded = sd_save(cart, sd_name)
+    sram = cart / "sram.bin"
+    first = sram.read_bytes()[:size]
+    game_saved = loaded is None or first[: len(loaded)] != loaded[:size]
+    if not game_saved:
+        if scripted:
+            result.notes.append("the key script didn't make this game save")
+            scripted = False
+        # The game didn't save, so test the kernel's copy path with a pattern
+        # in the cart's save memory, as if the game had written it.
+        first = bytes((i * 37 + 11) & 0xFF for i in range(size))
+        sram.write_bytes(first + sram.read_bytes()[size:])
 
     # Power-on 2: the kernel asks to write the save to SD; confirm.
-    play("2-menu.png", [(100, "A")], 300)
-    if sd_save(cart, sd_name) != first:
-        raise Failure("SAVER/ does not hold what the game saved")
+    power_on(cart, [(100, "A")], 300)
+    written = sd_save(cart, sd_name)
+    if written is None or written[:size] != first[: len(written)]:
+        result.set("save cycle", "fail", "SAVER/ does not hold what the game saved")
+        result.metrics["seconds"] = round(time.time() - started, 1)
+        return
 
-    # Power-on 3: launch again; the game must load that save and save again.
-    trace = play("3-play.png", LAUNCH + keys, frames)
-    problems = [
-        p for p in launch_problems(trace, game, shots / "3-play.png").values() if p
-    ]
-    if problems:
-        raise Failure("relaunch: " + "; ".join(problems))
-    second = (cart / "sram.bin").read_bytes()[:size]
-    if second == first:
-        raise Failure("the game did not save after the relaunch")
-    counters = [gen3_counter(s) for s in (start, first, second)]
-    detail = ""
-    if None not in counters:
-        detail = f"save counter {counters[0]}→{counters[1]}→{counters[2]}"
-        if not counters[0] < counters[1] < counters[2]:
-            raise Failure(f"{detail}, should go up")
-    result.set("save cycle", "pass", detail)
-
-
-def print_table(results: list[Result]) -> None:
-    rows = [["", "GAME", *(c.upper() for c in CHECKS)]]
-    for r in results:
-        name = f"{r.game['code']} {r.game['title']}"
-        if r.skipped:
-            rows.append(["SKIP", name, *("-" for _ in CHECKS)])
+    # Power-on 3: launch again; the kernel must load the save back.
+    if scripted:
+        _, trace = power_on(cart, LAUNCH + keys, frames)
+        second = (cart / "sram.bin").read_bytes()[:size]
+        counters = [gen3_counter(s) for s in (loaded or b"", first, second)]
+        if second == first:
+            result.set("save cycle", "fail", "the game did not save after the relaunch")
+        elif None not in counters and not counters[0] < counters[1] < counters[2]:
+            result.set("save cycle", "fail", f"save counter {counters}, should go up")
         else:
-            rows.append([r.status.upper(), name, *(r.checks[c][0] for c in CHECKS)])
-    widths = [max(len(row[i]) for row in rows) for i in range(len(rows[0]))]
-    for row in rows:
-        print("  ".join(cell.ljust(w) for cell, w in zip(row, widths)).rstrip())
-    for r in results:
-        details = [f"{c}: {d}" for c, (_, d) in r.checks.items() if d]
-        details += [r.skipped] if r.skipped else []
-        details += [r.note] if r.note else []
-        for d in details:
-            print(f"  {r.game['code']}  {d}")
+            detail = (
+                f"save counter {counters[0]}→{counters[1]}→{counters[2]}"
+                if None not in counters
+                else "key script saved twice"
+            )
+            result.set("save cycle", "pass", detail)
+    else:
+        _, trace = power_on(cart, LAUNCH, GAME_START + 20)
+        # The cart logs a checksum of the save the kernel loaded as the game
+        # takes over, before the game can change it.
+        loads = re.findall(
+            r"game save: mode \w+, (\d+) bytes, crc32 ([0-9A-F]{8})", trace
+        )
+        if loads:
+            length, crc = int(loads[0][0]), int(loads[0][1], 16)
+            came_back = zlib.crc32(written[:length]) == crc
+        else:
+            back = (cart / "sram.bin").read_bytes()[:size]
+            came_back = back[: len(written)] == written[:size]
+        if not came_back:
+            result.set("save cycle", "fail", "the save was not loaded back on relaunch")
+        else:
+            what = "the game's save" if game_saved else "a test pattern"
+            amount = (
+                f"{len(written) // 1024} KB"
+                if len(written) >= 1024
+                else f"{len(written)} bytes"
+            )
+            result.set(
+                "save cycle", "pass", f"{what} ({amount}) reached SAVER/ and came back"
+            )
+    result.metrics["seconds"] = round(time.time() - started, 1)
 
 
-def write_report(results: list[Result]) -> Path:
-    rows = []
+# --- Output --------------------------------------------------------------------------
+
+
+def kernel_table() -> dict[str, int]:
+    text = Path("source/saveMODE.h").read_bytes().decode("gbk")
+    return {
+        c: int(m, 16) for c, m in re.findall(r'\{"(\w{4})",(0x[0-9a-fA-F]+)\}', text)
+    }
+
+
+def size_class(size: int) -> str:
+    for limit, name in ((4 << 20, "≤ 4 MB"), (8 << 20, "8 MB"), (16 << 20, "16 MB")):
+        if size <= limit:
+            return name
+    return "32 MB"
+
+
+def requirements(game: dict, size: int, table: dict) -> str:
+    """What the game needs of the kernel; games with the same text are alike."""
+    parts = [game.get("system", "gba"), game["save"], size_class(size)]
+    if game.get("system", "gba") == "gba":
+        mode = table.get(game["code"])
+        parts.append(f"save mode {mode:02X}" if mode else "not in the save table")
+        if game["save"].startswith("eeprom") and size > 0x1200000:
+            parts.append("EEPROM over 18 MB")
+    if game["rtc"]:
+        parts.append("clock")
+    parts += game.get("hardware", [])
+    return " · ".join(parts)
+
+
+def pick(games: list[dict], roms: dict, table: dict) -> list[tuple[dict, list[dict]]]:
+    """One game per set of requirements, with the games it stands for."""
+    groups: dict[str, list[dict]] = {}
+    for game in games:
+        rom = roms.get(game["sha1"])
+        size = rom.stat().st_size if rom else 0
+        groups.setdefault(requirements(game, size, table), []).append(game)
+
+    def preference(game: dict) -> tuple:
+        rom = roms.get(game["sha1"])
+        return (
+            not (KEYS / f"{game['code']}.keys").exists(),
+            not (rom and rom.with_suffix(".sav").exists()),
+            rom is None,
+            game["file"],
+        )
+
+    picked = []
+    for group in groups.values():
+        group.sort(key=preference)
+        picked.append((group[0], group[1:]))
+    return picked
+
+
+def matches(game: dict, filters: list[str]) -> bool:
+    if not filters:
+        return True
+    fields = [
+        game["code"],
+        game.get("system", "gba"),
+        game["save"],
+        game["file"],
+        game["title"],
+    ]
+    return any(f.lower() in field.lower() for f in filters for field in fields)
+
+
+def print_summary(results: list[Result], run_file: Path) -> None:
+    counts = {
+        s: sum(r.status == s for r in results)
+        for s in ("pass", "partial", "fail", "skip")
+    }
     for r in results:
-        g = r.game
-        cells = "".join(
-            f'<td class="{"skip" if r.skipped else r.checks[c][0].replace(" ", "-")}"'
-            f' title="{html.escape(r.checks[c][1])}">'
-            f"{'-' if r.skipped else html.escape(r.checks[c][0])}"
-            f"{'<br><small>' + html.escape(r.checks[c][1]) + '</small>' if r.checks[c][1] else ''}</td>"
-            for c in CHECKS
-        )
-        shots = "".join(
-            f'<figure><img src="data:image/png;base64,{base64.b64encode(s.read_bytes()).decode()}" width="240" height="160"'
-            f' alt=""><figcaption>{html.escape(s.stem)}</figcaption></figure>'
-            for s in r.shots
-        )
-        note = r.skipped or r.note
-        rows.append(
-            f'<tr><td class="{r.status}">{r.status.upper()}</td>'
-            f"<td><b>{html.escape(g['code'])}</b> {html.escape(g['title'])}"
-            f"<br><small>{html.escape(g['file'])}</small>"
-            f"{'<br><small>' + html.escape(note) + '</small>' if note else ''}</td>"
-            f'{cells}<td class="shots">{shots}</td></tr>'
-        )
-    header = "".join(f"<th>{c}</th>" for c in CHECKS)
-    page = REPORT / "index.html"
-    page.write_text(
-        f"""<!doctype html>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Torii compatibility</title>
-<style>
-:root {{ color-scheme: light dark; --pass: #1a7f37; --fail: #cf222e; --muted: #6e7781; }}
-body {{ font: 14px system-ui, sans-serif; margin: 16px; background: Canvas; color: CanvasText; }}
-table {{ border-collapse: collapse; }}
-th, td {{ border-bottom: 1px solid #8884; padding: 6px 10px; text-align: left; vertical-align: top; }}
-.pass {{ color: var(--pass); font-weight: 600; }}
-.fail {{ color: var(--fail); font-weight: 600; }}
-.skip, .n\\/a, .not-run, small {{ color: var(--muted); font-weight: normal; }}
-.shots {{ display: flex; gap: 8px; flex-wrap: wrap; }}
-figure {{ margin: 0; }}
-img {{ image-rendering: pixelated; display: block; }}
-figcaption {{ font-size: 12px; color: var(--muted); }}
-</style>
-<h1>Torii compatibility</h1>
-<p>{sum(r.status == "pass" for r in results)} passed, {sum(r.status == "fail" for r in results)} failed,
-{sum(r.status == "skip" for r in results)} skipped. Made by <code>just compat</code>.</p>
-<table>
-<tr><th></th><th>Game</th>{header}<th>Screens</th></tr>
-{"".join(rows)}
-</table>
-"""
+        if r.status in ("fail", "skip"):
+            reasons = r.skipped or "; ".join(
+                f"{c}: {d}" for c, (s, d) in r.checks.items() if s == "fail"
+            )
+            print(
+                f"{r.status.upper():7} {r.game['code']:8} {r.game['file'][:48]:48} {reasons}"
+            )
+    print(
+        f"{counts['pass']} passed, {counts['partial']} partly tested, {counts['fail']} failed, "
+        f"{counts['skip']} skipped; results in {run_file}, report in {REPORT / 'index.html'}"
     )
-    return page
 
 
 def main() -> int:
     games = tomllib.loads((ROMS / "games.toml").read_text()).get("game", [])
-    wanted = set(sys.argv[1:])
-    results = [Result(g) for g in games if not wanted or g["code"] in wanted]
+    every = "--all" in sys.argv[1:]
+    filters = [a for a in sys.argv[1:] if a != "--all"]
+    roms, saves = rom_index(), save_index()
+    table = kernel_table()
+    wanted = [g for g in games if not g.get("skip") and matches(g, filters)]
+    chosen = [(g, []) for g in wanted] if every else pick(wanted, roms, table)
+    results = []
+    for game, alike in chosen:
+        result = Result(game)
+        rom = roms.get(game["sha1"])
+        result.requirements = requirements(
+            game, rom.stat().st_size if rom else 0, table
+        )
+        result.alike = [g["file"] for g in alike]
+        results.append(result)
+    left_out = sum(1 for g in games if g.get("skip"))
 
     def play(result: Result) -> None:
         try:
-            run_game(result)
-        except Failure as e:
-            result.fail_next(str(e))
+            run_game(result, roms, saves)
+        except Exception as e:  # noqa: BLE001 - one game going wrong must not stop the run
+            for name in CHECKS:
+                if result.checks[name][0] == "untested":
+                    result.set(
+                        name,
+                        "fail",
+                        str(e) if isinstance(e, Failure) else f"runner error: {e!r}",
+                    )
+                    break
+        print(
+            f"{result.status:7} {result.game['file'][:60]}", file=sys.stderr, flush=True
+        )
 
     # Each game has its own cart, so they run side by side.
     with ThreadPoolExecutor(max_workers=os.cpu_count() or 4) as pool:
         list(pool.map(play, results))
-    print_table(results)
-    page = write_report(results)
+
+    runs = REPORT / "runs"
+    runs.mkdir(parents=True, exist_ok=True)
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    run_file = runs / f"{stamp}.json"
+    run_file.write_text(
+        json.dumps(
+            {
+                "time": stamp,
+                "filters": filters + (["--all"] if every else []),
+                "listed": len(games),
+                "left out": left_out,
+                "kernel": hashlib.sha1(Path(KERNEL).read_bytes()).hexdigest()[:10],
+                "games": [r.to_json() for r in results],
+            }
+        )
+    )
+    subprocess.run([sys.executable, "tests/compat_report.py"], check=True)
+    print_summary(results, run_file)
+    covered = len(results) + sum(len(r.alike) for r in results)
     print(
-        f"{sum(r.status == 'pass' for r in results)} passed, "
-        f"{sum(r.status == 'fail' for r in results)} failed, "
-        f"{sum(r.status == 'skip' for r in results)} skipped; report in {page}"
+        f"{len(results)} games tested stand for {covered} of {len(games)} listed; {left_out} left out (skip)"
     )
     return 1 if any(r.status == "fail" for r in results) else 0
 

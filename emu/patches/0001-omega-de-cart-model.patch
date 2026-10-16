@@ -216,10 +216,10 @@ index 4bf354f..fd3e023 100644
  	cheats/codebreaker.c
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..e4b3b8f
+index 0000000..62ca1ea
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,890 @@
+@@ -0,0 +1,901 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -232,6 +232,7 @@ index 0000000..e4b3b8f
 +#include <mgba/internal/gba/memory.h>
 +#include <mgba/internal/gba/savedata.h>
 +#include <mgba/core/serialize.h>
++#include <mgba-util/crc32.h>
 +#include <mgba-util/memory.h>
 +#include <mgba-util/vfs.h>
 +
@@ -574,6 +575,13 @@ index 0000000..e4b3b8f
 +	struct GBAOmega* omega = &gba->memory.omega;
 +	enum SavedataType type = _saveType(omega->saveMode, omega->saveSize);
 +	if (type == SAVEDATA_FORCE_NONE) {
++		// No save chip to emulate (e.g. the kernel's GB emulator, which uses
++		// cart SRAM directly): log what the kernel loaded there.
++		size_t size = omega->saveSize < OMEGA_SRAM_SIZE ? omega->saveSize : OMEGA_SRAM_SIZE;
++		if (size && omega->sram) {
++			_trace(gba, "game save: mode %02X, %zu bytes, crc32 %08X", omega->saveMode, size,
++			       doCrc32(omega->sram, size));
++		}
 +		return;
 +	}
 +	struct GBASavedata* savedata = &gba->memory.savedata;
@@ -588,7 +596,10 @@ index 0000000..e4b3b8f
 +	omega->gameSaveActive = true;
 +	omega->rtcTraced = false;
 +	mLOG(GBA_OMEGA, INFO, "Game save: mode %02X, %zu bytes", omega->saveMode, size);
-+	_trace(gba, "game save: mode %02X, %zu bytes", omega->saveMode, size);
++	// The checksum lets tests check what the kernel loaded before the game
++	// can change it.
++	_trace(gba, "game save: mode %02X, %zu bytes, crc32 %08X", omega->saveMode, size,
++	       savedata->data && size ? doCrc32(savedata->data, size) : 0);
 +}
 +
 +// Power-off: the save chip's contents are what the cart SRAM holds.

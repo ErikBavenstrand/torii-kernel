@@ -120,9 +120,22 @@ run *args: build emu-headless cart
 test: build emu-headless test-roms _test-kernel-build
     {{emu_docker}} tests/all.sh
 
-# Play the games listed in roms/games.toml through the kernel, e.g. `just compat BPEE`
-compat *codes: build emu-headless
-    {{emu_docker}} python3 tests/games.py {{codes}}
+# Play the listed games through the kernel and write dist/compat/index.html. Filters pick
+# games by code, system, save chip or file name, e.g. `just compat gbc` or `just compat Pokemon`
+[positional-arguments]
+compat *filters: build emu-headless
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Library folders from roms/library.txt, mounted read-only under /library
+    mounts=() library=""
+    i=0
+    while IFS= read -r dir; do
+      [ -n "$dir" ] || continue
+      mounts+=(-v "$dir:/library/$i:ro")
+      library="$library:/library/$i"
+      i=$((i + 1))
+    done < <(cat roms/library.txt 2>/dev/null || true)
+    docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/src -w /src "${mounts[@]}" -e TORII_LIBRARY="${library#:}" {{emu_image}} python3 tests/games.py "$@"
 
 # Build the test kernel (ezkerneltest.gba) with tests/kernel and run its unit tests headlessly
 test-kernel: emu-headless _test-kernel-build
@@ -167,12 +180,10 @@ _cart-copy mode +files:
     {{fresh}} sync --all dist/.cart-add
     {{emu_docker}} tools/cart_copy.sh {{mode}} {{cart}}/sd.img dist/.cart-add/*; status=$?; rm -rf dist/.cart-add; exit $status
 
-# Copy games into roms/ and add them to roms/games.toml, e.g. `just game-add ~/roms/game.gba`
+# List games (files or folders, left where they are) in roms/games.toml, e.g. `just game-add ~/roms`
 [positional-arguments]
-game-add +roms: emu-image
-    cp -n "$@" roms/
-    {{fresh}} sync --all roms
-    for f in "$@"; do printf 'roms/%s\0' "$(basename "$f")"; done | xargs -0 {{emu_docker}} python3 tools/games.py add
+game-add +paths:
+    python3 tools/games.py add "$@"
 
 # Build the patched mGBA natively (SDL frontend) for `play` and `dev`
 emu:

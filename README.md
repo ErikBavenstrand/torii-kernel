@@ -27,7 +27,7 @@ the kernel on, and tests.
 | `just dev` | like `play`, rebuilding whenever `source/` changes |
 | `just test` | kernel unit tests, then homebrew games through the kernel: boot, every save type across power cycles, crash reports and save states |
 | `just cart-add game.gba` | copies a file onto the emulated SD card |
-| `just game-add game.gba` | copies a game you own into the git-ignored `roms/` and lists it in `roms/games.toml` |
+| `just game-add PATH...` | lists games you own (files or whole folders, left in place) in `roms/games.toml` |
 | `just test-kernel` | builds a test kernel that runs the unit tests in `tests/kernel` at boot (also part of `just test`) |
 | `just compat` | plays each listed game through the kernel and checks it boots, gets the right save type and clock, and keeps its saves; prints a table and writes `dist/compat/index.html` with screenshots |
 | `just size` | kernel size against the 1 MB kernel area, IWRAM and EWRAM, plus the largest symbols; fails if anything is over |
@@ -57,9 +57,17 @@ Run with `OMEGA_TRACE=1` to log what the kernel and games do with the cart
 (register writes, launches with their save type, SD reads and writes, mode
 switches, clock use) to stderr.
 
-`just compat` plays the games in `roms/games.toml`. A game with a starting
-save (`roms/<name>.sav`) and a key script (`tests/games/<code>.keys`) goes
-through a full save cycle; the others are only launched.
+`just compat` tests the games in `roms/games.toml`: one game per set of
+requirements (system, save chip, kernel save mode, ROM size, clock, other
+hardware), since Ruby and Sapphire, say, need the same of the kernel; `just
+compat --all` tests every game. Each game boots through the kernel while the
+test presses START and A; the screen must change, the save type must match
+the ROM, a clock game must find the clock on, and the save must reach
+`SAVER/` and come back on relaunch (a test pattern stands in when the game
+doesn't save on its own). `dist/compat/index.html` shows the results, what
+changed since each game's previous run, coverage by requirement, and
+screenshots. List your games with `just game-add ~/path/to/roms` (folders
+stay where they are); ROM hacks and kernel plugins are marked `skip`.
 
 When code running headlessly hits an illegal opcode or jumps somewhere that
 can't run code, `mgba-shot` stops with exit status 3 and prints a crash report:
