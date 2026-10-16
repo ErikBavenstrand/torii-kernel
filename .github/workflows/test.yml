@@ -1,9 +1,13 @@
-# Builds the kernel and runs the homebrew tests on the emulated cart. Games you
-# own (just compat) stay local: their ROMs are never in the repository.
+# Builds the kernel, runs the homebrew tests on the emulated cart, and keeps the
+# built kernel as a download. Pushing a version tag (v0.1.0, ...) also
+# publishes a GitHub Release with ezkernelnew.bin attached. Games you own
+# (just compat) stay local: their ROMs are never in the repository.
 name: test
 
 on:
   push:
+    branches: ["**"]
+    tags: ["v*"]
   pull_request:
 
 jobs:
@@ -16,6 +20,12 @@ jobs:
         run: just test
       - name: Size
         run: just size
+      - name: Keep the kernel
+        uses: actions/upload-artifact@v4
+        with:
+          name: ezkernelnew
+          path: dist/ezkernelnew.bin
+          if-no-files-found: error
       - name: Keep screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -23,3 +33,32 @@ jobs:
           name: shots
           path: dist/shots
           if-no-files-found: ignore
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ezkernelnew
+      - name: Write the release notes
+        run: |
+          {
+            echo "## Install"
+            echo
+            echo "1. Copy \`ezkernelnew.bin\` to the root of the EZ-Flash Omega DE's SD card."
+            echo "2. Put the card in the cart, hold R and switch the GBA on, then confirm the update."
+            echo
+            echo "## Changes"
+            echo
+            # The Unreleased section of CHANGELOG.md, without its heading
+            awk '/^## /{n++} n==1 && !/^## /' CHANGELOG.md
+          } > release-notes.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: ezkernelnew.bin
+          body_path: release-notes.md

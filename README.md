@@ -8,6 +8,15 @@ Right now the kernel is EZ-Flash's official 1.06, unmodified. What this repo
 adds so far is the groundwork: a reproducible build, an emulated cart to run
 the kernel on, and tests.
 
+## Download
+
+Get `ezkernelnew.bin` from the
+[latest release](https://github.com/ErikBavenstrand/torii-kernel/releases/latest),
+or from the `ezkernelnew` download of any
+[CI run](https://github.com/ErikBavenstrand/torii-kernel/actions). Copy it to
+the root of the cart's SD card, hold R while switching the GBA on, and confirm
+the update.
+
 ## Setup
 
 - Docker and [just](https://github.com/casey/just). On macOS, install

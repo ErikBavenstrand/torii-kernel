@@ -4,6 +4,7 @@ Torii is a custom kernel for the EZ-Flash Omega DE, forked from EZ-Flash's offic
 
 ## Kernel source
 
+- To release, rename `## Unreleased` in `CHANGELOG.md` to the version, commit, and push a tag like `v0.1.0`: CI publishes a GitHub Release with `ezkernelnew.bin` and that section as its notes.
 - **Mandatory:** log every change to `source/` in `CHANGELOG.md`, under Unreleased: what changed and why, with the commit's short hash, in two or three lines. Commit the change first, then add the entry with its hash (one follow-up commit can log several changes).
 - Files from the official repo (commit `12cb68b`) keep EZ-Flash's formatting: CRLF line endings, tabs.
 - `source/ezkernelnew.c`, `source/lang.c`, `source/GBApatch.c` and `source/gba_rts_patch.s` contain GBK-encoded Chinese strings.
