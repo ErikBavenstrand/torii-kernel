@@ -53,7 +53,8 @@ They persist between runs, like a real cart. Point any build of the patched
 mGBA at a cart folder with `OMEGA_DIR=dist/cart` or `-C omega.dir=dist/cart`.
 
 mGBA's SDL keys: arrows, X = A, Z = B, A = L, S = R, Enter = Start,
-Backspace = Select.
+Backspace = Select. The window opens at 4× (960×640); change it with
+`just scale=3 play` (any of 1–8).
 
 Not modelled yet: the in-game menu's real-time saves (RTS) and firmware
 updates. Flash and EEPROM data sit in cart SRAM in mGBA's layout (Flash bank 1

@@ -10,6 +10,8 @@ emu_image := "omega-remix-emu"
 kernel_docker := "docker run --rm --platform linux/amd64 -u $(id -u):$(id -g) -v \"$PWD\":/src -w /src -e LIBGBA=/opt/devkitpro/libgba " + kernel_image
 emu_docker := "docker run --rm -u $(id -u):$(id -g) -v \"$PWD\":/src " + emu_image
 mgba := "emu/build-native/sdl/mgba"
+# Emulator window size as a multiple of 240x160, e.g. `just scale=3 play`
+scale := "4"
 cart := "dist/cart"
 
 # Build the flashable upgrade file: dist/ezkernelnew.bin
@@ -20,11 +22,11 @@ build: emu-image
 
 # Run the kernel on the emulated Omega DE cart (cart files in dist/cart)
 play: build emu cart
-    OMEGA_DIR={{cart}} {{mgba}} dist/ezkernelnew.bin
+    OMEGA_DIR={{cart}} {{mgba}} -{{scale}} dist/ezkernelnew.bin
 
 # Rebuild and relaunch the emulated cart whenever source/ changes
 dev: emu cart
-    tools/dev_watch.py
+    OMEGA_SCALE={{scale}} tools/dev_watch.py
 
 # Headless screenshot on the emulated cart, e.g. `just shot 300 100:A 106:-`
 shot frame="300" *keys: build emu-headless cart

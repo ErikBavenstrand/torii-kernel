@@ -5,7 +5,7 @@
 """Rebuild the kernel and relaunch the emulated cart whenever source/ changes.
 
 Runs the kernel on the patched mGBA from `just emu`, with the cart files in
-dist/cart.
+dist/cart, at OMEGA_SCALE times the GBA's 240x160 (default 4).
 """
 
 import os
@@ -23,7 +23,8 @@ def launch() -> subprocess.Popen:
     env = dict(os.environ, OMEGA_DIR=str(ROOT / "dist" / "cart"))
     mgba = ROOT / "emu" / "build-native" / "sdl" / "mgba"
     rom = ROOT / "dist" / "ezkernelnew.bin"
-    return subprocess.Popen([str(mgba), str(rom)], env=env)
+    scale = os.environ.get("OMEGA_SCALE", "4")
+    return subprocess.Popen([str(mgba), f"-{scale}", str(rom)], env=env)
 
 
 def snapshot() -> dict:
