@@ -4,7 +4,7 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.2.0 (2026-10-17)
 
 - **Added:** LOGGING in settings page 2 (Off, Errors, Info, Debug; off by
   default) writes the kernel's log to four rotating 64 KB files in
