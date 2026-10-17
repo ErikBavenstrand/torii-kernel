@@ -2319,9 +2319,9 @@ re_showfile:
 		      if( show_offset+file_select <  folder_total)
 		      {	   				
 	   				if(strcmp(currentpath,"/") !=0){	
-	   					sprintf(currentpath,"%s%s",currentpath,"/");
+	   					strncat(currentpath,"/",MAX_path_len-1-strlen(currentpath));
 						}
-		      	sprintf(currentpath,"%s%s",currentpath,pFolder[show_offset+file_select].filename);
+		      	strncat(currentpath,pFolder[show_offset+file_select].filename,MAX_path_len-1-strlen(currentpath));
 		      	
 						res=f_chdir(currentpath);
 						if(res != FR_OK){
