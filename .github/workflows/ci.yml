@@ -20,28 +20,28 @@ concurrency:
 jobs:
   lint:
     name: Lint
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: extractions/setup-just@v2
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: extractions/setup-just@v4
+      - uses: astral-sh/setup-uv@v10.3.0
       - name: Lint Python and shell scripts
         run: just lint
 
   kernel:
     name: Build kernel
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: extractions/setup-just@v2
+      - uses: actions/checkout@v7
+      - uses: extractions/setup-just@v4
       - name: Build ezkernelnew.bin
         run: just build
       - name: Check size against the cart and GBA memory
         run: just size
       - name: Upload ezkernelnew.bin
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ezkernelnew
           path: dist/ezkernelnew.bin
@@ -49,16 +49,16 @@ jobs:
 
   test:
     name: Test on the emulated cart
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: extractions/setup-just@v2
+      - uses: actions/checkout@v7
+      - uses: extractions/setup-just@v4
       - name: Run kernel unit tests and homebrew game tests
         run: just test
       - name: Upload screenshots
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: screenshots
           path: dist/shots

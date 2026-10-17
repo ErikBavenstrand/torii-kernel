@@ -13,17 +13,17 @@ permissions:
 jobs:
   build:
     name: Build and test
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: extractions/setup-just@v2
+      - uses: actions/checkout@v7
+      - uses: extractions/setup-just@v4
       - name: Run all tests (builds ezkernelnew.bin)
         run: just test
       - name: Check size against the cart and GBA memory
         run: just size
       - name: Upload ezkernelnew.bin
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ezkernelnew
           path: dist/ezkernelnew.bin
@@ -32,19 +32,19 @@ jobs:
   publish:
     name: Publish release
     needs: build
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: ezkernelnew
       - name: Write release notes
         run: tools/release_notes.sh > release-notes.md
       - name: Create the release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: ezkernelnew.bin
           body_path: release-notes.md
