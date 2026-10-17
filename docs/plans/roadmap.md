@@ -86,8 +86,10 @@ A mode you launch on the real cart that:
 - measures real timings: NOR wait states (the kernel never sets `WAITCNT`), glyph
   rendering, LZ77 decompression and SD throughput;
 - settles the EEPROM 512 versus 8K question for games in the save table;
-- looks for a separate rumble control. `0x096A0000` gates the whole GPIO port, and only
-  Drill Dozer and WarioWare: Twisted! have a rumble motor;
+- looks for a separate rumble control. The Omega DE has its own rumble motor on the cart
+  GPIO port, and `0x096A0000` gates the whole port. The kernel now enables it per game,
+  from the GBA game code or the GB cart type at 0x147 (`a854cdc`). GBA romhacks that add
+  rumble only get the port while CLOCK is on;
 - walks you through the manual checklist with pass/fail buttons.
 
 It writes a report to SD that we bring back to the repo. When the real cart disagrees with
