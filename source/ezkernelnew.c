@@ -2519,8 +2519,11 @@ boot_game:
 		f_close(&gfile);
 		gl_game_uses = Game_hardware(is_EMU, GAMECODE, gb_cart_type);
 	} else {
-		memset(GAMECODE, 'F', 4);
-		gl_game_uses = 0;
+		// A Recently Played entry for a file that has since moved: launching
+		// would make its save and start an emulator with no ROM
+		tlog("launch %s: can't open it", pfilename);
+		Show_error_num(1);
+		return 0;
 	}
 
 	//check
