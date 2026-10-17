@@ -6,6 +6,16 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** A and L+START do nothing in an empty SD folder (`d7dda3e`). They
+  acted on a stale entry from the folder listed before: A opened its launch
+  menu or started a GB, GBC or NES game. Ported from DS Style v7.4.
+- **Changed:** names are drawn in ASCII (`a47a7a7`). The 12x12 GBK font and
+  FatFs's code page 936 go, freeing about 350 KB of ROM. FatFs uses code page
+  850: accented Latin letters lose their accents, and names it can't hold,
+  such as Japanese ones, show and open as their 8.3 short name.
+- **Removed:** Chinese (`c05855f`). English is the only language until language
+  packs arrive; a saved Chinese setting loads English. Cheats come from
+  `/CHEAT/Eng`, and the fast patch engine is no longer off for Chinese.
 - **Fixed:** cheat lines no longer make bogus writes (`2c274c8`): an entry
   without a value is dropped instead of reusing the last one, empty `;` and
   trailing `,` add nothing (a trailing `,` wrote 0 to the next address), and
