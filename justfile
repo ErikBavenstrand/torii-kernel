@@ -58,12 +58,13 @@ play *roms: build emu cart
 sd card *games: build
     tools/sd_copy.sh "$@"
 
-# Write compile_commands.json for clangd (devkitPro's headers go to dist/devkitpro)
+# Write compile_commands.json for clangd, covering the kernel and its unit tests
+# (devkitPro's headers go to dist/devkitpro; .clangd adapts the flags for clang)
 compile-commands: emu-image
-    mkdir -p dist
-    {{kernel_docker}} sh -c 'make TARGET=ezkernelnew -B -n > dist/make-dry-run.txt 2>/dev/null; cd /opt && cp -r --parents devkitpro/libgba/include devkitpro/devkitARM/arm-none-eabi/include /src/dist/'
-    {{emu_docker}} python3 tools/compile_commands.py dist/make-dry-run.txt "$PWD"
-    rm dist/make-dry-run.txt
+    mkdir -p dist build build-test
+    {{kernel_docker}} sh -c 'make TARGET=ezkernelnew -B -n > dist/dry-run-kernel.txt && make TARGET=ezkerneltest BUILD=build-test SOURCES="source source/ff15 tests/kernel" -B -n > dist/dry-run-test.txt && cd /opt && cp -r --parents devkitpro/libgba/include devkitpro/devkitARM/arm-none-eabi/include /src/dist/'
+    {{emu_docker}} python3 tools/compile_commands.py "$PWD" build=dist/dry-run-kernel.txt build-test=dist/dry-run-test.txt
+    rm dist/dry-run-kernel.txt dist/dry-run-test.txt
 
 # Kernel size against the cart and GBA memory limits, and the largest symbols
 size count="12": build
