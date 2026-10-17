@@ -4,7 +4,7 @@
 
 enum
 {
-	EMax = 32
+	EMax = 64 //Torii: was 32; Kirby: Nightmare in Dream Land has 44 IRQ handler literals
 };
 typedef struct SPatchInfo
 {
@@ -69,7 +69,8 @@ u8 Check_mde_file(TCHAR* gamefilename);
 u8 Make_mde_file(TCHAR* gamefilename,u8 Save_num);
 
 void Patch_SpecialROM_sheepmode(void);
-u32 use_internal_engine(u8 gamecode[]);
+u32 use_internal_engine(u8 gamecode[], TCHAR* gamefilename);
+void Apply_rom_patches(void);
 u32 Check_cheat_file(TCHAR *gamefilename);
 void SetTrimSize(u8* buffer,u32 romsize,u32 iSize,u32 mode,BYTE saveMODE);
 u32 Find_spend_address_SpecialROM(u32* Data);

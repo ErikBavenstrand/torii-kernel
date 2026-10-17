@@ -14,7 +14,8 @@
 //   -h FRAME         after FRAME, print a hash of the screen (same picture,
 //                    same hash), to compare runs without saving PNGs
 //   -p FRAME:ADDR:VALUE  before FRAME, write a 32-bit VALUE to ADDR
-//   -u TEXT          stop after the frame in which the kernel logs TEXT
+//   -u TEXT          stop after the frame in which the kernel (or a -L
+//                    script) logs TEXT
 //   -x FRAME:PATH    after FRAME, write a save state (with the cart's state)
 //   -l PATH          load a save state before the first frame
 //   -L SCRIPT        run a Lua script (mGBA's scripting API: emu, callbacks,
@@ -160,9 +161,12 @@ static void quiet_log(struct mLogger* logger, int category, enum mLogLevel level
 		return;  // The crash report has it, and it repeats until the frame ends.
 	}
 	if (!strcmp(id, "script")) {  // console:log and friends from -L scripts
-		fputs("script: ", stderr);
-		vfprintf(stderr, format, args);
-		fputc('\n', stderr);
+		char line[512];
+		vsnprintf(line, sizeof(line), format, args);
+		fprintf(stderr, "script: %s\n", line);
+		if (until_text && strstr(line, until_text)) {
+			until_hit = 1;
+		}
 		return;
 	}
 	if (!strcmp(id, "gba.debug")) {

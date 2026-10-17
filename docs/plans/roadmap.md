@@ -41,15 +41,16 @@ Still open from the bug work:
   debug mode before any mass change. A game moved from 8K to 512 keeps its old 8 KB `.sav`,
   and the kernel then loads only its first 512 bytes. Check on the real cart whether 8K-mode
   data sits in those bytes, and settle what happens to existing saves (see v0.5).
-- **Hook coverage:** use `just compat` to find games the in-game menu and cheat hook miss.
-  That happens when the literal-pool scan misses `0x3007FFC`, or when a game never enables
-  the VBlank IRQ.
+- **Hook coverage:** done. `just compat` has an in-game menu column; all 118 commercial
+  GBA games in the library pass (`docs/research/hook-coverage.md`). Four games get exact-ROM
+  patches for the EU dumps tested; other regions may need their own. The menu can't restore
+  BLDY or the BG2 affine registers after it closes, as they are write-only.
 - **Clean boot:** IWRAM is still not fully cleared at launch, because the `SoftReset_now`
   code stays there. No game is known to need it. Clean-boot tests use `tests/roms/idle`
   (no crt0), since devkitARM's crt0 clears EWRAM itself.
-- **Settings default:** the emulated kernel NOR reads 0x0000 for settings that were never
-  written, while real carts read 0xFFFF. Fix the cart model. The settings slots are 13 for
-  CLOCK and 25 for RUMBLE; 23–24 are DS Style's reset and backup toggles.
+- **Settings default:** done. The emulated kernel NOR already read 0xFFFF for settings that
+  were never written. The 0x0000 seen came from saves, which zero slots 65–255
+  (`tests/settings.sh`), and erased hotkey slots are now range-checked.
 
 ### Tooling
 

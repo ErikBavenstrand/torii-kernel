@@ -514,7 +514,8 @@ loopbak:
 	ldr  	r6,=0x403 		@;MODE_3 | BG2_ENABLE
 	strh 	r6,[r7]	
 	@;mov 	r2,#0	
-	strh 	r3,[r7,#208]  @;IME =0 Disable
+	add		r12,r7,#0x200	@;Torii: IME is 0x4000208, not 208 (DMA2CNT_L)
+	strh 	r3,[r12,#8]  @;IME =0 Disable
 
 	strh 	r3,[r7,#REG_SOUNDCNT_X] @;sound off
 			
@@ -622,7 +623,8 @@ save_exit:
 		
 	mov		r7,#0x4000000
 	mov 	r2,#1
-	strh 	r2,[r7,#208]
+	add		r12,r7,#0x200	@;Torii: IME = 1
+	strh 	r2,[r12,#8]
 	
 	ldmfd	sp!,{r3}
 	strh 	r3,[r7,#REG_SOUNDCNT_X]
@@ -891,6 +893,8 @@ register_list_end:
 	ldr r0,=0x4000202   @;0x4000202
 	mov r1,#0
 	strh r1,[r0]
+	mov r1,#1			@;Torii: IME on; the state holds the menu's IME = 0
+	strh r1,[r0,#6]
 	
 
 	ldr 	r0,=0x0E008400

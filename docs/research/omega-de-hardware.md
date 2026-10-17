@@ -94,7 +94,7 @@ Every control-register write is wrapped like this:
 | `0x09700000` | `Set_64MROM_flag` | 64 MB ROM mapping for NOR games |
 | `0x09860000` | `SetPSRampage` | PSRAM window page (C3) |
 | `0x09880000` | `SetRompage` | ROM map: `0x200` = boot from PSRAM, NOR game = `NORaddress >> 17` (C4) |
-| `0x09C00000` | `SetRampage` | Save SRAM 64 KB bank (`0x00`, `0x10`) (E0) |
+| `0x09C00000` | `SetRampage` | 4 KB page of the save and work RAM at `0x0E000000` (E0); see *Save and work RAM* |
 | `0x09E00000` | data port (read/write) | SD sector buffer (up to 2 KB), status reads; `0xEEE1` = busy |
 
 ### Other mapped hardware
@@ -104,8 +104,8 @@ Every control-register write is wrapped like this:
   GL064 uses buffered writes (`0x25 … 0x29`).
 - **Game NOR (S98):** `0x09000000–0x097FFFFF`, same command set.
 - **PSRAM:** `0x08800000` window.
-- **SRAM / flash-save emulation:** `0x0E000000`; `Bank_Switching` uses the flash-save command
-  sequence `0x5555=AA, 0x2AAA=55, 0x5555=B0, 0x0000=bank`.
+- **SRAM / flash-save emulation:** `0x0E000000`, paged by `0x09C00000`; `Bank_Switching` uses
+  the flash-save command sequence `0x5555=AA, 0x2AAA=55, 0x5555=B0, 0x0000=bank`.
 - **RTC and rumble:** standard GBA cart GPIO at `0x080000C4` (data), `0xC6` (dir), `0xC8` (enable),
   S-3511-style serial protocol for the RTC; rumble games drive the motor from a GPIO pin.
   One register (`0x096A0000`) turns the whole port on for the game, so there is no
@@ -202,6 +202,24 @@ entries, or picked in the menu): `0x11` SRAM 32K, `0x21` EEPROM 512,
 (treated as 64 KB SRAM). Pokémon Ruby, Sapphire, FireRed, LeafGreen and
 Emerald (`BPEE`, `BPEJ`) are all `0x31`.
 
+**Save and work RAM** (from *EZ-FLASH OMEGA DE DOCUMENT.pdf* in this repo,
+matching what the kernel does). `0x0E000000–0x0E00FFFF` shows 64 KB starting
+at page `0x09C00000` × 4 KB:
+
+| Pages | Memory | Used for |
+|---|---|---|
+| `0x00`, `0x10` | FM28V100 FRAM, 128 KB | game saves |
+| `0x20`, `0x30` | S71GL064 SRAM (1 MB; its first 128 KB are unused behind the FRAM) | the in-game menu's copy of VRAM (`0x10000` + `0x2C00` bytes) |
+| `0x40`–`0xAF` | S71GL064 SRAM | the save-state buffer: the 0x70000-byte `RTS/<game>.rts` is loaded here at launch. VRAM, IWRAM, EWRAM, OAM, palette, IO, registers, and a flag at `0xAFFF0` |
+
+The page applies in game mode too: the menu sets `0x20` to keep the screen
+and `0x40`+ for states, then goes back to `0x00`. The menu does this
+whatever the game's save chip, so we take pages from `0x20` up to be plain
+RAM even while the FPGA presents a flash chip on the save pages (inferred
+from the kernel; the PDF doesn't say). The emulated cart models this
+with one 1 MB `sram.bin` (before 2026-10-17 it had 512 KB, so the state
+buffer wrapped onto the game's save). `tests/menu.sh` checks it.
+
 **RTC:** a GPIO RTC at `0x080000C4` (S-3511 protocol), used by the menu clock
 in kernel mode and by games when register `0x096A0000` is 1.
 
@@ -216,6 +234,24 @@ this game: with game-mode RTC disabled in the model, Emerald says "The
 internal battery has run dry" after the title screen; with it enabled, it
 doesn't.
 
+**Settings** live in the kernel NOR at `+0x7B0000`, as 16-bit slots (names in
+`source/ez_define.h`). A new cart's NOR is erased, so slots the kernel never
+wrote read `0xFFFF`. The emulated cart does the same, since it creates
+`kernel-nor.bin` filled with `0xFF` (`tests/settings.sh`). At boot
+`CheckSwitch` maps every value it doesn't know to a default: English,
+addons off, fast patch engine, thumbnails off, CLOCK and RUMBLE on (slots 13
+and 25), auto-save off, LED defaults. Saving any setting erases the sector
+and writes slots 0–255 back. The kernel's own slots get their values, slots
+14–64 keep what they read (so DS Style's 23 and 24 stay `0xFFFF` until DS
+Style writes them), and 65–255 become `0` from the unused part of the
+buffer. The hotkey slots 5–10 are written as the defaults the settings page
+shows (L R SELECT, L R START) the first time any row is saved.
+
+The in-game key masks in `GBApatch.c` used to build `1 << value` from
+slots 5–10 with no range check, so an erased slot gave `0x3FF`, "no key
+held". Since `b736015`, slots past 9 count as the defaults the settings page
+shows.
+
 ## 5. Save prompt behaviour
 
 On power-on, if a game ran since the last save, the kernel asks "Save sav?".
@@ -228,7 +264,12 @@ One edge, observed in the source but not reproduced: `Save_savefile`'s result
 is ignored, so if the SD write fails (card full, write error) the flag is still
 cleared and that session is lost the same way as with B.
 
-## 6. Open questions
+## 6. In-game menu hook
+
+See [hook-coverage.md](hook-coverage.md): how the kernel hooks a game's IRQ
+for the in-game menu, and which games it misses.
+
+## 7. Open questions
 
 - What the `0x09E00000` status values mean beyond `0xEEE1` (busy) and `0x0000/0x0001` handshakes.
 - What `0x096C0000` (auto-save) does in current firmware.

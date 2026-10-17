@@ -2934,7 +2934,7 @@ boot_game:
 						}
 						else 
 						{
-			    		res=use_internal_engine(GAMECODE);	
+			    		res=use_internal_engine(GAMECODE,pfilename);	
 			    		if(res == 1) 
 			    		{
 			    			Send_FATbuffer(FAT_table_buffer,0);//Loading rom	
@@ -2946,6 +2946,7 @@ boot_game:
 						}
 					}	
 	    		Patch_SpecialROM_sleepmode();//
+	    		Apply_rom_patches();//Torii: exact-ROM patches, SD launches only
 	    		GBApatch_PSRAM(PSRAMBase_S98,gamefilesize);																																			
 				}
 				else{//no select switch ,CLEAN

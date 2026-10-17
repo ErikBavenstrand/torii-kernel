@@ -14,6 +14,8 @@ jobs=(
   "tests/save_types.sh eeprom512"
   "tests/crash.sh"
   "tests/state.sh"
+  "tests/settings.sh"
+  "tests/menu.sh"
 )
 
 logs=$(mktemp -d)

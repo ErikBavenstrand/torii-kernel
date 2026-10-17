@@ -14,5 +14,13 @@ void test_cheat_garbage(void);
 void test_cheat_empty_entries(void);
 void test_cheat_whitespace(void);
 void test_charset_ascii(void);
+void test_irq_table_lookup(void);
+void test_irq_table_rejects_blank_codes(void);
+void test_irq_table_bounds(void);
+void test_irq_table_next_entry(void);
+void test_irq_literals(void);
+void test_hotkey_value(void);
+void test_rom_patch_table(void);
+void test_rom_patch_matches(void);
 
 #endif

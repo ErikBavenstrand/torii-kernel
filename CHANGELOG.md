@@ -20,6 +20,44 @@ git log, not here.
 - **Removed:** Chinese (`c05855f`). English is the only language until language
   packs arrive; a saved Chinese setting loads English. Cheats come from
   `/CHEAT/Eng`, and the fast patch engine is no longer off for Chinese.
+- **Fixed:** the in-game menu, cheats, reset and sleep work in rev 1 of
+  Pokémon FireRed and LeafGreen, Crash Bandicoot Purple and SimCity 2000
+  (`b736015`). The fast patch engine's built-in table is keyed by game code
+  alone and has rev 0's offsets, so these games got unrelated words
+  overwritten, and most crashed with an addon on. A table entry is now used
+  only if every listed word in the ROM is an IRQ handler address; otherwise
+  the kernel scans the ROM. Blank game codes (homebrew) no longer match the
+  table's all-zero entry.
+- **Fixed:** an unset in-game hotkey (erased settings) counts as the key the
+  settings page shows, L R SELECT or L R START (`b736015`). It made the key
+  read as "no key held", so reset or the menu would fire on every frame.
+- **Fixed:** with an addon on, Grand Theft Auto Advance, Super Monkey Ball
+  Jr. and LEGO Star Wars II (EU) no longer crash or hang (`c57c3b6`,
+  `dcf4c5b`). Each clears the top of IWRAM after the kernel's hook is in;
+  their clear now stops just below it.
+- **Fixed:** the in-game menu works in Lara Croft Tomb Raider: Legend (EU),
+  which computes its IRQ handler address instead of loading it
+  (`dcf4c5b`).
+- **Changed:** these four per-game patches live in one table in `irqpatch.c`
+  (`35613bf`). Each applies only to the exact ROM (game code, revision and
+  header check) and only if the patch site holds the expected word.
+- **Fixed:** Crash Nitro Kart no longer crashes after the in-game menu
+  (`dcf4c5b`). The kernel moves a game's stack down to make room for the
+  menu's saved registers; this game reloads its stack from a second
+  literal, which is now moved too.
+- **Fixed:** the in-game menu turns IME off and on as intended (`37c7d60`).
+  It wrote DMA2's count register instead, leaving it at 1 after every menu.
+  Loading a save state turns IME back on too (`110277b`), since the state
+  is saved while the menu has it off.
+- **Fixed:** the IRQ patch keeps up to 64 stores, not 32 (`bd61eec`).
+  Kirby: Nightmare in Dream Land has 42 listed, and the rest stayed
+  unpatched. Cached `/PATCH/*.pat` files of the old layout are scanned
+  again, and a `.pat` is no longer read whatever its size.
+- **Changed:** of several built-in table entries for one game code, the
+  first that matches the ROM is used (`c69aa23`), so FireRed rev 1 gets its
+  own entry; lowercase game codes count. The exact-ROM patches run only on
+  SD launches and check the header against the game code.
+
 - **Fixed:** cheat lines no longer make bogus writes (`2c274c8`): an entry
   without a value is dropped instead of reusing the last one, empty `;` and
   trailing `,` add nothing (a trailing `,` wrote 0 to the next address), and
