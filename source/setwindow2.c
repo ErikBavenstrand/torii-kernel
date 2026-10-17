@@ -10,6 +10,7 @@
 #include "RTC.h"
 #include "draw.h"
 #include "Ezcard_OP.h"
+#include "tlog.h"
 
 u16 auto_save_sel;
 u16 ModeB_INIT;
@@ -22,6 +23,8 @@ u16 Breathing_B;
 u16 SD_R;
 u16 SD_G;
 u16 SD_B;
+
+u16 log_sel;  //Torii: LOGGING, TLOG_OFF to TLOG_DEBUG
 
 extern u16 gl_auto_save_sel;
 extern u16 gl_ModeB_init;
@@ -71,6 +74,7 @@ u32 Setting_window2(void)
 	u8 led_pos = 1;
 
 	u8 ModeB_pos = 3;
+	u8 log_pos = 1;
 
 	select = 0;
 	u32 y_offset = 24;
@@ -101,6 +105,7 @@ u32 Setting_window2(void)
 	SD_R = gl_SD_R;
 	SD_G = gl_SD_G;
 	SD_B = gl_SD_B;
+	log_sel = tlog_level_setting();
 
 	while (1) {
 		VBlankIntrWait();
@@ -179,12 +184,23 @@ u32 Setting_window2(void)
 				sprintf(msg, "%s", "B");
 				DrawHZText12(msg, 0, x_offset + 5 * 6 + 5 * 6 + 15 + 15 + 15, y_offset + line_x * 4,
 					     (led_pos == 7) ? gl_color_selected : gl_color_text, 1);
-				line_total = 3;
 			} else {
 				ClearWithBG((u16 *)gImage_SET2, 0, y_offset + line_x * 3, 240,
 					    160 - (y_offset + line_x * 2), 1);
-				line_total = 3;
 			}
+			//Torii: LOGGING, then DIAGNOSE, which starts Diagnostics. They sit on
+			//rows 5 and 6, below the LED rows, and are selected as lines 3 and 4.
+			sprintf(msg, "%s", gl_logging);
+			DrawHZText12(msg, 0, set_offset, y_offset + line_x * 5, gl_color_selected, 1);
+			ClearWithBG((u16 *)gImage_SET2, x_offset, y_offset + line_x * 5, 200 - x_offset, 13, 1);
+			sprintf(msg, "< %s >", gl_log_levels[log_sel]);
+			DrawHZText12(msg, 0, x_offset + 15, y_offset + line_x * 5,
+				     (log_pos == 0) ? gl_color_selected : gl_color_text, 1);
+			sprintf(msg, "%s", gl_diagnose);
+			DrawHZText12(msg, 0, set_offset, y_offset + line_x * 6, gl_color_selected, 1);
+			sprintf(msg, "%s", gl_diag_run);
+			DrawHZText12(msg, 0, x_offset + 15, y_offset + line_x * 6, gl_color_text, 1);
+			line_total = 5;
 			u32 offsety;
 
 			for (line = 0; line < line_total; line++) {
@@ -195,6 +211,8 @@ u32 Setting_window2(void)
 						clean_color = gl_color_btn_clean;
 					else if ((line == select) && (2 == select) && (led_pos == 1))
 						clean_color = gl_color_btn_clean;
+					else if ((line == select) && (3 == select) && (log_pos == 1))
+						clean_color = gl_color_btn_clean;
 					else
 						clean_color = gl_color_MENU_btn;
 				} else {
@@ -203,8 +221,7 @@ u32 Setting_window2(void)
 					else
 						clean_color = gl_color_MENU_btn;
 				}
-				offsety = y_offset + line * line_x;
-				//if(line>1) offsety += line_x;
+				offsety = y_offset + ((line < 3) ? line : line + 2) * line_x;
 
 				Clear(202, offsety - 2, 30, 14, clean_color, 1);
 
@@ -225,7 +242,9 @@ u32 Setting_window2(void)
 			re_show = 0;
 			scanKeys();
 			keys = keysDown();
-			if (keys & KEY_A) {//set
+			if ((keys & KEY_A) && (select == 4)) {
+				return 2;  //Diagnostics
+			} else if (keys & KEY_A) {//set
 				Set_OK_line = select;
 				Set_OK = 1;//!Set_OK;
 				re_show = 1;
@@ -234,6 +253,8 @@ u32 Setting_window2(void)
 					ModeB_pos = 0;
 				} else if (select == 2) {
 					led_pos = 0;
+				} else if (select == 3) {
+					log_pos = 0;
 				}
 			} else if (keys & KEY_DOWN) {
 				if (select < (u32)(line_total - 1)) {
@@ -275,7 +296,9 @@ u32 Setting_window2(void)
 					re_show = 1;
 				}
 			} else if (keys & KEY_RIGHT) {
-				if (select == 0) {
+				if (select == 3) {
+					log_pos = 1;
+				} else if (select == 0) {
 					auto_save_pos = 1;
 				} else if (select == 1) {
 					if (ModeB_pos < 4)
@@ -290,7 +313,9 @@ u32 Setting_window2(void)
 				}
 				re_show = 1;
 			} else if (keys & KEY_LEFT) {
-				if (select == 0) {
+				if (select == 3) {
+					log_pos = 0;
+				} else if (select == 0) {
 					auto_save_pos = 0;
 				} else if (select == 1) {
 					if (ModeB_pos > 0)
@@ -305,7 +330,15 @@ u32 Setting_window2(void)
 				}
 				re_show = 1;
 			} else if (keys & KEY_A) {
-				if (select == 0) {
+				if (select == 3) {
+					if (log_pos == 0) {
+						log_sel = (log_sel + 1) % (TLOG_DEBUG + 1);
+					} else {
+						save_set2_info();
+						Set_OK = 0;
+						log_pos = 1;
+					}
+				} else if (select == 0) {
 					switch (auto_save_pos) {
 					case 0:
 						auto_save_sel = !auto_save_sel;
@@ -396,10 +429,19 @@ void save_set2_info(void)
 	SET_info_buffer[assress_SD_R] = SD_R;
 	SET_info_buffer[assress_SD_G] = SD_G;
 	SET_info_buffer[assress_SD_B] = SD_B;
+	SET_info_buffer[assress_logging] = log_sel;
 
 	//save to nor
 	Save_SET_info(SET_info_buffer, 0x200);
 	u16 led_status = (led_open_sel << 7) | (Breathing_R << 5) | (Breathing_G << 4) | (Breathing_B << 3) |
 			 (SD_R << 2) | (SD_G << 1) | (SD_B);
 	Set_LED_control(led_status);
+	if (log_sel != tlog_level) {
+		// At the higher of the two levels, so turning logging off is logged too
+		if (log_sel > tlog_level)
+			tlog_set_level(log_sel);
+		tlog("settings: LOGGING is %s", gl_log_levels[log_sel]);
+		tlog_flush();
+		tlog_set_level(log_sel);
+	}
 }

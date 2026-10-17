@@ -47,7 +47,7 @@ echo "PASS: the list shows read-only and no-archive entries, not hidden or syste
 # the name is too long and launch nothing
 OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -k 100:DOWN -k 104:- -k 116:DOWN -k 120:- \
   -k 132:A -k 136:- -k 180:A -k 184:- -f 400 >"$cart/kernel.log" 2>&1
-grep -q '^kernel: error 8: Name too long' "$cart/kernel.log" ||
+grep -Eq '^kernel( error)?: error 8: Name too long' "$cart/kernel.log" ||
   fail "FAT32: no error for the long name: $(grep '^kernel: ' "$cart/kernel.log" | tail -2)"
 grep -q '^kernel: launch' "$cart/kernel.log" && fail "FAT32: the long name launched something"
 echo "PASS: a name past 99 bytes shows Name too long on FAT32"
@@ -63,7 +63,7 @@ tools/sdimg.sh "$cart/sd.img" put tests/roms/hello/hello.gba "/${short%.gba} and
 [ "$(counts "$cart")" = "2 0" ] || fail "exFAT: the list has $(counts "$cart") files and folders, expected 2 0"
 # The long one sorts first (a space before the short one's dot): open it, CLEAN BOOT
 OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -k 116:A -k 120:- -k 160:A -k 164:- -f 300 >"$cart/kernel.log" 2>&1
-grep -q '^kernel: error 8: Name too long' "$cart/kernel.log" ||
+grep -Eq '^kernel( error)?: error 8: Name too long' "$cart/kernel.log" ||
   fail "exFAT: no error for the long name: $(grep '^kernel: ' "$cart/kernel.log" | tail -2)"
 grep -q '^kernel: launch' "$cart/kernel.log" && fail "exFAT: the long name launched the other file"
 # Hold L, START on the long one, A to confirm the delete

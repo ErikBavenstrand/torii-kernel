@@ -1,0 +1,248 @@
+#!/usr/bin/env bash
+# SD logging, the crash dump and Diagnostics on the emulated cart
+# (source/tlog.c, source/cartlog.c, source/diag.c). One part per run, so
+# tests/all.sh runs them side by side:
+#   launch  logging off touches nothing; at Info a launch is logged and the
+#           next boot says how the session ended; a launch cut off is caught
+#   debug   the in-game menu's DEBUG entry writes only cart RAM page 0xF0,
+#           and the next boot logs it
+#   crash   with logging off, Diagnostics (started by keys held at power-on)
+#           logs its report, leaves the save chip alone, and its crash test's
+#           dump reaches the log, named by tools/logs.py
+#   rotate  a full log file hands over to the next one
+#   full    a full card stops the logging, not the kernel
+# Every part checks the card with fsck.fat. Runs inside the torii-emu container.
+set -euo pipefail
+
+part=$1
+cart=dist/cart-logging-$part
+rm -rf "$cart"
+mkdir -p "$cart"
+
+fail() {
+  echo "FAIL: logging $part: $*" >&2
+  [ ! -f "$cart/kernel.log" ] || tail -15 "$cart/kernel.log" >&2
+  exit 1
+}
+
+new_card() { # size in KB, FAT type
+  mkfs.fat -C -F "$2" -n LOGGING "$cart/sd.img" "$1" >/dev/null
+  mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/Hello.gba
+}
+
+# Runs the kernel; its log lines go to kernel.log. A crash report fails the test.
+boot() {
+  OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin "$@" >>"$cart/out.log" 2>"$cart/run.log" || true
+  cat "$cart/run.log" >>"$cart/kernel.log"
+  ! grep -q '^crash at frame' "$cart/run.log" || fail "the emulator caught a crash"
+}
+
+# Settings slots (source/ez_define.h) in the kernel NOR, as SLOT=VALUE.
+settings() {
+  local slot value
+  for slot in "$@"; do
+    value=${slot#*=}
+    printf %b "\\x$(printf %02x $((value & 0xFF)))\\x$(printf %02x $((value >> 8)))" |
+      dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7B0000 + 2 * ${slot%=*})) conv=notrunc status=none
+  done
+}
+
+# keys FRAME KEY... -> mgba-shot press/release pairs, one key every 8 frames.
+keys() {
+  local frame=$1
+  shift
+  for key in "$@"; do
+    printf -- '-k %d:%s -k %d:- ' "$frame" "$key" $((frame + 4))
+    frame=$((frame + 8))
+  done
+}
+
+# The text of log file N (its zero padding dropped).
+log() { mtype -i "$cart/sd.img" "::/torii/logs/torii-$1.log" | tr -d '\0'; }
+# (Through a file: grep -q stops reading early, which pipefail counts as a failure.)
+has() {
+  log "${2:-0}" >"$cart/log.txt"
+  grep -qF -- "$1" "$cart/log.txt" || fail "no '$1' in torii-${2:-0}.log"
+}
+# Every line of log file N is a header or "SECONDS.CC LEVEL text": a byte
+# lost or shifted on the way to the card breaks one.
+lines_ok() {
+  log "${1:-0}" >"$cart/log.txt"
+  ! grep -naEv '^(torii log [0-9]{8} +| *[0-9]+\.[0-9]{2} [EID] .*)$' "$cart/log.txt" >"$cart/bad.txt" ||
+    fail "torii-${1:-0}.log has a broken line: $(head -2 "$cart/bad.txt")"
+}
+card_ok() { fsck.fat -n "$cart/sd.img" >/dev/null 2>&1 || fail "fsck.fat finds the card damaged: $(fsck.fat -n "$cart/sd.img" 2>&1 | tail -3)"; }
+
+# Hex of LEN bytes of cart SRAM (sram.bin) from OFFSET.
+sram() { od -A n -t x1 -v -j $(($1)) -N $(($2)) "$cart/sram.bin" | tr -d ' \n'; }
+blank() { [ -z "$(sram "$1" "$2" | tr -d f)" ]; }
+
+case $part in
+launch)
+  new_card 65536 32
+  boot -f 200
+  # Off: no folder on the card, nothing in cart RAM page 0xF0, even after a launch.
+  # shellcheck disable=SC2046 # $(keys) is a list of options
+  boot $(keys 100 A) $(keys 160 A) -f 400
+  grep -q '^kernel: launch: starting the game' "$cart/kernel.log" || fail "Hello.gba didn't launch"
+  ! mdir -i "$cart/sd.img" ::/torii >/dev/null 2>&1 || fail "logging off made /torii"
+  blank 0xF0000 0x2000 || fail "logging off wrote cart RAM page 0xF0"
+  card_ok
+
+  settings 14=1 26=2 # AUTO SAVE on (no "Save sav?" after a launch), LOGGING Info
+  boot -f 200
+  [ "$(mdir -b -i "$cart/sd.img" ::/torii/logs)" = "::/torii/logs/torii-0.log" ] || fail "not one log file"
+  [ "$(mtype -i "$cart/sd.img" ::/torii/logs/torii-0.log | wc -c)" = 65536 ] || fail "the log file isn't 64 KB"
+  [ "$(log 0 | head -1)" = "torii log 00000001     " ] || fail "header: $(log 0 | head -1)"
+  has "logging info, build main"
+  has "previous session: nothing in cart RAM"
+
+  # SAVER and torii sort first: down twice to Hello.gba, then CLEAN BOOT.
+  # shellcheck disable=SC2046
+  boot $(keys 100 DOWN DOWN A) $(keys 160 A) -f 400
+  has "launch: loading Hello.gba, CLEAN BOOT"
+  has "launch: header: title"
+  has "launch: CART clock on, rumble on"
+  has "launch: starting the game"
+  boot -f 200
+  has "previous session: ended in Hello.gba"
+  [ "$(log 0 | grep -c 'Torii kernel boot')" = 3 ] || fail "not one session marker a boot"
+  card_ok
+
+  # A launch cut off (the emulator stops in the frame that logs it, as if
+  # the power went): the next boot says so.
+  # shellcheck disable=SC2046
+  boot $(keys 100 DOWN DOWN A) $(keys 160 A) -u 'launch: loading Hello.gba'
+  boot -f 200
+  has "previous session: ended abnormally in launching (step 0): Hello.gba"
+  card_ok
+  lines_ok
+  echo "PASS: logging off touches neither the card nor cart RAM; at Info a launch is logged, and a cut-off one caught"
+  ;;
+
+debug)
+  new_card 65536 32
+  # English, RESET and SAVESTATE on, sleep key L+R+SELECT, menu key
+  # L+R+START, fast patch engine, CART clock and rumble on, LOGGING Info.
+  settings 0=0xE1E1 1=1 2=1 3=0 4=0 5=9 6=8 7=2 8=9 9=8 10=3 11=1 12=0 13=1 14=1 25=1 26=2
+  boot -f 200
+  cp "$cart/sram.bin" "$cart/sram-before.bin"
+  # Hello.gba, BOOT WITH ADDON; in game, L+R+START, then down to DEBUG
+  # (RESET SAVE LOAD DEBUG) and A.
+  # The game starts around frame 850, once the savestate file is made.
+  # shellcheck disable=SC2046
+  boot $(keys 100 DOWN DOWN A) $(keys 160 DOWN A) -k 1200:L+R+START -k 1206:- $(keys 1240 DOWN DOWN DOWN A) -f 1400
+  has "launch: IRQ hook from"
+  has "launch: in-game code: in-game menu (RTS_ReplaceIRQ)"
+  has "patched words"
+  [ "$(sram 0xF1000 16)" = "$(printf TORII-DEBUGINFO1 | od -A n -t x1 | tr -d ' \n')" ] || fail "no debug info in cart RAM"
+  # Past the save chip, the menu's screen copy and the savestate buffer
+  # (0x00000-0xAFFFF), only page 0xF0 changed (cmp counts bytes from 1).
+  changed=$({ cmp -l "$cart/sram-before.bin" "$cart/sram.bin" || true; } |
+    awk -v states_end=$((0xB0000)) -v ours=$((0xF0000)) -v ours_end=$((0xF2000)) \
+      '$1 - 1 >= states_end && ($1 - 1 < ours || $1 - 1 >= ours_end) { n++ } END { print n + 0 }')
+  [ "$changed" = 0 ] || fail "DEBUG changed $changed bytes of cart RAM outside page 0xF0"
+  boot -f 200
+  has "debug info from the in-game menu: "
+  has "(the hook is in place)"
+  has "debug info: IE "
+  blank 0xF1000 16 || [ "$(sram 0xF1000 16)" = "00000000000000000000000000000000" ] || fail "the debug info wasn't cleared"
+  card_ok
+  lines_ok
+  echo "PASS: the in-game menu's DEBUG writes only cart RAM page 0xF0, and the next boot logs it"
+  ;;
+
+crash)
+  new_card 65536 32
+  boot -f 100 # makes the cart's files
+  fram=$(sram 0 0x20000 | md5sum)
+  # Diagnostics from L+R+SELECT at power-on. When its questions come, START
+  # skips them; at the summary, SELECT crashes the kernel on purpose.
+  presses=$(for f in $(seq 2000 24 4400); do printf -- '-k %d:START -k %d:- -k %d:SELECT -k %d:- ' "$f" $((f + 4)) $((f + 12)) $((f + 16)); done)
+  # shellcheck disable=SC2086
+  boot -k 1:L+R+SELECT -k 60:- $presses -f 5200
+  has "diag: Diagnostics started"
+  has "diag: unit tests: pass"
+  has "diag: PSRAM holds a pattern: pass"
+  has "diag: 800 KB of NOR read correctly: pass"
+  has "diag: the tests left the save chip alone: pass"
+  has "diag: SD write test: pass"
+  has "diag: questions skipped"
+  has "diag: crash test"
+  has "crash: the kernel crashed"
+  has "crash: pc 0200"
+  has "crash: | "
+  grep -q '^kernel error: crash: ' "$cart/kernel.log" || fail "the crash dump wasn't logged as an error"
+  [ "$(sram 0 0x20000 | md5sum)" = "$fram" ] || fail "Diagnostics changed the save chip"
+  mkdir -p "$cart/card/torii/logs"
+  mcopy -n -i "$cart/sd.img" ::/torii/logs/* "$cart/card/torii/logs/"
+  python3 tools/logs.py "$cart/card" dist/ezkernelnew.sym "$cart/logs" >/dev/null
+  grep -q 'crash: lr .* (Diagnostics+0x' "$cart/logs/torii.log" || fail "tools/logs.py didn't name the crash's lr: $(grep 'crash: lr' "$cart/logs/torii.log")"
+  card_ok
+  lines_ok
+  echo "PASS: Diagnostics logs with logging off and leaves the save chip alone; its crash test's dump reaches the log"
+  ;;
+
+rotate)
+  new_card 65536 32
+  settings 26=2
+  boot -f 100
+  # File 2 (sequence 7) has 30 bytes left; file 3 is an older one (sequence 6).
+  python3 - "$cart" <<'EOF'
+import sys
+cart = sys.argv[1]
+def make(seq, text_len):
+    text = b"torii log %08d     \n" % seq
+    line = b"   1.00 I filler line, long enough to fill the file quickly....\n"
+    while len(text) + len(line) < text_len - 20:
+        text += line
+    last = b"   1.00 I end"
+    text += last + b"." * (text_len - len(text) - len(last) - 1) + b"\n"
+    assert len(text) == text_len
+    return text + bytes(65536 - text_len)
+open(f"{cart}/torii-2.log", "wb").write(make(7, 65536 - 30))
+open(f"{cart}/torii-3.log", "wb").write(make(6, 4000))
+EOF
+  mcopy -o -i "$cart/sd.img" "$cart/torii-2.log" "$cart/torii-3.log" ::/torii/logs/
+  boot -f 200
+  # Whole lines only: what didn't fit in file 2 starts file 3.
+  [ "$(log 2 | tail -c 1 | od -A n -t x1 | tr -d ' ')" = 0a ] || fail "file 2 ends in the middle of a line"
+  [ "$(log 3 | head -1)" = "torii log 00000008     " ] || fail "file 3 wasn't started as sequence 8: $(log 3 | head -1)"
+  has "Torii kernel boot" 3
+  log 3 >"$cart/log.txt"
+  ! grep -q "filler line" "$cart/log.txt" || fail "file 3 kept the old text"
+  [ "$(mtype -i "$cart/sd.img" ::/torii/logs/torii-3.log | wc -c)" = 65536 ] || fail "file 3 isn't 64 KB"
+  card_ok
+  lines_ok 2
+  lines_ok 3
+  echo "PASS: a full log file hands over to the next, which starts empty, between lines"
+  ;;
+
+full)
+  # A small FAT16 card with under 64 KB free.
+  new_card 16384 16
+  # Hello.gba's save is there already, so launching it needs no new space.
+  head -c 65536 /dev/zero | tr '\0' '\377' >"$cart/Hello.sav"
+  mmd -i "$cart/sd.img" ::/SAVER
+  mcopy -i "$cart/sd.img" "$cart/Hello.sav" ::/SAVER/Hello.sav
+  free=$(mdir -i "$cart/sd.img" ::/ | sed -n 's/^ *\([0-9 ]*\) bytes free.*/\1/p' | tr -d ' ')
+  head -c $((free - 49152)) /dev/urandom >"$cart/filler.bin"
+  mcopy -i "$cart/sd.img" "$cart/filler.bin" ::/FILLER.BIN
+  settings 14=1 26=3 # AUTO SAVE on, LOGGING Debug
+  boot -f 200
+  grep -q "no more SD logging until the next boot" "$cart/kernel.log" || fail "a full card didn't stop the logging"
+  ! mtype -i "$cart/sd.img" ::/torii/logs/torii-0.log >/dev/null 2>&1 || fail "the log file it couldn't finish is still there"
+  # The kernel still launches games: past SAVER, torii and FILLER.BIN.
+  # shellcheck disable=SC2046
+  boot $(keys 100 DOWN DOWN DOWN A) $(keys 160 A) -f 400
+  grep -q '^kernel: launch: starting the game' "$cart/kernel.log" || fail "with a full card, Hello.gba didn't launch"
+  mtype -i "$cart/sd.img" ::/FILLER.BIN | cmp -s - "$cart/filler.bin" || fail "the other file changed"
+  card_ok
+  echo "PASS: a full card stops the logging, not the kernel, and other files stay as they were"
+  ;;
+
+*)
+  echo "usage: $0 launch|debug|crash|rotate|full" >&2
+  exit 2
+  ;;
+esac

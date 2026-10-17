@@ -63,6 +63,15 @@ static const struct {
 	{"hotkey_value", test_hotkey_value},
 	{"rom_patch_table", test_rom_patch_table},
 	{"rom_patch_matches", test_rom_patch_matches},
+	{"log_ring_keeps_order", test_log_ring_keeps_order},
+	{"log_ring_drops_whole_lines", test_log_ring_drops_whole_lines},
+	{"log_ring_long_line", test_log_ring_long_line},
+	{"log_ring_tail", test_log_ring_tail},
+	{"log_header", test_log_header},
+	{"log_pick_current", test_log_pick_current},
+	{"log_find_end", test_log_find_end},
+	{"lz77_round_trip", test_lz77_round_trip},
+	{"lz77_compresses", test_lz77_compresses},
 };
 
 int main(void)

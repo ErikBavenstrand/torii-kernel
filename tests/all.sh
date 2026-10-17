@@ -22,6 +22,11 @@ jobs=(
   "tests/fragmented.sh"
   "tests/listing.sh"
   "tests/cheats.sh"
+  "tests/logging.sh launch"
+  "tests/logging.sh debug"
+  "tests/logging.sh crash"
+  "tests/logging.sh rotate"
+  "tests/logging.sh full"
 )
 
 logs=$(mktemp -d)

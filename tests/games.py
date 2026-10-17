@@ -372,7 +372,10 @@ def check_boot(result: Result, trace: str, out: str, shots: list[Path]) -> bool:
     g = result.game
     crash = lines(trace, "crash at frame ")
     errors = lines(trace, "kernel error: ")
-    launches = lines(trace, ": launch: ")
+    # The cart model's trace ("omega FRAME: launch: ..."), not the kernel's log
+    launches = [
+        line for line in lines(trace, ": launch: ") if line.startswith("omega ")
+    ]
     hashes = [
         line.split(": ")[1]
         for line in out.splitlines()

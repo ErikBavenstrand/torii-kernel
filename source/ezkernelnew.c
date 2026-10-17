@@ -25,6 +25,8 @@
 #include "GBApatch.h"
 #include "showcht.h"
 #include "helpwindow.h"
+#include "cartlog.h"
+#include "diag.h"
 
 #include "jagoombacolor.h"
 #include "pocketnes.h"
@@ -838,7 +840,7 @@ static void Make_recently_play_file(TCHAR *path, TCHAR *gamefilename)
 	}
 }
 //---------------------------------------------------------------------------------
-static void init_FAT_table(void)
+void init_FAT_table(void)
 {
 	//memset(FAT_table_buffer,0,0x200);
 	FAT_table_buffer[0] = 0x00000000;
@@ -1564,7 +1566,8 @@ static void Show_error_num(u8 error_num)
 		break;
 	}
 
-	tlog("error %u: %s", error_num, msg);
+	tlog_error("error %u: %s", error_num, msg);
+	tlog_flush();
 	DrawHZText12(msg, 0, 90, 2, RGB(31, 00, 00), 1);
 	wait_btn();
 }
@@ -1751,10 +1754,12 @@ static void Set_saveMODE(BYTE saveMODE)
 int main(void)
 {
 	tlog_init();
-	tlog("Torii kernel boot");
+	tlog_marker("power-on or reset", 0);
 	torii_run_tests();
 	irqInit();
+	cartlog_install();
 	irqEnable(IRQ_VBLANK);
+	cartlog_boot_start();
 
 	REG_IME = 1;
 
@@ -1800,7 +1805,16 @@ int main(void)
 	}
 	VBlankIntrWait();
 
+	// Diagnostics also starts from these keys held at power-on, in case the
+	// menu itself is broken. Read once the card is up, a second into the boot.
+	u32 diag_keys = (~REG_KEYINPUT & 0x3FF) == DIAG_BOOT_KEYS;
+	tlog_debug("boot: keys held %03X", ~REG_KEYINPUT & 0x3FF);
 	Check_save_flag();
+	tlog_sd_ready();
+	cartlog_boot_report();
+	tlog_flush();
+	if (diag_keys)
+		Diagnostics();
 
 	f_chdir("/");
 	//TCHAR currentpath[MAX_path_len];
@@ -1821,6 +1835,7 @@ int main(void)
 		Save_NOR_info((u16 *)pNorFS, sizeof(FM_NOR_FS) * MAX_NOR);
 	}
 
+	cartlog_phase(PHASE_MENU, 0, NULL);
 refind_file:
 
 	if (page_num == SD_list) {
@@ -1943,6 +1958,7 @@ re_showfile:
 				{
 					DrawPic((u16 *)gImage_SET, 0, 0, 240, 160, 0, 0, 1);
 					res = Setting_window();
+					tlog_flush();
 					if (res == 0) {
 						DrawPic((u16 *)gImage_NOR, 0, 0, 240, 160, 0, 0, 1);
 						page_num = NOR_list;  //NOR
@@ -1955,7 +1971,10 @@ re_showfile:
 				{
 					DrawPic((u16 *)gImage_SET2, 0, 0, 240, 160, 0, 0, 1);
 					res = Setting_window2();
-					if (res == 0) {
+					tlog_flush();
+					if (res == 2) {  //Torii: DIAGNOSE, which restarts the kernel
+						Diagnostics();
+					} else if (res == 0) {
 						DrawPic((u16 *)gImage_SET, 0, 0, 240, 160, 0, 0, 1);
 						page_num = SET_win;  //set1
 					} else {
@@ -2215,6 +2234,23 @@ re_showfile:
 	}
 }
 //---------------------------------------------------------------
+// Torii: the last step of every launch. Logs the rest of the launch record,
+// notes in cart RAM that the game started, writes the log to the card, then
+// starts the game.
+static void Launch_now(u16 page, u32 key_L, const char *how)
+{
+	if (tlog_wants(TLOG_INFO)) {
+		tlog("launch: %s, %s reset", how, key_L ? "hard (L held)" : "soft");
+		static const char *const uses[] = {"neither", "the clock", "rumble", "the clock and rumble"};
+		tlog("launch: CART clock %s, rumble %s; the game uses %s; GPIO port %s", gl_game_clock ? "on" : "off",
+		     gl_game_rumble ? "on" : "off", uses[gl_game_uses & 3], Game_GPIO_status() ? "on" : "off");
+	}
+	tlog("launch: starting the game");
+	cartlog_phase(PHASE_GAME, 0, NULL);
+	tlog_flush();
+	SetRompageWithHardReset(page, key_L);
+}
+//---------------------------------------------------------------------------------
 static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 {
 	//TCHAR savfilename[100];
@@ -2240,6 +2276,13 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 	pfilename = pNorFS[show_offset + file_select].filename;
 	gamefilesize = pNorFS[show_offset + file_select].filesize;
 	SAVEMODE = pNorFS[show_offset + file_select].savemode;
+	memcpy(GAMECODE, &pNorFS[show_offset + file_select].gamename[0xC], 4);  //header 0xA0: title, then game code
+	cartlog_phase(PHASE_LAUNCH, 0, pfilename);
+	tlog("launch: loading %s from NOR at %08lX: code %.4s, %lu bytes, save type %02X, patched %u, savestates %u",
+	     pfilename, (unsigned long)pNorFS[show_offset + file_select].rompage << 17, (const char *)GAMECODE,
+	     (unsigned long)gamefilesize, SAVEMODE, pNorFS[show_offset + file_select].have_patch,
+	     pNorFS[show_offset + file_select].have_RTS);
+	tlog_flush();
 
 	ShowbootProgress(gl_check_sav);
 	//memcpy(savfilename,pfilename,100);
@@ -2263,9 +2306,8 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 	FAT_table_buffer[0x1F4 / 4] = SET_PARAMETER_MODE;
 	Send_FATbuffer(FAT_table_buffer, 1);  //only RTS FAT and some parameter
 	//wait_btn();
-	memcpy(GAMECODE, &pNorFS[show_offset + file_select].gamename[0xC], 4);  //header 0xA0: title, then game code
 	gl_game_uses = Game_hardware(0, GAMECODE, 0);
-	SetRompageWithHardReset(pNorFS[show_offset + file_select].rompage, key_L);
+	Launch_now(pNorFS[show_offset + file_select].rompage, key_L, "NOR game");
 	while (1)
 		;
 }
@@ -2392,6 +2434,7 @@ u8 NOR_list_MENU(u32 show_offset, u32 file_select)
 		} else if (keysdown & KEY_A) {
 			if (MENU_line == 0) {  //boot to NOR.page
 				Boot_NOR_game(show_offset, file_select, key_L);
+				cartlog_phase(PHASE_MENU, 0, NULL);
 			} else if (MENU_line == 1) {
 				//delete lastest geme
 				if (show_offset + file_select + 1 == game_total_NOR) {
@@ -2588,8 +2631,14 @@ boot_game:
 	res = f_open(&gfile, pfilename, FA_READ);
 	if (res == FR_OK) {
 		u8 gb_cart_type = 0;
-		f_lseek(&gfile, 0xAC);
-		f_read(&gfile, GAMECODE, 4, (UINT *)&ret);
+		u8 header[0x20];
+		f_lseek(&gfile, 0xA0);
+		if (f_read(&gfile, header, sizeof(header), (UINT *)&ret) != FR_OK || ret != sizeof(header))
+			memset(header, 0, sizeof(header));
+		memcpy(GAMECODE, header + 0xC, 4);
+		if (!is_EMU)
+			tlog("launch: header: title %.12s, code %.4s, maker %.2s, version %u, check %02X",
+			     (char *)header, (char *)header + 0xC, (char *)header + 0x10, header[0x1C], header[0x1D]);
 		if (is_EMU == 1 || is_EMU == 2) {
 			f_lseek(&gfile, 0x147);
 			f_read(&gfile, &gb_cart_type, 1, (UINT *)&ret);
@@ -2647,12 +2696,15 @@ boot_game:
 	{
 		ShowbootProgress(gl_loading_game);
 		f_chdir(currentpath);  //return to game folder
+		cartlog_phase(PHASE_LAUNCH, 0, pfilename);
+		tlog("launch: loading %s with %s", pfilename, (is_EMU == 3) ? "PocketNES" : "Jagoomba Color");
+		tlog_flush();
 
 		FAT_table_buffer[0x1F4 / 4] = SET_PARAMETER_MODE;
 		Send_FATbuffer(FAT_table_buffer, 1);
 
 		res = LoadEMU2PSRAM(pfilename, is_EMU);
-		SetRompageWithHardReset(0x200, key_L);
+		Launch_now(0x200, key_L, (is_EMU == 3) ? "plugin PocketNES" : "plugin Jagoomba Color");
 		while (1)
 			;
 	} else {  //gba file
@@ -2675,11 +2727,14 @@ boot_game:
 		switch (MENU_line) {
 		case 0:  //DirectPSRAM CLEAN BOOT
 			ShowbootProgress(gl_loading_game);
+			cartlog_phase(PHASE_LAUNCH, 0, pfilename);
+			tlog("launch: loading %s, CLEAN BOOT", pfilename);
+			tlog_flush();
 
 			Send_FATbuffer(FAT_table_buffer, 0);
 			GBApatch_Cleanrom(PSRAMBase_S98, gamefilesize);
 			//wait_btn();
-			SetRompageWithHardReset(0x200, key_L);
+			Launch_now(0x200, key_L, "CLEAN BOOT");
 			break;
 		case 1:  //PSRAM BOOT WITH ADDON
 			ShowbootProgress(gl_loading_game);
@@ -2687,6 +2742,11 @@ boot_game:
 			gl_rts_on = Read_SET_info(assress_v_rts);
 			gl_sleep_on = Read_SET_info(assress_v_sleep);
 			gl_cheat_on = Read_SET_info(assress_v_cheat);
+			cartlog_phase(PHASE_LAUNCH, 0, pfilename);
+			tlog("launch: loading %s, BOOT WITH ADDON: reset %u, savestate %u, sleep %u, cheats %u (%lu)",
+			     pfilename, gl_reset_on, gl_rts_on, gl_sleep_on, gl_cheat_on,
+			     (unsigned long)gl_cheat_count);
+			tlog_flush();
 			if ((gl_reset_on == 1) || (gl_rts_on == 1) || (gl_sleep_on == 1) || (gl_cheat_on == 1)) {
 				if (gl_rts_on == 1) {
 					ShowbootProgress(gl_check_RTS);
@@ -2700,6 +2760,7 @@ boot_game:
 				ShowbootProgress(gl_check_pat);
 				have_pat = Check_pat(pfilename);
 				if (have_pat == 1) {
+					tlog("launch: IRQ hook from PATCH/ (cached scan)");
 					Send_FATbuffer(FAT_table_buffer, 0);  //Loading rom
 				} else  //(have_pat==0)
 				{
@@ -2711,6 +2772,7 @@ boot_game:
 					f_close(&gfile);
 					SetTrimSize(pReadCache, gamefilesize, 0x20000, 0x0, SAVEMODE);
 					if (gl_engine_sel == 0) {
+						tlog("launch: IRQ hook from a scan of the ROM (scan engine)");
 					get_find:
 						FAT_table_buffer[0x1F4 / 4] = SET_PARAMETER_MODE;
 						Send_FATbuffer(FAT_table_buffer, 1);
@@ -2720,20 +2782,33 @@ boot_game:
 					} else {
 						res = use_internal_engine(GAMECODE, pfilename);
 						if (res == 1) {
+							tlog("launch: IRQ hook from the built-in table");
 							Send_FATbuffer(FAT_table_buffer, 0);  //Loading rom
 						} else {
+							tlog("launch: IRQ hook from a scan of the ROM (not in the "
+							     "table)");
 							goto get_find;
 						}
 					}
 				}
+				u32 found = iCount2;
 				Patch_SpecialROM_sleepmode();  //
+				if (iCount2 > found)
+					tlog("launch: %lu code patches for this game's IRQ setup",
+					     (unsigned long)(iCount2 - found));
+				found = iCount2;
 				Apply_rom_patches();  //Torii: exact-ROM patches, SD launches only
+				if (iCount2 > found)
+					tlog("launch: exact-ROM patch for %.4s (irqpatch.c rom_patches)",
+					     (char *)GAMECODE);
 				GBApatch_PSRAM(PSRAMBase_S98, gamefilesize);
+				Log_patches();
 			} else {  //no select switch ,CLEAN
+				tlog("launch: no addon on, so no patches");
 				Send_FATbuffer(FAT_table_buffer, 0);  //Loading rom
 			}
 			//wait_btn();
-			SetRompageWithHardReset(0x200, key_L);
+			Launch_now(0x200, key_L, "BOOT WITH ADDON");
 			break;
 		case 2:  //WRITE TO NOR CLEAN
 			f_chdir(currentpath);  //return to game folder
@@ -2802,6 +2877,7 @@ boot_game:
 u8 SD_list_MENU(u32 show_offset, u32 file_select, u32 play_re)
 {
 	u8 res = SD_list_open(show_offset, file_select, play_re);
+	cartlog_phase(PHASE_MENU, 0, NULL);
 	if (res == 0 && play_re != 0xBB) {
 		strncpy(currentpath, currentpath_temp, MAX_path_len);
 		f_chdir(currentpath);

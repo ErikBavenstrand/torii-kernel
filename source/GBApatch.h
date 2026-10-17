@@ -25,6 +25,9 @@ extern void RTS_Sleep_key(void);
 extern void RTS_Reset_key(void);
 //extern void RTS_Wakeup_key(void);
 extern void RTS_switch(void);
+extern void Debug_switch(void);
+extern void Debug_blob_start(void);
+extern void Debug_blob_end(void);
 extern void Cheat_count(void);
 extern void CHEAT(void);
 extern void no_CHEAT_end(void);
@@ -50,6 +53,11 @@ extern void Fire_Emblem_iQue_patch_end(void);
 
 extern u32 gl_cheat_count;
 
+// Bytes kept free at the ROM's end for the in-game menu's code with
+// SAVESTATE on and no cheats (RTS_ReplaceIRQ_start to no_CHEAT_end); see
+// SetTrimSize.
+#define RTS_PATCH_LENGTH 0x1000
+
 void GBApatch_Cleanrom(u32 *address, int filesize);
 void GBApatch_PSRAM(u32 *address, int filesize);
 void Patch_somegame(u32 *Data);
@@ -65,6 +73,13 @@ u8 Make_mde_file(TCHAR *gamefilename, u8 Save_num);
 void Patch_SpecialROM_sheepmode(void);
 u32 use_internal_engine(u8 gamecode[], TCHAR *gamefilename);
 void Apply_rom_patches(void);
+// The ROM words the in-game patches change (the IRQ hook's literals and code
+// patches), as word offsets, and how many there are.
+extern SPatchInfo2 iPatchInfo2[EMax];
+extern u32 iCount2;
+// Logs which in-game code went into the ROM, where, and every patched word:
+// part of the launch record.
+void Log_patches(void);
 u32 Check_cheat_file(TCHAR *gamefilename);
 void SetTrimSize(u8 *buffer, u32 romsize, u32 iSize, u32 mode, BYTE saveMODE);
 u32 Find_spend_address_SpecialROM(u32 *Data);
