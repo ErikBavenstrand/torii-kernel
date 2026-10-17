@@ -28,7 +28,6 @@ u16 gl_color_chtBG    = RGB(4,8,0xC);
 extern FIL gfile;
 char buf[MAX_BUF_LEN]EWRAM_BSS;
 char _paramv[MAX_BUF_LEN] EWRAM_BSS;
-extern void Draw_select_icon(u32 X,u32 Y,u32 mode);
 //------------------------------------------------------------------
 //------------------------------------------------------------------
 void Trim(char s[])
@@ -42,8 +41,9 @@ void Trim(char s[])
 	}
 }
 //------------------------------------------------------------------
-void Get_KEY_val(FIL* file,char*KEY_section,char*KEY_secval,char getbuff[])
+static void Get_KEY_val(FIL* file,char*KEY_section,char*KEY_secval,char getbuff[])
 {
+	(void)file;
 	int text_comment = 0;
 
 	int in_section=0;
@@ -84,7 +84,7 @@ void Get_KEY_val(FIL* file,char*KEY_section,char*KEY_secval,char getbuff[])
     }
 
 		char _paramk[MAX_KEY_LEN] = {0}; 
-		char _paramv[/*MAX_VAL_LEN*/MAX_KEY_LEN] = {0};
+		char key_value[/*MAX_VAL_LEN*/MAX_KEY_LEN] = {0};
 
     int _kv=0, _klen=0, _vlen=0;
     int i = 0;
@@ -140,7 +140,7 @@ void Get_KEY_val(FIL* file,char*KEY_section,char*KEY_secval,char getbuff[])
 	      if (_vlen >= MAX_KEY_LEN || buf[i] == '#')
 					break;
 	                
-	      _paramv[_vlen++] = buf[i];
+	      key_value[_vlen++] = buf[i];
 	    }
 	          
 	  }
@@ -149,20 +149,21 @@ void Get_KEY_val(FIL* file,char*KEY_section,char*KEY_secval,char getbuff[])
 		{
 			if( strcmp(KEY_secval,_paramk) == 0)
 			{
-				strcpy(getbuff,_paramv); 
+				strcpy(getbuff,key_value); 
 
 				return ;	
 			}				
 		}
-		if (strcmp(_paramk, "")==0 || strcmp(_paramv, "")==0)
+		if (strcmp(_paramk, "")==0 || strcmp(key_value, "")==0)
 			continue;
 
 		memset(buf,0,MAX_KEY_LEN) ;
   }
 }
 //------------------------------------------------------------------
-u32 Get_CHT_val(FIL* file,char*KEY_section,char*KEY_secval/*,char getbuff[]*/)
+static u32 Get_CHT_val(FIL* file,char*KEY_section,char*KEY_secval/*,char getbuff[]*/)
 {
+	(void)file;
 	int text_comment = 0;
 
 	int in_section=0;
@@ -292,20 +293,20 @@ u32 Get_CHT_val(FIL* file,char*KEY_section,char*KEY_secval/*,char getbuff[]*/)
 						break;
 			    }
 
-					int buf_len = strlen(buf);
-					//DEBUG_printf("cht buf_len %x",buf_len);	    
+					int line_len = strlen(buf);
+					//DEBUG_printf("cht line_len %x",line_len);	    
 			          
 			    // ignore and skip the line with first chracter '#', '=' or '/'
-			    if (buf_len <= 1 || buf[0] == '#' || buf[0] == '=' || buf[0] == '/')
+			    if (line_len <= 1 || buf[0] == '#' || buf[0] == '=' || buf[0] == '/')
 			    {	    	
 			        break;
 			    }
-			    for (i=0; i<buf_len; ++i)
+			    for (i=0; i<line_len; ++i)
 		    	{
 		     	 	if (buf[i] == '=')
 		          goto endcht;
 		      }
-			    for (i=0; i<buf_len && _vlen<MAX_BUF_LEN; ++i)
+			    for (i=0; i<line_len && _vlen<MAX_BUF_LEN; ++i)
 		    	{
 						_paramv[_vlen++] = buf[i];
 		      }
@@ -325,9 +326,10 @@ u32 Get_CHT_val(FIL* file,char*KEY_section,char*KEY_secval/*,char getbuff[]*/)
   return 0;
 }
 //------------------------------------------------------------------
-u32 Get_all_Section_val(FIL* file)
+static u32 Get_all_Section_val(FIL* file)
 {
-	char buf[MAX_sectionVAL_LEN];
+	(void)file;
+	char line_buf[MAX_sectionVAL_LEN];
 	int text_comment = 0;
 
 	int in_section=0;
@@ -340,21 +342,21 @@ u32 Get_all_Section_val(FIL* file)
 
 	//fseek(file,0x0,SEEK_SET);
 	f_lseek(&gfile, 0x0);
-	while(f_gets(buf, MAX_sectionVAL_LEN, &gfile) != NULL)
+	while(f_gets(line_buf, MAX_sectionVAL_LEN, &gfile) != NULL)
 	{
 		memset(tmpCHTFS.LINEname,0x00,MAX_KEY_LEN);
-		Trim(buf);
+		Trim(line_buf);
 		// to skip text comment with flags /* ...*/
-		if(buf[0] == '-'  && buf[1] == '-')
+		if(line_buf[0] == '-'  && line_buf[1] == '-')
 			break;
-		if (buf[0] != '#' && (buf[0] != '/' || buf[1] != '/'))
+		if (line_buf[0] != '#' && (line_buf[0] != '/' || line_buf[1] != '/'))
 		{
-		    if (strstr(buf, "/*") != NULL)
+		    if (strstr(line_buf, "/*") != NULL)
 		    {
 		        text_comment = 1;
 		        continue;
 		    }
-		    else if (strstr(buf, "*/") != NULL)
+		    else if (strstr(line_buf, "*/") != NULL)
 		    {
 		        text_comment = 0;
 		        continue;
@@ -365,10 +367,10 @@ u32 Get_all_Section_val(FIL* file)
 		    continue;
 		}
 
-		int buf_len = strlen(buf);            
+		int buf_len = strlen(line_buf);            
 		
 		// ignore and skip the line with first chracter '#', '=' or '/'
-		if (buf_len <= 1 || buf[0] == '#' || buf[0] == '=' || buf[0] == '/')
+		if (buf_len <= 1 || line_buf[0] == '#' || line_buf[0] == '=' || line_buf[0] == '/')
 		{
 			in_section =0;
 		    continue;
@@ -385,10 +387,10 @@ u32 Get_all_Section_val(FIL* file)
 
 		for (i=0; i<buf_len; ++i)
 		{
-			if (buf[i] == ' ')
+			if (line_buf[i] == ' ')
 				continue;
 
-			if (buf[i] == '[')
+			if (line_buf[i] == '[')
 			{
 				is_section = 1;
 				in_section = 0;
@@ -397,12 +399,12 @@ u32 Get_all_Section_val(FIL* file)
 				continue;
 			}
 
-			if(is_section == 1 && buf[i] != ']')
+			if(is_section == 1 && line_buf[i] != ']')
 			{
-				if(section_len < MAX_KEY_LEN-1) section[section_len++] = buf[i];
+				if(section_len < MAX_KEY_LEN-1) section[section_len++] = line_buf[i];
 				continue;
 			}
-      else if (buf[i] == ']')
+      else if (line_buf[i] == ']')
       {      	
       	memcpy(tmpCHTFS.LINEname,section,section_len);      	
       	tmpCHTFS.is_section = 1;
@@ -422,14 +424,14 @@ u32 Get_all_Section_val(FIL* file)
 			if(in_section ==1)
 			{								
         // scan param key name
-        if (_kv == 0 && buf[i] != '=')
+        if (_kv == 0 && line_buf[i] != '=')
         {
             if (_klen >= MAX_KEY_LEN)
                 break;
-            _paramk[_klen++] = buf[i];
+            _paramk[_klen++] = line_buf[i];
             continue;
         }
-        else if (buf[i] == '=')
+        else if (line_buf[i] == '=')
         {
       		//DEBUG_printf(":%s ",_paramk);
       		memcpy(tmpCHTFS.LINEname,_paramk,_klen);      		
@@ -443,10 +445,10 @@ u32 Get_all_Section_val(FIL* file)
         else{
 		      /*
 		      // scan param key value
-		      if (_vlen >= MAX_VAL_LEN || buf[i] == '#')
+		      if (_vlen >= MAX_VAL_LEN || line_buf[i] == '#')
 		                break;
 		                
-		      _paramv[_vlen++] = buf[i];
+		      _paramv[_vlen++] = line_buf[i];
 		      */
 	    	}
       }
@@ -463,7 +465,7 @@ u32 Get_all_Section_val(FIL* file)
 	return Line;
 }
 //------------------------------------------------------------------
-void Show_KEY_val(u32 total,u32 Select,u32 showoffset)
+static void Show_KEY_val(u32 total,u32 Select,u32 showoffset)
 {
 	u32 need_show;	
 	u32 line;
@@ -532,14 +534,14 @@ void Show_KEY_val(u32 total,u32 Select,u32 showoffset)
 	}		
 }
 //------------------------------------------------------------------
-unsigned long str2hex( char*str)
+static unsigned long str2hex( char*str)
 {
 	unsigned long sum=0;
 	unsigned long i;
 	int len = strlen(str);
 	
 	if(len >8) return 0;
-	for(i=0;i<len;i++)
+	for(i=0;i<(unsigned long)len;i++)
 	{
 		if(str[i] >= '0' && str[i] <= '9')
 			sum = sum*16 + str[i]-'0';
@@ -618,8 +620,9 @@ void Parse_cheat_line(const char *line,u32 len)
 		Add_cheat(str2hex(address_buf)+address_add,str2hex(val_buf));
 }
 //------------------------------------------------------------------
-void Analyze_KEYVAL(FIL* file,u32 total)
+static void Analyze_KEYVAL(FIL* file,u32 total)
 {
+	(void)file;
 	u32 tol;
 	u32 buflen;
 
@@ -639,7 +642,7 @@ void Analyze_KEYVAL(FIL* file,u32 total)
 	}
 }
 //------------------------------------------------------------------
-u32 Check_count(u32 all_count)
+static u32 Check_count(u32 all_count)
 {
 	u32 count=0;
 	u32 Line;
@@ -655,7 +658,7 @@ u32 Check_count(u32 all_count)
 	return count;
 }
 //------------------------------------------------------------------
-unsigned char HexToChar(unsigned char bChar)  
+static unsigned char HexToChar(unsigned char bChar)  
 {  
     if((bChar>=0x30)&&(bChar<=0x39))  
     {  
@@ -676,7 +679,7 @@ unsigned char HexToChar(unsigned char bChar)
     return bChar;  
 }  
 //------------------------------------------------------------------
-u32 Change2cht_folder(u32 chtname)
+static u32 Change2cht_folder(u32 chtname)
 {
 	TCHAR chtnamebuf[100];
 	u32 res;
@@ -823,7 +826,7 @@ u32 Check_cheat_file(TCHAR *gamefilename)
 	}	
 }
 //---------------------------------------------------------------------------------
-void Show_num(u32 totalcount,u32 select)
+static void Show_num(u32 totalcount,u32 select)
 {
 	char msg[20];
 	Clear(186, 3, 7*6, 15, gl_color_chtBG, 1);

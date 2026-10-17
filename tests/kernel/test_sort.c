@@ -5,6 +5,7 @@
 
 #include "../../source/sort.h"
 #include "torii_test.h"
+#include "tests.h"
 
 typedef struct {
 	char filename[100];

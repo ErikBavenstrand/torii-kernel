@@ -2,6 +2,7 @@
 #include <gba_base.h>
 
 #include "torii_test.h"
+#include "tests.h"
 
 u32 Check_file_type(char *pfilename);
 

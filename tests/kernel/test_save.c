@@ -4,6 +4,7 @@
 #include <gba_base.h>
 
 #include "torii_test.h"
+#include "tests.h"
 
 typedef unsigned char BYTE;
 

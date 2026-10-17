@@ -4,6 +4,7 @@
 #include <gba_base.h>
 
 #include "torii_test.h"
+#include "tests.h"
 
 // From source/showcht.h, which needs FatFs's headers.
 #define CHEAT_PATCH_LENGTH 0x2000

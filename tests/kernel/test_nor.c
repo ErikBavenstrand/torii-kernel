@@ -2,6 +2,7 @@
 #include <gba_base.h>
 
 #include "torii_test.h"
+#include "tests.h"
 
 void Read_NOR_info(void);
 extern u16 SET_info_buffer[0x200];

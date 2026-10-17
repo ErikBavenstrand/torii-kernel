@@ -31,6 +31,7 @@ extern u32 gl_cheat_count;
 //int Get_KEY_val(FIL* file,char*KEY_section,char*KEY_secval,char getbuff[]);
 int Show_all_KEY_val(FIL* file);
 u32 Check_cht_file(TCHAR *gamefilename);
+u32 Check_cheat_file(TCHAR *gamefilename);
 void Open_cht_file(TCHAR *gamefilename,u32 havecht);
 void Trim(char s[]);
 void Parse_cheat_line(const char *line,u32 len);

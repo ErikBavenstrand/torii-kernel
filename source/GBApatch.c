@@ -38,7 +38,7 @@ u32 iCount2;
 
 u32 spend_address;
 //------------------------------------------------------------------
-void Write(u32 romaddress, const u8* buffer, u32 size)
+static void Write(u32 romaddress, const u8* buffer, u32 size)
 {
 	u32 x;
 	if(is_NORpatch)
@@ -73,6 +73,7 @@ void Write(u32 romaddress, const u8* buffer, u32 size)
 //------------------------------------------------------------------
 bool IWRAM_CODE PatchDragonBallZ(u32 *Data)
 {
+	(void)Data;
   bool res=false;
 	const u32 game_codes_DragonBallZ[]=
 	{
@@ -206,7 +207,7 @@ void IWRAM_CODE CheckNes(u32 *Data)
   }
 }
 //------------------------------------------------------------------
-bool PatchNes(u32 *Data)
+static bool PatchNes(u32 *Data)
 {
   bool res=false;
   if(is_Nes)
@@ -228,7 +229,7 @@ bool PatchNes(u32 *Data)
   return res;
 }
 //---------------------------------------------------------------------------------
-void Add2(u32 anOffset, u32 aValue)
+static void Add2(u32 anOffset, u32 aValue)
 {
 	if (iCount2<(EMax))
 	{
@@ -365,7 +366,7 @@ void SetTrimSize(u8* buffer,u32 romsize,u32 iSize,u32 mode,BYTE saveMODE)
   Patch_SpecialROM_TrimSize();
 }
 //------------------------------------------------------------------
-void Patch_B_address(void)
+static void Patch_B_address(void)
 {
 	if (!iCount2) return;
 	u32 B_install_handler;
@@ -378,8 +379,9 @@ void Patch_B_address(void)
 	}	
 }
 //------------------------------------------------------------------
-void Patch_Reset_Sleep(u32 *Data)
+static void Patch_Reset_Sleep(u32 *Data)
 {	    
+	(void)Data;
 	Patch_B_address();
 	u32 Return_address = 0x8000000+ EA_offset*4 + 8;
 		
@@ -422,8 +424,9 @@ void Patch_Reset_Sleep(u32 *Data)
 	Write(iTrimSize, patchbuffer, p_patch_end-p_patch_start);
 }
 //------------------------------------------------------------------
-void Patch_RTS_Cheat(u32 *Data)
+static void Patch_RTS_Cheat(u32 *Data)
 {
+	(void)Data;
 	Patch_B_address();
 	u32 Return_address = 0x8000000+ EA_offset*4 + 8;
 	
@@ -501,8 +504,9 @@ void Patch_RTS_Cheat(u32 *Data)
 	Write(iTrimSize, patchbuffer,copysize);
 }
 //------------------------------------------------------------------
-void Patch_RTS_only(u32 *Data)
+static void Patch_RTS_only(u32 *Data)
 {
+	(void)Data;
 	Patch_B_address();
 	u32 Return_address = 0x8000000+ EA_offset*4 + 8;
 	
@@ -547,6 +551,7 @@ void Patch_RTS_only(u32 *Data)
 //------------------------------------------------------------------
 void GBApatch_Cleanrom(u32* address,int filesize)//Only once
 {
+	(void)filesize;
 	windows_offset = 0;
 	is_NORpatch = 0;
 	CheckNes(address);
@@ -555,7 +560,7 @@ void GBApatch_Cleanrom(u32* address,int filesize)//Only once
 	//Check_Fire_Emblem();
 }
 //------------------------------------------------------------------
-u32 Get_spend_address(u32* Data)
+static u32 Get_spend_address(u32* Data)
 {
 	u32 ii;	
 	u32 offset;
@@ -600,6 +605,7 @@ u32 Get_spend_address(u32* Data)
 //------------------------------------------------------------------
 void GBApatch_PSRAM(u32* address,int filesize)//Only once
 {
+	(void)filesize;
 	windows_offset = 0;
 	is_NORpatch = 0;
 	EA_offset = address[0] & 0xFFFFFF;
@@ -640,6 +646,7 @@ void GBApatch_Cleanrom_NOR(u32* address,u32 offset)
 //------------------------------------------------------------------
 void GBApatch_NOR(u32* address,int filesize,u32 offset)
 {
+	(void)filesize;
 	windows_offset = offset;
 	is_NORpatch = 1;
   if(offset==0)
@@ -671,7 +678,7 @@ void GBApatch_NOR(u32* address,int filesize,u32 offset)
 	}
 }
 //------------------------------------------------------------------
-void make_pat_name(TCHAR*patnamebuf,TCHAR* gamefilename)
+static void make_pat_name(TCHAR*patnamebuf,TCHAR* gamefilename)
 {
 	memcpy(patnamebuf,gamefilename,100);
 	u32 len=strlen(patnamebuf);
@@ -680,7 +687,7 @@ void make_pat_name(TCHAR*patnamebuf,TCHAR* gamefilename)
 	patnamebuf[len-1] = 't';	
 }
 //------------------------------------------------------------------
-void GBA_patch_init(void)
+static void GBA_patch_init(void)
 {
 	is_NORpatch = 0;
 	windows_offset = 0;
@@ -700,7 +707,7 @@ void GBA_patch_init(void)
 	memset(iPatchInfo2, 0x00, sizeof(iPatchInfo2));
 }
 //------------------------------------------------------------------
-void GBA_patch_init_buffer(u32* buffer)
+static void GBA_patch_init_buffer(u32* buffer)
 {
 	memcpy(iPatchInfo2, buffer, sizeof(iPatchInfo2));
 	u32 start = sizeof(iPatchInfo2)/4;
@@ -811,7 +818,7 @@ void Make_pat_file(TCHAR* gamefilename)
 	res=f_chdir("/");
 }
 //------------------------------------------------------------------
-void make_mde_name(TCHAR*mdenamebuf,TCHAR* gamefilename)
+static void make_mde_name(TCHAR*mdenamebuf,TCHAR* gamefilename)
 {
 	memcpy(mdenamebuf,gamefilename,100);
 	u32 len=strlen(mdenamebuf);

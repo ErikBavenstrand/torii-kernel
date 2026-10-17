@@ -38,10 +38,8 @@ extern u16 gl_SD_G;
 extern u16 gl_SD_B;
 
 void save_set2_info(void);
-extern void Draw_select_icon(u32 X,u32 Y,u32 mode);
 extern void IWRAM_CODE Set_LED_control(u16  status);
 
-extern void CheckSwitch(void);
 //---------------------------------------------------------------------------------
 /*void Draw_select_icon(u32 X,u32 Y,u32 mode)
 {
@@ -242,7 +240,7 @@ u32 Setting_window2(void)
 					}
 				}
 				else if (keys  & KEY_DOWN){  
-					if(select < line_total-1){
+					if(select < (u32)(line_total-1)){
 						select++;		
 						re_show=1;
 					}

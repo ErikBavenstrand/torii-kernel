@@ -63,6 +63,21 @@ extern u16 gl_color_btn_clean;
 
 u32 Setting_window(void);
 u32 Setting_window2(void);
+void Draw_select_icon(u32 X,u32 Y,u32 mode);
+void CheckLanguage(void);
+void CheckSwitch(void);
+u32 Game_hardware(u32 is_EMU,const u8 *gamecode,u8 gb_cart_type);
+u32 Recently_play_add(const char *entry,u32 count);
+u8 Check_saveMODE(u8 gamecode[]);
+u8 Get_saveMODE(u8 Save_num,u32 gamefilesize);
+u32 Check_file_type(TCHAR *pfilename);
+u32 Get_savefilesize(BYTE saveMODE);
+// IWRAM code must run from IWRAM while the ROM page changes, so it is never
+// static: GCC would inline it into callers in ROM.
+void IWRAM_CODE Refresh_filename(u32 show_offset,u32 file_select,u32 updown,u32 haveThumbnail);
+u32 IWRAM_CODE Loadsavefile(TCHAR *filename);
+u32 IWRAM_CODE Save_savefile(TCHAR *filename,u32 savesize);
+u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename,u32 is_EMU);
 
 void delay(u32 R0);
 u32 LoadRTSfile(TCHAR *filename);

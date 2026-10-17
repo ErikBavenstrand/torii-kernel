@@ -24,7 +24,7 @@ extern FIL gfile;
 extern u32 game_total_NOR;
 extern u32 iTrimSize;
 //---------------------------------------------------------------
-void Chip_Reset()
+void Chip_Reset(void)
 {
 	*((vu16 *)(FlashBase_S98)) = 0xF0 ;
 }
@@ -84,7 +84,7 @@ void IWRAM_CODE Block_Erase(u32 blockAdd) //0x20000 BYTE pre block
 	SetRompage(gl_currentpage);
 }
 //-----------------------------------------------------------
-void Chip_Erase()
+void Chip_Erase(void)
 {
 	char msg[128];
 	u32 count=0;
@@ -115,7 +115,7 @@ void Chip_Erase()
 }
 
 //-----------------------------------------------------------
-void FormatNor()
+void FormatNor(void)
 {
 	char msg[128];
 	sprintf(msg,"%s",gl_formatnor_info);

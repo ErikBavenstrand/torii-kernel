@@ -127,7 +127,7 @@ void wait_btn()
 //---------------------------------------------------------------------------------
 
 //---------------------------------------------------------------------------------
-void Get_file_size(u32 num,char*str)
+static void Get_file_size(u32 num,char*str)
 {
 		u32 filesize;
 
@@ -145,7 +145,7 @@ void Get_file_size(u32 num,char*str)
 		}
 }
 //---------------------------------------------------------------------------------
-void Show_ICON_filename_SD(u32 show_offset,u32 file_select,u32 haveThumbnail)
+static void Show_ICON_filename_SD(u32 show_offset,u32 file_select,u32 haveThumbnail)
 {
 	u32 need_show_game;
 	u32 need_show_folder;
@@ -468,7 +468,7 @@ void IWRAM_CODE Refresh_filename(u32 show_offset,u32 file_select,u32 updown,u32 
 	}
 }
 //---------------------------------------------------------------------------------
-void Show_ICON_filename_NOR(u32 show_offset,u32 file_select)
+static void Show_ICON_filename_NOR(u32 show_offset,u32 file_select)
 {
 	int need_show;
 	int line;
@@ -484,7 +484,7 @@ void Show_ICON_filename_NOR(u32 show_offset,u32 file_select)
 
 	for(line=0;line<need_show;line++)
 	{
-		if(line== file_select){
+		if((u32)line== file_select){
 			Clear(17,20 + file_select*14,240-17,13,gl_color_selectBG_nor,1);
 		}		
 
@@ -504,7 +504,7 @@ void Show_ICON_filename_NOR(u32 show_offset,u32 file_select)
 	}
 }
 //---------------------------------------------------------------------------------
-void Refresh_filename_NOR(u32 show_offset,u32 file_select,u32 updown)
+static void Refresh_filename_NOR(u32 show_offset,u32 file_select,u32 updown)
 {
 	char msg[20];
 	u16 name_color1;
@@ -550,7 +550,7 @@ void Refresh_filename_NOR(u32 show_offset,u32 file_select,u32 updown)
 
 }
 //---------------------------------------------------------------------------------
-void Show_game_num(u32 count,u32 list)
+static void Show_game_num(u32 count,u32 list)
 {
 	char msg[20];
 	if(list==0){
@@ -566,7 +566,7 @@ void Show_game_num(u32 count,u32 list)
 	DrawHZText12(msg,0,185,3, gl_color_text,1);
 }
 //---------------------------------------------------------------------------------
-void Filename_loop(u32 shift,u32 show_offset,u32 file_select,u32 haveThumbnail)
+static void Filename_loop(u32 shift,u32 show_offset,u32 file_select,u32 haveThumbnail)
 {
 	u32 need_show_folder;
 	//u32 line;
@@ -621,7 +621,7 @@ void Filename_loop(u32 shift,u32 show_offset,u32 file_select,u32 haveThumbnail)
 		}
 		
 		namelen = strlen(temp_filename);
-		if(namelen >(char_num-1) ) 
+		if((u32)namelen >(char_num-1) ) 
 		{
 			u32  tt = ((shift-timeout)/8)% (namelen);
 			if(orgtt!= tt )
@@ -649,7 +649,7 @@ void Filename_loop(u32 shift,u32 show_offset,u32 file_select,u32 haveThumbnail)
 	}		
 }
 //---------------------------------------------------------------------------------
-void Show_MENU_btn()
+static void Show_MENU_btn(void)
 {
 	char msg[30];
 	Clear(60,118-1,55,14,gl_color_MENU_btn,1);
@@ -658,7 +658,7 @@ void Show_MENU_btn()
 	DrawHZText12(msg,0,60,118, gl_color_text,1);
 }
 //---------------------------------------------------------------------------------
-void Show_MENU(u32 menu_select,PAGE_NUM page,u32 havecht,u32 Save_num,u32 is_menu,u32 firstgame)
+static void Show_MENU(u32 menu_select,PAGE_NUM page,u32 havecht,u32 Save_num,u32 is_menu,u32 firstgame)
 {
 	int line;
 	u32 y_offset= 30;
@@ -684,9 +684,9 @@ void Show_MENU(u32 menu_select,PAGE_NUM page,u32 havecht,u32 Save_num,u32 is_men
 		linemax = 1;
 	}
 		
-	for(line=0;line<linemax;line++)
+	for(line=0;(u32)line<linemax;line++)
 	{		
-		if(line== menu_select){
+		if((u32)line== menu_select){
 			name_color = gl_color_selected;
 		}
 		else if(line == 1){
@@ -754,7 +754,7 @@ void Show_MENU(u32 menu_select,PAGE_NUM page,u32 havecht,u32 Save_num,u32 is_men
 	}
 }
 //------------------------------------------------------------------
-void Show_game_name(u32 total,u32 Select)
+static void Show_game_name(u32 total,u32 Select)
 {
 	u32 need_show;	
 	u32 line;
@@ -784,7 +784,7 @@ void Show_game_name(u32 total,u32 Select)
 	}		
 }
 //---------------------------------------------------------------------------------
-u32  get_count(void)
+static u32  get_count(void)
 {
 	u32 res;
 	u32 count=0;
@@ -810,7 +810,7 @@ u32  get_count(void)
 	return count;
 }
 //---------------------------------------------------------------------------------
-u32 show_recently_play(void)
+static u32 show_recently_play(void)
 {
 	//u32 res;
 	u32 all_count=0;
@@ -933,7 +933,7 @@ u32 Recently_play_add(const char *entry,u32 count)
 	return count;
 }
 //---------------------------------------------------------------------------------
-void Make_recently_play_file(TCHAR* path,TCHAR* gamefilename)
+static void Make_recently_play_file(TCHAR* path,TCHAR* gamefilename)
 {
 	u32 res;
 	u32 i;
@@ -963,7 +963,7 @@ void Make_recently_play_file(TCHAR* path,TCHAR* gamefilename)
 	}
 }
 //---------------------------------------------------------------------------------
-void init_FAT_table(void)
+static void init_FAT_table(void)
 {
 	//memset(FAT_table_buffer,0,0x200);
 	FAT_table_buffer[0] = 0x00000000;
@@ -1099,7 +1099,7 @@ u32 IWRAM_CODE Save_savefile(TCHAR *filename,u32 savesize)
 			if(savesize < 0x800)
 			{
 				ReadSram(SRAMSaver,pReadCache,savesize);
-				for(i=0;i<(savesize+0x1FF)/0x200 ;i++)
+				for(i=0;(u32)i<(savesize+0x1FF)/0x200 ;i++)
 				{
 		      f_write(&file, pReadCache+0x200*i, 0x200, &written);
 		      if(written != 0x200) break;
@@ -1128,7 +1128,7 @@ u32 IWRAM_CODE Save_savefile(TCHAR *filename,u32 savesize)
 				else
 				{
 					ReadSram(SRAMSaver, pReadCache, savesize );
-					for(i=0;i<savesize/0x800 ;i++)
+					for(i=0;(u32)i<savesize/0x800 ;i++)
 					{
 			      f_write(&file, pReadCache+0x800*i, 0x200*4, &written);
 			      if(written != 0x200*4) break;
@@ -1176,7 +1176,7 @@ u32 IWRAM_CODE LoadRTSfile(TCHAR *filename)
   }
 }
 //---------------------------------------------------------------------------------
-u32 SavefileWrite(TCHAR *filename,u32 savesize)
+static u32 SavefileWrite(TCHAR *filename,u32 savesize)
 {
 	FIL file;
 	if(savesize==0) return 0xff;
@@ -1191,7 +1191,7 @@ u32 SavefileWrite(TCHAR *filename,u32 savesize)
 
 			if(savesize < 0x800)
 			{
-				for(i=0;i<(savesize+0x1FF)/0x200 ;i++)
+				for(i=0;(u32)i<(savesize+0x1FF)/0x200 ;i++)
 				{
 		      f_write(&file, pReadCache, 0x200, &written);
 		      if(written != 0x200) break;
@@ -1199,7 +1199,7 @@ u32 SavefileWrite(TCHAR *filename,u32 savesize)
 			}
 			else
 			{
-				for(i=0;i<(savesize+0x1FF)/0x800 ;i++)
+				for(i=0;(u32)i<(savesize+0x1FF)/0x800 ;i++)
 				{
 		      f_write(&file, pReadCache, 0x200*4, &written);
 		      if(written != 0x200*4) break;
@@ -1553,7 +1553,7 @@ u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename,u32 is_EMU)
 }
 //---------------------------------------------------------------------------------
 extern u16 SET_info_buffer [0x200]EWRAM_BSS;
-void save_set_info_SELECT(void)
+static void save_set_info_SELECT(void)
 {
 	u32 address;
 	for(address=0;address < assress_max;address++)
@@ -1571,18 +1571,18 @@ void save_set_info_SELECT(void)
 }
 //---------------------------------------------------------------------------------
 //Sort folder
-void Sort_folder(u32 folder_total)
+static void Sort_folder(u32 count)
 {
-	sort_by_name(pFolder,folder_total,sizeof(FM_Folder_FS));
+	sort_by_name(pFolder,count,sizeof(FM_Folder_FS));
 }
 //---------------------------------------------------------------------------------
 //Sort file 
-void Sort_file(u32 game_total_SD)
+static void Sort_file(u32 count)
 {
-	sort_by_name(pFilename_buffer,game_total_SD,sizeof(FM_FILE_FS));
+	sort_by_name(pFilename_buffer,count,sizeof(FM_FILE_FS));
 }	
 //---------------------------------------------------------------------------------
-u32 Load_Thumbnail(TCHAR *pfilename_pic)
+static u32 Load_Thumbnail(TCHAR *pfilename_pic)
 {
   u32 rett;
   u32 res;
@@ -1610,14 +1610,14 @@ u32 Load_Thumbnail(TCHAR *pfilename_pic)
 }
 //---------------------------------------------------------------------------------
 //Delete file
-void SD_list_L_START(u32 show_offset,u32 file_select,u32 folder_total)
+static void SD_list_L_START(u32 show_offset,u32 file_select,u32 folders)
 {
 	//u32 res;	
 	DrawPic((u16*)gImage_MENU, 56, 25, 128, 110, 0, 0, 1);//show menu pic		
 	Show_MENU_btn();
 
 	DrawHZText12(gl_LSTART_help,0,60,60,gl_color_text,1);//use sure?gl_LSTART_help
-	DrawHZText12(pFilename_buffer[show_offset+file_select-folder_total].filename,20,60,75,0x7fff,1);//file name
+	DrawHZText12(pFilename_buffer[show_offset+file_select-folders].filename,20,60,75,0x7fff,1);//file name
 	DrawHZText12(gl_formatnor_info,5,60,90,gl_color_text,1);//use sure?
 	while(1){
 		VBlankIntrWait();
@@ -1625,7 +1625,7 @@ void SD_list_L_START(u32 show_offset,u32 file_select,u32 folder_total)
 		u16 keysdown  = keysDown();
 		if (keysdown & KEY_A) {
 			TCHAR *pdelfilename;			
-			pdelfilename = pFilename_buffer[show_offset+file_select-folder_total].filename;	
+			pdelfilename = pFilename_buffer[show_offset+file_select-folders].filename;	
 			/*res = */f_unlink(pdelfilename);	
 			break;
 		}
@@ -1661,7 +1661,7 @@ u32 Check_file_type(TCHAR *pfilename)
 	}	
 }
 //---------------------------------------------------------------------------------
-void Show_error_num(u8 error_num)
+static void Show_error_num(u8 error_num)
 {
 	char msg[50];
 
@@ -1717,7 +1717,7 @@ u32 Get_savefilesize(BYTE saveMODE)
 	return 	savefilesize;
 }
 //---------------------------------------------------------------------------------
-u8 Process_savefile(u32 is_EMU,TCHAR *pfilename,u32 gamefilesize,BYTE saveMODE)
+static u8 Process_savefile(u32 is_EMU,TCHAR *pfilename,u32 gamefilesize,BYTE saveMODE)
 {
 	u32 res;
 	u32 savefilesize=0;	
@@ -1804,7 +1804,7 @@ u8 Process_savefile(u32 is_EMU,TCHAR *pfilename,u32 gamefilesize,BYTE saveMODE)
 	return 0;
 }
 //---------------------------------------------------------------------------------
-void Check_save_flag(void)
+static void Check_save_flag(void)
 {
 	//check save
 	u16 readd;
@@ -1868,7 +1868,7 @@ void Check_save_flag(void)
 	}
 }
 //---------------------------------------------------------------------------------
-void Set_saveMODE(BYTE saveMODE)
+static void Set_saveMODE(BYTE saveMODE)
 {
 	u32 address;
 	for(address=0;address < assress_max;address++)
@@ -2402,7 +2402,7 @@ re_showfile:
 	}
 }
 //---------------------------------------------------------------
-void Boot_NOR_game(u32 show_offset,	u32 file_select,u32 key_L)
+static void Boot_NOR_game(u32 show_offset,	u32 file_select,u32 key_L)
 {
 	//TCHAR savfilename[100];	
 	TCHAR *pfilename;
@@ -2458,7 +2458,7 @@ void Boot_NOR_game(u32 show_offset,	u32 file_select,u32 key_L)
 	while(1);	
 }
 //---------------------------------------------------------------
-u8 FRAM_save_op(u8 OP)
+static u8 FRAM_save_op(u8 OP)
 {
 	u32 res;
 	u32 savefilesize=0;	

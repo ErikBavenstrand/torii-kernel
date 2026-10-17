@@ -5,6 +5,7 @@
 #include <gba_base.h>
 
 #include "torii_test.h"
+#include "tests.h"
 
 extern char p_recently_play[10][512];
 u32 Recently_play_add(const char *entry, u32 count);

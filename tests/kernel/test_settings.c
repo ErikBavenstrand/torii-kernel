@@ -4,6 +4,7 @@
 
 #include "../../source/Ezcard_OP.h"
 #include "torii_test.h"
+#include "tests.h"
 
 u32 Game_hardware(u32 is_EMU, const u8 *gamecode, u8 gb_cart_type);
 extern u16 gl_game_clock;
