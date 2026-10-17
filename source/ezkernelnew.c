@@ -2318,7 +2318,8 @@ re_showfile:
 
 			      goto refind_file;
 			    }
-		      else{   //SD_list file
+		      // An empty folder has no file under the cursor
+		      else if(show_offset+file_select-folder_total < game_total_SD){   //SD_list file
 		      	res = SD_list_MENU(show_offset,file_select,play_re);
 						if(res){
 							if(res==2){
@@ -2351,7 +2352,7 @@ re_showfile:
 				if(page_num==SD_list){//only work on sd list								
 					if(key_L)
 					{
-						if(show_offset+file_select >= folder_total){
+						if((show_offset+file_select >= folder_total) && (show_offset+file_select-folder_total < game_total_SD)){
 							SD_list_L_START(show_offset,file_select,folder_total);
 							goto refind_file;	
 						}				
