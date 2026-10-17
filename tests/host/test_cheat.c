@@ -109,3 +109,66 @@ void test_cheat_garbage(void)
 	parse(",,,;;;");
 	CHECK(gl_cheat_count <= CHEAT_MAX);
 }
+
+void test_cheat_empty_entries(void)
+{
+	// An entry without a value is dropped, not given the previous one.
+	parse("2000000,05;3000000");
+	CHECK_EQ(gl_cheat_count, 1);
+	CHECK_EQ(pCHEAT[0].address, 0x2000000);
+	CHECK_EQ(pCHEAT[0].VAL, 5);
+
+	parse("3000000,;2000000,07");  // an empty value too
+	CHECK_EQ(gl_cheat_count, 1);
+	CHECK_EQ(pCHEAT[0].address, 0x2000000);
+
+	parse(";");  // a ';' adds nothing without an address
+	CHECK_EQ(gl_cheat_count, 0);
+	parse(";;;");
+	CHECK_EQ(gl_cheat_count, 0);
+	parse(",05;,06,07");  // nor do values without one
+	CHECK_EQ(gl_cheat_count, 0);
+
+	parse("2000000,01;;");
+	CHECK_EQ(gl_cheat_count, 1);
+
+	parse("2000000,01;x");  // a field of no hex digits is empty
+	CHECK_EQ(gl_cheat_count, 1);
+	CHECK_EQ(pCHEAT[0].VAL, 1);
+
+	// A trailing ',' wrote 0 to the next address in 1.06.
+	parse("2000000,01,");
+	CHECK_EQ(gl_cheat_count, 1);
+	parse("2000000,01,;3000000,02");
+	CHECK_EQ(gl_cheat_count, 2);
+	CHECK_EQ(pCHEAT[1].address, 0x3000000);
+	CHECK_EQ(pCHEAT[1].VAL, 2);
+
+	// An empty value between two others takes no address.
+	parse("2000000,01,,02");
+	CHECK_EQ(gl_cheat_count, 2);
+	CHECK_EQ(pCHEAT[1].address, 0x2000001);
+	CHECK_EQ(pCHEAT[1].VAL, 2);
+
+	// A NUL within len is skipped like any other non-digit.
+	static const char nul[] = "2000000,01;\0";
+	char *line = malloc(sizeof(nul) - 1);
+	memcpy(line, nul, sizeof(nul) - 1);
+	gl_cheat_count = 0;
+	Parse_cheat_line(line, sizeof(nul) - 1);
+	CHECK_EQ(gl_cheat_count, 1);
+	free(line);
+}
+
+void test_cheat_whitespace(void)
+{
+	parse("2000000,\t01");  // tabs are skipped like spaces
+	CHECK_EQ(gl_cheat_count, 1);
+	CHECK_EQ(pCHEAT[0].VAL, 1);
+
+	parse("2000000,01,\r\n02\r\n");  // and CRs and LFs, as in a joined CRLF file
+	CHECK_EQ(gl_cheat_count, 2);
+	CHECK_EQ(pCHEAT[0].VAL, 1);
+	CHECK_EQ(pCHEAT[1].address, 0x2000001);
+	CHECK_EQ(pCHEAT[1].VAL, 2);
+}

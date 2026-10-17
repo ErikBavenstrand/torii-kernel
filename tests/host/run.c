@@ -46,6 +46,8 @@ static const struct {
 	{"cheat_long_fields", test_cheat_long_fields},
 	{"cheat_cap", test_cheat_cap},
 	{"cheat_garbage", test_cheat_garbage},
+	{"cheat_empty_entries", test_cheat_empty_entries},
+	{"cheat_whitespace", test_cheat_whitespace},
 };
 
 int main(void)

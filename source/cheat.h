@@ -19,7 +19,8 @@ extern u32 gl_cheat_count;
 
 // Parses one cheat's value, "ADDR,VV,VV;ADDR,VV", into pCHEAT: each value
 // after the first goes to the next address. Reads len bytes of line, which
-// need not end in a NUL. Writes past CHEAT_MAX are dropped.
+// need not end in a NUL. Only hex digits count, and entries missing an
+// address or a value are dropped, as are writes past CHEAT_MAX.
 void Parse_cheat_line(const char *line, u32 len);
 
 #endif
