@@ -170,6 +170,36 @@ Debug level for its own run only. It:
 It writes its report to SD as a log stream that we bring back to the repo. When the real
 cart disagrees with the emulator, the fix goes into the cart model.
 
+## v0.2.1 Real-cart fixes
+
+From the first real-cart test of v0.2.0 (`docs/research/cart-test-2026-10-18.md`):
+
+- **Log files:** fill new log files with zeros from RAM, not a ROM array. On the real cart,
+  ROM reads while SD mode is on return the SD buffer's leftover data. Make `disk_write`
+  refuse or copy any buffer in ROM. Recover log files already full of junk (start a new file
+  when the space after the text isn't zero), and make `log_find_end` robust.
+- **Cart model:** while SD mode is on, ROM reads don't return NOR contents. Cart RAM beyond the
+  save clears on a power cycle. The clock gate is `0x096A0000` bit 0. The EEPROM doesn't
+  answer without a game loaded. Add a test that log files are zero after their text.
+- **Reproducible builds:** sort the Makefile's `$(wildcard)` lists, so CI and macOS link the
+  same binary. Attach `ezkernelnew.sym` to each release, and put a real build ID (a CRC or the
+  git hash) in the boot line. `just logs` warns when the symbols don't match.
+- **Save logging:** log every "Save sav?" decision, save copy (with size and result), NOR
+  write and settings save. Report `f_write` and `f_close` errors from `Save_savefile`
+  instead of ignoring them.
+- **Diagnostics:**
+  - name the failed checklist item in the summary;
+  - show the clock live on the clock item;
+  - log probe answers as info, not errors;
+  - after a crash, say the session crashed;
+  - show a GB game's title instead of `(????)`;
+  - in the checklist, say to use RESET, not power-off, before checking the DEBUG snapshot.
+- **EEPROM probe:** run it in game mode, from a small test ROM, so it can settle 512 vs 8K.
+- **WAITCNT:** the cart reads correctly at 2/1 with prefetch, 20% faster than the default.
+  Consider setting it in the kernel, and for games that don't set it themselves.
+- **Rumble:** no GPIO register value drove the motor. Find out how the cart's rumble is
+  driven (WarioWare: Twisted! with the user's report, or the bitstream).
+
 ## v0.3 Renderer
 
 The menu is currently mode 3 (`SetMode(MODE_3 | BG2_ENABLE)`), drawn pixel by pixel in C.
