@@ -2843,7 +2843,8 @@ boot_game:
 	//check
 	
 	SAVEMODE = Get_saveMODE(Save_num,gamefilesize);			
-	tlog("launch %s: code %.4s, %lu bytes, save mode %02X", pfilename, GAMECODE, (unsigned long)gamefilesize, SAVEMODE);
+	tlog("launch %s: code %.4s, %lu bytes, save mode %02X, uses%s%s", pfilename, is_EMU ? "-" : (char*)GAMECODE, (unsigned long)gamefilesize, SAVEMODE,
+	     (gl_game_uses & GAME_USES_CLOCK) ? " clock" : "", (gl_game_uses & GAME_USES_RUMBLE) ? " rumble" : (gl_game_uses ? "" : " nothing"));
 	if(MENU_line<2){//work for psram
 		if(gamefilesize > 0x2000000){
 			ShowbootProgress(gl_file_overflow);	

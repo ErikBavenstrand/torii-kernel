@@ -2,13 +2,10 @@
 // source/ezkernelnew.c).
 #include <gba_base.h>
 
+#include "../../source/Ezcard_OP.h"
 #include "torii_test.h"
 
-#define GAME_USES_CLOCK 1
-#define GAME_USES_RUMBLE 2
 u32 Game_hardware(u32 is_EMU, const u8 *gamecode, u8 gb_cart_type);
-u16 Game_GPIO_status(void);
-extern u32 gl_game_uses;
 extern u16 gl_game_clock;
 extern u16 gl_game_rumble;
 
