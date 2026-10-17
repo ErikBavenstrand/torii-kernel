@@ -16,6 +16,9 @@ void SetRampage(u16 page);
 void IWRAM_CODE Progress(u16 x, u16 y, u16 w, u16 h, u16 c, u8 isDrawDirect);
 void IWRAM_CODE Send_FATbuffer(u32*buffer,u32 mode);
 void IWRAM_CODE SetRompageWithHardReset(u16 page,u32 bootmode);
+#define GAME_USES_CLOCK  1
+#define GAME_USES_RUMBLE 2
+extern u32 gl_game_uses;
 u16 IWRAM_CODE Game_GPIO_status(void);
 void ReadSram(u32 address, u8* data , u32 size );
 void WriteSram(u32 address, u8* data , u32 size );

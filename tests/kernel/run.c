@@ -12,6 +12,7 @@ void test_nes_classics_use_eeprom(void);
 void test_file_type(void);
 void test_cheat_parse(void);
 void test_cheat_cap(void);
+void test_game_hardware(void);
 void test_clock_and_rumble_are_separate(void);
 void test_sort_by_name(void);
 void test_sort_full_list(void);
@@ -30,6 +31,7 @@ static const struct {
 	{"file_type", test_file_type},
 	{"cheat_parse", test_cheat_parse},
 	{"cheat_cap", test_cheat_cap},
+	{"game_hardware", test_game_hardware},
 	{"clock_and_rumble_are_separate", test_clock_and_rumble_are_separate},
 	{"sort_by_name", test_sort_by_name},
 	{"sort_full_list", test_sort_full_list},

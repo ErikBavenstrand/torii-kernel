@@ -880,6 +880,32 @@ u32 show_recently_play(void)
 	return return_val;
 }
 //------------------------------------------------------------------
+// Which of the cart's clock and rumble motor a game can use (GAME_USES_*).
+// GBA: only Drill Dozer and WarioWare: Twisted! have rumble, and neither has a
+// clock; any other game may read the clock. GB and GBC games run in Goomba,
+// which passes the cart's clock to MBC3+TIMER games and its rumble motor to
+// MBC5+RUMBLE games, going by the cart type at 0x147. PocketNES shows the clock.
+u32 Game_hardware(u32 is_EMU,const u8 *gamecode,u8 gb_cart_type)
+{
+	switch(is_EMU)
+	{
+		case 0://gba
+			if((gamecode[0]=='V' && gamecode[1]=='4' && gamecode[2]=='9') ||
+			   (gamecode[0]=='R' && gamecode[1]=='Z' && gamecode[2]=='W'))
+				return GAME_USES_RUMBLE;
+			return GAME_USES_CLOCK;
+		case 1://gbc
+		case 2://gb
+			if(gb_cart_type==0x0F || gb_cart_type==0x10)
+				return GAME_USES_CLOCK;
+			if(gb_cart_type>=0x1C && gb_cart_type<=0x1E)
+				return GAME_USES_RUMBLE;
+			return 0;
+		default://nes
+			return GAME_USES_CLOCK;
+	}
+}
+//---------------------------------------------------------------------------------
 // Moves entry to the top of the count rows in p_recently_play, adding it if
 // it is new and dropping the oldest row when all 10 are taken. Returns the
 // new count.
@@ -2427,6 +2453,7 @@ void Boot_NOR_game(u32 show_offset,	u32 file_select,u32 key_L)
 	Send_FATbuffer(FAT_table_buffer,1); //only RTS FAT and some parameter
 	//wait_btn();
 	memcpy(GAMECODE,&pNorFS[show_offset+file_select].gamename[0xC],4);//header 0xA0: title, then game code
+	gl_game_uses = Game_hardware(0,GAMECODE,0);
 	SetRompageWithHardReset(pNorFS[show_offset+file_select].rompage,key_L);
 	while(1);	
 }
@@ -2797,13 +2824,20 @@ boot_game:
 	f_chdir(currentpath);//return to game folder	
 	res = f_open(&gfile, pfilename, FA_READ);
 	if(res == FR_OK)			{
+		u8 gb_cart_type = 0;
 		f_lseek(&gfile, 0xAC);
 		f_read(&gfile, GAMECODE, 4, (UINT *)&ret);			
+		if(is_EMU==1 || is_EMU==2){
+			f_lseek(&gfile, 0x147);
+			f_read(&gfile, &gb_cart_type, 1, (UINT *)&ret);
+		}
 		gamefilesize = f_size(&gfile);
 		f_close(&gfile);
+		gl_game_uses = Game_hardware(is_EMU,GAMECODE,gb_cart_type);
 	}
 	else{
 		memset(GAMECODE,'F',4);
+		gl_game_uses = 0;
 	}	
 											
 	//check

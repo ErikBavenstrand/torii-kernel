@@ -251,19 +251,15 @@ void IWRAM_CODE Send_FATbuffer(u32*buffer,u32 mode)
 // --------------------------------------------------------------------
 extern u16 gl_game_clock;
 extern u16 gl_game_rumble;
-extern u8 GAMECODE[4];
+u32 gl_game_uses;//GAME_USES_* of the game being launched, from Game_hardware
 
 // The cart's clock and rumble motor share its GPIO port, and one register
-// opens the whole port to the game. Only two games have a rumble motor in
-// their cart, Drill Dozer and WarioWare: Twisted!, and neither has a clock,
-// so they get the port when RUMBLE is on. Every other game, emulated GB and
-// GBC games included (Pokemon Gold's clock), gets it when CLOCK is on.
+// opens the whole port to the game. It opens when the game uses either and
+// that one is switched on in CART.
 u16 IWRAM_CODE Game_GPIO_status(void)
 {
-	if((GAMECODE[0]=='V' && GAMECODE[1]=='4' && GAMECODE[2]=='9') ||
-	   (GAMECODE[0]=='R' && GAMECODE[1]=='Z' && GAMECODE[2]=='W'))
-		return gl_game_rumble;
-	return gl_game_clock;
+	return ((gl_game_uses & GAME_USES_CLOCK) && gl_game_clock) ||
+	       ((gl_game_uses & GAME_USES_RUMBLE) && gl_game_rumble);
 }
 
 void IWRAM_CODE SetRompageWithHardReset(u16 page,u32 bootmode)
