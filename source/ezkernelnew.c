@@ -2708,6 +2708,11 @@ u8 SD_list_MENU(u32 show_offset,	u32 file_select,u32 play_re )
 		Save_num	= old_Save_num;
 		MENU_max = 4+ ((gl_cheat_on==1)? ((havecht>0)?1:0):0) ;			
 	}
+
+	if(is_EMU){//GB, GBC and NES games only have CLEAN BOOT: start them without the menu
+		key_L = (~REG_KEYINPUT & KEY_L) ? 1 : 0;//L held: hard reset, as in the menu
+		goto boot_game;
+	}
 		
 re_show_menu:
 	DrawPic((u16*)gImage_MENU, 56, 25, 128, 110, 0, 0, 1);//show menu pic		
@@ -2812,6 +2817,7 @@ re_show_menu:
 		ShowTime(SD_list,0);
 	}	//3
 
+boot_game:
 	Clear(0, 0, 240, 160, gl_color_cheat_black, 1);
 	DrawHZText12(gl_Loading,0,(240-strlen(gl_Loading)*6)/2,74, gl_color_text,1);
 

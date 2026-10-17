@@ -81,8 +81,10 @@ KERNEL_SAVE = {
     0x33: "flash64k",
 }
 CHECKS = ["boots", "save type", "clock", "save cycle"]
-# The SAVER folder sorts before the game, so: down, open, CLEAN BOOT.
+# The SAVER folder sorts before the game, so: down, open, CLEAN BOOT. GB, GBC
+# and NES games start on open, with no menu.
 LAUNCH = [(100, "DOWN"), (120, "A"), (180, "A")]
+LAUNCH_EMU = LAUNCH[:2]
 GAME_START = 300  # the kernel has handed over to the game by now
 RUN_FRAMES = 2400
 SHOTS = (600, 1500, RUN_FRAMES)
@@ -401,6 +403,7 @@ def run_game(result: Result, roms: dict, saves: dict) -> None:
     for hw in g.get("hardware", []):
         result.notes.append(f"{hw} not emulated")
     size = SAVE_SIZE.get(g["save"])
+    launch = LAUNCH if system == "gba" else LAUNCH_EMU
     started = time.time()
 
     # Power-on 1: launch, then play (a key script, or mashing).
@@ -412,7 +415,7 @@ def run_game(result: Result, roms: dict, saves: dict) -> None:
         a for f, p in zip(shot_frames, shots, strict=True) for a in ("-s", f"{f}:{p}")
     ]
     extra += [a for f in range(60, frames + 1, 60) for a in ("-h", str(f))]
-    out, trace = power_on(cart, LAUNCH + keys, frames, extra)
+    out, trace = power_on(cart, launch + keys, frames, extra)
     result.shots = [str(p.relative_to(REPORT)) for p in shots if p.exists()]
     if not check_boot(result, trace, out, [p for p in shots if p.exists()]):
         result.metrics["seconds"] = round(time.time() - started, 1)
@@ -445,7 +448,7 @@ def run_game(result: Result, roms: dict, saves: dict) -> None:
 
     # Power-on 3: launch again; the kernel must load the save back.
     if scripted:
-        _, trace = power_on(cart, LAUNCH + keys, frames)
+        _, trace = power_on(cart, launch + keys, frames)
         second = (cart / "sram.bin").read_bytes()[:size]
         counters = [gen3_counter(s) for s in (loaded or b"", first, second)]
         if second == first:
@@ -460,7 +463,7 @@ def run_game(result: Result, roms: dict, saves: dict) -> None:
             )
             result.set("save cycle", "pass", detail)
     else:
-        _, trace = power_on(cart, LAUNCH, GAME_START + 20)
+        _, trace = power_on(cart, launch, GAME_START + 20)
         # The cart logs a checksum of the save the kernel loaded as the game
         # takes over, before the game can change it.
         loads = re.findall(
