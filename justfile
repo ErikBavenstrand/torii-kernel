@@ -268,7 +268,7 @@ emu-image: _vm
 
 # Start the torii colima VM on macOS if it isn't running
 _vm:
-    @if [ "$(uname)" = Darwin ] && ! colima status -p torii >/dev/null 2>&1; then colima start -p torii --vm-type vz --mount-type virtiofs --vz-rosetta --cpu 4 --memory 6 && docker context use colima >/dev/null 2>&1 || true; fi
+    @if [ "$(uname)" = Darwin ] && ! colima status -p torii >/dev/null 2>&1; then colima start -p torii --vm-type vz --mount-type virtiofs --vz-rosetta --cpu 8 --memory 8 && docker context use colima >/dev/null 2>&1 || true; fi
 
 # Remove build outputs (keeps the emulated cart in dist/cart)
 clean:

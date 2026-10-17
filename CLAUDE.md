@@ -29,6 +29,15 @@ Torii is a custom kernel for the EZ-Flash Omega DE, forked from EZ-Flash's offic
 
 ## Checking changes
 
+Check in tiers; each costs more, so run it only when it applies (timings in `docs/research/dev-loop-speed.md`):
+
+- After each edit: `just build`, or `just test-kernel` / `just test-host` for the code you touched.
+- Before each commit: `just lint` and `just test`, plus `just analyze` if C changed.
+- Before handing work back, if launching, saves, patching or the cart model changed: `just compat`.
+- Once per branch, before merge, under the same condition: `just compat --all`.
+
+Reviews: one round of at most two agents. Use a code reviewer, plus an adversarial tester only for launching, saves, the cart model or patching. Give them your test and compat results (`dist/compat/runs/*.json`) so they don't re-run them, and a time budget (about 10 minutes). Re-check your own fixes instead of starting another round, unless a fix changed behaviour.
+
 1. Run `just test`. Every line should start with `PASS`.
    Unit-test kernel functions in `tests/kernel/` (`CHECK`, `CHECK_EQ` from `torii_test.h`; declare each test in `tests.h` and list it in `run.c`). They run inside a test build of the kernel, so they can call any kernel function.
    Test hardware-free code in `tests/host/` too: it builds for the host under ASan and UBSan (`just test-host`), with `tests/host/gba_base.h` standing in for libgba's. Keep such code in its own file, as `source/sort.c` and `source/cheat.c` are.
