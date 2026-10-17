@@ -18,5 +18,7 @@ void test_irq_table_rejects_blank_codes(void);
 void test_irq_table_bounds(void);
 void test_irq_literals(void);
 void test_hotkey_value(void);
+void test_rom_patch_table(void);
+void test_rom_patch_matches(void);
 
 #endif

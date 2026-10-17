@@ -440,6 +440,16 @@ def hook_table() -> dict[bytes, str]:
         patches = len(re.findall(r"Add2(?:_if)?\(", body))
         what = f"{patches} code patch{'es' if patches != 1 else ''}"
         table[key] = f"{table[key]}, {what}" if key in table else what
+    # Code patches for exact ROMs (source/irqpatch.c), keyed by code, revision
+    # and header check.
+    patches = Path("source/irqpatch.c").read_text()
+    for m in re.finditer(
+        r"\{\{'(.)', '(.)', '(.)', '(.)'\}, (0x[0-9A-Fa-f]+), (0x[0-9A-Fa-f]+),",
+        patches,
+    ):
+        key = "".join(m.groups()[:4]).encode()
+        what = "exact-ROM patch"
+        table[key] = f"{table[key]}, {what}" if key in table else what
     return table
 
 

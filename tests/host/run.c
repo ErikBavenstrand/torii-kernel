@@ -53,6 +53,8 @@ static const struct {
 	{"irq_table_bounds", test_irq_table_bounds},
 	{"irq_literals", test_irq_literals},
 	{"hotkey_value", test_hotkey_value},
+	{"rom_patch_table", test_rom_patch_table},
+	{"rom_patch_matches", test_rom_patch_matches},
 };
 
 int main(void)

@@ -1028,40 +1028,30 @@ u32 use_internal_engine(u8 gamecode[], TCHAR* gamefilename)
 	return 1;
 }
 //------------------------------------------------------------------
-//Torii: patches the ROM word at a word offset in the first 8 MB only if it
-//holds the expected value, so other revisions of the game are left alone.
-//The ROM is in PSRAM by now on an SD launch; on a NOR launch it isn't, and
-//nothing is patched.
-static void Add2_if(u32 offset, u32 expected, u32 value)
+//Torii: the code patches for exact ROMs in source/irqpatch.c. The ROM is in
+//PSRAM by now on an SD launch; on a NOR launch it isn't, the words don't
+//match, and nothing is patched.
+static void Apply_rom_patches(void)
 {
+	u8 header[0xC0];
 	SetPSRampage(0);
-	if(((vu32*)PSRAMBase_S98)[offset] == expected)
-		Add2(offset, value);
+	for(u32 i=0; i<sizeof(header)/2; i++)
+		((u16*)header)[i] = ((vu16*)PSRAMBase_S98)[i];
+	for(u32 i=0; i<rom_patch_count; i++)
+	{
+		const ST_rom_patch* p = &rom_patches[i];
+		if(Rom_patch_matches(p, header) && ((vu32*)PSRAMBase_S98)[p->offset/4] == p->expected)
+			Add2(p->offset/4, p->value);
+	}
 }
 //------------------------------------------------------------------
 void Patch_SpecialROM_sleepmode(void)
 {
 	g_Offset = 0;
+	Apply_rom_patches();
 	//
 	switch(*(u32*)GAMECODE)
 	{
-	//Torii: games that fill all of IWRAM after the hook is in, over the hook
-	//at 0x3007FFC, and then crash at their first interrupt. Their fill now
-	//stops at 0x3007FF0.
-	case 0x50544742://Grand Theft Auto Advance(EU): DMA3 fill from 0x3000000
-		Add2_if(0x584/4, 0x85002000, 0x85001FFC);
-		break;
-	case 0x50554C41://Super Monkey Ball Jr.(EU): DMA3 fill from 0x3007600
-		Add2_if(0x36070/4, 0x85000280, 0x8500027C);
-		break;
-	case 0x50374C42://LEGO Star Wars II(EU): crt0 clears up to 0x3008000
-		Add2_if(0x14C/4, 0x03008000, 0x03007FF0);
-		break;
-	case 0x50384C42://Torii: Lara Croft Tomb Raider - Legend(EU) stores its IRQ
-		//handler at 0x3008000-4, computed; subs r0,#4 becomes subs r0,#12 (r0 is
-		//reloaded before its next use)
-		Add2_if(0x14A0/4, 0x38046008, 0x380C6008);
-		break;
 	case 0x4A4E4941://0414 - Initial D - Another Stage(JP)
 		Add2(0x11C/4, 0xE241100C);//sub r1,r1,0xC
 		break;

@@ -22,4 +22,23 @@ int Find_irq_table_entry(const u32 *table, u32 words, const u8 code[4], const u3
 // 0xFFFF, counts as the key in defaults[], as the settings page shows it.
 u16 Hotkey_value(const u16 slots[3], const u16 defaults[3]);
 
+// A code patch for one exact ROM, for games the general patching can't hook
+// (see rom_patches in irqpatch.c). It applies only to the ROM whose header
+// has this game code, revision and complement check, and only if the word
+// at offset (bytes, word-aligned, in the first 8 MB) is expected.
+typedef struct {
+	char code[4];  // header 0xAC
+	u8 version;    // header 0xBC
+	u8 checksum;   // header 0xBD
+	u32 offset;
+	u32 expected;
+	u32 value;
+} ST_rom_patch;
+
+extern const ST_rom_patch rom_patches[];
+extern const u32 rom_patch_count;
+
+// True if header (the ROM's first 0xC0 bytes) is the ROM patch p is for.
+int Rom_patch_matches(const ST_rom_patch *p, const u8 *header);
+
 #endif

@@ -82,3 +82,37 @@ void test_hotkey_value(void)
 	CHECK_EQ(Hotkey_value((const u16[]){0xFFFF, 0xFFFF, 0xFFFF}, menu), 0x0F7);
 	CHECK_EQ(Hotkey_value((const u16[]){10, 8, 0xFFFF}, sleep), 0x0FB);
 }
+
+void test_rom_patch_table(void)
+{
+	for (u32 i = 0; i < rom_patch_count; i++) {
+		const ST_rom_patch *p = &rom_patches[i];
+		CHECK_EQ(p->offset % 4, 0);
+		CHECK(p->offset + 4 <= 0x800000);  // read through the first PSRAM window
+		CHECK(p->offset >= 0xC0);          // not the header the match reads
+		CHECK(p->expected != p->value);
+		for (int c = 0; c < 4; c++)
+			CHECK((p->code[c] >= '0' && p->code[c] <= '9') || (p->code[c] >= 'A' && p->code[c] <= 'Z'));
+		for (u32 j = 0; j < i; j++)  // one entry per site
+			CHECK(memcmp(p->code, rom_patches[j].code, 4) || p->offset != rom_patches[j].offset);
+	}
+}
+
+void test_rom_patch_matches(void)
+{
+	const ST_rom_patch *p = &rom_patches[0];
+	u8 header[0xC0] = {0};
+
+	memcpy(&header[0xAC], p->code, 4);
+	header[0xBC] = p->version;
+	header[0xBD] = p->checksum;
+	CHECK(Rom_patch_matches(p, header));
+	header[0xBC] = p->version + 1;  // another revision
+	CHECK(!Rom_patch_matches(p, header));
+	header[0xBC] = p->version;
+	header[0xBD] = p->checksum ^ 1;  // a hack with another title
+	CHECK(!Rom_patch_matches(p, header));
+	header[0xBD] = p->checksum;
+	header[0xAF] = 'E';  // another region
+	CHECK(!Rom_patch_matches(p, header));
+}
