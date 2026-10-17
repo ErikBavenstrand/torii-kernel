@@ -49,8 +49,9 @@ static char glyph_of(u32 c)
 	case 0x201E:
 	case 0x201F:
 		return '"';
+	default:
+		return '?';
 	}
-	return '?';
 }
 
 char charset_next(const char *s, u32 len, u32 *pos)

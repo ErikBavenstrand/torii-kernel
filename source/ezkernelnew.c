@@ -1187,9 +1187,9 @@ static void List_name(char *entry, const FILINFO *info)
 {
 	u32 len = strlen(info->fname);
 	if (len < 100) {
-		strcpy(entry, info->fname);
+		memcpy(entry, info->fname, len + 1);
 	} else if (info->altname[0]) {
-		strcpy(entry, info->altname);
+		memcpy(entry, info->altname, sizeof(info->altname));  // 8.3 and its NUL fit
 	} else {
 		const char *ext = strrchr(info->fname, '.');
 		u32 ext_len = (ext && (info->fname + len - ext) < 8) ? (u32)(info->fname + len - ext) : 0;
