@@ -61,11 +61,10 @@ char* gl_online_manual;
 
 char* gl_no_game_played;
 
-char* gl_ingameRTC;
+char* gl_cart_str;
+char* gl_clock_str;
 //char* gl_offRTC_powersave;
-char* gl_ingameRTC_open;
-char* gl_ingameRTC_close;
-char* gl_ingame_rumble_str;
+char* gl_rumble_str;
 
 char* gl_error_0;
 char* gl_error_1;
@@ -162,11 +161,10 @@ const char zh_online_manual[]="  在线说明书";
 
 const char zh_no_game_played[]="还没玩过游戏";
 
-const char zh_ingameRTC[]=" 游戏时钟";
+const char zh_cart[]="     卡带";
+const char zh_clock[]="时钟";
 //const char zh_offRTC_powersave[]=" ";
-const char zh_ingameRTC_open[]="打开";
-const char zh_ingameRTC_close[]="关闭";//TURNOFF TO POWER SAVE
-const char zh_ingame_rumble[]="震动";
+const char zh_rumble[]="震动";
 
 const char zh_error_0[]="文件夹错误";
 const char zh_error_1[]="文件错误";
@@ -275,10 +273,9 @@ const char en_online_manual[]="Online manual";
 
 const char en_no_game_played[]="No game played yet";
 
-const char en_ingameRTC[]=" GAME RTC";
-const char en_ingameRTC_open[]="OPEN";
-const char en_ingameRTC_close[]="CLOSE";//TURNOFF TO POWER SAVE
-const char en_ingame_rumble[]="RUMBLE";
+const char en_cart[]="     CART";
+const char en_clock[]="CLOCK";
+const char en_rumble[]="RUMBLE";
 
 const char en_error_0[]="Folder error";
 const char en_error_1[]="File error";
@@ -388,11 +385,10 @@ void LoadChinese(void)
 	
 	gl_no_game_played = (char*)zh_no_game_played;
 	
-	gl_ingameRTC = (char*)zh_ingameRTC;
+	gl_cart_str = (char*)zh_cart;
+	gl_clock_str = (char*)zh_clock;
 	//gl_offRTC_powersave = (char*)zh_offRTC_powersave;
-	gl_ingameRTC_open = (char*)zh_ingameRTC_open;
-	gl_ingameRTC_close = (char*)zh_ingameRTC_close;
-	gl_ingame_rumble_str = (char*)zh_ingame_rumble;
+	gl_rumble_str = (char*)zh_rumble;
 	
 	gl_error_0 = (char*)zh_error_0;
 	gl_error_1 = (char*)zh_error_1;
@@ -489,11 +485,10 @@ void LoadEnglish(void)
 	
 	gl_no_game_played = (char*)en_no_game_played;
 	
-	gl_ingameRTC = (char*)en_ingameRTC;
+	gl_cart_str = (char*)en_cart;
+	gl_clock_str = (char*)en_clock;
 	//gl_offRTC_powersave = (char*)en_offRTC_powersave;
-	gl_ingameRTC_open = (char*)en_ingameRTC_open;
-	gl_ingameRTC_close = (char*)en_ingameRTC_close;
-	gl_ingame_rumble_str = (char*)en_ingame_rumble;
+	gl_rumble_str = (char*)en_rumble;
 	
 	gl_error_0 = (char*)en_error_0;
 	gl_error_1 = (char*)en_error_1;

@@ -249,20 +249,21 @@ void IWRAM_CODE Send_FATbuffer(u32*buffer,u32 mode)
 #define	RESET_SOUND		 	(1<<6)	/*!< Reset Sound registers				*/
 #define	RESET_OTHER		 	(1<<7)	/*!< all other registers				*/
 // --------------------------------------------------------------------
-extern u16 gl_ingame_RTC_open_status;
-extern u16 gl_ingame_rumble;
+extern u16 gl_game_clock;
+extern u16 gl_game_rumble;
 extern u8 GAMECODE[4];
 
-// The cart's GPIO port carries both the RTC and the rumble motor, and one
-// register turns it on for the game. Games with rumble (Drill Dozer, WarioWare:
-// Twisted) have no RTC, so they follow the RUMBLE setting and every other game
-// follows GAME RTC.
+// The cart's clock and rumble motor share its GPIO port, and one register
+// opens the whole port to the game. Only two games have a rumble motor in
+// their cart, Drill Dozer and WarioWare: Twisted!, and neither has a clock,
+// so they get the port when RUMBLE is on. Every other game, emulated GB and
+// GBC games included (Pokemon Gold's clock), gets it when CLOCK is on.
 u16 IWRAM_CODE Game_GPIO_status(void)
 {
 	if((GAMECODE[0]=='V' && GAMECODE[1]=='4' && GAMECODE[2]=='9') ||
 	   (GAMECODE[0]=='R' && GAMECODE[1]=='Z' && GAMECODE[2]=='W'))
-		return gl_ingame_rumble;
-	return gl_ingame_RTC_open_status;
+		return gl_game_rumble;
+	return gl_game_clock;
 }
 
 void IWRAM_CODE SetRompageWithHardReset(u16 page,u32 bootmode)

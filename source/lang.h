@@ -62,10 +62,9 @@ extern char* gl_online_manual;
 
 extern char* gl_no_game_played;
 
-extern char* gl_ingameRTC;
-extern char* gl_ingameRTC_open;
-extern char* gl_ingameRTC_close;
-extern char* gl_ingame_rumble_str;
+extern char* gl_cart_str;
+extern char* gl_clock_str;
+extern char* gl_rumble_str;
 
 extern char* gl_error_0;
 extern char* gl_error_1;

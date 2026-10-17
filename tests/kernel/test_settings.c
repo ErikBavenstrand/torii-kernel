@@ -7,27 +7,27 @@
 
 u16 Game_GPIO_status(void);
 extern u8 GAMECODE[4];
-extern u16 gl_ingame_RTC_open_status;
-extern u16 gl_ingame_rumble;
+extern u16 gl_game_clock;
+extern u16 gl_game_rumble;
 
-static u16 gpio(const char *code, u16 rtc, u16 rumble)
+static u16 gpio(const char *code, u16 clock, u16 rumble)
 {
 	memcpy(GAMECODE, code, 4);
-	gl_ingame_RTC_open_status = rtc;
-	gl_ingame_rumble = rumble;
+	gl_game_clock = clock;
+	gl_game_rumble = rumble;
 	return Game_GPIO_status();
 }
 
-void test_rtc_and_rumble_are_separate(void)
+void test_clock_and_rumble_are_separate(void)
 {
-	u16 rtc = gl_ingame_RTC_open_status, rumble = gl_ingame_rumble;
-	// Turning GAME RTC off leaves rumble on (ez-flash/omega-de-kernel#5).
+	u16 clock = gl_game_clock, rumble = gl_game_rumble;
+	// Turning CLOCK off leaves rumble on (ez-flash/omega-de-kernel#5).
 	CHECK_EQ(gpio("V49E", 0, 1), 1);  // Drill Dozer
 	CHECK_EQ(gpio("RZWJ", 0, 1), 1);  // WarioWare: Twisted
 	CHECK_EQ(gpio("V49P", 1, 0), 0);  // RUMBLE off
-	// Other games follow GAME RTC alone.
+	// Every other game follows CLOCK alone.
 	CHECK_EQ(gpio("BPEE", 1, 0), 1);  // Pokémon Emerald
 	CHECK_EQ(gpio("BPEE", 0, 1), 0);
-	gl_ingame_RTC_open_status = rtc;
-	gl_ingame_rumble = rumble;
+	gl_game_clock = clock;
+	gl_game_rumble = rumble;
 }

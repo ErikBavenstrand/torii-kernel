@@ -59,8 +59,8 @@ u16 gl_engine_sel;
 
 
 u16 gl_show_Thumbnail;
-u16 gl_ingame_RTC_open_status;
-u16 gl_ingame_rumble;
+u16 gl_game_clock;
+u16 gl_game_rumble;
 
 
 u8 __attribute__((aligned(4)))GAMECODE[4];
@@ -1348,13 +1348,17 @@ void CheckSwitch(void)
 		gl_show_Thumbnail = 0x0;
 	}
 	
-	gl_ingame_RTC_open_status = Read_SET_info(assress_ingame_RTC_open_status);
-	if( (gl_ingame_RTC_open_status != 0x0) && (gl_ingame_RTC_open_status != 0x1))
+	gl_game_clock = Read_SET_info(assress_game_clock);
+	if( (gl_game_clock != 0x0) && (gl_game_clock != 0x1))
 	{
-		gl_ingame_RTC_open_status = 0x1;
+		gl_game_clock = 0x1;
 	}
 
-	gl_ingame_rumble = (Read_SET_info(assress_ingame_rumble_off) != 0x1);
+	gl_game_rumble = Read_SET_info(assress_game_rumble);
+	if( (gl_game_rumble != 0x0) && (gl_game_rumble != 0x1))
+	{
+		gl_game_rumble = 0x1;
+	}
 	
 	gl_auto_save_sel = Read_SET_info(assress_auto_save_sel);
 	if( (gl_auto_save_sel != 0x0) && (gl_auto_save_sel != 0x1))

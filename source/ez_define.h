@@ -95,7 +95,7 @@
 #define assress_edit_rtshotkey_2 10
 #define assress_engine_sel  11
 #define assress_show_Thumbnail 12
-#define assress_ingame_RTC_open_status 13
+#define assress_game_clock 13 //games can read the cart's clock
 #define assress_auto_save_sel 14
 #define assress_ModeB_INIT 15
 #define assress_led_open_sel 16
@@ -106,7 +106,7 @@
 #define assress_SD_G 21
 #define assress_SD_B 22
 //23 and 24 are DS Style's reset and backup toggles
-#define assress_ingame_rumble_off 48 //1 = rumble off; erased or 0 = on
+#define assress_game_rumble 25 //games can use the cart's rumble motor
 
 #define assress_saveMODE 64
 #define assress_max 65

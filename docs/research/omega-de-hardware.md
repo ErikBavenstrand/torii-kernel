@@ -109,7 +109,10 @@ Every control-register write is wrapped like this:
 - **RTC and rumble:** standard GBA cart GPIO at `0x080000C4` (data), `0xC6` (dir), `0xC8` (enable),
   S-3511-style serial protocol for the RTC; rumble games drive the motor from a GPIO pin.
   One register (`0x096A0000`) turns the whole port on for the game, so there is no
-  separate rumble switch: the kernel picks its value per game (`Game_GPIO_status`).
+  separate rumble switch: the kernel picks its value per game (`Game_GPIO_status`):
+  Drill Dozer and WarioWare: Twisted!, the only carts with a rumble motor, follow the
+  RUMBLE setting; every other game follows CLOCK. Jagoomba uses the clock for MBC3 games
+  (Pokémon Gold/Silver/Crystal) but rumbles only through the Game Boy Player link.
 
 ### FPGA firmware update protocol
 
