@@ -43,6 +43,8 @@ settings() {
   done
 }
 settings 0=0xE1E1 1=1 2=1 3=0 4=0 5=9 6=8 7=2 8=9 9=8 10=3 11=1 12=0 13=1 25=1
+rm -rf "$cart-state"
+cp -r "$cart" "$cart-state"  # for the save-state run below
 
 # keys FRAME KEY... -> mgba-shot press/release pairs, one key every 8 frames.
 keys() {
@@ -89,4 +91,24 @@ backup=$(od -A n -t x1 -j $((0x20000 + pixel - 0x06000000)) -N 2 "$cart/sram.bin
 od -A n -t x1 -N 5 "$cart/sram.bin" | tr -d ' \n' | grep -q '4f4d525801' ||
   fail "the game's save did not survive the addon launch (SRAM $(od -A n -t x1 -N 5 "$cart/sram.bin"))"
 
-echo "PASS: in-game menu opens on L+R+START, B returns to the game with its screen, and the save survives"
+# A save state round trip on a copy of the cart from before power-on 3:
+# the same launch, then from the menu SAVE (down one, A), and later LOAD
+# (down two, A). The state holds the menu's IME = 0, so loading must turn
+# IME back on, or the game stops at its next VBlankIntrWait.
+key=$(sed -n 's/^script: hook \([0-9]*\) key L+R+START$/\1/p' <<<"$log" | head -1)
+load=$((key + 300))
+hashes=$(for f in $(seq $((load + 100)) 20 $((load + 400))); do printf -- '-h %d ' "$f"; done)
+# shellcheck disable=SC2046,SC2086 # $(keys) and $hashes are lists of options
+out=$(OMEGA_DIR=$cart-state emu/build-linux/mgba-shot dist/ezkernelnew.bin \
+  $(keys 100 DOWN A) $(keys 180 DOWN DOWN DOWN DOWN RIGHT RIGHT RIGHT RIGHT UP UP UP A) \
+  -k "$key:L+R+START" -k "$((key + 6)):-" $(keys $((key + 40)) DOWN A) \
+  -k "$load:L+R+START" -k "$((load + 6)):-" $(keys $((load + 40)) DOWN DOWN A) \
+  -m $((load + 400)):0x04000208:2 $hashes -f $((load + 400)) 2>"$cart/log")
+log=$(cat "$cart/log")
+grep -q '^crash at frame' <<<"$log" && fail "crashed in the save state run"
+[ "$(awk '$1 == "mem" { print $5 $6 }' <<<"$out")" = 0100 ] || fail "IME is off after loading a state"
+[ "$(awk '$1 == "hash" { print $4 }' <<<"$out" | sort -u | wc -l)" -gt 1 ] ||
+  fail "the game did not go on after loading a state"
+rm -rf "$cart-state"
+
+echo "PASS: in-game menu opens on L+R+START, B returns to the game with its screen, a state saves and loads, and the save survives"

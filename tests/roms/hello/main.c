@@ -65,7 +65,10 @@ int main(void)
 	REG_IE = 1;
 	REG_IME = 1;
 	for (;;) {
-		__asm__ volatile("swi 0x05" ::: "r0", "r1", "r2", "r3", "memory");  // VBlankIntrWait
+		// Poll rather than VBlankIntrWait, which turns IME back on itself:
+		// many games poll, and then IME left off stops them.
+		for (unsigned last = frames; frames == last;)
+			;
 		unsigned x = 1 + frames % 238;
 		VRAM[158 * 240 + x] = RGB(31, 0, 0);
 		VRAM[158 * 240 + (x == 1 ? 238 : x - 1)] = RGB(2, 6, 20);

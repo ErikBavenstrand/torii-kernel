@@ -893,6 +893,8 @@ register_list_end:
 	ldr r0,=0x4000202   @;0x4000202
 	mov r1,#0
 	strh r1,[r0]
+	mov r1,#1			@;Torii: IME on; the state holds the menu's IME = 0
+	strh r1,[r0,#6]
 	
 
 	ldr 	r0,=0x0E008400
