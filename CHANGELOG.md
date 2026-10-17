@@ -12,7 +12,11 @@ git log, not here.
 - **Changed:** names are drawn in ASCII (`a47a7a7`). The 12x12 GBK font and
   FatFs's code page 936 go, freeing about 350 KB of ROM. FatFs uses code page
   850: accented Latin letters lose their accents, and names it can't hold,
-  such as Japanese ones, show and open as their 8.3 short name.
+  such as Japanese ones, show and open as their 8.3 short name on FAT cards;
+  on exFAT cards they show as `?` and must be renamed. Before upgrading, if
+  the last game you played has non-ASCII characters in its name, switch on
+  once with the old kernel so it writes the save back; the new kernel would
+  write it under a garbled name.
 - **Removed:** Chinese (`c05855f`). English is the only language until language
   packs arrive; a saved Chinese setting loads English. Cheats come from
   `/CHEAT/Eng`, and the fast patch engine is no longer off for Chinese.
