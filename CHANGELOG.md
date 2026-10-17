@@ -12,7 +12,7 @@ git log, not here.
   it touches neither the card nor cart RAM. Each launch logs what the
   kernel did (header, save type, IRQ hook source, patched words, CART and
   GPIO), and the next boot says how the session ended. A new file needs
-  1 MB free besides, and lines never split across files (`0167c1a`,
+  1 MB free besides (`4c831be`), and lines never split across files (`0167c1a`,
   `0bfd2bf`).
 - **Added:** a kernel crash (an IRQ arriving outside the kernel's code) is
   kept in cart RAM page 0xF0 with the registers, stack and last log lines,
