@@ -763,9 +763,14 @@ u32 Check_pat(TCHAR* gamefilename)
 		if(res == FR_OK)//have a old file
 		{
 			patfilesize = f_size(&gfile);
-			f_read(&gfile, pReadCache, patfilesize, &ret);
+			//Torii: only a file of this kernel's layout (EMax slots, then 16 words);
+			//another size is from an older kernel, and the ROM is scanned again.
+			find_the_patfile = (patfilesize == sizeof(iPatchInfo2) + 16*4);
+			if(find_the_patfile)
+				f_read(&gfile, pReadCache, patfilesize, &ret);
 			f_close(&gfile);
-			find_the_patfile = 1;
+			if(find_the_patfile && ((u32*)pReadCache)[sizeof(iPatchInfo2)/4 + 5] > EMax)
+				find_the_patfile = 0;//Torii: a slot count past EMax is corrupt
 		}					
 		else
 		{

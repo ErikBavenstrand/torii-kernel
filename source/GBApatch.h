@@ -4,7 +4,7 @@
 
 enum
 {
-	EMax = 32
+	EMax = 64 //Torii: was 32; Kirby: Nightmare in Dream Land has 44 IRQ handler literals
 };
 typedef struct SPatchInfo
 {
