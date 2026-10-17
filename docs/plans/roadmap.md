@@ -77,7 +77,34 @@ Still open from the bug work:
 
 Then update CLAUDE.md: the GBK, CRLF and `zh_*` rules go.
 
-### On-cart debug mode
+### Logging and on-cart debug mode
+
+#### SD logging
+
+Logging to SD is built first, because the debug mode writes its report through it. It is
+off by default and costs nothing when disabled. `torii.ini` turns it on and sets a level
+(error, warn, info, debug).
+
+- **Kernel log:** `tlog()` writes into a small ring buffer in RAM (2–4 KB of the free
+  EWRAM). The buffer is flushed to `/torii/logs/` at safe points: before a launch, on
+  errors, and when settings close. Files are append-only and rotate, keeping the last N,
+  so the card never fills. Every boot starts with a session marker. Under the emulator,
+  `tlog()` still goes to mGBA's console.
+- **Launch record:** before each launch, the log records exactly what the kernel did:
+  game code and revision, save type, the patches and hooks applied (including
+  `rom_patches` and `reset_table.h` matches), cheats, CART settings and the plugin.
+- **Crash detection:** if a game ran and didn't come back cleanly, the next boot logs that
+  the previous session ended abnormally, next to its launch record.
+- **In-game snapshot:** a "Save debug info" entry in the in-game menu writes registers,
+  the hook state and a small memory sample to SD.
+- **Kernel crash dump:** an exception handler stores the registers and call stack in cart
+  RAM that survives a soft reset, and the next boot writes them to the log. Whether the
+  dump also survives a power cycle is checked on the real cart.
+- **Tools:** `just logs PATH` pulls the logs from an SD card and turns code addresses into
+  function names from the matching `ezkernelnew.sym`, in the same format as the emulator's
+  crash reports.
+
+#### On-cart debug mode
 
 A mode you launch on the real cart that:
 
@@ -93,8 +120,8 @@ A mode you launch on the real cart that:
   rumble only get the port while CLOCK is on;
 - walks you through the manual checklist with pass/fail buttons.
 
-It writes a report to SD that we bring back to the repo. When the real cart disagrees with
-the emulator, the fix goes into the cart model.
+It writes its report to SD as a log stream that we bring back to the repo. When the real
+cart disagrees with the emulator, the fix goes into the cart model.
 
 ## v0.3 Renderer
 
