@@ -197,7 +197,7 @@ static int byte_at(void *ctx, u32 offset)
 // Makes log file slot full size and zero, then writes its header. A rotation
 // cut off by power loss leaves a file with no header, which counts as unused.
 // Free space a new log file must leave on the card, for saves and states.
-#define LOG_CARD_RESERVE (1024 * 1024)
+#define LOG_CARD_RESERVE 0x100000u
 
 static FRESULT start_file(u32 slot, u32 seq)
 {
