@@ -571,6 +571,7 @@ def check_menu(result: Result, rom: Path, sd_name: str, table: dict) -> None:
         "pass",
         f"opened {opened - key_at} frames after the key; the game went on ({len(after)} screens)",
     )
+    shutil.rmtree(cart)  # a failing game's cart stays for debugging
 
 
 def run_game(result: Result, roms: dict, saves: dict, table: dict) -> None:
