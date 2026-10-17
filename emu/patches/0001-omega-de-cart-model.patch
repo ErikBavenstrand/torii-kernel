@@ -12,10 +12,10 @@ index 59ca1c1..1dd19c0 100644
  	EXTDATA_MAX
 diff --git a/include/mgba/internal/gba/cart/omega.h b/include/mgba/internal/gba/cart/omega.h
 new file mode 100644
-index 0000000..572bf65
+index 0000000..f71b63a
 --- /dev/null
 +++ b/include/mgba/internal/gba/cart/omega.h
-@@ -0,0 +1,145 @@
+@@ -0,0 +1,146 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -82,6 +82,7 @@ index 0000000..572bf65
 +	int bufferCount;
 +	uint16_t buffer[OMEGA_NOR_BUFFER_WORDS];
 +	uint8_t bufferLoaded[OMEGA_NOR_BUFFER_WORDS];
++	uint16_t lastWord;
 +	// After an aborted buffer write: unlock steps of the AA/55/F0 that ends it,
 +	// and DQ6, which toggles on each status read until then.
 +	uint8_t abortStep;
@@ -277,10 +278,10 @@ index 1d0c0dd..b6abc91 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..6284ee9
+index 0000000..7b19d18
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1012 @@
+@@ -0,0 +1,1026 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -463,9 +464,8 @@ index 0000000..6284ee9
 +		}
 +	case OMEGA_NOR_BUFFER_ABORT: {
 +		// Status until the abort reset: DQ7 inverted, DQ6 toggling, DQ1 set.
-+		uint16_t last = nor->bufferCount ? nor->buffer[nor->bufferCount - 1] : 0;
 +		nor->toggle ^= 0x40;
-+		return (~last & 0x80) | nor->toggle | 0x02;
++		return (~nor->lastWord & 0x80) | nor->toggle | 0x02;
 +	}
 +	case OMEGA_NOR_PPB:
 +	case OMEGA_NOR_PPB_COMMAND:
@@ -488,8 +488,13 @@ index 0000000..6284ee9
 +	uint32_t command = offset & 0xFFF;
 +	uint8_t byte = value;
 +	switch (nor->state) {
-+	case OMEGA_NOR_READ:
 +	case OMEGA_NOR_AUTOSELECT:
++		// Only the reset leaves autoselect.
++		if (byte == 0xF0) {
++			nor->state = OMEGA_NOR_READ;
++		}
++		break;
++	case OMEGA_NOR_READ:
 +		if (byte == 0xF0) {
 +			nor->state = OMEGA_NOR_READ;
 +		} else if (command == 0xAAA && byte == 0xAA) {
@@ -504,6 +509,7 @@ index 0000000..6284ee9
 +			// Write to buffer, at any address in the sector to program.
 +			nor->bufferBase = offset;
 +			nor->bufferCount = 0;
++			nor->lastWord = 0;
 +			memset(nor->bufferLoaded, 0, sizeof(nor->bufferLoaded));
 +			nor->state = OMEGA_NOR_BUFFER_COUNT;
 +			break;
@@ -572,6 +578,7 @@ index 0000000..6284ee9
 +		unsigned word = (offset & (pageSize - 1)) >> 1;
 +		nor->buffer[word] = value;
 +		nor->bufferLoaded[word] = 1;
++		nor->lastWord = value;
 +		++nor->bufferCount;
 +		if (--nor->bufferRemaining == 0) {
 +			nor->state = OMEGA_NOR_BUFFER_CONFIRM;
@@ -591,7 +598,7 @@ index 0000000..6284ee9
 +		nor->state = OMEGA_NOR_READ;
 +		break;
 +	case OMEGA_NOR_BUFFER_ABORT:
-+		if (nor->abortStep == 0 && command == 0xAAA && byte == 0xAA) {
++		if (command == 0xAAA && byte == 0xAA) {
 +			nor->abortStep = 1;
 +		} else if (nor->abortStep == 1 && command == 0x554 && byte == 0x55) {
 +			nor->abortStep = 2;
@@ -841,6 +848,11 @@ index 0000000..6284ee9
 +		_trace(gba, "mode game from PSRAM");
 +	} else {
 +		_trace(gba, "mode game from NOR offset %06X", (omega->romPage & 0x1FF) << 17);
++		// The real chip would serve ID or status words instead of the game.
++		if (omega->gameNor.state != OMEGA_NOR_READ) {
++			mLOG(GBA_OMEGA, WARN, "Game NOR boot while the chip is in command state %d", omega->gameNor.state);
++			_trace(gba, "game NOR not in read mode (state %d)", omega->gameNor.state);
++		}
 +	}
 +}
 +
@@ -1009,9 +1021,9 @@ index 0000000..6284ee9
 +	int32_t bufferCount;
 +	uint16_t buffer[OMEGA_NOR_BUFFER_WORDS];
 +	uint8_t bufferLoaded[OMEGA_NOR_BUFFER_WORDS];
++	uint16_t lastWord;
 +	uint8_t abortStep;
 +	uint8_t toggle;
-+	uint16_t reserved;
 +};
 +
 +// Fixed-size part of the cart state, followed by the data port, the cart SRAM
@@ -1050,18 +1062,21 @@ index 0000000..6284ee9
 +	out->bufferCount = nor->bufferCount;
 +	memcpy(out->buffer, nor->buffer, sizeof(out->buffer));
 +	memcpy(out->bufferLoaded, nor->bufferLoaded, sizeof(out->bufferLoaded));
++	out->lastWord = nor->lastWord;
 +	out->abortStep = nor->abortStep;
 +	out->toggle = nor->toggle;
 +}
 +
 +static void _loadNorState(struct GBAOmegaNor* nor, const struct GBAOmegaNorSnapshot* in) {
-+	nor->state = in->state;
++	// A state from elsewhere can hold anything; keep it in range.
++	nor->state = in->state <= OMEGA_NOR_PPB_EXIT ? in->state : OMEGA_NOR_READ;
 +	nor->bufferBase = in->bufferBase;
-+	nor->bufferRemaining = in->bufferRemaining;
-+	nor->bufferCount = in->bufferCount;
++	nor->bufferRemaining = in->bufferRemaining >= 0 && in->bufferRemaining <= OMEGA_NOR_BUFFER_WORDS ? in->bufferRemaining : 0;
++	nor->bufferCount = in->bufferCount >= 0 && in->bufferCount <= OMEGA_NOR_BUFFER_WORDS ? in->bufferCount : 0;
 +	memcpy(nor->buffer, in->buffer, sizeof(nor->buffer));
 +	memcpy(nor->bufferLoaded, in->bufferLoaded, sizeof(nor->bufferLoaded));
 +	nor->abortStep = in->abortStep;
++	nor->lastWord = in->lastWord;
 +	nor->toggle = in->toggle;
 +}
 +
