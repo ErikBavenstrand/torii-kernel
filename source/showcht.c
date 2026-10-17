@@ -36,7 +36,7 @@ void Trim(char s[])
 	int n;
 	for(n = strlen(s) - 1; n >= 0; n--)
 	{
-		if(s[n]!=' ' && s[n]!='\t' && s[n]!='\n')
+		if(s[n]!=' ' && s[n]!='\t' && s[n]!='\n' && s[n]!='\r')//CRLF and LF files alike
 			break;
 		s[n] = '\0';
 	}
@@ -109,7 +109,7 @@ void Get_KEY_val(FIL* file,char*KEY_section,char*KEY_secval,char getbuff[])
 
 			if(is_section == 1 && buf[i] != ']')
 			{
-				section[section_len++] = buf[i];
+				if(section_len < MAX_KEY_LEN-1) section[section_len++] = buf[i];
 				continue;
 			}
       else if (buf[i] == ']')
@@ -229,7 +229,7 @@ u32 Get_CHT_val(FIL* file,char*KEY_section,char*KEY_secval/*,char getbuff[]*/)
 
 			if(is_section == 1 && buf[i] != ']')
 			{
-				section[section_len++] = buf[i];
+				if(section_len < MAX_KEY_LEN-1) section[section_len++] = buf[i];
 				continue;
 			}
       else if (buf[i] == ']')
@@ -263,7 +263,6 @@ u32 Get_CHT_val(FIL* file,char*KEY_section,char*KEY_secval/*,char getbuff[]*/)
 	    }
 	          
 	  }
-	  _vlen--; //remove 0xd
 	    
      //DEBUG_printf("KEY_section %s, section %s",KEY_section,section);	     
 		if( strcmp(KEY_section,section)== 0)
@@ -306,11 +305,10 @@ u32 Get_CHT_val(FIL* file,char*KEY_section,char*KEY_secval/*,char getbuff[]*/)
 		     	 	if (buf[i] == '=')
 		          goto endcht;
 		      }
-			    for (i=0; i<buf_len; ++i)
+			    for (i=0; i<buf_len && _vlen<MAX_BUF_LEN; ++i)
 		    	{
 						_paramv[_vlen++] = buf[i];
 		      }
-		       _vlen--; //remove 0xd
 		      //DEBUG_printf("%x %x %x %x %x %x %x %x", buf[0],buf[1], buf[2],buf[3], buf[4],buf[5], buf[6],buf[7]);	
 		      //wait_btn();
 			    
@@ -401,7 +399,7 @@ u32 Get_all_Section_val(FIL* file)
 
 			if(is_section == 1 && buf[i] != ']')
 			{
-				section[section_len++] = buf[i];
+				if(section_len < MAX_KEY_LEN-1) section[section_len++] = buf[i];
 				continue;
 			}
       else if (buf[i] == ']')
