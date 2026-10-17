@@ -83,6 +83,29 @@ void test_log_ring_long_line(void)
 	free(r);
 }
 
+void test_log_ring_take_lines(void)
+{
+	log_ring *r = new_ring();
+	char out[LOG_RING_SIZE];
+	// Lines across the end of the buffer come out whole and in order.
+	for (int i = 0; i < 400; i++)
+		log_ring_put(r, "0123456789\n", 11);
+	drain(r);
+	log_ring_put(r, "line one, longer than the rest\nline two\n", 40);
+	u32 n = log_ring_take_lines(r, out, 35);
+	CHECK_EQ(n, 31);
+	CHECK(memcmp(out, "line one, longer than the rest\n", 31) == 0);
+	log_ring_drop(r, n);
+	CHECK_EQ(log_ring_take_lines(r, out, sizeof(out)), 9);
+	CHECK(memcmp(out, "line two\n", 9) == 0);
+	log_ring_drop(r, 9);
+	CHECK_EQ(log_ring_take_lines(r, out, sizeof(out)), 0);
+	// A line longer than max comes out in max pieces.
+	log_ring_put(r, "abcdefghij\n", 11);
+	CHECK_EQ(log_ring_take_lines(r, out, 4), 4);
+	free(r);
+}
+
 void test_log_ring_tail(void)
 {
 	log_ring *r = new_ring();

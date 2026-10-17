@@ -65,7 +65,13 @@ def read_logs(folder: Path) -> list[tuple[int, Path, str]]:
         if not match:
             print(f"skipped {path.name}: no header (never used, or cut off)")
             continue
-        text = data[match.end() :].split(b"\0", 1)[0]
+        if len(data) != 0x10000:
+            print(
+                f"skipped {path.name}: {len(data)} bytes, not a log file the kernel uses"
+            )
+            continue
+        # The zeros after the text, and any a torn write left inside it
+        text = data[match.end() :].rstrip(b"\0").replace(b"\0", b"")
         logs.append((int(match.group(1)), path, text.decode("utf-8", "replace")))
     logs.sort()
     return logs

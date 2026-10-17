@@ -67,6 +67,7 @@ static const struct {
 	{"log_ring_drops_whole_lines", test_log_ring_drops_whole_lines},
 	{"log_ring_long_line", test_log_ring_long_line},
 	{"log_ring_tail", test_log_ring_tail},
+	{"log_ring_take_lines", test_log_ring_take_lines},
 	{"log_header", test_log_header},
 	{"log_pick_current", test_log_pick_current},
 	{"log_find_end", test_log_find_end},

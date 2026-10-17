@@ -192,6 +192,25 @@ EOF
   mcopy -n -i "$cart/sd.img" ::/torii/logs/* "$cart/card/torii/logs/"
   python3 tools/logs.py "$cart/card" dist/ezkernelnew.sym "$cart/logs" >/dev/null
   grep -q 'crash: lr .* (Diagnostics+0x' "$cart/logs/torii.log" || fail "tools/logs.py didn't name the crash's lr: $(grep 'crash: lr' "$cart/logs/torii.log")"
+  # The largest crash dump there can be (64 stack words that look like code
+  # addresses, a full 1 KB of log) reaches the card whole, header first.
+  python3 - "$cart/sram.bin" <<'EOF'
+import struct, sys
+regs = [0x1000 + i for i in range(16)] + [0x6000001F]
+regs[13:16] = [0x03007E00, 0x08004321, 0x02001234]
+log = b""
+while len(log) + 70 <= 1024:
+    log += b"   1.00 I " + b"y" * 59 + b"\n"
+dump = b"TORIICR1" + struct.pack("<17I", *regs) + struct.pack("<III", 1234, 0x03007E00, 64)
+dump += struct.pack("<64I", *[0x0800ABCD] * 64) + struct.pack("<I", len(log)) + log.ljust(1024, b"\0")
+sram = bytearray(open(sys.argv[1], "rb").read())
+sram[0xF0100 : 0xF0100 + len(dump)] = dump
+open(sys.argv[1], "wb").write(sram)
+EOF
+  boot -f 200
+  has "crash: the kernel crashed 1234 frames after boot: pc 02001234"
+  [ "$(log 0 | grep -c 'crash: stack 03007.*0800ABCD')" = 64 ] || fail "the big crash dump lost stack lines"
+  blank 0xF0100 8 || [ "$(sram 0xF0100 8)" = 0000000000000000 ] || fail "the big crash dump wasn't cleared"
   card_ok
   lines_ok
   echo "PASS: Diagnostics logs with logging off and leaves the save chip and NOR list alone; its crash test's dump reaches the log"

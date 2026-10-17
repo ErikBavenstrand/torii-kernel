@@ -31,6 +31,7 @@ void test_log_ring_keeps_order(void);
 void test_log_ring_drops_whole_lines(void);
 void test_log_ring_long_line(void);
 void test_log_ring_tail(void);
+void test_log_ring_take_lines(void);
 void test_log_header(void);
 void test_log_pick_current(void);
 void test_log_find_end(void);
