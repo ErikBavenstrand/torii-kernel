@@ -7,44 +7,48 @@
 usage: check.py [--full] [--staged] [--base REF] [--dry-run]
 
 Changed files are those that differ from where the branch left REF (main by
-default), committed or not, plus untracked ones; with --staged, only the
-staged changes. Each file selects tiers by the rules below, the first rule
+default), committed or not, plus untracked ones, and emu/mgba when it has
+edits not yet saved to emu/patches (git ignores emu/mgba). With --staged,
+only the staged changes count, though the checks run on the working tree.
+Each file selects tiers by the rules below, the first rule
 that matches winning; the checks then run in a fixed order, all of them even
 after one fails, and a summary lists what failed.
 
 Kernel source is the default for compat: every file in source/ and
 tests/kernel/ links into the one kernel binary, so a change anywhere can break
-launching (EWRAM data, IWRAM code and the stack share tight limits). Only the
-files in NO_COMPAT skip it. A path no rule knows runs everything.
+launching (EWRAM data, IWRAM code and the stack share tight limits, which
+`just size` checks). Only the files in NO_COMPAT skip compat. A path no rule
+knows runs everything.
 
 --full is the before-merge tier: compat becomes `compat --all`.
 --dry-run prints the plan without running it.
 """
 
 import fnmatch
+import hashlib
 import os
 import subprocess
 import sys
+from pathlib import Path
 
-LINT, TEST_HOST, TEST, ANALYZE, COMPAT = (
+LINT, TEST_HOST, TEST, SIZE, ANALYZE, COMPAT = (
     "lint",
     "test-host",
     "test",
+    "size",
     "analyze",
     "compat",
 )
-ORDER = [LINT, TEST_HOST, TEST, ANALYZE, COMPAT]
-KERNEL = {LINT, TEST, COMPAT}
-EVERYTHING = {LINT, TEST, ANALYZE, COMPAT}
+ORDER = [LINT, TEST_HOST, TEST, SIZE, ANALYZE, COMPAT]
+KERNEL = {LINT, TEST, SIZE, COMPAT}
+EVERYTHING = {LINT, TEST, SIZE, ANALYZE, COMPAT}
 
 # Kernel C files that only draw menus or text and never run while a game
-# launches or saves: they skip compat. Headers never skip it, as launching
-# code includes them.
+# launches or saves: they skip compat (not size). Headers never skip it, as
+# launching code includes them; nor does lang.c, whose strings it uses.
 NO_COMPAT = {
     "source/charset.c",
-    "source/diag.c",
     "source/helpwindow.c",
-    "source/lang.c",
 }
 
 # (patterns, tiers, why): fnmatch patterns, where "*" also matches "/"
@@ -79,13 +83,18 @@ RULES = [
         {LINT},
         "EZ-Flash's files, not built",
     ),
+    (
+        ["tests/host/gba_base.h"],
+        {LINT, TEST_HOST, ANALYZE},
+        "host tests, and cppcheck reads it",
+    ),
     (["tests/host/*", "tests/host.sh"], {LINT, TEST_HOST}, "host tests"),
     (
         sorted(NO_COMPAT),
-        {LINT, TEST, ANALYZE},
+        {LINT, TEST, SIZE, ANALYZE},
         "menu or text only, listed in NO_COMPAT",
     ),
-    (["source/*.c", "source/*.h"], {LINT, TEST, ANALYZE, COMPAT}, "kernel C"),
+    (["source/*.c", "source/*.h"], EVERYTHING, "kernel C"),
     (["Makefile"], EVERYTHING, "kernel build flags"),
     (["source/*", "tests/kernel/*", "image.bin"], KERNEL, "kernel"),
     (
@@ -127,14 +136,35 @@ def tiers_for(path: str) -> tuple[set, str]:
     return EVERYTHING, "no rule for this path: everything"
 
 
-def git(*args: str) -> list[str]:
-    out = subprocess.run(["git", *args], capture_output=True, text=True, check=True)
+def git(*args: str, cwd: str = ".") -> list[str]:
+    out = subprocess.run(
+        ["git", "-c", "core.quotePath=false", *args],
+        capture_output=True,
+        text=True,
+        check=True,
+        cwd=cwd,
+    )
     return [line for line in out.stdout.splitlines() if line]
 
 
+def mgba_edited() -> bool:
+    """emu/mgba differs from the patches it was made or saved from (as emu/fetch.sh checks)."""
+    if not Path("emu/mgba").is_dir():
+        return False
+    subprocess.run(["git", "-C", "emu/mgba", "add", "-A"], check=True)
+    diff = subprocess.run(
+        ["git", "-C", "emu/mgba", "diff", "--cached"], capture_output=True, check=True
+    ).stdout
+    stamp = Path("emu/.mgba-patches")
+    recorded = stamp.read_text().strip() if stamp.exists() else ""
+    return hashlib.sha256(diff).hexdigest() != recorded
+
+
 def changed_files(base: str, staged: bool) -> tuple[list[str], str]:
+    unsaved = ["emu/mgba"] if mgba_edited() else []
     if staged:
-        return git("diff", "--cached", "--name-only", "--no-renames"), "staged"
+        files = git("diff", "--cached", "--name-only", "--no-renames")
+        return sorted(set(files + unsaved)), "staged"
     for ref in (base, f"origin/{base}"):
         found = subprocess.run(
             ["git", "rev-parse", "--verify", "-q", ref],
@@ -146,9 +176,14 @@ def changed_files(base: str, staged: bool) -> tuple[list[str], str]:
             break
     else:
         sys.exit(f"check: no branch {base} or origin/{base} to compare with")
+    if fork == git("rev-parse", "HEAD")[0]:
+        print(
+            f"check: HEAD is {ref} itself, so only uncommitted changes count; "
+            "use --base to compare with an older commit"
+        )
     files = git("diff", "--name-only", "--no-renames", fork)
     files += git("ls-files", "--others", "--exclude-standard")
-    return sorted(set(files)), f"against {ref}, committed or not"
+    return sorted(set(files + unsaved)), f"against {ref}, committed or not"
 
 
 def main() -> int:
@@ -156,6 +191,8 @@ def main() -> int:
     full, staged, dry_run = "--full" in args, "--staged" in args, "--dry-run" in args
     base = "main"
     if "--base" in args:
+        if args.index("--base") + 1 == len(args):
+            sys.exit(__doc__)
         base = args[args.index("--base") + 1]
     unknown = [
         a

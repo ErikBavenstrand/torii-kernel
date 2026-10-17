@@ -181,6 +181,7 @@ cppcheck_flags := "--include=tests/host/gba_base.h --platform=unix32 --enable=wa
 _analyze-run: compile-commands _analyze-image
     #!/usr/bin/env bash
     set -uo pipefail
+    trap 'kill $(jobs -p) 2>/dev/null' INT TERM
     mkdir -p dist/analyze
     rm -f dist/analyze/cppcheck.txt dist/analyze/clang-tidy.txt dist/analyze/gcc.txt
     python3 tools/analyze.py project dist/analyze/project.json || exit 1

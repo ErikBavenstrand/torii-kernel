@@ -11,6 +11,7 @@ usage: fresh.py sync [--all] PATH...   wait until containers see recent edits
        fresh.py check NAME OUTPUT... -- PATH...
                                        exit 0 if NAME can be skipped
        fresh.py record NAME -- PATH...  note that NAME was built from PATH
+       fresh.py hash PATH...            print the hash check compares, e.g. for a cache key
 
 sync: the torii colima VM shares the repo over virtiofs, which caches file
 attributes for about a second. Right after an edit a container can see the
@@ -100,6 +101,9 @@ def container_view(files: list[str]) -> dict[str, tuple[str, int]]:
 def sync(paths: list[str]) -> int:
     if sys.platform != "darwin":
         return 0  # Linux bind mounts show edits at once; the lag is colima's
+    if "FRESH_IMAGE" not in os.environ:
+        print("fresh: sync needs FRESH_IMAGE; run it through just", file=sys.stderr)
+        return 2
     everything = paths[0] == "--all"
     host = recent_files(paths[1:] if everything else paths, everything)
     if not host:
@@ -225,6 +229,9 @@ def main() -> int:
     if len(sys.argv) >= 4 and sys.argv[1] == "track" and "--" in sys.argv:
         split = sys.argv.index("--")
         return track(sys.argv[2], sys.argv[3:split], sys.argv[split + 1 :])
+    if len(sys.argv) >= 3 and sys.argv[1] == "hash":
+        print(inputs_hash(sys.argv[2:]))
+        return 0
     if len(sys.argv) >= 3 and sys.argv[1] == "sync":
         return sync(sys.argv[2:])
     if len(sys.argv) >= 4 and sys.argv[1] == "stamp":

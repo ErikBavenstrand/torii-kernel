@@ -75,17 +75,22 @@ jobs:
           dockerfile: docker/emu.Dockerfile
           record: emu-image
           recipe: emu-image
-      # The emulator build is cached under a hash of what `just emu-headless`
-      # reads (emu_inputs in the justfile), so mGBA must be fetched first.
+      # The emulator build is cached under the hash tools/fresh.py checks it
+      # against: of what `just emu-headless` reads (emu_inputs in the
+      # justfile), so mGBA must be fetched first.
       - name: Fetch mGBA
-        run: emu/fetch.sh
+        id: emu-inputs
+        run: |
+          emu/fetch.sh
+          # shellcheck disable=SC2046 # emu_inputs is a list of paths
+          echo "hash=$(python3 tools/fresh.py hash $(just --evaluate emu_inputs))" >> "$GITHUB_OUTPUT"
       - id: emu
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             emu/build-linux
             dist/.fresh/emu-headless
-          key: emu-build-${{ runner.arch }}-${{ hashFiles('emu/mgba/src/**', 'emu/mgba/include/**', 'emu/mgba/CMakeLists.txt', 'emu/mgba/cmake/**', 'emu/mgba-shot.c', 'emu/build.sh', 'docker/emu.Dockerfile') }}
+          key: emu-build-${{ runner.arch }}-${{ steps.emu-inputs.outputs.hash }}
       - name: Build the emulator
         run: just emu-headless
       - if: steps.emu.outputs.cache-hit != 'true'
