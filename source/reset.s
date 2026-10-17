@@ -10,6 +10,8 @@ SoftReset_now:
 	bx  r1
 	.code 32
 SoftReset_now16:
+	mov r0,#0x04000000		@;IME off: the clears below wipe the IRQ handler
+	str r0,[r0,#0x208]
 	@;run the reset from the top of IWRAM, which the BIOS SoftReset clears,
 	@;so nothing is left in EWRAM (it used to go to 0x02001000)
 	adr r1,SoftReset
