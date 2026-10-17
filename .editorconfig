@@ -1,0 +1,45 @@
+# Editor settings: https://editorconfig.org
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{c,h,s,S,lua}]
+indent_style = tab
+indent_size = 8
+
+[{Makefile,*.mk}]
+indent_style = tab
+
+[*.py]
+indent_style = space
+indent_size = 4
+
+[{justfile,*.sh,*.yml,*.yaml,*.toml,*.md,*Dockerfile,.clang-format,.clangd}]
+indent_style = space
+
+[*.sh]
+indent_size = 2
+
+[*.patch]
+trim_trailing_whitespace = false
+insert_final_newline = unset
+
+# Vendored FatFs, kept as upstream wrote it
+[source/ff15/**]
+trim_trailing_whitespace = false
+indent_style = unset
+indent_size = unset
+
+# Files from EZ-Flash's official source: CRLF, some GBK-encoded, kept as they
+# are until the source cleanup
+[{*.bat,emusrc/**,source/{Ezcard_OP.c,Ezcard_OP.h,GBApatch.c,GBApatch.h,HZK12.h,NORflash_OP.c,NORflash_OP.h,RTC.c,RTC.h,asc126.h,draw.c,draw.h,ez_define.h,ezkernel.h,ezkernelnew.c,gba_nes_patch.h,gba_rts_only.s,gba_rts_patch.s,gba_sleep_patch.s,helpwindow.c,helpwindow.h,lang.c,lang.h,pocketnes.h,reset.s,reset_table.h,saveMODE.h,setwindow.c,setwindow2.c,showcht.c,showcht.h}}]
+charset = unset
+end_of_line = crlf
+insert_final_newline = unset
+trim_trailing_whitespace = false
+indent_style = unset
+indent_size = unset
