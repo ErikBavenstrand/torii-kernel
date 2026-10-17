@@ -43,8 +43,8 @@ Still open from the bug work:
   data sits in those bytes, and settle what happens to existing saves (see v0.5).
 - **Hook coverage:** done. `just compat` has an in-game menu column; all 118 commercial
   GBA games in the library pass (`docs/research/hook-coverage.md`). Four games get exact-ROM
-  patches for the EU dumps tested; other regions may need their own. The menu can't restore
-  BLDY or the BG2 affine registers after it closes, as they are write-only.
+  patches for the EU dumps tested; other regions may need their own. The menu keeps the game's
+  brightness, but still resets the BG2 affine registers, which are write-only.
 - **Clean boot:** IWRAM is still not fully cleared at launch, because the `SoftReset_now`
   code stays there. No game is known to need it. Clean-boot tests use `tests/roms/idle`
   (no crt0), since devkitARM's crt0 clears EWRAM itself.

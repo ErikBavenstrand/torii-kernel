@@ -6,6 +6,11 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** a game's brightness survives the in-game menu (`5b10b34`). The
+  menu zeroed BLDY, which is write-only, so a game that dims the screen
+  once (Pokémon Ruby's title menu) came back at full brightness. It now
+  turns blending off through BLDCNT and restores it on exit. The BG2
+  rotation registers are still reset, as the menu draws on BG2.
 - **Fixed:** the in-game menu, cheats, reset and sleep work in rev 1 of
   Pokémon FireRed and LeafGreen, Crash Bandicoot Purple and SimCity 2000
   (`b736015`). The fast patch engine's built-in table is keyed by game code
