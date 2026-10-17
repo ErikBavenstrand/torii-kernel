@@ -96,8 +96,27 @@ needs.
 | Crash Nitro Kart (BCNP) | crash 18 frames after the menu | after `RegisterRamReset` it reloads its stack from a second literal the kernel didn't move, so the stack sat on the menu's register save area at `0x3007E80` | `dcf4c5b`: `Get_spend_address` moves that literal too |
 | RTC Checker (homebrew, no game code) | no menu | never enables the VBlank IRQ. Its blank code also matched the table's all-zero entry | `b736015`: blank codes skip the table. The menu stays n/a |
 
-The per-game patches are for the EU dumps here and apply only if the ROM
-holds the expected word. Other regions may need their own.
+### Exact-ROM patches
+
+Most fixes are general rules: the table check, the blank-code rule, and
+moving every reload of the stack top. Four games overwrite the hook in ways
+no safe rule can find from the ROM alone. A rule on crt0's `0x03008000` end
+address would also change 9 working games; one on DMA control words would
+also hit the sound DMAs of about 60; GTA's fill target is in a register;
+and Lara's address is computed. They get code patches from the
+`rom_patches` table in `source/irqpatch.c`. Each entry applies only to the
+ROM with its game code, revision and header complement check, and only if
+the patch site holds the expected word.
+
+| Game (EU) | Code, revision, check | Patch | Compat case |
+|---|---|---|---|
+| Grand Theft Auto Advance | BGTP, 0, 0xAC | DMA control `0x584`: `0x85002000` → `0x85001FFC` | `just compat --all BGTP` |
+| Super Monkey Ball Jr. | ALUP, 0, 0x15 | DMA control `0x36070`: `0x85000280` → `0x8500027C` | `just compat --all ALUP` |
+| LEGO Star Wars II | BL7P, 0, 0xE0 | crt0 clear end `0x14C`: `0x03008000` → `0x03007FF0` | `just compat --all BL7P` |
+| Lara Croft Tomb Raider: Legend | BL8P, 0, 0xB8 | word `0x14A0`: `subs r0,#4` → `subs r0,#12` | `just compat --all BL8P` |
+
+The compat report's "hook from" metric says "exact-ROM patch" for these.
+Other regions of the same games don't match and still miss the menu.
 
 Super Mario Advance 4 rev 1 (AX4P) passed before, but 5 of its 7 table
 offsets are rev 0's, so the kernel overwrote 5 unrelated words; it now

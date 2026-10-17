@@ -20,11 +20,13 @@ git log, not here.
 - **Fixed:** with an addon on, Grand Theft Auto Advance, Super Monkey Ball
   Jr. and LEGO Star Wars II (EU) no longer crash or hang (`c57c3b6`,
   `dcf4c5b`). Each clears the top of IWRAM after the kernel's hook is in;
-  their clear now stops just below it. These per-game patches apply only
-  if the ROM holds the expected word.
+  their clear now stops just below it.
 - **Fixed:** the in-game menu works in Lara Croft Tomb Raider: Legend (EU),
   which computes its IRQ handler address instead of loading it
   (`dcf4c5b`).
+- **Changed:** these four per-game patches live in one table in `irqpatch.c`
+  (`35613bf`). Each applies only to the exact ROM (game code, revision and
+  header check) and only if the patch site holds the expected word.
 - **Fixed:** Crash Nitro Kart no longer crashes after the in-game menu
   (`dcf4c5b`). The kernel moves a game's stack down to make room for the
   menu's saved registers; this game reloads its stack from a second
