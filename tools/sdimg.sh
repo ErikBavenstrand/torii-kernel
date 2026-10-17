@@ -15,6 +15,10 @@ if [ ! -x "$bin" ] || [ -n "$(find tools/sdimg.c tools/sdimg.sh source/ff15 -new
     -e 's/^#define FF_FS_NORTC\t\t0/#define FF_FS_NORTC\t\t1/' \
     -e 's/^#define FF_USE_LABEL\t0/#define FF_USE_LABEL\t1/' \
     source/ff15/ffconf.h >"$out/ffconf.h"
-  cc -std=gnu11 -O1 -g -Wall -I "$out" -o "$bin" tools/sdimg.c "$out/ff.c" "$out/ffunicode.c"
+  # Tests run in parallel and may all build at once: each builds into its own
+  # file and renames it into place, so none runs a half-written binary.
+  tmp=$(mktemp "$bin.XXXXXX")
+  cc -std=gnu11 -O1 -g -Wall -I "$out" -o "$tmp" tools/sdimg.c "$out/ff.c" "$out/ffunicode.c"
+  mv -f "$tmp" "$bin"
 fi
 exec "$bin" "$@"
