@@ -1,5 +1,6 @@
 # Checks every push to main and every pull request: lint, build the kernel
-# (kept as a download), and run the homebrew tests on the emulated cart. Each
+# (kept as a download), run the host tests and the homebrew tests on the
+# emulated cart, and run the advisory static analysis. Each
 # job runs the same `just` recipe as on a developer's machine. Games you own
 # (`just compat`) stay local: their ROMs are never in the repository.
 name: CI
@@ -66,3 +67,19 @@ jobs:
           name: screenshots
           path: dist/shots
           if-no-files-found: ignore
+
+  analyze:
+    name: Static analysis (advisory)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    # Advisory: the job fails only on findings missing from
+    # tools/analyze-baseline.txt, and that doesn't fail the workflow.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: extractions/setup-just@v4
+      - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          cache-dependency-glob: justfile
+      - name: Run cppcheck, clang-tidy and GCC's -fanalyzer against the baseline
+        run: just analyze

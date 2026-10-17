@@ -22,6 +22,8 @@ kernel_docker := "docker run --rm --platform linux/amd64 -u $(id -u):$(id -g) -v
 emu_docker := "docker run --rm -u $(id -u):$(id -g) -v \"$PWD\":/src " + emu_image
 # C formatter for `just lint` and `just format`; .clang-format-ignore lists the files it skips
 clang_format := "23.1.2"
+# Advisory analysis for `just analyze` (cppcheck is pinned in docker/analyze.Dockerfile)
+clang_tidy := "22.1.8"
 # The SDL emulator, printing the kernel's tlog lines ("GBA Debug: ...")
 mgba := "emu/build-native/sdl/mgba -C logLevel.gba.debug=31"
 # Emulator window size as a multiple of 240x160, e.g. `just scale=3 play`
@@ -139,6 +141,29 @@ lint:
 # Format the C files that `just lint` checks, in place
 format:
     git ls-files -z '*.c' '*.h' | xargs -0 uvx clang-format@{{clang_format}} -i
+
+# Advisory static analysis of source/ (not FatFs): cppcheck, clang-tidy and GCC 10's
+# -fanalyzer. Fails only on findings missing from tools/analyze-baseline.txt
+analyze: _analyze-run
+    python3 tools/analyze.py check dist/analyze tools/analyze-baseline.txt
+
+# Run the analysis and write its findings to tools/analyze-baseline.txt
+analyze-baseline: _analyze-run
+    python3 tools/analyze.py baseline dist/analyze tools/analyze-baseline.txt
+
+# cppcheck reads tests/host/gba_base.h for libgba's macros, as it skips system headers. Left
+# out: style-only checks, printf types (GCC checks those for the real target) and GNU void * arithmetic.
+cppcheck_flags := "--include=tests/host/gba_base.h --platform=unix32 --enable=warning,style,performance,portability --inline-suppr --suppress=missingIncludeSystem --suppress=variableScope --suppress=constParameterPointer --suppress=constVariablePointer --suppress='invalidPrintfArgType_*' --suppress=arithOperationsOnVoidPointer --template='{file}:{line}: {severity}: {id}: {message}'"
+
+# The repo is mounted at its own path, so compile_commands.json's paths work in containers.
+_analyze-run: compile-commands
+    @{{fresh}} check analyze-image -- docker/analyze.Dockerfile && docker image inspect torii-analyze >/dev/null 2>&1 || { docker build -q -t torii-analyze -f docker/analyze.Dockerfile docker >/dev/null && {{fresh}} record analyze-image -- docker/analyze.Dockerfile; }
+    mkdir -p dist/analyze
+    python3 tools/analyze.py project dist/analyze/project.json
+    docker run --rm -u $(id -u):$(id -g) -v "$PWD":"$PWD" -w "$PWD" torii-analyze cppcheck -q --project=dist/analyze/project.json {{cppcheck_flags}} 2> dist/analyze/cppcheck.txt
+    python3 tools/analyze.py files | xargs uvx clang-tidy@{{clang_tidy}} -p . --quiet > dist/analyze/clang-tidy.txt 2>/dev/null
+    python3 tools/analyze.py gcc | docker run --rm -i --platform linux/amd64 -u $(id -u):$(id -g) -v "$PWD":"$PWD" -w "$PWD" {{kernel_image}} sh 2> dist/analyze/gcc.txt
+    @wc -l dist/analyze/cppcheck.txt dist/analyze/clang-tidy.txt dist/analyze/gcc.txt | sed '$d'
 
 # Play the listed games through the kernel and write dist/compat/index.html. Filters pick
 # games by code, system, save chip or file name, e.g. `just compat gbc` or `just compat Pokemon`

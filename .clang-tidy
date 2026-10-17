@@ -1,0 +1,23 @@
+# clang-tidy for `just analyze`, reading compile_commands.json. Those are
+# GCC's commands for devkitARM (see .clangd), so set clang's target and drop
+# the flags clang doesn't know. Paths are relative to build/.
+# Left out as noise for this code: parameter order, reserved names, casts
+# through void *, hardware registers at fixed addresses, and C11's _s functions.
+Checks: >-
+  -*,bugprone-*,clang-analyzer-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-reserved-identifier,
+  -bugprone-casting-through-void,
+  -clang-analyzer-core.FixedAddressDereference,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
+HeaderFilterRegex: '/(source|tests)/'
+ExcludeHeaderFilterRegex: '/source/ff15/'
+ExtraArgs:
+  - --target=arm-none-eabi
+  - -isystem../dist/devkitpro/devkitARM/arm-none-eabi/include
+RemovedArgs:
+  - -mtune=arm7tdmi
+  - -mthumb-interwork
+  - -fcallgraph-info=su
+  - -fstack-usage
+  - -Werror

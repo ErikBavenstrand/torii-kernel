@@ -1,4 +1,5 @@
-// Stands in for libgba's gba_base.h when kernel code builds for the host:
+// Stands in for libgba's gba_base.h when kernel code builds for the host,
+// and for cppcheck (just analyze):
 // its types, and the memory section attributes as no-ops.
 #ifndef TORII_HOST_GBA_BASE_H
 #define TORII_HOST_GBA_BASE_H
