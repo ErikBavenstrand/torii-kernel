@@ -12,7 +12,7 @@ export DOCKER_CONTEXT := if os() == "macos" { "colima-torii" } else { env("DOCKE
 # Run before every build in a container, see tools/fresh.py
 fresh := "python3 tools/fresh.py"
 # What each build reads; a step is skipped while these are unchanged
-kernel_inputs := "source Makefile image.bin tools/omega_image.py tools/nm_to_sym.py " + kernel_image
+kernel_inputs := "source tests/kernel Makefile image.bin tools/omega_image.py tools/nm_to_sym.py " + kernel_image
 test_kernel_inputs := "source tests/kernel Makefile " + kernel_image
 emu_inputs := "emu/mgba/src emu/mgba/include emu/mgba/CMakeLists.txt emu/mgba/cmake emu/mgba-shot.c emu/build.sh docker/emu.Dockerfile"
 test_rom_outputs := "tests/roms/hello/hello.gba tests/roms/crash/crash.gba tests/roms/crash/crash.sym tests/roms/savetest/flash128.gba tests/roms/savetest/eeprom512.gba tests/roms/idle/idle.gba"
@@ -41,7 +41,7 @@ build: emu-image
 
 _build-kernel:
     {{fresh}} stamp build "{{kernel_image}}" Makefile
-    {{fresh}} track build ezkernelnew.elf ezkernelnew.gba -- source Makefile
+    {{fresh}} track build ezkernelnew.elf ezkernelnew.gba -- source tests/kernel Makefile
     {{kernel_docker}} make TARGET=ezkernelnew -j8
     {{emu_docker}} python3 tools/omega_image.py ezkernelnew.gba image.bin dist/ezkernelnew.bin
     {{kernel_docker}} sh -c '/opt/devkitpro/devkitARM/bin/arm-none-eabi-nm -n ezkernelnew.elf > dist/ezkernelnew.nm'
@@ -61,11 +61,16 @@ play *roms: build emu cart
 sd card *games: build
     tools/sd_copy.sh "$@"
 
+# Pull the kernel's logs off an SD card, e.g. `just logs /Volumes/OMEGA`: joined into
+# dist/logs/torii.log, with crash dump addresses named from dist/ezkernelnew.sym
+logs path:
+    python3 tools/logs.py "{{path}}" dist/ezkernelnew.sym dist/logs
+
 # Write compile_commands.json for clangd, covering the kernel and its unit tests
 # (devkitPro's headers go to dist/devkitpro; .clangd adapts the flags for clang)
 compile-commands: emu-image
     mkdir -p dist build build-test
-    {{kernel_docker}} sh -c 'make TARGET=ezkernelnew -B -n > dist/dry-run-kernel.txt && make TARGET=ezkerneltest BUILD=build-test SOURCES="source source/ff15 tests/kernel" -B -n > dist/dry-run-test.txt && cd /opt && cp -r --parents devkitpro/libgba/include devkitpro/devkitARM/arm-none-eabi/include /src/dist/'
+    {{kernel_docker}} sh -c 'make TARGET=ezkernelnew -B -n > dist/dry-run-kernel.txt && make TARGET=ezkerneltest BUILD=build-test -B -n > dist/dry-run-test.txt && cd /opt && cp -r --parents devkitpro/libgba/include devkitpro/devkitARM/arm-none-eabi/include /src/dist/'
     {{emu_docker}} python3 tools/compile_commands.py "$PWD" build=dist/dry-run-kernel.txt build-test=dist/dry-run-test.txt
     rm dist/dry-run-kernel.txt dist/dry-run-test.txt
 
@@ -197,7 +202,7 @@ _test-kernel-build: emu-image
 _build-test-kernel:
     {{fresh}} stamp build-test "{{kernel_image}} tests/kernel" Makefile
     {{fresh}} track build-test ezkerneltest.elf ezkerneltest.gba -- source tests/kernel Makefile
-    {{kernel_docker}} make TARGET=ezkerneltest BUILD=build-test SOURCES="source source/ff15 tests/kernel" -j8
+    {{kernel_docker}} make TARGET=ezkerneltest BUILD=build-test -j8
     {{fresh}} record test-kernel -- {{test_kernel_inputs}}
 
 test-roms: emu-image

@@ -69,6 +69,8 @@ u8 Check_saveMODE(u8 gamecode[]);
 u8 Get_saveMODE(u8 Save_num, u32 gamefilesize);
 u32 Check_file_type(TCHAR *pfilename);
 u32 Get_savefilesize(BYTE saveMODE);
+// Empties FAT_table_buffer, the cart's table of a file's cluster runs and parameters.
+void init_FAT_table(void);
 // IWRAM code must run from IWRAM while the ROM page changes, so it is never
 // static: GCC would inline it into callers in ROM.
 void IWRAM_CODE Refresh_filename(u32 show_offset, u32 file_select, u32 updown, u32 haveThumbnail);

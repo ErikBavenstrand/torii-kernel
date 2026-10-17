@@ -15,7 +15,6 @@
 #include "Ezcard_OP.h"
 #include "irqpatch.h"
 #include "tlog.h"
-#include "tlog.h"
 
 u32 windows_offset;
 u32 is_NORpatch;
@@ -37,6 +36,7 @@ u32 iCount2;
 #define sizeofa(array) (sizeof(array) / sizeof(array[0]))
 
 u32 spend_address;
+static const char *patch_kind;  //Torii: for Log_patches
 //------------------------------------------------------------------
 static void Write(u32 romaddress, const u8 *buffer, u32 size)
 {
@@ -217,6 +217,16 @@ void IWRAM_CODE PatchInternal(u32 *Data, int iSize, u32 offset)
 	}
 }
 //------------------------------------------------------------------
+// Bytes SetTrimSize keeps free at the ROM's end for the in-game code.
+static u32 Patch_length(void)
+{
+	if (gl_cheat_on == 1)
+		return CHEAT_PATCH_LENGTH;
+	if ((gl_rts_on == 1) /* || (gl_cheat_on==1)*/)
+		return RTS_PATCH_LENGTH;
+	return 0x300;
+}
+//------------------------------------------------------------------
 void SetTrimSize(u8 *buffer, u32 romsize, u32 iSize, u32 mode, BYTE saveMODE)
 {
 	u8 byte;
@@ -224,17 +234,7 @@ void SetTrimSize(u8 *buffer, u32 romsize, u32 iSize, u32 mode, BYTE saveMODE)
 	u32 top;
 	u32 alignedSize;
 
-	u32 PATCH_LENGTH;
-
-	if ((gl_rts_on == 1) /* || (gl_cheat_on==1)*/) {
-		PATCH_LENGTH = 0x1000;
-	} else {
-		PATCH_LENGTH = 0x300;
-	}
-
-	if (gl_cheat_on == 1) {
-		PATCH_LENGTH = CHEAT_PATCH_LENGTH;
-	}
+	u32 PATCH_LENGTH = Patch_length();
 
 	if (0) {
 		iTrimSize = 0x1fff000;
@@ -406,6 +406,7 @@ static void Patch_RTS_Cheat(u32 *Data)
 	if (gl_cheat_count > CHEAT_MAX)
 		gl_cheat_count = CHEAT_MAX;
 	TLOG_ASSERT(p_no_cheat_end - p_patch_start + gl_cheat_count * 8 <= CHEAT_PATCH_LENGTH);
+	TLOG_ASSERT(p_no_cheat_end - p_patch_start <= RTS_PATCH_LENGTH);
 	u32 cheat_count_offset = (u8 *)Cheat_count - p_patch_start;
 	*(vu32 *)(patchbuffer + cheat_count_offset) = gl_cheat_count;
 
@@ -423,6 +424,21 @@ static void Patch_RTS_Cheat(u32 *Data)
 
 	u32 copysize = p_no_cheat_end - p_patch_start;
 	copysize = copysize + gl_cheat_count * 8;
+
+	//Torii: the menu's DEBUG entry: its code goes after the cheats, only with
+	//LOGGING on and if it fits the space kept for the patch.
+	u32 debug_size = (u8 *)Debug_blob_end - (u8 *)Debug_blob_start;
+	u32 debug_at = 0;
+	if (tlog_level != TLOG_OFF && !is_NORpatch) {  // a NOR copy would keep it with logging off
+		if (copysize + debug_size <= Patch_length() && iTrimSize + copysize + debug_size <= 0x2000000) {
+			dmaCopy((void *)Debug_blob_start, patchbuffer + copysize, debug_size);
+			debug_at = copysize;
+			copysize += debug_size;
+		} else {
+			tlog("launch: no room for the in-game menu's DEBUG entry");
+		}
+	}
+	*(vu32 *)(patchbuffer + ((u8 *)Debug_switch - p_patch_start)) = debug_at;
 
 	if (iTrimSize + copysize > 0x2000000) {
 		copysize = 0x2000000 - iTrimSize;
@@ -552,12 +568,36 @@ void GBApatch_PSRAM(u32 *address, int filesize)//Only once
 	if ((gl_rts_on == 1) && (gl_cheat_on == 0) && (gl_reset_on == 0) && (gl_sleep_on == 0)) {
 		spend_address = Get_spend_address(address);
 		Patch_RTS_only(address);
+		patch_kind = "savestate keys (RTS_only)";
 	} else if ((gl_rts_on == 1) || ((gl_cheat_on == 1) && (gl_cheat_count > 0))) {
 		spend_address = Get_spend_address(address);
 		//DEBUG_printf("spend_address =%x",spend_address);
 		Patch_RTS_Cheat(address);
+		patch_kind = "in-game menu (RTS_ReplaceIRQ)";
 	} else {
 		Patch_Reset_Sleep(address);
+		patch_kind = "reset and sleep keys (Sleep_ReplaceIRQ)";
+	}
+}
+//------------------------------------------------------------------
+void Log_patches(void)
+{
+	if (!tlog_wants(TLOG_INFO))
+		return;
+	tlog("launch: in-game code: %s at ROM %08lX, game entry %08lX, stack literal %08lX",
+	     patch_kind ? patch_kind : "none", (unsigned long)iTrimSize, (unsigned long)EA_offset * 4 + 8,
+	     (unsigned long)spend_address);
+	tlog("launch: %lu patched words (offset=value):", (unsigned long)iCount2);
+	for (u32 i = 0; i < iCount2; i += 4) {
+		char words[4][20];
+		for (u32 j = 0; j < 4; j++) {
+			words[j][0] = 0;
+			if (i + j < iCount2)
+				snprintf(words[j], sizeof(words[j]), " %06lX=%08lX",
+					 (unsigned long)iPatchInfo2[i + j].iOffset * 4,
+					 (unsigned long)iPatchInfo2[i + j].iValue);
+		}
+		tlog("launch: %s%s%s%s", words[0], words[1], words[2], words[3]);
 	}
 }
 //------------------------------------------------------------------

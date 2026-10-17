@@ -65,6 +65,11 @@ extern char *gl_cart_str;
 extern char *gl_clock_str;
 extern char *gl_rumble_str;
 
+extern char *gl_logging;
+extern char **gl_log_levels;  // TLOG_OFF to TLOG_DEBUG
+extern char *gl_diagnose;
+extern char *gl_diag_run;
+
 extern char *gl_error_0;
 extern char *gl_error_1;
 extern char *gl_error_2;

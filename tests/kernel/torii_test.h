@@ -8,6 +8,9 @@
 
 extern int torii_test_failures;
 
+// Runs every test, logging a PASS or FAIL line for each; returns how many failed.
+int torii_unit_tests(void);
+
 #define CHECK(cond) \
 	do { \
 		if (!(cond)) { \

@@ -99,6 +99,7 @@
 #define assress_SD_B 22
 //23 and 24 are DS Style's reset and backup toggles
 #define assress_game_rumble 25 //games can use the cart's rumble motor
+#define assress_logging 26 //Torii: LOGGING level, source/tlog.h (0xFFFF: off)
 
 #define assress_saveMODE 64
 #define assress_max 65

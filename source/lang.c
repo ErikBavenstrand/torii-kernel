@@ -64,6 +64,11 @@ char *gl_clock_str;
 //char* gl_offRTC_powersave;
 char *gl_rumble_str;
 
+char *gl_logging;
+char **gl_log_levels;
+char *gl_diagnose;
+char *gl_diag_run;
+
 char *gl_error_0;
 char *gl_error_1;
 char *gl_error_2;
@@ -164,6 +169,11 @@ const char en_no_game_played[] = "No game played yet";
 const char en_cart[] = "     CART";
 const char en_clock[] = "CLOCK";
 const char en_rumble[] = "RUMBLE";
+
+const char en_logging[] = "  LOGGING";
+const char *en_log_levels[4] = {"OFF", "ERRORS", "INFO", "DEBUG"};
+const char en_diagnose[] = " DIAGNOSE";
+const char en_diag_run[] = "RUN TESTS AND PROBES";
 
 const char en_error_0[] = "Folder error";
 const char en_error_1[] = "File error";
@@ -267,6 +277,11 @@ void LoadEnglish(void)
 	gl_clock_str = (char *)en_clock;
 	//gl_offRTC_powersave = (char*)en_offRTC_powersave;
 	gl_rumble_str = (char *)en_rumble;
+
+	gl_logging = (char *)en_logging;
+	gl_log_levels = (char **)en_log_levels;
+	gl_diagnose = (char *)en_diagnose;
+	gl_diag_run = (char *)en_diag_run;
 
 	gl_error_0 = (char *)en_error_0;
 	gl_error_1 = (char *)en_error_1;

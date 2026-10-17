@@ -22,7 +22,7 @@ include $(DEVKITARM)/gba_rules
 #---------------------------------------------------------------------------------
 TARGET		:= $(notdir $(CURDIR))
 BUILD		:= build
-SOURCES		:= source source/ff15
+SOURCES		:= source source/ff15 tests/kernel
 INCLUDES	:= include source/ff15
 DATA		:=
 MUSIC		:=
@@ -40,6 +40,12 @@ CFLAGS	:=	-g -Wall -Os\
 CFLAGS	+=	-fstack-usage -fcallgraph-info=su
 
 CFLAGS	+=	$(INCLUDE)
+
+# The unit tests in tests/kernel are in every kernel, for Diagnostics; the
+# test kernel also runs them at boot
+ifeq ($(TARGET),ezkerneltest)
+CFLAGS	+=	-DTORII_TEST_KERNEL
+endif
 
 # Extra warnings, as errors, for our code; the vendored FatFs (source/ff15) is exempt
 WARNFLAGS	:=	-Werror -Wextra -Wshadow -Wundef -Wformat=2 -Wstrict-prototypes -Wmissing-prototypes

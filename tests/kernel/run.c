@@ -1,4 +1,5 @@
-// Runs the kernel unit tests at boot in the test kernel, in place of the
+// The kernel unit tests. Every kernel has them, for Diagnostics
+// (source/diag.c); the test kernel also runs them at boot, in place of the
 // weak, empty torii_run_tests in source/tlog.c, then stops.
 #include "torii_test.h"
 #include "tests.h"
@@ -25,9 +26,10 @@ static const struct {
 	{"recently_played", test_recently_played},
 	{"nor_info_stays_in_bounds", test_nor_info_stays_in_bounds},
 	{"nor_write_refused_when_list_full", test_nor_write_refused_when_list_full},
+	{"menu_code_fits", test_menu_code_fits},
 };
 
-void torii_run_tests(void)
+int torii_unit_tests(void)
 {
 	int failed_tests = 0;
 	unsigned count = sizeof(tests) / sizeof(*tests);
@@ -39,6 +41,14 @@ void torii_run_tests(void)
 		tlog("%s %s", failed ? "FAIL" : "PASS", tests[i].name);
 	}
 	tlog("TESTS DONE: %u passed, %d failed", count - failed_tests, failed_tests);
+	return failed_tests;
+}
+
+#ifdef TORII_TEST_KERNEL
+void torii_run_tests(void)
+{
+	torii_unit_tests();
 	for (;;)
 		;
 }
+#endif
