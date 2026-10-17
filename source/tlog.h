@@ -50,8 +50,9 @@ void tlog_sd_ready(void);
 // Writes the lines waiting in RAM to the card. Call it only where the
 // kernel's ROM is mapped and no other code is in the middle of a FatFs call.
 void tlog_flush(void);
-// Writes text to the card even with LOGGING off (crash dumps), then flushes.
-void tlog_force(const char *format, ...) __attribute__((format(printf, 1, 2)));
+// A line at level that goes to the card even with LOGGING off (crash
+// dumps); the next tlog_flush writes it.
+void tlog_force(u32 level, const char *format, ...) __attribute__((format(printf, 2, 3)));
 
 // The last line the previous session wrote to the card, read when the card
 // was mounted with logging on; NULL if there is none.

@@ -159,21 +159,21 @@ static void report_crash(void)
 	if (tlog_level == TLOG_OFF)  // with logging on, this boot's line is there already
 		tlog_marker("a crash report", 1);
 	const u32 *r = crash.regs;
-	tlog_force("crash: the kernel crashed %lu frames after boot: pc %08lX outside its code",
+	tlog_force(TLOG_ERRORS, "crash: the kernel crashed %lu frames after boot: pc %08lX outside its code",
 		   (unsigned long)crash.frames, (unsigned long)r[15]);
 	for (u32 i = 0; i < 16; i += 4)
-		tlog_force("crash: r%-2lu %08lX %08lX %08lX %08lX", (unsigned long)i, (unsigned long)r[i],
+		tlog_force(TLOG_ERRORS, "crash: r%-2lu %08lX %08lX %08lX %08lX", (unsigned long)i, (unsigned long)r[i],
 			   (unsigned long)r[i + 1], (unsigned long)r[i + 2], (unsigned long)r[i + 3]);
-	tlog_force("crash: cpsr %08lX (%s)", (unsigned long)r[16], (r[16] & 0x20) ? "thumb" : "arm");
-	tlog_force("crash: lr %08lX", (unsigned long)r[14]);
-	tlog_force("crash: pc %08lX", (unsigned long)r[15]);
+	tlog_force(TLOG_ERRORS, "crash: cpsr %08lX (%s)", (unsigned long)r[16], (r[16] & 0x20) ? "thumb" : "arm");
+	tlog_force(TLOG_ERRORS, "crash: lr %08lX", (unsigned long)r[14]);
+	tlog_force(TLOG_ERRORS, "crash: pc %08lX", (unsigned long)r[15]);
 	if (crash.stack_words > CRASH_STACK_WORDS)
 		crash.stack_words = CRASH_STACK_WORDS;
 	for (u32 i = 0; i < crash.stack_words; i++) {
 		u32 w = crash.stack[i];
 		// Words that may be return addresses into the kernel; just logs names them.
 		if ((w >= 0x08000000 && w < 0x08100000) || (w >= 0x03000000 && w < 0x03008000))
-			tlog_force("crash: stack %08lX: %08lX", (unsigned long)(crash.stack_base + 4 * i),
+			tlog_force(TLOG_ERRORS, "crash: stack %08lX: %08lX", (unsigned long)(crash.stack_base + 4 * i),
 				   (unsigned long)w);
 	}
 	if (crash.log_len > CRASH_LOG_BYTES)
@@ -181,11 +181,11 @@ static void report_crash(void)
 	// The log lines from before the crash, one at a time.
 	char *p = crash.log, *end = crash.log + crash.log_len;
 	if (p < end)
-		tlog_force("crash: the log before it:");
+		tlog_force(TLOG_ERRORS, "crash: the log before it:");
 	while (p < end) {
 		char *nl = memchr(p, '\n', end - p);
 		u32 len = nl ? (u32)(nl - p) : (u32)(end - p);
-		tlog_force("crash: | %.*s", (int)len, p);
+		tlog_force(TLOG_ERRORS, "crash: | %.*s", (int)len, p);
 		p += len + 1;
 	}
 	tlog_flush();
@@ -199,43 +199,45 @@ static void report_snapshot(void)
 	if (memcmp(s->magic, SNAPSHOT_MAGIC, 16) != 0)
 		return;
 	cart_clear_magic(CARTLOG_SNAPSHOT, 16);
-	tlog_force("debug info from the in-game menu: %.12s, code %.4s, version %u, hook at %08lX",
+	tlog_force(TLOG_INFO, "debug info from the in-game menu: %.12s, code %.4s, version %u, hook at %08lX",
 		   (const char *)s->header, (const char *)s->header + 0xC, s->header[0x1C], (unsigned long)s->irq_hook);
 	const u32 *r = s->regs;
-	tlog_force("debug info: r4-r7 %08lX %08lX %08lX %08lX", (unsigned long)r[0], (unsigned long)r[1],
+	tlog_force(TLOG_INFO, "debug info: r4-r7 %08lX %08lX %08lX %08lX", (unsigned long)r[0], (unsigned long)r[1],
 		   (unsigned long)r[2], (unsigned long)r[3]);
-	tlog_force("debug info: r8-r11 %08lX %08lX %08lX %08lX", (unsigned long)r[4], (unsigned long)r[5],
+	tlog_force(TLOG_INFO, "debug info: r8-r11 %08lX %08lX %08lX %08lX", (unsigned long)r[4], (unsigned long)r[5],
 		   (unsigned long)r[6], (unsigned long)r[7]);
-	tlog_force("debug info: r0-r3 %08lX %08lX %08lX %08lX r12 %08lX", (unsigned long)s->irq_frame[0],
+	tlog_force(TLOG_INFO, "debug info: r0-r3 %08lX %08lX %08lX %08lX r12 %08lX", (unsigned long)s->irq_frame[0],
 		   (unsigned long)s->irq_frame[1], (unsigned long)s->irq_frame[2], (unsigned long)s->irq_frame[3],
 		   (unsigned long)s->irq_frame[4]);
-	tlog_force("debug info: pc %08lX cpsr %08lX sp %08lX lr %08lX", (unsigned long)(s->irq_frame[5] - 4),
+	tlog_force(TLOG_INFO, "debug info: pc %08lX cpsr %08lX sp %08lX lr %08lX", (unsigned long)(s->irq_frame[5] - 4),
 		   (unsigned long)r[10], (unsigned long)r[12], (unsigned long)r[13]);
-	tlog_force("debug info: game IRQ handler %08lX, IRQ flags %08lX, IRQ vector %08lX (the hook is %s)",
+	tlog_force(TLOG_INFO, "debug info: game IRQ handler %08lX, IRQ flags %08lX, IRQ vector %08lX (the hook is %s)",
 		   (unsigned long)s->hook[1], (unsigned long)s->hook[2], (unsigned long)s->hook[3],
 		   (s->hook[3] == s->irq_hook) ? "in place" : "gone");
 	u16 io[8];
 	memcpy(io, s->io_irq, sizeof(io));
-	tlog_force("debug info: IE %04X IF %04X WAITCNT %04X IME %04X", io[0], io[1], io[2], io[4]);
+	tlog_force(TLOG_INFO, "debug info: IE %04X IF %04X WAITCNT %04X IME %04X", io[0], io[1], io[2], io[4]);
 	for (u32 i = 0; i < 0x60; i += 16) {
 		const u8 *b = s->io + i;
 		tlog_force(
+			TLOG_INFO,
 			"debug info: io %03lX: %02X%02X %02X%02X %02X%02X %02X%02X %02X%02X %02X%02X %02X%02X %02X%02X",
 			(unsigned long)i, b[1], b[0], b[3], b[2], b[5], b[4], b[7], b[6], b[9], b[8], b[11], b[10],
 			b[13], b[12], b[15], b[14]);
 	}
 	for (u32 i = 0; i < 0x200; i += 32) {
 		const u32 *w = (const u32 *)(s->iwram_top + i);
-		tlog_force("debug info: %08lX: %08lX %08lX %08lX %08lX %08lX %08lX %08lX %08lX",
+		tlog_force(TLOG_INFO, "debug info: %08lX: %08lX %08lX %08lX %08lX %08lX %08lX %08lX %08lX",
 			   (unsigned long)0x03007E00 + i, (unsigned long)w[0], (unsigned long)w[1], (unsigned long)w[2],
 			   (unsigned long)w[3], (unsigned long)w[4], (unsigned long)w[5], (unsigned long)w[6],
 			   (unsigned long)w[7]);
 	}
 	for (u32 i = 0; i < 0x100; i += 32) {
 		const u32 *w = (const u32 *)(s->stack + i);
-		tlog_force("debug info: sp+%03lX: %08lX %08lX %08lX %08lX %08lX %08lX %08lX %08lX", (unsigned long)i,
-			   (unsigned long)w[0], (unsigned long)w[1], (unsigned long)w[2], (unsigned long)w[3],
-			   (unsigned long)w[4], (unsigned long)w[5], (unsigned long)w[6], (unsigned long)w[7]);
+		tlog_force(TLOG_INFO, "debug info: sp+%03lX: %08lX %08lX %08lX %08lX %08lX %08lX %08lX %08lX",
+			   (unsigned long)i, (unsigned long)w[0], (unsigned long)w[1], (unsigned long)w[2],
+			   (unsigned long)w[3], (unsigned long)w[4], (unsigned long)w[5], (unsigned long)w[6],
+			   (unsigned long)w[7]);
 	}
 	tlog_flush();
 }

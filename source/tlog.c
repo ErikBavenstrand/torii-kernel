@@ -59,7 +59,8 @@ void tlog_marker(const char *why, int force)
 	// so it goes to the card at any level but off.
 	u8 level = tlog_level;
 	if (force) {
-		tlog_force(MARKER, why, tlog_level_name(level), (unsigned long)main, (unsigned long)&__rom_end__);
+		tlog_force(TLOG_INFO, MARKER, why, tlog_level_name(level), (unsigned long)main,
+			   (unsigned long)&__rom_end__);
 		return;
 	}
 	if (tlog_level != TLOG_OFF)
@@ -395,16 +396,16 @@ void tlog_flush(void)
 	force_pending = 0;
 }
 
-void tlog_force(const char *format, ...)
+void tlog_force(u32 level, const char *format, ...)
 {
 	va_list args;
-	u8 level = tlog_level;
-	if (tlog_level < TLOG_ERRORS)
-		tlog_level = TLOG_ERRORS;
+	u8 kept = tlog_level;
+	if (tlog_level < level)
+		tlog_level = level;
 	va_start(args, format);
-	tlog_send(TLOG_ERRORS, format, args);
+	tlog_send(level, format, args);
 	va_end(args);
-	tlog_level = level;
+	tlog_level = kept;
 	force_pending = 1;
 }
 
