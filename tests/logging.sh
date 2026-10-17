@@ -156,11 +156,23 @@ crash)
   new_card 65536 32
   boot -f 100 # makes the cart's files
   fram=$(sram 0 0x20000 | md5sum)
-  # Diagnostics from L+R+SELECT at power-on. When its questions come, START
+  # A game in NOR, listed in the kernel NOR's table: Diagnostics reads the
+  # game NOR's ID, and a chip left in ID mode used to empty this list.
+  dd if=tests/roms/hello/hello.gba of="$cart/game-nor.bin" conv=notrunc status=none
+  python3 - "$cart/kernel-nor.bin" <<'EOF'
+import struct, sys
+rom = open("tests/roms/hello/hello.gba", "rb").read()
+entry = b"Hello.gba".ljust(100, b"\0") + struct.pack("<HHHHIBBH", 0, 0, 0, 0, len(rom), 0x11, 0, 0) + rom[0xA0:0xB0]
+nor = bytearray(open(sys.argv[1], "rb").read())
+nor[0x7A0000 : 0x7A0000 + 132 * 64] = entry + bytes(132 * 63)
+open(sys.argv[1], "wb").write(nor)
+EOF
+  nor_list=$(od -A n -t x1 -j $((0x7A0000)) -N 132 "$cart/kernel-nor.bin" | tr -d ' \n')
+  # Diagnostics from L+R+SELECT at power-on, A to start. When its questions come, START
   # skips them; at the summary, SELECT crashes the kernel on purpose.
   presses=$(for f in $(seq 2000 24 4400); do printf -- '-k %d:START -k %d:- -k %d:SELECT -k %d:- ' "$f" $((f + 4)) $((f + 12)) $((f + 16)); done)
   # shellcheck disable=SC2086
-  boot -k 1:L+R+SELECT -k 60:- $presses -f 5200
+  boot -k 1:L+R+SELECT -k 60:- -k 120:A -k 124:- $presses -f 5200
   has "diag: Diagnostics started"
   has "diag: unit tests: pass"
   has "diag: PSRAM holds a pattern: pass"
@@ -174,13 +186,15 @@ crash)
   has "crash: | "
   grep -q '^kernel error: crash: ' "$cart/kernel.log" || fail "the crash dump wasn't logged as an error"
   [ "$(sram 0 0x20000 | md5sum)" = "$fram" ] || fail "Diagnostics changed the save chip"
+  [ "$(od -A n -t x1 -j $((0x7A0000)) -N 132 "$cart/kernel-nor.bin" | tr -d ' \n')" = "$nor_list" ] ||
+    fail "Diagnostics' restart emptied the NOR game list"
   mkdir -p "$cart/card/torii/logs"
   mcopy -n -i "$cart/sd.img" ::/torii/logs/* "$cart/card/torii/logs/"
   python3 tools/logs.py "$cart/card" dist/ezkernelnew.sym "$cart/logs" >/dev/null
   grep -q 'crash: lr .* (Diagnostics+0x' "$cart/logs/torii.log" || fail "tools/logs.py didn't name the crash's lr: $(grep 'crash: lr' "$cart/logs/torii.log")"
   card_ok
   lines_ok
-  echo "PASS: Diagnostics logs with logging off and leaves the save chip alone; its crash test's dump reaches the log"
+  echo "PASS: Diagnostics logs with logging off and leaves the save chip and NOR list alone; its crash test's dump reaches the log"
   ;;
 
 rotate)

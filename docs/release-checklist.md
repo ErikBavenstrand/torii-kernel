@@ -53,7 +53,7 @@ Diagnostics runs these by itself and logs each result:
 - EEPROM 512 or 8K: reads one block of the save chip through the FPGA's
   EEPROM with 6-bit and 14-bit addresses at save types 0x21 and 0x22,
   and compares each reply with the chip's bytes. It needs a save in the
-  chip's first 512 bytes: play an EEPROM game and save first.
+  chip's first 128 bytes: play an EEPROM game and save first.
 
 Then it asks you (A yes, B no, SELECT skip; START at the first question
 skips them all):
@@ -69,8 +69,9 @@ skips them all):
 - **The clock:** shows the right date and time.
 - The "since the last run" checks from the table above.
 
-At the end, A restarts the kernel. SELECT crashes it on purpose first, to
-check the crash dump: the next boot must log `crash: the kernel crashed`
+Diagnostics first asks whether to start (B goes back, restarting the
+kernel). At the end, A restarts the kernel; SELECT crashes it on purpose
+first, to check the crash dump: the next boot must log `crash: the kernel crashed`
 with the registers and the log lines before it. Switch the console off
 and on once after that too, and see whether a second crash test's dump
 survives a power cycle (it lives in cart RAM; on the emulator it always
