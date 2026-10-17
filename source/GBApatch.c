@@ -1015,12 +1015,32 @@ u32 use_internal_engine(u8 gamecode[], TCHAR* gamefilename)
 	return 1;
 }
 //------------------------------------------------------------------
+//Torii: patches the ROM word at a word offset in the first 8 MB only if it
+//holds the expected value, so other revisions of the game are left alone.
+//The ROM is in PSRAM by now on an SD launch; on a NOR launch it isn't, and
+//nothing is patched.
+static void Add2_if(u32 offset, u32 expected, u32 value)
+{
+	SetPSRampage(0);
+	if(((vu32*)PSRAMBase_S98)[offset] == expected)
+		Add2(offset, value);
+}
+//------------------------------------------------------------------
 void Patch_SpecialROM_sleepmode(void)
 {
 	g_Offset = 0;
 	//
 	switch(*(u32*)GAMECODE)
 	{
+	//Torii: games that fill all of IWRAM after the hook is in, over the hook
+	//at 0x3007FFC, and then crash at their first interrupt. Their fill now
+	//stops at 0x3007FF0.
+	case 0x50544742://Grand Theft Auto Advance(EU): DMA3 fill from 0x3000000
+		Add2_if(0x584/4, 0x85002000, 0x85001FFC);
+		break;
+	case 0x50554C41://Super Monkey Ball Jr.(EU): DMA3 fill from 0x3007600
+		Add2_if(0x36070/4, 0x85000280, 0x8500027C);
+		break;
 	case 0x4A4E4941://0414 - Initial D - Another Stage(JP)
 		Add2(0x11C/4, 0xE241100C);//sub r1,r1,0xC
 		break;
