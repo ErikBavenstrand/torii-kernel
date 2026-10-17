@@ -507,37 +507,47 @@ def check_menu(result: Result, rom: Path, sd_name: str, table: dict) -> None:
     before = [
         (f, v) for f, v in vectors if f >= start[0] and (key_at is None or f <= key_at)
     ]
-    own = [(f, v) for f, v in before if not base <= v < base + PATCH_SIZE]
-    hooked = any(base <= v < base + PATCH_SIZE for _, v in before)
+    # The first value is what the kernel left; the hook goes in after that,
+    # and only a change after the hook counts as the game's.
+    hooked_at = [f for f, v in before if base <= v < base + PATCH_SIZE]
+    own = [
+        (f, v)
+        for f, v in before
+        if hooked_at and f > hooked_at[0] and not base <= v < base + PATCH_SIZE
+    ]
     vblank = first("vblank ")
     if vblank:
         on, total = (int(w) for w in vblank[1].split()[1::2])
         result.metrics["VBlank IRQ"] = f"on {on} of {total} frames"
-    if own and (
-        not hooked
-        or own[-1][0] > max(f for f, v in before if base <= v < base + PATCH_SIZE)
-    ):
+    if not hooked_at:
+        stayed = before[-1][1] if before else 0
+        result.metrics["IRQ vector"] = f"never hooked, {stayed:08X}"
+        unhooked = f"the hook was never seen at 0x3007FFC: it held {stayed:08X} from the game's first frame (the entry code failed, or the game overwrote it at once)"
+    elif own and own[-1][0] > hooked_at[-1]:
         result.metrics["IRQ vector"] = f"the game's own, {own[-1][1]:08X}"
+        unhooked = f"the game overwrote the hook at 0x3007FFC with {own[-1][1]:08X}, {own[-1][0] - start[0]} frames in"
     else:
-        result.metrics["IRQ vector"] = "hooked" if hooked else "never set"
+        result.metrics["IRQ vector"] = "hooked"
+        unhooked = ""
     opened = next((f for f, t in events if t == "menu open"), None)
     closed = next(
         (f for f, t in events if t == "menu closed" and opened and f > opened), None
     )
     if crash and (key_at is None or int(crash[0].split()[3].rstrip(":")) < key_at):
         why = f"crashed before the menu key: {crash[0]}"
-        if result.metrics["IRQ vector"].startswith("the game's own"):
-            why = f"the game overwrote the hook at 0x3007FFC with {own[-1][1]:08X}, then {why}"
-        result.set("in-game menu", "fail", why)
+        result.set(
+            "in-game menu", "fail", f"{unhooked}, then {why}" if unhooked else why
+        )
         return
     if opened is None:
-        if result.metrics["IRQ vector"].startswith("the game's own"):
-            why = f"the game overwrote the hook at 0x3007FFC with {own[-1][1]:08X}, {own[-1][0] - start[0]} frames in"
-            why += f"; {note}" if note else ""
+        if unhooked:
+            why = unhooked + (f"; {note}" if note else "")
+        elif crash:
+            why = f"crashed after the menu key: {crash[0]}"
+        elif key_at is None or "hook watch done" not in trace:
+            why = "the run ended before the menu was tried (the game started late)"
         elif vblank and vblank[1].startswith("vblank 0 "):
             why = "the game never enabled the VBlank IRQ"
-        elif crash:
-            why = crash[0]
         else:
             why = "the menu did not open"
         result.set("in-game menu", "fail", why)

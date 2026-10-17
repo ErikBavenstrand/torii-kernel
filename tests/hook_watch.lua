@@ -18,8 +18,10 @@
 -- with `-u 'hook watch done'`). Other lines it logs (stderr, as
 -- "script: hook FRAME ..."):
 --
---   game ENTRY               the game started; ENTRY is its first ROM word
---   patch START              the patch area the entry branch points to
+--   game ENTRY               the game started (the ROM header changed);
+--                            ENTRY is its first ROM word
+--   patch START              the entry branches to the kernel's entry code
+--                            (it starts MOV R0,#0x4000000; ADR R1,hook)
 --   vector XXXXXXXX          0x3007FFC changed (the IRQ handler in use)
 --   chained XXXXXXXX         0x3007FF4 changed (the game's own handler)
 --   key KEYS                 the script pressed KEYS (- releases)
@@ -27,7 +29,7 @@
 --                            enabled (IME, IE bit 0, DISPSTAT bit 3), from
 --                            the game's start to the menu key
 --   menu open | closed       the menu is on screen: mode 3 with BG2 only,
---                            the CPU inside the patch area
+--                            the CPU in the menu's code
 
 local GAME_RUN = 600  -- frames of game before the menu key
 local MENU_WAIT = 60  -- frames the menu gets to open before B
@@ -37,7 +39,7 @@ local PATCH_SIZE = 0x2000  -- the largest patch area (cheats)
 local KEYS = { A = 0x001, B = 0x002, START = 0x008, DOWN = 0x080, R = 0x100, L = 0x200 }
 local MENU_KEY = KEYS.L | KEYS.R | KEYS.START
 
-local kernelEntry = nil
+local kernelHeader = nil
 local gameStart = nil
 local patchStart = nil
 local last = {}
@@ -61,8 +63,10 @@ local function press(mask, name)
 	log("key " .. name)
 end
 
-local function inPatch(address)
-	return patchStart and address >= patchStart and address < patchStart + PATCH_SIZE
+-- The menu's code, past the entry code and the hook's own key checks
+-- (ingamemenu_now is 0x3B0 bytes in).
+local function inMenuCode(address)
+	return patchStart and address >= patchStart + 0x100 and address < patchStart + PATCH_SIZE
 end
 
 -- Key presses relative to the game's start: {frame, mask, name}.
@@ -85,20 +89,25 @@ end
 
 callbacks:add("frame", function()
 	local frame = emu:currentFrame()
-	local entry = emu:read32(0x08000000)
-	kernelEntry = kernelEntry or entry
+	-- First word, title, code and header checksum: the kernel's until the
+	-- game is mapped in. (No one of them will do: many games share the
+	-- kernel's entry branch, and homebrew may have a blank title and code.)
+	local header = string.format("%08X%08X%08X%08X%08X", emu:read32(0x08000000), emu:read32(0x080000A0),
+		emu:read32(0x080000A8), emu:read32(0x080000AC), emu:read32(0x080000BC))
+	kernelHeader = kernelHeader or header
 	if not gameStart then
-		if entry == kernelEntry then
+		if header == kernelHeader then
 			return
 		end
 		gameStart = frame
+		local entry = emu:read32(0x08000000)
 		log(string.format("game %08X", entry))
-		-- A hooked game starts with a branch to the patch area at the end of
-		-- the ROM; a game's own entry branch skips only its header (to about
-		-- 0x080000C0). With no
-		-- literal to patch, the kernel leaves the entry alone.
+		-- A hooked game's first instruction branches to the kernel's entry
+		-- code after the ROM. With nothing to patch, the kernel leaves the
+		-- game's own entry branch alone.
 		local target = 0x08000000 + 8 + ((entry & 0xFFFFFF) << 2)
-		if entry >> 24 == 0xEA and target >= 0x08000200 then
+		if entry >> 24 == 0xEA and emu:read32(target) == 0xE3A00301
+				and emu:read32(target + 4) & 0xFFFFF000 == 0xE28F1000 then
 			patchStart = target
 			log(string.format("patch %08X", patchStart))
 		end
@@ -121,7 +130,7 @@ callbacks:add("frame", function()
 		log(string.format("vblank %d of %d", vblank, frames))
 	end
 
-	local menu = emu:read16(0x04000000) == 0x0403 and inPatch(emu:readRegister("pc"))
+	local menu = emu:read16(0x04000000) == 0x0403 and inMenuCode(emu:readRegister("pc"))
 	if frame >= menuKeyFrame then
 		report("menu", menu and "open" or "closed")
 	end

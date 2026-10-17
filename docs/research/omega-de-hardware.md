@@ -209,13 +209,14 @@ at page `0x09C00000` × 4 KB:
 | Pages | Memory | Used for |
 |---|---|---|
 | `0x00`, `0x10` | FM28V100 FRAM, 128 KB | game saves |
-| `0x20`, `0x30` | S71GL064 SRAM (1 MB in all) | the in-game menu's copy of VRAM (`0x10000` + `0x2C00` bytes) |
-| `0x40`–`0xA0` | S71GL064 SRAM | the save-state buffer: the 0x70000-byte `RTS/<game>.rts` is loaded here at launch. VRAM, IWRAM, EWRAM, OAM, palette, IO, registers, and a flag at `0xAFFF0` |
+| `0x20`, `0x30` | S71GL064 SRAM (1 MB; its first 128 KB are unused behind the FRAM) | the in-game menu's copy of VRAM (`0x10000` + `0x2C00` bytes) |
+| `0x40`–`0xAF` | S71GL064 SRAM | the save-state buffer: the 0x70000-byte `RTS/<game>.rts` is loaded here at launch. VRAM, IWRAM, EWRAM, OAM, palette, IO, registers, and a flag at `0xAFFF0` |
 
 The page applies in game mode too: the menu sets `0x20` to keep the screen
-and `0x40`+ for states, then goes back to `0x00`. That works whatever save
-chip the game has, so pages from `0x20` up are plain RAM even while the FPGA
-emulates flash or EEPROM on the save pages. The emulated cart models this
+and `0x40`+ for states, then goes back to `0x00`. The menu does this
+whatever the game's save chip, so we take pages from `0x20` up to be plain
+RAM even while the FPGA presents a flash chip on the save pages (inferred
+from the kernel; the PDF doesn't say). The emulated cart models this
 with one 1 MB `sram.bin` (before 2026-10-17 it had 512 KB, so the state
 buffer wrapped onto the game's save). `tests/menu.sh` checks it.
 

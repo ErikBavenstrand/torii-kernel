@@ -12,10 +12,10 @@ index 59ca1c1..1dd19c0 100644
  	EXTDATA_MAX
 diff --git a/include/mgba/internal/gba/cart/omega.h b/include/mgba/internal/gba/cart/omega.h
 new file mode 100644
-index 0000000..1dc0889
+index 0000000..43a7b11
 --- /dev/null
 +++ b/include/mgba/internal/gba/cart/omega.h
-@@ -0,0 +1,128 @@
+@@ -0,0 +1,129 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -42,9 +42,10 @@ index 0000000..1dc0889
 +#define OMEGA_PSRAM_SIZE 0x02000000
 +// Save memory and work RAM at 0x0E000000, in 4 KB pages chosen with
 +// 0x09C00000: pages 0x00-0x1F are the 128 KB FRAM that holds game saves,
-+// pages 0x20-0xFF the S71GL064's 1 MB SRAM, where the in-game menu keeps
-+// its screen backup (0x20-0x3F) and the save-state buffer (0x40-0xAF).
-+// One backing file holds both, by page number.
++// pages 0x20-0xFF the rest of the S71GL064's 1 MB SRAM (its first 128 KB
++// sit unused behind the FRAM), where the in-game menu keeps its screen
++// backup (0x20-0x3F) and the save-state buffer (0x40-0xAF). One backing
++// file holds both, by page number.
 +#define OMEGA_SRAM_SIZE 0x00100000
 +#define OMEGA_SAVE_PAGES 0x20
 +#define OMEGA_PORT_SIZE 0x1000
@@ -260,10 +261,10 @@ index 1d0c0dd..b6abc91 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..46f35ad
+index 0000000..f2311b3
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,904 @@
+@@ -0,0 +1,908 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -721,6 +722,10 @@ index 0000000..46f35ad
 +	}
 +	if (!_isKernelMode(omega) && !omega->gameSaveActive) {
 +		_startGameSave(gba);
++	} else if (_isKernelMode(omega) && omega->gameSaveActive) {
++		// Back in the kernel without a power cycle (the in-game menu's reset):
++		// the save chip's contents go back into the cart SRAM.
++		_stopGameSave(gba);
 +	}
 +	// Refresh instruction fetch in case the CPU is running from the cart.
 +	memory->activeRegion = -1;
@@ -891,7 +896,7 @@ index 0000000..46f35ad
 +
 +// --- Save states -------------------------------------------------------------
 +
-+#define OMEGA_STATE_MAGIC 0x31474D4F  // "OMG1"
++#define OMEGA_STATE_MAGIC 0x32474D4F  // "OMG2": 1 MB of SRAM
 +
 +struct GBAOmegaNorSnapshot {
 +	uint32_t state;

@@ -53,8 +53,11 @@ it checks the hook from outside the kernel:
   handler);
 - how many frames had the VBlank IRQ fully enabled (IME, IE bit 0, DISPSTAT
   bit 3);
-- whether the menu is on screen: mode 3 with BG2 only, and the CPU inside
-  the patch area.
+- whether the menu is on screen: mode 3 with BG2 only, and the CPU in the
+  menu's code.
+- that the patch area starts with the kernel's entry code, so a game whose
+  own entry was left alone isn't counted as hooked. The game's start is
+  when the ROM header changes; many games share the kernel's first word.
 
 The script presses START and A to get past title screens. 600 frames into
 the game it holds L+R+START, then B a second later, then DOWN, A, START and A.
@@ -76,14 +79,14 @@ one homebrew ROM.
 
 | Game | What happens | Cause |
 |---|---|---|
-| Pokémon FireRed (BPRE rev 1), WaterBlue (FireRed hack) | crash before the menu key | table offsets are for rev 0. The kernel writes `0x3007FF4` over 2 code words and misses 2 of the 3 real stores. |
+| Pokémon FireRed (BPRE rev 1), WaterBlue (FireRed hack) | crash before the menu key | table offsets are for rev 0. The kernel writes `0x3007FF4` over 2 unrelated words (a pointer and a code word) and misses 2 of the 3 real literals. |
 | Pokémon LeafGreen (BPGE rev 1, two dumps) | crash before the menu key | same: offsets `0x1BB`, `0x1C0C8E` are rev 0's |
 | Crash Bandicoot Purple (BD4E rev 1) | crash before the menu key | all 3 table offsets miss this revision |
 | SimCity 2000 (A5CP rev 1) | no menu; the game sets its own handler 1 frame in | 1 of 2 table offsets misses; the real store stays |
-| Grand Theft Auto Advance (BGTP) | crash at the first IRQ (`0xEFEFEFEF`) | the table is right, but the game fills IWRAM with `0xEF` after the hook is in, and its handler now goes to `0x3007FF4` |
+| Grand Theft Auto Advance (BGTP) | crash at the first IRQ (`0xEFEFEFEF`) | both table offsets hold the literal (4 more matching words weren't checked). The game fills IWRAM with `0xEF` after the hook is in, and its handler now goes to `0x3007FF4` |
 | Super Monkey Ball Jr. (ALUP) | crash at the first IRQ (`0xD5BEADDE`) | same: the game fills IWRAM over the hook |
 | Lara Croft Tomb Raider: Legend (BL8P) | no menu; the game sets its own handler (`03000F00`) 1 frame in | the one table entry matches, but the game also writes the vector another way |
-| RTC Checker (homebrew, no game code) | no menu | never enables the VBlank IRQ. Also, its blank code matches the table's all-zero entry ("GBADev 2004Mbit Competition"), so the kernel patches 10 arbitrary words |
+| RTC Checker (homebrew, no game code) | no menu | never enables the VBlank IRQ. Also, its blank code matches the table's all-zero entry ("GBADev 2004Mbit Competition"). Its 10 offsets lie past this small ROM, but the entry branch is written anyway; a larger homebrew ROM would get 10 stray writes |
 | Crash Nitro Kart (BCNP) | crashes 18 frames after the menu closes | not investigated |
 | LEGO Star Wars II (BL7P) | after the menu, a black screen that ignores keys | not investigated |
 
@@ -110,7 +113,8 @@ Other things seen:
    entry only if every offset holds `0x3007FFC` or `0x3FFFFFC`, and
    otherwise use the scan. Skip the table for blank or non-alphanumeric game
    codes. This fixes FireRed, LeafGreen, WaterBlue, Crash Purple and SimCity
-   2000 rev 1, and stops the stray writes into SMA4 rev 1 and homebrew.
+   2000 rev 1, and stops the stray writes into SMA4 rev 1 and zero-code
+   homebrew.
 2. **Games that clear IWRAM** (GTA Advance, Super Monkey Ball Jr.) need the
    hook to come back after the clear. One option is to install it when the
    game first enables IRQs instead of at entry. Another is a per-game patch
