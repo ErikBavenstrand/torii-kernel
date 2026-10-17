@@ -35,6 +35,25 @@ void Trim(char s[])
 	}
 }
 //------------------------------------------------------------------
+char *Read_line(char *line, int len, FIL *fp)
+{
+	int n = 0;
+	UINT got;
+	char c;
+
+	while (n < len - 1) {
+		if (f_read(fp, &c, 1, &got) != FR_OK || got != 1)
+			break;
+		line[n++] = c;
+		if (c == '\n')
+			break;
+	}
+	if (n == 0)
+		return NULL;
+	line[n] = 0;
+	return line;
+}
+//------------------------------------------------------------------
 static void Get_KEY_val(FIL *file, char *KEY_section, char *KEY_secval, char getbuff[])
 {
 	(void)file;
@@ -46,7 +65,7 @@ static void Get_KEY_val(FIL *file, char *KEY_section, char *KEY_secval, char get
 	char section[MAX_KEY_LEN] = {0};
 
 	f_lseek(&gfile, 0x0);
-	while (f_gets(buf, MAX_KEY_LEN, &gfile) != NULL) {
+	while (Read_line(buf, MAX_KEY_LEN, &gfile) != NULL) {
 		Trim(buf);
 		// to skip text comment with flags /* ...*/
 		if (buf[0] != '#' && (buf[0] != '/' || buf[1] != '/')) {
@@ -148,7 +167,7 @@ static u32 Get_CHT_val(FIL *file, char *KEY_section, char *KEY_secval /*,char ge
 	char section[MAX_KEY_LEN] = {0};
 
 	f_lseek(&gfile, 0x0);
-	while (f_gets(buf, MAX_BUF_LEN, &gfile) != NULL) {
+	while (Read_line(buf, MAX_BUF_LEN, &gfile) != NULL) {
 		Trim(buf);
 		// to skip text comment with flags /* ...*/
 		if (buf[0] != '#' && (buf[0] != '/' || buf[1] != '/')) {
@@ -229,7 +248,7 @@ static u32 Get_CHT_val(FIL *file, char *KEY_section, char *KEY_secval /*,char ge
 		if (strcmp(KEY_section, section) == 0) {
 			if (strcmp(KEY_secval, _paramk) == 0) {
 				//0111 Multi-line
-				while (f_gets(buf, MAX_BUF_LEN, &gfile) != NULL) {
+				while (Read_line(buf, MAX_BUF_LEN, &gfile) != NULL) {
 					Trim(buf);
 					// to skip text comment with flags /* ...*/
 					if (buf[0] != '#' && (buf[0] != '/' || buf[1] != '/')) {
@@ -289,7 +308,7 @@ static u32 Get_all_Section_val(FIL *file)
 
 	//fseek(file,0x0,SEEK_SET);
 	f_lseek(&gfile, 0x0);
-	while (f_gets(line_buf, MAX_sectionVAL_LEN, &gfile) != NULL) {
+	while (Read_line(line_buf, MAX_sectionVAL_LEN, &gfile) != NULL) {
 		memset(tmpCHTFS.LINEname, 0x00, MAX_KEY_LEN);
 		Trim(line_buf);
 		// to skip text comment with flags /* ...*/

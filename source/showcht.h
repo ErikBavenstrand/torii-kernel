@@ -22,3 +22,7 @@ u32 Check_cht_file(TCHAR *gamefilename);
 u32 Check_cheat_file(TCHAR *gamefilename);
 void Open_cht_file(TCHAR *gamefilename, u32 havecht);
 void Trim(char s[]);
+// Reads a line into line like f_gets, at most len - 1 bytes with its \n, but
+// byte for byte: FatFs's f_gets decodes UTF-8 and drops other bytes, which
+// broke cheat files in Latin-1 or GBK
+char *Read_line(char *line, int len, FIL *fp);

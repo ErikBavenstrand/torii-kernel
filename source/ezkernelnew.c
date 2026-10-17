@@ -682,7 +682,7 @@ static u32 get_count(void)
 	{
 		f_lseek(&gfile, 0x0);
 		memset(buf, 0x00, 512);
-		while (f_gets(buf, 512, &gfile) != NULL) {
+		while (Read_line(buf, 512, &gfile) != NULL) {
 			//DrawHZText12(buf, 32, 1+16, showy, name_color,1);
 			Trim(buf);
 			if (buf[0] != '/')

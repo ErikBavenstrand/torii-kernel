@@ -21,6 +21,7 @@ jobs=(
   "tests/stale_recent.sh"
   "tests/fragmented.sh"
   "tests/listing.sh"
+  "tests/cheats.sh"
 )
 
 logs=$(mktemp -d)
