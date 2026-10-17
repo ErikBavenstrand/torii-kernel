@@ -18,6 +18,8 @@ old size and timestamp, and a file git replaced can read as its old content.
 For files under PATH changed in the last two seconds, this waits (at most
 about a second) until a container sees the same size and timestamp. Build outputs
 (.o, .gba, ...) are skipped unless --all is given, e.g. for folders of games.
+The containers that look run the toolchain image the justfile exports as
+FRESH_IMAGE, which every build needs anyway.
 
 stamp: make only compares source timestamps, so a changed Makefile or
 toolchain leaves old objects behind. This hashes KEY and the FILEs and, if
@@ -47,7 +49,6 @@ from pathlib import Path
 
 RECENT = 2.0  # seconds; virtiofs caches attributes for about one
 TIMEOUT = 5.0
-IMAGE = "torii-emu"
 # Written by the builds in containers, so containers see them as written.
 OUTPUTS = {".o", ".d", ".a", ".elf", ".gba", ".nm", ".sym", ".map", ".png"}
 
@@ -73,11 +74,13 @@ def container_view(files: list[str]) -> dict[str, tuple[str, int]]:
             "docker",
             "run",
             "--rm",
+            "--platform",
+            "linux/amd64",
             "-v",
             f"{os.getcwd()}:/src",
             "-w",
             "/src",
-            IMAGE,
+            os.environ["FRESH_IMAGE"],
             "stat",
             "-c",
             "%.9Y %s %n",

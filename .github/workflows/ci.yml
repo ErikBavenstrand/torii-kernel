@@ -1,7 +1,10 @@
 # Checks every push to main and every pull request: lint, build the kernel
 # (kept as a download), run the host tests and the homebrew tests on the
 # emulated cart, and run the advisory static analysis. Each
-# job runs the same `just` recipe as on a developer's machine. Actions are
+# job runs the same `just` recipe as on a developer's machine. The images
+# and the emulator build are cached (.github/actions/image and the test job);
+# tools/fresh.py's records come with them, so `just` rebuilds whatever doesn't
+# match its inputs, as it does locally. Actions are
 # pinned to commits, and just and uv to versions. Games you own
 # (`just compat`) stay local: their ROMs are never in the repository.
 name: CI
@@ -66,6 +69,32 @@ jobs:
       - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
         with:
           just-version: 1.58.0
+      - uses: ./.github/actions/image
+        with:
+          image: torii-emu
+          dockerfile: docker/emu.Dockerfile
+          record: emu-image
+          recipe: emu-image
+      # The emulator build is cached under a hash of what `just emu-headless`
+      # reads (emu_inputs in the justfile), so mGBA must be fetched first.
+      - name: Fetch mGBA
+        run: emu/fetch.sh
+      - id: emu
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            emu/build-linux
+            dist/.fresh/emu-headless
+          key: emu-build-${{ runner.arch }}-${{ hashFiles('emu/mgba/src/**', 'emu/mgba/include/**', 'emu/mgba/CMakeLists.txt', 'emu/mgba/cmake/**', 'emu/mgba-shot.c', 'emu/build.sh', 'docker/emu.Dockerfile') }}
+      - name: Build the emulator
+        run: just emu-headless
+      - if: steps.emu.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            emu/build-linux
+            dist/.fresh/emu-headless
+          key: ${{ steps.emu.outputs.cache-primary-key }}
       - name: Run kernel unit tests and homebrew game tests
         run: just test
       - name: Upload screenshots
@@ -92,5 +121,11 @@ jobs:
         with:
           version: 0.12.23
           cache-dependency-glob: justfile
+      - uses: ./.github/actions/image
+        with:
+          image: torii-analyze
+          dockerfile: docker/analyze.Dockerfile
+          record: analyze-image
+          recipe: _analyze-image
       - name: Run cppcheck, clang-tidy and GCC's -fanalyzer against the baseline
         run: just analyze
