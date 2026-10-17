@@ -41,9 +41,19 @@ Still open from the bug work:
   debug mode before any mass change. A game moved from 8K to 512 keeps its old 8 KB `.sav`,
   and the kernel then loads only its first 512 bytes. Check on the real cart whether 8K-mode
   data sits in those bytes, and settle what happens to existing saves (see v0.5).
-- **Hook coverage:** use `just compat` to find games the in-game menu and cheat hook miss.
-  That happens when the literal-pool scan misses `0x3007FFC`, or when a game never enables
-  the VBlank IRQ.
+- **Hook coverage:** `just compat` now has an in-game menu column (`tests/hook_watch.lua`;
+  results in `docs/research/hook-coverage.md`). 12 of 119 GBA games fail it:
+  - `reset_table.h` is keyed by game code only, with offsets for revision 0, so later
+    revisions (FireRed and LeafGreen rev 1, SimCity 2000 rev 1, and others) get the wrong
+    words patched.
+  - GTA Advance and Super Monkey Ball Jr. fill IWRAM over the hook.
+  - Lara Croft: Legend sets its interrupt handler a second way.
+  - Crash Nitro Kart and LEGO Star Wars II break after the menu.
+
+  The fixes are being made before the source cleanup's reformat: verify the table offsets
+  and fall back to the ROM scan, re-install the hook after IWRAM is cleared, fix
+  `ingamemenu_now`'s IME write (it hits `0x040000D0`), range-check the hotkey settings
+  slots, and restore the brightness and rotation registers after the menu.
 - **Clean boot:** IWRAM is still not fully cleared at launch, because the `SoftReset_now`
   code stays there. No game is known to need it. Clean-boot tests use `tests/roms/idle`
   (no crt0), since devkitARM's crt0 clears EWRAM itself.
