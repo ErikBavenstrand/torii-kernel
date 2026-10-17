@@ -13,7 +13,8 @@ static int find(const u32 *table, u32 words, const char *code, const u32 **offse
 {
 	u32 *copy = malloc(words * 4 + 1);
 	memcpy(copy, table, words * 4);
-	int count = Find_irq_table_entry(copy, words, (const u8 *)code, offsets);
+	u32 pos = 0;
+	int count = Find_irq_table_entry(copy, words, (const u8 *)code, &pos, offsets);
 	if (count > 0)
 		*offsets = &table[*offsets - copy];  // point into the caller's table
 	free(copy);
@@ -44,7 +45,22 @@ void test_irq_table_rejects_blank_codes(void)
 	// The table has an all-zero entry, which homebrew with no code matched.
 	CHECK_EQ(find(table, words, "\0\0\0\0", &offsets), -1);
 	CHECK_EQ(find(table, words, "    ", &offsets), -1);
-	CHECK_EQ(find(table, words, "bpre", &offsets), -1);
+	CHECK_EQ(find(table, words, "bpre", &offsets), -1);  // not listed
+	CHECK_EQ(find(table, words, "tvap", &offsets), 0);   // TV Tuner PAL (CN), a lowercase code
+}
+
+void test_irq_table_next_entry(void)
+{
+	// A code listed twice, for two revisions: each call finds the next one.
+	static const u32 table[] = {0x41414141, 1, 0x10, 0x42424242, 0, 0x41414141, 2, 0x20, 0x24};
+	const u32 *offsets;
+	u32 pos = 0;
+
+	CHECK_EQ(Find_irq_table_entry(table, 9, (const u8 *)"AAAA", &pos, &offsets), 1);
+	CHECK_EQ(offsets[0], 0x10);
+	CHECK_EQ(Find_irq_table_entry(table, 9, (const u8 *)"AAAA", &pos, &offsets), 2);
+	CHECK_EQ(offsets[1], 0x24);
+	CHECK_EQ(Find_irq_table_entry(table, 9, (const u8 *)"AAAA", &pos, &offsets), -1);
 }
 
 void test_irq_table_bounds(void)

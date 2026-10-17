@@ -7,13 +7,13 @@ int Is_irq_literal(u32 word)
 
 static int is_code_char(u8 c)
 {
-	return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z');
+	return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
 }
 
-int Find_irq_table_entry(const u32 *table, u32 words, const u8 code[4], const u32 **offsets)
+int Find_irq_table_entry(const u32 *table, u32 words, const u8 code[4], u32 *pos, const u32 **offsets)
 {
 	u32 want = code[0] | (code[1] << 8) | (code[2] << 16) | ((u32)code[3] << 24);
-	u32 i = 0;
+	u32 i = *pos;
 
 	for (int c = 0; c < 4; c++)
 		if (!is_code_char(code[c]))
@@ -22,11 +22,13 @@ int Find_irq_table_entry(const u32 *table, u32 words, const u8 code[4], const u3
 		u32 count = table[i + 1];
 		if (count > words - i - 2)
 			return -1;  // a truncated entry ends the table
+		u32 next = i + count + 2;
 		if (table[i] == want) {
 			*offsets = &table[i + 2];
+			*pos = next;
 			return (int)count;
 		}
-		i += count + 2;
+		i = next;
 	}
 	return -1;
 }

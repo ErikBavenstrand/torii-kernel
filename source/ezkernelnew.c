@@ -2963,6 +2963,7 @@ boot_game:
 						}
 					}	
 	    		Patch_SpecialROM_sleepmode();//
+	    		Apply_rom_patches();//Torii: exact-ROM patches, SD launches only
 	    		GBApatch_PSRAM(PSRAMBase_S98,gamefilesize);																																			
 				}
 				else{//no select switch ,CLEAN

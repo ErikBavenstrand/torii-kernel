@@ -1007,18 +1007,23 @@ static u32 Table_matches_rom(TCHAR* gamefilename, const u32* offsets, int count)
 	return ok;
 }
 //------------------------------------------------------------------
-//Torii: the table lookup is bounds-checked and skips blank game codes, and
-//a table entry that doesn't match this ROM falls back to the scan.
+//Torii: the table lookup is bounds-checked and skips blank game codes. Of
+//the entries for this code, the first that matches this ROM is used; if
+//none does, the kernel scans the ROM.
 u32 use_internal_engine(u8 gamecode[], TCHAR* gamefilename)
 {
 	const u32 *offsets;
-	int count = Find_irq_table_entry((const u32*)reset_table, sizeof(reset_table)/4, gamecode, &offsets);
-	if(count < 0)	return 0;
-	if(!Table_matches_rom(gamefilename, offsets, count))
+	u32 pos = 0;
+	int count;
+	do
 	{
-		tlog("patch: the built-in table doesn't match this ROM, scanning it");
-		return 0;
-	}
+		count = Find_irq_table_entry((const u32*)reset_table, sizeof(reset_table)/4, gamecode, &pos, &offsets);
+		if(count < 0)
+		{
+			if(pos)	tlog("patch: the built-in table doesn't match this ROM, scanning it");
+			return 0;
+		}
+	}while(!Table_matches_rom(gamefilename, offsets, count));
 	g_Offset = 0;
 	iCount2 = 0;
 	for(int ii=0;ii<count;ii++)
@@ -1028,11 +1033,11 @@ u32 use_internal_engine(u8 gamecode[], TCHAR* gamefilename)
 	return 1;
 }
 //------------------------------------------------------------------
-//Torii: the code patches for exact ROMs in source/irqpatch.c. The ROM is in
-//PSRAM by now on an SD launch; on a NOR launch it isn't, the words don't
-//match, and nothing is patched.
-static void Apply_rom_patches(void)
+//Torii: the code patches for exact ROMs in source/irqpatch.c. Call it only
+//once the ROM is in PSRAM (an SD launch), as it checks the words there.
+void Apply_rom_patches(void)
 {
+	g_Offset = 0;
 	u8 header[0xC0];
 	SetPSRampage(0);
 	for(u32 i=0; i<sizeof(header)/2; i++)
@@ -1040,7 +1045,8 @@ static void Apply_rom_patches(void)
 	for(u32 i=0; i<rom_patch_count; i++)
 	{
 		const ST_rom_patch* p = &rom_patches[i];
-		if(Rom_patch_matches(p, header) && ((vu32*)PSRAMBase_S98)[p->offset/4] == p->expected)
+		if(Rom_patch_matches(p, header) && !memcmp(&header[0xAC], GAMECODE, 4)
+			&& ((vu32*)PSRAMBase_S98)[p->offset/4] == p->expected)
 			Add2(p->offset/4, p->value);
 	}
 }
@@ -1048,7 +1054,6 @@ static void Apply_rom_patches(void)
 void Patch_SpecialROM_sleepmode(void)
 {
 	g_Offset = 0;
-	Apply_rom_patches();
 	//
 	switch(*(u32*)GAMECODE)
 	{

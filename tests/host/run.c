@@ -51,6 +51,7 @@ static const struct {
 	{"irq_table_lookup", test_irq_table_lookup},
 	{"irq_table_rejects_blank_codes", test_irq_table_rejects_blank_codes},
 	{"irq_table_bounds", test_irq_table_bounds},
+	{"irq_table_next_entry", test_irq_table_next_entry},
 	{"irq_literals", test_irq_literals},
 	{"hotkey_value", test_hotkey_value},
 	{"rom_patch_table", test_rom_patch_table},

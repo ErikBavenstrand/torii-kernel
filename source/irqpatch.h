@@ -11,10 +11,12 @@
 int Is_irq_literal(u32 word);
 
 // Finds a game in the built-in table (source/reset_table.h: game code, count,
-// then that many word offsets into the ROM). Returns the count and points
-// *offsets at them, or -1 if the game isn't listed. A code that isn't four
-// letters or digits (homebrew often leaves it blank) is never listed.
-int Find_irq_table_entry(const u32 *table, u32 words, const u8 code[4], const u32 **offsets);
+// then that many word offsets into the ROM), from word *pos on (start at 0).
+// Returns the count, points *offsets at them and moves *pos past the entry,
+// so a second call finds the next entry for the same code; -1 if there is no
+// more. A code that isn't four letters or digits (homebrew often leaves it
+// blank) is never listed.
+int Find_irq_table_entry(const u32 *table, u32 words, const u8 code[4], u32 *pos, const u32 **offsets);
 
 // The KEYINPUT value while exactly the three keys in slots[] are held (0 A,
 // 1 B, 2 SELECT, 3 START, 4 RIGHT, 5 LEFT, 6 UP, 7 DOWN, 8 R, 9 L), as the
