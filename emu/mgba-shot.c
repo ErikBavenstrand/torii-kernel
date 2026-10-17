@@ -48,24 +48,25 @@
 
 struct event {
 	unsigned frame;
-	char* arg;
+	char *arg;
 };
 
-static const char* KEY_NAMES[] = {"A", "B", "SELECT", "START", "RIGHT", "LEFT", "UP", "DOWN", "R", "L"};
+static const char *KEY_NAMES[] = {"A", "B", "SELECT", "START", "RIGHT", "LEFT", "UP", "DOWN", "R", "L"};
 
 // --- Crash reports ---------------------------------------------------------
 
 struct symbol {
 	uint32_t address;
-	char* name;
+	char *name;
 };
 
-static struct symbol* symbols;
+static struct symbol *symbols;
 static size_t nsymbols;
 
 // Reads an armips symbol file (ADDRESS NAME per line, sorted by address).
-static void load_symbols(const char* path) {
-	FILE* f = fopen(path, "r");
+static void load_symbols(const char *path)
+{
+	FILE *f = fopen(path, "r");
 	if (!f) {
 		return;
 	}
@@ -88,9 +89,10 @@ static void load_symbols(const char* path) {
 }
 
 // "name+0xOFFSET" for the symbol at or below address, or "" if none is close.
-static const char* symbolize(uint32_t address) {
+static const char *symbolize(uint32_t address)
+{
 	static char out[512];
-	const struct symbol* best = NULL;
+	const struct symbol *best = NULL;
 	for (size_t i = 0; i < nsymbols && symbols[i].address <= address; ++i) {
 		best = &symbols[i];
 	}
@@ -101,32 +103,35 @@ static const char* symbolize(uint32_t address) {
 	return out;
 }
 
-static const char* until_text;
+static const char *until_text;
 static int until_hit;
 
-static struct mCore* crash_core;
+static struct mCore *crash_core;
 static int crashed;
 static char crash_reason[256];
 static uint32_t crash_regs[16], crash_cpsr;
 
-static void note_crash(const char* format, va_list args) {
+static void note_crash(const char *format, va_list args)
+{
 	if (crashed || !crash_core) {
 		return;
 	}
 	crashed = 1;
 	vsnprintf(crash_reason, sizeof(crash_reason), format, args);
-	struct ARMCore* cpu = crash_core->cpu;
+	struct ARMCore *cpu = crash_core->cpu;
 	memcpy(crash_regs, cpu->gprs, sizeof(crash_regs));
 	crash_cpsr = cpu->cpsr.packed;
 }
 
-static int is_code(uint32_t address) {
+static int is_code(uint32_t address)
+{
 	address &= ~1u;
 	return (address >= 0x08000000 && address < 0x0A000000) || (address >= 0x03000000 && address < 0x03008000) ||
 	       (address >= 0x02000000 && address < 0x02040000);
 }
 
-static void print_crash(unsigned frame) {
+static void print_crash(unsigned frame)
+{
 	fprintf(stderr, "crash at frame %u: %s\n", frame, crash_reason);
 	for (int i = 0; i < 13; i += 4) {
 		for (int j = i; j < i + 4 && j < 13; ++j) {
@@ -135,13 +140,13 @@ static void print_crash(unsigned frame) {
 		fputc('\n', stderr);
 	}
 	fprintf(stderr, "  sp  %08X  cpsr %08X (%s)\n", crash_regs[ARM_SP], crash_cpsr,
-	        crash_cpsr & 0x20 ? "thumb" : "arm");
+		crash_cpsr & 0x20 ? "thumb" : "arm");
 	fprintf(stderr, "  lr  %08X%s\n", crash_regs[ARM_LR], symbolize(crash_regs[ARM_LR] & ~1u));
 	fprintf(stderr, "  pc  %08X%s\n", crash_regs[ARM_PC], symbolize(crash_regs[ARM_PC] & ~1u));
 	fprintf(stderr, "  code addresses on the stack:\n");
 	int shown = 0;
-	for (uint32_t sp = crash_regs[ARM_SP] & ~3u; sp < 0x03008000 && sp < (crash_regs[ARM_SP] & ~3u) + 0x400 && shown < 16;
-	     sp += 4) {
+	for (uint32_t sp = crash_regs[ARM_SP] & ~3u;
+	     sp < 0x03008000 && sp < (crash_regs[ARM_SP] & ~3u) + 0x400 && shown < 16; sp += 4) {
 		uint32_t word = crash_core->busRead32(crash_core, sp);
 		if (is_code(word) && (word & 1)) {  // Thumb return addresses
 			fprintf(stderr, "    [%08X] %08X%s\n", sp, word, symbolize(word & ~1u));
@@ -152,10 +157,12 @@ static void print_crash(unsigned frame) {
 
 // Prints errors, and every line the kernel logs with tlog (category
 // gba.debug) as "kernel: ..." or "kernel error: ...".
-static void quiet_log(struct mLogger* logger, int category, enum mLogLevel level, const char* format, va_list args) {
-	(void) logger;
-	const char* id = mLogCategoryId(category);
-	if ((!strcmp(id, "gba.memory") && (level & (mLOG_GAME_ERROR | mLOG_FATAL)) && strstr(format, "invalid address")) ||
+static void quiet_log(struct mLogger *logger, int category, enum mLogLevel level, const char *format, va_list args)
+{
+	(void)logger;
+	const char *id = mLogCategoryId(category);
+	if ((!strcmp(id, "gba.memory") && (level & (mLOG_GAME_ERROR | mLOG_FATAL)) &&
+	     strstr(format, "invalid address")) ||
 	    (!strcmp(id, "gba") && !strncmp(format, "Illegal opcode", 14))) {
 		note_crash(format, args);
 		return;  // The crash report has it, and it repeats until the frame ends.
@@ -184,13 +191,14 @@ static void quiet_log(struct mLogger* logger, int category, enum mLogLevel level
 	}
 }
 
-static uint32_t parse_keys(const char* spec) {
+static uint32_t parse_keys(const char *spec)
+{
 	uint32_t keys = 0;
 	if (!strcmp(spec, "-")) {
 		return 0;
 	}
-	char* copy = strdup(spec);
-	for (char* tok = strtok(copy, "+"); tok; tok = strtok(NULL, "+")) {
+	char *copy = strdup(spec);
+	for (char *tok = strtok(copy, "+"); tok; tok = strtok(NULL, "+")) {
 		size_t i;
 		for (i = 0; i < sizeof(KEY_NAMES) / sizeof(*KEY_NAMES); ++i) {
 			if (!strcmp(tok, KEY_NAMES[i])) {
@@ -207,25 +215,27 @@ static uint32_t parse_keys(const char* spec) {
 	return keys;
 }
 
-static struct event parse_event(const char* spec) {
+static struct event parse_event(const char *spec)
+{
 	struct event ev;
-	char* colon = strchr(spec, ':');
+	char *colon = strchr(spec, ':');
 	if (!colon) {
 		fprintf(stderr, "expected FRAME:VALUE, got %s\n", spec);
 		exit(2);
 	}
-	ev.frame = (unsigned) strtoul(spec, NULL, 10);
+	ev.frame = (unsigned)strtoul(spec, NULL, 10);
 	ev.arg = colon + 1;
 	return ev;
 }
 
 struct events {
-	struct event* list;
+	struct event *list;
 	size_t count;
 	size_t cap;
 };
 
-static void add_event(struct events* events, const char* spec) {
+static void add_event(struct events *events, const char *spec)
+{
 	if (events->count == events->cap) {
 		events->cap = events->cap ? events->cap * 2 : 64;
 		events->list = realloc(events->list, events->cap * sizeof(*events->list));
@@ -241,34 +251,35 @@ struct options {
 	struct events hashes;
 	struct events pokes;
 	struct events states;
-	const char* loadState;
-	const char* scripts[16];
+	const char *loadState;
+	const char *scripts[16];
 	size_t nscripts;
 	int realtime;
-	const char* until;
+	const char *until;
 	unsigned frames;
-	const char* saveOut;
+	const char *saveOut;
 	unsigned gdbPort;
-	const char* symFile;
+	const char *symFile;
 };
 
-static void parse_options(struct options* opts, int argc, char** argv);
+static void parse_options(struct options *opts, int argc, char **argv);
 
-static void parse_file(struct options* opts, const char* path) {
-	FILE* f = fopen(path, "r");
+static void parse_file(struct options *opts, const char *path)
+{
+	FILE *f = fopen(path, "r");
 	if (!f) {
 		fprintf(stderr, "cannot read %s\n", path);
 		exit(2);
 	}
 	size_t cap = 64, argc = 0;
-	char** argv = malloc(cap * sizeof(*argv));
+	char **argv = malloc(cap * sizeof(*argv));
 	char line[1024];
 	while (fgets(line, sizeof(line), f)) {
-		char* hash = strchr(line, '#');
+		char *hash = strchr(line, '#');
 		if (hash) {
 			*hash = '\0';
 		}
-		for (char* tok = strtok(line, " \t\r\n"); tok; tok = strtok(NULL, " \t\r\n")) {
+		for (char *tok = strtok(line, " \t\r\n"); tok; tok = strtok(NULL, " \t\r\n")) {
 			if (argc == cap) {
 				cap *= 2;
 				argv = realloc(argv, cap * sizeof(*argv));
@@ -277,17 +288,18 @@ static void parse_file(struct options* opts, const char* path) {
 		}
 	}
 	fclose(f);
-	parse_options(opts, (int) argc, argv);
+	parse_options(opts, (int)argc, argv);
 }
 
-static void parse_options(struct options* opts, int argc, char** argv) {
+static void parse_options(struct options *opts, int argc, char **argv)
+{
 	for (int i = 0; i < argc; ++i) {
 		if (i + 1 >= argc && strcmp(argv[i], "-t")) {
 			fprintf(stderr, "missing value for %s\n", argv[i]);
 			exit(2);
 		}
 		if (!strcmp(argv[i], "-f")) {
-			opts->frames = (unsigned) strtoul(argv[++i], NULL, 10);
+			opts->frames = (unsigned)strtoul(argv[++i], NULL, 10);
 		} else if (!strcmp(argv[i], "-k")) {
 			add_event(&opts->keys, argv[++i]);
 		} else if (!strcmp(argv[i], "-S")) {
@@ -297,11 +309,11 @@ static void parse_options(struct options* opts, int argc, char** argv) {
 		} else if (!strcmp(argv[i], "-m")) {
 			add_event(&opts->dumps, argv[++i]);
 		} else if (!strcmp(argv[i], "-r")) {
-			char* spec = malloc(strlen(argv[++i]) + 2);
+			char *spec = malloc(strlen(argv[++i]) + 2);
 			sprintf(spec, "%s:", argv[i]);
 			add_event(&opts->regs, spec);
 		} else if (!strcmp(argv[i], "-h")) {
-			char* spec = malloc(strlen(argv[++i]) + 2);
+			char *spec = malloc(strlen(argv[++i]) + 2);
 			sprintf(spec, "%s:", argv[i]);
 			add_event(&opts->hashes, spec);
 		} else if (!strcmp(argv[i], "-p")) {
@@ -319,7 +331,7 @@ static void parse_options(struct options* opts, int argc, char** argv) {
 		} else if (!strcmp(argv[i], "-y")) {
 			opts->symFile = argv[++i];
 		} else if (!strcmp(argv[i], "-g")) {
-			opts->gdbPort = (unsigned) strtoul(argv[++i], NULL, 10);
+			opts->gdbPort = (unsigned)strtoul(argv[++i], NULL, 10);
 		} else if (!strcmp(argv[i], "-i")) {
 			parse_file(opts, argv[++i]);
 		} else {
@@ -329,8 +341,9 @@ static void parse_options(struct options* opts, int argc, char** argv) {
 	}
 }
 
-static void print_registers(struct mCore* core, unsigned frame) {
-	struct ARMCore* cpu = core->cpu;
+static void print_registers(struct mCore *core, unsigned frame)
+{
+	struct ARMCore *cpu = core->cpu;
 	printf("regs frame %u:", frame);
 	for (int i = 0; i < 16; ++i) {
 		printf(" r%d=%08X", i, cpu->gprs[i]);
@@ -338,9 +351,10 @@ static void print_registers(struct mCore* core, unsigned frame) {
 	printf(" cpsr=%08X\n", cpu->cpsr.packed);
 }
 
-static void dump_memory(struct mCore* core, unsigned frame, const char* spec) {
+static void dump_memory(struct mCore *core, unsigned frame, const char *spec)
+{
 	uint32_t address = strtoul(spec, NULL, 0);
-	const char* colon = strchr(spec, ':');
+	const char *colon = strchr(spec, ':');
 	uint32_t length = colon ? strtoul(colon + 1, NULL, 0) : 16;
 	for (uint32_t i = 0; i < length; i += 16) {
 		printf("mem frame %u %08X:", frame, address + i);
@@ -351,32 +365,36 @@ static void dump_memory(struct mCore* core, unsigned frame, const char* spec) {
 	}
 }
 
-static void poke_memory(struct mCore* core, const char* spec) {
+static void poke_memory(struct mCore *core, const char *spec)
+{
 	uint32_t address = strtoul(spec, NULL, 0);
-	const char* colon = strchr(spec, ':');
+	const char *colon = strchr(spec, ':');
 	uint32_t value = colon ? strtoul(colon + 1, NULL, 0) : 0;
 	core->busWrite32(core, address, value);  // Like a CPU store, so the renderer sees it
 }
 
 // FNV-1a over the screen's pixels.
-static uint64_t hash_screen(const color_t* pixels, unsigned width, unsigned height) {
+static uint64_t hash_screen(const color_t *pixels, unsigned width, unsigned height)
+{
 	uint64_t hash = 0xCBF29CE484222325ULL;
-	const uint8_t* bytes = (const uint8_t*) pixels;
-	for (size_t i = 0; i < (size_t) width * height * BYTES_PER_PIXEL; ++i) {
+	const uint8_t *bytes = (const uint8_t *)pixels;
+	for (size_t i = 0; i < (size_t)width * height * BYTES_PER_PIXEL; ++i) {
 		hash = (hash ^ bytes[i]) * 0x100000001B3ULL;
 	}
 	return hash;
 }
 
-static unsigned last_frame(const struct events* events, unsigned frames) {
+static unsigned last_frame(const struct events *events, unsigned frames)
+{
 	for (size_t i = 0; i < events->count; ++i) {
 		frames = events->list[i].frame > frames ? events->list[i].frame : frames;
 	}
 	return frames;
 }
 
-static int save_png(const char* path, const color_t* pixels, unsigned width, unsigned height) {
-	struct VFile* vf = VFileOpen(path, O_CREAT | O_TRUNC | O_WRONLY);
+static int save_png(const char *path, const color_t *pixels, unsigned width, unsigned height)
+{
+	struct VFile *vf = VFileOpen(path, O_CREAT | O_TRUNC | O_WRONLY);
 	if (!vf) {
 		return 0;
 	}
@@ -388,18 +406,22 @@ static int save_png(const char* path, const color_t* pixels, unsigned width, uns
 	return ok;
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv)
+{
 	if (argc < 2) {
-		fprintf(stderr, "usage: %s ROM [-f FRAMES] [-k FRAME:KEYS]... [-s FRAME:OUT.png]... [-S SAVE] [-i FILE] [-g PORT]\n", argv[0]);
+		fprintf(stderr,
+			"usage: %s ROM [-f FRAMES] [-k FRAME:KEYS]... [-s FRAME:OUT.png]... [-S SAVE] [-i FILE] [-g "
+			"PORT]\n",
+			argv[0]);
 		return 2;
 	}
 	struct options opts = {0};
 	parse_options(&opts, argc - 2, argv + 2);
-	struct event* keys = opts.keys.list;
-	struct event* shots = opts.shots.list;
+	struct event *keys = opts.keys.list;
+	struct event *shots = opts.shots.list;
 	size_t nkeys = opts.keys.count, nshots = opts.shots.count;
 	unsigned frames = opts.frames;
-	const char* saveOut = opts.saveOut;
+	const char *saveOut = opts.saveOut;
 	for (size_t i = 0; i < nkeys; ++i) {
 		frames = keys[i].frame > frames ? keys[i].frame : frames;
 	}
@@ -419,7 +441,7 @@ int main(int argc, char** argv) {
 	static struct mLogger logger = {.log = quiet_log};
 	mLogSetDefaultLogger(&logger);
 
-	struct mCore* core = mCoreFind(argv[1]);
+	struct mCore *core = mCoreFind(argv[1]);
 	if (!core || !core->init(core)) {
 		fprintf(stderr, "cannot create a core for %s\n", argv[1]);
 		return 1;
@@ -427,7 +449,7 @@ int main(int argc, char** argv) {
 	mCoreInitConfig(core, NULL);
 	unsigned width, height;
 	core->desiredVideoDimensions(core, &width, &height);
-	color_t* buffer = calloc((size_t) width * height, BYTES_PER_PIXEL);
+	color_t *buffer = calloc((size_t)width * height, BYTES_PER_PIXEL);
 	core->setVideoBuffer(core, buffer, width);
 	if (!mCoreLoadFile(core, argv[1])) {
 		fprintf(stderr, "cannot load %s\n", argv[1]);
@@ -445,7 +467,7 @@ int main(int argc, char** argv) {
 		mScriptContextRegisterEngines(&scriptContext);
 		mScriptContextAttachLogger(&scriptContext, &scriptLogger);
 		mScriptContextAttachCore(&scriptContext, core);
-		struct mScriptEngineContext* lua = HashTableLookup(&scriptContext.engines, "lua");
+		struct mScriptEngineContext *lua = HashTableLookup(&scriptContext.engines, "lua");
 		for (size_t i = 0; i < opts.nscripts; ++i) {
 			if (!lua || !mScriptContextLoadFile(&scriptContext, opts.scripts[i]) || !lua->run(lua)) {
 				fprintf(stderr, "cannot run script %s\n", opts.scripts[i]);
@@ -464,7 +486,7 @@ int main(int argc, char** argv) {
 	}
 #endif
 	if (opts.loadState) {
-		struct VFile* vf = VFileOpen(opts.loadState, O_RDONLY);
+		struct VFile *vf = VFileOpen(opts.loadState, O_RDONLY);
 		if (!vf || !mCoreLoadStateNamed(core, vf, SAVESTATE_SAVEDATA | SAVESTATE_RTC)) {
 			fprintf(stderr, "cannot load state %s\n", opts.loadState);
 			return 1;
@@ -476,14 +498,14 @@ int main(int argc, char** argv) {
 	} else {
 		char path[1024];
 		snprintf(path, sizeof(path), "%s", argv[1]);
-		char* dot = strrchr(path, '.');
+		char *dot = strrchr(path, '.');
 		if (dot && dot > strrchr(path, '/')) {
 			strcpy(dot, ".sym");
 			load_symbols(path);
 		}
 	}
 
-	struct mDebugger* debugger = NULL;
+	struct mDebugger *debugger = NULL;
 	if (opts.gdbPort) {
 #ifdef USE_GDB_STUB
 		static struct GDBStub gdb;
@@ -550,7 +572,7 @@ int main(int argc, char** argv) {
 		}
 		for (size_t i = 0; i < opts.states.count; ++i) {
 			if (opts.states.list[i].frame == frame) {
-				struct VFile* vf = VFileOpen(opts.states.list[i].arg, O_CREAT | O_TRUNC | O_RDWR);
+				struct VFile *vf = VFileOpen(opts.states.list[i].arg, O_CREAT | O_TRUNC | O_RDWR);
 				if (vf && mCoreSaveStateNamed(core, vf, SAVESTATE_SAVEDATA | SAVESTATE_RTC)) {
 					printf("state frame %u -> %s\n", frame, opts.states.list[i].arg);
 				} else {
@@ -574,7 +596,8 @@ int main(int argc, char** argv) {
 		}
 		for (size_t i = 0; i < opts.hashes.count; ++i) {
 			if (opts.hashes.list[i].frame == frame) {
-				printf("hash frame %u: %016llX\n", frame, (unsigned long long) hash_screen(buffer, width, height));
+				printf("hash frame %u: %016llX\n", frame,
+				       (unsigned long long)hash_screen(buffer, width, height));
 			}
 		}
 		for (size_t i = 0; i < nshots; ++i) {
@@ -594,9 +617,9 @@ int main(int argc, char** argv) {
 	}
 
 	if (saveOut) {
-		void* save = NULL;
+		void *save = NULL;
 		size_t size = core->savedataClone(core, &save);
-		FILE* f = fopen(saveOut, "wb");
+		FILE *f = fopen(saveOut, "wb");
 		if (!f || fwrite(save, 1, size, f) != size) {
 			fprintf(stderr, "cannot write %s\n", saveOut);
 			status = 1;
@@ -609,7 +632,7 @@ int main(int argc, char** argv) {
 
 #ifdef USE_GDB_STUB
 	if (debugger) {
-		GDBStubShutdown((struct GDBStub*) debugger);
+		GDBStubShutdown((struct GDBStub *)debugger);
 	}
 #endif
 	mCoreConfigDeinit(&core->config);

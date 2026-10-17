@@ -445,7 +445,7 @@ def hook_table() -> dict[bytes, str]:
             struct.pack("<I", words[i]), f"built-in table, {words[i + 1]} patched"
         )
         i += words[i + 1] + 2
-    source = Path("source/GBApatch.c").read_bytes().decode("gbk")
+    source = Path("source/GBApatch.c").read_text()
     special = source.split("void Patch_SpecialROM_sleepmode(void)")[1].split("\n}")[0]
     # Cases can share a body (case A: case B: ...), so each runs to its break.
     for case in re.finditer(r"\bcase 0x([0-9A-Fa-f]{8})", special):
@@ -732,9 +732,9 @@ def run_game(result: Result, roms: dict, saves: dict, table: dict) -> None:
 
 
 def kernel_table() -> dict[str, int]:
-    text = Path("source/saveMODE.h").read_bytes().decode("gbk")
+    text = Path("source/saveMODE.h").read_text()
     return {
-        c: int(m, 16) for c, m in re.findall(r'\{"(\w{4})",(0x[0-9a-fA-F]+)\}', text)
+        c: int(m, 16) for c, m in re.findall(r'\{"(\w{4})",\s*(0x[0-9a-fA-F]+)\}', text)
     }
 
 

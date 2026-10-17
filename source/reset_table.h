@@ -1,5 +1,6 @@
-
-const int  __attribute__((aligned(4))) reset_table[] = { 
+// The fast patch engine's table, one game per line: code, count, then its IRQ handler words.
+// clang-format off
+const int  __attribute__((aligned(4))) reset_table[] = {
 0x4A5A4641,0x00000002,0x0000008D,0x000123B6,//0001 - F-Zero(JP).zip
 0x4A414D41,0x00000007,0x0000009C,0x000005F4,0x0000F70A,0x000DBD01,0x000DBD5E,0x000DF749,0x000DF8B2,//0002 - Super Mario Advance(JP).zip
 0x4A455241,0x00000001,0x00000079,//0003 - Battle Network Rockman EXE(JP).zip
@@ -2819,3 +2820,4 @@ const int  __attribute__((aligned(4))) reset_table[] = {
 0xFFFFFFFF
 
 };
+// clang-format on

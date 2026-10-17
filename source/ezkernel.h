@@ -4,45 +4,42 @@
 #include "ff.h"
 #include "ez_define.h"
 
-
-typedef struct FM_NOR_FILE_SECT{////save to nor
-	char filename[100];	
-	u16 rompage ;
-	u16 have_patch ;
-	u16	have_RTS;
+typedef struct FM_NOR_FILE_SECT {////save to nor
+	char filename[100];
+	u16 rompage;
+	u16 have_patch;
+	u16 have_RTS;
 	u16 is_64MBrom;//reserved;
 	u32 filesize;
 	u8 savemode;
 	u8 reserved1;
-	u16 reserved2 ;
+	u16 reserved2;
 	char gamename[0x10];
 } FM_NOR_FS;
 
-typedef struct FM_Folder_SECT{
-	char filename[100];	
+typedef struct FM_Folder_SECT {
+	char filename[100];
 } FM_Folder_FS;
 
-typedef struct FM_FILE_SECT{
+typedef struct FM_FILE_SECT {
 	char filename[100];
-	u32 filesize;	
+	u32 filesize;
 } FM_FILE_FS;
 
-
 typedef enum {
-	SD_list=0,
-	NOR_list=1,
-	SET_win=2,
-	SET2_win=3,
-	HELP=4,
-}PAGE_NUM ;
+	SD_list = 0,
+	NOR_list = 1,
+	SET_win = 2,
+	SET2_win = 3,
+	HELP = 4,
+} PAGE_NUM;
 //----------------------------
-extern DWORD Get_NextCluster(	FFOBJID* obj,	DWORD clst);
-extern DWORD ClustToSect(FATFS* fs,DWORD clst);
+extern DWORD Get_NextCluster(FFOBJID *obj, DWORD clst);
+extern DWORD ClustToSect(FATFS *fs, DWORD clst);
 
-extern FM_NOR_FS pNorFS[MAX_NOR]EWRAM_BSS;
-extern u8 pReadCache [MAX_pReadCache_size]EWRAM_BSS;
-extern u8 __attribute__((aligned(4)))GAMECODE[4];
-
+extern FM_NOR_FS pNorFS[MAX_NOR] EWRAM_BSS;
+extern u8 pReadCache[MAX_pReadCache_size] EWRAM_BSS;
+extern u8 __attribute__((aligned(4))) GAMECODE[4];
 
 extern u16 gl_reset_on;
 extern u16 gl_rts_on;
@@ -63,25 +60,25 @@ extern u16 gl_color_btn_clean;
 
 u32 Setting_window(void);
 u32 Setting_window2(void);
-void Draw_select_icon(u32 X,u32 Y,u32 mode);
+void Draw_select_icon(u32 X, u32 Y, u32 mode);
 void CheckLanguage(void);
 void CheckSwitch(void);
-u32 Game_hardware(u32 is_EMU,const u8 *gamecode,u8 gb_cart_type);
-u32 Recently_play_add(const char *entry,u32 count);
+u32 Game_hardware(u32 is_EMU, const u8 *gamecode, u8 gb_cart_type);
+u32 Recently_play_add(const char *entry, u32 count);
 u8 Check_saveMODE(u8 gamecode[]);
-u8 Get_saveMODE(u8 Save_num,u32 gamefilesize);
+u8 Get_saveMODE(u8 Save_num, u32 gamefilesize);
 u32 Check_file_type(TCHAR *pfilename);
 u32 Get_savefilesize(BYTE saveMODE);
 // IWRAM code must run from IWRAM while the ROM page changes, so it is never
 // static: GCC would inline it into callers in ROM.
-void IWRAM_CODE Refresh_filename(u32 show_offset,u32 file_select,u32 updown,u32 haveThumbnail);
+void IWRAM_CODE Refresh_filename(u32 show_offset, u32 file_select, u32 updown, u32 haveThumbnail);
 u32 IWRAM_CODE Loadsavefile(TCHAR *filename);
-u32 IWRAM_CODE Save_savefile(TCHAR *filename,u32 savesize);
-u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename,u32 is_EMU);
+u32 IWRAM_CODE Save_savefile(TCHAR *filename, u32 savesize);
+u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU);
 
 void delay(u32 R0);
 u32 LoadRTSfile(TCHAR *filename);
-void ShowTime(u32 page_num ,u32 page_mode);
-u8 NOR_list_MENU(u32 show_offset,	u32 file_select);
-u8 SD_list_MENU(u32 show_offset,	u32 file_select,u32 play_re);
+void ShowTime(u32 page_num, u32 page_mode);
+u8 NOR_list_MENU(u32 show_offset, u32 file_select);
+u8 SD_list_MENU(u32 show_offset, u32 file_select, u32 play_re);
 //#endif
