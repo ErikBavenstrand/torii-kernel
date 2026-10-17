@@ -21,6 +21,10 @@ fresh cart and three power-ons:
    the save to SAVER/.
 3. Launch it again: the kernel must load that save back into the cart.
 
+A GBA game that boots also gets a cart of its own with SAVESTATE and RESET
+on, is launched with BOOT WITH ADDON, and tests/hook_watch.lua opens and
+leaves the in-game menu (L+R+START, then B) once the game has run a while.
+
 Checks, each pass, fail, untested (the run didn't get that far) or n/a:
 
 - boots: the game left the kernel and its screen changed; a crash, kernel
@@ -30,6 +34,12 @@ Checks, each pass, fail, untested (the run didn't get that far) or n/a:
 - save cycle: what the game wrote reached SAVER/ and came back on relaunch;
   for a game that didn't save during the run, a test pattern put in the
   cart's save memory makes the same trip
+- in-game menu: the kernel hooked the game's IRQ, the menu opened, and the
+  game went on after it; a failure says why (no literal for the kernel to
+  patch, the game set its own handler, no VBlank IRQ, a crash). Metrics
+  give the hook: how the kernel found the game's IRQ handler stores
+  (built-in table or ROM scan), the IRQ vector during the game and how many
+  frames had the VBlank IRQ enabled
 
 A game with a starting save (roms/<name>.sav, .esv for GB/GBC) and a key
 script (tests/games/<code>.keys) plays that script instead, saves in-game and
@@ -80,7 +90,7 @@ KERNEL_SAVE = {
     0x32: "flash64k",
     0x33: "flash64k",
 }
-CHECKS = ["boots", "save type", "clock", "save cycle"]
+CHECKS = ["boots", "save type", "clock", "save cycle", "in-game menu"]
 # The SAVER folder sorts before the game, so: down, open, CLEAN BOOT. GB, GBC
 # and NES games start on open, with no menu.
 LAUNCH = [(100, "DOWN"), (120, "A"), (180, "A")]
@@ -88,6 +98,21 @@ LAUNCH_EMU = LAUNCH[:2]
 GAME_START = 300  # the kernel has handed over to the game by now
 RUN_FRAMES = 2400
 SHOTS = (600, 1500, RUN_FRAMES)
+
+# The in-game menu run: SAVESTATE and RESET on (with SAVESTATE alone the kernel
+# patches in a quick save/load instead of the menu), menu key L+R+START,
+# English, the fast patch engine, clock and rumble on: settings slots in the
+# kernel NOR (source/ez_define.h), written before power-on.
+MENU_SETTINGS = {0: 0xE1E1, 1: 1, 2: 1, 3: 0, 4: 0, 5: 9, 6: 8, 7: 2, 8: 9, 9: 8}
+MENU_SETTINGS |= {10: 3, 11: 1, 12: 0, 13: 1, 25: 1}
+KERNEL_NOR_SIZE = 0x800000
+SETTINGS = 0x7B0000
+# Down to the game, open it, then BOOT WITH ADDON.
+LAUNCH_ADDON = [(100, "DOWN"), (120, "A"), (180, "DOWN"), (200, "A")]
+HOOK_WATCH = "tests/hook_watch.lua"
+IRQ_LITERALS = (0x03007FFC, 0x03FFFFFC)  # what the kernel's ROM scan patches
+PATCH_SLOTS = 32  # EMax in source/GBApatch.h: literals past this stay unpatched
+PATCH_SIZE = 0x2000  # the largest patch area, as in hook_watch.lua
 
 
 class Failure(Exception):
@@ -192,13 +217,15 @@ def save_name(sd_name: str) -> str:
     return f"{stem}.{'sav' if ext == 'gba' else 'esv'}"
 
 
-def sd_save(cart: Path, sd_name: str) -> bytes | None:
+def sd_file(cart: Path, path: str) -> bytes | None:
     try:
-        return mtools(
-            "mtype", "-i", str(cart / "sd.img"), f"::/SAVER/{save_name(sd_name)}"
-        )
+        return mtools("mtype", "-i", str(cart / "sd.img"), f"::/{path}")
     except subprocess.CalledProcessError:
         return None
+
+
+def sd_save(cart: Path, sd_name: str) -> bytes | None:
+    return sd_file(cart, f"SAVER/{save_name(sd_name)}")
 
 
 # --- Reading results -------------------------------------------------------------
@@ -317,6 +344,14 @@ def key_of(game: dict) -> str:
     return game["sha1"][:10]
 
 
+def screen_hashes(out: str) -> list[tuple[int, str]]:
+    """(frame, hash) for each -h line of mgba-shot's output."""
+    return [
+        (int(m[0]), m[1])
+        for m in re.findall(r"^hash frame (\d+): (\S+)", out, re.MULTILINE)
+    ]
+
+
 def check_boot(result: Result, trace: str, out: str, shots: list[Path]) -> bool:
     """Record boots, save type and clock from the first power-on."""
     g = result.game
@@ -377,7 +412,158 @@ def check_boot(result: Result, trace: str, out: str, shots: list[Path]) -> bool:
     return result.checks["boots"][0] == "pass"
 
 
-def run_game(result: Result, roms: dict, saves: dict) -> None:
+def irq_literals(rom: bytes) -> int:
+    """Words the kernel's ROM scan would patch (PatchInternal)."""
+    words = struct.unpack_from(f"<{len(rom) // 4}I", rom)
+    return sum(words.count(v) for v in IRQ_LITERALS)
+
+
+def hook_table() -> dict[bytes, str]:
+    """How the kernel finds each known game's IRQ handler stores, by game code:
+    its built-in table of literals (reset_table.h) and the code patches for
+    games that compute the address (Patch_SpecialROM_sleepmode)."""
+    text = Path("source/reset_table.h").read_text()
+    words = [int(w, 16) for w in re.findall(r"0x([0-9A-Fa-f]{8})", text)]
+    table, i = {}, 0
+    while i + 1 < len(words):
+        table.setdefault(
+            struct.pack("<I", words[i]), f"built-in table, {words[i + 1]} patched"
+        )
+        i += words[i + 1] + 2
+    source = Path("source/GBApatch.c").read_bytes().decode("gbk")
+    special = source.split("void Patch_SpecialROM_sleepmode(void)")[1].split("\n}")[0]
+    # Cases can share a body (case A: case B: ...), so each runs to its break.
+    for case in re.finditer(r"\bcase 0x([0-9A-Fa-f]{8})", special):
+        key = struct.pack("<I", int(case[1], 16))
+        body = special[case.end() : special.find("break;", case.end())]
+        patches = len(re.findall(r"Add2\(", body))
+        what = f"{patches} code patch{'es' if patches != 1 else ''}"
+        table[key] = f"{table[key]}, {what}" if key in table else what
+    return table
+
+
+def menu_cart(cart: Path, rom: Path, sd_name: str) -> None:
+    make_cart(cart, rom, sd_name, None)
+    nor = bytearray(b"\xff") * KERNEL_NOR_SIZE
+    for slot, value in MENU_SETTINGS.items():
+        struct.pack_into("<H", nor, SETTINGS + 2 * slot, value)
+    (cart / "kernel-nor.bin").write_bytes(nor)
+
+
+def check_menu(result: Result, rom: Path, sd_name: str, table: dict) -> None:
+    """Launch with addons, open the in-game menu and leave it (hook_watch.lua)."""
+    data = rom.read_bytes()
+    found = irq_literals(data)
+    code = data[0xAC:0xB0]
+    in_table = table.get(code)
+    result.metrics["IRQ literals"] = found
+    cart = CARTS / f"{key_of(result.game)}-menu"
+    menu_cart(cart, rom, sd_name)
+    # Loading with patches takes about 90 frames per MB.
+    frames = 400 + (len(data) >> 20) * 150 + 1800
+    hashes = [a for f in range(30, frames + 1, 30) for a in ("-h", str(f))]
+    out, trace = power_on(
+        cart, LAUNCH_ADDON, frames, ["-L", HOOK_WATCH, "-u", "hook watch done", *hashes]
+    )
+    events = [
+        (int(f), text)
+        for f, text in re.findall(r"^script: hook (\d+) (.*)$", trace, re.MULTILINE)
+    ]
+    pat = sd_file(cart, f"PATCH/{sd_name.rsplit('.', 1)[0]}.pat")
+    if pat and len(pat) >= 0x118:
+        patched = struct.unpack_from("<I", pat, 0x114)[0]
+        result.metrics["hook from"] = f"ROM scan, {patched} patched"
+    elif in_table is not None:
+        result.metrics["hook from"] = in_table
+    note = (
+        f"the ROM has no {' or '.join(f'{v:#x}' for v in IRQ_LITERALS)} literal"
+        if not found
+        else f"{found} literals, over the kernel's {PATCH_SLOTS} patch slots"
+        if found > PATCH_SLOTS
+        else ""
+    )
+
+    def first(prefix: str) -> tuple[int, str] | None:
+        return next(((f, t) for f, t in events if t.startswith(prefix)), None)
+
+    crash = lines(trace, "crash at frame ")
+    start = first("game ")
+    if not start:
+        result.set(
+            "in-game menu",
+            "fail",
+            crash[0] if crash else "the addon launch never started the game",
+        )
+        return
+    patch = first("patch ")
+    if not patch:
+        detail = "the kernel did not hook the game" + (f": {note}" if note else "")
+        result.metrics["IRQ vector"] = "not hooked"
+        result.set("in-game menu", "fail", detail)
+        return
+    base = int(patch[1].split()[1], 16)
+    key_at = next((f for f, t in events if t == "key L+R+START"), None)
+    vectors = [(f, int(t.split()[1], 16)) for f, t in events if t.startswith("vector ")]
+    before = [
+        (f, v) for f, v in vectors if f >= start[0] and (key_at is None or f <= key_at)
+    ]
+    own = [(f, v) for f, v in before if not base <= v < base + PATCH_SIZE]
+    hooked = any(base <= v < base + PATCH_SIZE for _, v in before)
+    vblank = first("vblank ")
+    if vblank:
+        on, total = (int(w) for w in vblank[1].split()[1::2])
+        result.metrics["VBlank IRQ"] = f"on {on} of {total} frames"
+    if own and (
+        not hooked
+        or own[-1][0] > max(f for f, v in before if base <= v < base + PATCH_SIZE)
+    ):
+        result.metrics["IRQ vector"] = f"the game's own, {own[-1][1]:08X}"
+    else:
+        result.metrics["IRQ vector"] = "hooked" if hooked else "never set"
+    opened = next((f for f, t in events if t == "menu open"), None)
+    closed = next(
+        (f for f, t in events if t == "menu closed" and opened and f > opened), None
+    )
+    if crash and (key_at is None or int(crash[0].split()[3].rstrip(":")) < key_at):
+        why = f"crashed before the menu key: {crash[0]}"
+        if result.metrics["IRQ vector"].startswith("the game's own"):
+            why = f"the game overwrote the hook at 0x3007FFC with {own[-1][1]:08X}, then {why}"
+        result.set("in-game menu", "fail", why)
+        return
+    if opened is None:
+        if result.metrics["IRQ vector"].startswith("the game's own"):
+            why = f"the game overwrote the hook at 0x3007FFC with {own[-1][1]:08X}, {own[-1][0] - start[0]} frames in"
+            why += f"; {note}" if note else ""
+        elif vblank and vblank[1].startswith("vblank 0 "):
+            why = "the game never enabled the VBlank IRQ"
+        elif crash:
+            why = crash[0]
+        else:
+            why = "the menu did not open"
+        result.set("in-game menu", "fail", why)
+        return
+    if crash:
+        result.set("in-game menu", "fail", f"crashed after the menu: {crash[0]}")
+        return
+    if closed is None:
+        result.set("in-game menu", "fail", "B did not close the menu")
+        return
+    after = {h for f, h in screen_hashes(out) if f > closed + 30}
+    if len(after) <= 1:
+        result.set(
+            "in-game menu",
+            "fail",
+            "the screen did not change after the menu, even with keys pressed",
+        )
+        return
+    result.set(
+        "in-game menu",
+        "pass",
+        f"opened {opened - key_at} frames after the key; the game went on ({len(after)} screens)",
+    )
+
+
+def run_game(result: Result, roms: dict, saves: dict, table: dict) -> None:
     g = result.game
     rom = roms.get(g["sha1"])
     if not rom:
@@ -420,6 +606,10 @@ def run_game(result: Result, roms: dict, saves: dict) -> None:
     if not check_boot(result, trace, out, [p for p in shots if p.exists()]):
         result.metrics["seconds"] = round(time.time() - started, 1)
         return
+    if system == "gba":
+        check_menu(result, rom, sd_name, table)
+    else:
+        result.set("in-game menu", "n/a")
     if size is None:
         result.set("save cycle", "n/a")
         result.metrics["seconds"] = round(time.time() - started, 1)
@@ -604,6 +794,7 @@ def main() -> int:
     filters = [a for a in sys.argv[1:] if a != "--all"]
     roms, saves = rom_index(), save_index()
     table = kernel_table()
+    hooks = hook_table()
     wanted = [g for g in games if not g.get("skip") and matches(g, filters)]
     chosen = [(g, []) for g in wanted] if every else pick(wanted, roms, table)
     results = []
@@ -619,7 +810,7 @@ def main() -> int:
 
     def play(result: Result) -> None:
         try:
-            run_game(result, roms, saves)
+            run_game(result, roms, saves, hooks)
         except Exception as e:  # noqa: BLE001 - one game going wrong must not stop the run
             for name in CHECKS:
                 if result.checks[name][0] == "untested":

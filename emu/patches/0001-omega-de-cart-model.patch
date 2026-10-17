@@ -12,10 +12,10 @@ index 59ca1c1..1dd19c0 100644
  	EXTDATA_MAX
 diff --git a/include/mgba/internal/gba/cart/omega.h b/include/mgba/internal/gba/cart/omega.h
 new file mode 100644
-index 0000000..30929a0
+index 0000000..1dc0889
 --- /dev/null
 +++ b/include/mgba/internal/gba/cart/omega.h
-@@ -0,0 +1,121 @@
+@@ -0,0 +1,128 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -40,7 +40,13 @@ index 0000000..30929a0
 +#define OMEGA_KERNEL_NOR_SIZE 0x00800000
 +#define OMEGA_GAME_NOR_SIZE 0x04000000
 +#define OMEGA_PSRAM_SIZE 0x02000000
-+#define OMEGA_SRAM_SIZE 0x00080000
++// Save memory and work RAM at 0x0E000000, in 4 KB pages chosen with
++// 0x09C00000: pages 0x00-0x1F are the 128 KB FRAM that holds game saves,
++// pages 0x20-0xFF the S71GL064's 1 MB SRAM, where the in-game menu keeps
++// its screen backup (0x20-0x3F) and the save-state buffer (0x40-0xAF).
++// One backing file holds both, by page number.
++#define OMEGA_SRAM_SIZE 0x00100000
++#define OMEGA_SAVE_PAGES 0x20
 +#define OMEGA_PORT_SIZE 0x1000
 +
 +enum GBAOmegaNorState {
@@ -100,7 +106,8 @@ index 0000000..30929a0
 +	uint32_t saveSize;
 +	uint32_t gameSize;
 +	// True while a game runs with mGBA's savedata emulating its save chip;
-+	// its contents go back into the cart SRAM at power-off.
++	// its contents go back into the cart SRAM at power-off. Pages past the
++	// save memory stay plain RAM in game mode.
 +	bool gameSaveActive;
 +	// GPIO pins (RTC) overlaid on ROM 0xC4-0xC9, kept apart from the ROM data.
 +	uint16_t gpio[4];
@@ -253,10 +260,10 @@ index 1d0c0dd..b6abc91 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..62ca1ea
+index 0000000..46f35ad
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,901 @@
+@@ -0,0 +1,904 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -1121,8 +1128,11 @@ index 0000000..62ca1ea
 +	}
 +}
 +
++// The kernel and its in-game menu reach the cart SRAM directly; a game's own
++// save accesses (pages below OMEGA_SAVE_PAGES) go to the emulated save chip.
 +bool GBAOmegaOwnsSRAM(const struct GBA* gba) {
-+	return gba->memory.omega.enabled && !gba->memory.omega.gameSaveActive;
++	const struct GBAOmega* omega = &gba->memory.omega;
++	return omega->enabled && (!omega->gameSaveActive || omega->ramPage >= OMEGA_SAVE_PAGES);
 +}
 +
 +static uint32_t _sramOffset(const struct GBAOmega* omega, uint32_t address) {
