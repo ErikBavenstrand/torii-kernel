@@ -10,6 +10,8 @@ void test_save_file_size(void);
 void test_save_mode_table(void);
 void test_nes_classics_use_eeprom(void);
 void test_file_type(void);
+void test_cheat_parse(void);
+void test_cheat_cap(void);
 void test_nor_info_stays_in_bounds(void);
 
 static const struct {
@@ -22,6 +24,8 @@ static const struct {
 	{"save_mode_table", test_save_mode_table},
 	{"nes_classics_use_eeprom", test_nes_classics_use_eeprom},
 	{"file_type", test_file_type},
+	{"cheat_parse", test_cheat_parse},
+	{"cheat_cap", test_cheat_cap},
 	{"nor_info_stays_in_bounds", test_nor_info_stays_in_bounds},
 };
 

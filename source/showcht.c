@@ -16,7 +16,7 @@ FM_CHT_LINE tmpCHTFS ;
 u8 *pCHTbuffer = (u8*)(pReadCache + 0x2000); //patchbuffer
 
 
-ST_entry pCHEAT[3000]EWRAM_BSS;
+ST_entry pCHEAT[CHEAT_MAX]EWRAM_BSS;
 u32 gl_cheat_count;
 
 extern u16 gl_select_lang;
@@ -553,90 +553,90 @@ unsigned long str2hex( char*str)
 	return sum;
 }
 //------------------------------------------------------------------
+// Adds one cheat write, dropping it once the table is full: the in-game
+// handler and every entry must fit in CHEAT_PATCH_LENGTH.
+static void Add_cheat(u32 address,u32 val)
+{
+	if(gl_cheat_count >= CHEAT_MAX)
+		return;
+	ST_entry cheat = { address,val };
+	pCHEAT[gl_cheat_count++] = cheat;
+}
+//------------------------------------------------------------------
+// Parses one cheat's value, "ADDR,VV,VV;ADDR,VV", into pCHEAT: each value
+// after the first goes to the next address.
+void Parse_cheat_line(const char *line,u32 len)
+{
+	u32 i;
+	u32 address_len=0;
+	u32 val_len=0;
+	char address_buf[9];
+	char val_buf[3];
+	u32 is_val=0;
+	u32 is_address=1;
+	u32 address_add=0;
+
+	memset(address_buf,0x00,sizeof(address_buf));
+	memset(val_buf,0x00,sizeof(val_buf));
+	for(i=0;i<len;i++)
+	{
+		if (line[i] == ' '){
+			continue;
+		}
+		else if (line[i] == ','){
+			if(is_address==1)	//first ','
+			{
+				is_address = 0;
+			}
+			else{	//next ','
+				Add_cheat(str2hex(address_buf)+address_add,str2hex(val_buf));
+				address_add++;
+			}
+			val_len=0;
+			memset(val_buf,0x00,sizeof(val_buf));
+			is_val = 1;
+			continue;
+		}
+		else if(line[i] == ';'){
+			Add_cheat(str2hex(address_buf)+address_add,str2hex(val_buf));
+			is_val = 0;
+			is_address = 1;
+			address_add=0;
+			memset(address_buf,0x00,sizeof(address_buf));
+			address_len=0;
+			continue;
+		}
+
+		if(is_val){
+			if(val_len < sizeof(val_buf)-1)
+				val_buf[val_len++] = line[i];
+		}
+		else{
+			if(address_len < sizeof(address_buf)-1)
+				address_buf[address_len++] = line[i];
+		}
+	}
+	if(address_len)	//a line ending in ';' has no last entry
+		Add_cheat(str2hex(address_buf)+address_add,str2hex(val_buf));
+}
+//------------------------------------------------------------------
 void Analyze_KEYVAL(FIL* file,u32 total)
 {
-	u32 tol,i;
+	u32 tol;
 	u32 buflen;
-	//u32 entry;
-	//u32 address;
-	u32 address_len;
-	u32 val_len;
-	char address_buf[8];
-	char val_buf[3];
-	u32 is_val;
-	u32 is_address;
-	u32 address_add;
-	//char BUF_val[256];
-	
-	//DEBUG_printf("total %x  ",total);
+
 	gl_cheat_count=0;
-		
-	if(total)
-	{		
-	}
 	for(tol=0;tol<total;tol++)
 	{
-		
 		if( ((FM_CHT_LINE*)pCHTbuffer)[tol].select == 1)
-		{						
+		{
 			u32 current_select = tol-1;
-			while(((FM_CHT_LINE*)pCHTbuffer)[current_select].is_section != 1)						
+			while(((FM_CHT_LINE*)pCHTbuffer)[current_select].is_section != 1)
 			{
 				current_select--;
 			}
-			//DEBUG_printf("section %s  ", ((FM_CHT_LINE*)pCHTbuffer)[current_select].LINEname);										
 			buflen= Get_CHT_val(&gfile,((FM_CHT_LINE*)pCHTbuffer)[current_select].LINEname,((FM_CHT_LINE*)pCHTbuffer)[tol].LINEname);
-																																				
-			address_len=0;
-			is_val = 0;
-			is_address = 1;
-			address_add = 0;
-			memset(address_buf,0x00,8);
-			for(i=0;i<buflen;i++)
-			{
-	      if (_paramv[i] == ' '){
-	          continue;
-				}
-				else if (_paramv[i] == ','){						
-					if(is_address==1)	//first ','
-					{					
-						is_address = 0;											 
-					}
-					else{	//next ','
-						//DEBUG_printf(",0x%x =%x", str2hex(address_buf)+address_add,str2hex(val_buf));
-						ST_entry cheat = { str2hex(address_buf)+address_add,str2hex(val_buf) };
-						pCHEAT[gl_cheat_count++] = cheat;
-		
-						address_add++;
-					}
-					val_len=0;
-					memset(val_buf,0x00,3);	
-					is_val = 1;
-					continue;
-				}
-				else if(_paramv[i] == ';'){
-					ST_entry cheat = { str2hex(address_buf)+address_add,str2hex(val_buf) };
-					pCHEAT[gl_cheat_count++] = cheat;	
-					
-					
-					is_val = 0;
-					is_address = 1;
-					address_add=0;
-					memset(address_buf,0x00,8);
-					address_len=0;				
-					continue;
-				}
-				
-				if(is_val){
-					val_buf[val_len++] = _paramv[i];
-				}
-				else{
-					address_buf[address_len++] = _paramv[i];
-				}							
-			}
-			ST_entry cheat = { str2hex(address_buf)+address_add,str2hex(val_buf) };
-			pCHEAT[gl_cheat_count++] = cheat;
-						
+			Parse_cheat_line(_paramv,buflen);
 		}
 	}
 }

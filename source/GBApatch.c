@@ -13,6 +13,7 @@
 #include "lang.h"
 #include "showcht.h"
 #include "Ezcard_OP.h"
+#include "tlog.h"
 
 
 
@@ -32,7 +33,6 @@ u32 w_cheat_on;
 
 SPatchInfo2 iPatchInfo2[EMax];
 u32 iCount2;
-extern ST_entry pCHEAT[256];
 
 #define sizeofa(array) (sizeof(array)/sizeof(array[0]))
 
@@ -284,7 +284,7 @@ void SetTrimSize(u8* buffer,u32 romsize,u32 iSize,u32 mode,BYTE saveMODE)
 	}
 	
 	if(gl_cheat_on==1){
-		PATCH_LENGTH = 0x2000;
+		PATCH_LENGTH = CHEAT_PATCH_LENGTH;
 	}
 	
   if(0)
@@ -468,6 +468,9 @@ void Patch_RTS_Cheat(u32 *Data)
 	//cheat
 	u8*p_no_cheat_end =  (u8*)no_CHEAT_end;
 	
+	if(gl_cheat_count > CHEAT_MAX)
+		gl_cheat_count = CHEAT_MAX;
+	TLOG_ASSERT(p_no_cheat_end-p_patch_start + gl_cheat_count*8 <= CHEAT_PATCH_LENGTH);
 	u32 cheat_count_offset = (u8*)Cheat_count - p_patch_start;		
 	*(vu32*)(patchbuffer+cheat_count_offset) = gl_cheat_count;	
 	
