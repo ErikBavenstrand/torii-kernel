@@ -497,7 +497,9 @@ static void step_eeprom(void)
 	SetRampage(0);
 	ReadSram(SRAMSaver, fram, sizeof(fram));
 	u32 block = 64;
-	for (u32 b = 0; b < 64 && block == 64; b++) {
+	// Blocks 0-15 only: the address bits a wrong-width request leaves over
+	// then start 0, 0, never 1, 0, the start of a write.
+	for (u32 b = 0; b < 16 && block == 64; b++) {
 		u32 ones = 0, zeros = 0;
 		for (u32 i = 0; i < 8; i++) {
 			ones += fram[b * 8 + i] == 0xFF;
@@ -507,7 +509,7 @@ static void step_eeprom(void)
 			block = b;
 	}
 	if (block == 64) {
-		say(GREY, "The save chip's first 512 bytes are");
+		say(GREY, "The save chip's first 128 bytes are");
 		say(GREY, "blank, so replies can't be told apart:");
 		say(GREY, "save in an EEPROM game, then run this.");
 		result(1, "EEPROM probe (inconclusive)");
@@ -522,7 +524,8 @@ static void step_eeprom(void)
 	static const u32 widths[] = {6, 14};
 	for (u32 t = 0; t < 2; t++) {
 		set_save_type(types[t], sizes[t]);
-		for (u32 w = 0; w < 2; w++) {
+		for (u32 n = 0; n < 2; n++) {
+			u32 w = t ? 1 - n : n;  // the type's own width first
 			diag_eeprom_read(block, widths[w]);
 			u8 got[8] = {0};
 			for (u32 i = 0; i < 64; i++)
@@ -541,7 +544,10 @@ static void step_eeprom(void)
 			     (unsigned long)widths[w], got[0], got[1], got[2], got[3], got[4], got[5], got[6], got[7]);
 		}
 	}
-	// Leave no save type set; the next launch sets its own.
+	// End with a request of the right width, then SRAM as the save type,
+	// so no EEPROM command is left half sent; the next launch sets its own.
+	diag_eeprom_read(block, 14);
+	set_save_type(0x11, 0x8000);
 	init_FAT_table();
 	pause_frames(120);
 }
@@ -581,6 +587,7 @@ static void step_rumble(void)
 		int clock = clock_answers();
 		say(WHITE, "register %u: clock %s", values[i], clock ? "answers" : "silent");
 		rumble_pulse();
+		Set_RTC_status(1);  // the clock back before the answer is logged with a time
 		char topic[32];
 		snprintf(topic, sizeof(topic), "rumble at register %u", values[i]);
 		ask(topic, "Did it rumble just now?");
@@ -681,6 +688,14 @@ static u32 crash_loop[1] EWRAM_BSS;
 
 void Diagnostics(void)
 {
+	screen_title("start?");
+	say(WHITE, "Diagnostics tests the cart and writes");
+	say(WHITE, "a report to /torii/logs. It never");
+	say(WHITE, "writes your saves. It takes a minute,");
+	say(WHITE, "then restarts the kernel.");
+	say(WHITE, "A: start   B: back");
+	if (wait_key(KEY_A | KEY_B) & KEY_B)
+		SoftReset_now();
 	if (tlog_level == TLOG_OFF) {  // this session has no line on the card yet
 		tlog_set_level(TLOG_DEBUG);
 		tlog_marker("Diagnostics", 0);

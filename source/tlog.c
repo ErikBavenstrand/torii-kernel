@@ -138,6 +138,11 @@ void tlog_debug(const char *format, ...)
 	va_end(args);
 }
 
+int tlog_all_written(void)
+{
+	return ring.head == ring.tail && !ring.lost;
+}
+
 u32 tlog_recent(char *out, u32 max)
 {
 	return log_ring_tail(&ring, out, max);
@@ -191,6 +196,9 @@ static int byte_at(void *ctx, u32 offset)
 
 // Makes log file slot full size and zero, then writes its header. A rotation
 // cut off by power loss leaves a file with no header, which counts as unused.
+// Free space a new log file must leave on the card, for saves and states.
+#define LOG_CARD_RESERVE (1024 * 1024)
+
 static FRESULT start_file(u32 slot, u32 seq)
 {
 	char path[32];
@@ -202,6 +210,22 @@ static FRESULT start_file(u32 slot, u32 seq)
 	res = f_open(&log_file, path, FA_WRITE | FA_OPEN_ALWAYS);
 	if (res != FR_OK)
 		return res;
+	if (f_size(&log_file) < LOG_FILE_SIZE) {
+		// A file to make or grow: only if the card keeps room to spare.
+		DWORD clusters;
+		FATFS *fs;
+		res = f_getfree("", &clusters, &fs);
+		if (res == FR_OK && (unsigned long long)clusters * fs->csize * 512 <
+					    LOG_FILE_SIZE - f_size(&log_file) + LOG_CARD_RESERVE)
+			res = FR_DENIED;
+		if (res != FR_OK) {
+			u32 made = f_size(&log_file) == 0;
+			f_close(&log_file);
+			if (made)
+				f_unlink(path);
+			return res;
+		}
+	}
 	for (u32 offset = 0; offset < LOG_FILE_SIZE; offset += sizeof(zeros)) {
 		res = f_write(&log_file, zeros, sizeof(zeros), &done);
 		if (res == FR_OK && done != sizeof(zeros))

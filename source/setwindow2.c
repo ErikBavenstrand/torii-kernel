@@ -429,7 +429,8 @@ void save_set2_info(void)
 	SET_info_buffer[assress_SD_R] = SD_R;
 	SET_info_buffer[assress_SD_G] = SD_G;
 	SET_info_buffer[assress_SD_B] = SD_B;
-	SET_info_buffer[assress_logging] = log_sel;
+	if (log_sel != tlog_level_setting())  // an erased slot stays erased until changed
+		SET_info_buffer[assress_logging] = log_sel;
 
 	//save to nor
 	Save_SET_info(SET_info_buffer, 0x200);

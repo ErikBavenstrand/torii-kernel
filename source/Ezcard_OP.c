@@ -155,6 +155,7 @@ u16 Read_S98NOR_ID(void)
 	*((vu16 *)(FlashBase_S98 + 0x2AA * 2)) = 0x55;
 	*((vu16 *)(FlashBase_S98 + 0x555 * 2)) = 0x90;
 	ID1 = *((vu16 *)(FlashBase_S98 + 0xE * 2));
+	*((vu16 *)(FlashBase_S98)) = 0xF0;  //Torii: back to reading, or the NOR list reads the ID
 	return ID1;
 }
 // --------------------------------------------------------------------

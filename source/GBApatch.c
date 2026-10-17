@@ -429,7 +429,7 @@ static void Patch_RTS_Cheat(u32 *Data)
 	//LOGGING on and if it fits the space kept for the patch.
 	u32 debug_size = (u8 *)Debug_blob_end - (u8 *)Debug_blob_start;
 	u32 debug_at = 0;
-	if (tlog_level != TLOG_OFF) {
+	if (tlog_level != TLOG_OFF && !is_NORpatch) {  // a NOR copy would keep it with logging off
 		if (copysize + debug_size <= Patch_length() && iTrimSize + copysize + debug_size <= 0x2000000) {
 			dmaCopy((void *)Debug_blob_start, patchbuffer + copysize, debug_size);
 			debug_at = copysize;

@@ -1828,6 +1828,10 @@ int main(void)
 
 	Read_NOR_info();
 	gl_norOffset = 0x000000;
+	// Torii: the game NOR back to reading, in case a soft reset (a kernel
+	// crash) came while it was in a command; in ID mode the list reads as
+	// empty and the code below would erase the NOR game table.
+	*(vu16 *)FlashBase_S98 = 0xF0;
 	game_total_NOR = GetFileListFromNor();//initialize to prevent direct writes to NOR without page turning
 
 	if (game_total_NOR == 0) {

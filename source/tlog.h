@@ -6,7 +6,7 @@
 //   /torii/logs/torii-N.log at safe points (after boot, on errors, when
 //   settings close, before a launch).
 // With LOGGING off on a real cart, every call returns at once and nothing
-// touches the card.
+// touches the card, except to log a kernel crash dump (source/cartlog.c).
 #ifndef TORII_TLOG_H
 #define TORII_TLOG_H
 
@@ -57,6 +57,9 @@ void tlog_force(u32 level, const char *format, ...) __attribute__((format(printf
 // The last line the previous session wrote to the card, read when the card
 // was mounted with logging on; NULL if there is none.
 const char *tlog_previous_line(void);
+
+// True if every line so far reached the card (or none was kept).
+int tlog_all_written(void);
 
 // The newest log text, for the crash dump: see log_ring_tail.
 u32 tlog_recent(char *out, u32 max);

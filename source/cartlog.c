@@ -121,7 +121,7 @@ void IWRAM_CODE torii_crash(const u32 *regs)
 {
 	u32 i;
 	REG_IME = 0;
-	SetRompage(gl_currentpage);  // the kernel's ROM, for the calls below
+	SetRompage(gl_currentpage ? gl_currentpage : 0x8002);  // the kernel's ROM, for the calls below
 	memset(&crash, 0, sizeof(crash));
 	for (i = 0; i < 17; i++)
 		crash.regs[i] = regs[i];
@@ -155,7 +155,6 @@ static void report_crash(void)
 	cart_read(CARTLOG_CRASH, &crash, sizeof(crash));
 	if (memcmp(crash.magic, CRASH_MAGIC, 8) != 0)
 		return;
-	cart_clear_magic(CARTLOG_CRASH, 8);
 	if (tlog_level == TLOG_OFF)  // with logging on, this boot's line is there already
 		tlog_marker("a crash report", 1);
 	const u32 *r = crash.regs;
@@ -189,6 +188,8 @@ static void report_crash(void)
 		p += len + 1;
 	}
 	tlog_flush();
+	if (tlog_all_written())  // else the next boot tries again
+		cart_clear_magic(CARTLOG_CRASH, 8);
 }
 
 static void report_snapshot(void)

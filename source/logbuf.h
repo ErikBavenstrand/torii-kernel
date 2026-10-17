@@ -35,7 +35,8 @@ u32 log_ring_tail(const log_ring *r, char *out, u32 max);
 // The log files: LOG_FILES of LOG_FILE_SIZE bytes each, written in turn.
 // Each starts with a header holding its sequence number; text follows, and
 // zero bytes fill the rest. A file is made full size once, so a flush only
-// rewrites its data sectors and never changes the card's FAT.
+// rewrites its data sectors and its entry in /torii/logs (the time it was
+// written), and never changes the card's FAT.
 #define LOG_FILES 4
 #define LOG_FILE_SIZE 0x10000
 #define LOG_HEADER_LEN 24  // "torii log 00000001\n" and padding
