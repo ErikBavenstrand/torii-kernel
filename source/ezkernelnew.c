@@ -1180,6 +1180,25 @@ u32 IWRAM_CODE Loadfile2PSRAM(TCHAR *filename)
 	}
 }
 //---------------------------------------------------------------------------------
+// Copies the name a list entry keeps in its 100 bytes. A longer name lists
+// as its 8.3 name, which opens; exFAT has none, so there it is cut short,
+// keeping its extension, and won't open.
+static void List_name(char *entry, const FILINFO *info)
+{
+	u32 len = strlen(info->fname);
+	if (len < 100) {
+		strcpy(entry, info->fname);
+	} else if (info->altname[0]) {
+		strcpy(entry, info->altname);
+	} else {
+		const char *ext = strrchr(info->fname, '.');
+		u32 ext_len = (ext && (info->fname + len - ext) < 8) ? (u32)(info->fname + len - ext) : 0;
+		memcpy(entry, info->fname, 99 - ext_len);
+		memcpy(entry + 99 - ext_len, info->fname + len - ext_len, ext_len);
+		entry[99] = 0;
+	}
+}
+//---------------------------------------------------------------------------------
 void CheckLanguage(void)
 {
 	u16 id = Read_SET_info(assress_language);
@@ -1789,17 +1808,18 @@ refind_file:
 				if (res != FR_OK || fileinfo.fname[0] == 0)
 					break;
 
-				if ((fileinfo.fattrib == AM_DIR) || (fileinfo.fattrib == 0x30))  //DIR and exFAT dir
-				{
+				// Hidden and system entries stay out; the other attributes,
+				// such as read-only or archive, don't matter
+				if (fileinfo.fattrib & (AM_HID | AM_SYS))
+					continue;
+				if (fileinfo.fattrib & AM_DIR) {
 					if (folder_total >= MAX_folder)  //full: skip, but keep reading files
 						continue;
-					memcpy(pFolder[folder_total].filename, fileinfo.fname, 100);
-					pFolder[folder_total++].filename[99] = 0;
-				} else if ((fileinfo.fattrib == AM_ARC) || (fileinfo.fattrib == 0x21)) {
+					List_name(pFolder[folder_total++].filename, &fileinfo);
+				} else {
 					if (game_total_SD >= MAX_files)  //full: skip, but keep reading folders
 						continue;
-					memcpy(pFilename_buffer[game_total_SD].filename, fileinfo.fname, 100);
-					pFilename_buffer[game_total_SD].filename[99] = 0;
+					List_name(pFilename_buffer[game_total_SD].filename, &fileinfo);
 					pFilename_buffer[game_total_SD++].filesize = fileinfo.fsize;
 				}
 			}

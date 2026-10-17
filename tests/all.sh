@@ -20,6 +20,7 @@ jobs=(
   "tests/names.sh exfat"
   "tests/stale_recent.sh"
   "tests/fragmented.sh"
+  "tests/listing.sh"
 )
 
 logs=$(mktemp -d)
