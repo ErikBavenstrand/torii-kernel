@@ -13,9 +13,11 @@ git log, not here.
 - **Fixed:** too many cheats no longer overrun the patch area (`d57c89f`).
   The table is capped at 600 entries, which fit after the in-game handler in
   the 0x2000 bytes appended to the ROM; it also frees 19 KB of EWRAM.
-- **Added:** a RUMBLE setting next to GAME RTC (`6d39f85`). Turning GAME RTC
-  off no longer turns off rumble (ez-flash/omega-de-kernel#5): rumble games
-  follow RUMBLE, every other game follows GAME RTC.
+- **Changed:** the GAME RTC setting becomes a CART row with separate CLOCK
+  and RUMBLE checkboxes (`6d39f85`, `e7aaa36`). Turning the clock off no
+  longer turns off rumble (ez-flash/omega-de-kernel#5): Drill Dozer and
+  WarioWare: Twisted!, the only carts with a rumble motor, follow RUMBLE,
+  and every other game follows CLOCK.
 - **Changed:** GB, GBC and NES games start as soon as you open them
   (`7489a1b`). Their boot menu only offered CLEAN BOOT
   (ez-flash/omega-de-kernel#12); hold L for a hard reset as before.
