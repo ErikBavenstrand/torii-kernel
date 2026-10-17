@@ -2158,6 +2158,7 @@ re_showfile:
 						} else {
 							page_mode = 0x1;
 							res = SD_list_MENU(show_offset, file_select, play_re);
+							play_re = 0xBB;  // A in the list opens the list's games again
 							if (res) {
 								if (res == 2) {
 									page_num = NOR_list;
@@ -2388,7 +2389,7 @@ u8 NOR_list_MENU(u32 show_offset, u32 file_select)
 	return 0;
 }
 //---------------------------------------------------------------
-u8 SD_list_MENU(u32 show_offset, u32 file_select, u32 play_re)
+static u8 SD_list_open(u32 show_offset, u32 file_select, u32 play_re)
 {
 	u32 res;
 	u8 Save_num = 0;  //save tpye: auto
@@ -2742,4 +2743,18 @@ boot_game:
 		}
 	}
 	return 0;
+}
+//---------------------------------------------------------------------------------
+// Opens the game under the cursor, or Recently Played entry play_re. An entry
+// moves currentpath to its folder; when it returns 0, to the list as it was,
+// currentpath goes back too, or the list would show one folder and open files
+// in another.
+u8 SD_list_MENU(u32 show_offset, u32 file_select, u32 play_re)
+{
+	u8 res = SD_list_open(show_offset, file_select, play_re);
+	if (res == 0 && play_re != 0xBB) {
+		strncpy(currentpath, currentpath_temp, MAX_path_len);
+		f_chdir(currentpath);
+	}
+	return res;
 }
