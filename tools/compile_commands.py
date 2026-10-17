@@ -21,6 +21,18 @@ import sys
 from pathlib import Path
 
 
+def host_path(arg: str, root: str, devkitpro: str) -> str:
+    """Map a container path, alone or after -I and the like, to the host."""
+    for flag in ("", "-I", "-iquote", "-isystem"):
+        path = arg[len(flag) :]
+        if not arg.startswith(flag):
+            continue
+        for container, host in (("/opt/devkitpro", devkitpro), ("/src", root)):
+            if path == container or path.startswith(container + "/"):
+                return flag + host + path[len(container) :]
+    return arg
+
+
 def main() -> int:
     root = sys.argv[1]
     devkitpro = f"{root}/dist/devkitpro"
@@ -42,9 +54,7 @@ def main() -> int:
                 if arg == "-MF":
                     skip = True
                     continue
-                out.append(
-                    arg.replace("/opt/devkitpro", devkitpro).replace("/src", root, 1)
-                )
+                out.append(host_path(arg, root, devkitpro))
             source = out[out.index("-c") + 1]
             entries.setdefault(
                 source,

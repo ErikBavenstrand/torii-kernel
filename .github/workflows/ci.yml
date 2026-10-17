@@ -30,7 +30,7 @@ jobs:
         with:
           # The lint tools are pinned in the justfile; there is no lock file.
           cache-dependency-glob: justfile
-      - name: Lint Python and shell scripts
+      - name: Lint C, Python, shell scripts and workflows
         run: just lint
 
   kernel:

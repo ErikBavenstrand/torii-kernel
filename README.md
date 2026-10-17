@@ -4,7 +4,7 @@ A custom kernel for the EZ-Flash Omega Definitive Edition, in the making.
 Named after the shrine gate you pass through into another world, like every
 game you launch. Not affiliated with EZ-Flash.
 
-Right now the kernel is EZ-Flash's official 1.06, unmodified. What this repo
+Right now the kernel is EZ-Flash's official 1.06 with bug fixes. What this repo
 adds so far is the groundwork: a reproducible build, an emulated cart to run
 the kernel on, and tests.
 
@@ -37,7 +37,7 @@ the update.
 | `just test` | host and kernel unit tests, then homebrew games through the kernel: boot, every save type across power cycles, crash reports and save states |
 | `just cart-add game.gba` | copies a file onto the emulated SD card |
 | `just game-add PATH...` | copies games you own (files or whole folders) into the git-ignored `roms/` and lists them in `roms/games.toml` |
-| `just test-host` | builds the hardware-free kernel code (sorting, cheat parsing) for your computer with AddressSanitizer and UndefinedBehaviorSanitizer and runs `tests/host` (also part of `just test`) |
+| `just test-host` | builds the hardware-free kernel code (sorting, cheat parsing) for Linux in the tools container with AddressSanitizer and UndefinedBehaviorSanitizer and runs `tests/host` (also part of `just test`) |
 | `just test-kernel` | builds a test kernel that runs the unit tests in `tests/kernel` at boot (also part of `just test`) |
 | `just compat` | plays each listed game through the kernel and checks it boots, gets the right save type and clock, and keeps its saves; prints a table and writes `dist/compat/index.html` with screenshots |
 | `just size` | kernel size against the 1 MB kernel area, IWRAM and EWRAM, plus the largest symbols; fails if anything is over |

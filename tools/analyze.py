@@ -13,7 +13,8 @@ usage: analyze.py files                 C files to analyze, one per line
 The analyzed files are the kernel's own C files in source/, which
 compile_commands.json (`just compile-commands`) lists; the vendored FatFs
 (source/ff15) is left out. DIR holds each tool's output: cppcheck.txt,
-clang-tidy.txt and gcc.txt. A finding is the tool, file, check and message,
+clang-tidy.txt and gcc.txt. A tool that reports nothing where the baseline
+expects findings fails the check, as does a GCC run that didn't finish. A finding is the tool, file, check and message,
 without line numbers, so edits elsewhere in a file don't make old findings
 look new. The baseline lists each finding as often as it occurs.
 """
@@ -27,6 +28,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 GCC = "/opt/devkitpro/devkitARM/bin/arm-none-eabi-gcc"
+# The last line of gcc.txt, so an analysis that never ran can't pass
+DONE = "gcc -fanalyzer: analyzed"
 # GCC-only build flags that would stop or slow the analysis
 DROPPED = {"-Werror", "-fstack-usage", "-fcallgraph-info=su", "-MMD", "-MP"}
 
@@ -88,6 +91,7 @@ def main() -> int:
     elif command == "gcc":
         # One analyzer run per file, output to /dev/null; warnings go to stderr.
         print("set -e")
+        count = 0
         for _rel, entry in commands():
             args = [a for a in entry["arguments"] if a not in DROPPED]
             source = args[args.index("-c") + 1]
@@ -101,6 +105,8 @@ def main() -> int:
                 "/dev/null",
             ]
             print(f"(cd {shlex.quote(entry['directory'])} && {shlex.join(args)})")
+            count += 1
+        print(f"echo '{DONE} {count} files' >&2")
     elif command in ("check", "baseline"):
         directory, baseline = Path(sys.argv[2]), Path(sys.argv[3])
         current = findings(directory)
@@ -116,6 +122,18 @@ def main() -> int:
         )
         new, gone = current - known, known - current
         by_tool = Counter(f.split(" ", 1)[0] for f in current.elements())
+        # A tool that finds nothing where the baseline expects findings more
+        # likely failed to run than fixed them all.
+        expected = Counter(f.split(" ", 1)[0] for f in known.elements())
+        silent = [tool for tool in expected if not by_tool[tool]]
+        if silent:
+            print(
+                f"{', '.join(silent)} found nothing, but the baseline expects findings: check dist/analyze/"
+            )
+            return 1
+        if DONE not in (directory / "gcc.txt").read_text(errors="replace"):
+            print("gcc -fanalyzer did not finish: check dist/analyze/gcc.txt")
+            return 1
         print(
             "findings: "
             + ", ".join(f"{tool} {n}" for tool, n in sorted(by_tool.items()))

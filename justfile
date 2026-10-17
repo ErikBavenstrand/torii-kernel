@@ -1,7 +1,7 @@
 # Torii build commands. Needs Docker and just; `play` and `dev` also need
 # CMake, pkg-config and SDL2 to build the patched mGBA natively.
 #
-# The kernel source is the official 1.06 release, unmodified. It is built with
+# The kernel source is forked from the official 1.06 release. It is built with
 # devkitARM r54 (GCC 10.1), the closest release to the r53 EZ-Flash used that
 # compiles it without changes, pinned by digest. It runs under amd64 emulation.
 
@@ -160,9 +160,9 @@ _analyze-run: compile-commands
     @{{fresh}} check analyze-image -- docker/analyze.Dockerfile && docker image inspect torii-analyze >/dev/null 2>&1 || { docker build -q -t torii-analyze -f docker/analyze.Dockerfile docker >/dev/null && {{fresh}} record analyze-image -- docker/analyze.Dockerfile; }
     mkdir -p dist/analyze
     python3 tools/analyze.py project dist/analyze/project.json
-    docker run --rm -u $(id -u):$(id -g) -v "$PWD":"$PWD" -w "$PWD" torii-analyze cppcheck -q --project=dist/analyze/project.json {{cppcheck_flags}} 2> dist/analyze/cppcheck.txt
-    python3 tools/analyze.py files | xargs uvx clang-tidy@{{clang_tidy}} -p . --quiet > dist/analyze/clang-tidy.txt 2>/dev/null
-    python3 tools/analyze.py gcc | docker run --rm -i --platform linux/amd64 -u $(id -u):$(id -g) -v "$PWD":"$PWD" -w "$PWD" {{kernel_image}} sh 2> dist/analyze/gcc.txt
+    docker run --rm -u $(id -u):$(id -g) -v "$PWD":"$PWD" -w "$PWD" torii-analyze cppcheck -q --project=dist/analyze/project.json {{cppcheck_flags}} 2> dist/analyze/cppcheck.txt || { tail -n 20 dist/analyze/cppcheck.txt; exit 1; }
+    python3 tools/analyze.py files | xargs uvx clang-tidy@{{clang_tidy}} -p . --quiet > dist/analyze/clang-tidy.txt 2>/dev/null || { grep -A3 ' error: ' dist/analyze/clang-tidy.txt | head -n 20; exit 1; }
+    python3 tools/analyze.py gcc | docker run --rm -i --platform linux/amd64 -u $(id -u):$(id -g) -v "$PWD":"$PWD" -w "$PWD" {{kernel_image}} sh 2> dist/analyze/gcc.txt || { tail -n 20 dist/analyze/gcc.txt; exit 1; }
     @wc -l dist/analyze/cppcheck.txt dist/analyze/clang-tidy.txt dist/analyze/gcc.txt | sed '$d'
 
 # Play the listed games through the kernel and write dist/compat/index.html. Filters pick
