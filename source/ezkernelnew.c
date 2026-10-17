@@ -852,6 +852,7 @@ u32 Check_game_RTS_FAT(TCHAR *filename, u32 game_save_rts)
 	//u32 ret;
 	FIL file;
 	u32 *FAT_table_P;
+	u32 *FAT_table_end;
 	u32 getcluster;
 	u32 getcluster_old;
 	u32 cluster_num = 0;
@@ -866,8 +867,9 @@ u32 Check_game_RTS_FAT(TCHAR *filename, u32 game_save_rts)
 	//DEBUG_printf("first clust %x;  sec=%x ",(&file)->obj.sclust,	ClustToSect(&EZcardFs,(&file)->obj.sclust)	);
 	//DEBUG_printf("fs->fs_type %x",(&EZcardFs)->fs_type);
 #endif
+	// Values from here up are bad clusters or the end of the chain
 	if ((&EZcardFs)->fs_type == FS_FAT16) {
-		lastest_cluster = 0xFFFF;
+		lastest_cluster = 0xFFF7;
 	} else {
 		lastest_cluster = 0xFFFFFF7;
 	}
@@ -883,6 +885,9 @@ u32 Check_game_RTS_FAT(TCHAR *filename, u32 game_save_rts)
 	else {
 		FAT_table_P = FAT_table_buffer + FAT_table_RTS_offset / 4;
 	}
+	// The game's table ends at the launch parameters at 0x1F0, the RTS
+	// file's at the end of the buffer: each run of clusters takes 8 bytes
+	FAT_table_end = (game_save_rts == 1) ? FAT_table_buffer + 0x1F0 / 4 : FAT_table_buffer + FAT_table_size / 4;
 
 	*FAT_table_P = 0x00000000;
 	FAT_table_P++;
@@ -893,7 +898,16 @@ u32 Check_game_RTS_FAT(TCHAR *filename, u32 game_save_rts)
 	do {
 		getcluster = Get_NextCluster(&(&file)->obj, getcluster);
 		cluster_num++;
+		if (getcluster < 2) {  // FatFs couldn't follow the chain
+			f_close(&file);
+			return RTS_FAT_FRAGMENTED;
+		}
 		if (getcluster != (getcluster_old + 1)) {
+			if (FAT_table_P + 2 > FAT_table_end) {
+				tlog("%s has more runs of clusters than the cart's table holds", filename);
+				f_close(&file);
+				return RTS_FAT_FRAGMENTED;
+			}
 #ifdef DEBUG
 			//DEBUG_printf("getcluster = %x",getcluster);
 #endif
@@ -1495,6 +1509,9 @@ static void Show_error_num(u8 error_num)
 		break;
 	case 0x6:
 		sprintf(msg, "%s", gl_error_6);
+		break;
+	case 0x7:
+		sprintf(msg, "%s", gl_error_7);
 		break;
 	default:
 		sprintf(msg, "%s", "error?");
@@ -2578,8 +2595,8 @@ boot_game:
 
 		f_chdir(currentpath);  //return to game folder
 		res = Check_game_RTS_FAT(pfilename, 1);  //game FAT
-		if (res == 0xffffffff) {
-			error_num = 1;
+		if (res != 0) {
+			error_num = (res == RTS_FAT_FRAGMENTED) ? 7 : 1;
 			Show_error_num(error_num);
 			return 0;
 		}

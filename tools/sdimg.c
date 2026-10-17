@@ -2,9 +2,10 @@
 // tests can use exFAT (which mtools can't write) and UTF-8 names. Built and
 // run by tools/sdimg.sh inside the torii-emu container.
 //
-//   sdimg IMG mkfs fat32|exfat MEGABYTES
+//   sdimg IMG mkfs fat16|fat32|exfat MEGABYTES
 //   sdimg IMG mkdir PATH
 //   sdimg IMG put LOCAL_FILE PATH
+//   sdimg IMG put-fragmented LOCAL_FILE PATH RUNS  (in RUNS runs of clusters)
 //   sdimg IMG get PATH LOCAL_FILE
 //   sdimg IMG ls PATH
 //   sdimg IMG rm PATH
@@ -76,7 +77,7 @@ static int mkfs(const char *path, const char *type, long megabytes)
 		return fail("creating the image", FR_DENIED);
 	if (fseek(img, megabytes * 1024 * 1024 - 1, SEEK_SET) || fputc(0, img) == EOF)
 		return fail("sizing the image", FR_DISK_ERR);
-	MKFS_PARM opt = {.fmt = strcmp(type, "exfat") == 0 ? FM_EXFAT : FM_FAT32};
+	MKFS_PARM opt = {.fmt = strcmp(type, "exfat") == 0 ? FM_EXFAT : strcmp(type, "fat16") == 0 ? FM_FAT : FM_FAT32};
 	FRESULT res = f_mkfs("", &opt, work, sizeof(work));
 	if (res != FR_OK)
 		return fail("f_mkfs", res);
@@ -104,6 +105,40 @@ static int put(const char *local, const char *path)
 		res = f_write(&f, buf, (UINT)n, &done);
 		if (res != FR_OK || done != n)
 			return fail("f_write", res);
+	}
+	fclose(in);
+	return f_close(&f) == FR_OK ? 0 : fail("f_close", FR_DISK_ERR);
+}
+
+// Writes the file one cluster at a time with a one-cluster filler file
+// (/FILLnnnn.BIN) after each, so its first RUNS - 1 clusters are separate runs
+static int put_fragmented(const char *local, const char *path, long runs, FATFS *fs)
+{
+	FILE *in = fopen(local, "rb");
+	if (!in) {
+		perror(local);
+		return 1;
+	}
+	UINT cluster = fs->csize * 512;
+	FIL f;
+	FRESULT res = f_open(&f, path, FA_WRITE | FA_CREATE_ALWAYS);
+	if (res != FR_OK)
+		return fail("f_open", res);
+	static BYTE buf[65536];
+	size_t n;
+	for (long run = 1; (n = fread(buf, 1, run < runs ? cluster : sizeof(buf), in)) > 0; run++) {
+		UINT done;
+		res = f_write(&f, buf, (UINT)n, &done);
+		if (res != FR_OK || done != n)
+			return fail("f_write", res);
+		if (run < runs) {
+			char filler[32];
+			FIL g;
+			snprintf(filler, sizeof(filler), "/FILL%04ld.BIN", run);
+			if ((res = f_open(&g, filler, FA_WRITE | FA_CREATE_ALWAYS)) != FR_OK ||
+			    (res = f_write(&g, buf, 1, &done)) != FR_OK || (res = f_close(&g)) != FR_OK)
+				return fail("writing a filler file", res);
+		}
 	}
 	fclose(in);
 	return f_close(&f) == FR_OK ? 0 : fail("f_close", FR_DISK_ERR);
@@ -166,6 +201,8 @@ int main(int argc, char **argv)
 		status = (res == FR_OK || res == FR_EXIST) ? 0 : fail("f_mkdir", res);
 	} else if (strcmp(cmd, "put") == 0 && argc == 5) {
 		status = put(argv[3], argv[4]);
+	} else if (strcmp(cmd, "put-fragmented") == 0 && argc == 6) {
+		status = put_fragmented(argv[3], argv[4], atol(argv[5]), &fs);
 	} else if (strcmp(cmd, "get") == 0 && argc == 5) {
 		status = get(argv[3], argv[4]);
 	} else if (strcmp(cmd, "ls") == 0 && argc == 4) {

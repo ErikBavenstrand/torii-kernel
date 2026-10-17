@@ -869,7 +869,7 @@ u32 Check_RTS(TCHAR *gamefilename)
 	LoadRTSfile(rtsnamebuf);
 	if (rtsfilesize) {
 		res = Check_game_RTS_FAT(rtsnamebuf, 3);//rts FAT
-		if (res == 0xffffffff) {
+		if (res != 0) {
 			rtsfilesize = 0;
 		}
 	}

@@ -69,6 +69,10 @@ u32 Check_cheat_file(TCHAR *gamefilename);
 void SetTrimSize(u8 *buffer, u32 romsize, u32 iSize, u32 mode, BYTE saveMODE);
 u32 Find_spend_address_SpecialROM(u32 *Data);
 void Patch_SpecialROM_TrimSize(void);
+// Fills the cart's table of the file's cluster runs (game_save_rts 1: the
+// game's, 3: the RTS file's). Returns 0, 0xffffffff if the file doesn't
+// open, or RTS_FAT_FRAGMENTED if its runs don't fit or its chain breaks.
+#define RTS_FAT_FRAGMENTED 0xfffffffe
 u32 Check_game_RTS_FAT(TCHAR *filename, u32 game_save_rts);
 void IWRAM_CODE PatchInternal(u32 *Data, int iSize, u32 offset);
 void Patch_SpecialROM_sleepmode(void);
