@@ -18,6 +18,7 @@
 #include "saveMODE.h"
 #include "RTC.h"
 #include "tlog.h"
+#include "sort.h"
 #include "NORflash_OP.h"
 #include "lang.h"
 #include "GBApatch.h"
@@ -34,7 +35,6 @@ FM_FILE_FS pFilename_buffer[MAX_files]EWRAM_BSS;
 FM_NOR_FS pNorFS[MAX_NOR]EWRAM_BSS;
 FM_Folder_FS pFolder[MAX_folder]EWRAM_BSS;
 
-FM_FILE_FS pFilename_temp;
 
 u32 FAT_table_buffer[FAT_table_size/4]EWRAM_BSS;
 u8 pReadCache [MAX_pReadCache_size]EWRAM_BSS;
@@ -1547,49 +1547,13 @@ void save_set_info_SELECT(void)
 //Sort folder
 void Sort_folder(u32 folder_total)
 {
-	u32 ret;
-	u32 i;
-	int get;
-	if(folder_total>1)
-	{
-		for(ret=0;ret<folder_total-1;ret++)
-		{
-			for(i=0;i<folder_total-ret-1;i++)
-			{
-				get = strcmp(pFolder[i].filename,pFolder[i+1].filename) ;
-				if(get>0)
-				{
-					dmaCopy(&pFolder[i+1],&(pFilename_temp.filename),sizeof(FM_Folder_FS));
-					dmaCopy(&pFolder[i],&pFolder[i+1],sizeof(FM_Folder_FS));
-					dmaCopy(&(pFilename_temp.filename),&pFolder[i],sizeof(FM_Folder_FS));					
-				}
-			}
-		}
-	}
+	sort_by_name(pFolder,folder_total,sizeof(FM_Folder_FS));
 }
 //---------------------------------------------------------------------------------
 //Sort file 
 void Sort_file(u32 game_total_SD)
 {
-	u32 ret;
-	u32 i;
-	int get;
-	if(game_total_SD>1)
-	{
-		for(ret=0;ret<game_total_SD-1;ret++)
-		{
-			for(i=0;i<game_total_SD-ret-1;i++)
-			{
-				get = strcmp(pFilename_buffer[i].filename,pFilename_buffer[i+1].filename) ;
-				if(get>0)
-				{
-					dmaCopy(&pFilename_buffer[i+1],&pFilename_temp,sizeof(FM_FILE_FS));
-					dmaCopy(&pFilename_buffer[i],&pFilename_buffer[i+1],sizeof(FM_FILE_FS));
-					dmaCopy(&pFilename_temp,&pFilename_buffer[i],sizeof(FM_FILE_FS));					
-				}
-			}
-		}
-	}	
+	sort_by_name(pFilename_buffer,game_total_SD,sizeof(FM_FILE_FS));
 }	
 //---------------------------------------------------------------------------------
 u32 Load_Thumbnail(TCHAR *pfilename_pic)
@@ -1998,7 +1962,7 @@ refind_file:
 				{
 					memcpy(pFolder[folder_total].filename,fileinfo.fname,100);
 					pFolder[folder_total++].filename[99] = 0;
-					if ( folder_total > MAX_folder )//cut
+					if ( folder_total >= MAX_folder )//full
 	      		break;
 				}
 				else if(	(fileinfo.fattrib == AM_ARC) || (fileinfo.fattrib == 0x21) )
@@ -2006,7 +1970,7 @@ refind_file:
 					memcpy(pFilename_buffer[game_total_SD].filename,fileinfo.fname,100);
 					pFilename_buffer[game_total_SD].filename[99] = 0;
 					pFilename_buffer[game_total_SD++].filesize = fileinfo.fsize;
-	    		if ( game_total_SD > MAX_files )//cut
+	    		if ( game_total_SD >= MAX_files )//full
 	      		break;
 				}
 			}
