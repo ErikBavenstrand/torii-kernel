@@ -1180,23 +1180,31 @@ u32 IWRAM_CODE Loadfile2PSRAM(TCHAR *filename)
 	}
 }
 //---------------------------------------------------------------------------------
-// Copies the name a list entry keeps in its 100 bytes. A longer name lists
-// as its 8.3 name, which opens; exFAT has none, so there it is cut short,
-// keeping its extension, and won't open.
+// Copies the name a list entry keeps in its 100 bytes. A longer name is cut
+// at a character boundary and ends in '*', which no FAT name holds: the entry
+// can't open or delete anything, least of all another file whose name it
+// shares the start of, and opening it says the name is too long. (An 8.3 name
+// would open, but two in different folders can match, and so share a save.)
 static void List_name(char *entry, const FILINFO *info)
 {
 	u32 len = strlen(info->fname);
 	if (len < 100) {
 		memcpy(entry, info->fname, len + 1);
-	} else if (info->altname[0]) {
-		memcpy(entry, info->altname, sizeof(info->altname));  // 8.3 and its NUL fit
-	} else {
-		const char *ext = strrchr(info->fname, '.');
-		u32 ext_len = (ext && (info->fname + len - ext) < 8) ? (u32)(info->fname + len - ext) : 0;
-		memcpy(entry, info->fname, 99 - ext_len);
-		memcpy(entry + 99 - ext_len, info->fname + len - ext_len, ext_len);
-		entry[99] = 0;
+		return;
 	}
+	len = 98;
+	while (len > 0 && (info->fname[len] & 0xC0) == 0x80)  // not mid-character
+		len--;
+	memcpy(entry, info->fname, len);
+	entry[len] = '*';
+	entry[len + 1] = 0;
+}
+//---------------------------------------------------------------------------------
+// True for a list entry whose name List_name cut short
+static u32 Name_cut(const char *entry)
+{
+	u32 len = strlen(entry);
+	return len > 0 && entry[len - 1] == '*';
 }
 //---------------------------------------------------------------------------------
 void CheckLanguage(void)
@@ -1532,11 +1540,18 @@ static void Show_error_num(u8 error_num)
 	case 0x7:
 		sprintf(msg, "%s", gl_error_7);
 		break;
+	case 0x8:
+		sprintf(msg, "%s", gl_error_8);
+		break;
+	case 0x9:
+		sprintf(msg, "%s", gl_error_9);
+		break;
 	default:
 		sprintf(msg, "%s", "error?");
 		break;
 	}
 
+	tlog("error %u: %s", error_num, msg);
 	DrawHZText12(msg, 0, 90, 2, RGB(31, 00, 00), 1);
 	wait_btn();
 }
@@ -2097,15 +2112,24 @@ re_showfile:
 				if (page_num == SD_list) {
 					//res = f_getcwd(currentpath, sizeof currentpath / sizeof *currentpath);
 					if (show_offset + file_select < folder_total) {
+						const char *folder = pFolder[show_offset + file_select].filename;
+						u32 old_len = strlen(currentpath);
+						// A cut name, or a path past MAX_path_len, can't be
+						// opened; cutting the path would open another folder
+						if (Name_cut(folder) || old_len + 1 + strlen(folder) >= MAX_path_len) {
+							Show_error_num(Name_cut(folder) ? 8 : 9);
+							goto re_showfile;
+						}
 						if (strcmp(currentpath, "/") != 0) {
 							strncat(currentpath, "/",
 								MAX_path_len - 1 - strlen(currentpath));
 						}
-						strncat(currentpath, pFolder[show_offset + file_select].filename,
-							MAX_path_len - 1 - strlen(currentpath));
+						strncat(currentpath, folder, MAX_path_len - 1 - strlen(currentpath));
 
 						res = f_chdir(currentpath);
 						if (res != FR_OK) {
+							currentpath[old_len] = 0;
+							f_chdir(currentpath);
 							error_num = 0;
 							Show_error_num(error_num);
 							goto re_showfile;
@@ -2413,6 +2437,10 @@ static u8 SD_list_open(u32 show_offset, u32 file_select, u32 play_re)
 	//press A, show boot MENU;
 	if (play_re == 0xBB) {
 		pfilename = pFilename_buffer[show_offset + file_select - folder_total].filename;
+		if (Name_cut(pfilename)) {
+			Show_error_num(8);
+			return 0;
+		}
 	} else {
 		char *p = strrchr(p_recently_play[play_re], '/');
 		strncpy(currentpath_temp, currentpath, 256);  //old

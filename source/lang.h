@@ -73,6 +73,8 @@ extern char *gl_error_4;
 extern char *gl_error_5;
 extern char *gl_error_6;
 extern char *gl_error_7;
+extern char *gl_error_8;
+extern char *gl_error_9;
 
 extern char *gl_save_sav;
 extern char *gl_save_ing;

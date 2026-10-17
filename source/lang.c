@@ -72,6 +72,8 @@ char *gl_error_4;
 char *gl_error_5;
 char *gl_error_6;
 char *gl_error_7;
+char *gl_error_8;
+char *gl_error_9;
 
 char *gl_save_sav;
 char *gl_save_ing;
@@ -171,6 +173,8 @@ const char en_error_4[] = "Read save error";
 const char en_error_5[] = "Make save error";
 const char en_error_6[] = "RTS file error";
 const char en_error_7[] = "File fragmented";
+const char en_error_8[] = "Name too long";
+const char en_error_9[] = "Path too long";
 
 const char en_save_sav[] = "Save sav?";
 const char en_save_ing[] = "Sav...";
@@ -272,6 +276,8 @@ void LoadEnglish(void)
 	gl_error_5 = (char *)en_error_5;
 	gl_error_6 = (char *)en_error_6;
 	gl_error_7 = (char *)en_error_7;
+	gl_error_8 = (char *)en_error_8;
+	gl_error_9 = (char *)en_error_9;
 
 	gl_save_sav = (char *)en_save_sav;
 	gl_save_ing = (char *)en_save_ing;
