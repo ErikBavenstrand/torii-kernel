@@ -10,7 +10,6 @@ source/Ezcard_OP.c -text
 source/Ezcard_OP.h -text
 source/GBApatch.c -text
 source/GBApatch.h -text
-source/HZK12.h -text
 source/NORflash_OP.c -text
 source/NORflash_OP.h -text
 source/RTC.c -text

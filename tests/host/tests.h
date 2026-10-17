@@ -13,5 +13,6 @@ void test_cheat_cap(void);
 void test_cheat_garbage(void);
 void test_cheat_empty_entries(void);
 void test_cheat_whitespace(void);
+void test_charset_ascii(void);
 
 #endif

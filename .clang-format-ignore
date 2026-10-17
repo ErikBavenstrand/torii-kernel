@@ -11,7 +11,6 @@ source/Ezcard_OP.c
 source/Ezcard_OP.h
 source/GBApatch.c
 source/GBApatch.h
-source/HZK12.h
 source/NORflash_OP.c
 source/NORflash_OP.h
 source/RTC.c

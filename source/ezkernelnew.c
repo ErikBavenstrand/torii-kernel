@@ -69,7 +69,7 @@ FATFS EZcardFs;
 FILINFO fileinfo;
 DIR dir;
 FIL gfile;
-u8 dwName;
+
 
 u16 gl_reset_on;
 u16 gl_rts_on;
@@ -575,7 +575,7 @@ static void Filename_loop(u32 shift,u32 show_offset,u32 file_select,u32 haveThum
 	int namelen;
 	static u32 orgtt = 123455;
 	u32 timeout = 20;
-	//u8 dwName=0;	
+
 	char msg[128];
 	char temp_filename[100];
 	
@@ -629,18 +629,6 @@ static void Filename_loop(u32 shift,u32 show_offset,u32 file_select,u32 haveThum
 				orgtt = tt ;
 				sprintf(msg,"%s   ",temp_filename + tt);
 				strncpy(msg+strlen(msg) ,temp_filename , 128 - strlen(msg) );
-				if(temp_filename[tt] > 0x80)
-				{						
-					if(dwName)
-					{
-						msg[0] = 0x20;
-						dwName = 0;
-					}
-					else
-						dwName = 1;
-				}
-				else
-					dwName = 0;
 					
 				Clear(17,20 + file_select*14,(char_num)*6,13,gl_color_selectBG_sd,1);	
 				DrawHZText12(msg, char_num-1, 1+16, y_offset + file_select*14, gl_color_text,1);
@@ -2050,9 +2038,7 @@ re_showfile:
 			if((shift==0) || (gl_show_Thumbnail==0)){
 				short_filename = 0;				
 			}
-			if(shift==0){
-				dwName =0;
-			}			
+
 			shift++;
 			
 			haveThumbnail = 0;

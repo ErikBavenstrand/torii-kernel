@@ -36,7 +36,7 @@ indent_size = unset
 
 # Files from EZ-Flash's official source: CRLF, some GBK-encoded, kept as they
 # are until the source cleanup
-[{*.bat,source/{Ezcard_OP.c,Ezcard_OP.h,GBApatch.c,GBApatch.h,HZK12.h,NORflash_OP.c,NORflash_OP.h,RTC.c,RTC.h,asc126.h,draw.c,draw.h,ez_define.h,ezkernel.h,ezkernelnew.c,gba_nes_patch.h,gba_rts_only.s,gba_rts_patch.s,gba_sleep_patch.s,helpwindow.c,helpwindow.h,lang.c,lang.h,pocketnes.h,reset.s,reset_table.h,saveMODE.h,setwindow.c,setwindow2.c,showcht.c,showcht.h}}]
+[{*.bat,source/{Ezcard_OP.c,Ezcard_OP.h,GBApatch.c,GBApatch.h,NORflash_OP.c,NORflash_OP.h,RTC.c,RTC.h,asc126.h,draw.c,draw.h,ez_define.h,ezkernel.h,ezkernelnew.c,gba_nes_patch.h,gba_rts_only.s,gba_rts_patch.s,gba_sleep_patch.s,helpwindow.c,helpwindow.h,lang.c,lang.h,pocketnes.h,reset.s,reset_table.h,saveMODE.h,setwindow.c,setwindow2.c,showcht.c,showcht.h}}]
 charset = unset
 end_of_line = crlf
 insert_final_newline = unset

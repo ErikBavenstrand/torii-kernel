@@ -6,7 +6,7 @@
 #include <string.h>
 
 #include "ez_define.h"
-#include "HZK12.h"
+#include "charset.h"
 #include "asc126.h"
 #include "ezkernel.h"
 #include "draw.h"
@@ -86,7 +86,7 @@ void DrawHZText12(char *str, u16 len, u16 x, u16 y, u16 c, u8 isDrawDirect)
 {
   u32 i,l,hi=0;
   u32 location;
-	u8 cc,c1,c2;
+	u8 cc,c1;
 	u16 *v;
 	u16 *p1 = Vcache;
 	u16 *p2 = VideoBuffer;
@@ -110,89 +110,32 @@ void DrawHZText12(char *str, u16 len, u16 x, u16 y, u16 c, u8 isDrawDirect)
 		len=(240-x)/6;
     while(hi<l)
     {
-		c1 = str[hi];
-    	hi++;
-    	if(c1<0x80)  //ASCII
-    	{
-			yy = 240*y;
-    		location = c1*12;
-    		for(i=0;i<12;i++)
-			{
-				cc = ASC_DATA[location+i];
-				if(cc & 0x01)
-					v[x+7+yy]=c;
-				if(cc & 0x02)
-					v[x+6+yy]=c;
-				if(cc & 0x04)
-					v[x+5+yy]=c;
-				if(cc & 0x08)
-					v[x+4+yy]=c;
-				if(cc & 0x10)
-					v[x+3+yy]=c;
-				if(cc & 0x20)
-					v[x+2+yy]=c;
-				if(cc & 0x40)
-					v[x+1+yy]=c;
-				if(cc & 0x80)
-					v[x+yy]=c;
-				yy+=240;
-			}		
-    		x+=6;
-    		continue;
-    	}
-		else	//Double-byte
-		{	
-    		c2 = str[hi];
-    		hi++;
-    		if(c1<0xb0){   		
-    			location = ((c1-0xa1)*94+(c2-0xa1))*24;
-    		}
-    		else{
-    			location = (9*94+(c1-0xb0)*94+(c2-0xa1))*24;
-    		}
-
-			yy = 240*y;
-			for(i=0;i<12;i++)
-			{				
-				cc = acHZK12[location+i*2];
-				if(cc & 0x01)
-					v[x+7+yy]=c;
-				if(cc & 0x02)
-					v[x+6+yy]=c;
-				if(cc & 0x04)
-					v[x+5+yy]=c;
-				if(cc & 0x08)
-					v[x+4+yy]=c;
-				if(cc & 0x10)
-					v[x+3+yy]=c;
-				if(cc & 0x20)
-					v[x+2+yy]=c;
-				if(cc & 0x40)
-					v[x+1+yy]=c;
-				if(cc & 0x80)
-					v[x+yy]=c;
-								
-				cc = acHZK12[location+i*2+1];
-				if(cc & 0x01)
-					v[x+15+yy]=c;
-				if(cc & 0x02)
-					v[x+14+yy]=c;
-				if(cc & 0x04)
-					v[x+13+yy]=c;
-				if(cc & 0x08)
-					v[x+12+yy]=c;
-				if(cc & 0x10)
-					v[x+11+yy]=c;
-				if(cc & 0x20)
-					v[x+10+yy]=c;
-				if(cc & 0x40)
-					v[x+9+yy]=c;
-				if(cc & 0x80)
-					v[x+8+yy]=c;
-				yy+=240;
-			}
-			x+=12;
+		c1 = charset_ascii(str[hi]);
+		hi++;
+		yy = 240*y;
+		location = c1*12;
+		for(i=0;i<12;i++)
+		{
+			cc = ASC_DATA[location+i];
+			if(cc & 0x01)
+				v[x+7+yy]=c;
+			if(cc & 0x02)
+				v[x+6+yy]=c;
+			if(cc & 0x04)
+				v[x+5+yy]=c;
+			if(cc & 0x08)
+				v[x+4+yy]=c;
+			if(cc & 0x10)
+				v[x+3+yy]=c;
+			if(cc & 0x20)
+				v[x+2+yy]=c;
+			if(cc & 0x40)
+				v[x+1+yy]=c;
+			if(cc & 0x80)
+				v[x+yy]=c;
+			yy+=240;
 		}
+		x+=6;
 	}
 }
 //---------------------------------------------------------------------------------
