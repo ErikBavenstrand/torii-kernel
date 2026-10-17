@@ -68,9 +68,10 @@ VBlank IRQ, as part of `just test`.
 
 ## Results
 
-122 GBA games ran: 107 open the menu and go on afterwards, 12 fail, and 3 GB
-games are n/a. All 119 commercial GBA games are in the built-in table, so the
-ROM scan was never used. Every game that boots enables the VBlank IRQ, except
+119 GBA games ran (118 commercial, 1 homebrew). 107 open the menu and go on
+afterwards, and 12 fail. (The `gba` filter also matched 3 GB games, which are
+n/a.) All 118 commercial games are in the built-in table, and the homebrew
+one matches its all-zero entry, so the ROM scan was never used. Every game that boots enables the VBlank IRQ, except
 one homebrew ROM.
 
 | Game | What happens | Cause |
