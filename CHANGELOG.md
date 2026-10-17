@@ -24,13 +24,20 @@ git log, not here.
   (ez-flash/omega-de-kernel#12); hold L for a hard reset as before.
 - **Changed:** the SD listing sorts names ignoring case (`792f94e`), with a
   merge sort in place of a bubble sort that copied whole entries. Listing a
-  folder past its 256 folders or 512 files no longer writes past the list.
+  folder past its 256 folders or 512 files no longer writes past the list,
+  and a full list of one kind no longer hides the other (`f16036c`).
 - **Fixed:** the recently played list at its 10-entry limit (`aa88d7c`).
   Relaunching a listed game or adding to a full list wrote a stray 11th row,
   and the file was never truncated, so old rows lingered.
+- **Fixed:** cheat files with LF line endings (`2ff3845`). Each value lost
+  its last digit, so cheats wrote wrong values, and an empty value hung the
+  kernel. Long values and section names can no longer overflow their buffers.
 - **Fixed:** games start with EWRAM fully clear (`b6045f7`). The launch
   reset already cleared it, but the kernel then ran its last reset step from
-  EWRAM and left 64 bytes there; that step now runs from IWRAM.
+  EWRAM and left 64 bytes there; that step now runs from IWRAM, with
+  interrupts off before IWRAM is cleared (`972be9d`).
+- **Changed:** the launch log names the clock and rumble a game may use
+  (`63061c9`).
 
 ## v0.1.0 (2026-10-17)
 
