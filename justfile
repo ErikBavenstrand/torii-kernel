@@ -123,8 +123,8 @@ shot frame="300" *keys: build emu-headless cart
 run *args: build emu-headless cart
     {{emu_docker}} env OMEGA_DIR={{cart}} OMEGA_TRACE emu/build-linux/mgba-shot dist/ezkernelnew.bin "$@"
 
-# Boot test ROMs through the kernel and check every save type survives power cycles
-test: build emu-headless test-roms _test-kernel-build
+# Run the host tests, then boot test ROMs through the kernel and check every save type survives power cycles
+test: test-host build emu-headless test-roms _test-kernel-build
     {{emu_docker}} tests/all.sh
 
 # Lint and format-check the C, Python, shell scripts and CI workflows (pinned versions)
@@ -145,6 +145,10 @@ format:
 [positional-arguments]
 compat *filters: build emu-headless
     {{emu_docker}} python3 tests/games.py "$@"
+
+# Build the hardware-free kernel code with tests/host for the host, under ASan and UBSan, and run it
+test-host: emu-image
+    {{emu_docker}} tests/host.sh
 
 # Build the test kernel (ezkerneltest.gba) with tests/kernel and run its unit tests headlessly
 test-kernel: emu-headless _test-kernel-build

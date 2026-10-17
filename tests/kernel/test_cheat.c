@@ -1,21 +1,11 @@
-// Cheat parsing and the cheat table's cap (source/showcht.c, source/GBApatch.c).
+// Cheat parsing and the cheat table's cap (source/cheat.c, source/GBApatch.c).
 #include <string.h>
 
 #include <gba_base.h>
 
+#include "../../source/cheat.h"
 #include "torii_test.h"
 #include "tests.h"
-
-// From source/showcht.h, which needs FatFs's headers.
-#define CHEAT_PATCH_LENGTH 0x2000
-#define CHEAT_MAX 600
-typedef struct {
-	u32 address;
-	u32 VAL;
-} ST_entry;
-extern ST_entry pCHEAT[];
-extern u32 gl_cheat_count;
-void Parse_cheat_line(const char *line, u32 len);
 
 // From source/gba_rts_patch.s: the in-game handler, then the cheat table.
 void RTS_ReplaceIRQ_start(void);
