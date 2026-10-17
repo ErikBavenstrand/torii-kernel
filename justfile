@@ -129,6 +129,16 @@ run *args: build emu-headless cart
 # Run the host tests, then boot test ROMs through the kernel and check every save type survives power cycles
 test: test-host build emu-headless test-roms _test-kernel-build
     {{emu_docker}} tests/all.sh
+    @{{just_executable()}} _test-run
+
+# `just run` works with OMEGA_TRACE unset and set (on a cart of its own)
+_test-run:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    plain=$(env -u OMEGA_TRACE {{just_executable()}} cart=dist/cart-run run -f 1 2>&1) && ! grep -q '^omega ' <<<"$plain" &&
+      traced=$(OMEGA_TRACE=1 {{just_executable()}} cart=dist/cart-run run -f 1 2>&1) && grep -q '^omega 0: mode kernel' <<<"$traced" &&
+      echo "PASS: just run works with and without OMEGA_TRACE" ||
+      { echo "FAIL: just run"; printf '%s\n' "${plain:-}" "${traced:-}" | tail -5; exit 1; }
 
 # Check that text files are UTF-8 with LF, and lint and format-check the C, Python, shell scripts and CI workflows (pinned versions)
 lint:
