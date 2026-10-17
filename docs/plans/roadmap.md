@@ -82,8 +82,9 @@ Then update CLAUDE.md: the GBK, CRLF and `zh_*` rules go.
 #### SD logging
 
 Logging to SD is built first, because the debug mode writes its report through it. It is
-off by default and costs nothing when disabled. `torii.ini` turns it on and sets a level
-(error, warn, info, debug).
+a persistent setting, `Logging: Off / Errors / Info / Debug`, off by default and free when
+off. Until `torii.ini` arrives in v0.5, it lives in a free kernel settings slot, like CLOCK
+and RUMBLE. Kernel crash dumps are captured even when logging is off.
 
 - **Kernel log:** `tlog()` writes into a small ring buffer in RAM (2–4 KB of the free
   EWRAM). The buffer is flushed to `/torii/logs/` at safe points: before a launch, on
@@ -106,7 +107,9 @@ off by default and costs nothing when disabled. `torii.ini` turns it on and sets
 
 #### On-cart debug mode
 
-A mode you launch on the real cart that:
+Not a setting: you run it when you want it, from a Diagnostics entry in settings or by
+holding a key combination at power-on (in case the menu itself is broken). It logs at
+Debug level for its own run only. It:
 
 - runs the unit tests;
 - probes the hardware: RTC, PSRAM, NOR reads, and a save-chip test that doesn't touch the
