@@ -33,6 +33,16 @@ git log, not here.
   literal, which is now moved too.
 - **Fixed:** the in-game menu turns IME off and on as intended (`37c7d60`).
   It wrote DMA2's count register instead, leaving it at 1 after every menu.
+  Loading a save state turns IME back on too (`110277b`), since the state
+  is saved while the menu has it off.
+- **Fixed:** the IRQ patch keeps up to 64 stores, not 32 (`bd61eec`).
+  Kirby: Nightmare in Dream Land has 42 listed, and the rest stayed
+  unpatched. Cached `/PATCH/*.pat` files of the old layout are scanned
+  again, and a `.pat` is no longer read whatever its size.
+- **Changed:** of several built-in table entries for one game code, the
+  first that matches the ROM is used (`c69aa23`), so FireRed rev 1 gets its
+  own entry; lowercase game codes count. The exact-ROM patches run only on
+  SD launches and check the header against the game code.
 
 - **Fixed:** cheat lines no longer make bogus writes (`2c274c8`): an entry
   without a value is dropped instead of reusing the last one, empty `;` and
