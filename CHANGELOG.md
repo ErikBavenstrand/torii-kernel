@@ -6,6 +6,20 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** the SD list shows files without the archive bit and read-only
+  folders (`371b98b`); it leaves out only hidden and system entries. A name
+  longer than 99 bytes lists as its 8.3 name and opens; on exFAT, which has
+  none, it is cut short and shows File error.
+- **Fixed:** a game in more pieces on SD than the cart's table of cluster
+  runs holds (61) shows File fragmented instead of overwriting the launch
+  parameters and EWRAM (`906c429`), and FAT16 cards whose chains end in
+  0xFFF8-0xFFFE no longer hang the launch.
+- **Fixed:** writing a 65th game to NOR reports NOR full instead of writing
+  past the 64-entry list in EWRAM (`bdc832d`).
+- **Fixed:** a Recently Played game whose file is gone shows File error
+  (`df1119c`). It made a save and started Goomba or PocketNES with no ROM.
+- **Fixed:** a 99-byte `.gb` name no longer writes its save name one byte
+  past the buffer (`8a5cc6c`).
 - **Changed:** all source is UTF-8 with LF line endings and formatted by
   clang-format (`27835ea`); the kernel builds the same.
 - **Fixed:** A and L+START do nothing in an empty SD folder (`d7dda3e`). They
