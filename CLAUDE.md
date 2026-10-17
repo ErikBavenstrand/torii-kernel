@@ -32,13 +32,12 @@ Torii is a custom kernel for the EZ-Flash Omega DE, forked from EZ-Flash's offic
 Check in tiers; each costs more, so run it only when it applies (timings in `docs/research/dev-loop-speed.md`):
 
 - After each edit: `just build`, or `just test-kernel` / `just test-host` for the code you touched.
-- Before each commit: `just lint` and `just test`, plus `just analyze` if C changed.
-- Before handing work back, if launching, saves, patching or the cart model changed: `just compat`.
-- Once per branch, before merge, under the same condition: `just compat --all`.
+- Before each commit and before handing work back: `just check`. It reads the files changed against main (committed or not, plus edits in `emu/mgba` not yet saved to `emu/patches`; `--staged` for staged ones), prints the tiers each needs and why, and runs them: docs need `lint`; `tests/host/` needs `test-host`; kernel C adds `test`, `size` and `analyze`; and anything that can change launching, saves, patching or the cart model adds `compat`. Every file in `source/` and `tests/kernel/` counts as that, except the menu-only files in `NO_COMPAT`. The rules are in `tools/check.py`; `--dry-run` shows the plan.
+- Once per branch, before merge: `just check --full`, which runs `compat --all` instead of `compat`.
 
 Reviews: one round of at most two agents. Use a code reviewer, plus an adversarial tester only for launching, saves, the cart model or patching. Give them your test and compat results (`dist/compat/runs/*.json`) so they don't re-run them, and a time budget (about 10 minutes). Re-check your own fixes instead of starting another round, unless a fix changed behaviour.
 
-1. Run `just test`. Every line should start with `PASS`.
+1. `just test` (run by `just check`): every line should start with `PASS`.
    Unit-test kernel functions in `tests/kernel/` (`CHECK`, `CHECK_EQ` from `torii_test.h`; declare each test in `tests.h` and list it in `run.c`). They run inside a test build of the kernel, so they can call any kernel function.
    Test hardware-free code in `tests/host/` too: it builds for the host under ASan and UBSan (`just test-host`), with `tests/host/gba_base.h` standing in for libgba's. Keep such code in its own file, as `source/sort.c` and `source/cheat.c` are.
    For changes to launching, saves or the cart model, also run `just compat` (games you own, listed in `roms/games.toml`; missing ones are skipped).

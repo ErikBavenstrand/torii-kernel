@@ -1,0 +1,46 @@
+# Restores a Docker image the justfile builds from the Actions cache, or builds
+# it with its recipe and caches it. The cache holds the image and the
+# tools/fresh.py record of the Dockerfile it was built from, so `just` itself
+# decides whether the restored image is current: if the record doesn't match
+# the Dockerfile, the recipe builds the image again. The key is the
+# Dockerfile's hash, as the images copy nothing from their build context.
+name: Cached image
+description: Restore a just-built Docker image from the cache, or build and cache it
+inputs:
+  image:
+    description: Image tag, e.g. torii-emu
+    required: true
+  dockerfile:
+    description: The Dockerfile the image is built from
+    required: true
+  record:
+    description: The tools/fresh.py record the recipe keeps for the image
+    required: true
+  recipe:
+    description: The just recipe that builds the image if it is out of date
+    required: true
+runs:
+  using: composite
+  steps:
+    - id: cache
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          dist/ci/${{ inputs.image }}.tar
+          dist/.fresh/${{ inputs.record }}
+        key: image-${{ inputs.image }}-${{ runner.arch }}-${{ hashFiles(inputs.dockerfile) }}
+    - if: steps.cache.outputs.cache-hit == 'true'
+      shell: bash
+      run: docker load -q -i "dist/ci/${{ inputs.image }}.tar"
+    - shell: bash
+      run: just "${{ inputs.recipe }}"
+    - if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: mkdir -p dist/ci && docker save -o "dist/ci/${{ inputs.image }}.tar" "${{ inputs.image }}"
+    - if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          dist/ci/${{ inputs.image }}.tar
+          dist/.fresh/${{ inputs.record }}
+        key: ${{ steps.cache.outputs.cache-primary-key }}

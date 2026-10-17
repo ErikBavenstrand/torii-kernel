@@ -6,7 +6,7 @@
 
 usage: analyze.py files                 C files to analyze, one per line
        analyze.py project OUT            compile_commands.json for those files
-       analyze.py gcc                    shell script running GCC's -fanalyzer
+       analyze.py gcc DIR                shell script running GCC's -fanalyzer
        analyze.py check DIR BASELINE     fail on findings not in BASELINE
        analyze.py baseline DIR BASELINE  write DIR's findings to BASELINE
 
@@ -14,7 +14,13 @@ The analyzed files are the kernel's own C files in source/, which
 compile_commands.json (`just compile-commands`) lists; the vendored FatFs
 (source/ff15) is left out. DIR holds each tool's output: cppcheck.txt,
 clang-tidy.txt and gcc.txt. A tool that reports nothing where the baseline
-expects findings fails the check, as does a GCC run that didn't finish. A finding is the tool, file, check and message,
+expects findings fails the check, as does a GCC run that didn't finish.
+
+The GCC script runs in the toolchain container from the repository root. It
+writes one script per source file to DIR and runs them nproc at a time, each
+into its own output file, then prints the outputs in file order, so the
+messages of parallel runs can't interleave. The end marker follows only when
+every run succeeded. A finding is the tool, file, check and message,
 without line numbers, so edits elsewhere in a file don't make old findings
 look new. The baseline lists each finding as often as it occurs.
 """
@@ -90,7 +96,11 @@ def main() -> int:
         Path(sys.argv[2]).write_text(json.dumps(out, indent=1) + "\n")
     elif command == "gcc":
         # One analyzer run per file, output to /dev/null; warnings go to stderr.
+        # The scripts are written in the container: files written on the host
+        # can reach it late (see tools/fresh.py).
         print("set -e")
+        print(f'd="$PWD"/{shlex.quote(sys.argv[2])}')
+        print('rm -rf "$d" && mkdir -p "$d"')
         count = 0
         for _rel, entry in commands():
             args = [a for a in entry["arguments"] if a not in DROPPED]
@@ -104,9 +114,17 @@ def main() -> int:
                 "-o",
                 "/dev/null",
             ]
-            print(f"(cd {shlex.quote(entry['directory'])} && {shlex.join(args)})")
+            print(f"cat > \"$d\"/{count:03}.sh <<'EOF'")
+            print('exec > "${0%.sh}.txt" 2>&1')
+            print(f"cd {shlex.quote(entry['directory'])} && exec {shlex.join(args)}")
+            print("EOF")
             count += 1
-        print(f"echo '{DONE} {count} files' >&2")
+        print("set +e")
+        print("""printf '%s\\n' "$d"/*.sh | xargs -I {} -P "$(nproc)" sh {}""")
+        print("status=$?")
+        print('cat "$d"/*.txt')
+        print(f"[ $status -eq 0 ] && echo '{DONE} {count} files'")
+        print("exit $status")
     elif command in ("check", "baseline"):
         directory, baseline = Path(sys.argv[2]), Path(sys.argv[3])
         current = findings(directory)

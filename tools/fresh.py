@@ -11,6 +11,7 @@ usage: fresh.py sync [--all] PATH...   wait until containers see recent edits
        fresh.py check NAME OUTPUT... -- PATH...
                                        exit 0 if NAME can be skipped
        fresh.py record NAME -- PATH...  note that NAME was built from PATH
+       fresh.py hash PATH...            print the hash check compares, e.g. for a cache key
 
 sync: the torii colima VM shares the repo over virtiofs, which caches file
 attributes for about a second. Right after an edit a container can see the
@@ -18,6 +19,8 @@ old size and timestamp, and a file git replaced can read as its old content.
 For files under PATH changed in the last two seconds, this waits (at most
 about a second) until a container sees the same size and timestamp. Build outputs
 (.o, .gba, ...) are skipped unless --all is given, e.g. for folders of games.
+The containers that look run the toolchain image the justfile exports as
+FRESH_IMAGE, which every build needs anyway.
 
 stamp: make only compares source timestamps, so a changed Makefile or
 toolchain leaves old objects behind. This hashes KEY and the FILEs and, if
@@ -47,7 +50,6 @@ from pathlib import Path
 
 RECENT = 2.0  # seconds; virtiofs caches attributes for about one
 TIMEOUT = 5.0
-IMAGE = "torii-emu"
 # Written by the builds in containers, so containers see them as written.
 OUTPUTS = {".o", ".d", ".a", ".elf", ".gba", ".nm", ".sym", ".map", ".png"}
 
@@ -73,11 +75,13 @@ def container_view(files: list[str]) -> dict[str, tuple[str, int]]:
             "docker",
             "run",
             "--rm",
+            "--platform",
+            "linux/amd64",
             "-v",
             f"{os.getcwd()}:/src",
             "-w",
             "/src",
-            IMAGE,
+            os.environ["FRESH_IMAGE"],
             "stat",
             "-c",
             "%.9Y %s %n",
@@ -97,6 +101,9 @@ def container_view(files: list[str]) -> dict[str, tuple[str, int]]:
 def sync(paths: list[str]) -> int:
     if sys.platform != "darwin":
         return 0  # Linux bind mounts show edits at once; the lag is colima's
+    if "FRESH_IMAGE" not in os.environ:
+        print("fresh: sync needs FRESH_IMAGE; run it through just", file=sys.stderr)
+        return 2
     everything = paths[0] == "--all"
     host = recent_files(paths[1:] if everything else paths, everything)
     if not host:
@@ -222,6 +229,9 @@ def main() -> int:
     if len(sys.argv) >= 4 and sys.argv[1] == "track" and "--" in sys.argv:
         split = sys.argv.index("--")
         return track(sys.argv[2], sys.argv[3:split], sys.argv[split + 1 :])
+    if len(sys.argv) >= 3 and sys.argv[1] == "hash":
+        print(inputs_hash(sys.argv[2:]))
+        return 0
     if len(sys.argv) >= 3 and sys.argv[1] == "sync":
         return sync(sys.argv[2:])
     if len(sys.argv) >= 4 and sys.argv[1] == "stamp":

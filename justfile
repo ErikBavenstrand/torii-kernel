@@ -11,6 +11,8 @@ export DOCKER_CONTEXT := if os() == "macos" { "colima-torii" } else { env("DOCKE
 
 # Run before every build in a container, see tools/fresh.py
 fresh := "python3 tools/fresh.py"
+# The image fresh.py's sync checks the share with
+export FRESH_IMAGE := kernel_image
 # What each build reads; a step is skipped while these are unchanged
 kernel_inputs := "source tests/kernel Makefile image.bin tools/omega_image.py tools/nm_to_sym.py " + kernel_image
 test_kernel_inputs := "source tests/kernel Makefile " + kernel_image
@@ -35,7 +37,7 @@ gdb_net := if os() == "linux" { "--network host" } else { "--add-host=host.docke
 gdb_host := if os() == "linux" { "127.0.0.1" } else { "host.docker.internal" }
 
 # Build the flashable upgrade file: dist/ezkernelnew.bin
-build: emu-image
+build: _ready
     @mkdir -p dist
     @{{fresh}} check kernel dist/ezkernelnew.bin dist/ezkernelnew.sym ezkernelnew.elf -- {{kernel_inputs}} || {{just_executable()}} _build-kernel
 
@@ -43,9 +45,9 @@ _build-kernel:
     {{fresh}} stamp build "{{kernel_image}}" Makefile
     {{fresh}} track build ezkernelnew.elf ezkernelnew.gba -- source tests/kernel Makefile
     {{kernel_docker}} make TARGET=ezkernelnew -j8
-    {{emu_docker}} python3 tools/omega_image.py ezkernelnew.gba image.bin dist/ezkernelnew.bin
+    python3 tools/omega_image.py ezkernelnew.gba image.bin dist/ezkernelnew.bin
     {{kernel_docker}} sh -c '/opt/devkitpro/devkitARM/bin/arm-none-eabi-nm -n ezkernelnew.elf > dist/ezkernelnew.nm'
-    {{emu_docker}} python3 tools/nm_to_sym.py dist/ezkernelnew.nm dist/ezkernelnew.sym
+    python3 tools/nm_to_sym.py dist/ezkernelnew.nm dist/ezkernelnew.sym
     {{fresh}} record kernel -- {{kernel_inputs}}
 
 # Games given are copied onto the SD card unless a file of that name is
@@ -68,10 +70,10 @@ logs path:
 
 # Write compile_commands.json for clangd, covering the kernel and its unit tests
 # (devkitPro's headers go to dist/devkitpro; .clangd adapts the flags for clang)
-compile-commands: emu-image
+compile-commands: _ready
     mkdir -p dist build build-test
     {{kernel_docker}} sh -c 'make TARGET=ezkernelnew -B -n > dist/dry-run-kernel.txt && make TARGET=ezkerneltest BUILD=build-test -B -n > dist/dry-run-test.txt && cd /opt && cp -r --parents devkitpro/libgba/include devkitpro/devkitARM/arm-none-eabi/include /src/dist/'
-    {{emu_docker}} python3 tools/compile_commands.py "$PWD" build=dist/dry-run-kernel.txt build-test=dist/dry-run-test.txt
+    python3 tools/compile_commands.py "$PWD" build=dist/dry-run-kernel.txt build-test=dist/dry-run-test.txt
     rm dist/dry-run-kernel.txt dist/dry-run-test.txt
 
 # Kernel size against the cart and GBA memory limits, and the largest symbols
@@ -172,15 +174,38 @@ analyze-baseline: _analyze-run
 # out: style-only checks, printf types (GCC checks those for the real target) and GNU void * arithmetic.
 cppcheck_flags := "--include=tests/host/gba_base.h --platform=unix32 --enable=warning,style,performance,portability --inline-suppr --suppress=missingIncludeSystem --suppress=variableScope --suppress=constParameterPointer --suppress=constVariablePointer --suppress='invalidPrintfArgType_*' --suppress=arithOperationsOnVoidPointer --template='{file}:{line}: {severity}: {id}: {message}'"
 
+# The three tools run at once, each into its own file, and GCC one process per
+# source file (tools/analyze.py gcc). clang-tidy stays one process: per file, it
+# would repeat a header's findings once per file it is included from.
 # The repo is mounted at its own path, so compile_commands.json's paths work in containers.
-_analyze-run: compile-commands
-    @{{fresh}} check analyze-image -- docker/analyze.Dockerfile && docker image inspect torii-analyze >/dev/null 2>&1 || { docker build -q -t torii-analyze -f docker/analyze.Dockerfile docker >/dev/null && {{fresh}} record analyze-image -- docker/analyze.Dockerfile; }
+_analyze-run: compile-commands _analyze-image
+    #!/usr/bin/env bash
+    set -uo pipefail
+    trap 'kill $(jobs -p) 2>/dev/null' INT TERM
     mkdir -p dist/analyze
-    python3 tools/analyze.py project dist/analyze/project.json
-    docker run --rm -u $(id -u):$(id -g) -v "$PWD":"$PWD" -w "$PWD" torii-analyze cppcheck -q --project=dist/analyze/project.json {{cppcheck_flags}} 2> dist/analyze/cppcheck.txt || { tail -n 20 dist/analyze/cppcheck.txt; exit 1; }
-    python3 tools/analyze.py files | xargs uvx clang-tidy@{{clang_tidy}} -p . --quiet > dist/analyze/clang-tidy.txt 2>/dev/null || { grep -A3 ' error: ' dist/analyze/clang-tidy.txt | head -n 20; exit 1; }
-    python3 tools/analyze.py gcc | docker run --rm -i --platform linux/amd64 -u $(id -u):$(id -g) -v "$PWD":"$PWD" -w "$PWD" {{kernel_image}} sh 2> dist/analyze/gcc.txt || { tail -n 20 dist/analyze/gcc.txt; exit 1; }
-    @wc -l dist/analyze/cppcheck.txt dist/analyze/clang-tidy.txt dist/analyze/gcc.txt | sed '$d'
+    rm -f dist/analyze/cppcheck.txt dist/analyze/clang-tidy.txt dist/analyze/gcc.txt
+    python3 tools/analyze.py project dist/analyze/project.json || exit 1
+    docker run --rm -u $(id -u):$(id -g) -v "$PWD":"$PWD" -w "$PWD" torii-analyze cppcheck -q --project=dist/analyze/project.json {{cppcheck_flags}} 2> dist/analyze/cppcheck.txt &
+    cppcheck=$!
+    python3 tools/analyze.py files | xargs uvx clang-tidy@{{clang_tidy}} -p . --quiet > dist/analyze/clang-tidy.txt 2>/dev/null &
+    tidy=$!
+    python3 tools/analyze.py gcc dist/analyze/gcc | docker run --rm -i --platform linux/amd64 -u $(id -u):$(id -g) -v "$PWD":"$PWD" -w "$PWD" {{kernel_image}} sh > dist/analyze/gcc.txt 2>&1 &
+    gcc=$!
+    failed=0
+    wait $cppcheck || { echo "cppcheck failed:"; tail -n 20 dist/analyze/cppcheck.txt; failed=1; }
+    wait $tidy || { echo "clang-tidy failed:"; grep -A3 ' error: ' dist/analyze/clang-tidy.txt | head -n 20; failed=1; }
+    wait $gcc || { echo "gcc -fanalyzer failed:"; tail -n 20 dist/analyze/gcc.txt; failed=1; }
+    wc -l dist/analyze/cppcheck.txt dist/analyze/clang-tidy.txt dist/analyze/gcc.txt | sed '$d'
+    exit $failed
+
+# Run the checks the changed files need (against main, or --staged), e.g. `just check`;
+# --full adds the before-merge tier (compat --all), --dry-run only prints the plan
+[positional-arguments]
+check *args:
+    @JUST={{just_executable()}} python3 tools/check.py "$@"
+
+_analyze-image: _ready
+    @{{fresh}} check analyze-image -- docker/analyze.Dockerfile && docker image inspect torii-analyze >/dev/null 2>&1 || { docker build -q -t torii-analyze -f docker/analyze.Dockerfile docker >/dev/null && {{fresh}} record analyze-image -- docker/analyze.Dockerfile; }
 
 # Play the listed games through the kernel and write dist/compat/index.html. Filters pick
 # games by code, system, save chip or file name, e.g. `just compat gbc` or `just compat Pokemon`
@@ -205,12 +230,12 @@ _build-test-kernel:
     {{kernel_docker}} make TARGET=ezkerneltest BUILD=build-test -j8
     {{fresh}} record test-kernel -- {{test_kernel_inputs}}
 
-test-roms: emu-image
+test-roms: _ready
     @{{fresh}} check test-roms {{test_rom_outputs}} -- tests/roms || {{just_executable()}} _build-test-roms
 
 _build-test-roms:
     {{kernel_docker}} sh -c 'make -B -C tests/roms/hello && make -B -C tests/roms/idle && make -B -C tests/roms/savetest && make -B -C tests/roms/crash all'
-    {{emu_docker}} python3 tools/nm_to_sym.py tests/roms/crash/crash.nm tests/roms/crash/crash.sym
+    python3 tools/nm_to_sym.py tests/roms/crash/crash.nm tests/roms/crash/crash.sym
     {{fresh}} record test-roms -- tests/roms
 
 # Create the emulated cart (SD image from emu/sd) if it does not exist
@@ -260,10 +285,13 @@ _build-emu-headless:
 emu-save-patch:
     emu/save-patch.sh
 
+# Build the tools image that tests, the emulated cart and mgba-shot run in
+emu-image: _ready
+    @{{fresh}} check emu-image -- docker/emu.Dockerfile && docker image inspect {{emu_image}} >/dev/null 2>&1 || { docker build -q -t {{emu_image}} -f docker/emu.Dockerfile docker >/dev/null && {{fresh}} record emu-image -- docker/emu.Dockerfile; }
+
 # Every recipe that runs a container comes through here: make sure the torii
 # VM runs and that containers see the latest edits.
-emu-image: _vm
-    @{{fresh}} check emu-image -- docker/emu.Dockerfile && docker image inspect {{emu_image}} >/dev/null 2>&1 || { docker build -q -t {{emu_image}} -f docker/emu.Dockerfile docker >/dev/null && {{fresh}} record emu-image -- docker/emu.Dockerfile; }
+_ready: _vm
     @{{fresh}} sync source Makefile image.bin tests tools emu/mgba/src emu/mgba/include emu/mgba-shot.c emu/build.sh docker
 
 # Start the torii colima VM on macOS if it isn't running
