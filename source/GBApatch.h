@@ -58,6 +58,7 @@ extern u32 gl_cheat_count;
 
 void GBApatch_Cleanrom(u32* address,int filesize);
 void GBApatch_PSRAM(u32* address,int filesize);
+void Patch_somegame(u32 *Data);
 
 void GBApatch_Cleanrom_NOR(u32* address,u32 offset);
 void GBApatch_NOR(u32* address,int filesize,u32 offset);
