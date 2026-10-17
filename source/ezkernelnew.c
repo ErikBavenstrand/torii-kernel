@@ -682,6 +682,11 @@ static u32 get_count(void)
 			Trim(buf);
 			if (buf[0] != '/')
 				break;
+			// A folder or name longer than the kernel writes (an edited file)
+			// would overrun currentpath or a list entry
+			char *slash = strrchr(buf, '/');
+			if ((u32)(slash - buf) >= MAX_path_len || strlen(slash + 1) > 99)
+				continue;
 			memset(p_recently_play[count], 0x00, 512);
 			dmaCopy(buf, &(p_recently_play[count]), 512);
 			memset(buf, 0x00, 512);
@@ -899,8 +904,8 @@ u32 Check_game_RTS_FAT(TCHAR *filename, u32 game_save_rts)
 	do {
 		getcluster = Get_NextCluster(&(&file)->obj, getcluster);
 		cluster_num++;
-		// The card failed to read (on exFAT the value also ends a chain)
-		if (getcluster == 0xFFFFFFFF && (&EZcardFs)->fs_type != FS_EXFAT) {
+		// The card failed to read: FatFs masks every real FAT value below this
+		if (getcluster == 0xFFFFFFFF) {
 			f_close(&file);
 			return 0xffffffff;
 		}

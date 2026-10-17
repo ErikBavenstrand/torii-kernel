@@ -55,3 +55,21 @@ grep -q '^kernel: launch Hello.gba: code' "$cart/kernel.log" ||
 mtype -i "$cart/sd.img" "::/SAVER/Recently play.txt" | grep -qx '/Hello.gba' ||
   fail "Recently Played has $(mtype -i "$cart/sd.img" "::/SAVER/Recently play.txt" | tr '\n' ' '), expected /Hello.gba"
 echo "PASS: after the error, the list's own games open"
+
+# A Recently Played line longer than the kernel writes (an edited file) is
+# skipped: its folder would overrun the path buffer
+cart=dist/cart-stale-long
+rm -rf "$cart" && mkdir -p "$cart"
+mkfs.fat -C -F 32 -n STALE "$cart/sd.img" 65536 >/dev/null
+mmd -i "$cart/sd.img" ::/SAVER
+mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/Hello.gba
+{
+  printf '/%s/x.gba\n' "$(printf 'a%.0s' $(seq 300))"
+  printf '/Hello.gba\n'
+} >"$cart/recent.txt"
+mcopy -i "$cart/sd.img" "$cart/recent.txt" "::/SAVER/Recently play.txt"
+OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -k 100:START -k 104:- -k 130:A -k 134:- \
+  -k 170:A -k 174:- -f 400 >"$cart/kernel.log" 2>&1
+grep -q '^kernel: launch Hello.gba: code' "$cart/kernel.log" ||
+  fail "the entry after an over-long line didn't open: $(grep '^kernel: ' "$cart/kernel.log" | tail -2)"
+echo "PASS: an over-long Recently Played line is skipped"
