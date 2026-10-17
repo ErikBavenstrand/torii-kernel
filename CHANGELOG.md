@@ -6,10 +6,12 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** all source is UTF-8 with LF line endings and formatted by
+  clang-format (`27835ea`); the kernel builds the same.
 - **Fixed:** A and L+START do nothing in an empty SD folder (`d7dda3e`). They
   acted on a stale entry from the folder listed before: A opened its launch
   menu or started a GB, GBC or NES game. Ported from DS Style v7.4.
-- **Changed:** names are drawn in ASCII (`a47a7a7`). The 12x12 GBK font and
+- **Changed:** names are drawn in ASCII (`a47a7a7`, `eff3a93`). The 12x12 GBK font and
   FatFs's code page 936 go, freeing about 350 KB of ROM. FatFs uses code page
   850: accented Latin letters lose their accents, and names it can't hold,
   such as Japanese ones, show and open as their 8.3 short name on FAT cards;

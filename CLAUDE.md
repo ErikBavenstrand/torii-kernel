@@ -6,9 +6,6 @@ Torii is a custom kernel for the EZ-Flash Omega DE, forked from EZ-Flash's offic
 
 - To release, rename `## Unreleased` in `CHANGELOG.md` to the version, commit, and push a tag like `v0.1.0`: CI publishes a GitHub Release with `ezkernelnew.bin` and that section as its notes.
 - **Mandatory:** log every change to `source/` in `CHANGELOG.md`, under Unreleased: what changed and why, with the commit's short hash, in two or three lines. Commit the change first, then add the entry with its hash (one follow-up commit can log several changes).
-- Files from the official repo (commit `12cb68b`) keep EZ-Flash's formatting: CRLF line endings, tabs.
-- `source/lang.c`, `source/GBApatch.c`, `source/gba_rts_patch.s` and `source/asc126.h` contain GBK-encoded Chinese comments.
-  Edit them as bytes, decoding and encoding with `gbk`; a UTF-8 round trip corrupts the strings.
 - Language strings live in `source/lang.c` as `en_*` strings, wired up in `LoadEnglish`. `lang_packs` lists the languages SETTINGS offers; English is the only one until v0.9.
 - The menu font has ASCII glyphs only. FatFs returns names in code page 850 (`FF_CODE_PAGE`), and `charset_ascii()` in `source/charset.c` folds them for drawing.
 - Our code builds with `-Werror` and the extra warnings in the Makefile's `WARNFLAGS`; the vendored `source/ff15` is exempt.
@@ -21,8 +18,10 @@ Torii is a custom kernel for the EZ-Flash Omega DE, forked from EZ-Flash's offic
 
 ## Formatting
 
+- Text files are UTF-8 with LF line endings; `just lint` checks. Only `emusrc/` and `*.bat` keep EZ-Flash's encoding and CRLF.
 - Run `just format` after editing C files; `just lint` fails on unformatted ones.
-  It formats our files with `.clang-format`; `.clang-format-ignore` lists the official and vendored files it skips.
+  It formats every C file with `.clang-format`, except the vendored ones `.clang-format-ignore` lists.
+- `.git-blame-ignore-revs` lists the commit that reformatted the official source; run `git config blame.ignoreRevsFile .git-blame-ignore-revs` once so `git blame` skips it.
 
 ## Checking changes
 
