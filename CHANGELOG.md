@@ -6,6 +6,10 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** cheat lines no longer make bogus writes (`2c274c8`): an entry
+  without a value is dropped instead of reusing the last one, empty `;` and
+  trailing `,` add nothing (a trailing `,` wrote 0 to the next address), and
+  only hex digits count, so tabs, CRs and stray bytes are skipped.
 - **Changed:** the cheat line parser moves unchanged from `showcht.c` to
   `cheat.c`, with the cheat table in `cheat.h` (`a0a46a4`), so it builds
   without FatFs or the hardware and the host tests run it under sanitizers.
