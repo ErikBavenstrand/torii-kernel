@@ -4,6 +4,31 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Fixed:** save types for Doom, Doom II, Gauntlet - Dark Legacy and the
+  Classic NES Series and Famicom Mini games (`b9c9245`). The first three are
+  EEPROM 512, not 8K (ez-flash/omega-de-kernel#3); the NES games are EEPROM
+  (512, or 8K for the Zelda games and a few others), not SRAM.
+- **Fixed:** too many cheats no longer overrun the patch area (`d57c89f`).
+  The table is capped at 600 entries, which fit after the in-game handler in
+  the 0x2000 bytes appended to the ROM; it also frees 19 KB of EWRAM.
+- **Added:** a RUMBLE setting next to GAME RTC (`6d39f85`). Turning GAME RTC
+  off no longer turns off rumble (ez-flash/omega-de-kernel#5): rumble games
+  follow RUMBLE, every other game follows GAME RTC.
+- **Changed:** GB, GBC and NES games start as soon as you open them
+  (`7489a1b`). Their boot menu only offered CLEAN BOOT
+  (ez-flash/omega-de-kernel#12); hold L for a hard reset as before.
+- **Changed:** the SD listing sorts names ignoring case (`792f94e`), with a
+  merge sort in place of a bubble sort that copied whole entries. Listing a
+  folder past its 256 folders or 512 files no longer writes past the list.
+- **Fixed:** the recently played list at its 10-entry limit (`aa88d7c`).
+  Relaunching a listed game or adding to a full list wrote a stray 11th row,
+  and the file was never truncated, so old rows lingered.
+- **Fixed:** games start with EWRAM fully clear (`b6045f7`). The launch
+  reset already cleared it, but the kernel then ran its last reset step from
+  EWRAM and left 64 bytes there; that step now runs from IWRAM.
+
 ## v0.1.0 (2026-10-17)
 
 - **Fixed:** the kernel builds on Linux (`c04ca5e`). `draw.c` included
