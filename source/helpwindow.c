@@ -14,7 +14,7 @@
 
 
 
-extern u16 gl_select_lang;
+
 u16 Rev;
 //---------------------------------------------------------------------------------
 static void Show_ver(void)
@@ -31,13 +31,7 @@ void Show_help_window(void)
 {
 	char msg[20];
 	Show_ver();
-	if(gl_select_lang == 0xE1E1)//english
-	{
-		DrawPic((u16*)gImage_English_manual, 240-70, 160-70, 70, 70, 0, 0, 1);//
-	}
-	else{
-		DrawPic((u16*)gImage_Chinese_manual, 240-70, 160-70, 70, 70, 0, 0, 1);//
-	}
+	DrawPic((u16*)gImage_English_manual, 240-70, 160-70, 70, 70, 0, 0, 1);//
 	DrawHZText12("START  :",0,3,20, gl_color_selected,1);
 		DrawHZText12(gl_START_help,0,52,20, gl_color_text,1);
 		

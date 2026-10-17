@@ -19,7 +19,7 @@ u8 *pCHTbuffer = (u8*)(pReadCache + 0x2000); //patchbuffer
 ST_entry pCHEAT[CHEAT_MAX]EWRAM_BSS;
 u32 gl_cheat_count;
 
-extern u16 gl_select_lang;
+
 
 u16 gl_color_chtBG    = RGB(4,8,0xC);
 //------------------------------------------------------------------
@@ -652,13 +652,7 @@ static u32 Change2cht_folder(u32 chtname)
 	}						
 	
 	
-	if(gl_select_lang == 0xE1E1)//english
-	{
-		sprintf(currentpath,"/CHEAT/Eng/%s",folder_name);
-	}
-	else{		
-		sprintf(currentpath,"/CHEAT/Chn/%s",folder_name);
-	}
+	sprintf(currentpath,"/CHEAT/Eng/%s",folder_name);
 	res=f_chdir(currentpath);		
 	return res;
 }

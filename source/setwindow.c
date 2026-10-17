@@ -12,7 +12,7 @@
 #include "Ezcard_OP.h"
 
 //extern const unsigned char __attribute__((aligned(4)))gImage_SET[76800];
-extern u16 gl_select_lang;
+
 extern u16 gl_engine_sel;
 extern u16 gl_show_Thumbnail;
 extern u16 gl_game_clock;
@@ -105,15 +105,9 @@ u32 Setting_window(void)
 	u32 x_offset = set_offset+9*6+3;
 	
 	u32 line_x = 17;
+	u32 lang;
 			
-	if(gl_select_lang == 0xE1E1)
-	{
-		language_sel = 0;
-	}
-	else
-	{
-		language_sel = 1;
-	}	
+	language_sel = gl_lang;
 	v_reset = Read_SET_info(assress_v_reset);
 	v_rts = 	Read_SET_info(assress_v_rts);
 	v_sleep = Read_SET_info(assress_v_sleep);
@@ -172,12 +166,13 @@ u32 Setting_window(void)
 			//					
 			sprintf(msg,"%s",gl_language);
 			DrawHZText12(msg,0,set_offset,y_offset+line_x*3,gl_color_selected,1);			
-				Draw_select_icon(x_offset,y_offset+line_x*3,(language_sel == 0x0));
-				Draw_select_icon(x_offset+12*6,y_offset+line_x*3,(language_sel == 0x1));	
-				sprintf(msg,"%s",gl_en_lang);
-				DrawHZText12(msg,0,x_offset+15,y_offset+line_x*3,((language_sel==0)&&currstate&& (2== select))?gl_color_selected:gl_color_text,1);
-				sprintf(msg,"%s",gl_zh_lang);
-				DrawHZText12(msg,0,x_offset+12*6+15,y_offset+line_x*3,((language_sel==1)&&currstate&& (2== select))?gl_color_selected:gl_color_text,1);			
+				// Two languages fit on the row
+				for(lang = 0; (lang < lang_pack_count) && (lang < 2); lang++)
+				{
+					Draw_select_icon(x_offset+lang*12*6,y_offset+line_x*3,(language_sel == lang));
+					sprintf(msg,"%s",lang_packs[lang].name);
+					DrawHZText12(msg,0,x_offset+lang*12*6+15,y_offset+line_x*3,((language_sel==lang)&&currstate&& (2== select))?gl_color_selected:gl_color_text,1);
+				}
 			
 			//
 			VBlankIntrWait();			
@@ -1037,7 +1032,8 @@ u32 Setting_window(void)
 						}
 						else if(select ==2) //lang
 						{
-							language_sel = 1;								
+							if((language_sel + 1u < lang_pack_count) && (language_sel < 1))
+								language_sel++;
 						}
 						else if(select ==3)
 						{
@@ -1082,7 +1078,8 @@ u32 Setting_window(void)
 						}
 						else if(select ==2) //lang
 						{
-								language_sel = 0;
+							if(language_sel)
+								language_sel--;
 						}						
 						else if(select ==3)
 						{
@@ -1201,12 +1198,7 @@ u32 Setting_window(void)
 void save_setw_info(void)
 {
 	u32 address;	
-	if(language_sel == 0x0){//english						
-		SET_info_buffer[assress_language] = 0xE1E1;
-	}
-	else{					
-		SET_info_buffer[assress_language] = 0xE2E2;
-	}
+	SET_info_buffer[assress_language] = lang_packs[language_sel].id;
 	SET_info_buffer[assress_v_reset] = v_reset;
 	SET_info_buffer[assress_v_rts] = v_rts;
 	SET_info_buffer[assress_v_sleep] = v_sleep;

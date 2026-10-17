@@ -54,7 +54,7 @@ u32 folder_total;
 
 u32 gl_currentpage;
 u32 gl_norOffset;
-u16 gl_select_lang;
+u32 gl_lang;
 u16 gl_engine_sel;
 
 
@@ -1322,21 +1322,17 @@ u32 IWRAM_CODE Loadfile2PSRAM(TCHAR *filename)
 //---------------------------------------------------------------------------------
 void CheckLanguage(void)
 {
-	//read setting
-	gl_select_lang =  Read_SET_info(assress_language);
-	if( (gl_select_lang != 0xE1E1) && (gl_select_lang != 0xE2E2))
+	u16 id = Read_SET_info(assress_language);
+	u32 i;
+
+	// An unknown id, such as a dropped language's, gets the first language
+	gl_lang = 0;
+	for(i = 0; i < lang_pack_count; i++)
 	{
-		gl_select_lang = 0xE1E1;
+		if(lang_packs[i].id == id)
+			gl_lang = i;
 	}
-	
-	if(gl_select_lang == 0xE1E1)//english
-	{
-		LoadEnglish();
-	}
-	else//ÖÐÎÄ
-	{
-		LoadChinese();
-	}
+	lang_packs[gl_lang].load();
 }
 //---------------------------------------------------------------------------------
 void CheckSwitch(void)
@@ -2940,7 +2936,7 @@ boot_game:
 						f_read(&gfile, pReadCache, 0x20000, (UINT*)&ret);
 						f_close(&gfile);
 						SetTrimSize(pReadCache,gamefilesize,0x20000,0x0,SAVEMODE);						
-						if((gl_engine_sel==0) || (gl_select_lang == 0xE2E2))
+						if(gl_engine_sel==0)
 						{	
 								get_find:		
 			    		FAT_table_buffer[0x1F4/4] = SET_PARAMETER_MODE;
