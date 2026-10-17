@@ -43,6 +43,8 @@ grep -qF "AGAME.GBA has more runs of clusters than the cart's table holds" dist/
 if od -A n -t x1 -N 5 dist/cart-fragmented-refused/sram.bin | tr -d ' \n' | grep -q '4f4d5258'; then
   fail "a game in 62 pieces booted"
 fi
+mdir -i dist/cart-fragmented-refused/sd.img ::/SAVER >/dev/null 2>&1 &&
+  fail "the refused game still got a save or a Recently Played entry"
 echo "PASS: a game in 62 pieces shows an error"
 
 # FAT16 chains can end in any of 0xFFF8-0xFFFF; the kernel stopped only at

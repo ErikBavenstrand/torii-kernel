@@ -649,8 +649,6 @@ static void Show_game_name(u32 total, u32 Select)
 	u32 need_show;
 	u32 line;
 
-	char msg[256];
-
 	u32 X_offset = 1;
 	u32 Y_offset = 20;
 	u32 line_x = 14;
@@ -667,8 +665,8 @@ static void Show_game_name(u32 total, u32 Select)
 		else
 			name_color = gl_color_text;
 
-		sprintf(msg, "%s", p_recently_play[line]);
-		DrawHZText12(msg, 39, X_offset, Y_offset + line * line_x, name_color, 1);
+		// An entry runs to 355 bytes, past what a copy here held
+		DrawHZText12(p_recently_play[line], 39, X_offset, Y_offset + line * line_x, name_color, 1);
 	}
 }
 //---------------------------------------------------------------------------------
@@ -868,12 +866,18 @@ u32 Check_game_RTS_FAT(TCHAR *filename, u32 game_save_rts)
 	//DEBUG_printf("fs->fs_type %x",(&EZcardFs)->fs_type);
 #endif
 	// Values from here up are bad clusters or the end of the chain
-	if ((&EZcardFs)->fs_type == FS_FAT16) {
+	if ((&EZcardFs)->fs_type == FS_FAT12) {
+		lastest_cluster = 0xFF7;
+	} else if ((&EZcardFs)->fs_type == FS_FAT16) {
 		lastest_cluster = 0xFFF7;
 	} else {
 		lastest_cluster = 0xFFFFFF7;
 	}
 	getcluster = (&file)->obj.sclust;
+	if (getcluster < 2) {  // an empty file has no clusters
+		f_close(&file);
+		return 0xffffffff;
+	}
 
 	if (game_save_rts == 1) {
 		FAT_table_P = FAT_table_buffer;
@@ -898,6 +902,11 @@ u32 Check_game_RTS_FAT(TCHAR *filename, u32 game_save_rts)
 	do {
 		getcluster = Get_NextCluster(&(&file)->obj, getcluster);
 		cluster_num++;
+		// The card failed to read (on exFAT the value also ends a chain)
+		if (getcluster == 0xFFFFFFFF && (&EZcardFs)->fs_type != FS_EXFAT) {
+			f_close(&file);
+			return 0xffffffff;
+		}
 		if (getcluster < 2) {  // FatFs couldn't follow the chain
 			f_close(&file);
 			return RTS_FAT_FRAGMENTED;
@@ -1825,7 +1834,7 @@ refind_file:
 
 				// Hidden and system entries stay out; the other attributes,
 				// such as read-only or archive, don't matter
-				if (fileinfo.fattrib & (AM_HID | AM_SYS))
+				if (fileinfo.fattrib & (AM_HID | AM_SYS | 0x08))  // 0x08: a volume label
 					continue;
 				if (fileinfo.fattrib & AM_DIR) {
 					if (folder_total >= MAX_folder)  //full: skip, but keep reading files
@@ -2598,6 +2607,15 @@ boot_game:
 	tlog("launch %s: code %.4s, %lu bytes, save mode %02X, uses%s%s", pfilename, is_EMU ? "-" : (char *)GAMECODE,
 	     (unsigned long)gamefilesize, SAVEMODE, (gl_game_uses & GAME_USES_CLOCK) ? " clock" : "",
 	     (gl_game_uses & GAME_USES_RUMBLE) ? " rumble" : (gl_game_uses ? "" : " nothing"));
+	// A GBA game the cart can't load fails here, before its save or Recently
+	// Played entry is written; the table is filled again below
+	if (!is_EMU) {
+		res = Check_game_RTS_FAT(pfilename, 1);
+		if (res != 0) {
+			Show_error_num((res == RTS_FAT_FRAGMENTED) ? 7 : 1);
+			return 0;
+		}
+	}
 	if (MENU_line < 2) {  //work for psram
 		if (gamefilesize > 0x2000000) {
 			ShowbootProgress(gl_file_overflow);
