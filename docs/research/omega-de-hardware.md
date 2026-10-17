@@ -102,7 +102,13 @@ Every control-register write is wrapped like this:
 - **Kernel NOR (S71, PL064/GL064):** `0x08000000`, AMD/Spansion command set (`0x555/0x2AA`).
   Settings at `+0x790000` (save info), `+0x7A0000` (NOR index), `+0x7B0000` (settings).
   GL064 uses buffered writes (`0x25 … 0x29`).
-- **Game NOR (S98):** `0x09000000–0x097FFFFF`, same command set.
+- **Game NOR (S98):** `0x09000000–0x097FFFFF`, same command set. Autoselect word `0x0E` reads
+  `0x223D`; `Loadfile2NOR` writes only to a chip with that ID. The kernel (`NORflash_OP.c`)
+  erases sectors (`80 … 30`, four `0x30`s across the 32 KB boot sectors at 0 and `0x3FE0000`),
+  programs with the 16-word buffer (`25`, count 15 at the buffer, 16 words, `29`; a wrong count,
+  a word outside the buffer page or a missing `29` aborts until `AA, 55, F0`), and before each
+  write runs `C0` (PPB command set), `80, 30` (erase all PPBs), `90, 00` (exit). Each 8 MB of the
+  chip is a ROM page step of `0x1000`.
 - **PSRAM:** `0x08800000` window.
 - **SRAM / flash-save emulation:** `0x0E000000`, paged by `0x09C00000`; `Bank_Switching` uses
   the flash-save command sequence `0x5555=AA, 0x2AAA=55, 0x5555=B0, 0x0000=bank`.

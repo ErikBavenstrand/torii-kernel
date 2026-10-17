@@ -22,6 +22,7 @@ jobs=(
   "tests/fragmented.sh"
   "tests/listing.sh"
   "tests/cheats.sh"
+  "tests/nor.sh"
 )
 
 logs=$(mktemp -d)
