@@ -5,12 +5,14 @@
 set -euo pipefail
 
 mkdir -p dist/host
-cc -std=gnu11 -g -O1 -fno-omit-frame-pointer \
+# -funsigned-char: char is unsigned on ARM, signed on x86 hosts
+cc -std=gnu11 -g -O1 -fno-omit-frame-pointer -funsigned-char \
   -fsanitize=address,undefined -fno-sanitize-recover=all \
   -Wall -Wextra -Wshadow -Wundef -Wformat=2 -Wstrict-prototypes -Wmissing-prototypes -Werror \
   -I tests/host -o dist/host/tests \
   source/sort.c source/cheat.c tests/host/*.c
-if ASAN_OPTIONS=abort_on_error=0:detect_leaks=1 dist/host/tests; then
+# A hung test (an endless loop in a sort, say) fails after a minute.
+if ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=print_stacktrace=1 timeout 60 dist/host/tests; then
   echo "PASS: host unit tests"
 else
   echo "FAIL: host unit tests"

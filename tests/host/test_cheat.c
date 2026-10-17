@@ -35,15 +35,29 @@ void test_cheat_parse(void)
 
 	parse("");
 	CHECK_EQ(gl_cheat_count, 0);
+
+	parse("09afAF09,9f,F9,0a");  // every edge of the hex digit ranges, either case
+	CHECK_EQ(gl_cheat_count, 3);
+	CHECK_EQ(pCHEAT[0].address, 0x09AFAF09);
+	CHECK_EQ(pCHEAT[0].VAL, 0x9F);
+	CHECK_EQ(pCHEAT[1].VAL, 0xF9);
+	CHECK_EQ(pCHEAT[2].VAL, 0x0A);
+
+	parse("2000000,12,3");  // a short value after a long one doesn't keep its digits
+	CHECK_EQ(pCHEAT[1].VAL, 3);
 }
 
 void test_cheat_reads_only_len(void)
 {
 	// The kernel passes a length into a larger buffer: the rest is ignored.
+	static const char text[] = "2000000,01;2000004,02";
+	char *line = malloc(10);  // only the first 10 bytes, so ASan sees a read past them
+	memcpy(line, text, 10);
 	gl_cheat_count = 0;
-	Parse_cheat_line("2000000,01;2000004,02", 10);
+	Parse_cheat_line(line, 10);
 	CHECK_EQ(gl_cheat_count, 1);
 	CHECK_EQ(pCHEAT[0].VAL, 1);
+	free(line);
 }
 
 void test_cheat_long_fields(void)

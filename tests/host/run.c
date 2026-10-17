@@ -50,6 +50,8 @@ static const struct {
 
 int main(void)
 {
+	// Line by line, so the lines before a sanitizer abort aren't lost.
+	setvbuf(stdout, NULL, _IOLBF, 0);
 	int failed_tests = 0;
 	unsigned count = sizeof(tests) / sizeof(*tests);
 	for (unsigned i = 0; i < count; i++) {
