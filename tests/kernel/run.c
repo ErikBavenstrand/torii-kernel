@@ -15,6 +15,7 @@ void test_cheat_cap(void);
 void test_rtc_and_rumble_are_separate(void);
 void test_sort_by_name(void);
 void test_sort_full_list(void);
+void test_recently_played(void);
 void test_nor_info_stays_in_bounds(void);
 
 static const struct {
@@ -32,6 +33,7 @@ static const struct {
 	{"rtc_and_rumble_are_separate", test_rtc_and_rumble_are_separate},
 	{"sort_by_name", test_sort_by_name},
 	{"sort_full_list", test_sort_full_list},
+	{"recently_played", test_recently_played},
 	{"nor_info_stays_in_bounds", test_nor_info_stays_in_bounds},
 };
 

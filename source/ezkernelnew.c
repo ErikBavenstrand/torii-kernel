@@ -880,12 +880,38 @@ u32 show_recently_play(void)
 	return return_val;
 }
 //------------------------------------------------------------------
+// Moves entry to the top of the count rows in p_recently_play, adding it if
+// it is new and dropping the oldest row when all 10 are taken. Returns the
+// new count.
+u32 Recently_play_add(const char *entry,u32 count)
+{
+	u32 i;
+	u32 found = count;
+	for(i=0;i<count;i++)
+	{
+		if(strcmp(entry,p_recently_play[i]) ==0){
+			found = i;
+			break;
+		}
+	}
+	if(found == count){//new: take a free row, or the oldest one
+		if(count < 10)
+			count++;
+		found = count-1;
+	}
+	for(i=found;i>0;i--){
+		memcpy(p_recently_play[i],p_recently_play[i-1],512);
+	}
+	memset(p_recently_play[0],0x00,512);
+	strncpy(p_recently_play[0],entry,511);
+	return count;
+}
+//---------------------------------------------------------------------------------
 void Make_recently_play_file(TCHAR* path,TCHAR* gamefilename)
 {
 	u32 res;
 	u32 i;
 	u32  count;
-	int get=1;
 	char buf[512];	
 	
 	//res=f_chdir("/SAVER");
@@ -899,42 +925,12 @@ void Make_recently_play_file(TCHAR* path,TCHAR* gamefilename)
 	else{
 		sprintf(buf,"%s/%s",path,gamefilename);	
 	}	
-
-	for(i=0;i<count;i++)
-	{
-		get = strcmp(buf,p_recently_play[i]) ;
-		if(get==0)
-		{
-			u32 j;
-			for(j=i;j>0;j--){
-				memset(p_recently_play[j],0x00,512);
-				dmaCopy(&(p_recently_play[j-1]),&(p_recently_play[j]), 512);					
-			}
-			break;			
-		}
-	}	
-	
-	if(get != 0){
-		if(count==10){
-			for(i=9;i>0;i--){
-				memset(p_recently_play[i],0x00,512);
-				dmaCopy(&(p_recently_play[i-1]),&(p_recently_play[i]), 512);	
-			}		
-		}
-		else if(count){
-			for(i=count;i>0;i--){
-				memset(p_recently_play[i],0x00,512);
-				dmaCopy(&(p_recently_play[i-1]),&(p_recently_play[i]), 512);	
-			}
-		}	
-	}
-	dmaCopy(buf,&(p_recently_play[0]), 512);	//write first one
+	count = Recently_play_add(buf,count);
 		
-	res = f_open(&gfile,"Recently play.txt", FA_WRITE | FA_OPEN_ALWAYS);
+	res = f_open(&gfile,"Recently play.txt", FA_WRITE | FA_CREATE_ALWAYS);//truncate: the list can shrink
 	if(res == FR_OK)
 	{	
-		f_lseek(&gfile, 0x0000);
-		for(i=0;i<count+1;i++){			
+		for(i=0;i<count;i++){			
 			res=f_printf(&gfile, "%s\n", p_recently_play[i]);
 		}
 		f_close(&gfile);
