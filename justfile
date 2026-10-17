@@ -19,7 +19,8 @@ test_rom_outputs := "tests/roms/hello/hello.gba tests/roms/crash/crash.gba tests
 kernel_image := "devkitpro/devkitarm@sha256:1acab59884288115af0e70782a9b69017a8cc6bad69542b24e8652233f215c56"
 emu_image := "torii-emu"
 kernel_docker := "docker run --rm --platform linux/amd64 -u $(id -u):$(id -g) -v \"$PWD\":/src -w /src -e LIBGBA=/opt/devkitpro/libgba " + kernel_image
-emu_docker := "docker run --rm -u $(id -u):$(id -g) -v \"$PWD\":/src " + emu_image
+# LC_ALL: mtools stores UTF-8 file names correctly only in a UTF-8 locale
+emu_docker := "docker run --rm -u $(id -u):$(id -g) -e LC_ALL=C.UTF-8 -v \"$PWD\":/src " + emu_image
 # C formatter for `just lint` and `just format`; .clang-format-ignore lists the files it skips
 clang_format := "23.1.2"
 # Advisory analysis for `just analyze` (cppcheck is pinned in docker/analyze.Dockerfile)
