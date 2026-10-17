@@ -1986,18 +1986,18 @@ refind_file:
 
 				if(	(fileinfo.fattrib == AM_DIR) || (fileinfo.fattrib == 0x30))//DIR and exFAT dir
 				{
+					if ( folder_total >= MAX_folder )//full: skip, but keep reading files
+						continue;
 					memcpy(pFolder[folder_total].filename,fileinfo.fname,100);
 					pFolder[folder_total++].filename[99] = 0;
-					if ( folder_total >= MAX_folder )//full
-	      		break;
 				}
 				else if(	(fileinfo.fattrib == AM_ARC) || (fileinfo.fattrib == 0x21) )
 				{
+					if ( game_total_SD >= MAX_files )//full: skip, but keep reading folders
+						continue;
 					memcpy(pFilename_buffer[game_total_SD].filename,fileinfo.fname,100);
 					pFilename_buffer[game_total_SD].filename[99] = 0;
 					pFilename_buffer[game_total_SD++].filesize = fileinfo.fsize;
-	    		if ( game_total_SD >= MAX_files )//full
-	      		break;
 				}
 			}
 		}
