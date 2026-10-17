@@ -58,15 +58,19 @@ Still open from the bug work:
   - A ROM whose header byte 0xB2 isn't 0x96 (homebrew not run through gbafix) is written but
     never listed, and the next write overwrites it.
 - **Non-ASCII names:** the list draws names by byte count, so CJK names start scrolling too
-  early, and a character split at the edge of the list shows as `?`.
+  early, and a character split at the edge of the list shows as `?`. Names over 99 bytes
+  (about 34 CJK characters) show cut with `*` and "Name too long", and can't be opened. The
+  v0.3 file list fixes both.
 - **Clean boot:** IWRAM is still not fully cleared at launch, because the `SoftReset_now`
   code stays there. No game is known to need it. Clean-boot tests use `tests/roms/idle`
   (no crt0), since devkitARM's crt0 clears EWRAM itself.
 - **Settings default:** done. The emulated kernel NOR already read 0xFFFF for settings that
   were never written. The 0x0000 seen came from saves, which zero slots 65–255
-  (`tests/settings.sh`), and erased hotkey slots are now range-checked.
+  (`tests/settings.sh`), and erased hotkey slots are now range-checked. Known slots: 13 is
+  CLOCK and 25 is RUMBLE; 23–24 were DS Style's reset and backup toggles, so leave them
+  unused.
 
-### Tooling
+### Tooling (done)
 
 - **Warnings:** add `-Wextra -Wshadow -Wundef -Wformat=2 -Wstrict-prototypes
   -Wmissing-prototypes`, exempting the vendored FatFs. Fix everything, then turn on `-Werror`.
@@ -81,9 +85,18 @@ Still open from the bug work:
 - **Host tests:** build pure code (parsers, sorting, cheat decoders) for the host with
   ASan/UBSan, reusing `torii_test.h`.
 - **Advisory analysis:** run cppcheck, clang-tidy (`bugprone-*`, `clang-analyzer-*`) and
-  GCC 10's `-fanalyzer` in report-only mode, with a baseline.
+  GCC 10's `-fanalyzer` in report-only mode, with a baseline. GCC 10's analyzer gives up on
+  the kernel's big functions (`-Wanalyzer-too-complex`) and finds nothing so far.
+- **Pinning:** Docker images by digest plus a Debian snapshot, Actions by SHA, just and uv
+  by version. Bump the snapshot and the image digest together.
 
-### Source cleanup
+Notes from the tooling work:
+
+- Making ROM functions `static` grew the static deepest-stack estimate from about 1.8 KB to
+  2.4 KB (`main`, `Process_savefile`, `Open_cht_file`). It fits in IWRAM's free space, and
+  `noinline` on the save writer and cheat readers would win it back if needed.
+
+### Source cleanup (done)
 
 1. Port the Simple DE and DS Style fixes we want while their code still lines up with ours.
 2. Remove the Chinese strings, the HZK12 font and FatFs's CP936 tables (about 87 KB each).
