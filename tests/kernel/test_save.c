@@ -33,6 +33,25 @@ void test_check_save_mode(void)
 	CHECK_EQ(lookup("AFZJ"), 0x11);  // F-Zero (JP): SRAM, the first entry
 	CHECK_EQ(lookup("AMAJ"), 0x21);  // Super Mario Advance (JP): EEPROM 512
 	CHECK_EQ(lookup("ZZZZ"), 0x10);  // unknown games get 0x10
+	CHECK_EQ(lookup("ADME"), 0x21);  // Doom: EEPROM 512 (ez-flash/omega-de-kernel#3)
+	CHECK_EQ(lookup("A9DP"), 0x21);  // Doom II
+	CHECK_EQ(lookup("AYGE"), 0x21);  // Gauntlet - Dark Legacy
+	CHECK_EQ(lookup("FSME"), 0x21);  // Classic NES Series - Super Mario Bros.
+	CHECK_EQ(lookup("FZLE"), 0x22);  // Classic NES Series - The Legend of Zelda: EEPROM 8K
+}
+
+void test_nes_classics_use_eeprom(void)
+{
+	// Classic NES Series and Famicom Mini games (codes starting with F) all
+	// save to EEPROM; the table used to give them SRAM.
+	for (unsigned i = 0; i < 3000 && memcmp(saveMODE_table[i].gamecode, "FFFF", 4); i++) {
+		if (saveMODE_table[i].gamecode[0] != 'F')
+			continue;
+		u8 mode = saveMODE_table[i].savemode;
+		if (mode != 0x21 && mode != 0x22)
+			tlog_error("%.4s has save mode %02X, not EEPROM", saveMODE_table[i].gamecode, mode);
+		CHECK(mode == 0x21 || mode == 0x22);
+	}
 }
 
 void test_get_save_mode(void)
