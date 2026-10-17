@@ -6,6 +6,34 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** LOGGING in settings page 2 (Off, Errors, Info, Debug; off by
+  default) writes the kernel's log to four rotating 64 KB files in
+  `/torii/logs`, so a real cart can bring back reports (`63f50a5`). Off,
+  it touches neither the card nor cart RAM. Each launch logs what the
+  kernel did (header, save type, IRQ hook source, patched words, CART and
+  GPIO), and the next boot says how the session ended. A new file needs
+  1 MB free besides, and lines never split across files (`0167c1a`,
+  `0bfd2bf`).
+- **Added:** a kernel crash (an IRQ arriving outside the kernel's code) is
+  kept in cart RAM page 0xF0 with the registers, stack and last log lines,
+  and logged at the next boot even with LOGGING off (`63f50a5`); a dump
+  stays until it reaches the card, and the largest arrives whole
+  (`0167c1a`, `0bfd2bf`).
+- **Added:** with LOGGING on, the in-game menu has DEBUG, which saves the
+  game's registers, hook state and memory for the next boot's log
+  (`63f50a5`, `ed77614`). Its code goes in only then, and never into a NOR
+  copy (`0167c1a`). The menu's font keeps only the rows and letters it
+  draws, so the menu is smaller than before and still takes 600 cheats.
+- **Added:** Diagnostics (DIAGNOSE in settings page 2, or L+R+SELECT at
+  power-on) runs the unit tests and probes the clock, PSRAM, NOR, the save
+  chip (read only) and cart SRAM, times WAITCNT settings, glyphs, BIOS
+  LZ77 and the SD card, tries EEPROM 512 against 8K, looks for a separate
+  rumble control, and asks the checklist in `docs/release-checklist.md`
+  (`63f50a5`, `7aca5da`, `0167c1a`).
+- **Fixed:** reading the game NOR's ID left the chip in ID mode, so after
+  a soft reset the NOR list read as empty and the kernel erased its table;
+  the read now resets the chip, and so does boot (`0167c1a`).
+
 - **Fixed:** Recently Played no longer overflows a 256-byte buffer on a
   long path (`6b868b7`), and skips a line too long for the kernel to have
   written (`db08c34`), whose folder overran the path buffer.
