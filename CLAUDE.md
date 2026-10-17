@@ -10,16 +10,26 @@ Torii is a custom kernel for the EZ-Flash Omega DE, forked from EZ-Flash's offic
 - `source/ezkernelnew.c`, `source/lang.c`, `source/GBApatch.c` and `source/gba_rts_patch.s` contain GBK-encoded Chinese strings.
   Edit them as bytes, decoding and encoding with `gbk`; a UTF-8 round trip corrupts the strings.
 - Language strings live in `source/lang.c` as `en_*` and `zh_*` pairs, wired up in `LoadEnglish` and `LoadChinese`. Add both.
+- Our code builds with `-Werror` and the extra warnings in the Makefile's `WARNFLAGS`; the vendored `source/ff15` is exempt.
+  Make a function used in one file `static`, and declare the rest in a header.
+  Keep `IWRAM_CODE` functions extern: GCC inlines a static one into its ROM callers, and the code then runs from ROM while the ROM page changes.
 - Log from kernel code with `tlog()` and `TLOG_ASSERT()` from `source/tlog.h`. Lines print as `kernel: ...` from `mgba-shot` and as `GBA Debug: ...` from `just play`; on real hardware they cost nothing. A failed assert fails `just compat`.
-- `just size` checks the kernel against the 1 MB kernel area, IWRAM and EWRAM. EWRAM has about 400 bytes left; past its end, data wraps onto its start. The deepest stack measured is about 1.7 KB, so keep IWRAM free space well above that.
+- `just size` checks the kernel against the 1 MB kernel area, IWRAM and EWRAM. EWRAM has about 400 bytes left; past its end, data wraps onto its start. `just stack` lists the largest frames and estimates the deepest call chain at about 2.5 KB, so keep IWRAM free space well above that.
 - Build only with `just build`. It pins devkitARM r54 because newer GCC rejects the unmodified source.
 - Builds guard against stale objects themselves (`tools/fresh.py`): colima's sshfs mount shows edits to containers up to a second late, with whole-second timestamps, so make alone can reuse old objects. Build through the `just` recipes, never `make` directly.
+
+## Formatting
+
+- Run `just format` after editing C files; `just lint` fails on unformatted ones.
+  It formats our files with `.clang-format`; `.clang-format-ignore` lists the official and vendored files it skips.
 
 ## Checking changes
 
 1. Run `just test`. Every line should start with `PASS`.
-   Unit-test kernel functions in `tests/kernel/` (`CHECK`, `CHECK_EQ` from `torii_test.h`; list each test in `run.c`). They run inside a test build of the kernel, so they can call any kernel function.
+   Unit-test kernel functions in `tests/kernel/` (`CHECK`, `CHECK_EQ` from `torii_test.h`; declare each test in `tests.h` and list it in `run.c`). They run inside a test build of the kernel, so they can call any kernel function.
+   Test hardware-free code in `tests/host/` too: it builds for the host under ASan and UBSan (`just test-host`), with `tests/host/gba_base.h` standing in for libgba's. Keep such code in its own file, as `source/sort.c` and `source/cheat.c` are.
    For changes to launching, saves or the cart model, also run `just compat` (games you own, listed in `roms/games.toml`; missing ones are skipped).
+   For changes to C code, also run `just analyze`. It fails only on findings missing from `tools/analyze-baseline.txt`; fix them, or run `just analyze-baseline` for false alarms and fixed findings.
 2. For anything visible, run `just shot FRAME KEYS...` and read `dist/shots/shot.png`.
    The menu appears around frame 100. Press a key as `N:A`, release it as `N+6:-`, and leave about 8 frames between presses.
 3. To debug headlessly, start `just debug-shot -f FRAMES [mgba-shot options]` in the background and drive it with `just gdb -batch -ex 'break FUNC' -ex continue -ex bt ...`. mGBA's own debugger commands can also be piped into `just debug-cli`, which opens a window.

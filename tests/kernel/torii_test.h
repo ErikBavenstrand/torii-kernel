@@ -18,7 +18,7 @@ extern int torii_test_failures;
 
 #define CHECK_EQ(actual, expected) \
 	do { \
-		unsigned long _a = (unsigned long) (actual), _e = (unsigned long) (expected); \
+		unsigned long _a = (unsigned long)(actual), _e = (unsigned long)(expected); \
 		if (_a != _e) { \
 			tlog_error("FAIL %s:%d: %s is 0x%lX, expected 0x%lX", __FILE__, __LINE__, #actual, _a, _e); \
 			++torii_test_failures; \

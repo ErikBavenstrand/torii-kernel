@@ -10,13 +10,14 @@
 #include "RTC.h"
 #include "draw.h"
 #include "Ezcard_OP.h"
+#include "helpwindow.h"
 
 
 
 extern u16 gl_select_lang;
 u16 Rev;
 //---------------------------------------------------------------------------------
-void Show_ver(void)
+static void Show_ver(void)
 {
 	char msg[20];
 	char *ver="K:1.06";
@@ -26,7 +27,7 @@ void Show_ver(void)
 	Rev = FPGAver & 0xF000;
 }
 //---------------------------------------------------------------------------------
-void Show_help_window()
+void Show_help_window(void)
 {
 	char msg[20];
 	Show_ver();

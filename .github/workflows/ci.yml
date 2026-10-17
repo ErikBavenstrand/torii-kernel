@@ -1,6 +1,8 @@
 # Checks every push to main and every pull request: lint, build the kernel
-# (kept as a download), and run the homebrew tests on the emulated cart. Each
-# job runs the same `just` recipe as on a developer's machine. Games you own
+# (kept as a download), run the host tests and the homebrew tests on the
+# emulated cart, and run the advisory static analysis. Each
+# job runs the same `just` recipe as on a developer's machine. Actions are
+# pinned to commits, and just and uv to versions. Games you own
 # (`just compat`) stay local: their ROMs are never in the repository.
 name: CI
 
@@ -23,13 +25,16 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
-      - uses: extractions/setup-just@v4
-      - uses: astral-sh/setup-uv@v10.3.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
         with:
+          just-version: 1.58.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: 0.12.23
           # The lint tools are pinned in the justfile; there is no lock file.
           cache-dependency-glob: justfile
-      - name: Lint Python and shell scripts
+      - name: Lint C, Python, shell scripts and workflows
         run: just lint
 
   kernel:
@@ -37,14 +42,16 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-      - uses: extractions/setup-just@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+        with:
+          just-version: 1.58.0
       - name: Build ezkernelnew.bin
         run: just build
       - name: Check size against the cart and GBA memory
         run: just size
       - name: Upload ezkernelnew.bin
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ezkernelnew
           path: dist/ezkernelnew.bin
@@ -55,14 +62,35 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
-      - uses: extractions/setup-just@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+        with:
+          just-version: 1.58.0
       - name: Run kernel unit tests and homebrew game tests
         run: just test
       - name: Upload screenshots
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: screenshots
           path: dist/shots
           if-no-files-found: ignore
+
+  analyze:
+    name: Static analysis (advisory)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    # Advisory: the job fails only on findings missing from
+    # tools/analyze-baseline.txt, and that doesn't fail the workflow.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+        with:
+          just-version: 1.58.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: 0.12.23
+          cache-dependency-glob: justfile
+      - name: Run cppcheck, clang-tidy and GCC's -fanalyzer against the baseline
+        run: just analyze

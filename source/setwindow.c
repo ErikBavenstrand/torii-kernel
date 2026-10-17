@@ -18,8 +18,6 @@ extern u16 gl_show_Thumbnail;
 extern u16 gl_game_clock;
 extern u16 gl_game_rumble;
 
-extern void CheckSwitch(void);
-extern void CheckLanguage(void);
 void save_setw_info(void);
 
 u16 SET_info_buffer [0x200]EWRAM_BSS;
@@ -482,19 +480,19 @@ u32 Setting_window(void)
 							if(	edit_pos < 7)	
 								Clear(clean_pos,y_offset ,clean_w,13,gl_color_btn_clean,1);
 								
-							char* wkday;
+							char* edit_wkday;
 							switch(edit_datetime[_WKD])
 							{
-								case 0:wkday = gl_Sun;break;
-								case 1:wkday = gl_Mon;break;
-								case 2:wkday = gl_Tues;break;
-								case 3:wkday = gl_Wed;break;
-								case 4:wkday = gl_Thur;break;
-								case 5:wkday = gl_Fri;break;
-								case 6:wkday = gl_Sat;break;	
-								default:wkday = gl_Sun;break;	
+								case 0:edit_wkday = gl_Sun;break;
+								case 1:edit_wkday = gl_Mon;break;
+								case 2:edit_wkday = gl_Tues;break;
+								case 3:edit_wkday = gl_Wed;break;
+								case 4:edit_wkday = gl_Thur;break;
+								case 5:edit_wkday = gl_Fri;break;
+								case 6:edit_wkday = gl_Sat;break;	
+								default:edit_wkday = gl_Sun;break;	
 							}						
-							sprintf(msg,"20%02d/%02d/%02d %02d:%02d:%02d %s",edit_datetime[_YEAR],edit_datetime[_MONTH],edit_datetime[_DAY],edit_datetime[_HOUR],edit_datetime[_MIN],edit_datetime[_SEC] ,wkday);
+							sprintf(msg,"20%02d/%02d/%02d %02d:%02d:%02d %s",edit_datetime[_YEAR],edit_datetime[_MONTH],edit_datetime[_DAY],edit_datetime[_HOUR],edit_datetime[_MIN],edit_datetime[_SEC] ,edit_wkday);
 							DrawHZText12(msg,0,x_offset,y_offset,gl_color_text,1);	
 						}
 						else if(select ==4)

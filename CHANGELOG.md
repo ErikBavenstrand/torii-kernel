@@ -4,6 +4,22 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Fixed:** cheat lines no longer make bogus writes (`2c274c8`): an entry
+  without a value is dropped instead of reusing the last one, empty `;` and
+  trailing `,` add nothing (a trailing `,` wrote 0 to the next address), and
+  only hex digits count, so tabs, CRs and stray bytes are skipped.
+- **Changed:** the cheat line parser moves unchanged from `showcht.c` to
+  `cheat.c`, with the cheat table in `cheat.h` (`a0a46a4`), so it builds
+  without FatFs or the hardware and the host tests run it under sanitizers.
+- **Changed:** `sort.c` follows the new `.clang-format` (`14e1d5b`).
+- **Changed:** the kernel builds with `-Wextra`, `-Wshadow`, `-Wundef`,
+  `-Wformat=2`, `-Wstrict-prototypes`, `-Wmissing-prototypes` and `-Werror`
+  (`d65cdb4`). The fixes keep behaviour: `(void)` prototypes, renamed
+  shadowing locals, casts that keep the unsigned comparisons, `static` for
+  file-local functions; `IWRAM_CODE` functions stay extern.
+
 ## v0.1.1 (2026-10-17)
 
 - **Fixed:** opening an SD folder no longer builds the path with `sprintf`

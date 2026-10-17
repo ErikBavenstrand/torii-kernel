@@ -9,7 +9,7 @@ static u8 held[104] EWRAM_BSS;
 
 static const char *name_of(const u8 *entries, u32 size, u16 i)
 {
-	return (const char *) (entries + i * size);
+	return (const char *)(entries + i * size);
 }
 
 void sort_by_name(void *entries, u32 count, u32 size)

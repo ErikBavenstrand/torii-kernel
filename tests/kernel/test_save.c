@@ -4,6 +4,7 @@
 #include <gba_base.h>
 
 #include "torii_test.h"
+#include "tests.h"
 
 typedef unsigned char BYTE;
 
@@ -85,9 +86,10 @@ void test_save_mode_table(void)
 	for (i = 0; i < 3000 && memcmp(saveMODE_table[i].gamecode, "FFFF", 4); i++) {
 		u8 mode = saveMODE_table[i].savemode;
 		int known = mode == 0x00 || mode == 0x10 || mode == 0x11 || mode == 0x21 || mode == 0x22 ||
-		            mode == 0x23 || mode == 0x31 || mode == 0x32 || mode == 0x33;
+			    mode == 0x23 || mode == 0x31 || mode == 0x32 || mode == 0x33;
 		if (!known)
-			tlog_error("save table entry %u (%.4s) has unknown save mode %02X", i, saveMODE_table[i].gamecode, mode);
+			tlog_error("save table entry %u (%.4s) has unknown save mode %02X", i,
+				   saveMODE_table[i].gamecode, mode);
 		CHECK(known);
 	}
 	CHECK(i < 3000);

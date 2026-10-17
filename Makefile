@@ -36,7 +36,13 @@ CFLAGS	:=	-g -Wall -Os\
 		-mcpu=arm7tdmi -mtune=arm7tdmi\
 		$(ARCH)
 
+# Each object's stack frames (.su) and call graph (.ci), read by tools/stack.py
+CFLAGS	+=	-fstack-usage -fcallgraph-info=su
+
 CFLAGS	+=	$(INCLUDE)
+
+# Extra warnings, as errors, for our code; the vendored FatFs (source/ff15) is exempt
+WARNFLAGS	:=	-Werror -Wextra -Wshadow -Wundef -Wformat=2 -Wstrict-prototypes -Wmissing-prototypes
 
 CXXFLAGS	:=	$(CFLAGS) -fno-rtti -fno-exceptions
 
@@ -102,10 +108,12 @@ export OFILES_SOURCES := $(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
 
 export OFILES := $(OFILES_BIN) $(OFILES_SOURCES)
 
+export FATFS_OFILES := $(patsubst %.c,%.o,$(notdir $(wildcard source/ff15/*.c)))
+
 export HFILES := $(addsuffix .h,$(subst .,_,$(BINFILES)))
 
 export INCLUDE	:=	$(foreach dir,$(INCLUDES),-iquote $(CURDIR)/$(dir)) \
-					$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
+					$(foreach dir,$(LIBDIRS),-isystem $(dir)/include) \
 					-I$(CURDIR)/$(BUILD)
 
 export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
@@ -135,6 +143,8 @@ $(OUTPUT).gba	:	$(OUTPUT).elf
 $(OUTPUT).elf	:	$(OFILES)
 
 $(OFILES_SOURCES) : $(HFILES)
+
+$(filter-out $(FATFS_OFILES),$(OFILES_SOURCES)) : CFLAGS += $(WARNFLAGS)
 
 #---------------------------------------------------------------------------------
 # The bin2o rule should be copied and modified

@@ -1,0 +1,39 @@
+# Text files are stored and checked out with LF line endings; git detects
+# binary files itself.
+* text=auto eol=lf
+
+# Files from EZ-Flash's official source keep their CRLF line endings, byte for
+# byte, until the source cleanup converts them. Some are GBK-encoded.
+*.bat -text
+emusrc/** -text
+source/Ezcard_OP.c -text
+source/Ezcard_OP.h -text
+source/GBApatch.c -text
+source/GBApatch.h -text
+source/HZK12.h -text
+source/NORflash_OP.c -text
+source/NORflash_OP.h -text
+source/RTC.c -text
+source/RTC.h -text
+source/asc126.h -text
+source/draw.c -text
+source/draw.h -text
+source/ez_define.h -text
+source/ezkernel.h -text
+source/ezkernelnew.c -text
+source/gba_nes_patch.h -text
+source/gba_rts_only.s -text
+source/gba_rts_patch.s -text
+source/gba_sleep_patch.s -text
+source/helpwindow.c -text
+source/helpwindow.h -text
+source/lang.c -text
+source/lang.h -text
+source/pocketnes.h -text
+source/reset.s -text
+source/reset_table.h -text
+source/saveMODE.h -text
+source/setwindow.c -text
+source/setwindow2.c -text
+source/showcht.c -text
+source/showcht.h -text

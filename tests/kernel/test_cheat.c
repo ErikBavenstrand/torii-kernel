@@ -1,20 +1,11 @@
-// Cheat parsing and the cheat table's cap (source/showcht.c, source/GBApatch.c).
+// Cheat parsing and the cheat table's cap (source/cheat.c, source/GBApatch.c).
 #include <string.h>
 
 #include <gba_base.h>
 
+#include "../../source/cheat.h"
 #include "torii_test.h"
-
-// From source/showcht.h, which needs FatFs's headers.
-#define CHEAT_PATCH_LENGTH 0x2000
-#define CHEAT_MAX 600
-typedef struct {
-	u32 address;
-	u32 VAL;
-} ST_entry;
-extern ST_entry pCHEAT[];
-extern u32 gl_cheat_count;
-void Parse_cheat_line(const char *line, u32 len);
+#include "tests.h"
 
 // From source/gba_rts_patch.s: the in-game handler, then the cheat table.
 void RTS_ReplaceIRQ_start(void);
@@ -61,7 +52,7 @@ void test_cheat_cap(void)
 	CHECK_EQ(pCHEAT[CHEAT_MAX - 1].address, 0x20000 + CHEAT_MAX - 1);
 
 	// The handler and a full table fit in the patch area appended to the ROM.
-	u32 handler = (u8 *) no_CHEAT_end - (u8 *) RTS_ReplaceIRQ_start;
+	u32 handler = (u8 *)no_CHEAT_end - (u8 *)RTS_ReplaceIRQ_start;
 	tlog("cheat handler: 0x%lX bytes, room for %lu cheats", handler, (CHEAT_PATCH_LENGTH - handler) / 8);
 	CHECK(handler + CHEAT_MAX * 8 <= CHEAT_PATCH_LENGTH);
 	gl_cheat_count = 0;

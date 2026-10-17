@@ -4,7 +4,7 @@ A custom kernel for the EZ-Flash Omega Definitive Edition, in the making.
 Named after the shrine gate you pass through into another world, like every
 game you launch. Not affiliated with EZ-Flash.
 
-Right now the kernel is EZ-Flash's official 1.06, unmodified. What this repo
+Right now the kernel is EZ-Flash's official 1.06 with bug fixes. What this repo
 adds so far is the groundwork: a reproducible build, an emulated cart to run
 the kernel on, and tests.
 
@@ -34,13 +34,17 @@ the update.
 | `just sd /Volumes/OMEGA [game.gba...]` | copies the kernel (and games) to a real SD card and ejects it; hold R while switching on to install |
 | `just play [game.gba...]` | runs the kernel on an emulated cart, first copying any games given onto its SD card unless they are already there |
 | `just dev` | like `play`, rebuilding whenever `source/` changes |
-| `just test` | kernel unit tests, then homebrew games through the kernel: boot, every save type across power cycles, crash reports and save states |
+| `just test` | host and kernel unit tests, then homebrew games through the kernel: boot, every save type across power cycles, crash reports and save states |
 | `just cart-add game.gba` | copies a file onto the emulated SD card |
 | `just game-add PATH...` | copies games you own (files or whole folders) into the git-ignored `roms/` and lists them in `roms/games.toml` |
+| `just test-host` | builds the hardware-free kernel code (sorting, cheat parsing) for Linux in the tools container with AddressSanitizer and UndefinedBehaviorSanitizer and runs `tests/host` (also part of `just test`) |
 | `just test-kernel` | builds a test kernel that runs the unit tests in `tests/kernel` at boot (also part of `just test`) |
 | `just compat` | plays each listed game through the kernel and checks it boots, gets the right save type and clock, and keeps its saves; prints a table and writes `dist/compat/index.html` with screenshots |
 | `just size` | kernel size against the 1 MB kernel area, IWRAM and EWRAM, plus the largest symbols; fails if anything is over |
-| `just compile-commands` | writes `compile_commands.json` so clangd (editors, agents) can jump to definitions and show errors |
+| `just stack` | the largest stack frames and a static estimate of the deepest call chains |
+| `just lint` / `just format` | checks the C (clang-format), Python, shell scripts and CI workflows / formats the C files in place |
+| `just analyze` | advisory static analysis of `source/` with cppcheck, clang-tidy and GCC's `-fanalyzer`; fails only on findings missing from `tools/analyze-baseline.txt` (`just analyze-baseline` rewrites it) |
+| `just compile-commands` | writes `compile_commands.json` for the kernel and its unit tests, so clangd (editors, agents) can jump to definitions and show errors; `.clangd` adapts the GCC flags for clang |
 
 `just --list` shows the rest.
 

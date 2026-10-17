@@ -77,3 +77,7 @@ void Patch_SpecialROM_TrimSize(void);
 u32 Check_game_RTS_FAT(TCHAR *filename,u32 game_save_rts);
 void IWRAM_CODE PatchInternal(u32* Data,int iSize,u32 offset);
 void Patch_SpecialROM_sleepmode(void);
+// IWRAM code must run from IWRAM while the ROM page changes, so it is never
+// static: GCC would inline it into callers in ROM.
+bool IWRAM_CODE PatchDragonBallZ(u32 *Data);
+void IWRAM_CODE CheckNes(u32 *Data);

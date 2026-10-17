@@ -1,0 +1,13 @@
+# clangd for the kernel, reading compile_commands.json (`just compile-commands`).
+# Those are GCC's commands for devkitARM, so set clang's target and drop the
+# flags clang doesn't know. Paths are relative to build/ and build-test/.
+CompileFlags:
+  Add:
+    - --target=arm-none-eabi
+    - -isystem../dist/devkitpro/devkitARM/arm-none-eabi/include
+  Remove:
+    - -mtune=*
+    - -mthumb-interwork
+    - -fcallgraph-info=*
+    - -fstack-usage
+    - -Werror
