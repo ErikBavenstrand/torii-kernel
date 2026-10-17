@@ -10,10 +10,12 @@ SoftReset_now:
 	bx  r1
 	.code 32
 SoftReset_now16:
+	@;run the reset from the top of IWRAM, which the BIOS SoftReset clears,
+	@;so nothing is left in EWRAM (it used to go to 0x02001000)
 	adr r1,SoftReset
 	adr r3,SoftReset_end
-	mov r2,#0x02000000
-	add r2,#0x1000 @;533
+	mov r2,#0x03000000
+	add r2,#0x7E00
 copy_loop:
 	ldr r0,[r1],#4
 	str r0,[r2],#4
@@ -30,15 +32,15 @@ clearL:
 	blt		clearL
 
 	ldr		r2,=RegisterRamReset
-	ldr		r3,=0x3008000
+	ldr		r3,=0x3007E00 @;not the copy above
 	mov		r0,#0
 clearL2:
 	str		r0,[r2],#+4
 	cmp		r2,r3
 	blt		clearL2
 		
-	mov r0,#0x02000000
-	add r0,r0,#0x1000
+	mov r0,#0x03000000
+	add r0,r0,#0x7E00
 	add r0,r0,#1
 	bx r0
 @----------------------------------------------
