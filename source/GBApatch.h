@@ -69,7 +69,7 @@ u8 Check_mde_file(TCHAR* gamefilename);
 u8 Make_mde_file(TCHAR* gamefilename,u8 Save_num);
 
 void Patch_SpecialROM_sheepmode(void);
-u32 use_internal_engine(u8 gamecode[]);
+u32 use_internal_engine(u8 gamecode[], TCHAR* gamefilename);
 u32 Check_cheat_file(TCHAR *gamefilename);
 void SetTrimSize(u8* buffer,u32 romsize,u32 iSize,u32 mode,BYTE saveMODE);
 u32 Find_spend_address_SpecialROM(u32* Data);

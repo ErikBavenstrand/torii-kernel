@@ -13,6 +13,8 @@
 #include "lang.h"
 #include "showcht.h"
 #include "Ezcard_OP.h"
+#include "irqpatch.h"
+#include "tlog.h"
 #include "tlog.h"
 
 
@@ -379,6 +381,10 @@ static void Patch_B_address(void)
 	}	
 }
 //------------------------------------------------------------------
+//Torii: the hotkeys the settings page shows for unset (erased) slots:
+//L R SELECT and L R START. Without them an erased slot gave 1 << 0xFFFF.
+static const u16 sleep_hotkey_default[3] = {9, 8, 2};
+static const u16 rts_hotkey_default[3] = {9, 8, 3};
 static void Patch_Reset_Sleep(u32 *Data)
 {	    
 	(void)Data;
@@ -401,8 +407,8 @@ static void Patch_Reset_Sleep(u32 *Data)
 	u16 read8 = Read_SET_info(assress_edit_rtshotkey_0); 
 	u16 read9 = Read_SET_info(assress_edit_rtshotkey_1); 
 	u16 read10 = Read_SET_info(assress_edit_rtshotkey_2); 
-	u16 sleep_key = ~((1<< read5) | (1<< read6) | (1<< read7));
-  u16 reset_key = ~((1<< read8) | (1<< read9) | (1<< read10));	
+	u16 sleep_key = Hotkey_value((const u16[]){read5, read6, read7}, sleep_hotkey_default);
+  u16 reset_key = Hotkey_value((const u16[]){read8, read9, read10}, rts_hotkey_default);	
 
   u32 Reset_key_offset = (u8*)Reset_key - p_patch_start;
  	u32 Sleep_key_offset = (u8*)Sleep_key - p_patch_start;
@@ -450,8 +456,8 @@ static void Patch_RTS_Cheat(u32 *Data)
 	u16 read8 = Read_SET_info(assress_edit_rtshotkey_0); 
 	u16 read9 = Read_SET_info(assress_edit_rtshotkey_1); 
 	u16 read10 = Read_SET_info(assress_edit_rtshotkey_2); 
-	u16 RTS_sleep_key_val = ~((1<< read5) | (1<< read6) | (1<< read7));
-  u16 RTS_reset_key_val = ~((1<< read8) | (1<< read9) | (1<< read10));	
+	u16 RTS_sleep_key_val = Hotkey_value((const u16[]){read5, read6, read7}, sleep_hotkey_default);
+  u16 RTS_reset_key_val = Hotkey_value((const u16[]){read8, read9, read10}, rts_hotkey_default);	
 	 
   u32 RTS_Reset_key_offset = (u8*)RTS_Reset_key - p_patch_start;
  	u32 RTS_Sleep_key_offset = (u8*)RTS_Sleep_key - p_patch_start;
@@ -530,8 +536,8 @@ static void Patch_RTS_only(u32 *Data)
 	u16 read8 = Read_SET_info(assress_edit_rtshotkey_0); 
 	u16 read9 = Read_SET_info(assress_edit_rtshotkey_1); 
 	u16 read10 = Read_SET_info(assress_edit_rtshotkey_2); 
-	u16 RTS_only_SAVE_key_val = ~((1<< read5) | (1<< read6) | (1<< read7));
-  u16 RTS_only_LOAD_key_val = ~((1<< read8) | (1<< read9) | (1<< read10));	
+	u16 RTS_only_SAVE_key_val = Hotkey_value((const u16[]){read5, read6, read7}, sleep_hotkey_default);
+  u16 RTS_only_LOAD_key_val = Hotkey_value((const u16[]){read8, read9, read10}, rts_hotkey_default);	
 	 
   u32 RTS_only_SAVE_key_offset = (u8*)RTS_only_SAVE_key - p_patch_start;
  	u32 RTS_only_LOAD_key_offset = (u8*)RTS_only_LOAD_key - p_patch_start;
@@ -968,39 +974,45 @@ u32 Check_RTS(TCHAR* gamefilename)
 	return rtsfilesize;
 }
 //------------------------------------------------------------------
-u32 use_internal_engine(u8 gamecode[])
+//Torii: reads the listed words from the ROM file; true if all are IRQ
+//handler literals. Another revision of a game keeps them elsewhere, and
+//patching the listed words there breaks it.
+static u32 Table_matches_rom(TCHAR* gamefilename, const u32* offsets, int count)
 {
-	u32 i;
-	u32 count0x3007FFC=0;
-	u32 result=0;
-	
-	g_Offset = 0;
-	
-	dmaCopy((void*)reset_table, (void*)pReadCache, sizeof(reset_table));
-	for(i=0;i<sizeof(reset_table)/4;i++)
+	u32 word;
+	UINT got;
+	u32 ok;
+	if(f_open(&gfile, gamefilename, FA_READ) != FR_OK)
+		return 0;
+	ok = 1;
+	for(int ii=0; ok && ii<count; ii++)
 	{
-		count0x3007FFC = ((vu32*)pReadCache)[i+1];				
-
-		if( ((vu32*)pReadCache)[i] == *(vu32*)gamecode )
-		{	
-			result =1;			
-			break;
-		}
-		i += (count0x3007FFC+1);
-	}	
-	if(result==0)	return 0;
-		
-	#ifdef DEBUG
-		//DEBUG_printf("%d: %X VS %X %x",i,((vu32*)pReadCache)[i],*(vu32*)gamecode,count0x3007FFC);
-		//wait_btn();	
-	#endif
-	i += 2;
+		ok = (f_lseek(&gfile, offsets[ii]*4) == FR_OK) && (f_read(&gfile, &word, 4, &got) == FR_OK)
+			&& (got == 4) && Is_irq_literal(word);
+	}
+	f_close(&gfile);
+	return ok;
+}
+//------------------------------------------------------------------
+//Torii: the table lookup is bounds-checked and skips blank game codes, and
+//a table entry that doesn't match this ROM falls back to the scan.
+u32 use_internal_engine(u8 gamecode[], TCHAR* gamefilename)
+{
+	const u32 *offsets;
+	int count = Find_irq_table_entry((const u32*)reset_table, sizeof(reset_table)/4, gamecode, &offsets);
+	if(count < 0)	return 0;
+	if(!Table_matches_rom(gamefilename, offsets, count))
+	{
+		tlog("patch: the built-in table doesn't match this ROM, scanning it");
+		return 0;
+	}
+	g_Offset = 0;
 	iCount2 = 0;
-  for(u32 ii=0;ii<count0x3007FFC;ii++)
-  {
-      Add2(((vu32*)pReadCache)[i+ii], 0x3007FF4);//0x3007FFC offset
-  }
-	return result;
+	for(int ii=0;ii<count;ii++)
+	{
+		Add2(offsets[ii], 0x3007FF4);//0x3007FFC offset
+	}
+	return 1;
 }
 //------------------------------------------------------------------
 void Patch_SpecialROM_sleepmode(void)

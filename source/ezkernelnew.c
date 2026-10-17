@@ -2951,7 +2951,7 @@ boot_game:
 						}
 						else 
 						{
-			    		res=use_internal_engine(GAMECODE);	
+			    		res=use_internal_engine(GAMECODE,pfilename);	
 			    		if(res == 1) 
 			    		{
 			    			Send_FATbuffer(FAT_table_buffer,0);//Loading rom	
