@@ -481,8 +481,9 @@ def check_menu(result: Result, rom: Path, sd_name: str, table: dict) -> None:
         for f, text in re.findall(r"^script: hook (\d+) (.*)$", trace, re.MULTILINE)
     ]
     pat = sd_file(cart, f"PATCH/{sd_name.rsplit('.', 1)[0]}.pat")
-    if pat and len(pat) >= 0x118:
-        patched = struct.unpack_from("<I", pat, 0x114)[0]
+    if pat and len(pat) >= 64:
+        # Patch slots, then 16 words; the slot count is the 6th.
+        patched = struct.unpack_from("<I", pat, len(pat) - 64 + 20)[0]
         result.metrics["hook from"] = f"ROM scan, {patched} patched"
     elif in_table is not None:
         result.metrics["hook from"] = in_table
@@ -574,6 +575,11 @@ def check_menu(result: Result, rom: Path, sd_name: str, table: dict) -> None:
         return
     if closed is None:
         result.set("in-game menu", "fail", "B did not close the menu")
+        return
+    if any(t == "kernel back" for _, t in events):
+        result.set(
+            "in-game menu", "fail", "the game went back to the kernel after the menu"
+        )
         return
     after = {h for f, h in screen_hashes(out) if f > closed + 30}
     if len(after) <= 1:

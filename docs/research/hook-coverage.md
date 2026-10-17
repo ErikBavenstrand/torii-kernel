@@ -122,8 +122,10 @@ Super Mario Advance 4 rev 1 (AX4P) passed before, but 5 of its 7 table
 offsets are rev 0's, so the kernel overwrote 5 unrelated words; it now
 scans.
 
-Kirby: Nightmare in Dream Land has 33 matching words, more than the scan's
-32 slots. That only matters if it falls back to the scan.
+Kirby: Nightmare in Dream Land has 44 matching words (42 of `0x3007FFC`,
+2 of the mirror), more than the scan's 32 slots; with the scan engine 12
+stayed unpatched. The kernel now has 64 slots (`EMax`), and `.pat` files
+of the old layout are scanned again.
 
 Other things seen:
 

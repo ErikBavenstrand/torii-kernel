@@ -28,6 +28,8 @@
 --   vblank N of M            frames that ended with the VBlank IRQ fully
 --                            enabled (IME, IE bit 0, DISPSTAT bit 3), from
 --                            the game's start to the menu key
+--   kernel back              the kernel's ROM is mapped again: the game
+--                            reset to the kernel
 --   menu open | closed       the menu is on screen: mode 3 with BG2 only,
 --                            the CPU in the menu's code
 
@@ -112,6 +114,8 @@ callbacks:add("frame", function()
 			log(string.format("patch %08X", patchStart))
 		end
 		plan(frame)
+	elseif header == kernelHeader then
+		report("kernel", "back")  -- the kernel is mapped again (a reset)
 	end
 
 	report("vector", string.format("%08X", emu:read32(0x03007FFC)))
