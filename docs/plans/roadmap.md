@@ -47,9 +47,8 @@ Still open from the bug work:
   brightness, but still resets the BG2 affine registers, which are write-only.
 - **Game NOR:** WRITE TO NOR now runs in the emulator (`tests/nor.sh`), which showed these
   kernel bugs. Each one can lose or overwrite a NOR game:
-  - `Read_S98NOR_ID` (`Ezcard_OP.c`) leaves the chip in ID mode, with no `0xF0` reset. After
-    `Loadfile2NOR` returns early (file won't open, NOR full, wrong ID), the NOR list reads
-    empty, and the next write lands at 0 over the first game. Fix: write `0xF0` after the read.
+  - Fixed: `Read_S98NOR_ID` (`Ezcard_OP.c`) left the chip in ID mode, so the NOR list could
+    read empty and the next write landed over the first game. It now writes `0xF0`.
   - `GetFileListFromNor` returns without `REG_IME = 1` when its scan reaches the end of the 64 MB.
   - "Delete latest" erases only the game's first 128 KB and keeps its list entry. If a write
     with the same header loses power after one block, the old entry lists the half-written game.
@@ -64,6 +63,15 @@ Still open from the bug work:
 - **Clean boot:** IWRAM is still not fully cleared at launch, because the `SoftReset_now`
   code stays there. No game is known to need it. Clean-boot tests use `tests/roms/idle`
   (no crt0), since devkitARM's crt0 clears EWRAM itself.
+- **From the logging work:**
+  - `Save_savefile` ignores short writes, so a nearly full card silently truncates a new
+    save (v0.5's crash-safe saving replaces it).
+  - The in-game menu's LOAD with no saved state jumps to 0xFFFFFFFE.
+  - The kernel erases the NOR game table whenever it reads the list as empty.
+  - Needs the real cart: whether cart RAM page 0xF0 survives a power cycle, which WAITCNT
+    settings read correctly, how the FPGA answers EEPROM requests of each width, rumble at
+    GPIO values 2 and 3 without the clock, whether an SD write right after the FPGA copies
+    a game into PSRAM is safe, and what the BIOS does on an undefined instruction.
 - **Settings default:** done. The emulated kernel NOR already read 0xFFFF for settings that
   were never written. The 0x0000 seen came from saves, which zero slots 65–255
   (`tests/settings.sh`), and erased hotkey slots are now range-checked. Known slots: 13 is
@@ -105,7 +113,7 @@ Notes from the tooling work:
 
 Then update CLAUDE.md: the GBK, CRLF and `zh_*` rules go.
 
-### Logging and on-cart debug mode
+### Logging and on-cart debug mode (done)
 
 #### SD logging
 
