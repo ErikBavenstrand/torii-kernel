@@ -15,6 +15,7 @@ static const struct {
 	{"save_mode_table", test_save_mode_table},
 	{"nes_classics_use_eeprom", test_nes_classics_use_eeprom},
 	{"file_type", test_file_type},
+	{"file_type_short_names", test_file_type_short_names},
 	{"cheat_parse", test_cheat_parse},
 	{"cheat_cap", test_cheat_cap},
 	{"game_hardware", test_game_hardware},

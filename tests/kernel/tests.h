@@ -8,6 +8,7 @@ void test_save_file_size(void);
 void test_save_mode_table(void);
 void test_nes_classics_use_eeprom(void);
 void test_file_type(void);
+void test_file_type_short_names(void);
 void test_cheat_parse(void);
 void test_cheat_cap(void);
 void test_game_hardware(void);

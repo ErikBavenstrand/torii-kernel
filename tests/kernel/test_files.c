@@ -17,3 +17,12 @@ void test_file_type(void)
 	CHECK_EQ(Check_file_type(nes), 3);
 	CHECK_EQ(Check_file_type(txt), 0xff);
 }
+
+void test_file_type_short_names(void)
+{
+	// Names too short for an extension: the check read before the name
+	char empty[] = "", one[] = "a", two[] = "gb";
+	CHECK_EQ(Check_file_type(empty), 0xff);
+	CHECK_EQ(Check_file_type(one), 0xff);
+	CHECK_EQ(Check_file_type(two), 0xff);
+}

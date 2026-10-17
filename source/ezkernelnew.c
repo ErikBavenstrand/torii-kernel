@@ -187,7 +187,6 @@ static void Show_ICON_filename_SD(u32 show_offset, u32 file_select, u32 haveThum
 	}
 
 	u32 offset = 0;
-	u32 strlen8;
 	TCHAR *pfilename;
 	if (show_offset >= folder_total)
 		offset = show_offset - folder_total;
@@ -210,15 +209,13 @@ static void Show_ICON_filename_SD(u32 show_offset, u32 file_select, u32 haveThum
 
 		u32 showy = y_offset + (line) * 14;
 		pfilename = pFilename_buffer[offset + line - need_show_folder].filename;
-		strlen8 = strlen(pfilename);
 		u16 *icon;
-		if (!strcasecmp(&(pfilename[strlen8 - 3]), "gba")) {
+		u32 type = Check_file_type(pfilename);
+		if (type == 0) {
 			icon = (u16 *)(gImage_icon_gba /*gImage_icons+1*16*14*2*/);
-		} else if (!strcasecmp(&(pfilename[strlen8 - 3]), "gbc")) {
+		} else if (type == 1 || type == 2) {
 			icon = (u16 *)(gImage_icon_GB);
-		} else if (!strcasecmp(&(pfilename[strlen8 - 2]), "gb")) {
-			icon = (u16 *)(gImage_icon_GB);
-		} else if (!strcasecmp(&(pfilename[strlen8 - 3]), "nes")) {
+		} else if (type == 3) {
 			icon = (u16 *)(gImage_icon_FC);
 		} else {
 			icon = (u16 *)(gImage_icon_other /*gImage_icons+2*16*14*2*/);
@@ -1506,7 +1503,9 @@ u32 Check_file_type(TCHAR *pfilename)
 {
 	u32 strlen8 = strlen(pfilename);
 	//u32 is_EMU;
-	if (!strcasecmp(&(pfilename[strlen8 - 3]), "gba")) {
+	if (strlen8 < 3) {  // too short for an extension; don't read before the name
+		return 0xff;
+	} else if (!strcasecmp(&(pfilename[strlen8 - 3]), "gba")) {
 		return 0;
 	} else if (!strcasecmp(&(pfilename[strlen8 - 3]), "gbc")) {
 		return 1;
