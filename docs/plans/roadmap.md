@@ -16,27 +16,40 @@ source EZ-Flash hasn't released, so it isn't supported.
 
 ## v0.2 Foundations
 
-### Bugs
+### Bugs (done)
 
-Each fix comes with a test:
+Fixed with tests on main, from `b9c9245` to `b6687ea`. `CHANGELOG.md` has the details.
 
-- **Save types:** correct the `saveMODE.h` table. Gauntlet and Doom are EEPROM 512, and the
-  Classic NES Series are EEPROM, not SRAM (ez-flash/omega-de-kernel#3).
-- **Cheat table:** bounds-check it. `Analyze_KEYVAL` doesn't check `pCHEAT`, and cheats past
-  the 0x2000-byte patch area spill over (about 607 one-byte entries).
-- **RTC and rumble:** make them separate toggles. Turning GAME RTC off also turns rumble off
-  (ez-flash/omega-de-kernel#5).
-- **Goomba:** persist its settings, and drop the needless Clean Boot prompt
-  (ez-flash/omega-de-kernel#12).
-- **Sorting:** replace the bubble sort, which swaps 100-byte entries with case-sensitive
-  `strcmp`, with a case-insensitive merge sort over an index.
-- **Recently played:** at its 10-entry limit it writes 11 rows and never truncates the file
-  (DS Style fixed this).
-- **Clean boot:** check that `RESET_EWRAM` is part of the boot reset for games that need a
-  clean memory state.
-- **Investigate with `just compat`:** games the in-game menu and cheat hook miss (the
-  literal-pool scan for `0x3007FFC`, or games that never enable the VBlank IRQ), and games
-  that need a clean boot state.
+- **Save types:** Doom, Doom II and Gauntlet are now EEPROM 512, and the Classic NES Series
+  are EEPROM (ez-flash/omega-de-kernel#3).
+- **Cheat table:** capped at 600 writes, which is what the 0x2000-byte patch area holds.
+- **Clock and rumble:** they are now separate settings, shown as one row, `CART: [x] CLOCK
+  [x] RUMBLE` (ez-flash/omega-de-kernel#5).
+- **GB, GBC and NES games:** they start without the Clean Boot menu. The Goomba palette
+  waits for v0.6 (ez-flash/omega-de-kernel#12).
+- **Sorting:** the SD listing uses a case-insensitive merge sort.
+- **Recently played:** it works at its 10-entry limit.
+- **Clean boot:** EWRAM is fully cleared when a game starts.
+
+Still open from the bug work:
+
+- **EEPROM sizes:** FlashGBX's cart-dump database (`db_AGB.json` in `res/config.zip`) lists
+  941 more table entries marked 0x22 (EEPROM 8K) as 512-byte EEPROM. It also lists 9 marked
+  0x23 and 6 marked 0x32 (Flash 64K) as 512-byte, plus a few others. The official kernel
+  ships those as 8K and they seem to work, so the FPGA may accept 512-byte games in 8K mode,
+  except some (Doom, Gauntlet). The emulated cart can't tell, so test this with the on-cart
+  debug mode before any mass change. A game moved from 8K to 512 keeps its old 8 KB `.sav`,
+  and the kernel then loads only its first 512 bytes. Check on the real cart whether 8K-mode
+  data sits in those bytes, and settle what happens to existing saves (see v0.5).
+- **Hook coverage:** use `just compat` to find games the in-game menu and cheat hook miss.
+  That happens when the literal-pool scan misses `0x3007FFC`, or when a game never enables
+  the VBlank IRQ.
+- **Clean boot:** IWRAM is still not fully cleared at launch, because the `SoftReset_now`
+  code stays there. No game is known to need it. Clean-boot tests use `tests/roms/idle`
+  (no crt0), since devkitARM's crt0 clears EWRAM itself.
+- **Settings default:** the emulated kernel NOR reads 0x0000 for settings that were never
+  written, while real carts read 0xFFFF. Fix the cart model. The settings slots are 13 for
+  CLOCK and 25 for RUMBLE; 23–24 are DS Style's reset and backup toggles.
 
 ### Tooling
 
@@ -72,6 +85,9 @@ A mode you launch on the real cart that:
   user's saves;
 - measures real timings: NOR wait states (the kernel never sets `WAITCNT`), glyph
   rendering, LZ77 decompression and SD throughput;
+- settles the EEPROM 512 versus 8K question for games in the save table;
+- looks for a separate rumble control. `0x096A0000` gates the whole GPIO port, and only
+  Drill Dozer and WarioWare: Twisted! have a rumble motor;
 - walks you through the manual checklist with pass/fail buttons.
 
 It writes a report to SD that we bring back to the repo. When the real cart disagrees with
@@ -195,6 +211,9 @@ The kernel's copy is made safe like this:
 5. **Write failures:** a failed write shows a clear error and keeps everything.
 6. **Tests:** the emulated cart cuts power at every step, and the test checks that a good
    save always survives.
+7. **Save-type changes:** when a game's save type changes, for example EEPROM 8K to 512, its
+   existing save is converted or kept untouched in the slot's history. It is never silently
+   truncated.
 
 ### Slots and history
 
@@ -262,6 +281,9 @@ VBlank or keypad IRQ.
    - **What it runs:** a small interpreter in IWRAM for conditionals, ELSE/ENDIF blocks,
      button activators, pointer writes and add/or/and codes.
    - **Speed:** it has a cycle budget measured in the emulator.
+   - **Space:** it needs its own size budget. Today's patch area appended to the ROM is
+     0x2000 bytes: a 0xD04-byte handler plus 8 bytes per byte-write, which caps cheats at
+     600. Plan the new engine's code and code storage separately from that table.
    - **Hook check:** `just compat` reports games the hook misses.
 3. **Goal and tests:** every documented code type, each with test vectors. Types that behave
    differently on a kernel than on the original devices, such as slowdown codes, are
