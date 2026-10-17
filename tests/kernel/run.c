@@ -23,6 +23,7 @@ static const struct {
 	{"sort_full_list", test_sort_full_list},
 	{"recently_played", test_recently_played},
 	{"nor_info_stays_in_bounds", test_nor_info_stays_in_bounds},
+	{"nor_write_refused_when_list_full", test_nor_write_refused_when_list_full},
 };
 
 void torii_run_tests(void)

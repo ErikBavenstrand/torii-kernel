@@ -211,6 +211,9 @@ u32 Loadfile2NOR(TCHAR *filename, u32 NORaddress, u16 have_patch, u8 SAVEMODE)
 	//u16 readdata;
 	u32 add_patch = 0;
 
+	if (game_total_NOR >= MAX_NOR)  // the list holds MAX_NOR games, however small
+		return 2;
+
 	u16 norid = Read_S98NOR_ID();
 	if (norid == 0x223D)//S98
 	{
@@ -361,7 +364,7 @@ u32 GetFileListFromNor(void)
 			SetRompage(gl_currentpage + page);
 			StartAddress -= 0x800000;
 		}
-		if (count > MAX_NOR)
+		if (count >= MAX_NOR)
 			break; //max
 
 		Value = *(vu16 *)(StartAddress + 0xbe);
