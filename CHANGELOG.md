@@ -7,18 +7,26 @@ git log, not here.
 ## Unreleased
 
 - **Fixed:** Recently Played no longer overflows a 256-byte buffer on a
-  long path (`6b868b7`).
+  long path (`6b868b7`), and skips a line too long for the kernel to have
+  written (`db08c34`), whose folder overran the path buffer.
+- **Fixed:** a name shorter than three bytes no longer makes the type check
+  read before it (`72a69fc`).
+- **Changed:** the list's name copies have explicit bounds and the charset
+  switch a default (`8831f34`), for `just analyze`; no change in behaviour.
 - **Fixed:** the SD list shows files without the archive bit and read-only
-  folders (`371b98b`, `6b868b7`); it leaves out only hidden and system
-  entries. A name longer than 99 bytes, which a list entry can't hold, used
+  folders (`371b98b`); it leaves out only hidden and system entries and
+  volume labels (`6b868b7`). An 8.3-only name with accented letters lists
+  instead of showing `?` (`6b868b7`). A name longer than 99 bytes, which a list entry can't hold, used
   to be cut and fail to open; it now shows cut with a `*` and says Name too
   long, and can't open or delete a file whose name starts the same
-  (`c324466`). A folder path past 255 bytes says Path too long.
+  (`c324466`). A folder path past 255 bytes says Path too long, and a folder
+  that fails to open leaves the path as it was.
 - **Fixed:** a game in more pieces on SD than the cart's table of cluster
   runs holds (61) shows File fragmented instead of overwriting the launch
   parameters and EWRAM (`906c429`), before its save is made (`6b868b7`).
   FAT12 and FAT16 cards whose chains end in any end mark no longer hang the
-  launch.
+  launch; an empty game file or a failed card read shows File error
+  (`6b868b7`, `db08c34`).
 - **Fixed:** writing a 65th game to NOR reports NOR full instead of writing
   past the 64-entry list in EWRAM (`bdc832d`).
 - **Fixed:** a Recently Played game whose file is gone shows File error
