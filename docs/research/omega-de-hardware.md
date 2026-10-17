@@ -88,7 +88,7 @@ Every control-register write is wrapped like this:
 | `0x09640000` | SD block count | 1–4 blocks; bit 15 set = write |
 | `0x09660000` | `SetSPIControl` | 1 = enable; then `0x09E00000` reads the FPGA version |
 | `0x09680000` | `SetSPIWrite` | 1 = program the staged 256 B page into config flash |
-| `0x096A0000` | `Set_RTC_status` | 1 = RTC on in game |
+| `0x096A0000` | `Set_RTC_status` | 1 = GPIO port (RTC and rumble) on in game |
 | `0x096C0000` | `Set_AUTO_save` | commented out in this kernel |
 | `0x096E0000` | `Set_LED_control` | bit 7 enable, bits 5/4/3 breathing R/G/B, bits 2/1/0 SD-activity R/G/B |
 | `0x09700000` | `Set_64MROM_flag` | 64 MB ROM mapping for NOR games |
@@ -106,8 +106,10 @@ Every control-register write is wrapped like this:
 - **PSRAM:** `0x08800000` window.
 - **SRAM / flash-save emulation:** `0x0E000000`; `Bank_Switching` uses the flash-save command
   sequence `0x5555=AA, 0x2AAA=55, 0x5555=B0, 0x0000=bank`.
-- **RTC:** standard GBA cart GPIO at `0x080000C4` (data), `0xC6` (dir), `0xC8` (enable),
-  S-3511-style serial protocol.
+- **RTC and rumble:** standard GBA cart GPIO at `0x080000C4` (data), `0xC6` (dir), `0xC8` (enable),
+  S-3511-style serial protocol for the RTC; rumble games drive the motor from a GPIO pin.
+  One register (`0x096A0000`) turns the whole port on for the game, so there is no
+  separate rumble switch: the kernel picks its value per game (`Game_GPIO_status`).
 
 ### FPGA firmware update protocol
 

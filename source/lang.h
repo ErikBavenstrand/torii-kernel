@@ -65,6 +65,7 @@ extern char* gl_no_game_played;
 extern char* gl_ingameRTC;
 extern char* gl_ingameRTC_open;
 extern char* gl_ingameRTC_close;
+extern char* gl_ingame_rumble_str;
 
 extern char* gl_error_0;
 extern char* gl_error_1;

@@ -12,6 +12,7 @@ void test_nes_classics_use_eeprom(void);
 void test_file_type(void);
 void test_cheat_parse(void);
 void test_cheat_cap(void);
+void test_rtc_and_rumble_are_separate(void);
 void test_nor_info_stays_in_bounds(void);
 
 static const struct {
@@ -26,6 +27,7 @@ static const struct {
 	{"file_type", test_file_type},
 	{"cheat_parse", test_cheat_parse},
 	{"cheat_cap", test_cheat_cap},
+	{"rtc_and_rumble_are_separate", test_rtc_and_rumble_are_separate},
 	{"nor_info_stays_in_bounds", test_nor_info_stays_in_bounds},
 };
 

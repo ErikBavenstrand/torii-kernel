@@ -105,6 +105,8 @@
 #define assress_SD_R 20
 #define assress_SD_G 21
 #define assress_SD_B 22
+//23 and 24 are DS Style's reset and backup toggles
+#define assress_ingame_rumble_off 48 //1 = rumble off; erased or 0 = on
 
 #define assress_saveMODE 64
 #define assress_max 65

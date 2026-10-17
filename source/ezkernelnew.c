@@ -60,6 +60,7 @@ u16 gl_engine_sel;
 
 u16 gl_show_Thumbnail;
 u16 gl_ingame_RTC_open_status;
+u16 gl_ingame_rumble;
 
 
 u8 __attribute__((aligned(4)))GAMECODE[4];
@@ -1356,6 +1357,8 @@ void CheckSwitch(void)
 	{
 		gl_ingame_RTC_open_status = 0x1;
 	}
+
+	gl_ingame_rumble = (Read_SET_info(assress_ingame_rumble_off) != 0x1);
 	
 	gl_auto_save_sel = Read_SET_info(assress_auto_save_sel);
 	if( (gl_auto_save_sel != 0x0) && (gl_auto_save_sel != 0x1))
@@ -2459,6 +2462,7 @@ void Boot_NOR_game(u32 show_offset,	u32 file_select,u32 key_L)
 	FAT_table_buffer[0x1F4/4] = SET_PARAMETER_MODE;
 	Send_FATbuffer(FAT_table_buffer,1); //only RTS FAT and some parameter
 	//wait_btn();
+	memcpy(GAMECODE,&pNorFS[show_offset+file_select].gamename[0xC],4);//header 0xA0: title, then game code
 	SetRompageWithHardReset(pNorFS[show_offset+file_select].rompage,key_L);
 	while(1);	
 }

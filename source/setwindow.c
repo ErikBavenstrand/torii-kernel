@@ -16,6 +16,7 @@ extern u16 gl_select_lang;
 extern u16 gl_engine_sel;
 extern u16 gl_show_Thumbnail;
 extern u16 gl_ingame_RTC_open_status;
+extern u16 gl_ingame_rumble;
 
 extern void CheckSwitch(void);
 extern void CheckLanguage(void);
@@ -93,7 +94,7 @@ u32 Setting_window(void)
 	u8 datetime[7];
 	u8 edit_datetime[7]={0};
 	
-	u8 RTC_pos = 1;
+	u8 RTC_pos = 2;
 
 	u8 *str0;
 	u8 *str1;
@@ -219,6 +220,9 @@ u32 Setting_window(void)
 					sprintf(msg,"%s",gl_ingameRTC_close);
 				}			
 				DrawHZText12(msg,0,x_offset+15,y_offset+line_x*7,(RTC_pos==0)?gl_color_selected:gl_color_text,1);	
+				Draw_select_icon(x_offset+12*6,y_offset+line_x*7,(gl_ingame_rumble == 0x1));
+				sprintf(msg,"%s",gl_ingame_rumble_str);
+				DrawHZText12(msg,0,x_offset+12*6+15,y_offset+line_x*7,(RTC_pos==1)?gl_color_selected:gl_color_text,1);
 	
 	
 			u32 offsety;
@@ -236,7 +240,7 @@ u32 Setting_window(void)
 						clean_color = gl_color_btn_clean;	
 					else if((line== select) && (5== select) && (rtshotkey_pos==3)) 	
 						clean_color = gl_color_btn_clean;		
-					else if((line== select) && (6== select) && (RTC_pos==1)) 
+					else if((line== select) && (6== select) && (RTC_pos==2)) 
 						clean_color = gl_color_btn_clean;	
 						
 					else 
@@ -1062,7 +1066,9 @@ u32 Setting_window(void)
 						}
 						else if(select ==6)
 						{
-								RTC_pos = 1;
+							if(RTC_pos<2){
+								RTC_pos ++;
+							}
 						}
 						re_show = 1;	
 					}
@@ -1105,7 +1111,9 @@ u32 Setting_window(void)
 						}	
 						else if(select ==6)
 						{
-								RTC_pos = 0;
+							if(RTC_pos){
+								RTC_pos --;
+							}
 						}
 						re_show = 1;	
 					} else if(keys & KEY_A) {
@@ -1173,7 +1181,8 @@ u32 Setting_window(void)
 							switch(RTC_pos)
 							{
 								case 0:gl_ingame_RTC_open_status = !gl_ingame_RTC_open_status;break;
-								case 1:
+								case 1:gl_ingame_rumble = !gl_ingame_rumble;break;
+								case 2:
 									{
 										save_setw_info();
 										Set_OK = 0;	
@@ -1182,6 +1191,7 @@ u32 Setting_window(void)
 										{
 											gl_ingame_RTC_open_status = 0x1;
 										}
+										gl_ingame_rumble = (Read_SET_info(assress_ingame_rumble_off) != 0x1);
 										break;							
 									}
 							}	
@@ -1224,7 +1234,8 @@ void save_setw_info(void)
 	for(address=14;address < assress_max;address++)
 	{
 		SET_info_buffer[address] = Read_SET_info(address);
-	}				
+	}
+	SET_info_buffer[assress_ingame_rumble_off] = !gl_ingame_rumble;
 	//save to nor 
 	Save_SET_info(SET_info_buffer,0x200);
 }

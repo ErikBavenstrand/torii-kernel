@@ -250,10 +250,24 @@ void IWRAM_CODE Send_FATbuffer(u32*buffer,u32 mode)
 #define	RESET_OTHER		 	(1<<7)	/*!< all other registers				*/
 // --------------------------------------------------------------------
 extern u16 gl_ingame_RTC_open_status;
+extern u16 gl_ingame_rumble;
+extern u8 GAMECODE[4];
+
+// The cart's GPIO port carries both the RTC and the rumble motor, and one
+// register turns it on for the game. Games with rumble (Drill Dozer, WarioWare:
+// Twisted) have no RTC, so they follow the RUMBLE setting and every other game
+// follows GAME RTC.
+u16 IWRAM_CODE Game_GPIO_status(void)
+{
+	if((GAMECODE[0]=='V' && GAMECODE[1]=='4' && GAMECODE[2]=='9') ||
+	   (GAMECODE[0]=='R' && GAMECODE[1]=='Z' && GAMECODE[2]=='W'))
+		return gl_ingame_rumble;
+	return gl_ingame_RTC_open_status;
+}
 
 void IWRAM_CODE SetRompageWithHardReset(u16 page,u32 bootmode)
 {
-	Set_RTC_status(gl_ingame_RTC_open_status);
+	Set_RTC_status(Game_GPIO_status());
 	SetRompage(page);
 	RegisterRamReset(RESET_EWRAM|RESET_PALETTE| RESET_VRAM|RESET_OAM |RESET_SIO | RESET_SOUND | RESET_OTHER);
 	if(bootmode==1){
