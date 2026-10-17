@@ -36,6 +36,9 @@ CFLAGS	:=	-g -Wall -Os\
 		-mcpu=arm7tdmi -mtune=arm7tdmi\
 		$(ARCH)
 
+# Each object's stack frames (.su) and call graph (.ci), read by tools/stack.py
+CFLAGS	+=	-fstack-usage -fcallgraph-info=su
+
 CFLAGS	+=	$(INCLUDE)
 
 # Extra warnings, as errors, for our code; the vendored FatFs (source/ff15) is exempt

@@ -15,6 +15,7 @@ Torii is a custom kernel for the EZ-Flash Omega DE, forked from EZ-Flash's offic
   Keep `IWRAM_CODE` functions extern: GCC inlines a static one into its ROM callers, and the code then runs from ROM while the ROM page changes.
 - Log from kernel code with `tlog()` and `TLOG_ASSERT()` from `source/tlog.h`. Lines print as `kernel: ...` from `mgba-shot` and as `GBA Debug: ...` from `just play`; on real hardware they cost nothing. A failed assert fails `just compat`.
 - `just size` checks the kernel against the 1 MB kernel area, IWRAM and EWRAM. EWRAM has about 400 bytes left; past its end, data wraps onto its start. The deepest stack measured is about 1.7 KB, so keep IWRAM free space well above that.
+  `just stack` lists the largest frames and a static estimate of the deepest call chains.
 - Build only with `just build`. It pins devkitARM r54 because newer GCC rejects the unmodified source.
 - Builds guard against stale objects themselves (`tools/fresh.py`): colima's sshfs mount shows edits to containers up to a second late, with whole-second timestamps, so make alone can reuse old objects. Build through the `just` recipes, never `make` directly.
 

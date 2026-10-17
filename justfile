@@ -67,6 +67,10 @@ compile-commands: emu-image
 size count="12": build
     {{kernel_docker}} tools/size.sh ezkernelnew.elf ezkernelnew.gba {{count}}
 
+# Largest stack frames and deepest call chains (a static estimate, see tools/stack.py)
+stack count="12": build
+    python3 tools/stack.py build {{count}}
+
 # Like play, with tools/remote.lua taking commands on 127.0.0.1:8888 (keys, memory, screenshots, states)
 [positional-arguments]
 play-remote *roms: build emu cart
