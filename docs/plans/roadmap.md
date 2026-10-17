@@ -64,10 +64,18 @@ Still open from the bug work:
   code stays there. No game is known to need it. Clean-boot tests use `tests/roms/idle`
   (no crt0), since devkitARM's crt0 clears EWRAM itself.
 - **From the logging work:**
-  - `Save_savefile` ignores short writes, so a nearly full card silently truncates a new
-    save (v0.5's crash-safe saving replaces it).
+  - `Save_savefile` ignores short writes, and `Check_save_flag` ignores its result, so a
+    nearly full card silently truncates a new save, e.g. 64 KB written as 32 KB (v0.5's
+    crash-safe saving replaces it).
   - The in-game menu's LOAD with no saved state jumps to 0xFFFFFFFE.
-  - The kernel erases the NOR game table whenever it reads the list as empty.
+  - The kernel erases the NOR game table whenever it reads the list as empty (a chip left in
+    a command mode or a read glitch): the games stay in NOR but drop off the list, and the
+    next WRITE TO NOR overwrites them. The chip is now reset before reading, but the
+    erase-on-empty logic needs a safer rule.
+  - The `/torii` folder shows in the SD root list and moves games down a row (key scripts
+    in compat may need an extra DOWN). v0.4 hides system folders.
+  - The log file sequence number doesn't handle overflow past 99999999 (only reachable with
+    crafted files).
   - Needs the real cart: whether cart RAM page 0xF0 survives a power cycle, which WAITCNT
     settings read correctly, how the FPGA answers EEPROM requests of each width, rumble at
     GPIO values 2 and 3 without the clock, whether an SD write right after the FPGA copies
