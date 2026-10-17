@@ -45,6 +45,18 @@ Still open from the bug work:
   GBA games in the library pass (`docs/research/hook-coverage.md`). Four games get exact-ROM
   patches for the EU dumps tested; other regions may need their own. The menu keeps the game's
   brightness, but still resets the BG2 affine registers, which are write-only.
+- **Game NOR:** WRITE TO NOR now runs in the emulator (`tests/nor.sh`), which showed these
+  kernel bugs. Each one can lose or overwrite a NOR game:
+  - `Read_S98NOR_ID` (`Ezcard_OP.c`) leaves the chip in ID mode, with no `0xF0` reset. After
+    `Loadfile2NOR` returns early (file won't open, NOR full, wrong ID), the NOR list reads
+    empty, and the next write lands at 0 over the first game. Fix: write `0xF0` after the read.
+  - `GetFileListFromNor` returns without `REG_IME = 1` when its scan reaches the end of the 64 MB.
+  - "Delete latest" erases only the game's first 128 KB and keeps its list entry. If a write
+    with the same header loses power after one block, the old entry lists the half-written game.
+  - Losing power inside `Save_NOR_info` (erase, then program) empties the list, and the next
+    write goes to 0 over the first game.
+  - A ROM whose header byte 0xB2 isn't 0x96 (homebrew not run through gbafix) is written but
+    never listed, and the next write overwrites it.
 - **Clean boot:** IWRAM is still not fully cleared at launch, because the `SoftReset_now`
   code stays there. No game is known to need it. Clean-boot tests use `tests/roms/idle`
   (no crt0), since devkitARM's crt0 clears EWRAM itself.
