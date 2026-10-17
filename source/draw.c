@@ -103,8 +103,9 @@ void DrawHZText12(char *str, u16 len, u16 x, u16 y, u16 c, u8 isDrawDirect)
 	if ((u16)(len * 6) > (u16)(240 - x))
 		len = (240 - x) / 6;
 	while (hi < l) {
-		c1 = charset_ascii(str[hi]);
-		hi++;
+		c1 = charset_next(str, l, &hi);
+		if (c1 == 0)
+			continue;
 		yy = 240 * y;
 		location = c1 * 12;
 		for (i = 0; i < 12; i++) {

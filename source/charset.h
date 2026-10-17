@@ -4,11 +4,11 @@
 
 #include <gba_base.h>
 
-// The ASCII character to draw for byte c of a name. FatFs hands names over
-// in code page 850 (FF_CODE_PAGE): its accented Latin letters lose their
-// accents, other symbols become '?'. FatFs hands over a name with characters
-// code page 850 lacks as its 8.3 short name on FAT, so it still opens; exFAT
-// has no short names, so there it is "?" and doesn't open.
-char charset_ascii(u8 c);
+// Reads the UTF-8 character at s[*pos], one of len bytes, moves *pos past
+// it, and returns the ASCII glyph to draw for it: Latin letters lose their
+// accents, a few dashes and quotes become their ASCII forms, and anything
+// else is '?'. Returns 0, draw nothing, for a continuation byte with no lead
+// byte, such as where a scrolled name starts mid-character.
+char charset_next(const char *s, u32 len, u32 *pos);
 
 #endif

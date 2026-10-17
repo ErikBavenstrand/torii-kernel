@@ -16,6 +16,8 @@ jobs=(
   "tests/state.sh"
   "tests/settings.sh"
   "tests/menu.sh"
+  "tests/names.sh fat32"
+  "tests/names.sh exfat"
 )
 
 logs=$(mktemp -d)
