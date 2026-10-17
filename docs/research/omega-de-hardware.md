@@ -171,6 +171,11 @@ While SD control is 3 the port returns status; `0xEEE1` means busy.
    window instead, patching each 128 KB block on the way.
 4. `SetRompageWithHardReset(0x200)` maps PSRAM at `0x08000000` and soft-resets
    (SWI 0) into the game, or hard-resets (SWI 0x26) when L is held.
+   The hard reset reboots through the BIOS intro, which clears all RAM and I/O
+   registers but not the cart: its rompage and save type stay as the kernel set
+   them, so the game boots from PSRAM. mGBA's HLE BIOS lacks SWI 0x26; the
+   patched emulator clears memory and registers and starts at `0x08000000`
+   without the intro (`tests/hard_reset.sh`).
 
 **Saves:** before launch the kernel writes the save path and size to kernel NOR
 `+0x790000` with flag `0x11` and loads the `.sav` into SRAM (`0x0E000000`, 64 KB

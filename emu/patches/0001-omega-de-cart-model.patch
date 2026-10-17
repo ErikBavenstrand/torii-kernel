@@ -214,6 +214,43 @@ index 4bf354f..fd3e023 100644
  	cart/vfame.c
  	cheats.c
  	cheats/codebreaker.c
+diff --git a/src/gba/bios.c b/src/gba/bios.c
+index 1d0c0dd..b6abc91 100644
+--- a/src/gba/bios.c
++++ b/src/gba/bios.c
+@@ -187,6 +187,22 @@ static void _RegisterRamReset(struct GBA* gba) {
+ 	}
+ }
+ 
++// Torii: HardReset reboots through the BIOS intro. A test can't tell the intro
++// apart from its outcome, so clear what the boot clears (all RAM and registers)
++// and start the cartridge like SoftReset does.
++static void _HardReset(struct GBA* gba) {
++	struct ARMCore* cpu = gba->cpu;
++	cpu->gprs[0] = 0xFF;
++	_RegisterRamReset(gba);
++	memset(gba->memory.iwram, 0, SIZE_WORKING_IRAM);
++	gba->memory.io[REG_POSTFLG >> 1] = 1;
++	int i;
++	for (i = 0; i < ARM_PC; ++i) {
++		cpu->gprs[i] = 0;
++	}
++	_SoftReset(gba);
++}
++
+ static void _BgAffineSet(struct GBA* gba) {
+ 	struct ARMCore* cpu = gba->cpu;
+ 	int i = cpu->gprs[2];
+@@ -450,6 +466,9 @@ void GBASwi16(struct ARMCore* cpu, int immediate) {
+ 	case GBA_SWI_REGISTER_RAM_RESET:
+ 		_RegisterRamReset(gba);
+ 		break;
++	case GBA_SWI_HARD_RESET:
++		_HardReset(gba);
++		break;
+ 	case GBA_SWI_HALT:
+ 		ARMRaiseSWI(cpu);
+ 		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
 index 0000000..62ca1ea

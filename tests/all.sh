@@ -7,6 +7,7 @@ jobs=(
   "tests/kernel.sh"
   "tests/smoke.sh"
   "tests/clean_boot.sh"
+  "tests/hard_reset.sh"
   "tests/save_types.sh flash128"
   "tests/save_types.sh flash64"
   "tests/save_types.sh eeprom8k"
