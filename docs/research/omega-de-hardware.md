@@ -211,6 +211,8 @@ at page `0x09C00000` × 4 KB:
 | `0x00`, `0x10` | FM28V100 FRAM, 128 KB | game saves |
 | `0x20`, `0x30` | S71GL064 SRAM (1 MB; its first 128 KB are unused behind the FRAM) | the in-game menu's copy of VRAM (`0x10000` + `0x2C00` bytes) |
 | `0x40`–`0xAF` | S71GL064 SRAM | the save-state buffer: the 0x70000-byte `RTS/<game>.rts` is loaded here at launch. VRAM, IWRAM, EWRAM, OAM, palette, IO, registers, and a flag at `0xAFFF0` |
+| `0xC0`, `0xD0` | S71GL064 SRAM | Torii: Diagnostics' pattern test (free otherwise) |
+| `0xF0` | S71GL064 SRAM | Torii: what the kernel keeps for its next boot (`source/cartlog.h`): where the session got to at `0xF0000`, a kernel crash dump at `0xF0100`, the in-game menu's DEBUG snapshot at `0xF1000` |
 
 The page applies in game mode too: the menu sets `0x20` to keep the screen
 and `0x40`+ for states, then goes back to `0x00`. The menu does this
@@ -269,7 +271,38 @@ cleared and that session is lost the same way as with B.
 See [hook-coverage.md](hook-coverage.md): how the kernel hooks a game's IRQ
 for the in-game menu, and which games it misses.
 
-## 7. Open questions
+## 7. Logging and Diagnostics
+
+The kernel logs to `/torii/logs` on the card (`source/tlog.c`) and keeps
+a little state in cart SRAM page `0xF0` (table above). Things the
+emulated cart can't tell, which the real cart's logs will:
+
+- **Does page `0xF0` survive a power cycle?** The boot report says
+  "nothing in cart RAM" when it finds no state from the previous session.
+  The S71GL064's SRAM part is probably pseudo-SRAM with no battery, so
+  probably not; it does survive a soft reset. The log on the card doesn't
+  depend on it: a launch whose last logged line is its first ("launch:
+  loading") is reported as cut off either way.
+- **The kernel's crash handler** (`source/crash.s`) checks, on every IRQ,
+  where the IRQ interrupted the kernel. What the real BIOS does on an
+  undefined instruction isn't known here (mGBA's HLE BIOS skips it), so
+  a crash that disables IRQs, or loops inside the kernel's code, goes
+  uncaught.
+- **WAITCNT:** the kernel never sets it, so NOR and PSRAM run at the BIOS
+  default (4/2, no prefetch). Diagnostics times faster settings and checks
+  their data against the default's.
+- **EEPROM 512 vs 8K:** whether the FPGA's EEPROM answers a 6-bit and a
+  14-bit read request at save types `0x21` and `0x22` (Diagnostics,
+  "EEPROM 512 or 8K"). mGBA's EEPROM takes either.
+- **Rumble:** whether a value of `0x096A0000` other than 0 and 1 drives
+  the motor without the clock, or the other way round.
+- **SD writes through `Write_SD_sectors` use 16-bit DMA** from the
+  caller's buffer, and FatFs passes whole sectors straight from the
+  buffer given to `f_write`. A buffer at an odd address shifts the data by
+  a byte, as the DMA rounds the address down (seen on the emulated cart
+  too). The logger writes through a word-aligned buffer for that reason.
+
+## 8. Open questions
 
 - What the `0x09E00000` status values mean beyond `0xEEE1` (busy) and `0x0000/0x0001` handshakes.
 - What `0x096C0000` (auto-save) does in current firmware.

@@ -32,6 +32,7 @@ the update.
 |---|---|
 | `just build` | `dist/ezkernelnew.bin`, the file you flash to the cart |
 | `just sd /Volumes/OMEGA [game.gba...]` | copies the kernel (and games) to a real SD card and ejects it; hold R while switching on to install |
+| `just logs /Volumes/OMEGA` | copies the kernel's logs off a real SD card into `dist/logs/torii.log`, naming the code addresses in crash dumps (see below) |
 | `just play [game.gba...]` | runs the kernel on an emulated cart, first copying any games given onto its SD card unless they are already there |
 | `just dev` | like `play`, rebuilding whenever `source/` changes |
 | `just test` | host and kernel unit tests, then homebrew games through the kernel: boot, every save type across power cycles, crash reports and save states |
@@ -51,6 +52,21 @@ the update.
 The build uses devkitARM r54, the closest available release to the r53
 EZ-Flash used, so the compiled kernel isn't bit-for-bit their file. To flash
 exactly the official kernel, use the `ezkernelnew.bin` in the repo root.
+
+## Logs and Diagnostics
+
+To bring back a report from a real cart, set LOGGING (settings page 2) to
+ERRORS, INFO or DEBUG. The kernel then writes what it does to
+`/torii/logs` on the card: every boot, every launch with the patches it
+applied, errors, and how the previous session ended. Off, the default, it
+writes nothing. A kernel crash is kept in cart RAM and logged at the next
+boot, even with LOGGING off. With LOGGING on, the in-game menu has a DEBUG
+entry that saves the game's registers and memory for the next boot's log.
+
+DIAGNOSE on the same page (or L+R+SELECT held while switching on) runs
+**Diagnostics**: the unit tests, hardware probes and timings, then a few
+questions; [docs/release-checklist.md](docs/release-checklist.md) lists
+them. Read the results with `just logs`.
 
 ## The emulated cart
 
