@@ -20,6 +20,8 @@ kernel_image := "devkitpro/devkitarm@sha256:1acab59884288115af0e70782a9b69017a8c
 emu_image := "torii-emu"
 kernel_docker := "docker run --rm --platform linux/amd64 -u $(id -u):$(id -g) -v \"$PWD\":/src -w /src -e LIBGBA=/opt/devkitpro/libgba " + kernel_image
 emu_docker := "docker run --rm -u $(id -u):$(id -g) -v \"$PWD\":/src " + emu_image
+# C formatter for `just lint` and `just format`; .clang-format-ignore lists the files it skips
+clang_format := "23.1.2"
 # The SDL emulator, printing the kernel's tlog lines ("GBA Debug: ...")
 mgba := "emu/build-native/sdl/mgba -C logLevel.gba.debug=31"
 # Emulator window size as a multiple of 240x160, e.g. `just scale=3 play`
@@ -124,13 +126,18 @@ run *args: build emu-headless cart
 test: build emu-headless test-roms _test-kernel-build
     {{emu_docker}} tests/all.sh
 
-# Lint and format-check the Python, shell scripts and CI workflows (pinned versions)
+# Lint and format-check the C, Python, shell scripts and CI workflows (pinned versions)
 lint:
+    git ls-files -z '*.c' '*.h' | xargs -0 uvx clang-format@{{clang_format}} --dry-run -Werror
     uvx ruff@0.17.1 check tools tests
     uvx ruff@0.17.1 format --check tools tests
     uvx --from shellcheck-py@0.11.0.1 shellcheck tests/*.sh tools/*.sh emu/*.sh
     uvx --from shfmt-py@4.2.0 shfmt -d -i 2 tests/*.sh tools/*.sh emu/*.sh
     uvx --from actionlint-py@1.7.12.25 actionlint .github/workflows/*.yml
+
+# Format the C files that `just lint` checks, in place
+format:
+    git ls-files -z '*.c' '*.h' | xargs -0 uvx clang-format@{{clang_format}} -i
 
 # Play the listed games through the kernel and write dist/compat/index.html. Filters pick
 # games by code, system, save chip or file name, e.g. `just compat gbc` or `just compat Pokemon`

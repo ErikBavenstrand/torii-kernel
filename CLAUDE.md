@@ -19,6 +19,11 @@ Torii is a custom kernel for the EZ-Flash Omega DE, forked from EZ-Flash's offic
 - Build only with `just build`. It pins devkitARM r54 because newer GCC rejects the unmodified source.
 - Builds guard against stale objects themselves (`tools/fresh.py`): colima's sshfs mount shows edits to containers up to a second late, with whole-second timestamps, so make alone can reuse old objects. Build through the `just` recipes, never `make` directly.
 
+## Formatting
+
+- Run `just format` after editing C files; `just lint` fails on unformatted ones.
+  It formats our files with `.clang-format`; `.clang-format-ignore` lists the official and vendored files it skips.
+
 ## Checking changes
 
 1. Run `just test`. Every line should start with `PASS`.

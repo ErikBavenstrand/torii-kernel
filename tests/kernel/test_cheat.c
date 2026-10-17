@@ -62,7 +62,7 @@ void test_cheat_cap(void)
 	CHECK_EQ(pCHEAT[CHEAT_MAX - 1].address, 0x20000 + CHEAT_MAX - 1);
 
 	// The handler and a full table fit in the patch area appended to the ROM.
-	u32 handler = (u8 *) no_CHEAT_end - (u8 *) RTS_ReplaceIRQ_start;
+	u32 handler = (u8 *)no_CHEAT_end - (u8 *)RTS_ReplaceIRQ_start;
 	tlog("cheat handler: 0x%lX bytes, room for %lu cheats", handler, (CHEAT_PATCH_LENGTH - handler) / 8);
 	CHECK(handler + CHEAT_MAX * 8 <= CHEAT_PATCH_LENGTH);
 	gl_cheat_count = 0;

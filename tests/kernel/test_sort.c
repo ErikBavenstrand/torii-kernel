@@ -14,12 +14,16 @@ typedef struct {
 
 // 52 KB: borrows the kernel's 128 KB read cache, which is free while tests run.
 extern u8 pReadCache[];
-#define files ((file_entry *) pReadCache)
+#define files ((file_entry *)pReadCache)
 
 void test_sort_by_name(void)
 {
-	static const char *const names[] = {"zelda.gbc", "Advance Wars.gba", "mario.gba", "Zelda.gba", "BANJO.gba", "aria.gba"};
-	static const char *const sorted[] = {"Advance Wars.gba", "aria.gba", "BANJO.gba", "mario.gba", "Zelda.gba", "zelda.gbc"};
+	static const char *const names[] = {
+		"zelda.gbc", "Advance Wars.gba", "mario.gba", "Zelda.gba", "BANJO.gba", "aria.gba",
+	};
+	static const char *const sorted[] = {
+		"Advance Wars.gba", "aria.gba", "BANJO.gba", "mario.gba", "Zelda.gba", "zelda.gbc",
+	};
 	unsigned n = sizeof(names) / sizeof(*names);
 	for (unsigned i = 0; i < n; i++) {
 		strcpy(files[i].filename, names[i]);

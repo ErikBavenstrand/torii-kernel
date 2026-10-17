@@ -12,13 +12,13 @@ extern u16 gl_game_rumble;
 
 void test_game_hardware(void)
 {
-	CHECK_EQ(Game_hardware(0, (const u8 *) "V49E", 0), GAME_USES_RUMBLE);  // Drill Dozer
-	CHECK_EQ(Game_hardware(0, (const u8 *) "RZWJ", 0), GAME_USES_RUMBLE);  // WarioWare: Twisted!
-	CHECK_EQ(Game_hardware(0, (const u8 *) "BPEE", 0), GAME_USES_CLOCK);   // Pokémon Emerald
-	CHECK_EQ(Game_hardware(1, (const u8 *) "\0\0\0\0", 0x10), GAME_USES_CLOCK);  // MBC3+TIMER: Pokémon Crystal
-	CHECK_EQ(Game_hardware(1, (const u8 *) "\0\0\0\0", 0x1E), GAME_USES_RUMBLE);  // MBC5+RUMBLE: Pokémon Pinball
-	CHECK_EQ(Game_hardware(2, (const u8 *) "\0\0\0\0", 0x00), 0);  // ROM only: Tetris
-	CHECK_EQ(Game_hardware(3, (const u8 *) "\0\0\0\0", 0), GAME_USES_CLOCK);  // NES
+	CHECK_EQ(Game_hardware(0, (const u8 *)"V49E", 0), GAME_USES_RUMBLE);  // Drill Dozer
+	CHECK_EQ(Game_hardware(0, (const u8 *)"RZWJ", 0), GAME_USES_RUMBLE);  // WarioWare: Twisted!
+	CHECK_EQ(Game_hardware(0, (const u8 *)"BPEE", 0), GAME_USES_CLOCK);   // Pokémon Emerald
+	CHECK_EQ(Game_hardware(1, (const u8 *)"\0\0\0\0", 0x10), GAME_USES_CLOCK);  // MBC3+TIMER: Pokémon Crystal
+	CHECK_EQ(Game_hardware(1, (const u8 *)"\0\0\0\0", 0x1E), GAME_USES_RUMBLE);  // MBC5+RUMBLE: Pokémon Pinball
+	CHECK_EQ(Game_hardware(2, (const u8 *)"\0\0\0\0", 0x00), 0);  // ROM only: Tetris
+	CHECK_EQ(Game_hardware(3, (const u8 *)"\0\0\0\0", 0), GAME_USES_CLOCK);  // NES
 }
 
 static u16 gpio(u32 uses, u16 clock, u16 rumble)
