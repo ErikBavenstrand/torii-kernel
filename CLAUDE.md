@@ -6,10 +6,8 @@ Torii is a custom kernel for the EZ-Flash Omega DE, forked from EZ-Flash's offic
 
 - To release, rename `## Unreleased` in `CHANGELOG.md` to the version, commit, and push a tag like `v0.1.0`: CI publishes a GitHub Release with `ezkernelnew.bin` and that section as its notes.
 - **Mandatory:** log every change to `source/` in `CHANGELOG.md`, under Unreleased: what changed and why, with the commit's short hash, in two or three lines. Commit the change first, then add the entry with its hash (one follow-up commit can log several changes).
-- Files from the official repo (commit `12cb68b`) keep EZ-Flash's formatting: CRLF line endings, tabs.
-- `source/ezkernelnew.c`, `source/lang.c`, `source/GBApatch.c` and `source/gba_rts_patch.s` contain GBK-encoded Chinese strings.
-  Edit them as bytes, decoding and encoding with `gbk`; a UTF-8 round trip corrupts the strings.
-- Language strings live in `source/lang.c` as `en_*` and `zh_*` pairs, wired up in `LoadEnglish` and `LoadChinese`. Add both.
+- Language strings live in `source/lang.c` as `en_*` strings, wired up in `LoadEnglish`. `lang_packs` lists the languages SETTINGS offers; English is the only one until v0.9.
+- File names are UTF-8: FatFs uses its UTF-8 API (`FF_LFN_UNICODE 2`), so every name lists and opens as it is; `FF_CODE_PAGE` matters only for 8.3-only names. The menu font has ASCII glyphs only, and `charset_next()` in `source/charset.c` picks one per character.
 - Our code builds with `-Werror` and the extra warnings in the Makefile's `WARNFLAGS`; the vendored `source/ff15` is exempt.
   Make a function used in one file `static`, and declare the rest in a header.
   Keep `IWRAM_CODE` functions extern: GCC inlines a static one into its ROM callers, and the code then runs from ROM while the ROM page changes.
@@ -20,8 +18,10 @@ Torii is a custom kernel for the EZ-Flash Omega DE, forked from EZ-Flash's offic
 
 ## Formatting
 
+- Text files are UTF-8 with LF line endings; `just lint` checks. Only `emusrc/` and `*.bat` keep EZ-Flash's encoding and CRLF.
 - Run `just format` after editing C files; `just lint` fails on unformatted ones.
-  It formats our files with `.clang-format`; `.clang-format-ignore` lists the official and vendored files it skips.
+  It formats every C file with `.clang-format`, except the vendored ones `.clang-format-ignore` lists.
+- `.git-blame-ignore-revs` lists the commit that reformatted the official source; run `git config blame.ignoreRevsFile .git-blame-ignore-revs` once so `git blame` skips it.
 
 ## Checking changes
 
@@ -35,7 +35,8 @@ Torii is a custom kernel for the EZ-Flash Omega DE, forked from EZ-Flash's offic
 3. To debug headlessly, start `just debug-shot -f FRAMES [mgba-shot options]` in the background and drive it with `just gdb -batch -ex 'break FUNC' -ex continue -ex bt ...`. mGBA's own debugger commands can also be piped into `just debug-cli`, which opens a window.
 4. To probe a run, use `just run` with `mgba-shot` options (listed at the top of `emu/mgba-shot.c`): `-k FRAME:KEYS` presses keys, `-u TEXT` stops once the kernel logs TEXT, `-m FRAME:ADDR:LEN` dumps memory, `-r FRAME` prints registers, `-h FRAME` prints a screen hash, `-p FRAME:ADDR:VALUE` writes memory, and `-i FILE` reads options from a file, `-x FRAME:PATH` saves a state and `-l PATH` starts from one. Set `OMEGA_TRACE=1` for the cart trace.
 5. For an interactive session, start `just remote` in the background and send `tools/remote.lua` commands with `nc 127.0.0.1 8888` (`press KEYS`, `wait FRAMES`, `read ADDR LEN`, `screenshot PATH`, `save PATH`); paths are relative to the repo. Stop it with `docker rm -f torii-remote`.
-6. To check the cart's state, read the files in `dist/cart/` (`sram.bin`, `kernel-nor.bin`) or the SD image with `mtools` inside the `torii-emu` container.
+6. For SD images with exFAT or UTF-8 names (mtools can't write exFAT), use `tools/sdimg.sh` inside the `torii-emu` container, as `tests/names.sh` does.
+7. To check the cart's state, read the files in `dist/cart/` (`sram.bin`, `kernel-nor.bin`) or the SD image with `mtools` inside the `torii-emu` container.
 
 ## Emulated cart
 

@@ -1,40 +1,4 @@
-# Files clang-format leaves alone (just lint checks the rest). The official
-# EZ-Flash files go once the source cleanup reformats them.
+# Files clang-format leaves alone (just lint checks the rest): vendored code
+# kept as upstream wrote it.
 emusrc/**
 source/ff15/*
-# The cart model's runner, while another branch changes it
-emu/*
-# From EZ-Flash's official source
-source/goomba.h
-source/jagoombacolor.h
-source/Ezcard_OP.c
-source/Ezcard_OP.h
-source/GBApatch.c
-source/GBApatch.h
-source/HZK12.h
-source/NORflash_OP.c
-source/NORflash_OP.h
-source/RTC.c
-source/RTC.h
-source/asc126.h
-source/draw.c
-source/draw.h
-source/ez_define.h
-source/ezkernel.h
-source/ezkernelnew.c
-source/gba_nes_patch.h
-source/gba_rts_only.s
-source/gba_rts_patch.s
-source/gba_sleep_patch.s
-source/helpwindow.c
-source/helpwindow.h
-source/lang.c
-source/lang.h
-source/pocketnes.h
-source/reset.s
-source/reset_table.h
-source/saveMODE.h
-source/setwindow.c
-source/setwindow2.c
-source/showcht.c
-source/showcht.h

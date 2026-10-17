@@ -8,6 +8,7 @@ void test_save_file_size(void);
 void test_save_mode_table(void);
 void test_nes_classics_use_eeprom(void);
 void test_file_type(void);
+void test_file_type_short_names(void);
 void test_cheat_parse(void);
 void test_cheat_cap(void);
 void test_game_hardware(void);
@@ -16,5 +17,6 @@ void test_sort_by_name(void);
 void test_sort_full_list(void);
 void test_recently_played(void);
 void test_nor_info_stays_in_bounds(void);
+void test_nor_write_refused_when_list_full(void);
 
 #endif

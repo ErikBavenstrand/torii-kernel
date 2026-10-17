@@ -1,5 +1,6 @@
-// Runs kernel code that needs no hardware (sorting, cheat parsing, patch tables) on the
-// host, under AddressSanitizer and UndefinedBehaviorSanitizer (just test-host).
+// Runs kernel code that needs no hardware (sorting, cheat parsing, patch tables,
+// drawing name characters) on the host, under AddressSanitizer and
+// UndefinedBehaviorSanitizer (just test-host).
 // Prints one PASS or FAIL line per test, like the kernel unit tests.
 #include <stdarg.h>
 #include <stdio.h>
@@ -48,6 +49,12 @@ static const struct {
 	{"cheat_garbage", test_cheat_garbage},
 	{"cheat_empty_entries", test_cheat_empty_entries},
 	{"cheat_whitespace", test_cheat_whitespace},
+	{"charset_ascii", test_charset_ascii},
+	{"charset_latin", test_charset_latin},
+	{"charset_other_scripts", test_charset_other_scripts},
+	{"charset_broken", test_charset_broken},
+	{"save_name", test_save_name},
+	{"save_name_longest", test_save_name_longest},
 	{"irq_table_lookup", test_irq_table_lookup},
 	{"irq_table_rejects_blank_codes", test_irq_table_rejects_blank_codes},
 	{"irq_table_bounds", test_irq_table_bounds},

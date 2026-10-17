@@ -16,6 +16,12 @@ jobs=(
   "tests/state.sh"
   "tests/settings.sh"
   "tests/menu.sh"
+  "tests/names.sh fat32"
+  "tests/names.sh exfat"
+  "tests/stale_recent.sh"
+  "tests/fragmented.sh"
+  "tests/listing.sh"
+  "tests/cheats.sh"
 )
 
 logs=$(mktemp -d)

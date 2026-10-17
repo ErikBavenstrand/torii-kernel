@@ -15,6 +15,7 @@ static const struct {
 	{"save_mode_table", test_save_mode_table},
 	{"nes_classics_use_eeprom", test_nes_classics_use_eeprom},
 	{"file_type", test_file_type},
+	{"file_type_short_names", test_file_type_short_names},
 	{"cheat_parse", test_cheat_parse},
 	{"cheat_cap", test_cheat_cap},
 	{"game_hardware", test_game_hardware},
@@ -23,6 +24,7 @@ static const struct {
 	{"sort_full_list", test_sort_full_list},
 	{"recently_played", test_recently_played},
 	{"nor_info_stays_in_bounds", test_nor_info_stays_in_bounds},
+	{"nor_write_refused_when_list_full", test_nor_write_refused_when_list_full},
 };
 
 void torii_run_tests(void)

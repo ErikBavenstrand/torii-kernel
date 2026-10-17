@@ -6,6 +6,53 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** Recently Played no longer overflows a 256-byte buffer on a
+  long path (`6b868b7`), and skips a line too long for the kernel to have
+  written (`db08c34`), whose folder overran the path buffer.
+- **Fixed:** a name shorter than three bytes no longer makes the type check
+  read before it (`72a69fc`).
+- **Changed:** the list's name copies have explicit bounds and the charset
+  switch a default (`8831f34`), for `just analyze`; no change in behaviour.
+- **Fixed:** the SD list shows files without the archive bit and read-only
+  folders (`371b98b`); it leaves out only hidden and system entries and
+  volume labels (`6b868b7`). An 8.3-only name with accented letters lists
+  instead of showing `?` (`6b868b7`). A name longer than 99 bytes, which a list entry can't hold, used
+  to be cut and fail to open; it now shows cut with a `*` and says Name too
+  long, and can't open or delete a file whose name starts the same
+  (`c324466`). A folder path past 255 bytes says Path too long, and a folder
+  that fails to open leaves the path as it was.
+- **Fixed:** a game in more pieces on SD than the cart's table of cluster
+  runs holds (61) shows File fragmented instead of overwriting the launch
+  parameters and EWRAM (`906c429`), before its save is made (`6b868b7`).
+  FAT12 and FAT16 cards whose chains end in any end mark no longer hang the
+  launch; an empty game file or a failed card read shows File error
+  (`6b868b7`, `db08c34`).
+- **Fixed:** writing a 65th game to NOR reports NOR full instead of writing
+  past the 64-entry list in EWRAM (`bdc832d`).
+- **Fixed:** a Recently Played game whose file is gone shows File error
+  (`df1119c`). It made a save and started Goomba or PocketNES with no ROM.
+  After a failed Recently Played launch, the list opens its own games again
+  (`ff9aa71`); they opened from the entry's folder, or reopened the entry.
+- **Fixed:** a 99-byte `.gb` name no longer writes its save name one byte
+  past the buffer (`8a5cc6c`).
+- **Changed:** all source is UTF-8 with LF line endings and formatted by
+  clang-format (`27835ea`); the kernel builds the same.
+- **Fixed:** A and L+START do nothing in an empty SD folder (`d7dda3e`). They
+  acted on a stale entry from the folder listed before: A opened its launch
+  menu or started a GB, GBC or NES game. Ported from DS Style v7.4.
+- **Changed:** names are drawn in ASCII (`a47a7a7`, `eff3a93`, `93092e0`,
+  `6711497`). The 12x12 GBK font and FatFs's code page 936 go, freeing
+  about 350 KB of ROM. FatFs hands names over as UTF-8, so every file lists,
+  opens and saves under its own name on FAT32 and exFAT; accented Latin
+  letters show without their accents, other scripts as `?`. Cheat files and
+  Recently Played are read byte for byte, so `.cht` files in Latin-1 or GBK
+  still parse. Upgrading: the save the old kernel still has to write back
+  and the Recently Played list keep names in GBK, which no longer match. If
+  the last game you played has a non-ASCII name, switch on once with the old
+  kernel first so it writes the save back.
+- **Removed:** Chinese (`c05855f`). English is the only language until language
+  packs arrive; a saved Chinese setting loads English. Cheats come from
+  `/CHEAT/Eng`, and the fast patch engine is no longer off for Chinese.
 - **Fixed:** a game's brightness survives the in-game menu (`5b10b34`). The
   menu zeroed BLDY, which is write-only, so a game that dims the screen
   once (Pokémon Ruby's title menu) came back at full brightness. It now

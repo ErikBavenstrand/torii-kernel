@@ -570,7 +570,7 @@ showMENU:
 	cmp		r12,r11
 	ldreq		r3,=0x6A80 @;select
 	ldrne		r3,=0x7FFF 
-	bl		printchar    @; r0 ch£¨ r1, X  £¨ r2, Y , r3 color
+	bl		printchar    @; r0 chÔºå r1, X  Ôºå r2, Y , r3 color
 
 	add		r10,#8
 	b			showAll
@@ -954,7 +954,7 @@ showerror:
 	mov		r1,r10
 	add		r2,r9,#0
 	mov	  r3,#0x1F  @;red
-	bl		printchar    @; r0 char£¨ r1, X  £¨ r2, Y , r3 color
+	bl		printchar    @; r0 charÔºå r1, X  Ôºå r2, Y , r3 color
 	add		r10,#8
 	b			showerror
 enderror:	
@@ -1005,7 +1005,7 @@ draw_plot:
 	STRH    R2, [R3]
 	BX			LR
 		@;===================================================	
-printchar:	@; r0 ¥Ú”°µƒ◊÷∑˚£¨ r1, X  £¨ r2, Y , r3 —’…´
+printchar:	@; r0 ÊâìÂç∞ÁöÑÂ≠óÁ¨¶Ôºå r1, X  Ôºå r2, Y , r3 È¢úËâ≤
 	STMFD   SP!, {R8-R11,LR}
 	MOV     R8, R1
 	MOV     R6, R2

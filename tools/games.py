@@ -56,10 +56,10 @@ GB_CLOCK = {0x0F, 0x10}
 
 
 def kernel_table() -> dict[str, int]:
-    text = KERNEL_TABLE.read_bytes().decode("gbk")
+    text = KERNEL_TABLE.read_text()
     return {
         code: int(mode, 16)
-        for code, mode in re.findall(r'\{"(\w{4})",(0x[0-9a-fA-F]+)\}', text)
+        for code, mode in re.findall(r'\{"(\w{4})",\s*(0x[0-9a-fA-F]+)\}', text)
     }
 
 
