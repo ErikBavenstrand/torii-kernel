@@ -220,6 +220,11 @@ The kernel's copy is made safe like this:
   and boot method.
 - **Saves:** emulator saves use the slot system, which ends today's name collisions between
   folders.
+- **Jagoomba from source:** build Jagoomba Color v0.5 from source in the repo, replacing
+  the prebuilt `jagoombacolor.h`. Fix the palette not persisting (ez-flash/omega-de-kernel#12)
+  there: `GFX_reset` in `lcd.s` overwrites the palette that `readconfig` loaded from the
+  game's `.esv` with the GBC BIOS palette on every boot, so apply the automatic palette only
+  when the save holds no config yet.
 - **Emulators:** Jagoomba Color is built in as a default that the table can override.
   PocketNES and the rest load as plugins: sms, gg, sg, sv, ws, wsc, ngp, pce, z80, col, c8,
   nes, plus the viewer plugins.
