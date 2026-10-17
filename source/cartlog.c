@@ -168,6 +168,7 @@ static void report_crash(void)
 	tlog_force(TLOG_ERRORS, "crash: pc %08lX", (unsigned long)r[15]);
 	if (crash.stack_words > CRASH_STACK_WORDS)
 		crash.stack_words = CRASH_STACK_WORDS;
+	tlog_flush();  // in parts: the whole report may not fit the ring
 	for (u32 i = 0; i < crash.stack_words; i++) {
 		u32 w = crash.stack[i];
 		// Words that may be return addresses into the kernel; just logs names them.
@@ -181,6 +182,7 @@ static void report_crash(void)
 	char *p = crash.log, *end = crash.log + crash.log_len;
 	if (p < end)
 		tlog_force(TLOG_ERRORS, "crash: the log before it:");
+	tlog_flush();
 	while (p < end) {
 		char *nl = memchr(p, '\n', end - p);
 		u32 len = nl ? (u32)(nl - p) : (u32)(end - p);
@@ -322,7 +324,8 @@ void cartlog_phase(u32 phase, u32 detail, const char *game)
 	if (game) {
 		strncpy(state.game, game, sizeof(state.game) - 1);
 		state.game[sizeof(state.game) - 1] = 0;
-		memcpy(state.code, GAMECODE, 4);
+		for (u32 i = 0; i < 4; i++)  // a GB ROM has no code there
+			state.code[i] = (GAMECODE[i] >= ' ' && GAMECODE[i] < 0x7F) ? GAMECODE[i] : '?';
 	}
 	if (memcmp(state.magic, STATE_MAGIC, 8) != 0) {  // logging was off at boot
 		memcpy(state.magic, STATE_MAGIC, 8);

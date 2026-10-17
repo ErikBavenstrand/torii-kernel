@@ -27,6 +27,12 @@ void log_ring_put(log_ring *r, const char *s, u32 n);
 u32 log_ring_peek(const log_ring *r, const char **text);
 void log_ring_drop(log_ring *r, u32 n);
 
+// Copies the oldest text a flush hasn't taken, whole lines of it and at
+// most max bytes, across the end of the buffer, into out; returns the count
+// (log_ring_drop takes them). Whole lines, so a log file never ends inside
+// one.
+u32 log_ring_take_lines(const log_ring *r, char *out, u32 max);
+
 // Copies the newest text, flushed or not, at most max bytes of it and
 // starting at a line, into out; returns the count. The crash dump keeps it
 // in cart RAM.

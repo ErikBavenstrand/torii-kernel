@@ -309,6 +309,7 @@ const char *tlog_previous_line(void)
 	return prev_last[0] ? prev_last : NULL;
 }
 
+// Writes n bytes of whole lines, at most 512 and word-aligned (see bounce).
 static FRESULT write_text(const char *text, u32 n)
 {
 	UINT done;
@@ -338,12 +339,9 @@ static FRESULT write_text(const char *text, u32 n)
 				continue;
 			}
 		}
-		if (k > sizeof(bounce))
-			k = sizeof(bounce);
-		memcpy(bounce, text, k);
 		res = f_lseek(&log_file, cur_end);
 		if (res == FR_OK)
-			res = f_write(&log_file, bounce, k, &done);
+			res = f_write(&log_file, text, k, &done);
 		if (res == FR_OK && done != k)
 			res = FR_DENIED;
 		if (res != FR_OK)
@@ -381,7 +379,6 @@ void tlog_sd_ready(void)
 void tlog_flush(void)
 {
 	char path[32];
-	const char *text;
 	u32 n;
 	FRESULT res;
 
@@ -398,14 +395,16 @@ void tlog_flush(void)
 		return;
 	}
 	if (ring.lost) {
-		char note[64];
-		int len = snprintf(note, sizeof(note), "(%lu bytes of log lost: the buffer filled up)\n",
+		u32 centis = torii_frames * 5 / 3;
+		int len = snprintf((char *)bounce, sizeof(bounce),
+				   "%5lu.%02lu E (%lu bytes of log lost: the buffer filled up)\n",
+				   (unsigned long)(centis / 100 % 100000), (unsigned long)(centis % 100),
 				   (unsigned long)ring.lost);
 		ring.lost = 0;
-		res = write_text(note, len);
+		res = write_text((const char *)bounce, len);
 	}
-	while (res == FR_OK && (n = log_ring_peek(&ring, &text)) > 0) {
-		res = write_text(text, n);
+	while (res == FR_OK && (n = log_ring_take_lines(&ring, (char *)bounce, sizeof(bounce))) > 0) {
+		res = write_text((const char *)bounce, n);
 		log_ring_drop(&ring, n);
 	}
 	if (res != FR_OK) {

@@ -41,6 +41,21 @@ void log_ring_drop(log_ring *r, u32 n)
 	r->tail += (n < have) ? n : have;
 }
 
+u32 log_ring_take_lines(const log_ring *r, char *out, u32 max)
+{
+	u32 n = r->head - r->tail;
+	if (n > max) {
+		n = max;
+		while (n && r->data[(r->tail + n - 1) & MASK] != '\n')
+			n--;
+		if (!n)  // no line ends within max: take max
+			n = max;
+	}
+	for (u32 i = 0; i < n; i++)
+		out[i] = r->data[(r->tail + i) & MASK];
+	return n;
+}
+
 u32 log_ring_tail(const log_ring *r, char *out, u32 max)
 {
 	// Text a flush took stays in the ring until new text overwrites it.
