@@ -129,9 +129,15 @@ of the old layout are scanned again.
 
 Other things seen:
 
-- **The menu changes the screen state.** It zeroes BLDY and the BG2 affine
-  registers and doesn't restore them; they are write-only, so it can't. A
-  game that set them once looks wrong until it writes them again. Pokémon
-  Ruby's darkened title menu comes back at full brightness.
+- **The menu changes the screen state.** EZ-Flash's 1.06 menu zeroed BLDY
+  and the BG2 affine registers and never restored them; they are
+  write-only. A game that set them once looked wrong until it wrote them
+  again: Pokémon Ruby's darkened title menu came back at full brightness.
+  Since `5b10b34` the menu turns blending off through BLDCNT, which can be
+  read, and restores it, leaving BLDY alone. The BG2 affine registers are
+  still reset, as the menu draws on BG2; avoiding that would mean a
+  tile-based menu. No one online reports this; the closest is EZ-Flash's
+  note that sound registers are write-only, so sound can turn to noise
+  after loading a save state.
 - **The menu's IME stores missed IME** until `37c7d60`: `strh r3,[r7,#208]`
   wrote `0x040000D0` (DMA2's count), leaving it at 1 after every menu.

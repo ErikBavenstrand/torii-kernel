@@ -2,10 +2,14 @@
 // saves persist. Draws one bar per boot (stored in SRAM) on a blue screen.
 // A VBlank interrupt moves a marker along the bottom edge, so the kernel's
 // in-game menu, which hooks that interrupt, can be tested (tests/menu.sh).
+// The screen is dimmed once, as some games do, so the test can check the
+// menu gives the dimming back.
 #include <stdint.h>
 
 #define REG_DISPCNT (*(volatile uint16_t *)0x04000000)
 #define REG_DISPSTAT (*(volatile uint16_t *)0x04000004)
+#define REG_BLDCNT (*(volatile uint16_t *)0x04000050)
+#define REG_BLDY (*(volatile uint16_t *)0x04000054)
 #define REG_IE (*(volatile uint16_t *)0x04000200)
 #define REG_IF (*(volatile uint16_t *)0x04000202)
 #define REG_IME (*(volatile uint16_t *)0x04000208)
@@ -60,6 +64,8 @@ int main(void)
 		for (int y = 40; y < 120; y++)
 			for (int x = 0; x < 8; x++)
 				VRAM[y * 240 + 12 + b * 11 + x] = RGB(31, 28, 4);
+	REG_BLDCNT = (1 << 2) | (3 << 6);  // BG2, brightness decrease
+	REG_BLDY = 8;                      // half
 	IRQ_HANDLER = on_irq;
 	REG_DISPSTAT = 1 << 3;  // VBlank interrupt
 	REG_IE = 1;
