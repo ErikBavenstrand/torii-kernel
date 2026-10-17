@@ -79,16 +79,16 @@ VBlank IRQ, as part of `just test`.
 table. Every game that boots enables the VBlank IRQ, except the homebrew one.
 
 Before the kernel fixes (kernel at `f219ed6`), 107 opened the menu and went
-on afterwards, and 12 failed. After them (`dcf4c5b`), 118 pass, and the
+on afterwards, and 12 failed. After them, 118 pass, and the
 homebrew RTC Checker is n/a: it never enables the VBlank IRQ, which the menu
 needs.
 
 | Game | Before | Cause | Fix |
 |---|---|---|---|
-| Pokémon FireRed (BPRE rev 1), WaterBlue (FireRed hack) | crash before the menu key | table offsets are for rev 0. The kernel wrote `0x3007FF4` over 2 unrelated words (a pointer and a code word) and missed 2 of the 3 real literals | `b736015`: the table entry doesn't match, so the kernel scans |
-| Pokémon LeafGreen (BPGE rev 1, two dumps) | crash before the menu key | same: offsets `0x1BB`, `0x1C0C8E` are rev 0's | same |
-| Crash Bandicoot Purple (BD4E rev 1) | crash before the menu key | all 3 table offsets miss this revision | same |
-| SimCity 2000 (A5CP rev 1) | no menu; the game set its own handler 1 frame in | 1 of 2 table offsets missed; the real store stayed | same |
+| Pokémon FireRed (BPRE rev 1), WaterBlue (FireRed hack) | crash before the menu key | table offsets are for rev 0. The kernel wrote `0x3007FF4` over 2 unrelated words (a pointer and a code word) and missed 2 of the 3 real literals | `b736015`, `c69aa23`: entries are checked against the ROM; the table's rev 1 entry matches |
+| Pokémon LeafGreen (BPGE rev 1, two dumps) | crash before the menu key | same: offsets `0x1BB`, `0x1C0C8E` are rev 0's | same: the rev 1 entry matches |
+| Crash Bandicoot Purple (BD4E rev 1) | crash before the menu key | all 3 table offsets miss this revision | `b736015`: no entry matches, so the kernel scans |
+| SimCity 2000 (A5CP rev 1) | no menu; the game set its own handler 1 frame in | 1 of 2 table offsets missed; the real store stayed | same: the kernel scans |
 | Grand Theft Auto Advance (BGTP) | crash at the first IRQ (`0xEFEFEFEF`) | a DMA fills all of IWRAM with `0xEF` after the hook is in | `c57c3b6`: the fill stops at `0x3007FF0` |
 | Super Monkey Ball Jr. (ALUP) | crash at the first IRQ (`0xD5BEADDE`) | a DMA fills `0x3007600` to the end of IWRAM | same |
 | LEGO Star Wars II (BL7P) | hung, a black screen after the menu | crt0 clears IWRAM up to `0x3008000`, then the first IRQ jumps to 0 | `dcf4c5b`: the clear stops at `0x3007FF0` |
@@ -120,7 +120,7 @@ Other regions of the same games don't match and still miss the menu.
 
 Super Mario Advance 4 rev 1 (AX4P) passed before, but 5 of its 7 table
 offsets are rev 0's, so the kernel overwrote 5 unrelated words; it now
-scans.
+uses the table's rev 1 entry.
 
 Kirby: Nightmare in Dream Land has 44 matching words (42 of `0x3007FFC`,
 2 of the mirror), more than the scan's 32 slots; with the scan engine 12

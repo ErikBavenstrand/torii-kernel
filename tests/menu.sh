@@ -44,7 +44,7 @@ settings() {
 }
 settings 0=0xE1E1 1=1 2=1 3=0 4=0 5=9 6=8 7=2 8=9 9=8 10=3 11=1 12=0 13=1 25=1
 rm -rf "$cart-state"
-cp -r "$cart" "$cart-state"  # for the save-state run below
+cp -r "$cart" "$cart-state" # for the save-state run below
 
 # keys FRAME KEY... -> mgba-shot press/release pairs, one key every 8 frames.
 keys() {
