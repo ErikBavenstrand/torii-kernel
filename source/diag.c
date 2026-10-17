@@ -224,7 +224,7 @@ static void step_unit_tests(void)
 	step("unit tests");
 	say(WHITE, "running the kernel's unit tests...");
 	int failed = torii_unit_tests();
-	say(failed ? RED : GREEN, "%d unit tests failed (each is in the log)", failed);
+	say(failed ? RED : GREEN, "%d unit tests failed (see the log)", failed);
 	result(!failed, "unit tests");
 	pause_frames(60);
 }
@@ -245,8 +245,8 @@ static void step_rtc(void)
 	rtc_enable();
 	rtc_get(b);
 	rtc_disenable();
-	say(WHITE, "20%02X-%02X-%02X %02X:%02X:%02X, then %02X:%02X:%02X", a[0], a[1], a[2], a[4] & 0x3F, a[5], a[6],
-	    b[4] & 0x3F, b[5], b[6]);
+	say(WHITE, "20%02X-%02X-%02X %02X:%02X:%02X", a[0], a[1], a[2], a[4] & 0x3F, a[5], a[6]);
+	say(WHITE, "then %02X:%02X:%02X", b[4] & 0x3F, b[5], b[6]);
 	tlog_debug("diag: clock raw %02X %02X %02X %02X %02X %02X %02X", a[0], a[1], a[2], a[3], a[4], a[5], a[6]);
 	int valid = bcd_ok(a[0], 99) && bcd_ok(a[1], 12) && a[1] && bcd_ok(a[2], 31) && a[2] &&
 		    bcd_ok(a[4] & 0x3F, 23) && bcd_ok(a[5], 59) && bcd_ok(a[6], 59);
@@ -255,7 +255,7 @@ static void step_rtc(void)
 	say(WHITE, "%lu seconds passed in about 2.2", (unsigned long)passed);
 	result(valid, "clock reads a valid date");
 	if (passed == 0 && tlog_in_emulator())
-		say(GREY, "clock runs: can't tell, the emulator runs fast");
+		say(GREY, "clock runs: the emulator can't tell");
 	else
 		result(passed >= 1 && passed <= 4, "clock runs");
 	pause_frames(60);
@@ -287,7 +287,7 @@ static void step_psram(void)
 		}
 		u32 read_cycles = diag_timer_stop();
 		if (!pass)
-			say(WHITE, "64 KB written at %lu KB/s, checked at %lu KB/s",
+			say(WHITE, "64 KB: write %lu KB/s, check %lu KB/s",
 			    (unsigned long)kb_per_s(0x10000, write_cycles),
 			    (unsigned long)kb_per_s(0x10000, read_cycles));
 	}
@@ -365,7 +365,7 @@ static void step_save_chip(void)
 
 	u32 after = fram_crc();
 	say(after == before ? WHITE : RED, "save chip CRC after: %08lX", (unsigned long)after);
-	result(after == before, "the tests left the save chip alone");
+	result(after == before, "save chip untouched by the tests");
 	pause_frames(60);
 }
 
@@ -382,15 +382,15 @@ static void timed_reads(const char *what, const vu32 *src)
 		u32 cycles = diag_read_timed(src, 0x4000, waitcnts[i], &sum);
 		if (i == 0)
 			sum0 = sum;
-		say(sum == sum0 ? WHITE : RED, "%s WAITCNT %04X (%s): %lu KB/s%s", what, waitcnts[i], waitcnt_names[i],
-		    (unsigned long)kb_per_s(0x10000, cycles), sum == sum0 ? "" : ", WRONG DATA");
+		say(sum == sum0 ? WHITE : RED, "%s %04X %s: %lu KB/s%s", what, waitcnts[i], waitcnt_names[i],
+		    (unsigned long)kb_per_s(0x10000, cycles), sum == sum0 ? "" : ", BAD DATA");
 	}
 }
 
 static void step_timing(void)
 {
 	step("timings");
-	say(WHITE, "64 KB of word reads at each WAITCNT:");
+	say(WHITE, "64 KB read at each WAITCNT (WS0 N/S):");
 	timed_reads("NOR", (const vu32 *)0x08000000);
 	SetPSRampage(0);
 	timed_reads("PSRAM", (const vu32 *)PSRAMBase_S98);
@@ -414,8 +414,8 @@ static void step_timing(void)
 	LZ77UnCompWram(packed, out);
 	u32 lz_cycles = diag_timer_stop();
 	int lz_ok = memcmp(out, picture, 0x4000) == 0;
-	say(lz_ok ? WHITE : RED, "LZ77 to WRAM: %lu KB/s (%lu bytes packed)",
-	    (unsigned long)kb_per_s(0x4000, lz_cycles), (unsigned long)packed_size);
+	say(lz_ok ? WHITE : RED, "LZ77 to WRAM: %lu KB/s (from %lu B)", (unsigned long)kb_per_s(0x4000, lz_cycles),
+	    (unsigned long)packed_size);
 	result(lz_ok, "BIOS LZ77 gives back the data");
 
 	// SD reads: 256 KB of raw sectors from the card's start.
@@ -507,15 +507,15 @@ static void step_eeprom(void)
 			block = b;
 	}
 	if (block == 64) {
-		say(GREY, "the save chip's first 512 bytes are blank,");
-		say(GREY, "so replies can't be told apart: play an");
-		say(GREY, "EEPROM game, save, and run this again");
+		say(GREY, "The save chip's first 512 bytes are");
+		say(GREY, "blank, so replies can't be told apart:");
+		say(GREY, "save in an EEPROM game, then run this.");
 		result(1, "EEPROM probe (inconclusive)");
 		pause_frames(120);
 		return;
 	}
 	const u8 *want = &fram[block * 8];
-	say(WHITE, "block %lu holds %02X%02X%02X%02X%02X%02X%02X%02X", (unsigned long)block, want[0], want[1], want[2],
+	say(WHITE, "block %lu: %02X%02X%02X%02X%02X%02X%02X%02X", (unsigned long)block, want[0], want[1], want[2],
 	    want[3], want[4], want[5], want[6], want[7]);
 	static const u8 types[] = {0x21, 0x22};
 	static const u32 sizes[] = {0x200, 0x2000};
@@ -532,11 +532,11 @@ static void step_eeprom(void)
 				rev[i] = got[7 - i];
 			const char *verdict =
 				!memcmp(got, want, 8)   ? "matches"
-				: !memcmp(rev, want, 8) ? "matches, bytes reversed"
+				: !memcmp(rev, want, 8) ? "matches, reversed"
 				: (got[0] & got[1] & got[2] & got[3] & got[4] & got[5] & got[6] & got[7]) == 0xFF
 					? "all ones: no answer"
 					: "differs";
-			say(WHITE, "type %02X, %2lu-bit address: %s", types[t], (unsigned long)widths[w], verdict);
+			say(WHITE, "type %02X, %2lu-bit request: %s", types[t], (unsigned long)widths[w], verdict);
 			tlog("diag: eeprom type %02X width %lu reply %02X%02X%02X%02X%02X%02X%02X%02X", types[t],
 			     (unsigned long)widths[w], got[0], got[1], got[2], got[3], got[4], got[5], got[6], got[7]);
 		}
@@ -572,8 +572,8 @@ static int clock_answers(void)
 static void step_rumble(void)
 {
 	step("rumble");
-	say(WHITE, "Hold the console. It pulses the motor with");
-	say(WHITE, "the GPIO register (0x096A0000) at 1, 0, 2, 3.");
+	say(WHITE, "Hold the console: the motor pulses with");
+	say(WHITE, "GPIO register 0x096A0000 at 1, 0, 2, 3.");
 	static const u16 values[] = {1, 0, 2, 3};
 	for (u32 i = 0; i < 4; i++) {
 		Set_RTC_status(values[i]);
@@ -593,18 +593,19 @@ static void step_rumble(void)
 // docs/release-checklist.md, "In Diagnostics": things only a person can see.
 // Each line fits the screen.
 static const char *const checklist[] = {
-	"The colour bars show red, green, blue, white.",
-	"The LED breathes now (it stops after).",
+	"The bars are red, green, blue, white.",
+	"The LED breathes red and blue now.",
 	"The clock above shows the right time.",
-	"Since the last run: a GBA game started from SD.",
-	"...its in-game save survived a power cycle.",
-	"...the in-game menu opened (L+R+START).",
+	"Since the last run, a GBA game started.",
+	"...its save survived a power cycle.",
+	"...the in-game menu opened.",
 	"...a save state saved and loaded.",
-	"...sleep (L+R+SELECT) slept and woke.",
+	"...sleep slept and woke.",
 	"...a GB or GBC game ran.",
 	"...a NES game ran.",
 	"...a game written to NOR started.",
-	"...the menu clock kept time powered off.",
+	"...the clock kept time while off.",
+	"...DEBUG in a game reached the log.",
 };
 
 static void show_colour_bars(void)
@@ -617,8 +618,8 @@ static void show_colour_bars(void)
 static void step_keys(void)
 {
 	step("buttons");
-	say(WHITE, "Press every button once. START+SELECT for");
-	say(WHITE, "two seconds gives up.");
+	say(WHITE, "Press every button once. Hold START and");
+	say(WHITE, "SELECT for two seconds to give up.");
 	u16 seen = 0;
 	u32 held = 0;
 	wait_release();
@@ -699,8 +700,8 @@ void Diagnostics(void)
 	step_eeprom();
 
 	step("questions");
-	say(WHITE, "The rest needs you: rumble, the buttons,");
-	say(WHITE, "and a short checklist.");
+	say(WHITE, "The rest needs you: rumble, buttons and");
+	say(WHITE, "a short checklist.");
 	say(WHITE, "A: go on   START: skip them");
 	if (wait_key(KEY_A | KEY_START) & KEY_A) {
 		step_rumble();
@@ -717,10 +718,10 @@ void Diagnostics(void)
 		for (u32 i = 0; i < summary_count; i++)
 			say(RED, "failed: %s", summary[i]);
 	}
-	say(WHITE, "The report is in /torii/logs on the card.");
+	say(WHITE, "The report is in /torii/logs.");
 	say(WHITE, "A: restart the kernel");
-	say(WHITE, "SELECT: crash it on purpose, to test the");
-	say(WHITE, "crash dump, then restart");
+	say(WHITE, "SELECT: crash it on purpose, to test");
+	say(WHITE, "the crash dump, then restart");
 	tlog("diag: done");
 	cartlog_phase(PHASE_MENU, 0, NULL);
 	tlog_flush();

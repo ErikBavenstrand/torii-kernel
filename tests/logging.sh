@@ -165,7 +165,7 @@ crash)
   has "diag: unit tests: pass"
   has "diag: PSRAM holds a pattern: pass"
   has "diag: 800 KB of NOR read correctly: pass"
-  has "diag: the tests left the save chip alone: pass"
+  has "diag: save chip untouched by the tests: pass"
   has "diag: SD write test: pass"
   has "diag: questions skipped"
   has "diag: crash test"
