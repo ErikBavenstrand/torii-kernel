@@ -57,6 +57,8 @@ Still open from the bug work:
     write goes to 0 over the first game.
   - A ROM whose header byte 0xB2 isn't 0x96 (homebrew not run through gbafix) is written but
     never listed, and the next write overwrites it.
+- **Non-ASCII names:** the list draws names by byte count, so CJK names start scrolling too
+  early, and a character split at the edge of the list shows as `?`.
 - **Clean boot:** IWRAM is still not fully cleared at launch, because the `SoftReset_now`
   code stays there. No game is known to need it. Clean-boot tests use `tests/roms/idle`
   (no crt0), since devkitARM's crt0 clears EWRAM itself.
@@ -69,7 +71,8 @@ Still open from the bug work:
 - **Warnings:** add `-Wextra -Wshadow -Wundef -Wformat=2 -Wstrict-prototypes
   -Wmissing-prototypes`, exempting the vendored FatFs. Fix everything, then turn on `-Werror`.
 - **Stack and size:** add `-fstack-usage`, and try `-ffunction-sections -fdata-sections
-  -Wl,--gc-sections`, comparing `just size` before and after.
+  -Wl,--gc-sections`, comparing `just size` before and after. Tried and rejected: gc-sections
+  cost 568 bytes of ROM and 24 of IWRAM.
 - **Editor config:** add `.editorconfig` and `.gitattributes`.
 - **Formatting:** run a pinned clang-format through `uvx` in `just lint` and CI, and add a
   short formatting note to CLAUDE.md. There is no Claude Code hook.

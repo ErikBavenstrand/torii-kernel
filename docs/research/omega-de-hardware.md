@@ -280,5 +280,8 @@ for the in-game menu, and which games it misses.
 - What the `0x09E00000` status values mean beyond `0xEEE1` (busy) and `0x0000/0x0001` handshakes.
 - What `0x096C0000` (auto-save) does in current firmware.
 - What logic the extra 130-word frames at minor `0x17` hold (likely BRAM/IOB tail frames).
+- What `0x09700000` (`Set_64MROM_flag`) changes in the ROM map. The emulated cart stores it and
+  maps only 32 MB of a NOR game. Its NOR erases and writes also finish at once, so emulation
+  can't cut power in the middle of one.
 - The `0xD200/0x1500` unlock is from the original EZ-Flash IV/Omega line. It's unknown whether
   the FPGA checks the exact address/value pairs or only the sequence.
