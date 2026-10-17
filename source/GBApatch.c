@@ -602,7 +602,20 @@ static u32 Get_spend_address(u32* Data)
   
   if(	(Data[address/4] > 0x03007E80) /*|| (Data[address/4] == 0x03007E00)*/ || (Data[address/4] == 0x0203FFFC) )
   {
-  	Data[address/4] = Data[address/4] - 0x80; 
+  	u32 top = Data[address/4];
+  	Data[address/4] = top - 0x80; 
+  	//Torii: a later "ldr sp,[pc,#n]" of the same stack top would put the
+  	//stack back over the in-game menu's save area (Crash Nitro Kart reloads
+  	//it after a RAM reset), so lower those too.
+  	for(u32 k=ii+3; k<ii+3+16 && k<search_size; k++)
+  	{
+  		if((Data[k] & 0xFFFFF000) == 0xE59FD000)
+  		{
+  			u32 lit = k*4 + 8 + (Data[k] & 0xFFF);
+  			if(Data[lit/4] == top)
+  				Data[lit/4] = top - 0x80;
+  		}
+  	}
   	return (Data[address/4]);
   }
   else 
@@ -987,7 +1000,7 @@ static u32 Table_matches_rom(TCHAR* gamefilename, const u32* offsets, int count)
 	ok = 1;
 	for(int ii=0; ok && ii<count; ii++)
 	{
-		ok = (f_lseek(&gfile, offsets[ii]*4) == FR_OK) && (f_read(&gfile, &word, 4, &got) == FR_OK)
+		ok = (f_lseek(&gfile, (FSIZE_t)offsets[ii]*4) == FR_OK) && (f_read(&gfile, &word, 4, &got) == FR_OK)
 			&& (got == 4) && Is_irq_literal(word);
 	}
 	f_close(&gfile);
@@ -1040,6 +1053,14 @@ void Patch_SpecialROM_sleepmode(void)
 		break;
 	case 0x50554C41://Super Monkey Ball Jr.(EU): DMA3 fill from 0x3007600
 		Add2_if(0x36070/4, 0x85000280, 0x8500027C);
+		break;
+	case 0x50374C42://LEGO Star Wars II(EU): crt0 clears up to 0x3008000
+		Add2_if(0x14C/4, 0x03008000, 0x03007FF0);
+		break;
+	case 0x50384C42://Torii: Lara Croft Tomb Raider - Legend(EU) stores its IRQ
+		//handler at 0x3008000-4, computed; subs r0,#4 becomes subs r0,#12 (r0 is
+		//reloaded before its next use)
+		Add2_if(0x14A0/4, 0x38046008, 0x380C6008);
 		break;
 	case 0x4A4E4941://0414 - Initial D - Another Stage(JP)
 		Add2(0x11C/4, 0xE241100C);//sub r1,r1,0xC
