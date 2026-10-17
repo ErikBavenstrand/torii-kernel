@@ -53,6 +53,8 @@ static const struct {
 	{"charset_latin", test_charset_latin},
 	{"charset_other_scripts", test_charset_other_scripts},
 	{"charset_broken", test_charset_broken},
+	{"save_name", test_save_name},
+	{"save_name_longest", test_save_name_longest},
 	{"irq_table_lookup", test_irq_table_lookup},
 	{"irq_table_rejects_blank_codes", test_irq_table_rejects_blank_codes},
 	{"irq_table_bounds", test_irq_table_bounds},

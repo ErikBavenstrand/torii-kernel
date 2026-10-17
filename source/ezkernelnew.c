@@ -19,6 +19,7 @@
 #include "RTC.h"
 #include "tlog.h"
 #include "sort.h"
+#include "savename.h"
 #include "NORflash_OP.h"
 #include "lang.h"
 #include "GBApatch.h"
@@ -1546,32 +1547,14 @@ static u8 Process_savefile(u32 is_EMU, TCHAR *pfilename, u32 gamefilesize, BYTE 
 {
 	u32 res;
 	u32 savefilesize = 0;
-	TCHAR savfilename[100];
-	u32 strlen8;
+	TCHAR savfilename[SAVE_NAME_MAX];
 
 	res = f_chdir(SAVER_FOLDER);
 	if (res != FR_OK) {
 		return 2;
 	}
 
-	memcpy(savfilename, pfilename, 100);
-	strlen8 = strlen(savfilename);
-	if (is_EMU) {
-		if (is_EMU == 2) {//gb
-			(savfilename)[strlen8 - 2] = 'e';
-			(savfilename)[strlen8 - 1] = 's';
-			(savfilename)[strlen8 - 0] = 'v';
-			(savfilename)[strlen8 + 1] = 0;
-		} else {
-			(savfilename)[strlen8 - 3] = 'e';
-			(savfilename)[strlen8 - 2] = 's';
-			(savfilename)[strlen8 - 1] = 'v';
-		}
-	} else {//gba
-		(savfilename)[strlen8 - 3] = 's';
-		(savfilename)[strlen8 - 2] = 'a';
-		(savfilename)[strlen8 - 1] = 'v';
-	}
+	save_name(savfilename, pfilename, is_EMU);
 	//#ifdef DEBUG
 	//DEBUG_printf("sav %s",savfilename);
 	//DEBUG_printf("saveMODE %x",saveMODE);
@@ -2216,8 +2199,7 @@ static u8 FRAM_save_op(u8 OP)
 {
 	u32 res;
 	u32 savefilesize = 0;
-	TCHAR savfilename[100];
-	u32 strlen8;
+	TCHAR savfilename[SAVE_NAME_MAX];
 
 	TCHAR *pfilename;
 	BYTE SAVEMODE;
@@ -2234,11 +2216,7 @@ static u8 FRAM_save_op(u8 OP)
 	pfilename = pNorFS[0].filename;
 	SAVEMODE = pNorFS[0].savemode;
 
-	memcpy(savfilename, pfilename, 100);
-	strlen8 = strlen(savfilename);
-	(savfilename)[strlen8 - 3] = 's';
-	(savfilename)[strlen8 - 2] = 'a';
-	(savfilename)[strlen8 - 1] = 'v';
+	save_name(savfilename, pfilename, 0);
 
 	res = f_open(&gfile, savfilename, FA_OPEN_EXISTING);
 
