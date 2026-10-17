@@ -6,6 +6,12 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** opening an SD folder no longer builds the path with `sprintf`
+  onto itself (`5193849`), which is undefined behaviour and could write past
+  the 256-byte path; it appends with bounded `strncat`.
+- **Changed:** the kernel builds without compiler warnings (`1e8dcee`):
+  `Patch_somegame` gets a prototype in place of an implicit declaration, and
+  the NOR erase poll drops an unused variable.
 - **Fixed:** save types for Doom, Doom II, Gauntlet - Dark Legacy and the
   Classic NES Series and Famicom Mini games (`b9c9245`). The first three are
   EEPROM 512, not 8K (ez-flash/omega-de-kernel#3); the NES games are EEPROM
