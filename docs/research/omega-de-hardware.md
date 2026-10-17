@@ -247,13 +247,10 @@ Style writes them), and 65–255 become `0` from the unused part of the
 buffer. The hotkey slots 5–10 are written as the defaults the settings page
 shows (L R SELECT, L R START) the first time any row is saved.
 
-One unchecked read: `GBApatch.c` builds the in-game key masks from slots
-5–10 with `1 << value` and no range check. An erased slot gives a mask of
-`0x3FF`, meaning "no key held", so reset or the menu would trigger on every
-VBlank. That only happens if an addon is on while the hotkey slots are
-still erased, which this kernel's settings page never writes. Another
-kernel's settings could. The settings page clamps values over 10 to the
-defaults; the patch code should do the same.
+The in-game key masks in `GBApatch.c` used to build `1 << value` from
+slots 5–10 with no range check, so an erased slot gave `0x3FF`, "no key
+held". Since `b736015`, slots past 9 count as the defaults the settings page
+shows.
 
 ## 5. Save prompt behaviour
 

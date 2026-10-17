@@ -2,9 +2,9 @@
 
 Which games the kernel's in-game menu (and the cheat, reset and sleep hooks
 that share its IRQ hook) misses, measured on the emulated cart with every
-GBA game in `roms/games.toml` (`just compat --all gba`, 2026-10-17, kernel
-`f219ed6`). Results come from the emulated cart. Check the failures on a
-real cart before changing the kernel for them.
+GBA game in `roms/games.toml` (`just compat --all gba`, 2026-10-17), and
+what the kernel fixes made of it. Results come from the emulated cart; the
+fixes are worth confirming on a real cart.
 
 ## How the hook works
 
@@ -16,11 +16,14 @@ ROM as it loads (`source/GBApatch.c`):
    `0x3007FF4`. So the game installs its handler one slot lower.
    - With the fast patch engine (the default, English only), the offsets
      come from a built-in table keyed by game code (`source/reset_table.h`,
-     2,700+ entries). Unknown games fall back to the scan.
+     2,700+ entries). Unknown games fall back to the scan, and so (since
+     `b736015`) do games whose listed words aren't IRQ handler literals in
+     this ROM, and blank game codes.
    - Otherwise the kernel scans every aligned ROM word (`PatchInternal`),
      keeps at most 32 (`EMax`), and caches the result in `/PATCH/<game>.pat`.
    - `Patch_SpecialROM_sleepmode` adds code patches for a few games that
-     compute the address instead of loading it.
+     compute the address instead of loading it, or that clear IWRAM over
+     the hook.
 2. If it patched anything, the ROM's first instruction becomes a branch to
    the patch area after the ROM's end. That code stores the hook (`RTS_irq`)
    at `0x3007FFC` and jumps to the game's real entry.
@@ -71,27 +74,34 @@ VBlank IRQ, as part of `just test`.
 
 ## Results
 
-119 GBA games ran (118 commercial, 1 homebrew). 107 open the menu and go on
-afterwards, and 12 fail. (The `gba` filter also matched 3 GB games, which are
-n/a.) All 118 commercial games are in the built-in table, and the homebrew
-one matches its all-zero entry, so the ROM scan was never used. Every game that boots enables the VBlank IRQ, except
-one homebrew ROM.
+119 GBA games ran (118 commercial, 1 homebrew; the `gba` filter also matched
+3 GB games, which are n/a). All 118 commercial games are in the built-in
+table. Every game that boots enables the VBlank IRQ, except the homebrew one.
 
-| Game | What happens | Cause |
-|---|---|---|
-| Pokémon FireRed (BPRE rev 1), WaterBlue (FireRed hack) | crash before the menu key | table offsets are for rev 0. The kernel writes `0x3007FF4` over 2 unrelated words (a pointer and a code word) and misses 2 of the 3 real literals. |
-| Pokémon LeafGreen (BPGE rev 1, two dumps) | crash before the menu key | same: offsets `0x1BB`, `0x1C0C8E` are rev 0's |
-| Crash Bandicoot Purple (BD4E rev 1) | crash before the menu key | all 3 table offsets miss this revision |
-| SimCity 2000 (A5CP rev 1) | no menu; the game sets its own handler 1 frame in | 1 of 2 table offsets misses; the real store stays |
-| Grand Theft Auto Advance (BGTP) | crash at the first IRQ (`0xEFEFEFEF`) | both table offsets hold the literal (4 more matching words weren't checked). The game fills IWRAM with `0xEF` after the hook is in, and its handler now goes to `0x3007FF4` |
-| Super Monkey Ball Jr. (ALUP) | crash at the first IRQ (`0xD5BEADDE`) | same: the game fills IWRAM over the hook |
-| Lara Croft Tomb Raider: Legend (BL8P) | no menu; the game sets its own handler (`03000F00`) 1 frame in | the one table entry matches, but the game also writes the vector another way |
-| RTC Checker (homebrew, no game code) | no menu | never enables the VBlank IRQ. Also, its blank code matches the table's all-zero entry ("GBADev 2004Mbit Competition"). Its 10 offsets lie past this small ROM, but the entry branch is written anyway; a larger homebrew ROM would get 10 stray writes |
-| Crash Nitro Kart (BCNP) | crashes 18 frames after the menu closes | not investigated |
-| LEGO Star Wars II (BL7P) | after the menu, a black screen that ignores keys | not investigated |
+Before the kernel fixes (kernel at `f219ed6`), 107 opened the menu and went
+on afterwards, and 12 failed. After them (`dcf4c5b`), 118 pass, and the
+homebrew RTC Checker is n/a: it never enables the VBlank IRQ, which the menu
+needs.
 
-Super Mario Advance 4 rev 1 (AX4P) passes, but 5 of its 7 table offsets are
-rev 0's, so the kernel overwrites 5 unrelated words with `0x3007FF4`.
+| Game | Before | Cause | Fix |
+|---|---|---|---|
+| Pokémon FireRed (BPRE rev 1), WaterBlue (FireRed hack) | crash before the menu key | table offsets are for rev 0. The kernel wrote `0x3007FF4` over 2 unrelated words (a pointer and a code word) and missed 2 of the 3 real literals | `b736015`: the table entry doesn't match, so the kernel scans |
+| Pokémon LeafGreen (BPGE rev 1, two dumps) | crash before the menu key | same: offsets `0x1BB`, `0x1C0C8E` are rev 0's | same |
+| Crash Bandicoot Purple (BD4E rev 1) | crash before the menu key | all 3 table offsets miss this revision | same |
+| SimCity 2000 (A5CP rev 1) | no menu; the game set its own handler 1 frame in | 1 of 2 table offsets missed; the real store stayed | same |
+| Grand Theft Auto Advance (BGTP) | crash at the first IRQ (`0xEFEFEFEF`) | a DMA fills all of IWRAM with `0xEF` after the hook is in | `c57c3b6`: the fill stops at `0x3007FF0` |
+| Super Monkey Ball Jr. (ALUP) | crash at the first IRQ (`0xD5BEADDE`) | a DMA fills `0x3007600` to the end of IWRAM | same |
+| LEGO Star Wars II (BL7P) | hung, a black screen after the menu | crt0 clears IWRAM up to `0x3008000`, then the first IRQ jumps to 0 | `dcf4c5b`: the clear stops at `0x3007FF0` |
+| Lara Croft Tomb Raider: Legend (BL8P) | no menu; its handler replaced the hook 1 frame in | it stores at `0x3008000 - 4`, computed | `dcf4c5b`: `subs r0,#4` becomes `subs r0,#12` |
+| Crash Nitro Kart (BCNP) | crash 18 frames after the menu | after `RegisterRamReset` it reloads its stack from a second literal the kernel didn't move, so the stack sat on the menu's register save area at `0x3007E80` | `dcf4c5b`: `Get_spend_address` moves that literal too |
+| RTC Checker (homebrew, no game code) | no menu | never enables the VBlank IRQ. Its blank code also matched the table's all-zero entry | `b736015`: blank codes skip the table. The menu stays n/a |
+
+The per-game patches are for the EU dumps here and apply only if the ROM
+holds the expected word. Other regions may need their own.
+
+Super Mario Advance 4 rev 1 (AX4P) passed before, but 5 of its 7 table
+offsets are rev 0's, so the kernel overwrote 5 unrelated words; it now
+scans.
 
 Kirby: Nightmare in Dream Land has 33 matching words, more than the scan's
 32 slots. That only matters if it falls back to the scan.
@@ -102,23 +112,5 @@ Other things seen:
   registers and doesn't restore them; they are write-only, so it can't. A
   game that set them once looks wrong until it writes them again. Pokémon
   Ruby's darkened title menu comes back at full brightness.
-- **The menu's "IME = 0" doesn't disable IME.** `strh r3,[r7,#208]` in
-  `gba_rts_patch.s` writes `0x040000D0` (DMA2's count), not IME at
-  `0x04000208`. The menu runs inside the IRQ handler with IRQs masked, so
-  this is mostly harmless.
-
-## Recommended kernel changes (not made here)
-
-1. **Check the table against the ROM.** In `use_internal_engine`, apply an
-   entry only if every offset holds `0x3007FFC` or `0x3FFFFFC`, and
-   otherwise use the scan. Skip the table for blank or non-alphanumeric game
-   codes. This fixes FireRed, LeafGreen, WaterBlue, Crash Purple and SimCity
-   2000 rev 1, and stops the stray writes into SMA4 rev 1 and zero-code
-   homebrew.
-2. **Games that clear IWRAM** (GTA Advance, Super Monkey Ball Jr.) need the
-   hook to come back after the clear. One option is to install it when the
-   game first enables IRQs instead of at entry. Another is a per-game patch
-   in `Patch_SpecialROM_sleepmode`. Until then, an addon launch crashes these
-   games.
-3. Fix the IME store in `ingamemenu_now` (`#0x208` needs a base register).
-4. Look into Crash Nitro Kart and LEGO Star Wars II on a real cart first.
+- **The menu's IME stores missed IME** until `37c7d60`: `strh r3,[r7,#208]`
+  wrote `0x040000D0` (DMA2's count), leaving it at 1 after every menu.

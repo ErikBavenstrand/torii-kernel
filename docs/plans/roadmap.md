@@ -41,21 +41,15 @@ Still open from the bug work:
   debug mode before any mass change. A game moved from 8K to 512 keeps its old 8 KB `.sav`,
   and the kernel then loads only its first 512 bytes. Check on the real cart whether 8K-mode
   data sits in those bytes, and settle what happens to existing saves (see v0.5).
-- **Hook coverage:** measured. `just compat` has an in-game menu column, and
-  `docs/research/hook-coverage.md` has the results: 107 of 119 GBA games work. Still to do
-  in `source/`:
-  - Check `reset_table.h` offsets against the ROM, which fixes rev 1 FireRed, LeafGreen,
-    Crash Purple and SimCity 2000.
-  - Re-hook games that clear IWRAM (GTA Advance, Super Monkey Ball Jr.).
-  - Fix the menu's IME store.
-  - Look into Crash Nitro Kart and LEGO Star Wars II after the menu.
+- **Hook coverage:** done. `just compat` has an in-game menu column; all 118 commercial
+  GBA games in the library pass (`docs/research/hook-coverage.md`). The per-game patches
+  cover the EU dumps tested; other regions may need their own.
 - **Clean boot:** IWRAM is still not fully cleared at launch, because the `SoftReset_now`
   code stays there. No game is known to need it. Clean-boot tests use `tests/roms/idle`
   (no crt0), since devkitARM's crt0 clears EWRAM itself.
 - **Settings default:** done. The emulated kernel NOR already read 0xFFFF for settings that
   were never written. The 0x0000 seen came from saves, which zero slots 65–255
-  (`tests/settings.sh`, `docs/research/omega-de-hardware.md`). Still to do in `source/`:
-  range-check the hotkey slots 5–10 in `GBApatch.c`, as the settings page does.
+  (`tests/settings.sh`), and erased hotkey slots are now range-checked.
 
 ### Tooling
 

@@ -6,6 +6,32 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** the in-game menu, cheats, reset and sleep work in rev 1 of
+  Pokémon FireRed and LeafGreen, Crash Bandicoot Purple and SimCity 2000
+  (`b736015`). The fast patch engine's built-in table is keyed by game code
+  alone and has rev 0's offsets, so these games got unrelated words
+  overwritten, and most crashed with an addon on. A table entry is now used
+  only if every listed word in the ROM is an IRQ handler address; otherwise
+  the kernel scans the ROM. Blank game codes (homebrew) no longer match the
+  table's all-zero entry.
+- **Fixed:** an unset in-game hotkey (erased settings) counts as the key the
+  settings page shows, L R SELECT or L R START (`b736015`). It made the key
+  read as "no key held", so reset or the menu would fire on every frame.
+- **Fixed:** with an addon on, Grand Theft Auto Advance, Super Monkey Ball
+  Jr. and LEGO Star Wars II (EU) no longer crash or hang (`c57c3b6`,
+  `dcf4c5b`). Each clears the top of IWRAM after the kernel's hook is in;
+  their clear now stops just below it. These per-game patches apply only
+  if the ROM holds the expected word.
+- **Fixed:** the in-game menu works in Lara Croft Tomb Raider: Legend (EU),
+  which computes its IRQ handler address instead of loading it
+  (`dcf4c5b`).
+- **Fixed:** Crash Nitro Kart no longer crashes after the in-game menu
+  (`dcf4c5b`). The kernel moves a game's stack down to make room for the
+  menu's saved registers; this game reloads its stack from a second
+  literal, which is now moved too.
+- **Fixed:** the in-game menu turns IME off and on as intended (`37c7d60`).
+  It wrote DMA2's count register instead, leaving it at 1 after every menu.
+
 - **Fixed:** cheat lines no longer make bogus writes (`2c274c8`): an entry
   without a value is dropped instead of reusing the last one, empty `;` and
   trailing `,` add nothing (a trailing `,` wrote 0 to the next address), and

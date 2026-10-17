@@ -36,7 +36,8 @@ Checks, each pass, fail, untested (the run didn't get that far) or n/a:
   cart's save memory makes the same trip
 - in-game menu: the kernel hooked the game's IRQ, the menu opened, and the
   game went on after it; a failure says why (no literal for the kernel to
-  patch, the game set its own handler, no VBlank IRQ, a crash). Metrics
+  patch, the game set its own handler, a crash); n/a for a game that never
+  enables the VBlank IRQ, which the menu needs. Metrics
   give the hook: how the kernel found the game's IRQ handler stores
   (built-in table or ROM scan), the IRQ vector during the game and how many
   frames had the VBlank IRQ enabled
@@ -436,7 +437,7 @@ def hook_table() -> dict[bytes, str]:
     for case in re.finditer(r"\bcase 0x([0-9A-Fa-f]{8})", special):
         key = struct.pack("<I", int(case[1], 16))
         body = special[case.end() : special.find("break;", case.end())]
-        patches = len(re.findall(r"Add2\(", body))
+        patches = len(re.findall(r"Add2(?:_if)?\(", body))
         what = f"{patches} code patch{'es' if patches != 1 else ''}"
         table[key] = f"{table[key]}, {what}" if key in table else what
     return table
@@ -547,7 +548,13 @@ def check_menu(result: Result, rom: Path, sd_name: str, table: dict) -> None:
         elif key_at is None or "hook watch done" not in trace:
             why = "the run ended before the menu was tried (the game started late)"
         elif vblank and vblank[1].startswith("vblank 0 "):
-            why = "the game never enabled the VBlank IRQ"
+            # The menu opens from the VBlank IRQ; nothing the kernel can fix.
+            result.set(
+                "in-game menu",
+                "n/a",
+                "the game never enables the VBlank IRQ, which the menu needs",
+            )
+            return
         else:
             why = "the menu did not open"
         result.set("in-game menu", "fail", why)
