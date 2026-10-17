@@ -232,8 +232,8 @@ def sd_save(cart: Path, sd_name: str) -> bytes | None:
 # --- Reading results -------------------------------------------------------------
 
 
-def png_is_blank(path: Path) -> bool:
-    """True if every pixel of an 8-bit RGB(A) PNG has the same colour."""
+def png_lines(path: Path):
+    """Yield (channels, pixels of one line) for an 8-bit RGB(A) PNG, top down."""
     data = path.read_bytes()
     pos, idat = 8, b""
     width = height = channels = 0
@@ -249,7 +249,6 @@ def png_is_blank(path: Path) -> bool:
     raw = zlib.decompress(idat)
     stride = width * channels
     prev = bytearray(stride)
-    pixels = set()
     for y in range(height):
         kind = raw[y * (stride + 1)]
         line = bytearray(raw[y * (stride + 1) + 1 : (y + 1) * (stride + 1)])
@@ -268,11 +267,26 @@ def png_is_blank(path: Path) -> bool:
                 pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
                 pred = a if pa <= pb and pa <= pc else b if pb <= pc else c
                 line[i] = (line[i] + pred) & 0xFF
-        pixels.update(bytes(line[i : i + 3]) for i in range(0, stride, channels))
+        yield channels, line
+        prev = line
+
+
+def png_is_blank(path: Path) -> bool:
+    """True if every pixel of an 8-bit RGB(A) PNG has the same colour."""
+    pixels = set()
+    for channels, line in png_lines(path):
+        pixels.update(bytes(line[i : i + 3]) for i in range(0, len(line), channels))
         if len(pixels) > 1:
             return False
-        prev = line
     return True
+
+
+def png_pixel(path: Path, x: int, y: int) -> str:
+    """The RGB colour at x, y of an 8-bit RGB(A) PNG, as hex."""
+    for row, (channels, line) in enumerate(png_lines(path)):
+        if row == y:
+            return line[x * channels : x * channels + 3].hex()
+    raise ValueError(f"{path} has no row {y}")
 
 
 def gen3_counter(save: bytes) -> int | None:

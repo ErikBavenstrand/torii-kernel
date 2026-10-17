@@ -488,6 +488,8 @@ loopbak:
 	strh  r2,[r11],#2 @;offset 0x78	
 		
 	mov		r7,#0x4000000
+	ldrh 	r3,[r7,#REG_BLDCNT]	@;Torii: keep the game's blending, restored on exit
+	stmfd	sp!,{r3}
 	ldrh 	r3,[r7,#REG_SOUNDCNT_L]  @;san guo
 	stmfd	sp!,{r3}		
 	ldrh 	r3,[r7,#REG_SOUNDCNT_X]  @;bak
@@ -505,7 +507,7 @@ loopbak:
 	str 	r3,[r7,#0x28]	@;BG2X/Y
 	str 	r3,[r7,#0x2c]	
 	
-	strh 	r3,[r7,#0x54]	@;Bldy Brightness
+	strh 	r3,[r7,#REG_BLDCNT]	@;Torii: blending off; BLDY is write-only, so leave it
 
 	strh 	r3,[r7,#0xBA]	@;DMA0CNT_H	0086game
 	strh 	r3,[r7,#0xC6]	@;DMA1CNT_H		
@@ -631,6 +633,8 @@ save_exit:
 	
 	ldmfd	sp!,{r3}	
 	strh 	r3,[r7,#REG_SOUNDCNT_L]  @;san guo
+	ldmfd	sp!,{r3}
+	strh 	r3,[r7,#REG_BLDCNT]	@;Torii: the game's blending
 	
 	adrl	r11, spend_0x80
 	ldr		r11,[r11]  
@@ -703,6 +707,8 @@ wram_2000000:
 	ldmfd	sp!,{r6}
 	ldr		r7,=0x4000000
 	strh 	r6,[r7] @;re
+	ldrh	r3,[sp,#8]		@;Torii: the game's BLDCNT, so the state holds it
+	strh	r3,[r7,#REG_BLDCNT]
 	bl 		restore_LCD		
 		
 	mov 	r0,#0x90

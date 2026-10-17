@@ -45,6 +45,8 @@ settings() {
 settings 0=0xE1E1 1=1 2=1 3=0 4=0 5=9 6=8 7=2 8=9 9=8 10=3 11=1 12=0 13=1 25=1
 rm -rf "$cart-state"
 cp -r "$cart" "$cart-state" # for the save-state run below
+rm -rf "$cart-blend"
+cp -r "$cart" "$cart-blend" # and the brightness run
 
 # keys FRAME KEY... -> mgba-shot press/release pairs, one key every 8 frames.
 keys() {
@@ -111,4 +113,20 @@ grep -q '^crash at frame' <<<"$log" && fail "crashed in the save state run"
   fail "the game did not go on after loading a state"
 rm -rf "$cart-state"
 
-echo "PASS: in-game menu opens on L+R+START, B returns to the game with its screen, a state saves and loads, and the save survives"
+# Brightness: hello dims its screen once with BLDY, which is write-only, so
+# the menu must leave it alone and only turn the blending off and on. A
+# background pixel must look the same before the menu and after it.
+pixel() { python3 -c "import sys; sys.path.insert(0, 'tests'); import games; print(games.png_pixel(games.Path('$1'), 120, 80))"; }
+# shellcheck disable=SC2046 # $(keys) is a list of options
+OMEGA_DIR=$cart-blend emu/build-linux/mgba-shot dist/ezkernelnew.bin \
+  $(keys 100 DOWN A) $(keys 180 DOWN DOWN DOWN DOWN RIGHT RIGHT RIGHT RIGHT UP UP UP A) \
+  -s "$((key - 20)):$cart-blend/before.png" -k "$key:L+R+START" -k "$((key + 6)):-" \
+  -k "$((key + 60)):B" -k "$((key + 66)):-" -s "$((key + 200)):$cart-blend/after.png" \
+  -f $((key + 200)) >/dev/null 2>&1
+before=$(pixel "$cart-blend/before.png")
+after=$(pixel "$cart-blend/after.png")
+[ "$before" != 1031a5 ] || fail "hello's screen isn't dimmed, so the brightness check can't tell"
+[ "$after" = "$before" ] || fail "the menu lost the game's brightness (pixel $after, was $before)"
+rm -rf "$cart-blend"
+
+echo "PASS: in-game menu opens on L+R+START, B returns to the game with its screen, a state saves and loads, the brightness stays, and the save survives"
