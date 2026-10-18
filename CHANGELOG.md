@@ -4,7 +4,7 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.2.3 (2026-10-18)
 
 **Don't use v0.2.1 or v0.2.2:** both can erase EZ-Flash's boot loader, and the
 cart then starts in safe mode (`No_Loader_found`). `docs/recovery.md` says
