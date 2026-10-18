@@ -15,6 +15,15 @@ git log, not here.
   with "..." by character and clears rectangles: about 250 cycles a glyph
   (`c50ccf8`, `53bc7e1`). Trailing spaces no longer cut a line that fits
   (`fd242f0`).
+- **Changed:** about 17.4 KB of EWRAM freed for the v0.3 engine (2.3 KB free
+  before, 19.7 KB after), with no visible change. The cheat screen's line and
+  value buffers and the file list sort's work buffer now borrow `pReadCache`,
+  which holds nothing between menu passes (its owners are listed in
+  `ez_define.h`). Recently Played rows shrink from 512 to 356 bytes, the
+  longest entry the kernel keeps (`b9d6f5e`, `8224c72`).
+- **Fixed:** a cheat file over 2275 lines ran its list off `pReadCache` and
+  overwrote the NOR game list in RAM. The list now stops at 2053 lines and
+  logs that the rest were left out (`b9d6f5e`, `664670e`).
 - **Added:** the v0.3 menu engine's motion and input layers, not yet used by
   the menu. Motion has eased tweens and critically damped springs (retargets
   keep their velocity) for scroll, sprites, blend and palette fades. Input

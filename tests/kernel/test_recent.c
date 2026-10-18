@@ -4,11 +4,9 @@
 
 #include <gba_base.h>
 
+#include "../../source/ezkernel.h"
 #include "torii_test.h"
 #include "tests.h"
-
-extern char p_recently_play[10][512];
-u32 Recently_play_add(const char *entry, u32 count);
 
 void test_recently_played(void)
 {
@@ -34,9 +32,18 @@ void test_recently_played(void)
 	CHECK_EQ(count, 3);
 	CHECK(strcmp(p_recently_play[0], "/new.gba") == 0);
 	CHECK(strcmp(p_recently_play[1], "/game5.gba") == 0);
-}
 
-const char *Recently_play_nor(const char *entry);
+	// The longest entry the kernel writes, a 255-byte folder and a 99-byte
+	// name, fits a row whole.
+	char longest[RECENT_LEN];
+	memset(longest, 'a', sizeof(longest) - 1);
+	longest[0] = '/';
+	longest[MAX_path_len - 1] = '/';
+	longest[sizeof(longest) - 1] = 0;
+	count = Recently_play_add(longest, count);
+	CHECK(strcmp(p_recently_play[0], longest) == 0);
+	CHECK(strcmp(p_recently_play[1], "/new.gba") == 0);
+}
 
 void test_recently_played_nor(void)
 {
