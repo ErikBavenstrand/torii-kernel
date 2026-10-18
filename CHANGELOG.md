@@ -15,10 +15,12 @@ how to recover.
   NOR list's copy B was written there. Copy B now sits at 0x780000, and
   Save_info writes nothing outside 0x780000-0x7BFFFF (`79cdf75`), nor more
   than 8 KB in the settings sector, which is 8 KB boot sectors on a PL064J
-  (`36931c8`).
+  (`36931c8`). Save_info maps the kernel's ROM page itself before writing,
+  so no other page can turn its offsets into the loader's (`b2ad489`).
 - **Added:** Diagnostics reads the boot loader, without writing it, and
-  logs its CRC32 and whether it's blank, erased or has a GBA header; a blank
-  or erased one is an error with a warning on screen (`36931c8`).
+  logs its CRC32, whether it's blank, erased or overwritten (no GBA header)
+  and whether it is EZ-Flash's DE.BIN; a damaged one is an error with a
+  warning on screen (`36931c8`, `b2ad489`).
 
 ## v0.2.2 (2026-10-18)
 
