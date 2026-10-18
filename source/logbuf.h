@@ -47,6 +47,10 @@ u32 log_ring_tail(const log_ring *r, char *out, u32 max);
 #define LOG_FILE_SIZE 0x10000
 #define LOG_HEADER_LEN 24  // "torii log 00000001\n" and padding
 
+// Sequences run from 1 to LOG_SEQ_MAX (the header's 8 digits), then wrap to 1.
+#define LOG_SEQ_MAX 99999999u
+u32 log_next_seq(u32 seq);
+
 // Writes the header for sequence seq (LOG_HEADER_LEN bytes, no NUL).
 void log_header_make(char *out, u32 seq);
 
@@ -54,8 +58,8 @@ void log_header_make(char *out, u32 seq);
 // new file, or one whose rotation was cut off).
 u32 log_header_seq(const char *buf, u32 n);
 
-// The file to append to: the one with the highest sequence, or -1 if none
-// has a header.
+// The file to append to: the one with the newest sequence, counting across
+// the wrap (1 is newer than LOG_SEQ_MAX), or -1 if none has a header.
 int log_pick_current(const u32 seqs[LOG_FILES]);
 
 // Where the text in a log file ends, from the whole file fed in order, in
@@ -66,6 +70,9 @@ int log_pick_current(const u32 seqs[LOG_FILES]);
 typedef struct {
 	u32 seen;  // bytes fed so far
 	u32 end;  // the first zero after the header, once found
+	u32 line;  // where the last line before the end starts: past the end's
+		   // last '\n', or LOG_HEADER_LEN; short of the end if power
+		   // loss cut off a flush in the middle of a line
 	u8 found;
 	u8 junk;  // a nonzero byte follows the end
 } log_end;
@@ -75,5 +82,11 @@ void log_end_feed(log_end *e, const char *buf, u32 n);
 // The end: the first zero after the header, or the bytes seen if there is
 // none (a full file). From LOG_HEADER_LEN on.
 u32 log_end_offset(const log_end *e);
+// The longest line the kernel writes ("SSSSS.CC L " and 240 bytes of text).
+#define LOG_LINE_MAX 252
+// True if the file holds junk: a nonzero byte after the end, or text after
+// the last '\n' longer than any line (as junk with no zero byte in it
+// leaves). A cut-off flush leaves less than a line there.
+int log_end_is_junk(const log_end *e);
 
 #endif

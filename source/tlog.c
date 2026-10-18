@@ -28,6 +28,7 @@ static log_ring ring EWRAM_BSS;
 #define PREFIX_LEN 11
 #define TEXT_MAX 240
 static char line[PREFIX_LEN + TEXT_MAX + 2] EWRAM_BSS;
+_Static_assert(PREFIX_LEN + TEXT_MAX + 1 <= LOG_LINE_MAX, "log_end_is_junk takes longer lines for junk");
 
 u32 tlog_level_setting(void)
 {
@@ -279,7 +280,7 @@ static FRESULT open_current(void)
 		return start_file(0, 1);
 
 	log_path(path, cur);
-	res = f_open(&log_file, path, FA_READ);
+	res = f_open(&log_file, path, FA_READ | FA_WRITE);
 	if (res != FR_OK)
 		return res;
 	cur_slot = cur;
@@ -296,15 +297,32 @@ static FRESULT open_current(void)
 			break;
 		log_end_feed(&end, (const char *)bounce, done);
 	}
-	if (end.junk) {
+	if (log_end_is_junk(&end)) {
 		// Its end can't be found: keep the file as it is, and go on in
 		// the next one.
 		f_close(&log_file);
 		tlog_error("log: torii-%lu.log has junk after its text; going on in the next file",
 			   (unsigned long)cur_slot);
-		return start_file((cur_slot + 1) % LOG_FILES, cur_seq + 1);
+		return start_file((cur_slot + 1) % LOG_FILES, log_next_seq(cur_seq));
 	}
 	cur_end = log_end_offset(&end);
+	if (end.line < cur_end) {
+		// Power loss cut off a flush inside a line: zero what it wrote of
+		// it, so the next line starts on its own.
+		u32 cut = cur_end - end.line;
+		memset(bounce, 0, cut);
+		res = f_lseek(&log_file, end.line);
+		if (res == FR_OK)
+			res = f_write(&log_file, bounce, cut, &done);
+		if (res == FR_OK && done != cut)
+			res = FR_DENIED;
+		if (res != FR_OK) {
+			f_close(&log_file);
+			return res;
+		}
+		cur_end = end.line;
+		tlog("log: dropped %lu bytes of a line cut off by power loss", (unsigned long)cut);
+	}
 
 	// The previous session's last line, without its newline.
 	u32 len = sizeof(prev_last) - 1;
@@ -331,7 +349,7 @@ static FRESULT rotate(void)
 {
 	char path[32];
 	f_close(&log_file);
-	FRESULT res = start_file((cur_slot + 1) % LOG_FILES, cur_seq + 1);
+	FRESULT res = start_file((cur_slot + 1) % LOG_FILES, log_next_seq(cur_seq));
 	if (res != FR_OK)
 		return res;
 	log_path(path, cur_slot);

@@ -146,19 +146,21 @@ launch)
   soft_boot -f 200
   has "previous session: ended abnormally in launching (step 0): Hello.gba"
   # After a power cut, only the log's last line can say so, if its flush
-  # finished. A frame holds the whole launch, so write that line here.
+  # finished. A frame holds the whole launch, so write that line here, and
+  # after it part of one, as a flush cut off between sectors leaves.
   mtype -i "$cart/sd.img" ::/torii/logs/torii-0.log >"$cart/torii-0.log"
   python3 - "$cart/torii-0.log" <<'EOF'
 import sys
 data = bytearray(open(sys.argv[1], "rb").read())
 end = data.index(b"\0", 24)
-line = b"   9.99 I launch: loading Hello.gba, CLEAN BOOT\n"
+line = b"   9.99 I launch: loading Hello.gba, CLEAN BOOT\n   9.9"
 data[end : end + len(line)] = line
 open(sys.argv[1], "wb").write(data)
 EOF
   mcopy -o -i "$cart/sd.img" "$cart/torii-0.log" ::/torii/logs/
   boot -f 200
   has "previous session: a launch never reached the game; its last line was:    9.99 I launch: loading Hello.gba"
+  has "log: dropped 6 bytes of a line cut off by power loss"
   card_ok
   lines_ok
   zeros_ok
@@ -322,10 +324,23 @@ EOF
   has "Torii kernel boot" 1
   boot -f 200 # the next boot goes on in file 1
   [ "$(count 'Torii kernel boot' 1)" = 2 ] || fail "the next boot didn't go on in file 1"
+  # Junk with no zero byte in it: 0xFF from the text to the end of file 1.
+  mtype -i "$cart/sd.img" ::/torii/logs/torii-1.log >"$cart/torii-1.log"
+  python3 - "$cart/torii-1.log" <<'EOF'
+import sys
+data = open(sys.argv[1], "rb").read()
+end = data.index(b"\0", 24)
+open(sys.argv[1], "wb").write(data[:end] + b"\xff" * (len(data) - end))
+EOF
+  mcopy -o -i "$cart/sd.img" "$cart/torii-1.log" ::/torii/logs/
+  boot -f 200
+  [ "$(log 2 | head -1)" = "torii log 00000007     " ] || fail "file 2 wasn't started as sequence 7: $(log 2 | head -1)"
+  has "log: torii-1.log has junk after its text; going on in the next file" 2
+  mtype -i "$cart/sd.img" ::/torii/logs/torii-1.log | cmp -s - "$cart/torii-1.log" || fail "the 0xFF junk file was changed"
   card_ok
-  lines_ok 1
-  zeros_ok 1
-  echo "PASS: a log file with junk after its text is left alone, and logging goes on in the next file"
+  lines_ok 2
+  zeros_ok 2
+  echo "PASS: a log file with junk after its text, with or without zeros in it, is left alone, and logging goes on in the next file"
   ;;
 
 full)

@@ -34,6 +34,7 @@ void test_log_ring_tail(void);
 void test_log_ring_take_lines(void);
 void test_log_header(void);
 void test_log_pick_current(void);
+void test_log_next_seq(void);
 void test_log_end(void);
 void test_lz77_round_trip(void);
 void test_lz77_compresses(void);

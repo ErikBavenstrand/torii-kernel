@@ -109,11 +109,23 @@ u32 log_header_seq(const char *buf, u32 n)
 	return seq;
 }
 
+u32 log_next_seq(u32 seq)
+{
+	return (seq >= LOG_SEQ_MAX) ? 1 : seq + 1;
+}
+
+// True if sequence a comes after b: less than half the cycle ahead of it.
+static int seq_newer(u32 a, u32 b)
+{
+	u32 ahead = (a + LOG_SEQ_MAX - b) % LOG_SEQ_MAX;
+	return ahead && ahead < LOG_SEQ_MAX / 2;
+}
+
 int log_pick_current(const u32 seqs[LOG_FILES])
 {
 	int best = -1;
 	for (int i = 0; i < LOG_FILES; i++) {
-		if (seqs[i] && (best < 0 || seqs[i] > seqs[best]))
+		if (seqs[i] && (best < 0 || seq_newer(seqs[i], seqs[best])))
 			best = i;
 	}
 	return best;
@@ -122,6 +134,7 @@ int log_pick_current(const u32 seqs[LOG_FILES])
 void log_end_start(log_end *e)
 {
 	memset(e, 0, sizeof(*e));
+	e->line = LOG_HEADER_LEN;
 }
 
 // True if a byte of v is zero.
@@ -138,7 +151,7 @@ void log_end_feed(log_end *e, const char *buf, u32 n)
 		// at every boot.
 		if (e->seen >= LOG_HEADER_LEN && !((uintptr_t)(buf + i) & 3) && n - i >= 4) {
 			u32 v = *(const u32 *)(const void *)(buf + i);
-			if (e->found ? v == 0 : !has_zero(v)) {
+			if (e->found ? v == 0 : !has_zero(v) && !has_zero(v ^ 0x0A0A0A0Au)) {
 				i += 4;
 				e->seen += 4;
 				continue;
@@ -150,12 +163,19 @@ void log_end_feed(log_end *e, const char *buf, u32 n)
 			} else if (!buf[i]) {
 				e->found = 1;
 				e->end = e->seen;
+			} else if (buf[i] == '\n') {
+				e->line = e->seen + 1;
 			}
 		}
 		i++;
 		e->seen++;
 	}
 	e->seen += n - i;  // after junk, only the count
+}
+
+int log_end_is_junk(const log_end *e)
+{
+	return e->junk || log_end_offset(e) - e->line > LOG_LINE_MAX;
 }
 
 u32 log_end_offset(const log_end *e)
