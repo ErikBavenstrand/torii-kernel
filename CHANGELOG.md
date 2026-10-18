@@ -4,6 +4,25 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Fixed:** the in-game menu's DEBUG gave no sign it worked, and a
+  power-off then lost the snapshot. It now says DEBUG SAVED and picks
+  RESET, whose boot logs it (`5dab00c`).
+- **Fixed:** after a crash dump, the boot report says the kernel crashed
+  and where, not that the session ended in the menu; GB and GBC games are
+  named by their title, not `(????)` (`f0c4dab`).
+- **Added:** the EEPROM probe ROM (`tests/roms/eeprom`) asks the cart's
+  EEPROM in game mode, where it answers, with 6-bit or 14-bit addresses;
+  the kernel's next boot logs each step and a verdict, to settle 512 against
+  8K on the real cart (`f0c4dab`).
+- **Changed:** Diagnostics shows the clock live and logs it at the answer,
+  names each failed check in the summary, logs rumble answers as info,
+  and checks the checklist's yes answers against the log, listing those it
+  can't back as unconfirmed. Its EEPROM step points to the probe ROM; the
+  kernel-mode probe, which the real cart never answered, is gone
+  (`f2e94c5`).
+
 ## v0.2.0 (2026-10-17)
 
 - **Added:** LOGGING in settings page 2 (Off, Errors, Info, Debug; off by
