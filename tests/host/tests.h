@@ -46,5 +46,20 @@ void test_logcheck_launches(void);
 void test_logcheck_reports(void);
 void test_eeprom_probe_patterns(void);
 void test_eeprom_probe_verdict(void);
+void test_ease_lut_reproducible(void);
+void test_ease_endpoints(void);
+void test_tween_endpoints(void);
+void test_spring_converges(void);
+void test_spring_dt_clamp(void);
+void test_spring_retarget(void);
+void test_spring_jump_and_shift(void);
+void test_motion_targets(void);
+void test_motion_cap_and_handles(void);
+void test_palette_fade(void);
+void test_input_tap(void);
+void test_input_repeat_schedule(void);
+void test_input_accel_reset(void);
+void test_input_paging(void);
+void test_input_wrap(void);
 
 #endif

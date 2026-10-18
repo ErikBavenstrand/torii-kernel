@@ -2,3 +2,5 @@
 # kept as upstream wrote it.
 emusrc/**
 source/ff15/*
+# Generated tables, written as their tool writes them.
+source/engine/ease_lut.c

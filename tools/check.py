@@ -49,6 +49,10 @@ EVERYTHING = {LINT, TEST, SIZE, ANALYZE, COMPAT}
 # launching code includes them; nor does lang.c, whose strings it uses.
 NO_COMPAT = {
     "source/charset.c",
+    "source/engine/ease_lut.c",
+    "source/engine/input.c",
+    "source/engine/input_hw.c",
+    "source/engine/motion.c",
     "source/helpwindow.c",
 }
 
@@ -96,6 +100,11 @@ RULES = [
         "font converter, tested by test-host",
     ),
     (["tools/font_preview.py"], {LINT}, "font preview sheets"),
+    (
+        ["tools/ease_lut.py"],
+        {LINT, TEST_HOST},
+        "easing table generator, whose table the host tests check",
+    ),
     (
         sorted(NO_COMPAT),
         {LINT, TEST, SIZE, ANALYZE},
