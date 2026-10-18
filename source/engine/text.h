@@ -87,10 +87,10 @@ struct text_run {
 };
 
 // Draws a run into 4bpp column-major tiles. ARM code in IWRAM.
-void text_blit(const struct text_run *run);
+IWRAM_CODE void text_blit(const struct text_run *run);
 #ifdef TORII_TEST_KERNEL
 // The same for a font with 1 byte rows, for the tests' benchmark
-void text_blit_rows1(const struct text_run *run);
+IWRAM_CODE void text_blit_rows1(const struct text_run *run);
 #endif
 
 #endif

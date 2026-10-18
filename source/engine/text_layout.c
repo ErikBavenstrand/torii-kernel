@@ -11,7 +11,7 @@ int text_next_glyph(const char *s, u32 len, u32 *pos)
 	if (c == CHARSET_NONE)
 		return -1;
 	if (c >= TORII_FONT_FIRST && c <= TORII_FONT_LAST)
-		return c - TORII_FONT_FIRST;
+		return (int)(c - TORII_FONT_FIRST);
 	return TORII_FONT_REPLACEMENT;
 }
 

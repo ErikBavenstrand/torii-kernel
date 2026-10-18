@@ -346,8 +346,6 @@ def rows_of(glyph: Glyph) -> tuple[int, list[int]]:
     return top, rows
 
 
-
-
 def label(cp: int) -> str:
     if cp == REPLACEMENT + FIRST:
         return "replacement"

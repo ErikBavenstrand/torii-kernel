@@ -11,7 +11,7 @@ u32 text_draw_line(const struct text_window *win, const struct torii_font *font,
 	if (!line->count)
 		return x;
 	if (y + font->line_height > win->height * 8u || x + line->extent > win->width * 8u || font->row_bytes != 2) {
-		TLOG_ASSERT(!"text_draw_line: the line is outside the window");
+		tlog_error("assert failed: text_draw_line: line at %lu,%lu outside the window", (unsigned long)x, (unsigned long)y);
 		return x;
 	}
 	struct text_run run = {
