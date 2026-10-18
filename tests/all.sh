@@ -27,6 +27,7 @@ jobs=(
   "tests/logging.sh debug"
   "tests/logging.sh crash"
   "tests/logging.sh rotate"
+  "tests/logging.sh junk"
   "tests/logging.sh full"
 )
 

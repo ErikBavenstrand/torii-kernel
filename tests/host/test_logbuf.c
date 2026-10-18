@@ -154,25 +154,129 @@ void test_log_pick_current(void)
 	CHECK_EQ(log_pick_current(seqs), 1);
 	u32 first[LOG_FILES] = {0, 0, 3, 0};
 	CHECK_EQ(log_pick_current(first), 2);
+	// Across the wrap, 1 and 2 come after 99999998 and 99999999.
+	u32 wrapped[LOG_FILES] = {LOG_SEQ_MAX - 1, LOG_SEQ_MAX, 1, 2};
+	CHECK_EQ(log_pick_current(wrapped), 3);
+	u32 just_wrapped[LOG_FILES] = {LOG_SEQ_MAX - 2, 1, LOG_SEQ_MAX - 1, LOG_SEQ_MAX};
+	CHECK_EQ(log_pick_current(just_wrapped), 1);
+	u32 at_max[LOG_FILES] = {LOG_SEQ_MAX - 3, LOG_SEQ_MAX - 1, LOG_SEQ_MAX - 2, LOG_SEQ_MAX};
+	CHECK_EQ(log_pick_current(at_max), 3);
 }
 
-static int reads;
-static int byte_at(void *ctx, u32 offset)
+void test_log_next_seq(void)
 {
-	reads++;
-	return ((const u8 *)ctx)[offset];
+	CHECK_EQ(log_next_seq(1), 2);
+	CHECK_EQ(log_next_seq(LOG_SEQ_MAX - 1), LOG_SEQ_MAX);
+	CHECK_EQ(log_next_seq(LOG_SEQ_MAX), 1);
+	// Every sequence it gives fits the header's 8 digits.
+	char h[LOG_HEADER_LEN];
+	u32 seq = LOG_SEQ_MAX - 2;
+	for (int i = 0; i < 5; i++) {
+		seq = log_next_seq(seq);
+		log_header_make(h, seq);
+		CHECK_EQ(log_header_seq(h, sizeof(h)), seq);
+	}
 }
 
-void test_log_find_end(void)
+// Feeds file to a log_end in pieces of step bytes, from offset skew of a
+// buffer, so the word path meets every alignment.
+static log_end scan(const u8 *file, u32 size, u32 step, u32 skew)
+{
+	static u8 piece[600 + 4];
+	log_end e;
+	log_end_start(&e);
+	for (u32 at = 0; at < size; at += step) {
+		u32 n = (size - at < step) ? size - at : step;
+		memcpy(piece + skew, file + at, n);
+		log_end_feed(&e, (const char *)piece + skew, n);
+	}
+	return e;
+}
+
+void test_log_end(void)
 {
 	u8 *file = malloc(LOG_FILE_SIZE);
 	u32 ends[] = {LOG_HEADER_LEN, LOG_HEADER_LEN + 1, 1000, 0x8000, LOG_FILE_SIZE - 1, LOG_FILE_SIZE};
+	u32 steps[] = {1, 7, 512, 600};
 	for (u32 i = 0; i < sizeof(ends) / sizeof(*ends); i++) {
-		memset(file, 0, LOG_FILE_SIZE);
-		memset(file, 'a', ends[i]);
-		reads = 0;
-		CHECK_EQ(log_find_end(byte_at, file, LOG_FILE_SIZE), ends[i]);
-		CHECK(reads <= 17);  // a binary search over 64 KB
+		for (u32 j = 0; j < sizeof(steps) / sizeof(*steps); j++) {
+			for (u32 skew = 0; skew < 4; skew++) {
+				memset(file, 0, LOG_FILE_SIZE);
+				memset(file, 'a', ends[i]);
+				log_end e = scan(file, LOG_FILE_SIZE, steps[j], skew);
+				CHECK_EQ(log_end_offset(&e), ends[i]);
+				CHECK(!e.junk);
+				if (ends[i] < LOG_FILE_SIZE - 1) {
+					// One junk byte anywhere after the end.
+					u32 at = ends[i] + 1 + (LOG_FILE_SIZE - ends[i] - 2) * j / 3;
+					file[at] = 0x5A;
+					e = scan(file, LOG_FILE_SIZE, steps[j], skew);
+					CHECK(e.junk);
+					CHECK_EQ(log_end_offset(&e), ends[i]);
+				}
+			}
+		}
 	}
+	// Zeros in the header don't end the text.
+	memset(file, 0, LOG_FILE_SIZE);
+	memset(file + 4, 'a', 100);
+	log_end e = scan(file, LOG_FILE_SIZE, 512, 0);
+	CHECK_EQ(log_end_offset(&e), 104);
+	CHECK(!e.junk);
+	// What v0.2.0 left on the real cart: header, text, then the SD buffer's
+	// leftovers, with zeros among them.
+	srand(1);
+	for (u32 i = 0; i < LOG_FILE_SIZE; i++)
+		file[i] = (i % 97 < 40) ? 0 : rand();
+	memset(file, 'a', 3000);
+	e = scan(file, LOG_FILE_SIZE, 512, 0);
+	CHECK(e.junk);
+	// The last line's start, also when a flush was cut off inside a line.
+	memset(file, 0, LOG_FILE_SIZE);
+	memset(file, 'a', 3000);
+	file[999] = '\n';
+	file[2499] = '\n';
+	for (u32 j = 0; j < sizeof(steps) / sizeof(*steps); j++) {
+		for (u32 skew = 0; skew < 4; skew++) {
+			e = scan(file, LOG_FILE_SIZE, steps[j], skew);
+			CHECK_EQ(log_end_offset(&e), 3000);
+			CHECK_EQ(e.line, 2500);
+		}
+	}
+	file[2999] = '\n';  // whole lines: the last starts at the end
+	e = scan(file, LOG_FILE_SIZE, 512, 0);
+	CHECK_EQ(e.line, 3000);
+	memset(file, 0, LOG_FILE_SIZE);
+	memset(file, 'a', 100);  // no line ends after the header
+	e = scan(file, LOG_FILE_SIZE, 512, 0);
+	CHECK_EQ(e.line, LOG_HEADER_LEN);
+	// What a cut-off flush leaves (less than a line after the last '\n') is
+	// not junk; junk with no zero byte in it, here 0xFF to the end, is.
+	memset(file, 0, LOG_FILE_SIZE);
+	memset(file, 'a', 3000);
+	file[2899] = '\n';
+	e = scan(file, LOG_FILE_SIZE, 512, 0);
+	CHECK(!log_end_is_junk(&e));
+	file[2899] = 'a';
+	file[3000 - LOG_LINE_MAX - 1] = '\n';
+	e = scan(file, LOG_FILE_SIZE, 512, 0);
+	CHECK(!log_end_is_junk(&e));  // a partial line of LOG_LINE_MAX bytes
+	file[3000 - LOG_LINE_MAX - 1] = 'a';
+	file[3000 - LOG_LINE_MAX - 2] = '\n';
+	e = scan(file, LOG_FILE_SIZE, 512, 0);
+	CHECK(log_end_is_junk(&e));
+	memset(file + 2900, 0xFF, LOG_FILE_SIZE - 2900);
+	e = scan(file, LOG_FILE_SIZE, 512, 0);
+	CHECK_EQ(log_end_offset(&e), LOG_FILE_SIZE);
+	CHECK(log_end_is_junk(&e));
+	file[LOG_FILE_SIZE - 1] = '\n';  // a full file of whole lines
+	memset(file + 2500, 'b', LOG_FILE_SIZE - 2501);
+	for (u32 i = 2500 + 100; i < LOG_FILE_SIZE; i += 100)
+		file[i] = '\n';
+	e = scan(file, LOG_FILE_SIZE, 512, 0);
+	CHECK(!log_end_is_junk(&e));
+	// Nothing fed: the end is the header's.
+	log_end_start(&e);
+	CHECK_EQ(log_end_offset(&e), LOG_HEADER_LEN);
 	free(file);
 }

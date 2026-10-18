@@ -14,6 +14,19 @@ git log, not here.
 - **Changed:** the kernel builds byte for byte the same on CI and macOS:
   the Makefile sorts its file lists, which set the link order, and asserts
   name files relative to the project (`82d6615`).
+- **Fixed:** log files no longer fill with junk on the real cart. A new
+  file was zero-filled from a ROM array, and ROM reads while SD mode is on
+  return the FPGA's SD buffer; it is now filled from RAM, and `disk_write`
+  refuses a source in ROM (`059e795`).
+- **Fixed:** a log file with junk after its text (from v0.2.0) is left as
+  it is, and logging goes on in the next file; the end of a file's text is
+  found by reading the whole file, so junk can't hide it (`059e795`), even
+  junk with no zero byte in it, such as 0xFF (`7887069`).
+- **Fixed:** a flush cut off by power loss left part of a line, and the
+  next session's first line ran on from it; the next boot now drops the
+  part (`7887069`).
+- **Fixed:** the log's sequence number wraps from 99999999 to 1 instead
+  of overflowing the header's 8 digits, which lost a file (`7887069`).
 
 ## v0.2.0 (2026-10-17)
 

@@ -70,7 +70,8 @@ static const struct {
 	{"log_ring_take_lines", test_log_ring_take_lines},
 	{"log_header", test_log_header},
 	{"log_pick_current", test_log_pick_current},
-	{"log_find_end", test_log_find_end},
+	{"log_next_seq", test_log_next_seq},
+	{"log_end", test_log_end},
 	{"lz77_round_trip", test_lz77_round_trip},
 	{"lz77_compresses", test_lz77_compresses},
 };
