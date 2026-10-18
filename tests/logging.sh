@@ -376,7 +376,17 @@ EOF
   card_ok
   lines_ok 2
   zeros_ok 2
-  echo "PASS: a log file with junk after its text, with or without zeros in it, is left alone, and logging goes on in the next file"
+  # tools/logs.py shows the junk as a count of its bytes, not the bytes
+  # (v0.2.0's made a 42 KB line), and keeps the lines around it.
+  mkdir -p "$cart/card/torii/logs"
+  mcopy -n -i "$cart/sd.img" ::/torii/logs/* "$cart/card/torii/logs/"
+  python3 tools/logs.py "$cart/card" dist/ezkernelnew.sym "$cart/logs" >/dev/null
+  grep -q '^   1.00 I the last good line$' "$cart/logs/torii.log" || fail "tools/logs.py lost the line before the junk"
+  grep -q '^\[[0-9]* bytes of junk\]$' "$cart/logs/torii.log" || fail "tools/logs.py didn't count the junk"
+  [ "$(awk '{ if (length($0) > m) m = length($0) } END { print m + 0 }' "$cart/logs/torii.log")" -le 300 ] ||
+    fail "tools/logs.py wrote a junk line"
+  ! LC_ALL=C grep -q '[^[:print:][:space:]]' "$cart/logs/torii.log" || fail "tools/logs.py wrote bytes that aren't text"
+  echo "PASS: a log file with junk after its text, with or without zeros in it, is left alone, logging goes on in the next file, and tools/logs.py counts the junk"
   ;;
 
 full)

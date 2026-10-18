@@ -95,6 +95,40 @@ def symbolize(symbols: list[tuple[int, str]], address: int) -> str:
     return f" ({best[1]}+0x{address - best[0]:X})"
 
 
+LINE_START = re.compile(rb" *\d+\.\d\d [EIDW] ")
+
+
+def escape(raw: bytes) -> tuple[str, int]:
+    """raw with bytes that aren't printable UTF-8 as \\xNN, and how many."""
+    out: list[str] = []
+    junk = 0
+    for ch in raw.decode("utf-8", "surrogateescape"):
+        code = ord(ch)
+        if 0xDC80 <= code <= 0xDCFF:  # a byte that isn't UTF-8
+            out.append(f"\\x{code - 0xDC00:02X}")
+            junk += 1
+        elif ch == "\t" or (ch.isprintable() and ch != "\ufffd"):
+            out.append(ch)
+        else:
+            out.extend(f"\\x{b:02X}" for b in ch.encode("utf-8"))
+            junk += 1
+    return "".join(out), junk
+
+
+def clean_lines(raw: bytes) -> list[str]:
+    """One line of a log file as lines to show. v0.2.0 could leave kilobytes
+    of junk in front of a line: that goes on a line of its own as a count
+    of its bytes, and a line that is only junk becomes that count. Other
+    bytes that aren't printable UTF-8 show as \\xNN."""
+    start = LINE_START.search(raw)
+    head = raw[: start.start()] if start else raw
+    _, junk = escape(head)
+    if not junk:
+        return [escape(raw)[0]]
+    note = f"[{len(head)} bytes of junk]"
+    return [note, escape(raw[start.start() :])[0]] if start else [note]
+
+
 def read_logs(folder: Path) -> list[tuple[int, Path, str]]:
     logs = []
     for path in sorted(folder.glob("torii-*.log")):
@@ -110,7 +144,8 @@ def read_logs(folder: Path) -> list[tuple[int, Path, str]]:
             continue
         # The zeros after the text, and any a torn write left inside it
         text = data[match.end() :].rstrip(b"\0").replace(b"\0", b"")
-        logs.append((int(match.group(1)), path, text.decode("utf-8", "replace")))
+        lines = [shown for line in text.split(b"\n") for shown in clean_lines(line)]
+        logs.append((int(match.group(1)), path, "\n".join(lines)))
     logs.sort()
     return logs
 
@@ -182,7 +217,7 @@ def main() -> int:
     sessions = crashes = 0
     other_builds: dict[str, int] = {}  # build ID (or "main X") -> boots or crashes
     for _, _, text in logs:
-        for text_line in text.splitlines():
+        for text_line in text.split("\n"):
             line = text_line
             boot = BOOT.search(line)
             crash_build = CRASH_BUILD.search(line)
