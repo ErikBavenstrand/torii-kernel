@@ -318,8 +318,12 @@ def entry_order(name: str) -> tuple:
     return (scen, 0, 0, rest)
 
 
-def update(results: list[Result], want: dict[str, str], names: set[str]) -> None:
-    new = {k: v for k, v in want.items() if k.split("/")[0] not in names}
+def update(
+    results: list[Result], want: dict[str, str], names: set[str], every: set[str]
+) -> None:
+    """Records the runs of names; a full run (names is every) drops deleted scenarios."""
+    keep = every - names
+    new = {k: v for k, v in want.items() if k.split("/")[0] in keep}
     PNGS.mkdir(parents=True, exist_ok=True)
     for r in results:
         new.update(r.entries())
@@ -327,7 +331,7 @@ def update(results: list[Result], want: dict[str, str], names: set[str]) -> None
             shutil.copy(png, PNGS / f"{r.name}.{key}.png")
     for png in PNGS.glob("*.png"):
         scen, _, key = png.stem.partition(".")
-        if scen in names and f"{scen}/{key}" not in new:
+        if scen not in keep and f"{scen}/{key}" not in new:
             png.unlink()
     lines = [
         f"{k} {v}" for k, v in sorted(new.items(), key=lambda kv: entry_order(kv[0]))
@@ -376,7 +380,7 @@ def main() -> int:
         return 1
     cycles = [line for r in results for line in r.cycles]
     if mode == "--update":
-        update(results, read_manifest(), set(names))
+        update(results, read_manifest(), set(names), set(every))
         return 0
     if mode == "--update-perf":
         perf.update(cycles, perf.BUDGET, partial=bool(args))

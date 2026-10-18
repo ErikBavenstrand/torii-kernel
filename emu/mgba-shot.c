@@ -23,8 +23,9 @@
 //                    socket, console); with -L and no -f, run until killed
 //   -t               run at the GBA's real speed instead of as fast as possible
 //   -w TEXT          wait until the kernel (or a -L script) logs TEXT, from
-//                    the frame of the last key press (or -p) between the
-//                    previous -w and this one; a FRAME of @N in
+//                    the frame of the last @N key press (or -p) after the
+//                    previous -w (the last plain one, for the first -w);
+//                    keys and pokes take @1 or later; a FRAME of @N in
 //                    a later option means N frames after the frame that line
 //                    came in (keys at @N go down before frame N runs, outputs
 //                    come after it). The run ends once the last -w is met and
@@ -332,6 +333,29 @@ static struct event *add_event(struct events *events, const char *spec)
 	return ev;
 }
 
+// Keys and pokes go in before a frame runs, and frame @0 has run already.
+static void no_zero(const struct event *ev, const char *option)
+{
+	if (ev->wait >= 0 && ev->frame == 0) {
+		fprintf(stderr, "%s @0: keys and pokes take @1 or later\n", option);
+		exit(2);
+	}
+}
+
+// Whether every -w is met and the events that follow each are done.
+static int waits_done(unsigned frame)
+{
+	if (next_wait < nwaits) {
+		return 0;
+	}
+	for (int i = 0; i < nwaits; ++i) {
+		if (frame < waits[i].hit + waits[i].last) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
 // Notes an event's frame for the -w it follows; press: a key press or a poke,
 // which the next -w waits for.
 static void note_frame(const struct event *ev, int press)
@@ -426,6 +450,7 @@ static void parse_options(struct options *opts, int argc, char **argv)
 			opts->frames = (unsigned)strtoul(argv[++i], NULL, 10);
 		} else if (!strcmp(argv[i], "-k")) {
 			struct event *ev = add_event(&opts->keys, argv[++i]);
+			no_zero(ev, "-k");
 			note_frame(ev, strcmp(ev->arg, "-") != 0);
 		} else if (!strcmp(argv[i], "-S")) {
 			opts->saveOut = argv[++i];
@@ -453,7 +478,9 @@ static void parse_options(struct options *opts, int argc, char **argv)
 			ev->end = end.frame;
 			note_frame(ev, 0);
 		} else if (!strcmp(argv[i], "-p")) {
-			note_frame(add_event(&opts->pokes, argv[++i]), 1);
+			struct event *ev = add_event(&opts->pokes, argv[++i]);
+			no_zero(ev, "-p");
+			note_frame(ev, 1);
 		} else if (!strcmp(argv[i], "-x")) {
 			note_frame(add_event(&opts->states, argv[++i]), 0);
 		} else if (!strcmp(argv[i], "-w")) {
@@ -615,6 +642,7 @@ int main(int argc, char **argv)
 	}
 	core->reset(core);
 	crash_core = core;
+	current_frame = 1;  // lines before the first frame (from -L scripts) count as frame 1's
 #ifdef ENABLE_SCRIPTING
 	static struct mScriptContext scriptContext;
 	static struct mLogger scriptLogger = {.log = quiet_log};
@@ -786,8 +814,7 @@ int main(int argc, char **argv)
 			printf("stopped at frame %u\n", frame);
 			break;
 		}
-		if (nwaits && next_wait == nwaits && frame >= waits[nwaits - 1].hit + waits[nwaits - 1].last &&
-		    frame >= last_plain) {
+		if (nwaits && waits_done(frame) && frame >= last_plain) {
 			printf("stopped at frame %u\n", frame);
 			break;
 		}
