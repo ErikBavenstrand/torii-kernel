@@ -7,6 +7,10 @@
 
 #define MAX_sectionVAL_LEN 300
 
+// Where the cheat screen's line and value buffers (MAX_BUF_LEN each) start in
+// pReadCache: its last bytes.
+#define READCACHE_CHEAT_WORK (MAX_pReadCache_size - 2 * MAX_BUF_LEN)
+
 typedef struct CHT_LINE {
 	char LINEname[MAX_KEY_LEN];
 	//char KEY_val[256];

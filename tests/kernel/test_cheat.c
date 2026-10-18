@@ -12,6 +12,8 @@
 void RTS_ReplaceIRQ_start(void);
 void no_CHEAT_end(void);
 
+extern u8 pReadCache[];
+
 static void parse(const char *line)
 {
 	gl_cheat_count = 0;
@@ -41,7 +43,9 @@ void test_cheat_parse(void)
 void test_cheat_cap(void)
 {
 	// 700 one-byte writes: more than fit in the patch area.
-	static char line[8 + 3 * 700 + 1] EWRAM_BSS;  // IWRAM is short: every kernel has the tests
+	// 2 KB: borrows the kernel's read cache, which is free while tests run
+	// (IWRAM is short, and every kernel has the tests).
+	char *line = (char *)pReadCache + 0x1000;
 	char *p = line;
 	memcpy(p, "20000,00", 8);
 	p += 8;

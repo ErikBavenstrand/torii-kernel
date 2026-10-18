@@ -37,9 +37,15 @@ FM_NOR_FS pNorFS[MAX_NOR] EWRAM_BSS;
 FM_Folder_FS pFolder[MAX_folder] EWRAM_BSS;
 
 u32 FAT_table_buffer[FAT_table_size / 4] EWRAM_BSS;
-u8 pReadCache[MAX_pReadCache_size] EWRAM_BSS;
+u8 pReadCache[MAX_pReadCache_size] EWRAM_BSS;  // a scratch buffer: its owners are in ez_define.h
+_Static_assert(READCACHE_SORT_WORK >= 0x1E0 && READCACHE_SORT_WORK % 4 == 0 &&
+		       READCACHE_SORT_WORK + SORT_WORK_SIZE <= 0x2000,
+	       "the sort's work buffer meets Clear()'s line or the cheat list");
 
-char p_recently_play[10][512] EWRAM_BSS;
+// A row holds the longest entry get_count keeps and the kernel writes: a
+// folder under MAX_path_len, '/', and a list entry's name.
+#define RECENT_LEN (MAX_path_len + sizeof(((FM_FILE_FS *)0)->filename))
+char p_recently_play[10][RECENT_LEN] EWRAM_BSS ALIGN(4);
 TCHAR currentpath[MAX_path_len];//
 TCHAR currentpath_temp[MAX_path_len];
 TCHAR current_filename[200];
@@ -700,8 +706,8 @@ static u32 get_count(void)
 				if ((u32)(slash - buf) >= MAX_path_len || strlen(slash + 1) > 99)
 					continue;
 			}
-			memset(p_recently_play[count], 0x00, 512);
-			dmaCopy(buf, &(p_recently_play[count]), 512);
+			memset(p_recently_play[count], 0x00, RECENT_LEN);
+			dmaCopy(buf, &(p_recently_play[count]), RECENT_LEN);
 			memset(buf, 0x00, 512);
 			count++;
 			if (count == 10)
@@ -818,10 +824,10 @@ u32 Recently_play_add(const char *entry, u32 count)
 		found = count - 1;
 	}
 	for (i = found; i > 0; i--) {
-		memcpy(p_recently_play[i], p_recently_play[i - 1], 512);
+		memcpy(p_recently_play[i], p_recently_play[i - 1], RECENT_LEN);
 	}
-	memset(p_recently_play[0], 0x00, 512);
-	strncpy(p_recently_play[0], entry, 511);
+	memset(p_recently_play[0], 0x00, RECENT_LEN);
+	strncpy(p_recently_play[0], entry, RECENT_LEN - 1);
 	return count;
 }
 //---------------------------------------------------------------------------------
@@ -1514,13 +1520,13 @@ static void save_set_info_SELECT(void)
 //Sort folder
 static void Sort_folder(u32 count)
 {
-	sort_by_name(pFolder, count, sizeof(FM_Folder_FS));
+	sort_by_name(pFolder, count, sizeof(FM_Folder_FS), pReadCache + READCACHE_SORT_WORK);
 }
 //---------------------------------------------------------------------------------
 //Sort file
 static void Sort_file(u32 count)
 {
-	sort_by_name(pFilename_buffer, count, sizeof(FM_FILE_FS));
+	sort_by_name(pFilename_buffer, count, sizeof(FM_FILE_FS), pReadCache + READCACHE_SORT_WORK);
 }
 //---------------------------------------------------------------------------------
 static u32 Load_Thumbnail(TCHAR *pfilename_pic)

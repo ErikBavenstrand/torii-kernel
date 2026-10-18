@@ -13,7 +13,12 @@
 
 FM_CHT_LINE tmpCHTFS;
 
-u8 *pCHTbuffer = (u8 *)(pReadCache + 0x2000); //patchbuffer
+// The cheat screen borrows pReadCache (owners: ez_define.h) until it returns:
+// the parsed list from 0x2000, then the line and value buffers at its end.
+#define CHT_LIST_OFFSET 0x2000
+#define CHT_LINES_MAX ((READCACHE_CHEAT_WORK - CHT_LIST_OFFSET) / sizeof(FM_CHT_LINE))
+_Static_assert(READCACHE_CHEAT_WORK % 4 == 0, "word-aligned buffers");
+u8 *pCHTbuffer = (u8 *)(pReadCache + CHT_LIST_OFFSET); //patchbuffer
 
 ST_entry pCHEAT[CHEAT_MAX] EWRAM_BSS;
 u32 gl_cheat_count;
@@ -22,8 +27,8 @@ u16 gl_color_chtBG = RGB(4, 8, 0xC);
 //------------------------------------------------------------------
 
 extern FIL gfile;
-char buf[MAX_BUF_LEN] EWRAM_BSS;
-char _paramv[MAX_BUF_LEN] EWRAM_BSS;
+static char *const buf = (char *)pReadCache + READCACHE_CHEAT_WORK;  // a line read
+static char *const _paramv = (char *)pReadCache + READCACHE_CHEAT_WORK + MAX_BUF_LEN;  // a cheat's value
 //------------------------------------------------------------------
 //------------------------------------------------------------------
 void Trim(char s[])
@@ -310,6 +315,10 @@ static u32 Get_all_Section_val(FIL *file)
 	//fseek(file,0x0,SEEK_SET);
 	f_lseek(&gfile, 0x0);
 	while (Read_line(line_buf, MAX_sectionVAL_LEN, &gfile) != NULL) {
+		if (Line >= CHT_LINES_MAX) {  // the list would reach buf and _paramv
+			tlog("cheats: the list is full at %lu lines; the rest are left out", (unsigned long)Line);
+			break;
+		}
 		memset(tmpCHTFS.LINEname, 0x00, MAX_KEY_LEN);
 		Trim(line_buf);
 		// to skip text comment with flags /* ...*/
@@ -671,6 +680,8 @@ void Open_cht_file(TCHAR *gamefilename, u32 havecht)
 
 	char buffer[127] = {0};
 
+	// As zeroed as they were in EWRAM of their own, before the first file
+	memset(buf, 0, 2 * MAX_BUF_LEN);
 	if (havecht == 0x0000FFFF) {
 		res = f_chdir("/CHEAT");
 		if (res != FR_OK) {
