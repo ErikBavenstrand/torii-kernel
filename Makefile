@@ -22,7 +22,7 @@ include $(DEVKITARM)/gba_rules
 #---------------------------------------------------------------------------------
 TARGET		:= $(notdir $(CURDIR))
 BUILD		:= build
-SOURCES		:= source source/ff15 tests/kernel
+SOURCES		:= source source/engine source/ff15 tests/kernel
 INCLUDES	:= include source/ff15
 DATA		:=
 MUSIC		:=

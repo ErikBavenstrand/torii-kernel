@@ -82,6 +82,14 @@ static const struct {
 	{"logcheck_reports", test_logcheck_reports},
 	{"eeprom_probe_patterns", test_eeprom_probe_patterns},
 	{"eeprom_probe_verdict", test_eeprom_probe_verdict},
+	{"pool_alloc_free_merge", test_pool_alloc_free_merge},
+	{"pool_align_range_top", test_pool_align_range_top},
+	{"pool_tags_cache_revive", test_pool_tags_cache_revive},
+	{"pool_slots", test_pool_slots},
+	{"pool_random", test_pool_random},
+	{"res_arena", test_res_arena},
+	{"pool_tag_place", test_pool_tag_place},
+	{"budget_check", test_budget_check},
 };
 
 int main(void)

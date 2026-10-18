@@ -30,6 +30,12 @@ static const struct {
 	{"nor_scan_keeps_interrupts", test_nor_scan_keeps_interrupts},
 	{"menu_code_fits", test_menu_code_fits},
 	{"build_id_matches_the_rom", test_build_id_matches_the_rom},
+	{"engine_res_alloc", test_engine_res_alloc},
+	{"engine_budget", test_engine_budget},
+	{"engine_queue_caps", test_engine_queue_caps},
+	{"engine_commit", test_engine_commit},
+	{"engine_jobs", test_engine_jobs},
+	{"engine_cycles", test_engine_cycles},
 };
 
 int torii_unit_tests(void)
@@ -51,7 +57,6 @@ int torii_unit_tests(void)
 void torii_run_tests(void)
 {
 	torii_unit_tests();
-	for (;;)
-		;
+	engine_smoke();
 }
 #endif

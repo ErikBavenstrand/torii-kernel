@@ -46,5 +46,13 @@ void test_logcheck_launches(void);
 void test_logcheck_reports(void);
 void test_eeprom_probe_patterns(void);
 void test_eeprom_probe_verdict(void);
+void test_pool_alloc_free_merge(void);
+void test_pool_align_range_top(void);
+void test_pool_tags_cache_revive(void);
+void test_pool_slots(void);
+void test_pool_random(void);
+void test_res_arena(void);
+void test_pool_tag_place(void);
+void test_budget_check(void);
 
 #endif

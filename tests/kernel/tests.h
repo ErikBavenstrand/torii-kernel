@@ -22,5 +22,14 @@ void test_nor_write_refused_when_list_full(void);
 void test_nor_scan_keeps_interrupts(void);
 void test_menu_code_fits(void);
 void test_build_id_matches_the_rom(void);
+void test_engine_res_alloc(void);
+void test_engine_budget(void);
+void test_engine_queue_caps(void);
+void test_engine_commit(void);
+void test_engine_jobs(void);
+void test_engine_cycles(void);
+
+// The test kernel's engine scene, shown after the tests (engine_smoke.c).
+void engine_smoke(void) __attribute__((noreturn));
 
 #endif

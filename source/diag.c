@@ -17,7 +17,6 @@
 #include <gba_input.h>
 #include <gba_interrupt.h>
 #include <gba_systemcalls.h>
-#include <gba_timers.h>
 #include <gba_video.h>
 
 #include "ff.h"
@@ -35,6 +34,7 @@
 #include "lz77.h"
 #include "tlog.h"
 #include "waitcnt.h"
+#include "engine/cycles.h"
 #include "../tests/kernel/torii_test.h"
 
 #define REG_WAITCNT_IO (*(vu16 *)0x04000204)
@@ -158,23 +158,19 @@ static int ask(const char *topic, const char *question, int kind)
 
 // --- Timing ------------------------------------------------------------------
 
-// Timers 2 and 3 cascaded: CPU cycles (16.78 MHz) in 32 bits.
+// The engine's cycle counter (engine/cycles.h), which keeps running: the
+// start is a time stamp, so Diagnostics' timings don't disturb the frame's.
+static u32 diag_timer_t0;
+
 void IWRAM_CODE diag_timer_start(void)
 {
-	REG_TM2CNT_H = 0;
-	REG_TM3CNT_H = 0;
-	REG_TM2CNT_L = 0;
-	REG_TM3CNT_L = 0;
-	REG_TM3CNT_H = TIMER_START | TIMER_COUNT;
-	REG_TM2CNT_H = TIMER_START;
+	cycles_init();
+	diag_timer_t0 = cycles_now();
 }
 
 u32 IWRAM_CODE diag_timer_stop(void)
 {
-	REG_TM2CNT_H = 0;
-	u32 cycles = REG_TM2CNT_L | (u32)REG_TM3CNT_L << 16;
-	REG_TM3CNT_H = 0;
-	return cycles;
+	return cycles_now() - diag_timer_t0;
 }
 
 // KB per second from bytes moved in cycles.
