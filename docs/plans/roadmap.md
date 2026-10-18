@@ -273,59 +273,51 @@ recovery used on 2026-10-18.
 ## v0.3 Renderer
 
 The menu is currently mode 3 (`SetMode(MODE_3 | BG2_ENABLE)`), drawn pixel by pixel in C.
+v0.3 replaces it with a mode 0 engine built to carry v0.4's UI. The design, the tickets,
+and every decision made along the way are in [v0.3-decisions.md](v0.3-decisions.md).
 
-### Engine
+- **Engine:** a fixed 60 fps loop with time-sliced jobs, shadow state committed in VBlank,
+  allocators for VRAM, palettes, sprites and affine matrices, and a layout budget checker.
+- **Text:** proportional glyphs drawn by an ARM blitter in IWRAM straight into VRAM tiles,
+  in palette-index colours. Lists scroll through the wrapping map with 16 px rows.
+- **Views:** a widget tree with a view stack, a focus model, and lists fed by a data source.
+  Layouts are data.
+- **Motion:** eased tweens for transitions, and springs for anything the user can interrupt.
+- **Input:** per-key repeat with a stepped speed-up.
+- **Covers:** decoded covers cached in PSRAM and streamed into sprites.
+- **Names:** cut and measured by UTF-8 character. Full names of any length are kept
+  outside EWRAM (for example a PSRAM index), so names over 99 bytes list, open, launch
+  and save.
+- **Look:** today's screens and keys, with two proportional fonts, light and dark themes,
+  and accent colours.
+- **Testing:** golden screenshots, a cycle budget per frame, and a renderer step in
+  Diagnostics that times the real cart.
 
-Torii gets its own mode 0 engine in C. It uses libtonc where libtonc fits, and our own code
-wherever that measures faster or safer. Its design comes from pokeemerald, Butano and Tonc:
-
-- **Windows:** a window is a rectangle of tiles on one BG, with its own tiles, a palette bank
-  and a RAM buffer.
-- **Text:** a proportional font drawn into the window tiles in palette-index colours, so
-  changing the theme is a palette change, with no redraw. The glyph blitter is ARM code in
-  IWRAM.
-- **VBlank commit:** shadow copies of the hardware state, and one queue that copies changes
-  during VBlank, capped by bytes and by VCOUNT. Palettes keep unfaded and faded buffers for
-  fades.
-- **Lists:** scroll through the wrapping 32x32 map and draw only the newly exposed row.
-- **Cover art:** 8bpp sprites on the separate sprite palette, LZ77-compressed and
-  decompressed by BIOS SWI 12h straight into VRAM.
-- **Layouts:** described as data, not code.
-
-### Budget
-
-The budget each layout is checked against comes from GBATEK and Tonc:
+The budget each layout is checked against (GBATEK, Tonc):
 
 - **VRAM:** 64 KB for BG maps and tiles, 32 KB for sprite tiles. One layout fits exactly:
   4bpp full-screen text (19.2 KB), a 4bpp wallpaper (19.2 KB), 8bpp 120x80 art (9.6 KB),
-  9.3 KB of panels and 4 maps (8 KB). An 8bpp full-screen wallpaper plus full-screen text plus
-  the maps is 256 B over.
+  9.3 KB of panels and 4 maps (8 KB).
 - **Colours:** 255 BG colours shared by every BG, and another 255 for sprites.
 - **Covers in sprite VRAM:** about 5 at 80x80 in 8bpp, or 10 in 4bpp.
 - **Effects:** one blend mode and one coefficient pair per frame, no sprite-to-sprite alpha,
   one mosaic size, and 2 rectangular windows plus the OBJ window.
-- **Text speed:** about 631 cycles per glyph in ARM from IWRAM, against 2044 in Thumb from
-  ROM. A 40-glyph row is 30% of VBlank in ARM and 98% in Thumb.
-- **Free memory now:** about 345 KB of ROM, 5.7 KB of IWRAM and 400 B of EWRAM.
-- **Mode switching:** switching mode halfway down the screen is undocumented, so we don't
-  rely on it.
+- **Free memory (2026-10-18):** 660 KB of ROM, 4.0 KB of IWRAM and 7.0 KB of EWRAM.
 
-### Fonts and themes
+## v0.3.1 Themes
 
-- **Fonts:** two proportional pixel fonts, body text on a 12 px line and headings at 16 px.
-  They are 1bpp glyphs with a width table, covering Latin-1 and common punctuation, made from
-  Cozette (MIT) or Spleen (BSD-2) and credited in About. A repo tool converts BDF or PNG
-  fonts.
-- **Names:** cut and measured by UTF-8 character, not by byte. Full names of any length are
-  kept outside EWRAM (for example a PSRAM index), so names over 99 bytes list, open, launch
-  and save.
-- **Theme format:** a theme is `themes/<name>/theme.ini` plus LZ77 assets, which a repo tool
-  converts from PNG. Its keys override compiled-in defaults one by one: palette, fonts,
-  spacing, view layouts, icons. A missing key or asset falls back to the default theme.
-- **Built-in themes:** a light theme, a dark theme, and accent colours as palette swaps.
-- **Budget check:** the kernel checks each layout against the budget and rejects it with a
-  readable error. `just theme-check` validates a theme and previews it in the emulator.
-- **Existing screens:** ported to the engine.
+- **Theme format:** `themes/<name>/theme.ini` plus LZ77 assets. Its keys override the
+  compiled-in defaults one by one (palette, fonts, spacing, view layouts, icons) through a
+  bounded patch table. A missing key or asset falls back to the default theme.
+- **Tools:** a PNG converter for assets, and `just theme-check`, which validates a theme
+  against the budget and previews it in the emulator.
+- **Budget check:** the kernel rejects a theme over budget with a readable error.
+
+## v0.3.2 Renderer fixes
+
+Bugs found while building v0.3 and v0.3.1 that weren't fixed before their release.
+
+- None yet.
 
 ## v0.4 Browsing
 
