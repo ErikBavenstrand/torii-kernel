@@ -4,6 +4,16 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Fixed:** log files no longer fill with junk on the real cart. A new
+  file was zero-filled from a ROM array, and ROM reads while SD mode is on
+  return the FPGA's SD buffer; it is now filled from RAM, and `disk_write`
+  refuses a source in ROM (`059e795`).
+- **Fixed:** a log file with junk after its text (from v0.2.0) is left as
+  it is, and logging goes on in the next file; the end of a file's text is
+  found by reading the whole file, so junk can't hide it (`059e795`).
+
 ## v0.2.0 (2026-10-17)
 
 - **Added:** LOGGING in settings page 2 (Off, Errors, Info, Debug; off by
