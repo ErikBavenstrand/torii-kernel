@@ -9,7 +9,8 @@
 // slow jobs but never starve them.
 //
 // Cancelling calls the step once more with state JOB_CANCEL, so it can close
-// files; whatever it returns, the job ends.
+// files; whatever it returns, the job ends. JOB_CANCEL replaces the state, so
+// a step keeps what it must undo (an open file, say) in its ctx.
 #ifndef TORII_ENGINE_JOBS_H
 #define TORII_ENGINE_JOBS_H
 

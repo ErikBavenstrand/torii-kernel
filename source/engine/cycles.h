@@ -26,7 +26,7 @@
 // counting timer 2's overflows); leaves a running one alone.
 static inline __attribute__((always_inline)) void cycles_init(void)
 {
-	if ((CYCLES_TM2CNT_H & 0x80) && (CYCLES_TM3CNT_H & 0x84) == 0x84)
+	if ((CYCLES_TM2CNT_H & 0xC7) == 0x80 && (CYCLES_TM3CNT_H & 0xC7) == 0x84)
 		return;
 	CYCLES_TM2CNT_H = 0;
 	CYCLES_TM3CNT_H = 0;

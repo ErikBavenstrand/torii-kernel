@@ -201,7 +201,7 @@ static int queue_push(u32 dst, u32 src, u32 bytes, u16 kind)
 {
 	// Palette, VRAM and OAM only: a stray address must never reach the cart
 	if ((dst | bytes | (kind == QUEUE_COPY ? src : 0)) & 3 || !bytes || bytes > 0xFFFF || dst < 0x05000000 ||
-	    dst + bytes > 0x07000400) {
+	    bytes > 0x07000400 - dst) {
 		res_set_error("bad VRAM copy: %08lX from %08lX, %lu bytes (words, under 64 KB, into video memory)",
 			      (unsigned long)dst, (unsigned long)src, (unsigned long)bytes);
 		return 0;

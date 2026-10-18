@@ -88,7 +88,7 @@ void engine_smoke(void)
 			frame_wake();
 		if (frame == 62) {
 			// the last state was drawn in frame 60 and committed in 61
-			tlog("screen ready: engine-smoke");
+			tlog_debug("screen ready: engine-smoke");
 			frame_measure("engine-smoke");
 			frame_wake();  // a measured frame that draws (the same picture)
 			ready = 1;
