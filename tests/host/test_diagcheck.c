@@ -21,9 +21,11 @@ void test_logcheck_launches(void)
 	s = logcheck_line(0, "   5.00 I launch: loading reset 1, sleep 1,.gba, BOOT WITH ADDON: reset 0, savestate 1, "
 			     "sleep 0, cheats 0 (0)");
 	CHECK_EQ(s, SEEN_GBA | SEEN_MENU | SEEN_SAVESTATE);
-	s = logcheck_line(0, "   5.00 I launch: loading A.gba, BOOT WITH ADDON: reset 1, savestate 0, sleep 1, cheats 0 (0)");
+	s = logcheck_line(
+		0, "   5.00 I launch: loading A.gba, BOOT WITH ADDON: reset 1, savestate 0, sleep 1, cheats 0 (0)");
 	CHECK_EQ(s, SEEN_GBA | SEEN_MENU | SEEN_SLEEP);
-	s = logcheck_line(0, "   5.00 I launch: loading A.gba, BOOT WITH ADDON: reset 0, savestate 0, sleep 0, cheats 1 (3)");
+	s = logcheck_line(
+		0, "   5.00 I launch: loading A.gba, BOOT WITH ADDON: reset 0, savestate 0, sleep 0, cheats 1 (3)");
 	CHECK_EQ(s, SEEN_GBA);
 	// Other lines about a launch prove nothing.
 	CHECK_EQ(logcheck_line(0, "   6.00 I launch Hello.gba: code OMRS, 1234 bytes, save mode 11"), 0);
