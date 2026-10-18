@@ -12,7 +12,13 @@ git log, not here.
   refuses a source in ROM (`059e795`).
 - **Fixed:** a log file with junk after its text (from v0.2.0) is left as
   it is, and logging goes on in the next file; the end of a file's text is
-  found by reading the whole file, so junk can't hide it (`059e795`).
+  found by reading the whole file, so junk can't hide it (`059e795`), even
+  junk with no zero byte in it, such as 0xFF (`7887069`).
+- **Fixed:** a flush cut off by power loss left part of a line, and the
+  next session's first line ran on from it; the next boot now drops the
+  part (`7887069`).
+- **Fixed:** the log's sequence number wraps from 99999999 to 1 instead
+  of overflowing the header's 8 digits, which lost a file (`7887069`).
 
 ## v0.2.0 (2026-10-17)
 
