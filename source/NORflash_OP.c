@@ -295,18 +295,58 @@ static u32 nor_mark_write(u32 offset, u32 end, const FM_NOR_FS *entry)
 	return nor_mark_valid(offset, end, header, &mark);
 }
 
+// How many of pNorFS's games, from the first, are in the game NOR; sets
+// *end to where they end.
+static u32 nor_walk(u32 *end)
+{
+	u8 header[0x20];
+	u32 offset = 0, count;
+	Chip_Reset();  // in a command mode the chip reads no games
+	for (count = 0; count < MAX_NOR && offset < NOR_GAME_SIZE; count++) {
+		nor_read(offset + 0xA0, header, sizeof(header));
+		if (!nor_entry_valid(&pNorFS[count], offset, header))
+			break;
+		offset += pNorFS[count].filesize;
+	}
+	*end = offset;
+	return count;
+}
+
+// Loads the trailerless list in copy A, an older kernel's, into pNorFS.
+// Its entries were never cleared, so a mark flag in them means nothing.
+static void nor_load_legacy(const u8 *a)
+{
+	memcpy(pNorFS, a, NOR_LIST_BYTES);
+	for (nor_list_stored = 0; nor_list_stored < MAX_NOR && pNorFS[nor_list_stored].filesize &&
+				  pNorFS[nor_list_stored].filesize != 0xFFFFFFFF;
+	     nor_list_stored++)
+		;
+	for (u32 i = 0; i < MAX_NOR; i++)
+		pNorFS[i].reserved1 = 0;
+}
+
 void Read_NOR_info(void)
 {
 	const u8 *a = (const u8 *)FlashBase_S71 + NOR_LIST_A;
 	const u8 *b = (const u8 *)FlashBase_S71 + NOR_LIST_B;
-	u32 copy = nor_list_pick(a, b);
-	memcpy(pNorFS, copy == NOR_COPY_B ? b : a, NOR_LIST_BYTES);
+	u32 copy = nor_list_pick(a, b), seq, end;
+	if (copy == NOR_COPY_B && !nor_list_check(a, &seq)) {
+		// A without its trailer: a Torii save cut off there, or an older
+		// kernel saved its list after Torii (a downgrade and back). Take
+		// the one more of whose games are in NOR; a cut-off A has no more.
+		nor_load_legacy(a);
+		u32 games_a = nor_walk(&end);
+		memcpy(pNorFS, b, NOR_LIST_BYTES);
+		if (games_a > nor_walk(&end)) {
+			nor_load_legacy(a);
+			tlog("nor: list read from copy A, an older kernel's with more games than copy B");
+			return;
+		}
+	}
 	if (copy == NOR_COPY_NONE) {  // an older kernel's list, or none
-		for (nor_list_stored = 0; nor_list_stored < MAX_NOR && pNorFS[nor_list_stored].filesize &&
-					  pNorFS[nor_list_stored].filesize != 0xFFFFFFFF;
-		     nor_list_stored++)
-			;
+		nor_load_legacy(a);
 	} else {
+		memcpy(pNorFS, copy == NOR_COPY_B ? b : a, NOR_LIST_BYTES);
 		nor_list_stored =
 			((const struct nor_list_trailer *)((copy == NOR_COPY_B ? b : a) + NOR_LIST_BYTES))->count;
 	}
@@ -359,10 +399,12 @@ void Delete_latest_NOR(void)
 	u32 start = (u32)e->rompage << 17, end = start + e->filesize;
 	tlog("nor: deleting %s at %07lX", e->filename, (unsigned long)start);
 	// The completion mark first, then the header: a power cut midway leaves
-	// a game no list entry matches and no mark brings back. Writes erase
-	// each block they use, so the rest can stay.
-	Block_Erase(end - NOR_BLOCK);
-	if (end - NOR_BLOCK != start)
+	// a game no list entry matches and no mark brings back. A game without
+	// a mark goes by its header alone. Writes erase each block they use, so
+	// the rest can stay.
+	if (e->reserved1 == NOR_ENTRY_MARKED)
+		Block_Erase(end - NOR_BLOCK);
+	if (e->reserved1 != NOR_ENTRY_MARKED || end - NOR_BLOCK != start)
 		Block_Erase(start);
 	memset(e, 0, sizeof(*e));
 	game_total_NOR--;
@@ -437,8 +479,13 @@ u32 Loadfile2NOR(TCHAR *filename, u32 NORaddress, u16 have_patch, u8 SAVEMODE)
 		u32 used = filesize;
 		if (have_patch && iTrimSize + NOR_PATCH_MAX > used)
 			used = iTrimSize + NOR_PATCH_MAX;
-		if (used > fileneedsize - NOR_MARK_SPACE)
-			fileneedsize += NOR_BLOCK;
+		u32 marked = 1;
+		if (used > fileneedsize - NOR_MARK_SPACE) {
+			if (fileneedsize + NOR_BLOCK <= NOR_GAME_SIZE - NORaddress)
+				fileneedsize += NOR_BLOCK;
+			else  // no room for its block: listed by its header, as older kernels' games are
+				marked = 0;
+		}
 
 		if (fileneedsize > (0x4000000 - NORaddress)) {
 			f_close(&gfile);
@@ -472,7 +519,7 @@ u32 Loadfile2NOR(TCHAR *filename, u32 NORaddress, u16 have_patch, u8 SAVEMODE)
 		tmpNorFS.have_RTS = gl_rts_on;
 		tmpNorFS.is_64MBrom = flag_64MBrom;
 		tmpNorFS.savemode = SAVEMODE;
-		tmpNorFS.reserved1 = NOR_ENTRY_MARKED;
+		tmpNorFS.reserved1 = marked ? NOR_ENTRY_MARKED : 0;
 
 		snprintf(tmpNorFS.filename, sizeof(tmpNorFS.filename), "%s", filename);
 		tlog("nor: writing %s at %07lX, %lu bytes in an area of %lu", filename, (unsigned long)NORaddress,
@@ -525,7 +572,10 @@ u32 Loadfile2NOR(TCHAR *filename, u32 NORaddress, u16 have_patch, u8 SAVEMODE)
 		for (blocknum = datasize; blocknum < fileneedsize; blocknum += NOR_BLOCK)
 			Block_Erase(blocknum + NORaddress);
 		u32 end = NORaddress + fileneedsize;
-		if (!nor_erased(end - NOR_MARK_SPACE, NOR_MARK_SPACE) || !nor_mark_write(NORaddress, end, &tmpNorFS)) {
+		if (!marked) {
+			tlog("nor: no room for %s's completion mark", filename);
+		} else if (!nor_erased(end - NOR_MARK_SPACE, NOR_MARK_SPACE) ||
+			   !nor_mark_write(NORaddress, end, &tmpNorFS)) {
 			tlog_error("nor: the completion mark of %s at %07lX didn't write", filename,
 				   (unsigned long)(end - NOR_MARK_SPACE));
 			return 1;
@@ -546,20 +596,16 @@ u32 GetFileListFromNor(void)
 {
 	u8 header[0x20];
 	struct nor_mark mark;
-	u32 offset = 0, count;
+	u32 offset, count = nor_walk(&offset);
 
-	Chip_Reset();  // in a command mode the chip reads no games
-	for (count = 0; count < MAX_NOR && offset < NOR_GAME_SIZE; count++) {
-		nor_read(offset + 0xA0, header, sizeof(header));
-		if (!nor_entry_valid(&pNorFS[count], offset, header))
-			break;
-		offset += pNorFS[count].filesize;
+	if (count < nor_list_stored) {
+		count = nor_walk(&offset);  // a second look before dropping games
+		if (count < nor_list_stored)
+			tlog_error("nor: list entry %lu (%.99s) doesn't match the game NOR at %07lX; it and the %lu "
+				   "after it are dropped",
+				   (unsigned long)count, pNorFS[count].filename, (unsigned long)offset,
+				   (unsigned long)(nor_list_stored - count - 1));
 	}
-	if (count < nor_list_stored)
-		tlog_error("nor: list entry %lu (%.99s) doesn't match the game NOR at %07lX; it and the %lu after it "
-			   "are dropped",
-			   (unsigned long)count, pNorFS[count].filename, (unsigned long)offset,
-			   (unsigned long)(nor_list_stored - count - 1));
 	// Games written in full that the list lacks: a power cut before the list
 	// was saved, or a list lost
 	for (; count < MAX_NOR && offset < NOR_GAME_SIZE; count++) {

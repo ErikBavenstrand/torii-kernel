@@ -114,8 +114,10 @@ kernel_wipe() {
 rom "$root/A.gba" tests/roms/hello/hello.gba
 rom "$root/B.gba" tests/roms/savetest/flash128.gba
 rom "$root/C.gba" tests/roms/savetest/eeprom8k.gba
-# B2 holds B's header but other bytes, over three blocks
+# B2 holds B's header but other bytes, over three blocks; B2x over two
 rom "$root/B2.gba" tests/roms/savetest/flash128.gba 3 0x5A
+rom "$root/B2x.gba" tests/roms/savetest/flash128.gba 2 0x5A
+rom "$root/D.gba" tests/roms/savetest/flash64.gba
 # A without gbafix's fixed byte 0x96 at 0xB2, as homebrew can be
 python3 - "$root/A.gba" "$root/U.gba" <<'EOF'
 import sys
@@ -197,7 +199,7 @@ k = bytearray(open(sys.argv[1], "rb").read())
 g = bytearray(open(sys.argv[2], "rb").read())
 k[0x7A2100:0x7B0000] = b"\xff" * (0x7B0000 - 0x7A2100)  # the trailer
 k[0x7C0000:0x7D0000] = b"\xff" * 0x10000                # the second copy
-k[0x7A0000 + 0x71] = 0                                # the entry's mark
+k[0x7A0000 + 0x71] = ord("T")  # stack garbage there can look like Torii's mark flag
 g[0x20000 - 0x200:0x20000] = b"\xff" * 0x200            # A's completion mark
 open(sys.argv[1], "wb").write(k)
 open(sys.argv[2], "wb").write(g)
@@ -206,6 +208,56 @@ write 2
 holds 0 A.gba || fail "A.gba was overwritten"
 holds 0x20000 B.gba || fail "B.gba is not at 0x20000: the older list was lost"
 echo "PASS: a NOR list from an older kernel is kept"
+
+# entry NAME OFFSET SIZE ROM: an older kernel's list entry, as hex
+entry() {
+  python3 - "$@" <<'EOF2'
+import struct, sys
+name, offset, size, rom = sys.argv[1], int(sys.argv[2], 0), int(sys.argv[3], 0), sys.argv[4]
+title = open(rom, "rb").read()[0xA0:0xB0]
+print(struct.pack("<100sHHHHIBBH16s", name.encode(), offset >> 17, 0, 0, 0, size, 0, 0, 0, title).hex())
+EOF2
+}
+
+# older_list KERNEL_NOR HEX...: copy A as an older kernel saves it (the
+# sector erased, then the entries), copy B left alone
+older_list() {
+  python3 - "$@" <<'EOF2'
+import sys
+k = bytearray(open(sys.argv[1], "rb").read())
+entries = b"".join(bytes.fromhex(h) for h in sys.argv[2:])
+k[0x7A0000:0x7B0000] = b"\xff" * 0x10000
+k[0x7A0000:0x7A2100] = entries + bytes(0x2100 - len(entries))
+open(sys.argv[1], "wb").write(k)
+EOF2
+}
+
+# Nearly full: an older kernel's game up to 256 KB before the end, then a
+# 256 KB ROM, which leaves no room for a block for its mark. It is written
+# without one rather than refused.
+new_cart near-full A.gba B2x.gba
+dd if="$root/A.gba" of="$cart/game-nor.bin" conv=notrunc status=none
+head -c $((8 << 20)) /dev/zero | tr '\0' '\377' >"$cart/kernel-nor.bin"
+older_list "$cart/kernel-nor.bin" "$(entry A.gba 0 0x3FC0000 "$root/A.gba")"
+write 2
+holds 0x3FC0000 B2x.gba || fail "B2x.gba wasn't written in the last 256 KB"
+boot -f 200
+grep -q 'nor: 2 games, the next goes at 4000000' "$cart/$runs.log" || fail "B2x.gba isn't listed"
+echo "PASS: a game that fills the game NOR is written without its completion mark"
+
+# A downgrade and back: an older kernel adds C after Torii's A and B, saving
+# only copy A. Copy B is whole but older; the next write must go after C.
+new_cart downgrade A.gba B.gba C.gba D.gba
+write 1
+write 2
+dd if="$root/C.gba" of="$cart/game-nor.bin" bs=128K seek=2 conv=notrunc status=none
+older_list "$cart/kernel-nor.bin" "$(head -c 132 <(tail -c +$((0x7A0001)) "$cart/kernel-nor.bin") | od -v -A n -t x1 | tr -d ' \n')" \
+  "$(tail -c +$((0x7A0001 + 132)) "$cart/kernel-nor.bin" | head -c 132 | od -v -A n -t x1 | tr -d ' \n')" \
+  "$(entry C.gba 0x40000 0x20000 "$root/C.gba")"
+write 4
+holds 0x40000 C.gba || fail "C.gba, added by an older kernel, was overwritten"
+holds 0x60000 D.gba || fail "D.gba is not at 0x60000"
+echo "PASS: games an older kernel added after a downgrade are kept"
 
 # A list whose games fill all 64 MB (here one older kernel's entry): the scan
 # used to return without turning interrupts back on, and the menu then hung

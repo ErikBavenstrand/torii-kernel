@@ -2870,6 +2870,9 @@ boot_game:
 				DrawHZText12(gl_NOR_full, 0, 0, 160 - 15, gl_color_NORFULL, 1);  //"NOR FULL!"
 				wait_btn();
 				return 1;
+			} else {  // Torii: the file or the NOR failed; the game isn't listed
+				Show_error_num(1);
+				return 1;
 			}
 			break;
 		case 3:  //WRITE TO NOR ADDON
@@ -2906,6 +2909,9 @@ boot_game:
 				DrawHZText12(gl_NOR_full, 0, 0, 160 - 15, gl_color_NORFULL, 1);  //"NOR FULL!"
 				wait_btn();
 				return 0;
+			} else {  // Torii: the file or the NOR failed; the game isn't listed
+				Show_error_num(1);
+				return 1;
 			}
 			break;
 		default:

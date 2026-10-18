@@ -277,12 +277,21 @@ CRC-32), and writes a second copy at `+0x7C0000`. A save writes the copy the
 list wasn't read from first, then the other, so a power cut leaves one whole
 copy; the reader takes the whole copy with the higher number, else the
 trailerless list at `+0x7A0000` as an older kernel's. The official kernel
-reads Torii's copy A unchanged. Each game Torii writes also gets a
+reads Torii's copy A unchanged, and saves only copy A, without the trailer:
+when A has none but B is whole, the reader takes whichever more of whose
+games are in NOR, so games added after a downgrade stay. Entries from a
+trailerless list count as unmarked, since older kernels left `reserved1`
+uninitialised. Each game Torii writes also gets a
 completion mark, programmed last, in the last 512 bytes of its NOR area
 (magic `TNM1`, offset, size, header `0xA0–0xBF`, its list entry, CRC-32):
-the area grows by a block when the ROM or its patch reaches those bytes.
+the area grows by a block when the ROM or its patch reaches those bytes,
+which most commercial ROMs (whole powers of two) do. When that block no
+longer fits, the game is written unmarked and listed by its header, as an
+older kernel's.
 Its entry's `reserved1` byte is `'T'`. A marked entry without its mark isn't
-listed, and a game with a mark the list lacks is put back. Erase and program
+listed, and a game with a mark the list lacks is put back. A power cut
+during FORMAT ALL's chip erase can still leave a half-erased game whose
+header and mark survive; format again. Erase and program
 take the model no time, so `OMEGA_POWER_CUT` (`emu/mgba/src/gba/cart/omega.c`) cuts the
 power between operations for `tests/nor_safety.sh`.
 
