@@ -219,6 +219,8 @@ _Static_assert(sizeof(FM_NOR_FS) == NOR_ENTRY_SIZE && MAX_NOR == NOR_LIST_ENTRIE
 _Static_assert(CHEAT_PATCH_LENGTH >= RTS_PATCH_LENGTH, "NOR_PATCH_MAX");
 
 static u32 nor_list_stored;  // games on the copy Read_NOR_info read
+static u32 nor_list_from = NOR_LIST_A;  // the copy it read
+static u32 nor_list_legacy;  // it read an older kernel's list, with no trailer
 
 // Copies len bytes at offset in the game NOR, which shows 8 MB at a time.
 // len stays within one 8 MB page.
@@ -336,11 +338,25 @@ static void nor_load_legacy(const u8 *a)
 		pNorFS[i].reserved1 = 0;
 }
 
+// Logs which list Read_NOR_info read, when it differs from the last time: the
+// menu reads it on each visit.
+static void nor_log_read(const char *from)
+{
+	static const char *last_from;
+	static u32 last_count = 0xFFFFFFFF;
+	if (from == last_from && nor_list_stored == last_count)
+		return;
+	last_from = from;
+	last_count = nor_list_stored;
+	tlog_debug("nor: list read from %s, %lu games", from, (unsigned long)nor_list_stored);
+}
+
 void Read_NOR_info(void)
 {
 	const u8 *a = (const u8 *)FlashBase_S71 + NOR_LIST_A;
 	const u8 *b = (const u8 *)FlashBase_S71 + NOR_LIST_B;
 	u32 copy = nor_list_pick(a, b), seq, end;
+	nor_list_legacy = 0;
 	if (copy == NOR_COPY_B && !nor_list_check(a, &seq)) {
 		// A without its trailer: a Torii save cut off there, or an older
 		// kernel saved its list after Torii (a downgrade and back). Take
@@ -350,22 +366,36 @@ void Read_NOR_info(void)
 		memcpy(pNorFS, b, NOR_LIST_BYTES);
 		if (games_a > nor_walk(&end)) {
 			nor_load_legacy(a);
-			tlog("nor: list read from copy A, an older kernel's with more games than copy B");
+			nor_list_from = NOR_LIST_A;
+			nor_list_legacy = 1;
+			nor_log_read("copy A, an older kernel's with more games than copy B");
 			return;
 		}
 	}
 	if (copy == NOR_COPY_NONE) {  // an older kernel's list, or none
 		nor_load_legacy(a);
+		nor_list_from = NOR_LIST_A;
+		nor_list_legacy = 1;
 	} else {
 		memcpy(pNorFS, copy == NOR_COPY_B ? b : a, NOR_LIST_BYTES);
+		nor_list_from = copy == NOR_COPY_B ? NOR_LIST_B : NOR_LIST_A;
 		nor_list_stored =
 			((const struct nor_list_trailer *)((copy == NOR_COPY_B ? b : a) + NOR_LIST_BYTES))->count;
 	}
-	tlog_debug("nor: list read from %s, %lu games",
-		   copy == NOR_COPY_A   ? "copy A"
-		   : copy == NOR_COPY_B ? "copy B"
-					: "an older kernel's copy A",
-		   (unsigned long)nor_list_stored);
+	nor_log_read(copy == NOR_COPY_A ? "copy A" : copy == NOR_COPY_B ? "copy B" : "an older kernel's copy A");
+}
+
+void Migrate_NOR_list(u32 count)
+{
+	if (!nor_list_legacy)
+		return;
+	// Only a list the game NOR bears out in full: an older kernel's list
+	// that a misread made look shorter must not be saved short.
+	if (!count || count != nor_list_stored)
+		return;
+	tlog("nor: saving an older kernel's list of %lu games in Torii's format", (unsigned long)count);
+	if (Save_NOR_list(count) == 0)
+		nor_list_legacy = 0;
 }
 
 u32 Save_NOR_list(u32 count)
@@ -378,9 +408,9 @@ u32 Save_NOR_list(u32 count)
 		seq = ((s32)(seq_b - seq_a) > 0 ? seq_b : seq_a) + 1;
 	else
 		seq = (has_a ? seq_a : has_b ? seq_b : 0) + 1;
-	// Write first the copy the list isn't read from; with neither whole, B,
-	// as A may hold an older kernel's list
-	u32 first = nor_list_pick(a, b) == NOR_COPY_B ? NOR_LIST_A : NOR_LIST_B;
+	// Write first the copy the list wasn't read from: an older kernel's list
+	// is read from A, so B goes first
+	u32 first = nor_list_from == NOR_LIST_B ? NOR_LIST_A : NOR_LIST_B;
 	u32 second = first == NOR_LIST_A ? NOR_LIST_B : NOR_LIST_A;
 
 	u8 *record = pReadCache;
@@ -659,7 +689,11 @@ u32 GetFileListFromNor(void)
 	if (count < MAX_NOR)
 		memset(&pNorFS[count], 0, (MAX_NOR - count) * sizeof(FM_NOR_FS));
 	gl_norOffset = offset;
-	tlog_debug("nor: %lu games, the next goes at %07lX", (unsigned long)count, (unsigned long)offset);
+	static u32 last_count = 0xFFFFFFFF, last_offset;  // the menu checks on each visit: log changes
+	if (count != last_count || offset != last_offset)
+		tlog_debug("nor: %lu games, the next goes at %07lX", (unsigned long)count, (unsigned long)offset);
+	last_count = count;
+	last_offset = offset;
 	return count;
 }
 //-----------------------------------------------------------

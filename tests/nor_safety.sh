@@ -191,9 +191,9 @@ echo "PASS: a lost NOR list is rebuilt from the games in NOR, and the boot doesn
 
 # A list from an older kernel (no copy at 0x7C0000, no trailer, no
 # completion marks in NOR) still counts.
-new_cart legacy A.gba B.gba
-write 1
-python3 - "$cart/kernel-nor.bin" "$cart/game-nor.bin" <<'EOF'
+# make_legacy: turn the cart's list into an older kernel's.
+make_legacy() {
+  python3 - "$cart/kernel-nor.bin" "$cart/game-nor.bin" <<'EOF'
 import sys
 k = bytearray(open(sys.argv[1], "rb").read())
 g = bytearray(open(sys.argv[2], "rb").read())
@@ -204,10 +204,48 @@ g[0x20000 - 0x200:0x20000] = b"\xff" * 0x200            # A's completion mark
 open(sys.argv[1], "wb").write(k)
 open(sys.argv[2], "wb").write(g)
 EOF
+}
+new_cart legacy A.gba B.gba
+write 1
+make_legacy
 write 2
 holds 0 A.gba || fail "A.gba was overwritten"
 holds 0x20000 B.gba || fail "B.gba is not at 0x20000: the older list was lost"
 echo "PASS: a NOR list from an older kernel is kept"
+
+# The boot saves an older kernel's list in Torii's format once, B first, and
+# says so; later boots read it quietly. A power cut in any step of that loses
+# no game. (The menu reads the list up to three times a visit; v0.2.1 logged
+# "an older kernel's copy A" each time.)
+new_cart migrate A.gba B.gba
+write 1
+make_legacy
+cp "$cart/kernel-nor.bin" "$root/legacy-kernel-nor.bin"
+cp "$cart/game-nor.bin" "$root/legacy-game-nor.bin"
+boot -f 300
+grep -q "nor: saving an older kernel's list of 1 games in Torii's format" "$cart/$runs.log" || fail "the list wasn't moved"
+[ "$(grep -c "older kernel's copy A" "$cart/$runs.log")" = 1 ] || fail "the older list was logged more than once"
+magic() { tail -c +$(($1 + 1)) "$cart/kernel-nor.bin" | head -c 4; }
+[ "$(magic 0x7C2100)" = TNL2 ] || fail "copy B has no trailer"
+[ "$(magic 0x7A2100)" = TNL2 ] || fail "copy A has no trailer"
+boot -f 300
+! grep -q "older kernel" "$cart/$runs.log" || fail "the next boot read an older kernel's list again"
+[ "$(grep -c "nor: list read from" "$cart/$runs.log")" = 1 ] || fail "the list read was logged more than once"
+write 2
+holds 0x20000 B.gba || fail "B.gba is not at 0x20000 after the move"
+echo "PASS: an older kernel's NOR list is saved in Torii's format once"
+for cut in kernel:erase:1@0x7C0000 kernel:program:4240@0x7C0000 kernel:erase:1@0x7A0000 \
+  kernel:program:1@0x7A0000 kernel:program:4240@0x7A0000; do
+  new_cart "migrate-cut-${cut//[:@]/-}" A.gba B.gba
+  cp "$root/legacy-kernel-nor.bin" "$cart/kernel-nor.bin"
+  cp "$root/legacy-game-nor.bin" "$cart/game-nor.bin"
+  boot -c "$cut" -f 300
+  boot -f 300
+  write 2
+  holds 0 A.gba || fail "A.gba was overwritten"
+  holds 0x20000 B.gba || fail "B.gba is not at 0x20000: A.gba was lost from the list"
+  echo "PASS: a power cut at $cut while saving an older kernel's list in Torii's format loses no game"
+done
 
 # entry NAME OFFSET SIZE ROM: an older kernel's list entry, as hex
 entry() {

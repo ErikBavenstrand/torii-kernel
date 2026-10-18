@@ -1954,6 +1954,7 @@ int main(void)
 	// list whenever it read no games (a chip left in a command mode, a read
 	// glitch), and the next write then went over them.
 	game_total_NOR = GetFileListFromNor();//initialize to prevent direct writes to NOR without page turning
+	Migrate_NOR_list(game_total_NOR);
 
 	cartlog_phase(PHASE_MENU, 0, NULL);
 refind_file:
