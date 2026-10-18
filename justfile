@@ -237,9 +237,20 @@ _analyze-image: _ready
 compat *filters: build emu-headless
     {{emu_docker}} python3 tests/games.py "$@"
 
-# Build the hardware-free kernel code with tests/host for the host, under ASan and UBSan, and run it
+# Build the hardware-free kernel code with tests/host for the host, under ASan and UBSan, and run it; test tools/font.py
 test-host: emu-image
     {{emu_docker}} tests/host.sh
+    @uv run -q tests/font_test.py
+
+# Convert the menu fonts in assets/fonts to C: dist/fonts/font_body.{c,h} and font_heading.{c,h}
+font:
+    uv run -q tools/font.py assets/fonts/galmuri/Galmuri9.bdf --name body --line-height 12 --squeeze --clip -o dist/fonts/font_body
+    uv run -q tools/font.py assets/fonts/galmuri/Galmuri11-Bold.bdf --name heading --line-height 16 --squeeze --clip -o dist/fonts/font_heading
+    uvx clang-format@{{clang_format}} -i dist/fonts/font_body.c dist/fonts/font_body.h dist/fonts/font_heading.c dist/fonts/font_heading.h
+
+# Redraw the font candidates' preview sheets in docs/research/fonts, e.g. `just font-preview galmuri`
+font-preview *keys:
+    uv run -q tools/font_preview.py {{keys}}
 
 # Build the test kernel (ezkerneltest.gba) with tests/kernel and run its unit tests headlessly
 test-kernel: emu-headless _test-kernel-build
