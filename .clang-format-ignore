@@ -5,3 +5,5 @@ emusrc/**
 source/ff15/*
 source/engine/font_body.c
 source/engine/font_heading.c
+# Generated tables, written as their tool writes them.
+source/engine/ease_lut.c

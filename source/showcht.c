@@ -9,6 +9,7 @@
 #include "ezkernel.h"
 #include "showcht.h"
 #include "draw.h"
+#include "tlog.h"
 
 FM_CHT_LINE tmpCHTFS;
 
@@ -717,6 +718,7 @@ void Open_cht_file(TCHAR *gamefilename, u32 havecht)
 					}
 					Show_KEY_val(all_count, Select, showoffset);
 					Show_num(all_count, Select + showoffset + 1);
+					tlog_debug("screen ready: cheats");
 					re_show = 0;
 				}
 				scanKeys();

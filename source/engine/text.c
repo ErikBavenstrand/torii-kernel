@@ -28,8 +28,7 @@ _Static_assert(offsetof(struct torii_glyph, width) == 5, "GLYPH_WIDTH");
 int text_line_fits(const struct text_window *win, const struct torii_font *font, u32 x, u32 y,
 		   const struct text_line *line)
 {
-	return y + font->line_height <= win->height * 8u && x + line->extent <= win->width * 8u &&
-	       font->row_bytes == 2;
+	return y + font->line_height <= win->height * 8u && x + line->extent <= win->width * 8u && font->row_bytes == 2;
 }
 
 u32 text_draw_line(const struct text_window *win, const struct torii_font *font, u32 x, u32 y, u32 ink,
@@ -38,7 +37,8 @@ u32 text_draw_line(const struct text_window *win, const struct torii_font *font,
 	if (!line->count)
 		return x;
 	if (!text_line_fits(win, font, x, y, line)) {
-		tlog_error("assert failed: text_draw_line: line at %lu,%lu outside the window", (unsigned long)x, (unsigned long)y);
+		tlog_error("assert failed: text_draw_line: line at %lu,%lu outside the window", (unsigned long)x,
+			   (unsigned long)y);
 		return x;
 	}
 	struct text_run run = {

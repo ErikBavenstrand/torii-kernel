@@ -37,6 +37,8 @@ jobs=(
   "tests/logging.sh rotate"
   "tests/logging.sh junk"
   "tests/logging.sh full"
+  "python3 tests/shots.py"
+  "python3 tests/perf.py self-test"
 )
 
 logs=$(mktemp -d)

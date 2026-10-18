@@ -1,0 +1,20 @@
+# Diagnostics' first page (DIAGNOSE, the fifth row of SETTINGS page 2). The
+# page redraws after each key, slower than keys come, so each DOWN waits for it.
+-w "screen ready: sd-list"
+-k @8:R -k @12:-
+-w "screen ready: nor-list"
+-k @8:R -k @12:-
+-w "screen ready: settings1"
+-k @8:R -k @12:-
+-w "screen ready: settings2"
+-k @8:DOWN -k @12:-
+-w "screen ready: settings2"
+-k @8:DOWN -k @12:-
+-w "screen ready: settings2"
+-k @8:DOWN -k @12:-
+-w "screen ready: settings2"
+-k @8:DOWN -k @12:-
+-w "screen ready: settings2"
+-k @8:A -k @12:-
+-w "screen ready: diag-start"
+-s @1:screen.png

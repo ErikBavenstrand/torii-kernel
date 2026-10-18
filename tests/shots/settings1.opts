@@ -1,0 +1,7 @@
+# SETTINGS page 1 (R twice), with the pinned clock
+-w "screen ready: sd-list"
+-k @8:R -k @12:-
+-w "screen ready: nor-list"
+-k @8:R -k @12:-
+-w "screen ready: settings1"
+-s @1:screen.png

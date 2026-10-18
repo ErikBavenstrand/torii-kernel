@@ -1,6 +1,8 @@
 // The kernel unit tests. Every kernel has them, for Diagnostics
 // (source/diag.c); the test kernel also runs them at boot, in place of the
 // weak, empty torii_run_tests in source/tlog.c, then stops.
+#include <gba_input.h>
+
 #include "torii_test.h"
 #include "tests.h"
 #include "text_demo.h"
@@ -31,6 +33,13 @@ static const struct {
 	{"nor_scan_keeps_interrupts", test_nor_scan_keeps_interrupts},
 	{"menu_code_fits", test_menu_code_fits},
 	{"build_id_matches_the_rom", test_build_id_matches_the_rom},
+	{"engine_res_alloc", test_engine_res_alloc},
+	{"engine_budget", test_engine_budget},
+	{"engine_queue_caps", test_engine_queue_caps},
+	{"engine_commit", test_engine_commit},
+	{"engine_jobs", test_engine_jobs},
+	{"engine_cycles", test_engine_cycles},
+	{"engine_hold_for_queue", test_engine_hold_for_queue},
 	{"text_blit", test_text_blit},
 	{"text_draw", test_text_draw},
 	{"text_clear", test_text_clear},
@@ -56,8 +65,9 @@ int torii_unit_tests(void)
 void torii_run_tests(void)
 {
 	torii_unit_tests();
-	text_demo();
-	for (;;)
-		;
+	// The engine's scene, or with L held (mgba-shot -k 1:L) the text demo
+	if (!(REG_KEYINPUT & KEY_L))
+		text_demo();
+	engine_smoke();
 }
 #endif

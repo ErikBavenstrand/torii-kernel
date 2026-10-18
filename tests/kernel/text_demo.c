@@ -1,6 +1,7 @@
-// A temporary text demo in mode 0, in the test kernel only: after the unit
-// tests it draws sample text on BG0 and logs "text demo ready". See it with
-// mgba-shot ezkerneltest.gba -u 'text demo ready' -s FRAME:PNG.
+// A temporary text demo in mode 0, in the test kernel only: with L held at
+// boot, after the unit tests it draws sample text on BG0 (in place of the
+// engine's scene) and logs "screen ready: text-demo". See it with
+// mgba-shot ezkerneltest.gba -k 1:L -f 1600 -s 1600:PNG.
 // T6 replaces it with the Diagnostics demo.
 #ifdef TORII_TEST_KERNEL
 #include <gba_video.h>
@@ -71,6 +72,8 @@ void text_demo(void)
 
 	REG_BG0CNT = BG_16_COLOR | CHAR_BASE(0) | SCREEN_BASE(31);
 	REG_DISPCNT = MODE_0 | BG0_ON;
-	tlog("text demo ready");
+	tlog_debug("screen ready: text-demo");
+	for (;;)
+		;
 }
 #endif

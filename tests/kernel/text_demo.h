@@ -2,6 +2,7 @@
 #ifndef TORII_TEXT_DEMO_H
 #define TORII_TEXT_DEMO_H
 
-void text_demo(void);
+// Draws the demo, logs "screen ready: text-demo" and stops there.
+void text_demo(void) __attribute__((noreturn));
 
 #endif

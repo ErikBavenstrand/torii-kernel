@@ -10,6 +10,7 @@
 #include "RTC.h"
 #include "draw.h"
 #include "Ezcard_OP.h"
+#include "tlog.h"
 
 //extern const unsigned char __attribute__((aligned(4)))gImage_SET[76800];
 
@@ -526,6 +527,8 @@ u32 Setting_window(void)
 			sprintf(msg, "%s %s  %s", str0, str1, str2);
 			DrawHZText12(msg, 0, x_offset + 10, y_offset + line_x * 6, gl_color_text, 1);
 
+			if (re_show)
+				tlog_debug("screen ready: settings1");
 			re_show = 0;
 			scanKeys();
 			keys = keysDown();

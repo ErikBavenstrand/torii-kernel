@@ -8,7 +8,7 @@
 #include <gba_base.h>
 #include <gba_interrupt.h>
 
-#include "../../source/diag.h"
+#include "../../source/engine/cycles.h"
 #include "../../source/engine/text.h"
 #include "../../source/waitcnt.h"
 #include "text_bench.h"
@@ -214,13 +214,13 @@ static u32 cycles(blit_fn *blit, const struct text_run *run)
 	u16 ime = REG_IME, waitcnt = REG_WAITCNT_CART;
 	REG_IME = 0;
 	REG_WAITCNT_CART = WAITCNT_MENU;
-	diag_timer_start();
-	u32 overhead = diag_timer_stop();
+	cycles_init();
+	u32 overhead = cycles_since(cycles_now());
 	u32 best = 0xFFFFFFFF;
 	for (int i = 0; i < 4; i++) {
-		diag_timer_start();
+		u32 start = cycles_now();
 		blit(run);
-		u32 t = diag_timer_stop() - overhead;
+		u32 t = cycles_since(start) - overhead;
 		if (t < best)
 			best = t;
 	}
@@ -248,38 +248,41 @@ void test_text_cycles(void)
 	u32 row = cycles(text_blit, &run);
 	struct text_run one = {vram, 16, &font_body, line.glyphs + 1, 1, 3, 2, 1};  // 'u' at x 3
 	u32 glyph = cycles(text_blit, &one);
-	tlog("frame-cycles: text-glyph %lu", (unsigned long)glyph);
-	tlog("frame-cycles: text-row38 %lu (%lu a glyph)", (unsigned long)row, (unsigned long)(row / 38));
+	cycles_report("text-glyph", glyph);
+	cycles_report("text-row38", row);
+	tlog("text-row38: %lu cycles a glyph", (unsigned long)(row / 38));
 
 	// A heading's worth: 20 glyphs of the 16 px font, most over 8 px wide
 	static const char heading[] = "SETTINGS AND OPTIONS";
 	text_layout(&font_heading, heading, sizeof(heading) - 1, 240, &line);
 	struct text_run head = {vram, 16, &font_heading, line.glyphs, line.count, 1, 0, 1};
 	u32 wide = cycles(text_blit, &head);
-	tlog("frame-cycles: text-heading20 %lu (%lu a glyph)", (unsigned long)wide, (unsigned long)(wide / line.count));
+	cycles_report("text-heading20", wide);
+	tlog("text-heading20: %lu cycles a glyph", (unsigned long)(wide / line.count));
 
 	// Clearing a 16 px list row of 30 tiles, and an 8 px one
 	u16 ime = REG_IME, waitcnt = REG_WAITCNT_CART;
 	REG_IME = 0;
 	REG_WAITCNT_CART = WAITCNT_MENU;
-	diag_timer_start();
+	cycles_init();
+	u32 start = cycles_now();
 	text_clear_rows(&win, 0, 16);
-	u32 clear = diag_timer_stop();
-	diag_timer_start();
+	u32 clear = cycles_since(start);
+	start = cycles_now();
 	text_clear_rows(&win, 4, 8);
-	u32 clear8 = diag_timer_stop();
+	u32 clear8 = cycles_since(start);
 	REG_WAITCNT_CART = waitcnt;
 	REG_IME = ime;
-	tlog("frame-cycles: text-clear-row %lu", (unsigned long)clear);
-	tlog("frame-cycles: text-clear-row8-unaligned %lu", (unsigned long)clear8);
+	cycles_report("text-clear-row", clear);
+	cycles_report("text-clear-row8-unaligned", clear8);
 
 #ifdef TORII_TEST_KERNEL
 	text_layout(&font_body, row38, sizeof(row38) - 1, 240, &line);
 	run.glyphs = line.glyphs;
-	tlog("frame-cycles: text-row38-c %lu", (unsigned long)cycles(bench_blit_c, &run));
-	tlog("frame-cycles: text-row38-tonc %lu", (unsigned long)cycles(bench_blit_tonc, &run));
-	tlog("frame-cycles: text-heading20-c %lu", (unsigned long)cycles(bench_blit_c, &head));
-	tlog("frame-cycles: text-heading20-tonc %lu", (unsigned long)cycles(bench_blit_tonc, &head));
+	cycles_report("text-row38-c", cycles(bench_blit_c, &run));
+	cycles_report("text-row38-tonc", cycles(bench_blit_tonc, &run));
+	cycles_report("text-heading20-c", cycles(bench_blit_c, &head));
+	cycles_report("text-heading20-tonc", cycles(bench_blit_tonc, &head));
 
 	// The body font with 1 byte rows (its 8 px glyphs only) against 2 byte
 	// rows, both copied to EWRAM after the test windows so that the bitmaps
@@ -307,8 +310,8 @@ void test_text_cycles(void)
 	body2.glyphs = glyphs2;
 	body2.bits = bits2;
 	run.font = &body1;
-	tlog("frame-cycles: text-row38-rows1-ewram %lu", (unsigned long)cycles(text_blit_rows1, &run));
+	cycles_report("text-row38-rows1-ewram", cycles(text_blit_rows1, &run));
 	run.font = &body2;
-	tlog("frame-cycles: text-row38-rows2-ewram %lu", (unsigned long)cycles(text_blit, &run));
+	cycles_report("text-row38-rows2-ewram", cycles(text_blit, &run));
 #endif
 }

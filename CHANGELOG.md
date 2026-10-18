@@ -4,6 +4,27 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Added:** the v0.3 menu engine's motion and input layers, not yet used by
+  the menu. Motion has eased tweens and critically damped springs (retargets
+  keep their velocity) for scroll, sprites, blend and palette fades. Input
+  repeats per key (15 frames, then every 4, every 2 after 1 s), pages with
+  L/R (20, then 8), and wraps a list only on a fresh press or after a pause
+  at its end (`8b073d0`, `ff18199`).
+- **Added:** each menu screen logs `screen ready: NAME` at debug level once
+  drawn, so the golden-screen tests (`tests/shots`) wait for screens rather
+  than fixed frames (`65acf23`).
+- **Added:** the v0.3 tile engine's core in `source/engine/`, not yet used by
+  any screen: a 60 fps frame loop with idle detection, state-machine jobs
+  within a cycle budget, shadow video registers, palettes and OAM committed
+  in VBlank through a capped VRAM queue, allocators for VRAM, palette banks
+  and affine matrices with per-view arenas, and a layout budget checker
+  (`a5d6392`, `09a5d58`).
+- **Changed:** Diagnostics' timings read a free-running TM2/TM3 cycle counter
+  shared with the engine, instead of restarting the timers each time
+  (`a5d6392`).
+
 ## v0.2.4 (2026-10-18)
 
 Tested on a real Omega DE (FPGA firmware 7): everything in v0.2.3, plus the

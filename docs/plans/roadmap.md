@@ -315,9 +315,11 @@ The budget each layout is checked against (GBATEK, Tonc):
 
 ## v0.3.2 Renderer fixes
 
-Bugs found while building v0.3 and v0.3.1 that weren't fixed before their release.
+Bugs found while building v0.3 and v0.3.1. Each is struck out here once a ticket fixes it.
 
-- None yet.
+- A scrolling long file name runs into the size column in the SD list (T3; port T9).
+- The game menu shows "CHEAT(0)" before the cheat list has been opened (T3; port T11).
+- The cheat view counts sections plus entries: "[002/004]" for 2 cheats (T3; port T11).
 
 ## v0.4 Browsing
 

@@ -50,9 +50,13 @@ EVERYTHING = {LINT, TEST, SIZE, ANALYZE, COMPAT}
 # engine's); nor does lang.c, whose strings it uses.
 NO_COMPAT = {
     "source/charset.c",
+    "source/engine/ease_lut.c",
     "source/engine/font.h",
     "source/engine/font_body.c",
     "source/engine/font_heading.c",
+    "source/engine/input.c",
+    "source/engine/input_hw.c",
+    "source/engine/motion.c",
     "source/engine/text.c",
     "source/engine/text.h",
     "source/engine/text_blit.s",
@@ -105,6 +109,11 @@ RULES = [
     ),
     (["tools/font_preview.py"], {LINT}, "font preview sheets"),
     (
+        ["tools/ease_lut.py"],
+        {LINT, TEST_HOST},
+        "easing table generator, whose table the host tests check",
+    ),
+    (
         sorted(NO_COMPAT),
         {LINT, TEST, SIZE, ANALYZE},
         "menu or text only, listed in NO_COMPAT",
@@ -140,6 +149,11 @@ RULES = [
         ],
         {LINT, TEST, REPRO, COMPAT},
         "builds the kernel image or the cart",
+    ),
+    (
+        ["tests/shots*", "tests/perf*"],
+        {LINT, TEST},
+        "golden screens or cycle budget, checked by `just test`",
     ),
     (["tests/*"], {LINT, TEST}, "emulated-cart tests"),
     (["justfile"], EVERYTHING | {REPRO}, "recipes"),
