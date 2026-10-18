@@ -72,7 +72,10 @@ def fetch_release_symbols(tag: str, out_dir: Path) -> Path:
             f"https://github.com/{REPO}/releases/tag/{tag} and pass --sym"
         )
     except subprocess.CalledProcessError:
-        sys.exit(f"error: couldn't download {tag}'s ezkernelnew.sym with gh")
+        sys.exit(
+            f"error: couldn't download {tag}'s ezkernelnew.sym with gh "
+            "(releases before v0.2.1 have none)"
+        )
     return folder / "ezkernelnew.sym"
 
 
@@ -191,7 +194,7 @@ def main() -> int:
                     name = boot.group(3) or f"main {boot.group(1)}, no id"
                     other_builds[name] = other_builds.get(name, 0) + 1
                     line += "  [another build: addresses not named]"
-            elif crash_build:
+            elif crash_build and sym_id is not None:
                 # The dump is the crashed kernel's, which may not be the one reporting it.
                 matches = same_build(int(crash_build.group(1), 16), None)
                 if symbols and not matches:
