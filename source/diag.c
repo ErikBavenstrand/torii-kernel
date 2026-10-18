@@ -137,15 +137,16 @@ static int ask(const char *topic, const char *question, int kind)
 	say(GREY, kind == ASK_TRIED ? "A: yes   B: no   SELECT: didn't try" : "A: yes   B: no   SELECT: skip");
 	u16 key = wait_key(KEY_A | KEY_B | KEY_SELECT);
 	int answer = (key & KEY_A) ? ANSWER_YES : (key & KEY_B) ? ANSWER_NO : ANSWER_SKIP;
-	say(answer == ANSWER_YES                       ? GREEN
-	    : answer == ANSWER_NO && kind != ASK_PROBE ? RED
-	    : answer == ANSWER_NO                      ? WHITE
-						       : GREY,
-	    "%s: %s", topic,
-	    answer == ANSWER_YES  ? "yes"
-	    : answer == ANSWER_NO ? "no"
-	    : kind == ASK_TRIED   ? "not tried"
-				  : "skipped");
+	u16 colour = GREY;
+	const char *said = kind == ASK_TRIED ? "not tried" : "skipped";
+	if (answer == ANSWER_YES) {
+		colour = GREEN;
+		said = "yes";
+	} else if (answer == ANSWER_NO) {
+		colour = kind == ASK_PROBE ? WHITE : RED;
+		said = "no";
+	}
+	say(colour, "%s: %s", topic, said);
 	tlog_flush();
 	return answer;
 }

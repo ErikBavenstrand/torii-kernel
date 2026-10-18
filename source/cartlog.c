@@ -291,8 +291,9 @@ static void report_eeprom_probe(void)
 		if (src >= 0)
 			snprintf(what, sizeof(what), "step %d's write (block %u)", src, p->step[src].block);
 		else
-			strcpy(what, !memcmp(s->data, other, 8) ? "an earlier run's other width (this block)"
-								: "nothing written in this run");
+			snprintf(what, sizeof(what), "%s",
+				 !memcmp(s->data, other, 8) ? "an earlier run's other width (this block)"
+							    : "nothing written in this run");
 		tlog_force(TLOG_INFO, "eeprom probe: %2lu: read block %u: %s, from %s", (unsigned long)i, s->block,
 			   data, what);
 	}
