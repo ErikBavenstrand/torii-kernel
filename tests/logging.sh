@@ -267,7 +267,7 @@ EOF
   blank 0xF0100 8 || [ "$(sram 0xF0100 8)" = 0000000000000000 ] || fail "the big crash dump wasn't cleared"
   # A dump in v0.2.0's layout is reported as skipped, and cleared.
   printf 'TORIICR1' | dd of="$cart/sram.bin" bs=1 seek=$((0xF0100)) conv=notrunc status=none
-  boot -f 200
+  soft_boot -f 200 # cart RAM past the save is lost on a power cycle, as on the real cart
   has "crash: an older kernel crashed"
   blank 0xF0100 8 || [ "$(sram 0xF0100 8)" = 0000000000000000 ] || fail "the old crash dump wasn't cleared"
   card_ok
