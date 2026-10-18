@@ -53,6 +53,9 @@ jobs:
         run: just build
       - name: Check size against the cart and GBA memory
         run: just size
+      # Rebuilds from a shuffled copy of the source in another folder
+      - name: Check the build is reproducible
+        run: just repro
       - name: Upload ezkernelnew.bin
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

@@ -7,6 +7,7 @@
 #include "ff.h"
 #include "ez_define.h"
 #include "Ezcard_OP.h"
+#include "build_id.h"
 #include "logbuf.h"
 #include "tlog.h"
 
@@ -51,7 +52,7 @@ const char *tlog_level_name(u32 level)
 extern int main(void);
 extern const u8 __rom_end__;  // the linker's: the end of the kernel's ROM image
 
-#define MARKER "Torii kernel boot: %s, logging %s, build main %08lX end %08lX"
+#define MARKER "Torii kernel boot: %s, logging %s, build main %08lX end %08lX id %08lX"
 
 void tlog_marker(const char *why, int force)
 {
@@ -60,12 +61,13 @@ void tlog_marker(const char *why, int force)
 	u8 level = tlog_level;
 	if (force) {
 		tlog_force(TLOG_INFO, MARKER, why, tlog_level_name(level), (unsigned long)main,
-			   (unsigned long)&__rom_end__);
+			   (unsigned long)&__rom_end__, (unsigned long)torii_build_id);
 		return;
 	}
 	if (tlog_level != TLOG_OFF)
 		tlog_level = TLOG_INFO;
-	tlog(MARKER, why, tlog_level_name(level), (unsigned long)main, (unsigned long)&__rom_end__);
+	tlog(MARKER, why, tlog_level_name(level), (unsigned long)main, (unsigned long)&__rom_end__,
+	     (unsigned long)torii_build_id);
 	tlog_level = level;
 }
 

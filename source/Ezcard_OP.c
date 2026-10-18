@@ -611,12 +611,15 @@ static const u32 crc32tab[] = {
 	0xaed16a4aL, 0xd9d65adcL, 0x40df0b66L, 0x37d83bf0L, 0xa9bcae53L, 0xdebb9ec5L, 0x47b2cf7fL, 0x30b5ffe9L,
 	0xbdbdf21cL, 0xcabac28aL, 0x53b39330L, 0x24b4a3a6L, 0xbad03605L, 0xcdd70693L, 0x54de5729L, 0x23d967bfL,
 	0xb3667a2eL, 0xc4614ab8L, 0x5d681b02L, 0x2a6f2b94L, 0xb40bbe37L, 0xc30c8ea1L, 0x5a05df1bL, 0x2d02ef8dL};
+u32 crc32_update(u32 crc, const u8 *buf, u32 size)
+{
+	crc ^= 0xFFFFFFFF;
+	for (u32 i = 0; i < size; i++)
+		crc = crc32tab[(crc ^ buf[i]) & 0xff] ^ (crc >> 8);
+	return crc ^ 0xFFFFFFFF;
+}
+
 u32 crc32(unsigned char *buf, u32 size)
 {
-	u32 i, crc;
-	crc = 0xFFFFFFFF;
-	for (i = 0; i < size; i++)
-		crc = crc32tab[(crc ^ buf[i]) & 0xff] ^ (crc >> 8);
-
-	return crc ^ 0xFFFFFFFF;
+	return crc32_update(0, buf, size);
 }

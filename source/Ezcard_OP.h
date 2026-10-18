@@ -30,6 +30,8 @@ u16 IWRAM_CODE Read_SET_info(u32 offset);
 u32 Loadfile2PSRAM(TCHAR *filename);
 u16 IWRAM_CODE Read_FPGA_ver(void);
 u32 crc32(unsigned char *buf, u32 size);
+// Continues a CRC32 (zlib's): crc32_update(crc32(a), b) is the CRC of a then b.
+u32 crc32_update(u32 crc, const u8 *buf, u32 size);
 void IWRAM_CODE Set_RTC_status(u16 status);
 void IWRAM_CODE Set_LED_control(u16 status);
 void IWRAM_CODE Set_64MROM_flag(u16 flag);

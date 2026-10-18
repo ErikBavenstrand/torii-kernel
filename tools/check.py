@@ -31,15 +31,16 @@ import subprocess
 import sys
 from pathlib import Path
 
-LINT, TEST_HOST, TEST, SIZE, ANALYZE, COMPAT = (
+LINT, TEST_HOST, TEST, SIZE, REPRO, ANALYZE, COMPAT = (
     "lint",
     "test-host",
     "test",
     "size",
+    "repro",
     "analyze",
     "compat",
 )
-ORDER = [LINT, TEST_HOST, TEST, SIZE, ANALYZE, COMPAT]
+ORDER = [LINT, TEST_HOST, TEST, SIZE, REPRO, ANALYZE, COMPAT]
 KERNEL = {LINT, TEST, SIZE, COMPAT}
 EVERYTHING = {LINT, TEST, SIZE, ANALYZE, COMPAT}
 
@@ -95,7 +96,7 @@ RULES = [
         "menu or text only, listed in NO_COMPAT",
     ),
     (["source/*.c", "source/*.h"], EVERYTHING, "kernel C"),
-    (["Makefile"], EVERYTHING, "kernel build flags"),
+    (["Makefile"], EVERYTHING | {REPRO}, "kernel build flags"),
     (["source/*", "tests/kernel/*", "image.bin"], KERNEL, "kernel"),
     (
         ["emu/*", "docker/emu.Dockerfile"],
@@ -116,16 +117,18 @@ RULES = [
         [
             "tools/omega_image.py",
             "tools/nm_to_sym.py",
+            "tools/build_id.py",
+            "tools/repro.sh",
             "tools/make_cart.sh",
             "tools/cart_copy.sh",
             "tools/sdimg.*",
             "tools/fresh.py",
         ],
-        {LINT, TEST, COMPAT},
+        {LINT, TEST, REPRO, COMPAT},
         "builds the kernel image or the cart",
     ),
     (["tests/*"], {LINT, TEST}, "emulated-cart tests"),
-    (["justfile"], EVERYTHING, "recipes"),
+    (["justfile"], EVERYTHING | {REPRO}, "recipes"),
 ]
 
 

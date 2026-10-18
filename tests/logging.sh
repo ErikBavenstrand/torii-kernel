@@ -183,6 +183,9 @@ EOF
   has "diag: crash test"
   has "crash: the kernel crashed"
   has "crash: pc 0200"
+  id=$(head -1 dist/ezkernelnew.sym | cut -d' ' -f5)
+  has "crash: build id $id"
+  ! grep -q "crash: build id $id, not" "$cart/log.txt" || fail "the crash test's dump came from another build"
   has "crash: | "
   grep -q '^kernel error: crash: ' "$cart/kernel.log" || fail "the crash dump wasn't logged as an error"
   [ "$(sram 0 0x20000 | md5sum)" = "$fram" ] || fail "Diagnostics changed the save chip"
@@ -201,7 +204,8 @@ regs[13:16] = [0x03007E00, 0x08004321, 0x02001234]
 log = b""
 while len(log) + 70 <= 1024:
     log += b"   1.00 I " + b"y" * 59 + b"\n"
-dump = b"TORIICR1" + struct.pack("<17I", *regs) + struct.pack("<III", 1234, 0x03007E00, 64)
+# Frames, the build ID (another kernel's), the stack's address and length
+dump = b"TORIICR2" + struct.pack("<17I", *regs) + struct.pack("<IIII", 1234, 0x12345678, 0x03007E00, 64)
 dump += struct.pack("<64I", *[0x0800ABCD] * 64) + struct.pack("<I", len(log)) + log.ljust(1024, b"\0")
 sram = bytearray(open(sys.argv[1], "rb").read())
 sram[0xF0100 : 0xF0100 + len(dump)] = dump
@@ -209,8 +213,14 @@ open(sys.argv[1], "wb").write(sram)
 EOF
   boot -f 200
   has "crash: the kernel crashed 1234 frames after boot: pc 02001234"
+  has "crash: build id 12345678, not this kernel's"
   [ "$(log 0 | grep -c 'crash: stack 03007.*0800ABCD')" = 64 ] || fail "the big crash dump lost stack lines"
   blank 0xF0100 8 || [ "$(sram 0xF0100 8)" = 0000000000000000 ] || fail "the big crash dump wasn't cleared"
+  # A dump in v0.2.0's layout is reported as skipped, and cleared.
+  printf 'TORIICR1' | dd of="$cart/sram.bin" bs=1 seek=$((0xF0100)) conv=notrunc status=none
+  boot -f 200
+  has "crash: an older kernel crashed"
+  blank 0xF0100 8 || [ "$(sram 0xF0100 8)" = 0000000000000000 ] || fail "the old crash dump wasn't cleared"
   card_ok
   lines_ok
   echo "PASS: Diagnostics logs with logging off and leaves the save chip and NOR list alone; its crash test's dump reaches the log"
