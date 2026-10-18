@@ -10,7 +10,7 @@ git log, not here.
   Galmuri9 and Galmuri11 Bold fonts are converted into `source/engine/`
   with 2-byte rows (`23efcc2`). `charset_next_latin1()` reads UTF-8 names
   for these Latin-1 fonts, drawing anything else as the replacement glyph
-  (`7f5bed7`). An ARM blitter in IWRAM (556 bytes) draws glyphs straight
+  (`7f5bed7`, `997f45c`). An ARM blitter in IWRAM (556 bytes) draws glyphs straight
   into mode 0 window tiles, and a text API measures strings, cuts them
   with "..." by character and clears rectangles: about 250 cycles a glyph
   (`c50ccf8`, `53bc7e1`). Trailing spaces no longer cut a line that fits
