@@ -4,6 +4,20 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Added:** the save flow is logged: every "Save sav?" answer, save copy
+  and load (name, size, save type, and the `f_write`, `f_read` and
+  `f_close` results), NOR game write, and write of the settings, NOR game
+  list or pending-save record, read back to check it (`b2dac40`). A save
+  copy the card cuts short is now an error in the log, not silent.
+- **Changed:** the menu runs at WAITCNT `0x4018` (WS0 2/1 with prefetch),
+  which the real cart read correctly, instead of the BIOS's `0x0000`; in
+  mGBA a folder of 300 files opens in 23 frames instead of 40. Writes never
+  measured at that speed (control registers, SD transfers, NOR, the clock,
+  and launching with its PSRAM writes) keep `0x0000`, and games start at
+  `0x0000` (`b2dac40`). Still to be confirmed on the real cart.
+
 ## v0.2.0 (2026-10-17)
 
 - **Added:** LOGGING in settings page 2 (Off, Errors, Info, Debug; off by
