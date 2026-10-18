@@ -242,11 +242,11 @@ test-host: emu-image
     {{emu_docker}} tests/host.sh
     @uv run -q tests/font_test.py
 
-# Convert the menu fonts in assets/fonts to C: dist/fonts/font_body.{c,h} and font_heading.{c,h}
+# Convert the menu fonts in assets/fonts to C: source/engine/font_body.c and font_heading.c
+# (committed; tests/font_test.py checks they match)
 font:
-    uv run -q tools/font.py assets/fonts/galmuri/Galmuri9.bdf --name body --line-height 12 --squeeze --clip -o dist/fonts/font_body
-    uv run -q tools/font.py assets/fonts/galmuri/Galmuri11-Bold.bdf --name heading --line-height 16 --squeeze --clip -o dist/fonts/font_heading
-    uvx clang-format@{{clang_format}} -i dist/fonts/font_body.c dist/fonts/font_body.h dist/fonts/font_heading.c dist/fonts/font_heading.h
+    uv run -q tools/font.py assets/fonts/galmuri/Galmuri9.bdf --name body --line-height 12 --squeeze --clip -o source/engine/font_body
+    uv run -q tools/font.py assets/fonts/galmuri/Galmuri11-Bold.bdf --name heading --line-height 16 --squeeze --clip -o source/engine/font_heading
 
 # Redraw the font candidates' preview sheets in docs/research/fonts, e.g. `just font-preview galmuri`
 font-preview *keys:
