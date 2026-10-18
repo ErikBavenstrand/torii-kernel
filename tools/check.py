@@ -91,6 +91,12 @@ RULES = [
     ),
     (["tests/host/*", "tests/host.sh"], {LINT, TEST_HOST}, "host tests"),
     (
+        ["tools/font.py", "tests/font_test.py", "assets/fonts/*"],
+        {LINT, TEST_HOST},
+        "font converter, tested by test-host",
+    ),
+    (["tools/font_preview.py"], {LINT}, "font preview sheets"),
+    (
         sorted(NO_COMPAT),
         {LINT, TEST, SIZE, ANALYZE},
         "menu or text only, listed in NO_COMPAT",
