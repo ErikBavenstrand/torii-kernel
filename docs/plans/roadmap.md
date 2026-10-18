@@ -172,6 +172,7 @@ cart disagrees with the emulator, the fix goes into the cart model.
 
 ## v0.2.1 Real-cart fixes
 
+Every known bug, found in our work or inherited from the official kernel, is fixed here.
 From the first real-cart test of v0.2.0 (`docs/research/cart-test-2026-10-18.md`):
 
 - **Log files:** fill new log files with zeros from RAM, not a ROM array. On the real cart,
@@ -207,6 +208,26 @@ From the first real-cart test of v0.2.0 (`docs/research/cart-test-2026-10-18.md`
 - **Rumble:** no GPIO register value drove the motor. Test with Drill Dozer: WarioWare:
   Twisted! needs a motion sensor the Omega DE lacks. Then find out how the cart's rumble is
   driven, or whether this cart has a motor at all.
+
+Also every bug still open from v0.2:
+
+- **Game NOR:** interrupts left off after a full scan, half-written games listed after
+  "delete latest", the list lost on a power cut in `Save_NOR_info`, homebrew without 0x96 at
+  0xB2 never listed, the table erased whenever the list reads empty, and NOR launches not
+  updating Recently Played.
+- **In-game menu:** LOAD with no saved state crashes. IWRAM isn't fully cleared at launch
+  (the `SoftReset_now` code stays).
+- **File list:** hide `/torii` and the other kernel folders, cut names by UTF-8 character,
+  and make names over 99 bytes list, open, launch and save.
+- **Jagoomba from source:** moved here from v0.6, with the GB palette fix
+  (ez-flash/omega-de-kernel#12).
+- **Logging:** the log sequence number overflow.
+
+Not fixable in v0.2.1:
+- the BG2 affine registers reset by the in-game menu, which needs the tile-based menu in
+  v0.7;
+- EEPROM sizes, which wait for the in-game EEPROM probe on the real cart;
+- rumble, which needs Drill Dozer on the real cart.
 
 ## v0.3 Renderer
 
