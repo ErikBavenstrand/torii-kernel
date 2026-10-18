@@ -6,18 +6,15 @@ git log, not here.
 
 ## Unreleased
 
-- **Fixed:** Diagnostics' rumble step never rumbled: it drove GPIO pin 3,
-  but the Omega DE's motor answers 0xF1 at 0x09E20000 and then 2 at
-  0x08001000, as Jagoomba drives it. It now asks about pulses, 2 held on,
-  and pulses with the GPIO port off (`a6c76ee`).
-- **Changed:** that still didn't rumble on the real cart, in kernel mode.
-  Diagnostics now also drives the motor with the ROM page at PSRAM, as
-  under Jagoomba, and logs what 0x08001000 reads; the boot logs the new
-  rumble probe ROM's answers from game mode (`1fab0fc`, `c2faa0e`).
-- **Fixed:** Diagnostics' rumble now rumbles: the motor takes 0x08001000
-  only while the ROM page isn't the kernel's and the GPIO port is on (real
-  cart), so it pulses under the PSRAM page, once, and a no is a failure
-  (`6adf948`).
+- **Fixed:** Diagnostics' rumble step never rumbled. The Omega DE's motor
+  isn't driven through GPIO pin 3 in kernel mode: as Jagoomba does it, 0xF1
+  at 0x09E20000, then 2 and 0 at 0x08001000, which reach the motor only
+  while the GPIO port is on and the ROM page isn't the kernel's (real cart).
+  Diagnostics pulses it so under the PSRAM page, and a no is a failure
+  (`a6c76ee`, `6adf948`).
+- **Added:** the boot logs the answers of the rumble probe ROM
+  (`tests/roms/rumble`), which tries the motor four ways in game mode
+  (`1fab0fc`, `c2faa0e`).
 
 ## v0.2.3 (2026-10-18)
 

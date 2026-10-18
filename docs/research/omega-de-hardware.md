@@ -96,7 +96,7 @@ Every control-register write is wrapped like this:
 | `0x09880000` | `SetRompage` | ROM map: `0x200` = boot from PSRAM, NOR game = `NORaddress >> 17` (C4) |
 | `0x09C00000` | `SetRampage` | 4 KB page of the save and work RAM at `0x0E000000` (E0); see *Save and work RAM* |
 | `0x09E00000` | data port (read/write) | SD sector buffer (up to 2 KB), status reads; `0xEEE1` = busy |
-| `0x09E20000` | `Set_rumble` | `0xF1` = rumble on the Omega DE's motor: 2 written at `0x08001000` then starts it, 0 stops it, while the ROM page isn't the kernel's (see *RTC and rumble*) |
+| `0x09E20000` | `Set_rumble` | `0xF1` = rumble on the Omega DE's motor: 2 written at `0x08001000` then starts it, 0 stops it, while `0x096A0000` bit 0 is set and the ROM page isn't the kernel's (see *RTC and rumble*) |
 
 **SD mode hides the ROM.** While `0x09400000` is on, reads from cart ROM
 outside the data port don't return NOR or PSRAM: they return data left in
