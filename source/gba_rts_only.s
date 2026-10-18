@@ -99,18 +99,19 @@ RTS_irq:
 	LDREQ		PC, [R0,#-0xC]			@;old_interrupt_handler
 
 	ldr 		r2,[r0,#REG_P1]
-	bic 		r2,r2,#0xFF000000
-	bic 		r2,r2,#0x00FF0000
 	
+	@; Torii: a hotkey is the mask of its keys (Hotkey_value), and matches when
+	@; they are all held (0 in REG_P1), whatever else is: an extra or stuck key
+	@; used to block it. HOTKEY_OFF needs all ten held, which the D-pad can't.
 check_save:
 	adr 		r3,RTS_only_SAVE_key 
 	ldr 		r3,[r3]
-	cmp 		r2,r3		
+	tst 		r2,r3
 	beq			call_Save	
 check_load:
 	adr 		r3,RTS_only_LOAD_key 
 	ldr 		r3,[r3]
-	cmp 		r2,r3 	
+	tst 		r2,r3
 	beq 		call_Load	
 	ldr 		pc,[r0,#-(0x04000000-0x03FFFFF4)] @;to normal IRQ routine								
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -118,9 +119,9 @@ check_load:
 
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 RTS_only_SAVE_key:
-	.word 0xFB @;L+R+select
+	.word 0x304 @;L+R+select
 RTS_only_LOAD_key:
-	.word 0xF7 @;L+R+Start
+	.word 0x308 @;L+R+Start
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	.arm

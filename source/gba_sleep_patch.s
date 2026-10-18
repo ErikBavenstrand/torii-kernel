@@ -103,19 +103,20 @@ my_irq:
 	
 
 	ldr r2,[r0,#REG_P1]
-	bic r2,r2,#0xFF000000
-	bic r2,r2,#0x00FF0000
 	@;tst r2,#0x0300	@L+R?
 	@;ldrne pc,[r0,#-(0x04000000-0x03FFFFB4)] @to IRQ routine if not pressed
 	
+	@; Torii: a hotkey is the mask of its keys (Hotkey_value), and matches when
+	@; they are all held (0 in REG_P1), whatever else is: an extra or stuck key
+	@; used to block it. HOTKEY_OFF needs all ten held, which the D-pad can't.
 	adr r3,Reset_key @
 	ldr r3,[r3]
-	cmp r2,r3				
+	tst r2,r3
 	beq reset_now	
 
 	adr r3,Sleep_key @
 	ldr r3,[r3]
-	cmp r2,r3 			
+	tst r2,r3
 	beq sleep_now
 	ldr pc,[r0,#-(0x04000000-0x03FFFFF4)] @;to normal IRQ routine									
 @;--------------------------------------------------------------
@@ -133,9 +134,9 @@ copy_loop:
 	bx r0
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Sleep_key:
-	.word 0xF7 @L+R+Start?
+	.word 0x308 @L+R+Start?
 Reset_key:
-	.word 0x1BD @;L up B;
+	.word 0x242 @;L up B;
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	.thumb
 reset_code:

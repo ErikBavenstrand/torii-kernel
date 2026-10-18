@@ -47,6 +47,8 @@ rm -rf "$cart-state"
 cp -r "$cart" "$cart-state" # for the save-state run below
 rm -rf "$cart-blend"
 cp -r "$cart" "$cart-blend" # and the brightness run
+rm -rf "$cart-extra"
+cp -r "$cart" "$cart-extra" # and the run with an extra key held
 
 # keys FRAME KEY... -> mgba-shot press/release pairs, one key every 8 frames.
 keys() {
@@ -129,4 +131,19 @@ after=$(pixel "$cart-blend/after.png")
 [ "$after" = "$before" ] || fail "the menu lost the game's brightness (pixel $after, was $before)"
 rm -rf "$cart-blend"
 
-echo "PASS: in-game menu opens on L+R+START, B returns to the game with its screen, a state saves and loads, the brightness stays, and the save survives"
+# The menu key with another key held too (a stuck or laggy button on the
+# real cart, in v0.2.1): the hook matches the menu key's bits, so the menu
+# still opens and keeps the screen in cart SRAM page 0x20.
+backup_at() { od -A n -t x1 -j $((0x20000 + pixel - 0x06000000)) -N 2 "$1/sram.bin" | tr -d ' \n'; }
+[ "$(backup_at "$cart-extra")" != c250 ] || fail "page 0x20 holds the screen before the extra-key run"
+# shellcheck disable=SC2046 # $(keys) is a list of options
+OMEGA_DIR=$cart-extra emu/build-linux/mgba-shot dist/ezkernelnew.bin \
+  $(keys 100 DOWN A) $(keys 180 DOWN DOWN DOWN DOWN RIGHT RIGHT RIGHT RIGHT UP UP UP A) \
+  -k "$key:L+R+START+DOWN" -k "$((key + 6)):-" -k "$((key + 60)):B" -k "$((key + 66)):-" \
+  -f $((key + 120)) >/dev/null 2>"$cart/log"
+log=$(cat "$cart/log")
+grep -q '^crash at frame' <<<"$log" && fail "crashed in the extra-key run"
+[ "$(backup_at "$cart-extra")" = c250 ] || fail "L+R+START with DOWN held didn't open the menu"
+rm -rf "$cart-extra"
+
+echo "PASS: in-game menu opens on L+R+START (and with an extra key held), B returns to the game with its screen, a state saves and loads, the brightness stays, and the save survives"

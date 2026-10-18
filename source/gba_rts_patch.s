@@ -104,13 +104,14 @@ RTS_irq:
 	LDREQ		PC, [R0,#-0xC]			@;old_interrupt_handler
 
 	ldr 		r2,[r0,#REG_P1]
-	bic 		r2,r2,#0xFF000000
-	bic 		r2,r2,#0x00FF0000
 	
+	@; Torii: a hotkey is the mask of its keys (Hotkey_value), and matches when
+	@; they are all held (0 in REG_P1), whatever else is: an extra or stuck key
+	@; used to block it. HOTKEY_OFF needs all ten held, which the D-pad can't.
 	@;check ingamemenu
 	adr 		r3,RTS_Reset_key 
 	ldr 		r3,[r3]
-	cmp 		r2,r3		
+	tst 		r2,r3
 	bne			check_sleep	
 	@;----------------------
 	adrl		r12, spend_0x80
@@ -122,12 +123,13 @@ RTS_irq:
 	stmfd   SP!, {LR}  			@;0x4000000,	
 	bl 			ingamemenu_now	
 	ldmfd   SP!, {LR}
+	ldr 		r2,[r0,#REG_P1]		@; the keys now, not the menu's r2
 	@;----------------------
 	@;check sleep
 check_sleep:
 	adr 		r3,RTS_Sleep_key 
 	ldr 		r3,[r3]
-	cmp 		r2,r3 			
+	tst 		r2,r3
 	beq 		sleep_now
 	
 	@;check cheat
@@ -167,9 +169,9 @@ copy_loop:
 	bx r0
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 RTS_Sleep_key:
-	.word 0xFB @;L+R+select
+	.word 0x304 @;L+R+select
 RTS_Reset_key:
-	.word 0xF7 @;L+R+Start
+	.word 0x308 @;L+R+Start
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	.align	
 	.thumb

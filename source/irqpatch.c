@@ -39,7 +39,7 @@ u16 Hotkey_value(const u16 slots[3], const u16 defaults[3])
 
 	for (int k = 0; k < 3; k++)
 		held |= 1 << (slots[k] <= 9 ? slots[k] : defaults[k]);
-	return ~held & 0x3FF;
+	return held;
 }
 
 // Games that overwrite the in-game hook at 0x3007FFC in ways the general

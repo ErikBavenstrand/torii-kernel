@@ -343,13 +343,13 @@ static void Patch_Reset_Sleep(u32 *Data)
 	u32 Sleep_key_offset = (u8 *)Sleep_key - p_patch_start;
 
 	if (gl_reset_on != 1) {
-		*(vu32 *)(patchbuffer + Reset_key_offset) = 0;
+		*(vu32 *)(patchbuffer + Reset_key_offset) = HOTKEY_OFF;
 	} else {
 		*(vu32 *)(patchbuffer + Reset_key_offset) = reset_key & 0x3FF;
 	}
 
 	if (gl_sleep_on != 1) {
-		*(vu32 *)(patchbuffer + Sleep_key_offset) = 0;
+		*(vu32 *)(patchbuffer + Sleep_key_offset) = HOTKEY_OFF;
 	} else {
 		*(vu32 *)(patchbuffer + Sleep_key_offset) = sleep_key & 0x3FF;
 	}
@@ -391,7 +391,7 @@ static void Patch_RTS_Cheat(u32 *Data)
 
 	*(vu32 *)(patchbuffer + RTS_Reset_key_offset) = RTS_reset_key_val & 0x3FF;
 	if (gl_sleep_on != 1) {
-		*(vu32 *)(patchbuffer + RTS_Sleep_key_offset) = 0;
+		*(vu32 *)(patchbuffer + RTS_Sleep_key_offset) = HOTKEY_OFF;
 	} else {
 		*(vu32 *)(patchbuffer + RTS_Sleep_key_offset) = RTS_sleep_key_val & 0x3FF;
 	}
