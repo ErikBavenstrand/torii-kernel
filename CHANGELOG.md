@@ -4,6 +4,13 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Fixed:** v0.2.2 bricked a cart at boot. Kernel NOR from 0x7C0000 wraps
+  onto EZ-Flash's bootloader, and the NOR list's copy B was written there.
+  Copy B now sits at 0x780000, and Save_info writes nothing outside
+  0x780000-0x7BFFFF (`79cdf75`).
+
 ## v0.2.2 (2026-10-18)
 
 - **Fixed:** the EEPROM probe's report counts a read that matches a write
