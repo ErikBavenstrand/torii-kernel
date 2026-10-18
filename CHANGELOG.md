@@ -6,6 +6,9 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** about 100 bytes of the kernel's reset code stayed in IWRAM
+  when a game started. The last step now runs from the top of IWRAM, which
+  the BIOS clears, and clears all the rest (`b8ff2e0`).
 - **Fixed:** the in-game menu's DEBUG gave no sign it worked, and a
   power-off then lost the snapshot. It now says DEBUG SAVED and picks
   RESET, whose boot logs it (`5dab00c`).
@@ -15,13 +18,16 @@ git log, not here.
 - **Added:** the EEPROM probe ROM (`tests/roms/eeprom`) asks the cart's
   EEPROM in game mode, where it answers, with 6-bit or 14-bit addresses;
   the kernel's next boot logs each step and a verdict, to settle 512 against
-  8K on the real cart (`f0c4dab`).
+  8K on the real cart (`f0c4dab`). Each run's data carries a nonce, so an
+  earlier run's can't pass for its own (`08ab386`).
 - **Changed:** Diagnostics shows the clock live and logs it at the answer,
   names each failed check in the summary, logs rumble answers as info,
   and checks the checklist's yes answers against the log, listing those it
   can't back as unconfirmed. Its EEPROM step points to the probe ROM; the
   kernel-mode probe, which the real cart never answered, is gone
-  (`f2e94c5`).
+  (`f2e94c5`). A launch counts as evidence only once it reached the game,
+  and file names can't fake it (`08ab386`). The WAITCNT line says it is the
+  menu's (`3dbd34e`).
 
 ## v0.2.0 (2026-10-17)
 
