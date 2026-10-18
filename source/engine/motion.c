@@ -97,9 +97,10 @@ static MotionId add(MotionTarget target, s32 value, u8 kind, u8 owner)
 // 1 if value is within the limit; logs an assert otherwise.
 static int check_range(int64_t value)
 {
-	int ok = value >= -VALUE_LIMIT && value <= VALUE_LIMIT;
-	TLOG_ASSERT(ok);
-	return ok;
+	if (value >= -VALUE_LIMIT && value <= VALUE_LIMIT)
+		return 1;
+	tlog_error("assert failed: motion: value %ld outside +-16384 units", (long)(value / FIX_ONE));
+	return 0;
 }
 
 static s32 clamp_omega(s32 omega)
