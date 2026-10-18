@@ -4,6 +4,31 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Fixed:** the game NOR list survives a power cut: it is kept in two copies
+  (kernel NOR `0x7A0000` and `0x7C0000`) with a sequence number and CRC, and a
+  save always leaves one whole copy (`c14ddbf`). The official kernel's list
+  still reads, the official kernel reads Torii's, and games it adds after a
+  downgrade are kept on the way back (`811a126`).
+- **Fixed:** each game written to NOR ends with a completion mark, written
+  last, so a game cut off while written is never listed, and a lost list is
+  rebuilt from the marks (`c14ddbf`). It takes the area's last 512 bytes, or
+  one more 128 KB block when the ROM fills its last block; a game with no
+  room left for that block is written without a mark (`811a126`).
+- **Fixed:** the boot no longer erases the NOR list when it reads no games,
+  which let the next write go over them; a write reads the list again first
+  (`c14ddbf`), and a failed write shows File error (`811a126`).
+- **Fixed:** delete latest drops the game from the list and erases its mark
+  and header, so a later write with the same header that loses power isn't
+  listed with the old size (`c14ddbf`).
+- **Fixed:** a ROM without gbafix's `0x96` at `0xB2` is listed after it is
+  written to NOR, instead of being overwritten by the next write (`c14ddbf`).
+- **Fixed:** the NOR scan turned interrupts back on when it reached the end of
+  the 64 MB (`c14ddbf`).
+- **Added:** a game started from NOR goes on Recently Played as `NOR:NAME`
+  and starts from NOR there (`c14ddbf`).
+
 ## v0.2.0 (2026-10-17)
 
 - **Added:** LOGGING in settings page 2 (Off, Errors, Info, Debug; off by
