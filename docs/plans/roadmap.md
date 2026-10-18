@@ -186,8 +186,8 @@ From the first real-cart test of v0.2.0 (`docs/research/cart-test-2026-10-18.md`
   same binary. Attach `ezkernelnew.sym` to each release, and put a real build ID (a CRC or the
   git hash) in the boot line. `just logs` warns when the symbols don't match.
 - **Save logging:** log every "Save sav?" decision, save copy (with size and result), NOR
-  write and settings save. Report `f_write` and `f_close` errors from `Save_savefile`
-  instead of ignoring them.
+  write and settings save, including `f_write` and `f_close` results. Handling those errors
+  is v0.5's crash-safe saving.
 - **Diagnostics:**
   - name the failed checklist item in the summary;
   - show the clock live on the clock item;
@@ -209,25 +209,23 @@ From the first real-cart test of v0.2.0 (`docs/research/cart-test-2026-10-18.md`
   Twisted! needs a motion sensor the Omega DE lacks. Then find out how the cart's rumble is
   driven, or whether this cart has a motor at all.
 
-Also every bug still open from v0.2:
+Also every bug still open from v0.2 that belongs here:
 
 - **Game NOR:** interrupts left off after a full scan, half-written games listed after
   "delete latest", the list lost on a power cut in `Save_NOR_info`, homebrew without 0x96 at
   0xB2 never listed, the table erased whenever the list reads empty, and NOR launches not
   updating Recently Played.
-- **In-game menu:** LOAD with no saved state crashes. IWRAM isn't fully cleared at launch
-  (the `SoftReset_now` code stays).
-- **File list:** hide `/torii` and the other kernel folders, cut names by UTF-8 character,
-  and make names over 99 bytes list, open, launch and save.
-- **Jagoomba from source:** moved here from v0.6, with the GB palette fix
-  (ez-flash/omega-de-kernel#12).
+- **Launch:** IWRAM isn't fully cleared (the `SoftReset_now` code stays).
 - **Logging:** the log sequence number overflow.
 
-Not fixable in v0.2.1:
-- the BG2 affine registers reset by the in-game menu, which needs the tile-based menu in
-  v0.7;
-- EEPROM sizes, which wait for the in-game EEPROM probe on the real cart;
-- rumble, which needs Drill Dozer on the real cart.
+Kept in their own milestones:
+- hiding `/torii`, in v0.4;
+- UTF-8 name drawing and names over 99 bytes, in v0.3;
+- save write errors, in v0.5;
+- Jagoomba from source and the palette fix, in v0.6;
+- the in-game LOAD crash and the BG2 affine registers, in v0.7.
+
+EEPROM sizes and rumble wait for the next real-cart test.
 
 ## v0.3 Renderer
 
@@ -275,6 +273,9 @@ The budget each layout is checked against comes from GBATEK and Tonc:
   They are 1bpp glyphs with a width table, covering Latin-1 and common punctuation, made from
   Cozette (MIT) or Spleen (BSD-2) and credited in About. A repo tool converts BDF or PNG
   fonts.
+- **Names:** cut and measured by UTF-8 character, not by byte. Full names of any length are
+  kept outside EWRAM (for example a PSRAM index), so names over 99 bytes list, open, launch
+  and save.
 - **Theme format:** a theme is `themes/<name>/theme.ini` plus LZ77 assets, which a repo tool
   converts from PNG. Its keys override compiled-in defaults one by one: palette, fonts,
   spacing, view layouts, icons. A missing key or asset falls back to the default theme.
@@ -290,7 +291,8 @@ The budget each layout is checked against comes from GBATEK and Tonc:
 - **Recents:** shown as a virtual folder.
 - **Boot to:** the screen of your choice, and the SD position is remembered.
 - **View modes:** list, list plus art, grid and carousel, as theme layouts.
-- **Names:** system files hidden, and names cleaned of extensions and bracket tags.
+- **Names:** system files and kernel folders (`/torii`, `SAVER`, `RTS`, dot files) hidden,
+  and names cleaned of extensions and bracket tags.
 - **Small touches:** a message for empty folders, per-extension icons, and NOR games in the
   same views.
 - **Folder index:** 512 files per folder through an index in PSRAM, keeping 256 folders.
@@ -398,6 +400,9 @@ L+R+Start for reset and L+R+Select for sleep. It becomes a proper overlay:
 - **Actions:** return to the Torii menu, reset, sleep, and a screenshot to SD.
 - **Look:** the theme's colours and font, within its memory budget.
 - **Hotkey:** configurable.
+- **Fixes it brings:** LOAD with no saved state shows a message instead of crashing (it
+  jumps to 0xFFFFFFFE today). Drawing with tiles leaves the game's BG2 affine registers
+  alone.
 - **Test:** every `just compat` game opens and closes the menu, and the screen and game
   state have to come back unchanged.
 
