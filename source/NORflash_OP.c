@@ -216,6 +216,9 @@ _Static_assert(sizeof(FM_NOR_FS) == NOR_ENTRY_SIZE && MAX_NOR == NOR_LIST_ENTRIE
 #define NOR_BLOCK 0x20000
 // The most a patch adds at iTrimSize (Patch_length in GBApatch.c)
 #define NOR_PATCH_MAX CHEAT_PATCH_LENGTH
+_Static_assert((NOR_LIST_A & 0xFFFF) == 0 && (NOR_LIST_B & 0xFFFF) == 0 && NOR_LIST_A < KERNEL_NOR_SMALL &&
+		       NOR_LIST_B < KERNEL_NOR_SMALL && NOR_LIST_RECORD <= 0x10000,
+	       "each NOR list copy is one 64 KB sector Save_info takes (kernel_nor_record_ok)");
 _Static_assert(NOR_LIST_A >= KERNEL_NOR_DATA && NOR_LIST_A + NOR_LIST_RECORD <= KERNEL_NOR_WINDOW &&
 		       NOR_LIST_B >= KERNEL_NOR_DATA && NOR_LIST_B + NOR_LIST_RECORD <= KERNEL_NOR_WINDOW &&
 		       NOR_LIST_B != SAVE_info_offset && NOR_LIST_B != SET_info_offset && NOR_LIST_B != NOR_LIST_A,

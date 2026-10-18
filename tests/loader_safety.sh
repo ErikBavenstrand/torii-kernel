@@ -80,10 +80,11 @@ settings() {
 }
 
 # boot [-c CUT] [-g] OPTIONS...: one power-on; -c cuts the power at CUT
-# (OMEGA_POWER_CUT), -g emulates the S29GL064A kernel NOR. Then the loader
+# (OMEGA_POWER_CUT), -g emulates the S29GL064A kernel NOR (KERNEL_NOR picks
+# any OMEGA_KERNEL_NOR chip). Then the loader
 # must be as seeded.
 boot() {
-  local cut='' chip='' status=0
+  local cut='' chip=${KERNEL_NOR:-} status=0
   [ $ok = 1 ] || return 0 # the case failed: the rest would only repeat it
   while :; do
     case $1 in
@@ -194,6 +195,7 @@ EOF
   logged "diag: Diagnostics started"
   logged "diag: unit tests: pass"
   logged "diag: boot loader present: pass"
+  logged "not DE.BIN"
   pass "Diagnostics"
 
   # Diagnostics reads the loader and says when it's damaged, as v0.2.2 left
@@ -204,7 +206,23 @@ EOF
   boot $diag -f 4500
   logged "diag: boot loader present: FAIL"
   logged "kernel error: diag: the boot loader is DAMAGED"
-  pass "Diagnostics finds a damaged loader"
+  pass "Diagnostics finds an erased loader"
+
+  # ... and as v0.2.2 really left it: erased, then the NOR list programmed
+  # over its first 8 KB (the program hung past them)
+  new_cart diagnostics-overwritten
+  older_list
+  python3 - "$cart/kernel-nor.bin" <<'EOF'
+import sys
+k = bytearray(open(sys.argv[1], "rb").read())
+k[0x7C0000:0x7C2000] = k[0x7A0000:0x7A2000]
+open(sys.argv[1], "wb").write(k)
+EOF
+  seeded=$(loader)
+  boot $diag -f 4500
+  logged "diag: boot loader present: FAIL"
+  logged "kernel error: diag: the boot loader is OVERWRITTEN"
+  pass "Diagnostics finds a loader the NOR list overwrote"
 
   new_cart gl064
   older_list
@@ -217,6 +235,17 @@ EOF
   boot -g $launch -f 700
   logged "nor: wrote the pending-save record"
   pass "the same writes on the S29GL064A"
+
+  # The GL064A models whose loader is one 64 KB sector: top boot, uniform
+  for chip in gl064top gl064uniform; do
+    new_cart "$chip"
+    older_list
+    KERNEL_NOR=$chip boot -f 300
+    logged "nor: saving an older kernel's list of 1 games"
+    KERNEL_NOR=$chip boot $write_b -f 700
+    logged "nor: list saved, 2 games"
+    pass "the boot's migration and WRITE TO NOR on the $chip"
+  done
 
   # Power cuts before each of the first erases and programs, and in the
   # middle of a sector's programs, then a normal power-on. The kernel NOR

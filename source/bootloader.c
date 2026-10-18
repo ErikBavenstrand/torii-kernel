@@ -39,7 +39,7 @@ const char *loader_state_name(enum loader_state state)
 	case LOADER_DAMAGED:
 		return "DAMAGED, its first 8 KB erased";
 	case LOADER_NO_HEADER:
-		return "present, without a GBA header";
+		return "OVERWRITTEN, no GBA header";
 	default:
 		return "present, with a GBA header";
 	}

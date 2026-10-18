@@ -329,7 +329,7 @@ them for bytes) and a bricked cart (2026-10-18):
 |---|---|---|
 | `0x000000–0x00FFFF` | `0x7C0000–0x7CFFFF` | EZ-Flash's boot loader (ROM page `0x8000` shows it at `0x08000000`) |
 | `0x010000–0x03FFFF` | `0x7D0000–0x7FFFFF` | unused |
-| `0x040000–…` | `0x000000–…` | the kernel (`ezkernelnew.bin`, under 2.6 MB) |
+| `0x040000–…` | `0x000000–…` | the kernel (`ezkernelnew.bin`: 2.44 MB with its images; the PDF allows 2 MB) |
 | `0x7C0000–0x7FFFFF` | `0x780000–0x7BFFFF` | the kernel's data: Torii's NOR list copy B, save info, NOR list, settings |
 
 The chip is 8 MB and the window too, so the window's last 256 KB wrap onto
@@ -342,12 +342,18 @@ the recovery. The PDF's own table lists the data records at the window
 offsets, not chip offsets; only the brick shows the window starts at chip
 `0x40000`.
 
-Sector maps: the S29PL064J (autoselect `227E 2202 2201`) has 64 KB sectors
-with eight 8 KB boot sectors at each end; the S29GL064A boot-sector models
-have them at one end (bottom boot: `227E 2210 2200`). Either way chip
-`0x0000–0xFFFF`, the loader, is 8 KB sectors, and on a PL064J so is the
-window's `0x7B0000–0x7BFFFF`, the settings sector: an erase there clears
-only 8 KB.
+Sector maps: the S29PL064J (autoselect `227E 2202 2201`, the kernel's
+`S71id == 0x2202`) has 64 KB sectors with eight 8 KB boot sectors at each
+end (Infineon S29PL-J datasheet) and no write buffer. The S29GL064A, which
+the kernel assumes for any other ID and programs through the write buffer,
+comes with eight 8 KB boot sectors at the bottom (model R4, `227E 2210
+2200`) or the top (R3, `2210 2201`), or uniform 64 KB sectors (R1/R2,
+`220C`; IDs from flashrom). So the loader is 8 KB sectors on a PL064J and a
+bottom-boot GL064A, where one erase there clears 8 KB, and one 64 KB sector
+on the others, where it clears all of it. The window's `0x7B0000–0x7BFFFF`,
+the settings sector, is 8 KB sectors on a PL064J and a top-boot GL064A: an
+erase there clears only 8 KB. Which chip a cart has is in Diagnostics' log
+("kernel NOR id"). The PDF says "S71GL064A08" but doesn't give the model.
 
 **What writes the kernel NOR** (audit for v0.2.3, from `grep` over `source/`
 for `Save_info`, `FlashBase_S71`, the command bytes `0x30`, `0xA0`, `0x25`,
@@ -373,10 +379,15 @@ game page, and `cartlog.c` sets `gl_currentpage`. Static asserts in
 `NORflash_OP.c` keep both list copies inside the data sectors.
 
 The emulated cart (`emu/mgba/src/gba/cart/omega.c`) models this: the window
-at chip `(page & 0x1FF) × 128 KB` wrapping at 8 MB, both sector maps
-(`OMEGA_KERNEL_NOR=gl064` picks the GL064A), a program over unerased bits
-failing with DQ5 until a reset, and a stand-in loader seeded when the chip
-below the kernel is blank. `kernel-nor.bin` holds the chip in window order
+at chip `(page & 0x1FF) × 128 KB` wrapping at 8 MB, the PL064J (no write
+buffer) and the three GL064A maps (`OMEGA_KERNEL_NOR=gl064`, `gl064top`,
+`gl064uniform`), a program over unerased bits failing with DQ5 until a reset
+(F0), and a stand-in loader seeded when the chip below the kernel is blank.
+Its limits: erases and programs take no time, instruction fetches from the
+cart see the chip's data even while it serves status or ID words (the
+kernel's flash code and IRQ handler run from IWRAM, so it never fetches
+then), command addresses decode A10–A0, and under page `0x8000` fetches
+mirror the first 256 KB. `kernel-nor.bin` holds the chip in window order
 (page `0x8002`), so the loader is at its offset `0x7C0000`. Any erase or
 program below chip `0x40000` prints `BOOT LOADER WRITTEN` and stops the run
 with status 76 (`OMEGA_LOADER_WRITES=allow` runs on, as the real chip

@@ -25,10 +25,15 @@
 #define KERNEL_NOR_SMALL 0x7B0000
 #define KERNEL_NOR_SMALL_SECTOR 0x2000
 
-// The ROM page that shows the boot loader at 0x08000000. Only Diagnostics'
-// read-only check (diag_loader_read) sets it.
+// The ROM pages that show the boot loader and the kernel at 0x08000000.
+// Only Diagnostics' read-only check (diag_loader_read) sets the loader's.
 #define ROM_PAGE_LOADER 0x8000
+#define ROM_PAGE_KERNEL 0x8002
 #define LOADER_SIZE 0x10000
+// EZ-Flash's loader image, DE.BIN (SHA-1 0c13deff...2217, with a GBA header):
+// its size and CRC32. Safe mode's "Update loader" writes it at chip 0.
+#define DE_BIN_SIZE 13444
+#define DE_BIN_CRC32 0x89544B57
 
 // Whether Save_info may erase the sector at window offset OFFSET and program
 // SIZE bytes there: a whole 64 KB-aligned sector of the kernel's data, the
@@ -38,7 +43,7 @@ int kernel_nor_record_ok(u32 offset, u32 size);
 enum loader_state {
 	LOADER_BLANK,  // all 0xFF: the cart starts in safe mode
 	LOADER_DAMAGED,  // its first 8 KB sector erased, nothing programmed since
-	LOADER_NO_HEADER,  // no GBA header: overwritten, or EZ-Flash's has none
+	LOADER_NO_HEADER,  // no GBA header (DE.BIN has one): overwritten, as v0.2.2 left it
 	LOADER_OK,  // a GBA header: 0x96 at 0xB2 and a matching complement
 };
 

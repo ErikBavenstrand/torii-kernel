@@ -373,14 +373,13 @@ static void step_loader(void)
 	enum loader_state state = loader_check((const u8 *)image);
 	u32 crc = crc32(image, LOADER_SIZE);
 	const char *title = (const char *)image + 0xA0;
-	int whole = state == LOADER_OK || state == LOADER_NO_HEADER;
-	say(state == LOADER_OK ? WHITE
-	    : whole            ? YELLOW
-			       : RED,
-	    "boot loader CRC %08lX, %s", (unsigned long)crc, loader_state_name(state));
-	if (state == LOADER_OK)
-		tlog("diag: boot loader title %.12s, code %.4s", title, title + 12);
-	if (!whole) {
+	int whole = state == LOADER_OK;
+	say(whole ? WHITE : RED, "boot loader CRC %08lX, %s", (unsigned long)crc, loader_state_name(state));
+	if (whole) {
+		int de_bin = crc32(image, DE_BIN_SIZE) == DE_BIN_CRC32;
+		tlog("diag: boot loader title %.12s, code %.4s, %s", title, title + 12,
+		     de_bin ? "EZ-Flash's DE.BIN" : "not DE.BIN (another loader version?)");
+	} else {
 		tlog_error("diag: the boot loader is %s: the cart will start in EZ-Flash's safe mode at the next "
 			   "power-on (docs/recovery.md)",
 			   loader_state_name(state));

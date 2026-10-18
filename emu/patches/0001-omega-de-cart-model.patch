@@ -12,10 +12,10 @@ index 59ca1c1..1dd19c0 100644
  	EXTDATA_MAX
 diff --git a/include/mgba/internal/gba/cart/omega.h b/include/mgba/internal/gba/cart/omega.h
 new file mode 100644
-index 0000000..3d49106
+index 0000000..9e874d9
 --- /dev/null
 +++ b/include/mgba/internal/gba/cart/omega.h
-@@ -0,0 +1,165 @@
+@@ -0,0 +1,167 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -86,8 +86,10 @@ index 0000000..3d49106
 +	// The kernel NOR's backing file starts at chip offset 0x40000, where ROM
 +	// page 0x8002 shows it at 0x08000000: chip = (offset + chipOffset) mod size.
 +	uint32_t chipOffset;
-+	// 0 for the game NOR's map, else OMEGA_NOR_BOOT_* for 8 KB boot sectors.
++	// OMEGA_NOR_BOOT_* for 8 KB boot sectors (the game NOR has its own map).
 +	uint8_t bootSectors;
++	// No write-buffer command (S29PL064J): 25 ... 29 programs nothing.
++	bool noBuffer;
 +	enum GBAOmegaNorState state;
 +	uint32_t bufferBase;
 +	int bufferRemaining;
@@ -307,10 +309,10 @@ index 1d0c0dd..b77704a 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..4874efa
+index 0000000..86796cb
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1280 @@
+@@ -0,0 +1,1297 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -574,16 +576,19 @@ index 0000000..4874efa
 +	uint16_t old = nor->data[offset] | (nor->data[offset + 1] << 8);
 +	nor->data[offset] &= value;
 +	nor->data[offset + 1] &= value >> 8;
-+	return (old & value) == value;
++	if ((old & value) != value) {
++		fprintf(stderr, "omega: NOR program at %06X failed (DQ5): %04X over %04X, which isn't erased\n", offset, value,
++		        old);
++		return false;
++	}
++	return true;
 +}
 +
 +// A program that can't verify runs until the chip's time limit: then DQ5 is
 +// set, DQ6 toggles and DQ7 reads the complement of the data, until the reset
 +// command (F0). The kernel's toggle polling hangs on it, as v0.2.2's did on
 +// the real cart.
-+static void _norProgramFail(struct GBAOmegaNor* nor, uint32_t offset, uint16_t value) {
-+	fprintf(stderr, "omega: NOR program at %06X failed (DQ5): %04X over %04X, which isn't erased\n", offset, value,
-+	        _read16(nor->data, nor->size, offset));
++static void _norProgramFail(struct GBAOmegaNor* nor, uint16_t value) {
 +	nor->state = OMEGA_NOR_PROGRAM_FAIL;
 +	nor->lastWord = value;
 +}
@@ -680,7 +685,7 @@ index 0000000..4874efa
 +		nor->state = (command == 0x554 && byte == 0x55) ? OMEGA_NOR_UNLOCK2 : OMEGA_NOR_READ;
 +		break;
 +	case OMEGA_NOR_UNLOCK2:
-+		if (byte == 0x25) {
++		if (byte == 0x25 && !nor->noBuffer) {
 +			// Write to buffer, at any address in the sector to program.
 +			nor->bufferBase = offset;
 +			nor->bufferCount = 0;
@@ -730,7 +735,7 @@ index 0000000..4874efa
 +		_norOperation(nor, offset, false);
 +		nor->state = OMEGA_NOR_READ;
 +		if (!_norProgram(nor, offset, value)) {
-+			_norProgramFail(nor, offset, value);
++			_norProgramFail(nor, value);
 +		}
 +		_norLoaderGuard(nor, offset & ~1, 2, "program");
 +		break;
@@ -778,7 +783,7 @@ index 0000000..4874efa
 +		for (unsigned i = 0; i < OMEGA_NOR_BUFFER_WORDS; ++i) {
 +			if (nor->bufferLoaded[i] && !_norProgram(nor, nor->bufferBase + i * 2, nor->buffer[i]) &&
 +			    nor->state == OMEGA_NOR_READ) {
-+				_norProgramFail(nor, nor->bufferBase + i * 2, nor->buffer[i]);
++				_norProgramFail(nor, nor->buffer[i]);
 +			}
 +		}
 +		_norLoaderGuard(nor, nor->bufferBase, OMEGA_NOR_BUFFER_WORDS * 2, "buffer program");
@@ -1193,17 +1198,31 @@ index 0000000..4874efa
 +	}
 +	omega->kernelNor.size = OMEGA_KERNEL_NOR_SIZE;
 +	omega->kernelNor.chipOffset = KERNEL_CHIP_KERNEL;
++	// OMEGA_KERNEL_NOR picks the chip; the kernel takes ID 0x2202 for the
++	// PL064 (word programming) and any other for a GL064 (buffered).
 +	const char* chip = getenv("OMEGA_KERNEL_NOR");
++	omega->kernelNor.noBuffer = false;
 +	if (chip && !strcmp(chip, "gl064")) {
-+		// S29GL064A bottom boot (model 03): buffered programming
++		// S29GL064A bottom boot (model R4)
 +		omega->kernelNor.id = 0x2210;
 +		omega->kernelNor.id3 = 0x2200;
 +		omega->kernelNor.bootSectors = OMEGA_NOR_BOOT_BOTTOM;
++	} else if (chip && !strcmp(chip, "gl064top")) {
++		// S29GL064A top boot (model R3): the loader is one 64 KB sector
++		omega->kernelNor.id = 0x2210;
++		omega->kernelNor.id3 = 0x2201;
++		omega->kernelNor.bootSectors = OMEGA_NOR_BOOT_TOP;
++	} else if (chip && !strcmp(chip, "gl064uniform")) {
++		// S29GL064A uniform 64 KB sectors (models R1, R2)
++		omega->kernelNor.id = 0x220C;
++		omega->kernelNor.id3 = 0x2201;
++		omega->kernelNor.bootSectors = 0;
 +	} else {
-+		// S29PL064J: word programming, boot sectors at both ends
++		// S29PL064J: boot sectors at both ends, no write buffer
 +		omega->kernelNor.id = 0x2202;
 +		omega->kernelNor.id3 = 0x2201;
 +		omega->kernelNor.bootSectors = OMEGA_NOR_BOOT_BOTTOM | OMEGA_NOR_BOOT_TOP;
++		omega->kernelNor.noBuffer = true;
 +	}
 +	omega->gameNor.size = OMEGA_GAME_NOR_SIZE;
 +	omega->gameNor.id = 0x223D;  // S98: the only game NOR the kernel writes

@@ -76,6 +76,11 @@ sudo fdisk /dev/rdiskN
 The loader goes in sectors 1 to 27, so the first partition's start sector
 must be **28 or more**. Cards formatted by a computer start it at 2048 or
 8192. If it starts earlier, stop: writing would damage the file system.
+Stop too if `fdisk` shows no partition table, or entries that make no
+sense: some cards hold the file system from sector 0, with no partition
+table, and sectors 1 to 27 are then part of it. Copy the card's files off,
+reformat it with an MBR partition table (Disk Utility: *Master Boot Record*,
+*MS-DOS (FAT)* or *ExFAT*), copy them back, and start this step again.
 
 ## 3. Write DE.BIN at byte 0x200
 
@@ -117,5 +122,5 @@ the kernel you installed.
   file system. Keep it there on a test card (`docs/release-checklist.md`):
   if a test bricks the cart, step 5 works at once.
 - Torii's Diagnostics (settings page 2, DIAGNOSE) reads the loader and logs
-  its CRC and state ("boot loader present"), and warns if it's blank or
-  erased.
+  its CRC and state ("boot loader present"), whether it is this DE.BIN, and
+  warns if it's blank, erased or overwritten.

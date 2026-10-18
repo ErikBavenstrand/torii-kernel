@@ -329,6 +329,9 @@ u32 IWRAM_CODE Save_info(u32 info_offset, u16 *info_buffer, u32 buffersize)
 		WAITCNT_RESTORE(waitcnt);
 		return buffersize / 2;
 	}
+	// The offsets are the kernel page's: under another page they could be
+	// the loader (bootloader.h)
+	SetRompage(ROM_PAGE_KERNEL);
 	u16 S71id = Read_S71NOR_ID();
 	*((vu16 *)(FlashBase_S71)) = 0xF0;
 
