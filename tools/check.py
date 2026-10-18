@@ -91,6 +91,11 @@ RULES = [
     ),
     (["tests/host/*", "tests/host.sh"], {LINT, TEST_HOST}, "host tests"),
     (
+        ["tools/ease_lut.py"],
+        {LINT, TEST_HOST},
+        "easing table generator, whose table the host tests check",
+    ),
+    (
         sorted(NO_COMPAT),
         {LINT, TEST, SIZE, ANALYZE},
         "menu or text only, listed in NO_COMPAT",

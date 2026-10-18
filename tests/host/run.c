@@ -1,5 +1,5 @@
 // Runs kernel code that needs no hardware (sorting, cheat parsing, patch tables,
-// drawing name characters) on the host, under AddressSanitizer and
+// drawing name characters, motion and input) on the host, under AddressSanitizer and
 // UndefinedBehaviorSanitizer (just test-host).
 // Prints one PASS or FAIL line per test, like the kernel unit tests.
 #include <stdarg.h>
@@ -82,6 +82,21 @@ static const struct {
 	{"logcheck_reports", test_logcheck_reports},
 	{"eeprom_probe_patterns", test_eeprom_probe_patterns},
 	{"eeprom_probe_verdict", test_eeprom_probe_verdict},
+	{"ease_lut_reproducible", test_ease_lut_reproducible},
+	{"ease_endpoints", test_ease_endpoints},
+	{"tween_endpoints", test_tween_endpoints},
+	{"spring_converges", test_spring_converges},
+	{"spring_dt_clamp", test_spring_dt_clamp},
+	{"spring_retarget", test_spring_retarget},
+	{"spring_jump_and_shift", test_spring_jump_and_shift},
+	{"motion_targets", test_motion_targets},
+	{"motion_cap_and_handles", test_motion_cap_and_handles},
+	{"palette_fade", test_palette_fade},
+	{"input_tap", test_input_tap},
+	{"input_repeat_schedule", test_input_repeat_schedule},
+	{"input_accel_reset", test_input_accel_reset},
+	{"input_paging", test_input_paging},
+	{"input_wrap", test_input_wrap},
 };
 
 int main(void)
