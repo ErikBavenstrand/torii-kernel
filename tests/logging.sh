@@ -149,7 +149,7 @@ open('$cart/Test.gb', 'wb').write(rom)"
   # shellcheck disable=SC2046
   boot $(keys 100 DOWN DOWN DOWN A) $(keys 160 A) -f 400
   has "launch: loading Test.gb with Jagoomba Color"
-  boot -f 200
+  soft_boot -f 200 # cart RAM keeps the session only across a soft reset
   has "previous session: ended in Test.gb (TORIITEST)"
 
   # A launch cut off (the emulator stops in the frame that logs it): after
