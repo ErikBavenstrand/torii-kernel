@@ -1700,10 +1700,14 @@ static u32 Grow_savefile(TCHAR *filename, u32 size, u32 need)
 			total += written;
 		}
 	}
+	// Cut short (a full card), it goes back to its old size: a size the
+	// save copy can't write whole would lose the rest without an error.
+	if (total < need && total > size && f_lseek(&file, size) == FR_OK && f_truncate(&file) == FR_OK)
+		total = size;
 	FRESULT cerr = f_close(&file);
 	if (total < need || cerr != FR_OK) {
-		tlog_error("save: growing %s from %lu to %lu bytes: %lu written, f_close gave %d", filename,
-			   (unsigned long)size, (unsigned long)need, (unsigned long)total, cerr);
+		tlog_error("save: can't grow %s from %lu to %lu bytes (a full card?): kept at %lu, f_close gave %d",
+			   filename, (unsigned long)size, (unsigned long)need, (unsigned long)total, cerr);
 		return cerr == FR_OK ? total : size;
 	}
 	tlog("save: grew %s from %lu to %lu bytes, the save type's size, padding with FF", filename,

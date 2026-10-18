@@ -422,13 +422,17 @@ u32 Save_NOR_list(u32 count)
 		u32 got;
 		u32 wrong = Save_info(copies[i], (u16 *)record, NOR_LIST_RECORD);
 		if (wrong || !nor_list_check((const u8 *)FlashBase_S71 + copies[i], &got) || got != seq) {
-			// Leave the other copy alone: it may be the only whole one
+			// Leave the other copy alone: it may be the only whole one, so the
+			// next save must write this one first again
+			if (i)
+				nor_list_from = first;
 			tlog_error("nor: writing the NOR game list at %06lX: %lu of %lu halfwords read back wrong",
 				   (unsigned long)copies[i], (unsigned long)wrong, (unsigned long)NOR_LIST_RECORD / 2);
 			return 1;
 		}
 	}
 	nor_list_stored = count;
+	nor_list_from = second;  // both whole: the next save goes to first
 	tlog("nor: list saved, %lu games, number %lu", (unsigned long)count, (unsigned long)seq);
 	return 0;
 }

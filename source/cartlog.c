@@ -290,6 +290,16 @@ static const char *probe_variant(u32 variant)
 	}
 }
 
+// Whether a write step comes before step i: data from this run before any
+// write is an earlier run's that happens to share its nonce.
+static int written_before(const struct eeprom_probe *p, u32 i)
+{
+	while (i--)
+		if (p->step[i].op == EEPROM_PROBE_WRITE)
+			return 1;
+	return 0;
+}
+
 // The EEPROM probe ROM's report (tests/roms/eeprom): each step, where each
 // read's data came from, and what they add up to.
 static void report_eeprom_probe(void)
@@ -334,7 +344,7 @@ static void report_eeprom_probe(void)
 			if (near && len < sizeof(what))
 				snprintf(what + len, sizeof(what) - len, ", except byte 7: wrote %02X, read %02X",
 					 w->data[7], s->data[7]);
-		} else if (s->data[3] == (u8)(p->nonce >> 8) && s->data[4] == (u8)p->nonce) {
+		} else if (written_before(p, i) && s->data[3] == (u8)(p->nonce >> 8) && s->data[4] == (u8)p->nonce) {
 			snprintf(what, sizeof(what), "this run, but no write matches it");
 		} else if (s->data[0] == 0xE6 || s->data[0] == 0xEE) {
 			snprintf(what, sizeof(what), "an earlier %u-bit run", s->data[0] == 0xE6 ? 6 : 14);
@@ -345,13 +355,14 @@ static void report_eeprom_probe(void)
 			   data, what);
 	}
 	u32 v = eeprom_probe_verdict(p);
-	tlog_force(TLOG_INFO, "eeprom probe: %lu-bit addresses %s%s%s%s", (unsigned long)p->width,
+	tlog_force(TLOG_INFO, "eeprom probe: %lu-bit addresses %s%s%s%s%s", (unsigned long)p->width,
 		   (v & EEPROM_PROBE_WORKS)            ? "work"
 		   : (v & EEPROM_PROBE_LAST_BYTE_LOST) ? "lose the last byte written"
 						       : "don't read back what was written",
 		   (v & EEPROM_PROBE_WRAPS) ? "; blocks wrap at 64: a 512-byte EEPROM" : "",
 		   (v & EEPROM_PROBE_8K) ? "; 1024 blocks: an 8 KB EEPROM" : "",
-		   (v & EEPROM_PROBE_TIMED_OUT) ? "; a write never finished" : "");
+		   (v & EEPROM_PROBE_TIMED_OUT) ? "; a write never finished" : "",
+		   (v & EEPROM_PROBE_WORKS) && (v & EEPROM_PROBE_LAST_BYTE_LOST) ? "; a write lost its last byte" : "");
 	tlog_flush();
 }
 

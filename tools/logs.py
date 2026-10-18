@@ -122,9 +122,11 @@ def clean_lines(raw: bytes) -> list[str]:
     bytes that aren't printable UTF-8 show as \\xNN."""
     start = LINE_START.search(raw)
     head = raw[: start.start()] if start else raw
-    _, junk = escape(head)
+    shown, junk = escape(head)
     if not junk:
         return [escape(raw)[0]]
+    if not start and junk * 4 < len(head):  # a line with a few bad bytes keeps its text
+        return [shown]
     note = f"[{len(head)} bytes of junk]"
     return [note, escape(raw[start.start() :])[0]] if start else [note]
 
