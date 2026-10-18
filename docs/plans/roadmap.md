@@ -194,11 +194,19 @@ From the first real-cart test of v0.2.0 (`docs/research/cart-test-2026-10-18.md`
   - after a crash, say the session crashed;
   - show a GB game's title instead of `(????)`;
   - in the checklist, say to use RESET, not power-off, before checking the DEBUG snapshot.
+- **Clock display:** the checklist clock looked stuck about 10 minutes behind. Make it live,
+  and check the RTC against real time (Diagnostics could log both).
+- **In-game DEBUG:** give feedback when the snapshot is taken, and survive power-off. Either
+  write it to SD from the menu, or tell the user to use RESET. On the real cart, choosing it
+  seemed to do nothing.
+- **Checklist answers:** a yes needs proof where the log can give it. For example, flag a
+  "sleep works" yes when no launch had sleep on, and an NES yes with no NES launch.
 - **EEPROM probe:** run it in game mode, from a small test ROM, so it can settle 512 vs 8K.
 - **WAITCNT:** the cart reads correctly at 2/1 with prefetch, 20% faster than the default.
   Consider setting it in the kernel, and for games that don't set it themselves.
-- **Rumble:** no GPIO register value drove the motor. Find out how the cart's rumble is
-  driven (WarioWare: Twisted! with the user's report, or the bitstream).
+- **Rumble:** no GPIO register value drove the motor. Test with Drill Dozer: WarioWare:
+  Twisted! needs a motion sensor the Omega DE lacks. Then find out how the cart's rumble is
+  driven, or whether this cart has a motor at all.
 
 ## v0.3 Renderer
 
