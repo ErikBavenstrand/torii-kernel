@@ -70,11 +70,16 @@ static const struct {
 	{"log_ring_take_lines", test_log_ring_take_lines},
 	{"log_header", test_log_header},
 	{"log_pick_current", test_log_pick_current},
-	{"log_find_end", test_log_find_end},
+	{"log_next_seq", test_log_next_seq},
+	{"log_end", test_log_end},
 	{"lz77_round_trip", test_lz77_round_trip},
 	{"lz77_compresses", test_lz77_compresses},
 	{"nor_list_copies", test_nor_list_copies},
 	{"nor_mark", test_nor_mark},
+	{"logcheck_launches", test_logcheck_launches},
+	{"logcheck_reports", test_logcheck_reports},
+	{"eeprom_probe_patterns", test_eeprom_probe_patterns},
+	{"eeprom_probe_verdict", test_eeprom_probe_verdict},
 };
 
 int main(void)

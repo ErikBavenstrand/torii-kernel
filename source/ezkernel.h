@@ -76,8 +76,8 @@ void init_FAT_table(void);
 // IWRAM code must run from IWRAM while the ROM page changes, so it is never
 // static: GCC would inline it into callers in ROM.
 void IWRAM_CODE Refresh_filename(u32 show_offset, u32 file_select, u32 updown, u32 haveThumbnail);
-u32 IWRAM_CODE Loadsavefile(TCHAR *filename);
-u32 IWRAM_CODE Save_savefile(TCHAR *filename, u32 savesize);
+u32 Loadsavefile(TCHAR *filename);
+u32 Save_savefile(TCHAR *filename, u32 savesize);
 u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU);
 
 void delay(u32 R0);

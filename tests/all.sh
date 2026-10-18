@@ -12,6 +12,10 @@ jobs=(
   "tests/save_types.sh flash64"
   "tests/save_types.sh eeprom8k"
   "tests/save_types.sh eeprom512"
+  "tests/saves.sh copy"
+  "tests/saves.sh full"
+  "tests/eeprom_probe.sh 512"
+  "tests/eeprom_probe.sh 8k"
   "tests/crash.sh"
   "tests/state.sh"
   "tests/settings.sh"
@@ -28,6 +32,7 @@ jobs=(
   "tests/logging.sh debug"
   "tests/logging.sh crash"
   "tests/logging.sh rotate"
+  "tests/logging.sh junk"
   "tests/logging.sh full"
 )
 

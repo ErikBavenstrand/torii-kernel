@@ -32,7 +32,7 @@ the update.
 |---|---|
 | `just build` | `dist/ezkernelnew.bin`, the file you flash to the cart |
 | `just sd /Volumes/OMEGA [game.gba...]` | copies the kernel (and games) to a real SD card and ejects it; hold R while switching on to install |
-| `just logs /Volumes/OMEGA` | copies the kernel's logs off a real SD card into `dist/logs/torii.log`, naming the code addresses in crash dumps (see below) |
+| `just logs /Volumes/OMEGA` | copies the kernel's logs off a real SD card into `dist/logs/torii.log`, naming the code addresses in crash dumps (see below); `--tag v0.2.1` names them with that release's symbols |
 | `just play [game.gba...]` | runs the kernel on an emulated cart, first copying any games given onto its SD card unless they are already there |
 | `just dev` | like `play`, rebuilding whenever `source/` changes |
 | `just test` | host and kernel unit tests, then homebrew games through the kernel: boot, every save type across power cycles, crash reports and save states |
@@ -52,6 +52,13 @@ the update.
 The build uses devkitARM r54, the closest available release to the r53
 EZ-Flash used, so the compiled kernel isn't bit-for-bit their file. To flash
 exactly the official kernel, use the `ezkernelnew.bin` in the repo root.
+
+The build is reproducible: the same source gives the same `ezkernelnew.bin`
+on any machine, which `just repro` (and CI) checks by rebuilding from a
+shuffled copy in another folder. Each kernel carries a build ID, the CRC32
+of its ROM, which its log lines show; releases attach `ezkernelnew.sym` and
+`ezkernelnew.elf`, and `just logs` names crash addresses only with symbols
+of the same ID.
 
 ## Logs and Diagnostics
 

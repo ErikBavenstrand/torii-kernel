@@ -81,14 +81,14 @@ Every control-register write is wrapped like this:
 
 | Address | Name in kernel | Values / meaning |
 |---|---|---|
-| `0x09400000` | `SetSDControl` | 0 = off, 1 = SD on (buffer readable), 3 = start/read-state |
+| `0x09400000` | `SetSDControl` | 0 = off, 1 = SD on (buffer readable), 3 = start/read-state; while it is on, ROM reads return the SD buffer (below) |
 | `0x09420000` | `SetbufferControl` | 0 = off, 1 = buffer write, 3 = execute; used to send FAT tables and firmware pages |
 | `0x09600000` | SD LBA low 16 bits | |
 | `0x09620000` | SD LBA high 16 bits | |
 | `0x09640000` | SD block count | 1–4 blocks; bit 15 set = write |
 | `0x09660000` | `SetSPIControl` | 1 = enable; then `0x09E00000` reads the FPGA version |
 | `0x09680000` | `SetSPIWrite` | 1 = program the staged 256 B page into config flash |
-| `0x096A0000` | `Set_RTC_status` | 1 = GPIO port (RTC and rumble) on in game |
+| `0x096A0000` | `Set_RTC_status` | bit 0 = GPIO port (RTC and rumble) on, in kernel mode too: 1 and 3 let the clock answer, 0 and 2 keep it silent (real cart, 2026-10-18) |
 | `0x096C0000` | `Set_AUTO_save` | commented out in this kernel |
 | `0x096E0000` | `Set_LED_control` | bit 7 enable, bits 5/4/3 breathing R/G/B, bits 2/1/0 SD-activity R/G/B |
 | `0x09700000` | `Set_64MROM_flag` | 64 MB ROM mapping for NOR games |
@@ -96,6 +96,17 @@ Every control-register write is wrapped like this:
 | `0x09880000` | `SetRompage` | ROM map: `0x200` = boot from PSRAM, NOR game = `NORaddress >> 17` (C4) |
 | `0x09C00000` | `SetRampage` | 4 KB page of the save and work RAM at `0x0E000000` (E0); see *Save and work RAM* |
 | `0x09E00000` | data port (read/write) | SD sector buffer (up to 2 KB), status reads; `0xEEE1` = busy |
+
+**SD mode hides the ROM.** While `0x09400000` is on, reads from cart ROM
+outside the data port don't return NOR or PSRAM: they return data left in
+the FPGA's SD buffer (real cart, 2026-10-18). Code that reads ROM in SD mode
+gets that data, and an SD write whose source buffer is in ROM writes it: v0.2.0
+zero-filled its log files from a ROM array, and they filled with junk. The
+kernel's SD code runs from IWRAM, and `disk_write` refuses a source in ROM.
+Which buffer bytes a given address returns isn't known; the emulated cart
+repeats the 2 KB buffer through the ROM space and starts it at `0xFF` at
+power-on, so stale data never reads as zeros. It doesn't model instruction
+fetches in SD mode.
 
 ### Other mapped hardware
 
@@ -219,7 +230,14 @@ at page `0x09C00000` × 4 KB:
 | `0x20`, `0x30` | S71GL064 SRAM (1 MB; its first 128 KB are unused behind the FRAM) | the in-game menu's copy of VRAM (`0x10000` + `0x2C00` bytes) |
 | `0x40`–`0xAF` | S71GL064 SRAM | the save-state buffer: the 0x70000-byte `RTS/<game>.rts` is loaded here at launch. VRAM, IWRAM, EWRAM, OAM, palette, IO, registers, and a flag at `0xAFFF0` |
 | `0xC0`, `0xD0` | S71GL064 SRAM | Torii: Diagnostics' pattern test (free otherwise) |
-| `0xF0` | S71GL064 SRAM | Torii: what the kernel keeps for its next boot (`source/cartlog.h`): where the session got to at `0xF0000`, a kernel crash dump at `0xF0100`, the in-game menu's DEBUG snapshot at `0xF1000` |
+| `0xF0` | S71GL064 SRAM | Torii: what the kernel keeps for its next boot (`source/cartlog.h`): where the session got to at `0xF0000`, a kernel crash dump at `0xF0100`, the in-game menu's DEBUG snapshot at `0xF1000`, the EEPROM probe ROM's report at `0xF1800` |
+
+Pages `0x20` and up have no battery: on the real cart they survive a soft
+reset (RESET, or the crash handler's restart) but not a power cycle
+(2026-10-18). So the session state, the crash dump and the DEBUG snapshot
+reach the next boot only without a power cycle. The emulated cart fills
+them with `0xFF` at power-on, which every `mgba-shot` run is;
+`OMEGA_SOFT_RESET=1` starts a run as after a soft reset instead.
 
 The page applies in game mode too: the menu sets `0x20` to keep the screen
 and `0x40`+ for states, then goes back to `0x00`. The menu does this
@@ -230,7 +248,8 @@ with one 1 MB `sram.bin` (before 2026-10-17 it had 512 KB, so the state
 buffer wrapped onto the game's save). `tests/menu.sh` checks it.
 
 **RTC:** a GPIO RTC at `0x080000C4` (S-3511 protocol), used by the menu clock
-in kernel mode and by games when register `0x096A0000` is 1.
+in kernel mode and by games. It answers only while bit 0 of `0x096A0000` is
+set, in kernel mode too; the kernel sets it to 1 at boot.
 
 **Verified with a commercial game:** Pokémon Emerald (`BPEE`, 16 MB, Flash
 128K, RTC) runs the whole cycle on the emulated cart, launched from SD: new
@@ -318,23 +337,33 @@ The kernel logs to `/torii/logs` on the card (`source/tlog.c`) and keeps
 a little state in cart SRAM page `0xF0` (table above). Things the
 emulated cart can't tell, which the real cart's logs will:
 
-- **Does page `0xF0` survive a power cycle?** The boot report says
-  "nothing in cart RAM" when it finds no state from the previous session.
-  The S71GL064's SRAM part is probably pseudo-SRAM with no battery, so
-  probably not; it does survive a soft reset. The log on the card doesn't
-  depend on it: a launch whose last logged line is its first ("launch:
-  loading") is reported as cut off either way.
+- **Page `0xF0` doesn't survive a power cycle** (real cart, 2026-10-18),
+  only a soft reset. The boot report then says "nothing in cart RAM". The
+  log on the card doesn't depend on it: a launch whose last logged line is
+  its first ("launch: loading") is reported as cut off either way.
 - **The kernel's crash handler** (`source/crash.s`) checks, on every IRQ,
   where the IRQ interrupted the kernel. What the real BIOS does on an
   undefined instruction isn't known here (mGBA's HLE BIOS skips it), so
   a crash that disables IRQs, or loops inside the kernel's code, goes
   uncaught.
-- **WAITCNT:** the kernel never sets it, so NOR and PSRAM run at the BIOS
-  default (4/2, no prefetch). Diagnostics times faster settings and checks
-  their data against the default's.
+- **WAITCNT:** the real cart reads NOR and PSRAM correctly at WS0 2/1 with
+  prefetch (cart test of 2026-10-18), so the menu runs at `0x4018`
+  (`source/waitcnt.h`). Untested at that speed, and kept at the BIOS's
+  `0x0000`: writes to the control registers, transfers through the SD buffer
+  at `0x09E00000`, NOR erases and writes, the RTC's serial lines, and
+  launching, with its PSRAM writes. Games start at `0x0000`. In
+  mGBA, opening a folder of 300 files takes 23 frames instead of 40. Whether
+  the real cart runs the menu's code correctly at `0x4018` is still to be
+  confirmed. Diagnostics times faster settings and checks their data against
+  the default's.
 - **EEPROM 512 vs 8K:** whether the FPGA's EEPROM answers a 6-bit and a
   14-bit read request at save types `0x21` and `0x22` (Diagnostics,
-  "EEPROM 512 or 8K"). mGBA's EEPROM takes either.
+  "EEPROM 512 or 8K"). mGBA's EEPROM takes either. On the real cart, with
+  only the save type set and the ROM page switched to `0x200` from the
+  kernel (no game started), reads at `0x0DFFFF00` returned `AAAA…` at both
+  types and widths: the EEPROM didn't answer. The emulated cart answers as
+  an EEPROM only once a BIOS SoftReset or HardReset has started the game in
+  game mode, as every launch does.
 - **Rumble:** whether a value of `0x096A0000` other than 0 and 1 drives
   the motor without the clock, or the other way round.
 - **SD writes through `Write_SD_sectors` use 16-bit DMA** from the

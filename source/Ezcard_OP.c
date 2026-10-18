@@ -12,6 +12,8 @@
 #include "ezkernel.h"
 #include "draw.h"
 #include "Ezcard_OP.h"
+#include "tlog.h"
+#include "waitcnt.h"
 
 extern u32 FAT_table_buffer[FAT_table_size / 4] EWRAM_BSS;
 
@@ -23,12 +25,14 @@ extern void SoftReset_now(void);
 // --------------------------------------------------------------------
 void IWRAM_CODE SetSDControl(u16 control)
 {
+	u16 waitcnt = WAITCNT_SLOW();
 	*(u16 *)0x9fe0000 = 0xd200;
 	*(u16 *)0x8000000 = 0x1500;
 	*(u16 *)0x8020000 = 0xd200;
 	*(u16 *)0x8040000 = 0x1500;
 	*(u16 *)0x9400000 = control;
 	*(u16 *)0x9fc0000 = 0x1500;
+	WAITCNT_RESTORE(waitcnt);
 }
 // --------------------------------------------------------------------
 void IWRAM_CODE SD_Enable(void)
@@ -72,6 +76,7 @@ u32 IWRAM_CODE Wait_SD_Response(void)
 // --------------------------------------------------------------------
 u32 IWRAM_CODE Read_SD_sectors(u32 address, u16 count, u8 *SDbuffer)
 {
+	u16 waitcnt = WAITCNT_SLOW();
 	SD_Enable();
 
 	u16 i;
@@ -103,11 +108,13 @@ u32 IWRAM_CODE Read_SD_sectors(u32 address, u16 count, u8 *SDbuffer)
 		dmaCopy((void *)0x9E00000, SDbuffer + i * 512, blocks * 512);
 	}
 	SD_Disable();
+	WAITCNT_RESTORE(waitcnt);
 	return 0;
 }
 // --------------------------------------------------------------------
 u32 IWRAM_CODE Write_SD_sectors(u32 address, u16 count, const u8 *SDbuffer)
 {
+	u16 waitcnt = WAITCNT_SLOW();
 	SD_Enable();
 	SD_Read_state();
 	u16 i;
@@ -127,11 +134,14 @@ u32 IWRAM_CODE Write_SD_sectors(u32 address, u16 count, const u8 *SDbuffer)
 		*(vu16 *)0x9fc0000 = 0x1500;
 
 		res = Wait_SD_Response();
-		if (res == 1)
+		if (res == 1) {
+			WAITCNT_RESTORE(waitcnt);
 			return 1;
+		}
 	}
 	delay(3000);
 	SD_Disable();
+	WAITCNT_RESTORE(waitcnt);
 	return 0;
 }
 // --------------------------------------------------------------------
@@ -161,55 +171,66 @@ u16 Read_S98NOR_ID(void)
 // --------------------------------------------------------------------
 void IWRAM_CODE SetRompage(u16 page)
 {
+	u16 waitcnt = WAITCNT_SLOW();
 	*(vu16 *)0x9fe0000 = 0xd200;
 	*(vu16 *)0x8000000 = 0x1500;
 	*(vu16 *)0x8020000 = 0xd200;
 	*(vu16 *)0x8040000 = 0x1500;
 	*(vu16 *)0x9880000 = page;//C4
 	*(vu16 *)0x9fc0000 = 0x1500;
+	WAITCNT_RESTORE(waitcnt);
 }
 // --------------------------------------------------------------------
 void IWRAM_CODE SetbufferControl(u16 control)
 {
+	u16 waitcnt = WAITCNT_SLOW();
 	*(u16 *)0x9fe0000 = 0xd200;
 	*(u16 *)0x8000000 = 0x1500;
 	*(u16 *)0x8020000 = 0xd200;
 	*(u16 *)0x8040000 = 0x1500;
 	*(u16 *)0x9420000 = control;//A1
 	*(u16 *)0x9fc0000 = 0x1500;
+	WAITCNT_RESTORE(waitcnt);
 }
 // --------------------------------------------------------------------
 void IWRAM_CODE SetPSRampage(u16 page)
 {
+	u16 waitcnt = WAITCNT_SLOW();
 	*(vu16 *)0x9fe0000 = 0xd200;
 	*(vu16 *)0x8000000 = 0x1500;
 	*(vu16 *)0x8020000 = 0xd200;
 	*(vu16 *)0x8040000 = 0x1500;
 	*(vu16 *)0x9860000 = page;//C3
 	*(vu16 *)0x9fc0000 = 0x1500;
+	WAITCNT_RESTORE(waitcnt);
 }
 // --------------------------------------------------------------------
 void IWRAM_CODE SetRampage(u16 page)
 {
+	u16 waitcnt = WAITCNT_SLOW();
 	*(vu16 *)0x9fe0000 = 0xd200;
 	*(vu16 *)0x8000000 = 0x1500;
 	*(vu16 *)0x8020000 = 0xd200;
 	*(vu16 *)0x8040000 = 0x1500;
 	*(vu16 *)0x9c00000 = page;//E0
 	*(vu16 *)0x9fc0000 = 0x1500;
+	WAITCNT_RESTORE(waitcnt);
 }
 // --------------------------------------------------------------------
 void IWRAM_CODE Send_FATbuffer(u32 *buffer, u32 mode)
 {
+	u16 waitcnt = WAITCNT_SLOW();
 	SetbufferControl(1);
 	dmaCopy(buffer, (void *)0x9E00000, 0x400);
 	if (mode == 2) {
 		SetbufferControl(0);
+		WAITCNT_RESTORE(waitcnt);
 		return;
 	}
 	SetbufferControl(3);
 	if (mode == 1) {
 		SetbufferControl(0);
+		WAITCNT_RESTORE(waitcnt);
 		return;
 	}
 
@@ -226,6 +247,7 @@ void IWRAM_CODE Send_FATbuffer(u32 *buffer, u32 mode)
 			break;
 	}
 	SetbufferControl(0);
+	WAITCNT_RESTORE(waitcnt);
 }
 // --------------------------------------------------------------------
 #define RESET_EWRAM (1 << 0) /*!< Clear 256K on-board WRAM			*/
@@ -253,6 +275,7 @@ u16 IWRAM_CODE Game_GPIO_status(void)
 void IWRAM_CODE SetRompageWithHardReset(u16 page, u32 bootmode)
 {
 	Set_RTC_status(Game_GPIO_status());
+	REG_WAITCNT_CART = WAITCNT_BIOS;  // what games expect at start (waitcnt.h)
 	SetRompage(page);
 	RegisterRamReset(RESET_EWRAM | RESET_PALETTE | RESET_VRAM | RESET_OAM | RESET_SIO | RESET_SOUND | RESET_OTHER);
 	if (bootmode == 1) {
@@ -286,9 +309,14 @@ void IWRAM_CODE Bank_Switching(u8 bank)
 	*((vu8 *)(SAVE_sram_base + 0x0000)) = bank;
 }
 // --------------------------------------------------------------------
-void IWRAM_CODE Save_info(u32 info_offset, u16 *info_buffer, u32 buffersize)
+// Erases one block of the kernel's NOR and writes buffersize bytes to it.
+// Returns how many halfwords read back wrong.
+u32 IWRAM_CODE Save_info(u32 info_offset, u16 *info_buffer, u32 buffersize)
 {
 	u32 offset;
+	u32 written;
+	u32 wrong = 0;
+	u16 waitcnt = WAITCNT_SLOW();
 	vu16 *buf = (vu16 *)info_buffer;
 	register u32 loopwrite;
 	vu16 v1, v2;
@@ -310,6 +338,7 @@ void IWRAM_CODE Save_info(u32 info_offset, u16 *info_buffer, u32 buffersize)
 	//erase finish
 	if (S71id == 0x2202) //PL064
 	{
+		written = buffersize / 2;
 		for (loopwrite = 0; loopwrite < buffersize / 2; loopwrite++) {
 			*((vu16 *)(FlashBase_S71 + 0x555 * 2)) = 0xAA;
 			*((vu16 *)(FlashBase_S71 + 0x2AA * 2)) = 0x55;
@@ -322,6 +351,7 @@ void IWRAM_CODE Save_info(u32 info_offset, u16 *info_buffer, u32 buffersize)
 		}
 	} else { //GL064
 		u32 i;
+		written = buffersize / 32 * 16;
 		for (loopwrite = 0; loopwrite < (buffersize / 32); loopwrite++) {
 			*((vu16 *)(FlashBase_S71 + 0x555 * 2)) = 0xAA;
 			*((vu16 *)(FlashBase_S71 + 0x2AA * 2)) = 0x55;
@@ -340,17 +370,35 @@ void IWRAM_CODE Save_info(u32 info_offset, u16 *info_buffer, u32 buffersize)
 	}
 
 	*((vu16 *)(FlashBase_S71)) = 0xF0;
+	// Torii: read it back
+	for (loopwrite = 0; loopwrite < written; loopwrite++)
+		if (*((vu16 *)(FlashBase_S71 + offset + loopwrite * 2)) != buf[loopwrite])
+			wrong++;
+	WAITCNT_RESTORE(waitcnt);
+	return wrong;
 }
 
 // --------------------------------------------------------------------
+// Torii: the three NOR records log what they wrote, after the write, when
+// the kernel's NOR reads again.
+static void log_info_write(const char *what, u32 buffersize, u32 wrong)
+{
+	if (wrong)
+		tlog_error("nor: writing %s: %lu of %lu halfwords read back wrong", what, (unsigned long)wrong,
+			   (unsigned long)buffersize / 2);
+	else
+		tlog("nor: wrote %s, %lu bytes", what, (unsigned long)buffersize);
+}
+
 void IWRAM_CODE Save_sav_info(u16 *SAV_info_buffer, u32 buffersize)
 {
-	Save_info(SAVE_info_offset, SAV_info_buffer, buffersize);
+	log_info_write(SAV_info_buffer[0] == 0x11 ? "the pending-save record" : "an empty pending-save record",
+		       buffersize, Save_info(SAVE_info_offset, SAV_info_buffer, buffersize));
 }
 // --------------------------------------------------------------------
 void IWRAM_CODE Save_SET_info(u16 *SET_info_buffer, u32 buffersize)
 {
-	Save_info(SET_info_offset, SET_info_buffer, buffersize);
+	log_info_write("the settings", buffersize, Save_info(SET_info_offset, SET_info_buffer, buffersize));
 }
 // --------------------------------------------------------------------
 u16 IWRAM_CODE Read_SET_info(u32 offset)
@@ -365,12 +413,14 @@ u16 IWRAM_CODE Read_sav_info(u32 offset)
 // --------------------------------------------------------------------
 void IWRAM_CODE SetSPIControl(u16 control)
 {
+	u16 waitcnt = WAITCNT_SLOW();
 	*(u16 *)0x9fe0000 = 0xd200;
 	*(u16 *)0x8000000 = 0x1500;
 	*(u16 *)0x8020000 = 0xd200;
 	*(u16 *)0x8040000 = 0x1500;
 	*(u16 *)0x9660000 = control;
 	*(u16 *)0x9fc0000 = 0x1500;
+	WAITCNT_RESTORE(waitcnt);
 }
 // --------------------------------------------------------------------
 void IWRAM_CODE SPI_Enable(void)
@@ -394,12 +444,14 @@ u16 IWRAM_CODE Read_FPGA_ver(void)
 // --------------------------------------------------------------------
 void IWRAM_CODE SetSPIWrite(u16 control)
 {
+	u16 waitcnt = WAITCNT_SLOW();
 	*(u16 *)0x9fe0000 = 0xd200;
 	*(u16 *)0x8000000 = 0x1500;
 	*(u16 *)0x8020000 = 0xd200;
 	*(u16 *)0x8040000 = 0x1500;
 	*(u16 *)0x9680000 = control;
 	*(u16 *)0x9fc0000 = 0x1500;
+	WAITCNT_RESTORE(waitcnt);
 }
 // --------------------------------------------------------------------
 void IWRAM_CODE SPI_Write_Enable(void)
@@ -414,12 +466,14 @@ void IWRAM_CODE SPI_Write_Disable(void)
 // --------------------------------------------------------------------
 void IWRAM_CODE Set_RTC_status(u16 status)
 {
+	u16 waitcnt = WAITCNT_SLOW();
 	*(u16 *)0x9fe0000 = 0xd200;
 	*(u16 *)0x8000000 = 0x1500;
 	*(u16 *)0x8020000 = 0xd200;
 	*(u16 *)0x8040000 = 0x1500;
 	*(u16 *)0x96A0000 = status;
 	*(u16 *)0x9fc0000 = 0x1500;
+	WAITCNT_RESTORE(waitcnt);
 }
 // --------------------------------------------------------------------
 /*void IWRAM_CODE Set_AUTO_save(u16  mode)
@@ -434,22 +488,26 @@ void IWRAM_CODE Set_RTC_status(u16 status)
 // --------------------------------------------------------------------
 void IWRAM_CODE Set_LED_control(u16 status)
 {
+	u16 waitcnt = WAITCNT_SLOW();
 	*(u16 *)0x9fe0000 = 0xd200;
 	*(u16 *)0x8000000 = 0x1500;
 	*(u16 *)0x8020000 = 0xd200;
 	*(u16 *)0x8040000 = 0x1500;
 	*(u16 *)0x96E0000 = status;
 	*(u16 *)0x9fc0000 = 0x1500;
+	WAITCNT_RESTORE(waitcnt);
 }
 // --------------------------------------------------------------------
 void IWRAM_CODE Set_64MROM_flag(u16 flag)
 {
+	u16 waitcnt = WAITCNT_SLOW();
 	*(u16 *)0x9fe0000 = 0xd200;
 	*(u16 *)0x8000000 = 0x1500;
 	*(u16 *)0x8020000 = 0xd200;
 	*(u16 *)0x8040000 = 0x1500;
 	*(u16 *)0x9700000 = flag;
 	*(u16 *)0x9fc0000 = 0x1500;
+	WAITCNT_RESTORE(waitcnt);
 }
 // --------------------------------------------------------------------
 void IWRAM_CODE FW_update(u16 DEcard_FW_readver, u16 FW_built_in_ver, void *FWbinaddress, u32 FWsize, u32 build_crc32,

@@ -11,6 +11,7 @@
 #include "diskio.h"		/* Declarations of disk functions */
 #include "../Ezcard_OP.h"
 #include "../RTC.h"
+#include "../tlog.h"
 /* Definitions of physical drive number for each drive */
 //#define DEV_RAM		0	/* Example: Map Ramdisk to physical drive 0 */
 //#define DEV_MMC		1	/* Example: Map MMC/SD card to physical drive 1 */
@@ -193,6 +194,11 @@ DRESULT disk_write (
 
 	return RES_PARERR;*/
 	DRESULT res;
+	/* Torii: ROM reads while SD mode is on return the cart's SD buffer, so
+	   a source in ROM would write that instead: refuse it. */
+	TLOG_ASSERT((DWORD)buff < 0x08000000);
+	if ((DWORD)buff >= 0x08000000)
+		return RES_PARERR;
 	res = Write_SD_sectors(sector, count, buff);
 	return res;
 }

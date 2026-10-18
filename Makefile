@@ -41,6 +41,12 @@ CFLAGS	+=	-fstack-usage -fcallgraph-info=su
 
 CFLAGS	+=	$(INCLUDE)
 
+# __FILE__ (in asserts) and the debug info (also ASFLAGS') name sources
+# relative to the project, so the kernel is the same in any folder. The
+# objects build in $(BUILD), so TOPDIR passes the project folder down.
+export TOPDIR	?=	$(CURDIR)
+CFLAGS	+=	-ffile-prefix-map=$(TOPDIR)/=
+
 # The unit tests in tests/kernel are in every kernel, for Diagnostics; the
 # test kernel also runs them at boot
 ifeq ($(TARGET),ezkerneltest)
@@ -52,7 +58,7 @@ WARNFLAGS	:=	-Werror -Wextra -Wshadow -Wundef -Wformat=2 -Wstrict-prototypes -Wm
 
 CXXFLAGS	:=	$(CFLAGS) -fno-rtti -fno-exceptions
 
-ASFLAGS	:=	-g $(ARCH)
+ASFLAGS	:=	-g $(ARCH) -Wa,--debug-prefix-map=$(TOPDIR)/=
 LDFLAGS	=	-g $(ARCH) -Wl,-Map,$(notdir $*.map)
 
 #---------------------------------------------------------------------------------
@@ -84,13 +90,15 @@ export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) \
 
 export DEPSDIR	:=	$(CURDIR)/$(BUILD)
 
-CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
-CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
-SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
-BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
+# Sorted: the link order follows these lists, and devkitARM's GNU Make 4.1
+# returns $(wildcard) in directory order, which differs between file systems
+CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(sort $(wildcard $(dir)/*.c))))
+CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(sort $(wildcard $(dir)/*.cpp))))
+SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(sort $(wildcard $(dir)/*.s))))
+BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(sort $(wildcard $(dir)/*.*))))
 
 ifneq ($(strip $(MUSIC)),)
-	export AUDIOFILES	:=	$(foreach dir,$(notdir $(wildcard $(MUSIC)/*.*)),$(CURDIR)/$(MUSIC)/$(dir))
+	export AUDIOFILES	:=	$(foreach dir,$(notdir $(sort $(wildcard $(MUSIC)/*.*))),$(CURDIR)/$(MUSIC)/$(dir))
 	BINFILES += soundbank.bin
 endif
 
@@ -114,7 +122,7 @@ export OFILES_SOURCES := $(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
 
 export OFILES := $(OFILES_BIN) $(OFILES_SOURCES)
 
-export FATFS_OFILES := $(patsubst %.c,%.o,$(notdir $(wildcard source/ff15/*.c)))
+export FATFS_OFILES := $(patsubst %.c,%.o,$(notdir $(sort $(wildcard source/ff15/*.c))))
 
 export HFILES := $(addsuffix .h,$(subst .,_,$(BINFILES)))
 

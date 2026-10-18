@@ -18,6 +18,8 @@ Torii is a custom kernel for the EZ-Flash Omega DE, forked from EZ-Flash's offic
 - Cart SRAM pages from `0x40` hold save states and page `0xF0` the kernel's crash dump and session state (`source/cartlog.h`); pages `0x00`-`0x1F` are the game's save. Leave the page at 0 when done.
 - `just size` checks the kernel against the 1 MB kernel area, IWRAM and EWRAM. EWRAM has about 7 KB left; past its end, data wraps onto its start. `just stack` lists the largest frames and estimates the deepest call chain at about 2.5 KB, so keep IWRAM free space well above that (about 4.4 KB now). Every kernel links the unit tests, for Diagnostics, so their static buffers go in EWRAM.
 - Build only with `just build`. It pins devkitARM r54 because newer GCC rejects the unmodified source.
+- The build is reproducible; `just repro` checks it, and CI runs it. Keep it so: sort any `$(wildcard)` or file listing that sets an order, and keep paths and dates out of the binary.
+  `tools/build_id.py` writes the build ID (`source/build_id.h`, a CRC32 of the ROM) after linking, and `just logs` uses the ID to pick symbols.
 - Builds guard against stale objects themselves (`tools/fresh.py`): the colima VM's virtiofs mount shows edits to containers up to a second late, so make alone can reuse old objects. Build through the `just` recipes, never `make` directly.
 
 ## Formatting

@@ -1,6 +1,8 @@
 # Publishes a GitHub Release when a version tag (v0.1.0, ...) is pushed: the
-# kernel is built and tested, then ezkernelnew.bin is attached with install
-# steps and the newest CHANGELOG.md section as notes (tools/release_notes.sh).
+# kernel is built, checked to be reproducible and tested, then ezkernelnew.bin
+# is attached with install steps and the newest CHANGELOG.md section as notes
+# (tools/release_notes.sh), and with ezkernelnew.sym and ezkernelnew.elf, which
+# `just logs --tag` and gdb read for crash dumps from this build.
 name: Release
 
 on:
@@ -24,11 +26,16 @@ jobs:
         run: just test
       - name: Check size against the cart and GBA memory
         run: just size
-      - name: Upload ezkernelnew.bin
+      - name: Check the build is reproducible
+        run: just repro
+      - name: Upload the kernel and its symbols
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ezkernelnew
-          path: dist/ezkernelnew.bin
+          path: |
+            dist/ezkernelnew.bin
+            dist/ezkernelnew.sym
+            ezkernelnew.elf
           if-no-files-found: error
 
   publish:
@@ -48,5 +55,8 @@ jobs:
       - name: Create the release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
-          files: ezkernelnew.bin
+          files: |
+            dist/ezkernelnew.bin
+            dist/ezkernelnew.sym
+            ezkernelnew.elf
           body_path: release-notes.md

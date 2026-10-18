@@ -10,12 +10,13 @@ SoftReset_now:
 	bx  r1
 	.code 32
 SoftReset_now16:
-	mov r0,#0x04000000		@;IME off: the clears below wipe the IRQ handler
+	mov r0,#0x04000000		@;IME off: the clear below wipes the IRQ handler
 	str r0,[r0,#0x208]
-	@;run the reset from the top of IWRAM, which the BIOS SoftReset clears,
-	@;so nothing is left in EWRAM (it used to go to 0x02001000)
-	adr r1,SoftReset
-	adr r3,SoftReset_end
+	@;Torii: the last step runs from a stub at the top of IWRAM, which the
+	@;BIOS SoftReset clears, so the stub can clear all the rest of IWRAM,
+	@;this code included, and the game finds IWRAM all zero
+	adr r1,reset_stub
+	adr r3,reset_stub_end
 	mov r2,#0x03000000
 	add r2,#0x7E00
 copy_loop:
@@ -23,28 +24,29 @@ copy_loop:
 	str r0,[r2],#4
 	cmp r1,r3
 	blt copy_loop
-
-	mov		r2,#0x3000000
-	@;add		r3,r2,#0x1000
-	ldr		r3,=SoftReset_now
-	mov		r0,#0
-clearL:
-	str		r0,[r2],#+4
-	cmp		r2,r3
-	blt		clearL
-
-	ldr		r2,=RegisterRamReset
-	ldr		r3,=0x3007E00 @;not the copy above
-	mov		r0,#0
-clearL2:
-	str		r0,[r2],#+4
-	cmp		r2,r3
-	blt		clearL2
-		
 	mov r0,#0x03000000
 	add r0,r0,#0x7E00
-	add r0,r0,#1
 	bx r0
+
+@;Runs at 0x3007E00 (ARM): no literals, so it copies as it is. Clears
+@;0x3000000-0x3007DFF, then does what SoftReset below does: 0x3007F00 = 1,
+@;the restart flag at 0x3007FFA = 0 (so SWI 0 starts the cart), sp at
+@;0x3007F00.
+reset_stub:
+	mov r2,#0x03000000
+	add r3,r2,#0x7E00
+	mov r0,#0
+clear_iwram:
+	str r0,[r2],#4
+	cmp r2,r3
+	blt clear_iwram
+	add r2,r3,#0x100		@;0x3007F00
+	mov r1,#1
+	str r1,[r2]
+	mov sp,r2
+	str r0,[r2,#0xF8]		@;0x3007FF8-0x3007FFB, the flag at 0x3007FFA among them
+	swi 0
+reset_stub_end:
 @----------------------------------------------
 	.code 16
 

@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <string.h>
 
 #include "logbuf.h"
@@ -108,26 +109,78 @@ u32 log_header_seq(const char *buf, u32 n)
 	return seq;
 }
 
+u32 log_next_seq(u32 seq)
+{
+	return (seq >= LOG_SEQ_MAX) ? 1 : seq + 1;
+}
+
+// True if sequence a comes after b: less than half the cycle ahead of it.
+static int seq_newer(u32 a, u32 b)
+{
+	u32 ahead = (a + LOG_SEQ_MAX - b) % LOG_SEQ_MAX;
+	return ahead && ahead < LOG_SEQ_MAX / 2;
+}
+
 int log_pick_current(const u32 seqs[LOG_FILES])
 {
 	int best = -1;
 	for (int i = 0; i < LOG_FILES; i++) {
-		if (seqs[i] && (best < 0 || seqs[i] > seqs[best]))
+		if (seqs[i] && (best < 0 || seq_newer(seqs[i], seqs[best])))
 			best = i;
 	}
 	return best;
 }
 
-u32 log_find_end(int (*byte_at)(void *ctx, u32 offset), void *ctx, u32 size)
+void log_end_start(log_end *e)
 {
-	// The answer is the first offset holding zero, in [LOG_HEADER_LEN, size].
-	u32 lo = LOG_HEADER_LEN, hi = size;
-	while (lo < hi) {
-		u32 mid = lo + (hi - lo) / 2;
-		if (byte_at(ctx, mid) > 0)
-			lo = mid + 1;
-		else
-			hi = mid;
+	memset(e, 0, sizeof(*e));
+	e->line = LOG_HEADER_LEN;
+}
+
+// True if a byte of v is zero.
+static int has_zero(u32 v)
+{
+	return ((v - 0x01010101u) & ~v & 0x80808080u) != 0;
+}
+
+void log_end_feed(log_end *e, const char *buf, u32 n)
+{
+	u32 i = 0;
+	while (i < n && !e->junk) {
+		// Whole words where they can be read as such: a 64 KB file is read
+		// at every boot.
+		if (e->seen >= LOG_HEADER_LEN && !((uintptr_t)(buf + i) & 3) && n - i >= 4) {
+			u32 v = *(const u32 *)(const void *)(buf + i);
+			if (e->found ? v == 0 : !has_zero(v) && !has_zero(v ^ 0x0A0A0A0Au)) {
+				i += 4;
+				e->seen += 4;
+				continue;
+			}
+		}
+		if (e->seen >= LOG_HEADER_LEN) {
+			if (e->found) {
+				e->junk = buf[i] != 0;
+			} else if (!buf[i]) {
+				e->found = 1;
+				e->end = e->seen;
+			} else if (buf[i] == '\n') {
+				e->line = e->seen + 1;
+			}
+		}
+		i++;
+		e->seen++;
 	}
-	return lo;
+	e->seen += n - i;  // after junk, only the count
+}
+
+int log_end_is_junk(const log_end *e)
+{
+	return e->junk || log_end_offset(e) - e->line > LOG_LINE_MAX;
+}
+
+u32 log_end_offset(const log_end *e)
+{
+	if (e->found)
+		return e->end;
+	return (e->seen > LOG_HEADER_LEN) ? e->seen : LOG_HEADER_LEN;
 }

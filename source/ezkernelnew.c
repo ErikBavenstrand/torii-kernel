@@ -18,6 +18,7 @@
 #include "saveMODE.h"
 #include "RTC.h"
 #include "tlog.h"
+#include "waitcnt.h"
 #include "sort.h"
 #include "savename.h"
 #include "NORflash_OP.h"
@@ -96,6 +97,11 @@ u16 gl_color_NORFULL      = RGB(31,00,00);
 u16 gl_color_btn_clean    = RGB(00,00,31);
 */
 u16 SAV_info_buffer[0x200];//Torii: IWRAM, so EWRAM data fits in 256 KB
+// The pending-save record in the kernel's NOR: 0x11, the size in 512-byte
+// units, then the save's file name from halfword 2. Torii keeps the save
+// type at halfword SAV_INFO_TYPE, past the longest name, for the log (0
+// from older kernels).
+#define SAV_INFO_TYPE 0x80
 //******************************************************************************
 void delay(u32 R0)
 {
@@ -966,7 +972,7 @@ u32 Check_game_RTS_FAT(TCHAR *filename, u32 game_save_rts)
 	return 0;
 }
 //---------------------------------------------------------------------------------
-u32 IWRAM_CODE Loadsavefile(TCHAR *filename)
+u32 Loadsavefile(TCHAR *filename)
 {
 	UINT ret;
 	UINT filesize;
@@ -981,27 +987,53 @@ u32 IWRAM_CODE Loadsavefile(TCHAR *filename)
 
 		SetRampage(0x0);
 
+		// Torii: the reads' results are logged
+		FRESULT res, res2 = FR_OK;
+		UINT got;
 		if (filesize > 64 * 1024) {
-			f_read(&file, pReadCache, 64 * 1024, (UINT *)&ret);
+			res = f_read(&file, pReadCache, 64 * 1024, (UINT *)&ret);
+			got = ret;
 			WriteSram(SRAMSaver, pReadCache, 64 * 1024);
 			SetRampage(0x10);
 			left = filesize - 64 * 1024;
-			f_read(&file, pReadCache, left, (UINT *)&ret);
+			res2 = f_read(&file, pReadCache, left, (UINT *)&ret);
+			got += ret;
 			WriteSram(SRAMSaver, pReadCache, left);
 		} else {
-			f_read(&file, pReadCache, filesize, (UINT *)&ret);
+			res = f_read(&file, pReadCache, filesize, (UINT *)&ret);
+			got = ret;
 			WriteSram(SRAMSaver, pReadCache, filesize);
 		}
 		f_close(&file);
 		SetRampage(0x0);
+		if (res != FR_OK || res2 != FR_OK || got != filesize)
+			tlog_error("save: loading %s into cart SRAM: f_read gave %d and %d, %u of %u bytes", filename,
+				   res, res2, got, filesize);
+		else
+			tlog("save: loaded %s into cart SRAM, %u bytes", filename, filesize);
 		return 1;
 	}
 	default:
+		tlog_error("save: can't open %s to load it", filename);
 		return false;
 	}
 }
 //---------------------------------------------------------------------------------
-u32 IWRAM_CODE Save_savefile(TCHAR *filename, u32 savesize)
+// Torii: f_write for Save_savefile, adding up what went to the card and
+// keeping the first error.
+static void save_write(FIL *file, const u8 *data, UINT len, u32 *total, FRESULT *first_error)
+{
+	UINT written = 0;
+	FRESULT res = f_write(file, data, len, &written);
+	*total += written;
+	if (res != FR_OK && *first_error == FR_OK)
+		*first_error = res;
+}
+
+// Copies savesize bytes of cart SRAM to filename, over the file there, and
+// logs what reached the card. ROM code, as Loadsavefile: both run only in
+// the menu.
+u32 Save_savefile(TCHAR *filename, u32 savesize)
 {
 	FIL file;
 	if (savesize == 0)
@@ -1009,50 +1041,47 @@ u32 IWRAM_CODE Save_savefile(TCHAR *filename, u32 savesize)
 	u32 ret = f_open(&file, filename, FA_WRITE | FA_CREATE_ALWAYS);
 	switch (ret) {
 	case FR_OK: {
-		int i;
-		unsigned int written;
+		u32 i;
+		u32 total = 0, expected;
+		FRESULT werr = FR_OK;
 		//memset(pReadCache,0xFF,0x200*4);
 		SetRampage(0x0);
 
 		if (savesize < 0x800) {
 			ReadSram(SRAMSaver, pReadCache, savesize);
-			for (i = 0; (u32)i < (savesize + 0x1FF) / 0x200; i++) {
-				f_write(&file, pReadCache + 0x200 * i, 0x200, &written);
-				if (written != 0x200)
-					break;
-			}
+			expected = (savesize + 0x1FF) / 0x200 * 0x200;
+			for (i = 0; i < (savesize + 0x1FF) / 0x200 && total == i * 0x200; i++)
+				save_write(&file, pReadCache + 0x200 * i, 0x200, &total, &werr);
 		} else {
 			if (savesize > 64 * 1024) {
+				expected = 128 * 1024;
 				ReadSram(SRAMSaver, pReadCache, 64 * 1024);
-
-				for (i = 0; i < 64 * 1024 / 0x800; i++) {
-					f_write(&file, pReadCache + 0x800 * i, 0x200 * 4, &written);
-					if (written != 0x200 * 4)
-						break;
-				}
+				for (i = 0; i < 64 * 1024 / 0x800 && total == i * 0x800; i++)
+					save_write(&file, pReadCache + 0x800 * i, 0x200 * 4, &total, &werr);
 				SetRampage(0x10);
 				ReadSram(SRAMSaver, pReadCache, 64 * 1024);
-
-				for (i = 0; i < 64 * 1024 / 0x800; i++) {
-					f_write(&file, pReadCache + 0x800 * i, 0x200 * 4, &written);
-					if (written != 0x200 * 4)
-						break;
-				}
+				for (i = 0; i < 64 * 1024 / 0x800 && total == 64 * 1024 + i * 0x800; i++)
+					save_write(&file, pReadCache + 0x800 * i, 0x200 * 4, &total, &werr);
 			} else {
+				expected = savesize / 0x800 * 0x800;
 				ReadSram(SRAMSaver, pReadCache, savesize);
-				for (i = 0; (u32)i < savesize / 0x800; i++) {
-					f_write(&file, pReadCache + 0x800 * i, 0x200 * 4, &written);
-					if (written != 0x200 * 4)
-						break;
-				}
+				for (i = 0; i < savesize / 0x800 && total == i * 0x800; i++)
+					save_write(&file, pReadCache + 0x800 * i, 0x200 * 4, &total, &werr);
 			}
 		}
+		SetRampage(0x0);  // Torii: the page was left at 0x10
 
-		f_close(&file);
+		FRESULT cerr = f_close(&file);
+		if (werr != FR_OK || cerr != FR_OK || total != expected)
+			tlog_error("save: writing %s: %lu of %lu bytes written, f_write gave %d, f_close %d", filename,
+				   (unsigned long)total, (unsigned long)expected, werr, cerr);
+		else
+			tlog("save: wrote %s, %lu bytes, f_close gave %d", filename, (unsigned long)total, cerr);
 
 		return 1;
 	} break;
 	default:
+		tlog_error("save: can't create %s: f_open gave %lu", filename, (unsigned long)ret);
 		return false;
 	}
 }
@@ -1096,25 +1125,34 @@ static u32 SavefileWrite(TCHAR *filename, u32 savesize)
 		unsigned int written;
 		memset(pReadCache, 0xFF, 0x200 * 4);
 
+		u32 total = 0;
 		if (savesize < 0x800) {
 			for (i = 0; (u32)i < (savesize + 0x1FF) / 0x200; i++) {
 				f_write(&file, pReadCache, 0x200, &written);
+				total += written;
 				if (written != 0x200)
 					break;
 			}
 		} else {
 			for (i = 0; (u32)i < (savesize + 0x1FF) / 0x800; i++) {
 				f_write(&file, pReadCache, 0x200 * 4, &written);
+				total += written;
 				if (written != 0x200 * 4)
 					break;
 			}
 		}
 
-		f_close(&file);
+		FRESULT cerr = f_close(&file);
+		if (total < savesize || cerr != FR_OK)  // Torii: logged, as before not an error
+			tlog_error("save: making a blank %s: %lu of %lu bytes written, f_close gave %d", filename,
+				   (unsigned long)total, (unsigned long)savesize, cerr);
+		else
+			tlog("save: made a blank %s, %lu bytes", filename, (unsigned long)total);
 
 		return 1;
 	} break;
 	default:
+		tlog_error("save: can't create %s: f_open gave %lu", filename, (unsigned long)ret);
 		return false;
 	}
 }
@@ -1661,6 +1699,7 @@ static u8 Process_savefile(u32 is_EMU, TCHAR *pfilename, u32 gamefilesize, BYTE 
 	{
 		savefilesize = f_size(&gfile);
 		f_close(&gfile);
+		tlog("save: %s exists, %lu bytes, save type %02X", savfilename, (unsigned long)savefilesize, saveMODE);
 	} else //make a new one
 	{
 		ShowbootProgress(gl_make_sav);
@@ -1684,6 +1723,7 @@ static u8 Process_savefile(u32 is_EMU, TCHAR *pfilename, u32 gamefilesize, BYTE 
 		SAV_info_buffer[1] = savefilesize >> 9;
 		//memcpy(&SAV_info_buffer[2],savfilename,100);
 		strcpy((char *)&SAV_info_buffer[2], savfilename);
+		SAV_info_buffer[SAV_INFO_TYPE] = saveMODE;
 		Save_sav_info(SAV_info_buffer, 0x200);
 	}
 
@@ -1709,6 +1749,8 @@ static void Check_save_flag(void)
 	u32 savefilesize;
 	readd = Read_sav_info(0);
 	savefilesize = Read_sav_info(1) << 9;
+	if (readd != 0x11)
+		tlog_debug("save: no save waiting to be copied");
 	if (readd == 0x11) {
 		//u32 res;
 		register u32 loopwrite;
@@ -1724,7 +1766,12 @@ static void Check_save_flag(void)
 		DrawHZText12((TCHAR *)SAV_info_buffer + 40, 20, 60, 64, 0x7fff, 1);//file name
 			//DrawHZText12(gl_formatnor_info,5,60,90,gl_color_text,1);//use sure?
 
+		// Torii: the answer is logged
+		static const char saved_how[] = "save: \"Save sav?\" for %s/%s, %lu bytes, save type %02X: %s";
+		u16 savetype = Read_sav_info(SAV_INFO_TYPE);
 		if (gl_auto_save_sel) {
+			tlog(saved_how, SAVER_FOLDER, (TCHAR *)SAV_info_buffer, (unsigned long)savefilesize, savetype,
+			     "auto");
 			DrawHZText12(gl_save_ing, 0, 60, 88, gl_color_text, 1);//use sure?gl_LSTART_help
 			f_mkdir(SAVER_FOLDER);//"/SAVER"
 			f_chdir(SAVER_FOLDER);
@@ -1736,6 +1783,8 @@ static void Check_save_flag(void)
 				scanKeys();
 				u16 keysdown = keysDown();
 				if (keysdown & KEY_A) {
+					tlog(saved_how, SAVER_FOLDER, (TCHAR *)SAV_info_buffer,
+					     (unsigned long)savefilesize, savetype, "A, save");
 					DrawHZText12(gl_save_ing, 0, 60, 88, gl_color_text,
 						     1);//use sure?gl_LSTART_help
 					f_mkdir(SAVER_FOLDER);
@@ -1752,6 +1801,8 @@ static void Check_save_flag(void)
 						}*/
 					break;
 				} else if (keysdown & KEY_B) {
+					tlog(saved_how, SAVER_FOLDER, (TCHAR *)SAV_info_buffer,
+					     (unsigned long)savefilesize, savetype, "B, not saved");
 					break;
 				}
 			}
@@ -1781,6 +1832,9 @@ static void Set_saveMODE(BYTE saveMODE)
 //---------------------------------------------------------------------------------
 int main(void)
 {
+	// A soft reset or an in-game RESET keeps the last WAITCNT; the firmware
+	// update below runs at the BIOS's, the menu after it faster (waitcnt.h).
+	REG_WAITCNT_CART = WAITCNT_BIOS;
 	tlog_init();
 	tlog_marker("power-on or reset", 0);
 	torii_run_tests();
@@ -1816,6 +1870,8 @@ int main(void)
 
 	//check FW
 	Check_FW_update();
+	REG_WAITCNT_CART = WAITCNT_MENU;
+	tlog_debug("boot: WAITCNT %04X for the menu", REG_WAITCNT_CART);
 
 	DrawPic((u16 *)gImage_splash, 0, 0, 240, 160, 0, 0, 1);
 	CheckLanguage();
@@ -2478,7 +2534,9 @@ u8 NOR_list_MENU(u32 show_offset, u32 file_select)
 			key_L = 0;
 		} else if (keysdown & KEY_A) {
 			if (MENU_line == 0) {  //boot to NOR.page
+				REG_WAITCNT_CART = WAITCNT_BIOS;  // as SD_list_MENU
 				Boot_NOR_game(show_offset, file_select, key_L);
+				REG_WAITCNT_CART = WAITCNT_MENU;
 				cartlog_phase(PHASE_MENU, 0, NULL);
 			} else if (MENU_line == 1) {
 				//delete lastest geme
@@ -2927,7 +2985,11 @@ boot_game:
 // in another.
 u8 SD_list_MENU(u32 show_offset, u32 file_select, u32 play_re)
 {
+	// A launch loads and patches the game in PSRAM, writes never measured
+	// faster than the BIOS's wait states (waitcnt.h)
+	REG_WAITCNT_CART = WAITCNT_BIOS;
 	u8 res = SD_list_open(show_offset, file_select, play_re);
+	REG_WAITCNT_CART = WAITCNT_MENU;
 	cartlog_phase(PHASE_MENU, 0, NULL);
 	if (res == 0 && play_re != 0xBB) {
 		strncpy(currentpath, currentpath_temp, MAX_path_len);

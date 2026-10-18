@@ -17,6 +17,7 @@
 #include "cheat.h"
 #include "norlist.h"
 #include "tlog.h"
+#include "waitcnt.h"
 //#define DEBUG
 
 extern FM_NOR_FS pNorFS[MAX_NOR] EWRAM_BSS;
@@ -37,6 +38,7 @@ void IWRAM_CODE Block_Erase(u32 blockAdd) //0x20000 BYTE pre block
 	vu16 page, v1, v2;
 	u32 Address;
 	u32 loop;
+	u16 waitcnt = WAITCNT_SLOW();
 
 	page = gl_currentpage;
 	Address = blockAdd;
@@ -79,6 +81,7 @@ void IWRAM_CODE Block_Erase(u32 blockAdd) //0x20000 BYTE pre block
 		} while ((v1 != v2) || ((v1 & 0x80) != 0x80));
 	}
 	SetRompage(gl_currentpage);
+	WAITCNT_RESTORE(waitcnt);
 }
 //-----------------------------------------------------------
 void Chip_Erase(void)
@@ -86,6 +89,8 @@ void Chip_Erase(void)
 	char msg[128];
 	u32 count = 0;
 	vu16 v1, v2 = 0;
+	u16 waitcnt = WAITCNT_SLOW();
+	tlog("nor: erasing the whole game NOR");
 	REG_IME = 0;
 	*((vu16 *)(FlashBase_S98 + 0x555 * 2)) = 0xAA;
 	*((vu16 *)(FlashBase_S98 + 0x2AA * 2)) = 0x55;
@@ -108,6 +113,8 @@ void Chip_Erase(void)
 		v2 = *((vu16 *)(FlashBase_S98));
 	} while (v1 != v2);
 	REG_IME = 1;
+	WAITCNT_RESTORE(waitcnt);
+	tlog("nor: erased the game NOR");
 }
 
 //-----------------------------------------------------------
@@ -139,6 +146,7 @@ void WriteFlash(u32 address, u8 *buffer, u32 size)
 	vu16 page, v1, v2;
 	register u32 loopwrite;
 	vu16 *buf = (vu16 *)buffer;
+	u16 waitcnt = WAITCNT_SLOW();
 
 	page = gl_currentpage;
 	while (address >= 0x800000) {
@@ -161,6 +169,7 @@ void WriteFlash(u32 address, u8 *buffer, u32 size)
 		} while (v1 != v2);
 	}
 	SetRompage(gl_currentpage);
+	WAITCNT_RESTORE(waitcnt);
 }
 //---------------------------------------------------------------
 void IWRAM_CODE WriteFlash_with32word(u32 address, u8 *buffer, u32 size)
@@ -169,6 +178,7 @@ void IWRAM_CODE WriteFlash_with32word(u32 address, u8 *buffer, u32 size)
 	register u32 loopwrite;
 	vu16 *buf = (vu16 *)buffer;
 	u32 i;
+	u16 waitcnt = WAITCNT_SLOW();
 
 	page = gl_currentpage;
 	while (address >= 0x800000) {
@@ -197,6 +207,7 @@ void IWRAM_CODE WriteFlash_with32word(u32 address, u8 *buffer, u32 size)
 		} while (v1 != v2);
 	}
 	SetRompage(gl_currentpage);
+	WAITCNT_RESTORE(waitcnt);
 }
 //-----------------------------------------------------------
 // Torii: the list and completion marks (norlist.h).
@@ -379,10 +390,11 @@ u32 Save_NOR_list(u32 count)
 	const u32 copies[2] = {first, second};
 	for (u32 i = 0; i < 2; i++) {
 		u32 got;
-		Save_info(copies[i], (u16 *)record, NOR_LIST_RECORD);
-		if (!nor_list_check((const u8 *)FlashBase_S71 + copies[i], &got) || got != seq) {
+		u32 wrong = Save_info(copies[i], (u16 *)record, NOR_LIST_RECORD);
+		if (wrong || !nor_list_check((const u8 *)FlashBase_S71 + copies[i], &got) || got != seq) {
 			// Leave the other copy alone: it may be the only whole one
-			tlog_error("nor: the list copy at %06lX didn't read back", (unsigned long)copies[i]);
+			tlog_error("nor: writing the NOR game list at %06lX: %lu of %lu halfwords read back wrong",
+				   (unsigned long)copies[i], (unsigned long)wrong, (unsigned long)NOR_LIST_RECORD / 2);
 			return 1;
 		}
 	}
@@ -411,7 +423,7 @@ void Delete_latest_NOR(void)
 	Save_NOR_list(game_total_NOR);
 }
 //-----------------------------------------------------------
-u32 Loadfile2NOR(TCHAR *filename, u32 NORaddress, u16 have_patch, u8 SAVEMODE)
+static u32 Loadfile2NOR_slow(TCHAR *filename, u32 NORaddress, u16 have_patch, u8 SAVEMODE)
 {
 	u32 res;
 	u32 ret;
@@ -447,8 +459,10 @@ u32 Loadfile2NOR(TCHAR *filename, u32 NORaddress, u16 have_patch, u8 SAVEMODE)
 			return 2;
 
 		res = f_open(&gfile, filename, FA_READ);
-		if (res != FR_OK)
-			return 1;
+		if (res != FR_OK) {  // Torii: was 0, which callers take for success
+			tlog_error("nor: can't open %s: f_open gave %lu", filename, (unsigned long)res);
+			return 3;
+		}
 
 		filesize = f_size(&gfile);
 		f_lseek(&gfile, 0xa0);
@@ -488,7 +502,9 @@ u32 Loadfile2NOR(TCHAR *filename, u32 NORaddress, u16 have_patch, u8 SAVEMODE)
 		}
 
 		if (fileneedsize > (0x4000000 - NORaddress)) {
-			f_close(&gfile);
+			f_close(&gfile);  // Torii: was left open
+			tlog_error("nor: %s needs %08lX bytes, %08lX are free", filename, (unsigned long)fileneedsize,
+				   (unsigned long)(0x4000000 - NORaddress));
 			return 2; //Not enough NOR space
 		}
 
@@ -522,8 +538,8 @@ u32 Loadfile2NOR(TCHAR *filename, u32 NORaddress, u16 have_patch, u8 SAVEMODE)
 		tmpNorFS.reserved1 = marked ? NOR_ENTRY_MARKED : 0;
 
 		snprintf(tmpNorFS.filename, sizeof(tmpNorFS.filename), "%s", filename);
-		tlog("nor: writing %s at %07lX, %lu bytes in an area of %lu", filename, (unsigned long)NORaddress,
-		     (unsigned long)filesize, (unsigned long)fileneedsize);
+		tlog("nor: %s: %lu bytes in an area of %lu", filename, (unsigned long)filesize,
+		     (unsigned long)fileneedsize);
 
 		Clear(60, 160 - 15, 120, 15, gl_color_cheat_black, 1);
 		DrawHZText12(gl_writing, 0, 70, 160 - 15, gl_color_text, 1);
@@ -539,7 +555,7 @@ u32 Loadfile2NOR(TCHAR *filename, u32 NORaddress, u16 have_patch, u8 SAVEMODE)
 				tlog_error("nor: reading %s at %lu failed (%lu)", filename, (unsigned long)blocknum,
 					   (unsigned long)res);
 				f_close(&gfile);
-				return 1;  // no completion mark, so it isn't listed
+				return 3;  // no completion mark, so it isn't listed
 			}
 			if (ret < 0x20000)  // past the ROM's end: erased, not the last block's bytes
 				memset(pReadCache + ret, 0xFF, 0x20000 - ret);
@@ -578,7 +594,7 @@ u32 Loadfile2NOR(TCHAR *filename, u32 NORaddress, u16 have_patch, u8 SAVEMODE)
 			   !nor_mark_write(NORaddress, end, &tmpNorFS)) {
 			tlog_error("nor: the completion mark of %s at %07lX didn't write", filename,
 				   (unsigned long)(end - NOR_MARK_SPACE));
-			return 1;
+			return 3;
 		}
 
 		dmaCopy(&tmpNorFS, &pNorFS[game_total_NOR], sizeof(FM_NOR_FS));
@@ -590,6 +606,24 @@ u32 Loadfile2NOR(TCHAR *filename, u32 NORaddress, u16 have_patch, u8 SAVEMODE)
 #endif
 		return 1;
 	}
+}
+// Torii: writes a game to the game NOR at NORaddress, at the BIOS's wait
+// states (waitcnt.h), and logs it. Returns 0 when written, 1 for an unknown
+// NOR, 2 when it doesn't fit, 3 when the file doesn't open.
+u32 Loadfile2NOR(TCHAR *filename, u32 NORaddress, u16 have_patch, u8 SAVEMODE)
+{
+	tlog("nor: writing %s at %08lX, patched %u, save type %02X", filename, (unsigned long)NORaddress, have_patch,
+	     SAVEMODE);
+	u16 waitcnt = WAITCNT_SLOW();
+	u32 res = Loadfile2NOR_slow(filename, NORaddress, have_patch, SAVEMODE);
+	WAITCNT_RESTORE(waitcnt);
+	if (res == 0)
+		tlog("nor: wrote %s at %08lX, %lu bytes", filename, (unsigned long)NORaddress,
+		     (unsigned long)pNorFS[game_total_NOR].filesize);
+	else if (res == 1)
+		tlog_error("nor: not written: the game NOR's ID isn't the S98's");
+	tlog_flush();
+	return res;
 }
 //-----------------------------------------------------------
 u32 GetFileListFromNor(void)

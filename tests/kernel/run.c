@@ -29,6 +29,7 @@ static const struct {
 	{"nor_write_refused_when_list_full", test_nor_write_refused_when_list_full},
 	{"nor_scan_keeps_interrupts", test_nor_scan_keeps_interrupts},
 	{"menu_code_fits", test_menu_code_fits},
+	{"build_id_matches_the_rom", test_build_id_matches_the_rom},
 };
 
 int torii_unit_tests(void)
