@@ -4,6 +4,12 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Added:** each menu screen logs `screen ready: NAME` at debug level once
+  drawn, so the golden-screen tests (`tests/shots`) wait for screens rather
+  than fixed frames (`65acf23`).
+
 ## v0.2.4 (2026-10-18)
 
 Tested on a real Omega DE (FPGA firmware 7): everything in v0.2.3, plus the
