@@ -41,7 +41,7 @@ void IWRAM_CODE Bank_Switching(u8 bank);
 void IWRAM_CODE SD_Enable(void);
 void IWRAM_CODE SD_Read_state(void);
 u32 IWRAM_CODE Wait_SD_Response(void);
-void IWRAM_CODE Save_info(u32 info_offset, u16 *info_buffer, u32 buffersize);
+u32 IWRAM_CODE Save_info(u32 info_offset, u16 *info_buffer, u32 buffersize);
 void IWRAM_CODE SetSPIControl(u16 control);
 void IWRAM_CODE SPI_Enable(void);
 void IWRAM_CODE SPI_Disable(void);
