@@ -14,6 +14,10 @@ git log, not here.
   Diagnostics now also drives the motor with the ROM page at PSRAM, as
   under Jagoomba, and logs what 0x08001000 reads; the boot logs the new
   rumble probe ROM's answers from game mode (`1fab0fc`, `c2faa0e`).
+- **Fixed:** Diagnostics' rumble now rumbles: the motor takes 0x08001000
+  only while the ROM page isn't the kernel's and the GPIO port is on (real
+  cart), so it pulses under the PSRAM page, once, and a no is a failure
+  (`6adf948`).
 
 ## v0.2.3 (2026-10-18)
 
