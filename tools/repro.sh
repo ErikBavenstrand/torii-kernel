@@ -14,7 +14,7 @@ shuf "$list" | while IFS= read -r file; do
   cp "/src/$file" "$work/$file"
 done
 echo "files in $work/source, in the order make sees them:"
-find "$work/source" -maxdepth 1 -name '*.c' -printf '%f ' | head -c 300
+find "$work/source" -maxdepth 1 -name '*.c' -printf '%f '
 echo
 make -C "$work" TARGET=ezkernelnew -j8 >/dev/null
 cp "$work/ezkernelnew.gba" "$work/ezkernelnew.elf" "/src/$out/"

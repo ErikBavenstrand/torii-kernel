@@ -216,6 +216,11 @@ EOF
   has "crash: build id 12345678, not this kernel's"
   [ "$(log 0 | grep -c 'crash: stack 03007.*0800ABCD')" = 64 ] || fail "the big crash dump lost stack lines"
   blank 0xF0100 8 || [ "$(sram 0xF0100 8)" = 0000000000000000 ] || fail "the big crash dump wasn't cleared"
+  # A dump in v0.2.0's layout is reported as skipped, and cleared.
+  printf 'TORIICR1' | dd of="$cart/sram.bin" bs=1 seek=$((0xF0100)) conv=notrunc status=none
+  boot -f 200
+  has "crash: an older kernel crashed"
+  blank 0xF0100 8 || [ "$(sram 0xF0100 8)" = 0000000000000000 ] || fail "the old crash dump wasn't cleared"
   card_ok
   lines_ok
   echo "PASS: Diagnostics logs with logging off and leaves the save chip and NOR list alone; its crash test's dump reaches the log"

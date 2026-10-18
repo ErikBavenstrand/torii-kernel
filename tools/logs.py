@@ -191,7 +191,7 @@ def main() -> int:
                 build_id = int(boot.group(3), 16) if boot.group(3) else None
                 matches = same_build(build_id, int(boot.group(1), 16))
                 if symbols and not matches:
-                    name = boot.group(3) or f"main {boot.group(1)}, no id"
+                    name = boot.group(3) or f"unknown (main {boot.group(1)})"
                     other_builds[name] = other_builds.get(name, 0) + 1
                     line += "  [another build: addresses not named]"
             elif crash_build and sym_id is not None:

@@ -156,16 +156,25 @@ void IWRAM_CODE torii_crash(const u32 *regs)
 static void report_crash(void)
 {
 	cart_read(CARTLOG_CRASH, &crash, sizeof(crash));
-	if (memcmp(crash.magic, CRASH_MAGIC, 8) != 0)
+	int old = memcmp(crash.magic, "TORIICR1", 8) == 0;  // v0.2.0's, before build IDs
+	if (!old && memcmp(crash.magic, CRASH_MAGIC, 8) != 0)
 		return;
 	if (tlog_level == TLOG_OFF)  // with logging on, this boot's line is there already
 		tlog_marker("a crash report", 1);
+	if (old) {
+		tlog_force(TLOG_ERRORS,
+			   "crash: an older kernel crashed; its dump's layout isn't this one's, so it is skipped");
+		tlog_flush();
+		if (tlog_all_written())
+			cart_clear_magic(CARTLOG_CRASH, 8);
+		return;
+	}
 	const u32 *r = crash.regs;
-	tlog_force(TLOG_ERRORS, "crash: the kernel crashed %lu frames after boot: pc %08lX outside its code",
-		   (unsigned long)crash.frames, (unsigned long)r[15]);
-	// tools/logs.py names the addresses below with this build's symbols.
+	// First: tools/logs.py names the addresses after it with this build's symbols.
 	tlog_force(TLOG_ERRORS, "crash: build id %08lX%s", (unsigned long)crash.build_id,
 		   crash.build_id == torii_build_id ? "" : ", not this kernel's");
+	tlog_force(TLOG_ERRORS, "crash: the kernel crashed %lu frames after boot: pc %08lX outside its code",
+		   (unsigned long)crash.frames, (unsigned long)r[15]);
 	for (u32 i = 0; i < 16; i += 4)
 		tlog_force(TLOG_ERRORS, "crash: r%-2lu %08lX %08lX %08lX %08lX", (unsigned long)i, (unsigned long)r[i],
 			   (unsigned long)r[i + 1], (unsigned long)r[i + 2], (unsigned long)r[i + 3]);
