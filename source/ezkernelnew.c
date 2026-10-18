@@ -1676,6 +1676,41 @@ u32 Get_savefilesize(BYTE saveMODE)
 	return savefilesize;
 }
 //---------------------------------------------------------------------------------
+// Torii: pads a .sav smaller than its save type needs (a 512-byte EEPROM
+// save for a game now set to EEPROM 8K) with 0xFF, the blank chip's bytes.
+// Kept short, the blocks past its end were never loaded or written back,
+// so they were lost at power-off. Returns the size the file has now.
+static u32 Grow_savefile(TCHAR *filename, u32 size, u32 need)
+{
+	FIL file;
+	u32 ret = f_open(&file, filename, FA_WRITE | FA_OPEN_EXISTING);
+	if (ret != FR_OK) {
+		tlog_error("save: can't grow %s: f_open gave %lu", filename, (unsigned long)ret);
+		return size;
+	}
+	u32 total = size;
+	if (f_lseek(&file, size) == FR_OK) {
+		memset(pReadCache, 0xFF, 0x800);
+		while (total < need) {
+			UINT chunk = need - total < 0x800 ? need - total : 0x800, written = 0;
+			if (f_write(&file, pReadCache, chunk, &written) != FR_OK || written != chunk) {
+				total += written;
+				break;
+			}
+			total += written;
+		}
+	}
+	FRESULT cerr = f_close(&file);
+	if (total < need || cerr != FR_OK) {
+		tlog_error("save: growing %s from %lu to %lu bytes: %lu written, f_close gave %d", filename,
+			   (unsigned long)size, (unsigned long)need, (unsigned long)total, cerr);
+		return cerr == FR_OK ? total : size;
+	}
+	tlog("save: grew %s from %lu to %lu bytes, the save type's size, padding with FF", filename,
+	     (unsigned long)size, (unsigned long)need);
+	return total;
+}
+//---------------------------------------------------------------------------------
 static u8 Process_savefile(u32 is_EMU, TCHAR *pfilename, u32 gamefilesize, BYTE saveMODE)
 {
 	u32 res;
@@ -1700,6 +1735,9 @@ static u8 Process_savefile(u32 is_EMU, TCHAR *pfilename, u32 gamefilesize, BYTE 
 		savefilesize = f_size(&gfile);
 		f_close(&gfile);
 		tlog("save: %s exists, %lu bytes, save type %02X", savfilename, (unsigned long)savefilesize, saveMODE);
+		u32 need = Get_savefilesize(saveMODE);
+		if (!is_EMU && saveMODE != 0 && savefilesize < need)
+			savefilesize = Grow_savefile(savfilename, savefilesize, need);
 	} else //make a new one
 	{
 		ShowbootProgress(gl_make_sav);

@@ -4,7 +4,8 @@
 //
 // Record layout: "OMRX" + boot count. Flash 128K writes it to bank 1 offset 0,
 // so a correct save file holds it at 0x10000. EEPROM writes it to block 1, so
-// it lands at byte 8 of the save file.
+// it lands at byte 8 of the save file; EEPROM 8K writes it to block 1000
+// (byte 8000) too, past where a 512-byte save ends.
 #include <stdint.h>
 
 #define REG_DISPCNT (*(volatile uint16_t *)0x04000000)
@@ -160,6 +161,9 @@ static void write_record(const uint8_t rec[5])
 	for (int i = 0; i < 5; i++)
 		block[i] = rec[i];
 	write_block(BLOCK, block);
+#ifdef SAVE_EEPROM8K
+	write_block(1000, block);
+#endif
 }
 
 #endif
