@@ -6,6 +6,12 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** cover streaming for the v0.3 tile menu, not yet used by any
+  screen. Files are read from SD a few KB per job step; LZ77 assets (TAS1,
+  written by `tools/asset.py`) are decoded into a cache in PSRAM page 0
+  (from 0x08C00000) and copied into sprite slots in VBlank, nearest the
+  cursor first; affine sprites can scale and rotate them. Every game launch
+  empties the cache before PSRAM is overwritten (`fb0614e`, `170e13a`).
 - **Added:** text for the v0.3 tile menu, not yet used by any screen. The
   Galmuri9 and Galmuri11 Bold fonts are converted into `source/engine/`
   with 2-byte rows (`23efcc2`). `charset_next_latin1()` reads UTF-8 names
