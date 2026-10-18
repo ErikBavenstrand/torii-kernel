@@ -4,7 +4,10 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.2.4 (2026-10-18)
+
+Tested on a real Omega DE (FPGA firmware 7): everything in v0.2.3, plus the
+rumble fix below.
 
 - **Fixed:** Diagnostics' rumble step never rumbled. The Omega DE's motor
   isn't driven through GPIO pin 3 in kernel mode: as Jagoomba does it, 0xF1
