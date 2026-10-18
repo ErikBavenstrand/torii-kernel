@@ -537,8 +537,13 @@ static void read_log(void)
 static void step_eeprom(void)
 {
 	step("EEPROM 512 or 8K");
-	if (log_seen & SEEN_EEPROM_PROBE) {
-		say(GREEN, "The EEPROM probe's report is in the log.");
+	if (log_seen & SEEN_EEPROM_PROBE_FAILED) {
+		say(RED, "An EEPROM probe run failed: its");
+		say(RED, "verdict and steps are in the log.");
+		add_failure("the EEPROM probe");
+	} else if (log_seen & SEEN_EEPROM_PROBE) {
+		say(GREEN, "EEPROM probe runs since the last run");
+		say(GREEN, "read back what they wrote: pass");
 	} else {
 		say(WHITE, "Not tested since the last run. The");
 		say(WHITE, "EEPROM answers only in a game: launch");
@@ -694,6 +699,10 @@ static void step_keys(void)
 	if (seen != 0x3FF)
 		tlog("diag: keys never pressed: %03X", (unsigned)(~seen & 0x3FF));
 	result(seen == 0x3FF, "every button");
+	if (~seen & (KEY_L | KEY_R)) {
+		say(YELLOW, "The in-game menu and sleep hotkeys use");
+		say(YELLOW, "L and R by default: they need both.");
+	}
 	wait_release();
 }
 
@@ -806,6 +815,7 @@ void Diagnostics(void)
 	tlog_flush();
 	u16 key = wait_key(KEY_A | KEY_SELECT);
 	if (key & KEY_SELECT) {
+		cartlog_phase(PHASE_CRASH_TEST, 0, NULL);
 		tlog("diag: crash test: running from EWRAM, outside the kernel's code");
 		tlog_flush();
 		crash_loop[0] = 0xEAFFFFFE;  // ARM: b .

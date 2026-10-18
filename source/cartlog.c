@@ -364,7 +364,8 @@ static int prev_crashed;  // a crash dump was there at this boot
 
 static const char *phase_name(u32 phase)
 {
-	static const char *const names[] = {"nothing", "booting", "the menu", "launching", "a game", "Diagnostics"};
+	static const char *const names[] = {
+		"nothing", "booting", "the menu", "launching", "a game", "Diagnostics", "Diagnostics' crash test"};
 	return phase < sizeof(names) / sizeof(*names) ? names[phase] : "an unknown phase";
 }
 
@@ -401,7 +402,11 @@ void cartlog_boot_report(void)
 	if (last && strstr(last, "launch: loading "))
 		tlog_error("previous session: a launch never reached the game; its last line was: %s", last);
 
-	if (prev_crashed && prev_magic_ok) {
+	if (prev_crashed && prev_magic_ok && prev_phase == PHASE_CRASH_TEST) {
+		tlog("previous session: Diagnostics' crash test, which crashes the kernel on purpose: the dump above "
+		     "is "
+		     "its");
+	} else if (prev_crashed && prev_magic_ok) {
 		tlog_error("previous session: the kernel crashed in %s (step %lu)%s%s", phase_name(prev_phase),
 			   (unsigned long)prev_detail, state.game[0] ? "; the last game launched: " : "", state.game);
 	} else if (prev_crashed) {

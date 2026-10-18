@@ -60,16 +60,28 @@ void test_logcheck_launches(void)
 
 void test_logcheck_reports(void)
 {
+	static const char work[] = "  1.00 I eeprom probe: 6-bit addresses work";
 	u32 s = SEEN("  1.00 I debug info from the in-game menu: HELLO, code OMRS, version 0",
-		     "  1.00 I eeprom probe: a 6-bit run, 9 steps");
+		     "  1.00 I eeprom probe: a 6-bit run, 9 steps", work);
 	CHECK_EQ(s, SEEN_DEBUG | SEEN_EEPROM_PROBE);
+	// Only the verdict counts: v0.2.1 turned the item green on any line.
+	CHECK_EQ(SEEN("  1.00 I eeprom probe: a 6-bit run, 9 steps",
+		      "  1.00 I eeprom probe:  1: write block 1 (waited, then polled): E6000173 0EFEFF3A"),
+		 0);
+	CHECK_EQ(SEEN("  1.00 I eeprom probe: 6-bit addresses don't read back what was written"),
+		 SEEN_EEPROM_PROBE_FAILED);
+	CHECK_EQ(
+		SEEN("  1.00 I eeprom probe: 14-bit addresses lose the last byte written; 1024 blocks: an 8 KB EEPROM"),
+		SEEN_EEPROM_PROBE_FAILED);
+	CHECK_EQ(SEEN("  1.00 I eeprom probe: 14-bit addresses work; 1024 blocks: an 8 KB EEPROM"), SEEN_EEPROM_PROBE);
+	CHECK_EQ(SEEN("  1.00 I eeprom probe: 6-bit addresses work; a write never finished"), SEEN_EEPROM_PROBE_FAILED);
+	CHECK_EQ(SEEN(work, "  1.00 I eeprom probe: 14-bit addresses don't read back what was written"),
+		 SEEN_EEPROM_PROBE | SEEN_EEPROM_PROBE_FAILED);
 	// The end of a Diagnostics run starts over; its start doesn't, nor a
 	// file name that quotes it.
-	CHECK_EQ(SEEN("  1.00 I eeprom probe: a 6-bit run", "  2.00 I diag: Diagnostics started, logging at debug"),
-		 SEEN_EEPROM_PROBE);
-	CHECK_EQ(SEEN("  1.00 I eeprom probe: a 6-bit run", "  2.00 I diag: done"), 0);
-	CHECK_EQ(SEEN("  1.00 I eeprom probe: a 6-bit run", "  2.00 I launch: loading diag: done.gba, CLEAN BOOT"),
-		 SEEN_EEPROM_PROBE);
+	CHECK_EQ(SEEN(work, "  2.00 I diag: Diagnostics started, logging at debug"), SEEN_EEPROM_PROBE);
+	CHECK_EQ(SEEN(work, "  2.00 I diag: done"), 0);
+	CHECK_EQ(SEEN(work, "  2.00 I launch: loading diag: done.gba, CLEAN BOOT"), SEEN_EEPROM_PROBE);
 	CHECK_EQ(SEEN("  1.00 I launch eeprom probe: .gba: code -"), 0);
 	CHECK_EQ(SEEN("torii log 00000001     "), 0);
 }

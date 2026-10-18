@@ -28,6 +28,7 @@ enum {
 	PHASE_LAUNCH = 3,  // loading a game
 	PHASE_GAME = 4,  // jumped to the game
 	PHASE_DIAG = 5,  // in Diagnostics, at step `detail`
+	PHASE_CRASH_TEST = 6,  // Diagnostics crashing the kernel on purpose
 };
 
 // Reads where the previous session got to and records that this one is

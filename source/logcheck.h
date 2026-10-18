@@ -15,7 +15,8 @@ enum {
 	SEEN_NES = 1 << 5,  // a NES game launched (PocketNES)
 	SEEN_NOR = 1 << 6,  // a game launched from NOR
 	SEEN_DEBUG = 1 << 7,  // the in-game menu's DEBUG snapshot reached the log
-	SEEN_EEPROM_PROBE = 1 << 8,  // the EEPROM probe ROM's report reached the log
+	SEEN_EEPROM_PROBE = 1 << 8,  // an EEPROM probe report's verdict: its width works
+	SEEN_EEPROM_PROBE_FAILED = 1 << 9,  // an EEPROM probe report's verdict: anything else
 };
 
 struct logcheck {

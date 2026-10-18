@@ -65,6 +65,20 @@ static u32 launch_flags(const char *line)
 	return seen;
 }
 
+// What an "eeprom probe: " line says (source/cartlog.c): only its verdict,
+// "N-bit addresses work..." or another ending, counts.
+static u32 probe_verdict(const char *text)
+{
+	while (*text >= '0' && *text <= '9')
+		text++;
+	if (!starts(text, "-bit addresses "))
+		return 0;
+	text += strlen("-bit addresses ");
+	if (starts(text, "work") && !strstr(text, "never finished"))
+		return SEEN_EEPROM_PROBE;
+	return SEEN_EEPROM_PROBE_FAILED;
+}
+
 void logcheck_line(struct logcheck *c, const char *line)
 {
 	const char *text = body(line);
@@ -75,7 +89,7 @@ void logcheck_line(struct logcheck *c, const char *line)
 	} else if (starts(text, "debug info from the in-game menu: ")) {
 		c->seen |= SEEN_DEBUG;
 	} else if (starts(text, "eeprom probe: ")) {
-		c->seen |= SEEN_EEPROM_PROBE;
+		c->seen |= probe_verdict(text + strlen("eeprom probe: "));
 	} else if (starts(text, "launch: loading ")) {
 		c->pending = launch_flags(text);  // a new launch: the last one failed
 	} else if (!strcmp(text, "launch: starting the game")) {

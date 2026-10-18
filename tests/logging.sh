@@ -279,12 +279,18 @@ sram = bytearray(open(sys.argv[1], "rb").read())
 sram[0xF0100 : 0xF0100 + len(dump)] = dump
 open(sys.argv[1], "wb").write(sram)
 EOF
+  dd if="$cart/sram.bin" of="$cart/dump.bin" bs=1 skip=$((0xF0100)) count=1376 status=none
   soft_boot -f 200 # the crash handler restarts the kernel without a power cycle
   has "crash: the kernel crashed 1234 frames after boot: pc 02001234"
   has "crash: build id 12345678, not this kernel's"
   has "previous session: the kernel crashed in the menu (step 0)"
   [ "$(log 0 | grep -c 'crash: stack 03007.*0800ABCD')" = 64 ] || fail "the big crash dump lost stack lines"
   blank 0xF0100 8 || [ "$(sram 0xF0100 8)" = 0000000000000000 ] || fail "the big crash dump wasn't cleared"
+  # A crash in Diagnostics' crash test (phase 6) is reported as that.
+  dd if="$cart/dump.bin" of="$cart/sram.bin" bs=1 seek=$((0xF0100)) conv=notrunc status=none
+  printf '\x06' | dd of="$cart/sram.bin" bs=1 seek=$((0xF000C)) conv=notrunc status=none
+  soft_boot -f 200
+  has "previous session: Diagnostics' crash test, which crashes the kernel on purpose"
   # A dump in v0.2.0's layout is reported as skipped, and cleared.
   printf 'TORIICR1' | dd of="$cart/sram.bin" bs=1 seek=$((0xF0100)) conv=notrunc status=none
   soft_boot -f 200 # cart RAM past the save is lost on a power cycle, as on the real cart
