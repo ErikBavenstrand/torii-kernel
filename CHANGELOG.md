@@ -4,6 +4,26 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Fixed:** the EEPROM probe's report counts a read that matches a write
+  in bytes 0-6 (the block and the run's nonce) as that write, logs "except
+  byte 7: wrote XX, read FF" and flags the run's last-byte loss, so its
+  size checks still work; it logs how each write waited (`a517691`).
+- **Fixed:** Diagnostics' EEPROM item passed on any probe line, even a
+  failed run's; it now checks the verdict. A button step missing L or R
+  says the hotkeys need them, and the boot after the deliberate crash test
+  says it was that test, not "crashed in the menu" (`ce9e84d`).
+- **Fixed:** a `.sav` smaller than its save type needs (512 bytes for
+  EEPROM 8K) is grown with 0xFF and logged; blocks past its end were never
+  loaded or written back, so they were lost at power-off (`a1d6598`).
+- **Fixed:** the in-game menu, sleep and RTS-only hotkeys match when the
+  combo's keys are held, whatever else is; an extra or stuck key used to
+  block them. The handler is 4 bytes smaller (`0c2ccf2`).
+- **Changed:** an older kernel's NOR list is saved in Torii's two-copy
+  format once, crash-safely, and the list and game count are logged only
+  when they change; v0.2.1 logged the older list on every read (`7a7e916`).
+
 ## v0.2.1 (2026-10-18)
 
 - **Added:** a build ID, the CRC32 of the kernel's ROM, written after
