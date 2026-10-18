@@ -154,6 +154,20 @@ void test_text_draw(void)
 	text_layout(&font_body, name, sizeof(name) - 1, 20, &line);
 	ref_draw(tiles_b, &font_body, line.glyphs, line.count, COLUMNS * 8 - 20, 0, 9);
 	CHECK(memcmp(tiles_a, tiles_b, WORDS * 4) == 0);
+
+	// Lines outside the window: text_draw_line refuses them (and logs an
+	// assert, so they're only checked here), text_draw past the right edge
+	// draws nothing
+	text_layout(&font_body, "Hi", 2, 100, &line);
+	u32 low = ROWS * 8 - font_body.line_height;
+	CHECK(text_line_fits(&win, &font_body, 0, low, &line));
+	CHECK(!text_line_fits(&win, &font_body, 0, low + 1, &line));
+	CHECK(text_line_fits(&win, &font_body, COLUMNS * 8 - line.extent, 0, &line));
+	CHECK(!text_line_fits(&win, &font_body, COLUMNS * 8 - line.extent + 1, 0, &line));
+	fill(tiles_a, 3);
+	fill(tiles_b, 3);
+	CHECK_EQ(text_draw(&win, &font_body, COLUMNS * 8, 0, 50, 9, "Hi", 2), COLUMNS * 8);
+	CHECK(memcmp(tiles_a, tiles_b, WORDS * 4) == 0);
 }
 
 void test_text_clear(void)

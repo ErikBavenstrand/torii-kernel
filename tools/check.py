@@ -45,13 +45,17 @@ KERNEL = {LINT, TEST, SIZE, COMPAT}
 EVERYTHING = {LINT, TEST, SIZE, ANALYZE, COMPAT}
 
 # Kernel C files that only draw menus or text and never run while a game
-# launches or saves: they skip compat (not size). Headers never skip it, as
-# launching code includes them; nor does lang.c, whose strings it uses.
+# launches or saves: they skip compat (not size). Other headers never skip
+# it, as launching code includes them (only menu code includes the text
+# engine's); nor does lang.c, whose strings it uses.
 NO_COMPAT = {
     "source/charset.c",
+    "source/engine/font.h",
     "source/engine/font_body.c",
     "source/engine/font_heading.c",
     "source/engine/text.c",
+    "source/engine/text.h",
+    "source/engine/text_blit.s",
     "source/engine/text_layout.c",
     "source/helpwindow.c",
 }

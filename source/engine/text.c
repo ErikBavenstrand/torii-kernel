@@ -5,12 +5,39 @@
 
 #include "../tlog.h"
 
+#include <stddef.h>
+
+// text_blit.s hard-codes these
+_Static_assert(offsetof(struct text_run, tiles) == 0, "RUN_TILES");
+_Static_assert(offsetof(struct text_run, column_words) == 4, "RUN_COLUMN_WORDS");
+_Static_assert(offsetof(struct text_run, font) == 8, "RUN_FONT");
+_Static_assert(offsetof(struct text_run, glyphs) == 12, "RUN_GLYPHS");
+_Static_assert(offsetof(struct text_run, count) == 16, "RUN_COUNT");
+_Static_assert(offsetof(struct text_run, x) == 20, "RUN_X");
+_Static_assert(offsetof(struct text_run, y) == 24, "RUN_Y");
+_Static_assert(offsetof(struct text_run, ink) == 28, "RUN_INK");
+_Static_assert(offsetof(struct torii_font, glyphs) == 0, "FONT_GLYPHS");
+_Static_assert(offsetof(struct torii_font, bits) == 4, "FONT_BITS");
+_Static_assert(sizeof(struct torii_glyph) == 6, "the glyph table's stride");
+_Static_assert(offsetof(struct torii_glyph, offset) == 0, "GLYPH_OFFSET");
+_Static_assert(offsetof(struct torii_glyph, advance) == 2, "GLYPH_ADVANCE");
+_Static_assert(offsetof(struct torii_glyph, top) == 3, "GLYPH_TOP");
+_Static_assert(offsetof(struct torii_glyph, rows) == 4, "GLYPH_ROWS");
+_Static_assert(offsetof(struct torii_glyph, width) == 5, "GLYPH_WIDTH");
+
+int text_line_fits(const struct text_window *win, const struct torii_font *font, u32 x, u32 y,
+		   const struct text_line *line)
+{
+	return y + font->line_height <= win->height * 8u && x + line->extent <= win->width * 8u &&
+	       font->row_bytes == 2;
+}
+
 u32 text_draw_line(const struct text_window *win, const struct torii_font *font, u32 x, u32 y, u32 ink,
 		   const struct text_line *line)
 {
 	if (!line->count)
 		return x;
-	if (y + font->line_height > win->height * 8u || x + line->extent > win->width * 8u || font->row_bytes != 2) {
+	if (!text_line_fits(win, font, x, y, line)) {
 		tlog_error("assert failed: text_draw_line: line at %lu,%lu outside the window", (unsigned long)x, (unsigned long)y);
 		return x;
 	}

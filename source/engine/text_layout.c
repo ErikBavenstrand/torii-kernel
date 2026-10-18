@@ -42,7 +42,8 @@ u32 text_layout(const struct torii_font *font, const char *s, u32 len, u32 clip,
 		if (g < 0)
 			continue;
 		const struct torii_glyph *glyph = &glyphs[g];
-		if (count == TEXT_MAX_GLYPHS || pen + glyph->width > clip) {
+		// A blank glyph (a space) always fits: it has no ink to clip
+		if (count == TEXT_MAX_GLYPHS || (glyph->rows && pen + glyph->width > clip)) {
 			line->truncated = 1;
 			break;
 		}

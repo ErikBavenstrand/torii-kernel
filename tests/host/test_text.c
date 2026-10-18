@@ -162,6 +162,11 @@ void test_text_layout(void)
 	layout(&font_body, "Hello", extent, &line);
 	CHECK(!line.truncated);
 	CHECK_EQ(line.count, 5);
+	// Trailing spaces fit past the last inked pixel: they add no ink
+	layout(&font_body, "Hello  ", extent, &line);
+	CHECK(!line.truncated);
+	CHECK_EQ(line.count, 7);
+	CHECK_EQ(line.extent, extent);
 	layout(&font_body, "Hello", extent - 1, &line);
 	CHECK(line.truncated);
 	check_line(&font_body, &line, extent - 1);

@@ -41,17 +41,19 @@ u32 text_width(const struct torii_font *font, const char *s, u32 len);
 struct text_line {
 	u8 glyphs[TEXT_MAX_GLYPHS];
 	u32 count;
-	u32 advance;    // pen advance of the glyphs
+	u32 advance;    // pen advance of the glyphs (trailing spaces may take it past the clip)
 	u32 extent;     // pixels from the pen to the right of the last inked pixel
 	u8 truncated;   // the string didn't fit and ends in an ellipsis
 };
 
 // Lays out a UTF-8 string to fit clip pixels: every inked pixel lands in
-// [0, clip). A string too wide is cut after its last character that leaves
+// [0, clip); blank glyphs (spaces) always fit. A string too wide is cut after its last character that leaves
 // room for "..." (blank glyphs before the cut dropped) and ends in "...";
 // if not even "..." fits, nothing is drawn. Returns line->count.
 u32 text_layout(const struct torii_font *font, const char *s, u32 len, u32 clip, struct text_line *line);
 
+// text_draw doesn't say whether it cut the string: a widget that needs to
+// know (to start a marquee, say) calls text_layout and text_draw_line.
 // Draws a UTF-8 string with its line's top at pixel (x, y) of the window,
 // in palette index ink (1-15), cut with an ellipsis to fit clip pixels and
 // the window's right edge. The whole line must fit the window's height
@@ -60,7 +62,13 @@ u32 text_layout(const struct torii_font *font, const char *s, u32 len, u32 clip,
 u32 text_draw(const struct text_window *win, const struct torii_font *font, u32 x, u32 y, u32 clip, u32 ink,
 	      const char *s, u32 len);
 
-// Draws a laid-out line (text_layout) at (x, y), as text_draw does.
+// True if a laid-out line drawn at (x, y) lies inside the window. The line
+// must have been laid out with this font.
+int text_line_fits(const struct text_window *win, const struct torii_font *font, u32 x, u32 y,
+		   const struct text_line *line);
+
+// Draws a laid-out line (text_layout) at (x, y), as text_draw does; one
+// that doesn't fit (text_line_fits) draws nothing and logs an assert.
 u32 text_draw_line(const struct text_window *win, const struct torii_font *font, u32 x, u32 y, u32 ink,
 		   const struct text_line *line);
 
