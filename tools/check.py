@@ -127,6 +127,11 @@ RULES = [
         {LINT, TEST, REPRO, COMPAT},
         "builds the kernel image or the cart",
     ),
+    (
+        ["tests/shots*", "tests/perf*"],
+        {LINT, TEST},
+        "golden screens or cycle budget, checked by `just test`",
+    ),
     (["tests/*"], {LINT, TEST}, "emulated-cart tests"),
     (["justfile"], EVERYTHING | {REPRO}, "recipes"),
 ]

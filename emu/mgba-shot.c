@@ -6,7 +6,8 @@
 //   -s FRAME:PATH    write a PNG of the screen after FRAME
 //   -S PATH          write the emulated save chip's contents when done
 //   -i FILE          read more options from FILE, whitespace-separated
-//                    (# starts a comment), for long input scripts
+//                    (# starts a comment, "double quotes" keep blanks in a
+//                    word), for long input scripts
 //   -g PORT          wait for gdb on PORT (all addresses) before running
 //   -y SYMFILE       symbols for crash reports (default: the ROM's .sym)
 //   -m FRAME:ADDR:LEN  after FRAME, print LEN bytes of memory from ADDR (hex)
@@ -21,6 +22,20 @@
 //   -L SCRIPT        run a Lua script (mGBA's scripting API: emu, callbacks,
 //                    socket, console); with -L and no -f, run until killed
 //   -t               run at the GBA's real speed instead of as fast as possible
+//   -w TEXT          wait until the kernel (or a -L script) logs TEXT, from
+//                    the frame of the last key press (or -p) between the
+//                    previous -w and this one; a FRAME of @N in
+//                    a later option means N frames after the frame that line
+//                    came in (keys at @N go down before frame N runs, outputs
+//                    come after it). The run ends once the last -w is met and
+//                    its @ events are done. A -w not met within a minute of
+//                    game time (or by -f) fails the run with status 4
+//   -H FROM:TO       print the screen's hash after every frame from FROM to
+//                    TO (both @N or both plain frames), as -h does
+//   -c EPOCH         pin the cart's clock: it reads EPOCH (Unix seconds; the
+//                    GBA sees local time, so set TZ=UTC) at power-on and runs
+//                    with emulated time, not the host's
+//   -O DIR           write -s PNGs given relative paths into DIR
 //
 // If the CPU hits an illegal opcode or jumps to an invalid address, it prints
 // a crash report (registers, and code addresses found on the stack with their
@@ -47,9 +62,25 @@
 #include <time.h>
 
 struct event {
-	unsigned frame;
+	unsigned frame;  // or, after a -w, the offset from the frame it was met
 	char *arg;
+	int wait;  // index of the -w it follows if FRAME was @N, else -1
+	unsigned end;  // -H: the last frame, of the same kind as frame
 };
+
+// -w steps, met in order.
+#define MAX_WAITS 64
+struct wait {
+	const char *text;
+	unsigned hit;  // the frame its line came in; 0 until then
+	unsigned last;  // the largest @ offset among the events that follow it
+	unsigned press;  // the largest @ offset of a key press or poke among them
+};
+static struct wait waits[MAX_WAITS];
+static int nwaits;
+static int next_wait;  // the first wait not met yet
+static unsigned first_arm;  // the last plain key press or poke frame before the first -w
+static unsigned current_frame;
 
 static const char *KEY_NAMES[] = {"A", "B", "SELECT", "START", "RIGHT", "LEFT", "UP", "DOWN", "R", "L"};
 
@@ -105,6 +136,27 @@ static const char *symbolize(uint32_t address)
 
 static const char *until_text;
 static int until_hit;
+
+#define WAIT_FRAMES 3600  // how long a -w waits: a minute
+
+// The frame lines start to count for the next -w from.
+static unsigned wait_start(void)
+{
+	return next_wait ? waits[next_wait - 1].hit + waits[next_wait - 1].press : first_arm;
+}
+
+// A line the kernel or a script logged: checks -u and the next -w.
+static void saw_line(const char *line)
+{
+	if (until_text && strstr(line, until_text)) {
+		until_hit = 1;
+	}
+	if (next_wait < nwaits) {
+		if (current_frame >= wait_start() && strstr(line, waits[next_wait].text)) {
+			waits[next_wait++].hit = current_frame;
+		}
+	}
+}
 
 static struct mCore *crash_core;
 static int crashed;
@@ -171,18 +223,14 @@ static void quiet_log(struct mLogger *logger, int category, enum mLogLevel level
 		char line[512];
 		vsnprintf(line, sizeof(line), format, args);
 		fprintf(stderr, "script: %s\n", line);
-		if (until_text && strstr(line, until_text)) {
-			until_hit = 1;
-		}
+		saw_line(line);
 		return;
 	}
 	if (!strcmp(id, "gba.debug")) {
 		char line[512];
 		vsnprintf(line, sizeof(line), format, args);
 		fprintf(stderr, "%s%s\n", level & (mLOG_FATAL | mLOG_ERROR) ? "kernel error: " : "kernel: ", line);
-		if (until_text && strstr(line, until_text)) {
-			until_hit = 1;
-		}
+		saw_line(line);
 		return;
 	}
 	if (level & (mLOG_FATAL | mLOG_ERROR)) {
@@ -215,17 +263,56 @@ static uint32_t parse_keys(const char *spec)
 	return keys;
 }
 
+// FRAME, or @N after the last -w so far, into ev.
+static void parse_frame(struct event *ev, const char *spec)
+{
+	ev->wait = -1;
+	if (*spec == '@') {
+		if (!nwaits) {
+			fprintf(stderr, "%s: an @ frame needs a -w before it\n", spec);
+			exit(2);
+		}
+		ev->wait = nwaits - 1;
+		++spec;
+	}
+	ev->frame = (unsigned)strtoul(spec, NULL, 10);
+}
+
 static struct event parse_event(const char *spec)
 {
-	struct event ev;
+	struct event ev = {0};
 	char *colon = strchr(spec, ':');
 	if (!colon) {
 		fprintf(stderr, "expected FRAME:VALUE, got %s\n", spec);
 		exit(2);
 	}
-	ev.frame = (unsigned)strtoul(spec, NULL, 10);
+	parse_frame(&ev, spec);
 	ev.arg = colon + 1;
+	ev.end = ev.frame;
 	return ev;
+}
+
+// The frame ev starts at, or 0 while its -w is not met.
+static unsigned start_frame(const struct event *ev)
+{
+	if (ev->wait < 0) {
+		return ev->frame;
+	}
+	const struct wait *w = &waits[ev->wait];
+	return w->hit ? w->hit + ev->frame : 0;
+}
+
+// Whether ev happens at frame.
+static int due(const struct event *ev, unsigned frame)
+{
+	return start_frame(ev) == frame;
+}
+
+// Whether frame lies in ev's range (-H).
+static int in_range(const struct event *ev, unsigned frame)
+{
+	unsigned start = start_frame(ev);
+	return start && frame >= start && frame <= start + (ev->end - ev->frame);
 }
 
 struct events {
@@ -234,13 +321,30 @@ struct events {
 	size_t cap;
 };
 
-static void add_event(struct events *events, const char *spec)
+static struct event *add_event(struct events *events, const char *spec)
 {
 	if (events->count == events->cap) {
 		events->cap = events->cap ? events->cap * 2 : 64;
 		events->list = realloc(events->list, events->cap * sizeof(*events->list));
 	}
-	events->list[events->count++] = parse_event(spec);
+	struct event *ev = &events->list[events->count++];
+	*ev = parse_event(spec);
+	return ev;
+}
+
+// Notes an event's frame for the -w it follows; press: a key press or a poke,
+// which the next -w waits for.
+static void note_frame(const struct event *ev, int press)
+{
+	if (ev->wait >= 0) {
+		struct wait *w = &waits[ev->wait];
+		w->last = ev->end > w->last ? ev->end : w->last;
+		if (press && ev->frame > w->press) {
+			w->press = ev->frame;
+		}
+	} else if (press && !nwaits && ev->frame > first_arm) {
+		first_arm = ev->frame;
+	}
 }
 
 struct options {
@@ -251,6 +355,10 @@ struct options {
 	struct events hashes;
 	struct events pokes;
 	struct events states;
+	struct events ranges;
+	const char *outDir;
+	long long epoch;
+	int pinClock;
 	const char *loadState;
 	const char *scripts[16];
 	size_t nscripts;
@@ -279,12 +387,28 @@ static void parse_file(struct options *opts, const char *path)
 		if (hash) {
 			*hash = '\0';
 		}
-		for (char *tok = strtok(line, " \t\r\n"); tok; tok = strtok(NULL, " \t\r\n")) {
+		// Words split at blanks; "a quoted word" keeps its blanks
+		for (char *p = line;;) {
+			p += strspn(p, " \t\r\n");
+			if (!*p) {
+				break;
+			}
+			char *end;
+			if (*p == '"') {
+				end = strchr(++p, '"');
+				if (!end) {
+					fprintf(stderr, "%s: unclosed quote\n", path);
+					exit(2);
+				}
+			} else {
+				end = p + strcspn(p, " \t\r\n");
+			}
 			if (argc == cap) {
 				cap *= 2;
 				argv = realloc(argv, cap * sizeof(*argv));
 			}
-			argv[argc++] = strdup(tok);
+			argv[argc++] = strndup(p, (size_t)(end - p));
+			p = *end ? end + 1 : end;
 		}
 	}
 	fclose(f);
@@ -301,25 +425,48 @@ static void parse_options(struct options *opts, int argc, char **argv)
 		if (!strcmp(argv[i], "-f")) {
 			opts->frames = (unsigned)strtoul(argv[++i], NULL, 10);
 		} else if (!strcmp(argv[i], "-k")) {
-			add_event(&opts->keys, argv[++i]);
+			struct event *ev = add_event(&opts->keys, argv[++i]);
+			note_frame(ev, strcmp(ev->arg, "-") != 0);
 		} else if (!strcmp(argv[i], "-S")) {
 			opts->saveOut = argv[++i];
 		} else if (!strcmp(argv[i], "-s")) {
-			add_event(&opts->shots, argv[++i]);
+			note_frame(add_event(&opts->shots, argv[++i]), 0);
 		} else if (!strcmp(argv[i], "-m")) {
-			add_event(&opts->dumps, argv[++i]);
+			note_frame(add_event(&opts->dumps, argv[++i]), 0);
 		} else if (!strcmp(argv[i], "-r")) {
 			char *spec = malloc(strlen(argv[++i]) + 2);
 			sprintf(spec, "%s:", argv[i]);
-			add_event(&opts->regs, spec);
+			note_frame(add_event(&opts->regs, spec), 0);
 		} else if (!strcmp(argv[i], "-h")) {
 			char *spec = malloc(strlen(argv[++i]) + 2);
 			sprintf(spec, "%s:", argv[i]);
-			add_event(&opts->hashes, spec);
+			note_frame(add_event(&opts->hashes, spec), 0);
+		} else if (!strcmp(argv[i], "-H")) {
+			struct event *ev = add_event(&opts->ranges, argv[++i]);
+			struct event end = {0};
+			parse_frame(&end, ev->arg);
+			if (end.wait != ev->wait || end.frame < ev->frame) {
+				fprintf(stderr, "-H %s: FROM and TO must both be @N or both frames, FROM first\n",
+					argv[i]);
+				exit(2);
+			}
+			ev->end = end.frame;
+			note_frame(ev, 0);
 		} else if (!strcmp(argv[i], "-p")) {
-			add_event(&opts->pokes, argv[++i]);
+			note_frame(add_event(&opts->pokes, argv[++i]), 1);
 		} else if (!strcmp(argv[i], "-x")) {
-			add_event(&opts->states, argv[++i]);
+			note_frame(add_event(&opts->states, argv[++i]), 0);
+		} else if (!strcmp(argv[i], "-w")) {
+			if (nwaits == MAX_WAITS) {
+				fprintf(stderr, "more than %d -w options\n", MAX_WAITS);
+				exit(2);
+			}
+			waits[nwaits++].text = argv[++i];
+		} else if (!strcmp(argv[i], "-c")) {
+			opts->epoch = strtoll(argv[++i], NULL, 10);
+			opts->pinClock = 1;
+		} else if (!strcmp(argv[i], "-O")) {
+			opts->outDir = argv[++i];
 		} else if (!strcmp(argv[i], "-t")) {
 			opts->realtime = 1;
 		} else if (!strcmp(argv[i], "-L") && opts->nscripts < 16) {
@@ -384,12 +531,21 @@ static uint64_t hash_screen(const color_t *pixels, unsigned width, unsigned heig
 	return hash;
 }
 
+// The last plain frame among events, or frames if that is later.
 static unsigned last_frame(const struct events *events, unsigned frames)
 {
 	for (size_t i = 0; i < events->count; ++i) {
-		frames = events->list[i].frame > frames ? events->list[i].frame : frames;
+		if (events->list[i].wait < 0) {
+			frames = events->list[i].end > frames ? events->list[i].end : frames;
+		}
 	}
 	return frames;
+}
+
+// Prints the screen's hash, as -h does.
+static void print_hash(unsigned frame, const color_t *pixels, unsigned width, unsigned height)
+{
+	printf("hash frame %u: %016llX\n", frame, (unsigned long long)hash_screen(pixels, width, height));
 }
 
 static int save_png(const char *path, const color_t *pixels, unsigned width, unsigned height)
@@ -422,19 +578,17 @@ int main(int argc, char **argv)
 	size_t nkeys = opts.keys.count, nshots = opts.shots.count;
 	unsigned frames = opts.frames;
 	const char *saveOut = opts.saveOut;
-	for (size_t i = 0; i < nkeys; ++i) {
-		frames = keys[i].frame > frames ? keys[i].frame : frames;
-	}
-	for (size_t i = 0; i < nshots; ++i) {
-		frames = shots[i].frame > frames ? shots[i].frame : frames;
-	}
+	frames = last_frame(&opts.keys, frames);
+	frames = last_frame(&opts.shots, frames);
+	frames = last_frame(&opts.ranges, frames);
 	frames = last_frame(&opts.dumps, frames);
 	frames = last_frame(&opts.regs, frames);
 	frames = last_frame(&opts.hashes, frames);
 	frames = last_frame(&opts.pokes, frames);
 	frames = last_frame(&opts.states, frames);
+	unsigned last_plain = frames;  // a run with -w goes on at least to here
 	until_text = opts.until;
-	if (until_text && !opts.frames) {
+	if ((until_text || nwaits) && !opts.frames) {
 		frames = frames > 36000 ? frames : 36000;  // Give up after 10 minutes of game time.
 	}
 
@@ -447,6 +601,10 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	mCoreInitConfig(core, NULL);
+	if (opts.pinClock) {
+		core->rtc.override = RTC_FAKE_EPOCH;
+		core->rtc.value = opts.epoch * 1000;
+	}
 	unsigned width, height;
 	core->desiredVideoDimensions(core, &width, &height);
 	color_t *buffer = calloc((size_t)width * height, BYTES_PER_PIXEL);
@@ -526,14 +684,16 @@ int main(int argc, char **argv)
 	}
 
 	int status = 0;
-	for (unsigned frame = 1; frame <= frames; ++frame) {
+	unsigned frame;
+	for (frame = 1; frame <= frames; ++frame) {
+		current_frame = frame;
 		for (size_t i = 0; i < nkeys; ++i) {
-			if (keys[i].frame == frame) {
+			if (due(&keys[i], frame)) {
 				core->setKeys(core, parse_keys(keys[i].arg));
 			}
 		}
 		for (size_t i = 0; i < opts.pokes.count; ++i) {
-			if (opts.pokes.list[i].frame == frame) {
+			if (due(&opts.pokes.list[i], frame)) {
 				poke_memory(core, opts.pokes.list[i].arg);
 			}
 		}
@@ -571,7 +731,7 @@ int main(int argc, char **argv)
 			break;
 		}
 		for (size_t i = 0; i < opts.states.count; ++i) {
-			if (opts.states.list[i].frame == frame) {
+			if (due(&opts.states.list[i], frame)) {
 				struct VFile *vf = VFileOpen(opts.states.list[i].arg, O_CREAT | O_TRUNC | O_RDWR);
 				if (vf && mCoreSaveStateNamed(core, vf, SAVESTATE_SAVEDATA | SAVESTATE_RTC)) {
 					printf("state frame %u -> %s\n", frame, opts.states.list[i].arg);
@@ -585,27 +745,39 @@ int main(int argc, char **argv)
 			}
 		}
 		for (size_t i = 0; i < opts.dumps.count; ++i) {
-			if (opts.dumps.list[i].frame == frame) {
+			if (due(&opts.dumps.list[i], frame)) {
 				dump_memory(core, frame, opts.dumps.list[i].arg);
 			}
 		}
 		for (size_t i = 0; i < opts.regs.count; ++i) {
-			if (opts.regs.list[i].frame == frame) {
+			if (due(&opts.regs.list[i], frame)) {
 				print_registers(core, frame);
 			}
 		}
 		for (size_t i = 0; i < opts.hashes.count; ++i) {
-			if (opts.hashes.list[i].frame == frame) {
-				printf("hash frame %u: %016llX\n", frame,
-				       (unsigned long long)hash_screen(buffer, width, height));
+			if (due(&opts.hashes.list[i], frame)) {
+				print_hash(frame, buffer, width, height);
+			}
+		}
+		for (size_t i = 0; i < opts.ranges.count; ++i) {
+			if (in_range(&opts.ranges.list[i], frame)) {
+				print_hash(frame, buffer, width, height);
+				break;  // once, if ranges overlap
 			}
 		}
 		for (size_t i = 0; i < nshots; ++i) {
-			if (shots[i].frame == frame) {
-				if (save_png(shots[i].arg, buffer, width, height)) {
-					printf("frame %u -> %s\n", frame, shots[i].arg);
+			if (due(&shots[i], frame)) {
+				char path[1024];
+				if (opts.outDir && shots[i].arg[0] != '/') {
+					snprintf(path, sizeof(path), "%s/%s", opts.outDir, shots[i].arg);
 				} else {
-					fprintf(stderr, "cannot write %s\n", shots[i].arg);
+					snprintf(path, sizeof(path), "%s", shots[i].arg);
+				}
+				if (save_png(path, buffer, width, height)) {
+					printf("frame %u -> %s (hash %016llX)\n", frame, path,
+					       (unsigned long long)hash_screen(buffer, width, height));
+				} else {
+					fprintf(stderr, "cannot write %s\n", path);
 					status = 1;
 				}
 			}
@@ -614,6 +786,19 @@ int main(int argc, char **argv)
 			printf("stopped at frame %u\n", frame);
 			break;
 		}
+		if (nwaits && next_wait == nwaits && frame >= waits[nwaits - 1].hit + waits[nwaits - 1].last &&
+		    frame >= last_plain) {
+			printf("stopped at frame %u\n", frame);
+			break;
+		}
+		if (next_wait < nwaits && frame >= wait_start() + WAIT_FRAMES) {
+			++frame;  // as if the loop ran out
+			break;
+		}
+	}
+	if (nwaits && next_wait < nwaits && !crashed && !until_hit) {
+		fprintf(stderr, "timed out at frame %u waiting for: %s\n", frame - 1, waits[next_wait].text);
+		status = status ? status : 4;
 	}
 
 	if (saveOut) {
