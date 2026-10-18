@@ -6,10 +6,19 @@ git log, not here.
 
 ## Unreleased
 
-- **Fixed:** v0.2.2 bricked a cart at boot. Kernel NOR from 0x7C0000 wraps
-  onto EZ-Flash's bootloader, and the NOR list's copy B was written there.
-  Copy B now sits at 0x780000, and Save_info writes nothing outside
-  0x780000-0x7BFFFF (`79cdf75`).
+**Don't use v0.2.1 or v0.2.2:** both can erase EZ-Flash's boot loader, and the
+cart then starts in safe mode (`No_Loader_found`). `docs/recovery.md` says
+how to recover.
+
+- **Fixed:** v0.2.2 bricked a cart at boot, and v0.2.1 on WRITE TO NOR and
+  delete. Kernel NOR from 0x7C0000 wraps onto EZ-Flash's boot loader, and the
+  NOR list's copy B was written there. Copy B now sits at 0x780000, and
+  Save_info writes nothing outside 0x780000-0x7BFFFF (`79cdf75`), nor more
+  than 8 KB in the settings sector, which is 8 KB boot sectors on a PL064J
+  (`36931c8`).
+- **Added:** Diagnostics reads the boot loader, without writing it, and
+  logs its CRC32 and whether it's blank, erased or has a GBA header; a blank
+  or erased one is an error with a warning on screen (`36931c8`).
 
 ## v0.2.2 (2026-10-18)
 

@@ -253,6 +253,23 @@ Still to confirm on the real cart (`docs/release-checklist.md`): the in-game men
 states, DEBUG, sleep and cheats (the console's L button was laggy), GB/GBC, NES, a NOR write,
 rumble, the probe's verdict, and the clock against real time.
 
+## v0.2.3 Boot loader safety (done)
+
+v0.2.2 bricked the real cart at its first boot: the NOR list's copy B went to kernel NOR
+`0x7C0000`, which wraps onto EZ-Flash's boot loader, and the cart started in safe mode
+(`No_Loader_found`). v0.2.1 wrote the same place on WRITE TO NOR and delete. **v0.2.1 and
+v0.2.2 must not be used**; both are marked unsafe on GitHub, and `docs/recovery.md` has the
+recovery used on 2026-10-18.
+
+- Copy B moves to `0x780000`; `Save_info`, the only kernel-NOR writer, refuses anything
+  outside `0x780000–0x7BFFFF` (`source/bootloader.h`).
+- The emulated cart models the real chip: the loader at chip 0, the kernel window at
+  `0x40000` wrapping at 8 MB, 8 KB boot sectors, programming failures. Any write to the
+  loader stops the run, and `tests/loader_safety.sh` runs every kernel-NOR writer, power cuts
+  in them and the other chip; it fails on v0.2.1 and v0.2.2.
+- Diagnostics reads the loader (read-only) and logs its CRC and state.
+- The release checklist keeps `DE.BIN` on the test card and tests NOR write and delete.
+
 ## v0.3 Renderer
 
 The menu is currently mode 3 (`SetMode(MODE_3 | BG2_ENABLE)`), drawn pixel by pixel in C.

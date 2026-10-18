@@ -15,6 +15,8 @@ Torii is a custom kernel for the EZ-Flash Omega DE, forked from EZ-Flash's offic
 - Log from kernel code with `tlog()`, `tlog_error()`, `tlog_debug()` and `TLOG_ASSERT()` from `source/tlog.h`. Lines print as `kernel: ...` (errors as `kernel error: ...`) from `mgba-shot` and as `GBA Debug: ...` from `just play`. A failed assert fails `just compat`.
   On a real cart, lines at the LOGGING setting's level wait in a RAM ring and `tlog_flush()` writes them to `/torii/logs`; with LOGGING off nothing touches the card. Call `tlog_flush()` only where the kernel's ROM is mapped and no FatFs call is under way. `just logs PATH` reads a card's logs.
 - Give `f_write` and `f_read` word-aligned buffers: FatFs hands whole sectors straight to `Write_SD_sectors`, whose 16-bit DMA rounds an odd address down.
+- **Kernel NOR is written only through `Save_info`, within window offsets `[0x780000, 0x7C0000)`** (`kernel_nor_record_ok` in `source/bootloader.h`). From `0x7C0000` the kernel's window wraps onto EZ-Flash's boot loader, and erasing it bricks the cart, as v0.2.1 and v0.2.2 did. Nothing but Diagnostics' read-only loader check sets ROM page `0x8000`.
+  The emulator enforces it: a write to the loader stops the run with status 76, and `tests/loader_safety.sh` runs every path that writes kernel NOR. Add any new one to that test.
 - Cart SRAM pages from `0x40` hold save states and page `0xF0` the kernel's crash dump and session state (`source/cartlog.h`); pages `0x00`-`0x1F` are the game's save. Leave the page at 0 when done.
 - `just size` checks the kernel against the 1 MB kernel area, IWRAM and EWRAM. EWRAM has about 7 KB left; past its end, data wraps onto its start. `just stack` lists the largest frames and estimates the deepest call chain at about 2.5 KB, so keep IWRAM free space well above that (about 4.4 KB now). Every kernel links the unit tests, for Diagnostics, so their static buffers go in EWRAM.
 - Build only with `just build`. It pins devkitARM r54 because newer GCC rejects the unmodified source.
@@ -55,6 +57,7 @@ Reviews: one round of at most two agents. Use a code reviewer, plus an adversari
 ## Emulated cart
 
 - The cart model lives in `emu/mgba/src/gba/cart/omega.c`. `emu/mgba` is a git-ignored mGBA checkout made by `emu/fetch.sh`.
+- `kernel-nor.bin` holds the 8 MB kernel NOR in the kernel's window order: offsets are window offsets under ROM page `0x8002`, and the boot loader (chip 0) is at `0x7C0000`.
 - After editing it, run `just emu-save-patch`, or the change is lost on the next fetch.
 - `docs/research/omega-de-hardware.md` documents the registers, memory map, launch flow and save types. Update it when you learn something new about the hardware.
 

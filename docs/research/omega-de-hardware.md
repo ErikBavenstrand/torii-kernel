@@ -110,9 +110,12 @@ fetches in SD mode.
 
 ### Other mapped hardware
 
-- **Kernel NOR (S71, PL064/GL064):** `0x08000000`, AMD/Spansion command set (`0x555/0x2AA`).
-  Settings at `+0x790000` (save info), `+0x7A0000` (NOR index), `+0x7B0000` (settings).
-  Torii keeps a second copy of the NOR index at `+0x7C0000` (see *Game NOR list* below).
+- **Kernel NOR (S71GL064A08's 8 MB flash; the kernel handles a PL064 and a GL064):**
+  `0x08000000` in kernel mode, AMD/Spansion command set (`0x555/0x2AA`). EZ-Flash's boot
+  loader is at chip 0 and the kernel at chip `0x40000`, which ROM page `0x8002` shows at
+  `0x08000000`; see *Kernel NOR and the boot loader* in section 4. The kernel's data, at
+  window offsets: save info `+0x790000`, NOR index `+0x7A0000`, settings `+0x7B0000`, and
+  Torii's second copy of the NOR index at `+0x780000` (*Game NOR list* below).
   GL064 uses buffered writes (`0x25 … 0x29`).
 - **Game NOR (S98):** `0x09000000–0x097FFFFF`, same command set. Autoselect word `0x0E` reads
   `0x223D`; `Loadfile2NOR` writes only to a chip with that ID. The kernel (`NORflash_OP.c`)
@@ -154,8 +157,11 @@ emulated cart (`emu/`).
 
 **ROM page register (`0x09880000`)**
 
-- Bit 15 set = kernel mode (`0x8002` at boot). Bits 12–14 select which 8 MB of
-  the 64 MB game NOR shows in the `0x09000000` window.
+- Bit 15 set = kernel mode. Its low 9 bits pick where `0x08000000` starts in
+  the kernel NOR, in 128 KB steps: `0x8000` shows the boot loader (chip 0),
+  `0x8002` the kernel (chip `0x40000`), which is what the kernel runs under.
+  Bits 12–14 select which 8 MB of the 64 MB game NOR shows in the
+  `0x09000000` window.
 - `0x200` = game mode, all 32 MB of PSRAM at `0x08000000`.
 - `N < 0x200` = game mode, game NOR from offset `N × 128 KB` at `0x08000000`
   (NOR games store `rompage = NORaddress >> 17`).
@@ -164,7 +170,7 @@ emulated cart (`emu/`).
 
 | Address | Content |
 |---|---|
-| `0x08000000–0x087FFFFF` | Kernel NOR (S29PL064-style, ID `0x2202`, 64 KB sectors). Kernel at 0, save info `+0x790000`, NOR index `+0x7A0000` (Torii's second copy `+0x7C0000`), settings `+0x7B0000` |
+| `0x08000000–0x087FFFFF` | Kernel NOR from chip `0x40000` (ROM page `0x8002`): the kernel at `0x08000000`, Torii's second NOR index `+0x780000`, save info `+0x790000`, NOR index `+0x7A0000`, settings `+0x7B0000`; from `+0x7C0000` the window wraps onto the boot loader at chip 0 |
 | `0x08800000–0x08FFFFFF` | PSRAM window, page register `0x09860000` in steps of `0x1000` per 8 MB |
 | `0x09000000–0x097FFFFF` | Game NOR window (64 MB chip, 128 KB sectors, 32 KB boot sectors in the first and last 128 KB, 16-word buffered programming) |
 | `0x09E00000` | Data port (SD sectors, FAT table, status) |
@@ -292,7 +298,8 @@ empty list whenever the walk found no games.
 
 Torii (`source/norlist.h`) keeps the same 64 entries but adds a 32-byte
 trailer at `+0x2100` (magic `TNL2`, a sequence number, the game count, a
-CRC-32), and writes a second copy at `+0x7C0000`. A save writes the copy the
+CRC-32), and writes a second copy at `+0x780000` (v0.2.1 and v0.2.2 put it at
+`+0x7C0000`, which is the boot loader: see below). A save writes the copy the
 list wasn't read from first, then the other, so a power cut leaves one whole
 copy; the reader takes the whole copy with the higher number, else the
 trailerless list at `+0x7A0000` as an older kernel's. The official kernel
@@ -313,6 +320,68 @@ during FORMAT ALL's chip erase can still leave a half-erased game whose
 header and mark survive; format again. Erase and program
 take the model no time, so `OMEGA_POWER_CUT` (`emu/mgba/src/gba/cart/omega.c`) cuts the
 power between operations for `tests/nor_safety.sh`.
+
+**Kernel NOR and the boot loader.** From the official *EZ-FLASH OMEGA DE
+DOCUMENT.pdf* (its NOR allocation lists 16-bit word addresses, so double
+them for bytes) and a bricked cart (2026-10-18):
+
+| Chip offset | Window offset (page `0x8002`) | Content |
+|---|---|---|
+| `0x000000–0x00FFFF` | `0x7C0000–0x7CFFFF` | EZ-Flash's boot loader (ROM page `0x8000` shows it at `0x08000000`) |
+| `0x010000–0x03FFFF` | `0x7D0000–0x7FFFFF` | unused |
+| `0x040000–…` | `0x000000–…` | the kernel (`ezkernelnew.bin`, under 2.6 MB) |
+| `0x7C0000–0x7FFFFF` | `0x780000–0x7BFFFF` | the kernel's data: Torii's NOR list copy B, save info, NOR list, settings |
+
+The chip is 8 MB and the window too, so the window's last 256 KB wrap onto
+the chip's first: offsets from `0x7C0000` are the loader. v0.2.1 and v0.2.2
+wrote the NOR list's copy B at `0x7C0000`. The erase cleared the loader's
+first 8 KB sector, the program wrote the list over it and then hung on
+loader bytes it couldn't program (the chip's DQ5 error), and the cart came
+back up in EZ-Flash's safe mode, `No_Loader_found`. `docs/recovery.md` has
+the recovery. The PDF's own table lists the data records at the window
+offsets, not chip offsets; only the brick shows the window starts at chip
+`0x40000`.
+
+Sector maps: the S29PL064J (autoselect `227E 2202 2201`) has 64 KB sectors
+with eight 8 KB boot sectors at each end; the S29GL064A boot-sector models
+have them at one end (bottom boot: `227E 2210 2200`). Either way chip
+`0x0000–0xFFFF`, the loader, is 8 KB sectors, and on a PL064J so is the
+window's `0x7B0000–0x7BFFFF`, the settings sector: an erase there clears
+only 8 KB.
+
+**What writes the kernel NOR** (audit for v0.2.3, from `grep` over `source/`
+for `Save_info`, `FlashBase_S71`, the command bytes `0x30`, `0xA0`, `0x25`,
+`0x29` and `0x10`, `0x08000000` writes and `0x09880000`/`SetRompage`):
+
+| Path | Writes | Through |
+|---|---|---|
+| Settings saved (`Save_SET_info`: SETTINGS, a game's save type, thumbnails) | `0x7B0000`, 512 bytes | `Save_info` |
+| Pending-save record set at launch, cleared at the next boot (`Save_sav_info`) | `0x790000`, 512 bytes | `Save_info` |
+| NOR list saved: WRITE TO NOR, delete latest, FORMAT ALL, the boot's migration of an older list (`Save_NOR_list`) | `0x780000` then `0x7A0000` (or the other way), 0x2120 bytes each | `Save_info` |
+| `Read_S71NOR_ID` (in `Save_info` and Diagnostics' first step) | autoselect `90` and reset `F0` at `0x0AAA`/`0x0554`/0: commands, no erase or program | — |
+| The register unlock (`SetRompage` and the other `Set*` in `Ezcard_OP.c`, the in-game menu's `.s` files) | `0x1500`/`0xD200` at `0x08000000`, `0x08020000`, `0x08040000`: not NOR commands | — |
+| Diagnostics' loader check (`diag_loader_read`) | sets ROM page `0x8000` and reads 64 KB, from IWRAM with interrupts off, then `0x8002` again | — |
+
+`Save_info` (`source/Ezcard_OP.c`) is the only code that erases or programs
+the kernel NOR. It refuses, writing nothing, any record that
+`kernel_nor_record_ok` (`source/bootloader.c`, host tested) rejects: one
+that isn't a 64 KB-aligned sector between `0x780000` and `0x7BFFFF` holding
+up to 64 KB, or, at `0x7B0000`, more than 8 KB. Game NOR writes
+(`NORflash_OP.c`) go to `0x09000000`, a different chip. Nothing else sets
+ROM page `0x8000`: the in-game menu's reset sets `0x8002`, launches set a
+game page, and `cartlog.c` sets `gl_currentpage`. Static asserts in
+`NORflash_OP.c` keep both list copies inside the data sectors.
+
+The emulated cart (`emu/mgba/src/gba/cart/omega.c`) models this: the window
+at chip `(page & 0x1FF) × 128 KB` wrapping at 8 MB, both sector maps
+(`OMEGA_KERNEL_NOR=gl064` picks the GL064A), a program over unerased bits
+failing with DQ5 until a reset, and a stand-in loader seeded when the chip
+below the kernel is blank. `kernel-nor.bin` holds the chip in window order
+(page `0x8002`), so the loader is at its offset `0x7C0000`. Any erase or
+program below chip `0x40000` prints `BOOT LOADER WRITTEN` and stops the run
+with status 76 (`OMEGA_LOADER_WRITES=allow` runs on, as the real chip
+would). `tests/loader_safety.sh` runs every path above, power cuts in them
+and the GL064A, and fails on v0.2.1 and v0.2.2.
 
 ## 5. Save prompt behaviour
 

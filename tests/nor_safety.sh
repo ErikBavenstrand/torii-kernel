@@ -67,7 +67,10 @@ EOF
 }
 outside_data() {
   # (from 0x300000: the emulator copies the kernel file to 0 at each power-on)
-  { tail -c +$((0x300000 + 1)) "$cart/kernel-nor.bin" | head -c $((0x480000)); tail -c +$((0x7C0000 + 1)) "$cart/kernel-nor.bin"; } | md5sum
+  {
+    tail -c +$((0x300000 + 1)) "$cart/kernel-nor.bin" | head -c $((0x480000))
+    tail -c +$((0x7C0000 + 1)) "$cart/kernel-nor.bin"
+  } | md5sum
 }
 
 # boot [-c CUT] OPTIONS...: one power-on, with the cart trace; with -c the

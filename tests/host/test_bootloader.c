@@ -50,7 +50,7 @@ void test_loader_check(void)
 	u8 sum = 0;
 	for (u32 i = 0xA0; i < 0xBD; i++)
 		sum += image[i];
-	image[0xBD] = (u8)-(sum + 0x19);
+	image[0xBD] = (u8) - (sum + 0x19);
 	CHECK_EQ(loader_check(image), LOADER_OK);
 	image[0xBD] ^= 1;
 	CHECK_EQ(loader_check(image), LOADER_NO_HEADER);
