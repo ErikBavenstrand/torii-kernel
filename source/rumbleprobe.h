@@ -27,7 +27,7 @@ enum {
 struct rumble_probe_try {
 	uint8_t way;  // RUMBLE_PULSED...
 	uint8_t answer;  // RUMBLE_ANSWER_*
-	uint16_t before;  // 0x08001000 read before the try
+	uint16_t before;  // 0x08001000 read before the try; GPIO pin 3 leaves it be
 	uint16_t on;  // read right after the first 2 written there
 	uint16_t off;  // read after the last 0, before putting `before` back
 };

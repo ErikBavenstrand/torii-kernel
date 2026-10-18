@@ -35,8 +35,11 @@ for line in "pulsed as Jagoomba does (0xF1 at 0x09E20000, then 2 and 0 at 0x0800
   "0x08001000 held at 2 (after 0xF1 at 0x09E20000): no" \
   "pulsed as Jagoomba does, with 0x096A0000 at 0 (GPIO port off): skipped" \
   "GPIO pin 3 held on, as Drill Dozer does (enable 1, direction 8, data 8): yes"; do
-  grep -qF "rumble probe: $line; 0x08001000 read" "$log" || fail "no line '$line'"
+  grep -qF "rumble probe: $line" "$log" || fail "no line '$line'"
 done
+# The three tries that write 0x08001000 log what it read.
+[ "$(grep -c 'rumble probe: .*; 0x08001000 read [0-9A-F]*, [0-9A-F]* after 2, [0-9A-F]* after 0$' "$log")" = 3 ] ||
+  fail "not three tries with 0x08001000 reads"
 # What reached the cart's motor: 60 pulses (and a last off), a hold, 60
 # pulses with the port off.
 motor=$(grep -o '^omega [0-9]*: rumble o.*' "$log" | cut -d' ' -f3- | sort | uniq -c | tr -s ' ' | paste -sd ,)

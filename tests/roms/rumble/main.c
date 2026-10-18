@@ -6,7 +6,8 @@
 // about a second each, and asks after each whether the cart rumbled: A yes,
 // B no, SELECT skip. Each try also reads 0x08001000 before, after its first
 // 2 and after its last 0, to tell whether those writes reach the PSRAM the
-// ROM runs from, and puts the halfword back if they did. Then A goes back to
+// ROM runs from, and puts the halfword back if they did (the ROM ends before
+// 0x1000, so they would only hit what lies past it). Then A goes back to
 // the kernel, whose boot logs the answers from cart RAM page 0xF0. It has no
 // save and touches no other page.
 #include <stdint.h>
@@ -38,22 +39,22 @@
 #define IWRAM_FN __attribute__((section(".iwram"), long_call, noinline, target("arm")))
 
 // A cart register, behind its unlock sequence (source/Ezcard_OP.c).
-#define CART_REG(address, value)            \
-	do {                                \
+#define CART_REG(address, value) \
+	do { \
 		REG16(0x09FE0000) = 0xD200; \
 		REG16(0x08000000) = 0x1500; \
 		REG16(0x08020000) = 0xD200; \
 		REG16(0x08040000) = 0x1500; \
-		REG16(address) = (value);   \
+		REG16(address) = (value); \
 		REG16(0x09FC0000) = 0x1500; \
 	} while (0)
 
-#define WAIT_FRAME()                     \
-	do {                             \
+#define WAIT_FRAME() \
+	do { \
 		while (REG_VCOUNT >= 160) \
-			;                \
-		while (REG_VCOUNT < 160)  \
-			;                \
+			; \
+		while (REG_VCOUNT < 160) \
+			; \
 	} while (0)
 
 // --- The screen: a 3x5 font, drawn twice its size ----------------------------
@@ -117,7 +118,9 @@ IWRAM_FN static void drive(struct rumble_probe_try *t)
 		for (int f = 0; f < FRAMES; f++)
 			WAIT_FRAME();
 		REG16(0x080000C4) = 0;
-		t->on = t->off = MOTOR;
+		REG16(0x080000C6) = 0;  // the port as the kernel's clock code expects to find it
+		REG16(0x080000C8) = 0;
+		t->on = t->off = t->before;  // 0x08001000 untouched
 	} else {
 		for (int f = 0; f < FRAMES; f++) {
 			if (f == 0 || way != RUMBLE_HELD) {
@@ -132,8 +135,10 @@ IWRAM_FN static void drive(struct rumble_probe_try *t)
 		}
 		MOTOR = 0;
 		t->off = MOTOR;
-		if (t->off != t->before)
-			MOTOR = t->before;  // the write reached the PSRAM: put the ROM back
+		// The first 2 read back: the writes reached the PSRAM, so put it back.
+		// Otherwise that write would only reach the motor.
+		if (t->on == 2 && t->off != t->before)
+			MOTOR = t->before;
 	}
 	CART_REG(0x096A0000, 1);
 }

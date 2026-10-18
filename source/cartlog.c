@@ -325,6 +325,11 @@ static void report_rumble_probe(void)
 	tlog_force(TLOG_INFO, "rumble probe: %lu tries in game mode", (unsigned long)tries);
 	for (u32 i = 0; i < tries; i++) {
 		const struct rumble_probe_try *t = &p->t[i];
+		if (t->way == RUMBLE_GPIO_PIN3) {
+			tlog_force(TLOG_INFO, "rumble probe: %s: %s", ways[t->way],
+				   t->answer < 3 ? answers[t->answer] : "?");
+			continue;
+		}
 		tlog_force(TLOG_INFO, "rumble probe: %s: %s; 0x08001000 read %04X, %04X after 2, %04X after 0",
 			   t->way < sizeof(ways) / sizeof(*ways) ? ways[t->way] : ways[0],
 			   t->answer < 3 ? answers[t->answer] : "?", t->before, t->on, t->off);
