@@ -274,6 +274,22 @@ static void probe_bytes(char *out, const u8 *d)
 	snprintf(out, 24, "%02X%02X%02X%02X %02X%02X%02X%02X", d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7]);
 }
 
+static const char *probe_variant(u32 variant)
+{
+	switch (variant) {
+	case EEPROM_PROBE_POLL_AT_ONCE:
+		return "polled at once";
+	case EEPROM_PROBE_WAIT_THEN_POLL:
+		return "waited, then polled";
+	case EEPROM_PROBE_NO_POLL:
+		return "no poll, waited 10 ms";
+	case EEPROM_PROBE_EXTRA_BIT:
+		return "an extra 0 bit, waited, then polled";
+	default:
+		return "an unknown way";
+	}
+}
+
 // The EEPROM probe ROM's report (tests/roms/eeprom): each step, where each
 // read's data came from, and what they add up to.
 static void report_eeprom_probe(void)
@@ -290,29 +306,49 @@ static void report_eeprom_probe(void)
 	for (u32 i = 0; i < steps; i++) {
 		const struct eeprom_probe_step *s = &p->step[i];
 		probe_bytes(data, s->data);
-		if (s->op == EEPROM_PROBE_WRITE) {
-			if (s->polls == EEPROM_PROBE_TIMEOUT)
-				tlog_force(TLOG_INFO, "eeprom probe: %2lu: write block %u: %s, never finished",
-					   (unsigned long)i, s->block, data);
-			else
-				tlog_force(TLOG_INFO, "eeprom probe: %2lu: write block %u: %s, ready after %lu polls",
-					   (unsigned long)i, s->block, data, (unsigned long)s->polls);
+		if (s->op == EEPROM_PROBE_WAIT) {
+			tlog_force(TLOG_INFO, "eeprom probe: %2lu: waited a frame", (unsigned long)i);
 			continue;
 		}
-		int src = eeprom_probe_source(p, i);
-		char what[48];
-		if (src >= 0)
-			snprintf(what, sizeof(what), "step %d's write (block %u)", src, p->step[src].block);
-		else if (s->data[0] == 0xE6 || s->data[0] == 0xEE)
+		if (s->op == EEPROM_PROBE_WRITE) {
+			if (s->polls == EEPROM_PROBE_TIMEOUT)
+				tlog_force(TLOG_INFO, "eeprom probe: %2lu: write block %u (%s): %s, never finished",
+					   (unsigned long)i, s->block, probe_variant(s->variant), data);
+			else if (s->variant == EEPROM_PROBE_NO_POLL)
+				tlog_force(TLOG_INFO, "eeprom probe: %2lu: write block %u (%s): %s", (unsigned long)i,
+					   s->block, probe_variant(s->variant), data);
+			else
+				tlog_force(TLOG_INFO,
+					   "eeprom probe: %2lu: write block %u (%s): %s, ready after %lu polls",
+					   (unsigned long)i, s->block, probe_variant(s->variant), data,
+					   (unsigned long)s->polls);
+			continue;
+		}
+		int near;
+		int src = eeprom_probe_source(p, i, &near);
+		char what[96];
+		if (src >= 0) {
+			const struct eeprom_probe_step *w = &p->step[src];
+			u32 len = snprintf(what, sizeof(what), "step %d's write (block %u, %s)", src, w->block,
+					   probe_variant(w->variant));
+			if (near && len < sizeof(what))
+				snprintf(what + len, sizeof(what) - len, ", except byte 7: wrote %02X, read %02X",
+					 w->data[7], s->data[7]);
+		} else if (s->data[3] == (u8)(p->nonce >> 8) && s->data[4] == (u8)p->nonce) {
+			snprintf(what, sizeof(what), "this run, but no write matches it");
+		} else if (s->data[0] == 0xE6 || s->data[0] == 0xEE) {
 			snprintf(what, sizeof(what), "an earlier %u-bit run", s->data[0] == 0xE6 ? 6 : 14);
-		else
+		} else {
 			snprintf(what, sizeof(what), "nothing written in this run");
+		}
 		tlog_force(TLOG_INFO, "eeprom probe: %2lu: read block %u: %s, from %s", (unsigned long)i, s->block,
 			   data, what);
 	}
 	u32 v = eeprom_probe_verdict(p);
 	tlog_force(TLOG_INFO, "eeprom probe: %lu-bit addresses %s%s%s%s", (unsigned long)p->width,
-		   (v & EEPROM_PROBE_WORKS) ? "work" : "don't read back what was written",
+		   (v & EEPROM_PROBE_WORKS)            ? "work"
+		   : (v & EEPROM_PROBE_LAST_BYTE_LOST) ? "lose the last byte written"
+						       : "don't read back what was written",
 		   (v & EEPROM_PROBE_WRAPS) ? "; blocks wrap at 64: a 512-byte EEPROM" : "",
 		   (v & EEPROM_PROBE_8K) ? "; 1024 blocks: an 8 KB EEPROM" : "",
 		   (v & EEPROM_PROBE_TIMED_OUT) ? "; a write never finished" : "");

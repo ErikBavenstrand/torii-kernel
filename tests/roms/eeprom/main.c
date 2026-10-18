@@ -6,7 +6,9 @@
 // the test with 6-bit addresses, B with 14-bit ones: one width per launch, so
 // a request of the wrong width can't leave the chip half way through a
 // command for the other. It writes and reads a few blocks, shows a verdict,
-// and leaves every step in cart RAM page 0xF0 (source/eepromprobe.h); then A
+// and leaves every step in cart RAM page 0xF0 (source/eepromprobe.h). Blocks
+// 1-4 are each written a different way (EEPROM_PROBE_POLL_AT_ONCE...) and
+// read back a frame later; the screen shows which bytes differ. Then A
 // goes back to the kernel, whose boot logs the report. Its EEPROM is its own
 // save, so nothing else is touched.
 #include <stdint.h>
@@ -121,9 +123,40 @@ static void read_block(unsigned block, uint8_t out[8])
 	}
 }
 
-// Returns how many polls the chip took to say it was ready.
-static uint32_t write_block(unsigned block, const uint8_t in[8])
+// Waits for n scanline starts: at least n - 1 whole lines of 1232 cycles
+// (about 73 us each), as VCOUNT changes once a line.
+static void wait_lines(unsigned n)
 {
+	while (n--) {
+		uint16_t line = REG_VCOUNT;
+		while (REG_VCOUNT == line)
+			;
+	}
+}
+
+#define LINES_1MS 15
+#define LINES_10MS 137
+
+// A real EEPROM takes about 6 ms; a million polls is over a second.
+static uint32_t poll_ready(void)
+{
+	for (uint32_t polls = 0; polls < 1000000; polls++)
+		if (EEPROM[0] & 1)
+			return polls;
+	return EEPROM_PROBE_TIMEOUT;
+}
+
+// Writes a block the variant's way (EEPROM_PROBE_*). Returns how many polls
+// the chip took to say it was ready, or 0 if it wasn't polled.
+//
+// On the real cart (v0.2.1, firmware 7), polling right after the stop bit
+// lost each write's last byte, while games keep it: Crash Bandicoot XS's
+// EEPROM_V122 spends over 100 cycles setting up a timer before its first
+// poll. So the probe waits before polling, and tries the other ways on
+// blocks of their own.
+static uint32_t write_block(unsigned block, const uint8_t in[8], unsigned variant)
+{
+	static const uint16_t zero = 0;
 	bits[0] = 1;
 	bits[1] = 0;
 	int n = put_address(block);
@@ -133,11 +166,24 @@ static uint32_t write_block(unsigned block, const uint8_t in[8])
 	n += 64;
 	bits[n++] = 0;
 	dma(EEPROM, bits, n);
-	// A real EEPROM takes about 6 ms; a million polls is over a second.
-	for (uint32_t polls = 0; polls < 1000000; polls++)
-		if (EEPROM[0] & 1)
-			return polls;
-	return EEPROM_PROBE_TIMEOUT;
+	uint32_t polls = 0;
+	switch (variant) {
+	case EEPROM_PROBE_POLL_AT_ONCE:
+		polls = poll_ready();
+		break;
+	case EEPROM_PROBE_NO_POLL:
+		wait_lines(LINES_10MS);
+		break;
+	case EEPROM_PROBE_EXTRA_BIT:
+		dma(EEPROM, &zero, 1);  // a chip waiting for a command's start bit ignores it
+		/* fall through */
+	default:
+		wait_lines(2);
+		polls = poll_ready();
+		break;
+	}
+	wait_lines(LINES_1MS);
+	return polls;
 }
 
 // --- The probe ---------------------------------------------------------------
@@ -151,37 +197,52 @@ static void step_read(unsigned block)
 	s->width = (uint8_t)width;
 	s->block = (uint16_t)block;
 	read_block(block, s->data);
+	wait_lines(1);
 }
 
-static void step_write(unsigned block)
+static void step_write(unsigned block, unsigned variant)
 {
 	struct eeprom_probe_step *s = &report.step[report.steps++];
 	s->op = EEPROM_PROBE_WRITE;
 	s->width = (uint8_t)width;
 	s->block = (uint16_t)block;
+	s->variant = (uint8_t)variant;
 	eeprom_probe_pattern(s->data, width, block, report.nonce);
-	s->polls = write_block(block, s->data);
+	s->polls = write_block(block, s->data, variant);
 }
+
+static void step_wait_frame(void)
+{
+	report.step[report.steps++].op = EEPROM_PROBE_WAIT;
+	wait_lines(229);
+}
+
+// The ways to write, in blocks 1-4 (VARIANT_BLOCK + variant - 1).
+#define VARIANT_BLOCK 1
+static const uint8_t variants[] = {EEPROM_PROBE_WAIT_THEN_POLL, EEPROM_PROBE_POLL_AT_ONCE, EEPROM_PROBE_NO_POLL,
+				   EEPROM_PROBE_EXTRA_BIT};
 
 static void probe(void)
 {
 	report.width = width;
 	report.nonce = waited & 0xFFFF;
 	step_read(1);  // what an earlier run left
-	step_write(1);
+	step_write(1, EEPROM_PROBE_WAIT_THEN_POLL);
 	step_read(1);
-	step_write(2);
-	step_read(2);
-	step_read(1);
-	step_write(63);
+	for (unsigned i = 1; i < sizeof(variants); i++)
+		step_write(VARIANT_BLOCK + i, variants[i]);
+	step_wait_frame();
+	for (unsigned i = 0; i < sizeof(variants); i++)
+		step_read(VARIANT_BLOCK + i);
+	step_write(63, EEPROM_PROBE_WAIT_THEN_POLL);
 	step_read(63);
 	if (width == 14) {
 		// 512 bytes are blocks 0-63: past them, block 65 lands on block 1
 		// and block 1023 on block 63 if the chip wraps.
-		step_write(65);
+		step_write(65, EEPROM_PROBE_WAIT_THEN_POLL);
 		step_read(65);
 		step_read(1);
-		step_write(1023);
+		step_write(1023, EEPROM_PROBE_WAIT_THEN_POLL);
 		step_read(1023);
 		step_read(63);
 	}
@@ -232,6 +293,56 @@ __attribute__((section(".iwram"), long_call, noinline, noreturn, target("arm")))
 		;
 }
 
+static char hex_digit(unsigned v)
+{
+	return (char)(v < 10 ? '0' + v : 'A' + v - 10);
+}
+
+// One line per way to write: OK, or which bytes read back different after
+// the frame's wait.
+static void show_variants(int y)
+{
+	static const char *const names[] = {"", "POLL AT ONCE", "WAIT THEN POLL", "NO POLL 10MS", "EXTRA 0 BIT"};
+	unsigned after = 0;
+	while (after < report.steps && report.step[after].op != EEPROM_PROBE_WAIT)
+		after++;
+	for (unsigned i = 0; i < sizeof(variants); i++, y += 12) {
+		const struct eeprom_probe_step *r = &report.step[after + 1 + i];
+		uint8_t want[8];
+		eeprom_probe_pattern(want, width, r->block, report.nonce);
+		char line[32], *o = line;
+		for (const char *n = names[variants[i]]; *n;)
+			*o++ = *n++;
+		*o++ = ':';
+		unsigned differ = 0, last = 0;
+		for (unsigned b = 0; b < 8; b++)
+			if (r->data[b] != want[b]) {
+				differ++;
+				last = b;
+			}
+		const char *verdict = differ == 0   ? " OK"
+				      : differ == 8 ? " ALL DIFFER"
+				      : differ > 1  ? " BYTES"
+						    : " BYTE ";
+		while (*verdict)
+			*o++ = *verdict++;
+		if (differ == 1) {
+			*o++ = hex_digit(last);
+			*o++ = ' ';
+			*o++ = hex_digit(r->data[last] >> 4);
+			*o++ = hex_digit(r->data[last] & 0xF);
+		} else if (differ > 1 && differ < 8) {
+			for (unsigned b = 0; b < 8; b++)
+				if (r->data[b] != want[b]) {
+					*o++ = ' ';
+					*o++ = hex_digit(b);
+				}
+		}
+		*o = 0;
+		text(8, y, differ ? RGB(31, 8, 8) : RGB(8, 31, 8), line);
+	}
+}
+
 int main(void)
 {
 	REG_WAITCNT = 0x4317;  // the cart waitstates commercial games use
@@ -251,17 +362,20 @@ int main(void)
 	clear();
 	text(8, 8, RGB(31, 31, 8), width == 6 ? "6-BIT RUN" : "14-BIT RUN");
 	uint16_t good = RGB(8, 31, 8), bad = RGB(31, 8, 8);
-	text(8, 32, (v & EEPROM_PROBE_WORKS) ? good : bad,
-	     (v & EEPROM_PROBE_WORKS) ? "READS BACK WHAT IT WROTE" : "DOES NOT READ BACK");
+	text(8, 24, (v & EEPROM_PROBE_WORKS) ? good : bad,
+	     (v & EEPROM_PROBE_WORKS)            ? "READS BACK WHAT IT WROTE"
+	     : (v & EEPROM_PROBE_LAST_BYTE_LOST) ? "LOSES THE LAST BYTE"
+						 : "DOES NOT READ BACK");
 	if (v & EEPROM_PROBE_TIMED_OUT)
-		text(8, 44, bad, "A WRITE NEVER FINISHED");
+		text(8, 36, bad, "A WRITE NEVER FINISHED");
 	if (width == 14)
-		text(8, 56, RGB(31, 31, 31),
+		text(8, 48, RGB(31, 31, 31),
 		     (v & EEPROM_PROBE_WRAPS) ? "WRAPS AT 64 BLOCKS: 512 B"
 		     : (v & EEPROM_PROBE_8K)  ? "1024 BLOCKS: 8 KB"
 					      : "SIZE UNKNOWN");
-	text(8, 92, RGB(31, 31, 31), "A: BACK TO THE KERNEL,");
-	text(8, 104, RGB(31, 31, 31), "WHICH LOGS EVERY STEP.");
+	show_variants(64);
+	text(8, 120, RGB(31, 31, 31), "A: BACK TO THE KERNEL,");
+	text(8, 132, RGB(31, 31, 31), "WHICH LOGS EVERY STEP.");
 	wait_key(KEY_A);
 	back_to_kernel();
 }

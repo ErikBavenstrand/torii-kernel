@@ -120,10 +120,10 @@ void test_eeprom_probe_verdict(void)
 	add(&p, EEPROM_PROBE_WRITE, 1023, NULL);
 	add(&p, EEPROM_PROBE_READ, 1023, NULL);
 	CHECK_EQ(eeprom_probe_verdict(&p), EEPROM_PROBE_WORKS | EEPROM_PROBE_8K);
-	CHECK_EQ(eeprom_probe_source(&p, 0), -1);
-	CHECK_EQ(eeprom_probe_source(&p, 4), 1);
-	CHECK_EQ(eeprom_probe_source(&p, 6), 5);
-	CHECK_EQ(eeprom_probe_source(&p, 5), -1);  // a write
+	CHECK_EQ(eeprom_probe_source(&p, 0, NULL), -1);
+	CHECK_EQ(eeprom_probe_source(&p, 4, NULL), 1);
+	CHECK_EQ(eeprom_probe_source(&p, 6, NULL), 5);
+	CHECK_EQ(eeprom_probe_source(&p, 5, NULL), -1);  // a write
 
 	// A 512-byte chip: block 65 lands on block 1, 1023 on 63.
 	memset(&p, 0, sizeof(p));
@@ -159,8 +159,64 @@ void test_eeprom_probe_verdict(void)
 	add(&p, EEPROM_PROBE_READ, 1, earlier);
 	CHECK_EQ(eeprom_probe_verdict(&p), 0);
 
+	// The real cart in v0.2.1 (cart-test-2026-10-18b): every write lost its
+	// last byte, which read FF. Bytes 0-6 still say which write it was, so
+	// the size checks go on.
+	u8 lost[8], lost65[8], lost1023[8];
+	memset(&p, 0, sizeof(p));
+	p.width = 14;
+	p.nonce = 0xC1E7;
+	eeprom_probe_pattern(lost, 14, 1, p.nonce);
+	eeprom_probe_pattern(lost65, 14, 65, p.nonce);
+	eeprom_probe_pattern(lost1023, 14, 1023, p.nonce);
+	CHECK_EQ(lost[0], 0xEE);
+	CHECK_EQ(lost[3], 0xC1);
+	CHECK_EQ(lost[7], 0x32);
+	lost[7] = lost65[7] = lost1023[7] = 0xFF;
+	add(&p, EEPROM_PROBE_WRITE, 1, NULL);
+	add(&p, EEPROM_PROBE_READ, 1, lost);
+	add(&p, EEPROM_PROBE_WRITE, 65, NULL);
+	add(&p, EEPROM_PROBE_READ, 65, lost65);
+	add(&p, EEPROM_PROBE_READ, 1, lost);  // its own block: no wrap
+	add(&p, EEPROM_PROBE_WRITE, 1023, NULL);
+	add(&p, EEPROM_PROBE_READ, 1023, lost1023);
+	int near = 0;
+	CHECK_EQ(eeprom_probe_source(&p, 1, &near), 0);
+	CHECK_EQ(near, 1);
+	CHECK_EQ(eeprom_probe_source(&p, 6, &near), 5);
+	CHECK_EQ(near, 1);
+	CHECK_EQ(eeprom_probe_verdict(&p), EEPROM_PROBE_LAST_BYTE_LOST | EEPROM_PROBE_8K);
+
+	// The same chip wrapping at 64 blocks, seen through near-matches.
+	p.step[4].data[2] = 65;
+	p.step[4].data[5] = (u8)~65;
+	CHECK_EQ(eeprom_probe_source(&p, 4, &near), 2);
+	CHECK_EQ(near, 1);
+	CHECK_EQ(eeprom_probe_verdict(&p), EEPROM_PROBE_LAST_BYTE_LOST | EEPROM_PROBE_WRAPS);
+
+	// An exact match wins over a near one, and sets no flag.
+	memset(&p, 0, sizeof(p));
+	p.width = 6;
+	add(&p, EEPROM_PROBE_WRITE, 1, NULL);
+	add(&p, EEPROM_PROBE_WRITE, 1, NULL);
+	p.step[1].data[7] ^= 0x0F;  // the same block written again, byte 7 changed
+	add(&p, EEPROM_PROBE_READ, 1, p.step[0].data);
+	CHECK_EQ(eeprom_probe_source(&p, 2, &near), 0);
+	CHECK_EQ(near, 0);
+	CHECK_EQ(eeprom_probe_verdict(&p), EEPROM_PROBE_WORKS);
+
+	// Byte 6 differing too is no match.
+	memset(&p, 0, sizeof(p));
+	p.width = 6;
+	add(&p, EEPROM_PROBE_WRITE, 1, NULL);
+	add(&p, EEPROM_PROBE_READ, 1, p.step[0].data);
+	p.step[1].data[6] ^= 1;
+	p.step[1].data[7] = 0xFF;
+	CHECK_EQ(eeprom_probe_source(&p, 1, &near), -1);
+	CHECK_EQ(eeprom_probe_verdict(&p), 0);
+
 	// A step count past the table is cut to it.
 	p.steps = 1000;
-	CHECK_EQ(eeprom_probe_source(&p, EEPROM_PROBE_STEPS), -1);
+	CHECK_EQ(eeprom_probe_source(&p, EEPROM_PROBE_STEPS, NULL), -1);
 	(void)eeprom_probe_verdict(&p);
 }

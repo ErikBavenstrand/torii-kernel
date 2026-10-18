@@ -47,6 +47,12 @@ run_case() {
   grep -q "eeprom probe: $width-bit addresses work" "$log" ||
     fail "$type $width-bit: $(grep 'eeprom probe: [0-9]*-bit' "$log")"
   ! grep -q "never finished" "$log" || fail "$type $width-bit: a write never finished"
+  # Each way to write (blocks 1-4) reads back whole a frame later.
+  grep -q "eeprom probe: *[0-9]*: waited a frame" "$log" || fail "$type $width-bit: no frame's wait"
+  for way in "polled at once" "waited, then polled" "no poll, waited 10 ms" "an extra 0 bit, waited, then polled"; do
+    grep -q "read block [1-4]: .*, from step [0-9]*'s write (block [1-4], $way)\$" "$log" ||
+      fail "$type $width-bit: the write that $way didn't read back"
+  done
   if [ "$width" = 14 ]; then
     # mGBA's EEPROM holds 8 KB whatever the type says.
     grep -q "1024 blocks: an 8 KB EEPROM" "$log" || fail "$type 14-bit: $(grep 'eeprom probe: 14-bit' "$log")"
