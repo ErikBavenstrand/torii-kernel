@@ -22,6 +22,71 @@ static const char latin_a_ascii[128] = {
 	'U', 'u', 'U', 'u', 'W', 'w', 'Y', 'y', 'Y', 'Z', 'z', 'Z', 'z', 'Z', 'z', 's', // U+0170
 };
 
+static char glyph_of(u32 c)
+{
+	if (c < 0x80)
+		return c;
+	if (c >= 0xA0 && c < 0x100)
+		return latin1_ascii[c - 0xA0];
+	if (c >= 0x100 && c < 0x180)
+		return latin_a_ascii[c - 0x100];
+	switch (c) {
+	case 0x2010: // hyphens and dashes
+	case 0x2011:
+	case 0x2012:
+	case 0x2013:
+	case 0x2014:
+	case 0x2015:
+	case 0x2212: // minus
+		return '-';
+	case 0x2018: // single quotes
+	case 0x2019:
+	case 0x201A:
+	case 0x201B:
+		return '\'';
+	case 0x201C: // double quotes
+	case 0x201D:
+	case 0x201E:
+	case 0x201F:
+		return '"';
+	default:
+		return '?';
+	}
+}
+
+char charset_next(const char *s, u32 len, u32 *pos)
+{
+	const u8 *p = (const u8 *)s;
+	u8 lead = p[*pos];
+	u32 count, c;
+
+	(*pos)++;
+	if (lead < 0x80)
+		return lead;
+	if (lead < 0xC0)
+		return 0; // a continuation byte without its lead byte
+	if (lead < 0xE0) {
+		count = 1;
+		c = lead & 0x1F;
+	} else if (lead < 0xF0) {
+		count = 2;
+		c = lead & 0x0F;
+	} else if (lead < 0xF8) {
+		count = 3;
+		c = lead & 0x07;
+	} else {
+		return '?';
+	}
+	// A truncated or broken sequence draws one '?' and ends at the bad byte
+	while (count--) {
+		if (*pos >= len || (p[*pos] & 0xC0) != 0x80)
+			return '?';
+		c = (c << 6) | (p[*pos] & 0x3F);
+		(*pos)++;
+	}
+	return glyph_of(c);
+}
+
 // Dashes and curly quotes, which Latin-1 lacks: their ASCII forms, or 0
 static char punctuation_of(u32 c)
 {
@@ -49,25 +114,10 @@ static char punctuation_of(u32 c)
 	}
 }
 
-static char glyph_of(u32 c)
-{
-	if (c < 0x80)
-		return c;
-	if (c >= 0xA0 && c < 0x100)
-		return latin1_ascii[c - 0xA0];
-	if (c >= 0x100 && c < 0x180)
-		return latin_a_ascii[c - 0x100];
-	char p = punctuation_of(c);
-	return p ? p : '?';
-}
-
-#define NO_CHARACTER 0xFFFFFFFF
-
-// The code point of the UTF-8 character at s[*pos], moving *pos past it.
-// NO_CHARACTER for a continuation byte with no lead byte, such as where a
-// scrolled name starts mid-character; CHARSET_REPLACEMENT for a truncated
-// or broken sequence, which ends at the bad byte.
-static u32 decode(const char *s, u32 len, u32 *pos)
+// The same decoding as charset_next's, kept apart: sharing it slowed
+// charset_next enough to shift when the mode 3 list's scrolling name redraws,
+// which the sd-scroll golden (tests/shots) hashes frame by frame.
+u32 charset_next_latin1(const char *s, u32 len, u32 *pos)
 {
 	const u8 *p = (const u8 *)s;
 	u8 lead = p[*pos];
@@ -77,7 +127,7 @@ static u32 decode(const char *s, u32 len, u32 *pos)
 	if (lead < 0x80)
 		return lead;
 	if (lead < 0xC0)
-		return NO_CHARACTER;
+		return CHARSET_NONE;
 	if (lead < 0xE0) {
 		count = 1;
 		c = lead & 0x1F;
@@ -96,28 +146,10 @@ static u32 decode(const char *s, u32 len, u32 *pos)
 		c = (c << 6) | (p[*pos] & 0x3F);
 		(*pos)++;
 	}
-	return c;
-}
-
-char charset_next(const char *s, u32 len, u32 *pos)
-{
-	u32 c = decode(s, len, pos);
-	if (c == NO_CHARACTER)
-		return 0;
-	if (c == CHARSET_REPLACEMENT)
-		return '?';
-	return glyph_of(c);
-}
-
-u32 charset_next_latin1(const char *s, u32 len, u32 *pos)
-{
-	u32 c = decode(s, len, pos);
-	if (c == NO_CHARACTER)
-		return CHARSET_NONE;
 	if (c < 0x100)
 		return c;
 	if (c < 0x180)
 		return (u8)latin_a_ascii[c - 0x100];
-	char p = punctuation_of(c);
-	return p ? (u32)(u8)p : CHARSET_REPLACEMENT;
+	char q = punctuation_of(c);
+	return q ? (u32)(u8)q : CHARSET_REPLACEMENT;
 }
