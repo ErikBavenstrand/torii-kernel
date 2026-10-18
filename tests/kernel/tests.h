@@ -16,8 +16,10 @@ void test_clock_and_rumble_are_separate(void);
 void test_sort_by_name(void);
 void test_sort_full_list(void);
 void test_recently_played(void);
+void test_recently_played_nor(void);
 void test_nor_info_stays_in_bounds(void);
 void test_nor_write_refused_when_list_full(void);
+void test_nor_scan_keeps_interrupts(void);
 void test_menu_code_fits(void);
 
 #endif

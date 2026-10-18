@@ -73,6 +73,8 @@ static const struct {
 	{"log_find_end", test_log_find_end},
 	{"lz77_round_trip", test_lz77_round_trip},
 	{"lz77_compresses", test_lz77_compresses},
+	{"nor_list_copies", test_nor_list_copies},
+	{"nor_mark", test_nor_mark},
 };
 
 int main(void)

@@ -14,6 +14,9 @@
 #include "lang.h"
 #include "Ezcard_OP.h"
 #include "GBApatch.h"
+#include "cheat.h"
+#include "norlist.h"
+#include "tlog.h"
 //#define DEBUG
 
 extern FM_NOR_FS pNorFS[MAX_NOR] EWRAM_BSS;
@@ -122,6 +125,8 @@ void FormatNor(void)
 		if (keys & KEY_A) {
 			Chip_Erase();
 			memset(pNorFS, 00, sizeof(FM_NOR_FS) * MAX_NOR);
+			game_total_NOR = 0;
+			Save_NOR_list(0);  // Torii: the boot no longer saves an empty list
 			return;
 		} else if (keys & KEY_B) {
 			return;
@@ -194,6 +199,176 @@ void IWRAM_CODE WriteFlash_with32word(u32 address, u8 *buffer, u32 size)
 	SetRompage(gl_currentpage);
 }
 //-----------------------------------------------------------
+// Torii: the list and completion marks (norlist.h).
+_Static_assert(sizeof(FM_NOR_FS) == NOR_ENTRY_SIZE && MAX_NOR == NOR_LIST_ENTRIES, "norlist.h's sizes");
+#define NOR_GAME_SIZE 0x4000000
+#define NOR_BLOCK 0x20000
+// The most a patch adds at iTrimSize (Patch_length in GBApatch.c)
+#define NOR_PATCH_MAX CHEAT_PATCH_LENGTH
+_Static_assert(CHEAT_PATCH_LENGTH >= RTS_PATCH_LENGTH, "NOR_PATCH_MAX");
+
+static u32 nor_list_stored;  // games on the copy Read_NOR_info read
+
+// Copies len bytes at offset in the game NOR, which shows 8 MB at a time.
+// len stays within one 8 MB page.
+static void nor_read(u32 offset, void *dst, u32 len)
+{
+	u16 ime = REG_IME;
+	REG_IME = 0;
+	SetRompage(gl_currentpage + (offset >> 23) * 0x1000);
+	memcpy(dst, (const void *)(FlashBase_S98 + (offset & 0x7FFFFF)), len);
+	SetRompage(gl_currentpage);
+	REG_IME = ime;
+}
+
+// Whether the game NOR reads 0xFF for len bytes (a multiple of 32) at offset
+static u32 nor_erased(u32 offset, u32 len)
+{
+	u32 words[8];
+	for (; len; offset += sizeof(words), len -= sizeof(words)) {
+		nor_read(offset, words, sizeof(words));
+		for (u32 i = 0; i < 8; i++)
+			if (words[i] != 0xFFFFFFFF)
+				return 0;
+	}
+	return 1;
+}
+
+// Whether the game at offset, with header, has a whole completion mark at the
+// end of an area ending at end. Leaves the mark read in mark.
+static u32 nor_mark_valid(u32 offset, u32 end, const u8 *header, struct nor_mark *mark)
+{
+	if (end <= offset || end > NOR_GAME_SIZE)
+		return 0;
+	nor_read(end - NOR_MARK_SPACE, mark, 2 * sizeof(u32));  // the magic and offset, to skip the rest fast
+	if (mark->magic != NOR_MARK_MAGIC || mark->offset != offset)
+		return 0;
+	nor_read(end - NOR_MARK_SPACE, mark, sizeof(*mark));
+	return nor_mark_check(mark, offset, end, header);
+}
+
+// Whether list entry e is the game at offset: its title and code are in the
+// header there, and a game Torii wrote has its completion mark.
+static u32 nor_entry_valid(const FM_NOR_FS *e, u32 offset, const u8 *header)
+{
+	struct nor_mark mark;
+	if (!e->filesize || (e->filesize & (NOR_BLOCK - 1)) || e->filesize > NOR_GAME_SIZE - offset ||
+	    e->rompage != offset >> 17 || memcmp(header, e->gamename, sizeof(e->gamename)) != 0)
+		return 0;
+	if (e->reserved1 != NOR_ENTRY_MARKED)  // an older kernel's, which wrote no marks
+		return 1;
+	return nor_mark_valid(offset, offset + e->filesize, header, &mark) && memcmp(mark.entry, e, sizeof(*e)) == 0;
+}
+
+// The end of the area of the game at offset, from its completion mark, or 0
+static u32 nor_find_mark(u32 offset, const u8 *header, struct nor_mark *mark)
+{
+	for (u32 end = offset + NOR_BLOCK; end <= NOR_GAME_SIZE; end += NOR_BLOCK)
+		if (nor_mark_valid(offset, end, header, mark))
+			return end;
+	return 0;
+}
+
+// Erases every completion mark, whole or not, that claims offset, so none
+// outlives its game: a game written there later and cut off would be listed.
+static void nor_clear_marks(u32 offset)
+{
+	struct nor_mark mark;
+	for (u32 end = offset + NOR_BLOCK; end <= NOR_GAME_SIZE; end += NOR_BLOCK) {
+		nor_read(end - NOR_MARK_SPACE, &mark, 2 * sizeof(u32));
+		if (mark.magic == NOR_MARK_MAGIC && mark.offset == offset) {
+			tlog("nor: erasing an old completion mark at %07lX", (unsigned long)(end - NOR_MARK_SPACE));
+			Block_Erase(end - NOR_BLOCK);
+		}
+	}
+}
+
+// Programs the completion mark of the game at offset whose area ends at end,
+// after all its data. 1 when it reads back whole.
+static u32 nor_mark_write(u32 offset, u32 end, const FM_NOR_FS *entry)
+{
+	struct nor_mark mark;
+	u8 header[0x20];
+	nor_read(offset + 0xA0, header, sizeof(header));
+	nor_mark_make(&mark, offset, end - offset, header, entry);
+	WriteFlash_with32word(end - NOR_MARK_SPACE, (u8 *)&mark, sizeof(mark));
+	return nor_mark_valid(offset, end, header, &mark);
+}
+
+void Read_NOR_info(void)
+{
+	const u8 *a = (const u8 *)FlashBase_S71 + NOR_LIST_A;
+	const u8 *b = (const u8 *)FlashBase_S71 + NOR_LIST_B;
+	u32 copy = nor_list_pick(a, b);
+	memcpy(pNorFS, copy == NOR_COPY_B ? b : a, NOR_LIST_BYTES);
+	if (copy == NOR_COPY_NONE) {  // an older kernel's list, or none
+		for (nor_list_stored = 0; nor_list_stored < MAX_NOR && pNorFS[nor_list_stored].filesize &&
+					  pNorFS[nor_list_stored].filesize != 0xFFFFFFFF;
+		     nor_list_stored++)
+			;
+	} else {
+		nor_list_stored =
+			((const struct nor_list_trailer *)((copy == NOR_COPY_B ? b : a) + NOR_LIST_BYTES))->count;
+	}
+	tlog_debug("nor: list read from %s, %lu games",
+		   copy == NOR_COPY_A   ? "copy A"
+		   : copy == NOR_COPY_B ? "copy B"
+					: "an older kernel's copy A",
+		   (unsigned long)nor_list_stored);
+}
+
+u32 Save_NOR_list(u32 count)
+{
+	const u8 *a = (const u8 *)FlashBase_S71 + NOR_LIST_A;
+	const u8 *b = (const u8 *)FlashBase_S71 + NOR_LIST_B;
+	u32 seq_a = 0, seq_b = 0, seq;
+	u32 has_a = nor_list_check(a, &seq_a), has_b = nor_list_check(b, &seq_b);
+	if (has_a && has_b)
+		seq = ((s32)(seq_b - seq_a) > 0 ? seq_b : seq_a) + 1;
+	else
+		seq = (has_a ? seq_a : has_b ? seq_b : 0) + 1;
+	// Write first the copy the list isn't read from; with neither whole, B,
+	// as A may hold an older kernel's list
+	u32 first = nor_list_pick(a, b) == NOR_COPY_B ? NOR_LIST_A : NOR_LIST_B;
+	u32 second = first == NOR_LIST_A ? NOR_LIST_B : NOR_LIST_A;
+
+	u8 *record = pReadCache;
+	memset(record, 0, NOR_LIST_RECORD);
+	memcpy(record, pNorFS, count * sizeof(FM_NOR_FS));
+	nor_list_seal(record, seq, count);
+	const u32 copies[2] = {first, second};
+	for (u32 i = 0; i < 2; i++) {
+		u32 got;
+		Save_info(copies[i], (u16 *)record, NOR_LIST_RECORD);
+		if (!nor_list_check((const u8 *)FlashBase_S71 + copies[i], &got) || got != seq) {
+			// Leave the other copy alone: it may be the only whole one
+			tlog_error("nor: the list copy at %06lX didn't read back", (unsigned long)copies[i]);
+			return 1;
+		}
+	}
+	nor_list_stored = count;
+	tlog("nor: list saved, %lu games, number %lu", (unsigned long)count, (unsigned long)seq);
+	return 0;
+}
+
+void Delete_latest_NOR(void)
+{
+	if (!game_total_NOR)
+		return;
+	FM_NOR_FS *e = &pNorFS[game_total_NOR - 1];
+	u32 start = (u32)e->rompage << 17, end = start + e->filesize;
+	tlog("nor: deleting %s at %07lX", e->filename, (unsigned long)start);
+	// The completion mark first, then the header: a power cut midway leaves
+	// a game no list entry matches and no mark brings back. Writes erase
+	// each block they use, so the rest can stay.
+	Block_Erase(end - NOR_BLOCK);
+	if (end - NOR_BLOCK != start)
+		Block_Erase(start);
+	memset(e, 0, sizeof(*e));
+	game_total_NOR--;
+	Save_NOR_list(game_total_NOR);
+}
+//-----------------------------------------------------------
 u32 Loadfile2NOR(TCHAR *filename, u32 NORaddress, u16 have_patch, u8 SAVEMODE)
 {
 	u32 res;
@@ -217,9 +392,21 @@ u32 Loadfile2NOR(TCHAR *filename, u32 NORaddress, u16 have_patch, u8 SAVEMODE)
 	u16 norid = Read_S98NOR_ID();
 	if (norid == 0x223D)//S98
 	{
+		// Torii: the list again, from the kernel NOR and the game NOR now,
+		// so a list read wrong earlier can't put this game over another
+		Read_NOR_info();
+		game_total_NOR = GetFileListFromNor();
+		if (gl_norOffset != NORaddress) {
+			tlog_error("nor: the game NOR changed: writing at %07lX, not %07lX",
+				   (unsigned long)gl_norOffset, (unsigned long)NORaddress);
+			NORaddress = gl_norOffset;
+		}
+		if (game_total_NOR >= MAX_NOR)
+			return 2;
+
 		res = f_open(&gfile, filename, FA_READ);
 		if (res != FR_OK)
-			return 0;
+			return 1;
 
 		filesize = f_size(&gfile);
 		f_lseek(&gfile, 0xa0);
@@ -233,18 +420,28 @@ u32 Loadfile2NOR(TCHAR *filename, u32 NORaddress, u16 have_patch, u8 SAVEMODE)
 			flag_64MBrom = 0;
 		}
 
+		memset(&tmpNorFS, 0, sizeof(tmpNorFS));
 		memcpy(tmpNorFS.gamename, temp, 0x10);
 		tmpNorFS.rompage = NORaddress >> 17;
 
 		fileneedsize = ((((filesize + 0x1FFFF) / 0x20000) * 0x20000));
+		u32 datasize = fileneedsize;  // the blocks the loop below writes
 		if (have_patch) {
 			if (iTrimSize >= fileneedsize) {
 				fileneedsize = fileneedsize + 0x20000;
 				add_patch = 1;
 			}
 		}
+		// Torii: the completion mark takes the area's last NOR_MARK_SPACE
+		// bytes, or a block of its own when the ROM or its patch reaches them
+		u32 used = filesize;
+		if (have_patch && iTrimSize + NOR_PATCH_MAX > used)
+			used = iTrimSize + NOR_PATCH_MAX;
+		if (used > fileneedsize - NOR_MARK_SPACE)
+			fileneedsize += NOR_BLOCK;
 
 		if (fileneedsize > (0x4000000 - NORaddress)) {
+			f_close(&gfile);
 			return 2; //Not enough NOR space
 		}
 
@@ -268,14 +465,18 @@ u32 Loadfile2NOR(TCHAR *filename, u32 NORaddress, u16 have_patch, u8 SAVEMODE)
 		*((vu16 *)(FlashBase_S98 + 0x000 * 2)) = 0x00;
 		/////////////////
 
+		nor_clear_marks(NORaddress);
+
 		tmpNorFS.filesize = fileneedsize;
 		tmpNorFS.have_patch = have_patch;
 		tmpNorFS.have_RTS = gl_rts_on;
 		tmpNorFS.is_64MBrom = flag_64MBrom;
 		tmpNorFS.savemode = SAVEMODE;
+		tmpNorFS.reserved1 = NOR_ENTRY_MARKED;
 
-		sprintf(tmpNorFS.filename, "%s", filename);
-		dmaCopy(&tmpNorFS, &pNorFS[game_total_NOR], sizeof(FM_NOR_FS));
+		snprintf(tmpNorFS.filename, sizeof(tmpNorFS.filename), "%s", filename);
+		tlog("nor: writing %s at %07lX, %lu bytes in an area of %lu", filename, (unsigned long)NORaddress,
+		     (unsigned long)filesize, (unsigned long)fileneedsize);
 
 		Clear(60, 160 - 15, 120, 15, gl_color_cheat_black, 1);
 		DrawHZText12(gl_writing, 0, 70, 160 - 15, gl_color_text, 1);
@@ -286,7 +487,15 @@ u32 Loadfile2NOR(TCHAR *filename, u32 NORaddress, u16 have_patch, u8 SAVEMODE)
 			Block_Erase(blocknum + NORaddress);
 
 			f_lseek(&gfile, blocknum);
-			f_read(&gfile, pReadCache, 0x20000, (UINT *)&ret);//pReadCache max 0x20000 Byte
+			res = f_read(&gfile, pReadCache, 0x20000, (UINT *)&ret);//pReadCache max 0x20000 Byte
+			if (res != FR_OK || (ret < 0x20000 && blocknum + ret < filesize)) {
+				tlog_error("nor: reading %s at %lu failed (%lu)", filename, (unsigned long)blocknum,
+					   (unsigned long)res);
+				f_close(&gfile);
+				return 1;  // no completion mark, so it isn't listed
+			}
+			if (ret < 0x20000)  // past the ROM's end: erased, not the last block's bytes
+				memset(pReadCache + ret, 0xFF, 0x20000 - ret);
 			if (have_patch) {
 				if ((gl_reset_on == 1) || (gl_rts_on == 1) || (gl_sleep_on == 1) ||
 				    (gl_cheat_on == 1)) {
@@ -305,12 +514,25 @@ u32 Loadfile2NOR(TCHAR *filename, u32 NORaddress, u16 have_patch, u8 SAVEMODE)
 		if (have_patch) {
 			if (add_patch) {
 				Block_Erase(blocknum + NORaddress);
+				memset(pReadCache, 0xFF, 0x20000);  // Torii: only the patch, not the last block again
 				GBApatch_NOR((u32 *)pReadCache, 0x20000, blocknum);
 				WriteFlash_with32word(blocknum + NORaddress, pReadCache, 0x20000);
+				datasize += NOR_BLOCK;
 			}
 		}
 
-		Save_NOR_info((u16 *)pNorFS, sizeof(FM_NOR_FS) * 0x40);
+		// Torii: the completion mark, last
+		for (blocknum = datasize; blocknum < fileneedsize; blocknum += NOR_BLOCK)
+			Block_Erase(blocknum + NORaddress);
+		u32 end = NORaddress + fileneedsize;
+		if (!nor_erased(end - NOR_MARK_SPACE, NOR_MARK_SPACE) || !nor_mark_write(NORaddress, end, &tmpNorFS)) {
+			tlog_error("nor: the completion mark of %s at %07lX didn't write", filename,
+				   (unsigned long)(end - NOR_MARK_SPACE));
+			return 1;
+		}
+
+		dmaCopy(&tmpNorFS, &pNorFS[game_total_NOR], sizeof(FM_NOR_FS));
+		Save_NOR_list(game_total_NOR + 1);  // if it fails, the mark lists the game
 		return 0;
 	} else {
 #ifdef DEBUG
@@ -322,57 +544,42 @@ u32 Loadfile2NOR(TCHAR *filename, u32 NORaddress, u16 have_patch, u8 SAVEMODE)
 //-----------------------------------------------------------
 u32 GetFileListFromNor(void)
 {
-	REG_IME = 0;
-	u32 page = 0, count = 0;
-	u32 StartAddress = FlashBase_S98;
-	//FM_NOR_FS tmpNorFS ;
-	char temp[50];
-	vu16 Value;
+	u8 header[0x20];
+	struct nor_mark mark;
+	u32 offset = 0, count;
 
-	Value = *(vu16 *)(StartAddress + 0xbe);
-	u16 x24 = *(vu16 *)(StartAddress + 0x6);
-
-	//DEBUG_printf(" %x %x %x",StartAddress,Value,x24);
-
-	while (((Value & 0xFF) == 0xCE) || ((Value & 0xFF) == 0xCF) || ((Value & 0xFF) == 0x00) || (x24 == 0x51ae)) {
-		//DEBUG_printf(" %x %x %x",StartAddress,Value,x24);
-		if (*(vu8 *)(StartAddress + 0xb2) == 0x96) {
-			memcpy(temp, (char *)(StartAddress + 0xa0), 0x10);
-			//temp[12] = 0 ;
-
-			//DEBUG_printf("  %s VS %s",temp ,pNorFS[count].gamename);
-
-			if (memcmp(temp, pNorFS[count].gamename, 0x10) ==
-			    0) //if(!strcasecmp(temp, pNorFS[count].gamename))
-			{
-				gl_norOffset += pNorFS[count].filesize;
-				StartAddress += pNorFS[count].filesize;
-				count++;
-			} else {
-				break;
-			}
-		} else {
+	Chip_Reset();  // in a command mode the chip reads no games
+	for (count = 0; count < MAX_NOR && offset < NOR_GAME_SIZE; count++) {
+		nor_read(offset + 0xA0, header, sizeof(header));
+		if (!nor_entry_valid(&pNorFS[count], offset, header))
 			break;
-		}
-
-		while (StartAddress >= FlashBase_S98_end) {
-			page += 0x1000;
-			if (page > 0x7000) {
-				SetRompage(gl_currentpage);
-				return count;
-			}
-			SetRompage(gl_currentpage + page);
-			StartAddress -= 0x800000;
-		}
-		if (count >= MAX_NOR)
-			break; //max
-
-		Value = *(vu16 *)(StartAddress + 0xbe);
-		x24 = *(vu16 *)(StartAddress + 0x6);
+		offset += pNorFS[count].filesize;
 	}
-	SetRompage(gl_currentpage);
-
-	REG_IME = 1;
+	if (count < nor_list_stored)
+		tlog_error("nor: list entry %lu (%.99s) doesn't match the game NOR at %07lX; it and the %lu after it "
+			   "are dropped",
+			   (unsigned long)count, pNorFS[count].filename, (unsigned long)offset,
+			   (unsigned long)(nor_list_stored - count - 1));
+	// Games written in full that the list lacks: a power cut before the list
+	// was saved, or a list lost
+	for (; count < MAX_NOR && offset < NOR_GAME_SIZE; count++) {
+		nor_read(offset + 0xA0, header, sizeof(header));
+		u32 end = nor_find_mark(offset, header, &mark);
+		if (!end)
+			break;
+		memcpy(&pNorFS[count], mark.entry, sizeof(FM_NOR_FS));
+		if (pNorFS[count].filesize != end - offset || pNorFS[count].rompage != offset >> 17 ||
+		    pNorFS[count].reserved1 != NOR_ENTRY_MARKED)
+			break;
+		pNorFS[count].filename[sizeof(pNorFS[count].filename) - 1] = 0;
+		tlog("nor: %s at %07lX has its completion mark but no list entry: listed", pNorFS[count].filename,
+		     (unsigned long)offset);
+		offset = end;
+	}
+	if (count < MAX_NOR)
+		memset(&pNorFS[count], 0, (MAX_NOR - count) * sizeof(FM_NOR_FS));
+	gl_norOffset = offset;
+	tlog_debug("nor: %lu games, the next goes at %07lX", (unsigned long)count, (unsigned long)offset);
 	return count;
 }
 //-----------------------------------------------------------

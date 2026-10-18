@@ -1,6 +1,7 @@
 #include <gba_base.h>
 
 #include "ff.h"
+#include "crc32.h"
 
 void IWRAM_CODE SD_Disable(void);
 void SetSDControl(u16 control);
@@ -23,13 +24,10 @@ u16 IWRAM_CODE Game_GPIO_status(void);
 void ReadSram(u32 address, u8 *data, u32 size);
 void WriteSram(u32 address, u8 *data, u32 size);
 void IWRAM_CODE Save_sav_info(u16 *SAV_info_buffer, u32 buffersize);
-void IWRAM_CODE Save_NOR_info(u16 *NOR_info_buffer, u32 buffersize);
 void IWRAM_CODE Save_SET_info(u16 *SET_info_buffer, u32 buffersize);
-void IWRAM_CODE Read_NOR_info(void);
 u16 IWRAM_CODE Read_SET_info(u32 offset);
 u32 Loadfile2PSRAM(TCHAR *filename);
 u16 IWRAM_CODE Read_FPGA_ver(void);
-u32 crc32(unsigned char *buf, u32 size);
 void IWRAM_CODE Set_RTC_status(u16 status);
 void IWRAM_CODE Set_LED_control(u16 status);
 void IWRAM_CODE Set_64MROM_flag(u16 flag);

@@ -682,13 +682,18 @@ static u32 get_count(void)
 		while (Read_line(buf, 512, &gfile) != NULL) {
 			//DrawHZText12(buf, 32, 1+16, showy, name_color,1);
 			Trim(buf);
-			if (buf[0] != '/')
-				break;
-			// A folder or name longer than the kernel writes (an edited file)
-			// would overrun currentpath or a list entry
-			char *slash = strrchr(buf, '/');
-			if ((u32)(slash - buf) >= MAX_path_len || strlen(slash + 1) > 99)
-				continue;
+			if (Recently_play_nor(buf)) {  // a game started from NOR
+				if (strlen(Recently_play_nor(buf)) > 99)
+					continue;
+			} else {
+				if (buf[0] != '/')
+					break;
+				// A folder or name longer than the kernel writes (an edited
+				// file) would overrun currentpath or a list entry
+				char *slash = strrchr(buf, '/');
+				if ((u32)(slash - buf) >= MAX_path_len || strlen(slash + 1) > 99)
+					continue;
+			}
 			memset(p_recently_play[count], 0x00, 512);
 			dmaCopy(buf, &(p_recently_play[count]), 512);
 			memset(buf, 0x00, 512);
@@ -812,16 +817,29 @@ u32 Recently_play_add(const char *entry, u32 count)
 	return count;
 }
 //---------------------------------------------------------------------------------
-static void Make_recently_play_file(TCHAR *path, TCHAR *gamefilename)
+static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L);
+//---------------------------------------------------------------------------------
+// Puts entry, a path or a NOR game's entry, on top of Recently Played.
+static void Recently_play_save(const char *entry)
 {
 	u32 res;
 	u32 i;
-	u32 count;
-	char buf[512];
+	u32 count = get_count();
 
-	//res=f_chdir("/SAVER");
-	//is in SAVER
-	count = get_count();
+	count = Recently_play_add(entry, count);
+
+	res = f_open(&gfile, "/SAVER/Recently play.txt", FA_WRITE | FA_CREATE_ALWAYS);//truncate: the list can shrink
+	if (res == FR_OK) {
+		for (i = 0; i < count; i++) {
+			res = f_printf(&gfile, "%s\n", p_recently_play[i]);
+		}
+		f_close(&gfile);
+	}
+}
+//---------------------------------------------------------------------------------
+static void Make_recently_play_file(TCHAR *path, TCHAR *gamefilename)
+{
+	char buf[512];
 
 	memset(buf, 0x00, 512);
 	if (strcmp(path, "/") == 0) {
@@ -829,15 +847,25 @@ static void Make_recently_play_file(TCHAR *path, TCHAR *gamefilename)
 	} else {
 		sprintf(buf, "%s/%s", path, gamefilename);
 	}
-	count = Recently_play_add(buf, count);
-
-	res = f_open(&gfile, "Recently play.txt", FA_WRITE | FA_CREATE_ALWAYS);//truncate: the list can shrink
-	if (res == FR_OK) {
-		for (i = 0; i < count; i++) {
-			res = f_printf(&gfile, "%s\n", p_recently_play[i]);
-		}
-		f_close(&gfile);
-	}
+	Recently_play_save(buf);
+}
+//---------------------------------------------------------------------------------
+// Torii: a game started from NOR is on Recently Played as NOR:NAME, NAME its
+// list entry's file name, and starts from NOR there. Returns NAME, or NULL
+// for an SD path.
+const char *Recently_play_nor(const char *entry)
+{
+	return strncmp(entry, RECENT_NOR, sizeof(RECENT_NOR) - 1) == 0 ? entry + sizeof(RECENT_NOR) - 1 : NULL;
+}
+//---------------------------------------------------------------------------------
+// The game NOR list's game named name, or game_total_NOR if none.
+static u32 NOR_game_named(const char *name)
+{
+	u32 i;
+	for (i = 0; i < game_total_NOR; i++)
+		if (strcmp(pNorFS[i].filename, name) == 0)
+			break;
+	return i;
 }
 //---------------------------------------------------------------------------------
 void init_FAT_table(void)
@@ -1828,16 +1856,10 @@ int main(void)
 
 	Read_NOR_info();
 	gl_norOffset = 0x000000;
-	// Torii: the game NOR back to reading, in case a soft reset (a kernel
-	// crash) came while it was in a command; in ID mode the list reads as
-	// empty and the code below would erase the NOR game table.
-	*(vu16 *)FlashBase_S98 = 0xF0;
+	// Torii: reading the list writes nothing. The official kernel erased the
+	// list whenever it read no games (a chip left in a command mode, a read
+	// glitch), and the next write then went over them.
 	game_total_NOR = GetFileListFromNor();//initialize to prevent direct writes to NOR without page turning
-
-	if (game_total_NOR == 0) {
-		memset(pNorFS, 00, sizeof(FM_NOR_FS) * MAX_NOR);
-		Save_NOR_info((u16 *)pNorFS, sizeof(FM_NOR_FS) * MAX_NOR);
-	}
 
 	cartlog_phase(PHASE_MENU, 0, NULL);
 refind_file:
@@ -2215,6 +2237,20 @@ re_showfile:
 						play_re = show_recently_play();
 						if (play_re == 0xBB) {
 							goto refind_file;  //KEY B
+						} else if (Recently_play_nor(p_recently_play[play_re])) {
+							const char *name = Recently_play_nor(p_recently_play[play_re]);
+							Read_NOR_info();
+							game_total_NOR = GetFileListFromNor();
+							u32 nor_game = NOR_game_named(name);
+							if (nor_game < game_total_NOR) {
+								Boot_NOR_game(0, nor_game,
+									      0);  // returns only if it failed
+								cartlog_phase(PHASE_MENU, 0, NULL);
+							} else {
+								tlog("launch %s: not on the game NOR", name);
+								Show_error_num(1);
+							}
+							goto refind_file;
 						} else {
 							page_mode = 0x1;
 							res = SD_list_MENU(show_offset, file_select, play_re);
@@ -2294,6 +2330,11 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 	if (error_num != 0) {
 		Show_error_num(error_num);
 		return;
+	}
+	{
+		char entry[sizeof(RECENT_NOR) + sizeof(pNorFS[0].filename)];
+		snprintf(entry, sizeof(entry), RECENT_NOR "%.99s", pfilename);
+		Recently_play_save(entry);
 	}
 
 	Set_64MROM_flag(pNorFS[show_offset + file_select].is_64MBrom);
@@ -2442,7 +2483,7 @@ u8 NOR_list_MENU(u32 show_offset, u32 file_select)
 			} else if (MENU_line == 1) {
 				//delete lastest geme
 				if (show_offset + file_select + 1 == game_total_NOR) {
-					Block_Erase(gl_norOffset - pNorFS[show_offset + file_select].filesize);
+					Delete_latest_NOR();
 				} else {
 					DrawHZText12(gl_lastest_game, 0, 66, 118 - 15, gl_color_text, 1);
 					wait_btn();

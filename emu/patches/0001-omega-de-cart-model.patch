@@ -278,10 +278,10 @@ index 1d0c0dd..b6abc91 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..7b19d18
+index 0000000..3e91398
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1026 @@
+@@ -0,0 +1,1108 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -300,6 +300,8 @@ index 0000000..7b19d18
 +
 +#include <stdarg.h>
 +#include <stdio.h>
++#include <stdlib.h>
++#include <unistd.h>
 +
 +mLOG_DEFINE_CATEGORY(GBA_OMEGA, "GBA Omega DE", "gba.omega");
 +
@@ -413,6 +415,77 @@ index 0000000..7b19d18
 +}
 +
 +// --- NOR flash (AMD/Spansion command set) ----------------------------------
++
++// Power cuts for tests: OMEGA_POWER_CUT=CHIP:OP:N[@OFFSET] (CHIP game or
++// kernel, OP erase or program) cuts the power just before the Nth such
++// operation, counting only those in the sector at OFFSET when given. A word
++// program and a buffer confirm (29) each count as one program. The model
++// finishes each operation at once, so this cuts between operations: the cart
++// files are synced and the emulator exits with status 75.
++#define POWER_CUT_STATUS 75
++static struct GBAOmega* _cutOmega;
++static struct {
++	bool armed;
++	bool game;
++	bool erase;
++	long countdown;
++	bool sector;
++	uint32_t offset;
++} _cut;
++
++static uint32_t _norSectorBase(const struct GBAOmegaNor* nor, uint32_t offset);
++
++static void _parsePowerCut(void) {
++	const char* spec = getenv("OMEGA_POWER_CUT");
++	_cut.armed = false;
++	if (!spec || !*spec) {
++		return;
++	}
++	char chip[8], op[8];
++	long count;
++	int used = 0;
++	if (sscanf(spec, "%7[a-z]:%7[a-z]:%ld%n", chip, op, &count, &used) != 3 || count < 1 ||
++	    (strcmp(chip, "game") && strcmp(chip, "kernel")) || (strcmp(op, "erase") && strcmp(op, "program"))) {
++		fprintf(stderr, "omega: bad OMEGA_POWER_CUT %s (CHIP:OP:N[@OFFSET])\n", spec);
++		exit(2);
++	}
++	_cut.sector = spec[used] == '@';
++	_cut.offset = _cut.sector ? strtoul(spec + used + 1, NULL, 0) : 0;
++	_cut.game = !strcmp(chip, "game");
++	_cut.erase = !strcmp(op, "erase");
++	_cut.countdown = count;
++	_cut.armed = true;
++}
++
++static void _syncFile(struct VFile* vf, uint8_t* data, size_t size) {
++	if (vf && data) {
++		vf->sync(vf, data, size);
++	}
++}
++
++// Called before each erase and program; cuts the power when it is due.
++static void _norOperation(struct GBAOmegaNor* nor, uint32_t offset, bool erase) {
++	struct GBAOmega* omega = _cutOmega;
++	if (!_cut.armed || !omega || erase != _cut.erase || (nor == &omega->gameNor) != _cut.game) {
++		return;
++	}
++	if (_cut.sector && _norSectorBase(nor, offset) != _norSectorBase(nor, _cut.offset)) {
++		return;
++	}
++	if (--_cut.countdown) {
++		return;
++	}
++	fprintf(stderr, "omega: power cut before %s %s at %06X\n", _cut.game ? "game" : "kernel",
++	        erase ? "erase" : "program", offset);
++	_syncFile(omega->kernelNor.vf, omega->kernelNor.data, OMEGA_KERNEL_NOR_SIZE);
++	_syncFile(omega->gameNor.vf, omega->gameNor.data, OMEGA_GAME_NOR_SIZE);
++	_syncFile(omega->sramVf, omega->sram, OMEGA_SRAM_SIZE);
++	if (omega->sd) {
++		omega->sd->sync(omega->sd, NULL, 0);
++	}
++	fflush(NULL);
++	_exit(POWER_CUT_STATUS);
++}
 +
 +static void _norProgram(struct GBAOmegaNor* nor, uint32_t offset, uint16_t value) {
 +	offset &= ~1;
@@ -541,13 +614,16 @@ index 0000000..7b19d18
 +		break;
 +	case OMEGA_NOR_ERASE_UNLOCK2:
 +		if (byte == 0x30) {
++			_norOperation(nor, offset, true);
 +			_norErase(nor, offset);
 +		} else if (byte == 0x10 && command == 0xAAA) {
++			_norOperation(nor, offset, true);
 +			memset(nor->data, 0xFF, nor->size);
 +		}
 +		nor->state = OMEGA_NOR_READ;
 +		break;
 +	case OMEGA_NOR_PROGRAM:
++		_norOperation(nor, offset, false);
 +		_norProgram(nor, offset, value);
 +		nor->state = OMEGA_NOR_READ;
 +		break;
@@ -590,6 +666,7 @@ index 0000000..7b19d18
 +			_norAbortBuffer(nor, "no 0x29 at the sector after the last word");
 +			break;
 +		}
++		_norOperation(nor, nor->bufferBase, false);
 +		for (unsigned i = 0; i < OMEGA_NOR_BUFFER_WORDS; ++i) {
 +			if (nor->bufferLoaded[i]) {
 +				_norProgram(nor, nor->bufferBase + i * 2, nor->buffer[i]);
@@ -981,6 +1058,8 @@ index 0000000..7b19d18
 +	omega->romPage = ROM_PAGE_BOOT;
 +	const char* trace = getenv("OMEGA_TRACE");
 +	omega->trace = trace && *trace && strcmp(trace, "0");
++	_parsePowerCut();
++	_cutOmega = omega;
 +	omega->enabled = true;
 +	_remap(gba);
 +	mLOG(GBA_OMEGA, INFO, "Omega DE cart enabled from %s", dir);
@@ -997,6 +1076,9 @@ index 0000000..7b19d18
 +		gba->memory.romSize = omega->originalRomSize;
 +		gba->memory.romMask = omega->originalRomMask;
 +		gba->memory.activeRegion = -1;
++	}
++	if (_cutOmega == omega) {
++		_cutOmega = NULL;
 +	}
 +	_unmapFile(&omega->kernelNor.vf, &omega->kernelNor.data, OMEGA_KERNEL_NOR_SIZE);
 +	_unmapFile(&omega->gameNor.vf, &omega->gameNor.data, OMEGA_GAME_NOR_SIZE);

@@ -35,3 +35,17 @@ void test_recently_played(void)
 	CHECK(strcmp(p_recently_play[0], "/new.gba") == 0);
 	CHECK(strcmp(p_recently_play[1], "/game5.gba") == 0);
 }
+
+const char *Recently_play_nor(const char *entry);
+
+void test_recently_played_nor(void)
+{
+	// A game started from NOR is listed by its NOR entry's name
+	CHECK(strcmp(Recently_play_nor("NOR:Advance Wars.gba"), "Advance Wars.gba") == 0);
+	CHECK(Recently_play_nor("/NOR:Advance Wars.gba") == NULL);
+	CHECK(Recently_play_nor("/GBA/Advance Wars.gba") == NULL);
+	u32 count = Recently_play_add("/GBA/Advance Wars.gba", 0);
+	count = Recently_play_add("NOR:Advance Wars.gba", count);
+	CHECK_EQ(count, 2);  // the SD file and the NOR copy are two entries
+	CHECK(strcmp(p_recently_play[0], "NOR:Advance Wars.gba") == 0);
+}

@@ -24,8 +24,10 @@ static const struct {
 	{"sort_by_name", test_sort_by_name},
 	{"sort_full_list", test_sort_full_list},
 	{"recently_played", test_recently_played},
+	{"recently_played_nor", test_recently_played_nor},
 	{"nor_info_stays_in_bounds", test_nor_info_stays_in_bounds},
 	{"nor_write_refused_when_list_full", test_nor_write_refused_when_list_full},
+	{"nor_scan_keeps_interrupts", test_nor_scan_keeps_interrupts},
 	{"menu_code_fits", test_menu_code_fits},
 };
 

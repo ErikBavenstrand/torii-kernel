@@ -101,6 +101,7 @@ Every control-register write is wrapped like this:
 
 - **Kernel NOR (S71, PL064/GL064):** `0x08000000`, AMD/Spansion command set (`0x555/0x2AA`).
   Settings at `+0x790000` (save info), `+0x7A0000` (NOR index), `+0x7B0000` (settings).
+  Torii keeps a second copy of the NOR index at `+0x7C0000` (see *Game NOR list* below).
   GL064 uses buffered writes (`0x25 … 0x29`).
 - **Game NOR (S98):** `0x09000000–0x097FFFFF`, same command set. Autoselect word `0x0E` reads
   `0x223D`; `Loadfile2NOR` writes only to a chip with that ID. The kernel (`NORflash_OP.c`)
@@ -152,7 +153,7 @@ emulated cart (`emu/`).
 
 | Address | Content |
 |---|---|
-| `0x08000000–0x087FFFFF` | Kernel NOR (S29PL064-style, ID `0x2202`, 64 KB sectors). Kernel at 0, save info `+0x790000`, NOR index `+0x7A0000`, settings `+0x7B0000` |
+| `0x08000000–0x087FFFFF` | Kernel NOR (S29PL064-style, ID `0x2202`, 64 KB sectors). Kernel at 0, save info `+0x790000`, NOR index `+0x7A0000` (Torii's second copy `+0x7C0000`), settings `+0x7B0000` |
 | `0x08800000–0x08FFFFFF` | PSRAM window, page register `0x09860000` in steps of `0x1000` per 8 MB |
 | `0x09000000–0x097FFFFF` | Game NOR window (64 MB chip, 128 KB sectors, 32 KB boot sectors in the first and last 128 KB, 16-word buffered programming) |
 | `0x09E00000` | Data port (SD sectors, FAT table, status) |
@@ -259,6 +260,31 @@ The in-game key masks in `GBApatch.c` used to build `1 << value` from
 slots 5–10 with no range check, so an erased slot gave `0x3FF`, "no key
 held". Since `b736015`, slots past 9 count as the defaults the settings page
 shows.
+
+**Game NOR list.** The official kernel keeps the list of NOR games at kernel
+NOR `+0x7A0000`: 64 entries of `FM_NOR_FS` (132 bytes each: file name, ROM
+page, patch flags, NOR area size, save type, then the 16 bytes of title and
+code from header `0xA0`). Games sit back to back from offset 0, each in whole
+128 KB blocks, and a new one goes after the last. At boot the kernel walks
+the list against the game NOR, comparing each entry's 16 bytes with the
+header at its offset (the official kernel also required `0x96` at `0xB2`).
+Saving erases the sector and programs it, and the official kernel saved an
+empty list whenever the walk found no games.
+
+Torii (`source/norlist.h`) keeps the same 64 entries but adds a 32-byte
+trailer at `+0x2100` (magic `TNL2`, a sequence number, the game count, a
+CRC-32), and writes a second copy at `+0x7C0000`. A save writes the copy the
+list wasn't read from first, then the other, so a power cut leaves one whole
+copy; the reader takes the whole copy with the higher number, else the
+trailerless list at `+0x7A0000` as an older kernel's. The official kernel
+reads Torii's copy A unchanged. Each game Torii writes also gets a
+completion mark, programmed last, in the last 512 bytes of its NOR area
+(magic `TNM1`, offset, size, header `0xA0–0xBF`, its list entry, CRC-32):
+the area grows by a block when the ROM or its patch reaches those bytes.
+Its entry's `reserved1` byte is `'T'`. A marked entry without its mark isn't
+listed, and a game with a mark the list lacks is put back. Erase and program
+take the model no time, so `OMEGA_POWER_CUT` (`emu/mgba/src/gba/cart/omega.c`) cuts the
+power between operations for `tests/nor_safety.sh`.
 
 ## 5. Save prompt behaviour
 

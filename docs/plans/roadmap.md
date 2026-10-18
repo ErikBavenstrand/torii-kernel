@@ -49,13 +49,13 @@ Still open from the bug work:
   kernel bugs. Each one can lose or overwrite a NOR game:
   - Fixed: `Read_S98NOR_ID` (`Ezcard_OP.c`) left the chip in ID mode, so the NOR list could
     read empty and the next write landed over the first game. It now writes `0xF0`.
-  - `GetFileListFromNor` returns without `REG_IME = 1` when its scan reaches the end of the 64 MB.
-  - "Delete latest" erases only the game's first 128 KB and keeps its list entry. If a write
-    with the same header loses power after one block, the old entry lists the half-written game.
-  - Losing power inside `Save_NOR_info` (erase, then program) empties the list, and the next
-    write goes to 0 over the first game.
-  - A ROM whose header byte 0xB2 isn't 0x96 (homebrew not run through gbafix) is written but
-    never listed, and the next write overwrites it.
+  - Fixed in v0.2.1 (`tests/nor_safety.sh`, the list format in `omega-de-hardware.md`):
+    `GetFileListFromNor` returned without `REG_IME = 1` when its scan reached the end of the
+    64 MB. "Delete latest" erased only the game's first 128 KB and kept its list entry, so a
+    write with the same header cut off after one block was listed. Losing power inside
+    `Save_NOR_info` emptied the list, and the next write went over the first game. A ROM
+    without 0x96 at 0xB2 was written but never listed. The list now has two copies, games a
+    completion mark, and the boot rebuilds a lost list from the marks.
 - **Non-ASCII names:** the list draws names by byte count, so CJK names start scrolling too
   early, and a character split at the edge of the list shows as `?`. Names over 99 bytes
   (about 34 CJK characters) show cut with `*` and "Name too long", and can't be opened. The
@@ -68,10 +68,9 @@ Still open from the bug work:
     nearly full card silently truncates a new save, e.g. 64 KB written as 32 KB (v0.5's
     crash-safe saving replaces it).
   - The in-game menu's LOAD with no saved state jumps to 0xFFFFFFFE.
-  - The kernel erases the NOR game table whenever it reads the list as empty (a chip left in
-    a command mode or a read glitch): the games stay in NOR but drop off the list, and the
-    next WRITE TO NOR overwrites them. The chip is now reset before reading, but the
-    erase-on-empty logic needs a safer rule.
+  - Fixed in v0.2.1: the kernel erased the NOR game table whenever it read the list as empty
+    (a chip left in a command mode or a read glitch), and the next WRITE TO NOR overwrote the
+    games. Reading the list now writes nothing, and a write reads it again first.
   - The `/torii` folder shows in the SD root list and moves games down a row (key scripts
     in compat may need an extra DOWN). v0.4 hides system folders.
   - The log file sequence number doesn't handle overflow past 99999999 (only reachable with

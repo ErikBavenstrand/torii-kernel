@@ -65,6 +65,8 @@ void CheckLanguage(void);
 void CheckSwitch(void);
 u32 Game_hardware(u32 is_EMU, const u8 *gamecode, u8 gb_cart_type);
 u32 Recently_play_add(const char *entry, u32 count);
+#define RECENT_NOR "NOR:"
+const char *Recently_play_nor(const char *entry);
 u8 Check_saveMODE(u8 gamecode[]);
 u8 Get_saveMODE(u8 Save_num, u32 gamefilesize);
 u32 Check_file_type(TCHAR *pfilename);
