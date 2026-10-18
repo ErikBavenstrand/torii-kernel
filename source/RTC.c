@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "RTC.h"
+#include "waitcnt.h"
 // --------------------------------------------------------------------
 void rtc_enable(void)
 {
@@ -64,9 +65,12 @@ int rtc_read(void)
 	return v;
 }
 // --------------------------------------------------------------------
+// The clock's serial lines are timed by repeated writes, so its reads and
+// writes run at the BIOS's wait states (waitcnt.h).
 int rtc_get(u8 *data)
 {
 	int i;
+	u16 waitcnt = WAITCNT_SLOW();
 	*RTC_DATA = 1;
 	*RTC_RW = 7;
 	*RTC_DATA = 1;
@@ -78,12 +82,14 @@ int rtc_get(u8 *data)
 	*RTC_RW = 5;
 	for (i = 4; i < 7; i++)
 		data[i] = (u8)rtc_read();
+	WAITCNT_RESTORE(waitcnt);
 	return 0;
 }
 // --------------------------------------------------------------------
 int rtc_gettime(u8 *data)
 {
 	int i;
+	u16 waitcnt = WAITCNT_SLOW();
 	*RTC_DATA = 1;
 	*RTC_RW = 7;
 	*RTC_DATA = 1;
@@ -92,6 +98,7 @@ int rtc_gettime(u8 *data)
 	*RTC_RW = 5;
 	for (i = 0; i < 3; i++)
 		data[i] = (u8)rtc_read();
+	WAITCNT_RESTORE(waitcnt);
 	return 0;
 }
 // --------------------------------------------------------------------
@@ -104,6 +111,7 @@ void rtc_set(u8 *data)
 		newdata[i] = _BCD(data[i]);
 	}
 
+	u16 waitcnt = WAITCNT_SLOW();
 	*RTC_ENABLE = 1;
 	*RTC_DATA = 1;
 	*RTC_DATA = 5;
@@ -115,4 +123,5 @@ void rtc_set(u8 *data)
 	for (i = 4; i < 7; i++) {
 		rtc_data(newdata[i]);
 	}
+	WAITCNT_RESTORE(waitcnt);
 }

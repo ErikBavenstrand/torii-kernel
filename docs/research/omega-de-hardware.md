@@ -311,9 +311,16 @@ emulated cart can't tell, which the real cart's logs will:
   undefined instruction isn't known here (mGBA's HLE BIOS skips it), so
   a crash that disables IRQs, or loops inside the kernel's code, goes
   uncaught.
-- **WAITCNT:** the kernel never sets it, so NOR and PSRAM run at the BIOS
-  default (4/2, no prefetch). Diagnostics times faster settings and checks
-  their data against the default's.
+- **WAITCNT:** the real cart reads NOR and PSRAM correctly at WS0 2/1 with
+  prefetch (cart test of 2026-10-18), so the menu runs at `0x4018`
+  (`source/waitcnt.h`). Untested at that speed, and kept at the BIOS's
+  `0x0000`: writes to the control registers, transfers through the SD buffer
+  at `0x09E00000`, NOR erases and writes, the RTC's serial lines, and
+  launching, with its PSRAM writes. Games start at `0x0000`. In
+  mGBA, opening a folder of 300 files takes 23 frames instead of 40. Whether
+  the real cart runs the menu's code correctly at `0x4018` is still to be
+  confirmed. Diagnostics times faster settings and checks their data against
+  the default's.
 - **EEPROM 512 vs 8K:** whether the FPGA's EEPROM answers a 6-bit and a
   14-bit read request at save types `0x21` and `0x22` (Diagnostics,
   "EEPROM 512 or 8K"). mGBA's EEPROM takes either. On the real cart, with

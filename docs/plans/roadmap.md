@@ -186,8 +186,10 @@ From the first real-cart test of v0.2.0 (`docs/research/cart-test-2026-10-18.md`
   same binary. Attach `ezkernelnew.sym` to each release, and put a real build ID (a CRC or the
   git hash) in the boot line. `just logs` warns when the symbols don't match.
 - **Save logging:** log every "Save sav?" decision, save copy (with size and result), NOR
-  write and settings save, including `f_write` and `f_close` results. Handling those errors
-  is v0.5's crash-safe saving.
+  write and settings save, including `f_write` and `f_close` results. Done: a short copy is
+  logged as an error with the bytes written (`tests/saves.sh`), but still cuts the save short;
+  handling the error and keeping the old save is v0.5's crash-safe saving. On the real cart,
+  check a power-on copy's log lines.
 - **Diagnostics:**
   - name the failed checklist item in the summary;
   - show the clock live on the clock item;
@@ -204,7 +206,12 @@ From the first real-cart test of v0.2.0 (`docs/research/cart-test-2026-10-18.md`
   "sleep works" yes when no launch had sleep on, and an NES yes with no NES launch.
 - **EEPROM probe:** run it in game mode, from a small test ROM, so it can settle 512 vs 8K.
 - **WAITCNT:** the cart reads correctly at 2/1 with prefetch, 20% faster than the default.
-  Consider setting it in the kernel, and for games that don't set it themselves.
+  The menu now runs at `0x4018`, and every launch restores `0x0000` (`source/waitcnt.h`);
+  launching (PSRAM writes), the cart's control registers, SD transfers, NOR writes and the
+  clock stay at `0x0000`. In mGBA a 300-file folder opens
+  in 23 frames instead of 40. **The real cart must confirm it:** browse, open a large
+  folder, launch from SD and NOR, write a game to NOR, set the clock and run Diagnostics,
+  then check the log for errors. Games that don't set WAITCNT still start at `0x0000`.
 - **Rumble:** no GPIO register value drove the motor. Test with Drill Dozer: WarioWare:
   Twisted! needs a motion sensor the Omega DE lacks. Then find out how the cart's rumble is
   driven, or whether this cart has a motor at all.
