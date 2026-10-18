@@ -14,8 +14,8 @@ fresh := "python3 tools/fresh.py"
 # The image fresh.py's sync checks the share with
 export FRESH_IMAGE := kernel_image
 # What each build reads; a step is skipped while these are unchanged
-kernel_inputs := "source tests/kernel Makefile image.bin tools/omega_image.py tools/nm_to_sym.py " + kernel_image
-test_kernel_inputs := "source tests/kernel Makefile " + kernel_image
+kernel_inputs := "source tests/kernel Makefile image.bin tools/omega_image.py tools/nm_to_sym.py tools/build_id.py " + kernel_image
+test_kernel_inputs := "source tests/kernel Makefile tools/build_id.py " + kernel_image
 emu_inputs := "emu/mgba/src emu/mgba/include emu/mgba/CMakeLists.txt emu/mgba/cmake emu/mgba-shot.c emu/build.sh docker/emu.Dockerfile"
 test_rom_outputs := "tests/roms/hello/hello.gba tests/roms/crash/crash.gba tests/roms/crash/crash.sym tests/roms/savetest/flash128.gba tests/roms/savetest/eeprom512.gba tests/roms/idle/idle.gba"
 kernel_image := "devkitpro/devkitarm@sha256:1acab59884288115af0e70782a9b69017a8cc6bad69542b24e8652233f215c56"
@@ -50,9 +50,10 @@ _build-kernel:
 
 # Turn a linked kernel (STEM.gba and STEM.elf) into OUT/ezkernelnew.bin and its symbols
 _package stem out:
+    python3 tools/build_id.py {{stem}}.gba {{stem}}.elf
     python3 tools/omega_image.py {{stem}}.gba image.bin {{out}}/ezkernelnew.bin
     {{kernel_docker}} sh -c '/opt/devkitpro/devkitARM/bin/arm-none-eabi-nm -n {{stem}}.elf > {{out}}/ezkernelnew.nm'
-    python3 tools/nm_to_sym.py {{out}}/ezkernelnew.nm {{out}}/ezkernelnew.sym
+    python3 tools/nm_to_sym.py {{out}}/ezkernelnew.nm {{out}}/ezkernelnew.sym {{stem}}.gba
 
 # Check the build is reproducible: rebuild from a shuffled copy of the source in
 # another folder (tools/repro.sh) and compare with `just build`'s files
@@ -86,8 +87,10 @@ sd card *games: build
 
 # Pull the kernel's logs off an SD card, e.g. `just logs /Volumes/OMEGA`: joined into
 # dist/logs/torii.log, with crash dump addresses named from dist/ezkernelnew.sym
-logs path:
-    python3 tools/logs.py "{{path}}" dist/ezkernelnew.sym dist/logs
+# if its build ID matches; `--tag v0.2.1` uses that release's symbols, `--sym FILE` others
+[positional-arguments]
+logs path *args:
+    python3 tools/logs.py "$@"
 
 # Write compile_commands.json for clangd, covering the kernel and its unit tests
 # (devkitPro's headers go to dist/devkitpro; .clangd adapts the flags for clang)
@@ -249,6 +252,7 @@ _build-test-kernel:
     {{fresh}} stamp build-test "{{kernel_image}} tests/kernel" Makefile
     {{fresh}} track build-test ezkerneltest.elf ezkerneltest.gba -- source tests/kernel Makefile
     {{kernel_docker}} make TARGET=ezkerneltest BUILD=build-test -j8
+    python3 tools/build_id.py ezkerneltest.gba ezkerneltest.elf
     {{fresh}} record test-kernel -- {{test_kernel_inputs}}
 
 test-roms: _ready

@@ -5,6 +5,7 @@
 #include <gba_interrupt.h>
 
 #include "Ezcard_OP.h"
+#include "build_id.h"
 #include "cartlog.h"
 #include "tlog.h"
 
@@ -18,7 +19,7 @@ volatile u32 torii_frames;
 // --- What the blocks in cart RAM hold ---------------------------------------
 
 #define STATE_MAGIC "TORIIST1"
-#define CRASH_MAGIC "TORIICR1"
+#define CRASH_MAGIC "TORIICR2"
 #define SNAPSHOT_MAGIC "TORII-DEBUGINFO1"  // gba_rts_patch.s writes it last
 
 struct cartlog_state {
@@ -36,6 +37,7 @@ struct cartlog_crash {
 	char magic[8];
 	u32 regs[17];  // r0-r15, cpsr
 	u32 frames;
+	u32 build_id;  // of the kernel that crashed, which may not be the one reporting it
 	u32 stack_base;
 	u32 stack_words;
 	u32 stack[CRASH_STACK_WORDS];
@@ -126,6 +128,7 @@ void IWRAM_CODE torii_crash(const u32 *regs)
 	for (i = 0; i < 17; i++)
 		crash.regs[i] = regs[i];
 	crash.frames = torii_frames;
+	crash.build_id = torii_build_id;
 	u32 sp = regs[13] & ~3u;
 	if (in_ram(sp)) {
 		crash.stack_base = sp;
@@ -160,6 +163,9 @@ static void report_crash(void)
 	const u32 *r = crash.regs;
 	tlog_force(TLOG_ERRORS, "crash: the kernel crashed %lu frames after boot: pc %08lX outside its code",
 		   (unsigned long)crash.frames, (unsigned long)r[15]);
+	// tools/logs.py names the addresses below with this build's symbols.
+	tlog_force(TLOG_ERRORS, "crash: build id %08lX%s", (unsigned long)crash.build_id,
+		   crash.build_id == torii_build_id ? "" : ", not this kernel's");
 	for (u32 i = 0; i < 16; i += 4)
 		tlog_force(TLOG_ERRORS, "crash: r%-2lu %08lX %08lX %08lX %08lX", (unsigned long)i, (unsigned long)r[i],
 			   (unsigned long)r[i + 1], (unsigned long)r[i + 2], (unsigned long)r[i + 3]);

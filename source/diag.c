@@ -22,6 +22,7 @@
 #include "ez_define.h"
 #include "ezkernel.h"
 #include "Ezcard_OP.h"
+#include "build_id.h"
 #include "RTC.h"
 #include "cartlog.h"
 #include "diag.h"
@@ -209,6 +210,9 @@ static void step_info(void)
 	say(WHITE, "kernel NOR id %04X, game NOR id %04X", Read_S71NOR_ID(), Read_S98NOR_ID());
 	say(WHITE, "WAITCNT %04X (the kernel never sets it)", REG_WAITCNT_IO);
 	say(WHITE, "kernel ROM %08lX-%08lX", 0x08000000ul, (unsigned long)&__rom_end__);
+	u32 id = build_id_compute();
+	say(id == torii_build_id ? WHITE : RED, "build id %08lX%s", (unsigned long)torii_build_id,
+	    id == torii_build_id ? ", matches the ROM" : ", NOT the ROM's");
 	for (u32 slot = 0; slot < 32; slot += 8) {
 		u16 v[8];
 		for (u32 i = 0; i < 8; i++)
