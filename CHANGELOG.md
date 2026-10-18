@@ -9,7 +9,8 @@ git log, not here.
 - **Added:** a build ID, the CRC32 of the kernel's ROM, written after
   linking without moving any code. The boot log line, crash dumps (the
   crashed kernel's ID) and Diagnostics show it, and a unit test checks it
-  against the ROM, so `just logs` can tell which symbols fit a log (`d7d0b85`).
+  against the ROM, so `just logs` can tell which symbols fit a log (`d7d0b85`,
+  `18502bc`). A crash dump in v0.2.0's layout is logged as skipped and cleared.
 - **Changed:** the kernel builds byte for byte the same on CI and macOS:
   the Makefile sorts its file lists, which set the link order, and asserts
   name files relative to the project (`82d6615`).
