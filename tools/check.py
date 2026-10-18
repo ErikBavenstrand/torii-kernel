@@ -49,6 +49,10 @@ EVERYTHING = {LINT, TEST, SIZE, ANALYZE, COMPAT}
 # launching code includes them; nor does lang.c, whose strings it uses.
 NO_COMPAT = {
     "source/charset.c",
+    "source/engine/font_body.c",
+    "source/engine/font_heading.c",
+    "source/engine/text.c",
+    "source/engine/text_layout.c",
     "source/helpwindow.c",
 }
 

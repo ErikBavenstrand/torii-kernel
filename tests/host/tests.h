@@ -46,5 +46,8 @@ void test_logcheck_launches(void);
 void test_logcheck_reports(void);
 void test_eeprom_probe_patterns(void);
 void test_eeprom_probe_verdict(void);
+void test_text_utf8(void);
+void test_text_width(void);
+void test_text_layout(void);
 
 #endif

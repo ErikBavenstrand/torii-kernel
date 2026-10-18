@@ -7,7 +7,8 @@ Torii is a custom kernel for the EZ-Flash Omega DE, forked from EZ-Flash's offic
 - To release, rename `## Unreleased` in `CHANGELOG.md` to the version, commit, and push a tag like `v0.1.0`: CI publishes a GitHub Release with `ezkernelnew.bin` and that section as its notes.
 - **Mandatory:** log every change to `source/` in `CHANGELOG.md`, under Unreleased: what changed and why, with the commit's short hash, in two or three lines. Commit the change first, then add the entry with its hash (one follow-up commit can log several changes).
 - Language strings live in `source/lang.c` as `en_*` strings, wired up in `LoadEnglish`. `lang_packs` lists the languages SETTINGS offers; English is the only one until v0.9.
-- File names are UTF-8: FatFs uses its UTF-8 API (`FF_LFN_UNICODE 2`), so every name lists and opens as it is; `FF_CODE_PAGE` matters only for 8.3-only names. The menu font has ASCII glyphs only, and `charset_next()` in `source/charset.c` picks one per character.
+- File names are UTF-8: FatFs uses its UTF-8 API (`FF_LFN_UNICODE 2`), so every name lists and opens as it is; `FF_CODE_PAGE` matters only for 8.3-only names. The mode 3 menu font has ASCII glyphs only, and `charset_next()` in `source/charset.c` picks one per character; the tile fonts (`source/engine/font.h`) cover Latin-1, through `charset_next_latin1()`.
+- `just font` generates the tile fonts into `source/engine/font_body.c` and `font_heading.c` from `assets/fonts`; they are committed, never edited by hand, and `tests/font_test.py` fails when they are stale.
 - Our code builds with `-Werror` and the extra warnings in the Makefile's `WARNFLAGS`; the vendored `source/ff15` is exempt.
   Make a function used in one file `static`, and declare the rest in a header.
   Keep `IWRAM_CODE` functions extern: GCC inlines a static one into its ROM callers, and the code then runs from ROM while the ROM page changes.

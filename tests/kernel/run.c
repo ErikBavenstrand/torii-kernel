@@ -3,6 +3,7 @@
 // weak, empty torii_run_tests in source/tlog.c, then stops.
 #include "torii_test.h"
 #include "tests.h"
+#include "text_demo.h"
 
 int torii_test_failures;
 
@@ -30,6 +31,10 @@ static const struct {
 	{"nor_scan_keeps_interrupts", test_nor_scan_keeps_interrupts},
 	{"menu_code_fits", test_menu_code_fits},
 	{"build_id_matches_the_rom", test_build_id_matches_the_rom},
+	{"text_blit", test_text_blit},
+	{"text_draw", test_text_draw},
+	{"text_clear", test_text_clear},
+	{"text_cycles", test_text_cycles},
 };
 
 int torii_unit_tests(void)
@@ -51,6 +56,7 @@ int torii_unit_tests(void)
 void torii_run_tests(void)
 {
 	torii_unit_tests();
+	text_demo();
 	for (;;)
 		;
 }

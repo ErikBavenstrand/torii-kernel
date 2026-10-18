@@ -22,7 +22,7 @@ include $(DEVKITARM)/gba_rules
 #---------------------------------------------------------------------------------
 TARGET		:= $(notdir $(CURDIR))
 BUILD		:= build
-SOURCES		:= source source/ff15 tests/kernel
+SOURCES		:= source source/engine source/ff15 tests/kernel
 INCLUDES	:= include source/ff15
 DATA		:=
 MUSIC		:=
@@ -59,6 +59,9 @@ WARNFLAGS	:=	-Werror -Wextra -Wshadow -Wundef -Wformat=2 -Wstrict-prototypes -Wm
 CXXFLAGS	:=	$(CFLAGS) -fno-rtti -fno-exceptions
 
 ASFLAGS	:=	-g $(ARCH) -Wa,--debug-prefix-map=$(TOPDIR)/=
+ifeq ($(TARGET),ezkerneltest)
+ASFLAGS	+=	-DTORII_TEST_KERNEL
+endif
 LDFLAGS	=	-g $(ARCH) -Wl,-Map,$(notdir $*.map)
 
 #---------------------------------------------------------------------------------
