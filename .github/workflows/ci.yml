@@ -114,6 +114,14 @@ jobs:
           name: screenshots
           path: dist/shots
           if-no-files-found: ignore
+      # tests/shots.py: actual, expected and diff PNGs of each screen that changed
+      - name: Upload failed golden shots
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: shots-failed
+          path: dist/shots-failed
+          if-no-files-found: ignore
 
   analyze:
     name: Static analysis (advisory)

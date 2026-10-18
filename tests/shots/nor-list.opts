@@ -1,0 +1,5 @@
+# The NOR list (R from the SD list): no games on the game NOR
+-w "screen ready: sd-list"
+-k @8:R -k @12:-
+-w "screen ready: nor-list"
+-s @1:screen.png

@@ -239,6 +239,8 @@ u32 Setting_window2(void)
 		currstate = Set_OK;
 		switch (currstate) {
 		case 0: //initial state
+			if (re_show)
+				tlog_debug("screen ready: settings2");
 			re_show = 0;
 			scanKeys();
 			keys = keysDown();

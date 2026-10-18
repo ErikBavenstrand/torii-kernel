@@ -12,6 +12,9 @@ git log, not here.
   repeats per key (15 frames, then every 4, every 2 after 1 s), pages with
   L/R (20, then 8), and wraps a list only on a fresh press or after a pause
   at its end (`8b073d0`, `ff18199`).
+- **Added:** each menu screen logs `screen ready: NAME` at debug level once
+  drawn, so the golden-screen tests (`tests/shots`) wait for screens rather
+  than fixed frames (`65acf23`).
 
 ## v0.2.4 (2026-10-18)
 

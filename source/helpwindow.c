@@ -11,6 +11,7 @@
 #include "draw.h"
 #include "Ezcard_OP.h"
 #include "helpwindow.h"
+#include "tlog.h"
 
 u16 Rev;
 //---------------------------------------------------------------------------------
@@ -45,6 +46,7 @@ void Show_help_window(void)
 	DrawHZText12(msg, 0, 3, 149, gl_color_text, 1);
 
 	DrawHZText12(gl_online_manual, 0, 240 - 70 - 7, 77, gl_color_text, 1);
+	tlog_debug("screen ready: help");
 	while (1) {
 		VBlankIntrWait();
 		scanKeys();
