@@ -206,8 +206,10 @@ EOF
   logged "diag: rumble pulsed: yes"
   logged "diag: rumble held on: yes"
   logged "diag: rumble with the GPIO port off: yes"
-  [ $ok = 0 ] || [ "$(grep -c 'rumble on$' "$log")" -ge 61 ] || bad "the cart saw $(grep -c 'rumble on$' "$log") motor starts, not 61"
-  [ $ok = 0 ] || grep -q 'rumble on (GPIO port off)' "$log" || bad "no motor start with the GPIO port off"
+  # 60 pulses and one hold with the port on, then 60 pulses with it off
+  motor=$(grep -o 'rumble o.*' "$log" | sort | uniq -c | tr -s ' ' | paste -sd ,)
+  [ $ok = 0 ] || [ "$motor" = " 61 rumble off, 60 rumble off (GPIO port off), 61 rumble on, 60 rumble on (GPIO port off)" ] ||
+    bad "the cart saw the motor as: $motor"
   pass "Diagnostics' rumble step"
 
   # Diagnostics reads the loader and says when it's damaged, as v0.2.2 left

@@ -160,7 +160,9 @@ fetches in SD mode.
   (`Game_hardware`, `Game_GPIO_status`): Drill Dozer and WarioWare: Twisted! and
   MBC5+RUMBLE GB/GBC games use rumble; other GBA games, MBC3+TIMER GB/GBC games and
   PocketNES use the clock. Diagnostics' rumble step asks whether pulses rumble, whether
-  2 held for a second does, and whether pulses do with `0x096A0000` at 0. The emulated
+  2 held for a second does, and whether pulses do with `0x096A0000` at 0. Nothing
+  sets `0x09E20000` back afterwards, as no other value for it is known; Jagoomba
+  leaves it at `0xF1` too, and games launched after it ran fine. The emulated
   cart traces the motor (`rumble on`, `rumble off`) but has none.
 
 ### FPGA firmware update protocol
