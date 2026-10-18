@@ -43,7 +43,7 @@ void test_cheat_parse(void)
 void test_cheat_cap(void)
 {
 	// 700 one-byte writes: more than fit in the patch area.
-	// 2 KB: borrows the kernel's read cache, which is free while tests run
+	// 2.1 KB: borrows the kernel's read cache, which is free while tests run
 	// (IWRAM is short, and every kernel has the tests).
 	char *line = (char *)pReadCache + 0x1000;
 	char *p = line;

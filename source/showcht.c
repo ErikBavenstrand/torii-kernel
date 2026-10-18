@@ -413,7 +413,7 @@ static u32 Get_all_Section_val(FIL *file)
 				}
 			}
 		}
-		if (_kv == 1) {
+		if (_kv == 1 && Line < CHT_LINES_MAX) {  // "a=b[c]" adds a section, then this
 			tmpCHTFS.len = _vlen;
 			//memcpy(tmpCHTFS.KEY_val,_paramv,_vlen);
 			dmaCopy(&tmpCHTFS, &((FM_CHT_LINE *)pCHTbuffer)[Line], sizeof(FM_CHT_LINE));

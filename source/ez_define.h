@@ -9,7 +9,7 @@
 // - All of it: bulk SD, NOR, SRAM and PSRAM transfers inside one operation:
 //   starting a game (chunks, patch files, the save), writing a game to NOR,
 //   the NOR list's record, save backup and restore, GameID2cht.bin,
-//   Diagnostics, and the unit tests (which run inside Diagnostics).
+//   Diagnostics, and the unit tests (in Diagnostics, and at boot in a test build).
 // Vcache, its first 75 KB, is mode 3's back buffer, but nothing draws there:
 // every caller draws direct. The v0.3 engine may borrow it as staging while
 // the menu is idle, if it is done before one of these starts.
