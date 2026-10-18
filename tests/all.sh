@@ -12,6 +12,8 @@ jobs=(
   "tests/save_types.sh flash64"
   "tests/save_types.sh eeprom8k"
   "tests/save_types.sh eeprom512"
+  "tests/eeprom_probe.sh 512"
+  "tests/eeprom_probe.sh 8k"
   "tests/crash.sh"
   "tests/state.sh"
   "tests/settings.sh"

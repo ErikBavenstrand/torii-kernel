@@ -73,6 +73,10 @@ static const struct {
 	{"log_find_end", test_log_find_end},
 	{"lz77_round_trip", test_lz77_round_trip},
 	{"lz77_compresses", test_lz77_compresses},
+	{"logcheck_launches", test_logcheck_launches},
+	{"logcheck_reports", test_logcheck_reports},
+	{"eeprom_probe_patterns", test_eeprom_probe_patterns},
+	{"eeprom_probe_verdict", test_eeprom_probe_verdict},
 };
 
 int main(void)

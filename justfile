@@ -17,7 +17,7 @@ export FRESH_IMAGE := kernel_image
 kernel_inputs := "source tests/kernel Makefile image.bin tools/omega_image.py tools/nm_to_sym.py " + kernel_image
 test_kernel_inputs := "source tests/kernel Makefile " + kernel_image
 emu_inputs := "emu/mgba/src emu/mgba/include emu/mgba/CMakeLists.txt emu/mgba/cmake emu/mgba-shot.c emu/build.sh docker/emu.Dockerfile"
-test_rom_outputs := "tests/roms/hello/hello.gba tests/roms/crash/crash.gba tests/roms/crash/crash.sym tests/roms/savetest/flash128.gba tests/roms/savetest/eeprom512.gba tests/roms/idle/idle.gba"
+test_rom_outputs := "tests/roms/hello/hello.gba tests/roms/crash/crash.gba tests/roms/crash/crash.sym tests/roms/savetest/flash128.gba tests/roms/savetest/eeprom512.gba tests/roms/idle/idle.gba tests/roms/eeprom/eeprom.gba"
 kernel_image := "devkitpro/devkitarm@sha256:1acab59884288115af0e70782a9b69017a8cc6bad69542b24e8652233f215c56"
 emu_image := "torii-emu"
 kernel_docker := "docker run --rm --platform linux/amd64 -u $(id -u):$(id -g) -v \"$PWD\":/src -w /src -e LIBGBA=/opt/devkitpro/libgba " + kernel_image
@@ -231,12 +231,12 @@ _build-test-kernel:
     {{fresh}} record test-kernel -- {{test_kernel_inputs}}
 
 test-roms: _ready
-    @{{fresh}} check test-roms {{test_rom_outputs}} -- tests/roms || {{just_executable()}} _build-test-roms
+    @{{fresh}} check test-roms {{test_rom_outputs}} -- tests/roms source/eepromprobe.c source/eepromprobe.h || {{just_executable()}} _build-test-roms
 
 _build-test-roms:
-    {{kernel_docker}} sh -c 'make -B -C tests/roms/hello && make -B -C tests/roms/idle && make -B -C tests/roms/savetest && make -B -C tests/roms/crash all'
+    {{kernel_docker}} sh -c 'make -B -C tests/roms/hello && make -B -C tests/roms/idle && make -B -C tests/roms/savetest && make -B -C tests/roms/eeprom && make -B -C tests/roms/crash all'
     python3 tools/nm_to_sym.py tests/roms/crash/crash.nm tests/roms/crash/crash.sym
-    {{fresh}} record test-roms -- tests/roms
+    {{fresh}} record test-roms -- tests/roms source/eepromprobe.c source/eepromprobe.h
 
 # Create the emulated cart (SD image from emu/sd) if it does not exist
 cart: emu-image
