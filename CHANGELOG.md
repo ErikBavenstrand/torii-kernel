@@ -4,7 +4,7 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.2.2 (2026-10-18)
 
 - **Fixed:** the EEPROM probe's report counts a read that matches a write
   in bytes 0-6 (the block and the run's nonce) as that write, logs "except
