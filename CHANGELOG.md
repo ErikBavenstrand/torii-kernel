@@ -10,6 +10,10 @@ git log, not here.
   but the Omega DE's motor answers 0xF1 at 0x09E20000 and then 2 at
   0x08001000, as Jagoomba drives it. It now asks about pulses, 2 held on,
   and pulses with the GPIO port off (`a6c76ee`).
+- **Changed:** that still didn't rumble on the real cart, in kernel mode.
+  Diagnostics now also drives the motor with the ROM page at PSRAM, as
+  under Jagoomba, and logs what 0x08001000 reads; the boot logs the new
+  rumble probe ROM's answers from game mode (`1fab0fc`).
 
 ## v0.2.3 (2026-10-18)
 
