@@ -12,9 +12,12 @@ typedef struct {
 	u32 filesize;
 } file_entry;
 
-// 52 KB: borrows the kernel's 128 KB read cache, which is free while tests run.
+// 52 KB: borrows the kernel's 128 KB read cache, which is free while tests run,
+// and its last bytes as the sort's work buffer.
 extern u8 pReadCache[];
 #define files ((file_entry *)pReadCache)
+#define work (pReadCache + 0x20000 - SORT_WORK_SIZE)
+_Static_assert(SORT_MAX * sizeof(file_entry) <= 0x20000 - SORT_WORK_SIZE, "the list and work overlap");
 
 void test_sort_by_name(void)
 {
@@ -29,7 +32,7 @@ void test_sort_by_name(void)
 		strcpy(files[i].filename, names[i]);
 		files[i].filesize = i;
 	}
-	sort_by_name(files, n, sizeof(file_entry));
+	sort_by_name(files, n, sizeof(file_entry), work);
 	for (unsigned i = 0; i < n; i++)
 		CHECK(strcmp(files[i].filename, sorted[i]) == 0);
 	CHECK_EQ(files[0].filesize, 1);  // the whole entry moves with its name
@@ -47,7 +50,7 @@ void test_sort_full_list(void)
 		files[i].filename[3] = 0;
 		files[i].filesize = v;
 	}
-	sort_by_name(files, SORT_MAX, sizeof(file_entry));
+	sort_by_name(files, SORT_MAX, sizeof(file_entry), work);
 	for (unsigned i = 0; i < SORT_MAX; i++)
 		CHECK_EQ(files[i].filesize, i);
 }

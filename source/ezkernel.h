@@ -66,6 +66,10 @@ void CheckSwitch(void);
 u32 Game_hardware(u32 is_EMU, const u8 *gamecode, u8 gb_cart_type);
 u32 Recently_play_add(const char *entry, u32 count);
 #define RECENT_NOR "NOR:"
+// A Recently Played row holds the longest entry get_count keeps and the
+// kernel writes: a folder under MAX_path_len, '/', and a list entry's name.
+#define RECENT_LEN (MAX_path_len + sizeof(((FM_FILE_FS *)0)->filename))
+extern char p_recently_play[10][RECENT_LEN];
 const char *Recently_play_nor(const char *entry);
 u8 Check_saveMODE(u8 gamecode[]);
 u8 Get_saveMODE(u8 Save_num, u32 gamefilesize);
