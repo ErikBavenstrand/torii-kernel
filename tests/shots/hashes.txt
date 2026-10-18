@@ -4,27 +4,25 @@
 # that all hash the same.
 cheats/screen 47999C2B46846CC0
 diag-start/screen 1EF53FFFB16A8AEC
-file-menu/screen 7FA3B2C565DADB92
+file-menu/screen D08AC44FF4854042
 help/screen D8C7377F69946185
 nor-list/screen 0F70E61FC6E0F4AD
 recent/screen C461631DF072F1C4
 sd-list/screen DAFEFBEF130ADFF5
-sd-scroll/scrolled DC06C6523C59BE8B
+sd-scroll/scrolled 423F88E293FBA7C7
 sd-scroll/start EF7C57F54BB3A2F1
-sd-scroll/frames 0-10 EF7C57F54BB3A2F1
-sd-scroll/frames 11-38 4CD8DCA9E388A641
-sd-scroll/frames 39-39 7B38560B49CBF55C
-sd-scroll/frames 40-52 4CD8DCA9E388A641
-sd-scroll/frames 53-53 5999E2EA3413E752
-sd-scroll/frames 54-68 B0916EA78F14DCDF
-sd-scroll/frames 69-69 62ACCC8CD4F6680C
-sd-scroll/frames 70-70 25B7AE1C15F417A1
-sd-scroll/frames 71-84 37AA4C242E821D45
+sd-scroll/frames 0-38 EF7C57F54BB3A2F1
+sd-scroll/frames 39-39 2A5168ED4BB84271
+sd-scroll/frames 40-52 EF7C57F54BB3A2F1
+sd-scroll/frames 53-53 B9B4C2A210D7181F
+sd-scroll/frames 54-68 FED35E3819B2400F
+sd-scroll/frames 69-69 27E29649CBA215E1
+sd-scroll/frames 70-84 6B29B529141A3611
 sd-scroll/frames 85-85 E72891AEDAF5627F
-sd-scroll/frames 86-100 858D349FCD1CC013
+sd-scroll/frames 86-100 F517833BE980FAAF
 sd-scroll/frames 101-101 95C1C00E5D225545
-sd-scroll/frames 102-116 3A361C1F71F629C9
+sd-scroll/frames 102-116 F5B6F878CC5107C5
 sd-scroll/frames 117-117 BBB13CC78FDCE317
-sd-scroll/frames 118-119 DC06C6523C59BE8B
+sd-scroll/frames 118-119 423F88E293FBA7C7
 settings1/screen BEC0937CCB96EF71
 settings2/screen 1BD1F13454FBDB6C

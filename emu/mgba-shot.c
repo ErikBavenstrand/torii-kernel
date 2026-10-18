@@ -36,6 +36,8 @@
 //   -c EPOCH         pin the cart's clock: it reads EPOCH (Unix seconds; the
 //                    GBA sees local time, so set TZ=UTC) at power-on and runs
 //                    with emulated time, not the host's
+//   -C EPOCH         as -c, but the clock stands still at EPOCH, so a screen
+//                    showing the time looks the same whenever it is drawn
 //   -O DIR           write -s PNGs given relative paths into DIR
 //
 // If the CPU hits an illegal opcode or jumps to an invalid address, it prints
@@ -492,6 +494,9 @@ static void parse_options(struct options *opts, int argc, char **argv)
 		} else if (!strcmp(argv[i], "-c")) {
 			opts->epoch = strtoll(argv[++i], NULL, 10);
 			opts->pinClock = 1;
+		} else if (!strcmp(argv[i], "-C")) {
+			opts->epoch = strtoll(argv[++i], NULL, 10);
+			opts->pinClock = 2;
 		} else if (!strcmp(argv[i], "-O")) {
 			opts->outDir = argv[++i];
 		} else if (!strcmp(argv[i], "-t")) {
@@ -629,7 +634,7 @@ int main(int argc, char **argv)
 	}
 	mCoreInitConfig(core, NULL);
 	if (opts.pinClock) {
-		core->rtc.override = RTC_FAKE_EPOCH;
+		core->rtc.override = opts.pinClock == 2 ? RTC_FIXED : RTC_FAKE_EPOCH;
 		core->rtc.value = opts.epoch * 1000;
 	}
 	unsigned width, height;
