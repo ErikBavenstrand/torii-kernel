@@ -733,6 +733,7 @@ static u32 show_recently_play(void)
 
 			if (re_show) {
 				Show_game_name(all_count, Select);
+				tlog_debug("screen ready: recent");
 				re_show = 0;
 			}
 			scanKeys();
@@ -758,6 +759,7 @@ static u32 show_recently_play(void)
 		}
 	} else {
 		DrawHZText12(gl_no_game_played, 0, 1, 20, gl_color_text, 1);
+		tlog_debug("screen ready: recent");
 		while (1) {
 			VBlankIntrWait();
 			VBlankIntrWait();
@@ -2143,6 +2145,8 @@ re_showfile:
 			}
 			if (continue_MENU)
 				break;
+			// For tests/shots: the list is drawn once ShowTime below adds the clock
+			const char *drawn = !updata ? NULL : (page_num == SD_list) ? "sd-list" : "nor-list";
 			if (page_num == SD_list) {
 				if (game_folder_total)
 					Filename_loop(shift, show_offset, file_select, short_filename);
@@ -2369,6 +2373,8 @@ re_showfile:
 			}
 
 			ShowTime(page_num, page_mode);
+			if (drawn)
+				tlog_debug("screen ready: %s", drawn);
 		}  //2
 	}
 }
@@ -2685,6 +2691,7 @@ re_show_menu:
 		if (re_menu) {
 			Show_MENU(MENU_line, SD_list, ((havecht > 0) ? 1 : 0), Save_num, is_EMU,
 				  (show_offset + file_select == 0));
+			tlog_debug("screen ready: file-menu");
 		}
 		VBlankIntrWait();
 

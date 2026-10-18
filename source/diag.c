@@ -815,6 +815,7 @@ void Diagnostics(void)
 	say(WHITE, "writes your saves. It takes a minute,");
 	say(WHITE, "then restarts the kernel.");
 	say(WHITE, "A: start   B: back");
+	tlog_debug("screen ready: diag-start");
 	if (wait_key(KEY_A | KEY_B) & KEY_B)
 		SoftReset_now();
 	if (tlog_level == TLOG_OFF) {  // this session has no line on the card yet
