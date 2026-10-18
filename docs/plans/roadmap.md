@@ -33,14 +33,12 @@ Fixed with tests on main, from `b9c9245` to `b6687ea`. `CHANGELOG.md` has the de
 
 Still open from the bug work:
 
-- **EEPROM sizes:** FlashGBX's cart-dump database (`db_AGB.json` in `res/config.zip`) lists
-  941 more table entries marked 0x22 (EEPROM 8K) as 512-byte EEPROM. It also lists 9 marked
-  0x23 and 6 marked 0x32 (Flash 64K) as 512-byte, plus a few others. The official kernel
-  ships those as 8K and they seem to work, so the FPGA may accept 512-byte games in 8K mode,
-  except some (Doom, Gauntlet). The emulated cart can't tell, so test this with the on-cart
-  debug mode before any mass change. A game moved from 8K to 512 keeps its old 8 KB `.sav`,
-  and the kernel then loads only its first 512 bytes. Check on the real cart whether 8K-mode
-  data sits in those bytes, and settle what happens to existing saves (see v0.5).
+- **EEPROM sizes:** settled, no change needed. FlashGBX's cart-dump database (`db_AGB.json`
+  in `res/config.zip`) lists 941 table entries marked 0x22 (EEPROM 8K) as 512-byte EEPROM,
+  plus 9 marked 0x23 and 6 marked 0x32 (Flash 64K). The real cart decides the address width
+  per request, so 8K mode takes these games' 6-bit requests and their saves stay in the first
+  512 bytes (`docs/research/cart-test-2026-10-18b.md`). The 0x23 and 0x32 entries are
+  unchecked, and Doom and Gauntlet stay EEPROM 512.
 - **Hook coverage:** done. `just compat` has an in-game menu column; all 118 commercial
   GBA games in the library pass (`docs/research/hook-coverage.md`). Four games get exact-ROM
   patches for the EU dumps tested; other regions may need their own. The menu keeps the game's
@@ -232,6 +230,28 @@ Kept in their own milestones:
 - the in-game LOAD crash and the BG2 affine registers, in v0.7.
 
 EEPROM sizes and rumble wait for the next real-cart test.
+
+## v0.2.2 Second real-cart fixes (done)
+
+From the real-cart test of v0.2.1 (`docs/research/cart-test-2026-10-18b.md`):
+
+- **EEPROM probe:** every write lost its last byte, polled right after the stop bit. The
+  probe now waits before polling, writes four blocks four different ways and shows which
+  bytes differ; the kernel accepts a match on bytes 0–6 and logs the lost byte.
+- **Diagnostics:** the EEPROM item checks the probe's verdict; a button step missing L or R
+  says the hotkeys need them; the boot after the crash test names it.
+- **Save size:** a `.sav` smaller than its save type (512 bytes under EEPROM 8K) is grown
+  with `FF`, so blocks past its end survive power-off.
+- **Hotkeys:** match the combo's keys, so an extra or stuck key doesn't block the in-game
+  menu or sleep.
+- **NOR list:** an older kernel's list is saved in the new format once, and list reads are
+  logged only when they change.
+- **`just logs`:** junk bytes show as a count, not verbatim.
+- **Hello** shows a green square while its test cheat runs, for the checklist.
+
+Still to confirm on the real cart (`docs/release-checklist.md`): the in-game menu, save
+states, DEBUG, sleep and cheats (the console's L button was laggy), GB/GBC, NES, a NOR write,
+rumble, the probe's verdict, and the clock against real time.
 
 ## v0.3 Renderer
 

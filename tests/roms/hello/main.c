@@ -3,7 +3,9 @@
 // A VBlank interrupt moves a marker along the bottom edge, so the kernel's
 // in-game menu, which hooks that interrupt, can be tested (tests/menu.sh).
 // The screen is dimmed once, as some games do, so the test can check the
-// menu gives the dimming back.
+// menu gives the dimming back. A green square in the top right corner shows
+// a cheat at work: CHEAT/Hello.cht with "ON=1236,58;" writes 0x58 to
+// EWRAM 0x02001236 each frame once the in-game menu's CHEAT is ON.
 #include <stdint.h>
 
 #define REG_DISPCNT (*(volatile uint16_t *)0x04000000)
@@ -19,6 +21,7 @@
 #define BIOS_IF (*(volatile uint16_t *)0x03007FF8)
 #define VRAM ((volatile uint16_t *)0x06000000)
 #define SRAM ((volatile uint8_t *)0x0E000000)
+#define CHEAT_BYTE (*(volatile uint8_t *)0x02001236)  // nothing else uses EWRAM
 #define RGB(r, g, b) ((r) | ((g) << 5) | ((b) << 10))
 
 // Lets save-type detectors (including the kernel's) classify this as SRAM.
@@ -78,5 +81,9 @@ int main(void)
 		unsigned x = 1 + frames % 238;
 		VRAM[158 * 240 + x] = RGB(31, 0, 0);
 		VRAM[158 * 240 + (x == 1 ? 238 : x - 1)] = RGB(2, 6, 20);
+		uint16_t square = CHEAT_BYTE == 0x58 ? RGB(4, 31, 4) : RGB(2, 6, 20);
+		for (int y = 8; y < 24; y++)
+			for (int sx = 216; sx < 232; sx++)
+				VRAM[y * 240 + sx] = square;
 	}
 }

@@ -356,14 +356,22 @@ emulated cart can't tell, which the real cart's logs will:
   the real cart runs the menu's code correctly at `0x4018` is still to be
   confirmed. Diagnostics times faster settings and checks their data against
   the default's.
-- **EEPROM 512 vs 8K:** whether the FPGA's EEPROM answers a 6-bit and a
-  14-bit read request at save types `0x21` and `0x22` (Diagnostics,
-  "EEPROM 512 or 8K"). mGBA's EEPROM takes either. On the real cart, with
-  only the save type set and the ROM page switched to `0x200` from the
-  kernel (no game started), reads at `0x0DFFFF00` returned `AAAA…` at both
-  types and widths: the EEPROM didn't answer. The emulated cart answers as
-  an EEPROM only once a BIOS SoftReset or HardReset has started the game in
-  game mode, as every launch does.
+- **EEPROM 512 vs 8K** (cart test of v0.2.1, `cart-test-2026-10-18b.md`,
+  with the probe ROM `tests/roms/eeprom` started as a game):
+  - The address width is decided per request: at save types `0x21` and
+    `0x22`, 6-bit and 14-bit requests both read and write.
+  - Even at `0x21`, the EEPROM holds 1024 distinct 8-byte blocks: 14-bit
+    writes to blocks 65 and 1023 didn't land on blocks 1 and 63. A `0x21`
+    save file is only 512 bytes, though, so blocks past 63 don't survive a
+    power cycle.
+  - Commercial games' writes keep all 64 bits (Crash Bandicoot XS's save).
+    The probe's own writes lost their last byte (it read `FF`), polling for
+    ready right after the stop bit; Crash's EEPROM_V122 library waits over
+    100 cycles first. v0.2.2's probe tries four ways to write to settle it.
+  - In kernel mode (no game started), reads at `0x0DFFFF00` return `AAAA…`
+    at both types and widths: the EEPROM answers only in game mode. The
+    emulated cart answers as an EEPROM only once a BIOS SoftReset or
+    HardReset has started the game in game mode, as every launch does.
 - **Rumble:** whether a value of `0x096A0000` other than 0 and 1 drives
   the motor without the clock, or the other way round.
 - **SD writes through `Write_SD_sectors` use 16-bit DMA** from the
