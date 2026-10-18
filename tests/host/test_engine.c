@@ -154,7 +154,10 @@ void test_pool_slots(void)
 // and that no two blocks overlap after every step.
 void test_pool_random(void)
 {
-	enum { UNITS = 512, LIVE = 40 };
+	enum {
+		UNITS = 512,
+		LIVE = 40
+	};
 	struct pool p = make(POOL_MAX_BLOCKS, UNITS);
 	u8 live[LIVE];
 	u32 nlive = 0;
@@ -207,9 +210,22 @@ void test_res_arena(void)
 	u8 map = res_bg_map(1, 0);
 	CHECK(pal != RES_NONE && tiles != RES_NONE && map != RES_NONE);
 	CHECK_EQ(res_mark(), mark + 3);
-	// Released out of order: its log entry goes too
+	CHECK(res_fresh(RES_BG_VRAM));
+	CHECK_EQ(res_palette(RES_BG_PAL, 1, 0x77), pal);  // shared: not fresh
+	CHECK(!res_fresh(RES_BG_PAL));
+	CHECK(res_release(RES_BG_PAL, pal));
+	// Released out of order, below a view's mark: a gap, and the view
+	// above still releases exactly its own
+	u8 inner = res_mark();
+	u8 child = res_obj_tiles(2, 0, 0);
 	CHECK(res_release(RES_BG_VRAM, tiles));
-	CHECK_EQ(res_mark(), mark + 2);
+	CHECK_EQ(res_mark(), inner + 1);
+	res_release_to(inner);
+	CHECK_EQ(pool_state(res_pool(RES_OBJ_VRAM), child), POOL_FREE);
+	CHECK_EQ(pool_refs(res_pool(RES_BG_VRAM), map), 1);
+	// Releasing the newest entry trims gaps under it
+	CHECK(res_release(RES_BG_VRAM, map));
+	CHECK_EQ(res_mark(), mark + 1);
 	res_release_to(mark);
 	CHECK_EQ(res_mark(), mark);
 	CHECK_EQ(pool_free_units(res_pool(RES_BG_VRAM), 0), RES_BG_UNITS);
@@ -275,4 +291,46 @@ void test_pool_tag_place(void)
 	CHECK_EQ(pool_len(&p, c), 8);
 	CHECK(pool_valid(&p));
 	CHECK_EQ(pool_free_units(&p, 1), 56);
+}
+
+// A split needing a slot the pool lacks mustn't hide a run that fits
+// exactly, nor cost the cache (found by the adversarial review).
+void test_pool_slots_exact_fit(void)
+{
+	struct pool p = make(5, 40);
+	u8 x = pool_alloc(&p, 5, 1, 0, 40, 0, 0);
+	u8 f1 = pool_alloc(&p, 15, 1, 0, 40, 0, 0);
+	u8 z = pool_alloc(&p, 10, 1, 0, 40, 0, 0);
+	u8 f2 = pool_alloc(&p, 5, 1, 0, 40, 0x77, 0);
+	u8 w = pool_alloc(&p, 5, 1, 0, 40, 0, 0);
+	CHECK(x != POOL_NONE && f1 != POOL_NONE && z != POOL_NONE && f2 != POOL_NONE && w != POOL_NONE);
+	pool_unref(&p, f1);  // free 5-20; all 5 slots in use
+	CHECK_EQ(pool_alloc(&p, 3, 1, 0, 40, 0, 0), POOL_NONE);  // a split needs a slot
+	CHECK_EQ(p.error, POOL_ERR_SLOTS);
+	pool_unref(&p, f2);  // cached 30-35
+	u8 exact = pool_alloc(&p, 15, 1, 0, 40, 0, 0);  // fits 5-20 exactly, no split
+	CHECK_EQ(pool_start(&p, exact), 5);
+	CHECK_EQ(pool_find(&p, 0x77), f2);  // the cache survived
+	CHECK(pool_valid(&p));
+}
+
+// Reclaiming stays oldest first after the age counter wraps.
+void test_pool_age_wrap(void)
+{
+	struct pool p = make(16, 16);
+	u8 young = pool_alloc(&p, 1, 1, 0, 16, 0x02, 0);  // 0-1
+	pool_unref(&p, young);
+	u8 old = pool_alloc(&p, 1, 1, 0, 16, 0x01, 0);  // 1-2, next to the free run
+	pool_unref(&p, old);
+	for (u32 i = 0; i < 600; i++) {  // revive and cache the other many times
+		u8 h = pool_alloc(&p, 1, 1, 0, 16, 0x02, 0);
+		CHECK_EQ(h, young);
+		pool_unref(&p, h);
+	}
+	// 15 units fit once the oldest (0x01, at 1-2) goes; 0x02 stays
+	u8 big = pool_alloc(&p, 15, 1, 0, 16, 0, 0);
+	CHECK_EQ(pool_start(&p, big), 1);
+	CHECK_EQ(pool_find(&p, 0x01), POOL_NONE);
+	CHECK_EQ(pool_find(&p, 0x02), young);
+	CHECK(pool_valid(&p));
 }

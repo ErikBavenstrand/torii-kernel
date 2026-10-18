@@ -89,6 +89,8 @@ static const struct {
 	{"pool_random", test_pool_random},
 	{"res_arena", test_res_arena},
 	{"pool_tag_place", test_pool_tag_place},
+	{"pool_slots_exact_fit", test_pool_slots_exact_fit},
+	{"pool_age_wrap", test_pool_age_wrap},
 	{"budget_check", test_budget_check},
 };
 

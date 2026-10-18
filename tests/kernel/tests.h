@@ -28,6 +28,7 @@ void test_engine_queue_caps(void);
 void test_engine_commit(void);
 void test_engine_jobs(void);
 void test_engine_cycles(void);
+void test_engine_hold_for_queue(void);
 
 // The test kernel's engine scene, shown after the tests (engine_smoke.c).
 void engine_smoke(void) __attribute__((noreturn));

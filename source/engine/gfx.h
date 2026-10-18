@@ -68,6 +68,7 @@ struct gfx_obj {
 
 extern struct gfx_regs gfx_regs;  // read freely; write through the setters
 extern u32 gfx_dirty_regs;  // GFX_DIRTY_* bits
+extern u32 gfx_hold_regs;  // regions gfx_hold_for_queue holds back
 extern u32 gfx_dirty_pal;  // bit n: palette bank n (0-15 BG, 16-31 sprites)
 extern u16 gfx_pal_unfaded[512];
 extern u16 gfx_pal_faded[512];
@@ -109,11 +110,23 @@ void gfx_oam_end(void);
 void gfx_affine_set(u32 matrix, s16 pa, s16 pb, s16 pc, s16 pd);
 
 // Queues a copy or a fill of bytes (a multiple of 4, word-aligned addresses)
-// for VBlank. 0 if the queue is full or the arguments are bad (logged).
+// into palette RAM, VRAM or OAM, for VBlank. 0 if the queue is full or the
+// arguments are bad (logged). The source is read at the commit, so it must
+// not be a stack buffer or anything changed before then.
 int gfx_queue_copy(void *dst, const void *src, u32 bytes);
 int gfx_queue_fill(void *dst, u32 value, u32 bytes);
 u32 gfx_queue_len(void);
-// Drops everything queued (when the sources are about to go away).
+// Holds the register regions given (GFX_DIRTY_* bits) until the VRAM queued
+// so far has been copied: a commit writes them only once the queue is empty
+// (in the same VBlank if it finishes in time, else the next one). For page
+// flips: queue the hidden page's tiles and map, set the new BG control or
+// scroll, then hold it, and the flip never shows half a page. The hold ends
+// once the regions are written.
+void gfx_hold_for_queue(u32 regions);
+// Drops everything queued (when the sources are about to go away). Tagged
+// VRAM blocks whose upload was queued then hold garbage: release them, and
+// keep every VRAM write to engine blocks in the queue so writes keep their
+// order.
 void gfx_queue_clear(void);
 
 // The commit. Call it in VBlank, as frame_begin does: registers, palettes,

@@ -366,3 +366,31 @@ void test_engine_cycles(void)
 	cycles_init();
 	CHECK(cycles_since(start) >= two);
 }
+
+void test_engine_hold_for_queue(void)
+{
+	engine_quiet(1);
+	vu16 *winin = (vu16 *)0x04000048;  // readable, and unused by mode 3 screens
+	u16 kept = *winin;
+	CHECK(gfx_queue_copy(TEST_VRAM, (const void *)0x08000000, 2048));
+	gfx_set_win(4, kept ^ 0x3F);
+	gfx_hold_for_queue(GFX_DIRTY_WIN);
+	gfx_commit_max_bytes = 1024;  // the queue takes two commits
+	wait_vblank_start();
+	gfx_commit();
+	CHECK_EQ(*winin, kept);
+	CHECK_EQ(gfx_dirty_regs, GFX_DIRTY_WIN);
+	CHECK(!frame_idle());
+	wait_vblank_start();
+	gfx_commit();  // the queue empties, then the held window goes
+	CHECK_EQ(gfx_queue_len(), 0);
+	CHECK_EQ(*winin, kept ^ 0x3F);
+	CHECK_EQ(gfx_dirty_regs, 0);
+	CHECK_EQ(gfx_hold_regs, 0);
+	// Without queued work a hold changes nothing
+	gfx_set_win(4, kept);
+	gfx_hold_for_queue(GFX_DIRTY_WIN);
+	gfx_commit();
+	CHECK_EQ(*winin, kept);
+	engine_quiet(0);
+}

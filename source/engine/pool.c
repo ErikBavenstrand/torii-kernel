@@ -49,6 +49,8 @@ void pool_init(struct pool *pool, const char *name, struct pool_block *blocks, u
 {
 	if (cap > POOL_MAX_BLOCKS)
 		cap = POOL_MAX_BLOCKS;
+	if (!cap)
+		cap = 1;  // blocks must have room for one
 	pool->name = name;
 	pool->blocks = blocks;
 	pool->units = units;
@@ -56,6 +58,7 @@ void pool_init(struct pool *pool, const char *name, struct pool_block *blocks, u
 	pool->cap = cap;
 	pool->age = 0;
 	pool->error = POOL_OK;
+	pool->fresh = 0;
 	pool->spare = POOL_LINK_END;
 	for (u8 i = cap; i-- > 1;)
 		slot_put(pool, i);
@@ -104,6 +107,30 @@ static void free_block(struct pool *pool, u8 h)
 	}
 }
 
+// The age counter is about to wrap: renumbers the cached blocks 1 to n,
+// oldest first, so reclaiming stays oldest first however long the pool lives.
+static void renumber_ages(struct pool *pool)
+{
+	unsigned long long done = 0;  // slots renumbered
+	u8 n = 0;
+	for (;;) {
+		u8 oldest = POOL_NONE, best = 0;
+		for (u8 i = pool->head; i != POOL_LINK_END; i = next_of(&pool->blocks[i])) {
+			const struct pool_block *b = &pool->blocks[i];
+			u8 age = (u8)(pool->age - b->refs);
+			if (state_of(b) == POOL_CACHED && !(done >> i & 1) && (oldest == POOL_NONE || age >= best)) {
+				oldest = i;
+				best = age;
+			}
+		}
+		if (oldest == POOL_NONE)
+			break;
+		done |= 1ull << oldest;
+		pool->blocks[oldest].refs = ++n;
+	}
+	pool->age = n;
+}
+
 // Frees the block cached longest ago; 0 if none is cached.
 static int reclaim_oldest(struct pool *pool)
 {
@@ -123,31 +150,47 @@ static int reclaim_oldest(struct pool *pool)
 }
 
 // Finds a free block and a start for the allocation; POOL_NONE if no free
-// run fits.
+// run fits. A run whose split needs more block slots than are spare is only
+// a fallback, taken when no run fits without (pool_alloc then reclaims).
 static u8 place(const struct pool *pool, u32 len, u32 align, u32 lo, u32 hi, u8 flags, u32 *at_out)
 {
-	u8 found = POOL_NONE;
+	u8 found = POOL_NONE, fallback = POOL_NONE, spare = spare_count(pool);
+	u32 fallback_at = 0;
 	for (u8 i = pool->head; i != POOL_LINK_END; i = next_of(&pool->blocks[i])) {
 		const struct pool_block *b = &pool->blocks[i];
 		if (state_of(b) != POOL_FREE)
 			continue;
+		u32 bend = (u32)b->start + b->len;
 		u32 start = b->start > lo ? b->start : lo;
-		u32 end = (u32)b->start + b->len < hi ? (u32)b->start + b->len : hi;
+		u32 end = bend < hi ? bend : hi;
 		if (end < start + len)
 			continue;
+		u32 at;
 		if (flags & POOL_TOP) {
-			u32 at = (end - len) & ~(align - 1);
-			if (at >= start) {
-				found = i;
-				*at_out = at;
-			}
+			at = (end - len) & ~(align - 1);
+			if (at < start)
+				continue;
 		} else {
-			u32 at = (start + align - 1) & ~(align - 1);
-			if (at + len <= end) {
-				*at_out = at;
-				return i;
-			}
+			at = (start + align - 1) & ~(align - 1);
+			if (at + len > end)
+				continue;
 		}
+		u8 need = (at > b->start) + (at + len < bend);
+		if (need > spare) {
+			if (fallback == POOL_NONE || (flags & POOL_TOP)) {
+				fallback = i;
+				fallback_at = at;
+			}
+			continue;
+		}
+		found = i;
+		*at_out = at;
+		if (!(flags & POOL_TOP))
+			return i;
+	}
+	if (found == POOL_NONE && fallback != POOL_NONE) {
+		*at_out = fallback_at;
+		return fallback;
 	}
 	return found;
 }
@@ -156,6 +199,7 @@ u8 pool_alloc(struct pool *pool, u16 len, u16 align, u16 lo, u16 hi, u16 tag, u8
 {
 	if (hi > pool->units)
 		hi = pool->units;
+	pool->fresh = 0;
 	if (!len || !align || (align & (align - 1)) || lo >= hi) {
 		pool->error = POOL_ERR_ARGS;
 		return POOL_NONE;
@@ -188,10 +232,11 @@ u8 pool_alloc(struct pool *pool, u16 len, u16 align, u16 lo, u16 hi, u16 tag, u8
 			b->refs++;
 		}
 		pool->error = POOL_OK;
+		pool->fresh = 0;
 		return h;
 	}
 	for (;;) {
-		u32 at;
+		u32 at = 0;
 		u8 i = place(pool, len, align, lo, hi, flags, &at);
 		if (i != POOL_NONE) {
 			struct pool_block *b = &pool->blocks[i];
@@ -224,6 +269,7 @@ u8 pool_alloc(struct pool *pool, u16 len, u16 align, u16 lo, u16 hi, u16 tag, u8
 				u->refs = 1;
 				set_state(u, POOL_USED);
 				pool->error = POOL_OK;
+				pool->fresh = 1;
 				return used;
 			}
 			if (!reclaim_oldest(pool)) {
@@ -260,6 +306,8 @@ int pool_unref(struct pool *pool, u8 handle)
 	if (--b->refs)
 		return 1;
 	if (b->tag) {
+		if (pool->age == 0xFF)
+			renumber_ages(pool);
 		set_state(b, POOL_CACHED);
 		b->refs = ++pool->age;
 	} else {
@@ -332,21 +380,14 @@ int pool_valid(const struct pool *pool)
 
 const char *pool_error_text(u8 error)
 {
-	switch (error) {
-	case POOL_OK:
-		return "no error";
-	case POOL_ERR_FULL:
-		return "no free run fits";
-	case POOL_ERR_SLOTS:
-		return "out of block slots";
-	case POOL_ERR_ARGS:
-		return "bad arguments";
-	case POOL_ERR_TAG_SIZE:
-		return "tag in use with another size";
-	case POOL_ERR_TAG_PLACE:
-		return "tag in use outside the range asked for";
-	case POOL_ERR_REFS:
-		return "too many references";
-	}
-	return "unknown error";
+	static const char *const text[] = {
+		"no error",
+		"no free run fits",
+		"out of block slots",
+		"bad arguments",
+		"tag in use with another size",
+		"tag in use outside the range asked for",
+		"too many references",
+	};
+	return error < sizeof(text) / sizeof(*text) ? text[error] : "unknown error";
 }

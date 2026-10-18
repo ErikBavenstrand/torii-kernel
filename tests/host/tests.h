@@ -53,6 +53,8 @@ void test_pool_slots(void);
 void test_pool_random(void);
 void test_res_arena(void);
 void test_pool_tag_place(void);
+void test_pool_slots_exact_fit(void);
+void test_pool_age_wrap(void);
 void test_budget_check(void);
 
 #endif

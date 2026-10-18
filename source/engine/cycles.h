@@ -24,7 +24,7 @@
 
 // Starts the counter if it isn't running (both timers enabled, timer 3
 // counting timer 2's overflows); leaves a running one alone.
-static inline void cycles_init(void)
+static inline __attribute__((always_inline)) void cycles_init(void)
 {
 	if ((CYCLES_TM2CNT_H & 0x80) && (CYCLES_TM3CNT_H & 0x84) == 0x84)
 		return;
@@ -36,10 +36,10 @@ static inline void cycles_init(void)
 	CYCLES_TM2CNT_H = 0x80;  // enabled, every cycle
 }
 
-// The count now. Inline, so it runs from wherever its caller runs (IWRAM
+// The count now. Always inlined, so it runs from wherever its caller runs (IWRAM
 // code at a test WAITCNT included). The high half is read on both sides of
 // the low one, so a carry between the reads can't tear the value.
-static inline u32 cycles_now(void)
+static inline __attribute__((always_inline)) u32 cycles_now(void)
 {
 	u32 hi, lo;
 	do {
@@ -50,7 +50,7 @@ static inline u32 cycles_now(void)
 }
 
 // Cycles since start, a value cycles_now returned.
-static inline u32 cycles_since(u32 start)
+static inline __attribute__((always_inline)) u32 cycles_since(u32 start)
 {
 	return cycles_now() - start;
 }

@@ -57,9 +57,11 @@ int job_running(u8 id)
 
 static void cancel(struct job *j)
 {
-	j->state = JOB_CANCEL;
-	j->step(j);
+	// The slot frees first, so a cancel from inside the step can't recurse
+	job_step step = j->step;
 	j->step = 0;
+	j->state = JOB_CANCEL;
+	step(j);
 }
 
 void job_cancel(u8 id)
@@ -98,8 +100,14 @@ u32 jobs_run_from(u32 start, u32 deadline)
 		}
 		if (!j)
 			break;
-		if (j->step(j) == JOB_DONE)
+		// The step may cancel itself (a view pop), and a new job may then
+		// take the slot: only a job still the same one ends here
+		job_step step = j->step;
+		u8 gen = j->gen;
+		if (step(j) == JOB_DONE && j->step == step && j->gen == gen) {
 			j->step = 0;
+			frame_wake();  // its result needs drawing
+		}
 		steps++;
 	} while (cycles_since(start) < deadline);
 	return steps;

@@ -30,6 +30,7 @@ struct queue_entry {
 
 struct gfx_regs gfx_regs EWRAM_BSS;
 u32 gfx_dirty_regs;
+u32 gfx_hold_regs;
 u32 gfx_dirty_pal;
 u16 gfx_pal_unfaded[512] EWRAM_BSS ALIGN(4);
 u16 gfx_pal_faded[512] EWRAM_BSS ALIGN(4);
@@ -65,6 +66,7 @@ void gfx_init(void)
 	gfx_commit_last_line = GFX_COMMIT_LAST_LINE;
 	gfx_commit_bytes = gfx_commit_left = 0;
 	gfx_dirty_regs = GFX_DIRTY_REGS | GFX_DIRTY_OAM;
+	gfx_hold_regs = 0;
 	gfx_dirty_pal = 0xFFFFFFFF;
 }
 
@@ -197,9 +199,11 @@ void gfx_affine_set(u32 matrix, s16 pa, s16 pb, s16 pc, s16 pd)
 
 static int queue_push(u32 dst, u32 src, u32 bytes, u16 kind)
 {
-	if ((dst | bytes | (kind == QUEUE_COPY ? src : 0)) & 3 || !bytes || bytes > 0xFFFF) {
-		res_set_error("bad VRAM copy: %08lX from %08lX, %lu bytes (words only, under 64 KB)",
-			   (unsigned long)dst, (unsigned long)src, (unsigned long)bytes);
+	// Palette, VRAM and OAM only: a stray address must never reach the cart
+	if ((dst | bytes | (kind == QUEUE_COPY ? src : 0)) & 3 || !bytes || bytes > 0xFFFF || dst < 0x05000000 ||
+	    dst + bytes > 0x07000400) {
+		res_set_error("bad VRAM copy: %08lX from %08lX, %lu bytes (words, under 64 KB, into video memory)",
+			      (unsigned long)dst, (unsigned long)src, (unsigned long)bytes);
 		return 0;
 	}
 	if (queue_count == GFX_QUEUE_CAP) {
@@ -228,6 +232,11 @@ int gfx_queue_fill(void *dst, u32 value, u32 bytes)
 u32 gfx_queue_len(void)
 {
 	return queue_count;
+}
+
+void gfx_hold_for_queue(u32 regions)
+{
+	gfx_hold_regs |= regions & GFX_DIRTY_REGS;
 }
 
 void gfx_queue_clear(void)
@@ -271,9 +280,8 @@ u32 IWRAM_CODE gfx_commit_queue(u32 byte_cap, u32 last_line)
 	return done;
 }
 
-void gfx_commit(void)
+static void write_regs(u32 dirty)
 {
-	u32 dirty = gfx_dirty_regs;
 	vu16 *io = IO;
 	if (dirty & GFX_DIRTY_DISPCNT)
 		io[0] = gfx_regs.dispcnt;
@@ -291,6 +299,15 @@ void gfx_commit(void)
 	if (dirty & GFX_DIRTY_BLEND)
 		for (u32 i = 0; i < 3; i++)
 			io[0x28 + i] = gfx_regs.blend[i];
+}
+
+void gfx_commit(void)
+{
+	u32 dirty = gfx_dirty_regs;
+	// Regions held for the queue wait while it has work
+	u32 held = queue_count ? dirty & gfx_hold_regs & GFX_DIRTY_REGS : 0;
+	write_regs(dirty & ~held);
+	gfx_hold_regs &= ~(dirty & ~held);
 
 	// Palettes: one DMA per run of dirty banks
 	u32 banks = gfx_dirty_pal;
@@ -319,9 +336,19 @@ void gfx_commit(void)
 		DMA3CNT = DMA_ON_32 | sizeof(gfx_oam) / 4;
 		dirty &= ~(u32)GFX_DIRTY_OAM;
 	}
-	gfx_dirty_regs = dirty & GFX_DIRTY_OAM;
+	dirty &= GFX_DIRTY_OAM;
 
 	gfx_commit_bytes = gfx_commit_queue(gfx_commit_max_bytes, gfx_commit_last_line);
+	if (held && !queue_count) {
+		// The queue finished: the held regions go now if VBlank lasts
+		u32 line = REG_VCOUNT_;
+		if (line >= 160 && line < 227) {
+			write_regs(held);
+			gfx_hold_regs &= ~held;
+			held = 0;
+		}
+	}
+	gfx_dirty_regs = dirty | held;
 	u32 left = 0;
 	for (u32 i = 0; i < queue_count; i++)
 		left += queue[(queue_head + i) & (GFX_QUEUE_CAP - 1)].bytes;

@@ -66,6 +66,7 @@ struct pool {
 	u8 spare;  // first unused slot, chained through link
 	u8 age;  // bumped each time a block is cached
 	u8 error;  // POOL_OK or why the last pool_alloc failed
+	u8 fresh;  // 1 if the last pool_alloc placed a new block (its contents are garbage)
 };
 
 // Sets the pool up as one free block of units; blocks has cap slots (at
@@ -74,7 +75,8 @@ void pool_init(struct pool *pool, const char *name, struct pool_block *blocks, u
 
 // Allocates len units at a multiple of align (a power of two) inside
 // [lo, hi), sharing or reviving a block if tag is set. Returns its handle,
-// or POOL_NONE with pool->error set.
+// or POOL_NONE with pool->error set. pool->fresh says whether the block is
+// new (upload its contents) or shared or revived (they are still there).
 u8 pool_alloc(struct pool *pool, u16 len, u16 align, u16 lo, u16 hi, u16 tag, u8 flags);
 // The used or cached block with this tag, or POOL_NONE; it takes no reference.
 u8 pool_find(const struct pool *pool, u16 tag);
@@ -86,17 +88,20 @@ int pool_unref(struct pool *pool, u8 handle);
 // Frees every cached block.
 void pool_flush(struct pool *pool);
 
+// The block's start, length and state; 0 (POOL_FREE) for a handle past the
+// pool's slots, POOL_NONE included, so a failed allocation reads nothing
+// out of bounds.
 static inline u16 pool_start(const struct pool *pool, u8 handle)
 {
-	return pool->blocks[handle].start;
+	return handle < pool->cap ? pool->blocks[handle].start : 0;
 }
 static inline u16 pool_len(const struct pool *pool, u8 handle)
 {
-	return pool->blocks[handle].len;
+	return handle < pool->cap ? pool->blocks[handle].len : 0;
 }
 static inline u8 pool_state(const struct pool *pool, u8 handle)
 {
-	return pool->blocks[handle].link >> 6;
+	return handle < pool->cap ? pool->blocks[handle].link >> 6 : POOL_FREE;
 }
 static inline u8 pool_refs(const struct pool *pool, u8 handle)
 {

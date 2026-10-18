@@ -18,6 +18,7 @@ static struct {
 	u8 handle;
 } res_log[RES_LOG_CAP] EWRAM_BSS;
 static u8 res_log_len EWRAM_BSS;
+#define RES_LOG_GAP 0xFF  // a log entry released on its own
 static char res_msg[120] EWRAM_BSS;
 u8 res_errors_quiet;
 
@@ -80,9 +81,11 @@ int res_release(enum res_kind kind, u8 handle)
 	for (u8 i = res_log_len; i-- > 0;) {
 		if (res_log[i].kind != kind || res_log[i].handle != handle)
 			continue;
-		for (u8 j = i; j + 1 < res_log_len; j++)
-			res_log[j] = res_log[j + 1];
-		res_log_len--;
+		// A gap, not a shift: entries above keep their places, so the
+		// marks views hold still count the same entries
+		res_log[i].kind = RES_LOG_GAP;
+		while (res_log_len && res_log[res_log_len - 1].kind == RES_LOG_GAP)
+			res_log_len--;
 		return pool_unref(&pools[kind], handle);
 	}
 	return 0;
@@ -97,8 +100,14 @@ void res_release_to(u8 mark)
 {
 	while (res_log_len > mark) {
 		res_log_len--;
-		pool_unref(&pools[res_log[res_log_len].kind], res_log[res_log_len].handle);
+		if (res_log[res_log_len].kind != RES_LOG_GAP)
+			pool_unref(&pools[res_log[res_log_len].kind], res_log[res_log_len].handle);
 	}
+}
+
+int res_fresh(enum res_kind kind)
+{
+	return pools[kind].fresh;
 }
 
 u8 res_bg_tiles(u16 count, int bpp8, u8 charblock, u16 tag)

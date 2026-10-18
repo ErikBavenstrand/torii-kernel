@@ -36,6 +36,7 @@ static const struct {
 	{"engine_commit", test_engine_commit},
 	{"engine_jobs", test_engine_jobs},
 	{"engine_cycles", test_engine_cycles},
+	{"engine_hold_for_queue", test_engine_hold_for_queue},
 };
 
 int torii_unit_tests(void)

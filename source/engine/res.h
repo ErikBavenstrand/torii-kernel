@@ -46,9 +46,14 @@ void res_init(void);
 // sharing or reviving a block with the same tag (0: never shared). flags is
 // POOL_TOP or 0. Returns a handle, or RES_NONE after logging why.
 u8 res_alloc(enum res_kind kind, u16 len, u16 align, u16 lo, u16 hi, u16 tag, u8 flags);
-// Drops one reference to handle. Its newest log entry goes, so a later
-// res_release_to doesn't drop it again. 0 if handle holds no reference.
+// Drops one reference to handle. Its newest log entry becomes a gap, so a
+// later res_release_to doesn't drop it again and the marks views hold stay
+// right. 0 if handle holds no reference taken through res_alloc.
 int res_release(enum res_kind kind, u8 handle);
+// 1 if the last res_alloc of kind placed a new block, whose contents must be
+// uploaded; 0 if it shared a used block or revived a cached one (still
+// loaded), or failed.
+int res_fresh(enum res_kind kind);
 // The log's depth now: what res_release_to(mark) returns to.
 u8 res_mark(void);
 // Drops every reference taken since mark, newest first.
