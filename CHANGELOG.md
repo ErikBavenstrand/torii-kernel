@@ -4,6 +4,13 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Fixed:** Diagnostics' rumble step never rumbled: it drove GPIO pin 3,
+  but the Omega DE's motor answers 0xF1 at 0x09E20000 and then 2 at
+  0x08001000, as Jagoomba drives it. It now asks about pulses, 2 held on,
+  and pulses with the GPIO port off (`a6c76ee`).
+
 ## v0.2.3 (2026-10-18)
 
 **Don't use v0.2.1 or v0.2.2:** both can erase EZ-Flash's boot loader, and the
