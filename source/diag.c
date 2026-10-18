@@ -230,7 +230,7 @@ static void step_info(void)
 	    ((fpga & 0xF000) == 0xA000 || (fpga & 0xF000) == 0xB000) ? "LX16, Rev.B" : "LX9, Rev.A");
 	tlog("diag: FPGA version register %04X", fpga);
 	say(WHITE, "kernel NOR id %04X, game NOR id %04X", Read_S71NOR_ID(), Read_S98NOR_ID());
-	say(WHITE, "WAITCNT %04X (the kernel never sets it)", REG_WAITCNT_IO);
+	say(WHITE, "WAITCNT %04X in the menu (games start at 0000)", REG_WAITCNT_IO);
 	say(WHITE, "kernel ROM %08lX-%08lX", 0x08000000ul, (unsigned long)&__rom_end__);
 	for (u32 slot = 0; slot < 32; slot += 8) {
 		u16 v[8];
