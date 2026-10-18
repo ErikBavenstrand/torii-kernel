@@ -59,6 +59,9 @@ WARNFLAGS	:=	-Werror -Wextra -Wshadow -Wundef -Wformat=2 -Wstrict-prototypes -Wm
 CXXFLAGS	:=	$(CFLAGS) -fno-rtti -fno-exceptions
 
 ASFLAGS	:=	-g $(ARCH) -Wa,--debug-prefix-map=$(TOPDIR)/=
+ifeq ($(TARGET),ezkerneltest)
+ASFLAGS	+=	-DTORII_TEST_KERNEL
+endif
 LDFLAGS	=	-g $(ARCH) -Wl,-Map,$(notdir $*.map)
 
 #---------------------------------------------------------------------------------

@@ -1,4 +1,27 @@
+// pReadCache, 128 KB of EWRAM, is the kernel's scratch buffer. It holds
+// nothing between two passes of a menu loop: each owner below borrows it for
+// one operation and needs nothing in it afterwards. Its owners, by offset:
+// - [0, 0x1E0): Clear()'s fill line, on every call, even drawing direct.
+// - READCACHE_SORT_WORK: sort_by_name's work buffer, while a folder is listed.
+// - [0x2000, ...): the cheat screen's parsed list, and READCACHE_CHEAT_WORK
+//   at the end, its line and value buffers (showcht.c), until it returns.
+// - [0x10000, 0x14B38): a thumbnail, read and drawn in one SD list pass.
+// - All of it: bulk SD, NOR, SRAM and PSRAM transfers inside one operation:
+//   starting a game (chunks, patch files, the save), writing a game to NOR,
+//   the NOR list's record, save backup and restore, GameID2cht.bin,
+//   Diagnostics, and the unit tests (in Diagnostics, and at boot in a test build).
+// - READCACHE_STAGE: the engine's asset jobs (engine/stage.h), within one job
+//   step: an SD chunk on its way to PSRAM, a decoded cover, the path being
+//   opened. Nothing in it outlives the step, and steps run only from
+//   jobs_run, never inside one of the operations above, so it can overlap
+//   them all. An owner that wants to keep data here across frames that run
+//   jobs must stop the asset jobs first (cover_shutdown).
+// Vcache, its first 75 KB, is mode 3's back buffer, but nothing draws there:
+// every caller draws direct.
 #define MAX_pReadCache_size 0x20000
+#define READCACHE_STAGE 0x0
+#define READCACHE_STAGE_SIZE 0x8000
+#define READCACHE_SORT_WORK 0x800  // SORT_WORK_SIZE bytes
 #define MAX_files 0x200
 #define MAX_folder 0x100
 #define MAX_NOR 0x40

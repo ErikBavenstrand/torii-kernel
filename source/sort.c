@@ -3,19 +3,17 @@
 #include <string.h>
 #include <strings.h>
 
-static u16 order[SORT_MAX] EWRAM_BSS;
-static u16 scratch[SORT_MAX] EWRAM_BSS;
-static u8 held[104] EWRAM_BSS;
-
 static const char *name_of(const u8 *entries, u32 size, u16 i)
 {
 	return (const char *)(entries + i * size);
 }
 
-void sort_by_name(void *entries, u32 count, u32 size)
+void sort_by_name(void *entries, u32 count, u32 size, void *work)
 {
 	u8 *base = entries;
-	if (count < 2 || count > SORT_MAX || size > sizeof(held))
+	u16 *order = work, *scratch = order + SORT_MAX;
+	u8 *held = (u8 *)(scratch + SORT_MAX);
+	if (count < 2 || count > SORT_MAX || size > SORT_ENTRY_MAX)
 		return;
 
 	for (u32 i = 0; i < count; i++)

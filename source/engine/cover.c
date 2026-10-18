@@ -325,6 +325,7 @@ void cover_init(cover_locate_fn locate, u8 owner)
 	if (loader.ready && loader.rd.open)
 		f_close(&loader.rd.fil);
 	memset(&loader, 0, sizeof(loader));
+	TLOG_ASSERT(!((u32)stage_buffer() & 3));  // pReadCache, as the linker places it
 	loader.locate = locate;
 	loader.owner = owner;
 	loader.entry = COVER_NONE;

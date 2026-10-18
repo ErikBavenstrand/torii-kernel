@@ -5,6 +5,7 @@
 
 #include "torii_test.h"
 #include "tests.h"
+#include "text_demo.h"
 #include "../../source/waitcnt.h"
 
 int torii_test_failures;
@@ -40,6 +41,10 @@ static const struct {
 	{"engine_jobs", test_engine_jobs},
 	{"engine_cycles", test_engine_cycles},
 	{"engine_hold_for_queue", test_engine_hold_for_queue},
+	{"text_blit", test_text_blit},
+	{"text_draw", test_text_draw},
+	{"text_clear", test_text_clear},
+	{"text_cycles", test_text_cycles},
 	{"asset_lz77_decode", test_asset_lz77_decode},
 	{"asset_psram_round_trip", test_asset_psram_round_trip},
 	{"asset_sd_read", test_asset_sd_read},
@@ -100,6 +105,9 @@ void torii_run_tests(void)
 		cover_demo();
 	}
 	torii_unit_tests();
+	// The engine's scene, or with L held (mgba-shot -k 1:L) the text demo
+	if (!(REG_KEYINPUT & KEY_L))
+		text_demo();
 	engine_smoke();
 }
 #endif

@@ -13,6 +13,7 @@ cc -std=gnu11 -g -O1 -fno-omit-frame-pointer -funsigned-char \
   source/sort.c source/cheat.c source/charset.c source/irqpatch.c source/savename.c source/logbuf.c source/lz77.c source/logcheck.c source/eepromprobe.c source/norlist.c source/bootloader.c source/crc32.c \
   source/engine/motion.c source/engine/ease_lut.c source/engine/input.c \
   source/engine/pool.c source/engine/res.c source/engine/budget.c \
+  source/engine/text_layout.c source/engine/font_body.c source/engine/font_heading.c \
   source/engine/asset.c source/engine/covercache.c source/engine/affine.c \
   tests/kernel/asset_data.c tests/host/*.c
 # A hung test (an endless loop in a sort, say) fails after a minute, and

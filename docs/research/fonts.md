@@ -105,7 +105,7 @@ Font License 1.1".
 `tools/font.py` reads BDF fonts and PNG grids of glyph cells. TTF pixel fonts were not
 needed: every candidate worth keeping ships BDF.
 
-- Output: `font_NAME.c` and `font_NAME.h` with a `struct torii_font`: line height, baseline,
+- Output: `font_NAME.c` with a `struct torii_font` (declared in `source/engine/font.h`): line height, baseline,
   row size, and 225 glyph entries (U+0020–U+00FF and a replacement glyph). Each entry is
   6 bytes: bitmap offset, advance, first inked row, inked rows and inked width.
 - Bitmap rows are little-endian with bit 0 the leftmost pixel. A GBA 4bpp tile row is one
@@ -114,10 +114,11 @@ needed: every candidate worth keeping ships BDF.
   is `word << 4x`, with the rest `word >> (32 - 4x)` in the next tile (nothing when x is 0;
   a shift by 32 is undefined in C). Only inked rows are stored, so the blitter skips the
   blank ones.
-- Rows are 1, 2 or 4 bytes for the whole font, set by its widest glyph. Galmuri9's letters
-  are at most 8 px wide, but ©, ®, ¼, ½, ¾ and the replacement glyph are 9, so the body font
-  uses 2-byte rows: a row expands to two words and, shifted, can span three tiles. Dropping
-  those glyphs to 8 px would halve its bitmaps (about 1.5 KB).
+- Rows are 2 bytes, so glyphs are at most 16 px wide. Galmuri9's letters are at most 8 px
+  wide, but ©, ®, ¼, ½, ¾ and the replacement glyph are 9. T4 kept them: the blitter reads
+  an 8 px glyph's row as one byte at either row size, in the same cycles (9485 for a
+  38-glyph row both ways, `tests/kernel/test_text.c`), so 1-byte rows would only have saved
+  about 1.5 KB of ROM, at the cost of redrawing those glyphs or a second code path.
 - Code points the font lacks share the replacement glyph's entry, as do DEL and the C1
   controls. U+00A0 and U+00AD fall back to space and hyphen.
 - The baseline defaults to the line height minus the deepest ASCII descender. ASCII must
@@ -126,7 +127,9 @@ needed: every candidate worth keeping ships BDF.
 - The output depends only on the source file's bytes and the options (the header records
   the file's name and SHA-256, not its path), so builds stay reproducible.
 
-`just font` converts the recommended pair into `dist/fonts/`; the engine ticket decides
-where the C files live in `source/`. `tests/font_test.py` (run by `just test-host`) checks
+`just font` converts the recommended pair into `source/engine/font_body.c` and
+`font_heading.c`, which are committed (the build container has no Python, and the build
+stays one `just build`). `tests/font_test.py` (run by `just test-host`) checks
 widths, the row layout, refitting, missing glyphs, determinism, PNG grids, that the output
-compiles under the kernel's warning flags, and that the vendored fonts convert cleanly.
+compiles under the kernel's warning flags, that the vendored fonts convert cleanly, and that
+the committed C matches what `just font` makes now.
