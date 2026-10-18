@@ -4,8 +4,8 @@
 # tests/all.sh runs them side by side:
 #   launch  logging off touches nothing; at Info a launch is logged and the
 #           next boot says how the session ended; a launch cut off is caught
-#   debug   the in-game menu's DEBUG entry writes only cart RAM page 0xF0,
-#           and the next boot logs it
+#   debug   the in-game menu's DEBUG entry says it saved, writes only cart
+#           RAM page 0xF0, and RESET from the menu logs it
 #   crash   with logging off, Diagnostics (started by keys held at power-on)
 #           logs its report, leaves the save chip alone, and its crash test's
 #           dump reaches the log, named by tools/logs.py
@@ -139,6 +139,19 @@ launch)
   [ "$(count "$lost")" = $((before + 1)) ] || fail "after a power cycle, the boot report didn't say cart RAM was lost"
   card_ok
 
+  # A GB game: the next boot names it by the title in its header, as it has
+  # no game code. Zeros are NOPs to the GB CPU, so it runs.
+  python3 -c "
+rom = bytearray(32768)
+rom[0x134 : 0x134 + 9] = b'TORIITEST'
+open('$cart/Test.gb', 'wb').write(rom)"
+  mcopy -i "$cart/sd.img" "$cart/Test.gb" ::/Test.gb
+  # shellcheck disable=SC2046
+  boot $(keys 100 DOWN DOWN DOWN A) $(keys 160 A) -f 400
+  has "launch: loading Test.gb with Jagoomba Color"
+  boot -f 200
+  has "previous session: ended in Test.gb (TORIITEST)"
+
   # A launch cut off (the emulator stops in the frame that logs it): after
   # a soft reset, cart RAM says where it stopped.
   # shellcheck disable=SC2046
@@ -175,22 +188,24 @@ debug)
   boot -f 200
   cp "$cart/sram.bin" "$cart/sram-before.bin"
   # Hello.gba, BOOT WITH ADDON; in game, L+R+START, then down to DEBUG
-  # (RESET SAVE LOAD DEBUG) and A.
+  # (RESET SAVE LOAD DEBUG) and A. The menu stays, saying the snapshot is
+  # saved, with RESET picked (a power-off would clear cart RAM): A on it goes
+  # back to the kernel, whose boot logs the snapshot.
   # The game starts around frame 850, once the savestate file is made.
+  # The message's first row (y 147, from x 20) shows in VRAM.
   # shellcheck disable=SC2046
-  boot $(keys 100 DOWN DOWN A) $(keys 160 DOWN A) -k 1200:L+R+START -k 1206:- $(keys 1240 DOWN DOWN DOWN A) -f 1400
+  boot $(keys 100 DOWN DOWN A) $(keys 160 DOWN A) -k 1200:L+R+START -k 1206:- $(keys 1240 DOWN DOWN DOWN A) \
+    -m 1300:$(printf 0x%X $((0x06000000 + (147 * 240 + 20) * 2))):400 -s 1300:"$cart/debug.png" $(keys 1320 A) -f 1700
+  grep -qi 'e0 *03' "$cart/out.log" || fail "no green message after DEBUG: $(tail -3 "$cart/out.log")"
   has "launch: IRQ hook from"
   has "launch: in-game code: in-game menu (RTS_ReplaceIRQ)"
   has "patched words"
-  [ "$(sram 0xF1000 16)" = "$(printf TORII-DEBUGINFO1 | od -A n -t x1 | tr -d ' \n')" ] || fail "no debug info in cart RAM"
   # Past the save chip, the menu's screen copy and the savestate buffer
   # (0x00000-0xAFFFF), only page 0xF0 changed (cmp counts bytes from 1).
   changed=$({ cmp -l "$cart/sram-before.bin" "$cart/sram.bin" || true; } |
     awk -v states_end=$((0xB0000)) -v ours=$((0xF0000)) -v ours_end=$((0xF2000)) \
       '$1 - 1 >= states_end && ($1 - 1 < ours || $1 - 1 >= ours_end) { n++ } END { print n + 0 }')
   [ "$changed" = 0 ] || fail "DEBUG changed $changed bytes of cart RAM outside page 0xF0"
-  # The snapshot survives a soft reset (RESET), not a power cycle.
-  soft_boot -f 200
   has "debug info from the in-game menu: "
   has "(the hook is in place)"
   has "debug info: IE "
@@ -198,7 +213,7 @@ debug)
   card_ok
   lines_ok
   zeros_ok
-  echo "PASS: the in-game menu's DEBUG writes only cart RAM page 0xF0, and the next boot logs it"
+  echo "PASS: the in-game menu's DEBUG says it saved, writes only cart RAM page 0xF0, and RESET logs it"
   ;;
 
 crash)
@@ -244,6 +259,10 @@ EOF
   mcopy -n -i "$cart/sd.img" ::/torii/logs/* "$cart/card/torii/logs/"
   python3 tools/logs.py "$cart/card" dist/ezkernelnew.sym "$cart/logs" >/dev/null
   grep -q 'crash: lr .* (Diagnostics+0x' "$cart/logs/torii.log" || fail "tools/logs.py didn't name the crash's lr: $(grep 'crash: lr' "$cart/logs/torii.log")"
+  # With logging on, the session's state is in cart RAM too: the boot after
+  # a crash says where it was.
+  settings 26=2
+  boot -f 200
   # The largest crash dump there can be (64 stack words that look like code
   # addresses, a full 1 KB of log) reaches the card whole, header first.
   python3 - "$cart/sram.bin" <<'EOF'
@@ -263,6 +282,7 @@ EOF
   soft_boot -f 200 # the crash handler restarts the kernel without a power cycle
   has "crash: the kernel crashed 1234 frames after boot: pc 02001234"
   has "crash: build id 12345678, not this kernel's"
+  has "previous session: the kernel crashed in the menu (step 0)"
   [ "$(log 0 | grep -c 'crash: stack 03007.*0800ABCD')" = 64 ] || fail "the big crash dump lost stack lines"
   blank 0xF0100 8 || [ "$(sram 0xF0100 8)" = 0000000000000000 ] || fail "the big crash dump wasn't cleared"
   # A dump in v0.2.0's layout is reported as skipped, and cleared.

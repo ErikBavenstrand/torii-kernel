@@ -1,7 +1,8 @@
 // Diagnostics (see diag.h). Every result goes to the log as a "diag:" line;
 // the screen shows the same lines in the menu's font, a page at a time. The
 // steps that need the user come last: rumble, the checklist from
-// docs/release-checklist.md, and a crash test.
+// docs/release-checklist.md, checked against the log where it can be, and a
+// crash test.
 //
 // It never writes to the game saves: it reads the FRAM only, writes test
 // patterns to a free SRAM page (CARTLOG_TEST_PAGE), and checks the FRAM's
@@ -27,15 +28,14 @@
 #include "cartlog.h"
 #include "diag.h"
 #include "draw.h"
+#include "logbuf.h"
+#include "logcheck.h"
 #include "lz77.h"
 #include "tlog.h"
 #include "../tests/kernel/torii_test.h"
 
 #define REG_WAITCNT_IO (*(vu16 *)0x04000204)
 
-extern u32 FAT_table_buffer[FAT_table_size / 4];
-extern u32 gl_currentpage;
-extern FATFS EZcardFs;
 extern const u8 __rom_end__;
 extern void SoftReset_now(void);
 
@@ -96,11 +96,16 @@ static void wait_release(void)
 	} while (keysHeld());
 }
 
+// Called every frame while wait_key waits, if set: the live clock.
+static void (*wait_tick)(void);
+
 static u16 wait_key(u16 mask)
 {
 	wait_release();
 	for (;;) {
 		VBlankIntrWait();
+		if (wait_tick)
+			wait_tick();
 		scanKeys();
 		u16 keys = keysDown() & mask;
 		if (keys)
@@ -120,20 +125,29 @@ enum {
 	ANSWER_YES = 1
 };
 
+enum {
+	ASK_CHECK,  // no is a failure, logged as an error
+	ASK_PROBE,  // no is a finding, logged as info
+	ASK_TRIED,  // a check of something the user may not have tried
+};
+
 // Asks a yes/no question about what the user saw: A yes, B no, SELECT skip.
-static int ask(const char *topic, const char *question)
+static int ask(const char *topic, const char *question, int kind)
 {
 	say(WHITE, "%s", question);
-	say(GREY, "A: yes   B: no   SELECT: skip");
+	say(GREY, kind == ASK_TRIED ? "A: yes   B: no   SELECT: didn't try" : "A: yes   B: no   SELECT: skip");
 	u16 key = wait_key(KEY_A | KEY_B | KEY_SELECT);
 	int answer = (key & KEY_A) ? ANSWER_YES : (key & KEY_B) ? ANSWER_NO : ANSWER_SKIP;
-	say(answer == ANSWER_YES  ? GREEN
-	    : answer == ANSWER_NO ? RED
-				  : GREY,
-	    "%s: %s", topic,
-	    answer == ANSWER_YES  ? "yes"
-	    : answer == ANSWER_NO ? "no"
-				  : "skipped");
+	u16 colour = GREY;
+	const char *said = kind == ASK_TRIED ? "not tried" : "skipped";
+	if (answer == ANSWER_YES) {
+		colour = GREEN;
+		said = "yes";
+	} else if (answer == ANSWER_NO) {
+		colour = kind == ASK_PROBE ? WHITE : RED;
+		said = "no";
+	}
+	say(colour, "%s: %s", topic, said);
 	tlog_flush();
 	return answer;
 }
@@ -189,15 +203,24 @@ u32 IWRAM_CODE diag_read_timed(const vu32 *src, u32 words, u16 waitcnt, u32 *sum
 
 // --- Steps -------------------------------------------------------------------
 
-static const char *summary[16];
+// The summary's lines: each failed check, then each yes the log can't back.
+static const char *summary[24];
 static u32 summary_count;
+static const char *unconfirmed[16];
+static u32 unconfirmed_count;
+
+static void add_failure(const char *what)
+{
+	if (summary_count < sizeof(summary) / sizeof(*summary))
+		summary[summary_count++] = what;
+}
 
 // Shows a check's result; failures go in the summary. what is a literal.
 static void result(int ok, const char *what)
 {
 	say(ok ? GREEN : RED, "%s: %s", what, ok ? "pass" : "FAIL");
-	if (!ok && summary_count < sizeof(summary) / sizeof(*summary))
-		summary[summary_count++] = what;
+	if (!ok)
+		add_failure(what);
 }
 
 static void step_info(void)
@@ -208,7 +231,7 @@ static void step_info(void)
 	    ((fpga & 0xF000) == 0xA000 || (fpga & 0xF000) == 0xB000) ? "LX16, Rev.B" : "LX9, Rev.A");
 	tlog("diag: FPGA version register %04X", fpga);
 	say(WHITE, "kernel NOR id %04X, game NOR id %04X", Read_S71NOR_ID(), Read_S98NOR_ID());
-	say(WHITE, "WAITCNT %04X (the kernel never sets it)", REG_WAITCNT_IO);
+	say(WHITE, "WAITCNT %04X in the menu (games start at 0000)", REG_WAITCNT_IO);
 	say(WHITE, "kernel ROM %08lX-%08lX", 0x08000000ul, (unsigned long)&__rom_end__);
 	u32 id = build_id_compute();
 	say(id == torii_build_id ? WHITE : RED, "build id %08lX%s", (unsigned long)torii_build_id,
@@ -454,106 +477,77 @@ static void step_timing(void)
 	pause_frames(60);
 }
 
+// --- The log on the card ------------------------------------------------------
+
+// What the log shows happened since the last Diagnostics run (logcheck.h).
+static u32 log_seen;
+static struct logcheck log_check EWRAM_BSS;
+
+// Reads the log files, oldest first, into pReadCache one at a time.
+static void read_log(void)
+{
+	char path[40];
+	u32 seqs[LOG_FILES];
+	FIL f;
+	UINT got;
+	memset(&log_check, 0, sizeof(log_check));
+	tlog_flush();
+	for (u32 i = 0; i < LOG_FILES; i++) {
+		seqs[i] = 0;
+		snprintf(path, sizeof(path), "/torii/logs/torii-%lu.log", (unsigned long)i);
+		if (f_open(&f, path, FA_READ) != FR_OK)
+			continue;
+		if (f_read(&f, pReadCache, LOG_HEADER_LEN, &got) == FR_OK)
+			seqs[i] = log_header_seq((const char *)pReadCache, got);
+		f_close(&f);
+	}
+	for (;;) {
+		int next = -1;
+		for (u32 i = 0; i < LOG_FILES; i++)
+			if (seqs[i] && (next < 0 || seqs[i] < seqs[next]))
+				next = (int)i;
+		if (next < 0)
+			break;
+		seqs[next] = 0;
+		snprintf(path, sizeof(path), "/torii/logs/torii-%lu.log", (unsigned long)next);
+		if (f_open(&f, path, FA_READ) != FR_OK)
+			continue;
+		if (f_read(&f, pReadCache, LOG_FILE_SIZE, &got) != FR_OK)
+			got = 0;
+		f_close(&f);
+		// Line by line, to the first zero byte: the end of the text.
+		pReadCache[got] = 0;  // got <= LOG_FILE_SIZE, half the buffer
+		for (char *text = (char *)pReadCache; *text;) {
+			char *nl = strchr(text, '\n');
+			if (nl)
+				*nl = 0;
+			logcheck_line(&log_check, text);
+			if (!nl)
+				break;
+			text = nl + 1;
+		}
+	}
+	log_seen = log_check.seen;
+	tlog("diag: the log since the last run shows %03lX (see source/logcheck.h)", (unsigned long)log_seen);
+}
+
 // --- EEPROM 512 or 8K ----------------------------------------------------------
 
-static u16 eeprom_request[2 + 14 + 1] EWRAM_BSS;
-static u16 eeprom_reply[68] EWRAM_BSS;
-
-// Reads EEPROM block `block`, sending addr_bits address bits, in game mode:
-// with the ROM page at 0x200 the FPGA presents the save type the parameter
-// block set. It only reads; a write would need the request to start 1, 0.
-void IWRAM_CODE diag_eeprom_read(u32 block, u32 addr_bits)
-{
-	u32 n = 0;
-	eeprom_request[n++] = 1;
-	eeprom_request[n++] = 1;
-	for (u32 bit = addr_bits; bit-- > 0;)
-		eeprom_request[n++] = (block >> bit) & 1;
-	eeprom_request[n++] = 0;
-
-	u16 ime = REG_IME;
-	REG_IME = 0;
-	SetRompage(0x200);
-	REG_DMA3SAD = (u32)eeprom_request;
-	REG_DMA3DAD = 0x0DFFFF00;
-	REG_DMA3CNT = DMA_ENABLE | DMA16 | n;
-	REG_DMA3SAD = 0x0DFFFF00;
-	REG_DMA3DAD = (u32)eeprom_reply;
-	REG_DMA3CNT = DMA_ENABLE | DMA16 | 68;
-	SetRompage(gl_currentpage);
-	REG_IME = ime;
-}
-
-static void set_save_type(u8 type, u32 size)
-{
-	init_FAT_table();
-	FAT_table_buffer[0x1F4 / 4] = SET_PARAMETER_MODE;
-	FAT_table_buffer[0x1F8 / 4] = EZcardFs.csize;
-	FAT_table_buffer[0x1FC / 4] = ((u32)type << 24) | size;
-	Send_FATbuffer(FAT_table_buffer, 1);
-}
-
+// The cart's EEPROM answers only in game mode: tests/roms/eeprom asks it.
 static void step_eeprom(void)
 {
 	step("EEPROM 512 or 8K");
-	// A block of the save chip that isn't blank, to compare the replies with.
-	u8 fram[0x200];
-	SetRampage(0);
-	ReadSram(SRAMSaver, fram, sizeof(fram));
-	u32 block = 64;
-	// Blocks 0-15 only: the address bits a wrong-width request leaves over
-	// then start 0, 0, never 1, 0, the start of a write.
-	for (u32 b = 0; b < 16 && block == 64; b++) {
-		u32 ones = 0, zeros = 0;
-		for (u32 i = 0; i < 8; i++) {
-			ones += fram[b * 8 + i] == 0xFF;
-			zeros += fram[b * 8 + i] == 0x00;
-		}
-		if (ones < 8 && zeros < 8)
-			block = b;
+	if (log_seen & SEEN_EEPROM_PROBE) {
+		say(GREEN, "The EEPROM probe's report is in the log.");
+	} else {
+		say(WHITE, "Not tested since the last run. The");
+		say(WHITE, "EEPROM answers only in a game: launch");
+		say(WHITE, "eeprom.gba (tests/roms/eeprom) CLEAN");
+		say(WHITE, "BOOT, SAVE TYPE EEPROM 512, then 8K,");
+		say(WHITE, "with A, then B, each time: four runs.");
+		say(WHITE, "Each goes back to the kernel and logs.");
 	}
-	if (block == 64) {
-		say(GREY, "The save chip's first 128 bytes are");
-		say(GREY, "blank, so replies can't be told apart:");
-		say(GREY, "save in an EEPROM game, then run this.");
-		result(1, "EEPROM probe (inconclusive)");
-		pause_frames(120);
-		return;
-	}
-	const u8 *want = &fram[block * 8];
-	say(WHITE, "block %lu: %02X%02X%02X%02X%02X%02X%02X%02X", (unsigned long)block, want[0], want[1], want[2],
-	    want[3], want[4], want[5], want[6], want[7]);
-	static const u8 types[] = {0x21, 0x22};
-	static const u32 sizes[] = {0x200, 0x2000};
-	static const u32 widths[] = {6, 14};
-	for (u32 t = 0; t < 2; t++) {
-		set_save_type(types[t], sizes[t]);
-		for (u32 n = 0; n < 2; n++) {
-			u32 w = t ? 1 - n : n;  // the type's own width first
-			diag_eeprom_read(block, widths[w]);
-			u8 got[8] = {0};
-			for (u32 i = 0; i < 64; i++)
-				got[i / 8] |= (eeprom_reply[4 + i] & 1) << (7 - i % 8);
-			u8 rev[8];
-			for (u32 i = 0; i < 8; i++)
-				rev[i] = got[7 - i];
-			const char *verdict =
-				!memcmp(got, want, 8)   ? "matches"
-				: !memcmp(rev, want, 8) ? "matches, reversed"
-				: (got[0] & got[1] & got[2] & got[3] & got[4] & got[5] & got[6] & got[7]) == 0xFF
-					? "all ones: no answer"
-					: "differs";
-			say(WHITE, "type %02X, %2lu-bit request: %s", types[t], (unsigned long)widths[w], verdict);
-			tlog("diag: eeprom type %02X width %lu reply %02X%02X%02X%02X%02X%02X%02X%02X", types[t],
-			     (unsigned long)widths[w], got[0], got[1], got[2], got[3], got[4], got[5], got[6], got[7]);
-		}
-	}
-	// End with a request of the right width, then SRAM as the save type,
-	// so no EEPROM command is left half sent; the next launch sets its own.
-	diag_eeprom_read(block, 14);
-	set_save_type(0x11, 0x8000);
-	init_FAT_table();
-	pause_frames(120);
+	pause_frames(180);
 }
 
 // --- Rumble ------------------------------------------------------------------
@@ -594,7 +588,7 @@ static void step_rumble(void)
 		Set_RTC_status(1);  // the clock back before the answer is logged with a time
 		char topic[32];
 		snprintf(topic, sizeof(topic), "rumble at register %u", values[i]);
-		ask(topic, "Did it rumble just now?");
+		ask(topic, "Did it rumble just now?", ASK_PROBE);
 	}
 	Set_RTC_status(1);
 }
@@ -602,22 +596,66 @@ static void step_rumble(void)
 // --- Checklist ---------------------------------------------------------------
 
 // docs/release-checklist.md, "In Diagnostics": things only a person can see.
-// Each line fits the screen.
-static const char *const checklist[] = {
-	"The bars are red, green, blue, white.",
-	"The LED breathes red and blue now.",
-	"The clock above shows the right time.",
-	"Since the last run, a GBA game started.",
-	"...its save survived a power cycle.",
-	"...the in-game menu opened.",
-	"...a save state saved and loaded.",
-	"...sleep slept and woke.",
-	"...a GB or GBC game ran.",
-	"...a NES game ran.",
-	"...a game written to NOR started.",
-	"...the clock kept time while off.",
-	"...DEBUG in a game reached the log.",
+// Each question fits the screen; name is a literal for the summary. A yes to
+// something the log should show (needs) is "unconfirmed" without it.
+struct check {
+	const char *question;
+	const char *name;
+	u32 needs;
+	const char *proof;  // what the log lacks, for the unconfirmed line
 };
+#define CHECK_PREFIX "checklist: "
+#define ITEM(question, name, needs, proof) {question, CHECK_PREFIX name, needs, proof}
+
+static const struct check checklist[] = {
+	ITEM("The bars are red, green, blue, white.", "colour bars", 0, NULL),
+	ITEM("The LED breathes red and blue now.", "LED", 0, NULL),
+	ITEM("The clock above shows the right time.", "clock", 0, NULL),
+	ITEM("Since the last run, a GBA game started.", "a GBA game started", SEEN_GBA, "GBA launch"),
+	ITEM("...its save survived a power cycle.", "a save survived a power cycle", SEEN_GBA, "GBA launch"),
+	ITEM("...the in-game menu opened.", "the in-game menu", SEEN_MENU,
+	     "BOOT WITH ADDON launch with RESET or SAVESTATE on"),
+	ITEM("...a save state saved and loaded.", "save states", SEEN_SAVESTATE, "launch with SAVESTATE on"),
+	ITEM("...sleep slept and woke.", "sleep", SEEN_SLEEP, "launch with SLEEP on"),
+	ITEM("...a GB or GBC game ran.", "a GB or GBC game", SEEN_GB, "GB or GBC launch"),
+	ITEM("...a NES game ran.", "a NES game", SEEN_NES, "NES launch"),
+	ITEM("...a game written to NOR started.", "a game from NOR", SEEN_NOR, "launch from NOR"),
+	ITEM("...the clock kept time while off.", "the clock while off", 0, NULL),
+	ITEM("...DEBUG in a game reached the log.", "DEBUG", SEEN_DEBUG, "debug info"),
+};
+
+#define CLOCK_ITEM 2
+#define CLOCK_Y 30
+
+static u8 clock_shown;  // the second on screen
+
+static void clock_read(u8 t[7])
+{
+	rtc_enable();
+	rtc_get(t);
+	rtc_disenable();
+}
+
+static void clock_draw(void)
+{
+	u8 t[7];
+	clock_read(t);
+	if (t[6] == clock_shown)
+		return;
+	clock_shown = t[6];
+	char line[24];
+	snprintf(line, sizeof(line), "20%02X-%02X-%02X %02X:%02X:%02X", t[0], t[1], t[2], t[4] & 0x3F, t[5], t[6]);
+	Clear(0, CLOCK_Y, 240, 12, RGB(0, 0, 0), 1);
+	DrawHZText12(line, 39, 2, CLOCK_Y, YELLOW, 1);
+}
+
+// The live clock on the clock item: read four times a second, drawn when
+// the second changes.
+static void clock_tick(void)
+{
+	if (torii_frames % 15 == 0)
+		clock_draw();
+}
 
 static void show_colour_bars(void)
 {
@@ -661,29 +699,49 @@ static void step_keys(void)
 
 static void step_checklist(void)
 {
-	u32 fails = 0;
-	for (u32 i = 0; i < sizeof(checklist) / sizeof(*checklist); i++) {
+	const u32 count = sizeof(checklist) / sizeof(*checklist);
+	for (u32 i = 0; i < count; i++) {
+		const struct check *c = &checklist[i];
 		step("checklist");
-		say(GREY, "item %lu of %lu", (unsigned long)i + 1,
-		    (unsigned long)(sizeof(checklist) / sizeof(*checklist)));
+		say(GREY, "item %lu of %lu", (unsigned long)i + 1, (unsigned long)count);
 		if (i == 0)
 			show_colour_bars();
 		if (i == 1)
 			Set_LED_control(0x80 | 0x20 | 0x08);  // breathing red and blue
-		if (i == 2) {
-			u8 t[7];
-			rtc_enable();
-			rtc_get(t);
-			rtc_disenable();
-			say(YELLOW, "20%02X-%02X-%02X %02X:%02X:%02X", t[0], t[1], t[2], t[4] & 0x3F, t[5], t[6]);
+		if (i == CLOCK_ITEM) {
+			diag_y = CLOCK_Y + 12;
+			clock_shown = 0xFF;  // not a BCD second: drawn at once
+			clock_draw();
+			wait_tick = clock_tick;
 		}
-		char topic[16];
-		snprintf(topic, sizeof(topic), "checklist %lu", (unsigned long)i + 1);
-		fails += ask(topic, checklist[i]) == ANSWER_NO;
+		char topic[48];
+		snprintf(topic, sizeof(topic), "checklist %lu (%s)", (unsigned long)i + 1,
+			 c->name + sizeof(CHECK_PREFIX) - 1);
+		int answer = ask(topic, c->question, i > CLOCK_ITEM ? ASK_TRIED : ASK_CHECK);
+		wait_tick = NULL;
 		if (i == 1)
 			CheckSwitch();  // the LED as the settings have it
+		if (i == CLOCK_ITEM) {
+			// To compare with the real time the user notes: the clock's drift.
+			u8 t[7];
+			clock_read(t);
+			tlog("diag: %s: the clock read 20%02X-%02X-%02X %02X:%02X:%02X at the answer", topic, t[0],
+			     t[1], t[2], t[4] & 0x3F, t[5], t[6]);
+		}
+		if (answer == ANSWER_NO) {
+			add_failure(c->name);
+		} else if (answer == ANSWER_YES && c->needs) {
+			if (log_seen & c->needs) {
+				tlog("diag: %s: the log shows it", topic);
+			} else {
+				say(YELLOW, "unconfirmed: the log doesn't show it");
+				tlog("diag: %s: unconfirmed: the log has no %s since the last run", topic, c->proof);
+				if (unconfirmed_count < sizeof(unconfirmed) / sizeof(*unconfirmed))
+					unconfirmed[unconfirmed_count++] = c->name;
+				pause_frames(90);
+			}
+		}
 	}
-	result(!fails, "checklist");
 }
 
 // --- The run -----------------------------------------------------------------
@@ -707,6 +765,7 @@ void Diagnostics(void)
 	tlog_set_level(TLOG_DEBUG);
 	diag_step_no = 0;
 	summary_count = 0;
+	unconfirmed_count = 0;
 	tlog("diag: Diagnostics started, logging at debug for this run");
 
 	step_info();
@@ -716,6 +775,7 @@ void Diagnostics(void)
 	step_nor();
 	step_save_chip();
 	step_timing();
+	read_log();
 	step_eeprom();
 
 	step("questions");
@@ -731,12 +791,12 @@ void Diagnostics(void)
 	}
 
 	step("summary");
-	if (summary_count == 0) {
-		say(GREEN, "everything passed");
-	} else {
-		for (u32 i = 0; i < summary_count; i++)
-			say(RED, "failed: %s", summary[i]);
-	}
+	if (summary_count == 0)
+		say(GREEN, unconfirmed_count ? "no check failed" : "everything passed");
+	for (u32 i = 0; i < summary_count; i++)
+		say(RED, "failed: %s", summary[i]);
+	for (u32 i = 0; i < unconfirmed_count; i++)
+		say(YELLOW, "unconfirmed: %s", unconfirmed[i]);
 	say(WHITE, "The report is in /torii/logs.");
 	say(WHITE, "A: restart the kernel");
 	say(WHITE, "SELECT: crash it on purpose, to test");

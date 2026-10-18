@@ -229,7 +229,7 @@ at page `0x09C00000` × 4 KB:
 | `0x20`, `0x30` | S71GL064 SRAM (1 MB; its first 128 KB are unused behind the FRAM) | the in-game menu's copy of VRAM (`0x10000` + `0x2C00` bytes) |
 | `0x40`–`0xAF` | S71GL064 SRAM | the save-state buffer: the 0x70000-byte `RTS/<game>.rts` is loaded here at launch. VRAM, IWRAM, EWRAM, OAM, palette, IO, registers, and a flag at `0xAFFF0` |
 | `0xC0`, `0xD0` | S71GL064 SRAM | Torii: Diagnostics' pattern test (free otherwise) |
-| `0xF0` | S71GL064 SRAM | Torii: what the kernel keeps for its next boot (`source/cartlog.h`): where the session got to at `0xF0000`, a kernel crash dump at `0xF0100`, the in-game menu's DEBUG snapshot at `0xF1000` |
+| `0xF0` | S71GL064 SRAM | Torii: what the kernel keeps for its next boot (`source/cartlog.h`): where the session got to at `0xF0000`, a kernel crash dump at `0xF0100`, the in-game menu's DEBUG snapshot at `0xF1000`, the EEPROM probe ROM's report at `0xF1800` |
 
 Pages `0x20` and up have no battery: on the real cart they survive a soft
 reset (RESET, or the crash handler's restart) but not a power cycle

@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 
 #include <gba_base.h>
 #include <gba_interrupt.h>
@@ -7,6 +8,8 @@
 #include "Ezcard_OP.h"
 #include "build_id.h"
 #include "cartlog.h"
+#include "eepromprobe.h"
+#include "ff.h"
 #include "tlog.h"
 
 extern void SoftReset_now(void);
@@ -18,7 +21,7 @@ volatile u32 torii_frames;
 
 // --- What the blocks in cart RAM hold ---------------------------------------
 
-#define STATE_MAGIC "TORIIST1"
+#define STATE_MAGIC "TORIIST2"
 #define CRASH_MAGIC "TORIICR2"
 #define SNAPSHOT_MAGIC "TORII-DEBUGINFO1"  // gba_rts_patch.s writes it last
 
@@ -29,6 +32,7 @@ struct cartlog_state {
 	u32 detail;
 	char code[4];
 	char game[100];
+	char title[16];  // a GB or GBC game's title, from its header (0x134)
 };
 
 #define CRASH_STACK_WORDS 64
@@ -65,13 +69,16 @@ struct cartlog_snapshot {
 
 u32 crash_regs[17];
 u32 crash_stack[128] EWRAM_BSS;
-// The crash dump or the debug info, one at a time.
+// The crash dump, the debug info or the EEPROM probe's report, one at a time.
 static union {
 	struct cartlog_crash crash;
 	struct cartlog_snapshot snapshot;
+	struct eeprom_probe probe;
 } block EWRAM_BSS;
 #define crash block.crash
 _Static_assert(CARTLOG_CRASH + sizeof(struct cartlog_crash) <= CARTLOG_SNAPSHOT, "crash dump size");
+_Static_assert(CARTLOG_SNAPSHOT + CARTLOG_SNAPSHOT_SIZE <= CARTLOG_EEPROM_PROBE, "snapshot size");
+_Static_assert(sizeof(struct eeprom_probe) == 0x200, "EEPROM probe report layout");
 
 // --- Cart RAM access ----------------------------------------------------------
 
@@ -153,12 +160,13 @@ void IWRAM_CODE torii_crash(const u32 *regs)
 
 // --- The boot report ------------------------------------------------------------
 
-static void report_crash(void)
+// True if there was a crash dump.
+static int report_crash(void)
 {
 	cart_read(CARTLOG_CRASH, &crash, sizeof(crash));
 	int old = memcmp(crash.magic, "TORIICR1", 8) == 0;  // v0.2.0's, before build IDs
 	if (!old && memcmp(crash.magic, CRASH_MAGIC, 8) != 0)
-		return;
+		return 0;
 	if (tlog_level == TLOG_OFF)  // with logging on, this boot's line is there already
 		tlog_marker("a crash report", 1);
 	if (old) {
@@ -167,7 +175,7 @@ static void report_crash(void)
 		tlog_flush();
 		if (tlog_all_written())
 			cart_clear_magic(CARTLOG_CRASH, 8);
-		return;
+		return 1;
 	}
 	const u32 *r = crash.regs;
 	// First: tools/logs.py names the addresses after it with this build's symbols.
@@ -207,6 +215,7 @@ static void report_crash(void)
 	tlog_flush();
 	if (tlog_all_written())  // else the next boot tries again
 		cart_clear_magic(CARTLOG_CRASH, 8);
+	return 1;
 }
 
 static void report_snapshot(void)
@@ -260,10 +269,62 @@ static void report_snapshot(void)
 	tlog_flush();
 }
 
+static void probe_bytes(char *out, const u8 *d)
+{
+	snprintf(out, 24, "%02X%02X%02X%02X %02X%02X%02X%02X", d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7]);
+}
+
+// The EEPROM probe ROM's report (tests/roms/eeprom): each step, where each
+// read's data came from, and what they add up to.
+static void report_eeprom_probe(void)
+{
+	struct eeprom_probe *p = &block.probe;
+	cart_read(CARTLOG_EEPROM_PROBE, p, sizeof(*p));
+	if (memcmp(p->magic, EEPROM_PROBE_MAGIC, 16) != 0)
+		return;
+	cart_clear_magic(CARTLOG_EEPROM_PROBE, 16);
+	u32 steps = p->steps < EEPROM_PROBE_STEPS ? p->steps : EEPROM_PROBE_STEPS;
+	tlog_force(TLOG_INFO, "eeprom probe: a %lu-bit run, %lu steps (the save type is in the launch line before)",
+		   (unsigned long)p->width, (unsigned long)steps);
+	char data[24];
+	for (u32 i = 0; i < steps; i++) {
+		const struct eeprom_probe_step *s = &p->step[i];
+		probe_bytes(data, s->data);
+		if (s->op == EEPROM_PROBE_WRITE) {
+			if (s->polls == EEPROM_PROBE_TIMEOUT)
+				tlog_force(TLOG_INFO, "eeprom probe: %2lu: write block %u: %s, never finished",
+					   (unsigned long)i, s->block, data);
+			else
+				tlog_force(TLOG_INFO, "eeprom probe: %2lu: write block %u: %s, ready after %lu polls",
+					   (unsigned long)i, s->block, data, (unsigned long)s->polls);
+			continue;
+		}
+		int src = eeprom_probe_source(p, i);
+		char what[48];
+		if (src >= 0)
+			snprintf(what, sizeof(what), "step %d's write (block %u)", src, p->step[src].block);
+		else if (s->data[0] == 0xE6 || s->data[0] == 0xEE)
+			snprintf(what, sizeof(what), "an earlier %u-bit run", s->data[0] == 0xE6 ? 6 : 14);
+		else
+			snprintf(what, sizeof(what), "nothing written in this run");
+		tlog_force(TLOG_INFO, "eeprom probe: %2lu: read block %u: %s, from %s", (unsigned long)i, s->block,
+			   data, what);
+	}
+	u32 v = eeprom_probe_verdict(p);
+	tlog_force(TLOG_INFO, "eeprom probe: %lu-bit addresses %s%s%s%s", (unsigned long)p->width,
+		   (v & EEPROM_PROBE_WORKS) ? "work" : "don't read back what was written",
+		   (v & EEPROM_PROBE_WRAPS) ? "; blocks wrap at 64: a 512-byte EEPROM" : "",
+		   (v & EEPROM_PROBE_8K) ? "; 1024 blocks: an 8 KB EEPROM" : "",
+		   (v & EEPROM_PROBE_TIMED_OUT) ? "; a write never finished" : "");
+	tlog_flush();
+}
+
 static struct cartlog_state state EWRAM_BSS;
+_Static_assert(CARTLOG_STATE + sizeof(struct cartlog_state) <= CARTLOG_CRASH, "session state size");
 static u32 prev_magic_ok;  // the previous session's state, as cartlog_boot_start found it
 static u32 prev_phase;
 static u32 prev_detail;
+static int prev_crashed;  // a crash dump was there at this boot
 
 static const char *phase_name(u32 phase)
 {
@@ -292,8 +353,9 @@ void cartlog_boot_start(void)
 
 void cartlog_boot_report(void)
 {
-	report_crash();
+	prev_crashed = report_crash();
 	report_snapshot();
+	report_eeprom_probe();
 	if (tlog_level == TLOG_OFF)
 		return;
 
@@ -303,7 +365,12 @@ void cartlog_boot_report(void)
 	if (last && strstr(last, "launch: loading "))
 		tlog_error("previous session: a launch never reached the game; its last line was: %s", last);
 
-	if (!prev_magic_ok) {
+	if (prev_crashed && prev_magic_ok) {
+		tlog_error("previous session: the kernel crashed in %s (step %lu)%s%s", phase_name(prev_phase),
+			   (unsigned long)prev_detail, state.game[0] ? "; the last game launched: " : "", state.game);
+	} else if (prev_crashed) {
+		tlog_error("previous session: the kernel crashed (cart RAM had no state saying where)");
+	} else if (!prev_magic_ok) {
 		tlog("previous session: nothing in cart RAM (the first boot with logging on, or cart RAM lost power)");
 	} else {
 		switch (prev_phase) {
@@ -311,8 +378,9 @@ void cartlog_boot_report(void)
 			tlog("previous session: ended in the menu");
 			break;
 		case PHASE_GAME:
-			tlog("previous session: ended in %s (%.4s), by power-off or the in-game menu's RESET",
-			     state.game, state.code);
+			tlog("previous session: ended in %s (%.*s), by power-off or the in-game menu's RESET",
+			     state.game, state.title[0] ? (int)sizeof(state.title) : 4,
+			     state.title[0] ? state.title : state.code);
 			break;
 		case PHASE_BOOT:
 		case PHASE_LAUNCH:
@@ -328,6 +396,31 @@ void cartlog_boot_report(void)
 	tlog("boot %lu with logging on", (unsigned long)state.boot);
 }
 
+static int is_gb_file(const char *name)
+{
+	const char *dot = strrchr(name, '.');
+	return dot && (!strcasecmp(dot, ".gb") || !strcasecmp(dot, ".gbc"));
+}
+
+static FIL title_file EWRAM_BSS;
+static u32 title_buf[4] EWRAM_BSS;  // word-aligned for f_read
+
+// A GB or GBC game's title, from the header at 0x134: up to 16 characters,
+// the GBC flag or padding ending it. Reads the file from the current folder.
+static void read_gb_title(const char *game)
+{
+	UINT got;
+	memset(state.title, 0, sizeof(state.title));
+	if (f_open(&title_file, game, FA_READ) != FR_OK)
+		return;
+	if (f_lseek(&title_file, 0x134) == FR_OK && f_read(&title_file, title_buf, 16, &got) == FR_OK && got == 16) {
+		const char *t = (const char *)title_buf;
+		for (u32 i = 0; i < 16 && t[i] >= ' ' && t[i] < 0x7F; i++)
+			state.title[i] = t[i];
+	}
+	f_close(&title_file);
+}
+
 void cartlog_phase(u32 phase, u32 detail, const char *game)
 {
 	if (tlog_level == TLOG_OFF)
@@ -339,8 +432,12 @@ void cartlog_phase(u32 phase, u32 detail, const char *game)
 	if (game) {
 		strncpy(state.game, game, sizeof(state.game) - 1);
 		state.game[sizeof(state.game) - 1] = 0;
-		for (u32 i = 0; i < 4; i++)  // a GB ROM has no code there
+		for (u32 i = 0; i < 4; i++)  // a GB ROM has no code there, but a title
 			state.code[i] = (GAMECODE[i] >= ' ' && GAMECODE[i] < 0x7F) ? GAMECODE[i] : '?';
+		if (is_gb_file(game))
+			read_gb_title(game);
+		else
+			memset(state.title, 0, sizeof(state.title));
 	}
 	if (memcmp(state.magic, STATE_MAGIC, 8) != 0) {  // logging was off at boot
 		memcpy(state.magic, STATE_MAGIC, 8);

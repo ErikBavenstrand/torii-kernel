@@ -16,6 +16,7 @@
 #define CARTLOG_CRASH 0x0E000100  // struct cartlog_crash
 #define CARTLOG_SNAPSHOT 0x0E001000  // the in-game menu's DEBUG entry (gba_rts_patch.s)
 #define CARTLOG_SNAPSHOT_SIZE 0x500
+#define CARTLOG_EEPROM_PROBE 0x0E001800  // the EEPROM probe ROM's report (source/eepromprobe.h)
 // Pages Diagnostics may write test patterns to: free SRAM past the states.
 #define CARTLOG_TEST_PAGE 0xC0
 
@@ -32,8 +33,9 @@ enum {
 // Reads where the previous session got to and records that this one is
 // booting (only with LOGGING on). Call it early: it needs no card.
 void cartlog_boot_start(void);
-// Logs the previous session's state, crash dump and in-game debug info (a
-// crash dump even with LOGGING off) and clears them. Call it once the card is
+// Logs the previous session's state, crash dump, in-game debug info and
+// EEPROM probe report (all but the state even with LOGGING off) and clears
+// them. Call it once the card is
 // mounted, then cartlog_phase(PHASE_MENU) when the menu shows.
 void cartlog_boot_report(void);
 

@@ -38,5 +38,9 @@ void test_log_next_seq(void);
 void test_log_end(void);
 void test_lz77_round_trip(void);
 void test_lz77_compresses(void);
+void test_logcheck_launches(void);
+void test_logcheck_reports(void);
+void test_eeprom_probe_patterns(void);
+void test_eeprom_probe_verdict(void);
 
 #endif

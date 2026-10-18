@@ -1016,7 +1016,26 @@ call_Debug:
 	adrl	r7,WriteSram
 	mov		lr,pc
 	mov		pc,r8
-	b		b_pressed_quit
+	@;Torii: say it worked, and stay in the menu with RESET picked: the
+	@;snapshot is in cart RAM, which a power-off clears, so RESET is the
+	@;way to get it logged.
+	adrl	r8,s_debug_saved
+	mov		r9,#145		@;Y
+	mov		r10,#20		@;X
+debug_saved:
+	ldrb	r0,[r8],#+1
+	cmp		r0,#0
+	moveq	r11,#0
+	beq		begin_show
+	cmp		r0,#' '
+	beq		debug_saved_space
+	mov		r1,r10
+	mov		r2,r9
+	ldr		r3,=0x03E0	@;green
+	bl		printchar
+debug_saved_space:
+	add		r10,#8
+	b		debug_saved
 
 	
 	.ltorg	
@@ -1115,6 +1134,8 @@ s_cheatOFF:
  	.byte  'C','H','E','A','T','O','F','F',0x0
 s_debug:
  	.byte  'D','E','B','U','G',0x0
+s_debug_saved:		@;Torii: letters A to V and spaces only (printchar)
+	.asciz	"DEBUG SAVED  CHOOSE RESET"
 	.align	
 S_RTS_FLAG:
  	.byte  'E','Z','-','O','m','e','g','a','R','T','C','F','I','L','E','.'

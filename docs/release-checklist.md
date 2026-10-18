@@ -9,18 +9,24 @@ every answer to `/torii/logs` at Debug level. Bring the card back and run
 
 ## Before you start
 
-1. Copy the build to the card: `just sd /Volumes/OMEGA`.
+1. Copy the build and the EEPROM probe to the card:
+   `just test-roms && just sd /Volumes/OMEGA tests/roms/eeprom/eeprom.gba`.
 2. Set LOGGING to DEBUG in settings page 2 and save, so the sessions
    below are logged too.
 3. Have on the card: a GBA game with a battery save, one with an EEPROM
-   save, one with a clock (Pokémon Emerald), Drill Dozer or WarioWare:
-   Twisted! if you have one, a GB or GBC game, a NES game, and a `.cht`
-   file for one game.
+   save, one with a clock (Pokémon Emerald), Drill Dozer for rumble if you
+   have it, a GB or GBC game, a NES game, and a `.cht` file for one game.
+   WarioWare: Twisted! can't be played on the Omega DE: it needs a motion
+   sensor the cart lacks.
 
 ## By hand, before Diagnostics
 
 Do these first; Diagnostics asks about them afterwards ("since the last
-run"). Answer no to anything you didn't try.
+run"). Answer SELECT ("didn't try") to anything you didn't try. Diagnostics
+checks each yes against the log where it can: a yes with no matching launch
+in the log (sleep with no launch that had SLEEP on, NES with no NES launch)
+is logged as "unconfirmed" and listed in the summary. So keep LOGGING on
+for all of these.
 
 | Check | How |
 |---|---|
@@ -33,7 +39,9 @@ run"). Answer no to anything you didn't try.
 | A NES game runs | from the SD list |
 | A game written to NOR starts | WRITE TO NOR CLEAN, then from the NOR list |
 | The clock kept time while off | the menu's clock after a while switched off |
-| DEBUG works in a game | with LOGGING on: L+R+START, DEBUG, then RESET; the next boot logs "debug info" |
+| DEBUG works in a game | with LOGGING on: L+R+START, DEBUG; it says DEBUG SAVED and picks RESET. Then RESET, not power-off: the snapshot is in cart RAM, which a power-off clears. The kernel's boot logs "debug info" |
+| Rumble in a game | Drill Dozer, BOOT WITH ADDON or CLEAN BOOT |
+| The EEPROM probe | `eeprom.gba`, CLEAN BOOT with SAVE TYPE EEPROM 512, A (6-bit addresses); again with B (14-bit); then the same two with EEPROM 8K. Each run shows a verdict and goes back to the kernel on A, whose boot logs every step ("eeprom probe:"). Its EEPROM is its own save |
 
 ## In Diagnostics
 
@@ -50,10 +58,9 @@ Diagnostics runs these by itself and logs each result:
 - timings: 64 KB of NOR and of PSRAM at seven WAITCNT settings (the BIOS
   default and faster ones, checked against the default's data), one
   glyph, BIOS LZ77 to WRAM, SD reads, SD writes;
-- EEPROM 512 or 8K: reads one block of the save chip through the FPGA's
-  EEPROM with 6-bit and 14-bit addresses at save types 0x21 and 0x22,
-  and compares each reply with the chip's bytes. It needs a save in the
-  chip's first 128 bytes: play an EEPROM game and save first.
+- EEPROM 512 or 8K: whether the EEPROM probe's report reached the log
+  since the last run, and if not, how to run it. The cart's EEPROM
+  answers only in game mode, so the kernel can't probe it itself.
 
 Then it asks you (A yes, B no, SELECT skip; START at the first question
 skips them all):
@@ -66,8 +73,13 @@ skips them all):
   gives up).
 - **The screen:** red, green, blue and white bars.
 - **The LED:** it breathes red and blue for a moment.
-- **The clock:** shows the right date and time.
+- **The clock:** shows the right date and time. It is live; the log
+  records what it read when you answered, so note the real time then:
+  the difference is the clock's drift.
 - The "since the last run" checks from the table above.
+
+Rumble answers are findings, logged as info, not failures. The summary
+names each failed check and each unconfirmed yes.
 
 Diagnostics first asks whether to start (B goes back, restarting the
 kernel). At the end, A restarts the kernel; SELECT crashes it on purpose
