@@ -125,7 +125,15 @@ fetches in SD mode.
   a word outside the buffer page or a missing `29` aborts until `AA, 55, F0`), and before each
   write runs `C0` (PPB command set), `80, 30` (erase all PPBs), `90, 00` (exit). Each 8 MB of the
   chip is a ROM page step of `0x1000`.
-- **PSRAM:** `0x08800000` window.
+- **PSRAM:** `0x08800000` window. Every kernel user of another page
+  (launching, the patcher, Diagnostics' PSRAM step) sets page 0 back
+  afterwards, so the menu always sees page 0. The v0.3 engine keeps its
+  cover cache there (`source/engine/psram.h`): from `0x08C00000` (page 0,
+  +4 MB), about 304 KB, written by DMA at `WAITCNT_BIOS` and read at
+  `WAITCNT_MENU`; the first 4 MB stay free for other menu data. A launch
+  overwrites it, so the launch empties the cache first. In SD mode the cart
+  hides PSRAM too, so `f_read` can't fill it directly: data from the card
+  goes through RAM.
 - **SRAM / flash-save emulation:** `0x0E000000`, paged by `0x09C00000`; `Bank_Switching` uses
   the flash-save command sequence `0x5555=AA, 0x2AAA=55, 0x5555=B0, 0x0000=bank`.
 - **RTC and rumble:** standard GBA cart GPIO at `0x080000C4` (data), `0xC6` (dir), `0xC8` (enable),

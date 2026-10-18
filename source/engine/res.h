@@ -42,10 +42,20 @@ enum res_kind {
 // Sets up every pool empty and clears the log and the error.
 void res_init(void);
 
+// res_alloc flag: the reference isn't logged, so no view's arena owns it.
+// For owners that come and go on their own schedule, out of order (the
+// cover streamer's sprite slots): they drop it with res_unref, and the log
+// doesn't fill with gaps as they churn.
+#define RES_NOLOG 0x80
+
 // Allocates len units of kind at a multiple of align inside [lo, hi) units,
 // sharing or reviving a block with the same tag (0: never shared). flags is
-// POOL_TOP or 0. Returns a handle, or RES_NONE after logging why.
+// POOL_TOP or 0, plus RES_NOLOG. Returns a handle, or RES_NONE after logging
+// why.
 u8 res_alloc(enum res_kind kind, u16 len, u16 align, u16 lo, u16 hi, u16 tag, u8 flags);
+// Drops a reference res_alloc took with RES_NOLOG. 0 if handle isn't a used
+// block.
+int res_unref(enum res_kind kind, u8 handle);
 // Drops one reference to handle. Its newest log entry becomes a gap, so a
 // later res_release_to doesn't drop it again and the marks views hold stay
 // right. 0 if handle holds no reference taken through res_alloc.

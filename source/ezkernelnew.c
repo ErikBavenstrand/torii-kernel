@@ -28,6 +28,7 @@
 #include "helpwindow.h"
 #include "cartlog.h"
 #include "diag.h"
+#include "engine/cover.h"
 
 #include "jagoombacolor.h"
 #include "pocketnes.h"
@@ -2768,6 +2769,8 @@ re_show_menu:
 	}  //3
 
 boot_game:
+	// The launch fills PSRAM with the game: the cover cache there is gone
+	cover_cache_invalidate();
 	Clear(0, 0, 240, 160, gl_color_cheat_black, 1);
 	DrawHZText12(gl_Loading, 0, (240 - strlen(gl_Loading) * 6) / 2, 74, gl_color_text, 1);
 

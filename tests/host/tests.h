@@ -71,5 +71,10 @@ void test_pool_tag_place(void);
 void test_pool_slots_exact_fit(void);
 void test_pool_age_wrap(void);
 void test_budget_check(void);
+void test_asset_header(void);
+void test_asset_check_refuses(void);
+void test_cover_cache_wants(void);
+void test_cover_cache_eviction(void);
+void test_affine_rotscale(void);
 
 #endif

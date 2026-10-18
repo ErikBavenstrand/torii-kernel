@@ -164,18 +164,18 @@ test: test-host build emu-headless test-roms _test-kernel-build
 
 # Check the golden screens and the cycle budget (part of `just test`), e.g. `just shots settings1`
 [positional-arguments]
-shots *scenarios: build emu-headless test-roms
+shots *scenarios: build emu-headless test-roms _test-kernel-build
     {{emu_docker}} python3 tests/shots.py "$@"
 
 # Re-record the golden screens (tests/shots/hashes.txt and png/) and print what changed;
 # name scenarios to re-record only those, e.g. `just shots-update settings1`
 [positional-arguments]
-shots-update *scenarios: build emu-headless test-roms
+shots-update *scenarios: build emu-headless test-roms _test-kernel-build
     {{emu_docker}} python3 tests/shots.py --update "$@"
 
 # Re-record the cycle budget (tests/perf/budget.txt) from the scenarios' frame-cycles lines
 [positional-arguments]
-perf-update *scenarios: build emu-headless test-roms
+perf-update *scenarios: build emu-headless test-roms _test-kernel-build
     {{emu_docker}} python3 tests/shots.py --update-perf "$@"
 
 # `just run` works with OMEGA_TRACE unset and set (on a cart of its own)

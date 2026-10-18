@@ -7,7 +7,9 @@ Each scenario is an mgba-shot options file, tests/shots/NAME.opts, run on a
 fresh cart (the SD card below, kernel NOR erased) with the clock frozen. It
 waits for the kernel's "screen ready: SCREEN" lines with -w and names its key
 frames with -s @N:KEY.png; -H @A:@B hashes every frame of an animation.
-Lines starting "#! settings SLOT=VALUE..." set kernel settings slots first.
+Lines starting "#! settings SLOT=VALUE..." set kernel settings slots first;
+"#! kernel test" runs the test kernel (ezkerneltest.gba, `just test-kernel`'s
+build) instead, for scenes only it has, as the cover demo.
 
 Check (the default): every key frame's screen hash, and every animation's
 frame hashes, must equal tests/shots/hashes.txt. On a mismatch the actual,
@@ -44,6 +46,7 @@ RUNS = Path("dist/shots-run")
 FAILED = Path("dist/shots-failed")
 SHOT = "emu/build-linux/mgba-shot"
 KERNEL = "dist/ezkernelnew.bin"
+TEST_KERNEL = "ezkerneltest.gba"
 # 2026-01-01 12:34:56 UTC: the clock stands still there in every scenario
 EPOCH = 1767270896
 SETTINGS = 0x7B0000  # settings sector in the kernel NOR (as tests/settings.sh)
@@ -136,8 +139,11 @@ def boot(name: str, sd: Path, cart: Path, out: Path, extra: list[str] = ()):
     shutil.rmtree(cart, ignore_errors=True)
     cart.mkdir(parents=True)
     shutil.copy(sd, cart / "sd.img")
+    kernel = KERNEL
     for line in opts.read_text(encoding="utf-8").splitlines():
-        if line.startswith("#! settings"):
+        if line.split() == ["#!", "kernel", "test"]:
+            kernel = TEST_KERNEL
+        elif line.startswith("#! settings"):
             nor = cart / "kernel-nor.bin"
             if not nor.exists():
                 nor.write_bytes(b"\xff" * KERNEL_NOR_SIZE)
@@ -148,7 +154,7 @@ def boot(name: str, sd: Path, cart: Path, out: Path, extra: list[str] = ()):
                     f.write(struct.pack("<H", value))
     env = dict(os.environ, OMEGA_DIR=str(cart), TZ="UTC")
     env.pop("OMEGA_TRACE", None)
-    cmd = [SHOT, KERNEL, "-C", str(EPOCH), "-O", str(out), "-i", str(opts), *extra]
+    cmd = [SHOT, kernel, "-C", str(EPOCH), "-O", str(out), "-i", str(opts), *extra]
     return subprocess.run(cmd, env=env, capture_output=True, text=True, check=False)
 
 

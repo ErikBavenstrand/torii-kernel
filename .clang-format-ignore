@@ -4,3 +4,4 @@ emusrc/**
 source/ff15/*
 # Generated tables, written as their tool writes them.
 source/engine/ease_lut.c
+tests/kernel/asset_data.c

@@ -1,3 +1,6 @@
 # Cycles per frame for tests/perf.py, written by `just perf-update`.
 # NAME CYCLES: the most one frame of NAME took in the scenarios' runs.
 # A run fails over 280896 (a whole frame) or 10% above the figure here.
+cover-decode 38607
+cover-demo 18615
+cover-upload 3427
