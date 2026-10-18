@@ -45,10 +45,31 @@ _build-kernel:
     {{fresh}} stamp build "{{kernel_image}}" Makefile
     {{fresh}} track build ezkernelnew.elf ezkernelnew.gba -- source tests/kernel Makefile
     {{kernel_docker}} make TARGET=ezkernelnew -j8
-    python3 tools/omega_image.py ezkernelnew.gba image.bin dist/ezkernelnew.bin
-    {{kernel_docker}} sh -c '/opt/devkitpro/devkitARM/bin/arm-none-eabi-nm -n ezkernelnew.elf > dist/ezkernelnew.nm'
-    python3 tools/nm_to_sym.py dist/ezkernelnew.nm dist/ezkernelnew.sym
+    @{{just_executable()}} _package ezkernelnew dist
     {{fresh}} record kernel -- {{kernel_inputs}}
+
+# Turn a linked kernel (STEM.gba and STEM.elf) into OUT/ezkernelnew.bin and its symbols
+_package stem out:
+    python3 tools/omega_image.py {{stem}}.gba image.bin {{out}}/ezkernelnew.bin
+    {{kernel_docker}} sh -c '/opt/devkitpro/devkitARM/bin/arm-none-eabi-nm -n {{stem}}.elf > {{out}}/ezkernelnew.nm'
+    python3 tools/nm_to_sym.py {{out}}/ezkernelnew.nm {{out}}/ezkernelnew.sym
+
+# Check the build is reproducible: rebuild from a shuffled copy of the source in
+# another folder (tools/repro.sh) and compare with `just build`'s files
+repro: build
+    #!/usr/bin/env bash
+    set -euo pipefail
+    rm -rf dist/repro && mkdir -p dist/repro
+    git ls-files -co --exclude-standard source tests/kernel include Makefile > dist/repro/files.txt
+    docker run --rm --platform linux/amd64 -u $(id -u):$(id -g) --tmpfs /work:exec,uid=$(id -u) -v "$PWD":/src -w /src -e LIBGBA=/opt/devkitpro/libgba {{kernel_image}} tools/repro.sh dist/repro dist/repro/files.txt
+    {{just_executable()}} _package dist/repro/ezkernelnew dist/repro
+    status=0
+    for file in dist/ezkernelnew.bin dist/ezkernelnew.sym ezkernelnew.elf; do
+      copy=dist/repro/$(basename "$file")
+      if cmp -s "$file" "$copy"; then echo "PASS: $file is the same ($(sha256sum < "$file" | cut -c1-16))"
+      else echo "FAIL: $file differs from $copy"; status=1; fi
+    done
+    exit $status
 
 # Games given are copied onto the SD card unless a file of that name is
 # already there, so their saves are kept.
