@@ -86,3 +86,70 @@ char charset_next(const char *s, u32 len, u32 *pos)
 	}
 	return glyph_of(c);
 }
+
+// Dashes and curly quotes, which Latin-1 lacks: their ASCII forms, or 0
+static char punctuation_of(u32 c)
+{
+	switch (c) {
+	case 0x2010: // hyphens and dashes
+	case 0x2011:
+	case 0x2012:
+	case 0x2013:
+	case 0x2014:
+	case 0x2015:
+	case 0x2212: // minus
+		return '-';
+	case 0x2018: // single quotes
+	case 0x2019:
+	case 0x201A:
+	case 0x201B:
+		return '\'';
+	case 0x201C: // double quotes
+	case 0x201D:
+	case 0x201E:
+	case 0x201F:
+		return '"';
+	default:
+		return 0;
+	}
+}
+
+// The same decoding as charset_next's, kept apart: sharing it slowed
+// charset_next enough to shift when the mode 3 list's scrolling name redraws,
+// which the sd-scroll golden (tests/shots) hashes frame by frame.
+u32 charset_next_latin1(const char *s, u32 len, u32 *pos)
+{
+	const u8 *p = (const u8 *)s;
+	u8 lead = p[*pos];
+	u32 count, c;
+
+	(*pos)++;
+	if (lead < 0x80)
+		return lead;
+	if (lead < 0xC0)
+		return CHARSET_NONE;
+	if (lead < 0xE0) {
+		count = 1;
+		c = lead & 0x1F;
+	} else if (lead < 0xF0) {
+		count = 2;
+		c = lead & 0x0F;
+	} else if (lead < 0xF8) {
+		count = 3;
+		c = lead & 0x07;
+	} else {
+		return CHARSET_REPLACEMENT;
+	}
+	while (count--) {
+		if (*pos >= len || (p[*pos] & 0xC0) != 0x80)
+			return CHARSET_REPLACEMENT;
+		c = (c << 6) | (p[*pos] & 0x3F);
+		(*pos)++;
+	}
+	if (c < 0x100)
+		return c;
+	if (c < 0x180)
+		return (u8)latin_a_ascii[c - 0x100];
+	char q = punctuation_of(c);
+	return q ? (u32)(u8)q : CHARSET_REPLACEMENT;
+}

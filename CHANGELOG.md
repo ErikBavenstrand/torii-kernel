@@ -6,6 +6,15 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** text for the v0.3 tile menu, not yet used by any screen. The
+  Galmuri9 and Galmuri11 Bold fonts are converted into `source/engine/`
+  with 2-byte rows (`23efcc2`). `charset_next_latin1()` reads UTF-8 names
+  for these Latin-1 fonts, drawing anything else as the replacement glyph
+  (`7f5bed7`, `997f45c`). An ARM blitter in IWRAM (556 bytes) draws glyphs straight
+  into mode 0 window tiles, and a text API measures strings, cuts them
+  with "..." by character and clears rectangles: about 250 cycles a glyph
+  (`c50ccf8`, `53bc7e1`). Trailing spaces no longer cut a line that fits
+  (`fd242f0`).
 - **Added:** the v0.3 menu engine's motion and input layers, not yet used by
   the menu. Motion has eased tweens and critically damped springs (retargets
   keep their velocity) for scroll, sprites, blend and palette fades. Input

@@ -122,7 +122,9 @@ class Layout(unittest.TestCase):
         offset, _, top, rows, width = packed.entries[font.index(ord("A"))]
         self.assertEqual((top, rows, width), (0, 5, 3))
         # bit 0 is the leftmost pixel: ".#." is 0b010, "#.#" is 0b101
-        self.assertEqual(list(packed.bits[offset : offset + 5]), [2, 5, 7, 5, 5])
+        rows = packed.bits[offset : offset + 10]
+        self.assertEqual(list(rows[0::2]), [2, 5, 7, 5, 5])
+        self.assertEqual(list(rows[1::2]), [0] * 5)  # 2 bytes a row
         _, _, top, rows, _ = packed.entries[font.index(ord("g"))]
         self.assertEqual((top, rows), (2, 4))
 
@@ -235,7 +237,7 @@ class Missing(unittest.TestCase):
 
 
 class Output(unittest.TestCase):
-    def emit(self, directory: str) -> tuple[str, str]:
+    def emit(self, directory: str) -> str:
         src = Path(directory) / "tiny.bdf"
         src.write_text(BDF)
         f = font.load(
@@ -251,10 +253,9 @@ class Output(unittest.TestCase):
 
     def test_c_text(self):
         with tempfile.TemporaryDirectory() as tmp:
-            header, source = self.emit(tmp)
-        self.assertIn("extern const struct torii_font font_t;", header)
-        self.assertIn("#define TORII_FONT_REPLACEMENT", header)
-        self.assertIn('#include "font_t.h"', source)
+            source = self.emit(tmp)
+        self.assertIn("const struct torii_font font_t = {", source)
+        self.assertIn('#include "font.h"', source)
         self.assertIn("tiny.bdf (sha256 ", source)
         self.assertEqual(source.count("/* U+"), font.REPLACEMENT)
         self.assertNotIn("*/ *", source.split("The bitmaps")[1].split("\n */")[0])
@@ -311,6 +312,20 @@ class Vendored(unittest.TestCase):
             self.assertLessEqual(set(f.clipped), {ord(c) for c in "¡µ¿Çç"}, name)
             self.assertEqual(f.line_height, height)
 
+    def test_committed_c_is_current(self):
+        """source/engine/font_*.c is what `just font` makes from the BDFs now,
+        with the options its first line names."""
+        for name in ("body", "heading"):
+            path = ROOT / "source/engine" / f"font_{name}.c"
+            committed = path.read_text()
+            first = committed.splitlines()[0]
+            # "/* Made by tools/font.py from X.bdf (sha256 ...), OPTIONS. Do not edit."
+            bdf = first.split(" from ")[1].split(" (")[0]
+            options = first.split("), ")[1].removesuffix(". Do not edit.").split()
+            src = ROOT / "assets/fonts/galmuri" / bdf
+            f = font.load(font.parse_args([str(src), "--name", name, *options]))
+            self.assertEqual(font.emit(f), committed, f"{path.name}: run `just font`")
+
     @unittest.skipUnless(shutil.which("cc"), "no C compiler")
     def test_compiles_without_warnings(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -328,6 +343,8 @@ class Vendored(unittest.TestCase):
                 [
                     "cc",
                     *flags.split(),
+                    "-I",
+                    str(ROOT / "source/engine"),
                     "-c",
                     "-o",
                     str(Path(tmp) / "t.o"),

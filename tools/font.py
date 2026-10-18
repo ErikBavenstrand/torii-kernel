@@ -7,8 +7,8 @@
 
 usage: font.py SRC -o OUT --name NAME --line-height H [options]
 
-SRC is a BDF font, or a PNG grid of glyph cells (--png-cell). OUT.c and OUT.h
-get a `const struct torii_font font_NAME` covering U+0020-U+00FF, plus a
+SRC is a BDF font, or a PNG grid of glyph cells (--png-cell). OUT.c gets a
+`const struct torii_font font_NAME` covering U+0020-U+00FF, plus a
 replacement glyph for everything else. The output depends only on SRC's bytes
 and the options, so builds stay reproducible.
 
@@ -33,21 +33,29 @@ options:
   --png-advance N     PNG only: advance of a glyph (default: the cell width,
                       or the ink width with --proportional)
 
-Format (struct torii_font in OUT.h):
+Format (struct torii_font in source/engine/font.h, which OUT.c includes and
+which declares the menu's fonts):
   glyphs[cp - 0x20] for U+0020-U+00FF, glyphs[TORII_FONT_REPLACEMENT] for any
   other code point. Code points the font lacks, and C1 controls, share the
   replacement glyph's entry.
   Each glyph is `rows` bitmap rows starting `top` rows below the line's top;
-  rows outside that are blank. A row is `row_bytes` bytes, little-endian, and
-  bit 0 is the leftmost pixel, at the pen position.
+  rows outside that are blank. A row is `row_bytes` (2) bytes, little-endian,
+  and bit 0 is the leftmost pixel, at the pen position, so glyphs are at most
+  16 px wide.
 Why that layout: a GBA 4bpp tile row is one little-endian word whose low
 nibble is the leftmost pixel. With bit 0 leftmost, a row expands to that word
 by table lookup (bit i to nibble i) with no bit reversal, and drawing at pixel
 x of a tile is `word << 4x`, the bits shifted out going to the next tile's
 word as `word >> (32 - 4x)` (none when x is 0: a shift by 32 is undefined in
-C). Rows of 2 or 4 bytes expand to 2 or 4 words the same way. Storing only the inked rows skips the blank ones
-(about a third of a 12 px line), and keeping them contiguous lets the blitter
-walk one pointer.
+C). The second byte expands to the next word the same way. Storing only the
+inked rows skips the blank ones (about a third of a 12 px line), and keeping
+them contiguous lets the blitter walk one pointer.
+Why always 2 bytes: rows of 1 byte would fit a font whose glyphs are all 8 px
+or narrower, but the blitter (source/engine/text_blit.s) reads the first byte
+of a row the same way at either size, and in the same cycles (measured:
+tests/kernel/test_text.c), so one size keeps one code path, and the body
+font's few 9 px glyphs (the copyright and fraction signs, the replacement
+glyph) keep their shapes.
 """
 
 import argparse
@@ -90,12 +98,11 @@ class Font:
 
     @property
     def row_bytes(self) -> int:
-        for size in (1, 2, 4):
-            if self.max_width <= 8 * size:
-                return size
-        raise ValueError(
-            f"{self.name}: glyphs {self.max_width} px wide, at most 32 fit"
-        )
+        if self.max_width > 16:
+            raise ValueError(
+                f"{self.name}: glyphs {self.max_width} px wide, at most 16 fit"
+            )
+        return 2
 
     def width(self, text: str) -> int:
         return sum(self.glyphs[index(ord(c))].advance for c in text)
@@ -339,38 +346,6 @@ def rows_of(glyph: Glyph) -> tuple[int, list[int]]:
     return top, rows
 
 
-TYPES = """\
-#ifndef TORII_FONT_TYPES
-#define TORII_FONT_TYPES
-/* Made by tools/font.py; the format is described there. */
-#include <stdint.h>
-
-#define TORII_FONT_FIRST 0x20
-#define TORII_FONT_LAST 0xFF
-/* glyphs[] index for code points outside U+0020-U+00FF */
-#define TORII_FONT_REPLACEMENT (TORII_FONT_LAST - TORII_FONT_FIRST + 1)
-#define TORII_FONT_GLYPHS (TORII_FONT_REPLACEMENT + 1)
-
-struct torii_glyph {
-\tuint16_t offset; /* into bits[], in bytes */
-\tuint8_t advance; /* pen advance in pixels */
-\tuint8_t top;     /* first bitmap row, from the line's top */
-\tuint8_t rows;    /* bitmap rows (0 for blank glyphs) */
-\tuint8_t width;   /* inked columns from the pen, at most 8 * row_bytes */
-};
-
-struct torii_font {
-\tconst struct torii_glyph *glyphs; /* TORII_FONT_GLYPHS entries */
-\tconst uint8_t *bits;  /* rows of row_bytes bytes, bit 0 leftmost */
-\tuint8_t line_height;  /* pixels from one line's top to the next */
-\tuint8_t baseline;     /* rows above the baseline */
-\tuint8_t row_bytes;    /* 1, 2 or 4 */
-\tuint8_t max_width;    /* widest glyph's inked columns */
-};
-#endif
-"""
-
-
 def label(cp: int) -> str:
     if cp == REPLACEMENT + FIRST:
         return "replacement"
@@ -414,16 +389,10 @@ def pack(font: Font) -> Packed:
     return Packed(bytes(bits), entries, art)
 
 
-def emit(font: Font) -> tuple[str, str]:
-    """The .h and .c text."""
+def emit(font: Font) -> str:
+    """The .c text."""
     packed = pack(font)
     name = font.name
-    guard = f"TORII_FONT_{name.upper()}_H"
-    header = (
-        f"/* Made by tools/font.py from {font.source}. Do not edit. */\n"
-        f"#ifndef {guard}\n#define {guard}\n\n{TYPES}\n"
-        f"extern const struct torii_font font_{name};\n\n#endif\n"
-    )
     data = [
         "\t" + " ".join(f"0x{b:02X}," for b in packed.bits[start : start + 12])
         for start in range(0, len(packed.bits), 12)
@@ -435,7 +404,7 @@ def emit(font: Font) -> tuple[str, str]:
     source = (
         f"/* Made by tools/font.py from {font.source}. Do not edit.\n"
         f" * {len(packed.bits)} bytes of bitmaps in {font.row_bytes} byte rows. */\n"
-        f'#include "font_{name}.h"\n\n'
+        '#include "font.h"\n\n'
         f"static const uint8_t font_{name}_bits[] __attribute__((aligned(4))) = {{\n"
         + "\n".join(data)
         + "\n};\n\n/* The bitmaps, '#' inked:\n"
@@ -449,7 +418,7 @@ def emit(font: Font) -> tuple[str, str]:
         f"\t{font.line_height},\n\t{font.baseline},\n\t{font.row_bytes},\n\t{font.max_width},\n"
         "};\n"
     )
-    return header, source
+    return source
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -457,7 +426,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         description="Convert a pixel font (see the module docstring)."
     )
     p.add_argument("src", type=Path)
-    p.add_argument("-o", "--out", type=Path, help="OUT.c and OUT.h; omit to only check")
+    p.add_argument("-o", "--out", type=Path, help="write OUT.c; omit to only check")
     p.add_argument("--name", required=True)
     p.add_argument("--line-height", type=int, required=True)
     p.add_argument("--baseline", type=int)
@@ -528,9 +497,8 @@ def main(argv: list[str]) -> int:
         text = subset_bdf(args.src.read_bytes().decode("latin-1"))
         args.subset_bdf.write_bytes(text.encode("latin-1"))
     if args.out:
-        header, source = emit(font)
+        source = emit(font)
         args.out.parent.mkdir(parents=True, exist_ok=True)
-        args.out.with_suffix(".h").write_text(header, newline="\n")
         args.out.with_suffix(".c").write_text(source, newline="\n")
     return 0
 
