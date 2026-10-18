@@ -310,7 +310,8 @@ void IWRAM_CODE Bank_Switching(u8 bank)
 }
 // --------------------------------------------------------------------
 // Erases one block of the kernel's NOR and writes buffersize bytes to it.
-// Returns how many halfwords read back wrong.
+// Returns how many halfwords read back wrong; all of them, writing nothing,
+// for a block outside the kernel's data sectors (ez_define.h).
 u32 IWRAM_CODE Save_info(u32 info_offset, u16 *info_buffer, u32 buffersize)
 {
 	u32 offset;
@@ -320,6 +321,13 @@ u32 IWRAM_CODE Save_info(u32 info_offset, u16 *info_buffer, u32 buffersize)
 	vu16 *buf = (vu16 *)info_buffer;
 	register u32 loopwrite;
 	vu16 v1, v2;
+	// Torii: only the kernel's data sectors; past KERNEL_NOR_WINDOW is the
+	// bootloader, and below KERNEL_NOR_DATA the kernel (ez_define.h)
+	if (buffersize > 0x10000 || info_offset < KERNEL_NOR_DATA || info_offset > KERNEL_NOR_WINDOW - buffersize ||
+	    (info_offset & 0xFFFF)) {
+		WAITCNT_RESTORE(waitcnt);
+		return buffersize / 2;
+	}
 	u16 S71id = Read_S71NOR_ID();
 	*((vu16 *)(FlashBase_S71)) = 0xF0;
 

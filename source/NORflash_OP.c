@@ -216,6 +216,10 @@ _Static_assert(sizeof(FM_NOR_FS) == NOR_ENTRY_SIZE && MAX_NOR == NOR_LIST_ENTRIE
 #define NOR_BLOCK 0x20000
 // The most a patch adds at iTrimSize (Patch_length in GBApatch.c)
 #define NOR_PATCH_MAX CHEAT_PATCH_LENGTH
+_Static_assert(NOR_LIST_A >= KERNEL_NOR_DATA && NOR_LIST_A + NOR_LIST_RECORD <= KERNEL_NOR_WINDOW &&
+		       NOR_LIST_B >= KERNEL_NOR_DATA && NOR_LIST_B + NOR_LIST_RECORD <= KERNEL_NOR_WINDOW &&
+		       NOR_LIST_B != SAVE_info_offset && NOR_LIST_B != SET_info_offset && NOR_LIST_B != NOR_LIST_A,
+	       "the NOR list copies sit in free kernel NOR data sectors, below the bootloader's alias");
 _Static_assert(CHEAT_PATCH_LENGTH >= RTS_PATCH_LENGTH, "NOR_PATCH_MAX");
 
 static u32 nor_list_stored;  // games on the copy Read_NOR_info read

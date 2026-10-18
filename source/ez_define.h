@@ -35,6 +35,14 @@
 #define _UnusedVram (void *)0x06012c00
 
 #define FlashBase_S71 (void *)0x08000000
+// Torii: in kernel mode (ROM page 0x8002) 0x08000000 shows the kernel NOR
+// from 256 KB in; the 256 KB before it hold EZ-Flash's bootloader (ROM page
+// 0x8000, the official Omega document). The chip is 8 MB, so the window's
+// last 256 KB, from KERNEL_NOR_WINDOW, wrap onto the bootloader: writing
+// there bricks the cart ("No_Loader_found"). The kernel's data sectors are
+// KERNEL_NOR_DATA up to KERNEL_NOR_WINDOW, and Save_info writes only there.
+#define KERNEL_NOR_DATA 0x780000
+#define KERNEL_NOR_WINDOW 0x7C0000
 
 #define SAVE_info_offset 0x790000
 #define NOR_info_offset 0x7A0000

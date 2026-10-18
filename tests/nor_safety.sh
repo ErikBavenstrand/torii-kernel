@@ -52,13 +52,36 @@ new_cart() {
   runs=0
 }
 
+# On a real cart the kernel-mode window's last 256 KB, kernel NOR 0x7C0000
+# up, wrap onto EZ-Flash's bootloader (source/ez_define.h); v0.2.2 put the
+# NOR list's copy B there and bricked a cart. bootloader_fill fills it like a
+# bootloader; outside_data prints a hash of the kernel NOR around the data
+# sectors 0x780000-0x7BFFFF, which no power-on may change.
+bootloader_fill() {
+  python3 - "$cart/kernel-nor.bin" <<'EOF'
+import sys
+with open(sys.argv[1], "r+b") as f:
+    f.seek(0x7C0000)
+    f.write(bytes(range(256)) * (0x40000 // 256))
+EOF
+}
+outside_data() {
+  # (from 0x300000: the emulator copies the kernel file to 0 at each power-on)
+  { tail -c +$((0x300000 + 1)) "$cart/kernel-nor.bin" | head -c $((0x480000)); tail -c +$((0x7C0000 + 1)) "$cart/kernel-nor.bin"; } | md5sum
+}
+
 # boot [-c CUT] OPTIONS...: one power-on, with the cart trace; with -c the
-# power is cut at CUT (OMEGA_POWER_CUT), which must happen.
+# power is cut at CUT (OMEGA_POWER_CUT), which must happen. Fails if it
+# wrote the kernel NOR outside its data sectors.
 boot() {
-  local cut='' status=0 log
+  local cut='' status=0 log before=''
   if [ "$1" = -c ]; then
     cut=$2
     shift 2
+  fi
+  if [ -f "$cart/kernel-nor.bin" ]; then
+    bootloader_fill
+    before=$(outside_data)
   fi
   runs=$((runs + 1))
   log=$cart/$runs.log
@@ -71,6 +94,9 @@ boot() {
   fi
   if grep -E 'assert failed|^crash at frame' "$log" >&2; then
     fail "power-on $runs: the kernel crashed or failed an assert"
+  fi
+  if [ -n "$before" ] && [ "$(outside_data)" != "$before" ]; then
+    fail "power-on $runs wrote the kernel NOR outside 0x780000-0x7BFFFF (0x7C0000 up is the bootloader)"
   fi
 }
 
@@ -138,7 +164,7 @@ echo "PASS: a ROM without 0x96 at 0xB2 is listed and kept"
 # Power cuts in each step of the NOR list update after B's data is written:
 # A and B stay, and C goes after them.
 for cut in kernel:erase:1@0x7A0000 kernel:program:1@0x7A0000 kernel:program:4240@0x7A0000 \
-  kernel:erase:1@0x7C0000 kernel:program:1@0x7C0000 kernel:program:4240@0x7C0000; do
+  kernel:erase:1@0x780000 kernel:program:1@0x780000 kernel:program:4240@0x780000; do
   new_cart "list-cut-${cut//[:@]/-}" A.gba B.gba C.gba
   write 1
   write 2 "$cut"
@@ -177,11 +203,11 @@ echo "PASS: a game cut off while written isn't listed"
 new_cart lost-list A.gba B.gba C.gba
 write 1
 write 2
-kernel_wipe 0x7A0000 0x7C0000
+kernel_wipe 0x7A0000 0x780000
 cp "$cart/kernel-nor.bin" "$cart/wiped.bin"
 boot -f 300
-cmp -s <(tail -c +$((0x7A0001)) "$cart/kernel-nor.bin" | head -c $((0x30000))) \
-  <(tail -c +$((0x7A0001)) "$cart/wiped.bin" | head -c $((0x30000))) ||
+cmp -s <(tail -c +$((0x780001)) "$cart/kernel-nor.bin" | head -c $((0x40000))) \
+  <(tail -c +$((0x780001)) "$cart/wiped.bin" | head -c $((0x40000))) ||
   fail "the boot wrote the NOR list"
 write 3
 holds 0 A.gba || fail "A.gba was overwritten"
@@ -189,7 +215,7 @@ holds 0x20000 B.gba || fail "B.gba was overwritten"
 holds 0x40000 C.gba || fail "C.gba is not at 0x40000"
 echo "PASS: a lost NOR list is rebuilt from the games in NOR, and the boot doesn't write it"
 
-# A list from an older kernel (no copy at 0x7C0000, no trailer, no
+# A list from an older kernel (no copy at 0x780000, no trailer, no
 # completion marks in NOR) still counts.
 # make_legacy: turn the cart's list into an older kernel's.
 make_legacy() {
@@ -198,7 +224,7 @@ import sys
 k = bytearray(open(sys.argv[1], "rb").read())
 g = bytearray(open(sys.argv[2], "rb").read())
 k[0x7A2100:0x7B0000] = b"\xff" * (0x7B0000 - 0x7A2100)  # the trailer
-k[0x7C0000:0x7D0000] = b"\xff" * 0x10000                # the second copy
+k[0x780000:0x790000] = b"\xff" * 0x10000                # the second copy
 k[0x7A0000 + 0x71] = ord("T")  # stack garbage there can look like Torii's mark flag
 g[0x20000 - 0x200:0x20000] = b"\xff" * 0x200            # A's completion mark
 open(sys.argv[1], "wb").write(k)
@@ -226,7 +252,7 @@ boot -f 300
 grep -q "nor: saving an older kernel's list of 1 games in Torii's format" "$cart/$runs.log" || fail "the list wasn't moved"
 [ "$(grep -c "older kernel's copy A" "$cart/$runs.log")" = 1 ] || fail "the older list was logged more than once"
 magic() { tail -c +$(($1 + 1)) "$cart/kernel-nor.bin" | head -c 4; }
-[ "$(magic 0x7C2100)" = TNL2 ] || fail "copy B has no trailer"
+[ "$(magic 0x782100)" = TNL2 ] || fail "copy B has no trailer"
 [ "$(magic 0x7A2100)" = TNL2 ] || fail "copy A has no trailer"
 boot -f 300
 ! grep -q "older kernel" "$cart/$runs.log" || fail "the next boot read an older kernel's list again"
@@ -234,7 +260,7 @@ boot -f 300
 write 2
 holds 0x20000 B.gba || fail "B.gba is not at 0x20000 after the move"
 echo "PASS: an older kernel's NOR list is saved in Torii's format once"
-for cut in kernel:erase:1@0x7C0000 kernel:program:4240@0x7C0000 kernel:erase:1@0x7A0000 \
+for cut in kernel:erase:1@0x780000 kernel:program:4240@0x780000 kernel:erase:1@0x7A0000 \
   kernel:program:1@0x7A0000 kernel:program:4240@0x7A0000; do
   new_cart "migrate-cut-${cut//[:@]/-}" A.gba B.gba
   cp "$root/legacy-kernel-nor.bin" "$cart/kernel-nor.bin"

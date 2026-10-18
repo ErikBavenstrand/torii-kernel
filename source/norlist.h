@@ -19,7 +19,7 @@
 #include <gba_base.h>
 
 #define NOR_LIST_A 0x7A0000
-#define NOR_LIST_B 0x7C0000
+#define NOR_LIST_B 0x780000  // not 0x7C0000: that is the bootloader (ez_define.h)
 #define NOR_ENTRY_SIZE 132  // sizeof(FM_NOR_FS)
 #define NOR_LIST_ENTRIES 0x40  // MAX_NOR
 #define NOR_LIST_BYTES (NOR_ENTRY_SIZE * NOR_LIST_ENTRIES)
