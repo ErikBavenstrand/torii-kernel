@@ -4,7 +4,7 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.2.1 (2026-10-18)
 
 - **Added:** a build ID, the CRC32 of the kernel's ROM, written after
   linking without moving any code. The boot log line, crash dumps (the

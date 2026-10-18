@@ -169,7 +169,7 @@ Debug level for its own run only. It:
 It writes its report to SD as a log stream that we bring back to the repo. When the real
 cart disagrees with the emulator, the fix goes into the cart model.
 
-## v0.2.1 Real-cart fixes
+## v0.2.1 Real-cart fixes (done)
 
 Every known bug, found in our work or inherited from the official kernel, is fixed here.
 From the first real-cart test of v0.2.0 (`docs/research/cart-test-2026-10-18.md`):
