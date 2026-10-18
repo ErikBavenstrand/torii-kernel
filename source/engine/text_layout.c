@@ -15,11 +15,23 @@ int text_next_glyph(const char *s, u32 len, u32 *pos)
 	return TORII_FONT_REPLACEMENT;
 }
 
+// text_next_glyph with printable ASCII inline: layout runs per character,
+// and two calls from ROM cost more than the rest of the loop
+static inline __attribute__((always_inline)) int next_glyph(const char *s, u32 len, u32 *pos)
+{
+	u8 c = (u8)s[*pos];
+	if (c >= TORII_FONT_FIRST && c < 0x80) {
+		(*pos)++;
+		return c - TORII_FONT_FIRST;
+	}
+	return text_next_glyph(s, len, pos);
+}
+
 u32 text_width(const struct torii_font *font, const char *s, u32 len)
 {
 	u32 width = 0, pos = 0;
 	while (pos < len) {
-		int g = text_next_glyph(s, len, &pos);
+		int g = next_glyph(s, len, &pos);
 		if (g >= 0)
 			width += font->glyphs[g].advance;
 	}
@@ -38,7 +50,7 @@ u32 text_layout(const struct torii_font *font, const char *s, u32 len, u32 clip,
 
 	line->truncated = 0;
 	while (pos < len) {
-		int g = text_next_glyph(s, len, &pos);
+		int g = next_glyph(s, len, &pos);
 		if (g < 0)
 			continue;
 		const struct torii_glyph *glyph = &glyphs[g];
@@ -88,7 +100,7 @@ u32 text_layout_window(const struct torii_font *font, const char *s, u32 len, u3
 	line->truncated = 0;
 	*lead = 0;
 	while (pos < len) {
-		int g = text_next_glyph(s, len, &pos);
+		int g = next_glyph(s, len, &pos);
 		if (g < 0)
 			continue;
 		const struct torii_glyph *glyph = &glyphs[g];

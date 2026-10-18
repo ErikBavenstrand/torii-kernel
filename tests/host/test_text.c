@@ -223,3 +223,52 @@ void test_text_layout(void)
 	CHECK_EQ(line.count, TEXT_MAX_GLYPHS);
 	check_line(&font_body, &line, 1000);
 }
+
+void test_text_layout_window(void)
+{
+	const struct torii_font *font = &font_body;
+	const char *s = "A long file name that does not fit its row.gba";
+	u32 len = (u32)strlen(s), full = text_width(font, s, len);
+	struct text_line line, plain;
+	u32 lead = 99;
+	// From 0 it is text_layout without the ellipsis
+	text_layout_window(font, s, len, 0, 100, &line, &lead);
+	CHECK_EQ(lead, 0);
+	CHECK(line.truncated);
+	CHECK(line.extent <= 100);
+	text_layout(font, s, len, 1000, &plain);
+	for (u32 i = 0; i < line.count; i++)
+		CHECK_EQ(line.glyphs[i], plain.glyphs[i]);
+	// Every skip: glyphs start at or after skip, ink stays inside the clip
+	for (u32 skip = 0; skip < full + 4; skip++) {
+		text_layout_window(font, s, len, skip, 100, &line, &lead);
+		CHECK(lead + line.extent <= 100);
+		if (!line.count)
+			continue;
+		CHECK(lead < (u32)font->max_width + 2);
+		// The first glyph is the first whose pen is at or past skip
+		u32 pen = 0, pos = 0, g = 0;
+		for (;;) {
+			int gi = text_next_glyph(s, len, &pos);
+			if (pen >= skip) {
+				g = (u32)gi;
+				break;
+			}
+			pen += font->glyphs[gi].advance;
+		}
+		CHECK_EQ(line.glyphs[0], g);
+		CHECK_EQ(lead, pen - skip);
+	}
+	// Past the end: nothing
+	text_layout_window(font, s, len, full + 1, 100, &line, &lead);
+	CHECK_EQ(line.count, 0);
+	CHECK(!line.truncated);
+	// A string longer than TEXT_MAX_GLYPHS scrolls to its end
+	static char longname[400];
+	for (u32 i = 0; i < sizeof(longname) - 1; i++)
+		longname[i] = (char)('a' + i % 26);
+	u32 llen = sizeof(longname) - 1, lw = text_width(font, longname, llen);
+	text_layout_window(font, longname, llen, lw - 50, 100, &line, &lead);
+	CHECK(line.count > 0 && !line.truncated);
+	CHECK_EQ(line.glyphs[line.count - 1], (u32)(longname[llen - 1] - TORII_FONT_FIRST));
+}

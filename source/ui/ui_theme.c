@@ -1,5 +1,5 @@
 // The built-in themes and accents, and theme maths (ui.h). Hardware-free:
-// ui/run.c loads the palette this builds.
+// ui/ui_run.c loads the palette this builds.
 #include "ui.h"
 
 #define RGB(r, g, b) ((u16)((r) | (g) << 5 | (b) << 10))
@@ -66,9 +66,8 @@ const struct ui_theme ui_theme_light = {
 };
 
 const struct ui_accent ui_accents[] = {
-	{"Blue", RGB(9, 19, 31)},   {"Teal", RGB(4, 22, 22)},  {"Green", RGB(8, 22, 10)},
-	{"Orange", RGB(31, 15, 4)}, {"Red", RGB(28, 7, 8)},    {"Purple", RGB(18, 10, 28)},
-	{"Pink", RGB(30, 11, 20)},
+	{"Blue", RGB(9, 19, 31)}, {"Teal", RGB(4, 22, 22)},    {"Green", RGB(8, 22, 10)}, {"Orange", RGB(31, 15, 4)},
+	{"Red", RGB(28, 7, 8)},   {"Purple", RGB(18, 10, 28)}, {"Pink", RGB(30, 11, 20)},
 };
 const u32 ui_accent_count = sizeof(ui_accents) / sizeof(ui_accents[0]);
 

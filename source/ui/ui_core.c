@@ -217,7 +217,7 @@ static int check_caps(const struct ui_view_spec *spec, u32 *state_bytes)
 		}
 		bytes += (ui_kind_ops[s->kind]->state_size + 3u) & ~3u;
 	}
-	if (bytes > UI_ARENA_BYTES - core.arena_used) {
+	if (bytes > (u32)(UI_ARENA_BYTES - core.arena_used)) {
 		ui_set_error("view %s needs %lu bytes of widget state, %u of %d free", spec->name, (unsigned long)bytes,
 			     (unsigned)(UI_ARENA_BYTES - core.arena_used), UI_ARENA_BYTES);
 		return 0;
@@ -256,12 +256,13 @@ static int place_nodes(struct ui_view *v)
 		ui_layout(s, spec->id, node->parent == UI_NONE ? 0 : &nodes[node->parent], node);
 		s16 hidden;
 		if ((s->flags & UI_HIDDEN) ||
-		    (s->id && spec->id && ui_theme_patch(ui_theme(), spec->id, s->id, UI_FIELD_HIDDEN, &hidden) && hidden))
+		    (s->id && spec->id && ui_theme_patch(ui_theme(), spec->id, s->id, UI_FIELD_HIDDEN, &hidden) &&
+		     hidden))
 			node->flags |= UI_N_HIDDEN;
 		if ((node->x | node->y | node->w | node->h) & 7 || node->w <= 0 || node->h <= 0 || node->x < 0 ||
 		    node->y < 0 || node->x + node->w > SCREEN_W || node->y + node->h > SCREEN_H) {
-			ui_set_error("view %s, node %lu: rectangle %d,%d %dx%d isn't whole tiles on the screen", spec->name,
-				     (unsigned long)i, node->x, node->y, node->w, node->h);
+			ui_set_error("view %s, node %lu: rectangle %d,%d %dx%d isn't whole tiles on the screen",
+				     spec->name, (unsigned long)i, node->x, node->y, node->w, node->h);
 			return 0;
 		}
 		// Children in spec order: append to the parent's list
@@ -396,7 +397,7 @@ u8 ui_focus_next(int dir)
 	struct ui_view *v = ui_top();
 	if (!v)
 		return UI_NONE;
-	u32 start = v->focus == UI_NONE ? (dir > 0 ? v->count - 1 : 0) : (u32)(v->focus - v->first);
+	u32 start = v->focus == UI_NONE ? (dir > 0 ? v->count - 1u : 0u) : (u32)(v->focus - v->first);
 	for (u32 step = 1; step <= v->count; step++) {
 		u32 i = dir > 0 ? (start + step) % v->count : (start + v->count - step % v->count) % v->count;
 		u8 n = (u8)(v->first + i);

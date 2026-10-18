@@ -5,7 +5,7 @@
 
 #include "torii_test.h"
 #include "tests.h"
-#include "text_demo.h"
+#include "ui_demo.h"
 
 int torii_test_failures;
 
@@ -44,6 +44,7 @@ static const struct {
 	{"text_draw", test_text_draw},
 	{"text_clear", test_text_clear},
 	{"text_cycles", test_text_cycles},
+	{"ui_pool_and_arenas", test_ui_pool_and_arenas},
 };
 
 int torii_unit_tests(void)
@@ -65,9 +66,9 @@ int torii_unit_tests(void)
 void torii_run_tests(void)
 {
 	torii_unit_tests();
-	// The engine's scene, or with L held (mgba-shot -k 1:L) the text demo
+	// The engine's scene, or with L held (mgba-shot -k 1:L) the UI demo
 	if (!(REG_KEYINPUT & KEY_L))
-		text_demo();
+		ui_demo();
 	engine_smoke();
 }
 #endif

@@ -1,5 +1,5 @@
 // The simple widgets (ui.h): label, panel, image, progress bar, scroll bar,
-// and the table of every kind's ops. Lists and grids are in ui/list.c.
+// and the table of every kind's ops. Lists and grids are in ui/ui_list.c.
 #include <string.h>
 
 #include "ui_priv.h"
@@ -165,7 +165,8 @@ static void panel_draw(u8 node)
 			int left = x == 0, right = x == w - 1, top = y == 0, bottom = y == h - 1;
 			if (style == UI_PANEL_BORDER) {
 				if ((left || right) && (top || bottom))
-					e = ui_shared_entry(plane, UI_TILE_BORDER + (right ? 1u : 0u) + (bottom ? 2u : 0u));
+					e = ui_shared_entry(plane,
+							    UI_TILE_BORDER + (right ? 1u : 0u) + (bottom ? 2u : 0u));
 				else if (top || bottom)
 					e = ui_shared_entry(plane, UI_TILE_BORDER + 4 + (bottom ? 1u : 0u));
 				else if (left || right)
@@ -418,12 +419,12 @@ static void scrollbar_draw(u8 node)
 }
 
 static const struct ui_ops scrollbar_ops = {sizeof(struct bar_state), scrollbar_measure, scrollbar_init, 0,
-					    scrollbar_update, scrollbar_draw};
+					    scrollbar_update,         scrollbar_draw};
 
 // --- Every kind ---------------------------------------------------------
 
 const struct ui_ops *const ui_kind_ops[UI_KINDS] = {
-	[UI_LABEL] = &label_ops,     [UI_PANEL] = &panel_ops,         [UI_LIST] = &ui_list_ops,
-	[UI_GRID] = &ui_list_ops,    [UI_IMAGE] = &image_ops,         [UI_SCROLLBAR] = &scrollbar_ops,
+	[UI_LABEL] = &label_ops,       [UI_PANEL] = &panel_ops, [UI_LIST] = &ui_list_ops,
+	[UI_GRID] = &ui_list_ops,      [UI_IMAGE] = &image_ops, [UI_SCROLLBAR] = &scrollbar_ops,
 	[UI_PROGRESS] = &progress_ops,
 };

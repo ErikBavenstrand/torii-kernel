@@ -36,8 +36,9 @@
 // a lower plane number is in front; a pushed view is in front of the ones
 // under it, which stay resident and show only where it leaves them visible
 // (on planes it doesn't use). A list or grid needs a plane of its own, as
-// it scrolls it, and one of the two hardware windows to clip it; planes 1
-// and 3 use character block 1 (list tiles), planes 0 and 2 block 0.
+// it scrolls it, and one of the two hardware windows to clip it. Planes 1
+// and 3 take tiles from character blocks 1 and 2 (lists), planes 0 and 2
+// from block 0.
 //
 // Rectangles are in pixels and multiples of 8 (everything is tiles); text
 // inside them lands on any pixel.
@@ -482,7 +483,7 @@ u32 ui_dim_setting(void);
 // The input state ui_frame reads (theme timings).
 const InputState *ui_input(void);
 
-// --- For widget code (ui/widgets.c, ui/list.c) -------------------------------
+// --- For widget code (ui/ui_widgets.c, ui/ui_list.c) -------------------------------
 
 // A widget kind: state_size bytes of arena per node, and
 //   measure: adds what the node (laid out, not yet initialised) needs to its
@@ -501,7 +502,7 @@ struct ui_ops {
 	void (*update)(u8 node, u32 dt);
 	void (*draw)(u8 node);
 };
-// The ops of each kind (ui/widgets.c; tests/host has its own).
+// The ops of each kind (ui/ui_widgets.c; tests/host has its own).
 extern const struct ui_ops *const ui_kind_ops[UI_KINDS];
 
 void ui_set_error(const char *format, ...) __attribute__((format(printf, 1, 2)));
@@ -510,7 +511,7 @@ u8 ui_ink(u8 node, u8 def);
 u8 ui_paper(u8 node, u8 def);
 // Wakes the frame (frame_wake; a stub in tests/host).
 void ui_wake(void);
-// Called after a view is popped, to show the one under it again (ui/run.c;
+// Called after a view is popped, to show the one under it again (ui/ui_run.c;
 // a stub in tests/host).
 void ui_hook_popped(void);
 // The owner id of a view's motions and jobs.
@@ -518,7 +519,7 @@ u8 ui_owner(const struct ui_view *view);
 // 1 while the event phase runs (ui_pop waits for its end).
 extern u8 ui_dispatching;
 
-// Hardware-free core (ui/core.c), used by ui/run.c and the host tests.
+// Hardware-free core (ui/ui_core.c), used by ui/ui_run.c and the host tests.
 struct ui_view *ui_view_at(u32 depth);
 // Pushes the nodes and arena state of a view (no VRAM or planes): the
 // part ui_push shares with the host tests.

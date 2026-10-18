@@ -1,4 +1,4 @@
-// The maths of a list's ring of rows (ui/list.c), hardware-free so
+// The maths of a list's ring of rows (ui/ui_list.c), hardware-free so
 // tests/host runs it.
 //
 // A list or grid shows rows of rh pixels (16 or 32) in a viewport h pixels

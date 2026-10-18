@@ -495,7 +495,8 @@ static void draw_row(u8 node, struct list_state *st, u32 *tiles, u32 r, u32 skip
 				u32 dlen = strlen(item.detail);
 				u32 dw = text_width(font, item.detail, dlen);
 				if (dw + t->pad < w)
-					text_draw(&win, font, w - t->pad - dw + 1, y, dw, UI_ROLE_DIM, item.detail, dlen);
+					text_draw(&win, font, w - t->pad - dw + 1, y, dw, UI_ROLE_DIM, item.detail,
+						  dlen);
 			}
 			if (skip) {
 				struct text_line line;
@@ -513,7 +514,8 @@ static void draw_row(u8 node, struct list_state *st, u32 *tiles, u32 r, u32 skip
 			u32 tx0 = x0 / 8 + (cw / 8 - 2) / 2;
 			for (u32 ty = 0; ty < 2; ty++)
 				for (u32 tx = 0; tx < 2; tx++)
-					memcpy(&tiles[((tx0 + tx) * st->rt + ty) * 8], &item.icon[(ty * 2 + tx) * 8], 32);
+					memcpy(&tiles[((tx0 + tx) * st->rt + ty) * 8], &item.icon[(ty * 2 + tx) * 8],
+					       32);
 			y = 16 + (h - 16 - font->line_height) / 2;
 		}
 		struct text_line line;
@@ -529,16 +531,26 @@ static void list_draw(u8 node)
 	if (st->page == PAGE_HIDING)
 		return;
 	u16 *map = ui_map(node);
+	// While nothing of it is on screen (a page change, a view not shown
+	// yet) a whole page may take more than a frame: it draws within the
+	// budget and goes on next frame
+	int hidden = st->page == PAGE_DRAW || !ui_node_shown(node);
 	// Rows given new slots: neither their tiles nor their map rows are on screen
 	for (u32 s = 0; s < st->ring.k; s++) {
 		if (!(st->dirty >> s & 1))
 			continue;
+		if (hidden && frame_elapsed() > UI_DRAW_BUDGET) {
+			ui_dirty(node, 1);  // the rest next frame
+			return;
+		}
 		u32 r = st->slot_row[s];
 		if (r != UI_ITEM_NONE) {
 			draw_row(node, st, slot_tiles(st, spec->plane, s), r, 0);
 			if (st->fresh >> s & 1)
 				row_entries(st, map + ring_map_row(&st->ring, r) * 32, r, s);
 		}
+		st->dirty &= ~(1u << s);
+		st->fresh &= ~(1u << s);
 	}
 	st->dirty = st->fresh = 0;
 	if (st->page == PAGE_DRAW) {
@@ -593,5 +605,5 @@ static void list_draw(u8 node)
 	}
 }
 
-const struct ui_ops ui_list_ops = {sizeof(struct list_state), list_measure, list_init, list_event, list_update,
-				   list_draw};
+const struct ui_ops ui_list_ops = {
+	sizeof(struct list_state), list_measure, list_init, list_event, list_update, list_draw};

@@ -1,4 +1,4 @@
-// Helpers the widgets (ui/widgets.c, ui/list.c) share with ui/run.c:
+// Helpers the widgets (ui/ui_widgets.c, ui/ui_list.c) share with ui/ui_run.c:
 // tiles, map entries, the VRAM staging area. Not for screens.
 #ifndef TORII_UI_PRIV_H
 #define TORII_UI_PRIV_H
@@ -15,10 +15,11 @@ enum {
 	UI_SHARED_TILES = 22,
 };
 
-// Character block (0 or 1) of plane: planes 1 and 3 hold lists.
+// Character block of plane: 1 for plane 1 and 2 for plane 3 (the planes
+// lists use), 0 for planes 0 and 2. A BG reaches 1024 tiles from its block.
 static inline u32 ui_plane_cb(u32 plane)
 {
-	return plane & 1;
+	return plane == 3 ? 2 : plane & 1;
 }
 
 // A map entry: tile (counted from the plane's character block) in bank.
@@ -57,10 +58,15 @@ void ui_plane_hide(u32 plane, int hidden);
 // 1 if a hide asked for earlier has been committed: the plane is off screen.
 int ui_plane_hidden_now(u32 plane);
 
+// Cycles into the frame after which drawing that nobody sees yet (a page
+// change, a view not shown) waits for the next frame, so no frame runs over
+// (a frame is 280,896 cycles; a list row takes up to about 40,000).
+#define UI_DRAW_BUDGET 180000
+
 // 1 while the d-pad repeats at the speed that skips scroll animation.
 int ui_skipping(void);
 
-// The ops of lists and grids (ui/list.c).
+// The ops of lists and grids (ui/ui_list.c).
 extern const struct ui_ops ui_list_ops;
 
 // The current font for UI_FONT_*.

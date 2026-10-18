@@ -42,8 +42,8 @@ static struct {
 	u16 stage_used;    // words given out since the queue was last empty
 	u8 stage_map;      // its res handle
 	u8 palette;        // res handle of the two theme banks
-	u8 shared[2];      // shared tiles of each character block
-	u16 shared_first[2];
+	u8 shared[3];      // shared tiles of each character block planes use
+	u16 shared_first[3];
 	u8 skip;           // the list skips its scroll animation (fast repeat)
 	u8 hidden;         // planes hidden for a page change
 	u32 hide_frame[UI_PLANES];
@@ -116,7 +116,8 @@ static void edge(u32 *tile, u32 side)
 	for (u32 y = 0; y < 8; y++) {
 		u8 px[8];
 		for (u32 x = 0; x < 8; x++) {
-			int on = (side == 0 && y == 0) || (side == 1 && y == 7) || (side == 2 && x == 0) || (side == 3 && x == 7);
+			int on = (side == 0 && y == 0) || (side == 1 && y == 7) || (side == 2 && x == 0) ||
+				 (side == 3 && x == 7);
 			px[x] = on ? UI_ROLE_BORDER : UI_ROLE_PANEL;
 		}
 		tile[y] = row_of(px);
@@ -304,7 +305,8 @@ static int dim_step(u32 dt)
 		ui.idle += dt;
 	if (ui.dim_after && !ui.dimmed && ui.idle >= ui.dim_after) {
 		ui.dimmed = 1;
-		ui.dim_motion = motion_tween(MOTION_TO_S16(&ui.dim_y), 0, FIX(ui_theme()->idle_dim), 60, EASE_IN_OUT_CUBIC, 0);
+		ui.dim_motion =
+			motion_tween(MOTION_TO_S16(&ui.dim_y), 0, FIX(ui_theme()->idle_dim), 60, EASE_IN_OUT_CUBIC, 0);
 		tlog_debug("ui: dimmed after %lu idle frames", (unsigned long)ui.idle);
 	}
 	return 0;
@@ -421,10 +423,16 @@ void ui_init(const struct ui_theme *theme)
 	ui_core_reset();
 	ui_theme_select(theme, UI_ACCENT_THEME);
 	input_init(&ui.in, &ui_theme()->input);
+	// Keys already held (from the screen before) count as held, not pressed
+	input_poll(&ui.in, 1, 0);
 	ui.palette = res_palette(RES_BG_PAL, 2, TAG_PALETTE);
 	TLOG_ASSERT(ui.palette != RES_NONE && res_start(RES_BG_PAL, ui.palette) == 0);
-	for (u32 cb = 0; cb < 2; cb++) {
-		ui.shared[cb] = res_bg_tiles(UI_SHARED_TILES, 0, (u8)cb, (u16)(TAG_SHARED + cb));
+	for (u32 cb = 0; cb < 3; cb++) {
+		// Block 0's at its bottom; blocks 1 and 2's at the top of their
+		// reach, so they don't split the long runs lists need
+		u16 lo = (u16)(cb * 512), hi = (u16)(lo + 1024);
+		ui.shared[cb] =
+			res_alloc(RES_BG_VRAM, UI_SHARED_TILES, 1, lo, hi, (u16)(TAG_SHARED + cb), cb ? POOL_TOP : 0);
 		TLOG_ASSERT(ui.shared[cb] != RES_NONE);
 		ui.shared_first[cb] = res_bg_tile_index(ui.shared[cb], 0, (u8)cb);
 		// Nothing shows these tiles yet: write them straight to VRAM
@@ -448,7 +456,7 @@ void ui_shutdown(void)
 	motion_free(ui.dim_motion);
 	motion_free(ui.modal_motion);
 	res_release(RES_BG_VRAM, ui.stage_map);
-	for (u32 cb = 0; cb < 2; cb++)
+	for (u32 cb = 0; cb < 3; cb++)
 		res_release(RES_BG_VRAM, ui.shared[cb]);
 	res_release(RES_BG_PAL, ui.palette);
 	gfx_set_blend(0, 0, 0);
@@ -515,6 +523,7 @@ static void draw_all(void)
 {
 	for (u32 d = 0; d < ui_depth(); d++) {
 		struct ui_view *v = ui_view_at(d);
+		int unfinished = 0;
 		for (u32 i = 0; i < v->count; i++) {
 			u8 n = (u8)(v->first + i);
 			struct ui_node *node = ui_node(n);
@@ -525,8 +534,10 @@ static void draw_all(void)
 			if (ops->draw)
 				ops->draw(n);
 			node->flags |= UI_N_DRAWN;
+			// A node that dirtied itself again goes on next frame
+			unfinished |= node->flags & UI_N_DIRTY;
 		}
-		if (!(v->flags & UI_V_SHOWN)) {
+		if (!(v->flags & UI_V_SHOWN) && !unfinished) {
 			// Its planes go on together, once what it queued is in VRAM
 			v->flags |= UI_V_SHOWN;
 			gfx_hold_for_queue(GFX_DIRTY_DISPCNT | GFX_DIRTY_BGCNT | GFX_DIRTY_BGOFS);

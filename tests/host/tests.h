@@ -49,6 +49,7 @@ void test_eeprom_probe_verdict(void);
 void test_text_utf8(void);
 void test_text_width(void);
 void test_text_layout(void);
+void test_text_layout_window(void);
 void test_ease_lut_reproducible(void);
 void test_ease_endpoints(void);
 void test_tween_endpoints(void);
@@ -75,5 +76,13 @@ void test_pool_tag_place(void);
 void test_pool_slots_exact_fit(void);
 void test_pool_age_wrap(void);
 void test_budget_check(void);
+void test_ui_layout_anchors(void);
+void test_ui_patches(void);
+void test_ui_palette(void);
+void test_ui_ring_setup(void);
+void test_ui_ring_windows(void);
+void test_ui_ring_invariant(void);
+void test_ui_stack(void);
+void test_ui_focus_and_keys(void);
 
 #endif
