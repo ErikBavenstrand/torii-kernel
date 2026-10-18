@@ -23,6 +23,7 @@
 #include "ez_define.h"
 #include "ezkernel.h"
 #include "Ezcard_OP.h"
+#include "bootloader.h"
 #include "build_id.h"
 #include "RTC.h"
 #include "cartlog.h"
@@ -32,12 +33,14 @@
 #include "logcheck.h"
 #include "lz77.h"
 #include "tlog.h"
+#include "waitcnt.h"
 #include "../tests/kernel/torii_test.h"
 
 #define REG_WAITCNT_IO (*(vu16 *)0x04000204)
 
 extern const u8 __rom_end__;
 extern void SoftReset_now(void);
+extern u32 gl_currentpage;
 
 #define WHITE RGB(31, 31, 31)
 #define GREY RGB(20, 20, 20)
@@ -201,6 +204,24 @@ u32 IWRAM_CODE diag_read_timed(const vu32 *src, u32 words, u16 waitcnt, u32 *sum
 	return cycles;
 }
 
+// Copies halfwords of EZ-Flash's boot loader from OFFSET into DST, reading
+// only: ROM page 0x8000 shows the loader where the kernel's code was, so this
+// runs from IWRAM with interrupts off, copies with a plain loop (no ROM
+// helper), and puts the kernel's page back before anything else runs.
+void IWRAM_CODE diag_loader_read(u32 offset, u16 *dst, u32 halfwords)
+{
+	u16 ime = REG_IME;
+	REG_IME = 0;
+	u16 waitcnt = WAITCNT_SLOW();
+	SetRompage(ROM_PAGE_LOADER);
+	const vu16 *src = (const vu16 *)(0x08000000 + offset);
+	for (u32 i = 0; i < halfwords; i++)
+		dst[i] = src[i];
+	SetRompage(gl_currentpage ? gl_currentpage : 0x8002);
+	WAITCNT_RESTORE(waitcnt);
+	REG_IME = ime;
+}
+
 // --- Steps -------------------------------------------------------------------
 
 // The summary's lines: each failed check, then each yes the log can't back.
@@ -338,6 +359,38 @@ static void step_nor(void)
 	say(WHITE, "FPGA image CRCs %08lX %08lX", (unsigned long)lx9, (unsigned long)lx16);
 	result(lx9 == LX9_FW_crc32 && lx16 == LX16_FW_crc32, "800 KB of NOR read correctly");
 	pause_frames(60);
+}
+
+// Reads EZ-Flash's boot loader (never writes it) and logs its CRC and
+// whether it looks whole. A blank or damaged loader means the cart starts in
+// safe mode at the next power-on: docs/recovery.md.
+static void step_loader(void)
+{
+	step("boot loader");
+	u16 *image = (u16 *)pReadCache;
+	for (u32 at = 0; at < LOADER_SIZE; at += 0x1000)
+		diag_loader_read(at, image + at / 2, 0x1000 / 2);
+	enum loader_state state = loader_check((const u8 *)image);
+	u32 crc = crc32(image, LOADER_SIZE);
+	const char *title = (const char *)image + 0xA0;
+	int whole = state == LOADER_OK || state == LOADER_NO_HEADER;
+	say(state == LOADER_OK ? WHITE
+	    : whole            ? YELLOW
+			       : RED,
+	    "boot loader CRC %08lX, %s", (unsigned long)crc, loader_state_name(state));
+	if (state == LOADER_OK)
+		tlog("diag: boot loader title %.12s, code %.4s", title, title + 12);
+	if (!whole) {
+		tlog_error("diag: the boot loader is %s: the cart will start in EZ-Flash's safe mode at the next "
+			   "power-on (docs/recovery.md)",
+			   loader_state_name(state));
+		say(RED, "DON'T POWER OFF before reading");
+		say(RED, "docs/recovery.md on the Torii site");
+	}
+	// Whether EZ-Flash's loader has a GBA header isn't known yet: only a blank
+	// or erased one fails
+	result(whole, "boot loader present");
+	pause_frames(whole ? 60 : 600);
 }
 
 static u32 fram_crc(void)
@@ -782,6 +835,7 @@ void Diagnostics(void)
 	step_rtc();
 	step_psram();
 	step_nor();
+	step_loader();
 	step_save_chip();
 	step_timing();
 	read_log();

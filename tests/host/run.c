@@ -75,6 +75,8 @@ static const struct {
 	{"lz77_round_trip", test_lz77_round_trip},
 	{"lz77_compresses", test_lz77_compresses},
 	{"nor_list_copies", test_nor_list_copies},
+	{"kernel_nor_records", test_kernel_nor_records},
+	{"loader_check", test_loader_check},
 	{"nor_mark", test_nor_mark},
 	{"logcheck_launches", test_logcheck_launches},
 	{"logcheck_reports", test_logcheck_reports},

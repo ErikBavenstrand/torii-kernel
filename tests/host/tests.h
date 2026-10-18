@@ -36,6 +36,8 @@ void test_log_header(void);
 void test_log_pick_current(void);
 void test_log_next_seq(void);
 void test_log_end(void);
+void test_kernel_nor_records(void);
+void test_loader_check(void);
 void test_lz77_round_trip(void);
 void test_lz77_compresses(void);
 void test_nor_list_copies(void);

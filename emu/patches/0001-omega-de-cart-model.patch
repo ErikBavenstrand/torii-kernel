@@ -12,10 +12,10 @@ index 59ca1c1..1dd19c0 100644
  	EXTDATA_MAX
 diff --git a/include/mgba/internal/gba/cart/omega.h b/include/mgba/internal/gba/cart/omega.h
 new file mode 100644
-index 0000000..9bcc7c7
+index 0000000..3d49106
 --- /dev/null
 +++ b/include/mgba/internal/gba/cart/omega.h
-@@ -0,0 +1,152 @@
+@@ -0,0 +1,165 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -66,7 +66,13 @@ index 0000000..9bcc7c7
 +	OMEGA_NOR_PPB,
 +	OMEGA_NOR_PPB_COMMAND,
 +	OMEGA_NOR_PPB_EXIT,
++	OMEGA_NOR_PROGRAM_FAIL,
 +};
++
++// Sector maps (S29PL064J, S29GL064A): uniform 64 KB sectors except for eight
++// 8 KB boot sectors at the bottom, the top, or both.
++#define OMEGA_NOR_BOOT_BOTTOM 1
++#define OMEGA_NOR_BOOT_TOP 2
 +
 +// Words in the game NOR's write buffer (S29GL-style buffered programming).
 +#define OMEGA_NOR_BUFFER_WORDS 16
@@ -74,7 +80,14 @@ index 0000000..9bcc7c7
 +struct GBAOmegaNor {
 +	uint8_t* data;
 +	size_t size;
++	// Autoselect words 0x0E and 0x0F (word 0x01 is 0x227E on both chips).
 +	uint16_t id;
++	uint16_t id3;
++	// The kernel NOR's backing file starts at chip offset 0x40000, where ROM
++	// page 0x8002 shows it at 0x08000000: chip = (offset + chipOffset) mod size.
++	uint32_t chipOffset;
++	// 0 for the game NOR's map, else OMEGA_NOR_BOOT_* for 8 KB boot sectors.
++	uint8_t bootSectors;
 +	enum GBAOmegaNorState state;
 +	uint32_t bufferBase;
 +	int bufferRemaining;
@@ -294,10 +307,10 @@ index 1d0c0dd..b77704a 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..0069fe7
+index 0000000..4874efa
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1145 @@
+@@ -0,0 +1,1280 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -348,8 +361,22 @@ index 0000000..0069fe7
 +#define ROM_PAGE_KERNEL 0x8000
 +#define ROM_PAGE_PSRAM 0x200
 +#define ROM_PAGE_BOOT 0x8002
-+// Save info, NOR game index and settings start here in the kernel NOR.
-+#define OMEGA_KERNEL_SETTINGS 0x790000
++// The kernel NOR is the 8 MB flash of the S71GL064A08 (the official Omega DE
++// document): EZ-Flash's boot loader at chip 0 (64 KB, at 0x08000000 under ROM
++// page 0x8000), the kernel from chip 0x40000 (ROM page 0x8002). In kernel mode
++// the ROM page's low 9 bits pick where 0x08000000 starts in the chip, in
++// 128 KB steps as a NOR game's page does, and the 8 MB window wraps at the
++// chip's end: the kernel's window offsets from 0x7C0000 are the loader.
++// kernel-nor.bin holds the chip in the kernel's order, so its offsets are
++// window offsets under ROM page 0x8002 and the loader sits at 0x7C0000.
++#define KERNEL_CHIP_KERNEL 0x40000
++#define KERNEL_CHIP_LOADER_SIZE 0x10000
++// No write may reach the chip below the kernel: the loader and the 192 KB
++// after it. One that does stops the emulator with this status.
++#define LOADER_WRITE_STATUS 76
++// The kernel's data sectors (save info, NOR lists, settings) start here, so
++// the kernel copied in at power-on stops before them.
++#define OMEGA_KERNEL_DATA 0x780000
 +
 +#define SECTOR_SIZE 512
 +#define SD_BUFFER_SIZE 0x800
@@ -504,15 +531,61 @@ index 0000000..0069fe7
 +	_exit(POWER_CUT_STATUS);
 +}
 +
++static uint32_t _norChip(const struct GBAOmegaNor* nor, uint32_t offset) {
++	return (offset + nor->chipOffset) & (nor->size - 1);
++}
 +
-+static void _norProgram(struct GBAOmegaNor* nor, uint32_t offset, uint16_t value) {
-+	offset &= ~1;
-+	if (offset + 2 > nor->size) {
++// Called after each kernel NOR erase and program of LENGTH bytes at OFFSET.
++// On the real cart one that reaches the boot loader bricks it: it starts in
++// EZ-Flash's safe mode ("No_Loader_found") until the loader is rewritten
++// (docs/recovery.md). The emulator says so, keeps the damage in
++// kernel-nor.bin for tests to see, and stops with status 76, unless
++// OMEGA_LOADER_WRITES=allow lets it run on, as the real chip would.
++static void _norLoaderGuard(struct GBAOmegaNor* nor, uint32_t offset, uint32_t length, const char* op) {
++	struct GBAOmega* omega = _cutOmega;
++	if (!omega || nor != &omega->kernelNor) {
 +		return;
 +	}
-+	// Programming can only clear bits.
++	uint32_t chip = _norChip(nor, offset);
++	if (length < nor->size && chip >= KERNEL_CHIP_KERNEL && chip + length <= nor->size) {
++		return;
++	}
++	fprintf(stderr, "omega: BOOT LOADER WRITTEN: kernel NOR %s at window offset %06X, chip %06X; the real cart would start in safe mode (No_Loader_found)\n",
++	        op, offset, chip);
++	const char* allow = getenv("OMEGA_LOADER_WRITES");
++	if (allow && !strcmp(allow, "allow")) {
++		return;
++	}
++	_syncFile(omega->kernelNor.vf, omega->kernelNor.data, OMEGA_KERNEL_NOR_SIZE);
++	_syncFile(omega->gameNor.vf, omega->gameNor.data, OMEGA_GAME_NOR_SIZE);
++	_syncFile(omega->sramVf, omega->sram, OMEGA_SRAM_SIZE);
++	fflush(NULL);
++	_exit(LOADER_WRITE_STATUS);
++}
++
++
++// Returns false when the word can't be programmed: programming only clears
++// bits, so a 1 over a 0 never verifies.
++static bool _norProgram(struct GBAOmegaNor* nor, uint32_t offset, uint16_t value) {
++	offset &= ~1;
++	if (offset + 2 > nor->size) {
++		return true;
++	}
++	uint16_t old = nor->data[offset] | (nor->data[offset + 1] << 8);
 +	nor->data[offset] &= value;
 +	nor->data[offset + 1] &= value >> 8;
++	return (old & value) == value;
++}
++
++// A program that can't verify runs until the chip's time limit: then DQ5 is
++// set, DQ6 toggles and DQ7 reads the complement of the data, until the reset
++// command (F0). The kernel's toggle polling hangs on it, as v0.2.2's did on
++// the real cart.
++static void _norProgramFail(struct GBAOmegaNor* nor, uint32_t offset, uint16_t value) {
++	fprintf(stderr, "omega: NOR program at %06X failed (DQ5): %04X over %04X, which isn't erased\n", offset, value,
++	        _read16(nor->data, nor->size, offset));
++	nor->state = OMEGA_NOR_PROGRAM_FAIL;
++	nor->lastWord = value;
 +}
 +
 +static uint32_t _norSectorSize(const struct GBAOmegaNor* nor, uint32_t offset) {
@@ -522,6 +595,12 @@ index 0000000..0069fe7
 +			return 0x8000;
 +		}
 +		return 0x20000;
++	}
++	// 64 KB sectors, with eight 8 KB boot sectors in the first and/or last 64 KB.
++	uint32_t chip = _norChip(nor, offset);
++	if (((nor->bootSectors & OMEGA_NOR_BOOT_BOTTOM) && chip < 0x10000) ||
++	    ((nor->bootSectors & OMEGA_NOR_BOOT_TOP) && chip >= nor->size - 0x10000)) {
++		return 0x2000;
 +	}
 +	return 0x10000;
 +}
@@ -549,7 +628,7 @@ index 0000000..0069fe7
 +		case 0x0E:
 +			return nor->id;
 +		case 0x0F:
-+			return 0x2201;
++			return nor->id3;
 +		default:
 +			return 0x0000;
 +		}
@@ -558,6 +637,10 @@ index 0000000..0069fe7
 +		nor->toggle ^= 0x40;
 +		return (~nor->lastWord & 0x80) | nor->toggle | 0x02;
 +	}
++	case OMEGA_NOR_PROGRAM_FAIL:
++		// Status until the reset: DQ7 inverted, DQ6 toggling, DQ5 set.
++		nor->toggle ^= 0x40;
++		return (~nor->lastWord & 0x80) | nor->toggle | 0x20;
 +	case OMEGA_NOR_PPB:
 +	case OMEGA_NOR_PPB_COMMAND:
 +	case OMEGA_NOR_PPB_EXIT:
@@ -580,7 +663,8 @@ index 0000000..0069fe7
 +	uint8_t byte = value;
 +	switch (nor->state) {
 +	case OMEGA_NOR_AUTOSELECT:
-+		// Only the reset leaves autoselect.
++	case OMEGA_NOR_PROGRAM_FAIL:
++		// Only the reset leaves autoselect or a failed program.
 +		if (byte == 0xF0) {
 +			nor->state = OMEGA_NOR_READ;
 +		}
@@ -631,19 +715,24 @@ index 0000000..0069fe7
 +		nor->state = (command == 0x554 && byte == 0x55) ? OMEGA_NOR_ERASE_UNLOCK2 : OMEGA_NOR_READ;
 +		break;
 +	case OMEGA_NOR_ERASE_UNLOCK2:
++		nor->state = OMEGA_NOR_READ;
 +		if (byte == 0x30) {
 +			_norOperation(nor, offset, true);
 +			_norErase(nor, offset);
++			_norLoaderGuard(nor, _norSectorBase(nor, offset), _norSectorSize(nor, offset), "sector erase");
 +		} else if (byte == 0x10 && command == 0xAAA) {
 +			_norOperation(nor, offset, true);
 +			memset(nor->data, 0xFF, nor->size);
++			_norLoaderGuard(nor, 0, nor->size, "chip erase");
 +		}
-+		nor->state = OMEGA_NOR_READ;
 +		break;
 +	case OMEGA_NOR_PROGRAM:
 +		_norOperation(nor, offset, false);
-+		_norProgram(nor, offset, value);
 +		nor->state = OMEGA_NOR_READ;
++		if (!_norProgram(nor, offset, value)) {
++			_norProgramFail(nor, offset, value);
++		}
++		_norLoaderGuard(nor, offset & ~1, 2, "program");
 +		break;
 +	case OMEGA_NOR_BUFFER_COUNT:
 +		if (_norSectorBase(nor, offset) != _norSectorBase(nor, nor->bufferBase)) {
@@ -685,12 +774,14 @@ index 0000000..0069fe7
 +			break;
 +		}
 +		_norOperation(nor, nor->bufferBase, false);
++		nor->state = OMEGA_NOR_READ;
 +		for (unsigned i = 0; i < OMEGA_NOR_BUFFER_WORDS; ++i) {
-+			if (nor->bufferLoaded[i]) {
-+				_norProgram(nor, nor->bufferBase + i * 2, nor->buffer[i]);
++			if (nor->bufferLoaded[i] && !_norProgram(nor, nor->bufferBase + i * 2, nor->buffer[i]) &&
++			    nor->state == OMEGA_NOR_READ) {
++				_norProgramFail(nor, nor->bufferBase + i * 2, nor->buffer[i]);
 +			}
 +		}
-+		nor->state = OMEGA_NOR_READ;
++		_norLoaderGuard(nor, nor->bufferBase, OMEGA_NOR_BUFFER_WORDS * 2, "buffer program");
 +		break;
 +	case OMEGA_NOR_BUFFER_ABORT:
 +		if (command == 0xAAA && byte == 0xAA) {
@@ -908,13 +999,27 @@ index 0000000..0069fe7
 +
 +// --- Mapping ---------------------------------------------------------------
 +
++// Kernel NOR backing-file offset that kernel-mode cart offset OFFSET shows.
++static uint32_t _kernelNorOffset(const struct GBAOmega* omega, uint32_t offset) {
++	uint32_t window = (omega->romPage & 0x1FF) << 17;
++	return (window + offset - KERNEL_CHIP_KERNEL) & (OMEGA_KERNEL_NOR_SIZE - 1);
++}
++
 +static void _remap(struct GBA* gba) {
 +	struct GBAOmega* omega = &gba->memory.omega;
 +	struct GBAMemory* memory = &gba->memory;
 +	if (_isKernelMode(omega)) {
-+		memory->rom = (uint32_t*) omega->kernelNor.data;
-+		memory->romSize = OMEGA_KERNEL_NOR_SIZE;
-+		memory->romMask = OMEGA_KERNEL_NOR_SIZE - 1;
++		// Instruction fetches see the chip from the window's start to the
++		// backing file's end (all of it under the kernel's page); data reads
++		// and writes wrap (GBAOmegaRead16).
++		uint32_t start = _kernelNorOffset(omega, 0);
++		uint32_t mask = OMEGA_KERNEL_NOR_SIZE;
++		memory->rom = (uint32_t*) &omega->kernelNor.data[start];
++		memory->romSize = OMEGA_KERNEL_NOR_SIZE - start;
++		while (mask > memory->romSize) {
++			mask >>= 1;
++		}
++		memory->romMask = mask - 1;
 +	} else if ((omega->romPage & 0x3FF) >= ROM_PAGE_PSRAM) {
 +		memory->rom = (uint32_t*) omega->psram;
 +		memory->romSize = OMEGA_PSRAM_SIZE;
@@ -942,8 +1047,10 @@ index 0000000..0069fe7
 +	memory->activeRegion = -1;
 +	gba->cpu->memory.setActiveRegion(gba->cpu, gba->cpu->gprs[ARM_PC]);
 +	mLOG(GBA_OMEGA, DEBUG, "ROM page %04X", omega->romPage);
-+	if (_isKernelMode(omega)) {
++	if (_isKernelMode(omega) && (omega->romPage & 0x1FF) == (ROM_PAGE_BOOT & 0x1FF)) {
 +		_trace(gba, "mode kernel");
++	} else if (_isKernelMode(omega)) {
++		_trace(gba, "mode kernel, NOR window at chip %06X (ROM page %04X)", (omega->romPage & 0x1FF) << 17, omega->romPage);
 +	} else if ((omega->romPage & 0x3FF) >= ROM_PAGE_PSRAM) {
 +		_trace(gba, "mode game from PSRAM");
 +	} else {
@@ -1026,6 +1133,33 @@ index 0000000..0069fe7
 +
 +// --- Public interface ------------------------------------------------------
 +
++// A stand-in for EZ-Flash's boot loader, written when the chip below the
++// kernel is blank (a new kernel-nor.bin), so tests can check that nothing
++// writes it: a GBA header (title TORII LOADER, 0x96 at 0xB2, its complement)
++// over a fixed pattern through its 64 KB. A brick erases only part of it.
++static void _seedLoader(struct GBAOmega* omega) {
++	uint8_t* loader = &omega->kernelNor.data[OMEGA_KERNEL_NOR_SIZE - KERNEL_CHIP_KERNEL];
++	for (uint32_t i = 0; i < KERNEL_CHIP_KERNEL; ++i) {
++		if (loader[i] != 0xFF) {
++			return;
++		}
++	}
++	for (uint32_t i = 0; i < KERNEL_CHIP_LOADER_SIZE; ++i) {
++		loader[i] = (uint8_t) ((i >> 8) ^ (i * 0x1D) ^ 0x5A);
++	}
++	static const uint8_t branch[4] = { 0x2E, 0x00, 0x00, 0xEA };  // b 0xC0
++	memcpy(loader, branch, sizeof(branch));
++	memset(&loader[0xA0], 0, 0x20);
++	memcpy(&loader[0xA0], "TORII LOADER", 12);
++	memcpy(&loader[0xAC], "TLDR01", 6);
++	loader[0xB2] = 0x96;
++	uint8_t sum = 0;
++	for (uint32_t i = 0xA0; i < 0xBD; ++i) {
++		sum += loader[i];
++	}
++	loader[0xBD] = -(sum + 0x19);
++}
++
 +void GBAOmegaInit(struct GBAOmega* omega) {
 +	memset(omega, 0, sizeof(*omega));
 +}
@@ -1058,9 +1192,23 @@ index 0000000..0069fe7
 +		memset(&omega->sram[OMEGA_SAVE_PAGES << 12], 0xFF, OMEGA_SRAM_SIZE - (OMEGA_SAVE_PAGES << 12));
 +	}
 +	omega->kernelNor.size = OMEGA_KERNEL_NOR_SIZE;
-+	omega->kernelNor.id = 0x2202;  // S29PL064: word programming
++	omega->kernelNor.chipOffset = KERNEL_CHIP_KERNEL;
++	const char* chip = getenv("OMEGA_KERNEL_NOR");
++	if (chip && !strcmp(chip, "gl064")) {
++		// S29GL064A bottom boot (model 03): buffered programming
++		omega->kernelNor.id = 0x2210;
++		omega->kernelNor.id3 = 0x2200;
++		omega->kernelNor.bootSectors = OMEGA_NOR_BOOT_BOTTOM;
++	} else {
++		// S29PL064J: word programming, boot sectors at both ends
++		omega->kernelNor.id = 0x2202;
++		omega->kernelNor.id3 = 0x2201;
++		omega->kernelNor.bootSectors = OMEGA_NOR_BOOT_BOTTOM | OMEGA_NOR_BOOT_TOP;
++	}
 +	omega->gameNor.size = OMEGA_GAME_NOR_SIZE;
 +	omega->gameNor.id = 0x223D;  // S98: the only game NOR the kernel writes
++	omega->gameNor.id3 = 0x2201;
++	_seedLoader(omega);
 +
 +	char path[PATH_MAX];
 +	snprintf(path, sizeof(path), "%s" PATH_SEP "sd.img", dir);
@@ -1073,9 +1221,9 @@ index 0000000..0069fe7
 +	// NOR but keep the settings the kernel stores above it. memory.romSize
 +	// can include padding, so use the file's real size.
 +	size_t kernelSize = gba->pristineRomSize ? gba->pristineRomSize : gba->memory.romSize;
-+	if (kernelSize > OMEGA_KERNEL_SETTINGS) {
-+		mLOG(GBA_OMEGA, WARN, "Kernel image overlaps the settings area; truncating");
-+		kernelSize = OMEGA_KERNEL_SETTINGS;
++	if (kernelSize > OMEGA_KERNEL_DATA) {
++		mLOG(GBA_OMEGA, WARN, "Kernel image overlaps the kernel's data sectors; truncating");
++		kernelSize = OMEGA_KERNEL_DATA;
 +	}
 +	memcpy(omega->kernelNor.data, gba->memory.rom, kernelSize);
 +
@@ -1186,7 +1334,7 @@ index 0000000..0069fe7
 +
 +static void _loadNorState(struct GBAOmegaNor* nor, const struct GBAOmegaNorSnapshot* in) {
 +	// A state from elsewhere can hold anything; keep it in range.
-+	nor->state = in->state <= OMEGA_NOR_PPB_EXIT ? in->state : OMEGA_NOR_READ;
++	nor->state = in->state <= OMEGA_NOR_PROGRAM_FAIL ? in->state : OMEGA_NOR_READ;
 +	nor->bufferBase = in->bufferBase;
 +	nor->bufferRemaining = in->bufferRemaining >= 0 && in->bufferRemaining <= OMEGA_NOR_BUFFER_WORDS ? in->bufferRemaining : 0;
 +	nor->bufferCount = in->bufferCount >= 0 && in->bufferCount <= OMEGA_NOR_BUFFER_WORDS ? in->bufferCount : 0;
@@ -1330,7 +1478,7 @@ index 0000000..0069fe7
 +		return _openBus(address);
 +	}
 +	if (offset < PSRAM_WINDOW) {
-+		return _norRead(&omega->kernelNor, offset);
++		return _norRead(&omega->kernelNor, _kernelNorOffset(omega, offset));
 +	}
 +	if (offset < GAME_NOR_WINDOW) {
 +		uint32_t psram = (((omega->psramPage >> 12) * WINDOW_SIZE) + offset - PSRAM_WINDOW) & (OMEGA_PSRAM_SIZE - 1);
@@ -1384,7 +1532,7 @@ index 0000000..0069fe7
 +		return;  // Game mode: the game's ROM is read-only.
 +	}
 +	if (offset < PSRAM_WINDOW) {
-+		_norWrite(&omega->kernelNor, offset, value);
++		_norWrite(&omega->kernelNor, _kernelNorOffset(omega, offset), value);
 +	} else if (offset < GAME_NOR_WINDOW) {
 +		uint32_t psram = (((omega->psramPage >> 12) * WINDOW_SIZE) + offset - PSRAM_WINDOW) & (OMEGA_PSRAM_SIZE - 1);
 +		omega->psram[psram] = value;

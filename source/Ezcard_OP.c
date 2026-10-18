@@ -311,7 +311,7 @@ void IWRAM_CODE Bank_Switching(u8 bank)
 // --------------------------------------------------------------------
 // Erases one block of the kernel's NOR and writes buffersize bytes to it.
 // Returns how many halfwords read back wrong; all of them, writing nothing,
-// for a block outside the kernel's data sectors (ez_define.h).
+// for a block outside the kernel's data sectors (bootloader.h).
 u32 IWRAM_CODE Save_info(u32 info_offset, u16 *info_buffer, u32 buffersize)
 {
 	u32 offset;
@@ -322,9 +322,10 @@ u32 IWRAM_CODE Save_info(u32 info_offset, u16 *info_buffer, u32 buffersize)
 	register u32 loopwrite;
 	vu16 v1, v2;
 	// Torii: only the kernel's data sectors; past KERNEL_NOR_WINDOW is the
-	// bootloader, and below KERNEL_NOR_DATA the kernel (ez_define.h)
-	if (buffersize > 0x10000 || info_offset < KERNEL_NOR_DATA || info_offset > KERNEL_NOR_WINDOW - buffersize ||
-	    (info_offset & 0xFFFF)) {
+	// boot loader, and below KERNEL_NOR_DATA the kernel (bootloader.h)
+	if (!kernel_nor_record_ok(info_offset, buffersize)) {
+		tlog_error("nor: refused to write %lu bytes at kernel NOR %06lX, outside its data sectors",
+			   (unsigned long)buffersize, (unsigned long)info_offset);
 		WAITCNT_RESTORE(waitcnt);
 		return buffersize / 2;
 	}
