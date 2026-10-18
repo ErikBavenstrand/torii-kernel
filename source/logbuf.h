@@ -58,10 +58,22 @@ u32 log_header_seq(const char *buf, u32 n);
 // has a header.
 int log_pick_current(const u32 seqs[LOG_FILES]);
 
-// Where the text in a log file ends: the first zero byte, found by binary
-// search, as the text has none and the rest of the file is zeros.
-// byte_at(ctx, offset) reads one byte, or returns -1 on a read error, which
-// counts as the end. Returns a value from LOG_HEADER_LEN to size.
-u32 log_find_end(int (*byte_at)(void *ctx, u32 offset), void *ctx, u32 size);
+// Where the text in a log file ends, from the whole file fed in order, in
+// pieces of any size: the text has no zero bytes and zeros fill the rest,
+// so the end is the first zero after the header. A nonzero byte after that
+// is junk, as v0.2.0 wrote on the real cart by zero-filling from ROM while
+// SD mode was on; the end found in such a file can't be trusted.
+typedef struct {
+	u32 seen;  // bytes fed so far
+	u32 end;  // the first zero after the header, once found
+	u8 found;
+	u8 junk;  // a nonzero byte follows the end
+} log_end;
+
+void log_end_start(log_end *e);
+void log_end_feed(log_end *e, const char *buf, u32 n);
+// The end: the first zero after the header, or the bytes seen if there is
+// none (a full file). From LOG_HEADER_LEN on.
+u32 log_end_offset(const log_end *e);
 
 #endif

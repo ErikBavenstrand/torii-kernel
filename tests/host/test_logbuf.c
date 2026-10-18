@@ -156,23 +156,61 @@ void test_log_pick_current(void)
 	CHECK_EQ(log_pick_current(first), 2);
 }
 
-static int reads;
-static int byte_at(void *ctx, u32 offset)
+// Feeds file to a log_end in pieces of step bytes, from offset skew of a
+// buffer, so the word path meets every alignment.
+static log_end scan(const u8 *file, u32 size, u32 step, u32 skew)
 {
-	reads++;
-	return ((const u8 *)ctx)[offset];
+	static u8 piece[600 + 4];
+	log_end e;
+	log_end_start(&e);
+	for (u32 at = 0; at < size; at += step) {
+		u32 n = (size - at < step) ? size - at : step;
+		memcpy(piece + skew, file + at, n);
+		log_end_feed(&e, (const char *)piece + skew, n);
+	}
+	return e;
 }
 
-void test_log_find_end(void)
+void test_log_end(void)
 {
 	u8 *file = malloc(LOG_FILE_SIZE);
 	u32 ends[] = {LOG_HEADER_LEN, LOG_HEADER_LEN + 1, 1000, 0x8000, LOG_FILE_SIZE - 1, LOG_FILE_SIZE};
+	u32 steps[] = {1, 7, 512, 600};
 	for (u32 i = 0; i < sizeof(ends) / sizeof(*ends); i++) {
-		memset(file, 0, LOG_FILE_SIZE);
-		memset(file, 'a', ends[i]);
-		reads = 0;
-		CHECK_EQ(log_find_end(byte_at, file, LOG_FILE_SIZE), ends[i]);
-		CHECK(reads <= 17);  // a binary search over 64 KB
+		for (u32 j = 0; j < sizeof(steps) / sizeof(*steps); j++) {
+			for (u32 skew = 0; skew < 4; skew++) {
+				memset(file, 0, LOG_FILE_SIZE);
+				memset(file, 'a', ends[i]);
+				log_end e = scan(file, LOG_FILE_SIZE, steps[j], skew);
+				CHECK_EQ(log_end_offset(&e), ends[i]);
+				CHECK(!e.junk);
+				if (ends[i] < LOG_FILE_SIZE - 1) {
+					// One junk byte anywhere after the end.
+					u32 at = ends[i] + 1 + (LOG_FILE_SIZE - ends[i] - 2) * j / 3;
+					file[at] = 0x5A;
+					e = scan(file, LOG_FILE_SIZE, steps[j], skew);
+					CHECK(e.junk);
+					CHECK_EQ(log_end_offset(&e), ends[i]);
+				}
+			}
+		}
 	}
+	// Zeros in the header don't end the text.
+	memset(file, 0, LOG_FILE_SIZE);
+	memset(file + 4, 'a', 100);
+	log_end e = scan(file, LOG_FILE_SIZE, 512, 0);
+	CHECK_EQ(log_end_offset(&e), 104);
+	CHECK(!e.junk);
+	// What v0.2.0 left on the real cart: header, text, then the SD buffer's
+	// leftovers, with zeros among them.
+	srand(1);
+	for (u32 i = 0; i < LOG_FILE_SIZE; i++)
+		file[i] = (i % 97 < 40) ? 0 : rand();
+	memset(file, 'a', 3000);
+	e = scan(file, LOG_FILE_SIZE, 512, 0);
+	CHECK(e.junk);
+	// Nothing fed: the end is the header's.
+	log_end_start(&e);
+	CHECK_EQ(log_end_offset(&e), LOG_HEADER_LEN);
 	free(file);
 }

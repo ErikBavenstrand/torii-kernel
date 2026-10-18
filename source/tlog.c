@@ -166,7 +166,9 @@ static char prev_last[TEXT_MAX + PREFIX_LEN + 1] EWRAM_BSS;
 
 // FatFs hands whole sectors straight to the cart's SD code, which copies
 // them with 16-bit DMA: so every buffer given to f_write is word-aligned.
-static const u32 zeros[128];
+// The one buffer, in RAM: it carries text to the card, zeros into a new
+// file, and the file in when looking for its end. (On the cart, ROM reads
+// while SD mode is on return the SD buffer, so a source in ROM writes junk.)
 static u32 bounce[128] EWRAM_BSS;
 
 static void log_path(char *path, u32 slot)
@@ -185,19 +187,12 @@ static void sd_failed(const char *what, FRESULT res)
 	tlog_level = level;
 }
 
-static int byte_at(void *ctx, u32 offset)
-{
-	UINT read;
-	u8 b;
-	if (f_lseek((FIL *)ctx, offset) != FR_OK || f_read((FIL *)ctx, &b, 1, &read) != FR_OK || read != 1)
-		return -1;
-	return b;
-}
+// Free space a new log file must leave on the card, for saves and states.
+#define LOG_CARD_RESERVE 0x100000u
 
 // Makes log file slot full size and zero, then writes its header. A rotation
 // cut off by power loss leaves a file with no header, which counts as unused.
-// Free space a new log file must leave on the card, for saves and states.
-#define LOG_CARD_RESERVE 0x100000u
+// It fills bounce with zeros, so call it with nothing waiting there.
 
 static FRESULT start_file(u32 slot, u32 seq)
 {
@@ -226,9 +221,10 @@ static FRESULT start_file(u32 slot, u32 seq)
 			return res;
 		}
 	}
-	for (u32 offset = 0; offset < LOG_FILE_SIZE; offset += sizeof(zeros)) {
-		res = f_write(&log_file, zeros, sizeof(zeros), &done);
-		if (res == FR_OK && done != sizeof(zeros))
+	memset(bounce, 0, sizeof(bounce));
+	for (u32 offset = 0; offset < LOG_FILE_SIZE; offset += sizeof(bounce)) {
+		res = f_write(&log_file, bounce, sizeof(bounce), &done);
+		if (res == FR_OK && done != sizeof(bounce))
 			res = FR_DENIED;  // the card is full
 		if (res != FR_OK) {
 			// Give the space back: the card's other files need it more.
@@ -288,7 +284,27 @@ static FRESULT open_current(void)
 		return res;
 	cur_slot = cur;
 	cur_seq = seqs[cur];
-	cur_end = log_find_end(byte_at, &log_file, LOG_FILE_SIZE);
+	log_end end;
+	log_end_start(&end);
+	for (u32 offset = 0; offset < LOG_FILE_SIZE && !end.junk; offset += sizeof(bounce)) {
+		res = f_read(&log_file, bounce, sizeof(bounce), &done);
+		if (res != FR_OK) {
+			f_close(&log_file);
+			return res;
+		}
+		if (!done)
+			break;
+		log_end_feed(&end, (const char *)bounce, done);
+	}
+	if (end.junk) {
+		// Its end can't be found: keep the file as it is, and go on in
+		// the next one.
+		f_close(&log_file);
+		tlog_error("log: torii-%lu.log has junk after its text; going on in the next file",
+			   (unsigned long)cur_slot);
+		return start_file((cur_slot + 1) % LOG_FILES, cur_seq + 1);
+	}
+	cur_end = log_end_offset(&end);
 
 	// The previous session's last line, without its newline.
 	u32 len = sizeof(prev_last) - 1;
@@ -309,47 +325,44 @@ const char *tlog_previous_line(void)
 	return prev_last[0] ? prev_last : NULL;
 }
 
-// Writes n bytes of whole lines, at most 512 and word-aligned (see bounce).
-static FRESULT write_text(const char *text, u32 n)
+// Starts the next log file and opens it for writing. It fills bounce with
+// zeros (see start_file).
+static FRESULT rotate(void)
 {
-	UINT done;
-	FRESULT res;
-	while (n) {
-		if (cur_end >= LOG_FILE_SIZE) {
-			char path[32];
-			f_close(&log_file);
-			res = start_file((cur_slot + 1) % LOG_FILES, cur_seq + 1);
-			if (res != FR_OK)
-				return res;
-			log_path(path, cur_slot);
-			res = f_open(&log_file, path, FA_WRITE | FA_OPEN_EXISTING);
-			if (res != FR_OK)
-				return res;
-		}
-		u32 room = LOG_FILE_SIZE - cur_end;
-		u32 k = n;
-		if (k > room) {
-			// Whole lines only; the rest of the file stays zeros, and the
-			// next file takes the line that didn't fit.
-			k = room;
-			while (k && text[k - 1] != '\n')
-				k--;
-			if (!k) {
-				cur_end = LOG_FILE_SIZE;
-				continue;
-			}
-		}
-		res = f_lseek(&log_file, cur_end);
-		if (res == FR_OK)
-			res = f_write(&log_file, text, k, &done);
-		if (res == FR_OK && done != k)
-			res = FR_DENIED;
-		if (res != FR_OK)
-			return res;
-		cur_end += k;
-		text += k;
-		n -= k;
+	char path[32];
+	f_close(&log_file);
+	FRESULT res = start_file((cur_slot + 1) % LOG_FILES, cur_seq + 1);
+	if (res != FR_OK)
+		return res;
+	log_path(path, cur_slot);
+	return f_open(&log_file, path, FA_WRITE | FA_OPEN_EXISTING);
+}
+
+// Writes as many whole lines of the n bytes of text as fit in the current
+// file, and sets *written to their length: 0 once the file is full, whose
+// rest then stays zeros. text is word-aligned (see bounce).
+static FRESULT write_text(const char *text, u32 n, u32 *written)
+{
+	UINT done = 0;
+	u32 k = n;
+	u32 room = (cur_end < LOG_FILE_SIZE) ? LOG_FILE_SIZE - cur_end : 0;
+	*written = 0;
+	if (k > room) {
+		k = room;
+		while (k && text[k - 1] != '\n')
+			k--;
 	}
+	if (!k)
+		return FR_OK;
+	FRESULT res = f_lseek(&log_file, cur_end);
+	if (res == FR_OK)
+		res = f_write(&log_file, text, k, &done);
+	if (res == FR_OK && done != k)
+		res = FR_DENIED;
+	if (res != FR_OK)
+		return res;
+	cur_end += k;
+	*written = k;
 	return FR_OK;
 }
 
@@ -394,18 +407,34 @@ void tlog_flush(void)
 		sd_failed("opening the log", res);
 		return;
 	}
-	if (ring.lost) {
-		u32 centis = torii_frames * 5 / 3;
-		int len = snprintf((char *)bounce, sizeof(bounce),
-				   "%5lu.%02lu E (%lu bytes of log lost: the buffer filled up)\n",
-				   (unsigned long)(centis / 100 % 100000), (unsigned long)(centis % 100),
-				   (unsigned long)ring.lost);
-		ring.lost = 0;
-		res = write_text((const char *)bounce, len);
-	}
-	while (res == FR_OK && (n = log_ring_take_lines(&ring, (char *)bounce, sizeof(bounce))) > 0) {
-		res = write_text((const char *)bounce, n);
-		log_ring_drop(&ring, n);
+	// Text waits in the ring until it is on the card: a file that fills up
+	// takes what fits, and the next file is started before bounce is
+	// filled again.
+	int rotated = 0;
+	while (res == FR_OK) {
+		u32 lost = ring.lost;
+		if (lost) {
+			u32 centis = torii_frames * 5 / 3;
+			n = snprintf((char *)bounce, sizeof(bounce),
+				     "%5lu.%02lu E (%lu bytes of log lost: the buffer filled up)\n",
+				     (unsigned long)(centis / 100 % 100000), (unsigned long)(centis % 100),
+				     (unsigned long)lost);
+		} else {
+			n = log_ring_take_lines(&ring, (char *)bounce, sizeof(bounce));
+			if (!n)
+				break;
+		}
+		u32 written;
+		res = write_text((const char *)bounce, n, &written);
+		if (res != FR_OK)
+			break;
+		if (!lost)
+			log_ring_drop(&ring, written);
+		else if (written)
+			ring.lost = 0;
+		if (written < n)
+			res = (written || !rotated) ? rotate() : FR_INT_ERR;  // a new file takes any n
+		rotated = written < n;
 	}
 	if (res != FR_OK) {
 		sd_failed("writing the log", res);
