@@ -66,11 +66,13 @@ static void clear(void)
 		VRAM[i] = RGB(2, 4, 10);
 }
 
+static uint32_t waited;  // loops until the key: the run's nonce
+
 static uint16_t wait_key(uint16_t mask)
 {
 	while (~REG_KEYINPUT & 0x3FF)  // let go first
 		;
-	for (;;) {
+	for (waited = 0;; waited++) {
 		uint16_t down = ~REG_KEYINPUT & mask;
 		if (down)
 			return down;
@@ -157,13 +159,14 @@ static void step_write(unsigned block)
 	s->op = EEPROM_PROBE_WRITE;
 	s->width = (uint8_t)width;
 	s->block = (uint16_t)block;
-	eeprom_probe_pattern(s->data, width, block);
+	eeprom_probe_pattern(s->data, width, block, report.nonce);
 	s->polls = write_block(block, s->data);
 }
 
 static void probe(void)
 {
 	report.width = width;
+	report.nonce = waited & 0xFFFF;
 	step_read(1);  // what an earlier run left
 	step_write(1);
 	step_read(1);

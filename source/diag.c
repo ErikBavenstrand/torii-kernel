@@ -477,6 +477,7 @@ static void step_timing(void)
 
 // What the log shows happened since the last Diagnostics run (logcheck.h).
 static u32 log_seen;
+static struct logcheck log_check EWRAM_BSS;
 
 // Reads the log files, oldest first, into pReadCache one at a time.
 static void read_log(void)
@@ -485,7 +486,7 @@ static void read_log(void)
 	u32 seqs[LOG_FILES];
 	FIL f;
 	UINT got;
-	log_seen = 0;
+	memset(&log_check, 0, sizeof(log_check));
 	tlog_flush();
 	for (u32 i = 0; i < LOG_FILES; i++) {
 		seqs[i] = 0;
@@ -516,12 +517,13 @@ static void read_log(void)
 			char *nl = strchr(text, '\n');
 			if (nl)
 				*nl = 0;
-			log_seen = logcheck_line(log_seen, text);
+			logcheck_line(&log_check, text);
 			if (!nl)
 				break;
 			text = nl + 1;
 		}
 	}
+	log_seen = log_check.seen;
 	tlog("diag: the log since the last run shows %03lX (see source/logcheck.h)", (unsigned long)log_seen);
 }
 
@@ -786,7 +788,7 @@ void Diagnostics(void)
 
 	step("summary");
 	if (summary_count == 0)
-		say(GREEN, "everything passed");
+		say(GREEN, unconfirmed_count ? "no check failed" : "everything passed");
 	for (u32 i = 0; i < summary_count; i++)
 		say(RED, "failed: %s", summary[i]);
 	for (u32 i = 0; i < unconfirmed_count; i++)

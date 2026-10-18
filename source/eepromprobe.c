@@ -4,13 +4,13 @@
 
 #include "eepromprobe.h"
 
-void eeprom_probe_pattern(uint8_t out[8], uint32_t width, uint32_t block)
+void eeprom_probe_pattern(uint8_t out[8], uint32_t width, uint32_t block, uint32_t nonce)
 {
 	out[0] = 0xE0 | (width & 0xF);
 	out[1] = (uint8_t)(block >> 8);
 	out[2] = (uint8_t)block;
-	out[3] = 0xA5;
-	out[4] = 0x5A;
+	out[3] = (uint8_t)(nonce >> 8);
+	out[4] = (uint8_t)nonce;
 	out[5] = (uint8_t)~block;
 	out[6] = (uint8_t)~(block >> 8);
 	out[7] = (uint8_t)(0x3C ^ width);

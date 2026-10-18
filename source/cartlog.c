@@ -285,15 +285,13 @@ static void report_eeprom_probe(void)
 			continue;
 		}
 		int src = eeprom_probe_source(p, i);
-		u8 other[8];
-		eeprom_probe_pattern(other, p->width == 6 ? 14 : 6, s->block);
 		char what[48];
 		if (src >= 0)
 			snprintf(what, sizeof(what), "step %d's write (block %u)", src, p->step[src].block);
+		else if (s->data[0] == 0xE6 || s->data[0] == 0xEE)
+			snprintf(what, sizeof(what), "an earlier %u-bit run", s->data[0] == 0xE6 ? 6 : 14);
 		else
-			snprintf(what, sizeof(what), "%s",
-				 !memcmp(s->data, other, 8) ? "an earlier run's other width (this block)"
-							    : "nothing written in this run");
+			snprintf(what, sizeof(what), "nothing written in this run");
 		tlog_force(TLOG_INFO, "eeprom probe: %2lu: read block %u: %s, from %s", (unsigned long)i, s->block,
 			   data, what);
 	}
@@ -307,6 +305,7 @@ static void report_eeprom_probe(void)
 }
 
 static struct cartlog_state state EWRAM_BSS;
+_Static_assert(CARTLOG_STATE + sizeof(struct cartlog_state) <= CARTLOG_CRASH, "session state size");
 static u32 prev_magic_ok;  // the previous session's state, as cartlog_boot_start found it
 static u32 prev_phase;
 static u32 prev_detail;

@@ -18,9 +18,14 @@ enum {
 	SEEN_EEPROM_PROBE = 1 << 8,  // the EEPROM probe ROM's report reached the log
 };
 
-// The SEEN_* flags after one more log line (its text, without the newline):
-// seen with the line's own added. The end of a Diagnostics run starts over
-// at 0.
-u32 logcheck_line(u32 seen, const char *line);
+struct logcheck {
+	u32 seen;  // SEEN_* flags
+	u32 pending;  // the current launch's, until it reaches the game
+};
+
+// Reads one more log line (its text, without the newline). A launch counts
+// once "launch: starting the game" follows it; the end of a Diagnostics run
+// starts over. Start from a zeroed struct.
+void logcheck_line(struct logcheck *c, const char *line);
 
 #endif

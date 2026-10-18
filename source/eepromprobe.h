@@ -30,13 +30,15 @@ struct eeprom_probe {
 	char magic[16];
 	uint32_t width;
 	uint32_t steps;
-	uint32_t spare[2];
+	uint32_t nonce;  // this run's, in its patterns
+	uint32_t spare;
 	struct eeprom_probe_step step[EEPROM_PROBE_STEPS];
 };
 
-// The bytes a width-bit run writes to block: different for every block and
-// width, and never all 0x00 or 0xFF.
-void eeprom_probe_pattern(uint8_t out[8], uint32_t width, uint32_t block);
+// The bytes a width-bit run writes to block: different for every block,
+// width and run (nonce), and never all 0x00 or 0xFF. The nonce keeps an
+// earlier run's data, still in the save, from passing for this run's.
+void eeprom_probe_pattern(uint8_t out[8], uint32_t width, uint32_t block, uint32_t nonce);
 
 // For read step i, the latest write step before it whose data it returned,
 // or -1 if none.
