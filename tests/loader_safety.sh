@@ -136,7 +136,8 @@ save_setting="-k 200:R -k 206:- -k 220:R -k 226:- -k 270:DOWN -k 276:- -k 285:DO
 launch="$(keys 200 DOWN DOWN DOWN DOWN A) $(keys 250 DOWN DOWN DOWN DOWN RIGHT RIGHT RIGHT RIGHT RIGHT UP UP UP UP A)"
 diag="-k 1:L+R+SELECT -k 60:- -k 120:A -k 124:- $(for f in $(seq 2000 24 4400); do printf -- '-k %d:START -k %d:- ' "$f" $((f + 4)); done)"
 # Diagnostics with its questions answered yes, A every 24 frames: the rumble
-# step writes 0x08001000, inside the kernel NOR's window.
+# step writes 0x08001000, inside the kernel NOR's window, and sets the ROM
+# page to PSRAM and back.
 diag_rumble="-k 1:L+R+SELECT -k 60:- -k 120:A -k 124:- $(for f in $(seq 2000 24 3600); do printf -- '-k %d:A -k %d:- ' "$f" $((f + 4)); done)"
 
 # older_list: the official kernel's NOR list (no trailer, no copy B) with
@@ -203,13 +204,17 @@ EOF
 
   new_cart diagnostics-rumble
   OMEGA_TRACE=1 boot $diag_rumble -f 3700
-  logged "diag: rumble pulsed: yes"
-  logged "diag: rumble held on: yes"
-  logged "diag: rumble with the GPIO port off: yes"
-  # 60 pulses and one hold with the port on, then 60 pulses with it off
+  logged "diag: rumble pulsed in kernel mode: yes"
+  logged "diag: rumble pulsed, ROM page PSRAM: 0x08001000 read"
+  logged "diag: rumble pulsed, ROM page PSRAM: yes"
+  logged "diag: rumble held, ROM page PSRAM: yes"
+  logged "mode game from PSRAM"
+  # 60 pulses in kernel mode; 60 (and a last off) and one hold under the
+  # PSRAM page, with the kernel's page back after each
   motor=$(grep -o 'rumble o.*' "$log" | sort | uniq -c | tr -s ' ' | paste -sd ,)
-  [ $ok = 0 ] || [ "$motor" = " 61 rumble off, 60 rumble off (GPIO port off), 61 rumble on, 60 rumble on (GPIO port off)" ] ||
-    bad "the cart saw the motor as: $motor"
+  [ $ok = 0 ] || [ "$motor" = " 122 rumble off, 121 rumble on" ] || bad "the cart saw the motor as: $motor"
+  [ $ok = 0 ] || [ "$(grep -o 'omega [0-9]*: mode .*' "$log" | tail -1 | cut -d' ' -f3-)" = "mode kernel" ] ||
+    bad "the kernel's page wasn't put back"
   pass "Diagnostics' rumble step"
 
   # Diagnostics reads the loader and says when it's damaged, as v0.2.2 left

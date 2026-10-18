@@ -159,11 +159,24 @@ fetches in SD mode.
   rumble needs GAME RTC on, so the kernel opens the GPIO port for rumble games too
   (`Game_hardware`, `Game_GPIO_status`): Drill Dozer and WarioWare: Twisted! and
   MBC5+RUMBLE GB/GBC games use rumble; other GBA games, MBC3+TIMER GB/GBC games and
-  PocketNES use the clock. Diagnostics' rumble step asks whether pulses rumble, whether
-  2 held for a second does, and whether pulses do with `0x096A0000` at 0. Nothing
-  sets `0x09E20000` back afterwards, as no other value for it is known; Jagoomba
-  leaves it at `0xF1` too, and games launched after it ran fine. The emulated
-  cart traces the motor (`rumble on`, `rumble off`) but has none.
+  PocketNES use the clock. Nothing sets `0x09E20000` back after rumble, as no other
+  value for it is known; Jagoomba leaves it at `0xF1` too, and games launched after it
+  ran fine.
+  **In kernel mode the motor doesn't answer** (v0.2.3+ Diagnostics, real cart,
+  2026-10-18, build `D77FBB2C`): Jagoomba's pulses, 2 held for a second, and pulses with
+  `0x096A0000` at 0 all got "no", with the GPIO port on for the first two, while
+  Pokémon Pinball in Jagoomba rumbled on the same cart. Under ROM page `0x8002`,
+  `0x08001000` is the kernel NOR's window; Jagoomba writes it under page `0x200`
+  (PSRAM), after a launch that also sent the game's save type (`SetbufferControl(3)`
+  with `SET_PARAMETER_MODE`) and set `0x096A0000`. To find which of those the motor
+  needs, Diagnostics now drives it in kernel mode and then with the ROM page at PSRAM
+  (pulsed and held, from IWRAM with interrupts off, logging what `0x08001000` reads),
+  and the rumble probe ROM (`tests/roms/rumble`, launched CLEAN BOOT) tries four ways in
+  game mode: Jagoomba's pulses, 2 held, pulses with the port off, and GPIO pin 3 as
+  Drill Dozer drives it. Its answers land in SRAM page `0xF0` at `0x1A00` and the
+  kernel's next boot logs them (`rumble probe:`). The emulated cart traces the motor
+  (`rumble on`, `rumble off`, with `(GPIO port off)` when `0x096A0000` bit 0 is clear)
+  in either mode, but has none.
 
 ### FPGA firmware update protocol
 
@@ -480,10 +493,12 @@ emulated cart can't tell, which the real cart's logs will:
     at both types and widths: the EEPROM answers only in game mode. The
     emulated cart answers as an EEPROM only once a BIOS SoftReset or
     HardReset has started the game in game mode, as every launch does.
-- **Rumble** (resolved): the motor is driven through `0x09E20000` and
-  `0x08001000`, not the GPIO port (*RTC and rumble*). Still open, for the
-  next Diagnostics run: whether holding 2 at `0x08001000` rumbles, and
-  whether the motor needs `0x096A0000` bit 0.
+- **Rumble:** Jagoomba drives the motor through `0x09E20000` and
+  `0x08001000`, not the GPIO port, but the same writes in kernel mode don't
+  rumble (*RTC and rumble*). Open, for the next cart run (Diagnostics and
+  the rumble probe ROM): whether ROM page `0x200` is enough or game mode is
+  needed, whether holding 2 rumbles, whether the motor needs `0x096A0000`
+  bit 0, and whether GPIO pin 3 (Drill Dozer) rumbles in game mode.
 - **SD writes through `Write_SD_sectors` use 16-bit DMA** from the
   caller's buffer, and FatFs passes whole sectors straight from the
   buffer given to `f_write`. A buffer at an odd address shifts the data by

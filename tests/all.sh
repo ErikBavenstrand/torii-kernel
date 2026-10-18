@@ -17,6 +17,7 @@ jobs=(
   "tests/saves.sh full"
   "tests/eeprom_probe.sh 512"
   "tests/eeprom_probe.sh 8k"
+  "tests/rumble_probe.sh"
   "tests/crash.sh"
   "tests/state.sh"
   "tests/settings.sh"

@@ -17,6 +17,7 @@
 #define CARTLOG_SNAPSHOT 0x0E001000  // the in-game menu's DEBUG entry (gba_rts_patch.s)
 #define CARTLOG_SNAPSHOT_SIZE 0x500
 #define CARTLOG_EEPROM_PROBE 0x0E001800  // the EEPROM probe ROM's report (source/eepromprobe.h)
+#define CARTLOG_RUMBLE_PROBE 0x0E001A00  // the rumble probe ROM's report (source/rumbleprobe.h)
 // Pages Diagnostics may write test patterns to: free SRAM past the states.
 #define CARTLOG_TEST_PAGE 0xC0
 

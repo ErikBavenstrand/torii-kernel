@@ -9,6 +9,7 @@
 #include "build_id.h"
 #include "cartlog.h"
 #include "eepromprobe.h"
+#include "rumbleprobe.h"
 #include "ff.h"
 #include "tlog.h"
 
@@ -74,11 +75,14 @@ static union {
 	struct cartlog_crash crash;
 	struct cartlog_snapshot snapshot;
 	struct eeprom_probe probe;
+	struct rumble_probe rumble;
 } block EWRAM_BSS;
 #define crash block.crash
 _Static_assert(CARTLOG_CRASH + sizeof(struct cartlog_crash) <= CARTLOG_SNAPSHOT, "crash dump size");
 _Static_assert(CARTLOG_SNAPSHOT + CARTLOG_SNAPSHOT_SIZE <= CARTLOG_EEPROM_PROBE, "snapshot size");
 _Static_assert(sizeof(struct eeprom_probe) == 0x200, "EEPROM probe report layout");
+_Static_assert(CARTLOG_EEPROM_PROBE + sizeof(struct eeprom_probe) <= CARTLOG_RUMBLE_PROBE, "EEPROM probe size");
+_Static_assert(sizeof(struct rumble_probe) == 0x58, "rumble probe report layout");
 
 // --- Cart RAM access ----------------------------------------------------------
 
@@ -300,6 +304,33 @@ static int written_before(const struct eeprom_probe *p, u32 i)
 	return 0;
 }
 
+// The rumble probe ROM's report (tests/roms/rumble): each way it drove the
+// motor in game mode, the user's answer, and what 0x08001000 read.
+static void report_rumble_probe(void)
+{
+	static const char *const ways[] = {
+		"?",
+		"pulsed as Jagoomba does (0xF1 at 0x09E20000, then 2 and 0 at 0x08001000 each frame)",
+		"0x08001000 held at 2 (after 0xF1 at 0x09E20000)",
+		"pulsed as Jagoomba does, with 0x096A0000 at 0 (GPIO port off)",
+		"GPIO pin 3 held on, as Drill Dozer does (enable 1, direction 8, data 8)",
+	};
+	static const char *const answers[] = {"skipped", "yes", "no"};
+	struct rumble_probe *p = &block.rumble;
+	cart_read(CARTLOG_RUMBLE_PROBE, p, sizeof(*p));
+	if (memcmp(p->magic, RUMBLE_PROBE_MAGIC, 16) != 0)
+		return;
+	cart_clear_magic(CARTLOG_RUMBLE_PROBE, 16);
+	u32 tries = p->tries < RUMBLE_PROBE_TRIES ? p->tries : RUMBLE_PROBE_TRIES;
+	tlog_force(TLOG_INFO, "rumble probe: %lu tries in game mode", (unsigned long)tries);
+	for (u32 i = 0; i < tries; i++) {
+		const struct rumble_probe_try *t = &p->t[i];
+		tlog_force(TLOG_INFO, "rumble probe: %s: %s; 0x08001000 read %04X, %04X after 2, %04X after 0",
+			   t->way < sizeof(ways) / sizeof(*ways) ? ways[t->way] : ways[0],
+			   t->answer < 3 ? answers[t->answer] : "?", t->before, t->on, t->off);
+	}
+}
+
 // The EEPROM probe ROM's report (tests/roms/eeprom): each step, where each
 // read's data came from, and what they add up to.
 static void report_eeprom_probe(void)
@@ -404,6 +435,7 @@ void cartlog_boot_report(void)
 	prev_crashed = report_crash();
 	report_snapshot();
 	report_eeprom_probe();
+	report_rumble_probe();
 	if (tlog_level == TLOG_OFF)
 		return;
 
