@@ -42,9 +42,6 @@ _Static_assert(READCACHE_SORT_WORK >= 0x1E0 && READCACHE_SORT_WORK % 4 == 0 &&
 		       READCACHE_SORT_WORK + SORT_WORK_SIZE <= 0x2000,
 	       "the sort's work buffer meets Clear()'s line or the cheat list");
 
-// A row holds the longest entry get_count keeps and the kernel writes: a
-// folder under MAX_path_len, '/', and a list entry's name.
-#define RECENT_LEN (MAX_path_len + sizeof(((FM_FILE_FS *)0)->filename))
 char p_recently_play[10][RECENT_LEN] EWRAM_BSS ALIGN(4);
 TCHAR currentpath[MAX_path_len];//
 TCHAR currentpath_temp[MAX_path_len];
