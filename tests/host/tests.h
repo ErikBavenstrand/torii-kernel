@@ -61,5 +61,15 @@ void test_input_repeat_schedule(void);
 void test_input_accel_reset(void);
 void test_input_paging(void);
 void test_input_wrap(void);
+void test_pool_alloc_free_merge(void);
+void test_pool_align_range_top(void);
+void test_pool_tags_cache_revive(void);
+void test_pool_slots(void);
+void test_pool_random(void);
+void test_res_arena(void);
+void test_pool_tag_place(void);
+void test_pool_slots_exact_fit(void);
+void test_pool_age_wrap(void);
+void test_budget_check(void);
 
 #endif

@@ -15,6 +15,15 @@ git log, not here.
 - **Added:** each menu screen logs `screen ready: NAME` at debug level once
   drawn, so the golden-screen tests (`tests/shots`) wait for screens rather
   than fixed frames (`65acf23`).
+- **Added:** the v0.3 tile engine's core in `source/engine/`, not yet used by
+  any screen: a 60 fps frame loop with idle detection, state-machine jobs
+  within a cycle budget, shadow video registers, palettes and OAM committed
+  in VBlank through a capped VRAM queue, allocators for VRAM, palette banks
+  and affine matrices with per-view arenas, and a layout budget checker
+  (`a5d6392`, `09a5d58`).
+- **Changed:** Diagnostics' timings read a free-running TM2/TM3 cycle counter
+  shared with the engine, instead of restarting the timers each time
+  (`a5d6392`).
 
 ## v0.2.4 (2026-10-18)
 

@@ -11,7 +11,8 @@ cc -std=gnu11 -g -O1 -fno-omit-frame-pointer -funsigned-char \
   -Wall -Wextra -Wshadow -Wundef -Wformat=2 -Wstrict-prototypes -Wmissing-prototypes -Werror \
   -I tests/host -o dist/host/tests \
   source/sort.c source/cheat.c source/charset.c source/irqpatch.c source/savename.c source/logbuf.c source/lz77.c source/logcheck.c source/eepromprobe.c source/norlist.c source/bootloader.c source/crc32.c \
-  source/engine/motion.c source/engine/ease_lut.c source/engine/input.c tests/host/*.c
+  source/engine/motion.c source/engine/ease_lut.c source/engine/input.c \
+  source/engine/pool.c source/engine/res.c source/engine/budget.c tests/host/*.c
 # A hung test (an endless loop in a sort, say) fails after a minute, and
 # output is capped: ASan can loop printing "AddressSanitizer:DEADLYSIGNAL"
 # when the kernel randomises mmap with more bits than it supports (CI's

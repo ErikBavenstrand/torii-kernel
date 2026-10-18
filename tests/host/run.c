@@ -97,6 +97,16 @@ static const struct {
 	{"input_accel_reset", test_input_accel_reset},
 	{"input_paging", test_input_paging},
 	{"input_wrap", test_input_wrap},
+	{"pool_alloc_free_merge", test_pool_alloc_free_merge},
+	{"pool_align_range_top", test_pool_align_range_top},
+	{"pool_tags_cache_revive", test_pool_tags_cache_revive},
+	{"pool_slots", test_pool_slots},
+	{"pool_random", test_pool_random},
+	{"res_arena", test_res_arena},
+	{"pool_tag_place", test_pool_tag_place},
+	{"pool_slots_exact_fit", test_pool_slots_exact_fit},
+	{"pool_age_wrap", test_pool_age_wrap},
+	{"budget_check", test_budget_check},
 };
 
 int main(void)
