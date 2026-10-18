@@ -8,8 +8,9 @@
 // The d-pad repeats: it fires on the press frame, again once held for delay
 // frames, then every interval frames, and every fast_interval frames once a
 // repeat would fall at or past fast_after frames held (every skip_interval
-// frames instead while the caller says the scroll animation is skipped). Releasing a direction, or
-// pressing another, starts the schedule over. L and R fire on the press,
+// frames instead while the caller says the scroll animation is skipped).
+// Pressing a direction, or releasing one, starts every held direction's
+// schedule over: one still held fires again only after delay frames. L and R fire on the press,
 // after page_delay frames, then every page_interval frames, with no speed-up.
 // Other keys fire only on the press.
 #ifndef TORII_INPUT_H

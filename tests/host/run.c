@@ -94,6 +94,7 @@ static const struct {
 	{"spring_jump_and_shift", test_spring_jump_and_shift},
 	{"motion_targets", test_motion_targets},
 	{"motion_cap_and_handles", test_motion_cap_and_handles},
+	{"motion_range_before_alloc", test_motion_range_before_alloc},
 	{"palette_fade", test_palette_fade},
 	{"input_tap", test_input_tap},
 	{"input_repeat_schedule", test_input_repeat_schedule},

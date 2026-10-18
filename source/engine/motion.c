@@ -94,9 +94,12 @@ static MotionId add(MotionTarget target, s32 value, u8 kind, u8 owner)
 	return MOTION_NONE;
 }
 
-static void check_range(int64_t value)
+// 1 if value is within the limit; logs an assert otherwise.
+static int check_range(int64_t value)
 {
-	TLOG_ASSERT(value >= -VALUE_LIMIT && value <= VALUE_LIMIT);
+	int ok = value >= -VALUE_LIMIT && value <= VALUE_LIMIT;
+	TLOG_ASSERT(ok);
+	return ok;
 }
 
 static s32 clamp_omega(s32 omega)
@@ -182,7 +185,8 @@ static void step_spring(Motion *m, u32 dt)
 			x += v;
 		}
 		// Checked once a frame, so dt 3 matches three frames of dt 1.
-		s32 off = m->goal - x;
+		// In 64 bits: goal and x may sit at opposite value limits.
+		int64_t off = (int64_t)m->goal - x;
 		if (off > -near && off < near && v > -slow && v < slow) {
 			x = m->goal;
 			v = 0;
@@ -243,12 +247,13 @@ u32 motion_count(void)
 
 MotionId motion_tween(MotionTarget target, s32 from, s32 to, u32 frames, Ease ease, u8 owner)
 {
+	// Checked before a slot is taken, so a bad value leaves the pool alone
+	if (!check_range(from) || !check_range(to))
+		return MOTION_NONE;
 	MotionId id = add(target, from, KIND_TWEEN, owner);
 	Motion *m = find(id);
 	if (!m)
 		return MOTION_NONE;
-	check_range(from);
-	check_range(to);
 	m->ease = (u8)ease;
 	m->start = from;
 	m->goal = to;
@@ -262,7 +267,8 @@ void motion_tween_to(MotionId id, s32 to, u32 frames)
 	Motion *m = find(id);
 	if (!m || m->kind != KIND_TWEEN)
 		return;
-	check_range(to);
+	if (!check_range(to))
+		return;
 	m->start = m->value;
 	m->goal = to;
 	m->u.tween.elapsed = 0;
@@ -272,11 +278,12 @@ void motion_tween_to(MotionId id, s32 to, u32 frames)
 
 MotionId motion_spring(MotionTarget target, s32 value, s32 omega, u8 owner)
 {
+	if (!check_range(value))
+		return MOTION_NONE;
 	MotionId id = add(target, value, KIND_SPRING, owner);
 	Motion *m = find(id);
 	if (m)
 		m->u.omega = clamp_omega(omega);
-	check_range(value);
 	return id;
 }
 
@@ -285,7 +292,8 @@ void motion_spring_target(MotionId id, s32 target)
 	Motion *m = find(id);
 	if (!m || m->kind != KIND_SPRING || m->goal == target)
 		return;
-	check_range(target);
+	if (!check_range(target))
+		return;
 	m->goal = target;
 	m->flags |= FLAG_RUNNING;
 }
@@ -295,7 +303,8 @@ void motion_spring_jump(MotionId id, s32 value)
 	Motion *m = find(id);
 	if (!m || m->kind != KIND_SPRING)
 		return;
-	check_range(value);
+	if (!check_range(value))
+		return;
 	m->value = value;
 	m->goal = value;
 	m->start = 0;
@@ -307,8 +316,8 @@ void motion_spring_shift(MotionId id, s32 delta)
 	Motion *m = find(id);
 	if (!m || m->kind != KIND_SPRING || delta == 0)
 		return;
-	check_range((int64_t)m->value + delta);
-	check_range((int64_t)m->goal + delta);
+	if (!check_range((int64_t)m->value + delta) || !check_range((int64_t)m->goal + delta))
+		return;
 	m->value += delta;
 	m->goal += delta;
 	m->flags |= FLAG_WRITE;
@@ -355,6 +364,14 @@ void motion_free_owner(u8 owner)
 			retire(&pool[slot]);
 }
 
+// diff * f / 256, rounded to the nearest with halves away from zero, so a
+// fade towards white and one towards black move a channel by the same amount
+static s32 fade_step(s32 diff, s32 f)
+{
+	s32 d = diff * f;
+	return d >= 0 ? (d + 128) >> 8 : -((-d + 128) >> 8);
+}
+
 void palette_fade(u16 *dst, const u16 *src, u32 count, u16 color, u32 factor)
 {
 	if (factor > FADE_MAX)
@@ -364,9 +381,9 @@ void palette_fade(u16 *dst, const u16 *src, u32 count, u16 color, u32 factor)
 	for (u32 i = 0; i < count; i++) {
 		s32 c = src[i];
 		s32 r = c & 31, g = c >> 5 & 31, b = c >> 10 & 31;
-		r += (tr - r) * f >> 8;
-		g += (tg - g) * f >> 8;
-		b += (tb - b) * f >> 8;
+		r += fade_step(tr - r, f);
+		g += fade_step(tg - g, f);
+		b += fade_step(tb - b, f);
 		dst[i] = (u16)(r | g << 5 | b << 10);
 	}
 }

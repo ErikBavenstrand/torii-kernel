@@ -58,6 +58,7 @@ void test_spring_retarget(void);
 void test_spring_jump_and_shift(void);
 void test_motion_targets(void);
 void test_motion_cap_and_handles(void);
+void test_motion_range_before_alloc(void);
 void test_palette_fade(void);
 void test_input_tap(void);
 void test_input_repeat_schedule(void);

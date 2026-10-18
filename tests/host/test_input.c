@@ -131,9 +131,14 @@ void test_input_accel_reset(void)
 	check_frames(right, nr, r_want, 3);
 	CHECK_EQ(nd, 2);
 	check_frames(down, nd, d_want, 2);
-	// Letting go of the new one leaves the old one on its fresh schedule.
-	input_step(&s, INPUT_DOWN, 1, 1);  // frame 20 of the new schedule
+	// Letting go of the new one starts the old one's schedule over again:
+	// its next repeat comes delay frames after the release.
+	input_step(&s, INPUT_DOWN, 1, 1);
 	CHECK(!input_fired(&s, INPUT_DOWN));
+	n = hold(&s, INPUT_DOWN, INPUT_DOWN, 20, 1, fired, 64);
+	CHECK_EQ(n, 2);
+	static const u32 after_release[] = {14, 18};
+	check_frames(fired, n, after_release, 2);
 	// L and R don't reset the d-pad.
 	input_init(&s, NULL);
 	hold(&s, INPUT_DOWN, INPUT_DOWN, 100, 0, fired, 64);
