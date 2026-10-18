@@ -388,7 +388,10 @@ The kernel's copy is made safe like this:
    checks out, so a failed copy is retried on the next boot.
 4. **Sanity checks:** a blank chip (all `FF` or `00`), or one identical to the file, is
    skipped without making a backup. A chip that doesn't look like the slot that was loaded
-   asks before writing.
+   asks before writing. This also ends the blank 64 KB `.sav` that every game missing from
+   the save table gets today (save mode `0x10`, from `Check_saveMODE`): it gets no file at
+   launch, and one only once its chip differs from the blank pattern the kernel loaded.
+   `tests/saves.sh` checks it with `hello.gba`, which never saves.
 5. **Write failures:** a failed write shows a clear error and keeps everything.
 6. **Tests:** the emulated cart cuts power at every step, and the test checks that a good
    save always survives.
