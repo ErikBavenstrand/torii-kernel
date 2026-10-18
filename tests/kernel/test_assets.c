@@ -37,6 +37,9 @@ static void reset_engine(int quiet)
 	gfx_dirty_pal = 0;
 	res_init();
 	jobs_init();
+	// The pools are new: no cover slot may keep a handle into the old ones,
+	// or a later cover_cache_invalidate (a launch) would release it
+	cover_reset();
 	res_errors_quiet = (u8)quiet;
 }
 
@@ -322,6 +325,23 @@ void test_asset_cover_cache(void)
 	cover_slot_show(1, 3);
 	cover_update();
 	CHECK_EQ(cover_slot_state(1), COVER_SLOT_FAILED);
+
+	// Emptied with its upload still queued: its tiles stay allocated until
+	// the copy has landed, so it can't land in VRAM someone else owns
+	struct pool *obj = res_pool(RES_OBJ_VRAM);
+	cover_slot_show(2, 1);
+	cover_update();
+	CHECK_EQ(cover_slot_state(2), COVER_SLOT_UPLOADING);
+	u16 queued = pool_free_units(obj, 0);
+	cover_slot_clear(2);
+	CHECK_EQ(pool_free_units(obj, 0), queued);
+	while (REG_VCOUNT_A >= 160)
+		;
+	while (REG_VCOUNT_A < 160)
+		;
+	gfx_commit_queue(GFX_COMMIT_BYTES, GFX_COMMIT_LAST_LINE);
+	cover_update();
+	CHECK_EQ(pool_free_units(obj, 0), queued + 4);
 
 	// Clearing frees the tiles; invalidating forgets the cache
 	u16 free_before = pool_free_units(res_pool(RES_OBJ_VRAM), 0);

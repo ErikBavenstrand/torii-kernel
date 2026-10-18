@@ -310,10 +310,10 @@ index 1d0c0dd..b77704a 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..2c4e9aa
+index 0000000..cf1b236
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1329 @@
+@@ -0,0 +1,1348 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -384,6 +384,10 @@ index 0000000..2c4e9aa
 +// No write may reach the chip below the kernel: the loader and the 192 KB
 +// after it. One that does stops the emulator with this status.
 +#define LOADER_WRITE_STATUS 76
++// A PSRAM write while the cart is in SD mode, which hides PSRAM: where it
++// lands on the real cart isn't known, so the emulator stops with this status
++// (unless OMEGA_SD_PSRAM_WRITES=allow) rather than let it work here.
++#define SD_PSRAM_WRITE_STATUS 77
 +// The kernel's data sectors (save info, NOR lists, settings) start here, so
 +// the kernel copied in at power-on stops before them.
 +#define OMEGA_KERNEL_DATA 0x780000
@@ -571,6 +575,18 @@ index 0000000..2c4e9aa
 +	_syncFile(omega->sramVf, omega->sram, OMEGA_SRAM_SIZE);
 +	fflush(NULL);
 +	_exit(LOADER_WRITE_STATUS);
++}
++
++// Called for a CPU or DMA write to the PSRAM window while SD mode is on.
++static void _sdPsramWrite(uint32_t address, uint32_t psram) {
++	fprintf(stderr, "omega: PSRAM WRITTEN IN SD MODE at %08X (PSRAM %07X); the real cart hides PSRAM then\n",
++	        address, psram);
++	const char* allow = getenv("OMEGA_SD_PSRAM_WRITES");
++	if (allow && !strcmp(allow, "allow")) {
++		return;
++	}
++	fflush(NULL);
++	_exit(SD_PSRAM_WRITE_STATUS);
 +}
 +
 +
@@ -1587,6 +1603,9 @@ index 0000000..2c4e9aa
 +		_norWrite(&omega->kernelNor, _kernelNorOffset(omega, offset), value);
 +	} else if (offset < GAME_NOR_WINDOW) {
 +		uint32_t psram = (((omega->psramPage >> 12) * WINDOW_SIZE) + offset - PSRAM_WINDOW) & (OMEGA_PSRAM_SIZE - 1);
++		if (omega->sdControl) {
++			_sdPsramWrite(address, psram);
++		}
 +		omega->psram[psram] = value;
 +		omega->psram[psram + 1] = value >> 8;
 +	} else if (offset < GAME_NOR_WINDOW + WINDOW_SIZE) {

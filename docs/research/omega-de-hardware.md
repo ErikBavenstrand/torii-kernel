@@ -133,7 +133,9 @@ fetches in SD mode.
   `WAITCNT_MENU`; the first 4 MB stay free for other menu data. A launch
   overwrites it, so the launch empties the cache first. In SD mode the cart
   hides PSRAM too, so `f_read` can't fill it directly: data from the card
-  goes through RAM.
+  goes through RAM. Where a PSRAM write lands in SD mode isn't known, so the
+  emulated cart stops with status 77 on one (`OMEGA_SD_PSRAM_WRITES=allow`
+  lets it run on).
 - **SRAM / flash-save emulation:** `0x0E000000`, paged by `0x09C00000`; `Bank_Switching` uses
   the flash-save command sequence `0x5555=AA, 0x2AAA=55, 0x5555=B0, 0x0000=bank`.
 - **RTC and rumble:** standard GBA cart GPIO at `0x080000C4` (data), `0xC6` (dir), `0xC8` (enable),

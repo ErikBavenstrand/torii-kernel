@@ -89,11 +89,16 @@ extern struct cover_stats cover_stats;
 // to (jobs_cancel_owner), or JOB_OWNER_NONE.
 void cover_init(cover_locate_fn locate, u8 owner);
 void cover_on_ready(cover_ready_fn ready);
+// Forgets everything without releasing anything, as before cover_init: for
+// when engine_init (or res_init and jobs_init) has reset what the slots and
+// the loader held. Closes the loader's file if open.
+void cover_reset(void);
 // Stops the loader (closing its file) and empties every slot, freeing
 // their sprite tiles and palette banks. The cache keeps what it decoded.
 void cover_shutdown(void);
-// PSRAM is about to be overwritten (a game launch): cover_shutdown, and the
-// cache forgets everything. Does nothing before cover_init.
+// PSRAM is about to be overwritten (a game launch): stops the loader
+// (closing its file) and forgets everything as cover_reset does, releasing
+// nothing; cover_init again to stream. Does nothing before cover_init.
 void cover_cache_invalidate(void);
 
 // A batch of wants (see covercache.h): begin, want each id with its
@@ -105,7 +110,8 @@ void cover_wants_end(void);
 // Shows id in slot (0 to COVER_SLOTS - 1), replacing what it showed; the
 // same id again changes nothing. Returns 0 for a bad slot.
 int cover_slot_show(u8 slot, u32 id);
-// Empties slot, freeing its tiles and palette bank.
+// Empties slot, freeing its tiles and palette bank (once its upload, if
+// still queued, has landed).
 void cover_slot_clear(u8 slot);
 u8 cover_slot_state(u8 slot);
 u32 cover_slot_id(u8 slot);

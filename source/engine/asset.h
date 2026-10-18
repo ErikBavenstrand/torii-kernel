@@ -73,8 +73,10 @@ static inline u32 asset_tile_bytes(const struct asset_header *h)
 
 // Checks a header against the file's size and the first word of its LZ77
 // data (lz_word, the BIOS header: type 0x10, then the decoded size).
-// Returns ASSET_OK or why not; a file that passes decodes within
-// ASSET_TILE_BYTES_MAX, so the BIOS never writes past a buffer that size.
+// Returns ASSET_OK or why not. A file that passes declares at most
+// ASSET_TILE_BYTES_MAX decoded bytes; a broken stream can still make a
+// decoder that checks only between blocks write up to 17 bytes past that
+// (mGBA's does; the BIOS's is unverified), so leave 18 bytes of slack.
 int asset_check(const struct asset_header *h, u32 file_bytes, u32 lz_word);
 // Words for asset_check's result, for messages.
 const char *asset_error_text(int error);

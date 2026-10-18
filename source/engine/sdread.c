@@ -74,6 +74,8 @@ int sd_read_step(struct sd_read *r)
 			n = r->chunk;
 		int psram = psram_holds(r->dst, r->max);
 		u8 *buf = psram ? stage_buffer() : r->dst + r->done;
+		if (psram)
+			psram_begin();
 		UINT got = 0;
 		FRESULT fr = f_read(&r->fil, buf, n, &got);
 		if (fr != FR_OK || got != n || (psram && !psram_write(r->dst + r->done, buf, (n + 3) & ~3u))) {

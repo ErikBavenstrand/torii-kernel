@@ -2388,6 +2388,10 @@ re_showfile:
 // starts the game.
 static void Launch_now(u16 page, u32 key_L, const char *how)
 {
+	// Every launch path ends here: no cover job keeps a file open past this
+	// point, and the cache in PSRAM is forgotten (the SD paths did so before
+	// loading; a second call does nothing)
+	cover_cache_invalidate();
 	if (tlog_wants(TLOG_INFO)) {
 		tlog("launch: %s, %s reset", how, key_L ? "hard (L held)" : "soft");
 		static const char *const uses[] = {"neither", "the clock", "rumble", "the clock and rumble"};
@@ -2402,6 +2406,7 @@ static void Launch_now(u16 page, u32 key_L, const char *how)
 //---------------------------------------------------------------------------------
 static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 {
+	cover_cache_invalidate();  // before the save files are touched, as boot_game does
 	//TCHAR savfilename[100];
 	TCHAR *pfilename;
 	u32 gamefilesize = 0;

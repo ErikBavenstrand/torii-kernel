@@ -55,6 +55,18 @@ static struct {
 } loader EWRAM_BSS;
 struct cover_stats cover_stats EWRAM_BSS;
 
+// What a slot held when it was emptied with its upload still queued: its
+// sprite tiles and palette bank stay allocated, and its cache entry pinned
+// (so the PSRAM source stays), until the copy has landed. Otherwise the
+// VBlank queue could copy a newer cover's bytes into VRAM someone else owns.
+#define DRAINS (2 * COVER_SLOTS)
+struct drain {
+	u32 ticket;
+	u8 used;
+	u8 entry, tiles, pal;
+};
+static struct drain drains[DRAINS] EWRAM_BSS;
+
 u8 *cover_psram_slot(u8 entry)
 {
 	return (u8 *)(PSRAM_ASSET_BASE + COVER_STAGE_BYTES + (u32)entry * COVER_SLOT_BYTES);
@@ -93,7 +105,9 @@ static int decode(u8 entry, const u8 *src, u32 bytes)
 	}
 	u8 *stage = stage_buffer();
 	u32 start = cycles_now();
-	// asset_check made sure the BIOS writes at most ASSET_TILE_BYTES_MAX
+	// asset_check made sure the decoded size is at most ASSET_TILE_BYTES_MAX;
+	// a broken stream may run up to 17 bytes past it (as mGBA's decoder
+	// does), into STAGE_PALETTE, which is written right after
 	LZ77UnCompWram(src + lz_at, stage + STAGE_TILES);
 	u32 lz77 = cycles_since(start);
 	memcpy(stage + STAGE_PALETTE, src + ASSET_HEADER_BYTES, asset_palette_bytes(&h));
@@ -149,6 +163,7 @@ static int loader_step(struct job *job)
 		}
 		cc_load_start(&cache, e);
 		loader.entry = e;
+		psram_begin();  // the stage and the slots are in page 0
 		u32 id = cache.entry[e].id;
 		struct cover_src src = {COVER_SRC_NONE, 0, 0};
 		char *path = (char *)stage_buffer() + STAGE_PATH;
@@ -230,8 +245,42 @@ static void slot_free_vram(struct slot *s)
 	s->tiles = s->pal = RES_NONE;
 }
 
+// Frees what drained slots held once their copies have landed.
+static void drains_run(void)
+{
+	for (u32 i = 0; i < DRAINS; i++) {
+		struct drain *d = &drains[i];
+		if (!d->used || !gfx_queue_done(d->ticket))
+			continue;
+		if (d->tiles != RES_NONE)
+			res_unref(RES_OBJ_VRAM, d->tiles);
+		if (d->pal != RES_NONE)
+			res_unref(RES_OBJ_PAL, d->pal);
+		if (d->entry != COVER_NONE)
+			cc_unpin(&cache, d->entry);
+		d->used = 0;
+	}
+}
+
 static void slot_empty(struct slot *s)
 {
+	if (s->state == COVER_SLOT_UPLOADING && !gfx_queue_done(s->ticket)) {
+		for (u32 i = 0; i < DRAINS; i++) {
+			struct drain *d = &drains[i];
+			if (d->used)
+				continue;
+			d->used = 1;
+			d->ticket = s->ticket;
+			d->entry = s->entry;
+			d->tiles = s->tiles;
+			d->pal = s->pal;
+			s->entry = COVER_NONE;
+			s->tiles = s->pal = RES_NONE;
+			break;
+		}
+		// With every drain in use (more uploads queued than the queue
+		// holds), free now: a queued copy then lands in freed VRAM
+	}
 	slot_free_vram(s);
 	if (s->entry != COVER_NONE)
 		cc_unpin(&cache, s->entry);
@@ -305,7 +354,10 @@ static int slot_upload(u8 n)
 		memcpy(colours, psram + COVER_SLOT_PALETTE, (u32)h.colours * 2);
 		gfx_pal_load(16 + res_start(RES_OBJ_PAL, s->pal), colours, 16);
 	}
-	gfx_queue_copy(res_obj_addr(s->tiles), psram + COVER_SLOT_TILES, asset_tile_bytes(&h));
+	if (!gfx_queue_copy(res_obj_addr(s->tiles), psram + COVER_SLOT_TILES, asset_tile_bytes(&h))) {
+		slot_settle(n, 0);
+		return 0;
+	}
 	s->ticket = gfx_queue_ticket();
 	s->shape = (u8)(shape >> 2);
 	s->size = (u8)(shape & 3);
@@ -318,23 +370,29 @@ static int slot_upload(u8 n)
 
 // --- The API ----------------------------------------------------------------
 
-void cover_init(cover_locate_fn locate, u8 owner)
+void cover_reset(void)
 {
 	// engine_init has reset the jobs and pools: nothing to release, but a
 	// file the old loader had open
 	if (loader.ready && loader.rd.open)
 		f_close(&loader.rd.fil);
 	memset(&loader, 0, sizeof(loader));
-	TLOG_ASSERT(!((u32)stage_buffer() & 3));  // pReadCache, as the linker places it
-	loader.locate = locate;
-	loader.owner = owner;
 	loader.entry = COVER_NONE;
 	loader.job = JOB_NONE;
-	loader.ready = 1;
 	cc_init(&cache);
 	for (u32 i = 0; i < COVER_SLOTS; i++)
 		slot_reset(&slots[i]);
+	memset(drains, 0, sizeof(drains));
 	memset(&cover_stats, 0, sizeof(cover_stats));
+}
+
+void cover_init(cover_locate_fn locate, u8 owner)
+{
+	cover_reset();
+	TLOG_ASSERT(!((u32)stage_buffer() & 3));  // pReadCache, as the linker places it
+	loader.locate = locate;
+	loader.owner = owner;
+	loader.ready = 1;
 }
 
 void cover_on_ready(cover_ready_fn ready)
@@ -351,14 +409,20 @@ void cover_shutdown(void)
 	loader_stop();
 	for (u32 i = 0; i < COVER_SLOTS; i++)
 		slot_empty(&slots[i]);
+	drains_run();
 }
 
 void cover_cache_invalidate(void)
 {
 	if (!loader.ready)
 		return;
-	cover_shutdown();
-	cc_invalidate(&cache);
+	// Close the loader's file; then forget, releasing nothing: the launch
+	// discards the engine, and handles from before an engine_init would
+	// release blocks the pools have since given to others
+	if (loader.job != JOB_NONE && job_running(loader.job))
+		job_cancel(loader.job);
+	loader_stop();
+	cover_reset();
 }
 
 void cover_wants_begin(void)
@@ -468,6 +532,7 @@ void cover_update(void)
 {
 	if (!loader.ready)
 		return;
+	drains_run();
 	u32 uploads = 0;
 	for (u8 n = 0; n < COVER_SLOTS; n++) {
 		struct slot *s = &slots[n];
