@@ -4,6 +4,15 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Added:** the v0.3 menu engine's motion and input layers, not yet used by
+  the menu. Motion has eased tweens and critically damped springs (retargets
+  keep their velocity) for scroll, sprites, blend and palette fades. Input
+  repeats per key (15 frames, then every 4, every 2 after 1 s), pages with
+  L/R (20, then 8), and wraps a list only on a fresh press or after a pause
+  at its end (`8b073d0`, `ff18199`).
+
 ## v0.2.4 (2026-10-18)
 
 Tested on a real Omega DE (FPGA firmware 7): everything in v0.2.3, plus the
