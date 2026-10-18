@@ -89,6 +89,14 @@ local function plan(start)
 	end
 end
 
+-- While the kernel has SD mode on, ROM reads return the cart's 4 KB SD
+-- buffer (as on the real cart), and the kernel spends most of a launch's
+-- frames in SD transfers: then the ROM repeats every 4 KB, which a real ROM's
+-- entry branch and header never do.
+local function sdMode()
+	return emu:read32(0x08000000) == emu:read32(0x08001000) and emu:read32(0x080000A0) == emu:read32(0x080010A0)
+end
+
 callbacks:add("frame", function()
 	local frame = emu:currentFrame()
 	-- First word, title, code and header checksum: the kernel's until the
@@ -98,7 +106,7 @@ callbacks:add("frame", function()
 		emu:read32(0x080000A8), emu:read32(0x080000AC), emu:read32(0x080000BC))
 	kernelHeader = kernelHeader or header
 	if not gameStart then
-		if header == kernelHeader then
+		if header == kernelHeader or sdMode() then
 			return
 		end
 		gameStart = frame
@@ -113,7 +121,7 @@ callbacks:add("frame", function()
 			patchStart = target
 			log(string.format("patch %08X", patchStart))
 		end
-		plan(frame)
+		plan(gameStart)
 	elseif header == kernelHeader then
 		report("kernel", "back")  -- the kernel is mapped again (a reset)
 	end

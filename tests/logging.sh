@@ -10,6 +10,8 @@
 #           logs its report, leaves the save chip alone, and its crash test's
 #           dump reaches the log, named by tools/logs.py
 #   rotate  a full log file hands over to the next one
+#   junk    a log file with junk after its text (v0.2.0 on the real cart)
+#           is left alone, and logging goes on in the next
 #   full    a full card stops the logging, not the kernel
 # Every part checks the card with fsck.fat. Runs inside the torii-emu container.
 set -euo pipefail
@@ -30,11 +32,20 @@ new_card() { # size in KB, FAT type
   mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/Hello.gba
 }
 
-# Runs the kernel; its log lines go to kernel.log. A crash report fails the test.
+# Runs the kernel from power-on, which clears cart RAM past the save chip;
+# its log lines go to kernel.log. A crash report fails the test.
 boot() {
   OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin "$@" >>"$cart/out.log" 2>"$cart/run.log" || true
   cat "$cart/run.log" >>"$cart/kernel.log"
   ! grep -q '^crash at frame' "$cart/run.log" || fail "the emulator caught a crash"
+}
+# Runs it as after a soft reset (RESET, or a crash's restart), with the cart
+# still powered: cart RAM keeps its contents.
+soft_boot() { OMEGA_SOFT_RESET=1 boot "$@"; }
+# How many lines of log file N hold TEXT.
+count() {
+  log "${2:-0}" >"$cart/log.txt"
+  grep -cF -- "$1" "$cart/log.txt" || true
 }
 
 # Settings slots (source/ez_define.h) in the kernel NOR, as SLOT=VALUE.
@@ -71,6 +82,19 @@ lines_ok() {
   ! grep -naEv '^(torii log [0-9]{8} +| *[0-9]+\.[0-9]{2} [EID] .*)$' "$cart/log.txt" >"$cart/bad.txt" ||
     fail "torii-${1:-0}.log has a broken line: $(head -2 "$cart/bad.txt")"
 }
+# Every byte of log file N after its text is zero: a new file is filled
+# with zeros from RAM (on the cart, ROM read in SD mode is the SD buffer).
+zeros_ok() {
+  mtype -i "$cart/sd.img" "::/torii/logs/torii-${1:-0}.log" >"$cart/raw.log"
+  python3 - "$cart/raw.log" <<'EOF' || fail "torii-${1:-0}.log isn't all zeros after its text"
+import sys
+data = open(sys.argv[1], "rb").read()
+end = data.find(b"\0", 24)
+if end >= 0 and data[end:].strip(b"\0"):
+    junk = end + next(i for i, b in enumerate(data[end:]) if b)
+    sys.exit(f"text ends at {end:#x}, then a nonzero byte at {junk:#x}")
+EOF
+}
 card_ok() { fsck.fat -n "$cart/sd.img" >/dev/null 2>&1 || fail "fsck.fat finds the card damaged: $(fsck.fat -n "$cart/sd.img" 2>&1 | tail -3)"; }
 
 # Hex of LEN bytes of cart SRAM (sram.bin) from OFFSET.
@@ -104,19 +128,40 @@ launch)
   has "launch: header: title"
   has "launch: CART clock on, rumble on"
   has "launch: starting the game"
-  boot -f 200
+  # Back in the kernel by a soft reset, cart RAM says where the session ended.
+  soft_boot -f 200
   has "previous session: ended in Hello.gba"
   [ "$(log 0 | grep -c 'Torii kernel boot')" = 3 ] || fail "not one session marker a boot"
+  # After a power cycle cart RAM holds nothing.
+  lost="previous session: nothing in cart RAM"
+  before=$(count "$lost")
+  boot -f 200
+  [ "$(count "$lost")" = $((before + 1)) ] || fail "after a power cycle, the boot report didn't say cart RAM was lost"
   card_ok
 
-  # A launch cut off (the emulator stops in the frame that logs it, as if
-  # the power went): the next boot says so.
+  # A launch cut off (the emulator stops in the frame that logs it): after
+  # a soft reset, cart RAM says where it stopped.
   # shellcheck disable=SC2046
   boot $(keys 100 DOWN DOWN A) $(keys 160 A) -u 'launch: loading Hello.gba'
-  boot -f 200
+  soft_boot -f 200
   has "previous session: ended abnormally in launching (step 0): Hello.gba"
+  # After a power cut, only the log's last line can say so, if its flush
+  # finished. A frame holds the whole launch, so write that line here.
+  mtype -i "$cart/sd.img" ::/torii/logs/torii-0.log >"$cart/torii-0.log"
+  python3 - "$cart/torii-0.log" <<'EOF'
+import sys
+data = bytearray(open(sys.argv[1], "rb").read())
+end = data.index(b"\0", 24)
+line = b"   9.99 I launch: loading Hello.gba, CLEAN BOOT\n"
+data[end : end + len(line)] = line
+open(sys.argv[1], "wb").write(data)
+EOF
+  mcopy -o -i "$cart/sd.img" "$cart/torii-0.log" ::/torii/logs/
+  boot -f 200
+  has "previous session: a launch never reached the game; its last line was:    9.99 I launch: loading Hello.gba"
   card_ok
   lines_ok
+  zeros_ok
   echo "PASS: logging off touches neither the card nor cart RAM; at Info a launch is logged, and a cut-off one caught"
   ;;
 
@@ -142,13 +187,15 @@ debug)
     awk -v states_end=$((0xB0000)) -v ours=$((0xF0000)) -v ours_end=$((0xF2000)) \
       '$1 - 1 >= states_end && ($1 - 1 < ours || $1 - 1 >= ours_end) { n++ } END { print n + 0 }')
   [ "$changed" = 0 ] || fail "DEBUG changed $changed bytes of cart RAM outside page 0xF0"
-  boot -f 200
+  # The snapshot survives a soft reset (RESET), not a power cycle.
+  soft_boot -f 200
   has "debug info from the in-game menu: "
   has "(the hook is in place)"
   has "debug info: IE "
   blank 0xF1000 16 || [ "$(sram 0xF1000 16)" = "00000000000000000000000000000000" ] || fail "the debug info wasn't cleared"
   card_ok
   lines_ok
+  zeros_ok
   echo "PASS: the in-game menu's DEBUG writes only cart RAM page 0xF0, and the next boot logs it"
   ;;
 
@@ -207,12 +254,13 @@ sram = bytearray(open(sys.argv[1], "rb").read())
 sram[0xF0100 : 0xF0100 + len(dump)] = dump
 open(sys.argv[1], "wb").write(sram)
 EOF
-  boot -f 200
+  soft_boot -f 200 # the crash handler restarts the kernel without a power cycle
   has "crash: the kernel crashed 1234 frames after boot: pc 02001234"
   [ "$(log 0 | grep -c 'crash: stack 03007.*0800ABCD')" = 64 ] || fail "the big crash dump lost stack lines"
   blank 0xF0100 8 || [ "$(sram 0xF0100 8)" = 0000000000000000 ] || fail "the big crash dump wasn't cleared"
   card_ok
   lines_ok
+  zeros_ok
   echo "PASS: Diagnostics logs with logging off and leaves the save chip and NOR list alone; its crash test's dump reaches the log"
   ;;
 
@@ -248,7 +296,36 @@ EOF
   card_ok
   lines_ok 2
   lines_ok 3
+  zeros_ok 2
+  zeros_ok 3
   echo "PASS: a full log file hands over to the next, which starts empty, between lines"
+  ;;
+
+junk)
+  # What v0.2.0 left on the real cart: file 0 (sequence 5) holds a header,
+  # some text, then junk to its end.
+  new_card 65536 32
+  settings 26=2
+  boot -f 100
+  python3 - "$cart" <<'EOF'
+import random, sys
+random.seed(1)
+text = b"torii log 00000005     \n" + b"   1.00 I the last good line\n"
+junk = bytes(0 if i % 97 < 40 else random.randrange(1, 256) for i in range(65536 - len(text)))
+open(f"{sys.argv[1]}/torii-0.log", "wb").write(text + junk)
+EOF
+  mcopy -o -i "$cart/sd.img" "$cart/torii-0.log" ::/torii/logs/
+  boot -f 200
+  mtype -i "$cart/sd.img" ::/torii/logs/torii-0.log | cmp -s - "$cart/torii-0.log" || fail "the junk file was changed"
+  [ "$(log 1 | head -1)" = "torii log 00000006     " ] || fail "file 1 wasn't started as sequence 6: $(log 1 | head -1)"
+  has "log: torii-0.log has junk after its text; going on in the next file" 1
+  has "Torii kernel boot" 1
+  boot -f 200 # the next boot goes on in file 1
+  [ "$(count 'Torii kernel boot' 1)" = 2 ] || fail "the next boot didn't go on in file 1"
+  card_ok
+  lines_ok 1
+  zeros_ok 1
+  echo "PASS: a log file with junk after its text is left alone, and logging goes on in the next file"
   ;;
 
 full)
@@ -275,7 +352,7 @@ full)
   ;;
 
 *)
-  echo "usage: $0 launch|debug|crash|rotate|full" >&2
+  echo "usage: $0 launch|debug|crash|rotate|junk|full" >&2
   exit 2
   ;;
 esac

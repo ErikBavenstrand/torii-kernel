@@ -12,10 +12,10 @@ index 59ca1c1..1dd19c0 100644
  	EXTDATA_MAX
 diff --git a/include/mgba/internal/gba/cart/omega.h b/include/mgba/internal/gba/cart/omega.h
 new file mode 100644
-index 0000000..f71b63a
+index 0000000..9bcc7c7
 --- /dev/null
 +++ b/include/mgba/internal/gba/cart/omega.h
-@@ -0,0 +1,146 @@
+@@ -0,0 +1,152 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -127,6 +127,10 @@ index 0000000..f71b63a
 +	// its contents go back into the cart SRAM at power-off. Pages past the
 +	// save memory stay plain RAM in game mode.
 +	bool gameSaveActive;
++	// True once a BIOS reset has started the game in game mode: only then
++	// does the FPGA answer as an EEPROM (on the real cart, a probe in game
++	// mode from the kernel, with no game started, got no answer).
++	bool gameBooted;
 +	// GPIO pins (RTC) overlaid on ROM 0xC4-0xC9, kept apart from the ROM data.
 +	uint16_t gpio[4];
 +
@@ -157,6 +161,8 @@ index 0000000..f71b63a
 +bool GBAOmegaSerialize(const struct GBA*, struct mStateExtdataItem*);
 +bool GBAOmegaDeserialize(struct GBA*, const struct mStateExtdataItem*);
 +uint8_t GBAOmegaReadSRAM(struct GBA*, uint32_t address);
++// The BIOS SoftReset or HardReset ran: in game mode, the game starts.
++void GBAOmegaBiosReset(struct GBA*);
 +void GBAOmegaWriteSRAM(struct GBA*, uint32_t address, uint8_t value);
 +
 +CXX_GUARD_END
@@ -240,10 +246,20 @@ index 4bf354f..fd3e023 100644
  	cheats.c
  	cheats/codebreaker.c
 diff --git a/src/gba/bios.c b/src/gba/bios.c
-index 1d0c0dd..b6abc91 100644
+index 1d0c0dd..b77704a 100644
 --- a/src/gba/bios.c
 +++ b/src/gba/bios.c
-@@ -187,6 +187,22 @@ static void _RegisterRamReset(struct GBA* gba) {
+@@ -37,6 +37,9 @@ static int _mulWait(int32_t r) {
+ 
+ static void _SoftReset(struct GBA* gba) {
+ 	struct ARMCore* cpu = gba->cpu;
++	if (gba->memory.omega.enabled) {
++		GBAOmegaBiosReset(gba);
++	}
+ 	ARMSetPrivilegeMode(cpu, MODE_IRQ);
+ 	cpu->spsr.packed = 0;
+ 	cpu->gprs[ARM_LR] = 0;
+@@ -187,6 +190,22 @@ static void _RegisterRamReset(struct GBA* gba) {
  	}
  }
  
@@ -266,7 +282,7 @@ index 1d0c0dd..b6abc91 100644
  static void _BgAffineSet(struct GBA* gba) {
  	struct ARMCore* cpu = gba->cpu;
  	int i = cpu->gprs[2];
-@@ -450,6 +466,9 @@ void GBASwi16(struct ARMCore* cpu, int immediate) {
+@@ -450,6 +469,9 @@ void GBASwi16(struct ARMCore* cpu, int immediate) {
  	case GBA_SWI_REGISTER_RAM_RESET:
  		_RegisterRamReset(gba);
  		break;
@@ -278,10 +294,10 @@ index 1d0c0dd..b6abc91 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..7b19d18
+index 0000000..94051cc
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1026 @@
+@@ -0,0 +1,1062 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -334,6 +350,7 @@ index 0000000..7b19d18
 +#define OMEGA_KERNEL_SETTINGS 0x790000
 +
 +#define SECTOR_SIZE 512
++#define SD_BUFFER_SIZE 0x800
 +#define FAT_SIZE_INDEX (0x1F0 / 4)
 +#define FAT_PARAM_INDEX (0x1F4 / 4)
 +#define FAT_SAVE_INDEX (0x1FC / 4)
@@ -775,8 +792,10 @@ index 0000000..7b19d18
 +	omega->gameSaveActive = false;
 +}
 +
++// Bit 0 of 0x096A0000 alone opens the GPIO port, in kernel mode too: on the
++// real cart, values 1 and 3 let the clock answer, 0 and 2 kept it silent.
 +static bool _rtcActive(const struct GBAOmega* omega) {
-+	return _isKernelMode(omega) || omega->rtcStatus;
++	return omega->rtcStatus & 1;
 +}
 +
 +// Log the first time a game touches the clock pins after launch.
@@ -797,7 +816,7 @@ index 0000000..7b19d18
 +static bool _isEeprom(const struct GBA* gba, uint32_t address) {
 +	const struct GBAOmega* omega = &gba->memory.omega;
 +	enum SavedataType type = gba->memory.savedata.type;
-+	if (!omega->gameSaveActive || (type != SAVEDATA_EEPROM && type != SAVEDATA_EEPROM512)) {
++	if (!omega->gameSaveActive || !omega->gameBooted || (type != SAVEDATA_EEPROM && type != SAVEDATA_EEPROM512)) {
 +		return false;
 +	}
 +	if ((address >> 24) != 0x0D) {
@@ -830,6 +849,9 @@ index 0000000..7b19d18
 +			memory->romSize = OMEGA_PSRAM_SIZE;
 +		}
 +		memory->romMask = OMEGA_PSRAM_SIZE - 1;
++	}
++	if (_isKernelMode(omega)) {
++		omega->gameBooted = false;
 +	}
 +	if (!_isKernelMode(omega) && !omega->gameSaveActive) {
 +		_startGameSave(gba);
@@ -944,6 +966,18 @@ index 0000000..7b19d18
 +	if (!omega->kernelNor.data || !omega->gameNor.data || !omega->sram || !omega->psram) {
 +		GBAOmegaDisable(gba);
 +		return false;
++	}
++	// Power-on: only the save memory (pages below OMEGA_SAVE_PAGES) keeps
++	// its contents; the rest of the cart RAM has no battery. What it holds
++	// after power-off on the real cart is unknown; here it reads 0xFF.
++	// OMEGA_SOFT_RESET=1 starts as after a soft reset instead (RESET, or a
++	// return to the kernel), which keeps it.
++	// The SD buffer's contents at power-on are unknown too; 0xFF, so code
++	// that reads stale data from it (see GBAOmegaRead16) doesn't read zeros.
++	memset(omega->port, 0xFF, OMEGA_PORT_SIZE);
++	const char* softReset = getenv("OMEGA_SOFT_RESET");
++	if (!softReset || !*softReset || !strcmp(softReset, "0")) {
++		memset(&omega->sram[OMEGA_SAVE_PAGES << 12], 0xFF, OMEGA_SRAM_SIZE - (OMEGA_SAVE_PAGES << 12));
 +	}
 +	omega->kernelNor.size = OMEGA_KERNEL_NOR_SIZE;
 +	omega->kernelNor.id = 0x2202;  // S29PL064: word programming
@@ -1179,6 +1213,7 @@ index 0000000..7b19d18
 +	_loadNorState(&omega->gameNor, &header.gameNor);
 +	// The save chip came back with the core state; map the ROM to match.
 +	_remap(gba);
++	omega->gameBooted = omega->gameSaveActive;  // a state saved in game mode is a running game
 +	_trace(gba, "state loaded: %s", _isKernelMode(omega) ? "kernel mode" : "game mode");
 +	return true;
 +}
@@ -1195,6 +1230,15 @@ index 0000000..7b19d18
 +	}
 +	if (offset >= PORT_BASE && offset < PORT_END && _portActive(omega)) {
 +		return _portRead(omega, offset - PORT_BASE);
++	}
++	if (_isKernelMode(omega) && omega->sdControl) {
++		// SD mode: on the real cart, reads anywhere else in the cart's ROM
++		// space return data left in the FPGA's SD buffer, not NOR or PSRAM,
++		// so an SD write from a buffer in ROM writes that. Here the 2 KB
++		// buffer (4 sectors, the most the kernel moves at once) repeats
++		// through the ROM space. (Instruction fetches still see the ROM; the
++		// kernel's SD code runs from IWRAM.)
++		return _read16(omega->port, OMEGA_PORT_SIZE, offset & (SD_BUFFER_SIZE - 1));
 +	}
 +	if (!_isKernelMode(omega)) {
 +		if (offset < gba->memory.romSize) {
@@ -1307,6 +1351,14 @@ index 0000000..7b19d18
 +		break;
 +	}
 +	omega->sram[_sramOffset(omega, address)] = value;
++}
++
++void GBAOmegaBiosReset(struct GBA* gba) {
++	struct GBAOmega* omega = &gba->memory.omega;
++	omega->gameBooted = !_isKernelMode(omega);
++	if (omega->gameBooted) {
++		_trace(gba, "game started");
++	}
 +}
 diff --git a/src/gba/core.c b/src/gba/core.c
 index 5401c12..9a75d34 100644
