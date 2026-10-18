@@ -13,7 +13,7 @@ git log, not here.
 - **Changed:** that still didn't rumble on the real cart, in kernel mode.
   Diagnostics now also drives the motor with the ROM page at PSRAM, as
   under Jagoomba, and logs what 0x08001000 reads; the boot logs the new
-  rumble probe ROM's answers from game mode (`1fab0fc`).
+  rumble probe ROM's answers from game mode (`1fab0fc`, `c2faa0e`).
 
 ## v0.2.3 (2026-10-18)
 
