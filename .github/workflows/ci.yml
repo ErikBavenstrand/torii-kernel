@@ -103,6 +103,8 @@ jobs:
             emu/build-linux
             dist/.fresh/emu-headless
           key: ${{ steps.emu.outputs.cache-primary-key }}
+      - name: Lower mmap randomisation, which this ASan can't handle at 32 bits
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
       - name: Run kernel unit tests and homebrew game tests
         run: just test
       - name: Upload screenshots
