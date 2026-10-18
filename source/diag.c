@@ -609,45 +609,38 @@ static void step_eeprom(void)
 
 // --- Rumble ------------------------------------------------------------------
 
-// The cart's GPIO port: pin 3 drives the rumble motor (Drill Dozer's
-// wiring), pins 0-2 the clock.
-static void rumble_pulse(void)
+// The motor is not on the GPIO port: Set_rumble drives it as Jagoomba does,
+// which pulses it, on and off at once, each frame a game asks for rumble.
+static void rumble_pulses(u32 frames)
 {
-	*RTC_ENABLE = 1;
-	*RTC_RW = 0xF;
-	*RTC_DATA = 0x9;
-	pause_frames(40);
-	*RTC_DATA = 0x1;
-	*RTC_RW = 0x7;
+	while (frames--) {
+		Set_rumble(1);
+		Set_rumble(0);
+		VBlankIntrWait();
+	}
 }
 
-static int clock_answers(void)
-{
-	u8 t[7];
-	rtc_enable();
-	rtc_get(t);
-	rtc_disenable();
-	return bcd_ok(t[1], 12) && t[1] && bcd_ok(t[2], 31) && t[2] && bcd_ok(t[5], 59) && bcd_ok(t[6], 59);
-}
-
+// One question per way of driving the motor. The pulses are what Jagoomba
+// does, known to work; held on and with the GPIO port off are probes.
 static void step_rumble(void)
 {
 	step("rumble");
-	say(WHITE, "Hold the console: the motor pulses with");
-	say(WHITE, "GPIO register 0x096A0000 at 1, 0, 2, 3.");
-	static const u16 values[] = {1, 0, 2, 3};
-	for (u32 i = 0; i < 4; i++) {
-		Set_RTC_status(values[i]);
-		pause_frames(10);
-		int clock = clock_answers();
-		say(WHITE, "register %u: clock %s", values[i], clock ? "answers" : "silent");
-		rumble_pulse();
-		Set_RTC_status(1);  // the clock back before the answer is logged with a time
-		char topic[32];
-		snprintf(topic, sizeof(topic), "rumble at register %u", values[i]);
-		ask(topic, "Did it rumble just now?", ASK_PROBE);
-	}
+	say(WHITE, "Hold the console: the motor runs three");
+	say(WHITE, "times, a second each.");
 	Set_RTC_status(1);
+	pause_frames(30);
+	rumble_pulses(60);
+	ask("rumble pulsed", "Did it rumble just now?", ASK_PROBE);
+	pause_frames(30);
+	Set_rumble(1);
+	pause_frames(60);
+	Set_rumble(0);
+	ask("rumble held on", "Did it rumble just now?", ASK_PROBE);
+	Set_RTC_status(0);
+	pause_frames(30);
+	rumble_pulses(60);
+	Set_RTC_status(1);  // the clock back before the answer is logged with a time
+	ask("rumble with the GPIO port off", "Did it rumble just now?", ASK_PROBE);
 }
 
 // --- Checklist ---------------------------------------------------------------

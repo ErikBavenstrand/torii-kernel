@@ -76,8 +76,9 @@ Diagnostics checks the cart by itself (unit tests, clock, PSRAM, NOR, the
 boot loader, save chip, timings, SD) and whether the EEPROM probe's runs passed. Then it asks
 you (A yes, B no, SELECT skip; START at the first question skips them all):
 
-- **Rumble:** it pulses the GPIO port at four register values and asks
-  after each if the cart rumbled.
+- **Rumble:** it runs the motor three times, a second each, and asks
+  after each if the cart rumbled: pulsed as Jagoomba does, held on, and
+  pulsed with the GPIO port off.
 - **Buttons:** press every button once. If L or R never registers, the
   in-game menu and sleep can't work, and it says so.
 - **The screen** and **the LED:** confirmed in v0.2.1; answer them.

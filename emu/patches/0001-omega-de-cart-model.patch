@@ -12,10 +12,10 @@ index 59ca1c1..1dd19c0 100644
  	EXTDATA_MAX
 diff --git a/include/mgba/internal/gba/cart/omega.h b/include/mgba/internal/gba/cart/omega.h
 new file mode 100644
-index 0000000..9e874d9
+index 0000000..45f6994
 --- /dev/null
 +++ b/include/mgba/internal/gba/cart/omega.h
-@@ -0,0 +1,167 @@
+@@ -0,0 +1,168 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -130,6 +130,7 @@ index 0000000..9e874d9
 +	uint16_t psramPage;
 +	uint16_t romPage;
 +	uint16_t ramPage;
++	uint16_t rumbleMode;  // 0x09E20000: 0xF1 lets 0x08001000 drive the motor
 +	uint32_t sdLba;
 +	int flashCmdStep;
 +
@@ -309,10 +310,10 @@ index 1d0c0dd..b77704a 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..86796cb
+index 0000000..7a1dd43
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1297 @@
+@@ -0,0 +1,1313 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -353,12 +354,17 @@ index 0000000..86796cb
 +#define REG_SPI_CONTROL 0x01660000
 +#define REG_SPI_WRITE 0x01680000
 +#define REG_RTC 0x016A0000
++#define REG_RUMBLE 0x01E20000
 +#define REG_AUTOSAVE 0x016C0000
 +#define REG_LED 0x016E0000
 +#define REG_ROM64 0x01700000
 +#define REG_PSRAM_PAGE 0x01860000
 +#define REG_ROM_PAGE 0x01880000
 +#define REG_RAM_PAGE 0x01C00000
++// The Omega DE's rumble motor, as EZ-Flash's Goomba drives it (emusrc/src/
++// mappers.s): 0xF1 in REG_RUMBLE, then 2 at 0x08001000 runs the motor, 0 stops it.
++#define RUMBLE_MOTOR 0x00001000
++#define RUMBLE_MODE_OMEGA 0xF1
 +
 +#define ROM_PAGE_KERNEL 0x8000
 +#define ROM_PAGE_PSRAM 0x200
@@ -1112,6 +1118,9 @@ index 0000000..86796cb
 +	case REG_RTC:
 +		omega->rtcStatus = value;
 +		break;
++	case REG_RUMBLE:
++		omega->rumbleMode = value;
++		break;
 +	case REG_AUTOSAVE:
 +		break;
 +	case REG_LED:
@@ -1296,7 +1305,7 @@ index 0000000..86796cb
 +
 +// --- Save states -------------------------------------------------------------
 +
-+#define OMEGA_STATE_MAGIC 0x33474D4F  // "OMG3": 1 MB of SRAM, NOR write buffer
++#define OMEGA_STATE_MAGIC 0x34474D4F  // "OMG4": 1 MB of SRAM, NOR write buffer, rumble
 +
 +struct GBAOmegaNorSnapshot {
 +	uint32_t state;
@@ -1330,6 +1339,7 @@ index 0000000..86796cb
 +	uint16_t psramPage;
 +	uint16_t romPage;
 +	uint16_t ramPage;
++	uint16_t rumbleMode;
 +	uint16_t gpio[4];
 +	uint8_t saveMode;
 +	uint8_t unlocked;
@@ -1396,6 +1406,7 @@ index 0000000..86796cb
 +		.psramPage = omega->psramPage,
 +		.romPage = omega->romPage,
 +		.ramPage = omega->ramPage,
++		.rumbleMode = omega->rumbleMode,
 +		.saveMode = omega->saveMode,
 +		.unlocked = omega->unlocked,
 +		.gameSaveActive = omega->gameSaveActive,
@@ -1454,6 +1465,7 @@ index 0000000..86796cb
 +	omega->psramPage = header.psramPage;
 +	omega->romPage = header.romPage;
 +	omega->ramPage = header.ramPage;
++	omega->rumbleMode = header.rumbleMode;
 +	omega->saveMode = header.saveMode;
 +	omega->unlocked = header.unlocked;
 +	omega->gameSaveActive = header.gameSaveActive;
@@ -1541,6 +1553,11 @@ index 0000000..86796cb
 +	}
 +	if (omega->unlocked && _writeRegister(gba, offset, value)) {
 +		return;
++	}
++	if (offset == RUMBLE_MOTOR && omega->rumbleMode == RUMBLE_MODE_OMEGA) {
++		// No motor to run: log it, and let the write go on to whatever the
++		// window maps, as it may on the real cart.
++		_trace(gba, "rumble %s%s", value == 2 ? "on" : value ? "write" : "off", _rtcActive(omega) ? "" : " (GPIO port off)");
 +	}
 +	if (offset >= PORT_BASE && offset < PORT_BASE + OMEGA_PORT_SIZE && _portActive(omega)) {
 +		omega->port[offset - PORT_BASE] = value;

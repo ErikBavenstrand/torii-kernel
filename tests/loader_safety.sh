@@ -135,6 +135,9 @@ delete=$(keys 200 R DOWN A DOWN A)
 save_setting="-k 200:R -k 206:- -k 220:R -k 226:- -k 270:DOWN -k 276:- -k 285:DOWN -k 291:- -k 300:A -k 306:- -k 340:A -k 346:-"
 launch="$(keys 200 DOWN DOWN DOWN DOWN A) $(keys 250 DOWN DOWN DOWN DOWN RIGHT RIGHT RIGHT RIGHT RIGHT UP UP UP UP A)"
 diag="-k 1:L+R+SELECT -k 60:- -k 120:A -k 124:- $(for f in $(seq 2000 24 4400); do printf -- '-k %d:START -k %d:- ' "$f" $((f + 4)); done)"
+# Diagnostics with its questions answered yes, A every 24 frames: the rumble
+# step writes 0x08001000, inside the kernel NOR's window.
+diag_rumble="-k 1:L+R+SELECT -k 60:- -k 120:A -k 124:- $(for f in $(seq 2000 24 3600); do printf -- '-k %d:A -k %d:- ' "$f" $((f + 4)); done)"
 
 # older_list: the official kernel's NOR list (no trailer, no copy B) with
 # A.gba at 0 in the game NOR, as on a cart coming from EZ-Flash's 1.06
@@ -197,6 +200,15 @@ EOF
   logged "diag: boot loader present: pass"
   logged "not DE.BIN"
   pass "Diagnostics"
+
+  new_cart diagnostics-rumble
+  OMEGA_TRACE=1 boot $diag_rumble -f 3700
+  logged "diag: rumble pulsed: yes"
+  logged "diag: rumble held on: yes"
+  logged "diag: rumble with the GPIO port off: yes"
+  [ $ok = 0 ] || [ "$(grep -c 'rumble on$' "$log")" -ge 61 ] || bad "the cart saw $(grep -c 'rumble on$' "$log") motor starts, not 61"
+  [ $ok = 0 ] || grep -q 'rumble on (GPIO port off)' "$log" || bad "no motor start with the GPIO port off"
+  pass "Diagnostics' rumble step"
 
   # Diagnostics reads the loader and says when it's damaged, as v0.2.2 left
   # it: its first 8 KB sector erased.

@@ -488,6 +488,24 @@ void IWRAM_CODE Set_RTC_status(u16 status)
 	WAITCNT_RESTORE(waitcnt);
 }
 // --------------------------------------------------------------------
+// The cart's rumble motor, driven as EZ-Flash's Goomba (emusrc/src/mappers.s)
+// and the bundled Jagoomba drive it: 0xF1 at 0x09E20000 gives 0x08001000 to
+// the motor, where 2 starts it and 0 stops it. Jagoomba pulses it, on then off
+// at once, each frame the game asks for rumble. In kernel mode the write also
+// reaches the kernel NOR, which ignores it: it is no flash command.
+void IWRAM_CODE Set_rumble(u16 on)
+{
+	u16 waitcnt = WAITCNT_SLOW();
+	*(u16 *)0x9fe0000 = 0xd200;
+	*(u16 *)0x8000000 = 0x1500;
+	*(u16 *)0x8020000 = 0xd200;
+	*(u16 *)0x8040000 = 0x1500;
+	*(u16 *)0x9E20000 = 0xF1;
+	*(u16 *)0x9fc0000 = 0x1500;
+	*(vu16 *)0x8001000 = on ? 2 : 0;
+	WAITCNT_RESTORE(waitcnt);
+}
+// --------------------------------------------------------------------
 /*void IWRAM_CODE Set_AUTO_save(u16  mode)
 {
 	*(u16 *)0x9fe0000 = 0xd200;
