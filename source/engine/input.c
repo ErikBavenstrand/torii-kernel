@@ -24,7 +24,7 @@ static u32 next_interval(const InputTiming *t, u16 bit, u32 held, int skip_anim)
 	u32 frames;
 	if (bit & INPUT_PAGE)
 		frames = t->page_interval;
-	else if (held < t->fast_after)
+	else if (held + t->interval < t->fast_after)
 		frames = t->interval;
 	else
 		frames = skip_anim ? t->skip_interval : t->fast_interval;
@@ -69,14 +69,14 @@ void input_step(InputState *s, u16 keys, u32 dt, int skip_anim)
 	}
 }
 
-u32 input_move(InputState *s, u16 key, u32 cursor, u32 count, s32 delta)
+u32 input_move(const InputState *s, InputWrap *w, u16 key, u32 cursor, u32 count, s32 delta)
 {
 	if (count == 0)
 		return 0;
 	if (cursor >= count)
 		cursor = count - 1;
-	if (cursor != s->cursor)
-		s->cursor_since = s->now;
+	if (cursor != w->cursor)
+		w->since = s->now;
 	u32 step = delta < 0 ? 0u - (u32)delta : (u32)delta;
 	u32 moved = cursor;
 	if (delta < 0 ? step <= cursor : step < count - cursor) {
@@ -86,11 +86,11 @@ u32 input_move(InputState *s, u16 key, u32 cursor, u32 count, s32 delta)
 		int fresh = (s->pressed & key) != 0;
 		if (cursor != edge)
 			moved = edge;
-		else if (fresh || s->now - s->cursor_since >= s->timing->wrap_pause)
+		else if (fresh || s->now - w->since >= s->timing->wrap_pause)
 			moved = delta < 0 ? count - 1 : 0;
 	}
 	if (moved != cursor)
-		s->cursor_since = s->now;
-	s->cursor = moved;
+		w->since = s->now;
+	w->cursor = moved;
 	return moved;
 }

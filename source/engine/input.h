@@ -6,9 +6,9 @@
 // it; input_poll (input_hw.c) reads them from the hardware.
 //
 // The d-pad repeats: it fires on the press frame, again once held for delay
-// frames, then every interval frames, every fast_interval frames once held
-// fast_after frames, and every skip_interval frames from then on while the
-// caller says the scroll animation is skipped. Releasing a direction, or
+// frames, then every interval frames, and every fast_interval frames once a
+// repeat would fall at or past fast_after frames held (every skip_interval
+// frames instead while the caller says the scroll animation is skipped). Releasing a direction, or
 // pressing another, starts the schedule over. L and R fire on the press,
 // after page_delay frames, then every page_interval frames, with no speed-up.
 // Other keys fire only on the press.
@@ -45,7 +45,8 @@ typedef struct {
 	u8 wrap_pause;    // a held key wraps at a list end after resting there this long
 } InputTiming;
 
-// 15, 4, 60 (1 s), 2, 1; L/R 20, 8; wrap pause 15.
+// 15, 4, 60 (1 s), 2, 1; L/R 20, 8; wrap pause 15. A held d-pad fires on
+// frames 0, 15, 19, ... 59, then 61, 63, ... (or 60, 61, ... while skipped).
 extern const InputTiming input_timing_default;
 
 typedef struct {
@@ -57,9 +58,14 @@ typedef struct {
 	u16 fire;     // pressed or repeated this frame: act on these
 	u32 held_frames[INPUT_KEYS];
 	u32 next_fire[INPUT_KEYS]; // held_frames at which the key repeats next
-	u32 cursor_since;          // input_move: when the cursor last moved
-	u32 cursor;                // input_move: where it left the cursor
 } InputState;
+
+// The wrap gate for one cursor (a list, or one axis of a grid): each owns
+// its own, set up by input_wrap_init.
+typedef struct {
+	u32 since;  // InputState.now when the cursor last moved
+	u32 cursor; // where input_move left it
+} InputWrap;
 
 // Starts with no key held. timing NULL takes input_timing_default.
 void input_init(InputState *s, const InputTiming *timing);
@@ -79,12 +85,19 @@ static inline int input_fired(const InputState *s, u16 key)
 	return (s->fire & key) != 0;
 }
 
+// Starts a cursor's gate: the cursor counts as having just arrived.
+static inline void input_wrap_init(InputWrap *w, const InputState *s, u32 cursor)
+{
+	w->since = s->now;
+	w->cursor = cursor;
+}
+
 // Where a list cursor goes when key fires, moving delta items (1, -1 or a
 // page) in a list of count. A move past an end first stops at that end. From
 // the end itself it wraps to the other end only on a fresh press of key, or
 // once the cursor has rested at the end for wrap_pause frames; a repeat that
 // arrives sooner leaves it there. A cursor moved by other means counts as
-// having just arrived.
-u32 input_move(InputState *s, u16 key, u32 cursor, u32 count, s32 delta);
+// having just arrived. w is this cursor's gate.
+u32 input_move(const InputState *s, InputWrap *w, u16 key, u32 cursor, u32 count, s32 delta);
 
 #endif

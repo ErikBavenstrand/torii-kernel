@@ -31,7 +31,7 @@
 // Frames per update are clamped to this (the frame loop's dt cap).
 #define MOTION_MAX_DT 3
 
-// A handle: slot and generation, so a freed motion's handle stays dead when
+// A handle: slot and 12-bit generation, so a freed motion's handle stays dead when
 // its slot is reused. MOTION_NONE is never a live motion, and every call
 // ignores it (queries return 0).
 typedef u16 MotionId;
@@ -85,6 +85,9 @@ static inline MotionTarget motion_target(u8 kind, void *ptr, MotionSetFn set)
 #define MOTION_TO_S32(p) motion_target(MOTION_TARGET_S32, (s32 *)(p), NULL)
 #define MOTION_TO_CALL(fn, ctx) motion_target(MOTION_TARGET_CALL, (ctx), (fn))
 
+// A spring settles within 1/16 of its target's smallest step (a unit, or
+// 1/256 for MOTION_TARGET_S16_8), so the last frame never jumps visibly.
+//
 // Spring stiffness: omega, the natural frequency in radians per frame, 16.16.
 // Larger is faster; the time to cover 90% of a jump from rest doesn't depend
 // on its length. Frames to 90%, and to settle on a 16 px jump:
@@ -98,7 +101,8 @@ static inline MotionTarget motion_target(u8 kind, void *ptr, MotionSetFn set)
 void motion_reset(void);
 
 // Advances every motion by dt frames (clamped to 1..MOTION_MAX_DT; 0 does
-// nothing) and writes the targets of those that moved. Returns how many
+// nothing) and writes the targets of those that moved. A motion a
+// MOTION_TARGET_CALL setter starts during the update may advance in it too. Returns how many
 // wrote, so the caller knows what is dirty. A spring advances in fixed
 // steps, so dt 3 lands exactly where three updates of dt 1 do.
 u32 motion_update(u32 dt);
@@ -145,7 +149,7 @@ int motion_running(MotionId id);
 
 // Frees a motion: its handle goes dead and the target is left as it is.
 void motion_free(MotionId id);
-// Frees every motion tagged owner (a view, when it pops).
+// Frees every motion tagged owner (a view, when it pops); 0 frees nothing.
 void motion_free_owner(u8 owner);
 
 // Palette fades. Writes count colours to dst: each colour of src moved

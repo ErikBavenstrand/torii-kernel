@@ -300,6 +300,19 @@ void test_motion_targets(void)
 	CHECK_EQ(rec.calls, 1);  // at rest: no more calls
 	(void)ir;
 	(void)ic;
+
+	// An 8.8 spring (scale 1.0 to 2.0) settles to within its own step: its
+	// last frame moves the s16 by at most 1.
+	motion_spring_jump(i8, FIX(1));
+	motion_update(1);
+	motion_spring_target(i8, FIX(2));
+	s16 last = scale;
+	while (motion_running(i8)) {
+		last = scale;
+		motion_update(1);
+	}
+	CHECK_EQ(scale, 0x200);
+	CHECK(0x200 - last <= 1);
 	motion_reset();
 }
 
@@ -339,7 +352,9 @@ void test_motion_cap_and_handles(void)
 	motion_spring_target(fresh, FIX(9));
 	CHECK_EQ(motion_goal(fresh), FIX(1));
 
-	// Freeing by owner frees only that owner's.
+	// Freeing by owner frees only that owner's; owner 0 is no owner.
+	motion_free_owner(0);
+	CHECK_EQ(motion_count(), MOTION_CAP);
 	motion_free_owner(7);
 	CHECK_EQ(motion_count(), MOTION_CAP - MOTION_CAP / 2);
 	CHECK_EQ(motion_value(ids[1]), 0);
@@ -354,6 +369,17 @@ void test_motion_cap_and_handles(void)
 		if (i != 2)
 			CHECK_EQ(motion_value(ids[i]), 0);
 	CHECK_EQ(motion_value(fresh), 0);
+
+	// A handle stays dead through many reuses of its slot.
+	motion_reset();
+	MotionId first = motion_spring(none, FIX(1), SPRING_FAST, 0);
+	motion_free(first);
+	for (u32 i = 0; i < 1000; i++) {
+		MotionId again = motion_spring(none, FIX(2), SPRING_FAST, 0);
+		CHECK(again != first);
+		CHECK_EQ(motion_value(first), 0);
+		motion_free(again);
+	}
 	motion_reset();
 }
 
