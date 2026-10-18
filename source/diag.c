@@ -610,79 +610,42 @@ static void step_eeprom(void)
 
 // --- Rumble ------------------------------------------------------------------
 
-// The motor is not on the GPIO port: Set_rumble drives it as Jagoomba does,
-// which pulses it, on and off at once, each frame a game asks for rumble.
-// Driven that way in kernel mode, it didn't rumble (real cart, 2026-10-18).
-static void rumble_pulses(u32 frames)
-{
-	while (frames--) {
-		Set_rumble(1);
-		Set_rumble(0);
-		VBlankIntrWait();
-	}
-}
-
 #define ROM_PAGE_PSRAM 0x200  // the page games from PSRAM, Jagoomba among them, run under
 
-// Runs the motor for a second, pulsed or held, with the ROM page at PSRAM as
-// under Jagoomba, where 0x08001000 is PSRAM rather than the kernel NOR. The
-// kernel's code is gone meanwhile, so this runs from IWRAM with interrupts
-// off, waits on VCOUNT, and puts the kernel's page back before returning.
-// read gets 0x08001000 before, after the first 2 and after the last 0: what
-// changed reached the PSRAM, which the next launch loads afresh anyway.
-void IWRAM_CODE diag_rumble_psram(u32 held, u16 *read)
+// Pulses the motor for a second as Jagoomba does (Set_rumble, on and off at
+// once, each frame). The motor takes 0x08001000 only while the ROM page isn't
+// the kernel NOR's, whose window it otherwise is (real cart, 2026-10-18), so
+// this sets the PSRAM page meanwhile: from IWRAM with interrupts off, as the
+// kernel's code is gone, waiting on VCOUNT, with the kernel's page back
+// before it returns. The writes don't reach the PSRAM.
+void IWRAM_CODE diag_rumble_pulses(void)
 {
 	u16 ime = REG_IME;
 	REG_IME = 0;
 	SetRompage(ROM_PAGE_PSRAM);
-	read[0] = *(vu16 *)0x08001000;
 	for (u32 f = 0; f < 60; f++) {
-		if (f == 0 || !held) {
-			Set_rumble(1);
-			if (f == 0)
-				read[1] = *(vu16 *)0x08001000;
-		}
-		if (!held)
-			Set_rumble(0);
+		Set_rumble(1);
+		Set_rumble(0);
 		while (REG_VCOUNT >= 160)
 			;
 		while (REG_VCOUNT < 160)
 			;
 	}
-	Set_rumble(0);
-	read[2] = *(vu16 *)0x08001000;
 	SetRompage(gl_currentpage ? gl_currentpage : 0x8002);
 	REG_IME = ime;
 }
 
-static void rumble_psram(u32 held, const char *topic)
-{
-	u16 read[3];
-	pause_frames(30);
-	diag_rumble_psram(held, read);
-	tlog("diag: %s: 0x08001000 read %04X, %04X after 2, %04X after 0", topic, read[0], read[1], read[2]);
-	ask(topic, "Did it rumble just now?", ASK_PROBE);
-}
-
-// One question per way of driving the motor, each a second long, with the
-// GPIO port on (0x096A0000 at 1) as Jagoomba has it. Kernel mode first; then
-// with the ROM page at PSRAM, pulsed and held. What else a launch sets, the
-// save type above all, stays for the rumble probe ROM (tests/roms/rumble),
-// which runs in game mode.
+// The motor also needs the GPIO port on (0x096A0000 bit 0), as for a game.
 static void step_rumble(void)
 {
 	step("rumble");
-	say(WHITE, "Hold the console: the motor runs three");
-	say(WHITE, "times, a second each.");
+	say(WHITE, "Hold the console: the motor runs for a");
+	say(WHITE, "second.");
 	Set_RTC_status(1);
 	pause_frames(30);
-	rumble_pulses(60);
-	ask("rumble pulsed in kernel mode", "Did it rumble just now?", ASK_PROBE);
-	rumble_psram(0, "rumble pulsed, ROM page PSRAM");
-	rumble_psram(1, "rumble held, ROM page PSRAM");
-	say(WHITE, "For game mode, launch rumble.gba");
-	say(WHITE, "(tests/roms/rumble) CLEAN BOOT.");
-	pause_frames(120);
+	diag_rumble_pulses();
+	if (ask("rumble", "Did it rumble just now?", ASK_CHECK) == ANSWER_NO)
+		add_failure("rumble");
 }
 
 // --- Checklist ---------------------------------------------------------------

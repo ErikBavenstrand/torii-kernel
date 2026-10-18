@@ -310,10 +310,10 @@ index 1d0c0dd..b77704a 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..7a1dd43
+index 0000000..2c4e9aa
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1313 @@
+@@ -0,0 +1,1329 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -362,7 +362,9 @@ index 0000000..7a1dd43
 +#define REG_ROM_PAGE 0x01880000
 +#define REG_RAM_PAGE 0x01C00000
 +// The Omega DE's rumble motor, as EZ-Flash's Goomba drives it (emusrc/src/
-+// mappers.s): 0xF1 in REG_RUMBLE, then 2 at 0x08001000 runs the motor, 0 stops it.
++// mappers.s): 0xF1 in REG_RUMBLE, then 2 at 0x08001000 runs the motor, 0 stops
++// it. GPIO pin 3 (data bit 3, direction bit 3) drives it too, as in Drill Dozer.
++// The cart has no motor here: the trace says what it would do.
 +#define RUMBLE_MOTOR 0x00001000
 +#define RUMBLE_MODE_OMEGA 0xF1
 +
@@ -978,6 +980,13 @@ index 0000000..7a1dd43
 +	return omega->rtcStatus & 1;
 +}
 +
++// The rumble motor runs only with the GPIO port on and the ROM page not the
++// kernel's: under the kernel's page, 0x08001000 is the kernel NOR's, and GPIO
++// pin 3 didn't rumble either (real cart, 2026-10-18).
++static bool _motorDriven(const struct GBAOmega* omega) {
++	return _rtcActive(omega) && !_isKernelMode(omega);
++}
++
 +// Log the first time a game touches the clock pins after launch.
 +static void _traceClock(struct GBA* gba, bool active) {
 +	struct GBAOmega* omega = &gba->memory.omega;
@@ -1530,6 +1539,9 @@ index 0000000..7a1dd43
 +		_traceClock(gba, _rtcActive(omega));
 +		if (_rtcActive(omega)) {
 +			GBAHardwareGPIOWrite(&gba->memory.hw, offset, value);
++			if (offset == GPIO_REG_DATA && (gba->memory.hw.direction & 8) && _motorDriven(omega)) {
++				_trace(gba, "rumble %s (GPIO pin 3)", (value & 8) ? "on" : "off");
++			}
 +		}
 +		return;
 +	}
@@ -1555,9 +1567,13 @@ index 0000000..7a1dd43
 +		return;
 +	}
 +	if (offset == RUMBLE_MOTOR && omega->rumbleMode == RUMBLE_MODE_OMEGA) {
-+		// No motor to run: log it, and let the write go on to whatever the
-+		// window maps, as it may on the real cart.
-+		_trace(gba, "rumble %s%s", value == 2 ? "on" : value ? "write" : "off", _rtcActive(omega) ? "" : " (GPIO port off)");
++		if (_motorDriven(omega)) {
++			// The motor's: the PSRAM under it keeps its data (real cart).
++			_trace(gba, "rumble %s", value == 2 ? "on" : value ? "write" : "off");
++			return;
++		}
++		// The kernel NOR's (which ignores it) or, in game mode, nothing's.
++		_trace(gba, "rumble write ignored: %s", _isKernelMode(omega) ? "the kernel's ROM page" : "GPIO port off");
 +	}
 +	if (offset >= PORT_BASE && offset < PORT_BASE + OMEGA_PORT_SIZE && _portActive(omega)) {
 +		omega->port[offset - PORT_BASE] = value;

@@ -2,7 +2,7 @@
 # The rumble probe ROM (tests/roms/rumble) on the emulated cart: launched CLEAN
 # BOOT, it drives the motor four ways, takes an answer after each, goes back
 # to the kernel, and the kernel's boot logs the answers. The emulated cart has
-# no motor; its trace shows what reached it.
+# no motor; its trace shows what the real one does.
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and `just test-roms`.
 set -euo pipefail
@@ -40,10 +40,10 @@ done
 # The three tries that write 0x08001000 log what it read.
 [ "$(grep -c 'rumble probe: .*; 0x08001000 read [0-9A-F]*, [0-9A-F]* after 2, [0-9A-F]* after 0$' "$log")" = 3 ] ||
   fail "not three tries with 0x08001000 reads"
-# What reached the cart's motor: 60 pulses (and a last off), a hold, 60
-# pulses with the port off.
-motor=$(grep -o '^omega [0-9]*: rumble o.*' "$log" | cut -d' ' -f3- | sort | uniq -c | tr -s ' ' | paste -sd ,)
-[ "$motor" = " 62 rumble off, 61 rumble off (GPIO port off), 61 rumble on, 60 rumble on (GPIO port off)" ] ||
+# What the cart's motor did: 60 pulses (and a last off), a hold, nothing with
+# the port off, and GPIO pin 3 on and off.
+motor=$(grep -o '^omega [0-9]*: rumble .*' "$log" | cut -d' ' -f3- | sort | uniq -c | tr -s ' ' | paste -sd ,)
+[ "$motor" = " 62 rumble off, 1 rumble off (GPIO pin 3), 61 rumble on, 1 rumble on (GPIO pin 3), 121 rumble write ignored: GPIO port off" ] ||
   fail "the cart saw the motor as: $motor"
 # The report is cleared once logged.
 [ -z "$(od -A n -t x1 -v -j $((0xF1A00)) -N 16 "$cart/sram.bin" | tr -d ' \n0')" ] || fail "the report wasn't cleared"

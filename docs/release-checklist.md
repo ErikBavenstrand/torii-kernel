@@ -20,8 +20,8 @@ in `dist/logs/torii.log`.
    `0x200` of the card once (`docs/recovery.md`, steps 1–4). If a build
    erases the cart's boot loader, safe mode's "Update loader" then works at
    once, without a computer.
-3. Copy the build, the EEPROM and rumble probes and the cheat test to the card:
-   `just test-roms && just sd /Volumes/OMEGA tests/roms/eeprom/eeprom.gba tests/roms/rumble/rumble.gba tests/roms/hello/hello.gba`.
+3. Copy the build, the EEPROM probe and the cheat test to the card:
+   `just test-roms && just sd /Volumes/OMEGA tests/roms/eeprom/eeprom.gba tests/roms/hello/hello.gba`.
    Then make `CHEAT/Hello.cht` on the card holding these lines:
 
    ```
@@ -61,7 +61,6 @@ on, NES with no NES launch) as "unconfirmed" in its summary.
 | Deleting a NOR game | in the NOR list, delete the latest game. Power off and on: the cart must start the kernel, the game gone from the list |
 | Rumble in a game | Drill Dozer, BOOT WITH ADDON or CLEAN BOOT: does the cart rumble? |
 | The EEPROM probe | `eeprom.gba`, CLEAN BOOT with SAVE TYPE EEPROM 512: A (6-bit addresses), then again with B (14-bit). Then the same two with EEPROM 8K. See below |
-| The rumble probe | `rumble.gba`, CLEAN BOOT. Hold the console; for each of its four tries, A runs the motor a second, then answer whether it rumbled (A yes, B no). Then A: the kernel's boot logs the answers ("rumble probe:") |
 
 **The EEPROM probe** writes blocks 1–4 four different ways, reads them back
 a frame later, and shows one line for each way: OK in green, or which bytes
@@ -77,10 +76,8 @@ Diagnostics checks the cart by itself (unit tests, clock, PSRAM, NOR, the
 boot loader, save chip, timings, SD) and whether the EEPROM probe's runs passed. Then it asks
 you (A yes, B no, SELECT skip; START at the first question skips them all):
 
-- **Rumble:** it runs the motor three times, a second each, and asks
-  after each if the cart rumbled: pulsed as Jagoomba does in kernel mode,
-  then pulsed and held with the ROM page at PSRAM, as under Jagoomba. The
-  rumble probe ROM (table above) tries game mode itself.
+- **Rumble:** it pulses the motor for a second, as Jagoomba does, and asks
+  if the cart rumbled. A no is a failure.
 - **Buttons:** press every button once. If L or R never registers, the
   in-game menu and sleep can't work, and it says so.
 - **The screen** and **the LED:** confirmed in v0.2.1; answer them.

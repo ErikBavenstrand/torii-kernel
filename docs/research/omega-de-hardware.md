@@ -88,7 +88,7 @@ Every control-register write is wrapped like this:
 | `0x09640000` | SD block count | 1–4 blocks; bit 15 set = write |
 | `0x09660000` | `SetSPIControl` | 1 = enable; then `0x09E00000` reads the FPGA version |
 | `0x09680000` | `SetSPIWrite` | 1 = program the staged 256 B page into config flash |
-| `0x096A0000` | `Set_RTC_status` | bit 0 = GPIO port (RTC) on, in kernel mode too: 1 and 3 let the clock answer, 0 and 2 keep it silent (real cart, 2026-10-18). Whether it also gates the rumble motor is open (*RTC and rumble*) |
+| `0x096A0000` | `Set_RTC_status` | bit 0 = GPIO port on: the clock (in kernel mode too: 1 and 3 let it answer, 0 and 2 keep it silent) and the rumble motor (real cart, 2026-10-18) |
 | `0x096C0000` | `Set_AUTO_save` | commented out in this kernel |
 | `0x096E0000` | `Set_LED_control` | bit 7 enable, bits 5/4/3 breathing R/G/B, bits 2/1/0 SD-activity R/G/B |
 | `0x09700000` | `Set_64MROM_flag` | 64 MB ROM mapping for NOR games |
@@ -96,7 +96,7 @@ Every control-register write is wrapped like this:
 | `0x09880000` | `SetRompage` | ROM map: `0x200` = boot from PSRAM, NOR game = `NORaddress >> 17` (C4) |
 | `0x09C00000` | `SetRampage` | 4 KB page of the save and work RAM at `0x0E000000` (E0); see *Save and work RAM* |
 | `0x09E00000` | data port (read/write) | SD sector buffer (up to 2 KB), status reads; `0xEEE1` = busy |
-| `0x09E20000` | `Set_rumble` | `0xF1` = rumble on the Omega DE's motor: 2 written at `0x08001000` then starts it, 0 stops it (see *RTC and rumble*) |
+| `0x09E20000` | `Set_rumble` | `0xF1` = rumble on the Omega DE's motor: 2 written at `0x08001000` then starts it, 0 stops it, while the ROM page isn't the kernel's (see *RTC and rumble*) |
 
 **SD mode hides the ROM.** While `0x09400000` is on, reads from cart ROM
 outside the data port don't return NOR or PSRAM: they return data left in
@@ -129,54 +129,46 @@ fetches in SD mode.
 - **SRAM / flash-save emulation:** `0x0E000000`, paged by `0x09C00000`; `Bank_Switching` uses
   the flash-save command sequence `0x5555=AA, 0x2AAA=55, 0x5555=B0, 0x0000=bank`.
 - **RTC and rumble:** standard GBA cart GPIO at `0x080000C4` (data), `0xC6` (dir), `0xC8` (enable),
-  S-3511-style serial protocol for the RTC. `0x096A0000` turns the port on for the game.
-  The Omega DE's own rumble motor (the one Mode B's DS Rumble Pak uses) is not on a GPIO
-  pin: EZ-Flash's Goomba (`emusrc/src/mappers.s`, `MBC5RAMB`) and the bundled Jagoomba
-  Color drive it with an unlocked register write and a ROM-space write:
+  S-3511-style serial protocol for the RTC. `0x096A0000` bit 0 turns the port on.
+  The Omega DE has its own rumble motor (the one Mode B's DS Rumble Pak uses). **It runs
+  only while `0x096A0000` bit 0 is set and the ROM page isn't the kernel's**, and then
+  two things drive it (real cart, 2026-10-18, Diagnostics and `tests/roms/rumble`):
 
-  ```
-  unlock (0x09FE0000=D200, 0x08000000=1500, 0x08020000=D200, 0x08040000=1500)
-  0x09E20000 = 0x00F1    ; the motor's mode
-  0x09FC0000 = 0x1500    ; lock
-  0x08001000 = 2         ; motor on
-  0x08001000 = 0         ; motor off, at once
-  ```
+  - **The EZODE way**, as EZ-Flash's Goomba (`emusrc/src/mappers.s`, `MBC5RAMB`) and the
+    bundled Jagoomba Color do it. All 16-bit writes:
 
-  All 16-bit writes, the whole sequence each time the GB game sets bit 3 (rumble) of its
-  MBC5 RAM bank register, and nothing when it clears it. The emulator's trace of
-  Pokémon Pinball under the kernel shows exactly this, with `0x096A0000` at 1 and no
-  write to `0x080000C4`–`C8`. The game asks on 4 or 5 frames in a row and again 10
-  frames later, so the motor gets a burst of short pulses; on the real cart (2026-10-18)
-  that rumbles. A Pokémon Pinball: Ruby & Sapphire rumble patch
-  (github.com/Wokann/PokemonPinballRubySapphire_CHN, `include/rumble.h`) names this
-  interface "EZODE" and holds 2 for as long as it wants rumble.
-  Driving GPIO pin 3 instead, as Drill Dozer's cart does (data `0x9`, direction `0xF`,
-  40 frames), didn't rumble in kernel mode at any `0x096A0000` value from 0 to 3 (v0.2.3
-  Diagnostics, real cart, 2026-10-18); whether it does in game mode, where Drill Dozer
-  and WarioWare: Twisted! run, is untested.
-  In kernel mode `0x08001000` is in the kernel NOR's window, which ignores the write
-  as it is no flash command. EZ-Flash's issue ez-flash/omega-de-kernel#5 says Goomba's
-  rumble needs GAME RTC on, so the kernel opens the GPIO port for rumble games too
-  (`Game_hardware`, `Game_GPIO_status`): Drill Dozer and WarioWare: Twisted! and
-  MBC5+RUMBLE GB/GBC games use rumble; other GBA games, MBC3+TIMER GB/GBC games and
-  PocketNES use the clock. Nothing sets `0x09E20000` back after rumble, as no other
-  value for it is known; Jagoomba leaves it at `0xF1` too, and games launched after it
-  ran fine.
-  **In kernel mode the motor doesn't answer** (v0.2.3+ Diagnostics, real cart,
-  2026-10-18, build `D77FBB2C`): Jagoomba's pulses, 2 held for a second, and pulses with
-  `0x096A0000` at 0 all got "no", with the GPIO port on for the first two, while
-  Pokémon Pinball in Jagoomba rumbled on the same cart. Under ROM page `0x8002`,
-  `0x08001000` is the kernel NOR's window; Jagoomba writes it under page `0x200`
-  (PSRAM), after a launch that also sent the game's save type (`SetbufferControl(3)`
-  with `SET_PARAMETER_MODE`) and set `0x096A0000`. To find which of those the motor
-  needs, Diagnostics now drives it in kernel mode and then with the ROM page at PSRAM
-  (pulsed and held, from IWRAM with interrupts off, logging what `0x08001000` reads),
-  and the rumble probe ROM (`tests/roms/rumble`, launched CLEAN BOOT) tries four ways in
-  game mode: Jagoomba's pulses, 2 held, pulses with the port off, and GPIO pin 3 as
-  Drill Dozer drives it. Its answers land in SRAM page `0xF0` at `0x1A00` and the
-  kernel's next boot logs them (`rumble probe:`). The emulated cart traces the motor
-  (`rumble on`, `rumble off`, with `(GPIO port off)` when `0x096A0000` bit 0 is clear)
-  in either mode, but has none.
+    ```
+    unlock (0x09FE0000=D200, 0x08000000=1500, 0x08020000=D200, 0x08040000=1500)
+    0x09E20000 = 0x00F1    ; the motor's mode
+    0x09FC0000 = 0x1500    ; lock
+    0x08001000 = 2         ; motor on
+    0x08001000 = 0         ; motor off
+    ```
+
+    Jagoomba runs the whole sequence, 2 then 0 at once, each time the GB game sets bit 3
+    (rumble) of its MBC5 RAM bank register, and nothing when it clears it. Pokémon
+    Pinball asks on 4 or 5 frames in a row, and those short pulses rumble. Holding 2 for
+    a second rumbles too, as a Pokémon Pinball: Ruby & Sapphire rumble patch does
+    (github.com/Wokann/PokemonPinballRubySapphire_CHN, `include/rumble.h`, which names
+    the interface "EZODE"). The writes to `0x08001000` don't reach the PSRAM the game
+    runs from: it read `0000` before and after them in game mode. Nothing sets
+    `0x09E20000` back afterwards, as no other value for it is known; Jagoomba leaves it
+    at `0xF1` too, and games launched after it ran fine.
+  - **GPIO pin 3**, as Drill Dozer's cart wires it: enable `1`, direction bit 3, data
+    bit 3 (on) or clear (off). It rumbled in game mode.
+
+  Under the kernel's ROM page `0x8002`, `0x08001000` is the kernel NOR's window: the
+  write goes to the NOR, which ignores it as no flash command, and the motor stays
+  still. GPIO pin 3 didn't rumble in kernel mode either (v0.2.3). Diagnostics therefore
+  pulses the motor with the ROM page at PSRAM (`0x200`), from IWRAM with interrupts off,
+  and puts the kernel's page back after; there, `0x08001000` read `FFFF` throughout.
+  With `0x096A0000` at 0, Jagoomba's pulses didn't rumble in game mode, matching
+  ez-flash/omega-de-kernel#5 (Goomba's rumble needs GAME RTC on). So the kernel opens
+  the port for rumble games too (`Game_hardware`, `Game_GPIO_status`): Drill Dozer and
+  WarioWare: Twisted! and MBC5+RUMBLE GB/GBC games use rumble; other GBA games,
+  MBC3+TIMER GB/GBC games and PocketNES use the clock. The emulated cart has no motor
+  but traces what it would do under this rule (`rumble on`, `rumble off`, `(GPIO pin
+  3)`, or `rumble write ignored: ...`).
 
 ### FPGA firmware update protocol
 
@@ -493,12 +485,10 @@ emulated cart can't tell, which the real cart's logs will:
     at both types and widths: the EEPROM answers only in game mode. The
     emulated cart answers as an EEPROM only once a BIOS SoftReset or
     HardReset has started the game in game mode, as every launch does.
-- **Rumble:** Jagoomba drives the motor through `0x09E20000` and
-  `0x08001000`, not the GPIO port, but the same writes in kernel mode don't
-  rumble (*RTC and rumble*). Open, for the next cart run (Diagnostics and
-  the rumble probe ROM): whether ROM page `0x200` is enough or game mode is
-  needed, whether holding 2 rumbles, whether the motor needs `0x096A0000`
-  bit 0, and whether GPIO pin 3 (Drill Dozer) rumbles in game mode.
+- **Rumble** (resolved, real cart, 2026-10-18): the motor needs
+  `0x096A0000` bit 0 and a ROM page other than the kernel's; pulses and a
+  held 2 at `0x08001000` both work, the writes don't reach the PSRAM, and
+  GPIO pin 3 drives it in game mode (*RTC and rumble*).
 - **SD writes through `Write_SD_sectors` use 16-bit DMA** from the
   caller's buffer, and FatFs passes whole sectors straight from the
   buffer given to `f_write`. A buffer at an odd address shifts the data by

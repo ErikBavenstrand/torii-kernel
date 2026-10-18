@@ -1,6 +1,7 @@
-// Torii rumble probe ROM: settles how the Omega DE's rumble motor is driven,
-// in game mode, where Jagoomba drives it. Diagnostics, in kernel mode, got no
-// rumble the way Jagoomba drives it (real cart, 2026-10-18).
+// Torii rumble probe ROM: tries the Omega DE's rumble motor in game mode,
+// where Jagoomba drives it. On the real cart (2026-10-18) all but the try
+// with the GPIO port off rumbled (docs/research/omega-de-hardware.md, "RTC
+// and rumble"); it stays to check another cart or firmware.
 //
 // Launch it CLEAN BOOT. It drives the motor four ways (source/rumbleprobe.h),
 // about a second each, and asks after each whether the cart rumbled: A yes,

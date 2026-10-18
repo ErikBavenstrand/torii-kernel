@@ -136,8 +136,7 @@ save_setting="-k 200:R -k 206:- -k 220:R -k 226:- -k 270:DOWN -k 276:- -k 285:DO
 launch="$(keys 200 DOWN DOWN DOWN DOWN A) $(keys 250 DOWN DOWN DOWN DOWN RIGHT RIGHT RIGHT RIGHT RIGHT UP UP UP UP A)"
 diag="-k 1:L+R+SELECT -k 60:- -k 120:A -k 124:- $(for f in $(seq 2000 24 4400); do printf -- '-k %d:START -k %d:- ' "$f" $((f + 4)); done)"
 # Diagnostics with its questions answered yes, A every 24 frames: the rumble
-# step writes 0x08001000, inside the kernel NOR's window, and sets the ROM
-# page to PSRAM and back.
+# step sets the ROM page to PSRAM and back.
 diag_rumble="-k 1:L+R+SELECT -k 60:- -k 120:A -k 124:- $(for f in $(seq 2000 24 3600); do printf -- '-k %d:A -k %d:- ' "$f" $((f + 4)); done)"
 
 # older_list: the official kernel's NOR list (no trailer, no copy B) with
@@ -204,15 +203,11 @@ EOF
 
   new_cart diagnostics-rumble
   OMEGA_TRACE=1 boot $diag_rumble -f 3700
-  logged "diag: rumble pulsed in kernel mode: yes"
-  logged "diag: rumble pulsed, ROM page PSRAM: 0x08001000 read"
-  logged "diag: rumble pulsed, ROM page PSRAM: yes"
-  logged "diag: rumble held, ROM page PSRAM: yes"
+  logged "diag: rumble: yes"
   logged "mode game from PSRAM"
-  # 60 pulses in kernel mode; 60 (and a last off) and one hold under the
-  # PSRAM page, with the kernel's page back after each
-  motor=$(grep -o 'rumble o.*' "$log" | sort | uniq -c | tr -s ' ' | paste -sd ,)
-  [ $ok = 0 ] || [ "$motor" = " 122 rumble off, 121 rumble on" ] || bad "the cart saw the motor as: $motor"
+  # 60 pulses under the PSRAM page (and a last off), the kernel's page back
+  motor=$(grep -o '^omega [0-9]*: rumble .*' "$log" | cut -d' ' -f3- | sort | uniq -c | tr -s ' ' | paste -sd ,)
+  [ $ok = 0 ] || [ "$motor" = " 60 rumble off, 60 rumble on" ] || bad "the cart saw the motor as: $motor"
   [ $ok = 0 ] || [ "$(grep -o 'omega [0-9]*: mode .*' "$log" | tail -1 | cut -d' ' -f3-)" = "mode kernel" ] ||
     bad "the kernel's page wasn't put back"
   pass "Diagnostics' rumble step"
