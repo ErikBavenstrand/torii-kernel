@@ -672,6 +672,9 @@ sd-theme-menus/list 795D672AB1E0F14A
 sd-theme-wall/dialog 796AEEBCB8551E70
 sd-theme-wall/kept 0969DFACF8A353B3
 sd-theme-wall/list C0CB12E6BB3CC753
+settings-edit/modeb 285B0A3E2EC551E7
+settings-edit/save 6E78999D5CA95D36
+settings-edit/save-turned B4E21CA7E5A815E6
 settings-held/held-l 0CA5C0696DB712FC
 settings-held/held-r 0CA5C0696DB712FC
 settings-led/edit 780E60240DD4DC4E

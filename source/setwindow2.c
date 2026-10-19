@@ -500,8 +500,11 @@ static int page2_event(struct ui_view *view, const struct ui_event *e)
 		return 1;
 	} else if (keys & INPUT_A) {
 		p2.set_ok = 1;
-		if (p2.select == SEL_MODEB)
-			p2.ModeB_pos = 0;
+		// Every edit opens on the value, MODE B's on the mode it has
+		if (p2.select == SEL_SAVE)
+			p2.auto_save_pos = 0;
+		else if (p2.select == SEL_MODEB)
+			p2.ModeB_pos = ModeB_INIT < 3 ? (u8)ModeB_INIT : 0;
 		else if (p2.select == SEL_LED)
 			p2.led_pos = 0;
 		else if (is_rgb(p2.select))
