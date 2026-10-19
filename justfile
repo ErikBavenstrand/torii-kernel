@@ -254,11 +254,12 @@ compat *filters: build emu-headless
     {{emu_docker}} python3 tests/games.py "$@"
 
 # Build the hardware-free kernel code with tests/host for the host, under ASan and UBSan, and run it;
-# test tools/font.py, tools/asset.py and the theme checker
+# test tools/font.py, tools/asset.py, the theme checker and the upgrade file's layout
 test-host: emu-image
     {{emu_docker}} tests/host.sh
     @uv run -q tests/font_test.py
     @uv run -q tests/asset_test.py
+    @uv run -q tests/image_test.py
 
 # Check an SD theme folder (docs/themes.md) as the kernel would load it, then preview it
 # on the emulated cart: PNGs of the UI demo and the cheat viewer, e.g. `just theme-check themes/example`

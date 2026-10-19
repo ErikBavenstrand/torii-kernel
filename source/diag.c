@@ -550,7 +550,7 @@ static void step_nor(void)
 	u32 a = crc32((u8 *)0x08000000, size), b = crc32((u8 *)0x08000000, size);
 	say(WHITE, "kernel CRC %08lX twice: %s", (unsigned long)a, a == b ? "same" : "DIFFERENT");
 	result(a == b, "kernel NOR reads the same twice");
-	// The FPGA images in the upgrade file have known CRCs (ez_define.h).
+	// The FPGA images in the upgrade file have known CRCs (image_layout.h).
 	u32 lx9 = crc32((u8 *)LX9_newomega_top_bin_address, LX9_newomega_top_bin_size);
 	u32 lx16 = crc32((u8 *)LX16_newomega_top_bin_address, LX16_newomega_top_bin_size);
 	say(WHITE, "FPGA image CRCs %08lX %08lX", (unsigned long)lx9, (unsigned long)lx16);
@@ -685,17 +685,17 @@ static void step_timing(void)
 	// The glyph's time is the renderer step's now (diag_render.c)
 
 	// BIOS LZ77: 16 KB of the official SD list's background picture, which
-	// image.bin still holds at 0x08117890 though nothing draws it now: the
-	// same data as before, so the figure compares with older reports.
+	// the upgrade file keeps for this (image_layout.h): the same data as
+	// before, so the figure compares with older reports.
 	u8 *packed = pReadCache, *out = pReadCache + 0x8000;
-	const u8 *picture = (const u8 *)0x08117890;
-	u32 packed_size = lz77_compress(picture, 0x4000, packed);
+	const u8 *picture = (const u8 *)LZ77_SAMPLE_address;
+	u32 packed_size = lz77_compress(picture, LZ77_SAMPLE_size, packed);
 	diag_timer_start();
 	LZ77UnCompWram(packed, out);
 	u32 lz_cycles = diag_timer_stop();
-	int lz_ok = memcmp(out, picture, 0x4000) == 0;
-	say(lz_ok ? WHITE : RED, "LZ77 to WRAM: %lu KB/s (from %lu B)", (unsigned long)kb_per_s(0x4000, lz_cycles),
-	    (unsigned long)packed_size);
+	int lz_ok = memcmp(out, picture, LZ77_SAMPLE_size) == 0;
+	say(lz_ok ? WHITE : RED, "LZ77 to WRAM: %lu KB/s (from %lu B)",
+	    (unsigned long)kb_per_s(LZ77_SAMPLE_size, lz_cycles), (unsigned long)packed_size);
 	result(lz_ok, "BIOS LZ77 gives back the data");
 
 	// SD reads: 256 KB of raw sectors from the card's start.
