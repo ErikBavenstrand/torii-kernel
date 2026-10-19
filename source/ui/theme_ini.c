@@ -21,12 +21,15 @@ const struct theme_view_name theme_view_names[] = {
 	{"recent", 12},
 	{"file-menu", 13},
 	{"nor-menu", 14},
-	{"message", 15},
-	{"confirm", 16},
 	// SETTINGS and HELP (source/settings.h)
 	{"settings1", 20},
 	{"settings2", 21},
 	{"help", 22},
+	// Dialogs (ui/dialog.c) and Diagnostics (diag.c, diag_render.c)
+	{"dialog", 30},
+	{"progress", 31},
+	{"diag", 32},
+	{"diag-demo", 33},
 };
 const u32 theme_view_name_count = sizeof(theme_view_names) / sizeof(theme_view_names[0]);
 

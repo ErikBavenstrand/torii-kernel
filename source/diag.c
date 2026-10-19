@@ -1,8 +1,8 @@
 // Diagnostics (see diag.h). Every result goes to the log as a "diag:" line;
-// the screen shows the same lines in the menu's font, a page at a time. The
-// steps that need the user come last: rumble, the checklist from
-// docs/release-checklist.md, checked against the log where it can be, and a
-// crash test.
+// the screen shows the same lines on the engine (source/ui), in a list that
+// scrolls to the newest. The steps that need the user come last: rumble,
+// the checklist from docs/release-checklist.md, checked against the log
+// where it can be, the renderer demo, and a crash test.
 //
 // It never writes to the game saves: it reads the FRAM only, writes test
 // patterns to a free SRAM page (CARTLOG_TEST_PAGE), and checks the FRAM's
@@ -28,13 +28,17 @@
 #include "RTC.h"
 #include "cartlog.h"
 #include "diag.h"
-#include "draw.h"
+#include "diag_priv.h"
 #include "logbuf.h"
 #include "logcheck.h"
 #include "lz77.h"
 #include "tlog.h"
 #include "waitcnt.h"
 #include "engine/cycles.h"
+#include "engine/engine.h"
+#include "engine/motion.h"
+#include "ui/dialog.h"
+#include "ui/ui.h"
 #include "../tests/kernel/torii_test.h"
 
 #define REG_WAITCNT_IO (*(vu16 *)0x04000204)
@@ -43,47 +47,237 @@ extern const u8 __rom_end__;
 extern void SoftReset_now(void);
 extern u32 gl_currentpage;
 
-#define WHITE RGB(31, 31, 31)
-#define GREY RGB(20, 20, 20)
-#define GREEN RGB(8, 31, 8)
-#define RED RGB(31, 8, 8)
-#define YELLOW RGB(31, 31, 8)
+#define say diag_say
+#define step diag_step
+#define ask diag_ask
+#define pause_frames diag_pause
 
 // --- Screen and keys ---------------------------------------------------------
+//
+// One engine view: a title bar, and the step's lines in a list that scrolls
+// to the newest, with no row selected. The list's count is fixed: rows past
+// the last line are blank, and a new line redraws its row. The colour bars
+// for the checklist are an image with its own palette.
 
-static u32 diag_y;
+#define DIAG_LINES 32       // lines kept: a long summary scrolls back over them
+#define DIAG_LINE_BYTES 48  // about what a line holds in the body font
+#define DIAG_ROWS 512       // the list's rows: more lines than a page ever has
+
+enum {
+	N_TITLE_BAR,
+	N_TITLE,
+	N_LIST,
+	N_BARS,
+	N_COUNT
+};
+
+static struct {
+	char lines[DIAG_LINES][DIAG_LINE_BYTES];
+	u8 ink[DIAG_LINES];
+	u32 count;  // lines on this page
+	char title[48];
+	struct ui_view *view;
+	u16 keys;  // fired since wait_key started listening
+	u32 pumped;  // torii_frames when say last ran a frame
+} scr EWRAM_BSS;
+
 static u32 diag_step_no;
-static char diag_text[64];
+
+static u32 lines_count(void *ctx)
+{
+	(void)ctx;
+	return DIAG_ROWS;
+}
+
+static int lines_fetch(void *ctx, u32 index, struct ui_item *out)
+{
+	(void)ctx;
+	if (index < scr.count && index + DIAG_LINES >= scr.count) {
+		out->text = scr.lines[index % DIAG_LINES];
+		out->ink = scr.ink[index % DIAG_LINES];
+	} else {
+		out->text = "";
+	}
+	return UI_ITEM_READY;
+}
+
+static const struct ui_list_model lines_model = {lines_count, lines_fetch, 0};
+
+// The checklist's colour bars, 240x24 px: red, green, blue and white bars 56
+// px wide, as 30x3 tiles in a palette of their own (colours 1-4)
+#define SOLID(c) (0x11111111u * (c))
+#define EDGE(c) (0x00111111u * (c))  // its right 2 px transparent: the gap
+#define T8(w) w, w, w, w, w, w, w, w
+#define BAR(c) T8(SOLID(c)), T8(SOLID(c)), T8(SOLID(c)), T8(SOLID(c)), T8(SOLID(c)), T8(SOLID(c)), T8(EDGE(c))
+#define BARS_ROW T8(0), BAR(1), BAR(2), BAR(3), BAR(4), T8(0)
+static const u32 bars_tiles[30 * 3 * 8] = {BARS_ROW, BARS_ROW, BARS_ROW};
+static const u16 bars_palette[16] = {0, RGB(31, 0, 0), RGB(0, 31, 0), RGB(0, 0, 31), RGB(31, 31, 31)};
+
+static const struct ui_label_config title_config = {"", UI_FONT_HEADING, UI_ALIGN_LEFT, 0};
+static const struct ui_list_config list_config = {&lines_model, 16, 0, UI_LIST_PLAIN, 0};
+static const struct ui_image_config bars_config = {bars_tiles, bars_palette, 0xD1A6};
+
+static const struct ui_spec diag_nodes[N_COUNT] = {
+	[N_TITLE_BAR] = {.kind = UI_PANEL,
+			 .id = 1,
+			 .parent = UI_NONE,
+			 .plane = 2,
+			 .anchor = UI_HFILL,
+			 .paper = UI_ROLE_PANEL,
+			 .h = 16},
+	[N_TITLE] = {.kind = UI_LABEL,
+		     .id = 2,
+		     .parent = N_TITLE_BAR,
+		     .plane = 2,
+		     .anchor = UI_FILL,
+		     .paper = UI_ROLE_PANEL,
+		     .data = &title_config},
+	[N_LIST] = {.kind = UI_LIST,
+		    .id = 3,
+		    .parent = UI_NONE,
+		    .plane = 1,
+		    .anchor = UI_FILL,
+		    .paper = UI_ROLE_BG,
+		    .y = 16,
+		    .data = &list_config},
+	[N_BARS] = {.kind = UI_IMAGE,
+		    .id = 4,
+		    .parent = UI_NONE,
+		    .plane = 0,
+		    .flags = UI_HIDDEN,
+		    .y = 120,
+		    .w = 240,
+		    .h = 24,
+		    .data = &bars_config},
+};
+
+static int diag_event(struct ui_view *view, const struct ui_event *e)
+{
+	(void)view;
+	if (e->type != UI_EV_KEYS)
+		return 0;
+	scr.keys |= e->keys;
+	return 1;
+}
+
+static const struct ui_view_spec diag_view_spec = {
+	.name = "diag", .nodes = diag_nodes, .count = N_COUNT, .id = 32, .focus = UI_NONE, .event = diag_event};
+
+static u8 node_of(u32 n)
+{
+	return (u8)(scr.view->first + n);
+}
+
+// Pushes the screen's view, showing the page as it was
+static void screen_push(void)
+{
+	scr.view = ui_push(&diag_view_spec, 0);
+	if (!scr.view) {
+		tlog_error("diag: %s", ui_error());
+		return;
+	}
+	ui_label_set(node_of(N_TITLE), scr.title);
+	ui_list_set_cursor(node_of(N_LIST), scr.count ? scr.count - 1 : 0);
+	for (u32 i = 0; i < 30 && !(scr.view->flags & UI_V_SHOWN); i++)
+		ui_frame();
+}
+
+void diag_screen_hide(void)
+{
+	if (!scr.view)
+		return;
+	ui_pop();
+	scr.view = 0;
+}
+
+void diag_screen_show(void)
+{
+	if (!scr.view)
+		screen_push();
+}
+
+// Sets the engine and the screen up (again after the unit tests, which reset
+// the engine), showing the page as it was
+static void screen_open(void)
+{
+	VBlankIntrWait();
+	*(vu16 *)0x05000000 = 0;  // a black backdrop until the theme's
+	*(vu16 *)0x04000000 = 0;  // mode 0, nothing on
+	engine_init();
+	motion_reset();  // the unit tests leave motions behind
+	ui_init(NULL);
+	ui_dim_set_frames(0);  // no dimming in the middle of a question
+	screen_push();
+}
+
+static void screen_close(void)
+{
+	ui_shutdown();
+	dialog_mode3();  // the registers as the unit tests expect them, on a black screen
+	scr.view = 0;
+}
 
 static void screen_title(const char *title)
 {
-	Clear(0, 0, 240, 160, RGB(0, 0, 0), 1);
-	snprintf(diag_text, sizeof(diag_text), "DIAGNOSTICS: %s", title);
-	DrawHZText12(diag_text, 39, 2, 2, YELLOW, 1);
-	diag_y = 18;
+	snprintf(scr.title, sizeof(scr.title), "DIAGNOSTICS: %s", title);
+	scr.count = 0;
+	if (!scr.view)
+		return;
+	ui_label_set(node_of(N_TITLE), scr.title);
+	ui_show(node_of(N_BARS), 0);
+	ui_list_reset(node_of(N_LIST), 0);
 }
 
-// Shows a line (cut to the screen's 39 characters) and logs it whole.
-static void __attribute__((format(printf, 2, 3))) say(u16 color, const char *format, ...)
+// Adds a line to the page; it shows in the next frame
+static void line_add(u8 colour, const char *text)
+{
+	u32 i = scr.count++;
+	snprintf(scr.lines[i % DIAG_LINES], DIAG_LINE_BYTES, "%s", text);
+	scr.ink[i % DIAG_LINES] = colour;
+	if (!scr.view)
+		return;
+	ui_list_refresh(node_of(N_LIST), i, i);
+	ui_list_set_cursor(node_of(N_LIST), i);
+}
+
+// Replaces line i (a live line: the clock, the buttons not pressed yet)
+static void line_set(u32 i, u8 colour, const char *text)
+{
+	if (i >= scr.count || i + DIAG_LINES < scr.count)
+		return;
+	snprintf(scr.lines[i % DIAG_LINES], DIAG_LINE_BYTES, "%s", text);
+	scr.ink[i % DIAG_LINES] = colour;
+	if (scr.view)
+		ui_list_refresh(node_of(N_LIST), i, i);
+}
+
+void diag_pause(u32 frames)
+{
+	while (frames--)
+		ui_frame();
+}
+
+void diag_say(u8 colour, const char *format, ...)
 {
 	char text[160];
 	va_list args;
 	va_start(args, format);
 	vsnprintf(text, sizeof(text), format, args);
 	va_end(args);
-	if (color == RED)
+	if (colour == RED)
 		tlog_error("diag: %s", text);
 	else
 		tlog("diag: %s", text);
-	if (diag_y > 160 - 13) {
-		Clear(0, 18, 240, 142, RGB(0, 0, 0), 1);
-		diag_y = 18;
+	line_add(colour, text);
+	// The screen keeps up with the log: a frame, unless one ran since the
+	// last VBlank (a burst of lines shows at the next)
+	if (torii_frames != scr.pumped) {
+		ui_frame();
+		scr.pumped = torii_frames;
 	}
-	DrawHZText12(text, 39, 2, diag_y, color, 1);
-	diag_y += 12;
 }
 
-static void step(const char *name)
+void diag_step(const char *name)
 {
 	diag_step_no++;
 	cartlog_phase(PHASE_DIAG, diag_step_no, NULL);
@@ -95,54 +289,35 @@ static void step(const char *name)
 static void wait_release(void)
 {
 	do {
-		VBlankIntrWait();
-		scanKeys();
-	} while (keysHeld());
+		ui_frame();
+	} while (ui_input()->held);
 }
 
 // Called every frame while wait_key waits, if set: the live clock.
 static void (*wait_tick)(void);
 
+// Waits for every key to be let go, then for a press of one in mask.
 static u16 wait_key(u16 mask)
 {
 	wait_release();
+	scr.keys = 0;
 	for (;;) {
-		VBlankIntrWait();
+		ui_frame();
 		if (wait_tick)
 			wait_tick();
-		scanKeys();
-		u16 keys = keysDown() & mask;
+		u16 keys = scr.keys & mask;
 		if (keys)
 			return keys;
 	}
 }
 
-static void pause_frames(u32 frames)
-{
-	while (frames--)
-		VBlankIntrWait();
-}
-
-enum {
-	ANSWER_SKIP = -1,
-	ANSWER_NO = 0,
-	ANSWER_YES = 1
-};
-
-enum {
-	ASK_CHECK,  // no is a failure, logged as an error
-	ASK_PROBE,  // no is a finding, logged as info
-	ASK_TRIED,  // a check of something the user may not have tried
-};
-
-// Asks a yes/no question about what the user saw: A yes, B no, SELECT skip.
-static int ask(const char *topic, const char *question, int kind)
+int diag_ask(const char *topic, const char *question, int kind)
 {
 	say(WHITE, "%s", question);
 	say(GREY, kind == ASK_TRIED ? "A: yes   B: no   SELECT: didn't try" : "A: yes   B: no   SELECT: skip");
 	u16 key = wait_key(KEY_A | KEY_B | KEY_SELECT);
 	int answer = (key & KEY_A) ? ANSWER_YES : (key & KEY_B) ? ANSWER_NO : ANSWER_SKIP;
-	u16 colour = GREY;
+	u8 colour = GREY;
 	const char *said = kind == ASK_TRIED ? "not tried" : "skipped";
 	if (answer == ANSWER_YES) {
 		colour = GREEN;
@@ -221,16 +396,26 @@ void IWRAM_CODE diag_loader_read(u32 offset, u16 *dst, u32 halfwords)
 
 // --- Steps -------------------------------------------------------------------
 
-// The summary's lines: each failed check, then each yes the log can't back.
+// The summary's lines: each failed check, each yes the log can't back, and
+// each renderer figure slower than the emulator's.
 static const char *summary[24];
 static u32 summary_count;
 static const char *unconfirmed[16];
 static u32 unconfirmed_count;
+static const char *slow[12];
+static u32 slow_count;
 
-static void add_failure(const char *what)
+void diag_add_failure(const char *what)
 {
 	if (summary_count < sizeof(summary) / sizeof(*summary))
 		summary[summary_count++] = what;
+}
+#define add_failure diag_add_failure
+
+void diag_add_slow(const char *what)
+{
+	if (slow_count < sizeof(slow) / sizeof(*slow))
+		slow[slow_count++] = what;
 }
 
 // Shows a check's result; failures go in the summary. what is a literal.
@@ -264,11 +449,16 @@ static void step_info(void)
 	pause_frames(60);
 }
 
+// The unit tests reset the engine (pools, shadow state, motions), so the
+// screen goes away while they run and comes back as it was.
 static void step_unit_tests(void)
 {
 	step("unit tests");
 	say(WHITE, "running the kernel's unit tests...");
+	pause_frames(2);  // shown before the screen goes
+	screen_close();
 	int failed = torii_unit_tests();
+	screen_open();
 	say(failed ? RED : GREEN, "%d unit tests failed (see the log)", failed);
 	result(!failed, "unit tests");
 	pause_frames(60);
@@ -314,14 +504,14 @@ static void step_psram(void)
 {
 	step("PSRAM");
 	vu16 *p = (vu16 *)(PSRAMBase_S98 + PSRAM_TEST_OFFSET);
-	u32 errors = 0, first = 0;
+	u32 errors = 0, first = 0, write_cycles = 0, read_cycles = 0;
 	SetPSRampage(PSRAM_TEST_PAGE);
 	for (u32 pass = 0; pass < 2; pass++) {
 		u16 flip = pass ? 0xFFFF : 0;
 		diag_timer_start();
 		for (u32 i = 0; i < 0x8000; i++)
 			p[i] = (u16)(i * 0x9E37 + 0x1234) ^ flip;
-		u32 write_cycles = diag_timer_stop();
+		u32 w = diag_timer_stop();
 		diag_timer_start();
 		for (u32 i = 0; i < 0x8000; i++) {
 			if (p[i] != ((u16)(i * 0x9E37 + 0x1234) ^ flip)) {
@@ -330,13 +520,15 @@ static void step_psram(void)
 				errors++;
 			}
 		}
-		u32 read_cycles = diag_timer_stop();
-		if (!pass)
-			say(WHITE, "64 KB: write %lu KB/s, check %lu KB/s",
-			    (unsigned long)kb_per_s(0x10000, write_cycles),
-			    (unsigned long)kb_per_s(0x10000, read_cycles));
+		u32 r = diag_timer_stop();
+		if (!pass) {
+			write_cycles = w;
+			read_cycles = r;
+		}
 	}
 	SetPSRampage(0);
+	say(WHITE, "64 KB: write %lu KB/s, check %lu KB/s", (unsigned long)kb_per_s(0x10000, write_cycles),
+	    (unsigned long)kb_per_s(0x10000, read_cycles));
 	if (errors)
 		say(RED, "%lu halfwords wrong, the first at +%lX", (unsigned long)errors, (unsigned long)first * 2);
 	result(!errors, "PSRAM holds a pattern");
@@ -369,11 +561,16 @@ static void step_loader(void)
 		diag_loader_read(at, image + at / 2, 0x1000 / 2);
 	enum loader_state state = loader_check((const u8 *)image);
 	u32 crc = crc32(image, LOADER_SIZE);
-	const char *title = (const char *)image + 0xA0;
 	int whole = state == LOADER_OK;
+	int de_bin = whole && crc32(image, DE_BIN_SIZE) == DE_BIN_CRC32;
+	// The header's title and code, copied before anything else runs: the
+	// image is in pReadCache, which the mode 3 screen's say() used to clear
+	// the start of (v0.3.2's garbled title)
+	char title[17];
+	memcpy(title, (const char *)image + 0xA0, 16);
+	title[16] = 0;
 	say(whole ? WHITE : RED, "boot loader CRC %08lX, %s", (unsigned long)crc, loader_state_name(state));
 	if (whole) {
-		int de_bin = crc32(image, DE_BIN_SIZE) == DE_BIN_CRC32;
 		tlog("diag: boot loader title %.12s, code %.4s, %s", title, title + 12,
 		     de_bin ? "EZ-Flash's DE.BIN" : "not DE.BIN (another loader version?)");
 	} else {
@@ -472,15 +669,7 @@ static void step_timing(void)
 	timed_reads("PSRAM", (const vu32 *)PSRAMBase_S98);
 	tlog_flush();
 
-	// Glyphs: one line of 39 characters, drawn ten times.
-	static const char sample[] = "The quick brown fox jumps over the dog.";
-	diag_timer_start();
-	for (u32 i = 0; i < 10; i++)
-		DrawHZText12((char *)sample, 39, 2, 146, GREY, 1);
-	u32 glyph_cycles = diag_timer_stop() / (10 * 39);
-	Clear(0, 146, 240, 14, RGB(0, 0, 0), 1);
-	say(WHITE, "a glyph takes %lu cycles (%lu us)", (unsigned long)glyph_cycles,
-	    (unsigned long)(glyph_cycles * 1000000ull / 16777216));
+	// The glyph's time is the renderer step's now (diag_render.c)
 
 	// BIOS LZ77: 16 KB of the SD list's background picture.
 	u8 *packed = pReadCache, *out = pReadCache + 0x8000;
@@ -676,9 +865,9 @@ static const struct check checklist[] = {
 };
 
 #define CLOCK_ITEM 2
-#define CLOCK_Y 30
 
-static u8 clock_shown;  // the second on screen
+static u8 clock_shown;   // the second on screen
+static u32 clock_line;   // the page's line that shows it
 
 static void clock_read(u8 t[7])
 {
@@ -696,8 +885,7 @@ static void clock_draw(void)
 	clock_shown = t[6];
 	char line[24];
 	snprintf(line, sizeof(line), "20%02X-%02X-%02X %02X:%02X:%02X", t[0], t[1], t[2], t[4] & 0x3F, t[5], t[6]);
-	Clear(0, CLOCK_Y, 240, 12, RGB(0, 0, 0), 1);
-	DrawHZText12(line, 39, 2, CLOCK_Y, YELLOW, 1);
+	line_set(clock_line, YELLOW, line);
 }
 
 // The live clock on the clock item: read four times a second, drawn when
@@ -708,28 +896,24 @@ static void clock_tick(void)
 		clock_draw();
 }
 
-static void show_colour_bars(void)
-{
-	static const u16 colours[] = {RGB(31, 0, 0), RGB(0, 31, 0), RGB(0, 0, 31), RGB(31, 31, 31)};
-	for (u32 i = 0; i < 4; i++)
-		Clear(2 + i * 59, 120, 56, 24, colours[i], 1);
-}
-
 static void step_keys(void)
 {
 	step("buttons");
 	say(WHITE, "Press every button once. Hold START and");
 	say(WHITE, "SELECT for two seconds to give up.");
-	u16 seen = 0;
+	u16 seen = 0, shown = 0xFFFF;
 	u32 held = 0;
 	wait_release();
+	line_add(YELLOW, "");  // the buttons not pressed yet
+	u32 keys_line = scr.count - 1;
 	while (seen != 0x3FF && held < 120) {
-		VBlankIntrWait();
-		scanKeys();
-		seen |= keysDown();
-		held = ((keysHeld() & (KEY_START | KEY_SELECT)) == (KEY_START | KEY_SELECT)) ? held + 1 : 0;
+		ui_frame();
+		const InputState *in = ui_input();
+		seen |= in->pressed;
+		held = ((in->held & (KEY_START | KEY_SELECT)) == (KEY_START | KEY_SELECT)) ? held + 1 : 0;
 		static const char *const names[] = {"A", "B", "SEL", "START", "RIGHT", "LEFT", "UP", "DOWN", "R", "L"};
-		if (torii_frames % 8 == 0) {
+		if (seen != shown) {
+			shown = seen;
 			char line[64];
 			u32 len = 0;
 			line[0] = 0;
@@ -737,11 +921,9 @@ static void step_keys(void)
 				if (!(seen & (1 << k)))
 					len += snprintf(line + len, sizeof(line) - len, "%s ", names[k]);
 			}
-			Clear(0, 60, 240, 13, RGB(0, 0, 0), 1);
-			DrawHZText12(line[0] ? line : "all seen", 39, 2, 60, YELLOW, 1);
+			line_set(keys_line, YELLOW, line[0] ? line : "all seen");
 		}
 	}
-	diag_y = 74;
 	if (seen != 0x3FF)
 		tlog("diag: keys never pressed: %03X", (unsigned)(~seen & 0x3FF));
 	result(seen == 0x3FF, "every button");
@@ -759,12 +941,13 @@ static void step_checklist(void)
 		const struct check *c = &checklist[i];
 		step("checklist");
 		say(GREY, "item %lu of %lu", (unsigned long)i + 1, (unsigned long)count);
-		if (i == 0)
-			show_colour_bars();
+		if (i == 0 && scr.view)
+			ui_show(node_of(N_BARS), 1);
 		if (i == 1)
 			Set_LED_control(0x80 | 0x20 | 0x08);  // breathing red and blue
 		if (i == CLOCK_ITEM) {
-			diag_y = CLOCK_Y + 12;
+			line_add(YELLOW, "");
+			clock_line = scr.count - 1;
 			clock_shown = 0xFF;  // not a BCD second: drawn at once
 			clock_draw();
 			wait_tick = clock_tick;
@@ -801,16 +984,42 @@ static void step_checklist(void)
 
 // --- The run -----------------------------------------------------------------
 
+// Waits for A or SELECT on the summary; UP and DOWN scroll back over its
+// lines, which may be more than the screen shows
+static u16 summary_keys(void)
+{
+	u32 first = scr.count > DIAG_LINES ? scr.count - DIAG_LINES : 0;
+	u32 cursor = scr.count ? scr.count - 1 : 0;
+	wait_release();
+	scr.keys = 0;
+	for (;;) {
+		ui_frame();
+		u16 keys = scr.keys;
+		scr.keys = 0;
+		if (keys & (KEY_A | KEY_SELECT))
+			return keys;
+		if ((keys & KEY_UP) && cursor > first)
+			cursor--;
+		if ((keys & KEY_DOWN) && cursor + 1 < scr.count)
+			cursor++;
+		if (scr.view && (keys & (KEY_UP | KEY_DOWN)))
+			ui_list_set_cursor(node_of(N_LIST), cursor);
+	}
+}
+
 static u32 crash_loop[1] EWRAM_BSS;
 
 void Diagnostics(void)
 {
+	memset(&scr, 0, sizeof(scr));
 	screen_title("start?");
+	screen_open();
 	say(WHITE, "Diagnostics tests the cart and writes");
 	say(WHITE, "a report to /torii/logs. It never");
 	say(WHITE, "writes your saves. It takes a minute,");
 	say(WHITE, "then restarts the kernel.");
 	say(WHITE, "A: start   B: back");
+	diag_pause(3);  // drawn before the screen counts as ready
 	tlog_debug("screen ready: diag-start");
 	if (wait_key(KEY_A | KEY_B) & KEY_B)
 		SoftReset_now();
@@ -822,6 +1031,7 @@ void Diagnostics(void)
 	diag_step_no = 0;
 	summary_count = 0;
 	unconfirmed_count = 0;
+	slow_count = 0;
 	tlog("diag: Diagnostics started, logging at debug for this run");
 
 	step_info();
@@ -832,36 +1042,41 @@ void Diagnostics(void)
 	step_loader();
 	step_save_chip();
 	step_timing();
+	diag_renderer_step();
 	read_log();
 	step_eeprom();
 
 	step("questions");
-	say(WHITE, "The rest needs you: rumble, buttons and");
-	say(WHITE, "a short checklist.");
+	say(WHITE, "The rest needs you: rumble, buttons, a");
+	say(WHITE, "short checklist and a renderer demo.");
 	say(WHITE, "A: go on   START: skip them");
 	if (wait_key(KEY_A | KEY_START) & KEY_A) {
 		step_rumble();
 		step_keys();
 		step_checklist();
+		diag_renderer_demo();
 	} else {
 		tlog("diag: questions skipped");
 	}
 
 	step("summary");
 	if (summary_count == 0)
-		say(GREEN, unconfirmed_count ? "no check failed" : "everything passed");
+		say(GREEN, unconfirmed_count || slow_count ? "no check failed" : "everything passed");
 	for (u32 i = 0; i < summary_count; i++)
 		say(RED, "failed: %s", summary[i]);
 	for (u32 i = 0; i < unconfirmed_count; i++)
 		say(YELLOW, "unconfirmed: %s", unconfirmed[i]);
+	for (u32 i = 0; i < slow_count; i++)
+		say(YELLOW, "slower than the emulator: %s", slow[i]);
 	say(WHITE, "The report is in /torii/logs.");
 	say(WHITE, "A: restart the kernel");
 	say(WHITE, "SELECT: crash it on purpose, to test");
 	say(WHITE, "the crash dump, then restart");
+	say(GREY, "UP/DOWN: scroll the summary");
 	tlog("diag: done");
 	cartlog_phase(PHASE_MENU, 0, NULL);
 	tlog_flush();
-	u16 key = wait_key(KEY_A | KEY_SELECT);
+	u16 key = summary_keys();
 	if (key & KEY_SELECT) {
 		cartlog_phase(PHASE_CRASH_TEST, 0, NULL);
 		tlog("diag: crash test: running from EWRAM, outside the kernel's code");

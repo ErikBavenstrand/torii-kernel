@@ -11,6 +11,7 @@
 #include "NORflash_OP.h"
 #include "ezkernel.h"
 #include "draw.h"
+#include "ui/dialog.h"
 #include "lang.h"
 #include "Ezcard_OP.h"
 #include "GBApatch.h"
@@ -101,11 +102,9 @@ void Chip_Erase(void)
 	do {
 		VBlankIntrWait();
 		VBlankIntrWait();
-		ShowTime(NOR_list, 0);
-		DrawPic((u16 *)(gImage_MENU + 78 * 128 * 2), 56, 90 + 13, 128, 13, 0, 0, 1);//show menu pic
-
+		// Torii: the count on FormatNor's progress dialog (it was drawn on the menu, with the clock)
 		itoa(count, msg, 2);
-		DrawHZText12(msg, 0, 60, 90 + 13, gl_color_text, 1);
+		dialog_progress_status(msg);
 		count++;
 
 		VBlankIntrWait();
@@ -119,12 +118,15 @@ void Chip_Erase(void)
 
 //-----------------------------------------------------------
 // Erases the whole game NOR and its list (FORMAT ALL, once confirmed).
+// Torii: the erase's count is a progress dialog (source/ui/dialog.h)
 void FormatNor(void)
 {
+	dialog_progress_begin(NULL, NULL);
 	Chip_Erase();
 	memset(pNorFS, 00, sizeof(FM_NOR_FS) * MAX_NOR);
 	game_total_NOR = 0;
 	Save_NOR_list(0);  // Torii: the boot no longer saves an empty list
+	dialog_progress_end();
 }
 //---------------------------------------------------------------
 void WriteFlash(u32 address, u8 *buffer, u32 size)
@@ -568,12 +570,11 @@ static u32 Loadfile2NOR_slow(TCHAR *filename, u32 NORaddress, u16 have_patch, u8
 		tlog("nor: %s: %lu bytes in an area of %lu", filename, (unsigned long)filesize,
 		     (unsigned long)fileneedsize);
 
-		Clear(60, 160 - 15, 120, 15, gl_color_cheat_black, 1);
-		DrawHZText12(gl_writing, 0, 70, 160 - 15, gl_color_text, 1);
+		// Torii: on the launch's progress dialog, with a bar
+		dialog_progress_status(gl_writing);
 		for (blocknum = 0; blocknum < filesize; blocknum += 0x20000) {
-			sprintf(msg, "%luMb/%luMb", (blocknum) / 0x20000, filesize / 0x20000);
-			Clear(70 + 54, 160 - 15, 100, 15, gl_color_cheat_black, 1);
-			DrawHZText12(msg, 0, 70 + 54, 160 - 15, gl_color_text, 1);
+			sprintf(msg, "%s %luMb/%luMb", gl_writing, (blocknum) / 0x20000, filesize / 0x20000);
+			dialog_progress_set(blocknum, filesize, msg);
 			Block_Erase(blocknum + NORaddress);
 
 			f_lseek(&gfile, blocknum);

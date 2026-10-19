@@ -11,6 +11,7 @@ extern char *gl_theme_error;
 extern char *gl_file_overflow;
 
 extern char *gl_menu_btn;
+extern char *gl_close_btn;  // a message dialog's key (source/ui/dialog.c)
 extern char *gl_lastest_game;
 
 extern char *gl_writing;

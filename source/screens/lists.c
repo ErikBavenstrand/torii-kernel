@@ -36,6 +36,7 @@
 #include "../tlog.h"
 #include "../engine/engine.h"
 #include "../engine/text.h"
+#include "../ui/dialog.h"
 #include "../ui/ui.h"
 
 // The SD list's folder (ezkernelnew.c): the launch path opens games there
@@ -70,13 +71,11 @@ enum action {
 	ACT_NOR_MENU,     // arg: the NOR game
 	ACT_MENU_A,       // arg: the menu line; key_l
 	ACT_MENU_B,
-	ACT_DIALOG_A,     // A or B on a message or confirm dialog
-	ACT_DIALOG_B,
 };
 
-// What a message or confirm dialog does once answered
+// What a message or confirm dialog (ui/dialog.h) does once answered
 enum after {
-	AFTER_POP,     // back to the list under it
+	AFTER_POP,     // back to the list under it (the dialog has gone)
 	AFTER_SD,      // the SD list, listed again
 	AFTER_NOR,     // the NOR list, read again
 	AFTER_DELETE,  // confirm: delete current_filename
@@ -553,49 +552,6 @@ static const struct ui_view_spec file_menu6 = {"file-menu", menu6_nodes, 4, 13, 
 static const struct ui_view_spec nor_menu3 = {"nor-menu", menu3_nodes, 4, 14, UI_NONE, UI_VIEW_MODAL, menu_event};
 static const struct ui_view_spec nor_menu5 = {"nor-menu", menu5_nodes, 4, 14, UI_NONE, UI_VIEW_MODAL, menu_event};
 
-// A message, or a question A and B answer. A minimal local dialog until
-// T12's message and confirm views land.
-#define D_TEXT 1
-#define D_HINT 2
-static const struct ui_label_config text_label = {"", UI_FONT_BODY, UI_ALIGN_CENTER, 0};
-static const struct ui_spec dialog_nodes[] = {
-	{.kind = UI_PANEL,
-	 .id = 1,
-	 .parent = UI_NONE,
-	 .plane = 0,
-	 .anchor = UI_HCENTER | UI_VCENTER,
-	 .paper = UI_ROLE_PANEL,
-	 .w = 208,
-	 .h = 80},  // whole tiles once centred: (160 - 80) / 2 = 40
-	{.kind = UI_LABEL,
-	 .id = 2,
-	 .parent = 0,
-	 .plane = 0,
-	 .anchor = UI_HFILL,
-	 .paper = UI_ROLE_PANEL,
-	 .x = 8,
-	 .y = 8,
-	 .w = 8,
-	 .h = 48,
-	 .data = &text_label},
-	{.kind = UI_LABEL,
-	 .id = 3,
-	 .parent = 0,
-	 .plane = 0,
-	 .anchor = UI_HFILL,
-	 .ink = UI_ROLE_DIM,
-	 .paper = UI_ROLE_PANEL,
-	 .x = 8,
-	 .y = 56,
-	 .w = 8,
-	 .h = 16,
-	 .data = &hint_label},
-};
-
-static int dialog_event(struct ui_view *v, const struct ui_event *e);
-static const struct ui_view_spec message_view = {"message", dialog_nodes, 3, 15, UI_NONE, UI_VIEW_MODAL, dialog_event};
-static const struct ui_view_spec confirm_view = {"confirm", dialog_nodes, 3, 16, UI_NONE, UI_VIEW_MODAL, dialog_event};
-
 // --- Engine and screens ------------------------------------------------------------
 
 static void engine_enter(void)
@@ -780,23 +736,28 @@ static void show_nor(u32 at)
 	show(SCR_NOR, at);
 }
 
-// A message (confirm 0) or a question; after says what follows
-static void dialog(const char *text, int confirm, enum after after)
+static void dialog_answer(int yes);
+
+// A message (confirm 0) or a question (ui/dialog.h), over the list with its
+// menus closed; after says what follows. Runs its own frames, so it is only
+// called from do_action, outside ui_frame.
+static void dialog_kind(const char *title, const char *text, int confirm, enum after after, u32 kind)
 {
 	while (ui_depth() > 1)
 		ui_pop();
 	lists.menu = 0;
 	lists.after = (u8)after;
-	if (text != lists.message)
-		snprintf(lists.message, sizeof(lists.message), "%s", text);
-	struct ui_view *d = ui_push(confirm ? &confirm_view : &message_view, &lists);
-	if (!d) {
-		tlog_error("lists: %s", ui_error());
-		return;
-	}
-	lists.dialog_first = d->first;
-	ui_label_set((u8)(d->first + D_TEXT), lists.message);
-	ui_label_set((u8)(d->first + D_HINT), confirm ? gl_menu_btn : "");
+	int yes = 0;
+	if (confirm)
+		yes = dialog_confirm(title, text, kind);
+	else
+		dialog_message(title, text, kind);
+	dialog_answer(yes);
+}
+
+static void dialog(const char *text, int confirm, enum after after)
+{
+	dialog_kind(NULL, text, confirm, after, DIALOG_INFO);
 }
 
 static void error_dialog(u8 error_num, enum after after)
@@ -804,7 +765,7 @@ static void error_dialog(u8 error_num, enum after after)
 	const char *msg = Error_message(error_num);
 	tlog_error("error %u: %s", error_num, msg);
 	tlog_flush();
-	dialog(msg, 0, after);
+	dialog_kind(NULL, msg, 0, after, DIALOG_ERROR);
 }
 
 static void menu_open(u32 which, u32 rows, u32 max, u32 line)
@@ -941,18 +902,6 @@ static int menu_event(struct ui_view *v, const struct ui_event *e)
 		lists.menu_line = (u8)line;
 		ui_list_set_cursor(node, line);
 	}
-	return 1;
-}
-
-static int dialog_event(struct ui_view *v, const struct ui_event *e)
-{
-	(void)v;
-	if (e->type != UI_EV_KEYS || lists.act)
-		return e->type == UI_EV_KEYS;
-	if (e->keys & INPUT_A)
-		act(ACT_DIALOG_A, 0);
-	else if (e->keys & INPUT_B)
-		act(ACT_DIALOG_B, 0);
 	return 1;
 }
 
@@ -1132,14 +1081,15 @@ static void nor_menu_a(u32 line, u32 key_l)
 		if (res == 2)
 			error_dialog(2, AFTER_NOR);
 		else
-			dialog(res ? gl_file_noexist : gl_save_loaded, 0, AFTER_NOR);
+			dialog_kind(NULL, res ? gl_file_noexist : gl_save_loaded, 0, AFTER_NOR,
+				    res ? DIALOG_ERROR : DIALOG_INFO);
 		break;
 	default:  // back the SRAM up
 		res = FRAM_save_op(0);
 		if (res == 2) {
 			error_dialog(2, AFTER_NOR);
 		} else if (res == 0x10) {
-			dialog(gl_file_exist, 1, AFTER_BACKUP);
+			dialog_kind(NULL, gl_file_exist, 1, AFTER_BACKUP, DIALOG_ERROR);
 		} else {
 			if (FRAM_save_op(2) == 2)
 				error_dialog(2, AFTER_NOR);
@@ -1160,10 +1110,8 @@ static void dialog_answer(int yes)
 		show_sd(cursor());
 		break;
 	case AFTER_FORMAT:
-		if (yes) {
-			engine_leave();
-			FormatNor();
-		}
+		if (yes)
+			FormatNor();  // its progress dialog shows over the list
 		show_nor(0);
 		break;
 	case AFTER_BACKUP:
@@ -1183,7 +1131,6 @@ static void dialog_answer(int yes)
 		show_nor(lists.nor_game);
 		break;
 	default:
-		ui_pop();
 		break;
 	}
 }
@@ -1229,8 +1176,9 @@ static void do_action(void)
 	case ACT_DELETE_ASK:
 		snprintf(current_filename, sizeof(current_filename), "%s",
 			 names_get(sd_files[arg - folder_total].name));
-		snprintf(lists.message, sizeof(lists.message), "%s\n%s", gl_LSTART_help, current_filename);
-		dialog(lists.message, 1, AFTER_DELETE);
+		// "Delete file SURE?" (the start of gl_formatnor_info) over the whole name
+		snprintf(lists.message, sizeof(lists.message), "%s %.5s", gl_LSTART_help, gl_formatnor_info);
+		dialog_kind(lists.message, current_filename, 1, AFTER_DELETE, DIALOG_INFO);
 		break;
 	case ACT_NOR_MENU:
 		lists.nor_game = arg;
@@ -1254,10 +1202,6 @@ static void do_action(void)
 		}
 		lists.menu = 0;
 		ui_pop();
-		break;
-	case ACT_DIALOG_A:
-	case ACT_DIALOG_B:
-		dialog_answer(a == ACT_DIALOG_A && ui_top() && ui_top()->spec == &confirm_view);
 		break;
 	default:
 		break;

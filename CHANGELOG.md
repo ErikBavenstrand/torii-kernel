@@ -6,6 +6,26 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** messages, questions and progress are dialogs on the v0.3 tile
+  engine (`source/ui/dialog.h`): the launch's progress (with the game's name),
+  WRITE TO NOR's and the PSRAM load's progress with a bar, "Save sav?", the
+  NOR menu's format, save load and backup, delete latest, L+START delete,
+  and every error message, the lists' too. Texts, keys and flow are as
+  before; a message now shows "[B]OK", a question returns once its key is
+  let go, and the delete question shows the whole name. The screen doesn't
+  dim while a dialog is up. The format erase and the save backup show
+  their progress over the NOR list (`6067e1b`, `adf21e9`, `ba02013`,
+  `7b2d44d`, `8107dfe`).
+- **Changed:** Diagnostics runs on the engine: its lines scroll in a list,
+  colours are theme roles, the summary scrolls with UP/DOWN. A renderer
+  step times a glyph, a 38-glyph row, an LZ77 cover into PSRAM, a PSRAM to
+  VRAM copy, PSRAM writes at the slow and the menu's WAITCNT (read back),
+  a scroll frame and a page change, and flags any figure more than 20%
+  above the emulator's; a ten-second scroll-and-fade demo asks about
+  tearing. The boot loader's title is no longer garbled in the log. An SD
+  theme's wallpaper is read from PSRAM page 0 even when a launch or a NOR
+  write left another page selected (`6067e1b`, `adf21e9`, `ba02013`,
+  `6db6bfa`).
 - **Changed:** the SD list, the NOR list and Recently Played, with the game
   menu, the NOR game menu and their questions, run on the v0.3 tile engine:
   a title bar with the folder, clock and count, 16 px rows with file-type

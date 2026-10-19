@@ -8,6 +8,7 @@ char *gl_theme_error;
 char *gl_file_overflow;
 
 char *gl_menu_btn;
+char *gl_close_btn;
 char *gl_lastest_game;
 
 char *gl_writing;
@@ -130,6 +131,7 @@ const char en_theme_error[] = "Theme not loaded, using Dark:";
 const char en_file_overflow[] = "File overflow,load to NOR";
 
 const char en_menu_btn[] = "[B]CANCEL    [A]OK";
+const char en_close_btn[] = "[B]OK";
 const char en_writing[] = "WRITING...";
 const char en_lastest_game[] = "SELECT THE LASTEST";
 
@@ -255,6 +257,7 @@ void LoadEnglish(void)
 	gl_file_overflow = (char *)en_file_overflow;
 
 	gl_menu_btn = (char *)en_menu_btn;
+	gl_close_btn = (char *)en_close_btn;
 	gl_writing = (char *)en_writing;
 	gl_lastest_game = (char *)en_lastest_game;
 

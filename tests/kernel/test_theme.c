@@ -9,6 +9,7 @@
 #include "torii_test.h"
 #include "tests.h"
 #include "ff.h"
+#include "../../source/Ezcard_OP.h"
 #include "../../source/crc32.h"
 #include "../../source/engine/engine.h"
 #include "../../source/engine/stage.h"
@@ -146,6 +147,9 @@ void test_theme_load(void)
 	gfx_init();
 	res_init();
 	ui_theme_select(ui_theme_sd(), UI_ACCENT_THEME);
+	// As a dialog's ui_init can run it, with another PSRAM page left selected by
+	// a PSRAM loader: it selects page 0, where the file is
+	SetPSRampage(0x1000);
 	ui_wallpaper_setup();
 	u16 bgcnt = 0;
 	CHECK(ui_wallpaper_bgcnt(&bgcnt));

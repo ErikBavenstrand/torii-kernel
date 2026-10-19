@@ -344,6 +344,10 @@ void ui_wallpaper_setup(void)
 	if (!wall_current() || (wall_up() && sd.up_gen == sd.wall_gen))
 		return;
 	sd.h_tiles = RES_NONE;
+	// Page 0, where the file is: a dialog's ui_init can run while a PSRAM
+	// loader has left another page selected (it selects its page again
+	// before each copy)
+	psram_begin();
 	// The file in PSRAM is lost after a game was loaded there
 	const u8 *file = wall_file(sd.wall_slot);
 	if (crc32(file, sd.wall_bytes) != sd.wall_crc) {

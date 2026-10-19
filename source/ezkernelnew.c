@@ -13,6 +13,7 @@
 #include "ez_define.h"
 #include "ff.h"
 #include "draw.h"
+#include "ui/dialog.h"
 #include "ezkernel.h"
 #include "Ezcard_OP.h"
 #include "saveMODE.h"
@@ -154,15 +155,6 @@ static void Show_theme_error(void)
 	}
 	for (u32 i = 0; i < 120; i++)
 		VBlankIntrWait();
-}
-//---------------------------------------------------------------------------------
-static void Show_MENU_btn(void)
-{
-	char msg[30];
-	Clear(60, 118 - 1, 55, 14, gl_color_MENU_btn, 1);
-	Clear(125, 118 - 1, 55, 14, gl_color_MENU_btn, 1);
-	sprintf(msg, "%s", gl_menu_btn);
-	DrawHZText12(msg, 0, 60, 118, gl_color_text, 1);
 }
 //---------------------------------------------------------------------------------
 // Reads Recently Played into p_recently_play; returns how many rows it holds.
@@ -643,7 +635,7 @@ u32 IWRAM_CODE Loadfile2PSRAM(TCHAR *filename)
 	u32 filesize;
 	u32 res;
 	u32 blocknum;
-	char msg[20];
+	char msg[40];
 
 	u32 Address;
 	vu16 page = 0;
@@ -652,14 +644,13 @@ u32 IWRAM_CODE Loadfile2PSRAM(TCHAR *filename)
 	res = f_open(&gfile, filename, FA_READ);
 	if (res == FR_OK) {
 		filesize = f_size(&gfile);
-		Clear(60, 160 - 15, 120, 15, gl_color_cheat_black, 1);
-		DrawHZText12(gl_writing, 0, 70, 160 - 15, gl_color_text, 1);
+		// Torii: on the launch's progress dialog, with a bar
+		dialog_progress_status(gl_writing);
 
 		f_lseek(&gfile, 0x0000);
 		for (blocknum = 0x0000; blocknum < filesize; blocknum += 0x20000) {
-			sprintf(msg, "%luMb/%luMb", (blocknum) / 0x20000, filesize / 0x20000);
-			Clear(70 + 54, 160 - 15, 110, 15, gl_color_cheat_black, 1);
-			DrawHZText12(msg, 0, 70 + 54, 160 - 15, gl_color_text, 1);
+			sprintf(msg, "%s %luMb/%luMb", gl_writing, (blocknum) / 0x20000, filesize / 0x20000);
+			dialog_progress_set(blocknum, filesize, msg);
 			f_read(&gfile, pReadCache, 0x20000, &ret);//pReadCache max 0x20000 Byte
 
 			if ((gl_reset_on == 1) || (gl_rts_on == 1) || (gl_sleep_on == 1) || (gl_cheat_on == 1)) {
@@ -818,7 +809,7 @@ u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU)
 	u32 filesize;
 	u32 res;
 	u32 blocknum;
-	char msg[20];
+	char msg[40];
 
 	u32 Address;
 	vu16 page = 0;
@@ -859,14 +850,13 @@ u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU)
 			//use rtc, have been modify
 		}
 
-		Clear(60, 160 - 15, 120, 15, gl_color_cheat_black, 1);
-		DrawHZText12(gl_writing, 0, 78, 160 - 15, gl_color_text, 1);
+		// Torii: on the launch's progress dialog, with a bar
+		dialog_progress_status(gl_writing);
 
 		f_lseek(&gfile, 0x0000);
 		for (blocknum = 0x0000; blocknum < filesize; blocknum += 0x20000) {
-			sprintf(msg, "%luMb", (blocknum) / 0x20000);
-			Clear(78 + 54, 160 - 15, 110, 15, gl_color_cheat_black, 1);
-			DrawHZText12(msg, 0, 78 + 54, 160 - 15, gl_color_text, 1);
+			sprintf(msg, "%s %luMb", gl_writing, (blocknum) / 0x20000);
+			dialog_progress_set(blocknum, filesize, msg);
 			//f_lseek(&gfile, blocknum);
 			f_read(&gfile, pReadCache, 0x20000, &ret);//pReadCache max 0x20000 Byte
 
@@ -922,11 +912,9 @@ static void Show_error_num(u8 error_num)
 {
 	const char *msg = Error_message(error_num);
 
-	ClearWithBG((u16 *)gImage_SD, 90, 2, 90, 13, 1);
 	tlog_error("error %u: %s", error_num, msg);
 	tlog_flush();
-	DrawHZText12((char *)msg, 0, 90, 2, RGB(31, 00, 00), 1);
-	wait_btn();
+	dialog_message(NULL, msg, DIALOG_ERROR);
 }
 //---------------------------------------------------------------------------------
 u32 Get_savefilesize(BYTE saveMODE)
@@ -1093,59 +1081,30 @@ static void Check_save_flag(void)
 	if (readd == 0x11) {
 		//u32 res;
 		register u32 loopwrite;
-		DrawPic((u16 *)gImage_SD, 0, 0, 240, 160, 0, 0, 1);
 		for (loopwrite = 0; loopwrite < 0x200 / 2; loopwrite++) {
 			((u16 *)SAV_info_buffer)[loopwrite] = Read_sav_info(loopwrite + 2);
 		}
-		DrawPic((u16 *)gImage_MENU, 56, 25, 128, 110, 0, 0, 1);//show menu pic
 
-		DrawHZText12(gl_save_sav, 0, 60, 28, gl_color_text, 1);//use sure?gl_LSTART_help
-		DrawHZText12((TCHAR *)SAV_info_buffer, 20, 60, 40, 0x7fff, 1);//file name
-		DrawHZText12((TCHAR *)SAV_info_buffer + 20, 20, 60, 52, 0x7fff, 1);//file name
-		DrawHZText12((TCHAR *)SAV_info_buffer + 40, 20, 60, 64, 0x7fff, 1);//file name
-			//DrawHZText12(gl_formatnor_info,5,60,90,gl_color_text,1);//use sure?
-
-		// Torii: the answer is logged
+		// Torii: the answer is logged. The question and the saving are
+		// dialogs on the engine (source/ui/dialog.h)
 		static const char saved_how[] = "save: \"Save sav?\" for %s/%s, %lu bytes, save type %02X: %s";
 		u16 savetype = Read_sav_info(SAV_INFO_TYPE);
-		if (gl_auto_save_sel) {
-			tlog(saved_how, SAVER_FOLDER, (TCHAR *)SAV_info_buffer, (unsigned long)savefilesize, savetype,
-			     "auto");
-			DrawHZText12(gl_save_ing, 0, 60, 88, gl_color_text, 1);//use sure?gl_LSTART_help
+		TCHAR *name = (TCHAR *)SAV_info_buffer;
+		dialog_open();
+		int save = gl_auto_save_sel || dialog_confirm(gl_save_sav, name, DIALOG_INFO);
+		tlog(saved_how, SAVER_FOLDER, name, (unsigned long)savefilesize, savetype,
+		     gl_auto_save_sel ? "auto"
+		     : save           ? "A, save"
+				      : "B, not saved");
+		if (save) {
+			dialog_progress_begin(gl_save_sav, name);
+			dialog_progress_status(gl_save_ing);
 			f_mkdir(SAVER_FOLDER);//"/SAVER"
 			f_chdir(SAVER_FOLDER);
-			Save_savefile((TCHAR *)SAV_info_buffer, savefilesize);
-		} else {
-			Show_MENU_btn();
-			while (1) {
-				VBlankIntrWait();
-				scanKeys();
-				u16 keysdown = keysDown();
-				if (keysdown & KEY_A) {
-					tlog(saved_how, SAVER_FOLDER, (TCHAR *)SAV_info_buffer,
-					     (unsigned long)savefilesize, savetype, "A, save");
-					DrawHZText12(gl_save_ing, 0, 60, 88, gl_color_text,
-						     1);//use sure?gl_LSTART_help
-					f_mkdir(SAVER_FOLDER);
-					f_chdir(SAVER_FOLDER);
-					Save_savefile((TCHAR *)SAV_info_buffer, savefilesize);
-					/*TCHAR bmpfilename[100];	
-						u32 bmpnum;
-						for(bmpnum=0;bmpnum<1000;bmpnum++)
-						{
-							f_mkdir(SAVER_FOLDER);
-							f_chdir(SAVER_FOLDER);
-							sprintf(bmpfilename,"%4lu.sav",bmpnum);
-							Save_savefile(bmpfilename,savefilesize);
-						}*/
-					break;
-				} else if (keysdown & KEY_B) {
-					tlog(saved_how, SAVER_FOLDER, (TCHAR *)SAV_info_buffer,
-					     (unsigned long)savefilesize, savetype, "B, not saved");
-					break;
-				}
-			}
+			Save_savefile(name, savefilesize);
+			dialog_progress_end();
 		}
+		dialog_close();
 		memset(SAV_info_buffer, 0x00, sizeof(SAV_info_buffer));//clean flag
 		Save_sav_info(SAV_info_buffer, 0x200);
 	}
@@ -1277,8 +1236,8 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 	BYTE error_num;
 	u32 res;
 
-	Clear(0, 0, 240, 160, gl_color_cheat_black, 1);
-	DrawHZText12(gl_Loading, 0, (240 - strlen(gl_Loading) * 6) / 2, 74, gl_color_text, 1);
+	// The launch's progress, until the game starts (NOR_launch ends it otherwise)
+	dialog_progress_begin(gl_Loading, pNorFS[show_offset + file_select].filename);
 
 	init_FAT_table();
 
@@ -1365,8 +1324,8 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 	BYTE SAVEMODE;
 	// The launch fills PSRAM with the game: the cover cache there is gone
 	cover_cache_invalidate();
-	Clear(0, 0, 240, 160, gl_color_cheat_black, 1);
-	DrawHZText12(gl_Loading, 0, (240 - strlen(gl_Loading) * 6) / 2, 74, gl_color_text, 1);
+	// The launch's progress, until the game starts (Game_launch ends it otherwise)
+	dialog_progress_begin(gl_Loading, pfilename);
 
 	u32 gamefilesize = 0;
 	//u32 savefilesize=0;
@@ -1421,8 +1380,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 	}
 	if (MENU_line < 2) {  //work for psram
 		if (gamefilesize > 0x2000000) {
-			ShowbootProgress(gl_file_overflow);
-			wait_btn();
+			dialog_message(NULL, gl_file_overflow, DIALOG_ERROR);
 			return 0;
 		}
 
@@ -1571,9 +1529,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 				}
 				return 2;
 			} else if (res == 2) {
-				Clear(0, 160 - 15, 200, 15, gl_color_cheat_black, 1);
-				DrawHZText12(gl_NOR_full, 0, 0, 160 - 15, gl_color_NORFULL, 1);  //"NOR FULL!"
-				wait_btn();
+				dialog_message(NULL, gl_NOR_full, DIALOG_ERROR);  //"NOR FULL!"
 				return 1;
 			} else {  // Torii: the file or the NOR failed; the game isn't listed
 				Show_error_num(1);
@@ -1610,9 +1566,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 				}
 				return 2;
 			} else if (res == 2) {
-				Clear(0, 160 - 15, 200, 15, gl_color_cheat_black, 1);
-				DrawHZText12(gl_NOR_full, 0, 0, 160 - 15, gl_color_NORFULL, 1);  //"NOR FULL!"
-				wait_btn();
+				dialog_message(NULL, gl_NOR_full, DIALOG_ERROR);  //"NOR FULL!"
 				return 0;
 			} else {  // Torii: the file or the NOR failed; the game isn't listed
 				Show_error_num(1);
@@ -1631,6 +1585,7 @@ u8 Game_launch(struct game_pick *g, u32 menu_line, u32 key_L)
 	// faster than the BIOS's wait states (waitcnt.h)
 	REG_WAITCNT_CART = WAITCNT_BIOS;
 	u8 res = Game_boot(g->name, g->is_emu, menu_line, g->save_num, g->old_save_num, key_L);
+	dialog_progress_end();  // the launch's, if it failed or wrote to NOR: back to mode 3
 	REG_WAITCNT_CART = WAITCNT_MENU;
 	cartlog_phase(PHASE_MENU, 0, NULL);
 	return res;
@@ -1640,6 +1595,7 @@ void NOR_launch(u32 index, u32 key_L)
 {
 	REG_WAITCNT_CART = WAITCNT_BIOS;  // as Game_launch
 	Boot_NOR_game(0, index, key_L);  // returns only if it failed
+	dialog_progress_end();  // back to mode 3
 	REG_WAITCNT_CART = WAITCNT_MENU;
 	cartlog_phase(PHASE_MENU, 0, NULL);
 }
@@ -1673,7 +1629,10 @@ u8 FRAM_save_op(u8 OP)
 		Loadsavefile(savfilename);
 		return 0;
 	}
-	//bak fram save
+	//bak fram save, with a progress dialog while it saves
+	dialog_progress_begin(NULL, savfilename);
+	dialog_progress_status(gl_save_ing);
 	Save_savefile(savfilename, Get_savefilesize(pNorFS[0].savemode));
+	dialog_progress_end();
 	return 0;
 }

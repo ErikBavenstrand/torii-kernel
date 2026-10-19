@@ -55,6 +55,7 @@ struct list_state {
 	u16 first;  // first slot's tile number
 	u8 page;
 	u8 sel_ok;  // the map shows the selection at sel_drawn
+	u8 plain;   // UI_LIST_PLAIN: nothing shows as selected
 	u8 queued_a;  // A pressed during a page change: dispatched once it is drawn
 	u32 count, rows;
 	u32 cursor;
@@ -328,6 +329,7 @@ static int list_init(u8 node)
 		return 0;
 	}
 	st->mq_set = 0xFF;
+	st->plain = (config(node)->flags & UI_LIST_PLAIN) != 0;
 	input_wrap_init(&st->wrap, ui_input(), 0);
 	ui_list_reset(node, 0);
 	return 1;
@@ -583,6 +585,8 @@ static void list_update(u8 node, u32 dt)
 // shows), with item sel in the selected bank
 static void row_entries(const struct list_state *st, u16 *rows, u32 r, u32 s, u32 sel)
 {
+	if (st->plain)
+		sel = 0xFFFFFFFFu;  // no item
 	u32 rt = st->rt, cw = st->tw / st->cols, item = r * st->cols;
 	u32 tile = slot_tile(st, s);
 	for (u32 col = 0; col < st->cols; col++, item++, tile += cw * rt, rows += cw) {

@@ -2,6 +2,7 @@
 # SCENARIO/KEY HASH: the key frame tests/shots/png/SCENARIO.KEY.png shows.
 # SCENARIO/frames FIRST-LAST HASH: frames of a -H range (counted from 0)
 # that all hash the same.
+boot-progress/screen 8A9B3222959885A1
 cheats/screen 063A1B234EA6DC79
 cheats-long/screen 50CC9D4DE1FE8EC1
 cheats-long/scrolled B9FCA1EEBABF43C5
@@ -44,7 +45,8 @@ cover-demo/frames 28-28 DE528E2C9590DC52
 cover-demo/frames 29-29 0690C16F9D9454FC
 cover-demo/frames 30-30 23A2E3B708CF46A1
 cover-demo/frames 31-32 3CCAC1492B95FF7A
-diag-start/screen 1EF53FFFB16A8AEC
+diag-renderer/demo CFABCE035BEAC9FD
+diag-start/screen 3162F4422A6557C5
 file-menu/screen 2BC422F470DDF7F3
 help/screen 5B20C617DB3A66BC
 nor-list/screen B41DDB1AFEB55DC1
@@ -52,7 +54,7 @@ recent/screen 672BEF507A1E554D
 sd-deep/held DADD3FA9E4F41079
 sd-deep/paged 1F9A20893381FF91
 sd-delete/kept 5CB316715377D608
-sd-delete/screen DC88559CB4686E2D
+sd-delete/screen 27DF7DB1CACAF0C0
 sd-list/screen 34EED145D7C6A8C0
 sd-long/menu D9F54562E74ACFE3
 sd-long/scrolled 932B53789E40D384

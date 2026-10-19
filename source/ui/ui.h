@@ -339,6 +339,7 @@ enum {
 	UI_LIST_ICONS = 4,    // list: rows keep UI_LIST_ICON_W px at the left for item.icon
 	UI_LIST_FIXED = 8,    // list: never more items than whole rows fit, so it never scrolls
 			      // and needs no spare row slots (a menu in a dialog); more are cut
+	UI_LIST_PLAIN = 16,   // no row shows as selected (a log): the cursor only scrolls
 };
 #define UI_LIST_ICON_W 16
 
