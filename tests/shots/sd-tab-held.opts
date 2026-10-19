@@ -18,3 +18,5 @@
 -s @80:gliding.png
 -k @120:-
 -s @150:rest.png
+# The tear watch: no write changes the screen while it scans out
+-T 1:99999

@@ -9,3 +9,5 @@
 -s @30:end.png
 -k @40:DOWN -k @44:-
 -s @70:top.png
+# The tear watch: no write changes the screen while it scans out
+-T 1:99999

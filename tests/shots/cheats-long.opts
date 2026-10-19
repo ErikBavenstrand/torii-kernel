@@ -11,3 +11,5 @@
 -w "screen ready: cheats"
 -s @1:screen.png
 -s @320:scrolled.png
+# The tear watch: no write changes the screen while it scans out
+-T 1:99999

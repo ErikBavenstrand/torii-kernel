@@ -40,6 +40,11 @@
 //   -C EPOCH         as -c, but the clock stands still at EPOCH, so a screen
 //                    showing the time looks the same whenever it is drawn
 //   -O DIR           write -s PNGs given relative paths into DIR
+//   -T FROM:TO       watch frames FROM to TO (as -H takes them) for tears:
+//                    a store that changes what the screen shows while lines
+//                    0-159 scan out prints a "tear:" line (see the tear
+//                    watch below); the run ends with "tears: N". The window
+//                    doesn't make the run longer: -T 1:99999 watches it all
 //
 // If the CPU hits an illegal opcode or jumps to an invalid address, it prints
 // a crash report (registers, and code addresses found on the stack with their
@@ -53,6 +58,7 @@
 #include <mgba/script/context.h>
 #endif
 #include <mgba/internal/arm/arm.h>
+#include <mgba/internal/gba/gba.h>
 #include <mgba-util/png-io.h>
 #include <mgba-util/vfs.h>
 #ifdef USE_GDB_STUB
@@ -137,6 +143,263 @@ static const char *symbolize(uint32_t address)
 	}
 	snprintf(out, sizeof(out), " (%s+0x%X)", best->name, address - best->address);
 	return out;
+}
+
+// --- Tear watch (-T) -------------------------------------------------------
+//
+// While on, a store (by the CPU or DMA) that changes what the screen shows
+// while the PPU scans out lines 0-159, the display on, is a tear: a write
+// to the display registers (DISPCNT to BLDY), to palette RAM, or to BG VRAM
+// the screen shows as the registers stand now (a map entry of an enabled
+// BG on screen, or the row of a tile such an entry shows, through the
+// windows, and not faded out whole). It prints "tear: frame F line L WHAT ADDR old -> new" with the
+// code storing it. Only mode 0 (text BGs) is modelled; sprite VRAM and OAM
+// are not watched, and the OBJ window counts as outside the windows.
+
+#define TEAR_REPORTS 40  // lines printed; the rest are counted
+#define TEAR_VRAM 0x10000  // BG VRAM in modes 0-2
+
+static struct ARMMemory tear_orig;
+static struct GBA *tear_gba;
+static int tear_on;
+static unsigned long tear_count;
+static uint8_t tear_shown[TEAR_VRAM / 2];  // BG VRAM halfwords on screen
+static int tear_stale = 1;  // tear_shown needs a rescan
+static uint16_t tear_old[64];  // a store's halfwords before it
+static uint32_t tear_from, tear_halves;  // what tear_old holds: start (byte address) and count
+
+static int tear_in(uint16_t win, uint32_t at, uint32_t max)
+{
+	uint32_t lo = win >> 8, hi = win & 0xFF;
+	if (hi > max || lo > hi) {
+		hi = max;
+	}
+	return at >= lo && at < hi;
+}
+
+// Whether BG bg shows at pixel (x, y): through the windows, and not faded
+// out whole (BLDY 16 to black or white, or alpha with EVA 0, on it).
+static int tear_layer_at(const uint16_t *io, uint32_t bg, uint32_t x, uint32_t y)
+{
+	uint32_t win = io[0] >> 13, region = 0x3F;  // the window's control bits, all on with no windows
+	if (!win) {
+		region = 0x3F;
+	} else if ((win & 1) && tear_in(io[0x20], x, 240) && tear_in(io[0x22], y, 160)) {
+		region = io[0x24] & 0xFF;
+	} else if ((win & 2) && tear_in(io[0x21], x, 240) && tear_in(io[0x23], y, 160)) {
+		region = io[0x24] >> 8;
+	} else {
+		region = io[0x25] & 0xFF;
+	}
+	if (!(region >> bg & 1)) {
+		return 0;
+	}
+	uint32_t bldcnt = io[0x28], mode = (bldcnt >> 6) & 3;
+	if ((region & 0x20) && (bldcnt >> bg & 1)) {
+		if (mode >= 2 && (io[0x2A] & 0x1F) >= 16) {
+			return 0;
+		}
+		if (mode == 1 && (io[0x29] & 0x1F) == 0) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+// Marks the BG VRAM halfwords the screen shows now.
+static void tear_scan(void)
+{
+	memset(tear_shown, 0, sizeof(tear_shown));
+	tear_stale = 0;
+	const uint16_t *io = tear_gba->memory.io, *vram = tear_gba->video.vram;
+	if ((io[0] & 0x80) || (io[0] & 7)) {
+		return;  // forced blank, or a mode not modelled
+	}
+	for (uint32_t bg = 0; bg < 4; ++bg) {
+		if (!(io[0] & (0x100u << bg))) {
+			continue;
+		}
+		uint16_t cnt = io[4 + bg];
+		uint32_t cb = ((cnt >> 2) & 3) * 0x4000u, sb = ((cnt >> 8) & 31) * 0x800u;
+		uint32_t w = (cnt & 0x4000) ? 512 : 256, h = (cnt & 0x8000) ? 512 : 256;
+		uint32_t c8 = (cnt & 0x80) ? 2 : 1, hofs = io[8 + 2 * bg], vofs = io[9 + 2 * bg];
+		for (uint32_t y = 0; y < 160; ++y) {
+			for (uint32_t x = 0; x < 240; ++x) {
+				if (!tear_layer_at(io, bg, x, y)) {
+					continue;
+				}
+				uint32_t px = (x + hofs) & (w - 1), py = (y + vofs) & (h - 1);
+				uint32_t block = (px >> 8) + (py >> 8) * (w >> 8);
+				uint32_t entry = sb + block * 0x800 + (((py & 255) >> 3) * 32 + ((px & 255) >> 3)) * 2;
+				if (entry >= TEAR_VRAM) {
+					continue;
+				}
+				tear_shown[entry >> 1] = 1;
+				uint16_t e = vram[entry >> 1];
+				uint32_t row = (e & 0x800) ? 7 - (py & 7) : (py & 7);
+				uint32_t at = cb + (e & 0x3FFu) * 32 * c8 + row * 4 * c8;
+				for (uint32_t i = 0; i < 2 * c8 && at + 2 * i < TEAR_VRAM; ++i) {
+					tear_shown[(at >> 1) + i] = 1;
+				}
+			}
+		}
+	}
+}
+
+// What a byte address is to the watch: 1 display register, 2 palette, 3 BG
+// VRAM (offset in *off), 0 not watched.
+static int tear_kind(uint32_t address, uint32_t *off)
+{
+	switch (address >> 24) {
+	case 4:
+		*off = address & 0xFFFFFF;
+		return *off < 0x56 && (*off < 4 || *off >= 8) ? 1 : 0;
+	case 5:
+		*off = address & 0x3FF;
+		return 2;
+	case 6:
+		*off = address & 0x1FFFF;
+		if (*off >= 0x18000) {
+			*off -= 0x8000;
+		}
+		return *off < TEAR_VRAM ? 3 : 0;
+	default:
+		return 0;
+	}
+}
+
+static uint16_t tear_read(int kind, uint32_t off)
+{
+	if (kind == 1) {
+		return tear_gba->memory.io[off >> 1];
+	}
+	if (kind == 2) {
+		return tear_gba->video.palette[off >> 1];
+	}
+	return tear_gba->video.vram[off >> 1];
+}
+
+// Before a store of bytes from address: notes what it may change.
+static void tear_before(uint32_t address, uint32_t bytes)
+{
+	tear_halves = 0;
+	uint32_t off;
+	if (!tear_on || !tear_kind(address, &off)) {
+		return;
+	}
+	tear_from = address & ~1u;
+	tear_halves = (bytes + (address & 1) + 1) / 2;
+	if (tear_halves > 64) {
+		tear_halves = 64;
+	}
+	for (uint32_t i = 0; i < tear_halves; ++i) {
+		int kind = tear_kind(tear_from + 2 * i, &off);
+		tear_old[i] = kind ? tear_read(kind, off) : 0;
+	}
+}
+
+// After it: reports the halfwords it changed on screen.
+static void tear_after(struct ARMCore *cpu)
+{
+	static const char *const what[] = {"", "register", "palette", "vram"};
+	for (uint32_t i = 0; i < tear_halves; ++i) {
+		uint32_t off, address = tear_from + 2 * i;
+		int kind = tear_kind(address, &off);
+		if (!kind) {
+			continue;
+		}
+		uint16_t now = tear_read(kind, off);
+		if (now == tear_old[i]) {
+			continue;
+		}
+		int on_screen = 1;
+		if (kind == 3) {
+			if (tear_stale) {
+				tear_scan();
+			}
+			on_screen = tear_shown[off >> 1];
+			if (on_screen) {
+				tear_stale = 1;  // a map entry on screen may show other tiles now
+			}
+		} else if (kind == 1) {
+			tear_stale = 1;
+		}
+		// The registers as they were decide whether it showed
+		int blank = tear_gba->video.vcount >= 160 ||
+			    (kind == 1 && off == 0 ? tear_old[i] & 0x80 : tear_gba->memory.io[0] & 0x80);
+		if (blank || !on_screen) {
+			continue;
+		}
+		if (tear_count++ < TEAR_REPORTS) {
+			printf("tear: frame %u line %d %s %08X %04X -> %04X pc %08X%s", current_frame,
+			       tear_gba->video.vcount, what[kind], address, tear_old[i], now, cpu->gprs[15],
+			       symbolize(cpu->gprs[15]));
+			printf(" lr %08X%s\n", cpu->gprs[14], symbolize(cpu->gprs[14]));
+		}
+	}
+	tear_halves = 0;
+}
+
+static void tear_store32(struct ARMCore *cpu, uint32_t address, int32_t value, int *cycles)
+{
+	tear_before(address & ~3u, 4);
+	tear_orig.store32(cpu, address, value, cycles);
+	if (tear_halves) {
+		tear_after(cpu);
+	}
+}
+
+static void tear_store16(struct ARMCore *cpu, uint32_t address, int16_t value, int *cycles)
+{
+	tear_before(address & ~1u, 2);
+	tear_orig.store16(cpu, address, value, cycles);
+	if (tear_halves) {
+		tear_after(cpu);
+	}
+}
+
+static void tear_store8(struct ARMCore *cpu, uint32_t address, int8_t value, int *cycles)
+{
+	tear_before(address & ~1u, 2);  // a byte to VRAM or palette RAM writes the halfword
+	tear_orig.store8(cpu, address, value, cycles);
+	if (tear_halves) {
+		tear_after(cpu);
+	}
+}
+
+static uint32_t tear_store_multiple(struct ARMCore *cpu, uint32_t address, int mask, enum LSMDirection direction,
+				    int *cycles)
+{
+	uint32_t count = 0;
+	for (int m = mask; m; m &= m - 1) {
+		++count;
+	}
+	uint32_t start = address;
+	if (direction & LSM_D) {
+		start -= count * 4 - 4;
+		if (direction & LSM_B) {
+			start -= 4;
+		}
+	} else if (direction & LSM_B) {
+		start += 4;
+	}
+	tear_before(start & ~3u, count * 4);
+	uint32_t out = tear_orig.storeMultiple(cpu, address, mask, direction, cycles);
+	if (tear_halves) {
+		tear_after(cpu);
+	}
+	return out;
+}
+
+static void tear_install(struct mCore *core)
+{
+	struct ARMCore *cpu = core->cpu;
+	tear_gba = core->board;
+	tear_orig = cpu->memory;
+	cpu->memory.store32 = tear_store32;
+	cpu->memory.store16 = tear_store16;
+	cpu->memory.store8 = tear_store8;
+	cpu->memory.storeMultiple = tear_store_multiple;
 }
 
 static const char *until_text;
@@ -384,6 +647,7 @@ struct options {
 	struct events pokes;
 	struct events states;
 	struct events ranges;
+	struct events tears;
 	const char *outDir;
 	long long epoch;
 	int pinClock;
@@ -481,6 +745,16 @@ static void parse_options(struct options *opts, int argc, char **argv)
 			}
 			ev->end = end.frame;
 			note_frame(ev, 0);
+		} else if (!strcmp(argv[i], "-T")) {
+			struct event *ev = add_event(&opts->tears, argv[++i]);
+			struct event end = {0};
+			parse_frame(&end, ev->arg);
+			if (end.wait != ev->wait || end.frame < ev->frame) {
+				fprintf(stderr, "-T %s: FROM and TO must both be @N or both frames, FROM first\n",
+					argv[i]);
+				exit(2);
+			}
+			ev->end = end.frame;  // a window only: it doesn't make the run longer
 		} else if (!strcmp(argv[i], "-p")) {
 			struct event *ev = add_event(&opts->pokes, argv[++i]);
 			no_zero(ev, "-p");
@@ -710,6 +984,9 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (opts.tears.count) {
+		tear_install(core);
+	}
 	struct mDebugger *debugger = NULL;
 	if (opts.gdbPort) {
 #ifdef USE_GDB_STUB
@@ -743,6 +1020,10 @@ int main(int argc, char **argv)
 			if (due(&opts.pokes.list[i], frame)) {
 				poke_memory(core, opts.pokes.list[i].arg);
 			}
+		}
+		tear_on = 0;
+		for (size_t i = 0; i < opts.tears.count; ++i) {
+			tear_on |= in_range(&opts.tears.list[i], frame);
 		}
 		if (debugger) {
 			mDebuggerRunFrame(debugger);
@@ -841,6 +1122,9 @@ int main(int argc, char **argv)
 			++frame;  // as if the loop ran out
 			break;
 		}
+	}
+	if (opts.tears.count) {
+		printf("tears: %lu\n", tear_count);
 	}
 	if (nwaits && next_wait < nwaits && !crashed && !until_hit) {
 		fprintf(stderr, "timed out at frame %u waiting for: %s\n", frame - 1, waits[next_wait].text);

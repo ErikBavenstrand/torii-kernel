@@ -9,3 +9,5 @@
 -k @20:L -k @50:-
 -w "screen ready: nor-list"
 -s @60:back.png
+# The tear watch: no write changes the screen while it scans out
+-T 1:99999
