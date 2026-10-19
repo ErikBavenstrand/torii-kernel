@@ -1,14 +1,25 @@
-# A deep scroll (folder Long, 302 files): RIGHT pages twenty times, then
-# DOWN held for two seconds runs at full speed
+# A deep scroll (folder Long, 302 files). RIGHT tapped eight times, one
+# every 8 frames, pages by scrolling, never blanking the list. Then DOWN held
+# 3.5 seconds: the repeat ramps up smoothly to 40 rows a second and the list
+# glides with the cursor, which stays on screen; let go, it brakes to a
+# whole row. Then LEFT held pages back on the paging schedule, the list
+# streaming at 24 px a frame, to the top, where it stops (a held key never
+# wraps the list). Every frame of both holds is hashed. UP pressed afresh at
+# the top wraps to the end (a page change).
 -w "screen ready: sd-list"
 -k @8:DOWN -k @12:- -k @16:DOWN -k @20:-
 -k @28:A -k @32:-
 -w "screen ready: sd-list"
 -k @8:RIGHT -k @12:- -k @16:RIGHT -k @20:- -k @24:RIGHT -k @28:- -k @32:RIGHT -k @36:-
 -k @40:RIGHT -k @44:- -k @48:RIGHT -k @52:- -k @56:RIGHT -k @60:- -k @64:RIGHT -k @68:-
--k @72:RIGHT -k @76:- -k @80:RIGHT -k @84:- -k @88:RIGHT -k @92:- -k @96:RIGHT -k @100:-
--k @104:RIGHT -k @108:- -k @112:RIGHT -k @116:- -k @120:RIGHT -k @124:- -k @128:RIGHT -k @132:-
--k @136:RIGHT -k @140:- -k @144:RIGHT -k @148:- -k @152:RIGHT -k @156:- -k @160:RIGHT -k @164:-
--s @190:paged.png
--k @200:DOWN -k @320:-
--s @360:held.png
+-s @100:paged.png
+-k @110:DOWN -k @320:-
+-H @110:@350
+-s @250:held-mid.png
+-s @350:held.png
+-k @360:LEFT -k @530:-
+-H @360:@560
+-s @420:paging.png
+-s @560:top.png
+-k @580:UP -k @584:-
+-s @610:wrapped.png

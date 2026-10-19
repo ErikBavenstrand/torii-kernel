@@ -128,7 +128,9 @@ A UTF-8 text file (a BOM is skipped; LF, CRLF or CR line ends; at most 8 KB; lin
 | `[effects]` | `KIND_effects` | 0-15, how screens replace each other (bits, added up): 1 fade out to the background and the next screen in from it, 2 slide sideways, 4 slide up and down, 8 mosaic | tab 3, deeper 5, fade 1, leave 1 |
 | `[effects]` | `KIND_out`, `KIND_in` | 0-30 frames going out and coming in | tab, deeper and leave 3, 8; fade 3, 6 |
 | `[effects]` | `KIND_px` | 0-64 px a slide goes | tab 16, deeper 12, fade and leave 0 |
-| `[input]` | `delay`, `interval`, `fast_after`, `fast_interval`, `skip_interval`, `page_delay`, `page_interval` | 1-255 frames (`engine/input.h`) | 15, 4, 60, 2, 1, 20, 4 |
+| `[input]` | `delay`, `interval`, `page_delay`, `page_interval` | 1-255 frames (`engine/input.h`): a held d-pad repeats after `delay`, first every `interval` frames | 15, 4, 20, 6 |
+| `[input]` | `ramp` | 0-255 frames from the first repeat to top speed, along a smooth curve (0: top speed at once) | 90 |
+| `[input]` | `top_speed` | 1-60 repeats a second at the end of the ramp (60: every frame) | 40 |
 | `[input]` | `wrap_pause` | 0-255 frames | 15 |
 | `[wallpaper]` | `file` | a file name in the theme's folder (no `/`, `\`, `:`, not starting with `.`, under 32 bytes): a 4bpp TAS1 asset | none |
 | `[patches]` | `VIEW.NODE.FIELD` | see below; at most 16 (a repeated target replaces its patch) | none |

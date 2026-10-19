@@ -92,9 +92,8 @@ void test_theme_keys(void)
 				   "[input]\n"
 				   "delay = 20\n"
 				   "interval = 5\n"
-				   "fast_after = 90\n"
-				   "fast_interval = 3\n"
-				   "skip_interval = 2\n"
+				   "ramp = 120\n"
+				   "top_speed = 45\n"
 				   "page_delay = 25\n"
 				   "page_interval = 10\n"
 				   "wrap_pause = 0\n"
@@ -147,9 +146,8 @@ void test_theme_keys(void)
 		      sizeof(t->transition[0])));
 	CHECK_EQ(t->input.delay, 20);
 	CHECK_EQ(t->input.interval, 5);
-	CHECK_EQ(t->input.fast_after, 90);
-	CHECK_EQ(t->input.fast_interval, 3);
-	CHECK_EQ(t->input.skip_interval, 2);
+	CHECK_EQ(t->input.ramp, 120);
+	CHECK_EQ(t->input.top_speed, 45);
 	CHECK_EQ(t->input.page_delay, 25);
 	CHECK_EQ(t->input.page_interval, 10);
 	CHECK_EQ(t->input.wrap_pause, 0);

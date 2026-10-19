@@ -188,14 +188,15 @@ debug)
   settings 0=0xE1E1 1=1 2=1 3=0 4=0 5=9 6=8 7=2 8=9 9=8 10=3 11=1 12=0 13=1 14=1 25=1 26=2
   boot -f 200
   cp "$cart/sram.bin" "$cart/sram-before.bin"
-  # Hello.gba, BOOT WITH ADDON; in game, L+R+START, then down to DEBUG
+  # Hello.gba (under the torii folder the first boot made: one DOWN, as a
+  # second wraps to the top), BOOT WITH ADDON; in game, L+R+START, then down to DEBUG
   # (RESET SAVE LOAD DEBUG) and A. The menu stays, saying the snapshot is
   # saved, with RESET picked (a power-off would clear cart RAM): A on it goes
   # back to the kernel, whose boot logs the snapshot.
   # The game starts around frame 850, once the savestate file is made.
   # The message's first row (y 147, from x 20) shows in VRAM.
   # shellcheck disable=SC2046
-  boot $(keys 100 DOWN DOWN A) $(keys 160 DOWN A) -k 1200:L+R+START -k 1206:- $(keys 1240 DOWN DOWN DOWN A) \
+  boot $(keys 100 DOWN A) $(keys 160 DOWN A) -k 1200:L+R+START -k 1206:- $(keys 1240 DOWN DOWN DOWN A) \
     -m 1300:$(printf 0x%X $((0x06000000 + (147 * 240 + 20) * 2))):400 -s 1300:"$cart/debug.png" $(keys 1320 A) -f 1700
   grep -qi 'e0 *03' "$cart/out.log" || fail "no green message after DEBUG: $(tail -3 "$cart/out.log")"
   has "launch: IRQ hook from"

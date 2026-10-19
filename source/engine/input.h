@@ -1,18 +1,24 @@
 // Input: per-key repeat counted in frames (not libgba's shared setRepeat),
-// L/R paging on its own schedule, and list cursor moves that wrap only when
-// the user means it.
+// paging keys on their own schedule, and list cursor moves that wrap only
+// when the user means it.
 //
 // input_step takes the keys held this frame as a bitmask, so tests/host runs
 // it; input_poll (input_hw.c) reads them from the hardware.
 //
 // The d-pad repeats: it fires on the press frame, again once held for delay
-// frames, then every interval frames, and every fast_interval frames once a
-// repeat would fall at or past fast_after frames held (every skip_interval
-// frames instead while the caller says the scroll animation is skipped).
-// Pressing a direction, or releasing one, starts every held direction's
-// schedule over: one still held fires again only after delay frames. L and R fire on the press,
-// after page_delay frames, then every page_interval frames, with no speed-up.
-// Other keys fire only on the press.
+// frames, then on a smooth ramp: from one repeat every interval frames, the
+// rate rises along a smoothstep curve over ramp frames to top_speed repeats
+// a second, and stays there. A repeat is due when an accumulator, advanced
+// by the rate each frame, passes a whole repeat; input_phase gives what it
+// holds towards the next one, so a list can scroll at the cursor's speed
+// between repeats rather than in steps. Pressing a direction, or releasing
+// one, starts every held direction's schedule over: one still held fires
+// again only after delay frames.
+//
+// Paging keys (L and R, plus any input_page_keys adds, such as LEFT and
+// RIGHT where they move a page) fire on the press, after page_delay frames,
+// then every page_interval frames, with no speed-up. Other keys fire only on
+// the press.
 #ifndef TORII_INPUT_H
 #define TORII_INPUT_H
 
@@ -37,18 +43,21 @@
 // Timings in frames: layout and theme data, so a view may pass its own.
 typedef struct {
 	u8 delay;         // press to first repeat
-	u8 interval;      // between repeats
-	u8 fast_after;    // held this long, repeats speed up
-	u8 fast_interval; // between repeats then
-	u8 skip_interval; // between repeats then, while the scroll animation is skipped
-	u8 page_delay;    // L and R: press to first repeat
-	u8 page_interval; // L and R: between repeats
+	u8 interval;      // between repeats at the start of the ramp
+	u8 ramp;          // first repeat to top speed
+	u8 top_speed;     // repeats a second at top speed, 1-60 (60: every frame)
+	u8 page_delay;    // paging keys: press to first repeat
+	u8 page_interval; // paging keys: between repeats
 	u8 wrap_pause;    // a held key wraps at a list end after resting there this long
 } InputTiming;
 
-// 15, 4, 60 (1 s), 2, 1; L/R 20, 8; wrap pause 15. A held d-pad fires on
-// frames 0, 15, 19, ... 59, then 61, 63, ... (or 60, 61, ... while skipped).
+// 15, 4, 90, 40; paging 20, 6; wrap pause 15. A held d-pad fires on frames
+// 0 and 15, then about 4 frames apart, closing up smoothly to 40 a second
+// (two frames in three) by frame 105 (1.75 s).
 extern const InputTiming input_timing_default;
+
+// Repeat rates are 16.16 repeats a frame.
+#define INPUT_ONE 0x10000u
 
 typedef struct {
 	const InputTiming *timing;
@@ -57,8 +66,12 @@ typedef struct {
 	u16 pressed;  // went down this frame
 	u16 released; // went up this frame
 	u16 fire;     // pressed or repeated this frame: act on these
+	u16 page_keys; // keys on the paging schedule: INPUT_PAGE unless input_page_keys says
+	u16 repeating; // held keys past their first repeat
 	u32 held_frames[INPUT_KEYS];
-	u32 next_fire[INPUT_KEYS]; // held_frames at which the key repeats next
+	u32 phase[INPUT_KEYS];  // towards the next repeat (INPUT_ONE is one), once repeating
+	u32 rate[INPUT_KEYS];   // the repeat rate this frame, once repeating
+	u16 ramp_frames[INPUT_KEYS]; // since the first repeat, up to ramp
 } InputState;
 
 // The wrap gate for one cursor (a list, or one axis of a grid): each owns
@@ -71,14 +84,26 @@ typedef struct {
 // Starts with no key held. timing NULL takes input_timing_default.
 void input_init(InputState *s, const InputTiming *timing);
 
+// Which keys page (INPUT_PAGE and any of the d-pad's): they repeat on the
+// paging schedule from the next step (one already repeating switches rate).
+void input_page_keys(InputState *s, u16 keys);
+
 // One frame: keys is the held mask (INPUT_*), dt the frames since the last
-// step (clamped to 1..3; repeats fire at most once a step). skip_anim: the
-// caller skips the scroll animation at the current repeat speed, which lets
-// the d-pad repeat every skip_interval frames once it is past fast_after.
-void input_step(InputState *s, u16 keys, u32 dt, int skip_anim);
+// step (clamped to 1..3; repeats fire at most once a step).
+void input_step(InputState *s, u16 keys, u32 dt);
 
 // Reads the keys from REG_KEYINPUT and steps (kernel only, input_hw.c).
-void input_poll(InputState *s, u32 dt, int skip_anim);
+void input_poll(InputState *s, u32 dt);
+
+// The repeat rate of key at the curve's point ramp frames after its first
+// repeat: 16.16 repeats a frame (hardware-free, for tests and tuning).
+u32 input_ramp_rate(const InputTiming *t, u32 ramp);
+
+// What key has gathered towards its next repeat (0 to INPUT_ONE - 1), and
+// its repeat rate this frame; both 0 unless key is held past its first
+// repeat. key is a single bit.
+u32 input_phase(const InputState *s, u16 key);
+u32 input_rate(const InputState *s, u16 key);
 
 // True if key (any of a mask) fired this frame.
 static inline int input_fired(const InputState *s, u16 key)

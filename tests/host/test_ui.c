@@ -262,9 +262,10 @@ void test_ui_ring_windows(void)
 	CHECK_EQ(ring_scroll_for(&r, 0, 160, 1000, 1), 0);
 	CHECK_EQ(ring_scroll_for(&r, 10, 160, 1000, 1), 144);
 	CHECK_EQ(ring_scroll_for(&r, 999, 0, 1000, 1), 16000 - 128);
-	// Far: more than visible + 1 rows away
-	CHECK(!ring_far(&r, 0, 160));
-	CHECK(ring_far(&r, 0, 161));
+	// Far: more than two viewports away (and visible + 1 rows)
+	CHECK(!ring_far(&r, 0, 256));
+	CHECK(ring_far(&r, 0, 257));
+	CHECK(ring_far(&r, 300, 0));
 	CHECK(ring_far(&r, 16000, 0));
 	// Two 16 px rows a frame at most
 	CHECK_EQ(ring_step(&r, 0, 100), 32);

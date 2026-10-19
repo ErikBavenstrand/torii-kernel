@@ -76,8 +76,34 @@ s32 ring_scroll_for(const struct ui_ring *r, u32 row, s32 scroll, u32 rows, u32 
 s32 ring_step(const struct ui_ring *r, s32 shown, s32 want);
 
 // 1 if moving the shown scroll from shown to target needs a page change:
-// more than visible + 1 rows away, too far to scroll to in a few frames.
+// more than two viewports away (and more than visible + 1 rows), too far to
+// scroll to in about ten frames. Nearer, the scroll catches up at ring_step's
+// speed: quick taps of a page key never blank the list.
 int ring_far(const struct ui_ring *r, s32 shown, s32 target);
+
+// Gliding: while a held key's repeats move the cursor step rows at a time,
+// the scroll moves at the cursor's speed between repeats instead of in
+// steps. target is the scroll for the cursor's row (ring_scroll_for), phase
+// how far the key is towards its next repeat and rate its repeats a frame
+// (both 16.16, input_phase and input_rate).
+struct ring_glide {
+	s32 want;   // the scroll now: phase of the way to the next row's target
+	s32 speed;  // its speed, px a frame (16.16; negative going up)
+	s32 goal;   // a spring's goal: want plus the lag of a spring of stiffness
+		    // omega chasing a goal moving at speed (2 speed / omega), so
+		    // the spring runs at want, not behind it; within the scroll's range
+};
+void ring_glide(const struct ui_ring *r, u32 row, s32 step, s32 target, u32 rows, u32 phase, u32 rate, s32 omega,
+		struct ring_glide *g);
+
+// Where a glide that ended with the scroll at at, moving at speed (16.16 px
+// a frame), comes to rest: the first scroll in its direction, row-aligned
+// as target is, at least speed / omega on (a spring of stiffness omega gets
+// there from that speed without overshooting); row stays on screen.
+s32 ring_glide_stop(const struct ui_ring *r, u32 row, s32 target, s32 at, s32 speed, s32 omega, u32 rows);
+
+// scroll moved as little as it takes for row to be wholly on screen.
+s32 ring_keep_on_screen(const struct ui_ring *r, u32 row, s32 scroll);
 
 // How far (px, a multiple of rh) to move a spring's base so its goal,
 // goal_px from the base, stays within UI_RING_REBASE_PX; 0 if it is.

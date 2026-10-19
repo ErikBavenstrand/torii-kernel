@@ -17,6 +17,16 @@ static u32 last_cycles EWRAM_BSS;
 static u32 frames EWRAM_BSS;
 static u8 woken EWRAM_BSS;
 static const char *measure_name EWRAM_BSS;
+// frame_split marks of this frame, and the line its commit ended on
+static u32 split_at[FRAME_SPLITS] EWRAM_BSS;
+static u8 split_count EWRAM_BSS;
+static u8 commit_line EWRAM_BSS;
+// The slowest measured frame since the last report: logged once measuring
+// stops, as logging costs a frame's worth of cycles it would add
+static const char *worst_name EWRAM_BSS;
+static u32 worst_cycles EWRAM_BSS;
+static u32 worst_split[FRAME_SPLITS] EWRAM_BSS;
+static u8 worst_line EWRAM_BSS;
 
 void frame_init(void)
 {
@@ -41,6 +51,9 @@ u32 frame_begin(void)
 	start_cycles = cycles_now();
 	if (gfx_pending())
 		gfx_commit();
+	commit_line = (u8) * (vu16 *)0x04000006;
+	split_count = 0;
+	frame_split();
 	u32 now = torii_frames;
 	u32 dt = now - last_vblank;
 	last_vblank = now;
@@ -58,7 +71,24 @@ void frame_end(void)
 	woken = 0;
 	if (measure_name) {
 		cycles_frame(measure_name, last_cycles);
+		if (last_cycles > worst_cycles) {
+			// Where the time went: the commit, then each stretch between marks
+			worst_name = measure_name;
+			worst_cycles = last_cycles;
+			worst_line = commit_line;
+			for (u32 i = 0; i < FRAME_SPLITS; i++)
+				worst_split[i] =
+					i < split_count ? split_at[i] - (i ? split_at[i - 1] : start_cycles) : 0;
+		}
 		measure_name = 0;
+	} else if (worst_name) {
+		const u32 *d = worst_split;
+		tlog_console("frame-split: %s %lu, commit to line %u: %lu %lu %lu %lu %lu %lu %lu %lu", worst_name,
+			     (unsigned long)worst_cycles, worst_line, (unsigned long)d[0], (unsigned long)d[1],
+			     (unsigned long)d[2], (unsigned long)d[3], (unsigned long)d[4], (unsigned long)d[5],
+			     (unsigned long)d[6], (unsigned long)d[7]);
+		worst_name = 0;
+		worst_cycles = 0;
 	}
 }
 
@@ -90,6 +120,12 @@ u32 frame_last_cycles(void)
 u32 frame_count(void)
 {
 	return frames;
+}
+
+void frame_split(void)
+{
+	if (split_count < FRAME_SPLITS)
+		split_at[split_count++] = cycles_now();
 }
 
 int frame_measuring(void)

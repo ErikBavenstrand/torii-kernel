@@ -3,7 +3,7 @@
 
 #include <gba_input.h>
 
-void input_poll(InputState *s, u32 dt, int skip_anim)
+void input_poll(InputState *s, u32 dt)
 {
-	input_step(s, (u16)(~REG_KEYINPUT & INPUT_ALL), dt, skip_anim);
+	input_step(s, (u16)(~REG_KEYINPUT & INPUT_ALL), dt);
 }

@@ -46,10 +46,10 @@ const struct ui_theme ui_theme_dark = {
 	.marquee_pause = 60,
 	.marquee_gap = 8,
 	.page_fade = 4,
+	.input = {15, 4, 90, 40, 20, 6, 15},
 	.dialog_in = 12,
 	.dialog_out = 10,
 	.transition = TRANSITIONS,
-	.input = {15, 4, 60, 2, 1, 20, 4, 15},
 };
 
 const struct ui_theme ui_theme_light = {
@@ -82,10 +82,10 @@ const struct ui_theme ui_theme_light = {
 	.marquee_pause = 60,
 	.marquee_gap = 8,
 	.page_fade = 4,
+	.input = {15, 4, 90, 40, 20, 6, 15},
 	.dialog_in = 12,
 	.dialog_out = 10,
 	.transition = TRANSITIONS,
-	.input = {15, 4, 60, 2, 1, 20, 4, 15},
 };
 
 const struct ui_accent ui_accents[] = {

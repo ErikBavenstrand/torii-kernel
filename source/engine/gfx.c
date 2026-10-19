@@ -29,6 +29,8 @@ struct queue_entry {
 };
 
 struct gfx_regs gfx_regs EWRAM_BSS;
+u16 gfx_live_dispcnt EWRAM_BSS;
+u16 gfx_live_bgofs[8] EWRAM_BSS;
 u32 gfx_dirty_regs;
 u32 gfx_hold_regs;
 u32 gfx_dirty_pal;
@@ -51,6 +53,8 @@ void gfx_init(void)
 {
 	memset(&gfx_regs, 0, sizeof(gfx_regs));
 	gfx_regs.dispcnt = 0x0080;  // forced blank
+	gfx_live_dispcnt = 0x0080;
+	memset(gfx_live_bgofs, 0, sizeof(gfx_live_bgofs));
 	memset(gfx_pal_unfaded, 0, sizeof(gfx_pal_unfaded));
 	memset(gfx_pal_faded, 0, sizeof(gfx_pal_faded));
 	gfx_pal_faded_on = 0;
@@ -297,13 +301,13 @@ static void write_regs(u32 dirty)
 {
 	vu16 *io = IO;
 	if (dirty & GFX_DIRTY_DISPCNT)
-		io[0] = gfx_regs.dispcnt;
+		io[0] = gfx_live_dispcnt = gfx_regs.dispcnt;
 	if (dirty & GFX_DIRTY_BGCNT)
 		for (u32 i = 0; i < 4; i++)
 			io[4 + i] = gfx_regs.bgcnt[i];
 	if (dirty & GFX_DIRTY_BGOFS)
 		for (u32 i = 0; i < 8; i++)
-			io[8 + i] = gfx_regs.bgofs[i];
+			io[8 + i] = gfx_live_bgofs[i] = gfx_regs.bgofs[i];
 	if (dirty & GFX_DIRTY_WIN)
 		for (u32 i = 0; i < 6; i++)
 			io[0x20 + i] = gfx_regs.win[i];

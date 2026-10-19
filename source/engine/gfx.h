@@ -67,6 +67,10 @@ struct gfx_obj {
 #define GFX_COMMIT_LAST_LINE 225
 
 extern struct gfx_regs gfx_regs;  // read freely; write through the setters
+// What the hardware shows: DISPCNT and the BG scrolls as the last commit
+// wrote them (checks that nothing draws where the screen shows it)
+extern u16 gfx_live_dispcnt;
+extern u16 gfx_live_bgofs[8];
 extern u32 gfx_dirty_regs;  // GFX_DIRTY_* bits
 extern u32 gfx_hold_regs;  // regions gfx_hold_for_queue holds back
 extern u32 gfx_dirty_pal;  // bit n: palette bank n (0-15 BG, 16-31 sprites)

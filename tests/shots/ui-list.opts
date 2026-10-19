@@ -26,7 +26,7 @@
 -k @330:L -k @331:- -k @332:L -k @333:- -k @334:L -k @335:-
 -H @330:@345
 -s @360:queued-l.png
-# Held R pages every 4 frames after 20 (the cycle budget's held paging),
+# Held R pages every 6 frames after 20 (the cycle budget's held paging),
 # rests at 1000, wraps to 1 and pages on
 -k @370:R -k @440:-
 -s @460:held-r.png
