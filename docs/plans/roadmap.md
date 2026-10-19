@@ -369,7 +369,7 @@ Bugs found while building v0.3 and v0.3.1. Each is struck out here once a ticket
   - ~~The hang left no log: nothing flushed between WRITE TO NOR and SETTINGS.~~ Fixed (`ab9378c`): the log goes to the card as SETTINGS opens and before an SD theme loads; `tests/logging.sh hang`. Not done: the session state in cart RAM page 0xF0 at screen changes, since that page didn't survive the power-off (boot 3 found "nothing in cart RAM").
 - **Cart checks for the next test:**
   - Is the brake after letting go at top speed (about two rows) too far? If so, raise `SPRING_BRAKE` (F1).
-  - Do the scroll timings at 40 rows/s match the emulator (F1)?
+  - Does the held scroll at 30 rows/s (8 px a frame) still tear? If so, which screen is the cart's: an IPS kit that re-scans the picture tears by itself (v0.3.2 scroll feel).
   - Time a real FORMAT ALL erase and set `CHIP_ERASE_FRAMES` from it; its bar is only an estimate (F4).
 - The cheat parser drops spaces from cheat names ("Never money" shows as "Nevermoney"), more visible in the proportional font (T11 review; v0.8 cheats).
 - The cheat parser's `Get_KEY_val` and `Get_CHT_val` copy 50-byte fields that may lack a NUL (T16; v0.8 cheats).
