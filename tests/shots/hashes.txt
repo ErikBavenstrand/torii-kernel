@@ -53,7 +53,7 @@ diag-start/screen 3162F4422A6557C5
 diag-tests/back FC971D7CA6CEA1D0
 diag-tests/frames 0-2 D68A87FB42CF8D44
 diag-tests/frames 3-3 7DCF004DEAC7F9B0
-diag-tests/frames 4-6 FC971D7CA6CEA1D0
+diag-tests/frames 4-12 FC971D7CA6CEA1D0
 dialog-clock/asked 5BE6D838D67CEE20
 dialog-clock/later 7ACC6D69BA6B2858
 dialog-fragmented/dialog 60333A971C48C65E

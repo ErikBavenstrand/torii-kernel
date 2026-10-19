@@ -414,8 +414,9 @@ static void save_write(FIL *file, const u8 *data, UINT len, u32 *total, FRESULT 
 }
 
 // Copies savesize bytes of cart SRAM to filename, over the file there, and
-// logs what reached the card: 1 once all of it did, 0 if the file couldn't
-// be made or the write fell short. ROM code, as Loadsavefile: both run only in
+// logs what reached the card: SAVE_WRITTEN once all of it did, SAVE_NOTHING
+// for savesize 0 (no file touched), SAVE_FAILED if the file couldn't be made
+// or the write fell short (ezkernel.h). ROM code, as Loadsavefile: both run only in
 // the menu. Torii: the SRAM goes through pReadCache's upper half, which no
 // frame touches (ez_define.h), so the progress dialog can draw between
 // writes.
@@ -424,7 +425,7 @@ u32 Save_savefile(TCHAR *filename, u32 savesize)
 	u8 *buf = pReadCache + READCACHE_SAVE;
 	FIL file;
 	if (savesize == 0)
-		return 0xff;
+		return SAVE_NOTHING;
 	u32 ret = f_open(&file, filename, FA_WRITE | FA_CREATE_ALWAYS);
 	switch (ret) {
 	case FR_OK: {
@@ -470,14 +471,14 @@ u32 Save_savefile(TCHAR *filename, u32 savesize)
 		if (werr != FR_OK || cerr != FR_OK || total != expected) {
 			tlog_error("save: writing %s: %lu of %lu bytes written, f_write gave %d, f_close %d", filename,
 				   (unsigned long)total, (unsigned long)expected, werr, cerr);
-			return 0;  // Torii: a short write (a full card) is a failure
+			return SAVE_FAILED;  // Torii: a short write (a full card) is a failure
 		}
 		tlog("save: wrote %s, %lu bytes, f_close gave %d", filename, (unsigned long)total, cerr);
-		return 1;
+		return SAVE_WRITTEN;
 	} break;
 	default:
 		tlog_error("save: can't create %s: f_open gave %lu", filename, (unsigned long)ret);
-		return false;
+		return SAVE_FAILED;
 	}
 }
 //---------------------------------------------------------------------------------
@@ -512,7 +513,7 @@ static u32 SavefileWrite(TCHAR *filename, u32 savesize)
 {
 	FIL file;
 	if (savesize == 0)
-		return 0xff;
+		return SAVE_NOTHING;
 	u32 ret = f_open(&file, filename, FA_WRITE | FA_CREATE_ALWAYS);
 	switch (ret) {
 	case FR_OK: {
@@ -548,7 +549,7 @@ static u32 SavefileWrite(TCHAR *filename, u32 savesize)
 	} break;
 	default:
 		tlog_error("save: can't create %s: f_open gave %lu", filename, (unsigned long)ret);
-		return false;
+		return SAVE_FAILED;
 	}
 }
 //---------------------------------------------------------------
@@ -1044,11 +1045,17 @@ static void Check_save_flag(void)
 			f_mkdir(SAVER_FOLDER);//"/SAVER"
 			f_chdir(SAVER_FOLDER);
 			u32 saved = Save_savefile(name, savefilesize);
-			if (saved)
+			if (saved == SAVE_WRITTEN)
 				progress_done(gl_done);
 			dialog_progress_end();
-			if (!saved)  // Torii: not "Done" over a save the card didn't take
+			if (saved == SAVE_FAILED) {
+				// Torii: not "Done" over a save the card didn't take, and the
+				// record stays, so the next power-on offers the copy again
 				Show_error_num(3);
+				tlog("save: the pending-save record stays for the next power-on");
+				dialog_close();
+				return;
+			}
 		}
 		dialog_close();
 		memset(SAV_info_buffer, 0x00, sizeof(SAV_info_buffer));//clean flag
@@ -1596,8 +1603,9 @@ u8 FRAM_save_op(u8 OP)
 	dialog_progress_begin(gl_saving, savfilename);
 	progress_step(gl_save_ing, 0, PROGRESS_FULL);
 	u32 saved = Save_savefile(savfilename, Get_savefilesize(pNorFS[0].savemode));
-	if (saved)
+	if (saved == SAVE_WRITTEN)
 		progress_done(gl_done);
 	dialog_progress_end();
-	return saved ? 0 : 3;
+	// A game with no save type (SAVE_NOTHING) writes no file, as before
+	return saved == SAVE_FAILED ? 3 : 0;
 }

@@ -216,7 +216,11 @@ static void screen_open(int again)
 	screen_push();
 	for (u32 i = 0; i < 30 && gfx_queue_len(); i++)
 		ui_frame();
+	if (gfx_queue_len())
+		tlog_debug("diag: page redrawn with %lu VRAM copies still queued", (unsigned long)gfx_queue_len());
 	gfx_freeze(0);  // the next commit writes the page's registers and palettes
+	if (again)
+		tlog_debug("diag: page back after the unit tests");
 }
 
 static void screen_title(const char *title)

@@ -62,6 +62,10 @@ void init_FAT_table(void);
 // IWRAM code must run from IWRAM while the ROM page changes, so it is never
 // static: GCC would inline it into callers in ROM.
 u32 Loadsavefile(TCHAR *filename);
+// Save_savefile's results
+#define SAVE_FAILED 0   // no file made, or the write fell short (a full card)
+#define SAVE_WRITTEN 1  // all of it reached the card
+#define SAVE_NOTHING 2  // savesize 0: nothing to write, no file touched
 u32 Save_savefile(TCHAR *filename, u32 savesize);
 u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU);
 

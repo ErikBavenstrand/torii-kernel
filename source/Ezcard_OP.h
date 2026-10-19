@@ -35,6 +35,8 @@ u16 IWRAM_CODE Read_SET_info(u32 offset);
 // any differs from the NOR's. It returns 1 if it wrote, and ends the staging.
 void Stage_SET_info(const u16 *SET_info_buffer);
 u32 Commit_SET_info(u16 *SET_info_buffer);
+// Ends the staging without writing anything (the unit tests)
+void Discard_SET_info(void);
 u32 Loadfile2PSRAM(TCHAR *filename);
 u16 IWRAM_CODE Read_FPGA_ver(void);
 void IWRAM_CODE Set_RTC_status(u16 status);

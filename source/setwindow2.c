@@ -581,6 +581,10 @@ static void save_set2_info(void)
 		SET_info_buffer[assress_logging] = log_sel;
 	//Torii: the menu's look, the same way
 	int theme = themes.touched && theme_sel != themes.initial;
+	// theme.txt is written now, not with the NOR as SETTINGS closes: a
+	// failure is told here, on its row, and the boot reads theme.txt only
+	// while slot 28 says SD, so a power cut before the NOR write can at most
+	// bring in early an SD theme picked over another SD theme
 	if (theme && theme_sel >= 2 && !ui_theme_choice_write(themes.names[theme_sel - 2])) {
 		// The card holds the SD theme's name: without it, THEME stays as it was
 		tlog_error("settings: THEME not saved: " THEME_CHOICE_FILE " couldn't be written");

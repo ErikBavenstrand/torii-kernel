@@ -1,6 +1,7 @@
 # Diagnostics' unit tests: the page holds still while they run and stays
 # up as it comes back (v0.3.2: it went black for 2 frames), every frame
-# hashed. DIAGNOSE is the last row of SETTINGS page 2, as in diag-start.
+# hashed until past the redraw's end ("page back"). DIAGNOSE is the last
+# row of SETTINGS page 2, as in diag-start.
 -w "screen ready: sd-list"
 -k @8:R -k @12:-
 -w "screen ready: nor-list"
@@ -14,5 +15,6 @@
 -w "screen ready: diag-start"
 -k @8:A -k @12:-
 -w "TESTS DONE"
--H @0:@6
--s @6:back.png
+-H @0:@12
+-w "diag: page back after the unit tests"
+-s @4:back.png

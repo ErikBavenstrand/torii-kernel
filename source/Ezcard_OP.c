@@ -433,6 +433,11 @@ void Stage_SET_info(const u16 *SET_info_buffer)
 	tlog_debug("settings: staged, written as SETTINGS closes");
 }
 // --------------------------------------------------------------------
+void Discard_SET_info(void)
+{
+	set_staging = 0;
+}
+// --------------------------------------------------------------------
 u32 Commit_SET_info(u16 *SET_info_buffer)
 {
 	if (!set_staging)

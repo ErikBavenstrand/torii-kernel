@@ -222,14 +222,15 @@ u32 Settings_run(u32 page)
 			open_page(to);
 		} else if (settings_leaving) {
 			settings_leaving = 0;
+			// The NOR write while the page still shows, not on a blank
+			// screen after the transition
+			Commit_SET_info(SET_info_buffer);
 			ui_leave(settings_result == SETTINGS_TO_DIAGNOSE ? UI_TR_LEAVE : UI_TR_TAB, -1);
 			while (ui_depth())
 				ui_pop();
 		}
 	}
-	// Once, as SETTINGS closes, and only if a setting changed: the kernel
-	// NOR wears with each erase
-	Commit_SET_info(SET_info_buffer);
+	Commit_SET_info(SET_info_buffer);  // a no-op once the leave above wrote it
 	if (own) {
 		ui_shutdown();
 		dialog_blank();

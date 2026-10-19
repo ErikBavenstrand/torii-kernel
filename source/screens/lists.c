@@ -1021,7 +1021,7 @@ static void folder_up(void)
 		memcpy(currentpath, "/", 2);
 	if (f_chdir(currentpath) != FR_OK) {
 		memcpy(currentpath, currentpath_temp, MAX_path_len);
-		error_dialog(10, AFTER_POP);
+		error_dialog(0, AFTER_POP);  // "Can't open the folder" (10 had no message)
 		return;
 	}
 	if (lists.depth > 1)

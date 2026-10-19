@@ -7,7 +7,8 @@
 #   nearly-full  a copy that just fits the card is written whole, through
 #         its progress dialog, and the menu comes back
 #   full  a copy the card can't take shows an error dialog and logs how much
-#         of it was written (the copy is still cut short: crash-safe saves
+#         of it was written; its record stays, so the next power-on offers
+#         it again (the cut-short file stays until then: crash-safe saves
 #         are v0.5)
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and building tests/roms/savetest.
@@ -132,7 +133,17 @@ full)
   grep -q "^kernel: screen ready: sd-list" "$cart/run.log" || fail "no menu after the copy ran out of room"
   mtype -i "$cart/sd.img" ::/FILLER.BIN | cmp -s - "$cart/filler.bin" || fail "the other file changed"
   fsck.fat -n "$cart/sd.img" >/dev/null || fail "fsck.fat found errors"
-  echo "PASS: saves full: a copy the card can't take shows an error dialog and logs how much was written"
+  # The pending-save record stays, so once the card has room again the next
+  # power-on offers the copy again and writes it whole.
+  [ "$(pending)" = 0011 ] || fail "the failed copy cleared the pending-save record"
+  mdel -i "$cart/sd.img" ::/FILLER.BIN
+  boot -k 100:A -k 106:- -f 500
+  logged 'save: "Save sav?" for /SAVER/Test.sav, 131072 bytes, save type 31: A, save'
+  logged "save: wrote Test.sav, 131072 bytes"
+  [ "$(save_record)" = 4f4d525802 ] || fail "the copy after freeing room isn't the game's save: $(save_record)"
+  [ "$(pending)" = 0000 ] || fail "the pending-save record is still set after the copy"
+  fsck.fat -n "$cart/sd.img" >/dev/null || fail "fsck.fat found errors after the second copy"
+  echo "PASS: saves full: a copy the card can't take shows an error dialog, logs how much was written, and is offered again"
   ;;
 
 nearly-full)

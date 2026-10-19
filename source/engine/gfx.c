@@ -33,7 +33,7 @@ u16 gfx_live_dispcnt EWRAM_BSS;
 u16 gfx_live_bgofs[8] EWRAM_BSS;
 u32 gfx_dirty_regs;
 u32 gfx_hold_regs;
-u8 gfx_frozen;
+static u8 gfx_frozen;
 u32 gfx_dirty_pal;
 u16 gfx_pal_unfaded[512] EWRAM_BSS ALIGN(4);
 u16 gfx_pal_faded[512] EWRAM_BSS ALIGN(4);
