@@ -1186,8 +1186,8 @@ int main(void)
 	tlog_flush();
 	if (diag_keys) {
 		dialog_notice_end();
-		dialog_close();  // Diagnostics runs its own session (and never returns)
-		Diagnostics();
+		dialog_close();  // Diagnostics runs its own session
+		Diagnostics();   // back only if B didn't start it: the menu starts as usual
 	}
 	if (!ui_theme_boot())
 		Show_theme_error();

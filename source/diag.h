@@ -10,8 +10,9 @@
 // L + R + SELECT, held while the cart powers on
 #define DIAG_BOOT_KEYS (KEY_L | KEY_R | KEY_SELECT)
 
-// Runs Diagnostics, then restarts the kernel.
-void Diagnostics(void) __attribute__((noreturn));
+// Runs Diagnostics, then restarts the kernel. B on its first page returns
+// instead, on a black screen (dialog_blank) with the engine shut down.
+void Diagnostics(void);
 
 // IWRAM code must run from IWRAM while the ROM page or wait states change, so
 // it is never static: GCC would inline it into callers in ROM.

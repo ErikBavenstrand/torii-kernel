@@ -14,9 +14,13 @@
 #define GREEN (UI_ROLE_ICON + 2)
 #define RED (UI_ROLE_ICON + 3)
 
-// Shows a line in colour (cut to the screen's width) and logs it whole; a
-// red line logs as an error.
+// Shows a line in colour and logs it whole; a red line logs as an error. A
+// line wider than the screen goes on in the next (diag_line_cut).
 void diag_say(u8 colour, const char *format, ...) __attribute__((format(printf, 2, 3)));
+// Where to cut text so it fits clip pixels in the body font: at its last
+// space that leaves a part that fits, or its whole length if it fits or has
+// no such space.
+u32 diag_line_cut(const char *text, u32 clip);
 // Starts the next step: logs it, writes the log to the card and shows a new
 // page titled name.
 void diag_step(const char *name);

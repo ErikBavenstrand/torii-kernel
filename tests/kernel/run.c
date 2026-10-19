@@ -46,6 +46,7 @@ static const struct {
 	{"text_draw", test_text_draw},
 	{"text_clear", test_text_clear},
 	{"text_cycles", test_text_cycles},
+	{"diag_line_cut", test_diag_line_cut},
 	{"ui_pool_and_arenas", test_ui_pool_and_arenas},
 	{"asset_lz77_decode", test_asset_lz77_decode},
 	{"asset_psram_round_trip", test_asset_psram_round_trip},
