@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "ui_priv.h"
+#include "sdtheme.h"
 #include "../engine/cycles.h"
 #include "../engine/frame.h"
 #include "../engine/gfx.h"
@@ -360,6 +361,7 @@ void ui_theme_set(const struct ui_theme *theme, u16 accent)
 {
 	ui_theme_select(theme, accent);
 	ui.in.timing = &ui_theme()->input;
+	ui_wallpaper_setup();
 	load_palette();
 	ui_wake();
 }
@@ -477,6 +479,16 @@ static void regs_update(void)
 		if (modal && d < top - 1)
 			lower |= LAYER_BG(p);
 	}
+	// The SD theme's wallpaper, behind everything, while no view takes plane 3
+	u32 d3;
+	u16 wall;
+	if (!plane_owner(3, &d3) && ui_wallpaper_bgcnt(&wall)) {
+		gfx_set_bgcnt(3, wall);
+		gfx_set_scroll(3, 0, 0);
+		dispcnt |= (u16)DISP_BG(3);
+		if (modal)
+			lower |= LAYER_BG(3);
+	}
 	// Static planes follow their view's slide; lists set their own scroll
 	u32 scrollers = 0, list_planes = 0, win_plane[UI_SCROLLERS] = {0, 0};
 	const struct ui_node *win_node[UI_SCROLLERS] = {0, 0};
@@ -572,7 +584,10 @@ const struct ui_theme *ui_theme_setting(u16 *accent)
 	// Stored as index + 1, so 0 and erased (0xFFFF) both mean the theme's own
 	u16 a = Read_SET_info(assress_accent);
 	*accent = a >= 1 && a <= ui_accent_count ? ui_accents[a - 1].colour : UI_ACCENT_THEME;
-	return Read_SET_info(assress_theme) == 1 ? &ui_theme_light : &ui_theme_dark;
+	u16 t = Read_SET_info(assress_theme);
+	if (t == UI_THEME_SD && ui_theme_sd())
+		return ui_theme_sd();
+	return t == 1 ? &ui_theme_light : &ui_theme_dark;
 }
 
 void ui_init(const struct ui_theme *theme)
@@ -604,6 +619,7 @@ void ui_init(const struct ui_theme *theme)
 	TLOG_ASSERT(ui.stage_map != RES_NONE);
 	ui.stage = res_bg_addr(ui.stage_map);
 	ui_dim_set_minutes(ui_dim_setting());
+	ui_wallpaper_setup();
 	load_palette();
 	gfx_set_dispcnt(DISP_MODE0_OBJ1D | DISP_OBJ);
 	ui_wake();
@@ -626,6 +642,18 @@ void ui_shutdown(void)
 struct ui_view *ui_push(const struct ui_view_spec *spec, void *ctx)
 {
 	struct ui_view *v = ui_core_push(spec, ctx);
+	// A screen the SD theme breaks (patches, row height) gets its base theme
+	const struct ui_theme *base = v ? 0 : ui_theme_fallback_base();
+	if (base) {
+		const struct ui_theme *sd_theme = ui_theme();
+		u16 accent = ui_accent();
+		ui_theme_set(base, accent);
+		v = ui_core_push(spec, ctx);
+		if (v)
+			ui_theme_fell_back(ui_error());
+		else
+			ui_theme_set(sd_theme, accent);
+	}
 	if (!v)
 		return 0;
 	// Its maps are cleared and drawn once nothing popped shows their VRAM

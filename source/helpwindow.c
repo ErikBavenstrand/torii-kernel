@@ -101,6 +101,6 @@ static const struct ui_spec help_nodes[] = {
 };
 
 static const struct ui_view_spec help_view = {
-	"help", help_nodes, sizeof(help_nodes) / sizeof(help_nodes[0]), 0, UI_NONE, 0, help_event};
+	"help", help_nodes, sizeof(help_nodes) / sizeof(help_nodes[0]), 22, UI_NONE, 0, help_event};
 
 const struct settings_page settings_help = {&help_view, help_enter, 0, 0, 0, 0};

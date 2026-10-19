@@ -736,7 +736,7 @@ static const struct ui_spec page1_nodes[] = {
 };
 
 static const struct ui_view_spec page1_view = {
-	"settings1", page1_nodes, sizeof(page1_nodes) / sizeof(page1_nodes[0]), 0, UI_NONE, 0, page1_event};
+	"settings1", page1_nodes, sizeof(page1_nodes) / sizeof(page1_nodes[0]), 20, UI_NONE, 0, page1_event};
 
 const struct settings_page settings_page1 = {&page1_view, page1_enter,  page1_count,
 					     page1_row,   page1_cursor, page1_poll};

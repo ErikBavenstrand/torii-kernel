@@ -7,8 +7,8 @@
 // switch pages back. psram_begin() selects it once per batch of writes all
 // the same, in case something left another page selected. Within it the
 // cover cache (engine/cover.h) uses COVER_PSRAM_BYTES from
-// PSRAM_ASSET_BASE; the first 4 MB stay free for other menu data (a name
-// index, T9).
+// PSRAM_ASSET_BASE and the SD theme's files PSRAM_THEME_BASE; the first
+// 4 MB stay free for other menu data (a name index, T9).
 //
 // A game launch fills PSRAM with the game, so everything here is lost then:
 // the launch calls cover_cache_invalidate first.
@@ -25,6 +25,10 @@
 #define PSRAM_WINDOW_BYTES 0x00800000u
 #define PSRAM_ASSET_PAGE 0
 #define PSRAM_ASSET_BASE (PSRAM_WINDOW + 0x00400000u)
+// The SD theme's asset files (ui/sdtheme.h): two slots of
+// PSRAM_THEME_SLOT_BYTES, 512 KB past the cover cache's start
+#define PSRAM_THEME_BASE (PSRAM_ASSET_BASE + 0x00080000u)
+#define PSRAM_THEME_SLOT_BYTES 0x4000u
 
 // 1 if [p, p + bytes) lies in the PSRAM window.
 static inline int psram_holds(const void *p, u32 bytes)

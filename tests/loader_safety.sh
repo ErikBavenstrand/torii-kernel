@@ -139,6 +139,8 @@ write_b=$(keys 200 DOWN DOWN DOWN A DOWN DOWN A)
 delete=$(keys 200 R DOWN A DOWN A)
 # THEME on SETTINGS page 2 set to LIGHT and saved, through save_set2_info
 save_theme="$(keys 200 R) $(keys 220 R) $(keys 270 R) $(keys 320 DOWN DOWN DOWN A A RIGHT A)"
+# ACCENT on SETTINGS page 2 set to Blue and saved
+save_accent="$(keys 200 R) $(keys 220 R) $(keys 270 R) $(keys 320 DOWN DOWN DOWN DOWN A A RIGHT A)"
 save_setting="-k 200:R -k 206:- -k 220:R -k 226:- -k 270:DOWN -k 276:- -k 285:DOWN -k 291:- -k 300:A -k 306:- -k 340:A -k 346:-"
 launch="$(keys 200 DOWN DOWN DOWN DOWN A) $(keys 250 DOWN DOWN DOWN DOWN RIGHT RIGHT RIGHT RIGHT RIGHT UP UP UP UP A)"
 diag="-k 1:L+R+SELECT -k 60:- -k 120:A -k 124:- $(for f in $(seq 2000 24 4400); do printf -- '-k %d:START -k %d:- ' "$f" $((f + 4)); done)"
@@ -181,9 +183,20 @@ EOF
   logged "settings: THEME LIGHT"
   [ "$(slot 28)" = 1 ] || bad "THEME wasn't saved: slot 28 holds $(slot 28)"
   [ "$(slot 26)" = 2 ] || bad "the save lost LOGGING: slot 26 holds $(slot 26)"
+  [ "$(slot 27)" = 65535 ] || bad "DIM was written: slot 27 holds $(slot 27)"
+  [ "$(slot 29)" = 65535 ] || bad "ACCENT was written: slot 29 holds $(slot 29)"
   boot -f 200
   [ "$(slot 28)" = 1 ] || bad "THEME didn't survive a power-on: slot 28 holds $(slot 28)"
   pass "a settings save on page 2 (THEME), kept after a power-on"
+
+  new_cart settings-accent
+  boot $save_accent -f 480
+  logged "nor: wrote the settings"
+  logged "settings: THEME DARK, ACCENT BLUE"
+  [ "$(slot 29)" = 1 ] || bad "ACCENT wasn't saved as Blue: slot 29 holds $(slot 29)"
+  [ "$(slot 28)" = 65535 ] || bad "THEME was written: slot 28 holds $(slot 28)"
+  [ "$(slot 27)" = 65535 ] || bad "DIM was written: slot 27 holds $(slot 27)"
+  pass "an ACCENT save on page 2 writes only its slot"
 
   new_cart pending-save
   boot $launch -f 700

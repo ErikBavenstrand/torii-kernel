@@ -101,6 +101,11 @@ RULES = [
     ),
     (["roms/games.example.toml"], {LINT}, "example config"),
     (
+        ["themes/*"],
+        {LINT, TEST_HOST, TEST},
+        "example theme, read by the host tests and the ui-sd-theme shot",
+    ),
+    (
         ["emusrc/*", "*.bat", "Link_kernel_image.exe", "ezkernelnew.bin"],
         {LINT},
         "EZ-Flash's files, not built",

@@ -22,6 +22,7 @@ jobs=(
   "tests/crash.sh"
   "tests/state.sh"
   "tests/settings.sh"
+  "tests/themes.sh"
   "tests/menu.sh"
   "tests/names.sh fat32"
   "tests/names.sh exfat"
