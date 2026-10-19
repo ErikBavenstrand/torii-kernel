@@ -928,9 +928,10 @@ int Open_cht_file(TCHAR *gamefilename, u32 havecht)
 			ui_init(NULL);
 			cs_run(&cs);
 			shown = 1;  // the engine ran: mode 3 needs repainting either way
-			cs_leave_engine();
-
+			// Reading the picks' codes can take seconds in a big file: the
+			// cheat screen stays up meanwhile, rather than a black one
 			Analyze_KEYVAL(&gfile, cs.count);
+			cs_leave_engine();
 			cheats_opened = 1;
 			cheats_picked = 0;
 			for (u32 i = 0; i < cs.count; i++)
