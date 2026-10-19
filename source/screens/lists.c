@@ -124,6 +124,7 @@ static struct {
 	u8 queued_a;      // A during a page change, for once the page is up
 	u8 icons_made;
 	u32 nor_game;     // the NOR game menu's game
+	u32 sd_cursor;    // the SD list's cursor when it went for the NOR list or Recently Played
 	u32 recent_count;
 	u32 list_first;   // pool index of the list view's first node
 	u32 dialog_first;
@@ -1213,13 +1214,14 @@ static void do_action(void)
 		lists.from_recent = 0;
 		open_game();
 		break;
-	case ACT_TO_SD:  // L from the NOR list, B from Recently Played
+	case ACT_TO_SD:  // L from the NOR list, B from Recently Played: the cursor where it was
 		if (lists.screen == SCR_NOR)
-			show_sd(0, UI_TR_TAB, -1);
+			show_sd(lists.sd_cursor, UI_TR_TAB, -1);
 		else
-			show_sd(0, UI_TR_DEEPER, -1);
+			show_sd(lists.sd_cursor, UI_TR_DEEPER, -1);
 		break;
 	case ACT_TO_NOR:
+		lists.sd_cursor = cursor();
 		show_nor(0, UI_TR_TAB, 1);
 		break;
 	case ACT_SETTINGS:
@@ -1236,6 +1238,7 @@ static void do_action(void)
 		show_nor(0, UI_TR_TAB, -1);
 		break;
 	case ACT_RECENT:
+		lists.sd_cursor = cursor();
 		go(UI_TR_DEEPER, 1);
 		lists.recent_count = Recently_play_load();
 		show(SCR_RECENT, 0, UI_TR_DEEPER, 1);
