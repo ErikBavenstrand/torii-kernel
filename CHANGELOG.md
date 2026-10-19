@@ -6,6 +6,10 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** picking an SD theme in SETTINGS after WRITE TO NOR froze the
+  cart: the theme's file reader lives in the shared read buffer, which held
+  the game's last bytes, and its unset finish hook was called. The reader
+  now starts clean (`c11ab97`).
 - **Fixed:** a Recently Played NOR game no longer on the game NOR stayed on
   the list; opening it now drops it with the error, and NOR DELETE and
   FORMAT ALL take the games they remove off the list (`5ae634f`).
