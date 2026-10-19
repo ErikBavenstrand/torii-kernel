@@ -411,8 +411,14 @@ struct ui_event {
 // --- The stack -------------------------------------------------------------
 
 // Sets up the UI on the engine (call engine_init first): palette banks, the
-// staging area, the input state, with theme (NULL: ui_theme_dark).
+// staging area, the input state, with theme (NULL: the THEME and ACCENT
+// settings, ui_theme_setting).
 void ui_init(const struct ui_theme *theme);
+// The theme and accent the THEME and ACCENT settings pick (settings slots
+// assress_theme, 1 for light, and assress_accent, 1 + an index into
+// ui_accents; erased or unknown values give the dark theme with its own
+// accent).
+const struct ui_theme *ui_theme_setting(u16 *accent);
 // Pops every view and releases the UI's resources.
 void ui_shutdown(void);
 

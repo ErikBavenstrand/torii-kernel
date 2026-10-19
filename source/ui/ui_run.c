@@ -504,11 +504,22 @@ static void regs_update(void)
 
 // --- The stack ----------------------------------------------------------------
 
+const struct ui_theme *ui_theme_setting(u16 *accent)
+{
+	// Stored as index + 1, so 0 and erased (0xFFFF) both mean the theme's own
+	u16 a = Read_SET_info(assress_accent);
+	*accent = a >= 1 && a <= ui_accent_count ? a - 1 : UI_ACCENT_THEME;
+	return Read_SET_info(assress_theme) == 1 ? &ui_theme_light : &ui_theme_dark;
+}
+
 void ui_init(const struct ui_theme *theme)
 {
+	u16 accent = UI_ACCENT_THEME;
 	memset(&ui, 0, sizeof(ui));
 	ui_core_reset();
-	ui_theme_select(theme, UI_ACCENT_THEME);
+	if (!theme)
+		theme = ui_theme_setting(&accent);
+	ui_theme_select(theme, accent);
 	input_init(&ui.in, &ui_theme()->input);
 	// Keys already held (from the screen before) count as held, not pressed
 	input_poll(&ui.in, 1, 0);

@@ -127,6 +127,8 @@
 #define assress_game_rumble 25 //games can use the cart's rumble motor
 #define assress_logging 26 //Torii: LOGGING level, source/tlog.h (0xFFFF: off)
 #define assress_dim 27 //Torii: DIM, idle minutes before the screen dims, 1-60 (else off), source/ui/ui.h
+#define assress_theme 28 //Torii: THEME, 1 light (else dark), source/ui/ui.h
+#define assress_accent 29 //Torii: ACCENT, 1 + an index into ui_accents (else the theme's own)
 
 #define assress_saveMODE 64
 #define assress_max 65
