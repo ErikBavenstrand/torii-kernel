@@ -184,8 +184,10 @@ int ui_theme_patch(const struct ui_theme *theme, u8 view, u8 node, u8 field, s16
 // palette (hardware-free: ui_theme_set does both).
 void ui_theme_select(const struct ui_theme *theme, u16 accent);
 // Makes theme (with accent, or UI_ACCENT_THEME) the current one: a palette
-// change, committed in the next VBlank; nothing is redrawn. A theme with
-// other fonts, row heights or patches takes effect on views pushed after.
+// change, committed in the next VBlank; nothing is redrawn. Switch only
+// between themes with the same fonts, row height and pad while views are
+// up (the built-ins are): text already drawn keeps the old metrics, and
+// patches and row heights apply to views pushed after.
 void ui_theme_set(const struct ui_theme *theme, u16 accent);
 const struct ui_theme *ui_theme(void);
 u16 ui_accent(void);
@@ -224,7 +226,7 @@ enum {
 // ui_spec.flags
 enum {
 	UI_FOCUSABLE = 1,  // takes focus (lists, grids)
-	UI_HIDDEN = 2,     // starts hidden (ui_show)
+	UI_HIDDEN = 2,     // starts hidden (ui_show; a hidden list's plane is off)
 };
 
 // One widget of a layout, in ROM. Parents come before their children.
@@ -416,7 +418,10 @@ void ui_shutdown(void);
 
 // Pushes a view; NULL if it doesn't fit (caps, the layout's budget, a bad
 // layout), with the reason in ui_error() and the log. The view is drawn
-// hidden and shown in one VBlank.
+// hidden and shown in one VBlank. From an event handler, ui_pop() then
+// ui_push() replaces the handler's view (the pop goes first); the handler
+// must return straight after either. Tile uploads a view queued (images)
+// are not cancelled by its pop: pop such a view only once they are done.
 struct ui_view *ui_push(const struct ui_view_spec *spec, void *ctx);
 // Pops the top view (at the end of the event phase, if called from an event
 // handler): its motions stop, its jobs are cancelled, its tiles and maps go.
@@ -450,13 +455,17 @@ int ui_emit(u8 index, u8 type, u32 value);
 
 // --- Widgets -------------------------------------------------------------------
 
+// The label keeps the pointer and may draw from it in any later frame:
+// text must stay valid and unchanged until the next ui_label_set or the
+// view's pop (a static or the view's ctx buffer, never the stack).
 void ui_label_set(u8 node, const char *text);
 // value of max (max 0 counts as empty).
 void ui_progress_set(u8 node, u32 value, u32 max);
 // The list's model changed (a new folder): the cursor goes to cursor and
 // the list redraws as a page change.
 void ui_list_reset(u8 node, u32 cursor);
-// Items lo to hi have loaded (or changed): rows showing them redraw.
+// Items lo to hi have loaded (or changed): rows showing them redraw. A row
+// on screen redraws in place, so it may tear for one frame.
 void ui_list_refresh(u8 node, u32 lo, u32 hi);
 void ui_list_set_cursor(u8 node, u32 cursor);
 u32 ui_list_cursor(u8 node);
