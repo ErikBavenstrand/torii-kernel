@@ -6,6 +6,20 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** one wrap rule for every list and menu: a held key stops at
+  the end and stays there, and a fresh press at the end wraps. The menus and
+  the UI demo's list used to wrap after a 15-frame rest; the theme key
+  `wrap_pause` is gone (`6844884`).
+- **Fixed:** L from the NOR list and B from Recently Played bring the SD list
+  back with the cursor where it was, not on its first row (`691fc00`).
+- **Fixed:** after a card failure the lists' idle flush no longer calls
+  `tlog_flush` every idle frame (`tlog_card_failed`) (`40bf58f`).
+- **Fixed:** if the list's view can't be pushed, an error comes in from black
+  and the session starts over, instead of a black screen that takes no key
+  (`046cfdf`).
+- **Fixed:** two presses of one key while a screen goes out are two moves on
+  the next screen, not one, and keys queued for the next screen are no
+  longer dropped while DIM is on: they wake it (`bf7f65d`).
 - **Changed:** scrolling. A held d-pad speeds up smoothly from a row every
   4 frames to 40 rows a second, its top speed at 1.75 s held, and the list
   glides with the cursor at its speed, so the cursor never leaves the
