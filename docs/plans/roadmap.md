@@ -324,6 +324,23 @@ Bugs found while building v0.3 and v0.3.1. Each is struck out here once a ticket
 - After a failed launch from the NOR list's game menu, the menu stays open on a black screen until a key redraws its rows (pre-existing; T12 review; port T9).
 - The NOR format dialog counts the erase in binary (`itoa(count, msg, 2)`), and the list's clock stops during the erase (T12 review).
 - With an SD theme's wallpaper, BACK UP SAVE's progress dialog fails to get VRAM and doesn't show (F4 review).
+- Leaving the NOR list with L starts the SD list at its first row, not where the cursor was (`ACT_TO_SD` calls `show_sd(0, ...)` in `source/screens/lists.c`) (F1).
+- SETTINGS page 2 writes kernel NOR on every change, not once when leaving: five settings writes in 25 s on the cart, which wears the NOR (`source/setwindow2.c`) (F3).
+- Two presses of one key in the 3 frames a screen goes out count as one, because the held keys are a bitmask (`ui_frame` in `source/ui/ui_run.c`). Queue up to two presses (F2).
+- If `show()`'s `ui_push` fails, the menu stays in the transition gap with a black screen. Fall back to `ui_enter` and an error dialog (`source/screens/lists.c`) (F2).
+- While DIM is on, `ui_frame` drops keys queued for the next screen (F2).
+- The empty-folder label doesn't fade with its list in the alpha fade, because pixels over another plane of the same screen don't blend (`regs_update`) (F2).
+- The Diagnostics page blanks for 2 frames when it comes back after the unit tests (`screen_open` in `source/diag.c`) (F3).
+- After a card failure, the lists' idle flush calls `tlog_flush` every idle frame. Each call returns at once, but it could stop trying (`idle_flush`) (F3).
+- BOOT WITH ADDON's first progress step says "Loading the game" while it still checks save states and patches (`source/ezkernelnew.c`), and `source/ui/dialog.h`'s usage example still names `gl_save_sav` (F4).
+- Held-key wrapping differs between lists: the main lists stop at the end, while menus and the demo list wrap after a 15-frame rest (`input_move`, `wrap_pause`). Settle on one rule (F1).
+- `tests/themes.sh` still copies the example theme with `mcopy -s`, in the host's file order (F1).
+- No golden covers the two longest dialog texts (`en_file_overflow`, `en_error_7`). Untested paths: a NES launch, BOOT WITH ADDON with the scan engine forced, and a nearly full card during a save copy (F4).
+- `docs/recovery.md` and the release notes should say that a cart whose kernel NOR is a uniform-sector S29GL064A (ID `0x220C`) can't take a kernel update: EZ-Flash's loader stops with "Bad NOR ID" (F5).
+- **Cart checks for the next test:**
+  - Is the brake after letting go at top speed (about two rows) too far? If so, raise `SPRING_BRAKE` (F1).
+  - Do the scroll timings at 40 rows/s match the emulator (F1)?
+  - Time a real FORMAT ALL erase and set `CHIP_ERASE_FRAMES` from it; its bar is only an estimate (F4).
 - The cheat parser drops spaces from cheat names ("Never money" shows as "Nevermoney"), more visible in the proportional font (T11 review; v0.8 cheats).
 - The cheat parser's `Get_KEY_val` and `Get_CHT_val` copy 50-byte fields that may lack a NUL (T16; v0.8 cheats).
 
@@ -348,6 +365,29 @@ Bugs found while building v0.3 and v0.3.1. Each is struck out here once a ticket
 - **Settings:** a 12/24-hour clock and time editor, settings in categories, and Help pages.
 
 - **Screens redesigned (user, 2026-10-19):** v0.3 ported the official screens as they were. v0.4 redesigns their layout and navigation: settings in a section of their own, organised by category, with clear editing; the cheat screen; and the lists, as views a theme can swap (a RetroArch-like carousel of systems and games, sections).
+
+- **Engine follow-ups from v0.3 (session reports, 2026-10-19):**
+  - **Smoothness:**
+    - A page change still blanks the list for a frame before it fades in. Fade out first (F1).
+    - A whole-palette fade costs about 45k cycles a frame. Fade only the banks in use, or use the brightness registers for fades to black (`palette_fade`) (F1).
+    - A page change's hidden draw peaks at about 248k cycles of a 281k frame (`UI_DRAW_BUDGET`) (F1).
+    - Grids don't glide on held LEFT/RIGHT (F1).
+  - **Transitions:**
+    - A true cross-fade between screens needs both resident; today they fade through the background (F2).
+    - Mosaic transitions exist but no theme or golden uses them (F2).
+    - Parent/child transitions could scale, with affine BGs or sprites (F2).
+    - The `KIND_effects` theme key could take names (`fade+slide_x`) instead of a bitmask (F2).
+    - Dialogs in a session of their own (launch, firmware) appear without motion, and dialogs popped by a screen change pop without motion (F2).
+    - A menu that comes up with its screen shows at full brightness over a list fading in (F2).
+  - **Data:**
+    - There is no row cache keyed by item (VRAM has no room for more slots; EWRAM could hold one) (F1).
+    - `ui_list_autoscroll` sends no cursor events (F1).
+    - `frame_measure` keeps one name per frame (F2).
+  - **Progress:**
+    - Show progress during the cart's own ROM copy (`Send_FATbuffer`'s IWRAM busy loop) with an IWRAM VBlank hook; it needs a cart test (F4).
+    - The bar shows overall progress and the status the step's percentage: pick one.
+    - The NOR write's dialog title.
+    - Trim the launch's 0.3 s of step texts if users notice it.
 
 ## v0.5 Saves
 
@@ -486,6 +526,8 @@ VBlank or keypad IRQ.
 5. **Cheat database:** not bundled. libretro's is CC-BY-SA-4.0, so a `just cheats` tool
    fetches and converts it, with attribution.
 
+- **From v0.3:** opening a big .cht file freezes the cheat screen while `Analyze_KEYVAL` runs. Run it as a job with progress (`Open_cht_file`) (F2).
+
 ## v0.9 Languages and firmware
 
 - **Strings:** every UI string has an ID, with English in `lang/en.ini` compiled in as the
@@ -503,6 +545,38 @@ VBlank or keypad IRQ.
   it refuses EZODE-B carts.
 
 Then 1.0.
+
+- **Fonts:**
+  - Glyphs outside Latin-1 draw a replacement box today.
+  - There is no kerning.
+  - Galmuri9's Ç ç ¡ ¿ µ lose a tail pixel at 12 px.
+  - Per-glyph row sizes would save about 1.5 KB of ROM (`tools/font.py`) (T1).
+
+## Backlog
+
+Small items from the v0.3 sessions with no version yet:
+
+- **Logs:**
+  - Frame-timing summaries carry the log write's time, not the scroll's.
+  - They are DEBUG only.
+  - Their table holds 8 names.
+  - On a nearly full buffer they can push out older lines (`source/engine/cycles.c`, `tlog_flush`) (F3).
+- **Crash dumps** name stale stack words that point into read-only data (`t_model+0x2628`) (`source/cartlog.c`, `tools/logs.py`) (F3).
+- **Diagnostics wording:** "3 seconds passed in about 2.2" (F3).
+- **Lost at power-off:** the session record in cart RAM page `0xF0` doesn't survive a power cycle (hardware). Keep it somewhere battery-backed if wanted (F3).
+- **PSRAM:** where a DMA into PSRAM from cart space lands on the real cart is unknown. Nothing does it any more (F3).
+- **Logs:** the save log line still says `"Save sav?"`; change it together with `tests/saves.sh` (F4).
+- **Latent risks:**
+  - The second half of `Save_savefile` runs frames with SRAM page 0x10 selected.
+  - `FRAM_save_op` runs frames with a file open and the working folder at `/SAVER`.
+  - Both are safe today and commented (F4).
+- **Release file:** EZ-Flash's loader installs only the first 3 MB of `ezkernelnew.bin`; `tools/omega_image.py` enforces it (F5).
+- **Emulator:**
+  - The kernel install fills the last sector's tail with 0xFF, where the real loader writes stale bytes.
+  - `OMEGA_FPGA_VERSION` isn't validated (F5).
+- **Font tests:**
+  - `tools/font_preview.py` needs network for the candidates.
+  - `tests/font_test.py` compiles with the host `cc`, not devkitARM (T1).
 
 ## Process
 
