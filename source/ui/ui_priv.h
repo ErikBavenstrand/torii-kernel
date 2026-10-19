@@ -82,9 +82,6 @@ void ui_queue_keys(u16 keys);
 // UI_DRAW_BUDGET. Otherwise it waits for the next frame.
 int ui_draw_room(u32 cycles);
 
-// 1 while the d-pad repeats at the speed that skips scroll animation.
-int ui_skipping(void);
-
 // The ops of lists and grids (ui/ui_list.c).
 extern const struct ui_ops ui_list_ops;
 

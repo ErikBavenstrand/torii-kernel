@@ -8,6 +8,10 @@
 //   are written straight away: they aren't on screen either. At rest, the
 //   rows just above and below the screen are drawn too (spare slots), so a
 //   step from rest draws nothing.
+// - A held key's repeats make the scroll glide: between repeats it moves at
+//   the cursor's speed (input_phase, ring_glide), driving the spring's goal
+//   ahead by the spring's lag, so a held d-pad scrolls at a steady speed
+//   with the cursor on screen. Let go, it brakes to the next whole row.
 // - The selection is a palette bank switch in the selected row's (or
 //   cell's) map entries, through the staging area, so it shows in one
 //   VBlank: text is never redrawn for it.
@@ -30,6 +34,7 @@
 #include "../engine/gfx.h"
 #include "../engine/res.h"
 #include "../engine/text.h"
+#include "../tlog.h"
 
 enum {
 	PAGE_NONE,
@@ -46,6 +51,10 @@ enum {
 
 #define MQ_MARGIN 2  // hidden tile columns each side of a marquee slot
 #define ROW_GUESS 30000  // cycles a row may take, before one has been timed
+// The scroll's spring brakes stiffer when a glide ends, so the list stops
+// within about a row of where the key was let go
+#define SPRING_BRAKE 0x18000  // 1.5
+#define GLIDE_AUTO 0x8000  // glide_key of ui_list_autoscroll's moves (no key's bit)
 
 struct list_state {
 	struct ui_ring ring;
@@ -64,9 +73,20 @@ struct list_state {
 	s32 base;       // the spring's base, px
 	s32 spring;     // the spring's value (16.16, from base), written by motion
 	s32 page_target;
+	s32 target;     // the scroll the cursor's row wants (ring_scroll_for), px
+	u16 glide_key;  // the held key whose repeats move the cursor, 0 none
+	s16 glide_step; // rows each repeat moves it
+	s32 glide_speed;  // the glide's last speed, px a frame (16.16)
+	u32 glide_at;     // InputState.now when a repeat of glide_key last moved the cursor
+	u8 braking;       // a glide ended and the spring brakes: the cursor stays on screen
+	s16 set_offset[2];  // the view's offset in the scrolls set last frame and this one
+	s32 auto_rate;    // ui_list_autoscroll: items a frame (16.16), 0 off
+	u32 auto_phase;   // towards its next move
+	u8 auto_move;     // set_cursor is making that move
 	u32 page_cursor;  // the cursor a page change's rows are drawn for
 	MotionId motion;
 	u16 slot_row[UI_RING_MAX_SLOTS];
+	u16 drawn_row[UI_RING_MAX_SLOTS];  // the row each slot's tiles hold
 	u32 dirty;   // slots to draw: the window's dirty-row mask
 	u32 fresh;   // slots given a new row: their map rows need writing
 	u32 blank;   // slots holding nothing but paper: no clear needed
@@ -235,7 +255,7 @@ static void fill_spare(struct list_state *st)
 static void forget_slots(struct list_state *st)
 {
 	for (u32 s = 0; s < UI_RING_MAX_SLOTS; s++)
-		st->slot_row[s] = UI_ITEM_NONE;
+		st->slot_row[s] = st->drawn_row[s] = UI_ITEM_NONE;
 	st->lo = 1;
 	st->hi = 0;
 	st->plo = st->phi = 0xFFFFFFFF;
@@ -245,6 +265,53 @@ static void forget_slots(struct list_state *st)
 static s32 goal_px(const struct list_state *st)
 {
 	return st->base + FIX_ROUND(motion_goal(st->motion));
+}
+
+// The held key whose repeat moved the cursor from old to cursor this frame:
+// the scroll then glides (0: a press, or a move from code)
+static u16 glide_key(u32 old, u32 cursor)
+{
+	const InputState *in = ui_input();
+	u16 keys = in->fire & ~in->pressed & in->repeating;
+	if (cursor > old)
+		keys &= INPUT_DOWN | INPUT_RIGHT | INPUT_R;
+	else if (cursor < old)
+		keys &= INPUT_UP | INPUT_LEFT | INPUT_L;
+	else
+		keys = 0;
+	return (u16)(keys & -keys);  // one key
+}
+
+// One frame of a glide: the spring's goal runs with the cursor's speed; once
+// the key is let go (or another direction restarts it), it brakes
+static void glide(struct list_state *st)
+{
+	const InputState *in = ui_input();
+	u16 key = st->glide_key;
+	u32 rate, phase, row = st->cursor / st->cols;
+	if (key == GLIDE_AUTO) {
+		rate = (u32)(st->auto_rate < 0 ? -st->auto_rate : st->auto_rate);
+		phase = st->auto_phase;
+	} else {
+		// A repeat that didn't move the cursor (the list's end, or a view
+		// above took the key) ends the glide as letting go does
+		int stalled = (in->fire & key) && st->glide_at != in->now;
+		rate = (in->held & key) && !stalled ? input_rate(in, key) : 0;
+		phase = input_phase(in, key);
+	}
+	if (!rate) {
+		s32 at = st->base + FIX_ROUND(st->spring);
+		st->target = ring_glide_stop(&st->ring, row, st->target, at, st->glide_speed, SPRING_BRAKE, st->rows);
+		st->glide_key = 0;
+		st->braking = 1;
+		motion_spring_omega(st->motion, SPRING_BRAKE);
+		motion_spring_target(st->motion, FIX(st->target - st->base));
+		return;
+	}
+	struct ring_glide g;
+	ring_glide(&st->ring, row, st->glide_step, st->target, st->rows, phase, rate, SPRING_SCROLL, &g);
+	st->glide_speed = g.speed;
+	motion_spring_target(st->motion, FIX(g.goal - st->base));
 }
 
 static void marquee_reset(u8 node, struct list_state *st)
@@ -274,6 +341,10 @@ static void blank_map(u8 node, const struct list_state *st)
 // Starts a page change to scroll target (or does it now while hidden)
 static void page_change(u8 node, struct list_state *st, s32 target)
 {
+	st->target = target;
+	st->glide_key = 0;
+	st->braking = 0;
+	motion_spring_omega(st->motion, SPRING_SCROLL);
 	if (!ui_node_shown(node)) {
 		st->shown = st->base = target;
 		motion_spring_jump(st->motion, 0);
@@ -290,27 +361,32 @@ static void page_change(u8 node, struct list_state *st, s32 target)
 	ui_plane_hide(ui_node_spec(node)->plane, 1);
 }
 
-// jump: no spring (fast repeat): the scroll goes straight there, at
-// ring_step's speed
-static void set_cursor(u8 node, struct list_state *st, u32 cursor, int jump)
+static void set_cursor(u8 node, struct list_state *st, u32 cursor)
 {
 	if (cursor >= st->count)
 		cursor = st->count ? st->count - 1 : 0;
+	u32 old = st->cursor;
 	st->cursor = cursor;
 	marquee_reset(node, st);
 	st->sel_ok = st->sel_ok && st->sel_drawn == cursor;
+	// A repeat glides on; a press or a move from code springs
+	s32 step = (s32)(cursor / st->cols) - (s32)(old / st->cols);
+	st->glide_key = st->page != PAGE_NONE || !step ? 0 : st->auto_move ? GLIDE_AUTO : glide_key(old, cursor);
+	st->glide_step = (s16)step;
+	st->glide_at = ui_input()->now;
+	st->braking = 0;
+	motion_spring_omega(st->motion, SPRING_SCROLL);  // after a glide's brake
 	// During a page change, from where its page will be
-	s32 from = st->page != PAGE_NONE ? st->page_target : goal_px(st);
+	s32 from = st->page != PAGE_NONE ? st->page_target : st->target;
 	s32 target = ring_scroll_for(&st->ring, cursor / st->cols, from, st->rows, 1);
 	if (st->page != PAGE_NONE)
 		st->page_target = target;
 	else if (ring_far(&st->ring, st->shown, target))
 		page_change(node, st, target);
-	else if (jump) {
-		st->base = target;
-		motion_spring_jump(st->motion, 0);
-	} else {
-		motion_spring_target(st->motion, FIX(target - st->base));
+	else {
+		st->target = target;
+		if (!st->glide_key)
+			motion_spring_target(st->motion, FIX(target - st->base));
 	}
 	ui_dirty(node, 1);
 }
@@ -370,7 +446,40 @@ void ui_list_set_cursor(u8 node, u32 cursor)
 {
 	struct list_state *st = ui_node_state(node);
 	if (cursor != st->cursor)
-		set_cursor(node, st, cursor, 0);
+		set_cursor(node, st, cursor);
+}
+
+void ui_list_autoscroll(u8 node, s32 rate)
+{
+	struct list_state *st = ui_node_state(node);
+	if (rate && !st->auto_rate)
+		st->auto_phase = 0;
+	st->auto_rate = rate;
+	ui_wake();
+}
+
+// One frame of ui_list_autoscroll: the cursor moves an item each time the
+// phase passes a whole one; at the list's end it stops
+static void autoscroll(u8 node, struct list_state *st, u32 dt)
+{
+	if (!st->auto_rate || st->page != PAGE_NONE)
+		return;
+	ui_wake();
+	u32 rate = (u32)(st->auto_rate < 0 ? -st->auto_rate : st->auto_rate);
+	st->auto_phase += rate * dt;
+	if (st->auto_phase < INPUT_ONE)
+		return;
+	st->auto_phase -= INPUT_ONE;
+	if (st->auto_phase >= INPUT_ONE)
+		st->auto_phase = INPUT_ONE - 1;
+	u32 cols = st->cols;
+	if (st->auto_rate > 0 ? st->cursor + cols >= st->count : st->cursor < cols) {
+		st->auto_rate = 0;  // the end: glide() brakes
+		return;
+	}
+	st->auto_move = 1;
+	set_cursor(node, st, st->auto_rate > 0 ? st->cursor + cols : st->cursor - cols);
+	st->auto_move = 0;
 }
 
 u32 ui_list_cursor(u8 node)
@@ -432,10 +541,7 @@ static int list_event(u8 node, const struct ui_event *e)
 			to = t < 0 ? 0 : (u32)t >= st->count ? st->count - 1 : (u32)t;
 		}
 		if (to != st->cursor) {
-			// A held L or R jumps like the d-pad's fast repeat: the
-			// scroll arrives as the next page fires
-			int jump = ui_skipping() || ((key & INPUT_PAGE) && !(in->pressed & key));
-			set_cursor(node, st, to, jump);
+			set_cursor(node, st, to);
 			ui_emit(node, UI_EV_CURSOR, to);
 		}
 		return 1;
@@ -547,7 +653,7 @@ static void list_update(u8 node, u32 dt)
 		}
 		// Off screen now: every row can be drawn where it lands. Only the
 		// rows on screen (dir 0): the spare ones fill in once it shows
-		st->shown = st->base = st->page_target;
+		st->shown = st->base = st->target = st->page_target;
 		motion_spring_jump(st->motion, 0);
 		forget_slots(st);
 		blank_map(node, st);
@@ -556,7 +662,14 @@ static void list_update(u8 node, u32 dt)
 		st->page = PAGE_DRAW;
 		ui_dirty(node, 1);
 	} else if (st->page == PAGE_NONE) {
-		s32 want = st->base + FIX_ROUND(st->spring);
+		autoscroll(node, st, dt);
+		if (st->glide_key)
+			glide(st);
+		s32 want = st->base + FIX_ROUND(st->spring), max = ring_max_scroll(&st->ring, st->rows);
+		st->braking = st->braking && motion_running(st->motion);
+		if (st->glide_key || st->braking)
+			want = ring_keep_on_screen(&st->ring, st->cursor / st->cols, want);
+		want = want < 0 ? 0 : want > max ? max : want;
 		s32 next = ring_step(&st->ring, st->shown, want);
 		int dir = next > st->shown ? 1 : next < st->shown ? -1 : (want > next) - (want < next);
 		int still = next == st->shown && next == want;
@@ -575,6 +688,8 @@ static void list_update(u8 node, u32 dt)
 	// Not while a view above shows its own plane there
 	if (ui_plane_owned(node))
 		gfx_set_scroll(spec->plane, (u16)(-n->x), (u16)(st->shown - n->y - v->offset));
+	st->set_offset[0] = st->set_offset[1];
+	st->set_offset[1] = v->offset;
 	if (st->dirty || !st->sel_ok)
 		ui_dirty(node, 1);
 	marquee_tick(node, st, dt);
@@ -638,6 +753,23 @@ static void draw_detail(const struct text_window *win, const struct row_ctx *rc,
 	text_layout(rc->font, detail, strlen(detail), rc->w, line);
 	if (!line->truncated && line->advance + rc->pad < rc->w)
 		text_draw_line(win, rc->font, x0 + rc->w + 1 - rc->pad - line->advance, rc->y, UI_ROLE_DIM, line);
+}
+
+// 1 if map row mr (in tiles) of a row rh px tall shows on screen now, as the
+// last commit left the list's plane (its scroll, and whether it is on)
+static int map_row_live(u8 node, const struct list_state *st, u32 mr)
+{
+	const struct ui_spec *spec = ui_node_spec(node);
+	if (!(gfx_live_dispcnt & (0x100u << spec->plane)) || (gfx_live_dispcnt & 0x80))
+		return 0;
+	const struct ui_node *n = ui_node(node);
+	// The scroll the last commit wrote went out with last frame's offset (a
+	// dialog sliding in moves it); another view may own the plane
+	if (!ui_plane_owned(node) || st->set_offset[0] != st->set_offset[1])
+		return 0;
+	u32 top = (u32)(gfx_live_bgofs[spec->plane * 2 + 1] + n->y + st->set_offset[0]) & 255;
+	u32 d = (mr * 8 - top) & 255;
+	return d < st->ring.h || d > 256u - st->ring.rh;
 }
 
 // Draws row r into a slot's tiles, cleared first unless blank (they hold
@@ -736,6 +868,14 @@ static void list_draw(u8 node)
 		}
 		u32 r = st->slot_row[s];
 		if (r != UI_ITEM_NONE) {
+			// The ring's promise (ring.h): a row given a slot is drawn where
+			// the screen doesn't show it, its tiles nor its map rows
+			if (!hidden && (st->fresh & bit) && st->ring.k < st->ring.ring_rows) {
+				TLOG_ASSERT(!map_row_live(node, st, ring_map_row(&st->ring, r)));
+				if (st->drawn_row[s] != UI_ITEM_NONE)
+					TLOG_ASSERT(!map_row_live(node, st, ring_map_row(&st->ring, st->drawn_row[s])));
+			}
+			st->drawn_row[s] = (u16)r;
 			u32 start = cycles_now();
 			if (draw_row(st, &rc, tile_addr(spec->plane, slot_tile(st, s)), r, (st->blank & bit) != 0))
 				st->blank &= ~bit;
@@ -763,10 +903,12 @@ static void list_draw(u8 node)
 			// Keys moved the cursor while the page drew: scroll on to it
 			st->page_cursor = st->cursor;
 			s32 target = ring_scroll_for(&st->ring, st->cursor / st->cols, st->shown, st->rows, 1);
-			if (ring_far(&st->ring, st->shown, target))
+			if (ring_far(&st->ring, st->shown, target)) {
 				page_change(node, st, target);
-			else
+			} else {
+				st->target = target;
 				motion_spring_target(st->motion, FIX(target - st->base));
+			}
 			ui_dirty(node, 1);
 		}
 		return;

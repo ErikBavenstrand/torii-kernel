@@ -126,7 +126,8 @@ static struct {
 	u8 clock_hms[3];
 	const char *measure;
 	u32 measure_left;
-	InputWrap wrap;
+	InputWrap wrap;       // the menus' cursor
+	InputWrap list_wrap;  // the list's
 	struct game_pick game;
 	char title[MAX_path_len];
 	char clock[12];
@@ -485,8 +486,8 @@ static const struct ui_spec list_nodes[N_NODES] = {
 
 static int list_event(struct ui_view *v, const struct ui_event *e);
 static const struct ui_view_spec list_views[SCREENS] = {
-	[SCR_SD] = {"sd-list", list_nodes, N_NODES, 10, UI_NONE, 0, list_event},
-	[SCR_NOR] = {"nor-list", list_nodes, N_NODES, 11, UI_NONE, 0, list_event},
+	[SCR_SD] = {"sd-list", list_nodes, N_NODES, 10, UI_NONE, UI_VIEW_LR_PAGES, list_event},
+	[SCR_NOR] = {"nor-list", list_nodes, N_NODES, 11, UI_NONE, UI_VIEW_LR_PAGES, list_event},
 	[SCR_RECENT] = {"recent", list_nodes, N_NODES, 12, UI_NONE, 0, list_event},
 };
 
@@ -667,6 +668,7 @@ static void show(enum screen s, u32 at)
 	lists.clock[0] = 0;
 	clock_read();
 	ui_list_reset(list_node(), at);
+	input_wrap_init(&lists.list_wrap, ui_input(), cursor());
 	count_update(cursor());
 	if (s == SCR_RECENT && !lists.recent_count) {
 		ui_label_set((u8)(v->first + N_EMPTY), gl_no_game_played);
@@ -800,17 +802,23 @@ static void menu_open(u32 which, u32 rows, u32 max, u32 line)
 
 // --- Events (they only record what to do) ---------------------------------------
 
-static void move(u8 node, s32 delta, u32 count, u32 at)
+// Moves the list's cursor delta items for key: past an end it stops there
+// first, and wraps to the other end on a fresh press, or a repeat once it
+// has rested at the end (input_move), as the menus do
+static void move(u8 node, u16 key, s32 delta, u32 count, u32 at)
 {
 	if (!count)
 		return;
-	s32 to = (s32)at + delta;
-	to = to < 0 ? 0 : (u32)to >= count ? (s32)count - 1 : to;
-	if ((u32)to == at)
+	u32 to = input_move(ui_input(), &lists.list_wrap, key, at, count, delta);
+	if (to == at)
 		return;
-	ui_list_set_cursor(node, (u32)to);
-	count_update((u32)to);
-	measure("lists-scroll", MEASURE_FRAMES);
+	ui_list_set_cursor(node, to);
+	count_update(to);
+	// A move too far to scroll to (a wrap) is a page change: its own figure
+	if (ui_list_paging(node))
+		measure("lists-page", 4);
+	else
+		measure("lists-scroll", MEASURE_FRAMES);
 }
 
 static void act(u8 a, u32 arg)
@@ -827,23 +835,31 @@ static int list_event(struct ui_view *v, const struct ui_event *e)
 		return e->type == UI_EV_KEYS;
 	u16 k = e->keys, pressed = ui_input()->pressed;
 	u8 node = list_node();
+	u32 count = list_count(0), at = ui_list_cursor(node);
+	u32 page = lists.screen == SCR_RECENT ? 0 : LIST_ROWS;
+	// One move a frame, a fresh press first; other keys still act the same
+	// frame, as a held d-pad fires every frame at top speed
+	u16 moves = k & INPUT_DPAD;
+	if (moves & pressed)
+		moves &= pressed;
+	if (moves & INPUT_DOWN)
+		move(node, INPUT_DOWN, 1, count, at);
+	else if (moves & INPUT_UP)
+		move(node, INPUT_UP, -1, count, at);
+	else if ((moves & INPUT_LEFT) && page)
+		move(node, INPUT_LEFT, -(s32)page, count, at);
+	else if ((moves & INPUT_RIGHT) && page)
+		move(node, INPUT_RIGHT, (s32)page, count, at);
+	k &= (u16)~INPUT_DPAD;
+	at = ui_list_cursor(node);
 	if ((k & INPUT_A) && ui_list_paging(node)) {
 		// The page the cursor moved to isn't drawn yet: A waits for it, as
 		// the list's own A does (lists_run hands it back)
 		lists.queued_a = 1;
 		k &= (u16)~INPUT_A;
 	}
-	u32 count = list_count(0), at = ui_list_cursor(node);
-	u32 page = lists.screen == SCR_RECENT ? 0 : LIST_ROWS;
-	if (k & INPUT_DOWN)
-		move(node, 1, count, at);
-	else if (k & INPUT_UP)
-		move(node, -1, count, at);
-	else if ((k & INPUT_LEFT) && page)
-		move(node, -(s32)page, count, at);
-	else if ((k & INPUT_RIGHT) && page)
-		move(node, (s32)page, count, at);
-	else if (lists.screen == SCR_RECENT) {
+	if (!k) {
+	} else if (lists.screen == SCR_RECENT) {
 		if (k & INPUT_A) {
 			if (count)
 				act(ACT_RECENT_OPEN, at);

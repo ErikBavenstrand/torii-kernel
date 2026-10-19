@@ -65,7 +65,6 @@ static struct {
 	u16 shared_first[3];
 	struct stage_span spans[STAGE_SPANS];
 	u8 span_count;
-	u8 skip;           // the list skips its scroll animation (fast repeat)
 	u8 hidden;         // planes hidden for a page change
 	u8 hide_pending;   // hidden, but no DISPCNT without them written yet
 	u32 hide_frame[UI_PLANES];  // the frame whose regs hid them
@@ -601,7 +600,7 @@ void ui_init(const struct ui_theme *theme)
 	ui_theme_select(theme, accent);
 	input_init(&ui.in, &ui_theme()->input);
 	// Keys already held (from the screen before) count as held, not pressed
-	input_poll(&ui.in, 1, 0);
+	input_poll(&ui.in, 1);
 	ui.palette = res_palette(RES_BG_PAL, 2, TAG_PALETTE);
 	TLOG_ASSERT(ui.palette != RES_NONE && res_start(RES_BG_PAL, ui.palette) == 0);
 	// A wallpaper left among the maps goes first, as before a push
@@ -792,15 +791,6 @@ static void ready_check(void)
 	tlog_debug("screen ready: %s", v->spec->name);
 }
 
-static int skip_animation(void)
-{
-	const InputState *s = &ui.in;
-	for (u32 k = 4; k < 8; k++)  // the d-pad
-		if ((s->held >> k & 1) && s->held_frames[k] >= s->timing->fast_after)
-			return 1;
-	return 0;
-}
-
 u32 ui_frame(void)
 {
 	u32 dt = frame_begin();
@@ -812,8 +802,9 @@ u32 ui_frame(void)
 		ui.pop_wait = 0;
 	reveal_tick(dt);
 	ready_check();
-	input_poll(&ui.in, dt, ui.skip);
-	ui.skip = (u8)skip_animation();
+	const struct ui_view *top = ui_top();
+	input_page_keys(&ui.in, top && (top->spec->flags & UI_VIEW_LR_PAGES) ? INPUT_LEFT | INPUT_RIGHT : 0);
+	input_poll(&ui.in, dt);
 	u16 fire = ui.in.fire;
 	if (dim_step(dt))
 		fire = 0;
@@ -826,12 +817,14 @@ u32 ui_frame(void)
 		ui_dispatch_keys(fire);
 		ui_apply_pops();
 	}
+	frame_split();  // keys
 	if (motion_update(dt))
 		frame_wake();
 	update_all(dt);
+	frame_split();  // motion and update
 	// A view still to be shown (one pushed after a pop waits a frame) wakes
 	// the frames until it is: nothing else may (a view without a list)
-	const struct ui_view *top = ui_top();
+	top = ui_top();
 	if (top && !(top->flags & UI_V_SHOWN))
 		frame_wake();
 	// Once nothing popped shows its VRAM any more (sdtheme.h), in a frame of
@@ -846,14 +839,11 @@ u32 ui_frame(void)
 	}
 	if (!frame_idle()) {
 		jobs_run(JOB_DEADLINE);
+		frame_split();  // jobs
 		draw_all();
+		frame_split();  // draw
 		regs_update();
 	}
 	frame_end();
 	return ui_depth();
-}
-
-int ui_skipping(void)
-{
-	return ui.skip;
 }

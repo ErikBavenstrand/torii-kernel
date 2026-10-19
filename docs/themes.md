@@ -124,7 +124,9 @@ A UTF-8 text file (a BOM is skipped; LF, CRLF or CR line ends; at most 8 KB; lin
 | `[effects]` | `marquee_pause` | 0-255 frames it rests at the end | 60 |
 | `[effects]` | `marquee_gap` | 0-120 px it scrolls past the name's end | 8 |
 | `[effects]` | `page_fade` | 0-30 frames a list fades in after a page change (0: none) | 4 |
-| `[input]` | `delay`, `interval`, `fast_after`, `fast_interval`, `skip_interval`, `page_delay`, `page_interval` | 1-255 frames (`engine/input.h`) | 15, 4, 60, 2, 1, 20, 4 |
+| `[input]` | `delay`, `interval`, `page_delay`, `page_interval` | 1-255 frames (`engine/input.h`): a held d-pad repeats after `delay`, first every `interval` frames | 15, 4, 20, 6 |
+| `[input]` | `ramp` | 0-255 frames from the first repeat to top speed, along a smooth curve (0: top speed at once) | 90 |
+| `[input]` | `top_speed` | 1-60 repeats a second at the end of the ramp (60: every frame) | 60 |
 | `[input]` | `wrap_pause` | 0-255 frames | 15 |
 | `[wallpaper]` | `file` | a file name in the theme's folder (no `/`, `\`, `:`, not starting with `.`, under 32 bytes): a 4bpp TAS1 asset | none |
 | `[patches]` | `VIEW.NODE.FIELD` | see below; at most 16 (a repeated target replaces its patch) | none |

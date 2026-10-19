@@ -17,7 +17,8 @@
 //   diag-psram-menu     the same at WAITCNT_MENU, a probe: writes at the
 //                       menu's speed aren't confirmed on the cart, so it reads
 //                       them back (at WAITCNT_SLOW) and says if any went wrong
-//   diag-scroll         the worst frame of a list scrolling 8 rows
+//   diag-scroll         the worst frame of a list gliding a row a frame (a
+//                       held d-pad at top speed)
 //   diag-page           the worst frame of a list's page change
 // The timed parts run with interrupts off, so a VBlank doesn't land in them.
 // The PSRAM tests use the last 64 KB of the 32 MB PSRAM (page 0x3000, as the
@@ -318,8 +319,9 @@ static void time_list(void)
 	u8 list = (u8)(v->first + D_LIST);
 	ui_list_set_cursor(list, 40);  // too far to scroll: a page change
 	u32 page = worst_frame(12);
-	ui_list_set_cursor(list, 48);  // 8 rows down: the scroll
+	ui_list_autoscroll(list, INPUT_ONE);  // a row a frame, as a held d-pad's top speed
 	u32 scroll = worst_frame(40);
+	ui_list_autoscroll(list, 0);
 	demo_pop();
 	figure("diag-scroll", "scroll frame", scroll);
 	figure("diag-page", "page change frame", page);
@@ -357,14 +359,21 @@ void diag_renderer_demo(void)
 	struct ui_view *v = demo_push();
 	if (v) {
 		u8 list = (u8)(v->first + D_LIST);
-		u32 cursor = 0;
 		for (u32 f = 0; f < 600; f++) {
 			ui_frame();
-			if (f % 6 == 0)
-				ui_list_set_cursor(list, ++cursor);
-			if (f == 300)
-				ui_list_set_cursor(list, cursor += 100);  // and a page change
-			if (f == 150 || f == 420)
+			// Down, speeding up from 10 rows a second to 60 as a held
+			// d-pad does, a fade at full speed, a brake; a page change; up
+			// at 30 rows a second through a fade, and a brake
+			if (f < 150)
+				ui_list_autoscroll(list, (s32)(INPUT_ONE / 6 + (INPUT_ONE - INPUT_ONE / 6) * f / 150));
+			if (f == 250 || f == 540)
+				ui_list_autoscroll(list, 0);
+			if (f == 280)
+				ui_list_set_cursor(list,
+						   ui_list_cursor(list) + 100);  // too far to scroll: a page change
+			if (f == 330)
+				ui_list_autoscroll(list, -(s32)(INPUT_ONE / 2));
+			if (f == 160 || f == 420)
 				ui_fade(FADE_BLACK, FADE_MAX, 30);
 			if (f == 200 || f == 470)
 				ui_fade(FADE_BLACK, 0, 30);

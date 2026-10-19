@@ -54,5 +54,13 @@ u32 frame_count(void);
 // At this frame's frame_end, logs its busy cycles as "frame-cycles: NAME N"
 // (cycles_report). For the cycle budget test and Diagnostics.
 void frame_measure(const char *name);
+// Marks the end of a stretch of the frame. The slowest of a run of
+// measured frames is logged, on the first frame after them, as
+// "frame-split: NAME N, commit to line L: C S1 S2 ...": N its cycles, L the
+// VCOUNT its commit ended on (160-227 is inside VBlank), C the commit's
+// cycles, and Sn each stretch up to the nth mark after it (FRAME_SPLITS in
+// all; ui_frame marks keys, motion and update, jobs, draw).
+#define FRAME_SPLITS 8
+void frame_split(void);
 
 #endif

@@ -271,6 +271,9 @@ struct ui_view_spec {
 
 enum {
 	UI_VIEW_MODAL = 1,  // a dialog: dims the views under it and slides in
+	// LEFT and RIGHT move a page: held, they repeat on the paging schedule
+	// (InputTiming.page_*) rather than the d-pad's ramp
+	UI_VIEW_LR_PAGES = 2,
 };
 
 // --- Widget configs (ui_spec.data) ---------------------------------------
@@ -491,6 +494,10 @@ void ui_list_reset(u8 node, u32 cursor);
 // on screen redraws in place, so it may tear for one frame.
 void ui_list_refresh(u8 node, u32 lo, u32 hi);
 void ui_list_set_cursor(u8 node, u32 cursor);
+// Moves the cursor by itself, rate items a frame (16.16: INPUT_ONE is one;
+// negative goes up), the list gliding with it as with a held key, until
+// rate 0 or the list's end. For demos: it emits no UI_EV_CURSOR.
+void ui_list_autoscroll(u8 node, s32 rate);
 u32 ui_list_cursor(u8 node);
 // 1 while a page change hides or draws the list's page: a handler taking A
 // itself waits until it is up, as the list's own A does

@@ -1,6 +1,8 @@
 // See ring.h.
 #include "ring.h"
 
+#include <stdint.h>
+
 int ring_setup(struct ui_ring *r, u32 h, u32 rh, const char **why)
 {
 	*why = 0;
@@ -85,10 +87,56 @@ s32 ring_step(const struct ui_ring *r, s32 shown, s32 want)
 
 int ring_far(const struct ui_ring *r, s32 shown, s32 target)
 {
-	s32 d = target - shown;
+	s32 d = target - shown, near = (s32)((r->visible + 1) * r->rh);
 	if (d < 0)
 		d = -d;
-	return d > (s32)((r->visible + 1) * r->rh);
+	if (near < 2 * (s32)r->h)
+		near = 2 * (s32)r->h;
+	return d > near;
+}
+
+void ring_glide(const struct ui_ring *r, u32 row, s32 step, s32 target, u32 rows, u32 phase, u32 rate, s32 omega,
+		struct ring_glide *g)
+{
+	s32 next = (s32)row + step;
+	if (next < 0)
+		next = 0;
+	if (rows && next >= (s32)rows)
+		next = (s32)rows - 1;
+	s32 span = ring_scroll_for(r, (u32)next, target, rows, 1) - target;
+	g->want = target + (s32)(((int64_t)span * phase) >> 16);
+	g->speed = (s32)((int64_t)span * rate);  // px a frame, 16.16
+	s32 lag = omega > 0 ? (s32)(((int64_t)g->speed * 2) / omega) : 0;  // px
+	s32 goal = g->want + lag, max = ring_max_scroll(r, rows);
+	g->goal = goal < 0 ? 0 : goal > max ? max : goal;
+}
+
+s32 ring_glide_stop(const struct ui_ring *r, u32 row, s32 target, s32 at, s32 speed, s32 omega, u32 rows)
+{
+	s32 rh = r->rh, ahead = omega > 0 ? speed / omega : 0;  // px: both are 16.16
+	s32 from = at + ahead;
+	// Row-aligned as target is: target + n rows
+	s32 stop = target + (from - target) / rh * rh;
+	if (speed > 0 && stop < from)
+		stop += rh;
+	else if (speed < 0 && stop > from)
+		stop -= rh;
+	s32 max = ring_max_scroll(r, rows);
+	if (stop > max)
+		stop = max;
+	if (stop < 0)
+		stop = 0;
+	return ring_scroll_for(r, row, stop, rows, 1);
+}
+
+s32 ring_keep_on_screen(const struct ui_ring *r, u32 row, s32 scroll)
+{
+	s32 top = (s32)(row * r->rh), lo = top + r->rh - (s32)r->h;
+	if (scroll > top)
+		scroll = top;
+	if (scroll < lo)
+		scroll = lo;
+	return scroll < 0 ? 0 : scroll;
 }
 
 s32 ring_rebase(const struct ui_ring *r, s32 goal_px)

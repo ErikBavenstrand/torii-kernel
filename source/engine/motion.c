@@ -373,18 +373,24 @@ static s32 fade_step(s32 diff, s32 f)
 	return d >= 0 ? (d + 128) >> 8 : -((-d + 128) >> 8);
 }
 
+// Each channel's 32 faded values, in place in the colour: a whole-palette
+// fade (512 colours, every frame of ui_fade) is then three lookups a colour,
+// about a fifth of the cycles of working each channel out
+static u16 fade_lut[3][32] EWRAM_BSS;
+
 void palette_fade(u16 *dst, const u16 *src, u32 count, u16 color, u32 factor)
 {
 	if (factor > FADE_MAX)
 		factor = FADE_MAX;
 	s32 f = (s32)factor;
-	s32 tr = color & 31, tg = color >> 5 & 31, tb = color >> 10 & 31;
+	for (u32 ch = 0; ch < 3; ch++) {
+		s32 t = color >> (5 * ch) & 31;
+		for (s32 v = 0; v < 32; v++)
+			fade_lut[ch][v] = (u16)((v + fade_step(t - v, f)) << (5 * ch));
+	}
+	const u16 *lr = fade_lut[0], *lg = fade_lut[1], *lb = fade_lut[2];
 	for (u32 i = 0; i < count; i++) {
-		s32 c = src[i];
-		s32 r = c & 31, g = c >> 5 & 31, b = c >> 10 & 31;
-		r += fade_step(tr - r, f);
-		g += fade_step(tg - g, f);
-		b += fade_step(tb - b, f);
-		dst[i] = (u16)(r | g << 5 | b << 10);
+		u32 c = src[i];
+		dst[i] = (u16)(lr[c & 31] | lg[c >> 5 & 31] | lb[c >> 10 & 31]);
 	}
 }

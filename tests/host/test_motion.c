@@ -430,6 +430,30 @@ void test_palette_fade(void)
 	palette_fade(out, src, 7, FADE_WHITE, 128);
 	CHECK_EQ(out[0], 16 | 16 << 5 | 16 << 10);
 	CHECK_EQ(out[2], 31 | 16 << 5 | 16 << 10);
+	// Every colour, against the formula worked per channel (the lookup tables
+	// must give what it gives)
+	static u16 all[0x8000], faded[0x8000];
+	for (u32 c = 0; c < 0x8000; c++)
+		all[c] = (u16)c;
+	static const u16 targets[] = {FADE_BLACK, FADE_WHITE, 0x7C1F, 0x1234};
+	static const u32 factors[] = {1, 77, 128, 200, 255};
+	for (u32 t = 0; t < 4; t++) {
+		for (u32 k = 0; k < 5; k++) {
+			palette_fade(faded, all, 0x8000, targets[t], factors[k]);
+			u32 bad = 0;
+			for (u32 c = 0; c < 0x8000; c++) {
+				u16 want = 0;
+				for (u32 ch = 0; ch < 3; ch++) {
+					s32 v = c >> (5 * ch) & 31, d = (s32)(targets[t] >> (5 * ch) & 31) - v;
+					s32 m = d * (s32)factors[k];
+					v += m >= 0 ? (m + 128) >> 8 : -((-m + 128) >> 8);
+					want |= (u16)(v << (5 * ch));
+				}
+				bad += faded[c] != want;
+			}
+			CHECK_EQ(bad, 0u);
+		}
+	}
 	// Towards a colour: each channel on its own.
 	palette_fade(out, src, 1, 0x7C1F, 64);  // magenta, a quarter: 7.75
 	CHECK_EQ(out[0], 8 | 0 << 5 | 8 << 10);
