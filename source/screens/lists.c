@@ -15,6 +15,7 @@
 // the card, pop and push views, or leave the engine for mode 3 code
 // (launches, NOR writes, SETTINGS, cheats). A launch fills PSRAM, so the
 // folder is listed again whenever the lists come back from mode 3.
+#include <gba_input.h>
 #include <gba_video.h>
 #include <stdio.h>
 #include <string.h>
@@ -562,7 +563,7 @@ static const struct ui_spec dialog_nodes[] = {
 	 .anchor = UI_HCENTER | UI_VCENTER,
 	 .paper = UI_ROLE_PANEL,
 	 .w = 208,
-	 .h = 72},
+	 .h = 80},  // whole tiles once centred: (160 - 80) / 2 = 40
 	{.kind = UI_LABEL,
 	 .id = 2,
 	 .parent = 0,
@@ -572,7 +573,7 @@ static const struct ui_spec dialog_nodes[] = {
 	 .x = 8,
 	 .y = 8,
 	 .w = 8,
-	 .h = 40,
+	 .h = 48,
 	 .data = &text_label},
 	{.kind = UI_LABEL,
 	 .id = 3,
@@ -582,7 +583,7 @@ static const struct ui_spec dialog_nodes[] = {
 	 .ink = UI_ROLE_DIM,
 	 .paper = UI_ROLE_PANEL,
 	 .x = 8,
-	 .y = 48,
+	 .y = 56,
 	 .w = 8,
 	 .h = 16,
 	 .data = &hint_label},
@@ -620,6 +621,7 @@ static void engine_leave(void)
 	REG_BG2CNT = 0;
 	Clear(0, 0, 240, 160, 0, 1);
 	REG_DISPCNT = MODE_3 | BG2_ENABLE;
+	scanKeys();  // libgba's key state catches up: keys held now aren't news to mode 3 code
 }
 
 static u8 list_node(void)
@@ -695,8 +697,9 @@ static void show(enum screen s, u32 at)
 	lists.screen = (u8)s;
 	lists.menu = 0;
 	struct ui_view *v = ui_push(&list_views[s], &lists);
-	if (!v) {
+	if (!v) {  // a layout over budget: nothing would take keys
 		tlog_error("lists: %s", ui_error());
+		TLOG_ASSERT(v);
 		return;
 	}
 	lists.list_first = v->first;
@@ -731,6 +734,7 @@ static void list_folder(void)
 {
 	folder_total = 0;
 	game_total_SD = 0;
+	f_chdir(currentpath);  // the folder file names are relative to (a launch may have left /SAVER)
 	names_reset();
 	if (f_opendir(&dir, currentpath) == FR_OK) {
 		for (;;) {
@@ -1018,9 +1022,7 @@ static void launch(u32 line, u32 key_l)
 	u32 at = lists.from_recent ? 0 : cursor();
 	engine_leave();
 	u8 res = Game_launch(&lists.game, line, key_l);
-	if (res == 0)
-		recent_restore();
-	lists.from_recent = 0;
+	recent_restore();  // the list's folder, whatever the launch did
 	if (res == 2)
 		show_nor(0);
 	else
@@ -1133,8 +1135,10 @@ static void nor_menu_a(u32 line, u32 key_l)
 		} else if (res == 0x10) {
 			dialog(gl_file_exist, 1, AFTER_BACKUP);
 		} else {
-			FRAM_save_op(2);
-			dialog(gl_save_saved, 0, AFTER_NOR);
+			if (FRAM_save_op(2) == 2)
+				error_dialog(2, AFTER_NOR);
+			else
+				dialog(gl_save_saved, 0, AFTER_NOR);
 		}
 		break;
 	}
@@ -1145,7 +1149,8 @@ static void dialog_answer(int yes)
 	switch (lists.after) {
 	case AFTER_DELETE:
 		if (yes)
-			f_unlink(current_filename);
+			if (f_chdir(currentpath) == FR_OK)  // cwd may be /SAVER after a launch
+				f_unlink(current_filename);
 		show_sd(cursor());
 		break;
 	case AFTER_FORMAT:
@@ -1157,8 +1162,10 @@ static void dialog_answer(int yes)
 		break;
 	case AFTER_BACKUP:
 		if (yes) {
-			FRAM_save_op(2);
-			dialog(gl_save_saved, 0, AFTER_NOR);
+			if (FRAM_save_op(2) == 2)
+				error_dialog(2, AFTER_NOR);
+			else
+				dialog(gl_save_saved, 0, AFTER_NOR);
 		} else {
 			show_nor(lists.nor_game);
 		}

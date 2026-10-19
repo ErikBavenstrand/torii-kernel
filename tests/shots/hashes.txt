@@ -51,6 +51,8 @@ nor-list/screen B41DDB1AFEB55DC1
 recent/screen 672BEF507A1E554D
 sd-deep/held DADD3FA9E4F41079
 sd-deep/paged 1F9A20893381FF91
+sd-delete/kept 5CB316715377D608
+sd-delete/screen DC88559CB4686E2D
 sd-list/screen 34EED145D7C6A8C0
 sd-long/menu 09557074CB598DAB
 sd-long/scrolled 531105B9E901F98C

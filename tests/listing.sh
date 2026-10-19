@@ -70,7 +70,7 @@ OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -k 116:A -k 120:-
 grep -qF "kernel: launch: loading $longer, CLEAN BOOT" "$cart/kernel.log" ||
   fail "exFAT: the long name didn't launch: $(grep '^kernel' "$cart/kernel.log" | tail -2)"
 # Hold L, START on the long one, A to confirm the delete (a fresh card)
-rm -f "$cart/sd.img"
+rm -rf "$cart" && mkdir -p "$cart" # the kernel NOR too: the launch above left a save to copy
 tools/sdimg.sh "$cart/sd.img" mkfs exfat 64
 tools/sdimg.sh "$cart/sd.img" put tests/roms/hello/hello.gba "/$short"
 tools/sdimg.sh "$cart/sd.img" put tests/roms/hello/hello.gba "/$longer"
