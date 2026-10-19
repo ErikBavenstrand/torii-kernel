@@ -6,15 +6,17 @@ git log, not here.
 
 ## Unreleased
 
-- **Changed:** scrolling. A held d-pad speeds up smoothly from 4 frames a
-  row to a row a frame over 1.5 s, and the list glides with the cursor at
-  its speed, so the cursor never leaves the screen; let go, it brakes to a
-  whole row. Held LEFT/RIGHT page every 6 frames and scroll through instead
-  of blanking the list (the fastest-scroll flicker and its 200k-cycle
-  frames on the cart); every scroll frame is now under 75k cycles. The
-  lists wrap at their ends on a fresh press, as the menus do, and A or B
-  pressed during a held scroll is no longer lost. Fades cost half as much,
-  and Diagnostics' demo scrolls smoothly (`c11f265`).
+- **Changed:** scrolling. A held d-pad speeds up smoothly from a row every
+  4 frames to 40 rows a second, its top speed at 1.75 s held, and the list
+  glides with the cursor at its speed, so the cursor never leaves the
+  screen; let go, it brakes to a whole row. Held LEFT/RIGHT page every 6
+  frames and scroll through instead of blanking the list (the
+  fastest-scroll flicker and its 200k-cycle frames on the cart); every
+  scroll frame is now under 75k cycles in the emulator. A fresh press at a
+  list's end wraps to the other end, as in the menus; a held key stops
+  there. A, B and START pressed during a held scroll act on the row shown
+  selected. Fades cost half as much, and Diagnostics' demo scrolls
+  smoothly (`c11f265`, `f73b9ff`).
 - **Fixed:** Diagnostics' unit tests failed on the cart (`asset_psram_round_trip`):
   a DMA from the kernel's ROM into PSRAM writes nothing on the real cart.
   `psram_write` now refuses sources in cart space; the test copies its data to
