@@ -322,6 +322,7 @@ Bugs found while building v0.3 and v0.3.1. Each is struck out here once a ticket
 - ~~The cheat view counts sections plus entries: "[002/004]" for 2 cheats (T3; port T11).~~ Fixed by T11 (`5e44a3b`).
 - ~~Diagnostics' loader check can log a garbled loader title: `say()` clears the start of `pReadCache`, where the image is (T16 review; port T12).~~ Fixed by T12 (`6067e1b`).
 - After a failed launch from the NOR list's game menu, the menu stays open on a black screen until a key redraws its rows (pre-existing; T12 review; port T9).
+- The NOR format dialog counts the erase in binary (`itoa(count, msg, 2)`), and the list's clock stops during the erase (T12 review).
 - The cheat parser drops spaces from cheat names ("Never money" shows as "Nevermoney"), more visible in the proportional font (T11 review; v0.8 cheats).
 - The cheat parser's `Get_KEY_val` and `Get_CHT_val` copy 50-byte fields that may lack a NUL (T16; v0.8 cheats).
 
