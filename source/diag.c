@@ -210,13 +210,6 @@ static void screen_open(void)
 	screen_push();
 }
 
-static void screen_close(void)
-{
-	ui_shutdown();
-	dialog_blank();  // the registers as the unit tests expect them, on a black screen
-	scr.view = 0;
-}
-
 static void screen_title(const char *title)
 {
 	snprintf(scr.title, sizeof(scr.title), "DIAGNOSTICS: %s", title);
@@ -449,14 +442,29 @@ static void step_info(void)
 	pause_frames(60);
 }
 
-// The unit tests reset the engine (pools, shadow state, motions), so the
-// screen goes away while they run and comes back as it was.
+// Leaves the page on screen while the unit tests run, for the seconds they
+// take: they reset the engine (pools, shadow state, motions) but write only
+// sprite VRAM from 0x06014000, OAM and the sprite palette (tests/kernel),
+// never BG VRAM, the BG palette or DISPCNT. So with sprites off the page's
+// backgrounds stay as they are. The engine's state is dropped, not shut down
+// (ui_shutdown would queue changes to the page's VRAM); screen_open starts
+// it again.
+static void screen_hold(void)
+{
+	VBlankIntrWait();
+	*(vu16 *)0x04000000 &= ~0x1000;  // DISPCNT: sprites off
+	scr.view = 0;
+}
+
+// The unit tests reset the engine, so the page holds still while they run
+// (screen_hold) and comes back as it was.
 static void step_unit_tests(void)
 {
 	step("unit tests");
 	say(WHITE, "running the kernel's unit tests...");
-	pause_frames(2);  // shown before the screen goes
-	screen_close();
+	say(WHITE, "(the screen holds still for about 5 s)");
+	pause_frames(30);  // shown, faded in, before the engine stops
+	screen_hold();
 	int failed = torii_unit_tests();
 	screen_open();
 	say(failed ? RED : GREEN, "%d unit tests failed (see the log)", failed);
