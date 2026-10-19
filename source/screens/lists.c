@@ -1222,7 +1222,7 @@ static void do_action(void)
 static void idle_flush(void)
 {
 	u32 pending = tlog_pending(), idle = ui_idle_frames();
-	if (!pending || lists.act || jobs_pending())
+	if (!pending || lists.act || jobs_pending() || gfx_pending())
 		return;
 	if ((pending >= LOG_RING_SIZE / 2 && idle >= IDLE_FLUSH_FRAMES) || idle >= IDLE_FLUSH_ALL_FRAMES)
 		tlog_flush();
