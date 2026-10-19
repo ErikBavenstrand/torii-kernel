@@ -104,6 +104,13 @@ int dialog_progress_active(void);
 
 #define DIALOG_PROGRESS_FRAMES 12
 
+// A function the dialogs call every DIALOG_PROGRESS_FRAMES or so while they
+// hold the screen (NULL: none), for the screen under them, whose own loop
+// waits meanwhile: the lists keep their clock going under a question or a
+// 4-minute erase. It runs before a frame, from the dialogs' loops, never
+// from inside ui_frame; it must check that its screen is still up.
+void dialog_set_tick(void (*tick)(void));
+
 // The launch's progress line (the official kernel's name for it): the
 // status line of the progress dialog, which it begins if none is up.
 void ShowbootProgress(const char *str);

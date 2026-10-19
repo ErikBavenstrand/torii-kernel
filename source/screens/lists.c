@@ -647,6 +647,14 @@ static void clock_read(void)
 		ui_label_set((u8)(lists.list_first + N_CLOCK), lists.clock);
 }
 
+// The clock under a dialog (dialog_set_tick), while the list is still up
+static void clock_tick(void)
+{
+	const struct ui_view *v = ui_view_at(0);
+	if (v && v->ctx == &lists)
+		clock_read();
+}
+
 // The SD list's title: the folder's path, or its last part if the path
 // doesn't fit
 static void sd_title(void)
@@ -1305,6 +1313,7 @@ void lists_run(void)
 	memset(&lists, 0, sizeof(lists));
 	memset(folder_cursor, 0, sizeof(folder_cursor));
 	lists.depth = 1;
+	dialog_set_tick(clock_tick);
 	show_sd(0, UI_TR_LEAVE, 0);  // in from the boot's black screen
 	for (;;) {
 		if (lists.measure_left) {
