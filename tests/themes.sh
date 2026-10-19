@@ -98,3 +98,32 @@ mtype -i "$cart/sd.img" ::/torii/theme.txt | grep -q '^example' || fail "theme.t
 out=$(OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -w "screen ready: sd-list" 2>&1 || true)
 grep -q "kernel: theme: loaded example" <<<"$out" || fail "the saved SD theme didn't load at the next power-on"
 echo "PASS: SETTINGS picks and saves the SD theme (theme.txt, THEME = 2), loaded at the next power-on"
+
+# An SD theme picked after WRITE TO NOR (v0.3.2 on the real cart): the write
+# leaves the game's last bytes in pReadCache, where the theme's SD reader
+# lives, and the load must not call what they hold. Hello.gba padded to
+# 1 MB with 0xFF, written CLEAN from the SD list's file menu, then THEME
+# stepped to the example (A on DARK, LIGHT, the example).
+rm -rf "$cart"
+mkdir -p "$cart"
+mkfs.fat -C -F 32 -n THEMES "$cart/sd.img" 65536 >/dev/null
+mmd -i "$cart/sd.img" ::/torii ::/torii/themes ::/torii/themes/example
+copy_tree "$cart/sd.img" themes/example ::/torii/themes/example
+python3 - tests/roms/hello/hello.gba "$cart/Big.gba" <<'EOF2'
+import sys
+rom = open(sys.argv[1], "rb").read()
+open(sys.argv[2], "wb").write(rom + b"\xff" * (0x100000 - len(rom)))
+EOF2
+mcopy -i "$cart/sd.img" "$cart/Big.gba" ::/Big.gba
+# shellcheck disable=SC2086 # $keys is a list of options
+out=$(OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -w "screen ready: sd-list" \
+  -k @8:DOWN -k @12:- -k @20:A -k @24:- -w "screen ready: file-menu" \
+  -k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:A -k @36:- -w "nor: list saved" \
+  -w "screen ready: nor-list" $keys -w "screen ready: settings1" $keys -w "screen ready: settings2" \
+  -k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:DOWN -k @48:- -k @56:DOWN -k @60:- \
+  -k @68:A -k @72:- -k @80:A -k @84:- -k @92:A -k @96:- -w "theme: loaded example" 2>&1 || true)
+grep -q "^crash at frame" <<<"$out" && fail "the theme load after WRITE TO NOR crashed: $(grep -A2 '^crash at' <<<"$out")"
+grep -q "kernel: nor: wrote Big.gba" <<<"$out" || fail "WRITE TO NOR didn't write Big.gba: $(grep 'nor:' <<<"$out" | tail -3)"
+grep -q "kernel: theme: loaded example" <<<"$out" ||
+  fail "THEME didn't load the example after WRITE TO NOR: $(grep -E 'theme|settings' <<<"$out" | tail -3)"
+echo "PASS: an SD theme picked after WRITE TO NOR loads (the reader in pReadCache starts clean)"
