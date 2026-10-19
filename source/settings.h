@@ -54,12 +54,15 @@ extern const struct settings_page settings_page1, settings_page2, settings_help;
 
 // The header, the first three nodes of each page: a panel, the title at its
 // left and a label at its right (set them with settings_header).
+// clang-format off
 #define SETTINGS_HEADER \
-	{.kind = UI_PANEL, .id = 1, .parent = UI_NONE, .plane = 2, .anchor = UI_HFILL, .paper = UI_ROLE_PANEL, .h = 16}, \
+	{.kind = UI_PANEL, .id = 1, .parent = UI_NONE, .plane = 2, .anchor = UI_HFILL, \
+	 .paper = UI_ROLE_PANEL, .h = 16}, \
 	{.kind = UI_LABEL, .id = 2, .parent = 0, .plane = 2, .anchor = UI_LEFT, .ink = UI_ROLE_TEXT, \
 	 .paper = UI_ROLE_PANEL, .w = 160, .h = 16, .data = &settings_title_config}, \
 	{.kind = UI_LABEL, .id = 3, .parent = 0, .plane = 2, .anchor = UI_RIGHT, .ink = UI_ROLE_DIM, \
 	 .paper = UI_ROLE_PANEL, .w = 80, .h = 16, .data = &settings_corner_config}
+// clang-format on
 extern const struct ui_label_config settings_title_config, settings_corner_config;
 extern const struct ui_list_model settings_model;
 

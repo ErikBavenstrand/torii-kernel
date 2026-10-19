@@ -1,6 +1,7 @@
 // SETTINGS page 1 (clock, addons, language, patch engine, hot keys, cart
 // hardware), and the runner the settings pages share (settings.h).
 #include <gba_systemcalls.h>
+#include <gba_input.h>
 #include <gba_video.h>
 #include <stdio.h>
 #include <string.h>
@@ -222,6 +223,9 @@ u32 Settings_run(u32 page)
 	}
 	ui_shutdown();
 	back_to_mode3();
+	// The engine reads the keys its own way: catch libgba's state up, so the
+	// menu doesn't take the key that left (L, held) for a new press
+	scanKeys();
 	return settings_result;
 }
 
