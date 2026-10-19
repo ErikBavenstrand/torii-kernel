@@ -30,6 +30,7 @@ static const struct {
 	{"sort_full_list", test_sort_full_list},
 	{"recently_played", test_recently_played},
 	{"recently_played_nor", test_recently_played_nor},
+	{"recently_played_remove", test_recently_played_remove},
 	{"nor_info_stays_in_bounds", test_nor_info_stays_in_bounds},
 	{"nor_write_refused_when_list_full", test_nor_write_refused_when_list_full},
 	{"nor_scan_keeps_interrupts", test_nor_scan_keeps_interrupts},

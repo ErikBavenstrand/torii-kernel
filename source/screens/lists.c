@@ -81,9 +81,10 @@ enum action {
 // What a message or confirm dialog (ui/dialog.h) does once answered
 enum after {
 	AFTER_POP,     // back to the list under it (the dialog has gone)
-	AFTER_SD,      // the SD list, listed again
+	AFTER_RECENT,  // Recently Played, read again, the cursor on the entry
 	AFTER_NOR,     // the NOR list, read again
 	AFTER_DELETE,  // confirm: delete current_filename
+	AFTER_NOR_DELETE,  // confirm: delete the latest NOR game
 	AFTER_FORMAT,  // confirm: FORMAT ALL
 	AFTER_BACKUP,  // confirm: overwrite the NOR game's save file
 };
@@ -125,6 +126,7 @@ static struct {
 	u8 icons_made;
 	u32 nor_game;     // the NOR game menu's game
 	u32 sd_cursor;    // the SD list's cursor when it went for the NOR list or Recently Played
+	u32 recent_row;   // the Recently Played entry opened
 	u32 recent_count;
 	u32 list_first;   // pool index of the list view's first node
 	u32 dialog_first;
@@ -349,10 +351,7 @@ static int list_fetch(void *ctx, u32 i, struct ui_item *out)
 			out->icon = type_icon(out->text);
 		}
 	} else if (lists.screen == SCR_NOR) {
-		char *p = lists.detail;
-		put_num(&p, pNorFS[i].filesize >> 20);
-		put(&p, "M");
-		*p = 0;
+		size_text(lists.detail, pNorFS[i].filesize);
 		out->text = pNorFS[i].filename;
 		out->detail = lists.detail;
 		out->icon = icons[ICON_NOR];
@@ -705,8 +704,8 @@ static void show(enum screen s, u32 at, u32 kind, s32 way)
 	clock_read();
 	ui_list_reset(list_node(), at);
 	count_update(cursor());
-	if (s == SCR_RECENT && !lists.recent_count) {
-		ui_label_set((u8)(v->first + N_EMPTY), gl_no_game_played);
+	if (s != SCR_SD && !list_count(0)) {
+		ui_label_set((u8)(v->first + N_EMPTY), s == SCR_NOR ? gl_no_game_nor : gl_no_game_played);
 		ui_show((u8)(v->first + N_EMPTY), 1);
 	}
 	measure("lists-screen", 3);
@@ -777,6 +776,13 @@ static void show_nor(u32 at, u32 kind, s32 way)
 	go(kind, way);
 	read_nor();
 	show(SCR_NOR, at, kind, way);
+}
+
+static void show_recent(u32 at, u32 kind, s32 way)
+{
+	go(kind, way);
+	lists.recent_count = Recently_play_load();
+	show(SCR_RECENT, at, kind, way);
 }
 
 static void dialog_answer(int yes);
@@ -1042,12 +1048,15 @@ static void recent_restore(void)
 // back if it didn't start
 static void launch(u32 line, u32 key_l)
 {
-	u32 at = lists.from_recent ? lists.sd_cursor : cursor();
+	u32 at = cursor();
+	int recent = lists.from_recent;
 	engine_leave();
 	u8 res = Game_launch(&lists.game, line, key_l);
 	recent_restore();  // the list's folder, whatever the launch did
 	if (res == 2)
 		show_nor(0, UI_TR_LEAVE, 0);
+	else if (recent)  // back where the game was picked
+		show_recent(lists.recent_row, UI_TR_LEAVE, 0);
 	else
 		show_sd(at, UI_TR_LEAVE, 0);
 }
@@ -1060,7 +1069,7 @@ static void open_game(void)
 	if (!Game_pick(&lists.game)) {  // can't boot
 		if (lists.from_recent) {
 			recent_restore();
-			show_sd(lists.sd_cursor, UI_TR_DEEPER, -1);
+			show_recent(lists.recent_row, UI_TR_FADE, 0);
 		}
 		return;
 	}
@@ -1076,17 +1085,18 @@ static void recent_open(u32 row)
 {
 	const char *entry = p_recently_play[row];
 	const char *nor = Recently_play_nor(entry);
+	lists.recent_row = row;
 	if (nor) {
 		read_nor();
 		u32 game = NOR_game_named(nor);
 		if (game >= game_total_NOR) {
 			tlog("launch %s: not on the game NOR", nor);
-			error_dialog(1, AFTER_SD);
+			error_dialog(1, AFTER_RECENT);
 			return;
 		}
 		engine_leave();
 		NOR_launch(game, 0);  // returns only if it failed
-		show_sd(lists.sd_cursor, UI_TR_LEAVE, 0);
+		show_recent(row, UI_TR_LEAVE, 0);
 		return;
 	}
 	const char *slash = strrchr(entry, '/');  // Recently_play_load kept only paths
@@ -1122,7 +1132,7 @@ static void game_menu_a(u32 line, u32 key_l)
 		// listed there, and a cut one would save under another name
 		if (lists.from_recent) {
 			recent_restore();
-			error_dialog(8, AFTER_SD);
+			error_dialog(8, AFTER_RECENT);
 		} else {
 			error_dialog(8, AFTER_POP);  // back to the list, the cursor where it was
 		}
@@ -1142,8 +1152,9 @@ static void nor_menu_a(u32 line, u32 key_l)
 		break;
 	case 1:  // delete: only the latest game
 		if (lists.nor_game + 1 == game_total_NOR) {
-			Delete_latest_NOR();
-			show_nor(lists.nor_game, UI_TR_FADE, 0);
+			// "Delete this game from NOR?" over its name, as the SD list asks
+			dialog_kind(gl_nor_delete_ask, pNorFS[lists.nor_game].filename, 1, AFTER_NOR_DELETE,
+				    DIALOG_INFO);
 		} else {
 			dialog(gl_lastest_game, 0, AFTER_NOR);
 		}
@@ -1191,6 +1202,14 @@ static void nor_menu_a(u32 line, u32 key_l)
 	}
 }
 
+// The deleted current_filename, in currentpath, comes off Recently Played
+static void recent_forget(void)
+{
+	char entry[RECENT_LEN];
+	snprintf(entry, sizeof(entry), strcmp(currentpath, "/") == 0 ? "%s%s" : "%s/%s", currentpath, current_filename);
+	Recently_play_forget(entry);
+}
+
 static void dialog_answer(int yes)
 {
 	switch (lists.after) {
@@ -1199,9 +1218,17 @@ static void dialog_answer(int yes)
 		if (!yes)
 			break;
 		if (f_chdir(currentpath) == FR_OK)  // cwd may be /SAVER after a launch
-			if (f_unlink(current_filename) == FR_OK)
+			if (f_unlink(current_filename) == FR_OK) {
 				tlog_card_freed();
+				recent_forget();
+			}
 		show_sd(cursor(), UI_TR_FADE, 0);
+		break;
+	case AFTER_NOR_DELETE:
+		if (!yes)
+			break;
+		Delete_latest_NOR();
+		show_nor(lists.nor_game, UI_TR_FADE, 0);
 		break;
 	case AFTER_FORMAT:
 		if (!yes)
@@ -1218,8 +1245,8 @@ static void dialog_answer(int yes)
 				dialog(gl_save_saved, 0, AFTER_NOR);
 		}
 		break;
-	case AFTER_SD:  // from Recently Played: the cursor where it was
-		show_sd(lists.sd_cursor, UI_TR_DEEPER, -1);
+	case AFTER_RECENT:
+		show_recent(lists.recent_row, UI_TR_FADE, 0);
 		break;
 	case AFTER_NOR:
 		show_nor(lists.nor_game, UI_TR_FADE, 0);
@@ -1272,9 +1299,7 @@ static void do_action(void)
 		break;
 	case ACT_RECENT:
 		lists.sd_cursor = cursor();
-		go(UI_TR_DEEPER, 1);
-		lists.recent_count = Recently_play_load();
-		show(SCR_RECENT, 0, UI_TR_DEEPER, 1);
+		show_recent(0, UI_TR_DEEPER, 1);
 		break;
 	case ACT_RECENT_OPEN:
 		recent_open(arg);
@@ -1298,12 +1323,12 @@ static void do_action(void)
 	case ACT_MENU_B:
 		if (lists.menu == 1) {
 			cheat_menu_forget();
-			if (lists.from_recent) {
+			// Back to the list's folder; a Recently Played entry's menu
+			// closes over Recently Played
+			if (lists.from_recent)
 				recent_restore();
-				show_sd(lists.sd_cursor, UI_TR_DEEPER, -1);
-				break;
-			}
-			f_chdir(currentpath);  // back to the list's folder
+			else
+				f_chdir(currentpath);
 		}
 		lists.menu = 0;
 		ui_close();

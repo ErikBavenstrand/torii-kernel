@@ -213,21 +213,53 @@ u32 Recently_play_add(const char *entry, u32 count)
 	return count;
 }
 //---------------------------------------------------------------------------------
-// Puts entry, a path or a NOR game's entry, on top of Recently Played.
-static void Recently_play_save(const char *entry)
+// Drops entry from the count rows in p_recently_play, the rows under it moving
+// up. Returns the new count.
+u32 Recently_play_remove(const char *entry, u32 count)
+{
+	u32 i = 0;
+	while (i < count) {
+		if (strcmp(entry, p_recently_play[i]) == 0) {
+			count--;
+			memmove(p_recently_play[i], p_recently_play[i + 1], (count - i) * RECENT_LEN);
+			memset(p_recently_play[count], 0x00, RECENT_LEN);
+		} else {
+			i++;
+		}
+	}
+	return count;
+}
+//---------------------------------------------------------------------------------
+// Writes the count rows in p_recently_play to Recently Played's file.
+static void Recently_play_write(u32 count)
 {
 	u32 res;
 	u32 i;
-	u32 count = Recently_play_load();
-
-	count = Recently_play_add(entry, count);
-
 	res = f_open(&gfile, "/SAVER/Recently play.txt", FA_WRITE | FA_CREATE_ALWAYS);//truncate: the list can shrink
 	if (res == FR_OK) {
 		for (i = 0; i < count; i++) {
 			res = f_printf(&gfile, "%s\n", p_recently_play[i]);
 		}
 		f_close(&gfile);
+	}
+}
+//---------------------------------------------------------------------------------
+// Puts entry, a path or a NOR game's entry, on top of Recently Played.
+static void Recently_play_save(const char *entry)
+{
+	u32 count = Recently_play_load();
+
+	count = Recently_play_add(entry, count);
+	Recently_play_write(count);
+}
+//---------------------------------------------------------------------------------
+void Recently_play_forget(const char *entry)
+{
+	u32 count = Recently_play_load();
+	u32 left = Recently_play_remove(entry, count);
+	if (left != count) {
+		tlog("recent: forgot %s", entry);
+		Recently_play_write(left);
 	}
 }
 //---------------------------------------------------------------------------------

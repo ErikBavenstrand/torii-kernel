@@ -49,6 +49,10 @@ u32 Recently_play_add(const char *entry, u32 count);
 extern char p_recently_play[10][RECENT_LEN];
 const char *Recently_play_nor(const char *entry);
 u32 Recently_play_load(void);
+// Drops entry from the count rows in p_recently_play; returns the new count.
+u32 Recently_play_remove(const char *entry, u32 count);
+// Drops entry, a path, from Recently Played's file (a file deleted from the card).
+void Recently_play_forget(const char *entry);
 // The game NOR list's game named name, or game_total_NOR if none.
 u32 NOR_game_named(const char *name);
 // The text of error error_num (gl_error_*), as Show_error_num shows it.
