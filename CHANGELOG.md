@@ -17,6 +17,42 @@ git log, not here.
   `tab_*`, `deeper_*`, `fade_*`, `leave_*` in theme.ini). A delete, FORMAT
   ALL or overwrite question answered no leaves the list as it was (`98955be`,
   `e707f85`, `504cbf2`).
+- **Fixed:** Diagnostics' unit tests failed on the cart (`asset_psram_round_trip`):
+  a DMA from the kernel's ROM into PSRAM writes nothing on the real cart.
+  `psram_write` now refuses sources in cart space; the test copies its data to
+  RAM first (`b058a21`).
+- **Fixed:** a scrolling list logged a `frame-cycles:` line every frame and
+  overflowed the log (107 KB lost in one cart test). Measured frames go to
+  mGBA's console only, and the card gets one summary per name at DEBUG when the
+  log is written; the lists also write the log while no key is held, so
+  a long stay in the menu or a power-off loses no lines (`b08c3b9`, `29c35d2`).
+- **Fixed:** Diagnostics no longer goes black for about 5 s while its unit
+  tests run: the page stays on screen (`32b6f96`).
+- **Fixed:** log lines: a refused NOR write now says it wasn't written, the
+  boot loader's blank title says DE.BIN has none, and the crash test's boot
+  line is complete (`42db653`).
+- **Fixed:** progress bars move and fill. Each step of a launch (save,
+  loading, patching), WRITE TO NOR, the power-on save copy, BACK UP SAVE
+  and FORMAT ALL fills its share of the bar, with the step's percentage,
+  and the bar shows full ("Done") before the dialog closes. It used to sit
+  at 0% everywhere but the NOR write and stop a block short. The FORMAT ALL
+  bar is an estimate based on the official "about 4 mins", with the time so
+  far. During a CLEAN BOOT the cart copies the game itself, so the bar holds
+  until the copy ends (`a865d94`).
+- **Changed:** dialog, progress and message texts are clear sentence-case
+  English ("Save to SD card?", "Writing to NOR 50%", "No save file found",
+  "Delete this file?", the firmware update's), with no "Sav" (`a865d94`).
+- **Changed:** BREATHING and SD LED on SETTINGS page 2 are rows UP and DOWN
+  stop on, edited like any other (R, G, B, OK). The settings are stored as
+  before (`a865d94`).
+- **Changed:** HELP shows "Torii 0.3.0 · FW N" instead of the official
+  "K:1.06", and every boot logs "Torii 0.3.0, build id …"
+  (`source/version.h`) (`a865d94`).
+
+- **Changed:** `ezkernelnew.bin` is 1.79 MB instead of 2.44 MB: it no longer
+  carries EZ-Flash's 16bpp menu pictures, which nothing draws since v0.3. The
+  FPGA firmware moved down to fill the gap (`source/image_layout.h`); the
+  firmware update writes the same bytes as before (`546fd17`).
 - **Removed:** HELP's "SELECT: Thumbnail toggle" line; the lists no longer
   show thumbnails (`3250448`).
 - **Fixed:** with an SD theme that has a wallpaper, the game menu no longer

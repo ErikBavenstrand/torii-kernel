@@ -118,6 +118,22 @@ extern char *gl_save_loaded;
 extern char *gl_save_saved;
 extern char *gl_file_exist;
 extern char *gl_file_noexist;
+extern char *gl_delete_ask;    // the L+START question's title, over the file's name
+extern char *gl_saving;        // the progress title while a save goes to the card
+extern char *gl_format_title;  // FORMAT ALL's progress title
+extern char *gl_erasing;       // its status, with the time so far
+extern char *gl_done;          // a progress dialog's last status, at 100%
+extern char *gl_patching;      // a launch's step after loading, with the addons on
+extern char *gl_keep_power;    // FORMAT ALL's text, under its title
+
+// The firmware update's texts (Ezcard_OP.c). It runs before a language is
+// loaded, and the formats stay literals so the compiler checks them.
+#define EN_FW_TITLE "Rev.%s firmware update"
+#define EN_FW_CRC_ERROR "The firmware in the kernel is damaged (CRC32).\nPress [B] to go back."
+#define EN_FW_QUESTION "Installed: V%02d\nNew: V%02d\nPress [A] to update\nPress [B] to cancel"
+#define EN_FW_UPDATING "Updating V%02d to V%02d.\nDon't turn the power off."
+#define EN_FW_PROGRESS "Updating... %lu%%"
+#define EN_FW_DONE "Done. Turn the power off."
 
 extern char **gl_rom_menu;
 extern char **gl_nor_op;

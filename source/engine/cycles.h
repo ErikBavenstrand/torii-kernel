@@ -56,7 +56,17 @@ static inline __attribute__((always_inline)) u32 cycles_since(u32 start)
 }
 
 // Logs "frame-cycles: NAME N", the line tests/perf/budget.txt checks and
-// Diagnostics' renderer step compares. NAME has no spaces.
+// Diagnostics' renderer step compares, at INFO: for one-off figures. NAME has
+// no spaces.
 void cycles_report(const char *name, u32 cycles);
+// A measured frame (frame_measure): "frame-cycles: NAME N" goes to mGBA's
+// console only, for tests/perf, since a scrolling list measures most frames
+// and would flood the card's log. The frame also counts towards NAME's
+// summary.
+void cycles_frame(const char *name, u32 cycles);
+// Logs, at DEBUG, each name's measured frames since the last summary
+// ("frame-cycles summary: NAME: N frames, worst W, mean M") and starts
+// again. tlog_flush calls it.
+void cycles_summary(void);
 
 #endif

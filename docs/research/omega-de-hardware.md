@@ -9,24 +9,83 @@ Source: official repo `ez-flash/omega-de-kernel` (HEAD, last commit 2025-09-08).
 
 ## 1. Upgrade file layout
 
+### The official file (EZ-Flash 1.06, Torii before F5)
+
 `ezkernelnew.bin` = compiled kernel (`0x000000–0x0FFFFF`, padded) + `image.bin` byte-identical
 at `0x100000`. The file is mapped at GBA ROM `0x08000000`, so the `0x08xxxxxx` addresses in
 `ez_define.h` are file offsets + `0x08000000`.
 
 | ROM address | Content |
 |---|---|
-| `0x08100000–0x0818D610…` | Manuals, splash, UI backgrounds, icons (16bpp; Torii draws none since v0.3, Diagnostics times LZ77 on the SD list picture at `0x08117890`) |
+| `0x08100000–0x0818D610…` | Manuals, splash, UI backgrounds, icons (16bpp; Torii draws none since v0.3; Diagnostics timed LZ77 on the SD list picture at `0x08117890`) |
 | `0x08194410…` | Theme colour table (unused since v0.3) |
 | `0x08195000` (+`0x535BC`) | FPGA bitstream, XC6SLX9, firmware v5 |
+| `0x081E85BC–0x081FFFFF` | Mostly zero bytes, with a few fragments (no sync word): read only as the LX9 update's last page (`0x44` bytes, all zero) |
 | `0x08200000` (+`0x716A0`) | FPGA bitstream, XC6SLX16, firmware v7 |
+| `0x082716A0–0x082719DB` | 828 bytes, zeros and fragments: the LX16 update's last page writes the first `0x60` of them to the FPGA's flash |
 
-Both extracted blobs match the CRC32s hard-coded in the kernel (`0x7E33C4FB`, `0x709EF09C`).
-Extract them from `image.bin` (offsets are ROM address − `0x08100000`):
+Both bitstreams end with `DESYNC` and NOOPs exactly at their size and match the CRC32s
+hard-coded in the kernel (`0x7E33C4FB`, `0x709EF09C`). Extract them from `image.bin`
+(offsets are ROM address − `0x08100000`):
 
 ```bash
 dd if=image.bin of=lx9.bin bs=1 skip=$((0x95000)) count=$((0x535bc))
 dd if=image.bin of=lx16.bin bs=1 skip=$((0x100000)) count=$((0x716a0))
 ```
+
+### Torii's file (F5, after v0.3)
+
+`tools/omega_image.py` builds the part after the kernel from `image.bin` (still committed,
+the official 1.06 file) as `source/image_layout.h` lays it out; nothing else in the kernel
+gives these addresses, and `tests/image_test.py` checks the two agree. The pictures are left
+out. Each part is copied with the official bytes after it up to a 256-byte page end, because
+the firmware update sends whole pages: the FPGA's flash gets exactly what the official file
+gave it (`tests/fw_update.sh` compares it on the emulated cart).
+
+| ROM address | Content | Read by |
+|---|---|---|
+| `0x08000000–0x080FFFFF` | the kernel, zero-padded | the CPU; the loader checks its first word |
+| `0x08100000` (+`0x535BC`, page `0x53600`) | LX9 bitstream, firmware v5 | `Check_FW_update` (Rev.A, version < 5), Diagnostics' CRC |
+| `0x08154000` (+`0x716A0`, page `0x71700`) | LX16 bitstream, firmware v7 | `Check_FW_update` (Rev.B, version < 7), Diagnostics' CRC |
+| `0x081C6000` (+`0x4000`) | 16 KB of the SD list picture (official `0x08117890`) | Diagnostics' LZ77 timing, so its figure compares with older reports |
+| end `0x081CA000` | file size `0x1CA000` (1,875,968 bytes; the official file is 2,562,524) | |
+
+Zero bytes fill the gaps. Nothing reads past the end.
+
+### How EZ-Flash's loader installs it
+
+From a disassembly of `DE.BIN` (the loader, 13444 bytes, SHA-1 `0c13deff…2217`; the main
+routine is at `0x08001A18`, its flash code is copied to IWRAM from `0x08003094`):
+
+- At power-on it reads the keys. **R not held:** if the word at `0x08040000` (chip
+  `0x40000`, the kernel's start; ROM page `0x8000`) is `0xEA00002E` (the GBA header's
+  branch), it sets ROM page `0x8002` and starts the kernel; otherwise it shows
+  `No_Kernel_found!` and how to update. That word is the only thing it checks.
+- **R held** (`EZ-FLASH UPDATE MODE`): it mounts the card (FAT32 or exFAT), opens
+  `/ezkernelnew.bin`, and takes **min(file size, `0x300000`)**: a file over 3 MB is
+  installed cut short. It reads the NOR ID and stops with `Bad NOR ID` unless it is
+  `0x2210` (S29GL064A, boot sectors) or `0x2202` (S29PL064J); a uniform-sector GL064A
+  (`0x220C`) can't be updated.
+- Then, for each 64 KB block of the file from offset 0: read the block into EWRAM
+  `0x02000000` (the last one: what's left), **erase one sector** at chip `0x40000 + offset`
+  (command `0x30` at `0x08040000 + offset`), and program it: the PL064J word by word for the
+  whole 64 KB (the last block's bytes past the file's end are whatever the buffer held),
+  the GL064A through its 32-byte write buffer for the block (the last: what's left plus
+  32, rounded down to 32 bytes). Then
+  `Reboot...` and the check above.
+- So it writes chip `0x40000` up to the file's size rounded up to 64 KB, and nothing else:
+  for Torii's file chip `0x40000–0x20FFFF` (window `0x000000–0x1CFFFF`, 29 sectors; the
+  official file's 40 sectors reached window `0x27FFFF`). The highest it can ever reach is
+  window `0x2FFFFF`, far below the kernel's data sectors (`0x780000`) and the boot loader
+  (`0x7C0000`).
+
+Consequences of the smaller file: the sectors after it (window `0x1D0000–0x27FFFF`) keep
+what the previous kernel left there, such as the old LX16 bitstream at `0x200000`. Nothing
+reads them: the kernel reads only its own layout's addresses, `FW_update` CRC-checks exactly
+the bytes it then sends, and any later install (an older Torii or EZ-Flash's 1.06) rewrites
+every sector it needs. A power cut during the install leaves a half-written kernel either
+way, as before. The emulated cart installs the file the same way (whole 64 KB sectors, at
+most 3 MB, the rest of `kernel-nor.bin` as it was).
 
 ## 2. FPGA bitstreams (parsed with `tools/spartan6_bitstream.py`)
 
@@ -136,6 +195,14 @@ fetches in SD mode.
   goes through RAM. Where a PSRAM write lands in SD mode isn't known, so the
   emulated cart stops with status 77 on one (`OMEGA_SD_PSRAM_WRITES=allow`
   lets it run on).
+  A DMA from cart space (the kernel's ROM) into PSRAM doesn't reach its
+  target on the real cart: a 6-byte DMA3 from a `const` array in ROM left
+  the target halfwords unchanged (Diagnostics' unit tests, 2026-10-19),
+  while the same from EWRAM works. Observed only that; the likely cause is
+  that source and destination share the cart's one bus and address latch,
+  so the writes may land elsewhere rather than nowhere. `psram_write`
+  refuses sources in cart space, and the emulated cart drops such writes
+  (with a warning on stderr), so tests catch it.
 - **SRAM / flash-save emulation:** `0x0E000000`, paged by `0x09C00000`; `Bank_Switching` uses
   the flash-save command sequence `0x5555=AA, 0x2AAA=55, 0x5555=B0, 0x0000=bank`.
 - **RTC and rumble:** standard GBA cart GPIO at `0x080000C4` (data), `0xC6` (dir), `0xC8` (enable),
@@ -193,6 +260,12 @@ fetches in SD mode.
 The FPGA writes its own config SPI flash, so the GBA can never reach the flash directly.
 If an update fails, the cart is bricked. That's why EZRecovery exists.
 
+The last page goes past the bitstream (`0x535BC` and `0x716A0` aren't multiples of 256),
+so the update also writes the image's next `0x44` (LX9) or `0x60` (LX16) bytes; Torii's
+layout keeps the official ones there. The emulated cart answers `Read_FPGA_ver` with
+`OMEGA_FPGA_VERSION` (default `B007`) and, when that is set, keeps the FPGA's flash in
+`fpga-flash.bin` (2 MB), written a page per `SPI_Write_Enable` (`tests/fw_update.sh`).
+
 ## 4. Memory map and game launch
 
 Worked out from the kernel source and confirmed by booting the kernel on the
@@ -233,7 +306,10 @@ While SD control is 3 the port returns status; `0xEEE1` means busy.
    parameters. The RTS file's table goes at `+0x300`.
 2. `Send_FATbuffer` writes the table to the port with buffer control 1, then
    sets buffer control 3. In load mode the FPGA copies the file into PSRAM and
-   the port reads non-zero, then not 1, when done.
+   the port reads non-zero, then not 1, when done. The kernel spins on the
+   port (IWRAM code) the whole time, so it can't move a progress bar during
+   the copy: the launch's bar stands at its "Loading the game" step until the
+   copy ends (source/progress.h).
 3. With patches enabled the kernel loads the ROM itself through the PSRAM
    window instead, patching each 128 KB block on the way.
 4. `SetRompageWithHardReset(0x200)` maps PSRAM at `0x08000000` and soft-resets
@@ -372,7 +448,7 @@ them for bytes) and a bricked cart (2026-10-18):
 |---|---|---|
 | `0x000000–0x00FFFF` | `0x7C0000–0x7CFFFF` | EZ-Flash's boot loader (ROM page `0x8000` shows it at `0x08000000`) |
 | `0x010000–0x03FFFF` | `0x7D0000–0x7FFFFF` | unused |
-| `0x040000–…` | `0x000000–…` | the kernel (`ezkernelnew.bin`: 2.44 MB with its images; the PDF allows 2 MB) |
+| `0x040000–…` | `0x000000–…` | the kernel (`ezkernelnew.bin`: 1.79 MB since F5, 2.44 MB before; the PDF allows 2 MB, the loader installs at most 3 MB) |
 | `0x7C0000–0x7FFFFF` | `0x780000–0x7BFFFF` | the kernel's data: Torii's NOR list copy B, save info, NOR list, settings |
 
 The chip is 8 MB and the window too, so the window's last 256 KB wrap onto

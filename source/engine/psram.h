@@ -37,13 +37,22 @@ static inline int psram_holds(const void *p, u32 bytes)
 	return a >= PSRAM_WINDOW && bytes <= PSRAM_WINDOW_BYTES && a - PSRAM_WINDOW <= PSRAM_WINDOW_BYTES - bytes;
 }
 
+// 1 if p is in cart space (ROM, PSRAM, NOR: 0x08000000 to 0x0DFFFFFF).
+static inline int psram_cart_space(const void *p)
+{
+	return (u32)p - 0x08000000u < 0x06000000u;
+}
+
 // Selects the asset page (SetPSRampage, once per batch of writes).
 void psram_begin(void);
 // Copies bytes (rounded up to halfwords) from RAM to PSRAM at dst, at the
 // slow WAITCNT, with DMA3 in 1 KB pieces so a VBlank IRQ waits at most a few
-// lines. dst must be in the window and src and dst halfword-aligned; a bad
-// call writes nothing and logs why (0), so a stray address never reaches
-// the cart.
+// lines. dst must be in the window, src in RAM (not cart space: on the cart
+// a DMA from the kernel's ROM into PSRAM misses its target, probably as
+// source and destination share the cart's bus; copy const data to RAM
+// first), and both
+// halfword-aligned; a bad call writes nothing and logs why (0), so a stray
+// address never reaches the cart.
 int psram_write(void *dst, const void *src, u32 bytes);
 
 #endif

@@ -581,6 +581,8 @@ void ui_dim_set_minutes(u32 minutes);
 // The same in frames, for tests and demos.
 void ui_dim_set_frames(u32 frames);
 int ui_dimmed(void);
+// Frames since a key was last held.
+u32 ui_idle_frames(void);
 // The DIM setting from the kernel NOR (settings slot assress_dim): idle
 // minutes, 1-60; 0 (off) for anything else, the erased slot included.
 u32 ui_dim_setting(void);

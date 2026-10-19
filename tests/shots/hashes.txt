@@ -2,13 +2,14 @@
 # SCENARIO/KEY HASH: the key frame tests/shots/png/SCENARIO.KEY.png shows.
 # SCENARIO/frames FIRST-LAST HASH: frames of a -H range (counted from 0)
 # that all hash the same.
-boot/screen 7A7B71CE01BB114C
+boot/screen 2F699359A5731225
 boot-progress/screen 8A9B3222959885A1
+boot-progress-big/loading 7868AEBC12088DD1
 cheats/screen 063A1B234EA6DC79
 cheats-long/screen 50CC9D4DE1FE8EC1
 cheats-long/scrolled B9FCA1EEBABF43C5
 cheats-many/back C78CF12FFC50B7D4
-cheats-many/menu A4A48C5055E5D3F3
+cheats-many/menu D37E84197BA8C3E0
 cheats-many/moved ACF06BAA67A24475
 cheats-many/paged 322CB8381C0A9591
 cheats-many/picked BE302E9402E3CA48
@@ -48,251 +49,78 @@ cover-demo/frames 30-30 23A2E3B708CF46A1
 cover-demo/frames 31-32 3CCAC1492B95FF7A
 diag-renderer/demo CFABCE035BEAC9FD
 diag-start/screen 3162F4422A6557C5
-file-menu/screen C268870729D04F01
-help/screen FF8D788BD1ABB79C
+file-menu/screen 2BC422F470DDF7F3
+help/screen FD71702F76BB10E0
 nor-list/screen B41DDB1AFEB55DC1
+nor-write/done 8DE07CA2EAFDF0C4
+nor-write/half C04FD0A7B7D4B370
 recent/screen 672BEF507A1E554D
 sd-deep/held DADD3FA9E4F41079
 sd-deep/paged 1F9A20893381FF91
 sd-delete/kept 5CB316715377D608
-sd-delete/screen FED78DD619FDCC6C
+sd-delete/screen 18920185BB37BAA4
 sd-list/screen 34EED145D7C6A8C0
-sd-long/menu 3597AA9093EE34C7
+sd-long/menu D9F54562E74ACFE3
 sd-long/scrolled 932B53789E40D384
 sd-long/start D4C21CE5469167D4
-sd-scroll/scrolled 818F72FFC7BF6260
+sd-scroll/scrolled A8266BC030B94860
 sd-scroll/start 818F72FFC7BF6260
-sd-scroll/frames 0-33 818F72FFC7BF6260
-sd-scroll/frames 34-34 F451021FDA885AA0
-sd-scroll/frames 35-35 7B4CC8CCD14A7618
-sd-scroll/frames 36-36 302E62567D1ABB80
-sd-scroll/frames 37-37 BADE9840B7F8A4D8
-sd-scroll/frames 38-38 1E339A125859F338
-sd-scroll/frames 39-39 EA114C7C35829870
-sd-scroll/frames 40-40 91919F3DE27E3E98
-sd-scroll/frames 41-41 38E3E0FC7AF827E0
-sd-scroll/frames 42-42 3CFCF0018ED978E8
-sd-scroll/frames 43-43 43463663576F11E8
-sd-scroll/frames 44-44 78B5E632AA63E750
-sd-scroll/frames 45-45 04F58AF2D7836C00
-sd-scroll/frames 46-46 D710F4F969981370
-sd-scroll/frames 47-47 D2409686CDD88510
-sd-scroll/frames 48-48 EA73A2767A220AD8
-sd-scroll/frames 49-49 278556D711DBE138
-sd-scroll/frames 50-50 C8E014A7C2FA6E08
-sd-scroll/frames 51-51 B279B77DC2856700
-sd-scroll/frames 52-52 1EF409CA7C6A0E40
-sd-scroll/frames 53-53 0E42AD38C5B4B318
-sd-scroll/frames 54-54 6BAF27EF5883ECF8
-sd-scroll/frames 55-114 A8266BC030B94860
-sd-scroll/frames 115-119 818F72FFC7BF6260
-sd-theme-menus/dialog A36B142F20F61DF0
-sd-theme-menus/file-menu 88CD9C871C0077EE
+sd-scroll/frames 0-39 818F72FFC7BF6260
+sd-scroll/frames 40-40 F451021FDA885AA0
+sd-scroll/frames 41-41 7B4CC8CCD14A7618
+sd-scroll/frames 42-42 302E62567D1ABB80
+sd-scroll/frames 43-43 BADE9840B7F8A4D8
+sd-scroll/frames 44-44 1E339A125859F338
+sd-scroll/frames 45-45 EA114C7C35829870
+sd-scroll/frames 46-46 91919F3DE27E3E98
+sd-scroll/frames 47-47 38E3E0FC7AF827E0
+sd-scroll/frames 48-48 3CFCF0018ED978E8
+sd-scroll/frames 49-49 43463663576F11E8
+sd-scroll/frames 50-50 78B5E632AA63E750
+sd-scroll/frames 51-51 04F58AF2D7836C00
+sd-scroll/frames 52-52 D710F4F969981370
+sd-scroll/frames 53-53 D2409686CDD88510
+sd-scroll/frames 54-54 EA73A2767A220AD8
+sd-scroll/frames 55-55 278556D711DBE138
+sd-scroll/frames 56-56 C8E014A7C2FA6E08
+sd-scroll/frames 57-57 B279B77DC2856700
+sd-scroll/frames 58-58 1EF409CA7C6A0E40
+sd-scroll/frames 59-59 0E42AD38C5B4B318
+sd-scroll/frames 60-60 6BAF27EF5883ECF8
+sd-scroll/frames 61-119 A8266BC030B94860
+sd-theme-menus/dialog 1BA10065BD81C17C
+sd-theme-menus/file-menu 53E8845BB4D19DBE
 sd-theme-menus/kept 78C37A96E08CB9A9
 sd-theme-menus/list 795D672AB1E0F14A
-sd-theme-wall/dialog 0842657D44235024
+sd-theme-wall/dialog E68F68D7F481490E
 sd-theme-wall/kept 0969DFACF8A353B3
 sd-theme-wall/list C0CB12E6BB3CC753
 settings-held/held-l 0CA5C0696DB712FC
 settings-held/held-r 0CA5C0696DB712FC
-settings-light/help 23A913E73883ED51
+settings-led/edit 780E60240DD4DC4E
+settings-led/saved 2DD464C96878975E
+settings-light/help 49552FEE0648E09D
 settings-light/screen 25BF7277EB3BBB08
 settings-sd-theme/again 7E1CFB4EE11082A8
 settings-sd-theme/theme F261CF6429EF81B4
 settings1/back B41DDB1AFEB55DC1
 settings1/screen 0CA5C0696DB712FC
 settings2/screen 055FC38099E617EE
-tr-deeper/games-in EC49937E75087FF6
-tr-deeper/recent 672BEF507A1E554D
-tr-deeper/root-back 87D202DFB0E19999
-tr-deeper/sd 34EED145D7C6A8C0
-tr-deeper/frames 0-1 F7E40BE7DBC25590
-tr-deeper/frames 2-2 00D333FB66A07014
-tr-deeper/frames 3-3 7A1A509F987B29A6
-tr-deeper/frames 4-5 7B90E77090ED8325
-tr-deeper/frames 6-6 EC49937E75087FF6
-tr-deeper/frames 7-7 19F63F4DA9319D39
-tr-deeper/frames 8-8 54CAA0FE471DEBFC
-tr-deeper/frames 9-9 C856A9FFD2C704BA
-tr-deeper/frames 10-10 72D3F650AF9333CB
-tr-deeper/frames 11-20 71ECE925DE039DC4
-tr-deeper/frames 21-21 8B230CAE8688F0C0
-tr-deeper/frames 22-22 452FAE576DB458B6
-tr-deeper/frames 23-24 7B90E77090ED8325
-tr-deeper/frames 25-25 87D202DFB0E19999
-tr-deeper/frames 26-26 30BAD36DF70772BC
-tr-deeper/frames 27-27 C226DB75DEB43D1A
-tr-deeper/frames 28-28 E961E6C52FCD3682
-tr-deeper/frames 29-29 271E96756B90D58B
-tr-deeper/frames 30-31 7D031703A6F61C90
-tr-deeper/frames 32-39 F7E40BE7DBC25590
-tr-deeper/frames 40-40 00D333FB66A07014
-tr-deeper/frames 41-41 7A1A509F987B29A6
-tr-deeper/frames 42-43 7B90E77090ED8325
-tr-deeper/frames 44-44 31746E2439F898E5
-tr-deeper/frames 45-45 0064F5E3FE31AF2D
-tr-deeper/frames 46-46 6A833CD16788DEBD
-tr-deeper/frames 47-47 0016839771382945
-tr-deeper/frames 48-48 EAE5D8AB536B74F9
-tr-deeper/frames 49-58 672BEF507A1E554D
-tr-deeper/frames 59-59 302A11D48B054BA9
-tr-deeper/frames 60-60 F066458D17A0D8E5
-tr-deeper/frames 61-62 7B90E77090ED8325
-tr-deeper/frames 63-63 D04F30DF76B22C31
-tr-deeper/frames 64-64 30215BF077354D84
-tr-deeper/frames 65-65 2ED006D8C4C979BE
-tr-deeper/frames 66-66 B85931D6135A78C9
-tr-deeper/frames 67-67 D80E4D196BDABF9A
-tr-deeper/frames 68-69 5CA023B53FDBF7C0
-tr-deeper/frames 70-75 34EED145D7C6A8C0
-tr-leave/fading 392C0BDAEB1D3F2B
-tr-leave/progress 8A9B3222959885A1
-tr-leave/frames 0-1 4F47817065DDD361
-tr-leave/frames 2-2 392C0BDAEB1D3F2B
-tr-leave/frames 3-3 8859EF7BFC7AC10B
-tr-leave/frames 4-7 7C573B18E65FE325
-tr-leave/frames 8-8 7B90E77090ED8325
-tr-leave/frames 9-10 8A9B3222959885A1
-tr-menu/closing 52948E493E423F65
-tr-menu/dimming 9DAE717E072EB8CB
-tr-menu/menu D5E56E6C36BAC2F9
-tr-menu/menu-back DB75759B0AA2D6A9
-tr-menu/opening 5E5ECC662EA0EE2C
-tr-menu/frames 0-1 5CB316715377D608
-tr-menu/frames 2-2 FE50850A824BE260
-tr-menu/frames 3-3 0FEBC3504D4DC7A2
-tr-menu/frames 4-4 5E5ECC662EA0EE2C
-tr-menu/frames 5-5 4E35186E6C58C8E8
-tr-menu/frames 6-6 6E1DD5384F822094
-tr-menu/frames 7-7 2C6886B64FD334EF
-tr-menu/frames 8-8 9DAE717E072EB8CB
-tr-menu/frames 9-9 F36C7091F4926A33
-tr-menu/frames 10-10 1E54161F344F9795
-tr-menu/frames 11-22 C268870729D04F01
-tr-menu/frames 23-23 9465DC6F9FD6A7E3
-tr-menu/frames 24-24 61DF8E96F1E0477B
-tr-menu/frames 25-25 52948E493E423F65
-tr-menu/frames 26-26 E25EF4B27803BCFB
-tr-menu/frames 27-27 C7E7FACA432CCAD0
-tr-menu/frames 28-28 19A6C53293E98421
-tr-menu/frames 29-29 46414C1E89CDC187
-tr-menu/frames 30-30 5907267C478DCF68
-tr-menu/frames 31-35 5CB316715377D608
-tr-menu/frames 36-37 C8013271970DAF6C
-tr-menu/frames 38-38 EED6581D67ED9FAB
-tr-menu/frames 39-39 453DA4C303892FFB
-tr-menu/frames 40-41 7C573B18E65FE325
-tr-menu/frames 42-42 B4BA622ECC9773B6
-tr-menu/frames 43-43 F45C60B6963F1198
-tr-menu/frames 44-44 BC5F5FBC0980F549
-tr-menu/frames 45-45 0B217B9585F6E05F
-tr-menu/frames 46-46 C1C5ED227DDAE3BC
-tr-menu/frames 47-62 063A1B234EA6DC79
-tr-menu/frames 63-63 290D7DFAF68A6B5C
-tr-menu/frames 64-64 4E1D30ACFD3FF1BD
-tr-menu/frames 65-66 7B90E77090ED8325
-tr-menu/frames 67-67 AE46101BF0C1FC36
-tr-menu/frames 68-68 000C36F2A9B461B7
-tr-menu/frames 69-69 DB75759B0AA2D6A9
-tr-menu/frames 70-70 69276138FD261C2F
-tr-menu/frames 71-71 FD3D8CEECCC41118
-tr-menu/frames 72-72 4450E29D2A30B58F
-tr-menu/frames 73-73 9B4A4002A08025C7
-tr-menu/frames 74-74 257375D51094BB37
-tr-menu/frames 75-75 056A863AD80DD2CD
-tr-menu/frames 76-79 D5E56E6C36BAC2F9
-tr-tab/nor-in 7B90E77090ED8325
-tr-tab/sd 34EED145D7C6A8C0
-tr-tab/sd-out 04B868B5E139156D
-tr-tab/settings2-back C518D5B669513E49
-tr-tab/settings2-in 458F886AA66347C5
-tr-tab/frames 0-1 34EED145D7C6A8C0
-tr-tab/frames 2-2 04B868B5E139156D
-tr-tab/frames 3-3 9B16C7C1303F73F7
-tr-tab/frames 4-6 7B90E77090ED8325
-tr-tab/frames 7-7 AEEB7123326CD0E9
-tr-tab/frames 8-8 BC5CAF1EFF0F3231
-tr-tab/frames 9-9 42ECFE6D75EF0879
-tr-tab/frames 10-10 35359432C7D1BDF5
-tr-tab/frames 11-11 3B40C7AFF59C2F0D
-tr-tab/frames 12-20 B41DDB1AFEB55DC1
-tr-tab/frames 21-21 0C8CABFC562B6029
-tr-tab/frames 22-22 EF2931957EB717F5
-tr-tab/frames 23-24 7B90E77090ED8325
-tr-tab/frames 25-25 0A59EF3A7FAD4BE5
-tr-tab/frames 26-26 FF889BEB5F444E73
-tr-tab/frames 27-27 34D5BE94A9963CAB
-tr-tab/frames 28-28 63C28204698F7FA0
-tr-tab/frames 29-29 F034BD75281953AF
-tr-tab/frames 30-39 0CA5C0696DB712FC
-tr-tab/frames 40-40 4775F4C6C3A787F9
-tr-tab/frames 41-41 4A74544CCBED010B
-tr-tab/frames 42-43 7B90E77090ED8325
-tr-tab/frames 44-44 458F886AA66347C5
-tr-tab/frames 45-45 032E4D81D8A6E1CC
-tr-tab/frames 46-46 A030524E08A9052E
-tr-tab/frames 47-47 0C04576E39F92FB3
-tr-tab/frames 48-48 1896BCE399945740
-tr-tab/frames 49-58 055FC38099E617EE
-tr-tab/frames 59-59 721EF937B527C2B9
-tr-tab/frames 60-60 7D3B08ABC52F1F8C
-tr-tab/frames 61-62 7B90E77090ED8325
-tr-tab/frames 63-63 FC3266F603597FC4
-tr-tab/frames 64-64 84E51C1645BD1EA3
-tr-tab/frames 65-65 B3EB4F280F794CC1
-tr-tab/frames 66-66 CF33CB0DA522FB3D
-tr-tab/frames 67-67 5CD7548985E47311
-tr-tab/frames 68-77 FF8D788BD1ABB79C
-tr-tab/frames 78-78 C2A276C164B61DB2
-tr-tab/frames 79-79 DFCD86AD73706D14
-tr-tab/frames 80-81 7B90E77090ED8325
-tr-tab/frames 82-82 C518D5B669513E49
-tr-tab/frames 83-83 EA20BA76FD12581D
-tr-tab/frames 84-84 A710B4B870D737DA
-tr-tab/frames 85-85 DC858E67400F83D7
-tr-tab/frames 86-86 402B21B8733A4E28
-tr-tab/frames 87-88 2446C1FB4CA5705E
-tr-tab/frames 89-94 055FC38099E617EE
-tr-tab/frames 95-96 0CA5C0696DB712FC
-tr-tab/frames 97-97 78660AC616365D4D
-tr-tab/frames 98-98 68BCA822AF37E8FC
-tr-tab/frames 99-101 7B90E77090ED8325
-tr-tab/frames 102-102 71E4B39A44BE8B2C
-tr-tab/frames 103-103 59FE7609D1F93788
-tr-tab/frames 104-104 ED05983AA5FB2469
-tr-tab/frames 105-105 6BD8A418862B49F5
-tr-tab/frames 106-106 3701876DD53D59F5
-tr-tab/frames 107-108 1CF39FD70A3E16C1
-tr-tab/frames 109-115 B41DDB1AFEB55DC1
-tr-tab/frames 116-116 2D3236436B878101
-tr-tab/frames 117-117 0E73B4539F67262E
-tr-tab/frames 118-119 7B90E77090ED8325
-tr-tab/frames 120-120 B29C216BD6A4B164
-tr-tab/frames 121-121 8515523C4647CC29
-tr-tab/frames 122-122 26960D68EEF984F1
-tr-tab/frames 123-123 1D296352017DAC81
-tr-tab/frames 124-124 E95AD594D454F459
-tr-tab/frames 125-126 80379FC0BE72B7C0
-tr-tab/frames 127-132 34EED145D7C6A8C0
 ui-dialog/closed 7B29AF95A30A3BB1
-ui-dialog/dialog 3B8B21C843BFA15F
+ui-dialog/dialog 3FA6B2F8C249F938
 ui-dialog/grid 5A3482184C6909F7
 ui-dialog/grid-moved 2EDED34FBF0528AF
 ui-dialog/frames 0-0 7B29AF95A30A3BB1
-ui-dialog/frames 1-1 9998427C57EAF7C5
-ui-dialog/frames 2-2 45F748F5088B1B21
-ui-dialog/frames 3-3 87D4F3C1C24604B9
-ui-dialog/frames 4-4 8A00863D97052F15
-ui-dialog/frames 5-5 F10ADED97075FBAF
-ui-dialog/frames 6-6 5420DD81F4B2FA56
-ui-dialog/frames 7-7 9B2903EBC0E32001
-ui-dialog/frames 8-8 4BF1C4F923B63177
-ui-dialog/frames 9-9 053B75012DCE456B
-ui-dialog/frames 10-20 3B8B21C843BFA15F
+ui-dialog/frames 1-1 E858DC9BEEE0D3B2
+ui-dialog/frames 2-2 C6DE5B3B7BAB1ACB
+ui-dialog/frames 3-3 5420DD81F4B2FA56
+ui-dialog/frames 4-4 9DAE22A8534474FA
+ui-dialog/frames 5-6 186B0690AED83C10
+ui-dialog/frames 7-20 3FA6B2F8C249F938
 ui-list/held-r 60593C7A91F9705C
 ui-list/marquee 121FE297E2817E25
 ui-list/paged B696DCE470FC0855
-ui-list/queued-a 7112B1A05DBB0F1F
+ui-list/queued-a 441A0F1EDCE09468
 ui-list/queued-l CA4171B44C9580B1
 ui-list/screen C3A0441DFBE90A84
 ui-list/wrapped 409C4C58BBE18D59
@@ -328,7 +156,7 @@ ui-list/frames 49-49 E06A67B440CE3AC9
 ui-list/frames 50-50 9AE783DD021EDAE1
 ui-list/frames 51-51 7FF58B05C5869675
 ui-list/frames 52-53 46AD62F62A89A7DD
-ui-sd-theme/dialog 60F3988923065A51
+ui-sd-theme/dialog FC0221C7401B81E5
 ui-sd-theme/list A3A189B9FCADEF84
 ui-theme/awake ECFA426BD367A550
 ui-theme/dimmed 0742C6ED47A9035E

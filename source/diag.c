@@ -210,13 +210,6 @@ static void screen_open(void)
 	screen_push();
 }
 
-static void screen_close(void)
-{
-	ui_shutdown();
-	dialog_blank();  // the registers as the unit tests expect them, on a black screen
-	scr.view = 0;
-}
-
 static void screen_title(const char *title)
 {
 	snprintf(scr.title, sizeof(scr.title), "DIAGNOSTICS: %s", title);
@@ -449,14 +442,29 @@ static void step_info(void)
 	pause_frames(60);
 }
 
-// The unit tests reset the engine (pools, shadow state, motions), so the
-// screen goes away while they run and comes back as it was.
+// Leaves the page on screen while the unit tests run, for the seconds they
+// take: they reset the engine (pools, shadow state, motions) but write only
+// sprite VRAM from 0x06014000, OAM and the sprite palette (tests/kernel),
+// never BG VRAM, the BG palette or DISPCNT. So with sprites off the page's
+// backgrounds stay as they are. The engine's state is dropped, not shut down
+// (ui_shutdown would queue changes to the page's VRAM); screen_open starts
+// it again.
+static void screen_hold(void)
+{
+	VBlankIntrWait();
+	*(vu16 *)0x04000000 &= ~0x1000;  // DISPCNT: sprites off
+	scr.view = 0;
+}
+
+// The unit tests reset the engine, so the page holds still while they run
+// (screen_hold) and comes back as it was.
 static void step_unit_tests(void)
 {
 	step("unit tests");
 	say(WHITE, "running the kernel's unit tests...");
-	pause_frames(2);  // shown before the screen goes
-	screen_close();
+	say(WHITE, "(the screen holds still for about 5 s)");
+	pause_frames(30);  // shown, faded in, before the engine stops
+	screen_hold();
 	int failed = torii_unit_tests();
 	screen_open();
 	say(failed ? RED : GREEN, "%d unit tests failed (see the log)", failed);
@@ -542,7 +550,7 @@ static void step_nor(void)
 	u32 a = crc32((u8 *)0x08000000, size), b = crc32((u8 *)0x08000000, size);
 	say(WHITE, "kernel CRC %08lX twice: %s", (unsigned long)a, a == b ? "same" : "DIFFERENT");
 	result(a == b, "kernel NOR reads the same twice");
-	// The FPGA images in the upgrade file have known CRCs (ez_define.h).
+	// The FPGA images in the upgrade file have known CRCs (image_layout.h).
 	u32 lx9 = crc32((u8 *)LX9_newomega_top_bin_address, LX9_newomega_top_bin_size);
 	u32 lx16 = crc32((u8 *)LX16_newomega_top_bin_address, LX16_newomega_top_bin_size);
 	say(WHITE, "FPGA image CRCs %08lX %08lX", (unsigned long)lx9, (unsigned long)lx16);
@@ -571,8 +579,13 @@ static void step_loader(void)
 	title[16] = 0;
 	say(whole ? WHITE : RED, "boot loader CRC %08lX, %s", (unsigned long)crc, loader_state_name(state));
 	if (whole) {
-		tlog("diag: boot loader title %.12s, code %.4s, %s", title, title + 12,
-		     de_bin ? "EZ-Flash's DE.BIN" : "not DE.BIN (another loader version?)");
+		// DE.BIN's header has no title or code: zeros
+		if (title[0] || title[12])
+			tlog("diag: boot loader title %.12s, code %.4s, %s", title, title + 12,
+			     de_bin ? "EZ-Flash's DE.BIN" : "not DE.BIN (another loader version?)");
+		else
+			tlog("diag: boot loader with a blank title and code, %s",
+			     de_bin ? "EZ-Flash's DE.BIN (it has none)" : "not DE.BIN (another loader version?)");
 	} else {
 		tlog_error("diag: the boot loader is %s: the cart will start in EZ-Flash's safe mode at the next "
 			   "power-on (docs/recovery.md)",
@@ -672,17 +685,17 @@ static void step_timing(void)
 	// The glyph's time is the renderer step's now (diag_render.c)
 
 	// BIOS LZ77: 16 KB of the official SD list's background picture, which
-	// image.bin still holds at 0x08117890 though nothing draws it now: the
-	// same data as before, so the figure compares with older reports.
+	// the upgrade file keeps for this (image_layout.h): the same data as
+	// before, so the figure compares with older reports.
 	u8 *packed = pReadCache, *out = pReadCache + 0x8000;
-	const u8 *picture = (const u8 *)0x08117890;
-	u32 packed_size = lz77_compress(picture, 0x4000, packed);
+	const u8 *picture = (const u8 *)LZ77_SAMPLE_address;
+	u32 packed_size = lz77_compress(picture, LZ77_SAMPLE_size, packed);
 	diag_timer_start();
 	LZ77UnCompWram(packed, out);
 	u32 lz_cycles = diag_timer_stop();
-	int lz_ok = memcmp(out, picture, 0x4000) == 0;
-	say(lz_ok ? WHITE : RED, "LZ77 to WRAM: %lu KB/s (from %lu B)", (unsigned long)kb_per_s(0x4000, lz_cycles),
-	    (unsigned long)packed_size);
+	int lz_ok = memcmp(out, picture, LZ77_SAMPLE_size) == 0;
+	say(lz_ok ? WHITE : RED, "LZ77 to WRAM: %lu KB/s (from %lu B)",
+	    (unsigned long)kb_per_s(LZ77_SAMPLE_size, lz_cycles), (unsigned long)packed_size);
 	result(lz_ok, "BIOS LZ77 gives back the data");
 
 	// SD reads: 256 KB of raw sectors from the card's start.

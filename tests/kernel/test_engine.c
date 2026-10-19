@@ -1,9 +1,10 @@
 // The engine core (source/engine): allocators, the VRAM queue's caps, the
 // shadow state's commit, jobs within a budget, the cycle counter.
 //
-// These run in every kernel's Diagnostics too, with its screen down (the
-// engine shut down, a black screen: dialog_blank): they touch only sprite
-// VRAM past 0x06014000, OAM and the sprite palette, never DISPCNT, and leave
+// These run in every kernel's Diagnostics too, with its page held on screen
+// (the engine's state dropped, sprites off): they touch only sprite VRAM
+// past 0x06014000, OAM and the sprite palette, never DISPCNT or BG VRAM
+// (BG0CNT's mosaic bit only, which shows nothing, and set back), and leave
 // the engine's state reset (engine shadow state not dirty, pools empty), as
 // Diagnostics starts its screen again after them.
 #include <string.h>
@@ -370,27 +371,37 @@ void test_engine_cycles(void)
 void test_engine_hold_for_queue(void)
 {
 	engine_quiet(1);
-	vu16 *winin = (vu16 *)0x04000048;  // readable, and cleared while no screen is up
-	u16 kept = *winin;
+	// The BG control registers: readable, unlike the windows' sizes, so the
+	// shadow can start from what Diagnostics' page (on screen while the
+	// tests run) has, and get it back. The change is BG0's mosaic bit, which
+	// shows nothing with the mosaic size at 1 (MOSAIC 0)
+	vu16 *bgcnt = (vu16 *)0x04000008;
+	u16 kept[4];
+	for (u32 i = 0; i < 4; i++) {
+		kept[i] = bgcnt[i];
+		gfx_set_bgcnt(i, kept[i]);
+	}
+	gfx_dirty_regs = 0;
 	CHECK(gfx_queue_copy(TEST_VRAM, (const void *)0x08000000, 2048));
-	gfx_set_win(4, kept ^ 0x3F);
-	gfx_hold_for_queue(GFX_DIRTY_WIN);
+	gfx_set_bgcnt(0, kept[0] ^ 0x40);
+	gfx_hold_for_queue(GFX_DIRTY_BGCNT);
 	gfx_commit_max_bytes = 1024;  // the queue takes two commits
 	wait_vblank_start();
 	gfx_commit();
-	CHECK_EQ(*winin, kept);
-	CHECK_EQ(gfx_dirty_regs, GFX_DIRTY_WIN);
+	CHECK_EQ(bgcnt[0], kept[0]);
+	CHECK_EQ(gfx_dirty_regs, GFX_DIRTY_BGCNT);
 	CHECK(!frame_idle());
 	wait_vblank_start();
-	gfx_commit();  // the queue empties, then the held window goes
+	gfx_commit();  // the queue empties, then the held registers go
 	CHECK_EQ(gfx_queue_len(), 0);
-	CHECK_EQ(*winin, kept ^ 0x3F);
+	CHECK_EQ(bgcnt[0], kept[0] ^ 0x40);
+	CHECK_EQ(bgcnt[1], kept[1]);
 	CHECK_EQ(gfx_dirty_regs, 0);
 	CHECK_EQ(gfx_hold_regs, 0);
 	// Without queued work a hold changes nothing
-	gfx_set_win(4, kept);
-	gfx_hold_for_queue(GFX_DIRTY_WIN);
+	gfx_set_bgcnt(0, kept[0]);
+	gfx_hold_for_queue(GFX_DIRTY_BGCNT);
 	gfx_commit();
-	CHECK_EQ(*winin, kept);
+	CHECK_EQ(bgcnt[0], kept[0]);
 	engine_quiet(0);
 }
