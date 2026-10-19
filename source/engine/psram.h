@@ -48,8 +48,9 @@ void psram_begin(void);
 // Copies bytes (rounded up to halfwords) from RAM to PSRAM at dst, at the
 // slow WAITCNT, with DMA3 in 1 KB pieces so a VBlank IRQ waits at most a few
 // lines. dst must be in the window, src in RAM (not cart space: on the cart
-// a DMA from the kernel's ROM into PSRAM writes nothing, as source and
-// destination share the cart's bus; copy const data to RAM first), and both
+// a DMA from the kernel's ROM into PSRAM misses its target, probably as
+// source and destination share the cart's bus; copy const data to RAM
+// first), and both
 // halfword-aligned; a bad call writes nothing and logs why (0), so a stray
 // address never reaches the cart.
 int psram_write(void *dst, const void *src, u32 bytes);
