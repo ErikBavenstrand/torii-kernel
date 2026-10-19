@@ -33,18 +33,9 @@ Fixed with tests on main, from `b9c9245` to `b6687ea`. `CHANGELOG.md` has the de
 
 Still open from the bug work:
 
-- **EEPROM sizes:** settled, no change needed. FlashGBX's cart-dump database (`db_AGB.json`
-  in `res/config.zip`) lists 941 table entries marked 0x22 (EEPROM 8K) as 512-byte EEPROM,
-  plus 9 marked 0x23 and 6 marked 0x32 (Flash 64K). The real cart decides the address width
-  per request, so 8K mode takes these games' 6-bit requests and their saves stay in the first
-  512 bytes (`docs/research/cart-test-2026-10-18b.md`). The 0x23 and 0x32 entries are
-  unchecked, and Doom and Gauntlet stay EEPROM 512.
-- **Hook coverage:** done. `just compat` has an in-game menu column; all 118 commercial
-  GBA games in the library pass (`docs/research/hook-coverage.md`). Four games get exact-ROM
-  patches for the EU dumps tested; other regions may need their own. The menu keeps the game's
-  brightness, but still resets the BG2 affine registers, which are write-only.
-- **Game NOR:** WRITE TO NOR now runs in the emulator (`tests/nor.sh`), which showed these
-  kernel bugs. Each one can lose or overwrite a NOR game:
+- ~~**EEPROM sizes:** settled, no change needed. FlashGBX's cart-dump database (`db_AGB.json` in `res/config.zip`) lists 941 table entries marked 0x22 (EEPROM 8K) as 512-byte EEPROM, plus 9 marked 0x23 and 6 marked 0x32 (Flash 64K). The real cart decides the address width per request, so 8K mode takes these games' 6-bit requests and their saves stay in the first 512 bytes (`docs/research/cart-test-2026-10-18b.md`). The 0x23 and 0x32 entries are unchecked, and Doom and Gauntlet stay EEPROM 512.~~
+- ~~**Hook coverage:** done. `just compat` has an in-game menu column; all 118 commercial GBA games in the library pass (`docs/research/hook-coverage.md`). Four games get exact-ROM patches for the EU dumps tested; other regions may need their own. The menu keeps the game's brightness, but still resets the BG2 affine registers, which are write-only.~~
+- ~~**Game NOR:** WRITE TO NOR now runs in the emulator (`tests/nor.sh`), which showed these kernel bugs. Each one can lose or overwrite a NOR game:~~
   - Fixed: `Read_S98NOR_ID` (`Ezcard_OP.c`) left the chip in ID mode, so the NOR list could
     read empty and the next write landed over the first game. It now writes `0xF0`.
   - Fixed in v0.2.1 (`tests/nor_safety.sh`, the list format in `omega-de-hardware.md`):
@@ -54,34 +45,22 @@ Still open from the bug work:
     `Save_NOR_info` emptied the list, and the next write went over the first game. A ROM
     without 0x96 at 0xB2 was written but never listed. The list now has two copies, games a
     completion mark, and the boot rebuilds a lost list from the marks.
-- **Non-ASCII names:** the list draws names by byte count, so CJK names start scrolling too
-  early, and a character split at the edge of the list shows as `?`. Names over 99 bytes
-  (about 34 CJK characters) show cut with `*` and "Name too long", and can't be opened. The
-  v0.3 file list fixes both.
-- **Clean boot:** IWRAM is still not fully cleared at launch, because the `SoftReset_now`
-  code stays there. No game is known to need it. Clean-boot tests use `tests/roms/idle`
-  (no crt0), since devkitARM's crt0 clears EWRAM itself.
+- ~~**Non-ASCII names:** the list draws names by byte count, so CJK names start scrolling too early, and a character split at the edge of the list shows as `?`. Names over 99 bytes (about 34 CJK characters) show cut with `*` and "Name too long", and can't be opened. The v0.3 file list fixes both.~~ Fixed by v0.3 (`5e1981c`).
+- ~~**Clean boot:** IWRAM is still not fully cleared at launch, because the `SoftReset_now` code stays there. No game is known to need it. Clean-boot tests use `tests/roms/idle` (no crt0), since devkitARM's crt0 clears EWRAM itself.~~ Fixed by v0.2.1.
 - **From the logging work:**
   - `Save_savefile` ignores short writes, and `Check_save_flag` ignores its result, so a
     nearly full card silently truncates a new save, e.g. 64 KB written as 32 KB (v0.5's
     crash-safe saving replaces it).
   - The in-game menu's LOAD with no saved state jumps to 0xFFFFFFFE.
-  - Fixed in v0.2.1: the kernel erased the NOR game table whenever it read the list as empty
-    (a chip left in a command mode or a read glitch), and the next WRITE TO NOR overwrote the
-    games. Reading the list now writes nothing, and a write reads it again first.
+  - ~~Fixed in v0.2.1: the kernel erased the NOR game table whenever it read the list as empty (a chip left in a command mode or a read glitch), and the next WRITE TO NOR overwrote the games. Reading the list now writes nothing, and a write reads it again first.~~
   - The `/torii` folder shows in the SD root list and moves games down a row (key scripts
     in compat may need an extra DOWN). v0.4 hides system folders.
-  - The log file sequence number doesn't handle overflow past 99999999 (only reachable with
-    crafted files).
+  - ~~The log file sequence number doesn't handle overflow past 99999999 (only reachable with crafted files).~~ Fixed by v0.2.1 (`7887069`).
   - Needs the real cart: whether cart RAM page 0xF0 survives a power cycle, which WAITCNT
     settings read correctly, how the FPGA answers EEPROM requests of each width, rumble at
     GPIO values 2 and 3 without the clock, whether an SD write right after the FPGA copies
     a game into PSRAM is safe, and what the BIOS does on an undefined instruction.
-- **Settings default:** done. The emulated kernel NOR already read 0xFFFF for settings that
-  were never written. The 0x0000 seen came from saves, which zero slots 65–255
-  (`tests/settings.sh`), and erased hotkey slots are now range-checked. Known slots: 13 is
-  CLOCK and 25 is RUMBLE; 23–24 were DS Style's reset and backup toggles, so leave them
-  unused.
+- ~~**Settings default:** done. The emulated kernel NOR already read 0xFFFF for settings that were never written. The 0x0000 seen came from saves, which zero slots 65–255 (`tests/settings.sh`), and erased hotkey slots are now range-checked. Known slots: 13 is CLOCK and 25 is RUMBLE; 23–24 were DS Style's reset and backup toggles, so leave them unused.~~
 
 ### Tooling (done)
 
@@ -270,28 +249,23 @@ recovery used on 2026-10-18.
 - Diagnostics reads the loader (read-only) and logs its CRC and state.
 - The release checklist keeps `DE.BIN` on the test card and tests NOR write and delete.
 
-## v0.3 Renderer
+## v0.3 Renderer (done)
+
+Released in v0.3.0, together with v0.3.1 and v0.3.2.
 
 The official menu was mode 3 (`SetMode(MODE_3 | BG2_ENABLE)`), drawn pixel by pixel in C.
 v0.3 replaces it with a mode 0 engine built to carry v0.4's UI; mode 3 and `draw.c` are gone. The design, the tickets,
 and every decision made along the way are in [v0.3-decisions.md](v0.3-decisions.md).
 
-- **Engine:** a fixed 60 fps loop with time-sliced jobs, shadow state committed in VBlank,
-  allocators for VRAM, palettes, sprites and affine matrices, and a layout budget checker.
-- **Text:** proportional glyphs drawn by an ARM blitter in IWRAM straight into VRAM tiles,
-  in palette-index colours. Lists scroll through the wrapping map with 16 px rows.
-- **Views:** a widget tree with a view stack, a focus model, and lists fed by a data source.
-  Layouts are data.
-- **Motion:** eased tweens for transitions, and springs for anything the user can interrupt.
-- **Input:** per-key repeat with a stepped speed-up.
-- **Covers:** decoded covers cached in PSRAM and streamed into sprites.
-- **Names:** cut and measured by UTF-8 character. Full names of any length are kept
-  outside EWRAM (for example a PSRAM index), so names over 99 bytes list, open, launch
-  and save.
-- **Look:** today's screens and keys, with two proportional fonts, light and dark themes,
-  and accent colours.
-- **Testing:** golden screenshots, a cycle budget per frame, and a renderer step in
-  Diagnostics that times the real cart.
+- ~~**Engine:** a fixed 60 fps loop with time-sliced jobs, shadow state committed in VBlank, allocators for VRAM, palettes, sprites and affine matrices, and a layout budget checker.~~
+- ~~**Text:** proportional glyphs drawn by an ARM blitter in IWRAM straight into VRAM tiles, in palette-index colours. Lists scroll through the wrapping map with 16 px rows.~~
+- ~~**Views:** a widget tree with a view stack, a focus model, and lists fed by a data source. Layouts are data.~~
+- ~~**Motion:** eased tweens for transitions, and springs for anything the user can interrupt.~~
+- ~~**Input:** per-key repeat with a stepped speed-up.~~
+- ~~**Covers:** decoded covers cached in PSRAM and streamed into sprites.~~
+- ~~**Names:** cut and measured by UTF-8 character. Full names of any length are kept outside EWRAM (for example a PSRAM index), so names over 99 bytes list, open, launch and save.~~
+- ~~**Look:** today's screens and keys, with two proportional fonts, light and dark themes, and accent colours.~~
+- ~~**Testing:** golden screenshots, a cycle budget per frame, and a renderer step in Diagnostics that times the real cart.~~
 
 The budget each layout is checked against (GBATEK, Tonc):
 
@@ -304,14 +278,11 @@ The budget each layout is checked against (GBATEK, Tonc):
   one mosaic size, and 2 rectangular windows plus the OBJ window.
 - **Free memory (2026-10-18):** 660 KB of ROM, 4.0 KB of IWRAM and 7.0 KB of EWRAM.
 
-## v0.3.1 Themes
+## v0.3.1 Themes (done)
 
-- **Theme format:** `themes/<name>/theme.ini` plus LZ77 assets. Its keys override the
-  compiled-in defaults one by one (palette, fonts, spacing, view layouts, icons) through a
-  bounded patch table. A missing key or asset falls back to the default theme.
-- **Tools:** a PNG converter for assets, and `just theme-check`, which validates a theme
-  against the budget and previews it in the emulator.
-- **Budget check:** the kernel rejects a theme over budget with a readable error.
+- ~~**Theme format:** `themes/<name>/theme.ini` plus LZ77 assets. Its keys override the compiled-in defaults one by one (palette, fonts, spacing, view layouts, icons) through a bounded patch table. A missing key or asset falls back to the default theme.~~
+- ~~**Tools:** a PNG converter for assets, and `just theme-check`, which validates a theme against the budget and previews it in the emulator.~~
+- ~~**Budget check:** the kernel rejects a theme over budget with a readable error.~~
 
 ## v0.3.2 Renderer fixes
 
