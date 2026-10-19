@@ -47,7 +47,8 @@ script (tests/games/<code>.keys) plays that script instead, saves in-game and
 is relaunched to save again; Pokémon generation 3 save counters must go up.
 
 Results go to dist/compat/runs/<time>.json and the report to
-dist/compat/index.html (tests/compat_report.py). Runs inside the torii-emu
+dist/compat/index.html (tests/compat_report.py); a failed game's carts are
+kept in dist/cart-games/. Runs inside the torii-emu
 container and reads ROMs only from roms/, where `just game-add` copies them.
 """
 
@@ -59,6 +60,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import tempfile
 import time
 import tomllib
 import zlib
@@ -69,7 +71,11 @@ KERNEL = "dist/ezkernelnew.bin"
 SHOT = "emu/build-linux/mgba-shot"
 ROMS = Path("roms")
 KEYS = Path("tests/games")
-CARTS = Path("dist/cart-games")
+# The games' carts, on the container's own disk: the emulator syncs the
+# memory-mapped cart files at each power-off, which takes about 0.5 s on the
+# virtiofs mount (tests/carts.sh). A failed game's carts are copied to KEPT.
+CARTS = Path(tempfile.gettempdir()) / "torii-compat-carts"
+KEPT = Path("dist/cart-games")
 REPORT = Path("dist/compat")
 INDEX = Path("dist/.fresh/rom-index.json")
 
@@ -613,7 +619,6 @@ def check_menu(result: Result, rom: Path, sd_name: str, table: dict) -> None:
         "pass",
         f"opened {opened - key_at} frames after the key; the game went on ({len(after)} screens)",
     )
-    shutil.rmtree(cart)  # a failing game's cart stays for debugging
 
 
 def run_game(result: Result, roms: dict, saves: dict, table: dict) -> None:
@@ -862,6 +867,10 @@ def main() -> int:
     left_out = sum(1 for g in games if g.get("skip"))
 
     def play(result: Result) -> None:
+        key = key_of(result.game)
+        carts = [CARTS / key, CARTS / f"{key}-menu"]
+        for cart in carts:
+            shutil.rmtree(KEPT / cart.name, ignore_errors=True)
         try:
             run_game(result, roms, saves, hooks)
         except Exception as e:  # noqa: BLE001 - one game going wrong must not stop the run
@@ -873,6 +882,10 @@ def main() -> int:
                         str(e) if isinstance(e, Failure) else f"runner error: {e!r}",
                     )
                     break
+        for cart in carts:
+            if cart.exists() and result.status == "fail":
+                shutil.copytree(cart, KEPT / cart.name)
+            shutil.rmtree(cart, ignore_errors=True)
         print(
             f"{result.status:7} {result.game['file'][:60]}", file=sys.stderr, flush=True
         )

@@ -5,8 +5,11 @@
 # screen means PocketNES runs it. Runs inside the torii-emu container after
 # `just build` and `just emu-headless`.
 set -euo pipefail
+# shellcheck source=tests/carts.sh
+. tests/carts.sh
+local_carts "dist/cart-nes${1:+-$1}"
 
-cart=dist/cart-nes
+cart=$carts/nes
 rm -rf "$cart"
 mkdir -p "$cart"
 

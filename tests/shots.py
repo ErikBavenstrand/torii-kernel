@@ -49,6 +49,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import tempfile
 import zlib
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -62,6 +63,10 @@ MANIFEST = SHOTS / "hashes.txt"
 PNGS = SHOTS / "png"
 RUNS = Path("dist/shots-run")
 FAILED = Path("dist/shots-failed")
+# The scenarios' carts, on the container's own disk: the emulator syncs the
+# memory-mapped cart files at each power-off, which takes about 0.5 s on the
+# virtiofs mount (tests/carts.sh)
+CARTS = Path(tempfile.gettempdir()) / "torii-shots-carts"
 SHOT = "emu/build-linux/mgba-shot"
 KERNEL = "dist/ezkernelnew.bin"
 TEST_KERNEL = "ezkerneltest.gba"
@@ -321,7 +326,8 @@ def scenario(name: str, sd: Path) -> Result:
     result = Result(name)
     out = RUNS / name
     shutil.rmtree(out, ignore_errors=True)
-    proc = boot(name, sd, out / "cart", out)
+    out.mkdir(parents=True)
+    proc = boot(name, sd, CARTS / name, out)
     (out / "log.txt").write_text(proc.stderr + proc.stdout, encoding="utf-8")
     for line in proc.stdout.splitlines():
         if m := re.fullmatch(r"frame (\d+) -> (\S+) \(hash ([0-9A-F]+)\)", line):
@@ -418,7 +424,14 @@ def diff_png(actual: Path, expected: Path, out: Path) -> int:
 def shot_at(result: Result, frame: int, path: Path, sd: Path) -> None:
     """Runs the scenario again for the screen at an absolute frame (an animation frame)."""
     again = RUNS / result.name / "again"
-    boot(result.name, sd, again / "cart", again, ["-s", f"{frame}:{path.resolve()}"])
+    again.mkdir(parents=True, exist_ok=True)
+    boot(
+        result.name,
+        sd,
+        CARTS / f"{result.name}-again",
+        again,
+        ["-s", f"{frame}:{path.resolve()}"],
+    )
 
 
 def check(results: list[Result], want: dict[str, str], sd: Path) -> list[str]:

@@ -10,9 +10,12 @@
 set -euo pipefail
 
 kernel=${KERNEL:-dist/ezkernelnew.bin}
-root=dist/cart-nor-safety
-rm -rf "$root"
-mkdir -p "$root"
+# shellcheck source=tests/carts.sh
+. tests/carts.sh
+# An argument N/M runs every Mth case from the Nth (shard_init)
+shard_init "${1:-}"
+local_carts "dist/cart-nor-safety${1:+-${1/\//of}}"
+root=$carts
 
 fail() {
   echo "FAIL: $case: $*" >&2
@@ -35,14 +38,14 @@ open(out, "wb").write(rom)
 EOF
 }
 
-# new_cart NAME FILE...: a cart with an erased game NOR and an SD card holding
-# /SAVER and the FILEs at the root (cart/FILE paths), listed as SAVER, A, B, C.
+# new_cart NAME FILE...: a cart with an erased game NOR (the emulator makes it,
+# filling what a test didn't write with 0xFF) and an SD card holding /SAVER
+# and the FILEs at the root (cart/FILE paths), listed as SAVER, A, B, C.
 new_cart() {
   case=$1
   shift
   cart=$root/$case
   mkdir -p "$cart"
-  head -c $((64 << 20)) /dev/zero | tr '\0' '\377' >"$cart/game-nor.bin"
   mkfs.fat -C -F 32 -n NOR "$cart/sd.img" 65536 >/dev/null
   mmd -i "$cart/sd.img" ::/SAVER
   local f
@@ -159,70 +162,80 @@ open(sys.argv[2], "wb").write(rom)
 EOF
 
 # A game whose header lacks 0x96 is listed, so the next write goes after it.
-new_cart unfixed U.gba B.gba
-write 2
-write 1
-holds 0 U.gba || fail "U.gba is not at 0"
-holds 0x20000 B.gba || fail "B.gba is not at 0x20000 (U.gba wasn't listed)"
-echo "PASS: a ROM without 0x96 at 0xB2 is listed and kept"
+if shard_case; then
+  new_cart unfixed U.gba B.gba
+  write 2
+  write 1
+  holds 0 U.gba || fail "U.gba is not at 0"
+  holds 0x20000 B.gba || fail "B.gba is not at 0x20000 (U.gba wasn't listed)"
+  echo "PASS: a ROM without 0x96 at 0xB2 is listed and kept"
+fi
 
 # Power cuts in each step of the NOR list update after B's data is written:
 # A and B stay, and C goes after them.
 for cut in kernel:erase:1@0x7A0000 kernel:program:1@0x7A0000 kernel:program:4240@0x7A0000 \
   kernel:erase:1@0x780000 kernel:program:1@0x780000 kernel:program:4240@0x780000; do
-  new_cart "list-cut-${cut//[:@]/-}" A.gba B.gba C.gba
-  write 1
-  write 2 "$cut"
-  write 3
-  holds 0 A.gba || fail "A.gba was overwritten"
-  holds 0x20000 B.gba || fail "B.gba is not at 0x20000"
-  holds 0x40000 C.gba || fail "C.gba is not at 0x40000"
-  echo "PASS: a power cut at $cut while saving the NOR list loses no game"
+  if shard_case; then
+    new_cart "list-cut-${cut//[:@]/-}" A.gba B.gba C.gba
+    write 1
+    write 2 "$cut"
+    write 3
+    holds 0 A.gba || fail "A.gba was overwritten"
+    holds 0x20000 B.gba || fail "B.gba is not at 0x20000"
+    holds 0x40000 C.gba || fail "C.gba is not at 0x40000"
+    echo "PASS: a power cut at $cut while saving the NOR list loses no game"
+  fi
 done
 
 # Delete latest asks first: B on the question keeps the game. A erases the
 # whole game and drops it from the list. A later write with the same
 # header, cut after its first block, is not listed.
-new_cart delete A.gba B.gba B2.gba C.gba
-write 1
-write 2
-# shellcheck disable=SC2046
-boot $(keys 100 R DOWN A DOWN A _ B) -f 400
-! erased 0x20000 0x20000 || fail "B on the delete question erased B.gba"
-# shellcheck disable=SC2046
-boot $(keys 100 R DOWN A DOWN A _ A) -f 400
-erased 0x20000 0x20000 || fail "delete latest left B.gba's data"
-write 3 game:program:4097
-write 4
-holds 0 A.gba || fail "A.gba was overwritten"
-holds 0x20000 C.gba || fail "C.gba is not at 0x20000: the half-written B2.gba is listed"
-echo "PASS: delete latest erases the game, and a half-written game with its header isn't listed"
+if shard_case; then
+  new_cart delete A.gba B.gba B2.gba C.gba
+  write 1
+  write 2
+  # shellcheck disable=SC2046
+  boot $(keys 100 R DOWN A DOWN A _ B) -f 400
+  ! erased 0x20000 0x20000 || fail "B on the delete question erased B.gba"
+  # shellcheck disable=SC2046
+  boot $(keys 100 R DOWN A DOWN A _ A) -f 400
+  erased 0x20000 0x20000 || fail "delete latest left B.gba's data"
+  write 3 game:program:4097
+  write 4
+  holds 0 A.gba || fail "A.gba was overwritten"
+  holds 0x20000 C.gba || fail "C.gba is not at 0x20000: the half-written B2.gba is listed"
+  echo "PASS: delete latest erases the game, and a half-written game with its header isn't listed"
+fi
 
 # A power cut while a game's data is written: the game isn't listed.
-new_cart data-cut A.gba B2.gba C.gba
-write 1
-write 2 game:program:4097
-write 3
-holds 0 A.gba || fail "A.gba was overwritten"
-holds 0x20000 C.gba || fail "C.gba is not at 0x20000: the half-written B2.gba is listed"
-echo "PASS: a game cut off while written isn't listed"
+if shard_case; then
+  new_cart data-cut A.gba B2.gba C.gba
+  write 1
+  write 2 game:program:4097
+  write 3
+  holds 0 A.gba || fail "A.gba was overwritten"
+  holds 0x20000 C.gba || fail "C.gba is not at 0x20000: the half-written B2.gba is listed"
+  echo "PASS: a game cut off while written isn't listed"
+fi
 
 # Both copies of the NOR list lost: the boot rebuilds the list from the games
 # in NOR, writes nothing, and the next write goes after them.
-new_cart lost-list A.gba B.gba C.gba
-write 1
-write 2
-kernel_wipe 0x7A0000 0x780000
-cp "$cart/kernel-nor.bin" "$cart/wiped.bin"
-boot -f 300
-cmp -s <(tail -c +$((0x780001)) "$cart/kernel-nor.bin" | head -c $((0x40000))) \
-  <(tail -c +$((0x780001)) "$cart/wiped.bin" | head -c $((0x40000))) ||
-  fail "the boot wrote the NOR list"
-write 3
-holds 0 A.gba || fail "A.gba was overwritten"
-holds 0x20000 B.gba || fail "B.gba was overwritten"
-holds 0x40000 C.gba || fail "C.gba is not at 0x40000"
-echo "PASS: a lost NOR list is rebuilt from the games in NOR, and the boot doesn't write it"
+if shard_case; then
+  new_cart lost-list A.gba B.gba C.gba
+  write 1
+  write 2
+  kernel_wipe 0x7A0000 0x780000
+  cp "$cart/kernel-nor.bin" "$cart/wiped.bin"
+  boot -f 300
+  cmp -s <(tail -c +$((0x780001)) "$cart/kernel-nor.bin" | head -c $((0x40000))) \
+    <(tail -c +$((0x780001)) "$cart/wiped.bin" | head -c $((0x40000))) ||
+    fail "the boot wrote the NOR list"
+  write 3
+  holds 0 A.gba || fail "A.gba was overwritten"
+  holds 0x20000 B.gba || fail "B.gba was overwritten"
+  holds 0x40000 C.gba || fail "C.gba is not at 0x40000"
+  echo "PASS: a lost NOR list is rebuilt from the games in NOR, and the boot doesn't write it"
+fi
 
 # A list from an older kernel (no copy at 0x780000, no trailer, no
 # completion marks in NOR) still counts.
@@ -240,47 +253,51 @@ open(sys.argv[1], "wb").write(k)
 open(sys.argv[2], "wb").write(g)
 EOF
 }
-new_cart legacy A.gba B.gba
-write 1
-make_legacy
-write 2
-holds 0 A.gba || fail "A.gba was overwritten"
-holds 0x20000 B.gba || fail "B.gba is not at 0x20000: the older list was lost"
-echo "PASS: a NOR list from an older kernel is kept"
+if shard_case; then
+  new_cart legacy A.gba B.gba
+  write 1
+  make_legacy
+  write 2
+  holds 0 A.gba || fail "A.gba was overwritten"
+  holds 0x20000 B.gba || fail "B.gba is not at 0x20000: the older list was lost"
+  echo "PASS: a NOR list from an older kernel is kept"
+fi
 
 # The boot saves an older kernel's list in Torii's format once, B first, and
 # says so; later boots read it quietly. A power cut in any step of that loses
-# no game. (The menu reads the list up to three times a visit; v0.2.1 logged
+# no game (one shard case: the power cuts start from its legacy NOR files). (The menu reads the list up to three times a visit; v0.2.1 logged
 # "an older kernel's copy A" each time.)
-new_cart migrate A.gba B.gba
-write 1
-make_legacy
-cp "$cart/kernel-nor.bin" "$root/legacy-kernel-nor.bin"
-cp "$cart/game-nor.bin" "$root/legacy-game-nor.bin"
-boot -f 300
-grep -q "nor: saving an older kernel's list of 1 games in Torii's format" "$cart/$runs.log" || fail "the list wasn't moved"
-[ "$(grep -c "older kernel's copy A" "$cart/$runs.log")" = 1 ] || fail "the older list was logged more than once"
-magic() { tail -c +$(($1 + 1)) "$cart/kernel-nor.bin" | head -c 4; }
-[ "$(magic 0x782100)" = TNL2 ] || fail "copy B has no trailer"
-[ "$(magic 0x7A2100)" = TNL2 ] || fail "copy A has no trailer"
-boot -f 300
-! grep -q "older kernel" "$cart/$runs.log" || fail "the next boot read an older kernel's list again"
-[ "$(grep -c "nor: list read from" "$cart/$runs.log")" = 1 ] || fail "the list read was logged more than once"
-write 2
-holds 0x20000 B.gba || fail "B.gba is not at 0x20000 after the move"
-echo "PASS: an older kernel's NOR list is saved in Torii's format once"
-for cut in kernel:erase:1@0x780000 kernel:program:4240@0x780000 kernel:erase:1@0x7A0000 \
-  kernel:program:1@0x7A0000 kernel:program:4240@0x7A0000; do
-  new_cart "migrate-cut-${cut//[:@]/-}" A.gba B.gba
-  cp "$root/legacy-kernel-nor.bin" "$cart/kernel-nor.bin"
-  cp "$root/legacy-game-nor.bin" "$cart/game-nor.bin"
-  boot -c "$cut" -f 300
+if shard_case; then
+  new_cart migrate A.gba B.gba
+  write 1
+  make_legacy
+  cp "$cart/kernel-nor.bin" "$root/legacy-kernel-nor.bin"
+  cp "$cart/game-nor.bin" "$root/legacy-game-nor.bin"
   boot -f 300
+  grep -q "nor: saving an older kernel's list of 1 games in Torii's format" "$cart/$runs.log" || fail "the list wasn't moved"
+  [ "$(grep -c "older kernel's copy A" "$cart/$runs.log")" = 1 ] || fail "the older list was logged more than once"
+  magic() { tail -c +$(($1 + 1)) "$cart/kernel-nor.bin" | head -c 4; }
+  [ "$(magic 0x782100)" = TNL2 ] || fail "copy B has no trailer"
+  [ "$(magic 0x7A2100)" = TNL2 ] || fail "copy A has no trailer"
+  boot -f 300
+  ! grep -q "older kernel" "$cart/$runs.log" || fail "the next boot read an older kernel's list again"
+  [ "$(grep -c "nor: list read from" "$cart/$runs.log")" = 1 ] || fail "the list read was logged more than once"
   write 2
-  holds 0 A.gba || fail "A.gba was overwritten"
-  holds 0x20000 B.gba || fail "B.gba is not at 0x20000: A.gba was lost from the list"
-  echo "PASS: a power cut at $cut while saving an older kernel's list in Torii's format loses no game"
-done
+  holds 0x20000 B.gba || fail "B.gba is not at 0x20000 after the move"
+  echo "PASS: an older kernel's NOR list is saved in Torii's format once"
+  for cut in kernel:erase:1@0x780000 kernel:program:4240@0x780000 kernel:erase:1@0x7A0000 \
+    kernel:program:1@0x7A0000 kernel:program:4240@0x7A0000; do
+    new_cart "migrate-cut-${cut//[:@]/-}" A.gba B.gba
+    cp "$root/legacy-kernel-nor.bin" "$cart/kernel-nor.bin"
+    cp "$root/legacy-game-nor.bin" "$cart/game-nor.bin"
+    boot -c "$cut" -f 300
+    boot -f 300
+    write 2
+    holds 0 A.gba || fail "A.gba was overwritten"
+    holds 0x20000 B.gba || fail "B.gba is not at 0x20000: A.gba was lost from the list"
+    echo "PASS: a power cut at $cut while saving an older kernel's list in Torii's format loses no game"
+  done
+fi
 
 # entry NAME OFFSET SIZE ROM: an older kernel's list entry, as hex
 entry() {
@@ -308,37 +325,42 @@ EOF2
 # Nearly full: an older kernel's game up to 256 KB before the end, then a
 # 256 KB ROM, which leaves no room for a block for its mark. It is written
 # without one rather than refused.
-new_cart near-full A.gba B2x.gba
-dd if="$root/A.gba" of="$cart/game-nor.bin" conv=notrunc status=none
-head -c $((8 << 20)) /dev/zero | tr '\0' '\377' >"$cart/kernel-nor.bin"
-older_list "$cart/kernel-nor.bin" "$(entry A.gba 0 0x3FC0000 "$root/A.gba")"
-write 2
-holds 0x3FC0000 B2x.gba || fail "B2x.gba wasn't written in the last 256 KB"
-boot -f 200
-grep -q 'nor: 2 games, the next goes at 4000000' "$cart/$runs.log" || fail "B2x.gba isn't listed"
-echo "PASS: a game that fills the game NOR is written without its completion mark"
+if shard_case; then
+  new_cart near-full A.gba B2x.gba
+  dd if="$root/A.gba" of="$cart/game-nor.bin" conv=notrunc status=none
+  head -c $((8 << 20)) /dev/zero | tr '\0' '\377' >"$cart/kernel-nor.bin"
+  older_list "$cart/kernel-nor.bin" "$(entry A.gba 0 0x3FC0000 "$root/A.gba")"
+  write 2
+  holds 0x3FC0000 B2x.gba || fail "B2x.gba wasn't written in the last 256 KB"
+  boot -f 200
+  grep -q 'nor: 2 games, the next goes at 4000000' "$cart/$runs.log" || fail "B2x.gba isn't listed"
+  echo "PASS: a game that fills the game NOR is written without its completion mark"
+fi
 
 # A downgrade and back: an older kernel adds C after Torii's A and B, saving
 # only copy A. Copy B is whole but older; the next write must go after C.
-new_cart downgrade A.gba B.gba C.gba D.gba
-write 1
-write 2
-dd if="$root/C.gba" of="$cart/game-nor.bin" bs=128K seek=2 conv=notrunc status=none
-older_list "$cart/kernel-nor.bin" "$(head -c 132 <(tail -c +$((0x7A0001)) "$cart/kernel-nor.bin") | od -v -A n -t x1 | tr -d ' \n')" \
-  "$(tail -c +$((0x7A0001 + 132)) "$cart/kernel-nor.bin" | head -c 132 | od -v -A n -t x1 | tr -d ' \n')" \
-  "$(entry C.gba 0x40000 0x20000 "$root/C.gba")"
-write 4
-holds 0x40000 C.gba || fail "C.gba, added by an older kernel, was overwritten"
-holds 0x60000 D.gba || fail "D.gba is not at 0x60000"
-echo "PASS: games an older kernel added after a downgrade are kept"
+if shard_case; then
+  new_cart downgrade A.gba B.gba C.gba D.gba
+  write 1
+  write 2
+  dd if="$root/C.gba" of="$cart/game-nor.bin" bs=128K seek=2 conv=notrunc status=none
+  older_list "$cart/kernel-nor.bin" "$(head -c 132 <(tail -c +$((0x7A0001)) "$cart/kernel-nor.bin") | od -v -A n -t x1 | tr -d ' \n')" \
+    "$(tail -c +$((0x7A0001 + 132)) "$cart/kernel-nor.bin" | head -c 132 | od -v -A n -t x1 | tr -d ' \n')" \
+    "$(entry C.gba 0x40000 0x20000 "$root/C.gba")"
+  write 4
+  holds 0x40000 C.gba || fail "C.gba, added by an older kernel, was overwritten"
+  holds 0x60000 D.gba || fail "D.gba is not at 0x60000"
+  echo "PASS: games an older kernel added after a downgrade are kept"
+fi
 
 # A list whose games fill all 64 MB (here one older kernel's entry): the scan
 # used to return without turning interrupts back on, and the menu then hung
 # in its first wait for VBlank. R must still switch to the NOR list.
-new_cart full A.gba
-dd if="$root/A.gba" of="$cart/game-nor.bin" conv=notrunc status=none
-head -c $((8 << 20)) /dev/zero | tr '\0' '\377' >"$cart/kernel-nor.bin"
-python3 - "$cart/kernel-nor.bin" "$root/A.gba" <<'EOF'
+if shard_case; then
+  new_cart full A.gba
+  dd if="$root/A.gba" of="$cart/game-nor.bin" conv=notrunc status=none
+  head -c $((8 << 20)) /dev/zero | tr '\0' '\377' >"$cart/kernel-nor.bin"
+  python3 - "$cart/kernel-nor.bin" "$root/A.gba" <<'EOF'
 import struct, sys
 k = bytearray(open(sys.argv[1], "rb").read())
 title = open(sys.argv[2], "rb").read()[0xA0:0xB0]
@@ -346,22 +368,25 @@ entry = struct.pack("<100sHHHHIBBH16s", b"A.gba", 0, 0, 0, 0, 0x4000000, 0, 0, 0
 k[0x7A0000:0x7A0000 + len(entry)] = entry
 open(sys.argv[1], "wb").write(k)
 EOF
-boot -k 200:R -k 204:- -h 190 -h 300 -f 300
-[ "$(grep -c '^hash frame' "$cart/$runs.log")" = 2 ] || fail "no screen hashes"
-[ "$(grep '^hash frame' "$cart/$runs.log" | cut -d: -f2 | sort -u | wc -l)" = 2 ] ||
-  fail "R didn't switch to the NOR list: the menu hung"
-echo "PASS: a NOR list that fills the game NOR leaves interrupts on"
+  boot -k 200:R -k 204:- -h 190 -h 300 -f 300
+  [ "$(grep -c '^hash frame' "$cart/$runs.log")" = 2 ] || fail "no screen hashes"
+  [ "$(grep '^hash frame' "$cart/$runs.log" | cut -d: -f2 | sort -u | wc -l)" = 2 ] ||
+    fail "R didn't switch to the NOR list: the menu hung"
+  echo "PASS: a NOR list that fills the game NOR leaves interrupts on"
+fi
 
 # A game started from NOR goes on Recently Played, and opens from NOR there.
-new_cart recent A.gba
-write 1
-# shellcheck disable=SC2046
-boot $(keys 100 R A _ A) -f 400
-grep -q 'mode game from NOR offset 000000$' "$cart/$runs.log" || fail "A.gba didn't start from NOR"
-recent=$(mtype -i "$cart/sd.img" "::/SAVER/Recently play.txt" 2>/dev/null || true)
-[ "$recent" = "NOR:A.gba" ] || fail "Recently Played has '$recent', expected NOR:A.gba"
-# Confirm the save copy, then START and the first entry
-# shellcheck disable=SC2046
-boot -k 100:A -k 104:- $(keys 300 START A) -f 600
-grep -q 'mode game from NOR offset 000000$' "$cart/$runs.log" || fail "Recently Played didn't start A.gba from NOR"
-echo "PASS: a NOR game goes on Recently Played and starts from NOR there"
+if shard_case; then
+  new_cart recent A.gba
+  write 1
+  # shellcheck disable=SC2046
+  boot $(keys 100 R A _ A) -f 400
+  grep -q 'mode game from NOR offset 000000$' "$cart/$runs.log" || fail "A.gba didn't start from NOR"
+  recent=$(mtype -i "$cart/sd.img" "::/SAVER/Recently play.txt" 2>/dev/null || true)
+  [ "$recent" = "NOR:A.gba" ] || fail "Recently Played has '$recent', expected NOR:A.gba"
+  # Confirm the save copy, then START and the first entry
+  # shellcheck disable=SC2046
+  boot -k 100:A -k 104:- $(keys 300 START A) -f 600
+  grep -q 'mode game from NOR offset 000000$' "$cart/$runs.log" || fail "Recently Played didn't start A.gba from NOR"
+  echo "PASS: a NOR game goes on Recently Played and starts from NOR there"
+fi

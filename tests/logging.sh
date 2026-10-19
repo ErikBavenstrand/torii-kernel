@@ -18,9 +18,12 @@
 #   flood   a scrolled list's frame-cycles go to the card as summaries
 # Every part checks the card with fsck.fat. Runs inside the torii-emu container.
 set -euo pipefail
+# shellcheck source=tests/carts.sh
+. tests/carts.sh
+local_carts "dist/cart-logging${1:+-$1}"
 
 part=$1
-cart=dist/cart-logging-$part
+cart=$carts/logging-$part
 rm -rf "$cart"
 mkdir -p "$cart"
 

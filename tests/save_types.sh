@@ -6,6 +6,9 @@
 # Runs inside the torii-emu container after `just build`,
 # `just emu-headless` and building tests/roms/savetest.
 set -euo pipefail
+# shellcheck source=tests/carts.sh
+. tests/carts.sh
+local_carts "dist/cart-save-types${1:+-$1}"
 
 fail() {
   echo "FAIL: $*" >&2
@@ -29,7 +32,7 @@ hex_at() { # file offset -> 5 bytes as hex
 # name  save-type-menu-steps  record-offset
 run_case() {
   local name=$1 rights=$2 offset=$3
-  local cart=dist/cart-save-$name shots=dist/shots/save-$name
+  local cart=$carts/save-$name shots=dist/shots/save-$name
   rm -rf "$cart" "$shots"
   mkdir -p "$cart" "$shots"
   mkfs.fat -C -F 32 -n SAVETEST "$cart/sd.img" 65536 >/dev/null
@@ -64,7 +67,7 @@ run_case() {
 # kernel grows it to 8 KB with FF, keeping its bytes, so the block the game
 # writes past 512 bytes reaches the card.
 short_eeprom() {
-  local cart=dist/cart-save-eeprom8k-short
+  local cart=$carts/save-eeprom8k-short
   rm -rf "$cart"
   mkdir -p "$cart"
   mkfs.fat -C -F 32 -n SAVETEST "$cart/sd.img" 65536 >/dev/null

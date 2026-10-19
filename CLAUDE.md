@@ -45,6 +45,7 @@ Check in tiers; each costs more, so run it only when it applies (timings in `doc
 Reviews: one round of at most two agents. Use a code reviewer, plus an adversarial tester only for launching, saves, the cart model or patching. Give them your test and compat results (`dist/compat/runs/*.json`) so they don't re-run them, and a time budget (about 10 minutes). Re-check your own fixes instead of starting another round, unless a fix changed behaviour.
 
 1. `just test` (run by `just check`): every line should start with `PASS`.
+   Test scripts keep their carts on the container's disk: source `tests/carts.sh` and call `local_carts dist/cart-NAME` (on `dist/`, each power-on costs 0.5 s more).
    Unit-test kernel functions in `tests/kernel/` (`CHECK`, `CHECK_EQ` from `torii_test.h`; declare each test in `tests.h` and list it in `run.c`). They run inside a test build of the kernel, so they can call any kernel function.
    Test hardware-free code in `tests/host/` too: it builds for the host under ASan and UBSan (`just test-host`), with `tests/host/gba_base.h` standing in for libgba's. Keep such code in its own file, as `source/sort.c` and `source/cheat.c` are.
    For changes to launching, saves or the cart model, also run `just compat` (games you own, listed in `roms/games.toml`; missing ones are skipped).

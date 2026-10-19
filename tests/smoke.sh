@@ -4,8 +4,11 @@
 # again to check the save came back. Runs inside the torii-emu container
 # after `just build` and `just emu-headless`.
 set -euo pipefail
+# shellcheck source=tests/carts.sh
+. tests/carts.sh
+local_carts "dist/cart-smoke${1:+-$1}"
 
-cart=dist/cart-smoke
+cart=$carts/smoke
 shots=dist/shots/smoke
 rm -rf "$cart" "$shots"
 mkdir -p "$cart" "$shots"
