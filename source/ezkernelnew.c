@@ -114,6 +114,23 @@ static void __attribute__((noinline)) Show_boot_notice(const char *line1, const 
 	dialog_notice(NULL, msg, kind);
 }
 //---------------------------------------------------------------------------------
+// Torii: the boot's "Loading..." notice, only once the work after the card
+// mounted has taken BOOT_NOTICE_FRAMES (a third of a second): a fast boot
+// goes to the list with nothing before it (a notice only flashed), and a
+// slow one (a big, slow card; making the log file) says it is busy. The
+// boot calls it between its steps.
+#define BOOT_NOTICE_FRAMES 20
+static u32 boot_mounted;  // torii_frames once the card mounted
+static u8 boot_noticed;
+static void Boot_notice_check(void)
+{
+	if (boot_noticed || torii_frames - boot_mounted < BOOT_NOTICE_FRAMES)
+		return;
+	boot_noticed = 1;
+	tlog_debug("boot: still busy %lu frames after mounting", (unsigned long)(torii_frames - boot_mounted));
+	dialog_notice(NULL, gl_Loading, DIALOG_INFO);
+}
+//---------------------------------------------------------------------------------
 // Torii: says on the boot screen why the SD theme the THEME setting picks
 // didn't load (ui/sdtheme.h), for two seconds; the menu then uses Dark
 static void Show_theme_error(void)
@@ -263,12 +280,18 @@ void Recently_play_forget(const char *entry)
 	}
 }
 //---------------------------------------------------------------------------------
+// Recently Played's entry for file name in folder path, into buf (RECENT_LEN bytes)
+static void Recently_play_entry(char *buf, const TCHAR *path, const TCHAR *name)
+{
+	memset(buf, 0x00, RECENT_LEN);
+	snprintf(buf, RECENT_LEN, strcmp(path, "/") == 0 ? "%s%s" : "%s/%s", path, name);
+}
+//---------------------------------------------------------------------------------
 static void Make_recently_play_file(TCHAR *path, TCHAR *gamefilename)
 {
 	char buf[RECENT_LEN];
 
-	memset(buf, 0x00, sizeof(buf));
-	snprintf(buf, sizeof(buf), strcmp(path, "/") == 0 ? "%s%s" : "%s/%s", path, gamefilename);
+	Recently_play_entry(buf, path, gamefilename);
 	Recently_play_save(buf);
 }
 //---------------------------------------------------------------------------------
@@ -1197,9 +1220,10 @@ int main(void)
 	CheckSwitch();
 
 	// The boot's screens (a card error, the save question, a theme error)
-	// share one engine session. A card that mounts shows nothing: the rest
-	// of the boot takes a few frames, and a notice ("microSD card ready /
-	// Loading...") only flashed before the list.
+	// share one engine session. A card that mounts shows nothing unless the
+	// rest of the boot is slow (Boot_notice_check): it takes a few frames,
+	// and a notice ("microSD card ready / Loading...") only flashed before
+	// the list.
 	dialog_open();
 	res = f_mount(&EZcardFs, "", 1);
 	if (res != FR_OK) {
@@ -1207,22 +1231,25 @@ int main(void)
 		while (1)
 			ui_frame();
 	}
+	boot_mounted = torii_frames;
 
 	// Diagnostics also starts from these keys held at power-on, in case the
 	// menu itself is broken. Read once the card is up, a second into the boot.
 	u32 diag_keys = (~REG_KEYINPUT & 0x3FF) == DIAG_BOOT_KEYS;
 	tlog_debug("boot: keys held %03X", ~REG_KEYINPUT & 0x3FF);
 	Check_save_flag();
-	tlog_sd_ready();
+	Boot_notice_check();
+	tlog_sd_ready(Boot_notice_check);
 	cartlog_boot_report();
 	tlog_flush();
+	Boot_notice_check();
 	if (diag_keys) {
+		dialog_notice_end();
 		dialog_close();  // Diagnostics runs its own session
 		Diagnostics();   // back only if B didn't start it: the menu starts as usual
 	}
 	if (!ui_theme_boot())
 		Show_theme_error();
-	dialog_hand_over();  // the lists run in this session
 
 	f_chdir("/");
 	//TCHAR currentpath[MAX_path_len];
@@ -1238,6 +1265,9 @@ int main(void)
 	// glitch), and the next write then went over them.
 	game_total_NOR = GetFileListFromNor();//initialize to prevent direct writes to NOR without page turning
 	Migrate_NOR_list(game_total_NOR);
+	Boot_notice_check();
+	tlog_debug("boot: handing over %lu frames after mounting", (unsigned long)(torii_frames - boot_mounted));
+	dialog_hand_over();  // a notice fades out; the lists run in this session
 
 	cartlog_phase(PHASE_MENU, 0, NULL);
 	lists_run();  // the menu: never returns
@@ -1397,8 +1427,15 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 		gl_game_uses = Game_hardware(is_EMU, GAMECODE, gb_cart_type);
 	} else {
 		// A Recently Played entry for a file that has since moved: launching
-		// would make its save and start an emulator with no ROM
-		tlog("launch %s: can't open it", pfilename);
+		// would make its save and start an emulator with no ROM. A file
+		// that is gone comes off Recently Played (not on a card error,
+		// which may pass)
+		tlog("launch %s: can't open it (FatFs %lu)", pfilename, (unsigned long)res);
+		if (res == FR_NO_FILE || res == FR_NO_PATH) {
+			char entry[RECENT_LEN];
+			Recently_play_entry(entry, currentpath, pfilename);
+			Recently_play_forget(entry);
+		}
 		Show_error_num(1);
 		return 0;
 	}

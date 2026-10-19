@@ -49,8 +49,10 @@ void tlog_debug(const char *format, ...) __attribute__((format(printf, 1, 2)));
 // every frame for the tests (frame-cycles), which would flood the card.
 void tlog_console(const char *format, ...) __attribute__((format(printf, 1, 2)));
 
-// The card is mounted: flushes may write to it from now on.
-void tlog_sd_ready(void);
+// The card is mounted: flushes may write to it from now on. With logging
+// on, it opens the log (making a new file takes about 80 frames), calling
+// between, if not NULL, after each step: the boot's notice comes up then.
+void tlog_sd_ready(void (*between)(void));
 // Writes the lines waiting in RAM to the card, after the frame-cycles
 // summary (cycles_summary). Call it only where the kernel's ROM is mapped and
 // no other code is in the middle of a FatFs call.
@@ -62,6 +64,13 @@ void tlog_flush(void);
 // lasts; tlog_flush finishes it at once outside one, as before a launch.
 // Otherwise, or with no job slot free, it flushes now.
 void tlog_flush_soon(void);
+// Finishes tlog_flush_soon's open at once, if one is under way (or stops it,
+// with LOGGING off): before code that may delete a file in /torii/logs,
+// which the open holds open (FatFs keeps no lock: FF_FS_LOCK 0).
+void tlog_open_now(void);
+// For tests, poked by name: nonzero, tlog_flush_soon's job makes at most
+// this many steps less one, so a test can act while the open is under way.
+extern u32 tlog_open_steps_test;
 // A line at level that goes to the card even with LOGGING off (crash
 // dumps); the next tlog_flush writes it.
 void tlog_force(u32 level, const char *format, ...) __attribute__((format(printf, 2, 3)));

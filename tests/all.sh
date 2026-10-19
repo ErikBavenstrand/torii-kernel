@@ -44,6 +44,7 @@ jobs=(
   "tests/logging.sh junk"
   "tests/logging.sh full"
   "tests/logging.sh settings"
+  "tests/logging.sh open"
   "tests/logging.sh flood"
   "python3 tests/shots.py"
   "python3 tests/perf.py self-test"

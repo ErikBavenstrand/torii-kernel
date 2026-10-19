@@ -3,17 +3,19 @@
 # SCENARIO/frames FIRST-LAST HASH: frames of a -H range (counted from 0)
 # that all hash the same.
 boot/screen 34EED145D7C6A8C0
-boot/frames 0-2 7C573B18E65FE325
-boot/frames 3-3 7B90E77090ED8325
-boot/frames 4-4 7B2431247E1C9059
-boot/frames 5-5 2A3028DC62EB75E2
-boot/frames 6-6 74D4950BBD1434E6
-boot/frames 7-7 EE05FD7779962083
-boot/frames 8-8 55135B940AAE8F72
-boot/frames 9-40 34EED145D7C6A8C0
+boot/frames 0-1 7C573B18E65FE325
+boot/frames 2-2 7B90E77090ED8325
+boot/frames 3-3 7B2431247E1C9059
+boot/frames 4-4 2A3028DC62EB75E2
+boot/frames 5-5 74D4950BBD1434E6
+boot/frames 6-6 EE05FD7779962083
+boot/frames 7-7 55135B940AAE8F72
+boot/frames 8-40 34EED145D7C6A8C0
 boot-addon/addons B24B22C01BC420D0
 boot-progress/screen 8A9B3222959885A1
 boot-progress-big/loading 7868AEBC12088DD1
+boot-slow/list E7D96DEE3BD0FF1A
+boot-slow/notice ED54AF6F9CA38CCC
 cheats/screen 063A1B234EA6DC79
 cheats-long/screen 50CC9D4DE1FE8EC1
 cheats-long/scrolled B9FCA1EEBABF43C5
@@ -56,7 +58,8 @@ cover-demo/frames 28-28 DE528E2C9590DC52
 cover-demo/frames 29-29 0690C16F9D9454FC
 cover-demo/frames 30-30 23A2E3B708CF46A1
 cover-demo/frames 31-32 3CCAC1492B95FF7A
-diag-back/screen E5740101EF2460F9
+diag-back/list E5740101EF2460F9
+diag-back/screen 76E7DDD0E73114A6
 diag-pages/clock 04846E505A18BA04
 diag-pages/eeprom ACDAA962E076C42C
 diag-pages/loader 1C1B278EDEA54ACD
@@ -100,6 +103,8 @@ recent-empty/frames 3-3 11A4D8268FF62F13
 recent-empty/frames 4-4 CEB3414B1B1C7CC4
 recent-empty/frames 5-5 A33FDBAC86FF4278
 recent-empty/frames 6-13 61D38EE8AD54A4A0
+recent-menu-back/menu 35AD9DD2375F671D
+recent-menu-back/screen 955D31886802AD58
 sd-deep/held 863B28016E825B30
 sd-deep/held-mid 7C8E5C7B9240BC21
 sd-deep/paged 48F2860E461DE748

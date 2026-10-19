@@ -1217,6 +1217,7 @@ static void dialog_answer(int yes)
 	case AFTER_DELETE:
 		if (!yes)
 			break;
+		tlog_open_now();  // the file may be the log the background open holds
 		if (f_chdir(currentpath) == FR_OK)  // cwd may be /SAVER after a launch
 			if (f_unlink(current_filename) == FR_OK) {
 				tlog_card_freed();
@@ -1284,19 +1285,24 @@ static void do_action(void)
 		lists.sd_cursor = cursor();
 		show_nor(0, UI_TR_TAB, 1);
 		break;
-	case ACT_SETTINGS:
+	case ACT_SETTINGS: {
 		// In this session, beside the NOR list
 		go(UI_TR_TAB, 1);
 		while (ui_depth())
 			ui_pop();
-		if (Settings_run(SETTINGS_PAGE1) == SETTINGS_TO_DIAGNOSE) {
+		u32 page = SETTINGS_PAGE1;
+		while (Settings_run(page) == SETTINGS_TO_DIAGNOSE) {
 			engine_leave();
-			Diagnostics();  // restarts the kernel
+			// Back only on B at its first page (a run restarts the kernel):
+			// SETTINGS again, in a session of its own, where DIAGNOSE was picked
+			Diagnostics();
+			page = SETTINGS_AT_DIAGNOSE;
 		}
 		tlog_flush();
 		settings_changed();
 		show_nor(0, UI_TR_TAB, -1);
 		break;
+	}
 	case ACT_RECENT:
 		lists.sd_cursor = cursor();
 		show_recent(0, UI_TR_DEEPER, 1);
