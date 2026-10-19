@@ -6,6 +6,7 @@
 #include "torii_test.h"
 #include "tests.h"
 #include "text_demo.h"
+#include "../../source/waitcnt.h"
 
 int torii_test_failures;
 
@@ -44,6 +45,22 @@ static const struct {
 	{"text_draw", test_text_draw},
 	{"text_clear", test_text_clear},
 	{"text_cycles", test_text_cycles},
+	{"asset_lz77_decode", test_asset_lz77_decode},
+	{"asset_psram_round_trip", test_asset_psram_round_trip},
+	{"asset_sd_read", test_asset_sd_read},
+	{"asset_cover_cache", test_asset_cover_cache},
+};
+
+// The tests that need the cart (PSRAM, the card), run alone by
+// tests/assets.sh on the emulated cart; the plain test kernel run has none
+static const struct {
+	const char *name;
+	void (*run)(void);
+} asset_tests[] = {
+	{"asset_lz77_decode", test_asset_lz77_decode},
+	{"asset_psram_round_trip", test_asset_psram_round_trip},
+	{"asset_sd_read", test_asset_sd_read},
+	{"asset_cover_cache", test_asset_cover_cache},
 };
 
 int torii_unit_tests(void)
@@ -61,9 +78,32 @@ int torii_unit_tests(void)
 	return failed_tests;
 }
 
+int torii_asset_tests(void)
+{
+	int failed_tests = 0;
+	unsigned count = sizeof(asset_tests) / sizeof(*asset_tests);
+	for (unsigned i = 0; i < count; i++) {
+		int before = torii_test_failures;
+		asset_tests[i].run();
+		int failed = torii_test_failures != before;
+		failed_tests += failed;
+		tlog("%s %s", failed ? "FAIL" : "PASS", asset_tests[i].name);
+	}
+	tlog("ASSET TESTS DONE: %u passed, %d failed", count - failed_tests, failed_tests);
+	return failed_tests;
+}
+
 #ifdef TORII_TEST_KERNEL
 void torii_run_tests(void)
 {
+	// SELECT held at power-on: the cart run (tests/assets.sh and the
+	// cover-demo shot, on the emulated cart). The other tests assume no
+	// cart model: under it the NOR tests write the game NOR, then crash
+	if ((~REG_KEYINPUT & 0x3FF) == KEY_SELECT) {
+		REG_WAITCNT_CART = WAITCNT_MENU;  // as the menu runs
+		torii_asset_tests();
+		cover_demo();
+	}
 	torii_unit_tests();
 	// The engine's scene, or with L held (mgba-shot -k 1:L) the text demo
 	if (!(REG_KEYINPUT & KEY_L))

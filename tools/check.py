@@ -109,6 +109,11 @@ RULES = [
     ),
     (["tools/font_preview.py"], {LINT}, "font preview sheets"),
     (
+        ["tools/asset.py"],
+        {LINT, TEST_HOST, TEST},
+        "asset converter: test-host checks its test assets, the kernel tests decode them",
+    ),
+    (
         ["tools/ease_lut.py"],
         {LINT, TEST_HOST},
         "easing table generator, whose table the host tests check",

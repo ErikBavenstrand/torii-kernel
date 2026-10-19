@@ -1,0 +1,11 @@
+#! kernel test
+# The test kernel's cover demo (tests/kernel/cover_demo.c), which SELECT held
+# at power-on starts after the asset tests: covers streamed from SD through
+# PSRAM into affine sprites. The row once loaded, every frame of its slide,
+# and the row where it stops.
+-k 1:SELECT -k 30:-
+-w "cover-demo: loaded"
+-s @1:loaded.png
+-H @2:@34
+-w "screen ready: cover-demo"
+-s @1:screen.png

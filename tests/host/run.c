@@ -110,6 +110,11 @@ static const struct {
 	{"pool_slots_exact_fit", test_pool_slots_exact_fit},
 	{"pool_age_wrap", test_pool_age_wrap},
 	{"budget_check", test_budget_check},
+	{"asset_header", test_asset_header},
+	{"asset_check_refuses", test_asset_check_refuses},
+	{"cover_cache_wants", test_cover_cache_wants},
+	{"cover_cache_eviction", test_cover_cache_eviction},
+	{"affine_rotscale", test_affine_rotscale},
 };
 
 int main(void)

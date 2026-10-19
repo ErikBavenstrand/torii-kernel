@@ -2,9 +2,10 @@
 #include <stdio.h>
 
 #include "budget.h"
+#include "covercache.h"
 #include "res.h"
 
-u32 budget_psram_bytes = 8u << 20;
+u32 budget_psram_bytes = COVER_PSRAM_BYTES;
 
 void budget_capacity(struct engine_budget *out)
 {

@@ -33,8 +33,8 @@ enum {
 	BUDGET_PSRAM,
 };
 
-// PSRAM for the cover cache: one 8 MB page (decisions doc, Covers). T7 may
-// lower it once the cache's layout is known.
+// PSRAM for the cover cache: COVER_PSRAM_BYTES (engine/covercache.h), what
+// the cache uses of its 8 MB page (decisions doc, Covers).
 extern u32 budget_psram_bytes;
 
 // The hardware's whole capacity in mode 0.

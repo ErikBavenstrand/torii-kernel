@@ -44,6 +44,7 @@ u32 gfx_commit_left;
 
 static struct queue_entry queue[GFX_QUEUE_CAP] EWRAM_BSS;
 static u8 queue_head, queue_count;
+static u32 queue_pushed EWRAM_BSS;  // tickets handed out
 static u8 oam_count, oam_shown, oam_changed, oam_full_logged;
 
 void gfx_init(void)
@@ -216,6 +217,7 @@ static int queue_push(u32 dst, u32 src, u32 bytes, u16 kind)
 	e->bytes = (u16)bytes;
 	e->kind = kind;
 	queue_count++;
+	queue_pushed++;
 	return 1;
 }
 
@@ -232,6 +234,17 @@ int gfx_queue_fill(void *dst, u32 value, u32 bytes)
 u32 gfx_queue_len(void)
 {
 	return queue_count;
+}
+
+u32 gfx_queue_ticket(void)
+{
+	return queue_pushed;
+}
+
+int gfx_queue_done(u32 ticket)
+{
+	// Entries finish in order: all but the last queue_count tickets are done
+	return (s32)(queue_pushed - queue_count - ticket) >= 0;
 }
 
 void gfx_hold_for_queue(u32 regions)

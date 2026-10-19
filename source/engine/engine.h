@@ -9,6 +9,10 @@
 //   engine/budget.h  checking a layout's needs up front
 //   engine/cycles.h  the TM2/TM3 cycle counter
 //   engine/pool.h    the range allocator under res.h (hardware-free)
+//   engine/cover.h   cover streaming: SD or ROM, PSRAM cache, sprite slots
+//   engine/sdread.h  reading a file a few KB per job step
+//   engine/asset.h   the TAS1 asset format (tools/asset.py writes it)
+//   engine/affine.h  scale and rotate matrices for affine sprites
 #ifndef TORII_ENGINE_H
 #define TORII_ENGINE_H
 

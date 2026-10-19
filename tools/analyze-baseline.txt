@@ -22,8 +22,6 @@ clang-tidy source/NORflash_OP.c bugprone-narrowing-conversions: narrowing conver
 clang-tidy source/cheat.c bugprone-narrowing-conversions: narrowing conversion from '__size_t' (aka 'unsigned int') to signed type 'int' is implementation-defined
 clang-tidy source/draw.c bugprone-branch-clone: repeated branch body in conditional chain
 clang-tidy source/draw.c clang-analyzer-deadcode.DeadStores: Value stored to 'len' is never read
-clang-tidy source/ez_define.h bugprone-macro-parentheses: macro argument should be enclosed in parentheses
-clang-tidy source/ez_define.h bugprone-macro-parentheses: macro argument should be enclosed in parentheses
 clang-tidy source/ezkernelnew.c bugprone-branch-clone: repeated branch body in conditional chain
 clang-tidy source/ezkernelnew.c bugprone-branch-clone: repeated branch body in conditional chain
 clang-tidy source/ezkernelnew.c bugprone-branch-clone: switch has 2 consecutive identical branches

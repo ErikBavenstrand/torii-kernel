@@ -5,6 +5,7 @@ set -uo pipefail
 
 jobs=(
   "tests/kernel.sh"
+  "tests/assets.sh"
   "tests/smoke.sh"
   "tests/clean_boot.sh"
   "tests/hard_reset.sh"
