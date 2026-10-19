@@ -5,7 +5,6 @@
 
 extern char *gl_init_error;
 extern char *gl_power_off;
-extern char *gl_init_ok;
 extern char *gl_Loading;
 extern char *gl_theme_error;
 extern char *gl_file_overflow;

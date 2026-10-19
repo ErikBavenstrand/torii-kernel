@@ -2,7 +2,6 @@
 
 char *gl_init_error;
 char *gl_power_off;
-char *gl_init_ok;
 char *gl_Loading;
 char *gl_theme_error;
 char *gl_file_overflow;
@@ -134,7 +133,6 @@ char **gl_nor_op;
 //英文
 const char en_init_error[] = "microSD card error";
 const char en_power_off[] = "Turn the power off";
-const char en_init_ok[] = "microSD card ready";
 const char en_Loading[] = "Loading...";
 const char en_theme_error[] = "Theme not loaded, using Dark:";
 const char en_file_overflow[] = "Too big to start from the SD card (over 32 MB). Write it to NOR instead.";
@@ -269,7 +267,6 @@ void LoadEnglish(void)
 {
 	gl_init_error = (char *)en_init_error;
 	gl_power_off = (char *)en_power_off;
-	gl_init_ok = (char *)en_init_ok;
 	gl_Loading = (char *)en_Loading;
 	gl_theme_error = (char *)en_theme_error;
 	gl_file_overflow = (char *)en_file_overflow;
