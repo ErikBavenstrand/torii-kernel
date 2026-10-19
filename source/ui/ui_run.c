@@ -91,7 +91,7 @@ static struct {
 	s16 dim_y;         // BLDY of DIM (0-16)
 	s16 modal_y;       // BLDY under a modal view
 	u8 dimmed;
-	u8 wall_retry;     // a view was popped: put the wallpaper back if a screen took its room
+	u8 wall_retry;     // after a push or pop: put the wallpaper back where it fits (sdtheme.h)
 } ui EWRAM_BSS;
 
 void ui_wake(void)
