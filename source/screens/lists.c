@@ -131,8 +131,6 @@ static struct {
 	u8 clock_hms[3];
 	const char *measure;
 	u32 measure_left;
-	InputWrap wrap;       // the menus' cursor
-	InputWrap list_wrap;  // the list's
 	struct game_pick game;
 	char title[MAX_path_len];
 	char clock[12];
@@ -690,7 +688,6 @@ static void show(enum screen s, u32 at, u32 kind, s32 way)
 	lists.clock[0] = 0;
 	clock_read();
 	ui_list_reset(list_node(), at);
-	input_wrap_init(&lists.list_wrap, ui_input(), cursor());
 	count_update(cursor());
 	if (s == SCR_RECENT && !lists.recent_count) {
 		ui_label_set((u8)(v->first + N_EMPTY), gl_no_game_played);
@@ -833,26 +830,19 @@ static void menu_open(u32 which, u32 rows, u32 max, u32 line)
 	lists.dialog_first = d->first;
 	ui_list_reset((u8)(d->first + M_LIST), line);
 	ui_label_set((u8)(d->first + M_HINT), gl_menu_btn);
-	input_wrap_init(&lists.wrap, ui_input(), line);
 	measure("lists-menu-open", 3);
 }
 
 // --- Events (they only record what to do) ---------------------------------------
 
 // Moves the list's cursor delta items for key: past an end it stops there
-// first, and a fresh press at the end wraps to the other end (input_move); a
-// held key stays at the end, as each wrap is a page change
+// first, and a fresh press at the end wraps to the other end; a held key
+// stays at the end (input_move)
 static void move(u8 node, u16 key, s32 delta, u32 count, u32 at)
 {
 	if (!count)
 		return;
-	u32 to;
-	if (ui_input()->pressed & key) {
-		to = input_move(ui_input(), &lists.list_wrap, key, at, count, delta);
-	} else {
-		s32 t = (s32)at + delta;
-		to = t < 0 ? 0 : (u32)t >= count ? count - 1 : (u32)t;
-	}
+	u32 to = input_move(ui_input(), key, at, count, delta);
 	if (to == at)
 		return;
 	ui_list_move(node, to, key);
@@ -950,7 +940,7 @@ static int menu_event(struct ui_view *v, const struct ui_event *e)
 	u32 line = lists.menu_line;
 	if (k & (INPUT_DOWN | INPUT_UP)) {
 		u16 key = (k & INPUT_DOWN) ? INPUT_DOWN : INPUT_UP;
-		line = input_move(ui_input(), &lists.wrap, key, line, lists.menu_max + 1u, key == INPUT_DOWN ? 1 : -1);
+		line = input_move(ui_input(), key, line, lists.menu_max + 1u, key == INPUT_DOWN ? 1 : -1);
 	} else if (k & (INPUT_LEFT | INPUT_RIGHT)) {
 		if (lists.menu == 1 && line == 4) {  // the save type
 			if ((k & INPUT_LEFT) && lists.game.save_num)

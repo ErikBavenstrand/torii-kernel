@@ -96,7 +96,6 @@ void test_theme_keys(void)
 				   "top_speed = 45\n"
 				   "page_delay = 25\n"
 				   "page_interval = 10\n"
-				   "wrap_pause = 0\n"
 				   "[wallpaper]\n"
 				   "file = wall.tas\n"
 				   "[patches]\n"
@@ -150,7 +149,6 @@ void test_theme_keys(void)
 	CHECK_EQ(t->input.top_speed, 45);
 	CHECK_EQ(t->input.page_delay, 25);
 	CHECK_EQ(t->input.page_interval, 10);
-	CHECK_EQ(t->input.wrap_pause, 0);
 	CHECK_EQ(t->patch_count, 8);
 	s16 v;
 	CHECK(ui_theme_patch(t, 1, 4, UI_FIELD_X, &v) && v == 16);

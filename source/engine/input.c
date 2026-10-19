@@ -10,7 +10,6 @@ const InputTiming input_timing_default = {
 	.top_speed = 40,
 	.page_delay = 20,
 	.page_interval = 6,
-	.wrap_pause = 15,
 };
 
 void input_init(InputState *s, const InputTiming *timing)
@@ -120,28 +119,17 @@ void input_step(InputState *s, u16 keys, u32 dt)
 	}
 }
 
-u32 input_move(const InputState *s, InputWrap *w, u16 key, u32 cursor, u32 count, s32 delta)
+u32 input_move(const InputState *s, u16 key, u32 cursor, u32 count, s32 delta)
 {
 	if (count == 0)
 		return 0;
 	if (cursor >= count)
 		cursor = count - 1;
-	if (cursor != w->cursor)
-		w->since = s->now;
 	u32 step = delta < 0 ? 0u - (u32)delta : (u32)delta;
-	u32 moved = cursor;
-	if (delta < 0 ? step <= cursor : step < count - cursor) {
-		moved = delta < 0 ? cursor - step : cursor + step;
-	} else {
-		u32 edge = delta < 0 ? 0 : count - 1;
-		int fresh = (s->pressed & key) != 0;
-		if (cursor != edge)
-			moved = edge;
-		else if (fresh || s->now - w->since >= s->timing->wrap_pause)
-			moved = delta < 0 ? count - 1 : 0;
-	}
-	if (moved != cursor)
-		w->since = s->now;
-	w->cursor = moved;
-	return moved;
+	if (delta < 0 ? step <= cursor : step < count - cursor)
+		return delta < 0 ? cursor - step : cursor + step;
+	u32 edge = delta < 0 ? 0 : count - 1;
+	if (cursor != edge || !(s->pressed & key))
+		return edge;
+	return delta < 0 ? count - 1 : 0;
 }

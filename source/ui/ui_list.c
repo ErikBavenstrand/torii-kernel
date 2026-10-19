@@ -93,7 +93,6 @@ struct list_state {
 	u32 lo, hi;  // resident rows
 	u32 plo, phi;
 	u32 row_cycles;  // what the last row took to draw (hidden drawing's budget)
-	InputWrap wrap;
 	// Marquee
 	u8 mq;
 	u8 mq_set;   // the marquee slot the map shows (0 or 1), 0xFF neither
@@ -408,7 +407,6 @@ static int list_init(u8 node)
 	}
 	st->mq_set = 0xFF;
 	st->plain = (config(node)->flags & UI_LIST_PLAIN) != 0;
-	input_wrap_init(&st->wrap, ui_input(), 0);
 	ui_list_reset(node, 0);
 	return 1;
 }
@@ -544,7 +542,7 @@ static int list_event(u8 node, const struct ui_event *e)
 			continue;
 		u32 to;
 		if (config(node)->flags & UI_LIST_WRAP) {
-			to = input_move(in, &st->wrap, key, st->cursor, st->count, delta);
+			to = input_move(in, key, st->cursor, st->count, delta);
 		} else {
 			s32 t = (s32)st->cursor + delta;
 			to = t < 0 ? 0 : (u32)t >= st->count ? st->count - 1 : (u32)t;
