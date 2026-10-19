@@ -50,7 +50,8 @@ echo "PASS: SD theme loaded at boot; one that doesn't load is reported and the m
 # SETTINGS page 2's THEME picks the SD theme: on a card with themes/example
 # and nothing set, THEME (DOWN x5), A to edit, A for LIGHT, A for the
 # example (loaded as it is picked), RIGHT and A on OK save it: theme.txt
-# names it, slot 28 holds 2, and the next power-on loads it
+# names it, slot 28 holds 2 once SETTINGS is left (L, L), and the next
+# power-on loads it
 rm -rf "$cart"
 mkdir -p "$cart"
 mkfs.fat -C -F 32 -n THEMES "$cart/sd.img" 65536 >/dev/null
@@ -62,7 +63,8 @@ out=$(OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -w "screen 
   -w "screen ready: nor-list" $keys -w "screen ready: settings1" $keys -w "screen ready: settings2" \
   -k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:DOWN -k @48:- -k @56:DOWN -k @60:- -k @68:A -k @72:- -k @80:A -k @84:- \
   -k @92:A -k @96:- -k @104:RIGHT -k @108:- -k @116:A -k @120:- -w "settings: THEME" \
-  -s @10:dist/cart-themes/settings.png 2>&1 || true)
+  -s @10:dist/cart-themes/settings.png -k @20:L -k @24:- -w "screen ready: settings1" -k @8:L -k @12:- \
+  -w "screen ready: nor-list" 2>&1 || true)
 grep -q "kernel: settings: THEME Example" <<<"$out" ||
   fail "SETTINGS didn't save the example theme: $(grep -E 'settings|theme' <<<"$out" | head -3)"
 grep -q "kernel error:" <<<"$out" && fail "errors picking the example: $(grep 'kernel error' <<<"$out" | head -3)"

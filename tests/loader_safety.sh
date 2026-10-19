@@ -139,11 +139,21 @@ write_b=$(keys 200 DOWN DOWN DOWN A DOWN DOWN A)
 delete=$(keys 200 R DOWN A DOWN A)
 format=$(keys 200 R A DOWN DOWN A A)
 format_no=$(keys 200 R A DOWN DOWN A B)
+# SETTINGS writes the kernel NOR as it closes, so each sequence ends by
+# leaving it: L on page 2, then L on page 1 to the NOR list.
 # THEME on SETTINGS page 2 set to LIGHT and saved, through save_set2_info
-save_theme="$(keys 200 R) $(keys 220 R) $(keys 270 R) $(keys 320 DOWN DOWN DOWN DOWN DOWN A A RIGHT A)"
+save_theme="$(keys 200 R) $(keys 220 R) $(keys 270 R) $(keys 320 DOWN DOWN DOWN DOWN DOWN A A RIGHT A) $(keys 410 L) $(keys 450 L)"
 # ACCENT on SETTINGS page 2 set to Blue and saved
-save_accent="$(keys 200 R) $(keys 220 R) $(keys 270 R) $(keys 320 DOWN DOWN DOWN DOWN DOWN DOWN A A RIGHT A)"
-save_setting="-k 200:R -k 206:- -k 220:R -k 226:- -k 270:DOWN -k 276:- -k 285:DOWN -k 291:- -k 300:A -k 306:- -k 340:A -k 346:-"
+save_accent="$(keys 200 R) $(keys 220 R) $(keys 270 R) $(keys 320 DOWN DOWN DOWN DOWN DOWN DOWN A A RIGHT A) $(keys 410 L) $(keys 450 L)"
+save_setting="-k 200:R -k 206:- -k 220:R -k 226:- -k 270:DOWN -k 276:- -k 285:DOWN -k 291:- -k 300:A -k 306:- -k 340:A -k 346:- -k 370:L -k 376:-"
+# AUTO SAVE on page 2 turned over and saved COUNT times (A, LEFT, A, RIGHT,
+# A on OK), then SETTINGS left: toggles COUNT
+toggles() {
+  local i seq=''
+  for i in $(seq "$1"); do seq="$seq A LEFT A RIGHT A"; done
+  # shellcheck disable=SC2086 # seq is a list of keys
+  echo "$(keys 200 R) $(keys 220 R) $(keys 270 R) $(keys 320 $seq) $(keys $((330 + 40 * $1)) L) $(keys $((370 + 40 * $1)) L)"
+}
 launch="$(keys 200 DOWN DOWN DOWN DOWN A) $(keys 250 DOWN DOWN DOWN DOWN RIGHT RIGHT RIGHT RIGHT RIGHT UP UP UP UP A)"
 diag="-k 1:L+R+SELECT -k 60:- -k 120:A -k 124:- $(for f in $(seq 2000 24 4400); do printf -- '-k %d:START -k %d:- ' "$f" $((f + 4)); done)"
 # Diagnostics with its questions answered yes, A every 24 frames: the rumble
@@ -175,12 +185,12 @@ EOF
   pass "the boot that moves an older kernel's NOR list"
 
   new_cart settings
-  boot $save_setting -f 420
+  boot $save_setting -f 460
   logged "nor: wrote the settings"
   pass "a settings save"
 
   new_cart settings-page2
-  boot $save_theme -f 480
+  boot $save_theme -f 540
   logged "nor: wrote the settings"
   logged "settings: THEME LIGHT"
   [ "$(slot 28)" = 1 ] || bad "THEME wasn't saved: slot 28 holds $(slot 28)"
@@ -192,13 +202,32 @@ EOF
   pass "a settings save on page 2 (THEME), kept after a power-on"
 
   new_cart settings-accent
-  boot $save_accent -f 480
+  boot $save_accent -f 540
   logged "nor: wrote the settings"
   logged "settings: THEME DARK, ACCENT BLUE"
   [ "$(slot 29)" = 1 ] || bad "ACCENT wasn't saved as Blue: slot 29 holds $(slot 29)"
   [ "$(slot 28)" = 65535 ] || bad "THEME was written: slot 28 holds $(slot 28)"
   [ "$(slot 27)" = 65535 ] || bad "DIM was written: slot 27 holds $(slot 27)"
   pass "an ACCENT save on page 2 writes only its slot"
+
+  # Five saves on page 2 write the kernel NOR once, as SETTINGS closes
+  # (v0.3.2: each save erased the sector); saves that change nothing, and
+  # SETTINGS left without a save, don't write it
+  new_cart settings-once
+  boot $(toggles 5) -f 640
+  logged "nor: wrote the settings"
+  [ $ok = 0 ] || [ "$(grep -c 'nor: wrote the settings' "$log")" = 1 ] ||
+    bad "five saves wrote the settings $(grep -c 'nor: wrote the settings' "$log") times"
+  auto=$(slot 14)
+  [ "$auto" != 65535 ] || bad "AUTO SAVE wasn't saved: slot 14 holds $auto"
+  boot $(toggles 2) -f 520
+  logged "settings: staged"
+  [ $ok = 0 ] || ! grep -q 'nor: wrote the settings' "$log" || bad "two saves that change nothing wrote the settings"
+  [ "$(slot 14)" = "$auto" ] || bad "AUTO SAVE changed: slot 14 holds $(slot 14), not $auto"
+  boot $(keys 200 R) $(keys 220 R) $(keys 270 R) $(keys 320 L) $(keys 360 L) -f 420
+  logged "screen ready: settings2"
+  [ $ok = 0 ] || ! grep -q 'nor: wrote the settings' "$log" || bad "SETTINGS left without a save wrote the settings"
+  pass "SETTINGS writes the kernel NOR once as it closes, and only for a change"
 
   new_cart pending-save
   boot $launch -f 700
@@ -292,7 +321,7 @@ EOF
   logged "nor: saving an older kernel's list of 1 games"
   boot -g $write_b -f 700
   logged "nor: list saved, 2 games"
-  boot -g $save_setting -f 420
+  boot -g $save_setting -f 460
   logged "nor: wrote the settings"
   boot -g $launch -f 700
   logged "nor: wrote the pending-save record"
@@ -336,7 +365,7 @@ EOF
     pass "a power cut at $cut in the pending-save record, and the boot after it"
 
     new_cart "cut-settings-${cut//:/-}"
-    boot -c "$cut" $save_setting -f 420
+    boot -c "$cut" $save_setting -f 460
     boot -f 200
     pass "a power cut at $cut in a settings save, and the boot after it"
   done

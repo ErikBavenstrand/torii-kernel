@@ -28,10 +28,11 @@ ffff() {
 OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -f 200 >/dev/null 2>&1
 [ "$(slots 0 256)" = "$(ffff 256)" ] || fail "a new cart's settings are not erased: $(slots 0 16)"
 
-# Settings page (R twice), down to LANGUAGE, A to edit, A to save English.
+# Settings page (R twice), down to LANGUAGE, A to edit, A to save English,
+# L to leave SETTINGS, which writes the NOR as it closes.
 OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin \
   -k 100:R -k 106:- -k 120:R -k 126:- -k 170:DOWN -k 176:- -k 185:DOWN -k 191:- \
-  -k 200:A -k 206:- -k 240:A -k 246:- -f 320 >/dev/null 2>&1
+  -k 200:A -k 206:- -k 240:A -k 246:- -k 270:L -k 276:- -f 360 >/dev/null 2>&1
 [ "$(slots 0 1)" = e1e1 ] || fail "language not saved: $(slots 0 1)"
 # The hotkeys are saved as the defaults the page shows: L R SELECT, L R START.
 [ "$(slots 5 6)" = "0009 0008 0002 0009 0008 0003" ] || fail "hotkeys: $(slots 5 6)"

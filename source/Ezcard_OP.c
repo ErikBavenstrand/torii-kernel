@@ -415,9 +415,40 @@ void IWRAM_CODE Save_SET_info(u16 *SET_info_buffer, u32 buffersize)
 	log_info_write("the settings", buffersize, Save_info(SET_info_offset, SET_info_buffer, buffersize));
 }
 // --------------------------------------------------------------------
+// Torii: SETTINGS' saves, staged (Stage_SET_info) until it closes
+static u16 set_staged[assress_max] EWRAM_BSS;
+static u8 set_staging;  // in IWRAM: a launch may fill EWRAM, then read the settings
+
 u16 IWRAM_CODE Read_SET_info(u32 offset)
 {
+	if (set_staging && offset < assress_max)
+		return set_staged[offset];
 	return *((vu16 *)(FlashBase_S71 + SET_info_offset + offset * 2));
+}
+// --------------------------------------------------------------------
+void Stage_SET_info(const u16 *SET_info_buffer)
+{
+	memcpy(set_staged, SET_info_buffer, sizeof(set_staged));
+	set_staging = 1;
+	tlog_debug("settings: staged, written as SETTINGS closes");
+}
+// --------------------------------------------------------------------
+u32 Commit_SET_info(u16 *SET_info_buffer)
+{
+	if (!set_staging)
+		return 0;
+	set_staging = 0;  // Read_SET_info reads the NOR again
+	u32 changed = 0;
+	for (u32 address = 0; address < assress_max; address++)
+		if (Read_SET_info(address) != set_staged[address])
+			changed++;
+	if (!changed) {
+		tlog_debug("settings: nothing changed, not written");
+		return 0;
+	}
+	memcpy(SET_info_buffer, set_staged, sizeof(set_staged));
+	Save_SET_info(SET_info_buffer, 0x200);
+	return 1;
 }
 // --------------------------------------------------------------------
 u16 IWRAM_CODE Read_sav_info(u32 offset)

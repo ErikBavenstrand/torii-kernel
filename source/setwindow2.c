@@ -595,8 +595,7 @@ static void save_set2_info(void)
 	if (dim_sel != ui_dim_setting())
 		SET_info_buffer[assress_dim] = dim_sel;
 
-	//save to nor
-	Save_SET_info(SET_info_buffer, 0x200);
+	Stage_SET_info(SET_info_buffer);  //Torii: written as SETTINGS closes (Commit_SET_info)
 	if (theme) {
 		themes.initial = (u8)theme_sel;
 		themes.touched = 0;

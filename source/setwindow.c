@@ -227,6 +227,9 @@ u32 Settings_run(u32 page)
 				ui_pop();
 		}
 	}
+	// Once, as SETTINGS closes, and only if a setting changed: the kernel
+	// NOR wears with each erase
+	Commit_SET_info(SET_info_buffer);
 	if (own) {
 		ui_shutdown();
 		dialog_blank();
@@ -771,6 +774,5 @@ static void save_setw_info(void)
 		SET_info_buffer[address] = Read_SET_info(address);
 	}
 	SET_info_buffer[assress_game_rumble] = gl_game_rumble;
-	//save to nor
-	Save_SET_info(SET_info_buffer, 0x200);
+	Stage_SET_info(SET_info_buffer);  //Torii: written as SETTINGS closes (Commit_SET_info)
 }
