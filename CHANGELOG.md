@@ -20,8 +20,10 @@ git log, not here.
   VRAM copy, PSRAM writes at the slow and the menu's WAITCNT (read back),
   a scroll frame and a page change, and flags any figure more than 20%
   above the emulator's; a ten-second scroll-and-fade demo asks about
-  tearing. The boot loader's title is no longer garbled in the log (`6067e1b`,
-  `adf21e9`, `ba02013`).
+  tearing. The boot loader's title is no longer garbled in the log. An SD
+  theme's wallpaper is read from PSRAM page 0 even when a launch or a NOR
+  write left another page selected (`6067e1b`, `adf21e9`, `ba02013`,
+  `6db6bfa`).
 - **Added:** themes from the SD card. `/torii/themes/<name>/theme.ini`
   (version 1) overrides the dark or light theme key by key: colours, fonts,
   row height, spacing, fade, slide, marquee and key repeat timings, up to
