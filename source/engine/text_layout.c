@@ -127,3 +127,41 @@ u32 text_layout_window(const struct torii_font *font, const char *s, u32 len, u3
 	line->extent = extent;
 	return count;
 }
+
+u32 text_layout_span(const struct torii_font *font, const char *s, u32 len, u32 skip, u32 clip, struct text_line *line,
+		     s32 *lead)
+{
+	const struct torii_glyph *glyphs = font->glyphs;
+	u32 pen = 0, pos = 0, count = 0, extent = 0, start = 0, end = skip + clip;
+	line->truncated = 0;
+	*lead = 0;
+	while (pos < len) {
+		int g = next_glyph(s, len, &pos);
+		if (g < 0)
+			continue;
+		const struct torii_glyph *glyph = &glyphs[g];
+		// Ink wholly left of the span (a blank glyph has none: it goes
+		// unless it starts inside)
+		if (!count && (glyph->rows ? pen + glyph->width <= skip : pen < skip)) {
+			pen += glyph->advance;
+			continue;
+		}
+		if (pen >= end || count == TEXT_MAX_GLYPHS) {
+			line->truncated = 1;
+			break;
+		}
+		if (!count) {
+			start = pen;
+			*lead = (s32)pen - (s32)skip;
+		}
+		u32 x = pen - start;  // from the first glyph's pen
+		line->glyphs[count++] = (u8)g;
+		if (glyph->rows && x + glyph->width > extent)
+			extent = x + glyph->width;
+		pen += glyph->advance;
+	}
+	line->count = count;
+	line->advance = count ? pen - start : 0;
+	line->extent = extent;
+	return count;
+}
