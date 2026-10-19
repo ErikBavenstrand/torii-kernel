@@ -32,6 +32,7 @@ static const struct {
 	{"ui-list-scroll", 116613},
 	{"ui-page-change", 246531},
 	{"ui-screen-switch", 200664},
+	{"ui-wallpaper", 173832},
 };
 
 #endif

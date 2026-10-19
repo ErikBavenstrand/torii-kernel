@@ -119,8 +119,22 @@ void test_pool_tags_cache_revive(void)
 	CHECK_EQ(pool_find(&p, 0x20), b);
 	CHECK_EQ(pool_start(&p, big), 6);
 	CHECK(pool_valid(&p));
+	// POOL_KEEP fails rather than reclaim b
+	CHECK_EQ(pool_alloc(&p, 4, 1, 0, 16, 0, POOL_KEEP), POOL_NONE);
+	CHECK_EQ(p.error, POOL_ERR_FULL);
+	CHECK_EQ(pool_find(&p, 0x20), b);
 	pool_flush(&p);
 	CHECK_EQ(pool_find(&p, 0x20), POOL_NONE);
+	CHECK(pool_valid(&p));
+	// Dropping one cached block; a used one, a free slot or none stays
+	u8 d = pool_alloc(&p, 2, 1, 0, 16, 0x50, 0);
+	CHECK(!pool_drop(&p, d));
+	CHECK(!pool_drop(&p, POOL_NONE));
+	pool_unref(&p, d);
+	CHECK(pool_drop(&p, d));
+	CHECK_EQ(pool_find(&p, 0x50), POOL_NONE);
+	CHECK(!pool_drop(&p, d));
+	CHECK_EQ(pool_free_units(&p, 0), 8);
 	CHECK(pool_valid(&p));
 	// The reference cap
 	u8 r = pool_alloc(&p, 1, 1, 0, 16, 0x40, 0);

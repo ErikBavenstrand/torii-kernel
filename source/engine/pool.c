@@ -272,13 +272,13 @@ u8 pool_alloc(struct pool *pool, u16 len, u16 align, u16 lo, u16 hi, u16 tag, u8
 				pool->fresh = 1;
 				return used;
 			}
-			if (!reclaim_oldest(pool)) {
+			if ((flags & POOL_KEEP) || !reclaim_oldest(pool)) {
 				pool->error = POOL_ERR_SLOTS;
 				return POOL_NONE;
 			}
 			continue;
 		}
-		if (!reclaim_oldest(pool)) {
+		if ((flags & POOL_KEEP) || !reclaim_oldest(pool)) {
 			pool->error = POOL_ERR_FULL;
 			return POOL_NONE;
 		}
@@ -320,6 +320,14 @@ void pool_flush(struct pool *pool)
 {
 	while (reclaim_oldest(pool))
 		;
+}
+
+int pool_drop(struct pool *pool, u8 handle)
+{
+	if (handle >= pool->cap || state_of(&pool->blocks[handle]) != POOL_CACHED)
+		return 0;
+	free_block(pool, handle);
+	return 1;
 }
 
 u16 pool_free_units(const struct pool *pool, int with_cached)

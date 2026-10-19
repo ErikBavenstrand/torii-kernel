@@ -64,23 +64,34 @@ int ui_theme_boot(void);
 
 // --- For ui/ui_run.c ---------------------------------------------------------
 
-// The wallpaper's map and tiles go at the top of BG VRAM units
-// [0, UI_WALL_VRAM_END), under its map: the part only character block 0
-// reaches. Lists on planes 1 and 3 take their tiles from blocks 1 and 2
-// (units 512 up) and maps come from the top of VRAM, so neither ever needs
-// that room, and the wallpaper never moves their blocks either (T18: put
-// among the maps, it pushed every view's maps down a screenblock and the
-// game menu's plane 3 list no longer fit). Only planes 0 and 2 share it,
-// taking tiles from the bottom up.
+// Where the wallpaper goes (T18; the VRAM map is in the v0.3 decisions log):
+// - Its map and, under it, its tiles at the top of BG VRAM units
+//   [0, UI_WALL_VRAM_END): the part only character block 0 reaches. Lists
+//   on planes 1 and 3 take their tiles from blocks 1 and 2 (units 512 up)
+//   and maps come from the top of VRAM, so neither needs that room, and the
+//   wallpaper never moves their blocks. Put among the maps, it pushed every
+//   view's maps down and the game menu's plane 3 list no longer fit.
+// - Planes 0 and 2 take tiles there from the bottom up, and reclaim the
+//   wallpaper when they need its room (a dialog with a lot of text over a
+//   large wallpaper). It then goes among the maps, under the lowest one,
+//   until the next push or pop: ui_push and ui_init drop it from there
+//   first (ui_wallpaper_yield), so no view's or the UI's own maps go under
+//   it, and after a push or pop it moves back under UI_WALL_VRAM_END if it
+//   fits.
 #define UI_WALL_VRAM_END 512
 
-// Uploads the wallpaper of the current theme (if it has one and it isn't
-// up already): ui_init and ui_theme_set call it, and the frame after a view
-// is popped (once nothing popped shows). Its tiles, map and palette bank are
-// left cached (engine/res.h), so they never count against a screen's
-// budget: a screen whose planes 0 and 2 need the room reclaims them, and the
-// wallpaper is off until a view is popped and it fits again.
-void ui_wallpaper_setup(void);
+// Uploads the wallpaper of the current theme if it has one and it isn't up
+// under UI_WALL_VRAM_END already: ui_init and ui_theme_set call it, and the
+// frame after a push or pop (once nothing popped shows). Its tiles, map and
+// palette bank are left cached (engine/res.h), so they never count against a
+// screen's budget: a screen that needs the room reclaims them. 1 if it
+// uploaded it (it decodes and checks the file in PSRAM: a large one can take
+// a frame).
+int ui_wallpaper_setup(void);
+// Before a push or ui_init's allocations: frees the wallpaper's VRAM if it is
+// up among the maps, so the maps take the top as if it weren't there. 1 if
+// it was up.
+int ui_wallpaper_yield(void);
 // 1 if the wallpaper can show on plane 3 now, with its BGCNT in *bgcnt.
 int ui_wallpaper_bgcnt(u16 *bgcnt);
 // When a screen fails to push while the SD theme is current, ui_push tries
