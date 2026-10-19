@@ -71,6 +71,7 @@ static struct {
 	u8 pop_wait;       // 1: popped, regs not updated; 2: updated in pop_frame
 	u8 lists_hidden;   // planes of lists hidden with ui_show
 	u16 wake_keys;     // keys that woke the screen from DIM, ignored until let go
+	u16 queued_keys;   // ui_queue_keys: dispatched next frame
 	u32 pop_frame;
 	// A page's fade-in
 	u8 reveal;        // REVEAL_*
@@ -94,6 +95,12 @@ static struct {
 void ui_wake(void)
 {
 	frame_wake();
+}
+
+void ui_queue_keys(u16 keys)
+{
+	ui.queued_keys |= keys;
+	ui_wake();
 }
 
 const InputState *ui_input(void)
@@ -643,6 +650,7 @@ void ui_hook_popped(u8 planes)
 	// Its maps and tiles may go to the next view at once, but they show
 	// until regs without them are committed: a view pushed now waits
 	ui.pop_wait = 1;
+	ui.queued_keys = 0;
 	ui.hidden &= (u8)~planes;
 	ui.hide_pending &= (u8)~planes;
 	if (planes >> ui.reveal_plane & 1)
@@ -761,6 +769,9 @@ u32 ui_frame(void)
 	if (dim_step(dt))
 		fire = 0;
 	fire &= (u16)~ui.wake_keys;
+	if (!ui.dimmed)
+		fire |= ui.queued_keys;
+	ui.queued_keys = 0;
 	if (fire) {
 		frame_wake();
 		ui_dispatch_keys(fire);

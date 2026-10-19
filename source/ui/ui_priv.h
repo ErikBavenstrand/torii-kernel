@@ -70,6 +70,9 @@ int ui_plane_hidden_now(u32 plane);
 // it, so the new page comes up softly instead of popping. A plain show while
 // a darken blend is on (a modal view's dim, DIM) or with page_fade 0.
 void ui_plane_reveal(u32 plane);
+// Keys a widget held back (A during a list's page change), dispatched with
+// the next frame's keys as if pressed then. A pop forgets them.
+void ui_queue_keys(u16 keys);
 
 // Cycles into the frame by which drawing that nobody sees yet (a page
 // change, a view not shown) ends, so the frame still ends before the next

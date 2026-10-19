@@ -55,6 +55,7 @@ struct list_state {
 	u16 first;  // first slot's tile number
 	u8 page;
 	u8 sel_ok;  // the map shows the selection at sel_drawn
+	u8 queued_a;  // A pressed during a page change: dispatched once it is drawn
 	u32 count, rows;
 	u32 cursor;
 	u32 sel_drawn;  // the item whose map entries are in the selected bank
@@ -287,7 +288,9 @@ static void set_cursor(u8 node, struct list_state *st, u32 cursor, int jump)
 	st->cursor = cursor;
 	marquee_reset(node, st);
 	st->sel_ok = st->sel_ok && st->sel_drawn == cursor;
-	s32 target = ring_scroll_for(&st->ring, cursor / st->cols, goal_px(st), st->rows, 1);
+	// During a page change, from where its page will be
+	s32 from = st->page != PAGE_NONE ? st->page_target : goal_px(st);
+	s32 target = ring_scroll_for(&st->ring, cursor / st->cols, from, st->rows, 1);
 	if (st->page != PAGE_NONE)
 		st->page_target = target;
 	else if (ring_far(&st->ring, st->shown, target))
@@ -376,13 +379,15 @@ static int list_event(u8 node, const struct ui_event *e)
 	struct list_state *st = ui_node_state(node);
 	if (e->type != UI_EV_KEYS)
 		return 0;
-	if (st->page == PAGE_HIDING)
-		return (e->keys & (INPUT_DPAD | INPUT_PAGE | INPUT_A)) != 0;
 	const InputState *in = ui_input();
 	u32 page = st->ring.h / st->ring.rh;
 	s32 cols = st->cols;
 	if (e->keys & INPUT_A) {
-		if (st->count)
+		// Moves during a page change only move the page it draws (set_cursor);
+		// A waits until that page is up
+		if (st->page != PAGE_NONE)
+			st->queued_a = 1;
+		else if (st->count)
 			ui_emit(node, UI_EV_ACTIVATE, st->cursor);
 		return 1;
 	}
@@ -702,6 +707,10 @@ static void list_draw(u8 node)
 		st->sel_ok = st->page_cursor == st->cursor;
 		ui_plane_reveal(spec->plane);
 		gfx_hold_for_queue(GFX_DIRTY_DISPCNT);
+		if (st->queued_a) {
+			st->queued_a = 0;
+			ui_queue_keys(INPUT_A);
+		}
 		if (!st->sel_ok) {
 			// Keys moved the cursor while the page drew: scroll on to it
 			st->page_cursor = st->cursor;
