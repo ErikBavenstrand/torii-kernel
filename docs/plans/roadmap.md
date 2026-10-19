@@ -20,34 +20,24 @@ source EZ-Flash hasn't released, so it isn't supported.
 
 Fixed with tests on main, from `b9c9245` to `b6687ea`. `CHANGELOG.md` has the details.
 
-- **Save types:** Doom, Doom II and Gauntlet are now EEPROM 512, and the Classic NES Series
-  are EEPROM (ez-flash/omega-de-kernel#3).
-- **Cheat table:** capped at 600 writes, which is what the 0x2000-byte patch area holds.
-- **Clock and rumble:** they are now separate settings, shown as one row, `CART: [x] CLOCK
-  [x] RUMBLE` (ez-flash/omega-de-kernel#5).
-- **GB, GBC and NES games:** they start without the Clean Boot menu. The Goomba palette
-  waits for v0.6 (ez-flash/omega-de-kernel#12).
-- **Sorting:** the SD listing uses a case-insensitive merge sort.
-- **Recently played:** it works at its 10-entry limit.
-- **Clean boot:** EWRAM is fully cleared when a game starts.
+- ~~**Save types:** Doom, Doom II and Gauntlet are now EEPROM 512, and the Classic NES Series are EEPROM (ez-flash/omega-de-kernel#3).~~
+- ~~**Cheat table:** capped at 600 writes, which is what the 0x2000-byte patch area holds.~~
+- ~~**Clock and rumble:** they are now separate settings, shown as one row, `CART: [x] CLOCK [x] RUMBLE` (ez-flash/omega-de-kernel#5).~~
+- ~~**GB, GBC and NES games:** they start without the Clean Boot menu. The Goomba palette waits for v0.6 (ez-flash/omega-de-kernel#12).~~
+- ~~**Sorting:** the SD listing uses a case-insensitive merge sort.~~
+- ~~**Recently played:** it works at its 10-entry limit.~~
+- ~~**Clean boot:** EWRAM is fully cleared when a game starts.~~
 
 Still open from the bug work:
 
 - ~~**EEPROM sizes:** settled, no change needed. FlashGBX's cart-dump database (`db_AGB.json` in `res/config.zip`) lists 941 table entries marked 0x22 (EEPROM 8K) as 512-byte EEPROM, plus 9 marked 0x23 and 6 marked 0x32 (Flash 64K). The real cart decides the address width per request, so 8K mode takes these games' 6-bit requests and their saves stay in the first 512 bytes (`docs/research/cart-test-2026-10-18b.md`). The 0x23 and 0x32 entries are unchecked, and Doom and Gauntlet stay EEPROM 512.~~
 - ~~**Hook coverage:** done. `just compat` has an in-game menu column; all 118 commercial GBA games in the library pass (`docs/research/hook-coverage.md`). Four games get exact-ROM patches for the EU dumps tested; other regions may need their own. The menu keeps the game's brightness, but still resets the BG2 affine registers, which are write-only.~~
 - ~~**Game NOR:** WRITE TO NOR now runs in the emulator (`tests/nor.sh`), which showed these kernel bugs. Each one can lose or overwrite a NOR game:~~
-  - Fixed: `Read_S98NOR_ID` (`Ezcard_OP.c`) left the chip in ID mode, so the NOR list could
-    read empty and the next write landed over the first game. It now writes `0xF0`.
-  - Fixed in v0.2.1 (`tests/nor_safety.sh`, the list format in `omega-de-hardware.md`):
-    `GetFileListFromNor` returned without `REG_IME = 1` when its scan reached the end of the
-    64 MB. "Delete latest" erased only the game's first 128 KB and kept its list entry, so a
-    write with the same header cut off after one block was listed. Losing power inside
-    `Save_NOR_info` emptied the list, and the next write went over the first game. A ROM
-    without 0x96 at 0xB2 was written but never listed. The list now has two copies, games a
-    completion mark, and the boot rebuilds a lost list from the marks.
+  - ~~Fixed: `Read_S98NOR_ID` (`Ezcard_OP.c`) left the chip in ID mode, so the NOR list could read empty and the next write landed over the first game. It now writes `0xF0`.~~
+  - ~~Fixed in v0.2.1 (`tests/nor_safety.sh`, the list format in `omega-de-hardware.md`): `GetFileListFromNor` returned without `REG_IME = 1` when its scan reached the end of the 64 MB. "Delete latest" erased only the game's first 128 KB and kept its list entry, so a write with the same header cut off after one block was listed. Losing power inside `Save_NOR_info` emptied the list, and the next write went over the first game. A ROM without 0x96 at 0xB2 was written but never listed. The list now has two copies, games a completion mark, and the boot rebuilds a lost list from the marks.~~
 - ~~**Non-ASCII names:** the list draws names by byte count, so CJK names start scrolling too early, and a character split at the edge of the list shows as `?`. Names over 99 bytes (about 34 CJK characters) show cut with `*` and "Name too long", and can't be opened. The v0.3 file list fixes both.~~ Fixed by v0.3 (`5e1981c`).
 - ~~**Clean boot:** IWRAM is still not fully cleared at launch, because the `SoftReset_now` code stays there. No game is known to need it. Clean-boot tests use `tests/roms/idle` (no crt0), since devkitARM's crt0 clears EWRAM itself.~~ Fixed by v0.2.1.
-- **From the logging work:**
+- ~~**From the logging work:**~~
   - `Save_savefile` ignores short writes, and `Check_save_flag` ignores its result, so a
     nearly full card silently truncates a new save, e.g. 64 KB written as 32 KB (v0.5's
     crash-safe saving replaces it).
@@ -64,23 +54,14 @@ Still open from the bug work:
 
 ### Tooling (done)
 
-- **Warnings:** add `-Wextra -Wshadow -Wundef -Wformat=2 -Wstrict-prototypes
-  -Wmissing-prototypes`, exempting the vendored FatFs. Fix everything, then turn on `-Werror`.
-- **Stack and size:** add `-fstack-usage`, and try `-ffunction-sections -fdata-sections
-  -Wl,--gc-sections`, comparing `just size` before and after. Tried and rejected: gc-sections
-  cost 568 bytes of ROM and 24 of IWRAM.
-- **Editor config:** add `.editorconfig` and `.gitattributes`.
-- **Formatting:** run a pinned clang-format through `uvx` in `just lint` and CI, and add a
-  short formatting note to CLAUDE.md. There is no Claude Code hook.
-- **clangd:** add `.clangd` with `--target=arm-none-eabi`, built on
-  `just compile-commands`.
-- **Host tests:** build pure code (parsers, sorting, cheat decoders) for the host with
-  ASan/UBSan, reusing `torii_test.h`.
-- **Advisory analysis:** run cppcheck, clang-tidy (`bugprone-*`, `clang-analyzer-*`) and
-  GCC 10's `-fanalyzer` in report-only mode, with a baseline. GCC 10's analyzer gives up on
-  the kernel's big functions (`-Wanalyzer-too-complex`) and finds nothing so far.
-- **Pinning:** Docker images by digest plus a Debian snapshot, Actions by SHA, just and uv
-  by version. Bump the snapshot and the image digest together.
+- ~~**Warnings:** add `-Wextra -Wshadow -Wundef -Wformat=2 -Wstrict-prototypes -Wmissing-prototypes`, exempting the vendored FatFs. Fix everything, then turn on `-Werror`.~~
+- ~~**Stack and size:** add `-fstack-usage`, and try `-ffunction-sections -fdata-sections -Wl,--gc-sections`, comparing `just size` before and after. Tried and rejected: gc-sections cost 568 bytes of ROM and 24 of IWRAM.~~
+- ~~**Editor config:** add `.editorconfig` and `.gitattributes`.~~
+- ~~**Formatting:** run a pinned clang-format through `uvx` in `just lint` and CI, and add a short formatting note to CLAUDE.md. There is no Claude Code hook.~~
+- ~~**clangd:** add `.clangd` with `--target=arm-none-eabi`, built on `just compile-commands`.~~
+- ~~**Host tests:** build pure code (parsers, sorting, cheat decoders) for the host with ASan/UBSan, reusing `torii_test.h`.~~
+- ~~**Advisory analysis:** run cppcheck, clang-tidy (`bugprone-*`, `clang-analyzer-*`) and GCC 10's `-fanalyzer` in report-only mode, with a baseline. GCC 10's analyzer gives up on the kernel's big functions (`-Wanalyzer-too-complex`) and finds nothing so far.~~
+- ~~**Pinning:** Docker images by digest plus a Debian snapshot, Actions by SHA, just and uv by version. Bump the snapshot and the image digest together.~~
 
 Notes from the tooling work:
 
@@ -90,10 +71,9 @@ Notes from the tooling work:
 
 ### Source cleanup (done)
 
-1. Port the Simple DE and DS Style fixes we want while their code still lines up with ours.
-2. Remove the Chinese strings, the HZK12 font and FatFs's CP936 tables (about 87 KB each).
-3. Convert to UTF-8 with LF line endings, and run clang-format once in its own commit,
-   listed in `.git-blame-ignore-revs`.
+1. ~~Port the Simple DE and DS Style fixes we want while their code still lines up with ours.~~
+2. ~~Remove the Chinese strings, the HZK12 font and FatFs's CP936 tables (about 87 KB each).~~
+3. ~~Convert to UTF-8 with LF line endings, and run clang-format once in its own commit, listed in `.git-blame-ignore-revs`.~~
 
 Then update CLAUDE.md: the GBK, CRLF and `zh_*` rules go.
 
@@ -106,24 +86,12 @@ a persistent setting, `Logging: Off / Errors / Info / Debug`, off by default and
 off. Until `torii.ini` arrives in v0.5, it lives in a free kernel settings slot, like CLOCK
 and RUMBLE. Kernel crash dumps are captured even when logging is off.
 
-- **Kernel log:** `tlog()` writes into a small ring buffer in RAM (2–4 KB of the free
-  EWRAM). The buffer is flushed to `/torii/logs/` at safe points: before a launch, on
-  errors, and when settings close. Files are append-only and rotate, keeping the last N,
-  so the card never fills. Every boot starts with a session marker. Under the emulator,
-  `tlog()` still goes to mGBA's console.
-- **Launch record:** before each launch, the log records exactly what the kernel did:
-  game code and revision, save type, the patches and hooks applied (including
-  `rom_patches` and `reset_table.h` matches), cheats, CART settings and the plugin.
-- **Crash detection:** if a game ran and didn't come back cleanly, the next boot logs that
-  the previous session ended abnormally, next to its launch record.
-- **In-game snapshot:** a "Save debug info" entry in the in-game menu writes registers,
-  the hook state and a small memory sample to SD.
-- **Kernel crash dump:** an exception handler stores the registers and call stack in cart
-  RAM that survives a soft reset, and the next boot writes them to the log. Whether the
-  dump also survives a power cycle is checked on the real cart.
-- **Tools:** `just logs PATH` pulls the logs from an SD card and turns code addresses into
-  function names from the matching `ezkernelnew.sym`, in the same format as the emulator's
-  crash reports.
+- ~~**Kernel log:** `tlog()` writes into a small ring buffer in RAM (2–4 KB of the free EWRAM). The buffer is flushed to `/torii/logs/` at safe points: before a launch, on errors, and when settings close. Files are append-only and rotate, keeping the last N, so the card never fills. Every boot starts with a session marker. Under the emulator, `tlog()` still goes to mGBA's console.~~
+- ~~**Launch record:** before each launch, the log records exactly what the kernel did: game code and revision, save type, the patches and hooks applied (including `rom_patches` and `reset_table.h` matches), cheats, CART settings and the plugin.~~
+- ~~**Crash detection:** if a game ran and didn't come back cleanly, the next boot logs that the previous session ended abnormally, next to its launch record.~~
+- ~~**In-game snapshot:** a "Save debug info" entry in the in-game menu writes registers, the hook state and a small memory sample to SD.~~
+- ~~**Kernel crash dump:** an exception handler stores the registers and call stack in cart RAM that survives a soft reset, and the next boot writes them to the log. Whether the dump also survives a power cycle is checked on the real cart.~~
+- ~~**Tools:** `just logs PATH` pulls the logs from an SD card and turns code addresses into function names from the matching `ezkernelnew.sym`, in the same format as the emulator's crash reports.~~
 
 #### On-cart debug mode
 
@@ -131,17 +99,12 @@ Not a setting: you run it when you want it, from a Diagnostics entry in settings
 holding a key combination at power-on (in case the menu itself is broken). It logs at
 Debug level for its own run only. It:
 
-- runs the unit tests;
-- probes the hardware: RTC, PSRAM, NOR reads, and a save-chip test that doesn't touch the
-  user's saves;
-- measures real timings: NOR wait states (the kernel never sets `WAITCNT`), glyph
-  rendering, LZ77 decompression and SD throughput;
-- settles the EEPROM 512 versus 8K question for games in the save table;
-- looks for a separate rumble control. The Omega DE has its own rumble motor on the cart
-  GPIO port, and `0x096A0000` gates the whole port. The kernel now enables it per game,
-  from the GBA game code or the GB cart type at 0x147 (`a854cdc`). GBA romhacks that add
-  rumble only get the port while CLOCK is on;
-- walks you through the manual checklist with pass/fail buttons.
+- ~~runs the unit tests;~~
+- ~~probes the hardware: RTC, PSRAM, NOR reads, and a save-chip test that doesn't touch the user's saves;~~
+- ~~measures real timings: NOR wait states (the kernel never sets `WAITCNT`), glyph rendering, LZ77 decompression and SD throughput;~~
+- ~~settles the EEPROM 512 versus 8K question for games in the save table;~~
+- ~~looks for a separate rumble control. The Omega DE has its own rumble motor on the cart GPIO port, and `0x096A0000` gates the whole port. The kernel now enables it per game, from the GBA game code or the GB cart type at 0x147 (`a854cdc`). GBA romhacks that add rumble only get the port while CLOCK is on;~~
+- ~~walks you through the manual checklist with pass/fail buttons.~~
 
 It writes its report to SD as a log stream that we bring back to the repo. When the real
 cart disagrees with the emulator, the fix goes into the cart model.
@@ -151,59 +114,33 @@ cart disagrees with the emulator, the fix goes into the cart model.
 Every known bug, found in our work or inherited from the official kernel, is fixed here.
 From the first real-cart test of v0.2.0 (`docs/research/cart-test-2026-10-18.md`):
 
-- **Log files:** fill new log files with zeros from RAM, not a ROM array. On the real cart,
-  ROM reads while SD mode is on return the SD buffer's leftover data. Make `disk_write`
-  refuse or copy any buffer in ROM. Recover log files already full of junk (start a new file
-  when the space after the text isn't zero), and make `log_find_end` robust.
-- **Cart model:** while SD mode is on, ROM reads don't return NOR contents. Cart RAM beyond the
-  save clears on a power cycle. The clock gate is `0x096A0000` bit 0. The EEPROM doesn't
-  answer without a game loaded. Add a test that log files are zero after their text.
-- **Reproducible builds:** sort the Makefile's `$(wildcard)` lists, so CI and macOS link the
-  same binary. Attach `ezkernelnew.sym` to each release, and put a real build ID (a CRC or the
-  git hash) in the boot line. `just logs` warns when the symbols don't match.
-- **Save logging:** log every "Save sav?" decision, save copy (with size and result), NOR
-  write and settings save, including `f_write` and `f_close` results. Done: a short copy is
-  logged as an error with the bytes written (`tests/saves.sh`), but still cuts the save short;
-  handling the error and keeping the old save is v0.5's crash-safe saving. On the real cart,
-  check a power-on copy's log lines.
-- **Diagnostics:**
-  - name the failed checklist item in the summary;
-  - show the clock live on the clock item;
-  - log probe answers as info, not errors;
-  - after a crash, say the session crashed;
-  - show a GB game's title instead of `(????)`;
-  - in the checklist, say to use RESET, not power-off, before checking the DEBUG snapshot.
-- **Clock display:** the checklist clock looked stuck about 10 minutes behind. Make it live,
-  and check the RTC against real time (Diagnostics could log both).
-- **In-game DEBUG:** give feedback when the snapshot is taken, and survive power-off. Either
-  write it to SD from the menu, or tell the user to use RESET. On the real cart, choosing it
-  seemed to do nothing.
-- **Checklist answers:** a yes needs proof where the log can give it. For example, flag a
-  "sleep works" yes when no launch had sleep on, and an NES yes with no NES launch.
-- **EEPROM probe:** run it in game mode, from a small test ROM, so it can settle 512 vs 8K.
-- **WAITCNT:** the cart reads correctly at 2/1 with prefetch, 20% faster than the default.
-  The menu now runs at `0x4018`, and every launch restores `0x0000` (`source/waitcnt.h`);
-  launching (PSRAM writes), the cart's control registers, SD transfers, NOR writes and the
-  clock stay at `0x0000`. In mGBA a 300-file folder opens
-  in 23 frames instead of 40. **The real cart must confirm it:** browse, open a large
-  folder, launch from SD and NOR, write a game to NOR, set the clock and run Diagnostics,
-  then check the log for errors. Games that don't set WAITCNT still start at `0x0000`.
-- **Rumble:** no GPIO register value drove the motor. Test with Drill Dozer: WarioWare:
-  Twisted! needs a motion sensor the Omega DE lacks. Then find out how the cart's rumble is
-  driven, or whether this cart has a motor at all.
+- ~~**Log files:** fill new log files with zeros from RAM, not a ROM array. On the real cart, ROM reads while SD mode is on return the SD buffer's leftover data. Make `disk_write` refuse or copy any buffer in ROM. Recover log files already full of junk (start a new file when the space after the text isn't zero), and make `log_find_end` robust.~~
+- ~~**Cart model:** while SD mode is on, ROM reads don't return NOR contents. Cart RAM beyond the save clears on a power cycle. The clock gate is `0x096A0000` bit 0. The EEPROM doesn't answer without a game loaded. Add a test that log files are zero after their text.~~
+- ~~**Reproducible builds:** sort the Makefile's `$(wildcard)` lists, so CI and macOS link the same binary. Attach `ezkernelnew.sym` to each release, and put a real build ID (a CRC or the git hash) in the boot line. `just logs` warns when the symbols don't match.~~
+- ~~**Save logging:** log every "Save sav?" decision, save copy (with size and result), NOR write and settings save, including `f_write` and `f_close` results. Done: a short copy is logged as an error with the bytes written (`tests/saves.sh`), but still cuts the save short; handling the error and keeping the old save is v0.5's crash-safe saving. On the real cart, check a power-on copy's log lines.~~
+- ~~**Diagnostics:**~~
+  - ~~name the failed checklist item in the summary;~~
+  - ~~show the clock live on the clock item;~~
+  - ~~log probe answers as info, not errors;~~
+  - ~~after a crash, say the session crashed;~~
+  - ~~show a GB game's title instead of `(????)`;~~
+  - ~~in the checklist, say to use RESET, not power-off, before checking the DEBUG snapshot.~~
+- ~~**Clock display:** the checklist clock looked stuck about 10 minutes behind. Make it live, and check the RTC against real time (Diagnostics could log both).~~
+- ~~**In-game DEBUG:** give feedback when the snapshot is taken, and survive power-off. Either write it to SD from the menu, or tell the user to use RESET. On the real cart, choosing it seemed to do nothing.~~
+- ~~**Checklist answers:** a yes needs proof where the log can give it. For example, flag a "sleep works" yes when no launch had sleep on, and an NES yes with no NES launch.~~
+- ~~**EEPROM probe:** run it in game mode, from a small test ROM, so it can settle 512 vs 8K.~~
+- ~~**WAITCNT:** the cart reads correctly at 2/1 with prefetch, 20% faster than the default. The menu now runs at `0x4018`, and every launch restores `0x0000` (`source/waitcnt.h`); launching (PSRAM writes), the cart's control registers, SD transfers, NOR writes and the clock stay at `0x0000`. In mGBA a 300-file folder opens in 23 frames instead of 40. **The real cart must confirm it:** browse, open a large folder, launch from SD and NOR, write a game to NOR, set the clock and run Diagnostics, then check the log for errors. Games that don't set WAITCNT still start at `0x0000`.~~
+- ~~**Rumble:** no GPIO register value drove the motor. Test with Drill Dozer: WarioWare: Twisted! needs a motion sensor the Omega DE lacks. Then find out how the cart's rumble is driven, or whether this cart has a motor at all.~~
 
 Also every bug still open from v0.2 that belongs here:
 
-- **Game NOR:** interrupts left off after a full scan, half-written games listed after
-  "delete latest", the list lost on a power cut in `Save_NOR_info`, homebrew without 0x96 at
-  0xB2 never listed, the table erased whenever the list reads empty, and NOR launches not
-  updating Recently Played.
-- **Launch:** IWRAM isn't fully cleared (the `SoftReset_now` code stays).
-- **Logging:** the log sequence number overflow.
+- ~~**Game NOR:** interrupts left off after a full scan, half-written games listed after "delete latest", the list lost on a power cut in `Save_NOR_info`, homebrew without 0x96 at 0xB2 never listed, the table erased whenever the list reads empty, and NOR launches not updating Recently Played.~~
+- ~~**Launch:** IWRAM isn't fully cleared (the `SoftReset_now` code stays).~~
+- ~~**Logging:** the log sequence number overflow.~~
 
 Kept in their own milestones:
 - hiding `/torii`, in v0.4;
-- UTF-8 name drawing and names over 99 bytes, in v0.3;
+- ~~UTF-8 name drawing and names over 99 bytes, in v0.3;~~
 - save write errors, in v0.5;
 - Jagoomba from source and the palette fix, in v0.6;
 - the in-game LOAD crash and the BG2 affine registers, in v0.7.
@@ -214,19 +151,13 @@ EEPROM sizes and rumble wait for the next real-cart test.
 
 From the real-cart test of v0.2.1 (`docs/research/cart-test-2026-10-18b.md`):
 
-- **EEPROM probe:** every write lost its last byte, polled right after the stop bit. The
-  probe now waits before polling, writes four blocks four different ways and shows which
-  bytes differ; the kernel accepts a match on bytes 0–6 and logs the lost byte.
-- **Diagnostics:** the EEPROM item checks the probe's verdict; a button step missing L or R
-  says the hotkeys need them; the boot after the crash test names it.
-- **Save size:** a `.sav` smaller than its save type (512 bytes under EEPROM 8K) is grown
-  with `FF`, so blocks past its end survive power-off.
-- **Hotkeys:** match the combo's keys, so an extra or stuck key doesn't block the in-game
-  menu or sleep.
-- **NOR list:** an older kernel's list is saved in the new format once, and list reads are
-  logged only when they change.
-- **`just logs`:** junk bytes show as a count, not verbatim.
-- **Hello** shows a green square while its test cheat runs, for the checklist.
+- ~~**EEPROM probe:** every write lost its last byte, polled right after the stop bit. The probe now waits before polling, writes four blocks four different ways and shows which bytes differ; the kernel accepts a match on bytes 0–6 and logs the lost byte.~~
+- ~~**Diagnostics:** the EEPROM item checks the probe's verdict; a button step missing L or R says the hotkeys need them; the boot after the crash test names it.~~
+- ~~**Save size:** a `.sav` smaller than its save type (512 bytes under EEPROM 8K) is grown with `FF`, so blocks past its end survive power-off.~~
+- ~~**Hotkeys:** match the combo's keys, so an extra or stuck key doesn't block the in-game menu or sleep.~~
+- ~~**NOR list:** an older kernel's list is saved in the new format once, and list reads are logged only when they change.~~
+- ~~**`just logs`:** junk bytes show as a count, not verbatim.~~
+- ~~**Hello** shows a green square while its test cheat runs, for the checklist.~~
 
 Still to confirm on the real cart (`docs/release-checklist.md`): the in-game menu, save
 states, DEBUG, sleep and cheats (the console's L button was laggy), GB/GBC, NES, a NOR write,
@@ -240,14 +171,10 @@ v0.2.2 bricked the real cart at its first boot: the NOR list's copy B went to ke
 v0.2.2 must not be used**; both are marked unsafe on GitHub, and `docs/recovery.md` has the
 recovery used on 2026-10-18.
 
-- Copy B moves to `0x780000`; `Save_info`, the only kernel-NOR writer, refuses anything
-  outside `0x780000–0x7BFFFF` (`source/bootloader.h`).
-- The emulated cart models the real chip: the loader at chip 0, the kernel window at
-  `0x40000` wrapping at 8 MB, 8 KB boot sectors, programming failures. Any write to the
-  loader stops the run, and `tests/loader_safety.sh` runs every kernel-NOR writer, power cuts
-  in them and the other chip; it fails on v0.2.1 and v0.2.2.
-- Diagnostics reads the loader (read-only) and logs its CRC and state.
-- The release checklist keeps `DE.BIN` on the test card and tests NOR write and delete.
+- ~~Copy B moves to `0x780000`; `Save_info`, the only kernel-NOR writer, refuses anything outside `0x780000–0x7BFFFF` (`source/bootloader.h`).~~
+- ~~The emulated cart models the real chip: the loader at chip 0, the kernel window at `0x40000` wrapping at 8 MB, 8 KB boot sectors, programming failures. Any write to the loader stops the run, and `tests/loader_safety.sh` runs every kernel-NOR writer, power cuts in them and the other chip; it fails on v0.2.1 and v0.2.2.~~
+- ~~Diagnostics reads the loader (read-only) and logs its CRC and state.~~
+- ~~The release checklist keeps `DE.BIN` on the test card and tests NOR write and delete.~~
 
 ## v0.3 Renderer (done)
 
