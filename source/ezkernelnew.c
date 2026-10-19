@@ -2093,7 +2093,6 @@ re_showfile:
 					tlog_flush();
 					if (res == SETTINGS_TO_DIAGNOSE) {  //DIAGNOSE, which restarts the kernel
 						Diagnostics();
-						page_num = SET2_win;
 					} else {
 						DrawPic((u16 *)gImage_NOR, 0, 0, 240, 160, 0, 0, 1);
 						page_num = NOR_list;  //NOR

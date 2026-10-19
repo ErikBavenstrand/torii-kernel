@@ -714,7 +714,7 @@ static void page1_poll(void)
 	u8 old[7];
 	memcpy(old, p1.datetime, sizeof(old));
 	read_clock();
-	if (memcmp(old, p1.datetime, sizeof(old)))
+	if (memcmp(old, p1.datetime, sizeof(old)) != 0)
 		settings_sync();
 }
 
