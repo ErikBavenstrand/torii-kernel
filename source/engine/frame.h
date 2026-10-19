@@ -52,7 +52,8 @@ u32 frame_last_cycles(void);
 // Frames begun since frame_init.
 u32 frame_count(void);
 // At this frame's frame_end, logs its busy cycles as "frame-cycles: NAME N"
-// (cycles_report). For the cycle budget test and Diagnostics.
+// to mGBA's console and counts them in NAME's summary (cycles_frame). For
+// the cycle budget test.
 void frame_measure(const char *name);
 
 #endif

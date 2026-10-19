@@ -45,10 +45,15 @@ void tlog(const char *format, ...) __attribute__((format(printf, 1, 2)));
 void tlog_error(const char *format, ...) __attribute__((format(printf, 1, 2)));
 void tlog_debug(const char *format, ...) __attribute__((format(printf, 1, 2)));
 
+// A line for mGBA's debug console only, never the card: figures logged
+// every frame for the tests (frame-cycles), which would flood the card.
+void tlog_console(const char *format, ...) __attribute__((format(printf, 1, 2)));
+
 // The card is mounted: flushes may write to it from now on.
 void tlog_sd_ready(void);
-// Writes the lines waiting in RAM to the card. Call it only where the
-// kernel's ROM is mapped and no other code is in the middle of a FatFs call.
+// Writes the lines waiting in RAM to the card, after the frame-cycles
+// summary (cycles_summary). Call it only where the kernel's ROM is mapped and
+// no other code is in the middle of a FatFs call.
 void tlog_flush(void);
 // A line at level that goes to the card even with LOGGING off (crash
 // dumps); the next tlog_flush writes it.
@@ -57,6 +62,9 @@ void tlog_force(u32 level, const char *format, ...) __attribute__((format(printf
 // The last line the previous session wrote to the card, read when the card
 // was mounted with logging on; NULL if there is none.
 const char *tlog_previous_line(void);
+
+// Bytes of log text waiting in RAM for a flush.
+u32 tlog_pending(void);
 
 // True if every line so far reached the card (or none was kept).
 int tlog_all_written(void);

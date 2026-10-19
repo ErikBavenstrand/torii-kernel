@@ -27,6 +27,7 @@
 #include "../diag.h"
 #include "../ezkernel.h"
 #include "../lang.h"
+#include "../logbuf.h"
 #include "../nameindex.h"
 #include "../NORflash_OP.h"
 #include "../RTC.h"
@@ -48,7 +49,8 @@ extern DIR dir;
 #define LIST_ROWS 9       // rows a page of the list shows: (160 - 16) / 16
 #define FOLDER_DEPTH 100   // folders deep whose cursor is remembered
 #define CLOCK_POLL 15      // frames between clock reads
-#define MEASURE_FRAMES 16  // frames measured after a cursor move
+#define MEASURE_FRAMES 16     // frames measured after a cursor move
+#define IDLE_FLUSH_FRAMES 30  // frames with no key held before a log flush
 
 enum screen {
 	SCR_SD,
@@ -1212,6 +1214,16 @@ static void do_action(void)
 	}
 }
 
+// Writes the log to the card once it fills half its RAM ring, while the
+// lists wait for a key, so a long stay in the menu loses no lines and a
+// flush's SD write doesn't stall a scroll
+static void idle_flush(void)
+{
+	if (tlog_pending() >= LOG_RING_SIZE / 2 && ui_idle_frames() >= IDLE_FLUSH_FRAMES && ui_depth() == 1 &&
+	    !lists.act && !jobs_pending())
+		tlog_flush();
+}
+
 void lists_run(void)
 {
 	memset(&lists, 0, sizeof(lists));
@@ -1237,5 +1249,6 @@ void lists_run(void)
 		}
 		if (lists.act)
 			do_action();
+		idle_flush();
 	}
 }
