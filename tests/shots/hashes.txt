@@ -57,6 +57,15 @@ nor-list/screen B41DDB1AFEB55DC1
 nor-write/done 8DE07CA2EAFDF0C4
 nor-write/half C04FD0A7B7D4B370
 recent/screen 672BEF507A1E554D
+recent-empty/fading 56614F38BDA1A799
+recent-empty/screen C76B0991E0027C59
+recent-empty/frames 0-0 7B90E77090ED8325
+recent-empty/frames 1-1 B1BACBF3CC23347D
+recent-empty/frames 2-2 56614F38BDA1A799
+recent-empty/frames 3-3 D04C61103442ACC1
+recent-empty/frames 4-4 A297214B32E3F95D
+recent-empty/frames 5-5 985935EDF00F9B0D
+recent-empty/frames 6-13 C76B0991E0027C59
 sd-deep/held 863B28016E825B30
 sd-deep/held-mid 7C8E5C7B9240BC21
 sd-deep/paged 48F2860E461DE748

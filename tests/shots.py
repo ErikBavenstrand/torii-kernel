@@ -14,7 +14,9 @@ copies themes/NAME to /torii/themes/NAME on the scenario's card ("#! sd-theme
 NAME DIR" copies DIR there instead), and "#! theme-choice NAME" writes NAME to
 /torii/theme.txt, the SD theme the THEME setting's value 2 picks. "#! sd-file
 DEST SIZE SRC" copies SRC to DEST on the card, padded with 0xFF to SIZE
-bytes: a game large enough for a progress bar to move (boot-progress-big).
+bytes: a game large enough for a progress bar to move (boot-progress-big),
+or, with SIZE 0 and SRC /dev/null, an empty file in place of one (quote a
+DEST with spaces).
 
 Check (the default): every key frame's screen hash, and every animation's
 frame hashes, must equal tests/shots/hashes.txt. On a mismatch the actual,
@@ -32,6 +34,7 @@ emu-headless` (see `just test`, `just shots-update`, `just perf-update`).
 
 import os
 import re
+import shlex
 import shutil
 import struct
 import subprocess
@@ -242,11 +245,11 @@ def boot(
                 ]
             )
         elif line.startswith("#! sd-file "):
-            _, _, dest, size, src = line.split(maxsplit=4)
+            _, _, dest, size, src = shlex.split(line)
             data = Path(src).read_bytes()
             padded = cart / Path(dest).name
             padded.write_bytes(data + b"\xff" * (int(size, 0) - len(data)))
-            run(["mcopy", "-Q", "-i", str(cart / "sd.img"), str(padded), f"::{dest}"])
+            run(["mcopy", "-Q", "-o", "-i", str(cart / "sd.img"), str(padded), f"::{dest}"])
             padded.unlink()
         elif line.startswith("#! settings"):
             nor = cart / "kernel-nor.bin"
