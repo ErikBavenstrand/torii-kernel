@@ -272,8 +272,8 @@ recovery used on 2026-10-18.
 
 ## v0.3 Renderer
 
-The menu is currently mode 3 (`SetMode(MODE_3 | BG2_ENABLE)`), drawn pixel by pixel in C.
-v0.3 replaces it with a mode 0 engine built to carry v0.4's UI. The design, the tickets,
+The official menu was mode 3 (`SetMode(MODE_3 | BG2_ENABLE)`), drawn pixel by pixel in C.
+v0.3 replaces it with a mode 0 engine built to carry v0.4's UI; mode 3 and `draw.c` are gone. The design, the tickets,
 and every decision made along the way are in [v0.3-decisions.md](v0.3-decisions.md).
 
 - **Engine:** a fixed 60 fps loop with time-sliced jobs, shadow state committed in VBlank,
