@@ -1168,6 +1168,11 @@ static void nor_menu_a(u32 line, u32 key_l)
 		} else if (res == 0x10) {
 			dialog_kind(NULL, gl_file_exist, 1, AFTER_BACKUP, DIALOG_INFO);  // a question, not an error
 		} else {
+			// Its progress dialog goes over the list alone: over the menu
+			// too, it found no VRAM and never showed
+			while (ui_depth() > 1)
+				ui_pop();
+			lists.menu = 0;
 			if (FRAM_save_op(2) == 2)
 				error_dialog(2, AFTER_NOR);
 			else

@@ -636,6 +636,8 @@ sd-tab-held/frames 238-238 585DF47F64E09F34
 sd-tab-held/frames 239-239 5AE6D8874A41F3C0
 sd-tab-held/frames 240-240 C413DD70402A8CC0
 sd-tab-held/frames 241-292 1EDEE9B0BCDAA1C0
+sd-theme-backup/progress 6954FDE99F97C3BF
+sd-theme-backup/saved D2E042BB7CC6745B
 sd-theme-menus/dialog 1BA10065BD81C17C
 sd-theme-menus/file-menu 88CD9C871C0077EE
 sd-theme-menus/kept 78C37A96E08CB9A9
