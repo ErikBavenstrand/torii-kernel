@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "theme_ini.h"
+#include "../engine/asset.h"
 
 const struct theme_view_name theme_view_names[] = {
 	// The test kernel's UI demo (tests/kernel/ui_demo.c)
@@ -660,4 +661,44 @@ int theme_ini_parse(const char *text, u32 len, struct theme_ini *out)
 	p.pass = 2;
 	walk(&p, text, len);
 	return THEME_OK;
+}
+
+int theme_wallpaper_check(const char *folder, const char *file, const void *data, u32 size, char *msg, u32 cap)
+{
+	if (size > ASSET_FILE_MAX) {
+		snprintf(msg, cap, "%s: wallpaper %s is over 16 KB", folder, file);
+		return 0;
+	}
+	const u8 *bytes = data;
+	struct asset_header h;
+	u32 lz_word = 0;
+	if (size >= sizeof(h)) {
+		memcpy(&h, bytes, sizeof(h));
+		u32 at = ASSET_HEADER_BYTES + asset_palette_bytes(&h);
+		if (at + 4 <= size)
+			memcpy(&lz_word, bytes + at, 4);
+	} else
+		memset(&h, 0, sizeof(h));
+	int check = asset_check(&h, size, lz_word);
+	if (check != ASSET_OK) {
+		snprintf(msg, cap, "%s: wallpaper %s: %s", folder, file, asset_error_text(check));
+		return 0;
+	}
+	if (h.bpp != 4) {
+		snprintf(msg, cap, "%s: wallpaper %s is %ubpp; it must be 4bpp", folder, file, h.bpp);
+		return 0;
+	}
+	struct engine_budget need = {0}, have = {0};
+	need.bg_tiles = (u16)(h.width * h.height);
+	need.bg_maps = 1;
+	need.bg_banks = 1;
+	have.bg_tiles = THEME_WALLPAPER_TILES;
+	have.bg_maps = 1;
+	have.bg_banks = 1;
+	char why[80];
+	if (budget_check(&need, &have, why, sizeof(why)) != BUDGET_OK) {
+		snprintf(msg, cap, "%s: wallpaper %s is over budget: %s", folder, file, why);
+		return 0;
+	}
+	return 1;
 }

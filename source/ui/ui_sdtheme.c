@@ -9,7 +9,6 @@
 #include "sdtheme.h"
 #include "../crc32.h"
 #include "../engine/asset.h"
-#include "../engine/budget.h"
 #include "../engine/gfx.h"
 #include "../engine/psram.h"
 #include "../engine/res.h"
@@ -33,6 +32,7 @@ struct scratch {
 	FILINFO info;
 	char path[80];
 };
+_Static_assert(PSRAM_THEME_SLOT_BYTES == ASSET_FILE_MAX, "a theme's PSRAM slot holds the largest asset");
 _Static_assert(sizeof(struct scratch) <= READCACHE_THEME_SIZE, "theme scratch over READCACHE_THEME_SIZE");
 
 static struct {
@@ -134,39 +134,14 @@ static int load_wallpaper(const char *folder, const char *file, u32 slot, u32 *b
 	u8 *dst = wall_file(slot);
 	u32 size = 0;
 	int r = read_file(s->path, dst, PSRAM_THEME_SLOT_BYTES, &size);
-	if (r != SD_READ_OK) {
-		set_error("%s: wallpaper %s %s", folder, file,
-			  r == SD_READ_ERR_SIZE ? "is over 16 KB" : "can't be read");
+	if (r != SD_READ_OK && r != SD_READ_ERR_SIZE) {
+		set_error("%s: wallpaper %s can't be read", folder, file);
 		return 0;
 	}
-	struct asset_header h;
-	u32 lz_word = 0;
-	memcpy(&h, dst, sizeof(h));
-	if (size >= sizeof(h)) {
-		u32 at = ASSET_HEADER_BYTES + asset_palette_bytes(&h);
-		if (at + 4 <= size)
-			memcpy(&lz_word, dst + at, 4);
-	} else
-		memset(&h, 0, sizeof(h));
-	int check = asset_check(&h, size, lz_word);
-	if (check != ASSET_OK) {
-		set_error("%s: wallpaper %s: %s", folder, file, asset_error_text(check));
-		return 0;
-	}
-	if (h.bpp != 4) {
-		set_error("%s: wallpaper %s is %ubpp; it must be 4bpp", folder, file, h.bpp);
-		return 0;
-	}
-	struct engine_budget need = {0}, have = {0};
-	need.bg_tiles = (u16)(h.width * h.height);
-	need.bg_maps = 1;
-	need.bg_banks = 1;
-	have.bg_tiles = THEME_WALLPAPER_TILES;
-	have.bg_maps = 1;
-	have.bg_banks = 1;
-	char msg[80];
-	if (budget_check(&need, &have, msg, sizeof(msg)) != BUDGET_OK) {
-		set_error("%s: wallpaper %s is over budget: %s", folder, file, msg);
+	char msg[THEME_MESSAGE_MAX];
+	// Over the slot is over ASSET_FILE_MAX: the check says so
+	if (!theme_wallpaper_check(folder, file, dst, r == SD_READ_OK ? size : ASSET_FILE_MAX + 1, msg, sizeof(msg))) {
+		set_error("%s", msg);
 		return 0;
 	}
 	*bytes = size;
@@ -178,20 +153,23 @@ const struct ui_theme *ui_theme_load(const char *name)
 {
 	sd.error[0] = 0;
 	if (!name || !theme_name_ok(name)) {
-		set_error("\"%s\" isn't a theme folder name", name ? name : "");
+		set_error(THEME_MSG_BAD_FOLDER, name ? name : "");
 		return 0;
 	}
 	struct scratch *s = scratch();
 	snprintf(s->path, sizeof(s->path), THEME_DIR "/%s/theme.ini", name);
 	if (!file_exists(s->path)) {
-		set_error("%s has no theme.ini", name);
+		set_error(THEME_MSG_NO_INI, name);
 		return 0;
 	}
 	char *text = (char *)stage_buffer();
 	u32 size = 0;
 	int r = read_file(s->path, text, THEME_INI_MAX, &size);
 	if (r != SD_READ_OK) {
-		set_error("%s: theme.ini %s", name, r == SD_READ_ERR_SIZE ? "is over 8 KB" : "can't be read");
+		if (r == SD_READ_ERR_SIZE)
+			set_error(THEME_MSG_INI_BIG, name);
+		else
+			set_error(THEME_MSG_INI_READ, name);
 		return 0;
 	}
 	struct theme_ini *ini = &s->ini;
@@ -206,7 +184,7 @@ const struct ui_theme *ui_theme_load(const char *name)
 	if (ini->wallpaper[0]) {
 		snprintf(s->path, sizeof(s->path), THEME_DIR "/%s/%s", name, ini->wallpaper);
 		if (!file_exists(s->path)) {
-			tlog("theme: %s: no wallpaper %s; none shown", name, ini->wallpaper);
+			tlog("theme: " THEME_MSG_NO_WALLPAPER, name, ini->wallpaper);
 			ini->warnings++;
 		} else if (!load_wallpaper(name, ini->wallpaper, slot, &bytes, &crc))
 			return 0;
@@ -227,7 +205,7 @@ const struct ui_theme *ui_theme_load(const char *name)
 	sd.wall_crc = crc;
 	sd.wall_gen++;
 	sd.loaded = 1;
-	tlog("theme: loaded %s (%s, %u warnings%s)", name, theme->name, sd.warnings, bytes ? ", a wallpaper" : "");
+	tlog("theme: " THEME_MSG_LOADED, name, theme->name, sd.warnings, bytes ? ", a wallpaper" : "");
 	return theme;
 }
 

@@ -23,10 +23,6 @@
 // named in THEME_CHOICE_FILE; 1 is the light theme, anything else dark
 #define UI_THEME_SD 2
 
-// The wallpaper's budget: a 4bpp pattern of up to this many tiles, one map
-// and one palette bank
-#define THEME_WALLPAPER_TILES 256
-
 // Loads THEME_DIR/name/ and makes it the SD theme: theme.ini, then its
 // wallpaper (missing: none). Returns the theme, or NULL with the reason in
 // ui_theme_error() (a missing folder or theme.ini, a version other than 1,
