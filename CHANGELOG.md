@@ -6,6 +6,10 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** the SD theme loader's wallpaper check and log messages
+  moved into the hardware-free parser (`theme_wallpaper_check`), so `just
+  theme-check` prints exactly what the kernel logs. No behaviour change
+  (`0c3cec8`).
 - **Added:** themes from the SD card. `/torii/themes/<name>/theme.ini`
   (version 1) overrides the dark or light theme key by key: colours, fonts,
   row height, spacing, fade, slide, marquee and key repeat timings, up to
