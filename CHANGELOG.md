@@ -16,7 +16,7 @@ git log, not here.
   is darker. All of it is theme data (`dialog_in`, `dialog_out`,
   `tab_*`, `deeper_*`, `fade_*`, `leave_*` in theme.ini). A delete, FORMAT
   ALL or overwrite question answered no leaves the list as it was (`98955be`,
-  `e707f85`, `504cbf2`).
+  `e707f85`, `504cbf2`, `e9bb7af`).
 - **Fixed:** Diagnostics' unit tests failed on the cart (`asset_psram_round_trip`):
   a DMA from the kernel's ROM into PSRAM writes nothing on the real cart.
   `psram_write` now refuses sources in cart space; the test copies its data to
