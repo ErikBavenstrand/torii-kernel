@@ -586,8 +586,7 @@ int ui_list_paging(u8 node);
 // UI_LABEL_SWAP then flips in the same VBlank as the page shows. At once if
 // no page change is hiding the old page.
 void ui_list_page_label(u8 node, u8 label, const char *text);
-// 1 once no page change is under way, the scroll is at rest and every
-// refreshed row is queued (it lands in the VBlank after)
+// 1 once no page change is under way and the scroll is at rest
 int ui_list_still(u8 node);
 // For a scroll bar: content and viewport height, and scroll, in px.
 void ui_list_scroll_info(u8 node, u32 *content, u32 *view, u32 *scroll);
