@@ -90,6 +90,17 @@ def build_sd(path: Path) -> None:
         b"[Infinite lives]\r\nON=1234,56;\r\n\r\n[Max money]\r\nON=1235,57;\r\n\r\n"
         b"[GameInfo]\r\nName=Hello\r\n"
     )
+    # Cheat files for the cheat screen's scenarios: many cheats to scroll
+    # through (cheats-many), and names too long for a row (cheats-long)
+    shutil.copy("tests/roms/hello/hello.gba", stage / "Games" / "Long cheat.gba")
+    shutil.copy("tests/roms/hello/hello.gba", stage / "Games" / "Many cheats.gba")
+    (stage / "CHEAT" / "Many cheats.cht").write_bytes(many_cheats())
+    (stage / "CHEAT" / "Long cheat.cht").write_bytes(
+        b"[InfiniteHealthMagicAndAmmoForEveryoneInTheParty]\r\n"
+        b"OnlyWhileTheStartButtonIsHeldDownDuringBattles=1234,56;\r\n"
+        b"Always=1234,57;\r\n\r\n[Short]\r\nON=1235,58;\r\n\r\n"
+        b"[GameInfo]\r\nName=A game whose name is longer than its title bar\r\n"
+    )
     (stage / "SAVER" / "Recently play.txt").write_text(
         "/Hello.gba\n/Games/Idle.gba\n", encoding="utf-8"
     )
@@ -112,6 +123,21 @@ def build_sd(path: Path) -> None:
     )
     for entry in sorted(stage.iterdir()):
         run(["mcopy", "-s", "-Q", "-i", str(path), str(entry), "::/"])
+
+
+def many_cheats() -> bytes:
+    """A cheat file of 40 cheats, with one to three options each."""
+    words = ["Infinite", "Max", "Unlock", "Walk", "Instant", "Never", "All", "Super"]
+    things = ["lives", "money", "items", "through walls", "win", "lose", "maps", "jump"]
+    options = [["ON"], ["x2", "x10"], ["Slow", "Normal", "Fast"]]
+    out = []
+    for i in range(40):
+        out.append(f"[{words[i % 8]} {things[i // 5 % 8]} {i + 1}]")
+        for j, option in enumerate(options[i % 3]):
+            out.append(f"{option}={0x2000 + i:X},{j + 1:02X};")
+        out.append("")
+    out += ["[GameInfo]", "Name=Many cheats"]
+    return "\r\n".join(out).encode() + b"\r\n"
 
 
 def run(cmd: list[str]) -> None:

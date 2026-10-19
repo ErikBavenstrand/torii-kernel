@@ -43,3 +43,13 @@ done
 [ "$(grep -aoF ON "$cart/list.bin" | wc -l)" -eq 3 ] ||
   fail "the cheat list has $(grep -aoF ON "$cart/list.bin" | wc -l) entries, expected 3"
 echo "PASS: cheat files in Latin-1 and GBK parse"
+
+# Picking a cheat applies it: A on the first entry (the cursor starts there),
+# release B to leave, then BOOT WITH ADDON (the row the menu returns to). The
+# launch logs the cheat count; its one write is "1234,56"
+boot -k 100:DOWN -k 104:- -k 116:A -k 120:- -k 150:DOWN -k 154:- -k 162:DOWN -k 166:- -k 174:DOWN -k 178:- -k 186:DOWN -k 190:- \
+  -k 198:DOWN -k 202:- -k 214:A -k 218:- -k 250:A -k 254:- -k 270:B -k 274:- -k 310:A -k 314:- \
+  -u "launch: loading" -f 600 >"$cart/apply.txt" 2>&1 || true
+grep -q "launch: loading.*cheats 1 (1)" "$cart/apply.txt" ||
+  fail "a picked cheat isn't applied: $(grep -a "launch:" "$cart/apply.txt" | tail -1)"
+echo "PASS: a picked cheat is applied at launch"

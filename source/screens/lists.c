@@ -359,13 +359,11 @@ static const struct ui_list_model list_model = {list_count, list_fetch, 0};
 
 // --- The menus' model -----------------------------------------------------------
 
-// The CHEAT row: "CHEAT" until the cheat screen has picked cheats, then
-// "CHEAT(n)". T11's cheat_menu_label() takes this over when it merges.
+// The CHEAT row: "CHEAT" until the cheat screen has been opened, then
+// "CHEAT(n)" (showcht.c)
 static const char *cheat_row(void)
 {
-	if (!gl_cheat_count)
-		return gl_rom_menu[5];
-	snprintf(lists.row, sizeof(lists.row), "%s(%lu)", gl_rom_menu[5], (unsigned long)gl_cheat_count);
+	cheat_menu_label(lists.row, sizeof(lists.row), gl_rom_menu[5]);
 	return lists.row;
 }
 
@@ -1043,7 +1041,7 @@ static void open_game(void)
 		launch(0, (ui_input()->held & INPUT_L) != 0);  // L held: hard reset, as in the menu
 		return;
 	}
-	gl_cheat_count = 0;  // T11's cheat_menu_forget(): cheats never carry over between games
+	cheat_menu_forget();  // cheats never carry over between games
 	menu_open(1, lists.game.havecht ? 6 : 5, lists.game.menu_max, 0);
 }
 
@@ -1229,7 +1227,7 @@ static void do_action(void)
 		break;
 	case ACT_MENU_B:
 		if (lists.menu == 1) {
-			gl_cheat_count = 0;
+			cheat_menu_forget();
 			if (lists.from_recent) {
 				recent_restore();
 				show_sd(0);
