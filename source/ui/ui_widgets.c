@@ -256,9 +256,8 @@ static const struct ui_ops image_ops = {sizeof(struct image_state), image_measur
 struct bar_state {
 	u16 first;
 	u8 tiles;
-	u8 target;  // scroll bar: the list's node
-	u16 drawn0, drawn1;  // the filled span on screen (progress: [0, drawn1))
-	u16 want0, want1;
+	u16 drawn1;  // the filled span on screen, [0, drawn1)
+	u16 want1;
 };
 
 static int bar_measure(u8 node, struct engine_budget *need)
@@ -347,6 +346,20 @@ void ui_progress_set(u8 node, u32 value, u32 max)
 static const struct ui_ops progress_ops = {sizeof(struct bar_state), bar_measure, bar_init, 0, 0, progress_draw};
 
 // --- Scroll bar ---------------------------------------------------------
+//
+// Two tile sets, as a label with UI_LABEL_SWAP has: the thumb is drawn into
+// the set the map doesn't show, then the map flips to it in VBlank, with the
+// list's scroll. Drawn into the shown set, its moves tore while the screen
+// scanned the bar out, a frame ahead of the list (the tear watch, -T).
+
+struct scrollbar_state {
+	u16 first[2];
+	u8 tiles[2];
+	u8 target;  // the list's node
+	u8 cur;     // the set the map shows
+	u16 want0, want1;  // the thumb's rows, [want0, want1)
+	u16 drawn0, drawn1;  // the thumb the set cur shows
+};
 
 static int scrollbar_measure(u8 node, struct engine_budget *need)
 {
@@ -357,21 +370,27 @@ static int scrollbar_measure(u8 node, struct engine_budget *need)
 		ui_set_error("view %s: a scroll bar's target must be a list or grid", v->spec->name);
 		return 0;
 	}
-	return measure_window(node, need, 1);
+	return measure_window(node, need, 2);
 }
 
 static int scrollbar_init(u8 node)
 {
-	struct bar_state *st = ui_node_state(node);
+	struct scrollbar_state *st = ui_node_state(node);
 	const struct ui_scrollbar_config *c = ui_node_spec(node)->data;
+	const struct ui_node *n = ui_node(node);
 	st->target = (u8)(ui_node_view(node)->first + c->target);
-	return bar_init(node);
+	for (u32 i = 0; i < 2; i++) {
+		st->tiles[i] = ui_tiles(node, (u32)(n->w / 8) * (u32)(n->h / 8), 0, &st->first[i]);
+		if (st->tiles[i] == RES_NONE)
+			return 0;
+	}
+	return 1;
 }
 
 static void scrollbar_update(u8 node, u32 dt)
 {
 	(void)dt;
-	struct bar_state *st = ui_node_state(node);
+	struct scrollbar_state *st = ui_node_state(node);
 	u32 content, view, scroll, h = (u32)ui_node(node)->h;
 	ui_list_scroll_info(st->target, &content, &view, &scroll);
 	u32 t0 = 0, t1 = 0;
@@ -418,9 +437,25 @@ static void scrollbar_paint(const struct text_window *win, u32 a, u32 b, u32 kin
 	text_clear(win, SB_X + 2, a, 1, b - a, side);
 }
 
+// The whole bar, its thumb at [t0, t1), into set's tiles
+static void scrollbar_paint_set(u8 node, const struct scrollbar_state *st, u32 set, u32 t0, u32 t1)
+{
+	const struct ui_node *n = ui_node(node);
+	struct text_window win = window_of(node, st->first[set]);
+	u32 ink = ui_ink(node, UI_ROLE_ACCENT), track = ui_paper(node, UI_ROLE_TRACK), h = (u32)n->h;
+	text_clear(&win, 0, 0, (u32)n->w, h, UI_ROLE_NONE);
+	for (u32 y = 0; y < h;) {
+		u32 kind = scrollbar_row(y, t0, t1), end = y + 1;
+		while (end < h && scrollbar_row(end, t0, t1) == kind)
+			end++;
+		scrollbar_paint(&win, y, end, kind, ink, track);
+		y = end;
+	}
+}
+
 static void scrollbar_draw(u8 node)
 {
-	struct bar_state *st = ui_node_state(node);
+	struct scrollbar_state *st = ui_node_state(node);
 	struct ui_node *n = ui_node(node);
 	if (n->flags & UI_N_HIDDEN) {
 		if (!ui_map_fill(node, ui_shared_entry(ui_node_spec(node)->plane, UI_TILE_BLANK)))
@@ -428,36 +463,28 @@ static void scrollbar_draw(u8 node)
 		n->flags &= (u8)~UI_N_DRAWN;
 		return;
 	}
-	struct text_window win = window_of(node, st->first);
-	u32 ink = ui_ink(node, UI_ROLE_ACCENT), track = ui_paper(node, UI_ROLE_TRACK);
-	u32 h = (u32)n->h;
-	if (!(n->flags & UI_N_DRAWN)) {
-		text_clear(&win, 0, 0, (u32)n->w, h, UI_ROLE_NONE);
-		scrollbar_paint(&win, 0, h, SB_TRACK, ink, track);
-		st->drawn0 = st->drawn1 = 0;
-		if (!map_window(node, st->first, UI_BANK_NORMAL)) {
-			ui_dirty(node, 0xFF);
-			return;
-		}
+	u32 n0 = st->want0, n1 = st->want1;
+	// A shown bar draws into the set the map doesn't show, then flips
+	int flip = ui_node_shown(node) && (n->flags & UI_N_DRAWN);
+	if (flip && n0 == st->drawn0 && n1 == st->drawn1)
+		return;
+	if (flip && ui_map_busy(node, (u32)n->y / 8, (u32)n->h / 8)) {
+		ui_dirty(node, 0xFF);  // the last flip hasn't landed: its set still shows
+		return;
 	}
-	u32 o0 = st->drawn0, o1 = st->drawn1, n0 = st->want0, n1 = st->want1;
-	// Only rows whose state changes (no frame shows the bar half
-	// redrawn), in runs
-	for (u32 y = 0; y < h;) {
-		u32 was = scrollbar_row(y, o0, o1), now = scrollbar_row(y, n0, n1);
-		u32 end = y + 1;
-		while (end < h && scrollbar_row(end, o0, o1) == was && scrollbar_row(end, n0, n1) == now)
-			end++;
-		if (was != now)
-			scrollbar_paint(&win, y, end, now, ink, track);
-		y = end;
+	u32 set = flip ? st->cur ^ 1u : st->cur;
+	scrollbar_paint_set(node, st, set, n0, n1);
+	if (!map_window(node, st->first[set], UI_BANK_NORMAL)) {
+		ui_dirty(node, 0xFF);
+		return;
 	}
+	st->cur = (u8)set;
 	st->drawn0 = (u16)n0;
 	st->drawn1 = (u16)n1;
 }
 
-static const struct ui_ops scrollbar_ops = {sizeof(struct bar_state), scrollbar_measure, scrollbar_init, 0,
-					    scrollbar_update,         scrollbar_draw};
+static const struct ui_ops scrollbar_ops = {
+	sizeof(struct scrollbar_state), scrollbar_measure, scrollbar_init, 0, scrollbar_update, scrollbar_draw};
 
 // --- Every kind ---------------------------------------------------------
 

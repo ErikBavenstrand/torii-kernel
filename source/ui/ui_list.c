@@ -874,6 +874,51 @@ static void draw_marquee(const struct list_state *st, const struct row_ctx *rc, 
 		draw_detail(&win, rc, m, item.detail, &line);
 }
 
+// A row redrawn in its slot while the list shows (ui_list_refresh) is drawn
+// here, then copied over the slot's tiles in VBlank with the frame's other
+// changes: drawn straight into a slot on screen, it tore while the screen
+// scanned it out (the tear watch, -T). One row a frame, for every list.
+#define REFRESH_WORDS (30 * 4 * 8)  // a row 30 tiles wide, 4 tall
+static u32 refresh_tiles[REFRESH_WORDS] EWRAM_BSS;
+static u32 refresh_ticket EWRAM_BSS;
+static u8 refresh_owner EWRAM_BSS;  // whose copy is queued: its node + 1, 0 none
+static u8 refresh_slot EWRAM_BSS;
+
+// 1 while the copy queued for node's slot s hasn't landed
+static int refresh_pending(u8 node, u32 s)
+{
+	if (refresh_owner != node + 1u || refresh_slot != s)
+		return 0;
+	if (!gfx_queue_done(refresh_ticket))
+		return 1;
+	refresh_owner = 0;
+	return 0;
+}
+
+// Draws row r into refresh_tiles and queues it over slot s; 0 to try again
+// next frame (a copy still queued, or the queue full)
+static int refresh_row(u8 node, struct list_state *st, const struct row_ctx *rc, u32 s, u32 r)
+{
+	u32 words = (u32)st->tw * st->rt * 8;
+	if (words > REFRESH_WORDS)
+		return 0;
+	if (refresh_owner && !gfx_queue_done(refresh_ticket))
+		return 0;
+	u32 start = cycles_now();
+	if (draw_row(st, rc, refresh_tiles, r, 0))
+		st->blank &= ~(1u << s);
+	else
+		st->blank |= 1u << s;
+	if (!gfx_queue_copy(tile_addr(ui_node_spec(node)->plane, slot_tile(st, s)), refresh_tiles, words * 4))
+		return 0;
+	refresh_ticket = gfx_queue_ticket();
+	refresh_owner = (u8)(node + 1);
+	refresh_slot = (u8)s;
+	st->drawn_row[s] = (u16)r;
+	st->row_cycles = cycles_since(start);
+	return 1;
+}
+
 static void list_draw(u8 node)
 {
 	struct list_state *st = ui_node_state(node);
@@ -890,7 +935,10 @@ static void list_draw(u8 node)
 	// yet) a whole page may take more than a frame: it draws within the
 	// budget and goes on next frame
 	int hidden = st->page == PAGE_DRAW || !ui_node_shown(node);
-	// Rows given new slots: neither their tiles nor their map rows are on screen
+	// Rows given new slots: neither their tiles nor their map rows are on
+	// screen. Rows redrawn in their slots (ui_list_refresh) may be: they go
+	// through refresh_tiles, one a frame
+	u32 keep = 0;
 	for (u32 s = 0; s < st->ring.k; s++) {
 		u32 bit = 1u << s;
 		if (!(st->dirty & bit))
@@ -900,6 +948,15 @@ static void list_draw(u8 node)
 			return;
 		}
 		u32 r = st->slot_row[s];
+		int pending = refresh_pending(node, s);
+		if (r != UI_ITEM_NONE && (pending || (!hidden && !(st->fresh & bit)))) {
+			// Its slot's refresh copy hasn't landed, or it is one to make
+			if (pending || !refresh_row(node, st, &rc, s, r)) {
+				keep |= bit;
+				ui_dirty(node, 1);
+			}
+			continue;
+		}
 		if (r != UI_ITEM_NONE) {
 			// The ring's promise (ring.h): a row given a slot is drawn where
 			// the screen doesn't show it, its tiles nor its map rows
@@ -921,7 +978,10 @@ static void list_draw(u8 node)
 		st->dirty &= ~bit;
 		st->fresh &= ~bit;
 	}
-	st->dirty = st->fresh = 0;
+	st->dirty = keep;
+	st->fresh &= keep;
+	if (keep && hidden)
+		return;  // a slot waits for its refresh copy: the page goes on next frame
 	if (st->page == PAGE_DRAW) {
 		st->page = PAGE_NONE;
 		st->sel_drawn = st->page_cursor;
