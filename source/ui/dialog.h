@@ -65,7 +65,7 @@ void dialog_blank(void);
 
 // Shows text until B is pressed and let go. Hint: gl_close_btn, "[B]OK".
 void dialog_message(const char *title, const char *text, u32 kind);
-// Asks a yes/no question: A (1) or B (0), on the press. Hint: gl_menu_btn,
+// Asks a yes/no question: A (1) or B (0), once the key is released. Hint: gl_menu_btn,
 // "[B]CANCEL [A]OK".
 int dialog_confirm(const char *title, const char *text, u32 kind);
 
