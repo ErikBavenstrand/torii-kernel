@@ -292,7 +292,9 @@ def scenario(name: str, sd: Path) -> Result:
     errors = []
     seen = set()
     for line in proc.stderr.splitlines():
-        matched = [e for e in expected if line.startswith("kernel error:") and e in line]
+        matched = [
+            e for e in expected if line.startswith("kernel error:") and e in line
+        ]
         seen.update(matched)
         if not matched and line.startswith(
             ("kernel error:", "crash at", "timed out", "cannot")
