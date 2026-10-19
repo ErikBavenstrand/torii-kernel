@@ -67,7 +67,6 @@ char *gl_use_engine;
 char *gl_recently_play;
 
 char *gl_START_help;
-char *gl_SELECT_help;
 char *gl_L_A_help;
 char *gl_LSTART_help;
 char *gl_online_manual;
@@ -177,7 +176,6 @@ const char en_use_engine[] = "FAST PATCH ENGINE";
 const char en_recently_play[] = "RECENT PLAYED";
 
 const char en_START_help[] = "Open recently played list";
-const char en_SELECT_help[] = "Thumbnail toggle";
 const char en_L_A_help[] = "Multiboot";
 const char en_LSTART_help[] = "Delete file";
 const char en_online_manual[] = "Online manual";
@@ -300,7 +298,6 @@ void LoadEnglish(void)
 	gl_recently_play = (char *)en_recently_play;
 
 	gl_START_help = (char *)en_START_help;
-	gl_SELECT_help = (char *)en_SELECT_help;
 	gl_L_A_help = (char *)en_L_A_help;
 	gl_LSTART_help = (char *)en_LSTART_help;
 	gl_online_manual = (char *)en_online_manual;

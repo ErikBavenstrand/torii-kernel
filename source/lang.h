@@ -69,7 +69,6 @@ extern char *gl_use_engine;
 extern char *gl_recently_play;
 
 extern char *gl_START_help;
-extern char *gl_SELECT_help;
 extern char *gl_L_A_help;
 extern char *gl_LSTART_help;
 extern char *gl_online_manual;

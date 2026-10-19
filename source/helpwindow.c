@@ -21,8 +21,7 @@ static void help_enter(struct ui_view *view)
 	u16 fpga = Read_FPGA_ver();
 	snprintf(help.version, sizeof(help.version), "FW:%d K:1.06", fpga & 0xFF);
 	u16 rev = fpga & 0xF000;
-	snprintf(help.help, sizeof(help.help), "%s\n%s\n%s\n%s", gl_START_help, gl_SELECT_help, gl_L_A_help,
-		 gl_LSTART_help);
+	snprintf(help.help, sizeof(help.help), "%s\n%s\n%s", gl_START_help, gl_L_A_help, gl_LSTART_help);
 	// The fonts' licence (OFL-1.1) asks for the credit
 	snprintf(help.credits, sizeof(help.credits),
 		 "Galmuri font \xC2\xA9 Lee Minseo,\nSIL Open Font License 1.1\nRev.%s",
@@ -43,7 +42,7 @@ static int help_event(struct ui_view *view, const struct ui_event *e)
 	return 0;
 }
 
-static const struct ui_label_config keys_config = {"START\nSELECT\nL + A\nL+START", UI_FONT_BODY, UI_ALIGN_LEFT, 0};
+static const struct ui_label_config keys_config = {"START\nL + A\nL+START", UI_FONT_BODY, UI_ALIGN_LEFT, 0};
 static const struct ui_label_config text_config = {"", UI_FONT_BODY, UI_ALIGN_LEFT, 0};
 static const struct ui_label_config manual_config = {"", UI_FONT_BODY, UI_ALIGN_CENTER, 0};
 static const u16 qr_palette[16] = {0, 0x7FFF, 0x0000};

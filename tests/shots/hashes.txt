@@ -49,7 +49,7 @@ cover-demo/frames 31-32 3CCAC1492B95FF7A
 diag-renderer/demo CFABCE035BEAC9FD
 diag-start/screen 3162F4422A6557C5
 file-menu/screen 2BC422F470DDF7F3
-help/screen 5B20C617DB3A66BC
+help/screen FF8D788BD1ABB79C
 nor-list/screen B41DDB1AFEB55DC1
 recent/screen 672BEF507A1E554D
 sd-deep/held DADD3FA9E4F41079
@@ -87,7 +87,7 @@ sd-scroll/frames 60-60 6BAF27EF5883ECF8
 sd-scroll/frames 61-119 A8266BC030B94860
 settings-held/held-l 0CA5C0696DB712FC
 settings-held/held-r 0CA5C0696DB712FC
-settings-light/help 488DC004C5AB9F15
+settings-light/help 23A913E73883ED51
 settings-light/screen 25BF7277EB3BBB08
 settings-sd-theme/again 7E1CFB4EE11082A8
 settings-sd-theme/theme F261CF6429EF81B4
