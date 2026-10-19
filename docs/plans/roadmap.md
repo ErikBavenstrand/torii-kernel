@@ -318,9 +318,10 @@ The budget each layout is checked against (GBATEK, Tonc):
 Bugs found while building v0.3 and v0.3.1. Each is struck out here once a ticket fixes it.
 
 - A scrolling long file name runs into the size column in the SD list (T3; port T9).
-- The game menu shows "CHEAT(0)" before the cheat list has been opened (T3; port T11).
-- The cheat view counts sections plus entries: "[002/004]" for 2 cheats (T3; port T11).
+- ~~The game menu shows "CHEAT(0)" before the cheat list has been opened (T3; port T11).~~ Fixed by T11 (`5e44a3b`).
+- ~~The cheat view counts sections plus entries: "[002/004]" for 2 cheats (T3; port T11).~~ Fixed by T11 (`5e44a3b`).
 - Diagnostics' loader check can log a garbled loader title: `say()` clears the start of `pReadCache`, where the image is (T16 review; port T12).
+- The cheat parser drops spaces from cheat names ("Never money" shows as "Nevermoney"), more visible in the proportional font (T11 review; v0.8 cheats).
 - The cheat parser's `Get_KEY_val` and `Get_CHT_val` copy 50-byte fields that may lack a NUL (T16; v0.8 cheats).
 
 ## v0.4 Browsing

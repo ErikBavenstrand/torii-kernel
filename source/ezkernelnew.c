@@ -617,7 +617,7 @@ static void Show_MENU(u32 menu_select, PAGE_NUM page, u32 havecht, u32 Save_num,
 		else {
 			if (line == 5)//cheat
 			{
-				sprintf(msg, "%s(%ld)", gl_rom_menu[line], gl_cheat_count);
+				cheat_menu_label(msg, sizeof(msg), gl_rom_menu[line]);
 				DrawHZText12(msg, 32, 60, y_offset + line * 14, name_color, 1);
 			} else {
 				DrawHZText12(gl_rom_menu[line], 32, 60, y_offset + line * 14, name_color, 1);
@@ -2629,6 +2629,8 @@ static u8 SD_list_open(u32 show_offset, u32 file_select, u32 play_re)
 	TCHAR *pfilename;
 	BYTE SAVEMODE;
 
+	// No cheats picked yet for this game, whatever a menu before left
+	cheat_menu_forget();
 	//press A, show boot MENU;
 	if (play_re == 0xBB) {
 		pfilename = pFilename_buffer[show_offset + file_select - folder_total].filename;
@@ -2705,7 +2707,7 @@ re_show_menu:
 				re_menu = 1;
 			}
 		} else if (keysup & KEY_B) {
-			gl_cheat_count = 0;
+			cheat_menu_forget();
 			if (play_re != 0xBB) {
 				strncpy(currentpath, currentpath_temp, 256);  //
 			}
@@ -2741,7 +2743,10 @@ re_show_menu:
 					break;
 			} else if (MENU_line == 5) {
 				//open cht file
-				Open_cht_file(pfilename, havecht);
+				// It runs on the engine: the screen behind the menu comes back bare
+				if (Open_cht_file(pfilename, havecht))
+					DrawPic((u16 *)(play_re == 0xBB ? gImage_SD : gImage_RECENTLY), 0, 0, 240, 160,
+						0, 0, 1);
 				re_menu = 1;
 				MENU_line = 1;
 				goto re_show_menu;

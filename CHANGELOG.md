@@ -20,6 +20,13 @@ git log, not here.
   ACCENT showed black, and a screen without a list could fail to appear
   after another closed (`2a67c3f`).
 
+- **Changed:** the cheat screen runs on the v0.3 tile engine: cheats as
+  headings, their options indented, a picked one in the accent colour with
+  "[x]"; the cursor skips headings, LEFT/RIGHT and L/R page, long names
+  scroll. Picking and applying are unchanged. The counter counts options
+  only ("[001/002]", not "[002/004]"), the game menu shows CHEAT until the
+  screen is opened and then CHEAT(n) for the cheats picked, and opening the
+  game menu drops cheats a previous menu left picked (`5e44a3b`).
 - **Added:** views, widgets and themes for the v0.3 tile menu, not yet used
   by any screen (`source/ui/`). Screens are const layouts of labels,
   panels, lists, grids, images, scroll and progress bars with anchors, on a
