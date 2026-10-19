@@ -55,9 +55,9 @@
 // --- Caps --------------------------------------------------------------------
 // Hitting one makes ui_push fail with a readable error (ui_error()).
 
-#define UI_NODE_CAP 24      // nodes across every view on the stack
-#define UI_VIEW_CAP 4       // views on the stack
-#define UI_ARENA_BYTES 448  // widget state across every view on the stack
+#define UI_NODE_CAP 48       // nodes across every view on the stack
+#define UI_VIEW_CAP 4        // views on the stack
+#define UI_ARENA_BYTES 1024  // widget state across every view on the stack
 #define UI_SCROLLERS 2      // lists and grids resident at once (hardware windows)
 #define UI_PLANES 4
 #define UI_NONE 0xFF
@@ -143,6 +143,12 @@ struct ui_patch {
 //   fade_frames         frames of a palette fade (ui_fade)
 //   slide               px a modal view slides up from as it opens (0: none)
 //   marquee_delay       frames the cursor rests before a long name scrolls
+//   marquee_speed       px a second it scrolls, 1-60 (60: a pixel every frame;
+//                       slower speeds step a pixel some frames)
+//   marquee_pause       frames it rests at the end before it starts over
+//   marquee_gap         px it scrolls past the name's end before that pause
+//   page_fade           frames a list fades in over after a page change
+//                       (0: it just shows)
 //   input               key repeat and wrap timings (engine/input.h)
 //   patches             layout patches, patch_count of them
 struct ui_theme {
@@ -157,6 +163,10 @@ struct ui_theme {
 	u8 fade_frames;
 	u8 slide;
 	u8 marquee_delay;
+	u8 marquee_speed;
+	u8 marquee_pause;
+	u8 marquee_gap;
+	u8 page_fade;
 	u8 patch_count;
 	InputTiming input;
 	struct ui_patch patches[UI_PATCH_CAP];

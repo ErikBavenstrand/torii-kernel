@@ -5,20 +5,27 @@
 // - Each row slot is a text window of the row's width x its height in
 //   tiles (a 30x2 window for a full-width 16 px row). A row entering the
 //   viewport is drawn into a slot that isn't on screen, and its map rows
-//   are written straight away: they aren't on screen either.
+//   are written straight away: they aren't on screen either. At rest, the
+//   rows just above and below the screen are drawn too (spare slots), so a
+//   step from rest draws nothing.
 // - The selection is a palette bank switch in the selected row's (or
 //   cell's) map entries, through the staging area, so it shows in one
 //   VBlank: text is never redrawn for it.
-// - A jump too far to scroll a row a frame (a new folder, a wrap from the
-//   end to the start) is a page change: the plane is hidden at the next
-//   commit, every row is drawn the frame after, and the plane shows again
-//   in the VBlank after that.
+// - A jump too far to scroll to in a few frames (a new folder, a wrap from
+//   the end to the start) is a page change: the plane is hidden at the
+//   next commit, the rows on screen are drawn the frame after (the rest
+//   fill in later), and the plane fades in from the next VBlank
+//   (ui_plane_reveal).
 // - With UI_LIST_MARQUEE, a cut name on the selected row scrolls after the
-//   cursor rests: two extra slots take turns, flipped by map in VBlank.
+//   cursor rests: two extra slots, wider than a row, take turns, flipped by
+//   map in VBlank. Glyphs slide in and out at both edges: the slots have
+//   MQ_MARGIN hidden tile columns each side, where partly visible glyphs
+//   land, and the strips outside the name are cleared.
 #include <string.h>
 
 #include "ring.h"
 #include "ui_priv.h"
+#include "../engine/cycles.h"
 #include "../engine/frame.h"
 #include "../engine/gfx.h"
 #include "../engine/res.h"
@@ -27,19 +34,18 @@
 enum {
 	PAGE_NONE,
 	PAGE_HIDING,  // waiting for the plane to be off screen
-	PAGE_DRAW,    // rows assigned: draw them all, then show the plane
+	PAGE_DRAW,    // rows assigned: draw the visible ones, then reveal the plane
 };
 
 enum {
 	MQ_OFF,
-	MQ_WAIT,    // the cursor rests; scrolls after mq_wait frames
-	MQ_RUN,     // scrolling
-	MQ_END,     // at the end, pausing before it starts over
+	MQ_WAIT,  // the cursor rests; scrolls after mq_wait frames
+	MQ_RUN,   // scrolling
+	MQ_END,   // at the end, pausing before it starts over
 };
 
-#define MQ_STEP_FRAMES 2  // a pixel every two frames: 30 px a second
-#define MQ_END_FRAMES 60
-#define MQ_GAP 8          // px scrolled past the end before the pause
+#define MQ_MARGIN 2  // hidden tile columns each side of a marquee slot
+#define ROW_GUESS 30000  // cycles a row may take, before one has been timed
 
 struct list_state {
 	struct ui_ring ring;
@@ -50,6 +56,7 @@ struct list_state {
 	u8 page;
 	u8 sel_ok;  // the map shows the selection at sel_drawn
 	u8 plain;   // UI_LIST_PLAIN: nothing shows as selected
+	u8 queued_a;  // A pressed during a page change: dispatched once it is drawn
 	u32 count, rows;
 	u32 cursor;
 	u32 sel_drawn;  // the item whose map entries are in the selected bank
@@ -62,17 +69,31 @@ struct list_state {
 	u16 slot_row[UI_RING_MAX_SLOTS];
 	u32 dirty;   // slots to draw: the window's dirty-row mask
 	u32 fresh;   // slots given a new row: their map rows need writing
+	u32 blank;   // slots holding nothing but paper: no clear needed
 	u32 lo, hi;  // resident rows
 	u32 plo, phi;
+	u32 row_cycles;  // what the last row took to draw (hidden drawing's budget)
 	InputWrap wrap;
 	// Marquee
 	u8 mq;
-	u8 mq_set;    // the marquee slot the map shows (0 or 1), 0xFF neither
-	u8 mq_step;   // draw the next step
-	u8 pad;
+	u8 mq_set;   // the marquee slot the map shows (0 or 1), 0xFF neither
+	u8 mq_step;  // draw the next step
+	u8 mq_acc;   // sub-pixel progress, in 60ths of a pixel
 	u16 mq_wait;
 	u16 mq_px;
 	u16 mq_width;
+};
+
+// What drawing a row needs, looked up once per draw
+struct row_ctx {
+	const struct ui_list_model *model;
+	void *ctx;
+	const struct torii_font *font;
+	u32 w, h, cw;  // a row's size and a cell's width, px
+	u32 y;         // a list row's text top
+	u32 pad;       // the name's inset
+	u32 clip;      // the name's width
+	u32 paper, ink;
 };
 
 static const struct ui_list_config *config(u8 node)
@@ -86,10 +107,12 @@ static int marquee(u8 node)
 	return st->cols == 1 && (config(node)->flags & UI_LIST_MARQUEE);
 }
 
-static u32 slot_count(u8 node)
+// Tiles of the ring's slots, and of the two marquee slots after them
+static u32 tile_count(u8 node)
 {
 	const struct list_state *st = ui_node_state(node);
-	return st->ring.k + (marquee(node) ? 2u : 0u);
+	u32 mq = marquee(node) ? 2u * (st->tw + 2u * MQ_MARGIN) * st->rt : 0;
+	return st->ring.k * st->tw * st->rt + mq;
 }
 
 // Geometry from the config and rectangle; 0 with the error recorded
@@ -127,14 +150,24 @@ static int list_measure(u8 node, struct engine_budget *need)
 	struct list_state *st = ui_node_state(node);
 	if (!geometry(node, st))
 		return 0;
-	need->bg_tiles = (u16)(need->bg_tiles + slot_count(node) * st->tw * st->rt);
+	need->bg_tiles = (u16)(need->bg_tiles + tile_count(node));
 	return 1;
 }
 
-static u32 *slot_tiles(const struct list_state *st, u32 plane, u32 slot)
+static u32 *tile_addr(u32 plane, u32 tile)
 {
-	u32 tile = st->first + slot * st->tw * st->rt;
 	return (u32 *)(0x06000000 + ui_plane_cb(plane) * 0x4000 + tile * 32u);
+}
+
+static u32 slot_tile(const struct list_state *st, u32 slot)
+{
+	return st->first + slot * st->tw * st->rt;
+}
+
+// The first tile of marquee slot set (0 or 1)
+static u32 mq_tile(const struct list_state *st, u32 set)
+{
+	return slot_tile(st, st->ring.k) + set * (st->tw + 2u * MQ_MARGIN) * st->rt;
 }
 
 static u32 model_count(u8 node)
@@ -143,19 +176,24 @@ static u32 model_count(u8 node)
 	return n > UI_LIST_MAX ? UI_LIST_MAX : n;
 }
 
+// Gives row r its slot, to draw (no check that it is off screen)
+static void give_slot(struct list_state *st, u32 r)
+{
+	u32 s = ring_slot(&st->ring, r);
+	if (st->slot_row[s] != r) {
+		st->slot_row[s] = (u16)r;
+		st->dirty |= 1u << s;
+		st->fresh |= 1u << s;
+	}
+}
+
 // Gives the resident rows at the shown scroll their slots
 static void assign(u8 node, struct list_state *st, int dir)
 {
 	u32 lo, hi;
 	ring_resident(&st->ring, st->shown, dir, st->rows, &lo, &hi);
-	for (u32 r = lo; r <= hi && lo <= hi; r++) {
-		u32 s = ring_slot(&st->ring, r);
-		if (st->slot_row[s] != r) {
-			st->slot_row[s] = (u16)r;
-			st->dirty |= 1u << s;
-			st->fresh |= 1u << s;
-		}
-	}
+	for (u32 r = lo; r <= hi && lo <= hi; r++)
+		give_slot(st, r);
 	if (lo != st->lo || hi != st->hi) {
 		st->lo = lo;
 		st->hi = hi;
@@ -169,6 +207,19 @@ static void assign(u8 node, struct list_state *st, int dir)
 			m->prefetch(ui_node_view(node)->ctx, plo * st->cols, last < st->count ? last : st->count - 1);
 		}
 	}
+}
+
+// At rest: the row below the screen, then the one above, get their slots
+// (one a frame), so the next step needs no drawing. They aren't on screen,
+// and with k >= visible + 2 their slots are no resident row's (ring.h).
+static void fill_spare(struct list_state *st)
+{
+	if (st->lo > st->hi)
+		return;
+	if (st->hi + 1 < st->rows && st->slot_row[ring_slot(&st->ring, st->hi + 1)] != st->hi + 1)
+		give_slot(st, st->hi + 1);
+	else if (st->lo && st->slot_row[ring_slot(&st->ring, st->lo - 1)] != st->lo - 1)
+		give_slot(st, st->lo - 1);
 }
 
 static void forget_slots(struct list_state *st)
@@ -191,6 +242,7 @@ static void marquee_reset(u8 node, struct list_state *st)
 	st->mq = marquee(node) ? MQ_WAIT : MQ_OFF;
 	st->mq_wait = ui_theme()->marquee_delay;
 	st->mq_px = 0;
+	st->mq_acc = 0;
 	st->mq_step = 0;
 	if (st->mq_set != 0xFF) {
 		st->mq_set = 0xFF;
@@ -228,20 +280,23 @@ static void page_change(u8 node, struct list_state *st, s32 target)
 	ui_plane_hide(ui_node_spec(node)->plane, 1);
 }
 
-static void set_cursor(u8 node, struct list_state *st, u32 cursor)
+// jump: no spring (fast repeat): the scroll goes straight there, at
+// ring_step's speed
+static void set_cursor(u8 node, struct list_state *st, u32 cursor, int jump)
 {
 	if (cursor >= st->count)
 		cursor = st->count ? st->count - 1 : 0;
 	st->cursor = cursor;
 	marquee_reset(node, st);
 	st->sel_ok = st->sel_ok && st->sel_drawn == cursor;
-	s32 target = ring_scroll_for(&st->ring, cursor / st->cols, goal_px(st), st->rows, 1);
+	// During a page change, from where its page will be
+	s32 from = st->page != PAGE_NONE ? st->page_target : goal_px(st);
+	s32 target = ring_scroll_for(&st->ring, cursor / st->cols, from, st->rows, 1);
 	if (st->page != PAGE_NONE)
 		st->page_target = target;
 	else if (ring_far(&st->ring, st->shown, target))
 		page_change(node, st, target);
-	else if (ui_skipping()) {
-		// Fast repeat: no animation, one row a frame (ring_step's cap)
+	else if (jump) {
 		st->base = target;
 		motion_spring_jump(st->motion, 0);
 	} else {
@@ -255,7 +310,7 @@ static int list_init(u8 node)
 	struct list_state *st = ui_node_state(node);
 	if (!geometry(node, st))
 		return 0;
-	st->tiles = ui_tiles(node, slot_count(node) * st->tw * st->rt, 0, &st->first);
+	st->tiles = ui_tiles(node, tile_count(node), 0, &st->first);
 	if (st->tiles == RES_NONE)
 		return 0;
 	st->motion = motion_spring(MOTION_TO_S32(&st->spring), 0, SPRING_SCROLL, ui_owner(ui_node_view(node)));
@@ -305,7 +360,7 @@ void ui_list_set_cursor(u8 node, u32 cursor)
 {
 	struct list_state *st = ui_node_state(node);
 	if (cursor != st->cursor)
-		set_cursor(node, st, cursor);
+		set_cursor(node, st, cursor, 0);
 }
 
 u32 ui_list_cursor(u8 node)
@@ -326,13 +381,15 @@ static int list_event(u8 node, const struct ui_event *e)
 	struct list_state *st = ui_node_state(node);
 	if (e->type != UI_EV_KEYS)
 		return 0;
-	if (st->page == PAGE_HIDING)
-		return (e->keys & (INPUT_DPAD | INPUT_PAGE | INPUT_A)) != 0;
 	const InputState *in = ui_input();
 	u32 page = st->ring.h / st->ring.rh;
 	s32 cols = st->cols;
 	if (e->keys & INPUT_A) {
-		if (st->count)
+		// Moves during a page change only move the page it draws (set_cursor);
+		// A waits until that page is up
+		if (st->page != PAGE_NONE)
+			st->queued_a = 1;
+		else if (st->count)
 			ui_emit(node, UI_EV_ACTIVATE, st->cursor);
 		return 1;
 	}
@@ -360,7 +417,10 @@ static int list_event(u8 node, const struct ui_event *e)
 			to = t < 0 ? 0 : (u32)t >= st->count ? st->count - 1 : (u32)t;
 		}
 		if (to != st->cursor) {
-			set_cursor(node, st, to);
+			// A held L or R jumps like the d-pad's fast repeat: the
+			// scroll arrives as the next page fires
+			int jump = ui_skipping() || ((key & INPUT_PAGE) && !(in->pressed & key));
+			set_cursor(node, st, to, jump);
 			ui_emit(node, UI_EV_CURSOR, to);
 		}
 		return 1;
@@ -379,11 +439,13 @@ static void marquee_tick(u8 node, struct list_state *st, u32 dt)
 {
 	if (st->mq == MQ_OFF || st->page != PAGE_NONE || st->shown != st->base + FIX_ROUND(st->spring))
 		return;
+	const struct ui_theme *t = ui_theme();
 	if (st->mq_wait > dt) {
 		st->mq_wait = (u16)(st->mq_wait - dt);
 		ui_wake();
 		return;
 	}
+	st->mq_wait = 0;
 	switch (st->mq) {
 	case MQ_WAIT: {
 		// Only a cut name scrolls
@@ -395,27 +457,33 @@ static void marquee_tick(u8 node, struct list_state *st, u32 dt)
 			return;
 		}
 		u32 len = item.len ? item.len : strlen(item.text);
-		st->mq_width = (u16)text_width(ui_theme()->body, item.text, len);
-		u32 clip = text_clip(node, st);
-		if (st->mq_width <= clip) {
+		st->mq_width = (u16)text_width(t->body, item.text, len);
+		if (st->mq_width <= text_clip(node, st)) {
 			st->mq = MQ_OFF;
 			return;
 		}
+		// The cut name without its "...", from where it starts
 		st->mq = MQ_RUN;
 		st->mq_px = 0;
-		st->mq_wait = MQ_STEP_FRAMES;
+		st->mq_acc = 0;
+		st->mq_step = 1;
+		ui_dirty(node, 2);
 		break;
 	}
 	case MQ_RUN: {
-		u32 clip = text_clip(node, st);
-		st->mq_px++;
-		st->mq_step = 1;
-		st->mq_wait = MQ_STEP_FRAMES;
-		if (st->mq_px + clip >= (u32)st->mq_width + MQ_GAP) {
-			st->mq = MQ_END;
-			st->mq_wait = MQ_END_FRAMES;
+		// speed px a second, a pixel at most a frame (dt 1), in 60ths
+		u32 speed = t->marquee_speed > 60 ? 60 : t->marquee_speed ? t->marquee_speed : 1;
+		u32 acc = st->mq_acc + speed * dt;
+		if (acc >= 60) {
+			st->mq_px = (u16)(st->mq_px + acc / 60);
+			st->mq_step = 1;
+			ui_dirty(node, 2);
 		}
-		ui_dirty(node, 2);
+		st->mq_acc = (u8)(acc % 60);
+		if (st->mq_px + text_clip(node, st) >= (u32)st->mq_width + t->marquee_gap) {
+			st->mq = MQ_END;
+			st->mq_wait = t->marquee_pause;
+		}
 		break;
 	}
 	default:  // MQ_END: back to the start (the normal slot), which waits again
@@ -439,7 +507,8 @@ static void list_update(u8 node, u32 dt)
 			ui_wake();
 			return;
 		}
-		// Off screen now: every row can be drawn where it lands
+		// Off screen now: every row can be drawn where it lands. Only the
+		// rows on screen (dir 0): the spare ones fill in once it shows
 		st->shown = st->base = st->page_target;
 		motion_spring_jump(st->motion, 0);
 		forget_slots(st);
@@ -452,6 +521,7 @@ static void list_update(u8 node, u32 dt)
 		s32 want = st->base + FIX_ROUND(st->spring);
 		s32 next = ring_step(&st->ring, st->shown, want);
 		int dir = next > st->shown ? 1 : next < st->shown ? -1 : (want > next) - (want < next);
+		int still = next == st->shown && next == want;
 		st->shown = next;
 		s32 shift = ring_rebase(&st->ring, goal_px(st) - st->base);
 		if (shift) {
@@ -461,6 +531,8 @@ static void list_update(u8 node, u32 dt)
 		assign(node, st, dir);
 		if (st->shown != want)
 			ui_wake();
+		else if (still && !st->dirty && ui_node_shown(node))
+			fill_spare(st);
 	}
 	// Not while a view above shows its own plane there
 	if (ui_plane_owned(node))
@@ -470,83 +542,127 @@ static void list_update(u8 node, u32 dt)
 	marquee_tick(node, st, dt);
 }
 
-// The map entry for column tx, tile row ty of slot s, for item in bank
-static u16 entry(const struct list_state *st, u32 s, u32 tx, u32 ty, u32 bank)
-{
-	return ui_entry(st->first + s * st->tw * st->rt + tx * st->rt + ty, bank);
-}
-
-// Writes row r's entries (from slot s, or the marquee slot) into rows, the
-// map's rows from the row's first, with item sel selected
+// Writes row r's map entries into rows, the map's rows from the row's
+// first: slot s's tiles (a marquee slot's for the selected item while one
+// shows), with item sel in the selected bank
 static void row_entries(const struct list_state *st, u16 *rows, u32 r, u32 s, u32 sel)
 {
 	if (st->plain)
 		sel = 0xFFFFFFFFu;  // no item
-	u32 cw = st->tw / st->cols;
-	for (u32 ty = 0; ty < st->rt; ty++) {
-		for (u32 tx = 0; tx < st->tw; tx++) {
-			u32 item = r * st->cols + tx / cw;
-			u32 bank = item == sel && item < st->count ? UI_BANK_SELECTED : UI_BANK_NORMAL;
-			u32 slot = s;
-			if (item == sel && st->mq_set != 0xFF)
-				slot = st->ring.k + st->mq_set;
-			rows[ty * 32 + tx] = entry(st, slot, tx, ty, bank);
+	u32 rt = st->rt, cw = st->tw / st->cols, item = r * st->cols;
+	u32 tile = slot_tile(st, s);
+	for (u32 col = 0; col < st->cols; col++, item++, tile += cw * rt, rows += cw) {
+		u32 t = tile, bank = 0;
+		if (item == sel && item < st->count) {
+			bank = UI_BANK_SELECTED << 12;
+			if (st->mq_set != 0xFF)
+				t = mq_tile(st, st->mq_set) + MQ_MARGIN * rt;
 		}
-	}
-}
-
-// Draws row r into slot s's tiles (or tiles, for the marquee)
-static void draw_row(u8 node, struct list_state *st, u32 *tiles, u32 r, u32 skip)
-{
-	const struct ui_list_config *c = config(node);
-	const struct ui_theme *t = ui_theme();
-	const struct torii_font *font = t->body;
-	struct text_window win = {tiles, st->tw, st->rt};
-	u32 w = st->tw * 8u, h = st->rt * 8u, cw = w / st->cols;
-	text_clear(&win, 0, 0, w, h, ui_paper(node, UI_ROLE_BG));
-	u32 ink_def = ui_ink(node, UI_ROLE_TEXT);
-	for (u32 col = 0; col < st->cols; col++) {
-		u32 i = r * st->cols + col;
-		if (i >= st->count)
-			break;
-		struct ui_item item = {0};
-		if (!c->model->fetch(ui_node_view(node)->ctx, i, &item) || !item.text)
-			continue;  // drawn when ui_list_refresh says it loaded
-		u32 len = item.len ? item.len : strlen(item.text);
-		u32 ink = item.ink ? item.ink : ink_def;
-		if (st->cols == 1) {
-			u32 y = (h - font->line_height) / 2, clip = text_clip(node, st);
-			if (item.detail) {
-				u32 dlen = strlen(item.detail);
-				u32 dw = text_width(font, item.detail, dlen);
-				if (dw + t->pad < w)
-					text_draw(&win, font, w - t->pad - dw + 1, y, dw, UI_ROLE_DIM, item.detail,
-						  dlen);
-			}
-			if (skip) {
-				struct text_line line;
-				u32 lead;
-				text_layout_window(font, item.text, len, skip, clip, &line, &lead);
-				text_draw_line(&win, font, t->pad + lead, y, ink, &line);
-			} else {
-				text_draw(&win, font, t->pad, y, clip, ink, item.text, len);
+		t |= bank;
+		u16 *p = rows, *end = rows + cw;
+		if (rt == 2) {
+			// 16 px rows: a tile column is two map rows
+			for (; p < end; p++, t += 2) {
+				p[0] = (u16)t;
+				p[32] = (u16)(t + 1);
 			}
 			continue;
 		}
+		for (; p < end; p++)
+			for (u32 ty = 0; ty < rt; ty++)
+				p[ty * 32] = (u16)t++;
+	}
+}
+
+static void row_ctx_init(u8 node, const struct list_state *st, struct row_ctx *rc)
+{
+	const struct ui_theme *t = ui_theme();
+	rc->model = config(node)->model;
+	rc->ctx = ui_node_view(node)->ctx;
+	rc->font = t->body;
+	rc->w = st->tw * 8u;
+	rc->h = st->rt * 8u;
+	rc->cw = rc->w / st->cols;
+	rc->y = (rc->h - rc->font->line_height) / 2;
+	rc->pad = t->pad;
+	rc->clip = text_clip(node, st);
+	rc->paper = ui_paper(node, UI_ROLE_BG);
+	rc->ink = ui_ink(node, UI_ROLE_TEXT);
+}
+
+// The detail, right-aligned in the row, its window starting x0 px left of
+// the row (line is scratch)
+static void draw_detail(const struct text_window *win, const struct row_ctx *rc, u32 x0, const char *detail,
+			struct text_line *line)
+{
+	text_layout(rc->font, detail, strlen(detail), rc->w, line);
+	if (!line->truncated && line->advance + rc->pad < rc->w)
+		text_draw_line(win, rc->font, x0 + rc->w + 1 - rc->pad - line->advance, rc->y, UI_ROLE_DIM, line);
+}
+
+// Draws row r into a slot's tiles, cleared first unless blank (they hold
+// only paper); 1 if anything but paper was drawn
+static int draw_row(const struct list_state *st, const struct row_ctx *rc, u32 *tiles, u32 r, int blank)
+{
+	const struct torii_font *font = rc->font;
+	struct text_window win = {tiles, st->tw, st->rt};
+	struct text_line line;
+	int drew = 0;
+	if (!blank)
+		text_clear(&win, 0, 0, rc->w, rc->h, rc->paper);
+	for (u32 col = 0, i = r * st->cols; col < st->cols && i < st->count; col++, i++) {
+		struct ui_item item = {0};
+		if (!rc->model->fetch(rc->ctx, i, &item) || !item.text)
+			continue;  // drawn when ui_list_refresh says it loaded
+		u32 len = item.len ? item.len : strlen(item.text);
+		u32 ink = item.ink ? item.ink : rc->ink;
+		drew = 1;
+		if (st->cols == 1) {
+			text_layout(font, item.text, len, rc->clip, &line);
+			text_draw_line(&win, font, rc->pad, rc->y, ink, &line);
+			if (item.detail)
+				draw_detail(&win, rc, 0, item.detail, &line);
+			continue;
+		}
 		// A grid cell: an icon at the top if it is tall enough, the name below
-		u32 x0 = col * cw, y = (h - font->line_height) / 2;
-		if (item.icon && st->rt >= 4 && cw >= 16) {
-			u32 tx0 = x0 / 8 + (cw / 8 - 2) / 2;
+		u32 x0 = col * rc->cw, y = rc->y;
+		if (item.icon && st->rt >= 4 && rc->cw >= 16) {
+			u32 tx0 = x0 / 8 + (rc->cw / 8 - 2) / 2;
 			for (u32 ty = 0; ty < 2; ty++)
 				for (u32 tx = 0; tx < 2; tx++)
 					memcpy(&tiles[((tx0 + tx) * st->rt + ty) * 8], &item.icon[(ty * 2 + tx) * 8],
 					       32);
-			y = 16 + (h - 16 - font->line_height) / 2;
+			y = 16 + (rc->h - 16 - font->line_height) / 2;
 		}
-		struct text_line line;
-		text_layout(font, item.text, len, cw - 4, &line);
-		text_draw_line(&win, font, x0 + (cw - line.extent) / 2, y, ink, &line);
+		text_layout(font, item.text, len, rc->cw - 4, &line);
+		text_draw_line(&win, font, x0 + (rc->cw - line.extent) / 2, y, ink, &line);
 	}
+	return drew;
+}
+
+// Draws the selected row's name from px skip of it into a marquee slot:
+// glyphs partly in the name's span drawn whole into the slot's hidden
+// margins and the clip strips, which are then cleared, so they slide in
+// and out at both edges; the detail last
+static void draw_marquee(const struct list_state *st, const struct row_ctx *rc, u32 *tiles, u32 r, u32 skip)
+{
+	const struct torii_font *font = rc->font;
+	u32 m = MQ_MARGIN * 8, left = m + rc->pad, right = left + rc->clip;
+	struct text_window win = {tiles, (u8)(st->tw + 2 * MQ_MARGIN), st->rt};
+	u32 ww = win.width * 8u;
+	text_clear(&win, 0, 0, ww, rc->h, rc->paper);
+	struct ui_item item = {0};
+	if (!rc->model->fetch(rc->ctx, r, &item) || !item.text)
+		return;
+	struct text_line line;
+	s32 lead;
+	u32 len = item.len ? item.len : strlen(item.text);
+	text_layout_span(font, item.text, len, skip, rc->clip, &line, &lead);
+	text_draw_line(&win, font, (u32)((s32)left + lead), rc->y, item.ink ? item.ink : rc->ink, &line);
+	text_clear(&win, 0, 0, left, rc->h, rc->paper);
+	text_clear(&win, right, 0, ww - right, rc->h, rc->paper);
+	if (item.detail)
+		draw_detail(&win, rc, m, item.detail, &line);
 }
 
 static void list_draw(u8 node)
@@ -555,6 +671,8 @@ static void list_draw(u8 node)
 	const struct ui_spec *spec = ui_node_spec(node);
 	if (st->page == PAGE_HIDING || (ui_node(node)->flags & UI_N_HIDDEN))
 		return;
+	struct row_ctx rc;
+	row_ctx_init(node, st, &rc);
 	u16 *map = ui_map(node);
 	// A page's rows show the cursor it started with; one that moved since
 	// is restaged once the page is up
@@ -565,28 +683,38 @@ static void list_draw(u8 node)
 	int hidden = st->page == PAGE_DRAW || !ui_node_shown(node);
 	// Rows given new slots: neither their tiles nor their map rows are on screen
 	for (u32 s = 0; s < st->ring.k; s++) {
-		if (!(st->dirty >> s & 1))
+		u32 bit = 1u << s;
+		if (!(st->dirty & bit))
 			continue;
-		if (hidden && frame_elapsed() > UI_DRAW_BUDGET) {
+		if (hidden && !ui_draw_room(st->row_cycles ? st->row_cycles : ROW_GUESS)) {
 			ui_dirty(node, 1);  // the rest next frame
 			return;
 		}
 		u32 r = st->slot_row[s];
 		if (r != UI_ITEM_NONE) {
-			draw_row(node, st, slot_tiles(st, spec->plane, s), r, 0);
-			if (st->fresh >> s & 1)
+			u32 start = cycles_now();
+			if (draw_row(st, &rc, tile_addr(spec->plane, slot_tile(st, s)), r, (st->blank & bit) != 0))
+				st->blank &= ~bit;
+			else
+				st->blank |= bit;
+			if (st->fresh & bit)
 				row_entries(st, map + ring_map_row(&st->ring, r) * 32, r, s, sel);
+			st->row_cycles = cycles_since(start);
 		}
-		st->dirty &= ~(1u << s);
-		st->fresh &= ~(1u << s);
+		st->dirty &= ~bit;
+		st->fresh &= ~bit;
 	}
 	st->dirty = st->fresh = 0;
 	if (st->page == PAGE_DRAW) {
 		st->page = PAGE_NONE;
 		st->sel_drawn = st->page_cursor;
 		st->sel_ok = st->page_cursor == st->cursor;
-		ui_plane_hide(spec->plane, 0);
+		ui_plane_reveal(spec->plane);
 		gfx_hold_for_queue(GFX_DIRTY_DISPCNT);
+		if (st->queued_a) {
+			st->queued_a = 0;
+			ui_queue_keys(INPUT_A);
+		}
 		if (!st->sel_ok) {
 			// Keys moved the cursor while the page drew: scroll on to it
 			st->page_cursor = st->cursor;
@@ -612,7 +740,7 @@ static void list_draw(u8 node)
 			ui_dirty(node, 2);  // the last step's flip hasn't landed
 		} else if (r >= st->lo && r <= st->hi && st->slot_row[ring_slot(&st->ring, r)] == r) {
 			u32 set = st->mq_set == 0 ? 1 : 0;
-			draw_row(node, st, slot_tiles(st, spec->plane, st->ring.k + set), r, st->mq_px);
+			draw_marquee(st, &rc, tile_addr(spec->plane, mq_tile(st, set)), r, st->mq_px);
 			u8 old = st->mq_set;
 			st->mq_set = (u8)set;
 			u16 *rows = ui_map_rows(node, ring_map_row(&st->ring, r), st->rt);
@@ -633,12 +761,18 @@ static void list_draw(u8 node)
 		u32 n = rows_to[0] == rows_to[1] ? 1 : 2;
 		for (u32 i = 0; i < n; i++) {
 			u32 r = rows_to[i];
-			if (r < st->lo || r > st->hi || st->slot_row[ring_slot(&st->ring, r)] != r)
-				continue;  // not resident: its map rows are written when it is
+			u32 s = ring_slot(&st->ring, r);
+			if (r < st->lo || r > st->hi || st->slot_row[s] != r) {
+				// Not resident (so not on screen): it is drawn afresh,
+				// map rows and all, when it is
+				if (st->slot_row[s] == r)
+					st->slot_row[s] = UI_ITEM_NONE;
+				continue;
+			}
 			u16 *rows = ui_map_rows(node, ring_map_row(&st->ring, r), st->rt);
 			if (!rows)
 				return;  // staging is full: next frame
-			row_entries(st, rows, r, ring_slot(&st->ring, r), st->cursor);
+			row_entries(st, rows, r, s, st->cursor);
 		}
 		st->sel_drawn = st->cursor;
 		st->sel_ok = 1;
