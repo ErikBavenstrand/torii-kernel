@@ -664,7 +664,7 @@ settings2/screen 055FC38099E617EE
 tr-deeper/games-in EC49937E75087FF6
 tr-deeper/recent 672BEF507A1E554D
 tr-deeper/root-back 87D202DFB0E19999
-tr-deeper/sd 34EED145D7C6A8C0
+tr-deeper/sd F7E40BE7DBC25590
 tr-deeper/frames 0-1 F7E40BE7DBC25590
 tr-deeper/frames 2-2 00D333FB66A07014
 tr-deeper/frames 3-3 7A1A509F987B29A6
@@ -697,13 +697,13 @@ tr-deeper/frames 49-58 672BEF507A1E554D
 tr-deeper/frames 59-59 302A11D48B054BA9
 tr-deeper/frames 60-60 F066458D17A0D8E5
 tr-deeper/frames 61-62 7B90E77090ED8325
-tr-deeper/frames 63-63 D04F30DF76B22C31
-tr-deeper/frames 64-64 30215BF077354D84
-tr-deeper/frames 65-65 2ED006D8C4C979BE
-tr-deeper/frames 66-66 B85931D6135A78C9
-tr-deeper/frames 67-67 D80E4D196BDABF9A
-tr-deeper/frames 68-69 5CA023B53FDBF7C0
-tr-deeper/frames 70-75 34EED145D7C6A8C0
+tr-deeper/frames 63-63 87D202DFB0E19999
+tr-deeper/frames 64-64 30BAD36DF70772BC
+tr-deeper/frames 65-65 C226DB75DEB43D1A
+tr-deeper/frames 66-66 E961E6C52FCD3682
+tr-deeper/frames 67-67 271E96756B90D58B
+tr-deeper/frames 68-69 7D031703A6F61C90
+tr-deeper/frames 70-75 F7E40BE7DBC25590
 tr-leave/fading 392C0BDAEB1D3F2B
 tr-leave/progress 8A9B3222959885A1
 tr-leave/frames 0-1 4F47817065DDD361
