@@ -92,8 +92,6 @@ extern TCHAR current_filename[GAME_NAME_MAX + 1];
 extern u32 game_total_SD;
 extern u32 folder_total;
 extern u32 game_total_NOR;
-extern FILINFO fileinfo;
-extern DIR dir;
 
 // A game on its way from the list to the game menu and the launch.
 struct game_pick {

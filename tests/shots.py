@@ -85,7 +85,7 @@ def build_sd(path: Path) -> None:
     shutil.copy("tests/roms/idle/idle.gba", stage / "Long" / LONG_NAME)
     # Enough files to scroll a long way (sd-deep)
     for i in range(1, DEEP_FILES + 1):
-        (stage / "Games" / f"Game {i:03d}.gba").write_bytes(bytes(64 * i))
+        (stage / "Long" / f"Game {i:03d}.gba").write_bytes(bytes(64 * i))
     (stage / "CHEAT" / "Hello.cht").write_bytes(
         b"[Infinite lives]\r\nON=1234,56;\r\n\r\n[Max money]\r\nON=1235,57;\r\n\r\n"
         b"[GameInfo]\r\nName=Hello\r\n"

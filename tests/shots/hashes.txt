@@ -2,7 +2,15 @@
 # SCENARIO/KEY HASH: the key frame tests/shots/png/SCENARIO.KEY.png shows.
 # SCENARIO/frames FIRST-LAST HASH: frames of a -H range (counted from 0)
 # that all hash the same.
-cheats/screen 47999C2B46846CC0
+cheats/screen FB935F6A8E1FD561
+cheats-long/screen 0DFF1665E077CBA1
+cheats-long/scrolled F3087ADFA082EA39
+cheats-many/back 4584C5D6E57F6720
+cheats-many/menu 12C714B1135723ED
+cheats-many/moved 7B01A6EA5D0081B5
+cheats-many/paged 64E4597F0054E201
+cheats-many/picked 565E36A0F80AAF20
+cheats-many/screen 0EEABCB1268DDC69
 cover-demo/loaded 2D73C7A36427D46F
 cover-demo/screen 3CCAC1492B95FF7A
 cover-demo/frames 0-1 2D73C7A36427D46F
@@ -41,36 +49,36 @@ file-menu/screen 3C6B8DC2CD22BC52
 help/screen D8C7377F69946185
 nor-list/screen B41DDB1AFEB55DC1
 recent/screen 672BEF507A1E554D
-sd-deep/held 69D7F2DB7EE1B421
-sd-deep/paged F50DC92286383FE5
+sd-deep/held DADD3FA9E4F41079
+sd-deep/paged 1F9A20893381FF91
 sd-list/screen 34EED145D7C6A8C0
-sd-long/menu 9C6766D75857CA7D
-sd-long/scrolled 4942C31772FF8EB1
-sd-long/start 296284FDDD17EFE1
-sd-scroll/scrolled 6C146AABE9A9C84D
-sd-scroll/start E73E541BABB487CD
-sd-scroll/frames 0-43 E73E541BABB487CD
-sd-scroll/frames 44-45 016B30FF806CB6BD
-sd-scroll/frames 46-47 860B19D186764A1D
-sd-scroll/frames 48-49 48D0A0FB01519BDD
-sd-scroll/frames 50-51 AFC25B858817E87D
-sd-scroll/frames 52-53 D9730FBC7074A27D
-sd-scroll/frames 54-55 E657806DAE48CBE5
-sd-scroll/frames 56-57 E00D71CD60E8AFED
-sd-scroll/frames 58-59 BEF8FD397671EBA5
-sd-scroll/frames 60-61 FAD80B3DE141B30D
-sd-scroll/frames 62-63 2F83F7F4223EF605
-sd-scroll/frames 64-65 3C6EFF3B82332F6D
-sd-scroll/frames 66-67 7C4EE121CE6F4AB5
-sd-scroll/frames 68-69 D4B6023525A35445
-sd-scroll/frames 70-71 DA49D21DAC4C8CB5
-sd-scroll/frames 72-73 88119EB1F0B7CA85
-sd-scroll/frames 74-75 781EAC01B26DD835
-sd-scroll/frames 76-77 3989E7B067F65CED
-sd-scroll/frames 78-79 1773178A72FD49D5
-sd-scroll/frames 80-81 3255968D3D7A0E4D
-sd-scroll/frames 82-83 7A7357C8DE8E7595
-sd-scroll/frames 84-119 6C146AABE9A9C84D
+sd-long/menu 09557074CB598DAB
+sd-long/scrolled 531105B9E901F98C
+sd-long/start D4C21CE5469167D4
+sd-scroll/scrolled A8266BC030B94860
+sd-scroll/start 818F72FFC7BF6260
+sd-scroll/frames 0-40 818F72FFC7BF6260
+sd-scroll/frames 41-42 5A2265517484E2A0
+sd-scroll/frames 43-44 7C41154AC0DD1C20
+sd-scroll/frames 45-46 5BD69F27C984C4E0
+sd-scroll/frames 47-48 5F51B3A698CD2540
+sd-scroll/frames 49-50 0C9956255D2BEAA0
+sd-scroll/frames 51-52 91919F3DE27E3E98
+sd-scroll/frames 53-54 38E3E0FC7AF827E0
+sd-scroll/frames 55-56 79ED904B4570BF38
+sd-scroll/frames 57-58 015E149FB35A7400
+sd-scroll/frames 59-60 FE09CD89BDFB4B78
+sd-scroll/frames 61-62 DB919855AE4513E0
+sd-scroll/frames 63-64 FE7A568D5D42E048
+sd-scroll/frames 65-66 03B0E25C5E2B7598
+sd-scroll/frames 67-68 7CC1CECA06F91F48
+sd-scroll/frames 69-70 278556D711DBE138
+sd-scroll/frames 71-72 C8E014A7C2FA6E08
+sd-scroll/frames 73-74 520A016CC7D938C0
+sd-scroll/frames 75-76 E7EF7B4030C71B28
+sd-scroll/frames 77-78 F240C6CD72FDB220
+sd-scroll/frames 79-80 78195811AB84F408
+sd-scroll/frames 81-119 A8266BC030B94860
 settings1/screen BEC0937CCB96EF71
 settings2/screen 1BD1F13454FBDB6C
 ui-dialog/closed FC5A408D22114FA5

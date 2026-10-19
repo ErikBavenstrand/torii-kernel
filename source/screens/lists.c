@@ -38,6 +38,8 @@
 // The SD list's folder (ezkernelnew.c): the launch path opens games there
 extern TCHAR currentpath[MAX_path_len];
 extern TCHAR currentpath_temp[MAX_path_len];
+extern FILINFO fileinfo;
+extern DIR dir;
 
 #define LIST_ROWS 9       // rows a page of the list shows: (160 - 16) / 16
 #define FOLDER_DEPTH 100   // folders deep whose cursor is remembered
