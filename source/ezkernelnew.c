@@ -280,12 +280,18 @@ void Recently_play_forget(const char *entry)
 	}
 }
 //---------------------------------------------------------------------------------
+// Recently Played's entry for file name in folder path, into buf (RECENT_LEN bytes)
+static void Recently_play_entry(char *buf, const TCHAR *path, const TCHAR *name)
+{
+	memset(buf, 0x00, RECENT_LEN);
+	snprintf(buf, RECENT_LEN, strcmp(path, "/") == 0 ? "%s%s" : "%s/%s", path, name);
+}
+//---------------------------------------------------------------------------------
 static void Make_recently_play_file(TCHAR *path, TCHAR *gamefilename)
 {
 	char buf[RECENT_LEN];
 
-	memset(buf, 0x00, sizeof(buf));
-	snprintf(buf, sizeof(buf), strcmp(path, "/") == 0 ? "%s%s" : "%s/%s", path, gamefilename);
+	Recently_play_entry(buf, path, gamefilename);
 	Recently_play_save(buf);
 }
 //---------------------------------------------------------------------------------
@@ -1421,8 +1427,15 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 		gl_game_uses = Game_hardware(is_EMU, GAMECODE, gb_cart_type);
 	} else {
 		// A Recently Played entry for a file that has since moved: launching
-		// would make its save and start an emulator with no ROM
-		tlog("launch %s: can't open it", pfilename);
+		// would make its save and start an emulator with no ROM. A file
+		// that is gone comes off Recently Played (not on a card error,
+		// which may pass)
+		tlog("launch %s: can't open it (FatFs %lu)", pfilename, (unsigned long)res);
+		if (res == FR_NO_FILE || res == FR_NO_PATH) {
+			char entry[RECENT_LEN];
+			Recently_play_entry(entry, currentpath, pfilename);
+			Recently_play_forget(entry);
+		}
 		Show_error_num(1);
 		return 0;
 	}

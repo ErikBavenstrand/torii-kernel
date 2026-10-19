@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# A Recently Played entry whose file is gone: opening it must show an error
-# and leave the card alone, not make a save and start an emulator with no ROM.
+# A Recently Played entry whose file is gone: opening it must show an error,
+# drop the entry and leave the rest of the card alone, not make a save and
+# start an emulator with no ROM.
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and building tests/roms/hello.
 set -euo pipefail
@@ -20,7 +21,7 @@ run_case() {
   log=$cart/kernel.log
   mkfs.fat -C -F 32 -n STALE "$cart/sd.img" 65536 >/dev/null
   mmd -i "$cart/sd.img" ::/SAVER
-  printf '/Games/%s\n' "$name" >"$cart/recent.txt"
+  printf '/Games/%s\n/Other.gba\n' "$name" >"$cart/recent.txt"
   mcopy -i "$cart/sd.img" "$cart/recent.txt" "::/SAVER/Recently play.txt"
 
   OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -k 100:START -k 104:- "$@" \
@@ -29,7 +30,10 @@ run_case() {
   if mdir -b -i "$cart/sd.img" ::/SAVER | grep -qv 'Recently play.txt'; then
     fail "$name: the kernel wrote to /SAVER: $(mdir -b -i "$cart/sd.img" ::/SAVER | tr '\n' ' ')"
   fi
-  echo "PASS: a missing $name in Recently Played shows an error"
+  # The entry comes off the list; the others stay (v0.3.2: it stayed)
+  recent=$(mtype -i "$cart/sd.img" "::/SAVER/Recently play.txt" | tr '\n' ' ')
+  [ "$recent" = "/Other.gba " ] || fail "$name: after the error, Recently Played has '$recent'"
+  echo "PASS: a missing $name in Recently Played shows an error and comes off the list"
 }
 
 # A GB game starts as soon as it is picked; a GBA game after CLEAN BOOT
@@ -55,8 +59,8 @@ back=$(sed -n '/launch Gone.gba: can.t open it/,$p' "$cart/kernel.log" | grep -o
 [ "$back" = "screen ready: recent" ] || fail "after the error, B brought '$back', not Recently Played"
 grep -q '^kernel: launch Hello.gba: code' "$cart/kernel.log" ||
   fail "after the error, Hello.gba didn't launch: $(grep '^kernel: ' "$cart/kernel.log" | tail -2)"
-mtype -i "$cart/sd.img" "::/SAVER/Recently play.txt" | grep -qx '/Hello.gba' ||
-  fail "Recently Played has $(mtype -i "$cart/sd.img" "::/SAVER/Recently play.txt" | tr '\n' ' '), expected /Hello.gba"
+recent=$(mtype -i "$cart/sd.img" "::/SAVER/Recently play.txt" | tr '\n' ' ')
+[ "$recent" = "/Hello.gba " ] || fail "Recently Played has '$recent', expected /Hello.gba alone"
 echo "PASS: after the error, B goes back to Recently Played, and the list's own games open"
 
 # A file deleted from the SD list (L+START, A) comes off Recently Played;
