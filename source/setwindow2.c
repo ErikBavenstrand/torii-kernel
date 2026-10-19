@@ -165,6 +165,7 @@ static int theme_ready(u32 option)
 	const char *name = themes.names[option - 2];
 	if (!strcmp(ui_theme_sd_folder(), name) && ui_theme_sd())
 		return 1;
+	tlog_flush();  // the log is on the card before a load that might hang
 	if (ui_theme_load(name))
 		return 1;
 	tlog_error("settings: theme %s: %s", name, ui_theme_error());

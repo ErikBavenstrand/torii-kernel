@@ -46,6 +46,7 @@ jobs=(
   "tests/logging.sh settings"
   "tests/logging.sh open"
   "tests/logging.sh flood"
+  "tests/logging.sh hang"
   "python3 tests/shots.py"
   "python3 tests/perf.py self-test"
 )

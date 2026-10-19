@@ -570,8 +570,22 @@ flood)
   echo "PASS: measured frames reach the card as summaries, nothing is lost, and idle lists write the log"
   ;;
 
+hang)
+  # A hang in SETTINGS (v0.3.2: THEME after WRITE TO NOR froze the cart, and
+  # took the lines that led there along): what came before is on the card
+  # as SETTINGS opens. The run stops there, as a power-off would.
+  new_card 65536 32
+  settings 26=3 # LOGGING Debug
+  boot -w "screen ready: sd-list" -k @8:R -k @12:- -w "screen ready: nor-list" -k @8:R -k @12:- \
+    -w "screen ready: settings1"
+  has "screen ready: nor-list"
+  lines_ok
+  card_ok
+  echo "PASS: the log is on the card as SETTINGS opens"
+  ;;
+
 *)
-  echo "usage: $0 launch|debug|crash|rotate|junk|full|flood" >&2
+  echo "usage: $0 launch|debug|crash|rotate|junk|full|settings|open|flood|hang" >&2
   exit 2
   ;;
 esac
