@@ -1251,8 +1251,9 @@ u32 ui_frame(void)
 		frame_wake();
 	modal_tick(dt);
 	tr_tick(dt);
-	// Their frames are measured unless the screen measures its own
-	if ((ui.tr_phase != TR_IDLE || (ui_top() && ui_top()->opening)) && !frame_measuring())
+	// Their frames are measured, in mGBA only (the tests' figures), unless the
+	// screen measures its own
+	if ((ui.tr_phase != TR_IDLE || (ui_top() && ui_top()->opening)) && tlog_in_emulator() && !frame_measuring())
 		frame_measure(ui.tr_phase != TR_IDLE ? "ui-transition" : "ui-dialog-motion");
 	update_all(dt);
 	// A view still to be shown (one pushed after a pop waits a frame) wakes

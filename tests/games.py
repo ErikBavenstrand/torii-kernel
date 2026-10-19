@@ -96,8 +96,8 @@ CHECKS = ["boots", "save type", "clock", "save cycle", "in-game menu"]
 # and NES games start on open, with no menu.
 LAUNCH = [(100, "DOWN"), (120, "A"), (180, "A")]
 LAUNCH_EMU = LAUNCH[:2]
-# The kernel has handed over to the game by now: a 32 MB game's save loads
-# about 300 frames in, after the menu's transitions (v0.3 F2)
+# The kernel has handed over to the game by now: with the menu's transitions
+# (v0.3 F2) it finishes loading a 32 MB game and its save about 320 frames in
 GAME_START = 360
 RUN_FRAMES = 2400
 SHOTS = (600, 1500, RUN_FRAMES)

@@ -1265,11 +1265,11 @@ static void do_action(void)
 // Writes the log to the card while the lists wait for a key: once it fills
 // half its RAM ring, so a long stay in the menu loses no lines, and after
 // IDLE_FLUSH_ALL_FRAMES with any line waiting, so a power-off loses none. A
-// flush's SD write never stalls a scroll
+// flush's SD write never stalls a scroll or a transition
 static void idle_flush(void)
 {
 	u32 pending = tlog_pending(), idle = ui_idle_frames();
-	if (!pending || lists.act || jobs_pending() || gfx_pending())
+	if (!pending || lists.act || jobs_pending() || gfx_pending() || ui_transitioning())
 		return;
 	if ((pending >= LOG_RING_SIZE / 2 && idle >= IDLE_FLUSH_FRAMES) || idle >= IDLE_FLUSH_ALL_FRAMES)
 		tlog_flush();

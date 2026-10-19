@@ -230,9 +230,11 @@ void dialog_hand_over(void)
 	dlg.opens = 0;
 	dlg.owned = 0;
 	// What a new session would read: the SD theme may have loaded since
+	// (only if it differs: setting it decodes the wallpaper again)
 	u16 accent;
 	const struct ui_theme *t = ui_theme_setting(&accent);
-	ui_theme_set(t, accent);
+	if (t != ui_theme() || accent != ui_accent())
+		ui_theme_set(t, accent);
 	ui_dim_set_minutes(ui_dim_setting());
 	tlog_debug("dialog: engine session handed over");
 }
