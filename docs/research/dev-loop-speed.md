@@ -41,7 +41,14 @@ other sessions testing in the same VM (load 5–7): 193.5 s before the changes b
 
 What remains: about 4 s of `test-host` and docker starts, then `tests/all.sh` (about 15 s), whose slowest jobs are `tests/shots.py` (7 s alone) and `saves.sh full` (5 s).
 The run is CPU-bound: run one after another, the jobs took about 75 s.
-`just compat` still keeps its carts in `dist/cart-games` and pays the 0.5 s sync at each power-on.
+
+## Update 2026-10-19: compat carts off the virtiofs mount
+
+`tests/games.py` now keeps its carts in the container's `/tmp` too and copies a failed game's carts to `dist/cart-games`;
+reports and screenshots still go to `dist/compat`. Measured old and new in turns on a warm tree, `torii` VM with 8 CPUs, each pair started with no other container running (load 2–9):
+`just compat` 15.7–19.4 s before, 11.5–14.0 s after (three pairs); `just compat --all` 71 s before, 57 s after (one pair).
+The gain is smaller than for `just test` because game power-ons are long (2,400+ frames) and the run stays CPU-bound.
+A passing run also no longer leaves 140 MB per game in `dist/cart-games` (16 GB after `--all`).
 
 ## Top five, ranked by time saved × frequency ÷ effort
 
@@ -239,10 +246,10 @@ so "faster than real time" is already the case: the kernel unit tests take 60 ms
   `make_cart` 14 % (0.17–0.3 s per game: `mkfs.fat` and `mcopy` of a 64–80 MB image), `menu_cart` 7 %. Screenshots, PNG checks and mtools reads take under 1 %.
 - A GBA game takes 1.7–2.8 s, a GB game about 1.1 s. The longest, at 3.5–5.4 s, sets the floor for any run.
 - `make_cart` is 10× faster on tmpfs (0.024 s against 0.24 s per cart), but at most about 8 % of a compat run.
-  mgba-shot itself runs no faster from tmpfs: the cart files are memory-mapped.
+  mgba-shot also runs faster off virtiofs: it syncs the memory-mapped cart files at the end of each power-on, about 0.5 s on `dist/` (see the 2026-10-19 updates; carts are now in the container's `/tmp`).
 - Fixed costs: ROM index 0.01 s (cached), report 0.22 s.
-- Disk: each game keeps a 140 MB cart in `dist/cart-games` (SD image, 64 MB game NOR, kernel NOR, SRAM).
-  After `--all` that is 16 GB per worktree; the main checkout holds 13 GB and source-cleanup 11 GB.
+- Disk: each game kept a 140 MB cart in `dist/cart-games` (SD image, 64 MB game NOR, kernel NOR, SRAM).
+  After `--all` that was 16 GB per worktree; since 2026-10-19 only failed games' carts are kept there.
 
 ### CI
 
@@ -260,7 +267,6 @@ The analysis job (98 s) is advisory but adds to the wall clock. Job breakdown un
 | Fewer screenshots | 3 per game; PNG writes and checks are under 1 % |
 | Caching the compat baseline, incremental compat | every kernel change changes all games' inputs. Only a re-run with the same kernel, emulator, `tests/games*` and ROMs could be skipped: the tier policy (#1) avoids most of those without a cache |
 | Sharing the emulator build between worktrees | 23 s once per worktree |
-| Carts on tmpfs | up to 8 % of compat (but see the 2026-10-19 update: each power-on also pays a 0.5 s sync on virtiofs). Worth it later, mainly for the 16 GB of disk; deleting a passing game's cart does the same |
 | Running `test-host` alongside `tests/all.sh` | saves 1.3 s |
 
 ## Found while measuring
