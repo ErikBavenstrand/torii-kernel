@@ -62,6 +62,15 @@ NO_COMPAT = {
     "source/engine/text_blit.s",
     "source/engine/text_layout.c",
     "source/helpwindow.c",
+    "source/ui/ring.h",
+    "source/ui/ui.h",
+    "source/ui/ui_core.c",
+    "source/ui/ui_list.c",
+    "source/ui/ui_priv.h",
+    "source/ui/ui_ring.c",
+    "source/ui/ui_run.c",
+    "source/ui/ui_theme.c",
+    "source/ui/ui_widgets.c",
 }
 
 # (patterns, tiers, why): fnmatch patterns, where "*" also matches "/"

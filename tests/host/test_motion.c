@@ -254,6 +254,32 @@ void test_spring_jump_and_shift(void)
 	motion_update(1);
 	CHECK_EQ(b, FIX(20));
 	CHECK(!motion_running(ib));
+	// From one value limit to the other: the offset needs 64 bits (UBSan)
+	motion_spring_jump(ib, FIX(-16384));
+	motion_spring_target(ib, FIX(16384));
+	for (u32 i = 0; i < 200 && motion_running(ib); i++)
+		motion_update(3);
+	CHECK_EQ(b, FIX(16384));
+	motion_reset();
+}
+
+void test_motion_range_before_alloc(void)
+{
+	motion_reset();
+	s32 v = 0;
+	tlog("  (four assert lines about the value range are expected next)");
+	// Out of range: no motion, no slot taken
+	CHECK_EQ(motion_spring(MOTION_TO_S32(&v), FIX(16385), SPRING_FAST, 0), MOTION_NONE);
+	CHECK_EQ(motion_tween(MOTION_TO_S32(&v), 0, FIX(-16385), 4, EASE_LINEAR, 0), MOTION_NONE);
+	CHECK_EQ(motion_count(), 0);
+	// A bad target or shift leaves a live spring as it was
+	MotionId id = motion_spring(MOTION_TO_S32(&v), FIX(16000), SPRING_FAST, 0);
+	CHECK(id != MOTION_NONE);
+	motion_spring_target(id, FIX(16385));
+	CHECK_EQ(motion_goal(id), FIX(16000));
+	motion_spring_shift(id, FIX(1000));
+	CHECK_EQ(motion_value(id), FIX(16000));
+	CHECK_EQ(motion_goal(id), FIX(16000));
 	motion_reset();
 }
 
@@ -400,12 +426,22 @@ void test_palette_fade(void)
 	palette_fade(out, src, 7, FADE_BLACK, 128);
 	CHECK_EQ(out[1], 15 | 15 << 5 | 15 << 10);
 	CHECK_EQ(out[2], 15);
+	// Halves round away from zero: 0 moves up to 16 as 31 moves down to 15
 	palette_fade(out, src, 7, FADE_WHITE, 128);
-	CHECK_EQ(out[0], 15 | 15 << 5 | 15 << 10);
-	CHECK_EQ(out[2], 31 | 15 << 5 | 15 << 10);
+	CHECK_EQ(out[0], 16 | 16 << 5 | 16 << 10);
+	CHECK_EQ(out[2], 31 | 16 << 5 | 16 << 10);
 	// Towards a colour: each channel on its own.
-	palette_fade(out, src, 1, 0x7C1F, 64);  // magenta, a quarter
-	CHECK_EQ(out[0], 7 | 0 << 5 | 7 << 10);
+	palette_fade(out, src, 1, 0x7C1F, 64);  // magenta, a quarter: 7.75
+	CHECK_EQ(out[0], 8 | 0 << 5 | 8 << 10);
+	// Symmetric: a channel fading to white moves as its mirror does to black
+	for (u32 v = 0; v < 32; v++) {
+		for (u32 f = 0; f <= FADE_MAX; f++) {
+			u16 a = (u16)v, b = (u16)(31 - v), oa, ob;
+			palette_fade(&oa, &a, 1, FADE_WHITE, f);
+			palette_fade(&ob, &b, 1, FADE_BLACK, f);
+			CHECK_EQ((oa & 31) - v, (31 - v) - (ob & 31));
+		}
+	}
 	// Every channel moves monotonically towards the target as the factor grows.
 	for (u32 color = 0; color < 0x8000; color += 0x0421) {
 		u16 c = (u16)color, prev = 0x1234;

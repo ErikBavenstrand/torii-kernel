@@ -52,6 +52,17 @@ struct text_line {
 // if not even "..." fits, nothing is drawn. Returns line->count.
 u32 text_layout(const struct torii_font *font, const char *s, u32 len, u32 clip, struct text_line *line);
 
+// Lays out the part of a UTF-8 string that falls in the pixel span [skip,
+// skip + clip) of its line, for a marquee: glyphs that start left of skip
+// are dropped whole (they don't slide out half drawn: the blitter has no
+// left clip), and the line stops before the first glyph whose ink would
+// pass the right edge, with no ellipsis (line->truncated says it stopped).
+// *lead gets the gap from skip to the first glyph's pen: draw the line at x +
+// *lead. Returns line->count. A window never holds more than
+// TEXT_MAX_GLYPHS glyphs, so strings of any length scroll.
+u32 text_layout_window(const struct torii_font *font, const char *s, u32 len, u32 skip, u32 clip,
+		       struct text_line *line, u32 *lead);
+
 // text_draw doesn't say whether it cut the string: a widget that needs to
 // know (to start a marquee, say) calls text_layout and text_draw_line.
 // Draws a UTF-8 string with its line's top at pixel (x, y) of the window,

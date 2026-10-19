@@ -5,7 +5,7 @@
 
 #include "torii_test.h"
 #include "tests.h"
-#include "text_demo.h"
+#include "ui_demo.h"
 #include "../../source/waitcnt.h"
 
 int torii_test_failures;
@@ -45,6 +45,7 @@ static const struct {
 	{"text_draw", test_text_draw},
 	{"text_clear", test_text_clear},
 	{"text_cycles", test_text_cycles},
+	{"ui_pool_and_arenas", test_ui_pool_and_arenas},
 	{"asset_lz77_decode", test_asset_lz77_decode},
 	{"asset_psram_round_trip", test_asset_psram_round_trip},
 	{"asset_sd_read", test_asset_sd_read},
@@ -99,15 +100,18 @@ void torii_run_tests(void)
 	// SELECT held at power-on: the cart run (tests/assets.sh and the
 	// cover-demo shot, on the emulated cart). The other tests assume no
 	// cart model: under it the NOR tests write the game NOR, then crash
+	// SELECT and L: the UI demo on the cart (tests/shots/ui-*.opts)
+	if ((~REG_KEYINPUT & 0x3FF) == (KEY_SELECT | KEY_L))
+		ui_demo();
 	if ((~REG_KEYINPUT & 0x3FF) == KEY_SELECT) {
 		REG_WAITCNT_CART = WAITCNT_MENU;  // as the menu runs
 		torii_asset_tests();
 		cover_demo();
 	}
 	torii_unit_tests();
-	// The engine's scene, or with L held (mgba-shot -k 1:L) the text demo
+	// The engine's scene, or with L held (mgba-shot -k 1:L) the UI demo
 	if (!(REG_KEYINPUT & KEY_L))
-		text_demo();
+		ui_demo();
 	engine_smoke();
 }
 #endif

@@ -6,7 +6,8 @@
 // frame it moves (motion_update, in the frame's update phase), then once more
 // when it ends, and then rests. Values are s32 16.16 fixed point (FIX) and
 // must stay within +-16384 units (a list scrolled further rebases with
-// motion_spring_shift). No floats and no hardware access: tests/host runs all
+// motion_spring_shift): a value outside logs an assert, and the call does
+// nothing (a new motion is MOTION_NONE, and takes no slot). No floats and no hardware access: tests/host runs all
 // of it.
 //
 // Tweens have a fixed duration and an easing curve: fades and fixed
@@ -65,6 +66,10 @@ typedef enum {
 	MOTION_TARGET_S32,   // s32, the 16.16 value as it is
 	MOTION_TARGET_CALL,  // set(ctx, value): blend alpha, fade factors, anything else
 } MotionTargetKind;
+
+// A MOTION_TARGET_CALL setter gets the raw 16.16 value, not an integer: a
+// fade tweens FIX(0) to FIX(FADE_MAX) and its setter passes
+// FIX_ROUND(value) to palette_fade.
 
 typedef void (*MotionSetFn)(void *ctx, s32 value);
 
@@ -154,7 +159,8 @@ void motion_free_owner(u8 owner);
 
 // Palette fades. Writes count colours to dst: each colour of src moved
 // towards color by factor/256 (0 leaves src, 256 gives color), channel by
-// channel. factor over 256 counts as 256. dst may be src.
+// channel, rounded to the nearest (halves away from zero, so fades towards
+// white and black are symmetric). factor over 256 counts as 256. dst may be src.
 void palette_fade(u16 *dst, const u16 *src, u32 count, u16 color, u32 factor);
 
 #define FADE_BLACK 0x0000

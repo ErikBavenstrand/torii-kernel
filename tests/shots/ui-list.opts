@@ -1,0 +1,19 @@
+#! kernel test
+# The UI demo's list (tests/kernel/ui_demo.c: the test kernel on the cart with L and SELECT held): 1000
+# synthetic items. Two rows down, then R pages, with every frame of the
+# spring scroll hashed; the marquee of the long name the cursor lands on;
+# then back up, and UP at the top wraps to the end: a page change, drawn
+# hidden (every frame hashed).
+-k 1:L+SELECT
+-w "screen ready: ui-demo"
+-k @2:-
+-s @3:screen.png
+-k @10:DOWN -k @14:- -k @20:DOWN -k @24:-
+-k @40:R -k @44:-
+-H @40:@64
+-s @64:paged.png
+-s @180:marquee.png
+-k @190:L -k @194:- -k @200:UP -k @204:- -k @210:UP -k @214:-
+-k @240:UP -k @244:-
+-H @240:@252
+-s @270:wrapped.png

@@ -44,8 +44,10 @@ void input_step(InputState *s, u16 keys, u32 dt, int skip_anim)
 	s->released = s->held & ~keys;
 	s->held = keys;
 	s->fire = s->pressed;
-	// A new direction starts every held direction's schedule over.
-	u16 restart = s->pressed & INPUT_DPAD ? INPUT_DPAD : 0;
+	// A new direction, or letting one go, starts every held direction's
+	// schedule over (from delay, without firing): speed-up resets on a
+	// release or a change of direction.
+	u16 restart = (s->pressed | s->released) & INPUT_DPAD ? INPUT_DPAD : 0;
 	for (u32 k = 0; k < INPUT_KEYS; k++) {
 		u16 bit = (u16)(1 << k);
 		if (!(keys & bit) || !(bit & (INPUT_DPAD | INPUT_PAGE))) {
