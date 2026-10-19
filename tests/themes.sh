@@ -127,3 +127,32 @@ grep -q "kernel: nor: wrote Big.gba" <<<"$out" || fail "WRITE TO NOR didn't writ
 grep -q "kernel: theme: loaded example" <<<"$out" ||
   fail "THEME didn't load the example after WRITE TO NOR: $(grep -E 'theme|settings' <<<"$out" | tail -3)"
 echo "PASS: an SD theme picked after WRITE TO NOR loads (the reader in pReadCache starts clean)"
+
+# UP held on THEME (tests/shots/settings-theme-held.opts): 27 steps through
+# DARK, LIGHT, the example and wall128 load no theme while the key is down;
+# the example it stops on loads once, after it is let go
+rm -rf "$cart"
+mkdir -p "$cart"
+mkfs.fat -C -F 32 -n THEMES "$cart/sd.img" 65536 >/dev/null
+mmd -i "$cart/sd.img" ::/torii ::/torii/themes ::/torii/themes/example ::/torii/themes/wall128
+copy_tree "$cart/sd.img" themes/example ::/torii/themes/example
+copy_tree "$cart/sd.img" tests/themes/wall128 ::/torii/themes/wall128
+printf 'wall128\n' >"$cart/theme.txt"
+mcopy -Q -i "$cart/sd.img" "$cart/theme.txt" ::/torii/theme.txt
+python3 - "$cart/kernel-nor.bin" <<'EOF2'
+import struct, sys
+nor = bytearray(b"\xff" * (8 << 20))
+nor[0x7B0000 + 2 * 28 : 0x7B0000 + 2 * 29] = struct.pack("<H", 2)
+open(sys.argv[1], "wb").write(nor)
+EOF2
+# shellcheck disable=SC2086 # $keys is a list of options
+out=$(OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -w "screen ready: sd-list" $keys \
+  -w "screen ready: nor-list" $keys -w "screen ready: settings1" $keys -w "screen ready: settings2" \
+  -k @8:DOWN -k @11:- -k @16:DOWN -k @19:- -k @24:DOWN -k @27:- -k @32:DOWN -k @35:- -k @40:DOWN -k @43:- \
+  -k @48:A -k @51:- -k @70:UP -k @151:- -w "theme: loaded example" -k @20:RIGHT -k @24:- -k @32:A -k @36:- \
+  -w "settings: THEME" 2>&1 || true)
+loads=$(sed -n '/screen ready: settings2/,$p' <<<"$out" | grep -c "kernel: theme: loaded" || true)
+[ "$loads" = 1 ] || fail "UP held on THEME loaded $loads themes, not 1: $(grep 'theme: loaded' <<<"$out" | tail -3)"
+grep -q "kernel: settings: THEME Example" <<<"$out" ||
+  fail "THEME didn't stop on the example: $(grep -E 'settings:' <<<"$out" | tail -3)"
+echo "PASS: UP held on THEME steps without loading; the SD theme it stops on loads once"
