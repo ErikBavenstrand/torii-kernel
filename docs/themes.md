@@ -129,8 +129,8 @@ A UTF-8 text file (a BOM is skipped; LF, CRLF or CR line ends; at most 8 KB; lin
 | `[effects]` | `KIND_out`, `KIND_in` | 0-30 frames going out and coming in | tab, deeper and leave 3, 8; fade 3, 6 |
 | `[effects]` | `KIND_px` | 0-64 px a slide goes | tab 16, deeper 12, fade and leave 0 |
 | `[input]` | `delay`, `interval`, `page_delay`, `page_interval` | 1-255 frames (`engine/input.h`): a held d-pad repeats after `delay`, first every `interval` frames | 15, 4, 20, 6 |
-| `[input]` | `ramp` | 0-255 frames from the first repeat to top speed, along a smooth curve (0: top speed at once) | 90 |
-| `[input]` | `top_speed` | 1-60 repeats a second at the end of the ramp (60: every frame) | 40 |
+| `[input]` | `ramp` | 0-255 frames from the first repeat to top speed, along a smooth curve (0: top speed at once) | 54 |
+| `[input]` | `top_speed` | 1-60 repeats a second at the end of the ramp (60: every frame; 30 moves 16 px rows a whole 8 px a frame) | 30 |
 | `[wallpaper]` | `file` | a file name in the theme's folder (no `/`, `\`, `:`, not starting with `.`, under 32 bytes): a 4bpp TAS1 asset | none |
 | `[patches]` | `VIEW.NODE.FIELD` | see below; at most 16 (a repeated target replaces its patch) | none |
 
