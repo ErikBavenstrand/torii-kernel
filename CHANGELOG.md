@@ -6,6 +6,20 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** views, widgets and themes for the v0.3 tile menu, not yet used
+  by any screen (`source/ui/`). Screens are const layouts of labels,
+  panels, lists, grids, images, scroll and progress bars with anchors, on a
+  view stack with modal dialogs that slide in over the dimmed screen. Lists
+  scroll pixel by pixel on a spring through a ring of 16 px row slots,
+  select by palette bank, redraw a whole page hidden, and scroll a cut name
+  on the selected row. Dark and light themes with seven accents are palette
+  swaps, with palette fades and layout patches for theme files to come.
+  A DIM setting (slot 27, off by default) darkens the screen after idle
+  minutes; nothing new writes kernel NOR (`40c91a0`, `2b8037a`, `a38043a`).
+- **Changed:** motion checks a value's range before taking a slot and its
+  spring settles in 64 bits; palette fades round symmetrically; releasing a
+  direction restarts the repeat of one still held (`bec26d8`, `472a177`).
+  `RGB()` parenthesises its arguments (`0567902`).
 - **Added:** cover streaming for the v0.3 tile menu, not yet used by any
   screen. Files are read from SD a few KB per job step; LZ77 assets (TAS1,
   written by `tools/asset.py`) are decoded into a cache in PSRAM page 0
