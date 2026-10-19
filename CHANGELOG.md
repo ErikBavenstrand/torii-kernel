@@ -14,7 +14,9 @@ git log, not here.
   a launch fades to black. Dialogs and menus fade in, then dim the screen,
   while sliding up over 12 frames, and close the same way backwards; the dim
   is darker. All of it is theme data (`dialog_in`, `dialog_out`,
-  `tab_*`, `deeper_*`, `fade_*`, `leave_*` in theme.ini) (`98955be`).
+  `tab_*`, `deeper_*`, `fade_*`, `leave_*` in theme.ini). A delete, FORMAT
+  ALL or overwrite question answered no leaves the list as it was (`98955be`,
+  `e707f85`, `504cbf2`).
 - **Removed:** HELP's "SELECT: Thumbnail toggle" line; the lists no longer
   show thumbnails (`3250448`).
 - **Fixed:** with an SD theme that has a wallpaper, the game menu no longer
