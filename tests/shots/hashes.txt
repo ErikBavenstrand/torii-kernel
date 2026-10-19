@@ -2,8 +2,9 @@
 # SCENARIO/KEY HASH: the key frame tests/shots/png/SCENARIO.KEY.png shows.
 # SCENARIO/frames FIRST-LAST HASH: frames of a -H range (counted from 0)
 # that all hash the same.
-boot/screen 7A7B71CE01BB114C
+boot/screen 2F699359A5731225
 boot-progress/screen 8A9B3222959885A1
+boot-progress-big/loading 7868AEBC12088DD1
 cheats/screen 063A1B234EA6DC79
 cheats-long/screen 50CC9D4DE1FE8EC1
 cheats-long/scrolled B9FCA1EEBABF43C5
@@ -49,8 +50,10 @@ cover-demo/frames 31-32 3CCAC1492B95FF7A
 diag-renderer/demo CFABCE035BEAC9FD
 diag-start/screen 3162F4422A6557C5
 file-menu/screen 2BC422F470DDF7F3
-help/screen FF8D788BD1ABB79C
+help/screen FD71702F76BB10E0
 nor-list/screen B41DDB1AFEB55DC1
+nor-write/done 8DE07CA2EAFDF0C4
+nor-write/half C04FD0A7B7D4B370
 recent/screen 672BEF507A1E554D
 sd-deep/held F5DB10A27FDD2FB4
 sd-deep/held-mid 86041E41DC4EE1BC
@@ -423,7 +426,7 @@ sd-deep/frames 405-405 71D2AE59440741B1
 sd-deep/frames 406-406 273025A4CB665C20
 sd-deep/frames 407-441 818F72FFC7BF6260
 sd-delete/kept 5CB316715377D608
-sd-delete/screen 27DF7DB1CACAF0C0
+sd-delete/screen 18920185BB37BAA4
 sd-list/screen 34EED145D7C6A8C0
 sd-long/menu D9F54562E74ACFE3
 sd-long/scrolled 932B53789E40D384
@@ -453,16 +456,18 @@ sd-scroll/frames 58-58 1EF409CA7C6A0E40
 sd-scroll/frames 59-59 0E42AD38C5B4B318
 sd-scroll/frames 60-60 6BAF27EF5883ECF8
 sd-scroll/frames 61-119 A8266BC030B94860
-sd-theme-menus/dialog A36B142F20F61DF0
+sd-theme-menus/dialog 1BA10065BD81C17C
 sd-theme-menus/file-menu 53E8845BB4D19DBE
 sd-theme-menus/kept 78C37A96E08CB9A9
 sd-theme-menus/list 795D672AB1E0F14A
-sd-theme-wall/dialog B430564152CE6FF2
+sd-theme-wall/dialog E68F68D7F481490E
 sd-theme-wall/kept 0969DFACF8A353B3
 sd-theme-wall/list C0CB12E6BB3CC753
 settings-held/held-l 0CA5C0696DB712FC
 settings-held/held-r 0CA5C0696DB712FC
-settings-light/help 23A913E73883ED51
+settings-led/edit 780E60240DD4DC4E
+settings-led/saved 2DD464C96878975E
+settings-light/help 49552FEE0648E09D
 settings-light/screen 25BF7277EB3BBB08
 settings-sd-theme/again 7E1CFB4EE11082A8
 settings-sd-theme/theme F261CF6429EF81B4

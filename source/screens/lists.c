@@ -27,6 +27,7 @@
 #include "../diag.h"
 #include "../ezkernel.h"
 #include "../lang.h"
+#include "../logbuf.h"
 #include "../nameindex.h"
 #include "../NORflash_OP.h"
 #include "../RTC.h"
@@ -48,7 +49,9 @@ extern DIR dir;
 #define LIST_ROWS 9       // rows a page of the list shows: (160 - 16) / 16
 #define FOLDER_DEPTH 100   // folders deep whose cursor is remembered
 #define CLOCK_POLL 15      // frames between clock reads
-#define MEASURE_FRAMES 16  // frames measured after a cursor move
+#define MEASURE_FRAMES 16     // frames measured after a cursor move
+#define IDLE_FLUSH_FRAMES 30       // frames with no key held before a flush of a half-full log
+#define IDLE_FLUSH_ALL_FRAMES 300  // and before a flush of any log line
 
 enum screen {
 	SCR_SD,
@@ -135,7 +138,6 @@ static struct {
 	char detail[16];
 	char row[32];
 	char save_row[40];
-	char message[GAME_NAME_MAX + 64];
 } lists EWRAM_BSS;
 
 // --- Icons ----------------------------------------------------------------
@@ -1109,7 +1111,7 @@ static void nor_menu_a(u32 line, u32 key_l)
 		if (res == 2) {
 			error_dialog(2, AFTER_NOR);
 		} else if (res == 0x10) {
-			dialog_kind(NULL, gl_file_exist, 1, AFTER_BACKUP, DIALOG_ERROR);
+			dialog_kind(NULL, gl_file_exist, 1, AFTER_BACKUP, DIALOG_INFO);  // a question, not an error
 		} else {
 			if (FRAM_save_op(2) == 2)
 				error_dialog(2, AFTER_NOR);
@@ -1196,9 +1198,8 @@ static void do_action(void)
 	case ACT_DELETE_ASK:
 		snprintf(current_filename, sizeof(current_filename), "%s",
 			 names_get(sd_files[arg - folder_total].name));
-		// "Delete file SURE?" (the start of gl_formatnor_info) over the whole name
-		snprintf(lists.message, sizeof(lists.message), "%s %.5s", gl_LSTART_help, gl_formatnor_info);
-		dialog_kind(lists.message, current_filename, 1, AFTER_DELETE, DIALOG_INFO);
+		// "Delete this file?" over the whole name
+		dialog_kind(gl_delete_ask, current_filename, 1, AFTER_DELETE, DIALOG_INFO);
 		break;
 	case ACT_NOR_MENU:
 		lists.nor_game = arg;
@@ -1228,6 +1229,19 @@ static void do_action(void)
 	}
 }
 
+// Writes the log to the card while the lists wait for a key: once it fills
+// half its RAM ring, so a long stay in the menu loses no lines, and after
+// IDLE_FLUSH_ALL_FRAMES with any line waiting, so a power-off loses none. A
+// flush's SD write never stalls a scroll
+static void idle_flush(void)
+{
+	u32 pending = tlog_pending(), idle = ui_idle_frames();
+	if (!pending || lists.act || jobs_pending() || gfx_pending())
+		return;
+	if ((pending >= LOG_RING_SIZE / 2 && idle >= IDLE_FLUSH_FRAMES) || idle >= IDLE_FLUSH_ALL_FRAMES)
+		tlog_flush();
+}
+
 void lists_run(void)
 {
 	memset(&lists, 0, sizeof(lists));
@@ -1253,5 +1267,6 @@ void lists_run(void)
 		}
 		if (lists.act)
 			do_action();
+		idle_flush();
 	}
 }

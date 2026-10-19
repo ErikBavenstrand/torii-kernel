@@ -4,7 +4,7 @@ Torii is a custom kernel for the EZ-Flash Omega DE, forked from EZ-Flash's offic
 
 ## Kernel source
 
-- To release, rename `## Unreleased` in `CHANGELOG.md` to the version, commit, and push a tag like `v0.1.0`: CI publishes a GitHub Release with `ezkernelnew.bin` and that section as its notes.
+- To release, rename `## Unreleased` in `CHANGELOG.md` to the version, set `TORII_VERSION` in `source/version.h` to it (HELP shows it and every boot logs it), commit, and push a tag like `v0.1.0`: CI publishes a GitHub Release with `ezkernelnew.bin` and that section as its notes.
 - **Mandatory:** log every change to `source/` in `CHANGELOG.md`, under Unreleased: what changed and why, with the commit's short hash, in two or three lines. Commit the change first, then add the entry with its hash (one follow-up commit can log several changes).
 - Every screen draws through the tile engine (`source/engine`, `source/ui`); there is no bitmap mode. Code outside a screen (the boot, launches, the firmware update) shows messages, questions and progress with `source/ui/dialog.h`, which starts an engine session when none is up. A screen that ends its session calls `ui_shutdown()`, then `dialog_blank()`.
 - Language strings live in `source/lang.c` as `en_*` strings, wired up in `LoadEnglish`. `lang_packs` lists the languages SETTINGS offers; English is the only one until v0.9.

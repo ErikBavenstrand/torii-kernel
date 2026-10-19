@@ -117,22 +117,29 @@ char *gl_save_loaded;
 char *gl_save_saved;
 char *gl_file_exist;
 char *gl_file_noexist;
+char *gl_delete_ask EWRAM_BSS;
+char *gl_saving EWRAM_BSS;
+char *gl_format_title EWRAM_BSS;
+char *gl_erasing EWRAM_BSS;
+char *gl_done EWRAM_BSS;
+char *gl_patching EWRAM_BSS;
+char *gl_keep_power EWRAM_BSS;
 //--
 char **gl_rom_menu;
 char **gl_nor_op;
 
 //英文
-const char en_init_error[] = "Micro SD card initial error";
-const char en_power_off[] = "Power off";
-const char en_init_ok[] = "Micro SD card initial OK";
+const char en_init_error[] = "microSD card error";
+const char en_power_off[] = "Turn the power off";
+const char en_init_ok[] = "microSD card ready";
 const char en_Loading[] = "Loading...";
 const char en_theme_error[] = "Theme not loaded, using Dark:";
-const char en_file_overflow[] = "File overflow,load to NOR";
+const char en_file_overflow[] = "Too big to start from the SD card (over 32 MB). Write it to NOR instead.";
 
 const char en_menu_btn[] = "[B]CANCEL    [A]OK";
 const char en_close_btn[] = "[B]OK";
-const char en_writing[] = "WRITING...";
-const char en_lastest_game[] = "SELECT THE LASTEST";
+const char en_writing[] = "Writing to NOR";
+const char en_lastest_game[] = "Only the last game in NOR can be deleted";
 
 const char en_time[] = "     TIME";
 const char en_Mon[] = "MON";
@@ -157,18 +164,18 @@ const char en_lang[] = "ENGLISH";
 const char en_set_btn[] = "SET";
 const char en_ok_btn[] = " OK";
 
-const char en_formatnor_info[] = "SURE?about 4 mins";
+const char en_formatnor_info[] = "Erase every game in NOR? It takes about 4 minutes.";
 
-const char en_check_sav[] = "CHECKING SAV FILE";
-const char en_make_sav[] = "CREATING SAV FILE";
+const char en_check_sav[] = "Checking the save";
+const char en_make_sav[] = "Creating the save file";
 
-const char en_check_RTS[] = "CHECKING RTS FILE";
-const char en_make_RTS[] = "CREATING RTS FILE";
+const char en_check_RTS[] = "Checking the save states";
+const char en_make_RTS[] = "Creating the save state file";
 
-const char en_check_pat[] = "CHECKING PAT FILE";
-const char en_make_pat[] = "CREATING PAT FILE";
+const char en_check_pat[] = "Checking the patches";
+const char en_make_pat[] = "Saving the patches";
 
-const char en_loading_game[] = "LOADING GAME";
+const char en_loading_game[] = "Loading the game";
 
 const char en_engine[] = "   ENGINE";
 const char en_use_engine[] = "FAST PATCH ENGINE";
@@ -205,19 +212,19 @@ const char en_accent_own[] = "THEME'S OWN";
 const char en_dim[] = "DIM";
 const char en_minutes[] = "MIN";
 
-const char en_error_0[] = "Folder error";
-const char en_error_1[] = "File error";
-const char en_error_2[] = "SAVER error";
-const char en_error_3[] = "Save error";
-const char en_error_4[] = "Read save error";
-const char en_error_5[] = "Make save error";
-const char en_error_6[] = "RTS file error";
-const char en_error_7[] = "File fragmented";
-const char en_error_8[] = "Name too long";
-const char en_error_9[] = "Path too long";
+const char en_error_0[] = "Can't open the folder";
+const char en_error_1[] = "Can't open the file";
+const char en_error_2[] = "Can't open the SAVER folder";
+const char en_error_3[] = "Can't write the save";
+const char en_error_4[] = "Can't read the save";
+const char en_error_5[] = "Can't create the save file";
+const char en_error_6[] = "Can't create the save state file";
+const char en_error_7[] = "The file is too fragmented. Copy it to the card again.";
+const char en_error_8[] = "The file name is too long";
+const char en_error_9[] = "The folder path is too long";
 
-const char en_save_sav[] = "Save sav?";
-const char en_save_ing[] = "Sav...";
+const char en_save_sav[] = "Save to SD card?";
+const char en_save_ing[] = "Saving";
 const char en_save[] = "     SAVE";
 const char en_auto_save[] = "AUTO SAVE";
 
@@ -231,17 +238,24 @@ const char en_led_open[] = "ENABLE LED";
 const char en_Breathing_light[] = "BREATHING";
 const char en_SD_working[] = "   SD LED";
 
-const char en_NOR_full[] = "NOR space not enough  ";
-const char en_save_loaded[] = "Sav have been loaded";
-const char en_save_saved[] = "Sav have been saved";
-const char en_file_exist[] = "File exist, cover it?";
-const char en_file_noexist[] = "Cnt not find sav file";
+const char en_NOR_full[] = "Not enough room in NOR";
+const char en_save_loaded[] = "Save loaded";
+const char en_save_saved[] = "Save written to the SD card";
+const char en_file_exist[] = "There is a save file already. Replace it?";
+const char en_file_noexist[] = "No save file found";
+const char en_delete_ask[] = "Delete this file?";
+const char en_saving[] = "Saving to SD card";
+const char en_format_title[] = "Erasing NOR";
+const char en_erasing[] = "Erasing";
+const char en_done[] = "Done";
+const char en_patching[] = "Patching the game";
+const char en_keep_power[] = "Don't turn the power off.";
 
 const char *en_rom_menu[] = {
 	"CLEAN BOOT", "BOOT WITH ADDON", "WRITE TO NOR CLEAN", "WRITE TO NOR ADDON", "SAVE TYPE", "CHEAT",
 };
 const char *en_nor_op[5] = {
-	"DIRECT BOOT", "DELETE", "FORMAT ALL", "LOAD SAV FILE", "SAVE SAV FILE",
+	"DIRECT BOOT", "DELETE", "FORMAT ALL", "LOAD SAVE", "BACK UP SAVE",
 };
 
 //---------------------------------------------------------------------------------
@@ -358,6 +372,13 @@ void LoadEnglish(void)
 	gl_save_saved = (char *)en_save_saved;
 	gl_file_exist = (char *)en_file_exist;
 	gl_file_noexist = (char *)en_file_noexist;
+	gl_delete_ask = (char *)en_delete_ask;
+	gl_saving = (char *)en_saving;
+	gl_format_title = (char *)en_format_title;
+	gl_erasing = (char *)en_erasing;
+	gl_done = (char *)en_done;
+	gl_patching = (char *)en_patching;
+	gl_keep_power = (char *)en_keep_power;
 	//
 	gl_rom_menu = (char **)en_rom_menu;
 	gl_nor_op = (char **)en_nor_op;

@@ -136,6 +136,14 @@ fetches in SD mode.
   goes through RAM. Where a PSRAM write lands in SD mode isn't known, so the
   emulated cart stops with status 77 on one (`OMEGA_SD_PSRAM_WRITES=allow`
   lets it run on).
+  A DMA from cart space (the kernel's ROM) into PSRAM doesn't reach its
+  target on the real cart: a 6-byte DMA3 from a `const` array in ROM left
+  the target halfwords unchanged (Diagnostics' unit tests, 2026-10-19),
+  while the same from EWRAM works. Observed only that; the likely cause is
+  that source and destination share the cart's one bus and address latch,
+  so the writes may land elsewhere rather than nowhere. `psram_write`
+  refuses sources in cart space, and the emulated cart drops such writes
+  (with a warning on stderr), so tests catch it.
 - **SRAM / flash-save emulation:** `0x0E000000`, paged by `0x09C00000`; `Bank_Switching` uses
   the flash-save command sequence `0x5555=AA, 0x2AAA=55, 0x5555=B0, 0x0000=bank`.
 - **RTC and rumble:** standard GBA cart GPIO at `0x080000C4` (data), `0xC6` (dir), `0xC8` (enable),
@@ -233,7 +241,10 @@ While SD control is 3 the port returns status; `0xEEE1` means busy.
    parameters. The RTS file's table goes at `+0x300`.
 2. `Send_FATbuffer` writes the table to the port with buffer control 1, then
    sets buffer control 3. In load mode the FPGA copies the file into PSRAM and
-   the port reads non-zero, then not 1, when done.
+   the port reads non-zero, then not 1, when done. The kernel spins on the
+   port (IWRAM code) the whole time, so it can't move a progress bar during
+   the copy: the launch's bar stands at its "Loading the game" step until the
+   copy ends (source/progress.h).
 3. With patches enabled the kernel loads the ROM itself through the PSRAM
    window instead, patching each 128 KB block on the way.
 4. `SetRompageWithHardReset(0x200)` maps PSRAM at `0x08000000` and soft-resets

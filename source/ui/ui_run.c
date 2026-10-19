@@ -413,6 +413,11 @@ int ui_dimmed(void)
 	return ui.dimmed;
 }
 
+u32 ui_idle_frames(void)
+{
+	return ui.idle;
+}
+
 // Counts idle frames and dims or brightens; 1 if a key woke the screen (it
 // does nothing else)
 static int dim_step(u32 dt)

@@ -12,7 +12,9 @@ Lines starting "#! settings SLOT=VALUE..." set kernel settings slots first;
 build) instead, for scenes only it has, as the cover demo. "#! sd-theme NAME"
 copies themes/NAME to /torii/themes/NAME on the scenario's card ("#! sd-theme
 NAME DIR" copies DIR there instead), and "#! theme-choice NAME" writes NAME to
-/torii/theme.txt, the SD theme the THEME setting's value 2 picks.
+/torii/theme.txt, the SD theme the THEME setting's value 2 picks. "#! sd-file
+DEST SIZE SRC" copies SRC to DEST on the card, padded with 0xFF to SIZE
+bytes: a game large enough for a progress bar to move (boot-progress-big).
 
 Check (the default): every key frame's screen hash, and every animation's
 frame hashes, must equal tests/shots/hashes.txt. On a mismatch the actual,
@@ -231,6 +233,13 @@ def boot(
                     "::/torii/theme.txt",
                 ]
             )
+        elif line.startswith("#! sd-file "):
+            _, _, dest, size, src = line.split(maxsplit=4)
+            data = Path(src).read_bytes()
+            padded = cart / Path(dest).name
+            padded.write_bytes(data + b"\xff" * (int(size, 0) - len(data)))
+            run(["mcopy", "-Q", "-i", str(cart / "sd.img"), str(padded), f"::{dest}"])
+            padded.unlink()
         elif line.startswith("#! settings"):
             nor = cart / "kernel-nor.bin"
             if not nor.exists():

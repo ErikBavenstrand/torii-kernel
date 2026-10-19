@@ -18,6 +18,8 @@
 //   decoded there when it is put back after a push or pop (ui/ui_sdtheme.c),
 //   at most 8 KB (plus up to 17 bytes for a damaged LZ77 stream), so it ends
 //   at the cheat list (+0x2000), the one owner live across frames.
+// - READCACHE_SAVE, 64 KB: the SRAM on its way to a .sav (Save_savefile),
+//   clear of everything a frame writes, so its progress dialog can draw.
 // - READCACHE_THEME, with READCACHE_STAGE: loading an SD theme (ui/sdtheme.h),
 //   within one call: the reader, the parsed theme.ini, the decoded wallpaper.
 #define MAX_pReadCache_size 0x20000
@@ -26,6 +28,7 @@
 #define READCACHE_SORT_WORK 0x800  // SORT_WORK_SIZE bytes
 #define READCACHE_THEME 0x14C00
 #define READCACHE_THEME_SIZE 0x800
+#define READCACHE_SAVE 0x10000  // 64 KB, to the end
 #define MAX_files 0x200
 #define MAX_folder 0x100
 #define MAX_NOR 0x40

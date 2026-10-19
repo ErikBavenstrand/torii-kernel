@@ -1,4 +1,4 @@
-# The light theme: on SETTINGS page 2, THEME (DOWN three times), A to edit,
+# The light theme: on SETTINGS page 2, THEME (DOWN five times), A to edit,
 # A for LIGHT (a palette change), then RIGHT and A on OK save it; then HELP.
 -w "screen ready: sd-list"
 -k @8:R -k @12:-
@@ -7,8 +7,8 @@
 -w "screen ready: settings1"
 -k @8:R -k @12:-
 -w "screen ready: settings2"
--k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:-
--k @44:A -k @48:- -k @56:A -k @60:- -k @68:RIGHT -k @72:- -k @80:A -k @84:-
+-k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:DOWN -k @48:- -k @56:DOWN -k @60:-
+-k @68:A -k @72:- -k @80:A -k @84:- -k @92:RIGHT -k @96:- -k @104:A -k @108:-
 -w "settings: THEME LIGHT"
 -s @10:screen.png
 -k @20:R -k @24:-

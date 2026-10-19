@@ -452,8 +452,7 @@ void cartlog_boot_report(void)
 
 	if (prev_crashed && prev_magic_ok && prev_phase == PHASE_CRASH_TEST) {
 		tlog("previous session: Diagnostics' crash test, which crashes the kernel on purpose: the dump above "
-		     "is "
-		     "its");
+		     "is its result, not a fault");
 	} else if (prev_crashed && prev_magic_ok) {
 		tlog_error("previous session: the kernel crashed in %s (step %lu)%s%s", phase_name(prev_phase),
 			   (unsigned long)prev_detail, state.game[0] ? "; the last game launched: " : "", state.game);

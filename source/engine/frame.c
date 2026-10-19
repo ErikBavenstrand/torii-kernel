@@ -70,7 +70,7 @@ void frame_end(void)
 	last_cycles = cycles_since(start_cycles);
 	woken = 0;
 	if (measure_name) {
-		cycles_report(measure_name, last_cycles);
+		cycles_frame(measure_name, last_cycles);
 		if (last_cycles > worst_cycles) {
 			// Where the time went: the commit, then each stretch between marks
 			worst_name = measure_name;
