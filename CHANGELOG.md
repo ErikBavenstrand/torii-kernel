@@ -12,7 +12,8 @@ git log, not here.
 - **Fixed:** turning LOGGING on in SETTINGS froze the menu for over a
   second and lost the keys pressed then, while it made the 64 KB log file.
   The file is now made a sector at a time in the background, after the
-  screen's drawing each frame; the log waits in RAM meanwhile (`f38df20`).
+  screen's drawing each frame; the log waits in RAM meanwhile (`f38df20`,
+  `053bb2d`).
 - **Fixed:** B on Diagnostics' first page restarted the kernel, which
   landed at the SD root; it now goes back to the menu, as its hint says
   (`c449f44`).
