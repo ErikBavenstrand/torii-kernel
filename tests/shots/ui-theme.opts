@@ -3,7 +3,7 @@
 # black, switches to the light theme and fades back (every frame hashed);
 # again for dark with the orange accent. Left alone for 20 s, the screen
 # dims; a key brightens it and does nothing else (A opens no dialog).
--k 1:L
+-k 1:L+SELECT
 -w "screen ready: ui-demo"
 -k @2:-
 -k @10:START -k @14:-

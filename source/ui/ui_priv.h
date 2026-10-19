@@ -45,6 +45,14 @@ u16 *ui_map(u8 node);
 // staging area or the queue is full: try again next frame.
 u16 *ui_map_rows(u8 node, u32 ty, u32 rows);
 
+// 1 while rows [ty, ty + rows) of the node's map wait for a copy staged in
+// an earlier frame: what the map shows there isn't known yet (a label
+// flipping its tile sets checks it before drawing into the hidden set).
+int ui_map_busy(u8 node, u32 ty, u32 rows);
+
+// 1 if the node's view is the topmost with its plane (shown or not yet).
+int ui_plane_owned(u8 node);
+
 // Fills the node's rectangle in its map with entry (through ui_map_rows);
 // 0 if it must try again.
 int ui_map_fill(u8 node, u16 entry);

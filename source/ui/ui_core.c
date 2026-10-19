@@ -22,6 +22,7 @@ static struct {
 	u8 node_count;
 	u8 depth;
 	u8 pops;  // ui_pop calls waiting for the end of the event phase
+	u8 gen;   // bumped by every push and pop, so dispatch sees the stack change
 } core EWRAM_BSS;
 u8 ui_dispatching EWRAM_BSS;
 
@@ -129,7 +130,7 @@ static u8 patched(u8 node, u8 field, u8 value)
 	const struct ui_spec *s = ui_node_spec(node);
 	s16 p;
 	if (s->id && v->spec->id && ui_theme_patch(ui_theme(), v->spec->id, s->id, field, &p))
-		return (u8)p;
+		return p >= 0 && p < 16 ? (u8)p : 0;  // a palette index, or the default
 	return value;
 }
 
@@ -277,8 +278,45 @@ static int place_nodes(struct ui_view *v)
 	return 1;
 }
 
+// A list or grid scrolls its plane and clips it with a hardware window: it
+// needs its plane to itself, and at most UI_SCROLLERS can be resident
+static int check_planes(const struct ui_view *v)
+{
+	u32 scrollers = 0;
+	for (u32 d = 0; d < core.depth; d++) {
+		const struct ui_view *w = &views[d];
+		for (u32 i = 0; i < w->count; i++) {
+			const struct ui_spec *s = &w->spec->nodes[i];
+			if (s->kind != UI_LIST && s->kind != UI_GRID)
+				continue;
+			scrollers++;
+			if (w != v)
+				continue;
+			for (u32 j = 0; j < v->count; j++) {
+				if (j != i && v->spec->nodes[j].plane == s->plane) {
+					ui_set_error("view %s: a list or grid needs plane %u to itself", v->spec->name,
+						     s->plane);
+					return 0;
+				}
+			}
+		}
+	}
+	if (scrollers > UI_SCROLLERS) {
+		ui_set_error("view %s: more than %d lists and grids would be resident", v->spec->name, UI_SCROLLERS);
+		return 0;
+	}
+	return 1;
+}
+
 struct ui_view *ui_core_push(const struct ui_view_spec *spec, void *ctx)
 {
+	// A handler's ui_pop then ui_push replaces its view: the pop goes first
+	// (the handler returns straight after; dispatch sees the stack changed)
+	if (ui_dispatching && core.pops) {
+		ui_dispatching = 0;
+		ui_apply_pops();
+		ui_dispatching = 1;
+	}
 	u32 bytes;
 	if (!check_caps(spec, &bytes))
 		return 0;
@@ -301,7 +339,7 @@ struct ui_view *ui_core_push(const struct ui_view_spec *spec, void *ctx)
 
 	struct engine_budget need;
 	memset(&need, 0, sizeof(need));
-	int ok = place_nodes(v);
+	int ok = place_nodes(v) && check_planes(v);
 	for (u32 i = 0; ok && i < spec->count; i++) {
 		const struct ui_ops *ops = ui_kind_ops[spec->nodes[i].kind];
 		if (ops->measure)
@@ -336,6 +374,7 @@ struct ui_view *ui_core_push(const struct ui_view_spec *spec, void *ctx)
 		v->focus = (u8)(v->first + spec->focus);
 		nodes[v->focus].flags |= UI_N_FOCUS;
 	}
+	core.gen++;
 	ui_wake();
 	return v;
 }
@@ -346,6 +385,7 @@ void ui_core_pop(void)
 		return;
 	core.depth--;
 	unwind(&views[core.depth]);
+	core.gen++;
 }
 
 void ui_pop(void)
@@ -356,8 +396,14 @@ void ui_pop(void)
 	}
 	if (!core.depth)
 		return;
+	u8 planes = views[core.depth - 1].planes;
 	ui_core_pop();
-	ui_hook_popped();
+	ui_hook_popped(planes);
+}
+
+int ui_pops_waiting(void)
+{
+	return core.pops;
 }
 
 void ui_apply_pops(void)
@@ -424,7 +470,7 @@ int ui_dispatch_keys(u16 keys)
 	if (!v || !keys)
 		return 0;
 	struct ui_event e = {UI_EV_KEYS, UI_NONE, keys, 0};
-	u8 depth = core.depth;
+	u8 gen = core.gen;
 	int done = 0;
 	ui_dispatching = 1;
 	for (u8 n = v->focus; n != UI_NONE && !done; n = nodes[n].parent) {
@@ -433,10 +479,10 @@ int ui_dispatch_keys(u16 keys)
 		const struct ui_ops *ops = ui_kind_ops[ui_node_spec(n)->kind];
 		if (ops->event)
 			done = ops->event(n, &e);
-		if (core.depth != depth)  // a widget's event pushed a view
+		if (core.gen != gen)  // a widget's event pushed or popped a view
 			break;
 	}
-	if (!done && core.depth == depth && v->spec->event)
+	if (!done && core.gen == gen && v->spec->event)
 		done = v->spec->event(v, &e);
 	ui_dispatching = 0;
 	return done;

@@ -1,5 +1,6 @@
-// The UI demo, in the test kernel only: with L held at boot
-// (mgba-shot ezkerneltest.gba -k 1:L), after the unit tests it shows a
+// The UI demo, in the test kernel only: with L held at boot (mgba-shot
+// ezkerneltest.gba -k 1:L) after the unit tests, or with L and SELECT
+// held on the emulated cart (tests/shots/ui-*.opts) straight away, it shows a
 // list of 1000 synthetic items with smooth scrolling, a scroll bar, a
 // progress bar and a dialog, a grid, palette fades and theme switching,
 // and DIM after 20 s idle. Keys:

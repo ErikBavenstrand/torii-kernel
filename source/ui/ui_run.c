@@ -32,6 +32,15 @@
 #define TAG_PALETTE 0x5500
 #define TAG_SHARED 0x5510  // + character block
 #define STAGE_WORDS 512    // the staging area: one 2 KB screenblock
+#define STAGE_SPANS 8      // map row spans staged until the queue empties
+
+// Map rows staged: copy holds rows rows of map from ty on, staged in frame
+struct stage_span {
+	u16 *map;
+	u16 *copy;
+	u32 frame;
+	u8 rows;
+};
 
 // Frames the cycle budget leaves for jobs: what draw doesn't need
 #define JOB_DEADLINE (ENGINE_FRAME_CYCLES / 2)
@@ -44,9 +53,16 @@ static struct {
 	u8 palette;        // res handle of the two theme banks
 	u8 shared[3];      // shared tiles of each character block planes use
 	u16 shared_first[3];
+	struct stage_span spans[STAGE_SPANS];
+	u8 span_count;
 	u8 skip;           // the list skips its scroll animation (fast repeat)
 	u8 hidden;         // planes hidden for a page change
-	u32 hide_frame[UI_PLANES];
+	u8 hide_pending;   // hidden, but no DISPCNT without them written yet
+	u32 hide_frame[UI_PLANES];  // the frame whose regs hid them
+	u8 pop_wait;       // 1: popped, regs not updated; 2: updated in pop_frame
+	u8 lists_hidden;   // planes of lists hidden with ui_show
+	u16 wake_keys;     // keys that woke the screen from DIM, ignored until let go
+	u32 pop_frame;
 	// Fades
 	MotionId fade;
 	u16 fade_colour;
@@ -158,21 +174,61 @@ int ui_node_shown(u8 node)
 	return (ui_node_view(node)->flags & UI_V_SHOWN) != 0;
 }
 
+int ui_map_busy(u8 node, u32 ty, u32 rows)
+{
+	u16 *map = ui_map(node) + ty * 32, *end = map + rows * 32;
+	for (u32 i = 0; i < ui.span_count; i++) {
+		const struct stage_span *s = &ui.spans[i];
+		if (s->frame != frame_count() && s->map < end && map < s->map + s->rows * 32)
+			return 1;
+	}
+	return 0;
+}
+
 u16 *ui_map_rows(u8 node, u32 ty, u32 rows)
 {
-	u16 *map = ui_map(node) + ty * 32;
+	u16 *map = ui_map(node) + ty * 32, *end = map + rows * 32;
 	if (!ui_node_shown(node))
 		return map;
+	// Rows staged this frame are changed in their copy (all of it, or
+	// merged into a new one); rows staged in an earlier frame whose copy
+	// may still be waiting in the queue are left until it has landed
+	for (u32 i = 0; i < ui.span_count; i++) {
+		const struct stage_span *s = &ui.spans[i];
+		u16 *s_end = s->map + s->rows * 32;
+		if (s->map >= end || map >= s_end)
+			continue;
+		if (s->frame != frame_count()) {
+			ui_wake();
+			return 0;
+		}
+		if (map >= s->map && end <= s_end)
+			return s->copy + (map - s->map);
+	}
 	u32 words = rows * 16;
-	if (ui.stage_used + words > STAGE_WORDS || gfx_queue_len() >= GFX_QUEUE_CAP - 2) {
+	if (ui.stage_used + words > STAGE_WORDS || ui.span_count == STAGE_SPANS ||
+	    gfx_queue_len() >= GFX_QUEUE_CAP - 2) {
 		ui_wake();
 		return 0;
 	}
 	u16 *copy = ui.stage + ui.stage_used * 2;
 	// The VRAM to VRAM copy keeps the entries the caller doesn't change
 	CpuFastSet(map, copy, words);
+	// and rows staged this frame by others come from their copies
+	for (u32 i = 0; i < ui.span_count; i++) {
+		const struct stage_span *s = &ui.spans[i];
+		u16 *s_end = s->map + s->rows * 32;
+		u16 *a = s->map > map ? s->map : map, *b = s_end < end ? s_end : end;
+		if (a < b)
+			memcpy(copy + (a - map), s->copy + (a - s->map), (u32)(b - a) * 2);
+	}
 	if (!gfx_queue_copy(map, copy, words * 4))
 		return 0;
+	struct stage_span *s = &ui.spans[ui.span_count++];
+	s->map = map;
+	s->copy = copy;
+	s->rows = (u8)rows;
+	s->frame = frame_count();
 	ui.stage_used = (u16)(ui.stage_used + words);
 	return copy;
 }
@@ -194,18 +250,34 @@ void ui_plane_hide(u32 plane, int hidden)
 {
 	u8 bit = (u8)(1u << plane);
 	if (hidden) {
+		if (!(ui.hidden & bit))
+			ui.hide_pending |= bit;
 		ui.hidden |= bit;
-		ui.hide_frame[plane] = frame_count();
 	} else {
 		ui.hidden &= (u8)~bit;
+		ui.hide_pending &= (u8)~bit;
 	}
 	ui_wake();
 }
 
 int ui_plane_hidden_now(u32 plane)
 {
-	return (ui.hidden >> plane & 1) && frame_count() != ui.hide_frame[plane] &&
+	// Hidden once regs without it were written in an earlier frame, and
+	// that frame's commit wrote DISPCNT
+	return (ui.hidden >> plane & 1) && !(ui.hide_pending >> plane & 1) && frame_count() != ui.hide_frame[plane] &&
 	       !(gfx_dirty_regs & GFX_DIRTY_DISPCNT);
+}
+
+int ui_plane_owned(u8 node)
+{
+	u32 plane = ui_node_spec(node)->plane;
+	const struct ui_view *v = ui_node_view(node);
+	for (u32 d = ui_depth(); d-- > 0;) {
+		const struct ui_view *w = ui_view_at(d);
+		if (w->planes >> plane & 1)
+			return w == v;
+	}
+	return 0;
 }
 
 // --- Palettes and fades ----------------------------------------------------
@@ -247,11 +319,14 @@ void ui_fade(u16 colour, u32 to, u32 frames)
 	if (!frames)
 		frames = ui_theme()->fade_frames;
 	ui.fade_colour = colour;
-	if (ui.fade == MOTION_NONE || !motion_value(ui.fade))
-		ui.fade = motion_tween(MOTION_TO_CALL(fade_set, 0), motion_value(ui.fade), FIX((s32)to), frames,
-				       EASE_IN_OUT_CUBIC, 0);
-	else
+	// One tween for good, restarted from where it rests (a dead handle,
+	// after a motion_reset, gets a new one)
+	if (ui.fade != MOTION_NONE && (motion_running(ui.fade) || motion_value(ui.fade)))
 		motion_tween_to(ui.fade, FIX((s32)to), frames);
+	else {
+		motion_free(ui.fade);
+		ui.fade = motion_tween(MOTION_TO_CALL(fade_set, 0), 0, FIX((s32)to), frames, EASE_IN_OUT_CUBIC, 0);
+	}
 	ui_wake();
 }
 
@@ -288,9 +363,11 @@ int ui_dimmed(void)
 // does nothing else)
 static int dim_step(u32 dt)
 {
+	ui.wake_keys &= ui.in.held;
 	if (ui.in.held) {
 		ui.idle = 0;
 		if (ui.dimmed) {
+			ui.wake_keys = ui.in.held;  // they don't repeat either
 			ui.dimmed = 0;
 			motion_free(ui.dim_motion);
 			ui.dim_motion = MOTION_NONE;
@@ -313,12 +390,13 @@ static int dim_step(u32 dt)
 
 // --- Planes ---------------------------------------------------------------------
 
-// The topmost view showing plane p
+// The topmost shown view with plane p (one still being drawn doesn't take
+// the plane from the view under it yet)
 static struct ui_view *plane_owner(u32 p, u32 *depth)
 {
 	for (u32 d = ui_depth(); d-- > 0;) {
 		struct ui_view *v = ui_view_at(d);
-		if (v->planes >> p & 1) {
+		if ((v->planes >> p & 1) && (v->flags & UI_V_SHOWN)) {
 			*depth = d;
 			return v;
 		}
@@ -342,23 +420,27 @@ static void regs_update(void)
 		if (prio > 3)
 			prio = 3;
 		gfx_set_bgcnt(p, (u16)(prio | ui_plane_cb(p) << 2 | (u32)res_bg_screenblock(v->maps[p]) << 8));
-		if ((v->flags & UI_V_SHOWN) && !(ui.hidden >> p & 1))
+		if (!((ui.hidden | ui.lists_hidden) >> p & 1))
 			dispcnt |= (u16)DISP_BG(p);
 		if (modal && d < top - 1)
 			lower |= LAYER_BG(p);
 	}
 	// Static planes follow their view's slide; lists set their own scroll
-	u32 scrollers = 0, win_plane[UI_SCROLLERS] = {0, 0};
+	u32 scrollers = 0, list_planes = 0, win_plane[UI_SCROLLERS] = {0, 0};
 	const struct ui_node *win_node[UI_SCROLLERS] = {0, 0};
 	for (u32 d = top; d-- > 0;) {
 		struct ui_view *v = ui_view_at(d);
 		for (u32 i = 0; i < v->count; i++) {
 			const struct ui_spec *s = &v->spec->nodes[i];
 			const struct ui_node *n = ui_node((u8)(v->first + i));
-			if ((s->kind != UI_LIST && s->kind != UI_GRID) || (n->flags & UI_N_HIDDEN))
+			if (s->kind != UI_LIST && s->kind != UI_GRID)
 				continue;
 			u32 d2;
-			if (plane_owner(s->plane, &d2) != v || scrollers == UI_SCROLLERS)
+			if (plane_owner(s->plane, &d2) != v)
+				continue;
+			list_planes |= 1u << s->plane;
+			// ui_push allows at most UI_SCROLLERS
+			if ((n->flags & UI_N_HIDDEN) || scrollers == UI_SCROLLERS)
 				continue;
 			win_plane[scrollers] = s->plane;
 			win_node[scrollers] = n;
@@ -368,10 +450,7 @@ static void regs_update(void)
 	for (u32 p = 0; p < UI_PLANES; p++) {
 		u32 d;
 		struct ui_view *v = plane_owner(p, &d);
-		int scroller = 0;
-		for (u32 w = 0; w < scrollers; w++)
-			scroller |= win_plane[w] == p;
-		if (v && !scroller)
+		if (v && !(list_planes >> p & 1))
 			gfx_set_scroll(p, 0, (u16)(-v->offset));
 	}
 	if (scrollers) {
@@ -394,6 +473,15 @@ static void regs_update(void)
 		gfx_set_win(5, (u16)(outside | WIN_EFFECTS));
 	}
 	gfx_set_dispcnt(dispcnt);
+	// The hides asked for are in this frame's regs
+	for (u32 p = 0; p < UI_PLANES; p++)
+		if (ui.hide_pending >> p & 1)
+			ui.hide_frame[p] = frame_count();
+	ui.hide_pending = 0;
+	if (ui.pop_wait == 1) {
+		ui.pop_wait = 2;
+		ui.pop_frame = frame_count();
+	}
 	// Blending: DIM darkens everything; a modal view darkens what is under it
 	s32 y = 0;
 	u32 targets = 0;
@@ -466,14 +554,7 @@ struct ui_view *ui_push(const struct ui_view_spec *spec, void *ctx)
 	struct ui_view *v = ui_core_push(spec, ctx);
 	if (!v)
 		return 0;
-	// Its maps are new and not on screen: clear them straight away
-	for (u32 p = 0; p < UI_PLANES; p++) {
-		if (v->maps[p] == RES_NONE)
-			continue;
-		u32 blank = ui_shared_entry(p, UI_TILE_BLANK);
-		blank |= blank << 16;
-		CpuFastSet(&blank, res_bg_addr(v->maps[p]), 512 | 1 << 24);
-	}
+	// Its maps are cleared and drawn once nothing popped shows their VRAM
 	if ((spec->flags & UI_VIEW_MODAL) && ui_depth() > 1) {
 		const struct ui_theme *t = ui_theme();
 		if (t->slide) {
@@ -490,8 +571,13 @@ struct ui_view *ui_push(const struct ui_view_spec *spec, void *ctx)
 	return v;
 }
 
-void ui_hook_popped(void)
+void ui_hook_popped(u8 planes)
 {
+	// Its maps and tiles may go to the next view at once, but they show
+	// until regs without them are committed: a view pushed now waits
+	ui.pop_wait = 1;
+	ui.hidden &= (u8)~planes;
+	ui.hide_pending &= (u8)~planes;
 	// The view under it shows again as it was: its maps were left alone
 	const struct ui_view *v = ui_top();
 	if (!v || !(v->spec->flags & UI_VIEW_MODAL)) {
@@ -499,7 +585,6 @@ void ui_hook_popped(void)
 		ui.modal_motion = MOTION_NONE;
 		ui.modal_y = 0;
 	}
-	ui.hidden = 0;
 	ui_wake();
 }
 
@@ -520,12 +605,34 @@ static void update_all(u32 dt)
 
 static void draw_all(void)
 {
+	int popping = ui.pop_wait == 1 || (ui.pop_wait == 2 && frame_count() == ui.pop_frame);
+	ui.lists_hidden = 0;
 	for (u32 d = 0; d < ui_depth(); d++) {
 		struct ui_view *v = ui_view_at(d);
 		int unfinished = 0;
+		if (!(v->flags & UI_V_SHOWN)) {
+			if (popping) {
+				ui_wake();  // next frame
+				continue;
+			}
+			if (!(v->flags & UI_V_CLEARED)) {
+				// New maps, on no screen: cleared directly
+				for (u32 p = 0; p < UI_PLANES; p++) {
+					if (v->maps[p] == RES_NONE)
+						continue;
+					u32 blank = ui_shared_entry(p, UI_TILE_BLANK);
+					blank |= blank << 16;
+					CpuFastSet(&blank, res_bg_addr(v->maps[p]), 512 | 1 << 24);
+				}
+				v->flags |= UI_V_CLEARED;
+			}
+		}
 		for (u32 i = 0; i < v->count; i++) {
 			u8 n = (u8)(v->first + i);
 			struct ui_node *node = ui_node(n);
+			u32 kind = v->spec->nodes[i].kind;
+			if ((kind == UI_LIST || kind == UI_GRID) && (node->flags & UI_N_HIDDEN))
+				ui.lists_hidden |= (u8)(1u << v->spec->nodes[i].plane);
 			if (!(node->flags & UI_N_DIRTY))
 				continue;
 			node->flags &= (u8)~UI_N_DIRTY;
@@ -571,14 +678,19 @@ static int skip_animation(void)
 u32 ui_frame(void)
 {
 	u32 dt = frame_begin();
-	if (!gfx_queue_len())
+	if (!gfx_queue_len()) {
 		ui.stage_used = 0;
+		ui.span_count = 0;
+	}
+	if (ui.pop_wait == 2 && frame_count() != ui.pop_frame)
+		ui.pop_wait = 0;
 	ready_check();
 	input_poll(&ui.in, dt, ui.skip);
 	ui.skip = (u8)skip_animation();
 	u16 fire = ui.in.fire;
 	if (dim_step(dt))
 		fire = 0;
+	fire &= (u16)~ui.wake_keys;
 	if (fire) {
 		frame_wake();
 		ui_dispatch_keys(fire);

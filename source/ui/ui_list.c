@@ -56,6 +56,7 @@ struct list_state {
 	s32 base;       // the spring's base, px
 	s32 spring;     // the spring's value (16.16, from base), written by motion
 	s32 page_target;
+	u32 page_cursor;  // the cursor a page change's rows are drawn for
 	MotionId motion;
 	u16 slot_row[UI_RING_MAX_SLOTS];
 	u32 dirty;   // slots to draw: the window's dirty-row mask
@@ -196,6 +197,17 @@ static void marquee_reset(u8 node, struct list_state *st)
 	}
 }
 
+// Points the list's columns of the whole ring map at the blank tile, so no
+// map row shows a slot it no longer owns (a shorter list after a reset).
+// Only while the list isn't on screen.
+static void blank_map(u8 node, const struct list_state *st)
+{
+	u16 *map = ui_map(node), blank = ui_shared_entry(ui_node_spec(node)->plane, UI_TILE_BLANK);
+	for (u32 y = 0; y < 32; y++)
+		for (u32 x = 0; x < st->tw; x++)
+			map[y * 32 + x] = blank;
+}
+
 // Starts a page change to scroll target (or does it now while hidden)
 static void page_change(u8 node, struct list_state *st, s32 target)
 {
@@ -203,6 +215,9 @@ static void page_change(u8 node, struct list_state *st, s32 target)
 		st->shown = st->base = target;
 		motion_spring_jump(st->motion, 0);
 		forget_slots(st);
+		if (ui_node_view(node)->flags & UI_V_CLEARED)
+			blank_map(node, st);  // else the first draw clears it
+		st->page_cursor = st->cursor;
 		assign(node, st, 0);
 		ui_dirty(node, 1);
 		return;
@@ -415,6 +430,8 @@ static void list_update(u8 node, u32 dt)
 	const struct ui_spec *spec = ui_node_spec(node);
 	const struct ui_node *n = ui_node(node);
 	const struct ui_view *v = ui_node_view(node);
+	if (n->flags & UI_N_HIDDEN)
+		return;  // its plane is off (ui_run.c); rows stay as they are
 	if (st->page == PAGE_HIDING) {
 		if (!ui_plane_hidden_now(spec->plane)) {
 			ui_wake();
@@ -424,6 +441,8 @@ static void list_update(u8 node, u32 dt)
 		st->shown = st->base = st->page_target;
 		motion_spring_jump(st->motion, 0);
 		forget_slots(st);
+		blank_map(node, st);
+		st->page_cursor = st->cursor;
 		assign(node, st, 0);
 		st->page = PAGE_DRAW;
 		ui_dirty(node, 1);
@@ -441,7 +460,9 @@ static void list_update(u8 node, u32 dt)
 		if (st->shown != want)
 			ui_wake();
 	}
-	gfx_set_scroll(spec->plane, (u16)(-n->x), (u16)(st->shown - n->y - v->offset));
+	// Not while a view above shows its own plane there
+	if (ui_plane_owned(node))
+		gfx_set_scroll(spec->plane, (u16)(-n->x), (u16)(st->shown - n->y - v->offset));
 	if (st->dirty || !st->sel_ok)
 		ui_dirty(node, 1);
 	marquee_tick(node, st, dt);
@@ -454,16 +475,16 @@ static u16 entry(const struct list_state *st, u32 s, u32 tx, u32 ty, u32 bank)
 }
 
 // Writes row r's entries (from slot s, or the marquee slot) into rows, the
-// map's rows from the row's first
-static void row_entries(const struct list_state *st, u16 *rows, u32 r, u32 s)
+// map's rows from the row's first, with item sel selected
+static void row_entries(const struct list_state *st, u16 *rows, u32 r, u32 s, u32 sel)
 {
 	u32 cw = st->tw / st->cols;
 	for (u32 ty = 0; ty < st->rt; ty++) {
 		for (u32 tx = 0; tx < st->tw; tx++) {
 			u32 item = r * st->cols + tx / cw;
-			u32 bank = item == st->cursor && item < st->count ? UI_BANK_SELECTED : UI_BANK_NORMAL;
+			u32 bank = item == sel && item < st->count ? UI_BANK_SELECTED : UI_BANK_NORMAL;
 			u32 slot = s;
-			if (item == st->cursor && st->mq_set != 0xFF)
+			if (item == sel && st->mq_set != 0xFF)
 				slot = st->ring.k + st->mq_set;
 			rows[ty * 32 + tx] = entry(st, slot, tx, ty, bank);
 		}
@@ -528,9 +549,12 @@ static void list_draw(u8 node)
 {
 	struct list_state *st = ui_node_state(node);
 	const struct ui_spec *spec = ui_node_spec(node);
-	if (st->page == PAGE_HIDING)
+	if (st->page == PAGE_HIDING || (ui_node(node)->flags & UI_N_HIDDEN))
 		return;
 	u16 *map = ui_map(node);
+	// A page's rows show the cursor it started with; one that moved since
+	// is restaged once the page is up
+	u32 sel = st->page == PAGE_DRAW || !ui_node_shown(node) ? st->page_cursor : st->cursor;
 	// While nothing of it is on screen (a page change, a view not shown
 	// yet) a whole page may take more than a frame: it draws within the
 	// budget and goes on next frame
@@ -547,7 +571,7 @@ static void list_draw(u8 node)
 		if (r != UI_ITEM_NONE) {
 			draw_row(node, st, slot_tiles(st, spec->plane, s), r, 0);
 			if (st->fresh >> s & 1)
-				row_entries(st, map + ring_map_row(&st->ring, r) * 32, r, s);
+				row_entries(st, map + ring_map_row(&st->ring, r) * 32, r, s, sel);
 		}
 		st->dirty &= ~(1u << s);
 		st->fresh &= ~(1u << s);
@@ -555,29 +579,41 @@ static void list_draw(u8 node)
 	st->dirty = st->fresh = 0;
 	if (st->page == PAGE_DRAW) {
 		st->page = PAGE_NONE;
-		st->sel_ok = 1;
-		st->sel_drawn = st->cursor;
+		st->sel_drawn = st->page_cursor;
+		st->sel_ok = st->page_cursor == st->cursor;
 		ui_plane_hide(spec->plane, 0);
 		gfx_hold_for_queue(GFX_DIRTY_DISPCNT);
+		if (!st->sel_ok) {
+			// Keys moved the cursor while the page drew: scroll on to it
+			st->page_cursor = st->cursor;
+			s32 target = ring_scroll_for(&st->ring, st->cursor / st->cols, st->shown, st->rows, 1);
+			if (ring_far(&st->ring, st->shown, target))
+				page_change(node, st, target);
+			else
+				motion_spring_target(st->motion, FIX(target - st->base));
+			ui_dirty(node, 1);
+		}
 		return;
 	}
 	if (!ui_node_shown(node)) {
-		st->sel_ok = 1;
-		st->sel_drawn = st->cursor;
+		st->sel_drawn = st->page_cursor;
+		st->sel_ok = st->page_cursor == st->cursor;
 		return;
 	}
 	// The marquee: its next step into the slot the map doesn't show, then a
 	// flip of the row's map entries to it
 	if (st->mq_step) {
 		u32 r = st->cursor / st->cols;
-		if (r >= st->lo && r <= st->hi && st->slot_row[ring_slot(&st->ring, r)] == r) {
+		if (ui_map_busy(node, ring_map_row(&st->ring, r), st->rt)) {
+			ui_dirty(node, 2);  // the last step's flip hasn't landed
+		} else if (r >= st->lo && r <= st->hi && st->slot_row[ring_slot(&st->ring, r)] == r) {
 			u32 set = st->mq_set == 0 ? 1 : 0;
 			draw_row(node, st, slot_tiles(st, spec->plane, st->ring.k + set), r, st->mq_px);
 			u8 old = st->mq_set;
 			st->mq_set = (u8)set;
 			u16 *rows = ui_map_rows(node, ring_map_row(&st->ring, r), st->rt);
 			if (rows) {
-				row_entries(st, rows, r, ring_slot(&st->ring, r));
+				row_entries(st, rows, r, ring_slot(&st->ring, r), st->cursor);
 				st->mq_step = 0;
 			} else {
 				st->mq_set = old;  // try again next frame
@@ -598,7 +634,7 @@ static void list_draw(u8 node)
 			u16 *rows = ui_map_rows(node, ring_map_row(&st->ring, r), st->rt);
 			if (!rows)
 				return;  // staging is full: next frame
-			row_entries(st, rows, r, ring_slot(&st->ring, r));
+			row_entries(st, rows, r, ring_slot(&st->ring, r), st->cursor);
 		}
 		st->sel_drawn = st->cursor;
 		st->sel_ok = 1;

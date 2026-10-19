@@ -18,8 +18,9 @@ void ui_wake(void)
 	wakes++;
 }
 
-void ui_hook_popped(void)
+void ui_hook_popped(u8 planes)
 {
+	(void)planes;
 	popped_hooks++;
 }
 
@@ -323,9 +324,10 @@ void test_ui_ring_invariant(void)
 
 // --- The stack ------------------------------------------------------------
 
-static int view_events, view_activate_index;
+static int view_events, view_activate_index, replace_on_activate;
 static u8 view_keys;
 
+static const struct ui_view_spec dialog_view_2;
 static int on_event(struct ui_view *v, const struct ui_event *e)
 {
 	(void)v;
@@ -333,6 +335,8 @@ static int on_event(struct ui_view *v, const struct ui_event *e)
 	if (e->type == UI_EV_ACTIVATE) {
 		view_activate_index = (int)e->index;
 		ui_pop();  // waits for the end of the event phase
+		if (replace_on_activate)
+			ui_core_push(&dialog_view_2, 0);  // the pop goes first
 		return 1;
 	}
 	if (e->type == UI_EV_KEYS)
@@ -344,7 +348,7 @@ static const struct ui_spec main_nodes[] = {
 	{UI_PANEL, 1, UI_NONE, 2, UI_FILL, 0, 0, 0, 0, 0, 0, 0, 0},
 	{UI_LABEL, 2, 0, 2, UI_HFILL, 0, 0, 0, 8, 0, 8, 16, 0},
 	{UI_LIST, 3, 0, 1, UI_FILL, UI_FOCUSABLE, 0, 0, 0, 16, 0, 16, 0},
-	{UI_LIST, 4, 0, 3, UI_LEFT, UI_FOCUSABLE | UI_HIDDEN, 0, 0, 0, 0, 8, 8, 0},
+	{UI_LABEL, 4, 0, 2, UI_LEFT, UI_FOCUSABLE | UI_HIDDEN, 0, 0, 0, 0, 8, 8, 0},
 	{UI_GRID, 5, 0, 3, UI_LEFT, UI_FOCUSABLE, 0, 0, 0, 0, 8, 8, 0},
 };
 static const struct ui_view_spec main_view = {"main", main_nodes, 5, 1, 2, 0, on_event};
@@ -354,6 +358,19 @@ static const struct ui_spec dialog_nodes[] = {
 	{UI_LABEL, 2, 0, 0, UI_HFILL, 0, 0, 0, 8, 8, 8, 16, 0},
 };
 static const struct ui_view_spec dialog_view = {"dialog", dialog_nodes, 2, 2, UI_NONE, UI_VIEW_MODAL, on_event};
+
+static const struct ui_view_spec dialog_view_2 = {"dialog-2", dialog_nodes, 2, 2, UI_NONE, UI_VIEW_MODAL, on_event};
+
+// Two lists on one plane; and a view with a third list
+static const struct ui_spec shared_plane_nodes[] = {
+	{UI_LIST, 1, UI_NONE, 0, UI_LEFT, 0, 0, 0, 0, 0, 64, 64, 0},
+	{UI_LABEL, 2, UI_NONE, 0, UI_LEFT, 0, 0, 0, 64, 0, 64, 64, 0},
+};
+static const struct ui_view_spec shared_plane_view = {"shared-plane", shared_plane_nodes, 2, 0, UI_NONE, 0, 0};
+static const struct ui_spec third_list_nodes[] = {
+	{UI_LIST, 1, UI_NONE, 0, UI_LEFT, 0, 0, 0, 0, 0, 64, 64, 0},
+};
+static const struct ui_view_spec third_list_view = {"third-list", third_list_nodes, 1, 0, UI_NONE, 0, 0};
 
 static const struct ui_spec bad_rect_nodes[] = {
 	{UI_LABEL, 1, UI_NONE, 0, UI_LEFT, 0, 0, 0, 4, 0, 16, 16, 0},
@@ -424,6 +441,12 @@ void test_ui_stack(void)
 	CHECK(strstr(ui_error(), "whole tiles") != 0);
 	CHECK_EQ(ui_core_push(&bad_parent_view, 0), 0);
 	CHECK(strstr(ui_error(), "parents come first") != 0);
+	// A list needs its plane to itself, and two lists are resident already
+	CHECK_EQ(ui_core_push(&shared_plane_view, 0), 0);
+	CHECK(strstr(ui_error(), "to itself") != 0);
+	CHECK_EQ(ui_core_push(&third_list_view, 0), 0);
+	CHECK(strstr(ui_error(), "more than 2") != 0);
+	CHECK_EQ(res_mark(), mark1);
 	init_fail_at = inits + 1;  // the dialog's second node fails
 	CHECK_EQ(ui_core_push(&dialog_view, 0), 0);
 	CHECK(strstr(ui_error(), "test init failed") != 0);
@@ -495,5 +518,21 @@ void test_ui_focus_and_keys(void)
 	CHECK_EQ(ui_depth(), 1);
 	ui_apply_pops();
 	CHECK_EQ(ui_depth(), 0);
+	CHECK_EQ(motion_count(), 0);
+	// Pop then push from a handler replaces the view: the pop goes first,
+	// and dispatch stops at the change (the new view's nodes reuse the
+	// indices)
+	CHECK(ui_core_push(&main_view, 0) != 0);
+	replace_on_activate = 1;
+	view_events = 0;
+	CHECK(ui_dispatch_keys(INPUT_A));
+	replace_on_activate = 0;
+	CHECK_EQ(view_events, 1);
+	CHECK_EQ(ui_depth(), 1);
+	CHECK(ui_top()->spec == &dialog_view_2);
+	CHECK_EQ(ui_nodes_used(), 2);
+	ui_apply_pops();  // nothing waits
+	CHECK_EQ(ui_depth(), 1);
+	ui_core_pop();
 	CHECK_EQ(motion_count(), 0);
 }

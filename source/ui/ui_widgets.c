@@ -87,6 +87,10 @@ static void label_draw(u8 node)
 	}
 	// A shown label with two sets draws into the hidden one, then flips
 	int flip = st->sets == 2 && ui_node_shown(node) && (n->flags & UI_N_DRAWN);
+	if (flip && ui_map_busy(node, (u32)n->y / 8, (u32)n->h / 8)) {
+		ui_dirty(node, 0xFF);  // the last flip hasn't landed: its set still shows
+		return;
+	}
 	u32 set = flip ? st->cur ^ 1u : st->cur;
 	const struct ui_label_config *c = label_config(node);
 	const struct torii_font *font = ui_font(c->font);

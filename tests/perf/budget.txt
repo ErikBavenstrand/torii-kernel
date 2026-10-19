@@ -1,22 +1,11 @@
 # Cycles per frame for tests/perf.py, written by `just perf-update`.
 # NAME CYCLES: the most one frame of NAME took in the scenarios' runs.
 # A run fails over 280896 (a whole frame) or 10% above the figure here.
-text-clear-row 1671
-text-clear-row8-unaligned 3542
-text-glyph 346
-text-heading20 8465
-text-heading20-c 8785
-text-heading20-tonc 14452
-text-row38 9491
-text-row38-c 11649
-text-row38-rows1-ewram 9483
-text-row38-rows2-ewram 9483
-text-row38-tonc 19015
-ui-dialog-open 131586
-ui-grid-scroll 72326
-ui-list-scroll 99113
-ui-page-change 222307
-ui-screen-switch 231926
 cover-decode 38607
 cover-demo 18615
 cover-upload 3427
+ui-dialog-open 133625
+ui-grid-scroll 73670
+ui-list-scroll 100832
+ui-page-change 202369
+ui-screen-switch 235243

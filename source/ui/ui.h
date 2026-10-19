@@ -386,6 +386,7 @@ struct ui_view {
 enum {
 	UI_V_SHOWN = 1,   // its first draw is done and its planes are on
 	UI_V_READY = 2,   // "screen ready" logged
+	UI_V_CLEARED = 4,  // its maps were cleared for the first draw
 };
 
 // --- Events -------------------------------------------------------------------
@@ -513,7 +514,10 @@ u8 ui_paper(u8 node, u8 def);
 void ui_wake(void);
 // Called after a view is popped, to show the one under it again (ui/ui_run.c;
 // a stub in tests/host).
-void ui_hook_popped(void);
+// planes: the popped view's.
+void ui_hook_popped(u8 planes);
+// ui_pop calls waiting for the end of the event phase.
+int ui_pops_waiting(void);
 // The owner id of a view's motions and jobs.
 u8 ui_owner(const struct ui_view *view);
 // 1 while the event phase runs (ui_pop waits for its end).

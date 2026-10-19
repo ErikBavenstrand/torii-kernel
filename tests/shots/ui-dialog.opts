@@ -2,7 +2,7 @@
 # The UI demo's dialog and grid (tests/kernel/ui_demo.c): A opens a modal
 # dialog that slides up over the dimmed list (every frame hashed), B closes
 # it, SELECT switches to the grid, and the grid's cursor moves.
--k 1:L
+-k 1:L+SELECT
 -w "screen ready: ui-demo"
 -k @2:- -k @10:DOWN -k @14:-
 -k @20:A -k @24:-
