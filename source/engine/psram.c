@@ -18,7 +18,7 @@ void psram_begin(void)
 int psram_write(void *dst, const void *src, u32 bytes)
 {
 	bytes = (bytes + 1) & ~1u;
-	if (!bytes || ((u32)dst | (u32)src) & 1 || !psram_holds(dst, bytes) || psram_holds(src, bytes)) {
+	if (!bytes || ((u32)dst | (u32)src) & 1 || !psram_holds(dst, bytes) || psram_cart_space(src)) {
 		res_set_error("bad PSRAM write: %08lX from %08lX, %lu bytes", (unsigned long)(u32)dst,
 			      (unsigned long)(u32)src, (unsigned long)bytes);
 		return 0;

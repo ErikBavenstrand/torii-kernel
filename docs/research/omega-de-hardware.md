@@ -136,6 +136,12 @@ fetches in SD mode.
   goes through RAM. Where a PSRAM write lands in SD mode isn't known, so the
   emulated cart stops with status 77 on one (`OMEGA_SD_PSRAM_WRITES=allow`
   lets it run on).
+  A DMA from cart space (the kernel's ROM) into PSRAM writes nothing on the
+  real cart: a 6-byte DMA3 from a `const` array in ROM left PSRAM unchanged
+  (Diagnostics' unit tests, 2026-10-19), while the same from EWRAM works.
+  Source and destination share the cart's one bus and address latch.
+  `psram_write` refuses sources in cart space, and the emulated cart drops
+  such writes too (with a warning on stderr), so tests catch it.
 - **SRAM / flash-save emulation:** `0x0E000000`, paged by `0x09C00000`; `Bank_Switching` uses
   the flash-save command sequence `0x5555=AA, 0x2AAA=55, 0x5555=B0, 0x0000=bank`.
 - **RTC and rumble:** standard GBA cart GPIO at `0x080000C4` (data), `0xC6` (dir), `0xC8` (enable),

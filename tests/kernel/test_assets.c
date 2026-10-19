@@ -49,7 +49,7 @@ static int have_psram(void)
 {
 	if (!tlog_in_emulator())
 		return 1;
-	static const u16 probe[2] ALIGN(4) = {0xA55A, 0x0FF0};
+	const u16 probe[2] ALIGN(4) = {0xA55A, 0x0FF0};  // in RAM, as psram_write takes
 	vu16 *p = (vu16 *)PSRAM_ASSET_BASE;
 	psram_begin();
 	psram_write((void *)p, probe, sizeof(probe));
@@ -130,7 +130,11 @@ void test_asset_psram_round_trip(void)
 	     (unsigned long)read);
 
 	// 6 bytes in the middle: the halfwords around them keep their values
-	static const u16 six[3] ALIGN(4) = {0x1111, 0x2222, 0x3333};
+	// (from RAM: the cart drops a DMA from its own ROM into PSRAM, so the
+	// ROM copy below is refused)
+	static const u16 six_rom[3] ALIGN(4) = {0x1111, 0x2222, 0x3333};
+	u16 six[3] ALIGN(4);
+	memcpy(six, six_rom, sizeof(six));
 	CHECK(psram_write(slot + 100, six, 6));
 	CHECK_EQ(((const vu16 *)slot)[49], ((const u16 *)stage)[49]);
 	CHECK_EQ(((const vu16 *)slot)[50], 0x1111);
@@ -142,6 +146,7 @@ void test_asset_psram_round_trip(void)
 	CHECK(!psram_write((void *)(PSRAM_WINDOW + PSRAM_WINDOW_BYTES - 2), six, 6));
 	CHECK(!psram_write(slot + 1, six, 6));
 	CHECK(!psram_write(slot, slot + 64, 6));
+	CHECK(!psram_write(slot, six_rom, 6));
 	CHECK_EQ(((const vu16 *)slot)[0], ((const u16 *)stage)[0]);
 	reset_engine(0);
 }
