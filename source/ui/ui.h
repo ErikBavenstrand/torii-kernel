@@ -132,6 +132,34 @@ struct ui_patch {
 	s16 value;
 };
 
+// Screen transitions (ui_leave): the screen shown goes out, then the next one
+// comes in, each an eased step of a few frames. Two screens can't share
+// the screen while one replaces the other (both want the same planes and
+// most of BG VRAM), so the new one is drawn while nothing shows, between the
+// two halves. What a transition does is a theme's, per kind of change:
+enum ui_tr_kind {
+	UI_TR_TAB,     // to the screen beside it: the SD list, the NOR list, SETTINGS' pages
+	UI_TR_DEEPER,  // into a folder or a screen under this one (Recently Played,
+		       // cheats, help), or back out
+	UI_TR_FADE,    // the same screen redrawn (after a delete, a format, a failed launch)
+	UI_TR_LEAVE,   // out of the engine to black (a launch), or in from black
+	UI_TR_KINDS,
+};
+// ui_transition.effects; with no effect a screen just cuts to the next
+enum {
+	UI_TR_FADES = 1,    // fades out to the background (black under a
+			    // dialog, and for UI_TR_LEAVE, black) and the next one in from it
+	UI_TR_SLIDE_X = 2,  // slides px sideways: forward to the left, back to the right
+	UI_TR_SLIDE_Y = 4,  // slides px up going forward, down going back
+	UI_TR_MOSAIC = 8,   // breaks up into blocks (the mosaic registers)
+};
+struct ui_transition {
+	u8 effects;  // UI_TR_FADES ...
+	u8 out;      // frames going out (linear: it answers the key at once)
+	u8 in;       // frames coming in (ease out); 0 for either: no frames
+	u8 px;       // how far a slide goes
+};
+
 // A theme, in ROM (the built-ins) or RAM (T14's theme.ini). Fields:
 //   name                for settings and logs
 //   colour[UI_COLOURS]  RGB15, see ui_colour
@@ -142,6 +170,9 @@ struct ui_patch {
 //   idle_dim            how far DIM darkens the screen (BLDY, 0-16)
 //   fade_frames         frames of a palette fade (ui_fade)
 //   slide               px a modal view slides up from as it opens (0: none)
+//   dialog_in           frames a modal view takes to open: it fades in over the
+//                       screen, then the screen dims, while it slides up by slide px
+//   dialog_out          frames it takes to close: the same backwards
 //   marquee_delay       frames the cursor rests before a long name scrolls
 //   marquee_speed       px a second it scrolls, 1-60 (60: a pixel every frame;
 //                       slower speeds step a pixel some frames)
@@ -149,6 +180,7 @@ struct ui_patch {
 //   marquee_gap         px it scrolls past the name's end before that pause
 //   page_fade           frames a list fades in over after a page change
 //                       (0: it just shows)
+//   transition          how screens replace each other, per ui_tr_kind (ui_leave)
 //   input               key repeat and wrap timings (engine/input.h)
 //   patches             layout patches, patch_count of them
 struct ui_theme {
@@ -168,6 +200,9 @@ struct ui_theme {
 	u8 marquee_gap;
 	u8 page_fade;
 	u8 patch_count;
+	u8 dialog_in;
+	u8 dialog_out;
+	struct ui_transition transition[UI_TR_KINDS];
 	InputTiming input;
 	struct ui_patch patches[UI_PATCH_CAP];
 };
@@ -399,15 +434,20 @@ struct ui_view {
 	u8 planes;        // bit p: it shows plane p
 	u8 flags;         // UI_V_*
 	u8 maps[UI_PLANES];  // res handles of its maps, RES_NONE if unused
-	MotionId slide;   // a modal view's slide-in spring
-	s16 offset;       // px it is drawn below its place (sliding in)
+	s16 offset;       // px it is drawn below its place (a dialog sliding, a transition)
+	u16 open;         // a modal view: how far it has opened, 0-UI_OPEN (slide)
+	u16 open_blend;   // and its fade and the dim under it, 0-UI_OPEN
+	s8 opening;       // 1 opening, -1 closing (ui_close), 0 still
+	u8 pad;
 };
+#define UI_OPEN 256
 
 // ui_view.flags
 enum {
 	UI_V_SHOWN = 1,   // its first draw is done and its planes are on
 	UI_V_READY = 2,   // "screen ready" logged
 	UI_V_CLEARED = 4,  // its maps were cleared for the first draw
+	UI_V_ANIM = 8,     // a modal view that opens and closes with motion
 };
 
 // --- Events -------------------------------------------------------------------
@@ -459,6 +499,35 @@ const char *ui_error(void);
 
 // One frame of the loop (see the top). Returns ui_depth().
 u32 ui_frame(void);
+// 1 between ui_init and ui_shutdown: a screen started from another runs in
+// its session (pops the caller's views, pushes its own) instead of its own.
+int ui_active(void);
+
+// --- Transitions -------------------------------------------------------------
+// A screen replacing another (the theme's transition[kind]):
+//
+//	ui_leave(UI_TR_TAB, 1);   // the screen goes out: frames run until it has
+//	read_the_new_list();      // nothing shows meanwhile
+//	while (ui_depth())
+//		ui_pop();
+//	ui_push(&next, ctx);      // drawn hidden, then it comes in
+//
+// dir: 1 forward (the next tab, a folder in), -1 back, 0 neither. Keys
+// pressed while the screen goes out are held for the next one, which gets
+// them once it shows. A modal view on top is popped first, with no motion
+// (its dim carries on into the fade). Call these outside ui_frame, like
+// dialogs. A transition coming in can be interrupted: ui_leave goes out
+// from wherever it is.
+void ui_leave(u32 kind, s32 dir);
+// The next view shown comes in as after ui_leave(kind, dir), from black: a
+// new session's first screen
+void ui_enter(u32 kind, s32 dir);
+// 1 while a transition goes out, waits for the next screen or comes in.
+int ui_transitioning(void);
+// Closes the top view: a modal one over a screen plays its way out first
+// (theme dialog_out frames, keys meanwhile held for the view under it),
+// then it is popped. Outside ui_frame only; anywhere else ui_pop.
+void ui_close(void);
 
 // --- Nodes --------------------------------------------------------------------
 

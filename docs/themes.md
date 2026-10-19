@@ -116,7 +116,7 @@ A UTF-8 text file (a BOM is skipped; LF, CRLF or CR line ends; at most 8 KB; lin
 | `[fonts]` | `body`, `heading` | `body` or `heading` (the built-in fonts) | `body`, `heading` |
 | `[layout]` | `row_h` | `16` or `32` (list rows) | 16 |
 | `[layout]` | `pad` | 0-16 px text inset | 6 |
-| `[effects]` | `modal_dim`, `idle_dim` | 0-16 (BLDY) | dark 6, light 5; 11 |
+| `[effects]` | `modal_dim`, `idle_dim` | 0-16 (BLDY) | dark 8, light 6; 11 |
 | `[effects]` | `fade_frames` | 1-120 | 8 |
 | `[effects]` | `slide` | 0-96 px a dialog slides up from | 24 |
 | `[effects]` | `marquee_delay` | 0-255 frames before a cut name scrolls | 45 |
@@ -124,6 +124,10 @@ A UTF-8 text file (a BOM is skipped; LF, CRLF or CR line ends; at most 8 KB; lin
 | `[effects]` | `marquee_pause` | 0-255 frames it rests at the end | 60 |
 | `[effects]` | `marquee_gap` | 0-120 px it scrolls past the name's end | 8 |
 | `[effects]` | `page_fade` | 0-30 frames a list fades in after a page change (0: none) | 4 |
+| `[effects]` | `dialog_in`, `dialog_out` | 0-60 frames a dialog or menu takes to open (it fades in, then the screen dims, while it slides up `slide` px) and to close (the same backwards) | 12, 10 |
+| `[effects]` | `KIND_effects` | 0-15, how screens replace each other (bits, added up): 1 fade out to the background and the next screen in from it, 2 slide sideways, 4 slide up and down, 8 mosaic | tab 3, deeper 5, fade 1, leave 1 |
+| `[effects]` | `KIND_out`, `KIND_in` | 0-30 frames going out and coming in | tab, deeper and leave 3, 8; fade 3, 6 |
+| `[effects]` | `KIND_px` | 0-64 px a slide goes | tab 16, deeper 12, fade and leave 0 |
 | `[input]` | `delay`, `interval`, `page_delay`, `page_interval` | 1-255 frames (`engine/input.h`): a held d-pad repeats after `delay`, first every `interval` frames | 15, 4, 20, 6 |
 | `[input]` | `ramp` | 0-255 frames from the first repeat to top speed, along a smooth curve (0: top speed at once) | 90 |
 | `[input]` | `top_speed` | 1-60 repeats a second at the end of the ramp (60: every frame) | 40 |
@@ -137,5 +141,7 @@ Patches: `VIEW` is a view id (1-255) or a name from `theme_view_names[]` in `sou
 - `anchor`: words joined by `+`, `|`, `,` or blanks: `left`, `right`, `hfill`, `hcenter`, `top`, `bottom`, `vfill`, `vcenter`, `fill` (both fills), `center` (both centres); or a number 0-15.
 - `hidden`: `yes`/`no`, `true`/`false`, `on`/`off`, `1`/`0`.
 - `ink`, `paper`: a role, `none`, `bg`, `panel`, `text`, `dim`, `accent`, `accent_text`, `border`, `track`, `shadow`, `icon0`-`icon5`, or 0-15.
+
+`KIND` is `tab` (the SD list, the NOR list and SETTINGS' pages beside each other: going right slides left), `deeper` (into a folder, Recently Played, cheats or help, and back out: going in slides up), `fade` (the same screen redrawn, after a delete or a failed launch) or `leave` (to black for a launch, and in from black after one; always through black). A screen that goes out or comes in under a dialog or menu fades through black instead of to its background (the dim under the dialog carries on into it).
 
 Out of range numbers are clamped, with a warning; values that can't be read (a colour that isn't one, `row_h = 20`, an unknown font or field) are ignored, with a warning, and the key keeps the base's value. Unknown sections and keys are warnings. Only a missing or wrong `version` (or a file over 8 KB) refuses the file.

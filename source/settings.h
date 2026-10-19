@@ -27,9 +27,11 @@ enum {
 #define SETTINGS_TO_NOR 0        // L on page 1: the NOR list
 #define SETTINGS_TO_DIAGNOSE 2   // DIAGNOSE on page 2
 
-// Runs SETTINGS and HELP in an engine session of their own, from page until
-// the user leaves them; returns on a black screen (dialog_blank), and the
-// caller starts its own session again.
+// Runs SETTINGS and HELP from page until the user leaves them. Over an
+// engine session (the menu's; pop its views first) it runs in it and
+// returns with no view up and the screen gone (ui_leave), for the caller's
+// next one to come in; otherwise in one of its own, returning on a black
+// screen (dialog_blank).
 u32 Settings_run(u32 page);
 
 // --- For the pages (setwindow.c, setwindow2.c, helpwindow.c) --------------
@@ -72,9 +74,9 @@ extern const struct ui_list_model settings_model;
 u16 settings_keys(const struct ui_event *e);
 // Sets the header's title and right-hand label (kept, as ui_label_set keeps them)
 void settings_header(struct ui_view *view, const char *title, const char *corner);
-// From a view's handler: replaces it with page
+// From a view's handler: replaces it with page, after the frame
 void settings_open(u32 page);
-// From a view's handler: pops it, and Settings_run returns result
+// From a view's handler: pops it after the frame, and Settings_run returns result
 void settings_leave(u32 result);
 // Redraws the rows whose name or value changed and moves the list's
 // cursor to the page's (after a key, or when a value changes by itself)

@@ -64,5 +64,7 @@ void frame_measure(const char *name);
 // all; ui_frame marks keys, motion and update, jobs, draw).
 #define FRAME_SPLITS 8
 void frame_split(void);
+// 1 if frame_measure was called for this frame.
+int frame_measuring(void);
 
 #endif

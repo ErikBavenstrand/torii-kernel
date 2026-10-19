@@ -128,6 +128,11 @@ void frame_split(void)
 		split_at[split_count++] = cycles_now();
 }
 
+int frame_measuring(void)
+{
+	return measure_name != 0;
+}
+
 void frame_measure(const char *name)
 {
 	measure_name = name;

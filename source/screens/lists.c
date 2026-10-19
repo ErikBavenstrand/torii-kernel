@@ -13,9 +13,11 @@
 // The list's names are in PSRAM (nameindex.h). Event handlers only record
 // what to do (lists.act); the loop does it between frames, where it may read
 // the card, pop and push views, or leave the engine (launches and NOR writes,
-// whose dialogs run a session of their own, SETTINGS and cheats, which run
-// theirs). A launch fills PSRAM, so the folder is listed again whenever the
-// lists come back.
+// whose dialogs run a session of their own: they fill PSRAM and take
+// pReadCache, so the folder is listed again when the lists come back).
+// Everything else, SETTINGS, help and cheats included, runs in the lists'
+// one engine session: a screen replaces another with a transition
+// (ui_leave), so switching never goes black.
 #include <gba_input.h>
 #include <gba_video.h>
 #include <stdio.h>
@@ -561,25 +563,38 @@ static void engine_enter(void)
 {
 	if (lists.engine)
 		return;
-	// Black until the first commit (dialog_blank: mode 0, no layer on), not
-	// a forced blank, which shows white
-	dialog_blank();
-	engine_init();
-	ui_init(NULL);
+	if (!ui_active()) {
+		// Black until the first commit (dialog_blank: mode 0, no layer on),
+		// not a forced blank, which shows white; the list comes in from it
+		dialog_blank();
+		engine_init();
+		ui_init(NULL);
+		ui_enter(UI_TR_LEAVE, 0);
+	} else
+		ui_enter(UI_TR_LEAVE, 0);  // the boot's, handed over: in with the theme it set
 	if (!lists.icons_made)
 		make_icons();
 	lists.engine = 1;
 }
 
-// Leaves the engine for code that runs a session of its own, or none: a
-// black screen meanwhile
+// Leaves the engine for code that runs a session of its own, or none: the
+// screen fades to black, which stays meanwhile
 static void engine_leave(void)
 {
 	if (!lists.engine)
 		return;
+	ui_leave(UI_TR_LEAVE, 0);
 	ui_shutdown();
 	dialog_blank();
 	lists.engine = 0;
+}
+
+// The screen goes out as kind says (ui_leave): before the next one's slow
+// reads, so a key answers at once
+static void go(u32 kind, s32 way)
+{
+	if (lists.engine)
+		ui_leave(kind, way);
 }
 
 static u8 list_node(void)
@@ -646,10 +661,15 @@ static void sd_title(void)
 	snprintf(lists.title, sizeof(lists.title), "%s", s);
 }
 
-// Shows screen s with the cursor at at: every view goes, the list's comes
-static void show(enum screen s, u32 at)
+// Shows screen s with the cursor at at: every view goes (kind's way, way
+// as ui_leave's dir), the list's comes
+static void show(enum screen s, u32 at, u32 kind, s32 way)
 {
+	go(kind, way);  // nothing if the screen went already
 	engine_enter();
+	// What the last screen's handlers recorded since (keys while a dialog
+	// closed) was for it: keys held for this one come with it (ui_leave)
+	lists.act = ACT_NONE;
 	while (ui_depth())
 		ui_pop();
 	lists.screen = (u8)s;
@@ -732,19 +752,34 @@ static void read_nor(void)
 	game_total_NOR = GetFileListFromNor();
 }
 
-static void show_sd(u32 at)
+static void show_sd(u32 at, u32 kind, s32 way)
 {
+	go(kind, way);
 	list_folder();
-	show(SCR_SD, at);
+	show(SCR_SD, at, kind, way);
 }
 
-static void show_nor(u32 at)
+static void show_nor(u32 at, u32 kind, s32 way)
 {
+	go(kind, way);
 	read_nor();
-	show(SCR_NOR, at);
+	show(SCR_NOR, at, kind, way);
 }
 
 static void dialog_answer(int yes);
+
+// After SETTINGS, in the same session: the theme, accent and DIM it may
+// have changed, as a new session would read them (no view is up)
+static void settings_changed(void)
+{
+	u16 accent;
+	const struct ui_theme *t = ui_theme_setting(&accent);
+	// SETTINGS sets the theme as it changes: again only if it didn't (the
+	// wallpaper shows meanwhile, and would be decoded over itself)
+	if (t != ui_theme() || accent != ui_accent())
+		ui_theme_set(t, accent);
+	ui_dim_set_minutes(ui_dim_setting());
+}
 
 // A message (confirm 0) or a question (ui/dialog.h), over the list with its
 // menus closed; after says what follows. Runs its own frames, so it is only
@@ -964,7 +999,7 @@ static void folder_in(u32 index)
 		lists.depth++;
 	if (lists.depth < FOLDER_DEPTH)
 		folder_cursor[lists.depth] = 0;
-	show_sd(0);
+	show_sd(0, UI_TR_DEEPER, 1);
 }
 
 static void folder_up(void)
@@ -983,7 +1018,7 @@ static void folder_up(void)
 	}
 	if (lists.depth > 1)
 		lists.depth--;
-	show_sd(lists.depth < FOLDER_DEPTH ? folder_cursor[lists.depth] : 0);
+	show_sd(lists.depth < FOLDER_DEPTH ? folder_cursor[lists.depth] : 0, UI_TR_DEEPER, -1);
 }
 
 // Back from the game menu or a launch that didn't start: a Recently Played
@@ -1006,9 +1041,9 @@ static void launch(u32 line, u32 key_l)
 	u8 res = Game_launch(&lists.game, line, key_l);
 	recent_restore();  // the list's folder, whatever the launch did
 	if (res == 2)
-		show_nor(0);
+		show_nor(0, UI_TR_LEAVE, 0);
 	else
-		show_sd(at);
+		show_sd(at, UI_TR_LEAVE, 0);
 }
 
 // Opens current_filename in currentpath: the game menu, or straight to the
@@ -1019,7 +1054,7 @@ static void open_game(void)
 	if (!Game_pick(&lists.game)) {  // can't boot
 		if (lists.from_recent) {
 			recent_restore();
-			show_sd(0);
+			show_sd(0, UI_TR_DEEPER, -1);
 		}
 		return;
 	}
@@ -1045,7 +1080,7 @@ static void recent_open(u32 row)
 		}
 		engine_leave();
 		NOR_launch(game, 0);  // returns only if it failed
-		show_sd(0);
+		show_sd(0, UI_TR_LEAVE, 0);
 		return;
 	}
 	const char *slash = strrchr(entry, '/');  // Recently_play_load kept only paths
@@ -1067,9 +1102,12 @@ static void game_menu_a(u32 line, u32 key_l)
 		return;  // the save type: LEFT and RIGHT
 	if (line == 5) {  // the cheat screen, then the menu again on BOOT WITH ADDON
 		u32 at = cursor();
-		engine_leave();
+		// It runs in this session, in place of the list: both don't fit
+		go(UI_TR_DEEPER, 1);
+		while (ui_depth())
+			ui_pop();
 		Open_cht_file(lists.game.name, lists.game.havecht);
-		show((enum screen)lists.screen, at);
+		show((enum screen)lists.screen, at, UI_TR_DEEPER, -1);
 		menu_open(1, lists.menu_rows, lists.menu_max, 1);
 		return;
 	}
@@ -1094,12 +1132,12 @@ static void nor_menu_a(u32 line, u32 key_l)
 	case 0:  // boot
 		engine_leave();
 		NOR_launch(lists.nor_game, key_l);  // returns only if it failed
-		show_nor(lists.nor_game);
+		show_nor(lists.nor_game, UI_TR_LEAVE, 0);
 		break;
 	case 1:  // delete: only the latest game
 		if (lists.nor_game + 1 == game_total_NOR) {
 			Delete_latest_NOR();
-			show_nor(lists.nor_game);
+			show_nor(lists.nor_game, UI_TR_FADE, 0);
 		} else {
 			dialog(gl_lastest_game, 0, AFTER_NOR);
 		}
@@ -1134,16 +1172,19 @@ static void nor_menu_a(u32 line, u32 key_l)
 static void dialog_answer(int yes)
 {
 	switch (lists.after) {
+	// A question answered no changed nothing: the list stays as it is
 	case AFTER_DELETE:
-		if (yes)
-			if (f_chdir(currentpath) == FR_OK)  // cwd may be /SAVER after a launch
-				f_unlink(current_filename);
-		show_sd(cursor());
+		if (!yes)
+			break;
+		if (f_chdir(currentpath) == FR_OK)  // cwd may be /SAVER after a launch
+			f_unlink(current_filename);
+		show_sd(cursor(), UI_TR_FADE, 0);
 		break;
 	case AFTER_FORMAT:
-		if (yes)
-			FormatNor();  // its progress dialog shows over the list
-		show_nor(0);
+		if (!yes)
+			break;
+		FormatNor();  // its progress dialog shows over the list
+		show_nor(0, UI_TR_FADE, 0);
 		break;
 	case AFTER_BACKUP:
 		if (yes) {
@@ -1151,15 +1192,13 @@ static void dialog_answer(int yes)
 				error_dialog(2, AFTER_NOR);
 			else
 				dialog(gl_save_saved, 0, AFTER_NOR);
-		} else {
-			show_nor(lists.nor_game);
 		}
 		break;
-	case AFTER_SD:
-		show_sd(0);
+	case AFTER_SD:  // from Recently Played
+		show_sd(0, UI_TR_DEEPER, -1);
 		break;
 	case AFTER_NOR:
-		show_nor(lists.nor_game);
+		show_nor(lists.nor_game, UI_TR_FADE, 0);
 		break;
 	default:
 		break;
@@ -1184,22 +1223,32 @@ static void do_action(void)
 		lists.from_recent = 0;
 		open_game();
 		break;
-	case ACT_TO_SD:
-		show_sd(0);
+	case ACT_TO_SD:  // L from the NOR list, B from Recently Played
+		if (lists.screen == SCR_NOR)
+			show_sd(0, UI_TR_TAB, -1);
+		else
+			show_sd(0, UI_TR_DEEPER, -1);
 		break;
 	case ACT_TO_NOR:
-		show_nor(0);
+		show_nor(0, UI_TR_TAB, 1);
 		break;
 	case ACT_SETTINGS:
-		engine_leave();
-		if (Settings_run(SETTINGS_PAGE1) == SETTINGS_TO_DIAGNOSE)
+		// In this session, beside the NOR list
+		go(UI_TR_TAB, 1);
+		while (ui_depth())
+			ui_pop();
+		if (Settings_run(SETTINGS_PAGE1) == SETTINGS_TO_DIAGNOSE) {
+			engine_leave();
 			Diagnostics();  // restarts the kernel
+		}
 		tlog_flush();
-		show_nor(0);
+		settings_changed();
+		show_nor(0, UI_TR_TAB, -1);
 		break;
 	case ACT_RECENT:
+		go(UI_TR_DEEPER, 1);
 		lists.recent_count = Recently_play_load();
-		show(SCR_RECENT, 0);
+		show(SCR_RECENT, 0, UI_TR_DEEPER, 1);
 		break;
 	case ACT_RECENT_OPEN:
 		recent_open(arg);
@@ -1225,13 +1274,13 @@ static void do_action(void)
 			cheat_menu_forget();
 			if (lists.from_recent) {
 				recent_restore();
-				show_sd(0);
+				show_sd(0, UI_TR_DEEPER, -1);
 				break;
 			}
 			f_chdir(currentpath);  // back to the list's folder
 		}
 		lists.menu = 0;
-		ui_pop();
+		ui_close();
 		break;
 	default:
 		break;
@@ -1241,11 +1290,11 @@ static void do_action(void)
 // Writes the log to the card while the lists wait for a key: once it fills
 // half its RAM ring, so a long stay in the menu loses no lines, and after
 // IDLE_FLUSH_ALL_FRAMES with any line waiting, so a power-off loses none. A
-// flush's SD write never stalls a scroll
+// flush's SD write never stalls a scroll or a transition
 static void idle_flush(void)
 {
 	u32 pending = tlog_pending(), idle = ui_idle_frames();
-	if (!pending || lists.act || jobs_pending() || gfx_pending())
+	if (!pending || lists.act || jobs_pending() || gfx_pending() || ui_transitioning())
 		return;
 	if ((pending >= LOG_RING_SIZE / 2 && idle >= IDLE_FLUSH_FRAMES) || idle >= IDLE_FLUSH_ALL_FRAMES)
 		tlog_flush();
@@ -1256,7 +1305,7 @@ void lists_run(void)
 	memset(&lists, 0, sizeof(lists));
 	memset(folder_cursor, 0, sizeof(folder_cursor));
 	lists.depth = 1;
-	show_sd(0);
+	show_sd(0, UI_TR_LEAVE, 0);  // in from the boot's black screen
 	for (;;) {
 		if (lists.measure_left) {
 			frame_measure(lists.measure);

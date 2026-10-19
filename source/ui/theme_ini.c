@@ -78,6 +78,13 @@ struct key {
 #define FIELD(f) ((u16)offsetof(struct ui_theme, f))
 #define COLOUR(key, c) {S_COLOURS, K_COLOUR, 0, 0, FIELD(colour[c]), key}
 #define NUMBER(sec, key, f, lo, hi) {sec, K_U8, lo, hi, FIELD(f), key}
+// A transition's four keys: NAME_effects (ui.h's UI_TR_* bits), NAME_out,
+// NAME_in (frames) and NAME_px
+#define TRANSITION(name, kind) \
+	NUMBER(S_EFFECTS, name "_effects", transition[kind].effects, 0, 15), \
+		NUMBER(S_EFFECTS, name "_out", transition[kind].out, 0, 30), \
+		NUMBER(S_EFFECTS, name "_in", transition[kind].in, 0, 30), \
+		NUMBER(S_EFFECTS, name "_px", transition[kind].px, 0, 64)
 
 static const struct key keys[] = {
 	COLOUR("bg", UI_C_BG),
@@ -110,6 +117,12 @@ static const struct key keys[] = {
 	NUMBER(S_EFFECTS, "marquee_pause", marquee_pause, 0, 255),
 	NUMBER(S_EFFECTS, "marquee_gap", marquee_gap, 0, 120),
 	NUMBER(S_EFFECTS, "page_fade", page_fade, 0, 30),
+	NUMBER(S_EFFECTS, "dialog_in", dialog_in, 0, 60),
+	NUMBER(S_EFFECTS, "dialog_out", dialog_out, 0, 60),
+	TRANSITION("tab", UI_TR_TAB),
+	TRANSITION("deeper", UI_TR_DEEPER),
+	TRANSITION("fade", UI_TR_FADE),
+	TRANSITION("leave", UI_TR_LEAVE),
 	NUMBER(S_INPUT, "delay", input.delay, 1, 255),
 	NUMBER(S_INPUT, "interval", input.interval, 1, 255),
 	NUMBER(S_INPUT, "ramp", input.ramp, 0, 255),
