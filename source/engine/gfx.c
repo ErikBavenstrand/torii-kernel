@@ -33,6 +33,7 @@ u16 gfx_live_dispcnt EWRAM_BSS;
 u16 gfx_live_bgofs[8] EWRAM_BSS;
 u32 gfx_dirty_regs;
 u32 gfx_hold_regs;
+u8 gfx_frozen;
 u32 gfx_dirty_pal;
 u16 gfx_pal_unfaded[512] EWRAM_BSS ALIGN(4);
 u16 gfx_pal_faded[512] EWRAM_BSS ALIGN(4);
@@ -318,8 +319,22 @@ static void write_regs(u32 dirty)
 			io[0x28 + i] = gfx_regs.blend[i];
 }
 
+void gfx_freeze(int on)
+{
+	gfx_frozen = (u8)(on != 0);
+}
+
 void gfx_commit(void)
 {
+	if (gfx_frozen) {
+		// The screen shows what it showed: only the queue runs, and what
+		// changed stays marked for the commit after the freeze
+		gfx_commit_bytes = gfx_commit_queue(gfx_commit_max_bytes, gfx_commit_last_line);
+		gfx_commit_left = 0;
+		for (u32 i = 0; i < queue_count; i++)
+			gfx_commit_left += queue[(queue_head + i) & (GFX_QUEUE_CAP - 1)].bytes;
+		return;
+	}
 	u32 dirty = gfx_dirty_regs;
 	// Regions held for the queue wait while it has work
 	u32 held = queue_count ? dirty & gfx_hold_regs & GFX_DIRTY_REGS : 0;

@@ -49,6 +49,10 @@ cover-demo/frames 30-30 23A2E3B708CF46A1
 cover-demo/frames 31-32 3CCAC1492B95FF7A
 diag-renderer/demo CFABCE035BEAC9FD
 diag-start/screen 3162F4422A6557C5
+diag-tests/back FC971D7CA6CEA1D0
+diag-tests/frames 0-2 D68A87FB42CF8D44
+diag-tests/frames 3-3 7DCF004DEAC7F9B0
+diag-tests/frames 4-6 FC971D7CA6CEA1D0
 dialog-clock/asked 5BE6D838D67CEE20
 dialog-clock/later 7ACC6D69BA6B2858
 file-menu/screen C268870729D04F01

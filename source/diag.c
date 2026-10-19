@@ -197,17 +197,26 @@ void diag_screen_show(void)
 }
 
 // Sets the engine and the screen up (again after the unit tests, which reset
-// the engine), showing the page as it was
-static void screen_open(void)
+// the engine), showing the page as it was. Again, the page held on screen
+// (screen_hold) stays there while the new session draws it, in the same
+// VRAM (the same view in a new engine takes the same blocks): blanked, it
+// went black for 2 frames
+static void screen_open(int again)
 {
-	VBlankIntrWait();
-	*(vu16 *)0x05000000 = 0;  // a black backdrop until the theme's
-	*(vu16 *)0x04000000 = 0;  // mode 0, nothing on
+	if (!again) {
+		VBlankIntrWait();
+		*(vu16 *)0x05000000 = 0;  // a black backdrop until the theme's
+		*(vu16 *)0x04000000 = 0;  // mode 0, nothing on
+	}
 	engine_init();
+	gfx_freeze(again);
 	motion_reset();  // the unit tests leave motions behind
 	ui_init(NULL);
 	ui_dim_set_frames(0);  // no dimming in the middle of a question
 	screen_push();
+	for (u32 i = 0; i < 30 && gfx_queue_len(); i++)
+		ui_frame();
+	gfx_freeze(0);  // the next commit writes the page's registers and palettes
 }
 
 static void screen_title(const char *title)
@@ -466,7 +475,7 @@ static void step_unit_tests(void)
 	pause_frames(30);  // shown, faded in, before the engine stops
 	screen_hold();
 	int failed = torii_unit_tests();
-	screen_open();
+	screen_open(1);
 	say(failed ? RED : GREEN, "%d unit tests failed (see the log)", failed);
 	result(!failed, "unit tests");
 	pause_frames(60);
@@ -1028,7 +1037,7 @@ void Diagnostics(void)
 {
 	memset(&scr, 0, sizeof(scr));
 	screen_title("start?");
-	screen_open();
+	screen_open(0);
 	say(WHITE, "Diagnostics tests the cart and writes");
 	say(WHITE, "a report to /torii/logs. It never");
 	say(WHITE, "writes your saves. It takes a minute,");
