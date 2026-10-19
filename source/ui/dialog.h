@@ -21,7 +21,7 @@
 // between them. They nest; the last close ends the session.
 //
 //	if (dialog_confirm(gl_save_sav, name, DIALOG_INFO)) {  // A: 1, B: 0
-//		dialog_progress_begin(gl_save_sav, name);
+//		dialog_progress_begin(gl_saving, name);
 //		dialog_progress_status(gl_save_ing);              // drawn at once
 //		for (each block) {
 //			dialog_progress_set(done, total, status_text);  // a few times a second

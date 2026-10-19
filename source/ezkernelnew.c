@@ -1396,7 +1396,6 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 			Launch_now(0x200, key_L, "CLEAN BOOT");
 			break;
 		case 1:  //PSRAM BOOT WITH ADDON
-			progress_step(gl_loading_game, 150, 150);
 			gl_reset_on = Read_SET_info(assress_v_reset);
 			gl_rts_on = Read_SET_info(assress_v_rts);
 			gl_sleep_on = Read_SET_info(assress_v_sleep);

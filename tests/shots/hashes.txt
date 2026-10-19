@@ -3,6 +3,7 @@
 # SCENARIO/frames FIRST-LAST HASH: frames of a -H range (counted from 0)
 # that all hash the same.
 boot/screen 2F699359A5731225
+boot-addon/addons B24B22C01BC420D0
 boot-progress/screen 8A9B3222959885A1
 boot-progress-big/loading 7868AEBC12088DD1
 cheats/screen 063A1B234EA6DC79
