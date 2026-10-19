@@ -13,8 +13,8 @@ git log, not here.
 - **Fixed:** a scrolling list logged a `frame-cycles:` line every frame and
   overflowed the log (107 KB lost in one cart test). Measured frames go to
   mGBA's console only, and the card gets one summary per name at DEBUG when the
-  log is written; the lists also write the log when half its buffer is full
-  and no key is held (`b08c3b9`).
+  log is written; the lists also write the log while no key is held, so
+  a long stay in the menu or a power-off loses no lines (`b08c3b9`, `29c35d2`).
 - **Fixed:** Diagnostics no longer goes black for about 5 s while its unit
   tests run: the page stays on screen (`32b6f96`).
 - **Fixed:** log lines: a refused NOR write now says it wasn't written, the
