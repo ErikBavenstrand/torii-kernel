@@ -6,6 +6,20 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** SETTINGS (both pages) and HELP are drawn by the v0.3 tile
+  engine: a header and a list with each setting's name and value, the
+  official keys and edit flow, and the same settings writers. In edit mode
+  the row shows the option under the cursor (`« RESET: ON »`). Page 2 gains
+  THEME, ACCENT and DIM, previewed at once and saved like the other
+  settings; DIAGNOSE is now its last row. HELP credits the Galmuri fonts
+  (OFL-1.1) and gives its QR code a quiet zone (`783114e`, `54b83e8`,
+  `7075e23`).
+- **Fixed:** February days past 29 in leap years, hot keys stored as
+  invalid codes, a dead fifth MODE B position, and AUTO SAVE and MODE B
+  changes not reaching the next launch until a reboot (`783114e`). A saved
+  ACCENT showed black, and a screen without a list could fail to appear
+  after another closed (`2a67c3f`).
+
 - **Added:** views, widgets and themes for the v0.3 tile menu, not yet used
   by any screen (`source/ui/`). Screens are const layouts of labels,
   panels, lists, grids, images, scroll and progress bars with anchors, on a
