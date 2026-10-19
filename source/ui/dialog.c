@@ -223,7 +223,11 @@ void dialog_hand_over(void)
 {
 	if (!dlg.owned || !dlg.opens)
 		return;
-	ui_leave(UI_TR_LEAVE, 0);  // the notice fades to black
+	// The notice fades to black. A frame first: the boot's work since the
+	// last one would count as the fade's time, and it cut out
+	if (ui_depth())
+		ui_frame();
+	ui_leave(UI_TR_LEAVE, 0);
 	while (ui_depth())
 		ui_pop();
 	memset(&dlg.message, 0, sizeof(dlg.message));
@@ -457,6 +461,10 @@ void dialog_notice(const char *title, const char *text, u32 kind)
 		dlg.notice.view = 0;
 	} else {
 		dialog_open();
+		// Over nothing (the boot's "Loading...") it comes in from black as a
+		// screen does: a dialog's own fade needs a screen under it
+		if (!ui_depth())
+			ui_enter(UI_TR_LEAVE, 0);
 	}
 	if (!show(&dlg.notice, USE_NOTICE, title, text, kind, NULL)) {
 		dialog_close();
