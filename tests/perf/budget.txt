@@ -17,3 +17,6 @@ ui-grid-scroll 72326
 ui-list-scroll 99113
 ui-page-change 222307
 ui-screen-switch 231926
+cover-decode 38607
+cover-demo 18615
+cover-upload 3427

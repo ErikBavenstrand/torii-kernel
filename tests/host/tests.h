@@ -84,5 +84,10 @@ void test_ui_ring_windows(void);
 void test_ui_ring_invariant(void);
 void test_ui_stack(void);
 void test_ui_focus_and_keys(void);
+void test_asset_header(void);
+void test_asset_check_refuses(void);
+void test_cover_cache_wants(void);
+void test_cover_cache_eviction(void);
+void test_affine_rotscale(void);
 
 #endif

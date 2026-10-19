@@ -56,12 +56,13 @@ void res_set_error(const char *format, ...)
 u8 res_alloc(enum res_kind kind, u16 len, u16 align, u16 lo, u16 hi, u16 tag, u8 flags)
 {
 	struct pool *pool = &pools[kind];
-	if (res_log_len == RES_LOG_CAP) {
+	int logged = !(flags & RES_NOLOG);
+	if (logged && res_log_len == RES_LOG_CAP) {
 		res_set_error("%s: the allocation log is full (%u references held through res_alloc)", pool->name,
 			      RES_LOG_CAP);
 		return RES_NONE;
 	}
-	u8 h = pool_alloc(pool, len, align, lo, hi, tag, flags);
+	u8 h = pool_alloc(pool, len, align, lo, hi, tag, flags & POOL_TOP);
 	if (h == RES_NONE) {
 		res_set_error("%s: can't allocate %u units of %u bytes (align %u, tag %04X): %s; %u free, %u cached, "
 			      "longest free run %u",
@@ -70,6 +71,8 @@ u8 res_alloc(enum res_kind kind, u16 len, u16 align, u16 lo, u16 hi, u16 tag, u8
 			      pool_largest_free(pool, 1));
 		return RES_NONE;
 	}
+	if (!logged)
+		return h;
 	res_log[res_log_len].kind = (u8)kind;
 	res_log[res_log_len].handle = h;
 	res_log_len++;
@@ -89,6 +92,11 @@ int res_release(enum res_kind kind, u8 handle)
 		return pool_unref(&pools[kind], handle);
 	}
 	return 0;
+}
+
+int res_unref(enum res_kind kind, u8 handle)
+{
+	return pool_unref(&pools[kind], handle);
 }
 
 u8 res_mark(void)

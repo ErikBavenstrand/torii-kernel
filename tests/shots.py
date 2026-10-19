@@ -8,8 +8,8 @@ fresh cart (the SD card below, kernel NOR erased) with the clock frozen. It
 waits for the kernel's "screen ready: SCREEN" lines with -w and names its key
 frames with -s @N:KEY.png; -H @A:@B hashes every frame of an animation.
 Lines starting "#! settings SLOT=VALUE..." set kernel settings slots first;
-a line "#! kernel test" runs the test kernel (ezkerneltest.gba, after its
-unit tests) instead of dist/ezkernelnew.bin, for the UI demo's scenarios.
+"#! kernel test" runs the test kernel (ezkerneltest.gba, `just test-kernel`'s
+build) instead, for scenes only it has, as the cover demo.
 
 Check (the default): every key frame's screen hash, and every animation's
 frame hashes, must equal tests/shots/hashes.txt. On a mismatch the actual,
@@ -46,7 +46,6 @@ RUNS = Path("dist/shots-run")
 FAILED = Path("dist/shots-failed")
 SHOT = "emu/build-linux/mgba-shot"
 KERNEL = "dist/ezkernelnew.bin"
-# "#! kernel test" in a scenario runs the test kernel (its UI demo) instead
 TEST_KERNEL = "ezkerneltest.gba"
 # 2026-01-01 12:34:56 UTC: the clock stands still there in every scenario
 EPOCH = 1767270896
@@ -144,7 +143,7 @@ def boot(name: str, sd: Path, cart: Path, out: Path, extra: list[str] = ()):
     for line in opts.read_text(encoding="utf-8").splitlines():
         if line.split() == ["#!", "kernel", "test"]:
             kernel = TEST_KERNEL
-        if line.startswith("#! settings"):
+        elif line.startswith("#! settings"):
             nor = cart / "kernel-nor.bin"
             if not nor.exists():
                 nor.write_bytes(b"\xff" * KERNEL_NOR_SIZE)
@@ -155,8 +154,6 @@ def boot(name: str, sd: Path, cart: Path, out: Path, extra: list[str] = ()):
                     f.write(struct.pack("<H", value))
     env = dict(os.environ, OMEGA_DIR=str(cart), TZ="UTC")
     env.pop("OMEGA_TRACE", None)
-    if kernel == TEST_KERNEL:
-        env.pop("OMEGA_DIR")  # a plain ROM, as tests/kernel.sh runs it
     cmd = [SHOT, kernel, "-C", str(EPOCH), "-O", str(out), "-i", str(opts), *extra]
     return subprocess.run(cmd, env=env, capture_output=True, text=True, check=False)
 

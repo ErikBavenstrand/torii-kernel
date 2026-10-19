@@ -116,6 +116,12 @@ void gfx_affine_set(u32 matrix, s16 pa, s16 pb, s16 pc, s16 pd);
 int gfx_queue_copy(void *dst, const void *src, u32 bytes);
 int gfx_queue_fill(void *dst, u32 value, u32 bytes);
 u32 gfx_queue_len(void);
+// Tickets: each queued copy or fill counts one, and they finish in order.
+// gfx_queue_ticket() is the latest one's; gfx_queue_done(t) is 1 once that
+// copy (and every one before it) has been made, or dropped by
+// gfx_queue_clear. Streamers use them to know when an upload is complete.
+u32 gfx_queue_ticket(void);
+int gfx_queue_done(u32 ticket);
 // Holds the register regions given (GFX_DIRTY_* bits) until the VRAM queued
 // so far has been copied: a commit writes them only once the queue is empty
 // (in the same VBlank if it finishes in time, else the next one). For page

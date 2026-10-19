@@ -3,6 +3,39 @@
 # SCENARIO/frames FIRST-LAST HASH: frames of a -H range (counted from 0)
 # that all hash the same.
 cheats/screen 47999C2B46846CC0
+cover-demo/loaded 2D73C7A36427D46F
+cover-demo/screen 3CCAC1492B95FF7A
+cover-demo/frames 0-1 2D73C7A36427D46F
+cover-demo/frames 2-2 C774CC1BA6DCE3B5
+cover-demo/frames 3-3 526303F1567977E1
+cover-demo/frames 4-4 52AAD44789E1BE8C
+cover-demo/frames 5-5 1AF563A55CFAD513
+cover-demo/frames 6-6 3875D1DB5BF2120A
+cover-demo/frames 7-7 7253611CA88C39C0
+cover-demo/frames 8-8 60DCFB8FB026D6ED
+cover-demo/frames 9-9 59783BF54F2D91CD
+cover-demo/frames 10-10 E6B46A72DE0A3706
+cover-demo/frames 11-11 4982F2569C7920DD
+cover-demo/frames 12-12 F88A512E98229C64
+cover-demo/frames 13-13 C6DEC503EA8DF8E8
+cover-demo/frames 14-14 8901242D53CFCEAB
+cover-demo/frames 15-15 5FE4CD987C32350E
+cover-demo/frames 16-16 5A6A3F1B09F59BC6
+cover-demo/frames 17-17 62966C88425CB457
+cover-demo/frames 18-18 79F3C4A5A24CA7C0
+cover-demo/frames 19-19 35FD4C1CAA21FB23
+cover-demo/frames 20-20 F710923FAD881C7A
+cover-demo/frames 21-21 63B27E8091AA43F9
+cover-demo/frames 22-22 2358C26294FBA474
+cover-demo/frames 23-23 62E6E4D69E55C4AC
+cover-demo/frames 24-24 2585BF8F8BBFF827
+cover-demo/frames 25-25 9C1AFA00C6AC6B2B
+cover-demo/frames 26-26 B1AABE38D84BF9FF
+cover-demo/frames 27-27 F40DD48ED2C151DC
+cover-demo/frames 28-28 DE528E2C9590DC52
+cover-demo/frames 29-29 0690C16F9D9454FC
+cover-demo/frames 30-30 23A2E3B708CF46A1
+cover-demo/frames 31-32 3CCAC1492B95FF7A
 diag-start/screen 1EF53FFFB16A8AEC
 file-menu/screen D08AC44FF4854042
 help/screen D8C7377F69946185
