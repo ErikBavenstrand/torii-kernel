@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "ui_priv.h"
+#include "keyq.h"
 #include "sdtheme.h"
 #include "../engine/cycles.h"
 #include "../engine/frame.h"
@@ -90,7 +91,9 @@ static struct {
 	u8 pop_wait;       // 1: popped, regs not updated; 2: updated in pop_frame
 	u8 lists_hidden;   // planes of lists hidden with ui_show
 	u16 wake_keys;     // keys that woke the screen from DIM, ignored until let go
-	u16 queued_keys;   // ui_queue_keys: dispatched next frame
+	// Keys fired while a screen went out or a dialog closed, for the next
+	// view, and keys queued for the next frames (keyq.h)
+	struct keyq keys;
 	u32 pop_frame;
 	// A page's fade-in
 	u8 reveal;        // REVEAL_*
@@ -107,14 +110,13 @@ static struct {
 	u8 tr_step;       // frames of it shown
 	u8 tr_wait;       // TR_IN: the regs showing the screen are not on screen yet
 	u8 tr_in_frames;  // for the half coming in
-	u8 capture;       // ui_close: keys go to held_keys
+	u8 capture;       // ui_close: keys wait for the view under it (keys.held)
 	u8 gap_regs;      // the last regs show no view (a screen gone)
 	u8 tr_pushed;     // TR_GAP: a view was pushed since the screen went
 	u8 active;        // between ui_init and ui_shutdown
 	s16 tr_level, tr_dx, tr_dy;
 	s16 tr_l0, tr_l1, tr_x0, tr_x1, tr_y0, tr_y1;
 	s16 tr_in_x, tr_in_y;  // where the screen coming in starts
-	u16 held_keys;    // fired while a screen went out or a dialog closed
 	u32 tr_frame;     // the frame whose regs showed the screen coming in
 	u32 shown_frame[UI_VIEW_CAP];  // the frame whose regs showed each view
 	s16 last_dim;     // the dim under a dialog in the last regs (BLDY)
@@ -138,7 +140,7 @@ void ui_wake(void)
 
 void ui_queue_keys(u16 keys)
 {
-	ui.queued_keys |= keys;
+	keyq_queue(&ui.keys, keys);
 	ui_wake();
 }
 
@@ -456,6 +458,16 @@ u32 ui_idle_frames(void)
 	return ui.idle;
 }
 
+// Brightens the screen at once
+static void dim_off(void)
+{
+	ui.dimmed = 0;
+	motion_free(ui.dim_motion);
+	ui.dim_motion = MOTION_NONE;
+	ui.dim_y = 0;
+	ui_wake();
+}
+
 // Counts idle frames and dims or brightens; 1 if a key woke the screen (it
 // does nothing else)
 static int dim_step(u32 dt)
@@ -465,11 +477,7 @@ static int dim_step(u32 dt)
 		ui.idle = 0;
 		if (ui.dimmed) {
 			ui.wake_keys = ui.in.held;  // they don't repeat either
-			ui.dimmed = 0;
-			motion_free(ui.dim_motion);
-			ui.dim_motion = MOTION_NONE;
-			ui.dim_y = 0;
-			ui_wake();
+			dim_off();
 			return 1;
 		}
 		return 0;
@@ -661,8 +669,7 @@ void ui_leave(u32 kind, s32 dir)
 	}
 	ui.tr_phase = TR_OUT;
 	// Keys the old screen hasn't had yet are the next one's too
-	ui.held_keys |= ui.queued_keys;
-	ui.queued_keys = 0;
+	keyq_hold_queued(&ui.keys);
 	ui.tr_frames = t->out;
 	ui.tr_step = 0;
 	ui.tr_l0 = (s16)from;
@@ -750,11 +757,8 @@ static void tr_begin_in(void)
 		ui.tr_phase = TR_IDLE;
 		ui.tr_level = ui.tr_dx = ui.tr_dy = 0;
 	}
-	// Keys pressed while the last screen went out: this one's, next frame
-	if (ui.held_keys) {
-		ui.queued_keys |= ui.held_keys;
-		ui.held_keys = 0;
-	}
+	// Keys pressed while the last screen went out: this one's, from next frame
+	keyq_release(&ui.keys);
 	for (u32 d = 0; d < ui_depth(); d++) {
 		struct ui_view *v = ui_view_at(d);
 		if (!animated(v))
@@ -774,13 +778,16 @@ void ui_close(void)
 			ui_frame();
 		ui.capture = 0;
 	}
-	u16 keys = ui.held_keys | ui.queued_keys;  // the pop forgets the queue
-	ui.held_keys = 0;
+	struct keyq keys = ui.keys;  // the pop forgets the queue
+	keyq_release(&keys);
+	keyq_clear(&ui.keys);
 	ui_pop();
 	// The view under it gets keys pressed while it closed (the pop forgot
 	// the queue)
-	if (!ui_dispatching)
-		ui_queue_keys(keys);
+	if (!ui_dispatching) {
+		ui.keys = keys;
+		ui_wake();
+	}
 }
 
 // --- Registers ------------------------------------------------------------------
@@ -1032,7 +1039,7 @@ void ui_shutdown(void)
 	motion_free(ui.fade);
 	motion_free(ui.dim_motion);
 	ui.tr_phase = TR_IDLE;
-	ui.held_keys = ui.queued_keys = 0;
+	keyq_clear(&ui.keys);
 	ui.capture = 0;
 	res_release(RES_BG_VRAM, ui.stage_map);
 	for (u32 cb = 0; cb < 3; cb++)
@@ -1111,7 +1118,7 @@ void ui_hook_popped(u8 planes)
 		ui.pop_wait = 1;
 	}
 	ui.wall_retry = 1;
-	ui.queued_keys = 0;
+	keyq_drop_queued(&ui.keys);
 	// A dialog pushed next keeps the dim this one left (a menu replaced by a
 	// question); the next frame forgets it
 	if (ui.last_dim > ui.carry_dim)
@@ -1230,15 +1237,20 @@ u32 ui_frame(void)
 	fire &= (u16)~ui.wake_keys;
 	if (ui.capture || ui.tr_phase == TR_OUT || ui.tr_phase == TR_GAP) {
 		// A screen going out or a dialog closing: for the view after it
-		ui.held_keys |= fire;
+		keyq_hold(&ui.keys, fire, ui.in.pressed);
 		fire = 0;
 	} else {
-		if (!ui.dimmed) {
-			fire |= ui.queued_keys;
+		u16 queued = keyq_take(&ui.keys);
+		if (queued) {
+			// Pressed while the screen was awake: if DIM came on since, they
+			// wake it, and act
+			ui.idle = 0;
+			if (ui.dimmed)
+				dim_off();
+			fire |= queued;
 			// Handlers that act on a press (L, R) see a held-back one as one
-			ui.in.pressed |= ui.queued_keys;
+			ui.in.pressed |= queued;
 		}
-		ui.queued_keys = 0;
 	}
 	if (fire) {
 		frame_wake();

@@ -51,6 +51,7 @@ diag-renderer/demo CFABCE035BEAC9FD
 diag-start/screen 3162F4422A6557C5
 file-menu/screen C268870729D04F01
 help/screen FD71702F76BB10E0
+keys-two-presses/screen 412DB2340E2919AC
 lists-push-fail/error A052218899602B62
 lists-push-fail/list B41DDB1AFEB55DC1
 nor-launch-fail/back 9D22027A51331819
