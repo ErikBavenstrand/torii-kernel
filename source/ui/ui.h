@@ -489,6 +489,9 @@ void ui_shutdown(void);
 // must return straight after either. Tile uploads a view queued (images)
 // are not cancelled by its pop: pop such a view only once they are done.
 struct ui_view *ui_push(const struct ui_view_spec *spec, void *ctx);
+// Pushes still to fail as if the view didn't fit, for the tests (a golden
+// pokes it with mgba-shot's -p, which takes the symbol); 0 on a cart.
+extern u32 ui_push_fail_test;
 // Pops the top view (at the end of the event phase, if called from an event
 // handler): its motions stop, its jobs are cancelled, its tiles and maps go.
 void ui_pop(void);

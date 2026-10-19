@@ -12,7 +12,7 @@
 #   rotate  a full log file hands over to the next one
 #   junk    a log file with junk after its text (v0.2.0 on the real cart)
 #           is left alone, and logging goes on in the next
-#   full    a full card stops the logging, not the kernel
+#   full    a full card stops the logging and the idle flush, not the kernel
 #   flood   a scrolled list's frame-cycles go to the card as summaries
 # Every part checks the card with fsck.fat. Runs inside the torii-emu container.
 set -euo pipefail
@@ -404,6 +404,12 @@ full)
   settings 14=1 26=3 # AUTO SAVE on, LOGGING Debug
   boot -f 200
   grep -q "no more SD logging until the next boot" "$cart/kernel.log" || fail "a full card didn't stop the logging"
+  # The lists' idle flush stops trying once the card failed (it ran every
+  # idle frame before v0.3.2): idle in the menu for 600 frames, none.
+  : >"$cart/kernel.log"
+  boot -f 800
+  flushes=$(grep -c '^kernel: lists: idle flush' "$cart/kernel.log" || true)
+  [ "$flushes" -eq 0 ] || fail "the idle flush ran $flushes times after the card failed"
   ! mtype -i "$cart/sd.img" ::/torii/logs/torii-0.log >/dev/null 2>&1 || fail "the log file it couldn't finish is still there"
   # The kernel still launches games: past SAVER, torii and FILLER.BIN.
   # shellcheck disable=SC2046
@@ -411,7 +417,7 @@ full)
   grep -q '^kernel: launch: starting the game' "$cart/kernel.log" || fail "with a full card, Hello.gba didn't launch"
   mtype -i "$cart/sd.img" ::/FILLER.BIN | cmp -s - "$cart/filler.bin" || fail "the other file changed"
   card_ok
-  echo "PASS: a full card stops the logging, not the kernel, and other files stay as they were"
+  echo "PASS: a full card stops the logging and the idle flush, not the kernel, and other files stay as they were"
   ;;
 
 flood)

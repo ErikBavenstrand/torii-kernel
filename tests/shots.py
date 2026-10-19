@@ -15,6 +15,8 @@ NAME DIR" copies DIR there instead), and "#! theme-choice NAME" writes NAME to
 /torii/theme.txt, the SD theme the THEME setting's value 2 picks. "#! sd-file
 DEST SIZE SRC" copies SRC to DEST on the card, padded with 0xFF to SIZE
 bytes: a game large enough for a progress bar to move (boot-progress-big).
+"#! sd-rm PATH" deletes PATH (a file or a whole folder) from the card first,
+so a later sd-file can put a file in its place (nor-launch-fail).
 "#! sd-fragmented DEST SIZE RUNS SRC" copies SRC, padded with zeros to SIZE
 bytes, to DEST in RUNS runs of clusters (tools/sdimg.sh put-fragmented): a
 game too fragmented to start (dialog-fragmented). A "kernel error:" line
@@ -246,6 +248,9 @@ def boot(
                     "::/torii/theme.txt",
                 ]
             )
+        elif line.startswith("#! sd-rm "):
+            target = "::" + line.split(maxsplit=2)[2]
+            run(["mdeltree", "-i", str(cart / "sd.img"), target])
         elif line.startswith("#! sd-file "):
             _, _, dest, size, src = line.split(maxsplit=4)
             data = Path(src).read_bytes()

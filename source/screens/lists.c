@@ -124,6 +124,7 @@ static struct {
 	u8 queued_a;      // A during a page change, for once the page is up
 	u8 icons_made;
 	u32 nor_game;     // the NOR game menu's game
+	u32 sd_cursor;    // the SD list's cursor when it went for the NOR list or Recently Played
 	u32 recent_count;
 	u32 list_first;   // pool index of the list view's first node
 	u32 dialog_first;
@@ -131,8 +132,6 @@ static struct {
 	u8 clock_hms[3];
 	const char *measure;
 	u32 measure_left;
-	InputWrap wrap;       // the menus' cursor
-	InputWrap list_wrap;  // the list's
 	struct game_pick game;
 	char title[MAX_path_len];
 	char clock[12];
@@ -675,11 +674,18 @@ static void show(enum screen s, u32 at, u32 kind, s32 way)
 	lists.screen = (u8)s;
 	lists.menu = 0;
 	lists.queued_a = 0;
-	struct ui_view *v = ui_push(&list_views[s], &lists);
-	if (!v) {  // a layout over budget: nothing would take keys
+	// No room for the list (VRAM, a layout over budget) would leave the
+	// screen black in the transition's gap, with nothing to take keys: the
+	// error comes in from black, then the session starts over, freeing
+	// everything, and the list is tried again
+	struct ui_view *v;
+	for (u32 tries = 0; !(v = ui_push(&list_views[s], &lists)); tries++) {
 		tlog_error("lists: %s", ui_error());
-		TLOG_ASSERT(v);
-		return;
+		TLOG_ASSERT(tries == 0);  // a fresh session should have room
+		ui_enter(UI_TR_LEAVE, 0);
+		dialog_message(NULL, gl_list_failed, DIALOG_ERROR);
+		engine_leave();
+		engine_enter();
 	}
 	lists.list_first = v->first;
 	if (s == SCR_SD)
@@ -690,7 +696,6 @@ static void show(enum screen s, u32 at, u32 kind, s32 way)
 	lists.clock[0] = 0;
 	clock_read();
 	ui_list_reset(list_node(), at);
-	input_wrap_init(&lists.list_wrap, ui_input(), cursor());
 	count_update(cursor());
 	if (s == SCR_RECENT && !lists.recent_count) {
 		ui_label_set((u8)(v->first + N_EMPTY), gl_no_game_played);
@@ -833,26 +838,19 @@ static void menu_open(u32 which, u32 rows, u32 max, u32 line)
 	lists.dialog_first = d->first;
 	ui_list_reset((u8)(d->first + M_LIST), line);
 	ui_label_set((u8)(d->first + M_HINT), gl_menu_btn);
-	input_wrap_init(&lists.wrap, ui_input(), line);
 	measure("lists-menu-open", 3);
 }
 
 // --- Events (they only record what to do) ---------------------------------------
 
 // Moves the list's cursor delta items for key: past an end it stops there
-// first, and a fresh press at the end wraps to the other end (input_move); a
-// held key stays at the end, as each wrap is a page change
+// first, and a fresh press at the end wraps to the other end; a held key
+// stays at the end (input_move)
 static void move(u8 node, u16 key, s32 delta, u32 count, u32 at)
 {
 	if (!count)
 		return;
-	u32 to;
-	if (ui_input()->pressed & key) {
-		to = input_move(ui_input(), &lists.list_wrap, key, at, count, delta);
-	} else {
-		s32 t = (s32)at + delta;
-		to = t < 0 ? 0 : (u32)t >= count ? count - 1 : (u32)t;
-	}
+	u32 to = input_move(ui_input(), key, at, count, delta);
 	if (to == at)
 		return;
 	ui_list_move(node, to, key);
@@ -950,7 +948,7 @@ static int menu_event(struct ui_view *v, const struct ui_event *e)
 	u32 line = lists.menu_line;
 	if (k & (INPUT_DOWN | INPUT_UP)) {
 		u16 key = (k & INPUT_DOWN) ? INPUT_DOWN : INPUT_UP;
-		line = input_move(ui_input(), &lists.wrap, key, line, lists.menu_max + 1u, key == INPUT_DOWN ? 1 : -1);
+		line = input_move(ui_input(), key, line, lists.menu_max + 1u, key == INPUT_DOWN ? 1 : -1);
 	} else if (k & (INPUT_LEFT | INPUT_RIGHT)) {
 		if (lists.menu == 1 && line == 4) {  // the save type
 			if ((k & INPUT_LEFT) && lists.game.save_num)
@@ -1223,13 +1221,14 @@ static void do_action(void)
 		lists.from_recent = 0;
 		open_game();
 		break;
-	case ACT_TO_SD:  // L from the NOR list, B from Recently Played
+	case ACT_TO_SD:  // L from the NOR list, B from Recently Played: the cursor where it was
 		if (lists.screen == SCR_NOR)
-			show_sd(0, UI_TR_TAB, -1);
+			show_sd(lists.sd_cursor, UI_TR_TAB, -1);
 		else
-			show_sd(0, UI_TR_DEEPER, -1);
+			show_sd(lists.sd_cursor, UI_TR_DEEPER, -1);
 		break;
 	case ACT_TO_NOR:
+		lists.sd_cursor = cursor();
 		show_nor(0, UI_TR_TAB, 1);
 		break;
 	case ACT_SETTINGS:
@@ -1246,6 +1245,7 @@ static void do_action(void)
 		show_nor(0, UI_TR_TAB, -1);
 		break;
 	case ACT_RECENT:
+		lists.sd_cursor = cursor();
 		go(UI_TR_DEEPER, 1);
 		lists.recent_count = Recently_play_load();
 		show(SCR_RECENT, 0, UI_TR_DEEPER, 1);
@@ -1290,14 +1290,17 @@ static void do_action(void)
 // Writes the log to the card while the lists wait for a key: once it fills
 // half its RAM ring, so a long stay in the menu loses no lines, and after
 // IDLE_FLUSH_ALL_FRAMES with any line waiting, so a power-off loses none. A
-// flush's SD write never stalls a scroll or a transition
+// flush's SD write never stalls a scroll or a transition. Once the card
+// failed, no flush writes: it stops trying
 static void idle_flush(void)
 {
 	u32 pending = tlog_pending(), idle = ui_idle_frames();
-	if (!pending || lists.act || jobs_pending() || gfx_pending() || ui_transitioning())
+	if (!pending || tlog_card_failed() || lists.act || jobs_pending() || gfx_pending() || ui_transitioning())
 		return;
-	if ((pending >= LOG_RING_SIZE / 2 && idle >= IDLE_FLUSH_FRAMES) || idle >= IDLE_FLUSH_ALL_FRAMES)
+	if ((pending >= LOG_RING_SIZE / 2 && idle >= IDLE_FLUSH_FRAMES) || idle >= IDLE_FLUSH_ALL_FRAMES) {
+		tlog_console("lists: idle flush");  // tests/logging.sh counts them
 		tlog_flush();
+	}
 }
 
 void lists_run(void)
