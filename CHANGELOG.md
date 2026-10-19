@@ -6,6 +6,8 @@ git log, not here.
 
 ## Unreleased
 
+- **Removed:** HELP's "SELECT: Thumbnail toggle" line; the lists no longer
+  show thumbnails (`3250448`).
 - **Changed:** no screen draws in mode 3 any more: the boot's card message,
   the SD theme error and the firmware update's screens are engine dialogs
   with the official texts (the update's checks and writes are unchanged),
