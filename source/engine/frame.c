@@ -83,10 +83,10 @@ void frame_end(void)
 		measure_name = 0;
 	} else if (worst_name) {
 		const u32 *d = worst_split;
-		tlog_debug("frame-split: %s %lu, commit to line %u: %lu %lu %lu %lu %lu %lu %lu %lu", worst_name,
-			   (unsigned long)worst_cycles, worst_line, (unsigned long)d[0], (unsigned long)d[1],
-			   (unsigned long)d[2], (unsigned long)d[3], (unsigned long)d[4], (unsigned long)d[5],
-			   (unsigned long)d[6], (unsigned long)d[7]);
+		tlog_console("frame-split: %s %lu, commit to line %u: %lu %lu %lu %lu %lu %lu %lu %lu", worst_name,
+			     (unsigned long)worst_cycles, worst_line, (unsigned long)d[0], (unsigned long)d[1],
+			     (unsigned long)d[2], (unsigned long)d[3], (unsigned long)d[4], (unsigned long)d[5],
+			     (unsigned long)d[6], (unsigned long)d[7]);
 		worst_name = 0;
 		worst_cycles = 0;
 	}
