@@ -7,8 +7,10 @@ git log, not here.
 ## Unreleased
 
 - **Fixed:** SETTINGS wrote the kernel NOR on every OK (five erases in
-  25 s on a cart). Saves now stay in RAM and SETTINGS writes them once as it
-  closes, and not at all if nothing changed, to spare the NOR (`e5d3e8b`).
+  25 s on a cart). A setting still takes effect at once on OK, but it is
+  kept (written to the NOR) when you leave SETTINGS, once, and not at all if
+  nothing changed; turning the power off inside SETTINGS loses its changes
+  (`e5d3e8b`, `f51e614`).
 - **Fixed:** the lists' clock stopped under a dialog, such as FORMAT ALL's
   4-minute erase; it now keeps going (`a36ec16`).
 - **Fixed:** BACK UP SAVE's progress dialog never showed when the card had
@@ -18,7 +20,8 @@ git log, not here.
   after the unit tests; it now stays up (`3e8243e`).
 - **Fixed:** a save copy the card couldn't take (a full card) filled its
   bar to "Done"; the power-on copy and BACK UP SAVE now show "Can't write
-  the save" (`384c622`).
+  the save", and the power-on copy is offered again at the next power-on
+  (`384c622`, `f51e614`).
 - **Fixed:** BOOT WITH ADDON said "Loading the game" while it still checked
   save states and patches (`95b5f8d`).
 - **Known issue:** a cart whose kernel NOR is a uniform-sector S29GL064A

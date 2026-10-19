@@ -364,6 +364,7 @@ Bugs found while building v0.3 and v0.3.1. Each is struck out here once a ticket
   - art for console folders;
   - a scraper CLI in `tools/`.
 - **Settings:** a 12/24-hour clock and time editor, settings in categories, and Help pages.
+  Page 2's SAVE row (AUTO SAVE) opens edit mode with the cursor on OK, so A, A saves it unchanged and LEFT is needed to change it (pre-existing; v0.3.2 review).
 
 - **Screens redesigned (user, 2026-10-19):** v0.3 ported the official screens as they were. v0.4 redesigns their layout and navigation: settings in a section of their own, organised by category, with clear editing; the cheat screen; and the lists, as views a theme can swap (a RetroArch-like carousel of systems and games, sections).
 
