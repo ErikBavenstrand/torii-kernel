@@ -126,6 +126,8 @@ def cli(*args: str) -> subprocess.CompletedProcess:
 
 def stage(src: Path) -> Path:
     """Copies the theme folder src to dist/theme-check/ and returns where."""
+    if not src.is_dir():
+        sys.exit(f"theme-check: {src} isn't a folder")
     if not (src / "theme.ini").is_file() and not any(
         p.name.lower() == "theme.ini" for p in src.iterdir()
     ):
