@@ -33,6 +33,7 @@ jobs=(
   "tests/nor.sh"
   "tests/nor_safety.sh"
   "tests/loader_safety.sh"
+  "tests/fw_update.sh"
   "tests/logging.sh launch"
   "tests/logging.sh debug"
   "tests/logging.sh crash"

@@ -73,9 +73,9 @@
 #define DMA_COPY_MODE 0X1
 #define SET_PARAMETER_MODE 0x2
 
-// image.bin, at 0x08100000, holds EZ-Flash's 16bpp menu pictures, which the
-// kernel no longer draws (Diagnostics' LZ77 timing still reads one), then the
-// FPGA firmware Check_FW_update writes (LX9_ and LX16_newomega_top_bin_address).
+// After the kernel's 1 MB, from 0x08100000: the FPGA firmware Check_FW_update
+// writes and Diagnostics' LZ77 sample, from EZ-Flash's image.bin
+#include "image_layout.h"
 
 #define assress_language 0
 #define assress_v_reset 1
@@ -113,12 +113,6 @@
 #define LX9_FW_built_in_ver 5
 #define LX16_FW_built_in_ver 7
 
-#define LX9_newomega_top_bin_address (void *)0x08195000
-#define LX9_newomega_top_bin_size 0x535bc////0x536d0//0x534A8//
+// The firmware's address, size and CRC32: image_layout.h
 #define LX9_wirte_address 0x80000
-#define LX9_FW_crc32 0x7E33C4FB //0x76352215:fw4
-
-#define LX16_newomega_top_bin_address (void *)0x08200000
-#define LX16_newomega_top_bin_size 0x716A0
 #define LX16_wirte_address 0x100000
-#define LX16_FW_crc32 0x709EF09C

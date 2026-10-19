@@ -12,10 +12,10 @@ index 59ca1c1..1dd19c0 100644
  	EXTDATA_MAX
 diff --git a/include/mgba/internal/gba/cart/omega.h b/include/mgba/internal/gba/cart/omega.h
 new file mode 100644
-index 0000000..45f6994
+index 0000000..cba1cc5
 --- /dev/null
 +++ b/include/mgba/internal/gba/cart/omega.h
-@@ -0,0 +1,168 @@
+@@ -0,0 +1,174 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -156,6 +156,12 @@ index 0000000..45f6994
 +	bool rtcTraced;
 +
 +	uint8_t port[OMEGA_PORT_SIZE];
++
++	// The FPGA's version word (OMEGA_FPGA_VERSION) and, when that is set, its
++	// config SPI flash in fpga-flash.bin, which the firmware update writes.
++	uint16_t fpgaVersion;
++	struct VFile* fpgaFlashVf;
++	uint8_t* fpgaFlash;
 +
 +	uint32_t* originalRom;
 +	size_t originalRomSize;
@@ -310,10 +316,10 @@ index 1d0c0dd..b77704a 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..cf1b236
+index 0000000..2e88cfc
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1348 @@
+@@ -0,0 +1,1386 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -388,9 +394,10 @@ index 0000000..cf1b236
 +// lands on the real cart isn't known, so the emulator stops with this status
 +// (unless OMEGA_SD_PSRAM_WRITES=allow) rather than let it work here.
 +#define SD_PSRAM_WRITE_STATUS 77
-+// The kernel's data sectors (save info, NOR lists, settings) start here, so
-+// the kernel copied in at power-on stops before them.
-+#define OMEGA_KERNEL_DATA 0x780000
++// EZ-Flash's loader (DE.BIN) installs at most 3 MB of ezkernelnew.bin, in
++// whole 64 KB sectors from the kernel's start (docs/research/omega-de-hardware.md).
++#define LOADER_INSTALL_MAX 0x300000
++#define LOADER_INSTALL_SECTOR 0x10000
 +
 +#define SECTOR_SIZE 512
 +#define SD_BUFFER_SIZE 0x800
@@ -401,7 +408,12 @@ index 0000000..cf1b236
 +#define GPIO_FIRST 0xC4
 +#define GPIO_LAST 0xC9
 +// Rev.B cart (Spartan-6 LX16) on firmware 7, matching the shipped kernel.
++// OMEGA_FPGA_VERSION (hex) sets another, e.g. B006 or 0004 for an update.
 +#define FPGA_VERSION 0xB007
++// The FPGA's config SPI flash, which the firmware update writes in 256-byte
++// pages (LX9 from 0x80000, LX16 from 0x100000).
++#define FPGA_FLASH_SIZE 0x200000
++#define FPGA_PAGE_SIZE 256
 +
 +// One line per cart event on stderr, prefixed with the frame number, when
 +// OMEGA_TRACE=1. Tests read it to see what the kernel told the cart.
@@ -903,7 +915,7 @@ index 0000000..cf1b236
 +
 +static uint16_t _portRead(struct GBAOmega* omega, uint32_t offset) {
 +	if (omega->spiControl) {
-+		return FPGA_VERSION;
++		return omega->fpgaVersion;
 +	}
 +	if (omega->spiWrite) {
 +		return 0;  // Firmware page written
@@ -1099,6 +1111,24 @@ index 0000000..cf1b236
 +	}
 +}
 +
++// --- FPGA firmware ----------------------------------------------------------
++
++// The firmware update sends [u32 flash address][256 bytes] to the SD buffer,
++// then turns SPI write on: the FPGA programs that page of its config flash.
++static void _writeFpgaPage(struct GBA* gba) {
++	struct GBAOmega* omega = &gba->memory.omega;
++	uint32_t address = _portWord(omega, 0);
++	_trace(gba, "fpga flash: page %06X", address);
++	if (!omega->fpgaFlash) {
++		return;
++	}
++	if (address % FPGA_PAGE_SIZE || address >= FPGA_FLASH_SIZE) {
++		mLOG(GBA_OMEGA, WARN, "FPGA flash page %06X out of range", address);
++		return;
++	}
++	memcpy(&omega->fpgaFlash[address], &omega->port[4], FPGA_PAGE_SIZE);
++}
++
 +// --- Registers -------------------------------------------------------------
 +
 +static bool _writeRegister(struct GBA* gba, uint32_t offset, uint16_t value) {
@@ -1139,6 +1169,9 @@ index 0000000..cf1b236
 +		break;
 +	case REG_SPI_WRITE:
 +		omega->spiWrite = value;
++		if (value) {
++			_writeFpgaPage(gba);
++		}
 +		break;
 +	case REG_RTC:
 +		omega->rtcStatus = value;
@@ -1270,15 +1303,25 @@ index 0000000..cf1b236
 +		mLOG(GBA_OMEGA, WARN, "No SD card image at %s", path);
 +	}
 +
-+	// The loaded ROM is the kernel upgrade file; flash it over the kernel
-+	// NOR but keep the settings the kernel stores above it. memory.romSize
-+	// can include padding, so use the file's real size.
++	// The loaded ROM is the kernel upgrade file; install it as EZ-Flash's
++	// loader does (hold R): at most 3 MB, each 64 KB sector it reaches erased
++	// and programmed, and the sectors after it, like the kernel's data,
++	// left as they were. memory.romSize can include padding, so use the
++	// file's real size.
 +	size_t kernelSize = gba->pristineRomSize ? gba->pristineRomSize : gba->memory.romSize;
-+	if (kernelSize > OMEGA_KERNEL_DATA) {
-+		mLOG(GBA_OMEGA, WARN, "Kernel image overlaps the kernel's data sectors; truncating");
-+		kernelSize = OMEGA_KERNEL_DATA;
++	if (kernelSize > LOADER_INSTALL_MAX) {
++		mLOG(GBA_OMEGA, WARN, "Kernel image is over the loader's 3 MB; truncating");
++		kernelSize = LOADER_INSTALL_MAX;
 +	}
++	size_t installed = (kernelSize + LOADER_INSTALL_SECTOR - 1) & ~(size_t) (LOADER_INSTALL_SECTOR - 1);
++	memset(omega->kernelNor.data, 0xFF, installed);
 +	memcpy(omega->kernelNor.data, gba->memory.rom, kernelSize);
++	omega->fpgaVersion = FPGA_VERSION;
++	const char* fpga = getenv("OMEGA_FPGA_VERSION");
++	if (fpga && *fpga) {
++		omega->fpgaVersion = strtoul(fpga, NULL, 16);
++		omega->fpgaFlash = _mapFile(&omega->fpgaFlashVf, dir, "fpga-flash.bin", FPGA_FLASH_SIZE, 0xFF);
++	}
 +
 +	// Saves belong to the cart SRAM until a game starts.
 +	GBASavedataForceType(&gba->memory.savedata, SAVEDATA_FORCE_NONE);
@@ -1319,6 +1362,7 @@ index 0000000..cf1b236
 +	_unmapFile(&omega->kernelNor.vf, &omega->kernelNor.data, OMEGA_KERNEL_NOR_SIZE);
 +	_unmapFile(&omega->gameNor.vf, &omega->gameNor.data, OMEGA_GAME_NOR_SIZE);
 +	_unmapFile(&omega->sramVf, &omega->sram, OMEGA_SRAM_SIZE);
++	_unmapFile(&omega->fpgaFlashVf, &omega->fpgaFlash, FPGA_FLASH_SIZE);
 +	if (omega->psram) {
 +		mappedMemoryFree(omega->psram, OMEGA_PSRAM_SIZE);
 +	}
