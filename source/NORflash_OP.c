@@ -118,27 +118,13 @@ void Chip_Erase(void)
 }
 
 //-----------------------------------------------------------
+// Erases the whole game NOR and its list (FORMAT ALL, once confirmed).
 void FormatNor(void)
 {
-	char msg[128];
-	sprintf(msg, "%s", gl_formatnor_info);
-
-	DrawHZText12(msg, 0, 60, 90 + 13, gl_color_text, 1);
-
-	while (1) {
-		delay(500);
-		scanKeys();
-		u16 keys = keysDown();
-		if (keys & KEY_A) {
-			Chip_Erase();
-			memset(pNorFS, 00, sizeof(FM_NOR_FS) * MAX_NOR);
-			game_total_NOR = 0;
-			Save_NOR_list(0);  // Torii: the boot no longer saves an empty list
-			return;
-		} else if (keys & KEY_B) {
-			return;
-		}
-	}
+	Chip_Erase();
+	memset(pNorFS, 00, sizeof(FM_NOR_FS) * MAX_NOR);
+	game_total_NOR = 0;
+	Save_NOR_list(0);  // Torii: the boot no longer saves an empty list
 }
 //---------------------------------------------------------------
 void WriteFlash(u32 address, u8 *buffer, u32 size)

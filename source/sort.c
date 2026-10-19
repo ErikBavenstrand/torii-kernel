@@ -3,12 +3,17 @@
 #include <string.h>
 #include <strings.h>
 
-static const char *name_of(const u8 *entries, u32 size, u16 i)
+static const char *inline_name(const void *entry)
 {
-	return (const char *)(entries + i * size);
+	return entry;
 }
 
 void sort_by_name(void *entries, u32 count, u32 size, void *work)
+{
+	sort_by(entries, count, size, work, inline_name);
+}
+
+void sort_by(void *entries, u32 count, u32 size, void *work, const char *(*name)(const void *entry))
 {
 	u8 *base = entries;
 	u16 *order = work, *scratch = order + SORT_MAX;
@@ -27,7 +32,7 @@ void sort_by_name(void *entries, u32 count, u32 size, void *work)
 			u32 hi = lo + 2 * width < count ? lo + 2 * width : count;
 			u32 a = lo, b = mid, out = lo;
 			while (a < mid && b < hi) {
-				if (strcasecmp(name_of(base, size, from[b]), name_of(base, size, from[a])) < 0)
+				if (strcasecmp(name(base + from[b] * size), name(base + from[a] * size)) < 0)
 					to[out++] = from[b++];
 				else
 					to[out++] = from[a++];

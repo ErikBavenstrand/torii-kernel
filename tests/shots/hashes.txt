@@ -37,26 +37,40 @@ cover-demo/frames 29-29 0690C16F9D9454FC
 cover-demo/frames 30-30 23A2E3B708CF46A1
 cover-demo/frames 31-32 3CCAC1492B95FF7A
 diag-start/screen 1EF53FFFB16A8AEC
-file-menu/screen D08AC44FF4854042
+file-menu/screen 3C6B8DC2CD22BC52
 help/screen D8C7377F69946185
-nor-list/screen 0F70E61FC6E0F4AD
-recent/screen C461631DF072F1C4
-sd-list/screen DAFEFBEF130ADFF5
-sd-scroll/scrolled 423F88E293FBA7C7
-sd-scroll/start EF7C57F54BB3A2F1
-sd-scroll/frames 0-38 EF7C57F54BB3A2F1
-sd-scroll/frames 39-39 2A5168ED4BB84271
-sd-scroll/frames 40-52 EF7C57F54BB3A2F1
-sd-scroll/frames 53-53 B9B4C2A210D7181F
-sd-scroll/frames 54-68 FED35E3819B2400F
-sd-scroll/frames 69-69 27E29649CBA215E1
-sd-scroll/frames 70-84 6B29B529141A3611
-sd-scroll/frames 85-85 E72891AEDAF5627F
-sd-scroll/frames 86-100 F517833BE980FAAF
-sd-scroll/frames 101-101 95C1C00E5D225545
-sd-scroll/frames 102-116 F5B6F878CC5107C5
-sd-scroll/frames 117-117 BBB13CC78FDCE317
-sd-scroll/frames 118-119 423F88E293FBA7C7
+nor-list/screen B41DDB1AFEB55DC1
+recent/screen 672BEF507A1E554D
+sd-deep/held 69D7F2DB7EE1B421
+sd-deep/paged F50DC92286383FE5
+sd-list/screen 34EED145D7C6A8C0
+sd-long/menu 9C6766D75857CA7D
+sd-long/scrolled 4942C31772FF8EB1
+sd-long/start 296284FDDD17EFE1
+sd-scroll/scrolled 6C146AABE9A9C84D
+sd-scroll/start E73E541BABB487CD
+sd-scroll/frames 0-43 E73E541BABB487CD
+sd-scroll/frames 44-45 016B30FF806CB6BD
+sd-scroll/frames 46-47 860B19D186764A1D
+sd-scroll/frames 48-49 48D0A0FB01519BDD
+sd-scroll/frames 50-51 AFC25B858817E87D
+sd-scroll/frames 52-53 D9730FBC7074A27D
+sd-scroll/frames 54-55 E657806DAE48CBE5
+sd-scroll/frames 56-57 E00D71CD60E8AFED
+sd-scroll/frames 58-59 BEF8FD397671EBA5
+sd-scroll/frames 60-61 FAD80B3DE141B30D
+sd-scroll/frames 62-63 2F83F7F4223EF605
+sd-scroll/frames 64-65 3C6EFF3B82332F6D
+sd-scroll/frames 66-67 7C4EE121CE6F4AB5
+sd-scroll/frames 68-69 D4B6023525A35445
+sd-scroll/frames 70-71 DA49D21DAC4C8CB5
+sd-scroll/frames 72-73 88119EB1F0B7CA85
+sd-scroll/frames 74-75 781EAC01B26DD835
+sd-scroll/frames 76-77 3989E7B067F65CED
+sd-scroll/frames 78-79 1773178A72FD49D5
+sd-scroll/frames 80-81 3255968D3D7A0E4D
+sd-scroll/frames 82-83 7A7357C8DE8E7595
+sd-scroll/frames 84-119 6C146AABE9A9C84D
 settings1/screen BEC0937CCB96EF71
 settings2/screen 1BD1F13454FBDB6C
 ui-dialog/closed FC5A408D22114FA5

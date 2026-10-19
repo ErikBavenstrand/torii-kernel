@@ -18,4 +18,8 @@
 // bytes, 2-byte aligned, and holds nothing once it returns.
 void sort_by_name(void *entries, u32 count, u32 size, void *work);
 
+// The same for entries that keep their name elsewhere: name(entry) gives it
+// (the SD list's names are in PSRAM, nameindex.h).
+void sort_by(void *entries, u32 count, u32 size, void *work, const char *(*name)(const void *entry));
+
 #endif

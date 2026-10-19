@@ -107,6 +107,8 @@ static int geometry(u8 node, struct list_state *st)
 		return 0;
 	}
 	st->rt = (u8)(rh / 8);
+	if ((c->flags & UI_LIST_FIXED) && !c->cell_w)
+		st->ring.k = (u8)(n->h / rh);  // a slot per whole row: model_count keeps to them
 	if (c->cell_w) {
 		if (c->cell_w % 8 || c->cell_w > n->w) {
 			ui_set_error("view %s: a grid's cells are whole tiles, no wider than it", name);
@@ -139,6 +141,11 @@ static u32 *slot_tiles(const struct list_state *st, u32 plane, u32 slot)
 static u32 model_count(u8 node)
 {
 	u32 n = config(node)->model->count(ui_node_view(node)->ctx);
+	if ((config(node)->flags & UI_LIST_FIXED) && config(node)->cell_w == 0) {
+		const struct list_state *st = ui_node_state(node);
+		if (n > st->ring.k)
+			n = st->ring.k;
+	}
 	return n > UI_LIST_MAX ? UI_LIST_MAX : n;
 }
 
@@ -366,11 +373,34 @@ static int list_event(u8 node, const struct ui_event *e)
 	return 0;
 }
 
+// Where a list row's name starts: after the icon column, if it has one
+static u32 text_x(u8 node)
+{
+	u32 pad = ui_theme()->pad;
+	return (config(node)->flags & UI_LIST_ICONS) ? UI_LIST_ICON_W + pad / 2 : pad;
+}
+
 // Pixels a list row's name may use
 static u32 text_clip(u8 node, const struct list_state *st)
 {
-	u32 w = st->tw * 8u, used = 2u * ui_theme()->pad + config(node)->detail_w;
+	u32 w = st->tw * 8u, used = text_x(node) + ui_theme()->pad + config(node)->detail_w;
 	return w > used + 8 ? w - used : 8;
+}
+
+// Draws a 16x16 icon (2x2 tiles in row order) at the left of a list row's
+// slot, over its paper: colour 0 lets the paper show
+static void row_icon(u32 *tiles, u32 rt, const u32 *icon)
+{
+	u32 ty0 = (rt - 2) / 2;
+	for (u32 t = 0; t < 4; t++) {
+		u32 *dst = &tiles[((t & 1) * rt + ty0 + (t >> 1)) * 8];
+		const u32 *src = &icon[t * 8];
+		for (u32 y = 0; y < 8; y++) {
+			u32 px = src[y];
+			u32 set = (px | px >> 1 | px >> 2 | px >> 3) & 0x11111111u;
+			dst[y] = (dst[y] & ~(set * 0xF)) | px;
+		}
+	}
 }
 
 static void marquee_tick(u8 node, struct list_state *st, u32 dt)
@@ -511,7 +541,9 @@ static void draw_row(u8 node, struct list_state *st, u32 *tiles, u32 r, u32 skip
 		u32 len = item.len ? item.len : strlen(item.text);
 		u32 ink = item.ink ? item.ink : ink_def;
 		if (st->cols == 1) {
-			u32 y = (h - font->line_height) / 2, clip = text_clip(node, st);
+			u32 y = (h - font->line_height) / 2, clip = text_clip(node, st), x = text_x(node);
+			if (item.icon && (c->flags & UI_LIST_ICONS) && st->rt >= 2)
+				row_icon(tiles, st->rt, item.icon);
 			if (item.detail) {
 				u32 dlen = strlen(item.detail);
 				u32 dw = text_width(font, item.detail, dlen);
@@ -523,9 +555,9 @@ static void draw_row(u8 node, struct list_state *st, u32 *tiles, u32 r, u32 skip
 				struct text_line line;
 				u32 lead;
 				text_layout_window(font, item.text, len, skip, clip, &line, &lead);
-				text_draw_line(&win, font, t->pad + lead, y, ink, &line);
+				text_draw_line(&win, font, x + lead, y, ink, &line);
 			} else {
-				text_draw(&win, font, t->pad, y, clip, ink, item.text, len);
+				text_draw(&win, font, x, y, clip, ink, item.text, len);
 			}
 			continue;
 		}

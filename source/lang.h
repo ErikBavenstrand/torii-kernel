@@ -60,6 +60,7 @@ extern char *gl_LSTART_help;
 extern char *gl_online_manual;
 
 extern char *gl_no_game_played;
+extern char *gl_nor_title;
 
 extern char *gl_cart_str;
 extern char *gl_clock_str;
