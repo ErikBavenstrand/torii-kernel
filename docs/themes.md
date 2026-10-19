@@ -5,9 +5,11 @@ height, spacing, fades, dialog slide, scrolling of long names, key repeat
 timings, the layout of single screen elements, and a wallpaper behind the
 menu. Themes live on the SD card, so making one needs no kernel build.
 
-Today the screens on the v0.3 tile engine draw in the theme: the cheat
-viewer, and the test kernel's UI demo. The other screens still draw in
-the old way and ignore it until they are ported.
+The screens on the v0.3 tile engine draw in the theme: the SD list, the
+NOR list and Recently Played with their menus and questions, SETTINGS
+(both pages), HELP, the cheat viewer, and the test kernel's UI demo.
+Launching, WRITE TO NOR and Diagnostics still draw the old way and ignore
+it until they are ported.
 
 ## Make one
 
@@ -18,11 +20,18 @@ just theme-wallpaper art.png themes/night/wallpaper.tas --dither   # optional
 just theme-check themes/night       # what the kernel would log, and preview PNGs
 ```
 
-Then copy the folder to the card as `/torii/themes/night/` and pick
-`night` in SETTINGS > THEME. The kernel keeps the choice in
-`/torii/theme.txt` and loads the theme at every boot. (The THEME row
-offers SD themes once the settings screen is ported to the tile engine;
-until then `just theme-check` is the way to see a theme.)
+Then copy the folder to the card as `/torii/themes/night/` and pick it
+in SETTINGS page 2, THEME:
+
+- The row cycles DARK, LIGHT, then up to 8 folders of `/torii/themes`
+  (sorted by name). Picking a folder loads the theme and previews it at
+  once; one that fails to load is skipped, with the reason shown.
+- OK writes the folder's name to `/torii/theme.txt`, then stores the
+  choice in the settings. If the card write fails, the old choice stays.
+- The kernel loads the theme at every boot. If it fails then, the boot
+  screen says why, the menu uses Dark, and the row shows DARK.
+- ACCENT applies over a theme too: THEME'S OWN keeps the theme's
+  `accent`, and any other ACCENT replaces it.
 
 - `just theme-new NAME [dark|light]` writes `themes/NAME/theme.ini` from a
   built-in theme, listing every key with that theme's value. A key you
@@ -36,8 +45,11 @@ until then `just theme-check` is the way to see a theme.)
   loading the theme from `/torii/themes/DIR's name`: every warning, and
   either `loaded` or the reason the theme is refused. It then decodes the
   wallpaper, boots the emulated cart with the theme, and writes PNGs of
-  the UI demo (list, dialog, grid) and the cheat viewer to
-  `dist/theme-check/NAME/`, printing their paths. On the card the previews
+  the UI demo (list, dialog, grid), the SD list, SETTINGS page 2, the
+  game menu and the cheat viewer to `dist/theme-check/NAME/`, printing
+  their paths. Kernel errors in these runs fail the check: a screen the
+  theme breaks (a patch that pushes it off screen, say) falls back to the
+  base theme for the rest of the session. On the card the previews
   name the folder `example`, as the test kernel's UI demo loads that one.
   Exits non-zero if the kernel would refuse the theme or a preview fails.
 
@@ -66,7 +78,9 @@ A TAS1 asset (`source/engine/asset.h`): 4bpp, at most 256 tiles of 8x8 px
 (128x128 px, say, or 256x64), up to 15 colours plus colour 0. It is
 repeated over the screen from the top left, behind every screen element,
 and dims and fades with the menu. Colour 0 shows the theme's `bg`. It
-shows only where screens leave the background clear, so a theme that
+is hidden while a screen uses plane 3 for itself (the game and NOR game
+menus, the list's questions, the UI demo's dialog), and it shows only
+where screens leave the background clear, so a theme that
 wants it beside a list patches the list's rectangle (as the example does).
 
 The converter (`tools/asset.py wallpaper`) takes a PNG whose sides are
@@ -112,7 +126,7 @@ A UTF-8 text file (a BOM is skipped; LF, CRLF or CR line ends; at most 8 KB; lin
 | `[wallpaper]` | `file` | a file name in the theme's folder (no `/`, `\`, `:`, not starting with `.`, under 32 bytes): a 4bpp TAS1 asset | none |
 | `[patches]` | `VIEW.NODE.FIELD` | see below; at most 16 (a repeated target replaces its patch) | none |
 
-Patches: `VIEW` is a view id (1-255) or a name from `theme_view_names[]` in `source/ui/theme_ini.c` (today `ui-demo`, `ui-dialog` and `ui-grid`, the UI demo's; each ported screen adds its own); `NODE` is a node id (1-255, `ui_spec.id` in the screen's view spec, e.g. `tests/kernel/ui_demo.c`); `FIELD` and its values:
+Patches: `VIEW` is a view id (1-255) or a name from `theme_view_names[]` in `source/ui/theme_ini.c` (`sd-list` 10, `nor-list` 11, `recent` 12, `file-menu` 13, `nor-menu` 14, `message` 15, `confirm` 16, `settings1` 20, `settings2` 21, `help` 22, `cheats` 30, and the UI demo's `ui-demo` 1, `ui-dialog` 2, `ui-grid` 3; that table is the list to trust); `NODE` is a node id (1-255, `ui_spec.id` in the screen's view spec, e.g. `source/screens/lists.c`, `source/settings.h` or `tests/kernel/ui_demo.c`); `FIELD` and its values:
 
 - `x`, `y`: -240 to 240 px; `w`, `h`: 0 to 240 px. Rounded towards zero to a multiple of 8, with a warning. Their meaning follows the node's anchor (`ui.h`).
 - `anchor`: words joined by `+`, `|`, `,` or blanks: `left`, `right`, `hfill`, `hcenter`, `top`, `bottom`, `vfill`, `vcenter`, `fill` (both fills), `center` (both centres); or a number 0-15.

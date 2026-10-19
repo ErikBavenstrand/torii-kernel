@@ -14,9 +14,10 @@ run (in the torii-emu container): checks the staged theme with the kernel's
 own parser (tools/themecheck.c, built from source/ui/theme_ini.c), printing
 the lines the kernel would log when loading it from /torii/themes/FOLDER,
 decodes its wallpaper, then boots the emulated cart with it and writes
-preview PNGs: the test kernel's UI demo (list, dialog, grid) and the cheat
-viewer, the screens drawn in themes today. Prints their paths; exits 1 if
-the kernel would refuse the theme or a preview fails.
+preview PNGs: the test kernel's UI demo (list, dialog, grid), the SD list,
+SETTINGS page 2, the game menu and the cheat viewer. Prints their paths; exits 1 if
+the kernel would refuse the theme, or a preview fails or logs a kernel
+error (as a screen the theme breaks does).
 
 new (in the container): writes themes/NAME/theme.ini with every key at the
 dark or light theme's value, and checks it.
@@ -97,17 +98,33 @@ PREVIEWS = {
 #! settings 4=1 28=2
 #! sd-theme example {theme}
 #! theme-choice example
-# The cheat viewer (as tests/shots/cheats.opts), with THEME set to the SD
-# theme; the card's torii folder is one more row above Hello.gba
+# The game menu and the cheat viewer (as tests/shots/cheats.opts), with THEME
+# set to the SD theme; the card's torii folder is one more row above Hello.gba
 -w "screen ready: sd-list"
 -k @8:DOWN -k @12:- -k @16:DOWN -k @20:- -k @24:DOWN -k @28:- -k @32:DOWN -k @36:-
 -k @40:DOWN -k @44:-
 -k @52:A -k @56:-
 -w "screen ready: file-menu"
--k @8:DOWN -k @12:- -k @16:DOWN -k @20:- -k @24:DOWN -k @28:- -k @32:DOWN -k @36:- -k @40:DOWN -k @44:-
--k @52:A -k @56:-
+-s @20:file-menu.png
+-k @28:DOWN -k @32:- -k @36:DOWN -k @40:- -k @44:DOWN -k @48:- -k @52:DOWN -k @56:- -k @60:DOWN -k @64:-
+-k @72:A -k @76:-
 -w "screen ready: cheats"
 -s @20:screen.png
+""",
+    "menu": """\
+#! settings 28=2
+#! sd-theme example {theme}
+#! theme-choice example
+# The SD list, then SETTINGS page 2 (R three times, as tests/shots/settings2.opts)
+-w "screen ready: sd-list"
+-s @20:sd-list.png
+-k @28:R -k @32:-
+-w "screen ready: nor-list"
+-k @8:R -k @12:-
+-w "screen ready: settings1"
+-k @8:R -k @12:-
+-w "screen ready: settings2"
+-s @20:settings2.png
 """,
 }
 
@@ -182,6 +199,10 @@ def preview(stage_dir: Path, name: str, opts_text: str) -> tuple[list[Path], lis
         notes.append(
             f"FAIL: {name}: mgba-shot exited {proc.returncode} (log: {out / 'log.txt'})"
         )
+    elif any(line.startswith("kernel error:") for line in proc.stderr.splitlines()):
+        # A screen the theme broke falls back to its base theme for the
+        # session: on the cart that is the rest of the session in Dark
+        notes.append(f"FAIL: {name}: the kernel logged errors (log: {out / 'log.txt'})")
     return pngs, notes
 
 

@@ -415,14 +415,20 @@ def main(argv: list[str]) -> int:
         except ValueError as e:
             print(f"{argv[1]}: {e}")
             return 1
+        except OSError as e:  # missing, unreadable or not a picture; can't write
+            print(f"asset.py: {e}")
+            return 1
         return 0
     if len(argv) == 3 and argv[0] == "wallpaper":
         try:
             asset, line = encode_wallpaper(Path(argv[1]), dither)
+            Path(argv[2]).write_bytes(asset)
         except ValueError as e:
             print(f"{argv[1]}: {e}")
             return 1
-        Path(argv[2]).write_bytes(asset)
+        except OSError as e:
+            print(f"asset.py: {e}")
+            return 1
         print(f"{argv[2]}: {line}")
         return 0
     if len(argv) >= 2 and argv[0] == "info":

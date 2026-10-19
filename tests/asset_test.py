@@ -231,6 +231,16 @@ class AssetTest(unittest.TestCase):
                 ]
             )
         self.assertEqual(bad, 1)
+        junk = self.dir / "junk.png"
+        junk.write_bytes(b"not a picture")
+        for args in (
+            ["wallpaper", str(self.dir / "none.png"), str(out)],
+            ["wallpaper", str(junk), str(out)],
+            ["encode", str(junk), str(out)],
+        ):
+            with contextlib.redirect_stdout(io.StringIO()) as said:
+                self.assertEqual(asset.main(args), 1)
+            self.assertIn("asset.py:", said.getvalue())
 
 
 if __name__ == "__main__":

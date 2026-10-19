@@ -266,7 +266,7 @@ test-host: emu-image
 theme-check dir: build emu-headless test-roms _test-kernel-build
     #!/usr/bin/env bash
     set -euo pipefail
-    stage=$(python3 tools/theme_check.py stage "$1")
+    stage=$(uv run -q tools/theme_check.py stage "$1")
     {{fresh}} sync --all "$stage"
     {{emu_docker}} python3 tools/theme_check.py run "$stage"
 
