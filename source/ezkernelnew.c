@@ -45,6 +45,13 @@ u8 pReadCache[MAX_pReadCache_size] EWRAM_BSS;  // a scratch buffer: its owners a
 _Static_assert(READCACHE_SORT_WORK % 4 == 0 && READCACHE_SORT_WORK + SORT_WORK_SIZE <= 0x2000,
 	       "the sort's work buffer meets the cheat list");
 
+void readcache_poison(void)
+{
+	// mgba-shot fills it when it reads this line, in no emulated time, so
+	// the tests' frame timings stay as they are
+	tlog_console("scratch free %08lX %lX", (unsigned long)pReadCache, (unsigned long)sizeof(pReadCache));
+}
+
 char p_recently_play[10][RECENT_LEN] EWRAM_BSS ALIGN(4);
 TCHAR currentpath[MAX_path_len];//
 TCHAR currentpath_temp[MAX_path_len];

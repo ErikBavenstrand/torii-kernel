@@ -234,6 +234,15 @@ static void quiet_log(struct mLogger *logger, int category, enum mLogLevel level
 	if (!strcmp(id, "gba.debug")) {
 		char line[512];
 		vsnprintf(line, sizeof(line), format, args);
+		// readcache_poison (source/ezkernel.h): the kernel's scratch holds
+		// nothing now, so fill it with 0xFF here, at no cost in cycles, and
+		// code that reads stale data there fails the tests
+		unsigned long base, len;
+		if (sscanf(line, "scratch free %lx %lx", &base, &len) == 2 && crash_core) {
+			for (unsigned long a = base; a < base + len; a += 4)
+				crash_core->busWrite32(crash_core, (uint32_t)a, 0xFFFFFFFF);
+			return;
+		}
 		fprintf(stderr, "%s%s\n", level & (mLOG_FATAL | mLOG_ERROR) ? "kernel error: " : "kernel: ", line);
 		saw_line(line);
 		return;
