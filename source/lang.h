@@ -120,6 +120,8 @@ extern char *gl_save_saved;
 extern char *gl_file_exist;
 extern char *gl_file_noexist;
 extern char *gl_delete_ask;    // the L+START question's title, over the file's name
+extern char *gl_nor_delete_ask;  // the NOR DELETE question's title, over the game's name
+extern char *gl_no_game_nor;     // the empty NOR list's label
 extern char *gl_saving;        // the progress title while a save goes to the card
 extern char *gl_format_title;  // FORMAT ALL's progress title
 extern char *gl_erasing;       // its status, with the time so far

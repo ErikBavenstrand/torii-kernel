@@ -423,7 +423,9 @@ void dialog_message(const char *title, const char *text, u32 kind)
 	log_dialog(title, text, NULL);
 	dialog_open();
 	if (show(&dlg.message, USE_MESSAGE, title, text, kind, gl_close_btn)) {
-		wait_key(&dlg.message, KEY_B, 1);
+		// A or B. A pressed while it is still opening never reaches it
+		// (ui_frame), so a quick double A can't close it unseen
+		wait_key(&dlg.message, KEY_A | KEY_B, 1);
 		hide(&dlg.message);
 	}
 	dialog_close();

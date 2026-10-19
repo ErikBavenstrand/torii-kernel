@@ -180,13 +180,17 @@ for cut in kernel:erase:1@0x7A0000 kernel:program:1@0x7A0000 kernel:program:4240
   echo "PASS: a power cut at $cut while saving the NOR list loses no game"
 done
 
-# Delete latest erases the whole game and drops it from the list. A later
-# write with the same header, cut after its first block, is not listed.
+# Delete latest asks first: B on the question keeps the game. A erases the
+# whole game and drops it from the list. A later write with the same
+# header, cut after its first block, is not listed.
 new_cart delete A.gba B.gba B2.gba C.gba
 write 1
 write 2
 # shellcheck disable=SC2046
-boot $(keys 100 R DOWN A DOWN A) -f 400
+boot $(keys 100 R DOWN A DOWN A _ B) -f 400
+! erased 0x20000 0x20000 || fail "B on the delete question erased B.gba"
+# shellcheck disable=SC2046
+boot $(keys 100 R DOWN A DOWN A _ A) -f 400
 erased 0x20000 0x20000 || fail "delete latest left B.gba's data"
 write 3 game:program:4097
 write 4
