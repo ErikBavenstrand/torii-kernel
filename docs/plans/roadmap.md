@@ -334,9 +334,10 @@ Bugs found while building v0.3 and v0.3.1. Each is struck out here once a ticket
 - After a card failure, the lists' idle flush calls `tlog_flush` every idle frame. Each call returns at once, but it could stop trying (`idle_flush`) (F3).
 - BOOT WITH ADDON's first progress step says "Loading the game" while it still checks save states and patches (`source/ezkernelnew.c`), and `source/ui/dialog.h`'s usage example still names `gl_save_sav` (F4).
 - Held-key wrapping differs between lists: the main lists stop at the end, while menus and the demo list wrap after a 15-frame rest (`input_move`, `wrap_pause`). Settle on one rule (F1).
-- `tests/themes.sh` still copies the example theme with `mcopy -s`, in the host's file order (F1).
-- No golden covers the two longest dialog texts (`en_file_overflow`, `en_error_7`). Untested paths: a NES launch, BOOT WITH ADDON with the scan engine forced, and a nearly full card during a save copy (F4).
-- `docs/recovery.md` and the release notes should say that a cart whose kernel NOR is a uniform-sector S29GL064A (ID `0x220C`) can't take a kernel update: EZ-Flash's loader stops with "Bad NOR ID" (F5).
+- ~~`tests/themes.sh` still copies the example theme with `mcopy -s`, in the host's file order (F1).~~ Fixed by v0.3.2 (`0a1413d`).
+- ~~No golden covers the two longest dialog texts (`en_file_overflow`, `en_error_7`). Untested paths: a NES launch, BOOT WITH ADDON with the scan engine forced, and a nearly full card during a save copy (F4).~~ Fixed by v0.3.2 (`e4eacc7`: goldens `dialog-overflow`, `dialog-fragmented`; `24ec875`: `tests/nes.sh`, `tests/scan_engine.sh`, `tests/saves.sh nearly-full`).
+- ~~`docs/recovery.md` and the release notes should say that a cart whose kernel NOR is a uniform-sector S29GL064A (ID `0x220C`) can't take a kernel update: EZ-Flash's loader stops with "Bad NOR ID" (F5).~~ Fixed by v0.3.2 (`1a7fd3a`).
+- When the power-on save copy runs out of room, its progress dialog still fills and says "Done", and no error shows: only the log has it. `Check_save_flag` calls `progress_done(gl_done)` whatever `Save_savefile` gives, and `Save_savefile` returns 1 after a short write (`source/ezkernelnew.c`). Seen on the emulated cart in `tests/saves.sh full`'s case: the bar goes from 43% to a full "Done". Show an error dialog instead (v0.3.2 tests; v0.5's crash-safe saving replaces the copy).
 - **Cart checks for the next test:**
   - Is the brake after letting go at top speed (about two rows) too far? If so, raise `SPRING_BRAKE` (F1).
   - Do the scroll timings at 40 rows/s match the emulator (F1)?

@@ -9,6 +9,10 @@ cat <<'NOTES'
 1. Copy `ezkernelnew.bin` to the root of the EZ-Flash Omega DE's SD card.
 2. Put the card in the cart, hold R and switch the GBA on, then confirm the update.
 
+If the update stops with `Bad NOR ID`, the cart's kernel NOR is a uniform-sector
+S29GL064A (ID `0x220C`), and EZ-Flash's loader installs no kernel on it, Torii's
+or the official one (`docs/recovery.md`).
+
 NOTES
 # The publish job downloads the build's files here first
 if [ -f dist/ezkernelnew.sym ]; then
