@@ -6,6 +6,20 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** Diagnostics' unit tests failed on the cart (`asset_psram_round_trip`):
+  a DMA from the kernel's ROM into PSRAM writes nothing on the real cart.
+  `psram_write` now refuses sources in cart space; the test copies its data to
+  RAM first (`b058a21`).
+- **Fixed:** a scrolling list logged a `frame-cycles:` line every frame and
+  overflowed the log (107 KB lost in one cart test). Measured frames go to
+  mGBA's console only, and the card gets one summary per name at DEBUG when the
+  log is written; the lists also write the log when half its buffer is full
+  and no key is held (`b08c3b9`).
+- **Fixed:** Diagnostics no longer goes black for about 5 s while its unit
+  tests run: the page stays on screen (`32b6f96`).
+- **Fixed:** log lines: a refused NOR write now says it wasn't written, the
+  boot loader's blank title says DE.BIN has none, and the crash test's boot
+  line is complete (`42db653`).
 - **Removed:** HELP's "SELECT: Thumbnail toggle" line; the lists no longer
   show thumbnails (`3250448`).
 - **Fixed:** with an SD theme that has a wallpaper, the game menu no longer

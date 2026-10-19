@@ -50,7 +50,8 @@ extern DIR dir;
 #define FOLDER_DEPTH 100   // folders deep whose cursor is remembered
 #define CLOCK_POLL 15      // frames between clock reads
 #define MEASURE_FRAMES 16     // frames measured after a cursor move
-#define IDLE_FLUSH_FRAMES 30  // frames with no key held before a log flush
+#define IDLE_FLUSH_FRAMES 30       // frames with no key held before a flush of a half-full log
+#define IDLE_FLUSH_ALL_FRAMES 300  // and before a flush of any log line
 
 enum screen {
 	SCR_SD,
@@ -1214,13 +1215,16 @@ static void do_action(void)
 	}
 }
 
-// Writes the log to the card once it fills half its RAM ring, while the
-// lists wait for a key, so a long stay in the menu loses no lines and a
-// flush's SD write doesn't stall a scroll
+// Writes the log to the card while the lists wait for a key: once it fills
+// half its RAM ring, so a long stay in the menu loses no lines, and after
+// IDLE_FLUSH_ALL_FRAMES with any line waiting, so a power-off loses none. A
+// flush's SD write never stalls a scroll
 static void idle_flush(void)
 {
-	if (tlog_pending() >= LOG_RING_SIZE / 2 && ui_idle_frames() >= IDLE_FLUSH_FRAMES && ui_depth() == 1 &&
-	    !lists.act && !jobs_pending())
+	u32 pending = tlog_pending(), idle = ui_idle_frames();
+	if (!pending || lists.act || jobs_pending())
+		return;
+	if ((pending >= LOG_RING_SIZE / 2 && idle >= IDLE_FLUSH_FRAMES) || idle >= IDLE_FLUSH_ALL_FRAMES)
 		tlog_flush();
 }
 
