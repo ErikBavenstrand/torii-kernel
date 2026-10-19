@@ -134,7 +134,6 @@ static struct {
 	char detail[16];
 	char row[32];
 	char save_row[40];
-	char message[GAME_NAME_MAX + 64];
 } lists EWRAM_BSS;
 
 // --- Icons ----------------------------------------------------------------
@@ -1093,7 +1092,7 @@ static void nor_menu_a(u32 line, u32 key_l)
 		if (res == 2) {
 			error_dialog(2, AFTER_NOR);
 		} else if (res == 0x10) {
-			dialog_kind(NULL, gl_file_exist, 1, AFTER_BACKUP, DIALOG_ERROR);
+			dialog_kind(NULL, gl_file_exist, 1, AFTER_BACKUP, DIALOG_INFO);  // a question, not an error
 		} else {
 			if (FRAM_save_op(2) == 2)
 				error_dialog(2, AFTER_NOR);
@@ -1180,9 +1179,8 @@ static void do_action(void)
 	case ACT_DELETE_ASK:
 		snprintf(current_filename, sizeof(current_filename), "%s",
 			 names_get(sd_files[arg - folder_total].name));
-		// "Delete file SURE?" (the start of gl_formatnor_info) over the whole name
-		snprintf(lists.message, sizeof(lists.message), "%s %.5s", gl_LSTART_help, gl_formatnor_info);
-		dialog_kind(lists.message, current_filename, 1, AFTER_DELETE, DIALOG_INFO);
+		// "Delete this file?" over the whole name
+		dialog_kind(gl_delete_ask, current_filename, 1, AFTER_DELETE, DIALOG_INFO);
 		break;
 	case ACT_NOR_MENU:
 		lists.nor_game = arg;

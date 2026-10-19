@@ -90,7 +90,7 @@ mmd -i "$cart/sd.img" ::/SAVER
 mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba "::/$toolong"
 OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -k 116:DOWN -k 120:- -k 132:A -k 136:- -k 180:A -k 184:- \
   -f 400 >"$cart/kernel.log" 2>&1
-grep -Eq '^kernel( error)?: error 8: Name too long' "$cart/kernel.log" ||
-  fail "a 253-byte name: no Name too long: $(grep '^kernel' "$cart/kernel.log" | tail -2)"
+grep -Eq '^kernel( error)?: error 8: The file name is too long' "$cart/kernel.log" ||
+  fail "a 253-byte name: no "The file name is too long": $(grep '^kernel' "$cart/kernel.log" | tail -2)"
 [ -z "$(mdir -b -i "$cart/sd.img" ::/SAVER)" ] || fail "a 253-byte name: a save was written"
 echo "PASS: a name too long for the pending-save record says so and writes no save"

@@ -1,5 +1,5 @@
 #! sd-theme example
-# THEME picks the SD theme themes/example on SETTINGS page 2 (DOWN three
+# THEME picks the SD theme themes/example on SETTINGS page 2 (DOWN five
 # times, A to edit, A for LIGHT, A for the example, RIGHT and A on OK), then
 # ACCENT Blue (DOWN, A, A, RIGHT, A); both saved, they come back when
 # SETTINGS opens again (L, L to the NOR list, R)
@@ -10,8 +10,8 @@
 -w "screen ready: settings1"
 -k @8:R -k @12:-
 -w "screen ready: settings2"
--k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:-
--k @44:A -k @48:- -k @56:A -k @60:- -k @68:A -k @72:- -k @80:RIGHT -k @84:- -k @92:A -k @96:-
+-k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:DOWN -k @48:- -k @56:DOWN -k @60:-
+-k @68:A -k @72:- -k @80:A -k @84:- -k @92:A -k @96:- -k @104:RIGHT -k @108:- -k @116:A -k @120:-
 -w "settings: THEME Example, ACCENT THEME'S OWN"
 -s @10:theme.png
 -k @20:DOWN -k @24:- -k @32:A -k @36:- -k @44:A -k @48:- -k @56:RIGHT -k @60:- -k @68:A -k @72:-

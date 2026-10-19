@@ -45,12 +45,16 @@ extern u16 gl_SD_B;
 static void save_set2_info(void);
 extern void IWRAM_CODE Set_LED_control(u16 status);
 
-// Page 2's settings (select). BREATHING and SD LED are rows of their own on
-// screen (while the LED is on) but options of LED, as they were.
+// Page 2's settings (select). BREATHING and SD LED are there while the LED
+// is on. Torii: they are rows of their own, which UP and DOWN reach; the
+// official kernel reached them only from LED's edit mode (DOWN there), so
+// the cursor seemed to jump over them. Same settings, saved the same way.
 enum {
 	SEL_SAVE,
 	SEL_MODEB,
 	SEL_LED,
+	SEL_BREATHING,
+	SEL_SD_LED,
 	SEL_THEME,
 	SEL_ACCENT,
 	SEL_DIM,
@@ -60,12 +64,14 @@ enum {
 };
 
 // The official kernel's edit state, by the same names. extra_pos is THEME,
-// ACCENT and DIM's: 0 the value, 1 OK.
+// ACCENT and DIM's: 0 the value, 1 OK. led_pos is LED's (0 on or off, 1
+// OK), rgb_pos BREATHING's and SD LED's (0-2 R, G and B, 3 OK).
 static struct {
 	u8 select;
 	u8 set_ok;
 	u8 auto_save_pos;
 	u8 led_pos;
+	u8 rgb_pos;
 	u8 ModeB_pos;
 	u8 log_pos;
 	u8 extra_pos;
@@ -207,22 +213,36 @@ static void page2_enter(struct ui_view *view)
 	settings_header(view, gl_settings_title, "2 / 2");
 }
 
-// Rows on screen: the LED's two are there while it is on
-static u32 page2_count(void)
+// BREATHING and SD LED are there while the LED is on
+static int led_rows(void)
 {
-	return SELECTS2 + (led_open_sel == 0x1 ? 2u : 0u);
+	return led_open_sel == 0x1;
 }
 
-// The screen row of setting select
+static int is_rgb(u32 select)
+{
+	return select == SEL_BREATHING || select == SEL_SD_LED;
+}
+
+// Rows on screen
+static u32 page2_count(void)
+{
+	return SELECTS2 - (led_rows() ? 0u : 2u);
+}
+
+// The screen row of setting select, and back
 static u32 row_of(u32 select)
 {
-	return select <= SEL_LED || led_open_sel != 0x1 ? select : select + 2;
+	return select > SEL_LED && !led_rows() ? select - 2 : select;
+}
+
+static u32 select_of(u32 row)
+{
+	return row > SEL_LED && !led_rows() ? row + 2 : row;
 }
 
 static u32 page2_cursor(void)
 {
-	if (p2.set_ok && p2.select == SEL_LED && p2.led_pos >= 2)
-		return p2.led_pos < 5 ? SEL_LED + 1 : SEL_LED + 2;
 	return row_of(p2.select);
 }
 
@@ -246,15 +266,17 @@ static void dim_name(char *value, u32 size, u32 minutes)
 		snprintf(value, size, "%s", gl_off);
 }
 
-// R, G and B of the BREATHING or SD LED row: the ones on, or a token for
-// led_pos first, first + 1, first + 2
-static void rgb_value(char *value, u32 size, const u16 *rgb[3], u32 first)
+// R, G and B of the BREATHING or SD LED row: the ones on, or in edit mode
+// a token for rgb_pos
+static void rgb_value(char *value, u32 size, const u16 *rgb[3], u32 select)
 {
 	static const char *const names[3] = {"R", "G", "B"};
-	int edit = p2.set_ok && p2.select == SEL_LED && p2.led_pos >= first && p2.led_pos < first + 3;
-	if (edit) {
-		u32 i = p2.led_pos - first;
-		settings_token(value, size, names[i], *rgb[i] == 1);
+	if (p2.set_ok && p2.select == select) {
+		u32 i = p2.rgb_pos;
+		if (i < 3)
+			settings_token(value, size, names[i], *rgb[i] == 1);
+		else
+			settings_token(value, size, settings_name(gl_ok_btn), -1);
 		return;
 	}
 	for (u32 i = 0; i < 3; i++)
@@ -276,21 +298,18 @@ static void page2_row(u32 row, const char **name, char *value, u32 size)
 {
 	char buf[24];
 	const char *ok = settings_name(gl_ok_btn);
-	u32 select = row;
-	if (led_open_sel == 0x1 && row > SEL_LED) {
-		if (row == SEL_LED + 1) {
-			*name = settings_name(gl_Breathing_light);
-			const u16 *rgb[3] = {&Breathing_R, &Breathing_G, &Breathing_B};
-			rgb_value(value, size, rgb, 2);
-			return;
-		}
-		if (row == SEL_LED + 2) {
-			*name = settings_name(gl_SD_working);
-			const u16 *rgb[3] = {&SD_R, &SD_G, &SD_B};
-			rgb_value(value, size, rgb, 5);
-			return;
-		}
-		select = row - 2;
+	u32 select = select_of(row);
+	if (select == SEL_BREATHING) {
+		*name = settings_name(gl_Breathing_light);
+		const u16 *rgb[3] = {&Breathing_R, &Breathing_G, &Breathing_B};
+		rgb_value(value, size, rgb, select);
+		return;
+	}
+	if (select == SEL_SD_LED) {
+		*name = settings_name(gl_SD_working);
+		const u16 *rgb[3] = {&SD_R, &SD_G, &SD_B};
+		rgb_value(value, size, rgb, select);
+		return;
 	}
 	int edit = p2.set_ok && p2.select == select;
 	switch (select) {
@@ -314,7 +333,7 @@ static void page2_row(u32 row, const char **name, char *value, u32 size)
 	}
 	case SEL_LED:
 		*name = settings_name(gl_led);
-		if (edit && p2.led_pos < 2)
+		if (edit)
 			settings_token(value, size, p2.led_pos ? ok : gl_led_open,
 				       p2.led_pos ? -1 : led_open_sel == 0x1);
 		else
@@ -376,21 +395,11 @@ static void page2_edit_keys(u16 keys)
 		if (is_extra(select)) {
 			if (p2.extra_pos == 0)
 				extra_step(1);
-		} else if (select == SEL_LED) {
-			if (p2.led_pos > 4)
-				p2.led_pos -= 3;
-			else if (p2.led_pos > 1)
-				p2.led_pos = 0;
 		}
 	} else if (keys & INPUT_DOWN) {
 		if (is_extra(select)) {
 			if (p2.extra_pos == 0)
 				extra_step(-1);
-		} else if ((select == SEL_LED) && (led_open_sel == 0x1)) {
-			if (p2.led_pos < 2)
-				p2.led_pos = 2;
-			else if (p2.led_pos < 5)
-				p2.led_pos += 3;
 		}
 	} else if (keys & INPUT_RIGHT) {
 		if (select == SEL_LOGGING) {
@@ -403,11 +412,10 @@ static void page2_edit_keys(u16 keys)
 			if (p2.ModeB_pos < 3)
 				p2.ModeB_pos++;
 		} else if (select == SEL_LED) {
-			u8 pos = p2.led_pos;
-			if ((pos == 0) || (pos == 4) || (pos == 7))
-				p2.led_pos = 1;
-			else if (pos > 1)
-				p2.led_pos++;
+			p2.led_pos = 1;
+		} else if (is_rgb(select)) {
+			if (p2.rgb_pos < 3)
+				p2.rgb_pos++;
 		}
 	} else if (keys & INPUT_LEFT) {
 		if (select == SEL_LOGGING) {
@@ -420,11 +428,10 @@ static void page2_edit_keys(u16 keys)
 			if (p2.ModeB_pos > 0)
 				p2.ModeB_pos--;
 		} else if (select == SEL_LED) {
-			u8 pos = p2.led_pos;
-			if (pos == 1)
-				p2.led_pos = 0;
-			else if (pos > 2)  // SD LED's R goes back to BREATHING's B
-				p2.led_pos--;
+			p2.led_pos = 0;
+		} else if (is_rgb(select)) {
+			if (p2.rgb_pos > 0)
+				p2.rgb_pos--;
 		}
 	} else if (keys & INPUT_A) {
 		if (select == SEL_LOGGING) {
@@ -457,32 +464,21 @@ static void page2_edit_keys(u16 keys)
 				p2.set_ok = 0;
 			}
 		} else if (select == SEL_LED) {
-			switch (p2.led_pos) {
-			case 0:
+			if (p2.led_pos == 0) {
 				led_open_sel = !led_open_sel;
-				break;
-			case 1:
+			} else {
 				save_set2_info();
 				p2.set_ok = 0;
-				break;
-			case 2:
-				Breathing_R = !Breathing_R;
-				break;
-			case 3:
-				Breathing_G = !Breathing_G;
-				break;
-			case 4:
-				Breathing_B = !Breathing_B;
-				break;
-			case 5:
-				SD_R = !SD_R;
-				break;
-			case 6:
-				SD_G = !SD_G;
-				break;
-			default:
-				SD_B = !SD_B;
-				break;
+			}
+		} else if (is_rgb(select)) {
+			u16 *breathing[3] = {&Breathing_R, &Breathing_G, &Breathing_B};
+			u16 *sd[3] = {&SD_R, &SD_G, &SD_B};
+			if (p2.rgb_pos < 3) {
+				u16 *on = (select == SEL_BREATHING ? breathing : sd)[p2.rgb_pos];
+				*on = !*on;
+			} else {
+				save_set2_info();
+				p2.set_ok = 0;
 			}
 		}
 	}
@@ -508,16 +504,18 @@ static int page2_event(struct ui_view *view, const struct ui_event *e)
 			p2.ModeB_pos = 0;
 		else if (p2.select == SEL_LED)
 			p2.led_pos = 0;
+		else if (is_rgb(p2.select))
+			p2.rgb_pos = 0;
 		else if (p2.select == SEL_LOGGING)
 			p2.log_pos = 0;
 		else if (is_extra(p2.select))
 			p2.extra_pos = 0;
-	} else if (keys & INPUT_DOWN) {
-		if (p2.select < SELECTS2 - 1)
-			p2.select++;
+	} else if (keys & INPUT_DOWN) {  // by screen rows: BREATHING and SD LED only while there
+		if (row_of(p2.select) + 1 < page2_count())
+			p2.select = (u8)select_of(row_of(p2.select) + 1);
 	} else if (keys & INPUT_UP) {
 		if (p2.select)
-			p2.select--;
+			p2.select = (u8)select_of(row_of(p2.select) - 1);
 	} else if (keys & INPUT_L) {
 		settings_open(SETTINGS_PAGE1);
 		return 1;
