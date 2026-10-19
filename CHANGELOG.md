@@ -6,6 +6,15 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** scrolling. A held d-pad speeds up smoothly from 4 frames a
+  row to a row a frame over 1.5 s, and the list glides with the cursor at
+  its speed, so the cursor never leaves the screen; let go, it brakes to a
+  whole row. Held LEFT/RIGHT page every 6 frames and scroll through instead
+  of blanking the list (the fastest-scroll flicker and its 200k-cycle
+  frames on the cart); every scroll frame is now under 75k cycles. The
+  lists wrap at their ends on a fresh press, as the menus do, and A or B
+  pressed during a held scroll is no longer lost. Fades cost half as much,
+  and Diagnostics' demo scrolls smoothly (`c11f265`).
 - **Removed:** HELP's "SELECT: Thumbnail toggle" line; the lists no longer
   show thumbnails (`3250448`).
 - **Fixed:** with an SD theme that has a wallpaper, the game menu no longer
