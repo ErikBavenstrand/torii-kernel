@@ -65,7 +65,7 @@ EOF
 for spec in "lx16 B006 LX16_newomega_top_bin 0x100000 B V07" "lx9 0004 LX9_newomega_top_bin 0x80000 A V05"; do
   read -r name version part at rev to <<<"$spec"
   run "$name" "$version" "$kernel" A
-  grep -q "dialog: Rev.$rev FIRMWARE UPDATE: Current firmware version: V0${version: -1} Will be updated to version: $to Press \[A\] to update Press \[B\] to cancel: A, yes" "$cart/log.txt" ||
+  grep -q "dialog: Rev.$rev firmware update: Installed: V0${version: -1} New: $to Press \[A\] to update Press \[B\] to cancel: A, yes" "$cart/log.txt" ||
     bad "no update question answered A: $(grep -m 3 'kernel' "$cart/log.txt")"
   grep -q "screen ready: progress" "$cart/log.txt" || bad "no progress dialog"
   grep -q "firmware: updated to $to, waiting for the power-off" "$cart/log.txt" || bad "the update didn't finish"
@@ -74,7 +74,7 @@ done
 
 # B cancels: nothing written, the menu comes up
 run cancel B006 "$kernel" B
-grep -q "FIRMWARE UPDATE: .*: B, no" "$cart/log.txt" || bad "no update question answered B"
+grep -q "firmware update: .*: B, no" "$cart/log.txt" || bad "no update question answered B"
 grep -q "screen ready: sd-list" "$cart/log.txt" || bad "the menu didn't come up"
 out=$(check_flash none 2>&1) || bad "$out"
 
@@ -90,14 +90,14 @@ data[layout["LX16_newomega_top_bin_address"] - omega_image.ROM + 0x1000] ^= 1
 open(sys.argv[2], "wb").write(data)
 EOF
 run crc B006 "$root/bad-crc.bin" B
-grep -q "dialog: Rev.B FIRMWARE UPDATE: check crc32 error! press \[B\] to return" "$cart/log.txt" ||
+grep -q "dialog: Rev.B firmware update: The firmware in the kernel is damaged (CRC32). Press \[B\] to go back" "$cart/log.txt" ||
   bad "no CRC error: $(grep -m 3 'kernel' "$cart/log.txt")"
 grep -q "screen ready: sd-list" "$cart/log.txt" || bad "the menu didn't come up"
 out=$(check_flash none 2>&1) || bad "$out"
 
 # Up to date: no question
 run current B007 "$kernel" A
-grep -q "FIRMWARE UPDATE" "$cart/log.txt" && bad "asked to update firmware 7"
+grep -q "firmware update" "$cart/log.txt" && bad "asked to update firmware 7"
 grep -q "screen ready: sd-list" "$cart/log.txt" || bad "the menu didn't come up"
 out=$(check_flash none 2>&1) || bad "$out"
 
