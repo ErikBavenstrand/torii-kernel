@@ -831,6 +831,7 @@ u32 Recently_play_add(const char *entry, u32 count)
 }
 //---------------------------------------------------------------------------------
 static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L);
+static void Show_error_num(u8 error_num);
 //---------------------------------------------------------------------------------
 // Puts entry, a path or a NOR game's entry, on top of Recently Played.
 static void Recently_play_save(const char *entry)
@@ -1557,6 +1558,10 @@ static void SD_list_L_START(u32 show_offset, u32 file_select, u32 folders)
 	// The file's name, then "SURE?" (the start of gl_formatnor_info, as before)
 	char question[sizeof(pFilename_buffer[0].filename) + 8];
 	TCHAR *pdelfilename = pFilename_buffer[show_offset + file_select - folders].filename;
+	if (Name_cut(pdelfilename)) {  // a cut name would delete nothing, or another file
+		Show_error_num(8);
+		return;
+	}
 	snprintf(question, sizeof(question), "%s\n%.5s", pdelfilename, gl_formatnor_info);
 	if (dialog_confirm(gl_LSTART_help, question, DIALOG_INFO))
 		/*res = */ f_unlink(pdelfilename);
@@ -2467,7 +2472,10 @@ static u8 FRAM_save_op(u8 OP)
 			return 0;
 		}
 		savefilesize = Get_savefilesize(SAVEMODE);
+		dialog_progress_begin(NULL, savfilename);
+		dialog_progress_status(gl_save_ing);
 		Save_savefile(savfilename, savefilesize);
+		dialog_progress_end();
 		dialog_message(NULL, gl_save_saved, DIALOG_INFO);
 		dialog_close();
 	}

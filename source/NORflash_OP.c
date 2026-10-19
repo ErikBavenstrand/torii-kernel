@@ -123,7 +123,7 @@ void FormatNor(void)
 {
 	dialog_open();  // one engine session for the question and the erase
 	if (dialog_confirm(NULL, gl_formatnor_info, DIALOG_INFO)) {
-		dialog_progress_begin(NULL, gl_formatnor_info);
+		dialog_progress_begin(NULL, NULL);  // the count below, as before
 		Chip_Erase();
 		memset(pNorFS, 00, sizeof(FM_NOR_FS) * MAX_NOR);
 		game_total_NOR = 0;

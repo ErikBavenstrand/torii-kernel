@@ -175,6 +175,7 @@ void dialog_open(void)
 		REG_DISPCNT_ = 0;
 		engine_init();
 		ui_init(NULL);
+		ui_dim_set_frames(0);  // no dimming over a question or a 4-minute erase
 		dlg.owned = 1;
 		tlog_debug("dialog: the engine runs the dialogs (from mode 3)");
 	}
@@ -321,6 +322,7 @@ static void hide(struct shown *s)
 	if (!s->view)
 		return;
 	// The top view is s (dialogs pop in the order they were pushed)
+	TLOG_ASSERT(ui_top() == s->view);
 	if (ui_top() == s->view)
 		ui_pop();
 	s->view = 0;
@@ -344,9 +346,21 @@ static u16 wait_key(struct shown *s, u16 mask, int release)
 
 // --- Messages and questions -------------------------------------------------
 
+// Logs what a dialog says, on one line, and how it was answered
+static void log_dialog(const char *title, const char *text, const char *answer)
+{
+	char line[TEXT_MAX];
+	copy(line, sizeof(line), text);
+	for (char *c = line; *c; c++)
+		if (*c == '\n')
+			*c = ' ';
+	tlog("dialog: %s%s%s%s%s", title ? title : "", title ? ": " : "", line, answer ? ": " : "",
+	     answer ? answer : "");
+}
+
 void dialog_message(const char *title, const char *text, u32 kind)
 {
-	tlog("dialog: %s%s%s", title ? title : "", title ? ": " : "", text ? text : "");
+	log_dialog(title, text, NULL);
 	dialog_open();
 	if (show(&dlg.message, USE_MESSAGE, title, text, kind, gl_close_btn)) {
 		wait_key(&dlg.message, KEY_B, 1);
@@ -360,10 +374,10 @@ int dialog_confirm(const char *title, const char *text, u32 kind)
 	int yes = 0;
 	dialog_open();
 	if (show(&dlg.message, USE_CONFIRM, title, text, kind, gl_menu_btn)) {
-		yes = (wait_key(&dlg.message, KEY_A | KEY_B, 0) & KEY_A) != 0;
+		yes = (wait_key(&dlg.message, KEY_A | KEY_B, 1) & KEY_A) != 0;
 		hide(&dlg.message);
 	}
-	tlog("dialog: %s%s%s: %s", title ? title : "", title ? ": " : "", text ? text : "", yes ? "A, yes" : "B, no");
+	log_dialog(title, text, yes ? "A, yes" : "B, no");
 	dialog_close();
 	return yes;
 }

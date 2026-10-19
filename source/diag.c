@@ -59,8 +59,8 @@ extern u32 gl_currentpage;
 // the last line are blank, and a new line redraws its row. The colour bars
 // for the checklist are an image with its own palette.
 
-#define DIAG_LINES 16       // lines kept: more than the list shows
-#define DIAG_LINE_BYTES 56  // more than a line holds in the body font
+#define DIAG_LINES 32       // lines kept: a long summary scrolls back over them
+#define DIAG_LINE_BYTES 48  // about what a line holds in the body font
 #define DIAG_ROWS 512       // the list's rows: more lines than a page ever has
 
 enum {
@@ -455,6 +455,7 @@ static void step_unit_tests(void)
 {
 	step("unit tests");
 	say(WHITE, "running the kernel's unit tests...");
+	pause_frames(2);  // shown before the screen goes
 	screen_close();
 	int failed = torii_unit_tests();
 	screen_open();
@@ -983,6 +984,29 @@ static void step_checklist(void)
 
 // --- The run -----------------------------------------------------------------
 
+// Waits for A or SELECT on the summary; UP and DOWN scroll back over its
+// lines, which may be more than the screen shows
+static u16 summary_keys(void)
+{
+	u32 first = scr.count > DIAG_LINES ? scr.count - DIAG_LINES : 0;
+	u32 cursor = scr.count ? scr.count - 1 : 0;
+	wait_release();
+	scr.keys = 0;
+	for (;;) {
+		ui_frame();
+		u16 keys = scr.keys;
+		scr.keys = 0;
+		if (keys & (KEY_A | KEY_SELECT))
+			return keys;
+		if ((keys & KEY_UP) && cursor > first)
+			cursor--;
+		if ((keys & KEY_DOWN) && cursor + 1 < scr.count)
+			cursor++;
+		if (scr.view && (keys & (KEY_UP | KEY_DOWN)))
+			ui_list_set_cursor(node_of(N_LIST), cursor);
+	}
+}
+
 static u32 crash_loop[1] EWRAM_BSS;
 
 void Diagnostics(void)
@@ -1048,10 +1072,11 @@ void Diagnostics(void)
 	say(WHITE, "A: restart the kernel");
 	say(WHITE, "SELECT: crash it on purpose, to test");
 	say(WHITE, "the crash dump, then restart");
+	say(GREY, "UP/DOWN: scroll the summary");
 	tlog("diag: done");
 	cartlog_phase(PHASE_MENU, 0, NULL);
 	tlog_flush();
-	u16 key = wait_key(KEY_A | KEY_SELECT);
+	u16 key = summary_keys();
 	if (key & KEY_SELECT) {
 		cartlog_phase(PHASE_CRASH_TEST, 0, NULL);
 		tlog("diag: crash test: running from EWRAM, outside the kernel's code");
