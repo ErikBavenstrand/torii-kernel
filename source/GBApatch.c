@@ -707,8 +707,10 @@ u32 Check_pat(TCHAR *gamefilename)
 			//Torii: only a file of this kernel's layout (EMax slots, then 16 words);
 			//another size is from an older kernel, and the ROM is scanned again.
 			find_the_patfile = (patfilesize == sizeof(iPatchInfo2) + 16 * 4);
-			if (find_the_patfile)
-				f_read(&gfile, pReadCache, patfilesize, &ret);
+			//Torii: and only one read whole, or pReadCache holds an earlier owner's bytes
+			if (find_the_patfile &&
+			    (f_read(&gfile, pReadCache, patfilesize, &ret) != FR_OK || ret != patfilesize))
+				find_the_patfile = 0;
 			f_close(&gfile);
 			if (find_the_patfile && ((u32 *)pReadCache)[sizeof(iPatchInfo2) / 4 + 5] > EMax)
 				find_the_patfile = 0;//Torii: a slot count past EMax is corrupt
@@ -799,9 +801,12 @@ u8 Check_mde_file(TCHAR *gamefilename)
 		{
 			f_open(&gfile, mdenamebuf, FA_READ);
 			mdefilesize = f_size(&gfile);
-			f_read(&gfile, pReadCache, mdefilesize, &ret);
+			//Torii: only its first byte, the mode, is used: a bigger file overran
+			//pReadCache, and an empty or unreadable one gave an earlier owner's byte
+			if (mdefilesize > 4)
+				mdefilesize = 4;
+			find_the_mdefile = f_read(&gfile, pReadCache, mdefilesize, &ret) == FR_OK && ret >= 1;
 			f_close(&gfile);
-			find_the_mdefile = 1;
 		} else {
 			find_the_mdefile = 0;
 		}

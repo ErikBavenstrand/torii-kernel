@@ -568,7 +568,10 @@ u32 Check_cheat_file(TCHAR *gamefilename)
 			if (filesize > 0x10000)
 				filesize = 0x10000;
 			f_lseek(&gfile, 0x0);
-			f_read(&gfile, tempbuff, filesize, &ret);//pReadCache max 0x20000 Byte
+			//Torii: only what was read: the rest of pReadCache is an earlier owner's
+			if (f_read(&gfile, tempbuff, filesize, &ret) != FR_OK)
+				ret = 0;
+			filesize = ret;
 
 			for (i = 0; i < filesize / 4; i += 2) {
 				if (tempbuff[i] == GAMEID) {
