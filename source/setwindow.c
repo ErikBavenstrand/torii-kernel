@@ -11,7 +11,6 @@
 #include "lang.h"
 #include "ezkernel.h"
 #include "RTC.h"
-#include "draw.h"
 #include "Ezcard_OP.h"
 #include "settings.h"
 #include "tlog.h"
@@ -74,16 +73,6 @@ static struct {
 	u8 sleep_keys[3], menu_keys[3];  // as saved
 	u32 polled;      // frame of the last clock read
 } p1 EWRAM_BSS;
-
-//---------------------------------------------------------------------------------
-// The mode 3 screens' checkbox (the cheat screen still draws it)
-void Draw_select_icon(u32 X, u32 Y, u32 mode)
-{
-	Clear(X + 2, Y + 2, 8, 8, gl_color_text, 1);
-	Clear(X + 3, Y + 3, 6, 6, RGB(4, 8, 12), 1);
-	if (mode)
-		Clear(X + 4, Y + 4, 4, 4, gl_color_selected, 1);
-}
 
 // --- The runner ---------------------------------------------------------------
 

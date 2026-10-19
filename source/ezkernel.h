@@ -58,7 +58,6 @@ extern u16 gl_color_NORFULL;
 extern u16 gl_color_btn_clean;
 */
 
-void Draw_select_icon(u32 X, u32 Y, u32 mode);
 void CheckLanguage(void);
 void CheckSwitch(void);
 u32 Game_hardware(u32 is_EMU, const u8 *gamecode, u8 gb_cart_type);
