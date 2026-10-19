@@ -355,6 +355,13 @@ Bugs found while building v0.3 and v0.3.1. Each is struck out here once a ticket
 - ~~B on Diagnostics' first page from SETTINGS lands on the NOR list, not where DIAGNOSE was picked (v0.3.2 review).~~ Fixed by v0.3.2 (`386e5ed`): SETTINGS page 2 again, the cursor on DIAGNOSE (`SETTINGS_AT_DIAGNOSE`); golden `diag-back`.
 - ~~No golden covers B on a Recently Played game's menu returning to Recently Played (v0.3.2 review).~~ Fixed by v0.3.2 (`51ebdf1`): golden `recent-menu-back`.
 - ~~A Recently Played entry whose file is missing stays on the list after a failed launch ("Can't open the file") (v0.3.2 review).~~ Fixed by v0.3.2 (`217f418`): `Game_launch` calls `Recently_play_forget` on `FR_NO_FILE` or `FR_NO_PATH`; `tests/stale_recent.sh`.
+- Found by the final emulator validation (067006a), cosmetic, after the cart test:
+  - Diagnostics takes about 80 frames to react to A on "start?" (the log file is made synchronously before step 1, unlike in SETTINGS), and its title changes about 40 frames before its body.
+  - Diagnostics' save chip page shows its title over the previous page's lines, then a blank body while it reads the chip; "reading the 128 KB save chip twice..." goes only to the log, and the title is cut to "save chip and car…".
+  - Diagnostics' pages change title and body at different frames (the timings page shows a half-scrolled row under its title).
+  - The slow-boot "Loading..." notice cuts in and out without fading (`tests/shots/boot-slow.opts` says it fades).
+  - BOOT WITH ADDON with SAVESTATE logs "savestates 65535" while it creates the state file (log wording).
+  - A Recently Played NOR entry whose game is no longer on NOR stays on the list.
 - **Cart checks for the next test:**
   - Is the brake after letting go at top speed (about two rows) too far? If so, raise `SPRING_BRAKE` (F1).
   - Do the scroll timings at 40 rows/s match the emulator (F1)?
