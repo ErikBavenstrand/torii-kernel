@@ -65,11 +65,22 @@ int ui_node_shown(u8 node);
 void ui_plane_hide(u32 plane, int hidden);
 // 1 if a hide asked for earlier has been committed: the plane is off screen.
 int ui_plane_hidden_now(u32 plane);
+// Shows a plane hidden for a page change, fading it in over the theme's
+// page_fade frames from the next VBlank: alpha blending over what is behind
+// it, so the new page comes up softly instead of popping. A plain show while
+// a darken blend is on (a modal view's dim, DIM) or with page_fade 0.
+void ui_plane_reveal(u32 plane);
+// Keys a widget held back (A during a list's page change), dispatched with
+// the next frame's keys as if pressed then. A pop forgets them.
+void ui_queue_keys(u16 keys);
 
-// Cycles into the frame after which drawing that nobody sees yet (a page
-// change, a view not shown) waits for the next frame, so no frame runs over
-// (a frame is 280,896 cycles; a list row takes up to about 40,000).
-#define UI_DRAW_BUDGET 180000
+// Cycles into the frame by which drawing that nobody sees yet (a page
+// change, a view not shown) ends, so the frame still ends before the next
+// VBlank (a frame is 280,896 cycles) with room for the nodes drawn after.
+#define UI_DRAW_BUDGET 250000
+// 1 if such drawing may start work of about cycles now: it would end by
+// UI_DRAW_BUDGET. Otherwise it waits for the next frame.
+int ui_draw_room(u32 cycles);
 
 // 1 while the d-pad repeats at the speed that skips scroll animation.
 int ui_skipping(void);

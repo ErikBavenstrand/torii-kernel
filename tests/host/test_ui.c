@@ -210,11 +210,13 @@ void test_ui_ring_setup(void)
 	CHECK(!ring_setup(&r, 168, 16, &why) && why);
 	CHECK(ring_setup(&r, 128, 16, &why));
 	CHECK_EQ(r.visible, 9);  // a row cut at each end
-	CHECK_EQ(r.k, 11);
+	CHECK_EQ(r.step, 2);
+	CHECK_EQ(r.k, 12);  // visible + 1 + step
 	CHECK_EQ(r.ring_rows, 16);
 	CHECK(ring_setup(&r, 160, 16, &why));
-	CHECK_EQ(r.k, 13);
+	CHECK_EQ(r.k, 14);
 	CHECK(ring_setup(&r, 160, 32, &why));
+	CHECK_EQ(r.step, 1);  // 32 px a frame either way
 	CHECK_EQ(r.k, 8);
 	CHECK_EQ(r.ring_rows, 8);
 	CHECK(ring_setup(&r, 120, 16, &why));
@@ -250,9 +252,9 @@ void test_ui_ring_windows(void)
 	u32 plo, phi;
 	ring_prefetch(&r, 2, 10, 1000, &plo, &phi);
 	CHECK_EQ(plo, 0);
-	CHECK_EQ(phi, 21);
+	CHECK_EQ(phi, 22);
 	ring_prefetch(&r, 500, 509, 505, &plo, &phi);
-	CHECK_EQ(plo, 489);
+	CHECK_EQ(plo, 488);
 	CHECK_EQ(phi, 504);
 	// The cursor's scroll keeps a row of context, moving as little as it can
 	CHECK_EQ(ring_scroll_for(&r, 3, 0, 1000, 1), 0);
@@ -264,9 +266,9 @@ void test_ui_ring_windows(void)
 	CHECK(!ring_far(&r, 0, 160));
 	CHECK(ring_far(&r, 0, 161));
 	CHECK(ring_far(&r, 16000, 0));
-	// One row a frame at most
-	CHECK_EQ(ring_step(&r, 0, 100), 16);
-	CHECK_EQ(ring_step(&r, 100, 0), 84);
+	// Two 16 px rows a frame at most
+	CHECK_EQ(ring_step(&r, 0, 100), 32);
+	CHECK_EQ(ring_step(&r, 100, 0), 68);
 	CHECK_EQ(ring_step(&r, 5, 9), 9);
 	// Rebasing keeps the spring near its base, in whole rows
 	CHECK_EQ(ring_rebase(&r, 2048), 0);
@@ -277,7 +279,9 @@ void test_ui_ring_windows(void)
 
 // Scrolling at random, one ring_step a frame: the rows on screen before a
 // frame and the rows resident after it never share a slot or a ring row,
-// so a row is only ever drawn into tiles and map rows not on screen.
+// so a row is only ever drawn into tiles and map rows not on screen. At
+// rest the list also fills the rows just above and below the screen
+// (ui_list.c's spare slots), under the same rule.
 void test_ui_ring_invariant(void)
 {
 	static const u32 heights[] = {128, 160, 120, 64, 16};
@@ -292,7 +296,7 @@ void test_ui_ring_invariant(void)
 		u16 slot_row[UI_RING_MAX_SLOTS];
 		for (u32 s = 0; s < UI_RING_MAX_SLOTS; s++)
 			slot_row[s] = UI_ITEM_NONE;
-		for (u32 frame = 0; frame < 20000; frame++) {
+		for (u32 frame = 0; frame < 100000; frame++) {
 			seed = seed * 1103515245 + 12345;
 			if (!(seed >> 16 & 15))
 				want = (s32)((seed >> 4) % (u32)(max + 1));
@@ -303,7 +307,12 @@ void test_ui_ring_invariant(void)
 			u32 lo, hi;
 			ring_resident(&r, next, dir, rows, &lo, &hi);
 			CHECK(hi - lo < r.k);
-			for (u32 row = lo; row <= hi; row++) {
+			u32 spare_lo = lo, spare_hi = hi;
+			if (next == shown && next == want) {
+				spare_lo = lo ? lo - 1 : lo;
+				spare_hi = hi + 1 < rows ? hi + 1 : hi;
+			}
+			for (u32 row = spare_lo; row <= spare_hi; row++) {
 				u32 s = ring_slot(&r, row);
 				if (slot_row[s] != row) {
 					// A row given a slot now: the slot's old row and

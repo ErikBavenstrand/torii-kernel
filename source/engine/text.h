@@ -63,6 +63,18 @@ u32 text_layout(const struct torii_font *font, const char *s, u32 len, u32 clip,
 u32 text_layout_window(const struct torii_font *font, const char *s, u32 len, u32 skip, u32 clip,
 		       struct text_line *line, u32 *lead);
 
+// Lays out every glyph of a UTF-8 string whose ink falls at least partly in
+// the pixel span [skip, skip + clip) of its line, for a marquee that slides
+// glyphs in and out at both edges: the first glyph may start left of skip
+// and the last may end past the span, so draw the line into a window with
+// room on both sides, then clear what lies outside the span. *lead gets the
+// first glyph's pen minus skip (within +-font->max_width: above 0 when skip
+// falls in a gap or a space):
+// draw the line at x + *lead to put skip at x. line->truncated says glyphs
+// follow past the span. Returns line->count.
+u32 text_layout_span(const struct torii_font *font, const char *s, u32 len, u32 skip, u32 clip, struct text_line *line,
+		     s32 *lead);
+
 // text_draw doesn't say whether it cut the string: a widget that needs to
 // know (to start a marquee, say) calls text_layout and text_draw_line.
 // Draws a UTF-8 string with its line's top at pixel (x, y) of the window,

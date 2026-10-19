@@ -57,6 +57,7 @@ static const struct {
 	{"text_width", test_text_width},
 	{"text_layout", test_text_layout},
 	{"text_layout_window", test_text_layout_window},
+	{"text_layout_span", test_text_layout_span},
 	{"save_name", test_save_name},
 	{"save_name_longest", test_save_name_longest},
 	{"irq_table_lookup", test_irq_table_lookup},

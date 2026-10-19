@@ -18,7 +18,7 @@ const struct ui_theme ui_theme_dark = {
 			[UI_C_ACCENT] = RGB(9, 19, 31),
 			[UI_C_ACCENT_TEXT] = RGB(31, 31, 31),
 			[UI_C_BORDER] = RGB(11, 12, 15),
-			[UI_C_TRACK] = RGB(9, 10, 13),
+			[UI_C_TRACK] = RGB(13, 14, 18),
 			[UI_C_SHADOW] = RGB(1, 1, 2),
 			[UI_C_SELECTION] = RGB(9, 19, 31),
 			[UI_C_SELECTION_TEXT] = RGB(31, 31, 31),
@@ -33,7 +33,11 @@ const struct ui_theme ui_theme_dark = {
 	.fade_frames = 8,
 	.slide = 24,
 	.marquee_delay = 45,
-	.input = {15, 4, 60, 2, 1, 20, 8, 15},
+	.marquee_speed = 60,
+	.marquee_pause = 60,
+	.marquee_gap = 8,
+	.page_fade = 4,
+	.input = {15, 4, 60, 2, 1, 20, 4, 15},
 };
 
 const struct ui_theme ui_theme_light = {
@@ -62,7 +66,11 @@ const struct ui_theme ui_theme_light = {
 	.fade_frames = 8,
 	.slide = 24,
 	.marquee_delay = 45,
-	.input = {15, 4, 60, 2, 1, 20, 8, 15},
+	.marquee_speed = 60,
+	.marquee_pause = 60,
+	.marquee_gap = 8,
+	.page_fade = 4,
+	.input = {15, 4, 60, 2, 1, 20, 4, 15},
 };
 
 const struct ui_accent ui_accents[] = {
