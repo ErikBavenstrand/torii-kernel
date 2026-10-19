@@ -1152,9 +1152,16 @@ static void nor_menu_a(u32 line, u32 key_l)
 		dialog(gl_formatnor_info, 1, AFTER_FORMAT);
 		break;
 	case 3:  // load the save into SRAM
+		// A save still waiting to be copied may bring a progress dialog
+		// and a question first: over the list alone, as they fit there
+		while (ui_depth() > 1)
+			ui_pop();
+		lists.menu = 0;
 		res = FRAM_save_op(1);
 		if (res == 2)
 			error_dialog(2, AFTER_NOR);
+		else if (res == 4)  // the waiting save was kept: SRAM untouched
+			break;
 		else
 			dialog_kind(NULL, res ? gl_file_noexist : gl_save_loaded, 0, AFTER_NOR,
 				    res ? DIALOG_ERROR : DIALOG_INFO);
