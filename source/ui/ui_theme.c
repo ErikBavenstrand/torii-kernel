@@ -4,7 +4,6 @@
 
 #define RGB(r, g, b) ((u16)((r) | (g) << 5 | (b) << 10))
 
-// Icon colours, shared by the built-ins: folder, GBA, GB, NES, light, dark
 // Screen transitions, the same in both
 #define TRANSITIONS \
 	{ \
@@ -14,6 +13,7 @@
 		[UI_TR_LEAVE] = {UI_TR_FADES, 3, 8, 0}, \
 	}
 
+// Icon colours, shared by the built-ins: folder, GBA, GB, NES, light, dark
 #define ICONS RGB(31, 24, 8), RGB(20, 14, 31), RGB(12, 26, 12), RGB(30, 10, 10), RGB(31, 31, 31), RGB(4, 4, 6)
 
 const struct ui_theme ui_theme_dark = {

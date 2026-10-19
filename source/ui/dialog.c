@@ -184,7 +184,7 @@ static int dialog_event(struct ui_view *view, const struct ui_event *e)
 void dialog_open(void)
 {
 	dlg.opens++;
-	if (dlg.opens == 1 && ui_depth() == 0) {
+	if (dlg.opens == 1 && !ui_active()) {
 		// From plain code: a black screen while the engine sets up (mode 0
 		// with nothing on shows the backdrop), so no frame shows what VRAM
 		// held read as tiles

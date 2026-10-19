@@ -567,8 +567,8 @@ static void engine_enter(void)
 		engine_init();
 		ui_init(NULL);
 		ui_enter(UI_TR_LEAVE, 0);
-	}
-	// else the boot's session, handed over (dialog_hand_over)
+	} else
+		ui_enter(UI_TR_LEAVE, 0);  // the boot's, handed over: in with the theme it set
 	if (!lists.icons_made)
 		make_icons();
 	lists.engine = 1;
@@ -664,6 +664,9 @@ static void show(enum screen s, u32 at, u32 kind, s32 way)
 {
 	go(kind, way);  // nothing if the screen went already
 	engine_enter();
+	// What the last screen's handlers recorded since (keys while a dialog
+	// closed) was for it: keys held for this one come with it (ui_leave)
+	lists.act = ACT_NONE;
 	while (ui_depth())
 		ui_pop();
 	lists.screen = (u8)s;
@@ -767,7 +770,10 @@ static void settings_changed(void)
 {
 	u16 accent;
 	const struct ui_theme *t = ui_theme_setting(&accent);
-	ui_theme_set(t, accent);
+	// SETTINGS sets the theme as it changes: again only if it didn't (the
+	// wallpaper shows meanwhile, and would be decoded over itself)
+	if (t != ui_theme() || accent != ui_accent())
+		ui_theme_set(t, accent);
 	ui_dim_set_minutes(ui_dim_setting());
 }
 
@@ -1139,15 +1145,18 @@ static void nor_menu_a(u32 line, u32 key_l)
 static void dialog_answer(int yes)
 {
 	switch (lists.after) {
+	// A question answered no changed nothing: the list stays as it is
 	case AFTER_DELETE:
-		if (yes)
-			if (f_chdir(currentpath) == FR_OK)  // cwd may be /SAVER after a launch
-				f_unlink(current_filename);
+		if (!yes)
+			break;
+		if (f_chdir(currentpath) == FR_OK)  // cwd may be /SAVER after a launch
+			f_unlink(current_filename);
 		show_sd(cursor(), UI_TR_FADE, 0);
 		break;
 	case AFTER_FORMAT:
-		if (yes)
-			FormatNor();  // its progress dialog shows over the list
+		if (!yes)
+			break;
+		FormatNor();  // its progress dialog shows over the list
 		show_nor(0, UI_TR_FADE, 0);
 		break;
 	case AFTER_BACKUP:
@@ -1156,8 +1165,6 @@ static void dialog_answer(int yes)
 				error_dialog(2, AFTER_NOR);
 			else
 				dialog(gl_save_saved, 0, AFTER_NOR);
-		} else {
-			show_nor(lists.nor_game, UI_TR_FADE, 0);
 		}
 		break;
 	case AFTER_SD:  // from Recently Played

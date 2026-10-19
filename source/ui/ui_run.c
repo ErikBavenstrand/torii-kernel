@@ -499,19 +499,33 @@ static struct ui_view *plane_owner(u32 p, u32 *depth)
 
 // --- Modal views and transitions ---------------------------------------------
 
-// 1 if v is the top view and opens and closes with motion (a dialog or menu
-// over a screen)
+// 1 if v opens and closes with motion (a dialog or menu over a screen)
 static int animated(const struct ui_view *v)
 {
 	return v && (v->flags & UI_V_ANIM);
 }
 
-// The BLDY the top modal view dims what is under it by (0-16); 0 while it
-// fades in
+// The topmost such view (a message over an in-session progress dialog is
+// not one: the progress dialog's dim stays), its depth in *depth; NULL none
+static const struct ui_view *anim_view(u32 *depth)
+{
+	for (u32 d = ui_depth(); d-- > 1;) {
+		const struct ui_view *v = ui_view_at(d);
+		if (animated(v)) {
+			*depth = d;
+			return v;
+		}
+	}
+	return 0;
+}
+
+// The BLDY the topmost animated view dims what is under it by (0-16); 0
+// while it fades in
 static s32 modal_dim_now(void)
 {
-	const struct ui_view *v = ui_top();
-	if (!animated(v) || v->open_blend <= OPEN_FADE)
+	u32 d;
+	const struct ui_view *v = anim_view(&d);
+	if (!v || v->open_blend <= OPEN_FADE)
 		return 0;
 	u32 t = (u32)(v->open_blend - OPEN_FADE) * 0x10000u / (UI_OPEN - OPEN_FADE);
 	return (s32)((ui_theme()->modal_dim * ease_at(EASE_OUT_CUBIC, t) + EASE_ONE / 2) >> 15);
@@ -642,6 +656,9 @@ void ui_leave(u32 kind, s32 dir)
 		return;
 	}
 	ui.tr_phase = TR_OUT;
+	// Keys the old screen hasn't had yet are the next one's too
+	ui.held_keys |= ui.queued_keys;
+	ui.queued_keys = 0;
 	ui.tr_frames = t->out;
 	ui.tr_step = 0;
 	ui.tr_l0 = (s16)from;
@@ -753,7 +770,7 @@ void ui_close(void)
 			ui_frame();
 		ui.capture = 0;
 	}
-	u16 keys = ui.held_keys;
+	u16 keys = ui.held_keys | ui.queued_keys;  // the pop forgets the queue
 	ui.held_keys = 0;
 	ui_pop();
 	// The view under it gets keys pressed while it closed (the pop forgot
@@ -776,11 +793,12 @@ static void regs_update(void)
 		tr_begin_in();
 	u32 top = ui_depth();
 	u16 dispcnt = DISP_MODE0_OBJ1D | DISP_OBJ;
-	u32 lower = 0;   // planes of views under an animated top view
+	u32 lower = 0;   // planes of views under the topmost animated view
 	u32 shown = 0;   // planes views show
-	u32 top_planes = 0;
-	const struct ui_view *tv = ui_top();
-	int modal = animated(tv);
+	u32 top_planes = 0;  // planes of it and the views over it
+	u32 da = 0;
+	const struct ui_view *tv = anim_view(&da);
+	int modal = tv != 0;
 	int tr = ui.tr_phase != TR_IDLE;
 	// A screen that has gone shows nothing (the backdrop, the wallpaper)
 	int gone = tr && ui.tr_level >= UI_OPEN;
@@ -798,9 +816,9 @@ static void regs_update(void)
 		if (!((ui.hidden | ui.lists_hidden) >> p & 1) && !gone)
 			dispcnt |= (u16)DISP_BG(p);
 		shown |= LAYER_BG(p);
-		if (modal && d < top - 1)
+		if (modal && d < da)
 			lower |= LAYER_BG(p);
-		if (d == top - 1)
+		else if (modal)
 			top_planes |= LAYER_BG(p);
 	}
 	// The SD theme's wallpaper, behind everything, while no view takes plane 3
@@ -1159,8 +1177,9 @@ static void draw_all(void)
 			if (animated(v) && v->opening > 0)
 				v->open_blend = step_towards(v->open_blend, 1, 1, ui_theme()->dialog_in);
 			// A transition's blend goes with them: its first step shows with the screen
-			gfx_hold_for_queue(GFX_DIRTY_DISPCNT | GFX_DIRTY_BGCNT | GFX_DIRTY_BGOFS |
-					   (ui.tr_phase != TR_IDLE ? GFX_DIRTY_BLEND | GFX_DIRTY_MOSAIC : 0));
+			gfx_hold_for_queue(
+				GFX_DIRTY_DISPCNT | GFX_DIRTY_BGCNT | GFX_DIRTY_BGOFS |
+				(ui.tr_phase != TR_IDLE || animated(v) ? GFX_DIRTY_BLEND | GFX_DIRTY_MOSAIC : 0));
 		}
 	}
 }
@@ -1206,7 +1225,7 @@ u32 ui_frame(void)
 	if (dim_step(dt))
 		fire = 0;
 	fire &= (u16)~ui.wake_keys;
-	if (ui.capture || ui.tr_phase == TR_OUT) {
+	if (ui.capture || ui.tr_phase == TR_OUT || ui.tr_phase == TR_GAP) {
 		// A screen going out or a dialog closing: for the view after it
 		ui.held_keys |= fire;
 		fire = 0;
