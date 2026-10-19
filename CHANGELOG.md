@@ -6,6 +6,26 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** SETTINGS wrote the kernel NOR on every OK (five erases in
+  25 s on a cart). A setting still takes effect at once on OK, but it is
+  kept (written to the NOR) when you leave SETTINGS, once, and not at all if
+  nothing changed; turning the power off inside SETTINGS loses its changes
+  (`e5d3e8b`, `f51e614`).
+- **Fixed:** the lists' clock stopped under a dialog, such as FORMAT ALL's
+  4-minute erase; it now keeps going (`a36ec16`).
+- **Fixed:** BACK UP SAVE's progress dialog never showed when the card had
+  no save file yet: it found no VRAM over the NOR menu, which now closes
+  first (`ed09af3`).
+- **Fixed:** Diagnostics' page went black for 2 frames as it came back
+  after the unit tests; it now stays up (`3e8243e`).
+- **Fixed:** a save copy the card couldn't take (a full card) filled its
+  bar to "Done"; the power-on copy and BACK UP SAVE now show "Can't write
+  the save", and the power-on copy waits: the next power-on offers it
+  again, and a launch or LOAD SAVE first tries it again and, if the card
+  still can't take it, asks before losing it (`384c622`, `f51e614`,
+  `e38f84d`).
+- **Fixed:** BOOT WITH ADDON said "Loading the game" while it still checked
+  save states and patches (`95b5f8d`).
 - **Changed:** one wrap rule for every list and menu: a held key stops at
   the end and stays there, and a fresh press at the end wraps. The menus and
   the UI demo's list used to wrap after a 15-frame rest; the theme key

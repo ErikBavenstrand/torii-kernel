@@ -9,7 +9,9 @@
 // shows the option under the cursor between guillemets ("« RESET: ON »"),
 // or, for the clock and the hot keys, the whole value with that field in
 // brackets. L and R turn the page outside edit mode. Settings are saved
-// only through save_setw_info and save_set2_info, the official writers.
+// only through save_setw_info and save_set2_info, the official writers,
+// which stage them (Stage_SET_info): Settings_run writes the kernel NOR once
+// as it returns, if a setting changed.
 #ifndef TORII_SETTINGS_H
 #define TORII_SETTINGS_H
 

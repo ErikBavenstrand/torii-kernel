@@ -25,6 +25,7 @@ static const struct {
 	{"cheat_cap", test_cheat_cap},
 	{"game_hardware", test_game_hardware},
 	{"clock_and_rumble_are_separate", test_clock_and_rumble_are_separate},
+	{"settings_staged_until_changed", test_settings_staged_until_changed},
 	{"sort_by_name", test_sort_by_name},
 	{"sort_full_list", test_sort_full_list},
 	{"recently_played", test_recently_played},

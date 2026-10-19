@@ -3,6 +3,7 @@
 #include <gba_base.h>
 
 #include "../../source/Ezcard_OP.h"
+#include "../../source/ez_define.h"
 #include "torii_test.h"
 #include "tests.h"
 
@@ -42,4 +43,43 @@ void test_clock_and_rumble_are_separate(void)
 	gl_game_clock = clock;
 	gl_game_rumble = rumble;
 	gl_game_uses = uses;
+}
+
+extern u16 SET_info_buffer[0x200];
+
+// SETTINGS stages its saves and writes the kernel NOR once, as it closes,
+// only if a slot changed (Stage_SET_info, Commit_SET_info). Nothing here
+// writes the NOR: Diagnostics runs these tests on the cart. A changed slot is
+// staged only between two lines that can't fail, and the staging is
+// discarded before any check, so no path leaves it on for a later commit.
+void test_settings_staged_until_changed(void)
+{
+	u16 slots[assress_max];
+	for (u32 a = 0; a < assress_max; a++)
+		slots[a] = Read_SET_info(a);
+	u32 unstaged = Commit_SET_info(SET_info_buffer);  // nothing staged
+	Stage_SET_info(slots);
+	u32 same = Commit_SET_info(SET_info_buffer);  // staged, the same as the NOR's
+
+	// A changed slot reads as staged until the staging ends
+	u16 dim = slots[assress_dim];
+	slots[assress_dim] = (u16)(dim ^ 1);
+	Stage_SET_info(slots);
+	u16 staged_dim = Read_SET_info(assress_dim);
+	u16 staged_language = Read_SET_info(assress_language);
+	Discard_SET_info();
+	u16 after_dim = Read_SET_info(assress_dim);
+	// ... and changed back, there is nothing to write
+	slots[assress_dim] = dim;
+	Stage_SET_info(slots);
+	u32 back = Commit_SET_info(SET_info_buffer);
+	Discard_SET_info();  // whatever Commit did, staging is off
+
+	CHECK_EQ(unstaged, 0);
+	CHECK_EQ(same, 0);
+	CHECK_EQ(staged_dim, (u16)(dim ^ 1));
+	CHECK_EQ(staged_language, slots[assress_language]);
+	CHECK_EQ(after_dim, dim);
+	CHECK_EQ(back, 0);
+	CHECK_EQ(Read_SET_info(assress_dim), dim);
 }

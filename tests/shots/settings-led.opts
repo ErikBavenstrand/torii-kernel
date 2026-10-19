@@ -13,6 +13,6 @@
 -k @56:RIGHT -k @60:- -k @68:A -k @72:-
 -s @80:edit.png
 -k @88:RIGHT -k @92:- -k @100:RIGHT -k @104:- -k @112:A -k @116:-
--w "nor: wrote the settings"
+-w "settings: staged"
 -k @10:DOWN -k @14:-
 -s @30:saved.png

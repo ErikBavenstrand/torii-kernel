@@ -414,7 +414,9 @@ static void save_write(FIL *file, const u8 *data, UINT len, u32 *total, FRESULT 
 }
 
 // Copies savesize bytes of cart SRAM to filename, over the file there, and
-// logs what reached the card. ROM code, as Loadsavefile: both run only in
+// logs what reached the card: SAVE_WRITTEN once all of it did, SAVE_NOTHING
+// for savesize 0 (no file touched), SAVE_FAILED if the file couldn't be made
+// or the write fell short (ezkernel.h). ROM code, as Loadsavefile: both run only in
 // the menu. Torii: the SRAM goes through pReadCache's upper half, which no
 // frame touches (ez_define.h), so the progress dialog can draw between
 // writes.
@@ -423,7 +425,7 @@ u32 Save_savefile(TCHAR *filename, u32 savesize)
 	u8 *buf = pReadCache + READCACHE_SAVE;
 	FIL file;
 	if (savesize == 0)
-		return 0xff;
+		return SAVE_NOTHING;
 	u32 ret = f_open(&file, filename, FA_WRITE | FA_CREATE_ALWAYS);
 	switch (ret) {
 	case FR_OK: {
@@ -466,17 +468,17 @@ u32 Save_savefile(TCHAR *filename, u32 savesize)
 		SetRampage(0x0);  // Torii: the page was left at 0x10
 
 		FRESULT cerr = f_close(&file);
-		if (werr != FR_OK || cerr != FR_OK || total != expected)
+		if (werr != FR_OK || cerr != FR_OK || total != expected) {
 			tlog_error("save: writing %s: %lu of %lu bytes written, f_write gave %d, f_close %d", filename,
 				   (unsigned long)total, (unsigned long)expected, werr, cerr);
-		else
-			tlog("save: wrote %s, %lu bytes, f_close gave %d", filename, (unsigned long)total, cerr);
-
-		return 1;
+			return SAVE_FAILED;  // Torii: a short write (a full card) is a failure
+		}
+		tlog("save: wrote %s, %lu bytes, f_close gave %d", filename, (unsigned long)total, cerr);
+		return SAVE_WRITTEN;
 	} break;
 	default:
 		tlog_error("save: can't create %s: f_open gave %lu", filename, (unsigned long)ret);
-		return false;
+		return SAVE_FAILED;
 	}
 }
 //---------------------------------------------------------------------------------
@@ -511,7 +513,7 @@ static u32 SavefileWrite(TCHAR *filename, u32 savesize)
 {
 	FIL file;
 	if (savesize == 0)
-		return 0xff;
+		return SAVE_NOTHING;
 	u32 ret = f_open(&file, filename, FA_WRITE | FA_CREATE_ALWAYS);
 	switch (ret) {
 	case FR_OK: {
@@ -547,7 +549,7 @@ static u32 SavefileWrite(TCHAR *filename, u32 savesize)
 	} break;
 	default:
 		tlog_error("save: can't create %s: f_open gave %lu", filename, (unsigned long)ret);
-		return false;
+		return SAVE_FAILED;
 	}
 }
 //---------------------------------------------------------------
@@ -1010,46 +1012,97 @@ static u8 Process_savefile(u32 is_EMU, TCHAR *pfilename, u32 gamefilesize, BYTE 
 	return 0;
 }
 //---------------------------------------------------------------------------------
+// Torii: the pending-save record (Read_sav_info): the save waiting to be
+// copied from cart SRAM to the card, its file name into SAV_info_buffer and
+// its size in bytes into *size. 0 if none waits.
+static int pending_save(u32 *size)
+{
+	if (Read_sav_info(0) != 0x11) {
+		tlog_debug("save: no save waiting to be copied");
+		return 0;
+	}
+	*size = Read_sav_info(1) << 9;
+	for (u32 i = 0; i < 0x200 / 2; i++)
+		SAV_info_buffer[i] = Read_sav_info(i + 2);
+	return 1;
+}
+
+static void pending_save_clear(void)
+{
+	memset(SAV_info_buffer, 0x00, sizeof(SAV_info_buffer));  //clean flag
+	Save_sav_info(SAV_info_buffer, 0x200);
+}
+
+// Copies the pending save (SAV_info_buffer names it) to /SAVER on a
+// progress dialog: SAVE_WRITTEN, SAVE_NOTHING or SAVE_FAILED (no "Done")
+static u32 pending_save_copy(u32 size)
+{
+	TCHAR *name = (TCHAR *)SAV_info_buffer;
+	dialog_progress_begin(gl_saving, name);
+	progress_step(gl_save_ing, 0, PROGRESS_FULL);
+	f_mkdir(SAVER_FOLDER);  //"/SAVER"
+	f_chdir(SAVER_FOLDER);
+	u32 saved = Save_savefile(name, size);
+	if (saved == SAVE_WRITTEN)
+		progress_done(gl_done);
+	dialog_progress_end();
+	return saved;
+}
+
 static void Check_save_flag(void)
 {
-	//check save
-	u16 readd;
 	u32 savefilesize;
-	readd = Read_sav_info(0);
-	savefilesize = Read_sav_info(1) << 9;
-	if (readd != 0x11)
-		tlog_debug("save: no save waiting to be copied");
-	if (readd == 0x11) {
-		//u32 res;
-		register u32 loopwrite;
-		for (loopwrite = 0; loopwrite < 0x200 / 2; loopwrite++) {
-			((u16 *)SAV_info_buffer)[loopwrite] = Read_sav_info(loopwrite + 2);
-		}
-
-		// Torii: the answer is logged. The question and the saving are
-		// dialogs on the engine (source/ui/dialog.h)
-		static const char saved_how[] = "save: \"Save sav?\" for %s/%s, %lu bytes, save type %02X: %s";
-		u16 savetype = Read_sav_info(SAV_INFO_TYPE);
-		TCHAR *name = (TCHAR *)SAV_info_buffer;
-		dialog_open();
-		int save = gl_auto_save_sel || dialog_confirm(gl_save_sav, name, DIALOG_INFO);
-		tlog(saved_how, SAVER_FOLDER, name, (unsigned long)savefilesize, savetype,
-		     gl_auto_save_sel ? "auto"
-		     : save           ? "A, save"
-				      : "B, not saved");
-		if (save) {
-			dialog_progress_begin(gl_saving, name);
-			progress_step(gl_save_ing, 0, PROGRESS_FULL);
-			f_mkdir(SAVER_FOLDER);//"/SAVER"
-			f_chdir(SAVER_FOLDER);
-			Save_savefile(name, savefilesize);
-			progress_done(gl_done);
-			dialog_progress_end();
-		}
+	if (!pending_save(&savefilesize))
+		return;
+	// Torii: the answer is logged. The question and the saving are
+	// dialogs on the engine (source/ui/dialog.h)
+	static const char saved_how[] = "save: \"Save sav?\" for %s/%s, %lu bytes, save type %02X: %s";
+	u16 savetype = Read_sav_info(SAV_INFO_TYPE);
+	TCHAR *name = (TCHAR *)SAV_info_buffer;
+	dialog_open();
+	int save = gl_auto_save_sel || dialog_confirm(gl_save_sav, name, DIALOG_INFO);
+	tlog(saved_how, SAVER_FOLDER, name, (unsigned long)savefilesize, savetype,
+	     gl_auto_save_sel ? "auto"
+	     : save           ? "A, save"
+			      : "B, not saved");
+	if (save && pending_save_copy(savefilesize) == SAVE_FAILED) {
+		// Torii: not "Done" over a save the card didn't take, and the
+		// record stays: the next launch, or power-on, tries again
+		Show_error_num(3);
+		tlog("save: the pending-save record stays for the next try");
 		dialog_close();
-		memset(SAV_info_buffer, 0x00, sizeof(SAV_info_buffer));//clean flag
-		Save_sav_info(SAV_info_buffer, 0x200);
+		return;
 	}
+	dialog_close();
+	pending_save_clear();
+}
+
+// Torii: before anything hands cart SRAM to another game (a launch, LOAD
+// SAVE). A save still waiting to be copied (a power-on copy the card
+// couldn't take) would be lost, and its record would name the wrong game:
+// the next power-on would copy the other game's SRAM over its file. So the
+// copy runs again (the card may have room now); if it fails again, the
+// user picks: launch anyway (the record goes, the save is lost) or keep it.
+// 1: go on, 0: don't (the record stays).
+static int pending_save_settle(void)
+{
+	u32 size;
+	if (!pending_save(&size))
+		return 1;
+	TCHAR *name = (TCHAR *)SAV_info_buffer;
+	tlog("save: %s/%s still waits to be copied; trying again", SAVER_FOLDER, name);
+	dialog_open();
+	int go = 1;
+	if (pending_save_copy(size) == SAVE_FAILED) {
+		char msg[160];
+		snprintf(msg, sizeof(msg), EN_SAVE_UNSAVED, name);
+		go = dialog_confirm(NULL, msg, DIALOG_ERROR);
+		tlog("save: %s isn't on the card: %s", name, go ? "A, launch anyway, it is lost" : "B, kept");
+	}
+	dialog_close();
+	if (go)
+		pending_save_clear();
+	return go;
 }
 //---------------------------------------------------------------------------------
 static void Set_saveMODE(BYTE saveMODE)
@@ -1396,7 +1449,6 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 			Launch_now(0x200, key_L, "CLEAN BOOT");
 			break;
 		case 1:  //PSRAM BOOT WITH ADDON
-			progress_step(gl_loading_game, 150, 150);
 			gl_reset_on = Read_SET_info(assress_v_reset);
 			gl_rts_on = Read_SET_info(assress_v_rts);
 			gl_sleep_on = Read_SET_info(assress_v_sleep);
@@ -1540,6 +1592,10 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 }  //---------------------------------------------------------------------------------
 u8 Game_launch(struct game_pick *g, u32 menu_line, u32 key_L)
 {
+	// CLEAN BOOT and BOOT WITH ADDON load the game's save into cart SRAM
+	// (WRITE TO NOR doesn't touch it)
+	if (menu_line < 2 && !pending_save_settle())
+		return 0;
 	// A launch loads and patches the game in PSRAM, writes never measured
 	// faster than the BIOS's wait states (waitcnt.h)
 	REG_WAITCNT_CART = WAITCNT_BIOS;
@@ -1552,6 +1608,8 @@ u8 Game_launch(struct game_pick *g, u32 menu_line, u32 key_L)
 //---------------------------------------------------------------------------------
 void NOR_launch(u32 index, u32 key_L)
 {
+	if (!pending_save_settle())
+		return;
 	REG_WAITCNT_CART = WAITCNT_BIOS;  // as Game_launch
 	Boot_NOR_game(0, index, key_L);  // returns only if it failed
 	dialog_progress_end();  // a black screen
@@ -1561,7 +1619,10 @@ void NOR_launch(u32 index, u32 key_L)
 //---------------------------------------------------------------
 // The first NOR game's save (ezkernel.h): OP 0 looks for its file (0x10 if
 // there, 0 if not), 1 loads it into the cart's SRAM (0, or 3 if it isn't
-// there), 2 writes the SRAM to it (0). 2: the SAVER folder failed.
+// there, 4 if the user kept a save still waiting to be copied:
+// pending_save_settle), 2 writes the SRAM to it (0, or 3 if it couldn't be
+// written whole).
+// 2: the SAVER folder failed.
 u8 FRAM_save_op(u8 OP)
 {
 	u32 res;
@@ -1584,6 +1645,8 @@ u8 FRAM_save_op(u8 OP)
 	if (OP == 1) {  //load to fram
 		if (res != FR_OK)
 			return 3;
+		if (!pending_save_settle())  // Torii: SRAM holds another game's save
+			return 4;
 		Bank_Switching(0);
 		Loadsavefile(savfilename);
 		return 0;
@@ -1591,8 +1654,10 @@ u8 FRAM_save_op(u8 OP)
 	//bak fram save, with a progress dialog while it saves
 	dialog_progress_begin(gl_saving, savfilename);
 	progress_step(gl_save_ing, 0, PROGRESS_FULL);
-	Save_savefile(savfilename, Get_savefilesize(pNorFS[0].savemode));
-	progress_done(gl_done);
+	u32 saved = Save_savefile(savfilename, Get_savefilesize(pNorFS[0].savemode));
+	if (saved == SAVE_WRITTEN)
+		progress_done(gl_done);
 	dialog_progress_end();
-	return 0;
+	// A game with no save type (SAVE_NOTHING) writes no file, as before
+	return saved == SAVE_FAILED ? 3 : 0;
 }

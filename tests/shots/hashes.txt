@@ -3,6 +3,7 @@
 # SCENARIO/frames FIRST-LAST HASH: frames of a -H range (counted from 0)
 # that all hash the same.
 boot/screen 2F699359A5731225
+boot-addon/addons B24B22C01BC420D0
 boot-progress/screen 8A9B3222959885A1
 boot-progress-big/loading 7868AEBC12088DD1
 cheats/screen 063A1B234EA6DC79
@@ -49,6 +50,12 @@ cover-demo/frames 30-30 23A2E3B708CF46A1
 cover-demo/frames 31-32 3CCAC1492B95FF7A
 diag-renderer/demo CFABCE035BEAC9FD
 diag-start/screen 3162F4422A6557C5
+diag-tests/back FC971D7CA6CEA1D0
+diag-tests/frames 0-2 D68A87FB42CF8D44
+diag-tests/frames 3-3 7DCF004DEAC7F9B0
+diag-tests/frames 4-12 FC971D7CA6CEA1D0
+dialog-clock/asked 5BE6D838D67CEE20
+dialog-clock/later 7ACC6D69BA6B2858
 dialog-fragmented/dialog 60333A971C48C65E
 dialog-overflow/dialog 73463470FF0258D6
 file-menu/screen C268870729D04F01
@@ -65,6 +72,15 @@ nor-list/screen B41DDB1AFEB55DC1
 nor-write/done 8DE07CA2EAFDF0C4
 nor-write/half C04FD0A7B7D4B370
 recent/screen 672BEF507A1E554D
+recent-empty/fading 56614F38BDA1A799
+recent-empty/screen C76B0991E0027C59
+recent-empty/frames 0-0 7B90E77090ED8325
+recent-empty/frames 1-1 B1BACBF3CC23347D
+recent-empty/frames 2-2 56614F38BDA1A799
+recent-empty/frames 3-3 D04C61103442ACC1
+recent-empty/frames 4-4 A297214B32E3F95D
+recent-empty/frames 5-5 985935EDF00F9B0D
+recent-empty/frames 6-13 C76B0991E0027C59
 sd-deep/held 863B28016E825B30
 sd-deep/held-mid 7C8E5C7B9240BC21
 sd-deep/paged 48F2860E461DE748
@@ -646,6 +662,8 @@ sd-tab-held/frames 238-238 FD1D72C6F1A323B9
 sd-tab-held/frames 239-239 173511A35429A92D
 sd-tab-held/frames 240-240 AF0CF0717042772D
 sd-tab-held/frames 241-292 2A59CB0BDA5C792D
+sd-theme-backup/progress 6954FDE99F97C3BF
+sd-theme-backup/saved D2E042BB7CC6745B
 sd-theme-menus/dialog 1BA10065BD81C17C
 sd-theme-menus/file-menu 88CD9C871C0077EE
 sd-theme-menus/kept 78C37A96E08CB9A9

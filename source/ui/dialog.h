@@ -21,7 +21,7 @@
 // between them. They nest; the last close ends the session.
 //
 //	if (dialog_confirm(gl_save_sav, name, DIALOG_INFO)) {  // A: 1, B: 0
-//		dialog_progress_begin(gl_save_sav, name);
+//		dialog_progress_begin(gl_saving, name);
 //		dialog_progress_status(gl_save_ing);              // drawn at once
 //		for (each block) {
 //			dialog_progress_set(done, total, status_text);  // a few times a second
@@ -103,6 +103,13 @@ void dialog_progress_end(void);
 int dialog_progress_active(void);
 
 #define DIALOG_PROGRESS_FRAMES 12
+
+// A function the dialogs call every DIALOG_PROGRESS_FRAMES or so while they
+// hold the screen (NULL: none), for the screen under them, whose own loop
+// waits meanwhile: the lists keep their clock going under a question or a
+// 4-minute erase. It runs before a frame, from the dialogs' loops, never
+// from inside ui_frame; it must check that its screen is still up.
+void dialog_set_tick(void (*tick)(void));
 
 // The launch's progress line (the official kernel's name for it): the
 // status line of the progress dialog, which it begins if none is up.

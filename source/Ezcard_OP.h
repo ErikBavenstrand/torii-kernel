@@ -25,7 +25,18 @@ void ReadSram(u32 address, u8 *data, u32 size);
 void WriteSram(u32 address, u8 *data, u32 size);
 void IWRAM_CODE Save_sav_info(u16 *SAV_info_buffer, u32 buffersize);
 void IWRAM_CODE Save_SET_info(u16 *SET_info_buffer, u32 buffersize);
+// A settings slot (ez_define.h): as SETTINGS staged it, while it has staged
+// its saves, else as the kernel NOR holds it
 u16 IWRAM_CODE Read_SET_info(u32 offset);
+// Torii: SETTINGS writes the kernel NOR once, as it closes, not on every
+// save. A save stages a buffer's slots [0, assress_max) in RAM, where
+// Read_SET_info reads them; Commit_SET_info writes the staged slots through
+// SET_info_buffer (whose slots from assress_max are written as they are) if
+// any differs from the NOR's. It returns 1 if it wrote, and ends the staging.
+void Stage_SET_info(const u16 *SET_info_buffer);
+u32 Commit_SET_info(u16 *SET_info_buffer);
+// Ends the staging without writing anything (the unit tests)
+void Discard_SET_info(void);
 u32 Loadfile2PSRAM(TCHAR *filename);
 u16 IWRAM_CODE Read_FPGA_ver(void);
 void IWRAM_CODE Set_RTC_status(u16 status);

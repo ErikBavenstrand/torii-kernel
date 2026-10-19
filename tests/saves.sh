@@ -6,9 +6,10 @@
 #         and each step logs what it did
 #   nearly-full  a copy that just fits the card is written whole, through
 #         its progress dialog, and the menu comes back
-#   full  a copy the card can't take is logged as an error, with how much
-#         of it was written (the copy is still cut short: crash-safe saves
-#         are v0.5)
+#   full  a copy the card can't take shows an error dialog and logs how much
+#         of it was written; its record stays, and a launch tries the copy
+#         again first, asking before it loses the save (the cut-short file
+#         stays until then: crash-safe saves are v0.5)
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and building tests/roms/savetest.
 set -euo pipefail
@@ -112,21 +113,63 @@ full)
   # shellcheck disable=SC2046
   boot $(keys 100 DOWN A) $(keys 180 A) -f 600
   # Then the card loses Test.sav and fills up to 64 KB free: too little for
-  # the 128 KB copy.
+  # the 128 KB copy. The filler is a .gba, so the SD list shows it (and the
+  # kernel can delete it, below).
   mdel -i "$cart/sd.img" ::/SAVER/Test.sav
   free=$(mdir -i "$cart/sd.img" ::/ | sed -n 's/^ *\([0-9 ]*\) bytes free.*/\1/p' | tr -d ' ')
   head -c $((free - 65536)) /dev/urandom >"$cart/filler.bin"
-  mcopy -i "$cart/sd.img" "$cart/filler.bin" ::/FILLER.BIN
-  # Power-on 4: A at "Save sav?"; the copy runs out of room.
-  boot -k 100:A -k 106:- -f 400
+  mcopy -i "$cart/sd.img" "$cart/filler.bin" ::/Filler.gba
+  # Power-on 4: A at "Save sav?"; the copy runs out of room, and an error
+  # dialog says so, not "Done" (v0.3.2); B closes it.
+  boot -k 100:A -k 106:- -w "error 3: Can't write the save" -s @20:"$shots/4-error.png" -k @30:B -k @34:- \
+    -w "screen ready: sd-list"
   logged 'save: "Save sav?" for /SAVER/Test.sav, 131072 bytes, save type 31: A, save'
   logged_error "save: writing Test.sav: "
   grep -qE "kernel error: save: writing Test.sav: [0-9]+ of 131072 bytes written" "$cart/run.log" ||
     fail "the error doesn't say how much was written"
+  logged_error "error 3: Can't write the save"
+  logged "dialog: Can't write the save"
+  grep -A3 "kernel error: error 3: " "$cart/run.log" | grep -q "^kernel: screen ready: dialog" ||
+    fail "no error dialog after the copy ran out of room"
   grep -q "^kernel: screen ready: sd-list" "$cart/run.log" || fail "no menu after the copy ran out of room"
-  mtype -i "$cart/sd.img" ::/FILLER.BIN | cmp -s - "$cart/filler.bin" || fail "the other file changed"
+  mtype -i "$cart/sd.img" ::/Filler.gba | cmp -s - "$cart/filler.bin" || fail "the other file changed"
   fsck.fat -n "$cart/sd.img" >/dev/null || fail "fsck.fat found errors"
-  echo "PASS: saves full: a copy the card can't take is logged as an error"
+  # The pending-save record stays: the next power-on or launch tries again.
+  [ "$(pending)" = 0011 ] || fail "the failed copy cleared the pending-save record"
+  mtype -i "$cart/sd.img" ::/SAVER/Test.sav >"$cart/short.sav"
+
+  # Power-on 5: the copy fails again; then CLEAN BOOT of Test.gba (rows:
+  # SAVER, Filler.gba, Test.gba) would hand cart SRAM to a game, so the
+  # launch tries the copy again, fails, and asks; B keeps the save waiting
+  # and launches nothing.
+  boot -k 100:A -k 106:- -w "error 3: Can't write the save" -k @30:B -k @34:- \
+    -w "screen ready: sd-list" -k @10:DOWN -k @14:- -k @22:DOWN -k @26:- -k @34:A -k @38:- \
+    -w "screen ready: file-menu" -k @10:A -k @14:- \
+    -w "still waits to be copied" -w "screen ready: dialog" -s @20:"$shots/5-launch-anyway.png" -k @30:B -k @34:- \
+    -w "screen ready: sd-list"
+  logged "save: /SAVER/Test.sav still waits to be copied; trying again"
+  logged "save: Test.sav isn't on the card: B, kept"
+  ! grep -q "kernel: launch: loading" "$cart/run.log" || fail "B on the question still launched"
+  [ "$(pending)" = 0011 ] || fail "B on the question cleared the pending-save record"
+  mtype -i "$cart/sd.img" ::/SAVER/Test.sav | cmp -s - "$cart/short.sav" || fail "Test.sav changed though B kept it"
+
+  # Power-on 6: the copy fails again; L+START deletes Filler.gba in the
+  # menu, which makes room (the cursor lands on Test.gba), and CLEAN BOOT
+  # of Test.gba tries the copy again:
+  # it is written whole, the record goes, and the game starts.
+  boot -k 100:A -k 106:- -w "error 3: Can't write the save" -k @30:B -k @34:- \
+    -w "screen ready: sd-list" -k @10:DOWN -k @14:- -k @22:L -k @26:L+START -k @30:- \
+    -w "screen ready: dialog" -k @20:A -k @24:- \
+    -w "screen ready: sd-list" -k @20:A -k @24:- \
+    -w "screen ready: file-menu" -k @10:A -k @14:- \
+    -w "launch: loading Test.gba"
+  logged "dialog: Delete this file?: Filler.gba: A, yes"
+  logged "save: /SAVER/Test.sav still waits to be copied; trying again"
+  logged "save: wrote Test.sav, 131072 bytes"
+  ! grep -q "isn't on the card" "$cart/run.log" || fail "the question came though the copy was written"
+  [ "$(save_record)" = 4f4d525802 ] || fail "the copy at the launch isn't the game's save: $(save_record)"
+  fsck.fat -n "$cart/sd.img" >/dev/null || fail "fsck.fat found errors after the second copy"
+  echo "PASS: saves full: a copy the card can't take shows an error and stays waiting; a launch tries it again, and asks before losing it"
   ;;
 
 nearly-full)

@@ -166,6 +166,8 @@ static struct {
 	struct shown notice;    // a notice, under the other two
 	u32 value, max;
 	u8 bar_changed, status_changed;
+	void (*tick)(void);  // dialog_set_tick's
+	u32 last_tick;
 } dlg EWRAM_BSS;
 
 static int dialog_event(struct ui_view *view, const struct ui_event *e)
@@ -308,6 +310,20 @@ static void copy(char *out, u32 size, const char *s)
 
 // --- Frames ----------------------------------------------------------------
 
+void dialog_set_tick(void (*fn)(void))
+{
+	dlg.tick = fn;
+}
+
+// The screen under the dialogs gets its tick, before a frame draws what it set
+static void tick(void)
+{
+	if (dlg.tick && torii_frames - dlg.last_tick >= DIALOG_PROGRESS_FRAMES) {
+		dlg.last_tick = torii_frames;
+		dlg.tick();
+	}
+}
+
 static int dirty(const struct shown *s)
 {
 	if (!s->view)
@@ -325,6 +341,7 @@ static int dirty(const struct shown *s)
 static void settle(const struct shown *s, u32 frames)
 {
 	while (frames--) {
+		tick();
 		ui_frame();
 		if (!dirty(s) && (s->view->flags & UI_V_READY))
 			break;
@@ -378,6 +395,7 @@ static u16 wait_key(struct shown *s, u16 mask, int release)
 {
 	u16 key = 0;
 	for (;;) {
+		tick();
 		ui_frame();
 		if (!key && (s->keys & mask))
 			key = s->keys & mask;
@@ -515,6 +533,7 @@ void dialog_progress_set(u32 value, u32 max, const char *status)
 		return;
 	// One frame: what it draws lands in the next one's VBlank
 	apply();
+	tick();
 	ui_frame();
 	dlg.last_pump = torii_frames;
 }

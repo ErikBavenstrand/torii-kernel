@@ -127,6 +127,11 @@ extern char *gl_done;          // a progress dialog's last status, at 100%
 extern char *gl_patching;      // a launch's step after loading, with the addons on
 extern char *gl_keep_power;    // FORMAT ALL's text, under its title
 
+// A launch's question while a save waits to be copied (ezkernelnew.c): a
+// format, kept a literal so the compiler checks it (the save's file, cut
+// to 80 bytes: the dialog shows 4 lines)
+#define EN_SAVE_UNSAVED "The save of %.80s isn't on the card yet. Launching loses it. Launch anyway?"
+
 // The firmware update's texts (Ezcard_OP.c). It runs before a language is
 // loaded, and the formats stay literals so the compiler checks them.
 #define EN_FW_TITLE "Rev.%s firmware update"

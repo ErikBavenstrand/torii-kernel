@@ -646,6 +646,14 @@ static void clock_read(void)
 		ui_label_set((u8)(lists.list_first + N_CLOCK), lists.clock);
 }
 
+// The clock under a dialog (dialog_set_tick), while the list is still up
+static void clock_tick(void)
+{
+	const struct ui_view *v = ui_view_at(0);
+	if (v && v->ctx == &lists)
+		clock_read();
+}
+
 // The SD list's title: the folder's path, or its last part if the path
 // doesn't fit
 static void sd_title(void)
@@ -1011,7 +1019,7 @@ static void folder_up(void)
 		memcpy(currentpath, "/", 2);
 	if (f_chdir(currentpath) != FR_OK) {
 		memcpy(currentpath, currentpath_temp, MAX_path_len);
-		error_dialog(10, AFTER_POP);
+		error_dialog(0, AFTER_POP);  // "Can't open the folder" (10 had no message)
 		return;
 	}
 	if (lists.depth > 1)
@@ -1144,9 +1152,16 @@ static void nor_menu_a(u32 line, u32 key_l)
 		dialog(gl_formatnor_info, 1, AFTER_FORMAT);
 		break;
 	case 3:  // load the save into SRAM
+		// A save still waiting to be copied may bring a progress dialog
+		// and a question first: over the list alone, as they fit there
+		while (ui_depth() > 1)
+			ui_pop();
+		lists.menu = 0;
 		res = FRAM_save_op(1);
 		if (res == 2)
 			error_dialog(2, AFTER_NOR);
+		else if (res == 4)  // the waiting save was kept: SRAM untouched
+			break;
 		else
 			dialog_kind(NULL, res ? gl_file_noexist : gl_save_loaded, 0, AFTER_NOR,
 				    res ? DIALOG_ERROR : DIALOG_INFO);
@@ -1158,8 +1173,14 @@ static void nor_menu_a(u32 line, u32 key_l)
 		} else if (res == 0x10) {
 			dialog_kind(NULL, gl_file_exist, 1, AFTER_BACKUP, DIALOG_INFO);  // a question, not an error
 		} else {
-			if (FRAM_save_op(2) == 2)
-				error_dialog(2, AFTER_NOR);
+			// Its progress dialog goes over the list alone: over the menu
+			// too, it found no VRAM and never showed
+			while (ui_depth() > 1)
+				ui_pop();
+			lists.menu = 0;
+			res = FRAM_save_op(2);  // 2: no SAVER folder, 3: written short
+			if (res)
+				error_dialog(res, AFTER_NOR);
 			else
 				dialog(gl_save_saved, 0, AFTER_NOR);
 		}
@@ -1186,8 +1207,9 @@ static void dialog_answer(int yes)
 		break;
 	case AFTER_BACKUP:
 		if (yes) {
-			if (FRAM_save_op(2) == 2)
-				error_dialog(2, AFTER_NOR);
+			u8 res = FRAM_save_op(2);  // 2: no SAVER folder, 3: written short
+			if (res)
+				error_dialog(res, AFTER_NOR);
 			else
 				dialog(gl_save_saved, 0, AFTER_NOR);
 		}
@@ -1308,6 +1330,7 @@ void lists_run(void)
 	memset(&lists, 0, sizeof(lists));
 	memset(folder_cursor, 0, sizeof(folder_cursor));
 	lists.depth = 1;
+	dialog_set_tick(clock_tick);
 	show_sd(0, UI_TR_LEAVE, 0);  // in from the boot's black screen
 	for (;;) {
 		if (lists.measure_left) {

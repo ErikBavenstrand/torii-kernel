@@ -322,22 +322,22 @@ Bugs found while building v0.3 and v0.3.1. Each is struck out here once a ticket
 - ~~The cheat view counts sections plus entries: "[002/004]" for 2 cheats (T3; port T11).~~ Fixed by T11 (`5e44a3b`).
 - ~~Diagnostics' loader check can log a garbled loader title: `say()` clears the start of `pReadCache`, where the image is (T16 review; port T12).~~ Fixed by T12 (`6067e1b`).
 - ~~After a failed launch from the NOR list's game menu, the menu stays open on a black screen until a key redraws its rows (pre-existing; T12 review; port T9).~~ Fixed by v0.3.2 (`14f3626`): it no longer happens since the menus moved to the engine; the golden nor-launch-fail keeps it so.
-- The NOR format dialog counts the erase in binary (`itoa(count, msg, 2)`), and the list's clock stops during the erase (T12 review).
-- With an SD theme's wallpaper, BACK UP SAVE's progress dialog fails to get VRAM and doesn't show (F4 review).
+- ~~The NOR format dialog counts the erase in binary (`itoa(count, msg, 2)`), and the list's clock stops during the erase (T12 review).~~ Fixed by v0.3.2 (`a36ec16`): F4's progress dialog had already replaced the count; the clock now runs under dialogs.
+- ~~With an SD theme's wallpaper, BACK UP SAVE's progress dialog fails to get VRAM and doesn't show (F4 review).~~ Fixed by v0.3.2 (`ed09af3`): it was pushed over the NOR menu, with or without a wallpaper; the menu now closes first.
 - ~~Leaving the NOR list with L starts the SD list at its first row, not where the cursor was (`ACT_TO_SD` calls `show_sd(0, ...)` in `source/screens/lists.c`) (F1).~~ Fixed by v0.3.2 (`691fc00`).
-- SETTINGS page 2 writes kernel NOR on every change, not once when leaving: five settings writes in 25 s on the cart, which wears the NOR (`source/setwindow2.c`) (F3).
+- ~~SETTINGS page 2 writes kernel NOR on every change, not once when leaving: five settings writes in 25 s on the cart, which wears the NOR (`source/setwindow2.c`) (F3).~~ Fixed by v0.3.2 (`e5d3e8b`), page 1 too.
 - ~~Two presses of one key in the 3 frames a screen goes out count as one, because the held keys are a bitmask (`ui_frame` in `source/ui/ui_run.c`). Queue up to two presses (F2).~~ Fixed by v0.3.2 (`bf7f65d`).
 - ~~If `show()`'s `ui_push` fails, the menu stays in the transition gap with a black screen. Fall back to `ui_enter` and an error dialog (`source/screens/lists.c`) (F2).~~ Fixed by v0.3.2 (`046cfdf`).
 - ~~While DIM is on, `ui_frame` drops keys queued for the next screen (F2).~~ Fixed by v0.3.2 (`bf7f65d`).
-- The empty-folder label doesn't fade with its list in the alpha fade, because pixels over another plane of the same screen don't blend (`regs_update`) (F2).
-- The Diagnostics page blanks for 2 frames when it comes back after the unit tests (`screen_open` in `source/diag.c`) (F3).
+- ~~The empty-folder label doesn't fade with its list in the alpha fade, because pixels over another plane of the same screen don't blend (`regs_update`) (F2).~~ Not reproduced in v0.3.2 (`1bc8567`): the empty list leaves its plane clear under the label, so it blends with the backdrop; the golden `recent-empty` hashes the fade.
+- ~~The Diagnostics page blanks for 2 frames when it comes back after the unit tests (`screen_open` in `source/diag.c`) (F3).~~ Fixed by v0.3.2 (`3e8243e`).
 - ~~After a card failure, the lists' idle flush calls `tlog_flush` every idle frame. Each call returns at once, but it could stop trying (`idle_flush`) (F3).~~ Fixed by v0.3.2 (`40bf58f`).
-- BOOT WITH ADDON's first progress step says "Loading the game" while it still checks save states and patches (`source/ezkernelnew.c`), and `source/ui/dialog.h`'s usage example still names `gl_save_sav` (F4).
+- ~~BOOT WITH ADDON's first progress step says "Loading the game" while it still checks save states and patches (`source/ezkernelnew.c`), and `source/ui/dialog.h`'s usage example still names `gl_save_sav` (F4).~~ Fixed by v0.3.2 (`95b5f8d`).
 - ~~Held-key wrapping differs between lists: the main lists stop at the end, while menus and the demo list wrap after a 15-frame rest (`input_move`, `wrap_pause`). Settle on one rule (F1).~~ Fixed by v0.3.2 (`6844884`).
 - ~~`tests/themes.sh` still copies the example theme with `mcopy -s`, in the host's file order (F1).~~ Fixed by v0.3.2 (`0a1413d`).
 - ~~No golden covers the two longest dialog texts (`en_file_overflow`, `en_error_7`). Untested paths: a NES launch, BOOT WITH ADDON with the scan engine forced, and a nearly full card during a save copy (F4).~~ Fixed by v0.3.2 (`e4eacc7`: goldens `dialog-overflow`, `dialog-fragmented`; `24ec875`: `tests/nes.sh`, `tests/scan_engine.sh`, `tests/saves.sh nearly-full`).
 - ~~`docs/recovery.md` and the release notes should say that a cart whose kernel NOR is a uniform-sector S29GL064A (ID `0x220C`) can't take a kernel update: EZ-Flash's loader stops with "Bad NOR ID" (F5).~~ Fixed by v0.3.2 (`1a7fd3a`).
-- When the power-on save copy runs out of room, its progress dialog still fills and says "Done", and no error shows: only the log has it. `Check_save_flag` calls `progress_done(gl_done)` whatever `Save_savefile` gives, and `Save_savefile` returns 1 after a short write (`source/ezkernelnew.c`). Seen on the emulated cart in `tests/saves.sh full`'s case: the bar goes from 43% to a full "Done". Show an error dialog instead (v0.3.2 tests; v0.5's crash-safe saving replaces the copy).
+- ~~When the power-on save copy runs out of room, its progress dialog still fills and says "Done", and no error shows: only the log has it. `Check_save_flag` calls `progress_done(gl_done)` whatever `Save_savefile` gives, and `Save_savefile` returns 1 after a short write (`source/ezkernelnew.c`). Seen on the emulated cart in `tests/saves.sh full`'s case: the bar goes from 43% to a full "Done". Show an error dialog instead (v0.3.2 tests; v0.5's crash-safe saving replaces the copy).~~ Fixed by v0.3.2 (`384c622`): error 3 "Can't write the save" shows instead, also for BACK UP SAVE; `tests/saves.sh full` checks it.
 - **Cart checks for the next test:**
   - Is the brake after letting go at top speed (about two rows) too far? If so, raise `SPRING_BRAKE` (F1).
   - Do the scroll timings at 40 rows/s match the emulator (F1)?
@@ -364,6 +364,7 @@ Bugs found while building v0.3 and v0.3.1. Each is struck out here once a ticket
   - art for console folders;
   - a scraper CLI in `tools/`.
 - **Settings:** a 12/24-hour clock and time editor, settings in categories, and Help pages.
+  Page 2's SAVE row (AUTO SAVE) opens edit mode with the cursor on OK, so A, A saves it unchanged and LEFT is needed to change it (pre-existing; v0.3.2 review).
 
 - **Screens redesigned (user, 2026-10-19):** v0.3 ported the official screens as they were. v0.4 redesigns their layout and navigation: settings in a section of their own, organised by category, with clear editing; the cheat screen; and the lists, as views a theme can swap (a RetroArch-like carousel of systems and games, sections).
 

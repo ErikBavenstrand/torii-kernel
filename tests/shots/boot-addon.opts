@@ -1,0 +1,12 @@
+# BOOT WITH ADDON of Hello.gba with RESET on: as the launch starts on its
+# addons, the progress dialog still shows the save step's status, not
+# "Loading the game" (v0.3.2: it said so before checking the save states
+# and patches)
+#! settings 1=1
+-w "screen ready: sd-list"
+-k @8:DOWN -k @12:- -k @16:DOWN -k @20:- -k @24:DOWN -k @28:- -k @32:DOWN -k @36:-
+-k @44:A -k @48:-
+-w "screen ready: file-menu"
+-k @8:DOWN -k @12:- -k @20:A -k @24:-
+-w "BOOT WITH ADDON: reset 1"
+-s @0:addons.png

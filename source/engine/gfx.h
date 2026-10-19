@@ -133,6 +133,13 @@ int gfx_queue_done(u32 ticket);
 // scroll, then hold it, and the flip never shows half a page. The hold ends
 // once the regions are written.
 void gfx_hold_for_queue(u32 regions);
+// While frozen, commits write no register, palette or OAM: the screen keeps
+// what the last commit (or anything before the engine) put there, and only
+// the VRAM queue runs. What changed meanwhile goes at the first commit after
+// gfx_freeze(0). gfx_init leaves the freeze as it is. For a screen drawn
+// again just as it was in VRAM the screen shows (Diagnostics after its unit
+// tests): the page stays up while its new session draws it.
+void gfx_freeze(int on);
 // Drops everything queued (when the sources are about to go away). Tagged
 // VRAM blocks whose upload was queued then hold garbage: release them, and
 // keep every VRAM write to engine blocks in the queue so writes keep their
