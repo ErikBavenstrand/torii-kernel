@@ -56,7 +56,7 @@ cover-demo/frames 28-28 DE528E2C9590DC52
 cover-demo/frames 29-29 0690C16F9D9454FC
 cover-demo/frames 30-30 23A2E3B708CF46A1
 cover-demo/frames 31-32 3CCAC1492B95FF7A
-diag-back/screen B41DDB1AFEB55DC1
+diag-back/screen E5740101EF2460F9
 diag-pages/clock 04846E505A18BA04
 diag-pages/eeprom ACDAA962E076C42C
 diag-pages/loader 1C1B278EDEA54ACD
@@ -690,11 +690,11 @@ sd-theme-menus/list 795D672AB1E0F14A
 sd-theme-wall/dialog 796AEEBCB8551E70
 sd-theme-wall/kept 0969DFACF8A353B3
 sd-theme-wall/list C0CB12E6BB3CC753
+sd-wrap/end 9EFDC447B1CD6B78
+sd-wrap/top 818F72FFC7BF6260
 settings-edit/modeb 285B0A3E2EC551E7
 settings-edit/save 6E78999D5CA95D36
 settings-edit/save-turned B4E21CA7E5A815E6
-sd-wrap/end 9EFDC447B1CD6B78
-sd-wrap/top 818F72FFC7BF6260
 settings-held/held-l 0CA5C0696DB712FC
 settings-held/held-r 0CA5C0696DB712FC
 settings-led/edit 780E60240DD4DC4E
