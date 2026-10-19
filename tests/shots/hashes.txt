@@ -58,7 +58,8 @@ cover-demo/frames 28-28 DE528E2C9590DC52
 cover-demo/frames 29-29 0690C16F9D9454FC
 cover-demo/frames 30-30 23A2E3B708CF46A1
 cover-demo/frames 31-32 3CCAC1492B95FF7A
-diag-back/screen E5740101EF2460F9
+diag-back/list E5740101EF2460F9
+diag-back/screen 76E7DDD0E73114A6
 diag-pages/clock 04846E505A18BA04
 diag-pages/eeprom ACDAA962E076C42C
 diag-pages/loader 1C1B278EDEA54ACD

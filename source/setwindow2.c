@@ -190,6 +190,9 @@ static void page2_enter(struct ui_view *view)
 	p2.led_pos = 1;
 	p2.ModeB_pos = 3;
 	p2.log_pos = 1;
+	if (settings_at_diagnose)  // back from Diagnostics' first page
+		p2.select = SEL_DIAGNOSE;
+	settings_at_diagnose = 0;
 	CheckSwitch();
 
 	auto_save_sel = gl_auto_save_sel;

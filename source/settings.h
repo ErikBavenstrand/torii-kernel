@@ -23,6 +23,7 @@ enum {
 	SETTINGS_PAGE1,
 	SETTINGS_PAGE2,
 	SETTINGS_HELP,
+	SETTINGS_AT_DIAGNOSE,  // for Settings_run: page 2, its cursor on DIAGNOSE
 };
 
 // What Settings_run returns: where the menu goes next
@@ -50,6 +51,9 @@ struct settings_page {
 	void (*poll)(void);   // once a frame (NULL: none)
 };
 extern const struct settings_page settings_page1, settings_page2, settings_help;
+// 1 while page 2 is to open with its cursor on DIAGNOSE (SETTINGS_AT_DIAGNOSE):
+// its enter takes it
+extern u8 settings_at_diagnose;
 
 #define SETTINGS_LIST 3
 #define SETTINGS_ROWS_MAX 12

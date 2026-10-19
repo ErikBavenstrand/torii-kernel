@@ -194,12 +194,18 @@ void settings_leave(u32 result)
 	settings_leaving = 1;
 }
 
+u8 settings_at_diagnose;
+
 u32 Settings_run(u32 page)
 {
 	// Over the menu's session if it runs one (the caller has popped its views)
 	int own = !ui_active();
 	settings_result = SETTINGS_TO_NOR;
 	settings_next = settings_leaving = 0;
+	if (page == SETTINGS_AT_DIAGNOSE) {
+		page = SETTINGS_PAGE2;
+		settings_at_diagnose = 1;
+	}
 	if (own) {
 		engine_init();
 		ui_init(NULL);
