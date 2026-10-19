@@ -6,6 +6,18 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** SETTINGS wrote the kernel NOR on every OK (five erases in
+  25 s on a cart). Saves now stay in RAM and SETTINGS writes them once as it
+  closes, and not at all if nothing changed, to spare the NOR (`e5d3e8b`).
+- **Fixed:** the lists' clock stopped under a dialog, such as FORMAT ALL's
+  4-minute erase; it now keeps going (`a36ec16`).
+- **Fixed:** BACK UP SAVE's progress dialog never showed when the card had
+  no save file yet: it found no VRAM over the NOR menu, which now closes
+  first (`ed09af3`).
+- **Fixed:** Diagnostics' page went black for 2 frames as it came back
+  after the unit tests; it now stays up (`3e8243e`).
+- **Fixed:** BOOT WITH ADDON said "Loading the game" while it still checked
+  save states and patches (`95b5f8d`).
 - **Changed:** scrolling. A held d-pad speeds up smoothly from a row every
   4 frames to 40 rows a second, its top speed at 1.75 s held, and the list
   glides with the cursor at its speed, so the cursor never leaves the

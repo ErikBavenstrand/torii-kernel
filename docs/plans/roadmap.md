@@ -322,17 +322,17 @@ Bugs found while building v0.3 and v0.3.1. Each is struck out here once a ticket
 - ~~The cheat view counts sections plus entries: "[002/004]" for 2 cheats (T3; port T11).~~ Fixed by T11 (`5e44a3b`).
 - ~~Diagnostics' loader check can log a garbled loader title: `say()` clears the start of `pReadCache`, where the image is (T16 review; port T12).~~ Fixed by T12 (`6067e1b`).
 - After a failed launch from the NOR list's game menu, the menu stays open on a black screen until a key redraws its rows (pre-existing; T12 review; port T9).
-- The NOR format dialog counts the erase in binary (`itoa(count, msg, 2)`), and the list's clock stops during the erase (T12 review).
-- With an SD theme's wallpaper, BACK UP SAVE's progress dialog fails to get VRAM and doesn't show (F4 review).
+- ~~The NOR format dialog counts the erase in binary (`itoa(count, msg, 2)`), and the list's clock stops during the erase (T12 review).~~ Fixed by v0.3.2 (`a36ec16`): F4's progress dialog had already replaced the count; the clock now runs under dialogs.
+- ~~With an SD theme's wallpaper, BACK UP SAVE's progress dialog fails to get VRAM and doesn't show (F4 review).~~ Fixed by v0.3.2 (`ed09af3`): it was pushed over the NOR menu, with or without a wallpaper; the menu now closes first.
 - Leaving the NOR list with L starts the SD list at its first row, not where the cursor was (`ACT_TO_SD` calls `show_sd(0, ...)` in `source/screens/lists.c`) (F1).
-- SETTINGS page 2 writes kernel NOR on every change, not once when leaving: five settings writes in 25 s on the cart, which wears the NOR (`source/setwindow2.c`) (F3).
+- ~~SETTINGS page 2 writes kernel NOR on every change, not once when leaving: five settings writes in 25 s on the cart, which wears the NOR (`source/setwindow2.c`) (F3).~~ Fixed by v0.3.2 (`e5d3e8b`), page 1 too.
 - Two presses of one key in the 3 frames a screen goes out count as one, because the held keys are a bitmask (`ui_frame` in `source/ui/ui_run.c`). Queue up to two presses (F2).
 - If `show()`'s `ui_push` fails, the menu stays in the transition gap with a black screen. Fall back to `ui_enter` and an error dialog (`source/screens/lists.c`) (F2).
 - While DIM is on, `ui_frame` drops keys queued for the next screen (F2).
-- The empty-folder label doesn't fade with its list in the alpha fade, because pixels over another plane of the same screen don't blend (`regs_update`) (F2).
-- The Diagnostics page blanks for 2 frames when it comes back after the unit tests (`screen_open` in `source/diag.c`) (F3).
+- ~~The empty-folder label doesn't fade with its list in the alpha fade, because pixels over another plane of the same screen don't blend (`regs_update`) (F2).~~ Not reproduced in v0.3.2 (`1bc8567`): the empty list leaves its plane clear under the label, so it blends with the backdrop; the golden `recent-empty` hashes the fade.
+- ~~The Diagnostics page blanks for 2 frames when it comes back after the unit tests (`screen_open` in `source/diag.c`) (F3).~~ Fixed by v0.3.2 (`3e8243e`).
 - After a card failure, the lists' idle flush calls `tlog_flush` every idle frame. Each call returns at once, but it could stop trying (`idle_flush`) (F3).
-- BOOT WITH ADDON's first progress step says "Loading the game" while it still checks save states and patches (`source/ezkernelnew.c`), and `source/ui/dialog.h`'s usage example still names `gl_save_sav` (F4).
+- ~~BOOT WITH ADDON's first progress step says "Loading the game" while it still checks save states and patches (`source/ezkernelnew.c`), and `source/ui/dialog.h`'s usage example still names `gl_save_sav` (F4).~~ Fixed by v0.3.2 (`95b5f8d`).
 - Held-key wrapping differs between lists: the main lists stop at the end, while menus and the demo list wrap after a 15-frame rest (`input_move`, `wrap_pause`). Settle on one rule (F1).
 - `tests/themes.sh` still copies the example theme with `mcopy -s`, in the host's file order (F1).
 - No golden covers the two longest dialog texts (`en_file_overflow`, `en_error_7`). Untested paths: a NES launch, BOOT WITH ADDON with the scan engine forced, and a nearly full card during a save copy (F4).
