@@ -72,6 +72,7 @@ char *gl_LSTART_help;
 char *gl_online_manual;
 
 char *gl_no_game_played;
+char *gl_nor_title;
 
 char *gl_cart_str;
 char *gl_clock_str;
@@ -180,6 +181,7 @@ const char en_LSTART_help[] = "Delete file";
 const char en_online_manual[] = "Online manual";
 
 const char en_no_game_played[] = "No game played yet";
+const char en_nor_title[] = "NOR";  // the NOR list's title bar
 
 const char en_cart[] = "     CART";
 const char en_clock[] = "CLOCK";
@@ -359,6 +361,7 @@ void LoadEnglish(void)
 	//
 	gl_rom_menu = (char **)en_rom_menu;
 	gl_nor_op = (char **)en_nor_op;
+	gl_nor_title = (char *)en_nor_title;
 }
 //---------------------------------------------------------------------------------
 // The languages offered in SETTINGS. A new language adds its strings and a

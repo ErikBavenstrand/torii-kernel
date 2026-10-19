@@ -1,0 +1,10 @@
+# L+START on Hello.gba asks before deleting it (the local confirm dialog);
+# B keeps the file
+-w "screen ready: sd-list"
+-k @8:DOWN -k @12:- -k @16:DOWN -k @20:- -k @24:DOWN -k @28:- -k @32:DOWN -k @36:-
+-k @44:L -k @48:L+START -k @52:-
+-w "screen ready: confirm"
+-s @1:screen.png
+-k @8:B -k @12:-
+-w "screen ready: sd-list"
+-s @1:kept.png

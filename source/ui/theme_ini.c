@@ -14,6 +14,15 @@ const struct theme_view_name theme_view_names[] = {
 	{"ui-demo", 1},
 	{"ui-dialog", 2},
 	{"ui-grid", 3},
+	// The lists (source/screens/lists.c); the game and NOR game menus have
+	// two layouts each (rows), which share an id
+	{"sd-list", 10},
+	{"nor-list", 11},
+	{"recent", 12},
+	{"file-menu", 13},
+	{"nor-menu", 14},
+	{"message", 15},
+	{"confirm", 16},
 	// SETTINGS and HELP (source/settings.h)
 	{"settings1", 20},
 	{"settings2", 21},
