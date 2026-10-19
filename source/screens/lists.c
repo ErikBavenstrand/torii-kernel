@@ -1217,6 +1217,7 @@ static void dialog_answer(int yes)
 	case AFTER_DELETE:
 		if (!yes)
 			break;
+		tlog_open_now();  // the file may be the log the background open holds
 		if (f_chdir(currentpath) == FR_OK)  // cwd may be /SAVER after a launch
 			if (f_unlink(current_filename) == FR_OK) {
 				tlog_card_freed();

@@ -14,6 +14,7 @@
 #           is left alone, and logging goes on in the next
 #   full    a full card stops the logging and the idle flush, not the kernel
 #   settings LOGGING turned on in SETTINGS makes the file in the background
+#   open    that background open meets a delete, a cut-off and LOGGING off
 #   flood   a scrolled list's frame-cycles go to the card as summaries
 # Every part checks the card with fsck.fat. Runs inside the torii-emu container.
 set -euo pipefail
@@ -467,6 +468,69 @@ settings)
   lines_ok
   zeros_ok
   echo "PASS: turning LOGGING on in SETTINGS makes the log file in the background, keys still act, and its line reaches the card"
+  ;;
+
+open)
+  # The background open (tlog_flush_soon) held part way by the test hook
+  # tlog_open_steps_test (hex: 14 lets it make 19 steps, 8 to look and
+  # begin, then 11 sectors of zeros; 1 none), while other code acts.
+  hold=14
+  down=() # SETTINGS page 2, down to LOGGING
+  for i in $(seq 0 7); do
+    down+=(-k "@$((8 + 12 * i)):DOWN" -k "@$((12 + 12 * i)):-")
+  done
+  to_logging=(-w "screen ready: sd-list" -p "@2:tlog_open_steps_test:$hold" -k @8:R -k @12:- -w "screen ready: nor-list" -k @8:R -k @12:-
+    -w "screen ready: settings1" -k @8:R -k @12:- -w "screen ready: settings2" "${down[@]}")
+  # A edits it, A A step it to Info, RIGHT A keep it
+  to_info=(-k @104:A -k @108:- -k @116:A -k @120:- -k @128:A -k @132:- -k @140:RIGHT -k @144:- -k @152:A -k @156:-
+    -w "settings: staged")
+  # L to page 1, L leaves SETTINGS for the NOR list, L to the SD list
+  # (torii, Hello.gba)
+  to_sd=(-k @4:L -k @8:- -w "screen ready: settings1" -k @8:L -k @12:- -w "screen ready: nor-list" -k @8:L -k @12:-
+    -w "screen ready: sd-list")
+
+  # A delete meanwhile: the open holds the file it makes (FatFs keeps no
+  # lock), so it finishes first (tlog_open_now), whatever is deleted.
+  rm -rf "$cart" && mkdir -p "$cart" && new_card 65536 32
+  boot "${to_logging[@]}" "${to_info[@]}" "${to_sd[@]}" \
+    -k @8:DOWN -k @12:- -k @24:L -k @28:L+START -k @32:- -w "screen ready: dialog" -k @8:A -k @12:- \
+    -w "screen ready: sd-list" -k @420:-
+  grep -q 'log: opened at once' "$cart/kernel.log" || fail "the delete didn't finish the open first"
+  ! grep -q 'log: opened in the background' "$cart/kernel.log" || fail "the hook didn't hold the open"
+  ! mtype -i "$cart/sd.img" ::/Hello.gba >/dev/null 2>&1 || fail "Hello.gba wasn't deleted"
+  [ "$(log 0 | head -1)" = "torii log 00000001     " ] || fail "header: $(log 0 | head -1)"
+  has "settings: LOGGING is INFO"
+  card_ok
+  lines_ok
+  zeros_ok
+
+  # Cut off part way (a reset, power loss) after other FatFs calls (the SD
+  # list) wrote the FAT out: the file has all its clusters and its size, so
+  # the card loses none, and as a file without a header it is made again at
+  # the next boot.
+  rm -rf "$cart" && mkdir -p "$cart" && new_card 65536 32
+  boot "${to_logging[@]}" "${to_info[@]}" "${to_sd[@]}" -k @30:-
+  [ "$(mtype -i "$cart/sd.img" ::/torii/logs/torii-0.log | wc -c)" = 65536 ] || fail "the file cut off isn't 64 KB"
+  [ -z "$(log 0)" ] || fail "the file cut off has text: $(log 0 | head -1)"
+  card_ok
+  boot -f 260
+  [ "$(log 0 | head -1)" = "torii log 00000001     " ] || fail "after the cut, header: $(log 0 | head -1)"
+  has "logging info, build main"
+  card_ok
+  lines_ok
+  zeros_ok
+
+  # LOGGING turned off again before the open made a step: the card stays
+  # untouched.
+  rm -rf "$cart" && mkdir -p "$cart" && new_card 65536 32
+  to_logging[3]=@2:tlog_open_steps_test:1
+  boot "${to_logging[@]}" "${to_info[@]}" \
+    -k @16:A -k @20:- -k @28:A -k @32:- -k @40:A -k @44:- -k @52:RIGHT -k @56:- -k @64:A -k @68:- \
+    -w "settings: LOGGING is OFF" "${to_sd[@]}" -k @60:-
+  grep -q 'log: LOGGING is off: the open stops' "$cart/kernel.log" || fail "the open didn't stop"
+  ! mdir -i "$cart/sd.img" ::/torii >/dev/null 2>&1 || fail "the open went on with LOGGING off"
+  card_ok
+  echo "PASS: a delete finishes the background open first, one cut off leaves the card whole and is made again, and LOGGING off stops it"
   ;;
 
 flood)

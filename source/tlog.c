@@ -269,6 +269,7 @@ static struct {
 	u32 gen;  // the newest job's ctx: an older one stops
 	u32 seqs[LOG_FILES];  // the files' sequence numbers, from open_look
 	u32 stepped;  // torii_frames at open_job's last step
+	u32 steps;  // open_job's so far
 	u8 slot;  // the new file's
 	u8 state;  // the next step
 	u8 item;  // open_look's next
@@ -303,8 +304,29 @@ static FRESULT start_begin(u32 slot)
 		if (res == FR_OK && (unsigned long long)clusters * fs->csize * 512 <
 					    LOG_FILE_SIZE - f_size(&log_file) + LOG_CARD_RESERVE)
 			res = FR_DENIED;
+		// Its clusters, all at once, and its size and first cluster on the
+		// card now (f_sync), with a zero first sector: the clusters may hold
+		// an old log's header. Filling it takes seconds in the background
+		// (tlog_flush_soon), and other code's FatFs calls write the FAT out
+		// meanwhile: cut off by a reset or power loss, a file grown as it was
+		// filled left its clusters lost to the card. Now it is a full-size
+		// file without a header, which counts as unused and is made again.
+		u32 made = f_size(&log_file) == 0;
+		UINT done;
+		memset(bounce, 0, sizeof(bounce));
+		if (res == FR_OK)
+			res = f_lseek(&log_file, LOG_FILE_SIZE);
+		if (res == FR_OK && f_tell(&log_file) != LOG_FILE_SIZE)
+			res = FR_DENIED;  // the card filled up
+		if (res == FR_OK)
+			res = f_lseek(&log_file, 0);
+		if (res == FR_OK)
+			res = f_write(&log_file, bounce, sizeof(bounce), &done);
+		if (res == FR_OK)
+			res = f_sync(&log_file);
+		if (res == FR_OK)
+			res = f_lseek(&log_file, 0);
 		if (res != FR_OK) {
-			u32 made = f_size(&log_file) == 0;
 			f_close(&log_file);
 			if (made)
 				f_unlink(path);
@@ -596,22 +618,39 @@ static int sd_open(void)
 
 #define OPEN_WAIT_MAX 30
 
+// Stops the open (a cancel, LOGGING turned off): the file closes, and what
+// it made of a new one counts as unused (start_begin)
+static void open_stop(void)
+{
+	f_close(&log_file);
+	opening.on = 0;
+}
+
+u32 tlog_open_steps_test EWRAM_BSS;
+
 // tlog_flush_soon's job: a step of the open a frame, until it is done
 static int open_job(struct job *job)
 {
 	// A cancel gives the open up: tlog_flush starts it again
 	if ((u32)job->ctx != opening.gen || !opening.on || job->state == JOB_CANCEL) {
-		if (job->state == JOB_CANCEL && (u32)job->ctx == opening.gen && opening.on) {
-			f_close(&log_file);
-			opening.on = 0;
-		}
+		if (job->state == JOB_CANCEL && (u32)job->ctx == opening.gen && opening.on)
+			open_stop();
+		return JOB_DONE;
+	}
+	// LOGGING turned off meanwhile: the card is left alone from now on
+	if (tlog_level == TLOG_OFF && !force_pending) {
+		open_stop();
+		tlog_debug("log: LOGGING is off: the open stops");
 		return JOB_DONE;
 	}
 	// A step's SD writes take about a frame: the screen's transitions and
 	// drawing go first, for up to half a second at a time
 	if (!ui_settled() && torii_frames - opening.stepped < OPEN_WAIT_MAX)
 		return JOB_WAIT;
+	if (tlog_open_steps_test && opening.steps + 1 >= tlog_open_steps_test)
+		return JOB_WAIT;
 	opening.stepped = torii_frames;
+	opening.steps++;
 	if (open_step())
 		return JOB_MORE;
 	if (sd_state == SD_READY)  // sd_failed logged a failure
@@ -626,10 +665,25 @@ void tlog_flush_soon(void)
 		opening.job = job_start(open_job, (void *)opening.gen, JOB_OWNER_NONE);
 		if (opening.job != JOB_NONE) {
 			open_start();
+			// The first step waits for the screen too
+			opening.stepped = torii_frames;
+			opening.steps = 0;
 			return;
 		}
 	}
 	tlog_flush();
+}
+
+void tlog_open_now(void)
+{
+	if (!opening.on)
+		return;
+	if (tlog_level == TLOG_OFF && !force_pending) {
+		open_stop();
+		return;
+	}
+	sd_open();
+	tlog_debug("log: opened at once");
 }
 
 void tlog_sd_ready(void)

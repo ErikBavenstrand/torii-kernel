@@ -62,6 +62,13 @@ void tlog_flush(void);
 // lasts; tlog_flush finishes it at once outside one, as before a launch.
 // Otherwise, or with no job slot free, it flushes now.
 void tlog_flush_soon(void);
+// Finishes tlog_flush_soon's open at once, if one is under way (or stops it,
+// with LOGGING off): before code that may delete a file in /torii/logs,
+// which the open holds open (FatFs keeps no lock: FF_FS_LOCK 0).
+void tlog_open_now(void);
+// For tests, poked by name: nonzero, tlog_flush_soon's job makes at most
+// this many steps less one, so a test can act while the open is under way.
+extern u32 tlog_open_steps_test;
 // A line at level that goes to the card even with LOGGING off (crash
 // dumps); the next tlog_flush writes it.
 void tlog_force(u32 level, const char *format, ...) __attribute__((format(printf, 2, 3)));
