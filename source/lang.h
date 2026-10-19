@@ -31,6 +31,19 @@ extern char *gl_cheat;
 
 extern char *gl_hot_key;
 extern char *gl_hot_key2;
+extern char *gl_save_key;  // SLEEP KEY and MENU KEY when SAVESTATE is the only addon
+extern char *gl_load_key;
+
+extern char *gl_settings_title;
+extern char *gl_help_title;
+extern char *gl_on;
+extern char *gl_off;
+extern char *gl_theme;
+extern char **gl_theme_names;  // dark, light
+extern char *gl_accent;
+extern char *gl_accent_own;  // the theme's own accent
+extern char *gl_dim;
+extern char *gl_minutes;
 
 extern char *gl_language;
 
@@ -61,6 +74,7 @@ extern char *gl_LSTART_help;
 extern char *gl_online_manual;
 
 extern char *gl_no_game_played;
+extern char *gl_nor_title;
 
 extern char *gl_cart_str;
 extern char *gl_clock_str;

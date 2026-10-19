@@ -29,6 +29,19 @@ char *gl_cheat;
 
 char *gl_hot_key;
 char *gl_hot_key2;
+char *gl_save_key EWRAM_BSS;
+char *gl_load_key EWRAM_BSS;
+
+char *gl_settings_title EWRAM_BSS;
+char *gl_help_title EWRAM_BSS;
+char *gl_on EWRAM_BSS;
+char *gl_off EWRAM_BSS;
+char *gl_theme EWRAM_BSS;
+char **gl_theme_names EWRAM_BSS;
+char *gl_accent EWRAM_BSS;
+char *gl_accent_own EWRAM_BSS;
+char *gl_dim EWRAM_BSS;
+char *gl_minutes EWRAM_BSS;
 
 char *gl_language;
 char *gl_set_btn;
@@ -59,6 +72,7 @@ char *gl_LSTART_help;
 char *gl_online_manual;
 
 char *gl_no_game_played;
+char *gl_nor_title;
 
 char *gl_cart_str;
 char *gl_clock_str;
@@ -167,6 +181,7 @@ const char en_LSTART_help[] = "Delete file";
 const char en_online_manual[] = "Online manual";
 
 const char en_no_game_played[] = "No game played yet";
+const char en_nor_title[] = "NOR";  // the NOR list's title bar
 
 const char en_cart[] = "     CART";
 const char en_clock[] = "CLOCK";
@@ -176,6 +191,19 @@ const char en_logging[] = "  LOGGING";
 const char *en_log_levels[4] = {"OFF", "ERRORS", "INFO", "DEBUG"};
 const char en_diagnose[] = " DIAGNOSE";
 const char en_diag_run[] = "RUN TESTS AND PROBES";
+
+const char en_save_key[] = "SAVE KEY";
+const char en_load_key[] = "LOAD KEY";
+const char en_settings_title[] = "SETTINGS";
+const char en_help_title[] = "HELP";
+const char en_on[] = "ON";
+const char en_off[] = "OFF";
+const char en_theme[] = "THEME";
+const char *en_theme_names[2] = {"DARK", "LIGHT"};
+const char en_accent[] = "ACCENT";
+const char en_accent_own[] = "THEME'S OWN";
+const char en_dim[] = "DIM";
+const char en_minutes[] = "MIN";
 
 const char en_error_0[] = "Folder error";
 const char en_error_1[] = "File error";
@@ -286,6 +314,19 @@ void LoadEnglish(void)
 	gl_diagnose = (char *)en_diagnose;
 	gl_diag_run = (char *)en_diag_run;
 
+	gl_save_key = (char *)en_save_key;
+	gl_load_key = (char *)en_load_key;
+	gl_settings_title = (char *)en_settings_title;
+	gl_help_title = (char *)en_help_title;
+	gl_on = (char *)en_on;
+	gl_off = (char *)en_off;
+	gl_theme = (char *)en_theme;
+	gl_theme_names = (char **)en_theme_names;
+	gl_accent = (char *)en_accent;
+	gl_accent_own = (char *)en_accent_own;
+	gl_dim = (char *)en_dim;
+	gl_minutes = (char *)en_minutes;
+
 	gl_error_0 = (char *)en_error_0;
 	gl_error_1 = (char *)en_error_1;
 	gl_error_2 = (char *)en_error_2;
@@ -320,6 +361,7 @@ void LoadEnglish(void)
 	//
 	gl_rom_menu = (char **)en_rom_menu;
 	gl_nor_op = (char **)en_nor_op;
+	gl_nor_title = (char *)en_nor_title;
 }
 //---------------------------------------------------------------------------------
 // The languages offered in SETTINGS. A new language adds its strings and a

@@ -116,3 +116,32 @@ void test_sort_largest_list(void)
 	CHECK_EQ(list[1].filesize, count - 1);
 	free(list);
 }
+
+// sort_by: entries holding a pointer to their name, as the SD list's hold a
+// PSRAM handle
+typedef struct {
+	const char *name;
+	u32 index;
+} name_ref;
+
+static const char *ref_name(const void *entry)
+{
+	return ((const name_ref *)entry)->name;
+}
+
+void test_sort_by_accessor(void)
+{
+	static const char *const names[] = {"Zelda.gba", "advance.gba", "Metroid.gba", "advance.gba", "B.gba"};
+	static const u32 order[] = {1, 3, 4, 2, 0};  // case ignored, ties keep their order
+	name_ref *list = malloc(5 * sizeof(name_ref));
+	for (u32 i = 0; i < 5; i++) {
+		list[i].name = names[i];
+		list[i].index = i;
+	}
+	void *work = malloc(SORT_WORK_SIZE);
+	sort_by(list, 5, sizeof(name_ref), work, ref_name);
+	for (u32 i = 0; i < 5; i++)
+		CHECK_EQ(list[i].index, order[i]);
+	free(work);
+	free(list);
+}

@@ -317,7 +317,7 @@ The budget each layout is checked against (GBATEK, Tonc):
 
 Bugs found while building v0.3 and v0.3.1. Each is struck out here once a ticket fixes it.
 
-- A scrolling long file name runs into the size column in the SD list (T3; port T9).
+- ~~A scrolling long file name runs into the size column in the SD list (T3; port T9).~~ Fixed by T9: the marquee is clipped to the name column.
 - ~~The game menu shows "CHEAT(0)" before the cheat list has been opened (T3; port T11).~~ Fixed by T11 (`5e44a3b`).
 - ~~The cheat view counts sections plus entries: "[002/004]" for 2 cheats (T3; port T11).~~ Fixed by T11 (`5e44a3b`).
 - Diagnostics' loader check can log a garbled loader title: `say()` clears the start of `pReadCache`, where the image is (T16 review; port T12).

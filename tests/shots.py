@@ -52,6 +52,11 @@ KERNEL = "dist/ezkernelnew.bin"
 TEST_KERNEL = "ezkerneltest.gba"
 # 2026-01-01 12:34:56 UTC: the clock stands still there in every scenario
 EPOCH = 1767270896
+LONG_NAME = (
+    "B long name, past the ninety-nine bytes a list entry used to keep,"
+    " which now lists, scrolls, opens and saves whole (Rev 1).gba"
+)
+DEEP_FILES = 300
 SETTINGS = 0x7B0000  # settings sector in the kernel NOR (as tests/settings.sh)
 KERNEL_NOR_SIZE = 8 << 20
 
@@ -78,6 +83,12 @@ def build_sd(path: Path) -> None:
         "tests/roms/idle/idle.gba",
         stage / "Long" / "A name too long to fit on its row.gba",
     )
+    # Past the 99 bytes a list entry kept before v0.3: it lists, scrolls
+    # and opens whole (sd-long)
+    shutil.copy("tests/roms/idle/idle.gba", stage / "Long" / LONG_NAME)
+    # Enough files to scroll a long way (sd-deep)
+    for i in range(1, DEEP_FILES + 1):
+        (stage / "Long" / f"Game {i:03d}.gba").write_bytes(bytes(64 * i))
     (stage / "CHEAT" / "Hello.cht").write_bytes(
         b"[Infinite lives]\r\nON=1234,56;\r\n\r\n[Max money]\r\nON=1235,57;\r\n\r\n"
         b"[GameInfo]\r\nName=Hello\r\n"

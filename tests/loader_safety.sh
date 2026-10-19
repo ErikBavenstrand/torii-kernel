@@ -8,9 +8,9 @@
 # and a write there stops the emulator with status 76.
 #
 # Every path that erases or programs the kernel NOR runs here, each on its own
-# cart, with logging on: the boot's NOR list migration, a settings save, the
+# cart, with logging on: the boot's NOR list migration, settings saves on both pages, the
 # pending-save record and its clearing, WRITE TO NOR, delete latest,
-# Diagnostics, power cuts in the middle of those writes and the boot after
+# FORMAT ALL, Diagnostics, power cuts in the middle of those writes and the boot after
 # them, and the same writes on the other kernel NOR chip (S29GL064A, buffered
 # programming). After each power-on the loader must be byte-identical, and
 # each case checks that its write really happened. All cases run; the script
@@ -79,6 +79,11 @@ settings() {
   done
 }
 
+# slot SLOT: a settings slot's value, as the kernel NOR holds it
+slot() {
+  od -An -tu2 -j $((0x7B0000 + 2 * $1)) -N 2 "$cart/kernel-nor.bin" | tr -d ' '
+}
+
 # boot [-c CUT] [-g] OPTIONS...: one power-on; -c cuts the power at CUT
 # (OMEGA_POWER_CUT), -g emulates the S29GL064A kernel NOR (KERNEL_NOR picks
 # any OMEGA_KERNEL_NOR chip). Then the loader
@@ -132,6 +137,12 @@ keys() {
 write_a=$(keys 200 DOWN DOWN A DOWN DOWN A)
 write_b=$(keys 200 DOWN DOWN DOWN A DOWN DOWN A)
 delete=$(keys 200 R DOWN A DOWN A)
+format=$(keys 200 R A DOWN DOWN A A)
+format_no=$(keys 200 R A DOWN DOWN A B)
+# THEME on SETTINGS page 2 set to LIGHT and saved, through save_set2_info
+save_theme="$(keys 200 R) $(keys 220 R) $(keys 270 R) $(keys 320 DOWN DOWN DOWN A A RIGHT A)"
+# ACCENT on SETTINGS page 2 set to Blue and saved
+save_accent="$(keys 200 R) $(keys 220 R) $(keys 270 R) $(keys 320 DOWN DOWN DOWN DOWN A A RIGHT A)"
 save_setting="-k 200:R -k 206:- -k 220:R -k 226:- -k 270:DOWN -k 276:- -k 285:DOWN -k 291:- -k 300:A -k 306:- -k 340:A -k 346:-"
 launch="$(keys 200 DOWN DOWN DOWN DOWN A) $(keys 250 DOWN DOWN DOWN DOWN RIGHT RIGHT RIGHT RIGHT RIGHT UP UP UP UP A)"
 diag="-k 1:L+R+SELECT -k 60:- -k 120:A -k 124:- $(for f in $(seq 2000 24 4400); do printf -- '-k %d:START -k %d:- ' "$f" $((f + 4)); done)"
@@ -168,6 +179,27 @@ EOF
   logged "nor: wrote the settings"
   pass "a settings save"
 
+  new_cart settings-page2
+  boot $save_theme -f 480
+  logged "nor: wrote the settings"
+  logged "settings: THEME LIGHT"
+  [ "$(slot 28)" = 1 ] || bad "THEME wasn't saved: slot 28 holds $(slot 28)"
+  [ "$(slot 26)" = 2 ] || bad "the save lost LOGGING: slot 26 holds $(slot 26)"
+  [ "$(slot 27)" = 65535 ] || bad "DIM was written: slot 27 holds $(slot 27)"
+  [ "$(slot 29)" = 65535 ] || bad "ACCENT was written: slot 29 holds $(slot 29)"
+  boot -f 200
+  [ "$(slot 28)" = 1 ] || bad "THEME didn't survive a power-on: slot 28 holds $(slot 28)"
+  pass "a settings save on page 2 (THEME), kept after a power-on"
+
+  new_cart settings-accent
+  boot $save_accent -f 480
+  logged "nor: wrote the settings"
+  logged "settings: THEME DARK, ACCENT BLUE"
+  [ "$(slot 29)" = 1 ] || bad "ACCENT wasn't saved as Blue: slot 29 holds $(slot 29)"
+  [ "$(slot 28)" = 65535 ] || bad "THEME was written: slot 28 holds $(slot 28)"
+  [ "$(slot 27)" = 65535 ] || bad "DIM was written: slot 27 holds $(slot 27)"
+  pass "an ACCENT save on page 2 writes only its slot"
+
   new_cart pending-save
   boot $launch -f 700
   logged "launch: loading Test.gba"
@@ -190,6 +222,22 @@ EOF
   logged "nor: deleting B.gba"
   logged "nor: list saved, 1 games"
   pass "delete latest"
+
+  # FORMAT ALL: the NOR list's first game, its menu's third row, and A on
+  # the question
+  new_cart nor-format
+  boot $write_a -f 700
+  boot $format -f 900
+  logged "nor: erased the game NOR"
+  logged "nor: list saved, 0 games"
+  pass "FORMAT ALL"
+
+  # FORMAT ALL answered with B: nothing is erased or written
+  new_cart nor-format-no
+  boot $write_a -f 700
+  boot $format_no -f 600
+  [ $ok = 0 ] || ! grep -q 'nor: erasing\|nor: list saved' "$log" || bad "B on FORMAT ALL's question wrote the NOR"
+  pass "FORMAT ALL answered no"
 
   new_cart diagnostics
   older_list

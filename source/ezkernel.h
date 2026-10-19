@@ -1,8 +1,9 @@
-//#ifndef	EZKERNEL_HEADER
-//#define EZKERNEL_HEADER
+#ifndef EZKERNEL_HEADER
+#define EZKERNEL_HEADER
 
 #include "ff.h"
 #include "ez_define.h"
+#include "savename.h"
 
 typedef struct FM_NOR_FILE_SECT {////save to nor
 	char filename[100];
@@ -16,15 +17,6 @@ typedef struct FM_NOR_FILE_SECT {////save to nor
 	u16 reserved2;
 	char gamename[0x10];
 } FM_NOR_FS;
-
-typedef struct FM_Folder_SECT {
-	char filename[100];
-} FM_Folder_FS;
-
-typedef struct FM_FILE_SECT {
-	char filename[100];
-	u32 filesize;
-} FM_FILE_FS;
 
 typedef enum {
 	SD_list = 0,
@@ -58,19 +50,25 @@ extern u16 gl_color_NORFULL;
 extern u16 gl_color_btn_clean;
 */
 
-u32 Setting_window(void);
-u32 Setting_window2(void);
-void Draw_select_icon(u32 X, u32 Y, u32 mode);
 void CheckLanguage(void);
+// Leaves the v0.3 engine for the mode 3 menu (setwindow.c): ui_shutdown, the
+// registers mode 3 needs, a black bitmap, and libgba's key state caught up
+// with the keys held, so the caller repaints and reads keys as before.
+void menu_leave_engine(void);
 void CheckSwitch(void);
 u32 Game_hardware(u32 is_EMU, const u8 *gamecode, u8 gb_cart_type);
 u32 Recently_play_add(const char *entry, u32 count);
 #define RECENT_NOR "NOR:"
-// A Recently Played row holds the longest entry get_count keeps and the
-// kernel writes: a folder under MAX_path_len, '/', and a list entry's name.
-#define RECENT_LEN (MAX_path_len + sizeof(((FM_FILE_FS *)0)->filename))
+// A Recently Played row holds the longest entry Recently_play_load keeps and
+// the kernel writes: a folder under MAX_path_len, '/', and a GAME_NAME_MAX name.
+#define RECENT_LEN (MAX_path_len + GAME_NAME_MAX + 1)
 extern char p_recently_play[10][RECENT_LEN];
 const char *Recently_play_nor(const char *entry);
+u32 Recently_play_load(void);
+// The game NOR list's game named name, or game_total_NOR if none.
+u32 NOR_game_named(const char *name);
+// The text of error error_num (gl_error_*), as Show_error_num shows it.
+const char *Error_message(u8 error_num);
 u8 Check_saveMODE(u8 gamecode[]);
 u8 Get_saveMODE(u8 Save_num, u32 gamefilesize);
 u32 Check_file_type(TCHAR *pfilename);
@@ -79,7 +77,6 @@ u32 Get_savefilesize(BYTE saveMODE);
 void init_FAT_table(void);
 // IWRAM code must run from IWRAM while the ROM page changes, so it is never
 // static: GCC would inline it into callers in ROM.
-void IWRAM_CODE Refresh_filename(u32 show_offset, u32 file_select, u32 updown, u32 haveThumbnail);
 u32 Loadsavefile(TCHAR *filename);
 u32 Save_savefile(TCHAR *filename, u32 savesize);
 u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU);
@@ -87,6 +84,37 @@ u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU);
 void delay(u32 R0);
 u32 LoadRTSfile(TCHAR *filename);
 void ShowTime(u32 page_num, u32 page_mode);
-u8 NOR_list_MENU(u32 show_offset, u32 file_select);
-u8 SD_list_MENU(u32 show_offset, u32 file_select, u32 play_re);
-//#endif
+
+// The game the list or Recently Played picked (a copy in RAM: the list's
+// names are in PSRAM, which a launch fills). currentpath and
+// currentpath_temp, the SD list's folder, are declared in screens/lists.c,
+// as other files name locals so.
+extern TCHAR current_filename[GAME_NAME_MAX + 1];
+extern u32 game_total_SD;
+extern u32 folder_total;
+extern u32 game_total_NOR;
+
+// A game on its way from the list to the game menu and the launch.
+struct game_pick {
+	TCHAR *name;      // its file name in currentpath (current_filename)
+	u32 is_emu;       // Check_file_type: 0 GBA, 1 GBC, 2 GB, 3 NES
+	u32 havecht;      // Check_cheat_file: 0 no cheat file
+	u8 save_num;      // the SAVE TYPE line: 0 AUTO, 1-5 a type
+	u8 old_save_num;  // what its .mde file says
+	u8 menu_max;      // the game menu's last line the cursor reaches
+};
+// Fills g for g->name: 0 if it isn't a game. A GBA game reads its cheat and
+// save type files; an emulated one goes straight to Game_launch's line 0.
+u32 Game_pick(struct game_pick *g);
+// Launches g from game menu line menu_line (0 CLEAN BOOT, 1 BOOT WITH ADDON,
+// 2 WRITE TO NOR CLEAN, 3 WRITE TO NOR ADDON), L held for a hard reset, in
+// mode 3. Returns only if it didn't start a game: 0 nothing written, 1 the
+// game NOR may have changed, 2 a game was written to the game NOR.
+u8 Game_launch(struct game_pick *g, u32 menu_line, u32 key_L);
+// Starts NOR list game index; returns only if it failed. Mode 3.
+void NOR_launch(u32 index, u32 key_L);
+// The first NOR game's save: 0 looks for its file (0x10 there, 0 not), 1
+// loads it into SRAM (0, or 3 if missing), 2 writes SRAM to it (0); 2 for
+// a SAVER folder error.
+u8 FRAM_save_op(u8 OP);
+#endif

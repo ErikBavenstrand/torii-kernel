@@ -5,7 +5,6 @@
 // - READCACHE_SORT_WORK: sort_by_name's work buffer, while a folder is listed.
 // - [0x2000, ...): the cheat screen's parsed list, and READCACHE_CHEAT_WORK
 //   at the end, its line and value buffers (showcht.c), until it returns.
-// - [0x10000, 0x14B38): a thumbnail, read and drawn in one SD list pass.
 // - All of it: bulk SD, NOR, SRAM and PSRAM transfers inside one operation:
 //   starting a game (chunks, patch files, the save), writing a game to NOR,
 //   the NOR list's record, save backup and restore, GameID2cht.bin,

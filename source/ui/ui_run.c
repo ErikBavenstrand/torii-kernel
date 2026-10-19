@@ -604,11 +604,13 @@ void ui_init(const struct ui_theme *theme)
 	ui.palette = res_palette(RES_BG_PAL, 2, TAG_PALETTE);
 	TLOG_ASSERT(ui.palette != RES_NONE && res_start(RES_BG_PAL, ui.palette) == 0);
 	for (u32 cb = 0; cb < 3; cb++) {
-		// Block 0's at its bottom; blocks 1 and 2's at the top of their
-		// reach, so they don't split the long runs lists need
+		// Blocks 0's and 1's at their bottom, block 2's at the top of its
+		// reach, so they don't split the long runs lists need: block 1's
+		// list grows up from its bottom, block 2's into what that leaves
+		// (block 1's top would cut that in two, and two lists then don't fit)
 		u16 lo = (u16)(cb * 512), hi = (u16)(lo + 1024);
-		ui.shared[cb] =
-			res_alloc(RES_BG_VRAM, UI_SHARED_TILES, 1, lo, hi, (u16)(TAG_SHARED + cb), cb ? POOL_TOP : 0);
+		ui.shared[cb] = res_alloc(RES_BG_VRAM, UI_SHARED_TILES, 1, lo, hi, (u16)(TAG_SHARED + cb),
+					  cb == 2 ? POOL_TOP : 0);
 		TLOG_ASSERT(ui.shared[cb] != RES_NONE);
 		ui.shared_first[cb] = res_bg_tile_index(ui.shared[cb], 0, (u8)cb);
 		// Nothing shows these tiles yet: write them straight to VRAM
@@ -808,6 +810,11 @@ u32 ui_frame(void)
 	if (motion_update(dt))
 		frame_wake();
 	update_all(dt);
+	// A view still to be shown (one pushed after a pop waits a frame) wakes
+	// the frames until it is: nothing else may (a view without a list)
+	const struct ui_view *top = ui_top();
+	if (top && !(top->flags & UI_V_SHOWN))
+		frame_wake();
 	if (!frame_idle()) {
 		jobs_run(JOB_DEADLINE);
 		draw_all();

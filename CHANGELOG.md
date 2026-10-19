@@ -6,6 +6,36 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** the SD list, the NOR list and Recently Played, with the game
+  menu, the NOR game menu and their questions, run on the v0.3 tile engine:
+  a title bar with the folder, clock and count, 16 px rows with file-type
+  icons and sizes, smooth scrolling, and a cut name that scrolls inside its
+  column, no longer into the size. Keys and flow are as before; SELECT no
+  longer toggles thumbnails, which v0.4's covers replace (`5e1981c`,
+  `cfd3cc8`, `f641acd`).
+- **Changed:** file names of up to 255 bytes list, open, launch and save
+  whole: the list keeps them in PSRAM instead of 100 bytes each in EWRAM,
+  which frees 70 KB of EWRAM. A name whose save name won't fit the pending
+  save record (over 251 bytes) says Name too long, and one over 99 bytes
+  can't be written to the game NOR, whose list keeps 99 (`5e1981c`).
+- **Fixed:** L+START deleted a file in the current directory, which could
+  be /SAVER after a failed launch, rather than in the list's folder
+  (`f641acd`).
+- **Changed:** SETTINGS (both pages) and HELP are drawn by the v0.3 tile
+  engine: a header and a list with each setting's name and value, the
+  official keys and edit flow, and the same settings writers. In edit mode
+  the row shows the option under the cursor (`« RESET: ON »`). Page 2 gains
+  THEME (Dark, Light or a theme from `/torii/themes`, which OK records in
+  `/torii/theme.txt`), ACCENT and DIM, previewed at once and saved like the
+  other settings; DIAGNOSE is now its last row. Held L and R turn one page.
+  HELP credits the Galmuri fonts (OFL-1.1) and gives its QR code a quiet
+  zone (`783114e`, `54b83e8`, `7075e23`, `cdaf71c`, `e3b624a`, `8057d8b`).
+- **Fixed:** February days past 29 in leap years, hot keys stored as
+  invalid codes, a dead fifth MODE B position, and AUTO SAVE and MODE B
+  changes not reaching the next launch until a reboot (`783114e`). A saved
+  ACCENT showed black, and a screen without a list could fail to appear
+  after another closed (`2a67c3f`).
+
 - **Changed:** the SD theme loader's wallpaper check and log messages
   moved into the hardware-free parser (`theme_wallpaper_check`), so `just
   theme-check` prints exactly what the kernel logs. No behaviour change

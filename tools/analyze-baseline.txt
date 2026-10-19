@@ -47,36 +47,6 @@ clang-tidy source/ezkernelnew.c clang-analyzer-deadcode.DeadStores: Value stored
 clang-tidy source/ezkernelnew.c clang-analyzer-deadcode.DeadStores: Value stored to 'updata' is never read
 clang-tidy source/ezkernelnew.c clang-analyzer-security.insecureAPI.strcpy: Call to function 'strcpy' is insecure as it does not provide bounding of the memory buffer. Replace unbounded copy functions with analogous functions that support length arguments such as 'strlcpy'. CWE-119
 clang-tidy source/reset_table.h bugprone-narrowing-conversions: narrowing conversion from constant value 4294967295 (0xFFFFFFFF) of type 'unsigned int' to signed type 'int' is implementation-defined
-clang-tidy source/setwindow.c bugprone-branch-clone: repeated branch body in conditional chain
-clang-tidy source/setwindow.c bugprone-branch-clone: repeated branch body in conditional chain
-clang-tidy source/setwindow.c bugprone-branch-clone: repeated branch body in conditional chain
-clang-tidy source/setwindow.c bugprone-branch-clone: repeated branch body in conditional chain
-clang-tidy source/setwindow.c bugprone-branch-clone: switch has 2 consecutive identical branches
-clang-tidy source/setwindow.c bugprone-branch-clone: switch has 2 consecutive identical branches
-clang-tidy source/setwindow.c bugprone-branch-clone: switch has 2 consecutive identical branches
-clang-tidy source/setwindow.c bugprone-branch-clone: switch has 2 consecutive identical branches
-clang-tidy source/setwindow.c bugprone-switch-missing-default-case: switching on non-enum value without default case may not cover all cases
-clang-tidy source/setwindow.c bugprone-switch-missing-default-case: switching on non-enum value without default case may not cover all cases
-clang-tidy source/setwindow.c bugprone-switch-missing-default-case: switching on non-enum value without default case may not cover all cases
-clang-tidy source/setwindow.c bugprone-switch-missing-default-case: switching on non-enum value without default case may not cover all cases
-clang-tidy source/setwindow.c bugprone-switch-missing-default-case: switching on non-enum value without default case may not cover all cases
-clang-tidy source/setwindow.c bugprone-switch-missing-default-case: switching on non-enum value without default case may not cover all cases
-clang-tidy source/setwindow.c bugprone-switch-missing-default-case: switching on non-enum value without default case may not cover all cases
-clang-tidy source/setwindow.c bugprone-switch-missing-default-case: switching on non-enum value without default case may not cover all cases
-clang-tidy source/setwindow.c bugprone-switch-missing-default-case: switching on non-enum value without default case may not cover all cases
-clang-tidy source/setwindow.c bugprone-switch-missing-default-case: switching on non-enum value without default case may not cover all cases
-clang-tidy source/setwindow.c bugprone-switch-missing-default-case: switching on non-enum value without default case may not cover all cases
-clang-tidy source/setwindow.c bugprone-switch-missing-default-case: switching on non-enum value without default case may not cover all cases
-clang-tidy source/setwindow.c bugprone-switch-missing-default-case: switching on non-enum value without default case may not cover all cases
-clang-tidy source/setwindow.c bugprone-switch-missing-default-case: switching on non-enum value without default case may not cover all cases
-clang-tidy source/setwindow.c bugprone-switch-missing-default-case: switching on non-enum value without default case may not cover all cases
-clang-tidy source/setwindow2.c bugprone-branch-clone: repeated branch body in conditional chain
-clang-tidy source/setwindow2.c bugprone-branch-clone: repeated branch body in conditional chain
-clang-tidy source/setwindow2.c bugprone-branch-clone: repeated branch body in conditional chain
-clang-tidy source/setwindow2.c bugprone-switch-missing-default-case: switching on non-enum value without default case may not cover all cases
-clang-tidy source/setwindow2.c bugprone-switch-missing-default-case: switching on non-enum value without default case may not cover all cases
-clang-tidy source/setwindow2.c bugprone-switch-missing-default-case: switching on non-enum value without default case may not cover all cases
-clang-tidy source/setwindow2.c bugprone-switch-missing-default-case: switching on non-enum value without default case may not cover all cases
 clang-tidy source/showcht.c bugprone-narrowing-conversions: narrowing conversion from '__size_t' (aka 'unsigned int') to signed type 'int' is implementation-defined
 clang-tidy source/showcht.c bugprone-narrowing-conversions: narrowing conversion from '__size_t' (aka 'unsigned int') to signed type 'int' is implementation-defined
 clang-tidy source/showcht.c bugprone-narrowing-conversions: narrowing conversion from '__size_t' (aka 'unsigned int') to signed type 'int' is implementation-defined
@@ -111,7 +81,6 @@ cppcheck source/ezkernelnew.c unreadVariable: Variable 'res' is assigned a value
 cppcheck source/ezkernelnew.c unreadVariable: Variable 'res' is assigned a value that is never used.
 cppcheck source/ezkernelnew.c unreadVariable: Variable 'res' is assigned a value that is never used.
 cppcheck source/ezkernelnew.c unreadVariable: Variable 'savefilesize' is assigned a value that is never used.
-cppcheck source/setwindow2.c unreadVariable: Variable 'currstate' is assigned a value that is never used.
 cppcheck source/showcht.c unreadVariable: Variable 'is_section' is assigned a value that is never used.
 cppcheck source/showcht.c unreadVariable: Variable 'text_comment' is assigned a value that is never used.
 cppcheck source/showcht.c unreadVariable: Variable 'text_comment' is assigned a value that is never used.
