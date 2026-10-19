@@ -13,7 +13,9 @@ git log, not here.
   and every error message. Texts, keys and flow are as before; a message
   now shows "[B]OK", and a question returns once its key is let go. Deleting
   a file whose name is cut now says "Name too long" instead of failing
-  silently (`6067e1b`, `adf21e9`, `ba02013`).
+  silently, and the delete question shows the whole name. The screen
+  doesn't dim while a dialog is up (`6067e1b`, `adf21e9`, `ba02013`,
+  `7b2d44d`).
 - **Changed:** Diagnostics runs on the engine: its lines scroll in a list,
   colours are theme roles, the summary scrolls with UP/DOWN. A renderer
   step times a glyph, a 38-glyph row, an LZ77 cover into PSRAM, a PSRAM to
