@@ -11,6 +11,10 @@ over FRAME_CYCLES, a whole frame (228 lines of 1232 cycles), or over 10%
 above its recorded value; a NAME measured but not recorded, or recorded but
 not measured by a full run, fails too: `just perf-update` re-records.
 tests/shots.py runs this check on the lines its scenarios log.
+
+The budget is also compiled into the kernel, for Diagnostics' renderer
+step, which compares the cart's figures with the emulator's: update writes
+HEADER_FILE from it, and check fails while that file and the budget differ.
 """
 
 import re
@@ -18,6 +22,7 @@ import sys
 from pathlib import Path
 
 BUDGET = Path("tests/perf/budget.txt")
+HEADER_FILE = Path("source/perf_budget.h")
 FRAME_CYCLES = 280_896
 DRIFT = 0.10
 LINE = re.compile(r"frame-cycles: (\S+) (\d+)\s*$")
@@ -27,6 +32,34 @@ HEADER = """\
 # NAME CYCLES: the most one frame of NAME took in the scenarios' runs.
 # A run fails over 280896 (a whole frame) or 10% above the figure here.
 """
+
+
+def render_header(budget: dict[str, int]) -> str:
+    """HEADER_FILE's text for a budget."""
+    rows = "".join(f'\t{{"{k}", {v}}},\n' for k, v in sorted(budget.items()))
+    return (
+        "// The cycle budget, tests/perf/budget.txt, for Diagnostics' renderer step\n"
+        "// (source/diag_render.c). Written by tests/perf.py with the budget\n"
+        "// (`just perf-update`): don't edit.\n"
+        "#ifndef TORII_PERF_BUDGET_H\n"
+        "#define TORII_PERF_BUDGET_H\n"
+        "\n"
+        "static const struct {\n"
+        "\tconst char *name;\n"
+        "\tunsigned long cycles;\n"
+        "} perf_budget[] = {\n"
+        f"{rows}"
+        "};\n"
+        "\n"
+        "#endif\n"
+    )
+
+
+def header_problems(budget: dict[str, int], path: Path = HEADER_FILE) -> list[str]:
+    """A problem if path doesn't hold the budget."""
+    if path.exists() and path.read_text(encoding="utf-8") == render_header(budget):
+        return []
+    return [f"{path} doesn't match {BUDGET} (run `just perf-update`)"]
 
 
 def lines(text: str) -> list[str]:
@@ -96,6 +129,8 @@ def update(found: list[str], path: Path, partial: bool = False) -> None:
     path.write_text(
         HEADER + "".join(f"{k} {v}\n" for k, v in sorted(new.items())), encoding="utf-8"
     )
+    if path == BUDGET:
+        HEADER_FILE.write_text(render_header(new), encoding="utf-8")
     for name in sorted(set(old) | set(new)):
         if old.get(name) != new.get(name):
             print(f"perf: {name}: {old.get(name, '-')} -> {new.get(name, '-')}")
@@ -133,6 +168,7 @@ kernel: frame-cycles: sd-list nonsense
             [f"new: 10 cycles, not in {BUDGET} (run `just perf-update`)"],
         ),
         (check([], {}), []),
+        ('\t{"a", 1},\n\t{"b", 2},\n};' in render_header({"b": 2, "a": 1}), True),
     ]
     failed = [f"got {got!r}, want {want!r}" for got, want in cases if got != want]
     for f in failed:
@@ -156,7 +192,7 @@ def main() -> int:
     if args[0] == "update":
         update(found, BUDGET)
         return 0
-    problems = check(found, read_budget(BUDGET))
+    problems = check(found, read_budget(BUDGET)) + header_problems(read_budget(BUDGET))
     for p in problems:
         print(f"FAIL: perf: {p}")
     if not problems:

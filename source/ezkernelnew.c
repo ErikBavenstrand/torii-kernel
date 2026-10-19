@@ -13,6 +13,7 @@
 #include "ez_define.h"
 #include "ff.h"
 #include "draw.h"
+#include "ui/dialog.h"
 #include "ezkernel.h"
 #include "Ezcard_OP.h"
 #include "saveMODE.h"
@@ -1224,7 +1225,7 @@ u32 IWRAM_CODE Loadfile2PSRAM(TCHAR *filename)
 	u32 filesize;
 	u32 res;
 	u32 blocknum;
-	char msg[20];
+	char msg[40];
 
 	u32 Address;
 	vu16 page = 0;
@@ -1233,14 +1234,13 @@ u32 IWRAM_CODE Loadfile2PSRAM(TCHAR *filename)
 	res = f_open(&gfile, filename, FA_READ);
 	if (res == FR_OK) {
 		filesize = f_size(&gfile);
-		Clear(60, 160 - 15, 120, 15, gl_color_cheat_black, 1);
-		DrawHZText12(gl_writing, 0, 70, 160 - 15, gl_color_text, 1);
+		// Torii: on the launch's progress dialog, with a bar
+		dialog_progress_status(gl_writing);
 
 		f_lseek(&gfile, 0x0000);
 		for (blocknum = 0x0000; blocknum < filesize; blocknum += 0x20000) {
-			sprintf(msg, "%luMb/%luMb", (blocknum) / 0x20000, filesize / 0x20000);
-			Clear(70 + 54, 160 - 15, 110, 15, gl_color_cheat_black, 1);
-			DrawHZText12(msg, 0, 70 + 54, 160 - 15, gl_color_text, 1);
+			sprintf(msg, "%s %luMb/%luMb", gl_writing, (blocknum) / 0x20000, filesize / 0x20000);
+			dialog_progress_set(blocknum, filesize, msg);
 			f_read(&gfile, pReadCache, 0x20000, &ret);//pReadCache max 0x20000 Byte
 
 			if ((gl_reset_on == 1) || (gl_rts_on == 1) || (gl_sleep_on == 1) || (gl_cheat_on == 1)) {
@@ -1426,7 +1426,7 @@ u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU)
 	u32 filesize;
 	u32 res;
 	u32 blocknum;
-	char msg[20];
+	char msg[40];
 
 	u32 Address;
 	vu16 page = 0;
@@ -1467,14 +1467,13 @@ u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU)
 			//use rtc, have been modify
 		}
 
-		Clear(60, 160 - 15, 120, 15, gl_color_cheat_black, 1);
-		DrawHZText12(gl_writing, 0, 78, 160 - 15, gl_color_text, 1);
+		// Torii: on the launch's progress dialog, with a bar
+		dialog_progress_status(gl_writing);
 
 		f_lseek(&gfile, 0x0000);
 		for (blocknum = 0x0000; blocknum < filesize; blocknum += 0x20000) {
-			sprintf(msg, "%luMb", (blocknum) / 0x20000);
-			Clear(78 + 54, 160 - 15, 110, 15, gl_color_cheat_black, 1);
-			DrawHZText12(msg, 0, 78 + 54, 160 - 15, gl_color_text, 1);
+			sprintf(msg, "%s %luMb", gl_writing, (blocknum) / 0x20000);
+			dialog_progress_set(blocknum, filesize, msg);
 			//f_lseek(&gfile, blocknum);
 			f_read(&gfile, pReadCache, 0x20000, &ret);//pReadCache max 0x20000 Byte
 
@@ -1555,27 +1554,12 @@ static u32 Load_Thumbnail(TCHAR *pfilename_pic)
 //Delete file
 static void SD_list_L_START(u32 show_offset, u32 file_select, u32 folders)
 {
-	//u32 res;
-	DrawPic((u16 *)gImage_MENU, 56, 25, 128, 110, 0, 0, 1);//show menu pic
-	Show_MENU_btn();
-
-	DrawHZText12(gl_LSTART_help, 0, 60, 60, gl_color_text, 1);//use sure?gl_LSTART_help
-	DrawHZText12(pFilename_buffer[show_offset + file_select - folders].filename, 20, 60, 75, 0x7fff,
-		     1);//file name
-	DrawHZText12(gl_formatnor_info, 5, 60, 90, gl_color_text, 1);//use sure?
-	while (1) {
-		VBlankIntrWait();
-		scanKeys();
-		u16 keysdown = keysDown();
-		if (keysdown & KEY_A) {
-			TCHAR *pdelfilename;
-			pdelfilename = pFilename_buffer[show_offset + file_select - folders].filename;
-			/*res = */ f_unlink(pdelfilename);
-			break;
-		} else if (keysdown & KEY_B) {
-			break;
-		}
-	}
+	// The file's name, then "SURE?" (the start of gl_formatnor_info, as before)
+	char question[sizeof(pFilename_buffer[0].filename) + 8];
+	TCHAR *pdelfilename = pFilename_buffer[show_offset + file_select - folders].filename;
+	snprintf(question, sizeof(question), "%s\n%.5s", pdelfilename, gl_formatnor_info);
+	if (dialog_confirm(gl_LSTART_help, question, DIALOG_INFO))
+		/*res = */ f_unlink(pdelfilename);
 }
 //---------------------------------------------------------------------------------
 u32 Check_file_type(TCHAR *pfilename)
@@ -1601,7 +1585,6 @@ static void Show_error_num(u8 error_num)
 {
 	char msg[50];
 
-	ClearWithBG((u16 *)gImage_SD, 90, 2, 90, 13, 1);
 	switch (error_num) {
 	case 0x0:
 		sprintf(msg, "%s", gl_error_0);
@@ -1640,8 +1623,7 @@ static void Show_error_num(u8 error_num)
 
 	tlog_error("error %u: %s", error_num, msg);
 	tlog_flush();
-	DrawHZText12(msg, 0, 90, 2, RGB(31, 00, 00), 1);
-	wait_btn();
+	dialog_message(NULL, msg, DIALOG_ERROR);
 }
 //---------------------------------------------------------------------------------
 u32 Get_savefilesize(BYTE saveMODE)
@@ -1802,59 +1784,30 @@ static void Check_save_flag(void)
 	if (readd == 0x11) {
 		//u32 res;
 		register u32 loopwrite;
-		DrawPic((u16 *)gImage_SD, 0, 0, 240, 160, 0, 0, 1);
 		for (loopwrite = 0; loopwrite < 0x200 / 2; loopwrite++) {
 			((u16 *)SAV_info_buffer)[loopwrite] = Read_sav_info(loopwrite + 2);
 		}
-		DrawPic((u16 *)gImage_MENU, 56, 25, 128, 110, 0, 0, 1);//show menu pic
 
-		DrawHZText12(gl_save_sav, 0, 60, 28, gl_color_text, 1);//use sure?gl_LSTART_help
-		DrawHZText12((TCHAR *)SAV_info_buffer, 20, 60, 40, 0x7fff, 1);//file name
-		DrawHZText12((TCHAR *)SAV_info_buffer + 20, 20, 60, 52, 0x7fff, 1);//file name
-		DrawHZText12((TCHAR *)SAV_info_buffer + 40, 20, 60, 64, 0x7fff, 1);//file name
-			//DrawHZText12(gl_formatnor_info,5,60,90,gl_color_text,1);//use sure?
-
-		// Torii: the answer is logged
+		// Torii: the answer is logged. The question and the saving are
+		// dialogs on the engine (source/ui/dialog.h)
 		static const char saved_how[] = "save: \"Save sav?\" for %s/%s, %lu bytes, save type %02X: %s";
 		u16 savetype = Read_sav_info(SAV_INFO_TYPE);
-		if (gl_auto_save_sel) {
-			tlog(saved_how, SAVER_FOLDER, (TCHAR *)SAV_info_buffer, (unsigned long)savefilesize, savetype,
-			     "auto");
-			DrawHZText12(gl_save_ing, 0, 60, 88, gl_color_text, 1);//use sure?gl_LSTART_help
+		TCHAR *name = (TCHAR *)SAV_info_buffer;
+		dialog_open();
+		int save = gl_auto_save_sel || dialog_confirm(gl_save_sav, name, DIALOG_INFO);
+		tlog(saved_how, SAVER_FOLDER, name, (unsigned long)savefilesize, savetype,
+		     gl_auto_save_sel ? "auto"
+		     : save           ? "A, save"
+				      : "B, not saved");
+		if (save) {
+			dialog_progress_begin(gl_save_sav, name);
+			dialog_progress_status(gl_save_ing);
 			f_mkdir(SAVER_FOLDER);//"/SAVER"
 			f_chdir(SAVER_FOLDER);
-			Save_savefile((TCHAR *)SAV_info_buffer, savefilesize);
-		} else {
-			Show_MENU_btn();
-			while (1) {
-				VBlankIntrWait();
-				scanKeys();
-				u16 keysdown = keysDown();
-				if (keysdown & KEY_A) {
-					tlog(saved_how, SAVER_FOLDER, (TCHAR *)SAV_info_buffer,
-					     (unsigned long)savefilesize, savetype, "A, save");
-					DrawHZText12(gl_save_ing, 0, 60, 88, gl_color_text,
-						     1);//use sure?gl_LSTART_help
-					f_mkdir(SAVER_FOLDER);
-					f_chdir(SAVER_FOLDER);
-					Save_savefile((TCHAR *)SAV_info_buffer, savefilesize);
-					/*TCHAR bmpfilename[100];	
-						u32 bmpnum;
-						for(bmpnum=0;bmpnum<1000;bmpnum++)
-						{
-							f_mkdir(SAVER_FOLDER);
-							f_chdir(SAVER_FOLDER);
-							sprintf(bmpfilename,"%4lu.sav",bmpnum);
-							Save_savefile(bmpfilename,savefilesize);
-						}*/
-					break;
-				} else if (keysdown & KEY_B) {
-					tlog(saved_how, SAVER_FOLDER, (TCHAR *)SAV_info_buffer,
-					     (unsigned long)savefilesize, savetype, "B, not saved");
-					break;
-				}
-			}
+			Save_savefile(name, savefilesize);
+			dialog_progress_end();
 		}
+		dialog_close();
 		memset(SAV_info_buffer, 0x00, sizeof(SAV_info_buffer));//clean flag
 		Save_sav_info(SAV_info_buffer, 0x200);
 	}
@@ -2352,6 +2305,7 @@ re_showfile:
 							if (nor_game < game_total_NOR) {
 								Boot_NOR_game(0, nor_game,
 									      0);  // returns only if it failed
+								dialog_progress_end();  // back to mode 3
 								cartlog_phase(PHASE_MENU, 0, NULL);
 							} else {
 								tlog("launch %s: not on the game NOR", name);
@@ -2414,8 +2368,8 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 	BYTE error_num;
 	u32 res;
 
-	Clear(0, 0, 240, 160, gl_color_cheat_black, 1);
-	DrawHZText12(gl_Loading, 0, (240 - strlen(gl_Loading) * 6) / 2, 74, gl_color_text, 1);
+	// The launch's progress, until the game starts (or its caller ends it)
+	dialog_progress_begin(gl_Loading, pNorFS[show_offset + file_select].filename);
 
 	init_FAT_table();
 
@@ -2502,33 +2456,21 @@ static u8 FRAM_save_op(u8 OP)
 			f_close(&gfile);
 			Bank_Switching(0);
 			res = Loadsavefile(savfilename);
-			DrawHZText12(gl_save_loaded, 0, 66, 118 - 15, RGB(00, 31, 00), 1);
+			dialog_message(NULL, gl_save_loaded, DIALOG_INFO);
 		} else {
-			DrawHZText12(gl_file_noexist, 0, 66, 118 - 15, RGB(31, 00, 00), 1);
+			dialog_message(NULL, gl_file_noexist, DIALOG_ERROR);
 		}
 	} else if (OP == 2) {  //bak fram save
-		if (res == FR_OK)  //have a old save file
-		{
-			DrawHZText12(gl_file_exist, 0, 66, 118 - 15, RGB(31, 00, 00), 1);
-			while (1) {
-				VBlankIntrWait();
-				scanKeys();
-				u16 keysdown = keysDown();
-				if (keysdown & KEY_A) {
-					DrawPic((u16 *)gImage_MENU, 56, 25, 128, 110, 0, 0, 1);  //show menu pic
-					Show_MENU_btn();
-					break;
-				} else if (keysdown & KEY_B) {
-					return 0;
-					//break;
-				}
-			}
+		dialog_open();  // one engine session for the question and the answer
+		if (res == FR_OK && !dialog_confirm(NULL, gl_file_exist, DIALOG_ERROR)) {  //have a old save file
+			dialog_close();
+			return 0;
 		}
 		savefilesize = Get_savefilesize(SAVEMODE);
 		Save_savefile(savfilename, savefilesize);
-		DrawHZText12(gl_save_saved, 0, 66, 118 - 15, RGB(00, 31, 00), 1);
+		dialog_message(NULL, gl_save_saved, DIALOG_INFO);
+		dialog_close();
 	}
-	wait_btn();
 	return 0;
 }
 //---------------------------------------------------------------
@@ -2594,6 +2536,7 @@ u8 NOR_list_MENU(u32 show_offset, u32 file_select)
 			if (MENU_line == 0) {  //boot to NOR.page
 				REG_WAITCNT_CART = WAITCNT_BIOS;  // as SD_list_MENU
 				Boot_NOR_game(show_offset, file_select, key_L);
+				dialog_progress_end();  // back to mode 3 (a black screen: the menu isn't redrawn)
 				REG_WAITCNT_CART = WAITCNT_MENU;
 				cartlog_phase(PHASE_MENU, 0, NULL);
 			} else if (MENU_line == 1) {
@@ -2601,8 +2544,7 @@ u8 NOR_list_MENU(u32 show_offset, u32 file_select)
 				if (show_offset + file_select + 1 == game_total_NOR) {
 					Delete_latest_NOR();
 				} else {
-					DrawHZText12(gl_lastest_game, 0, 66, 118 - 15, gl_color_text, 1);
-					wait_btn();
+					dialog_message(NULL, gl_lastest_game, DIALOG_INFO);
 				}
 				return 1;
 			} else if (MENU_line == 2) {  //
@@ -2779,8 +2721,8 @@ re_show_menu:
 boot_game:
 	// The launch fills PSRAM with the game: the cover cache there is gone
 	cover_cache_invalidate();
-	Clear(0, 0, 240, 160, gl_color_cheat_black, 1);
-	DrawHZText12(gl_Loading, 0, (240 - strlen(gl_Loading) * 6) / 2, 74, gl_color_text, 1);
+	// The launch's progress, until the game starts (SD_list_MENU ends it otherwise)
+	dialog_progress_begin(gl_Loading, pfilename);
 
 	u32 gamefilesize = 0;
 	//u32 savefilesize=0;
@@ -2835,8 +2777,7 @@ boot_game:
 	}
 	if (MENU_line < 2) {  //work for psram
 		if (gamefilesize > 0x2000000) {
-			ShowbootProgress(gl_file_overflow);
-			wait_btn();
+			dialog_message(NULL, gl_file_overflow, DIALOG_ERROR);
 			return 0;
 		}
 
@@ -2985,9 +2926,7 @@ boot_game:
 				}
 				return 2;
 			} else if (res == 2) {
-				Clear(0, 160 - 15, 200, 15, gl_color_cheat_black, 1);
-				DrawHZText12(gl_NOR_full, 0, 0, 160 - 15, gl_color_NORFULL, 1);  //"NOR FULL!"
-				wait_btn();
+				dialog_message(NULL, gl_NOR_full, DIALOG_ERROR);  //"NOR FULL!"
 				return 1;
 			} else {  // Torii: the file or the NOR failed; the game isn't listed
 				Show_error_num(1);
@@ -3024,9 +2963,7 @@ boot_game:
 				}
 				return 2;
 			} else if (res == 2) {
-				Clear(0, 160 - 15, 200, 15, gl_color_cheat_black, 1);
-				DrawHZText12(gl_NOR_full, 0, 0, 160 - 15, gl_color_NORFULL, 1);  //"NOR FULL!"
-				wait_btn();
+				dialog_message(NULL, gl_NOR_full, DIALOG_ERROR);  //"NOR FULL!"
 				return 0;
 			} else {  // Torii: the file or the NOR failed; the game isn't listed
 				Show_error_num(1);
@@ -3050,6 +2987,7 @@ u8 SD_list_MENU(u32 show_offset, u32 file_select, u32 play_re)
 	// faster than the BIOS's wait states (waitcnt.h)
 	REG_WAITCNT_CART = WAITCNT_BIOS;
 	u8 res = SD_list_open(show_offset, file_select, play_re);
+	dialog_progress_end();  // the launch's, if it failed or wrote to NOR: back to mode 3
 	REG_WAITCNT_CART = WAITCNT_MENU;
 	cartlog_phase(PHASE_MENU, 0, NULL);
 	if (res == 0 && play_re != 0xBB) {

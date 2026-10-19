@@ -413,6 +413,7 @@ def main() -> int:
             f"PASS: golden shots: {len(results)} scenarios, {total} hashes match tests/shots/hashes.txt"
         )
     problems = perf.check(cycles, perf.read_budget(perf.BUDGET), partial=bool(args))
+    problems += perf.header_problems(perf.read_budget(perf.BUDGET))
     for p in problems:
         print(f"FAIL: perf: {p}")
     if problems:

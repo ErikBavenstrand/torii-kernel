@@ -325,6 +325,7 @@ struct ui_list_model {
 enum {
 	UI_LIST_WRAP = 1,     // the cursor wraps at the ends (input.h's rules)
 	UI_LIST_MARQUEE = 2,  // the selected row's name scrolls if it is cut
+	UI_LIST_PLAIN = 4,    // no row shows as selected (a log): the cursor only scrolls
 };
 
 // A list (cols 1) or a grid. ink defaults to TEXT and paper to BG. The

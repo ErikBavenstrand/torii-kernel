@@ -49,6 +49,7 @@ struct list_state {
 	u16 first;  // first slot's tile number
 	u8 page;
 	u8 sel_ok;  // the map shows the selection at sel_drawn
+	u8 plain;   // UI_LIST_PLAIN: nothing shows as selected
 	u32 count, rows;
 	u32 cursor;
 	u32 sel_drawn;  // the item whose map entries are in the selected bank
@@ -263,6 +264,7 @@ static int list_init(u8 node)
 		return 0;
 	}
 	st->mq_set = 0xFF;
+	st->plain = (config(node)->flags & UI_LIST_PLAIN) != 0;
 	input_wrap_init(&st->wrap, ui_input(), 0);
 	ui_list_reset(node, 0);
 	return 1;
@@ -478,6 +480,8 @@ static u16 entry(const struct list_state *st, u32 s, u32 tx, u32 ty, u32 bank)
 // map's rows from the row's first, with item sel selected
 static void row_entries(const struct list_state *st, u16 *rows, u32 r, u32 s, u32 sel)
 {
+	if (st->plain)
+		sel = 0xFFFFFFFFu;  // no item
 	u32 cw = st->tw / st->cols;
 	for (u32 ty = 0; ty < st->rt; ty++) {
 		for (u32 tx = 0; tx < st->tw; tx++) {

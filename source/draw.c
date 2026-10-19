@@ -155,10 +155,3 @@ void DEBUG_printf(const char *format, ...)
 		current_y = 1;
 	}
 }
-//---------------------------------------------------------------------------------
-void ShowbootProgress(char *str)
-{
-	u8 str_len = strlen(str);
-	Clear(60, 160 - 15, 120, 15, gl_color_cheat_black, 1);
-	DrawHZText12(str, 0, (240 - str_len * 6) / 2, 160 - 15, gl_color_text, 1);
-}
