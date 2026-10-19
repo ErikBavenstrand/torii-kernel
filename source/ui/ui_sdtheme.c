@@ -339,18 +339,21 @@ void ui_wallpaper_setup(void)
 	// No room on this screen is no error: not logged as one
 	u8 quiet = res_errors_quiet;
 	res_errors_quiet = 1;
-	u8 t = res_alloc(RES_BG_VRAM, (u16)tiles, 1, 0, RES_BG_UNITS, TAG_WALL_TILES, POOL_TOP | RES_NOLOG);
-	u8 m = t == RES_NONE ? RES_NONE
-			     : res_alloc(RES_BG_VRAM, RES_MAP_UNITS, RES_MAP_UNITS, 0, RES_BG_UNITS, TAG_WALL_MAP,
+	// The map at the top of what only character block 0 reaches, the tiles
+	// under it (sdtheme.h)
+	u8 m = res_alloc(RES_BG_VRAM, RES_MAP_UNITS, RES_MAP_UNITS, 0, UI_WALL_VRAM_END, TAG_WALL_MAP,
+			 POOL_TOP | RES_NOLOG);
+	u8 t = m == RES_NONE ? RES_NONE
+			     : res_alloc(RES_BG_VRAM, (u16)tiles, 1, 0, UI_WALL_VRAM_END, TAG_WALL_TILES,
 					 POOL_TOP | RES_NOLOG);
-	u8 p = m == RES_NONE ? RES_NONE
+	u8 p = t == RES_NONE ? RES_NONE
 			     : res_alloc(RES_BG_PAL, 1, 1, 0, RES_PAL_BANKS, TAG_WALL_PAL, POOL_TOP | RES_NOLOG);
 	res_errors_quiet = quiet;
 	if (p == RES_NONE) {
-		if (m != RES_NONE)
-			res_unref(RES_BG_VRAM, m);
 		if (t != RES_NONE)
 			res_unref(RES_BG_VRAM, t);
+		if (m != RES_NONE)
+			res_unref(RES_BG_VRAM, m);
 		tlog("theme: no room for the wallpaper on this screen");
 		return;
 	}
@@ -358,11 +361,8 @@ void ui_wallpaper_setup(void)
 	// tiles' block in VRAM (asset.h: up to 17 bytes past the end)
 	u8 *stage = stage_buffer();
 	LZ77UnCompWram(file + ASSET_HEADER_BYTES + pal_bytes, stage);
-	u16 start = res_start(RES_BG_VRAM, t);
-	u32 cb = start / 512u;
-	if (cb > 3)
-		cb = 3;
-	u32 first = start - cb * 512u;
+	// Character block 0: its tile numbers are unit numbers
+	u16 first = res_start(RES_BG_VRAM, t);
 	// Word writes: VRAM takes no byte writes
 	u32 *vram = res_bg_addr(t);
 	const u32 *src = (const u32 *)stage;
@@ -385,9 +385,9 @@ void ui_wallpaper_setup(void)
 	sd.h_tiles = t;
 	sd.h_map = m;
 	sd.h_pal = p;
-	sd.bgcnt = (u16)(3 | cb << 2 | (u32)res_bg_screenblock(m) << 8);
+	sd.bgcnt = (u16)(3 | (u32)res_bg_screenblock(m) << 8);
 	sd.up_gen = sd.wall_gen;
-	tlog_debug("theme: wallpaper up, %lu tiles at %u, map %u, bank %lu", (unsigned long)tiles, start,
+	tlog_debug("theme: wallpaper up, %lu tiles at %u, map %u, bank %lu", (unsigned long)tiles, first,
 		   res_bg_screenblock(m), (unsigned long)bank);
 }
 

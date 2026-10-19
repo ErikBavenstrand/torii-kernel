@@ -1,0 +1,23 @@
+#! settings 4=1 28=2
+#! sd-theme example
+#! theme-choice example
+# The game menu and a question over the SD list in the SD theme
+# themes/example, whose wallpaper shows beside the list: the menu's plane 3
+# list must find its VRAM next to the wallpaper (T18), and the wallpaper is
+# back once the question closes. Hello.gba is a row further down than in
+# file-menu.opts, below the card's torii folder: A on it opens the game menu,
+# B closes it; L+START asks before deleting it, B keeps it.
+-w "screen ready: sd-list"
+-s @20:list.png
+-k @28:DOWN -k @32:- -k @36:DOWN -k @40:- -k @44:DOWN -k @48:- -k @52:DOWN -k @56:-
+-k @60:DOWN -k @64:-
+-k @72:A -k @76:-
+-w "screen ready: file-menu"
+-s @20:file-menu.png
+-k @28:B -k @32:-
+-k @48:L -k @52:L+START -k @56:-
+-w "screen ready: dialog"
+-s @20:dialog.png
+-k @28:B -k @32:-
+-w "screen ready: sd-list"
+-s @20:kept.png

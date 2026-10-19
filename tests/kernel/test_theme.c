@@ -161,6 +161,16 @@ void test_theme_load(void)
 	CHECK_EQ(map[1] & 0x3FF, (map[0] & 0x3FF) + 1);   // 2 tiles wide, repeated
 	CHECK_EQ(map[2] & 0x3FF, map[0] & 0x3FF);
 	CHECK_EQ(map[32] & 0x3FF, (map[0] & 0x3FF) + 2);  // the next row
+	// Where (T18): only character block 0 reaches it, so lists on planes 1
+	// and 3 and every map get all the rest of BG VRAM with it still up
+	CHECK_EQ((bgcnt >> 2) & 3, 0);
+	CHECK((bgcnt >> 8 & 31) < UI_WALL_VRAM_END / RES_MAP_UNITS);
+	CHECK((map[0] & 0x3FF) < UI_WALL_VRAM_END);
+	u8 rest = res_alloc(RES_BG_VRAM, RES_BG_UNITS - UI_WALL_VRAM_END, 1, UI_WALL_VRAM_END, RES_BG_UNITS, 0,
+			    RES_NOLOG);
+	CHECK(rest != RES_NONE);
+	CHECK(ui_wallpaper_bgcnt(&bgcnt));
+	res_unref(RES_BG_VRAM, rest);
 	// Cached: the budget sees the room as free, and taking it all reclaims it
 	CHECK_EQ(pool_free_units(res_pool(RES_BG_VRAM), 1), RES_BG_UNITS);
 	u8 all = res_alloc(RES_BG_VRAM, RES_BG_UNITS, 1, 0, RES_BG_UNITS, 0, RES_NOLOG);

@@ -84,6 +84,13 @@ sd-scroll/frames 58-58 1EF409CA7C6A0E40
 sd-scroll/frames 59-59 0E42AD38C5B4B318
 sd-scroll/frames 60-60 6BAF27EF5883ECF8
 sd-scroll/frames 61-119 A8266BC030B94860
+sd-theme-menus/dialog A36B142F20F61DF0
+sd-theme-menus/file-menu 53E8845BB4D19DBE
+sd-theme-menus/kept 78C37A96E08CB9A9
+sd-theme-menus/list 795D672AB1E0F14A
+sd-theme-reclaim/dialog 196EA63302F5256A
+sd-theme-reclaim/kept 1BB921E13BD8056E
+sd-theme-reclaim/list 40F65CFA3D7586CE
 settings-held/held-l 0CA5C0696DB712FC
 settings-held/held-r 0CA5C0696DB712FC
 settings-light/help 488DC004C5AB9F15

@@ -64,11 +64,22 @@ int ui_theme_boot(void);
 
 // --- For ui/ui_run.c ---------------------------------------------------------
 
+// The wallpaper's map and tiles go at the top of BG VRAM units
+// [0, UI_WALL_VRAM_END), under its map: the part only character block 0
+// reaches. Lists on planes 1 and 3 take their tiles from blocks 1 and 2
+// (units 512 up) and maps come from the top of VRAM, so neither ever needs
+// that room, and the wallpaper never moves their blocks either (T18: put
+// among the maps, it pushed every view's maps down a screenblock and the
+// game menu's plane 3 list no longer fit). Only planes 0 and 2 share it,
+// taking tiles from the bottom up.
+#define UI_WALL_VRAM_END 512
+
 // Uploads the wallpaper of the current theme (if it has one and it isn't
-// up already): ui_init and ui_theme_set call it. Its tiles, map and palette
-// bank are left cached (engine/res.h), so they never count against a
-// screen's budget: a screen that needs the room reclaims them, and the
-// wallpaper then stays off until the next upload.
+// up already): ui_init and ui_theme_set call it, and the frame after a view
+// is popped (once nothing popped shows). Its tiles, map and palette bank are
+// left cached (engine/res.h), so they never count against a screen's
+// budget: a screen whose planes 0 and 2 need the room reclaims them, and the
+// wallpaper is off until a view is popped and it fits again.
 void ui_wallpaper_setup(void);
 // 1 if the wallpaper can show on plane 3 now, with its BGCNT in *bgcnt.
 int ui_wallpaper_bgcnt(u16 *bgcnt);
