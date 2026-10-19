@@ -1,8 +1,10 @@
+// SETTINGS page 1 (clock, addons, language, patch engine, hot keys, cart
+// hardware), and the runner the settings pages share (settings.h).
 #include <gba_systemcalls.h>
+#include <gba_video.h>
 #include <stdio.h>
-#include <stdlib.h>
+#include <string.h>
 #include <gba_base.h>
-#include <gba_input.h>
 
 #include "ez_define.h"
 #include "lang.h"
@@ -10,51 +12,70 @@
 #include "RTC.h"
 #include "draw.h"
 #include "Ezcard_OP.h"
+#include "settings.h"
 #include "tlog.h"
-
-//extern const unsigned char __attribute__((aligned(4)))gImage_SET[76800];
+#include "engine/engine.h"
 
 extern u16 gl_engine_sel;
 extern u16 gl_show_Thumbnail;
 extern u16 gl_game_clock;
 extern u16 gl_game_rumble;
 
-void save_setw_info(void);
+static void save_setw_info(void);
 
 u16 SET_info_buffer[0x200] EWRAM_BSS;
 
+// Hot keys, as the settings store them
 #define K_A (0)
 #define K_B (1)
 #define K_SELECT (2)
 #define K_START (3)
-#define K_RIGHT (4)
-#define K_LEFT (5)
-#define K_UP (6)
-#define K_DOWN (7)
 #define K_R (8)
 #define K_L (9)
+#define K_COUNT 10
+static const char *const key_names[K_COUNT] = {"A", "B", "SELECT", "START", "RIGHT", "LEFT", "UP", "DOWN", "R", "L"};
+static const u8 sleep_default[3] = {K_L, K_R, K_SELECT};
+static const u8 menu_default[3] = {K_L, K_R, K_START};
 
-u8 *str_A = (u8 *)"   A  ";
-u8 *str_B = (u8 *)"   B  ";
-u8 *str_SELECT = (u8 *)"SELECT";
-u8 *str_START = (u8 *)"START ";
-u8 *str_RIGHT = (u8 *)"RIGHT ";
-u8 *str_LEFT = (u8 *)" LEFT ";
-u8 *str_UP = (u8 *)"  UP  ";
-u8 *str_DOWN = (u8 *)" DOWN ";
-u8 *str_R = (u8 *)"   R  ";
-u8 *str_L = (u8 *)"   L  ";
+static u16 v_reset EWRAM_BSS;
+static u16 v_rts EWRAM_BSS;
+static u16 v_sleep EWRAM_BSS;
+static u16 v_cheat EWRAM_BSS;
+static u16 language_sel EWRAM_BSS;
+static u16 engine_sel EWRAM_BSS;
+static u8 edit_sleephotkey[3] EWRAM_BSS;
+static u8 edit_rtshotkey[3] EWRAM_BSS;
 
-u16 v_reset;
-u16 v_rts;
-u16 v_sleep;
-u16 v_cheat;
-u16 language_sel;
-u16 engine_sel;
-u8 edit_sleephotkey[3] = {0};
-u8 edit_rtshotkey[3] = {0};
+// Page 1's rows (select): the official kernel's order
+enum {
+	ROW_TIME,
+	ROW_ADDON,
+	ROW_LANGUAGE,
+	ROW_ENGINE,
+	ROW_SLEEP_KEY,
+	ROW_MENU_KEY,
+	ROW_CART,
+	ROWS1
+};
+
+// The official kernel's edit state, by the same names
+static struct {
+	u8 select;
+	u8 set_ok;  // edit mode
+	u8 edit_pos;
+	u8 addon_sel;
+	u8 sleep_pos;
+	u8 rtshotkey_pos;
+	u8 engine_pos;
+	u8 rtc_pos;
+	u8 edit_datetime[7];
+	u8 datetime[7];  // the clock as last read
+	u8 sleep_keys[3], menu_keys[3];  // as saved
+	u32 polled;      // frame of the last clock read
+} p1 EWRAM_BSS;
 
 //---------------------------------------------------------------------------------
+// The mode 3 screens' checkbox (the cheat screen still draws it)
 void Draw_select_icon(u32 X, u32 Y, u32 mode)
 {
 	Clear(X + 2, Y + 2, 8, 8, gl_color_text, 1);
@@ -62,1462 +83,660 @@ void Draw_select_icon(u32 X, u32 Y, u32 mode)
 	if (mode)
 		Clear(X + 4, Y + 4, 4, 4, gl_color_selected, 1);
 }
-//---------------------------------------------------------------------------------
-u32 Setting_window(void)
+
+// --- The runner ---------------------------------------------------------------
+
+static u32 settings_result EWRAM_BSS;
+static u32 row_count EWRAM_BSS;
+static u32 row_hash[SETTINGS_ROWS_MAX] EWRAM_BSS;
+static char row_value[64] EWRAM_BSS;
+
+const struct ui_label_config settings_title_config = {"", UI_FONT_HEADING, UI_ALIGN_LEFT, 0};
+const struct ui_label_config settings_corner_config = {"", UI_FONT_BODY, UI_ALIGN_RIGHT, 0};
+
+static const struct settings_page *const pages[] = {&settings_page1, &settings_page2, &settings_help};
+
+static u32 model_count(void *ctx)
 {
-	u16 keys;
-	u32 line;
-	u32 select;
-	u32 Set_OK = 0;
-	u32 Set_OK_line = 0;
+	const struct settings_page *p = ctx;
+	u32 n = p->count();
+	return n < SETTINGS_ROWS_MAX ? n : SETTINGS_ROWS_MAX;
+}
 
-	u8 edit_pos = 0;
-	//u32 i;
-	u32 currstate = 0;
+// The list draws a row straight after fetching it, so one buffer serves
+static int model_fetch(void *ctx, u32 index, struct ui_item *out)
+{
+	const struct settings_page *p = ctx;
+	const char *name = "";
+	row_value[0] = 0;
+	p->row(index, &name, row_value, sizeof(row_value));
+	out->text = name;
+	out->detail = row_value;
+	return UI_ITEM_READY;
+}
 
-	char msg[128];
-	u16 clean_color;
-	u16 clean_pos;
-	u16 clean_w;
-	u32 re_show = 1;
+const struct ui_list_model settings_model = {model_count, model_fetch, 0};
 
-	u32 addon_sel = 2;
+// FNV-1a of a row's name (by address) and value
+static u32 row_digest(const struct settings_page *p, u32 row)
+{
+	const char *name = "";
+	row_value[0] = 0;
+	p->row(row, &name, row_value, sizeof(row_value));
+	u32 h = 2166136261u ^ (u32)name;
+	for (const char *s = row_value; *s; s++)
+		h = (h ^ (u8)*s) * 16777619u;
+	return h;
+}
 
-	u8 sleep_pos = 0;
-	u8 rtshotkey_pos = 0;
+static void digest_all(const struct settings_page *p)
+{
+	row_count = model_count((void *)p);
+	for (u32 i = 0; i < row_count; i++)
+		row_hash[i] = row_digest(p, i);
+}
 
-	u8 engine_pos = 1;
+void settings_sync(void)
+{
+	struct ui_view *v = ui_top();
+	const struct settings_page *p = v ? v->ctx : 0;
+	if (!p || !p->count)
+		return;
+	u8 list = (u8)(v->first + SETTINGS_LIST);
+	if (model_count((void *)p) != row_count) {
+		// Rows came or went (LED's): the list redraws as a new page
+		digest_all(p);
+		ui_list_reset(list, p->cursor());
+		return;
+	}
+	for (u32 i = 0; i < row_count; i++) {
+		u32 h = row_digest(p, i);
+		if (h != row_hash[i]) {
+			row_hash[i] = h;
+			ui_list_refresh(list, i, i);
+		}
+	}
+	if (ui_list_cursor(list) != p->cursor())
+		ui_list_set_cursor(list, p->cursor());
+}
 
-	u8 datetime[7];
-	u8 edit_datetime[7] = {0};
+void settings_header(struct ui_view *view, const char *title, const char *corner)
+{
+	ui_label_set((u8)(view->first + 1), title);
+	ui_label_set((u8)(view->first + 2), corner);
+}
 
-	u8 RTC_pos = 2;
+static void open_page(u32 page)
+{
+	const struct settings_page *p = pages[page];
+	struct ui_view *v = ui_push(p->view, (void *)p);
+	if (!v) {
+		tlog_error("settings: %s", ui_error());
+		return;  // nothing on the stack: Settings_run returns
+	}
+	p->enter(v);
+	if (p->count) {
+		digest_all(p);
+		ui_list_reset((u8)(v->first + SETTINGS_LIST), p->cursor());
+	}
+}
 
-	u8 *str0;
-	u8 *str1;
-	u8 *str2;
+void settings_open(u32 page)
+{
+	ui_pop();
+	open_page(page);
+}
 
-	select = 0;
-	u32 y_offset = 24;
-	u32 set_offset = 1;
-	u32 x_offset = set_offset + 9 * 6 + 3;
+void settings_leave(u32 result)
+{
+	settings_result = result;
+	ui_pop();
+}
 
-	u32 line_x = 17;
-	u32 lang;
+// Back to the mode 3 menu: a black frame buffer, then mode 3
+static void back_to_mode3(void)
+{
+	VBlankIntrWait();
+	REG_DISPCNT = MODE_0;  // no layers: only the backdrop shows
+	REG_BLDCNT = 0;
+	REG_BLDALPHA = 0;
+	REG_BLDY = 0;
+	u32 zero = 0;
+	CpuFastSet(&zero, (void *)VRAM, (240 * 160 * 2 / 4) | FILL);
+	VBlankIntrWait();
+	REG_DISPCNT = MODE_3 | BG2_ENABLE;
+}
 
+u32 Settings_run(u32 page)
+{
+	settings_result = SETTINGS_TO_NOR;
+	engine_init();
+	ui_init(NULL);
+	open_page(page);
+	while (ui_depth()) {
+		ui_frame();
+		const struct ui_view *v = ui_top();
+		const struct settings_page *p = v ? v->ctx : 0;
+		if (p && p->poll)
+			p->poll();
+	}
+	ui_shutdown();
+	back_to_mode3();
+	return settings_result;
+}
+
+// --- Value helpers --------------------------------------------------------------
+
+const char *settings_name(const char *name)
+{
+	while (*name == ' ')
+		name++;
+	return name;
+}
+
+void settings_token(char *value, u32 size, const char *text, int state)
+{
+	if (state < 0)
+		snprintf(value, size, "\xC2\xAB %s \xC2\xBB", text);
+	else
+		snprintf(value, size, "\xC2\xAB %s: %s \xC2\xBB", text, state ? gl_on : gl_off);
+}
+
+void settings_add(char *value, u32 size, const char *sep, const char *text)
+{
+	u32 len = strlen(value);
+	if (len < size)
+		snprintf(value + len, size - len, "%s%s", len ? sep : "", text);
+}
+
+void settings_none(char *value, u32 size)
+{
+	if (!value[0])
+		snprintf(value, size, "%s", gl_off);
+}
+
+// --- Page 1 ------------------------------------------------------------------------
+
+static const char *weekday(u32 day)
+{
+	switch (day) {
+	case 1:
+		return gl_Mon;
+	case 2:
+		return gl_Tues;
+	case 3:
+		return gl_Wed;
+	case 4:
+		return gl_Thur;
+	case 5:
+		return gl_Fri;
+	case 6:
+		return gl_Sat;
+	default:
+		return gl_Sun;
+	}
+}
+
+// A hot key as stored, the default for anything that isn't a key
+static u8 hot_key(u32 slot, u8 def)
+{
+	u16 v = Read_SET_info(slot);
+	return v < K_COUNT ? (u8)v : def;
+}
+
+static void read_hot_keys(void)
+{
+	for (u32 i = 0; i < 3; i++) {
+		p1.sleep_keys[i] = hot_key(assress_edit_sleephotkey_0 + i, sleep_default[i]);
+		p1.menu_keys[i] = hot_key(assress_edit_rtshotkey_0 + i, menu_default[i]);
+	}
+}
+
+static void read_clock(void)
+{
+	rtc_enable();
+	rtc_get(p1.datetime);
+	rtc_disenable();
+	p1.polled = frame_count();
+}
+
+// The clock's fields as the official kernel shows them
+static void clock_fields(u8 *year, u8 *month, u8 *day, u8 *hh, u8 *mm, u8 *ss, u8 *wkd)
+{
+	const u8 *d = p1.datetime;
+	*hh = UNBCD(d[_HOUR] & 0x3F);
+	*mm = UNBCD(d[_MIN] & 0x7F);
+	*ss = UNBCD(d[_SEC] & 0x7F);
+	if (*hh > 23)
+		*hh = 0;
+	if (*mm > 59)
+		*mm = 0;
+	if (*ss > 59)
+		*ss = 0;
+	*month = UNBCD(d[_MONTH] & 0x1F);
+	*day = UNBCD(d[_DAY] & 0x3F);
+	if (*month == 0)
+		*month = 1;
+	if (*day == 0)
+		*day = 1;
+	*year = UNBCD(d[_YEAR]);
+	*wkd = UNBCD(d[_WKD] & 0x7);
+}
+
+static void page1_enter(struct ui_view *view)
+{
+	memset(&p1, 0, sizeof(p1));
+	p1.addon_sel = 2;
+	p1.engine_pos = 1;
+	p1.rtc_pos = 2;
 	language_sel = gl_lang;
 	v_reset = Read_SET_info(assress_v_reset);
 	v_rts = Read_SET_info(assress_v_rts);
 	v_sleep = Read_SET_info(assress_v_sleep);
 	v_cheat = Read_SET_info(assress_v_cheat);
-	if ((v_reset != 0x0) && (v_reset != 0x1)) {
+	if ((v_reset != 0x0) && (v_reset != 0x1))
 		v_reset = 0x0;
-	}
-	if ((v_rts != 0x0) && (v_rts != 0x1)) {
+	if ((v_rts != 0x0) && (v_rts != 0x1))
 		v_rts = 0x0;
-	}
-	if ((v_sleep != 0x0) && (v_sleep != 0x1)) {
+	if ((v_sleep != 0x0) && (v_sleep != 0x1))
 		v_sleep = 0x0;
-	}
-	if ((v_cheat != 0x0) && (v_cheat != 0x1)) {
+	if ((v_cheat != 0x0) && (v_cheat != 0x1))
 		v_cheat = 0x0;
-	}
-
 	engine_sel = gl_engine_sel;
+	read_hot_keys();
+	read_clock();
+	settings_header(view, gl_settings_title, "1 / 2");
+}
 
-	while (1) {
-		VBlankIntrWait();
+static u32 page1_count(void)
+{
+	return ROWS1;
+}
 
-		if (re_show) {
-			//
-			sprintf(msg, "%s", gl_time);
-			DrawHZText12(msg, 0, set_offset, y_offset, gl_color_selected, 1);
+static u32 page1_cursor(void)
+{
+	return p1.select;
+}
 
-			//
-			sprintf(msg, "%s", gl_addon);
-			DrawHZText12(msg, 0, set_offset, y_offset + line_x, gl_color_selected, 1);
+// Appends field to value, in brackets if it is under the edit cursor
+static void field(char *value, u32 size, const char *sep, const char *text, int marked)
+{
+	char buf[16];
+	snprintf(buf, sizeof(buf), marked ? "[%s]" : "%s", text);
+	settings_add(value, size, sep, buf);
+}
 
-			Draw_select_icon(x_offset, y_offset + line_x, v_reset);
-			sprintf(msg, "%s", gl_reset);
-			DrawHZText12(msg, 0, x_offset + 15, y_offset + line_x,
-				     (addon_sel == 0) ? gl_color_selected : gl_color_text, 1);
+static void clock_value(char *value, u32 size)
+{
+	int edit = p1.set_ok && p1.select == ROW_TIME;
+	u8 year, month, day, hh, mm, ss, wkd;
+	clock_fields(&year, &month, &day, &hh, &mm, &ss, &wkd);
+	if (edit) {
+		const u8 *e = p1.edit_datetime;
+		year = e[_YEAR];
+		month = e[_MONTH];
+		day = e[_DAY];
+		hh = e[_HOUR];
+		mm = e[_MIN];
+		ss = e[_SEC];
+		wkd = e[_WKD];
+	}
+	char f[7][8];
+	snprintf(f[0], sizeof(f[0]), "20%02u", year % 100u);
+	snprintf(f[1], sizeof(f[1]), "%02u", month);
+	snprintf(f[2], sizeof(f[2]), "%02u", day);
+	snprintf(f[3], sizeof(f[3]), "%02u", hh);
+	snprintf(f[4], sizeof(f[4]), "%02u", mm);
+	snprintf(f[5], sizeof(f[5]), "%02u", ss);
+	snprintf(f[6], sizeof(f[6]), "%s", weekday(wkd));
+	static const char *const seps[7] = {"", "/", "/", " ", ":", ":", " "};
+	for (u32 i = 0; i < 7; i++)
+		field(value, size, seps[i], f[i], edit && p1.edit_pos == i);
+	if (edit)
+		field(value, size, "  ", settings_name(gl_ok_btn), p1.edit_pos == 7);
+}
 
-			Draw_select_icon(x_offset + 12 * 6, y_offset + line_x, v_rts);
-			sprintf(msg, "%s", gl_rts);
-			DrawHZText12(msg, 0, x_offset + 12 * 6 + 15, y_offset + line_x,
-				     (addon_sel == 1) ? gl_color_selected : gl_color_text, 1);
-			VBlankIntrWait();
-			Draw_select_icon(x_offset, y_offset + line_x * 2, v_sleep);
-			sprintf(msg, "%s", gl_sleep);
-			DrawHZText12(msg, 0, x_offset + 15, y_offset + line_x * 2,
-				     (addon_sel == 3) ? gl_color_selected : gl_color_text, 1);
-			VBlankIntrWait();
-			Draw_select_icon(x_offset + 12 * 6, y_offset + line_x * 2, v_cheat);
-			sprintf(msg, "%s", gl_cheat);
-			DrawHZText12(msg, 0, x_offset + 12 * 6 + 15, y_offset + line_x * 2,
-				     (addon_sel == 4) ? gl_color_selected : gl_color_text, 1);
+static void keys_value(char *value, u32 size, const u8 *keys, int edit, u32 pos)
+{
+	for (u32 i = 0; i < 3; i++)
+		field(value, size, " + ", key_names[keys[i] < K_COUNT ? keys[i] : 0], edit && pos == i);
+	if (edit)
+		field(value, size, "  ", settings_name(gl_ok_btn), pos == 3);
+}
 
-			//
-			sprintf(msg, "%s", gl_language);
-			DrawHZText12(msg, 0, set_offset, y_offset + line_x * 3, gl_color_selected, 1);
-			// Two languages fit on the row
-			for (lang = 0; (lang < lang_pack_count) && (lang < 2); lang++) {
-				Draw_select_icon(x_offset + lang * 12 * 6, y_offset + line_x * 3,
-						 (language_sel == lang));
-				sprintf(msg, "%s", lang_packs[lang].name);
-				DrawHZText12(msg, 0, x_offset + lang * 12 * 6 + 15, y_offset + line_x * 3,
-					     ((language_sel == lang) && currstate && (2 == select)) ? gl_color_selected
-												    : gl_color_text,
-					     1);
+static void page1_row(u32 row, const char **name, char *value, u32 size)
+{
+	int edit = p1.set_ok && p1.select == row;
+	const char *ok = settings_name(gl_ok_btn);
+	// SAVESTATE alone turns the hot keys into save and load keys
+	int save_keys = (v_rts == 1) && (v_cheat == 0) && (v_reset == 0) && (v_sleep == 0);
+	switch (row) {
+	case ROW_TIME:
+		*name = settings_name(gl_time);
+		clock_value(value, size);
+		break;
+	case ROW_ADDON: {
+		*name = settings_name(gl_addon);
+		// addon_sel: RESET, SAVESTATE, OK, SLEEP, CHEAT
+		const char *names[5] = {gl_reset, gl_rts, ok, gl_sleep, gl_cheat};
+		const u16 on[5] = {v_reset, v_rts, 0, v_sleep, v_cheat};
+		if (edit && p1.addon_sel < 5) {
+			settings_token(value, size, names[p1.addon_sel],
+				       p1.addon_sel == 2 ? -1 : on[p1.addon_sel] == 1);
+		} else {
+			for (u32 i = 0; i < 5; i++)
+				if (i != 2 && on[i] == 1)
+					settings_add(value, size, "  ", names[i]);
+			settings_none(value, size);
+		}
+		break;
+	}
+	case ROW_LANGUAGE:
+		*name = settings_name(gl_language);
+		if (edit)
+			settings_token(value, size, lang_packs[language_sel].name, -1);
+		else
+			settings_add(value, size, "", lang_packs[language_sel].name);
+		break;
+	case ROW_ENGINE:
+		*name = settings_name(gl_engine);
+		if (edit)
+			settings_token(value, size, p1.engine_pos ? ok : gl_use_engine,
+				       p1.engine_pos ? -1 : engine_sel == 1);
+		else
+			settings_add(value, size, "", engine_sel == 1 ? gl_on : gl_off);
+		break;
+	case ROW_SLEEP_KEY:
+		*name = save_keys ? gl_save_key : settings_name(gl_hot_key);
+		keys_value(value, size, edit ? edit_sleephotkey : p1.sleep_keys, edit, p1.sleep_pos);
+		break;
+	case ROW_MENU_KEY:
+		*name = save_keys ? gl_load_key : settings_name(gl_hot_key2);
+		keys_value(value, size, edit ? edit_rtshotkey : p1.menu_keys, edit, p1.rtshotkey_pos);
+		break;
+	default: {  // ROW_CART
+		*name = settings_name(gl_cart_str);
+		// rtc_pos: CLOCK, RUMBLE, OK
+		const char *names[3] = {gl_clock_str, gl_rumble_str, ok};
+		const u16 on[3] = {gl_game_clock, gl_game_rumble, 0};
+		if (edit && p1.rtc_pos < 3) {
+			settings_token(value, size, names[p1.rtc_pos], p1.rtc_pos == 2 ? -1 : on[p1.rtc_pos] == 1);
+		} else {
+			for (u32 i = 0; i < 2; i++)
+				if (on[i] == 1)
+					settings_add(value, size, "  ", names[i]);
+			settings_none(value, size);
+		}
+		break;
+	}
+	}
+}
+
+static u8 days_in(u32 month, u32 year)
+{
+	static const u8 days[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+	if (month == 2 && year % 4 == 0)
+		return 29;
+	return month >= 1 && month <= 12 ? days[month - 1] : 31;
+}
+
+// UP (dir 1) or DOWN (-1) on the clock field under the edit cursor
+static void clock_step(int dir)
+{
+	u8 *e = p1.edit_datetime;
+	static const u8 index[7] = {_YEAR, _MONTH, _DAY, _HOUR, _MIN, _SEC, _WKD};
+	static const u8 lo[7] = {0, 1, 1, 0, 0, 0, 0};
+	u8 hi[7] = {99, 12, days_in(e[_MONTH], e[_YEAR]), 23, 59, 59, 6};
+	u32 pos = p1.edit_pos;
+	if (pos > 6)
+		return;
+	u8 *v = &e[index[pos]];
+	if (dir > 0)
+		*v = *v >= hi[pos] ? lo[pos] : *v + 1;
+	else
+		*v = *v <= lo[pos] ? hi[pos] : *v - 1;
+	// A shorter month (or February out of a leap year) keeps a day it has
+	u8 last = days_in(e[_MONTH], e[_YEAR]);
+	if (e[_DAY] > last)
+		e[_DAY] = last;
+}
+
+// UP (dir 1) or DOWN (-1) on hot key pos: the next key the other two don't use
+static void key_step(u8 *keys, u32 pos, int dir)
+{
+	if (pos > 2)
+		return;
+	u8 k = keys[pos];
+	for (u32 tries = 0; tries < K_COUNT; tries++) {
+		k = (u8)((k + K_COUNT + dir) % K_COUNT);
+		if (k != keys[(pos + 1) % 3] && k != keys[(pos + 2) % 3])
+			break;
+	}
+	keys[pos] = k;
+}
+
+// A in normal mode: edit the selected row (the official kernel's set-up)
+static void page1_start_edit(void)
+{
+	u8 year, month, day, hh, mm, ss, wkd;
+	read_clock();
+	clock_fields(&year, &month, &day, &hh, &mm, &ss, &wkd);
+	p1.set_ok = 1;
+	u8 *e = p1.edit_datetime;
+	e[_HOUR] = hh;
+	e[_MIN] = mm;
+	e[_SEC] = ss;
+	e[_DAY] = day;
+	e[_MONTH] = month;
+	e[_YEAR] = year;
+	e[_WKD] = wkd;
+	if (p1.select == ROW_ADDON)
+		p1.addon_sel = 0;
+	else if (p1.select == ROW_ENGINE)
+		p1.engine_pos = 0;
+	else if (p1.select == ROW_CART)
+		p1.rtc_pos = 0;
+	read_hot_keys();
+	memcpy(edit_sleephotkey, p1.sleep_keys, 3);
+	memcpy(edit_rtshotkey, p1.menu_keys, 3);
+}
+
+static void page1_edit_keys(u16 keys)
+{
+	u32 select = p1.select;
+	if (keys & (INPUT_UP | INPUT_DOWN)) {
+		int dir = (keys & INPUT_UP) ? 1 : -1;
+		if (select == ROW_TIME) {
+			clock_step(dir);
+		} else if (select == ROW_ADDON) {
+			if (dir > 0 && p1.addon_sel > 2)
+				p1.addon_sel -= 3;
+			else if (dir < 0 && p1.addon_sel < 2)
+				p1.addon_sel += 3;
+		} else if (select == ROW_SLEEP_KEY) {
+			key_step(edit_sleephotkey, p1.sleep_pos, dir);
+		} else if (select == ROW_MENU_KEY) {
+			key_step(edit_rtshotkey, p1.rtshotkey_pos, dir);
+		}
+	} else if (keys & INPUT_RIGHT) {
+		if (select == ROW_TIME) {
+			p1.edit_pos = p1.edit_pos == 7 ? 0 : p1.edit_pos + 1;
+		} else if (select == ROW_ADDON) {
+			if (p1.addon_sel == 3 || p1.addon_sel < 2)
+				p1.addon_sel++;
+		} else if (select == ROW_LANGUAGE) {
+			if ((language_sel + 1u < lang_pack_count) && (language_sel < 1))
+				language_sel++;
+		} else if (select == ROW_ENGINE) {
+			p1.engine_pos = 1;
+		} else if (select == ROW_SLEEP_KEY) {
+			if (p1.sleep_pos < 3)
+				p1.sleep_pos++;
+		} else if (select == ROW_MENU_KEY) {
+			if (p1.rtshotkey_pos < 3)
+				p1.rtshotkey_pos++;
+		} else if (select == ROW_CART) {
+			if (p1.rtc_pos < 2)
+				p1.rtc_pos++;
+		}
+	} else if (keys & INPUT_LEFT) {
+		if (select == ROW_TIME) {
+			p1.edit_pos = p1.edit_pos == 0 ? 7 : p1.edit_pos - 1;
+		} else if (select == ROW_ADDON) {
+			if (p1.addon_sel == 4 || (p1.addon_sel > 0 && p1.addon_sel < 3))
+				p1.addon_sel--;
+		} else if (select == ROW_LANGUAGE) {
+			if (language_sel)
+				language_sel--;
+		} else if (select == ROW_ENGINE) {
+			p1.engine_pos = 0;
+		} else if (select == ROW_SLEEP_KEY) {
+			if (p1.sleep_pos)
+				p1.sleep_pos--;
+		} else if (select == ROW_MENU_KEY) {
+			if (p1.rtshotkey_pos)
+				p1.rtshotkey_pos--;
+		} else if (select == ROW_CART) {
+			if (p1.rtc_pos)
+				p1.rtc_pos--;
+		}
+	} else if (keys & INPUT_A) {
+		if (select == ROW_TIME && p1.edit_pos == 7) {
+			rtc_enable();
+			rtc_set(p1.edit_datetime);
+			rtc_disenable();
+			delay(0x200);
+			p1.set_ok = 0;
+			read_clock();
+		} else if (select == ROW_ADDON) {
+			switch (p1.addon_sel) {
+			case 0:
+				v_reset = !v_reset;
+				break;
+			case 1:
+				v_rts = !v_rts;
+				break;
+			case 3:
+				v_sleep = !v_sleep;
+				break;
+			case 4:
+				v_cheat = !v_cheat;
+				break;
+			default:  // OK
+				save_setw_info();
+				CheckSwitch();  //read again
+				p1.set_ok = 0;
+				break;
 			}
-
-			//
-			VBlankIntrWait();
-			sprintf(msg, "%s", gl_engine);
-			DrawHZText12(msg, 0, set_offset, y_offset + line_x * 4, gl_color_selected, 1);
-			Draw_select_icon(x_offset, y_offset + line_x * 4, (engine_sel == 0x1));
-			sprintf(msg, "%s", gl_use_engine);
-			DrawHZText12(msg, 0, x_offset + 15, y_offset + line_x * 4,
-				     (engine_pos == 0) ? gl_color_selected : gl_color_text, 1);
-			//
-
-			ClearWithBG((u16 *)gImage_SET, set_offset, y_offset + line_x * 5, 9 * 6, 13, 1);
-			ClearWithBG((u16 *)gImage_SET, set_offset, y_offset + line_x * 6, 9 * 6, 13, 1);
-			if ((v_rts == 1) && (v_cheat == 0) && (v_reset == 0) && (v_sleep == 0)) {
-				sprintf(msg, "%s", " SAVE KEY");
-				DrawHZText12(msg, 0, set_offset, y_offset + line_x * 5, gl_color_selected, 1);
-
-				sprintf(msg, "%s", " LOAD KEY");
-				DrawHZText12(msg, 0, set_offset, y_offset + line_x * 6, gl_color_selected, 1);
+		} else if (select == ROW_LANGUAGE) {
+			save_setw_info();
+			CheckLanguage();  //read again
+			p1.set_ok = 0;
+		} else if (select == ROW_ENGINE) {
+			if (p1.engine_pos == 0) {
+				engine_sel = !engine_sel;
 			} else {
-				sprintf(msg, "%s", gl_hot_key);
-				DrawHZText12(msg, 0, set_offset, y_offset + line_x * 5, gl_color_selected, 1);
-
-				sprintf(msg, "%s", gl_hot_key2);
-				DrawHZText12(msg, 0, set_offset, y_offset + line_x * 6, gl_color_selected, 1);
+				save_setw_info();
+				p1.set_ok = 0;
+				gl_engine_sel = Read_SET_info(assress_engine_sel);
+				if ((gl_engine_sel != 0x0) && (gl_engine_sel != 0x1))
+					gl_engine_sel = 0x1;
 			}
-
-			//CART: the cart hardware games may use
-			sprintf(msg, "%s", gl_cart_str);
-			DrawHZText12(msg, 0, set_offset, y_offset + line_x * 7, gl_color_selected, 1);
-			Draw_select_icon(x_offset, y_offset + line_x * 7, (gl_game_clock == 0x1));
-			sprintf(msg, "%s", gl_clock_str);
-			DrawHZText12(msg, 0, x_offset + 15, y_offset + line_x * 7,
-				     (RTC_pos == 0) ? gl_color_selected : gl_color_text, 1);
-			Draw_select_icon(x_offset + 12 * 6, y_offset + line_x * 7, (gl_game_rumble == 0x1));
-			sprintf(msg, "%s", gl_rumble_str);
-			DrawHZText12(msg, 0, x_offset + 12 * 6 + 15, y_offset + line_x * 7,
-				     (RTC_pos == 1) ? gl_color_selected : gl_color_text, 1);
-
-			u32 offsety;
-			for (line = 0; line < 7; line++) {
-				if (Set_OK == 1) {
-					if ((line == select) && (0 == select) && (edit_pos == 7))
-						clean_color = gl_color_btn_clean;
-					else if ((line == select) && (1 == select) && (addon_sel == 2))
-						clean_color = gl_color_btn_clean;
-					else if ((line == select) && (3 == select) && (engine_pos == 1))
-						clean_color = gl_color_btn_clean;
-					else if ((line == select) && (4 == select) && (sleep_pos == 3))
-						clean_color = gl_color_btn_clean;
-					else if ((line == select) && (5 == select) && (rtshotkey_pos == 3))
-						clean_color = gl_color_btn_clean;
-					else if ((line == select) && (6 == select) && (RTC_pos == 2))
-						clean_color = gl_color_btn_clean;
-
-					else
-						clean_color = gl_color_MENU_btn;
-				} else {
-					if (line == select)
-						clean_color = gl_color_btn_clean;
-					else
-						clean_color = gl_color_MENU_btn;
-				}
-				offsety = y_offset + line * line_x;
-				if (line > 1)
-					offsety += line_x;
-
-				Clear(202, offsety - 2, 30, 14, clean_color, 1);
-
-				if (Set_OK && (line == Set_OK_line)) {
-					sprintf(msg, "%s", gl_ok_btn);
-				} else {
-					sprintf(msg, "%s", gl_set_btn);
-				}
-				DrawHZText12(msg, 0, 200 + 5, offsety, gl_color_text, 1);
-				VBlankIntrWait();
+		} else if ((select == ROW_SLEEP_KEY && p1.sleep_pos == 3) ||
+			   (select == ROW_MENU_KEY && p1.rtshotkey_pos == 3)) {
+			save_setw_info();
+			p1.set_ok = 0;
+		} else if (select == ROW_CART) {
+			switch (p1.rtc_pos) {
+			case 0:
+				gl_game_clock = !gl_game_clock;
+				break;
+			case 1:
+				gl_game_rumble = !gl_game_rumble;
+				break;
+			default:  // OK
+				save_setw_info();
+				p1.set_ok = 0;
+				gl_game_clock = Read_SET_info(assress_game_clock);
+				if ((gl_game_clock != 0x0) && (gl_game_clock != 0x1))
+					gl_game_clock = 0x1;
+				gl_game_rumble = Read_SET_info(assress_game_rumble);
+				if ((gl_game_rumble != 0x0) && (gl_game_rumble != 0x1))
+					gl_game_rumble = 0x1;
+				break;
 			}
 		}
-
-		currstate = Set_OK;
-		switch (currstate) {
-		case 0: //initial state
-				//get date and time
-			rtc_enable();
-			rtc_get(datetime);
-			rtc_disenable();
-			char *wkday;
-			switch (UNBCD(datetime[3] & 0x7)) {
-			case 0:
-				wkday = gl_Sun;
-				break;
-			case 1:
-				wkday = gl_Mon;
-				break;
-			case 2:
-				wkday = gl_Tues;
-				break;
-			case 3:
-				wkday = gl_Wed;
-				break;
-			case 4:
-				wkday = gl_Thur;
-				break;
-			case 5:
-				wkday = gl_Fri;
-				break;
-			case 6:
-				wkday = gl_Sat;
-				break;
-			default:
-				wkday = gl_Sun;
-				break;
-			}
-
-			u8 HH = UNBCD(datetime[4] & 0x3F);
-			u8 MM = UNBCD(datetime[5] & 0x7F);
-			u8 SS = UNBCD(datetime[6] & 0x7F);
-			if (HH > 23)
-				HH = 0;
-			if (MM > 59)
-				MM = 0;
-			if (SS > 59)
-				SS = 0;
-			u8 month = UNBCD(datetime[1] & 0x1F);
-			u8 day = UNBCD(datetime[2] & 0x3F);
-			if (month == 0)
-				month = 1;
-			if (day == 0)
-				day = 1;
-
-			sprintf(msg, "%u/%02u/%02u %02d:%02d:%02d %s", UNBCD(datetime[0]) + 2000, month, day, HH, MM,
-				SS, wkday);
-			ClearWithBG((u16 *)gImage_SET, x_offset, y_offset, 22 * 6, 13, 1);
-			DrawHZText12(msg, 0, x_offset, y_offset, gl_color_text, 1);
-			VBlankIntrWait();
-
-			u16 read5 = Read_SET_info(assress_edit_sleephotkey_0);
-			u16 read6 = Read_SET_info(assress_edit_sleephotkey_1);
-			u16 read7 = Read_SET_info(assress_edit_sleephotkey_2);
-			switch (read5) {
-			case 0:
-				str0 = str_A;
-				break;
-			case 1:
-				str0 = str_B;
-				break;
-			case 2:
-				str0 = str_SELECT;
-				break;
-			case 3:
-				str0 = str_START;
-				break;
-			case 4:
-				str0 = str_RIGHT;
-				break;
-			case 5:
-				str0 = str_LEFT;
-				break;
-			case 6:
-				str0 = str_UP;
-				break;
-			case 7:
-				str0 = str_DOWN;
-				break;
-			case 8:
-				str0 = str_R;
-				break;
-			case 9:
-				str0 = str_L;
-				break;
-			default:
-				str0 = str_L;
-				break;
-			}
-			switch (read6) {
-			case 0:
-				str1 = str_A;
-				break;
-			case 1:
-				str1 = str_B;
-				break;
-			case 2:
-				str1 = str_SELECT;
-				break;
-			case 3:
-				str1 = str_START;
-				break;
-			case 4:
-				str1 = str_RIGHT;
-				break;
-			case 5:
-				str1 = str_LEFT;
-				break;
-			case 6:
-				str1 = str_UP;
-				break;
-			case 7:
-				str1 = str_DOWN;
-				break;
-			case 8:
-				str1 = str_R;
-				break;
-			case 9:
-				str1 = str_L;
-				break;
-			default:
-				str1 = str_R;
-				break;
-			}
-			switch (read7) {
-			case 0:
-				str2 = str_A;
-				break;
-			case 1:
-				str2 = str_B;
-				break;
-			case 2:
-				str2 = str_SELECT;
-				break;
-			case 3:
-				str2 = str_START;
-				break;
-			case 4:
-				str2 = str_RIGHT;
-				break;
-			case 5:
-				str2 = str_LEFT;
-				break;
-			case 6:
-				str2 = str_UP;
-				break;
-			case 7:
-				str2 = str_DOWN;
-				break;
-			case 8:
-				str2 = str_R;
-				break;
-			case 9:
-				str2 = str_L;
-				break;
-			default:
-				str2 = str_SELECT;
-				break;
-			}
-			sprintf(msg, "%s %s  %s", str0, str1, str2);//read from flash
-			DrawHZText12(msg, 0, x_offset + 10, y_offset + line_x * 5, gl_color_text, 1);
-			u16 read8 = Read_SET_info(assress_edit_rtshotkey_0);
-			u16 read9 = Read_SET_info(assress_edit_rtshotkey_1);
-			u16 read10 = Read_SET_info(assress_edit_rtshotkey_2);
-			switch (read8) {
-			case 0:
-				str0 = str_A;
-				break;
-			case 1:
-				str0 = str_B;
-				break;
-			case 2:
-				str0 = str_SELECT;
-				break;
-			case 3:
-				str0 = str_START;
-				break;
-			case 4:
-				str0 = str_RIGHT;
-				break;
-			case 5:
-				str0 = str_LEFT;
-				break;
-			case 6:
-				str0 = str_UP;
-				break;
-			case 7:
-				str0 = str_DOWN;
-				break;
-			case 8:
-				str0 = str_R;
-				break;
-			case 9:
-				str0 = str_L;
-				break;
-			default:
-				str0 = str_L;
-				break;
-			}
-			switch (read9) {
-			case 0:
-				str1 = str_A;
-				break;
-			case 1:
-				str1 = str_B;
-				break;
-			case 2:
-				str1 = str_SELECT;
-				break;
-			case 3:
-				str1 = str_START;
-				break;
-			case 4:
-				str1 = str_RIGHT;
-				break;
-			case 5:
-				str1 = str_LEFT;
-				break;
-			case 6:
-				str1 = str_UP;
-				break;
-			case 7:
-				str1 = str_DOWN;
-				break;
-			case 8:
-				str1 = str_R;
-				break;
-			case 9:
-				str1 = str_L;
-				break;
-			default:
-				str1 = str_R;
-				break;
-			}
-			switch (read10) {
-			case 0:
-				str2 = str_A;
-				break;
-			case 1:
-				str2 = str_B;
-				break;
-			case 2:
-				str2 = str_SELECT;
-				break;
-			case 3:
-				str2 = str_START;
-				break;
-			case 4:
-				str2 = str_RIGHT;
-				break;
-			case 5:
-				str2 = str_LEFT;
-				break;
-			case 6:
-				str2 = str_UP;
-				break;
-			case 7:
-				str2 = str_DOWN;
-				break;
-			case 8:
-				str2 = str_R;
-				break;
-			case 9:
-				str2 = str_L;
-				break;
-			default:
-				str2 = str_START;
-				break;
-			}
-			sprintf(msg, "%s %s  %s", str0, str1, str2);
-			DrawHZText12(msg, 0, x_offset + 10, y_offset + line_x * 6, gl_color_text, 1);
-
-			if (re_show)
-				tlog_debug("screen ready: settings1");
-			re_show = 0;
-			scanKeys();
-			keys = keysDown();
-			if (keys & KEY_A) {//set
-				Set_OK_line = select;
-				Set_OK = 1;//!Set_OK;
-				re_show = 1;
-
-				edit_datetime[_HOUR] = HH;//UNBCD(datetime[_HOUR]&0x3F);
-				edit_datetime[_MIN] = MM;//UNBCD(datetime[_MIN]&0x7F);
-				edit_datetime[_SEC] = SS;//UNBCD(datetime[_SEC]&0x7F);
-				edit_datetime[_DAY] = day;//UNBCD(datetime[_DAY]&0x3F);
-				edit_datetime[_MONTH] = month;//UNBCD(datetime[_MONTH]&0x1F);
-				edit_datetime[_YEAR] = UNBCD(datetime[_YEAR]);
-				edit_datetime[_WKD] = UNBCD(datetime[_WKD] & 0x7);
-
-				if (select == 1) {
-					addon_sel = 0;
-				} else if (select == 3) {
-					engine_pos = 0;
-				} else if (select == 6) {
-					RTC_pos = 0;
-				}
-				edit_sleephotkey[0] = (read5 > 10) ? K_L : read5;
-				edit_sleephotkey[1] = (read6 > 10) ? K_R : read6;
-				edit_sleephotkey[2] = (read7 > 10) ? K_SELECT : read7;
-				edit_rtshotkey[0] = (read8 > 10) ? K_L : read8;
-				edit_rtshotkey[1] = (read9 > 10) ? K_R : read9;
-				edit_rtshotkey[2] = (read10 > 10) ? K_START : read10;
-
-			} else if (keys & KEY_DOWN) {
-				if (select < 6) {
-					select++;
-					re_show = 1;
-				}
-			} else if (keys & KEY_UP) {
-				if (select) {
-					select--;
-					re_show = 1;
-				}
-			} else if (keys & KEY_L) {
-				return 0;
-			} else if (keys & KEY_R) {
-				return 1;
-			}
-			break;
-		case 1: //edit state
-				//if(Set_OK_line==0) {
-			if (re_show) {
-				if (select == 0) {
-					ClearWithBG((u16 *)gImage_SET, x_offset, y_offset, 23 * 6, 13, 1);
-					switch (edit_pos) {
-					case 0:
-						clean_pos = x_offset;
-						clean_w = 24;
-						break;
-					case 1:
-						clean_pos = x_offset + 6 * 5;
-						clean_w = 12;
-						break;
-					case 2:
-						clean_pos = x_offset + 6 * 8;
-						clean_w = 12;
-						break;
-					case 3:
-						clean_pos = x_offset + 6 * 11;
-						clean_w = 12;
-						break;
-					case 4:
-						clean_pos = x_offset + 6 * 14;
-						clean_w = 12;
-						break;
-					case 5:
-						clean_pos = x_offset + 6 * 17;
-						clean_w = 12;
-						break;
-					case 6:
-						clean_pos = x_offset + 6 * 20;
-						clean_w = 18;
-						break;
-					}
-					if (edit_pos < 7)
-						Clear(clean_pos, y_offset, clean_w, 13, gl_color_btn_clean, 1);
-
-					char *edit_wkday;
-					switch (edit_datetime[_WKD]) {
-					case 0:
-						edit_wkday = gl_Sun;
-						break;
-					case 1:
-						edit_wkday = gl_Mon;
-						break;
-					case 2:
-						edit_wkday = gl_Tues;
-						break;
-					case 3:
-						edit_wkday = gl_Wed;
-						break;
-					case 4:
-						edit_wkday = gl_Thur;
-						break;
-					case 5:
-						edit_wkday = gl_Fri;
-						break;
-					case 6:
-						edit_wkday = gl_Sat;
-						break;
-					default:
-						edit_wkday = gl_Sun;
-						break;
-					}
-					sprintf(msg, "20%02d/%02d/%02d %02d:%02d:%02d %s", edit_datetime[_YEAR],
-						edit_datetime[_MONTH], edit_datetime[_DAY], edit_datetime[_HOUR],
-						edit_datetime[_MIN], edit_datetime[_SEC], edit_wkday);
-					DrawHZText12(msg, 0, x_offset, y_offset, gl_color_text, 1);
-				} else if (select == 4) {
-					ClearWithBG((u16 *)gImage_SET, x_offset, y_offset + line_x * 5, 23 * 6, 13, 1);
-					switch (sleep_pos) {
-					case 0:
-						clean_pos = x_offset + 10;
-						break;
-					case 1:
-						clean_pos = x_offset + 10 + 6 * 6 + 6;
-						break;
-					case 2:
-						clean_pos = x_offset + 10 + 6 * 12 + 18;
-						break;
-					}
-					if (sleep_pos < 3)
-						Clear(clean_pos, y_offset + line_x * 5, 36, 13, gl_color_btn_clean, 1);
-
-					//DEBUG_printf("%x %x %x", edit_sleephotkey[0],edit_sleephotkey[1],edit_sleephotkey[2]);
-					switch (edit_sleephotkey[0]) {
-					case 0:
-						str0 = str_A;
-						break;
-					case 1:
-						str0 = str_B;
-						break;
-					case 2:
-						str0 = str_SELECT;
-						break;
-					case 3:
-						str0 = str_START;
-						break;
-					case 4:
-						str0 = str_RIGHT;
-						break;
-					case 5:
-						str0 = str_LEFT;
-						break;
-					case 6:
-						str0 = str_UP;
-						break;
-					case 7:
-						str0 = str_DOWN;
-						break;
-					case 8:
-						str0 = str_R;
-						break;
-					case 9:
-						str0 = str_L;
-						break;
-					default:
-						str0 = str_L;
-						break;
-					}
-					switch (edit_sleephotkey[1]) {
-					case 0:
-						str1 = str_A;
-						break;
-					case 1:
-						str1 = str_B;
-						break;
-					case 2:
-						str1 = str_SELECT;
-						break;
-					case 3:
-						str1 = str_START;
-						break;
-					case 4:
-						str1 = str_RIGHT;
-						break;
-					case 5:
-						str1 = str_LEFT;
-						break;
-					case 6:
-						str1 = str_UP;
-						break;
-					case 7:
-						str1 = str_DOWN;
-						break;
-					case 8:
-						str1 = str_R;
-						break;
-					case 9:
-						str1 = str_L;
-						break;
-					default:
-						str1 = str_R;
-						break;
-					}
-					switch (edit_sleephotkey[2]) {
-					case 0:
-						str2 = str_A;
-						break;
-					case 1:
-						str2 = str_B;
-						break;
-					case 2:
-						str2 = str_SELECT;
-						break;
-					case 3:
-						str2 = str_START;
-						break;
-					case 4:
-						str2 = str_RIGHT;
-						break;
-					case 5:
-						str2 = str_LEFT;
-						break;
-					case 6:
-						str2 = str_UP;
-						break;
-					case 7:
-						str2 = str_DOWN;
-						break;
-					case 8:
-						str2 = str_R;
-						break;
-					case 9:
-						str2 = str_L;
-						break;
-					default:
-						str2 = str_SELECT;
-						break;
-					}
-					sprintf(msg, "%s %s  %s", str0, str1, str2);
-					DrawHZText12(msg, 0, x_offset + 10, y_offset + line_x * 5, gl_color_text, 1);
-				} else if (select == 5) {
-					ClearWithBG((u16 *)gImage_SET, x_offset, y_offset + line_x * 6, 23 * 6, 13, 1);
-					switch (rtshotkey_pos) {
-					case 0:
-						clean_pos = x_offset + 10;
-						break;
-					case 1:
-						clean_pos = x_offset + 10 + 6 * 6 + 6;
-						break;
-					case 2:
-						clean_pos = x_offset + 10 + 6 * 12 + 18;
-						break;
-					}
-					if (rtshotkey_pos < 3)
-						Clear(clean_pos, y_offset + line_x * 6, 36, 13, gl_color_btn_clean, 1);
-					//DEBUG_printf("%x %x %x", edit_rtshotkey[0],edit_rtshotkey[1],edit_rtshotkey[2]);
-					switch (edit_rtshotkey[0]) {
-					case 0:
-						str0 = str_A;
-						break;
-					case 1:
-						str0 = str_B;
-						break;
-					case 2:
-						str0 = str_SELECT;
-						break;
-					case 3:
-						str0 = str_START;
-						break;
-					case 4:
-						str0 = str_RIGHT;
-						break;
-					case 5:
-						str0 = str_LEFT;
-						break;
-					case 6:
-						str0 = str_UP;
-						break;
-					case 7:
-						str0 = str_DOWN;
-						break;
-					case 8:
-						str0 = str_R;
-						break;
-					case 9:
-						str0 = str_L;
-						break;
-					default:
-						str0 = str_L;
-						break;
-					}
-					switch (edit_rtshotkey[1]) {
-					case 0:
-						str1 = str_A;
-						break;
-					case 1:
-						str1 = str_B;
-						break;
-					case 2:
-						str1 = str_SELECT;
-						break;
-					case 3:
-						str1 = str_START;
-						break;
-					case 4:
-						str1 = str_RIGHT;
-						break;
-					case 5:
-						str1 = str_LEFT;
-						break;
-					case 6:
-						str1 = str_UP;
-						break;
-					case 7:
-						str1 = str_DOWN;
-						break;
-					case 8:
-						str1 = str_R;
-						break;
-					case 9:
-						str1 = str_L;
-						break;
-					default:
-						str1 = str_R;
-						break;
-					}
-					switch (edit_rtshotkey[2]) {
-					case 0:
-						str2 = str_A;
-						break;
-					case 1:
-						str2 = str_B;
-						break;
-					case 2:
-						str2 = str_SELECT;
-						break;
-					case 3:
-						str2 = str_START;
-						break;
-					case 4:
-						str2 = str_RIGHT;
-						break;
-					case 5:
-						str2 = str_LEFT;
-						break;
-					case 6:
-						str2 = str_UP;
-						break;
-					case 7:
-						str2 = str_DOWN;
-						break;
-					case 8:
-						str2 = str_R;
-						break;
-					case 9:
-						str2 = str_L;
-						break;
-					default:
-						str2 = str_START;
-						break;
-					}
-					sprintf(msg, "%s %s  %s", str0, str1, str2);
-					DrawHZText12(msg, 0, x_offset + 10, y_offset + line_x * 6, gl_color_text, 1);
-				}
-			}
-			re_show = 0;
-			scanKeys();
-			keys = keysDown();
-			u16 keysrepeat = keysDownRepeat();
-			if (keysrepeat & KEY_UP) {
-				if (select == 0) {
-					switch (edit_pos) {
-					case 2:
-						//day
-						switch (edit_datetime[_MONTH]) {
-						case 1:
-						case 3:
-						case 5:
-						case 7:
-						case 8:
-						case 10:
-						case 12:
-
-							if (edit_datetime[_DAY] == 31) {
-								edit_datetime[_DAY] = 1;
-							} else {
-								edit_datetime[_DAY]++;
-							}
-							break;
-						case 4:
-						case 6:
-						case 9:
-						case 11:
-							if (edit_datetime[_DAY] == 30) {
-								edit_datetime[_DAY] = 1;
-							} else {
-								edit_datetime[_DAY]++;
-							}
-							break;
-						case 2:
-							if ((edit_datetime[_YEAR] % 4 == 0 &&
-							     edit_datetime[_DAY] == 9) ||
-							    (edit_datetime[_YEAR] % 4 > 0 &&
-							     edit_datetime[_DAY] == 28)) {
-								edit_datetime[_DAY] = 1;
-							} else {
-								edit_datetime[_DAY]++;
-							}
-							break;
-						}
-						break;
-					case 1:
-						//month
-						if (edit_datetime[_MONTH] == 12) {
-							edit_datetime[_MONTH] = 1;
-						} else {
-							edit_datetime[_MONTH]++;
-						}
-						break;
-					case 0:
-						//year
-						if (edit_datetime[_YEAR] == 99) {
-							edit_datetime[_YEAR] = 0;
-						} else {
-							edit_datetime[_YEAR]++;
-						}
-						break;
-					case 6:
-						//week day
-						if (edit_datetime[_WKD] == 6) {
-							edit_datetime[_WKD] = 0;
-						} else {
-							edit_datetime[_WKD]++;
-						}
-						break;
-					case 3:
-						//hour
-						if (edit_datetime[_HOUR] == 23) {
-							edit_datetime[_HOUR] = 0;
-						} else {
-							edit_datetime[_HOUR]++;
-						}
-						break;
-					case 4:
-						//minute
-						if (edit_datetime[_MIN] == 59) {
-							edit_datetime[_MIN] = 0;
-						} else {
-							edit_datetime[_MIN]++;
-						}
-						break;
-					case 5:
-						//second
-						if (edit_datetime[_SEC] == 59) {
-							edit_datetime[_SEC] = 0;
-						} else {
-							edit_datetime[_SEC]++;
-						}
-						break;
-					}
-
-				} else if (select == 1) {
-					if (addon_sel > 2) {
-						addon_sel -= 3;
-					}
-				} else if (select == 4) {
-					switch (sleep_pos) {
-					case 0:
-						if (edit_sleephotkey[0] == 9) {
-							edit_sleephotkey[0] = 0;
-						} else {
-							edit_sleephotkey[0]++;
-						}
-
-						if (edit_sleephotkey[0] == edit_sleephotkey[1]) {
-							edit_sleephotkey[0]++;
-							if (edit_sleephotkey[0] == edit_sleephotkey[2])
-								edit_sleephotkey[0]++;
-						} else if (edit_sleephotkey[0] == edit_sleephotkey[2]) {
-							edit_sleephotkey[0]++;
-							if (edit_sleephotkey[0] == edit_sleephotkey[1])
-								edit_sleephotkey[0]++;
-						}
-						break;
-					case 1:
-						if (edit_sleephotkey[1] == 9) {
-							edit_sleephotkey[1] = 0;
-						} else {
-							edit_sleephotkey[1]++;
-						}
-
-						if (edit_sleephotkey[1] == edit_sleephotkey[0]) {
-							edit_sleephotkey[1]++;
-							if (edit_sleephotkey[1] == edit_sleephotkey[2])
-								edit_sleephotkey[1]++;
-						} else if (edit_sleephotkey[1] == edit_sleephotkey[2]) {
-							edit_sleephotkey[1]++;
-							if (edit_sleephotkey[1] == edit_sleephotkey[0])
-								edit_sleephotkey[1]++;
-						}
-						break;
-					case 2:
-						if (edit_sleephotkey[2] == 9) {
-							edit_sleephotkey[2] = 0;
-						} else {
-							edit_sleephotkey[2]++;
-						}
-
-						if (edit_sleephotkey[2] == edit_sleephotkey[0]) {
-							edit_sleephotkey[2]++;
-							if (edit_sleephotkey[2] == edit_sleephotkey[1])
-								edit_sleephotkey[2]++;
-						} else if (edit_sleephotkey[2] == edit_sleephotkey[1]) {
-							edit_sleephotkey[2]++;
-							if (edit_sleephotkey[2] == edit_sleephotkey[0])
-								edit_sleephotkey[2]++;
-						}
-						break;
-					}
-				} else if (select == 5) {
-					switch (rtshotkey_pos) {
-					case 0:
-						if (edit_rtshotkey[0] == 9) {
-							edit_rtshotkey[0] = 0;
-						} else {
-							edit_rtshotkey[0]++;
-						}
-
-						if (edit_rtshotkey[0] == edit_rtshotkey[1]) {
-							edit_rtshotkey[0]++;
-							if (edit_rtshotkey[0] == edit_rtshotkey[2])
-								edit_rtshotkey[0]++;
-						} else if (edit_rtshotkey[0] == edit_rtshotkey[2]) {
-							edit_rtshotkey[0]++;
-							if (edit_rtshotkey[0] == edit_rtshotkey[1])
-								edit_rtshotkey[0]++;
-						}
-						break;
-					case 1:
-						if (edit_rtshotkey[1] == 9) {
-							edit_rtshotkey[1] = 0;
-						} else {
-							edit_rtshotkey[1]++;
-						}
-
-						if (edit_rtshotkey[1] == edit_rtshotkey[0]) {
-							edit_rtshotkey[1]++;
-							if (edit_rtshotkey[1] == edit_rtshotkey[2])
-								edit_rtshotkey[1]++;
-						} else if (edit_rtshotkey[1] == edit_rtshotkey[2]) {
-							edit_rtshotkey[1]++;
-							if (edit_rtshotkey[1] == edit_rtshotkey[0])
-								edit_rtshotkey[1]++;
-						}
-						break;
-					case 2:
-						if (edit_rtshotkey[2] == 9) {
-							edit_rtshotkey[2] = 0;
-						} else {
-							edit_rtshotkey[2]++;
-						}
-
-						if (edit_rtshotkey[2] == edit_rtshotkey[0]) {
-							edit_rtshotkey[2]++;
-							if (edit_rtshotkey[2] == edit_rtshotkey[1])
-								edit_rtshotkey[2]++;
-						} else if (edit_rtshotkey[2] == edit_rtshotkey[1]) {
-							edit_rtshotkey[2]++;
-							if (edit_rtshotkey[2] == edit_rtshotkey[0])
-								edit_rtshotkey[2]++;
-						}
-						break;
-					}
-				}
-
-				re_show = 1;
-			} else if (keysrepeat & KEY_DOWN) {
-				if (select == 0) {
-					switch (edit_pos) {
-					case 2:
-						switch (edit_datetime[_MONTH]) {
-						case 1:
-						case 3:
-						case 5:
-						case 7:
-						case 8:
-						case 10:
-						case 12:
-							if (edit_datetime[_DAY] == 1) {
-								edit_datetime[_DAY] = 31;
-							} else {
-								//if(edit_datetime[_DAY] > 1)
-								edit_datetime[_DAY]--;
-							}
-							break;
-						case 4:
-						case 6:
-						case 9:
-						case 11:
-							if (edit_datetime[_DAY] == 1) {
-								edit_datetime[_DAY] = 30;
-							} else {
-								//if(edit_datetime[_DAY] > 1)
-								edit_datetime[_DAY]--;
-							}
-							break;
-						case 2:
-							if (edit_datetime[_DAY] == 1) {
-								if (edit_datetime[_YEAR] % 4 == 0) {
-									edit_datetime[_DAY] = 29;
-								} else {
-									edit_datetime[_DAY] = 28;
-								}
-							} else {
-								edit_datetime[_DAY]--;
-							}
-							break;
-						}
-						break;
-					case 1:
-						if (edit_datetime[_MONTH] == 1) {
-							edit_datetime[_MONTH] = 12;
-						} else {
-							edit_datetime[_MONTH]--;
-						}
-						break;
-					case 0:
-						if (edit_datetime[_YEAR] == 0) {
-							edit_datetime[_YEAR] = 99;
-						} else {
-							edit_datetime[_YEAR]--;
-						}
-						break;
-					case 6:
-						//week day
-						if (edit_datetime[_WKD] == 0) {
-							edit_datetime[_WKD] = 6;
-						} else {
-							edit_datetime[_WKD]--;
-						}
-						break;
-					case 3:
-						//hour
-						if (edit_datetime[_HOUR] == 0) {
-							edit_datetime[_HOUR] = 23;
-						} else {
-							edit_datetime[_HOUR]--;
-						}
-						break;
-					case 4:
-						//minute
-						if (edit_datetime[_MIN] == 0) {
-							edit_datetime[_MIN] = 59;
-						} else {
-							edit_datetime[_MIN]--;
-						}
-						break;
-					case 5:
-						//second
-						if (edit_datetime[_SEC] == 0) {
-							edit_datetime[_SEC] = 59;
-						} else {
-							edit_datetime[_SEC]--;
-						}
-						break;
-					}
-				} else if (select == 1) {
-					if (addon_sel < 2) {
-						addon_sel += 3;
-					}
-				} else if (select == 4) {
-					switch (sleep_pos) {
-					case 0:
-						if (edit_sleephotkey[0] == 0) {
-							edit_sleephotkey[0] = 9;
-						} else {
-							edit_sleephotkey[0]--;
-						}
-
-						if (edit_sleephotkey[0] == edit_sleephotkey[1]) {
-							if (edit_sleephotkey[0] == 0) {
-								edit_sleephotkey[0] = 9;
-							} else {
-								edit_sleephotkey[0]--;
-							}
-
-							if (edit_sleephotkey[0] == edit_sleephotkey[2])
-								edit_sleephotkey[0]--;
-						} else if (edit_sleephotkey[0] == edit_sleephotkey[2]) {
-							if (edit_sleephotkey[0] == 0) {
-								edit_sleephotkey[0] = 9;
-							} else {
-								edit_sleephotkey[0]--;
-							}
-
-							if (edit_sleephotkey[0] == edit_sleephotkey[1])
-								edit_sleephotkey[0]--;
-						}
-						break;
-					case 1:
-						if (edit_sleephotkey[1] == 0) {
-							edit_sleephotkey[1] = 9;
-						} else {
-							edit_sleephotkey[1]--;
-						}
-						if (edit_sleephotkey[1] == edit_sleephotkey[0]) {
-							if (edit_sleephotkey[1] == 0) {
-								edit_sleephotkey[1] = 9;
-							} else {
-								edit_sleephotkey[1]--;
-							}
-
-							if (edit_sleephotkey[1] == edit_sleephotkey[2])
-								edit_sleephotkey[1]--;
-						} else if (edit_sleephotkey[1] == edit_sleephotkey[2]) {
-							if (edit_sleephotkey[1] == 0) {
-								edit_sleephotkey[1] = 9;
-							} else {
-								edit_sleephotkey[1]--;
-							}
-
-							if (edit_sleephotkey[1] == edit_sleephotkey[0])
-								edit_sleephotkey[1]--;
-						}
-						break;
-					case 2:
-						if (edit_sleephotkey[2] == 0) {
-							edit_sleephotkey[2] = 9;
-						} else {
-							edit_sleephotkey[2]--;
-						}
-
-						if (edit_sleephotkey[2] == edit_sleephotkey[0]) {
-							if (edit_sleephotkey[2] == 0) {
-								edit_sleephotkey[2] = 9;
-							} else {
-								edit_sleephotkey[2]--;
-							}
-
-							if (edit_sleephotkey[2] == edit_sleephotkey[1])
-								edit_sleephotkey[2]--;
-						} else if (edit_sleephotkey[2] == edit_sleephotkey[1]) {
-							if (edit_sleephotkey[2] == 0) {
-								edit_sleephotkey[2] = 9;
-							} else {
-								edit_sleephotkey[2]--;
-							}
-
-							if (edit_sleephotkey[2] == edit_sleephotkey[0])
-								edit_sleephotkey[2]--;
-						}
-						break;
-					}
-				} else if (select == 5) {
-					switch (rtshotkey_pos) {
-					case 0:
-						if (edit_rtshotkey[0] == 0) {
-							edit_rtshotkey[0] = 9;
-						} else {
-							edit_rtshotkey[0]--;
-						}
-
-						if (edit_rtshotkey[0] == edit_rtshotkey[1]) {
-							if (edit_rtshotkey[0] == 0) {
-								edit_rtshotkey[0] = 9;
-							} else {
-								edit_rtshotkey[0]--;
-							}
-
-							if (edit_rtshotkey[0] == edit_rtshotkey[2])
-								edit_rtshotkey[0]--;
-						} else if (edit_rtshotkey[0] == edit_rtshotkey[2]) {
-							if (edit_rtshotkey[0] == 0) {
-								edit_rtshotkey[0] = 9;
-							} else {
-								edit_rtshotkey[0]--;
-							}
-
-							if (edit_rtshotkey[0] == edit_rtshotkey[1])
-								edit_rtshotkey[0]--;
-						}
-						break;
-					case 1:
-						if (edit_rtshotkey[1] == 0) {
-							edit_rtshotkey[1] = 9;
-						} else {
-							edit_rtshotkey[1]--;
-						}
-
-						if (edit_rtshotkey[1] == edit_rtshotkey[0]) {
-							if (edit_rtshotkey[1] == 0) {
-								edit_rtshotkey[1] = 9;
-							} else {
-								edit_rtshotkey[1]--;
-							}
-
-							if (edit_rtshotkey[1] == edit_rtshotkey[2])
-								edit_rtshotkey[1]--;
-						} else if (edit_rtshotkey[1] == edit_rtshotkey[2]) {
-							if (edit_rtshotkey[1] == 0) {
-								edit_rtshotkey[1] = 9;
-							} else {
-								edit_rtshotkey[1]--;
-							}
-
-							if (edit_rtshotkey[1] == edit_rtshotkey[0])
-								edit_rtshotkey[1]--;
-						}
-						break;
-					case 2:
-						if (edit_rtshotkey[2] == 0) {
-							edit_rtshotkey[2] = 9;
-						} else {
-							edit_rtshotkey[2]--;
-						}
-
-						if (edit_rtshotkey[2] == edit_rtshotkey[0]) {
-							if (edit_rtshotkey[2] == 0) {
-								edit_rtshotkey[2] = 9;
-							} else {
-								edit_rtshotkey[2]--;
-							}
-
-							if (edit_rtshotkey[2] == edit_rtshotkey[1])
-								edit_rtshotkey[2]--;
-						} else if (edit_rtshotkey[2] == edit_rtshotkey[1]) {
-							if (edit_rtshotkey[2] == 0) {
-								edit_rtshotkey[2] = 9;
-							} else {
-								edit_rtshotkey[2]--;
-							}
-
-							if (edit_rtshotkey[2] == edit_rtshotkey[0])
-								edit_rtshotkey[2]--;
-						}
-						break;
-					}
-				}
-				re_show = 1;
-			} else if (keys & KEY_RIGHT) {
-				if (select == 0) {
-					if (edit_pos == 7) {
-						edit_pos = 0;
-					} else {
-						edit_pos++;
-					}
-				} else if (select == 1) {
-					if (addon_sel == 3) {
-						addon_sel++;
-					} else if (addon_sel < 2) {
-						addon_sel++;
-					}
-				} else if (select == 2) //lang
-				{
-					if ((language_sel + 1u < lang_pack_count) && (language_sel < 1))
-						language_sel++;
-				} else if (select == 3) {
-					engine_pos = 1;
-				} else if (select == 4) {
-					if (sleep_pos < 3) {
-						sleep_pos++;
-					}
-				} else if (select == 5) {
-					if (rtshotkey_pos < 3) {
-						rtshotkey_pos++;
-					}
-				} else if (select == 6) {
-					if (RTC_pos < 2) {
-						RTC_pos++;
-					}
-				}
-				re_show = 1;
-			} else if (keys & KEY_LEFT) {
-				if (select == 0) {
-					if (edit_pos == 0) {
-						edit_pos = 7;
-					} else {
-						edit_pos--;
-					}
-				} else if (select == 1) {
-					if (addon_sel == 4) {
-						addon_sel--;
-					} else if ((addon_sel > 0) && (addon_sel < 3)) {
-						addon_sel--;
-					}
-				} else if (select == 2) //lang
-				{
-					if (language_sel)
-						language_sel--;
-				} else if (select == 3) {
-					engine_pos = 0;
-				} else if (select == 4) {
-					if (sleep_pos) {
-						sleep_pos--;
-					}
-				} else if (select == 5) {
-					if (rtshotkey_pos) {
-						rtshotkey_pos--;
-					}
-				} else if (select == 6) {
-					if (RTC_pos) {
-						RTC_pos--;
-					}
-				}
-				re_show = 1;
-			} else if (keys & KEY_A) {
-				if ((0 == select) && (edit_pos == 7)) {
-					rtc_enable();
-					rtc_set(edit_datetime);
-					rtc_disenable();
-					delay(0x200);
-					Set_OK = 0;//!Set_OK;
-				} else if (select == 1) {
-					switch (addon_sel) {
-					case 0:
-						v_reset = !v_reset;
-						break;
-					case 1:
-						v_rts = !v_rts;
-						break;
-					case 3:
-						v_sleep = !v_sleep;
-						break;
-					case 4:
-						v_cheat = !v_cheat;
-						break;
-					case 2: {
-						save_setw_info();
-						CheckSwitch(); //read again
-						Set_OK = 0;
-						break;
-					}
-					}
-				} else if (select == 2) {
-					save_setw_info();
-					CheckLanguage(); //read again
-					ClearWithBG((u16 *)gImage_SET, 0, 20, 240, 160 - 20, 1);
-					Set_OK = 0;
-				} else if (select == 3) {
-					switch (engine_pos) {
-					case 0:
-						engine_sel = !engine_sel;
-						break;
-					case 1: {
-						save_setw_info();
-						Set_OK = 0;
-						gl_engine_sel = Read_SET_info(assress_engine_sel);
-						if ((gl_engine_sel != 0x0) && (gl_engine_sel != 0x1)) {
-							gl_engine_sel = 0x1;
-						}
-						break;
-					}
-					}
-				} else if ((select == 4) && (sleep_pos == 3)) {
-					save_setw_info();
-					Set_OK = 0;
-				} else if ((select == 5) && (rtshotkey_pos == 3)) {
-					save_setw_info();
-					Set_OK = 0;
-				} else if (select == 6) {
-					switch (RTC_pos) {
-					case 0:
-						gl_game_clock = !gl_game_clock;
-						break;
-					case 1:
-						gl_game_rumble = !gl_game_rumble;
-						break;
-					case 2: {
-						save_setw_info();
-						Set_OK = 0;
-						gl_game_clock = Read_SET_info(assress_game_clock);
-						if ((gl_game_clock != 0x0) && (gl_game_clock != 0x1)) {
-							gl_game_clock = 0x1;
-						}
-						gl_game_rumble = Read_SET_info(assress_game_rumble);
-						if ((gl_game_rumble != 0x0) && (gl_game_rumble != 0x1)) {
-							gl_game_rumble = 0x1;
-						}
-						break;
-					}
-					}
-				}
-				re_show = 1;
-			}
-			break;
-		}//end switch
-	}//end while(1)
+		if (!p1.set_ok)
+			read_hot_keys();
+	}
 }
+
+static int page1_event(struct ui_view *view, const struct ui_event *e)
+{
+	(void)view;
+	if (e->type != UI_EV_KEYS)
+		return 0;
+	u16 keys = e->keys;
+	if (p1.set_ok) {
+		page1_edit_keys(keys);
+	} else if (keys & INPUT_A) {
+		page1_start_edit();
+	} else if (keys & INPUT_DOWN) {
+		if (p1.select < ROWS1 - 1)
+			p1.select++;
+	} else if (keys & INPUT_UP) {
+		if (p1.select)
+			p1.select--;
+	} else if (keys & INPUT_L) {
+		settings_leave(SETTINGS_TO_NOR);
+		return 1;
+	} else if (keys & INPUT_R) {
+		settings_open(SETTINGS_PAGE2);
+		return 1;
+	} else {
+		return 0;
+	}
+	settings_sync();
+	return 1;
+}
+
+// The clock row follows the cart's clock, outside its edit mode
+static void page1_poll(void)
+{
+	if (p1.set_ok && p1.select == ROW_TIME)
+		return;
+	if (frame_count() - p1.polled < 8)
+		return;
+	u8 old[7];
+	memcpy(old, p1.datetime, sizeof(old));
+	read_clock();
+	if (memcmp(old, p1.datetime, sizeof(old)))
+		settings_sync();
+}
+
+static const struct ui_list_config page1_list = {&settings_model, SETTINGS_ROW_H, 0, 0, 240 - 2 * 6 - SETTINGS_NAME_W};
+
+static const struct ui_spec page1_nodes[] = {
+	SETTINGS_HEADER,
+	{.kind = UI_LIST,
+	 .id = 4,
+	 .parent = UI_NONE,
+	 .plane = 1,
+	 .anchor = UI_HFILL,
+	 .paper = UI_ROLE_BG,
+	 .y = 16,
+	 .h = 144,
+	 .data = &page1_list},
+};
+
+static const struct ui_view_spec page1_view = {
+	"settings1", page1_nodes, sizeof(page1_nodes) / sizeof(page1_nodes[0]), 0, UI_NONE, 0, page1_event};
+
+const struct settings_page settings_page1 = {&page1_view, page1_enter,  page1_count,
+					     page1_row,   page1_cursor, page1_poll};
+
 //---------------------------------------------------------------------------------
-void save_setw_info(void)
+static void save_setw_info(void)
 {
 	u32 address;
 	SET_info_buffer[assress_language] = lang_packs[language_sel].id;
