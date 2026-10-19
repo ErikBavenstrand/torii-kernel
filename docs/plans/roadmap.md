@@ -346,6 +346,8 @@ Bugs found while building v0.3 and v0.3.1. Each is struck out here once a ticket
   - a scraper CLI in `tools/`.
 - **Settings:** a 12/24-hour clock and time editor, settings in categories, and Help pages.
 
+- **Screens redesigned (user, 2026-10-19):** v0.3 ported the official screens as they were. v0.4 redesigns their layout and navigation: settings in a section of their own, organised by category, with clear editing; the cheat screen; and the lists, as views a theme can swap (a RetroArch-like carousel of systems and games, sections).
+
 ## v0.5 Saves
 
 ### SD layout
@@ -450,6 +452,8 @@ L+R+Start for reset and L+R+Select for sleep. It becomes a proper overlay:
   alone.
 - **Test:** every `just compat` game opens and closes the menu, and the screen and game
   state have to come back unchanged.
+
+- **Review first (user, 2026-10-19):** before building it, review the current in-game menu and prototype the overlay. It can't run the kernel's engine in place (the game owns RAM and VRAM, and the kernel's ROM isn't mapped), so it needs a compact copy of the engine's text and theming. The prototype has to save and restore the game's screen and memory without breaking any `just compat` game. Picking cheats in game is part of it.
 
 ## v0.8 Cheats
 
