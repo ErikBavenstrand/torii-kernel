@@ -153,7 +153,7 @@ static int demo_fetch(void *ctx, u32 i, struct ui_item *out)
 	(void)ctx;
 	snprintf(demo_name, sizeof(demo_name), "%s %s %lu%s.gba", words[i % 12], words[(i / 12 + 5) % 12],
 		 (unsigned long)i + 1, i % 7 == 3 ? " - The Long Journey (Rev 1)" : "");
-	snprintf(demo_detail, sizeof(demo_detail), "%lu MB", (unsigned long)(4u << (i % 4)));
+	snprintf(demo_detail, sizeof(demo_detail), "%lu MB", 4ul << (i % 4));
 	out->text = demo_name;
 	out->detail = demo_detail;
 	return UI_ITEM_READY;
@@ -173,12 +173,28 @@ enum {
 // In place of Diagnostics' own view (both lists don't fit in BG VRAM):
 // chrome on plane 2, the list on plane 1
 static const struct ui_spec demo_nodes[D_COUNT] = {
-	[D_BAR] = {.kind = UI_PANEL, .id = 1, .parent = UI_NONE, .plane = 2, .anchor = UI_HFILL,
-		   .paper = UI_ROLE_PANEL, .h = 16},
-	[D_TITLE] = {.kind = UI_LABEL, .id = 2, .parent = D_BAR, .plane = 2, .anchor = UI_FILL,
-		     .paper = UI_ROLE_PANEL, .data = &demo_title},
-	[D_LIST] = {.kind = UI_LIST, .id = 3, .parent = UI_NONE, .plane = 1, .anchor = UI_FILL, .paper = UI_ROLE_BG,
-		    .y = 16, .data = &demo_list},
+	[D_BAR] = {.kind = UI_PANEL,
+		   .id = 1,
+		   .parent = UI_NONE,
+		   .plane = 2,
+		   .anchor = UI_HFILL,
+		   .paper = UI_ROLE_PANEL,
+		   .h = 16},
+	[D_TITLE] = {.kind = UI_LABEL,
+		     .id = 2,
+		     .parent = D_BAR,
+		     .plane = 2,
+		     .anchor = UI_FILL,
+		     .paper = UI_ROLE_PANEL,
+		     .data = &demo_title},
+	[D_LIST] = {.kind = UI_LIST,
+		    .id = 3,
+		    .parent = UI_NONE,
+		    .plane = 1,
+		    .anchor = UI_FILL,
+		    .paper = UI_ROLE_BG,
+		    .y = 16,
+		    .data = &demo_list},
 };
 
 static const struct ui_view_spec demo_view = {
@@ -271,7 +287,7 @@ static void time_psram_writes(void)
 	u16 *slow_pattern = (u16 *)(pReadCache + 0x10000), *menu_pattern = (u16 *)(pReadCache + 0x14000);
 	for (u32 i = 0; i < PROBE_BYTES / 2; i++) {
 		slow_pattern[i] = (u16)(i * 0x9E37 + 0x5A5A);
-		menu_pattern[i] = (u16)~(i * 0x7F4B + 0x1234);
+		menu_pattern[i] = (u16) ~(i * 0x7F4B + 0x1234);
 	}
 	SetPSRampage(PSRAM_SCRATCH_PAGE);
 	u32 slow = psram_write_at(WAITCNT_BIOS, PSRAM_SCRATCH, slow_pattern, PROBE_BYTES);

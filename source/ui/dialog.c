@@ -48,32 +48,88 @@ static const struct ui_label_config hint_label = {"", UI_FONT_BODY, UI_ALIGN_CEN
 // rectangle in the plane's map, a hole in the panel. A title or text left
 // out is an empty label, and only the progress dialog has a bar.
 #define DIALOG_NODES(text_ink) \
-	[N_PANEL] = {.kind = UI_PANEL, .id = 1, .parent = UI_NONE, .plane = 0, .anchor = UI_HCENTER | UI_VCENTER, \
-		     .paper = UI_ROLE_PANEL, .w = PANEL_W, .h = 96, .data = &border_panel}, \
-	[N_TITLE] = {.kind = UI_LABEL, .id = 2, .parent = N_PANEL, .plane = 0, .anchor = UI_HFILL, \
-		     .paper = UI_ROLE_PANEL, .x = 8, .y = 8, .w = 8, .h = 16, .data = &title_label}, \
-	[N_TEXT] = {.kind = UI_LABEL, .id = 3, .parent = N_PANEL, .plane = 0, .anchor = UI_HFILL, .ink = (text_ink), \
-		    .paper = UI_ROLE_PANEL, .x = 8, .y = 24, .w = 8, .h = 40, .data = &text_label}, \
-	[N_HINT] = {.kind = UI_LABEL, .id = 4, .parent = N_PANEL, .plane = 0, .anchor = UI_HFILL, .ink = UI_ROLE_DIM, \
-		    .paper = UI_ROLE_PANEL, .x = 8, .y = 72, .w = 8, .h = 16, .data = &hint_label}
+	[N_PANEL] = {.kind = UI_PANEL, \
+		     .id = 1, \
+		     .parent = UI_NONE, \
+		     .plane = 0, \
+		     .anchor = UI_HCENTER | UI_VCENTER, \
+		     .paper = UI_ROLE_PANEL, \
+		     .w = PANEL_W, \
+		     .h = 96, \
+		     .data = &border_panel}, \
+	[N_TITLE] = {.kind = UI_LABEL, \
+		     .id = 2, \
+		     .parent = N_PANEL, \
+		     .plane = 0, \
+		     .anchor = UI_HFILL, \
+		     .paper = UI_ROLE_PANEL, \
+		     .x = 8, \
+		     .y = 8, \
+		     .w = 8, \
+		     .h = 16, \
+		     .data = &title_label}, \
+	[N_TEXT] = {.kind = UI_LABEL, \
+		    .id = 3, \
+		    .parent = N_PANEL, \
+		    .plane = 0, \
+		    .anchor = UI_HFILL, \
+		    .ink = (text_ink), \
+		    .paper = UI_ROLE_PANEL, \
+		    .x = 8, \
+		    .y = 24, \
+		    .w = 8, \
+		    .h = 40, \
+		    .data = &text_label}, \
+	[N_HINT] = {.kind = UI_LABEL, \
+		    .id = 4, \
+		    .parent = N_PANEL, \
+		    .plane = 0, \
+		    .anchor = UI_HFILL, \
+		    .ink = UI_ROLE_DIM, \
+		    .paper = UI_ROLE_PANEL, \
+		    .x = 8, \
+		    .y = 72, \
+		    .w = 8, \
+		    .h = 16, \
+		    .data = &hint_label}
 
 static const struct ui_spec message_nodes[N_BAR] = {DIALOG_NODES(UI_ROLE_TEXT)};
 static const struct ui_spec error_nodes[N_BAR] = {DIALOG_NODES(UI_ROLE_ICON + 3)};  // red
 static const struct ui_spec progress_nodes[N_COUNT] = {
 	DIALOG_NODES(UI_ROLE_TEXT),
-	[N_BAR] = {.kind = UI_PROGRESS, .id = 5, .parent = N_PANEL, .plane = 0, .anchor = UI_HFILL, .x = 8, .y = 64,
-		   .w = 8, .h = 8},
+	[N_BAR] = {.kind = UI_PROGRESS,
+		   .id = 5,
+		   .parent = N_PANEL,
+		   .plane = 0,
+		   .anchor = UI_HFILL,
+		   .x = 8,
+		   .y = 64,
+		   .w = 8,
+		   .h = 8},
 };
 
 static int dialog_event(struct ui_view *view, const struct ui_event *e);
 
-static const struct ui_view_spec message_view = {.name = "dialog", .nodes = message_nodes, .count = N_BAR,
-						 .id = 20, .focus = UI_NONE, .flags = UI_VIEW_MODAL,
+static const struct ui_view_spec message_view = {.name = "dialog",
+						 .nodes = message_nodes,
+						 .count = N_BAR,
+						 .id = 20,
+						 .focus = UI_NONE,
+						 .flags = UI_VIEW_MODAL,
 						 .event = dialog_event};
-static const struct ui_view_spec error_view = {.name = "dialog", .nodes = error_nodes, .count = N_BAR, .id = 20,
-					       .focus = UI_NONE, .flags = UI_VIEW_MODAL, .event = dialog_event};
-static const struct ui_view_spec progress_view = {.name = "progress", .nodes = progress_nodes, .count = N_COUNT,
-						  .id = 21, .focus = UI_NONE, .flags = UI_VIEW_MODAL,
+static const struct ui_view_spec error_view = {.name = "dialog",
+					       .nodes = error_nodes,
+					       .count = N_BAR,
+					       .id = 20,
+					       .focus = UI_NONE,
+					       .flags = UI_VIEW_MODAL,
+					       .event = dialog_event};
+static const struct ui_view_spec progress_view = {.name = "progress",
+						  .nodes = progress_nodes,
+						  .count = N_COUNT,
+						  .id = 21,
+						  .focus = UI_NONE,
+						  .flags = UI_VIEW_MODAL,
 						  .event = dialog_event};
 
 // A shown dialog: its view and texts (labels draw from these buffers)
@@ -109,7 +165,8 @@ static int dialog_event(struct ui_view *view, const struct ui_event *e)
 
 void dialog_open(void)
 {
-	if (!dlg.opens++ && ui_depth() == 0) {
+	dlg.opens++;
+	if (dlg.opens == 1 && ui_depth() == 0) {
 		// From mode 3: a black screen while the engine sets up (mode 0 with
 		// nothing on shows the backdrop), so no frame shows mode 3's picture
 		// read as tiles
@@ -125,7 +182,10 @@ void dialog_open(void)
 
 void dialog_close(void)
 {
-	if (!dlg.opens || --dlg.opens || !dlg.owned)
+	if (!dlg.opens)
+		return;
+	dlg.opens--;
+	if (dlg.opens || !dlg.owned)
 		return;
 	dlg.owned = 0;
 	ui_shutdown();
@@ -240,7 +300,7 @@ static int show(struct shown *s, u32 use, const char *title, const char *text, u
 	copy(s->hint, sizeof(s->hint), hint);
 	s->keys = 0;
 	s->use = (u8)use;
-	const struct ui_view_spec *spec = use == USE_PROGRESS ? &progress_view
+	const struct ui_view_spec *spec = use == USE_PROGRESS    ? &progress_view
 					  : kind == DIALOG_ERROR ? &error_view
 								 : &message_view;
 	s->view = ui_push(spec, 0);
@@ -362,7 +422,7 @@ void dialog_progress_set(u32 value, u32 max, const char *status)
 		dlg.max = max;
 		dlg.bar_changed = 1;
 	}
-	if (status && strncmp(status, dlg.progress.hint, sizeof(dlg.progress.hint) - 1)) {
+	if (status && strncmp(status, dlg.progress.hint, sizeof(dlg.progress.hint) - 1) != 0) {
 		copy(dlg.progress.hint, sizeof(dlg.progress.hint), status);
 		dlg.status_changed = 1;
 	}

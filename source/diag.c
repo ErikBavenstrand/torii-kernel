@@ -78,6 +78,7 @@ static struct {
 	char title[48];
 	struct ui_view *view;
 	u16 keys;  // fired since wait_key started listening
+	u32 pumped;  // torii_frames when say last ran a frame
 } scr EWRAM_BSS;
 
 static u32 diag_step_no;
@@ -268,7 +269,12 @@ void diag_say(u8 colour, const char *format, ...)
 	else
 		tlog("diag: %s", text);
 	line_add(colour, text);
-	ui_frame();  // the screen keeps up with the log
+	// The screen keeps up with the log: a frame, unless one ran since the
+	// last VBlank (a burst of lines shows at the next)
+	if (torii_frames != scr.pumped) {
+		ui_frame();
+		scr.pumped = torii_frames;
+	}
 }
 
 void diag_step(const char *name)
@@ -989,7 +995,7 @@ void Diagnostics(void)
 	say(WHITE, "writes your saves. It takes a minute,");
 	say(WHITE, "then restarts the kernel.");
 	say(WHITE, "A: start   B: back");
-	diag_pause(20);  // the scroll settles before the shot
+	diag_pause(3);  // drawn before the screen counts as ready
 	tlog_debug("screen ready: diag-start");
 	if (wait_key(KEY_A | KEY_B) & KEY_B)
 		SoftReset_now();
