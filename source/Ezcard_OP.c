@@ -10,7 +10,8 @@
 
 #include "ez_define.h"
 #include "ezkernel.h"
-#include "draw.h"
+#include "ui/dialog.h"
+#include "ui/ui.h"
 #include "Ezcard_OP.h"
 #include "tlog.h"
 #include "waitcnt.h"
@@ -542,95 +543,68 @@ void IWRAM_CODE Set_64MROM_flag(u16 flag)
 	WAITCNT_RESTORE(waitcnt);
 }
 // --------------------------------------------------------------------
+// Torii: the screens are dialogs on the engine, in one session of their own
+// (ui/dialog.h), with the official texts; the CRC check, the SPI writes and
+// their order are the official ones. Keys act on release, not on the press.
 void IWRAM_CODE FW_update(u16 DEcard_FW_readver, u16 FW_built_in_ver, void *FWbinaddress, u32 FWsize, u32 build_crc32,
 			  u32 FW_wirte_address)
 {
 	vu16 busy;
 	vu32 offset;
-	u32 offset_Y = 5;
-	u32 line_x = 17;
-	char msg[100];
+	char title[32];
+	char msg[128];
+	char status[16];
 
-	Clear(0, 0, 240, 160, RGB(0, 18, 24), 1);
-
-	sprintf(msg, "Rev.%s FIRMWARE UPDATE", ((DEcard_FW_readver & 0xA000) == 0xA000) ? "B" : "A");
-	DrawHZText12(msg, 0, 57, offset_Y + 0 * line_x, 0x7FFF, 1);
+	sprintf(title, "Rev.%s FIRMWARE UPDATE", ((DEcard_FW_readver & 0xA000) == 0xA000) ? "B" : "A");
+	dialog_open();
 
 	u32 get_crc32 = crc32(FWbinaddress, FWsize);
 	//DEBUG_printf("get_crc32 %x ",get_crc32);
 
 	if (get_crc32 != build_crc32) {
-		sprintf(msg, "check crc32 error!");
-		DrawHZText12(msg, 0, 2, offset_Y + 1 * line_x, RGB(31, 00, 00), 1);
-		sprintf(msg, "press [B] to return");
-		DrawHZText12(msg, 0, 2, offset_Y + 2 * line_x, 0x7FFF, 1);
-		while (1) {
-			VBlankIntrWait();
-
-			scanKeys();
-			u16 keys = keysDown();
-
-			if (keys & KEY_B) {
-				return;
-			}
-		}
+		dialog_message(title, "check crc32 error!\npress [B] to return", DIALOG_ERROR);
+		dialog_close();
+		return;
 	}
 
-	sprintf(msg, "Current firmware version: V%02d", DEcard_FW_readver & 0xFF);
-	DrawHZText12(msg, 0, 2, offset_Y + 1 * line_x, 0x7FFF, 1);
+	// No key hint: the language isn't loaded yet, and the text names the keys
+	sprintf(msg,
+		"Current firmware version: V%02d\nWill be updated to version: V%02d\nPress [A] to update\nPress [B] to "
+		"cancel",
+		DEcard_FW_readver & 0xFF, FW_built_in_ver);
+	if (dialog_confirm(title, msg, DIALOG_INFO)) {
+		SPI_Write_Disable();
+		sprintf(msg, "Current firmware version: V%02d\nWill be updated to version: V%02d",
+			DEcard_FW_readver & 0xFF, FW_built_in_ver);
+		dialog_progress_begin(title, msg);
 
-	sprintf(msg, "Will be updated to version: V%02d", FW_built_in_ver);
-	DrawHZText12(msg, 0, 2, offset_Y + 2 * line_x, 0x7FFF, 1);
+		for (offset = 0x0000; offset < FWsize; offset += 256) {
+			sprintf(status, "progress: %lu%%", (offset * 100 / FWsize + 1));
+			dialog_progress_set(offset, FWsize, status);  // drawn a few times a second
 
-	sprintf(msg, "Press [A] to update");
-	DrawHZText12(msg, 0, 2, offset_Y + 4 * line_x, 0x7FFF, 1);
-	sprintf(msg, "Press [B] to cancel");
-	DrawHZText12(msg, 0, 2, offset_Y + 5 * line_x, 0x7FFF, 1);
+			FAT_table_buffer[0] = (FW_wirte_address + offset);//omega DE 0x80000
 
-	while (1) {
-		VBlankIntrWait();
+			dmaCopy(FWbinaddress + offset, &FAT_table_buffer[1], 256);
+			Send_FATbuffer(FAT_table_buffer, 2);
 
-		scanKeys();
-		u16 keys = keysDown();
-
-		if (keys & KEY_A) {
+			SPI_Write_Enable();
+			while (1) {
+				busy = SD_Response();
+				if (busy == 0)
+					break;
+			}
 			SPI_Write_Disable();
-			Clear(2, offset_Y + 4 * line_x, 220, 15, RGB(0, 18, 24), 1);
-			Clear(2, offset_Y + 5 * line_x, 220, 15, RGB(0, 18, 24), 1);
-
-			sprintf(msg, "progress:");
-			DrawHZText12(msg, 0, 2, offset_Y + 6 * line_x, 0x7FFF, 1);
-
-			for (offset = 0x0000; offset < FWsize; offset += 256) {
-				sprintf(msg, " %lu%%", (offset * 100 / FWsize + 1));
-				Clear(54, offset_Y + 6 * line_x, 120, 15, RGB(0, 18, 24), 1);
-				DrawHZText12(msg, 0, 54, offset_Y + 6 * line_x, 0x7FFF, 1);
-
-				FAT_table_buffer[0] = (FW_wirte_address + offset);//omega DE 0x80000
-
-				dmaCopy(FWbinaddress + offset, &FAT_table_buffer[1], 256);
-				Send_FATbuffer(FAT_table_buffer, 2);
-
-				SPI_Write_Enable();
-				while (1) {
-					busy = SD_Response();
-					if (busy == 0)
-						break;
-				}
-				SPI_Write_Disable();
-				//DEBUG_printf("count %x ",count);
-				//break;
-			}
-			sprintf(msg, "update finished,power off manual");
-			DrawHZText12(msg, 0, 2, offset_Y + 8 * line_x, 0x7FFF, 1);
-
-			while (1)
-				;
-			break;
-		} else if (keys & KEY_B) {
-			break;
+			//DEBUG_printf("count %x ",count);
+			//break;
 		}
+		dialog_progress_set(FWsize, FWsize, NULL);
+		dialog_progress_status("update finished,power off manual");
+		tlog("firmware: updated to V%02d, waiting for the power-off", FW_built_in_ver);
+
+		while (1)
+			ui_frame();
 	}
+	dialog_close();
 }
 // --------------------------------------------------------------------
 void IWRAM_CODE Check_FW_update(/*u16 Current_FW_ver,u16 Built_in_ver*/)

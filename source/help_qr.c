@@ -1,6 +1,7 @@
 // The online manual's QR code on HELP, as 10x10 4bpp tiles in row order
 // (colour 1 white, 2 black): the official kernel's 70x70 picture
-// (gImage_English_manual in image.bin) with a 5 px white margin (a quiet zone).
+// (the English manual picture at 0x08102648 in image.bin) with a 5 px white
+// margin (a quiet zone).
 #include "helpwindow.h"
 
 const u32 help_qr_tiles[10 * 10 * 8] = {

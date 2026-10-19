@@ -213,7 +213,7 @@ static void screen_open(void)
 static void screen_close(void)
 {
 	ui_shutdown();
-	dialog_mode3();  // the registers as the unit tests expect them, on a black screen
+	dialog_blank();  // the registers as the unit tests expect them, on a black screen
 	scr.view = 0;
 }
 
@@ -671,9 +671,11 @@ static void step_timing(void)
 
 	// The glyph's time is the renderer step's now (diag_render.c)
 
-	// BIOS LZ77: 16 KB of the SD list's background picture.
+	// BIOS LZ77: 16 KB of the official SD list's background picture, which
+	// image.bin still holds at 0x08117890 though nothing draws it now: the
+	// same data as before, so the figure compares with older reports.
 	u8 *packed = pReadCache, *out = pReadCache + 0x8000;
-	const u8 *picture = (const u8 *)gImage_SD;
+	const u8 *picture = (const u8 *)0x08117890;
 	u32 packed_size = lz77_compress(picture, 0x4000, packed);
 	diag_timer_start();
 	LZ77UnCompWram(packed, out);

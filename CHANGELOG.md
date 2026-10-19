@@ -12,6 +12,11 @@ git log, not here.
   pushes down the maps the menus' lists need room beside; a dialog that
   needs that room for its text moves it among the maps until it closes,
   without a one-frame flash of its tiles (`bc4a255`, `6956a8a`).
+- **Changed:** no screen draws in mode 3 any more: the boot's card message,
+  the SD theme error and the firmware update's screens are engine dialogs
+  with the official texts (the update's checks and writes are unchanged),
+  and the lists no longer start on a white frame. The mode 3 drawing code,
+  its font and the 16bpp pictures' use are gone (`4c15d3c`).
 - **Changed:** messages, questions and progress are dialogs on the v0.3 tile
   engine (`source/ui/dialog.h`): the launch's progress (with the game's name),
   WRITE TO NOR's and the PSRAM load's progress with a bar, "Save sav?", the

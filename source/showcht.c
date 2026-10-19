@@ -9,11 +9,11 @@
 
 #include "ezkernel.h"
 #include "showcht.h"
-#include "draw.h"
 #include "tlog.h"
 #include "savename.h"
 #include "engine/cover.h"
 #include "engine/engine.h"
+#include "ui/dialog.h"
 #include "ui/ui.h"
 
 FM_CHT_LINE tmpCHTFS;
@@ -899,18 +899,18 @@ int Open_cht_file(TCHAR *gamefilename, u32 havecht)
 			for (u32 i = 0; i < cs.count; i++)
 				cs.entries += cs.lines[i].is_section != 1;
 			cs.ord = cs.count && cs.lines[0].is_section != 1;  // entries up to line 0
-			setRepeat(15, 1);  // as before the port: the menus after it read keys with it
 
 			// The list sits in the cover stage's range: no asset job may run
 			cover_cache_invalidate();
 			engine_init();
 			ui_init(NULL);
 			cs_run(&cs);
-			shown = 1;  // the engine ran: mode 3 needs repainting either way
+			shown = 1;  // the engine ran: the caller's screen starts again either way
 			// Reading the picks' codes can take seconds in a big file: the
 			// cheat screen stays up meanwhile, rather than a black one
 			Analyze_KEYVAL(&gfile, cs.count);
-			menu_leave_engine();  // back to the mode 3 menu, on a black screen
+			ui_shutdown();
+			dialog_blank();  // back to the caller, on a black screen
 			cheats_opened = 1;
 			cheats_picked = 0;
 			for (u32 i = 0; i < cs.count; i++)

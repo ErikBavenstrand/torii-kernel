@@ -3,8 +3,8 @@
 # set to the SD theme (settings slot 28 = 2), the kernel loads the theme
 # /torii/theme.txt names, here themes/example; one that doesn't load is
 # logged and shown on the boot screen, and the menu still comes up.
-# The menu is still mode 3, so only the log shows the theme. Runs inside the
-# torii-emu container.
+# The log shows the theme; boot.png keeps the boot screen's error notice.
+# Runs inside the torii-emu container.
 set -euo pipefail
 
 cart=dist/cart-themes

@@ -15,8 +15,8 @@ at `0x100000`. The file is mapped at GBA ROM `0x08000000`, so the `0x08xxxxxx` a
 
 | ROM address | Content |
 |---|---|
-| `0x08100000–0x0818D610…` | Manuals, splash, UI backgrounds, icons |
-| `0x08194410…` | Theme colour table |
+| `0x08100000–0x0818D610…` | Manuals, splash, UI backgrounds, icons (16bpp; Torii draws none since v0.3, Diagnostics times LZ77 on the SD list picture at `0x08117890`) |
+| `0x08194410…` | Theme colour table (unused since v0.3) |
 | `0x08195000` (+`0x535BC`) | FPGA bitstream, XC6SLX9, firmware v5 |
 | `0x08200000` (+`0x716A0`) | FPGA bitstream, XC6SLX16, firmware v7 |
 

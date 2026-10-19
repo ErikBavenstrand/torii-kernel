@@ -1,7 +1,7 @@
 // The UI's node pool and view arenas with the real widgets (source/ui).
 //
-// Like the engine's tests, these run in Diagnostics while its mode 3
-// screen shows, so they never write BG VRAM: views are pushed with
+// Like the engine's tests, these run in Diagnostics with its screen down,
+// and they never write BG VRAM: views are pushed with
 // ui_core_push (nodes, arena, allocations, motions), not ui_push, and
 // nothing is drawn. They leave the engine and the UI reset.
 #include <string.h>

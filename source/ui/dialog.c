@@ -1,5 +1,5 @@
-// Generic dialogs (dialog.h): one modal view, in three uses.
-#include <gba_input.h>
+// Generic dialogs (dialog.h): one modal view, in four uses.
+#include <gba_input.h>  // KEY_A, KEY_B
 #include <gba_systemcalls.h>
 #include <stdio.h>
 #include <string.h>
@@ -13,7 +13,6 @@
 
 #define REG_DISPCNT_ (*(vu16 *)0x04000000)
 #define BG_PALETTE_ ((vu16 *)0x05000000)
-#define DISP_MODE3_BG2 0x0403
 
 #define PANEL_W 208
 #define TEXT_W 192  // the labels' width: the panel less 8 px each side
@@ -37,6 +36,7 @@ enum {
 	USE_MESSAGE,
 	USE_CONFIRM,
 	USE_PROGRESS,
+	USE_NOTICE,
 };
 
 static const struct ui_panel_config border_panel = {UI_PANEL_BORDER};
@@ -125,6 +125,20 @@ static const struct ui_view_spec error_view = {.name = "dialog",
 					       .focus = UI_NONE,
 					       .flags = UI_VIEW_MODAL,
 					       .event = dialog_event};
+static const struct ui_view_spec notice_view = {.name = "notice",
+						.nodes = message_nodes,
+						.count = N_BAR,
+						.id = 30,  // a dialog's look (theme patches)
+						.focus = UI_NONE,
+						.flags = UI_VIEW_MODAL,
+						.event = dialog_event};
+static const struct ui_view_spec notice_error_view = {.name = "notice",
+						      .nodes = error_nodes,
+						      .count = N_BAR,
+						      .id = 30,
+						      .focus = UI_NONE,
+						      .flags = UI_VIEW_MODAL,
+						      .event = dialog_event};
 static const struct ui_view_spec progress_view = {.name = "progress",
 						  .nodes = progress_nodes,
 						  .count = N_COUNT,
@@ -145,10 +159,11 @@ struct shown {
 
 static struct {
 	u8 opens;  // dialog_open calls not yet closed
-	u8 owned;  // the session is the dialogs': mode 3 comes back at the last close
+	u8 owned;  // the session is the dialogs': the last close shuts the engine down
 	u32 last_pump;
 	struct shown message;   // a message or question
 	struct shown progress;  // the progress dialog, under a message if both are up
+	struct shown notice;    // a notice, under the other two
 	u32 value, max;
 	u8 bar_changed, status_changed;
 } dlg EWRAM_BSS;
@@ -157,7 +172,9 @@ static int dialog_event(struct ui_view *view, const struct ui_event *e)
 {
 	if (e->type != UI_EV_KEYS)
 		return 0;
-	struct shown *s = view == dlg.message.view ? &dlg.message : &dlg.progress;
+	struct shown *s = view == dlg.message.view  ? &dlg.message
+			  : view == dlg.notice.view ? &dlg.notice
+						    : &dlg.progress;
 	s->keys |= e->keys;
 	return 1;
 }
@@ -168,16 +185,14 @@ void dialog_open(void)
 {
 	dlg.opens++;
 	if (dlg.opens == 1 && ui_depth() == 0) {
-		// From mode 3: a black screen while the engine sets up (mode 0 with
-		// nothing on shows the backdrop), so no frame shows mode 3's picture
-		// read as tiles
-		VBlankIntrWait();
-		BG_PALETTE_[0] = 0;
-		REG_DISPCNT_ = 0;
+		// From plain code: a black screen while the engine sets up (mode 0
+		// with nothing on shows the backdrop), so no frame shows what VRAM
+		// held read as tiles
+		dialog_blank();
 		engine_init();
 		ui_init(NULL);
 		dlg.owned = 1;
-		tlog_debug("dialog: the engine runs the dialogs (from mode 3)");
+		tlog_debug("dialog: the engine runs the dialogs");
 	}
 	// No dimming over a question or a 4-minute erase, over an engine screen
 	// too (dialog_close gives it back the DIM setting)
@@ -198,34 +213,21 @@ void dialog_close(void)
 	}
 	dlg.owned = 0;
 	ui_shutdown();
-	dialog_mode3();
-	tlog_debug("dialog: back to mode 3");
+	dialog_blank();
+	tlog_debug("dialog: engine session over");
 }
 
-void dialog_mode3(void)
+void dialog_blank(void)
 {
 	VBlankIntrWait();
 	BG_PALETTE_[0] = 0;
 	REG_DISPCNT_ = 0;
-	// The registers the engine writes, as the mode 3 menu has them: BG control
-	// and scroll, windows, mosaic and blending (not BG2's affine ones, which
-	// mode 3 uses and the engine leaves alone)
+	// BG control and scroll, windows, mosaic and blending (BG2's and BG3's
+	// affine registers only matter in modes 1 and 2, which nothing uses)
 	for (vu16 *r = (vu16 *)0x04000008; r < (vu16 *)0x04000020; r++)
 		*r = 0;
 	for (vu16 *r = (vu16 *)0x04000040; r < (vu16 *)0x04000056; r++)
 		*r = 0;
-	u32 zero = 0;
-	CpuFastSet(&zero, (void *)0x06000000, (240 * 160 * 2 / 4) | 1 << 24);
-	VBlankIntrWait();
-	REG_DISPCNT_ = DISP_MODE3_BG2;
-	// libgba's keysDown and keysUp gather changes until they are read, not
-	// until the next scanKeys: the engine read the keys itself, so read them
-	// once now, or the menu takes a key that left the screen (a held L) for
-	// a new press
-	scanKeys();
-	(void)keysDown();
-	(void)keysUp();
-	(void)keysDownRepeat();
 }
 
 // --- Text ----------------------------------------------------------------
@@ -316,7 +318,9 @@ static int show(struct shown *s, u32 use, const char *title, const char *text, u
 	copy(s->hint, sizeof(s->hint), hint);
 	s->keys = 0;
 	s->use = (u8)use;
-	const struct ui_view_spec *spec = use == USE_PROGRESS    ? &progress_view
+	const struct ui_view_spec *spec = use == USE_PROGRESS ? &progress_view
+					  : use == USE_NOTICE
+						  ? (kind == DIALOG_ERROR ? &notice_error_view : &notice_view)
 					  : kind == DIALOG_ERROR ? &error_view
 								 : &message_view;
 	s->view = ui_push(spec, 0);
@@ -395,6 +399,35 @@ int dialog_confirm(const char *title, const char *text, u32 kind)
 	log_dialog(title, text, yes ? "A, yes" : "B, no");
 	dialog_close();
 	return yes;
+}
+
+// --- Notices -----------------------------------------------------------------
+
+void dialog_notice(const char *title, const char *text, u32 kind)
+{
+	log_dialog(title, text, NULL);
+	if (dlg.notice.view) {
+		// Replaced: popped without a frame, so nothing shows in between
+		TLOG_ASSERT(ui_top() == dlg.notice.view);
+		if (ui_top() == dlg.notice.view)
+			ui_pop();
+		dlg.notice.view = 0;
+	} else {
+		dialog_open();
+	}
+	if (!show(&dlg.notice, USE_NOTICE, title, text, kind, NULL)) {
+		dialog_close();
+		return;
+	}
+	settle(&dlg.notice, 30);
+}
+
+void dialog_notice_end(void)
+{
+	if (!dlg.notice.view)
+		return;
+	hide(&dlg.notice);
+	dialog_close();
 }
 
 // --- Progress --------------------------------------------------------------

@@ -20,8 +20,6 @@ clang-tidy source/GBApatch.c clang-analyzer-security.PointerSub: Subtraction of 
 clang-tidy source/GBApatch.c clang-analyzer-security.PointerSub: Subtraction of two pointers that do not point into the same array is undefined behavior
 clang-tidy source/NORflash_OP.c bugprone-narrowing-conversions: narrowing conversion from 'u32' (aka 'unsigned int') to signed type 'int' is implementation-defined
 clang-tidy source/cheat.c bugprone-narrowing-conversions: narrowing conversion from '__size_t' (aka 'unsigned int') to signed type 'int' is implementation-defined
-clang-tidy source/draw.c bugprone-branch-clone: repeated branch body in conditional chain
-clang-tidy source/draw.c clang-analyzer-deadcode.DeadStores: Value stored to 'len' is never read
 clang-tidy source/ezkernelnew.c bugprone-branch-clone: repeated branch body in conditional chain
 clang-tidy source/ezkernelnew.c bugprone-branch-clone: repeated branch body in conditional chain
 clang-tidy source/ezkernelnew.c bugprone-branch-clone: switch has 2 consecutive identical branches

@@ -1,11 +1,11 @@
 // The engine core (source/engine): allocators, the VRAM queue's caps, the
 // shadow state's commit, jobs within a budget, the cycle counter.
 //
-// These run in every kernel's Diagnostics too, while its mode 3 screen
-// shows: they touch only what mode 3 leaves unused (sprite VRAM past
-// 0x06014000, OAM, the sprite palette), never DISPCNT, and leave the
-// engine's state reset (engine shadow state not dirty, pools empty). Once a
-// screen runs on the engine (T12), run them where its state can be lost.
+// These run in every kernel's Diagnostics too, with its screen down (the
+// engine shut down, a black screen: dialog_blank): they touch only sprite
+// VRAM past 0x06014000, OAM and the sprite palette, never DISPCNT, and leave
+// the engine's state reset (engine shadow state not dirty, pools empty), as
+// Diagnostics starts its screen again after them.
 #include <string.h>
 
 #include "torii_test.h"
@@ -15,7 +15,7 @@
 #define REG_VCOUNT_T (*(vu16 *)0x04000006)
 #define OAM_T ((vu16 *)0x07000000)
 #define OBJ_PAL_T ((vu16 *)0x05000200)
-// The last 4 KB of sprite VRAM: free in mode 3 and unused by Diagnostics
+// The last 4 KB of sprite VRAM, which Diagnostics doesn't use
 #define TEST_VRAM ((u32 *)0x06017000)
 
 // Waits for the start of VBlank (line 160), polling: the test kernel runs
@@ -216,7 +216,7 @@ void test_engine_commit(void)
 	gfx_pal_faded[31 * 16 + 2] = 0x1234;
 	gfx_pal_use_faded(1);
 	CHECK_EQ(gfx_dirty_pal, 0xFFFFFFFF);
-	gfx_dirty_pal = 1u << 31;  // keep to the sprite bank mode 3 doesn't use
+	gfx_dirty_pal = 1u << 31;  // keep to the last sprite bank
 	gfx_commit();
 	CHECK_EQ(OBJ_PAL_T[15 * 16 + 2], 0x1234);
 	for (u32 i = 0; i < 16; i++)
@@ -370,7 +370,7 @@ void test_engine_cycles(void)
 void test_engine_hold_for_queue(void)
 {
 	engine_quiet(1);
-	vu16 *winin = (vu16 *)0x04000048;  // readable, and unused by mode 3 screens
+	vu16 *winin = (vu16 *)0x04000048;  // readable, and cleared while no screen is up
 	u16 kept = *winin;
 	CHECK(gfx_queue_copy(TEST_VRAM, (const void *)0x08000000, 2048));
 	gfx_set_win(4, kept ^ 0x3F);
