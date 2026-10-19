@@ -11,6 +11,7 @@
 #include "logbuf.h"
 #include "tlog.h"
 #include "engine/cycles.h"
+#include "version.h"
 
 // mGBA's debug registers: write 0xC0DE to enable (it then reads 0x1DEA),
 // fill the string, then write the level with the send bit (0x100).
@@ -55,6 +56,8 @@ extern int main(void);
 extern const u8 __rom_end__;  // the linker's: the end of the kernel's ROM image
 
 #define MARKER "Torii kernel boot: %s, logging %s, build main %08lX end %08lX id %08lX"
+// Right after it: the version (version.h) with the build ID
+#define VERSION_LINE "Torii " TORII_VERSION ", build id %08lX"
 
 void tlog_marker(const char *why, int force)
 {
@@ -64,12 +67,14 @@ void tlog_marker(const char *why, int force)
 	if (force) {
 		tlog_force(TLOG_INFO, MARKER, why, tlog_level_name(level), (unsigned long)main,
 			   (unsigned long)&__rom_end__, (unsigned long)torii_build_id);
+		tlog_force(TLOG_INFO, VERSION_LINE, (unsigned long)torii_build_id);
 		return;
 	}
 	if (tlog_level != TLOG_OFF)
 		tlog_level = TLOG_INFO;
 	tlog(MARKER, why, tlog_level_name(level), (unsigned long)main, (unsigned long)&__rom_end__,
 	     (unsigned long)torii_build_id);
+	tlog(VERSION_LINE, (unsigned long)torii_build_id);
 	tlog_level = level;
 }
 

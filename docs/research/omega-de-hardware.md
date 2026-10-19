@@ -241,7 +241,10 @@ While SD control is 3 the port returns status; `0xEEE1` means busy.
    parameters. The RTS file's table goes at `+0x300`.
 2. `Send_FATbuffer` writes the table to the port with buffer control 1, then
    sets buffer control 3. In load mode the FPGA copies the file into PSRAM and
-   the port reads non-zero, then not 1, when done.
+   the port reads non-zero, then not 1, when done. The kernel spins on the
+   port (IWRAM code) the whole time, so it can't move a progress bar during
+   the copy: the launch's bar stands at its "Loading the game" step until the
+   copy ends (source/progress.h).
 3. With patches enabled the kernel loads the ROM itself through the PSRAM
    window instead, patching each 128 KB block on the way.
 4. `SetRompageWithHardReset(0x200)` maps PSRAM at `0x08000000` and soft-resets

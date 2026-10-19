@@ -14,6 +14,8 @@ void test_cheat_cap(void);
 void test_cheat_garbage(void);
 void test_cheat_empty_entries(void);
 void test_cheat_whitespace(void);
+void test_progress_permille(void);
+void test_progress_estimate(void);
 void test_save_name(void);
 void test_save_name_longest(void);
 void test_name_with_ext(void);

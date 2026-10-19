@@ -48,7 +48,7 @@ grep -q "screen ready: sd-list" <<<"$out" || fail "no menu after a theme that di
 echo "PASS: SD theme loaded at boot; one that doesn't load is reported and the menu still starts"
 
 # SETTINGS page 2's THEME picks the SD theme: on a card with themes/example
-# and nothing set, THEME (DOWN x3), A to edit, A for LIGHT, A for the
+# and nothing set, THEME (DOWN x5), A to edit, A for LIGHT, A for the
 # example (loaded as it is picked), RIGHT and A on OK save it: theme.txt
 # names it, slot 28 holds 2, and the next power-on loads it
 rm -rf "$cart"
@@ -60,8 +60,8 @@ keys="-k @8:R -k @12:-"
 # shellcheck disable=SC2086 # $keys is a list of options
 out=$(OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -w "screen ready: sd-list" $keys \
   -w "screen ready: nor-list" $keys -w "screen ready: settings1" $keys -w "screen ready: settings2" \
-  -k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:A -k @48:- -k @56:A -k @60:- \
-  -k @68:A -k @72:- -k @80:RIGHT -k @84:- -k @92:A -k @96:- -w "settings: THEME" \
+  -k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:DOWN -k @48:- -k @56:DOWN -k @60:- -k @68:A -k @72:- -k @80:A -k @84:- \
+  -k @92:A -k @96:- -k @104:RIGHT -k @108:- -k @116:A -k @120:- -w "settings: THEME" \
   -s @10:dist/cart-themes/settings.png 2>&1 || true)
 grep -q "kernel: settings: THEME Example" <<<"$out" ||
   fail "SETTINGS didn't save the example theme: $(grep -E 'settings|theme' <<<"$out" | head -3)"

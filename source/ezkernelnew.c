@@ -32,6 +32,7 @@
 #include "engine/cover.h"
 #include "screens/lists.h"
 #include "ui/sdtheme.h"
+#include "progress.h"
 
 #include "jagoombacolor.h"
 #include "pocketnes.h"
@@ -414,9 +415,12 @@ static void save_write(FIL *file, const u8 *data, UINT len, u32 *total, FRESULT 
 
 // Copies savesize bytes of cart SRAM to filename, over the file there, and
 // logs what reached the card. ROM code, as Loadsavefile: both run only in
-// the menu.
+// the menu. Torii: the SRAM goes through pReadCache's upper half, which no
+// frame touches (ez_define.h), so the progress dialog can draw between
+// writes.
 u32 Save_savefile(TCHAR *filename, u32 savesize)
 {
+	u8 *buf = pReadCache + READCACHE_SAVE;
 	FIL file;
 	if (savesize == 0)
 		return 0xff;
@@ -430,25 +434,33 @@ u32 Save_savefile(TCHAR *filename, u32 savesize)
 		SetRampage(0x0);
 
 		if (savesize < 0x800) {
-			ReadSram(SRAMSaver, pReadCache, savesize);
+			ReadSram(SRAMSaver, buf, savesize);
 			expected = (savesize + 0x1FF) / 0x200 * 0x200;
 			for (i = 0; i < (savesize + 0x1FF) / 0x200 && total == i * 0x200; i++)
-				save_write(&file, pReadCache + 0x200 * i, 0x200, &total, &werr);
+				save_write(&file, buf + 0x200 * i, 0x200, &total, &werr);
 		} else {
 			if (savesize > 64 * 1024) {
 				expected = 128 * 1024;
-				ReadSram(SRAMSaver, pReadCache, 64 * 1024);
-				for (i = 0; i < 64 * 1024 / 0x800 && total == i * 0x800; i++)
-					save_write(&file, pReadCache + 0x800 * i, 0x200 * 4, &total, &werr);
+				ReadSram(SRAMSaver, buf, 64 * 1024);
+				for (i = 0; i < 64 * 1024 / 0x800 && total == i * 0x800; i++) {
+					progress_part(total, expected);
+					save_write(&file, buf + 0x800 * i, 0x200 * 4, &total, &werr);
+				}
 				SetRampage(0x10);
-				ReadSram(SRAMSaver, pReadCache, 64 * 1024);
-				for (i = 0; i < 64 * 1024 / 0x800 && total == 64 * 1024 + i * 0x800; i++)
-					save_write(&file, pReadCache + 0x800 * i, 0x200 * 4, &total, &werr);
+				ReadSram(SRAMSaver, buf, 64 * 1024);
+				// The frames progress_part runs leave cart SRAM alone, so the
+				// page stays 0x10 through them (cartlog sets its own page)
+				for (i = 0; i < 64 * 1024 / 0x800 && total == 64 * 1024 + i * 0x800; i++) {
+					progress_part(total, expected);
+					save_write(&file, buf + 0x800 * i, 0x200 * 4, &total, &werr);
+				}
 			} else {
 				expected = savesize / 0x800 * 0x800;
-				ReadSram(SRAMSaver, pReadCache, savesize);
-				for (i = 0; i < savesize / 0x800 && total == i * 0x800; i++)
-					save_write(&file, pReadCache + 0x800 * i, 0x200 * 4, &total, &werr);
+				ReadSram(SRAMSaver, buf, savesize);
+				for (i = 0; i < savesize / 0x800 && total == i * 0x800; i++) {
+					progress_part(total, expected);
+					save_write(&file, buf + 0x800 * i, 0x200 * 4, &total, &werr);
+				}
 			}
 		}
 		SetRampage(0x0);  // Torii: the page was left at 0x10
@@ -600,7 +612,6 @@ u32 IWRAM_CODE Loadfile2PSRAM(TCHAR *filename)
 	u32 filesize;
 	u32 res;
 	u32 blocknum;
-	char msg[40];
 
 	u32 Address;
 	vu16 page = 0;
@@ -609,13 +620,11 @@ u32 IWRAM_CODE Loadfile2PSRAM(TCHAR *filename)
 	res = f_open(&gfile, filename, FA_READ);
 	if (res == FR_OK) {
 		filesize = f_size(&gfile);
-		// Torii: on the launch's progress dialog, with a bar
-		dialog_progress_status(gl_writing);
 
 		f_lseek(&gfile, 0x0000);
 		for (blocknum = 0x0000; blocknum < filesize; blocknum += 0x20000) {
-			sprintf(msg, "%s %luMb/%luMb", gl_writing, (blocknum) / 0x20000, filesize / 0x20000);
-			dialog_progress_set(blocknum, filesize, msg);
+			// Torii: the launch's step (progress.h), between blocks
+			progress_part(blocknum, filesize);
 			f_read(&gfile, pReadCache, 0x20000, &ret);//pReadCache max 0x20000 Byte
 
 			if ((gl_reset_on == 1) || (gl_rts_on == 1) || (gl_sleep_on == 1) || (gl_cheat_on == 1)) {
@@ -634,6 +643,7 @@ u32 IWRAM_CODE Loadfile2PSRAM(TCHAR *filename)
 		}
 		f_close(&gfile);
 		SetPSRampage(0);
+		progress_part(filesize, filesize);
 		return 0;
 	} else {
 		return 1;
@@ -743,7 +753,6 @@ u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU)
 	u32 filesize;
 	u32 res;
 	u32 blocknum;
-	char msg[40];
 
 	u32 Address;
 	vu16 page = 0;
@@ -784,13 +793,10 @@ u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU)
 			//use rtc, have been modify
 		}
 
-		// Torii: on the launch's progress dialog, with a bar
-		dialog_progress_status(gl_writing);
-
 		f_lseek(&gfile, 0x0000);
 		for (blocknum = 0x0000; blocknum < filesize; blocknum += 0x20000) {
-			sprintf(msg, "%s %luMb", gl_writing, (blocknum) / 0x20000);
-			dialog_progress_set(blocknum, filesize, msg);
+			// Torii: the launch's step (progress.h), between blocks
+			progress_part(blocknum, filesize);
 			//f_lseek(&gfile, blocknum);
 			f_read(&gfile, pReadCache, 0x20000, &ret);//pReadCache max 0x20000 Byte
 
@@ -806,6 +812,7 @@ u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU)
 		}
 		f_close(&gfile);
 		SetPSRampage(0);
+		progress_part(filesize, filesize);
 		return 0;
 	} else {
 		return 1;
@@ -1031,11 +1038,12 @@ static void Check_save_flag(void)
 		     : save           ? "A, save"
 				      : "B, not saved");
 		if (save) {
-			dialog_progress_begin(gl_save_sav, name);
-			dialog_progress_status(gl_save_ing);
+			dialog_progress_begin(gl_saving, name);
+			progress_step(gl_save_ing, 0, PROGRESS_FULL);
 			f_mkdir(SAVER_FOLDER);//"/SAVER"
 			f_chdir(SAVER_FOLDER);
 			Save_savefile(name, savefilesize);
+			progress_done(gl_done);
 			dialog_progress_end();
 		}
 		dialog_close();
@@ -1198,7 +1206,7 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 	     pNorFS[show_offset + file_select].have_RTS);
 	tlog_flush();
 
-	ShowbootProgress(gl_check_sav);
+	progress_step(gl_check_sav, 0, 500);
 	//memcpy(savfilename,pfilename,100);
 	error_num = Process_savefile(0, pfilename, gamefilesize, SAVEMODE);
 	if (error_num != 0) {
@@ -1213,7 +1221,7 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 
 	Set_64MROM_flag(pNorFS[show_offset + file_select].is_64MBrom);
 	if (pNorFS[show_offset + file_select].have_patch && pNorFS[show_offset + file_select].have_RTS) {
-		ShowbootProgress(gl_check_RTS);
+		progress_step(gl_check_RTS, 500, 900);
 		u32 size = Check_RTS(pfilename);
 		if (size == 0) {
 			error_num = 6;
@@ -1226,6 +1234,7 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 	Send_FATbuffer(FAT_table_buffer, 1);  //only RTS FAT and some parameter
 	//wait_btn();
 	gl_game_uses = Game_hardware(0, GAMECODE, 0);
+	progress_done(NULL);
 	Launch_now(pNorFS[show_offset + file_select].rompage, key_L, "NOR game");
 	while (1)
 		;
@@ -1323,7 +1332,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 			return 0;
 		}
 
-		ShowbootProgress(gl_check_sav);
+		progress_step(gl_check_sav, 0, 150);
 		res = f_mkdir(SAVER_FOLDER);  //"/SAVER"
 		if ((res != FR_OK) && (res != FR_EXIST)) {
 			error_num = 2;
@@ -1341,7 +1350,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 
 	if (is_EMU)  //boot emu game
 	{
-		ShowbootProgress(gl_loading_game);
+		progress_step(gl_loading_game, 150, 950);
 		f_chdir(currentpath);  //return to game folder
 		cartlog_phase(PHASE_LAUNCH, 0, pfilename);
 		tlog("launch: loading %s with %s", pfilename, (is_EMU == 3) ? "PocketNES" : "Jagoomba Color");
@@ -1351,6 +1360,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 		Send_FATbuffer(FAT_table_buffer, 1);
 
 		res = LoadEMU2PSRAM(pfilename, is_EMU);
+		progress_done(NULL);
 		Launch_now(0x200, key_L, (is_EMU == 3) ? "plugin PocketNES" : "plugin Jagoomba Color");
 		while (1)
 			;
@@ -1373,18 +1383,21 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 
 		switch (MENU_line) {
 		case 0:  //DirectPSRAM CLEAN BOOT
-			ShowbootProgress(gl_loading_game);
+			// The cart copies the game into PSRAM itself: no progress
+			// to show until it is done
+			progress_step(gl_loading_game, 150, 900);
 			cartlog_phase(PHASE_LAUNCH, 0, pfilename);
 			tlog("launch: loading %s, CLEAN BOOT", pfilename);
 			tlog_flush();
 
 			Send_FATbuffer(FAT_table_buffer, 0);
 			GBApatch_Cleanrom(PSRAMBase_S98, gamefilesize);
+			progress_done(NULL);
 			//wait_btn();
 			Launch_now(0x200, key_L, "CLEAN BOOT");
 			break;
 		case 1:  //PSRAM BOOT WITH ADDON
-			ShowbootProgress(gl_loading_game);
+			progress_step(gl_loading_game, 150, 150);
 			gl_reset_on = Read_SET_info(assress_v_reset);
 			gl_rts_on = Read_SET_info(assress_v_rts);
 			gl_sleep_on = Read_SET_info(assress_v_sleep);
@@ -1396,7 +1409,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 			tlog_flush();
 			if ((gl_reset_on == 1) || (gl_rts_on == 1) || (gl_sleep_on == 1) || (gl_cheat_on == 1)) {
 				if (gl_rts_on == 1) {
-					ShowbootProgress(gl_check_RTS);
+					progress_step(gl_check_RTS, 150, 200);
 					u32 size = Check_RTS(pfilename);
 					if (size == 0) {
 						error_num = 6;
@@ -1404,10 +1417,11 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 						return 0;
 					}
 				}
-				ShowbootProgress(gl_check_pat);
+				progress_step(gl_check_pat, 200, 250);
 				have_pat = Check_pat(pfilename);
 				if (have_pat == 1) {
 					tlog("launch: IRQ hook from PATCH/ (cached scan)");
+					progress_step(gl_loading_game, 250, 900);  // the cart copies it
 					Send_FATbuffer(FAT_table_buffer, 0);  //Loading rom
 				} else  //(have_pat==0)
 				{
@@ -1423,13 +1437,15 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 					get_find:
 						FAT_table_buffer[0x1F4 / 4] = SET_PARAMETER_MODE;
 						Send_FATbuffer(FAT_table_buffer, 1);
+						progress_step(gl_loading_game, 250, 850);
 						res = Loadfile2PSRAM(pfilename);
-						ShowbootProgress(gl_make_pat);
+						progress_step(gl_make_pat, 850, 900);
 						Make_pat_file(pfilename);
 					} else {
 						res = use_internal_engine(GAMECODE, pfilename);
 						if (res == 1) {
 							tlog("launch: IRQ hook from the built-in table");
+							progress_step(gl_loading_game, 250, 900);  // the cart copies it
 							Send_FATbuffer(FAT_table_buffer, 0);  //Loading rom
 						} else {
 							tlog("launch: IRQ hook from a scan of the ROM (not in the "
@@ -1444,6 +1460,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 					tlog("launch: %lu code patches for this game's IRQ setup",
 					     (unsigned long)(iCount2 - found));
 				found = iCount2;
+				progress_step(gl_patching, 900, 950);
 				Apply_rom_patches();  //Torii: exact-ROM patches, SD launches only
 				if (iCount2 > found)
 					tlog("launch: exact-ROM patch for %.4s (irqpatch.c rom_patches)",
@@ -1452,13 +1469,16 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 				Log_patches();
 			} else {  //no select switch ,CLEAN
 				tlog("launch: no addon on, so no patches");
+				progress_step(gl_loading_game, 150, 950);  // the cart copies it
 				Send_FATbuffer(FAT_table_buffer, 0);  //Loading rom
 			}
+			progress_done(NULL);
 			//wait_btn();
 			Launch_now(0x200, key_L, "BOOT WITH ADDON");
 			break;
 		case 2:  //WRITE TO NOR CLEAN
 			f_chdir(currentpath);  //return to game folder
+			progress_step(gl_writing, 0, PROGRESS_FULL);
 			res = Loadfile2NOR(pfilename, gl_norOffset, 0x0, SAVEMODE);
 			if (res == 0)  //ok
 			{
@@ -1496,6 +1516,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 				}
 				needpatch = 1;
 			}
+			progress_step(gl_writing, 0, PROGRESS_FULL);
 			res = Loadfile2NOR(pfilename, gl_norOffset, needpatch, SAVEMODE);
 			//wait_btn();
 			if (res == 0) {
@@ -1517,7 +1538,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 		}
 	}
 	return 0;
-}//---------------------------------------------------------------------------------
+}  //---------------------------------------------------------------------------------
 u8 Game_launch(struct game_pick *g, u32 menu_line, u32 key_L)
 {
 	// A launch loads and patches the game in PSRAM, writes never measured
@@ -1569,9 +1590,10 @@ u8 FRAM_save_op(u8 OP)
 		return 0;
 	}
 	//bak fram save, with a progress dialog while it saves
-	dialog_progress_begin(NULL, savfilename);
-	dialog_progress_status(gl_save_ing);
+	dialog_progress_begin(gl_saving, savfilename);
+	progress_step(gl_save_ing, 0, PROGRESS_FULL);
 	Save_savefile(savfilename, Get_savefilesize(pNorFS[0].savemode));
+	progress_done(gl_done);
 	dialog_progress_end();
 	return 0;
 }

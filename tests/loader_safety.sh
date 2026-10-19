@@ -140,9 +140,9 @@ delete=$(keys 200 R DOWN A DOWN A)
 format=$(keys 200 R A DOWN DOWN A A)
 format_no=$(keys 200 R A DOWN DOWN A B)
 # THEME on SETTINGS page 2 set to LIGHT and saved, through save_set2_info
-save_theme="$(keys 200 R) $(keys 220 R) $(keys 270 R) $(keys 320 DOWN DOWN DOWN A A RIGHT A)"
+save_theme="$(keys 200 R) $(keys 220 R) $(keys 270 R) $(keys 320 DOWN DOWN DOWN DOWN DOWN A A RIGHT A)"
 # ACCENT on SETTINGS page 2 set to Blue and saved
-save_accent="$(keys 200 R) $(keys 220 R) $(keys 270 R) $(keys 320 DOWN DOWN DOWN DOWN A A RIGHT A)"
+save_accent="$(keys 200 R) $(keys 220 R) $(keys 270 R) $(keys 320 DOWN DOWN DOWN DOWN DOWN DOWN A A RIGHT A)"
 save_setting="-k 200:R -k 206:- -k 220:R -k 226:- -k 270:DOWN -k 276:- -k 285:DOWN -k 291:- -k 300:A -k 306:- -k 340:A -k 346:-"
 launch="$(keys 200 DOWN DOWN DOWN DOWN A) $(keys 250 DOWN DOWN DOWN DOWN RIGHT RIGHT RIGHT RIGHT RIGHT UP UP UP UP A)"
 diag="-k 1:L+R+SELECT -k 60:- -k 120:A -k 124:- $(for f in $(seq 2000 24 4400); do printf -- '-k %d:START -k %d:- ' "$f" $((f + 4)); done)"

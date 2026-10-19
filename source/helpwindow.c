@@ -9,9 +9,10 @@
 #include "Ezcard_OP.h"
 #include "helpwindow.h"
 #include "settings.h"
+#include "version.h"
 
 static struct {
-	char version[20];
+	char version[32];
 	char help[160];
 	char credits[96];
 } help EWRAM_BSS;
@@ -19,7 +20,8 @@ static struct {
 static void help_enter(struct ui_view *view)
 {
 	u16 fpga = Read_FPGA_ver();
-	snprintf(help.version, sizeof(help.version), "FW:%d K:1.06", fpga & 0xFF);
+	// "Torii 0.3.0 · FW 7": the kernel's version, then the firmware's
+	snprintf(help.version, sizeof(help.version), "Torii " TORII_VERSION " \xC2\xB7 FW %d", fpga & 0xFF);
 	u16 rev = fpga & 0xF000;
 	snprintf(help.help, sizeof(help.help), "%s\n%s\n%s", gl_START_help, gl_L_A_help, gl_LSTART_help);
 	// The fonts' licence (OFL-1.1) asks for the credit
@@ -48,8 +50,16 @@ static const struct ui_label_config manual_config = {"", UI_FONT_BODY, UI_ALIGN_
 static const u16 qr_palette[16] = {0, 0x7FFF, 0x0000};
 static const struct ui_image_config qr_config = {help_qr_tiles, qr_palette, 0x4851};  // "HQ"
 
+// SETTINGS_HEADER with a wider corner, for "Torii 0.3.0 · FW 7"
+// clang-format off
 static const struct ui_spec help_nodes[] = {
-	SETTINGS_HEADER,
+	{.kind = UI_PANEL, .id = 1, .parent = UI_NONE, .plane = 2, .anchor = UI_HFILL,
+	 .paper = UI_ROLE_PANEL, .h = 16},
+	{.kind = UI_LABEL, .id = 2, .parent = 0, .plane = 2, .anchor = UI_LEFT, .ink = UI_ROLE_TEXT,
+	 .paper = UI_ROLE_PANEL, .w = 96, .h = 16, .data = &settings_title_config},
+	{.kind = UI_LABEL, .id = 3, .parent = 0, .plane = 2, .anchor = UI_RIGHT, .ink = UI_ROLE_DIM,
+	 .paper = UI_ROLE_PANEL, .w = 144, .h = 16, .data = &settings_corner_config},
+	// clang-format on
 	{.kind = UI_LABEL,
 	 .id = 4,
 	 .parent = UI_NONE,

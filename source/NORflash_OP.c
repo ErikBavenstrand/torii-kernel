@@ -18,6 +18,7 @@
 #include "norlist.h"
 #include "tlog.h"
 #include "waitcnt.h"
+#include "progress.h"
 //#define DEBUG
 
 extern FM_NOR_FS pNorFS[MAX_NOR] EWRAM_BSS;
@@ -84,10 +85,13 @@ void IWRAM_CODE Block_Erase(u32 blockAdd) //0x20000 BYTE pre block
 	WAITCNT_RESTORE(waitcnt);
 }
 //-----------------------------------------------------------
+// The official kernel's estimate for the whole erase: "about 4 mins"
+#define CHIP_ERASE_FRAMES (4 * 60 * 60)
+
 void Chip_Erase(void)
 {
-	char msg[128];
-	u32 count = 0;
+	char msg[48];
+	u32 start = torii_frames;
 	vu16 v1, v2 = 0;
 	u16 waitcnt = WAITCNT_SLOW();
 	tlog("nor: erasing the whole game NOR");
@@ -101,10 +105,12 @@ void Chip_Erase(void)
 	do {
 		VBlankIntrWait();
 		VBlankIntrWait();
-		// Torii: the count on FormatNor's progress dialog (it was drawn on the menu, with the clock)
-		itoa(count, msg, 2);
-		dialog_progress_status(msg);
-		count++;
+		// Torii: the time so far and an estimate on FormatNor's progress
+		// dialog (it was a count, drawn on the menu, with the clock)
+		u32 t = torii_frames - start;
+		snprintf(msg, sizeof(msg), "%s %lu:%02lu", gl_erasing, (unsigned long)(t / 3600),
+			 (unsigned long)(t / 60 % 60));
+		dialog_progress_set(progress_estimate(t, CHIP_ERASE_FRAMES), PROGRESS_FULL, msg);
 
 		VBlankIntrWait();
 		v1 = *((vu16 *)(FlashBase_S98));
@@ -117,14 +123,16 @@ void Chip_Erase(void)
 
 //-----------------------------------------------------------
 // Erases the whole game NOR and its list (FORMAT ALL, once confirmed).
-// Torii: the erase's count is a progress dialog (source/ui/dialog.h)
+// Torii: the erase shows on a progress dialog (source/ui/dialog.h)
 void FormatNor(void)
 {
-	dialog_progress_begin(NULL, NULL);
+	dialog_progress_begin(gl_format_title, gl_keep_power);
+	progress_step(gl_erasing, 0, PROGRESS_FULL);
 	Chip_Erase();
 	memset(pNorFS, 00, sizeof(FM_NOR_FS) * MAX_NOR);
 	game_total_NOR = 0;
 	Save_NOR_list(0);  // Torii: the boot no longer saves an empty list
+	progress_done(gl_done);
 	dialog_progress_end();
 }
 //---------------------------------------------------------------
@@ -459,7 +467,6 @@ static u32 Loadfile2NOR_slow(TCHAR *filename, u32 NORaddress, u16 have_patch, u8
 	u32 fileneedsize;
 
 	u32 blocknum;
-	char msg[128];
 	FM_NOR_FS tmpNorFS;
 	char temp[50];
 	char flag[4];
@@ -569,11 +576,9 @@ static u32 Loadfile2NOR_slow(TCHAR *filename, u32 NORaddress, u16 have_patch, u8
 		tlog("nor: %s: %lu bytes in an area of %lu", filename, (unsigned long)filesize,
 		     (unsigned long)fileneedsize);
 
-		// Torii: on the launch's progress dialog, with a bar
-		dialog_progress_status(gl_writing);
+		// Torii: the launch's step (progress.h), between blocks
 		for (blocknum = 0; blocknum < filesize; blocknum += 0x20000) {
-			sprintf(msg, "%s %luMb/%luMb", gl_writing, (blocknum) / 0x20000, filesize / 0x20000);
-			dialog_progress_set(blocknum, filesize, msg);
+			progress_part(blocknum, filesize);
 			Block_Erase(blocknum + NORaddress);
 
 			f_lseek(&gfile, blocknum);
@@ -626,6 +631,7 @@ static u32 Loadfile2NOR_slow(TCHAR *filename, u32 NORaddress, u16 have_patch, u8
 
 		dmaCopy(&tmpNorFS, &pNorFS[game_total_NOR], sizeof(FM_NOR_FS));
 		Save_NOR_list(game_total_NOR + 1);  // if it fails, the mark lists the game
+		progress_done(gl_done);
 		return 0;
 	} else {
 #ifdef DEBUG

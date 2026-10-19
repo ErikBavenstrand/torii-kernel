@@ -13,6 +13,7 @@
 #include "ui/dialog.h"
 #include "ui/ui.h"
 #include "Ezcard_OP.h"
+#include "lang.h"
 #include "tlog.h"
 #include "waitcnt.h"
 
@@ -544,7 +545,7 @@ void IWRAM_CODE Set_64MROM_flag(u16 flag)
 }
 // --------------------------------------------------------------------
 // Torii: the screens are dialogs on the engine, in one session of their own
-// (ui/dialog.h), with the official texts; the CRC check, the SPI writes and
+// (ui/dialog.h), with texts from lang.h (EN_FW_*); the CRC check, the SPI writes and
 // their order are the official ones. Keys act on release, not on the press.
 void IWRAM_CODE FW_update(u16 DEcard_FW_readver, u16 FW_built_in_ver, void *FWbinaddress, u32 FWsize, u32 build_crc32,
 			  u32 FW_wirte_address)
@@ -553,33 +554,29 @@ void IWRAM_CODE FW_update(u16 DEcard_FW_readver, u16 FW_built_in_ver, void *FWbi
 	vu32 offset;
 	char title[32];
 	char msg[128];
-	char status[16];
+	char status[24];
 
-	sprintf(title, "Rev.%s FIRMWARE UPDATE", ((DEcard_FW_readver & 0xA000) == 0xA000) ? "B" : "A");
+	sprintf(title, EN_FW_TITLE, ((DEcard_FW_readver & 0xA000) == 0xA000) ? "B" : "A");
 	dialog_open();
 
 	u32 get_crc32 = crc32(FWbinaddress, FWsize);
 	//DEBUG_printf("get_crc32 %x ",get_crc32);
 
 	if (get_crc32 != build_crc32) {
-		dialog_message(title, "check crc32 error!\npress [B] to return", DIALOG_ERROR);
+		dialog_message(title, EN_FW_CRC_ERROR, DIALOG_ERROR);
 		dialog_close();
 		return;
 	}
 
 	// No key hint: the language isn't loaded yet, and the text names the keys
-	sprintf(msg,
-		"Current firmware version: V%02d\nWill be updated to version: V%02d\nPress [A] to update\nPress [B] to "
-		"cancel",
-		DEcard_FW_readver & 0xFF, FW_built_in_ver);
+	sprintf(msg, EN_FW_QUESTION, DEcard_FW_readver & 0xFF, FW_built_in_ver);
 	if (dialog_confirm(title, msg, DIALOG_INFO)) {
 		SPI_Write_Disable();
-		sprintf(msg, "Current firmware version: V%02d\nWill be updated to version: V%02d",
-			DEcard_FW_readver & 0xFF, FW_built_in_ver);
+		sprintf(msg, EN_FW_UPDATING, DEcard_FW_readver & 0xFF, FW_built_in_ver);
 		dialog_progress_begin(title, msg);
 
 		for (offset = 0x0000; offset < FWsize; offset += 256) {
-			sprintf(status, "progress: %lu%%", (offset * 100 / FWsize + 1));
+			sprintf(status, EN_FW_PROGRESS, (offset * 100 / FWsize + 1));
 			dialog_progress_set(offset, FWsize, status);  // drawn a few times a second
 
 			FAT_table_buffer[0] = (FW_wirte_address + offset);//omega DE 0x80000
@@ -598,7 +595,7 @@ void IWRAM_CODE FW_update(u16 DEcard_FW_readver, u16 FW_built_in_ver, void *FWbi
 			//break;
 		}
 		dialog_progress_set(FWsize, FWsize, NULL);
-		dialog_progress_status("update finished,power off manual");
+		dialog_progress_status(EN_FW_DONE);
 		tlog("firmware: updated to V%02d, waiting for the power-off", FW_built_in_ver);
 
 		while (1)
