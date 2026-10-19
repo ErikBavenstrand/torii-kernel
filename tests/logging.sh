@@ -426,8 +426,11 @@ full)
   grep -q "the card is full; the log waits for room" "$cart/kernel.log" || fail "the card wasn't full before the delete"
   ! mtype -i "$cart/sd.img" ::/FILLER.BIN >/dev/null 2>&1 || fail "FILLER.BIN wasn't deleted"
   grep -q '^kernel: lists: idle flush' "$cart/kernel.log" || fail "no idle flush once a delete made room"
-  mtype -i "$cart/sd.img" ::/torii/logs/torii-0.log 2>/dev/null | grep -aq "Torii kernel boot" ||
-    fail "once a delete made room, the log wasn't written"
+  # Through a file, as in has(): grep -q exits at the first match, mtype then
+  # dies of SIGPIPE writing the rest of the 64 KB file, and pipefail failed
+  # the test when that happened (most runs under tests/all.sh's load).
+  mtype -i "$cart/sd.img" ::/torii/logs/torii-0.log >"$cart/log.txt" 2>/dev/null || : >"$cart/log.txt"
+  grep -aq "Torii kernel boot" "$cart/log.txt" || fail "once a delete made room, the log wasn't written"
   card_ok
   echo "PASS: a full card stops the logging and the idle flush, not the kernel, other files stay as they were, and a delete lets the log go on"
   ;;
