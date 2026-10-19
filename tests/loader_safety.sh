@@ -120,11 +120,13 @@ boot() {
 logged() { [ $ok = 0 ] || grep -qF -- "$1" "$log" || bad "power-on $runs didn't log '$1'"; }
 
 # keys FRAME KEY... -> mgba-shot press/release pairs, one key every 8 frames.
+# A key _ is a pause: A on a menu or question still opening does nothing,
+# so an A right after the key that opened one waits a slot.
 keys() {
   local frame=$1
   shift
   for key in "$@"; do
-    printf -- '-k %d:%s -k %d:- ' "$frame" "$key" $((frame + 4))
+    [ "$key" = _ ] || printf -- '-k %d:%s -k %d:- ' "$frame" "$key" $((frame + 4))
     frame=$((frame + 8))
   done
 }
@@ -137,7 +139,7 @@ keys() {
 write_a=$(keys 200 DOWN DOWN A DOWN DOWN A)
 write_b=$(keys 200 DOWN DOWN DOWN A DOWN DOWN A)
 delete=$(keys 200 R DOWN A DOWN A)
-format=$(keys 200 R A DOWN DOWN A A)
+format=$(keys 200 R A DOWN DOWN A _ A)
 format_no=$(keys 200 R A DOWN DOWN A B)
 # SETTINGS writes the kernel NOR as it closes, so each sequence ends by
 # leaving it: L on page 2, then L on page 1 to the NOR list.

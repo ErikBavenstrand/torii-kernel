@@ -45,11 +45,13 @@ boot() {
 }
 
 # keys FRAME KEY... -> mgba-shot press/release pairs, one key every 8 frames.
+# A key _ is a pause: A on a menu or question still opening does nothing,
+# so an A right after the key that opened one waits a slot.
 keys() {
   local frame=$1
   shift
   for key in "$@"; do
-    printf -- '-k %d:%s -k %d:- ' "$frame" "$key" $((frame + 4))
+    [ "$key" = _ ] || printf -- '-k %d:%s -k %d:- ' "$frame" "$key" $((frame + 4))
     frame=$((frame + 8))
   done
 }
@@ -81,7 +83,7 @@ nor_holds 0 "$hello" || fail "Hello.gba was not written to NOR at 0"
 
 # Power-on 2: R to the NOR list, open Hello, boot it.
 # shellcheck disable=SC2046
-boot 2-hello $(keys 100 R A A) -s 500:$shots/2-hello.png -f 500
+boot 2-hello $(keys 100 R A _ A) -s 500:$shots/2-hello.png -f 500
 grep -q 'mode game from NOR offset 000000$' "$cart/2-hello.log" || fail "Hello did not boot from NOR at 0"
 [ "$(hex_at "$cart/sram.bin" 0)" = 4f4d525801 ] || fail "Hello did not run from NOR (SRAM $(hex_at "$cart/sram.bin" 0))"
 
@@ -97,7 +99,7 @@ nor_holds 0 "$hello" || fail "writing World.gba changed Hello.gba"
 
 # Power-on 4: World from NOR, reading its ROM on both sides of the 8 MB page.
 # shellcheck disable=SC2046
-boot 4-world $(keys 100 R DOWN A A) -m 500:0x080000A0:16 -m 500:0x087DFFF0:16 -m 500:0x087E0000:16 \
+boot 4-world $(keys 100 R DOWN A _ A) -m 500:0x080000A0:16 -m 500:0x087DFFF0:16 -m 500:0x087E0000:16 \
   -m 500:0x0883FFF0:16 -s 500:$shots/4-world.png -f 500
 grep -q 'mode game from NOR offset 020000$' "$cart/4-world.log" || fail "World did not boot from NOR at 0x20000"
 rom_seen "$cart/4-world.log" "$world" 0xA0 0x7DFFF0 0x7E0000 0x83FFF0 || fail "World's ROM reads wrong from NOR"
@@ -106,7 +108,7 @@ rom_seen "$cart/4-world.log" "$world" 0xA0 0x7DFFF0 0x7E0000 0x83FFF0 || fail "W
 # back and adds a boot. World's flash save (128 KB, copied by about frame
 # 260) holds its first boot at 0x10000.
 # shellcheck disable=SC2046
-boot 5-hello -k 100:A -k 104:- $(keys 400 R A A) -s 800:$shots/5-hello.png -f 800
+boot 5-hello -k 100:A -k 104:- $(keys 400 R A _ A) -s 800:$shots/5-hello.png -f 800
 [ "$(mtype -i "$cart/sd.img" ::/SAVER/World.sav | od -A n -t x1 -j $((0x10000)) -N 5 | tr -d ' \n')" = 4f4d525801 ] ||
   fail "World did not run from NOR (no first boot in SAVER/World.sav)"
 grep -q 'mode game from NOR offset 000000$' "$cart/5-hello.log" || fail "Hello did not boot from NOR again"

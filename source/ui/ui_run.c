@@ -1252,6 +1252,12 @@ u32 ui_frame(void)
 			ui.in.pressed |= queued;
 		}
 	}
+	// A menu or dialog still opening takes no A or START, which pick and
+	// confirm: a quick double A would open a game's menu and pick its
+	// first item (CLEAN BOOT). The d-pad and B act at once
+	top = ui_top();
+	if (top && (top->spec->flags & UI_VIEW_MODAL) && (!(top->flags & UI_V_SHOWN) || top->opening > 0))
+		fire &= (u16) ~(INPUT_A | INPUT_START);
 	if (fire) {
 		frame_wake();
 		ui_dispatch_keys(fire);

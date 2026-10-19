@@ -64,6 +64,7 @@ keys-tab-back/end F7E40BE7DBC25590
 keys-two-presses/screen 412DB2340E2919AC
 lists-push-fail/error A052218899602B62
 lists-push-fail/list B41DDB1AFEB55DC1
+menu-double-a/screen 4F47817065DDD361
 nor-launch-fail/back 9D22027A51331819
 nor-launch-fail/error 640F853BE8E8C18D
 nor-launch-fail/later 9D22027A51331819
