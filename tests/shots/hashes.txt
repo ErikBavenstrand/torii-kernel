@@ -3,8 +3,7 @@
 # SCENARIO/frames FIRST-LAST HASH: frames of a -H range (counted from 0)
 # that all hash the same.
 boot/screen 34EED145D7C6A8C0
-boot/frames 0-1 7C573B18E65FE325
-boot/frames 2-2 7B90E77090ED8325
+boot/frames 0-2 7C573B18E65FE325
 boot/frames 3-3 7B2431247E1C9059
 boot/frames 4-4 2A3028DC62EB75E2
 boot/frames 5-5 74D4950BBD1434E6
@@ -16,6 +15,16 @@ boot-progress/screen 8A9B3222959885A1
 boot-progress-big/loading 7868AEBC12088DD1
 boot-slow/list E7D96DEE3BD0FF1A
 boot-slow/notice ED54AF6F9CA38CCC
+boot-slow/frames 0-1 7C573B18E65FE325
+boot-slow/frames 2-2 140E09D2C4CB26D5
+boot-slow/frames 3-3 E0450267BE58B6C3
+boot-slow/frames 4-4 C5F32A08254C18A1
+boot-slow/frames 5-5 DF46A292685D4DE4
+boot-slow/frames 6-6 01F81833C5C7685B
+boot-slow/frames 7-15 ED54AF6F9CA38CCC
+boot-slow/frames 16-16 44842D56E7C86620
+boot-slow/frames 17-17 140E09D2C4CB26D5
+boot-slow/frames 18-19 7C573B18E65FE325
 cheats/screen 063A1B234EA6DC79
 cheats-long/screen 50CC9D4DE1FE8EC1
 cheats-long/scrolled B9FCA1EEBABF43C5
@@ -69,6 +78,12 @@ diag-tests/back FC971D7CA6CEA1D0
 diag-tests/frames 0-2 D68A87FB42CF8D44
 diag-tests/frames 3-3 7DCF004DEAC7F9B0
 diag-tests/frames 4-12 FC971D7CA6CEA1D0
+diag-turn/save-memory 822FB5B6A28587AD
+diag-turn/timings B1690CFFEE58D4A5
+diag-turn/frames 0-2 856F3E86A7D2B3A5
+diag-turn/frames 3-3 FAAAAB8E0C9208DD
+diag-turn/frames 4-4 87607C8C6DF252C4
+diag-turn/frames 5-7 0A2982F33656B816
 dialog-clock/asked 5BE6D838D67CEE20
 dialog-clock/later 7ACC6D69BA6B2858
 dialog-double-a/closed A5FA458AE4ABEB70

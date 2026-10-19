@@ -80,6 +80,7 @@ static struct {
 	struct ui_view *view;
 	u16 keys;  // fired since wait_key started listening
 	u32 pumped;  // torii_frames when say last ran a frame
+	u8 turning;  // a page change waits for page_turn
 } scr EWRAM_BSS;
 
 static u32 diag_step_no;
@@ -114,7 +115,9 @@ static const struct ui_list_model lines_model = {lines_count, lines_fetch, 0};
 static const u32 bars_tiles[30 * 3 * 8] = {BARS_ROW, BARS_ROW, BARS_ROW};
 static const u16 bars_palette[16] = {0, RGB(31, 0, 0), RGB(0, 31, 0), RGB(0, 0, 31), RGB(31, 31, 31)};
 
-static const struct ui_label_config title_config = {"", UI_FONT_HEADING, UI_ALIGN_LEFT, 0};
+// Two tile sets: a new title flips in through the VRAM queue, in the same
+// VBlank as the new page's rows (page_turn)
+static const struct ui_label_config title_config = {"", UI_FONT_HEADING, UI_ALIGN_LEFT, UI_LABEL_SWAP};
 static const struct ui_list_config list_config = {&lines_model, 16, 0, UI_LIST_PLAIN, 0};
 static const struct ui_image_config bars_config = {bars_tiles, bars_palette, 0xD1A6};
 
@@ -177,6 +180,7 @@ static void screen_push(void)
 		tlog_error("diag: %s", ui_error());
 		return;
 	}
+	scr.turning = 0;  // a new view: drawn whole before it shows
 	ui_label_set(node_of(N_TITLE), scr.title);
 	ui_list_set_cursor(node_of(N_LIST), scr.count ? scr.count - 1 : 0);
 	for (u32 i = 0; i < 30 && !(scr.view->flags & UI_V_SHOWN); i++)
@@ -224,15 +228,47 @@ static void screen_open(int again)
 		tlog_debug("diag: page back after the unit tests");
 }
 
+// Starts a page: the list's page change hides the old lines, and page_turn,
+// at the next frame Diagnostics runs, brings the title in with the new ones
 static void screen_title(const char *title)
 {
 	snprintf(scr.title, sizeof(scr.title), "DIAGNOSTICS: %s", title);
 	scr.count = 0;
 	if (!scr.view)
 		return;
-	ui_label_set(node_of(N_TITLE), scr.title);
+	TLOG_ASSERT(text_width(&font_heading, scr.title, strlen(scr.title)) + 2u * ui_theme()->pad <= SCREEN_WIDTH);
 	ui_show(node_of(N_BARS), 0);
 	ui_list_reset(node_of(N_LIST), 0);
+	ui_list_page_label(node_of(N_LIST), node_of(N_TITLE), scr.title);
+	scr.turning = 1;
+}
+
+// Runs frames until the list's scroll is at rest and VRAM is up to date, and
+// at least min frames: the work after it may stop the frames for a while
+// (reading the save chip, the timings), and the screen then holds no half-
+// scrolled row
+static void settle(u32 min)
+{
+	u8 list = node_of(N_LIST);
+	for (u32 i = 0; i < 60 && (i < min || !ui_list_still(list) || gfx_queue_len()); i++)
+		ui_frame();
+	ui_frame();  // its commit puts up the registers the last frame set (the scroll)
+	scr.pumped = torii_frames;
+}
+
+// Finishes the page change screen_title started: the list draws the new
+// page with the lines said so far, the title changes in the same frame
+// (ui_list_page_label), and both show in the same VBlank; then its fade-in
+// ends
+static void page_turn(void)
+{
+	if (!scr.turning || !scr.view)
+		return;
+	scr.turning = 0;
+	u8 list = node_of(N_LIST);
+	for (u32 i = 0; i < 60 && ui_list_paging(list); i++)
+		ui_frame();
+	settle(ui_theme()->page_fade + 1u);
 }
 
 // Adds a line to the page; it shows in the next frame
@@ -260,6 +296,7 @@ static void line_set(u32 i, u8 colour, const char *text)
 
 void diag_pause(u32 frames)
 {
+	page_turn();
 	while (frames--)
 		ui_frame();
 }
@@ -301,12 +338,17 @@ void diag_say(u8 colour, const char *format, ...)
 		if (!*rest)
 			break;
 	}
-	// The screen keeps up with the log: a frame, unless one ran since the
-	// last VBlank (a burst of lines shows at the next)
-	if (torii_frames != scr.pumped) {
+	// The screen keeps up with the log: the new page with its first line, or
+	// a frame, unless one ran since the last VBlank (a burst of lines shows at
+	// the next); a line that scrolled the list waits for the scroll to end
+	if (scr.turning) {
+		page_turn();
+	} else if (torii_frames != scr.pumped) {
 		ui_frame();
 		scr.pumped = torii_frames;
 	}
+	if (scr.view && !ui_list_still(node_of(N_LIST)))
+		settle(0);
 }
 
 void diag_step(const char *name)
@@ -320,6 +362,7 @@ void diag_step(const char *name)
 
 static void wait_release(void)
 {
+	page_turn();
 	do {
 		ui_frame();
 	} while (ui_input()->held);
@@ -504,6 +547,10 @@ static void step_unit_tests(void)
 	say(WHITE, "(the screen holds still for about 5 s)");
 	pause_frames(30);  // shown, faded in, before the engine stops
 	screen_hold();
+	// The log's open, if its job hasn't finished, ends now while the page
+	// holds still: the tests reset the engine and its jobs
+	tlog_open_now();
+	tlog_flush();
 	int failed = torii_unit_tests();
 	screen_open(1);
 	say(failed ? RED : GREEN, "%d unit tests failed (see the log)", failed);
@@ -654,7 +701,7 @@ static u32 fram_crc(void)
 
 static void step_save_chip(void)
 {
-	step("save chip and cart RAM");
+	step("save memory");  // the save chip and cart SRAM, in a title that fits
 	say(WHITE, "reading the 128 KB save chip twice...");
 	u32 before = fram_crc();
 	u32 again = fram_crc();
@@ -1095,6 +1142,10 @@ void Diagnostics(void)
 	unconfirmed_count = 0;
 	slow_count = 0;
 	tlog("diag: Diagnostics started, logging at debug for this run");
+	// A new log file takes about 80 frames to make: a job makes it while the
+	// first page shows, and the unit tests' step finishes it (v0.3.2: A took
+	// that long to show anything)
+	tlog_flush_soon();
 
 	step_info();
 	step_unit_tests();

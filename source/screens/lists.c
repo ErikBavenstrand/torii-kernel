@@ -1090,7 +1090,12 @@ static void recent_open(u32 row)
 		read_nor();
 		u32 game = NOR_game_named(nor);
 		if (game >= game_total_NOR) {
-			tlog("launch %s: not on the game NOR", nor);
+			// Deleted, or written over by another kernel: it comes off
+			// Recently Played, as a file gone from the card does
+			char name[sizeof(pNorFS[0].filename)];
+			snprintf(name, sizeof(name), "%s", nor);  // the rows move as it goes
+			tlog("launch %s: not on the game NOR", name);
+			Recently_play_forget_nor(name);
 			error_dialog(1, AFTER_RECENT);
 			return;
 		}
@@ -1228,13 +1233,23 @@ static void dialog_answer(int yes)
 	case AFTER_NOR_DELETE:
 		if (!yes)
 			break;
-		Delete_latest_NOR();
+		{
+			// The game comes off Recently Played too, unless another of
+			// the same name is still on the NOR
+			char name[sizeof(pNorFS[0].filename)];
+			u32 had = game_total_NOR;
+			snprintf(name, sizeof(name), "%s", had ? pNorFS[had - 1].filename : "");
+			Delete_latest_NOR();
+			if (game_total_NOR < had && NOR_game_named(name) >= game_total_NOR)
+				Recently_play_forget_nor(name);
+		}
 		show_nor(lists.nor_game, UI_TR_FADE, 0);
 		break;
 	case AFTER_FORMAT:
 		if (!yes)
 			break;
 		FormatNor();  // its progress dialog shows over the list
+		Recently_play_forget_nor(NULL);  // no NOR game is left
 		show_nor(0, UI_TR_FADE, 0);
 		break;
 	case AFTER_BACKUP:

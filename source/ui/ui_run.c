@@ -637,6 +637,11 @@ void ui_enter(u32 kind, s32 dir)
 	tr_set_in(kind, dir);
 	ui.tr_mode = TR_DARKEN;  // from black
 	tr_gap();
+	// Black from the next commit: regs_update sets it only after that
+	// frame's commit, which may first put up a new session's palette (the
+	// boot's notice showed the background for a frame)
+	if (ui.tr_effects & UI_TR_FADES)
+		gfx_set_blend((u16)(BLEND_DARKEN | LAYER_ALL | LAYER_BD), 0, 16);
 	ui_wake();
 }
 
