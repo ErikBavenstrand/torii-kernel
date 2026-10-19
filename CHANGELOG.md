@@ -6,6 +6,22 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** messages, questions and progress are dialogs on the v0.3 tile
+  engine (`source/ui/dialog.h`): the launch's progress (with the game's name),
+  WRITE TO NOR's and the PSRAM load's progress with a bar, "Save sav?", the
+  NOR menu's format, save load and backup, delete latest, L+START delete,
+  and every error message. Texts, keys and flow are as before; a message
+  now shows "[B]OK", and a question returns once its key is let go. Deleting
+  a file whose name is cut now says "Name too long" instead of failing
+  silently (`6067e1b`, `adf21e9`, `ba02013`).
+- **Changed:** Diagnostics runs on the engine: its lines scroll in a list,
+  colours are theme roles, the summary scrolls with UP/DOWN. A renderer
+  step times a glyph, a 38-glyph row, an LZ77 cover into PSRAM, a PSRAM to
+  VRAM copy, PSRAM writes at the slow and the menu's WAITCNT (read back),
+  a scroll frame and a page change, and flags any figure more than 20%
+  above the emulator's; a ten-second scroll-and-fade demo asks about
+  tearing. The boot loader's title is no longer garbled in the log (`6067e1b`,
+  `adf21e9`, `ba02013`).
 - **Changed:** the cheat screen runs on the v0.3 tile engine: cheats as
   headings, their options indented, a picked one in the accent colour with
   "[x]"; the cursor skips headings, LEFT/RIGHT and L/R page, long names
