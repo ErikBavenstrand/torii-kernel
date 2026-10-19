@@ -108,6 +108,11 @@ u32 ui_theme_warnings(void)
 static int read_file(const char *path, void *dst, u32 max, u32 *size)
 {
 	struct sd_read *r = &scratch()->reader;
+	// The reader lives in pReadCache, which holds whatever its last borrower
+	// left (a game's bytes after WRITE TO NOR): sd_read_init leaves finish
+	// and user to the caller, and a stale finish was called as the read
+	// ended, a jump to 0xFFFFFFFF that froze the cart.
+	memset(r, 0, sizeof(*r));
 	sd_read_init(r, path, dst, max, 4096);
 	while (sd_read_step(r) == JOB_MORE)
 		;
