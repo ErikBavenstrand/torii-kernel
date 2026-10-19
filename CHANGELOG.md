@@ -13,7 +13,7 @@ git log, not here.
   THEME, ACCENT and DIM, previewed at once and saved like the other
   settings; DIAGNOSE is now its last row. HELP credits the Galmuri fonts
   (OFL-1.1) and gives its QR code a quiet zone (`783114e`, `54b83e8`,
-  `7075e23`).
+  `7075e23`, `cdaf71c`).
 - **Fixed:** February days past 29 in leap years, hot keys stored as
   invalid codes, a dead fifth MODE B position, and AUTO SAVE and MODE B
   changes not reaching the next launch until a reboot (`783114e`). A saved
