@@ -443,8 +443,8 @@ settings)
   # lost the keys pressed then. The line saying so reaches the card from the
   # lists' idle flush once SETTINGS closes.
   new_card 65536 32
-  down=()
-  for i in $(seq 0 7); do # down to LOGGING
+  down=() # down to LOGGING
+  for i in $(seq 0 7); do
     down+=(-k "@$((8 + 12 * i)):DOWN" -k "@$((12 + 12 * i)):-")
   done
   # A edits it, A A step it to Info, RIGHT A keep it; L at once goes to page

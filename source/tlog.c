@@ -436,7 +436,7 @@ static int scan_step(FRESULT *res)
 // can't be found, asks for the next file.
 static FRESULT open_finish(void)
 {
-	UINT done;
+	UINT done = 0;
 	FRESULT res;
 
 	if (log_end_is_junk(&opening.end)) {
