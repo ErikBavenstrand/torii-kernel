@@ -13,6 +13,7 @@
 #   junk    a log file with junk after its text (v0.2.0 on the real cart)
 #           is left alone, and logging goes on in the next
 #   full    a full card stops the logging, not the kernel
+#   flood   a scrolled list's frame-cycles go to the card as summaries
 # Every part checks the card with fsck.fat. Runs inside the torii-emu container.
 set -euo pipefail
 
@@ -412,8 +413,45 @@ full)
   echo "PASS: a full card stops the logging, not the kernel, and other files stay as they were"
   ;;
 
+flood)
+  # A list scrolled for seconds at Debug: its measured frames reach the card
+  # as a summary, not a line each, and nothing is lost (v0.3's cart test
+  # lost 107 KB of log to them)
+  new_card 65536 32
+  mmd -i "$cart/sd.img" ::/Many
+  for i in $(seq -w 1 150); do
+    mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba "::/Many/Game $i.gba"
+  done
+  settings 26=3 # LOGGING Debug
+  # Open Many, hold DOWN for 5 s, back out, then SETTINGS and out again (the
+  # log is written when SETTINGS closes)
+  # shellcheck disable=SC2046
+  boot $(keys 160 A) -k 200:DOWN -k 500:- $(keys 530 B R R) $(keys 610 L L) -f 750
+  lines_ok
+  has "lists: /Many: 0 folders, 150 files"
+  has "frame-cycles summary: lists-scroll: "
+  [ "$(count 'frame-cycles: ')" = 0 ] || fail "frame-cycles lines on the card"
+  [ "$(count 'bytes of log lost')" = 0 ] || fail "log lost"
+  grep -q '^kernel: frame-cycles: lists-scroll [0-9]' "$cart/kernel.log" || fail "no frame-cycles lines in mGBA's console"
+  # Lines that fill half the RAM ring reach the card once no key is held,
+  # with nothing else writing the log: SD list to NOR list and back, 16 times
+  before=$(count "ui: pushed nor-list")
+  # shellcheck disable=SC2046
+  boot $(keys 160 R L R L R L R L R L R L R L R L R L R L R L R L R L R L R L R L) -f 600
+  [ "$(count "ui: pushed nor-list")" -ge $((before + 16)) ] || fail "the lists didn't write the log while idle"
+  # A few lines reach the card after 5 s with no key held, over the file menu too
+  before=$(count "lists: /Many")
+  # shellcheck disable=SC2046
+  boot $(keys 160 A A) -f 600
+  [ "$(count "lists: /Many")" = $((before + 1)) ] || fail "a few lines didn't reach the card after 5 s idle"
+  has "ui: pushed file-menu"
+  lines_ok
+  card_ok
+  echo "PASS: measured frames reach the card as summaries, nothing is lost, and idle lists write the log"
+  ;;
+
 *)
-  echo "usage: $0 launch|debug|crash|rotate|junk|full" >&2
+  echo "usage: $0 launch|debug|crash|rotate|junk|full|flood" >&2
   exit 2
   ;;
 esac

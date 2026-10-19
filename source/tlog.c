@@ -10,6 +10,7 @@
 #include "build_id.h"
 #include "logbuf.h"
 #include "tlog.h"
+#include "engine/cycles.h"
 
 // mGBA's debug registers: write 0xC0DE to enable (it then reads 0x1DEA),
 // fill the string, then write the level with the send bit (0x100).
@@ -87,9 +88,10 @@ int tlog_wants(u32 level)
 	return tlog_emu || level <= tlog_level;
 }
 
-static void tlog_send(u32 level, const char *format, va_list args)
+// card: 0 for a line only mGBA's console takes (tlog_console)
+static void tlog_send(u32 level, int card, const char *format, va_list args)
 {
-	int to_card = level <= tlog_level;
+	int to_card = card && level <= tlog_level;
 	if (!to_card && !tlog_emu)
 		return;
 	int n = vsnprintf(line + PREFIX_LEN, TEXT_MAX + 1, format, args);
@@ -121,7 +123,7 @@ void tlog(const char *format, ...)
 {
 	va_list args;
 	va_start(args, format);
-	tlog_send(TLOG_INFO, format, args);
+	tlog_send(TLOG_INFO, 1, format, args);
 	va_end(args);
 }
 
@@ -129,7 +131,7 @@ void tlog_error(const char *format, ...)
 {
 	va_list args;
 	va_start(args, format);
-	tlog_send(TLOG_ERRORS, format, args);
+	tlog_send(TLOG_ERRORS, 1, format, args);
 	va_end(args);
 }
 
@@ -137,8 +139,23 @@ void tlog_debug(const char *format, ...)
 {
 	va_list args;
 	va_start(args, format);
-	tlog_send(TLOG_DEBUG, format, args);
+	tlog_send(TLOG_DEBUG, 1, format, args);
 	va_end(args);
+}
+
+void tlog_console(const char *format, ...)
+{
+	if (!tlog_emu)
+		return;
+	va_list args;
+	va_start(args, format);
+	tlog_send(TLOG_INFO, 0, format, args);
+	va_end(args);
+}
+
+u32 tlog_pending(void)
+{
+	return ring.head - ring.tail;
 }
 
 int tlog_all_written(void)
@@ -417,6 +434,7 @@ void tlog_flush(void)
 
 	if (tlog_level == TLOG_OFF && !force_pending)
 		return;
+	cycles_summary();
 	if (ring.head == ring.tail && !ring.lost)
 		return;
 	if (!sd_open())
@@ -475,7 +493,7 @@ void tlog_force(u32 level, const char *format, ...)
 	if (tlog_level < level)
 		tlog_level = level;
 	va_start(args, format);
-	tlog_send(level, format, args);
+	tlog_send(level, 1, format, args);
 	va_end(args);
 	tlog_level = kept;
 	force_pending = 1;

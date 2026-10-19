@@ -310,10 +310,10 @@ index 1d0c0dd..b77704a 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..cf1b236
+index 0000000..42669b7
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1348 @@
+@@ -0,0 +1,1377 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -589,6 +589,28 @@ index 0000000..cf1b236
 +	_exit(SD_PSRAM_WRITE_STATUS);
 +}
 +
++
++// True while a DMA whose source is cart space (ROM, PSRAM or NOR, 0x08000000
++// to 0x0DFFFFFF) does this write. On the cart such a DMA left its PSRAM
++// target unchanged (observed; likely because source and destination share
++// the cart's one bus and address latch, so the writes may land elsewhere).
++// Dropping them is the model. The kernel stages data in RAM first
++// (source/engine/psram.c).
++static bool _dmaFromCart(struct GBA* gba) {
++	if (!gba->performingDMA) {
++		return false;
++	}
++	uint32_t source = gba->memory.dma[gba->performingDMA >> 1].nextSource;
++	return source >= 0x08000000 && source < 0x0E000000;
++}
++
++static void _dmaFromCartWarn(uint32_t address) {
++	static bool warned;
++	if (!warned) {
++		warned = true;
++		fprintf(stderr, "omega: PSRAM write at %08X by DMA from cart space dropped (on the real cart it misses its target)\n", address);
++	}
++}
 +
 +// Returns false when the word can't be programmed: programming only clears
 +// bits, so a 1 over a 0 never verifies.
@@ -1605,6 +1627,13 @@ index 0000000..cf1b236
 +		uint32_t psram = (((omega->psramPage >> 12) * WINDOW_SIZE) + offset - PSRAM_WINDOW) & (OMEGA_PSRAM_SIZE - 1);
 +		if (omega->sdControl) {
 +			_sdPsramWrite(address, psram);
++		}
++		if (_dmaFromCart(gba)) {
++			// A DMA from cart space into PSRAM left its target unchanged on
++			// the real cart (Diagnostics' unit tests, v0.3)
++			_trace(gba, "PSRAM write at %08X by DMA from cart space dropped", address);
++			_dmaFromCartWarn(address);
++			return;
 +		}
 +		omega->psram[psram] = value;
 +		omega->psram[psram + 1] = value >> 8;
