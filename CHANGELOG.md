@@ -6,7 +6,6 @@ git log, not here.
 
 ## Unreleased
 
-<<<<<<< HEAD
 - **Fixed:** SETTINGS wrote the kernel NOR on every OK (five erases in
   25 s on a cart). Saves now stay in RAM and SETTINGS writes them once as it
   closes, and not at all if nothing changed, to spare the NOR (`e5d3e8b`).
@@ -17,15 +16,15 @@ git log, not here.
   first (`ed09af3`).
 - **Fixed:** Diagnostics' page went black for 2 frames as it came back
   after the unit tests; it now stays up (`3e8243e`).
+- **Fixed:** a save copy the card couldn't take (a full card) filled its
+  bar to "Done"; the power-on copy and BACK UP SAVE now show "Can't write
+  the save" (`384c622`).
 - **Fixed:** BOOT WITH ADDON said "Loading the game" while it still checked
   save states and patches (`95b5f8d`).
-||||||| 94d923f
-=======
 - **Known issue:** a cart whose kernel NOR is a uniform-sector S29GL064A
   (NOR ID `0x220C`; Diagnostics shows it as "kernel NOR id") can't take a
   kernel update: EZ-Flash's loader stops with "Bad NOR ID" when R is held,
   and installs neither Torii nor the official kernel (`docs/recovery.md`).
->>>>>>> main
 - **Changed:** scrolling. A held d-pad speeds up smoothly from a row every
   4 frames to 40 rows a second, its top speed at 1.75 s held, and the list
   glides with the cursor at its speed, so the cursor never leaves the
