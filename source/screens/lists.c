@@ -384,7 +384,7 @@ static int menu_fetch(void *ctx, u32 i, struct ui_item *out)
 		out->ink = UI_ROLE_DIM;  // BOOT WITH ADDON with no addon on: nothing to do
 	if (i == 4) {
 		static const char *const types[] = {"AUTO", "SRAM", "EEPROM8K", "EEPROM512", "FLASH64", "FLASH128"};
-		snprintf(lists.save_row, sizeof(lists.save_row), "%s  < %s >", gl_rom_menu[4],
+		snprintf(lists.save_row, sizeof(lists.save_row), "%s <%s>", gl_rom_menu[4],
 			 types[lists.game.save_num < 6 ? lists.game.save_num : 0]);
 		out->text = lists.save_row;
 	}
@@ -491,7 +491,7 @@ static const struct ui_view_spec list_views[SCREENS] = {
 // A menu: a list of rows on plane 3 between two panel strips on plane 0, the
 // lower one with the keys' hint. The list fills its rows exactly, so nothing
 // of the view under it shows through.
-#define MENU_W 160
+#define MENU_W 128  // six rows on plane 3 must fit beside the main list's tiles
 #define MENU_H(rows) (8 + (rows) * 16 + 16)
 #define MENU_Y(rows) (((160 - MENU_H(rows)) / 2) & ~7)
 #define M_LIST 1
