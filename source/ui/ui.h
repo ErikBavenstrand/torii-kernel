@@ -417,7 +417,8 @@ void ui_init(const struct ui_theme *theme);
 // The theme and accent the THEME and ACCENT settings pick (settings slots
 // assress_theme, 1 for light, and assress_accent, 1 + an index into
 // ui_accents; erased or unknown values give the dark theme with its own
-// accent).
+// accent). *accent gets what ui_theme_set takes: the accent's colour, or
+// UI_ACCENT_THEME.
 const struct ui_theme *ui_theme_setting(u16 *accent);
 // Pops every view and releases the UI's resources.
 void ui_shutdown(void);

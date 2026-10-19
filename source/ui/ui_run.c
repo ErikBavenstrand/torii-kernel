@@ -508,7 +508,7 @@ const struct ui_theme *ui_theme_setting(u16 *accent)
 {
 	// Stored as index + 1, so 0 and erased (0xFFFF) both mean the theme's own
 	u16 a = Read_SET_info(assress_accent);
-	*accent = a >= 1 && a <= ui_accent_count ? a - 1 : UI_ACCENT_THEME;
+	*accent = a >= 1 && a <= ui_accent_count ? ui_accents[a - 1].colour : UI_ACCENT_THEME;
 	return Read_SET_info(assress_theme) == 1 ? &ui_theme_light : &ui_theme_dark;
 }
 
@@ -710,6 +710,11 @@ u32 ui_frame(void)
 	if (motion_update(dt))
 		frame_wake();
 	update_all(dt);
+	// A view still to be shown (one pushed after a pop waits a frame) wakes
+	// the frames until it is: nothing else may (a view without a list)
+	const struct ui_view *top = ui_top();
+	if (top && !(top->flags & UI_V_SHOWN))
+		frame_wake();
 	if (!frame_idle()) {
 		jobs_run(JOB_DEADLINE);
 		draw_all();
