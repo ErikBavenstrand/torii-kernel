@@ -62,7 +62,7 @@ u8 res_alloc(enum res_kind kind, u16 len, u16 align, u16 lo, u16 hi, u16 tag, u8
 			      RES_LOG_CAP);
 		return RES_NONE;
 	}
-	u8 h = pool_alloc(pool, len, align, lo, hi, tag, flags & POOL_TOP);
+	u8 h = pool_alloc(pool, len, align, lo, hi, tag, flags & (POOL_TOP | POOL_KEEP));
 	if (h == RES_NONE) {
 		res_set_error("%s: can't allocate %u units of %u bytes (align %u, tag %04X): %s; %u free, %u cached, "
 			      "longest free run %u",

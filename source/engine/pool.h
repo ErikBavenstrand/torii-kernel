@@ -55,6 +55,7 @@ enum {
 
 // pool_alloc flags
 #define POOL_TOP 1  // take the highest fitting run, not the lowest
+#define POOL_KEEP 2  // fail (POOL_ERR_FULL or POOL_ERR_SLOTS) rather than reclaim cached blocks
 
 struct pool {
 	const char *name;
@@ -87,6 +88,8 @@ int pool_ref(struct pool *pool, u8 handle);
 int pool_unref(struct pool *pool, u8 handle);
 // Frees every cached block.
 void pool_flush(struct pool *pool);
+// Frees one cached block now, as reclaiming would; 0 if handle isn't one.
+int pool_drop(struct pool *pool, u8 handle);
 
 // The block's start, length and state; 0 (POOL_FREE) for a handle past the
 // pool's slots, POOL_NONE included, so a failed allocation reads nothing

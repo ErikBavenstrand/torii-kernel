@@ -85,6 +85,13 @@ sd-scroll/frames 58-58 1EF409CA7C6A0E40
 sd-scroll/frames 59-59 0E42AD38C5B4B318
 sd-scroll/frames 60-60 6BAF27EF5883ECF8
 sd-scroll/frames 61-119 A8266BC030B94860
+sd-theme-menus/dialog A36B142F20F61DF0
+sd-theme-menus/file-menu 53E8845BB4D19DBE
+sd-theme-menus/kept 78C37A96E08CB9A9
+sd-theme-menus/list 795D672AB1E0F14A
+sd-theme-wall/dialog B430564152CE6FF2
+sd-theme-wall/kept 0969DFACF8A353B3
+sd-theme-wall/list C0CB12E6BB3CC753
 settings-held/held-l 0CA5C0696DB712FC
 settings-held/held-r 0CA5C0696DB712FC
 settings-light/help 23A913E73883ED51
@@ -144,7 +151,7 @@ ui-list/frames 49-49 E06A67B440CE3AC9
 ui-list/frames 50-50 9AE783DD021EDAE1
 ui-list/frames 51-51 7FF58B05C5869675
 ui-list/frames 52-53 46AD62F62A89A7DD
-ui-sd-theme/dialog 1EFE9DA2DBD47B49
+ui-sd-theme/dialog FC0221C7401B81E5
 ui-sd-theme/list A3A189B9FCADEF84
 ui-theme/awake ECFA426BD367A550
 ui-theme/dimmed 0742C6ED47A9035E

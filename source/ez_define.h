@@ -14,6 +14,10 @@
 //   jobs_run, never inside one of the operations above, so it can overlap
 //   them all. An owner that wants to keep data here across frames that run
 //   jobs must stop the asset jobs first (cover_shutdown).
+// - READCACHE_STAGE [0, 0x2000), from ui_frame: the SD theme's wallpaper is
+//   decoded there when it is put back after a push or pop (ui/ui_sdtheme.c),
+//   at most 8 KB (plus up to 17 bytes for a damaged LZ77 stream), so it ends
+//   at the cheat list (+0x2000), the one owner live across frames.
 // - READCACHE_THEME, with READCACHE_STAGE: loading an SD theme (ui/sdtheme.h),
 //   within one call: the reader, the parsed theme.ini, the decoded wallpaper.
 #define MAX_pReadCache_size 0x20000

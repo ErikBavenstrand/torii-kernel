@@ -8,6 +8,12 @@ git log, not here.
 
 - **Removed:** HELP's "SELECT: Thumbnail toggle" line; the lists no longer
   show thumbnails (`3250448`).
+- **Fixed:** with an SD theme that has a wallpaper, the game menu no longer
+  fails to open and drops the menu to the Dark theme for the session. The
+  wallpaper now sits in BG VRAM that only planes 0 and 2 use, so it never
+  pushes down the maps the menus' lists need room beside; a dialog that
+  needs that room for its text moves it among the maps until it closes,
+  without a one-frame flash of its tiles (`bc4a255`, `6956a8a`).
 - **Changed:** no screen draws in mode 3 any more: the boot's card message,
   the SD theme error and the firmware update's screens are engine dialogs
   with the official texts (the update's checks and writes are unchanged),

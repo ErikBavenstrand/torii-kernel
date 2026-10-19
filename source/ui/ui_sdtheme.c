@@ -1,6 +1,7 @@
 // Themes from the SD card (ui/sdtheme.h): loading, choosing, and the
 // wallpaper on plane 3.
 #include <gba_compression.h>
+#include <gba_systemcalls.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -317,10 +318,58 @@ static void wall_drop(const char *why)
 	sd.wall_bytes = 0;
 }
 
-void ui_wallpaper_setup(void)
+// 1 if the wallpaper that is up lies under UI_WALL_VRAM_END
+static int wall_low(void)
 {
-	if (!wall_current() || (wall_up() && sd.up_gen == sd.wall_gen))
-		return;
+	return res_start(RES_BG_VRAM, sd.h_map) < UI_WALL_VRAM_END &&
+	       res_start(RES_BG_VRAM, sd.h_tiles) < UI_WALL_VRAM_END;
+}
+
+// Frees the wallpaper's VRAM blocks (cached) at once
+static void wall_free(void)
+{
+	pool_drop(res_pool(RES_BG_VRAM), sd.h_tiles);
+	pool_drop(res_pool(RES_BG_VRAM), sd.h_map);
+	sd.h_tiles = RES_NONE;
+}
+
+// Takes map and tiles blocks for the wallpaper at the top of [0, hi), the
+// map above the tiles, without reclaiming any cached block (the wallpaper
+// mustn't cost a screen its caches); 0 (none taken) if they don't fit. With
+// tagged 0 it only tries: blocks without tags, freed again. The pool
+// directly, outside the view log, and no room is no error (res_alloc would
+// format one).
+static int wall_place(u32 tiles, u16 hi, u8 *m, u8 *t, int tagged)
+{
+	struct pool *pool = res_pool(RES_BG_VRAM);
+	u8 hm = pool_alloc(pool, RES_MAP_UNITS, RES_MAP_UNITS, 0, hi, tagged ? TAG_WALL_MAP : 0, POOL_TOP | POOL_KEEP);
+	if (hm == POOL_NONE)
+		return 0;
+	u8 ht = pool_alloc(pool, (u16)tiles, 1, 0, hi, tagged ? TAG_WALL_TILES : 0, POOL_TOP | POOL_KEEP);
+	if (ht == POOL_NONE || !tagged) {
+		if (ht != POOL_NONE)
+			pool_unref(pool, ht);
+		// Freed, not cached: the next try mustn't revive it here
+		pool_unref(pool, hm);
+		pool_drop(pool, hm);
+		return ht != POOL_NONE;
+	}
+	*m = hm;
+	*t = ht;
+	return 1;
+}
+
+int ui_wallpaper_setup(void)
+{
+	if (!wall_current())
+		return 0;
+	if (wall_up() && sd.up_gen == sd.wall_gen) {
+		// Up among the maps: back under UI_WALL_VRAM_END if it fits there
+		// now (tried untagged: the real tags would free the blocks it shows)
+		if (wall_low() || !wall_place(pool_len(res_pool(RES_BG_VRAM), sd.h_tiles), UI_WALL_VRAM_END, 0, 0, 0))
+			return 0;
+		wall_free();
+	}
 	sd.h_tiles = RES_NONE;
 	// Page 0, where the file is: a dialog's ui_init can run while a PSRAM
 	// loader has left another page selected (it selects its page again
@@ -330,50 +379,52 @@ void ui_wallpaper_setup(void)
 	const u8 *file = wall_file(sd.wall_slot);
 	if (crc32(file, sd.wall_bytes) != sd.wall_crc) {
 		wall_drop("changed in PSRAM");
-		return;
+		return 0;
 	}
 	struct asset_header h;
 	memcpy(&h, file, sizeof(h));
 	u32 tiles = (u32)h.width * h.height;
 	u32 pal_bytes = asset_palette_bytes(&h);
-	// No room on this screen is no error: not logged as one
-	u8 quiet = res_errors_quiet;
-	res_errors_quiet = 1;
-	u8 t = res_alloc(RES_BG_VRAM, (u16)tiles, 1, 0, RES_BG_UNITS, TAG_WALL_TILES, POOL_TOP | RES_NOLOG);
-	u8 m = t == RES_NONE ? RES_NONE
-			     : res_alloc(RES_BG_VRAM, RES_MAP_UNITS, RES_MAP_UNITS, 0, RES_BG_UNITS, TAG_WALL_MAP,
-					 POOL_TOP | RES_NOLOG);
-	u8 p = m == RES_NONE ? RES_NONE
-			     : res_alloc(RES_BG_PAL, 1, 1, 0, RES_PAL_BANKS, TAG_WALL_PAL, POOL_TOP | RES_NOLOG);
-	res_errors_quiet = quiet;
-	if (p == RES_NONE) {
-		if (m != RES_NONE)
-			res_unref(RES_BG_VRAM, m);
-		if (t != RES_NONE)
+	// Under UI_WALL_VRAM_END (sdtheme.h); while a screen's planes 0 and 2
+	// use that room, among the maps until the next push or pop
+	u8 m = RES_NONE, t = RES_NONE, p = RES_NONE;
+	if (wall_place(tiles, UI_WALL_VRAM_END, &m, &t, 1) || wall_place(tiles, RES_BG_UNITS, &m, &t, 1)) {
+		p = pool_alloc(res_pool(RES_BG_PAL), 1, 1, 0, RES_PAL_BANKS, TAG_WALL_PAL, POOL_TOP);
+		if (p == RES_NONE) {
 			res_unref(RES_BG_VRAM, t);
+			res_unref(RES_BG_VRAM, m);
+		}
+	}
+	// No room on this screen is no error: not logged as one
+	if (p == RES_NONE) {
 		tlog("theme: no room for the wallpaper on this screen");
-		return;
+		return 0;
 	}
 	// Decoded in the stage first: a broken stream can't reach past the
 	// tiles' block in VRAM (asset.h: up to 17 bytes past the end)
 	u8 *stage = stage_buffer();
 	LZ77UnCompWram(file + ASSET_HEADER_BYTES + pal_bytes, stage);
+	// The character block whose reach its tiles start in
 	u16 start = res_start(RES_BG_VRAM, t);
 	u32 cb = start / 512u;
 	if (cb > 3)
 		cb = 3;
 	u32 first = start - cb * 512u;
-	// Word writes: VRAM takes no byte writes
-	u32 *vram = res_bg_addr(t);
-	const u32 *src = (const u32 *)stage;
-	for (u32 i = 0; i < tiles * RES_UNIT_BYTES / 4; i++)
-		vram[i] = src[i];
+	// Word copies (VRAM takes no byte writes), by the BIOS: it runs in a frame
+	CpuFastSet(stage, res_bg_addr(t), tiles * RES_UNIT_BYTES / 4);
 	u16 *map = res_bg_addr(m);
 	u32 bank = res_start(RES_BG_PAL, p);
-	for (u32 y = 0; y < WALL_MAP_SIZE; y++)
-		for (u32 x = 0; x < WALL_MAP_SIZE; x++)
-			map[y * WALL_MAP_SIZE + x] =
-				(u16)((first + (y % h.height) * h.width + x % h.width) | bank << 12);
+	// One period of rows, then copies of it: a forward copy repeats them
+	u32 rows = h.height < WALL_MAP_SIZE ? h.height : WALL_MAP_SIZE;
+	u32 row = first | bank << 12;
+	for (u32 y = 0; y < rows; y++, row += h.width)
+		for (u32 x = 0, tx = 0; x < WALL_MAP_SIZE; x++) {
+			map[y * WALL_MAP_SIZE + x] = (u16)(row + tx);
+			if (++tx == h.width)
+				tx = 0;
+		}
+	if (rows < WALL_MAP_SIZE)
+		CpuFastSet(map, map + rows * WALL_MAP_SIZE, (WALL_MAP_SIZE - rows) * WALL_MAP_SIZE / 2);
 	u16 pal[16] ALIGN(4);
 	memset(pal, 0, sizeof(pal));
 	memcpy(pal, file + ASSET_HEADER_BYTES, (u32)h.colours * 2);
@@ -389,6 +440,15 @@ void ui_wallpaper_setup(void)
 	sd.up_gen = sd.wall_gen;
 	tlog_debug("theme: wallpaper up, %lu tiles at %u, map %u, bank %lu", (unsigned long)tiles, start,
 		   res_bg_screenblock(m), (unsigned long)bank);
+	return 1;
+}
+
+int ui_wallpaper_yield(void)
+{
+	if (!wall_up() || wall_low())
+		return 0;
+	wall_free();
+	return 1;
 }
 
 int ui_wallpaper_bgcnt(u16 *bgcnt)

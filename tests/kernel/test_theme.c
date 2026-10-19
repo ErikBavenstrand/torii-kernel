@@ -161,15 +161,49 @@ void test_theme_load(void)
 	CHECK_EQ(map[1] & 0x3FF, (map[0] & 0x3FF) + 1);   // 2 tiles wide, repeated
 	CHECK_EQ(map[2] & 0x3FF, map[0] & 0x3FF);
 	CHECK_EQ(map[32] & 0x3FF, (map[0] & 0x3FF) + 2);  // the next row
+	// Where (T18): only character block 0 reaches it, so lists on planes 1
+	// and 3 and every map get all the rest of BG VRAM with it still up
+	CHECK_EQ((bgcnt >> 2) & 3, 0);
+	CHECK((bgcnt >> 8 & 31) < UI_WALL_VRAM_END / RES_MAP_UNITS);
+	CHECK((map[0] & 0x3FF) < UI_WALL_VRAM_END);
+	u8 rest = res_alloc(RES_BG_VRAM, RES_BG_UNITS - UI_WALL_VRAM_END, 1, UI_WALL_VRAM_END, RES_BG_UNITS, 0,
+			    RES_NOLOG);
+	CHECK(rest != RES_NONE);
+	CHECK(ui_wallpaper_bgcnt(&bgcnt));
+	res_unref(RES_BG_VRAM, rest);
 	// Cached: the budget sees the room as free, and taking it all reclaims it
 	CHECK_EQ(pool_free_units(res_pool(RES_BG_VRAM), 1), RES_BG_UNITS);
 	u8 all = res_alloc(RES_BG_VRAM, RES_BG_UNITS, 1, 0, RES_BG_UNITS, 0, RES_NOLOG);
 	CHECK(all != RES_NONE);
 	CHECK(!ui_wallpaper_bgcnt(&bgcnt));
 	res_unref(RES_BG_VRAM, all);
-	// Another theme current: none
-	ui_wallpaper_setup();
+	CHECK(ui_wallpaper_setup());
 	CHECK(ui_wallpaper_bgcnt(&bgcnt));
+	CHECK(!ui_wallpaper_setup());  // up already: nothing to do
+	// Its room taken (a dialog's text): among the maps, under the top
+	u8 low = res_alloc(RES_BG_VRAM, UI_WALL_VRAM_END, 1, 0, UI_WALL_VRAM_END, 0, RES_NOLOG);
+	CHECK(low != RES_NONE);
+	CHECK(!ui_wallpaper_bgcnt(&bgcnt));
+	CHECK(ui_wallpaper_setup());
+	CHECK(ui_wallpaper_bgcnt(&bgcnt));
+	CHECK_EQ(bgcnt >> 8 & 31, 31);
+	map = (const u16 *)(0x06000000 + (bgcnt >> 8 & 31) * 0x800u);
+	tiles = (const u32 *)(0x06000000 + ((bgcnt >> 2) & 3) * 0x4000u) + (map[0] & 0x3FF) * 8;
+	CHECK_EQ(crc32(tiles, 128), test_asset_small_crc);
+	// Dropped before a push from there, so the view's maps take the top
+	CHECK(ui_wallpaper_yield());
+	CHECK(!ui_wallpaper_bgcnt(&bgcnt));
+	CHECK_EQ(pool_free_units(res_pool(RES_BG_VRAM), 1), RES_BG_UNITS - UI_WALL_VRAM_END);
+	CHECK(ui_wallpaper_setup());
+	// Back under UI_WALL_VRAM_END once that room is free (not before)
+	CHECK(!ui_wallpaper_setup());
+	res_unref(RES_BG_VRAM, low);
+	CHECK(ui_wallpaper_setup());
+	CHECK(ui_wallpaper_bgcnt(&bgcnt));
+	CHECK((bgcnt >> 8 & 31) < UI_WALL_VRAM_END / RES_MAP_UNITS);
+	CHECK(!ui_wallpaper_yield());  // stays there for a push
+	CHECK(ui_wallpaper_bgcnt(&bgcnt));
+	// Another theme current: none
 	ui_theme_select(&ui_theme_dark, UI_ACCENT_THEME);
 	CHECK(!ui_wallpaper_bgcnt(&bgcnt));
 	gfx_init();

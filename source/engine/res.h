@@ -50,8 +50,8 @@ void res_init(void);
 
 // Allocates len units of kind at a multiple of align inside [lo, hi) units,
 // sharing or reviving a block with the same tag (0: never shared). flags is
-// POOL_TOP or 0, plus RES_NOLOG. Returns a handle, or RES_NONE after logging
-// why.
+// POOL_TOP, POOL_KEEP or both, or 0, plus RES_NOLOG. Returns a handle, or
+// RES_NONE after logging why.
 u8 res_alloc(enum res_kind kind, u16 len, u16 align, u16 lo, u16 hi, u16 tag, u8 flags);
 // Drops a reference res_alloc took with RES_NOLOG. 0 if handle isn't a used
 // block.

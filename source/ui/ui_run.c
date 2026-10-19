@@ -91,6 +91,7 @@ static struct {
 	s16 dim_y;         // BLDY of DIM (0-16)
 	s16 modal_y;       // BLDY under a modal view
 	u8 dimmed;
+	u8 wall_retry;     // after a push or pop: put the wallpaper back where it fits (sdtheme.h)
 } ui EWRAM_BSS;
 
 void ui_wake(void)
@@ -603,6 +604,9 @@ void ui_init(const struct ui_theme *theme)
 	input_poll(&ui.in, 1, 0);
 	ui.palette = res_palette(RES_BG_PAL, 2, TAG_PALETTE);
 	TLOG_ASSERT(ui.palette != RES_NONE && res_start(RES_BG_PAL, ui.palette) == 0);
+	// A wallpaper left among the maps goes first, as before a push
+	// (sdtheme.h): the staging map and block 2's tiles take the top
+	ui_wallpaper_yield();
 	for (u32 cb = 0; cb < 3; cb++) {
 		// Blocks 0's and 1's at their bottom, block 2's at the top of its
 		// reach, so they don't split the long runs lists need: block 1's
@@ -643,6 +647,12 @@ void ui_shutdown(void)
 
 struct ui_view *ui_push(const struct ui_view_spec *spec, void *ctx)
 {
+	u32 d3;
+	u16 wall;
+	int wall_up = ui_wallpaper_bgcnt(&wall);
+	int wall_shown = wall_up && !plane_owner(3, &d3);
+	// Among the maps, the wallpaper goes before the view takes any (sdtheme.h)
+	ui_wallpaper_yield();
 	struct ui_view *v = ui_core_push(spec, ctx);
 	// A screen the SD theme breaks (patches, row height) gets its base theme
 	const struct ui_theme *base = v ? 0 : ui_theme_fallback_base();
@@ -655,6 +665,14 @@ struct ui_view *ui_push(const struct ui_view_spec *spec, void *ctx)
 			ui_theme_fell_back(ui_error());
 		else
 			ui_theme_set(sd_theme, accent);
+	}
+	if (wall_up && !ui_wallpaper_bgcnt(&wall)) {
+		// It goes up again where it fits once regs are in. If it showed, the
+		// view waits as after a pop and draws once regs without the
+		// wallpaper are committed, or its tiles would show on plane 3
+		ui.wall_retry = 1;
+		if (wall_shown)
+			ui.pop_wait = 1;
 	}
 	if (!v)
 		return 0;
@@ -680,6 +698,7 @@ void ui_hook_popped(u8 planes)
 	// Its maps and tiles may go to the next view at once, but they show
 	// until regs without them are committed: a view pushed now waits
 	ui.pop_wait = 1;
+	ui.wall_retry = 1;
 	ui.queued_keys = 0;
 	ui.hidden &= (u8)~planes;
 	ui.hide_pending &= (u8)~planes;
@@ -815,6 +834,16 @@ u32 ui_frame(void)
 	const struct ui_view *top = ui_top();
 	if (top && !(top->flags & UI_V_SHOWN))
 		frame_wake();
+	// Once nothing popped shows its VRAM any more (sdtheme.h), in a frame of
+	// its own: not with a new view's drawing
+	if (ui.wall_retry) {
+		if (!ui.pop_wait && (!top || (top->flags & UI_V_SHOWN)) && !gfx_queue_len()) {
+			ui.wall_retry = 0;
+			if (ui_wallpaper_setup())
+				frame_measure("ui-wallpaper");
+		}
+		frame_wake();
+	}
 	if (!frame_idle()) {
 		jobs_run(JOB_DEADLINE);
 		draw_all();
