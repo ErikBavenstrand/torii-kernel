@@ -252,6 +252,7 @@ static void settle(u32 min)
 	u8 list = node_of(N_LIST);
 	for (u32 i = 0; i < 60 && (i < min || !ui_list_still(list) || gfx_queue_len()); i++)
 		ui_frame();
+	ui_frame();  // its commit puts up the registers the last frame set (the scroll)
 	scr.pumped = torii_frames;
 }
 
