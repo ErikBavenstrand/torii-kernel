@@ -23,3 +23,5 @@
 -s @560:top.png
 -k @580:UP -k @584:-
 -s @610:wrapped.png
+# The tear watch: no write changes the screen while it scans out
+-T 1:99999

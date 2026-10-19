@@ -3,14 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 
-const InputTiming input_timing_default = {
-	.delay = 15,
-	.interval = 4,
-	.ramp = 90,
-	.top_speed = 40,
-	.page_delay = 20,
-	.page_interval = 6,
-};
+const InputTiming input_timing_default = INPUT_TIMING_DEFAULT;
 
 void input_init(InputState *s, const InputTiming *timing)
 {

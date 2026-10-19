@@ -127,13 +127,17 @@ void test_ui_glide_held(void)
 			CHECK(v - last_v <= 5 && last_v - v <= 5);
 			if (v > top_v)
 				top_v = v;
+			// At the top of the ramp every frame moves the same whole
+			// number of px: uneven steps read as judder
+			if (f >= 100)
+				CHECK_EQ(v, 8);
 			last_v = v;
 			prev = s.shown;
 		}
 		CHECK(moving > 120);
-		// 40 rows a second at the top of the ramp: 10 2/3 px a frame
-		CHECK(top_v >= 10 && top_v <= 11);
-		CHECK(last_v >= 10 && last_v <= 11);
+		// 30 rows a second at the top of the ramp: 8 px a frame
+		CHECK_EQ(top_v, 8);
+		CHECK_EQ(last_v, 8);
 		CHECK_EQ(s.far, 0u);
 		// Let go
 		s32 at = s.shown;

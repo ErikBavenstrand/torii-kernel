@@ -6,6 +6,13 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** a held d-pad tops out at 30 rows a second, reached after
+  1.15 s, instead of 40 after 1.75 s: 30 moves the lists a steady 8 px every
+  frame, where 40 moved them in uneven 11, 11, 10 px steps (`1d28236`).
+- **Fixed:** a row redrawn in place (a SETTINGS value, a Diagnostics line)
+  and a scroll bar's thumb were drawn into tiles on screen and could tear
+  for a frame; they now land in VBlank with the list (`0817cbb`, `c3d13fc`).
+
 - **Fixed:** reads into the shared read buffer used only what they read: a
   short or failed read of a PATCH/ `.pat`, a SAVER/ `.mde` (a big one also
   overran the buffer), `GameID2cht.bin`, a save loaded into cart SRAM or a

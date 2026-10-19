@@ -16,3 +16,5 @@
 -w "settings: staged"
 -k @10:DOWN -k @14:-
 -s @30:saved.png
+# The tear watch: no write changes the screen while it scans out
+-T 1:99999

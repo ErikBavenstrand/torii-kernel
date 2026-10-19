@@ -5,3 +5,5 @@
 -w "screen ready: sd-list"
 -k @8:DOWN -k @12:- -k @16:R -k @17:- -k @18:DOWN -k @19:- -k @20:DOWN -k @21:- -k @22:L -k @23:-
 -s @100:end.png
+# The tear watch: no write changes the screen while it scans out
+-T 1:99999

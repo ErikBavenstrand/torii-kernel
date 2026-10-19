@@ -50,9 +50,13 @@ typedef struct {
 	u8 page_interval; // paging keys: between repeats
 } InputTiming;
 
-// 15, 4, 90, 40; paging 20, 6. A held d-pad fires on frames
-// 0 and 15, then about 4 frames apart, closing up smoothly to 40 a second
-// (two frames in three) by frame 105 (1.75 s).
+// 15, 4, 54, 30; paging 20, 6. A held d-pad fires on frames
+// 0 and 15, then about 4 frames apart, closing up smoothly to 30 a second
+// (every other frame) by frame 69 (1.15 s). 30 a second moves a 16 px row
+// list exactly 8 px every frame, where 40 alternated 11, 11 and 10 px
+// steps (docs/plans/v0.3-decisions.md, v0.3.2 scroll feel). The built-in
+// themes take the same figures.
+#define INPUT_TIMING_DEFAULT {15, 4, 54, 30, 20, 6}
 extern const InputTiming input_timing_default;
 
 // Repeat rates are 16.16 repeats a frame.

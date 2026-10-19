@@ -7,3 +7,5 @@
 -k @8:R -k @12:-
 -w "screen ready: settings2"
 -s @1:screen.png
+# The tear watch: no write changes the screen while it scans out
+-T 1:99999

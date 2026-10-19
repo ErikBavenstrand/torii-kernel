@@ -10,3 +10,5 @@
 -k @210:A -k @214:-
 -w "screen ready: file-menu"
 -s @1:menu.png
+# The tear watch: no write changes the screen while it scans out
+-T 1:99999

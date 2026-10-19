@@ -23,7 +23,10 @@ so a later sd-file can put a file in its place (nor-launch-fail).
 bytes, to DEST in RUNS runs of clusters (tools/sdimg.sh put-fragmented): a
 game too fragmented to start (dialog-fragmented). A "kernel error:" line
 fails a scenario unless an "#! expect-error TEXT" line expects it (it starts
-with TEXT); an expected one that isn't logged fails it too.
+with TEXT); an expected one that isn't logged fails it too. A scenario with
+-T FROM:TO runs mgba-shot's tear watch over those frames: any "tear:" line
+(a register, palette or on-screen VRAM write while lines 0-159 scan out)
+fails it.
 
 Check (the default): every key frame's screen hash, and every animation's
 frame hashes, must equal tests/shots/hashes.txt. On a mismatch the actual,
@@ -340,6 +343,9 @@ def scenario(name: str, sd: Path) -> Result:
         if line.startswith(("kernel error:", "crash at", "timed out", "cannot"))
         and not any(line.startswith(f"kernel error: {e}") for e in expected)
     ]
+    # The tear watch (-T in the opts): a store that changed the screen while
+    # it scanned out
+    errors += [line for line in proc.stdout.splitlines() if line.startswith("tear:")]
     errors += [
         f"no error line: {e}"
         for e in expected
