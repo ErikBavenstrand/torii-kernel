@@ -1,0 +1,13 @@
+# Names too long for a row (Games/Long cheat.gba): cut with "...", and the
+# selected one scrolls once the cursor rests on it
+#! settings 4=1
+-w "screen ready: sd-list"
+-k @8:DOWN -k @12:- -k @20:A -k @24:-
+-w "screen ready: sd-list"
+-k @8:DOWN -k @12:- -k @20:A -k @24:-
+-w "screen ready: file-menu"
+-k @8:DOWN -k @12:- -k @16:DOWN -k @20:- -k @24:DOWN -k @28:- -k @32:DOWN -k @36:- -k @40:DOWN -k @44:-
+-k @52:A -k @56:-
+-w "screen ready: cheats"
+-s @1:screen.png
+-s @320:scrolled.png

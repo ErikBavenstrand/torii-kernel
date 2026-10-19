@@ -6,6 +6,13 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** the cheat screen runs on the v0.3 tile engine: cheats as
+  headings, their options indented, a picked one in the accent colour with
+  "[x]"; the cursor skips headings, LEFT/RIGHT and L/R page, long names
+  scroll. Picking and applying are unchanged. The counter counts options
+  only ("[001/002]", not "[002/004]"), the game menu shows CHEAT until the
+  screen is opened and then CHEAT(n) for the cheats picked, and opening the
+  game menu drops cheats a previous menu left picked (`5e44a3b`).
 - **Added:** views, widgets and themes for the v0.3 tile menu, not yet used
   by any screen (`source/ui/`). Screens are const layouts of labels,
   panels, lists, grids, images, scroll and progress bars with anchors, on a
@@ -16,6 +23,12 @@ git log, not here.
   swaps, with palette fades and layout patches for theme files to come.
   A DIM setting (slot 27, off by default) darkens the screen after idle
   minutes; nothing new writes kernel NOR (`40c91a0`, `2b8037a`, `a38043a`).
+- **Changed:** the v0.3 UI is smoother. A page change or wrap draws its rows
+  in one hidden frame and fades the list in; lists scroll 32 px a frame, held
+  L/R pages every 4 frames, and a cut name slides in and out at both edges at
+  a pixel a frame. Keys pressed during a page change are no longer dropped.
+  Rows draw faster, caps rise to 48 nodes and a 1 KB arena, and the scroll
+  and progress bars are restyled (`a02944f`, `8df0d4c`, `9992a54`).
 - **Changed:** motion checks a value's range before taking a slot and its
   spring settles in 64 bits; palette fades round symmetrically; releasing a
   direction restarts the repeat of one still held (`bec26d8`, `472a177`).

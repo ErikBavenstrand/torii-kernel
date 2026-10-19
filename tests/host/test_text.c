@@ -272,3 +272,44 @@ void test_text_layout_window(void)
 	CHECK(line.count > 0 && !line.truncated);
 	CHECK_EQ(line.glyphs[line.count - 1], (u32)(longname[llen - 1] - TORII_FONT_FIRST));
 }
+
+void test_text_layout_span(void)
+{
+	const struct torii_font *font = &font_body;
+	const char *s = "A long file name that does not fit its row.gba";
+	u32 len = (u32)strlen(s), full = text_width(font, s, len);
+	struct text_line line, plain;
+	s32 lead = 99;
+	text_layout(font, s, len, 1000, &plain);
+	// Every skip: the glyphs are the run of plain's whose ink meets the span
+	for (u32 skip = 0; skip < full + 4; skip++) {
+		text_layout_span(font, s, len, skip, 100, &line, &lead);
+		CHECK(lead < (s32)font->max_width && lead > -(s32)font->max_width);
+		u32 pen = 0, i = 0, first = 0;
+		for (; i < plain.count; i++) {
+			const struct torii_glyph *g = &font->glyphs[plain.glyphs[i]];
+			if (g->rows ? pen + g->width > skip : pen >= skip)
+				break;
+			pen += g->advance;
+		}
+		first = i;
+		if (first == plain.count) {
+			CHECK_EQ(line.count, 0);
+			continue;
+		}
+		CHECK_EQ(lead, (s32)pen - (s32)skip);
+		for (u32 j = 0; j < line.count; j++) {
+			CHECK_EQ(line.glyphs[j], plain.glyphs[first + j]);
+			pen += font->glyphs[plain.glyphs[first + j]].advance;
+		}
+		// It stops at the first glyph starting past the span, or the end
+		CHECK(first + line.count == plain.count || pen >= skip + 100);
+		CHECK_EQ(line.truncated, first + line.count < plain.count);
+		// The last glyph starts inside the span
+		CHECK(lead + (s32)line.advance - (s32)font->glyphs[line.glyphs[line.count - 1]].advance < 100);
+	}
+	// From 0 it starts at the first glyph, partly visible ones included
+	text_layout_span(font, s, len, 0, 20, &line, &lead);
+	CHECK_EQ(lead, 0);
+	CHECK(line.truncated && line.extent > 20 - (u32)font->max_width);
+}

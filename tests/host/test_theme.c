@@ -36,6 +36,7 @@ static void check_sane(const struct theme_ini *t)
 	CHECK(t->theme.pad <= 16);
 	CHECK(t->theme.modal_dim <= 16 && t->theme.idle_dim <= 16);
 	CHECK(t->theme.fade_frames >= 1 && t->theme.fade_frames <= 120);
+	CHECK(t->theme.marquee_speed >= 1 && t->theme.marquee_speed <= 60);
 	CHECK(t->theme.body == &font_body || t->theme.body == &font_heading);
 	CHECK(t->theme.heading == &font_body || t->theme.heading == &font_heading);
 	CHECK(memchr(t->name, 0, sizeof(t->name)) != 0);
@@ -77,6 +78,10 @@ void test_theme_keys(void)
 				   "fade_frames = 12\n"
 				   "slide = 0\n"
 				   "marquee_delay = 90\n"
+				   "marquee_speed = 30\n"
+				   "marquee_pause = 0\n"
+				   "marquee_gap = 16\n"
+				   "page_fade = 0\n"
 				   "[input]\n"
 				   "delay = 20\n"
 				   "interval = 5\n"
@@ -119,6 +124,10 @@ void test_theme_keys(void)
 	CHECK_EQ(t->fade_frames, 12);
 	CHECK_EQ(t->slide, 0);
 	CHECK_EQ(t->marquee_delay, 90);
+	CHECK_EQ(t->marquee_speed, 30);
+	CHECK_EQ(t->marquee_pause, 0);
+	CHECK_EQ(t->marquee_gap, 16);
+	CHECK_EQ(t->page_fade, 0);
 	CHECK_EQ(t->input.delay, 20);
 	CHECK_EQ(t->input.interval, 5);
 	CHECK_EQ(t->input.fast_after, 90);
@@ -144,6 +153,13 @@ void test_theme_keys(void)
 	CHECK_EQ(ini.warnings, 0);
 	CHECK(!memcmp(ini.theme.colour, ui_theme_dark.colour, sizeof(ini.theme.colour)));
 	CHECK(!memcmp(&ini.theme.input, &ui_theme_dark.input, sizeof(ini.theme.input)));
+	// Fields a file leaves out are the built-in's, never 0
+	CHECK_EQ(ini.theme.marquee_speed, ui_theme_dark.marquee_speed);
+	CHECK_EQ(ini.theme.marquee_pause, ui_theme_dark.marquee_pause);
+	CHECK_EQ(ini.theme.marquee_gap, ui_theme_dark.marquee_gap);
+	CHECK_EQ(ini.theme.page_fade, ui_theme_dark.page_fade);
+	CHECK(ini.theme.marquee_speed > 0);
+	CHECK(ini.theme.row_h && ini.theme.fade_frames && ini.theme.body && ini.theme.heading);
 	CHECK_EQ(ini.theme.patch_count, 0);
 	CHECK(!strcmp(ini.name, "") && !strcmp(ini.wallpaper, ""));
 }

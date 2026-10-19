@@ -277,8 +277,27 @@ static int bar_init(u8 node)
 // The bar's thickness and top within its rectangle
 static void bar_rows(u32 h, u32 *top, u32 *rows)
 {
-	*rows = h >= 8 ? 4 : h;
+	*rows = h >= 8 ? 6 : h;
 	*top = (h - *rows) / 2;
+}
+
+// Columns [a, b) of a progress bar w px wide in role: a pill, its four
+// corner pixels left transparent (bars 3 px or more thick)
+static void progress_span(const struct text_window *win, u32 a, u32 b, u32 w, u32 top, u32 rows, u32 role)
+{
+	if (a >= b)
+		return;
+	text_clear(win, a, top, b - a, rows, role);
+	if (rows < 3)
+		return;
+	if (a == 0) {
+		text_clear(win, 0, top, 1, 1, UI_ROLE_NONE);
+		text_clear(win, 0, top + rows - 1, 1, 1, UI_ROLE_NONE);
+	}
+	if (b == w) {
+		text_clear(win, w - 1, top, 1, 1, UI_ROLE_NONE);
+		text_clear(win, w - 1, top + rows - 1, 1, 1, UI_ROLE_NONE);
+	}
 }
 
 static void progress_draw(u8 node)
@@ -294,10 +313,10 @@ static void progress_draw(u8 node)
 	struct text_window win = window_of(node, st->first);
 	u32 top, rows;
 	bar_rows((u32)n->h, &top, &rows);
-	u32 ink = ui_ink(node, UI_ROLE_ACCENT), track = ui_paper(node, UI_ROLE_TRACK);
+	u32 ink = ui_ink(node, UI_ROLE_ACCENT), track = ui_paper(node, UI_ROLE_TRACK), w = (u32)n->w;
 	if (!(n->flags & UI_N_DRAWN)) {
-		text_clear(&win, 0, 0, (u32)n->w, (u32)n->h, UI_ROLE_NONE);
-		text_clear(&win, 0, top, (u32)n->w, rows, track);
+		text_clear(&win, 0, 0, w, (u32)n->h, UI_ROLE_NONE);
+		progress_span(&win, 0, w, w, top, rows, track);
 		st->drawn1 = 0;
 		if (!map_window(node, st->first, UI_BANK_NORMAL)) {
 			ui_dirty(node, 0xFF);
@@ -306,9 +325,9 @@ static void progress_draw(u8 node)
 	}
 	// Only the pixels that change: no frame shows the bar half redrawn
 	if (st->want1 > st->drawn1)
-		text_clear(&win, st->drawn1, top, (u32)(st->want1 - st->drawn1), rows, ink);
+		progress_span(&win, st->drawn1, st->want1, w, top, rows, ink);
 	else if (st->want1 < st->drawn1)
-		text_clear(&win, st->want1, top, (u32)(st->drawn1 - st->want1), rows, track);
+		progress_span(&win, st->want1, st->drawn1, w, top, rows, track);
 	st->drawn1 = st->want1;
 }
 
@@ -317,6 +336,8 @@ void ui_progress_set(u8 node, u32 value, u32 max)
 	struct bar_state *st = ui_node_state(node);
 	u32 w = (u32)ui_node(node)->w;
 	u32 px = max ? (value >= max ? w : (u32)((unsigned long long)value * w / max)) : 0;
+	if (value && max && px < 2)
+		px = 2;  // any progress shows: the bar's rounded end
 	if (px != st->want1) {
 		st->want1 = (u16)px;
 		ui_dirty(node, 1);
@@ -370,18 +391,31 @@ static void scrollbar_update(u8 node, u32 dt)
 	}
 }
 
-// Rows [a, b) of the bar as track (thumb 0) or thumb (1)
-static void scrollbar_paint(const struct text_window *win, u32 a, u32 b, int thumb, u32 ink, u32 track)
+// A scroll bar row: the track's 1 px line, the thumb's 3 px, or a thumb's
+// rounded end (its first and last rows, the middle pixel only). The bar
+// keeps to the right of its 8 px column, clear of a list's detail column.
+enum {
+	SB_TRACK,
+	SB_THUMB,
+	SB_END
+};
+#define SB_X 4  // the thumb's left column
+static u32 scrollbar_row(u32 y, u32 t0, u32 t1)
+{
+	if (y < t0 || y >= t1)
+		return SB_TRACK;
+	return (y == t0 || y == t1 - 1) && t1 - t0 > 2 ? SB_END : SB_THUMB;
+}
+
+// Rows [a, b) of the bar as kind (SB_*)
+static void scrollbar_paint(const struct text_window *win, u32 a, u32 b, u32 kind, u32 ink, u32 track)
 {
 	if (a >= b)
 		return;
-	if (thumb) {
-		text_clear(win, 2, a, 4, b - a, ink);
-	} else {
-		text_clear(win, 2, a, 1, b - a, UI_ROLE_NONE);
-		text_clear(win, 3, a, 2, b - a, track);
-		text_clear(win, 5, a, 1, b - a, UI_ROLE_NONE);
-	}
+	u32 mid = kind == SB_TRACK ? track : ink, side = kind == SB_THUMB ? ink : UI_ROLE_NONE;
+	text_clear(win, SB_X, a, 1, b - a, side);
+	text_clear(win, SB_X + 1, a, 1, b - a, mid);
+	text_clear(win, SB_X + 2, a, 1, b - a, side);
 }
 
 static void scrollbar_draw(u8 node)
@@ -399,7 +433,7 @@ static void scrollbar_draw(u8 node)
 	u32 h = (u32)n->h;
 	if (!(n->flags & UI_N_DRAWN)) {
 		text_clear(&win, 0, 0, (u32)n->w, h, UI_ROLE_NONE);
-		scrollbar_paint(&win, 0, h, 0, ink, track);
+		scrollbar_paint(&win, 0, h, SB_TRACK, ink, track);
 		st->drawn0 = st->drawn1 = 0;
 		if (!map_window(node, st->first, UI_BANK_NORMAL)) {
 			ui_dirty(node, 0xFF);
@@ -407,12 +441,12 @@ static void scrollbar_draw(u8 node)
 		}
 	}
 	u32 o0 = st->drawn0, o1 = st->drawn1, n0 = st->want0, n1 = st->want1;
-	// Only rows whose state changes: old thumb rows the new one leaves
-	// become track, new ones thumb, in runs
+	// Only rows whose state changes (no frame shows the bar half
+	// redrawn), in runs
 	for (u32 y = 0; y < h;) {
-		int was = y >= o0 && y < o1, now = y >= n0 && y < n1;
+		u32 was = scrollbar_row(y, o0, o1), now = scrollbar_row(y, n0, n1);
 		u32 end = y + 1;
-		while (end < h && (end >= o0 && end < o1) == was && (end >= n0 && end < n1) == now)
+		while (end < h && scrollbar_row(end, o0, o1) == was && scrollbar_row(end, n0, n1) == now)
 			end++;
 		if (was != now)
 			scrollbar_paint(&win, y, end, now, ink, track);
