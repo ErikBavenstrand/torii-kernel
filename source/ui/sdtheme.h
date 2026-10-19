@@ -33,7 +33,9 @@
 // a wallpaper that is broken, not 4bpp or over budget); the SD theme loaded
 // before, if any, stays. Warnings (keys ignored or clamped) are logged and
 // counted in ui_theme_warnings(). Takes some tens of ms.
-// To show it, ui_theme_set(theme, accent) or ui_init.
+// To show it, ui_theme_set(theme, accent) or ui_init: the SD theme in use
+// before stays unchanged until then (two buffers alternate), but its
+// wallpaper goes off.
 const struct ui_theme *ui_theme_load(const char *name);
 // The loaded SD theme, or NULL.
 const struct ui_theme *ui_theme_sd(void);
@@ -45,8 +47,8 @@ const char *ui_theme_error(void);
 // Warnings the last successful ui_theme_load logged.
 u32 ui_theme_warnings(void);
 
-// Fills names with up to cap folder names from THEME_DIR that can be
-// themes (theme_name_ok; others are skipped), sorted bytewise. Returns how
+// Fills names with the first cap folder names found in THEME_DIR that can
+// be themes (theme_name_ok; others are skipped), sorted bytewise. Returns how
 // many; 0 if the folder is missing. Whether each holds a valid theme.ini
 // is only known once loaded.
 u32 ui_theme_list(char (*names)[THEME_NAME_MAX], u32 cap);
@@ -74,9 +76,12 @@ int ui_theme_boot(void);
 void ui_wallpaper_setup(void);
 // 1 if the wallpaper can show on plane 3 now, with its BGCNT in *bgcnt.
 int ui_wallpaper_bgcnt(u16 *bgcnt);
-// A screen failed to push while the SD theme is current: records why,
-// switches to the theme's base built-in theme and returns 1, so the push can
-// be tried again. 0 if the SD theme isn't current.
-int ui_theme_fallback(void);
+// When a screen fails to push while the SD theme is current, ui_push tries
+// it again in the theme's base built-in theme (this returns it; NULL if the
+// SD theme isn't current). If that works, the menu stays in the base theme
+// and ui_theme_fell_back(why) records it; if not, the theme wasn't the cause
+// and ui_push puts the SD theme back.
+const struct ui_theme *ui_theme_fallback_base(void);
+void ui_theme_fell_back(const char *why);
 
 #endif

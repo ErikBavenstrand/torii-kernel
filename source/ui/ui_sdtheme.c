@@ -36,8 +36,13 @@ struct scratch {
 _Static_assert(sizeof(struct scratch) <= READCACHE_THEME_SIZE, "theme scratch over READCACHE_THEME_SIZE");
 
 static struct {
-	struct ui_theme theme;
-	char name[THEME_NAME_MAX];
+	// Two, alternating: a load never rewrites the theme in use (ui.h: only
+	// ui_theme_set switches themes)
+	struct {
+		struct ui_theme theme;
+		char name[THEME_NAME_MAX];
+	} buf[2];
+	u8 cur;  // buf holding the loaded theme
 	char folder[THEME_NAME_MAX];
 	const struct ui_theme *base;
 	char error[THEME_MESSAGE_MAX];
@@ -46,8 +51,8 @@ static struct {
 	// The wallpaper: its file in PSRAM slot wall_slot, wall_bytes long (0: none)
 	u8 wall_slot;
 	u16 wall_bytes;
-	u8 wall_gen;  // counts loads, so a new theme's wallpaper is uploaded
-	u8 up_gen;    // the load whose wallpaper is up
+	u16 wall_gen;  // counts loads, so a new theme's wallpaper is uploaded
+	u16 up_gen;    // the load whose wallpaper is up
 	u32 wall_crc;
 	// Where it is up (res handles, cached), and its BGCNT
 	u8 h_tiles, h_map, h_pal;
@@ -71,12 +76,16 @@ static void set_error(const char *format, ...)
 	va_start(args, format);
 	vsnprintf(sd.error, sizeof(sd.error), format, args);
 	va_end(args);
-	tlog_error("theme: %s", sd.error);
+	// Quiet while tests make errors on purpose, as the engine's (res.h)
+	if (res_errors_quiet)
+		tlog("theme: %s", sd.error);
+	else
+		tlog_error("theme: %s", sd.error);
 }
 
 const struct ui_theme *ui_theme_sd(void)
 {
-	return sd.loaded ? &sd.theme : 0;
+	return sd.loaded ? &sd.buf[sd.cur].theme : 0;
 }
 
 const char *ui_theme_sd_folder(void)
@@ -203,10 +212,13 @@ const struct ui_theme *ui_theme_load(const char *name)
 			return 0;
 	}
 	// All good: it replaces the SD theme loaded before
-	sd.theme = ini->theme;
+	if (sd.loaded)
+		sd.cur ^= 1;
+	struct ui_theme *theme = &sd.buf[sd.cur].theme;
+	*theme = ini->theme;
 	const char *shown = ini->name[0] ? ini->name : name;
-	memcpy(sd.name, shown, strlen(shown) + 1);
-	sd.theme.name = sd.name;
+	memcpy(sd.buf[sd.cur].name, shown, strlen(shown) + 1);
+	theme->name = sd.buf[sd.cur].name;
 	memcpy(sd.folder, name, strlen(name) + 1);
 	sd.base = ini->base;
 	sd.warnings = ini->warnings;
@@ -215,8 +227,8 @@ const struct ui_theme *ui_theme_load(const char *name)
 	sd.wall_crc = crc;
 	sd.wall_gen++;
 	sd.loaded = 1;
-	tlog("theme: loaded %s (%s, %u warnings%s)", name, sd.name, sd.warnings, bytes ? ", a wallpaper" : "");
-	return &sd.theme;
+	tlog("theme: loaded %s (%s, %u warnings%s)", name, theme->name, sd.warnings, bytes ? ", a wallpaper" : "");
+	return theme;
 }
 
 u32 ui_theme_list(char (*names)[THEME_NAME_MAX], u32 cap)
@@ -248,8 +260,16 @@ int ui_theme_choice_read(char name[THEME_NAME_MAX])
 	// Word-aligned, as f_read wants: the stage
 	char *text = (char *)stage_buffer();
 	u32 size = 0;
-	if (read_file(THEME_CHOICE_FILE, text, 64, &size) != SD_READ_OK)
+	// The first line is all that counts: a longer file is read in part
+	FIL *f = &scratch()->reader.fil;
+	UINT got = 0;
+	if (f_open(f, THEME_CHOICE_FILE, FA_READ) != FR_OK)
 		return 0;
+	int ok = f_read(f, text, 64, &got) == FR_OK;
+	f_close(f);
+	if (!ok)
+		return 0;
+	size = got;
 	u32 start = 0, end;
 	if (size >= 3 && (u8)text[0] == 0xEF && (u8)text[1] == 0xBB && (u8)text[2] == 0xBF)
 		start = 3;
@@ -302,7 +322,7 @@ int ui_theme_boot(void)
 
 static int wall_current(void)
 {
-	return sd.loaded && sd.wall_bytes && ui_theme() == &sd.theme;
+	return sd.loaded && sd.wall_bytes && ui_theme() == ui_theme_sd();
 }
 
 // 1 while the uploaded wallpaper's blocks are still the ones it filled
@@ -334,12 +354,16 @@ void ui_wallpaper_setup(void)
 	memcpy(&h, file, sizeof(h));
 	u32 tiles = (u32)h.width * h.height;
 	u32 pal_bytes = asset_palette_bytes(&h);
+	// No room on this screen is no error: not logged as one
+	u8 quiet = res_errors_quiet;
+	res_errors_quiet = 1;
 	u8 t = res_alloc(RES_BG_VRAM, (u16)tiles, 1, 0, RES_BG_UNITS, TAG_WALL_TILES, POOL_TOP | RES_NOLOG);
 	u8 m = t == RES_NONE ? RES_NONE
 			     : res_alloc(RES_BG_VRAM, RES_MAP_UNITS, RES_MAP_UNITS, 0, RES_BG_UNITS, TAG_WALL_MAP,
 					 POOL_TOP | RES_NOLOG);
 	u8 p = m == RES_NONE ? RES_NONE
 			     : res_alloc(RES_BG_PAL, 1, 1, 0, RES_PAL_BANKS, TAG_WALL_PAL, POOL_TOP | RES_NOLOG);
+	res_errors_quiet = quiet;
 	if (p == RES_NONE) {
 		if (m != RES_NONE)
 			res_unref(RES_BG_VRAM, m);
@@ -393,11 +417,12 @@ int ui_wallpaper_bgcnt(u16 *bgcnt)
 	return 1;
 }
 
-int ui_theme_fallback(void)
+const struct ui_theme *ui_theme_fallback_base(void)
 {
-	if (!sd.loaded || ui_theme() != &sd.theme)
-		return 0;
-	set_error("%s broke a screen (%s); using the built-in %s theme", sd.folder, ui_error(), sd.base->name);
-	ui_theme_set(sd.base, ui_accent());
-	return 1;
+	return sd.loaded && ui_theme() == ui_theme_sd() ? sd.base : 0;
+}
+
+void ui_theme_fell_back(const char *why)
+{
+	set_error("%s broke a screen (%s); using the built-in %s theme", sd.folder, why, sd.base->name);
 }

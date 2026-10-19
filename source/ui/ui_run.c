@@ -579,9 +579,18 @@ void ui_shutdown(void)
 struct ui_view *ui_push(const struct ui_view_spec *spec, void *ctx)
 {
 	struct ui_view *v = ui_core_push(spec, ctx);
-	// A screen the SD theme breaks (patches, row height) gets the built-in one
-	if (!v && ui_theme_fallback())
+	// A screen the SD theme breaks (patches, row height) gets its base theme
+	const struct ui_theme *base = v ? 0 : ui_theme_fallback_base();
+	if (base) {
+		const struct ui_theme *sd_theme = ui_theme();
+		u16 accent = ui_accent();
+		ui_theme_set(base, accent);
 		v = ui_core_push(spec, ctx);
+		if (v)
+			ui_theme_fell_back(ui_error());
+		else
+			ui_theme_set(sd_theme, accent);
+	}
 	if (!v)
 		return 0;
 	// Its maps are cleared and drawn once nothing popped shows their VRAM

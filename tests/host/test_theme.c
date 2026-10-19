@@ -157,6 +157,14 @@ void test_theme_refused(void)
 	CHECK(strstr(ini.message, "version 2") != 0);
 	CHECK_EQ(parse("version = one\n"), THEME_ERR_VERSION);
 	CHECK_EQ(parse("version = 0\n"), THEME_ERR_VERSION);
+	CHECK(strstr(ini.message, "version 0") != 0);
+	CHECK_EQ(parse("version = -1\n"), THEME_ERR_VERSION);
+	CHECK(strstr(ini.message, "version -1") != 0);
+	CHECK(strstr((parse("version = x\n"), ini.message), "isn't a number") != 0);
+	// A refused file reports no warnings, not even through the callback
+	ini.on_warning = 0;
+	CHECK_EQ(parse("base = blue\nversion = 2\n"), THEME_ERR_VERSION);
+	CHECK_EQ(ini.warnings, 0);
 	// A version inside a section isn't the file's
 	CHECK_EQ(parse("[layout]\nversion = 1\n"), THEME_ERR_VERSION);
 	// The last version line counts
@@ -295,6 +303,14 @@ void test_theme_formats(void)
 	CHECK_EQ(ini.warnings, 1);
 	CHECK_EQ(parse("version = 1\nname = a\x01b\n"), THEME_OK);
 	CHECK(!strcmp(ini.name, ""));
+	// A comment after a section line; leading zeros
+	CHECK_EQ(parse("version = 001\n[layout] ; rows\nrow_h = 0000032\n[effects] # more\nslide = 8\n"), THEME_OK);
+	CHECK_EQ(ini.theme.row_h, 32);
+	CHECK_EQ(ini.theme.slide, 8);
+	CHECK_EQ(ini.warnings, 0);
+	// Only ';' ends a value
+	CHECK_EQ(parse("version = 1\n[layout]\npad = 4 # four\n"), THEME_OK);
+	CHECK_EQ(ini.warnings, 1);
 }
 
 void test_theme_names(void)
@@ -310,6 +326,9 @@ void test_theme_names(void)
 	CHECK(!theme_name_ok("a\\b"));
 	CHECK(!theme_name_ok(".."));
 	CHECK(!theme_name_ok("caf\xC3\xA9"));
+	CHECK(!theme_name_ok("Night."));
+	CHECK(!theme_name_ok("Night "));
+	CHECK(theme_name_ok("v1.2b"));
 }
 
 void test_theme_example(void)

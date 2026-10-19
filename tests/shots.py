@@ -148,7 +148,9 @@ def boot(name: str, sd: Path, cart: Path, out: Path, extra: list[str] = ()):
             name = line.split()[2]
             img = str(cart / "sd.img")
             for folder in ("::/torii", "::/torii/themes"):
-                subprocess.run(["mmd", "-i", img, folder], capture_output=True, check=False)
+                subprocess.run(
+                    ["mmd", "-i", img, folder], capture_output=True, check=False
+                )
             run(["mcopy", "-s", "-Q", "-i", img, f"themes/{name}", "::/torii/themes/"])
         elif line.startswith("#! settings"):
             nor = cart / "kernel-nor.bin"

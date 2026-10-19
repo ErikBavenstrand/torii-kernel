@@ -5,7 +5,8 @@
 //	version = 1          ; required: the format's version
 //	name = Night         ; shown in settings (default: the folder's name)
 //	base = dark          ; the built-in theme every missing key keeps
-//	[colours]            ; #RRGGBB, rounded down to 15 bits
+//	[colours]            ; #RRGGBB, rounded down to 15 bits (only ';' starts
+//	                     ; a comment after a value, as colours start with '#')
 //	bg = #101418
 //	[patches]            ; VIEW.NODE.FIELD = VALUE, at most 16
 //	ui-demo.4.x = 16
@@ -23,6 +24,7 @@
 #include "ui.h"
 
 #define THEME_VERSION 1
+#define THEME_VERSION_NAN (-1000000)  // parse_int reads at most 6 digits
 #define THEME_NAME_MAX 24  // bytes with the NUL: a theme's name and its folder's
 #define THEME_FILE_MAX 32  // an asset's file name in the theme's folder, with the NUL
 #define THEME_INI_MAX 0x2000  // bytes of theme.ini read
@@ -41,7 +43,8 @@ struct theme_ini {
 	char name[THEME_NAME_MAX];  // "" if the file names none
 	char wallpaper[THEME_FILE_MAX];  // [wallpaper] file, "" none
 	u16 warnings;
-	s32 version;  // as read; 0 if missing, -1 if not a number
+	s32 version;  // as read, THEME_VERSION_NAN if not a number
+	u8 has_version;  // a version line was found
 	char message[THEME_MESSAGE_MAX];  // the error, or the first warning ("" none)
 	// Called with each warning as it is found (a sentence starting "line N:");
 	// may be NULL. theme_ini_parse keeps it.

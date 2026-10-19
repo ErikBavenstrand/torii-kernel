@@ -174,6 +174,11 @@ static int parse_int(const char *s, s32 *out)
 		neg = *s++ == '-';
 	s32 v = 0;
 	u32 digits = 0;
+	if (*s == '0') {
+		// Leading zeros don't count towards the limit
+		while (s[1] == '0')
+			s++;
+	}
 	for (; *s >= '0' && *s <= '9'; s++) {
 		if (++digits > 6)
 			return 0;
@@ -240,7 +245,9 @@ int theme_name_ok(const char *name)
 		      c == '-' || c == '_' || c == '.'))
 			return 0;
 	}
-	return n > 0 && n < THEME_NAME_MAX && name[0] != '.' && name[0] != ' ';
+	// FAT drops a trailing dot or space, so such a name opens another folder
+	return n > 0 && n < THEME_NAME_MAX && name[0] != '.' && name[0] != ' ' && name[n - 1] != '.' &&
+	       name[n - 1] != ' ';
 }
 
 // Copies a display name: printable bytes (UTF-8 above 0x7F kept), cut at a
@@ -256,7 +263,7 @@ static void copy_name(struct parser *p, const char *value)
 			return;
 		}
 	}
-	for (; value[n] && n < THEME_NAME_MAX - 1; n++)
+	for (; n < THEME_NAME_MAX - 1 && value[n]; n++)
 		dst[n] = value[n];
 	if (value[n]) {
 		// Back off to the start of a UTF-8 character
@@ -282,6 +289,7 @@ static s16 rect_value(struct parser *p, const char *key, s32 v, s32 lo, s32 hi)
 	return (s16)v;
 }
 
+#define NO 0xFF
 static int parse_anchor(char *s, s32 *out)
 {
 	s32 n;
@@ -293,12 +301,12 @@ static int parse_anchor(char *s, s32 *out)
 	}
 	static const struct {
 		const char *name;
-		s8 h, v;  // -1: unchanged
+		u8 h, v;  // NO: unchanged
 	} words[] = {
-		{"left", UI_LEFT, -1},        {"right", UI_RIGHT, -1},
-		{"hfill", UI_HFILL, -1},      {"hcenter", UI_HCENTER, -1},
-		{"top", -1, UI_TOP},          {"bottom", -1, UI_BOTTOM},
-		{"vfill", -1, UI_VFILL},      {"vcenter", -1, UI_VCENTER},
+		{"left", UI_LEFT, NO},        {"right", UI_RIGHT, NO},
+		{"hfill", UI_HFILL, NO},      {"hcenter", UI_HCENTER, NO},
+		{"top", NO, UI_TOP},          {"bottom", NO, UI_BOTTOM},
+		{"vfill", NO, UI_VFILL},      {"vcenter", NO, UI_VCENTER},
 		{"fill", UI_HFILL, UI_VFILL}, {"center", UI_HCENTER, UI_VCENTER},
 	};
 	s32 h = UI_LEFT, v = UI_TOP;
@@ -319,9 +327,9 @@ static int parse_anchor(char *s, s32 *out)
 				break;
 		if (i == sizeof(words) / sizeof(words[0]))
 			return 0;
-		if (words[i].h >= 0)
+		if (words[i].h != NO)
 			h = words[i].h;
-		if (words[i].v >= 0)
+		if (words[i].v != NO)
 			v = words[i].v;
 		count++;
 		*s = end;
@@ -331,6 +339,7 @@ static int parse_anchor(char *s, s32 *out)
 	*out = h | v;
 	return 1;
 }
+#undef NO
 
 static int parse_role(const char *s, s32 *out)
 {
@@ -465,7 +474,8 @@ static void set_key(struct parser *p, const struct key *k, const char *value)
 			warn(p, "%s = %s isn't a font (body or heading); ignored", k->name, value);
 			return;
 		}
-		memcpy(theme + k->offset, &f, sizeof(f));
+		// A pointer field: offsetof keeps it aligned
+		*(const struct torii_font **)(void *)(theme + k->offset) = f;
 		return;
 	}
 	case K_ROW_H:
@@ -478,7 +488,7 @@ static void set_key(struct parser *p, const struct key *k, const char *value)
 	case K_FILE: {
 		char *dst = (char *)p->out + k->offset;
 		u32 len = (u32)strlen(value);
-		int ok = len > 0 && len < THEME_FILE_MAX && value[0] != '.';
+		int ok = len > 0 && len < THEME_FILE_MAX && value[0] != '.' && value[len - 1] != '.';
 		for (const char *s = value; ok && *s; s++)
 			ok = (u8)*s > 0x20 && *s != '/' && *s != '\\' && *s != ':' && (u8)*s < 0x7F;
 		if (!ok) {
@@ -488,6 +498,8 @@ static void set_key(struct parser *p, const struct key *k, const char *value)
 		memcpy(dst, value, len + 1);
 		return;
 	}
+	default:
+		return;
 	}
 }
 
@@ -497,21 +509,17 @@ static void top_key(struct parser *p, const char *key, const char *value)
 	if (same(key, "version")) {
 		if (p->pass == 1) {
 			s32 n;
-			out->version = parse_int(value, &n) && n > 0 ? n : -1;
+			out->version = parse_int(value, &n) ? n : THEME_VERSION_NAN;
+			out->has_version = 1;
 		}
 		return;
 	}
 	if (same(key, "base")) {
-		if (p->pass != 1)
-			return;
-		if (same(value, "dark"))
-			out->base = &ui_theme_dark;
-		else if (same(value, "light"))
-			out->base = &ui_theme_light;
-		else {
-			out->base = &ui_theme_dark;
+		int dark = same(value, "dark"), light = same(value, "light");
+		if (p->pass == 1)
+			out->base = light ? &ui_theme_light : &ui_theme_dark;
+		else if (!dark && !light)
 			warn(p, "base = %s isn't dark or light; dark used", value);
-		}
 		return;
 	}
 	if (p->pass != 2)
@@ -529,7 +537,8 @@ static void line(struct parser *p, char *s)
 		return;
 	if (*s == '[') {
 		char *end = strchr(s, ']');
-		if (!end || trim(end + 1)[0]) {
+		char *after = end ? trim(end + 1) : 0;
+		if (!end || (after[0] && after[0] != ';' && after[0] != '#')) {
 			if (p->pass == 2)
 				warn(p, "a section line is [name]; keys up to the next section ignored");
 			p->section = S_UNKNOWN;
@@ -629,15 +638,15 @@ int theme_ini_parse(const char *text, u32 len, struct theme_ini *out)
 	}
 	struct parser p = {out, 0, S_TOP, 1};
 	walk(&p, text, len);
-	if (out->version != THEME_VERSION) {
-		if (out->version > 0)
-			snprintf(out->message, sizeof(out->message), "theme.ini is version %ld; this kernel reads %d",
-				 (long)out->version, THEME_VERSION);
-		else if (out->version < 0)
-			snprintf(out->message, sizeof(out->message), "theme.ini's version isn't a number");
-		else
+	if (!out->has_version || out->version != THEME_VERSION) {
+		if (!out->has_version)
 			snprintf(out->message, sizeof(out->message), "theme.ini has no \"version = %d\" line",
 				 THEME_VERSION);
+		else if (out->version == THEME_VERSION_NAN)
+			snprintf(out->message, sizeof(out->message), "theme.ini's version isn't a number");
+		else
+			snprintf(out->message, sizeof(out->message), "theme.ini is version %ld; this kernel reads %d",
+				 (long)out->version, THEME_VERSION);
 		out->warnings = 0;
 		return THEME_ERR_VERSION;
 	}
