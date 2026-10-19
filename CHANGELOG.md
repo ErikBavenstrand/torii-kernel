@@ -19,8 +19,7 @@ git log, not here.
   invalid codes, a dead fifth MODE B position, and AUTO SAVE and MODE B
   changes not reaching the next launch until a reboot (`783114e`). A saved
   ACCENT showed black, and a screen without a list could fail to appear
-  after another closed (`2a67c3f`). Leaving the cheat screen with B held no
-  longer reaches the menu as a new press (`e3b624a`).
+  after another closed (`2a67c3f`).
 
 - **Added:** themes from the SD card. `/torii/themes/<name>/theme.ini`
   (version 1) overrides the dark or light theme key by key: colours, fonts,
