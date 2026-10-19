@@ -68,8 +68,12 @@ u32 tlog_pending(void);
 
 // True if every line so far reached the card (or none was kept).
 int tlog_all_written(void);
-// True once writing the card failed: no flush writes until the next boot.
+// True once writing the card failed (no flush writes until the next boot),
+// or while the card is full: then the text waits in RAM, and every flush
+// but the lists' idle one tries again.
 int tlog_card_failed(void);
+// A file was deleted: the card may have room for the log again.
+void tlog_card_freed(void);
 
 // The newest log text, for the crash dump: see log_ring_tail.
 u32 tlog_recent(char *out, u32 max);

@@ -182,6 +182,10 @@ enum {
 	SD_READY = 2,
 };
 static s8 sd_state;
+// The card had no room for the log at the last flush (FR_DENIED, the card's
+// or a folder's room): not a failure. The lists' idle flush waits until a
+// file is deleted (tlog_card_freed); any other flush tries again.
+static u8 no_room;
 static u8 force_pending;
 static u8 cur_slot;
 static u32 cur_seq;
@@ -198,7 +202,12 @@ static u32 bounce[128] EWRAM_BSS;
 
 int tlog_card_failed(void)
 {
-	return sd_state == SD_FAILED;
+	return sd_state == SD_FAILED || no_room;
+}
+
+void tlog_card_freed(void)
+{
+	no_room = 0;
 }
 
 static void log_path(char *path, u32 slot)
@@ -208,8 +217,20 @@ static void log_path(char *path, u32 slot)
 
 static void sd_failed(const char *what, FRESULT res)
 {
-	sd_state = SD_FAILED;
 	f_close(&log_file);
+	if (res == FR_DENIED) {
+		// The card is full: the text waits in the ring for room. Said
+		// once, and not to the card
+		if (!no_room) {
+			u8 level = tlog_level;
+			tlog_level = TLOG_OFF;
+			tlog_error("log: %s: the card is full; the log waits for room", what);
+			tlog_level = level;
+		}
+		no_room = 1;
+		return;
+	}
+	sd_state = SD_FAILED;
 	// Not to the card: it just failed. Logging stops until the next boot.
 	u8 level = tlog_level;
 	tlog_level = TLOG_OFF;
@@ -418,10 +439,11 @@ static int sd_open(void)
 	if (sd_state == SD_MOUNTED) {
 		FRESULT res = open_current();
 		if (res != FR_OK) {
-			sd_failed("opening the log", res);
+			sd_failed("opening the log", res);  // full: looked for again next flush
 			return 0;
 		}
 		sd_state = SD_READY;
+		no_room = 0;
 	}
 	return sd_state == SD_READY;
 }
@@ -493,6 +515,7 @@ void tlog_flush(void)
 		sd_failed("closing the log", res);
 		return;
 	}
+	no_room = 0;
 	force_pending = 0;
 }
 

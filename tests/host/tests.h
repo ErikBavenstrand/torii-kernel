@@ -51,6 +51,7 @@ void test_text_width(void);
 void test_text_layout(void);
 void test_text_layout_window(void);
 void test_text_layout_span(void);
+void test_charset_cut(void);
 void test_ease_lut_reproducible(void);
 void test_ease_endpoints(void);
 void test_tween_endpoints(void);

@@ -9,7 +9,9 @@
 #   full  a copy the card can't take shows an error dialog and logs how much
 #         of it was written; its record stays, and a launch tries the copy
 #         again first, asking before it loses the save (the cut-short file
-#         stays until then: crash-safe saves are v0.5)
+#         stays until then: crash-safe saves are v0.5); B keeps it waiting,
+#         A launches another game, and the next power-on copies that game's
+#         save to its own file, not the lost one's
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and building tests/roms/savetest.
 set -euo pipefail
@@ -152,6 +154,49 @@ full)
   ! grep -q "kernel: launch: loading" "$cart/run.log" || fail "B on the question still launched"
   [ "$(pending)" = 0011 ] || fail "B on the question cleared the pending-save record"
   mtype -i "$cart/sd.img" ::/SAVER/Test.sav | cmp -s - "$cart/short.sav" || fail "Test.sav changed though B kept it"
+
+  # A on the same question, on a copy of this cart, launching another game:
+  # Other.gba (tests/roms/hello, its save on the card already, so launching
+  # it needs no new room). Filler.gba goes, Other.gba and its save come, and
+  # a smaller filler leaves 16 KB free: the copy still can't fit.
+  main=$cart
+  cart=$main-anyway
+  rm -rf "$cart"
+  cp -r "$main" "$cart"
+  : >"$cart/kernel.log"
+  mdel -i "$cart/sd.img" ::/Filler.gba
+  mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/Other.gba
+  head -c 65536 /dev/zero | tr '\0' '\377' >"$cart/other.sav"
+  mcopy -i "$cart/sd.img" "$cart/other.sav" ::/SAVER/Other.sav
+  free=$(mdir -i "$cart/sd.img" ::/ | sed -n 's/^ *\([0-9 ]*\) bytes free.*/\1/p' | tr -d ' ')
+  head -c $((free - 16384)) /dev/urandom >"$cart/filler.bin"
+  mcopy -i "$cart/sd.img" "$cart/filler.bin" ::/Filler.gba
+  # Power-on 5a: B on the power-on copy's error, then CLEAN BOOT of
+  # Other.gba (rows: SAVER, Filler.gba, Other.gba, Test.gba); the copy fails
+  # again, and A on the question launches it: the record goes first.
+  boot -k 100:A -k 106:- -w "error 3: Can't write the save" -k @30:B -k @34:- \
+    -w "screen ready: sd-list" -k @10:DOWN -k @14:- -k @22:DOWN -k @26:- -k @34:A -k @38:- \
+    -w "screen ready: file-menu" -k @10:A -k @14:- \
+    -w "still waits to be copied" -w "screen ready: dialog" -k @30:A -k @34:- \
+    -w "launch: starting the game"
+  logged "save: Test.sav isn't on the card: A, launch anyway, it is lost"
+  grep -A20 "isn't on the card: A, launch anyway" "$cart/run.log" | grep -q "kernel: nor: wrote an empty pending-save record" ||
+    fail "A on the question didn't clear the pending-save record"
+  logged "launch: loading Other.gba, CLEAN BOOT"
+  logged "launch: starting the game"
+  mtype -i "$cart/sd.img" ::/SAVER/Test.sav >"$cart/lost.sav"
+  # Power-on 6a: the record now names Other.gba: A at "Save sav?" copies
+  # cart SRAM to Other.sav, and Test.sav stays as it was (before v0.3.2 the
+  # record still named Test.sav, which got the other game's save).
+  boot -k 100:A -k 106:- -w "screen ready: sd-list"
+  logged 'save: "Save sav?" for /SAVER/Other.sav'
+  logged "save: wrote Other.sav, "
+  ! grep -q '"Save sav?" for /SAVER/Test.sav' "$cart/run.log" || fail "the record still named Test.sav"
+  mtype -i "$cart/sd.img" ::/SAVER/Test.sav | cmp -s - "$cart/lost.sav" || fail "Test.sav changed after A launched another game"
+  [ "$(pending)" = 0000 ] || fail "the pending-save record is still set after Other.sav's copy"
+  mtype -i "$cart/sd.img" ::/Filler.gba | cmp -s - "$cart/filler.bin" || fail "the other file changed"
+  fsck.fat -n "$cart/sd.img" >/dev/null || fail "fsck.fat found errors after launching anyway"
+  cart=$main
 
   # Power-on 6: the copy fails again; L+START deletes Filler.gba in the
   # menu, which makes room (the cursor lands on Test.gba), and CLEAN BOOT

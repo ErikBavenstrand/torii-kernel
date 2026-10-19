@@ -104,11 +104,13 @@ boot() {
 }
 
 # keys FRAME KEY... -> mgba-shot press/release pairs, one key every 8 frames.
+# A key _ is a pause: A on a menu or question still opening does nothing,
+# so an A right after the key that opened one waits a slot.
 keys() {
   local frame=$1
   shift
   for key in "$@"; do
-    printf -- '-k %d:%s -k %d:- ' "$frame" "$key" $((frame + 4))
+    [ "$key" = _ ] || printf -- '-k %d:%s -k %d:- ' "$frame" "$key" $((frame + 4))
     frame=$((frame + 8))
   done
 }
@@ -350,7 +352,7 @@ echo "PASS: a NOR list that fills the game NOR leaves interrupts on"
 new_cart recent A.gba
 write 1
 # shellcheck disable=SC2046
-boot $(keys 100 R A A) -f 400
+boot $(keys 100 R A _ A) -f 400
 grep -q 'mode game from NOR offset 000000$' "$cart/$runs.log" || fail "A.gba didn't start from NOR"
 recent=$(mtype -i "$cart/sd.img" "::/SAVER/Recently play.txt" 2>/dev/null || true)
 [ "$recent" = "NOR:A.gba" ] || fail "Recently Played has '$recent', expected NOR:A.gba"

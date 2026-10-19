@@ -1,0 +1,9 @@
+# A quick double A on Hello.gba: the first opens its game menu, the second
+# comes while the menu is still opening and does nothing (it picked CLEAN
+# BOOT and launched the game before v0.3.2). The menu stays open, on its
+# first line, and nothing launches.
+-w "screen ready: sd-list"
+-k @8:DOWN -k @12:- -k @16:DOWN -k @20:- -k @24:DOWN -k @28:- -k @32:DOWN -k @36:-
+-k @44:A -k @46:- -k @48:A -k @50:-
+-w "screen ready: file-menu"
+-s @30:screen.png

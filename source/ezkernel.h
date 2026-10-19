@@ -103,7 +103,8 @@ u8 Game_launch(struct game_pick *g, u32 menu_line, u32 key_L);
 // up, as for Game_launch.
 void NOR_launch(u32 index, u32 key_L);
 // The first NOR game's save: 0 looks for its file (0x10 there, 0 not), 1
-// loads it into SRAM (0, or 3 if missing), 2 writes SRAM to it (0); 2 for
-// a SAVER folder error.
+// loads it into SRAM (0, 3 if missing, or 4 if the user kept a save still
+// waiting to be copied), 2 writes SRAM to it (0, or 3 if it couldn't be
+// written whole); 2 for a SAVER folder error.
 u8 FRAM_save_op(u8 OP);
 #endif
