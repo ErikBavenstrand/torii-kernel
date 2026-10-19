@@ -23,7 +23,7 @@ git log, not here.
   early, over the old lines or a blank page), and a page's fade or scroll
   ends before a step's work stops the frames, so the save memory page
   (renamed from "save chip and cart RAM", which was cut off) shows what it
-  reads and the timings page no half-scrolled row (`93c3ba4`).
+  reads and the timings page no half-scrolled row (`93c3ba4`, `aa42e9c`).
 - **Fixed:** a Recently Played entry whose file is gone stayed on the list
   after "Can't open the file", to fail again; it now comes off (not on a
   card error, which may pass) (`217f418`).
