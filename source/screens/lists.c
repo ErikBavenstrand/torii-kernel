@@ -1042,7 +1042,7 @@ static void recent_restore(void)
 // back if it didn't start
 static void launch(u32 line, u32 key_l)
 {
-	u32 at = lists.from_recent ? 0 : cursor();
+	u32 at = lists.from_recent ? lists.sd_cursor : cursor();
 	engine_leave();
 	u8 res = Game_launch(&lists.game, line, key_l);
 	recent_restore();  // the list's folder, whatever the launch did
@@ -1060,7 +1060,7 @@ static void open_game(void)
 	if (!Game_pick(&lists.game)) {  // can't boot
 		if (lists.from_recent) {
 			recent_restore();
-			show_sd(0, UI_TR_DEEPER, -1);
+			show_sd(lists.sd_cursor, UI_TR_DEEPER, -1);
 		}
 		return;
 	}
@@ -1086,7 +1086,7 @@ static void recent_open(u32 row)
 		}
 		engine_leave();
 		NOR_launch(game, 0);  // returns only if it failed
-		show_sd(0, UI_TR_LEAVE, 0);
+		show_sd(lists.sd_cursor, UI_TR_LEAVE, 0);
 		return;
 	}
 	const char *slash = strrchr(entry, '/');  // Recently_play_load kept only paths
@@ -1158,6 +1158,9 @@ static void nor_menu_a(u32 line, u32 key_l)
 			ui_pop();
 		lists.menu = 0;
 		res = FRAM_save_op(1);
+		// A key pressed while its dialogs closed went to the list under
+		// them (A would open the NOR menu): nothing was asked for
+		lists.act = ACT_NONE;
 		if (res == 2)
 			error_dialog(2, AFTER_NOR);
 		else if (res == 4)  // the waiting save was kept: SRAM untouched
@@ -1214,8 +1217,8 @@ static void dialog_answer(int yes)
 				dialog(gl_save_saved, 0, AFTER_NOR);
 		}
 		break;
-	case AFTER_SD:  // from Recently Played
-		show_sd(0, UI_TR_DEEPER, -1);
+	case AFTER_SD:  // from Recently Played: the cursor where it was
+		show_sd(lists.sd_cursor, UI_TR_DEEPER, -1);
 		break;
 	case AFTER_NOR:
 		show_nor(lists.nor_game, UI_TR_FADE, 0);
@@ -1296,7 +1299,7 @@ static void do_action(void)
 			cheat_menu_forget();
 			if (lists.from_recent) {
 				recent_restore();
-				show_sd(0, UI_TR_DEEPER, -1);
+				show_sd(lists.sd_cursor, UI_TR_DEEPER, -1);
 				break;
 			}
 			f_chdir(currentpath);  // back to the list's folder
