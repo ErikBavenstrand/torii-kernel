@@ -19,7 +19,10 @@ git log, not here.
   (`046cfdf`).
 - **Fixed:** two presses of one key while a screen goes out are two moves on
   the next screen, not one, and keys queued for the next screen are no
-  longer dropped while DIM is on: they wake it (`bf7f65d`).
+  longer dropped while DIM is on: they wake it (`bf7f65d`). Only the d-pad,
+  L and R count twice, so a double A can't act on a screen not seen yet, and
+  a second press the screen left before using is dropped rather than moving
+  the screen after it (`5cb9525`, `e7d2d4f`).
 - **Known issue:** a cart whose kernel NOR is a uniform-sector S29GL064A
   (NOR ID `0x220C`; Diagnostics shows it as "kernel NOR id") can't take a
   kernel update: EZ-Flash's loader stops with "Bad NOR ID" when R is held,
