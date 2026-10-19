@@ -516,7 +516,8 @@ void ui_list_page_label(u8 node, u8 label, const char *text)
 int ui_list_still(u8 node)
 {
 	const struct list_state *st = ui_node_state(node);
-	return st->page == PAGE_NONE && !motion_running(st->motion) && st->shown == st->target && !st->dirty;
+	return st->page == PAGE_NONE && !motion_running(st->motion) && st->shown == st->target &&
+	       !(st->dirty & ~st->fresh);
 }
 
 void ui_list_scroll_info(u8 node, u32 *content, u32 *view, u32 *scroll)
