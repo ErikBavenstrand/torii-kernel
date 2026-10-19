@@ -67,6 +67,7 @@ sd-scroll/frames 117-117 BBB13CC78FDCE317
 sd-scroll/frames 118-119 423F88E293FBA7C7
 settings-light/help 488DC004C5AB9F15
 settings-light/screen B8FD8F3C82589B02
+settings1/back 0F70E61FC6E0F4AD
 settings1/screen 0CA5C0696DB712FC
 settings2/screen D4570EB73F11A255
 ui-dialog/closed FC5A408D22114FA5

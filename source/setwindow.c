@@ -214,7 +214,11 @@ u32 Settings_run(u32 page)
 	back_to_mode3();
 	// The engine reads the keys its own way: catch libgba's state up, so the
 	// menu doesn't take the key that left (L, held) for a new press
+	// (keysDown and keysUp report what changed since they were last called)
 	scanKeys();
+	(void)keysDown();
+	(void)keysUp();
+	(void)keysDownRepeat();
 	return settings_result;
 }
 
