@@ -6,6 +6,24 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** a Recently Played NOR game no longer on the game NOR stayed on
+  the list; opening it now drops it with the error, and NOR DELETE and
+  FORMAT ALL take the games they remove off the list (`5ae634f`).
+- **Fixed:** BOOT WITH ADDON and WRITE TO NOR ADDON took an erased switch
+  slot's 0xFFFF as its value: the log said "savestate 65535", and a NOR game
+  written so made a save state file at every launch. An erased slot is off,
+  as SETTINGS shows it (`d9d75ef`).
+- **Fixed:** the slow boot's "Loading..." notice cut in, after a frame of
+  the background, and cut out; it now fades in from black and out again.
+  A new engine session's first frame no longer shows its background before
+  its fade from black, at the fast boot too (`52c691e`).
+- **Fixed:** Diagnostics took about 80 frames to react to A, making the log
+  file first; the file is now made while step 1 shows. Each page's title
+  and lines now change in the same frame (the title came about 40 frames
+  early, over the old lines or a blank page), and a page's fade or scroll
+  ends before a step's work stops the frames, so the save memory page
+  (renamed from "save chip and cart RAM", which was cut off) shows what it
+  reads and the timings page no half-scrolled row (`93c3ba4`).
 - **Fixed:** a Recently Played entry whose file is gone stayed on the list
   after "Can't open the file", to fail again; it now comes off (not on a
   card error, which may pass) (`217f418`).
