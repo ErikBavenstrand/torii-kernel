@@ -16,6 +16,12 @@ git log, not here.
   swaps, with palette fades and layout patches for theme files to come.
   A DIM setting (slot 27, off by default) darkens the screen after idle
   minutes; nothing new writes kernel NOR (`40c91a0`, `2b8037a`, `a38043a`).
+- **Changed:** the v0.3 UI is smoother. A page change or wrap draws its rows
+  in one hidden frame and fades the list in; lists scroll 32 px a frame, held
+  L/R pages every 4 frames, and a cut name slides in and out at both edges at
+  a pixel a frame. Keys pressed during a page change are no longer dropped.
+  Rows draw faster, caps rise to 48 nodes and a 1 KB arena, and the scroll
+  and progress bars are restyled (`a02944f`, `8df0d4c`, `9992a54`).
 - **Changed:** motion checks a value's range before taking a slot and its
   spring settles in 64 bits; palette fades round symmetrically; releasing a
   direction restarts the repeat of one still held (`bec26d8`, `472a177`).
