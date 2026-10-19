@@ -19,9 +19,9 @@ static const struct {
 	{"diag-psram-slow", 25429},
 	{"diag-row38", 9525},
 	{"diag-scroll", 98337},
-	{"lists-menu-open", 204099},
-	{"lists-page", 171677},
-	{"lists-screen", 213816},
+	{"lists-menu-open", 204098},
+	{"lists-page", 171561},
+	{"lists-screen", 215346},
 	{"lists-scroll", 75050},
 	{"text-clear-row", 1662},
 	{"text-clear-row8-unaligned", 3535},
@@ -34,7 +34,7 @@ static const struct {
 	{"ui-list-scroll", 120423},
 	{"ui-page-change", 248813},
 	{"ui-screen-switch", 202849},
-	{"ui-transition", 245889},
+	{"ui-transition", 245892},
 	{"ui-wallpaper", 175663},
 };
 
