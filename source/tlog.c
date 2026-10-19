@@ -196,6 +196,11 @@ static char prev_last[TEXT_MAX + PREFIX_LEN + 1] EWRAM_BSS;
 // while SD mode is on return the SD buffer, so a source in ROM writes junk.)
 static u32 bounce[128] EWRAM_BSS;
 
+int tlog_card_failed(void)
+{
+	return sd_state == SD_FAILED;
+}
+
 static void log_path(char *path, u32 slot)
 {
 	snprintf(path, 32, "/torii/logs/torii-%lu.log", (unsigned long)(slot % LOG_FILES));
