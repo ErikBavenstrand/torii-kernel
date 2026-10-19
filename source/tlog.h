@@ -49,8 +49,10 @@ void tlog_debug(const char *format, ...) __attribute__((format(printf, 1, 2)));
 // every frame for the tests (frame-cycles), which would flood the card.
 void tlog_console(const char *format, ...) __attribute__((format(printf, 1, 2)));
 
-// The card is mounted: flushes may write to it from now on.
-void tlog_sd_ready(void);
+// The card is mounted: flushes may write to it from now on. With logging
+// on, it opens the log (making a new file takes about 80 frames), calling
+// between, if not NULL, after each step: the boot's notice comes up then.
+void tlog_sd_ready(void (*between)(void));
 // Writes the lines waiting in RAM to the card, after the frame-cycles
 // summary (cycles_summary). Call it only where the kernel's ROM is mapped and
 // no other code is in the middle of a FatFs call.

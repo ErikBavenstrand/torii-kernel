@@ -686,14 +686,18 @@ void tlog_open_now(void)
 	tlog_debug("log: opened at once");
 }
 
-void tlog_sd_ready(void)
+void tlog_sd_ready(void (*between)(void))
 {
 	if (sd_state == SD_NONE)
 		sd_state = SD_MOUNTED;
 	// Look for the current file now, so the boot report can see how the
 	// previous session ended. With logging off the card stays untouched.
-	if (tlog_level != TLOG_OFF)
-		sd_open();
+	if (tlog_level == TLOG_OFF || sd_state != SD_MOUNTED || opening.on)
+		return;
+	open_start();
+	while (opening.on && open_step())
+		if (between)
+			between();
 }
 
 void tlog_flush(void)
