@@ -75,7 +75,8 @@ static struct {
 	// A page's fade-in
 	u8 reveal;        // REVEAL_*
 	u8 reveal_plane;
-	u8 reveal_step;   // frames of it shown, of the theme's page_fade
+	u8 reveal_step;   // frames of it shown, of reveal_frames
+	u8 reveal_frames; // the theme's page_fade when it started
 	u32 reveal_frame; // the frame whose regs showed the plane
 	// Fades
 	MotionId fade;
@@ -285,7 +286,8 @@ int ui_plane_hidden_now(u32 plane)
 void ui_plane_reveal(u32 plane)
 {
 	ui_plane_hide(plane, 0);
-	ui.reveal = ui_theme()->page_fade > 1 ? REVEAL_ASKED : REVEAL_OFF;
+	ui.reveal_frames = ui_theme()->page_fade;
+	ui.reveal = ui.reveal_frames > 1 ? REVEAL_ASKED : REVEAL_OFF;
 	ui.reveal_plane = (u8)plane;
 	ui.reveal_step = 1;
 }
@@ -294,15 +296,16 @@ void ui_plane_reveal(u32 plane)
 // screen. Called after the commit.
 static void reveal_tick(u32 dt)
 {
+	if (ui.reveal == REVEAL_OFF)
+		return;
+	ui_wake();  // its last frame too: the regs drop the blend
 	if (ui.reveal == REVEAL_WRITTEN && frame_count() != ui.reveal_frame && !(gfx_dirty_regs & GFX_DIRTY_DISPCNT))
 		ui.reveal = REVEAL_RUN;  // shown in this VBlank at the first step
 	if (ui.reveal == REVEAL_RUN) {
 		ui.reveal_step = (u8)(ui.reveal_step + dt);
-		if (ui.reveal_step >= ui_theme()->page_fade)
+		if (ui.reveal_step >= ui.reveal_frames)
 			ui.reveal = REVEAL_OFF;
 	}
-	if (ui.reveal != REVEAL_OFF)
-		ui_wake();
 }
 
 int ui_draw_room(u32 cycles)
@@ -543,7 +546,7 @@ static void regs_update(void)
 		gfx_set_blend((u16)(BLEND_DARKEN | targets), 0, (u16)y);
 	} else if (ui.reveal != REVEAL_OFF) {
 		// The list's plane over everything behind it
-		u32 p = LAYER_BG(ui.reveal_plane), eva = 16u * ui.reveal_step / ui_theme()->page_fade;
+		u32 p = LAYER_BG(ui.reveal_plane), eva = 16u * ui.reveal_step / ui.reveal_frames;
 		gfx_set_blend((u16)(BLEND_ALPHA | p | ((LAYER_ALL | LAYER_BD) & ~p) << 8), (u16)(eva | (16 - eva) << 8),
 			      0);
 		if (ui.reveal == REVEAL_ASKED) {
