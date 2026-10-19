@@ -99,7 +99,7 @@ static void Get_KEY_val(FIL *file, char *KEY_section, char *KEY_secval, char get
 		}
 
 		char _paramk[MAX_KEY_LEN] = {0};
-		char key_value[/*MAX_VAL_LEN*/ MAX_KEY_LEN] = {0};
+		char key_value[MAX_KEY_LEN + 1] = {0};  // its NUL even at MAX_KEY_LEN bytes, for strcpy
 
 		int _kv = 0, _klen = 0, _vlen = 0;
 		int i = 0;
@@ -651,6 +651,7 @@ struct cheat_screen {
 	u8 b_down;        // B went down on this screen: its release leaves
 	char counter[24];
 	char row[MAX_KEY_LEN + 3];
+	char title[MAX_KEY_LEN + 1];  // the game's name (GameInfo)
 };
 
 static u32 cs_name_len(const FM_CHT_LINE *line)
@@ -846,7 +847,7 @@ static const struct ui_spec cs_nodes[CS_NODES] = {
 static const struct ui_view_spec cs_view = {"cheats", cs_nodes, CS_NODES, 11, CS_LIST, 0, cs_event};
 
 // Runs the screen until B is released; 0 if it couldn't be shown
-static int cs_run(struct cheat_screen *cs, const char *title)
+static int cs_run(struct cheat_screen *cs)
 {
 	struct ui_view *v = ui_push(&cs_view, cs);
 	if (!v) {
@@ -855,7 +856,7 @@ static int cs_run(struct cheat_screen *cs, const char *title)
 	}
 	cs->list = (u8)(v->first + CS_LIST);
 	cs->label = (u8)(v->first + CS_COUNT);
-	ui_label_set((u8)(v->first + CS_TITLE), title);
+	ui_label_set((u8)(v->first + CS_TITLE), cs->title);
 	cs_move(cs, 0, 1);
 	while (ui_depth()) {
 		ui_frame();
@@ -879,19 +880,19 @@ static void cs_leave_engine(void)
 	scanKeys();  // libgba's key state catches up with what the engine read
 }
 
-void Open_cht_file(TCHAR *gamefilename, u32 havecht)
+int Open_cht_file(TCHAR *gamefilename, u32 havecht)
 {
+	int shown = 0;
+	struct cheat_screen cs;
 	u32 res;
 	TCHAR chtnamebuf[100];
-
-	char title[127] = {0};
 
 	// As zeroed as they were in EWRAM of their own, before the first file
 	memset(buf, 0, 2 * MAX_BUF_LEN);
 	if (havecht == 0x0000FFFF) {
 		res = f_chdir("/CHEAT");
 		if (res != FR_OK) {
-			return;
+			return 0;
 		}
 		memcpy(chtnamebuf, gamefilename, 100);
 		u32 len = strlen(chtnamebuf);
@@ -909,13 +910,11 @@ void Open_cht_file(TCHAR *gamefilename, u32 havecht)
 
 	if (res == FR_OK)  //have a cht file
 	{
-		Get_KEY_val(&gfile, "GameInfo", "Name", title);
-		title[MAX_KEY_LEN] = 0;
+		memset(&cs, 0, sizeof(cs));
+		Get_KEY_val(&gfile, "GameInfo", "Name", cs.title);
 
 		u32 all_count = Get_all_Section_val(&gfile);
 		if (all_count) {
-			struct cheat_screen cs;
-			memset(&cs, 0, sizeof(cs));
 			cs.lines = (FM_CHT_LINE *)pCHTbuffer;
 			cs.count = Check_count(all_count);  //cut from "GameInfo"
 			for (u32 i = 0; i < cs.count; i++)
@@ -927,7 +926,8 @@ void Open_cht_file(TCHAR *gamefilename, u32 havecht)
 			cover_cache_invalidate();
 			engine_init();
 			ui_init(NULL);
-			cs_run(&cs, title);
+			cs_run(&cs);
+			shown = 1;  // the engine ran: mode 3 needs repainting either way
 			cs_leave_engine();
 
 			Analyze_KEYVAL(&gfile, cs.count);
@@ -938,4 +938,5 @@ void Open_cht_file(TCHAR *gamefilename, u32 havecht)
 		}
 	}
 	f_close(&gfile);
+	return shown;
 }

@@ -2765,10 +2765,10 @@ re_show_menu:
 					break;
 			} else if (MENU_line == 5) {
 				//open cht file
-				Open_cht_file(pfilename, havecht);
-				// It ran on the engine: the screen behind the menu comes back bare
-				DrawPic((u16 *)(play_re == 0xBB ? gImage_SD : gImage_RECENTLY), 0, 0, 240, 160, 0, 0,
-					1);
+				// It runs on the engine: the screen behind the menu comes back bare
+				if (Open_cht_file(pfilename, havecht))
+					DrawPic((u16 *)(play_re == 0xBB ? gImage_SD : gImage_RECENTLY), 0, 0, 240, 160,
+						0, 0, 1);
 				re_menu = 1;
 				MENU_line = 1;
 				goto re_show_menu;
