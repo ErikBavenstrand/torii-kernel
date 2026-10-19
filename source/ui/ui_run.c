@@ -1041,8 +1041,15 @@ void ui_shutdown(void)
 	gfx_set_blend(0, 0, 0);
 }
 
+u32 ui_push_fail_test EWRAM_BSS;
+
 struct ui_view *ui_push(const struct ui_view_spec *spec, void *ctx)
 {
+	if (ui_push_fail_test) {
+		ui_push_fail_test--;
+		ui_set_error("view %s: failed for a test (ui_push_fail_test)", spec->name);
+		return 0;
+	}
 	u32 d3;
 	u16 wall;
 	int wall_up = ui_wallpaper_bgcnt(&wall);

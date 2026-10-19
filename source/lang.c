@@ -72,6 +72,7 @@ char *gl_LSTART_help;
 char *gl_online_manual;
 
 char *gl_no_game_played;
+char *gl_list_failed;
 char *gl_nor_title;
 
 char *gl_cart_str;
@@ -188,6 +189,7 @@ const char en_LSTART_help[] = "Delete file";
 const char en_online_manual[] = "Online manual";
 
 const char en_no_game_played[] = "No game played yet";
+const char en_list_failed[] = "Can't show the list. It is tried again once this closes.";
 const char en_nor_title[] = "NOR";  // the NOR list's title bar
 
 const char en_cart[] = "     CART";
@@ -317,6 +319,7 @@ void LoadEnglish(void)
 	gl_online_manual = (char *)en_online_manual;
 
 	gl_no_game_played = (char *)en_no_game_played;
+	gl_list_failed = (char *)en_list_failed;
 
 	gl_cart_str = (char *)en_cart;
 	gl_clock_str = (char *)en_clock;

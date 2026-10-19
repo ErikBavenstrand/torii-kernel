@@ -18,7 +18,7 @@ from pathlib import Path
 
 from build_id import read_id
 
-KEEP = set("TtDdBbRr")
+KEEP = set("TtDdBbRrSs")  # S: EWRAM_BSS (.sbss), which tests poke by name
 
 
 def main() -> int:

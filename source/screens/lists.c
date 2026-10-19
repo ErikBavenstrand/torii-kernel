@@ -674,11 +674,18 @@ static void show(enum screen s, u32 at, u32 kind, s32 way)
 	lists.screen = (u8)s;
 	lists.menu = 0;
 	lists.queued_a = 0;
-	struct ui_view *v = ui_push(&list_views[s], &lists);
-	if (!v) {  // a layout over budget: nothing would take keys
+	// No room for the list (VRAM, a layout over budget) would leave the
+	// screen black in the transition's gap, with nothing to take keys: the
+	// error comes in from black, then the session starts over, freeing
+	// everything, and the list is tried again
+	struct ui_view *v;
+	for (u32 tries = 0; !(v = ui_push(&list_views[s], &lists)); tries++) {
 		tlog_error("lists: %s", ui_error());
-		TLOG_ASSERT(v);
-		return;
+		TLOG_ASSERT(tries == 0);  // a fresh session should have room
+		ui_enter(UI_TR_LEAVE, 0);
+		dialog_message(NULL, gl_list_failed, DIALOG_ERROR);
+		engine_leave();
+		engine_enter();
 	}
 	lists.list_first = v->first;
 	if (s == SCR_SD)
