@@ -69,6 +69,12 @@ diag-tests/back FC971D7CA6CEA1D0
 diag-tests/frames 0-2 D68A87FB42CF8D44
 diag-tests/frames 3-3 7DCF004DEAC7F9B0
 diag-tests/frames 4-12 FC971D7CA6CEA1D0
+diag-turn/save-memory 822FB5B6A28587AD
+diag-turn/timings B1690CFFEE58D4A5
+diag-turn/frames 0-2 856F3E86A7D2B3A5
+diag-turn/frames 3-3 FAAAAB8E0C9208DD
+diag-turn/frames 4-4 87607C8C6DF252C4
+diag-turn/frames 5-7 0A2982F33656B816
 dialog-clock/asked 5BE6D838D67CEE20
 dialog-clock/later 7ACC6D69BA6B2858
 dialog-double-a/closed A5FA458AE4ABEB70

@@ -1,0 +1,26 @@
+# Diagnostics' page changes: A on "start?" shows the first step at once
+# (v0.3.2: about 80 frames later, while the log file was made), and each
+# page's title comes in with its lines, in the same frame (it came about 40
+# frames before them), every frame hashed from A until the cart page is up
+# (its later lines show the build). The save memory page shows "reading the
+# 128 KB save chip twice..." while it reads (it showed the previous page's
+# lines, then a blank body), and the timings page holds no half-scrolled
+# row under its title. DIAGNOSE is the last row of SETTINGS page 2, as in
+# diag-start.
+-w "screen ready: sd-list"
+-k @8:R -k @12:-
+-w "screen ready: nor-list"
+-k @8:R -k @12:-
+-w "screen ready: settings1"
+-k @8:R -k @12:-
+-w "screen ready: settings2"
+-k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:DOWN -k @48:-
+-k @56:DOWN -k @60:- -k @68:DOWN -k @72:- -k @80:DOWN -k @84:- -k @92:DOWN -k @96:-
+-k @104:DOWN -k @108:- -k @116:A -k @120:-
+-w "screen ready: diag-start"
+-k @8:A -k @12:-
+-H @8:@15
+-w "diag: reading the 128 KB save chip twice"
+-s @20:save-memory.png
+-w "diag: PSRAM 4018"
+-s @1:timings.png

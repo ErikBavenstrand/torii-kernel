@@ -581,6 +581,13 @@ u32 ui_list_cursor(u8 node);
 // 1 while a page change hides or draws the list's page: a handler taking A
 // itself waits until it is up, as the list's own A does
 int ui_list_paging(u8 node);
+// Sets label's text (ui_label_set) in the frame the list's page change draws
+// its new page, so a title changes with the page: a label with
+// UI_LABEL_SWAP then flips in the same VBlank as the page shows. At once if
+// no page change is hiding the old page.
+void ui_list_page_label(u8 node, u8 label, const char *text);
+// 1 once no page change is under way and the scroll is at rest
+int ui_list_still(u8 node);
 // For a scroll bar: content and viewport height, and scroll, in px.
 void ui_list_scroll_info(u8 node, u32 *content, u32 *view, u32 *scroll);
 

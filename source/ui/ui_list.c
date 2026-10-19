@@ -84,6 +84,8 @@ struct list_state {
 	u32 auto_phase;   // towards its next move
 	u8 auto_move;     // set_cursor is making that move
 	u32 page_cursor;  // the cursor a page change's rows are drawn for
+	const char *page_text;  // ui_list_page_label's text, for label page_label
+	u8 page_label, page_labelled;  // page_labelled: one waits for the page
 	MotionId motion;
 	u16 slot_row[UI_RING_MAX_SLOTS];
 	u16 drawn_row[UI_RING_MAX_SLOTS];  // the row each slot's tiles hold
@@ -499,6 +501,24 @@ int ui_list_paging(u8 node)
 	return ((const struct list_state *)ui_node_state(node))->page != PAGE_NONE;
 }
 
+void ui_list_page_label(u8 node, u8 label, const char *text)
+{
+	struct list_state *st = ui_node_state(node);
+	if (st->page != PAGE_HIDING) {
+		ui_label_set(label, text);
+		return;
+	}
+	st->page_label = label;
+	st->page_text = text;
+	st->page_labelled = 1;
+}
+
+int ui_list_still(u8 node)
+{
+	const struct list_state *st = ui_node_state(node);
+	return st->page == PAGE_NONE && !motion_running(st->motion) && st->shown == st->target;
+}
+
 void ui_list_scroll_info(u8 node, u32 *content, u32 *view, u32 *scroll)
 {
 	const struct list_state *st = ui_node_state(node);
@@ -668,6 +688,12 @@ static void list_update(u8 node, u32 dt)
 		assign(node, st, 0);
 		st->page = PAGE_DRAW;
 		ui_dirty(node, 1);
+		// A label that changes with the page draws in this frame too: its
+		// tiles queue before the page shows (list_draw holds DISPCNT for them)
+		if (st->page_labelled) {
+			st->page_labelled = 0;
+			ui_label_set(st->page_label, st->page_text);
+		}
 	} else if (st->page == PAGE_NONE) {
 		autoscroll(node, st, dt);
 		if (st->glide_key)
