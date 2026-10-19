@@ -9,7 +9,8 @@
 // calls the dialog after ui_frame returns.
 //
 // - From an engine screen (ui_depth() > 0), the dialog is a modal view
-//   pushed on top, which slides in over the dimmed screen, and it is popped
+//   pushed on top: it fades in and slides up as the screen under it dims
+//   (theme dialog_in), and closes the same way backwards (dialog_out)
 //   before the call returns. The screen's loop goes on as before.
 // - From plain code (no view up), the call sets up the engine itself
 //   (engine_init, ui_init with the THEME and ACCENT settings) and, when
@@ -53,6 +54,12 @@ void dialog_open(void);
 // Ends what dialog_open started: after the last close, a session the
 // dialogs started shuts the engine down on a black screen.
 void dialog_close(void);
+
+// Ends a session the dialogs started (the boot's) without ending the engine:
+// the screen goes to black (ui_leave), every dialog goes, and the session
+// is the caller's from then on (the menu's), with the THEME, ACCENT and DIM
+// settings applied as a new session would. Nothing if no such session runs.
+void dialog_hand_over(void);
 
 // The screen between two engine sessions, after ui_shutdown: black (mode 0
 // with no layer on, a black backdrop), and the registers the engine writes

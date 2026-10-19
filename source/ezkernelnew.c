@@ -1121,8 +1121,7 @@ int main(void)
 	}
 	if (!ui_theme_boot())
 		Show_theme_error();
-	dialog_notice_end();
-	dialog_close();  // the lists start their own session
+	dialog_hand_over();  // the notice fades out; the lists run in this session
 
 	f_chdir("/");
 	//TCHAR currentpath[MAX_path_len];

@@ -54,5 +54,7 @@ u32 frame_count(void);
 // At this frame's frame_end, logs its busy cycles as "frame-cycles: NAME N"
 // (cycles_report). For the cycle budget test and Diagnostics.
 void frame_measure(const char *name);
+// 1 if frame_measure was called for this frame.
+int frame_measuring(void);
 
 #endif

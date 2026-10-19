@@ -217,6 +217,26 @@ void dialog_close(void)
 	tlog_debug("dialog: engine session over");
 }
 
+void dialog_hand_over(void)
+{
+	if (!dlg.owned || !dlg.opens)
+		return;
+	ui_leave(UI_TR_LEAVE, 0);  // the notice fades to black
+	while (ui_depth())
+		ui_pop();
+	memset(&dlg.message, 0, sizeof(dlg.message));
+	memset(&dlg.progress, 0, sizeof(dlg.progress));
+	memset(&dlg.notice, 0, sizeof(dlg.notice));
+	dlg.opens = 0;
+	dlg.owned = 0;
+	// What a new session would read: the SD theme may have loaded since
+	u16 accent;
+	const struct ui_theme *t = ui_theme_setting(&accent);
+	ui_theme_set(t, accent);
+	ui_dim_set_minutes(ui_dim_setting());
+	tlog_debug("dialog: engine session handed over");
+}
+
 void dialog_blank(void)
 {
 	VBlankIntrWait();
@@ -340,10 +360,11 @@ static void hide(struct shown *s)
 {
 	if (!s->view)
 		return;
-	// The top view is s (dialogs pop in the order they were pushed)
+	// The top view is s (dialogs pop in the order they were pushed). Over
+	// a screen it closes with motion first, keys meanwhile held for it
 	TLOG_ASSERT(ui_top() == s->view);
 	if (ui_top() == s->view)
-		ui_pop();
+		ui_close();
 	s->view = 0;
 	s->use = USE_NONE;
 	ui_frame();  // the view under it comes back

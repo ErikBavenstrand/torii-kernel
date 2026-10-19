@@ -1,0 +1,20 @@
+# Screen transitions up and down (theme transition deeper): A into the folder
+# Games and B back out, START to Recently Played and B back; every frame of
+# each hashed, PNGs halfway in.
+-w "screen ready: sd-list"
+-k @8:DOWN -k @12:- -k @16:A -k @20:-
+-H @16:@34
+-s @22:games-in.png
+-w "screen ready: sd-list"
+-k @8:B -k @12:-
+-H @8:@26
+-s @14:root-back.png
+-w "screen ready: sd-list"
+-k @8:START -k @12:-
+-H @8:@26
+-w "screen ready: recent"
+-s @1:recent.png
+-k @8:B -k @12:-
+-H @8:@26
+-w "screen ready: sd-list"
+-s @1:sd.png
