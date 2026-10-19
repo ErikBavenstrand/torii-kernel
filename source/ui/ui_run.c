@@ -749,7 +749,7 @@ void ui_close(void)
 	if (animated(v) && !ui_dispatching && ui_theme()->dialog_out) {
 		v->opening = -1;
 		ui.capture = 1;
-		for (u32 guard = 0; v->opening && guard < 4u * 60; guard++)
+		for (u32 guard = 0; ui_top() == v && ui_top()->opening && guard < 4u * 60; guard++)
 			ui_frame();
 		ui.capture = 0;
 	}
