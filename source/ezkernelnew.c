@@ -448,6 +448,8 @@ u32 Save_savefile(TCHAR *filename, u32 savesize)
 				}
 				SetRampage(0x10);
 				ReadSram(SRAMSaver, buf, 64 * 1024);
+				// The frames progress_part runs leave cart SRAM alone, so the
+				// page stays 0x10 through them (cartlog sets its own page)
 				for (i = 0; i < 64 * 1024 / 0x800 && total == 64 * 1024 + i * 0x800; i++) {
 					progress_part(total, expected);
 					save_write(&file, buf + 0x800 * i, 0x200 * 4, &total, &werr);
