@@ -316,10 +316,10 @@ index 1d0c0dd..b77704a 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..2e88cfc
+index 0000000..1f7713b
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1386 @@
+@@ -0,0 +1,1387 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -1306,8 +1306,9 @@ index 0000000..2e88cfc
 +	// The loaded ROM is the kernel upgrade file; install it as EZ-Flash's
 +	// loader does (hold R): at most 3 MB, each 64 KB sector it reaches erased
 +	// and programmed, and the sectors after it, like the kernel's data,
-+	// left as they were. memory.romSize can include padding, so use the
-+	// file's real size.
++	// left as they were. The last sector's bytes past the file read 0xFF
++	// here; the loader programs whatever its buffer held there on a PL064J.
++	// memory.romSize can include padding, so use the file's real size.
 +	size_t kernelSize = gba->pristineRomSize ? gba->pristineRomSize : gba->memory.romSize;
 +	if (kernelSize > LOADER_INSTALL_MAX) {
 +		mLOG(GBA_OMEGA, WARN, "Kernel image is over the loader's 3 MB; truncating");

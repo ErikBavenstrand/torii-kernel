@@ -6,6 +6,10 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** `ezkernelnew.bin` is 1.79 MB instead of 2.44 MB: it no longer
+  carries EZ-Flash's 16bpp menu pictures, which nothing draws since v0.3. The
+  FPGA firmware moved down to fill the gap (`source/image_layout.h`); the
+  firmware update writes the same bytes as before (`546fd17`).
 - **Removed:** HELP's "SELECT: Thumbnail toggle" line; the lists no longer
   show thumbnails (`3250448`).
 - **Fixed:** with an SD theme that has a wallpaper, the game menu no longer
