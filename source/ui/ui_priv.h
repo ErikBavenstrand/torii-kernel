@@ -71,7 +71,9 @@ int ui_plane_hidden_now(u32 plane);
 // a darken blend is on (a modal view's dim, DIM) or with page_fade 0.
 void ui_plane_reveal(u32 plane);
 // Keys a widget held back (A during a list's page change), dispatched with
-// the next frame's keys as if pressed then. A pop forgets them.
+// the next frame's keys as if pressed then. A pop forgets them. They count
+// as the user's: they wake the screen from DIM, so queue only keys just
+// pressed.
 void ui_queue_keys(u16 keys);
 
 // Cycles into the frame by which drawing that nobody sees yet (a page

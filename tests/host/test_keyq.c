@@ -37,14 +37,25 @@ void test_keyq_two_presses(void)
 
 	// Two keys, one pressed twice: both go first, the second press after.
 	keyq_clear(&q);
-	frame(&s, &q, INPUT_R, 1);
-	frame(&s, &q, INPUT_R | INPUT_A, 1);  // A, and R still held: R counts once
-	frame(&s, &q, 0, 1);
 	frame(&s, &q, INPUT_A, 1);
+	frame(&s, &q, INPUT_A | INPUT_R, 1);  // R, and A still held: A counts once
+	frame(&s, &q, 0, 1);
+	frame(&s, &q, INPUT_R, 1);
 	frame(&s, &q, 0, 1);
 	keyq_release(&q);
 	CHECK_EQ(frame(&s, &q, 0, 0), INPUT_R | INPUT_A);
-	CHECK_EQ(frame(&s, &q, 0, 0), INPUT_A);
+	CHECK_EQ(frame(&s, &q, 0, 0), INPUT_R);
+	CHECK_EQ(frame(&s, &q, 0, 0), 0);
+
+	// A, B and START count once, however often pressed: a second A would
+	// act on a screen not seen yet.
+	keyq_clear(&q);
+	for (u32 i = 0; i < 2; i++) {
+		frame(&s, &q, INPUT_A | INPUT_B | INPUT_START, 1);
+		frame(&s, &q, 0, 1);
+	}
+	keyq_release(&q);
+	CHECK_EQ(frame(&s, &q, 0, 0), INPUT_A | INPUT_B | INPUT_START);
 	CHECK_EQ(frame(&s, &q, 0, 0), 0);
 }
 

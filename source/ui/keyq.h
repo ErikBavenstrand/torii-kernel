@@ -3,12 +3,16 @@
 // with keys held back for a later frame. They wait as a count per key, up
 // to two: a second press of a key that already waits goes the frame after
 // the first, so two quick presses while a screen goes out are two moves,
-// not one. Repeats of a held key count once, as before. Hardware-free, so
-// tests/host runs it.
+// not one. Only keys that move count twice (the d-pad, L and R): a second
+// A, B or START would act on a screen the user hasn't seen yet (a double A
+// on a folder would open its first game). Repeats of a held key count once,
+// as before. Hardware-free, so tests/host runs it.
 #ifndef TORII_KEYQ_H
 #define TORII_KEYQ_H
 
 #include <gba_base.h>
+
+#define KEYQ_TWICE 0x3F0  // the d-pad, R and L (input.h's bits)
 
 struct keyq {
 	u16 held[2];    // fired while no view took keys: [1] those pressed again
@@ -17,7 +21,8 @@ struct keyq {
 
 void keyq_clear(struct keyq *q);
 // A frame in which no view takes keys: fire waits for the next view. A key
-// of pressed that already waits counts a second time.
+// of pressed that already waits counts a second time, if it is one of
+// KEYQ_TWICE.
 void keyq_hold(struct keyq *q, u16 fire, u16 pressed);
 // Keys for the view on top, next frame (ui_queue_keys); one already queued
 // goes again the frame after.

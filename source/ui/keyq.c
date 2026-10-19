@@ -17,7 +17,7 @@ void keyq_clear(struct keyq *q)
 void keyq_hold(struct keyq *q, u16 fire, u16 pressed)
 {
 	// Only a fresh press counts twice: a held key's repeats are one move
-	q->held[1] |= (u16)(q->held[0] & fire & pressed);
+	q->held[1] |= (u16)(q->held[0] & fire & pressed & KEYQ_TWICE);
 	q->held[0] |= fire;
 }
 
