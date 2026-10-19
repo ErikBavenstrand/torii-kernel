@@ -6,8 +6,11 @@
 # and slots from 65 (assress_max) on become 0 (the rest of an EWRAM buffer).
 # Runs inside the torii-emu container.
 set -euo pipefail
+# shellcheck source=tests/carts.sh
+. tests/carts.sh
+local_carts "dist/cart-settings${1:+-$1}"
 
-cart=dist/cart-settings
+cart=$carts/settings
 rm -rf "$cart"
 mkdir -p "$cart"
 mkfs.fat -C -F 32 -n SETTINGS "$cart/sd.img" 65536 >/dev/null

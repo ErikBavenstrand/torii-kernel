@@ -6,13 +6,16 @@
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and building tests/roms/hello.
 set -euo pipefail
+# shellcheck source=tests/carts.sh
+. tests/carts.sh
+local_carts "dist/cart-cheats${1:+-$1}"
 
 fail() {
   echo "FAIL: $*" >&2
   exit 1
 }
 
-cart=dist/cart-cheats
+cart=$carts/cheats
 shots=dist/shots/cheats
 rm -rf "$cart" "$shots"
 mkdir -p "$cart" "$shots"

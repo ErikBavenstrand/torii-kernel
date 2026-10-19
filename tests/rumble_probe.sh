@@ -6,13 +6,16 @@
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and `just test-roms`.
 set -euo pipefail
+# shellcheck source=tests/carts.sh
+. tests/carts.sh
+local_carts "dist/cart-rumble-probe${1:+-$1}"
 
 fail() {
   echo "FAIL: rumble probe: $*" >&2
   exit 1
 }
 
-cart=dist/cart-rumble-probe shots=dist/shots/rumble-probe
+cart=$carts/rumble-probe shots=dist/shots/rumble-probe
 rm -rf "$cart" "$shots"
 mkdir -p "$cart" "$shots"
 mkfs.fat -C -F 32 -n RUMBLE "$cart/sd.img" 65536 >/dev/null

@@ -5,8 +5,11 @@
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and building tests/roms/idle.
 set -euo pipefail
+# shellcheck source=tests/carts.sh
+. tests/carts.sh
+local_carts "dist/cart-hard-reset${1:+-$1}"
 
-cart=dist/cart-hard-reset
+cart=$carts/hard-reset
 rm -rf "$cart"
 mkdir -p "$cart"
 mkfs.fat -C -F 32 -n HARDRESET "$cart/sd.img" 65536 >/dev/null

@@ -6,6 +6,9 @@
 # Runs inside the torii-emu container after `just build`,
 # `just emu-headless` and building tests/roms/savetest.
 set -euo pipefail
+# shellcheck source=tests/carts.sh
+. tests/carts.sh
+local_carts "dist/cart-names${1:+-$1}"
 
 fail() {
   echo "FAIL: $*" >&2
@@ -29,7 +32,7 @@ hex_at() { # file offset -> 5 bytes as hex
 # fs  label  game-name-without-extension
 run_case() {
   local fs=$1 label=$2 name=$3
-  local cart=dist/cart-names-$fs-$label shots=dist/shots/names-$fs-$label log
+  local cart=$carts/names-$fs-$label shots=dist/shots/names-$fs-$label log
   rm -rf "$cart" "$shots"
   mkdir -p "$cart" "$shots"
   log=$cart/kernel.log

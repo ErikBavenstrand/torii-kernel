@@ -20,9 +20,12 @@
 set -uo pipefail
 
 kernel=${KERNEL:-dist/ezkernelnew.bin}
-root=dist/cart-loader-safety
-rm -rf "$root"
-mkdir -p "$root"
+# shellcheck source=tests/carts.sh
+. tests/carts.sh
+# An argument N/M runs every Mth case from the Nth (shard_init)
+shard_init "${1:-}"
+local_carts "dist/cart-loader-safety${1:+-${1/\//of}}"
+root=$carts
 failed=0
 
 # rom OUT SOURCE: SOURCE with its header complement fixed
@@ -183,165 +186,197 @@ EOF
 
 # shellcheck disable=SC2086 # the key sequences are lists of options
 {
-  new_cart migrate
-  older_list
-  boot -f 300
-  logged "nor: saving an older kernel's list of 1 games"
-  boot -f 200
-  pass "the boot that moves an older kernel's NOR list"
+  if shard_case; then
+    new_cart migrate
+    older_list
+    boot -f 300
+    logged "nor: saving an older kernel's list of 1 games"
+    boot -f 200
+    pass "the boot that moves an older kernel's NOR list"
+  fi
 
-  new_cart settings
-  boot $save_setting -f 460
-  logged "nor: wrote the settings"
-  pass "a settings save"
+  if shard_case; then
+    new_cart settings
+    boot $save_setting -f 460
+    logged "nor: wrote the settings"
+    pass "a settings save"
+  fi
 
-  new_cart settings-page2
-  boot $save_theme -f 540
-  logged "nor: wrote the settings"
-  logged "settings: THEME LIGHT"
-  [ "$(slot 28)" = 1 ] || bad "THEME wasn't saved: slot 28 holds $(slot 28)"
-  [ "$(slot 26)" = 2 ] || bad "the save lost LOGGING: slot 26 holds $(slot 26)"
-  [ "$(slot 27)" = 65535 ] || bad "DIM was written: slot 27 holds $(slot 27)"
-  [ "$(slot 29)" = 65535 ] || bad "ACCENT was written: slot 29 holds $(slot 29)"
-  boot -f 200
-  [ "$(slot 28)" = 1 ] || bad "THEME didn't survive a power-on: slot 28 holds $(slot 28)"
-  pass "a settings save on page 2 (THEME), kept after a power-on"
+  if shard_case; then
+    new_cart settings-page2
+    boot $save_theme -f 540
+    logged "nor: wrote the settings"
+    logged "settings: THEME LIGHT"
+    [ "$(slot 28)" = 1 ] || bad "THEME wasn't saved: slot 28 holds $(slot 28)"
+    [ "$(slot 26)" = 2 ] || bad "the save lost LOGGING: slot 26 holds $(slot 26)"
+    [ "$(slot 27)" = 65535 ] || bad "DIM was written: slot 27 holds $(slot 27)"
+    [ "$(slot 29)" = 65535 ] || bad "ACCENT was written: slot 29 holds $(slot 29)"
+    boot -f 200
+    [ "$(slot 28)" = 1 ] || bad "THEME didn't survive a power-on: slot 28 holds $(slot 28)"
+    pass "a settings save on page 2 (THEME), kept after a power-on"
+  fi
 
-  new_cart settings-accent
-  boot $save_accent -f 540
-  logged "nor: wrote the settings"
-  logged "settings: THEME DARK, ACCENT BLUE"
-  [ "$(slot 29)" = 1 ] || bad "ACCENT wasn't saved as Blue: slot 29 holds $(slot 29)"
-  [ "$(slot 28)" = 65535 ] || bad "THEME was written: slot 28 holds $(slot 28)"
-  [ "$(slot 27)" = 65535 ] || bad "DIM was written: slot 27 holds $(slot 27)"
-  pass "an ACCENT save on page 2 writes only its slot"
+  if shard_case; then
+    new_cart settings-accent
+    boot $save_accent -f 540
+    logged "nor: wrote the settings"
+    logged "settings: THEME DARK, ACCENT BLUE"
+    [ "$(slot 29)" = 1 ] || bad "ACCENT wasn't saved as Blue: slot 29 holds $(slot 29)"
+    [ "$(slot 28)" = 65535 ] || bad "THEME was written: slot 28 holds $(slot 28)"
+    [ "$(slot 27)" = 65535 ] || bad "DIM was written: slot 27 holds $(slot 27)"
+    pass "an ACCENT save on page 2 writes only its slot"
+  fi
 
   # Five saves on page 2 write the kernel NOR once, as SETTINGS closes
   # (v0.3.2: each save erased the sector); saves that change nothing, and
   # SETTINGS left without a save, don't write it
-  new_cart settings-once
-  boot $toggles5 -f 640
-  logged "nor: wrote the settings"
-  [ $ok = 0 ] || [ "$(grep -c 'nor: wrote the settings' "$log")" = 1 ] ||
-    bad "five saves wrote the settings $(grep -c 'nor: wrote the settings' "$log") times"
-  auto=$(slot 14)
-  [ "$auto" != 65535 ] || bad "AUTO SAVE wasn't saved: slot 14 holds $auto"
-  boot $toggles2 -f 520
-  logged "settings: staged"
-  [ $ok = 0 ] || ! grep -q 'nor: wrote the settings' "$log" || bad "two saves that change nothing wrote the settings"
-  [ "$(slot 14)" = "$auto" ] || bad "AUTO SAVE changed: slot 14 holds $(slot 14), not $auto"
-  boot $settings_out -f 420
-  logged "screen ready: settings2"
-  [ $ok = 0 ] || ! grep -q 'nor: wrote the settings' "$log" || bad "SETTINGS left without a save wrote the settings"
-  pass "SETTINGS writes the kernel NOR once as it closes, and only for a change"
+  if shard_case; then
+    new_cart settings-once
+    boot $toggles5 -f 640
+    logged "nor: wrote the settings"
+    [ $ok = 0 ] || [ "$(grep -c 'nor: wrote the settings' "$log")" = 1 ] ||
+      bad "five saves wrote the settings $(grep -c 'nor: wrote the settings' "$log") times"
+    auto=$(slot 14)
+    [ "$auto" != 65535 ] || bad "AUTO SAVE wasn't saved: slot 14 holds $auto"
+    boot $toggles2 -f 520
+    logged "settings: staged"
+    [ $ok = 0 ] || ! grep -q 'nor: wrote the settings' "$log" || bad "two saves that change nothing wrote the settings"
+    [ "$(slot 14)" = "$auto" ] || bad "AUTO SAVE changed: slot 14 holds $(slot 14), not $auto"
+    boot $settings_out -f 420
+    logged "screen ready: settings2"
+    [ $ok = 0 ] || ! grep -q 'nor: wrote the settings' "$log" || bad "SETTINGS left without a save wrote the settings"
+    pass "SETTINGS writes the kernel NOR once as it closes, and only for a change"
+  fi
 
-  new_cart pending-save
-  boot $launch -f 700
-  logged "launch: loading Test.gba"
-  logged "nor: wrote the pending-save record"
-  boot -k 200:A -k 204:- -f 500
-  logged "nor: wrote an empty pending-save record"
-  pass "the pending-save record, written and cleared"
+  if shard_case; then
+    new_cart pending-save
+    boot $launch -f 700
+    logged "launch: loading Test.gba"
+    logged "nor: wrote the pending-save record"
+    boot -k 200:A -k 204:- -f 500
+    logged "nor: wrote an empty pending-save record"
+    pass "the pending-save record, written and cleared"
+  fi
 
-  new_cart nor-write
-  boot $write_a -f 700
-  logged "nor: list saved, 1 games"
-  boot $write_b -f 700
-  logged "nor: list saved, 2 games"
-  pass "WRITE TO NOR"
+  if shard_case; then
+    new_cart nor-write
+    boot $write_a -f 700
+    logged "nor: list saved, 1 games"
+    boot $write_b -f 700
+    logged "nor: list saved, 2 games"
+    pass "WRITE TO NOR"
+  fi
 
-  new_cart nor-delete
-  boot $write_a -f 700
-  boot $write_b -f 700
-  boot $delete -f 500
-  logged "nor: deleting B.gba"
-  logged "nor: list saved, 1 games"
-  pass "delete latest"
+  if shard_case; then
+    new_cart nor-delete
+    boot $write_a -f 700
+    boot $write_b -f 700
+    boot $delete -f 500
+    logged "nor: deleting B.gba"
+    logged "nor: list saved, 1 games"
+    pass "delete latest"
+  fi
 
   # FORMAT ALL: the NOR list's first game, its menu's third row, and A on
   # the question
-  new_cart nor-format
-  boot $write_a -f 700
-  boot $format -f 900
-  logged "nor: erased the game NOR"
-  logged "nor: list saved, 0 games"
-  pass "FORMAT ALL"
+  if shard_case; then
+    new_cart nor-format
+    boot $write_a -f 700
+    boot $format -f 900
+    logged "nor: erased the game NOR"
+    logged "nor: list saved, 0 games"
+    pass "FORMAT ALL"
+  fi
 
   # FORMAT ALL answered with B: nothing is erased or written
-  new_cart nor-format-no
-  boot $write_a -f 700
-  boot $format_no -f 600
-  [ $ok = 0 ] || ! grep -q 'nor: erasing\|nor: list saved' "$log" || bad "B on FORMAT ALL's question wrote the NOR"
-  pass "FORMAT ALL answered no"
+  if shard_case; then
+    new_cart nor-format-no
+    boot $write_a -f 700
+    boot $format_no -f 600
+    [ $ok = 0 ] || ! grep -q 'nor: erasing\|nor: list saved' "$log" || bad "B on FORMAT ALL's question wrote the NOR"
+    pass "FORMAT ALL answered no"
+  fi
 
-  new_cart diagnostics
-  older_list
-  boot -f 300
-  boot $diag -f 4500
-  logged "diag: Diagnostics started"
-  logged "diag: unit tests: pass"
-  logged "diag: boot loader present: pass"
-  logged "not DE.BIN"
-  pass "Diagnostics"
+  if shard_case; then
+    new_cart diagnostics
+    older_list
+    boot -f 300
+    boot $diag -f 4500
+    logged "diag: Diagnostics started"
+    logged "diag: unit tests: pass"
+    logged "diag: boot loader present: pass"
+    logged "not DE.BIN"
+    pass "Diagnostics"
+  fi
 
-  new_cart diagnostics-rumble
-  OMEGA_TRACE=1 boot $diag_rumble -f 3700
-  logged "diag: rumble: yes"
-  logged "mode game from PSRAM"
-  # 60 pulses under the PSRAM page (and a last off), the kernel's page back
-  motor=$(grep -o '^omega [0-9]*: rumble .*' "$log" | cut -d' ' -f3- | sort | uniq -c | tr -s ' ' | paste -sd ,)
-  [ $ok = 0 ] || [ "$motor" = " 60 rumble off, 60 rumble on" ] || bad "the cart saw the motor as: $motor"
-  [ $ok = 0 ] || [ "$(grep -o 'omega [0-9]*: mode .*' "$log" | tail -1 | cut -d' ' -f3-)" = "mode kernel" ] ||
-    bad "the kernel's page wasn't put back"
-  pass "Diagnostics' rumble step"
+  if shard_case; then
+    new_cart diagnostics-rumble
+    OMEGA_TRACE=1 boot $diag_rumble -f 3700
+    logged "diag: rumble: yes"
+    logged "mode game from PSRAM"
+    # 60 pulses under the PSRAM page (and a last off), the kernel's page back
+    motor=$(grep -o '^omega [0-9]*: rumble .*' "$log" | cut -d' ' -f3- | sort | uniq -c | tr -s ' ' | paste -sd ,)
+    [ $ok = 0 ] || [ "$motor" = " 60 rumble off, 60 rumble on" ] || bad "the cart saw the motor as: $motor"
+    [ $ok = 0 ] || [ "$(grep -o 'omega [0-9]*: mode .*' "$log" | tail -1 | cut -d' ' -f3-)" = "mode kernel" ] ||
+      bad "the kernel's page wasn't put back"
+    pass "Diagnostics' rumble step"
+  fi
 
   # Diagnostics reads the loader and says when it's damaged, as v0.2.2 left
   # it: its first 8 KB sector erased.
-  new_cart diagnostics-damaged
-  head -c 8192 /dev/zero | tr '\0' '\377' | dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7C0000)) conv=notrunc status=none
-  seeded=$(loader)
-  boot $diag -f 4500
-  logged "diag: boot loader present: FAIL"
-  logged "kernel error: diag: the boot loader is DAMAGED"
-  pass "Diagnostics finds an erased loader"
+  if shard_case; then
+    new_cart diagnostics-damaged
+    head -c 8192 /dev/zero | tr '\0' '\377' | dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7C0000)) conv=notrunc status=none
+    seeded=$(loader)
+    boot $diag -f 4500
+    logged "diag: boot loader present: FAIL"
+    logged "kernel error: diag: the boot loader is DAMAGED"
+    pass "Diagnostics finds an erased loader"
+  fi
 
   # ... and as v0.2.2 really left it: erased, then the NOR list programmed
   # over its first 8 KB (the program hung past them)
-  new_cart diagnostics-overwritten
-  older_list
-  python3 - "$cart/kernel-nor.bin" <<'EOF'
+  if shard_case; then
+    new_cart diagnostics-overwritten
+    older_list
+    python3 - "$cart/kernel-nor.bin" <<'EOF'
 import sys
 k = bytearray(open(sys.argv[1], "rb").read())
 k[0x7C0000:0x7C2000] = k[0x7A0000:0x7A2000]
 open(sys.argv[1], "wb").write(k)
 EOF
-  seeded=$(loader)
-  boot $diag -f 4500
-  logged "diag: boot loader present: FAIL"
-  logged "kernel error: diag: the boot loader is OVERWRITTEN"
-  pass "Diagnostics finds a loader the NOR list overwrote"
+    seeded=$(loader)
+    boot $diag -f 4500
+    logged "diag: boot loader present: FAIL"
+    logged "kernel error: diag: the boot loader is OVERWRITTEN"
+    pass "Diagnostics finds a loader the NOR list overwrote"
+  fi
 
-  new_cart gl064
-  older_list
-  boot -g -f 300
-  logged "nor: saving an older kernel's list of 1 games"
-  boot -g $write_b -f 700
-  logged "nor: list saved, 2 games"
-  boot -g $save_setting -f 460
-  logged "nor: wrote the settings"
-  boot -g $launch -f 700
-  logged "nor: wrote the pending-save record"
-  pass "the same writes on the S29GL064A"
+  if shard_case; then
+    new_cart gl064
+    older_list
+    boot -g -f 300
+    logged "nor: saving an older kernel's list of 1 games"
+    boot -g $write_b -f 700
+    logged "nor: list saved, 2 games"
+    boot -g $save_setting -f 460
+    logged "nor: wrote the settings"
+    boot -g $launch -f 700
+    logged "nor: wrote the pending-save record"
+    pass "the same writes on the S29GL064A"
+  fi
 
   # The GL064A models whose loader is one 64 KB sector: top boot, uniform
   for chip in gl064top gl064uniform; do
-    new_cart "$chip"
-    older_list
-    KERNEL_NOR=$chip boot -f 300
-    logged "nor: saving an older kernel's list of 1 games"
-    KERNEL_NOR=$chip boot $write_b -f 700
-    logged "nor: list saved, 2 games"
-    pass "the boot's migration and WRITE TO NOR on the $chip"
+    if shard_case; then
+      new_cart "$chip"
+      older_list
+      KERNEL_NOR=$chip boot -f 300
+      logged "nor: saving an older kernel's list of 1 games"
+      KERNEL_NOR=$chip boot $write_b -f 700
+      logged "nor: list saved, 2 games"
+      pass "the boot's migration and WRITE TO NOR on the $chip"
+    fi
   done
 
   # Power cuts before each of the first erases and programs, and in the
@@ -349,31 +384,39 @@ EOF
   # writes in a WRITE TO NOR come from the list save; in a launch, from the
   # pending-save record; in the migration, from the list save.
   for cut in kernel:erase:1 kernel:erase:2 kernel:program:1 kernel:program:2000 kernel:program:4300 kernel:program:6400; do
-    new_cart "cut-write-${cut//:/-}"
-    boot $write_a -f 700
-    boot -c "$cut" $write_b -f 700
-    boot -f 300
-    boot $write_b -f 700
-    logged "nor: list saved"
-    pass "a power cut at $cut in WRITE TO NOR, and the boots after it"
+    if shard_case; then
+      new_cart "cut-write-${cut//:/-}"
+      boot $write_a -f 700
+      boot -c "$cut" $write_b -f 700
+      boot -f 300
+      boot $write_b -f 700
+      logged "nor: list saved"
+      pass "a power cut at $cut in WRITE TO NOR, and the boots after it"
+    fi
 
-    new_cart "cut-migrate-${cut//:/-}"
-    older_list
-    boot -c "$cut" -f 300
-    boot -f 300
-    logged "nor: list read from"
-    pass "a power cut at $cut in the list migration, and the boot after it"
+    if shard_case; then
+      new_cart "cut-migrate-${cut//:/-}"
+      older_list
+      boot -c "$cut" -f 300
+      boot -f 300
+      logged "nor: list read from"
+      pass "a power cut at $cut in the list migration, and the boot after it"
+    fi
   done
   for cut in kernel:erase:1 kernel:program:1 kernel:program:100; do
-    new_cart "cut-launch-${cut//:/-}"
-    boot -c "$cut" $launch -f 700
-    boot -k 200:A -k 204:- -f 500
-    pass "a power cut at $cut in the pending-save record, and the boot after it"
+    if shard_case; then
+      new_cart "cut-launch-${cut//:/-}"
+      boot -c "$cut" $launch -f 700
+      boot -k 200:A -k 204:- -f 500
+      pass "a power cut at $cut in the pending-save record, and the boot after it"
+    fi
 
-    new_cart "cut-settings-${cut//:/-}"
-    boot -c "$cut" $save_setting -f 460
-    boot -f 200
-    pass "a power cut at $cut in a settings save, and the boot after it"
+    if shard_case; then
+      new_cart "cut-settings-${cut//:/-}"
+      boot -c "$cut" $save_setting -f 460
+      boot -f 200
+      pass "a power cut at $cut in a settings save, and the boot after it"
+    fi
   done
 }
 

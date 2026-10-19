@@ -115,7 +115,11 @@ RULES = [
         {LINT, TEST_HOST, ANALYZE},
         "host tests, and cppcheck reads it",
     ),
-    (["tests/host/*", "tests/host.sh"], {LINT, TEST_HOST}, "host tests"),
+    (
+        ["tests/host/*", "tests/host.sh", "tools/hostcc.py"],
+        {LINT, TEST_HOST},
+        "host tests",
+    ),
     (
         ["tools/font.py", "tests/font_test.py", "assets/fonts/*"],
         {LINT, TEST_HOST},

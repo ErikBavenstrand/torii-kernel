@@ -7,8 +7,11 @@
 # game must go on, and loading the save-state buffer into cart SRAM must
 # leave the game's save alone. Runs inside the torii-emu container.
 set -euo pipefail
+# shellcheck source=tests/carts.sh
+. tests/carts.sh
+local_carts "dist/cart-menu${1:+-$1}"
 
-cart=dist/cart-menu
+cart=$carts/menu
 rm -rf "$cart"
 mkdir -p "$cart"
 mkfs.fat -C -F 32 -n MENU "$cart/sd.img" 65536 >/dev/null

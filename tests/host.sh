@@ -4,12 +4,8 @@
 # sanitizer report fails them. Runs inside the torii-emu container.
 set -euo pipefail
 
-mkdir -p dist/host
-# -funsigned-char: char is unsigned on ARM, signed on x86 hosts
-cc -std=gnu11 -g -O1 -fno-omit-frame-pointer -funsigned-char \
-  -fsanitize=address,undefined -fno-sanitize-recover=all \
-  -Wall -Wextra -Wshadow -Wundef -Wformat=2 -Wstrict-prototypes -Wmissing-prototypes -Werror \
-  -I tests/host -o dist/host/tests \
+# Each file compiles once, in parallel, and is cached (tools/hostcc.py)
+python3 tools/hostcc.py dist/host/tests \
   source/sort.c source/cheat.c source/charset.c source/irqpatch.c source/savename.c source/progress_calc.c source/logbuf.c source/lz77.c source/logcheck.c source/eepromprobe.c source/norlist.c source/bootloader.c source/crc32.c \
   source/engine/motion.c source/engine/ease_lut.c source/engine/input.c \
   source/engine/pool.c source/engine/res.c source/engine/budget.c \

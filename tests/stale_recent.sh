@@ -5,6 +5,9 @@
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and building tests/roms/hello.
 set -euo pipefail
+# shellcheck source=tests/carts.sh
+. tests/carts.sh
+local_carts "dist/cart-stale-recent${1:+-$1}"
 
 fail() {
   echo "FAIL: $*" >&2
@@ -15,7 +18,7 @@ fail() {
 run_case() {
   local name=$1
   shift
-  local cart=dist/cart-stale-$name shots=dist/shots/stale-$name log
+  local cart=$carts/stale-$name shots=dist/shots/stale-$name log
   rm -rf "$cart" "$shots"
   mkdir -p "$cart" "$shots"
   log=$cart/kernel.log
@@ -42,7 +45,7 @@ run_case Gone.gba -k 130:A -k 134:- -k 170:A -k 174:-
 
 # After the error the list must still open its own games: the entry's folder
 # exists here, and the kernel used to keep looking in it
-cart=dist/cart-stale-after
+cart=$carts/stale-after
 rm -rf "$cart" && mkdir -p "$cart"
 mkfs.fat -C -F 32 -n STALE "$cart/sd.img" 65536 >/dev/null
 mmd -i "$cart/sd.img" ::/SAVER ::/Games
@@ -65,7 +68,7 @@ echo "PASS: after the error, B goes back to Recently Played, and the list's own 
 
 # A file deleted from the SD list (L+START, A) comes off Recently Played;
 # the other entries stay
-cart=dist/cart-stale-delete
+cart=$carts/stale-delete
 rm -rf "$cart" && mkdir -p "$cart"
 mkfs.fat -C -F 32 -n STALE "$cart/sd.img" 65536 >/dev/null
 mmd -i "$cart/sd.img" ::/SAVER
@@ -84,7 +87,7 @@ echo "PASS: a file deleted from the SD list comes off Recently Played"
 
 # A Recently Played line longer than the kernel writes (an edited file) is
 # skipped: its folder would overrun the path buffer
-cart=dist/cart-stale-long
+cart=$carts/stale-long
 rm -rf "$cart" && mkdir -p "$cart"
 mkfs.fat -C -F 32 -n STALE "$cart/sd.img" 65536 >/dev/null
 mmd -i "$cart/sd.img" ::/SAVER
@@ -102,7 +105,7 @@ echo "PASS: an over-long Recently Played line is skipped"
 
 # A Recently Played NOR game that is no longer on the game NOR shows an
 # error and comes off the list (v0.3.2: it stayed)
-cart=dist/cart-stale-nor
+cart=$carts/stale-nor
 rm -rf "$cart" && mkdir -p "$cart"
 mkfs.fat -C -F 32 -n STALE "$cart/sd.img" 65536 >/dev/null
 mmd -i "$cart/sd.img" ::/SAVER
@@ -130,7 +133,7 @@ keys() {
 # switches' slots erased, then started from the NOR list: its launch logs
 # no save states and makes no state file (v0.3.2: "savestates 65535", and
 # it made one)
-cart=dist/cart-stale-nordel
+cart=$carts/stale-nordel
 rm -rf "$cart" && mkdir -p "$cart"
 mkfs.fat -C -F 32 -n STALE "$cart/sd.img" 65536 >/dev/null
 mmd -i "$cart/sd.img" ::/SAVER
@@ -159,7 +162,7 @@ recent=$(mtype -i "$cart/sd.img" "::/SAVER/Recently play.txt" | tr '\n' ' ')
 echo "PASS: a NOR game written with RESET alone starts with no save states"
 
 # For FORMAT ALL below: a copy of the cart, with another NOR game listed
-format=dist/cart-stale-norformat
+format=$carts/stale-norformat
 rm -rf "$format" && cp -r "$cart" "$format"
 printf 'NOR:Hello.gba\n/Other.gba\nNOR:Old.gba\n' >"$format/recent.txt"
 mcopy -o -i "$format/sd.img" "$format/recent.txt" "::/SAVER/Recently play.txt"

@@ -15,9 +15,12 @@
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and building tests/roms/savetest.
 set -euo pipefail
+# shellcheck source=tests/carts.sh
+. tests/carts.sh
+local_carts "dist/cart-saves${1:+-$1}"
 
 part=$1
-cart=dist/cart-saves-$part shots=dist/shots/saves-$part
+cart=$carts/saves-$part shots=dist/shots/saves-$part
 rm -rf "$cart" "$shots"
 mkdir -p "$cart" "$shots"
 

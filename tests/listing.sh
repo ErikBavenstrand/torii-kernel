@@ -6,6 +6,9 @@
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and building tests/roms/hello.
 set -euo pipefail
+# shellcheck source=tests/carts.sh
+. tests/carts.sh
+local_carts "dist/cart-listing${1:+-$1}"
 
 fail() {
   echo "FAIL: $*" >&2
@@ -28,7 +31,7 @@ long="A long name that goes on and on past the hundred bytes a list entry keeps 
 [ ${#long} -gt 100 ] || fail "the long name is only ${#long} bytes"
 
 # FAT32: attributes, and a long name that opens as its 8.3 name
-cart=dist/cart-listing-fat32
+cart=$carts/listing-fat32
 rm -rf "$cart" && mkdir -p "$cart"
 mkfs.fat -C -F 32 -n LISTING "$cart/sd.img" 65536 >/dev/null
 for name in Normal NoArchive ReadOnly Hidden System; do
@@ -57,7 +60,7 @@ echo "PASS: a name past 99 bytes opens, launches and saves on FAT32"
 
 # exFAT: a long name whose first 95 bytes match another file's whole name.
 # Opening or deleting the long one must touch only it.
-cart=dist/cart-listing-exfat
+cart=$carts/listing-exfat
 rm -rf "$cart" && mkdir -p "$cart"
 short=$(printf 'A%.0s' $(seq 95)).gba
 longer="${short%.gba} and a long tail.gba"
@@ -82,7 +85,7 @@ echo "PASS: a name past 99 bytes opens and deletes only itself on exFAT"
 
 # A name whose save name won't fit the pending-save record (over 251 bytes):
 # it lists, but launching says the name is too long and writes no save
-cart=dist/cart-listing-toolong
+cart=$carts/listing-toolong
 rm -rf "$cart" && mkdir -p "$cart"
 toolong=$(printf 'L%.0s' $(seq 249)).gba
 mkfs.fat -C -F 32 -n LISTING "$cart/sd.img" 65536 >/dev/null

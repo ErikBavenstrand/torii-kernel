@@ -6,6 +6,9 @@
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and `just test-roms`.
 set -euo pipefail
+# shellcheck source=tests/carts.sh
+. tests/carts.sh
+local_carts "dist/cart-eeprom-probe${1:+-$1}"
 
 fail() {
   echo "FAIL: eeprom probe $*" >&2
@@ -25,7 +28,7 @@ keys() {
 # type  save-type-menu-steps  width-key  width
 run_case() {
   local type=$1 rights=$2 key=$3 width=$4
-  local cart=dist/cart-eeprom-$type-$width shots=dist/shots/eeprom-$type-$width
+  local cart=$carts/eeprom-$type-$width shots=dist/shots/eeprom-$type-$width
   rm -rf "$cart" "$shots"
   mkdir -p "$cart" "$shots"
   mkfs.fat -C -F 32 -n EEPROM "$cart/sd.img" 65536 >/dev/null
