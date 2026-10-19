@@ -7,8 +7,11 @@
 # and closes (tests/hook_watch.lua). Runs inside the torii-emu container
 # after `just build`, `just emu-headless` and building tests/roms/hello.
 set -euo pipefail
+# shellcheck source=tests/carts.sh
+. tests/carts.sh
+local_carts "dist/cart-scan-engine${1:+-$1}"
 
-cart=dist/cart-scan
+cart=$carts/scan
 rm -rf "$cart"
 mkdir -p "$cart"
 mkfs.fat -C -F 32 -n SCAN "$cart/sd.img" 65536 >/dev/null

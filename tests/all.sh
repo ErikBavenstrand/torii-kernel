@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Run the test scripts in parallel, then print each one's output in order.
 # Exits 1 if any failed. Runs inside the torii-emu container (see `just test`).
+# The longest scripts run as shards (N/M: every Mth case from the Nth), so
+# none of them sets the wall time alone.
 set -uo pipefail
 
 jobs=(
@@ -34,8 +36,13 @@ jobs=(
   "tests/listing.sh"
   "tests/cheats.sh"
   "tests/nor.sh"
-  "tests/nor_safety.sh"
-  "tests/loader_safety.sh"
+  "tests/nor_safety.sh 1/3"
+  "tests/nor_safety.sh 2/3"
+  "tests/nor_safety.sh 3/3"
+  "tests/loader_safety.sh 1/4"
+  "tests/loader_safety.sh 2/4"
+  "tests/loader_safety.sh 3/4"
+  "tests/loader_safety.sh 4/4"
   "tests/fw_update.sh"
   "tests/logging.sh launch"
   "tests/logging.sh debug"

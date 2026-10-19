@@ -7,12 +7,15 @@
 # container after `just build`, `just emu-headless` and the test ROMs.
 set -euo pipefail
 
-cart=dist/cart-nor
 shots=dist/shots/nor
+# shellcheck source=tests/carts.sh
+. tests/carts.sh
+local_carts dist/cart-nor
+cart=$carts
 hello=tests/roms/hello/hello.gba
 world=$cart/World.gba
-rm -rf "$cart" "$shots"
-mkdir -p "$cart" "$shots"
+rm -rf "$shots"
+mkdir -p "$shots"
 # flash128 padded to 8.25 MB with words that encode their offset, so it
 # lands at 0x20000 and ends past 0x800000 with no two blocks alike.
 python3 - tests/roms/savetest/flash128.gba "$world" <<'EOF'

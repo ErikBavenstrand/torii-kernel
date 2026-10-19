@@ -5,8 +5,11 @@
 # 0x4018, source/waitcnt.h). Runs inside the torii-emu container after `just build`,
 # `just emu-headless` and building tests/roms/idle.
 set -euo pipefail
+# shellcheck source=tests/carts.sh
+. tests/carts.sh
+local_carts "dist/cart-clean-boot${1:+-$1}"
 
-cart=dist/cart-clean-boot
+cart=$carts/clean-boot
 rm -rf "$cart"
 mkdir -p "$cart"
 mkfs.fat -C -F 32 -n CLEANBOOT "$cart/sd.img" 65536 >/dev/null

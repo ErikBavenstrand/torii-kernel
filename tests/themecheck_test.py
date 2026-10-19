@@ -7,6 +7,7 @@ files ignoring case as FAT does, and `new` writes themes that load cleanly."""
 import shutil
 import struct
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -16,6 +17,10 @@ import theme_check
 
 CASES = Path("dist/host/themecheck-cases")
 failures = []
+# The checker's runs, in parallel: each takes about 0.5 s, nearly all of it
+# LeakSanitizer's check at exit. (name, want, status, the run's future)
+POOL = ThreadPoolExecutor(8)
+runs = []
 
 
 def check(name: str, files: dict[str, bytes | str], want: list[str], status: int):
@@ -25,7 +30,13 @@ def check(name: str, files: dict[str, bytes | str], want: list[str], status: int
     folder.mkdir(parents=True)
     for file, data in files.items():
         (folder / file).write_bytes(data.encode() if isinstance(data, str) else data)
-    result = theme_check.cli("check", str(folder))
+    runs.append(
+        (name, want, status, POOL.submit(theme_check.cli, "check", str(folder)))
+    )
+
+
+def finish(name: str, want: list[str], status: int, result) -> None:
+    """Compares a checker run's lines and exit status with check()'s want."""
     got = [x for x in result.stdout.splitlines() if not x.startswith("theme-check:")]
     if got != want or result.returncode != status or result.stderr:
         failures.append(
@@ -44,16 +55,11 @@ WALL = INI + "[wallpaper]\nfile = wall.tas\n"
 
 def main() -> int:
     theme_check.build()
-    selftest = theme_check.cli("selftest")
-    if selftest.returncode:
-        failures.append(f"selftest: {selftest.stdout.strip()}")
-
-    example = theme_check.cli("check", "themes/example")
-    if example.returncode or not example.stdout.startswith(
-        "kernel: theme: loaded example (Example, 0 warnings, a wallpaper)\n"
-    ):
-        failures.append(f"example: {example.stdout!r}")
-
+    selftest = POOL.submit(theme_check.cli, "selftest")
+    example = POOL.submit(theme_check.cli, "check", "themes/example")
+    news = {
+        b: POOL.submit(theme_check.cli, "new", f"New {b}", b) for b in ("dark", "light")
+    }
     check(
         "good",
         {"theme.ini": WALL, "wall.tas": wallpaper()},
@@ -151,13 +157,23 @@ def main() -> int:
     )
 
     for base in ("dark", "light"):
-        text = theme_check.cli("new", f"New {base}", base).stdout
+        text = news[base].result().stdout
         check(
             f"new-{base}",
             {"theme.ini": text},
             [f"kernel: theme: loaded new-{base} (New {base}, 0 warnings)"],
             0,
         )
+
+    if selftest.result().returncode:
+        failures.append(f"selftest: {selftest.result().stdout.strip()}")
+    example = example.result()
+    if example.returncode or not example.stdout.startswith(
+        "kernel: theme: loaded example (Example, 0 warnings, a wallpaper)\n"
+    ):
+        failures.append(f"example: {example.stdout!r}")
+    for name, want, status, run in runs:
+        finish(name, want, status, run.result())
 
     for f in failures:
         print(f"FAIL: themecheck: {f}")

@@ -11,9 +11,12 @@
 # inside the torii-emu container after `just build` and `just emu-headless`;
 # KERNEL picks another upgrade file.
 set -uo pipefail
+# shellcheck source=tests/carts.sh
+. tests/carts.sh
+local_carts "dist/cart-fw-update${1:+-$1}"
 
 kernel=${KERNEL:-dist/ezkernelnew.bin}
-root=dist/cart-fw-update
+root=$carts/fw-update
 rm -rf "$root"
 mkdir -p "$root"
 failed=0

@@ -23,6 +23,26 @@ The build and test tools are already fast. The slow part of the loop is the agen
 - The `torii` VM uses 4 of the Mac's 10 performance cores. `just compat` is CPU-bound:
   in a separate VM with 10 CPUs and no other sessions' load, it took 11 s instead of 20 s, and `--all` took 56 s instead of 110 s.
 
+## Update 2026-10-19: `just test` back to about 20 s
+
+By 2026-10-19 a warm `just test` took 174–194 s (`test-host` alone 18.5 s). Measured the same day, warm tree, `torii` VM with 8 CPUs,
+other sessions testing in the same VM (load 5–7): 193.5 s before the changes below, 19–26 s after (four runs), all 272 PASS lines kept.
+
+- **Carts off the virtiofs mount** (most of it). The emulator memory-maps the cart files and syncs them at the end of each power-on.
+  On `dist/` that costs about 0.5 s a power-on, mostly the 64 MB game NOR; on the container's own disk 0.03 s for the same 600 frames.
+  `tests/nor_safety.sh` (63 power-ons) went from 119 s to 6.2 s alone, `tests/loader_safety.sh` from 38 s to 8.8 s, `tests/nor.sh` from 48 s to 1.9 s.
+  The test scripts now call `local_carts` (`tests/carts.sh`), which puts their carts in the container's `/tmp` and copies them to the old `dist/cart-*` folder only when the script fails;
+  `tests/shots.py` keeps its carts there too. This corrects "mgba-shot runs no faster from tmpfs" under Compat below: it holds for long game runs, but each power-on still pays the sync.
+  `nor_safety.sh` also stopped writing a 64 MB 0xFF game NOR per case (1.3 s each through `tr`); the emulator fills a new or short file with 0xFF itself.
+- **Shards.** `tests/all.sh` runs `nor_safety.sh` as 3 jobs and `loader_safety.sh` as 4 (`N/M` argument: every Mth case from the Nth), 2–2.7 s each.
+- **Host tests.** `tools/hostcc.py` compiles each file to its own object in parallel, cached in `dist/host/obj` by a hash of its preprocessed text (not times, which virtiofs can show late).
+  The theme checker shares the objects. Its 19 runs in `tests/themecheck_test.py` took 0.55 s each, nearly all LeakSanitizer's check at exit; they now run 8 at a time.
+  `just test-host`: 18.5 s to 3.7 s warm.
+
+What remains: about 4 s of `test-host` and docker starts, then `tests/all.sh` (about 15 s), whose slowest jobs are `tests/shots.py` (7 s alone) and `saves.sh full` (5 s).
+The run is CPU-bound: run one after another, the jobs took about 75 s.
+`just compat` still keeps its carts in `dist/cart-games` and pays the 0.5 s sync at each power-on.
+
 ## Top five, ranked by time saved × frequency ÷ effort
 
 | # | Change | Saves | How often | Effort | Risk |
@@ -240,7 +260,7 @@ The analysis job (98 s) is advisory but adds to the wall clock. Job breakdown un
 | Fewer screenshots | 3 per game; PNG writes and checks are under 1 % |
 | Caching the compat baseline, incremental compat | every kernel change changes all games' inputs. Only a re-run with the same kernel, emulator, `tests/games*` and ROMs could be skipped: the tier policy (#1) avoids most of those without a cache |
 | Sharing the emulator build between worktrees | 23 s once per worktree |
-| Carts on tmpfs | up to 8 % of compat. Worth it later, mainly for the 16 GB of disk; deleting a passing game's cart does the same |
+| Carts on tmpfs | up to 8 % of compat (but see the 2026-10-19 update: each power-on also pays a 0.5 s sync on virtiofs). Worth it later, mainly for the 16 GB of disk; deleting a passing game's cart does the same |
 | Running `test-host` alongside `tests/all.sh` | saves 1.3 s |
 
 ## Found while measuring

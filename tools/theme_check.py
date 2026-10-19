@@ -36,10 +36,13 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 sys.path.insert(0, str(ROOT / "tests"))
 
+import hostcc
+
 STAGES = Path("dist/theme-check")
 CLI = Path("dist/host/themecheck")
-# Built as tests/host.sh builds the host tests: char unsigned as on ARM,
-# under the sanitizers, so a theme.ini that trips the parser fails loudly
+# Built as tests/host.sh builds the host tests (tools/hostcc.py): char
+# unsigned as on ARM, under the sanitizers, so a theme.ini that trips the
+# parser fails loudly
 CLI_SOURCES = [
     "tools/themecheck.c",
     "source/ui/ui_theme.c",
@@ -52,25 +55,6 @@ CLI_SOURCES = [
     "source/engine/covercache.c",
     "source/engine/motion.c",
     "source/engine/ease_lut.c",
-]
-CFLAGS = [
-    "-std=gnu11",
-    "-g",
-    "-O1",
-    "-fno-omit-frame-pointer",
-    "-funsigned-char",
-    "-fsanitize=address,undefined",
-    "-fno-sanitize-recover=all",
-    "-Wall",
-    "-Wextra",
-    "-Wshadow",
-    "-Wundef",
-    "-Wformat=2",
-    "-Wstrict-prototypes",
-    "-Wmissing-prototypes",
-    "-Werror",
-    "-I",
-    "tests/host",
 ]
 
 # The folder the previews put the theme in: the test kernel's UI demo loads
@@ -130,9 +114,7 @@ PREVIEWS = {
 
 
 def build() -> Path:
-    CLI.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run(["cc", *CFLAGS, "-o", str(CLI), *CLI_SOURCES], check=True)
-    return CLI
+    return hostcc.build(CLI, CLI_SOURCES)
 
 
 def cli(*args: str) -> subprocess.CompletedProcess:
