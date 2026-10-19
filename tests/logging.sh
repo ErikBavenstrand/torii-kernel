@@ -114,7 +114,7 @@ launch)
   card_ok
 
   settings 14=1 26=2 # AUTO SAVE on (no "Save sav?" after a launch), LOGGING Info
-  boot -f 260 # the auto save's progress dialog holds "Done" a moment
+  boot -f 260        # the auto save's progress dialog holds "Done" a moment
   [ "$(mdir -b -i "$cart/sd.img" ::/torii/logs)" = "::/torii/logs/torii-0.log" ] || fail "not one log file"
   [ "$(mtype -i "$cart/sd.img" ::/torii/logs/torii-0.log | wc -c)" = 65536 ] || fail "the log file isn't 64 KB"
   [ "$(log 0 | head -1)" = "torii log 00000001     " ] || fail "header: $(log 0 | head -1)"
