@@ -6,6 +6,18 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** reads into the shared read buffer used only what they read: a
+  short or failed read of a PATCH/ `.pat`, a SAVER/ `.mde` (a big one also
+  overran the buffer), `GameID2cht.bin`, a save loaded into cart SRAM or a
+  save state file used an earlier owner's bytes (`e1d6d5a`). The tests now
+  fill the buffer with 0xFF between the lists' actions, so such reads fail
+  there, not on a cart (`6bd0189`).
+- **Changed:** a held key on THEME steps through the names at once and loads
+  the SD theme it stops on when let go; it loaded every SD theme it passed,
+  a few frames each, and lagged behind the key (`83fd215`).
+- **Changed:** the log goes to the card as SETTINGS opens and before an SD
+  theme loads, so a hang there no longer takes the lines that led to it
+  (`ab9378c`).
 - **Fixed:** picking an SD theme in SETTINGS after WRITE TO NOR froze the
   cart: the theme's file reader lives in the shared read buffer, which held
   the game's last bytes, and its unset finish hook was called. The reader
