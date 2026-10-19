@@ -89,6 +89,8 @@ ui-list/frames 25-25 6A9B6CE25EC355A4
 ui-list/frames 26-26 8C184AE18FE846C8
 ui-list/frames 27-27 612E509D6F820FE8
 ui-list/frames 28-37 DE58D59634F90555
+ui-sd-theme/dialog ECCE2C086FE1B8B2
+ui-sd-theme/list 3AFD91980ED1A6F4
 ui-theme/awake B86991408B3904B0
 ui-theme/dimmed E196C5704AFDFB9A
 ui-theme/light 3A1CF983F03E5CBD
