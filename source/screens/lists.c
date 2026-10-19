@@ -12,9 +12,10 @@
 //
 // The list's names are in PSRAM (nameindex.h). Event handlers only record
 // what to do (lists.act); the loop does it between frames, where it may read
-// the card, pop and push views, or leave the engine for mode 3 code
-// (launches, NOR writes, SETTINGS, cheats). A launch fills PSRAM, so the
-// folder is listed again whenever the lists come back from mode 3.
+// the card, pop and push views, or leave the engine (launches and NOR writes,
+// whose dialogs run a session of their own, SETTINGS and cheats, which run
+// theirs). A launch fills PSRAM, so the folder is listed again whenever the
+// lists come back.
 #include <gba_input.h>
 #include <gba_video.h>
 #include <stdio.h>
@@ -24,7 +25,6 @@
 #include "lists.h"
 #include "../cartlog.h"
 #include "../diag.h"
-#include "../draw.h"
 #include "../ezkernel.h"
 #include "../lang.h"
 #include "../nameindex.h"
@@ -558,7 +558,9 @@ static void engine_enter(void)
 {
 	if (lists.engine)
 		return;
-	REG_DISPCNT = 0x80;  // forced blank: VRAM holds mode 3's picture until the first commit
+	// Black until the first commit (dialog_blank: mode 0, no layer on), not
+	// a forced blank, which shows white
+	dialog_blank();
 	engine_init();
 	ui_init(NULL);
 	if (!lists.icons_made)
@@ -566,12 +568,14 @@ static void engine_enter(void)
 	lists.engine = 1;
 }
 
-// Leaves the engine for mode 3 code: a black screen it draws on
+// Leaves the engine for code that runs a session of its own, or none: a
+// black screen meanwhile
 static void engine_leave(void)
 {
 	if (!lists.engine)
 		return;
-	menu_leave_engine();  // the shared exit (setwindow.c): black mode 3, key state caught up
+	ui_shutdown();
+	dialog_blank();
 	lists.engine = 0;
 }
 

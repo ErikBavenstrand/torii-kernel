@@ -234,8 +234,8 @@ static const char row38[] = "Super Mario Advance 4 - Mario Bros. 3!";
 
 void test_text_cycles(void)
 {
-	// Hidden tiles in VRAM: the sprite tiles from 0x06014000, unused by
-	// the mode 3 menu
+	// Hidden tiles in VRAM: the sprite tiles from 0x06014000, which no
+	// screen shows while the tests run
 	u32 *vram = (u32 *)0x06014000;
 	struct text_window win = {vram, 30, 2};
 	struct text_line line;

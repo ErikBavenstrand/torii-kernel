@@ -38,23 +38,7 @@ extern u16 gl_rts_on;
 extern u16 gl_sleep_on;
 extern u16 gl_cheat_on;
 
-/*
-extern u16 gl_color_selected;
-extern u16 gl_color_text;
-extern u16 gl_color_selectBG_sd;
-extern u16 gl_color_selectBG_nor;
-extern u16 gl_color_MENU_btn;
-extern u16 gl_color_cheat_count;
-extern u16 gl_color_cheat_black;
-extern u16 gl_color_NORFULL;
-extern u16 gl_color_btn_clean;
-*/
-
 void CheckLanguage(void);
-// Leaves the v0.3 engine for the mode 3 menu (setwindow.c): ui_shutdown, the
-// registers mode 3 needs, a black bitmap, and libgba's key state caught up
-// with the keys held, so the caller repaints and reads keys as before.
-void menu_leave_engine(void);
 void CheckSwitch(void);
 u32 Game_hardware(u32 is_EMU, const u8 *gamecode, u8 gb_cart_type);
 u32 Recently_play_add(const char *entry, u32 count);
@@ -83,7 +67,6 @@ u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU);
 
 void delay(u32 R0);
 u32 LoadRTSfile(TCHAR *filename);
-void ShowTime(u32 page_num, u32 page_mode);
 
 // The game the list or Recently Played picked (a copy in RAM: the list's
 // names are in PSRAM, which a launch fills). currentpath and
@@ -107,11 +90,13 @@ struct game_pick {
 // save type files; an emulated one goes straight to Game_launch's line 0.
 u32 Game_pick(struct game_pick *g);
 // Launches g from game menu line menu_line (0 CLEAN BOOT, 1 BOOT WITH ADDON,
-// 2 WRITE TO NOR CLEAN, 3 WRITE TO NOR ADDON), L held for a hard reset, in
-// mode 3. Returns only if it didn't start a game: 0 nothing written, 1 the
-// game NOR may have changed, 2 a game was written to the game NOR.
+// 2 WRITE TO NOR CLEAN, 3 WRITE TO NOR ADDON), L held for a hard reset,
+// with no engine session up (its dialogs run their own). Returns only if it
+// didn't start a game: 0 nothing written, 1 the game NOR may have changed,
+// 2 a game was written to the game NOR.
 u8 Game_launch(struct game_pick *g, u32 menu_line, u32 key_L);
-// Starts NOR list game index; returns only if it failed. Mode 3.
+// Starts NOR list game index; returns only if it failed. No engine session
+// up, as for Game_launch.
 void NOR_launch(u32 index, u32 key_L);
 // The first NOR game's save: 0 looks for its file (0x10 there, 0 not), 1
 // loads it into SRAM (0, or 3 if missing), 2 writes SRAM to it (0); 2 for

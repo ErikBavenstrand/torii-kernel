@@ -189,14 +189,6 @@ void settings_leave(u32 result)
 	ui_pop();
 }
 
-// See ezkernel.h. The restore is dialog_mode3's (source/ui/dialog.h), which
-// the dialogs and Diagnostics share.
-void menu_leave_engine(void)
-{
-	ui_shutdown();
-	dialog_mode3();
-}
-
 u32 Settings_run(u32 page)
 {
 	settings_result = SETTINGS_TO_NOR;
@@ -210,7 +202,8 @@ u32 Settings_run(u32 page)
 		if (p && p->poll)
 			p->poll();
 	}
-	menu_leave_engine();
+	ui_shutdown();
+	dialog_blank();
 	return settings_result;
 }
 

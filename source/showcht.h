@@ -24,7 +24,8 @@ typedef struct CHT_LINE {
 int Show_all_KEY_val(FIL *file);
 u32 Check_cht_file(TCHAR *gamefilename);
 u32 Check_cheat_file(TCHAR *gamefilename);
-// Runs the cheat screen; 1 if it showed (the caller repaints its mode 3 screen)
+// Runs the cheat screen in an engine session of its own, returning on a black
+// screen; 1 if it showed
 int Open_cht_file(TCHAR *gamefilename, u32 havecht);
 // The game menu's CHEAT row into out: name alone until the cheat screen has
 // been opened, then name(n), n the cheats picked there

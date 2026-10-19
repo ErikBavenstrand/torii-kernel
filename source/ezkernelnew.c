@@ -12,8 +12,8 @@
 
 #include "ez_define.h"
 #include "ff.h"
-#include "draw.h"
 #include "ui/dialog.h"
+#include "ui/ui.h"
 #include "ezkernel.h"
 #include "Ezcard_OP.h"
 #include "saveMODE.h"
@@ -40,9 +40,8 @@ FM_NOR_FS pNorFS[MAX_NOR] EWRAM_BSS;
 
 u32 FAT_table_buffer[FAT_table_size / 4] EWRAM_BSS;
 u8 pReadCache[MAX_pReadCache_size] EWRAM_BSS;  // a scratch buffer: its owners are in ez_define.h
-_Static_assert(READCACHE_SORT_WORK >= 0x1E0 && READCACHE_SORT_WORK % 4 == 0 &&
-		       READCACHE_SORT_WORK + SORT_WORK_SIZE <= 0x2000,
-	       "the sort's work buffer meets Clear()'s line or the cheat list");
+_Static_assert(READCACHE_SORT_WORK % 4 == 0 && READCACHE_SORT_WORK + SORT_WORK_SIZE <= 0x2000,
+	       "the sort's work buffer meets the cheat list");
 
 char p_recently_play[10][RECENT_LEN] EWRAM_BSS ALIGN(4);
 TCHAR currentpath[MAX_path_len];//
@@ -86,17 +85,6 @@ u16 gl_SD_R;
 u16 gl_SD_G;
 u16 gl_SD_B;
 
-//----------------------------------------
-/*u16 gl_color_selected 		= RGB(00,20,26);
-u16 gl_color_text 				= RGB(31,31,31);
-u16 gl_color_selectBG_sd 	= RGB(00,00,31);
-u16 gl_color_selectBG_nor = RGB(10,10,10);
-u16 gl_color_MENU_btn			= RGB(20,20,20);
-u16 gl_color_cheat_count  = RGB(00,31,00);
-u16 gl_color_cheat_black  = RGB(00,00,00);
-u16 gl_color_NORFULL      = RGB(31,00,00);
-u16 gl_color_btn_clean    = RGB(00,00,31);
-*/
 u16 SAV_info_buffer[0x200];//Torii: IWRAM, so EWRAM data fits in 256 KB
 // The pending-save record in the kernel's NOR: 0x11, the size in 512-byte
 // units, then the save's file name from halfword 2. Torii keeps the save
@@ -115,46 +103,23 @@ void delay(u32 R0)
 	return;
 }
 //---------------------------------------------------------------------------------
-void wait_btn()
+// Torii: the boot screen's notice, two lines (ui/dialog.h). Not inlined, so
+// its buffer stays off main's frame, which is on the deepest call chain.
+static void __attribute__((noinline)) Show_boot_notice(const char *line1, const char *line2, u32 kind)
 {
-	while (1) {
-		scanKeys();
-		u16 keys = keysUp();
-		if (keys & KEY_B) {
-			break;
-		}
-	}
-	//while(*(vu16*)0x04000130 == 0x3FF );
-	//while(*(vu16*)0x04000130 != 0x3FF );
+	char msg[160];
+	snprintf(msg, sizeof(msg), "%s\n%s", line1, line2);
+	dialog_notice(NULL, msg, kind);
 }
-//---------------------------------------------------------------------------------
-
 //---------------------------------------------------------------------------------
 // Torii: says on the boot screen why the SD theme the THEME setting picks
 // didn't load (ui/sdtheme.h), for two seconds; the menu then uses Dark
 static void Show_theme_error(void)
 {
-	const char *msg = ui_theme_error();
-	DrawHZText12(gl_theme_error, 0, 2, 46, gl_color_cheat_black, 1);
-	u32 y = 59;
-	while (*msg && y < 160 - 13) {
-		u32 n = strlen(msg);
-		if (n > 38) {
-			// Break at the last space that fits
-			n = 38;
-			while (n > 0 && msg[n] != ' ')
-				n--;
-			if (!n)
-				n = 38;
-		}
-		DrawHZText12((char *)msg, (u16)n, 2, (u16)y, gl_color_cheat_black, 1);
-		msg += n;
-		while (*msg == ' ')
-			msg++;
-		y += 13;
-	}
+	// In the text: the heading font can't fit gl_theme_error on the title line
+	Show_boot_notice(gl_theme_error, ui_theme_error(), DIALOG_ERROR);
 	for (u32 i = 0; i < 120; i++)
-		VBlankIntrWait();
+		ui_frame();
 }
 //---------------------------------------------------------------------------------
 // Reads Recently Played into p_recently_play; returns how many rows it holds.
@@ -771,37 +736,6 @@ void CheckSwitch(void)
 			 (gl_Breathing_B << 3) | (gl_SD_R << 2) | (gl_SD_G << 1) | (gl_SD_B);
 	Set_LED_control(led_status);
 }
-//---------------------------------------------------------------------------------
-void ShowTime(u32 page_num, u32 page_mode)
-{
-	u8 datetime[3];
-	char msgtime[50];
-	//get time
-	rtc_enable();
-	rtc_gettime(datetime);
-	rtc_disenable();
-	delay(5);
-
-	if (page_mode == 0x1)
-		ClearWithBG((u16 *)gImage_RECENTLY, 80, 3, 80, 13, 1);
-	else if (page_num == SD_list)
-		ClearWithBG((u16 *)gImage_SD, 120, 3, 50, 13, 1);
-	else if (page_num == NOR_list)
-		ClearWithBG((u16 *)gImage_NOR, 120, 3, 50, 13, 1);
-
-	u8 HH = UNBCD(datetime[0] & 0x3F);
-	u8 MM = UNBCD(datetime[1] & 0x7F);
-	u8 SS = UNBCD(datetime[2] & 0x7F);
-	if (HH > 23)
-		HH = 0;
-	if (MM > 59)
-		MM = 0;
-	if (SS > 59)
-		SS = 0;
-
-	sprintf(msgtime, "%02u:%02u:%02u", HH, MM, SS);
-	DrawHZText12(msgtime, 0, 120, 3, gl_color_text, 1);
-}
 //---------------------------------------------------------------
 u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU)
 {
@@ -1147,31 +1081,30 @@ int main(void)
 
 	gl_currentpage = 0x8002;//kernel mode
 
-	SetMode(MODE_3 | BG2_ENABLE);
+	dialog_blank();  // black until the boot's screens are up
 
 	SD_Disable();
 	Set_RTC_status(1);
 
 	//check FW
-	Check_FW_update();
+	Check_FW_update();  // its screens, if any, in an engine session of their own
 	REG_WAITCNT_CART = WAITCNT_MENU;
 	tlog_debug("boot: WAITCNT %04X for the menu", REG_WAITCNT_CART);
 
-	DrawPic((u16 *)gImage_splash, 0, 0, 240, 160, 0, 0, 1);
 	CheckLanguage();
 	CheckSwitch();
 
+	// The boot's screens (the card's state, the save question, a theme
+	// error) share one engine session, a notice under the dialogs
+	dialog_open();
 	res = f_mount(&EZcardFs, "", 1);
 	if (res != FR_OK) {
-		DrawHZText12(gl_init_error, 0, 2, 20, gl_color_cheat_black, 1);
-		DrawHZText12(gl_power_off, 0, 2, 33, gl_color_cheat_black, 1);
+		Show_boot_notice(gl_init_error, gl_power_off, DIALOG_ERROR);
 		while (1)
-			;
+			ui_frame();
 	} else {
-		DrawHZText12(gl_init_ok, 0, 2, 20, gl_color_cheat_black, 1);
-		DrawHZText12(gl_Loading, 0, 2, 33, gl_color_cheat_black, 1);
+		Show_boot_notice(gl_init_ok, gl_Loading, DIALOG_INFO);
 	}
-	VBlankIntrWait();
 
 	// Diagnostics also starts from these keys held at power-on, in case the
 	// menu itself is broken. Read once the card is up, a second into the boot.
@@ -1181,10 +1114,15 @@ int main(void)
 	tlog_sd_ready();
 	cartlog_boot_report();
 	tlog_flush();
-	if (diag_keys)
+	if (diag_keys) {
+		dialog_notice_end();
+		dialog_close();  // Diagnostics runs its own session (and never returns)
 		Diagnostics();
+	}
 	if (!ui_theme_boot())
 		Show_theme_error();
+	dialog_notice_end();
+	dialog_close();  // the lists start their own session
 
 	f_chdir("/");
 	//TCHAR currentpath[MAX_path_len];
@@ -1316,7 +1254,8 @@ u32 Game_pick(struct game_pick *g)
 }
 //---------------------------------------------------------------------------------
 // The launch itself, from the game menu's line MENU_line (0 CLEAN BOOT, 1
-// BOOT WITH ADDON, 2 WRITE TO NOR CLEAN, 3 WRITE TO NOR ADDON), in mode 3.
+// BOOT WITH ADDON, 2 WRITE TO NOR CLEAN, 3 WRITE TO NOR ADDON), with no
+// engine session up.
 static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8 old_Save_num, u32 key_L)
 {
 	u32 res;
@@ -1585,7 +1524,7 @@ u8 Game_launch(struct game_pick *g, u32 menu_line, u32 key_L)
 	// faster than the BIOS's wait states (waitcnt.h)
 	REG_WAITCNT_CART = WAITCNT_BIOS;
 	u8 res = Game_boot(g->name, g->is_emu, menu_line, g->save_num, g->old_save_num, key_L);
-	dialog_progress_end();  // the launch's, if it failed or wrote to NOR: back to mode 3
+	dialog_progress_end();  // the launch's, if it failed or wrote to NOR: a black screen
 	REG_WAITCNT_CART = WAITCNT_MENU;
 	cartlog_phase(PHASE_MENU, 0, NULL);
 	return res;
@@ -1595,7 +1534,7 @@ void NOR_launch(u32 index, u32 key_L)
 {
 	REG_WAITCNT_CART = WAITCNT_BIOS;  // as Game_launch
 	Boot_NOR_game(0, index, key_L);  // returns only if it failed
-	dialog_progress_end();  // back to mode 3
+	dialog_progress_end();  // a black screen
 	REG_WAITCNT_CART = WAITCNT_MENU;
 	cartlog_phase(PHASE_MENU, 0, NULL);
 }

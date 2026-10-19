@@ -5,7 +5,6 @@
 #include <gba_dma.h>
 
 #include "ez_define.h"
-#include "draw.h"
 #include "ui/dialog.h"
 #include "GBApatch.h"
 #include "gba_nes_patch.h"

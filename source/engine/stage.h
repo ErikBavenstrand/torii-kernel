@@ -8,10 +8,8 @@
 // jobs_run, never from an IRQ and never inside another owner's operation, so
 // the stage can overlap every other owner. One that wants to keep data in
 // pReadCache across frames that run jobs must stop the asset jobs first
-// (cover_shutdown). Today's mode 3 menu has such owners: Vcache, the back
-// buffer when not drawing direct, Clear()'s fill line, and the cheat
-// screen's list (pCHTbuffer). None runs jobs, but a screen mixing them with
-// engine jobs would lose them.
+// (cover_shutdown). The cheat screen's list (pCHTbuffer) is such an owner:
+// it calls cover_cache_invalidate first and starts no jobs.
 #ifndef TORII_ENGINE_STAGE_H
 #define TORII_ENGINE_STAGE_H
 
