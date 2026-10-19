@@ -297,6 +297,15 @@ static int step_slow(struct job *job)
 	return JOB_MORE;
 }
 
+// Counts a call, then has nothing to do until the next frame
+static int step_wait(struct job *job)
+{
+	if (job->state == JOB_CANCEL)
+		return JOB_DONE;
+	++*(u32 *)job->ctx;
+	return JOB_WAIT;
+}
+
 void test_engine_jobs(void)
 {
 	engine_quiet(1);
@@ -328,6 +337,15 @@ void test_engine_jobs(void)
 	u32 ran = jobs_run_from(cycles_now(), 10000);
 	CHECK(ran >= 4 && ran <= 6);
 	CHECK_EQ(slow, ran);
+
+	// JOB_WAIT: no more steps of that job this run, the others go on
+	u32 waits = 0;
+	u8 w = job_start(step_wait, &waits, 4);
+	ran = jobs_run_from(cycles_now(), 10000);
+	CHECK_EQ(waits, 1);
+	CHECK(ran >= 4 && ran <= 7);
+	CHECK(job_running(w));
+	job_cancel(w);
 
 	// Cancelling calls the step once with JOB_CANCEL
 	job_cancel(s);

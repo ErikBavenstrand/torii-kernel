@@ -11,6 +11,8 @@
 #include "logbuf.h"
 #include "tlog.h"
 #include "engine/cycles.h"
+#include "engine/jobs.h"
+#include "ui/ui.h"
 #include "version.h"
 
 // mGBA's debug registers: write 0xC0DE to enable (it then reads 0x1DEA),
@@ -241,15 +243,52 @@ static void sd_failed(const char *what, FRESULT res)
 // Free space a new log file must leave on the card, for saves and states.
 #define LOG_CARD_RESERVE 0x100000u
 
-// Makes log file slot full size and zero, then writes its header. A rotation
-// cut off by power loss leaves a file with no header, which counts as unused.
-// It fills bounce with zeros, so call it with nothing waiting there.
+// Opening the log: finding the current file and where its text ends, or
+// making a new one (full size and zero, then its header). sd_open does it
+// at once; tlog_flush_soon's job a sector at a time, so turning LOGGING on
+// in SETTINGS doesn't stop the menu for a second or more. The steps:
+// open_look makes the folders and reads the files' headers, an item a step;
+// open_pick then either opens the current file,
+// which scan_step reads a sector at a time and open_finish closes, or asks
+// for a new one, as open_finish may too (junk); start_begin, start_fill (a
+// sector of zeros) and start_end make it. A file made only in part, by a
+// rotation cut off by power loss or an open given up, has no header and
+// counts as unused.
+enum {
+	OPEN_LOOK,
+	OPEN_PICK,
+	OPEN_SCAN,
+	OPEN_BEGIN,
+	OPEN_FILL,
+	OPEN_END,
+};
+static struct {
+	log_end end;  // what scan_step found so far
+	u32 seq;  // the new file's
+	u32 offset;  // start_fill's
+	u32 gen;  // the newest job's ctx: an older one stops
+	u32 seqs[LOG_FILES];  // the files' sequence numbers, from open_look
+	u32 stepped;  // torii_frames at open_job's last step
+	u8 slot;  // the new file's
+	u8 state;  // the next step
+	u8 item;  // open_look's next
+	u8 fresh;  // a new file is wanted
+	u8 on;  // under way: it holds log_file and bounce, and flushes wait
+	u8 job;  // tlog_flush_soon's
+} opening EWRAM_BSS;
 
-static FRESULT start_file(u32 slot, u32 seq)
+static void open_new(u32 slot, u32 seq)
+{
+	opening.fresh = 1;
+	opening.slot = (u8)slot;
+	opening.seq = seq;
+}
+
+// Opens log file slot to make it full size and zero, and fills bounce with
+// zeros for start_fill: so call it with nothing waiting there.
+static FRESULT start_begin(u32 slot)
 {
 	char path[32];
-	char header[LOG_HEADER_LEN];
-	UINT done;
 	FRESULT res;
 
 	log_path(path, slot);
@@ -273,17 +312,33 @@ static FRESULT start_file(u32 slot, u32 seq)
 		}
 	}
 	memset(bounce, 0, sizeof(bounce));
-	for (u32 offset = 0; offset < LOG_FILE_SIZE; offset += sizeof(bounce)) {
-		res = f_write(&log_file, bounce, sizeof(bounce), &done);
-		if (res == FR_OK && done != sizeof(bounce))
-			res = FR_DENIED;  // the card is full
-		if (res != FR_OK) {
-			// Give the space back: the card's other files need it more.
-			f_close(&log_file);
-			f_unlink(path);
-			return res;
-		}
+	return FR_OK;
+}
+
+// Writes the next sector of zeros to log file slot
+static FRESULT start_fill(u32 slot)
+{
+	char path[32];
+	UINT done;
+	FRESULT res = f_write(&log_file, bounce, sizeof(bounce), &done);
+	if (res == FR_OK && done != sizeof(bounce))
+		res = FR_DENIED;  // the card is full
+	if (res != FR_OK) {
+		// Give the space back: the card's other files need it more.
+		f_close(&log_file);
+		log_path(path, slot);
+		f_unlink(path);
 	}
+	return res;
+}
+
+// Writes the zeroed file's header, closes it, and makes it the current one
+static FRESULT start_end(u32 slot, u32 seq)
+{
+	char header[LOG_HEADER_LEN];
+	UINT done;
+	FRESULT res = FR_OK;
+
 	if (f_size(&log_file) > LOG_FILE_SIZE)
 		res = f_truncate(&log_file);
 	if (res == FR_OK)
@@ -298,70 +353,107 @@ static FRESULT start_file(u32 slot, u32 seq)
 		res = closed;
 	if (res != FR_OK)
 		return res;
-	cur_slot = slot;
+	cur_slot = (u8)slot;
 	cur_seq = seq;
 	cur_end = LOG_HEADER_LEN;
 	return FR_OK;
 }
 
-// Finds the file to append to and where its text ends, and keeps the last
-// line the previous session wrote.
-static FRESULT open_current(void)
+// Makes log file slot full size and zero, then writes its header, at once.
+// It fills bounce with zeros (see start_begin).
+static FRESULT start_file(u32 slot, u32 seq)
+{
+	FRESULT res = start_begin(slot);
+	for (u32 offset = 0; res == FR_OK && offset < LOG_FILE_SIZE; offset += sizeof(bounce))
+		res = start_fill(slot);
+	return res == FR_OK ? start_end(slot, seq) : res;
+}
+
+// Makes the folders, then reads the files' headers, an item a call: 1 once
+// all are done
+static int open_look(void)
 {
 	char path[32];
 	char buf[LOG_HEADER_LEN];
-	u32 seqs[LOG_FILES];
+	UINT done;
+	u32 item = opening.item++;
+
+	if (item == 0) {
+		f_mkdir("/torii");
+	} else if (item == 1) {
+		f_mkdir("/torii/logs");
+	} else {
+		u32 i = item - 2;
+		opening.seqs[i] = 0;
+		log_path(path, i);
+		if (f_open(&log_file, path, FA_READ) == FR_OK) {
+			if (f_size(&log_file) == LOG_FILE_SIZE && f_read(&log_file, buf, sizeof(buf), &done) == FR_OK)
+				opening.seqs[i] = log_header_seq(buf, done);
+			f_close(&log_file);
+		}
+	}
+	return opening.item >= 2 + LOG_FILES;
+}
+
+// From the headers open_look read: opens the current file for scan_step, or
+// asks for a new one (open_new).
+static FRESULT open_pick(void)
+{
+	char path[32];
+
+	opening.fresh = 0;
+	int cur = log_pick_current(opening.seqs);
+	if (cur < 0) {
+		open_new(0, 1);
+		return FR_OK;
+	}
+	log_path(path, cur);
+	FRESULT res = f_open(&log_file, path, FA_READ | FA_WRITE);
+	if (res != FR_OK)
+		return res;
+	cur_slot = (u8)cur;
+	cur_seq = opening.seqs[cur];
+	log_end_start(&opening.end);
+	return FR_OK;
+}
+
+// Reads the next sector of the current file; 1 once its end is found (or
+// the read failed: *res)
+static int scan_step(FRESULT *res)
+{
+	UINT done;
+	*res = f_read(&log_file, bounce, sizeof(bounce), &done);
+	if (*res != FR_OK) {
+		f_close(&log_file);
+		return 1;
+	}
+	log_end_feed(&opening.end, (const char *)bounce, done);
+	return !done || opening.end.junk || opening.end.seen >= LOG_FILE_SIZE;
+}
+
+// Once scan_step is done: sets where the current file's text ends, keeps the
+// last line the previous session wrote, and closes the file; or, if its end
+// can't be found, asks for the next file.
+static FRESULT open_finish(void)
+{
 	UINT done;
 	FRESULT res;
 
-	f_mkdir("/torii");
-	f_mkdir("/torii/logs");
-	for (u32 i = 0; i < LOG_FILES; i++) {
-		seqs[i] = 0;
-		log_path(path, i);
-		if (f_open(&log_file, path, FA_READ) != FR_OK)
-			continue;
-		if (f_size(&log_file) == LOG_FILE_SIZE && f_read(&log_file, buf, sizeof(buf), &done) == FR_OK)
-			seqs[i] = log_header_seq(buf, done);
-		f_close(&log_file);
-	}
-	int cur = log_pick_current(seqs);
-	if (cur < 0)
-		return start_file(0, 1);
-
-	log_path(path, cur);
-	res = f_open(&log_file, path, FA_READ | FA_WRITE);
-	if (res != FR_OK)
-		return res;
-	cur_slot = cur;
-	cur_seq = seqs[cur];
-	log_end end;
-	log_end_start(&end);
-	for (u32 offset = 0; offset < LOG_FILE_SIZE && !end.junk; offset += sizeof(bounce)) {
-		res = f_read(&log_file, bounce, sizeof(bounce), &done);
-		if (res != FR_OK) {
-			f_close(&log_file);
-			return res;
-		}
-		if (!done)
-			break;
-		log_end_feed(&end, (const char *)bounce, done);
-	}
-	if (log_end_is_junk(&end)) {
-		// Its end can't be found: keep the file as it is, and go on in
-		// the next one.
+	if (log_end_is_junk(&opening.end)) {
+		// Keep the file as it is, and go on in the next one.
 		f_close(&log_file);
 		tlog_error("log: torii-%lu.log has junk after its text; going on in the next file",
 			   (unsigned long)cur_slot);
-		return start_file((cur_slot + 1) % LOG_FILES, log_next_seq(cur_seq));
+		open_new((cur_slot + 1) % LOG_FILES, log_next_seq(cur_seq));
+		return FR_OK;
 	}
-	cur_end = log_end_offset(&end);
-	if (end.line < cur_end) {
+	cur_end = log_end_offset(&opening.end);
+	if (opening.end.line < cur_end) {
 		// Power loss cut off a flush inside a line: zero what it wrote of
 		// it, so the next line starts on its own.
-		u32 cut = cur_end - end.line;
+		u32 cut = cur_end - opening.end.line;
 		memset(bounce, 0, cut);
-		res = f_lseek(&log_file, end.line);
+		res = f_lseek(&log_file, opening.end.line);
 		if (res == FR_OK)
 			res = f_write(&log_file, bounce, cut, &done);
 		if (res == FR_OK && done != cut)
@@ -370,7 +462,7 @@ static FRESULT open_current(void)
 			f_close(&log_file);
 			return res;
 		}
-		cur_end = end.line;
+		cur_end = opening.end.line;
 		tlog("log: dropped %lu bytes of a line cut off by power loss", (unsigned long)cut);
 	}
 
@@ -386,6 +478,63 @@ static FRESULT open_current(void)
 			memmove(prev_last, start + 1, strlen(start + 1) + 1);
 	}
 	return f_close(&log_file);
+}
+
+// One step of opening the log (see above), from opening.state. Returns 1
+// while steps remain; once done, sd_state says how it went.
+static int open_step(void)
+{
+	FRESULT res = FR_OK;
+	switch (opening.state) {
+	case OPEN_LOOK:
+		if (open_look())
+			opening.state = OPEN_PICK;
+		break;
+	case OPEN_PICK:
+		res = open_pick();
+		opening.state = opening.fresh ? OPEN_BEGIN : OPEN_SCAN;
+		break;
+	case OPEN_SCAN:
+		if (scan_step(&res) && res == FR_OK) {
+			res = open_finish();
+			opening.state = opening.fresh ? OPEN_BEGIN : OPEN_END;
+		}
+		break;
+	case OPEN_BEGIN:
+		res = start_begin(opening.slot);
+		opening.offset = 0;
+		opening.state = OPEN_FILL;
+		break;
+	case OPEN_FILL:
+		res = start_fill(opening.slot);
+		opening.offset += sizeof(bounce);
+		if (opening.offset >= LOG_FILE_SIZE)
+			opening.state = OPEN_END;
+		break;
+	default:  // OPEN_END
+		if (opening.fresh)
+			res = start_end(opening.slot, opening.seq);
+		if (res != FR_OK)
+			break;
+		opening.on = 0;
+		sd_state = SD_READY;
+		no_room = 0;
+		return 0;
+	}
+	if (res != FR_OK) {
+		opening.on = 0;
+		sd_failed("opening the log", res);  // full: looked for again next flush
+		return 0;
+	}
+	return 1;
+}
+
+// Starts opening the log from its first step
+static void open_start(void)
+{
+	opening.state = OPEN_LOOK;
+	opening.item = 0;
+	opening.on = 1;
 }
 
 const char *tlog_previous_line(void)
@@ -434,18 +583,53 @@ static FRESULT write_text(const char *text, u32 n, u32 *written)
 	return FR_OK;
 }
 
+// Opens the log if it isn't yet: at once, or finishes tlog_flush_soon's
+// open at once. 1 if it is open.
 static int sd_open(void)
 {
-	if (sd_state == SD_MOUNTED) {
-		FRESULT res = open_current();
-		if (res != FR_OK) {
-			sd_failed("opening the log", res);  // full: looked for again next flush
-			return 0;
-		}
-		sd_state = SD_READY;
-		no_room = 0;
-	}
+	if (sd_state == SD_MOUNTED && !opening.on)
+		open_start();
+	while (opening.on && open_step())
+		;
 	return sd_state == SD_READY;
+}
+
+#define OPEN_WAIT_MAX 30
+
+// tlog_flush_soon's job: a step of the open a frame, until it is done
+static int open_job(struct job *job)
+{
+	// A cancel gives the open up: tlog_flush starts it again
+	if ((u32)job->ctx != opening.gen || !opening.on || job->state == JOB_CANCEL) {
+		if (job->state == JOB_CANCEL && (u32)job->ctx == opening.gen && opening.on) {
+			f_close(&log_file);
+			opening.on = 0;
+		}
+		return JOB_DONE;
+	}
+	// A step's SD writes take about a frame: the screen's transitions and
+	// drawing go first, for up to half a second at a time
+	if (!ui_settled() && torii_frames - opening.stepped < OPEN_WAIT_MAX)
+		return JOB_WAIT;
+	opening.stepped = torii_frames;
+	if (open_step())
+		return JOB_MORE;
+	if (sd_state == SD_READY)  // sd_failed logged a failure
+		tlog_debug("log: opened in the background");
+	return JOB_DONE;
+}
+
+void tlog_flush_soon(void)
+{
+	if (!opening.on && sd_state == SD_MOUNTED && tlog_level != TLOG_OFF && ui_active()) {
+		opening.gen++;
+		opening.job = job_start(open_job, (void *)opening.gen, JOB_OWNER_NONE);
+		if (opening.job != JOB_NONE) {
+			open_start();
+			return;
+		}
+	}
+	tlog_flush();
 }
 
 void tlog_sd_ready(void)
@@ -468,6 +652,11 @@ void tlog_flush(void)
 		return;
 	cycles_summary();
 	if (ring.head == ring.tail && !ring.lost)
+		return;
+	// While tlog_flush_soon's job opens the log, the text waits for it, as
+	// long as the engine session it runs in goes on; otherwise the rest of
+	// the open is done now (sd_open), as before a launch.
+	if (opening.on && job_running(opening.job) && ui_active())
 		return;
 	if (!sd_open())
 		return;

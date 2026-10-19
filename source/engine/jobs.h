@@ -24,6 +24,7 @@
 enum {
 	JOB_MORE = 0,
 	JOB_DONE = 1,
+	JOB_WAIT = 2,  // nothing to do this frame: no more steps until the next
 };
 
 struct job;

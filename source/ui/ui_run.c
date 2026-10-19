@@ -1202,17 +1202,30 @@ static void draw_all(void)
 	}
 }
 
+// 1 if view v (the top one) is on screen and still: nothing to draw or
+// upload, no transition
+static int top_still(const struct ui_view *v)
+{
+	if (!(v->flags & UI_V_SHOWN) || gfx_queue_len() || gfx_pending() || ui.tr_phase != TR_IDLE || v->opening)
+		return 0;
+	for (u32 i = 0; i < v->count; i++)
+		if (ui_node((u8)(v->first + i))->flags & UI_N_DIRTY)
+			return 0;
+	return 1;
+}
+
+int ui_settled(void)
+{
+	struct ui_view *v = ui_top();
+	return v && !ui.pop_wait && top_still(v);
+}
+
 // Logs "screen ready" once the top view is on screen and still
 static void ready_check(void)
 {
 	struct ui_view *v = ui_top();
-	if (!v || (v->flags & (UI_V_SHOWN | UI_V_READY)) != UI_V_SHOWN)
+	if (!v || (v->flags & UI_V_READY) || !top_still(v))
 		return;
-	if (gfx_queue_len() || gfx_pending() || ui.tr_phase != TR_IDLE || v->opening)
-		return;
-	for (u32 i = 0; i < v->count; i++)
-		if (ui_node((u8)(v->first + i))->flags & UI_N_DIRTY)
-			return;
 	v->flags |= UI_V_READY;
 	tlog_debug("screen ready: %s", v->spec->name);
 }

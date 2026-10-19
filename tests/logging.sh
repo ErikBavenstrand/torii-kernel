@@ -13,6 +13,7 @@
 #   junk    a log file with junk after its text (v0.2.0 on the real cart)
 #           is left alone, and logging goes on in the next
 #   full    a full card stops the logging and the idle flush, not the kernel
+#   settings LOGGING turned on in SETTINGS makes the file in the background
 #   flood   a scrolled list's frame-cycles go to the card as summaries
 # Every part checks the card with fsck.fat. Runs inside the torii-emu container.
 set -euo pipefail
@@ -433,6 +434,39 @@ full)
   grep -aq "Torii kernel boot" "$cart/log.txt" || fail "once a delete made room, the log wasn't written"
   card_ok
   echo "PASS: a full card stops the logging and the idle flush, not the kernel, other files stay as they were, and a delete lets the log go on"
+  ;;
+
+settings)
+  # LOGGING turned on in SETTINGS on a new card: the log file (64 KB of
+  # zeros) is made a sector at a time in a job (tlog_flush_soon), so the
+  # screen takes keys meanwhile: it froze for 80 frames before v0.3.2 and
+  # lost the keys pressed then. The line saying so reaches the card from the
+  # lists' idle flush once SETTINGS closes.
+  new_card 65536 32
+  down=()
+  for i in $(seq 0 7); do # down to LOGGING
+    down+=(-k "@$((8 + 12 * i)):DOWN" -k "@$((12 + 12 * i)):-")
+  done
+  # A edits it, A A step it to Info, RIGHT A keep it; L at once goes to page
+  # 1, L again leaves SETTINGS, and the lists then wait for their idle flush.
+  boot -w "screen ready: sd-list" -k @8:R -k @12:- -w "screen ready: nor-list" -k @8:R -k @12:- \
+    -w "screen ready: settings1" -k @8:R -k @12:- -w "screen ready: settings2" "${down[@]}" \
+    -k @104:A -k @108:- -k @116:A -k @120:- -k @128:A -k @132:- -k @140:RIGHT -k @144:- -k @152:A -k @156:- \
+    -w "settings: staged" -k @4:L -k @8:- \
+    -w "screen ready: settings1" -k @8:L -k @12:- \
+    -w "screen ready: nor-list" -k @420:-
+  staged=$(grep -n 'settings: staged' "$cart/kernel.log" | head -1 | cut -d: -f1)
+  page1=$(grep -n 'screen ready: settings1' "$cart/kernel.log" | tail -1 | cut -d: -f1)
+  opened=$(grep -n 'log: opened in the background' "$cart/kernel.log" | head -1 | cut -d: -f1)
+  [ -n "$staged" ] && [ -n "$opened" ] || fail "LOGGING wasn't saved, or the log wasn't opened in the background"
+  [ "$page1" -gt "$staged" ] && [ "$page1" -lt "$opened" ] || fail "L while the log was being made didn't go to page 1 at once"
+  [ "$(mtype -i "$cart/sd.img" ::/torii/logs/torii-0.log | wc -c)" = 65536 ] || fail "the log file isn't 64 KB"
+  [ "$(log 0 | head -1)" = "torii log 00000001     " ] || fail "header: $(log 0 | head -1)"
+  has "settings: LOGGING is INFO"
+  card_ok
+  lines_ok
+  zeros_ok
+  echo "PASS: turning LOGGING on in SETTINGS makes the log file in the background, keys still act, and its line reaches the card"
   ;;
 
 flood)

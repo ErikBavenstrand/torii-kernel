@@ -55,6 +55,13 @@ void tlog_sd_ready(void);
 // summary (cycles_summary). Call it only where the kernel's ROM is mapped and
 // no other code is in the middle of a FatFs call.
 void tlog_flush(void);
+// tlog_flush for a screen of an engine session (SETTINGS turning LOGGING
+// on): if the log isn't open on the card yet, a job opens it a sector at a
+// time over the next frames (about 130 steps to make a new 64 KB file), so
+// the screen goes on taking keys, and flushes wait for it while the session
+// lasts; tlog_flush finishes it at once outside one, as before a launch.
+// Otherwise, or with no job slot free, it flushes now.
+void tlog_flush_soon(void);
 // A line at level that goes to the card even with LOGGING off (crash
 // dumps); the next tlog_flush writes it.
 void tlog_force(u32 level, const char *format, ...) __attribute__((format(printf, 2, 3)));

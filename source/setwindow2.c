@@ -628,7 +628,7 @@ static void save_set2_info(void)
 		if (log_sel > tlog_level)
 			tlog_set_level(log_sel);
 		tlog("settings: LOGGING is %s", gl_log_levels[log_sel]);
-		tlog_flush();
+		tlog_flush_soon();  // opening the log on the card, if it must, over the next frames
 		tlog_set_level(log_sel);
 	}
 }

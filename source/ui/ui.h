@@ -527,6 +527,10 @@ void ui_leave(u32 kind, s32 dir);
 void ui_enter(u32 kind, s32 dir);
 // 1 while a transition goes out, waits for the next screen or comes in.
 int ui_transitioning(void);
+// 1 once the top view is on screen and still: nothing left to draw or
+// upload, no transition or pop under way. Slow work that shares the frame
+// (tlog_flush_soon's job) lets the screen go first while it isn't.
+int ui_settled(void);
 // Closes the top view: a modal one over a screen plays its way out first
 // (theme dialog_out frames, keys meanwhile held for the view under it),
 // then it is popped. Outside ui_frame only; anywhere else ui_pop.
