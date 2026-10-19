@@ -2,15 +2,15 @@
 # SCENARIO/KEY HASH: the key frame tests/shots/png/SCENARIO.KEY.png shows.
 # SCENARIO/frames FIRST-LAST HASH: frames of a -H range (counted from 0)
 # that all hash the same.
-cheats/screen FB935F6A8E1FD561
-cheats-long/screen 0DFF1665E077CBA1
-cheats-long/scrolled F3087ADFA082EA39
-cheats-many/back 4584C5D6E57F6720
+cheats/screen 063A1B234EA6DC79
+cheats-long/screen 50CC9D4DE1FE8EC1
+cheats-long/scrolled B9FCA1EEBABF43C5
+cheats-many/back C78CF12FFC50B7D4
 cheats-many/menu F2BB991CEE49A988
-cheats-many/moved 7B01A6EA5D0081B5
-cheats-many/paged 64E4597F0054E201
-cheats-many/picked 565E36A0F80AAF20
-cheats-many/screen 0EEABCB1268DDC69
+cheats-many/moved ACF06BAA67A24475
+cheats-many/paged 322CB8381C0A9591
+cheats-many/picked BE302E9402E3CA48
+cheats-many/screen B181CFCA2D449729
 cover-demo/loaded 2D73C7A36427D46F
 cover-demo/screen 3CCAC1492B95FF7A
 cover-demo/frames 0-1 2D73C7A36427D46F
@@ -65,6 +65,9 @@ sd-scroll/frames 101-101 95C1C00E5D225545
 sd-scroll/frames 102-116 F5B6F878CC5107C5
 sd-scroll/frames 117-117 BBB13CC78FDCE317
 sd-scroll/frames 118-119 423F88E293FBA7C7
+ui-dialog/closed 7B29AF95A30A3BB1
+ui-dialog/dialog 3FA6B2F8C249F938
+
 settings-light/help 488DC004C5AB9F15
 settings-light/screen B8FD8F3C82589B02
 settings1/back 0F70E61FC6E0F4AD
@@ -74,46 +77,66 @@ ui-dialog/closed FC5A408D22114FA5
 ui-dialog/dialog 6EC78C6B983FC1F0
 ui-dialog/grid 5A3482184C6909F7
 ui-dialog/grid-moved 2EDED34FBF0528AF
-ui-dialog/frames 0-0 FC5A408D22114FA5
-ui-dialog/frames 1-1 623D9EF1F024C6BA
-ui-dialog/frames 2-2 F0ED8F24608468DF
-ui-dialog/frames 3-3 3D24361FDF6DB1E6
-ui-dialog/frames 4-4 8294578DE07BC086
-ui-dialog/frames 5-6 D6B204E4C30B0F38
-ui-dialog/frames 7-20 6EC78C6B983FC1F0
-ui-list/marquee 00E49541195789BD
-ui-list/paged A450CB75219BBC1D
-ui-list/screen CCACFEB83CD51404
-ui-list/wrapped DE58D59634F90555
-ui-list/frames 0-0 3C38D6DC62741930
-ui-list/frames 1-1 B93C06F10ECD0954
-ui-list/frames 2-2 7965E2037873D0C4
-ui-list/frames 3-3 E26E9B48B88CBEB5
-ui-list/frames 4-4 147F6682F2D1D725
-ui-list/frames 5-5 59E4661A18E69735
-ui-list/frames 6-6 D3D7DD678943F08D
-ui-list/frames 7-7 942C737D8573250D
-ui-list/frames 8-8 1888FF7433C9F95D
-ui-list/frames 9-10 D5F5040A6779474D
-ui-list/frames 11-24 A450CB75219BBC1D
-ui-list/frames 25-25 6A9B6CE25EC355A4
-ui-list/frames 26-26 8C184AE18FE846C8
-ui-list/frames 27-27 612E509D6F820FE8
-ui-list/frames 28-37 DE58D59634F90555
-ui-theme/awake B86991408B3904B0
-ui-theme/dimmed E196C5704AFDFB9A
-ui-theme/light 3A1CF983F03E5CBD
-ui-theme/orange B86991408B3904B0
-ui-theme/frames 0-0 CCACFEB83CD51404
-ui-theme/frames 1-1 AE4CCA748A00FEE4
-ui-theme/frames 2-2 25F76289543334C5
-ui-theme/frames 3-3 480A5C06C95645FC
-ui-theme/frames 4-4 CF2D844FF265A5A5
-ui-theme/frames 5-5 20FBE151A6109545
-ui-theme/frames 6-6 3C4B26FB51B2EC25
-ui-theme/frames 7-7 5B2CBE2F84B54765
-ui-theme/frames 8-8 9A8FAFFE79CDAC45
-ui-theme/frames 9-9 8C8481CDB21AB85D
-ui-theme/frames 10-10 5355087415BD2825
-ui-theme/frames 11-11 5C8A80DC39ADECDF
-ui-theme/frames 12-20 3A1CF983F03E5CBD
+ui-dialog/frames 0-0 7B29AF95A30A3BB1
+ui-dialog/frames 1-1 E858DC9BEEE0D3B2
+ui-dialog/frames 2-2 C6DE5B3B7BAB1ACB
+ui-dialog/frames 3-3 5420DD81F4B2FA56
+ui-dialog/frames 4-4 9DAE22A8534474FA
+ui-dialog/frames 5-6 186B0690AED83C10
+ui-dialog/frames 7-20 3FA6B2F8C249F938
+ui-list/held-r 60593C7A91F9705C
+ui-list/marquee 121FE297E2817E25
+ui-list/paged B696DCE470FC0855
+ui-list/queued-a 441A0F1EDCE09468
+ui-list/queued-l CA4171B44C9580B1
+ui-list/screen C3A0441DFBE90A84
+ui-list/wrapped 409C4C58BBE18D59
+ui-list/frames 0-0 02A9CDF5A9680064
+ui-list/frames 1-1 C7828D29F98D74CC
+ui-list/frames 2-2 72E51B0DD32315BC
+ui-list/frames 3-3 600BA9A429B80335
+ui-list/frames 4-4 FFF229E0C715BFB5
+ui-list/frames 5-5 1E8B09A1D9E8F4B9
+ui-list/frames 6-6 2B3C9AD97415806D
+ui-list/frames 7-7 0B0E0BB0C2973419
+ui-list/frames 8-8 CCE445BDF75047FD
+ui-list/frames 9-10 97C35EE4788D78C1
+ui-list/frames 11-24 B696DCE470FC0855
+ui-list/frames 25-25 8F736F570359BE8C
+ui-list/frames 26-26 2AF538D8520B6BC0
+ui-list/frames 27-27 EF0A38801902505C
+ui-list/frames 28-28 2A66ED3A02961669
+ui-list/frames 29-29 A0190249D1DC431D
+ui-list/frames 30-37 409C4C58BBE18D59
+ui-list/frames 38-38 8F736F570359BE8C
+ui-list/frames 39-39 2AF538D8520B6BC0
+ui-list/frames 40-40 085ED75F3CF8B42C
+ui-list/frames 41-41 4CB5DAA6B2A9E23D
+ui-list/frames 42-42 9647770935FF57FD
+ui-list/frames 43-43 925AD33BA1AD30FC
+ui-list/frames 44-44 7143AB9846A6F260
+ui-list/frames 45-45 5E81E6B5CA96DE04
+ui-list/frames 46-46 9CEA92E6BFE32A3D
+ui-list/frames 47-47 3410BD4A432847A9
+ui-list/frames 48-48 AAE8B717005B823D
+ui-list/frames 49-49 E06A67B440CE3AC9
+ui-list/frames 50-50 9AE783DD021EDAE1
+ui-list/frames 51-51 7FF58B05C5869675
+ui-list/frames 52-53 46AD62F62A89A7DD
+ui-theme/awake ECFA426BD367A550
+ui-theme/dimmed 0742C6ED47A9035E
+ui-theme/light 56AF1467237DB189
+ui-theme/orange ECFA426BD367A550
+ui-theme/frames 0-0 C3A0441DFBE90A84
+ui-theme/frames 1-1 FEFD8F45030613E4
+ui-theme/frames 2-2 FF228505BCAA9B69
+ui-theme/frames 3-3 0678974090833720
+ui-theme/frames 4-4 E67A6FB4A861932D
+ui-theme/frames 5-5 D505227CA737B2F5
+ui-theme/frames 6-6 3CB67AA1663E7EA5
+ui-theme/frames 7-7 F326824360F01115
+ui-theme/frames 8-8 1D0E9656E3DD59D5
+ui-theme/frames 9-9 AB39682B33B73A95
+ui-theme/frames 10-10 CE752EF931DD9E81
+ui-theme/frames 11-11 C0D586FB8B0B579B
+ui-theme/frames 12-20 56AF1467237DB189

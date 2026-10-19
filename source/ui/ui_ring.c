@@ -15,7 +15,8 @@ int ring_setup(struct ui_ring *r, u32 h, u32 rh, const char **why)
 	r->h = (u16)h;
 	r->rh = (u8)rh;
 	r->visible = (u8)((h - 1) / rh + 2);
-	r->k = (u8)(r->visible + 2);
+	r->step = (u8)(32 / rh);
+	r->k = (u8)(r->visible + 1 + r->step);
 	r->ring_rows = (u8)(256 / rh);
 	if (r->k > UI_RING_MAX_SLOTS || r->k > r->ring_rows) {
 		*why = "the viewport needs more row slots than the ring holds";
@@ -74,11 +75,11 @@ s32 ring_scroll_for(const struct ui_ring *r, u32 row, s32 scroll, u32 rows, u32 
 
 s32 ring_step(const struct ui_ring *r, s32 shown, s32 want)
 {
-	s32 delta = want - shown;
-	if (delta > r->rh)
-		delta = r->rh;
-	else if (delta < -(s32)r->rh)
-		delta = -(s32)r->rh;
+	s32 delta = want - shown, most = (s32)(r->step * r->rh);
+	if (delta > most)
+		delta = most;
+	else if (delta < -most)
+		delta = -most;
 	return shown + delta;
 }
 
