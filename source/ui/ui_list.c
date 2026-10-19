@@ -516,7 +516,7 @@ void ui_list_page_label(u8 node, u8 label, const char *text)
 int ui_list_still(u8 node)
 {
 	const struct list_state *st = ui_node_state(node);
-	return st->page == PAGE_NONE && !motion_running(st->motion) && st->shown == st->target;
+	return st->page == PAGE_NONE && !motion_running(st->motion) && st->shown == st->target && !st->dirty;
 }
 
 void ui_list_scroll_info(u8 node, u32 *content, u32 *view, u32 *scroll)
@@ -877,43 +877,54 @@ static void draw_marquee(const struct list_state *st, const struct row_ctx *rc, 
 // A row redrawn in its slot while the list shows (ui_list_refresh) is drawn
 // here, then copied over the slot's tiles in VBlank with the frame's other
 // changes: drawn straight into a slot on screen, it tore while the screen
-// scanned it out (the tear watch, -T). One row a frame, for every list.
-#define REFRESH_WORDS (30 * 4 * 8)  // a row 30 tiles wide, 4 tall
+// scanned it out (the tear watch, -T). The pool holds two full-width 16 px
+// rows (or one 32 px row) for every list; rows past it wait a frame, and
+// it empties once its copies have landed.
+#define REFRESH_WORDS (30 * 4 * 8)  // two rows 30 tiles wide and 2 tall
+#define REFRESH_ROWS 4
 static u32 refresh_tiles[REFRESH_WORDS] EWRAM_BSS;
-static u32 refresh_ticket EWRAM_BSS;
-static u8 refresh_owner EWRAM_BSS;  // whose copy is queued: its node + 1, 0 none
-static u8 refresh_slot EWRAM_BSS;
+static u32 refresh_ticket EWRAM_BSS;  // the last copy queued
+static u16 refresh_used EWRAM_BSS;    // words of the pool queued
+static u8 refresh_count EWRAM_BSS;
+static u8 refresh_owner[REFRESH_ROWS] EWRAM_BSS;  // a queued row's node + 1
+static u8 refresh_slot[REFRESH_ROWS] EWRAM_BSS;
 
-// 1 while the copy queued for node's slot s hasn't landed
+// Empties the pool once its copies have landed
+static void refresh_reap(void)
+{
+	if (refresh_count && gfx_queue_done(refresh_ticket))
+		refresh_count = refresh_used = 0;
+}
+
+// 1 while a copy queued for node's slot s hasn't landed
 static int refresh_pending(u8 node, u32 s)
 {
-	if (refresh_owner != node + 1u || refresh_slot != s)
-		return 0;
-	if (!gfx_queue_done(refresh_ticket))
-		return 1;
-	refresh_owner = 0;
+	refresh_reap();
+	for (u32 i = 0; i < refresh_count; i++)
+		if (refresh_owner[i] == node + 1u && refresh_slot[i] == s)
+			return 1;
 	return 0;
 }
 
-// Draws row r into refresh_tiles and queues it over slot s; 0 to try again
-// next frame (a copy still queued, or the queue full)
+// Draws row r into the pool and queues it over slot s; 0 to try again next
+// frame (the pool or the queue full)
 static int refresh_row(u8 node, struct list_state *st, const struct row_ctx *rc, u32 s, u32 r)
 {
+	refresh_reap();
 	u32 words = (u32)st->tw * st->rt * 8;
-	if (words > REFRESH_WORDS)
+	if (refresh_count == REFRESH_ROWS || refresh_used + words > REFRESH_WORDS)
 		return 0;
-	if (refresh_owner && !gfx_queue_done(refresh_ticket))
-		return 0;
-	u32 start = cycles_now();
-	if (draw_row(st, rc, refresh_tiles, r, 0))
+	u32 *tiles = refresh_tiles + refresh_used, start = cycles_now();
+	if (draw_row(st, rc, tiles, r, 0))
 		st->blank &= ~(1u << s);
 	else
 		st->blank |= 1u << s;
-	if (!gfx_queue_copy(tile_addr(ui_node_spec(node)->plane, slot_tile(st, s)), refresh_tiles, words * 4))
+	if (!gfx_queue_copy(tile_addr(ui_node_spec(node)->plane, slot_tile(st, s)), tiles, words * 4))
 		return 0;
 	refresh_ticket = gfx_queue_ticket();
-	refresh_owner = (u8)(node + 1);
-	refresh_slot = (u8)s;
+	refresh_used = (u16)(refresh_used + words);
+	refresh_owner[refresh_count] = (u8)(node + 1);
+	refresh_slot[refresh_count++] = (u8)s;
 	st->drawn_row[s] = (u16)r;
 	st->row_cycles = cycles_since(start);
 	return 1;
@@ -937,7 +948,7 @@ static void list_draw(u8 node)
 	int hidden = st->page == PAGE_DRAW || !ui_node_shown(node);
 	// Rows given new slots: neither their tiles nor their map rows are on
 	// screen. Rows redrawn in their slots (ui_list_refresh) may be: they go
-	// through refresh_tiles, one a frame
+	// through the refresh pool
 	u32 keep = 0;
 	for (u32 s = 0; s < st->ring.k; s++) {
 		u32 bit = 1u << s;
