@@ -4,8 +4,8 @@
 #define TORII_SCREENS_LISTS_H
 
 // The menu, from the SD card's root folder; never returns. Launches, NOR
-// writes, SETTINGS and the cheat screen still draw in mode 3: the lists
-// leave the engine for them and come back after.
+// writes, SETTINGS and the cheat screen run engine sessions of their own:
+// the lists leave the engine for them and come back after.
 void lists_run(void) __attribute__((noreturn));
 
 #endif

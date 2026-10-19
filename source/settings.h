@@ -27,9 +27,9 @@ enum {
 #define SETTINGS_TO_NOR 0        // L on page 1: the NOR list
 #define SETTINGS_TO_DIAGNOSE 2   // DIAGNOSE on page 2
 
-// Runs SETTINGS and HELP on the engine from page until the user leaves
-// them. The menu around it is still mode 3: it returns with mode 3 set and
-// the screen black, and the caller repaints.
+// Runs SETTINGS and HELP in an engine session of their own, from page until
+// the user leaves them; returns on a black screen (dialog_blank), and the
+// caller starts its own session again.
 u32 Settings_run(u32 page);
 
 // --- For the pages (setwindow.c, setwindow2.c, helpwindow.c) --------------

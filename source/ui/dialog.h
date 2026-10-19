@@ -1,6 +1,7 @@
-// Generic dialogs on the engine (docs/plans/v0.3-decisions.md, T12): a
-// message, a yes/no question and a progress dialog, for every screen, ported
-// or still in mode 3.
+// Generic dialogs on the engine (docs/plans/v0.3-decisions.md, T12, T13): a
+// message, a yes/no question, a notice and a progress dialog, for every
+// screen and for the plain code between screens (the boot, the firmware
+// update, a launch).
 //
 // Each call runs frames until it is done (a loop of its own), so call it
 // from a screen's loop or from plain code, never from inside ui_frame (an
@@ -10,15 +11,13 @@
 // - From an engine screen (ui_depth() > 0), the dialog is a modal view
 //   pushed on top, which slides in over the dimmed screen, and it is popped
 //   before the call returns. The screen's loop goes on as before.
-// - From mode 3 code (no view up), the call sets up the engine itself
+// - From plain code (no view up), the call sets up the engine itself
 //   (engine_init, ui_init with the THEME and ACCENT settings) and, when
-//   done, puts mode 3 back on a black screen and syncs libgba's key state
-//   (scanKeys), so a key that closed the dialog doesn't act again: the
-//   caller repaints its screen, as after any engine screen.
+//   done, shuts it down on a black screen (dialog_blank).
 //
 // dialog_open() and dialog_close() keep that engine session over several
-// calls, so a question followed by a progress dialog doesn't flash back to
-// mode 3 between them. They nest; the last close ends the session.
+// calls, so a question followed by a progress dialog doesn't flash black
+// between them. They nest; the last close ends the session.
 //
 //	if (dialog_confirm(gl_save_sav, name, DIALOG_INFO)) {  // A: 1, B: 0
 //		dialog_progress_begin(gl_save_sav, name);
@@ -35,9 +34,9 @@
 // centred, with "\n" between lines; a line too wide wraps (at a space if
 // it can), and lines past the fourth (the third in a progress dialog) are
 // cut. Both are copied, so a stack buffer is fine. The view names are
-// "dialog" (message and question) and "progress", logged as "screen
-// ready: NAME" once shown. DIM is off while a dialog session is open;
-// closing it gives an engine screen back the DIM setting.
+// "dialog" (message and question), "notice" and "progress", logged as
+// "screen ready: NAME" once shown. DIM is off while a dialog session is
+// open; closing it gives an engine screen back the DIM setting.
 #ifndef TORII_UI_DIALOG_H
 #define TORII_UI_DIALOG_H
 
@@ -52,22 +51,30 @@ enum {
 // Keeps (or starts) the engine session dialogs run in; see the top.
 void dialog_open(void);
 // Ends what dialog_open started: after the last close, a session the
-// dialogs started returns to mode 3 (black screen; the caller repaints).
+// dialogs started shuts the engine down on a black screen.
 void dialog_close(void);
 
-// Puts the display back as the mode 3 menu has it, after ui_shutdown: a
-// black screen in mode 3, and the registers the engine writes cleared. Also
-// syncs libgba's key state (scanKeys). dialog_close calls it; Diagnostics
-// too, before its unit tests, which expect those registers as mode 3 left
-// them.
-void dialog_mode3(void);
+// The screen between two engine sessions, after ui_shutdown: black (mode 0
+// with no layer on, a black backdrop), and the registers the engine writes
+// (BG control and scroll, windows, mosaic, blending) cleared, so the next
+// session, or a game, starts from a blank display. Every screen that ends
+// its session calls it, and Diagnostics before its unit tests, which expect
+// those registers cleared. The next session's ui_init counts keys still
+// held as held, so a key that closed a screen doesn't act again.
+void dialog_blank(void);
 
-// Shows text until B is pressed and let go (as the mode 3 menu's
-// wait_btn). Hint: gl_close_btn, "[B]OK".
+// Shows text until B is pressed and let go. Hint: gl_close_btn, "[B]OK".
 void dialog_message(const char *title, const char *text, u32 kind);
 // Asks a yes/no question: A (1) or B (0), on the press. Hint: gl_menu_btn,
 // "[B]CANCEL [A]OK".
 int dialog_confirm(const char *title, const char *text, u32 kind);
+
+// A notice: a message with no keys, which stays up while the caller works
+// (the boot's "Loading...") until dialog_notice_end. Showing another while
+// one is up replaces it. Messages, questions and a progress dialog shown
+// meanwhile go on top of it; take those down first.
+void dialog_notice(const char *title, const char *text, u32 kind);
+void dialog_notice_end(void);
 
 // A progress dialog: title and text above, a status line and a bar below.
 // It stays up, with no keys, until dialog_progress_end; the work runs in
@@ -90,8 +97,8 @@ int dialog_progress_active(void);
 
 #define DIALOG_PROGRESS_FRAMES 12
 
-// The launch's progress line (the mode 3 kernel's name for it): the status
-// line of the progress dialog, which it begins if none is up.
+// The launch's progress line (the official kernel's name for it): the
+// status line of the progress dialog, which it begins if none is up.
 void ShowbootProgress(const char *str);
 
 #endif

@@ -6,8 +6,8 @@
 // (a real cart) and in tests/assets.sh (the emulated one); in the plain
 // test kernel run (tests/kernel.sh, no cart model) the cart tests log that
 // they are skipped. On hardware they never skip. Like test_engine.c, they
-// leave Diagnostics' mode 3 screen alone: sprite VRAM below 0x06014000 is
-// kept from the cover slots, and the engine is reset afterwards.
+// keep to sprite VRAM from 0x06014000 (below it is kept from the cover
+// slots), and the engine is reset afterwards.
 #include <string.h>
 
 #include <gba_compression.h>
@@ -276,7 +276,7 @@ void test_asset_cover_cache(void)
 		return;
 	memcpy(broken_asset, test_asset_small, test_asset_small_bytes);
 	broken_asset[(ASSET_HEADER_BYTES + 8) / 4] += 0x100;  // the LZ77 header's size
-	// Mode 3's frame reaches into sprite VRAM: keep covers above 0x06014000
+	// Keep covers above 0x06014000, as the other engine tests do
 	u8 keep = res_alloc(RES_OBJ_VRAM, 512, 1, 0, RES_OBJ_UNITS, 0, 0);
 	CHECK_EQ(res_start(RES_OBJ_VRAM, keep), 0);
 	cover_init(locate, JOB_OWNER_NONE);

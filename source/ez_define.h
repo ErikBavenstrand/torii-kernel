@@ -1,7 +1,6 @@
 // pReadCache, 128 KB of EWRAM, is the kernel's scratch buffer. It holds
 // nothing between two passes of a menu loop: each owner below borrows it for
 // one operation and needs nothing in it afterwards. Its owners, by offset:
-// - [0, 0x1E0): Clear()'s fill line, on every call, even drawing direct.
 // - READCACHE_SORT_WORK: sort_by_name's work buffer, while a folder is listed.
 // - [0x2000, ...): the cheat screen's parsed list, and READCACHE_CHEAT_WORK
 //   at the end, its line and value buffers (showcht.c), until it returns.
@@ -17,8 +16,6 @@
 //   jobs must stop the asset jobs first (cover_shutdown).
 // - READCACHE_THEME, with READCACHE_STAGE: loading an SD theme (ui/sdtheme.h),
 //   within one call: the reader, the parsed theme.ini, the decoded wallpaper.
-// Vcache, its first 75 KB, is mode 3's back buffer, but nothing draws there:
-// every caller draws direct.
 #define MAX_pReadCache_size 0x20000
 #define READCACHE_STAGE 0x0
 #define READCACHE_STAGE_SIZE 0x8000
@@ -37,8 +34,6 @@
 
 #define DEBUG
 
-#define VideoBuffer (u16 *)0x6000000
-#define Vcache (u16 *)pReadCache
 #define RGB(r, g, b) ((r) + ((g) << 5) + ((b) << 10))
 
 #define PSRAMBase_S98 (void *)0x08800000
@@ -74,34 +69,9 @@
 #define DMA_COPY_MODE 0X1
 #define SET_PARAMETER_MODE 0x2
 
-#define gImage_Chinese_manual (void *)0x08100000
-#define gImage_English_manual (void *)0x08102648
-#define gImage_splash (void *)0x08104C90
-#define gImage_SD (void *)0x08117890
-#define gImage_NOR (void *)0x0812A490
-#define gImage_SET (void *)0x0813D090
-#define gImage_SET2 (void *)0x0814FC90
-#define gImage_HELP (void *)0x08162890
-#define gImage_RECENTLY (void *)0x08175490
-#define gImage_NOTFOUND (void *)0x08188090
-#define gImage_icon_gba (void *)0x0818CB90
-#define gImage_icon_folder (void *)0x0818CD50
-#define gImage_icon_other (void *)0x0818CF10
-#define gImage_icon_FC (void *)0x0818D0D0
-#define gImage_icon_GB (void *)0x0818D290
-#define gImage_icon_nor (void *)0x0818D450
-#define gImage_MENU (void *)0x0818D610
-
-#define gl_color_text (*(u16 *)0x08194410)  //= RGB(31,31,31);
-#define gl_color_selectBG_sd (*(u16 *)0x08194412)  //= RGB(00,00,31);
-#define gl_color_selectBG_nor (*(u16 *)0x08194414)  //= RGB(10,10,10);
-#define gl_color_cheat_black (*(u16 *)0x08194416)  //= RGB(00,00,00);
-
-#define gl_color_MENU_btn (*(u16 *)0x0819441C)  //= RGB(20,20,20);
-#define gl_color_selected (*(u16 *)0x0819441E)  //= RGB(00,20,26);
-#define gl_color_cheat_count (*(u16 *)0x08194420)  //= RGB(00,31,00);
-#define gl_color_NORFULL (*(u16 *)0x08194422)  //= RGB(31,00,00);
-#define gl_color_btn_clean (*(u16 *)0x08194424)  //= RGB(00,00,31);
+// image.bin, at 0x08100000, holds EZ-Flash's 16bpp menu pictures, which the
+// kernel no longer draws (Diagnostics' LZ77 timing still reads one), then the
+// FPGA firmware Check_FW_update writes (LX9_ and LX16_newomega_top_bin_address).
 
 #define assress_language 0
 #define assress_v_reset 1

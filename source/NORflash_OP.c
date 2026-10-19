@@ -10,7 +10,6 @@
 #include "ez_define.h"
 #include "NORflash_OP.h"
 #include "ezkernel.h"
-#include "draw.h"
 #include "ui/dialog.h"
 #include "lang.h"
 #include "Ezcard_OP.h"

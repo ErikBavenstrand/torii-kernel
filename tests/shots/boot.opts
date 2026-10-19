@@ -1,0 +1,4 @@
+# The boot screen (source/ezkernelnew.c, main): the card's state as a notice
+# (source/ui/dialog.h) while the kernel reads the save flag and the NOR list
+-w "screen ready: notice"
+-s @1:screen.png
