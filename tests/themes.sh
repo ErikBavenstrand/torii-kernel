@@ -13,6 +13,30 @@ fail() {
   exit 1
 }
 
+# Copies the entries of folder $2 (not dot files) into folder $3 of image $1,
+# in sorted order, as copy_tree in tests/shots.py does: `mcopy -s` walks
+# folders in the host's directory order, which differs between filesystems
+# (APFS, ext4), and so would the card's directory entries.
+copy_tree() {
+  local img=$1 src=$2 dest=$3 entry
+  local files=()
+  while IFS= read -r -d '' entry; do
+    if [ -d "$entry" ]; then
+      if [ ${#files[@]} -gt 0 ]; then # one mcopy for a run of files, in order
+        mcopy -Q -i "$img" "${files[@]}" "$dest/"
+        files=()
+      fi
+      mmd -i "$img" "$dest/${entry##*/}"
+      copy_tree "$img" "$entry" "$dest/${entry##*/}"
+    else
+      files+=("$entry")
+    fi
+  done < <(find "$src" -mindepth 1 -maxdepth 1 ! -name '.*' -print0 | LC_ALL=C sort -z)
+  if [ ${#files[@]} -gt 0 ]; then
+    mcopy -Q -i "$img" "${files[@]}" "$dest/"
+  fi
+}
+
 # A fresh cart with THEME = 2 and theme.txt holding $1; more mgba-shot options follow
 boot() {
   local name=$1
@@ -20,8 +44,8 @@ boot() {
   rm -rf "$cart"
   mkdir -p "$cart"
   mkfs.fat -C -F 32 -n THEMES "$cart/sd.img" 65536 >/dev/null
-  mmd -i "$cart/sd.img" ::/torii ::/torii/themes
-  mcopy -s -Q -i "$cart/sd.img" themes/example ::/torii/themes/
+  mmd -i "$cart/sd.img" ::/torii ::/torii/themes ::/torii/themes/example
+  copy_tree "$cart/sd.img" themes/example ::/torii/themes/example
   printf '%s\n' "$name" >"$cart/theme.txt"
   mcopy -Q -i "$cart/sd.img" "$cart/theme.txt" ::/torii/theme.txt
   python3 - "$cart/kernel-nor.bin" <<'EOF'
@@ -55,8 +79,8 @@ echo "PASS: SD theme loaded at boot; one that doesn't load is reported and the m
 rm -rf "$cart"
 mkdir -p "$cart"
 mkfs.fat -C -F 32 -n THEMES "$cart/sd.img" 65536 >/dev/null
-mmd -i "$cart/sd.img" ::/torii ::/torii/themes
-mcopy -s -Q -i "$cart/sd.img" themes/example ::/torii/themes/
+mmd -i "$cart/sd.img" ::/torii ::/torii/themes ::/torii/themes/example
+copy_tree "$cart/sd.img" themes/example ::/torii/themes/example
 keys="-k @8:R -k @12:-"
 # shellcheck disable=SC2086 # $keys is a list of options
 out=$(OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -w "screen ready: sd-list" $keys \

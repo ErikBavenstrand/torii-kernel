@@ -4,6 +4,8 @@
 # runs them side by side:
 #   copy  a game's save is made, loaded and copied back at the next power-on,
 #         and each step logs what it did
+#   nearly-full  a copy that just fits the card is written whole, through
+#         its progress dialog, and the menu comes back
 #   full  a copy the card can't take is logged as an error, with how much
 #         of it was written (the copy is still cut short: crash-safe saves
 #         are v0.5)
@@ -121,13 +123,41 @@ full)
   logged_error "save: writing Test.sav: "
   grep -qE "kernel error: save: writing Test.sav: [0-9]+ of 131072 bytes written" "$cart/run.log" ||
     fail "the error doesn't say how much was written"
+  grep -q "^kernel: screen ready: sd-list" "$cart/run.log" || fail "no menu after the copy ran out of room"
   mtype -i "$cart/sd.img" ::/FILLER.BIN | cmp -s - "$cart/filler.bin" || fail "the other file changed"
   fsck.fat -n "$cart/sd.img" >/dev/null || fail "fsck.fat found errors"
   echo "PASS: saves full: a copy the card can't take is logged as an error"
   ;;
 
+nearly-full)
+  first_launch
+  first_copy
+  # Power-on 3: the game again (SAVER sorts first), which sets the record.
+  # shellcheck disable=SC2046
+  boot $(keys 100 DOWN A) $(keys 180 A) -f 600
+  # Then the card loses Test.sav and fills up to exactly 128 KB free: just
+  # room for the copy, through its progress dialog.
+  mdel -i "$cart/sd.img" ::/SAVER/Test.sav
+  free=$(mdir -i "$cart/sd.img" ::/ | sed -n 's/^ *\([0-9 ]*\) bytes free.*/\1/p' | tr -d ' ')
+  head -c $((free - 131072)) /dev/urandom >"$cart/filler.bin"
+  mcopy -i "$cart/sd.img" "$cart/filler.bin" ::/FILLER.BIN
+  # Power-on 4: A at "Save sav?"; the copy fills the card.
+  boot -k 100:A -k 106:- -s 116:"$shots/4-progress.png" -f 400
+  logged 'save: "Save sav?" for /SAVER/Test.sav, 131072 bytes, save type 31: A, save'
+  grep -q "^kernel: screen ready: progress" "$cart/run.log" || fail "no progress dialog for the copy"
+  logged "save: wrote Test.sav, 131072 bytes, f_close gave 0"
+  grep -q "^kernel error:" "$cart/run.log" && fail "errors: $(grep '^kernel error:' "$cart/run.log" | head -3)"
+  grep -q "^kernel: screen ready: sd-list" "$cart/run.log" || fail "no menu after the copy"
+  [ "$(save_record)" = 4f4d525802 ] || fail "the save has $(save_record), expected the second boot record"
+  left=$(mdir -i "$cart/sd.img" ::/ | sed -n 's/^ *\([0-9 ]*\) bytes free.*/\1/p' | tr -d ' ')
+  [ "$left" = 0 ] || fail "$left bytes free after the copy, expected 0"
+  mtype -i "$cart/sd.img" ::/FILLER.BIN | cmp -s - "$cart/filler.bin" || fail "the other file changed"
+  fsck.fat -n "$cart/sd.img" >/dev/null || fail "fsck.fat found errors"
+  echo "PASS: saves nearly-full: a copy that just fits the card is written whole"
+  ;;
+
 *)
-  echo "usage: $0 copy|full" >&2
+  echo "usage: $0 copy|full|nearly-full" >&2
   exit 2
   ;;
 esac
