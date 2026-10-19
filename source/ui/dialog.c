@@ -20,7 +20,8 @@
 #define TITLE_MAX 48
 #define TEXT_MAX 160
 #define STATUS_MAX 48
-#define TEXT_LINES 3
+#define TEXT_LINES 4      // a message's or question's text (48 px)
+#define PROGRESS_LINES 3  // a progress dialog's, above its bar (40 px)
 
 enum {
 	N_PANEL,
@@ -47,7 +48,7 @@ static const struct ui_label_config hint_label = {"", UI_FONT_BODY, UI_ALIGN_CEN
 // keeps its other planes. Nothing is hidden: a hidden node blanks its
 // rectangle in the plane's map, a hole in the panel. A title or text left
 // out is an empty label, and only the progress dialog has a bar.
-#define DIALOG_NODES(text_ink) \
+#define DIALOG_NODES(text_ink, text_h) \
 	[N_PANEL] = {.kind = UI_PANEL, \
 		     .id = 1, \
 		     .parent = UI_NONE, \
@@ -78,7 +79,7 @@ static const struct ui_label_config hint_label = {"", UI_FONT_BODY, UI_ALIGN_CEN
 		    .x = 8, \
 		    .y = 24, \
 		    .w = 8, \
-		    .h = 40, \
+		    .h = (text_h), \
 		    .data = &text_label}, \
 	[N_HINT] = {.kind = UI_LABEL, \
 		    .id = 4, \
@@ -93,10 +94,10 @@ static const struct ui_label_config hint_label = {"", UI_FONT_BODY, UI_ALIGN_CEN
 		    .h = 16, \
 		    .data = &hint_label}
 
-static const struct ui_spec message_nodes[N_BAR] = {DIALOG_NODES(UI_ROLE_TEXT)};
-static const struct ui_spec error_nodes[N_BAR] = {DIALOG_NODES(UI_ROLE_ICON + 3)};  // red
+static const struct ui_spec message_nodes[N_BAR] = {DIALOG_NODES(UI_ROLE_TEXT, 48)};
+static const struct ui_spec error_nodes[N_BAR] = {DIALOG_NODES(UI_ROLE_ICON + 3, 48)};  // red
 static const struct ui_spec progress_nodes[N_COUNT] = {
-	DIALOG_NODES(UI_ROLE_TEXT),
+	DIALOG_NODES(UI_ROLE_TEXT, 40),
 	[N_BAR] = {.kind = UI_PROGRESS,
 		   .id = 5,
 		   .parent = N_PANEL,
@@ -175,10 +176,13 @@ void dialog_open(void)
 		REG_DISPCNT_ = 0;
 		engine_init();
 		ui_init(NULL);
-		ui_dim_set_frames(0);  // no dimming over a question or a 4-minute erase
 		dlg.owned = 1;
 		tlog_debug("dialog: the engine runs the dialogs (from mode 3)");
 	}
+	// No dimming over a question or a 4-minute erase, over an engine screen
+	// too (dialog_close gives it back the DIM setting)
+	if (dlg.opens == 1)
+		ui_dim_set_frames(0);
 }
 
 void dialog_close(void)
@@ -186,8 +190,12 @@ void dialog_close(void)
 	if (!dlg.opens)
 		return;
 	dlg.opens--;
-	if (dlg.opens || !dlg.owned)
+	if (dlg.opens)
 		return;
+	if (!dlg.owned) {
+		ui_dim_set_minutes(ui_dim_setting());
+		return;
+	}
 	dlg.owned = 0;
 	ui_shutdown();
 	dialog_mode3();
@@ -216,8 +224,8 @@ void dialog_mode3(void)
 // --- Text ----------------------------------------------------------------
 
 // Copies text into out (size bytes), wrapping lines wider than the labels at
-// a space (or anywhere), at most TEXT_LINES lines
-static void wrap(char *out, u32 size, const char *text)
+// a space (or anywhere), at most max_lines lines
+static void wrap(char *out, u32 size, const char *text, u32 max_lines)
 {
 	const struct torii_font *font = ui_theme()->body;
 	u32 o = 0, lines = 1;
@@ -254,7 +262,7 @@ static void wrap(char *out, u32 size, const char *text)
 		line += take + skip;
 		if (!*line)
 			break;
-		if (lines == TEXT_LINES || o + 2 > size)
+		if (lines == max_lines || o + 2 > size)
 			break;
 		out[o++] = '\n';
 		lines++;
@@ -297,7 +305,7 @@ static void settle(const struct shown *s, u32 frames)
 static int show(struct shown *s, u32 use, const char *title, const char *text, u32 kind, const char *hint)
 {
 	copy(s->title, sizeof(s->title), title);
-	wrap(s->text, sizeof(s->text), text ? text : "");
+	wrap(s->text, sizeof(s->text), text ? text : "", use == USE_PROGRESS ? PROGRESS_LINES : TEXT_LINES);
 	copy(s->hint, sizeof(s->hint), hint);
 	s->keys = 0;
 	s->use = (u8)use;

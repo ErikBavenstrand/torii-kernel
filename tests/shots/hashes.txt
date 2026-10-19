@@ -48,7 +48,7 @@ cover-demo/frames 31-32 3CCAC1492B95FF7A
 diag-renderer/demo CFABCE035BEAC9FD
 diag-start/screen 3162F4422A6557C5
 dialog/back DAFEFBEF130ADFF5
-dialog/screen 13D78DB512039C09
+dialog/screen F7EA656E2E36CA64
 file-menu/screen FCB674D8FDC6B41A
 help/screen D8C7377F69946185
 nor-list/screen 0F70E61FC6E0F4AD

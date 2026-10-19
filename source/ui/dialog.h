@@ -33,9 +33,11 @@
 //
 // Text: title in the heading font (NULL: none), text in the body font,
 // centred, with "\n" between lines; a line too wide wraps (at a space if
-// it can), and lines past the third are cut. Both are copied, so a stack
-// buffer is fine. The view names are "dialog" (message and question) and
-// "progress", logged as "screen ready: NAME" once shown.
+// it can), and lines past the fourth (the third in a progress dialog) are
+// cut. Both are copied, so a stack buffer is fine. The view names are
+// "dialog" (message and question) and "progress", logged as "screen
+// ready: NAME" once shown. DIM is off while a dialog session is open;
+// closing it gives an engine screen back the DIM setting.
 #ifndef TORII_UI_DIALOG_H
 #define TORII_UI_DIALOG_H
 

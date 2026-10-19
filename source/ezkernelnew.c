@@ -1583,15 +1583,16 @@ static u32 Load_Thumbnail(TCHAR *pfilename_pic)
 //Delete file
 static void SD_list_L_START(u32 show_offset, u32 file_select, u32 folders)
 {
-	// The file's name, then "SURE?" (the start of gl_formatnor_info, as before)
-	char question[sizeof(pFilename_buffer[0].filename) + 8];
+	// "Delete file SURE?" (the start of gl_formatnor_info, as before) over the
+	// whole name, which may take 4 lines
+	char title[32];
 	TCHAR *pdelfilename = pFilename_buffer[show_offset + file_select - folders].filename;
 	if (Name_cut(pdelfilename)) {  // a cut name would delete nothing, or another file
 		Show_error_num(8);
 		return;
 	}
-	snprintf(question, sizeof(question), "%s\n%.5s", pdelfilename, gl_formatnor_info);
-	if (dialog_confirm(gl_LSTART_help, question, DIALOG_INFO))
+	snprintf(title, sizeof(title), "%s %.5s", gl_LSTART_help, gl_formatnor_info);
+	if (dialog_confirm(title, pdelfilename, DIALOG_INFO))
 		/*res = */ f_unlink(pdelfilename);
 }
 //---------------------------------------------------------------------------------
