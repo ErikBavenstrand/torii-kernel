@@ -123,6 +123,16 @@ RULES = [
     ),
     (["tools/font_preview.py"], {LINT}, "font preview sheets"),
     (
+        [
+            "tools/themecheck.c",
+            "tools/theme_check.py",
+            "tests/asset_test.py",
+            "tests/themecheck_test.py",
+        ],
+        {LINT, TEST_HOST},
+        "theme checker and asset converter tests, run by test-host",
+    ),
+    (
         ["tools/asset.py"],
         {LINT, TEST_HOST, TEST},
         "asset converter: test-host checks its test assets, the kernel tests decode them",

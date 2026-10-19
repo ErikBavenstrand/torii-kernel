@@ -841,7 +841,7 @@ static const struct ui_spec cs_nodes[CS_NODES] = {
 		       .data = &cs_bar},
 };
 
-static const struct ui_view_spec cs_view = {"cheats", cs_nodes, CS_NODES, 11, CS_LIST, 0, cs_event};
+static const struct ui_view_spec cs_view = {"cheats", cs_nodes, CS_NODES, 34, CS_LIST, 0, cs_event};
 
 // Runs the screen until B is released; 0 if it couldn't be shown
 static int cs_run(struct cheat_screen *cs)

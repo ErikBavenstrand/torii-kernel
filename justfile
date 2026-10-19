@@ -253,10 +253,32 @@ _analyze-image: _ready
 compat *filters: build emu-headless
     {{emu_docker}} python3 tests/games.py "$@"
 
-# Build the hardware-free kernel code with tests/host for the host, under ASan and UBSan, and run it; test tools/font.py
+# Build the hardware-free kernel code with tests/host for the host, under ASan and UBSan, and run it;
+# test tools/font.py, tools/asset.py and the theme checker
 test-host: emu-image
     {{emu_docker}} tests/host.sh
     @uv run -q tests/font_test.py
+    @uv run -q tests/asset_test.py
+
+# Check an SD theme folder (docs/themes.md) as the kernel would load it, then preview it
+# on the emulated cart: PNGs of the UI demo and the cheat viewer, e.g. `just theme-check themes/example`
+[positional-arguments]
+theme-check dir: build emu-headless test-roms _test-kernel-build
+    #!/usr/bin/env bash
+    set -euo pipefail
+    stage=$(uv run -q tools/theme_check.py stage "$1")
+    {{fresh}} sync --all "$stage"
+    {{emu_docker}} python3 tools/theme_check.py run "$stage"
+
+# Start a theme in themes/NAME from the dark or light theme, e.g. `just theme-new night light`
+theme-new name base="dark": emu-image
+    {{emu_docker}} python3 tools/theme_check.py new "{{name}}" "{{base}}"
+
+# Convert a PNG into a theme's wallpaper (4bpp, at most 256 tiles; more than 15 colours
+# are reduced), e.g. `just theme-wallpaper art.png themes/night/wallpaper.tas --dither`
+[positional-arguments]
+theme-wallpaper png tas *args:
+    uv run -q tools/asset.py wallpaper "$@"
 
 # Convert the menu fonts in assets/fonts to C: source/engine/font_body.c and font_heading.c
 # (committed; tests/font_test.py checks they match)

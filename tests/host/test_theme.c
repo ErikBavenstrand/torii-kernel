@@ -331,6 +331,15 @@ void test_theme_formats(void)
 
 void test_theme_names(void)
 {
+	// Patch view names: each name and id once (a shared id patches two
+	// screens at once, as cheats and nor-list once did)
+	for (u32 i = 0; i < theme_view_name_count; i++) {
+		CHECK(theme_view_names[i].id > 0);
+		for (u32 j = i + 1; j < theme_view_name_count; j++) {
+			CHECK(theme_view_names[i].id != theme_view_names[j].id);
+			CHECK(strcmp(theme_view_names[i].name, theme_view_names[j].name) != 0);
+		}
+	}
 	CHECK(theme_name_ok("example"));
 	CHECK(theme_name_ok("Night Owl-2_b.v1"));
 	CHECK(theme_name_ok("12345678901234567890123"));

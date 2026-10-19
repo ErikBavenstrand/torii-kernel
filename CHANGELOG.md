@@ -56,6 +56,19 @@ git log, not here.
   ACCENT showed black, and a screen without a list could fail to appear
   after another closed (`2a67c3f`).
 
+- **Added:** theme tools (not part of the kernel, listed as they are for
+  theme authors): `just theme-new` starts a theme from Dark or Light,
+  `just theme-wallpaper` converts a PNG into a wallpaper, reducing it to
+  15 colours, and `just theme-check` checks a theme with the kernel's own
+  parser and previews it on the emulated cart. `docs/themes.md` explains
+  themes and every theme.ini key.
+- **Fixed:** the cheat viewer shared theme view id 11 with the NOR list,
+  so a theme's `nor-list` patch moved its nodes too; it is now `cheats`,
+  id 34 (`38b60ec`).
+- **Changed:** the SD theme loader's wallpaper check and log messages
+  moved into the hardware-free parser (`theme_wallpaper_check`), so `just
+  theme-check` prints exactly what the kernel logs. No behaviour change
+  (`0c3cec8`).
 - **Added:** themes from the SD card. `/torii/themes/<name>/theme.ini`
   (version 1) overrides the dark or light theme key by key: colours, fonts,
   row height, spacing, fade, slide, marquee and key repeat timings, up to

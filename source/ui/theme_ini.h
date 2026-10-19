@@ -1,6 +1,7 @@
-// theme.ini, the text half of an SD theme (v0.3.1, docs/plans/v0.3-decisions.md
-// "T14 Themes" has the full key reference). Hardware-free: tests/host runs
-// it under ASan and UBSan, and ui/ui_sdtheme.c loads it on the cart.
+// theme.ini, the text half of an SD theme (v0.3.1; docs/themes.md has the
+// full key reference). Hardware-free: tests/host runs it under ASan and
+// UBSan, ui/ui_sdtheme.c loads it on the cart, and tools/themecheck.c builds
+// it into `just theme-check`.
 //
 //	version = 1          ; required: the format's version
 //	name = Night         ; shown in settings (default: the folder's name)
@@ -60,6 +61,26 @@ int theme_ini_parse(const char *text, u32 len, struct theme_ini *out);
 // 1 if name can be a theme's folder: 1 to THEME_NAME_MAX - 1 bytes of
 // letters, digits, space, '-', '_' and '.', not starting with '.' or a space.
 int theme_name_ok(const char *name);
+
+// The wallpaper's budget: a 4bpp pattern of up to this many tiles, one map
+// and one palette bank (tools/asset.py reads it from here)
+#define THEME_WALLPAPER_TILES 256
+
+// What ui_theme_load (ui/sdtheme.h) logs, after "theme: ". Here so that
+// tools/themecheck.c, behind `just theme-check`, prints the same lines.
+#define THEME_MSG_BAD_FOLDER "\"%s\" isn't a theme folder name"
+#define THEME_MSG_NO_INI "%s has no theme.ini"
+#define THEME_MSG_INI_BIG "%s: theme.ini is over 8 KB"
+#define THEME_MSG_INI_READ "%s: theme.ini can't be read"
+#define THEME_MSG_NO_WALLPAPER "%s: no wallpaper %s; none shown"
+#define THEME_MSG_LOADED "loaded %s (%s, %u warnings%s)"
+
+// Checks the wallpaper file of theme folder `folder` (size bytes at data;
+// data is not read when size is over ASSET_FILE_MAX) as ui_theme_load does:
+// a TAS1 asset, 4bpp, within THEME_WALLPAPER_TILES. Returns 1 if it can be
+// used, or 0 with the reason in msg (cap bytes), "FOLDER: wallpaper FILE ...".
+// It checks the header and the LZ77 header word only, not the stream.
+int theme_wallpaper_check(const char *folder, const char *file, const void *data, u32 size, char *msg, u32 cap);
 
 // A view name patches may use instead of its number (ui_view_spec.id), and
 // the table of them. Screens add a line for theirs.

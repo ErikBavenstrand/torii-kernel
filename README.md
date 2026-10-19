@@ -46,6 +46,7 @@ the update.
 | `just lint` / `just format` | checks the C (clang-format), Python, shell scripts and CI workflows / formats the C files in place |
 | `just analyze` | advisory static analysis of `source/` with cppcheck, clang-tidy and GCC's `-fanalyzer`; fails only on findings missing from `tools/analyze-baseline.txt` (`just analyze-baseline` rewrites it) |
 | `just font` / `just font-preview` | converts the menu fonts in `assets/fonts` to C in `source/engine` (`tools/font.py`; committed) / redraws the font candidates' preview sheets in `docs/research/fonts` |
+| `just theme-new NAME` / `just theme-wallpaper IN.png OUT.tas` / `just theme-check DIR` | starts an SD theme in `themes/NAME` / converts a picture into its wallpaper / checks a theme as the kernel would load it and writes preview PNGs from the emulated cart; [docs/themes.md](docs/themes.md) explains themes |
 | `just compile-commands` | writes `compile_commands.json` for the kernel and its unit tests, so clangd (editors, agents) can jump to definitions and show errors; `.clangd` adapts the GCC flags for clang |
 
 `just --list` shows the rest.

@@ -35,3 +35,5 @@ else
   echo "FAIL: host unit tests (exit $status)"
   exit 1
 fi
+# The theme checker (`just theme-check`): the kernel's parser as a command
+python3 tests/themecheck_test.py
