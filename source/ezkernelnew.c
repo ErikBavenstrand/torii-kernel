@@ -280,6 +280,25 @@ void Recently_play_forget(const char *entry)
 	}
 }
 //---------------------------------------------------------------------------------
+void Recently_play_forget_nor(const char *name)
+{
+	u32 count = Recently_play_load();
+	u32 left = count;
+	for (u32 i = 0; i < left;) {
+		const char *nor = Recently_play_nor(p_recently_play[i]);
+		if (nor && (!name || strcmp(nor, name) == 0)) {
+			char entry[RECENT_LEN];  // a copy: the rows move up over it
+			memcpy(entry, p_recently_play[i], RECENT_LEN);
+			tlog("recent: forgot %s", entry);
+			left = Recently_play_remove(entry, left);
+		} else {
+			i++;
+		}
+	}
+	if (left != count)
+		Recently_play_write(left);
+}
+//---------------------------------------------------------------------------------
 // Recently Played's entry for file name in folder path, into buf (RECENT_LEN bytes)
 static void Recently_play_entry(char *buf, const TCHAR *path, const TCHAR *name)
 {
