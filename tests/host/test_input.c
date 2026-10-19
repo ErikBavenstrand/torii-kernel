@@ -64,11 +64,13 @@ void test_input_tap(void)
 void test_input_ramp_curve(void)
 {
 	const InputTiming *t = &input_timing_default;
-	u32 from = INPUT_ONE / t->interval, to = INPUT_ONE * t->top_speed / 60;
+	u32 from = INPUT_ONE / t->interval, to = (INPUT_ONE * t->top_speed + 59) / 60;
 	CHECK_EQ(input_ramp_rate(t, 0), from);
 	CHECK_EQ(input_ramp_rate(t, t->ramp), to);
 	CHECK_EQ(input_ramp_rate(t, 1000), to);
-	CHECK_EQ(to, INPUT_ONE);  // every frame at the top
+	CHECK_EQ(t->top_speed, 40);  // two frames in three at the top
+	static const InputTiming every = {15, 4, 90, 60, 20, 6, 15};
+	CHECK_EQ(input_ramp_rate(&every, 90), INPUT_ONE);  // 60 a second: every frame
 	// Smoothstep's steepest slope is 1.5 / ramp of the rise: no frame jumps
 	// more than that, and the curve starts and ends flat
 	u32 most = (to - from) * 3 / (2 * t->ramp) + 2;
@@ -107,7 +109,8 @@ void test_input_repeat_schedule(void)
 	check_frames(fired, n, start, 5);
 	// The gaps close up: none is more than a frame longer than one before
 	// it (a rate between whole frames alternates them), and once the ramp
-	// is over (15 + 90 frames) it repeats every frame
+	// is over (15 + 90 frames) it repeats 40 times a second, two frames in
+	// three
 	u32 shortest = 4;
 	for (u32 i = 2; i < n; i++) {
 		u32 gap = fired[i] - fired[i - 1];
@@ -115,17 +118,20 @@ void test_input_repeat_schedule(void)
 		if (gap < shortest)
 			shortest = gap;
 	}
-	u32 every = 0;
-	for (u32 i = 1; i < n; i++)
-		if (fired[i] >= 15 + 90)
-			every += fired[i] - fired[i - 1] == 1;
-	CHECK_EQ(every, 180u - (15 + 90));
-	// About as many repeats as the curve's area: 75 in the 1.5 s ramp's
-	// 90 frames (the average of 1/4 and 1, as the curve is symmetric)
+	u32 top = 0;
+	for (u32 i = 1; i < n; i++) {
+		if (fired[i] >= 15 + 90) {
+			top++;
+			CHECK(fired[i] - fired[i - 1] <= 2);
+		}
+	}
+	CHECK(top >= 49 && top <= 51);  // 75 frames at 40 a second
+	// About as many repeats as the curve's area: 41 in the 1.5 s ramp's 90
+	// frames (the average of 1/4 and 2/3 a frame, as the curve is symmetric)
 	u32 in_ramp = 0;
 	for (u32 i = 0; i < n; i++)
 		in_ramp += fired[i] > 15 && fired[i] <= 105;
-	CHECK(in_ramp >= 55 && in_ramp <= 57);
+	CHECK(in_ramp >= 40 && in_ramp <= 43);
 
 	// The phase rises between repeats at the rate and drops on each:
 	// rows scrolled at phase * row height move at a steady speed
@@ -233,7 +239,7 @@ void test_input_accel_reset(void)
 	input_step(&s, INPUT_DOWN | INPUT_L, 1);
 	CHECK(input_fired(&s, INPUT_L));
 	n = hold(&s, INPUT_DOWN | INPUT_L, INPUT_DOWN, 8, fired, 64);
-	CHECK_EQ(n, 8);  // still every frame
+	CHECK(n >= 5 && n <= 6);  // still at top speed, two frames in three
 }
 
 void test_input_paging(void)

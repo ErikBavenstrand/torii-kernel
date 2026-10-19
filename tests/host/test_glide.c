@@ -104,8 +104,8 @@ static int on_screen(const struct sim *s)
 }
 
 // DOWN held 3 s in 302 rows: once the cursor reaches the screen's bottom
-// row of context the list scrolls with it, its speed rising smoothly to a
-// row a frame, the cursor always on screen; let go, it brakes within two
+// row of context the list scrolls with it, its speed rising smoothly to 40
+// rows a second, the cursor always on screen; let go, it brakes within two
 // rows to a whole row and stops, never backing up
 void test_ui_glide_held(void)
 {
@@ -131,8 +131,9 @@ void test_ui_glide_held(void)
 			prev = s.shown;
 		}
 		CHECK(moving > 120);
-		CHECK_EQ(top_v, 16);  // a row a frame at the top of the ramp
-		CHECK_EQ(last_v, 16);
+		// 40 rows a second at the top of the ramp: 10 2/3 px a frame
+		CHECK(top_v >= 10 && top_v <= 11);
+		CHECK(last_v >= 10 && last_v <= 11);
 		CHECK_EQ(s.far, 0u);
 		// Let go
 		s32 at = s.shown;
@@ -140,7 +141,7 @@ void test_ui_glide_held(void)
 			sim_frame(&s, 0);
 			s32 v = (s.shown - prev) * dir;
 			CHECK(v >= 0);
-			CHECK(v <= last_v || v <= 1);  // only slows down (but for the spring's last pixel)
+			CHECK(v <= last_v + 1);  // only slows down (but for a pixel's rounding)
 			CHECK(on_screen(&s));
 			last_v = v;
 			prev = s.shown;

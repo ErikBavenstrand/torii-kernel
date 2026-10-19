@@ -267,19 +267,19 @@ static s32 goal_px(const struct list_state *st)
 	return st->base + FIX_ROUND(motion_goal(st->motion));
 }
 
-// The held key whose repeat moved the cursor from old to cursor this frame:
-// the scroll then glides (0: a press, or a move from code)
-static u16 glide_key(u32 old, u32 cursor)
+// key if its repeat moved the cursor from old to cursor this frame, in its
+// own direction: the scroll then glides (0: a press, a move from code, a
+// wrap). In a grid only UP and DOWN glide: LEFT and RIGHT cross a row only
+// every cols moves
+static u16 glide_key(const struct list_state *st, u16 key, u32 old, u32 cursor)
 {
 	const InputState *in = ui_input();
-	u16 keys = in->fire & ~in->pressed & in->repeating;
-	if (cursor > old)
-		keys &= INPUT_DOWN | INPUT_RIGHT | INPUT_R;
-	else if (cursor < old)
-		keys &= INPUT_UP | INPUT_LEFT | INPUT_L;
-	else
-		keys = 0;
-	return (u16)(keys & -keys);  // one key
+	if (!(key & in->fire & ~in->pressed & in->repeating))
+		return 0;
+	if (st->cols > 1 && (key & (INPUT_LEFT | INPUT_RIGHT)))
+		return 0;
+	u16 down = INPUT_DOWN | INPUT_RIGHT | INPUT_R, up = INPUT_UP | INPUT_LEFT | INPUT_L;
+	return cursor > old ? key & down : cursor < old ? key & up : 0;
 }
 
 // One frame of a glide: the spring's goal runs with the cursor's speed; once
@@ -361,7 +361,7 @@ static void page_change(u8 node, struct list_state *st, s32 target)
 	ui_plane_hide(ui_node_spec(node)->plane, 1);
 }
 
-static void set_cursor(u8 node, struct list_state *st, u32 cursor)
+static void set_cursor(u8 node, struct list_state *st, u32 cursor, u16 key)
 {
 	if (cursor >= st->count)
 		cursor = st->count ? st->count - 1 : 0;
@@ -371,7 +371,9 @@ static void set_cursor(u8 node, struct list_state *st, u32 cursor)
 	st->sel_ok = st->sel_ok && st->sel_drawn == cursor;
 	// A repeat glides on; a press or a move from code springs
 	s32 step = (s32)(cursor / st->cols) - (s32)(old / st->cols);
-	st->glide_key = st->page != PAGE_NONE || !step ? 0 : st->auto_move ? GLIDE_AUTO : glide_key(old, cursor);
+	st->glide_key = st->page != PAGE_NONE || !step ? 0
+			: st->auto_move                ? GLIDE_AUTO
+						       : glide_key(st, key, old, cursor);
 	st->glide_step = (s16)step;
 	st->glide_at = ui_input()->now;
 	st->braking = 0;
@@ -446,7 +448,14 @@ void ui_list_set_cursor(u8 node, u32 cursor)
 {
 	struct list_state *st = ui_node_state(node);
 	if (cursor != st->cursor)
-		set_cursor(node, st, cursor);
+		set_cursor(node, st, cursor, 0);
+}
+
+void ui_list_move(u8 node, u32 cursor, u16 key)
+{
+	struct list_state *st = ui_node_state(node);
+	if (cursor != st->cursor)
+		set_cursor(node, st, cursor, key);
 }
 
 void ui_list_autoscroll(u8 node, s32 rate)
@@ -478,7 +487,7 @@ static void autoscroll(u8 node, struct list_state *st, u32 dt)
 		return;
 	}
 	st->auto_move = 1;
-	set_cursor(node, st, st->auto_rate > 0 ? st->cursor + cols : st->cursor - cols);
+	set_cursor(node, st, st->auto_rate > 0 ? st->cursor + cols : st->cursor - cols, 0);
 	st->auto_move = 0;
 }
 
@@ -541,7 +550,7 @@ static int list_event(u8 node, const struct ui_event *e)
 			to = t < 0 ? 0 : (u32)t >= st->count ? st->count - 1 : (u32)t;
 		}
 		if (to != st->cursor) {
-			set_cursor(node, st, to);
+			set_cursor(node, st, to, key);
 			ui_emit(node, UI_EV_CURSOR, to);
 		}
 		return 1;

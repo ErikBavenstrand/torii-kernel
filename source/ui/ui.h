@@ -494,6 +494,9 @@ void ui_list_reset(u8 node, u32 cursor);
 // on screen redraws in place, so it may tear for one frame.
 void ui_list_refresh(u8 node, u32 lo, u32 hi);
 void ui_list_set_cursor(u8 node, u32 cursor);
+// As ui_list_set_cursor, for a move key made: a repeat of a held key makes
+// the list glide at its speed rather than spring a row at a time.
+void ui_list_move(u8 node, u32 cursor, u16 key);
 // Moves the cursor by itself, rate items a frame (16.16: INPUT_ONE is one;
 // negative goes up), the list gliding with it as with a held key, until
 // rate 0 or the list's end. For demos: it emits no UI_EV_CURSOR.

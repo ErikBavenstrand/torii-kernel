@@ -37,7 +37,7 @@ const struct ui_theme ui_theme_dark = {
 	.marquee_pause = 60,
 	.marquee_gap = 8,
 	.page_fade = 4,
-	.input = {15, 4, 90, 60, 20, 6, 15},
+	.input = {15, 4, 90, 40, 20, 6, 15},
 };
 
 const struct ui_theme ui_theme_light = {
@@ -70,7 +70,7 @@ const struct ui_theme ui_theme_light = {
 	.marquee_pause = 60,
 	.marquee_gap = 8,
 	.page_fade = 4,
-	.input = {15, 4, 90, 60, 20, 6, 15},
+	.input = {15, 4, 90, 40, 20, 6, 15},
 };
 
 const struct ui_accent ui_accents[] = {

@@ -805,16 +805,22 @@ static void menu_open(u32 which, u32 rows, u32 max, u32 line)
 // --- Events (they only record what to do) ---------------------------------------
 
 // Moves the list's cursor delta items for key: past an end it stops there
-// first, and wraps to the other end on a fresh press, or a repeat once it
-// has rested at the end (input_move), as the menus do
+// first, and a fresh press at the end wraps to the other end (input_move); a
+// held key stays at the end, as each wrap is a page change
 static void move(u8 node, u16 key, s32 delta, u32 count, u32 at)
 {
 	if (!count)
 		return;
-	u32 to = input_move(ui_input(), &lists.list_wrap, key, at, count, delta);
+	u32 to;
+	if (ui_input()->pressed & key) {
+		to = input_move(ui_input(), &lists.list_wrap, key, at, count, delta);
+	} else {
+		s32 t = (s32)at + delta;
+		to = t < 0 ? 0 : (u32)t >= count ? count - 1 : (u32)t;
+	}
 	if (to == at)
 		return;
-	ui_list_set_cursor(node, to);
+	ui_list_move(node, to, key);
 	count_update(to);
 	// A move too far to scroll to (a wrap) is a page change: its own figure
 	if (ui_list_paging(node))
@@ -839,21 +845,11 @@ static int list_event(struct ui_view *v, const struct ui_event *e)
 	u8 node = list_node();
 	u32 count = list_count(0), at = ui_list_cursor(node);
 	u32 page = lists.screen == SCR_RECENT ? 0 : LIST_ROWS;
-	// One move a frame, a fresh press first; other keys still act the same
-	// frame, as a held d-pad fires every frame at top speed
+	// Keys other than the d-pad act first, on the row shown as selected (a
+	// held d-pad fires every frame at top speed, so they often come with a
+	// move)
 	u16 moves = k & INPUT_DPAD;
-	if (moves & pressed)
-		moves &= pressed;
-	if (moves & INPUT_DOWN)
-		move(node, INPUT_DOWN, 1, count, at);
-	else if (moves & INPUT_UP)
-		move(node, INPUT_UP, -1, count, at);
-	else if ((moves & INPUT_LEFT) && page)
-		move(node, INPUT_LEFT, -(s32)page, count, at);
-	else if ((moves & INPUT_RIGHT) && page)
-		move(node, INPUT_RIGHT, (s32)page, count, at);
 	k &= (u16)~INPUT_DPAD;
-	at = ui_list_cursor(node);
 	if ((k & INPUT_A) && ui_list_paging(node)) {
 		// The page the cursor moved to isn't drawn yet: A waits for it, as
 		// the list's own A does (lists_run hands it back)
@@ -894,6 +890,19 @@ static int list_event(struct ui_view *v, const struct ui_event *e)
 		}
 	}
 	// SELECT toggled the thumbnail; v0.3 shows none (v0.4's covers will)
+	if (lists.act)
+		return 1;  // the move waits: the action is on the row the user saw
+	// Then one move a frame, a fresh press first
+	if (moves & pressed)
+		moves &= pressed;
+	if (moves & INPUT_DOWN)
+		move(node, INPUT_DOWN, 1, count, at);
+	else if (moves & INPUT_UP)
+		move(node, INPUT_UP, -1, count, at);
+	else if ((moves & INPUT_LEFT) && page)
+		move(node, INPUT_LEFT, -(s32)page, count, at);
+	else if ((moves & INPUT_RIGHT) && page)
+		move(node, INPUT_RIGHT, (s32)page, count, at);
 	return 1;
 }
 

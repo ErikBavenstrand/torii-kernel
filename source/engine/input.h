@@ -51,9 +51,9 @@ typedef struct {
 	u8 wrap_pause;    // a held key wraps at a list end after resting there this long
 } InputTiming;
 
-// 15, 4, 90, 60; paging 20, 6; wrap pause 15. A held d-pad fires on frames
-// 0 and 15, then about 4 frames apart, closing up smoothly to every frame by
-// frame 105 (1.75 s).
+// 15, 4, 90, 40; paging 20, 6; wrap pause 15. A held d-pad fires on frames
+// 0 and 15, then about 4 frames apart, closing up smoothly to 40 a second
+// (two frames in three) by frame 105 (1.75 s).
 extern const InputTiming input_timing_default;
 
 // Repeat rates are 16.16 repeats a frame.
