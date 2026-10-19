@@ -10,4 +10,4 @@
 -k @52:A -k @56:-
 -w "screen ready: cheats"
 -s @1:screen.png
--s @200:scrolled.png
+-s @320:scrolled.png
