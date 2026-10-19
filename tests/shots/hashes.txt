@@ -2,7 +2,15 @@
 # SCENARIO/KEY HASH: the key frame tests/shots/png/SCENARIO.KEY.png shows.
 # SCENARIO/frames FIRST-LAST HASH: frames of a -H range (counted from 0)
 # that all hash the same.
-boot/screen 2F699359A5731225
+boot/screen 34EED145D7C6A8C0
+boot/frames 0-2 7C573B18E65FE325
+boot/frames 3-3 7B90E77090ED8325
+boot/frames 4-4 7B2431247E1C9059
+boot/frames 5-5 2A3028DC62EB75E2
+boot/frames 6-6 74D4950BBD1434E6
+boot/frames 7-7 EE05FD7779962083
+boot/frames 8-8 55135B940AAE8F72
+boot/frames 9-40 34EED145D7C6A8C0
 boot-addon/addons B24B22C01BC420D0
 boot-progress/screen 8A9B3222959885A1
 boot-progress-big/loading 7868AEBC12088DD1

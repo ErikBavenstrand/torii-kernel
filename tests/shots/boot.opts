@@ -1,4 +1,8 @@
-# The boot screen (source/ezkernelnew.c, main): the card's state as a notice
-# (source/ui/dialog.h) while the kernel reads the save flag and the NOR list
--w "screen ready: notice"
+# The boot (source/ezkernelnew.c, main): a card that mounts shows nothing
+# until the SD list comes in from black, every frame hashed from the boot's
+# hand-over to the list (v0.3.2: a "microSD card ready / Loading..." notice
+# flashed for 3 frames, then faded out before the list)
+-w "dialog: engine session handed over"
+-H @0:@40
+-w "screen ready: sd-list"
 -s @1:screen.png
