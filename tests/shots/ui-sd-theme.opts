@@ -1,0 +1,12 @@
+#! kernel test
+#! sd-theme example
+# The UI demo in the SD theme themes/example (tests/kernel/ui_demo.c, with R
+# held too): its colours, its wallpaper beside the list (a layout patch gives
+# the list margins), and a dialog over it with the theme's dim and slide.
+-k 1:L+SELECT+R
+-w "screen ready: ui-demo"
+-k @2:-
+-s @4:list.png
+-k @10:A -k @14:-
+-w "screen ready: ui-dialog"
+-s @30:dialog.png

@@ -6,6 +6,15 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** themes from the SD card. `/torii/themes/<name>/theme.ini`
+  (version 1) overrides the dark or light theme key by key: colours, fonts,
+  row height, spacing, fade, slide, marquee and key repeat timings, up to
+  16 layout patches, and a 4bpp LZ77 wallpaper repeated behind the menu.
+  THEME = 2 picks the theme `/torii/theme.txt` names, loaded at boot; one
+  that fails to load says why on the boot screen and the menu uses Dark,
+  and a screen the theme breaks falls back to its base theme. Nothing new
+  is written to kernel NOR. A stored ACCENT no longer draws as a
+  near-black colour (`c84f0df`, `0f7ac38`, `b7aa517`).
 - **Changed:** the cheat screen runs on the v0.3 tile engine: cheats as
   headings, their options indented, a picked one in the accent colour with
   "[x]"; the cursor skips headings, LEFT/RIGHT and L/R page, long names

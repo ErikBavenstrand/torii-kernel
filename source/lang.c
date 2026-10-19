@@ -4,6 +4,7 @@ char *gl_init_error;
 char *gl_power_off;
 char *gl_init_ok;
 char *gl_Loading;
+char *gl_theme_error;
 char *gl_file_overflow;
 
 char *gl_menu_btn;
@@ -111,6 +112,7 @@ const char en_init_error[] = "Micro SD card initial error";
 const char en_power_off[] = "Power off";
 const char en_init_ok[] = "Micro SD card initial OK";
 const char en_Loading[] = "Loading...";
+const char en_theme_error[] = "Theme not loaded, using Dark:";
 const char en_file_overflow[] = "File overflow,load to NOR";
 
 const char en_menu_btn[] = "[B]CANCEL    [A]OK";
@@ -221,6 +223,7 @@ void LoadEnglish(void)
 	gl_power_off = (char *)en_power_off;
 	gl_init_ok = (char *)en_init_ok;
 	gl_Loading = (char *)en_Loading;
+	gl_theme_error = (char *)en_theme_error;
 	gl_file_overflow = (char *)en_file_overflow;
 
 	gl_menu_btn = (char *)en_menu_btn;

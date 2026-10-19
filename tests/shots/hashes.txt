@@ -117,6 +117,8 @@ ui-list/frames 49-49 E06A67B440CE3AC9
 ui-list/frames 50-50 9AE783DD021EDAE1
 ui-list/frames 51-51 7FF58B05C5869675
 ui-list/frames 52-53 46AD62F62A89A7DD
+ui-sd-theme/dialog 1EFE9DA2DBD47B49
+ui-sd-theme/list A3A189B9FCADEF84
 ui-theme/awake ECFA426BD367A550
 ui-theme/dimmed 0742C6ED47A9035E
 ui-theme/light 56AF1467237DB189
