@@ -6,6 +6,22 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** a Recently Played entry whose file is gone stayed on the list
+  after "Can't open the file", to fail again; it now comes off (not on a
+  card error, which may pass) (`217f418`).
+- **Changed:** B on Diagnostics' first page, started from SETTINGS, goes
+  back to SETTINGS page 2 with the cursor on DIAGNOSE, not to the NOR list;
+  from the power-on keys it still goes on to the menu (`386e5ed`).
+- **Fixed:** with no notice before the list, a big, slow card (or making
+  the log file) left the boot black for seconds. "Loading..." now shows once
+  the boot has been busy for 20 frames after mounting; a fast boot still
+  goes straight to the list (`3d920ed`). The unused "microSD card ready"
+  string is gone (`0954c7b`).
+- **Fixed:** the background log open (`f38df20`) could meet a delete of the
+  file it held open, which FatFs doesn't guard against: a delete now
+  finishes it first. A reset or power loss part way lost the new file's
+  clusters on the card; the file is now allocated whole first. LOGGING
+  turned off meanwhile stops it, so the card is left alone (`9d2680d`).
 - **Fixed:** SETTINGS page 2's SAVE edit opened on OK, so A, A saved AUTO
   SAVE unchanged; it opens on the value, as the other rows do, and MODE B's
   opens on the mode it has, not on RUMBLE (`46e1138`).
