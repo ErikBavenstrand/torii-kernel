@@ -6,6 +6,24 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** progress bars move and fill. Each step of a launch (save,
+  loading, patching), WRITE TO NOR, the power-on save copy, BACK UP SAVE
+  and FORMAT ALL fills its share of the bar, with the step's percentage,
+  and the bar shows full ("Done") before the dialog closes. It used to sit
+  at 0% everywhere but the NOR write and stop a block short. The FORMAT ALL
+  bar is an estimate based on the official "about 4 mins", with the time so
+  far. During a CLEAN BOOT the cart copies the game itself, so the bar holds
+  until the copy ends (`a865d94`).
+- **Changed:** dialog, progress and message texts are clear sentence-case
+  English ("Save to SD card?", "Writing to NOR 50%", "No save file found",
+  "Delete this file?", the firmware update's), with no "Sav" (`a865d94`).
+- **Changed:** BREATHING and SD LED on SETTINGS page 2 are rows UP and DOWN
+  stop on, edited like any other (R, G, B, OK). The settings are stored as
+  before (`a865d94`).
+- **Changed:** HELP shows "Torii 0.3.0 · FW N" instead of the official
+  "K:1.06", and every boot logs "Torii 0.3.0, build id …"
+  (`source/version.h`) (`a865d94`).
+
 - **Removed:** HELP's "SELECT: Thumbnail toggle" line; the lists no longer
   show thumbnails (`3250448`).
 - **Fixed:** with an SD theme that has a wallpaper, the game menu no longer
