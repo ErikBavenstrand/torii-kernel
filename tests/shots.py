@@ -70,6 +70,26 @@ HEADER = """\
 """
 
 
+def copy_tree(img: str, src: Path, dest: str) -> None:
+    """Copies src's entries (not dot files) into folder dest of img, in
+    sorted order. `mcopy -s` would walk folders in the host's directory
+    order, which differs between filesystems (APFS, ext4): the card's
+    directory entries, and so the kernel's listing and sorting time, would
+    differ between machines and shift every golden after it by frames."""
+    files: list[str] = []
+    for e in sorted(e for e in src.iterdir() if e.name[0] != "."):
+        if not e.is_dir():
+            files.append(str(e))
+            continue
+        if files:  # one mcopy for a run of files, in order
+            run(["mcopy", "-Q", "-i", img, *files, f"{dest}/"])
+            files = []
+        run(["mmd", "-i", img, f"{dest}/{e.name}"])
+        copy_tree(img, e, f"{dest}/{e.name}")
+    if files:
+        run(["mcopy", "-Q", "-i", img, *files, f"{dest}/"])
+
+
 def build_sd(path: Path) -> None:
     """The SD card every scenario starts from."""
     stage = path.parent / "sd"
@@ -126,8 +146,7 @@ def build_sd(path: Path) -> None:
             "65536",
         ]
     )
-    for entry in sorted(stage.iterdir()):
-        run(["mcopy", "-s", "-Q", "-i", str(path), str(entry), "::/"])
+    copy_tree(str(path), stage, "::")
 
 
 def many_cheats() -> bytes:
@@ -203,18 +222,7 @@ def boot(
                     ["mmd", "-i", img, folder], capture_output=True, check=False
                 )
             # Dot files (.DS_Store and the like) stay behind
-            for entry in sorted(e for e in Path(src).iterdir() if e.name[0] != "."):
-                run(
-                    [
-                        "mcopy",
-                        "-s",
-                        "-Q",
-                        "-i",
-                        img,
-                        str(entry),
-                        f"::/torii/themes/{theme}/",
-                    ]
-                )
+            copy_tree(img, Path(src), f"::/torii/themes/{theme}")
         elif line.startswith("#! theme-choice "):
             choice = cart / "theme.txt"
             subprocess.run(
