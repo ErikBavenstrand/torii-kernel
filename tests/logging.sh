@@ -439,6 +439,12 @@ flood)
   # shellcheck disable=SC2046
   boot $(keys 160 R L R L R L R L R L R L R L R L R L R L R L R L R L R L R L R L) -f 600
   [ "$(count "ui: pushed nor-list")" -ge $((before + 16)) ] || fail "the lists didn't write the log while idle"
+  # A few lines reach the card after 5 s with no key held, over the file menu too
+  before=$(count "lists: /Many")
+  # shellcheck disable=SC2046
+  boot $(keys 160 A A) -f 600
+  [ "$(count "lists: /Many")" = $((before + 1)) ] || fail "a few lines didn't reach the card after 5 s idle"
+  has "ui: pushed file-menu"
   lines_ok
   card_ok
   echo "PASS: measured frames reach the card as summaries, nothing is lost, and idle lists write the log"
