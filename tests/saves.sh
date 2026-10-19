@@ -6,7 +6,7 @@
 #         and each step logs what it did
 #   nearly-full  a copy that just fits the card is written whole, through
 #         its progress dialog, and the menu comes back
-#   full  a copy the card can't take is logged as an error, with how much
+#   full  a copy the card can't take shows an error dialog and logs how much
 #         of it was written (the copy is still cut short: crash-safe saves
 #         are v0.5)
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
@@ -117,16 +117,22 @@ full)
   free=$(mdir -i "$cart/sd.img" ::/ | sed -n 's/^ *\([0-9 ]*\) bytes free.*/\1/p' | tr -d ' ')
   head -c $((free - 65536)) /dev/urandom >"$cart/filler.bin"
   mcopy -i "$cart/sd.img" "$cart/filler.bin" ::/FILLER.BIN
-  # Power-on 4: A at "Save sav?"; the copy runs out of room.
-  boot -k 100:A -k 106:- -f 400
+  # Power-on 4: A at "Save sav?"; the copy runs out of room, and an error
+  # dialog says so, not "Done" (v0.3.2); B closes it.
+  boot -k 100:A -k 106:- -w "error 3: Can't write the save" -s @20:"$shots/4-error.png" -k @30:B -k @34:- \
+    -w "screen ready: sd-list"
   logged 'save: "Save sav?" for /SAVER/Test.sav, 131072 bytes, save type 31: A, save'
   logged_error "save: writing Test.sav: "
   grep -qE "kernel error: save: writing Test.sav: [0-9]+ of 131072 bytes written" "$cart/run.log" ||
     fail "the error doesn't say how much was written"
+  logged_error "error 3: Can't write the save"
+  logged "dialog: Can't write the save"
+  grep -A3 "kernel error: error 3: " "$cart/run.log" | grep -q "^kernel: screen ready: dialog" ||
+    fail "no error dialog after the copy ran out of room"
   grep -q "^kernel: screen ready: sd-list" "$cart/run.log" || fail "no menu after the copy ran out of room"
   mtype -i "$cart/sd.img" ::/FILLER.BIN | cmp -s - "$cart/filler.bin" || fail "the other file changed"
   fsck.fat -n "$cart/sd.img" >/dev/null || fail "fsck.fat found errors"
-  echo "PASS: saves full: a copy the card can't take is logged as an error"
+  echo "PASS: saves full: a copy the card can't take shows an error dialog and logs how much was written"
   ;;
 
 nearly-full)
