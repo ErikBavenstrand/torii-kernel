@@ -12,6 +12,7 @@
 #include "ezkernel.h"
 #include "RTC.h"
 #include "Ezcard_OP.h"
+#include "ui/dialog.h"
 #include "settings.h"
 #include "tlog.h"
 #include "engine/engine.h"
@@ -188,30 +189,12 @@ void settings_leave(u32 result)
 	ui_pop();
 }
 
-// See ezkernel.h. Black first (the backdrop, layers off, rather than a
-// white forced blank), the bitmap cleared, then mode 3.
+// See ezkernel.h. The restore is dialog_mode3's (source/ui/dialog.h), which
+// the dialogs and Diagnostics share.
 void menu_leave_engine(void)
 {
 	ui_shutdown();
-	VBlankIntrWait();
-	REG_DISPCNT = MODE_0;  // no layers: only the backdrop shows
-	REG_BLDCNT = 0;
-	REG_BLDALPHA = 0;
-	REG_BLDY = 0;
-	REG_MOSAIC = 0;
-	REG_BG2CNT = 0;
-	u32 zero = 0;
-	CpuFastSet(&zero, (void *)VRAM, (240 * 160 * 2 / 4) | FILL);
-	VBlankIntrWait();
-	REG_DISPCNT = MODE_3 | BG2_ENABLE;
-	// libgba's keysDown and keysUp gather changes until they are read, not
-	// until the next scanKeys: the engine read the keys itself, so read
-	// them once now, or the menu takes a key that left the screen (a held
-	// L) for a new press
-	scanKeys();
-	(void)keysDown();
-	(void)keysUp();
-	(void)keysDownRepeat();
+	dialog_mode3();
 }
 
 u32 Settings_run(u32 page)

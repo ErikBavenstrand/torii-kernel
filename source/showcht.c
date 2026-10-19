@@ -11,6 +11,7 @@
 #include "showcht.h"
 #include "draw.h"
 #include "tlog.h"
+#include "savename.h"
 #include "engine/cover.h"
 #include "engine/engine.h"
 #include "ui/ui.h"
@@ -531,7 +532,7 @@ u32 Check_cheat_file(TCHAR *gamefilename)
 {
 	u32 res;
 	UINT ret;
-	TCHAR chtnamebuf[100];
+	TCHAR chtnamebuf[GAME_NAME_MAX + 1];
 	u32 filesize;
 	u32 GAMEID = 0;
 	u32 i;
@@ -545,11 +546,7 @@ u32 Check_cheat_file(TCHAR *gamefilename)
 			return 0;
 	}
 
-	memcpy(chtnamebuf, gamefilename, 100);
-	u32 len = strlen(chtnamebuf);
-	chtnamebuf[len - 3] = 'c';
-	chtnamebuf[len - 2] = 'h';
-	chtnamebuf[len - 1] = 't';
+	name_with_ext(chtnamebuf, gamefilename, "cht");
 
 	res = f_chdir("/CHEAT");
 	if (res != FR_OK) {
@@ -582,7 +579,7 @@ u32 Check_cheat_file(TCHAR *gamefilename)
 					res = Change2cht_folder(chtname);
 					if (res != 0)
 						return 0;
-					memset(chtnamebuf, 0x00, 100);
+					memset(chtnamebuf, 0x00, sizeof(chtnamebuf));
 					sprintf(chtnamebuf, "%d%d%d%d.cht", HexToChar(((u8 *)&chtname)[0]),
 						HexToChar(((u8 *)&chtname)[1]), HexToChar(((u8 *)&chtname)[2]),
 						HexToChar(((u8 *)&chtname)[3]));
@@ -871,7 +868,7 @@ int Open_cht_file(TCHAR *gamefilename, u32 havecht)
 	int shown = 0;
 	struct cheat_screen cs;
 	u32 res;
-	TCHAR chtnamebuf[100];
+	TCHAR chtnamebuf[GAME_NAME_MAX + 1];
 
 	// As zeroed as they were in EWRAM of their own, before the first file
 	memset(buf, 0, 2 * MAX_BUF_LEN);
@@ -880,11 +877,7 @@ int Open_cht_file(TCHAR *gamefilename, u32 havecht)
 		if (res != FR_OK) {
 			return 0;
 		}
-		memcpy(chtnamebuf, gamefilename, 100);
-		u32 len = strlen(chtnamebuf);
-		chtnamebuf[len - 3] = 'c';
-		chtnamebuf[len - 2] = 'h';
-		chtnamebuf[len - 1] = 't';
+		name_with_ext(chtnamebuf, gamefilename, "cht");
 	} else {
 		Change2cht_folder(havecht);
 		u8 *chtmode;

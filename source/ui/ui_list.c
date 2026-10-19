@@ -91,8 +91,10 @@ struct row_ctx {
 	const struct torii_font *font;
 	u32 w, h, cw;  // a row's size and a cell's width, px
 	u32 y;         // a list row's text top
-	u32 pad;       // the name's inset
+	u32 pad;       // the inset from a row's edges
+	u32 x;         // where a list row's name starts: pad, or after the icon column
 	u32 clip;      // the name's width
+	int icons;     // UI_LIST_ICONS
 	u32 paper, ink;
 };
 
@@ -131,6 +133,8 @@ static int geometry(u8 node, struct list_state *st)
 		return 0;
 	}
 	st->rt = (u8)(rh / 8);
+	if ((c->flags & UI_LIST_FIXED) && !c->cell_w)
+		st->ring.k = (u8)(n->h / rh);  // a slot per whole row: model_count keeps to them
 	if (c->cell_w) {
 		if (c->cell_w % 8 || c->cell_w > n->w) {
 			ui_set_error("view %s: a grid's cells are whole tiles, no wider than it", name);
@@ -173,6 +177,12 @@ static u32 mq_tile(const struct list_state *st, u32 set)
 static u32 model_count(u8 node)
 {
 	u32 n = config(node)->model->count(ui_node_view(node)->ctx);
+	if ((config(node)->flags & UI_LIST_FIXED) && !config(node)->cell_w) {
+		// Content within the viewport never scrolls, so each row keeps a slot
+		const struct list_state *st = ui_node_state(node);
+		if (n > st->ring.k)
+			n = st->ring.k;
+	}
 	return n > UI_LIST_MAX ? UI_LIST_MAX : n;
 }
 
@@ -368,6 +378,11 @@ u32 ui_list_cursor(u8 node)
 	return ((const struct list_state *)ui_node_state(node))->cursor;
 }
 
+int ui_list_paging(u8 node)
+{
+	return ((const struct list_state *)ui_node_state(node))->page != PAGE_NONE;
+}
+
 void ui_list_scroll_info(u8 node, u32 *content, u32 *view, u32 *scroll)
 {
 	const struct list_state *st = ui_node_state(node);
@@ -428,11 +443,34 @@ static int list_event(u8 node, const struct ui_event *e)
 	return 0;
 }
 
+// Where a list row's name starts: after the icon column, if it has one
+static u32 text_x(u8 node)
+{
+	u32 pad = ui_theme()->pad;
+	return (config(node)->flags & UI_LIST_ICONS) ? UI_LIST_ICON_W + pad / 2 : pad;
+}
+
 // Pixels a list row's name may use
 static u32 text_clip(u8 node, const struct list_state *st)
 {
-	u32 w = st->tw * 8u, used = 2u * ui_theme()->pad + config(node)->detail_w;
+	u32 w = st->tw * 8u, used = text_x(node) + ui_theme()->pad + config(node)->detail_w;
 	return w > used + 8 ? w - used : 8;
+}
+
+// Draws a 16x16 icon (2x2 tiles in row order) at tile column 0 of a row's
+// tiles, over its paper: colour 0 lets the paper show
+static void row_icon(u32 *tiles, u32 rt, const u32 *icon)
+{
+	u32 ty0 = (rt - 2) / 2;
+	for (u32 t = 0; t < 4; t++) {
+		u32 *dst = &tiles[((t & 1) * rt + ty0 + (t >> 1)) * 8];
+		const u32 *src = &icon[t * 8];
+		for (u32 y = 0; y < 8; y++) {
+			u32 px = src[y];
+			u32 set = (px | px >> 1 | px >> 2 | px >> 3) & 0x11111111u;
+			dst[y] = (dst[y] & ~(set * 0xF)) | px;
+		}
+	}
 }
 
 static void marquee_tick(u8 node, struct list_state *st, u32 dt)
@@ -585,6 +623,8 @@ static void row_ctx_init(u8 node, const struct list_state *st, struct row_ctx *r
 	rc->cw = rc->w / st->cols;
 	rc->y = (rc->h - rc->font->line_height) / 2;
 	rc->pad = t->pad;
+	rc->x = text_x(node);
+	rc->icons = (config(node)->flags & UI_LIST_ICONS) != 0;
 	rc->clip = text_clip(node, st);
 	rc->paper = ui_paper(node, UI_ROLE_BG);
 	rc->ink = ui_ink(node, UI_ROLE_TEXT);
@@ -618,8 +658,10 @@ static int draw_row(const struct list_state *st, const struct row_ctx *rc, u32 *
 		u32 ink = item.ink ? item.ink : rc->ink;
 		drew = 1;
 		if (st->cols == 1) {
+			if (item.icon && rc->icons && st->rt >= 2)
+				row_icon(tiles, st->rt, item.icon);
 			text_layout(font, item.text, len, rc->clip, &line);
-			text_draw_line(&win, font, rc->pad, rc->y, ink, &line);
+			text_draw_line(&win, font, rc->x, rc->y, ink, &line);
 			if (item.detail)
 				draw_detail(&win, rc, 0, item.detail, &line);
 			continue;
@@ -647,7 +689,7 @@ static int draw_row(const struct list_state *st, const struct row_ctx *rc, u32 *
 static void draw_marquee(const struct list_state *st, const struct row_ctx *rc, u32 *tiles, u32 r, u32 skip)
 {
 	const struct torii_font *font = rc->font;
-	u32 m = MQ_MARGIN * 8, left = m + rc->pad, right = left + rc->clip;
+	u32 m = MQ_MARGIN * 8, left = m + rc->x, right = left + rc->clip;
 	struct text_window win = {tiles, (u8)(st->tw + 2 * MQ_MARGIN), st->rt};
 	u32 ww = win.width * 8u;
 	text_clear(&win, 0, 0, ww, rc->h, rc->paper);
@@ -661,6 +703,8 @@ static void draw_marquee(const struct list_state *st, const struct row_ctx *rc, 
 	text_draw_line(&win, font, (u32)((s32)left + lead), rc->y, item.ink ? item.ink : rc->ink, &line);
 	text_clear(&win, 0, 0, left, rc->h, rc->paper);
 	text_clear(&win, right, 0, ww - right, rc->h, rc->paper);
+	if (item.icon && rc->icons && st->rt >= 2)
+		row_icon(tiles + MQ_MARGIN * st->rt * 8, st->rt, item.icon);  // the row's tile column 0
 	if (item.detail)
 		draw_detail(&win, rc, m, item.detail, &line);
 }

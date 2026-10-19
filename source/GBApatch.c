@@ -15,6 +15,7 @@
 #include "showcht.h"
 #include "Ezcard_OP.h"
 #include "irqpatch.h"
+#include "savename.h"
 #include "tlog.h"
 
 u32 windows_offset;
@@ -645,11 +646,7 @@ void GBApatch_NOR(u32 *address, int filesize, u32 offset)
 //------------------------------------------------------------------
 static void make_pat_name(TCHAR *patnamebuf, TCHAR *gamefilename)
 {
-	memcpy(patnamebuf, gamefilename, 100);
-	u32 len = strlen(patnamebuf);
-	patnamebuf[len - 3] = 'p';
-	patnamebuf[len - 2] = 'a';
-	patnamebuf[len - 1] = 't';
+	name_with_ext(patnamebuf, gamefilename, "pat");
 }
 //------------------------------------------------------------------
 static void GBA_patch_init(void)
@@ -699,7 +696,7 @@ u32 Check_pat(TCHAR *gamefilename)
 	u32 patfilesize;
 	u32 res;
 
-	TCHAR patnamebuf[100];
+	TCHAR patnamebuf[GAME_NAME_MAX + 1];
 	make_pat_name(patnamebuf, gamefilename);
 	res = f_chdir("/PATCH");
 	if (res == FR_OK) {
@@ -752,7 +749,7 @@ void Make_pat_file(TCHAR *gamefilename)
 	memset(w_buffer, 0x00, sizeof(w_buffer));
 
 	if (res == FR_OK) {
-		TCHAR patnamebuf[100];
+		TCHAR patnamebuf[GAME_NAME_MAX + 1];
 		make_pat_name(patnamebuf, gamefilename);
 
 		res = f_open(&gfile, patnamebuf, FA_WRITE | FA_OPEN_ALWAYS);
@@ -782,11 +779,7 @@ void Make_pat_file(TCHAR *gamefilename)
 //------------------------------------------------------------------
 static void make_mde_name(TCHAR *mdenamebuf, TCHAR *gamefilename)
 {
-	memcpy(mdenamebuf, gamefilename, 100);
-	u32 len = strlen(mdenamebuf);
-	mdenamebuf[len - 3] = 'm';
-	mdenamebuf[len - 2] = 'd';
-	mdenamebuf[len - 1] = 'e';
+	name_with_ext(mdenamebuf, gamefilename, "mde");
 }
 //------------------------------------------------------------------
 u8 Check_mde_file(TCHAR *gamefilename)
@@ -796,7 +789,7 @@ u8 Check_mde_file(TCHAR *gamefilename)
 	u32 mdefilesize;
 	u32 res;
 
-	TCHAR mdenamebuf[100];
+	TCHAR mdenamebuf[GAME_NAME_MAX + 1];
 	make_mde_name(mdenamebuf, gamefilename);
 
 	res = f_chdir("/SAVER");
@@ -845,7 +838,7 @@ u8 Make_mde_file(TCHAR *gamefilename, u8 Save_num)
 	memset(w_buffer, 0x00, sizeof(w_buffer));
 
 	if (res == FR_OK) {
-		TCHAR mdenamebuf[100];
+		TCHAR mdenamebuf[GAME_NAME_MAX + 1];
 		make_mde_name(mdenamebuf, gamefilename);
 
 		res = f_open(&gfile, mdenamebuf, FA_WRITE | FA_OPEN_ALWAYS);
@@ -869,12 +862,8 @@ u32 Check_RTS(TCHAR *gamefilename)
 	u32 rtsfilesize;
 	u32 res;
 
-	TCHAR rtsnamebuf[100];
-	memcpy(rtsnamebuf, gamefilename, 100);
-	u32 len = strlen(rtsnamebuf);
-	rtsnamebuf[len - 3] = 'r';
-	rtsnamebuf[len - 2] = 't';
-	rtsnamebuf[len - 1] = 's';
+	TCHAR rtsnamebuf[GAME_NAME_MAX + 1];
+	name_with_ext(rtsnamebuf, gamefilename, "rts");
 
 	res = f_mkdir("/RTS");
 	res = f_chdir("/RTS");

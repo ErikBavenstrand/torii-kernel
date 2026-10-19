@@ -10,7 +10,7 @@
 # Every path that erases or programs the kernel NOR runs here, each on its own
 # cart, with logging on: the boot's NOR list migration, settings saves on both pages, the
 # pending-save record and its clearing, WRITE TO NOR, delete latest,
-# Diagnostics, power cuts in the middle of those writes and the boot after
+# FORMAT ALL, Diagnostics, power cuts in the middle of those writes and the boot after
 # them, and the same writes on the other kernel NOR chip (S29GL064A, buffered
 # programming). After each power-on the loader must be byte-identical, and
 # each case checks that its write really happened. All cases run; the script
@@ -137,6 +137,8 @@ keys() {
 write_a=$(keys 200 DOWN DOWN A DOWN DOWN A)
 write_b=$(keys 200 DOWN DOWN DOWN A DOWN DOWN A)
 delete=$(keys 200 R DOWN A DOWN A)
+format=$(keys 200 R A DOWN DOWN A A)
+format_no=$(keys 200 R A DOWN DOWN A B)
 # THEME on SETTINGS page 2 set to LIGHT and saved, through save_set2_info
 save_theme="$(keys 200 R) $(keys 220 R) $(keys 270 R) $(keys 320 DOWN DOWN DOWN A A RIGHT A)"
 # ACCENT on SETTINGS page 2 set to Blue and saved
@@ -220,6 +222,22 @@ EOF
   logged "nor: deleting B.gba"
   logged "nor: list saved, 1 games"
   pass "delete latest"
+
+  # FORMAT ALL: the NOR list's first game, its menu's third row, and A on
+  # the question
+  new_cart nor-format
+  boot $write_a -f 700
+  boot $format -f 900
+  logged "nor: erased the game NOR"
+  logged "nor: list saved, 0 games"
+  pass "FORMAT ALL"
+
+  # FORMAT ALL answered with B: nothing is erased or written
+  new_cart nor-format-no
+  boot $write_a -f 700
+  boot $format_no -f 600
+  [ $ok = 0 ] || ! grep -q 'nor: erasing\|nor: list saved' "$log" || bad "B on FORMAT ALL's question wrote the NOR"
+  pass "FORMAT ALL answered no"
 
   new_cart diagnostics
   older_list

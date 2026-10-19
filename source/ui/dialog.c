@@ -216,9 +216,16 @@ void dialog_mode3(void)
 		*r = 0;
 	u32 zero = 0;
 	CpuFastSet(&zero, (void *)0x06000000, (240 * 160 * 2 / 4) | 1 << 24);
+	VBlankIntrWait();
 	REG_DISPCNT_ = DISP_MODE3_BG2;
-	// libgba's key state: keys held now are old, not pressed
+	// libgba's keysDown and keysUp gather changes until they are read, not
+	// until the next scanKeys: the engine read the keys itself, so read them
+	// once now, or the menu takes a key that left the screen (a held L) for
+	// a new press
 	scanKeys();
+	(void)keysDown();
+	(void)keysUp();
+	(void)keysDownRepeat();
 }
 
 // --- Text ----------------------------------------------------------------

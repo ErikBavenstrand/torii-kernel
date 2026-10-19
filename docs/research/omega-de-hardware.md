@@ -404,7 +404,7 @@ for `Save_info`, `FlashBase_S71`, the command bytes `0x30`, `0xA0`, `0x25`,
 
 | Path | Writes | Through |
 |---|---|---|
-| Settings saved (`Save_SET_info`: SETTINGS, a game's save type, thumbnails) | `0x7B0000`, 512 bytes | `Save_info` |
+| Settings saved (`Save_SET_info`: SETTINGS, a game's save type) | `0x7B0000`, 512 bytes | `Save_info` |
 | Pending-save record set at launch, cleared at the next boot (`Save_sav_info`) | `0x790000`, 512 bytes | `Save_info` |
 | NOR list saved: WRITE TO NOR, delete latest, FORMAT ALL, the boot's migration of an older list (`Save_NOR_list`) | `0x780000` then `0x7A0000` (or the other way), 0x2120 bytes each | `Save_info` |
 | `Read_S71NOR_ID` (in `Save_info` and Diagnostics' first step) | autoselect `90` and reset `F0` at `0x0AAA`/`0x0554`/0: commands, no erase or program | — |

@@ -10,12 +10,12 @@ git log, not here.
   engine (`source/ui/dialog.h`): the launch's progress (with the game's name),
   WRITE TO NOR's and the PSRAM load's progress with a bar, "Save sav?", the
   NOR menu's format, save load and backup, delete latest, L+START delete,
-  and every error message. Texts, keys and flow are as before; a message
-  now shows "[B]OK", and a question returns once its key is let go. Deleting
-  a file whose name is cut now says "Name too long" instead of failing
-  silently, and the delete question shows the whole name. The screen
-  doesn't dim while a dialog is up (`6067e1b`, `adf21e9`, `ba02013`,
-  `7b2d44d`).
+  and every error message, the lists' too. Texts, keys and flow are as
+  before; a message now shows "[B]OK", a question returns once its key is
+  let go, and the delete question shows the whole name. The screen doesn't
+  dim while a dialog is up. The format erase and the save backup show
+  their progress over the NOR list (`6067e1b`, `adf21e9`, `ba02013`,
+  `7b2d44d`, T9 merge).
 - **Changed:** Diagnostics runs on the engine: its lines scroll in a list,
   colours are theme roles, the summary scrolls with UP/DOWN. A renderer
   step times a glyph, a 38-glyph row, an LZ77 cover into PSRAM, a PSRAM to
@@ -26,6 +26,21 @@ git log, not here.
   theme's wallpaper is read from PSRAM page 0 even when a launch or a NOR
   write left another page selected (`6067e1b`, `adf21e9`, `ba02013`,
   `6db6bfa`).
+- **Changed:** the SD list, the NOR list and Recently Played, with the game
+  menu, the NOR game menu and their questions, run on the v0.3 tile engine:
+  a title bar with the folder, clock and count, 16 px rows with file-type
+  icons and sizes, smooth scrolling, and a cut name that scrolls inside its
+  column, no longer into the size. Keys and flow are as before; SELECT no
+  longer toggles thumbnails, which v0.4's covers replace (`5e1981c`,
+  `cfd3cc8`, `f641acd`).
+- **Changed:** file names of up to 255 bytes list, open, launch and save
+  whole: the list keeps them in PSRAM instead of 100 bytes each in EWRAM,
+  which frees 70 KB of EWRAM. A name whose save name won't fit the pending
+  save record (over 251 bytes) says Name too long, and one over 99 bytes
+  can't be written to the game NOR, whose list keeps 99 (`5e1981c`).
+- **Fixed:** L+START deleted a file in the current directory, which could
+  be /SAVER after a failed launch, rather than in the list's folder
+  (`f641acd`).
 - **Changed:** SETTINGS (both pages) and HELP are drawn by the v0.3 tile
   engine: a header and a list with each setting's name and value, the
   official keys and edit flow, and the same settings writers. In edit mode

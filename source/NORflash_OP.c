@@ -117,20 +117,16 @@ void Chip_Erase(void)
 }
 
 //-----------------------------------------------------------
-// Torii: the question and the erase's count are dialogs on the engine
-// (source/ui/dialog.h); the caller repaints the list after.
+// Erases the whole game NOR and its list (FORMAT ALL, once confirmed).
+// Torii: the erase's count is a progress dialog (source/ui/dialog.h)
 void FormatNor(void)
 {
-	dialog_open();  // one engine session for the question and the erase
-	if (dialog_confirm(NULL, gl_formatnor_info, DIALOG_INFO)) {
-		dialog_progress_begin(NULL, NULL);  // the count below, as before
-		Chip_Erase();
-		memset(pNorFS, 00, sizeof(FM_NOR_FS) * MAX_NOR);
-		game_total_NOR = 0;
-		Save_NOR_list(0);  // Torii: the boot no longer saves an empty list
-		dialog_progress_end();
-	}
-	dialog_close();
+	dialog_progress_begin(NULL, NULL);
+	Chip_Erase();
+	memset(pNorFS, 00, sizeof(FM_NOR_FS) * MAX_NOR);
+	game_total_NOR = 0;
+	Save_NOR_list(0);  // Torii: the boot no longer saves an empty list
+	dialog_progress_end();
 }
 //---------------------------------------------------------------
 void WriteFlash(u32 address, u8 *buffer, u32 size)

@@ -314,7 +314,8 @@ struct ui_item {
 	u8 ink;              // role of the text, 0: TEXT
 	u8 pad;
 	const char *detail;  // right-aligned in DIM (a size, a date); NULL none
-	const u32 *icon;     // grid: 2x2 4bpp tiles in row order, colours 10-15; NULL none
+	const u32 *icon;     // grid, or a list with UI_LIST_ICONS: 2x2 4bpp tiles in row order,
+			     // colours 10-15 (0 shows the row's paper); NULL none
 };
 
 enum {
@@ -335,8 +336,12 @@ struct ui_list_model {
 enum {
 	UI_LIST_WRAP = 1,     // the cursor wraps at the ends (input.h's rules)
 	UI_LIST_MARQUEE = 2,  // the selected row's name scrolls if it is cut
-	UI_LIST_PLAIN = 4,    // no row shows as selected (a log): the cursor only scrolls
+	UI_LIST_ICONS = 4,    // list: rows keep UI_LIST_ICON_W px at the left for item.icon
+	UI_LIST_FIXED = 8,    // list: never more items than whole rows fit, so it never scrolls
+			      // and needs no spare row slots (a menu in a dialog); more are cut
+	UI_LIST_PLAIN = 16,   // no row shows as selected (a log): the cursor only scrolls
 };
+#define UI_LIST_ICON_W 16
 
 // A list (cols 1) or a grid. ink defaults to TEXT and paper to BG. The
 // viewport is the node's rectangle.
@@ -487,6 +492,9 @@ void ui_list_reset(u8 node, u32 cursor);
 void ui_list_refresh(u8 node, u32 lo, u32 hi);
 void ui_list_set_cursor(u8 node, u32 cursor);
 u32 ui_list_cursor(u8 node);
+// 1 while a page change hides or draws the list's page: a handler taking A
+// itself waits until it is up, as the list's own A does
+int ui_list_paging(u8 node);
 // For a scroll bar: content and viewport height, and scroll, in px.
 void ui_list_scroll_info(u8 node, u32 *content, u32 *view, u32 *scroll);
 
