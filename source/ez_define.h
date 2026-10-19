@@ -15,12 +15,16 @@
 //   jobs_run, never inside one of the operations above, so it can overlap
 //   them all. An owner that wants to keep data here across frames that run
 //   jobs must stop the asset jobs first (cover_shutdown).
+// - READCACHE_THEME, with READCACHE_STAGE: loading an SD theme (ui/sdtheme.h),
+//   within one call: the reader, the parsed theme.ini, the decoded wallpaper.
 // Vcache, its first 75 KB, is mode 3's back buffer, but nothing draws there:
 // every caller draws direct.
 #define MAX_pReadCache_size 0x20000
 #define READCACHE_STAGE 0x0
 #define READCACHE_STAGE_SIZE 0x8000
 #define READCACHE_SORT_WORK 0x800  // SORT_WORK_SIZE bytes
+#define READCACHE_THEME 0x14C00
+#define READCACHE_THEME_SIZE 0x800
 #define MAX_files 0x200
 #define MAX_folder 0x100
 #define MAX_NOR 0x40
@@ -126,7 +130,7 @@
 #define assress_game_rumble 25 //games can use the cart's rumble motor
 #define assress_logging 26 //Torii: LOGGING level, source/tlog.h (0xFFFF: off)
 #define assress_dim 27 //Torii: DIM, idle minutes before the screen dims, 1-60 (else off), source/ui/ui.h
-#define assress_theme 28 //Torii: THEME, 1 light (else dark), source/ui/ui.h
+#define assress_theme 28 //Torii: THEME, 1 light, 2 the SD theme in /torii/theme.txt (else dark), source/ui/ui.h
 #define assress_accent 29 //Torii: ACCENT, 1 + an index into ui_accents (else the theme's own)
 
 #define assress_saveMODE 64

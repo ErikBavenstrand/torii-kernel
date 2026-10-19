@@ -17,3 +17,16 @@
 -k @240:UP -k @244:-
 -H @240:@252
 -s @270:wrapped.png
+# Keys during a page change wait for its page: DOWN at the end wraps to 1
+# and A a frame later opens item 1's dialog once the page is up; three L one
+# frame apart from item 1 wrap to 1000 and page on to 984.
+-k @280:DOWN -k @281:DOWN+A -k @284:-
+-s @300:queued-a.png
+-k @310:B -k @314:-
+-k @330:L -k @331:- -k @332:L -k @333:- -k @334:L -k @335:-
+-H @330:@345
+-s @360:queued-l.png
+# Held R pages every 4 frames after 20 (the cycle budget's held paging),
+# rests at 1000, wraps to 1 and pages on
+-k @370:R -k @440:-
+-s @460:held-r.png

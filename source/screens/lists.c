@@ -483,9 +483,9 @@ static const struct ui_spec list_nodes[N_NODES] = {
 
 static int list_event(struct ui_view *v, const struct ui_event *e);
 static const struct ui_view_spec list_views[SCREENS] = {
-	[SCR_SD] = {"sd-list", list_nodes, N_NODES, 1, UI_NONE, 0, list_event},
-	[SCR_NOR] = {"nor-list", list_nodes, N_NODES, 2, UI_NONE, 0, list_event},
-	[SCR_RECENT] = {"recent", list_nodes, N_NODES, 3, UI_NONE, 0, list_event},
+	[SCR_SD] = {"sd-list", list_nodes, N_NODES, 10, UI_NONE, 0, list_event},
+	[SCR_NOR] = {"nor-list", list_nodes, N_NODES, 11, UI_NONE, 0, list_event},
+	[SCR_RECENT] = {"recent", list_nodes, N_NODES, 12, UI_NONE, 0, list_event},
 };
 
 // A menu: a list of rows on plane 3 between two panel strips on plane 0, the
@@ -545,10 +545,10 @@ static const struct ui_spec menu5_nodes[] = MENU_NODES(5);
 static const struct ui_spec menu6_nodes[] = MENU_NODES(6);
 
 static int menu_event(struct ui_view *v, const struct ui_event *e);
-static const struct ui_view_spec file_menu5 = {"file-menu", menu5_nodes, 4, 4, UI_NONE, UI_VIEW_MODAL, menu_event};
-static const struct ui_view_spec file_menu6 = {"file-menu", menu6_nodes, 4, 4, UI_NONE, UI_VIEW_MODAL, menu_event};
-static const struct ui_view_spec nor_menu3 = {"nor-menu", menu3_nodes, 4, 5, UI_NONE, UI_VIEW_MODAL, menu_event};
-static const struct ui_view_spec nor_menu5 = {"nor-menu", menu5_nodes, 4, 5, UI_NONE, UI_VIEW_MODAL, menu_event};
+static const struct ui_view_spec file_menu5 = {"file-menu", menu5_nodes, 4, 13, UI_NONE, UI_VIEW_MODAL, menu_event};
+static const struct ui_view_spec file_menu6 = {"file-menu", menu6_nodes, 4, 13, UI_NONE, UI_VIEW_MODAL, menu_event};
+static const struct ui_view_spec nor_menu3 = {"nor-menu", menu3_nodes, 4, 14, UI_NONE, UI_VIEW_MODAL, menu_event};
+static const struct ui_view_spec nor_menu5 = {"nor-menu", menu5_nodes, 4, 14, UI_NONE, UI_VIEW_MODAL, menu_event};
 
 // A message, or a question A and B answer. A minimal local dialog until
 // T12's message and confirm views land.
@@ -590,8 +590,8 @@ static const struct ui_spec dialog_nodes[] = {
 };
 
 static int dialog_event(struct ui_view *v, const struct ui_event *e);
-static const struct ui_view_spec message_view = {"message", dialog_nodes, 3, 6, UI_NONE, UI_VIEW_MODAL, dialog_event};
-static const struct ui_view_spec confirm_view = {"confirm", dialog_nodes, 3, 7, UI_NONE, UI_VIEW_MODAL, dialog_event};
+static const struct ui_view_spec message_view = {"message", dialog_nodes, 3, 15, UI_NONE, UI_VIEW_MODAL, dialog_event};
+static const struct ui_view_spec confirm_view = {"confirm", dialog_nodes, 3, 16, UI_NONE, UI_VIEW_MODAL, dialog_event};
 
 // --- Engine and screens ------------------------------------------------------------
 

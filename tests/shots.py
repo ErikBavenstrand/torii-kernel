@@ -9,7 +9,8 @@ waits for the kernel's "screen ready: SCREEN" lines with -w and names its key
 frames with -s @N:KEY.png; -H @A:@B hashes every frame of an animation.
 Lines starting "#! settings SLOT=VALUE..." set kernel settings slots first;
 "#! kernel test" runs the test kernel (ezkerneltest.gba, `just test-kernel`'s
-build) instead, for scenes only it has, as the cover demo.
+build) instead, for scenes only it has, as the cover demo. "#! sd-theme NAME"
+copies themes/NAME to /torii/themes/NAME on the scenario's card.
 
 Check (the default): every key frame's screen hash, and every animation's
 frame hashes, must equal tests/shots/hashes.txt. On a mismatch the actual,
@@ -180,6 +181,14 @@ def boot(name: str, sd: Path, cart: Path, out: Path, extra: list[str] = ()):
     for line in opts.read_text(encoding="utf-8").splitlines():
         if line.split() == ["#!", "kernel", "test"]:
             kernel = TEST_KERNEL
+        elif line.startswith("#! sd-theme "):
+            name = line.split()[2]
+            img = str(cart / "sd.img")
+            for folder in ("::/torii", "::/torii/themes"):
+                subprocess.run(
+                    ["mmd", "-i", img, folder], capture_output=True, check=False
+                )
+            run(["mcopy", "-s", "-Q", "-i", img, f"themes/{name}", "::/torii/themes/"])
         elif line.startswith("#! settings"):
             nor = cart / "kernel-nor.bin"
             if not nor.exists():

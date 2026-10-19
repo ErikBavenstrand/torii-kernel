@@ -21,6 +21,15 @@ git log, not here.
 - **Fixed:** L+START deleted a file in the current directory, which could
   be /SAVER after a failed launch, rather than in the list's folder
   (`f641acd`).
+- **Added:** themes from the SD card. `/torii/themes/<name>/theme.ini`
+  (version 1) overrides the dark or light theme key by key: colours, fonts,
+  row height, spacing, fade, slide, marquee and key repeat timings, up to
+  16 layout patches, and a 4bpp LZ77 wallpaper repeated behind the menu.
+  THEME = 2 picks the theme `/torii/theme.txt` names, loaded at boot; one
+  that fails to load says why on the boot screen and the menu uses Dark,
+  and a screen the theme breaks falls back to its base theme. Nothing new
+  is written to kernel NOR. A stored ACCENT no longer draws as a
+  near-black colour (`c84f0df`, `0f7ac38`, `b7aa517`).
 - **Changed:** the cheat screen runs on the v0.3 tile engine: cheats as
   headings, their options indented, a picked one in the accent colour with
   "[x]"; the cursor skips headings, LEFT/RIGHT and L/R page, long names
@@ -38,6 +47,12 @@ git log, not here.
   swaps, with palette fades and layout patches for theme files to come.
   A DIM setting (slot 27, off by default) darkens the screen after idle
   minutes; nothing new writes kernel NOR (`40c91a0`, `2b8037a`, `a38043a`).
+- **Changed:** the v0.3 UI is smoother. A page change or wrap draws its rows
+  in one hidden frame and fades the list in; lists scroll 32 px a frame, held
+  L/R pages every 4 frames, and a cut name slides in and out at both edges at
+  a pixel a frame. Keys pressed during a page change are no longer dropped.
+  Rows draw faster, caps rise to 48 nodes and a 1 KB arena, and the scroll
+  and progress bars are restyled (`a02944f`, `8df0d4c`, `9992a54`).
 - **Changed:** motion checks a value's range before taking a slot and its
   spring settles in 64 bits; palette fades round symmetrically; releasing a
   direction restarts the repeat of one still held (`bec26d8`, `472a177`).

@@ -38,6 +38,7 @@ void test_asset_lz77_decode(void);
 void test_asset_psram_round_trip(void);
 void test_asset_sd_read(void);
 void test_asset_cover_cache(void);
+void test_theme_load(void);
 
 // Test assets (asset_data.c, written by tools/asset.py demo)
 #include <gba_base.h>

@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "ui_priv.h"
+#include "sdtheme.h"
 #include "../engine/cycles.h"
 #include "../engine/frame.h"
 #include "../engine/gfx.h"
@@ -27,7 +28,16 @@
 #define LAYER_BD 0x20
 #define LAYER_ALL 0x1F
 #define WIN_EFFECTS 0x20
+#define BLEND_ALPHA 0x0040
 #define BLEND_DARKEN 0x00C0
+
+// A page's fade-in (ui_plane_reveal)
+enum {
+	REVEAL_OFF,
+	REVEAL_ASKED,    // the next regs show the plane, faded all the way
+	REVEAL_WRITTEN,  // those regs wait for their commit (DISPCNT may be held)
+	REVEAL_RUN,      // on screen: one step a frame
+};
 
 #define TAG_PALETTE 0x5500
 #define TAG_SHARED 0x5510  // + character block
@@ -62,7 +72,14 @@ static struct {
 	u8 pop_wait;       // 1: popped, regs not updated; 2: updated in pop_frame
 	u8 lists_hidden;   // planes of lists hidden with ui_show
 	u16 wake_keys;     // keys that woke the screen from DIM, ignored until let go
+	u16 queued_keys;   // ui_queue_keys: dispatched next frame
 	u32 pop_frame;
+	// A page's fade-in
+	u8 reveal;        // REVEAL_*
+	u8 reveal_plane;
+	u8 reveal_step;   // frames of it shown, of reveal_frames
+	u8 reveal_frames; // the theme's page_fade when it started
+	u32 reveal_frame; // the frame whose regs showed the plane
 	// Fades
 	MotionId fade;
 	u16 fade_colour;
@@ -79,6 +96,12 @@ static struct {
 void ui_wake(void)
 {
 	frame_wake();
+}
+
+void ui_queue_keys(u16 keys)
+{
+	ui.queued_keys |= keys;
+	ui_wake();
 }
 
 const InputState *ui_input(void)
@@ -268,6 +291,36 @@ int ui_plane_hidden_now(u32 plane)
 	       !(gfx_dirty_regs & GFX_DIRTY_DISPCNT);
 }
 
+void ui_plane_reveal(u32 plane)
+{
+	ui_plane_hide(plane, 0);
+	ui.reveal_frames = ui_theme()->page_fade;
+	ui.reveal = ui.reveal_frames > 1 ? REVEAL_ASKED : REVEAL_OFF;
+	ui.reveal_plane = (u8)plane;
+	ui.reveal_step = 1;
+}
+
+// One frame of the fade-in: a step once the regs showing the plane are on
+// screen. Called after the commit.
+static void reveal_tick(u32 dt)
+{
+	if (ui.reveal == REVEAL_OFF)
+		return;
+	ui_wake();  // its last frame too: the regs drop the blend
+	if (ui.reveal == REVEAL_WRITTEN && frame_count() != ui.reveal_frame && !(gfx_dirty_regs & GFX_DIRTY_DISPCNT))
+		ui.reveal = REVEAL_RUN;  // shown in this VBlank at the first step
+	if (ui.reveal == REVEAL_RUN) {
+		ui.reveal_step = (u8)(ui.reveal_step + dt);
+		if (ui.reveal_step >= ui.reveal_frames)
+			ui.reveal = REVEAL_OFF;
+	}
+}
+
+int ui_draw_room(u32 cycles)
+{
+	return frame_elapsed() + cycles <= UI_DRAW_BUDGET;
+}
+
 int ui_plane_owned(u8 node)
 {
 	u32 plane = ui_node_spec(node)->plane;
@@ -308,6 +361,7 @@ void ui_theme_set(const struct ui_theme *theme, u16 accent)
 {
 	ui_theme_select(theme, accent);
 	ui.in.timing = &ui_theme()->input;
+	ui_wallpaper_setup();
 	load_palette();
 	ui_wake();
 }
@@ -425,6 +479,16 @@ static void regs_update(void)
 		if (modal && d < top - 1)
 			lower |= LAYER_BG(p);
 	}
+	// The SD theme's wallpaper, behind everything, while no view takes plane 3
+	u32 d3;
+	u16 wall;
+	if (!plane_owner(3, &d3) && ui_wallpaper_bgcnt(&wall)) {
+		gfx_set_bgcnt(3, wall);
+		gfx_set_scroll(3, 0, 0);
+		dispcnt |= (u16)DISP_BG(3);
+		if (modal)
+			lower |= LAYER_BG(3);
+	}
 	// Static planes follow their view's slide; lists set their own scroll
 	u32 scrollers = 0, list_planes = 0, win_plane[UI_SCROLLERS] = {0, 0};
 	const struct ui_node *win_node[UI_SCROLLERS] = {0, 0};
@@ -496,10 +560,21 @@ static void regs_update(void)
 	}
 	if (y > 16)
 		y = 16;
-	if (targets && y)
+	if (targets && y) {
+		ui.reveal = REVEAL_OFF;  // one blend at a time: the page just shows
 		gfx_set_blend((u16)(BLEND_DARKEN | targets), 0, (u16)y);
-	else
+	} else if (ui.reveal != REVEAL_OFF) {
+		// The list's plane over everything behind it
+		u32 p = LAYER_BG(ui.reveal_plane), eva = 16u * ui.reveal_step / ui.reveal_frames;
+		gfx_set_blend((u16)(BLEND_ALPHA | p | ((LAYER_ALL | LAYER_BD) & ~p) << 8), (u16)(eva | (16 - eva) << 8),
+			      0);
+		if (ui.reveal == REVEAL_ASKED) {
+			ui.reveal = REVEAL_WRITTEN;
+			ui.reveal_frame = frame_count();
+		}
+	} else {
 		gfx_set_blend(0, 0, 0);
+	}
 }
 
 // --- The stack ----------------------------------------------------------------
@@ -508,8 +583,11 @@ const struct ui_theme *ui_theme_setting(u16 *accent)
 {
 	// Stored as index + 1, so 0 and erased (0xFFFF) both mean the theme's own
 	u16 a = Read_SET_info(assress_accent);
-	*accent = a >= 1 && a <= ui_accent_count ? a - 1 : UI_ACCENT_THEME;
-	return Read_SET_info(assress_theme) == 1 ? &ui_theme_light : &ui_theme_dark;
+	*accent = a >= 1 && a <= ui_accent_count ? ui_accents[a - 1].colour : UI_ACCENT_THEME;
+	u16 t = Read_SET_info(assress_theme);
+	if (t == UI_THEME_SD && ui_theme_sd())
+		return ui_theme_sd();
+	return t == 1 ? &ui_theme_light : &ui_theme_dark;
 }
 
 void ui_init(const struct ui_theme *theme)
@@ -543,6 +621,7 @@ void ui_init(const struct ui_theme *theme)
 	TLOG_ASSERT(ui.stage_map != RES_NONE);
 	ui.stage = res_bg_addr(ui.stage_map);
 	ui_dim_set_minutes(ui_dim_setting());
+	ui_wallpaper_setup();
 	load_palette();
 	gfx_set_dispcnt(DISP_MODE0_OBJ1D | DISP_OBJ);
 	ui_wake();
@@ -565,6 +644,18 @@ void ui_shutdown(void)
 struct ui_view *ui_push(const struct ui_view_spec *spec, void *ctx)
 {
 	struct ui_view *v = ui_core_push(spec, ctx);
+	// A screen the SD theme breaks (patches, row height) gets its base theme
+	const struct ui_theme *base = v ? 0 : ui_theme_fallback_base();
+	if (base) {
+		const struct ui_theme *sd_theme = ui_theme();
+		u16 accent = ui_accent();
+		ui_theme_set(base, accent);
+		v = ui_core_push(spec, ctx);
+		if (v)
+			ui_theme_fell_back(ui_error());
+		else
+			ui_theme_set(sd_theme, accent);
+	}
 	if (!v)
 		return 0;
 	// Its maps are cleared and drawn once nothing popped shows their VRAM
@@ -589,8 +680,11 @@ void ui_hook_popped(u8 planes)
 	// Its maps and tiles may go to the next view at once, but they show
 	// until regs without them are committed: a view pushed now waits
 	ui.pop_wait = 1;
+	ui.queued_keys = 0;
 	ui.hidden &= (u8)~planes;
 	ui.hide_pending &= (u8)~planes;
+	if (planes >> ui.reveal_plane & 1)
+		ui.reveal = REVEAL_OFF;
 	// The view under it shows again as it was: its maps were left alone
 	const struct ui_view *v = ui_top();
 	if (!v || !(v->spec->flags & UI_VIEW_MODAL)) {
@@ -697,6 +791,7 @@ u32 ui_frame(void)
 	}
 	if (ui.pop_wait == 2 && frame_count() != ui.pop_frame)
 		ui.pop_wait = 0;
+	reveal_tick(dt);
 	ready_check();
 	input_poll(&ui.in, dt, ui.skip);
 	ui.skip = (u8)skip_animation();
@@ -704,6 +799,9 @@ u32 ui_frame(void)
 	if (dim_step(dt))
 		fire = 0;
 	fire &= (u16)~ui.wake_keys;
+	if (!ui.dimmed)
+		fire |= ui.queued_keys;
+	ui.queued_keys = 0;
 	if (fire) {
 		frame_wake();
 		ui_dispatch_keys(fire);

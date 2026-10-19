@@ -4,11 +4,8 @@
 cover-decode 38607
 cover-demo 19138
 cover-upload 3427
-lists-menu-open 207500
-lists-screen 190927
-lists-scroll 203539
-ui-dialog-open 133534
-ui-grid-scroll 73670
-ui-list-scroll 101686
-ui-page-change 204504
-ui-screen-switch 235345
+ui-dialog-open 160754
+ui-grid-scroll 26267
+ui-list-scroll 115711
+ui-page-change 245413
+ui-screen-switch 200470

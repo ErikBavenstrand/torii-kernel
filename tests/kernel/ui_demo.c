@@ -8,6 +8,8 @@
 //   A           a dialog for the item (A or B closes it)
 //   SELECT      the grid, and back
 //   START       the next theme and accent, through a fade
+// With R held as well on the cart, it starts in the SD theme "example"
+// (tests/shots/ui-sd-theme.opts).
 // It logs "screen ready: ui-demo", "ui-dialog", "ui-grid" (tests/shots
 // ui-*.opts) and frame-cycles figures for scrolling, page changes, the
 // dialog and switching screens (tests/perf/budget.txt).
@@ -20,6 +22,8 @@
 #include "ui_demo.h"
 #include "../../source/cartlog.h"
 #include "../../source/engine/engine.h"
+#include "ff.h"
+#include "../../source/ui/sdtheme.h"
 #include "../../source/ui/ui.h"
 #include "../../source/waitcnt.h"
 
@@ -380,13 +384,30 @@ static void switch_screen(void)
 	measure("ui-screen-switch", 3);
 }
 
+extern FATFS EZcardFs;
+
 void ui_demo(void)
+{
+	ui_demo_theme(0);
+}
+
+void ui_demo_theme(const char *sd_theme)
 {
 	REG_WAITCNT_CART = WAITCNT_MENU;  // as the menu runs
 	irqInit();
 	cartlog_install();
+	const struct ui_theme *theme = &ui_theme_dark;
+	if (sd_theme) {
+		const struct ui_theme *t = 0;
+		if (EZcardFs.fs_type || f_mount(&EZcardFs, "", 1) == FR_OK)
+			t = ui_theme_load(sd_theme);
+		if (t)
+			theme = t;
+		else
+			tlog_error("ui-demo: %s", ui_theme_error());
+	}
 	engine_init();
-	ui_init(&ui_theme_dark);
+	ui_init(theme);
 	memset(&demo, 0, sizeof(demo));
 	make_icons();
 	ui_dim_set_frames(20 * 60);

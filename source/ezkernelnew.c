@@ -30,6 +30,7 @@
 #include "diag.h"
 #include "engine/cover.h"
 #include "screens/lists.h"
+#include "ui/sdtheme.h"
 
 #include "jagoombacolor.h"
 #include "pocketnes.h"
@@ -127,6 +128,33 @@ void wait_btn()
 }
 //---------------------------------------------------------------------------------
 
+//---------------------------------------------------------------------------------
+// Torii: says on the boot screen why the SD theme the THEME setting picks
+// didn't load (ui/sdtheme.h), for two seconds; the menu then uses Dark
+static void Show_theme_error(void)
+{
+	const char *msg = ui_theme_error();
+	DrawHZText12(gl_theme_error, 0, 2, 46, gl_color_cheat_black, 1);
+	u32 y = 59;
+	while (*msg && y < 160 - 13) {
+		u32 n = strlen(msg);
+		if (n > 38) {
+			// Break at the last space that fits
+			n = 38;
+			while (n > 0 && msg[n] != ' ')
+				n--;
+			if (!n)
+				n = 38;
+		}
+		DrawHZText12((char *)msg, (u16)n, 2, (u16)y, gl_color_cheat_black, 1);
+		msg += n;
+		while (*msg == ' ')
+			msg++;
+		y += 13;
+	}
+	for (u32 i = 0; i < 120; i++)
+		VBlankIntrWait();
+}
 //---------------------------------------------------------------------------------
 static void Show_MENU_btn(void)
 {
@@ -1196,6 +1224,8 @@ int main(void)
 	tlog_flush();
 	if (diag_keys)
 		Diagnostics();
+	if (!ui_theme_boot())
+		Show_theme_error();
 
 	f_chdir("/");
 	//TCHAR currentpath[MAX_path_len];
