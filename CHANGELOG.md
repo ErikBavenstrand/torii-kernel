@@ -4,7 +4,10 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.3.0 (2026-10-19)
+
+Tested on a real Omega DE: the new mode 0 menu engine, SD themes, and the
+v0.3.2 fixes from two cart tests.
 
 - **Changed:** a held d-pad tops out at 30 rows a second, reached after
   1.15 s, instead of 40 after 1.75 s: 30 moves the lists a steady 8 px every
