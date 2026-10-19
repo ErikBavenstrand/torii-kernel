@@ -46,8 +46,10 @@ keys() {
 
 # Runs the kernel with the hook watcher until it is done; the log goes to run.log
 watch() {
+  local status=0
   OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin "$@" \
-    -L tests/hook_watch.lua -u 'hook watch done' -f 4000 >/dev/null 2>"$cart/run.log" || true
+    -L tests/hook_watch.lua -u 'hook watch done' -f 4000 >/dev/null 2>"$cart/run.log" || status=$?
+  [ "$status" != 76 ] || fail "the kernel wrote to the boot loader"
   ! grep -q '^crash at frame' "$cart/run.log" || fail "crashed"
   grep -q '^kernel error:' "$cart/run.log" && fail "errors: $(grep '^kernel error:' "$cart/run.log" | head -3)"
   grep -q '^script: hook [0-9]* patch ' "$cart/run.log" || fail "the kernel did not hook the game"
