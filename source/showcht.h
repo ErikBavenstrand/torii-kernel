@@ -25,6 +25,11 @@ int Show_all_KEY_val(FIL *file);
 u32 Check_cht_file(TCHAR *gamefilename);
 u32 Check_cheat_file(TCHAR *gamefilename);
 void Open_cht_file(TCHAR *gamefilename, u32 havecht);
+// The game menu's CHEAT row into out: name alone until the cheat screen has
+// been opened, then name(n), n the cheats picked there
+void cheat_menu_label(char *out, u32 size, const char *name);
+// Leaving the game menu: no cheats, and the cheat screen counts as unopened
+void cheat_menu_forget(void);
 void Trim(char s[]);
 // Reads a line into line like f_gets, at most len - 1 bytes with its \n, but
 // byte for byte: FatFs's f_gets decodes UTF-8 and drops other bytes, which

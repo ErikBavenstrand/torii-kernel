@@ -5,11 +5,15 @@
 #include <gba_base.h>
 #include <gba_input.h>
 #include <gba_dma.h>
+#include <gba_video.h>
 
 #include "ezkernel.h"
 #include "showcht.h"
 #include "draw.h"
 #include "tlog.h"
+#include "engine/cover.h"
+#include "engine/engine.h"
+#include "ui/ui.h"
 
 FM_CHT_LINE tmpCHTFS;
 
@@ -23,7 +27,6 @@ u8 *pCHTbuffer = (u8 *)(pReadCache + CHT_LIST_OFFSET); //patchbuffer
 ST_entry pCHEAT[CHEAT_MAX] EWRAM_BSS;
 u32 gl_cheat_count;
 
-u16 gl_color_chtBG = RGB(4, 8, 0xC);
 //------------------------------------------------------------------
 
 extern FIL gfile;
@@ -423,70 +426,6 @@ static u32 Get_all_Section_val(FIL *file)
 	return Line;
 }
 //------------------------------------------------------------------
-static void Show_KEY_val(u32 total, u32 Select, u32 showoffset)
-{
-	u32 need_show;
-	u32 line;
-	//char buffer_temp[128]={0};
-
-	char msg[256];
-
-	u32 X_offset = 15;
-	u32 Y_offset = 20;
-	u32 line_x = 14;
-	//u32 str_len;
-	u16 name_color;
-
-	if (total < 10)
-		need_show = total;
-	else
-		need_show = 10;
-
-	for (line = 0; line < need_show; line++) {
-		if (line == Select)
-			name_color = gl_color_selected;
-		else
-			name_color = gl_color_text;
-
-		u8 select = ((FM_CHT_LINE *)pCHTbuffer)[showoffset + line].select;
-
-		if (((FM_CHT_LINE *)pCHTbuffer)[showoffset + line].is_section == 1) {
-			Clear(X_offset + 3, Y_offset + line * line_x + 4, 4, 4, gl_color_text, 1);//section flag
-
-			sprintf(msg, "%s", ((FM_CHT_LINE *)pCHTbuffer)[showoffset + line].LINEname);
-
-			//int res = utf8_check(((FM_CHT_LINE*)pCHTbuffer)[showoffset+line].LINEname,strlen(((FM_CHT_LINE*)pCHTbuffer)[showoffset+line].LINEname));
-			//DEBUG_printf(" %x",res);
-
-			//DEBUG_printf(" %x %x %x %x ",((FM_CHT_LINE*)pCHTbuffer)[showoffset+line].LINEname[0],((FM_CHT_LINE*)pCHTbuffer)[showoffset+line].LINEname[1],((FM_CHT_LINE*)pCHTbuffer)[showoffset+line].LINEname[2],((FM_CHT_LINE*)pCHTbuffer)[showoffset+line].LINEname[3]);
-
-			//if(res==1)
-			//{
-			//Utf8ToGb2312(((FM_CHT_LINE*)pCHTbuffer)[showoffset+line].LINEname,strlen(((FM_CHT_LINE*)pCHTbuffer)[showoffset+line].LINEname),buffer_temp);
-			//sprintf(msg,"%s ",buffer_temp);
-			//}
-
-			DrawHZText12(msg, 30, X_offset + 13, Y_offset + line * line_x, name_color, 1);
-		} else {
-			VBlankIntrWait();
-			Draw_select_icon(X_offset + 13, Y_offset + line * line_x, select);
-
-			sprintf(msg, "%s", ((FM_CHT_LINE *)pCHTbuffer)[showoffset + line].LINEname);
-
-			/*int res = utf8_check(((FM_CHT_LINE*)pCHTbuffer)[showoffset+line].LINEname,strlen(((FM_CHT_LINE*)pCHTbuffer)[showoffset+line].LINEname));
-			if(res==1)
-			{
-				Utf8ToGb2312(((FM_CHT_LINE*)pCHTbuffer)[showoffset+line].LINEname,strlen(((FM_CHT_LINE*)pCHTbuffer)[showoffset+line].LINEname),buffer_temp);
-				sprintf(msg,"%s ",buffer_temp);
-			}*/
-
-			DrawHZText12(msg, 30, X_offset + 15 + 13, Y_offset + line * line_x, name_color, 1);
-			//sprintf(msg,"%s",((FM_CHT_LINE*)pCHTbuffer)[showoffset+line].KEY_val);
-			//DrawHZText12(msg,20,X_offset+15+13+60,Y_offset+line*line_x,name_color,1);
-		}
-	}
-}
-//------------------------------------------------------------------
 static void Analyze_KEYVAL(FIL *file, u32 total)
 {
 	(void)file;
@@ -662,23 +601,290 @@ u32 Check_cheat_file(TCHAR *gamefilename)
 		return 0;
 	}
 }
-//---------------------------------------------------------------------------------
-static void Show_num(u32 totalcount, u32 select)
-{
-	char msg[20];
-	Clear(186, 3, 7 * 6, 15, gl_color_chtBG, 1);
-	sprintf(msg, "[%03lu/%03lu]", select, totalcount);
-
-	DrawHZText12(msg, 0, 182, 3, gl_color_text, 1);
-}
 //------------------------------------------------------------------
+// The cheat screen, on the v0.3 engine. Each section of a .cht file is a
+// cheat, drawn as a heading, and its entries are the cheat's options: the
+// cursor skips sections, A picks an entry (or drops it again) and drops the
+// section's other entries, LEFT and RIGHT (and L and R) page, and releasing
+// B leaves, applying what was picked.
+//
+// The list stays in pReadCache (pCHTbuffer) while the screen runs, inside
+// the cover stage's range (engine/stage.h): the cover loader is stopped
+// before the engine starts, and the screen starts no jobs.
+
+// The entries picked when the cheat screen last closed, if it has been
+// opened since the game menu opened: the menu's CHEAT(n)
+static u32 cheats_picked EWRAM_BSS;
+static u8 cheats_opened EWRAM_BSS;
+
+void cheat_menu_label(char *out, u32 size, const char *name)
+{
+	if (!cheats_opened)
+		snprintf(out, size, "%s", name);
+	else
+		snprintf(out, size, "%s(%lu)", name, (unsigned long)cheats_picked);
+}
+
+void cheat_menu_forget(void)
+{
+	gl_cheat_count = 0;
+	cheats_opened = 0;
+}
+
+enum {
+	CS_BAR,
+	CS_TITLE,
+	CS_COUNT,
+	CS_LIST,
+	CS_SCROLL,
+	CS_NODES,
+};
+
+// The screen's state, on Open_cht_file's stack while the screen runs
+struct cheat_screen {
+	FM_CHT_LINE *lines;
+	u32 count;        // lines shown: sections and entries
+	u32 entries;      // entries among them
+	u32 cursor;       // the list's cursor, as last seen
+	u32 ord_at, ord;  // line ord_at has ord entries up to it: counting goes on from there
+	u8 list, label;   // node indices
+	u8 b_down;        // B went down on this screen: its release leaves
+	char counter[24];
+	char row[MAX_KEY_LEN + 3];
+};
+
+static u32 cs_name_len(const FM_CHT_LINE *line)
+{
+	u32 n = 0;
+	while (n < MAX_KEY_LEN && line->LINEname[n])
+		n++;
+	return n;
+}
+
+static u32 cs_count(void *ctx)
+{
+	return ((struct cheat_screen *)ctx)->count;
+}
+
+static int cs_fetch(void *ctx, u32 i, struct ui_item *out)
+{
+	struct cheat_screen *cs = ctx;
+	const FM_CHT_LINE *line = &cs->lines[i];
+	u32 len = cs_name_len(line);
+	if (line->is_section == 1) {
+		out->text = len ? line->LINEname : " ";  // len 0 would mean "up to the NUL"
+		out->len = (u16)(len ? len : 1);
+		out->ink = UI_ROLE_DIM;
+		return UI_ITEM_READY;
+	}
+	// An entry: indented under its section, and in the accent colour with
+	// a check at the right when picked
+	memcpy(cs->row, "   ", 3);
+	memcpy(cs->row + 3, line->LINEname, len);
+	out->text = cs->row;
+	out->len = (u16)(3 + len);
+	if (line->select) {
+		out->ink = UI_ROLE_ACCENT;
+		out->detail = "[x]";
+	}
+	return UI_ITEM_READY;
+}
+
+static const struct ui_list_model cs_model = {cs_count, cs_fetch, 0};
+
+// The nearest entry from line i in direction dir (1 or -1), i included;
+// count if there is none
+static u32 cs_entry_from(const struct cheat_screen *cs, u32 i, int dir)
+{
+	while (i < cs->count) {
+		if (cs->lines[i].is_section != 1)
+			return i;
+		if (dir < 0 && i == 0)
+			break;
+		i = (u32)((s32)i + dir);
+	}
+	return cs->count;
+}
+
+// The entry nearest to line i, looking in direction dir first; i itself if
+// the list has no entry
+static u32 cs_settle(const struct cheat_screen *cs, u32 i, int dir)
+{
+	u32 to = cs_entry_from(cs, i, dir);
+	if (to == cs->count)
+		to = cs_entry_from(cs, i, -dir);
+	return to == cs->count ? i : to;
+}
+
+// Shows "[ord/entries]": which entry the cursor is on, of how many
+static void cs_show_count(struct cheat_screen *cs)
+{
+	u32 ord = 0;
+	if (cs->cursor < cs->count && cs->lines[cs->cursor].is_section != 1) {
+		u32 i = cs->ord_at, n = cs->ord;
+		while (i < cs->cursor)
+			n += cs->lines[++i].is_section != 1;
+		while (i > cs->cursor)
+			n -= cs->lines[i--].is_section != 1;
+		cs->ord_at = i;
+		cs->ord = n;
+		ord = n;
+	}
+	snprintf(cs->counter, sizeof(cs->counter), "[%03lu/%03lu]", (unsigned long)ord, (unsigned long)cs->entries);
+	ui_label_set(cs->label, cs->counter);
+}
+
+// Moves the cursor to the entry nearest to line to, on side dir first
+static void cs_move(struct cheat_screen *cs, u32 to, int dir)
+{
+	to = cs_settle(cs, to, dir);
+	ui_list_set_cursor(cs->list, to);
+	cs->cursor = to;
+	cs_show_count(cs);
+}
+
+// A on an entry: picks it, or drops it if it was picked, and drops the other
+// entries of its section
+static void cs_pick(struct cheat_screen *cs, u32 at)
+{
+	FM_CHT_LINE *l = cs->lines;
+	if (at >= cs->count || l[at].is_section == 1)
+		return;
+	u32 lo = at, hi = at;
+	while (lo > 0 && l[lo - 1].is_section != 1)
+		l[--lo].select = 0;
+	while (hi + 1 < cs->count && l[hi + 1].is_section != 1)
+		l[++hi].select = 0;
+	l[at].select = !l[at].select;
+	ui_list_refresh(cs->list, lo, hi);
+}
+
+static int cs_event(struct ui_view *v, const struct ui_event *e)
+{
+	struct cheat_screen *cs = v->ctx;
+	switch (e->type) {
+	case UI_EV_CURSOR:
+		// The list moved a step or a page onto e->index: from a section,
+		// on to the nearest entry the way it went
+		cs_move(cs, e->index, e->index >= cs->cursor ? 1 : -1);
+		return 1;
+	case UI_EV_ACTIVATE:
+		cs_pick(cs, e->index);
+		return 1;
+	case UI_EV_KEYS: {
+		if (e->keys & INPUT_B) {
+			cs->b_down = 1;
+			return 1;
+		}
+		if (!(e->keys & (INPUT_LEFT | INPUT_RIGHT)) || !cs->count)
+			return 0;
+		// LEFT and RIGHT page, as L and R do
+		u32 page = (u32)ui_node(cs->list)->h / ui_theme()->row_h;
+		u32 to;
+		if (e->keys & INPUT_LEFT)
+			to = cs->cursor > page ? cs->cursor - page : 0;
+		else
+			to = cs->cursor + page < cs->count ? cs->cursor + page : cs->count - 1;
+		cs_move(cs, to, (e->keys & INPUT_LEFT) ? -1 : 1);
+		return 1;
+	}
+	default:
+		return 0;
+	}
+}
+
+static const struct ui_label_config cs_title = {"", UI_FONT_HEADING, UI_ALIGN_LEFT, 0};
+static const struct ui_label_config cs_counter = {"", UI_FONT_BODY, UI_ALIGN_RIGHT, UI_LABEL_SWAP};
+static const struct ui_list_config cs_list = {&cs_model, 0, 0, UI_LIST_MARQUEE, 24};
+static const struct ui_scrollbar_config cs_bar = {CS_LIST};
+
+static const struct ui_spec cs_nodes[CS_NODES] = {
+	[CS_BAR] = {.kind = UI_PANEL,
+		    .id = 1,
+		    .parent = UI_NONE,
+		    .plane = 2,
+		    .anchor = UI_HFILL,
+		    .paper = UI_ROLE_PANEL,
+		    .h = 16},
+	[CS_TITLE] = {.kind = UI_LABEL,
+		      .id = 2,
+		      .parent = CS_BAR,
+		      .plane = 2,
+		      .anchor = UI_HFILL | UI_VFILL,
+		      .paper = UI_ROLE_PANEL,
+		      .w = 72,
+		      .data = &cs_title},
+	[CS_COUNT] = {.kind = UI_LABEL,
+		      .id = 3,
+		      .parent = CS_BAR,
+		      .plane = 2,
+		      .anchor = UI_RIGHT | UI_VFILL,
+		      .ink = UI_ROLE_DIM,
+		      .paper = UI_ROLE_PANEL,
+		      .w = 72,
+		      .data = &cs_counter},
+	[CS_LIST] = {.kind = UI_LIST,
+		     .id = 4,
+		     .parent = UI_NONE,
+		     .plane = 1,
+		     .anchor = UI_FILL,
+		     .flags = UI_FOCUSABLE,
+		     .paper = UI_ROLE_BG,
+		     .y = 16,
+		     .w = 8,
+		     .data = &cs_list},
+	[CS_SCROLL] = {.kind = UI_SCROLLBAR,
+		       .id = 5,
+		       .parent = UI_NONE,
+		       .plane = 2,
+		       .anchor = UI_RIGHT | UI_VFILL,
+		       .y = 16,
+		       .w = 8,
+		       .data = &cs_bar},
+};
+
+static const struct ui_view_spec cs_view = {"cheats", cs_nodes, CS_NODES, 11, CS_LIST, 0, cs_event};
+
+// Runs the screen until B is released; 0 if it couldn't be shown
+static int cs_run(struct cheat_screen *cs, const char *title)
+{
+	struct ui_view *v = ui_push(&cs_view, cs);
+	if (!v) {
+		tlog_error("cheats: %s", ui_error());
+		return 0;
+	}
+	cs->list = (u8)(v->first + CS_LIST);
+	cs->label = (u8)(v->first + CS_COUNT);
+	ui_label_set((u8)(v->first + CS_TITLE), title);
+	cs_move(cs, 0, 1);
+	while (ui_depth()) {
+		ui_frame();
+		if (cs->b_down && (ui_input()->released & INPUT_B))
+			ui_pop();
+	}
+	return 1;
+}
+
+// Back to the mode 3 menu, on a black screen the caller repaints
+static void cs_leave_engine(void)
+{
+	ui_shutdown();
+	VBlankIntrWait();
+	REG_DISPCNT = 0x0080;  // forced blank while the bitmap is cleared
+	REG_BLDCNT = 0;
+	REG_MOSAIC = 0;
+	REG_BG2CNT = 0;
+	Clear(0, 0, 240, 160, 0, 1);
+	REG_DISPCNT = MODE_3 | BG2_ENABLE;
+	scanKeys();  // libgba's key state catches up with what the engine read
+}
+
 void Open_cht_file(TCHAR *gamefilename, u32 havecht)
 {
 	u32 res;
-	char msg[128];
 	TCHAR chtnamebuf[100];
 
-	char buffer[127] = {0};
+	char title[127] = {0};
 
 	// As zeroed as they were in EWRAM of their own, before the first file
 	memset(buf, 0, 2 * MAX_BUF_LEN);
@@ -701,157 +907,34 @@ void Open_cht_file(TCHAR *gamefilename, u32 havecht)
 	}
 	res = f_open(&gfile, chtnamebuf, FA_READ);
 
-	if (res == FR_OK)//have a cht file
+	if (res == FR_OK)  //have a cht file
 	{
-		Clear(0, 0, 240, 160, gl_color_chtBG, 1);
-		Clear(0, 18, 240, 1, gl_color_selected, 1);
-
-		Get_KEY_val(&gfile, "GameInfo", "Name", buffer);
-		sprintf(msg, "%s ", buffer);
-
-		DrawHZText12(msg, 30, 2, 4, gl_color_text, 1);
+		Get_KEY_val(&gfile, "GameInfo", "Name", title);
+		title[MAX_KEY_LEN] = 0;
 
 		u32 all_count = Get_all_Section_val(&gfile);
-		u32 Select = 1;
-		u32 showoffset = 0;
-		u32 re_show = 2;
-
 		if (all_count) {
-			all_count = Check_count(all_count);//cut from "GameInfo"
-			setRepeat(15, 1);
-			while (1)//3
-			{
-				VBlankIntrWait();
-				VBlankIntrWait();
-				if (re_show) {
-					if (re_show > 1) {
-						Clear(0, 19, 240, 160 - 19, gl_color_chtBG, 1);
-					}
-					Show_KEY_val(all_count, Select, showoffset);
-					Show_num(all_count, Select + showoffset + 1);
-					tlog_debug("screen ready: cheats");
-					re_show = 0;
-				}
-				scanKeys();
-				u16 keysdown = keysDown();
-				u16 keysup = keysUp();
-				u16 keysrepeat = keysDownRepeat();
+			struct cheat_screen cs;
+			memset(&cs, 0, sizeof(cs));
+			cs.lines = (FM_CHT_LINE *)pCHTbuffer;
+			cs.count = Check_count(all_count);  //cut from "GameInfo"
+			for (u32 i = 0; i < cs.count; i++)
+				cs.entries += cs.lines[i].is_section != 1;
+			cs.ord = cs.count && cs.lines[0].is_section != 1;  // entries up to line 0
+			setRepeat(15, 1);  // as before the port: the menus after it read keys with it
 
-				if (keysrepeat & KEY_DOWN) {
-					if (Select + showoffset + 1 < (all_count)) {
-						if (Select > 8) {
-							if (Select == 9) {
-								showoffset++;
-								if (((FM_CHT_LINE *)pCHTbuffer)[showoffset + Select]
-									    .is_section == 1) {
-									showoffset++;
-								}
-								re_show = 2;
-							}
-						} else {
-							Select++;
-							re_show = 1;
-							if (((FM_CHT_LINE *)pCHTbuffer)[showoffset + Select]
-								    .is_section == 1) {
-								Select++;
-								if (Select > 9) {
-									Select--;
-									showoffset++;
+			// The list sits in the cover stage's range: no asset job may run
+			cover_cache_invalidate();
+			engine_init();
+			ui_init(NULL);
+			cs_run(&cs, title);
+			cs_leave_engine();
 
-									re_show = 2;
-								}
-							}
-						}
-					}
-
-				} else if (keysrepeat & KEY_UP) {
-					if (Select) {
-						Select--;
-						if ((showoffset == 0) && (Select == 0)) {
-							if (((FM_CHT_LINE *)pCHTbuffer)[Select].is_section == 1) {
-								Select = 1;
-							}
-						}
-
-						if (((FM_CHT_LINE *)pCHTbuffer)[showoffset + Select].is_section == 1) {
-							if (Select)
-								Select--;
-						}
-						re_show = 1;
-					} else {
-						if (showoffset) {
-							showoffset--;
-							if (showoffset == 0) {
-								if (((FM_CHT_LINE *)pCHTbuffer)[0].is_section == 1) {
-									Select = 1;
-								}
-							}
-
-							if (((FM_CHT_LINE *)pCHTbuffer)[showoffset + Select]
-								    .is_section == 1) {
-								if (showoffset) {
-									showoffset--;
-									if (showoffset == 0) {
-										if (((FM_CHT_LINE *)pCHTbuffer)[0]
-											    .is_section == 1) {
-											Select = 1;
-										}
-									}
-								}
-							}
-							re_show = 2;
-						}
-					}
-				} else if (keysrepeat & KEY_LEFT) {
-					if (showoffset) {
-						if (showoffset > 9)
-							showoffset -= 10;
-						else
-							showoffset = 0;
-
-						if (((FM_CHT_LINE *)pCHTbuffer)[showoffset + Select].is_section == 1) {
-							Select--;
-						}
-						re_show = 2;
-					} else {
-						if (Select > 1) {
-							Select = 1;
-							re_show = 1;
-						}
-					}
-				} else if (keysrepeat & KEY_RIGHT) {
-					if (showoffset + 10 < all_count) {
-						if (showoffset + 20 <= all_count)
-							showoffset += 10;
-						else
-							showoffset = all_count - 10;
-
-						if (((FM_CHT_LINE *)pCHTbuffer)[showoffset + Select].is_section == 1) {
-							showoffset--;
-						}
-						re_show = 2;
-					}
-				} else if (keysdown & KEY_A) {
-					if (((FM_CHT_LINE *)pCHTbuffer)[showoffset + Select].is_section != 1) {
-						u32 current_select = showoffset + Select - 1;
-						while (((FM_CHT_LINE *)pCHTbuffer)[current_select].is_section != 1) {
-							((FM_CHT_LINE *)pCHTbuffer)[current_select--].select = 0;
-						}
-						current_select = showoffset + Select + 1;
-						while (((FM_CHT_LINE *)pCHTbuffer)[current_select].is_section != 1) {
-							((FM_CHT_LINE *)pCHTbuffer)[current_select++].select = 0;
-						}
-
-						u8 select = ((FM_CHT_LINE *)pCHTbuffer)[showoffset + Select].select;
-						((FM_CHT_LINE *)pCHTbuffer)[showoffset + Select].select = !select;
-
-						re_show = 1;
-					}
-				} else if (keysup & KEY_B) {
-					Analyze_KEYVAL(&gfile, all_count);
-					break;
-				}
-			}
+			Analyze_KEYVAL(&gfile, cs.count);
+			cheats_opened = 1;
+			cheats_picked = 0;
+			for (u32 i = 0; i < cs.count; i++)
+				cheats_picked += cs.lines[i].is_section != 1 && cs.lines[i].select == 1;
 		}
 	}
 	f_close(&gfile);
