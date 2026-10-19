@@ -6,6 +6,22 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** NOR DELETE erased the latest NOR game at once; it now asks
+  "Delete this game from NOR?" over the game's name first, as the SD list's
+  delete and FORMAT ALL do (`c211261`).
+- **Changed:** messages close with A as well as B, and their hint reads
+  "[A]OK". A pressed while one is still opening does nothing, so a quick
+  double A can't close it unseen (`c211261`).
+- **Fixed:** the NOR list showed "0M" for games under 1 MB; it shows sizes
+  as the SD list does (128K, 4M) (`c211261`).
+- **Fixed:** the empty NOR list was blank; it says "No games in NOR", and
+  Recently Played's title reads "RECENTLY PLAYED" (`c211261`).
+- **Fixed:** a file deleted from the SD list stayed on Recently Played; it
+  comes off. A launch from Recently Played that doesn't start, its errors
+  and B on its game menu go back to Recently Played, not the SD list
+  (`c211261`).
+- **Changed:** the cycle budget compiled in for Diagnostics' renderer step
+  is re-recorded, with a page change in a 302-file folder (`99fdea6`).
 - **Fixed:** a quick double A on a game opened its menu and the second A
   picked CLEAN BOOT. A menu or dialog still opening now ignores A and START;
   the d-pad and B act at once (`96d6515`).

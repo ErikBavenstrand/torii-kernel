@@ -56,3 +56,26 @@ void test_recently_played_nor(void)
 	CHECK_EQ(count, 2);  // the SD file and the NOR copy are two entries
 	CHECK(strcmp(p_recently_play[0], "NOR:Advance Wars.gba") == 0);
 }
+
+void test_recently_played_remove(void)
+{
+	// A file deleted from the SD card comes off the list; the rows under it
+	// move up, and the NOR copy of a game of that name stays
+	u32 count = Recently_play_add("/a.gba", 0);
+	count = Recently_play_add("NOR:b.gba", count);
+	count = Recently_play_add("/GBA/b.gba", count);
+	count = Recently_play_add("/c.gba", count);
+	CHECK_EQ(Recently_play_remove("/missing.gba", count), 4);
+	count = Recently_play_remove("/GBA/b.gba", count);
+	CHECK_EQ(count, 3);
+	CHECK(strcmp(p_recently_play[0], "/c.gba") == 0);
+	CHECK(strcmp(p_recently_play[1], "NOR:b.gba") == 0);
+	CHECK(strcmp(p_recently_play[2], "/a.gba") == 0);
+	CHECK_EQ(p_recently_play[3][0], 0);
+	count = Recently_play_remove("/a.gba", count);  // the last row
+	CHECK_EQ(count, 2);
+	CHECK(strcmp(p_recently_play[1], "NOR:b.gba") == 0);
+	count = Recently_play_remove("/c.gba", count);  // the first row
+	CHECK_EQ(count, 1);
+	CHECK(strcmp(p_recently_play[0], "NOR:b.gba") == 0);
+}

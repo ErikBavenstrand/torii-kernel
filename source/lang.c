@@ -119,6 +119,8 @@ char *gl_save_saved;
 char *gl_file_exist;
 char *gl_file_noexist;
 char *gl_delete_ask EWRAM_BSS;
+char *gl_nor_delete_ask EWRAM_BSS;
+char *gl_no_game_nor EWRAM_BSS;
 char *gl_saving EWRAM_BSS;
 char *gl_format_title EWRAM_BSS;
 char *gl_erasing EWRAM_BSS;
@@ -138,7 +140,7 @@ const char en_theme_error[] = "Theme not loaded, using Dark:";
 const char en_file_overflow[] = "Too big to start from the SD card (over 32 MB). Write it to NOR instead.";
 
 const char en_menu_btn[] = "[B]CANCEL    [A]OK";
-const char en_close_btn[] = "[B]OK";
+const char en_close_btn[] = "[A]OK";
 const char en_writing[] = "Writing to NOR";
 const char en_lastest_game[] = "Only the last game in NOR can be deleted";
 
@@ -181,7 +183,7 @@ const char en_loading_game[] = "Loading the game";
 const char en_engine[] = "   ENGINE";
 const char en_use_engine[] = "FAST PATCH ENGINE";
 
-const char en_recently_play[] = "RECENT PLAYED";
+const char en_recently_play[] = "RECENTLY PLAYED";
 
 const char en_START_help[] = "Open recently played list";
 const char en_L_A_help[] = "Multiboot";
@@ -246,6 +248,8 @@ const char en_save_saved[] = "Save written to the SD card";
 const char en_file_exist[] = "There is a save file already. Replace it?";
 const char en_file_noexist[] = "No save file found";
 const char en_delete_ask[] = "Delete this file?";
+const char en_nor_delete_ask[] = "Delete this game from NOR?";
+const char en_no_game_nor[] = "No games in NOR";
 const char en_saving[] = "Saving to SD card";
 const char en_format_title[] = "Erasing NOR";
 const char en_erasing[] = "Erasing";
@@ -376,6 +380,8 @@ void LoadEnglish(void)
 	gl_file_exist = (char *)en_file_exist;
 	gl_file_noexist = (char *)en_file_noexist;
 	gl_delete_ask = (char *)en_delete_ask;
+	gl_nor_delete_ask = (char *)en_nor_delete_ask;
+	gl_no_game_nor = (char *)en_no_game_nor;
 	gl_saving = (char *)en_saving;
 	gl_format_title = (char *)en_format_title;
 	gl_erasing = (char *)en_erasing;

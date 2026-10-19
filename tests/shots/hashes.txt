@@ -68,32 +68,38 @@ diag-tests/frames 3-3 7DCF004DEAC7F9B0
 diag-tests/frames 4-12 FC971D7CA6CEA1D0
 dialog-clock/asked 5BE6D838D67CEE20
 dialog-clock/later 7ACC6D69BA6B2858
-dialog-fragmented/dialog 60333A971C48C65E
-dialog-overflow/dialog 73463470FF0258D6
+dialog-double-a/closed A5FA458AE4ABEB70
+dialog-double-a/up 3901559B5206B81A
+dialog-fragmented/dialog BE1C890F27193783
+dialog-overflow/dialog A3F36349D1902AAB
 file-menu/screen C268870729D04F01
 help/screen FD71702F76BB10E0
 keys-tab-back/end F7E40BE7DBC25590
 keys-two-presses/screen 412DB2340E2919AC
-lists-push-fail/error A052218899602B62
-lists-push-fail/list B41DDB1AFEB55DC1
+lists-push-fail/error 60BD121AB98E064F
+lists-push-fail/list E5740101EF2460F9
 menu-double-a/screen 4F47817065DDD361
-nor-launch-fail/back 9D22027A51331819
-nor-launch-fail/error 640F853BE8E8C18D
-nor-launch-fail/later 9D22027A51331819
-nor-launch-fail/list 9D22027A51331819
-nor-list/screen B41DDB1AFEB55DC1
+nor-delete/ask 1D681C51606B139D
+nor-delete/empty E5740101EF2460F9
+nor-delete/kept A5FA458AE4ABEB70
+nor-delete/list A5FA458AE4ABEB70
+nor-launch-fail/back A5FA458AE4ABEB70
+nor-launch-fail/error B8CF0E71609EC550
+nor-launch-fail/later A5FA458AE4ABEB70
+nor-launch-fail/list A5FA458AE4ABEB70
+nor-list/screen E5740101EF2460F9
 nor-write/done 8DE07CA2EAFDF0C4
 nor-write/half C04FD0A7B7D4B370
-recent/screen 672BEF507A1E554D
-recent-empty/fading 56614F38BDA1A799
-recent-empty/screen C76B0991E0027C59
+recent/screen 4BF332265C4659D4
+recent-empty/fading B433C33410610144
+recent-empty/screen 61D38EE8AD54A4A0
 recent-empty/frames 0-0 7B90E77090ED8325
-recent-empty/frames 1-1 B1BACBF3CC23347D
-recent-empty/frames 2-2 56614F38BDA1A799
-recent-empty/frames 3-3 D04C61103442ACC1
-recent-empty/frames 4-4 A297214B32E3F95D
-recent-empty/frames 5-5 985935EDF00F9B0D
-recent-empty/frames 6-13 C76B0991E0027C59
+recent-empty/frames 1-1 AD387FA9F88B818C
+recent-empty/frames 2-2 B433C33410610144
+recent-empty/frames 3-3 11A4D8268FF62F13
+recent-empty/frames 4-4 CEB3414B1B1C7CC4
+recent-empty/frames 5-5 A33FDBAC86FF4278
+recent-empty/frames 6-13 61D38EE8AD54A4A0
 sd-deep/held 863B28016E825B30
 sd-deep/held-mid 7C8E5C7B9240BC21
 sd-deep/paged 48F2860E461DE748
@@ -486,7 +492,7 @@ sd-tab-back/recent-back 5CB316715377D608
 sd-tab-held/back 58D032715DB27440
 sd-tab-held/before 02129A257D6A61D4
 sd-tab-held/gliding 65B969F2DDED313C
-sd-tab-held/going BC5CAF1EFF0F3231
+sd-tab-held/going BA0CD81A0E928EF0
 sd-tab-held/rest 2A59CB0BDA5C792D
 sd-tab-held/frames 0-0 818F72FFC7BF6260
 sd-tab-held/frames 1-15 D4C21CE5469167D4
@@ -567,14 +573,14 @@ sd-tab-held/frames 103-103 22BA27A3BBFAFFEC
 sd-tab-held/frames 104-104 B9A1AFC9F989775A
 sd-tab-held/frames 105-105 E933100A60A0D576
 sd-tab-held/frames 106-108 7B90E77090ED8325
-sd-tab-held/frames 109-109 AEEB7123326CD0E9
-sd-tab-held/frames 110-110 BC5CAF1EFF0F3231
-sd-tab-held/frames 111-111 42ECFE6D75EF0879
-sd-tab-held/frames 112-112 35359432C7D1BDF5
-sd-tab-held/frames 113-113 3B40C7AFF59C2F0D
-sd-tab-held/frames 114-127 B41DDB1AFEB55DC1
-sd-tab-held/frames 128-128 2D3236436B878101
-sd-tab-held/frames 129-129 0E73B4539F67262E
+sd-tab-held/frames 109-109 B5C58BA660BE3A1B
+sd-tab-held/frames 110-110 BA0CD81A0E928EF0
+sd-tab-held/frames 111-111 8AD6D092D265056C
+sd-tab-held/frames 112-112 6BDD209965E1BD81
+sd-tab-held/frames 113-113 DD461801B897DE0D
+sd-tab-held/frames 114-127 E5740101EF2460F9
+sd-tab-held/frames 128-128 69387FA7FD84C3C4
+sd-tab-held/frames 129-129 F7E07A164AADB8D4
 sd-tab-held/frames 130-142 7B90E77090ED8325
 sd-tab-held/frames 143-143 3D54F6E09DED8A53
 sd-tab-held/frames 144-144 6AF3722DDC2792EC
@@ -675,8 +681,8 @@ sd-tab-held/frames 238-238 FD1D72C6F1A323B9
 sd-tab-held/frames 239-239 173511A35429A92D
 sd-tab-held/frames 240-240 AF0CF0717042772D
 sd-tab-held/frames 241-292 2A59CB0BDA5C792D
-sd-theme-backup/progress 6954FDE99F97C3BF
-sd-theme-backup/saved D2E042BB7CC6745B
+sd-theme-backup/progress BF510AAAE8B1AB3D
+sd-theme-backup/saved EC152C66EF69B804
 sd-theme-menus/dialog 1BA10065BD81C17C
 sd-theme-menus/file-menu 88CD9C871C0077EE
 sd-theme-menus/kept 78C37A96E08CB9A9
@@ -687,6 +693,8 @@ sd-theme-wall/list C0CB12E6BB3CC753
 settings-edit/modeb 285B0A3E2EC551E7
 settings-edit/save 6E78999D5CA95D36
 settings-edit/save-turned B4E21CA7E5A815E6
+sd-wrap/end 9EFDC447B1CD6B78
+sd-wrap/top 818F72FFC7BF6260
 settings-held/held-l 0CA5C0696DB712FC
 settings-held/held-r 0CA5C0696DB712FC
 settings-led/edit 780E60240DD4DC4E
@@ -695,11 +703,11 @@ settings-light/help 49552FEE0648E09D
 settings-light/screen 25BF7277EB3BBB08
 settings-sd-theme/again 7E1CFB4EE11082A8
 settings-sd-theme/theme F261CF6429EF81B4
-settings1/back B41DDB1AFEB55DC1
+settings1/back E5740101EF2460F9
 settings1/screen 0CA5C0696DB712FC
 settings2/screen 055FC38099E617EE
 tr-deeper/games-in EC49937E75087FF6
-tr-deeper/recent 672BEF507A1E554D
+tr-deeper/recent 4BF332265C4659D4
 tr-deeper/root-back 87D202DFB0E19999
 tr-deeper/sd F7E40BE7DBC25590
 tr-deeper/frames 0-1 F7E40BE7DBC25590
@@ -725,14 +733,14 @@ tr-deeper/frames 32-39 F7E40BE7DBC25590
 tr-deeper/frames 40-40 00D333FB66A07014
 tr-deeper/frames 41-41 7A1A509F987B29A6
 tr-deeper/frames 42-43 7B90E77090ED8325
-tr-deeper/frames 44-44 31746E2439F898E5
-tr-deeper/frames 45-45 0064F5E3FE31AF2D
-tr-deeper/frames 46-46 6A833CD16788DEBD
-tr-deeper/frames 47-47 0016839771382945
-tr-deeper/frames 48-48 EAE5D8AB536B74F9
-tr-deeper/frames 49-58 672BEF507A1E554D
-tr-deeper/frames 59-59 302A11D48B054BA9
-tr-deeper/frames 60-60 F066458D17A0D8E5
+tr-deeper/frames 44-44 CBAE0949EB9AEDDC
+tr-deeper/frames 45-45 D4FA6D8E941B6108
+tr-deeper/frames 46-46 24056821D35F17E7
+tr-deeper/frames 47-47 C177A5E9C94EDECC
+tr-deeper/frames 48-48 FE659B9F1520102C
+tr-deeper/frames 49-58 4BF332265C4659D4
+tr-deeper/frames 59-59 46C3209A335ACCC9
+tr-deeper/frames 60-60 632876DF3247CEDC
 tr-deeper/frames 61-62 7B90E77090ED8325
 tr-deeper/frames 63-63 87D202DFB0E19999
 tr-deeper/frames 64-64 30BAD36DF70772BC
@@ -806,14 +814,14 @@ tr-tab/frames 0-1 34EED145D7C6A8C0
 tr-tab/frames 2-2 04B868B5E139156D
 tr-tab/frames 3-3 9B16C7C1303F73F7
 tr-tab/frames 4-6 7B90E77090ED8325
-tr-tab/frames 7-7 AEEB7123326CD0E9
-tr-tab/frames 8-8 BC5CAF1EFF0F3231
-tr-tab/frames 9-9 42ECFE6D75EF0879
-tr-tab/frames 10-10 35359432C7D1BDF5
-tr-tab/frames 11-11 3B40C7AFF59C2F0D
-tr-tab/frames 12-20 B41DDB1AFEB55DC1
-tr-tab/frames 21-21 0C8CABFC562B6029
-tr-tab/frames 22-22 EF2931957EB717F5
+tr-tab/frames 7-7 B5C58BA660BE3A1B
+tr-tab/frames 8-8 BA0CD81A0E928EF0
+tr-tab/frames 9-9 8AD6D092D265056C
+tr-tab/frames 10-10 6BDD209965E1BD81
+tr-tab/frames 11-11 DD461801B897DE0D
+tr-tab/frames 12-20 E5740101EF2460F9
+tr-tab/frames 21-21 06A8BE21A006BD54
+tr-tab/frames 22-22 3DD302638E2F9EBF
 tr-tab/frames 23-24 7B90E77090ED8325
 tr-tab/frames 25-25 0A59EF3A7FAD4BE5
 tr-tab/frames 26-26 FF889BEB5F444E73
@@ -853,15 +861,15 @@ tr-tab/frames 95-96 0CA5C0696DB712FC
 tr-tab/frames 97-97 78660AC616365D4D
 tr-tab/frames 98-98 68BCA822AF37E8FC
 tr-tab/frames 99-101 7B90E77090ED8325
-tr-tab/frames 102-102 71E4B39A44BE8B2C
-tr-tab/frames 103-103 59FE7609D1F93788
-tr-tab/frames 104-104 ED05983AA5FB2469
-tr-tab/frames 105-105 6BD8A418862B49F5
-tr-tab/frames 106-106 3701876DD53D59F5
-tr-tab/frames 107-108 1CF39FD70A3E16C1
-tr-tab/frames 109-115 B41DDB1AFEB55DC1
-tr-tab/frames 116-116 2D3236436B878101
-tr-tab/frames 117-117 0E73B4539F67262E
+tr-tab/frames 102-102 FFA8DAEE8D2FFCDE
+tr-tab/frames 103-103 4EC49BC4C47765B4
+tr-tab/frames 104-104 85C28E4E7279DC7C
+tr-tab/frames 105-105 CDBA6AAFA7425641
+tr-tab/frames 106-106 F83AAF47021CC485
+tr-tab/frames 107-108 6CE914809618EE19
+tr-tab/frames 109-115 E5740101EF2460F9
+tr-tab/frames 116-116 69387FA7FD84C3C4
+tr-tab/frames 117-117 F7E07A164AADB8D4
 tr-tab/frames 118-119 7B90E77090ED8325
 tr-tab/frames 120-120 B29C216BD6A4B164
 tr-tab/frames 121-121 8515523C4647CC29

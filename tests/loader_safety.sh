@@ -138,7 +138,7 @@ keys() {
 # shellcheck disable=SC2046 # $(keys) is a list of options
 write_a=$(keys 200 DOWN DOWN A DOWN DOWN A)
 write_b=$(keys 200 DOWN DOWN DOWN A DOWN DOWN A)
-delete=$(keys 200 R DOWN A DOWN A)
+delete=$(keys 200 R DOWN A DOWN A _ A)
 format=$(keys 200 R A DOWN DOWN A _ A)
 format_no=$(keys 200 R A DOWN DOWN A B)
 # SETTINGS writes the kernel NOR as it closes, so each sequence ends by
