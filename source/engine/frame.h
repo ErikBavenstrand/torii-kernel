@@ -55,5 +55,7 @@ u32 frame_count(void);
 // to mGBA's console and counts them in NAME's summary (cycles_frame). For
 // the cycle budget test.
 void frame_measure(const char *name);
+// 1 if frame_measure was called for this frame.
+int frame_measuring(void);
 
 #endif

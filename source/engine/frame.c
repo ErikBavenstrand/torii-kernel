@@ -92,6 +92,11 @@ u32 frame_count(void)
 	return frames;
 }
 
+int frame_measuring(void)
+{
+	return measure_name != 0;
+}
+
 void frame_measure(const char *name)
 {
 	measure_name = name;

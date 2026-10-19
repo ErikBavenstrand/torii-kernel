@@ -6,6 +6,17 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** the whole menu runs in one engine session: switching between
+  the SD list, the NOR list, Recently Played, folders, SETTINGS, help and
+  the cheat screen never goes black. A screen fades to its background and
+  slides away in 3 frames, the next is drawn while nothing shows and comes in
+  over 8 (sideways for L/R, up and down for folders, Recently Played, cheats);
+  a launch fades to black. Dialogs and menus fade in, then dim the screen,
+  while sliding up over 12 frames, and close the same way backwards; the dim
+  is darker. All of it is theme data (`dialog_in`, `dialog_out`,
+  `tab_*`, `deeper_*`, `fade_*`, `leave_*` in theme.ini). A delete, FORMAT
+  ALL or overwrite question answered no leaves the list as it was (`98955be`,
+  `e707f85`, `504cbf2`, `e9bb7af`).
 - **Fixed:** Diagnostics' unit tests failed on the cart (`asset_psram_round_trip`):
   a DMA from the kernel's ROM into PSRAM writes nothing on the real cart.
   `psram_write` now refuses sources in cart space; the test copies its data to

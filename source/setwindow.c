@@ -78,6 +78,11 @@ static struct {
 // --- The runner ---------------------------------------------------------------
 
 static u32 settings_result EWRAM_BSS;
+// What a handler asked for, done by Settings_run's loop after the frame (a
+// transition runs frames of its own): page + 1 to open, or leaving
+static u8 settings_next EWRAM_BSS;
+static u8 settings_leaving EWRAM_BSS;
+static u8 settings_shown EWRAM_BSS;  // the page up
 static u32 row_count EWRAM_BSS;
 static u32 row_hash[SETTINGS_ROWS_MAX] EWRAM_BSS;
 static char row_value[64] EWRAM_BSS;
@@ -170,6 +175,7 @@ static void open_page(u32 page)
 		tlog_error("settings: %s", ui_error());
 		return;  // nothing on the stack: Settings_run returns
 	}
+	settings_shown = (u8)page;
 	p->enter(v);
 	if (p->count) {
 		digest_all(p);
@@ -179,21 +185,26 @@ static void open_page(u32 page)
 
 void settings_open(u32 page)
 {
-	ui_pop();
-	open_page(page);
+	settings_next = (u8)(page + 1);
 }
 
 void settings_leave(u32 result)
 {
 	settings_result = result;
-	ui_pop();
+	settings_leaving = 1;
 }
 
 u32 Settings_run(u32 page)
 {
+	// Over the menu's session if it runs one (the caller has popped its views)
+	int own = !ui_active();
 	settings_result = SETTINGS_TO_NOR;
-	engine_init();
-	ui_init(NULL);
+	settings_next = settings_leaving = 0;
+	if (own) {
+		engine_init();
+		ui_init(NULL);
+		ui_enter(UI_TR_LEAVE, 0);
+	}
 	open_page(page);
 	while (ui_depth()) {
 		ui_frame();
@@ -201,9 +212,25 @@ u32 Settings_run(u32 page)
 		const struct settings_page *p = v ? v->ctx : 0;
 		if (p && p->poll)
 			p->poll();
+		// The pages sit side by side: page 1, page 2, help (the NOR list left of them)
+		if (settings_next) {
+			u32 to = settings_next - 1u;
+			settings_next = 0;
+			ui_leave(UI_TR_TAB, to > settings_shown ? 1 : -1);
+			while (ui_depth())
+				ui_pop();
+			open_page(to);
+		} else if (settings_leaving) {
+			settings_leaving = 0;
+			ui_leave(settings_result == SETTINGS_TO_DIAGNOSE ? UI_TR_LEAVE : UI_TR_TAB, -1);
+			while (ui_depth())
+				ui_pop();
+		}
 	}
-	ui_shutdown();
-	dialog_blank();
+	if (own) {
+		ui_shutdown();
+		dialog_blank();
+	}
 	return settings_result;
 }
 

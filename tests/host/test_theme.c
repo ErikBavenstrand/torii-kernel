@@ -82,6 +82,13 @@ void test_theme_keys(void)
 				   "marquee_pause = 0\n"
 				   "marquee_gap = 16\n"
 				   "page_fade = 0\n"
+				   "dialog_in = 20\n"
+				   "dialog_out = 6\n"
+				   "tab_effects = 9\n"
+				   "tab_out = 2\n"
+				   "tab_in = 12\n"
+				   "tab_px = 24\n"
+				   "leave_in = 0\n"
 				   "[input]\n"
 				   "delay = 20\n"
 				   "interval = 5\n"
@@ -128,6 +135,16 @@ void test_theme_keys(void)
 	CHECK_EQ(t->marquee_pause, 0);
 	CHECK_EQ(t->marquee_gap, 16);
 	CHECK_EQ(t->page_fade, 0);
+	CHECK_EQ(t->dialog_in, 20);
+	CHECK_EQ(t->dialog_out, 6);
+	CHECK_EQ(t->transition[UI_TR_TAB].effects, UI_TR_FADES | UI_TR_MOSAIC);
+	CHECK_EQ(t->transition[UI_TR_TAB].out, 2);
+	CHECK_EQ(t->transition[UI_TR_TAB].in, 12);
+	CHECK_EQ(t->transition[UI_TR_TAB].px, 24);
+	CHECK_EQ(t->transition[UI_TR_LEAVE].in, 0);
+	CHECK_EQ(t->transition[UI_TR_LEAVE].out, ui_theme_light.transition[UI_TR_LEAVE].out);
+	CHECK(!memcmp(&t->transition[UI_TR_DEEPER], &ui_theme_light.transition[UI_TR_DEEPER],
+		      sizeof(t->transition[0])));
 	CHECK_EQ(t->input.delay, 20);
 	CHECK_EQ(t->input.interval, 5);
 	CHECK_EQ(t->input.fast_after, 90);
@@ -217,24 +234,27 @@ void test_theme_warnings(void)
 				   "idle_dim = -3\n"        // 12: clamped to 0
 				   "fade_frames = 0\n"      // 13: clamped to 1
 				   "slide = 1234567\n"      // 14: not a number (too many digits)
-				   "[fonts]\n"              // 15
-				   "body = comic sans\n"    // 16
-				   "[sounds]\n"             // 17: unknown section
-				   "beep = yes\n"           // 18: ignored without a warning
-				   "[wallpaper]\n"          // 19
-				   "file = ../evil.tas\n"   // 20
-				   "file = a/b.tas\n"       // 21
-				   "just words\n"           // 22: no '='
-				   "[patches\n"             // 23: broken section line
-				   "x = 1\n";               // 24: ignored under it
+				   "dialog_in = 99\n"       // 15: clamped to 60
+				   "deeper_effects = 31\n"  // 16: clamped to 15
+				   "fade_px = 200\n"        // 17: clamped to 64
+				   "[fonts]\n"              // 18
+				   "body = comic sans\n"    // 19
+				   "[sounds]\n"             // 20: unknown section
+				   "beep = yes\n"           // 21: ignored without a warning
+				   "[wallpaper]\n"          // 22
+				   "file = ../evil.tas\n"   // 23
+				   "file = a/b.tas\n"       // 24
+				   "just words\n"           // 25: no '='
+				   "[patches\n"             // 26: broken section line
+				   "x = 1\n";               // 27: ignored under it
 	ini.on_warning = count_warning;
 	warnings_seen = 0;
 	char *copy = malloc(sizeof(text) - 1);
 	memcpy(copy, text, sizeof(text) - 1);
 	CHECK_EQ(theme_ini_parse(copy, sizeof(text) - 1, &ini), THEME_OK);
 	free(copy);
-	CHECK_EQ(ini.warnings, 16);
-	CHECK_EQ(warnings_seen, 16);
+	CHECK_EQ(ini.warnings, 19);
+	CHECK_EQ(warnings_seen, 19);
 	CHECK(!strncmp(ini.message, "line 2: base = sepia", 20));
 	CHECK(!memcmp(ini.theme.colour, ui_theme_dark.colour, sizeof(ini.theme.colour)));
 	CHECK_EQ(ini.theme.pad, 16);
@@ -242,6 +262,9 @@ void test_theme_warnings(void)
 	CHECK_EQ(ini.theme.idle_dim, 0);
 	CHECK_EQ(ini.theme.fade_frames, 1);
 	CHECK_EQ(ini.theme.slide, ui_theme_dark.slide);
+	CHECK_EQ(ini.theme.dialog_in, 60);
+	CHECK_EQ(ini.theme.transition[UI_TR_DEEPER].effects, 15);
+	CHECK_EQ(ini.theme.transition[UI_TR_FADE].px, 64);
 	CHECK(ini.theme.body == &font_body);
 	CHECK(!strcmp(ini.wallpaper, ""));
 	check_sane(&ini);

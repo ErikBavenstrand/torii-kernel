@@ -4,6 +4,15 @@
 
 #define RGB(r, g, b) ((u16)((r) | (g) << 5 | (b) << 10))
 
+// Screen transitions, the same in both
+#define TRANSITIONS \
+	{ \
+		[UI_TR_TAB] = {UI_TR_FADES | UI_TR_SLIDE_X, 3, 8, 16}, \
+		[UI_TR_DEEPER] = {UI_TR_FADES | UI_TR_SLIDE_Y, 3, 8, 12}, \
+		[UI_TR_FADE] = {UI_TR_FADES, 3, 6, 0}, \
+		[UI_TR_LEAVE] = {UI_TR_FADES, 3, 8, 0}, \
+	}
+
 // Icon colours, shared by the built-ins: folder, GBA, GB, NES, light, dark
 #define ICONS RGB(31, 24, 8), RGB(20, 14, 31), RGB(12, 26, 12), RGB(30, 10, 10), RGB(31, 31, 31), RGB(4, 4, 6)
 
@@ -28,7 +37,7 @@ const struct ui_theme ui_theme_dark = {
 	.heading = &font_heading,
 	.row_h = 16,
 	.pad = 6,
-	.modal_dim = 6,
+	.modal_dim = 8,
 	.idle_dim = 11,
 	.fade_frames = 8,
 	.slide = 24,
@@ -37,6 +46,9 @@ const struct ui_theme ui_theme_dark = {
 	.marquee_pause = 60,
 	.marquee_gap = 8,
 	.page_fade = 4,
+	.dialog_in = 12,
+	.dialog_out = 10,
+	.transition = TRANSITIONS,
 	.input = {15, 4, 60, 2, 1, 20, 4, 15},
 };
 
@@ -61,7 +73,7 @@ const struct ui_theme ui_theme_light = {
 	.heading = &font_heading,
 	.row_h = 16,
 	.pad = 6,
-	.modal_dim = 5,
+	.modal_dim = 6,
 	.idle_dim = 11,
 	.fade_frames = 8,
 	.slide = 24,
@@ -70,6 +82,9 @@ const struct ui_theme ui_theme_light = {
 	.marquee_pause = 60,
 	.marquee_gap = 8,
 	.page_fade = 4,
+	.dialog_in = 12,
+	.dialog_out = 10,
+	.transition = TRANSITIONS,
 	.input = {15, 4, 60, 2, 1, 20, 4, 15},
 };
 

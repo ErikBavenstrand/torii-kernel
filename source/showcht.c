@@ -843,7 +843,8 @@ static const struct ui_spec cs_nodes[CS_NODES] = {
 
 static const struct ui_view_spec cs_view = {"cheats", cs_nodes, CS_NODES, 34, CS_LIST, 0, cs_event};
 
-// Runs the screen until B is released; 0 if it couldn't be shown
+// Runs the screen until B is released, and returns with it still up; 0 if
+// it couldn't be shown
 static int cs_run(struct cheat_screen *cs)
 {
 	struct ui_view *v = ui_push(&cs_view, cs);
@@ -858,7 +859,7 @@ static int cs_run(struct cheat_screen *cs)
 	while (ui_depth()) {
 		ui_frame();
 		if (cs->b_down && (ui_input()->released & INPUT_B))
-			ui_pop();
+			break;
 	}
 	return 1;
 }
@@ -902,15 +903,25 @@ int Open_cht_file(TCHAR *gamefilename, u32 havecht)
 
 			// The list sits in the cover stage's range: no asset job may run
 			cover_cache_invalidate();
-			engine_init();
-			ui_init(NULL);
+			// Over the menu's session if it runs one (its views are popped)
+			int own = !ui_active();
+			if (own) {
+				engine_init();
+				ui_init(NULL);
+			}
 			cs_run(&cs);
 			shown = 1;  // the engine ran: the caller's screen starts again either way
 			// Reading the picks' codes can take seconds in a big file: the
 			// cheat screen stays up meanwhile, rather than a black one
 			Analyze_KEYVAL(&gfile, cs.count);
-			ui_shutdown();
-			dialog_blank();  // back to the caller, on a black screen
+			if (own) {
+				ui_shutdown();
+				dialog_blank();  // back to the caller, on a black screen
+			} else {
+				ui_leave(UI_TR_DEEPER, -1);  // back up to the game menu
+				while (ui_depth())
+					ui_pop();
+			}
 			cheats_opened = 1;
 			cheats_picked = 0;
 			for (u32 i = 0; i < cs.count; i++)
