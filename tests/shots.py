@@ -10,7 +10,9 @@ frames with -s @N:KEY.png; -H @A:@B hashes every frame of an animation.
 Lines starting "#! settings SLOT=VALUE..." set kernel settings slots first;
 "#! kernel test" runs the test kernel (ezkerneltest.gba, `just test-kernel`'s
 build) instead, for scenes only it has, as the cover demo. "#! sd-theme NAME"
-copies themes/NAME to /torii/themes/NAME on the scenario's card.
+copies themes/NAME to /torii/themes/NAME on the scenario's card ("#! sd-theme
+NAME DIR" copies DIR there instead), and "#! theme-choice NAME" writes NAME to
+/torii/theme.txt, the SD theme the THEME setting's value 2 picks.
 
 Check (the default): every key frame's screen hash, and every animation's
 frame hashes, must equal tests/shots/hashes.txt. On a mismatch the actual,
@@ -160,9 +162,17 @@ def runs_of(hashes: list[str]) -> list[tuple[int, int, str]]:
     return out
 
 
-def boot(name: str, sd: Path, cart: Path, out: Path, extra: list[str] = ()):
-    """Runs scenario name on a new cart, writing its key frames to out."""
-    opts = SHOTS / f"{name}.opts"
+def boot(
+    name: str,
+    sd: Path,
+    cart: Path,
+    out: Path,
+    extra: list[str] = (),
+    opts: Path | None = None,
+):
+    """Runs scenario name (or the options file opts) on a new cart, writing
+    its key frames to out. tools/theme_check.py runs its previews with it."""
+    opts = opts or SHOTS / f"{name}.opts"
     shutil.rmtree(cart, ignore_errors=True)
     cart.mkdir(parents=True)
     shutil.copy(sd, cart / "sd.img")
@@ -171,13 +181,45 @@ def boot(name: str, sd: Path, cart: Path, out: Path, extra: list[str] = ()):
         if line.split() == ["#!", "kernel", "test"]:
             kernel = TEST_KERNEL
         elif line.startswith("#! sd-theme "):
-            name = line.split()[2]
+            words = line.split(maxsplit=3)
+            theme = words[2]
+            src = words[3] if len(words) > 3 else f"themes/{theme}"
             img = str(cart / "sd.img")
-            for folder in ("::/torii", "::/torii/themes"):
+            for folder in ("::/torii", "::/torii/themes", f"::/torii/themes/{theme}"):
                 subprocess.run(
                     ["mmd", "-i", img, folder], capture_output=True, check=False
                 )
-            run(["mcopy", "-s", "-Q", "-i", img, f"themes/{name}", "::/torii/themes/"])
+            # Dot files (.DS_Store and the like) stay behind
+            for entry in sorted(e for e in Path(src).iterdir() if e.name[0] != "."):
+                run(
+                    [
+                        "mcopy",
+                        "-s",
+                        "-Q",
+                        "-i",
+                        img,
+                        str(entry),
+                        f"::/torii/themes/{theme}/",
+                    ]
+                )
+        elif line.startswith("#! theme-choice "):
+            choice = cart / "theme.txt"
+            subprocess.run(
+                ["mmd", "-i", str(cart / "sd.img"), "::/torii"],
+                capture_output=True,
+                check=False,
+            )
+            choice.write_text(line.split(maxsplit=2)[2] + "\n", encoding="utf-8")
+            run(
+                [
+                    "mcopy",
+                    "-Q",
+                    "-i",
+                    str(cart / "sd.img"),
+                    str(choice),
+                    "::/torii/theme.txt",
+                ]
+            )
         elif line.startswith("#! settings"):
             nor = cart / "kernel-nor.bin"
             if not nor.exists():

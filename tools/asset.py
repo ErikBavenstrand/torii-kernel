@@ -6,15 +6,21 @@
 """Convert pictures to Torii assets (source/engine/asset.h): tiles compressed
 with the GBA BIOS's LZ77, plus a palette.
 
-usage: asset.py encode IN.png OUT.tas [--bpp 4|8]
+usage: asset.py encode IN.png OUT.tas [--bpp 4|8] [--dither]
+       asset.py wallpaper IN.png OUT.tas [--dither]
        asset.py info FILE.tas...
        asset.py demo [--check]
 
 encode: a PNG whose sides are multiples of 8 (up to 256) becomes an asset.
-Colours are rounded to the GBA's 15 bits; pixels with alpha under 128 are
-transparent (colour 0). A 4bpp asset takes up to 15 colours, an 8bpp one
-up to 255, in order of first appearance; there is no colour reduction yet
-(T15's PNG converter adds it).
+Colour 0 is transparent: pixels with alpha under 128 get it. Colours are
+rounded to the GBA's 15 bits; a 4bpp asset takes up to 15 more, an 8bpp one
+up to 255, in order of first appearance. A picture with more is reduced to
+that many (median cut; --dither spreads the error, Floyd-Steinberg). An
+indexed PNG whose pixels all use the first 16 (or 256) entries is taken as
+it is: its indices are kept, and index 0 is transparent.
+
+wallpaper: encode for an SD theme's [wallpaper] (docs/themes.md): 4bpp, at
+most THEME_WALLPAPER_TILES tiles (source/ui/theme_ini.h).
 
 info: prints each asset's header and checks that its tiles decode.
 
@@ -22,11 +28,14 @@ demo: writes tests/kernel/asset_data.c, the test assets the kernel tests
 and the test kernel's cover demo use: generated patterns, no real art.
 --check compares the committed file instead.
 
-The output is the same on every machine: integer maths and a deterministic
-compressor, whose matches never point at the byte just before (distance 1),
-so the BIOS's VRAM decoder (SWI 0x12) reads them as well as the WRAM one.
+The limits come from the C headers, so the two never disagree. The output is
+the same on every machine: integer maths, a pinned Pillow, and a
+deterministic compressor, whose matches never point at the byte just
+before (distance 1), so the BIOS's VRAM decoder (SWI 0x12) reads them as
+well as the WRAM one.
 """
 
+import re
 import struct
 import sys
 import zlib
@@ -36,8 +45,22 @@ ROOT = Path(__file__).resolve().parent.parent
 DEMO_OUT = ROOT / "tests" / "kernel" / "asset_data.c"
 MAGIC = b"TAS1"
 HEADER = struct.Struct("<4sBBBBHHI")
-TILE_BYTES_MAX = 0x2000  # ASSET_TILE_BYTES_MAX
-FILE_MAX = 0x4000  # ASSET_FILE_MAX
+
+
+def c_defines(header: Path) -> dict[str, int]:
+    """The numeric #defines of a C header."""
+    text = header.read_text(encoding="utf-8")
+    pattern = r"^#define\s+(\w+)\s+(0x[0-9A-Fa-f]+|\d+)u?\b"
+    return {m[1]: int(m[2], 0) for m in re.finditer(pattern, text, re.MULTILINE)}
+
+
+_ASSET_H = c_defines(ROOT / "source" / "engine" / "asset.h")
+_THEME_H = c_defines(ROOT / "source" / "ui" / "theme_ini.h")
+TILE_BYTES_MAX = _ASSET_H["ASSET_TILE_BYTES_MAX"]
+FILE_MAX = _ASSET_H["ASSET_FILE_MAX"]
+TILES_PER_SIDE_MAX = _ASSET_H["ASSET_MAX_TILES_PER_SIDE"]
+WALLPAPER_TILES = _THEME_H["THEME_WALLPAPER_TILES"]
+assert _ASSET_H["ASSET_HEADER_BYTES"] == HEADER.size
 
 
 # --- LZ77, as the BIOS reads it ----------------------------------------------
@@ -140,8 +163,9 @@ def tiles_of(pixels: list[list[int]], bpp: int) -> bytes:
 def make_asset(pixels: list[list[int]], palette: list[int], bpp: int) -> bytes:
     """An asset from colour indices and BGR555 colours."""
     h, w = len(pixels), len(pixels[0])
-    if w % 8 or h % 8 or not 8 <= w <= 256 or not 8 <= h <= 256:
-        raise ValueError(f"{w}x{h}: sides must be multiples of 8, up to 256")
+    side = TILES_PER_SIDE_MAX * 8
+    if w % 8 or h % 8 or not 8 <= w <= side or not 8 <= h <= side:
+        raise ValueError(f"{w}x{h} px: sides must be multiples of 8, up to {side}")
     if bpp not in (4, 8) or len(palette) > (16 if bpp == 4 else 256):
         raise ValueError(f"{len(palette)} colours don't fit {bpp}bpp")
     raw = tiles_of(pixels, bpp)
@@ -177,34 +201,87 @@ def bgr555(r: int, g: int, b: int) -> int:
     return r >> 3 | (g >> 3) << 5 | (b >> 3) << 10
 
 
-def encode_png(path: Path, bpp: int) -> bytes:
+def png_pixels(
+    path: Path, bpp: int, dither: bool = False
+) -> tuple[list[list[int]], list[int], str]:
+    """(colour indices, BGR555 palette, a note on what was done) for a PNG."""
     from PIL import Image
 
-    img = Image.open(path).convert("RGBA")
+    limit = 16 if bpp == 4 else 256
+    img = Image.open(path)
+    img.load()
     w, h = img.size
-    data = list(img.getdata())
+    if img.mode == "P":
+        data = list(img.get_flattened_data())
+        if max(data, default=0) < limit:
+            rgb = img.getpalette() or []
+            rgb += [0] * (3 * limit - len(rgb))
+            count = max(data, default=0) + 1
+            palette = [0] + [bgr555(*rgb[3 * i : 3 * i + 3]) for i in range(1, count)]
+            pixels = [data[y * w : (y + 1) * w] for y in range(h)]
+            return pixels, palette, "indexed, taken as it is"
+    rgba = list(img.convert("RGBA").get_flattened_data())
+    opaque = [p[3] >= 128 for p in rgba]
+    # Rounded to 15 bits first, so colours the GBA can't tell apart are one
+    rounded = [(r & 0xF8, g & 0xF8, b & 0xF8) for r, g, b, _ in rgba]
+    colours = dict.fromkeys(c for c, o in zip(rounded, opaque, strict=True) if o)
+    note = ""
+    if len(colours) > limit - 1:
+        # Median cut over the opaque pixels; transparent ones borrow the
+        # first opaque colour, so they add none
+        fill = next(iter(colours))
+        flat = Image.new("RGB", (w, h))
+        flat.putdata([c if o else fill for c, o in zip(rounded, opaque, strict=True)])
+        reduced = flat.quantize(
+            colors=limit - 1,
+            method=Image.Quantize.MEDIANCUT,
+            dither=Image.Dither.NONE,
+        )
+        if dither:
+            # Pillow dithers only when mapping onto a given palette
+            reduced = flat.quantize(palette=reduced, dither=Image.Dither.FLOYDSTEINBERG)
+        pal = reduced.getpalette() or []
+        rounded = [
+            (pal[3 * i] & 0xF8, pal[3 * i + 1] & 0xF8, pal[3 * i + 2] & 0xF8)
+            for i in reduced.get_flattened_data()
+        ]
+        note = f"reduced from {len(colours)}" + (", dithered" if dither else "")
     palette = [0]  # colour 0: transparent
     index: dict[int, int] = {}
-    pixels = []
-    for y in range(h):
-        row = []
-        for x in range(w):
-            r, g, b, a = data[y * w + x]
-            if a < 128:
-                row.append(0)
-                continue
-            c = bgr555(r, g, b)
-            if c not in index:
-                index[c] = len(palette)
-                palette.append(c)
-            row.append(index[c])
-        pixels.append(row)
-    limit = 16 if bpp == 4 else 256
-    if len(palette) > limit:
-        raise ValueError(
-            f"{path}: {len(palette) - 1} colours, {bpp}bpp takes {limit - 1}"
-        )
+    flat_pixels = []
+    for (r, g, b), o in zip(rounded, opaque, strict=True):
+        if not o:
+            flat_pixels.append(0)
+            continue
+        c = bgr555(r, g, b)
+        if c not in index:
+            index[c] = len(palette)
+            palette.append(c)
+        flat_pixels.append(index[c])
+    pixels = [flat_pixels[y * w : (y + 1) * w] for y in range(h)]
+    return pixels, palette, note
+
+
+def encode_png(path: Path, bpp: int, dither: bool = False) -> bytes:
+    pixels, palette, _ = png_pixels(path, bpp, dither)
     return make_asset(pixels, palette, bpp)
+
+
+def encode_wallpaper(path: Path, dither: bool = False) -> tuple[bytes, str]:
+    """A theme's wallpaper asset and a line describing it."""
+    pixels, palette, note = png_pixels(path, 4, dither)
+    h, w = len(pixels), len(pixels[0])
+    tiles = (w // 8) * (h // 8)
+    if w % 8 == 0 and h % 8 == 0 and tiles > WALLPAPER_TILES:
+        raise ValueError(
+            f"{w}x{h} px is {tiles} tiles; a wallpaper takes {WALLPAPER_TILES} (e.g. 128x128)"
+        )
+    asset = make_asset(pixels, palette, 4)
+    return asset, (
+        f"{w}x{h} px, {tiles} of {WALLPAPER_TILES} tiles, {len(palette) - 1} colours"
+        + (f" ({note})" if note else "")
+        + f", {len(asset)} of {FILE_MAX} bytes"
+    )
 
 
 # --- The demo and test assets ---------------------------------------------------
@@ -327,11 +404,26 @@ def demo_source() -> str:
 
 
 def main(argv: list[str]) -> int:
+    dither = "--dither" in argv
+    argv = [a for a in argv if a != "--dither"]
     if len(argv) >= 3 and argv[0] == "encode":
         bpp = 4
         if "--bpp" in argv:
             bpp = int(argv[argv.index("--bpp") + 1])
-        Path(argv[2]).write_bytes(encode_png(Path(argv[1]), bpp))
+        try:
+            Path(argv[2]).write_bytes(encode_png(Path(argv[1]), bpp, dither))
+        except ValueError as e:
+            print(f"{argv[1]}: {e}")
+            return 1
+        return 0
+    if len(argv) == 3 and argv[0] == "wallpaper":
+        try:
+            asset, line = encode_wallpaper(Path(argv[1]), dither)
+        except ValueError as e:
+            print(f"{argv[1]}: {e}")
+            return 1
+        Path(argv[2]).write_bytes(asset)
+        print(f"{argv[2]}: {line}")
         return 0
     if len(argv) >= 2 and argv[0] == "info":
         failed = 0
