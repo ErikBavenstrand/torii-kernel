@@ -198,7 +198,7 @@ static const struct ui_spec demo_nodes[D_COUNT] = {
 };
 
 static const struct ui_view_spec demo_view = {
-	.name = "diag-demo", .nodes = demo_nodes, .count = D_COUNT, .id = 23, .focus = UI_NONE};
+	.name = "diag-demo", .nodes = demo_nodes, .count = D_COUNT, .id = 33, .focus = UI_NONE};
 
 static struct ui_view *demo_push(void)
 {

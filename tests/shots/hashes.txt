@@ -50,7 +50,7 @@ diag-start/screen 3162F4422A6557C5
 dialog/back DAFEFBEF130ADFF5
 dialog/screen F7EA656E2E36CA64
 file-menu/screen FCB674D8FDC6B41A
-help/screen D8C7377F69946185
+help/screen 5B20C617DB3A66BC
 nor-list/screen 0F70E61FC6E0F4AD
 recent/screen C461631DF072F1C4
 sd-list/screen DAFEFBEF130ADFF5
@@ -69,8 +69,15 @@ sd-scroll/frames 101-101 95C1C00E5D225545
 sd-scroll/frames 102-116 F5B6F878CC5107C5
 sd-scroll/frames 117-117 BBB13CC78FDCE317
 sd-scroll/frames 118-119 423F88E293FBA7C7
-settings1/screen BEC0937CCB96EF71
-settings2/screen 1BD1F13454FBDB6C
+settings-held/held-l 0CA5C0696DB712FC
+settings-held/held-r 0CA5C0696DB712FC
+settings-light/help 488DC004C5AB9F15
+settings-light/screen 25BF7277EB3BBB08
+settings-sd-theme/again 7E1CFB4EE11082A8
+settings-sd-theme/theme F261CF6429EF81B4
+settings1/back 0F70E61FC6E0F4AD
+settings1/screen 0CA5C0696DB712FC
+settings2/screen 055FC38099E617EE
 ui-dialog/closed 7B29AF95A30A3BB1
 ui-dialog/dialog 3FA6B2F8C249F938
 ui-dialog/grid 5A3482184C6909F7

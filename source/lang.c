@@ -30,6 +30,19 @@ char *gl_cheat;
 
 char *gl_hot_key;
 char *gl_hot_key2;
+char *gl_save_key EWRAM_BSS;
+char *gl_load_key EWRAM_BSS;
+
+char *gl_settings_title EWRAM_BSS;
+char *gl_help_title EWRAM_BSS;
+char *gl_on EWRAM_BSS;
+char *gl_off EWRAM_BSS;
+char *gl_theme EWRAM_BSS;
+char **gl_theme_names EWRAM_BSS;
+char *gl_accent EWRAM_BSS;
+char *gl_accent_own EWRAM_BSS;
+char *gl_dim EWRAM_BSS;
+char *gl_minutes EWRAM_BSS;
 
 char *gl_language;
 char *gl_set_btn;
@@ -179,6 +192,19 @@ const char *en_log_levels[4] = {"OFF", "ERRORS", "INFO", "DEBUG"};
 const char en_diagnose[] = " DIAGNOSE";
 const char en_diag_run[] = "RUN TESTS AND PROBES";
 
+const char en_save_key[] = "SAVE KEY";
+const char en_load_key[] = "LOAD KEY";
+const char en_settings_title[] = "SETTINGS";
+const char en_help_title[] = "HELP";
+const char en_on[] = "ON";
+const char en_off[] = "OFF";
+const char en_theme[] = "THEME";
+const char *en_theme_names[2] = {"DARK", "LIGHT"};
+const char en_accent[] = "ACCENT";
+const char en_accent_own[] = "THEME'S OWN";
+const char en_dim[] = "DIM";
+const char en_minutes[] = "MIN";
+
 const char en_error_0[] = "Folder error";
 const char en_error_1[] = "File error";
 const char en_error_2[] = "SAVER error";
@@ -288,6 +314,19 @@ void LoadEnglish(void)
 	gl_log_levels = (char **)en_log_levels;
 	gl_diagnose = (char *)en_diagnose;
 	gl_diag_run = (char *)en_diag_run;
+
+	gl_save_key = (char *)en_save_key;
+	gl_load_key = (char *)en_load_key;
+	gl_settings_title = (char *)en_settings_title;
+	gl_help_title = (char *)en_help_title;
+	gl_on = (char *)en_on;
+	gl_off = (char *)en_off;
+	gl_theme = (char *)en_theme;
+	gl_theme_names = (char **)en_theme_names;
+	gl_accent = (char *)en_accent;
+	gl_accent_own = (char *)en_accent_own;
+	gl_dim = (char *)en_dim;
+	gl_minutes = (char *)en_minutes;
 
 	gl_error_0 = (char *)en_error_0;
 	gl_error_1 = (char *)en_error_1;

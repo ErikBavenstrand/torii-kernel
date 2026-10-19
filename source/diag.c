@@ -161,7 +161,7 @@ static int diag_event(struct ui_view *view, const struct ui_event *e)
 }
 
 static const struct ui_view_spec diag_view_spec = {
-	.name = "diag", .nodes = diag_nodes, .count = N_COUNT, .id = 22, .focus = UI_NONE, .event = diag_event};
+	.name = "diag", .nodes = diag_nodes, .count = N_COUNT, .id = 32, .focus = UI_NONE, .event = diag_event};
 
 static u8 node_of(u32 n)
 {

@@ -26,6 +26,21 @@ git log, not here.
   theme's wallpaper is read from PSRAM page 0 even when a launch or a NOR
   write left another page selected (`6067e1b`, `adf21e9`, `ba02013`,
   `6db6bfa`).
+- **Changed:** SETTINGS (both pages) and HELP are drawn by the v0.3 tile
+  engine: a header and a list with each setting's name and value, the
+  official keys and edit flow, and the same settings writers. In edit mode
+  the row shows the option under the cursor (`« RESET: ON »`). Page 2 gains
+  THEME (Dark, Light or a theme from `/torii/themes`, which OK records in
+  `/torii/theme.txt`), ACCENT and DIM, previewed at once and saved like the
+  other settings; DIAGNOSE is now its last row. Held L and R turn one page.
+  HELP credits the Galmuri fonts (OFL-1.1) and gives its QR code a quiet
+  zone (`783114e`, `54b83e8`, `7075e23`, `cdaf71c`, `e3b624a`, `8057d8b`).
+- **Fixed:** February days past 29 in leap years, hot keys stored as
+  invalid codes, a dead fifth MODE B position, and AUTO SAVE and MODE B
+  changes not reaching the next launch until a reboot (`783114e`). A saved
+  ACCENT showed black, and a screen without a list could fail to appear
+  after another closed (`2a67c3f`).
+
 - **Added:** themes from the SD card. `/torii/themes/<name>/theme.ini`
   (version 1) overrides the dark or light theme key by key: colours, fonts,
   row height, spacing, fade, slide, marquee and key repeat timings, up to

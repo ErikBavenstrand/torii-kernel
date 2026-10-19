@@ -26,7 +26,7 @@
 #include "lang.h"
 #include "GBApatch.h"
 #include "showcht.h"
-#include "helpwindow.h"
+#include "settings.h"
 #include "cartlog.h"
 #include "diag.h"
 #include "engine/cover.h"
@@ -2074,40 +2074,18 @@ re_showfile:
 					ClearWithBG((u16 *)gImage_SD, 0, 20, 240, 160 - 20, 1);
 					Show_ICON_filename_SD(show_offset, file_select, gl_show_Thumbnail && is_GBA);
 
-				} else if (page_num == SET_win)  //set windows
-				{
-					DrawPic((u16 *)gImage_SET, 0, 0, 240, 160, 0, 0, 1);
-					res = Setting_window();
+				} else if ((page_num == SET_win) || (page_num == SET2_win) || (page_num == HELP)) {
+					//Torii: SETTINGS and HELP run on the engine until left
+					res = Settings_run((page_num == SET_win)    ? SETTINGS_PAGE1
+							   : (page_num == SET2_win) ? SETTINGS_PAGE2
+										    : SETTINGS_HELP);
 					tlog_flush();
-					if (res == 0) {
+					if (res == SETTINGS_TO_DIAGNOSE) {  //DIAGNOSE, which restarts the kernel
+						Diagnostics();
+					} else {
 						DrawPic((u16 *)gImage_NOR, 0, 0, 240, 160, 0, 0, 1);
 						page_num = NOR_list;  //NOR
-					} else {
-						DrawPic((u16 *)gImage_SET2, 0, 0, 240, 160, 0, 0, 1);
-						page_num = SET2_win;  //
 					}
-					goto re_showfile;
-				} else if (page_num == SET2_win)  //set2 windows
-				{
-					DrawPic((u16 *)gImage_SET2, 0, 0, 240, 160, 0, 0, 1);
-					res = Setting_window2();
-					tlog_flush();
-					if (res == 2) {  //Torii: DIAGNOSE, which restarts the kernel
-						Diagnostics();
-					} else if (res == 0) {
-						DrawPic((u16 *)gImage_SET, 0, 0, 240, 160, 0, 0, 1);
-						page_num = SET_win;  //set1
-					} else {
-						DrawPic((u16 *)gImage_HELP, 0, 0, 240, 160, 0, 0, 1);
-						page_num = HELP;  //HELP
-					}
-					goto re_showfile;
-				} else if (page_num == HELP)  //HELP windows
-				{
-					DrawPic((u16 *)gImage_HELP, 0, 0, 240, 160, 0, 0, 1);
-					Show_help_window();
-					DrawPic((u16 *)gImage_SET2, 0, 0, 240, 160, 0, 0, 1);
-					page_num = SET2_win;  //
 					goto re_showfile;
 				} else {
 					DrawPic((u16 *)gImage_NOR, 0, 0, 240, 160, 0, 0, 1);
