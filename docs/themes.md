@@ -82,6 +82,9 @@ is hidden while a screen uses plane 3 for itself (the game and NOR game
 menus, the list's questions, the UI demo's dialog), and it shows only
 where screens leave the background clear, so a theme that
 wants it beside a list patches the list's rectangle (as the example does).
+It never takes room a screen needs. The largest ones (over about 200
+tiles, as 128x128 px) can go off behind a question with a lot of text and
+come back when it closes; putting a large one back can take a frame or two.
 
 The converter (`tools/asset.py wallpaper`) takes a PNG whose sides are
 multiples of 8 and up to 256 px:

@@ -6,6 +6,12 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** with an SD theme that has a wallpaper, the game menu no longer
+  fails to open and drops the menu to the Dark theme for the session. The
+  wallpaper now sits in BG VRAM that only planes 0 and 2 use, so it never
+  pushes down the maps the menus' lists need room beside; a dialog that
+  needs that room for its text moves it among the maps until it closes,
+  without a one-frame flash of its tiles (`bc4a255`, `6956a8a`).
 - **Changed:** messages, questions and progress are dialogs on the v0.3 tile
   engine (`source/ui/dialog.h`): the launch's progress (with the game's name),
   WRITE TO NOR's and the PSRAM load's progress with a bar, "Save sav?", the
