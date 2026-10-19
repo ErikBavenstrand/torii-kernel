@@ -14,7 +14,8 @@
 //   -r FRAME         after FRAME, print the CPU registers
 //   -h FRAME         after FRAME, print a hash of the screen (same picture,
 //                    same hash), to compare runs without saving PNGs
-//   -p FRAME:ADDR:VALUE  before FRAME, write a 32-bit VALUE to ADDR
+//   -p FRAME:ADDR:VALUE  before FRAME, write a 32-bit VALUE to ADDR (hex, or
+//                    a symbol's name from the symbol file)
 //   -u TEXT          stop after the frame in which the kernel (or a -L
 //                    script) logs TEXT
 //   -x FRAME:PATH    after FRAME, write a save state (with the cart's state)
@@ -59,6 +60,7 @@
 #include <mgba/internal/debugger/gdb-stub.h>
 #endif
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -546,8 +548,20 @@ static void dump_memory(struct mCore *core, unsigned frame, const char *spec)
 
 static void poke_memory(struct mCore *core, const char *spec)
 {
-	uint32_t address = strtoul(spec, NULL, 0);
 	const char *colon = strchr(spec, ':');
+	uint32_t address = strtoul(spec, NULL, 0);
+	if (!isdigit((unsigned char)spec[0])) {  // a symbol's name
+		size_t len = colon ? (size_t)(colon - spec) : strlen(spec);
+		size_t i = 0;
+		while (i < nsymbols && (strlen(symbols[i].name) != len || strncmp(symbols[i].name, spec, len))) {
+			++i;
+		}
+		if (i == nsymbols) {
+			fprintf(stderr, "cannot poke %.*s: no such symbol\n", (int)len, spec);
+			exit(1);
+		}
+		address = symbols[i].address;
+	}
 	uint32_t value = colon ? strtoul(colon + 1, NULL, 0) : 0;
 	core->busWrite32(core, address, value);  // Like a CPU store, so the renderer sees it
 }

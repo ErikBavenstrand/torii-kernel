@@ -129,7 +129,6 @@ static const struct key keys[] = {
 	NUMBER(S_INPUT, "top_speed", input.top_speed, 1, 60),
 	NUMBER(S_INPUT, "page_delay", input.page_delay, 1, 255),
 	NUMBER(S_INPUT, "page_interval", input.page_interval, 1, 255),
-	NUMBER(S_INPUT, "wrap_pause", input.wrap_pause, 0, 255),
 	{S_WALLPAPER, K_FILE, 0, 0, (u16)offsetof(struct theme_ini, wallpaper), "file"},
 };
 

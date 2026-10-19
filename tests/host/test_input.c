@@ -27,7 +27,7 @@ static void check_frames(const u32 *got, u32 n, const u32 *want, u32 count)
 
 // A steady repeat every 4 frames, as before the ramp: the wrap tests count
 // frames on it
-static const InputTiming steady = {15, 4, 0, 15, 20, 8, 15};
+static const InputTiming steady = {15, 4, 0, 15, 20, 8};
 
 void test_input_tap(void)
 {
@@ -69,7 +69,7 @@ void test_input_ramp_curve(void)
 	CHECK_EQ(input_ramp_rate(t, t->ramp), to);
 	CHECK_EQ(input_ramp_rate(t, 1000), to);
 	CHECK_EQ(t->top_speed, 40);  // two frames in three at the top
-	static const InputTiming every = {15, 4, 90, 60, 20, 6, 15};
+	static const InputTiming every = {15, 4, 90, 60, 20, 6};
 	CHECK_EQ(input_ramp_rate(&every, 90), INPUT_ONE);  // 60 a second: every frame
 	// Smoothstep's steepest slope is 1.5 / ramp of the rise: no frame jumps
 	// more than that, and the curve starts and ends flat
@@ -88,12 +88,12 @@ void test_input_ramp_curve(void)
 	CHECK(mid > from + (to - from) / 2 - 2 && mid < from + (to - from) / 2 + 2);
 	// Out-of-range timings: top speed 0 counts as 1, past 60 as 60;
 	// interval 0 as 1; ramp 0 is the top at once
-	static const InputTiming odd = {15, 0, 0, 0, 20, 0, 15};
+	static const InputTiming odd = {15, 0, 0, 0, 20, 0};
 	CHECK_EQ(input_ramp_rate(&odd, 0), (INPUT_ONE + 59) / 60);
-	static const InputTiming fast = {15, 4, 30, 200, 20, 6, 15};
+	static const InputTiming fast = {15, 4, 30, 200, 20, 6};
 	CHECK_EQ(input_ramp_rate(&fast, 30), INPUT_ONE);
 	// A top speed under the start speed ramps down
-	static const InputTiming down = {15, 2, 10, 6, 20, 6, 15};
+	static const InputTiming down = {15, 2, 10, 6, 20, 6};
 	CHECK(input_ramp_rate(&down, 5) < INPUT_ONE / 2);
 	CHECK_EQ(input_ramp_rate(&down, 10), (INPUT_ONE * 6 + 59) / 60);
 }
@@ -272,7 +272,7 @@ void test_input_paging(void)
 	input_page_keys(&s, 0);
 	CHECK_EQ(s.page_keys, INPUT_PAGE);
 	// Timings come from the view's own table.
-	static const InputTiming slow = {30, 10, 0, 6, 40, 20, 12};
+	static const InputTiming slow = {30, 10, 0, 6, 40, 20};
 	static const u32 slow_want[] = {0, 30, 40, 50};
 	static const u32 slow_page[] = {0, 40, 60};
 	input_init(&s, &slow);
@@ -284,7 +284,7 @@ void test_input_paging(void)
 	CHECK_EQ(n, 3);
 	check_frames(fired, n, slow_page, 3);
 	// Intervals of 0 count as 1, so a key can't fire forever on one frame.
-	static const InputTiming zero = {0, 0, 0, 60, 0, 0, 0};
+	static const InputTiming zero = {0, 0, 0, 60, 0, 0};
 	input_init(&s, &zero);
 	n = hold(&s, INPUT_DOWN, INPUT_DOWN, 5, fired, 64);
 	CHECK_EQ(n, 5);
@@ -293,113 +293,89 @@ void test_input_paging(void)
 	CHECK_EQ(n, 5);
 }
 
-// Holds key, moving a cursor in a list of count from cursor through gate w,
-// for frames frames; writes where it is after each frame to at.
-static void scroll(InputState *s, InputWrap *w, u16 key, s32 delta, u32 *cursor, u32 count, u32 frames, u32 *at)
+// Holds key, moving a cursor in a list of count from cursor, for frames
+// frames; writes where it is after each frame to at.
+static void scroll(InputState *s, u16 key, s32 delta, u32 *cursor, u32 count, u32 frames, u32 *at)
 {
 	for (u32 f = 0; f < frames; f++) {
 		input_step(s, key, 1);
 		if (input_fired(s, key))
-			*cursor = input_move(s, w, key, *cursor, count, delta);
+			*cursor = input_move(s, key, *cursor, count, delta);
 		at[f] = *cursor;
 	}
 }
 
+// One rule for every list and menu (v0.3.2): a held key stops at the end
+// and stays there however long it rests; a fresh press at the end wraps.
 void test_input_wrap(void)
 {
 	InputState s;
-	InputWrap w;
 	input_init(&s, &steady);
 	u32 at[64], cursor = 0;
-	input_wrap_init(&w, &s, cursor);
-	// Held down a list of 5: repeats stop at the end (frame 23); after
-	// resting there 15 frames, the next repeat (frame 39) wraps.
-	scroll(&s, &w, INPUT_DOWN, 1, &cursor, 5, 48, at);
+	// Held down a list of 5: repeats stop at the end (frame 23) and stay
+	// there (v0.3's menus wrapped after 15 frames' rest, at frame 39).
+	scroll(&s, INPUT_DOWN, 1, &cursor, 5, 64, at);
 	CHECK_EQ(at[0], 1);
 	CHECK_EQ(at[14], 1);
 	CHECK_EQ(at[15], 2);
 	CHECK_EQ(at[19], 3);
 	CHECK_EQ(at[23], 4);
-	CHECK_EQ(at[27], 4);
-	CHECK_EQ(at[35], 4);
-	CHECK_EQ(at[38], 4);
-	CHECK_EQ(at[39], 0);
-	CHECK_EQ(at[43], 1);
-	CHECK_EQ(at[47], 2);
+	CHECK_EQ(at[39], 4);
+	CHECK_EQ(at[63], 4);
+	// Held up, the same at the top.
+	input_step(&s, 0, 1);
+	scroll(&s, INPUT_UP, -1, &cursor, 5, 64, at);
+	CHECK_EQ(at[0], 3);
+	CHECK_EQ(at[27], 0);
+	CHECK_EQ(at[63], 0);
 
 	// A fresh press at the end wraps at once, either way.
 	input_step(&s, 0, 1);
 	cursor = 4;
-	scroll(&s, &w, INPUT_DOWN, 1, &cursor, 5, 1, at);
+	scroll(&s, INPUT_DOWN, 1, &cursor, 5, 1, at);
 	CHECK_EQ(cursor, 0);
 	input_step(&s, 0, 1);
-	scroll(&s, &w, INPUT_UP, -1, &cursor, 5, 1, at);
+	scroll(&s, INPUT_UP, -1, &cursor, 5, 1, at);
 	CHECK_EQ(cursor, 4);
-
-	// Paging stops at the end first, even on a fresh press, then wraps.
-	input_step(&s, 0, 1);
-	cursor = 3;
-	scroll(&s, &w, INPUT_L, -10, &cursor, 20, 1, at);
-	CHECK_EQ(cursor, 0);
-	input_step(&s, 0, 1);
-	scroll(&s, &w, INPUT_L, -10, &cursor, 20, 1, at);
-	CHECK_EQ(cursor, 19);
-	input_step(&s, 0, 1);
-	scroll(&s, &w, INPUT_R, 10, &cursor, 20, 1, at);
-	CHECK_EQ(cursor, 0);
-	scroll(&s, &w, INPUT_R, 10, &cursor, 20, 21, at);  // held: 10 at frame 20
-	CHECK_EQ(cursor, 10);
-
-	// A cursor put at the end by other means has just arrived: a repeat
-	// leaves it there.
+	// And only the key pressed counts as fresh: UP held, DOWN's press
+	// doesn't let UP's repeat wrap.
 	input_init(&s, &steady);
 	cursor = 0;
-	input_wrap_init(&w, &s, cursor);
-	scroll(&s, &w, INPUT_DOWN, 1, &cursor, 50, 15, at);  // held, repeating
-	CHECK_EQ(cursor, 1);
-	cursor = 49;
-	scroll(&s, &w, INPUT_DOWN, 1, &cursor, 50, 1, at);  // the repeat at 15
-	CHECK_EQ(cursor, 49);
-	// So does one whose gate was just set up, however late.
-	for (u32 i = 0; i < 100; i++)
-		input_step(&s, INPUT_DOWN, 1);
-	input_wrap_init(&w, &s, 49);
-	cursor = 49;
-	scroll(&s, &w, INPUT_DOWN, 1, &cursor, 50, 2, at);  // a repeat in these 2 frames
-	CHECK_EQ(cursor, 49);
+	for (u32 f = 0; f < 16; f++)
+		input_step(&s, INPUT_UP, 1);  // the repeat at 15: UP fires, not freshly
+	CHECK(input_fired(&s, INPUT_UP) && !(s.pressed & INPUT_UP));
+	CHECK_EQ(input_move(&s, INPUT_UP, cursor, 5, -1), 0);
+	input_step(&s, INPUT_UP | INPUT_DOWN, 1);  // DOWN pressed
+	CHECK_EQ(input_move(&s, INPUT_UP, cursor, 5, -1), 0);
+	CHECK_EQ(input_move(&s, INPUT_DOWN, 4, 5, 1), 0);
 
-	// Two cursors keep gates of their own: one resting at its end doesn't
-	// let the other wrap the moment it arrives.
-	InputWrap rows, cols;
-	u32 row = 0, col = 1;
+	// Paging stops at the end first, even on a fresh press, then wraps.
 	input_init(&s, &steady);
-	input_wrap_init(&rows, &s, row);
-	input_wrap_init(&cols, &s, col);
-	for (u32 f = 0; f < 40; f++)
-		input_step(&s, 0, 1);
-	for (u32 f = 0; f < 16; f++) {
-		input_step(&s, INPUT_RIGHT, 1);
-		if (input_fired(&s, INPUT_RIGHT))
-			col = input_move(&s, &cols, INPUT_RIGHT, col, 4, 1);
-		if (f == 15)
-			row = input_move(&s, &rows, INPUT_RIGHT, row, 4, -1);  // row 0 rested 55 frames: wraps
-	}
-	CHECK_EQ(col, 3);  // 2 on the press, 3 (the end) on the repeat at 15
-	CHECK_EQ(row, 3);
-	for (u32 f = 0; f < 4; f++) {  // the repeat at 19, 4 frames after col arrived
-		input_step(&s, INPUT_RIGHT, 1);
-		if (input_fired(&s, INPUT_RIGHT))
-			col = input_move(&s, &cols, INPUT_RIGHT, col, 4, 1);
-	}
-	CHECK_EQ(col, 3);
+	input_step(&s, 0, 1);
+	cursor = 3;
+	scroll(&s, INPUT_L, -10, &cursor, 20, 1, at);
+	CHECK_EQ(cursor, 0);
+	input_step(&s, 0, 1);
+	scroll(&s, INPUT_L, -10, &cursor, 20, 1, at);
+	CHECK_EQ(cursor, 19);
+	input_step(&s, 0, 1);
+	scroll(&s, INPUT_R, 10, &cursor, 20, 1, at);
+	CHECK_EQ(cursor, 0);
+	scroll(&s, INPUT_R, 10, &cursor, 20, 60, at);  // held: 10 at frame 19, 19 at 27, and there
+	CHECK_EQ(at[19], 10);
+	CHECK_EQ(at[27], 19);
+	CHECK_EQ(cursor, 19);
 
 	// Edge cases: empty and one-item lists, a cursor past the end.
 	input_init(&s, &steady);
-	input_wrap_init(&w, &s, 0);
 	input_step(&s, INPUT_DOWN, 1);
-	CHECK_EQ(input_move(&s, &w, INPUT_DOWN, 5, 0, 1), 0);
-	CHECK_EQ(input_move(&s, &w, INPUT_DOWN, 0, 1, 1), 0);
-	CHECK_EQ(input_move(&s, &w, INPUT_DOWN, 0, 1, -1), 0);
-	CHECK_EQ(input_move(&s, &w, INPUT_DOWN, 9, 3, 1), 0);  // 9 counts as 2, the end: fresh, so it wraps
-	CHECK_EQ(input_move(&s, &w, INPUT_DOWN, 1, 3, -0x7FFFFFFF - 1), 0);  // the most negative delta
+	CHECK_EQ(input_move(&s, INPUT_DOWN, 5, 0, 1), 0);
+	CHECK_EQ(input_move(&s, INPUT_DOWN, 0, 1, 1), 0);
+	CHECK_EQ(input_move(&s, INPUT_DOWN, 0, 1, -1), 0);
+	CHECK_EQ(input_move(&s, INPUT_DOWN, 9, 3, 1), 0);  // 9 counts as 2, the end: fresh, so it wraps
+	CHECK_EQ(input_move(&s, INPUT_DOWN, 1, 3, -0x7FFFFFFF - 1), 0);  // the most negative delta
+	for (u32 f = 0; f < 15; f++)
+		input_step(&s, INPUT_DOWN, 1);  // the repeat at 15
+	CHECK(input_fired(&s, INPUT_DOWN) && !(s.pressed & INPUT_DOWN));
+	CHECK_EQ(input_move(&s, INPUT_DOWN, 9, 3, 1), 2);  // held: stays at the end
 }

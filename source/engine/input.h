@@ -1,6 +1,6 @@
 // Input: per-key repeat counted in frames (not libgba's shared setRepeat),
 // paging keys on their own schedule, and list cursor moves that wrap only
-// when the user means it.
+// on a fresh press.
 //
 // input_step takes the keys held this frame as a bitmask, so tests/host runs
 // it; input_poll (input_hw.c) reads them from the hardware.
@@ -48,10 +48,9 @@ typedef struct {
 	u8 top_speed;     // repeats a second at top speed, 1-60 (60: every frame)
 	u8 page_delay;    // paging keys: press to first repeat
 	u8 page_interval; // paging keys: between repeats
-	u8 wrap_pause;    // a held key wraps at a list end after resting there this long
 } InputTiming;
 
-// 15, 4, 90, 40; paging 20, 6; wrap pause 15. A held d-pad fires on frames
+// 15, 4, 90, 40; paging 20, 6. A held d-pad fires on frames
 // 0 and 15, then about 4 frames apart, closing up smoothly to 40 a second
 // (two frames in three) by frame 105 (1.75 s).
 extern const InputTiming input_timing_default;
@@ -73,13 +72,6 @@ typedef struct {
 	u32 rate[INPUT_KEYS];   // the repeat rate this frame, once repeating
 	u16 ramp_frames[INPUT_KEYS]; // since the first repeat, up to ramp
 } InputState;
-
-// The wrap gate for one cursor (a list, or one axis of a grid): each owns
-// its own, set up by input_wrap_init.
-typedef struct {
-	u32 since;  // InputState.now when the cursor last moved
-	u32 cursor; // where input_move left it
-} InputWrap;
 
 // Starts with no key held. timing NULL takes input_timing_default.
 void input_init(InputState *s, const InputTiming *timing);
@@ -111,19 +103,11 @@ static inline int input_fired(const InputState *s, u16 key)
 	return (s->fire & key) != 0;
 }
 
-// Starts a cursor's gate: the cursor counts as having just arrived.
-static inline void input_wrap_init(InputWrap *w, const InputState *s, u32 cursor)
-{
-	w->since = s->now;
-	w->cursor = cursor;
-}
-
 // Where a list cursor goes when key fires, moving delta items (1, -1 or a
-// page) in a list of count. A move past an end first stops at that end. From
-// the end itself it wraps to the other end only on a fresh press of key, or
-// once the cursor has rested at the end for wrap_pause frames; a repeat that
-// arrives sooner leaves it there. A cursor moved by other means counts as
-// having just arrived. w is this cursor's gate.
-u32 input_move(const InputState *s, InputWrap *w, u16 key, u32 cursor, u32 count, s32 delta);
+// page) in a list of count. A move past an end stops at that end. From the
+// end itself a fresh press of key wraps to the other end; a held key's
+// repeats stay there. Every list and menu moves this way
+// (docs/plans/v0.3-decisions.md, v0.3.2).
+u32 input_move(const InputState *s, u16 key, u32 cursor, u32 count, s32 delta);
 
 #endif

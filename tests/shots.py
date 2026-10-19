@@ -17,6 +17,8 @@ DEST SIZE SRC" copies SRC to DEST on the card, padded with 0xFF to SIZE
 bytes: a game large enough for a progress bar to move (boot-progress-big),
 or, with SIZE 0 and SRC /dev/null, an empty file in place of one (quote a
 DEST with spaces).
+"#! sd-rm PATH" deletes PATH (a file or a whole folder) from the card first,
+so a later sd-file can put a file in its place (nor-launch-fail).
 "#! sd-fragmented DEST SIZE RUNS SRC" copies SRC, padded with zeros to SIZE
 bytes, to DEST in RUNS runs of clusters (tools/sdimg.sh put-fragmented): a
 game too fragmented to start (dialog-fragmented). A "kernel error:" line
@@ -249,6 +251,9 @@ def boot(
                     "::/torii/theme.txt",
                 ]
             )
+        elif line.startswith("#! sd-rm "):
+            target = "::" + line.split(maxsplit=2)[2]
+            run(["mdeltree", "-i", str(cart / "sd.img"), target])
         elif line.startswith("#! sd-file "):
             _, _, dest, size, src = shlex.split(line)
             data = Path(src).read_bytes()

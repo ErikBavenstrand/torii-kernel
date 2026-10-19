@@ -24,6 +24,23 @@ git log, not here.
   (`384c622`, `f51e614`).
 - **Fixed:** BOOT WITH ADDON said "Loading the game" while it still checked
   save states and patches (`95b5f8d`).
+- **Changed:** one wrap rule for every list and menu: a held key stops at
+  the end and stays there, and a fresh press at the end wraps. The menus and
+  the UI demo's list used to wrap after a 15-frame rest; the theme key
+  `wrap_pause` is gone (`6844884`).
+- **Fixed:** L from the NOR list and B from Recently Played bring the SD list
+  back with the cursor where it was, not on its first row (`691fc00`).
+- **Fixed:** after a card failure the lists' idle flush no longer calls
+  `tlog_flush` every idle frame (`tlog_card_failed`) (`40bf58f`).
+- **Fixed:** if the list's view can't be pushed, an error comes in from black
+  and the session starts over, instead of a black screen that takes no key
+  (`046cfdf`).
+- **Fixed:** two presses of one key while a screen goes out are two moves on
+  the next screen, not one, and keys queued for the next screen are no
+  longer dropped while DIM is on: they wake it (`bf7f65d`). Only the d-pad,
+  L and R count twice, so a double A can't act on a screen not seen yet, and
+  a second press the screen left before using is dropped rather than moving
+  the screen after it (`5cb9525`, `e7d2d4f`).
 - **Known issue:** a cart whose kernel NOR is a uniform-sector S29GL064A
   (NOR ID `0x220C`; Diagnostics shows it as "kernel NOR id") can't take a
   kernel update: EZ-Flash's loader stops with "Bad NOR ID" when R is held,
