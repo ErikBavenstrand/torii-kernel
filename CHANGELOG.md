@@ -6,6 +6,22 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** a quick double A on a game opened its menu and the second A
+  picked CLEAN BOOT. A menu or dialog still opening now ignores A and START;
+  the d-pad and B act at once (`96d6515`).
+- **Fixed:** LOAD SAVE's question about a save still waiting to be copied
+  said "Launching loses it"; it now says "Loading the save loses it. Load
+  anyway?". The save's name in it is cut at a whole character (`3d9fecf`).
+- **Fixed:** a key pressed while LOAD SAVE's dialogs closed opened the NOR
+  menu unasked after B on its question (`09c385c`).
+- **Fixed:** coming back to the SD list from Recently Played (a launch that
+  didn't start, an error, B on the game menu) put the cursor on the first
+  row; it is where it was, as after B (`09c385c`).
+- **Fixed:** a full card stopped the log for the rest of the boot, as a card
+  failure; the log now waits in RAM and goes on once a file is deleted or at
+  the next flush with room (`1355085`).
+- **Fixed:** a failed folder-up showed "error?"; it shows error 0, "Can't
+  open the folder" (`f51e614`).
 - **Fixed:** SETTINGS wrote the kernel NOR on every OK (five erases in
   25 s on a cart). A setting still takes effect at once on OK, but it is
   kept (written to the NOR) when you leave SETTINGS, once, and not at all if

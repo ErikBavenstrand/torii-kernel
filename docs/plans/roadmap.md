@@ -436,7 +436,10 @@ The kernel's copy is made safe like this:
    the save table gets today (save mode `0x10`, from `Check_saveMODE`): it gets no file at
    launch, and one only once its chip differs from the blank pattern the kernel loaded.
    `tests/saves.sh` checks it with `hello.gba`, which never saves.
-5. **Write failures:** a failed write shows a clear error and keeps everything.
+5. **Write failures:** a failed write shows a clear error and keeps everything. Today
+   `Save_savefile` opens the `.sav` with `FA_CREATE_ALWAYS`, so a copy that runs out of
+   room on a full card has already truncated the good file it replaces (`tests/saves.sh
+   full` leaves a cut-short `Test.sav`); step 1's tmp file and step 2's rename end that.
 6. **Tests:** the emulated cart cuts power at every step, and the test checks that a good
    save always survives.
 7. **Save-type changes:** when a game's save type changes, for example EEPROM 8K to 512, its
