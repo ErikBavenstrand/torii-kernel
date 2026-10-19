@@ -426,18 +426,58 @@ static const struct ui_list_config list_config = {&list_model, 16, 0, UI_LIST_MA
 // The list isn't focusable: the view's handler takes every key, so L and R
 // switch screens as they always did instead of paging the list
 static const struct ui_spec list_nodes[N_NODES] = {
-	[N_BAR] = {.kind = UI_PANEL, .id = 1, .parent = UI_NONE, .plane = 2, .anchor = UI_HFILL, .paper = UI_ROLE_PANEL,
+	[N_BAR] = {.kind = UI_PANEL,
+		   .id = 1,
+		   .parent = UI_NONE,
+		   .plane = 2,
+		   .anchor = UI_HFILL,
+		   .paper = UI_ROLE_PANEL,
 		   .h = 16},
-	[N_TITLE] = {.kind = UI_LABEL, .id = 2, .parent = N_BAR, .plane = 2, .anchor = UI_LEFT | UI_VFILL,
-		     .paper = UI_ROLE_PANEL, .w = 96, .data = &title_label},
-	[N_CLOCK] = {.kind = UI_LABEL, .id = 3, .parent = N_BAR, .plane = 2, .anchor = UI_LEFT | UI_VFILL,
-		     .ink = UI_ROLE_DIM, .paper = UI_ROLE_PANEL, .x = 96, .w = 64, .data = &clock_label},
-	[N_COUNT] = {.kind = UI_LABEL, .id = 4, .parent = N_BAR, .plane = 2, .anchor = UI_RIGHT | UI_VFILL,
-		     .ink = UI_ROLE_DIM, .paper = UI_ROLE_PANEL, .w = 80, .data = &count_label},
-	[N_LIST] = {.kind = UI_LIST, .id = 5, .parent = UI_NONE, .plane = 1, .anchor = UI_FILL, .paper = UI_ROLE_BG,
-		    .y = 16, .data = &list_config},
-	[N_EMPTY] = {.kind = UI_LABEL, .id = 6, .parent = UI_NONE, .plane = 2, .anchor = UI_HFILL, .flags = UI_HIDDEN,
-		     .ink = UI_ROLE_DIM, .y = 16, .h = 16, .data = &empty_label},
+	[N_TITLE] = {.kind = UI_LABEL,
+		     .id = 2,
+		     .parent = N_BAR,
+		     .plane = 2,
+		     .anchor = UI_LEFT | UI_VFILL,
+		     .paper = UI_ROLE_PANEL,
+		     .w = 96,
+		     .data = &title_label},
+	[N_CLOCK] = {.kind = UI_LABEL,
+		     .id = 3,
+		     .parent = N_BAR,
+		     .plane = 2,
+		     .anchor = UI_LEFT | UI_VFILL,
+		     .ink = UI_ROLE_DIM,
+		     .paper = UI_ROLE_PANEL,
+		     .x = 96,
+		     .w = 64,
+		     .data = &clock_label},
+	[N_COUNT] = {.kind = UI_LABEL,
+		     .id = 4,
+		     .parent = N_BAR,
+		     .plane = 2,
+		     .anchor = UI_RIGHT | UI_VFILL,
+		     .ink = UI_ROLE_DIM,
+		     .paper = UI_ROLE_PANEL,
+		     .w = 80,
+		     .data = &count_label},
+	[N_LIST] = {.kind = UI_LIST,
+		    .id = 5,
+		    .parent = UI_NONE,
+		    .plane = 1,
+		    .anchor = UI_FILL,
+		    .paper = UI_ROLE_BG,
+		    .y = 16,
+		    .data = &list_config},
+	[N_EMPTY] = {.kind = UI_LABEL,
+		     .id = 6,
+		     .parent = UI_NONE,
+		     .plane = 2,
+		     .anchor = UI_HFILL,
+		     .flags = UI_HIDDEN,
+		     .ink = UI_ROLE_DIM,
+		     .y = 16,
+		     .h = 16,
+		     .data = &empty_label},
 };
 
 static int list_event(struct ui_view *v, const struct ui_event *e);
@@ -459,17 +499,44 @@ static const struct ui_view_spec list_views[SCREENS] = {
 static const struct ui_list_config menu_config = {&menu_model, 16, 0, UI_LIST_FIXED, 0};
 static const struct ui_label_config hint_label = {"", UI_FONT_BODY, UI_ALIGN_CENTER, 0};
 
-#define MENU_NODES(rows)                                                                                          \
-	{                                                                                                         \
-		{.kind = UI_PANEL, .id = 1, .parent = UI_NONE, .plane = 0, .anchor = UI_HCENTER,                  \
-		 .paper = UI_ROLE_PANEL, .y = MENU_Y(rows), .w = MENU_W, .h = 8},                                 \
-			{.kind = UI_LIST, .id = 2, .parent = UI_NONE, .plane = 3, .anchor = UI_HCENTER,           \
-			 .paper = UI_ROLE_PANEL, .y = MENU_Y(rows) + 8, .w = MENU_W, .h = (rows) * 16,            \
-			 .data = &menu_config},                                                                   \
-			{.kind = UI_PANEL, .id = 3, .parent = UI_NONE, .plane = 0, .anchor = UI_HCENTER,          \
-			 .paper = UI_ROLE_PANEL, .y = MENU_Y(rows) + 8 + (rows) * 16, .w = MENU_W, .h = 16},      \
-			{.kind = UI_LABEL, .id = 4, .parent = 2, .plane = 0, .anchor = UI_FILL, .ink = UI_ROLE_DIM, \
-			 .paper = UI_ROLE_PANEL, .data = &hint_label},                                            \
+#define MENU_NODES(rows) \
+	{ \
+		{.kind = UI_PANEL, \
+		 .id = 1, \
+		 .parent = UI_NONE, \
+		 .plane = 0, \
+		 .anchor = UI_HCENTER, \
+		 .paper = UI_ROLE_PANEL, \
+		 .y = MENU_Y(rows), \
+		 .w = MENU_W, \
+		 .h = 8}, \
+		{.kind = UI_LIST, \
+		 .id = 2, \
+		 .parent = UI_NONE, \
+		 .plane = 3, \
+		 .anchor = UI_HCENTER, \
+		 .paper = UI_ROLE_PANEL, \
+		 .y = MENU_Y(rows) + 8, \
+		 .w = MENU_W, \
+		 .h = (rows) * 16, \
+		 .data = &menu_config}, \
+		{.kind = UI_PANEL, \
+		 .id = 3, \
+		 .parent = UI_NONE, \
+		 .plane = 0, \
+		 .anchor = UI_HCENTER, \
+		 .paper = UI_ROLE_PANEL, \
+		 .y = MENU_Y(rows) + 8 + (rows) * 16, \
+		 .w = MENU_W, \
+		 .h = 16}, \
+		{.kind = UI_LABEL, \
+		 .id = 4, \
+		 .parent = 2, \
+		 .plane = 0, \
+		 .anchor = UI_FILL, \
+		 .ink = UI_ROLE_DIM, \
+		 .paper = UI_ROLE_PANEL, \
+		 .data = &hint_label}, \
 	}
 
 static const struct ui_spec menu3_nodes[] = MENU_NODES(3);
@@ -488,12 +555,37 @@ static const struct ui_view_spec nor_menu5 = {"nor-menu", menu5_nodes, 4, 5, UI_
 #define D_HINT 2
 static const struct ui_label_config text_label = {"", UI_FONT_BODY, UI_ALIGN_CENTER, 0};
 static const struct ui_spec dialog_nodes[] = {
-	{.kind = UI_PANEL, .id = 1, .parent = UI_NONE, .plane = 0, .anchor = UI_HCENTER | UI_VCENTER,
-	 .paper = UI_ROLE_PANEL, .w = 208, .h = 72},
-	{.kind = UI_LABEL, .id = 2, .parent = 0, .plane = 0, .anchor = UI_HFILL, .paper = UI_ROLE_PANEL, .x = 8, .y = 8,
-	 .w = 8, .h = 40, .data = &text_label},
-	{.kind = UI_LABEL, .id = 3, .parent = 0, .plane = 0, .anchor = UI_HFILL, .ink = UI_ROLE_DIM,
-	 .paper = UI_ROLE_PANEL, .x = 8, .y = 48, .w = 8, .h = 16, .data = &hint_label},
+	{.kind = UI_PANEL,
+	 .id = 1,
+	 .parent = UI_NONE,
+	 .plane = 0,
+	 .anchor = UI_HCENTER | UI_VCENTER,
+	 .paper = UI_ROLE_PANEL,
+	 .w = 208,
+	 .h = 72},
+	{.kind = UI_LABEL,
+	 .id = 2,
+	 .parent = 0,
+	 .plane = 0,
+	 .anchor = UI_HFILL,
+	 .paper = UI_ROLE_PANEL,
+	 .x = 8,
+	 .y = 8,
+	 .w = 8,
+	 .h = 40,
+	 .data = &text_label},
+	{.kind = UI_LABEL,
+	 .id = 3,
+	 .parent = 0,
+	 .plane = 0,
+	 .anchor = UI_HFILL,
+	 .ink = UI_ROLE_DIM,
+	 .paper = UI_ROLE_PANEL,
+	 .x = 8,
+	 .y = 48,
+	 .w = 8,
+	 .h = 16,
+	 .data = &hint_label},
 };
 
 static int dialog_event(struct ui_view *v, const struct ui_event *e);
@@ -873,7 +965,7 @@ static void folder_in(u32 index)
 	}
 	if (sep)
 		currentpath[old_len] = '/';
-	strcpy(currentpath + old_len + sep, folder);
+	memcpy(currentpath + old_len + sep, folder, strlen(folder) + 1);  // fits: checked above
 	if (f_chdir(currentpath) != FR_OK) {
 		currentpath[old_len] = 0;
 		f_chdir(currentpath);
@@ -897,7 +989,7 @@ static void folder_up(void)
 	memcpy(currentpath_temp, currentpath, MAX_path_len);
 	*p = 0;
 	if (currentpath[0] == 0)
-		strcpy(currentpath, "/");
+		memcpy(currentpath, "/", 2);
 	if (f_chdir(currentpath) != FR_OK) {
 		memcpy(currentpath, currentpath_temp, MAX_path_len);
 		error_dialog(10, AFTER_POP);
