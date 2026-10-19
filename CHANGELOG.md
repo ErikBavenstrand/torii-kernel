@@ -20,6 +20,10 @@ git log, not here.
 - **Fixed:** two presses of one key while a screen goes out are two moves on
   the next screen, not one, and keys queued for the next screen are no
   longer dropped while DIM is on: they wake it (`bf7f65d`).
+- **Known issue:** a cart whose kernel NOR is a uniform-sector S29GL064A
+  (NOR ID `0x220C`; Diagnostics shows it as "kernel NOR id") can't take a
+  kernel update: EZ-Flash's loader stops with "Bad NOR ID" when R is held,
+  and installs neither Torii nor the official kernel (`docs/recovery.md`).
 - **Changed:** scrolling. A held d-pad speeds up smoothly from a row every
   4 frames to 40 rows a second, its top speed at 1.75 s held, and the list
   glides with the cursor at its speed, so the cursor never leaves the

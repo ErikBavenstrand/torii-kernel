@@ -2,7 +2,8 @@
 # name, fails one push): R from the SD list goes out, the error comes in
 # from black instead of a black screen that takes no key (before v0.3.2),
 # and once it closes the session starts over and the NOR list comes in.
-#! expect-error view nor-list: failed for a test
+#! expect-error engine: ui: view nor-list: failed for a test
+#! expect-error lists: ui: view nor-list: failed for a test
 -w "screen ready: sd-list"
 -p @8:ui_push_fail_test:1
 -k @10:R -k @14:-

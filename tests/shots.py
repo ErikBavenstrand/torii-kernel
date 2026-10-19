@@ -16,9 +16,12 @@ NAME DIR" copies DIR there instead), and "#! theme-choice NAME" writes NAME to
 DEST SIZE SRC" copies SRC to DEST on the card, padded with 0xFF to SIZE
 bytes: a game large enough for a progress bar to move (boot-progress-big).
 "#! sd-rm PATH" deletes PATH (a file or a whole folder) from the card first,
-so a later sd-file can put a file in its place (nor-launch-fail). A
-"kernel error:" line fails a scenario, unless an "#! expect-error TEXT" line
-names it: each such TEXT must then appear in one of the error lines.
+so a later sd-file can put a file in its place (nor-launch-fail).
+"#! sd-fragmented DEST SIZE RUNS SRC" copies SRC, padded with zeros to SIZE
+bytes, to DEST in RUNS runs of clusters (tools/sdimg.sh put-fragmented): a
+game too fragmented to start (dialog-fragmented). A "kernel error:" line
+fails a scenario unless an "#! expect-error TEXT" line expects it (it starts
+with TEXT); an expected one that isn't logged fails it too.
 
 Check (the default): every key frame's screen hash, and every animation's
 frame hashes, must equal tests/shots/hashes.txt. On a mismatch the actual,
@@ -255,6 +258,24 @@ def boot(
             padded.write_bytes(data + b"\xff" * (int(size, 0) - len(data)))
             run(["mcopy", "-Q", "-i", str(cart / "sd.img"), str(padded), f"::{dest}"])
             padded.unlink()
+        elif line.startswith("#! sd-fragmented "):
+            _, _, dest, size, runs, src = line.split(maxsplit=5)
+            data = Path(src).read_bytes()
+            padded = cart / Path(dest).name
+            padded.write_bytes(data + b"\0" * (int(size, 0) - len(data)))
+            run(
+                [
+                    "tools/sdimg.sh",
+                    str(cart / "sd.img"),
+                    "put-fragmented",
+                    str(padded),
+                    dest,
+                    runs,
+                ]
+            )
+            padded.unlink()
+            # The files that split it up go; its clusters stay where they are
+            run(["mdel", "-i", str(cart / "sd.img"), "::/FILL*.BIN"])
         elif line.startswith("#! settings"):
             nor = cart / "kernel-nor.bin"
             if not nor.exists():
@@ -270,6 +291,16 @@ def boot(
     return subprocess.run(cmd, env=env, capture_output=True, text=True, check=False)
 
 
+def expected_errors(opts: Path) -> list[str]:
+    """The "#! expect-error TEXT" lines' TEXTs: kernel error lines starting
+    with TEXT the scenario must log, for an error dialog's golden."""
+    return [
+        line.split(maxsplit=2)[2]
+        for line in opts.read_text(encoding="utf-8").splitlines()
+        if line.startswith("#! expect-error ")
+    ]
+
+
 def scenario(name: str, sd: Path) -> Result:
     result = Result(name)
     out = RUNS / name
@@ -283,24 +314,18 @@ def scenario(name: str, sd: Path) -> Result:
         elif m := re.fullmatch(r"hash frame (\d+): ([0-9A-F]+)", line):
             result.frames.append((int(m[1]), m[2]))
     result.cycles = perf.lines(proc.stderr)
-    opts = (SHOTS / f"{name}.opts").read_text(encoding="utf-8").splitlines()
-    expected = [
-        line.split(maxsplit=2)[2]
-        for line in opts
-        if line.startswith("#! expect-error ")
+    expected = expected_errors(SHOTS / f"{name}.opts")
+    errors = [
+        line
+        for line in proc.stderr.splitlines()
+        if line.startswith(("kernel error:", "crash at", "timed out", "cannot"))
+        and not any(line.startswith(f"kernel error: {e}") for e in expected)
     ]
-    errors = []
-    seen = set()
-    for line in proc.stderr.splitlines():
-        matched = [
-            e for e in expected if line.startswith("kernel error:") and e in line
-        ]
-        seen.update(matched)
-        if not matched and line.startswith(
-            ("kernel error:", "crash at", "timed out", "cannot")
-        ):
-            errors.append(line)
-    errors += [f"no expected error line: {e}" for e in expected if e not in seen]
+    errors += [
+        f"no error line: {e}"
+        for e in expected
+        if f"\nkernel error: {e}" not in "\n" + proc.stderr
+    ]
     if proc.returncode or errors:
         result.error = f"mgba-shot exited {proc.returncode}: " + (
             "; ".join(errors[:3]) or proc.stderr.strip()[-200:]

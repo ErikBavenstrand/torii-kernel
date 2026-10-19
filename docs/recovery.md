@@ -10,6 +10,11 @@ loader*).
 These are the steps that recovered a cart on 2026-10-18. Your saves on the
 card and your NOR games are untouched by them.
 
+**Some carts can't take a kernel update at all.** If the cart's kernel NOR
+is a uniform-sector S29GL064A (NOR ID `0x220C`), EZ-Flash's loader stops
+with `Bad NOR ID` when you hold R, and installs nothing: not Torii, not the
+official kernel. See [A cart whose loader says Bad NOR ID](#a-cart-whose-loader-says-bad-nor-id).
+
 ## What happened
 
 The cart's kernel NOR holds EZ-Flash's boot loader at its start and the
@@ -115,6 +120,23 @@ even if the kernel in the cart's flash looks fine: the loader does the
 update before it starts the kernel, and a kernel like v0.2.2, which erases
 the loader at boot, must not get to run. After the update, the cart starts
 the kernel you installed.
+
+## A cart whose loader says Bad NOR ID
+
+Before it installs a kernel, the loader reads the kernel NOR's ID and goes
+on only for `0x2210` (S29GL064A with boot sectors) or `0x2202` (S29PL064J).
+On any other chip it shows `Bad NOR ID` and stops, with the kernel in the
+cart's flash as it was. Carts built with a uniform-sector S29GL064A (ID
+`0x220C`) are such carts: no kernel update reaches them, so they can't
+install Torii, and step 6 can't put a safe kernel on them. The loader
+itself is EZ-Flash's, and Torii can't change what it accepts
+(`docs/research/omega-de-hardware.md`, *How EZ-Flash's loader installs it*).
+
+To see which chip a cart has, open Torii's Diagnostics (settings page 2,
+DIAGNOSE) on a cart that runs Torii: it shows `kernel NOR id XXXX`. On a
+cart that never ran Torii, the `Bad NOR ID` message at the update is the
+sign. Ask EZ-Flash about such a cart: an official loader or kernel that
+accepts `0x220C` is the only way to update it.
 
 ## Afterwards
 

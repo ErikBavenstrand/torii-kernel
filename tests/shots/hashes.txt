@@ -49,6 +49,8 @@ cover-demo/frames 30-30 23A2E3B708CF46A1
 cover-demo/frames 31-32 3CCAC1492B95FF7A
 diag-renderer/demo CFABCE035BEAC9FD
 diag-start/screen 3162F4422A6557C5
+dialog-fragmented/dialog 60333A971C48C65E
+dialog-overflow/dialog 73463470FF0258D6
 file-menu/screen C268870729D04F01
 help/screen FD71702F76BB10E0
 keys-two-presses/screen 412DB2340E2919AC
