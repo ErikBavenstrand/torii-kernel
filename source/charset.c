@@ -75,3 +75,15 @@ u32 charset_next_latin1(const char *s, u32 len, u32 *pos)
 	char q = punctuation_of(c);
 	return q ? (u32)(u8)q : CHARSET_REPLACEMENT;
 }
+
+u32 charset_cut(const char *s, u32 max)
+{
+	u32 n = 0;
+	while (n < max && s[n])
+		n++;
+	if (n < max || !s[n])
+		return n;
+	while (n && ((u8)s[n] & 0xC0) == 0x80)
+		n--;
+	return n;
+}

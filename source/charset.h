@@ -14,5 +14,8 @@
 // CHARSET_NONE for a stray continuation byte, such as where a cut name
 // starts mid-character.
 u32 charset_next_latin1(const char *s, u32 len, u32 *pos);
+// How many bytes of the NUL-terminated s to keep for at most max: all of it
+// if it fits, else max or fewer, cut where a character starts.
+u32 charset_cut(const char *s, u32 max);
 
 #endif

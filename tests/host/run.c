@@ -55,6 +55,7 @@ static const struct {
 	{"text_layout", test_text_layout},
 	{"text_layout_window", test_text_layout_window},
 	{"text_layout_span", test_text_layout_span},
+	{"charset_cut", test_charset_cut},
 	{"progress_permille", test_progress_permille},
 	{"progress_estimate", test_progress_estimate},
 	{"save_name", test_save_name},

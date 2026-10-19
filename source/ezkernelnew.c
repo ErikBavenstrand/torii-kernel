@@ -28,6 +28,7 @@
 #include "showcht.h"
 #include "settings.h"
 #include "cartlog.h"
+#include "charset.h"
 #include "diag.h"
 #include "engine/cover.h"
 #include "screens/lists.h"
@@ -1082,9 +1083,10 @@ static void Check_save_flag(void)
 // couldn't take) would be lost, and its record would name the wrong game:
 // the next power-on would copy the other game's SRAM over its file. So the
 // copy runs again (the card may have room now); if it fails again, the
-// user picks: launch anyway (the record goes, the save is lost) or keep it.
+// user picks: go on anyway (the record goes, the save is lost) or keep it.
+// load: before LOAD SAVE, not a launch (the question says which).
 // 1: go on, 0: don't (the record stays).
-static int pending_save_settle(void)
+static int pending_save_settle(int load)
 {
 	u32 size;
 	if (!pending_save(&size))
@@ -1095,9 +1097,16 @@ static int pending_save_settle(void)
 	int go = 1;
 	if (pending_save_copy(size) == SAVE_FAILED) {
 		char msg[160];
-		snprintf(msg, sizeof(msg), EN_SAVE_UNSAVED, name);
+		int cut = (int)charset_cut(name, 80);
+		if (load)
+			snprintf(msg, sizeof(msg), EN_SAVE_UNSAVED_LOAD, cut, name);
+		else
+			snprintf(msg, sizeof(msg), EN_SAVE_UNSAVED, cut, name);
 		go = dialog_confirm(NULL, msg, DIALOG_ERROR);
-		tlog("save: %s isn't on the card: %s", name, go ? "A, launch anyway, it is lost" : "B, kept");
+		tlog("save: %s isn't on the card: %s", name,
+		     !go    ? "B, kept"
+		     : load ? "A, load anyway, it is lost"
+			    : "A, launch anyway, it is lost");
 	}
 	dialog_close();
 	if (go)
@@ -1594,7 +1603,7 @@ u8 Game_launch(struct game_pick *g, u32 menu_line, u32 key_L)
 {
 	// CLEAN BOOT and BOOT WITH ADDON load the game's save into cart SRAM
 	// (WRITE TO NOR doesn't touch it)
-	if (menu_line < 2 && !pending_save_settle())
+	if (menu_line < 2 && !pending_save_settle(0))
 		return 0;
 	// A launch loads and patches the game in PSRAM, writes never measured
 	// faster than the BIOS's wait states (waitcnt.h)
@@ -1608,7 +1617,7 @@ u8 Game_launch(struct game_pick *g, u32 menu_line, u32 key_L)
 //---------------------------------------------------------------------------------
 void NOR_launch(u32 index, u32 key_L)
 {
-	if (!pending_save_settle())
+	if (!pending_save_settle(0))
 		return;
 	REG_WAITCNT_CART = WAITCNT_BIOS;  // as Game_launch
 	Boot_NOR_game(0, index, key_L);  // returns only if it failed
@@ -1645,7 +1654,7 @@ u8 FRAM_save_op(u8 OP)
 	if (OP == 1) {  //load to fram
 		if (res != FR_OK)
 			return 3;
-		if (!pending_save_settle())  // Torii: SRAM holds another game's save
+		if (!pending_save_settle(1))  // Torii: SRAM holds another game's save
 			return 4;
 		Bank_Switching(0);
 		Loadsavefile(savfilename);

@@ -313,3 +313,16 @@ void test_text_layout_span(void)
 	CHECK_EQ(lead, 0);
 	CHECK(line.truncated && line.extent > 20 - (u32)font->max_width);
 }
+
+void test_charset_cut(void)
+{
+	CHECK_EQ(charset_cut("", 4), 0u);
+	CHECK_EQ(charset_cut("abc", 4), 3u);
+	CHECK_EQ(charset_cut("abcd", 4), 4u);
+	CHECK_EQ(charset_cut("abcde", 4), 4u);
+	// \xC3\xA9 is one character: not cut between its bytes
+	CHECK_EQ(charset_cut("abc\xC3\xA9", 4), 3u);
+	CHECK_EQ(charset_cut("abc\xC3\xA9", 5), 5u);
+	CHECK_EQ(charset_cut("ab\xE2\x80\x94z", 4), 2u);
+	CHECK_EQ(charset_cut("ab\xE2\x80\x94z", 5), 5u);
+}
