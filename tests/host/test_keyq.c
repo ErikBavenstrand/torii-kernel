@@ -89,7 +89,31 @@ void test_keyq_carry(void)
 	CHECK_EQ(frame(&s, &q, 0, 0), INPUT_R);  // the NOR list: R to SETTINGS...
 	keyq_hold_queued(&q);                    // ...which goes out at once
 	keyq_release(&q);
-	CHECK_EQ(frame(&s, &q, 0, 0), INPUT_R);  // SETTINGS gets the second R
+	CHECK_EQ(frame(&s, &q, 0, 0), 0);  // the second R was the NOR list's: dropped
+
+	// Keys the view never had carry over whole, second presses too.
+	keyq_clear(&q);
+	frame(&s, &q, INPUT_DOWN, 1);
+	frame(&s, &q, 0, 1);
+	frame(&s, &q, INPUT_DOWN, 1);
+	keyq_release(&q);
+	keyq_hold_queued(&q);  // the screen goes before its first frame
+	keyq_release(&q);
+	CHECK_EQ(frame(&s, &q, 0, 0), INPUT_DOWN);
+	CHECK_EQ(frame(&s, &q, 0, 0), INPUT_DOWN);
+
+	// R, DOWN, DOWN, L while the SD list goes out: the NOR list gets R, DOWN
+	// and L, and goes back; the second DOWN doesn't follow to the SD list
+	// (the adversarial review's case).
+	keyq_clear(&q);
+	frame(&s, &q, INPUT_DOWN, 1);
+	frame(&s, &q, 0, 1);
+	frame(&s, &q, INPUT_DOWN, 1);
+	frame(&s, &q, INPUT_L, 1);
+	keyq_release(&q);
+	CHECK_EQ(frame(&s, &q, 0, 0), INPUT_DOWN | INPUT_L);
+	keyq_hold_queued(&q);
+	keyq_release(&q);
 	CHECK_EQ(frame(&s, &q, 0, 0), 0);
 
 	// Queued keys go whatever fires that frame: ui_frame no longer drops

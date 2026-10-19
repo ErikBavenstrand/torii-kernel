@@ -12,6 +12,7 @@ void keyq_clear(struct keyq *q)
 {
 	q->held[0] = q->held[1] = 0;
 	q->queued[0] = q->queued[1] = 0;
+	q->seconds = 0;
 }
 
 void keyq_hold(struct keyq *q, u16 fire, u16 pressed)
@@ -34,14 +35,15 @@ void keyq_release(struct keyq *q)
 
 void keyq_hold_queued(struct keyq *q)
 {
-	add(&q->held[0], &q->held[1], q->queued[0], q->queued[1]);
+	add(&q->held[0], &q->held[1], (u16)(q->queued[0] & ~q->seconds), q->queued[1]);
 	q->queued[0] = q->queued[1] = 0;
+	q->seconds = 0;
 }
 
 u16 keyq_take(struct keyq *q)
 {
 	u16 keys = q->queued[0];
-	q->queued[0] = q->queued[1];
+	q->queued[0] = q->seconds = q->queued[1];
 	q->queued[1] = 0;
 	return keys;
 }
@@ -49,4 +51,5 @@ u16 keyq_take(struct keyq *q)
 void keyq_drop_queued(struct keyq *q)
 {
 	q->queued[0] = q->queued[1] = 0;
+	q->seconds = 0;
 }

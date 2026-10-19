@@ -17,6 +17,7 @@
 struct keyq {
 	u16 held[2];    // fired while no view took keys: [1] those pressed again
 	u16 queued[2];  // for the view on top: [0] next frame, [1] the frame after
+	u16 seconds;    // of queued[0]: second presses moved up by keyq_take
 };
 
 void keyq_clear(struct keyq *q);
@@ -30,7 +31,10 @@ void keyq_queue(struct keyq *q, u16 keys);
 // The next view is up: what waited for it is queued for it.
 void keyq_release(struct keyq *q);
 // The view on top goes before it had its queued keys: they wait for the
-// next one.
+// next one. A second press whose first the view already had is dropped: the
+// first may have been part of what made it go (DOWN, then L back to the SD
+// list, both in one frame), and the order of the two against other keys
+// is lost.
 void keyq_hold_queued(struct keyq *q);
 // The queued keys due this frame; those behind them move up a frame.
 u16 keyq_take(struct keyq *q);
