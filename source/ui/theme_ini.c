@@ -28,6 +28,8 @@ const struct theme_view_name theme_view_names[] = {
 	{"settings1", 20},
 	{"settings2", 21},
 	{"help", 22},
+	// The cheat viewer (source/showcht.c)
+	{"cheats", 30},
 };
 const u32 theme_view_name_count = sizeof(theme_view_names) / sizeof(theme_view_names[0]);
 
