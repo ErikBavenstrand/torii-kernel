@@ -145,7 +145,7 @@ def read_logs(folder: Path) -> list[tuple[int, Path, str]]:
             )
             continue
         # The zeros after the text, and any a torn write left inside it
-        text = data[match.end() :].rstrip(b"\0").replace(b"\0", b"")
+        text = data[match.end() :].rstrip(b"\0").replace(b"\0", b"").rstrip(b"\n")
         lines = [shown for line in text.split(b"\n") for shown in clean_lines(line)]
         logs.append((int(match.group(1)), path, "\n".join(lines)))
     logs.sort()

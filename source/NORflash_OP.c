@@ -649,6 +649,10 @@ u32 Loadfile2NOR(TCHAR *filename, u32 NORaddress, u16 have_patch, u8 SAVEMODE)
 		     (unsigned long)pNorFS[game_total_NOR].filesize);
 	else if (res == 1)
 		tlog_error("nor: not written: the game NOR's ID isn't the S98's");
+	else if (res == 2)
+		tlog("nor: not written: no room in the game NOR or its list");
+	else
+		tlog("nor: %s not written", filename);
 	tlog_flush();
 	return res;
 }
