@@ -149,11 +149,15 @@ save_setting="-k 200:R -k 206:- -k 220:R -k 226:- -k 270:DOWN -k 276:- -k 285:DO
 # AUTO SAVE on page 2 turned over and saved COUNT times (A, LEFT, A, RIGHT,
 # A on OK), then SETTINGS left: toggles COUNT
 toggles() {
-  local i seq=''
-  for i in $(seq "$1"); do seq="$seq A LEFT A RIGHT A"; done
+  local seq=''
+  for _ in $(seq "$1"); do seq="$seq A LEFT A RIGHT A"; done
   # shellcheck disable=SC2086 # seq is a list of keys
   echo "$(keys 200 R) $(keys 220 R) $(keys 270 R) $(keys 320 $seq) $(keys $((330 + 40 * $1)) L) $(keys $((370 + 40 * $1)) L)"
 }
+toggles5=$(toggles 5)
+toggles2=$(toggles 2)
+# SETTINGS opened and left, nothing saved
+settings_out="$(keys 200 R) $(keys 220 R) $(keys 270 R) $(keys 320 L) $(keys 360 L)"
 launch="$(keys 200 DOWN DOWN DOWN DOWN A) $(keys 250 DOWN DOWN DOWN DOWN RIGHT RIGHT RIGHT RIGHT RIGHT UP UP UP UP A)"
 diag="-k 1:L+R+SELECT -k 60:- -k 120:A -k 124:- $(for f in $(seq 2000 24 4400); do printf -- '-k %d:START -k %d:- ' "$f" $((f + 4)); done)"
 # Diagnostics with its questions answered yes, A every 24 frames: the rumble
@@ -214,17 +218,17 @@ EOF
   # (v0.3.2: each save erased the sector); saves that change nothing, and
   # SETTINGS left without a save, don't write it
   new_cart settings-once
-  boot $(toggles 5) -f 640
+  boot $toggles5 -f 640
   logged "nor: wrote the settings"
   [ $ok = 0 ] || [ "$(grep -c 'nor: wrote the settings' "$log")" = 1 ] ||
     bad "five saves wrote the settings $(grep -c 'nor: wrote the settings' "$log") times"
   auto=$(slot 14)
   [ "$auto" != 65535 ] || bad "AUTO SAVE wasn't saved: slot 14 holds $auto"
-  boot $(toggles 2) -f 520
+  boot $toggles2 -f 520
   logged "settings: staged"
   [ $ok = 0 ] || ! grep -q 'nor: wrote the settings' "$log" || bad "two saves that change nothing wrote the settings"
   [ "$(slot 14)" = "$auto" ] || bad "AUTO SAVE changed: slot 14 holds $(slot 14), not $auto"
-  boot $(keys 200 R) $(keys 220 R) $(keys 270 R) $(keys 320 L) $(keys 360 L) -f 420
+  boot $settings_out -f 420
   logged "screen ready: settings2"
   [ $ok = 0 ] || ! grep -q 'nor: wrote the settings' "$log" || bad "SETTINGS left without a save wrote the settings"
   pass "SETTINGS writes the kernel NOR once as it closes, and only for a change"

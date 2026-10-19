@@ -249,7 +249,17 @@ def boot(
             data = Path(src).read_bytes()
             padded = cart / Path(dest).name
             padded.write_bytes(data + b"\xff" * (int(size, 0) - len(data)))
-            run(["mcopy", "-Q", "-o", "-i", str(cart / "sd.img"), str(padded), f"::{dest}"])
+            run(
+                [
+                    "mcopy",
+                    "-Q",
+                    "-o",
+                    "-i",
+                    str(cart / "sd.img"),
+                    str(padded),
+                    f"::{dest}",
+                ]
+            )
             padded.unlink()
         elif line.startswith("#! settings"):
             nor = cart / "kernel-nor.bin"
