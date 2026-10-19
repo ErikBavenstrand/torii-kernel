@@ -31,6 +31,11 @@ extern DWORD ClustToSect(FATFS *fs, DWORD clst);
 
 extern FM_NOR_FS pNorFS[MAX_NOR] EWRAM_BSS;
 extern u8 pReadCache[MAX_pReadCache_size] EWRAM_BSS;
+// Says pReadCache holds nothing now (ez_define.h). In the emulator,
+// mgba-shot then fills it with 0xFF, so code that reads what an earlier owner
+// left there (a stale function pointer, length or count) fails in the tests
+// instead of on a cart. On a cart it does nothing.
+void readcache_poison(void);
 extern u8 __attribute__((aligned(4))) GAMECODE[4];
 
 extern u16 gl_reset_on;

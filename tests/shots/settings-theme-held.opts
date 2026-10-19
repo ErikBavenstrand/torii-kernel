@@ -1,0 +1,22 @@
+#! settings 28=2
+#! sd-theme example
+#! sd-theme wall128 tests/themes/wall128
+#! theme-choice wall128
+# UP held on THEME steps through DARK, LIGHT and the two SD themes without
+# loading each (a load takes frames): the names change as fast as the key
+# repeats, the look stays wall128's, and the theme the key stops on, the
+# example, loads once it is let go (tests/themes.sh counts the loads)
+-w "screen ready: sd-list"
+-k @8:R -k @12:-
+-w "screen ready: nor-list"
+-k @8:R -k @12:-
+-w "screen ready: settings1"
+-k @8:R -k @12:-
+-w "screen ready: settings2"
+-k @8:DOWN -k @11:- -k @16:DOWN -k @19:- -k @24:DOWN -k @27:- -k @32:DOWN -k @35:- -k @40:DOWN -k @43:-
+-k @48:A -k @51:-
+-k @70:UP -k @151:-
+-s @100:held.png
+-s @150:last.png
+-w "theme: loaded example"
+-s @20:loaded.png

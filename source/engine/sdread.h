@@ -58,7 +58,9 @@ struct sd_read {
 
 // Sets r up to read path into dst (max bytes of room). path must stay valid
 // until the first step has run. Checks the arguments: on a bad one, result
-// is SD_READ_ERR_ARGS already (logged) and steps do nothing.
+// is SD_READ_ERR_ARGS already (logged) and steps do nothing. It leaves
+// finish and user alone, so set them (to 0 if unused) on a struct that isn't
+// zeroed, such as one in pReadCache.
 void sd_read_init(struct sd_read *r, const char *path, void *dst, u32 max, u16 chunk);
 // One step: opens, reads a chunk, or closes. JOB_MORE until result is set,
 // then JOB_DONE.

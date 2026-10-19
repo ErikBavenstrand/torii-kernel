@@ -1277,6 +1277,7 @@ static void do_action(void)
 	u8 a = lists.act;
 	u32 arg = lists.arg, key_l = lists.key_l;
 	lists.act = ACT_NONE;
+	readcache_poison();  // nothing is in it between two actions
 	switch (a) {
 	case ACT_FOLDER_IN:
 		folder_in(arg);
@@ -1305,6 +1306,9 @@ static void do_action(void)
 		go(UI_TR_TAB, 1);
 		while (ui_depth())
 			ui_pop();
+		// What led here goes to the card first: a hang in SETTINGS (v0.3.2's
+		// THEME after WRITE TO NOR) otherwise took it along
+		tlog_flush();
 		u32 page = SETTINGS_PAGE1;
 		while (Settings_run(page) == SETTINGS_TO_DIAGNOSE) {
 			engine_leave();

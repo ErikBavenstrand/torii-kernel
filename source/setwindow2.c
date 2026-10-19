@@ -94,6 +94,9 @@ static struct {
 	u8 count;
 	u8 initial;  // the option the setting picked as the page opened (THEME_SD_GONE: none)
 	u8 touched;  // THEME was changed on this page: save it
+	u8 pending;  // the SD theme theme_sel names waits to load (theme_step)
+	u8 rest;     // frames since the last THEME step, while pending
+	s8 dir;      // the last step's direction
 	char note[96];  // why a theme didn't load or save, shown in the header until a key
 } themes EWRAM_BSS;
 // The initial option when THEME is 2 but no SD theme loaded: Dark shows, and
@@ -162,6 +165,7 @@ static int theme_ready(u32 option)
 	const char *name = themes.names[option - 2];
 	if (!strcmp(ui_theme_sd_folder(), name) && ui_theme_sd())
 		return 1;
+	tlog_flush();  // the log is on the card before a load that might hang
 	if (ui_theme_load(name))
 		return 1;
 	tlog_error("settings: theme %s: %s", name, ui_theme_error());
@@ -169,18 +173,54 @@ static int theme_ready(u32 option)
 	return 0;
 }
 
-// The next (dir >= 0) or previous THEME option; an SD theme is loaded as it
-// is picked, and one that doesn't load is passed over
+// 1 if option shows without a load: a built-in, or the SD theme loaded
+static int theme_loaded(u32 option)
+{
+	return option < 2 || (ui_theme_sd() && !strcmp(ui_theme_sd_folder(), themes.names[option - 2]));
+}
+
+// The next (dir >= 0) or previous THEME option. Its name shows at once; an
+// SD theme not loaded yet waits for theme_settle, so a held key steps
+// through the options without loading each one (a theme and its wallpaper
+// take a few frames).
 static void theme_step(int dir)
 {
 	u32 n = 2u + themes.count;
-	for (u32 tries = 0; tries < n; tries++) {
-		theme_sel = (u16)((theme_sel + (dir < 0 ? n - 1 : 1)) % n);
-		if (theme_ready(theme_sel))
-			break;
-	}
+	theme_sel = (u16)((theme_sel + (dir < 0 ? n - 1 : 1)) % n);
 	themes.touched = 1;
+	themes.dir = (s8)(dir < 0 ? -1 : 1);
+	themes.rest = 0;
+	themes.pending = !theme_loaded(theme_sel);
+	if (!themes.pending)
+		preview_look();
+}
+
+// Loads the SD theme THEME stepped to, if it waits: one that doesn't load is
+// passed over in the direction of the step, the others loaded as they come
+static void theme_settle(void)
+{
+	if (!themes.pending)
+		return;
+	themes.pending = 0;
+	u32 n = 2u + themes.count;
+	for (u32 tries = 0; tries < n && !theme_ready(theme_sel); tries++)
+		theme_sel = (u16)((theme_sel + (themes.dir < 0 ? n - 1 : 1)) % n);
 	preview_look();
+}
+
+// Frames without a step, with the key still held, before the SD theme
+// stepped to loads anyway
+#define THEME_REST 10
+
+static void page2_poll(void)
+{
+	if (!themes.pending)
+		return;
+	themes.rest++;
+	if ((ui_input()->held & (INPUT_UP | INPUT_DOWN | INPUT_A)) && themes.rest < THEME_REST)
+		return;
+	theme_settle();
+	settings_sync();  // the theme's own name, or the option it passed on to
 }
 
 static void page2_enter(struct ui_view *view)
@@ -209,6 +249,7 @@ static void page2_enter(struct ui_view *view)
 	themes.note[0] = 0;
 	themes.count = (u8)ui_theme_list(themes.names, THEME_SD_CAP);
 	themes.touched = 0;
+	themes.pending = 0;
 	themes.initial = theme_option();
 	theme_sel = themes.initial == THEME_SD_GONE ? 0 : themes.initial;
 	accent_sel = accent_setting();
@@ -492,6 +533,10 @@ static int page2_event(struct ui_view *view, const struct ui_event *e)
 	if (e->type != UI_EV_KEYS)
 		return 0;
 	u16 keys = settings_keys(e);
+	// Any key but another THEME step first loads the SD theme stepped to
+	if (themes.pending && keys &&
+	    !(p2.set_ok && p2.select == SEL_THEME && p2.extra_pos == 0 && (keys & (INPUT_UP | INPUT_DOWN | INPUT_A))))
+		theme_settle();
 	if (themes.note[0] && keys) {
 		ui_label_set((u8)(view->first + 1), gl_settings_title);  // the title back
 		themes.note[0] = 0;
@@ -564,7 +609,8 @@ static const struct ui_spec page2_nodes[] = {
 static const struct ui_view_spec page2_view = {
 	"settings2", page2_nodes, sizeof(page2_nodes) / sizeof(page2_nodes[0]), 21, UI_NONE, 0, page2_event};
 
-const struct settings_page settings_page2 = {&page2_view, page2_enter, page2_count, page2_row, page2_cursor, 0};
+const struct settings_page settings_page2 = {&page2_view, page2_enter,  page2_count,
+					     page2_row,   page2_cursor, page2_poll};
 
 //---------------------------------------------------------------------------------
 extern u16 SET_info_buffer[0x200] EWRAM_BSS;
