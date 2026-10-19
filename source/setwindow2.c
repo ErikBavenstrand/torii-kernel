@@ -404,7 +404,7 @@ static int page2_event(struct ui_view *view, const struct ui_event *e)
 	(void)view;
 	if (e->type != UI_EV_KEYS)
 		return 0;
-	u16 keys = e->keys;
+	u16 keys = settings_keys(e);
 	if (p2.set_ok) {
 		page2_edit_keys(keys);
 	} else if ((keys & INPUT_A) && (p2.select == SEL_DIAGNOSE)) {

@@ -150,6 +150,11 @@ void settings_sync(void)
 		ui_list_set_cursor(list, p->cursor());
 }
 
+u16 settings_keys(const struct ui_event *e)
+{
+	return e->keys & (u16)(~INPUT_PAGE | ui_input()->pressed);
+}
+
 void settings_header(struct ui_view *view, const char *title, const char *corner)
 {
 	ui_label_set((u8)(view->first + 1), title);
@@ -183,18 +188,30 @@ void settings_leave(u32 result)
 	ui_pop();
 }
 
-// Back to the mode 3 menu: a black frame buffer, then mode 3
-static void back_to_mode3(void)
+// See ezkernel.h. Black first (the backdrop, layers off, rather than a
+// white forced blank), the bitmap cleared, then mode 3.
+void menu_leave_engine(void)
 {
+	ui_shutdown();
 	VBlankIntrWait();
 	REG_DISPCNT = MODE_0;  // no layers: only the backdrop shows
 	REG_BLDCNT = 0;
 	REG_BLDALPHA = 0;
 	REG_BLDY = 0;
+	REG_MOSAIC = 0;
+	REG_BG2CNT = 0;
 	u32 zero = 0;
 	CpuFastSet(&zero, (void *)VRAM, (240 * 160 * 2 / 4) | FILL);
 	VBlankIntrWait();
 	REG_DISPCNT = MODE_3 | BG2_ENABLE;
+	// libgba's keysDown and keysUp gather changes until they are read, not
+	// until the next scanKeys: the engine read the keys itself, so read
+	// them once now, or the menu takes a key that left the screen (a held
+	// L) for a new press
+	scanKeys();
+	(void)keysDown();
+	(void)keysUp();
+	(void)keysDownRepeat();
 }
 
 u32 Settings_run(u32 page)
@@ -210,15 +227,7 @@ u32 Settings_run(u32 page)
 		if (p && p->poll)
 			p->poll();
 	}
-	ui_shutdown();
-	back_to_mode3();
-	// The engine reads the keys its own way: catch libgba's state up, so the
-	// menu doesn't take the key that left (L, held) for a new press
-	// (keysDown and keysUp report what changed since they were last called)
-	scanKeys();
-	(void)keysDown();
-	(void)keysUp();
-	(void)keysDownRepeat();
+	menu_leave_engine();
 	return settings_result;
 }
 
@@ -673,7 +682,7 @@ static int page1_event(struct ui_view *view, const struct ui_event *e)
 	(void)view;
 	if (e->type != UI_EV_KEYS)
 		return 0;
-	u16 keys = e->keys;
+	u16 keys = settings_keys(e);
 	if (p1.set_ok) {
 		page1_edit_keys(keys);
 	} else if (keys & INPUT_A) {

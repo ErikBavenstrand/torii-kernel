@@ -59,6 +59,10 @@ extern u16 gl_color_btn_clean;
 */
 
 void CheckLanguage(void);
+// Leaves the v0.3 engine for the mode 3 menu (setwindow.c): ui_shutdown, the
+// registers mode 3 needs, a black bitmap, and libgba's key state caught up
+// with the keys held, so the caller repaints and reads keys as before.
+void menu_leave_engine(void);
 void CheckSwitch(void);
 u32 Game_hardware(u32 is_EMU, const u8 *gamecode, u8 gb_cart_type);
 u32 Recently_play_add(const char *entry, u32 count);

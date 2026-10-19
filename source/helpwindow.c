@@ -36,7 +36,7 @@ static void help_enter(struct ui_view *view)
 static int help_event(struct ui_view *view, const struct ui_event *e)
 {
 	(void)view;
-	if (e->type == UI_EV_KEYS && (e->keys & INPUT_L)) {  //return
+	if (e->type == UI_EV_KEYS && (settings_keys(e) & INPUT_L)) {  //return
 		settings_open(SETTINGS_PAGE2);
 		return 1;
 	}

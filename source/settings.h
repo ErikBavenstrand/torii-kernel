@@ -66,6 +66,10 @@ extern const struct settings_page settings_page1, settings_page2, settings_help;
 extern const struct ui_label_config settings_title_config, settings_corner_config;
 extern const struct ui_list_model settings_model;
 
+// A key event's keys, L and R only on the frame they go down: the engine
+// repeats held L and R (for paging lists), which would turn pages on and
+// leave SETTINGS
+u16 settings_keys(const struct ui_event *e);
 // Sets the header's title and right-hand label (kept, as ui_label_set keeps them)
 void settings_header(struct ui_view *view, const char *title, const char *corner);
 // From a view's handler: replaces it with page
