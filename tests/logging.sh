@@ -403,13 +403,14 @@ full)
   mcopy -i "$cart/sd.img" "$cart/filler.bin" ::/FILLER.BIN
   settings 14=1 26=3 # AUTO SAVE on, LOGGING Debug
   boot -f 200
-  grep -q "no more SD logging until the next boot" "$cart/kernel.log" || fail "a full card didn't stop the logging"
-  # The lists' idle flush stops trying once the card failed (it ran every
-  # idle frame before v0.3.2): idle in the menu for 600 frames, none.
+  grep -q "the card is full; the log waits for room" "$cart/kernel.log" || fail "a full card didn't stop the logging"
+  ! grep -q "no more SD logging" "$cart/kernel.log" || fail "a full card counted as a card failure"
+  # The lists' idle flush waits while the card is full (it ran every idle
+  # frame before v0.3.2): idle in the menu for 600 frames, none.
   : >"$cart/kernel.log"
   boot -f 800
   flushes=$(grep -c '^kernel: lists: idle flush' "$cart/kernel.log" || true)
-  [ "$flushes" -eq 0 ] || fail "the idle flush ran $flushes times after the card failed"
+  [ "$flushes" -eq 0 ] || fail "the idle flush ran $flushes times while the card was full"
   ! mtype -i "$cart/sd.img" ::/torii/logs/torii-0.log >/dev/null 2>&1 || fail "the log file it couldn't finish is still there"
   # The kernel still launches games: past SAVER, torii and FILLER.BIN.
   # shellcheck disable=SC2046
@@ -417,7 +418,18 @@ full)
   grep -q '^kernel: launch: starting the game' "$cart/kernel.log" || fail "with a full card, Hello.gba didn't launch"
   mtype -i "$cart/sd.img" ::/FILLER.BIN | cmp -s - "$cart/filler.bin" || fail "the other file changed"
   card_ok
-  echo "PASS: a full card stops the logging and the idle flush, not the kernel, and other files stay as they were"
+  # Room again in the same boot: L+START on FILLER.BIN (past SAVER and
+  # torii) and A deletes it; the idle flush then writes the log, which kept
+  # its lines meanwhile.
+  # shellcheck disable=SC2046
+  boot $(keys 100 DOWN DOWN) -k 120:L -k 124:L+START -k 128:- $(keys 160 A) -f 1400
+  grep -q "the card is full; the log waits for room" "$cart/kernel.log" || fail "the card wasn't full before the delete"
+  ! mtype -i "$cart/sd.img" ::/FILLER.BIN >/dev/null 2>&1 || fail "FILLER.BIN wasn't deleted"
+  grep -q '^kernel: lists: idle flush' "$cart/kernel.log" || fail "no idle flush once a delete made room"
+  mtype -i "$cart/sd.img" ::/torii/logs/torii-0.log 2>/dev/null | grep -aq "Torii kernel boot" ||
+    fail "once a delete made room, the log wasn't written"
+  card_ok
+  echo "PASS: a full card stops the logging and the idle flush, not the kernel, other files stay as they were, and a delete lets the log go on"
   ;;
 
 flood)

@@ -1199,7 +1199,8 @@ static void dialog_answer(int yes)
 		if (!yes)
 			break;
 		if (f_chdir(currentpath) == FR_OK)  // cwd may be /SAVER after a launch
-			f_unlink(current_filename);
+			if (f_unlink(current_filename) == FR_OK)
+				tlog_card_freed();
 		show_sd(cursor(), UI_TR_FADE, 0);
 		break;
 	case AFTER_FORMAT:
@@ -1316,7 +1317,8 @@ static void do_action(void)
 // half its RAM ring, so a long stay in the menu loses no lines, and after
 // IDLE_FLUSH_ALL_FRAMES with any line waiting, so a power-off loses none. A
 // flush's SD write never stalls a scroll or a transition. Once the card
-// failed, no flush writes: it stops trying
+// failed it stops trying, and while the card is full it waits for a file
+// to be deleted (tlog_card_freed)
 static void idle_flush(void)
 {
 	u32 pending = tlog_pending(), idle = ui_idle_frames();
