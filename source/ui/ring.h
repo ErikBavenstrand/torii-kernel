@@ -40,7 +40,7 @@ int ring_setup(struct ui_ring *r, u32 h, u32 rh, const char **why);
 
 static inline u32 ring_slot(const struct ui_ring *r, u32 row)
 {
-	return row % r->k;
+	return r->k ? row % r->k : 0;
 }
 
 // The first map row (in tiles) of content row row.

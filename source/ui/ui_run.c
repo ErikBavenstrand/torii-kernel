@@ -50,7 +50,6 @@ static struct {
 	// Fades
 	MotionId fade;
 	u16 fade_colour;
-	u16 pad;
 	// DIM and the modal dim
 	u32 idle;          // frames with no key held
 	u32 dim_after;     // frames idle before dimming; 0 off
@@ -130,8 +129,8 @@ static void make_shared(u32 *tiles)
 		for (u32 y = 0; y < 8; y++)
 			tiles[(UI_TILE_SOLID + role) * 8 + y] = role * 0x11111111u;
 	for (u32 i = 0; i < 4; i++) {
-		corner(&tiles[(UI_TILE_BORDER + i) * 8], 0, i & 1, i >> 1);
-		corner(&tiles[(UI_TILE_ROUND + i) * 8], 1, i & 1, i >> 1);
+		corner(&tiles[(UI_TILE_BORDER + i) * 8], 0, (int)(i & 1), (int)(i >> 1));
+		corner(&tiles[(UI_TILE_ROUND + i) * 8], 1, (int)(i & 1), (int)(i >> 1));
 		edge(&tiles[(UI_TILE_BORDER + 4 + i) * 8], i);
 	}
 }
