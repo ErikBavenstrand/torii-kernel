@@ -20,8 +20,10 @@ git log, not here.
   after the unit tests; it now stays up (`3e8243e`).
 - **Fixed:** a save copy the card couldn't take (a full card) filled its
   bar to "Done"; the power-on copy and BACK UP SAVE now show "Can't write
-  the save", and the power-on copy is offered again at the next power-on
-  (`384c622`, `f51e614`).
+  the save", and the power-on copy waits: the next power-on offers it
+  again, and a launch or LOAD SAVE first tries it again and, if the card
+  still can't take it, asks before losing it (`384c622`, `f51e614`,
+  `e38f84d`).
 - **Fixed:** BOOT WITH ADDON said "Loading the game" while it still checked
   save states and patches (`95b5f8d`).
 - **Changed:** one wrap rule for every list and menu: a held key stops at
