@@ -15,6 +15,10 @@ NAME DIR" copies DIR there instead), and "#! theme-choice NAME" writes NAME to
 /torii/theme.txt, the SD theme the THEME setting's value 2 picks. "#! sd-file
 DEST SIZE SRC" copies SRC to DEST on the card, padded with 0xFF to SIZE
 bytes: a game large enough for a progress bar to move (boot-progress-big).
+"#! sd-rm PATH" deletes PATH (a file or a whole folder) from the card first,
+so a later sd-file can put a file in its place (nor-launch-fail). A
+"kernel error:" line fails a scenario, unless an "#! expect-error TEXT" line
+names it: each such TEXT must then appear in one of the error lines.
 
 Check (the default): every key frame's screen hash, and every animation's
 frame hashes, must equal tests/shots/hashes.txt. On a mismatch the actual,
@@ -241,6 +245,9 @@ def boot(
                     "::/torii/theme.txt",
                 ]
             )
+        elif line.startswith("#! sd-rm "):
+            target = "::" + line.split(maxsplit=2)[2]
+            run(["mdeltree", "-i", str(cart / "sd.img"), target])
         elif line.startswith("#! sd-file "):
             _, _, dest, size, src = line.split(maxsplit=4)
             data = Path(src).read_bytes()
@@ -276,11 +283,22 @@ def scenario(name: str, sd: Path) -> Result:
         elif m := re.fullmatch(r"hash frame (\d+): ([0-9A-F]+)", line):
             result.frames.append((int(m[1]), m[2]))
     result.cycles = perf.lines(proc.stderr)
-    errors = [
-        line
-        for line in proc.stderr.splitlines()
-        if line.startswith(("kernel error:", "crash at", "timed out", "cannot"))
+    opts = (SHOTS / f"{name}.opts").read_text(encoding="utf-8").splitlines()
+    expected = [
+        line.split(maxsplit=2)[2]
+        for line in opts
+        if line.startswith("#! expect-error ")
     ]
+    errors = []
+    seen = set()
+    for line in proc.stderr.splitlines():
+        matched = [e for e in expected if line.startswith("kernel error:") and e in line]
+        seen.update(matched)
+        if not matched and line.startswith(
+            ("kernel error:", "crash at", "timed out", "cannot")
+        ):
+            errors.append(line)
+    errors += [f"no expected error line: {e}" for e in expected if e not in seen]
     if proc.returncode or errors:
         result.error = f"mgba-shot exited {proc.returncode}: " + (
             "; ".join(errors[:3]) or proc.stderr.strip()[-200:]

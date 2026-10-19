@@ -51,6 +51,10 @@ diag-renderer/demo CFABCE035BEAC9FD
 diag-start/screen 3162F4422A6557C5
 file-menu/screen C268870729D04F01
 help/screen FD71702F76BB10E0
+nor-launch-fail/back 9D22027A51331819
+nor-launch-fail/error 640F853BE8E8C18D
+nor-launch-fail/later 9D22027A51331819
+nor-launch-fail/list 9D22027A51331819
 nor-list/screen B41DDB1AFEB55DC1
 nor-write/done 8DE07CA2EAFDF0C4
 nor-write/half C04FD0A7B7D4B370
