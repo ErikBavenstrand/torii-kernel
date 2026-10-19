@@ -89,11 +89,13 @@ u32 jobs_pending(void)
 u32 jobs_run_from(u32 start, u32 deadline)
 {
 	u32 steps = 0;
+	u32 waiting = 0;  // slots whose step said JOB_WAIT
 	do {
 		struct job *j = 0;
+		u32 slot = 0;
 		for (u32 i = 0; i < JOB_CAP && !j; i++) {
-			u32 slot = (next_slot + i) % JOB_CAP;
-			if (jobs[slot].step) {
+			slot = (next_slot + i) % JOB_CAP;
+			if (jobs[slot].step && !(waiting >> slot & 1)) {
 				j = &jobs[slot];
 				next_slot = (u8)((slot + 1) % JOB_CAP);
 			}
@@ -104,9 +106,12 @@ u32 jobs_run_from(u32 start, u32 deadline)
 		// take the slot: only a job still the same one ends here
 		job_step step = j->step;
 		u8 gen = j->gen;
-		if (step(j) == JOB_DONE && j->step == step && j->gen == gen) {
+		int r = step(j);
+		if (r == JOB_DONE && j->step == step && j->gen == gen) {
 			j->step = 0;
 			frame_wake();  // its result needs drawing
+		} else if (r == JOB_WAIT) {
+			waiting |= 1u << slot;
 		}
 		steps++;
 	} while (cycles_since(start) < deadline);

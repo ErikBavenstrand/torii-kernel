@@ -2,7 +2,15 @@
 # SCENARIO/KEY HASH: the key frame tests/shots/png/SCENARIO.KEY.png shows.
 # SCENARIO/frames FIRST-LAST HASH: frames of a -H range (counted from 0)
 # that all hash the same.
-boot/screen 2F699359A5731225
+boot/screen 34EED145D7C6A8C0
+boot/frames 0-2 7C573B18E65FE325
+boot/frames 3-3 7B90E77090ED8325
+boot/frames 4-4 7B2431247E1C9059
+boot/frames 5-5 2A3028DC62EB75E2
+boot/frames 6-6 74D4950BBD1434E6
+boot/frames 7-7 EE05FD7779962083
+boot/frames 8-8 55135B940AAE8F72
+boot/frames 9-40 34EED145D7C6A8C0
 boot-addon/addons B24B22C01BC420D0
 boot-progress/screen 8A9B3222959885A1
 boot-progress-big/loading 7868AEBC12088DD1
@@ -48,8 +56,12 @@ cover-demo/frames 28-28 DE528E2C9590DC52
 cover-demo/frames 29-29 0690C16F9D9454FC
 cover-demo/frames 30-30 23A2E3B708CF46A1
 cover-demo/frames 31-32 3CCAC1492B95FF7A
+diag-back/screen E5740101EF2460F9
+diag-pages/clock 04846E505A18BA04
+diag-pages/eeprom ACDAA962E076C42C
+diag-pages/loader 1C1B278EDEA54ACD
 diag-renderer/demo CFABCE035BEAC9FD
-diag-start/screen 3162F4422A6557C5
+diag-start/screen 856F3E86A7D2B3A5
 diag-tests/back FC971D7CA6CEA1D0
 diag-tests/frames 0-2 D68A87FB42CF8D44
 diag-tests/frames 3-3 7DCF004DEAC7F9B0
@@ -680,6 +692,9 @@ sd-theme-wall/kept 0969DFACF8A353B3
 sd-theme-wall/list C0CB12E6BB3CC753
 sd-wrap/end 9EFDC447B1CD6B78
 sd-wrap/top 818F72FFC7BF6260
+settings-edit/modeb 285B0A3E2EC551E7
+settings-edit/save 6E78999D5CA95D36
+settings-edit/save-turned B4E21CA7E5A815E6
 settings-held/held-l 0CA5C0696DB712FC
 settings-held/held-r 0CA5C0696DB712FC
 settings-led/edit 780E60240DD4DC4E

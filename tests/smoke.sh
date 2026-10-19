@@ -26,6 +26,12 @@ save_bytes() {
   mtype -i "$cart/sd.img" ::/SAVER/Hello.sav 2>/dev/null | head -c 5 | od -A n -t x1 | tr -d ' \n'
 }
 
+# Power-on 0: the boot goes to the list with no notice before it (v0.3.2:
+# "microSD card ready / Loading..." flashed for 3 frames).
+OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -w "screen ready: sd-list" >/dev/null 2>"$cart/boot.log" || true
+grep -q '^kernel: screen ready: sd-list' "$cart/boot.log" || fail "the boot didn't reach the SD list"
+! grep -q '^kernel: ui: pushed notice' "$cart/boot.log" || fail "the boot showed a notice before the list"
+
 # Power-on 1: Hello.gba is the only entry. Open it, then pick CLEAN BOOT.
 boot -k 100:A -k 106:- -k 160:A -k 166:- -s 400:$shots/1-game.png
 od -A n -t x1 -N 5 "$cart/sram.bin" | tr -d ' \n' | grep -q '4f4d525801' ||

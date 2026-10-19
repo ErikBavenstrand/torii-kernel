@@ -9,6 +9,7 @@
 #include <gba_interrupt.h>
 
 #include "../../source/engine/cycles.h"
+#include "../../source/diag_priv.h"
 #include "../../source/engine/text.h"
 #include "../../source/waitcnt.h"
 #include "text_bench.h"
@@ -314,4 +315,22 @@ void test_text_cycles(void)
 	run.font = &body2;
 	cycles_report("text-row38-rows2-ewram", cycles(text_blit, &run));
 #endif
+}
+
+// Diagnostics' long lines (source/diag.c, diag_line_cut): cut at the last
+// space that fits, whole if they fit or have no space to cut at
+void test_diag_line_cut(void)
+{
+	const char *line = "boot loader CRC 395276F5, present, with a GBA header";
+	u32 clip = 228;
+	u32 cut = diag_line_cut(line, clip);
+	CHECK(cut < strlen(line));
+	CHECK_EQ(line[cut], ' ');
+	CHECK(text_width(&font_body, line, cut) <= clip);
+	// the next word doesn't fit
+	const char *next = strchr(line + cut + 1, ' ');
+	CHECK(next && text_width(&font_body, line, (u32)(next - line)) > clip);
+	CHECK_EQ(diag_line_cut("WAITCNT 4018 in the menu, 0000 in games", clip), 39);
+	CHECK_EQ(diag_line_cut("a", 1), 1);
+	CHECK_EQ(diag_line_cut("unbreakable_words_only_here", 20), 27);
 }

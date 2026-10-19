@@ -1196,16 +1196,16 @@ int main(void)
 	CheckLanguage();
 	CheckSwitch();
 
-	// The boot's screens (the card's state, the save question, a theme
-	// error) share one engine session, a notice under the dialogs
+	// The boot's screens (a card error, the save question, a theme error)
+	// share one engine session. A card that mounts shows nothing: the rest
+	// of the boot takes a few frames, and a notice ("microSD card ready /
+	// Loading...") only flashed before the list.
 	dialog_open();
 	res = f_mount(&EZcardFs, "", 1);
 	if (res != FR_OK) {
 		Show_boot_notice(gl_init_error, gl_power_off, DIALOG_ERROR);
 		while (1)
 			ui_frame();
-	} else {
-		Show_boot_notice(gl_init_ok, gl_Loading, DIALOG_INFO);
 	}
 
 	// Diagnostics also starts from these keys held at power-on, in case the
@@ -1217,13 +1217,12 @@ int main(void)
 	cartlog_boot_report();
 	tlog_flush();
 	if (diag_keys) {
-		dialog_notice_end();
-		dialog_close();  // Diagnostics runs its own session (and never returns)
-		Diagnostics();
+		dialog_close();  // Diagnostics runs its own session
+		Diagnostics();   // back only if B didn't start it: the menu starts as usual
 	}
 	if (!ui_theme_boot())
 		Show_theme_error();
-	dialog_hand_over();  // the notice fades out; the lists run in this session
+	dialog_hand_over();  // the lists run in this session
 
 	f_chdir("/");
 	//TCHAR currentpath[MAX_path_len];

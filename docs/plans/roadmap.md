@@ -345,6 +345,11 @@ Bugs found while building v0.3 and v0.3.1. Each is struck out here once a ticket
 - ~~The empty NOR list is blank, while Recently Played says "No game played yet" (v0.3 emulator validation).~~ Fixed by v0.3.2 (`c211261`): "No games in NOR"; goldens `nor-list`, `nor-delete`.
 - ~~Recently Played's title reads "RECENT PLAYED" (`en_recently_play`) (v0.3 emulator validation).~~ Fixed by v0.3.2 (`c211261`): "RECENTLY PLAYED", which fits the title bar.
 - ~~A DOWN wrap from the end of the 302-file `/Long` folder costs 195,784 cycles, 14% over `lists-page`'s 171,561, and no golden covers it (v0.3 emulator validation).~~ Fixed by v0.3.2 (`99fdea6`): golden `sd-wrap` wraps both ways in `/Long`; the budget is re-recorded, as the frame is bounded by design (v0.3-decisions, "v0.3.2 validation fixes").
+- ~~SETTINGS page 2's SAVE row opens its edit on OK, not on the value, so A, A saves it unchanged (`page2_event` in `source/setwindow2.c` resets every row's edit position but `auto_save_pos`); MODE B's edit starts at RUMBLE, not at its mode (v0.3 emulator validation).~~ Fixed by v0.3.2 (`46e1138`): both open on their value; golden `settings-edit`.
+- ~~Turning LOGGING on freezes the menu for about 80 frames and drops the keys pressed then: `start_file` zero-fills the 64 KB log file after `f_getfree`, inside the OK press (`source/tlog.c`) (v0.3 emulator validation).~~ Fixed by v0.3.2 (`f38df20`): `tlog_flush_soon` opens the log a step at a time in an engine job that lets the screen draw first (`ui_settled`, `JOB_WAIT`); `tests/logging.sh settings`, kernel test `engine_jobs`.
+- ~~Diagnostics' start page says "B: back", but B soft-resets the kernel, which lands at the SD root (`source/diag.c`) (v0.3 emulator validation).~~ Fixed by v0.3.2 (`c449f44`): B ends Diagnostics' session and returns to the menu (the NOR list from SETTINGS); golden `diag-back`.
+- ~~Diagnostics' pages clip long lines ("boot loader CRC 395276F5, present, with a…", "WAITCNT 4018 in the menu (games start at…"), the clock page shows only its title for 2.2 s, and the EEPROM page names `tests/roms/eeprom` (v0.3 emulator validation).~~ Fixed by v0.3.2 (`c449f44`): `diag_say` wraps a long line at a space and the two lines are shorter, the clock page says it is measuring first, and the EEPROM page speaks to users; golden `diag-pages`, kernel test `diag_line_cut`.
+- ~~The boot shows "microSD card ready / Loading..." for about 3 frames, then fades to black before the list (`source/ezkernelnew.c`) (v0.3 emulator validation).~~ Fixed by v0.3.2 (`fdd9fe2`): a card that mounts shows nothing until the list; golden `boot` hashes the frames from the hand-over, `tests/smoke.sh` checks no notice shows.
 - **Cart checks for the next test:**
   - Is the brake after letting go at top speed (about two rows) too far? If so, raise `SPRING_BRAKE` (F1).
   - Do the scroll timings at 40 rows/s match the emulator (F1)?
@@ -371,7 +376,7 @@ Bugs found while building v0.3 and v0.3.1. Each is struck out here once a ticket
   - art for console folders;
   - a scraper CLI in `tools/`.
 - **Settings:** a 12/24-hour clock and time editor, settings in categories, and Help pages.
-  Page 2's SAVE row (AUTO SAVE) opens edit mode with the cursor on OK, so A, A saves it unchanged and LEFT is needed to change it (pre-existing; v0.3.2 review).
+  ~~Page 2's SAVE row (AUTO SAVE) opens edit mode with the cursor on OK, so A, A saves it unchanged and LEFT is needed to change it (pre-existing; v0.3.2 review).~~ Fixed by v0.3.2 (`46e1138`).
 
 - **Screens redesigned (user, 2026-10-19):** v0.3 ported the official screens as they were. v0.4 redesigns their layout and navigation: settings in a section of their own, organised by category, with clear editing; the cheat screen; and the lists, as views a theme can swap (a RetroArch-like carousel of systems and games, sections).
 

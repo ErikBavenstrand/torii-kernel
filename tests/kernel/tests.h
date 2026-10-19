@@ -28,6 +28,7 @@ void test_text_blit(void);
 void test_text_draw(void);
 void test_text_clear(void);
 void test_text_cycles(void);
+void test_diag_line_cut(void);
 void test_engine_res_alloc(void);
 void test_engine_budget(void);
 void test_engine_queue_caps(void);

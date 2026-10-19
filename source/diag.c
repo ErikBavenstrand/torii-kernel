@@ -37,6 +37,7 @@
 #include "engine/cycles.h"
 #include "engine/engine.h"
 #include "engine/motion.h"
+#include "engine/text.h"
 #include "ui/dialog.h"
 #include "ui/ui.h"
 #include "../tests/kernel/torii_test.h"
@@ -263,6 +264,18 @@ void diag_pause(u32 frames)
 		ui_frame();
 }
 
+u32 diag_line_cut(const char *text, u32 clip)
+{
+	u32 len = strlen(text);
+	if (text_width(&font_body, text, len) <= clip)
+		return len;
+	u32 cut = 0;
+	for (u32 i = 1; i < len; i++)
+		if (text[i] == ' ' && text_width(&font_body, text, i) <= clip)
+			cut = i;
+	return cut ? cut : len;  // no space to cut at: the list ends it in "..."
+}
+
 void diag_say(u8 colour, const char *format, ...)
 {
 	char text[160];
@@ -274,7 +287,20 @@ void diag_say(u8 colour, const char *format, ...)
 		tlog_error("diag: %s", text);
 	else
 		tlog("diag: %s", text);
-	line_add(colour, text);
+	// A line too wide for the page goes on in the next, cut at a space
+	u32 clip = SCREEN_WIDTH - 2u * ui_theme()->pad;
+	const char *rest = text;
+	for (;;) {
+		u32 cut = diag_line_cut(rest, clip);
+		char part[DIAG_LINE_BYTES];
+		snprintf(part, sizeof(part), "%.*s", (int)cut, rest);
+		line_add(colour, part);
+		rest += cut;
+		while (*rest == ' ')
+			rest++;
+		if (!*rest)
+			break;
+	}
 	// The screen keeps up with the log: a frame, unless one ran since the
 	// last VBlank (a burst of lines shows at the next)
 	if (torii_frames != scr.pumped) {
@@ -440,7 +466,7 @@ static void step_info(void)
 	    ((fpga & 0xF000) == 0xA000 || (fpga & 0xF000) == 0xB000) ? "LX16, Rev.B" : "LX9, Rev.A");
 	tlog("diag: FPGA version register %04X", fpga);
 	say(WHITE, "kernel NOR id %04X, game NOR id %04X", Read_S71NOR_ID(), Read_S98NOR_ID());
-	say(WHITE, "WAITCNT %04X in the menu (games start at 0000)", REG_WAITCNT_IO);
+	say(WHITE, "WAITCNT %04X in the menu, 0000 in games", REG_WAITCNT_IO);
 	say(WHITE, "kernel ROM %08lX-%08lX", 0x08000000ul, (unsigned long)&__rom_end__);
 	u32 id = build_id_compute();
 	say(id == torii_build_id ? WHITE : RED, "build id %08lX%s", (unsigned long)torii_build_id,
@@ -497,6 +523,7 @@ static void step_rtc(void)
 	rtc_enable();
 	rtc_get(a);
 	rtc_disenable();
+	say(WHITE, "measuring the clock for two seconds...");
 	pause_frames(130);  // a bit over two seconds
 	rtc_enable();
 	rtc_get(b);
@@ -590,7 +617,8 @@ static void step_loader(void)
 	char title[17];
 	memcpy(title, (const char *)image + 0xA0, 16);
 	title[16] = 0;
-	say(whole ? WHITE : RED, "boot loader CRC %08lX, %s", (unsigned long)crc, loader_state_name(state));
+	say(whole ? WHITE : RED, "boot loader CRC %08lX", (unsigned long)crc);
+	say(whole ? WHITE : RED, "it is %s", loader_state_name(state));
 	if (whole) {
 		// DE.BIN's header has no title or code: zeros
 		if (title[0] || title[12])
@@ -811,12 +839,12 @@ static void step_eeprom(void)
 		say(GREEN, "EEPROM probe runs since the last run");
 		say(GREEN, "read back what they wrote: pass");
 	} else {
-		say(WHITE, "Not tested since the last run. The");
-		say(WHITE, "EEPROM answers only in a game: launch");
-		say(WHITE, "eeprom.gba (tests/roms/eeprom) CLEAN");
-		say(WHITE, "BOOT, SAVE TYPE EEPROM 512, then 8K,");
-		say(WHITE, "with A, then B, each time: four runs.");
-		say(WHITE, "Each goes back to the kernel and logs.");
+		say(WHITE, "Not tested since the last run: only a");
+		say(WHITE, "game can test EEPROM. With Torii's");
+		say(WHITE, "EEPROM probe (eeprom.gba) on the card,");
+		say(WHITE, "launch it with CLEAN BOOT, SAVE TYPE");
+		say(WHITE, "EEPROM 512, then 8K, and press A, then");
+		say(WHITE, "B, each time: four runs, each logged.");
 	}
 	pause_frames(180);
 }
@@ -1046,11 +1074,17 @@ void Diagnostics(void)
 	say(WHITE, "a report to /torii/logs. It never");
 	say(WHITE, "writes your saves. It takes a minute,");
 	say(WHITE, "then restarts the kernel.");
-	say(WHITE, "A: start   B: back");
+	say(WHITE, "A: start   B: back to the menu");
 	diag_pause(3);  // drawn before the screen counts as ready
 	tlog_debug("screen ready: diag-start");
-	if (wait_key(KEY_A | KEY_B) & KEY_B)
-		SoftReset_now();
+	if (wait_key(KEY_A | KEY_B) & KEY_B) {
+		// Nothing changed yet: back to the caller, which starts the menu
+		// again (B still held counts as held there)
+		tlog("diag: not started");
+		ui_shutdown();
+		dialog_blank();
+		return;
+	}
 	if (tlog_level == TLOG_OFF) {  // this session has no line on the card yet
 		tlog_set_level(TLOG_DEBUG);
 		tlog_marker("Diagnostics", 0);

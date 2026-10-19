@@ -1,0 +1,16 @@
+# B on Diagnostics' first page goes back to the menu (the NOR list, beside
+# SETTINGS) without restarting the kernel: DIAGNOSE, then B
+-w "screen ready: sd-list"
+-k @8:R -k @12:-
+-w "screen ready: nor-list"
+-k @8:R -k @12:-
+-w "screen ready: settings1"
+-k @8:R -k @12:-
+-w "screen ready: settings2"
+-k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:DOWN -k @48:-
+-k @56:DOWN -k @60:- -k @68:DOWN -k @72:- -k @80:DOWN -k @84:- -k @92:DOWN -k @96:-
+-k @104:DOWN -k @108:- -k @116:A -k @120:-
+-w "screen ready: diag-start"
+-k @8:B -k @12:-
+-w "screen ready: nor-list"
+-s @1:screen.png

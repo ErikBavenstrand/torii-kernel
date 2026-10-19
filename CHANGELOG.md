@@ -6,6 +6,24 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** SETTINGS page 2's SAVE edit opened on OK, so A, A saved AUTO
+  SAVE unchanged; it opens on the value, as the other rows do, and MODE B's
+  opens on the mode it has, not on RUMBLE (`46e1138`).
+- **Fixed:** turning LOGGING on in SETTINGS froze the menu for over a
+  second and lost the keys pressed then, while it made the 64 KB log file.
+  The file is now made a sector at a time in the background, after the
+  screen's drawing each frame; the log waits in RAM meanwhile (`f38df20`,
+  `053bb2d`).
+- **Fixed:** B on Diagnostics' first page restarted the kernel, which
+  landed at the SD root; it now goes back to the menu, as its hint says
+  (`c449f44`).
+- **Fixed:** Diagnostics' pages cut long lines off ("boot loader CRC ...,
+  present, with a..."); a long line now goes on in the next. The clock page
+  says it is measuring during its 2-second wait, and the EEPROM page no
+  longer names a folder of the source (`c449f44`).
+- **Fixed:** the boot showed "microSD card ready / Loading..." for a few
+  frames before fading to black and the list; it now goes straight to the
+  list (`fdd9fe2`).
 - **Fixed:** NOR DELETE erased the latest NOR game at once; it now asks
   "Delete this game from NOR?" over the game's name first, as the SD list's
   delete and FORMAT ALL do (`c211261`).
