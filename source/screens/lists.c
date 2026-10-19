@@ -1173,8 +1173,9 @@ static void nor_menu_a(u32 line, u32 key_l)
 			while (ui_depth() > 1)
 				ui_pop();
 			lists.menu = 0;
-			if (FRAM_save_op(2) == 2)
-				error_dialog(2, AFTER_NOR);
+			res = FRAM_save_op(2);  // 2: no SAVER folder, 3: written short
+			if (res)
+				error_dialog(res, AFTER_NOR);
 			else
 				dialog(gl_save_saved, 0, AFTER_NOR);
 		}
@@ -1201,8 +1202,9 @@ static void dialog_answer(int yes)
 		break;
 	case AFTER_BACKUP:
 		if (yes) {
-			if (FRAM_save_op(2) == 2)
-				error_dialog(2, AFTER_NOR);
+			u8 res = FRAM_save_op(2);  // 2: no SAVER folder, 3: written short
+			if (res)
+				error_dialog(res, AFTER_NOR);
 			else
 				dialog(gl_save_saved, 0, AFTER_NOR);
 		}

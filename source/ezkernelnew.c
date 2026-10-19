@@ -414,7 +414,8 @@ static void save_write(FIL *file, const u8 *data, UINT len, u32 *total, FRESULT 
 }
 
 // Copies savesize bytes of cart SRAM to filename, over the file there, and
-// logs what reached the card. ROM code, as Loadsavefile: both run only in
+// logs what reached the card: 1 once all of it did, 0 if the file couldn't
+// be made or the write fell short. ROM code, as Loadsavefile: both run only in
 // the menu. Torii: the SRAM goes through pReadCache's upper half, which no
 // frame touches (ez_define.h), so the progress dialog can draw between
 // writes.
@@ -466,12 +467,12 @@ u32 Save_savefile(TCHAR *filename, u32 savesize)
 		SetRampage(0x0);  // Torii: the page was left at 0x10
 
 		FRESULT cerr = f_close(&file);
-		if (werr != FR_OK || cerr != FR_OK || total != expected)
+		if (werr != FR_OK || cerr != FR_OK || total != expected) {
 			tlog_error("save: writing %s: %lu of %lu bytes written, f_write gave %d, f_close %d", filename,
 				   (unsigned long)total, (unsigned long)expected, werr, cerr);
-		else
-			tlog("save: wrote %s, %lu bytes, f_close gave %d", filename, (unsigned long)total, cerr);
-
+			return 0;  // Torii: a short write (a full card) is a failure
+		}
+		tlog("save: wrote %s, %lu bytes, f_close gave %d", filename, (unsigned long)total, cerr);
 		return 1;
 	} break;
 	default:
@@ -1042,9 +1043,12 @@ static void Check_save_flag(void)
 			progress_step(gl_save_ing, 0, PROGRESS_FULL);
 			f_mkdir(SAVER_FOLDER);//"/SAVER"
 			f_chdir(SAVER_FOLDER);
-			Save_savefile(name, savefilesize);
-			progress_done(gl_done);
+			u32 saved = Save_savefile(name, savefilesize);
+			if (saved)
+				progress_done(gl_done);
 			dialog_progress_end();
+			if (!saved)  // Torii: not "Done" over a save the card didn't take
+				Show_error_num(3);
 		}
 		dialog_close();
 		memset(SAV_info_buffer, 0x00, sizeof(SAV_info_buffer));//clean flag
@@ -1560,7 +1564,8 @@ void NOR_launch(u32 index, u32 key_L)
 //---------------------------------------------------------------
 // The first NOR game's save (ezkernel.h): OP 0 looks for its file (0x10 if
 // there, 0 if not), 1 loads it into the cart's SRAM (0, or 3 if it isn't
-// there), 2 writes the SRAM to it (0). 2: the SAVER folder failed.
+// there), 2 writes the SRAM to it (0, or 3 if it couldn't be written whole).
+// 2: the SAVER folder failed.
 u8 FRAM_save_op(u8 OP)
 {
 	u32 res;
@@ -1590,8 +1595,9 @@ u8 FRAM_save_op(u8 OP)
 	//bak fram save, with a progress dialog while it saves
 	dialog_progress_begin(gl_saving, savfilename);
 	progress_step(gl_save_ing, 0, PROGRESS_FULL);
-	Save_savefile(savfilename, Get_savefilesize(pNorFS[0].savemode));
-	progress_done(gl_done);
+	u32 saved = Save_savefile(savfilename, Get_savefilesize(pNorFS[0].savemode));
+	if (saved)
+		progress_done(gl_done);
 	dialog_progress_end();
-	return 0;
+	return saved ? 0 : 3;
 }
