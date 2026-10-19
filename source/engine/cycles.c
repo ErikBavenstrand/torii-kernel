@@ -23,7 +23,7 @@ void cycles_frame(const char *name, u32 cycles)
 {
 	tlog_console("frame-cycles: %s %lu", name, (unsigned long)cycles);
 	for (u32 i = 0; i < SUMMARY_NAMES; i++) {
-		if (summary[i].name && strcmp(summary[i].name, name))
+		if (summary[i].name && strcmp(summary[i].name, name) != 0)
 			continue;
 		summary[i].name = name;
 		summary[i].frames++;
