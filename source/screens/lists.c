@@ -23,12 +23,14 @@
 
 #include "lists.h"
 #include "../cartlog.h"
+#include "../diag.h"
 #include "../draw.h"
 #include "../ezkernel.h"
 #include "../lang.h"
 #include "../nameindex.h"
 #include "../NORflash_OP.h"
 #include "../RTC.h"
+#include "../settings.h"
 #include "../showcht.h"
 #include "../sort.h"
 #include "../tlog.h"
@@ -115,6 +117,7 @@ static struct {
 	u8 menu_line;
 	u8 after;         // enum after, for the dialog shown
 	u8 from_recent;   // the game menu is for a Recently Played entry
+	u8 queued_a;      // A during a page change, for once the page is up
 	u8 icons_made;
 	u32 nor_game;     // the NOR game menu's game
 	u32 recent_count;
@@ -612,16 +615,8 @@ static void engine_leave(void)
 {
 	if (!lists.engine)
 		return;
-	ui_shutdown();
+	menu_leave_engine();  // the shared exit (setwindow.c): black mode 3, key state caught up
 	lists.engine = 0;
-	REG_DISPCNT = 0x80;
-	REG_BLDCNT = 0;
-	REG_BLDY = 0;
-	REG_MOSAIC = 0;
-	REG_BG2CNT = 0;
-	Clear(0, 0, 240, 160, 0, 1);
-	REG_DISPCNT = MODE_3 | BG2_ENABLE;
-	scanKeys();  // libgba's key state catches up: keys held now aren't news to mode 3 code
 }
 
 static u8 list_node(void)
@@ -696,6 +691,7 @@ static void show(enum screen s, u32 at)
 		ui_pop();
 	lists.screen = (u8)s;
 	lists.menu = 0;
+	lists.queued_a = 0;
 	struct ui_view *v = ui_push(&list_views[s], &lists);
 	if (!v) {  // a layout over budget: nothing would take keys
 		tlog_error("lists: %s", ui_error());
@@ -866,6 +862,12 @@ static int list_event(struct ui_view *v, const struct ui_event *e)
 		return e->type == UI_EV_KEYS;
 	u16 k = e->keys, pressed = ui_input()->pressed;
 	u8 node = list_node();
+	if ((k & INPUT_A) && ui_list_paging(node)) {
+		// The page the cursor moved to isn't drawn yet: A waits for it, as
+		// the list's own A does (lists_run hands it back)
+		lists.queued_a = 1;
+		k &= (u16)~INPUT_A;
+	}
 	u32 count = list_count(0), at = ui_list_cursor(node);
 	u32 page = lists.screen == SCR_RECENT ? 0 : LIST_ROWS;
 	if (k & INPUT_DOWN)
@@ -1094,8 +1096,12 @@ static void game_menu_a(u32 line, u32 key_l)
 	if (line >= 2 && strlen(lists.game.name) > sizeof(pNorFS[0].filename) - 1) {
 		// The game NOR's list keeps 99 bytes of a name: one longer can't be
 		// listed there, and a cut one would save under another name
-		recent_restore();
-		error_dialog(8, AFTER_SD);
+		if (lists.from_recent) {
+			recent_restore();
+			error_dialog(8, AFTER_SD);
+		} else {
+			error_dialog(8, AFTER_POP);  // back to the list, the cursor where it was
+		}
 		return;
 	}
 	launch(line, key_l);
@@ -1208,7 +1214,9 @@ static void do_action(void)
 		break;
 	case ACT_SETTINGS:
 		engine_leave();
-		Settings_pages();
+		if (Settings_run(SETTINGS_PAGE1) == SETTINGS_TO_DIAGNOSE)
+			Diagnostics();  // restarts the kernel
+		tlog_flush();
 		show_nor(0);
 		break;
 	case ACT_RECENT:
@@ -1273,6 +1281,11 @@ void lists_run(void)
 		else {
 			lists.clock_wait = CLOCK_POLL;
 			clock_read();
+		}
+		if (lists.queued_a && !lists.act && ui_depth() == 1 && !ui_list_paging(list_node())) {
+			struct ui_event e = {UI_EV_KEYS, UI_NONE, INPUT_A, 0};
+			lists.queued_a = 0;
+			list_event(ui_top(), &e);
 		}
 		if (lists.act)
 			do_action();

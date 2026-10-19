@@ -25,7 +25,7 @@
 #include "lang.h"
 #include "GBApatch.h"
 #include "showcht.h"
-#include "helpwindow.h"
+#include "settings.h"
 #include "cartlog.h"
 #include "diag.h"
 #include "engine/cover.h"
@@ -1676,36 +1676,4 @@ u8 FRAM_save_op(u8 OP)
 	//bak fram save
 	Save_savefile(savfilename, Get_savefilesize(pNorFS[0].savemode));
 	return 0;
-}
-//---------------------------------------------------------------------------------
-// The SETTINGS and HELP pages, in mode 3, from R on the NOR list: R goes on to
-// the next page, L back; L on the first page returns to the NOR list.
-void Settings_pages(void)
-{
-	PAGE_NUM page_num = SET_win;
-	u32 res;
-	for (;;) {
-		if (page_num == SET_win) {
-			DrawPic((u16 *)gImage_SET, 0, 0, 240, 160, 0, 0, 1);
-			res = Setting_window();
-			tlog_flush();
-			if (res == 0)
-				return;  // the NOR list
-			page_num = SET2_win;
-		} else if (page_num == SET2_win) {
-			DrawPic((u16 *)gImage_SET2, 0, 0, 240, 160, 0, 0, 1);
-			res = Setting_window2();
-			tlog_flush();
-			if (res == 2)  //Torii: DIAGNOSE, which restarts the kernel
-				Diagnostics();
-			else if (res == 0)
-				page_num = SET_win;
-			else
-				page_num = HELP;
-		} else {
-			DrawPic((u16 *)gImage_HELP, 0, 0, 240, 160, 0, 0, 1);
-			Show_help_window();
-			page_num = SET2_win;
-		}
-	}
 }

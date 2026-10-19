@@ -6,7 +6,7 @@ cheats/screen 063A1B234EA6DC79
 cheats-long/screen 50CC9D4DE1FE8EC1
 cheats-long/scrolled B9FCA1EEBABF43C5
 cheats-many/back C78CF12FFC50B7D4
-cheats-many/menu D37E84197BA8C3E0
+cheats-many/menu F2BB991CEE49A988
 cheats-many/moved ACF06BAA67A24475
 cheats-many/paged 322CB8381C0A9591
 cheats-many/picked BE302E9402E3CA48
@@ -45,45 +45,35 @@ cover-demo/frames 29-29 0690C16F9D9454FC
 cover-demo/frames 30-30 23A2E3B708CF46A1
 cover-demo/frames 31-32 3CCAC1492B95FF7A
 diag-start/screen 1EF53FFFB16A8AEC
-file-menu/screen 2BC422F470DDF7F3
-help/screen D8C7377F69946185
-nor-list/screen B41DDB1AFEB55DC1
-recent/screen 672BEF507A1E554D
-sd-deep/held DADD3FA9E4F41079
-sd-deep/paged 1F9A20893381FF91
-sd-delete/kept 5CB316715377D608
-sd-delete/screen DC88559CB4686E2D
-sd-list/screen 34EED145D7C6A8C0
-sd-long/menu D9F54562E74ACFE3
-sd-long/scrolled 932B53789E40D384
-sd-long/start D4C21CE5469167D4
-sd-scroll/scrolled A8266BC030B94860
-sd-scroll/start 818F72FFC7BF6260
-sd-scroll/frames 0-39 818F72FFC7BF6260
-sd-scroll/frames 40-40 F451021FDA885AA0
-sd-scroll/frames 41-41 7B4CC8CCD14A7618
-sd-scroll/frames 42-42 302E62567D1ABB80
-sd-scroll/frames 43-43 BADE9840B7F8A4D8
-sd-scroll/frames 44-44 1E339A125859F338
-sd-scroll/frames 45-45 EA114C7C35829870
-sd-scroll/frames 46-46 91919F3DE27E3E98
-sd-scroll/frames 47-47 38E3E0FC7AF827E0
-sd-scroll/frames 48-48 3CFCF0018ED978E8
-sd-scroll/frames 49-49 43463663576F11E8
-sd-scroll/frames 50-50 78B5E632AA63E750
-sd-scroll/frames 51-51 04F58AF2D7836C00
-sd-scroll/frames 52-52 D710F4F969981370
-sd-scroll/frames 53-53 D2409686CDD88510
-sd-scroll/frames 54-54 EA73A2767A220AD8
-sd-scroll/frames 55-55 278556D711DBE138
-sd-scroll/frames 56-56 C8E014A7C2FA6E08
-sd-scroll/frames 57-57 B279B77DC2856700
-sd-scroll/frames 58-58 1EF409CA7C6A0E40
-sd-scroll/frames 59-59 0E42AD38C5B4B318
-sd-scroll/frames 60-60 6BAF27EF5883ECF8
-sd-scroll/frames 61-119 A8266BC030B94860
-settings1/screen BEC0937CCB96EF71
-settings2/screen 1BD1F13454FBDB6C
+file-menu/screen FCB674D8FDC6B41A
+help/screen 5B20C617DB3A66BC
+nor-list/screen 0F70E61FC6E0F4AD
+recent/screen C461631DF072F1C4
+sd-list/screen DAFEFBEF130ADFF5
+sd-scroll/scrolled 423F88E293FBA7C7
+sd-scroll/start EF7C57F54BB3A2F1
+sd-scroll/frames 0-38 EF7C57F54BB3A2F1
+sd-scroll/frames 39-39 2A5168ED4BB84271
+sd-scroll/frames 40-52 EF7C57F54BB3A2F1
+sd-scroll/frames 53-53 B9B4C2A210D7181F
+sd-scroll/frames 54-68 FED35E3819B2400F
+sd-scroll/frames 69-69 27E29649CBA215E1
+sd-scroll/frames 70-84 6B29B529141A3611
+sd-scroll/frames 85-85 E72891AEDAF5627F
+sd-scroll/frames 86-100 F517833BE980FAAF
+sd-scroll/frames 101-101 95C1C00E5D225545
+sd-scroll/frames 102-116 F5B6F878CC5107C5
+sd-scroll/frames 117-117 BBB13CC78FDCE317
+sd-scroll/frames 118-119 423F88E293FBA7C7
+settings-held/held-l 0CA5C0696DB712FC
+settings-held/held-r 0CA5C0696DB712FC
+settings-light/help 488DC004C5AB9F15
+settings-light/screen 25BF7277EB3BBB08
+settings-sd-theme/again 7E1CFB4EE11082A8
+settings-sd-theme/theme F261CF6429EF81B4
+settings1/back 0F70E61FC6E0F4AD
+settings1/screen 0CA5C0696DB712FC
+settings2/screen 055FC38099E617EE
 ui-dialog/closed 7B29AF95A30A3BB1
 ui-dialog/dialog 3FA6B2F8C249F938
 ui-dialog/grid 5A3482184C6909F7

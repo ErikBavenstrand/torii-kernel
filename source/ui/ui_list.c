@@ -376,6 +376,11 @@ u32 ui_list_cursor(u8 node)
 	return ((const struct list_state *)ui_node_state(node))->cursor;
 }
 
+int ui_list_paging(u8 node)
+{
+	return ((const struct list_state *)ui_node_state(node))->page != PAGE_NONE;
+}
+
 void ui_list_scroll_info(u8 node, u32 *content, u32 *view, u32 *scroll)
 {
 	const struct list_state *st = ui_node_state(node);

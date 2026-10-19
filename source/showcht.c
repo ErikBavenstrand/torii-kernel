@@ -863,20 +863,6 @@ static int cs_run(struct cheat_screen *cs)
 	return 1;
 }
 
-// Back to the mode 3 menu, on a black screen the caller repaints
-static void cs_leave_engine(void)
-{
-	ui_shutdown();
-	VBlankIntrWait();
-	REG_DISPCNT = 0x0080;  // forced blank while the bitmap is cleared
-	REG_BLDCNT = 0;
-	REG_MOSAIC = 0;
-	REG_BG2CNT = 0;
-	Clear(0, 0, 240, 160, 0, 1);
-	REG_DISPCNT = MODE_3 | BG2_ENABLE;
-	scanKeys();  // libgba's key state catches up with what the engine read
-}
-
 int Open_cht_file(TCHAR *gamefilename, u32 havecht)
 {
 	int shown = 0;
@@ -924,7 +910,7 @@ int Open_cht_file(TCHAR *gamefilename, u32 havecht)
 			// Reading the picks' codes can take seconds in a big file: the
 			// cheat screen stays up meanwhile, rather than a black one
 			Analyze_KEYVAL(&gfile, cs.count);
-			cs_leave_engine();
+			menu_leave_engine();  // back to the mode 3 menu, on a black screen
 			cheats_opened = 1;
 			cheats_picked = 0;
 			for (u32 i = 0; i < cs.count; i++)

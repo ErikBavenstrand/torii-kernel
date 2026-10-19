@@ -432,7 +432,8 @@ void ui_init(const struct ui_theme *theme);
 // The theme and accent the THEME and ACCENT settings pick (settings slots
 // assress_theme, 1 for light, and assress_accent, 1 + an index into
 // ui_accents; erased or unknown values give the dark theme with its own
-// accent).
+// accent). *accent gets what ui_theme_set takes: the accent's colour, or
+// UI_ACCENT_THEME.
 const struct ui_theme *ui_theme_setting(u16 *accent);
 // Pops every view and releases the UI's resources.
 void ui_shutdown(void);
@@ -490,6 +491,9 @@ void ui_list_reset(u8 node, u32 cursor);
 void ui_list_refresh(u8 node, u32 lo, u32 hi);
 void ui_list_set_cursor(u8 node, u32 cursor);
 u32 ui_list_cursor(u8 node);
+// 1 while a page change hides or draws the list's page: a handler taking A
+// itself waits until it is up, as the list's own A does
+int ui_list_paging(u8 node);
 // For a scroll bar: content and viewport height, and scroll, in px.
 void ui_list_scroll_info(u8 node, u32 *content, u32 *view, u32 *scroll);
 
