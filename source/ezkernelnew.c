@@ -722,6 +722,17 @@ void CheckLanguage(void)
 	lang_packs[gl_lang].load();
 }
 //---------------------------------------------------------------------------------
+// Torii: the BOOT WITH ADDON switches as the launches read them: 1 on, else
+// off. An erased slot reads 0xFFFF, which went into the logs ("savestate
+// 65535"), the patch's switches and a NOR game's entry
+static void Read_addon_switches(void)
+{
+	gl_reset_on = Read_SET_info(assress_v_reset) == 1;
+	gl_rts_on = Read_SET_info(assress_v_rts) == 1;
+	gl_sleep_on = Read_SET_info(assress_v_sleep) == 1;
+	gl_cheat_on = Read_SET_info(assress_v_cheat) == 1;
+}
+//---------------------------------------------------------------------------------
 void CheckSwitch(void)
 {
 	gl_reset_on = Read_SET_info(assress_v_reset);
@@ -1322,10 +1333,12 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 	SAVEMODE = pNorFS[show_offset + file_select].savemode;
 	memcpy(GAMECODE, &pNorFS[show_offset + file_select].gamename[0xC], 4);  //header 0xA0: title, then game code
 	cartlog_phase(PHASE_LAUNCH, 0, pfilename);
+	// savestates: 1 if the launch makes the state file. Older kernels wrote
+	// an erased SAVESTATE slot's 0xFFFF into the entry, which counts as on
 	tlog("launch: loading %s from NOR at %08lX: code %.4s, %lu bytes, save type %02X, patched %u, savestates %u",
 	     pfilename, (unsigned long)pNorFS[show_offset + file_select].rompage << 17, (const char *)GAMECODE,
-	     (unsigned long)gamefilesize, SAVEMODE, pNorFS[show_offset + file_select].have_patch,
-	     pNorFS[show_offset + file_select].have_RTS);
+	     (unsigned long)gamefilesize, SAVEMODE, pNorFS[show_offset + file_select].have_patch != 0,
+	     pNorFS[show_offset + file_select].have_RTS != 0);
 	tlog_flush();
 
 	progress_step(gl_check_sav, 0, 500);
@@ -1526,10 +1539,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 			Launch_now(0x200, key_L, "CLEAN BOOT");
 			break;
 		case 1:  //PSRAM BOOT WITH ADDON
-			gl_reset_on = Read_SET_info(assress_v_reset);
-			gl_rts_on = Read_SET_info(assress_v_rts);
-			gl_sleep_on = Read_SET_info(assress_v_sleep);
-			gl_cheat_on = Read_SET_info(assress_v_cheat);
+			Read_addon_switches();
 			cartlog_phase(PHASE_LAUNCH, 0, pfilename);
 			tlog("launch: loading %s, BOOT WITH ADDON: reset %u, savestate %u, sleep %u, cheats %u (%lu)",
 			     pfilename, gl_reset_on, gl_rts_on, gl_sleep_on, gl_cheat_on,
@@ -1624,10 +1634,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 			}
 			break;
 		case 3:  //WRITE TO NOR ADDON
-			gl_reset_on = Read_SET_info(assress_v_reset);
-			gl_rts_on = Read_SET_info(assress_v_rts);
-			gl_sleep_on = Read_SET_info(assress_v_sleep);
-			gl_cheat_on = Read_SET_info(assress_v_cheat);
+			Read_addon_switches();
 
 			f_chdir(currentpath);  //return to game folder
 			u32 needpatch = 0;
