@@ -65,8 +65,8 @@
 #define SHARED \
 	.look = LOOK, .motion = MOTIONS, .body = &font_body, .heading = &font_heading, .row_h = 16, .pad = 6, \
 	.idle_dim = 11, .fade_frames = 8, .slide = 24, .marquee_delay = 45, .marquee_speed = 60, .marquee_pause = 60, \
-	.marquee_gap = 8, .page_fade = 4, .page_fade_out = 4, .input = INPUT_TIMING_DEFAULT, .dialog_in = 12, .dialog_out = 10, \
-	.transition = TRANSITIONS, .bar_shade_mix = 85
+	.marquee_gap = 8, .page_fade = 4, .page_fade_out = 4, .input = INPUT_TIMING_DEFAULT, .dialog_in = 12, \
+	.dialog_out = 10, .transition = TRANSITIONS, .bar_shade_mix = 85
 
 const struct ui_theme ui_theme_dark = {
 	.name = "Dark",
