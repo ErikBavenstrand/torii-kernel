@@ -348,6 +348,7 @@ static void show(const struct registry_place *p, u32 kind, s32 way)
 {
 	if (nav.engine)
 		ui_leave(kind, way);  // before the slow reads, so a key answers at once
+	read_settings();  // the clock's hours, as Settings may have changed them
 	count_items();
 	engine_enter();
 	// What the last screen's handlers recorded (keys while it went) was for
