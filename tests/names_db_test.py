@@ -26,13 +26,19 @@ DATS = ROOT / "tests" / "names"
 def update(sd, *extra):
     out, err = io.StringIO(), io.StringIO()
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-        status = names_db.main(["update", str(sd), "--offline", "--dats", str(DATS), *extra])
+        status = names_db.main(
+            ["update", str(sd), "--offline", "--dats", str(DATS), *extra]
+        )
     return status, out.getvalue(), err.getvalue()
 
 
 def cache_lines(sd):
     text = names_db.read_safe(Path(sd) / "torii" / "crc.txt")
-    return [line.split("\t") for line in text.splitlines() if line and not line.startswith("#")]
+    return [
+        line.split("\t")
+        for line in text.splitlines()
+        if line and not line.startswith("#")
+    ]
 
 
 class Dats(unittest.TestCase):
@@ -40,7 +46,9 @@ class Dats(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             fixture.write_dats(Path(tmp))
             for dat in fixture.DATS:
-                self.assertEqual((Path(tmp) / dat).read_text(), (DATS / dat).read_text(), dat)
+                self.assertEqual(
+                    (Path(tmp) / dat).read_text(), (DATS / dat).read_text(), dat
+                )
 
     def test_parse(self):
         version, games = names_db.parse_dat((DATS / fixture.DATS[0]).read_text())
@@ -66,7 +74,10 @@ class Dats(unittest.TestCase):
         self.assertEqual([len(t) for t in tables], [5, 2, 1, 1])
         # A game code names the retail game, though the dat lists its beta first
         self.assertEqual(codes[names_db.code_key("AWRE")], "Advance Wars (USA)")
-        self.assertEqual(codes[names_db.code_key("BZME")], "Legend of Zelda, The - The Minish Cap (USA)")
+        self.assertEqual(
+            codes[names_db.code_key("BZME")],
+            "Legend of Zelda, The - The Minish Cap (USA)",
+        )
         self.assertEqual(len(codes), 3)
 
 
@@ -105,8 +116,14 @@ class Card(unittest.TestCase):
         self.sd = Path(self.tmp.name)
         fixture.write_roms(self.sd)
         # Where the library doesn't look: hidden folders, dot files, past the depth cap
-        for hidden in ("SAVER/x.gba", "torii/x.gba", "System Volume Information/x.gba", ".Trash/x.gba",
-                       "GBA/._Wars.gba", "1/2/3/4/5/6/7/8/deep.gba"):
+        for hidden in (
+            "SAVER/x.gba",
+            "torii/x.gba",
+            "System Volume Information/x.gba",
+            ".Trash/x.gba",
+            "GBA/._Wars.gba",
+            "1/2/3/4/5/6/7/8/deep.gba",
+        ):
             p = self.sd / hidden
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_bytes(b"x" * 300)
@@ -124,10 +141,15 @@ class Card(unittest.TestCase):
         want = {p for p, _ in fixture.FILES} | {"/1/2/3/4/5/6/7/seven.gba"}
         self.assertEqual(set(lines), want)
         wars = lines["/GBA/Wars.gba"]
-        self.assertEqual(wars[:4], [f"{zlib.crc32(fixture.rom(1, 4096, 'AWRE')):08X}", "AWRE", "4096", "-"])
+        self.assertEqual(
+            wars[:4],
+            [f"{zlib.crc32(fixture.rom(1, 4096, 'AWRE')):08X}", "AWRE", "4096", "-"],
+        )
         self.assertEqual(lines["/Colour.gbc"][1], "-")  # codes are GBA's only
         self.assertEqual(lines["/NES/Famicom.nes"][2], "16400")
-        self.assertIn("GBA: 5 games, 2 named by CRC, 1 by game code, 2 keep their file names", out)
+        self.assertIn(
+            "GBA: 5 games, 2 named by CRC, 1 by game code, 2 keep their file names", out
+        )
         self.assertIn("GB: 2 games, 2 named by CRC", out)
         # Both copies, the same, each sealed by its CRC line
         main = (self.sd / "torii" / "crc.txt").read_bytes()
@@ -139,7 +161,9 @@ class Card(unittest.TestCase):
         update(self.sd)
         # The kernel took a date for one; a file changed size; a game left
         path = self.sd / "torii" / "crc.txt"
-        text = names_db.read_safe(path).replace("\t4096\t-\t/GBA/Wars.gba", "\t4096\t5A3C7B20\t/GBA/Wars.gba")
+        text = names_db.read_safe(path).replace(
+            "\t4096\t-\t/GBA/Wars.gba", "\t4096\t5A3C7B20\t/GBA/Wars.gba"
+        )
         names_db.write_safe(path, text)
         (self.sd / "GB" / "Mono.gb").write_bytes(b"changed" * 100)
         os.remove(self.sd / "Colour.gbc")
@@ -148,7 +172,10 @@ class Card(unittest.TestCase):
         self.assertIn("8 games, 1 CRCs computed, 7 kept", out)
         lines = {line[4]: line for line in cache_lines(self.sd)}
         self.assertEqual(lines["/GBA/Wars.gba"][3], "5A3C7B20")  # kept with its date
-        self.assertEqual(lines["/GB/Mono.gb"][:4], [f"{zlib.crc32(b'changed' * 100):08X}", "-", "700", "-"])
+        self.assertEqual(
+            lines["/GB/Mono.gb"][:4],
+            [f"{zlib.crc32(b'changed' * 100):08X}", "-", "700", "-"],
+        )
         self.assertNotIn("/Colour.gbc", lines)
 
     def test_safe_copies(self):
@@ -163,7 +190,7 @@ class Card(unittest.TestCase):
         self.assertEqual(names_db.read_safe(torii / "crc.txt"), "edited by hand\n")
 
     def test_no_crc(self):
-        status, out, _ = update(self.sd, "--no-crc")
+        status, _, _ = update(self.sd, "--no-crc")
         self.assertEqual(status, 0)
         self.assertTrue((self.sd / "torii" / "names.db").exists())
         self.assertFalse((self.sd / "torii" / "crc.txt").exists())
@@ -171,8 +198,13 @@ class Card(unittest.TestCase):
     def test_offline_without_dats(self):
         with tempfile.TemporaryDirectory() as empty:
             err = io.StringIO()
-            with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
-                status = names_db.main(["update", str(self.sd), "--offline", "--dats", empty])
+            with (
+                contextlib.redirect_stderr(err),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                status = names_db.main(
+                    ["update", str(self.sd), "--offline", "--dats", empty]
+                )
             self.assertEqual(status, 1)
             self.assertIn("--offline downloads nothing", err.getvalue())
         self.assertFalse((self.sd / "torii" / "names.db").exists())

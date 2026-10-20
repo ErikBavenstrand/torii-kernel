@@ -26,15 +26,40 @@ def rom(seed, size, code=None):
 
 # (dat file, game name, serial or None, (seed, size, code) or None for a game no file matches)
 GAMES = [
-    ("Nintendo - Game Boy Advance.dat", "Advance Wars (USA) (Beta)", "AWRE", (2, 4096, "AWRE")),
-    ("Nintendo - Game Boy Advance.dat", "Advance Wars (USA)", "AWRE", (1, 4096, "AWRE")),
-    ("Nintendo - Game Boy Advance.dat", "Legend of Zelda, The - The Minish Cap (USA)", "BZME", (3, 8192, "BZME")),
-    ("Nintendo - Game Boy Advance.dat", 'Quote \\"Test\\" (World)', None, (10, 1024, None)),
+    (
+        "Nintendo - Game Boy Advance.dat",
+        "Advance Wars (USA) (Beta)",
+        "AWRE",
+        (2, 4096, "AWRE"),
+    ),
+    (
+        "Nintendo - Game Boy Advance.dat",
+        "Advance Wars (USA)",
+        "AWRE",
+        (1, 4096, "AWRE"),
+    ),
+    (
+        "Nintendo - Game Boy Advance.dat",
+        "Legend of Zelda, The - The Minish Cap (USA)",
+        "BZME",
+        (3, 8192, "BZME"),
+    ),
+    (
+        "Nintendo - Game Boy Advance.dat",
+        'Quote \\"Test\\" (World)',
+        None,
+        (10, 1024, None),
+    ),
     ("Nintendo - Game Boy Advance.dat", "Unseen (Europe)", "UNSP", None),
     ("Nintendo - Game Boy Color.dat", "Colour Game (USA)", None, (4, 2048, None)),
     ("Nintendo - Game Boy Color.dat", "Colour Named Gb (World)", None, (6, 2048, None)),
     ("Nintendo - Game Boy.dat", "Mono Game (Japan)", None, (5, 2048, None)),
-    ("Nintendo - Nintendo Entertainment System.dat", "Famicom Game (Japan)", None, (7, 16400, None)),
+    (
+        "Nintendo - Nintendo Entertainment System.dat",
+        "Famicom Game (Japan)",
+        None,
+        (7, 16400, None),
+    ),
 ]
 
 # The card's files: (card path, (seed, size, code)). A hack keeps its base
@@ -74,7 +99,10 @@ def write_dats(out=HERE):
                 continue
             data = rom(*spec) if spec else bytes([i]) * 64
             crc = zlib.crc32(data)
-            ext = {"Nintendo - Game Boy Advance.dat": "gba", "Nintendo - Game Boy Color.dat": "gbc"}.get(dat, "gb")
+            ext = {
+                "Nintendo - Game Boy Advance.dat": "gba",
+                "Nintendo - Game Boy Color.dat": "gbc",
+            }.get(dat, "gb")
             if dat.endswith("Entertainment System.dat"):
                 ext = "nes"
             lines.append("game (")
@@ -84,7 +112,9 @@ def write_dats(out=HERE):
             if serial and not on_rom:
                 lines.append(f'\tserial "{serial}"')
             rom_serial = f' serial "{serial}"' if on_rom else ""
-            lines.append(f'\trom ( name "{name}.{ext}" size {len(data)} crc {crc:08X}{rom_serial} )')
+            lines.append(
+                f'\trom ( name "{name}.{ext}" size {len(data)} crc {crc:08X}{rom_serial} )'
+            )
             lines.append(")")
             lines.append("")
         (out / dat).write_text("\n".join(lines))

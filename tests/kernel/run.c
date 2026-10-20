@@ -76,6 +76,7 @@ static const struct {
 	// Not in Diagnostics: they use the index's PSRAM and write games to the card
 	{"library_psram", test_library_psram},
 	{"library_boot", test_library_boot},
+	{"names_identify", test_names_identify},
 };
 
 int torii_unit_tests(void)
@@ -117,6 +118,11 @@ void torii_run_tests(void)
 	// SELECT and L: the UI demo on the cart (tests/shots/ui-*.opts)
 	if ((~REG_KEYINPUT & 0x3FF) == (KEY_SELECT | KEY_L))
 		ui_demo();
+	// SELECT and B: the names bench (tests/names_db.sh bench), alone
+	if ((~REG_KEYINPUT & 0x3FF) == (KEY_SELECT | KEY_B)) {
+		names_bench();
+		return;
+	}
 	// SELECT and R: the art sheet (tests/shots/art-sheet.opts)
 	if ((~REG_KEYINPUT & 0x3FF) == (KEY_SELECT | KEY_R))
 		art_sheet();

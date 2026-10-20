@@ -164,6 +164,11 @@ RULES = [
         "easing table generator, whose table the host tests check",
     ),
     (
+        ["tools/names_db.py", "tests/names_db_test.py", "tests/names/*"],
+        {LINT, TEST_HOST, TEST},
+        "names database tool: test-host runs its tests, tests/names_db.sh reads its files on the cart",
+    ),
+    (
         sorted(NO_COMPAT),
         {LINT, TEST, SIZE, ANALYZE},
         "menu or text only, listed in NO_COMPAT",

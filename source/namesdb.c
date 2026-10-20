@@ -156,12 +156,8 @@ void names_cache_init(struct names_cache *c, u8 *base, names_put_fn put)
 
 int names_cache_clear_part(struct names_cache *c, u32 at, u32 bytes)
 {
-	static const u16 none[64] ALIGN(4) = {
-		0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF,
-		0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF,
-		0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF,
-		0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF,
-		0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF};
+	u16 none[64] ALIGN(4);  // in RAM: psram_write takes no source in cart space
+	memset(none, 0xFF, sizeof(none));
 	u32 end = at + bytes;
 	if (end > NAMES_CACHE_SLOTS * 2u)
 		end = NAMES_CACHE_SLOTS * 2u;
@@ -216,7 +212,7 @@ u32 names_cache_put(struct names_cache *c, const char *path, u32 size, u32 date,
 		c->full = 1;
 		return NAMES_CACHE_NONE;
 	}
-	char buf[NAMES_PATH_MAX + 2] ALIGN(4);
+	static char buf[NAMES_PATH_MAX + 2] EWRAM_BSS ALIGN(4);  // halfword-aligned for put, off the stack
 	memcpy(buf, path, len);
 	buf[len] = buf[len + 1] = 0;
 	c->put(c->base + NAMES_CACHE_OFF_POOL + c->pool, buf, bytes);
@@ -227,7 +223,8 @@ u32 names_cache_put(struct names_cache *c, const char *path, u32 size, u32 date,
 	c->ident ^= mix(&r);
 	const u16 *s = slots(c);
 	u32 i = r.hash & (NAMES_CACHE_SLOTS - 1);
-	while (s[i] < n)  // the next empty slot: NAMES_CACHE_MAX < NAMES_CACHE_SLOTS keeps one
+	// The next empty slot: NAMES_CACHE_MAX < NAMES_CACHE_SLOTS keeps one
+	for (u32 probes = 0; s[i] < n && probes < NAMES_CACHE_SLOTS; probes++)
 		i = (i + 1) & (NAMES_CACHE_SLOTS - 1);
 	u16 v = (u16)n;
 	c->put((u8 *)&s[i], &v, 2);

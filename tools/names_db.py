@@ -43,7 +43,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DATS = ROOT / "dist" / "dats"
 URL = "https://raw.githubusercontent.com/libretro/libretro-database/master/metadat/no-intro/"
-USER_AGENT = "torii-kernel names-update (https://github.com/ErikBavenstrand/torii-kernel)"
+USER_AGENT = (
+    "torii-kernel names-update (https://github.com/ErikBavenstrand/torii-kernel)"
+)
 
 # Library order (source/library.h): GBA, GBC, GB, NES
 CONSOLES = [
@@ -62,13 +64,23 @@ DB_MAX = 0x1C0000  # PSRAM_NAMES_DB_BYTES (source/engine/psram.h)
 
 # The kernel's hidden folders in the card's root (source/gamename.c), and its
 # depth cap (source/library_scan.c's LIB_DEPTH)
-HIDDEN_ROOT = {"torii", "saver", "rts", "system", "patch", "cheat", "system volume information"}
+HIDDEN_ROOT = {
+    "torii",
+    "saver",
+    "rts",
+    "system",
+    "patch",
+    "cheat",
+    "system volume information",
+}
 DEPTH = 8
 CRC_FILE = "crc.txt"
 CRC_HEADER = "# Torii's CRC cache: CRC32, GBA game code, size, date, path\n"
 
 # Tags of dumps a game code shouldn't name first: the retail game wins
-LESSER = re.compile(r"\((Beta|Proto|Demo|Sample|Kiosk|Pirate|Unl|Debug)[^)]*\)", re.I)
+LESSER = re.compile(
+    r"\((Beta|Proto|Demo|Sample|Kiosk|Pirate|Unl|Debug)[^)]*\)", re.IGNORECASE
+)
 
 
 class NamesError(Exception):
@@ -121,7 +133,7 @@ def parse_dat(text):
         if k2 != "(":
             continue
         block = parse_block(it)
-        fields = dict((k, v) for k, v in block if isinstance(v, str))
+        fields = {k: v for k, v in block if isinstance(v, str)}
         if val == "clrmamepro":
             version = fields.get("version", "")
         elif val == "game":
@@ -129,7 +141,7 @@ def parse_dat(text):
             serial = fields.get("serial", "")
             for k, v in block:
                 if k == "rom" and isinstance(v, list):
-                    rf = dict((a, b) for a, b in v if isinstance(b, str))
+                    rf = {a: b for a, b in v if isinstance(b, str)}
                     if re.fullmatch(r"[0-9A-Fa-f]{8}", rf.get("crc", "")):
                         roms.append((int(rf["crc"], 16), int(rf.get("size", "0") or 0)))
                     serial = serial or rf.get("serial", "")
@@ -413,7 +425,11 @@ def update_cache(sd, games):
             reused += 1
         else:
             if sys.stderr.isatty():
-                print(f"\r\033[KCRC {n + 1}/{len(games)}: {card_path[-60:]}", end="", file=sys.stderr)
+                print(
+                    f"\r\033[KCRC {n + 1}/{len(games)}: {card_path[-60:]}",
+                    end="",
+                    file=sys.stderr,
+                )
             crc, code, size2 = file_crc(file_path)
             if size2 != size:
                 continue
@@ -436,27 +452,39 @@ def update_cache(sd, games):
 def update(args):
     sd = Path(args.sd_path)
     if not sd.is_dir():
-        raise NamesError(f"{sd} isn't a folder: give the card's folder, e.g. /Volumes/OMEGA")
+        raise NamesError(
+            f"{sd} isn't a folder: give the card's folder, e.g. /Volumes/OMEGA"
+        )
     dats = Path(args.dats)
     texts = []
     for _, file, _ in CONSOLES:
-        texts.append(fetch(dats, file, args.offline, args.refresh).read_text("utf-8", "replace"))
+        texts.append(
+            fetch(dats, file, args.offline, args.refresh).read_text("utf-8", "replace")
+        )
     tables, codes, version = make_tables(texts)
     db = build_db(tables, codes, version)
     if len(db) > DB_MAX:
-        raise NamesError(f"names.db would be {len(db)} bytes, over the kernel's {DB_MAX}")
+        raise NamesError(
+            f"names.db would be {len(db)} bytes, over the kernel's {DB_MAX}"
+        )
     torii = sd / "torii"
     torii.mkdir(exist_ok=True)
     tmp = torii / "names.db.part"
     tmp.write_bytes(db)
     tmp.replace(torii / "names.db")
-    counts = ", ".join(f"{c[0]} {len(t)}" for c, t in zip(CONSOLES, tables))
-    print(f"wrote {torii / 'names.db'}: dats {version or '(no version)'}, {counts}, {len(codes)} GBA codes, {len(db)} bytes")
+    counts = ", ".join(
+        f"{c[0]} {len(t)}" for c, t in zip(CONSOLES, tables, strict=True)
+    )
+    print(
+        f"wrote {torii / 'names.db'}: dats {version or '(no version)'}, {counts}, {len(codes)} GBA codes, {len(db)} bytes"
+    )
     if args.no_crc:
         return
     games = walk_card(sd)
     found, computed, reused = update_cache(sd, games)
-    print(f"wrote {torii / CRC_FILE}: {len(found)} games, {computed} CRCs computed, {reused} kept")
+    print(
+        f"wrote {torii / CRC_FILE}: {len(found)} games, {computed} CRCs computed, {reused} kept"
+    )
     for i, (label, _, _) in enumerate(CONSOLES):
         mine = [found[p] for p, _, c in games if c == i and p in found]
         if not mine:
@@ -470,15 +498,24 @@ def update(args):
 
 
 def main(argv):
-    p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0], epilog=__doc__.split("\n\n", 1)[1],
-                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(
+        description=__doc__.split("\n\n")[0],
+        epilog=__doc__.split("\n\n", 1)[1],
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     sub = p.add_subparsers(dest="cmd", required=True)
     u = sub.add_parser("update", help="write names.db and crc.txt to a card")
     u.add_argument("sd_path", help="the card's folder on this PC")
     u.add_argument("--no-crc", action="store_true", help="leave crc.txt alone")
-    u.add_argument("--offline", action="store_true", help="never download: use the cached dats")
+    u.add_argument(
+        "--offline", action="store_true", help="never download: use the cached dats"
+    )
     u.add_argument("--refresh", action="store_true", help="download the dats again")
-    u.add_argument("--dats", default=str(DATS), help=f"the dats' cache (default {DATS.relative_to(ROOT)})")
+    u.add_argument(
+        "--dats",
+        default=str(DATS),
+        help=f"the dats' cache (default {DATS.relative_to(ROOT)})",
+    )
     args = p.parse_args(argv)
     try:
         update(args)

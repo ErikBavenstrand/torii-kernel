@@ -232,6 +232,9 @@ const char *names_lookup(const char *path, u32 size, u32 console);
 const char *names_dat_version(void);
 // Settings' "Identify library": CRCs for every library game without one.
 void names_identify(void);
+// Runs Identify library (or the run under way) to its end in a loop,
+// without the job: for tests, and a caller that shows its own progress.
+void names_identify_now(void);
 // 1 while Identify library runs, with the games looked at and their total.
 int names_identifying(u32 *done, u32 *total);
 // Each pass of the menu's loop (library_poll calls it): starts the job.
