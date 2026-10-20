@@ -445,7 +445,7 @@ static void test_hook(void)
 {
 	u32 word = nav_test_action;
 	nav_test_action = 0;
-	if (word >> 24 != NAV_TEST_MAGIC || !tlog_in_emulator())
+	if (word >> 24 != NAV_TEST_MAGIC || !tlog_in_emulator_now())
 		return;
 	u32 action = word & 0xFF, save = (word >> 8) & 0xFF, hard = (word >> 16) & 1;
 	nav_test_path[USERDATA_PATH_MAX - 1] = 0;

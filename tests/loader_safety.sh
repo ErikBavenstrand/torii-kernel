@@ -125,7 +125,8 @@ logged() { [ $ok = 0 ] || grep -qF -- "$1" "$log" || bad "power-on $runs didn't 
 # or B.gba, delete latest, FORMAT ALL, Test.gba launched with SAVE TYPE
 # Flash 128K, and Diagnostics from L+R+SELECT at power-on with its questions
 # skipped. The Settings page's saves come back with B16, and the NOR page's
-# questions answered no with B15: until then their cases say SKIP.
+# questions answered no with B15: until then their cases say SKIP (the
+# settings sector's write still runs, from a first WRITE TO NOR).
 write_a=$(nav_launch /A.gba nor at=200)
 write_b=$(nav_launch /B.gba nor at=200)
 delete=$(nav_nor_delete at=200)
@@ -279,7 +280,17 @@ EOF
     logged "nor: list saved, 2 games"
     boot -g $launch -f 700
     logged "nor: wrote the pending-save record"
-    pass "the same writes on the S29GL064A (its settings save: SKIP, waiting for B16)"
+    pass "the same writes on the S29GL064A"
+  fi
+
+  # The settings sector on the S29GL064A: the first game written to an empty
+  # game NOR saves its save type there (Set_saveMODE through Save_info)
+  if shard_case; then
+    new_cart gl064-settings
+    boot -g $write_a -f 700
+    logged "nor: list saved, 1 games"
+    logged "nor: wrote the settings"
+    pass "a settings save on the S29GL064A (the first WRITE TO NOR's save type)"
   fi
 
   # The GL064A models whose loader is one 64 KB sector: top boot, uniform

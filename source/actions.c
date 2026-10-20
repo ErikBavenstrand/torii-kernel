@@ -139,6 +139,10 @@ int action_delete_file(const char *path)
 
 void action_nor_launch(u32 index, u32 hard_reset)
 {
+	if (index >= game_total_NOR) {
+		tlog_error("launch: no NOR game %lu of %lu", (unsigned long)index, (unsigned long)game_total_NOR);
+		return;
+	}
 	session_end();
 	NOR_launch(index, hard_reset);  // returns only if it failed
 }

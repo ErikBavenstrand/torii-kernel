@@ -54,7 +54,8 @@ int action_delete_file(const char *path);
 
 // The game NOR's list, read into pNorFS and game_total_NOR (writes nothing)
 void action_nor_read(void);
-// Starts the game NOR's game index. Returns only if it didn't start, as
+// Starts the game NOR's game index (from the list action_nor_read read).
+// Returns only if it didn't start (or no such game), as
 // action_launch does.
 void action_nor_launch(u32 index, u32 hard_reset);
 // Deletes the game NOR's latest game (the only one the NOR can delete). It

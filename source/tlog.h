@@ -40,6 +40,9 @@ void tlog_set_level(u32 level);
 int tlog_wants(u32 level);
 // True when the kernel runs in mGBA (its debug console answers).
 int tlog_in_emulator(void);
+// The same, asked again now: the register must stop answering when turned
+// off and answer again when on (for a test hook that can erase NOR)
+int tlog_in_emulator_now(void);
 
 void tlog(const char *format, ...) __attribute__((format(printf, 1, 2)));
 void tlog_error(const char *format, ...) __attribute__((format(printf, 1, 2)));
