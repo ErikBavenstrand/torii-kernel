@@ -37,6 +37,7 @@
 #include "../showcht.h"
 #include "../sort.h"
 #include "../tlog.h"
+#include "../userdata.h"
 #include "../engine/engine.h"
 #include "../engine/text.h"
 #include "../ui/dialog.h"
@@ -361,9 +362,9 @@ static int list_fetch(void *ctx, u32 i, struct ui_item *out)
 		out->detail = lists.detail;
 		out->icon = icons[ICON_NOR];
 	} else {
-		const char *entry = p_recently_play[i];
+		const char *entry = userdata_recent_path(i);
 		out->text = entry;
-		out->icon = Recently_play_nor(entry) ? icons[ICON_NOR] : type_icon(entry);
+		out->icon = userdata_nor_name(entry) ? icons[ICON_NOR] : type_icon(entry);
 	}
 	return UI_ITEM_READY;
 }
@@ -790,7 +791,7 @@ static void show_nor(u32 at, u32 kind, s32 way)
 static void show_recent(u32 at, u32 kind, s32 way)
 {
 	go(kind, way);
-	lists.recent_count = Recently_play_load();
+	lists.recent_count = userdata_recent_count();
 	show(SCR_RECENT, at, kind, way);
 }
 
@@ -1089,8 +1090,8 @@ static void open_game(void)
 
 static void recent_open(u32 row)
 {
-	const char *entry = p_recently_play[row];
-	const char *nor = Recently_play_nor(entry);
+	const char *entry = userdata_recent_path(row);
+	const char *nor = userdata_nor_name(entry);
 	lists.recent_row = row;
 	if (nor) {
 		read_nor();
@@ -1101,7 +1102,7 @@ static void recent_open(u32 row)
 			char name[sizeof(pNorFS[0].filename)];
 			snprintf(name, sizeof(name), "%s", nor);  // the rows move as it goes
 			tlog("launch %s: not on the game NOR", name);
-			Recently_play_forget_nor(name);
+			userdata_forget_nor(name);
 			error_dialog(1, AFTER_RECENT);
 			return;
 		}
@@ -1110,7 +1111,7 @@ static void recent_open(u32 row)
 		show_recent(row, UI_TR_LEAVE, 0);
 		return;
 	}
-	const char *slash = strrchr(entry, '/');  // Recently_play_load kept only paths
+	const char *slash = strrchr(entry, '/');  // userdata_path_ok: a folder and a name that fit
 	memcpy(currentpath_temp, currentpath, MAX_path_len);
 	memset(currentpath, 0, MAX_path_len);
 	memcpy(currentpath, entry, (u32)(slash - entry));
@@ -1216,9 +1217,7 @@ static void nor_menu_a(u32 line, u32 key_l)
 // The deleted current_filename, in currentpath, comes off Recently Played
 static void recent_forget(void)
 {
-	char entry[RECENT_LEN];
-	snprintf(entry, sizeof(entry), strcmp(currentpath, "/") == 0 ? "%s%s" : "%s/%s", currentpath, current_filename);
-	Recently_play_forget(entry);
+	userdata_forget_file(currentpath, current_filename);
 }
 
 static void dialog_answer(int yes)
@@ -1247,7 +1246,7 @@ static void dialog_answer(int yes)
 			snprintf(name, sizeof(name), "%s", had ? pNorFS[had - 1].filename : "");
 			Delete_latest_NOR();
 			if (game_total_NOR < had && NOR_game_named(name) >= game_total_NOR)
-				Recently_play_forget_nor(name);
+				userdata_forget_nor(name);
 		}
 		show_nor(lists.nor_game, UI_TR_FADE, 0);
 		break;
@@ -1255,7 +1254,7 @@ static void dialog_answer(int yes)
 		if (!yes)
 			break;
 		FormatNor();  // its progress dialog shows over the list
-		Recently_play_forget_nor(NULL);  // no NOR game is left
+		userdata_forget_nor(NULL);  // no NOR game is left
 		show_nor(0, UI_TR_FADE, 0);
 		break;
 	case AFTER_BACKUP:

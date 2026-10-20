@@ -14,12 +14,16 @@
 //   jobs_run, never inside one of the operations above, so it can overlap
 //   them all. An owner that wants to keep data here across frames that run
 //   jobs must stop the asset jobs first (cover_shutdown).
+// - READCACHE_USERDATA, 32 KB: the user's lists (userdata_store.c), within
+//   one call: a list on its way between the card and PSRAM, the line read.
 // - READCACHE_SAVE, 64 KB: the SRAM on its way to a .sav (Save_savefile),
 //   clear of everything a frame writes, so its progress dialog can draw.
 #define MAX_pReadCache_size 0x20000
 #define READCACHE_STAGE 0x0
 #define READCACHE_STAGE_SIZE 0x8000
 #define READCACHE_SORT_WORK 0x800  // SORT_WORK_SIZE bytes
+#define READCACHE_USERDATA 0x8000
+#define READCACHE_USERDATA_SIZE 0x8000
 #define READCACHE_SAVE 0x10000  // 64 KB, to the end
 #define MAX_files 0x200
 #define MAX_folder 0x100

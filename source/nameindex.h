@@ -2,7 +2,7 @@
 // of any length FatFs gives (up to GAME_NAME_MAX bytes) list, open, launch
 // and save (docs/plans/v0.3-decisions.md, Text).
 //
-// The names live in the first 4 MB of PSRAM page 0 (engine/psram.h), read
+// The names live in the first 3.5 MB of PSRAM page 0 (engine/psram.h), read
 // through the 0x08800000 window: a handle is a name's offset there. Listing
 // a folder starts over (names_reset), and each name is copied in once, at
 // the slow WAITCNT, between FatFs calls (the cart hides PSRAM while SD mode
@@ -19,7 +19,7 @@
 #include "engine/psram.h"
 
 #define NAMES_BASE PSRAM_WINDOW
-#define NAMES_BYTES 0x00400000u  // up to PSRAM_ASSET_BASE, where covers start
+#define NAMES_BYTES (PSRAM_USERDATA_BASE - NAMES_BASE)  // up to the user's lists
 #define NAMES_NONE 0xFFFFFFFFu
 
 // Forgets every name (a new folder).

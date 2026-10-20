@@ -1,6 +1,8 @@
 #include "lang.h"
 #include "settings_model.h"
 
+#include "userdata.h"
+
 char *gl_init_error;
 char *gl_power_off;
 char *gl_Loading;
@@ -184,6 +186,21 @@ const char en_online_manual[] = "Online manual";
 const char en_no_game_played[] = "No game played yet";
 const char en_list_failed[] = "Can't show the list. It is tried again once this closes.";
 const char en_nor_title[] = "NOR";  // the NOR list's title bar
+
+// How long ago a game was played (userdata_ago): whole texts, or the
+// words after a number
+const char en_ago_now[] = "just now";
+const char en_ago_minutes[] = "m ago";
+const char en_ago_hours[] = "h ago";
+const char en_ago_yesterday[] = "yesterday";
+const char en_ago_days[] = " days";
+const char en_ago_week[] = "1 week";
+const char en_ago_weeks[] = " weeks";
+const char en_ago_month[] = "1 month";
+const char en_ago_months[] = " months";
+const char en_ago_year[] = "1 year";
+const char en_ago_years[] = " years";
+struct userdata_ago_words gl_ago;
 
 const char en_cart[] = "     CART";
 const char en_clock[] = "CLOCK";
@@ -385,6 +402,10 @@ void LoadEnglish(void)
 
 	gl_no_game_played = (char *)en_no_game_played;
 	gl_list_failed = (char *)en_list_failed;
+
+	gl_ago = (struct userdata_ago_words){en_ago_now,    en_ago_minutes, en_ago_hours, en_ago_yesterday,
+					     en_ago_days,   en_ago_week,    en_ago_weeks, en_ago_month,
+					     en_ago_months, en_ago_year,    en_ago_years};
 
 	gl_cart_str = (char *)en_cart;
 	gl_clock_str = (char *)en_clock;

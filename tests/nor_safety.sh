@@ -382,7 +382,7 @@ if shard_case; then
   # shellcheck disable=SC2046
   boot $(keys 100 R A _ A) -f 400
   grep -q 'mode game from NOR offset 000000$' "$cart/$runs.log" || fail "A.gba didn't start from NOR"
-  recent=$(mtype -i "$cart/sd.img" "::/SAVER/Recently play.txt" 2>/dev/null || true)
+  recent=$(mtype -i "$cart/sd.img" ::/torii/recent.txt 2>/dev/null | grep -v '^[#@]' | cut -f2 || true)
   [ "$recent" = "NOR:A.gba" ] || fail "Recently Played has '$recent', expected NOR:A.gba"
   # Confirm the save copy, then START and the first entry
   # shellcheck disable=SC2046

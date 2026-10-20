@@ -33,6 +33,7 @@
 #include "engine/cover.h"
 #include "screens/lists.h"
 #include "progress.h"
+#include "userdata.h"
 
 #include "jagoombacolor.h"
 #include "pocketnes.h"
@@ -51,7 +52,6 @@ void readcache_poison(void)
 	tlog_console("scratch free %08lX %lX", (unsigned long)pReadCache, (unsigned long)sizeof(pReadCache));
 }
 
-char p_recently_play[10][RECENT_LEN] EWRAM_BSS ALIGN(4);
 TCHAR currentpath[MAX_path_len];//
 TCHAR currentpath_temp[MAX_path_len];
 TCHAR current_filename[GAME_NAME_MAX + 1] EWRAM_BSS;
@@ -137,43 +137,6 @@ static void Boot_notice_check(void)
 	dialog_notice(NULL, gl_Loading, DIALOG_INFO);
 }
 //---------------------------------------------------------------------------------
-// Reads Recently Played into p_recently_play; returns how many rows it holds.
-u32 Recently_play_load(void)
-{
-	u32 res;
-	u32 count = 0;
-	char buf[RECENT_LEN + 1];  // the longest row and its newline
-	res = f_open(&gfile, "/SAVER/Recently play.txt", FA_READ);
-	if (res == FR_OK)//have a play file
-	{
-		f_lseek(&gfile, 0x0);
-		memset(buf, 0x00, sizeof(buf));
-		while (Read_line(buf, sizeof(buf), &gfile) != NULL) {
-			//DrawHZText12(buf, 32, 1+16, showy, name_color,1);
-			Trim(buf);
-			if (Recently_play_nor(buf)) {  // a game started from NOR
-				if (strlen(Recently_play_nor(buf)) > sizeof(pNorFS[0].filename) - 1)
-					continue;
-			} else {
-				if (buf[0] != '/')
-					break;
-				// A folder or name longer than the kernel writes (an edited
-				// file) would overrun currentpath or current_filename
-				char *slash = strrchr(buf, '/');
-				if ((u32)(slash - buf) >= MAX_path_len || strlen(slash + 1) > GAME_NAME_MAX)
-					continue;
-			}
-			memset(p_recently_play[count], 0x00, RECENT_LEN);
-			memcpy(p_recently_play[count], buf, RECENT_LEN - 1);
-			memset(buf, 0x00, sizeof(buf));
-			count++;
-			if (count == 10)
-				break;
-		}
-	}
-	f_close(&gfile);
-	return count;
-}
 //------------------------------------------------------------------
 // Which of the cart's clock and rumble motor a game can use (GAME_USES_*).
 // GBA: only Drill Dozer and WarioWare: Twisted! have rumble, and neither has a
@@ -198,124 +161,6 @@ u32 Game_hardware(u32 is_EMU, const u8 *gamecode, u8 gb_cart_type)
 	default://nes
 		return GAME_USES_CLOCK;
 	}
-}
-//---------------------------------------------------------------------------------
-// Moves entry to the top of the count rows in p_recently_play, adding it if
-// it is new and dropping the oldest row when all 10 are taken. Returns the
-// new count.
-u32 Recently_play_add(const char *entry, u32 count)
-{
-	u32 i;
-	u32 found = count;
-	for (i = 0; i < count; i++) {
-		if (strcmp(entry, p_recently_play[i]) == 0) {
-			found = i;
-			break;
-		}
-	}
-	if (found == count) {//new: take a free row, or the oldest one
-		if (count < 10)
-			count++;
-		found = count - 1;
-	}
-	for (i = found; i > 0; i--) {
-		memcpy(p_recently_play[i], p_recently_play[i - 1], RECENT_LEN);
-	}
-	memset(p_recently_play[0], 0x00, RECENT_LEN);
-	strncpy(p_recently_play[0], entry, RECENT_LEN - 1);
-	return count;
-}
-//---------------------------------------------------------------------------------
-// Drops entry from the count rows in p_recently_play, the rows under it moving
-// up. Returns the new count.
-u32 Recently_play_remove(const char *entry, u32 count)
-{
-	u32 i = 0;
-	while (i < count) {
-		if (strcmp(entry, p_recently_play[i]) == 0) {
-			count--;
-			memmove(p_recently_play[i], p_recently_play[i + 1], (count - i) * RECENT_LEN);
-			memset(p_recently_play[count], 0x00, RECENT_LEN);
-		} else {
-			i++;
-		}
-	}
-	return count;
-}
-//---------------------------------------------------------------------------------
-// Writes the count rows in p_recently_play to Recently Played's file.
-static void Recently_play_write(u32 count)
-{
-	u32 res;
-	u32 i;
-	res = f_open(&gfile, "/SAVER/Recently play.txt", FA_WRITE | FA_CREATE_ALWAYS);//truncate: the list can shrink
-	if (res == FR_OK) {
-		for (i = 0; i < count; i++) {
-			res = f_printf(&gfile, "%s\n", p_recently_play[i]);
-		}
-		f_close(&gfile);
-	}
-}
-//---------------------------------------------------------------------------------
-// Puts entry, a path or a NOR game's entry, on top of Recently Played.
-static void Recently_play_save(const char *entry)
-{
-	u32 count = Recently_play_load();
-
-	count = Recently_play_add(entry, count);
-	Recently_play_write(count);
-}
-//---------------------------------------------------------------------------------
-void Recently_play_forget(const char *entry)
-{
-	u32 count = Recently_play_load();
-	u32 left = Recently_play_remove(entry, count);
-	if (left != count) {
-		tlog("recent: forgot %s", entry);
-		Recently_play_write(left);
-	}
-}
-//---------------------------------------------------------------------------------
-void Recently_play_forget_nor(const char *name)
-{
-	u32 count = Recently_play_load();
-	u32 left = count;
-	for (u32 i = 0; i < left;) {
-		const char *nor = Recently_play_nor(p_recently_play[i]);
-		if (nor && (!name || strcmp(nor, name) == 0)) {
-			char entry[RECENT_LEN];  // a copy: the rows move up over it
-			memcpy(entry, p_recently_play[i], RECENT_LEN);
-			tlog("recent: forgot %s", entry);
-			left = Recently_play_remove(entry, left);
-		} else {
-			i++;
-		}
-	}
-	if (left != count)
-		Recently_play_write(left);
-}
-//---------------------------------------------------------------------------------
-// Recently Played's entry for file name in folder path, into buf (RECENT_LEN bytes)
-static void Recently_play_entry(char *buf, const TCHAR *path, const TCHAR *name)
-{
-	memset(buf, 0x00, RECENT_LEN);
-	snprintf(buf, RECENT_LEN, strcmp(path, "/") == 0 ? "%s%s" : "%s/%s", path, name);
-}
-//---------------------------------------------------------------------------------
-static void Make_recently_play_file(TCHAR *path, TCHAR *gamefilename)
-{
-	char buf[RECENT_LEN];
-
-	Recently_play_entry(buf, path, gamefilename);
-	Recently_play_save(buf);
-}
-//---------------------------------------------------------------------------------
-// Torii: a game started from NOR is on Recently Played as NOR:NAME, NAME its
-// list entry's file name, and starts from NOR there. Returns NAME, or NULL
-// for an SD path.
-const char *Recently_play_nor(const char *entry)
-{
-	return strncmp(entry, RECENT_NOR, sizeof(RECENT_NOR) - 1) == 0 ? entry + sizeof(RECENT_NOR) - 1 : NULL;
 }
 //---------------------------------------------------------------------------------
 // The game NOR list's game named name, or game_total_NOR if none.
@@ -1314,6 +1159,7 @@ static void Launch_now(u16 page, u32 key_L, const char *how)
 	// point, and the cache in PSRAM is forgotten (the SD paths did so before
 	// loading; a second call does nothing)
 	cover_cache_invalidate();
+	userdata_invalidate();
 	if (tlog_wants(TLOG_INFO)) {
 		tlog("launch: %s, %s reset", how, key_L ? "hard (L held)" : "soft");
 		static const char *const uses[] = {"neither", "the clock", "rumble", "the clock and rumble"};
@@ -1381,9 +1227,9 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 		return;
 	}
 	{
-		char entry[sizeof(RECENT_NOR) + sizeof(pNorFS[0].filename)];
-		snprintf(entry, sizeof(entry), RECENT_NOR "%.99s", pfilename);
-		Recently_play_save(entry);
+		char entry[sizeof(USERDATA_NOR) + sizeof(pNorFS[0].filename)];
+		snprintf(entry, sizeof(entry), USERDATA_NOR "%.99s", pfilename);
+		userdata_recent_add(entry);
 	}
 
 	Set_64MROM_flag(pNorFS[show_offset + file_select].is_64MBrom);
@@ -1477,11 +1323,8 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 		// that is gone comes off Recently Played (not on a card error,
 		// which may pass)
 		tlog("launch %s: can't open it (FatFs %lu)", pfilename, (unsigned long)res);
-		if (res == FR_NO_FILE || res == FR_NO_PATH) {
-			char entry[RECENT_LEN];
-			Recently_play_entry(entry, currentpath, pfilename);
-			Recently_play_forget(entry);
-		}
+		if (res == FR_NO_FILE || res == FR_NO_PATH)
+			userdata_forget_file(currentpath, pfilename);
 		Show_error_num(1);
 		return 0;
 	}
@@ -1520,8 +1363,10 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 			Show_error_num(error_num);
 			return 0;
 		}
-		Make_recently_play_file(currentpath, pfilename);  //make txt in /SAVER
+		userdata_recent_add_file(currentpath, pfilename);
 	}
+	// From here the launch may fill PSRAM, where the user's lists are
+	userdata_invalidate();
 
 	if (is_EMU)  //boot emu game
 	{

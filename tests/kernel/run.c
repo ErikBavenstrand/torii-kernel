@@ -29,9 +29,6 @@ static const struct {
 	{"settings_model_round_trip", test_settings_model_round_trip},
 	{"sort_by_name", test_sort_by_name},
 	{"sort_full_list", test_sort_full_list},
-	{"recently_played", test_recently_played},
-	{"recently_played_nor", test_recently_played_nor},
-	{"recently_played_remove", test_recently_played_remove},
 	{"nor_info_stays_in_bounds", test_nor_info_stays_in_bounds},
 	{"nor_write_refused_when_list_full", test_nor_write_refused_when_list_full},
 	{"nor_scan_keeps_interrupts", test_nor_scan_keeps_interrupts},
@@ -71,6 +68,10 @@ static const struct {
 	{"asset_psram_round_trip", test_asset_psram_round_trip},
 	{"asset_sd_read", test_asset_sd_read},
 	{"asset_cover_cache", test_asset_cover_cache},
+	// The user's lists on the card: on test files, never the user's
+	{"safefile", test_safefile},
+	{"userdata_recent_store", test_userdata_recent_store},
+	{"userdata_fav_store", test_userdata_fav_store},
 };
 
 int torii_unit_tests(void)
