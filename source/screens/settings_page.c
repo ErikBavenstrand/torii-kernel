@@ -956,9 +956,10 @@ static void settings_poll(void)
 		return;
 	u8 list = node(N_LIST);
 	if (sp.redraw) {
-		// leave ended an edit and an action left the page up
+		// leave ended an edit (perhaps put the LED back on) and an action
+		// left the page up: laid out and drawn again
 		sp.redraw = 0;
-		ui_list_refresh(list, 0, sp.lay.count);
+		relayout();
 		hints_show();
 	}
 	if (sp.mode == MODE_CAPTURE) {
@@ -980,8 +981,10 @@ static void settings_poll(void)
 			if ((left * look.bar_w + sp.cap.timeout - 1) / sp.cap.timeout != sp.bar_fill)
 				hints_show();
 		}
-	} else if (sp.refused_left && !--sp.refused_left) {
-		hints_show();
+	} else if (sp.refused_left) {
+		sp.refused_left--;
+		if (!sp.refused_left)
+			hints_show();  // the explanation back
 	}
 	if (sp.scanning && !library_busy()) {
 		sp.scanning = 0;

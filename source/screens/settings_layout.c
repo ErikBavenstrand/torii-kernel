@@ -35,10 +35,11 @@ u32 settings_layout_slot_of(const struct settings_layout *l, u32 id)
 
 u32 settings_layout_row_at(const struct settings_layout *l, u32 s)
 {
-	for (u32 i = s; i < l->count; i++)
+	u32 n = l->count < SET_LAYOUT_SLOTS ? l->count : SET_LAYOUT_SLOTS;
+	for (u32 i = s; i < n; i++)
 		if (l->slot[i].kind == SET_SLOT_ROW)
 			return i;
-	for (u32 i = s < l->count ? s : l->count; i-- > 0;)
+	for (u32 i = s < n ? s : n; i-- > 0;)
 		if (l->slot[i].kind == SET_SLOT_ROW)
 			return i;
 	return 0;
@@ -56,9 +57,10 @@ u32 settings_layout_step(const struct settings_layout *l, u32 s, int dir, int wr
 {
 	if (!l->rows)
 		return s;
-	for (u32 i = s + (dir > 0 ? 1 : (u32)-1); i < l->count; i += dir > 0 ? 1 : (u32)-1)
+	s32 n = l->count < SET_LAYOUT_SLOTS ? l->count : SET_LAYOUT_SLOTS, step = dir > 0 ? 1 : -1;
+	for (s32 i = (s32)s + step; i >= 0 && i < n; i += step)
 		if (l->slot[i].kind == SET_SLOT_ROW)
-			return i;
+			return (u32)i;
 	if (!wrap)
 		return s;
 	return dir > 0 ? settings_layout_row_at(l, 0) : settings_layout_row_at(l, l->count - 1);
