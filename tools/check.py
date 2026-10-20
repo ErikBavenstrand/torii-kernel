@@ -61,6 +61,8 @@ NO_COMPAT = {
     "source/engine/text.h",
     "source/engine/text_blit.s",
     "source/engine/text_layout.c",
+    "source/gamename.c",
+    "source/gamename.h",
     "source/helpwindow.c",
     "source/ui/ring.h",
     "source/ui/ui.h",

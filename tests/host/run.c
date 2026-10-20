@@ -142,6 +142,15 @@ static const struct {
 	{"cover_cache_wants", test_cover_cache_wants},
 	{"cover_cache_eviction", test_cover_cache_eviction},
 	{"affine_rotscale", test_affine_rotscale},
+	{"gamename_clean_real_names", test_gamename_clean_real_names},
+	{"gamename_clean_rules", test_gamename_clean_rules},
+	{"gamename_clean_limits", test_gamename_clean_limits},
+	{"gamename_dedupe", test_gamename_dedupe},
+	{"gamename_custom_parse", test_gamename_custom_parse},
+	{"gamename_custom_set", test_gamename_custom_set},
+	{"gamename_custom_io", test_gamename_custom_io},
+	{"gamename_display", test_gamename_display},
+	{"gamename_hidden", test_gamename_hidden},
 };
 
 int main(void)
