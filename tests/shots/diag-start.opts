@@ -1,5 +1,6 @@
 # Diagnostics' first page: DIAGNOSE, the last row of SETTINGS page 2 (DOWN
-# nine times: BREATHING and SD LED are rows while the LED is on).
+# nine times, the last staying on it: BREATHING and SD LED are rows while
+# the LED is on).
 -w "screen ready: sd-list"
 -k @8:R -k @12:-
 -w "screen ready: nor-list"

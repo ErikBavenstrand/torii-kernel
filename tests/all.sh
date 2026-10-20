@@ -25,7 +25,6 @@ jobs=(
   "tests/crash.sh"
   "tests/state.sh"
   "tests/settings.sh"
-  "tests/themes.sh"
   "tests/menu.sh"
   "tests/scan_engine.sh"
   "tests/nes.sh"

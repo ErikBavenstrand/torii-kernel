@@ -51,6 +51,7 @@
 #include "../engine/font.h"
 #include "../engine/input.h"
 #include "../engine/motion.h"
+#include "palette.h"
 
 // --- Caps --------------------------------------------------------------------
 // Hitting one makes ui_push fail with a readable error (ui_error()).
@@ -65,72 +66,62 @@
 // --- Palette roles -----------------------------------------------------------
 // Widgets draw with palette indices, never colours: a theme maps each index
 // (a role) to a colour, so retheming is a palette change and nothing is
-// redrawn. Bank 0 holds the normal colours; bank 1 is the same roles as a
-// selected row shows them (behind it the selection colour, text on it the
-// selection's text colour). Indices 10-15 are icon colours, the same in
-// both banks.
+// redrawn. The UI owns BG banks 0-3 (UI_BANKS). Every bank holds the
+// theme's neutral surfaces (palette.json's names in brackets) at indices
+// 1-8, so paper and text look the same in any bank; 9-15 are the bank's own.
 enum ui_role {
 	UI_ROLE_NONE = 0,  // transparent
-	UI_ROLE_BG,        // the screen's background
-	UI_ROLE_PANEL,     // panels, title bars, dialogs
-	UI_ROLE_TEXT,
-	UI_ROLE_DIM,       // secondary text: sizes, hints
-	UI_ROLE_ACCENT,    // highlights, progress fill, scroll bar thumb
-	UI_ROLE_ACCENT_TEXT,  // text on the accent colour
-	UI_ROLE_BORDER,    // panel outlines
-	UI_ROLE_TRACK,     // the empty part of a progress or scroll bar
-	UI_ROLE_SHADOW,
-	UI_ROLES,
-	UI_ROLE_ICON = 10,  // first of the 6 icon colours
+	UI_ROLE_BG,        // the page's paper [bg]
+	UI_ROLE_PANEL,     // cards [card]
+	UI_ROLE_BORDER,    // card hairlines [edge]
+	UI_ROLE_SHADOW,    // card shadows [shadow]
+	UI_ROLE_TRACK,     // key chips, empty bars [soft]
+	UI_ROLE_TEXT,      // [ink]
+	UI_ROLE_DIM,       // secondary text: sizes, values [ink2]
+	UI_ROLE_FAINT,     // hint labels, disabled text [ink3]
+	// Banks 0 and 1: the current item's accent (ui_item_set), and more
+	UI_ROLE_ACCENT,       // 16x16 icons, scroll bar thumb, bars, solid buttons [base]
+	UI_ROLE_TINT,         // the selection pill [tint]
+	UI_ROLE_ACCENT_INK,   // 8x8 icons, section labels, stars, marks [ink]; never base
+	UI_ROLE_ACCENT_TEXT,  // text on an ACCENT fill [on]
+	UI_ROLE_GROUND,       // the carousel backdrop: bg with backdrop_mix of base
+	UI_ROLE_DANGER,       // Delete, Format, failures: the danger item's ink
+	UI_ROLE_FLOAT,        // popups and confirmations: card with float_mix of ink
+	// Bank 2: the console inks, for the marks of Recent's and Favourites' rows
+	UI_ROLE_INK_GBA = UI_ROLE_ACCENT,
+	UI_ROLE_INK_GBC,
+	UI_ROLE_INK_GB,
+	UI_ROLE_INK_NES,
+	// Bank 3: danger and the NOR storage bar
+	UI_ROLE_ALERT_INK = UI_ROLE_ACCENT,  // the danger item's ink
+	UI_ROLE_ALERT_TINT,                  // and its tint
+	UI_ROLE_NOR_FILL,                    // used space, one shade a game: NOR's base,
+	UI_ROLE_NOR_FILL_MID,                // then bar_shade_mix of card,
+	UI_ROLE_NOR_FILL_LIGHT,              // then twice that
+	UI_ROLE_NOR_INK,
 };
-#define UI_BANK_NORMAL 0
-#define UI_BANK_SELECTED 1
+enum ui_bank {
+	UI_BANK_NORMAL,    // neutrals and the current item
+	UI_BANK_SELECTED,  // the same, with BG and PANEL the item's tint: a
+			   // row swapped into it shows the selection pill
+	UI_BANK_CONSOLES,  // neutrals and the console inks
+	UI_BANK_ALERT,     // neutrals, danger and the NOR bar
+	UI_BANKS,
+};
+// The colours a theme switch changes in BG palette RAM: one contiguous run,
+// so the theme wipe (B19, research override R7) can swap it in one HBlank
+// DMA (32 words). The UI's banks are always banks 0-3 (ui_init), nothing in
+// them is the same in both themes worth leaving out, and nothing outside them
+// depends on the theme. OBJ colours that follow the theme (the carousel's fog)
+// go in a contiguous run of OBJ banks of their own (B12).
+#define UI_THEME_RUN_FIRST 0
+#define UI_THEME_RUN_COLOURS (UI_BANKS * 16)
 
 // --- Themes ------------------------------------------------------------------
-
-// The theme's colours (RGB15). Bank 0 takes BG to SHADOW at their role's
-// index; bank 1 maps BG and PANEL to SELECTION, TEXT and ACCENT to
-// SELECTION_TEXT, and DIM to a mix of the two.
-enum ui_colour {
-	UI_C_BG,
-	UI_C_PANEL,
-	UI_C_TEXT,
-	UI_C_DIM,
-	UI_C_ACCENT,
-	UI_C_ACCENT_TEXT,
-	UI_C_BORDER,
-	UI_C_TRACK,
-	UI_C_SHADOW,
-	UI_C_SELECTION,       // behind the selected row
-	UI_C_SELECTION_TEXT,  // text on it
-	UI_C_ICON,            // 6 icon colours, palette indices 10-15
-	UI_COLOURS = UI_C_ICON + 6,
-};
-
-// Layout patches: a theme moves, resizes, hides or recolours a node of a
-// built-in layout without code. A patch names the view (ui_view_spec.id),
-// the node (ui_spec.id) and one field of this closed set, and replaces the
-// spec's value when the view is pushed (inks when drawn).
-enum ui_field {
-	UI_FIELD_X,       // the spec's x (pixels, a multiple of 8)
-	UI_FIELD_Y,
-	UI_FIELD_W,
-	UI_FIELD_H,
-	UI_FIELD_ANCHOR,  // UI_LEFT ... | UI_TOP ...
-	UI_FIELD_HIDDEN,  // 1: not shown
-	UI_FIELD_INK,     // a ui_role
-	UI_FIELD_PAPER,   // a ui_role
-	UI_FIELDS,
-};
-#define UI_PATCH_CAP 16
-
-struct ui_patch {
-	u8 view;   // ui_view_spec.id
-	u8 node;   // ui_spec.id
-	u8 field;  // ui_field
-	u8 pad;
-	s16 value;
-};
+// Two built-in themes, light and dark, with one layout: switching between
+// them is a palette change. Their colours are docs/design/v0.4/palette.json
+// (ui/palette.h, generated); their sizes and motions are the shared look of
+// docs/design/v0.4/spec.md, in one place so a tweak is a one-line change.
 
 // Screen transitions (ui_leave): the screen shown goes out, then the next one
 // comes in, each an eased step of a few frames. Two screens can't share
@@ -160,9 +151,69 @@ struct ui_transition {
 	u8 px;       // how far a slide goes
 };
 
-// A theme, in ROM (the built-ins) or RAM (T14's theme.ini). Fields:
+// The Paper clean look's sizes, in px (spec.md's grid)
+struct ui_look {
+	u8 margin;          // outer margin
+	u8 title_h;         // the title bar, from the top
+	u8 title_icon_x;    // its 16x16 icon
+	u8 title_icon_y;
+	u8 title_text_x;    // its heading
+	u8 title_right;     // where the position or clock ends
+	u8 content_top;     // the page between the title and hint bars
+	u8 content_bottom;  // its last row
+	u8 list_rows;       // rows in a list card
+	u8 list_pitch;      // a list row's height
+	u8 settings_pitch;  // a Settings row's height
+	u8 pill_h;          // the selection pill's height, in its row
+	u8 pill_radius;
+	u8 card_radius;
+	u8 button_radius;
+	u8 edge;            // a card's hairline
+	u8 shadow_offset;   // how far a card's shadow falls, down and right
+	u8 scrollbar_w;
+	u8 hint_y;          // the hint bar's key chips
+	u8 hint_chip_h;
+	u8 hint_chip_radius;
+	u8 hint_chip_pad;   // across, each side of the key's name
+	u8 hint_label_gap;  // between a chip and its label
+	u8 hint_gap;        // between one hint and the next
+	u8 hint_max;        // hints in the bar
+};
+
+// A motion: how many frames it takes (60 a second) and its curve (Ease)
+struct ui_move {
+	u8 frames;
+	u8 ease;
+};
+
+// Every motion of the new menu (spec.md, "Motion"; motion.png)
+struct ui_motions {
+	struct ui_move step;         // the carousel turning one item
+	u8 label_slide;              // px its label slides while it fades
+	struct ui_move open;         // opening an item, start to end
+	u8 open_zoom_end;            // the frame the zoom and fog end and the card starts
+	u16 open_zoom;               // the front object's scale at the zoom's end, in 256ths
+	u8 open_rise;                // px the page card rises while it fades in
+	struct ui_move open_card;    // its rise and fade
+	struct ui_move close;        // B: the open played backwards
+	struct ui_move popup_open;   // a popup opening from its row
+	struct ui_move popup_close;
+	u8 popup_slide;              // px it slides in from
+	struct ui_move theme_wipe;   // the top-down switch between light and dark
+	u8 wipe_edge;                // px of its dithered edge
+};
+
+// A theme, in ROM. Fields:
 //   name                for settings and logs
-//   colour[UI_COLOURS]  RGB15, see ui_colour
+//   surface, accent     its colours in ui/palette.h: the surfaces, and each
+//                       item's accent (accent[enum pal_item])
+//   pill_mix            how much of base an accent's tint mixes into a card,
+//                       in 256ths (palette.json's; the tints are made with it)
+//   backdrop_mix        how much of the item's base the carousel backdrop
+//                       mixes into bg (GROUND), in 256ths
+//   float_mix           how much ink a popup's card mixes in (FLOAT), in 256ths
+//   bar_shade_mix       how much card each next shade of the NOR bar mixes in
+//   look, motion        the shared sizes and motions
 //   body, heading       fonts for rows and labels, and for titles
 //   row_h               list row height, 16 or 32 px
 //   pad                 text inset from a row's or label's edges, px
@@ -182,10 +233,16 @@ struct ui_transition {
 //                       (0: it just shows)
 //   transition          how screens replace each other, per ui_tr_kind (ui_leave)
 //   input               key repeat and wrap timings (engine/input.h)
-//   patches             layout patches, patch_count of them
 struct ui_theme {
 	const char *name;
-	u16 colour[UI_COLOURS];
+	u8 pill_mix;
+	u8 backdrop_mix;
+	u8 float_mix;
+	u8 bar_shade_mix;
+	const struct pal_surfaces *surface;
+	const struct pal_accent *accent;
+	struct ui_look look;
+	struct ui_motions motion;
 	const struct torii_font *body;
 	const struct torii_font *heading;
 	u8 row_h;
@@ -199,43 +256,39 @@ struct ui_theme {
 	u8 marquee_pause;
 	u8 marquee_gap;
 	u8 page_fade;
-	u8 patch_count;
 	u8 dialog_in;
 	u8 dialog_out;
 	struct ui_transition transition[UI_TR_KINDS];
 	InputTiming input;
-	struct ui_patch patches[UI_PATCH_CAP];
 };
 
 extern const struct ui_theme ui_theme_dark;   // the default
 extern const struct ui_theme ui_theme_light;
 
-// Accent colours: palette swaps of a theme's accent and selection colours.
-#define UI_ACCENT_THEME 0xFFFF  // the theme's own
-struct ui_accent {
-	const char *name;
-	u16 colour;
-};
-extern const struct ui_accent ui_accents[];
-extern const u32 ui_accent_count;
+// The item whose accent colours the menu until a screen picks one
+#define UI_ITEM_DEFAULT PAL_SD
 
-// The two palette banks (32 colours) a theme and accent give. Hardware-free.
-void ui_theme_palette(const struct ui_theme *theme, u16 accent, u16 out[32]);
-// The value a theme patches field of node in view to, into *value; 0 if
-// none does (the last matching patch wins).
-int ui_theme_patch(const struct ui_theme *theme, u8 view, u8 node, u8 field, s16 *value);
+// The UI's palette banks (UI_BANKS x 16 colours) for theme with item's
+// accent (enum pal_item). Hardware-free.
+void ui_theme_banks(const struct ui_theme *theme, u32 item, u16 out[UI_BANKS * 16]);
+// a mixed with amount/256 of b, per 5-bit channel, rounded. Hardware-free.
+u16 ui_colour_mix(u16 a, u16 b, u32 amount);
 
-// Records theme and accent as the current ones, without touching the
-// palette (hardware-free: ui_theme_set does both).
-void ui_theme_select(const struct ui_theme *theme, u16 accent);
-// Makes theme (with accent, or UI_ACCENT_THEME) the current one: a palette
-// change, committed in the next VBlank; nothing is redrawn. Switch only
-// between themes with the same fonts, row height and pad while views are
-// up (the built-ins are): text already drawn keeps the old metrics, and
-// patches and row heights apply to views pushed after.
-void ui_theme_set(const struct ui_theme *theme, u16 accent);
+// Records theme as the current one, without touching the palette
+// (hardware-free: ui_theme_set does both).
+void ui_theme_select(const struct ui_theme *theme);
+// Records item (enum pal_item) as the current one, the same way
+// (ui_item_set does both).
+void ui_item_select(u32 item);
+// Makes theme the current one: a palette change, committed in the next
+// VBlank; nothing is redrawn. The built-ins share their fonts and layout,
+// so they can switch while views are up.
+void ui_theme_set(const struct ui_theme *theme);
+// Makes item's accent the current one: loads banks 0 and 1 (32 colours, 14
+// of them the item's) in the next VBlank; nothing is redrawn.
+void ui_item_set(u32 item);
 const struct ui_theme *ui_theme(void);
-u16 ui_accent(void);
+u32 ui_item(void);
 
 // --- Layouts -----------------------------------------------------------------
 
@@ -277,7 +330,7 @@ enum {
 // One widget of a layout, in ROM. Parents come before their children.
 struct ui_spec {
 	u8 kind;     // ui_kind
-	u8 id;       // for patches and ui_find: unique in its layout, 0 none
+	u8 id;       // for ui_find: unique in its layout, 0 none
 	u8 parent;   // index in the same array, UI_NONE: the screen
 	u8 plane;    // BG 0-3
 	u8 anchor;
@@ -296,7 +349,7 @@ struct ui_view_spec {
 	const char *name;  // logged as "screen ready: NAME" once shown
 	const struct ui_spec *nodes;
 	u8 count;
-	u8 id;       // for patches, 0 none
+	u8 id;       // unused since SD themes went (B10 drops it with the old screens)
 	u8 focus;    // index of the node focused first, UI_NONE none
 	u8 flags;    // UI_VIEW_*
 	// The screen's logic: keys no widget took, and widgets' events.
@@ -408,7 +461,7 @@ struct ui_scrollbar_config {
 // --- Views and nodes ------------------------------------------------------
 
 struct ui_node {
-	s16 x, y, w, h;  // on screen, after patches and anchors
+	s16 x, y, w, h;  // on screen, after anchors
 	u8 view;         // its view's depth in the stack
 	u8 parent, child, next;  // pool indices, UI_NONE
 	u8 flags;        // UI_N_*
@@ -470,15 +523,12 @@ struct ui_event {
 // --- The stack -------------------------------------------------------------
 
 // Sets up the UI on the engine (call engine_init first): palette banks, the
-// staging area, the input state, with theme (NULL: the THEME and ACCENT
-// settings, ui_theme_setting).
+// staging area, the input state, with theme (NULL: the THEME setting,
+// ui_theme_setting).
 void ui_init(const struct ui_theme *theme);
-// The theme and accent the THEME and ACCENT settings pick (settings slots
-// assress_theme, 1 for light, and assress_accent, 1 + an index into
-// ui_accents; erased or unknown values give the dark theme with its own
-// accent). *accent gets what ui_theme_set takes: the accent's colour, or
-// UI_ACCENT_THEME.
-const struct ui_theme *ui_theme_setting(u16 *accent);
+// The theme the THEME setting picks (settings slot assress_theme: 1 light,
+// anything else dark).
+const struct ui_theme *ui_theme_setting(void);
 // Pops every view and releases the UI's resources.
 void ui_shutdown(void);
 
@@ -651,7 +701,7 @@ struct ui_ops {
 extern const struct ui_ops *const ui_kind_ops[UI_KINDS];
 
 void ui_set_error(const char *format, ...) __attribute__((format(printf, 1, 2)));
-// The node's ink or paper role, after patches; def if the spec says 0.
+// The node's ink or paper role; def if the spec says 0.
 u8 ui_ink(u8 node, u8 def);
 u8 ui_paper(u8 node, u8 def);
 // Wakes the frame (frame_wake; a stub in tests/host).
@@ -684,7 +734,7 @@ void ui_apply_pops(void);
 u32 ui_arena_used(void);
 u32 ui_nodes_used(void);
 
-// Resolves a spec's rectangle against its parent's, with patches.
-void ui_layout(const struct ui_spec *spec, u8 view_id, const struct ui_node *parent, struct ui_node *out);
+// Resolves a spec's rectangle against its parent's.
+void ui_layout(const struct ui_spec *spec, const struct ui_node *parent, struct ui_node *out);
 
 #endif

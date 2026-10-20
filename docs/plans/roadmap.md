@@ -295,7 +295,7 @@ Planned in the interview and design rounds of 2026-10-19 and 2026-10-20. [v0.4-d
     - A true cross-fade between screens needs both resident; today they fade through the background (F2).
     - Mosaic transitions exist but no theme or golden uses them (F2).
     - Parent/child transitions could scale, with affine BGs or sprites (F2).
-    - The `KIND_effects` theme key could take names (`fade+slide_x`) instead of a bitmask (F2).
+    - ~~The `KIND_effects` theme key could take names (`fade+slide_x`) instead of a bitmask (F2).~~ Closed in v0.4: SD themes and `theme.ini` were dropped (E8, B1).
     - Dialogs in a session of their own (launch, firmware) appear without motion, and dialogs popped by a screen change pop without motion (F2).
     - A menu that comes up with its screen shows at full brightness over a list fading in (F2).
   - **Data:**
@@ -336,7 +336,6 @@ Everything the kernel stores lives under `/torii/`. ROMs can be anywhere.
   backups/<rom path>/<slot>/<timestamp>.sav
   games/<code>-<crc>.ini  per-game overrides (save type, RTC, cheats)
   art/<system>/{title,box}/<code or name>.lz
-  themes/<name>/theme.ini + assets
   lang/<code>.lng
   plugins/plugins.ini + emulator binaries
   cheats/<code>.cht

@@ -7,9 +7,7 @@
 //   d-pad, L/R  move and page (wrapping at the ends on a fresh press)
 //   A           a dialog for the item (A or B closes it)
 //   SELECT      the grid, and back
-//   START       the next theme and accent, through a fade
-// With R held as well on the cart, it starts in the SD theme "example"
-// (tests/shots/ui-sd-theme.opts).
+//   START       the next theme and item accent, through a fade
 // It logs "screen ready: ui-demo", "ui-dialog", "ui-grid" (tests/shots
 // ui-*.opts) and frame-cycles figures for scrolling, page changes, the
 // dialog and switching screens (tests/perf/budget.txt).
@@ -22,8 +20,6 @@
 #include "ui_demo.h"
 #include "../../source/cartlog.h"
 #include "../../source/engine/engine.h"
-#include "ff.h"
-#include "../../source/ui/sdtheme.h"
 #include "../../source/ui/ui.h"
 #include "../../source/waitcnt.h"
 
@@ -119,7 +115,12 @@ static int grid_fetch(void *ctx, u32 i, struct ui_item *out)
 static const struct ui_list_model demo_model = {demo_count, demo_fetch, 0};
 static const struct ui_list_model grid_model = {demo_count, grid_fetch, 0};
 
-// 16x16 icons in colours 10-15: a folder, a cartridge, a handheld, a disc
+// The art's letters: A amber, B purple, C green, D red, E light, F dark, as
+// the item's colours until the new icons replace these (ui.h roles)
+static const u8 icon_ink[6] = {UI_ROLE_ACCENT, UI_ROLE_ACCENT_INK, UI_ROLE_ACCENT_INK,
+			       UI_ROLE_DANGER, UI_ROLE_PANEL,      UI_ROLE_TEXT};
+
+// 16x16 icons: a folder, a cartridge, a handheld, a disc
 static void make_icons(void)
 {
 	static const char *const art[4] = {
@@ -195,7 +196,7 @@ static void make_icons(void)
 				u32 row = 0;
 				for (u32 x = 0; x < 8; x++) {
 					char c = art[k][(ty * 8 + y) * 16 + tx * 8 + x];
-					u32 index = c == '.' ? 0 : (u32)(UI_ROLE_ICON + (c - 'A'));
+					u32 index = c == '.' ? 0 : icon_ink[c - 'A'];
 					row |= index << (4 * x);
 				}
 				icons[k][t * 8 + y] = row;
@@ -305,12 +306,12 @@ static const struct ui_view_spec grid_view = {"ui-grid", grid_nodes, 5, 3, 2, 0,
 
 static const struct {
 	const struct ui_theme *theme;
-	u32 accent;  // index in ui_accents, or ITEMS for the theme's own
+	u32 item;  // whose accent (enum pal_item)
 } looks[] = {
-	{&ui_theme_dark, ITEMS},
-	{&ui_theme_light, ITEMS},
-	{&ui_theme_dark, 3},
-	{&ui_theme_light, 1},
+	{&ui_theme_dark, UI_ITEM_DEFAULT},
+	{&ui_theme_light, UI_ITEM_DEFAULT},
+	{&ui_theme_dark, PAL_RECENT},
+	{&ui_theme_light, PAL_GBC},
 };
 
 static int list_event(struct ui_view *v, const struct ui_event *e)
@@ -367,11 +368,11 @@ static void theme_step(void)
 	if (!demo.fading || ui_fading())
 		return;
 	demo.theme = (demo.theme + 1) % (sizeof(looks) / sizeof(looks[0]));
-	u32 a = looks[demo.theme].accent;
-	ui_theme_set(looks[demo.theme].theme, a < ui_accent_count ? ui_accents[a].colour : UI_ACCENT_THEME);
+	ui_theme_set(looks[demo.theme].theme);
+	ui_item_set(looks[demo.theme].item);
 	ui_fade(FADE_BLACK, 0, 6);
 	demo.fading = 0;
-	tlog("ui-demo: theme %s, accent %s", ui_theme()->name, a < ui_accent_count ? ui_accents[a].name : "own");
+	tlog("ui-demo: theme %s, item %lu", ui_theme()->name, (unsigned long)ui_item());
 }
 
 static void switch_screen(void)
@@ -384,30 +385,14 @@ static void switch_screen(void)
 	measure("ui-screen-switch", 3);
 }
 
-extern FATFS EZcardFs;
-
 void ui_demo(void)
-{
-	ui_demo_theme(0);
-}
-
-void ui_demo_theme(const char *sd_theme)
 {
 	REG_WAITCNT_CART = WAITCNT_MENU;  // as the menu runs
 	irqInit();
 	cartlog_install();
-	const struct ui_theme *theme = &ui_theme_dark;
-	if (sd_theme) {
-		const struct ui_theme *t = 0;
-		if (EZcardFs.fs_type || f_mount(&EZcardFs, "", 1) == FR_OK)
-			t = ui_theme_load(sd_theme);
-		if (t)
-			theme = t;
-		else
-			tlog_error("ui-demo: %s", ui_theme_error());
-	}
 	engine_init();
-	ui_init(theme);
+	ui_init(&ui_theme_dark);
+	ui_item_set(UI_ITEM_DEFAULT);
 	memset(&demo, 0, sizeof(demo));
 	make_icons();
 	ui_dim_set_frames(20 * 60);

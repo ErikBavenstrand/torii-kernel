@@ -7,7 +7,6 @@
 with the GBA BIOS's LZ77, plus a palette.
 
 usage: asset.py encode IN.png OUT.tas [--bpp 4|8] [--dither]
-       asset.py wallpaper IN.png OUT.tas [--dither]
        asset.py info FILE.tas...
        asset.py demo [--check]
 
@@ -18,9 +17,6 @@ up to 255, in order of first appearance. A picture with more is reduced to
 that many (median cut; --dither spreads the error, Floyd-Steinberg). An
 indexed PNG whose pixels all use the first 16 (or 256) entries is taken as
 it is: its indices are kept, and index 0 is transparent.
-
-wallpaper: encode for an SD theme's [wallpaper] (docs/themes.md): 4bpp, at
-most THEME_WALLPAPER_TILES tiles (source/ui/theme_ini.h).
 
 info: prints each asset's header and checks that its tiles decode.
 
@@ -55,11 +51,9 @@ def c_defines(header: Path) -> dict[str, int]:
 
 
 _ASSET_H = c_defines(ROOT / "source" / "engine" / "asset.h")
-_THEME_H = c_defines(ROOT / "source" / "ui" / "theme_ini.h")
 TILE_BYTES_MAX = _ASSET_H["ASSET_TILE_BYTES_MAX"]
 FILE_MAX = _ASSET_H["ASSET_FILE_MAX"]
 TILES_PER_SIDE_MAX = _ASSET_H["ASSET_MAX_TILES_PER_SIDE"]
-WALLPAPER_TILES = _THEME_H["THEME_WALLPAPER_TILES"]
 assert _ASSET_H["ASSET_HEADER_BYTES"] == HEADER.size
 
 
@@ -267,23 +261,6 @@ def encode_png(path: Path, bpp: int, dither: bool = False) -> bytes:
     return make_asset(pixels, palette, bpp)
 
 
-def encode_wallpaper(path: Path, dither: bool = False) -> tuple[bytes, str]:
-    """A theme's wallpaper asset and a line describing it."""
-    pixels, palette, note = png_pixels(path, 4, dither)
-    h, w = len(pixels), len(pixels[0])
-    tiles = (w // 8) * (h // 8)
-    if w % 8 == 0 and h % 8 == 0 and tiles > WALLPAPER_TILES:
-        raise ValueError(
-            f"{w}x{h} px is {tiles} tiles; a wallpaper takes {WALLPAPER_TILES} (e.g. 128x128)"
-        )
-    asset = make_asset(pixels, palette, 4)
-    return asset, (
-        f"{w}x{h} px, {tiles} of {WALLPAPER_TILES} tiles, {len(palette) - 1} colours"
-        + (f" ({note})" if note else "")
-        + f", {len(asset)} of {FILE_MAX} bytes"
-    )
-
-
 # --- The demo and test assets ---------------------------------------------------
 
 # 3x5 digits, a row a string
@@ -418,18 +395,6 @@ def main(argv: list[str]) -> int:
         except OSError as e:  # missing, unreadable or not a picture; can't write
             print(f"asset.py: {e}")
             return 1
-        return 0
-    if len(argv) == 3 and argv[0] == "wallpaper":
-        try:
-            asset, line = encode_wallpaper(Path(argv[1]), dither)
-            Path(argv[2]).write_bytes(asset)
-        except ValueError as e:
-            print(f"{argv[1]}: {e}")
-            return 1
-        except OSError as e:
-            print(f"asset.py: {e}")
-            return 1
-        print(f"{argv[2]}: {line}")
         return 0
     if len(argv) >= 2 and argv[0] == "info":
         failed = 0

@@ -3,7 +3,7 @@
 // struct between steps.
 //
 //	static struct sd_read r EWRAM_BSS;  // ~580 bytes: it holds a FIL
-//	sd_read_start(&r, "/themes/x/bg.tas", dst, max, 4096, owner);
+//	sd_read_start(&r, "/torii/art/x.tas", dst, max, 4096, owner);
 //	... later: r.result is SD_READ_OK (r.size bytes at dst) or an error
 //
 // The first step opens the file, each later one reads chunk bytes, and the

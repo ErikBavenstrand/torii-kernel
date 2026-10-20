@@ -64,6 +64,8 @@ NO_COMPAT = {
     "source/gamename.c",
     "source/gamename.h",
     "source/helpwindow.c",
+    "source/ui/palette.c",
+    "source/ui/palette.h",
     "source/ui/ring.h",
     "source/ui/ui.h",
     "source/ui/ui_core.c",
@@ -77,6 +79,11 @@ NO_COMPAT = {
 
 # (patterns, tiers, why): fnmatch patterns, where "*" also matches "/"
 RULES = [
+    (
+        ["docs/design/v0.4/palette.json", "tools/palette.py"],
+        {LINT, TEST_HOST},
+        "palette source, whose generated C test-host checks",
+    ),
     (["*.md", "docs/*", "LICENSE", "*.pdf"], {LINT}, "documentation"),
     ([".github/*"], {LINT}, "workflow, checked by actionlint"),
     (
@@ -103,11 +110,6 @@ RULES = [
     ),
     (["roms/games.example.toml"], {LINT}, "example config"),
     (
-        ["themes/*"],
-        {LINT, TEST_HOST, TEST},
-        "example theme, read by the host tests and the ui-sd-theme shot",
-    ),
-    (
         ["emusrc/*", "*.bat", "Link_kernel_image.exe", "ezkernelnew.bin"],
         {LINT},
         "EZ-Flash's files, not built",
@@ -129,14 +131,9 @@ RULES = [
     ),
     (["tools/font_preview.py"], {LINT}, "font preview sheets"),
     (
-        [
-            "tools/themecheck.c",
-            "tools/theme_check.py",
-            "tests/asset_test.py",
-            "tests/themecheck_test.py",
-        ],
+        ["tests/asset_test.py"],
         {LINT, TEST_HOST},
-        "theme checker and asset converter tests, run by test-host",
+        "asset converter tests, run by test-host",
     ),
     (
         ["tools/asset.py"],

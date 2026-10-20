@@ -44,6 +44,8 @@ typedef enum {
 	EASE_IN_CUBIC,
 	EASE_OUT_CUBIC,
 	EASE_IN_OUT_CUBIC,
+	EASE_OUT_QUAD,
+	EASE_SMOOTHSTEP,  // 3t^2 - 2t^3
 	EASE_COUNT,
 } Ease;
 

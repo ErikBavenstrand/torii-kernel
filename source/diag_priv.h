@@ -10,9 +10,9 @@
 // A line's colour: a palette role of the theme (ui.h)
 #define WHITE UI_ROLE_TEXT
 #define GREY UI_ROLE_DIM
-#define YELLOW (UI_ROLE_ICON + 0)  // the folder icon's amber
-#define GREEN (UI_ROLE_ICON + 2)
-#define RED (UI_ROLE_ICON + 3)
+#define YELLOW UI_ROLE_ACCENT_INK  // warnings: the item's ink
+#define GREEN UI_ROLE_TEXT         // passes: plain, as the palette has no green
+#define RED UI_ROLE_DANGER
 
 // Shows a line in colour and logs it whole; a red line logs as an error. A
 // line wider than the screen goes on in the next (diag_line_cut).

@@ -246,6 +246,11 @@ static const char *const icon_art[ICONS] = {
 	"................",
 };
 
+// The art's letters: A amber, B purple, C green, D red, E light, F dark, as
+// the item's colours until the new icons replace these (ui.h roles)
+static const u8 icon_ink[6] = {UI_ROLE_ACCENT, UI_ROLE_ACCENT_INK, UI_ROLE_ACCENT_INK,
+			       UI_ROLE_DANGER, UI_ROLE_PANEL,      UI_ROLE_TEXT};
+
 static void make_icons(void)
 {
 	for (u32 k = 0; k < ICONS; k++) {
@@ -255,7 +260,7 @@ static void make_icons(void)
 				u32 row = 0;
 				for (u32 x = 0; x < 8; x++) {
 					char c = icon_art[k][(ty * 8 + y) * 16 + tx * 8 + x];
-					u32 index = c == '.' ? 0 : (u32)(UI_ROLE_ICON + (c - 'A'));
+					u32 index = c == '.' ? 0 : icon_ink[c - 'A'];
 					row |= index << (4 * x);
 				}
 				icons[k][t * 8 + y] = row;
@@ -398,7 +403,7 @@ static int menu_fetch(void *ctx, u32 i, struct ui_item *out)
 		if (lists.game.havecht && gl_cheat_on == 0)
 			out->ink = UI_ROLE_DIM;  // the CHEAT addon is off
 		else if (gl_cheat_count)
-			out->ink = UI_ROLE_ACCENT;
+			out->ink = UI_ROLE_ACCENT_INK;
 	}
 	return UI_ITEM_READY;
 }
@@ -787,16 +792,13 @@ static void show_recent(u32 at, u32 kind, s32 way)
 
 static void dialog_answer(int yes);
 
-// After SETTINGS, in the same session: the theme, accent and DIM it may
-// have changed, as a new session would read them (no view is up)
+// After SETTINGS, in the same session: the theme and DIM it may have
+// changed, as a new session would read them (no view is up)
 static void settings_changed(void)
 {
-	u16 accent;
-	const struct ui_theme *t = ui_theme_setting(&accent);
-	// SETTINGS sets the theme as it changes: again only if it didn't (the
-	// wallpaper shows meanwhile, and would be decoded over itself)
-	if (t != ui_theme() || accent != ui_accent())
-		ui_theme_set(t, accent);
+	// SETTINGS sets the theme as it changes: again only if it didn't
+	if (ui_theme_setting() != ui_theme())
+		ui_theme_set(ui_theme_setting());
 	ui_dim_set_minutes(ui_dim_setting());
 }
 

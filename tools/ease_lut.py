@@ -32,6 +32,8 @@ CURVES = [
         "in-out cubic: 4t^3, then 1 - 4(1 - t)^3",
         lambda i: 4 * i**3 if 2 * i < N else CUBE - 4 * (N - i) ** 3,
     ),
+    ("out quad: 1 - (1 - t)^2", lambda i: CUBE - N * (N - i) ** 2),
+    ("smoothstep: 3t^2 - 2t^3", lambda i: 3 * N * i**2 - 2 * i**3),
 ]
 
 

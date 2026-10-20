@@ -6,7 +6,6 @@
 extern char *gl_init_error;
 extern char *gl_power_off;
 extern char *gl_Loading;
-extern char *gl_theme_error;
 extern char *gl_file_overflow;
 
 extern char *gl_menu_btn;
@@ -40,8 +39,6 @@ extern char *gl_on;
 extern char *gl_off;
 extern char *gl_theme;
 extern char **gl_theme_names;  // dark, light
-extern char *gl_accent;
-extern char *gl_accent_own;  // the theme's own accent
 extern char *gl_dim;
 extern char *gl_minutes;
 

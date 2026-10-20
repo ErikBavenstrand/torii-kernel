@@ -3,7 +3,6 @@
 char *gl_init_error;
 char *gl_power_off;
 char *gl_Loading;
-char *gl_theme_error;
 char *gl_file_overflow;
 
 char *gl_menu_btn;
@@ -38,8 +37,6 @@ char *gl_on EWRAM_BSS;
 char *gl_off EWRAM_BSS;
 char *gl_theme EWRAM_BSS;
 char **gl_theme_names EWRAM_BSS;
-char *gl_accent EWRAM_BSS;
-char *gl_accent_own EWRAM_BSS;
 char *gl_dim EWRAM_BSS;
 char *gl_minutes EWRAM_BSS;
 
@@ -125,7 +122,6 @@ char **gl_nor_op;
 const char en_init_error[] = "microSD card error";
 const char en_power_off[] = "Turn the power off";
 const char en_Loading[] = "Loading...";
-const char en_theme_error[] = "Theme not loaded, using Dark:";
 const char en_file_overflow[] = "Too big to start from the SD card (over 32 MB). Write it to NOR instead.";
 
 const char en_menu_btn[] = "[B]CANCEL    [A]OK";
@@ -191,8 +187,6 @@ const char en_on[] = "ON";
 const char en_off[] = "OFF";
 const char en_theme[] = "THEME";
 const char *en_theme_names[2] = {"DARK", "LIGHT"};
-const char en_accent[] = "ACCENT";
-const char en_accent_own[] = "THEME'S OWN";
 const char en_dim[] = "DIM";
 const char en_minutes[] = "MIN";
 
@@ -250,7 +244,6 @@ void LoadEnglish(void)
 	gl_init_error = (char *)en_init_error;
 	gl_power_off = (char *)en_power_off;
 	gl_Loading = (char *)en_Loading;
-	gl_theme_error = (char *)en_theme_error;
 	gl_file_overflow = (char *)en_file_overflow;
 
 	gl_menu_btn = (char *)en_menu_btn;
@@ -313,8 +306,6 @@ void LoadEnglish(void)
 	gl_off = (char *)en_off;
 	gl_theme = (char *)en_theme;
 	gl_theme_names = (char **)en_theme_names;
-	gl_accent = (char *)en_accent;
-	gl_accent_own = (char *)en_accent_own;
 	gl_dim = (char *)en_dim;
 	gl_minutes = (char *)en_minutes;
 

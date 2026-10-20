@@ -14,20 +14,12 @@
 //   jobs_run, never inside one of the operations above, so it can overlap
 //   them all. An owner that wants to keep data here across frames that run
 //   jobs must stop the asset jobs first (cover_shutdown).
-// - READCACHE_STAGE [0, 0x2000), from ui_frame: the SD theme's wallpaper is
-//   decoded there when it is put back after a push or pop (ui/ui_sdtheme.c),
-//   at most 8 KB (plus up to 17 bytes for a damaged LZ77 stream), so it ends
-//   at the cheat list (+0x2000), the one owner live across frames.
 // - READCACHE_SAVE, 64 KB: the SRAM on its way to a .sav (Save_savefile),
 //   clear of everything a frame writes, so its progress dialog can draw.
-// - READCACHE_THEME, with READCACHE_STAGE: loading an SD theme (ui/sdtheme.h),
-//   within one call: the reader, the parsed theme.ini, the decoded wallpaper.
 #define MAX_pReadCache_size 0x20000
 #define READCACHE_STAGE 0x0
 #define READCACHE_STAGE_SIZE 0x8000
 #define READCACHE_SORT_WORK 0x800  // SORT_WORK_SIZE bytes
-#define READCACHE_THEME 0x14C00
-#define READCACHE_THEME_SIZE 0x800
 #define READCACHE_SAVE 0x10000  // 64 KB, to the end
 #define MAX_files 0x200
 #define MAX_folder 0x100
@@ -107,8 +99,8 @@
 #define assress_game_rumble 25 //games can use the cart's rumble motor
 #define assress_logging 26 //Torii: LOGGING level, source/tlog.h (0xFFFF: off)
 #define assress_dim 27 //Torii: DIM, idle minutes before the screen dims, 1-60 (else off), source/ui/ui.h
-#define assress_theme 28 //Torii: THEME, 1 light, 2 the SD theme in /torii/theme.txt (else dark), source/ui/ui.h
-#define assress_accent 29 //Torii: ACCENT, 1 + an index into ui_accents (else the theme's own)
+#define assress_theme 28 //Torii: THEME, 1 light (else dark; 2, the SD theme until v0.4, too), source/ui/ui.h
+//29 was Torii's ACCENT until v0.4: never reuse it, old carts hold a value there
 
 #define assress_saveMODE 64
 #define assress_max 65
