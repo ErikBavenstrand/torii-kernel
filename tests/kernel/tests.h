@@ -13,6 +13,7 @@ void test_cheat_parse(void);
 void test_cheat_cap(void);
 void test_game_hardware(void);
 void test_clock_and_rumble_are_separate(void);
+void test_settings_model_round_trip(void);
 void test_settings_staged_until_changed(void);
 void test_sort_by_name(void);
 void test_sort_full_list(void);

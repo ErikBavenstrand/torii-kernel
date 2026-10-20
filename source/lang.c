@@ -1,4 +1,5 @@
 #include "lang.h"
+#include "settings_model.h"
 
 char *gl_init_error;
 char *gl_power_off;
@@ -117,6 +118,20 @@ char *gl_keep_power EWRAM_BSS;
 //--
 char **gl_rom_menu;
 char **gl_nor_op;
+
+// The v0.4 Settings page (settings_model.h)
+char **gl_set_sections EWRAM_BSS;
+char **gl_set_labels EWRAM_BSS;
+char **gl_set_explain EWRAM_BSS;
+char **gl_set_onoff EWRAM_BSS;
+char **gl_set_themes EWRAM_BSS;
+char **gl_set_views EWRAM_BSS;
+char **gl_set_starts EWRAM_BSS;
+char **gl_set_modes_b EWRAM_BSS;
+char **gl_set_colours EWRAM_BSS;
+char **gl_set_log_levels EWRAM_BSS;
+char **gl_set_ampm EWRAM_BSS;
+char *gl_set_minutes EWRAM_BSS;
 
 //英文
 const char en_init_error[] = "microSD card error";
@@ -238,6 +253,89 @@ const char *en_nor_op[5] = {
 	"DIRECT BOOT", "DELETE", "FORMAT ALL", "LOAD SAVE", "BACK UP SAVE",
 };
 
+// The v0.4 Settings page: section names, then each row's label and its
+// one-line explanation, which shows in the hint bar (at most 38 characters
+// and 232 px of body text, tests/host/test_settings_model.c)
+const char *en_set_sections[SET_SECTIONS] = {
+	[SET_SEC_LOOK] = "Look",     [SET_SEC_CLOCK] = "Clock",     [SET_SEC_GAMES] = "Games",
+	[SET_SEC_CART] = "Cart",     [SET_SEC_HOTKEYS] = "Hotkeys", [SET_SEC_LIBRARY] = "Library",
+	[SET_SEC_SYSTEM] = "System",
+};
+const char *en_set_labels[SET_LABELS] = {
+	[SET_THEME] = "Theme",
+	[SET_GAME_VIEW] = "Game view",
+	[SET_START_ON] = "Start on",
+	[SET_DIM] = "Dim screen",
+	[SET_TIME_ROW] = "Time",
+	[SET_DATE_ROW] = "Date",
+	[SET_CLOCK_24H] = "24-hour clock",
+	[SET_GAME_CLOCK] = "Clock for games",
+	[SET_ENGINE] = "Fast patching",
+	[SET_AUTO_SAVE] = "Auto save",
+	[SET_RTS] = "Save states",
+	[SET_CHEATS] = "Cheats",
+	[SET_RUMBLE] = "Rumble for games",
+	[SET_MODE_B] = "Mode B",
+	[SET_LED] = "LED",
+	[SET_LED_IDLE] = "LED colour",
+	[SET_LED_SD] = "SD card light",
+	[SET_RESET_ON] = "Reset hotkey",
+	[SET_RESET_KEYS] = "Reset keys",
+	[SET_SLEEP_ON] = "Sleep",
+	[SET_SLEEP_KEYS] = "Sleep keys",
+	[SET_RESCAN] = "Rescan library",
+	[SET_SHOW_ALL] = "Show all files",
+	[SET_LOGGING] = "Logging",
+	[SET_LANGUAGE] = "Language",
+	[SET_LABEL_SAVE_KEYS] = "Save state keys",
+	[SET_LABEL_LOAD_KEYS] = "Load state keys",
+};
+const char *en_set_explain[SET_LABELS] = {
+	[SET_THEME] = "Light paper or dark graphite.",
+	[SET_GAME_VIEW] = "Game lists: names alone, or box art.",
+	[SET_START_ON] = "Where the menu opens at power-on.",
+	[SET_DIM] = "Dims the screen after idle minutes.",
+	[SET_TIME_ROW] = "The cart's clock. A sets it.",
+	[SET_DATE_ROW] = "The cart's date. A sets it.",
+	[SET_CLOCK_24H] = "14:32 when on, 2:32 PM when off.",
+	[SET_GAME_CLOCK] = "Lets games read the cart's clock.",
+	[SET_ENGINE] = "Patches from a built-in table first.",
+	[SET_AUTO_SAVE] = "Copies saves to the card, no question.",
+	[SET_RTS] = "Save and load a game's state in game.",
+	[SET_CHEATS] = "Applies a game's cheat file.",
+	[SET_RUMBLE] = "Lets games use the cart's rumble.",
+	[SET_MODE_B] = "What the cart is in a DS (mode B).",
+	[SET_LED] = "The cart's light.",
+	[SET_LED_IDLE] = "The light's colour while idle.",
+	[SET_LED_SD] = "The light while the SD card works.",
+	[SET_RESET_ON] = "The keys leave a game for the menu.",
+	[SET_RESET_KEYS] = "Held together in game. A sets them.",
+	[SET_SLEEP_ON] = "The keys put a game to sleep.",
+	[SET_SLEEP_KEYS] = "Held together in game. A sets them.",
+	[SET_RESCAN] = "Looks for games on the card again.",
+	[SET_SHOW_ALL] = "The SD card page shows hidden files.",
+	[SET_LOGGING] = "Writes a log to /torii/logs.",
+	[SET_LANGUAGE] = "The menu's language.",
+	[SET_LABEL_SAVE_KEYS] = "Saves a state in game. A sets them.",
+	[SET_LABEL_LOAD_KEYS] = "Loads the state in game. A sets them.",
+};
+const char *en_set_onoff[2] = {"Off", "On"};
+const char *en_set_themes[2] = {"Dark", "Light"};
+const char *en_set_views[2] = {"List", "List + art"};
+const char *en_set_starts[SET_STARTS] = {
+	[SET_START_LAST] = "Last place", [SET_START_RECENT] = "Recent",
+	[SET_START_HOME] = "Home",       [SET_START_FAVOURITES] = "Favourites",
+	[SET_START_SD] = "SD card",      [SET_START_GBA] = "GBA",
+	[SET_START_GBC] = "GBC",         [SET_START_GB] = "GB",
+	[SET_START_NES] = "NES",
+};
+const char *en_set_modes_b[3] = {"Rumble", "RAM", "Link"};
+// By value: red 4, green 2, blue 1
+const char *en_set_colours[8] = {"Off", "Blue", "Green", "Cyan", "Red", "Magenta", "Yellow", "White"};
+const char *en_set_log_levels[4] = {"Off", "Errors", "Info", "Debug"};
+const char *en_set_ampm[2] = {"AM", "PM"};
+const char en_set_minutes[] = "min";
+
 //---------------------------------------------------------------------------------
 void LoadEnglish(void)
 {
@@ -352,6 +450,19 @@ void LoadEnglish(void)
 	//
 	gl_rom_menu = (char **)en_rom_menu;
 	gl_nor_op = (char **)en_nor_op;
+	//
+	gl_set_sections = (char **)en_set_sections;
+	gl_set_labels = (char **)en_set_labels;
+	gl_set_explain = (char **)en_set_explain;
+	gl_set_onoff = (char **)en_set_onoff;
+	gl_set_themes = (char **)en_set_themes;
+	gl_set_views = (char **)en_set_views;
+	gl_set_starts = (char **)en_set_starts;
+	gl_set_modes_b = (char **)en_set_modes_b;
+	gl_set_colours = (char **)en_set_colours;
+	gl_set_log_levels = (char **)en_set_log_levels;
+	gl_set_ampm = (char **)en_set_ampm;
+	gl_set_minutes = (char *)en_set_minutes;
 	gl_nor_title = (char *)en_nor_title;
 }
 //---------------------------------------------------------------------------------

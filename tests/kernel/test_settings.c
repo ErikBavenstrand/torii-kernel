@@ -4,6 +4,8 @@
 
 #include "../../source/Ezcard_OP.h"
 #include "../../source/ez_define.h"
+#include "../../source/lang.h"
+#include "../../source/settings.h"
 #include "torii_test.h"
 #include "tests.h"
 
@@ -82,4 +84,101 @@ void test_settings_staged_until_changed(void)
 	CHECK_EQ(after_dim, dim);
 	CHECK_EQ(back, 0);
 	CHECK_EQ(Read_SET_info(assress_dim), dim);
+}
+
+// The settings model's values (source/settings_model.h) round-trip through
+// their slots: every row's i-th value, set and staged together (the rows
+// have slots of their own), reads back the same through Read_SET_info, and
+// no slot outside the rows changes. Nothing is written: the staging is
+// discarded after each pass.
+static struct settings_values model_set EWRAM_BSS, model_read EWRAM_BSS;
+
+static void read_slots(struct settings_values *v)
+{
+	u16 slots[assress_max];
+	for (u32 a = 0; a < assress_max; a++)
+		slots[a] = Read_SET_info(a);
+	settings_values_init(v, slots);
+}
+
+static const u16 test_dims[] = {0, 1, 7, 60};
+// L+R+SELECT, L+R+START, START+SELECT, R+B, R+UP+DOWN: no two in a row
+// hold each other
+static const u16 test_combos[] = {0x0304, 0x0308, 0x000C, 0x0102, 0x01C0};
+#define COUNT(a) (sizeof(a) / sizeof((a)[0]))
+
+// How many values the round trip tries on row id, and the i-th
+static u32 test_values(u32 id)
+{
+	const struct settings_row *r = &settings_rows[id];
+	if (r->slot == SET_NO_SLOT)
+		return 0;
+	if (r->kind == SET_NUMBER)
+		return COUNT(test_dims);
+	if (r->kind == SET_KEYS)
+		return COUNT(test_combos);
+	return id == SET_LANGUAGE ? lang_pack_count : r->count;
+}
+
+static u16 test_value(u32 id, u32 i)
+{
+	const struct settings_row *r = &settings_rows[id];
+	if (r->kind == SET_NUMBER)
+		return test_dims[i];
+	if (r->kind == SET_KEYS)  // the two hotkeys never share a combination
+		return test_combos[(i + (id == SET_SLEEP_KEYS)) % COUNT(test_combos)];
+	return (u16)i;
+}
+
+void test_settings_model_round_trip(void)
+{
+	u32 trips = 0;
+	for (u32 i = 0; i < SET_STARTS; i++) {
+		u8 row_slot[assress_max] = {0};
+		read_slots(&model_set);
+		// The hotkeys parked on combinations the test doesn't use, so no
+		// value is refused for the other's (L+LEFT+RIGHT, L+LEFT+A)
+		static const u8 park_reset[3] = {9, 5, 4}, park_sleep[3] = {9, 5, 0};
+		for (u32 k = 0; k < 3; k++) {
+			model_set.slot[assress_edit_rtshotkey_0 + k] = park_reset[k];
+			model_set.slot[assress_edit_sleephotkey_0 + k] = park_sleep[k];
+			row_slot[assress_edit_rtshotkey_0 + k] = row_slot[assress_edit_sleephotkey_0 + k] = 1;
+		}
+		for (u32 id = 0; id < SET_ROWS; id++) {
+			if (i >= test_values(id))
+				continue;
+			const struct settings_row *r = &settings_rows[id];
+			if (r->kind == SET_KEYS)
+				CHECK_EQ(settings_set_keys(&model_set, id, test_value(id, i)), SET_KEYS_OK);
+			else
+				settings_set(&model_set, id, test_value(id, i));
+			u32 n = r->kind == SET_KEYS || r->kind == SET_COLOUR ? 3 : 1;
+			for (u32 a = r->slot; a < r->slot + n; a++)
+				row_slot[a] = 1;
+		}
+		settings_stage(&model_set);
+		read_slots(&model_read);
+		Discard_SET_info();
+		for (u32 id = 0; id < SET_ROWS; id++) {
+			if (i >= test_values(id))
+				continue;
+			CHECK_EQ(settings_get(&model_read, id), test_value(id, i));
+			trips++;
+		}
+		for (u32 a = 0; a < assress_max; a++)
+			if (!row_slot[a])
+				CHECK_EQ(model_read.slot[a], model_set.loaded[a]);
+	}
+	CHECK(trips > 60);
+	CHECK_EQ(Read_SET_info(assress_dim), model_set.loaded[assress_dim]);  // the staging is gone
+
+	// settings_load reads the staged slots, and the clock
+	read_slots(&model_set);
+	settings_step(&model_set, SET_START_ON, 1);
+	settings_stage(&model_set);
+	settings_load(&model_read);
+	Discard_SET_info();
+	CHECK_EQ(settings_get(&model_read, SET_START_ON), settings_get(&model_set, SET_START_ON));
+	CHECK(model_read.clock.year >= 2000 && model_read.clock.year <= 2099);
+	CHECK(model_read.clock.month >= 1 && model_read.clock.month <= 12);
 }

@@ -101,6 +101,11 @@
 #define assress_dim 27 //Torii: DIM, idle minutes before the screen dims, 1-60 (else off), source/ui/ui.h
 #define assress_theme 28 //Torii: THEME, 1 light (else dark; 2, the SD theme until v0.4, too), source/ui/ui.h
 //29 was Torii's ACCENT until v0.4: never reuse it, old carts hold a value there
+// Torii v0.4's (source/settings_model.h, which reads an unknown value as the default)
+#define assress_clock_24h 30 //the clock shows 24 hours: 0 12-hour, else 24-hour
+#define assress_game_view 31 //game lists: 1 list with art, else list
+#define assress_start_on 32 //where the menu opens at power-on: enum settings_start (else last place)
+#define assress_show_all 33 //the SD card page shows hidden files: 1 on, else off
 
 #define assress_saveMODE 64
 #define assress_max 65

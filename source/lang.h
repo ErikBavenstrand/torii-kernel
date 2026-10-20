@@ -135,6 +135,21 @@ extern char *gl_keep_power;    // FORMAT ALL's text, under its title
 extern char **gl_rom_menu;
 extern char **gl_nor_op;
 
+// The v0.4 Settings page (settings_model.h): by enum settings_section, by
+// row (and SET_LABELS' extra labels), and each SET_CHOICE's options by value
+extern char **gl_set_sections;
+extern char **gl_set_labels;
+extern char **gl_set_explain;
+extern char **gl_set_onoff;
+extern char **gl_set_themes;
+extern char **gl_set_views;
+extern char **gl_set_starts;
+extern char **gl_set_modes_b;
+extern char **gl_set_colours;
+extern char **gl_set_log_levels;
+extern char **gl_set_ampm;
+extern char *gl_set_minutes;  // the unit after DIM's minutes
+
 extern u32 gl_lang; // index of the current language in lang_packs
 
 void LoadEnglish(void);
