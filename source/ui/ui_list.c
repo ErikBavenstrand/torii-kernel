@@ -110,7 +110,7 @@ struct list_state {
 	u32 stale;   // slots whose row changed since it was drawn (ui_list_refresh)
 	u32 lo, hi;  // resident rows
 	u32 plo, phi;
-	u32 row_cycles;  // what the last row took to draw (hidden drawing's budget)
+	u32 row_cycles;  // what rows lately took to draw at most (hidden drawing's budget)
 	// Marquee
 	u8 mq;
 	u8 mq_set;   // the marquee slot the map shows (0 or 1), 0xFF neither
@@ -156,6 +156,15 @@ void ui_list_cache_clear(void)
 {
 	row_cache_clear(row_cache());
 	cache_clears++;
+}
+
+// A row's draw took cycles: the budget's estimate of the next is the
+// largest lately (decaying), so a long name after short ones doesn't
+// overrun it
+static void note_row_cycles(struct list_state *st, u32 cycles)
+{
+	u32 decayed = st->row_cycles - st->row_cycles / 8;
+	st->row_cycles = cycles > decayed ? cycles : decayed;
 }
 
 static const u32 *cached_row(const struct list_state *st, u32 r)
@@ -940,7 +949,7 @@ static int render_row(struct list_state *st, const struct row_ctx *rc, u32 *tile
 	}
 	u32 start = cycles_now();
 	int drew = draw_row(st, rc, tiles, r, blank);
-	st->row_cycles = cycles_since(start);
+	note_row_cycles(st, cycles_since(start));
 	return drew;
 }
 
@@ -970,7 +979,7 @@ static void predraw(u8 node, struct list_state *st, const struct row_ctx *rc)
 		u32 start = cycles_now();
 		if (!draw_row(st, rc, row, r, 0))
 			row_cache_forget(row_cache(), st->owner, r, r);  // not loaded yet
-		st->row_cycles = cycles_since(start);
+		note_row_cycles(st, cycles_since(start));
 	}
 	st->predrawn = 1;
 }

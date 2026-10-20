@@ -91,7 +91,7 @@ void ui_queue_keys(u16 keys);
 // and a list's page change (its rows drawn ahead into the row cache while
 // the old page fades out, then copied in), which leaves room for motion
 // running alongside and a slower frame on the cart.
-#define UI_PAGE_BUDGET 160000
+#define UI_PAGE_BUDGET 140000
 // 1 if such drawing may start work of about cycles now: it would end by
 // budget. Otherwise it waits for the next frame.
 int ui_draw_room(u32 cycles, u32 budget);
