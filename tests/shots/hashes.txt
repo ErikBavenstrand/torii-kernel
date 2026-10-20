@@ -776,13 +776,13 @@ tr-deeper/frames 67-67 271E96756B90D58B
 tr-deeper/frames 68-69 7D031703A6F61C90
 tr-deeper/frames 70-75 F7E40BE7DBC25590
 tr-leave/fading 392C0BDAEB1D3F2B
-tr-leave/progress 8A9B3222959885A1
+tr-leave/progress CB7467476B4BF67C
 tr-leave/frames 0-1 4F47817065DDD361
 tr-leave/frames 2-2 392C0BDAEB1D3F2B
 tr-leave/frames 3-3 8859EF7BFC7AC10B
 tr-leave/frames 4-7 7C573B18E65FE325
 tr-leave/frames 8-8 7B90E77090ED8325
-tr-leave/frames 9-10 8A9B3222959885A1
+tr-leave/frames 9-10 CB7467476B4BF67C
 tr-menu/closing 52948E493E423F65
 tr-menu/dimming 9DAE717E072EB8CB
 tr-menu/menu D5E56E6C36BAC2F9

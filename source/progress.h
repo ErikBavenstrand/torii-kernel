@@ -5,10 +5,11 @@
 // status line names only the slow steps ("Loading the game"); a quick one
 // passes NULL, keeping the status, and its caller logs it.
 //
-//	dialog_progress_begin(gl_starting, name);
+//	dialog_progress_begin(name, NULL);      // the game's name as the title
 //	progress_step(gl_loading_game, 0, 50);  // the status now, the bar at 0%
-//	tlog("launch: checking the save");
+//	(check the save)
 //	progress_step(NULL, 50, 100);           // the bar at 5%, the same status
+//	tlog("launch: ...");                    // (a quick step: only logged)
 //	progress_cart_copy(fat, size, 950);     // 10% to 95% on an estimate
 //	progress_done(NULL);                    // full, drawn now
 //	dialog_progress_end();
