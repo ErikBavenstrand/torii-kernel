@@ -13,8 +13,9 @@
 # Home lists the items in the carousel's order, Recent, Favourites and the
 # consoles only while they hold something: set NAV_SHOWN to the hidable items
 # the card shows (default "gba": GBA games, nothing played, no favourites).
-# Routes go from home's first row: DOWN to the item, or UP round the end for
-# the four that always show, then A.
+# Routes go from the carousel's first item: RIGHT to the item, or LEFT round
+# the end for the four that always show, then A (which opens the item the
+# ring is turning to, so the presses needn't wait for it).
 #
 # Routes into a page (a file on the SD card page, a game's popup, a Settings
 # row) come with the page's ticket: until then they fail, saying which one.
@@ -74,10 +75,10 @@ nav_to() {
     return 1
   fi
   case $place in
-  sd) keys=(UP UP UP UP) ;;
-  nor) keys=(UP UP UP) ;;
-  settings) keys=(UP UP) ;;
-  info) keys=(UP) ;;
+  sd) keys=(LEFT LEFT LEFT LEFT) ;;
+  nor) keys=(LEFT LEFT LEFT) ;;
+  settings) keys=(LEFT LEFT) ;;
+  info) keys=(LEFT) ;;
   *)
     # The hidable items home shows, in order: the place's row among them
     for word in recent fav gba gbc gb nes; do
@@ -92,7 +93,7 @@ nav_to() {
       _nav_fail "$place isn't on home (NAV_SHOWN is \"${NAV_SHOWN:-gba}\")"
       return 1
     fi
-    for (( ; index > 0; index--)); do keys+=(DOWN); done
+    for (( ; index > 0; index--)); do keys+=(RIGHT); done
     ;;
   esac
   _nav_file '-w "nav: home ready"' "$(_nav_keys 8 "${keys[@]}" A)" "-w \"nav: page $place ready\""
@@ -122,7 +123,7 @@ nav_info_page() {
   esac
   wait="screen ready: info-$page"
   [ "$page" = diag ] && wait="screen ready: diag-start"
-  _nav_file '-w "nav: home ready"' "$(_nav_keys 8 UP A)" '-w "screen ready: info"' \
+  _nav_file '-w "nav: home ready"' "$(_nav_keys 8 LEFT A)" '-w "screen ready: info"' \
     "$(_nav_keys 8 "${downs[@]}" A)" "-w \"$wait\""
 }
 

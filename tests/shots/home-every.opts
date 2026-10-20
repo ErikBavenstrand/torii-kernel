@@ -1,0 +1,10 @@
+# A card with a game for every console: Recent, the four consoles, SD card,
+# NOR, Settings and Info (nine dots). RIGHT twice turns to Game Boy Color.
+#! settings 28=1
+#! sd-file /Games/Color.gbc 0 tests/roms/hello/hello.gba
+#! sd-file /Games/Mono.gb 0 tests/roms/hello/hello.gba
+#! sd-file /Games/Famicom.nes 0 tests/roms/hello/hello.gba
+-w "nav: home ready"
+-k @8:RIGHT -k @12:- -k @24:RIGHT -k @28:-
+-w "home: facing gbc"
+-s @1:gbc.png

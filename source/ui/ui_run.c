@@ -450,8 +450,8 @@ static void fade_set(void *ctx, s32 value)
 	gfx_pal_use_faded(1);
 }
 
-// Loads the first banks of the UI's (an item switch changes only bank 0;
-// a theme switch all of them), and the sprites' bank
+// Loads the first banks of the UI's (an item switch changes banks 0 and
+// 1; a theme switch all of them), and the sprites' bank
 static void load_palette(u32 banks)
 {
 	u16 pal[UI_BANKS * 16];
@@ -474,7 +474,7 @@ void ui_theme_set(const struct ui_theme *theme)
 void ui_item_set(u32 item)
 {
 	ui_item_select(item);
-	load_palette(UI_BANK_NORMAL + 1);
+	load_palette(UI_BANK_CONSOLES + 1);
 	ui_wake();
 }
 

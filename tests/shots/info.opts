@@ -1,4 +1,4 @@
-# The Info page (source/screens/info.c, mockup #21) in the light theme: UP
+# The Info page (source/screens/info.c, mockup #21) in the light theme: LEFT
 # on home goes round the end to Info, A opens it. Its rows on two cards
 # (the four reading pages, then Diagnostics), each with its 8x8 icon and
 # what it holds, and the position at the right. DOWN from About steps over
@@ -9,7 +9,7 @@
 -w "nav: home ready"
 -P @2:info_version:0.4.0
 -P @2:info_build:0000B17A
--k @8:UP -k @12:- -k @16:A -k @20:-
+-k @8:LEFT -k @12:- -k @16:A -k @20:-
 -w "screen ready: info"
 -s @1:rows.png
 -k @8:DOWN -k @12:- -k @16:DOWN -k @20:- -k @24:DOWN -k @28:-

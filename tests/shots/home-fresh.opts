@@ -1,0 +1,15 @@
+# A fresh card: no games and nothing played, so home shows the four items
+# that always show (SD card, NOR, Settings, Info), each once (T26: fewer
+# than five, nearest first: the front, one each side and the next one to
+# the right). RIGHT turns to NOR: Info leaves at the left and comes in again
+# at the right (every frame hashed).
+#! sd-rm Hello.gba
+#! sd-rm Games
+#! sd-rm Long
+#! sd-rm SAVER
+-w "nav: home ready"
+-s @1:screen.png
+-k @8:RIGHT -k @12:-
+-H @8:@20
+-w "home: facing nor"
+-s @1:nor.png

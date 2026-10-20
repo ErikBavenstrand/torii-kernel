@@ -8,7 +8,7 @@
 -w "nav: home ready"
 -P @2:info_version:0.4.0
 -P @2:info_build:0000B17A
--k @8:UP -k @12:- -k @16:A -k @20:-
+-k @8:LEFT -k @12:- -k @16:A -k @20:-
 -w "screen ready: info"
 -k @8:A -k @12:-
 -H @8:@30

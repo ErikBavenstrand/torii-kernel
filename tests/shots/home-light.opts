@@ -1,7 +1,0 @@
-# Home in the light theme, with the clock set (12:34 shows at the right;
-# the scenarios' frozen clock is before 2026-10-01, which counts as unset
-# and shows nothing, T4)
-#! settings 28=1
--C 1792586096
--w "nav: home ready"
--s @1:screen.png

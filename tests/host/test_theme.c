@@ -112,13 +112,23 @@ void test_theme_banks_item(void)
 			CHECK_EQ(normal[UI_ROLE_DANGER], pal_accents[t][PAL_DANGER].ink);
 			CHECK_EQ(normal[UI_ROLE_GROUND], ui_colour_mix(s->bg, a->base, th->backdrop_mix));
 			CHECK_EQ(normal[UI_ROLE_FLOAT], ui_colour_mix(s->card, s->ink, th->float_mix));
-			// Switching item changes only bank 0's accent indices
+			// Bank 1's backdrop: the ground above the horizon, a shade darker below
+			const u16 *consoles = pal + 16;
+			CHECK_EQ(consoles[UI_ROLE_SKY], normal[UI_ROLE_GROUND]);
+			CHECK_EQ(consoles[UI_ROLE_FLOOR], ui_floor_colour(th, normal[UI_ROLE_GROUND]));
+			// Darker in light, lighter in dark: a horizon shows in both
+			if (t == PAL_LIGHT)
+				CHECK(luminance(consoles[UI_ROLE_FLOOR]) < luminance(consoles[UI_ROLE_SKY]));
+			else
+				CHECK(luminance(consoles[UI_ROLE_FLOOR]) > luminance(consoles[UI_ROLE_SKY]));
+			// Switching item changes only bank 0's accent indices and bank 1's backdrop
 			u16 other[UI_BANKS * 16];
 			ui_theme_banks(th, (item + 1) % PAL_ITEMS, other);
 			for (u32 i = 0; i < UI_BANKS * 16; i++) {
 				u32 b = i / 16, role = i % 16;
 				int accent = role >= UI_ROLE_ACCENT && role <= UI_ROLE_GROUND;
-				if (b != UI_BANK_NORMAL || !accent)
+				int backdrop = role == UI_ROLE_SKY || role == UI_ROLE_FLOOR;
+				if ((b != UI_BANK_NORMAL || !accent) && (b != UI_BANK_CONSOLES || !backdrop))
 					CHECK_EQ(other[i], pal[i]);
 			}
 		}
