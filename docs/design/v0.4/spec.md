@@ -1,0 +1,23 @@
+# v0.4 look: mockup spec
+
+The numbers the final mockups were drawn with. They are a starting point: expect to change many of them once the first build runs on the cart.
+
+Palette: exactly `palette.json`. Light = warm paper bg #F7EFE7, white cards, edge #E7DED6, shadow #DED6CE; dark = graphite bg #181821, cards #292931, edge #393939, shadow #101010. Per item: `base` for 16x16 icons, scrollbar thumb, NOR bar, solid buttons, carousel dots; `tint` for the selection pill (no outline); `ink` for 8x8 icons, section labels, stars, save dot, «», popup-title icon; `on` for text on a solid fill (selected confirm button, letter card, box-art band). Row text on pills is always neutral ink; Recent/NOR/Info base is never text. Danger = NES ink. Floating cards: card colour (dark: +5 % ink) with a 1 px edge and a 1-2 px shadow. No dots, grids or rules beyond card hairlines.
+
+Grid: 240x160, 4 px outer margin, title bar 0-18 (16x16 icon at 5,1; Galmuri11 bold title at x 25; Galmuri9 position/clock right at x 235), content 20-143, hint chips at y 147 (soft-grey key pill, ink3 label, max 4). Lists 8 rows of 14 px (pill 12 px, r3); Settings rows 12 px in section cards; cards r4; buttons r7. Galmuri9 (12 px) body, Galmuri11b (16 px) headings and letter card.
+
+Pages: one card for lists/SD/reading; B Clean's stacked cards for NOR (storage, games, Format all), Settings (8x8 icon + label on the paper, one card per section, scrollbar on the paper at x 231) and Info (four pages + Diagnostics). SD folders show path pills (current one tinted).
+
+Carousel: ring of 10, 36 deg per step, x = 120 + 98 sin a, feet y = 100 - 30 (1 - cos a), uniform scale 0.42 + 0.58 cos a (sprites normalised to ~52 px), fog toward the backdrop (1 - cos a) * 0.95, 5 visible (|a| <= 80 deg), dithered ground shadows. Backdrop = bg + 6 % (dark 8 %) of the item's base. Label: 16x16 icon + name (y 112), count (y 128), accent dot strip (y 138).
+
+Torii: no gate in the carousel backdrop (user, round 16); the red 16x16 torii glyph (vermilion #E74A29, black kasagi) sits top-left at (5,1) in place of the word TORII. The low horizon at y 74 with the ground 4 % darker stays.
+
+Popups: card at x 126, w 104, top = row - 20 clamped to 21..144-h, 3 px notch at the selected row (which stays tinted). Confirmations centred (172x64 at y 46), page dimmed 50 % toward bg (dark: toward shadow), Cancel preselected as a solid base pill (NOR uses its amber; Delete/Format text in danger ink).
+
+Keys: Home LEFT/RIGHT turn, A open. Every page B = back to the carousel facing that item (SD: up a folder first). Lists (consoles, Recent, Favourites): UP/DOWN move, L/R page, LEFT/RIGHT letter jump (letter card), A play, START game popup, SELECT list / list + art. Popups UP/DOWN, A, B. SD: A open/launch, START file popup. NOR: A launch, START popup, Format all row -> confirm. Settings: A edits « value » (LEFT/RIGHT change, A done, B cancel); Time opens a field card (UP/DOWN value, LEFT/RIGHT field). Info: A opens a reading page (UP/DOWN scroll) or runs Diagnostics.
+
+Motion (60 fps): step 10 f ease-out cubic (items slide along the ring, backdrop tint crossfades, label fades out/in with a 14 px slide, dot moves at the midpoint). Open 12 f: f0-5 the centre sprite scales 1.0 -> 1.9 and fogs out completely while the tint fades to the page surface; f5-12 the card rises 12 px and fades in (ease-out quad), so no ghost over the rows; the title bar slides in from the left over all 12 f. B reverses in 10 f. Popup 6 f ease-out quad (WIN0 opens up/down from the notch, card slides 8 px left; close 4 f). Theme wipe 16 f smoothstep, top-down HBlank palette swap with a 4 px dither edge.
+
+Hardware: mode 0. BG3 = backdrop (one colour + horizon tiles); BG2 = cards, pills, shadows (corner/edge tiles, pill = palette-swapped row with round end tiles); BG1 = text rows; BG0 = popups/confirm/letter card under WIN0. Carousel = 5 affine OBJs (64x64 4bpp, double-size, one uniform matrix each) + 5 ground-shadow OBJs; fog = per-item OBJ palette banks stepped toward the backdrop (no alpha). 16x16 icons = one OBJ each, two icons per 16-colour bank. Zoom = OBJ affine + BLDALPHA on BG1/BG2; confirm dim = BLDY on page layers, BG0 excluded.
+
+Palettes: BG bank 0 neutrals (bg, card, edge, shadow, soft, ink, ink2, ink3), bank 1 current item (base, tint, ink, on+ ground tone), bank 2 Recent/Favourites row sys-icons (four console inks), bank 3 danger/NOR bar shades; themes = two palette sets, identical layout. VRAM: BG tiles ~28 KB (font-rendered rows 2 layers x 8 KB, cards/pills 3 KB, popup 8 KB) + 4 maps 8 KB of 64 KB; OBJ ~16 KB (5 x 2 KB items, shadows 2 KB, icons 2 KB, box art 2 KB) of 32 KB.

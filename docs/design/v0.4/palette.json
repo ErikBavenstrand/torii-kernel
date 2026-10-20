@@ -1,0 +1,498 @@
+{
+  "surfaces": {
+    "light": {
+      "bg": "#F7EFE7",
+      "card": "#FFFFFF",
+      "edge": "#E7DED6",
+      "soft": "#D6CEC6",
+      "ink": "#292931",
+      "ink2": "#6B635A",
+      "ink3": "#9C948C",
+      "shadow": "#DED6CE"
+    },
+    "dark": {
+      "bg": "#181821",
+      "card": "#292931",
+      "edge": "#393939",
+      "soft": "#4A424A",
+      "ink": "#EFEFE7",
+      "ink2": "#B5ADA5",
+      "ink3": "#847B73",
+      "shadow": "#101010"
+    }
+  },
+  "pill_mix": {
+    "light": 0.17,
+    "dark": 0.3
+  },
+  "accents": {
+    "recent": {
+      "name": "Recent",
+      "source": "#EF7B21",
+      "light": {
+        "base": "#EF7B21",
+        "tint": "#FFEFDE",
+        "ink": "#9C5218",
+        "on": "#181821",
+        "outline": "#FFC69C",
+        "contrast": {
+          "ink_on_card": 5.78,
+          "ink_on_bg": 5.08,
+          "text_on_pill": 12.81,
+          "ink_on_pill": 5.13,
+          "on_on_base": 6.32,
+          "base_on_card": 2.79
+        }
+      },
+      "dark": {
+        "base": "#EF7B21",
+        "tint": "#634229",
+        "ink": "#EF7B21",
+        "on": "#181821",
+        "outline": "#844A29",
+        "contrast": {
+          "ink_on_card": 5.17,
+          "ink_on_bg": 6.32,
+          "text_on_pill": 7.76,
+          "ink_on_pill": 3.21,
+          "on_on_base": 6.32,
+          "base_on_card": 5.17
+        }
+      }
+    },
+    "fav": {
+      "name": "Favourites",
+      "source": "#E7529C",
+      "light": {
+        "base": "#E7529C",
+        "tint": "#FFE7EF",
+        "ink": "#B5427B",
+        "on": "#181821",
+        "outline": "#F7B5D6",
+        "contrast": {
+          "ink_on_card": 5.21,
+          "ink_on_bg": 4.58,
+          "text_on_pill": 12.32,
+          "ink_on_pill": 4.45,
+          "on_on_base": 5.11,
+          "base_on_card": 3.45
+        }
+      },
+      "dark": {
+        "base": "#E7529C",
+        "tint": "#633152",
+        "ink": "#EF5AA5",
+        "on": "#181821",
+        "outline": "#7B3963",
+        "contrast": {
+          "ink_on_card": 4.59,
+          "ink_on_bg": 5.6,
+          "text_on_pill": 8.69,
+          "ink_on_pill": 3.19,
+          "on_on_base": 5.11,
+          "base_on_card": 4.18
+        }
+      }
+    },
+    "gba": {
+      "name": "Game Boy Advance",
+      "source": "#4A39B5",
+      "light": {
+        "base": "#4A39B5",
+        "tint": "#E7DEF7",
+        "ink": "#4A39B5",
+        "on": "#FFFFFF",
+        "outline": "#ADA5DE",
+        "contrast": {
+          "ink_on_card": 8.26,
+          "ink_on_bg": 7.26,
+          "text_on_pill": 11.12,
+          "ink_on_pill": 6.36,
+          "on_on_base": 8.26,
+          "base_on_card": 8.26
+        }
+      },
+      "dark": {
+        "base": "#7B6BC6",
+        "tint": "#42395A",
+        "ink": "#9C8CD6",
+        "on": "#FFFFFF",
+        "outline": "#4A4273",
+        "contrast": {
+          "ink_on_card": 4.9,
+          "ink_on_bg": 5.99,
+          "text_on_pill": 9.25,
+          "ink_on_pill": 3.63,
+          "on_on_base": 4.41,
+          "base_on_card": 3.27
+        }
+      }
+    },
+    "gbc": {
+      "name": "Game Boy Color",
+      "source": "#089C94",
+      "light": {
+        "base": "#089C94",
+        "tint": "#D6EFEF",
+        "ink": "#087B73",
+        "on": "#181821",
+        "outline": "#94D6CE",
+        "contrast": {
+          "ink_on_card": 5.13,
+          "ink_on_bg": 4.51,
+          "text_on_pill": 11.99,
+          "ink_on_pill": 4.27,
+          "on_on_base": 5.2,
+          "base_on_card": 3.39
+        }
+      },
+      "dark": {
+        "base": "#089C94",
+        "tint": "#184A4A",
+        "ink": "#10A59C",
+        "on": "#181821",
+        "outline": "#185A5A",
+        "contrast": {
+          "ink_on_card": 4.73,
+          "ink_on_bg": 5.78,
+          "text_on_pill": 8.58,
+          "ink_on_pill": 3.25,
+          "on_on_base": 5.2,
+          "base_on_card": 4.25
+        }
+      }
+    },
+    "gb": {
+      "name": "Game Boy",
+      "source": "#6B9C10",
+      "light": {
+        "base": "#6B9C10",
+        "tint": "#E7EFD6",
+        "ink": "#527310",
+        "on": "#181821",
+        "outline": "#BDD694",
+        "contrast": {
+          "ink_on_card": 5.5,
+          "ink_on_bg": 4.83,
+          "text_on_pill": 12.17,
+          "ink_on_pill": 4.64,
+          "on_on_base": 5.36,
+          "base_on_card": 3.29
+        }
+      },
+      "dark": {
+        "base": "#6B9C10",
+        "tint": "#394A21",
+        "ink": "#73A518",
+        "on": "#181821",
+        "outline": "#425A21",
+        "contrast": {
+          "ink_on_card": 4.89,
+          "ink_on_bg": 5.98,
+          "text_on_pill": 8.35,
+          "ink_on_pill": 3.27,
+          "on_on_base": 5.36,
+          "base_on_card": 4.39
+        }
+      }
+    },
+    "nes": {
+      "name": "NES",
+      "source": "#CE2129",
+      "light": {
+        "base": "#CE2129",
+        "tint": "#F7DEDE",
+        "ink": "#CE2129",
+        "on": "#FFFFFF",
+        "outline": "#EF9C9C",
+        "contrast": {
+          "ink_on_card": 5.42,
+          "ink_on_bg": 4.76,
+          "text_on_pill": 11.31,
+          "ink_on_pill": 4.25,
+          "on_on_base": 5.42,
+          "base_on_card": 5.42
+        }
+      },
+      "dark": {
+        "base": "#D63942",
+        "tint": "#5A2931",
+        "ink": "#E76B73",
+        "on": "#FFFFFF",
+        "outline": "#733139",
+        "contrast": {
+          "ink_on_card": 4.64,
+          "ink_on_bg": 5.66,
+          "text_on_pill": 10.12,
+          "ink_on_pill": 3.76,
+          "on_on_base": 4.64,
+          "base_on_card": 3.11
+        }
+      }
+    },
+    "sd": {
+      "name": "SD card",
+      "source": "#297BDE",
+      "light": {
+        "base": "#297BDE",
+        "tint": "#DEEFFF",
+        "ink": "#216BC6",
+        "on": "#FFFFFF",
+        "outline": "#9CC6F7",
+        "contrast": {
+          "ink_on_card": 5.27,
+          "ink_on_bg": 4.63,
+          "text_on_pill": 12.29,
+          "ink_on_pill": 4.49,
+          "on_on_base": 4.21,
+          "base_on_card": 4.21
+        }
+      },
+      "dark": {
+        "base": "#297BDE",
+        "tint": "#294263",
+        "ink": "#5294E7",
+        "on": "#FFFFFF",
+        "outline": "#294A7B",
+        "contrast": {
+          "ink_on_card": 4.64,
+          "ink_on_bg": 5.66,
+          "text_on_pill": 8.85,
+          "ink_on_pill": 3.29,
+          "on_on_base": 4.21,
+          "base_on_card": 3.42
+        }
+      }
+    },
+    "nor": {
+      "name": "NOR",
+      "source": "#E79C10",
+      "light": {
+        "base": "#E79C10",
+        "tint": "#FFEFD6",
+        "ink": "#946310",
+        "on": "#181821",
+        "outline": "#F7D694",
+        "contrast": {
+          "ink_on_card": 5.18,
+          "ink_on_bg": 4.56,
+          "text_on_pill": 12.76,
+          "ink_on_pill": 4.58,
+          "on_on_base": 7.69,
+          "base_on_card": 2.29
+        }
+      },
+      "dark": {
+        "base": "#E79C10",
+        "tint": "#634A21",
+        "ink": "#E79C10",
+        "on": "#181821",
+        "outline": "#7B5A21",
+        "contrast": {
+          "ink_on_card": 6.29,
+          "ink_on_bg": 7.69,
+          "text_on_pill": 7.18,
+          "ink_on_pill": 3.62,
+          "on_on_base": 7.69,
+          "base_on_card": 6.29
+        }
+      }
+    },
+    "set": {
+      "name": "Settings",
+      "source": "#637B9C",
+      "light": {
+        "base": "#637B9C",
+        "tint": "#E7EFEF",
+        "ink": "#5A6B8C",
+        "on": "#FFFFFF",
+        "outline": "#BDC6D6",
+        "contrast": {
+          "ink_on_card": 5.36,
+          "ink_on_bg": 4.71,
+          "text_on_pill": 12.36,
+          "ink_on_pill": 4.59,
+          "on_on_base": 4.34,
+          "base_on_card": 4.34
+        }
+      },
+      "dark": {
+        "base": "#637B9C",
+        "tint": "#394252",
+        "ink": "#8494AD",
+        "on": "#FFFFFF",
+        "outline": "#424A63",
+        "contrast": {
+          "ink_on_card": 4.69,
+          "ink_on_bg": 5.72,
+          "text_on_pill": 8.76,
+          "ink_on_pill": 3.29,
+          "on_on_base": 4.34,
+          "base_on_card": 3.33
+        }
+      }
+    },
+    "info": {
+      "name": "Info",
+      "source": "#DEB510",
+      "light": {
+        "base": "#DEB510",
+        "tint": "#FFF7D6",
+        "ink": "#846B10",
+        "on": "#181821",
+        "outline": "#F7DE94",
+        "contrast": {
+          "ink_on_card": 5.13,
+          "ink_on_bg": 4.51,
+          "text_on_pill": 13.41,
+          "ink_on_pill": 4.77,
+          "on_on_base": 9.0,
+          "base_on_card": 1.96
+        }
+      },
+      "dark": {
+        "base": "#DEB510",
+        "tint": "#5A5221",
+        "ink": "#DEB510",
+        "on": "#181821",
+        "outline": "#7B6B21",
+        "contrast": {
+          "ink_on_card": 7.37,
+          "ink_on_bg": 9.0,
+          "text_on_pill": 6.82,
+          "ink_on_pill": 4.03,
+          "on_on_base": 9.0,
+          "base_on_card": 7.37
+        }
+      }
+    },
+    "torii": {
+      "name": "Torii (app)",
+      "source": "#E74A29",
+      "light": {
+        "base": "#E74A29",
+        "tint": "#FFE7DE",
+        "ink": "#BD3921",
+        "on": "#181821",
+        "outline": "#F7AD9C",
+        "contrast": {
+          "ink_on_card": 5.57,
+          "ink_on_bg": 4.89,
+          "text_on_pill": 12.18,
+          "ink_on_pill": 4.7,
+          "on_on_base": 4.54,
+          "base_on_card": 3.88
+        }
+      },
+      "dark": {
+        "base": "#E74A29",
+        "tint": "#633129",
+        "ink": "#EF634A",
+        "on": "#181821",
+        "outline": "#7B3929",
+        "contrast": {
+          "ink_on_card": 4.5,
+          "ink_on_bg": 5.5,
+          "text_on_pill": 9.08,
+          "ink_on_pill": 3.27,
+          "on_on_base": 4.54,
+          "base_on_card": 3.72
+        }
+      }
+    }
+  },
+  "icon_ramps": {
+    "recent": {
+      "o": "#633118",
+      "d": "#B55A18",
+      "b": "#EF7B21",
+      "l": "#F7B57B",
+      "w": "#FFEFE7"
+    },
+    "fav": {
+      "o": "#63214A",
+      "d": "#AD3973",
+      "b": "#E7529C",
+      "l": "#F79CC6",
+      "w": "#FFE7F7"
+    },
+    "gba": {
+      "o": "#211852",
+      "d": "#39298C",
+      "b": "#4A39B5",
+      "l": "#948CD6",
+      "w": "#DEDEF7"
+    },
+    "gbc": {
+      "o": "#103131",
+      "d": "#087373",
+      "b": "#089C94",
+      "l": "#73C6C6",
+      "w": "#E7F7EF"
+    },
+    "gb": {
+      "o": "#293118",
+      "d": "#5A6352",
+      "b": "#BDC6AD",
+      "l": "#DEDED6",
+      "w": "#94B518"
+    },
+    "nes": {
+      "o": "#181821",
+      "d": "#73736B",
+      "b": "#CE2129",
+      "l": "#BDBDB5",
+      "w": "#E7E7DE"
+    },
+    "sd": {
+      "o": "#183163",
+      "d": "#215AA5",
+      "b": "#297BDE",
+      "l": "#84B5EF",
+      "w": "#E7EFFF"
+    },
+    "nor": {
+      "o": "#634210",
+      "d": "#AD7310",
+      "b": "#E79C10",
+      "l": "#F7C673",
+      "w": "#FFF7DE"
+    },
+    "set": {
+      "o": "#29314A",
+      "d": "#4A5A73",
+      "b": "#637B9C",
+      "l": "#A5B5C6",
+      "w": "#EFEFF7"
+    },
+    "info": {
+      "o": "#5A4A10",
+      "d": "#A58410",
+      "b": "#DEB510",
+      "l": "#EFD673",
+      "w": "#FFF7DE"
+    },
+    "torii": {
+      "o": "#212118",
+      "d": "#AD2918",
+      "b": "#E74A29",
+      "l": "#F7846B",
+      "w": "#FFD6CE"
+    },
+    "file": {
+      "o": "#29314A",
+      "d": "#4A5A73",
+      "b": "#637B9C",
+      "l": "#A5B5C6",
+      "w": "#EFEFF7"
+    },
+    "folder": {
+      "o": "#634210",
+      "d": "#AD7310",
+      "b": "#E79C10",
+      "l": "#F7C673",
+      "w": "#FFF7DE"
+    }
+  },
+  "danger": "nes"
+}

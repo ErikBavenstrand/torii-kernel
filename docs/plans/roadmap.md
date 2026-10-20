@@ -274,28 +274,18 @@ Bugs found while building v0.3 and v0.3.1. Each is struck out here once a ticket
 
 ## v0.4 Browsing
 
-- **Start screen:** SD, NOR, Settings, last played and favourites.
-- **Favourites:** no cap.
-- **Recents:** shown as a virtual folder.
-- **Boot to:** the screen of your choice, and the SD position is remembered.
-- **View modes:** list, list plus art, grid and carousel, as theme layouts.
-- **Names:** system files and kernel folders (`/torii`, `SAVER`, `RTS`, dot files) hidden,
-  and names cleaned of extensions and bracket tags.
-- **Small touches:** a message for empty folders, per-extension icons, and NOR games in the
-  same views.
-- **Folder index:** 512 files per folder through an index in PSRAM, keeping 256 folders.
-- **Art:**
-  - title (120x80) and box (80x80) art;
-  - custom art for any file or folder, with no cap;
-  - art for NOR games;
-  - art for console folders;
-  - a scraper CLI in `tools/`.
-- **Settings:** a 12/24-hour clock and time editor, settings in categories, and Help pages.
-  ~~Page 2's SAVE row (AUTO SAVE) opens edit mode with the cursor on OK, so A, A saves it unchanged and LEFT is needed to change it (pre-existing; v0.3.2 review).~~ Fixed by v0.3.2 (`46e1138`).
+Planned in the interview and design rounds of 2026-10-19 and 2026-10-20. [v0.4-decisions.md](v0.4-decisions.md) has every decision, and [docs/design/v0.4](../design/v0.4/README.md) has the mockups in light and dark. They are a first version: expect to tune much of the look and motion once it runs on a cart.
 
-- **Screens redesigned (user, 2026-10-19):** v0.3 ported the official screens as they were. v0.4 redesigns their layout and navigation: settings in a section of their own, organised by category, with clear editing; the cheat screen; and the lists, as views a theme can swap (a RetroArch-like carousel of systems and games, sections).
+- **Navigation, all new:** a carousel home (Recent, Favourites, each console with games, SD card, NOR, Settings, Info) on a ring of five visible objects; A zooms into the item's page, B comes back. No tab bar, and none of the official keys.
+- **Pages:** game lists per console, Recent and Favourites (compact or with a placeholder box, letter jump, a game popup), an SD card browser, NOR with storage and Format all, Settings on one page of section cards, and Info (controls, help, about, Diagnostics).
+- **Look:** "Paper clean" in light and dark themes, one accent colour per item, a new icon set, a red torii glyph in the corner, and the carousel, opening and popup motions.
+- **Library index:** the whole card scanned by extension into `/torii/library.idx`, up to 4,096 games, rescanned when the card changes.
+- **Names:** custom names, then cleaned file names (no extension or bracket tags); system folders and dot files hidden, with a "Show all files" setting.
+- **Favourites and recents** on SD (`/torii/favorites.txt`, `/torii/recent.txt`), favourites with no cap; boot returns to where you left off, and holding START at power-on launches the last game.
+- **Settings:** a 12/24-hour clock and a time editor.
+- **Limits:** 1,024 entries per SD folder.
 
-- **Engine follow-ups from v0.3 (session reports, 2026-10-19):**
+- **Engine follow-ups from v0.3, all in v0.4 (session reports, 2026-10-19):**
   - **Smoothness:**
     - A page change still blanks the list for a frame before it fades in. Fade out first (F1).
     - A whole-palette fade costs about 45k cycles a frame. Fade only the banks in use, or use the brightness registers for fades to black (`palette_fade`) (F1).
@@ -317,6 +307,13 @@ Bugs found while building v0.3 and v0.3.1. Each is struck out here once a ticket
     - The bar shows overall progress and the status the step's percentage: pick one.
     - The NOR write's dialog title.
     - Trim the launch's 0.3 s of step texts if users notice it.
+
+## v0.4.1 Art
+
+- **Box art** (about square for GBA and GB), pre-converted on the PC, loaded after the cursor rests.
+- **Lookup:** custom art by file name first (romhacks keep their own art), then CRC or GBA game code, then the placeholder.
+- **Names** from a No-Intro CRC database, built by a `just` tool and not bundled.
+- **Tools:** `just art-add` for custom art and `just art-scrape` from libretro-thumbnails (check their terms first).
 
 ## v0.5 Saves
 
