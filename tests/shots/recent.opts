@@ -1,7 +1,0 @@
-# Recently played (START on the SD list): two games from the SD card
--w "screen ready: sd-list"
--k @8:START -k @12:-
--w "screen ready: recent"
--s @1:screen.png
-# The tear watch: no write changes the screen while it scans out
--T 1:99999

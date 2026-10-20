@@ -329,6 +329,8 @@ What the v0.4 ticket sessions, the conductor's reviews and the research left ope
 - A list already at its last scroll sends a cursor event with an unchanged index on every DOWN (`ui_list.c` `set_cursor`; B9 review).
 - A popup's first draw (143k cycles) and a confirmation's (170k) land a frame late while the library's background scan runs (B11).
 - While an overlay moves, only one list clips, so a page with two lists shows the second's spare rows for 4–6 frames; over a popup, the confirmation's rounded corners show the dimmed page for 1–2 px (B11).
+- Deleting the running log file with LOGGING on stops SD logging until the next boot (pre-existing; B10).
+- Non-canonical paths such as `/deep/../x.gba` launch and are stored in Recent as given (only the test hook can make one today; B10).
 
 ### Decisions to review
 
@@ -346,6 +348,8 @@ Made during the build without the user; each is cheap to change.
 - **Name cleaning:** 4–5 digit scene prefixes dropped except 1900–2099; the article table can misfire ("Rock, Paper, A"); colliding games show their first differing tag, preferring Rev/Beta/translation tags (B4).
 - **The "played ago" words** and the unset clock counting as before 2026-10-01 (B5).
 - **Mockups for Settings and the rename keyboard,** approved by the conductor for the build (`docs/design/v0.4/settings-*.png`, `keyboard-*.png`).
+- **Dropped v0.3 features:** the NOR menu's load and back-up of a save; the help QR code; the cheat screen, per-game save type, hard reset and write to NOR with addon come back in B13/B14 (B10).
+- **The boot position is written after 5 s idle,** a new SD write in the menu (B10).
 - **Popups and confirmations:** keys pressed while one closes: moves reach the page, A/B/START/SELECT are dropped; the confirmation's dim toward white also fades the hint bar's labels in light; L/R page by 8 rows (B11).
 - **Look values read off the mockups** where spec.md is silent: shadows, scroll bar, hint chips, pill size and spring, path pill colour (B1, B9).
 

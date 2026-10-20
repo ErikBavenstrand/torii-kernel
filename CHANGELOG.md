@@ -6,6 +6,24 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** the new menu replaces the v0.3 screens (T1): home lists the
+  items (Recent, Favourites and each console while they hold games, then SD
+  card, NOR, Settings, Info) until the carousel, each opening a page frame
+  (title bar with the item's icon, name and clock, a card, the hint bar); B
+  goes back facing the item; the menu starts where Start on says, Last place
+  from `recent.txt`'s `@boot` line; the clock shows nothing while it isn't
+  set; the library walk keeps running (B10; `671db53`, `5f46d9c`, `4e3b7cf`).
+- **Changed:** launches, write to NOR, deleting a file and the NOR's launch,
+  delete and format move into a screen-free `actions.c`; a deleted file
+  leaves Recent, the favourites and the library index at once, and a folder
+  is refused. The SD list, the NOR list, Recently Played, SETTINGS, HELP and
+  its QR code are gone, with the NOR menu's load and back-up of a save
+  (B10; `671db53`, `4f7406d`, `8552a32`, `a59065a`).
+- **Changed:** dialogs and the loading card are floating cards: a hairline
+  and shadow, the title in the heading font, key chips, and a progress bar
+  on the card (B10; `671db53`).
+- **Changed:** a screen's hidden first draw stops at 230,000 cycles, leaving
+  entrances 38,000 cycles of margin (B10; `07a4a64`).
 - **Added:** popups, confirmations and the letter card: a popup beside a
   list's selected row that opens from a notch at the row (6 frames, closing
   in 4) and never covers the title bar; a centred confirmation that dims the

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Hard reset launch test on the emulated cart: hold L while picking CLEAN BOOT,
+# Hard reset launch test on the emulated cart: CLEAN BOOT with L held,
 # so the kernel starts the game through the BIOS HardReset (swi 0x26) instead
 # of SoftReset. Checks the game runs and EWRAM is all zero when it starts.
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
@@ -7,6 +7,8 @@
 set -euo pipefail
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
+# shellcheck source=tests/nav.sh
+. tests/nav.sh
 local_carts "dist/cart-hard-reset${1:+-$1}"
 
 cart=$carts/hard-reset
@@ -20,9 +22,9 @@ fail() {
   exit 1
 }
 
-# Idle.gba is the only entry: open it, then pick CLEAN BOOT with L held.
-OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -k 100:A -k 106:- \
-  -k 150:L -k 160:L+A -k 166:L -k 170:- \
+# CLEAN BOOT of Idle.gba with L held.
+# shellcheck disable=SC2046 # nav.sh's options
+OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch /Idle.gba hard at=160) \
   -r 400 -m 400:0x02000000:0x40000 >"$cart/out.txt" 2>&1
 ! grep -i crash "$cart/out.txt" || fail "the launch crashed"
 # The game sits in its idle loop at 0x080000C0 (r15 reads 4 bytes ahead).

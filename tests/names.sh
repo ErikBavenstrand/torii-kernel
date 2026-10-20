@@ -1,28 +1,21 @@
 #!/usr/bin/env bash
 # Non-ASCII file names on FAT32 and exFAT: a save test ROM named in Japanese
-# or with accented Latin letters must list, launch, get its save written to
+# or with accented Latin letters must launch, get its save written to
 # /SAVER under its own name, and get that save back on the next launch.
+# (Listing them is the SD card page's, B14.)
 # Usage: names.sh [fat32|exfat]
 # Runs inside the torii-emu container after `just build`,
 # `just emu-headless` and building tests/roms/savetest.
 set -euo pipefail
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
+# shellcheck source=tests/nav.sh
+. tests/nav.sh
 local_carts "dist/cart-names${1:+-$1}"
 
 fail() {
   echo "FAIL: $*" >&2
   exit 1
-}
-
-# keys FRAME KEY... -> mgba-shot press/release pairs, one key every 8 frames.
-keys() {
-  local frame=$1
-  shift
-  for key in "$@"; do
-    printf -- '-k %d:%s -k %d:- ' "$frame" "$key" $((frame + 4))
-    frame=$((frame + 8))
-  done
 }
 
 hex_at() { # file offset -> 5 bytes as hex
@@ -40,10 +33,11 @@ run_case() {
   tools/sdimg.sh "$cart/sd.img" put tests/roms/savetest/flash128.gba "/$name.gba"
   boot() { OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin "$@" 2>&1 >/dev/null | tee -a "$log" | { grep -v '^kernel: ' || true; } >&2; }
 
-  # Power-on 1: open the game, set SAVE TYPE to FLASH 128K, launch.
+  # Power-on 1: CLEAN BOOT with SAVE TYPE FLASH 128K, as a page will
+  # (actions.c, through tests/nav.sh's hook). The SD card page's listing of
+  # the name comes with B14.
   # shellcheck disable=SC2046
-  boot -s 90:"$shots/0-list.png" $(keys 100 A) \
-    $(keys 150 DOWN DOWN DOWN DOWN RIGHT RIGHT RIGHT RIGHT RIGHT UP UP UP UP A) -s 600:"$shots/1-game.png"
+  boot $(nav_launch "/$name.gba" save=5 at=250) -s 600:"$shots/1-game.png"
   grep -qF "launch $name.gba:" "$log" || fail "$fs $label: the kernel didn't launch $name.gba"
 
   # Power-on 2: confirm the save prompt so the kernel writes the save.
@@ -55,15 +49,16 @@ run_case() {
   [ "$(hex_at "$cart/game.sav" $((0x10000)))" = 4f4d525801 ] ||
     fail "$fs $label: the save has $(hex_at "$cart/game.sav" $((0x10000))), expected the first boot record"
 
-  # Power-on 3: SAVER sorts first; move down to the game, open it, launch.
+  # Power-on 3: launch it again.
   # shellcheck disable=SC2046
-  boot $(keys 100 DOWN A) $(keys 180 A) -s 600:"$shots/3-game.png"
+  boot $(nav_launch "/$name.gba" at=180) -s 600:"$shots/3-game.png"
   [ "$(hex_at "$cart/sram.bin" $((0x10000)))" = 4f4d525802 ] ||
     fail "$fs $label: cart SRAM has $(hex_at "$cart/sram.bin" $((0x10000))), expected the second boot"
 
   echo "PASS: $fs $label name ($name)"
 }
 
+echo "SKIP (waiting for B14): the SD card page lists the names"
 # With an argument, run only that file system (tests/all.sh runs them in parallel).
 for fs in fat32 exfat; do
   case ${1:-all} in

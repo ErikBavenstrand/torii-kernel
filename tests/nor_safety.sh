@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Game NOR safety on the emulated cart: power cuts while a game or the NOR list
 # is written, deleting the latest game, a lost list, a list from an older
-# kernel, a ROM without gbafix's 0x96, and Recently Played for NOR games. Each
-# case writes small test ROMs through WRITE TO NOR and checks where the next
-# write lands: never over a listed game. OMEGA_POWER_CUT (emu omega.c) cuts
-# the power between two flash operations. Runs inside the torii-emu container
+# kernel, a ROM without gbafix's 0x96, and Recent for NOR games. Each
+# case writes small test ROMs through WRITE TO NOR (tests/nav.sh's hook) and
+# checks where the next write lands: never over a listed game. OMEGA_POWER_CUT
+# (emu omega.c) cuts the power between two flash operations. Runs inside the torii-emu container
 # after `just build`, `just emu-headless` and the test ROMs. KERNEL picks
 # another kernel file, e.g. an older build to see the cases fail.
 set -euo pipefail
@@ -12,6 +12,8 @@ set -euo pipefail
 kernel=${KERNEL:-dist/ezkernelnew.bin}
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
+# shellcheck source=tests/nav.sh
+. tests/nav.sh
 # An argument N/M runs every Mth case from the Nth (shard_init)
 shard_init "${1:-}"
 local_carts "dist/cart-nor-safety${1:+-${1/\//of}}"
@@ -40,10 +42,12 @@ EOF
 
 # new_cart NAME FILE...: a cart with an erased game NOR (the emulator makes it,
 # filling what a test didn't write with 0xFF) and an SD card holding /SAVER
-# and the FILEs at the root (cart/FILE paths), listed as SAVER, A, B, C.
+# and the FILEs at the root (cart/FILE paths), in name order as write counts
+# them.
 new_cart() {
   case=$1
   shift
+  mapfile -t files < <(printf '%s\n' "$@" | sort)
   cart=$root/$case
   mkdir -p "$cart"
   mkfs.fat -C -F 32 -n NOR "$cart/sd.img" 65536 >/dev/null
@@ -106,24 +110,11 @@ boot() {
   fi
 }
 
-# keys FRAME KEY... -> mgba-shot press/release pairs, one key every 8 frames.
-# A key _ is a pause: A on a menu or question still opening does nothing,
-# so an A right after the key that opened one waits a slot.
-keys() {
-  local frame=$1
-  shift
-  for key in "$@"; do
-    [ "$key" = _ ] || printf -- '-k %d:%s -k %d:- ' "$frame" "$key" $((frame + 4))
-    frame=$((frame + 8))
-  done
-}
-
-# write N [CUT]: WRITE TO NOR CLEAN for the Nth file in the root (1 = A).
+# write N [CUT]: WRITE TO NOR CLEAN of new_cart's Nth file (1 = the first),
+# as a page will (actions.c)
 write() {
-  local downs=() i
-  for ((i = 0; i < $1; i++)); do downs+=(DOWN); done
-  # shellcheck disable=SC2046 # $(keys) is a list of options
-  boot ${2:+-c "$2"} $(keys 100 "${downs[@]}" A DOWN DOWN A) -f 600
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot ${2:+-c "$2"} $(nav_launch "/${files[$1 - 1]}" nor at=130) -f 600
 }
 
 # holds OFFSET FILE: the game NOR holds root FILE at OFFSET
@@ -187,18 +178,16 @@ for cut in kernel:erase:1@0x7A0000 kernel:program:1@0x7A0000 kernel:program:4240
   fi
 done
 
-# Delete latest asks first: B on the question keeps the game. A erases the
-# whole game and drops it from the list. A later write with the same
-# header, cut after its first block, is not listed.
+# Delete latest erases the whole game and drops it from the list. A later
+# write with the same header, cut after its first block, is not listed.
+# (B on the NOR page's question, which keeps the game, comes back with B15.)
 if shard_case; then
+  echo "SKIP (waiting for B15): B on the NOR page's delete question keeps the game"
   new_cart delete A.gba B.gba B2.gba C.gba
   write 1
   write 2
   # shellcheck disable=SC2046
-  boot $(keys 100 R DOWN A DOWN A _ B) -f 400
-  ! erased 0x20000 0x20000 || fail "B on the delete question erased B.gba"
-  # shellcheck disable=SC2046
-  boot $(keys 100 R DOWN A DOWN A _ A) -f 400
+  boot $(nav_nor_delete at=130) -f 400
   erased 0x20000 0x20000 || fail "delete latest left B.gba's data"
   write 3 game:program:4097
   write 4
@@ -355,7 +344,7 @@ fi
 
 # A list whose games fill all 64 MB (here one older kernel's entry): the scan
 # used to return without turning interrupts back on, and the menu then hung
-# in its first wait for VBlank. R must still switch to the NOR list.
+# in its first wait for VBlank. DOWN must still move home's cursor.
 if shard_case; then
   new_cart full A.gba
   dd if="$root/A.gba" of="$cart/game-nor.bin" conv=notrunc status=none
@@ -368,25 +357,26 @@ entry = struct.pack("<100sHHHHIBBH16s", b"A.gba", 0, 0, 0, 0, 0x4000000, 0, 0, 0
 k[0x7A0000:0x7A0000 + len(entry)] = entry
 open(sys.argv[1], "wb").write(k)
 EOF
-  boot -k 200:R -k 204:- -h 190 -h 300 -f 300
+  boot -k 200:DOWN -k 204:- -h 190 -h 300 -f 300
   [ "$(grep -c '^hash frame' "$cart/$runs.log")" = 2 ] || fail "no screen hashes"
   [ "$(grep '^hash frame' "$cart/$runs.log" | cut -d: -f2 | sort -u | wc -l)" = 2 ] ||
-    fail "R didn't switch to the NOR list: the menu hung"
+    fail "DOWN didn't move home's cursor: the menu hung"
   echo "PASS: a NOR list that fills the game NOR leaves interrupts on"
 fi
 
-# A game started from NOR goes on Recently Played, and opens from NOR there.
+# A game started from NOR goes on Recent, and its entry starts it from NOR
+# (as the Recent page will, through actions.c).
 if shard_case; then
   new_cart recent A.gba
   write 1
   # shellcheck disable=SC2046
-  boot $(keys 100 R A _ A) -f 400
+  boot $(nav_nor_launch 0 at=130) -f 400
   grep -q 'mode game from NOR offset 000000$' "$cart/$runs.log" || fail "A.gba didn't start from NOR"
   recent=$(mtype -i "$cart/sd.img" ::/torii/recent.txt 2>/dev/null | grep -v '^[#@]' | cut -f2 || true)
-  [ "$recent" = "NOR:A.gba" ] || fail "Recently Played has '$recent', expected NOR:A.gba"
-  # Confirm the save copy, then START and the first entry
+  [ "$recent" = "NOR:A.gba" ] || fail "Recent has '$recent', expected NOR:A.gba"
+  # Confirm the save copy, then its Recent entry
   # shellcheck disable=SC2046
-  boot -k 100:A -k 104:- $(keys 300 START A) -f 600
-  grep -q 'mode game from NOR offset 000000$' "$cart/$runs.log" || fail "Recently Played didn't start A.gba from NOR"
-  echo "PASS: a NOR game goes on Recently Played and starts from NOR there"
+  boot -k 100:A -k 104:- $(nav_launch NOR:A.gba at=300) -f 600
+  grep -q 'mode game from NOR offset 000000$' "$cart/$runs.log" || fail "its Recent entry didn't start A.gba from NOR"
+  echo "PASS: a NOR game goes on Recent and its entry starts it from NOR"
 fi

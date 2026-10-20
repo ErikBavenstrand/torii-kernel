@@ -13,13 +13,19 @@
 #   junk    a log file with junk after its text (v0.2.0 on the real cart)
 #           is left alone, and logging goes on in the next
 #   full    a full card stops the logging and the idle flush, not the kernel
-#   settings LOGGING turned on in SETTINGS makes the file in the background
+#   settings LOGGING turned on in Settings makes the file in the background
+#           (SKIP until B16)
 #   open    that background open meets a delete, a cut-off and LOGGING off
-#   flood   a scrolled list's frame-cycles go to the card as summaries
+#           (SKIP until B16)
+#   flood   screens changing for seconds: frame-cycles go to the card as
+#           summaries
+#   hang    the log is on the card as the Settings page opens (SKIP until B16)
 # Every part checks the card with fsck.fat. Runs inside the torii-emu container.
 set -euo pipefail
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
+# shellcheck source=tests/nav.sh
+. tests/nav.sh
 local_carts "dist/cart-logging${1:+-$1}"
 
 part=$1
@@ -113,8 +119,8 @@ launch)
   boot -f 200
   # Off: no log folder on the card (/torii holds the library index), nothing
   # in cart RAM page 0xF0, even after a launch (which writes /torii/recent.txt).
-  # shellcheck disable=SC2046 # $(keys) is a list of options
-  boot $(keys 100 A) $(keys 160 A) -f 400
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot $(nav_launch /Hello.gba at=160) -f 400
   grep -q '^kernel: launch: starting the game' "$cart/kernel.log" || fail "Hello.gba didn't launch"
   ! mdir -i "$cart/sd.img" ::/torii/logs >/dev/null 2>&1 || fail "logging off made /torii/logs"
   blank 0xF0000 0x2000 || fail "logging off wrote cart RAM page 0xF0"
@@ -128,9 +134,9 @@ launch)
   has "logging info, build main"
   has "previous session: nothing in cart RAM"
 
-  # SAVER sorts first (the list hides torii): down to Hello.gba, then CLEAN BOOT.
+  # CLEAN BOOT of Hello.gba
   # shellcheck disable=SC2046
-  boot $(keys 100 DOWN A) $(keys 160 A) -f 400
+  boot $(nav_launch /Hello.gba at=160) -f 400
   has "launch: loading Hello.gba, CLEAN BOOT"
   has "launch: header: title"
   has "launch: CART clock on, rumble on"
@@ -154,7 +160,7 @@ rom[0x134 : 0x134 + 9] = b'TORIITEST'
 open('$cart/Test.gb', 'wb').write(rom)"
   mcopy -i "$cart/sd.img" "$cart/Test.gb" ::/Test.gb
   # shellcheck disable=SC2046
-  boot $(keys 100 DOWN DOWN A) $(keys 160 A) -f 400
+  boot $(nav_launch /Test.gb at=160) -f 400
   has "launch: loading Test.gb with Jagoomba Color"
   soft_boot -f 200 # cart RAM keeps the session only across a soft reset
   has "previous session: ended in Test.gb (TORIITEST)"
@@ -162,7 +168,7 @@ open('$cart/Test.gb', 'wb').write(rom)"
   # A launch cut off (the emulator stops in the frame that logs it): after
   # a soft reset, cart RAM says where it stopped.
   # shellcheck disable=SC2046
-  boot $(keys 100 DOWN A) $(keys 160 A) -u 'launch: loading Hello.gba'
+  boot $(nav_launch /Hello.gba at=160) -u 'launch: loading Hello.gba'
   soft_boot -f 200
   has "previous session: ended abnormally in launching (step 0): Hello.gba"
   # After a power cut, only the log's last line can say so, if its flush
@@ -194,15 +200,14 @@ debug)
   settings 0=0xE1E1 1=1 2=1 3=0 4=0 5=9 6=8 7=2 8=9 9=8 10=3 11=1 12=0 13=1 14=1 25=1 26=2
   boot -f 200
   cp "$cart/sram.bin" "$cart/sram-before.bin"
-  # Hello.gba (alone: the list hides the torii folder the first boot made,
-  # and DOWN wraps to it), BOOT WITH ADDON; in game, L+R+START, then down to DEBUG
+  # Hello.gba, BOOT WITH ADDON; in game, L+R+START, then down to DEBUG
   # (RESET SAVE LOAD DEBUG) and A. The menu stays, saying the snapshot is
   # saved, with RESET picked (a power-off would clear cart RAM): A on it goes
   # back to the kernel, whose boot logs the snapshot.
   # The game starts around frame 850, once the savestate file is made.
   # The message's first row (y 147, from x 20) shows in VRAM.
   # shellcheck disable=SC2046
-  boot $(keys 100 DOWN A) $(keys 160 DOWN A) -k 1200:L+R+START -k 1206:- $(keys 1240 DOWN DOWN DOWN A) \
+  boot $(nav_launch /Hello.gba addon at=170) -k 1200:L+R+START -k 1206:- $(keys 1240 DOWN DOWN DOWN A) \
     -m 1300:$(printf 0x%X $((0x06000000 + (147 * 240 + 20) * 2))):400 -s 1300:"$cart/debug.png" $(keys 1320 A) -f 1700
   grep -qi 'e0 *03' "$cart/out.log" || fail "no green message after DEBUG: $(tail -3 "$cart/out.log")"
   has "launch: IRQ hook from"
@@ -411,28 +416,27 @@ full)
   boot -f 200
   grep -q "the card is full; the log waits for room" "$cart/kernel.log" || fail "a full card didn't stop the logging"
   ! grep -q "no more SD logging" "$cart/kernel.log" || fail "a full card counted as a card failure"
-  # The lists' idle flush waits while the card is full (it ran every idle
+  # The menu's idle flush waits while the card is full (it ran every idle
   # frame before v0.3.2): idle in the menu for 600 frames, none.
   : >"$cart/kernel.log"
   boot -f 800
-  flushes=$(grep -c '^kernel: lists: idle flush' "$cart/kernel.log" || true)
+  flushes=$(grep -c '^kernel: nav: idle flush' "$cart/kernel.log" || true)
   [ "$flushes" -eq 0 ] || fail "the idle flush ran $flushes times while the card was full"
   ! mtype -i "$cart/sd.img" ::/torii/logs/torii-0.log >/dev/null 2>&1 || fail "the log file it couldn't finish is still there"
-  # The kernel still launches games: past SAVER and FILLER.BIN (the list
-  # hides torii).
+  # The kernel still launches games.
   # shellcheck disable=SC2046
-  boot $(keys 100 DOWN DOWN A) $(keys 160 A) -f 400
+  boot $(nav_launch /Hello.gba at=160) -f 400
   grep -q '^kernel: launch: starting the game' "$cart/kernel.log" || fail "with a full card, Hello.gba didn't launch"
   mtype -i "$cart/sd.img" ::/FILLER.BIN | cmp -s - "$cart/filler.bin" || fail "the other file changed"
   card_ok
-  # Room again in the same boot: L+START on FILLER.BIN (past SAVER) and A
-  # deletes it; the idle flush then writes the log, which kept its lines
-  # meanwhile.
+  # Room again in the same boot: FILLER.BIN deleted (as the SD card page
+  # will, through actions.c); the idle flush then writes the log, which kept
+  # its lines meanwhile.
   # shellcheck disable=SC2046
-  boot $(keys 100 DOWN) -k 120:L -k 124:L+START -k 128:- $(keys 160 A) -f 1400
+  boot $(nav_delete /FILLER.BIN at=160) -f 1400
   grep -q "the card is full; the log waits for room" "$cart/kernel.log" || fail "the card wasn't full before the delete"
   ! mtype -i "$cart/sd.img" ::/FILLER.BIN >/dev/null 2>&1 || fail "FILLER.BIN wasn't deleted"
-  grep -q '^kernel: lists: idle flush' "$cart/kernel.log" || fail "no idle flush once a delete made room"
+  grep -q '^kernel: nav: idle flush' "$cart/kernel.log" || fail "no idle flush once a delete made room"
   # Through a file, as in has(): grep -q exits at the first match, mtype then
   # dies of SIGPIPE writing the rest of the 64 KB file, and pipefail failed
   # the test when that happened (most runs under tests/all.sh's load).
@@ -443,150 +447,50 @@ full)
   ;;
 
 settings)
-  # LOGGING turned on in SETTINGS on a new card: the log file (64 KB of
-  # zeros) is made a sector at a time in a job (tlog_flush_soon), so the
-  # screen takes keys meanwhile: it froze for 80 frames before v0.3.2 and
-  # lost the keys pressed then. The line saying so reaches the card from the
-  # lists' idle flush once SETTINGS closes.
-  new_card 65536 32
-  down=() # down to LOGGING
-  for i in $(seq 0 6); do
-    down+=(-k "@$((8 + 12 * i)):DOWN" -k "@$((12 + 12 * i)):-")
-  done
-  # A edits it, A A step it to Info, RIGHT A keep it; L at once goes to page
-  # 1, L again leaves SETTINGS, and the lists then wait for their idle flush.
-  boot -w "screen ready: sd-list" -k @8:R -k @12:- -w "screen ready: nor-list" -k @8:R -k @12:- \
-    -w "screen ready: settings1" -k @8:R -k @12:- -w "screen ready: settings2" "${down[@]}" \
-    -k @104:A -k @108:- -k @116:A -k @120:- -k @128:A -k @132:- -k @140:RIGHT -k @144:- -k @152:A -k @156:- \
-    -w "settings: staged" -k @4:L -k @8:- \
-    -w "screen ready: settings1" -k @8:L -k @12:- \
-    -w "screen ready: nor-list" -k @420:-
-  staged=$(grep -n 'settings: staged' "$cart/kernel.log" | head -1 | cut -d: -f1)
-  page1=$(grep -n 'screen ready: settings1' "$cart/kernel.log" | tail -1 | cut -d: -f1)
-  opened=$(grep -n 'log: opened in the background' "$cart/kernel.log" | head -1 | cut -d: -f1)
-  [ -n "$staged" ] && [ -n "$opened" ] || fail "LOGGING wasn't saved, or the log wasn't opened in the background"
-  [ "$page1" -gt "$staged" ] && [ "$page1" -lt "$opened" ] || fail "L while the log was being made didn't go to page 1 at once"
-  [ "$(mtype -i "$cart/sd.img" ::/torii/logs/torii-0.log | wc -c)" = 65536 ] || fail "the log file isn't 64 KB"
-  [ "$(log 0 | head -1)" = "torii log 00000001     " ] || fail "header: $(log 0 | head -1)"
-  has "settings: LOGGING is INFO"
-  card_ok
-  lines_ok
-  zeros_ok
-  echo "PASS: turning LOGGING on in SETTINGS makes the log file in the background, keys still act, and its line reaches the card"
+  # LOGGING turned on in Settings makes the log file in the background
+  # (tlog_flush_soon) while the screen takes keys, and its line reaches the
+  # card from the menu's idle flush: the Settings page's (B16).
+  echo "SKIP (waiting for B16): LOGGING turned on in Settings makes the log file in the background"
   ;;
 
 open)
-  # The background open (tlog_flush_soon) held part way by the test hook
-  # tlog_open_steps_test (hex: 14 lets it make 19 steps, 8 to look and
-  # begin, then 11 sectors of zeros; 1 none), while other code acts.
-  hold=14
-  down=() # SETTINGS page 2, down to LOGGING
-  for i in $(seq 0 6); do
-    down+=(-k "@$((8 + 12 * i)):DOWN" -k "@$((12 + 12 * i)):-")
-  done
-  to_logging=(-w "screen ready: sd-list" -p "@2:tlog_open_steps_test:$hold" -k @8:R -k @12:- -w "screen ready: nor-list" -k @8:R -k @12:-
-    -w "screen ready: settings1" -k @8:R -k @12:- -w "screen ready: settings2" "${down[@]}")
-  # A edits it, A A step it to Info, RIGHT A keep it
-  to_info=(-k @104:A -k @108:- -k @116:A -k @120:- -k @128:A -k @132:- -k @140:RIGHT -k @144:- -k @152:A -k @156:-
-    -w "settings: staged")
-  # L to page 1, L leaves SETTINGS for the NOR list, L to the SD list
-  # (Hello.gba alone: it hides torii, and DOWN wraps)
-  to_sd=(-k @4:L -k @8:- -w "screen ready: settings1" -k @8:L -k @12:- -w "screen ready: nor-list" -k @8:L -k @12:-
-    -w "screen ready: sd-list")
-
-  # A delete meanwhile: the open holds the file it makes (FatFs keeps no
-  # lock), so it finishes first (tlog_open_now), whatever is deleted.
-  rm -rf "$cart" && mkdir -p "$cart" && new_card 65536 32
-  boot "${to_logging[@]}" "${to_info[@]}" "${to_sd[@]}" \
-    -k @8:DOWN -k @12:- -k @24:L -k @28:L+START -k @32:- -w "screen ready: dialog" -k @8:A -k @12:- \
-    -w "screen ready: sd-list" -k @420:-
-  grep -q 'log: opened at once' "$cart/kernel.log" || fail "the delete didn't finish the open first"
-  ! grep -q 'log: opened in the background' "$cart/kernel.log" || fail "the hook didn't hold the open"
-  ! mtype -i "$cart/sd.img" ::/Hello.gba >/dev/null 2>&1 || fail "Hello.gba wasn't deleted"
-  [ "$(log 0 | head -1)" = "torii log 00000001     " ] || fail "header: $(log 0 | head -1)"
-  has "settings: LOGGING is INFO"
-  card_ok
-  lines_ok
-  zeros_ok
-
-  # Cut off part way (a reset, power loss) after other FatFs calls (the SD
-  # list) wrote the FAT out: the file has all its clusters and its size, so
-  # the card loses none, and as a file without a header it is made again at
-  # the next boot.
-  rm -rf "$cart" && mkdir -p "$cart" && new_card 65536 32
-  boot "${to_logging[@]}" "${to_info[@]}" "${to_sd[@]}" -k @30:-
-  [ "$(mtype -i "$cart/sd.img" ::/torii/logs/torii-0.log | wc -c)" = 65536 ] || fail "the file cut off isn't 64 KB"
-  [ -z "$(log 0)" ] || fail "the file cut off has text: $(log 0 | head -1)"
-  card_ok
-  boot -f 260
-  [ "$(log 0 | head -1)" = "torii log 00000001     " ] || fail "after the cut, header: $(log 0 | head -1)"
-  has "logging info, build main"
-  card_ok
-  lines_ok
-  zeros_ok
-
-  # LOGGING turned off again before the open made a step: the card stays
-  # untouched.
-  rm -rf "$cart" && mkdir -p "$cart" && new_card 65536 32
-  to_logging[3]=@2:tlog_open_steps_test:1
-  boot "${to_logging[@]}" "${to_info[@]}" \
-    -k @16:A -k @20:- -k @28:A -k @32:- -k @40:A -k @44:- -k @52:RIGHT -k @56:- -k @64:A -k @68:- \
-    -w "settings: LOGGING is OFF" "${to_sd[@]}" -k @60:-
-  grep -q 'log: LOGGING is off: the open stops' "$cart/kernel.log" || fail "the open didn't stop"
-  ! mdir -i "$cart/sd.img" ::/torii/logs >/dev/null 2>&1 || fail "the open went on with LOGGING off"
-  card_ok
-  echo "PASS: a delete finishes the background open first, one cut off leaves the card whole and is made again, and LOGGING off stops it"
+  # The background open (tlog_flush_soon, held part way by the test hook
+  # tlog_open_steps_test) meeting a delete, a cut-off and LOGGING off: it
+  # starts from the Settings page's LOGGING row (B16).
+  echo "SKIP (waiting for B16): the background open meets a delete, a cut-off and LOGGING off"
   ;;
 
 flood)
-  # A list scrolled for seconds at Debug: its measured frames reach the card
-  # as a summary, not a line each, and nothing is lost (v0.3's cart test
-  # lost 107 KB of log to them)
+  # Screens changed for seconds at Debug: their measured frames reach the
+  # card as summaries, not a line each, and nothing is lost (v0.3's cart
+  # test lost 107 KB of log to them)
   new_card 65536 32
-  mmd -i "$cart/sd.img" ::/Many
-  for i in $(seq -w 1 150); do
-    mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba "::/Many/Game $i.gba"
-  done
   settings 26=3 # LOGGING Debug
-  # Open Many, hold DOWN for 5 s, back out, then SETTINGS and out again (the
-  # log is written when SETTINGS closes)
-  # shellcheck disable=SC2046
-  boot $(keys 160 A) -k 200:DOWN -k 500:- $(keys 530 B R R) $(keys 610 L L) -f 750
+  # A page opened and left 16 times: the menu rests 36 frames between them,
+  # as the idle flush of a half-full log needs 30
+  presses=$(for f in $(seq 160 64 1120); do printf -- '-k %d:A -k %d:- -k %d:B -k %d:- ' "$f" $((f + 4)) $((f + 24)) $((f + 28)); done)
+  # shellcheck disable=SC2086
+  boot $presses -f 1600
   lines_ok
-  has "lists: /Many: 0 folders, 150 files"
-  has "frame-cycles summary: lists-scroll: "
+  [ "$(count "nav: open gba")" -ge 16 ] || fail "the page wasn't opened 16 times: $(count "nav: open gba")"
+  has "frame-cycles summary: ui-transition: "
   [ "$(count 'frame-cycles: ')" = 0 ] || fail "frame-cycles lines on the card"
   [ "$(count 'bytes of log lost')" = 0 ] || fail "log lost"
-  grep -q '^kernel: frame-cycles: lists-scroll [0-9]' "$cart/kernel.log" || fail "no frame-cycles lines in mGBA's console"
-  # Lines that fill half the RAM ring reach the card once no key is held,
-  # with nothing else writing the log: SD list to NOR list and back, 16 times
-  before=$(count "ui: pushed nor-list")
-  # shellcheck disable=SC2046
-  boot $(keys 160 R L R L R L R L R L R L R L R L R L R L R L R L R L R L R L R L) -f 600
-  [ "$(count "ui: pushed nor-list")" -ge $((before + 16)) ] || fail "the lists didn't write the log while idle"
-  # A few lines reach the card after 5 s with no key held, over the file menu too
-  before=$(count "lists: /Many")
-  # shellcheck disable=SC2046
-  boot $(keys 160 A A) -f 600
-  [ "$(count "lists: /Many")" = $((before + 1)) ] || fail "a few lines didn't reach the card after 5 s idle"
-  has "ui: pushed file-menu"
+  grep -q '^kernel: frame-cycles: ui-transition [0-9]' "$cart/kernel.log" || fail "no frame-cycles lines in mGBA's console"
+  # A few lines reach the card after 5 s with no key held
+  before=$(count "nav: open gba")
+  boot -k 160:A -k 164:- -f 600
+  [ "$(count "nav: open gba")" = $((before + 1)) ] || fail "a few lines didn't reach the card after 5 s idle"
   lines_ok
   card_ok
-  echo "PASS: measured frames reach the card as summaries, nothing is lost, and idle lists write the log"
+  echo "PASS: measured frames reach the card as summaries, nothing is lost, and the idle menu writes the log"
   ;;
 
 hang)
-  # A hang in SETTINGS (v0.3.2: THEME after WRITE TO NOR froze the cart, and
+  # A hang in Settings (v0.3.2: THEME after WRITE TO NOR froze the cart, and
   # took the lines that led there along): what came before is on the card
-  # as SETTINGS opens. The run stops there, as a power-off would.
-  new_card 65536 32
-  settings 26=3 # LOGGING Debug
-  boot -w "screen ready: sd-list" -k @8:R -k @12:- -w "screen ready: nor-list" -k @8:R -k @12:- \
-    -w "screen ready: settings1"
-  has "screen ready: nor-list"
-  lines_ok
-  card_ok
-  echo "PASS: the log is on the card as SETTINGS opens"
+  # as the Settings page opens (B16).
+  echo "SKIP (waiting for B16): the log is on the card as the Settings page opens"
   ;;
 
 *)

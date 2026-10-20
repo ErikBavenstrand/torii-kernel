@@ -1,6 +1,7 @@
-// Diagnostics: tests and probes for a real cart, run from SETTINGS (DIAGNOSE)
-// or by holding DIAG_BOOT_KEYS at power-on. It logs at Debug level for its
-// own run and writes its report to the card through the log.
+// Diagnostics: tests and probes for a real cart, run by holding
+// DIAG_BOOT_KEYS at power-on (and from the Info page once B17 lands). It
+// logs at Debug level for its own run and writes its report to the card
+// through the log.
 #ifndef TORII_DIAG_H
 #define TORII_DIAG_H
 

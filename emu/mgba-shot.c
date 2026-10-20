@@ -16,6 +16,8 @@
 //                    same hash), to compare runs without saving PNGs
 //   -p FRAME:ADDR:VALUE  before FRAME, write a 32-bit VALUE to ADDR (hex, or
 //                    a symbol's name from the symbol file)
+//   -P FRAME:ADDR:TEXT  before FRAME, write TEXT and a NUL to ADDR (as -p's),
+//                    e.g. a path for a test hook
 //   -u TEXT          stop after the frame in which the kernel (or a -L
 //                    script) logs TEXT
 //   -x FRAME:PATH    after FRAME, write a save state (with the cart's state)
@@ -764,9 +766,11 @@ static void parse_options(struct options *opts, int argc, char **argv)
 				exit(2);
 			}
 			ev->end = end.frame;  // a window only: it doesn't make the run longer
-		} else if (!strcmp(argv[i], "-p")) {
+		} else if (!strcmp(argv[i], "-p") || !strcmp(argv[i], "-P")) {
+			int text = argv[i][1] == 'P';
 			struct event *ev = add_event(&opts->pokes, argv[++i]);
-			no_zero(ev, "-p");
+			no_zero(ev, text ? "-P" : "-p");
+			ev->end = (unsigned)text;  // unused by pokes otherwise: a text, not a word
 			note_frame(ev, 1);
 		} else if (!strcmp(argv[i], "-x")) {
 			note_frame(add_event(&opts->states, argv[++i]), 0);
@@ -829,7 +833,9 @@ static void dump_memory(struct mCore *core, unsigned frame, const char *spec)
 	}
 }
 
-static void poke_memory(struct mCore *core, const char *spec)
+// -p FRAME:ADDR:VALUE writes a word; -P FRAME:ADDR:TEXT (text set) writes
+// TEXT's bytes and a NUL
+static void poke_memory(struct mCore *core, const char *spec, int text)
 {
 	const char *colon = strchr(spec, ':');
 	uint32_t address = strtoul(spec, NULL, 0);
@@ -844,6 +850,13 @@ static void poke_memory(struct mCore *core, const char *spec)
 			exit(1);
 		}
 		address = symbols[i].address;
+	}
+	if (text) {
+		const char *s = colon ? colon + 1 : "";
+		do {
+			core->busWrite8(core, address++, (uint8_t)*s);
+		} while (*s++);
+		return;
 	}
 	uint32_t value = colon ? strtoul(colon + 1, NULL, 0) : 0;
 	core->busWrite32(core, address, value);  // Like a CPU store, so the renderer sees it
@@ -1027,7 +1040,7 @@ int main(int argc, char **argv)
 		}
 		for (size_t i = 0; i < opts.pokes.count; ++i) {
 			if (due(&opts.pokes.list[i], frame)) {
-				poke_memory(core, opts.pokes.list[i].arg);
+				poke_memory(core, opts.pokes.list[i].arg, (int)opts.pokes.list[i].end);
 			}
 		}
 		tear_on = 0;

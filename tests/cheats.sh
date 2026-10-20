@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2317,SC2329 # skipped until B13 (below)
 # A cheat file whose names are in Latin-1 or GBK, not UTF-8: every section and
 # entry must still parse, as the kernel reads .cht files byte for byte (FatFs's
 # own line reader decodes UTF-8 and drops other bytes). Opens the cheat screen
@@ -6,6 +7,13 @@
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and building tests/roms/hello.
 set -euo pipefail
+
+# The cheat screen opened from the v0.3 game menu, which went with B10; the
+# game popup that opens it again comes with B13, which brings this back on
+# its route.
+echo "SKIP (waiting for B13): a Latin-1 or GBK cheat file parses on the cheat screen"
+exit 0
+
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 local_carts "dist/cart-cheats${1:+-$1}"
@@ -36,7 +44,7 @@ printf '\x01\x00' | dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7B0000 + 2 * 4))
 # dump the parsed list, whose names lose their spaces
 list=$((16#$(sed -n 's/^\([0-9a-f]*\) [A-Za-z] pReadCache$/\1/p' dist/ezkernelnew.nm) + 0x2000))
 boot -k 100:DOWN -k 104:- -k 116:A -k 120:- -k 150:DOWN -k 154:- -k 162:DOWN -k 166:- -k 174:DOWN -k 178:- -k 186:DOWN -k 190:- \
-  -k 198:DOWN -k 202:- -k 214:A -k 218:- -s 300:"$shots/cheats.png" -m "300:$(printf 0x%x $list):1024" -f 300 \
+  -k 198:DOWN -k 202:- -k 214:A -k 218:- -s 300:"$shots/cheats.png" -m "300:$(printf 0x%x "$list"):1024" -f 300 \
   >"$cart/out.txt" 2>&1
 sed -n 's/^mem frame 300 [0-9A-F]*: //p' "$cart/out.txt" | python3 -c 'import sys; sys.stdout.buffer.write(bytes.fromhex(sys.stdin.read()))' >"$cart/list.bin"
 [ -s "$cart/list.bin" ] || fail "no memory dump: $(tail -3 "$cart/out.txt")"

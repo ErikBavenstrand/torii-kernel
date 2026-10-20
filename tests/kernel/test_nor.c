@@ -6,10 +6,9 @@
 #include "../../source/ez_define.h"
 #include "../../source/ezkernel.h"
 #include "../../source/NORflash_OP.h"
+#include "../../source/settings.h"
 #include "torii_test.h"
 #include "tests.h"
-
-extern u16 SET_info_buffer[0x200];
 
 void test_nor_info_stays_in_bounds(void)
 {

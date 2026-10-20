@@ -10,6 +10,8 @@
 set -euo pipefail
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
+# shellcheck source=tests/nav.sh
+. tests/nav.sh
 local_carts "dist/cart-userdata${1:+-$1}"
 
 fail() {
@@ -63,15 +65,16 @@ boot() {
   return $status
 }
 
-# START opens Recent; A on its first game, A on CLEAN BOOT launches it
-open_first="-k 100:START -k 104:- -k 130:A -k 134:- -k 170:A -k 174:-"
+# CLEAN BOOT of Recent's first game, as the Recent page will (B13), through
+# actions.c and tests/nav.sh's hook. The menu reads Recent as it starts.
+launch() { nav_launch "$1" at=170; }
 
 # The v0.3 list is read as it is; the first write (a launch) takes it over,
 # with its NOR games, the game's time and its CRC line
 new_cart migrate
 put "/SAVER/Recently play.txt" '/Hello.gba\nNOR:Old.gba\n'
-# shellcheck disable=SC2086 # $open_first is a list of options
-boot 1.log -C $now $open_first -f 400
+# shellcheck disable=SC2046 # nav.sh's options
+boot 1.log -C $now $(launch /Hello.gba) -f 400
 grep -q '^kernel: launch Hello.gba: code' "$cart/1.log" || fail "Hello.gba didn't launch: $(grep '^kernel' "$cart/1.log" | tail -3)"
 grep -q 'userdata: Recent: 2 games from /SAVER/Recently play.txt' "$cart/1.log" || fail "the v0.3 list wasn't read"
 copies "$now\t/Hello.gba\n0\tNOR:Old.gba\n"
@@ -81,8 +84,8 @@ echo "PASS: the v0.3 list and its NOR games move to /torii/recent.txt at the fir
 # A clock that isn't set gives no time (T4)
 new_cart unset
 put "/SAVER/Recently play.txt" '/Hello.gba\n'
-# shellcheck disable=SC2086
-boot 1.log -C $unset $open_first -f 400
+# shellcheck disable=SC2046
+boot 1.log -C $unset $(launch /Hello.gba) -f 400
 copies "0\t/Hello.gba\n"
 echo "PASS: a game played while the clock isn't set has time 0"
 
@@ -91,7 +94,7 @@ new_cart backup
 put /torii/recent.txt ''
 sealed '0\t/Gone.gba\n0\t/Hello.gba\n' >"$cart/bak.txt"
 mcopy -o -i "$cart/sd.img" "$cart/bak.txt" ::/torii/recent.txt.bak
-boot 1.log -k 100:START -k 104:- -f 200
+boot 1.log -f 200
 grep -q 'safefile: /torii/recent.txt: read the backup copy' "$cart/1.log" || fail "the backup copy wasn't read"
 grep -q 'userdata: Recent: 2 games from /torii/recent.txt' "$cart/1.log" || fail "Recent doesn't hold the backup's games"
 echo "PASS: an empty recent.txt (a cut write) gives way to recent.txt.bak"
@@ -102,8 +105,8 @@ new_cart hand
 put /torii/recent.txt '@boot gba 3\r\n/Hello.gba\r\n'
 sealed '0\t/Other.gba\n' >"$cart/bak.txt"
 mcopy -o -i "$cart/sd.img" "$cart/bak.txt" ::/torii/recent.txt.bak
-# shellcheck disable=SC2086
-boot 1.log -C $now $open_first -f 400
+# shellcheck disable=SC2046
+boot 1.log -C $now $(launch /Hello.gba) -f 400
 grep -q 'safefile: /torii/recent.txt: edited by hand' "$cart/1.log" || fail "the hand edit wasn't read as one"
 grep -q '^kernel: launch Hello.gba: code' "$cart/1.log" || fail "Hello.gba didn't launch from the edited list"
 copies "@boot gba 3\n$now\t/Hello.gba\n"
@@ -114,8 +117,8 @@ new_cart broken
 printf '\0\0\0\0\0\0\0\0' >"$cart/zero.txt"
 mcopy -o -i "$cart/sd.img" "$cart/zero.txt" ::/torii/recent.txt
 mcopy -o -i "$cart/sd.img" "$cart/zero.txt" ::/torii/recent.txt.bak
-# The list: SAVER, Hello.gba (it hides torii)
-boot 1.log -C $now -k 100:DOWN -k 104:- -k 116:A -k 120:- -k 164:A -k 168:- -f 450
+# shellcheck disable=SC2046
+boot 1.log -C $now $(launch /Hello.gba) -f 450
 grep -q 'safefile: /torii/recent.txt: neither copy holds up' "$cart/1.log" || fail "the broken copies weren't noticed"
 copies "$now\t/Hello.gba\n"
 echo "PASS: two broken copies read as an empty Recent, and the next launch writes good ones"
@@ -131,8 +134,8 @@ mcopy -o -i "$cart/sd.img" "$cart/sealed.txt" ::/torii/recent.txt.bak
 boot 0.log -f 1
 cp -r "$cart" "$carts/cut-start"
 nor=$(md5sum <"$cart/kernel-nor.bin")
-# shellcheck disable=SC2086
-OMEGA_TRACE=1 boot 1.log $open_first -f 300
+# shellcheck disable=SC2046
+OMEGA_TRACE=1 boot 1.log $(launch /Gone.gba) -f 300
 grep -q 'recent: forgot /Gone.gba' "$cart/1.log" || fail "Gone.gba didn't come off Recent: $(grep '^kernel' "$cart/1.log" | tail -3)"
 [ "$(md5sum <"$cart/kernel-nor.bin")" = "$nor" ] || fail "saving Recent wrote the kernel's NOR"
 grep -q 'safefile: writing /torii/recent.txt, the backup first' "$cart/1.log" || fail "the backup wasn't written first"
@@ -145,10 +148,10 @@ results=""
 for n in $(seq 1 "$writes"); do
   rm -rf "$cart" && cp -r "$carts/cut-start" "$cart"
   status=0
-  # shellcheck disable=SC2086
-  OMEGA_POWER_CUT=sd:write:$((first + n)) boot 2.log $open_first -f 300 || status=$?
+  # shellcheck disable=SC2046
+  OMEGA_POWER_CUT=sd:write:$((first + n)) boot 2.log $(launch /Gone.gba) -f 300 || status=$?
   [ $status = 75 ] || fail "no power cut before SD write $n of the save (exit $status)"
-  boot 3.log -k 100:START -k 104:- -f 200
+  boot 3.log -f 200
   got=$(grep -o 'userdata: Recent: [0-9]* games' "$cart/3.log" | grep -o '[0-9]*' || echo 0)
   case $got in
   2) results+="before " ;;
@@ -160,8 +163,8 @@ done
 echo "PASS: a power cut before any of the $writes SD writes of a save of Recent leaves a whole list ($results)"
 
 # A full card: recent.txt is empty (a cut write) and recent.txt.bak holds 32
-# long entries. Launching Hello.gba (the last of them, UP from the top)
-# writes recent.txt first, which runs out of room: that copy is left empty,
+# long entries. Launching Hello.gba (the last of them) writes recent.txt
+# first, which runs out of room: that copy is left empty,
 # so the next boot reads recent.txt.bak whole, not the part that fit.
 cart=$carts/full
 rm -rf "$cart"
@@ -180,11 +183,12 @@ put /torii/recent.txt ''
 free=$(mdir -i "$cart/sd.img" :: | grep -o '[0-9 ]* bytes free' | tr -dc 0-9)
 head -c $((free - 2048)) /dev/zero >"$cart/filler.bin"
 mcopy -i "$cart/sd.img" "$cart/filler.bin" ::/filler.bin
-boot 1.log -C $now -k 100:START -k 104:- -k 130:UP -k 134:- -k 150:A -k 154:- -k 190:A -k 194:- -f 450
+# shellcheck disable=SC2046
+boot 1.log -C $now $(nav_launch /Hello.gba at=190) -f 450
 grep -q 'safefile: writing /torii/recent.txt failed' "$cart/1.log" || fail "the write didn't run out of room"
 [ "$(mtype -i "$cart/sd.img" ::/torii/recent.txt | wc -c)" = 0 ] || fail "the failed copy isn't empty"
-# B at "Save sav?", then START
-boot 2.log -k 100:B -k 104:- -k 170:START -k 174:- -f 300
+# B at "Save sav?"; the menu reads Recent as it starts
+boot 2.log -k 100:B -k 104:- -f 300
 grep -q 'userdata: Recent: 32 games from /torii/recent.txt' "$cart/2.log" ||
   fail "after the full card, Recent has: $(grep 'userdata: Recent' "$cart/2.log")"
 echo "PASS: a write the full card can't take leaves its copy empty, and the other is read whole"

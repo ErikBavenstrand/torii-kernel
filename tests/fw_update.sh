@@ -36,7 +36,7 @@ run() {
   mkfs.fat -C -F 32 -n FW "$cart/sd.img" 65536 >/dev/null
   OMEGA_DIR=$cart OMEGA_FPGA_VERSION=$2 emu/build-linux/mgba-shot "$3" -f 3000 \
     -w "screen ready: dialog" -k "@8:$4" -k @14:- \
-    -u "firmware: updated" -u "screen ready: sd-list" >"$cart/log.txt" 2>&1
+    -u "firmware: updated" -u "screen ready: home" >"$cart/log.txt" 2>&1
 }
 
 # check_flash PART ADDRESS: fpga-flash.bin holds the upgrade file's PART (in whole
@@ -78,7 +78,7 @@ done
 # B cancels: nothing written, the menu comes up
 run cancel B006 "$kernel" B
 grep -q "firmware update: .*: B, no" "$cart/log.txt" || bad "no update question answered B"
-grep -q "screen ready: sd-list" "$cart/log.txt" || bad "the menu didn't come up"
+grep -q "screen ready: home" "$cart/log.txt" || bad "the menu didn't come up"
 out=$(check_flash none 2>&1) || bad "$out"
 
 # One byte of the LX16 firmware changed: the CRC32 check refuses it
@@ -95,13 +95,13 @@ EOF
 run crc B006 "$root/bad-crc.bin" B
 grep -q "dialog: Rev.B firmware update: The firmware in the kernel is damaged (CRC32). Press \[B\] to go back" "$cart/log.txt" ||
   bad "no CRC error: $(grep -m 3 'kernel' "$cart/log.txt")"
-grep -q "screen ready: sd-list" "$cart/log.txt" || bad "the menu didn't come up"
+grep -q "screen ready: home" "$cart/log.txt" || bad "the menu didn't come up"
 out=$(check_flash none 2>&1) || bad "$out"
 
 # Up to date: no question
 run current B007 "$kernel" A
 grep -q "firmware update" "$cart/log.txt" && bad "asked to update firmware 7"
-grep -q "screen ready: sd-list" "$cart/log.txt" || bad "the menu didn't come up"
+grep -q "screen ready: home" "$cart/log.txt" || bad "the menu didn't come up"
 out=$(check_flash none 2>&1) || bad "$out"
 
 [ $failed = 0 ] && echo "PASS: FPGA firmware update (LX16, LX9, cancel, CRC error, up to date)"

@@ -1,0 +1,6 @@
+# Start on (T19) set to NES, which the card has no games for: the menu
+# starts on home facing the nearest item that shows (SD card), not the
+# hidden page; tests/navigation.sh checks every Start on value from the log
+#! settings 32=8
+-w "nav: home ready"
+-s @1:screen.png

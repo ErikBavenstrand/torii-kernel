@@ -10,6 +10,8 @@
 set -euo pipefail
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
+# shellcheck source=tests/nav.sh
+. tests/nav.sh
 local_carts "dist/cart-library${1:+-${1//\//-}}"
 shard_init "${1:-}"
 
@@ -107,18 +109,15 @@ $(index "$cart")"
   index "$cart" --header | grep -qx "flags 0" || fail "the index says truncated"
   echo "PASS: the first boot indexes nested folders A-Z per console, skips hidden and too-deep ones, and finds saves"
 
-  # Power-on 2: loaded, the walk finds nothing new and writes nothing; the
-  # SD list doesn't show Torii's folder
-  sym() { grep " $1\$" dist/ezkernelnew.sym | cut -d' ' -f1; }
-  boot "$cart" "$cart/2.log" -m "200:0x$(sym folder_total):4" -f 300
+  # Power-on 2: loaded, the walk finds nothing new and writes nothing. (The
+  # SD card page not showing Torii's folder comes back with B14.)
+  echo "SKIP (waiting for B14): the SD card page doesn't show Torii's folder"
+  boot "$cart" "$cart/2.log" -f 300
   logged "$cart/2.log" "library: loaded 9 games (GBA 6, GBC 1, GB 1, NES 1)"
   logged "$cart/2.log" "library: unchanged"
   not_logged "$cart/2.log" "library: wrote"
   not_logged "$cart/2.log" "screen ready: progress"
   no_errors "$cart/2.log"
-  folders=$(sed -n 's/^mem frame 200 [0-9A-F]*: //p' "$cart/2.log" | cut -d' ' -f1)
-  # GBA, NES, SAVER, RTS, SYSTEM, System Volume Information, .Trashes, Deep: not torii
-  [ "$((16#$folders))" = 8 ] || fail "the SD list shows $((16#$folders)) folders, expected 8 (without torii)"
   echo "PASS: a later boot loads the index, finds the card unchanged and writes nothing"
 
   # Changes from a PC: one game added in the root and one in a nested
@@ -207,7 +206,7 @@ if shard_case; then
   boot "$cart" "$cart/4.log" -f 300
   logged "$cart/4.log" "library: the index is another card's"
   logged "$cart/4.log" "library: new index: 1 games (GBA 1, GBC 0, GB 0, NES 0)"
-  grep -E "kernel: (library: new index|screen ready: sd-list)" "$cart/4.log" | head -1 | grep -q "new index" ||
+  grep -E "kernel: (library: new index|screen ready: home)" "$cart/4.log" | head -1 | grep -q "new index" ||
     fail "the menu came up before the new index"
   index "$cart" --header | grep -qx "volume_serial 12345678" || fail "the new index has another serial"
   echo "PASS: another card's index is built again before the menu"
@@ -256,15 +255,16 @@ if shard_case; then
   put "$cart" "/$toolong" "/Zelda.gb"
   boot "$cart" "$cart/1.log" -f 200
   logged "$cart/1.log" "library: wrote /torii/library.idx"
-  # SAVER, then the long name: open it, CLEAN BOOT; it fails and the list comes back
-  # (B closes the error)
-  boot "$cart" "$cart/2.log" -k 116:DOWN -k 120:- -k 132:A -k 136:- -k 180:A -k 184:- -w "screen ready: dialog" \
-    -k @20:B -k @24:- -f 600
+  # CLEAN BOOT of the long name (as a page will, through actions.c); it
+  # fails and the menu comes back (B closes the error)
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot "$cart" "$cart/2.log" $(nav_launch "/$toolong" at=180) -w "screen ready: dialog" -k @20:B -k @24:- -f 600
   grep -q "^kernel error: error 8: The file name is too long" "$cart/2.log" || fail "the launch didn't fail"
   [ "$(grep -c 'kernel: library: loaded 2 games' "$cart/2.log")" = 2 ] ||
     fail "the index wasn't loaded again after the failed launch: $(grep 'kernel: library' "$cart/2.log")"
-  # Zelda.gb starts as soon as it is picked; the next boot loads the index
-  boot "$cart" "$cart/3.log" -k 116:DOWN -k 120:- -k 132:DOWN -k 136:- -k 148:A -k 152:- -f 400
+  # Zelda.gb starts; the next boot loads the index
+  # shellcheck disable=SC2046
+  boot "$cart" "$cart/3.log" $(nav_launch /Zelda.gb at=150) -f 400
   logged "$cart/3.log" "launch: starting the game"
   # (B at "Save sav?", which the game left)
   boot "$cart" "$cart/4.log" -k 100:B -k 106:- -f 400

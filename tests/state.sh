@@ -6,6 +6,8 @@
 set -euo pipefail
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
+# shellcheck source=tests/nav.sh
+. tests/nav.sh
 local_carts "dist/cart-state${1:+-$1}"
 
 cart=$carts/state-test
@@ -19,8 +21,9 @@ fail() {
   exit 1
 }
 
+# shellcheck disable=SC2046 # nav.sh's options
 first=$(OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin \
-  -k 100:A -k 106:- -k 160:A -k 166:- -x "400:$cart/game.ss" -h 450 2>/dev/null)
+  $(nav_launch /Hello.gba at=160) -x "400:$cart/game.ss" -h 450 2>/dev/null)
 grep -q "state frame 400" <<<"$first" || fail "no state written"
 hash=$(sed -n 's/^hash frame 450: //p' <<<"$first")
 

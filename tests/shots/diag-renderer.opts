@@ -1,20 +1,13 @@
 # Diagnostics run to its renderer step (source/diag_render.c), whose
 # frame-cycles figures are the emulator's in tests/perf/budget.txt: the cart
 # compares its own with them. The shot is the list it scrolls (its page shows
-# the figures, which change with any change to the code). DIAGNOSE is the
-# last row of SETTINGS page 2, as in diag-start.
--w "screen ready: sd-list"
--k @8:R -k @12:-
--w "screen ready: nor-list"
--k @8:R -k @12:-
--w "screen ready: settings1"
--k @8:R -k @12:-
--w "screen ready: settings2"
--k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:DOWN -k @48:-
--k @56:DOWN -k @60:- -k @68:DOWN -k @72:- -k @80:DOWN -k @84:- -k @92:DOWN -k @96:-
--k @104:DOWN -k @108:- -k @116:A -k @120:-
+# the figures, which change with any change to the code).
+# Diagnostics from L+R+SELECT held at power-on (B17 moves it to Info), A
+# once its first page is up and those keys are let go
+-k 1:L+R+SELECT
 -w "screen ready: diag-start"
--k @8:A -k @12:-
+-k 60:-
+-k @40:A -k @44:-
 -w "screen ready: diag-demo"
 -s @1:demo.png
 -w "frame-cycles: diag-page"

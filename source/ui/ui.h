@@ -503,7 +503,8 @@ struct ui_scrollbar_config {
 	u8 target;  // index of the list in the same layout
 };
 
-// A progress bar: ink (ACCENT) fills paper's track (TRACK). data may be NULL.
+// A progress bar: ink (ACCENT) fills a TRACK pill on paper (none:
+// transparent; FLOAT on a floating card). data may be NULL.
 
 // A card (spec.md: cards r4 with a soft shadow): a rounded surface of paper
 // (PANEL; FLOAT for a popup's) inside the rectangle, its body inset from

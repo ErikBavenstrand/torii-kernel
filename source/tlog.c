@@ -90,6 +90,17 @@ int tlog_in_emulator(void)
 	return tlog_emu;
 }
 
+int tlog_in_emulator_now(void)
+{
+	// mGBA answers 0x1DEA only while enabled: off, it reads 0; on again, the
+	// answer comes back. A cart's open bus (the prefetched code) can't follow
+	// both writes
+	REG_DEBUG_ENABLE = 0;
+	int off = REG_DEBUG_ENABLE != 0x1DEA;
+	REG_DEBUG_ENABLE = 0xC0DE;
+	return tlog_emu && off && REG_DEBUG_ENABLE == 0x1DEA;
+}
+
 int tlog_wants(u32 level)
 {
 	return tlog_emu || level <= tlog_level;

@@ -7,6 +7,8 @@
 set -euo pipefail
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
+# shellcheck source=tests/nav.sh
+. tests/nav.sh
 local_carts "dist/cart-clean-boot${1:+-$1}"
 
 cart=$carts/clean-boot
@@ -20,8 +22,9 @@ fail() {
   exit 1
 }
 
-# Idle.gba is the only entry: open it, then pick CLEAN BOOT.
-OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -k 100:A -k 106:- -k 160:A -k 166:- \
+# CLEAN BOOT of Idle.gba, once the menu is up.
+# shellcheck disable=SC2046 # nav.sh's options
+OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch /Idle.gba at=160) \
   -m 90:0x04000204:2 -m 400:0x04000204:2 -m 400:0x02000000:0x40000 -m 400:0x03000000:0x8000 2>/dev/null >"$cart/ram.txt"
 grep '^mem frame 400 020' "$cart/ram.txt" >"$cart/ewram.txt" || true
 grep '^mem frame 400 030' "$cart/ram.txt" >"$cart/iwram.txt" || true

@@ -8,6 +8,8 @@
 set -euo pipefail
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
+# shellcheck source=tests/nav.sh
+. tests/nav.sh
 local_carts "dist/cart-rumble-probe${1:+-$1}"
 
 fail() {
@@ -21,12 +23,12 @@ mkdir -p "$cart" "$shots"
 mkfs.fat -C -F 32 -n RUMBLE "$cart/sd.img" 65536 >/dev/null
 mcopy -i "$cart/sd.img" tests/roms/rumble/rumble.gba ::/Probe.gba
 
-# Open Probe.gba, CLEAN BOOT. Then each try: A runs it (60 frames), and the
+# CLEAN BOOT of Probe.gba. Then each try: A runs it (60 frames), and the
 # answers are A (yes), B (no), SELECT (skip), A. A goes back to the kernel,
 # and A at its "Save sav?" lets the boot go on to the report.
 k() { printf -- '-k %d:%s -k %d:- ' "$1" "$2" $(($1 + 4)); }
 # shellcheck disable=SC2046
-OMEGA_DIR=$cart OMEGA_TRACE=1 emu/build-linux/mgba-shot dist/ezkernelnew.bin $(k 100 A) $(k 180 A) \
+OMEGA_DIR=$cart OMEGA_TRACE=1 emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch /Probe.gba at=180) \
   -s 420:"$shots/1-try.png" $(k 420 A) -s 500:"$shots/2-answer.png" $(k 500 A) \
   $(k 540 A) $(k 620 B) $(k 660 A) $(k 740 SELECT) $(k 780 A) $(k 860 A) \
   -s 900:"$shots/3-done.png" $(k 900 A) -s 1100:"$shots/4-save.png" $(k 1100 A) -s 1400:"$shots/5-menu.png" -f 1400 >"$cart/out.log" 2>"$cart/kernel.log" || true

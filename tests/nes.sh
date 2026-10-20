@@ -7,6 +7,8 @@
 set -euo pipefail
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
+# shellcheck source=tests/nav.sh
+. tests/nav.sh
 local_carts "dist/cart-nes${1:+-$1}"
 
 cart=$carts/nes
@@ -23,8 +25,9 @@ python3 tests/nes_rom.py "$cart/Red.nes"
 mkfs.fat -C -F 32 -n NES "$cart/sd.img" 65536 >/dev/null
 mcopy -i "$cart/sd.img" "$cart/Red.nes" ::/Red.nes
 
-# Red.nes is the only entry: A opens it, and a NES game starts on open
-OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -k 100:A -k 106:- \
+# Red.nes, launched as a page will (a NES game starts clean)
+# shellcheck disable=SC2046 # nav.sh's options
+OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch /Red.nes at=100) \
   -s 700:"$cart/game.png" -f 700 >/dev/null 2>"$cart/kernel.log" || fail "the emulator failed"
 grep -q '^crash at frame' "$cart/kernel.log" && fail "the emulator caught a crash"
 grep -q '^kernel error:' "$cart/kernel.log" && fail "errors: $(grep '^kernel error:' "$cart/kernel.log" | head -3)"

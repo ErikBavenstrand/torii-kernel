@@ -248,6 +248,14 @@ static int list_measure(u8 node, struct engine_budget *need)
 	struct list_state *st = ui_node_state(node);
 	if (!geometry(node, st))
 		return 0;
+	// B9's contract for layouts: a list's plane holds nothing else (its
+	// scroll moves the whole plane), and a list over a card shows whole
+	// rows (no cut row peeks out at the viewport's edge)
+	const struct ui_view *v = ui_node_view(node);
+	for (u32 i = 0; i < v->count; i++)
+		TLOG_ASSERT(v->first + i == node ||
+			    ui_node_spec((u8)(v->first + i))->plane != ui_node_spec(node)->plane);
+	TLOG_ASSERT(st->opaque || st->plain || (config(node)->flags & UI_LIST_FIXED) || st->ring.h % st->ring.rh == 0);
 	need->bg_tiles = (u16)(need->bg_tiles + st->tw * st->ct);
 	// Its plane's map is two screenblocks (UI_RING_MAP_LINES): one more
 	need->bg_maps++;

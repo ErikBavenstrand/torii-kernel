@@ -1,4 +1,7 @@
-// Generic dialogs (dialog.h): one modal view, in four uses.
+// Generic dialogs (dialog.h): one modal view, in four uses, drawn as a
+// floating card of the Paper clean look (B9's widgets): the title in the
+// heading font, the text, and the key chips or the loading card's bar and
+// status line.
 #include <gba_input.h>  // KEY_A, KEY_B
 #include <gba_systemcalls.h>
 #include <stdio.h>
@@ -14,19 +17,35 @@
 #define REG_DISPCNT_ (*(vu16 *)0x04000000)
 #define BG_PALETTE_ ((vu16 *)0x05000000)
 
-#define PANEL_W 208
-#define TEXT_W 192  // the labels' width: the panel less 8 px each side
+// --- Look, px: a card centred on the screen ----------------------------------
+#define CARD_W 208
+#define CARD_H 96
+#define TEXT_X 8          // the texts' and the bar's inset from the card's sides
+#define TEXT_W (CARD_W - 2 * TEXT_X)
+#define TITLE_Y 8
+#define TITLE_H 16
+#define TEXT_Y 24
+#define TEXT_H 48         // a message's or question's text: 4 lines
+#define PROGRESS_TEXT_H 40  // a progress dialog's, above its bar
+#define BAR_Y 64
+#define BAR_H 8
+#define FOOT_Y 72         // the key chips, or the progress dialog's status line
+#define FOOT_H 16
+// A floating card: a hairline round it and its shadow a pixel below
+static const struct ui_card_config card = {0, 0, 0, 1, UI_CARD_EDGE};
+
 #define TITLE_MAX 48
 #define TEXT_MAX 160
 #define STATUS_MAX 48
 #define TEXT_LINES 4      // a message's or question's text (48 px)
 #define PROGRESS_LINES 3  // a progress dialog's, above its bar (40 px)
+#define HINTS_MAX 2
 
 enum {
-	N_PANEL,
+	N_CARD,
 	N_TITLE,
 	N_TEXT,
-	N_HINT,  // the keys, or a progress dialog's status line
+	N_FOOT,  // the key chips, or a progress dialog's status line
 	N_BAR,   // a progress dialog's only
 	N_COUNT
 };
@@ -39,74 +58,89 @@ enum {
 	USE_NOTICE,
 };
 
-static const struct ui_panel_config border_panel = {UI_PANEL_BORDER};
 static const struct ui_label_config title_label = {"", UI_FONT_HEADING, UI_ALIGN_CENTER, 0, 0};
 static const struct ui_label_config text_label = {"", UI_FONT_BODY, UI_ALIGN_CENTER, 0, 0};
-static const struct ui_label_config hint_label = {"", UI_FONT_BODY, UI_ALIGN_CENTER, 0, 0};
+static const struct ui_label_config status_label = {"", UI_FONT_BODY, UI_ALIGN_CENTER, 0, 0};
+static const struct ui_hints_config no_hints = {0, 0};
 
 // Everything on plane 0 (overlay and dialog text), so the screen under it
-// keeps its other planes. Nothing is hidden: a hidden node blanks its
-// rectangle in the plane's map, a hole in the panel. A title or text left
-// out is an empty label, and only the progress dialog has a bar.
+// keeps its other planes; each node paints the card's colour behind what it
+// draws. Nothing is hidden: a hidden node blanks its rectangle in the
+// plane's map, a hole in the card. A title or text left out is an empty
+// label, and only the progress dialog has a bar.
 #define DIALOG_NODES(text_ink, text_h) \
-	[N_PANEL] = {.kind = UI_PANEL, \
-		     .id = 1, \
-		     .parent = UI_NONE, \
-		     .plane = 0, \
-		     .anchor = UI_HCENTER | UI_VCENTER, \
-		     .paper = UI_ROLE_PANEL, \
-		     .w = PANEL_W, \
-		     .h = 96, \
-		     .data = &border_panel}, \
+	[N_CARD] = {.kind = UI_CARD, \
+		    .id = 1, \
+		    .parent = UI_NONE, \
+		    .plane = 0, \
+		    .anchor = UI_HCENTER | UI_VCENTER, \
+		    .paper = UI_ROLE_FLOAT, \
+		    .w = CARD_W, \
+		    .h = CARD_H, \
+		    .data = &card}, \
 	[N_TITLE] = {.kind = UI_LABEL, \
 		     .id = 2, \
-		     .parent = N_PANEL, \
+		     .parent = N_CARD, \
 		     .plane = 0, \
 		     .anchor = UI_HFILL, \
-		     .paper = UI_ROLE_PANEL, \
-		     .x = 8, \
-		     .y = 8, \
-		     .w = 8, \
-		     .h = 16, \
+		     .paper = UI_ROLE_FLOAT, \
+		     .x = TEXT_X, \
+		     .y = TITLE_Y, \
+		     .w = TEXT_X, \
+		     .h = TITLE_H, \
 		     .data = &title_label}, \
 	[N_TEXT] = {.kind = UI_LABEL, \
 		    .id = 3, \
-		    .parent = N_PANEL, \
+		    .parent = N_CARD, \
 		    .plane = 0, \
 		    .anchor = UI_HFILL, \
 		    .ink = (text_ink), \
-		    .paper = UI_ROLE_PANEL, \
-		    .x = 8, \
-		    .y = 24, \
-		    .w = 8, \
+		    .paper = UI_ROLE_FLOAT, \
+		    .x = TEXT_X, \
+		    .y = TEXT_Y, \
+		    .w = TEXT_X, \
 		    .h = (text_h), \
-		    .data = &text_label}, \
-	[N_HINT] = {.kind = UI_LABEL, \
+		    .data = &text_label}
+
+#define KEYS_NODE \
+	[N_FOOT] = {.kind = UI_HINTS, \
 		    .id = 4, \
-		    .parent = N_PANEL, \
+		    .parent = N_CARD, \
 		    .plane = 0, \
 		    .anchor = UI_HFILL, \
-		    .ink = UI_ROLE_DIM, \
-		    .paper = UI_ROLE_PANEL, \
-		    .x = 8, \
-		    .y = 72, \
-		    .w = 8, \
-		    .h = 16, \
-		    .data = &hint_label}
+		    .paper = UI_ROLE_FLOAT, \
+		    .x = TEXT_X, \
+		    .y = FOOT_Y, \
+		    .w = TEXT_X, \
+		    .h = FOOT_H, \
+		    .data = &no_hints}
 
-static const struct ui_spec message_nodes[N_BAR] = {DIALOG_NODES(UI_ROLE_TEXT, 48)};
-static const struct ui_spec error_nodes[N_BAR] = {DIALOG_NODES(UI_ROLE_DANGER, 48)};
+static const struct ui_spec message_nodes[N_BAR] = {DIALOG_NODES(UI_ROLE_TEXT, TEXT_H), KEYS_NODE};
+static const struct ui_spec error_nodes[N_BAR] = {DIALOG_NODES(UI_ROLE_DANGER, TEXT_H), KEYS_NODE};
 static const struct ui_spec progress_nodes[N_COUNT] = {
-	DIALOG_NODES(UI_ROLE_TEXT, 40),
+	DIALOG_NODES(UI_ROLE_TEXT, PROGRESS_TEXT_H),
+	[N_FOOT] = {.kind = UI_LABEL,
+		    .id = 4,
+		    .parent = N_CARD,
+		    .plane = 0,
+		    .anchor = UI_HFILL,
+		    .ink = UI_ROLE_DIM,
+		    .paper = UI_ROLE_FLOAT,
+		    .x = TEXT_X,
+		    .y = FOOT_Y,
+		    .w = TEXT_X,
+		    .h = FOOT_H,
+		    .data = &status_label},
 	[N_BAR] = {.kind = UI_PROGRESS,
 		   .id = 5,
-		   .parent = N_PANEL,
+		   .parent = N_CARD,
 		   .plane = 0,
 		   .anchor = UI_HFILL,
-		   .x = 8,
-		   .y = 64,
-		   .w = 8,
-		   .h = 8},
+		   .paper = UI_ROLE_FLOAT,
+		   .x = TEXT_X,
+		   .y = BAR_Y,
+		   .w = TEXT_X,
+		   .h = BAR_H},
 };
 
 static int dialog_event(struct ui_view *view, const struct ui_event *e);
@@ -128,7 +162,7 @@ static const struct ui_view_spec error_view = {.name = "dialog",
 static const struct ui_view_spec notice_view = {.name = "notice",
 						.nodes = message_nodes,
 						.count = N_BAR,
-						.id = 30,  // a dialog's look (theme patches)
+						.id = 30,
 						.focus = UI_NONE,
 						.flags = UI_VIEW_MODAL,
 						.event = dialog_event};
@@ -154,7 +188,8 @@ struct shown {
 	u8 use;
 	char title[TITLE_MAX];
 	char text[TEXT_MAX];
-	char hint[STATUS_MAX];
+	char status[STATUS_MAX];  // a progress dialog's
+	struct ui_hint hints[HINTS_MAX];  // a message's or question's key chips
 };
 
 static struct {
@@ -350,12 +385,13 @@ static void settle(const struct shown *s, u32 frames)
 	dlg.last_pump = torii_frames;
 }
 
-// Pushes the dialog view for s with its texts; 0 if it can't
-static int show(struct shown *s, u32 use, const char *title, const char *text, u32 kind, const char *hint)
+// Pushes the dialog view for s with its texts; 0 if it can't. A message
+// shows an OK chip, a question a cancel chip and an OK chip
+static int show(struct shown *s, u32 use, const char *title, const char *text, u32 kind)
 {
 	copy(s->title, sizeof(s->title), title);
 	wrap(s->text, sizeof(s->text), text ? text : "", use == USE_PROGRESS ? PROGRESS_LINES : TEXT_LINES);
-	copy(s->hint, sizeof(s->hint), hint);
+	s->status[0] = 0;
 	s->keys = 0;
 	s->use = (u8)use;
 	const struct ui_view_spec *spec = use == USE_PROGRESS ? &progress_view
@@ -372,7 +408,16 @@ static int show(struct shown *s, u32 use, const char *title, const char *text, u
 	u8 first = s->view->first;
 	ui_label_set((u8)(first + N_TITLE), s->title);
 	ui_label_set((u8)(first + N_TEXT), s->text);
-	ui_label_set((u8)(first + N_HINT), s->hint);
+	if (use == USE_PROGRESS) {
+		ui_label_set((u8)(first + N_FOOT), s->status);
+	} else if (use == USE_CONFIRM) {
+		s->hints[0] = (struct ui_hint){"B", gl_hint_cancel};
+		s->hints[1] = (struct ui_hint){"A", gl_hint_ok};
+		ui_hints_set((u8)(first + N_FOOT), s->hints, 2);
+	} else if (use == USE_MESSAGE) {
+		s->hints[0] = (struct ui_hint){"A", gl_hint_ok};
+		ui_hints_set((u8)(first + N_FOOT), s->hints, 1);
+	}
 	return 1;
 }
 
@@ -423,7 +468,7 @@ void dialog_message(const char *title, const char *text, u32 kind)
 {
 	log_dialog(title, text, NULL);
 	dialog_open();
-	if (show(&dlg.message, USE_MESSAGE, title, text, kind, gl_close_btn)) {
+	if (show(&dlg.message, USE_MESSAGE, title, text, kind)) {
 		// A or B. A pressed while it is still opening never reaches it
 		// (ui_frame), so a quick double A can't close it unseen
 		wait_key(&dlg.message, KEY_A | KEY_B, 1);
@@ -436,7 +481,7 @@ int dialog_confirm(const char *title, const char *text, u32 kind)
 {
 	int yes = 0;
 	dialog_open();
-	if (show(&dlg.message, USE_CONFIRM, title, text, kind, gl_menu_btn)) {
+	if (show(&dlg.message, USE_CONFIRM, title, text, kind)) {
 		yes = (wait_key(&dlg.message, KEY_A | KEY_B, 1) & KEY_A) != 0;
 		hide(&dlg.message);
 	}
@@ -463,7 +508,7 @@ void dialog_notice(const char *title, const char *text, u32 kind)
 		if (!ui_depth())
 			ui_enter(UI_TR_LEAVE, 0);
 	}
-	if (!show(&dlg.notice, USE_NOTICE, title, text, kind, NULL)) {
+	if (!show(&dlg.notice, USE_NOTICE, title, text, kind)) {
 		dialog_close();
 		return;
 	}
@@ -489,7 +534,7 @@ void dialog_progress_begin(const char *title, const char *text)
 	dialog_open();
 	dlg.value = dlg.max = 0;
 	dlg.bar_changed = dlg.status_changed = 0;
-	if (!show(&dlg.progress, USE_PROGRESS, title, text, DIALOG_INFO, NULL)) {
+	if (!show(&dlg.progress, USE_PROGRESS, title, text, DIALOG_INFO)) {
 		dialog_close();
 		return;
 	}
@@ -505,7 +550,7 @@ static void apply(void)
 {
 	u8 first = dlg.progress.view->first;
 	if (dlg.status_changed)
-		ui_label_set((u8)(first + N_HINT), dlg.progress.hint);
+		ui_label_set((u8)(first + N_FOOT), dlg.progress.status);
 	if (dlg.bar_changed)
 		ui_progress_set((u8)(first + N_BAR), dlg.value, dlg.max);
 	dlg.status_changed = dlg.bar_changed = 0;
@@ -517,7 +562,7 @@ void dialog_progress_status(const char *status)
 		dialog_progress_begin(NULL, NULL);
 	if (!dialog_progress_active())
 		return;
-	copy(dlg.progress.hint, sizeof(dlg.progress.hint), status);
+	copy(dlg.progress.status, sizeof(dlg.progress.status), status);
 	dlg.status_changed = 1;
 	apply();
 	settle(&dlg.progress, 4);
@@ -532,8 +577,8 @@ void dialog_progress_set(u32 value, u32 max, const char *status)
 		dlg.max = max;
 		dlg.bar_changed = 1;
 	}
-	if (status && strncmp(status, dlg.progress.hint, sizeof(dlg.progress.hint) - 1) != 0) {
-		copy(dlg.progress.hint, sizeof(dlg.progress.hint), status);
+	if (status && strncmp(status, dlg.progress.status, sizeof(dlg.progress.status) - 1) != 0) {
+		copy(dlg.progress.status, sizeof(dlg.progress.status), status);
 		dlg.status_changed = 1;
 	}
 	if (torii_frames - dlg.last_pump < DIALOG_PROGRESS_FRAMES)
