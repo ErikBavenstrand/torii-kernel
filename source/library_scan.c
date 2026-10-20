@@ -15,6 +15,7 @@
 // After ff.h, whose types it uses
 #include "diskio.h"
 #include "lang.h"
+#include "safefile.h"
 #include "savename.h"
 #include "tlog.h"
 #include "engine/cover.h"
@@ -80,7 +81,6 @@ enum {
 enum {
 	W_START,
 	W_CLEAR,
-	W_NAMES_OPEN,
 	W_NAMES,
 	W_SAVER_OPEN,
 	W_SAVER,
@@ -124,7 +124,6 @@ static struct {
 			u8 target;  // the file being written
 		} io;
 		struct {
-			FIL names;  // /torii/names.txt while the walk reads it; first: word-aligned
 			DIR dirs[LIB_DEPTH];
 			FILINFO fi;
 			struct lib_build b;
@@ -540,6 +539,67 @@ static void walk_end(void)
 	lib.state = S_SORT;
 }
 
+// Appends n bytes of names.txt's text (staged in lib.buf) to its PSRAM copy,
+// keeping an odd last byte staged: psram_write takes halfwords
+static u32 names_flush(u32 staged)
+{
+	u32 even = staged & ~1u;
+	if (lib.u.walk.names_len + even > LIB_NAMES_MAX) {
+		lib.u.walk.names_ok = 0;
+		return 0;
+	}
+	put(LIB_NAMES_TEXT + lib.u.walk.names_len, lib.buf, even);
+	lib.u.walk.names_len += even;
+	lib.buf[0] = lib.buf[even];
+	return staged - even;
+}
+
+// names.txt, through B5's safe file (the copy that holds), in one step: the
+// module has one FIL, which the menu's own lists may use between steps. The
+// lists sort by the name shown (R3), so its lines are part of the hash, and
+// a building walk copies them to PSRAM for gamename_custom.
+static void names_step(void)
+{
+	if (safefile_open(GAMENAME_FILE, LIB_NAMES_MAX) == SAFEFILE_NONE)
+		return;
+	char *line = (char *)lib.buf + LIB_IO_BYTES / 2;
+	u32 staged = 0;
+	lib.u.walk.names_ok = lib.build;
+	for (;;) {
+		int n = safefile_line(line, LIB_IO_BYTES / 2 - 2);  // with its '\n' and a staged byte, it fits
+		if (n == SAFEFILE_END)
+			break;
+		if (n == SAFEFILE_LONG)
+			continue;
+		line[n++] = '\n';
+		hash_bytes(line, (u32)n);
+		if (!lib.u.walk.names_ok)
+			continue;
+		if (staged + (u32)n > LIB_IO_BYTES / 2)
+			staged = names_flush(staged);
+		memcpy(lib.buf + staged, line, (u32)n);
+		staged += (u32)n;
+	}
+	if (safefile_failed())
+		lib.u.walk.names_ok = 0;
+	safefile_close();
+	if (!lib.u.walk.names_ok)
+		return;
+	lib.buf[staged++] = 0;  // an even end; the parser stops at names_len
+	u32 tail = staged & 1;
+	lib.buf[staged] = 0;
+	staged = names_flush(staged + tail);
+	lib.u.walk.names_len -= 1 + tail;
+	// One step (it sorts the lines unless the file is sorted, as the kernel
+	// writes it), logged for the cart's figure
+	u32 start = cycles_now();
+	gamename_custom_parse(&lib.u.walk.custom, (const char *)LIB_NAMES_TEXT, lib.u.walk.names_len, lib.u.walk.lines,
+			      GAMENAME_CUSTOM_MAX);
+	tlog("library: %lu custom names parsed in %lu ms", (unsigned long)lib.u.walk.custom.count,
+	     (unsigned long)ms_since(start));
+	lib.u.walk.names_ok = lib.u.walk.custom.count != 0;
+}
+
 static void walk_step(void)
 {
 	FRESULT fr;
@@ -551,7 +611,7 @@ static void walk_step(void)
 		lib.u.walk.serial = volume_serial();
 		if (lib.build)
 			lib_build_begin(&lib.u.walk.b, slot_at(lib.valid ? !lib.active : 0), put);
-		lib.phase = lib.build ? W_CLEAR : W_NAMES_OPEN;
+		lib.phase = lib.build ? W_CLEAR : W_NAMES;
 		return;
 	case W_CLEAR:
 		// The save table emptied a chunk a step (32 KB at the slow WAITCNT
@@ -560,51 +620,12 @@ static void walk_step(void)
 		put((u8 *)LIB_SAVES + lib.u.walk.cleared, lib.buf, LIB_IO_BYTES);
 		lib.u.walk.cleared += LIB_IO_BYTES;
 		if (lib.u.walk.cleared >= LIB_SAVES_SLOTS * 4u)
-			lib.phase = W_NAMES_OPEN;
-		return;
-	case W_NAMES_OPEN:
-		// names.txt: the lists sort by the name shown (R3), so its bytes are
-		// part of the hash, and a building walk copies it to PSRAM
-		fr = f_open(&lib.u.walk.names, GAMENAME_FILE, FA_READ);
-		if (fr == FR_OK) {
-			lib.u.walk.names_ok = f_size(&lib.u.walk.names) < LIB_NAMES_MAX;
 			lib.phase = W_NAMES;
-		} else {
-			lib.phase = W_SAVER_OPEN;
-		}
 		return;
-	case W_NAMES: {
-		UINT got = 0;
-		fr = f_read(&lib.u.walk.names, lib.buf, LIB_IO_BYTES, &got);
-		if (fr != FR_OK)
-			lib.u.walk.names_ok = 0;
-		hash_bytes(lib.buf, got);
-		if (lib.u.walk.names_len + got >= LIB_NAMES_MAX)
-			lib.u.walk.names_ok = 0;  // it grew since f_size
-		if (lib.build && lib.u.walk.names_ok && got) {
-			u32 even = (got + 1) & ~1u;
-			if (even > got)
-				lib.buf[got] = 0;
-			put(LIB_NAMES_TEXT + lib.u.walk.names_len, lib.buf, even);
-		}
-		lib.u.walk.names_len += got;
-		if (fr == FR_OK && got == LIB_IO_BYTES && lib.u.walk.names_len < LIB_NAMES_MAX)
-			return;
-		f_close(&lib.u.walk.names);
-		if (lib.build && lib.u.walk.names_ok) {
-			// One step (it sorts the lines), logged for the cart's figure
-			u32 start = cycles_now();
-			gamename_custom_parse(&lib.u.walk.custom, (const char *)LIB_NAMES_TEXT, lib.u.walk.names_len,
-					      lib.u.walk.lines, GAMENAME_CUSTOM_MAX);
-			tlog("library: %lu custom names parsed in %lu ms", (unsigned long)lib.u.walk.custom.count,
-			     (unsigned long)ms_since(start));
-			lib.u.walk.names_ok = lib.u.walk.custom.count != 0;
-		} else if (lib.build && lib.u.walk.names_len) {
-			tlog("library: %s is too big to sort by its names", GAMENAME_FILE);
-		}
+	case W_NAMES:
+		names_step();
 		lib.phase = W_SAVER_OPEN;
 		return;
-	}
 	case W_SAVER_OPEN:
 		lib.phase = f_opendir(dir, "/SAVER") == FR_OK ? W_SAVER : W_ROOT;
 		return;
