@@ -89,8 +89,7 @@ static struct {
 	u32 at;  // names.db bytes loaded, or slot bytes cleared
 	u32 started;
 	struct names_cache cache;
-	u32 cursor;  // M_RECENT: the Recent entry; M_ALL: console << 16 | the game in its list
-	u32 lib_gen;
+	u32 cursor;  // M_RECENT: the Recent entry; M_ALL: the library record
 	u32 total, done, computed, named, bytes, since_write, since_rename;
 	u32 crc, size, date, code, read;
 	u8 seen[NAMES_CACHE_MAX / 8];
@@ -462,9 +461,10 @@ static int next_game(void)
 	if (N.mode == M_RECENT) {
 		while (N.cursor < userdata_recent_count()) {
 			const char *p = userdata_recent_path(N.cursor++);
-			if (userdata_nor_name(p) || strlen(p) > NAMES_PATH_MAX)
+			u32 len = (u32)strlen(p);
+			if (userdata_nor_name(p) || len > NAMES_PATH_MAX)
 				continue;
-			strcpy(N.path, p);  // out of PSRAM before FatFs sees it
+			memcpy(N.path, p, len + 1);  // out of PSRAM before FatFs sees it
 			// Only the library's games: crc.txt keeps no others
 			if (library_find(N.path) == LIBRARY_NONE)
 				continue;
@@ -474,27 +474,16 @@ static int next_game(void)
 		}
 		return 0;
 	}
-	if (library_generation() != N.lib_gen) {
-		// The index changed (a new one, a game deleted): from the start
-		// again, which skips what has its CRC quickly
-		N.lib_gen = library_generation();
-		N.cursor = 0;
-	}
-	for (;;) {
-		u32 console = N.cursor >> 16, i = N.cursor & 0xFFFF;
-		if (console >= LIB_CONSOLES)
-			return 0;
-		if (i >= library_count(console)) {
-			N.cursor = (console + 1) << 16;
+	// The records in walk order, which the rebuilds new names cause keep
+	// (sorted order would change under the cursor)
+	while (N.cursor < library_records()) {
+		u32 rec = N.cursor++;
+		if ((library_flags(rec) & LIB_F_GONE) || !library_path(rec, N.path, sizeof(N.path)))
 			continue;
-		}
-		N.cursor++;
-		u32 rec = library_game(console, i);
-		if (rec == LIBRARY_NONE || !library_path(rec, N.path, sizeof(N.path)))
-			continue;
-		N.console = (u8)console;
+		N.console = (u8)(library_flags(rec) & LIB_F_CONSOLE);
 		return 1;
 	}
+	return 0;
 }
 
 static void identify_finish(void)
@@ -604,7 +593,6 @@ static void identify_begin(u32 mode)
 	N.mode = (u8)mode;
 	N.step = I_NEXT;
 	N.cursor = 0;
-	N.lib_gen = library_generation();
 	N.total = N.done = N.computed = N.named = N.bytes = N.since_write = N.since_rename = 0;
 	N.logged_full = 0;
 	N.started = cycles_now();

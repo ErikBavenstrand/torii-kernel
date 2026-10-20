@@ -1127,6 +1127,11 @@ u32 library_games_seen(void)
 	return lib.valid ? lib_hdr(active_slot())->games_seen : 0;
 }
 
+u32 library_records(void)
+{
+	return lib.valid ? lib_hdr(active_slot())->records : 0;
+}
+
 // After the menu changed the card: a walk follows (a walk under way may
 // have read the folder before the change, so it starts over), and a write
 // under way starts over with the changed index
