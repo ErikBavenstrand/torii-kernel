@@ -828,8 +828,6 @@ static u32 text_x(u8 node)
 	u32 pad = row_pad(node), flags = config(node)->flags;
 	if (flags & UI_LIST_ICON8)
 		return pad + UI_LIST_ICON8_W + ui_theme()->look.section_icon_gap;
-	return (flags & UI_LIST_ICONS) ? UI_LIST_ICON_W + pad / 2 : pad;
-	u32 pad = row_pad(node), flags = config(node)->flags;
 	if (flags & UI_LIST_ICONS)
 		return UI_LIST_ICON_W + pad / 2;
 	return flags & UI_LIST_MARKS ? pad + 8u + ui_theme()->look.row_mark_gap : pad;

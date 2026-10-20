@@ -88,13 +88,15 @@ enum ui_role {
 	UI_ROLE_DANGER,       // Delete, Format, failures: the danger item's ink
 	UI_ROLE_FLOAT,        // popups and confirmations: card with float_mix of ink
 	// Bank 1: the console inks, for the marks of Recent's and Favourites' rows,
-	// the carousel's backdrop, and the favourites' ink, for the game lists' stars	UI_ROLE_INK_GBA = UI_ROLE_ACCENT,
+	// the carousel's backdrop, and the favourites' ink, for the game lists' stars
+	UI_ROLE_INK_GBA = UI_ROLE_ACCENT,
 	UI_ROLE_INK_GBC,
 	UI_ROLE_INK_GB,
 	UI_ROLE_INK_NES,
 	UI_ROLE_SKY,      // the carousel's backdrop above its horizon: GROUND
 	UI_ROLE_FLOOR,    // and below it: GROUND moved by floor_step (ui_floor_colour)
-	UI_ROLE_INK_FAV,  // the favourites' ink	// Bank 2: danger and the NOR storage bar
+	UI_ROLE_INK_FAV,  // the favourites' ink
+	// Bank 2: danger and the NOR storage bar
 	UI_ROLE_ALERT_INK = UI_ROLE_ACCENT,  // the danger item's ink
 	UI_ROLE_ALERT_TINT,                  // and its tint
 	UI_ROLE_NOR_FILL,                    // used space, one shade a game: NOR's base,

@@ -443,7 +443,8 @@ static const char *walk_display(const char *crc_name)
 	char *out = lib_build_display(&lib.u.walk.b);
 	lib.u.walk.custom_name = gamename_display(out, lib.u.walk.full, lib.u.walk.names_ok ? &lib.u.walk.custom : NULL,
 						  crc_name) != GAMENAME_CLEAN;
-	return out;}
+	return out;
+}
 
 // One entry of the folder at the walk's depth; sub, when the entry is a
 // folder, is already open on it (f_readdir_sub)

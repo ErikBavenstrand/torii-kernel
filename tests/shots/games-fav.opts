@@ -4,7 +4,7 @@
 # shows, and its page lists them A-Z with their console marks.
 #! settings 28=1
 -w "nav: home ready"
--k @8:DOWN -k @12:-
+-k @8:RIGHT -k @12:-
 -k @20:A -k @24:-
 -w "nav: page gba ready"
 -k @8:DOWN -k @12:-
@@ -23,7 +23,7 @@
 -s @60:starred.png
 -k @66:B -k @70:-
 -w "nav: home ready"
--k @8:UP -k @12:-
+-k @8:LEFT -k @12:-
 -k @20:A -k @24:-
 -w "nav: page fav ready"
 -s @2:screen.png

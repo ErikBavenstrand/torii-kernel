@@ -2,7 +2,7 @@
 # held DOWN glides the list (every frame hashed, games-move's cycles).
 #! settings 28=1
 -w "nav: home ready"
--k @8:DOWN -k @12:-
+-k @8:RIGHT -k @12:-
 -k @20:A -k @24:-
 -w "nav: page gba ready"
 -s @2:screen.png

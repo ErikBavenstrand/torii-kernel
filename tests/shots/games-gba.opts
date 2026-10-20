@@ -6,7 +6,7 @@
 # the popup, and Game info shows the game's page, where RIGHT changes its
 # save type, written as B goes back to the list.
 -w "nav: home ready"
--k @8:DOWN -k @12:-
+-k @8:RIGHT -k @12:-
 -k @20:A -k @24:-
 -w "nav: page gba ready"
 -s @2:screen.png
