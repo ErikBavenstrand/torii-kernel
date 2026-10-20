@@ -36,7 +36,8 @@ void test_gamename_clean_real_names(void)
 	check_clean("Advance Wars (USA).gba", "Advance Wars");
 	check_clean("/GBA/Legend of Zelda, The - A Link to the Past (USA).gba",
 		    "The Legend of Zelda - A Link to the Past");
-	check_clean("Monde Perdu, Le - Jurassic Park (France) (En) (SGB Enhanced).gb", "Le Monde Perdu - Jurassic Park");
+	check_clean("Monde Perdu, Le - Jurassic Park (France) (En) (SGB Enhanced).gb",
+		    "Le Monde Perdu - Jurassic Park");
 	check_clean("Aventures de Buzz l'Eclair, Les (France).gbc", "Les Aventures de Buzz l'Eclair");
 	check_clean("Pokemon - Emerald Version (USA, Europe).gba", "Pokemon - Emerald Version");
 	check_clean("Mario & Luigi - Superstar Saga (USA, Australia).gba", "Mario & Luigi - Superstar Saga");

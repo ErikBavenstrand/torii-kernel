@@ -9,12 +9,12 @@
 // The"), which cleaning moves back to the front. Matched with case; one
 // ending in an apostrophe joins the title without a space ("L'Eclair").
 static const char *const articles[] = {
-	"The", "A", "An",  // English
-	"Le", "La", "Les", "L'",  // French
+	"The", "A",   "An",  // English
+	"Le",  "La",  "Les", "L'",  // French
 	"Der", "Die", "Das",  // German
-	"El", "Los", "Las",  // Spanish
-	"Il", "Lo", "Gli",  // Italian
-	"De", "Het", "Een",  // Dutch
+	"El",  "Los", "Las",  // Spanish
+	"Il",  "Lo",  "Gli",  // Italian
+	"De",  "Het", "Een",  // Dutch
 };
 
 // Tags worth showing when two games collide and differ in several tags:
@@ -371,7 +371,8 @@ u32 gamename_dedupe(char *out, const char *const *names, u32 count, u32 self)
 				continue;
 			if (first < 0)
 				first = (int)k;
-			if (kept < 0 && k < mine.count && k < other.count && (tag_kept(&mine, k) || tag_kept(&other, k)))
+			if (kept < 0 && k < mine.count && k < other.count &&
+			    (tag_kept(&mine, k) || tag_kept(&other, k)))
 				kept = (int)k;
 		}
 		if (first < 0)
@@ -481,6 +482,8 @@ u32 gamename_custom_parse(struct gamename_custom *c, const char *text, u32 len, 
 	c->line = line;
 	c->count = 0;
 	c->complete = 1;
+	if (!text)
+		return 0;
 	u32 at = 0;
 	if (c->len >= 3 && memcmp(text, "\xEF\xBB\xBF", 3) == 0)
 		at = 3;
