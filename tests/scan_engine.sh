@@ -70,9 +70,10 @@ mdir -i "$cart/sd.img" ::/PATCH/Hello.pat >/dev/null 2>&1 || fail "the scan wasn
 echo "PASS: BOOT WITH ADDON with the scan engine scans the ROM, hooks the game and writes PATCH/Hello.pat"
 
 # Power-on 2: copy the save (A at "Save sav?"), then down to the game
-# (PATCH, RTS and SAVER sort first) and BOOT WITH ADDON again.
+# (PATCH, RTS, SAVER and torii, the first launch's Recent, sort first) and
+# BOOT WITH ADDON again.
 # shellcheck disable=SC2046
-watch $(keys 100 A) $(keys 320 DOWN DOWN DOWN A) $(keys 400 DOWN A)
+watch $(keys 100 A) $(keys 320 DOWN DOWN DOWN DOWN A) $(keys 400 DOWN A)
 grep -qF "kernel: launch: IRQ hook from PATCH/ (cached scan)" "$cart/run.log" ||
   fail "the second launch didn't use PATCH/Hello.pat: $(grep -F 'IRQ hook' "$cart/run.log")"
 echo "PASS: the next BOOT WITH ADDON hooks the game from PATCH/Hello.pat without scanning"

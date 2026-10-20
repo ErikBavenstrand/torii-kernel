@@ -245,6 +245,7 @@ void test_userdata_fav_store(void)
 	static const char hand[] = "/c.gba\n\n  /a.gba\r\n# mine\n/c.gba\nbad line\n";
 	CHECK(put_file(T_FAV, hand, sizeof(hand) - 1));
 	userdata_invalidate();
+	userdata_load();
 	CHECK_EQ(userdata_fav_count(), 2);
 	CHECK(strcmp(userdata_fav_path(0), "/a.gba") == 0 && strcmp(userdata_fav_path(1), "/c.gba") == 0);
 	CHECK(userdata_forget("/c.gba"));

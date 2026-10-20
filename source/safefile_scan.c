@@ -20,14 +20,17 @@ static int blank(char c)
 // The line just read ends (at a newline or the end of the file)
 static void end_line(struct safefile_scan *s)
 {
-	u32 kept = s->line_len < sizeof(s->line) ? s->line_len : sizeof(s->line);
-	int empty = s->line_len == kept;
-	for (u32 i = 0; empty && i < kept; i++)
-		empty = blank(s->line[i]);
-	if (empty)
+	u32 crc, n = s->line_len;
+	if (n > sizeof(s->line)) {
+		s->crc_line = 0;  // longer than a CRC line can be: text
+		return;
+	}
+	u32 i = 0;
+	while (i < n && blank(s->line[i]))
+		i++;
+	if (i == n)
 		return;  // blank lines after the CRC line don't count
-	u32 crc;
-	s->crc_line = s->line_len == kept && safefile_parse_crc_line(s->line, kept, &crc);
+	s->crc_line = (u8)safefile_parse_crc_line(s->line, n, &crc);
 	if (s->crc_line) {
 		s->body = s->line_start;
 		s->body_crc = s->line_crc;

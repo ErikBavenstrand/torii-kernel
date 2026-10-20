@@ -91,10 +91,11 @@ grep -q 'mode game from NOR offset 000000$' "$cart/2-hello.log" || fail "Hello d
 [ "$(hex_at "$cart/sram.bin" 0)" = 4f4d525801 ] || fail "Hello did not run from NOR (SRAM $(hex_at "$cart/sram.bin" 0))"
 
 # Power-on 3: confirm the save copy to SAVER/Hello.sav, then down past
-# SAVER and Hello to World.gba, set SAVE TYPE to FLASH 128K (four down, five
-# right), and up two to write it to NOR after Hello.
+# SAVER, torii (the NOR launch's Recent) and Hello to World.gba, set SAVE
+# TYPE to FLASH 128K (four down, five right), and up two to write it to NOR
+# after Hello.
 # shellcheck disable=SC2046
-boot 3-write -k 100:A -k 104:- $(keys 300 DOWN DOWN A DOWN DOWN DOWN DOWN RIGHT RIGHT RIGHT RIGHT RIGHT UP UP A) -s 3800:$shots/3-nor-list.png -f 3800
+boot 3-write -k 100:A -k 104:- $(keys 300 DOWN DOWN DOWN A DOWN DOWN DOWN DOWN RIGHT RIGHT RIGHT RIGHT RIGHT UP UP A) -s 3800:$shots/3-nor-list.png -f 3800
 [ "$(mtype -i "$cart/sd.img" ::/SAVER/Hello.sav | head -c 5 | od -A n -t x1 | tr -d ' \n')" = 4f4d525801 ] ||
   fail "Hello's NOR save was not written back to SD"
 nor_holds 0x20000 "$world" || fail "World.gba was not written to NOR at 0x20000"

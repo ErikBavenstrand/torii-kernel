@@ -153,6 +153,9 @@ void userdata_ago(char *out, u32 size, u32 then, u32 now, const struct userdata_
 
 // PSRAM is about to be overwritten (a launch): read the card again next time.
 void userdata_invalidate(void);
+// Reads both lists now if they aren't in PSRAM (the boot, or after a launch
+// that didn't start), so no later call reads the card while a screen draws.
+void userdata_load(void);
 
 u32 userdata_recent_count(void);
 // Game i's path, newest first ("" past the end) and when it was played.

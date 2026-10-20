@@ -163,6 +163,14 @@ static u32 recent_get(void)
 	return st.recent_count;
 }
 
+static void ensure_fav(void);
+
+void userdata_load(void)
+{
+	ensure_recent();
+	ensure_fav();
+}
+
 static u32 recent_line(void *ctx, u32 n, char *buf, u32 size)
 {
 	(void)ctx;
@@ -211,7 +219,7 @@ u32 userdata_recent_time(u32 i)
 int userdata_recent_add(const char *path)
 {
 	if (!userdata_path_ok(path)) {
-		tlog_error("userdata: can't keep %s on Recent", path);
+		tlog("userdata: can't keep %s on Recent", path);
 		return 0;
 	}
 	snprintf(W->path, sizeof(W->path), "%s", path);  // path may be in PSRAM
@@ -235,7 +243,7 @@ const struct userdata_boot *userdata_boot_get(void)
 void userdata_boot_set(const char *item, u32 row)
 {
 	if (!userdata_item_ok(item)) {
-		tlog_error("userdata: no boot place %s", item);
+		tlog("userdata: no boot place %s", item);
 		return;
 	}
 	ensure_recent();
@@ -274,8 +282,8 @@ static void load_fav(void)
 			dropped++;
 			continue;
 		}
-		memcpy(W->pad, path, n);
-		memset(W->pad + n, 0, bytes - n);
+		memcpy(W->pad, path, n + 1);
+		memset(W->pad + n + 1, 0, bytes - n - 1);
 		psram_write((void *)(FAV_POOL_PS + used), W->pad, bytes);
 		W->u.fav[count++] = used;
 		used += bytes;
@@ -405,7 +413,7 @@ int userdata_fav_has(const char *path)
 int userdata_fav_set(const char *path, int on)
 {
 	if (!userdata_path_ok(path)) {
-		tlog_error("userdata: can't keep %s as a favourite", path);
+		tlog("userdata: can't keep %s as a favourite", path);
 		return 0;
 	}
 	ensure_fav();

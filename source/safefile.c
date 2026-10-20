@@ -20,7 +20,7 @@ static struct {
 	u32 have;   // bytes in sf_chunk
 	u32 at;     // the next of them
 	u8 open;
-} rd;
+} rd EWRAM_BSS;
 
 // path's backup copy's name into out (SAFEFILE_PATH_MAX bytes); 0 if too long
 static int bak_name(char *out, const char *path)
@@ -62,7 +62,7 @@ static int pick(const char *path, const char *bak)
 		return SAFEFILE_MAIN;  // NAME.bak doesn't matter
 	int has_bak = scan(bak, &sf_bak, has_main ? sf_main.size : 0);
 	int from = safefile_pick(has_main ? &sf_main : NULL, has_bak ? &sf_bak : NULL);
-	if (from == SAFEFILE_NONE && (has_main || has_bak))
+	if (from == SAFEFILE_NONE && ((has_main && sf_main.size) || has_bak))
 		tlog_error("safefile: %s: neither copy holds up: read as empty", path);
 	return from;
 }

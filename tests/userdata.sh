@@ -17,8 +17,8 @@ fail() {
   exit 1
 }
 
-now=1800000000   # 2027-01-15 08:00 UTC: a clock that is set
-unset=946684800  # 2000-01-01: the clock after its battery ran out
+now=1800000000  # 2027-01-15 08:00 UTC: a clock that is set
+unset=946684800 # 2000-01-01: the clock after its battery ran out
 
 # new_cart NAME: a card with /SAVER and Hello.gba
 new_cart() {
