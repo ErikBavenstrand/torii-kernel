@@ -6,6 +6,15 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** menu colours come from `docs/design/v0.4/palette.json`,
+  generated into `source/ui/palette.c` by `just palette`: built-in light and
+  dark themes with an accent per carousel item, and the new look's shared
+  sizes and motions in one place, `ui_theme.c` (B1; `89ab559`, `092fc22`,
+  `de09c11`).
+- **Removed:** SD themes: `theme.ini`, wallpapers, layout patches, ACCENT,
+  `/torii/theme.txt` and the theme tools. THEME is Dark or Light; an old SD
+  theme setting shows Dark (B1, E8; `89ab559`).
+- **Added:** ease-out quad and smoothstep motion curves (B1; `14890cb`).
 - **Changed:** the loading card shows the game's name and one bar for the
   whole start, with status only for the slow steps (Loading the game,
   Patching the game, Writing to NOR) and no percentages; the quick checks are
