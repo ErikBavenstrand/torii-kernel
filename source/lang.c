@@ -107,6 +107,31 @@ char *gl_nor_format_button EWRAM_BSS;
 char *gl_nor_states EWRAM_BSS;
 char *gl_nor_changed EWRAM_BSS;
 char **gl_nor_saves EWRAM_BSS;
+char *gl_hint_menu EWRAM_BSS;
+char *gl_sd_item EWRAM_BSS;
+char *gl_sd_items EWRAM_BSS;
+char *gl_sd_items_none EWRAM_BSS;
+char *gl_sd_first EWRAM_BSS;
+char *gl_sd_empty EWRAM_BSS;
+char *gl_sd_open EWRAM_BSS;
+char *gl_sd_launch EWRAM_BSS;
+char *gl_sd_nor EWRAM_BSS;
+char *gl_sd_nor_addon EWRAM_BSS;
+char *gl_sd_fav_add EWRAM_BSS;
+char *gl_sd_fav_remove EWRAM_BSS;
+char *gl_sd_delete EWRAM_BSS;
+char *gl_sd_info EWRAM_BSS;
+char *gl_sd_delete_ask EWRAM_BSS;
+char *gl_sd_delete_save EWRAM_BSS;
+char *gl_sd_delete_failed EWRAM_BSS;
+char *gl_sd_fav_failed EWRAM_BSS;
+char *gl_sd_kind_game EWRAM_BSS;
+char *gl_sd_kind_file EWRAM_BSS;
+char *gl_sd_kind_folder EWRAM_BSS;
+char *gl_sd_bytes EWRAM_BSS;
+char *gl_sd_changed EWRAM_BSS;
+char *gl_sd_save EWRAM_BSS;
+char *gl_sd_no_save EWRAM_BSS;
 
 // The Info page (screens/info.h)
 char **gl_info EWRAM_BSS;
@@ -425,6 +450,34 @@ const char *en_nor_saves[NOR_SAVES] = {
 	[NOR_SAVE_FLASH_128K] = "Flash 128 KB",
 };
 
+// The SD card page (screens/sdcard.c): counts, the truncation note, the
+// file popup, its confirmation and errors, and File info
+const char en_hint_menu[] = "menu";
+const char en_sd_item[] = "1 item";
+const char en_sd_items[] = "items";
+const char en_sd_items_none[] = "empty";
+const char en_sd_first[] = "Showing the first";
+const char en_sd_empty[] = "Nothing here";
+const char en_sd_open[] = "Open";
+const char en_sd_launch[] = "Launch";
+const char en_sd_nor[] = "Write to NOR";
+const char en_sd_nor_addon[] = "Write to NOR with addon";
+const char en_sd_fav_add[] = "Add to favourites";
+const char en_sd_fav_remove[] = "Remove from favourites";
+const char en_sd_delete[] = "Delete";
+const char en_sd_info[] = "File info";
+const char en_sd_delete_ask[] = "Delete";
+const char en_sd_delete_save[] = "The save stays.";
+const char en_sd_delete_failed[] = "Can't delete the file";
+const char en_sd_fav_failed[] = "Can't save the favourites";
+const char en_sd_kind_game[] = "game";
+const char en_sd_kind_file[] = "File";
+const char en_sd_kind_folder[] = "Folder";
+const char en_sd_bytes[] = "bytes";
+const char en_sd_changed[] = "Changed";
+const char en_sd_save[] = "Save";
+const char en_sd_no_save[] = "No save yet";
+
 //---------------------------------------------------------------------------------
 void LoadEnglish(void)
 {
@@ -536,6 +589,31 @@ void LoadEnglish(void)
 	gl_nor_states = (char *)en_nor_states;
 	gl_nor_changed = (char *)en_nor_changed;
 	gl_nor_saves = (char **)en_nor_saves;
+	gl_hint_menu = (char *)en_hint_menu;
+	gl_sd_item = (char *)en_sd_item;
+	gl_sd_items = (char *)en_sd_items;
+	gl_sd_items_none = (char *)en_sd_items_none;
+	gl_sd_first = (char *)en_sd_first;
+	gl_sd_empty = (char *)en_sd_empty;
+	gl_sd_open = (char *)en_sd_open;
+	gl_sd_launch = (char *)en_sd_launch;
+	gl_sd_nor = (char *)en_sd_nor;
+	gl_sd_nor_addon = (char *)en_sd_nor_addon;
+	gl_sd_fav_add = (char *)en_sd_fav_add;
+	gl_sd_fav_remove = (char *)en_sd_fav_remove;
+	gl_sd_delete = (char *)en_sd_delete;
+	gl_sd_info = (char *)en_sd_info;
+	gl_sd_delete_ask = (char *)en_sd_delete_ask;
+	gl_sd_delete_save = (char *)en_sd_delete_save;
+	gl_sd_delete_failed = (char *)en_sd_delete_failed;
+	gl_sd_fav_failed = (char *)en_sd_fav_failed;
+	gl_sd_kind_game = (char *)en_sd_kind_game;
+	gl_sd_kind_file = (char *)en_sd_kind_file;
+	gl_sd_kind_folder = (char *)en_sd_kind_folder;
+	gl_sd_bytes = (char *)en_sd_bytes;
+	gl_sd_changed = (char *)en_sd_changed;
+	gl_sd_save = (char *)en_sd_save;
+	gl_sd_no_save = (char *)en_sd_no_save;
 }
 //---------------------------------------------------------------------------------
 // The languages Settings offers. A new language adds its strings and a

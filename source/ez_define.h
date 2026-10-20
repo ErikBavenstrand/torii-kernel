@@ -1,7 +1,8 @@
 // pReadCache, 128 KB of EWRAM, is the kernel's scratch buffer. It holds
 // nothing between two passes of a menu loop: each owner below borrows it for
 // one operation and needs nothing in it afterwards. Its owners, by offset:
-// - READCACHE_SORT_WORK: sort_by_name's work buffer, while a folder is listed.
+// - READCACHE_SDLIST, 21.5 KB: the SD card page's folder listing on its way
+//   to PSRAM (sdlist.h's scratch), within one listing.
 // - [0x2000, ...): the cheat screen's parsed list, and READCACHE_CHEAT_WORK
 //   at the end, its line and value buffers (showcht.c), until it returns.
 // - All of it: bulk SD, NOR, SRAM and PSRAM transfers inside one operation:
@@ -23,13 +24,11 @@
 #define MAX_pReadCache_size 0x20000
 #define READCACHE_STAGE 0x0
 #define READCACHE_STAGE_SIZE 0x8000
-#define READCACHE_SORT_WORK 0x800  // SORT_WORK_SIZE bytes
+#define READCACHE_SDLIST 0x2000  // sizeof(struct sdlist_scratch), up to 0x8000
 #define READCACHE_USERDATA 0x8000
 #define READCACHE_USERDATA_SIZE 0x8000
 #define READCACHE_LIBRARY 0x1800  // sizeof(struct lib_build), up to 0x1C00
 #define READCACHE_SAVE 0x10000  // 64 KB, to the end
-#define MAX_files 0x200
-#define MAX_folder 0x100
 #define MAX_NOR 0x40
 
 #define MAX_path_len 0x100

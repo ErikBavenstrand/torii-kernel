@@ -144,6 +144,35 @@ enum nor_save {
 };
 extern char **gl_nor_saves;
 
+// The SD card page (screens/sdcard.c): gl_sd_first is followed by a
+// number, gl_sd_delete_ask by a name and "?", and gl_sd_kind_game follows a
+// console's name
+extern char *gl_hint_menu;
+extern char *gl_sd_item;
+extern char *gl_sd_items;
+extern char *gl_sd_items_none;
+extern char *gl_sd_first;
+extern char *gl_sd_empty;
+extern char *gl_sd_open;
+extern char *gl_sd_launch;
+extern char *gl_sd_nor;
+extern char *gl_sd_nor_addon;
+extern char *gl_sd_fav_add;
+extern char *gl_sd_fav_remove;
+extern char *gl_sd_delete;
+extern char *gl_sd_info;
+extern char *gl_sd_delete_ask;
+extern char *gl_sd_delete_save;
+extern char *gl_sd_delete_failed;
+extern char *gl_sd_fav_failed;
+extern char *gl_sd_kind_game;
+extern char *gl_sd_kind_file;
+extern char *gl_sd_kind_folder;
+extern char *gl_sd_bytes;
+extern char *gl_sd_changed;
+extern char *gl_sd_save;
+extern char *gl_sd_no_save;
+
 extern u32 gl_lang; // index of the current language in lang_packs
 
 void LoadEnglish(void);

@@ -69,6 +69,8 @@ NO_COMPAT = {
     "source/screens/info.c",
     "source/screens/info.h",
     "source/screens/registry.c",
+    "source/sdlist.c",
+    "source/sdlist.h",
     "source/ui/art.c",
     "source/ui/art.h",
     "source/ui/art_data.c",
