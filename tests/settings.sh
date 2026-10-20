@@ -103,5 +103,9 @@ grep -q 'settings: nothing changed, not written' "$cart/visit.log" || fail "the 
 # B on an edit puts the value back: nothing to write
 visit auto-save A RIGHT B
 [ "$(writes)" = 0 ] || fail "an edit B cancelled wrote the settings"
+# ... the value from before that A, not the one the page opened with: Dim
+# screen kept at 2 min, then edited again and cancelled
+visit dim A RIGHT A A RIGHT B
+[ "$(slots 27 1)" = 0002 ] || fail "B put back the page's first value, not the edit's: $(slots 27 1)"
 
 echo "PASS: unwritten settings read 0xFFFF, the v0.4 ones as their defaults, and the Settings page writes once a visit, only a change, keeping the slots it doesn't know"

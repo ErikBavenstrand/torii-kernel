@@ -146,6 +146,7 @@ static struct {
 	char pos[12];
 	char refused[48];
 	const char *keys_label;  // the Reset keys row's label as drawn
+	u16 edit_from[3];        // the edited row's slots as they were before A (B puts them back)
 	struct ui_hint hints[4];
 } sp EWRAM_BSS;
 
@@ -698,6 +699,7 @@ static void relayout(void)
 	u32 s = settings_layout_slot_of(&sp.lay, id);
 	sp.cursor = (u8)(s != SET_LAYOUT_NONE ? s : settings_layout_row_at(&sp.lay, sp.cursor));
 	ui_list_recount(node(N_LIST), sp.cursor);
+	sp.keys_label = settings_label(&sp.v, SET_RESET_KEYS);  // every row draws again
 	position_show();
 }
 
@@ -749,12 +751,25 @@ static void changed(u32 id)
 	frame_measure("settings-edit");
 }
 
+// The edited row's slots: kept as A starts the edit (to), or put back (B)
+static void edit_slots(u32 id, int back)
+{
+	const struct settings_row *r = &settings_rows[id];
+	u32 n = r->kind == SET_COLOUR ? 3 : 1;
+	if (r->slot == SET_NO_SLOT || r->slot + n > assress_max)
+		return;
+	if (back)
+		memcpy(&sp.v.slot[r->slot], sp.edit_from, n * sizeof(u16));
+	else
+		memcpy(sp.edit_from, &sp.v.slot[r->slot], n * sizeof(u16));
+}
+
 static void edit_end(int keep)
 {
 	u32 id = sp.edit_id;
 	sp.mode = MODE_BROWSE;
 	if (!keep) {
-		settings_restore(&sp.v, id);
+		edit_slots(id, 1);
 		previews(id, 1);
 	}
 	refresh_id(id);
@@ -861,6 +876,7 @@ static void activate(u32 id)
 	default:
 		sp.mode = MODE_EDIT;
 		sp.edit_id = (u8)id;
+		edit_slots(id, 0);
 		refresh_id(id);
 		hints_show();
 		break;
@@ -1015,7 +1031,7 @@ static void settings_leave(void)
 	if (!sp.live)
 		return;
 	if (sp.mode == MODE_EDIT) {
-		settings_restore(&sp.v, sp.edit_id);
+		edit_slots(sp.edit_id, 1);
 		previews(sp.edit_id, 0);
 	}
 	if (sp.mode != MODE_BROWSE)
