@@ -6,10 +6,9 @@
 
 #include "crc32.h"
 
-void safefile_scan_begin(struct safefile_scan *s, u32 prefix_len)
+void safefile_scan_begin(struct safefile_scan *s)
 {
 	memset(s, 0, sizeof(*s));
-	s->prefix_len = prefix_len;
 }
 
 static int blank(char c)
@@ -44,13 +43,10 @@ void safefile_scan_feed(struct safefile_scan *s, const void *data, u32 bytes)
 	u32 seg = 0;  // bytes of p before seg are in s->crc
 	for (u32 i = 0; i < bytes; i++) {
 		u32 at = s->size + i;
-		if (at == s->prefix_len || at == s->line_start) {
+		if (at == s->line_start) {
 			s->crc = crc32_update(s->crc, p + seg, i - seg);
 			seg = i;
-			if (at == s->prefix_len)
-				s->prefix_crc = s->crc;
-			if (at == s->line_start)
-				s->line_crc = s->crc;
+			s->line_crc = s->crc;
 		}
 		u8 b = p[i];
 		s->has_nul |= b == 0;
@@ -72,8 +68,6 @@ void safefile_scan_end(struct safefile_scan *s)
 {
 	if (s->line_len)
 		end_line(s);  // a last line with no newline (an edited file)
-	if (s->size == s->prefix_len)
-		s->prefix_crc = s->crc;
 	s->valid = s->crc_line && s->body_crc == s->stated;
 }
 
@@ -81,17 +75,12 @@ int safefile_pick(const struct safefile_scan *main, const struct safefile_scan *
 {
 	if (main && main->valid)
 		return SAFEFILE_MAIN;
-	int bak_ok = bak && bak->valid;
-	if (main && main->size && !main->has_nul) {
-		// FatFs writes a file's size only when it closes it, so a write cut
-		// short leaves NAME empty; a NAME that is the start of NAME.bak is
-		// treated the same, in case a cut leaves more
-		int cut = bak_ok && bak->prefix_len == main->size && main->size <= bak->body &&
-			  bak->prefix_crc == main->crc;
-		if (!cut)
-			return SAFEFILE_HAND;
-	}
-	return bak_ok ? SAFEFILE_BAK : SAFEFILE_NONE;
+	// FatFs writes a file's size only as it closes it, so a write cut short
+	// leaves NAME empty (and safefile_write empties a copy it couldn't
+	// finish): any other text is the user's
+	if (main && main->size && !main->has_nul)
+		return SAFEFILE_HAND;
+	return bak && bak->valid ? SAFEFILE_BAK : SAFEFILE_NONE;
 }
 
 u32 safefile_crc_line(char *out, u32 crc)

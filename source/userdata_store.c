@@ -63,6 +63,7 @@ _Static_assert(sizeof(struct work) <= READCACHE_USERDATA_SIZE, "the store's RAM 
 static struct {
 	u8 recent_ok, fav_ok;  // read since the last userdata_invalidate
 	u8 boot_set;           // the boot position changed since recent.txt was written
+	u8 recent_bad, fav_bad;  // the read failed: never write the list back from it
 	u32 recent_count;
 	u32 fav_count;
 	u32 fav_used;  // pool bytes
@@ -106,7 +107,7 @@ static void load_recent(void)
 	const char *from_file = recent_file();
 	u32 count = 0, dropped = 0;
 	int from = safefile_open(from_file, USERDATA_RECENT_FILE_MAX);
-	if (from == SAFEFILE_NONE) {
+	if (from == SAFEFILE_NONE && !safefile_failed()) {
 		// No recent.txt yet: the v0.3 list, if there is one, until the
 		// first write takes it over
 		from_file = old_file();
@@ -132,6 +133,7 @@ static void load_recent(void)
 		snprintf(W->u.recent[count].path, sizeof(W->u.recent[count].path), "%s", path);
 		count++;
 	}
+	st.recent_bad = (u8)safefile_failed();
 	safefile_close();
 	if (count) {
 		psram_begin();
@@ -139,6 +141,8 @@ static void load_recent(void)
 	}
 	st.recent_count = count;
 	st.recent_ok = 1;
+	if (st.recent_bad)
+		tlog_error("userdata: reading Recent failed: it isn't written until it reads whole");
 	if (!st.boot_set)
 		st.boot = boot;  // a place set since the last write wins
 	if (from != SAFEFILE_NONE)
@@ -182,6 +186,10 @@ static int recent_put(u32 count)
 		psram_write((void *)RECENT_PS, W->u.recent, count * sizeof(W->u.recent[0]));
 	}
 	st.recent_count = count;
+	if (st.recent_bad) {
+		tlog_error("userdata: Recent not written: its read failed");
+		return 0;
+	}
 	W->lines.line = recent_line;
 	W->lines.ctx = NULL;
 	if (!safefile_write(recent_file(), USERDATA_RECENT_FILE_MAX, safefile_lines_fill, &W->lines))
@@ -284,7 +292,10 @@ static void load_fav(void)
 		W->u.fav[count++] = used;
 		used += bytes;
 	}
+	st.fav_bad = (u8)safefile_failed();
 	safefile_close();
+	if (st.fav_bad)
+		tlog_error("userdata: reading the favourites failed: they aren't written until they read whole");
 	if (!userdata_in_order(W->u.fav, count, fav_str)) {
 		count = userdata_sort(W->u.fav, count, fav_str);  // edited by hand
 		tlog("userdata: favourites put in order");
@@ -336,6 +347,10 @@ static u32 fav_line(void *ctx, u32 n, char *buf, u32 size)
 // W->u, W->line and W->pad: the edit's paths are needed only until then)
 static int fav_write(void)
 {
+	if (st.fav_bad) {
+		tlog_error("userdata: favourites not written: their read failed");
+		return 0;
+	}
 	W->lines.line = fav_line;
 	W->lines.ctx = &W->edit;
 	int ok = safefile_write(fav_file(), USERDATA_FAV_FILE_MAX, safefile_lines_fill, &W->lines);

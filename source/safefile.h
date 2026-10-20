@@ -41,14 +41,19 @@ int safefile_open(const char *path, u32 max);
 #define SAFEFILE_LONG (-2)
 int safefile_line(char *buf, u32 size);
 void safefile_close(void);
+// 1 if reading the file since the last safefile_open failed (a card error,
+// not a missing file or a copy that doesn't hold up): what was read may be
+// short, so its caller mustn't write the file back from it.
+int safefile_failed(void);
 
 // Writes the text fill gives to both copies of path, making its folder if
 // needed. fill(ctx, pos, buf, max) puts up to max bytes of the text from
 // byte pos into buf and returns how many, 0 at the end; it is called through
 // the text twice, from pos 0 each time, and must give the same text both
 // times (it may read PSRAM). max is safefile_open's. A copy whose write
-// fails (a full card) is left empty, so the other one is read. Returns 1
-// once both copies are written.
+// fails (a full card) is left empty, so the other one is read. Nothing is
+// written when reading the copies to choose the order fails. Returns 1 once
+// both copies are written.
 typedef u32 (*safefile_fill)(void *ctx, u32 pos, char *buf, u32 max);
 int safefile_write(const char *path, u32 max, safefile_fill fill, void *ctx);
 

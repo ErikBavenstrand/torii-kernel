@@ -210,6 +210,16 @@ void test_userdata_recent_store(void)
 	CHECK(strcmp(userdata_recent_path(USERDATA_RECENT_MAX - 1), "/g02.gba") == 0);
 	// Paths the launch path can't take are refused
 	CHECK(!userdata_recent_add("C:/x.gba"));
+	// A read that fails (here a name FatFs refuses, as a card error would
+	// fail it) leaves a list that is never written back, and the v0.3 list
+	// isn't taken in its place
+	static const char old_list[] = "/a.gba\n";
+	CHECK(put_file(T_OLD, old_list, sizeof(old_list) - 1));
+	userdata_test_paths("/torii/t-bad?.txt", "/torii/t-bad?.fav", T_OLD);
+	CHECK_EQ(userdata_recent_count(), 0);
+	CHECK(!userdata_recent_add("/b.gba"));
+	CHECK(!userdata_fav_set("/b.gba", 1));
+	CHECK(exists(T_OLD));
 	userdata_test_paths(NULL, NULL, NULL);
 	remove_files();
 }

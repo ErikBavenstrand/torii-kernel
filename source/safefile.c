@@ -13,6 +13,7 @@
 static FIL sf_file EWRAM_BSS;
 static u8 sf_chunk[CHUNK] EWRAM_BSS ALIGN(4);
 static struct safefile_scan sf_main EWRAM_BSS, sf_bak EWRAM_BSS;
+static u8 sf_failed EWRAM_BSS;  // a read failed since safefile_open began
 
 static struct {
 	u32 limit;  // bytes of the copy to read: up to its CRC line
@@ -31,13 +32,15 @@ static int bak_name(char *out, const char *path)
 
 // Reads the copy at path through s; 0 if it isn't there, can't be read or
 // is larger than max bytes (a hand edit gone wrong: reading it would stall)
-static int scan(const char *path, struct safefile_scan *s, u32 prefix_len, u32 max)
+static int scan(const char *path, struct safefile_scan *s, u32 max)
 {
-	safefile_scan_begin(s, prefix_len);
+	safefile_scan_begin(s);
 	FRESULT res = f_open(&sf_file, path, FA_READ);
 	if (res != FR_OK) {
-		if (res != FR_NO_FILE && res != FR_NO_PATH)
+		if (res != FR_NO_FILE && res != FR_NO_PATH) {
 			tlog_error("safefile: can't open %s (FatFs %u)", path, (unsigned)res);
+			sf_failed = 1;
+		}
 		return 0;
 	}
 	if (f_size(&sf_file) > max) {
@@ -55,6 +58,7 @@ static int scan(const char *path, struct safefile_scan *s, u32 prefix_len, u32 m
 	f_close(&sf_file);
 	if (res != FR_OK) {
 		tlog_error("safefile: can't read %s (FatFs %u)", path, (unsigned)res);
+		sf_failed = 1;
 		return 0;
 	}
 	safefile_scan_end(s);
@@ -65,10 +69,11 @@ static int scan(const char *path, struct safefile_scan *s, u32 prefix_len, u32 m
 // are left in sf_main and sf_bak
 static int pick(const char *path, const char *bak, u32 max)
 {
-	int has_main = scan(path, &sf_main, 0, max);
+	sf_failed = 0;
+	int has_main = scan(path, &sf_main, max);
 	if (has_main && sf_main.valid)
 		return SAFEFILE_MAIN;  // NAME.bak doesn't matter
-	int has_bak = scan(bak, &sf_bak, has_main ? sf_main.size : 0, max);
+	int has_bak = scan(bak, &sf_bak, max);
 	return safefile_pick(has_main ? &sf_main : NULL, has_bak ? &sf_bak : NULL);
 }
 
@@ -89,6 +94,7 @@ int safefile_open(const char *path, u32 max)
 	FRESULT res = f_open(&sf_file, from == SAFEFILE_BAK ? bak : path, FA_READ);
 	if (res != FR_OK) {
 		tlog_error("safefile: can't open %s again (FatFs %u)", path, (unsigned)res);
+		sf_failed = 1;
 		return SAFEFILE_NONE;
 	}
 	memset(&rd, 0, sizeof(rd));
@@ -115,6 +121,7 @@ int safefile_line(char *buf, u32 size)
 				tlog_error("safefile: a read stopped %lu bytes short",
 					   (unsigned long)(rd.limit - rd.done));
 				rd.limit = rd.done;
+				sf_failed = 1;
 				break;
 			}
 			rd.have = got;
@@ -142,6 +149,11 @@ int safefile_line(char *buf, u32 size)
 	if (size)
 		buf[len] = 0;
 	return cut ? SAFEFILE_LONG : (int)len;
+}
+
+int safefile_failed(void)
+{
+	return sf_failed;
 }
 
 void safefile_close(void)
@@ -212,6 +224,10 @@ int safefile_write(const char *path, u32 max, safefile_fill fill, void *ctx)
 		return 0;
 	// The copy a reader takes now stays whole until the other is written
 	int bak_first = pick(path, bak, max) != SAFEFILE_BAK;
+	if (sf_failed) {
+		tlog_error("safefile: %s: not written, as reading it failed", path);
+		return 0;  // which copy holds up is unknown: write neither
+	}
 	tlog_debug("safefile: writing %s, %s first", path, bak_first ? "the backup" : "the main copy");
 	if (!write_copy(bak_first ? bak : path, fill, ctx))
 		return 0;

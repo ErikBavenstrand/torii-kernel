@@ -15,17 +15,17 @@ static u32 sealed(char *out, u32 size, const char *text)
 }
 
 // Scans bytes in pieces of piece bytes
-static void scan_in(struct safefile_scan *s, const char *bytes, u32 len, u32 prefix, u32 piece)
+static void scan_in(struct safefile_scan *s, const char *bytes, u32 len, u32 piece)
 {
-	safefile_scan_begin(s, prefix);
+	safefile_scan_begin(s);
 	for (u32 at = 0; at < len; at += piece)
 		safefile_scan_feed(s, bytes + at, len - at < piece ? len - at : piece);
 	safefile_scan_end(s);
 }
 
-static void scan(struct safefile_scan *s, const char *bytes, u32 len, u32 prefix)
+static void scan(struct safefile_scan *s, const char *bytes, u32 len)
 {
-	scan_in(s, bytes, len, prefix, len ? len : 1);
+	scan_in(s, bytes, len, len ? len : 1);
 }
 
 void test_safefile_crc_line(void)
@@ -51,51 +51,45 @@ void test_safefile_scan(void)
 	const char *text = "100\t/a.gba\nNOR:b.gba\n";
 	u32 len = sealed(buf, sizeof(buf), text);
 	// Whole, and in every piece size: the same result
-	scan(&s, buf, len, 0);
+	scan(&s, buf, len);
 	CHECK(s.valid && s.crc_line && !s.has_nul);
 	CHECK_EQ(s.body, strlen(text));
 	CHECK_EQ(s.size, len);
 	CHECK_EQ(s.crc, crc32(buf, len));
 	for (u32 piece = 1; piece < len; piece++) {
-		scan_in(&t, buf, len, 7, piece);
+		scan_in(&t, buf, len, piece);
 		CHECK(t.valid && t.body == s.body && t.crc == s.crc);
-		CHECK_EQ(t.prefix_crc, crc32(buf, 7));
 	}
-	// Prefixes at 0 and at the end
-	scan(&t, buf, len, 0);
-	CHECK_EQ(t.prefix_crc, 0);
-	scan(&t, buf, len, len);
-	CHECK_EQ(t.prefix_crc, crc32(buf, len));
 	// Blank lines and a lost newline after the CRC line still hold
 	char more[300];
 	snprintf(more, sizeof(more), "%s\r\n\n", buf);
-	scan(&t, more, (u32)strlen(more), 0);
+	scan(&t, more, (u32)strlen(more));
 	CHECK(t.valid);
-	scan(&t, buf, len - 1, 0);
+	scan(&t, buf, len - 1);
 	CHECK(t.valid);
 	// A changed byte, or a line after the CRC line, doesn't
 	snprintf(more, sizeof(more), "%s", buf);
 	more[1] = '9';
-	scan(&t, more, len, 0);
+	scan(&t, more, len);
 	CHECK(t.crc_line && !t.valid);
 	snprintf(more, sizeof(more), "%s/c.gba\n", buf);
-	scan(&t, more, (u32)strlen(more), 0);
+	scan(&t, more, (u32)strlen(more));
 	CHECK(!t.crc_line && !t.valid);
 	// No CRC line, an empty file, a NUL
-	scan(&t, text, (u32)strlen(text), 0);
+	scan(&t, text, (u32)strlen(text));
 	CHECK(!t.crc_line && !t.valid && t.size == strlen(text));
-	scan(&t, "", 0, 0);
+	scan(&t, "", 0);
 	CHECK(!t.valid && t.size == 0);
-	scan(&t, "a\0b\n", 4, 0);
+	scan(&t, "a\0b\n", 4);
 	CHECK(t.has_nul);
 	// A CRC line in the middle isn't the file's
 	snprintf(more, sizeof(more), "#crc32 00000000\n");
-	scan(&t, more, (u32)strlen(more), 0);
+	scan(&t, more, (u32)strlen(more));
 	CHECK(t.crc_line && t.valid && t.body == 0);  // the empty text's CRC is 0
 	// A very long line doesn't overrun the scan's line
 	memset(more, 'x', sizeof(more) - 1);
 	more[sizeof(more) - 1] = 0;
-	scan(&t, more, (u32)strlen(more), 0);
+	scan(&t, more, (u32)strlen(more));
 	CHECK(!t.crc_line);
 }
 
@@ -107,47 +101,50 @@ void test_safefile_pick(void)
 	u32 a_len = sealed(a, sizeof(a), new_text);
 	u32 b_len = sealed(b, sizeof(b), new_text);
 	// Both whole: NAME
-	scan(&m, a, a_len, 0);
-	scan(&k, b, b_len, m.size);
+	scan(&m, a, a_len);
+	scan(&k, b, b_len);
 	CHECK_EQ(safefile_pick(&m, &k), SAFEFILE_MAIN);
 	CHECK_EQ(safefile_pick(&m, NULL), SAFEFILE_MAIN);
-	// A cut during NAME: empty, or the first bytes of NAME.bak
-	for (u32 cut = 0; cut <= strlen(new_text); cut++) {
-		scan(&m, a, cut, 0);
-		scan(&k, b, b_len, cut);
-		CHECK_EQ(safefile_pick(&m, &k), SAFEFILE_BAK);
+	// A cut during NAME leaves it empty: NAME.bak. Lines trimmed off its end
+	// by hand (the start of NAME.bak) are the user's
+	scan(&m, a, 0);
+	scan(&k, b, b_len);
+	CHECK_EQ(safefile_pick(&m, &k), SAFEFILE_BAK);
+	for (u32 cut = 1; cut <= strlen(new_text); cut++) {
+		scan(&m, a, cut);
+		CHECK_EQ(safefile_pick(&m, &k), SAFEFILE_HAND);
 	}
 	// A cut during NAME.bak (written first): NAME holds
-	scan(&m, a, a_len, 0);
-	scan(&k, b, 5, m.size);
+	scan(&m, a, a_len);
+	scan(&k, b, 5);
 	CHECK_EQ(safefile_pick(&m, &k), SAFEFILE_MAIN);
 	// Edited by hand: no CRC line, or one left stale; even with no NAME.bak
-	scan(&m, "3\t/hand.gba\n", 12, 0);
-	scan(&k, b, b_len, m.size);
+	scan(&m, "3\t/hand.gba\n", 12);
+	scan(&k, b, b_len);
 	CHECK_EQ(safefile_pick(&m, &k), SAFEFILE_HAND);
 	CHECK_EQ(safefile_pick(&m, NULL), SAFEFILE_HAND);
 	char stale[256];
 	snprintf(stale, sizeof(stale), "/hand.gba\n%s", a + strlen(new_text));
-	scan(&m, stale, (u32)strlen(stale), 0);
+	scan(&m, stale, (u32)strlen(stale));
 	CHECK(m.crc_line && !m.valid);
 	CHECK_EQ(safefile_pick(&m, NULL), SAFEFILE_HAND);
 	// NAME longer than NAME.bak's text, or different, is a hand edit too
 	u32 old_len = sealed(b, sizeof(b), old_text);
-	scan(&m, new_text, (u32)strlen(new_text), 0);
-	scan(&k, b, old_len, m.size);
+	scan(&m, new_text, (u32)strlen(new_text));
+	scan(&k, b, old_len);
 	CHECK_EQ(safefile_pick(&m, &k), SAFEFILE_HAND);
 	// Not text, or empty, with no NAME.bak: nothing
-	scan(&m, "\0\0\0\0", 4, 0);
+	scan(&m, "\0\0\0\0", 4);
 	CHECK_EQ(safefile_pick(&m, NULL), SAFEFILE_NONE);
-	scan(&k, b, old_len, m.size);
+	scan(&k, b, old_len);
 	CHECK_EQ(safefile_pick(&m, &k), SAFEFILE_BAK);
-	scan(&m, "", 0, 0);
+	scan(&m, "", 0);
 	CHECK_EQ(safefile_pick(&m, NULL), SAFEFILE_NONE);
 	CHECK_EQ(safefile_pick(NULL, NULL), SAFEFILE_NONE);
 	// Only NAME.bak, or a NAME.bak that doesn't hold
-	scan(&k, b, old_len, 0);
+	scan(&k, b, old_len);
 	CHECK_EQ(safefile_pick(NULL, &k), SAFEFILE_BAK);
-	scan(&k, b, old_len - 3, 0);
+	scan(&k, b, old_len - 3);
 	CHECK_EQ(safefile_pick(NULL, &k), SAFEFILE_NONE);
 }
 

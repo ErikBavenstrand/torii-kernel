@@ -20,8 +20,6 @@
 struct safefile_scan {
 	u32 size;        // bytes fed
 	u32 crc;         // CRC32 of all of them
-	u32 prefix_len;  // the prefix whose CRC32 is wanted (safefile_scan_begin)
-	u32 prefix_crc;  // CRC32 of the first prefix_len bytes, once size >= prefix_len
 	u32 body;        // with a CRC line: the bytes before it
 	u32 body_crc;    // and their CRC32
 	u32 stated;      // the CRC32 the CRC line states
@@ -34,7 +32,7 @@ struct safefile_scan {
 	u8 has_nul;      // a NUL byte: not text (a write cut short can leave zeros)
 };
 
-void safefile_scan_begin(struct safefile_scan *s, u32 prefix_len);
+void safefile_scan_begin(struct safefile_scan *s);
 void safefile_scan_feed(struct safefile_scan *s, const void *data, u32 bytes);
 void safefile_scan_end(struct safefile_scan *s);
 
@@ -42,11 +40,10 @@ void safefile_scan_end(struct safefile_scan *s);
 // copy that isn't there):
 // - SAFEFILE_MAIN: NAME, whose CRC line holds;
 // - SAFEFILE_HAND: NAME without a CRC line that holds, taken as edited by
-//   hand: it is text, not empty, and not the first bytes of a NAME.bak that
-//   holds (which is what a write of NAME cut short leaves);
+//   hand when it is text and not empty (FatFs writes a file's size only as
+//   it closes it, so a write cut short leaves NAME empty);
 // - SAFEFILE_BAK: NAME.bak, whose CRC line holds;
 // - SAFEFILE_NONE: neither: the list is empty.
-// Scan NAME first, then NAME.bak with prefix_len = NAME's size.
 enum {
 	SAFEFILE_NONE,
 	SAFEFILE_MAIN,
