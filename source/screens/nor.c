@@ -303,8 +303,8 @@ static void hints_show(void)
 
 static void position_show(void)
 {
-	snprintf(nor.position, sizeof(nor.position), "%lu/%lu", (unsigned long)(nor.sel + 1),
-		 (unsigned long)(nor.count + 1));
+	snprintf(nor.position, sizeof(nor.position), "%lu/%lu", (unsigned long)nor.sel + 1,
+		 (unsigned long)nor.count + 1);
 	ui_title_set_right(at(N_TITLE), nor.position);
 }
 
@@ -365,6 +365,19 @@ static void info(u32 game)
 static void delete_latest(u32 game)
 {
 	tlog("nor: delete %lu", (unsigned long)game);
+	// action_nor_delete takes the latest game of the list as the NOR holds
+	// it now: only if that is still the game the user chose
+	char name[sizeof(pNorFS[0].filename)];
+	memcpy(name, pNorFS[game].filename, sizeof(name));
+	action_nor_read();
+	if (game + 1 != game_total_NOR || memcmp(name, pNorFS[game].filename, sizeof(name)) != 0) {
+		tlog_error("nor: delete %lu: the NOR's list changed (%lu games): nothing deleted", (unsigned long)game,
+			   (unsigned long)game_total_NOR);
+		nor.next_row = game;
+		nor.next_row_set = 1;
+		nav_reshow();
+		return;
+	}
 	dialog_notice(NULL, gl_nor_deleting, DIALOG_INFO);
 	int deleted = action_nor_delete();
 	dialog_notice_end();
