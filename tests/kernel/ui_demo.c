@@ -254,10 +254,10 @@ static const struct ui_spec widget_nodes[] = {
 	[W_STORAGE] = {UI_STORAGE, 7, UI_NONE, 2, UI_HFILL, 0, 0, UI_ROLE_PANEL, 8, 56, 8, 8, 0},
 	// A section label on the paper, its icon in the item's ink
 	[W_LOOK] = {UI_LABEL, 8, UI_NONE, 3, UI_HFILL, 0, UI_ROLE_ACCENT_INK, 0, 0, 72, 0, 16, &look_label},
-	// The lower card (y 88 to 144): 12 px rows
-	[W_LOW] = {UI_CARD, 9, UI_NONE, 2, UI_HFILL, 0, 0, 0, 0, 88, 0, 56, &low_card},
-	[W_LIST] = {UI_LIST, 10, UI_NONE, 1, UI_LEFT, UI_FOCUSABLE, 0, 0, LIST_X, 96, LIST_W, 40, &settings_list},
-	[W_BAR] = {UI_SCROLLBAR, 11, UI_NONE, 2, UI_LEFT, 0, 0, UI_ROLE_PANEL, LIST_X + LIST_W, 96, 8, 40,
+	// The lower card (y 88 to 128): two whole 12 px rows (B9's contract)
+	[W_LOW] = {UI_CARD, 9, UI_NONE, 2, UI_HFILL, 0, 0, 0, 0, 88, 0, 40, &low_card},
+	[W_LIST] = {UI_LIST, 10, UI_NONE, 1, UI_LEFT, UI_FOCUSABLE, 0, 0, LIST_X, 96, LIST_W, 24, &settings_list},
+	[W_BAR] = {UI_SCROLLBAR, 11, UI_NONE, 2, UI_LEFT, 0, 0, UI_ROLE_PANEL, LIST_X + LIST_W, 96, 8, 24,
 		   &settings_bar},
 };
 _Static_assert(W_LIST == W_LIST_TARGET, "the scroll bar's target");

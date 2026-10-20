@@ -87,7 +87,7 @@ void ui_queue_keys(u16 keys);
 // frame still ends before the next VBlank (a frame is 280,896 cycles) with
 // room for the nodes drawn after: a view not shown yet (nothing moves while
 // a screen comes in, so it takes most of the frame and shows sooner),
-#define UI_DRAW_BUDGET 250000
+#define UI_DRAW_BUDGET 230000
 // and a list's page change (its rows drawn ahead into the row cache while
 // the old page fades out, then copied in), which leaves room for motion
 // running alongside and a slower frame on the cart.
