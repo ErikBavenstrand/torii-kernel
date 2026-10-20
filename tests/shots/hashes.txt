@@ -278,21 +278,9 @@ page-empty/frames 10-10 76C0480B490D7FC3
 page-empty/frames 11-11 AC9324EBF1A166BF
 page-empty/frames 12-21 B62B7D8B2814CB3F
 page-empty/frames 22-22 A1CB849A5F1C97D8
-page-empty/frames 0-1 BE37C38063BAD0C0
-page-empty/frames 2-2 8D31351879B2DD12
-page-empty/frames 3-3 E2D6E751A614EE44
-page-empty/frames 4-5 7B90E77090ED8325
-page-empty/frames 6-6 157B4B679AEFCB64
-page-empty/frames 7-7 A1CB849A5F1C97D8
-page-empty/frames 8-8 5655BE772A02F3D0
-page-empty/frames 9-9 76C0480B490D7FC3
-page-empty/frames 10-10 AC9324EBF1A166BF
-page-empty/frames 11-20 B62B7D8B2814CB3F
-page-empty/frames 21-21 A1CB849A5F1C97D8
-page-empty/frames 22-22 568485A10863EE2D
 sd-dark/folder DFD4D3341592285D
 sd-dark/root 225FC0C5D082ACA9
-sd-many/end D6CC8911DBA71D94
+sd-many/end BB72E1C5C486A00C
 sd-many/root ABB8F464CD451D8C
 sd-root/back 7639FAE28B4FA9BF
 sd-root/confirm 5C09254428F1A147

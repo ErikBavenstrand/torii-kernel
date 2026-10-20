@@ -107,7 +107,6 @@ char *gl_nor_format_button EWRAM_BSS;
 char *gl_nor_states EWRAM_BSS;
 char *gl_nor_changed EWRAM_BSS;
 char **gl_nor_saves EWRAM_BSS;
-char *gl_hint_menu EWRAM_BSS;
 char *gl_sd_item EWRAM_BSS;
 char *gl_sd_items EWRAM_BSS;
 char *gl_sd_items_none EWRAM_BSS;
@@ -454,7 +453,6 @@ const char *en_nor_saves[NOR_SAVES] = {
 
 // The SD card page (screens/sdcard.c): counts, the truncation note, the
 // file popup, its confirmation and errors, and File info
-const char en_hint_menu[] = "menu";
 const char en_sd_item[] = "1 item";
 const char en_sd_items[] = "items";
 const char en_sd_items_none[] = "empty";
@@ -593,7 +591,6 @@ void LoadEnglish(void)
 	gl_nor_states = (char *)en_nor_states;
 	gl_nor_changed = (char *)en_nor_changed;
 	gl_nor_saves = (char **)en_nor_saves;
-	gl_hint_menu = (char *)en_hint_menu;
 	gl_sd_item = (char *)en_sd_item;
 	gl_sd_items = (char *)en_sd_items;
 	gl_sd_items_none = (char *)en_sd_items_none;
