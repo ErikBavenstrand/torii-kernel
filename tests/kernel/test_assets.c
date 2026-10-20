@@ -1,6 +1,7 @@
 // The asset pipeline (source/engine): the BIOS's LZ77 on an asset, PSRAM
 // writes and reads, the SD reader job, and the cover cache from ROM and SD
-// into sprite VRAM.
+// into sprite VRAM. Then the menu's art (source/ui/art.h): its table, and
+// that the screens' scenes fit the sprite VRAM the spec gives them.
 //
 // PSRAM and the card need a cart: these run in every kernel's Diagnostics
 // (a real cart) and in tests/assets.sh (the emulated one); in the plain
@@ -22,6 +23,7 @@
 #include "../../source/engine/psram.h"
 #include "../../source/engine/sdread.h"
 #include "../../source/engine/stage.h"
+#include "../../source/ui/art.h"
 
 extern FATFS EZcardFs;
 
@@ -355,5 +357,228 @@ void test_asset_cover_cache(void)
 	cover_cache_invalidate();
 	CHECK_EQ(cc_count(c, COVER_FREE), COVER_ENTRIES);
 	CHECK_EQ(cover_slot_state(1), COVER_SLOT_EMPTY);
+	reset_engine(0);
+}
+
+// --- The menu's art ---
+
+// Sprite VRAM the spec gives the menu's sprites: "OBJ ~16 KB of 32 KB"
+#define OBJ_BUDGET_TILES 512
+// The carousel's objects in VRAM: five in view and the one coming in
+// during a step (research-v04-motion.md)
+#define CAROUSEL_SLOTS 6
+
+// Pixel (x, y) of 4bpp tiles in 1D order, w tiles across
+static u32 pixel(const u32 *tiles, u32 w, u32 x, u32 y)
+{
+	return tiles[((y / 8) * w + x / 8) * 8 + y % 8] >> (x % 8 * 4) & 15;
+}
+
+void test_art_table(void)
+{
+	for (u32 i = 0; i < ART_ITEM_COUNT; i++) {
+		CHECK(art_items[i].icon16 < ART_ICON16_COUNT);
+		CHECK(art_items[i].icon8 < ART_ICON8_COUNT);
+		CHECK(art_items[i].sprite < ART_SPRITE_COUNT);
+	}
+	for (u32 i = 0; i < ART_ICON16_COUNT; i++) {
+		CHECK(art_icon16_bank[i] < ART_ICON16_BANKS);
+		CHECK(art_icon16_palette(i) == art_icon16_palettes[art_icon16_bank[i]]);
+	}
+	// At most two icons a bank, and no bank empty
+	for (u32 b = 0; b < ART_ICON16_BANKS; b++) {
+		u32 n = 0;
+		for (u32 i = 0; i < ART_ICON16_COUNT; i++)
+			n += art_icon16_bank[i] == b;
+		CHECK(n == 1 || n == 2);
+	}
+
+	for (u32 s = 0; s < ART_SPRITE_COUNT; s++) {
+		const struct art_sprite *a = &art_sprites[s];
+		const u32 *t = art_sprite_tiles[s];
+		CHECK(a->width && a->width <= ART_SPRITE_SIZE && a->height && a->height <= ART_SPRITE_FOOT + 1);
+		CHECK_EQ(art_sprite_palettes[s][ART_SHADOW_INDEX], 0);  // the shadow's, set by the screen
+		u32 max = 0, left = ART_SPRITE_SIZE, top = ART_SPRITE_SIZE, bottom = 0;
+		for (u32 y = 0; y < ART_SPRITE_SIZE; y++)
+			for (u32 x = 0; x < ART_SPRITE_SIZE; x++) {
+				u32 p = pixel(t, ART_SPRITE_SIZE / 8, x, y);
+				if (p > max)
+					max = p;
+				if (p && x < left)
+					left = x;
+				if (p && y < top)
+					top = y;
+				if (p)
+					bottom = y;
+			}
+		CHECK(max <= ART_SPRITE_COLOURS);
+		CHECK_EQ(bottom, ART_SPRITE_FOOT);
+		CHECK_EQ(top, ART_SPRITE_FOOT + 1 - a->height);
+		CHECK_EQ(left, (ART_SPRITE_SIZE - a->width) / 2u);
+		CHECK_EQ(a->shadow, art_shadow_for(a->width));
+	}
+
+	for (u32 i = 0; i < ART_SHADOW_COUNT; i++) {
+		CHECK(art_shadows[i].width % 2 == 0 && art_shadows[i].width <= 64);
+		CHECK(art_shadows[i].height && art_shadows[i].height <= 8);
+		if (i)
+			CHECK(art_shadows[i].width > art_shadows[i - 1].width);
+		CHECK_EQ(art_shadow_for(art_shadows[i].width), i);
+		u32 drawn = 0;
+		for (u32 y = 0; y < 8; y++)
+			for (u32 x = 0; x < 32; x++) {
+				u32 p = pixel(art_shadow_tiles[i], 4, x, y);
+				CHECK(p == 0 || p == ART_SHADOW_INDEX);
+				drawn += p != 0;
+			}
+		CHECK(drawn > 0);
+	}
+	CHECK_EQ(art_shadow_for(0), 0);
+	CHECK_EQ(art_shadow_for(255), ART_SHADOW_COUNT - 1);
+
+	// The 8x8 icons in a colour of the screen's choosing
+	u32 tile[8];
+	for (u32 i = 0; i < ART_ICON8_COUNT; i++) {
+		art_icon8_tile(i, 0x17, tile);  // only the low four bits count
+		u32 bits = 0, set = 0;
+		for (u32 y = 0; y < 8; y++) {
+			for (u32 x = 0; x < 8; x++) {
+				u32 p = tile[y] >> (x * 4) & 15;
+				CHECK(p == 0 || p == 7);
+				set += p == 7;
+			}
+			for (u32 v = art_icon8_bits[i][y]; v; v >>= 1)
+				bits += v & 1;
+		}
+		CHECK(set > 0);
+		CHECK_EQ(set, bits);
+	}
+
+	u32 box_max = 0;
+	for (u32 y = 0; y < ART_BOX_SIZE; y++)
+		for (u32 x = 0; x < ART_BOX_SIZE; x++) {
+			u32 p = pixel(art_box_tiles, ART_BOX_SIZE / 8, x, y);
+			if (p > box_max)
+				box_max = p;
+		}
+	CHECK_EQ(box_max, ART_BOX_SHAPE);
+}
+
+void test_art_obj_budget(void)
+{
+	reset_engine(1);
+	// Keep to sprite VRAM from 0x06014000, as the other engine tests do
+	u8 keep = res_alloc(RES_OBJ_VRAM, 512, 1, 0, RES_OBJ_UNITS, 0, 0);
+	CHECK_EQ(res_start(RES_OBJ_VRAM, keep), 0);
+	struct pool *obj = res_pool(RES_OBJ_VRAM);
+	u16 free0 = pool_free_units(obj, 0);
+
+	// The carousel: its objects, every shadow width, the item's label icon
+	// and the torii glyph, each upload within one VBlank's commit
+	u16 tiles[CAROUSEL_SLOTS];
+	for (u32 i = 0; i < CAROUSEL_SLOTS; i++) {
+		tiles[i] = art_load_sprite(art_items[i % ART_ITEM_COUNT].sprite);
+		CHECK(tiles[i] != ART_NONE && tiles[i] >= 512);
+		for (u32 j = 0; j < i; j++)
+			CHECK(tiles[i] != tiles[j]);
+		gfx_queue_clear();  // the copies would never land: the test commits nothing
+	}
+	for (u32 i = 0; i < ART_SHADOW_COUNT; i++) {
+		CHECK(art_load_shadow(i) != ART_NONE);
+		gfx_queue_clear();
+	}
+	u8 label_bank = 0xFF, torii_bank = 0xFF;
+	u16 label = art_load_icon16(art_items[0].icon16, &label_bank);
+	u16 torii = art_load_icon16(ART_ICON16_TORII, &torii_bank);
+	CHECK(label != ART_NONE && torii != ART_NONE && label_bank < 16 && torii_bank < 16);
+	gfx_queue_clear();
+	u16 used = free0 - pool_free_units(obj, 0);
+	CHECK_EQ(used,
+		 CAROUSEL_SLOTS * ART_SPRITE_TILES + ART_SHADOW_COUNT * ART_SHADOW_HALF_TILES + 2 * ART_ICON16_TILES);
+	struct engine_budget room = {.obj_tiles = OBJ_BUDGET_TILES, .obj_banks = RES_PAL_BANKS};
+	// A bank per object, so each fogs alone, and the icons' banks
+	struct engine_budget need = {.obj_tiles = used, .obj_banks = CAROUSEL_SLOTS + 2};
+	char why[80];
+	CHECK_EQ(budget_check(&need, &room, why, sizeof(why)), BUDGET_OK);
+	CHECK(ART_SPRITE_TILES * 32 <= GFX_COMMIT_BYTES);
+
+	// Loading again shares the tiles and the bank
+	u8 again_bank = 0xFF;
+	CHECK_EQ(art_load_icon16(ART_ICON16_TORII, &again_bank), torii);
+	CHECK_EQ(again_bank, torii_bank);
+	CHECK_EQ(art_load_sprite(art_items[0].sprite), tiles[0]);
+	CHECK_EQ(free0 - pool_free_units(obj, 0), used);
+	CHECK_EQ(art_load_sprite(ART_SPRITE_COUNT), ART_NONE);
+	CHECK_EQ(art_load_shadow(ART_SHADOW_COUNT), ART_NONE);
+	CHECK_EQ(art_load_icon16(ART_ICON16_COUNT, &again_bank), ART_NONE);
+	gfx_queue_clear();
+
+	// With the VRAM queue full a load fails and leaves nothing behind; the
+	// next one, with room, uploads (not revives an empty block)
+	// (fills of the kept VRAM, which nothing commits)
+	for (u32 i = 0; i < GFX_QUEUE_CAP && gfx_queue_len() < GFX_QUEUE_CAP; i++)
+		CHECK(gfx_queue_fill(res_obj_addr(keep), 0, 4));
+	CHECK_EQ(gfx_queue_len(), GFX_QUEUE_CAP);
+	u16 before = pool_free_units(obj, 0);
+	u32 last = ART_SPRITE_COUNT - 1;
+	CHECK_EQ(art_load_sprite(last), ART_NONE);
+	CHECK_EQ(pool_free_units(obj, 0), before);
+	CHECK_EQ(pool_find(obj, (u16)(ART_TAG_SPRITE | last)), POOL_NONE);
+	gfx_queue_clear();
+	CHECK(art_load_sprite(last) != ART_NONE);
+	CHECK_EQ(gfx_queue_len(), 1);
+	gfx_queue_clear();
+
+	// A list with art: the title icon (the placeholder box is BG tiles)
+	need.obj_tiles = ART_ICON16_TILES;
+	need.obj_banks = 1;
+	CHECK_EQ(budget_check(&need, &room, why, sizeof(why)), BUDGET_OK);
+	reset_engine(0);
+}
+
+// The carousel's ring turned 200 times: each turn drops the object (and
+// shadow) leaving the slots and takes the one coming in, unlogged, so the
+// engine's allocation log stays as it was however long the ring turns.
+void test_art_ring(void)
+{
+	reset_engine(1);
+	u8 keep = res_alloc(RES_OBJ_VRAM, 512, 1, 0, RES_OBJ_UNITS, 0, 0);
+	CHECK_EQ(res_start(RES_OBJ_VRAM, keep), 0);
+	struct pool *obj = res_pool(RES_OBJ_VRAM);
+	u16 free0 = pool_free_units(obj, 1);
+	u8 mark = res_mark();
+	u8 sprite[CAROUSEL_SLOTS], shadow[CAROUSEL_SLOTS];
+	for (u32 i = 0; i < CAROUSEL_SLOTS; i++) {
+		const struct art_sprite *a = &art_sprites[art_items[i % ART_ITEM_COUNT].sprite];
+		CHECK(art_take_sprite(art_items[i % ART_ITEM_COUNT].sprite, &sprite[i], 1) != ART_NONE);
+		CHECK(art_take_shadow(a->shadow, &shadow[i], 1) != ART_NONE);
+		gfx_queue_clear();
+	}
+	for (u32 turn = 0; turn < 200; turn++) {
+		u32 slot = turn % CAROUSEL_SLOTS;
+		u32 item = (turn + CAROUSEL_SLOTS) % ART_ITEM_COUNT;
+		art_drop(sprite[slot]);
+		art_drop(shadow[slot]);
+		u32 s = art_items[item].sprite;
+		CHECK(art_take_sprite(s, &sprite[slot], 1) != ART_NONE);
+		CHECK(art_take_shadow(art_sprites[s].shadow, &shadow[slot], 1) != ART_NONE);
+		gfx_queue_clear();
+		CHECK_EQ(res_mark(), mark);
+		// At most every slot's object and shadow held (slots share shadows;
+		// dropped blocks are cached, which counts as free)
+		CHECK(free0 - pool_free_units(obj, 1) <= CAROUSEL_SLOTS * (ART_SPRITE_TILES + ART_SHADOW_HALF_TILES));
+	}
+	for (u32 i = 0; i < CAROUSEL_SLOTS; i++) {
+		art_drop(sprite[i]);
+		art_drop(shadow[i]);
+	}
+	CHECK_EQ(pool_free_units(obj, 1), free0);
+	CHECK_EQ(res_mark(), mark);
+
+	// An object's colours with the ground tone in the shadow's slot
+	u16 c[16];
+	art_sprite_colours(ART_SPRITE_GBA, 0x1234, c);
+	CHECK_EQ(c[ART_SHADOW_INDEX], 0x1234);
+	CHECK_EQ(c[1], art_sprite_palettes[ART_SPRITE_GBA][1]);
 	reset_engine(0);
 }

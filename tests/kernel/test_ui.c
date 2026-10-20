@@ -55,6 +55,13 @@ static const struct ui_spec dialog_nodes[] = {
 };
 static const struct ui_view_spec dialog_view = {"test-dialog", dialog_nodes, 2, 0, UI_NONE, UI_VIEW_MODAL, 0};
 
+static const u32 t_image_tiles[4][8] = {{0x11111111}, {0x22222222}, {0x33333333}, {0x44444444}};
+static const struct ui_image_config t_image = {&t_image_tiles[0][0], 0, 0x5601};
+static const struct ui_spec image_nodes[] = {
+	{UI_IMAGE, 1, UI_NONE, 1, 0, 0, 0, 0, 8, 8, 16, 16, &t_image},
+};
+static const struct ui_view_spec image_view = {"test-image", image_nodes, 1, 0, UI_NONE, 0, 0};
+
 static const struct ui_list_config bad_rows = {&t_model, 24, 0, 0, 0};
 static const struct ui_spec bad_nodes[] = {
 	{UI_LIST, 1, UI_NONE, 1, UI_FILL, 0, 0, 0, 0, 0, 0, 0, &bad_rows},
@@ -145,5 +152,26 @@ void test_ui_pool_and_arenas(void)
 	CHECK_EQ(pool_free_units(bg, 0), free0);
 	CHECK_EQ(motion_count(), 0);
 	gfx_queue_clear();
+	reset(0);
+}
+
+// An image pushed while the VRAM queue is full is refused and leaves no
+// block behind; pushed again with room, its tiles are queued, not revived
+// empty from the cache.
+void test_ui_image_queue_full(void)
+{
+	reset(1);
+	struct pool *bg = res_pool(RES_BG_VRAM);
+	// (fills nothing commits)
+	for (u32 i = 0; i < GFX_QUEUE_CAP && gfx_queue_len() < GFX_QUEUE_CAP; i++)
+		CHECK(gfx_queue_fill((void *)0x06000000, 0, 4));
+	CHECK_EQ(ui_core_push(&image_view, 0), 0);
+	CHECK_EQ(pool_find(bg, t_image.tag), POOL_NONE);
+	CHECK_EQ(res_mark(), 0);
+	gfx_queue_clear();
+	CHECK(ui_core_push(&image_view, 0) != 0);
+	CHECK(pool_find(bg, t_image.tag) != POOL_NONE);
+	CHECK_EQ(gfx_queue_len(), 1);
+	ui_core_pop();
 	reset(0);
 }

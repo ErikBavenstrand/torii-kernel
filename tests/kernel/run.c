@@ -51,10 +51,14 @@ static const struct {
 	{"diag_line_cut", test_diag_line_cut},
 	{"ui_pool_and_arenas", test_ui_pool_and_arenas},
 	{"theme_switch_loads_banks", test_theme_switch_loads_banks},
+	{"ui_image_queue_full", test_ui_image_queue_full},
 	{"asset_lz77_decode", test_asset_lz77_decode},
 	{"asset_psram_round_trip", test_asset_psram_round_trip},
 	{"asset_sd_read", test_asset_sd_read},
 	{"asset_cover_cache", test_asset_cover_cache},
+	{"art_table", test_art_table},
+	{"art_obj_budget", test_art_obj_budget},
+	{"art_ring", test_art_ring},
 };
 
 // The tests that need the cart (PSRAM, the card), run alone by
@@ -108,6 +112,9 @@ void torii_run_tests(void)
 	// SELECT and L: the UI demo on the cart (tests/shots/ui-*.opts)
 	if ((~REG_KEYINPUT & 0x3FF) == (KEY_SELECT | KEY_L))
 		ui_demo();
+	// SELECT and R: the art sheet (tests/shots/art-sheet.opts)
+	if ((~REG_KEYINPUT & 0x3FF) == (KEY_SELECT | KEY_R))
+		art_sheet();
 	if ((~REG_KEYINPUT & 0x3FF) == KEY_SELECT) {
 		REG_WAITCNT_CART = WAITCNT_MENU;  // as the menu runs
 		torii_asset_tests();

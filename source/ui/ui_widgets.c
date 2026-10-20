@@ -214,9 +214,15 @@ static int image_init(u8 node)
 	st->tiles = ui_tiles(node, count, c->tag, &st->first);
 	if (st->tiles == RES_NONE)
 		return 0;
-	// From ROM, so the queue may read it whenever it gets there
-	if (res_fresh(RES_BG_VRAM) && !gfx_queue_copy(res_bg_addr(st->tiles), c->tiles, count * 32))
+	// From ROM, so the queue may read it whenever it gets there. With the
+	// queue full, the new block goes, not to the cache: revived by the next
+	// push, it would look loaded with nothing in it
+	if (res_fresh(RES_BG_VRAM) && !gfx_queue_copy(res_bg_addr(st->tiles), c->tiles, count * 32)) {
+		res_release(RES_BG_VRAM, st->tiles);
+		pool_drop(res_pool(RES_BG_VRAM), st->tiles);
+		st->tiles = RES_NONE;
 		return 0;
+	}
 	st->bank = UI_BANK_NORMAL;
 	if (c->palette) {
 		u8 pal = res_palette(RES_BG_PAL, 1, c->tag);

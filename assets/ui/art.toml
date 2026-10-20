@@ -1,0 +1,41 @@
+# The menu's art (source/ui/art.h). `just assets` converts the PNGs here
+# into source/ui/art_data.c and art_ids.h; tests/asset_test.py fails when
+# those are stale. Every PNG in icons16/, icons8/, sprites/ and shadows/ is
+# converted, its file name giving its id (icons16/gba.png is
+# ART_ICON16_GBA); this file says what the conversion can't tell from the
+# pictures.
+#
+#   icons16/  16x16; each pair in icon16_banks shares a palette bank, so
+#             at most 15 colours a pair
+#   icons8/   8x8, one colour (its shade is a preview only)
+#   sprites/  carousel objects, up to 64x64, at most 14 colours, drawn at
+#             1:1: draw them at the size they show at the front
+#   shadows/  wNN.png: 64x8, one colour, mirrored about the middle
+#   box.png   the placeholder box: 80x80, indexed, 1 band, 2 body, 3 shape
+
+# The carousel's items, in its order: each item's 16x16 icon, 8x8 icon and
+# carousel object (file names without .png).
+items = [
+	{ id = "recent", icon16 = "recent", icon8 = "recent", sprite = "recent" },
+	{ id = "fav", icon16 = "fav", icon8 = "fav", sprite = "fav" },
+	{ id = "gba", icon16 = "gba", icon8 = "gba", sprite = "gba" },
+	{ id = "gbc", icon16 = "gbc", icon8 = "gbc", sprite = "gbc" },
+	{ id = "gb", icon16 = "gb", icon8 = "gb", sprite = "gb" },
+	{ id = "nes", icon16 = "nes", icon8 = "nes", sprite = "nes" },
+	{ id = "sd", icon16 = "sd", icon8 = "sd", sprite = "sd" },
+	{ id = "nor", icon16 = "nor", icon8 = "nor", sprite = "nor" },
+	{ id = "set", icon16 = "set", icon8 = "set", sprite = "gear" },
+	{ id = "info", icon16 = "info", icon8 = "info", sprite = "book" },
+]
+
+# The 16x16 icons' palette banks: two icons each (or one), every icon in one
+# of them. A new icon goes into a bank here.
+icon16_banks = [
+	["fav", "file"],
+	["folder", "gb"],
+	["gba", "gbc"],
+	["info", "nes"],
+	["nor", "recent"],
+	["sd", "set"],
+	["torii"],
+]

@@ -64,6 +64,10 @@ NO_COMPAT = {
     "source/gamename.c",
     "source/gamename.h",
     "source/helpwindow.c",
+    "source/ui/art.c",
+    "source/ui/art.h",
+    "source/ui/art_data.c",
+    "source/ui/art_ids.h",
     "source/ui/palette.c",
     "source/ui/palette.h",
     "source/ui/ring.h",
@@ -130,6 +134,11 @@ RULES = [
         "font converter, tested by test-host",
     ),
     (["tools/font_preview.py"], {LINT}, "font preview sheets"),
+    (
+        ["assets/ui/*"],
+        {LINT, TEST_HOST, TEST},
+        "menu art: test-host checks source/ui/art_data.c is current, the art-sheet shot shows it",
+    ),
     (
         ["tests/asset_test.py"],
         {LINT, TEST_HOST},
