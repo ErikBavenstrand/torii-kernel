@@ -41,8 +41,8 @@ static int scan(const char *path, struct safefile_scan *s, u32 prefix_len, u32 m
 		return 0;
 	}
 	if (f_size(&sf_file) > max) {
-		tlog_error("safefile: %s is %lu bytes, over %lu: left alone", path, (unsigned long)f_size(&sf_file),
-			   (unsigned long)max);
+		tlog("safefile: %s is %lu bytes, over %lu: left alone", path, (unsigned long)f_size(&sf_file),
+		     (unsigned long)max);
 		f_close(&sf_file);
 		return 0;
 	}
