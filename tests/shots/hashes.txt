@@ -6,13 +6,13 @@ art-sheet/icons 9D83D7819A092CD6
 art-sheet/sprites1 251BEEB4DCEA16AC
 art-sheet/sprites2 456A349A1C29F1C0
 boot/screen C6847BCD3E72494F
-boot/frames 0-2 7C573B18E65FE325
-boot/frames 3-3 37EFB417968C90CC
-boot/frames 4-4 566FF6EBB5A3467C
-boot/frames 5-5 D1C4CA1A2E2549AD
-boot/frames 6-6 76175928B12E7E40
-boot/frames 7-7 6D211C324667D836
-boot/frames 8-40 C6847BCD3E72494F
+boot/frames 0-1 7C573B18E65FE325
+boot/frames 2-2 37EFB417968C90CC
+boot/frames 3-3 566FF6EBB5A3467C
+boot/frames 4-4 D1C4CA1A2E2549AD
+boot/frames 5-5 76175928B12E7E40
+boot/frames 6-6 6D211C324667D836
+boot/frames 7-40 C6847BCD3E72494F
 boot-addon/addons A33352904F1BFC63
 boot-copy/copied B5A097B0AA948805
 boot-copy/fast 3D0F80533FA1C1E5
@@ -25,7 +25,7 @@ boot-copy/frames 4-4 79637CFA5A407195
 boot-copy/frames 5-5 9A7602C8EC8401A5
 boot-copy/frames 6-6 530538A8D9BD3395
 boot-progress/screen 6C9065ED205438C3
-boot-progress-big/loading 27A93C9A5301C243
+boot-progress-big/loading C0FD04D97D4C0FA3
 boot-slow/list C6847BCD3E72494F
 boot-slow/notice 6C39139CBB65B8C3
 boot-slow/frames 0-1 7C573B18E65FE325
