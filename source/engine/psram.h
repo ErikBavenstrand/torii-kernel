@@ -5,12 +5,18 @@
 // Assets use page 0, the page the kernel keeps in the window whenever the
 // menu runs (every other PSRAM user puts it back to 0), so nothing has to
 // switch pages back. psram_begin() selects it once per batch of writes all
-// the same, in case something left another page selected. Within it the
-// cover cache (engine/cover.h) uses COVER_PSRAM_BYTES from
-// PSRAM_ASSET_BASE; the 512 KB from PSRAM_RESERVED_BASE (the SD themes'
-// until v0.4) are reserved; the first 4 MB hold other menu data: the SD
-// list's names (nameindex.h) and, in their last PSRAM_USERDATA_BYTES, Recent
-// and the favourites (userdata.h).
+// the same, in case something left another page selected. The map of page 0
+// while the menu runs (docs/plans/v0.4-decisions.md, PSRAM map):
+//
+//	0 MB      the SD list's file names (nameindex.h), PSRAM_NAMES_BYTES
+//	0.81 MB   the library walk's scratch: its save table, sort buffer and
+//	          a copy of /torii/names.txt
+//	1 MB      the library index: two slots of LIB_SLOT_BYTES (library.h),
+//	          the one the menu reads and the one a walk builds, to 3.5 MB
+//	3.5 MB    favourites and recents (B5), PSRAM_USERDATA_BASE
+//	4 MB      the cover cache (engine/cover.h), COVER_PSRAM_BYTES
+//	4.5 MB    reserved, PSRAM_RESERVED_BASE (the SD themes' until v0.4)
+//	5-8 MB    reserved (v0.4.1 art lookups, v0.9 language tables)
 //
 // A game launch fills PSRAM with the game, so everything here is lost then:
 // the launch calls cover_cache_invalidate first.
@@ -26,12 +32,18 @@
 #define PSRAM_WINDOW 0x08800000u
 #define PSRAM_WINDOW_BYTES 0x00800000u
 #define PSRAM_ASSET_PAGE 0
+#define PSRAM_NAMES_BYTES 0x000D0000u
+#define PSRAM_LIBRARY_SCRATCH (PSRAM_WINDOW + PSRAM_NAMES_BYTES)
+#define PSRAM_LIBRARY_SCRATCH_BYTES 0x00030000u
+#define PSRAM_LIBRARY_BASE (PSRAM_WINDOW + 0x00100000u)
 #define PSRAM_ASSET_BASE (PSRAM_WINDOW + 0x00400000u)
 // Reserved, 512 KB past the cover cache's start
 #define PSRAM_RESERVED_BASE (PSRAM_ASSET_BASE + 0x00080000u)
 // Recent and the favourites (userdata_store.c), up to the cover cache
 #define PSRAM_USERDATA_BYTES 0x00080000u
 #define PSRAM_USERDATA_BASE (PSRAM_ASSET_BASE - PSRAM_USERDATA_BYTES)
+// The library's slots end where the user's lists start (library_scan.c asserts it)
+#define PSRAM_LIBRARY_END PSRAM_USERDATA_BASE
 
 // 1 if [p, p + bytes) lies in the PSRAM window.
 static inline int psram_holds(const void *p, u32 bytes)

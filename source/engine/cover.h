@@ -101,6 +101,10 @@ void cover_shutdown(void);
 // nothing; cover_init again to stream. Does nothing before cover_init.
 void cover_cache_invalidate(void);
 
+// 1 while the loader job runs (reading or decoding a cover): other SD jobs
+// (the library walk) wait, since they share FatFs's sector window.
+int cover_loading(void);
+
 // A batch of wants (see covercache.h): begin, want each id with its
 // distance from the cursor, end (starts the loader if there is work).
 void cover_wants_begin(void);

@@ -6,6 +6,10 @@
 extern char *gl_init_error;
 extern char *gl_power_off;
 extern char *gl_Loading;
+extern char *gl_library_title;
+extern char *gl_library_scanning;
+extern char *gl_library_found;
+extern char *gl_library_saving;
 extern char *gl_file_overflow;
 
 extern char *gl_menu_btn;

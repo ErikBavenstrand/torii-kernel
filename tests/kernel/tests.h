@@ -47,6 +47,8 @@ void test_asset_cover_cache(void);
 void test_art_table(void);
 void test_art_obj_budget(void);
 void test_art_ring(void);
+void test_library_psram(void);
+void test_library_boot(void);
 
 // Test assets (asset_data.c, written by tools/asset.py demo)
 #include <gba_base.h>

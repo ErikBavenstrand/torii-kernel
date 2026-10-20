@@ -16,6 +16,8 @@
 //   jobs must stop the asset jobs first (cover_shutdown).
 // - READCACHE_USERDATA, 32 KB: the user's lists (userdata_store.c), within
 //   one call: a list on its way between the card and PSRAM, the line read.
+// - READCACHE_LIBRARY, 1 KB: library_renamed's name and key on their way to
+//   the index (library_scan.c), within the call.
 // - READCACHE_SAVE, 64 KB: the SRAM on its way to a .sav (Save_savefile),
 //   clear of everything a frame writes, so its progress dialog can draw.
 #define MAX_pReadCache_size 0x20000
@@ -24,6 +26,7 @@
 #define READCACHE_SORT_WORK 0x800  // SORT_WORK_SIZE bytes
 #define READCACHE_USERDATA 0x8000
 #define READCACHE_USERDATA_SIZE 0x8000
+#define READCACHE_LIBRARY 0x1800  // sizeof(struct lib_build), up to 0x1C00
 #define READCACHE_SAVE 0x10000  // 64 KB, to the end
 #define MAX_files 0x200
 #define MAX_folder 0x100

@@ -29,6 +29,7 @@
 #include "../diag.h"
 #include "../ezkernel.h"
 #include "../lang.h"
+#include "../library.h"
 #include "../logbuf.h"
 #include "../nameindex.h"
 #include "../NORflash_OP.h"
@@ -747,6 +748,9 @@ static void list_folder(void)
 			// such as read-only or archive, don't matter
 			if (fileinfo.fattrib & (AM_HID | AM_SYS | 0x08))  // 0x08: a volume label
 				continue;
+			// Torii's own folder, which the library index made (B14 hides the rest)
+			if (!strcmp(currentpath, "/") && !strcasecmp(fileinfo.fname, "torii"))
+				continue;
 			int is_dir = (fileinfo.fattrib & AM_DIR) != 0;
 			if (is_dir ? folder_total >= MAX_folder : game_total_SD >= MAX_files)
 				continue;  // full: skip, but keep reading the other kind
@@ -1411,6 +1415,7 @@ void lists_run(void)
 		}
 		if (lists.act)
 			do_action();
+		library_poll();
 		idle_flush();
 	}
 }

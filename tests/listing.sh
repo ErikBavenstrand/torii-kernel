@@ -79,7 +79,7 @@ tools/sdimg.sh "$cart/sd.img" put tests/roms/hello/hello.gba "/$short"
 tools/sdimg.sh "$cart/sd.img" put tests/roms/hello/hello.gba "/$longer"
 OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -k 116:L -k 120:L+START -k 124:- -k 160:A -k 164:- \
   -s 150:dist/shots/listing-delete.png -f 300 >/dev/null 2>&1
-left=$(tools/sdimg.sh "$cart/sd.img" ls / | cut -f1)
+left=$(tools/sdimg.sh "$cart/sd.img" ls / | cut -f1 | grep -vx 'torii/\?') # the library index's folder
 [ "$left" = "$short" ] || fail "exFAT: deleting the long name left: $(echo "$left" | tr '\n' ' ')"
 echo "PASS: a name past 99 bytes opens and deletes only itself on exFAT"
 

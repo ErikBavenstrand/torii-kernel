@@ -4721,6 +4721,65 @@ FRESULT f_readdir (
 
 
 
+/*-----------------------------------------------------------------------*/
+/* Torii: Read a Directory Item and Open it if a Sub-directory            */
+/*-----------------------------------------------------------------------*/
+/* f_readdir, and when the item read is a sub-directory and sub is not
+   null, sub is opened on it as f_opendir would, from the entry just read
+   rather than by following a path, so a walk over a folder of N
+   sub-folders doesn't scan it again for each (the library index, B3).
+   sub->obj.fs is 0 when the item isn't a sub-directory or sub is null. */
+
+FRESULT f_readdir_sub (
+	DIR* dp,			/* Pointer to the open directory object */
+	FILINFO* fno,		/* Pointer to file information to return */
+	DIR* sub			/* Directory object to open on a sub-directory item, or null */
+)
+{
+	FRESULT res;
+	FATFS *fs;
+	DEF_NAMBUF
+
+
+	if (sub) sub->obj.fs = 0;
+	res = validate(&dp->obj, &fs);	/* Check validity of the directory object */
+	if (res == FR_OK && fno) {
+		INIT_NAMBUF(fs);
+		res = DIR_READ_FILE(dp);		/* Read an item */
+		if (res == FR_NO_FILE) res = FR_OK;	/* Ignore end of directory */
+		if (res == FR_OK) {				/* A valid entry is found */
+			get_fileinfo(dp, fno);		/* Get the object information */
+			if (sub && fno->fname[0] && (fno->fattrib & AM_DIR)) {
+				sub->obj = dp->obj;		/* The volume, its mount ID */
+				sub->obj.attr = AM_DIR;
+#if FF_FS_EXFAT
+				if (fs->fs_type == FS_EXFAT) {
+					sub->obj.c_scl = dp->obj.sclust;	/* Containing directory information */
+					sub->obj.c_size = ((DWORD)dp->obj.objsize & 0xFFFFFF00) | dp->obj.stat;
+					sub->obj.c_ofs = dp->blk_ofs;
+					init_alloc_info(fs, &sub->obj);	/* Allocation information from fs->dirbuf */
+				} else
+#endif
+				{
+					sub->obj.sclust = ld_clust(fs, dp->dir);	/* From the entry still in the window */
+				}
+				sub->obj.id = fs->id;
+			}
+			res = dir_next(dp, 0);		/* Increment index for next */
+			if (res == FR_NO_FILE) res = FR_OK;	/* Ignore end of directory now */
+			if (res == FR_OK && sub && sub->obj.fs && dir_sdi(sub, 0) != FR_OK) {
+				sub->obj.fs = 0;	/* A bad start cluster: the sub-directory isn't opened; the parent reads on */
+			}
+		}
+		FREE_NAMBUF();
+	} else if (res == FR_OK) {
+		res = FR_INVALID_PARAMETER;
+	}
+	LEAVE_FF(fs, res);
+}
+
+
+
 #if FF_USE_FIND
 /*-----------------------------------------------------------------------*/
 /* Find Next File                                                        */
