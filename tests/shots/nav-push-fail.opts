@@ -2,8 +2,8 @@
 # name, fails one push): A on home goes out, the error comes in from black
 # instead of a black screen that takes no key (before v0.3.2), and once it
 # closes the session starts over and the page comes in.
-#! expect-error engine: ui: view page-empty: failed for a test
-#! expect-error nav: ui: view page-empty: failed for a test
+#! expect-error engine: ui: view games: failed for a test
+#! expect-error nav: ui: view games: failed for a test
 -w "nav: home ready"
 -p @8:ui_push_fail_test:1
 -k @10:A -k @14:-

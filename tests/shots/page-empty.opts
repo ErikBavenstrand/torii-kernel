@@ -1,12 +1,13 @@
-# A page whose ticket hasn't landed (source/screens/nav.c): A on home's
-# first item (Recent: the card's v0.3 list has two games) fades home out and
-# the page in (every frame hashed): its title bar with the item's icon and
-# name, an empty card, and B back in the hint bar. B fades back to home,
-# facing the item.
+# A page whose ticket hasn't landed (source/screens/nav.c): A on Info (UP
+# from home's first item wraps to it) fades home out and the page in
+# (every frame hashed): its title bar with the item's icon and name, an
+# empty card, and B back in the hint bar. B fades back to home, facing the
+# item.
 -w "nav: home ready"
--k @8:A -k @12:-
--H @8:@30
--w "nav: page recent ready"
+-k @8:UP -k @12:-
+-k @20:A -k @24:-
+-H @20:@42
+-w "nav: page info ready"
 -s @1:page.png
 -k @8:B -k @12:-
 -w "nav: home ready"

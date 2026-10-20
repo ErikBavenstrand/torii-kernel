@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # A Recent entry whose file is gone: opening it must show an error, drop the
 # entry and leave the rest of the card alone, not make a save and start an
-# emulator with no ROM. Entries open as the Recent page will (B13), through
-# actions.c and tests/nav.sh's hook; the page's own keys come with B13.
+# emulator with no ROM. Entries open through actions.c, from tests/nav.sh's
+# hook and from the Recent page (A on its row).
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and building tests/roms/hello.
 set -euo pipefail
@@ -54,27 +54,28 @@ run_case Gone.gb
 run_case Gone.gba
 
 # After the error the menu must still open other games: the entry's folder
-# exists here, and the kernel used to keep looking in it. (B on the error
-# going back to Recent, not elsewhere, comes with B13's Recent page.)
-echo "SKIP (waiting for B13): after a missing entry's error, B goes back to the Recent page"
+# exists here, and the kernel used to keep looking in it. A on the Recent
+# page's first row opens the gone entry; B on its error goes back to the
+# Recent page, now without it, and Hello.gba (the next row) opens from it.
 cart=$carts/stale-after
 rm -rf "$cart" && mkdir -p "$cart"
 mkfs.fat -C -F 32 -n STALE "$cart/sd.img" 65536 >/dev/null
 mmd -i "$cart/sd.img" ::/SAVER ::/Games
 mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/Hello.gba
-printf '/Games/Gone.gba\n' >"$cart/recent.txt"
+printf '/Games/Gone.gba\n/Hello.gba\n' >"$cart/recent.txt"
 mcopy -i "$cart/sd.img" "$cart/recent.txt" "::/SAVER/Recently play.txt"
-# The entry: its file error, B closes it, and the menu comes back; then
-# Hello.gba's CLEAN BOOT
+NAV_SHOWN="recent gba"
 # shellcheck disable=SC2046 # nav.sh's options
-OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch /Games/Gone.gba at=130) \
-  -w "screen ready: dialog" -k @20:B -k @24:- -w "nav: home ready" $(nav_launch /Hello.gba at=@10) \
-  -f 650 >"$cart/kernel.log" 2>&1
+OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_game recent 0) \
+  -k @20:A -k @24:- -w "screen ready: dialog" -k @20:B -k @24:- -w "nav: page recent ready" \
+  -s "@8:$cart/after.png" -k @20:A -k @24:- -u "launch Hello.gba: code" -f 1200 >"$cart/kernel.log" 2>&1 || true
+[ "$(grep -c '^kernel: nav: page recent ready' "$cart/kernel.log")" = 2 ] ||
+  fail "after the error, B didn't go back to the Recent page: $(grep '^kernel: nav' "$cart/kernel.log" | tail -3)"
 grep -q '^kernel: launch Hello.gba: code' "$cart/kernel.log" ||
-  fail "after the error, Hello.gba didn't launch: $(grep '^kernel: ' "$cart/kernel.log" | tail -2)"
+  fail "after the error, Hello.gba didn't launch from the Recent page: $(grep '^kernel: ' "$cart/kernel.log" | tail -2)"
 recent=$(recent_list "$cart")
 [ "$recent" = "/Hello.gba " ] || fail "Recent has '$recent', expected /Hello.gba alone"
-echo "PASS: after a missing entry's error, the menu comes back and other games open"
+echo "PASS: after a missing entry's error, B goes back to the Recent page and other games open from it"
 
 # A deleted file (as the SD card page will delete it, through actions.c)
 # leaves Recent; the other entries stay
@@ -97,8 +98,7 @@ echo "PASS: a deleted file leaves Recent"
 
 # A Recent line longer than the kernel writes (an edited file) is skipped:
 # its folder would overrun the path buffer. The Recent page's first row is
-# then the next entry (B13 opens it from the page).
-echo "SKIP (waiting for B13): an over-long Recent line is skipped on the Recent page"
+# then the next entry, which A opens.
 cart=$carts/stale-long
 rm -rf "$cart" && mkdir -p "$cart"
 mkfs.fat -C -F 32 -n STALE "$cart/sd.img" 65536 >/dev/null
@@ -110,10 +110,13 @@ mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/Hello.gba
 } >"$cart/recent.txt"
 mcopy -i "$cart/sd.img" "$cart/recent.txt" "::/SAVER/Recently play.txt"
 # The menu reads Recent at boot (its count on home) without trouble
-OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -w "nav: home ready" -f 300 >"$cart/kernel.log" 2>&1 ||
-  fail "the menu didn't come up with an over-long Recent line: $(grep '^kernel: ' "$cart/kernel.log" | tail -2)"
+NAV_SHOWN="recent gba"
+# shellcheck disable=SC2046 # nav.sh's options
+OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_game recent 0) \
+  -k @20:A -k @24:- -u "launch Hello.gba: code" -f 900 >"$cart/kernel.log" 2>&1 ||
+  fail "A on the Recent page didn't start Hello.gba: $(grep '^kernel: ' "$cart/kernel.log" | tail -2)"
 ! grep -qE 'assert failed|^crash at frame' "$cart/kernel.log" || fail "an over-long Recent line crashed the menu"
-echo "PASS: an over-long Recent line doesn't trouble the menu"
+echo "PASS: an over-long Recent line is skipped, and the Recent page's first row is the next game"
 
 # A Recent NOR game that is no longer on the game NOR shows an error and
 # comes off the list (v0.3.2: it stayed)

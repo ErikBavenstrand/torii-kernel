@@ -1,0 +1,17 @@
+# The list with art (Settings' game view, slot 31), in the light theme: the
+# GBA page with the placeholder box in the console's colour and the
+# selected game's size (mockup #7); then Recent (#24), whose rows lead with
+# their console marks and whose box follows the selected game's console,
+# with the scenarios' unset clock: no time played.
+#! settings 28=1 31=1
+-w "nav: home ready"
+-k @8:DOWN -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-s @2:gba.png
+-k @8:B -k @12:-
+-w "nav: home ready"
+-k @8:UP -k @12:-
+-k @20:A -k @24:-
+-w "nav: page recent ready"
+-s @2:recent.png

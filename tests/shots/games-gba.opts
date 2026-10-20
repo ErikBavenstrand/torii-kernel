@@ -1,0 +1,34 @@
+# The GBA page (source/screens/games.c) in the dark theme: the card's GBA
+# games A-Z with their sizes, the title's position and the hint bar (#6).
+# DOWN moves the pill a row (hashed every frame of its slide); RIGHT jumps
+# to the next letter with the letter card (#8); START opens the game popup
+# beside the row (#9), whose Delete asks first (#10); Cancel goes back to
+# the popup, and Game info shows the game's page, where RIGHT changes its
+# save type, written as B goes back to the list.
+-w "nav: home ready"
+-k @8:DOWN -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-s @2:screen.png
+-k @8:DOWN -k @12:-
+-H @8:@20
+-s @24:down.png
+-k @30:RIGHT -k @34:-
+-s @38:letter.png
+-k @80:START -k @84:-
+-w "screen ready: game-popup"
+-s @8:popup.png
+-k @12:DOWN -k @16:- -k @20:DOWN -k @24:- -k @28:DOWN -k @32:- -k @36:DOWN -k @40:- -k @44:DOWN -k @48:-
+-k @56:A -k @60:-
+-s @72:delete.png
+-k @80:B -k @84:-
+-s @100:cancelled.png
+-k @104:UP -k @108:-
+-k @116:A -k @120:-
+-w "screen ready: game-info"
+-s @20:info.png
+-k @24:RIGHT -k @28:-
+-s @36:info-sram.png
+-k @44:B -k @48:-
+-w "save type of"
+-s @30:closed.png

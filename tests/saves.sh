@@ -6,6 +6,8 @@
 #         and each step logs what it did
 #   nearly-full  a copy that just fits the card is written whole, through
 #         its progress dialog, and the menu comes back
+#   delete  Delete in a game list's popup removes the ROM and its save
+#         stays (T11): the game copied back starts with it
 #   full  a copy the card can't take shows an error dialog and logs how much
 #         of it was written; its record stays, and a launch tries the copy
 #         again first, asking before it loses the save (the cut-short file
@@ -86,6 +88,26 @@ first_copy() {
 }
 
 case $part in
+delete)
+  first_launch
+  first_copy
+  cp "$cart/test.sav" "$cart/kept.sav"
+  # Power-on 3: Delete in Test's popup on the GBA page, Delete answered
+  NAV_SHOWN="recent gba"
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot $(nav_game_delete gba 0) -w "delete: /Test.gba" -f 900
+  logged "delete: /Test.gba"
+  ! mtype -i "$cart/sd.img" ::/Test.gba >/dev/null 2>&1 || fail "Test.gba is still on the card"
+  mtype -i "$cart/sd.img" ::/SAVER/Test.sav | cmp -s - "$cart/kept.sav" || fail "the save changed or went"
+  # Power-on 4: the game copied back starts with its save
+  mcopy -i "$cart/sd.img" tests/roms/savetest/flash128.gba ::/Test.gba
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot $(nav_launch /Test.gba at=180) -f 600
+  logged "save: Test.sav exists, 131072 bytes"
+  logged "save: loaded Test.sav into cart SRAM, 131072 bytes"
+  echo "PASS: saves delete: Delete removes the ROM, its save stays and loads when the game comes back"
+  ;;
+
 copy)
   first_launch
   first_copy
