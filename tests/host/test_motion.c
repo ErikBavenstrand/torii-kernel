@@ -14,6 +14,10 @@ static uint64_t curve(u32 table, uint64_t i)
 		return i * i * i;
 	case EASE_OUT_CUBIC - 1:
 		return cube - (n - i) * (n - i) * (n - i);
+	case EASE_OUT_QUAD - 1:
+		return cube - n * (n - i) * (n - i);
+	case EASE_SMOOTHSTEP - 1:
+		return 3 * n * i * i - 2 * i * i * i;
 	default:
 		return 2 * i < n ? 4 * i * i * i : cube - 4 * (n - i) * (n - i) * (n - i);
 	}
