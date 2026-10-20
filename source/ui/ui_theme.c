@@ -26,6 +26,7 @@
 		.title_right = 235, \
 		.title_right_y = 2, \
 		.title_right_w = 64, \
+		.title_sub_gap = 4, \
 		.content_top = 20, \
 		.content_bottom = 143, \
 		.list_rows = 8, \

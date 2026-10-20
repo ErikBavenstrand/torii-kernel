@@ -292,7 +292,7 @@ enum {
 
 struct title_state {
 	struct paint heading, right;
-	const char *text, *right_text;
+	const char *text, *right_text, *sub;
 	u16 icon_tile;  // ART_NONE: no icon
 	u8 icon_bank;
 };
@@ -336,6 +336,7 @@ static int title_init(u8 node)
 		return 0;
 	st->text = c->text ? c->text : "";
 	st->right_text = c->right;
+	st->sub = 0;
 	st->icon_tile = ART_NONE;
 	if (c->icon != UI_TITLE_NO_ICON) {
 		st->icon_tile = art_load_icon16(c->icon, &st->icon_bank);
@@ -386,8 +387,15 @@ static void title_draw(u8 node)
 		}
 		u32 x = l->title_text_x - st->heading.tx * 8u, ww = st->heading.tw * 8u;
 		text_clear(&win, 0, 0, ww, h, paper);
-		if (l->title_text_y + t->heading->line_height <= h && x < ww)
-			draw_text(&win, t->heading, x, l->title_text_y, ww - x, ui_ink(node, UI_ROLE_TEXT), st->text);
+		if (l->title_text_y + t->heading->line_height <= h && x < ww) {
+			x += draw_text(&win, t->heading, x, l->title_text_y, ww - x, ui_ink(node, UI_ROLE_TEXT),
+				       st->text);
+			// The after-text, faint in the body font on the heading's baseline
+			const struct torii_font *b = t->body;
+			u32 sx = x + l->title_sub_gap, sy = l->title_text_y + t->heading->baseline - b->baseline;
+			if (st->sub && sx < ww && sy + b->line_height <= h)
+				draw_text(&win, b, sx, sy, ww - sx, UI_ROLE_FAINT, st->sub);
+		}
 		if (!paint_end(node, &st->heading, set, UI_BANK_NORMAL)) {
 			ui_dirty(node, todo);  // the flip next frame, with the right-hand text's
 			return;
@@ -415,6 +423,13 @@ void ui_title_set(u8 node, const char *text)
 {
 	struct title_state *st = ui_node_state(node);
 	st->text = text ? text : "";
+	ui_dirty(node, TITLE_HEADING);
+}
+
+void ui_title_set_sub(u8 node, const char *text)
+{
+	struct title_state *st = ui_node_state(node);
+	st->sub = text;
 	ui_dirty(node, TITLE_HEADING);
 }
 

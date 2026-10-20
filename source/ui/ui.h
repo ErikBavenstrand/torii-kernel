@@ -161,6 +161,7 @@ struct ui_look {
 	u8 title_right;     // where the position or clock ends
 	u8 title_right_y;   // its line top
 	u8 title_right_w;   // px kept for it (two tile sets: whole tiles)
+	u8 title_sub_gap;   // between the heading and its faint after-text ("Controls Info")
 	u8 content_top;     // the page between the title and hint bars
 	u8 content_bottom;  // its last row
 	u8 list_rows;       // rows in a list card
@@ -442,7 +443,8 @@ struct ui_item {
 	u8 key_len;          // key's bytes: 0 draws no chip (the text still at its column)
 	const char *detail;  // right-aligned in DIM (a size, a date); NULL none
 	const u32 *icon;     // a list with UI_LIST_ICONS: 2x2 4bpp tiles in row order,
-			     // colours 10-15 (0 shows the row's paper); NULL none
+			     // colours 10-15 (0 shows the row's paper); with UI_LIST_ICON8:
+			     // one 8x8 4bpp tile (art_icon8_tile), any colour; NULL none
 	const char *key;     // a reading row's key chip (ui/ui_reading.h): the text
 			     // starts at the look's reading_key_w; NULL none
 };
@@ -471,8 +473,11 @@ enum {
 	UI_LIST_PLAIN = 16,   // no row shows as selected (a log): the cursor only scrolls
 	UI_LIST_SCROLL = 32,  // the cursor is the top row: UP and DOWN scroll a row (a
 			      // reading view, with PLAIN), up to the last page
+	UI_LIST_ICON8 = 64,   // list: an 8x8 item.icon at the row's pad, the name after it
+			      // and the look's section_icon_gap (the Info page's rows)
 };
 #define UI_LIST_ICON_W 16
+#define UI_LIST_ICON8_W 8
 
 // A list. ink defaults to TEXT. The viewport is the node's rectangle.
 // paper 0 (none): rows are drawn transparent over what is behind them (a
@@ -522,11 +527,13 @@ struct ui_card_config {
 	u8 flags;  // UI_CARD_*
 };
 
-// The title bar: the item's 16x16 icon (a sprite), the heading, and a
-// right-hand text (the position or the clock) in DIM, at the look's
+// The title bar: the item's 16x16 icon (a sprite), the heading with an
+// optional faint after-text in the body font (a reading page's "Info",
+// ui_title_set_sub),
+// and a right-hand text (the position or the clock) in DIM, at the look's
 // title_* places. Its rectangle spans the screen's width from the top,
-// whole tiles under the heading's line; both texts change without
-// tearing (two tile sets each).
+// whole tiles under the heading's line; the texts change without tearing
+// (two tile sets each).
 #define UI_TITLE_NO_ICON 0xFFFF
 struct ui_title_config {
 	const char *text;   // the heading; ui_title_set replaces it
@@ -718,6 +725,7 @@ void ui_progress_set(u8 node, u32 value, u32 max);
 // as a label's text is: valid and unchanged until replaced or the view pops.
 void ui_title_set(u8 node, const char *text);
 void ui_title_set_right(u8 node, const char *text);
+void ui_title_set_sub(u8 node, const char *text);
 void ui_hints_set(u8 node, const struct ui_hint *hints, u32 count);
 void ui_hints_text(u8 node, const char *text);  // NULL: back to the chips
 void ui_path_set(u8 node, const char *path);

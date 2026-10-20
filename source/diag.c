@@ -280,6 +280,10 @@ static void line_add(u8 colour, const char *text)
 	if (!scr.view)
 		return;
 	ui_list_refresh(node_of(N_LIST), i, i);
+	// The line it replaces in the ring leaves the window: its row, cached
+	// or drawn, shows blank now (lines_fetch), not the old text
+	if (i >= DIAG_LINES)
+		ui_list_refresh(node_of(N_LIST), i - DIAG_LINES, i - DIAG_LINES);
 	ui_list_set_cursor(node_of(N_LIST), i);
 }
 

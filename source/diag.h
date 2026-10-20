@@ -1,7 +1,7 @@
-// Diagnostics: tests and probes for a real cart, run by holding
-// DIAG_BOOT_KEYS at power-on (and from the Info page once B17 lands). It
-// logs at Debug level for its own run and writes its report to the card
-// through the log.
+// Diagnostics: tests and probes for a real cart, run from the Info page
+// (screens/info.c) or by holding DIAG_BOOT_KEYS at power-on. It logs at
+// Debug level for its own run and writes its report to the card through
+// the log.
 #ifndef TORII_DIAG_H
 #define TORII_DIAG_H
 
@@ -12,7 +12,9 @@
 #define DIAG_BOOT_KEYS (KEY_L | KEY_R | KEY_SELECT)
 
 // Runs Diagnostics, then restarts the kernel. B on its first page returns
-// instead, on a black screen (dialog_blank) with the engine shut down.
+// instead, on a black screen (dialog_blank) with the engine shut down: to
+// the boot, which starts the menu, or to the Info page, which comes back.
+// Call it with no engine session up.
 void Diagnostics(void);
 
 // IWRAM code must run from IWRAM while the ROM page or wait states change, so

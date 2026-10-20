@@ -176,3 +176,44 @@ void test_ui_image_queue_full(void)
 	ui_core_pop();
 	reset(0);
 }
+
+// A reading view (UI_LIST_SCROLL) at its last scroll: DOWN moves nothing
+// and its view hears of no move (B9's review: it heard of one)
+static u32 scroll_moves;
+static int scroll_event(struct ui_view *v, const struct ui_event *e)
+{
+	(void)v;
+	if (e->type != UI_EV_CURSOR)
+		return 0;
+	scroll_moves++;
+	return 1;
+}
+static const struct ui_list_config t_scroll = {&t_model, 16, UI_LIST_PLAIN | UI_LIST_SCROLL, 0, 0};
+static const struct ui_spec scroll_nodes[] = {
+	{UI_LIST, 1, UI_NONE, 1, UI_LEFT, UI_FOCUSABLE, 0, 0, 0, 16, 64, 64, &t_scroll},
+};
+static const struct ui_view_spec scroll_view = {"test-scroll", scroll_nodes, 1, 0, 0, 0, scroll_event};
+
+void test_ui_scroll_end(void)
+{
+	reset(1);
+	model_items = 6;  // 4 rows show: the last scroll's top row is 2
+	struct ui_view *v = ui_core_push(&scroll_view, 0);
+	CHECK(v != 0);
+	if (v) {
+		u8 list = v->first;
+		ui_list_set_cursor(list, 5);
+		CHECK_EQ(ui_list_cursor(list), 2);
+		scroll_moves = 0;
+		ui_dispatch_keys(INPUT_DOWN);
+		CHECK_EQ(scroll_moves, 0);
+		CHECK_EQ(ui_list_cursor(list), 2);
+		ui_dispatch_keys(INPUT_UP);
+		CHECK_EQ(scroll_moves, 1);
+		CHECK_EQ(ui_list_cursor(list), 1);
+		ui_core_pop();
+	}
+	model_items = 1000;
+	gfx_queue_clear();
+	reset(0);
+}

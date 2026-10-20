@@ -1,5 +1,6 @@
 #include "lang.h"
 #include "settings_model.h"
+#include "screens/info.h"
 
 #include "userdata.h"
 
@@ -80,6 +81,9 @@ char *gl_pop_ok EWRAM_BSS;
 char *gl_pop_close EWRAM_BSS;
 char *gl_pop_cancel EWRAM_BSS;
 char *gl_pop_cancel_button EWRAM_BSS;
+
+// The Info page (screens/info.h)
+char **gl_info EWRAM_BSS;
 
 //英文
 const char en_init_error[] = "microSD card error";
@@ -253,6 +257,107 @@ const char en_pop_close[] = "close";
 const char en_pop_cancel[] = "cancel";
 const char en_pop_cancel_button[] = "Cancel";
 
+// The Info page (screens/info.h): its rows and what each holds, and the
+// reading pages. A reading page's lines: "# " starts a heading, a tab puts
+// a key chip before its text (ui/ui_reading.h); "%s" is what the page
+// fills in, in order. Keys as the hint bar shows them: "^v" UP/DOWN, "«»"
+// LEFT/RIGHT.
+#define LR "\xC2\xAB\xC2\xBB"  // «»
+const char *en_info[INFO_STRINGS] = {
+	[INFO_S_CONTROLS] = "Controls",
+	[INFO_S_INGAME] = "In game",
+	[INFO_S_CART] = "Your cart",
+	[INFO_S_ABOUT] = "About",
+	[INFO_S_DIAG] = "Diagnostics",
+	[INFO_S_CONTROLS_DETAIL] = "buttons, page by page",
+	[INFO_S_INGAME_DETAIL] = "hotkeys while playing",
+	[INFO_S_CART_DETAIL] = "Omega DE, %s MB NOR",
+	[INFO_S_ABOUT_DETAIL] = "Torii v%s",
+	[INFO_S_DIAG_DETAIL] = "run the checks",
+	[INFO_S_SCROLL] = "scroll",
+	[INFO_S_CONTROLS_TEXT] =
+		"# Home\n" LR "\tturn the carousel\n"
+		"A\topen the item\n"
+		"# Every page\n"
+		"B\tback to the carousel\n"
+		"L R\tpage up, page down\n"
+		"# Game lists\n"
+		"^v\tmove\n" LR "\tjump to the next or previous letter\n"
+		"A\tplay the game\n"
+		"START\tthe game's menu\n"
+		"L\thold it as you press A: the game starts with the GBA's boot screen\n"
+		"# SD card\n"
+		"A\topen the folder, or start the game\n"
+		"START\tthe file's menu\n"
+		"B\tup a folder; at the top, back to the carousel\n"
+		"# NOR\n"
+		"A\tstart the game\n"
+		"START\tthe game's menu\n"
+		"# Settings\n"
+		"A\tchange the value: " LR " picks, A keeps it, B puts it back\n"
+		"Time and date: A, then " LR " picks a field and ^v changes it.\n"
+		"Hotkeys: A, then hold the new keys together.\n"
+		"# Menus\n"
+		"^v\tchoose\n"
+		"A\tpick\n"
+		"B\tclose\n"
+		"In a question, " LR " chooses and B cancels.\n"
+		"# At power-on\n"
+		"Hold L, R and SELECT as you switch on to run Diagnostics, even when the menu won't start.",
+	[INFO_S_INGAME_START] = "# Hotkeys\n"
+				"They work in games started with their addons on (Boot with addon). Settings, "
+				"Hotkeys changes them.\n",
+	[INFO_S_INGAME_STATES] = "# Save states\n"
+				 "Hold %s to save the game's state, and %s to load it. Save before you load: with "
+				 "no state saved, a game can crash.\n",
+	[INFO_S_INGAME_MENU] = "# The in-game menu\n"
+			       "Hold %s to open it: back to the menu, save or load a state, and the game's cheats.\n",
+	[INFO_S_INGAME_RESET] = "# Back to the menu\n"
+				"Hold %s to leave the game for the menu.\n",
+	[INFO_S_INGAME_RESET_OFF] = "# Back to the menu\n"
+				    "Off: turn Reset hotkey on in Settings, or switch the GBA off and on.\n",
+	[INFO_S_INGAME_CHEATS] = "In a game with a cheat file, %s opens the in-game menu instead, with its cheats.\n",
+	[INFO_S_INGAME_SLEEP] = "# Sleep\n"
+				"Hold %s to put the game to sleep: the screen goes off. START and SELECT wake it.\n",
+	[INFO_S_INGAME_SLEEP_OFF] = "# Sleep\n"
+				    "Off: turn Sleep on in Settings.\n",
+	[INFO_S_INGAME_END] = "# Saves\n"
+			      "The game saves to the cart. The next time Torii starts, it copies the save to the card "
+			      "(without asking with Auto save on).\n",
+	[INFO_S_CART_START] = "# The cart\n"
+			      "An EZ-Flash Omega DE. Games start from the SD card, or from its %s MB NOR, where "
+			      "Write to NOR puts them.\n",
+	[INFO_S_CART_GAMES] = "# Games on the card\n",
+	[INFO_S_CART_CONSOLE] = "%s: %s\n",
+	[INFO_S_CART_FILES] = "%s on the card, games or not\n",
+	[INFO_S_CART_NOR] = "# On the NOR\n"
+			    "%s, %s MB of %s MB used\n",
+	[INFO_S_CART_NOR_EMPTY] = "# On the NOR\n"
+				  "No games. Write to NOR in a game's menu copies one there.\n",
+	[INFO_S_CART_LISTS] = "# Your lists\n"
+			      "Favourites: %s\n"
+			      "Recent: %s, of the last %s played\n",
+	[INFO_S_CART_END] = "# Torii's folders\n"
+			    "/torii keeps the game list, your lists, names and logs, and /SAVER the saves.\n",
+	[INFO_S_ABOUT_TORII] = "# Torii\n"
+			       "Version %s, build %s\n"
+			       "A custom kernel for the EZ-Flash Omega DE, built on EZ-Flash's open source kernel "
+			       "1.06. Not made by EZ-Flash.\n",
+	[INFO_S_ABOUT_CART] = "# The cart\n"
+			      "%s, FPGA firmware %s\n",
+	[INFO_S_ABOUT_REV_A] = "Revision A (LX9)",
+	[INFO_S_ABOUT_REV_B] = "Revision B (LX16)",
+	[INFO_S_ABOUT_CARD] = "# The SD card\n"
+			      "%s, %s free, %s\n",
+	[INFO_S_ABOUT_CARD_UNKNOWN] = "# The SD card\n"
+				      "Its size didn't read.\n",
+	[INFO_S_ABOUT_CREDITS] = "# Credits\n"
+				 "Fonts: Galmuri by Lee Minseo, under the SIL Open Font License 1.1.\n"
+				 "Console pictures: drawn on KyleBing's retro game console icons, CC BY 4.0.\n",
+	[INFO_S_ABOUT_NAMES] = "Game names: No-Intro's, from libretro-database, CC BY-SA 4.0.\n",
+};
+#undef LR
+
 //---------------------------------------------------------------------------------
 void LoadEnglish(void)
 {
@@ -336,6 +441,8 @@ void LoadEnglish(void)
 	gl_pop_close = (char *)en_pop_close;
 	gl_pop_cancel = (char *)en_pop_cancel;
 	gl_pop_cancel_button = (char *)en_pop_cancel_button;
+	//
+	gl_info = (char **)en_info;
 }
 //---------------------------------------------------------------------------------
 // The languages Settings offers. A new language adds its strings and a
