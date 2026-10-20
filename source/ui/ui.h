@@ -35,7 +35,7 @@
 // Planes: a widget draws on one of the four BGs (spec.plane). Within a view
 // a lower plane number is in front; a pushed view is in front of the ones
 // under it, which stay resident and show only where it leaves them visible
-// (on planes it doesn't use). A list or grid needs a plane of its own, as
+// (on planes it doesn't use). A list needs a plane of its own, as
 // it scrolls it, and one of the two hardware windows to clip it. Planes 1
 // and 3 take tiles from character blocks 1 and 2 (lists), planes 0 and 2
 // from block 0.
@@ -59,7 +59,7 @@
 #define UI_NODE_CAP 48       // nodes across every view on the stack
 #define UI_VIEW_CAP 4        // views on the stack
 #define UI_ARENA_BYTES 1024  // widget state across every view on the stack
-#define UI_SCROLLERS 2      // lists and grids resident at once (hardware windows)
+#define UI_SCROLLERS 2      // lists resident at once (hardware windows)
 #define UI_PLANES 4
 #define UI_NONE 0xFF
 
@@ -231,6 +231,8 @@ struct ui_motions {
 //   marquee_gap         px it scrolls past the name's end before that pause
 //   page_fade           frames a list fades in over after a page change
 //                       (0: it just shows)
+//   page_fade_out       frames the old page fades out over before it
+//                       (0: it goes at once)
 //   transition          how screens replace each other, per ui_tr_kind (ui_leave)
 //   input               key repeat and wrap timings (engine/input.h)
 struct ui_theme {
@@ -256,6 +258,7 @@ struct ui_theme {
 	u8 marquee_pause;
 	u8 marquee_gap;
 	u8 page_fade;
+	u8 page_fade_out;
 	u8 dialog_in;
 	u8 dialog_out;
 	struct ui_transition transition[UI_TR_KINDS];
@@ -296,7 +299,6 @@ enum ui_kind {
 	UI_LABEL,
 	UI_PANEL,
 	UI_LIST,
-	UI_GRID,
 	UI_IMAGE,
 	UI_SCROLLBAR,
 	UI_PROGRESS,
@@ -323,7 +325,7 @@ enum {
 
 // ui_spec.flags
 enum {
-	UI_FOCUSABLE = 1,  // takes focus (lists, grids)
+	UI_FOCUSABLE = 1,  // takes focus (lists)
 	UI_HIDDEN = 2,     // starts hidden (ui_show; a hidden list's plane is off)
 };
 
@@ -398,14 +400,14 @@ struct ui_panel_config {
 	u8 style;
 };
 
-// What a list row or grid cell shows (ui_list_model.fetch fills it).
+// What a list row shows (ui_list_model.fetch fills it).
 struct ui_item {
 	const char *text;    // UTF-8
 	u16 len;             // 0: up to the NUL
 	u8 ink;              // role of the text, 0: TEXT
 	u8 pad;
 	const char *detail;  // right-aligned in DIM (a size, a date); NULL none
-	const u32 *icon;     // grid, or a list with UI_LIST_ICONS: 2x2 4bpp tiles in row order,
+	const u32 *icon;     // a list with UI_LIST_ICONS: 2x2 4bpp tiles in row order,
 			     // colours 10-15 (0 shows the row's paper); NULL none
 };
 
@@ -434,12 +436,11 @@ enum {
 };
 #define UI_LIST_ICON_W 16
 
-// A list (cols 1) or a grid. ink defaults to TEXT and paper to BG. The
-// viewport is the node's rectangle.
+// A list. ink defaults to TEXT and paper to BG. The viewport is the
+// node's rectangle.
 struct ui_list_config {
 	const struct ui_list_model *model;
 	u8 row_h;     // 16 or 32 px; 0: the theme's
-	u8 cell_w;    // grid: cell width, px (a multiple of 8); list: 0
 	u8 flags;     // UI_LIST_*
 	u8 detail_w;  // list: px kept for the detail at the right
 };
@@ -451,9 +452,9 @@ struct ui_image_config {
 	u16 tag;              // shares tiles and palette between views (nonzero)
 };
 
-// A vertical scroll bar showing a list's or grid's position.
+// A vertical scroll bar showing a list's position.
 struct ui_scrollbar_config {
-	u8 target;  // index of the list or grid in the same layout
+	u8 target;  // index of the list in the same layout
 };
 
 // A progress bar: ink (ACCENT) fills paper's track (TRACK). data may be NULL.
@@ -507,8 +508,8 @@ enum {
 
 enum ui_event_type {
 	UI_EV_KEYS,      // keys fired this frame (input.h): .keys
-	UI_EV_ACTIVATE,  // A on a list or grid item: .index
-	UI_EV_CURSOR,    // a list's or grid's cursor moved: .index
+	UI_EV_ACTIVATE,  // A on a list item: .index
+	UI_EV_CURSOR,    // a list's cursor moved: .index
 	UI_EV_FOCUS,     // the node got focus
 	UI_EV_BLUR,      // the node lost focus
 };
@@ -631,7 +632,10 @@ void ui_progress_drew(u8 node, u32 x);
 // the list redraws as a page change.
 void ui_list_reset(u8 node, u32 cursor);
 // Items lo to hi have loaded (or changed): rows showing them redraw. A row
-// on screen redraws in place, so it may tear for one frame.
+// on screen redraws in place, so it may tear for one frame. Lists keep
+// drawn rows in a cache keyed by item (ui/rowcache.h) and show them again
+// when they scroll back: an item whose row would draw differently must be
+// refreshed even while off screen (or the list reset).
 void ui_list_refresh(u8 node, u32 lo, u32 hi);
 void ui_list_set_cursor(u8 node, u32 cursor);
 // As ui_list_set_cursor, for a move key made: a repeat of a held key makes
@@ -639,7 +643,8 @@ void ui_list_set_cursor(u8 node, u32 cursor);
 void ui_list_move(u8 node, u32 cursor, u16 key);
 // Moves the cursor by itself, rate items a frame (16.16: INPUT_ONE is one;
 // negative goes up), the list gliding with it as with a held key, until
-// rate 0 or the list's end. For demos: it emits no UI_EV_CURSOR.
+// rate 0 or the list's end. Each move emits UI_EV_CURSOR, as a key's does,
+// but from the update: its handler must not push or pop views.
 void ui_list_autoscroll(u8 node, s32 rate);
 u32 ui_list_cursor(u8 node);
 // 1 while a page change hides or draws the list's page: a handler taking A

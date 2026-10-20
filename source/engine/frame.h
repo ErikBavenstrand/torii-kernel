@@ -53,15 +53,21 @@ u32 frame_last_cycles(void);
 u32 frame_count(void);
 // At this frame's frame_end, logs its busy cycles as "frame-cycles: NAME N"
 // to mGBA's console and counts them in NAME's summary (cycles_frame). For
-// the cycle budget test.
+// the cycle budget test. A frame takes up to FRAME_MEASURES names (a
+// screen's own and the UI's transition, say), each logged once.
+#define FRAME_MEASURES 4
 void frame_measure(const char *name);
+// Takes name off this frame's names (a measurement that another replaced in
+// this frame: the frame is the new one's).
+void frame_measure_drop(const char *name);
 // Marks the end of a stretch of the frame. The slowest of a run of
 // measured frames goes to mGBA's console (not the card, as frame-cycles
 // lines), on the first frame after them, as
-// "frame-split: NAME N, commit to line L: C S1 S2 ...": N its cycles, L the
-// VCOUNT its commit ended on (160-227 is inside VBlank), C the commit's
-// cycles, and Sn each stretch up to the nth mark after it (FRAME_SPLITS in
-// all; ui_frame marks keys, motion and update, jobs, draw).
+// "frame-split: NAME N, commit to line L: C S1 S2 ...": NAME the first it
+// was measured under, N its cycles, L the VCOUNT its commit ended on
+// (160-227 is inside VBlank), C the commit's cycles, and Sn each stretch up
+// to the nth mark after it (FRAME_SPLITS in all; ui_frame marks keys,
+// motion and update, jobs, draw).
 #define FRAME_SPLITS 8
 void frame_split(void);
 // 1 if frame_measure was called for this frame.

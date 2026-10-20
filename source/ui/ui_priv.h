@@ -70,22 +70,36 @@ int ui_plane_hidden_now(u32 plane);
 // it, so the new page comes up softly instead of popping. A plain show while
 // a darken blend is on (a modal view's dim, DIM) or with page_fade 0.
 void ui_plane_reveal(u32 plane);
+// Fades a shown plane out over the theme's page_fade_out frames before a
+// page change hides it (alpha blending, as the fade-in): 0 if it can't (no
+// frames, another plane's fade running, a darken blend on), and the caller
+// hides it at once. Once ui_plane_fading_out goes 0 the blend is off: the
+// caller hides the plane in that frame.
+int ui_plane_fade_out(u32 plane);
+int ui_plane_fading_out(u32 plane);
 // Keys a widget held back (A during a list's page change), dispatched with
 // the next frame's keys as if pressed then. A pop forgets them. They count
 // as the user's: they wake the screen from DIM, so queue only keys just
 // pressed.
 void ui_queue_keys(u16 keys);
 
-// Cycles into the frame by which drawing that nobody sees yet (a page
-// change, a view not shown) ends, so the frame still ends before the next
-// VBlank (a frame is 280,896 cycles) with room for the nodes drawn after.
+// Cycles into the frame by which drawing that nobody sees yet ends, so the
+// frame still ends before the next VBlank (a frame is 280,896 cycles) with
+// room for the nodes drawn after: a view not shown yet (nothing moves while
+// a screen comes in, so it takes most of the frame and shows sooner),
 #define UI_DRAW_BUDGET 250000
+// and a list's page change (its rows drawn ahead into the row cache while
+// the old page fades out, then copied in), which leaves room for motion
+// running alongside and a slower frame on the cart.
+#define UI_PAGE_BUDGET 140000
 // 1 if such drawing may start work of about cycles now: it would end by
-// UI_DRAW_BUDGET. Otherwise it waits for the next frame.
-int ui_draw_room(u32 cycles);
+// budget. Otherwise it waits for the next frame.
+int ui_draw_room(u32 cycles, u32 budget);
 
-// The ops of lists and grids (ui/ui_list.c).
+// The ops of lists (ui/ui_list.c).
 extern const struct ui_ops ui_list_ops;
+// Forgets the rows lists keep drawn in the row cache (a theme change).
+void ui_list_cache_clear(void);
 
 // The current font for UI_FONT_*.
 const struct torii_font *ui_font(u32 which);

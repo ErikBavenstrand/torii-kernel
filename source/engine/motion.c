@@ -378,7 +378,7 @@ static s32 fade_step(s32 diff, s32 f)
 // about a fifth of the cycles of working each channel out
 static u16 fade_lut[3][32] EWRAM_BSS;
 
-void palette_fade(u16 *dst, const u16 *src, u32 count, u16 color, u32 factor)
+static void fade_tables(u16 color, u32 factor)
 {
 	if (factor > FADE_MAX)
 		factor = FADE_MAX;
@@ -388,9 +388,27 @@ void palette_fade(u16 *dst, const u16 *src, u32 count, u16 color, u32 factor)
 		for (s32 v = 0; v < 32; v++)
 			fade_lut[ch][v] = (u16)((v + fade_step(t - v, f)) << (5 * ch));
 	}
+}
+
+static void fade_run(u16 *dst, const u16 *src, u32 count)
+{
 	const u16 *lr = fade_lut[0], *lg = fade_lut[1], *lb = fade_lut[2];
 	for (u32 i = 0; i < count; i++) {
 		u32 c = src[i];
 		dst[i] = (u16)(lr[c & 31] | lg[c >> 5 & 31] | lb[c >> 10 & 31]);
 	}
+}
+
+void palette_fade(u16 *dst, const u16 *src, u32 count, u16 color, u32 factor)
+{
+	fade_tables(color, factor);
+	fade_run(dst, src, count);
+}
+
+void palette_fade_banks(u16 *dst, const u16 *src, u32 banks, u16 color, u32 factor)
+{
+	fade_tables(color, factor);
+	for (u32 b = 0; banks; b++, banks >>= 1)
+		if (banks & 1)
+			fade_run(dst + b * 16, src + b * 16, 16);
 }

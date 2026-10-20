@@ -1,6 +1,7 @@
 // See frame.h.
 #include <gba_interrupt.h>
 #include <gba_systemcalls.h>
+#include <string.h>
 
 #include "frame.h"
 #include "cycles.h"
@@ -16,7 +17,9 @@ static u32 start_cycles EWRAM_BSS;
 static u32 last_cycles EWRAM_BSS;
 static u32 frames EWRAM_BSS;
 static u8 woken EWRAM_BSS;
-static const char *measure_name EWRAM_BSS;
+// This frame's frame_measure names
+static const char *measure_names[FRAME_MEASURES] EWRAM_BSS;
+static u8 measure_count EWRAM_BSS;
 // frame_split marks of this frame, and the line its commit ended on
 static u32 split_at[FRAME_SPLITS] EWRAM_BSS;
 static u8 split_count EWRAM_BSS;
@@ -42,7 +45,7 @@ void frame_init(void)
 	last_cycles = 0;
 	frames = 0;
 	woken = 1;
-	measure_name = 0;
+	measure_count = 0;
 }
 
 u32 frame_begin(void)
@@ -69,18 +72,19 @@ void frame_end(void)
 {
 	last_cycles = cycles_since(start_cycles);
 	woken = 0;
-	if (measure_name) {
-		cycles_frame(measure_name, last_cycles);
+	if (measure_count) {
+		for (u32 i = 0; i < measure_count; i++)
+			cycles_frame(measure_names[i], last_cycles);
 		if (last_cycles > worst_cycles) {
 			// Where the time went: the commit, then each stretch between marks
-			worst_name = measure_name;
+			worst_name = measure_names[0];
 			worst_cycles = last_cycles;
 			worst_line = commit_line;
 			for (u32 i = 0; i < FRAME_SPLITS; i++)
 				worst_split[i] =
 					i < split_count ? split_at[i] - (i ? split_at[i - 1] : start_cycles) : 0;
 		}
-		measure_name = 0;
+		measure_count = 0;
 	} else if (worst_name) {
 		const u32 *d = worst_split;
 		tlog_console("frame-split: %s %lu, commit to line %u: %lu %lu %lu %lu %lu %lu %lu %lu", worst_name,
@@ -130,10 +134,26 @@ void frame_split(void)
 
 int frame_measuring(void)
 {
-	return measure_name != 0;
+	return measure_count != 0;
 }
 
 void frame_measure(const char *name)
 {
-	measure_name = name;
+	for (u32 i = 0; i < measure_count; i++)
+		if (measure_names[i] == name || !strcmp(measure_names[i], name))
+			return;
+	if (measure_count < FRAME_MEASURES)
+		measure_names[measure_count++] = name;
+	else
+		tlog_error("frame: more than %d names measure one frame (%s)", FRAME_MEASURES, name);
+}
+
+void frame_measure_drop(const char *name)
+{
+	for (u32 i = 0; i < measure_count; i++) {
+		if (measure_names[i] == name || !strcmp(measure_names[i], name)) {
+			measure_names[i] = measure_names[--measure_count];
+			return;
+		}
+	}
 }

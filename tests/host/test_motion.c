@@ -433,6 +433,15 @@ void test_palette_fade(void)
 	// Halves round away from zero: 0 moves up to 16 as 31 moves down to 15
 	palette_fade(out, src, 7, FADE_WHITE, 128);
 	CHECK_EQ(out[0], 16 | 16 << 5 | 16 << 10);
+	// By bank: banks 1 and 31 faded, the others left as they were
+	static u16 banks_in[512], pal_out[512];
+	for (u32 i = 0; i < 512; i++) {
+		banks_in[i] = 0x7FFF;
+		pal_out[i] = 0x1234;
+	}
+	palette_fade_banks(pal_out, banks_in, 1u << 1 | 1u << 31, FADE_BLACK, FADE_MAX);
+	for (u32 i = 0; i < 512; i++)
+		CHECK_EQ(pal_out[i], (i / 16 == 1 || i / 16 == 31) ? 0 : 0x1234);
 	CHECK_EQ(out[2], 31 | 16 << 5 | 16 << 10);
 	// Every colour, against the formula worked per channel (the lookup tables
 	// must give what it gives)

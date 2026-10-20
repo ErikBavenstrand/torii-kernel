@@ -2,15 +2,14 @@
 // ezkerneltest.gba -k 1:L) after the unit tests, or with L and SELECT
 // held on the emulated cart (tests/shots/ui-*.opts) straight away, it shows a
 // list of 1000 synthetic items with smooth scrolling, a scroll bar, a
-// progress bar and a dialog, a grid, palette fades and theme switching,
-// and DIM after 20 s idle. Keys:
+// progress bar and a dialog, palette fades and theme switching, and DIM
+// after 20 s idle. Keys:
 //   d-pad, L/R  move and page (wrapping at the ends on a fresh press)
 //   A           a dialog for the item (A or B closes it)
-//   SELECT      the grid, and back
 //   START       the next theme and item accent, through a fade
-// It logs "screen ready: ui-demo", "ui-dialog", "ui-grid" (tests/shots
-// ui-*.opts) and frame-cycles figures for scrolling, page changes, the
-// dialog and switching screens (tests/perf/budget.txt).
+// It logs "screen ready: ui-demo", "ui-dialog" (tests/shots ui-*.opts) and
+// frame-cycles figures for scrolling, page changes, the dialog and the
+// theme's fades (tests/perf/budget.txt).
 #ifdef TORII_TEST_KERNEL
 #include <gba_interrupt.h>
 #include <stdio.h>
@@ -35,7 +34,6 @@ static struct {
 	u32 measure_left;
 	u32 theme;
 	u8 fading;
-	u8 next;  // the screen to switch to after this frame: 1 list, 2 grid
 	u32 dialog_item;
 } demo EWRAM_BSS;
 
@@ -99,21 +97,7 @@ static int demo_fetch(void *ctx, u32 i, struct ui_item *out)
 	return UI_ITEM_READY;
 }
 
-static int grid_fetch(void *ctx, u32 i, struct ui_item *out)
-{
-	(void)ctx;
-	char *p = name_buf;
-	put(&p, words[i % 12]);
-	put(&p, " ");
-	put_num(&p, i + 1);
-	*p = 0;
-	out->text = name_buf;
-	out->icon = icons[i % 4];
-	return UI_ITEM_READY;
-}
-
 static const struct ui_list_model demo_model = {demo_count, demo_fetch, 0};
-static const struct ui_list_model grid_model = {demo_count, grid_fetch, 0};
 
 // The art's letters: A amber, B purple, C green, D red, E light, F dark, as
 // the item's colours until the new icons replace these (ui.h roles)
@@ -207,6 +191,9 @@ static void make_icons(void)
 
 static void measure(const char *name, u32 frames)
 {
+	// This frame is the new measurement's, not the one it replaces
+	if (demo.measure_left && demo.measure != name)
+		frame_measure_drop(demo.measure);
 	demo.measure = name;
 	demo.measure_left = frames;
 	frame_measure(name);  // this frame too
@@ -216,8 +203,8 @@ static void measure(const char *name, u32 frames)
 
 static const struct ui_label_config title_label = {"Torii UI", UI_FONT_HEADING, UI_ALIGN_LEFT, 0};
 static const struct ui_label_config count_label = {"1 / 1000", UI_FONT_BODY, UI_ALIGN_RIGHT, UI_LABEL_SWAP};
-static const struct ui_label_config hint_label = {"A open  SELECT grid  START theme", UI_FONT_BODY, UI_ALIGN_LEFT, 0};
-static const struct ui_list_config list_config = {&demo_model, 16, 0, UI_LIST_WRAP | UI_LIST_MARQUEE, 40};
+static const struct ui_label_config hint_label = {"A open  START theme", UI_FONT_BODY, UI_ALIGN_LEFT, 0};
+static const struct ui_list_config list_config = {&demo_model, 16, UI_LIST_WRAP | UI_LIST_MARQUEE, 40};
 static const struct ui_scrollbar_config bar_config = {3};
 
 enum {
@@ -272,36 +259,6 @@ static int dialog_event(struct ui_view *v, const struct ui_event *e)
 
 static const struct ui_view_spec dialog_view = {"ui-dialog", dialog_nodes, 4, 2, UI_NONE, UI_VIEW_MODAL, dialog_event};
 
-// --- The grid ----------------------------------------------------------------
-
-static const struct ui_label_config grid_title = {"Grid", UI_FONT_HEADING, UI_ALIGN_LEFT, 0};
-static const struct ui_list_config grid_config = {&grid_model, 32, 48, UI_LIST_WRAP, 0};
-static const struct ui_label_config grid_hint = {"SELECT list", UI_FONT_BODY, UI_ALIGN_LEFT, 0};
-
-static const struct ui_spec grid_nodes[] = {
-	{UI_PANEL, 1, UI_NONE, 2, UI_HFILL, 0, 0, UI_ROLE_PANEL, 0, 0, 0, 16, 0},
-	{UI_LABEL, 2, 0, 2, UI_FILL, 0, 0, UI_ROLE_PANEL, 0, 0, 0, 0, &grid_title},
-	{UI_GRID, 3, UI_NONE, 1, UI_FILL, UI_FOCUSABLE, 0, UI_ROLE_BG, 0, 16, 0, 16, &grid_config},
-	{UI_PANEL, 4, UI_NONE, 2, UI_HFILL | UI_BOTTOM, 0, 0, UI_ROLE_PANEL, 0, 0, 0, 16, 0},
-	{UI_LABEL, 5, 3, 2, UI_FILL, 0, UI_ROLE_DIM, UI_ROLE_PANEL, 0, 0, 0, 0, &grid_hint},
-};
-
-static int grid_event(struct ui_view *v, const struct ui_event *e)
-{
-	(void)v;
-	if (e->type == UI_EV_CURSOR) {
-		measure("ui-grid-scroll", 16);
-		return 1;
-	}
-	if (e->type == UI_EV_KEYS && (e->keys & (INPUT_SELECT | INPUT_B))) {
-		demo.next = 1;
-		return 1;
-	}
-	return 0;
-}
-
-static const struct ui_view_spec grid_view = {"ui-grid", grid_nodes, 5, 3, 2, 0, grid_event};
-
 // --- Events ------------------------------------------------------------------
 
 static const struct {
@@ -322,7 +279,7 @@ static int list_event(struct ui_view *v, const struct ui_event *e)
 		u32 jump = e->index > last ? e->index - last : last - e->index;
 		last = e->index;
 		if (jump > 9)
-			measure("ui-page-change", 4);
+			measure("ui-page-change", 12);
 		else
 			measure("ui-list-scroll", 16);
 		char *p = count_buf;
@@ -352,10 +309,6 @@ static int list_event(struct ui_view *v, const struct ui_event *e)
 			}
 			return 1;
 		}
-		if (e->keys & INPUT_SELECT) {
-			demo.next = 2;
-			return 1;
-		}
 		return 0;
 	default:
 		return 0;
@@ -373,16 +326,6 @@ static void theme_step(void)
 	ui_fade(FADE_BLACK, 0, 6);
 	demo.fading = 0;
 	tlog("ui-demo: theme %s, item %lu", ui_theme()->name, (unsigned long)ui_item());
-}
-
-static void switch_screen(void)
-{
-	u8 next = demo.next;
-	demo.next = 0;
-	ui_pop();
-	if (!ui_push(next == 2 ? &grid_view : &list_view, 0))
-		tlog_error("ui-demo: %s", ui_error());
-	measure("ui-screen-switch", 3);
 }
 
 void ui_demo(void)
@@ -403,10 +346,10 @@ void ui_demo(void)
 			frame_measure(demo.measure);
 			demo.measure_left--;
 		}
+		if (ui_fading())
+			frame_measure("ui-fade");
 		ui_frame();
 		theme_step();
-		if (demo.next)
-			switch_screen();
 	}
 }
 #endif

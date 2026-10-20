@@ -733,7 +733,7 @@ static void page1_poll(void)
 		settings_sync();
 }
 
-static const struct ui_list_config page1_list = {&settings_model, SETTINGS_ROW_H, 0, 0, 240 - 2 * 6 - SETTINGS_NAME_W};
+static const struct ui_list_config page1_list = {&settings_model, SETTINGS_ROW_H, 0, 240 - 2 * 6 - SETTINGS_NAME_W};
 
 static const struct ui_spec page1_nodes[] = {
 	SETTINGS_HEADER,

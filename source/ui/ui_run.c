@@ -50,10 +50,11 @@ enum {
 // is under it (one blend at a time); closing runs it backwards
 #define OPEN_FADE (UI_OPEN / 3)
 
-// A page's fade-in (ui_plane_reveal)
+// A page's fade-in (ui_plane_reveal), or the old page's fade-out before it
+// (ui_plane_fade_out)
 enum {
 	REVEAL_OFF,
-	REVEAL_ASKED,    // the next regs show the plane, faded all the way
+	REVEAL_ASKED,    // the next regs show the plane at its first step
 	REVEAL_WRITTEN,  // those regs wait for their commit (DISPCNT may be held)
 	REVEAL_RUN,      // on screen: one step a frame
 };
@@ -94,11 +95,12 @@ static struct {
 	// view, and keys queued for the next frames (keyq.h)
 	struct keyq keys;
 	u32 pop_frame;
-	// A page's fade-in
+	// A page's fade-in or fade-out
 	u8 reveal;        // REVEAL_*
+	u8 reveal_out;    // 1: the fade-out
 	u8 reveal_plane;
 	u8 reveal_step;   // frames of it shown, of reveal_frames
-	u8 reveal_frames; // the theme's page_fade when it started
+	u8 reveal_frames; // the theme's page_fade (page_fade_out) when it started
 	u32 reveal_frame; // the frame whose regs showed the plane
 	// Screen transitions: the half running goes from level, x and y 0 to 1
 	// (level 0 shown, UI_OPEN gone; x, y the screen's offset in px)
@@ -334,8 +336,52 @@ void ui_plane_reveal(u32 plane)
 	ui_plane_hide(plane, 0);
 	ui.reveal_frames = ui_theme()->page_fade;
 	ui.reveal = ui.reveal_frames > 1 ? REVEAL_ASKED : REVEAL_OFF;
+	ui.reveal_out = 0;
 	ui.reveal_plane = (u8)plane;
 	ui.reveal_step = 1;
+}
+
+// The plane's blend level (eva, 0-16) at a step of the fade running
+static u32 reveal_eva(u32 step)
+{
+	u32 eva = 16u * step / ui.reveal_frames;
+	return ui.reveal_out ? 16 - eva : eva;
+}
+
+static s32 modal_dim_now(void);
+
+int ui_plane_fade_out(u32 plane)
+{
+	u32 frames = ui_theme()->page_fade_out;
+	if (ui.reveal != REVEAL_OFF && ui.reveal_plane == plane) {
+		if (ui.reveal_out)
+			return 1;  // already going
+		if (frames > 1) {
+			// Fading in: out from where it is
+			u32 eva = reveal_eva(ui.reveal_step);
+			ui.reveal_out = 1;
+			ui.reveal_frames = (u8)frames;
+			ui.reveal_step = (u8)((16 - eva) * frames / 16);
+			ui.reveal_step = ui.reveal_step ? ui.reveal_step : 1;
+			ui_wake();
+			return 1;
+		}
+	}
+	// One fade at a time; none while a darken blend is on (regs_update)
+	if (frames <= 1 || ui.reveal != REVEAL_OFF || (ui.hidden >> plane & 1) || ui.dim_y > 0 || modal_dim_now() > 0)
+		return 0;
+	ui.reveal = REVEAL_ASKED;
+	ui.reveal_out = 1;
+	ui.reveal_plane = (u8)plane;
+	ui.reveal_frames = (u8)frames;
+	ui.reveal_step = 1;
+	ui_wake();
+	return 1;
+}
+
+int ui_plane_fading_out(u32 plane)
+{
+	return ui.reveal != REVEAL_OFF && ui.reveal_out && ui.reveal_plane == plane;
 }
 
 // One frame of the fade-in: a step once the regs showing the plane are on
@@ -354,9 +400,9 @@ static void reveal_tick(u32 dt)
 	}
 }
 
-int ui_draw_room(u32 cycles)
+int ui_draw_room(u32 cycles, u32 budget)
 {
-	return frame_elapsed() + cycles <= UI_DRAW_BUDGET;
+	return frame_elapsed() + cycles <= budget;
 }
 
 int ui_plane_owned(u8 node)
@@ -381,8 +427,9 @@ static void fade_set(void *ctx, s32 value)
 		gfx_pal_use_faded(0);
 		return;
 	}
-	palette_fade(gfx_pal_faded, gfx_pal_unfaded, 512, ui.fade_colour, (u32)f);
-	gfx_pal_mark(0xFFFFFFFF);
+	// Only the banks in use: a whole-palette fade cost about 45k cycles a frame
+	palette_fade_banks(gfx_pal_faded, gfx_pal_unfaded, gfx_pal_used, ui.fade_colour, (u32)f);
+	gfx_pal_mark(gfx_pal_used);
 	gfx_pal_use_faded(1);
 }
 
@@ -400,6 +447,7 @@ static void load_palette(u32 banks)
 void ui_theme_set(const struct ui_theme *theme)
 {
 	ui_theme_select(theme);
+	ui_list_cache_clear();  // rows may draw differently
 	ui.in.timing = &ui_theme()->input;
 	load_palette(UI_BANKS);
 	ui_wake();
@@ -809,6 +857,21 @@ static s32 view_dx(const struct ui_view *v)
 	return animated(v) ? 0 : ui.tr_dx;
 }
 
+// Another blend takes over from a page's fade: a fade-in just shows; a
+// fade-out's plane goes in these regs (DISPCNT is written already), so the
+// old page doesn't come back at full for a frame before the list hides it
+static void reveal_drop(void)
+{
+	if (ui.reveal != REVEAL_OFF && ui.reveal_out) {
+		u32 p = ui.reveal_plane;
+		ui.hidden |= (u8)(1u << p);
+		ui.hide_pending &= (u8) ~(1u << p);
+		ui.hide_frame[p] = frame_count();
+		gfx_set_dispcnt((u16)(gfx_regs.dispcnt & ~DISP_BG(p)));
+	}
+	ui.reveal = REVEAL_OFF;
+}
+
 static void regs_update(void)
 {
 	if (ui.tr_phase == TR_GAP && ui.tr_pushed && all_shown())
@@ -852,7 +915,7 @@ static void regs_update(void)
 		for (u32 i = 0; i < v->count; i++) {
 			const struct ui_spec *s = &v->spec->nodes[i];
 			const struct ui_node *n = ui_node((u8)(v->first + i));
-			if (s->kind != UI_LIST && s->kind != UI_GRID)
+			if (s->kind != UI_LIST)
 				continue;
 			u32 d2;
 			if (plane_owner(s->plane, &d2) != v)
@@ -930,10 +993,10 @@ static void regs_update(void)
 	ui.carry_dim = 0;
 	if (ui.dim_y > 0) {
 		s32 y = ui.dim_y > modal_y ? ui.dim_y : modal_y;
-		ui.reveal = REVEAL_OFF;  // the page just shows
+		reveal_drop();  // the page just shows
 		gfx_set_blend((u16)(BLEND_DARKEN | LAYER_ALL | LAYER_BD), 0, (u16)(y > 16 ? 16 : y));
 	} else if (tr && (ui.tr_effects & UI_TR_FADES) && !gone && ui.tr_level > 0) {
-		ui.reveal = REVEAL_OFF;
+		reveal_drop();
 		if (ui.tr_mode == TR_ALPHA && !modal) {
 			u32 eva = 16 - ((u32)ui.tr_level * 16 + UI_OPEN / 2) / UI_OPEN;
 			gfx_set_blend((u16)(BLEND_ALPHA | shown | LAYER_OBJ | LAYER_BD << 8),
@@ -947,20 +1010,20 @@ static void regs_update(void)
 			gfx_set_blend((u16)(BLEND_DARKEN | targets), 0, (u16)y);
 		}
 	} else if (tr && (ui.tr_effects & UI_TR_FADES) && gone && ui.tr_mode == TR_DARKEN) {
-		ui.reveal = REVEAL_OFF;
+		reveal_drop();
 		gfx_set_blend((u16)(BLEND_DARKEN | LAYER_ALL | LAYER_BD), 0, 16);  // black
 	} else if (modal && tv->open_blend < UI_OPEN && tv->open_blend <= OPEN_FADE && !tr) {
 		// The dialog fades in over the screen
-		ui.reveal = REVEAL_OFF;
+		reveal_drop();
 		u32 eva = ((u32)tv->open_blend * 16 + OPEN_FADE / 2) / OPEN_FADE;
 		gfx_set_blend((u16)(BLEND_ALPHA | top_planes | (lower | LAYER_BD) << 8), (u16)(eva | (16 - eva) << 8),
 			      0);
 	} else if (modal && modal_y > 0) {
-		ui.reveal = REVEAL_OFF;
+		reveal_drop();
 		gfx_set_blend((u16)(BLEND_DARKEN | lower | LAYER_BD), 0, (u16)modal_y);
 	} else if (ui.reveal != REVEAL_OFF) {
 		// The list's plane over everything behind it
-		u32 p = LAYER_BG(ui.reveal_plane), eva = 16u * ui.reveal_step / ui.reveal_frames;
+		u32 p = LAYER_BG(ui.reveal_plane), eva = reveal_eva(ui.reveal_step);
 		gfx_set_blend((u16)(BLEND_ALPHA | p | ((LAYER_ALL | LAYER_BD) & ~p) << 8), (u16)(eva | (16 - eva) << 8),
 			      0);
 		if (ui.reveal == REVEAL_ASKED) {
@@ -983,6 +1046,7 @@ void ui_init(const struct ui_theme *theme)
 {
 	memset(&ui, 0, sizeof(ui));
 	ui_core_reset();
+	ui_list_cache_clear();
 	ui_theme_select(theme ? theme : ui_theme_setting());
 	input_init(&ui.in, &ui_theme()->input);
 	// Keys already held (from the screen before) count as held, not pressed
@@ -1134,7 +1198,7 @@ static void draw_all(void)
 			u8 n = (u8)(v->first + i);
 			struct ui_node *node = ui_node(n);
 			u32 kind = v->spec->nodes[i].kind;
-			if ((kind == UI_LIST || kind == UI_GRID) && (node->flags & UI_N_HIDDEN))
+			if (kind == UI_LIST && (node->flags & UI_N_HIDDEN))
 				ui.lists_hidden |= (u8)(1u << v->spec->nodes[i].plane);
 			if (!(node->flags & UI_N_DIRTY))
 				continue;
@@ -1241,11 +1305,11 @@ u32 ui_frame(void)
 		frame_wake();
 	modal_tick(dt);
 	tr_tick(dt);
-	// Their frames are measured, in mGBA only (the tests' figures), unless the
-	// screen measures its own
-	if ((ui.tr_phase != TR_IDLE || (ui_top() && ui_top()->opening)) && tlog_in_emulator() && !frame_measuring())
+	// Their frames are measured, in mGBA only (the tests' figures)
+	if ((ui.tr_phase != TR_IDLE || (ui_top() && ui_top()->opening)) && tlog_in_emulator())
 		frame_measure(ui.tr_phase != TR_IDLE ? "ui-transition" : "ui-dialog-motion");
 	update_all(dt);
+	ui_apply_pops();  // asked for by handlers of events in the update (autoscroll)
 	frame_split();  // motion and update
 	// A view still to be shown (one pushed after a pop waits a frame) wakes
 	// the frames until it is: nothing else may (a view without a list)

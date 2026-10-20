@@ -1,7 +1,6 @@
 #! kernel test
-# The UI demo's dialog and grid (tests/kernel/ui_demo.c): A opens a modal
-# dialog that slides up over the dimmed list (every frame hashed), B closes
-# it, SELECT switches to the grid, and the grid's cursor moves.
+# The UI demo's dialog (tests/kernel/ui_demo.c): A opens a modal dialog
+# that slides up over the dimmed list (every frame hashed), and B closes it.
 -k 1:L+SELECT
 -w "screen ready: ui-demo"
 -k @2:- -k @10:DOWN -k @14:-
@@ -11,8 +10,3 @@
 -s @1:dialog.png
 -k @10:B -k @14:-
 -s @20:closed.png
--k @30:SELECT -k @34:-
--w "screen ready: ui-grid"
--s @1:grid.png
--k @10:DOWN -k @14:- -k @20:RIGHT -k @24:-
--s @50:grid-moved.png

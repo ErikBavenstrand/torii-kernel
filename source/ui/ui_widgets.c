@@ -1,5 +1,5 @@
 // The simple widgets (ui.h): label, panel, image, progress bar, scroll bar,
-// and the table of every kind's ops. Lists and grids are in ui/ui_list.c.
+// and the table of every kind's ops. Lists are in ui/ui_list.c.
 #include <string.h>
 
 #include "ui_priv.h"
@@ -400,8 +400,8 @@ static int scrollbar_measure(u8 node, struct engine_budget *need)
 	const struct ui_scrollbar_config *c = ui_node_spec(node)->data;
 	const struct ui_view *v = ui_node_view(node);
 	u32 kind = c && c->target < v->count ? v->spec->nodes[c->target].kind : UI_KINDS;
-	if (kind != UI_LIST && kind != UI_GRID) {
-		ui_set_error("view %s: a scroll bar's target must be a list or grid", v->spec->name);
+	if (kind != UI_LIST) {
+		ui_set_error("view %s: a scroll bar's target must be a list", v->spec->name);
 		return 0;
 	}
 	return measure_window(node, need, 2);
@@ -523,7 +523,6 @@ static const struct ui_ops scrollbar_ops = {
 // --- Every kind ---------------------------------------------------------
 
 const struct ui_ops *const ui_kind_ops[UI_KINDS] = {
-	[UI_LABEL] = &label_ops,       [UI_PANEL] = &panel_ops, [UI_LIST] = &ui_list_ops,
-	[UI_GRID] = &ui_list_ops,      [UI_IMAGE] = &image_ops, [UI_SCROLLBAR] = &scrollbar_ops,
-	[UI_PROGRESS] = &progress_ops,
+	[UI_LABEL] = &label_ops, [UI_PANEL] = &panel_ops,         [UI_LIST] = &ui_list_ops,
+	[UI_IMAGE] = &image_ops, [UI_SCROLLBAR] = &scrollbar_ops, [UI_PROGRESS] = &progress_ops,
 };
