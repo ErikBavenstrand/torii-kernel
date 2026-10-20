@@ -6,6 +6,10 @@
 char *gl_init_error;
 char *gl_power_off;
 char *gl_Loading;
+char *gl_library_title;
+char *gl_library_scanning;
+char *gl_library_found;
+char *gl_library_saving;
 char *gl_file_overflow;
 
 char *gl_menu_btn;
@@ -139,6 +143,12 @@ char *gl_set_minutes EWRAM_BSS;
 const char en_init_error[] = "microSD card error";
 const char en_power_off[] = "Turn the power off";
 const char en_Loading[] = "Loading...";
+// The library's first scan (library_scan.c): title, text, and after a count
+const char en_library_title[] = "Library";
+const char en_library_scanning[] = "Looking for games on the card";
+const char en_library_found[] = "games found";
+// ... and its write before a launch, when the menu hadn't rested long enough
+const char en_library_saving[] = "Saving the game list";
 const char en_file_overflow[] = "Too big to start from the SD card (over 32 MB). Write it to NOR instead.";
 
 const char en_menu_btn[] = "[B]CANCEL    [A]OK";
@@ -359,6 +369,10 @@ void LoadEnglish(void)
 	gl_init_error = (char *)en_init_error;
 	gl_power_off = (char *)en_power_off;
 	gl_Loading = (char *)en_Loading;
+	gl_library_title = (char *)en_library_title;
+	gl_library_scanning = (char *)en_library_scanning;
+	gl_library_found = (char *)en_library_found;
+	gl_library_saving = (char *)en_library_saving;
 	gl_file_overflow = (char *)en_file_overflow;
 
 	gl_menu_btn = (char *)en_menu_btn;

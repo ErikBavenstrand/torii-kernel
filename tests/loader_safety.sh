@@ -136,12 +136,12 @@ keys() {
 }
 
 # Key sequences, from frame 200 (logging slows the boot). WRITE TO NOR CLEAN
-# for A.gba or B.gba (after the folders SAVER and torii), delete latest in the NOR list, LANGUAGE saved in SETTINGS,
+# for A.gba or B.gba (after the folder SAVER: the list hides torii), delete latest in the NOR list, LANGUAGE saved in SETTINGS,
 # Test.gba launched with SAVE TYPE Flash 128K, and Diagnostics from
 # L+R+SELECT at power-on with its questions skipped.
 # shellcheck disable=SC2046 # $(keys) is a list of options
-write_a=$(keys 200 DOWN DOWN A DOWN DOWN A)
-write_b=$(keys 200 DOWN DOWN DOWN A DOWN DOWN A)
+write_a=$(keys 200 DOWN A DOWN DOWN A)
+write_b=$(keys 200 DOWN DOWN A DOWN DOWN A)
 delete=$(keys 200 R DOWN A DOWN A _ A)
 format=$(keys 200 R A DOWN DOWN A _ A)
 format_no=$(keys 200 R A DOWN DOWN A B)
@@ -164,7 +164,7 @@ toggles5=$(toggles 5)
 toggles2=$(toggles 2)
 # SETTINGS opened and left, nothing saved
 settings_out="$(keys 200 R) $(keys 220 R) $(keys 270 R) $(keys 320 L) $(keys 360 L)"
-launch="$(keys 200 DOWN DOWN DOWN DOWN A) $(keys 250 DOWN DOWN DOWN DOWN RIGHT RIGHT RIGHT RIGHT RIGHT UP UP UP UP A)"
+launch="$(keys 200 DOWN DOWN DOWN A) $(keys 250 DOWN DOWN DOWN DOWN RIGHT RIGHT RIGHT RIGHT RIGHT UP UP UP UP A)"
 diag="-k 1:L+R+SELECT -k 60:- -k 120:A -k 124:- $(for f in $(seq 2000 24 4400); do printf -- '-k %d:START -k %d:- ' "$f" $((f + 4)); done)"
 # Diagnostics with its questions answered yes, A every 24 frames: the rumble
 # step sets the ROM page to PSRAM and back.

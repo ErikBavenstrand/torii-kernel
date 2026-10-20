@@ -31,6 +31,7 @@
 #include "charset.h"
 #include "diag.h"
 #include "engine/cover.h"
+#include "library.h"
 #include "screens/lists.h"
 #include "progress.h"
 #include "userdata.h"
@@ -759,23 +760,10 @@ u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU)
 //---------------------------------------------------------------------------------
 extern u16 SET_info_buffer[0x200] EWRAM_BSS;
 //---------------------------------------------------------------------------------
+// Torii: the library's extension table (library.h), the one list of them
 u32 Check_file_type(TCHAR *pfilename)
 {
-	u32 strlen8 = strlen(pfilename);
-	//u32 is_EMU;
-	if (strlen8 < 3) {  // too short for an extension; don't read before the name
-		return 0xff;
-	} else if (!strcasecmp(&(pfilename[strlen8 - 3]), "gba")) {
-		return 0;
-	} else if (!strcasecmp(&(pfilename[strlen8 - 3]), "gbc")) {
-		return 1;
-	} else if (!strcasecmp(&(pfilename[strlen8 - 2]), "gb")) {
-		return 2;
-	} else if (!strcasecmp(&(pfilename[strlen8 - 3]), "nes")) {
-		return 3;
-	} else {
-		return 0xff;
-	}
+	return library_console_of(pfilename);
 }
 //---------------------------------------------------------------------------------
 const char *Error_message(u8 error_num)
@@ -1142,6 +1130,7 @@ int main(void)
 	// glitch), and the next write then went over them.
 	game_total_NOR = GetFileListFromNor();//initialize to prevent direct writes to NOR without page turning
 	Migrate_NOR_list(game_total_NOR);
+	library_boot();  // the index, or the first scan
 	Boot_notice_check();
 	tlog_debug("boot: handing over %lu frames after mounting", (unsigned long)(torii_frames - boot_mounted));
 	dialog_hand_over();  // a notice fades out; the lists run in this session
@@ -1185,6 +1174,7 @@ enum {
 };
 static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 {
+	library_before_launch();
 	cover_cache_invalidate();  // before the save files are touched, as boot_game does
 	//TCHAR savfilename[100];
 	TCHAR *pfilename;
@@ -1283,7 +1273,9 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 	u32 res;
 	u8 error_num;
 	BYTE SAVEMODE;
-	// The launch fills PSRAM with the game: the cover cache there is gone
+	// The launch fills PSRAM with the game: the library index and the cover
+	// cache there are gone
+	library_before_launch();
 	cover_cache_invalidate();
 	// The launch's progress, until the game starts (Game_launch ends it
 	// otherwise): the game's name, and the bar over every step below

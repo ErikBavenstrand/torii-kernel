@@ -8,14 +8,23 @@
 // Articles that No-Intro moves to the end of a title ("Legend of Zelda,
 // The"), which cleaning moves back to the front. Matched with case; one
 // ending in an apostrophe joins the title without a space ("L'Eclair").
-static const char *const articles[] = {
-	"The", "A",   "An",  // English
-	"Le",  "La",  "Les", "L'",  // French
-	"Der", "Die", "Das",  // German
-	"El",  "Los", "Las",  // Spanish
-	"Il",  "Lo",  "Gli",  // Italian
-	"De",  "Het", "Een",  // Dutch
-};
+// The longest article's bytes: step_article only looks for one when a ", "
+// sits within this reach of the title's end. Each article is checked
+// against it as it is listed.
+#define ARTICLE_MAX 3
+// clang-format off
+#define ARTICLES(X) \
+	X("The") X("A") X("An") /* English */ \
+	X("Le") X("La") X("Les") X("L'") /* French */ \
+	X("Der") X("Die") X("Das") /* German */ \
+	X("El") X("Los") X("Las") /* Spanish */ \
+	X("Il") X("Lo") X("Gli") /* Italian */ \
+	X("De") X("Het") X("Een") /* Dutch */
+// clang-format on
+#define ARTICLE_ENTRY(a) a,
+#define ARTICLE_CHECK(a) _Static_assert(sizeof(a) - 1 <= ARTICLE_MAX, "raise ARTICLE_MAX for " a);
+static const char *const articles[] = {ARTICLES(ARTICLE_ENTRY)};
+ARTICLES(ARTICLE_CHECK)
 
 // Tags worth showing when two games collide and differ in several tags:
 // the first that differs and starts with one of these wins over earlier
@@ -117,8 +126,7 @@ static int group_end(const char *s, u32 len, u32 at)
 static u32 step_base(char *out, const char *name, int drop_ext)
 {
 	u32 len = utf8_cut(name, strlen(name), GAMENAME_MAX);
-	for (u32 i = 0; i < len; i++)  // the caller ends it
-		out[i] = name[i];
+	memcpy(out, name, len);  // the caller ends it
 	if (drop_ext) {
 		u32 ext = 0;
 		while (ext < len && ext <= 4 && (is_ascii_letter(name[len - 1 - ext]) || is_digit(name[len - 1 - ext])))
@@ -221,7 +229,9 @@ static u32 step_separators(char *s, u32 len)
 		}
 	}
 	for (u32 i = 0; i + 5 <= len; i++) {
-		if (memcmp(s + i, " - - ", 5) == 0) {
+		// The first two bytes inline: the library cleans every game's name
+		// (B3), and a call per byte costs more than the rest of the rule
+		if (s[i] == ' ' && s[i + 1] == '-' && memcmp(s + i, " - - ", 5) == 0) {
 			memmove(s + i + 1, s + i + 3, len - i - 3);
 			len -= 2;
 			i--;  // again here: " - - - "
@@ -236,8 +246,14 @@ static u32 step_separators(char *s, u32 len)
 static u32 step_article(char *s, u32 len)
 {
 	u32 title = 0;
-	while (title < len && !(title + 3 <= len && memcmp(s + title, " - ", 3) == 0))
+	while (title < len && !(title + 3 <= len && s[title] == ' ' && s[title + 1] == '-' && s[title + 2] == ' '))
 		title++;
+	// Most titles have no ", " in the article's reach: no article to try
+	u32 comma = 0;
+	for (u32 back = 3; back <= ARTICLE_MAX + 2 && back <= title; back++)
+		comma |= s[title - back] == ',' && s[title - back + 1] == ' ';
+	if (!comma)
+		return len;
 	for (u32 k = 0; k < COUNT(articles); k++) {
 		const char *a = articles[k];
 		u32 alen = (u32)strlen(a), cut = alen + 2;  // ", " and the article
@@ -266,8 +282,13 @@ static u32 clean(char *out, const char *name, int drop_ext)
 	// Separators before articles, so "Game, The - (Disc 1)" still moves
 	// its article (the research's order has them after)
 	len = step_separators(out, len);
+	// Both rules again only if an article moved (a move always drops the
+	// ", "): they change nothing on their own output, and the library
+	// cleans every game's name (B3)
+	u32 before = len;
 	len = step_article(out, len);
-	len = step_spaces(out, step_separators(out, len));
+	if (len != before)
+		len = step_spaces(out, step_separators(out, len));
 	if (len == 0)  // Rule 8: nothing left but tags or digits
 		len = step_base(out, name, drop_ext);
 	out[len] = 0;
@@ -447,7 +468,11 @@ static int path_cmp_key(const struct gamename_custom *c, u32 at, const char *key
 {
 	const char *p = c->text + at;
 	for (;; p++, key++) {
-		char a = *p == '\t' ? 0 : lower(*p), b = lower(*key);
+		char a = *p, b = *key;
+		if (a == b && a && a != '\t')
+			continue;  // the same byte: no case folding (the text may be in PSRAM, B3)
+		a = a == '\t' ? 0 : lower(a);
+		b = lower(b);
 		if (a != b)
 			return (unsigned char)a < (unsigned char)b ? -1 : 1;
 		if (a == 0)
@@ -459,7 +484,11 @@ static int path_cmp_lines(const struct gamename_custom *c, u32 x, u32 y)
 {
 	const char *p = c->text + x, *q = c->text + y;
 	for (;; p++, q++) {
-		char a = *p == '\t' ? 0 : lower(*p), b = *q == '\t' ? 0 : lower(*q);
+		char a = *p, b = *q;
+		if (a == b && a && a != '\t')
+			continue;  // the same byte: no case folding
+		a = a == '\t' ? 0 : lower(a);
+		b = b == '\t' ? 0 : lower(b);
 		if (a != b)
 			return (unsigned char)a < (unsigned char)b ? -1 : 1;
 		if (a == 0)
@@ -532,10 +561,15 @@ u32 gamename_custom_parse(struct gamename_custom *c, const char *text, u32 len, 
 		}
 		at = end + 1;
 	}
-	// Heap sort by path, then drop all but the last line of each path
-	for (u32 i = c->count / 2; i-- > 0;)
+	// Heap sort by path, then drop all but the last line of each path. A file
+	// gamename_custom_set wrote is sorted already: one pass sees it (the
+	// library parses the file on every rebuild, from PSRAM, B3)
+	u32 sorted = 1;
+	for (u32 i = 1; i < c->count && sorted; i++)
+		sorted = line_before(c, line[i - 1], line[i]);
+	for (u32 i = c->count / 2; !sorted && i-- > 0;)
 		sift_down(c, line, i, c->count);
-	for (u32 n = c->count; n > 1; n--) {
+	for (u32 n = c->count; !sorted && n > 1; n--) {
 		u32 t = line[0];
 		line[0] = line[n - 1];
 		line[n - 1] = t;

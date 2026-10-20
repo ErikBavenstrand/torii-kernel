@@ -111,8 +111,8 @@ case $part in
 launch)
   new_card 65536 32
   boot -f 200
-  # Off: no log folder on the card, nothing in cart RAM page 0xF0, even after a
-  # launch (which writes /torii/recent.txt).
+  # Off: no log folder on the card (/torii holds the library index), nothing
+  # in cart RAM page 0xF0, even after a launch (which writes /torii/recent.txt).
   # shellcheck disable=SC2046 # $(keys) is a list of options
   boot $(keys 100 A) $(keys 160 A) -f 400
   grep -q '^kernel: launch: starting the game' "$cart/kernel.log" || fail "Hello.gba didn't launch"
@@ -128,9 +128,9 @@ launch)
   has "logging info, build main"
   has "previous session: nothing in cart RAM"
 
-  # SAVER and torii sort first: down twice to Hello.gba, then CLEAN BOOT.
+  # SAVER sorts first (the list hides torii): down to Hello.gba, then CLEAN BOOT.
   # shellcheck disable=SC2046
-  boot $(keys 100 DOWN DOWN A) $(keys 160 A) -f 400
+  boot $(keys 100 DOWN A) $(keys 160 A) -f 400
   has "launch: loading Hello.gba, CLEAN BOOT"
   has "launch: header: title"
   has "launch: CART clock on, rumble on"
@@ -154,7 +154,7 @@ rom[0x134 : 0x134 + 9] = b'TORIITEST'
 open('$cart/Test.gb', 'wb').write(rom)"
   mcopy -i "$cart/sd.img" "$cart/Test.gb" ::/Test.gb
   # shellcheck disable=SC2046
-  boot $(keys 100 DOWN DOWN DOWN A) $(keys 160 A) -f 400
+  boot $(keys 100 DOWN DOWN A) $(keys 160 A) -f 400
   has "launch: loading Test.gb with Jagoomba Color"
   soft_boot -f 200 # cart RAM keeps the session only across a soft reset
   has "previous session: ended in Test.gb (TORIITEST)"
@@ -162,7 +162,7 @@ open('$cart/Test.gb', 'wb').write(rom)"
   # A launch cut off (the emulator stops in the frame that logs it): after
   # a soft reset, cart RAM says where it stopped.
   # shellcheck disable=SC2046
-  boot $(keys 100 DOWN DOWN A) $(keys 160 A) -u 'launch: loading Hello.gba'
+  boot $(keys 100 DOWN A) $(keys 160 A) -u 'launch: loading Hello.gba'
   soft_boot -f 200
   has "previous session: ended abnormally in launching (step 0): Hello.gba"
   # After a power cut, only the log's last line can say so, if its flush
@@ -184,7 +184,7 @@ EOF
   card_ok
   lines_ok
   zeros_ok
-  echo "PASS: logging off touches neither the card nor cart RAM; at Info a launch is logged, and a cut-off one caught"
+  echo "PASS: logging off writes no log and leaves cart RAM alone; at Info a launch is logged, and a cut-off one caught"
   ;;
 
 debug)
@@ -194,8 +194,8 @@ debug)
   settings 0=0xE1E1 1=1 2=1 3=0 4=0 5=9 6=8 7=2 8=9 9=8 10=3 11=1 12=0 13=1 14=1 25=1 26=2
   boot -f 200
   cp "$cart/sram.bin" "$cart/sram-before.bin"
-  # Hello.gba (under the torii folder the first boot made: one DOWN, as a
-  # second wraps to the top), BOOT WITH ADDON; in game, L+R+START, then down to DEBUG
+  # Hello.gba (alone: the list hides the torii folder the first boot made,
+  # and DOWN wraps to it), BOOT WITH ADDON; in game, L+R+START, then down to DEBUG
   # (RESET SAVE LOAD DEBUG) and A. The menu stays, saying the snapshot is
   # saved, with RESET picked (a power-off would clear cart RAM): A on it goes
   # back to the kernel, whose boot logs the snapshot.
@@ -418,17 +418,18 @@ full)
   flushes=$(grep -c '^kernel: lists: idle flush' "$cart/kernel.log" || true)
   [ "$flushes" -eq 0 ] || fail "the idle flush ran $flushes times while the card was full"
   ! mtype -i "$cart/sd.img" ::/torii/logs/torii-0.log >/dev/null 2>&1 || fail "the log file it couldn't finish is still there"
-  # The kernel still launches games: past SAVER, torii and FILLER.BIN.
+  # The kernel still launches games: past SAVER and FILLER.BIN (the list
+  # hides torii).
   # shellcheck disable=SC2046
-  boot $(keys 100 DOWN DOWN DOWN A) $(keys 160 A) -f 400
+  boot $(keys 100 DOWN DOWN A) $(keys 160 A) -f 400
   grep -q '^kernel: launch: starting the game' "$cart/kernel.log" || fail "with a full card, Hello.gba didn't launch"
   mtype -i "$cart/sd.img" ::/FILLER.BIN | cmp -s - "$cart/filler.bin" || fail "the other file changed"
   card_ok
-  # Room again in the same boot: L+START on FILLER.BIN (past SAVER and
-  # torii) and A deletes it; the idle flush then writes the log, which kept
-  # its lines meanwhile.
+  # Room again in the same boot: L+START on FILLER.BIN (past SAVER) and A
+  # deletes it; the idle flush then writes the log, which kept its lines
+  # meanwhile.
   # shellcheck disable=SC2046
-  boot $(keys 100 DOWN DOWN) -k 120:L -k 124:L+START -k 128:- $(keys 160 A) -f 1400
+  boot $(keys 100 DOWN) -k 120:L -k 124:L+START -k 128:- $(keys 160 A) -f 1400
   grep -q "the card is full; the log waits for room" "$cart/kernel.log" || fail "the card wasn't full before the delete"
   ! mtype -i "$cart/sd.img" ::/FILLER.BIN >/dev/null 2>&1 || fail "FILLER.BIN wasn't deleted"
   grep -q '^kernel: lists: idle flush' "$cart/kernel.log" || fail "no idle flush once a delete made room"
@@ -489,7 +490,7 @@ open)
   to_info=(-k @104:A -k @108:- -k @116:A -k @120:- -k @128:A -k @132:- -k @140:RIGHT -k @144:- -k @152:A -k @156:-
     -w "settings: staged")
   # L to page 1, L leaves SETTINGS for the NOR list, L to the SD list
-  # (torii, Hello.gba)
+  # (Hello.gba alone: it hides torii, and DOWN wraps)
   to_sd=(-k @4:L -k @8:- -w "screen ready: settings1" -k @8:L -k @12:- -w "screen ready: nor-list" -k @8:L -k @12:-
     -w "screen ready: sd-list")
 
@@ -532,7 +533,7 @@ open)
     -k @16:A -k @20:- -k @28:A -k @32:- -k @40:A -k @44:- -k @52:RIGHT -k @56:- -k @64:A -k @68:- \
     -w "settings: LOGGING is OFF" "${to_sd[@]}" -k @60:-
   grep -q 'log: LOGGING is off: the open stops' "$cart/kernel.log" || fail "the open didn't stop"
-  ! mdir -i "$cart/sd.img" ::/torii >/dev/null 2>&1 || fail "the open went on with LOGGING off"
+  ! mdir -i "$cart/sd.img" ::/torii/logs >/dev/null 2>&1 || fail "the open went on with LOGGING off"
   card_ok
   echo "PASS: a delete finishes the background open first, one cut off leaves the card whole and is made again, and LOGGING off stops it"
   ;;

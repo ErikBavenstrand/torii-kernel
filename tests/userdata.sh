@@ -114,8 +114,8 @@ new_cart broken
 printf '\0\0\0\0\0\0\0\0' >"$cart/zero.txt"
 mcopy -o -i "$cart/sd.img" "$cart/zero.txt" ::/torii/recent.txt
 mcopy -o -i "$cart/sd.img" "$cart/zero.txt" ::/torii/recent.txt.bak
-# The list: SAVER, torii, Hello.gba
-boot 1.log -C $now -k 100:DOWN -k 104:- -k 116:DOWN -k 120:- -k 132:A -k 136:- -k 180:A -k 184:- -f 450
+# The list: SAVER, Hello.gba (it hides torii)
+boot 1.log -C $now -k 100:DOWN -k 104:- -k 116:A -k 120:- -k 164:A -k 168:- -f 450
 grep -q 'safefile: /torii/recent.txt: neither copy holds up' "$cart/1.log" || fail "the broken copies weren't noticed"
 copies "$now\t/Hello.gba\n"
 echo "PASS: two broken copies read as an empty Recent, and the next launch writes good ones"

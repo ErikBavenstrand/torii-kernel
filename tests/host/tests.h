@@ -141,4 +141,14 @@ void test_userdata_sort_big(void);
 void test_userdata_clock(void);
 void test_userdata_ago(void);
 
+void test_library_extensions(void);
+void test_library_sort_key(void);
+void test_library_build_and_sort(void);
+void test_library_sort_random(void);
+void test_library_cap(void);
+void test_library_file_round_trip(void);
+void test_library_forget_rename(void);
+void test_library_custom_display(void);
+void test_library_pinned_keys(void);
+
 #endif

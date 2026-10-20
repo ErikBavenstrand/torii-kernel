@@ -72,6 +72,9 @@ static const struct {
 	{"safefile", test_safefile},
 	{"userdata_recent_store", test_userdata_recent_store},
 	{"userdata_fav_store", test_userdata_fav_store},
+	// Not in Diagnostics: they use the index's PSRAM and write games to the card
+	{"library_psram", test_library_psram},
+	{"library_boot", test_library_boot},
 };
 
 int torii_unit_tests(void)

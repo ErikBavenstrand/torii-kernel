@@ -425,6 +425,11 @@ void cover_cache_invalidate(void)
 	cover_reset();
 }
 
+int cover_loading(void)
+{
+	return loader.ready && loader.job != JOB_NONE && job_running(loader.job);
+}
+
 void cover_wants_begin(void)
 {
 	if (!loader.ready)

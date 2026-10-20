@@ -6,13 +6,13 @@ art-sheet/icons 9D83D7819A092CD6
 art-sheet/sprites1 251BEEB4DCEA16AC
 art-sheet/sprites2 456A349A1C29F1C0
 boot/screen C6847BCD3E72494F
-boot/frames 0-2 7C573B18E65FE325
-boot/frames 3-3 37EFB417968C90CC
-boot/frames 4-4 566FF6EBB5A3467C
-boot/frames 5-5 D1C4CA1A2E2549AD
-boot/frames 6-6 76175928B12E7E40
-boot/frames 7-7 6D211C324667D836
-boot/frames 8-40 C6847BCD3E72494F
+boot/frames 0-1 7C573B18E65FE325
+boot/frames 2-2 37EFB417968C90CC
+boot/frames 3-3 566FF6EBB5A3467C
+boot/frames 4-4 D1C4CA1A2E2549AD
+boot/frames 5-5 76175928B12E7E40
+boot/frames 6-6 6D211C324667D836
+boot/frames 7-40 C6847BCD3E72494F
 boot-addon/addons A33352904F1BFC63
 boot-copy/copied B5A097B0AA948805
 boot-copy/fast 3D0F80533FA1C1E5
@@ -25,8 +25,8 @@ boot-copy/frames 4-4 79637CFA5A407195
 boot-copy/frames 5-5 9A7602C8EC8401A5
 boot-copy/frames 6-6 530538A8D9BD3395
 boot-progress/screen 6C9065ED205438C3
-boot-progress-big/loading 27A93C9A5301C243
-boot-slow/list 4CBEED8A656D0CA6
+boot-progress-big/loading C0FD04D97D4C0FA3
+boot-slow/list C6847BCD3E72494F
 boot-slow/notice 6C39139CBB65B8C3
 boot-slow/frames 0-1 7C573B18E65FE325
 boot-slow/frames 2-2 F3CC1C23C2A4A856
@@ -34,7 +34,9 @@ boot-slow/frames 3-3 A961719339329A1F
 boot-slow/frames 4-4 86E34B119CF1AD34
 boot-slow/frames 5-5 8FF5AF376FCBDE35
 boot-slow/frames 6-6 32E79620E4404280
-boot-slow/frames 7-15 6C39139CBB65B8C3
+boot-slow/frames 7-12 6C39139CBB65B8C3
+boot-slow/frames 13-13 861EA07BD4403715
+boot-slow/frames 14-15 6C39139CBB65B8C3
 boot-slow/frames 16-16 DBEDA77FF27B4A5E
 boot-slow/frames 17-17 F3CC1C23C2A4A856
 boot-slow/frames 18-19 7C573B18E65FE325
@@ -97,8 +99,8 @@ diag-turn/frames 0-2 10E6FB0374762B6D
 diag-turn/frames 3-3 301CCF82D7B4E223
 diag-turn/frames 4-4 EE03F344E8B283B6
 diag-turn/frames 5-7 C230B72F2FDF7BF4
-dialog-clock/asked 71143749941BC007
-dialog-clock/later B8E2CD800306CE33
+dialog-clock/asked 28A3D7AE6FBB1273
+dialog-clock/later 6C177CBCC3282375
 dialog-double-a/closed 6B7C58A93A62CE1F
 dialog-double-a/up E1E7DCBC28251D12
 dialog-fragmented/dialog 544D34073BFA568F

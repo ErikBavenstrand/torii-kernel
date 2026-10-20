@@ -63,15 +63,14 @@ keys() {
   done
 }
 
-# Power-on 3: down to the game (SAVER and torii, the first launch's Recent,
-# sort first), open it, SAVE TYPE FLASH
+# Power-on 3: down to the game (SAVER sorts first), open it, SAVE TYPE FLASH
 # 64K (four steps right of AUTO), up to BOOT WITH ADDON. A blue background
 # pixel, dumped every 10 frames, shows the menu gave the screen back.
 pixel=$((0x06000000 + (80 * 240 + 120) * 2))
 dumps=$(for f in $(seq 10 10 4000); do printf -- '-m %d:0x%x:2 -h %d ' "$f" "$pixel" "$f"; done)
 # Memory dumps and screen hashes go to stdout, the script's lines to stderr.
 # shellcheck disable=SC2046,SC2086 # $(keys) and $dumps are lists of options
-out=$(boot $(keys 100 DOWN DOWN A) $(keys 180 DOWN DOWN DOWN DOWN RIGHT RIGHT RIGHT RIGHT UP UP UP A) \
+out=$(boot $(keys 100 DOWN A) $(keys 180 DOWN DOWN DOWN DOWN RIGHT RIGHT RIGHT RIGHT UP UP UP A) \
   -L tests/hook_watch.lua -u 'hook watch done' -f 4000 $dumps 2>"$cart/log")
 log=$(cat "$cart/log")
 
@@ -108,7 +107,7 @@ load=$((key + 300))
 hashes=$(for f in $(seq $((load + 100)) 20 $((load + 400))); do printf -- '-h %d ' "$f"; done)
 # shellcheck disable=SC2046,SC2086 # $(keys) and $hashes are lists of options
 out=$(OMEGA_DIR=$cart-state emu/build-linux/mgba-shot dist/ezkernelnew.bin \
-  $(keys 100 DOWN DOWN A) $(keys 180 DOWN DOWN DOWN DOWN RIGHT RIGHT RIGHT RIGHT UP UP UP A) \
+  $(keys 100 DOWN A) $(keys 180 DOWN DOWN DOWN DOWN RIGHT RIGHT RIGHT RIGHT UP UP UP A) \
   -k "$key:L+R+START" -k "$((key + 6)):-" $(keys $((key + 40)) DOWN A) \
   -k "$load:L+R+START" -k "$((load + 6)):-" $(keys $((load + 40)) DOWN DOWN A) \
   -m $((load + 400)):0x04000208:2 $hashes -f $((load + 400)) 2>"$cart/log")
@@ -125,7 +124,7 @@ rm -rf "$cart-state"
 pixel() { python3 -c "import sys; sys.path.insert(0, 'tests'); import games; print(games.png_pixel(games.Path('$1'), 120, 80))"; }
 # shellcheck disable=SC2046 # $(keys) is a list of options
 OMEGA_DIR=$cart-blend emu/build-linux/mgba-shot dist/ezkernelnew.bin \
-  $(keys 100 DOWN DOWN A) $(keys 180 DOWN DOWN DOWN DOWN RIGHT RIGHT RIGHT RIGHT UP UP UP A) \
+  $(keys 100 DOWN A) $(keys 180 DOWN DOWN DOWN DOWN RIGHT RIGHT RIGHT RIGHT UP UP UP A) \
   -s "$((key - 20)):$cart-blend/before.png" -k "$key:L+R+START" -k "$((key + 6)):-" \
   -k "$((key + 60)):B" -k "$((key + 66)):-" -s "$((key + 200)):$cart-blend/after.png" \
   -f $((key + 200)) >/dev/null 2>&1
@@ -142,7 +141,7 @@ backup_at() { od -A n -t x1 -j $((0x20000 + pixel - 0x06000000)) -N 2 "$1/sram.b
 [ "$(backup_at "$cart-extra")" != c250 ] || fail "page 0x20 holds the screen before the extra-key run"
 # shellcheck disable=SC2046 # $(keys) is a list of options
 OMEGA_DIR=$cart-extra emu/build-linux/mgba-shot dist/ezkernelnew.bin \
-  $(keys 100 DOWN DOWN A) $(keys 180 DOWN DOWN DOWN DOWN RIGHT RIGHT RIGHT RIGHT UP UP UP A) \
+  $(keys 100 DOWN A) $(keys 180 DOWN DOWN DOWN DOWN RIGHT RIGHT RIGHT RIGHT UP UP UP A) \
   -k "$key:L+R+START+DOWN" -k "$((key + 6)):-" -k "$((key + 60)):B" -k "$((key + 66)):-" \
   -f $((key + 120)) >/dev/null 2>"$cart/log"
 log=$(cat "$cart/log")

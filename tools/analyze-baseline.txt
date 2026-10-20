@@ -19,7 +19,6 @@ clang-tidy source/GBApatch.c clang-analyzer-security.PointerSub: Subtraction of 
 clang-tidy source/GBApatch.c clang-analyzer-security.PointerSub: Subtraction of two pointers that do not point into the same array is undefined behavior
 clang-tidy source/GBApatch.c clang-analyzer-security.PointerSub: Subtraction of two pointers that do not point into the same array is undefined behavior
 clang-tidy source/cheat.c bugprone-narrowing-conversions: narrowing conversion from '__size_t' (aka 'unsigned int') to signed type 'int' is implementation-defined
-clang-tidy source/ezkernelnew.c bugprone-branch-clone: repeated branch body in conditional chain
 clang-tidy source/ezkernelnew.c bugprone-branch-clone: switch has 2 consecutive identical branches
 clang-tidy source/ezkernelnew.c bugprone-branch-clone: switch has 2 consecutive identical branches
 clang-tidy source/ezkernelnew.c bugprone-branch-clone: switch has 2 consecutive identical branches
@@ -34,6 +33,7 @@ clang-tidy source/ezkernelnew.c clang-analyzer-deadcode.DeadStores: Value stored
 clang-tidy source/ezkernelnew.c clang-analyzer-deadcode.DeadStores: Value stored to 'res' is never read
 clang-tidy source/ezkernelnew.c clang-analyzer-deadcode.DeadStores: Value stored to 'res' is never read
 clang-tidy source/ezkernelnew.c clang-analyzer-security.insecureAPI.strcpy: Call to function 'strcpy' is insecure as it does not provide bounding of the memory buffer. Replace unbounded copy functions with analogous functions that support length arguments such as 'strlcpy'. CWE-119
+clang-tidy source/library.c bugprone-not-null-terminated-result: the result from calling 'memcpy' is not null-terminated
 clang-tidy source/reset_table.h bugprone-narrowing-conversions: narrowing conversion from constant value 4294967295 (0xFFFFFFFF) of type 'unsigned int' to signed type 'int' is implementation-defined
 clang-tidy source/showcht.c bugprone-narrowing-conversions: narrowing conversion from '__size_t' (aka 'unsigned int') to signed type 'int' is implementation-defined
 clang-tidy source/showcht.c bugprone-narrowing-conversions: narrowing conversion from '__size_t' (aka 'unsigned int') to signed type 'int' is implementation-defined
@@ -64,6 +64,7 @@ cppcheck source/ezkernelnew.c unreadVariable: Variable 'res' is assigned a value
 cppcheck source/ezkernelnew.c unreadVariable: Variable 'res' is assigned a value that is never used.
 cppcheck source/ezkernelnew.c unreadVariable: Variable 'res' is assigned a value that is never used.
 cppcheck source/ezkernelnew.c unreadVariable: Variable 'res' is assigned a value that is never used.
+cppcheck source/library_scan.c constParameterCallback: Parameter 'job' can be declared as pointer to const. However it seems that 'library_job' is a callback function, if 'job' is declared with const you might also need to cast function pointer(s).
 cppcheck source/showcht.c unreadVariable: Variable 'is_section' is assigned a value that is never used.
 cppcheck source/showcht.c unreadVariable: Variable 'text_comment' is assigned a value that is never used.
 cppcheck source/showcht.c unreadVariable: Variable 'text_comment' is assigned a value that is never used.

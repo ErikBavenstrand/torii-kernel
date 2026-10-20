@@ -39,6 +39,15 @@ static const struct {
 	void (*run)(void);
 } tests[] = {
 	{"sort_matches_kernel", test_sort_matches_kernel},
+	{"library_extensions", test_library_extensions},
+	{"library_sort_key", test_library_sort_key},
+	{"library_build_and_sort", test_library_build_and_sort},
+	{"library_sort_random", test_library_sort_random},
+	{"library_cap", test_library_cap},
+	{"library_file_round_trip", test_library_file_round_trip},
+	{"library_forget_rename", test_library_forget_rename},
+	{"library_custom_display", test_library_custom_display},
+	{"library_pinned_keys", test_library_pinned_keys},
 	{"sort_is_stable", test_sort_is_stable},
 	{"sort_limits", test_sort_limits},
 	{"sort_largest_list", test_sort_largest_list},
