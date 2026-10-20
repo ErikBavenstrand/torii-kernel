@@ -6,6 +6,12 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** settings as data for the v0.4 page (`settings_model.c`): seven
+  section cards of at most six rows, values staged and written to NOR only
+  for a real change, the hotkey rules (no combination inside a game's own
+  A+B+START+SELECT soft reset), the time and date field editor and the
+  12/24-hour clock; new slots 30-33 (24-hour clock, game view, Start on, Show
+  all files) (B6; `9ab2c33`, `a49ba5e`, `a6de04e`, `e88ecce`).
 - **Changed:** menu colours come from `docs/design/v0.4/palette.json`,
   generated into `source/ui/palette.c` by `just palette`: built-in light and
   dark themes with an accent per carousel item, and the new look's shared
