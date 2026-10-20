@@ -1072,8 +1072,8 @@ static u8 Process_savefile(u32 is_EMU, TCHAR *pfilename, u32 gamefilesize, BYTE 
 			savefilesize = Grow_savefile(savfilename, savefilesize, need);
 	} else //make a new one
 	{
-		ShowbootProgress(gl_make_sav);
 		savefilesize = Get_savefilesize(saveMODE);
+		tlog("save: making %s, %lu bytes", savfilename, (unsigned long)savefilesize);
 		res = SavefileWrite(savfilename, savefilesize);
 		if (res == 0) {
 			u8 error_num = 5;
@@ -1338,6 +1338,17 @@ static void Launch_now(u16 page, u32 key_L, const char *how)
 	SetRompageWithHardReset(page, key_L);
 }
 //---------------------------------------------------------------------------------
+// A launch's steps, as where each ends in thousandths of the bar (progress.h):
+// the status names only "Loading the game" and "Patching the game", and the
+// quick checks in between move the bar and are logged
+enum {
+	LAUNCH_SAVE = 50,       // the save checked (or made) and loaded into cart SRAM
+	LAUNCH_STATES = 100,    // BOOT WITH ADDON: the save state file, the IRQ hook looked up
+	LAUNCH_SCAN = 800,      // the scan engine's load: the kernel reads the ROM itself
+	LAUNCH_PATCH = 900,     // the game loaded, before the patches
+	LAUNCH_COPIED = 950,    // the cart's copy with nothing to patch, then the ROM's fixes
+	LAUNCH_NOR_SAVE = 500,  // a NOR game: its save, then its save states
+};
 static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 {
 	cover_cache_invalidate();  // before the save files are touched, as boot_game does
@@ -1349,7 +1360,8 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 	u32 res;
 
 	// The launch's progress, until the game starts (NOR_launch ends it otherwise)
-	dialog_progress_begin(gl_Loading, pNorFS[show_offset + file_select].filename);
+	dialog_progress_begin(pNorFS[show_offset + file_select].filename, NULL);
+	progress_step(gl_loading_game, 0, LAUNCH_NOR_SAVE);
 
 	init_FAT_table();
 
@@ -1374,7 +1386,6 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 	     pNorFS[show_offset + file_select].have_RTS != 0);
 	tlog_flush();
 
-	progress_step(gl_check_sav, 0, 500);
 	//memcpy(savfilename,pfilename,100);
 	error_num = Process_savefile(0, pfilename, gamefilesize, SAVEMODE);
 	if (error_num != 0) {
@@ -1389,7 +1400,7 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 
 	Set_64MROM_flag(pNorFS[show_offset + file_select].is_64MBrom);
 	if (pNorFS[show_offset + file_select].have_patch && pNorFS[show_offset + file_select].have_RTS) {
-		progress_step(gl_check_RTS, 500, 900);
+		progress_step(NULL, LAUNCH_NOR_SAVE, PROGRESS_FULL);
 		u32 size = Check_RTS(pfilename);
 		if (size == 0) {
 			error_num = 6;
@@ -1440,8 +1451,9 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 	BYTE SAVEMODE;
 	// The launch fills PSRAM with the game: the cover cache there is gone
 	cover_cache_invalidate();
-	// The launch's progress, until the game starts (Game_launch ends it otherwise)
-	dialog_progress_begin(gl_Loading, pfilename);
+	// The launch's progress, until the game starts (Game_launch ends it
+	// otherwise): the game's name, and the bar over every step below
+	dialog_progress_begin(pfilename, NULL);
 
 	u32 gamefilesize = 0;
 	//u32 savefilesize=0;
@@ -1507,7 +1519,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 			return 0;
 		}
 
-		progress_step(gl_check_sav, 0, 150);
+		progress_step(gl_loading_game, 0, LAUNCH_SAVE);
 		res = f_mkdir(SAVER_FOLDER);  //"/SAVER"
 		if ((res != FR_OK) && (res != FR_EXIST)) {
 			error_num = 2;
@@ -1525,7 +1537,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 
 	if (is_EMU)  //boot emu game
 	{
-		progress_step(gl_loading_game, 150, 950);
+		progress_step(NULL, LAUNCH_SAVE, PROGRESS_FULL);
 		f_chdir(currentpath);  //return to game folder
 		cartlog_phase(PHASE_LAUNCH, 0, pfilename);
 		tlog("launch: loading %s with %s", pfilename, (is_EMU == 3) ? "PocketNES" : "Jagoomba Color");
@@ -1558,14 +1570,11 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 
 		switch (MENU_line) {
 		case 0:  //DirectPSRAM CLEAN BOOT
-			// The cart copies the game into PSRAM itself: no progress
-			// to show until it is done
-			progress_step(gl_loading_game, 150, 900);
 			cartlog_phase(PHASE_LAUNCH, 0, pfilename);
 			tlog("launch: loading %s, CLEAN BOOT", pfilename);
 			tlog_flush();
 
-			Send_FATbuffer(FAT_table_buffer, 0);
+			progress_cart_copy(FAT_table_buffer, gamefilesize, LAUNCH_COPIED);
 			GBApatch_Cleanrom(PSRAMBase_S98, gamefilesize);
 			progress_done(NULL);
 			//wait_btn();
@@ -1580,7 +1589,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 			tlog_flush();
 			if ((gl_reset_on == 1) || (gl_rts_on == 1) || (gl_sleep_on == 1) || (gl_cheat_on == 1)) {
 				if (gl_rts_on == 1) {
-					progress_step(gl_check_RTS, 150, 200);
+					progress_step(NULL, LAUNCH_SAVE, LAUNCH_STATES);
 					u32 size = Check_RTS(pfilename);
 					if (size == 0) {
 						error_num = 6;
@@ -1588,12 +1597,11 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 						return 0;
 					}
 				}
-				progress_step(gl_check_pat, 200, 250);
+				progress_step(NULL, LAUNCH_STATES, LAUNCH_STATES);
 				have_pat = Check_pat(pfilename);
 				if (have_pat == 1) {
 					tlog("launch: IRQ hook from PATCH/ (cached scan)");
-					progress_step(gl_loading_game, 250, 900);  // the cart copies it
-					Send_FATbuffer(FAT_table_buffer, 0);  //Loading rom
+					progress_cart_copy(FAT_table_buffer, gamefilesize, LAUNCH_PATCH);
 				} else  //(have_pat==0)
 				{
 					f_chdir(currentpath);  //return to game folder
@@ -1608,16 +1616,17 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 					get_find:
 						FAT_table_buffer[0x1F4 / 4] = SET_PARAMETER_MODE;
 						Send_FATbuffer(FAT_table_buffer, 1);
-						progress_step(gl_loading_game, 250, 850);
+						progress_step(NULL, LAUNCH_STATES, LAUNCH_SCAN);
 						res = Loadfile2PSRAM(pfilename);
-						progress_step(gl_make_pat, 850, 900);
+						progress_step(NULL, LAUNCH_SCAN, LAUNCH_PATCH);
+						tlog("launch: saving the hook's place in PATCH/");
 						Make_pat_file(pfilename);
 					} else {
 						res = use_internal_engine(GAMECODE, pfilename);
 						if (res == 1) {
 							tlog("launch: IRQ hook from the built-in table");
-							progress_step(gl_loading_game, 250, 900);  // the cart copies it
-							Send_FATbuffer(FAT_table_buffer, 0);  //Loading rom
+							progress_cart_copy(FAT_table_buffer, gamefilesize,
+									   LAUNCH_PATCH);
 						} else {
 							tlog("launch: IRQ hook from a scan of the ROM (not in the "
 							     "table)");
@@ -1631,7 +1640,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 					tlog("launch: %lu code patches for this game's IRQ setup",
 					     (unsigned long)(iCount2 - found));
 				found = iCount2;
-				progress_step(gl_patching, 900, 950);
+				progress_step(gl_patching, LAUNCH_PATCH, PROGRESS_FULL);
 				Apply_rom_patches();  //Torii: exact-ROM patches, SD launches only
 				if (iCount2 > found)
 					tlog("launch: exact-ROM patch for %.4s (irqpatch.c rom_patches)",
@@ -1640,8 +1649,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 				Log_patches();
 			} else {  //no select switch ,CLEAN
 				tlog("launch: no addon on, so no patches");
-				progress_step(gl_loading_game, 150, 950);  // the cart copies it
-				Send_FATbuffer(FAT_table_buffer, 0);  //Loading rom
+				progress_cart_copy(FAT_table_buffer, gamefilesize, LAUNCH_COPIED);
 			}
 			progress_done(NULL);
 			//wait_btn();
@@ -1649,7 +1657,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 			break;
 		case 2:  //WRITE TO NOR CLEAN
 			f_chdir(currentpath);  //return to game folder
-			progress_step(gl_writing, 0, PROGRESS_FULL);
+			progress_step(gl_writing, 0, PROGRESS_FULL);  // the whole bar
 			res = Loadfile2NOR(pfilename, gl_norOffset, 0x0, SAVEMODE);
 			if (res == 0)  //ok
 			{
@@ -1684,7 +1692,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 				}
 				needpatch = 1;
 			}
-			progress_step(gl_writing, 0, PROGRESS_FULL);
+			progress_step(gl_writing, 0, PROGRESS_FULL);  // the whole bar
 			res = Loadfile2NOR(pfilename, gl_norOffset, needpatch, SAVEMODE);
 			//wait_btn();
 			if (res == 0) {

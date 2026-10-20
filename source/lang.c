@@ -49,15 +49,6 @@ char *gl_ok_btn;
 
 char *gl_formatnor_info;
 
-char *gl_check_sav;
-char *gl_make_sav;
-
-char *gl_check_RTS;
-char *gl_make_RTS;
-
-char *gl_check_pat;
-char *gl_make_pat;
-
 char *gl_loading_game;
 
 char *gl_engine;
@@ -166,15 +157,6 @@ const char en_set_btn[] = "SET";
 const char en_ok_btn[] = " OK";
 
 const char en_formatnor_info[] = "Erase every game in NOR? It takes about 4 minutes.";
-
-const char en_check_sav[] = "Checking the save";
-const char en_make_sav[] = "Creating the save file";
-
-const char en_check_RTS[] = "Checking the save states";
-const char en_make_RTS[] = "Creating the save state file";
-
-const char en_check_pat[] = "Checking the patches";
-const char en_make_pat[] = "Saving the patches";
 
 const char en_loading_game[] = "Loading the game";
 
@@ -297,15 +279,6 @@ void LoadEnglish(void)
 	gl_set_btn = (char *)en_set_btn;
 	gl_ok_btn = (char *)en_ok_btn;
 	gl_formatnor_info = (char *)en_formatnor_info;
-
-	gl_check_sav = (char *)en_check_sav;
-	gl_make_sav = (char *)en_make_sav;
-
-	gl_check_RTS = (char *)en_check_RTS;
-	gl_make_RTS = (char *)en_make_RTS;
-
-	gl_check_pat = (char *)en_check_pat;
-	gl_make_pat = (char *)en_make_pat;
 
 	gl_loading_game = (char *)en_loading_game;
 

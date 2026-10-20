@@ -101,6 +101,15 @@ void dialog_progress_set(u32 value, u32 max, const char *status);
 // begun.
 void dialog_progress_end(void);
 int dialog_progress_active(void);
+// For filling the bar from an interrupt while the kernel waits in IWRAM
+// (progress.c, during the cart's ROM copy): draws what is pending, then
+// gives the bar's pixels (ui_progress_pixels) with the column value (of the
+// last dialog_progress_set's max) fills to. 0 if no progress dialog is up
+// or its bar isn't drawn.
+struct ui_bar_pixels;
+int dialog_progress_pixels(u32 value, struct ui_bar_pixels *out);
+// That fill now ends at column x: the bar goes on from there.
+void dialog_progress_drew(u32 x);
 
 #define DIALOG_PROGRESS_FRAMES 12
 
@@ -110,9 +119,5 @@ int dialog_progress_active(void);
 // 4-minute erase. It runs before a frame, from the dialogs' loops, never
 // from inside ui_frame; it must check that its screen is still up.
 void dialog_set_tick(void (*tick)(void));
-
-// The launch's progress line (the official kernel's name for it): the
-// status line of the progress dialog, which it begins if none is up.
-void ShowbootProgress(const char *str);
 
 #endif

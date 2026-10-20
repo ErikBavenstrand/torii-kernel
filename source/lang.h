@@ -52,15 +52,6 @@ extern char *gl_ok_btn;
 
 extern char *gl_formatnor_info;
 
-extern char *gl_check_sav;
-extern char *gl_make_sav;
-
-extern char *gl_check_RTS;
-extern char *gl_make_RTS;
-
-extern char *gl_check_pat;
-extern char *gl_make_pat;
-
 extern char *gl_loading_game;
 extern char *gl_engine;
 extern char *gl_use_engine;

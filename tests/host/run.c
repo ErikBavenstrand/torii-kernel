@@ -58,6 +58,7 @@ static const struct {
 	{"charset_cut", test_charset_cut},
 	{"progress_permille", test_progress_permille},
 	{"progress_estimate", test_progress_estimate},
+	{"progress_copy", test_progress_copy},
 	{"save_name", test_save_name},
 	{"save_name_longest", test_save_name_longest},
 	{"name_with_ext", test_name_with_ext},

@@ -563,6 +563,20 @@ int ui_emit(u8 index, u8 type, u32 value);
 void ui_label_set(u8 node, const char *text);
 // value of max (max 0 counts as empty).
 void ui_progress_set(u8 node, u32 value, u32 max);
+// A drawn progress bar's pixels, for code that fills it from an interrupt
+// while the kernel waits in IWRAM (progress.c, during the cart's ROM copy):
+// pixel (x, y) is nibble x % 8 of word tiles[x / 8 * column_words + y],
+// and the fill is rows [top, top + rows) in palette index ink. x is where
+// the fill ends now; px the column value of max would fill to.
+struct ui_bar_pixels {
+	vu32 *tiles;
+	u32 column_words, top, rows, ink, x, px;
+};
+// 0 if the bar isn't drawn as ui_progress_set last set it.
+int ui_progress_pixels(u8 node, u32 value, u32 max, struct ui_bar_pixels *out);
+// The fill now ends at column x (drawn by that code): the widget goes on
+// from there.
+void ui_progress_drew(u8 node, u32 x);
 // The list's model changed (a new folder): the cursor goes to cursor and
 // the list redraws as a page change.
 void ui_list_reset(u8 node, u32 cursor);

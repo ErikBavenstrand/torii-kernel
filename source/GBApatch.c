@@ -5,7 +5,6 @@
 #include <gba_dma.h>
 
 #include "ez_define.h"
-#include "ui/dialog.h"
 #include "GBApatch.h"
 #include "gba_nes_patch.h"
 #include "ezkernel.h"
@@ -14,6 +13,7 @@
 #include "showcht.h"
 #include "Ezcard_OP.h"
 #include "irqpatch.h"
+#include "progress.h"
 #include "savename.h"
 #include "tlog.h"
 
@@ -883,16 +883,19 @@ u32 Check_RTS(TCHAR *gamefilename)
 		f_close(&gfile);
 	} else //make a new one
 	{
-		ShowbootProgress(gl_make_RTS);
+		tlog("launch: making the save state file /RTS/%s", rtsnamebuf);
 		res = f_open(&gfile, rtsnamebuf, FA_WRITE | FA_OPEN_ALWAYS);
 		if (res == FR_OK) {
 			int i;
 			unsigned int written;
-			memset(pReadCache, 0xFF, 0x200 * 4);
 			for (i = 0; i < (0x70000) / 0x800; i++) {
+				// Filled each time: the frame progress_part may run
+				// can borrow pReadCache (ez_define.h)
+				memset(pReadCache, 0xFF, 0x200 * 4);
 				f_write(&gfile, pReadCache, 0x200 * 4, (UINT *)&written);
 				if (written != 0x200 * 4)
 					break;
+				progress_part((u32)i + 1, 0x70000 / 0x800);  // its step of the launch's bar
 			}
 			f_close(&gfile);
 

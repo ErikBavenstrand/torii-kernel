@@ -10,9 +10,19 @@ boot/frames 5-5 74D4950BBD1434E6
 boot/frames 6-6 EE05FD7779962083
 boot/frames 7-7 55135B940AAE8F72
 boot/frames 8-40 34EED145D7C6A8C0
-boot-addon/addons B24B22C01BC420D0
-boot-progress/screen 8A9B3222959885A1
-boot-progress-big/loading 7868AEBC12088DD1
+boot-addon/addons 82F2A07E3EB69688
+boot-copy/copied 18F47A45D97E9E25
+boot-copy/fast B8757053C9950481
+boot-copy/slow 5558C592E1157BED
+boot-copy/frames 0-0 4F039BCB9D660DC5
+boot-copy/frames 1-1 B82A8B2FF0E18DC1
+boot-copy/frames 2-2 4D80447E6971C249
+boot-copy/frames 3-3 B0EE6221DB29F945
+boot-copy/frames 4-4 897FD8F9D21FAFAD
+boot-copy/frames 5-5 A97A66CC787E41E5
+boot-copy/frames 6-6 56CD8E42B41F0951
+boot-progress/screen CB7467476B4BF67C
+boot-progress-big/loading 5A7CF9590ED2BC84
 boot-slow/list E7D96DEE3BD0FF1A
 boot-slow/notice ED54AF6F9CA38CCC
 boot-slow/frames 0-1 7C573B18E65FE325
@@ -106,8 +116,8 @@ nor-launch-fail/error B8CF0E71609EC550
 nor-launch-fail/later A5FA458AE4ABEB70
 nor-launch-fail/list A5FA458AE4ABEB70
 nor-list/screen E5740101EF2460F9
-nor-write/done 8DE07CA2EAFDF0C4
-nor-write/half C04FD0A7B7D4B370
+nor-write/done 94B197565A9923C1
+nor-write/half 9C0BA7D1F5EB79E1
 recent/screen 4BF332265C4659D4
 recent-empty/fading B433C33410610144
 recent-empty/screen 61D38EE8AD54A4A0
@@ -766,13 +776,13 @@ tr-deeper/frames 67-67 271E96756B90D58B
 tr-deeper/frames 68-69 7D031703A6F61C90
 tr-deeper/frames 70-75 F7E40BE7DBC25590
 tr-leave/fading 392C0BDAEB1D3F2B
-tr-leave/progress 8A9B3222959885A1
+tr-leave/progress CB7467476B4BF67C
 tr-leave/frames 0-1 4F47817065DDD361
 tr-leave/frames 2-2 392C0BDAEB1D3F2B
 tr-leave/frames 3-3 8859EF7BFC7AC10B
 tr-leave/frames 4-7 7C573B18E65FE325
 tr-leave/frames 8-8 7B90E77090ED8325
-tr-leave/frames 9-10 8A9B3222959885A1
+tr-leave/frames 9-10 CB7467476B4BF67C
 tr-menu/closing 52948E493E423F65
 tr-menu/dimming 9DAE717E072EB8CB
 tr-menu/menu D5E56E6C36BAC2F9

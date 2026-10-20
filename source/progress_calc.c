@@ -31,3 +31,22 @@ u32 progress_estimate(u32 elapsed, u32 expected)
 	}
 	return progress_permille(0, 950, elapsed, expected);
 }
+
+void progress_copy_plan(struct progress_copy *c, u32 from, u32 to, u32 frames)
+{
+	if (to < from)
+		to = from;
+	if (to > 0x7FFF)
+		to = 0x7FFF;  // a bar is a screen wide at most: at most 240
+	if (from > to)
+		from = to;
+	if (!frames)
+		frames = 1;
+	c->at = from << 16;
+	c->end = to << 16;
+	c->knee = c->at + ((to - from) << 16) / 10 * PROGRESS_COPY_KNEE;
+	c->fast = (c->knee - c->at) / frames;
+	c->slow = c->fast / PROGRESS_COPY_SLOW;
+	if (c->fast && !c->slow)
+		c->slow = 1;
+}
