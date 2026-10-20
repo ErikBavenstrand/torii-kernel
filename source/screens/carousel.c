@@ -435,6 +435,12 @@ static int car_event(u8 node, const struct ui_event *e)
 	return 1;
 }
 
+// 1 if a label set holds entry's label
+static int has_label(u32 entry)
+{
+	return car.set[0].entry == entry || car.set[1].entry == entry;
+}
+
 // --- Update: the sprites ---------------------------------------------------------
 
 static void add_label(u8 node, s32 dx, s32 dy, const struct label_set *ls, u32 set, int text)
@@ -499,6 +505,8 @@ static void car_update(u8 node, u32 dt)
 			ui_dirty(node, DIRTY_LABEL);
 		}
 	}
+	if (!has_label(carousel_facing(node)))
+		ui_dirty(node, DIRTY_LABEL);  // the label it turns to, drawn ahead
 	int text = ls->entry == entry && fade < 256;
 	if (ls->entry != SET_NONE)
 		car.used_now |= (u8)(1u << car.shown);
@@ -671,8 +679,12 @@ static void car_draw(u8 node)
 		ui_dirty(node, DIRTY_BACKDROP);
 	if (!(todo & DIRTY_LABEL) || !car.count)
 		return;
+	// The label the ring shows now, else the one it is turning to: drawn
+	// ahead, it is ready at the half way point
 	u32 entry = ring_item(round_fix(car.m.pos), car.count);
-	if (car.set[car.shown].entry == entry || car.set[car.shown ^ 1u].entry == entry)
+	if (has_label(entry))
+		entry = carousel_facing(node);
+	if (has_label(entry))
 		return;
 	// Into a set no sprite of this frame or the last uses
 	u32 busy = car.used_now | car.used_last, set = !(busy & 1) ? 0 : !(busy & 2) ? 1 : SET_NONE;
