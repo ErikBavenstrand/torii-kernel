@@ -47,7 +47,8 @@ rom "$root/B.gba" tests/roms/savetest/flash64.gba
 loader() { tail -c +$((0x7C0000 + 1)) "$cart/kernel-nor.bin" | md5sum | cut -c1-32; }
 
 # new_cart NAME: an erased cart with logging on (LOGGING Info) and a card
-# holding /SAVER, A.gba (Hello), B.gba and Test.gba (Flash 128K save test).
+# holding /SAVER, A.gba (Hello), B.gba and Test.gba (Flash 128K save test),
+# starting on Home.
 # The first power-on, one frame long, makes the cart's files and seeds the
 # loader.
 new_cart() {
@@ -64,7 +65,7 @@ new_cart() {
   OMEGA_DIR=$cart emu/build-linux/mgba-shot "$kernel" -f 1 >/dev/null 2>&1
   [ "$(tail -c +$((0x7C00A0 + 1)) "$cart/kernel-nor.bin" | head -c 12)" = "TORII LOADER" ] ||
     bad "the emulator didn't seed the loader"
-  # Logging on, and Start on Home: the NOR page's routes start from home
+  # Logging on, and Start on Home: the pages' routes start from home
   settings 26=2 32=2
   seeded=$(loader)
 }
