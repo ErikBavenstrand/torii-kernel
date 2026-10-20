@@ -6,6 +6,13 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** Recent and favourites move to `/torii/recent.txt` (time
+  played, newest first, 32 games, the boot position) and
+  `/torii/favorites.txt`, held in PSRAM and written as two copies each ending
+  in a CRC line (`safefile.c`, for every user file); a list read with a card
+  error is never written back; the v0.3 list and its NOR games are taken over
+  at the first write (B5; `32ec4e1`, `8bb170f`, `86c6194`, `298f10a`,
+  `1469880`).
 - **Removed:** grids (`UI_GRID`): v0.4 has none (B7, T13, E4; `e2d81cd`).
 - **Changed:** a palette fade works out only the banks in use (a fade frame
   drops from 58,819 to 27,877 cycles); `frame_measure` keeps several names a
