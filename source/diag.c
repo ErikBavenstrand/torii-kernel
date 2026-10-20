@@ -118,7 +118,7 @@ static const u16 bars_palette[16] = {0, RGB(31, 0, 0), RGB(0, 31, 0), RGB(0, 0, 
 // Two tile sets: a new title flips in through the VRAM queue, in the same
 // VBlank as the new page's rows (page_turn)
 static const struct ui_label_config title_config = {"", UI_FONT_HEADING, UI_ALIGN_LEFT, UI_LABEL_SWAP};
-static const struct ui_list_config list_config = {&lines_model, 16, 0, UI_LIST_PLAIN, 0};
+static const struct ui_list_config list_config = {&lines_model, 16, UI_LIST_PLAIN, 0};
 static const struct ui_image_config bars_config = {bars_tiles, bars_palette, 0xD1A6};
 
 static const struct ui_spec diag_nodes[N_COUNT] = {

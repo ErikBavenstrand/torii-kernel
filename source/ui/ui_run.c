@@ -852,7 +852,7 @@ static void regs_update(void)
 		for (u32 i = 0; i < v->count; i++) {
 			const struct ui_spec *s = &v->spec->nodes[i];
 			const struct ui_node *n = ui_node((u8)(v->first + i));
-			if (s->kind != UI_LIST && s->kind != UI_GRID)
+			if (s->kind != UI_LIST)
 				continue;
 			u32 d2;
 			if (plane_owner(s->plane, &d2) != v)
@@ -1134,7 +1134,7 @@ static void draw_all(void)
 			u8 n = (u8)(v->first + i);
 			struct ui_node *node = ui_node(n);
 			u32 kind = v->spec->nodes[i].kind;
-			if ((kind == UI_LIST || kind == UI_GRID) && (node->flags & UI_N_HIDDEN))
+			if (kind == UI_LIST && (node->flags & UI_N_HIDDEN))
 				ui.lists_hidden |= (u8)(1u << v->spec->nodes[i].plane);
 			if (!(node->flags & UI_N_DIRTY))
 				continue;

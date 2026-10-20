@@ -29,8 +29,8 @@ static int t_fetch(void *ctx, u32 index, struct ui_item *out)
 }
 
 static const struct ui_list_model t_model = {t_count, t_fetch, 0};
-static const struct ui_list_config t_list = {&t_model, 16, 0, UI_LIST_WRAP, 0};
-static const struct ui_list_config t_grid = {&t_model, 32, 48, 0, 0};
+static const struct ui_list_config t_list = {&t_model, 16, UI_LIST_WRAP, 0};
+static const struct ui_list_config t_tall = {&t_model, 32, 0, 0};
 static const struct ui_label_config t_title = {"Title", UI_FONT_HEADING, UI_ALIGN_LEFT, UI_LABEL_SWAP};
 static const struct ui_scrollbar_config t_bar = {2};
 
@@ -43,10 +43,10 @@ static const struct ui_spec main_nodes[] = {
 };
 static const struct ui_view_spec main_view = {"test-main", main_nodes, 5, 0, 2, 0, 0};
 
-static const struct ui_spec grid_nodes[] = {
-	{UI_GRID, 1, UI_NONE, 3, UI_FILL, UI_FOCUSABLE, 0, 0, 0, 16, 0, 0, &t_grid},
+static const struct ui_spec tall_nodes[] = {
+	{UI_LIST, 1, UI_NONE, 3, UI_FILL, UI_FOCUSABLE, 0, 0, 0, 16, 0, 0, &t_tall},
 };
-static const struct ui_view_spec grid_view = {"test-grid", grid_nodes, 1, 0, 0, 0, 0};
+static const struct ui_view_spec tall_view = {"test-tall", tall_nodes, 1, 0, 0, 0, 0};
 
 static const struct ui_label_config t_text = {"Open?", UI_FONT_BODY, UI_ALIGN_CENTER, 0};
 static const struct ui_spec dialog_nodes[] = {
@@ -62,7 +62,7 @@ static const struct ui_spec image_nodes[] = {
 };
 static const struct ui_view_spec image_view = {"test-image", image_nodes, 1, 0, UI_NONE, 0, 0};
 
-static const struct ui_list_config bad_rows = {&t_model, 24, 0, 0, 0};
+static const struct ui_list_config bad_rows = {&t_model, 24, 0, 0};
 static const struct ui_spec bad_nodes[] = {
 	{UI_LIST, 1, UI_NONE, 1, UI_FILL, 0, 0, 0, 0, 0, 0, 0, &bad_rows},
 };
@@ -125,9 +125,9 @@ void test_ui_pool_and_arenas(void)
 	CHECK_EQ(motion_count(), 1);
 	CHECK_EQ(pool_free_units(bg, 0), (u16)(free0 - used));
 
-	// A grid of 32 px rows doesn't fit on top of the list: refused with a
+	// A list of 32 px rows doesn't fit on top of the list: refused with a
 	// readable error, leaving nothing behind
-	CHECK_EQ(ui_core_push(&grid_view, 0), 0);
+	CHECK_EQ(ui_core_push(&tall_view, 0), 0);
 	CHECK(ui_error()[0] != 0);
 	CHECK_EQ(res_mark(), mark1);
 	CHECK_EQ(motion_count(), 1);
@@ -144,8 +144,8 @@ void test_ui_pool_and_arenas(void)
 	CHECK(strstr(ui_error(), "stack is full") != 0);
 	while (ui_depth())
 		ui_core_pop();
-	// The grid alone fits
-	CHECK(ui_core_push(&grid_view, 0) != 0);
+	// The list of 32 px rows alone fits
+	CHECK(ui_core_push(&tall_view, 0) != 0);
 	CHECK_EQ(motion_count(), 1);
 	ui_core_pop();
 	CHECK_EQ(ui_depth(), 0);

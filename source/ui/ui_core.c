@@ -255,7 +255,7 @@ static int place_nodes(struct ui_view *v)
 	return 1;
 }
 
-// A list or grid scrolls its plane and clips it with a hardware window: it
+// A list scrolls its plane and clips it with a hardware window: it
 // needs its plane to itself, and at most UI_SCROLLERS can be resident
 static int check_planes(const struct ui_view *v)
 {
@@ -264,14 +264,14 @@ static int check_planes(const struct ui_view *v)
 		const struct ui_view *w = &views[d];
 		for (u32 i = 0; i < w->count; i++) {
 			const struct ui_spec *s = &w->spec->nodes[i];
-			if (s->kind != UI_LIST && s->kind != UI_GRID)
+			if (s->kind != UI_LIST)
 				continue;
 			scrollers++;
 			if (w != v)
 				continue;
 			for (u32 j = 0; j < v->count; j++) {
 				if (j != i && v->spec->nodes[j].plane == s->plane) {
-					ui_set_error("view %s: a list or grid needs plane %u to itself", v->spec->name,
+					ui_set_error("view %s: a list needs plane %u to itself", v->spec->name,
 						     s->plane);
 					return 0;
 				}
@@ -279,7 +279,7 @@ static int check_planes(const struct ui_view *v)
 		}
 	}
 	if (scrollers > UI_SCROLLERS) {
-		ui_set_error("view %s: more than %d lists and grids would be resident", v->spec->name, UI_SCROLLERS);
+		ui_set_error("view %s: more than %d lists would be resident", v->spec->name, UI_SCROLLERS);
 		return 0;
 	}
 	return 1;

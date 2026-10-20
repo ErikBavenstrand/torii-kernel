@@ -84,7 +84,7 @@ void ui_queue_keys(u16 keys);
 // UI_DRAW_BUDGET. Otherwise it waits for the next frame.
 int ui_draw_room(u32 cycles);
 
-// The ops of lists and grids (ui/ui_list.c).
+// The ops of lists (ui/ui_list.c).
 extern const struct ui_ops ui_list_ops;
 
 // The current font for UI_FONT_*.

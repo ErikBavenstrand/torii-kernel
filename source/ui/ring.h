@@ -1,7 +1,7 @@
 // The maths of a list's ring of rows (ui/ui_list.c), hardware-free so
 // tests/host runs it.
 //
-// A list or grid shows rows of rh pixels (16 or 32) in a viewport h pixels
+// A list shows rows of rh pixels (16 or 32) in a viewport h pixels
 // tall, on a BG of its own whose 32x32 map wraps every 256 pixels. Content
 // row r lives in map rows (r % ring_rows) * rh / 8 onwards, so the BG's
 // vertical scroll is just the content scroll minus the viewport's top, mod
@@ -52,12 +52,6 @@ static inline u32 ring_slot(const struct ui_ring *r, u32 row)
 static inline u32 ring_map_row(const struct ui_ring *r, u32 row)
 {
 	return (row % r->ring_rows) * (r->rh / 8u);
-}
-
-// Rows of a grid with cols columns holding count items.
-static inline u32 ring_rows_of(u32 count, u32 cols)
-{
-	return cols ? (count + cols - 1) / cols : 0;
 }
 
 // The largest scroll: the last row's bottom at the viewport's bottom.

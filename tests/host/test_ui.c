@@ -74,7 +74,7 @@ static const struct ui_ops t_plain = {12, t_measure, t_init, 0, 0, 0};
 static const struct ui_ops t_list = {12, t_measure, t_init, t_event_list, 0, 0};
 static const struct ui_ops t_panel = {12, t_measure, t_init, t_event_panel, 0, 0};
 const struct ui_ops *const ui_kind_ops[UI_KINDS] = {
-	[UI_LABEL] = &t_plain, [UI_PANEL] = &t_panel,     [UI_LIST] = &t_list,      [UI_GRID] = &t_list,
+	[UI_LABEL] = &t_plain, [UI_PANEL] = &t_panel,     [UI_LIST] = &t_list,
 	[UI_IMAGE] = &t_plain, [UI_SCROLLBAR] = &t_plain, [UI_PROGRESS] = &t_plain,
 };
 
@@ -153,8 +153,6 @@ void test_ui_ring_setup(void)
 	CHECK(ring_setup(&r, 120, 16, &why));
 	CHECK_EQ(r.visible, 9);
 	CHECK_EQ(ring_map_row(&r, 17), 2);  // row 17 is ring row 1: map rows 2-3
-	CHECK_EQ(ring_rows_of(10, 3), 4);
-	CHECK_EQ(ring_rows_of(0, 3), 0);
 }
 
 void test_ui_ring_windows(void)
@@ -290,7 +288,7 @@ static const struct ui_spec main_nodes[] = {
 	{UI_LABEL, 2, 0, 2, UI_HFILL, 0, 0, 0, 8, 0, 8, 16, 0},
 	{UI_LIST, 3, 0, 1, UI_FILL, UI_FOCUSABLE, 0, 0, 0, 16, 0, 16, 0},
 	{UI_LABEL, 4, 0, 2, UI_LEFT, UI_FOCUSABLE | UI_HIDDEN, 0, 0, 0, 0, 8, 8, 0},
-	{UI_GRID, 5, 0, 3, UI_LEFT, UI_FOCUSABLE, 0, 0, 0, 0, 8, 8, 0},
+	{UI_LIST, 5, 0, 3, UI_LEFT, UI_FOCUSABLE, 0, 0, 0, 0, 8, 8, 0},
 };
 static const struct ui_view_spec main_view = {"main", main_nodes, 5, 1, 2, 0, on_event};
 
@@ -350,7 +348,7 @@ void test_ui_stack(void)
 	CHECK(list->flags & UI_N_FOCUS);
 	CHECK_EQ(ui_find(v, 5), 4);
 	CHECK_EQ(ui_find(v, 99), UI_NONE);
-	CHECK_EQ(ui_node_spec(4)->kind, UI_GRID);
+	CHECK_EQ(ui_node_spec(4)->kind, UI_LIST);
 	CHECK(ui_node_state(1) == (u8 *)ui_node_state(0) + 12);
 
 	// A modal dialog on top, then popped: everything it took comes back

@@ -432,7 +432,7 @@ static const struct ui_label_config title_label = {"", UI_FONT_BODY, UI_ALIGN_LE
 static const struct ui_label_config clock_label = {"", UI_FONT_BODY, UI_ALIGN_CENTER, UI_LABEL_SWAP};
 static const struct ui_label_config count_label = {"", UI_FONT_BODY, UI_ALIGN_RIGHT, UI_LABEL_SWAP};
 static const struct ui_label_config empty_label = {"", UI_FONT_BODY, UI_ALIGN_LEFT, 0};
-static const struct ui_list_config list_config = {&list_model, 16, 0, UI_LIST_MARQUEE | UI_LIST_ICONS, 40};
+static const struct ui_list_config list_config = {&list_model, 16, UI_LIST_MARQUEE | UI_LIST_ICONS, 40};
 
 // The list isn't focusable: the view's handler takes every key, so L and R
 // switch screens as they always did instead of paging the list
@@ -507,7 +507,7 @@ static const struct ui_view_spec list_views[SCREENS] = {
 #define M_LIST 1
 #define M_HINT 3
 
-static const struct ui_list_config menu_config = {&menu_model, 16, 0, UI_LIST_FIXED, 0};
+static const struct ui_list_config menu_config = {&menu_model, 16, UI_LIST_FIXED, 0};
 static const struct ui_label_config hint_label = {"", UI_FONT_BODY, UI_ALIGN_CENTER, 0};
 
 #define MENU_NODES(rows) \
