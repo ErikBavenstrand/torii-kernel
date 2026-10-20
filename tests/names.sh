@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Non-ASCII file names on FAT32 and exFAT: a save test ROM named in Japanese
 # or with accented Latin letters must launch, get its save written to
-# /SAVER under its own name, and get that save back on the next launch.
-# (Listing them is the SD card page's, B14.)
+# /SAVER under its own name, and get that save back on the next launch,
+# the second time from the SD card page, which lists the name whole.
 # Usage: names.sh [fat32|exfat]
 # Runs inside the torii-emu container after `just build`,
 # `just emu-headless` and building tests/roms/savetest.
@@ -34,8 +34,7 @@ run_case() {
   boot() { OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin "$@" 2>&1 >/dev/null | tee -a "$log" | { grep -v '^kernel: ' || true; } >&2; }
 
   # Power-on 1: CLEAN BOOT with SAVE TYPE FLASH 128K, as a page will
-  # (actions.c, through tests/nav.sh's hook). The SD card page's listing of
-  # the name comes with B14.
+  # (actions.c, through tests/nav.sh's hook: the page has no save type).
   # shellcheck disable=SC2046
   boot $(nav_launch "/$name.gba" save=5 at=250) -s 600:"$shots/1-game.png"
   grep -qF "launch $name.gba:" "$log" || fail "$fs $label: the kernel didn't launch $name.gba"
@@ -49,16 +48,17 @@ run_case() {
   [ "$(hex_at "$cart/game.sav" $((0x10000)))" = 4f4d525801 ] ||
     fail "$fs $label: the save has $(hex_at "$cart/game.sav" $((0x10000))), expected the first boot record"
 
-  # Power-on 3: launch it again.
+  # Power-on 3: launch it again, from the SD card page (its popup's Launch,
+  # once the page has logged the popup's path: the name lists whole)
   # shellcheck disable=SC2046
-  boot $(nav_launch "/$name.gba" at=180) -s 600:"$shots/3-game.png"
+  boot $(nav_file "/$name.gba" 0 launch) -s 800:"$shots/3-game.png"
+  grep -qF "sdcard: popup /$name.gba" "$log" || fail "$fs $label: the SD card page didn't list $name.gba"
   [ "$(hex_at "$cart/sram.bin" $((0x10000)))" = 4f4d525802 ] ||
     fail "$fs $label: cart SRAM has $(hex_at "$cart/sram.bin" $((0x10000))), expected the second boot"
 
   echo "PASS: $fs $label name ($name)"
 }
 
-echo "SKIP (waiting for B14): the SD card page lists the names"
 # With an argument, run only that file system (tests/all.sh runs them in parallel).
 for fs in fat32 exfat; do
   case ${1:-all} in

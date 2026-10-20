@@ -17,8 +17,24 @@
 # the end for the four that always show, then A (which opens the item the
 # ring is turning to, so the presses needn't wait for it).
 #
-# Routes into a page (a file on the SD card page, a game's popup, a Settings
-# row) come with the page's ticket: until then they fail, saying which one.
+# Routes into a page (a game's popup, a Settings row) come with the page's
+# ticket: until then they fail, saying which one.
+#
+# nav_file PATH ROW... [ACTION] [hard]: from power-on into the SD card page
+# (source/screens/sdcard.c) and down PATH's folders to its file, one ROW per
+# part of PATH: the row it has in its folder's listing (folders first, then
+# files, A-Z as the page sorts them, hidden entries left out), which the
+# test knows from the card it made. Each folder opens with A; on the file,
+# START opens its popup, and the route waits for the page to log that
+# popup's path, so a wrong row stops the run there. ACTION then picks from
+# the popup: popup (none: it stays open), launch (Launch; with hard, L held:
+# a hard reset), nor (Write to NOR), nor-addon (Write to NOR with addon,
+# which shows only while an addon is on), fav (Add to or Remove from
+# favourites, then B closes it), delete (Delete, then Delete in the
+# confirmation), delete-no (Delete, then Cancel, then B), info (File info,
+# then A closes it), or open (no popup: A on the row, which starts a game).
+# Later options count from the route's last wait (-w): the popup's line, or
+# the folder's with open.
 #
 # The NOR page's (B15), each from power-on through nav_to nor:
 #   nav_nor_game INDEX         the cursor on game INDEX (0 the first written),
@@ -110,8 +126,61 @@ nav_to() {
   _nav_file '-w "nav: home ready"' "$(_nav_keys 8 "${keys[@]}" A)" "-w \"nav: page $place ready\""
 }
 
+nav_file() {
+  local path=$1 hard=0 action=popup folder='' part parts=() rows=() lines=() keys=() i
+  shift
+  IFS=/ read -r -a parts <<<"${path#/}"
+  while [ $# -gt 0 ]; do
+    case $1 in
+    [0-9]*) rows+=("$1") ;;
+    hard) hard=1 ;;
+    popup | launch | nor | nor-addon | fav | delete | delete-no | info | open) action=$1 ;;
+    *)
+      _nav_fail "nav_file: unknown option $1"
+      return 1
+      ;;
+    esac
+    shift
+  done
+  if [ ${#rows[@]} != ${#parts[@]} ]; then
+    _nav_fail "nav_file $path: ${#parts[@]} parts but ${#rows[@]} rows"
+    return 1
+  fi
+  lines=('-w "nav: home ready"' "$(_nav_keys 8 UP UP UP UP A)" '-w "sdcard: ready /"')
+  for ((i = 0; i < ${#parts[@]}; i++)); do
+    part=${parts[$i]}
+    keys=()
+    for ((n = 0; n < rows[i]; n++)); do keys+=(DOWN); done
+    if ((i + 1 < ${#parts[@]})); then
+      folder="$folder/$part"
+      lines+=("$(_nav_keys 8 "${keys[@]}" A)" "-w \"sdcard: ready $folder\"")
+      continue
+    fi
+    if [ "$action" = open ]; then
+      if [ "$hard" = 1 ]; then keys+=(L+A); else keys+=(A); fi
+      lines+=("$(_nav_keys 8 "${keys[@]}")")
+      continue
+    fi
+    lines+=("$(_nav_keys 8 "${keys[@]}" START)" "-w \"sdcard: popup $path\"")
+    local a=A
+    [ "$hard" = 1 ] && a=L+A
+    case $action in
+    popup) keys=() ;;
+    launch) keys=("$a") ;;
+    nor) keys=(DOWN "$a") ;;
+    nor-addon) keys=(DOWN DOWN "$a") ;;
+    fav) keys=(UP UP UP A B) ;;
+    delete) keys=(UP UP A RIGHT A) ;;
+    delete-no) keys=(UP UP A A B) ;;
+    info) keys=(UP A A) ;;
+    esac
+    # The popup takes A once it has opened (6 frames); a confirmation the same
+    [ ${#keys[@]} -gt 0 ] && lines+=("$(_nav_keys 12 "${keys[@]}")")
+  done
+  _nav_file "${lines[@]}"
+}
+
 # Routes into pages, until their tickets land
-nav_file() { _nav_fail "the SD card page's files come with B14 (nav_file $*)"; }
 nav_game() { _nav_fail "the game lists come with B13 (nav_game $*)"; }
 
 # The NOR page's routes (B15; the top says what each does). They start from

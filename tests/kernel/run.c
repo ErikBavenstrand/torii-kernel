@@ -27,8 +27,6 @@ static const struct {
 	{"clock_and_rumble_are_separate", test_clock_and_rumble_are_separate},
 	{"settings_staged_until_changed", test_settings_staged_until_changed},
 	{"settings_model_round_trip", test_settings_model_round_trip},
-	{"sort_by_name", test_sort_by_name},
-	{"sort_full_list", test_sort_full_list},
 	{"nor_info_stays_in_bounds", test_nor_info_stays_in_bounds},
 	{"nor_write_refused_when_list_full", test_nor_write_refused_when_list_full},
 	{"nor_scan_keeps_interrupts", test_nor_scan_keeps_interrupts},

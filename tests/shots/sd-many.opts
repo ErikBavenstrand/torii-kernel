@@ -1,0 +1,13 @@
+# A folder past the SD card page's 1,024 entries: its count reads
+# "1,024+ items", and the list ends with the "showing the first 1,024"
+# note (UP from the first row wraps to it)
+#! settings 28=1
+#! sd-many /Many 1025
+-w "nav: home ready"
+-k @8:UP -k @12:- -k @16:UP -k @20:- -k @24:UP -k @28:- -k @32:UP -k @36:- -k @40:A -k @44:-
+-w "sdcard: counted /"
+-s @2:root.png
+-k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:A -k @36:-
+-w "sdcard: ready /Many"
+-k @8:UP -k @12:-
+-s @40:end.png

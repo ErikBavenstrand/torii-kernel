@@ -1,0 +1,29 @@
+# The SD card page (source/screens/sdcard.c) in the light theme. At the
+# card's root (#14): folders first, then files, the hidden rule's entries
+# left out (CHEAT, SAVER, torii); each folder's item count fills in once the
+# page rests. A on Long goes into it (the page change hashed every frame):
+# the title bar shows the path's pills, the current folder tinted. START on
+# a game opens the file popup (#15); Delete asks, Cancel preselected; Cancel
+# goes back to the popup, and File info shows the file's facts (not
+# captured: its date is the host's, from mtools). B goes up, the cursor on
+# the folder it left.
+#! settings 28=1
+-w "nav: home ready"
+-k @8:UP -k @12:- -k @16:UP -k @20:- -k @24:UP -k @28:- -k @32:UP -k @36:- -k @40:A -k @44:-
+-w "sdcard: counted /"
+-s @2:root.png
+-k @8:DOWN -k @12:- -k @20:A -k @24:-
+-H @20:@44
+-w "sdcard: ready /Long"
+-s @1:folder.png
+-k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:START -k @36:-
+-w "sdcard: popup"
+-s @12:popup.png
+-k @20:UP -k @24:- -k @32:UP -k @36:- -k @44:A -k @48:-
+-s @64:confirm.png
+-k @72:B -k @76:-
+-k @96:DOWN -k @100:- -k @108:A -k @112:-
+-k @150:A -k @154:-
+-k @190:B -k @194:-
+-w "sdcard: ready /"
+-s @1:back.png

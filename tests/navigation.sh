@@ -72,9 +72,9 @@ done
 # A hidden item, and a page's own routes, fail clearly
 ! nav_to gbc >/dev/null 2>"$cart/err.txt" || fail "nav_to gbc didn't fail with GBC hidden"
 grep -q "gbc isn't on home" "$cart/err.txt" || fail "nav_to gbc said: $(cat "$cart/err.txt")"
-! nav_file /Hello.gba >/dev/null 2>"$cart/err.txt" || fail "nav_file didn't fail"
-grep -q "come with B14" "$cart/err.txt" || fail "nav_file said: $(cat "$cart/err.txt")"
-echo "PASS: tests/nav.sh reaches home and every page, and a route not built yet fails clearly"
+! nav_file /Hello.gba >/dev/null 2>"$cart/err.txt" || fail "nav_file without its rows didn't fail"
+grep -q "1 parts but 0 rows" "$cart/err.txt" || fail "nav_file said: $(cat "$cart/err.txt")"
+echo "PASS: tests/nav.sh reaches home and every page, and a route it can't take fails clearly"
 
 # The Info page's routes: each reading page fills in and wraps its text
 # (an assert fails one that doesn't fit), and Diagnostics' first page comes

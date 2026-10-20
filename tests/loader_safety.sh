@@ -121,16 +121,17 @@ boot() {
 # logged TEXT: this power-on logged TEXT (the path under test ran)
 logged() { [ $ok = 0 ] || grep -qF -- "$1" "$log" || bad "power-on $runs didn't log '$1'"; }
 
-# The writes, as the pages will run them (actions.c, through tests/nav.sh's
-# hook), from frame 200 (logging slows the boot): WRITE TO NOR CLEAN of A.gba
-# or B.gba, Test.gba launched with SAVE TYPE Flash 128K, and Diagnostics
+# The writes, as the pages run them: WRITE TO NOR CLEAN of A.gba or B.gba
+# through the SD card page's file popup (rows 0 and 1 of the card's root:
+# SAVER and Torii's folder are hidden); through tests/nav.sh's hook
+# (actions.c) from frame 200 (logging slows the boot), Test.gba launched with SAVE TYPE Flash 128K, and Diagnostics
 # from L+R+SELECT at power-on with its questions skipped; and through the
 # NOR page's keys, delete latest (the popup's Delete on B.gba, then Delete)
 # and FORMAT ALL (Format all, then Format), each also answered no. The
 # Settings page's saves come back with B16: until then their cases say SKIP
 # (the settings sector's write still runs, from a first WRITE TO NOR).
-write_a=$(nav_launch /A.gba nor at=200)
-write_b=$(nav_launch /B.gba nor at=200)
+write_a=$(nav_file /A.gba 0 nor)
+write_b=$(nav_file /B.gba 1 nor)
 # (each waits for the page to come back after the action, then 30 frames)
 delete="$(nav_nor_delete_page 1 yes) $(_nav_file '-w "nav: page nor ready"' '-k @30:-')"
 delete_no="$(nav_nor_delete_page 1 no) $(_nav_file '-w "nor: delete 1: cancelled"' '-k @30:-')"
@@ -189,17 +190,17 @@ EOF
 
   if shard_case; then
     new_cart nor-write
-    boot $write_a -f 700
+    boot $write_a -f 900
     logged "nor: list saved, 1 games"
-    boot $write_b -f 700
+    boot $write_b -f 900
     logged "nor: list saved, 2 games"
     pass "WRITE TO NOR"
   fi
 
   if shard_case; then
     new_cart nor-delete
-    boot $write_a -f 700
-    boot $write_b -f 700
+    boot $write_a -f 900
+    boot $write_b -f 900
     boot $delete_no
     [ $ok = 0 ] || ! grep -qE 'nor: deleting|nor: list saved' "$log" || bad "B on the delete question wrote the NOR"
     boot $delete
@@ -211,7 +212,7 @@ EOF
   # FORMAT ALL
   if shard_case; then
     new_cart nor-format
-    boot $write_a -f 700
+    boot $write_a -f 900
     boot $format
     logged "nor: erased the game NOR"
     logged "nor: list saved, 0 games"
@@ -288,7 +289,7 @@ EOF
     older_list
     boot -g -f 300
     logged "nor: saving an older kernel's list of 1 games"
-    boot -g $write_b -f 700
+    boot -g $write_b -f 900
     logged "nor: list saved, 2 games"
     boot -g $launch -f 700
     logged "nor: wrote the pending-save record"
@@ -299,7 +300,7 @@ EOF
   # game NOR saves its save type there (Set_saveMODE through Save_info)
   if shard_case; then
     new_cart gl064-settings
-    boot -g $write_a -f 700
+    boot -g $write_a -f 900
     logged "nor: list saved, 1 games"
     logged "nor: wrote the settings"
     pass "a settings save on the S29GL064A (the first WRITE TO NOR's save type)"
@@ -312,7 +313,7 @@ EOF
       older_list
       KERNEL_NOR=$chip boot -f 300
       logged "nor: saving an older kernel's list of 1 games"
-      KERNEL_NOR=$chip boot $write_b -f 700
+      KERNEL_NOR=$chip boot $write_b -f 900
       logged "nor: list saved, 2 games"
       pass "the boot's migration and WRITE TO NOR on the $chip"
     fi
@@ -325,10 +326,10 @@ EOF
   for cut in kernel:erase:1 kernel:erase:2 kernel:program:1 kernel:program:2000 kernel:program:4300 kernel:program:6400; do
     if shard_case; then
       new_cart "cut-write-${cut//:/-}"
-      boot $write_a -f 700
-      boot -c "$cut" $write_b -f 700
+      boot $write_a -f 900
+      boot -c "$cut" $write_b -f 900
       boot -f 300
-      boot $write_b -f 700
+      boot $write_b -f 900
       logged "nor: list saved"
       pass "a power cut at $cut in WRITE TO NOR, and the boots after it"
     fi
