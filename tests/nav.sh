@@ -123,7 +123,7 @@ nav_info_page() {
   esac
   wait="screen ready: info-$page"
   [ "$page" = diag ] && wait="screen ready: diag-start"
-  _nav_file '-w "nav: home ready"' "$(_nav_keys 8 UP A)" '-w "screen ready: info"' \
+  _nav_file '-w "nav: home ready"' "$(_nav_keys 8 LEFT A)" '-w "screen ready: info"' \
     "$(_nav_keys 8 "${downs[@]}" A)" "-w \"$wait\""
 }
 
