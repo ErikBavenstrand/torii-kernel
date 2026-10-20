@@ -462,6 +462,22 @@ static struct {
 	u16 base[16];      // bank 0 of the theme, which both follow
 } pp EWRAM_BSS;
 
+// 1 if the run's view is still up. A screen leaving (ui_leave), a launch
+// or ui_shutdown pops it behind the run's back: a later view in its slot
+// has another spec, and the run is forgotten.
+static int run_live(struct run *r)
+{
+	if (r->view && (u32)(r->view - ui_view_at(0)) < ui_depth() && r->view->spec == &r->view_spec)
+		return 1;
+	r->view = 0;
+	return 0;
+}
+
+// Keys pressed while a run closes that the view under it gets: moves only.
+// A, B, START or SELECT then could act on a page the user can't see yet
+// (B then A would play the game under the popup).
+#define KEYS_AFTER (INPUT_DPAD | INPUT_L | INPUT_R)
+
 static void run_start(struct run *r, struct ui_view *v, u8 hints)
 {
 	r->view = v;
@@ -530,7 +546,7 @@ static void run_first_step(struct run *r, const struct ui_move *open)
 // hint bar given back and the keys pressed meanwhile passed on
 static void run_finish(struct run *r, const struct ui_move *close)
 {
-	if (!r->view)
+	if (!run_live(r))
 		return;
 	r->dir = -1;
 	r->from = r->open;
@@ -540,6 +556,7 @@ static void run_finish(struct run *r, const struct ui_move *close)
 	for (u32 guard = 0; guard < 4u * 60 && r->step < close->frames && r->open && ui_top() == r->view; guard++)
 		ui_frame();
 	u16 keys = r->keys_after;
+	TLOG_ASSERT(ui_top() == r->view);
 	if (ui_top() == r->view)
 		ui_pop();
 	r->view = 0;
@@ -683,7 +700,7 @@ static int popup_event(u8 node, const struct ui_event *e)
 	if (e->type != UI_EV_KEYS || !r->view)
 		return 0;
 	if (r->dir < 0) {
-		r->keys_after |= e->keys;  // for the page, once it has closed
+		r->keys_after |= e->keys & KEYS_AFTER;  // for the page, once it has closed
 		return 1;
 	}
 	if (e->keys & INPUT_B) {
@@ -745,7 +762,7 @@ const struct ui_ops ui_popup_ops = {
 int ui_popup_open(u8 list, u8 hints, const struct ui_popup *popup)
 {
 	TLOG_ASSERT(!ui_dispatching);
-	if (pp.pop.view)
+	if (run_live(&pp.pop))
 		ui_popup_close();
 	if (!popup || !popup->count || popup->count > UI_POPUP_ITEMS || list == UI_NONE ||
 	    ui_node_spec(list)->kind != UI_LIST) {
@@ -753,6 +770,7 @@ int ui_popup_open(u8 list, u8 hints, const struct ui_popup *popup)
 		tlog_error("%s", ui_error());
 		return 0;
 	}
+	TLOG_ASSERT(hints == UI_NONE || ui_node_spec(hints)->kind == UI_HINTS);
 	// Beside the row where it will rest, its top clamped under the title bar
 	// and over the hint bar
 	s32 row, top;
@@ -794,7 +812,7 @@ s32 ui_popup_choose(void)
 {
 	TLOG_ASSERT(!ui_dispatching);
 	struct run *r = &pp.pop;
-	if (!r->view)
+	if (!run_live(r))
 		return -1;
 	r->answer = ANSWER_NONE;
 	while (r->answer == ANSWER_NONE && ui_top() == r->view)
@@ -808,7 +826,7 @@ s32 ui_popup_choose(void)
 
 void ui_popup_changed(u32 item)
 {
-	if (!pp.pop.view || item >= pp.menu->count)
+	if (!run_live(&pp.pop) || item >= pp.menu->count)
 		return;
 	pp.redraw |= (u16)(1u << item);
 	ui_dirty(pp.pop.node, 1);
@@ -906,7 +924,7 @@ static int confirm_event(u8 node, const struct ui_event *e)
 	if (e->type != UI_EV_KEYS || !r->view)
 		return 0;
 	if (r->dir < 0) {
-		r->keys_after |= e->keys;
+		r->keys_after |= e->keys & KEYS_AFTER;
 		return 1;
 	}
 	if (e->keys & INPUT_B) {
@@ -968,14 +986,14 @@ static void confirm_draw(u8 node)
 		for (s32 y = 0; y < th; y++)
 			for (s32 x = n->x / 8; x < (n->x + n->w) / 8; x++)
 				rows[y * 32 + x] = blank;
-		if (pp.over_popup && pp.pop.view)
+		if (pp.over_popup && run_live(&pp.pop))
 			popup_entries(node, rows, ty, ty + th, 1);
 		st->c.mapped = 0;
 		return;
 	}
 	if (!st->c.mapped) {
 		canvas_whole(node, &st->c, confirm_render);
-		if (pp.over_popup && pp.pop.view)
+		if (pp.over_popup && run_live(&pp.pop))
 			popup_entries(node, ui_map(node), 0, 32, 0);  // not shown yet: straight into the map
 		canvas_map(node, &st->c, pp.bank + 1u);
 		pp.conf.drawn_frame = frame_count();
@@ -999,12 +1017,13 @@ const struct ui_ops ui_confirm_ops = {
 int ui_confirm(u8 hints, const struct ui_confirm *confirm)
 {
 	TLOG_ASSERT(!ui_dispatching);
-	if (pp.conf.view || !confirm)
+	if (run_live(&pp.conf) || !confirm)
 		return 0;
 	pp.ask = confirm;
 	pp.sel = 0;
 	pp.redraw_buttons = 0;
-	pp.over_popup = pp.pop.view && ui_top() == pp.pop.view;
+	TLOG_ASSERT(hints == UI_NONE || ui_node_spec(hints)->kind == UI_HINTS);
+	pp.over_popup = run_live(&pp.pop) && ui_top() == pp.pop.view;
 	s16 rect[4];
 	card_rect(look.conf_x, look.conf_y, look.conf_w, look.conf_h, rect);
 	run_spec(&pp.conf, "confirm", UI_CONFIRM, rect);

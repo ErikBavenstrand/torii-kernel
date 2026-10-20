@@ -795,6 +795,9 @@ void ui_list_cursor_row(u8 node, s32 *y, u32 *h);
 // Like dialogs (dialog.h), the popup and the confirmation run frames until
 // answered: call them from a screen's loop, never from inside ui_frame (an
 // event handler sets a flag; the loop calls them after ui_frame returns).
+// Close the popup before launching or leaving the screen (a run's view
+// popped behind its back is forgotten, but its answer is lost). Pages
+// leave plane 0 to these overlays.
 // While they are up, the page's hint bar (hints, a UI_HINTS node; UI_NONE
 // none) shows their keys, and gets its own back after.
 //
@@ -845,7 +848,7 @@ void ui_popup_close(void);
 
 struct ui_confirm {
 	const char *title;   // one line: "Delete Metroid Fusion?"
-	const char *text;    // one line under it, in ink2: "The save stays."; NULL none
+	const char *text;    // one line under it, in ink3: "The save stays."; NULL none
 	const char *action;  // the right-hand button: "Delete"
 	u8 danger;           // 1: the action destroys something (danger ink)
 };
