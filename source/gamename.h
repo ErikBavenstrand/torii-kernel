@@ -38,26 +38,35 @@ u32 gamename_clean_title(char *out, const char *name);
 
 // 1 if two cleaned names collide: equal but for ASCII case.
 int gamename_same(const char *a, const char *b);
+// The order that goes with it (strcmp's sign, ASCII case folded), so the
+// colliding names of a console sort next to each other.
+int gamename_cmp(const char *a, const char *b);
 
-// Writes the display name of names[self] into out (GAMENAME_MAX + 1 bytes)
-// when names[0..count) all clean to the same name, and returns its length.
-// names are what was cleaned: paths (the folder is the last resort) or CRC
-// names. Each keeps the tags that tell it apart from the others ("Pokemon
-// Emerald (USA)", "Pokemon Emerald (Europe)"); a name that differs only by
-// having no tag there keeps none; two names with the same tags add their
-// folders. The caller groups the colliding names of one console (never
-// across consoles) and calls this once per member; with count 1 it is
-// gamename_clean. Costs count^2 tag comparisons.
+// Appends to out the tags that tell names[self] apart, when the file names
+// names[0..count) (paths) all clean to the same name. out (GAMENAME_MAX + 1
+// bytes) must hold names[self]'s cleaned name (gamename_display's
+// GAMENAME_CLEAN result) on entry; returns its new length, never past
+// GAMENAME_MAX. Each keeps the tags that tell it apart from the others
+// ("Pokemon Emerald (USA)", "Pokemon Emerald (Europe)"); a name with no
+// tag where the other has one keeps none; a tag in the kept-tags table
+// (gamename.c: Rev, Beta, Proto, ...) is preferred over an earlier
+// difference. Two names with the same tags add their folder's name; that
+// doesn't separate two folders of the same name (/A/X and /B/X), which
+// stay alike. The caller groups the colliding names of one console (never
+// across consoles: sort with gamename_cmp, then take runs where
+// gamename_same) and calls this once per member; with count 1 out stays as
+// it is. One call scans the tags of all count names.
 u32 gamename_dedupe(char *out, const char *const *names, u32 count, u32 self);
 
 // --- Custom names: /torii/names.txt ------------------------------------------
 //
 // One game per line: its path from the card's root, a tab, its name, then
 // LF (CRLF and a UTF-8 BOM are read too). Lines that don't start with '/',
-// have no tab, or have an empty name are ignored (so '#' comments work),
-// and when a path appears twice the later line wins. Paths compare without
-// ASCII case, as FAT does. gamename_custom_set writes the file back sorted
-// by path, one valid line per game.
+// have no tab, or have an empty name are ignored, and when a path appears
+// twice the later line wins. Paths compare without ASCII case, as FAT does.
+// gamename_custom_set writes the file back with LF: first the lines that
+// aren't names ('#' comments, notes) as they were, then one line per game
+// sorted by path; blank lines, the BOM and lines with an empty name go.
 
 #define GAMENAME_FILE "/torii/names.txt"
 // Lines kept; a longer file loads but can't be changed (complete stays 0).
@@ -86,6 +95,7 @@ const char *gamename_custom_get(const struct gamename_custom *c, const char *pat
 // path's line; control characters in name become spaces, and it is trimmed
 // and cut to GAMENAME_MAX bytes. To follow a renamed file, get the old
 // path's name, set it on the new path, parse the result and remove the old.
+// out must not overlap c->text, which is read while out is written.
 #define GAMENAME_TOO_BIG 0xFFFFFFFFu
 u32 gamename_custom_set(const struct gamename_custom *c, const char *path, const char *name, char *out, u32 cap);
 

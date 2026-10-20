@@ -129,6 +129,11 @@ void test_gamename_clean_limits(void)
 	CHECK(gamename_same("Pokemon Emerald", "POKEMON emerald"));
 	CHECK(!gamename_same("Pokemon Emerald", "Pokemon Emeral"));
 	CHECK(!gamename_same("Pokémon", "Pokemon"));
+	CHECK(gamename_cmp("abc", "ABD") < 0);
+	CHECK(gamename_cmp("ABD", "abc") > 0);
+	CHECK(gamename_cmp("ab", "abc") < 0);
+	CHECK(gamename_cmp("Zelda", "é") < 0);
+	CHECK_EQ(gamename_cmp("GAME", "game"), 0);
 	free(out);
 }
 
@@ -205,6 +210,31 @@ void test_gamename_dedupe(void)
 	strcat(expected, " (éééééé)");
 	const char *full[] = {deep, other};
 	check_dedupe(full, 2, 0, expected);
+	// Room for one byte: no separator and no empty brackets
+	strcpy(deep, "/éé/");
+	strcpy(other, "/b/");
+	memset(expected, 'x', 252);
+	expected[252] = 0;
+	strcat(deep, expected);
+	strcat(other, expected);
+	strcat(deep, ".gb");
+	strcat(other, ".gb");
+	check_dedupe(full, 2, 0, expected);
+	// Room for one two-byte character
+	expected[250] = 0;
+	deep[6 + 250] = 0;
+	other[3 + 250] = 0;
+	strcat(deep, ".gba");
+	strcat(other, ".gba");
+	strcat(expected, " (é)");
+	check_dedupe(full, 2, 0, expected);
+
+	// A kept tag wins even when the other name has none there: the beta
+	// doesn't pass for the release
+	const char *beta[] = {"/Game (USA, Europe).gba", "/Game (USA) (Beta).gba", "/Game (USA, Europe) (Beta).gba"};
+	check_dedupe(beta, 3, 0, "Game");
+	check_dedupe(beta, 3, 1, "Game (USA) (Beta)");
+	check_dedupe(beta, 3, 2, "Game (USA, Europe) (Beta)");
 }
 
 // --- names.txt ------------------------------------------------------------------
@@ -332,17 +362,18 @@ void test_gamename_custom_set(void)
 
 	// Written back sorted, one line per path, the junk gone
 	custom_parse(m, "/c.gba\tSee\r\n# note\n/A.gba\tAy\n/a.gba\tAy two\n", GAMENAME_CUSTOM_MAX);
-	check_set(m, "/b.gba", " Bee\tline\n ", "/a.gba\tAy two\n/b.gba\tBee line\n/c.gba\tSee\n");
-	check_set(m, "/C.GBA", "Sea", "/a.gba\tAy two\n/C.GBA\tSea\n");
-	check_set(m, "/a.gba", "", "/c.gba\tSee\n");
-	check_set(m, "/a.gba", " \t ", "/c.gba\tSee\n");
-	check_set(m, "/z.gba", "Zed", "/a.gba\tAy two\n/c.gba\tSee\n/z.gba\tZed\n");
-	check_set(m, "/日本.gba", "名前", "/a.gba\tAy two\n/c.gba\tSee\n/日本.gba\t名前\n");
+	check_set(m, "/b.gba", " Bee\tline\n ", "# note\n/a.gba\tAy two\n/b.gba\tBee line\n/c.gba\tSee\n");
+	check_set(m, "/C.GBA", "Sea", "# note\n/a.gba\tAy two\n/C.GBA\tSea\n");
+	check_set(m, "/a.gba", "", "# note\n/c.gba\tSee\n");
+	check_set(m, "/a.gba", " \t ", "# note\n/c.gba\tSee\n");
+	check_set(m, "/z.gba", "Zed", "# note\n/a.gba\tAy two\n/c.gba\tSee\n/z.gba\tZed\n");
+	check_set(m, "/日本.gba", "名前", "# note\n/a.gba\tAy two\n/c.gba\tSee\n/日本.gba\t名前\n");
 
 	// Out of room: refused, never cut
 	char out[20];
 	CHECK_EQ(gamename_custom_set(&m->c, "/b.gba", "Bee", out, sizeof(out)), GAMENAME_TOO_BIG);
-	CHECK_EQ(gamename_custom_set(&m->c, "/a.gba", NULL, out, 12), 11);
+	CHECK_EQ(gamename_custom_set(&m->c, "/a.gba", NULL, out, 17), GAMENAME_TOO_BIG);
+	CHECK_EQ(gamename_custom_set(&m->c, "/a.gba", NULL, out, 18), 18);
 
 	// A set file parses back to the same names
 	char text[1024];
@@ -352,6 +383,9 @@ void test_gamename_custom_set(void)
 	CHECK_EQ(m->c.count, 3);
 	check_get(m, "/b.gba", "Bee");
 	check_get(m, "/a.gba", "Ay two");
+	// Notes stay as they were, BOM, blank and empty-name lines go
+	custom_parse(m, "\xEF\xBB\xBF# top\r\n\n  \nnotes here\n/x.gba\t \n/no tab\n/b\tB\n", GAMENAME_CUSTOM_MAX);
+	check_set(m, "/a", "A", "# top\nnotes here\n/no tab\n/a\tA\n/b\tB\n");
 	free(m->text);
 	free(m);
 }
@@ -416,10 +450,12 @@ void test_gamename_custom_io(void)
 void test_gamename_display(void)
 {
 	struct custom *m = calloc(1, sizeof(*m));
-	custom_parse(m, "/GBA/Zelda (USA).gba\tMy Zelda\n", GAMENAME_CUSTOM_MAX);
+	custom_parse(m, "/GBA/Zelda (USA).gba\tMy Zelda\n/GBA/Tab.gba\tA\tB\n", GAMENAME_CUSTOM_MAX);
 	char *out = malloc(GAMENAME_MAX + 1);
 	CHECK_EQ(gamename_display(out, "/GBA/Zelda (USA).gba", &m->c, "Legend of Zelda, The (USA)"), GAMENAME_CUSTOM);
 	CHECK(strcmp(out, "My Zelda") == 0);
+	CHECK_EQ(gamename_display(out, "/GBA/Tab.gba", &m->c, NULL), GAMENAME_CUSTOM);
+	CHECK(strcmp(out, "A B") == 0);
 	CHECK_EQ(gamename_display(out, "/GBA/Zelda (Europe).gba", &m->c, "Legend of Zelda, The (Europe)"),
 		 GAMENAME_CRC);
 	CHECK(strcmp(out, "The Legend of Zelda") == 0);

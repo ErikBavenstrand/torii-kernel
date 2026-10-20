@@ -117,7 +117,8 @@ static int group_end(const char *s, u32 len, u32 at)
 static u32 step_base(char *out, const char *name, int drop_ext)
 {
 	u32 len = utf8_cut(name, strlen(name), GAMENAME_MAX);
-	memcpy(out, name, len);
+	for (u32 i = 0; i < len; i++)  // the caller ends it
+		out[i] = name[i];
 	if (drop_ext) {
 		u32 ext = 0;
 		while (ext < len && ext <= 4 && (is_ascii_letter(name[len - 1 - ext]) || is_digit(name[len - 1 - ext])))
@@ -283,13 +284,18 @@ u32 gamename_clean_title(char *out, const char *name)
 	return clean(out, name, 0);
 }
 
-int gamename_same(const char *a, const char *b)
+int gamename_cmp(const char *a, const char *b)
 {
 	while (*a && lower(*a) == lower(*b)) {
 		a++;
 		b++;
 	}
-	return lower(*a) == lower(*b);
+	return (int)(unsigned char)lower(*a) - (int)(unsigned char)lower(*b);
+}
+
+int gamename_same(const char *a, const char *b)
+{
+	return gamename_cmp(a, b) == 0;
 }
 
 // --- Dedupe -----------------------------------------------------------------
@@ -305,7 +311,7 @@ struct tags {
 static void tags_of(struct tags *t, const char *name)
 {
 	const char *s = base_of(name);
-	u32 len = (u32)strlen(s);
+	u32 len = utf8_cut(s, (u32)strlen(s), GAMENAME_MAX);  // what cleaning reads
 	t->s = s;
 	t->count = 0;
 	for (u32 i = 0; i < len && t->count < TAGS_MAX; i++) {
@@ -342,14 +348,24 @@ static int tag_kept(const struct tags *t, u32 k)
 	return 0;
 }
 
-// Appends len bytes of s to out (holding *n bytes), as far as GAMENAME_MAX
-// allows, cut at a character boundary
-static void append(char *out, u32 *n, const char *s, u32 len)
+// Appends a space and len bytes of s to out (holding *n bytes), in
+// parentheses if brackets, with s cut at a character boundary to fit
+// GAMENAME_MAX; nothing when none of s fits
+static void append(char *out, u32 *n, const char *s, u32 len, int brackets)
 {
-	len = utf8_cut(s, len, GAMENAME_MAX - *n);
-	memcpy(out + *n, s, len);
-	*n += len;
-	out[*n] = 0;
+	u32 extra = brackets ? 3 : 1, room = GAMENAME_MAX - *n;
+	if (room <= extra)
+		return;
+	len = utf8_cut(s, len, room - extra);
+	if (len == 0)
+		return;
+	out[(*n)++] = ' ';
+	if (brackets)
+		out[(*n)++] = '(';
+	for (u32 i = 0; i < len; i++)
+		out[(*n)++] = s[i];
+	if (brackets)
+		out[(*n)++] = ')';
 }
 
 u32 gamename_dedupe(char *out, const char *const *names, u32 count, u32 self)
@@ -371,8 +387,7 @@ u32 gamename_dedupe(char *out, const char *const *names, u32 count, u32 self)
 				continue;
 			if (first < 0)
 				first = (int)k;
-			if (kept < 0 && k < mine.count && k < other.count &&
-			    (tag_kept(&mine, k) || tag_kept(&other, k)))
+			if (kept < 0 && (tag_kept(&mine, k) || tag_kept(&other, k)))
 				kept = (int)k;
 		}
 		if (first < 0)
@@ -384,8 +399,7 @@ u32 gamename_dedupe(char *out, const char *const *names, u32 count, u32 self)
 	for (u32 k = 0; k < mine.count; k++) {
 		if (!(positions & (1u << k)))
 			continue;
-		append(out, &n, " ", 1);
-		append(out, &n, mine.s + mine.at[k], mine.len[k]);
+		append(out, &n, mine.s + mine.at[k], mine.len[k], 0);
 	}
 	if (same_tags) {
 		// The folder the name is in, if it isn't the root
@@ -394,11 +408,10 @@ u32 gamename_dedupe(char *out, const char *const *names, u32 count, u32 self)
 			const char *folder = end - 1;
 			while (folder > name && folder[-1] != '/')
 				folder--;
-			append(out, &n, " (", 2);
-			append(out, &n, folder, (u32)(end - 1 - folder));
-			append(out, &n, ")", 1);
+			append(out, &n, folder, (u32)(end - 1 - folder), 1);
 		}
 	}
+	out[n] = 0;
 	return n;
 }
 
@@ -570,7 +583,7 @@ u32 gamename_custom_set(const struct gamename_custom *c, const char *path, const
 	// The new name, trimmed of spaces and control characters at both ends
 	u32 name_len = 0;
 	if (name) {
-		while ((unsigned char)*name <= ' ' && *name)
+		while (*name && ((unsigned char)*name <= ' ' || *name == 0x7F))
 			name++;
 		name_len = (u32)strlen(name);
 		while (name_len > 0 && ((unsigned char)name[name_len - 1] <= ' ' || name[name_len - 1] == 0x7F))
@@ -578,6 +591,17 @@ u32 gamename_custom_set(const struct gamename_custom *c, const char *path, const
 		name_len = utf8_cut(name, name_len, GAMENAME_MAX);
 	}
 	u32 n = 0;
+	// Lines that aren't names (comments, notes) stay, first and in order
+	u32 at = c->len >= 3 && memcmp(c->text, "\xEF\xBB\xBF", 3) == 0 ? 3 : 0;
+	while (at < c->len) {
+		u32 end = line_end(c, at), stop = end;
+		while (stop > at && (unsigned char)c->text[stop - 1] <= ' ')
+			stop--;
+		int entry = c->text[at] == '/' && memchr(c->text + at, '\t', end - at);
+		if (stop > at && !entry && (!put(out, cap, &n, c->text + at, stop - at) || !put(out, cap, &n, "\n", 1)))
+			return GAMENAME_TOO_BIG;
+		at = end + 1;
+	}
 	int placed = name_len == 0;  // removing: nothing to place
 	for (u32 i = 0; i <= c->count; i++) {
 		int d = i < c->count ? path_cmp_key(c, c->line[i], path) : 1;
@@ -588,10 +612,10 @@ u32 gamename_custom_set(const struct gamename_custom *c, const char *path, const
 		}
 		if (i == c->count || d == 0)
 			continue;
-		u32 at = c->line[i], len;
-		const char *tab = memchr(c->text + at, '\t', c->len - at);
-		const char *old = line_name(c, at, &len);
-		if (!put_line(out, cap, &n, c->text + at, (u32)(tab - (c->text + at)), old, len))
+		u32 from = c->line[i], len;
+		const char *tab = memchr(c->text + from, '\t', c->len - from);
+		const char *old = line_name(c, from, &len);
+		if (!put_line(out, cap, &n, c->text + from, (u32)(tab - (c->text + from)), old, len))
 			return GAMENAME_TOO_BIG;
 	}
 	return n;
@@ -624,7 +648,8 @@ enum gamename_source gamename_display(char *out, const char *path, const struct 
 	u32 len;
 	const char *name = custom ? gamename_custom_get(custom, path, &len) : NULL;
 	if (name) {
-		memcpy(out, name, len);
+		for (u32 i = 0; i < len; i++)  // a tab in a hand-edited name
+			out[i] = (unsigned char)name[i] < ' ' || name[i] == 0x7F ? ' ' : name[i];
 		out[len] = 0;
 		return GAMENAME_CUSTOM;
 	}
