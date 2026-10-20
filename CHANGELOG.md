@@ -4,6 +4,14 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Added:** names and hidden files: hardware-free `gamename.c` turns file
+  names into clean display names, tells colliding games apart by their
+  differing tags, reads and writes `/torii/names.txt` (custom names, moved
+  with a renamed file), and decides which SD entries stay hidden (B4;
+  `818f4e8`, `2ea8907`, `cafc8bf`, `9124ea7`).
+
 ## v0.3.0 (2026-10-19)
 
 Tested on a real Omega DE: the new mode 0 menu engine, SD themes, and the
