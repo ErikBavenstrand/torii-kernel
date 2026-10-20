@@ -15,7 +15,8 @@ extern const struct nav_page info_page;
 
 // The strings (lang.c's en_info, gl_info): the rows' names and what each
 // holds, the reading pages' texts and the parts the filled-in ones are
-// made of. A "%s" or "%lu" stands for what the page fills in.
+// made of. "%s", the only placeholder, stands for what the page fills
+// in, in order.
 enum info_string {
 	INFO_S_CONTROLS,  // the rows' names
 	INFO_S_INGAME,
@@ -24,7 +25,7 @@ enum info_string {
 	INFO_S_DIAG,
 	INFO_S_CONTROLS_DETAIL,  // what each row holds, right-aligned
 	INFO_S_INGAME_DETAIL,
-	INFO_S_CART_DETAIL,  // %lu: the game NOR's MB
+	INFO_S_CART_DETAIL,  // %s: the game NOR's MB
 	INFO_S_ABOUT_DETAIL,  // %s: the version
 	INFO_S_DIAG_DETAIL,
 	INFO_S_SCROLL,  // the reading pages' hint
@@ -40,17 +41,17 @@ enum info_string {
 	INFO_S_INGAME_SLEEP_OFF,
 	INFO_S_INGAME_END,
 	// Your cart
-	INFO_S_CART_START,  // %lu: the game NOR's MB
-	INFO_S_CART_GAMES,  // "# On the SD card"
+	INFO_S_CART_START,  // %s: the game NOR's MB
+	INFO_S_CART_GAMES,  // "# Games on the card"
 	INFO_S_CART_CONSOLE,  // %s: a console, %s: its count ("176 games")
 	INFO_S_CART_FILES,    // %s: files on the card ("1,204 files")
-	INFO_S_CART_NOR,      // %s: its games ("3 games"), %lu MB used, %lu MB in all
+	INFO_S_CART_NOR,      // %s: its games ("3 games"), %s MB used, %s MB in all
 	INFO_S_CART_NOR_EMPTY,
-	INFO_S_CART_LISTS,  // %lu favourites, %lu on Recent, %lu: Recent's most
+	INFO_S_CART_LISTS,  // %s favourites, %s on Recent, %s: Recent's most
 	INFO_S_CART_END,
 	// About
 	INFO_S_ABOUT_TORII,  // %s: the version, %s: the build ID
-	INFO_S_ABOUT_CART,   // %s: the revision, %lu: the FPGA firmware
+	INFO_S_ABOUT_CART,   // %s: the revision, %s: the FPGA firmware
 	INFO_S_ABOUT_REV_A,  // the revisions' names
 	INFO_S_ABOUT_REV_B,
 	INFO_S_ABOUT_CARD,   // %s: its size, %s: free, %s: its file system
@@ -60,10 +61,10 @@ enum info_string {
 	INFO_STRINGS
 };
 
-// What About shows as Torii's version and build ID: filled from
-// TORII_VERSION and the build ID the first time About opens, unless a
-// golden wrote them first (mgba-shot -P), so its screens don't change with
-// every build and release.
+// What Info shows as Torii's version (the About row, the About page) and
+// build ID: filled from TORII_VERSION and the build ID the first time the
+// Info page opens, unless a golden wrote them first (mgba-shot -P), so its
+// screens don't change with every build and release.
 extern char info_version[16];
 extern char info_build[12];
 

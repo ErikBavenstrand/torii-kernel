@@ -55,7 +55,7 @@ static const struct ui_card_config diag_card = {4, 3, 4, 1, 0};  // its row 3 px
 static const struct ui_card_config read_card = {4, 4, 4, 4, 0};
 
 #define OPEN_MEASURE_FRAMES 3  // frames measured after a reading page is pushed (its hidden first draw)
-#define NOR_MB 64              // the game NOR
+#define NOR_MB 64              // the game NOR (NORflash_OP.c's NOR_GAME_SIZE)
 #define INFO_TEXT_BYTES 2048   // a reading page's text, filled in
 #define INFO_ROWS 96           // its rows, wrapped
 
@@ -120,19 +120,24 @@ static u32 item_row(u32 item)
 static u32 fill(char *out, u32 at, u32 size, const char *tmpl, const char *a, const char *b, const char *c)
 {
 	const char *args[3] = {a, b, c};
-	u32 n = 0, room = size - 1;
+	u32 n = 0, room = size - 1, cut = 0;
 	for (const char *s = tmpl; *s; s++) {
 		if (s[0] == '%' && s[1] == 's') {
 			const char *arg = n < 3 && args[n] ? args[n] : "";
 			n++;
 			s++;
-			while (*arg && at < room)
-				out[at++] = *arg++;
+			for (; *arg; arg++)
+				if (at < room)
+					out[at++] = *arg;
+				else
+					cut = 1;
 		} else if (at < room) {
 			out[at++] = *s;
+		} else {
+			cut = 1;
 		}
 	}
-	TLOG_ASSERT(at < room);  // it all fitted
+	TLOG_ASSERT(!cut);  // it all fitted
 	out[at] = 0;
 	return at;
 }
@@ -472,9 +477,11 @@ static int read_event(struct ui_view *v, const struct ui_event *e)
 	}
 }
 
+// Measures the frames that draw a view just pushed, from the next one
 static void measure(void)
 {
-	info.measure_left = OPEN_MEASURE_FRAMES;
+	frame_measure("info-page");
+	info.measure_left = OPEN_MEASURE_FRAMES - 1;
 }
 
 // Fades the rows out and row's reading page in (after the frame)

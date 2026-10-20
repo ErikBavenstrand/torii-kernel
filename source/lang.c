@@ -279,7 +279,7 @@ const char *en_info[INFO_STRINGS] = {
 		"# Home\n" LR "\tturn the carousel\n"
 		"A\topen the item\n"
 		"# Every page\n"
-		"B\tback to the carousel\n"
+		"B\tback, towards the carousel\n"
 		"L R\tpage up, page down\n"
 		"# Game lists\n"
 		"^v\tmove\n" LR "\tjump to the next or previous letter\n"
@@ -316,7 +316,7 @@ const char *en_info[INFO_STRINGS] = {
 				"Hold %s to leave the game for the menu.\n",
 	[INFO_S_INGAME_RESET_OFF] = "# Back to the menu\n"
 				    "Off: turn Reset hotkey on in Settings, or switch the GBA off and on.\n",
-	[INFO_S_INGAME_CHEATS] = "In a game with a cheat file, %s opens the in-game menu instead, with its cheats.\n",
+	[INFO_S_INGAME_CHEATS] = "In a game with a cheat file, %s still opens the in-game menu, with its cheats.\n",
 	[INFO_S_INGAME_SLEEP] = "# Sleep\n"
 				"Hold %s to put the game to sleep: the screen goes off. START and SELECT wake it.\n",
 	[INFO_S_INGAME_SLEEP_OFF] = "# Sleep\n"

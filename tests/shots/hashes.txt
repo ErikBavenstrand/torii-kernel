@@ -120,20 +120,20 @@ info-about/about-end 1FBECA9B24D5C3DC
 info-about/cart A9C987376B088C44
 info-about/ingame 001FF409A6E2CE10
 info-read/back E434584DE986A1E1
-info-read/controls BF93E2F0217B5148
+info-read/controls 54C881529D44B1FA
 info-read/last 37F6085E6552C39D
 info-read/last-down 37F6085E6552C39D
-info-read/scrolled 4EB6AAF78B8B19F2
+info-read/scrolled E7C516944F344150
 info-read/frames 0-1 E434584DE986A1E1
 info-read/frames 2-2 2F0DB67D39E5384B
 info-read/frames 3-3 76E98C19EAC6FE78
 info-read/frames 4-8 47778893E1D42B25
-info-read/frames 9-9 1D69BA9FE51C372C
-info-read/frames 10-10 CACA718907D1DDB3
-info-read/frames 11-11 7E6A16460A1823D3
-info-read/frames 12-12 1A2565267E9A6031
-info-read/frames 13-13 DA7FF4E4607EC348
-info-read/frames 14-22 BF93E2F0217B5148
+info-read/frames 9-9 7C6306319EBB10AA
+info-read/frames 10-10 1792FB52E36632D5
+info-read/frames 11-11 30B5EE137AEFFF25
+info-read/frames 12-12 8F8A72A0CEF7815F
+info-read/frames 13-13 6FB49346DC4823FA
+info-read/frames 14-22 54C881529D44B1FA
 nav-push-fail/error 8DA1D73368B07BC5
 nav-push-fail/page B62B7D8B2814CB3F
 nor-launch-fail/back F0C1005F0AD879FC
