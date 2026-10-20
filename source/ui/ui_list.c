@@ -16,10 +16,18 @@
 //   entries, through the staging area, so it shows in one
 //   VBlank: text is never redrawn for it.
 // - A jump too far to scroll to in a few frames (a new folder, a wrap from
-//   the end to the start) is a page change: the plane is hidden at the
-//   next commit, the rows on screen are drawn the frame after (the rest
-//   fill in later), and the plane fades in from the next VBlank
-//   (ui_plane_reveal).
+//   the end to the start) is a page change: the old page fades out
+//   (ui_plane_fade_out) while the new page's rows are drawn ahead into the
+//   row cache, a few each frame; then the plane is hidden, the rows on
+//   screen are copied in from the cache (or drawn) the frame after, within
+//   UI_PAGE_BUDGET (the rest fill in later), and the plane fades in from the
+//   next VBlank (ui_plane_reveal).
+// - Drawn rows are kept in a cache keyed by item (ui/rowcache.h), in EWRAM:
+//   a row is copied there from its slot when the slot goes to another row
+//   (so a screen's first page costs nothing more to draw), and a row
+//   scrolled back to is copied in, not drawn. A model says when an item's
+//   row changes (ui_list_refresh, or ui_list_reset for a new model), which
+//   drops it.
 // - With UI_LIST_MARQUEE, a cut name on the selected row scrolls after the
 //   cursor rests: two extra slots, wider than a row, take turns, flipped by
 //   map in VBlank. Glyphs slide in and out at both edges: the slots have
@@ -28,6 +36,7 @@
 #include <string.h>
 
 #include "ring.h"
+#include "rowcache.h"
 #include "ui_priv.h"
 #include "../engine/cycles.h"
 #include "../engine/frame.h"
@@ -38,6 +47,7 @@
 
 enum {
 	PAGE_NONE,
+	PAGE_FADING,  // the old page fades out
 	PAGE_HIDING,  // waiting for the plane to be off screen
 	PAGE_DRAW,    // rows assigned: draw the visible ones, then reveal the plane
 };
@@ -51,6 +61,7 @@ enum {
 
 #define MQ_MARGIN 2  // hidden tile columns each side of a marquee slot
 #define ROW_GUESS 30000  // cycles a row may take, before one has been timed
+#define ROW_COPY 4000    // cycles a row copied from the cache takes, at most
 // The scroll's spring brakes stiffer when a glide ends, so the list stops
 // within about a row of where the key was let go
 #define SPRING_BRAKE 0x18000  // 1.5
@@ -65,6 +76,8 @@ struct list_state {
 	u8 sel_ok;  // the map shows the selection at sel_drawn
 	u8 plain;   // UI_LIST_PLAIN: nothing shows as selected
 	u8 queued_a;  // A pressed during a page change: dispatched once it is drawn
+	u8 predrawn;  // a page change's rows are all in the cache
+	u32 owner;    // its rows' owner in the row cache
 	u32 count, rows;
 	u32 cursor;
 	u32 sel_drawn;  // the item whose map entries are in the selected bank
@@ -91,6 +104,7 @@ struct list_state {
 	u32 dirty;   // slots to draw: the window's dirty-row mask
 	u32 fresh;   // slots given a new row: their map rows need writing
 	u32 blank;   // slots holding nothing but paper: no clear needed
+	u32 stale;   // slots whose row changed since it was drawn (ui_list_refresh)
 	u32 lo, hi;  // resident rows
 	u32 plo, phi;
 	u32 row_cycles;  // what the last row took to draw (hidden drawing's budget)
@@ -121,6 +135,22 @@ struct row_ctx {
 static const struct ui_list_config *config(u8 node)
 {
 	return ui_node_spec(node)->data;
+}
+
+// The row cache every list shares
+static u32 cache_arena[ROW_CACHE_BYTES / 4] EWRAM_BSS ALIGN(4);
+static struct row_cache cache EWRAM_BSS;
+
+static struct row_cache *row_cache(void)
+{
+	if (!cache.arena)
+		row_cache_init(&cache, cache_arena, ROW_CACHE_BYTES / 4);
+	return &cache;
+}
+
+void ui_list_cache_clear(void)
+{
+	row_cache_clear(row_cache());
 }
 
 static int marquee(u8 node)
@@ -247,7 +277,7 @@ static void forget_slots(struct list_state *st)
 	st->lo = 1;
 	st->hi = 0;
 	st->plo = st->phi = 0xFFFFFFFF;
-	st->dirty = st->fresh = 0;
+	st->dirty = st->fresh = st->stale = 0;
 }
 
 static s32 goal_px(const struct list_state *st)
@@ -263,7 +293,7 @@ static u16 glide_key(u16 key, u32 old, u32 cursor)
 	const InputState *in = ui_input();
 	if (!(key & in->fire & ~in->pressed & in->repeating))
 		return 0;
-	u16 down = INPUT_DOWN | INPUT_R, up = INPUT_UP | INPUT_L;
+	u16 down = INPUT_DOWN | INPUT_RIGHT | INPUT_R, up = INPUT_UP | INPUT_LEFT | INPUT_L;
 	return cursor > old ? key & down : cursor < old ? key & up : 0;
 }
 
@@ -341,9 +371,17 @@ static void page_change(u8 node, struct list_state *st, s32 target)
 		ui_dirty(node, 1);
 		return;
 	}
-	st->page = PAGE_HIDING;
+	// The old page fades out first, unless it can't: then it goes at once
+	u32 plane = ui_node_spec(node)->plane;
 	st->page_target = target;
-	ui_plane_hide(ui_node_spec(node)->plane, 1);
+	st->predrawn = 0;
+	if (ui_plane_fade_out(plane)) {
+		st->page = PAGE_FADING;
+	} else {
+		st->page = PAGE_HIDING;
+		ui_plane_hide(plane, 1);
+	}
+	ui_dirty(node, 1);
 }
 
 static void set_cursor(u8 node, struct list_state *st, u32 cursor, u16 key)
@@ -364,9 +402,10 @@ static void set_cursor(u8 node, struct list_state *st, u32 cursor, u16 key)
 	// During a page change, from where its page will be
 	s32 from = st->page != PAGE_NONE ? st->page_target : st->target;
 	s32 target = ring_scroll_for(&st->ring, cursor, from, st->rows, 1);
-	if (st->page != PAGE_NONE)
+	if (st->page != PAGE_NONE) {
 		st->page_target = target;
-	else if (ring_far(&st->ring, st->shown, target))
+		st->predrawn = 0;
+	} else if (ring_far(&st->ring, st->shown, target))
 		page_change(node, st, target);
 	else {
 		st->target = target;
@@ -398,6 +437,7 @@ static int list_init(u8 node)
 void ui_list_reset(u8 node, u32 cursor)
 {
 	struct list_state *st = ui_node_state(node);
+	st->owner = row_cache_owner(row_cache());  // a new model: no row drawn yet
 	st->count = model_count(node);
 	st->rows = st->count;
 	if (cursor >= st->count)
@@ -416,10 +456,14 @@ void ui_list_reset(u8 node, u32 cursor)
 void ui_list_refresh(u8 node, u32 lo, u32 hi)
 {
 	struct list_state *st = ui_node_state(node);
+	row_cache_forget(row_cache(), st->owner, lo, hi);
+	st->predrawn = 0;
 	for (u32 s = 0; s < st->ring.k; s++) {
 		u32 r = st->slot_row[s];
 		if (r != UI_ITEM_NONE && r >= lo && r <= hi)
 			st->dirty |= 1u << s;
+		if (st->drawn_row[s] != UI_ITEM_NONE && st->drawn_row[s] >= lo && st->drawn_row[s] <= hi)
+			st->stale |= 1u << s;
 	}
 	if (st->mq_set != 0xFF && st->cursor >= lo && st->cursor <= hi)
 		marquee_reset(node, st);
@@ -491,7 +535,7 @@ int ui_list_paging(u8 node)
 void ui_list_page_label(u8 node, u8 label, const char *text)
 {
 	struct list_state *st = ui_node_state(node);
-	if (st->page != PAGE_HIDING) {
+	if (st->page != PAGE_FADING && st->page != PAGE_HIDING) {
 		ui_label_set(label, text);
 		return;
 	}
@@ -653,6 +697,18 @@ static void list_update(u8 node, u32 dt)
 	const struct ui_view *v = ui_node_view(node);
 	if (n->flags & UI_N_HIDDEN)
 		return;  // its plane is off (ui_run.c); rows stay as they are
+	// The new page's rows are drawn ahead (list_draw) until they all are
+	if (st->page != PAGE_NONE && !st->predrawn)
+		ui_dirty(node, 1);
+	if (st->page == PAGE_FADING) {
+		if (ui_plane_fading_out(spec->plane)) {
+			ui_wake();
+		} else {
+			// Faded out: off screen from this frame's regs
+			st->page = PAGE_HIDING;
+			ui_plane_hide(spec->plane, 1);
+		}
+	}
 	if (st->page == PAGE_HIDING) {
 		if (!ui_plane_hidden_now(spec->plane)) {
 			ui_wake();
@@ -826,6 +882,70 @@ static void draw_marquee(const struct list_state *st, const struct row_ctx *rc, 
 		draw_detail(&win, rc, m, item.detail, &line);
 }
 
+static const u32 *cached_row(const struct list_state *st, u32 r)
+{
+	return row_cache_find(row_cache(), st->owner, r, st->tw, st->rt * 8u);
+}
+
+// Puts row r into a slot's tiles (or the refresh pool's): copied from the
+// row cache (cached: row_cache_find's answer), or drawn, cleared first
+// unless blank. 1 if anything but paper is there.
+static int render_row(struct list_state *st, const struct row_ctx *rc, u32 *tiles, u32 r, int blank, const u32 *cached)
+{
+	if (cached) {
+		row_cache_copy_out(cached, tiles, st->tw, st->rt * 8u, st->rt * 8u);
+		return 1;
+	}
+	u32 start = cycles_now();
+	int drew = draw_row(st, rc, tiles, r, blank);
+	st->row_cycles = cycles_since(start);
+	return drew;
+}
+
+static int refresh_pending(u8 node, u32 s);
+
+// Before slot s of node's list takes another row: the row its tiles hold
+// goes into the row cache, if they hold it as the model has it now and it
+// isn't there yet
+static void keep_row(u8 node, struct list_state *st, u32 s)
+{
+	u32 r = st->drawn_row[s], bit = 1u << s, lines = st->rt * 8u;
+	if (r == UI_ITEM_NONE || ((st->blank | st->stale) & bit) || refresh_pending(node, s) || cached_row(st, r))
+		return;
+	u32 *row = row_cache_put(row_cache(), st->owner, r, st->tw, lines);
+	if (row)
+		row_cache_copy_in(row, tile_addr(ui_node_spec(node)->plane, slot_tile(st, s)), st->tw, lines, lines);
+}
+
+// While a page change fades the old page out and hides it, the new page's
+// rows are drawn into the row cache, within the budget, so its first hidden
+// frame only copies them in. Not when the page doesn't fit in the cache.
+static void predraw(u8 node, struct list_state *st, const struct row_ctx *rc)
+{
+	u32 lo, hi, lines = st->rt * 8u;
+	ring_resident(&st->ring, st->page_target, 0, st->rows, &lo, &hi);
+	if (lo > hi || (hi - lo + 1) * st->tw * lines > ROW_CACHE_BYTES / 4) {
+		st->predrawn = 1;
+		return;
+	}
+	for (u32 r = lo; r <= hi; r++) {
+		if (cached_row(st, r))
+			continue;
+		if (!ui_draw_room(st->row_cycles ? st->row_cycles : ROW_GUESS, UI_PAGE_BUDGET)) {
+			ui_dirty(node, 1);  // the rest next frame
+			return;
+		}
+		u32 *row = row_cache_put(row_cache(), st->owner, r, st->tw, lines);
+		if (!row)
+			break;
+		u32 start = cycles_now();
+		if (!draw_row(st, rc, row, r, 0))
+			row_cache_forget(row_cache(), st->owner, r, r);  // not loaded yet
+		st->row_cycles = cycles_since(start);
+	}
+	st->predrawn = 1;
+}
+
 // A row redrawn in its slot while the list shows (ui_list_refresh) is drawn
 // here, then copied over the slot's tiles in VBlank with the frame's other
 // changes: drawn straight into a slot on screen, it tore while the screen
@@ -866,11 +986,12 @@ static int refresh_row(u8 node, struct list_state *st, const struct row_ctx *rc,
 	u32 words = (u32)st->tw * st->rt * 8;
 	if (refresh_count == REFRESH_ROWS || refresh_used + words > REFRESH_WORDS)
 		return 0;
-	u32 *tiles = refresh_tiles + refresh_used, start = cycles_now();
-	if (draw_row(st, rc, tiles, r, 0))
+	u32 *tiles = refresh_tiles + refresh_used;
+	if (render_row(st, rc, tiles, r, 0, cached_row(st, r)))
 		st->blank &= ~(1u << s);
 	else
 		st->blank |= 1u << s;
+	st->stale &= ~(1u << s);
 	if (!gfx_queue_copy(tile_addr(ui_node_spec(node)->plane, slot_tile(st, s)), tiles, words * 4))
 		return 0;
 	refresh_ticket = gfx_queue_ticket();
@@ -878,7 +999,6 @@ static int refresh_row(u8 node, struct list_state *st, const struct row_ctx *rc,
 	refresh_owner[refresh_count] = (u8)(node + 1);
 	refresh_slot[refresh_count++] = (u8)s;
 	st->drawn_row[s] = (u16)r;
-	st->row_cycles = cycles_since(start);
 	return 1;
 }
 
@@ -886,10 +1006,15 @@ static void list_draw(u8 node)
 {
 	struct list_state *st = ui_node_state(node);
 	const struct ui_spec *spec = ui_node_spec(node);
-	if (st->page == PAGE_HIDING || (ui_node(node)->flags & UI_N_HIDDEN))
+	if (ui_node(node)->flags & UI_N_HIDDEN)
 		return;
 	struct row_ctx rc;
 	row_ctx_init(node, st, &rc);
+	if (st->page == PAGE_FADING || st->page == PAGE_HIDING) {
+		if (!st->predrawn)
+			predraw(node, st, &rc);
+		return;
+	}
 	u16 *map = ui_map(node);
 	// A page's rows show the cursor it started with; one that moved since
 	// is restaged once the page is up
@@ -906,11 +1031,17 @@ static void list_draw(u8 node)
 		u32 bit = 1u << s;
 		if (!(st->dirty & bit))
 			continue;
-		if (hidden && !ui_draw_room(st->row_cycles ? st->row_cycles : ROW_GUESS)) {
+		u32 r = st->slot_row[s];
+		const u32 *cached = r != UI_ITEM_NONE ? cached_row(st, r) : 0;
+		// The row's draw or copy, and keep_row's copy of the row it replaces
+		u32 need = cached ? ROW_COPY : st->row_cycles ? st->row_cycles : ROW_GUESS;
+		if ((st->fresh & bit) && st->drawn_row[s] != UI_ITEM_NONE)
+			need += ROW_COPY;
+		u32 budget = st->page == PAGE_DRAW ? UI_PAGE_BUDGET : UI_DRAW_BUDGET;
+		if (hidden && !ui_draw_room(need, budget)) {
 			ui_dirty(node, 1);  // the rest next frame
 			return;
 		}
-		u32 r = st->slot_row[s];
 		int pending = refresh_pending(node, s);
 		if (r != UI_ITEM_NONE && (pending || (!hidden && !(st->fresh & bit)))) {
 			// Its slot's refresh copy hasn't landed, or it is one to make
@@ -928,15 +1059,19 @@ static void list_draw(u8 node)
 				if (st->drawn_row[s] != UI_ITEM_NONE)
 					TLOG_ASSERT(!map_row_live(node, st, ring_map_row(&st->ring, st->drawn_row[s])));
 			}
+			if ((st->fresh & bit) && st->drawn_row[s] != UI_ITEM_NONE) {
+				keep_row(node, st, s);
+				cached = cached_row(st, r);  // keeping it may have taken r's space
+			}
 			st->drawn_row[s] = (u16)r;
-			u32 start = cycles_now();
-			if (draw_row(st, &rc, tile_addr(spec->plane, slot_tile(st, s)), r, (st->blank & bit) != 0))
+			u32 *tiles = tile_addr(spec->plane, slot_tile(st, s));
+			if (render_row(st, &rc, tiles, r, (st->blank & bit) != 0, cached))
 				st->blank &= ~bit;
 			else
 				st->blank |= bit;
+			st->stale &= ~bit;
 			if (st->fresh & bit)
 				row_entries(st, map + ring_map_row(&st->ring, r) * 32, r, s, sel);
-			st->row_cycles = cycles_since(start);
 		}
 		st->dirty &= ~bit;
 		st->fresh &= ~bit;

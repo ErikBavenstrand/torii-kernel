@@ -15,7 +15,7 @@
 -s @180:marquee.png
 -k @190:L -k @194:- -k @200:UP -k @204:- -k @210:UP -k @214:-
 -k @240:UP -k @244:-
--H @240:@252
+-H @240:@258
 -s @270:wrapped.png
 # Keys during a page change wait for its page: DOWN at the end wraps to 1
 # and A a frame later opens item 1's dialog once the page is up; three L one

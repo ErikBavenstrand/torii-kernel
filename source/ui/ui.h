@@ -231,6 +231,8 @@ struct ui_motions {
 //   marquee_gap         px it scrolls past the name's end before that pause
 //   page_fade           frames a list fades in over after a page change
 //                       (0: it just shows)
+//   page_fade_out       frames the old page fades out over before it
+//                       (0: it goes at once)
 //   transition          how screens replace each other, per ui_tr_kind (ui_leave)
 //   input               key repeat and wrap timings (engine/input.h)
 struct ui_theme {
@@ -256,6 +258,7 @@ struct ui_theme {
 	u8 marquee_pause;
 	u8 marquee_gap;
 	u8 page_fade;
+	u8 page_fade_out;
 	u8 dialog_in;
 	u8 dialog_out;
 	struct ui_transition transition[UI_TR_KINDS];
@@ -629,7 +632,10 @@ void ui_progress_drew(u8 node, u32 x);
 // the list redraws as a page change.
 void ui_list_reset(u8 node, u32 cursor);
 // Items lo to hi have loaded (or changed): rows showing them redraw. A row
-// on screen redraws in place, so it may tear for one frame.
+// on screen redraws in place, so it may tear for one frame. Lists keep
+// drawn rows in a cache keyed by item (ui/rowcache.h) and show them again
+// when they scroll back: an item whose row would draw differently must be
+// refreshed even while off screen (or the list reset).
 void ui_list_refresh(u8 node, u32 lo, u32 hi);
 void ui_list_set_cursor(u8 node, u32 cursor);
 // As ui_list_set_cursor, for a move key made: a repeat of a held key makes

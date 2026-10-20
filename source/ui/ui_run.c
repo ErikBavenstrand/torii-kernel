@@ -50,10 +50,11 @@ enum {
 // is under it (one blend at a time); closing runs it backwards
 #define OPEN_FADE (UI_OPEN / 3)
 
-// A page's fade-in (ui_plane_reveal)
+// A page's fade-in (ui_plane_reveal), or the old page's fade-out before it
+// (ui_plane_fade_out)
 enum {
 	REVEAL_OFF,
-	REVEAL_ASKED,    // the next regs show the plane, faded all the way
+	REVEAL_ASKED,    // the next regs show the plane at its first step
 	REVEAL_WRITTEN,  // those regs wait for their commit (DISPCNT may be held)
 	REVEAL_RUN,      // on screen: one step a frame
 };
@@ -94,11 +95,12 @@ static struct {
 	// view, and keys queued for the next frames (keyq.h)
 	struct keyq keys;
 	u32 pop_frame;
-	// A page's fade-in
+	// A page's fade-in or fade-out
 	u8 reveal;        // REVEAL_*
+	u8 reveal_out;    // 1: the fade-out
 	u8 reveal_plane;
 	u8 reveal_step;   // frames of it shown, of reveal_frames
-	u8 reveal_frames; // the theme's page_fade when it started
+	u8 reveal_frames; // the theme's page_fade (page_fade_out) when it started
 	u32 reveal_frame; // the frame whose regs showed the plane
 	// Screen transitions: the half running goes from level, x and y 0 to 1
 	// (level 0 shown, UI_OPEN gone; x, y the screen's offset in px)
@@ -334,8 +336,52 @@ void ui_plane_reveal(u32 plane)
 	ui_plane_hide(plane, 0);
 	ui.reveal_frames = ui_theme()->page_fade;
 	ui.reveal = ui.reveal_frames > 1 ? REVEAL_ASKED : REVEAL_OFF;
+	ui.reveal_out = 0;
 	ui.reveal_plane = (u8)plane;
 	ui.reveal_step = 1;
+}
+
+// The plane's blend level (eva, 0-16) at a step of the fade running
+static u32 reveal_eva(u32 step)
+{
+	u32 eva = 16u * step / ui.reveal_frames;
+	return ui.reveal_out ? 16 - eva : eva;
+}
+
+static s32 modal_dim_now(void);
+
+int ui_plane_fade_out(u32 plane)
+{
+	u32 frames = ui_theme()->page_fade_out;
+	if (ui.reveal != REVEAL_OFF && ui.reveal_plane == plane) {
+		if (ui.reveal_out)
+			return 1;  // already going
+		if (frames > 1) {
+			// Fading in: out from where it is
+			u32 eva = reveal_eva(ui.reveal_step);
+			ui.reveal_out = 1;
+			ui.reveal_frames = (u8)frames;
+			ui.reveal_step = (u8)((16 - eva) * frames / 16);
+			ui.reveal_step = ui.reveal_step ? ui.reveal_step : 1;
+			ui_wake();
+			return 1;
+		}
+	}
+	// One fade at a time; none while a darken blend is on (regs_update)
+	if (frames <= 1 || ui.reveal != REVEAL_OFF || (ui.hidden >> plane & 1) || ui.dim_y > 0 || modal_dim_now() > 0)
+		return 0;
+	ui.reveal = REVEAL_ASKED;
+	ui.reveal_out = 1;
+	ui.reveal_plane = (u8)plane;
+	ui.reveal_frames = (u8)frames;
+	ui.reveal_step = 1;
+	ui_wake();
+	return 1;
+}
+
+int ui_plane_fading_out(u32 plane)
+{
+	return ui.reveal != REVEAL_OFF && ui.reveal_out && ui.reveal_plane == plane;
 }
 
 // One frame of the fade-in: a step once the regs showing the plane are on
@@ -354,9 +400,9 @@ static void reveal_tick(u32 dt)
 	}
 }
 
-int ui_draw_room(u32 cycles)
+int ui_draw_room(u32 cycles, u32 budget)
 {
-	return frame_elapsed() + cycles <= UI_DRAW_BUDGET;
+	return frame_elapsed() + cycles <= budget;
 }
 
 int ui_plane_owned(u8 node)
@@ -401,6 +447,7 @@ static void load_palette(u32 banks)
 void ui_theme_set(const struct ui_theme *theme)
 {
 	ui_theme_select(theme);
+	ui_list_cache_clear();  // rows may draw differently
 	ui.in.timing = &ui_theme()->input;
 	load_palette(UI_BANKS);
 	ui_wake();
@@ -961,7 +1008,7 @@ static void regs_update(void)
 		gfx_set_blend((u16)(BLEND_DARKEN | lower | LAYER_BD), 0, (u16)modal_y);
 	} else if (ui.reveal != REVEAL_OFF) {
 		// The list's plane over everything behind it
-		u32 p = LAYER_BG(ui.reveal_plane), eva = 16u * ui.reveal_step / ui.reveal_frames;
+		u32 p = LAYER_BG(ui.reveal_plane), eva = reveal_eva(ui.reveal_step);
 		gfx_set_blend((u16)(BLEND_ALPHA | p | ((LAYER_ALL | LAYER_BD) & ~p) << 8), (u16)(eva | (16 - eva) << 8),
 			      0);
 		if (ui.reveal == REVEAL_ASKED) {
@@ -984,6 +1031,7 @@ void ui_init(const struct ui_theme *theme)
 {
 	memset(&ui, 0, sizeof(ui));
 	ui_core_reset();
+	ui_list_cache_clear();
 	ui_theme_select(theme ? theme : ui_theme_setting());
 	input_init(&ui.in, &ui_theme()->input);
 	// Keys already held (from the screen before) count as held, not pressed

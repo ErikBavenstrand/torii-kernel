@@ -276,7 +276,7 @@ static int list_event(struct ui_view *v, const struct ui_event *e)
 		u32 jump = e->index > last ? e->index - last : last - e->index;
 		last = e->index;
 		if (jump > 9)
-			measure("ui-page-change", 4);
+			measure("ui-page-change", 12);
 		else
 			measure("ui-list-scroll", 16);
 		char *p = count_buf;
