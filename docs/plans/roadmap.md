@@ -320,6 +320,7 @@ Planned in the interview and design rounds of 2026-10-19 and 2026-10-20. [v0.4-d
 Bugs and loose ends the v0.4 ticket sessions and the conductor's reviews found and left open, one line each with where it came from. Each is struck out once fixed.
 
 - The launch copy's VBlank hook sets the VBlank handler back to none afterwards instead of restoring the previous one; harmless while the engine installs none (`source/progress.c`; B8 review).
+- The `diag-tests` golden failed once at frame 4 while the colima VM was busy, then passed unchanged: possibly flaky under load (B2).
 
 ## v0.5 Saves
 

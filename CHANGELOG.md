@@ -6,6 +6,14 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** menu art as engine assets: icons, carousel objects, ground
+  shadows and the placeholder box live in `assets/ui/` and convert with
+  `just assets` into `source/ui/art_data.c`, read by id through `art.h`, so
+  redrawing art is a PNG edit; unlogged loaders for the carousel's ring
+  (B2; `3fee70f`).
+- **Fixed:** a UI image refused while the VRAM queue was full left an empty
+  cached block that the next push revived; it is now dropped (B2;
+  `3fee70f`).
 - **Added:** settings as data for the v0.4 page (`settings_model.c`): seven
   section cards of at most six rows, values staged and written to NOR only
   for a real change, the hotkey rules (no combination inside a game's own
