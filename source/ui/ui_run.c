@@ -902,8 +902,10 @@ static void overlay_windows(u32 lists, const u32 *list_plane, const struct ui_no
 	y1 = y1 < y0 ? y0 : y1;
 	u32 in0 = outside | LAYER_BG(0), in1 = 0;
 	if (lists) {
-		// A list's columns past its width are blank, so it clips by its lines:
-		// it shows in WIN0 too when WIN0 is within them
+		// The list shows in WIN0 too where their lines meet: an overlay's
+		// card covers most of WIN0, and the list's pixels beside it (a
+		// popup's notch, its corners) matter more than a ring row peeking
+		// out past the list's lines for the few frames of the motion
 		const struct ui_node *n = list_node[0];
 		const struct ui_view *v = ui_view_at(n->view);
 		s32 ly0 = n->y + v->offset, ly1 = ly0 + n->h, lx0 = n->x + view_dx(v), lx1 = lx0 + n->w;
@@ -914,7 +916,7 @@ static void overlay_windows(u32 lists, const u32 *list_plane, const struct ui_no
 		gfx_set_win(1, (u16)(lx0 << 8 | lx1));
 		gfx_set_win(3, (u16)(ly0 << 8 | ly1));
 		in1 = outside | LAYER_BG(list_plane[0]);
-		if (y0 >= ly0 && y1 <= ly1)
+		if (y0 < ly1 && y1 > ly0)
 			in0 |= LAYER_BG(list_plane[0]);
 		*dispcnt |= DISP_WIN1;
 	}

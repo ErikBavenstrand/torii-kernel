@@ -399,6 +399,14 @@ static void card_rect(s32 x, s32 y, s32 w, s32 h, s16 *out)
 	out[3] = (s16)(((y1 + 7) & ~7) > 160 ? 160 : (y1 + 7) & ~7);
 }
 
+// A motion's curve at step of frames, in Q15 (EASE_ONE at the end, and at
+// most that: a curve that overshoots would wrap the window and slide maths)
+static u32 eased(u32 ease, u32 step, u32 frames)
+{
+	u32 e = frames && step < frames ? ease_at((Ease)ease, step * 0x10000u / frames) : EASE_ONE;
+	return e > EASE_ONE ? EASE_ONE : e;
+}
+
 static void measure(const char *name)
 {
 	if (tlog_in_emulator())
@@ -420,6 +428,7 @@ struct run {
 	s8 dir;       // 1 opening, -1 closing, 0 open
 	u8 waiting;   // its first frame isn't on screen yet
 	u8 hinted;    // the hint bar shows its keys
+	const struct ui_view_spec *hints_view;  // the hint bar's view
 	u8 step;      // frames of the motion running
 	u16 open;     // how open it is (Q15, EASE_ONE open)
 	u16 from;     // where a close started from
@@ -482,6 +491,7 @@ static int run_tick(struct run *r, u32 dt, const struct ui_move *open, const str
 			// Its keys in the hint bar, a frame after its own draw (each
 			// draws a lot: they needn't share a frame)
 			ui_hints_get(r->hints, &r->old_hints, &r->old_count, &r->old_text);
+			r->hints_view = ui_node_view(r->hints)->spec;
 			ui_hints_set(r->hints, r->hint, 3);
 			r->hinted = 1;
 		}
@@ -489,7 +499,7 @@ static int run_tick(struct run *r, u32 dt, const struct ui_move *open, const str
 	if (r->dir > 0) {
 		u32 frames = open->frames;
 		r->step = (u8)(r->step + dt > frames ? frames : r->step + dt);
-		r->open = (u16)(frames ? ease_at((Ease)open->ease, r->step * 0x10000u / frames) : EASE_ONE);
+		r->open = (u16)eased(open->ease, r->step, frames);
 		if (r->step >= frames) {
 			r->dir = 0;
 			r->view->opening = 0;
@@ -497,7 +507,7 @@ static int run_tick(struct run *r, u32 dt, const struct ui_move *open, const str
 	} else if (r->dir < 0) {
 		u32 frames = close->frames;
 		r->step = (u8)(r->step + dt > frames ? frames : r->step + dt);
-		u32 c = frames ? ease_at((Ease)close->ease, r->step * 0x10000u / frames) : EASE_ONE;
+		u32 c = eased(close->ease, r->step, frames);
 		r->open = (u16)(r->from * (EASE_ONE - c) >> 15);
 	} else {
 		return 1;
@@ -509,7 +519,7 @@ static int run_tick(struct run *r, u32 dt, const struct ui_move *open, const str
 // The opening's first step, shown with the view's first frame
 static void run_first_step(struct run *r, const struct ui_move *open)
 {
-	r->open = (u16)(open->frames ? ease_at((Ease)open->ease, 0x10000u / open->frames) : EASE_ONE);
+	r->open = (u16)eased(open->ease, 1, open->frames);
 	if (!open->frames) {
 		r->dir = 0;
 		r->view->opening = 0;
@@ -534,7 +544,8 @@ static void run_finish(struct run *r, const struct ui_move *close)
 		ui_pop();
 	r->view = 0;
 	ui_overlay_drop(r);
-	if (r->hinted) {
+	// The hint bar back, unless its view went meanwhile
+	if (r->hinted && r->hints < ui_nodes_used() && ui_node_view(r->hints)->spec == r->hints_view) {
 		ui_hints_set(r->hints, r->old_hints, r->old_count);
 		if (r->old_text)
 			ui_hints_text(r->hints, r->old_text);
@@ -649,6 +660,13 @@ static void popup_overlay(u32 e)
 
 static int popup_measure(u8 node, struct engine_budget *need)
 {
+	// An item's band is redrawn alone: its pill and its text line stay in it
+	const struct ui_theme *t = ui_theme();
+	if (t->look.pill_h > look.pop_pitch || t->body->line_height > look.pop_pitch) {
+		ui_set_error("popup: its pitch (%u px) is under the pill's height or the body font's line",
+			     look.pop_pitch);
+		return 0;
+	}
 	return canvas_measure(node, need);
 }
 
@@ -690,7 +708,7 @@ static void popup_update(u8 node, u32 dt)
 	struct run *r = &pp.pop;
 	if (!r->view || node != r->node || r->view != ui_node_view(node) || !ui_node_shown(node))
 		return;
-	s32 moving = r->dir;
+	int moving = r->dir != 0;
 	if (run_tick(r, dt, &ui_theme()->motion.popup_open, &ui_theme()->motion.popup_close) && moving) {
 		popup_overlay(r->open);  // open: no window, plane 0 everywhere
 		measure("popup-motion");
@@ -729,8 +747,9 @@ int ui_popup_open(u8 list, u8 hints, const struct ui_popup *popup)
 	TLOG_ASSERT(!ui_dispatching);
 	if (pp.pop.view)
 		ui_popup_close();
-	if (!popup || !popup->count || popup->count > UI_POPUP_ITEMS) {
-		ui_set_error("popup: 1 to %d items", UI_POPUP_ITEMS);
+	if (!popup || !popup->count || popup->count > UI_POPUP_ITEMS || list == UI_NONE ||
+	    ui_node_spec(list)->kind != UI_LIST) {
+		ui_set_error("popup: 1 to %d items, beside a list", UI_POPUP_ITEMS);
 		tlog_error("%s", ui_error());
 		return 0;
 	}
@@ -911,7 +930,7 @@ static void confirm_update(u8 node, u32 dt)
 	struct run *r = &pp.conf;
 	if (!r->view || node != r->node || r->view != ui_node_view(node) || !ui_node_shown(node))
 		return;
-	s32 moving = r->dir;
+	int moving = r->dir != 0;
 	if (run_tick(r, dt, &ui_theme()->motion.popup_open, &ui_theme()->motion.popup_close) && moving) {
 		confirm_colours(r->open);
 		measure("confirm-motion");
@@ -1085,7 +1104,9 @@ static void letter_update(u8 node, u32 dt)
 			letter_unwindow(st);  // off the map now
 		return;
 	}
-	if (!ui_plane_owned(node) || !ui_node_shown(node)) {
+	if (!ui_node_shown(node))
+		return;  // shown with the page
+	if (!ui_plane_owned(node)) {
 		// Under a popup or a dialog: gone at once
 		letter_unwindow(st);
 		if (st->phase != LET_UNMAP) {
@@ -1107,7 +1128,7 @@ static void letter_update(u8 node, u32 dt)
 	}
 	if (st->phase == LET_CLOSE) {
 		st->step = (u8)(st->step + dt > close->frames ? close->frames : st->step + dt);
-		u32 e = close->frames ? EASE_ONE - ease_at((Ease)close->ease, st->step * 0x10000u / close->frames) : 0;
+		u32 e = EASE_ONE - eased(close->ease, st->step, close->frames);
 		// The card shuts towards its middle line
 		const struct ui_node *n = ui_node(node);
 		s32 top = n->y + look.let_y, bottom = top + look.let_h + look.shadow_y, mid = (top + bottom) / 2;

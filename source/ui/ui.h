@@ -767,8 +767,9 @@ void ui_list_page_label(u8 node, u8 label, const char *text);
 int ui_list_still(u8 node);
 // For a scroll bar: content and viewport height, and scroll, in px.
 void ui_list_scroll_info(u8 node, u32 *content, u32 *view, u32 *scroll);
-// The screen line the cursor's row will rest at (its top, the view's slide
-// left out), and the row's height
+// The line the cursor's row will rest at once the list's scroll settles
+// (its top, in the view's own lines: add the view's offset for the
+// screen's), and the row's height
 void ui_list_cursor_row(u8 node, s32 *y, u32 *h);
 
 // --- Popups, confirmations and the letter card (ui/ui_popup.c) -------------
@@ -856,14 +857,20 @@ int ui_confirm(u8 hints, const struct ui_confirm *confirm);
 // leaves to it): a rectangle at the list card's top right, which holds the
 // card where the popup look table (ui/ui_popup.c) puts it.
 #define UI_LETTER_NODE(id) {UI_LETTER, (id), UI_NONE, 0, UI_LEFT, 0, 0, 0, 184, 24, 48, 48, 0}
-// Letters (ui/letter.h): 1-26 for A-Z, 0 and 27 for "#" (what sorts
-// before A and after Z); UI_LETTER_NONE nothing.
+// Letters (ui/letter.h, whose jumps need a list in library_sort_key's
+// order: A-Z lists only, not Recent or folders-first ones): 1-26 for A-Z,
+// 0 and 27 for "#" (what sorts before A and after Z); UI_LETTER_NONE
+// nothing.
 #define UI_LETTER_NONE 0xFF
 // Shows letter on the card, with prev and next (the letters LEFT and RIGHT
 // would jump to) beside it; it stays the theme's letter_linger frames.
 void ui_letter_show(u8 node, u32 letter, u32 prev, u32 next);
-// Takes the card down at once (the page changed under it).
+// Takes the card down without its motion, in the next VBlank or two (the
+// page changed under it).
 void ui_letter_hide(u8 node);
+// While a popup, confirmation or letter card opens or closes, WIN0 is its:
+// only one list clips (WIN1), so a page with two resident lists shows the
+// second's spare rows past its rectangle for those few frames.
 
 // --- Effects ----------------------------------------------------------------
 
