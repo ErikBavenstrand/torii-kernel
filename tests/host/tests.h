@@ -179,6 +179,8 @@ void test_letter_of(void);
 void test_letter_sorted(void);
 void test_letter_jump(void);
 void test_letter_one(void);
+void test_gamelist_size(void);
+void test_gamelist_sort(void);
 void test_colour_bldy(void);
 
 #endif

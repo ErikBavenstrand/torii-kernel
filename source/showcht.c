@@ -8,11 +8,13 @@
 #include <gba_video.h>
 
 #include "ezkernel.h"
+#include "lang.h"
 #include "showcht.h"
 #include "tlog.h"
 #include "savename.h"
 #include "engine/cover.h"
 #include "engine/engine.h"
+#include "ui/art_ids.h"
 #include "ui/dialog.h"
 #include "ui/ui.h"
 
@@ -602,39 +604,41 @@ u32 Check_cheat_file(TCHAR *gamefilename)
 	}
 }
 //------------------------------------------------------------------
-// The cheat screen, on the v0.3 engine. Each section of a .cht file is a
-// cheat, drawn as a heading, and its entries are the cheat's options: the
-// cursor skips sections, A picks an entry (or drops it again) and drops the
-// section's other entries, LEFT and RIGHT (and L and R) page, and releasing
-// B leaves, applying what was picked.
+// The cheat screen (showcht.h), in the game lists' look: the title bar with
+// the game's name and which entry the cursor is on, the cheats on a card,
+// and the hint bar. Each section of a .cht file is a cheat, drawn as a
+// heading, and its entries are the cheat's options: the cursor skips
+// sections, A picks an entry (or drops it again) and drops the section's
+// other entries, LEFT and RIGHT (and L and R) page, START plays with what
+// was picked, and releasing B goes back.
 //
 // The list stays in pReadCache (pCHTbuffer) while the screen runs, inside
 // the cover stage's range (engine/stage.h): the cover loader is stopped
 // before the engine starts, and the screen starts no jobs.
 
-// The entries picked when the cheat screen last closed, if it has been
-// opened since the game menu opened: the menu's CHEAT(n)
-static u32 cheats_picked EWRAM_BSS;
-static u8 cheats_opened EWRAM_BSS;
-
-void cheat_menu_label(char *out, u32 size, const char *name)
-{
-	if (!cheats_opened)
-		snprintf(out, size, "%s", name);
-	else
-		snprintf(out, size, "%s(%lu)", name, (unsigned long)cheats_picked);
-}
+// --- Look, px: the game lists' (screens/games.c) ----------------------------
+#define CS_TITLE_H 24
+#define CS_CARD_Y 16
+#define CS_CARD_H 128
+#define CS_LIST_X 8
+#define CS_LIST_Y 24
+#define CS_LIST_W 216  // up to the scroll bar's column
+#define CS_LIST_H 112  // 8 rows of 14 px
+#define CS_LIST_PAD 4
+#define CS_DETAIL_W 24  // a picked entry's "On"
+#define CS_INDENT "   "  // an entry under its section
+#define CS_HINTS_H 16
+static const struct ui_card_config cs_card = {4, 4, 4, 1, 0};
 
 void cheat_menu_forget(void)
 {
 	gl_cheat_count = 0;
-	cheats_opened = 0;
 }
 
 enum {
-	CS_BAR,
 	CS_TITLE,
-	CS_COUNT,
+	CS_HINTS,
+	CS_CARD,
 	CS_LIST,
 	CS_SCROLL,
 	CS_NODES,
@@ -647,11 +651,13 @@ struct cheat_screen {
 	u32 entries;      // entries among them
 	u32 cursor;       // the list's cursor, as last seen
 	u32 ord_at, ord;  // line ord_at has ord entries up to it: counting goes on from there
-	u8 list, label;   // node indices
+	u8 list, title;   // node indices
 	u8 b_down;        // B went down on this screen: its release leaves
+	u8 result;        // CHEATS_BACK or CHEATS_PLAY once it ends
 	char counter[24];
-	char row[MAX_KEY_LEN + 3];
-	char title[MAX_KEY_LEN + 1];  // the game's name (GameInfo)
+	char row[MAX_KEY_LEN + 4];
+	char heading[MAX_KEY_LEN + 1];  // the game's name (GameInfo's, if the caller gives none)
+	struct ui_hint hints[3];
 };
 
 static u32 cs_name_len(const FM_CHT_LINE *line)
@@ -670,6 +676,8 @@ static u32 cs_count(void *ctx)
 static int cs_fetch(void *ctx, u32 i, struct ui_item *out)
 {
 	struct cheat_screen *cs = ctx;
+	if (i >= cs->count)
+		return UI_ITEM_PENDING;
 	const FM_CHT_LINE *line = &cs->lines[i];
 	u32 len = cs_name_len(line);
 	if (line->is_section == 1) {
@@ -678,15 +686,16 @@ static int cs_fetch(void *ctx, u32 i, struct ui_item *out)
 		out->ink = UI_ROLE_DIM;
 		return UI_ITEM_READY;
 	}
-	// An entry: indented under its section, and in the accent colour with
-	// a check at the right when picked
-	memcpy(cs->row, "   ", 3);
-	memcpy(cs->row + 3, line->LINEname, len);
+	// An entry: indented under its section, and in the item's ink with "On"
+	// at the right when picked
+	u32 indent = sizeof(CS_INDENT) - 1;
+	memcpy(cs->row, CS_INDENT, indent);
+	memcpy(cs->row + indent, line->LINEname, len);
 	out->text = cs->row;
-	out->len = (u16)(3 + len);
+	out->len = (u16)(indent + len);
 	if (line->select) {
 		out->ink = UI_ROLE_ACCENT_INK;
-		out->detail = "[x]";
+		out->detail = gl_set_onoff[1];
 	}
 	return UI_ITEM_READY;
 }
@@ -717,7 +726,8 @@ static u32 cs_settle(const struct cheat_screen *cs, u32 i, int dir)
 	return to == cs->count ? i : to;
 }
 
-// Shows "[ord/entries]": which entry the cursor is on, of how many
+// Shows "ord/entries" at the title's right: which entry the cursor is on,
+// of how many
 static void cs_show_count(struct cheat_screen *cs)
 {
 	u32 ord = 0;
@@ -731,8 +741,8 @@ static void cs_show_count(struct cheat_screen *cs)
 		cs->ord = n;
 		ord = n;
 	}
-	snprintf(cs->counter, sizeof(cs->counter), "[%03lu/%03lu]", (unsigned long)ord, (unsigned long)cs->entries);
-	ui_label_set(cs->label, cs->counter);
+	snprintf(cs->counter, sizeof(cs->counter), "%lu/%lu", (unsigned long)ord, (unsigned long)cs->entries);
+	ui_title_set_right(cs->title, cs->counter);
 }
 
 // Moves the cursor to the entry nearest to line to, on side dir first
@@ -777,10 +787,14 @@ static int cs_event(struct ui_view *v, const struct ui_event *e)
 			cs->b_down = 1;
 			return 1;
 		}
+		if (e->keys & INPUT_START) {
+			cs->result = CHEATS_PLAY;
+			return 1;
+		}
 		if (!(e->keys & (INPUT_LEFT | INPUT_RIGHT)) || !cs->count)
 			return 0;
 		// LEFT and RIGHT page, as L and R do
-		u32 page = (u32)ui_node(cs->list)->h / ui_theme()->row_h;
+		u32 page = (u32)ui_node(cs->list)->h / ui_theme()->look.list_pitch;
 		u32 to;
 		if (e->keys & INPUT_LEFT)
 			to = cs->cursor > page ? cs->cursor - page : 0;
@@ -794,61 +808,28 @@ static int cs_event(struct ui_view *v, const struct ui_event *e)
 	}
 }
 
-static const struct ui_label_config cs_title = {"", UI_FONT_HEADING, UI_ALIGN_LEFT, 0, 0};
-static const struct ui_label_config cs_counter = {"", UI_FONT_BODY, UI_ALIGN_RIGHT, UI_LABEL_SWAP, 0};
-static const struct ui_list_config cs_list = {&cs_model, 0, UI_LIST_MARQUEE, 24, 0};
+static const struct ui_title_config cs_title = {"", "", ART_ICON16_GBA};
+static const struct ui_hints_config cs_no_hints = {0, 0};
+static const struct ui_list_config cs_list = {&cs_model, UI_ROW_PITCH_LIST, UI_LIST_MARQUEE, CS_DETAIL_W, CS_LIST_PAD};
 static const struct ui_scrollbar_config cs_bar = {CS_LIST};
 
 static const struct ui_spec cs_nodes[CS_NODES] = {
-	[CS_BAR] = {.kind = UI_PANEL,
-		    .id = 1,
-		    .parent = UI_NONE,
-		    .plane = 2,
-		    .anchor = UI_HFILL,
-		    .paper = UI_ROLE_PANEL,
-		    .h = 16},
-	[CS_TITLE] = {.kind = UI_LABEL,
-		      .id = 2,
-		      .parent = CS_BAR,
-		      .plane = 2,
-		      .anchor = UI_HFILL | UI_VFILL,
-		      .paper = UI_ROLE_PANEL,
-		      .w = 72,
-		      .data = &cs_title},
-	[CS_COUNT] = {.kind = UI_LABEL,
-		      .id = 3,
-		      .parent = CS_BAR,
-		      .plane = 2,
-		      .anchor = UI_RIGHT | UI_VFILL,
-		      .ink = UI_ROLE_DIM,
-		      .paper = UI_ROLE_PANEL,
-		      .w = 72,
-		      .data = &cs_counter},
-	[CS_LIST] = {.kind = UI_LIST,
-		     .id = 4,
-		     .parent = UI_NONE,
-		     .plane = 1,
-		     .anchor = UI_FILL,
-		     .flags = UI_FOCUSABLE,
-		     .paper = UI_ROLE_BG,
-		     .y = 16,
-		     .w = 8,
-		     .data = &cs_list},
-	[CS_SCROLL] = {.kind = UI_SCROLLBAR,
-		       .id = 5,
-		       .parent = UI_NONE,
-		       .plane = 2,
-		       .anchor = UI_RIGHT | UI_VFILL,
-		       .y = 16,
-		       .w = 8,
-		       .data = &cs_bar},
+	[CS_TITLE] = {UI_TITLE, 1, UI_NONE, 3, UI_HFILL, 0, 0, 0, 0, 0, 0, CS_TITLE_H, &cs_title},
+	[CS_HINTS] = {UI_HINTS, 2, UI_NONE, 3, UI_HFILL | UI_BOTTOM, 0, 0, 0, 0, 0, 0, CS_HINTS_H, &cs_no_hints},
+	[CS_CARD] = {UI_CARD, 3, UI_NONE, 2, UI_HFILL, 0, 0, 0, 0, CS_CARD_Y, 0, CS_CARD_H, &cs_card},
+	[CS_LIST] = {UI_LIST, 4, UI_NONE, 1, UI_LEFT, UI_FOCUSABLE, 0, 0, CS_LIST_X, CS_LIST_Y, CS_LIST_W, CS_LIST_H,
+		     &cs_list},
+	[CS_SCROLL] = {UI_SCROLLBAR, 5, UI_NONE, 2, UI_LEFT, 0, 0, UI_ROLE_PANEL, CS_LIST_X + CS_LIST_W, CS_LIST_Y, 8,
+		       CS_LIST_H, &cs_bar},
 };
 
-static const struct ui_view_spec cs_view = {"cheats", cs_nodes, CS_NODES, 34, CS_LIST, 0, cs_event};
+// One view spec per title icon: the title bar takes its icon from its spec
+#define CS_VIEW {"cheats", cs_nodes, CS_NODES, 0, CS_LIST, UI_VIEW_LR_PAGES, cs_event}
+static const struct ui_view_spec cs_view = CS_VIEW;
 
-// Runs the screen until B is released, and returns with it still up; 0 if
-// it couldn't be shown
-static int cs_run(struct cheat_screen *cs)
+// Runs the screen until START, or B is released, and returns with it still
+// up; 0 if it couldn't be shown
+static int cs_run(struct cheat_screen *cs, u16 icon)
 {
 	struct ui_view *v = ui_push(&cs_view, cs);
 	if (!v) {
@@ -856,30 +837,40 @@ static int cs_run(struct cheat_screen *cs)
 		return 0;
 	}
 	cs->list = (u8)(v->first + CS_LIST);
-	cs->label = (u8)(v->first + CS_COUNT);
-	ui_label_set((u8)(v->first + CS_TITLE), cs->title);
+	cs->title = (u8)(v->first + CS_TITLE);
+	ui_title_set(cs->title, cs->heading);
+	ui_title_icon_set(cs->title, icon);
+	cs->hints[0] = (struct ui_hint){"A", gl_games->hint_pick};
+	cs->hints[1] = (struct ui_hint){"START", gl_games->hint_play};
+	cs->hints[2] = (struct ui_hint){"B", gl_hint_back};
+	ui_hints_set((u8)(v->first + CS_HINTS), cs->hints, 3);
 	cs_move(cs, 0, 1);
 	while (ui_depth()) {
 		ui_frame();
-		if (cs->b_down && (ui_input()->released & INPUT_B))
+		if (cs->result)
 			break;
+		if (cs->b_down && (ui_input()->released & INPUT_B)) {
+			cs->result = CHEATS_BACK;
+			break;
+		}
 	}
 	return 1;
 }
 
-int Open_cht_file(TCHAR *gamefilename, u32 havecht)
+u32 Open_cht_file(TCHAR *gamefilename, u32 havecht, const char *title, u16 icon)
 {
-	int shown = 0;
+	u32 result = CHEATS_NONE;
 	struct cheat_screen cs;
 	u32 res;
 	TCHAR chtnamebuf[GAME_NAME_MAX + 1];
 
+	gl_cheat_count = 0;  // cheats never carry over between games
 	// As zeroed as they were in EWRAM of their own, before the first file
 	memset(buf, 0, 2 * MAX_BUF_LEN);
 	if (havecht == 0x0000FFFF) {
 		res = f_chdir("/CHEAT");
 		if (res != FR_OK) {
-			return 0;
+			return CHEATS_NONE;
 		}
 		name_with_ext(chtnamebuf, gamefilename, "cht");
 	} else {
@@ -894,7 +885,9 @@ int Open_cht_file(TCHAR *gamefilename, u32 havecht)
 	if (res == FR_OK)  //have a cht file
 	{
 		memset(&cs, 0, sizeof(cs));
-		Get_KEY_val(&gfile, "GameInfo", "Name", cs.title);
+		Get_KEY_val(&gfile, "GameInfo", "Name", cs.heading);
+		if (title && *title)
+			snprintf(cs.heading, sizeof(cs.heading), "%s", title);
 
 		u32 all_count = Get_all_Section_val(&gfile);
 		if (all_count) {
@@ -912,25 +905,25 @@ int Open_cht_file(TCHAR *gamefilename, u32 havecht)
 				engine_init();
 				ui_init(NULL);
 			}
-			cs_run(&cs);
-			shown = 1;  // the engine ran: the caller's screen starts again either way
-			// Reading the picks' codes can take seconds in a big file: the
-			// cheat screen stays up meanwhile, rather than a black one
-			Analyze_KEYVAL(&gfile, cs.count);
+			if (cs_run(&cs, icon)) {
+				result = cs.result;
+				// Reading the picks' codes can take seconds in a big file: the
+				// cheat screen stays up meanwhile, rather than a black one
+				if (result == CHEATS_PLAY)
+					Analyze_KEYVAL(&gfile, cs.count);
+				tlog("cheats: %s with %lu codes", result == CHEATS_PLAY ? "play" : "back",
+				     (unsigned long)gl_cheat_count);
+			}
 			if (own) {
 				ui_shutdown();
 				dialog_blank();  // back to the caller, on a black screen
 			} else {
-				ui_leave(UI_TR_DEEPER, -1);  // back up to the game menu
+				ui_leave(UI_TR_DEEPER, -1);  // back to the caller's screen
 				while (ui_depth())
 					ui_pop();
 			}
-			cheats_opened = 1;
-			cheats_picked = 0;
-			for (u32 i = 0; i < cs.count; i++)
-				cheats_picked += cs.lines[i].is_section != 1 && cs.lines[i].select == 1;
 		}
 	}
 	f_close(&gfile);
-	return shown;
+	return result;
 }

@@ -84,6 +84,8 @@ char *gl_hint_done EWRAM_BSS;
 char *gl_hint_field EWRAM_BSS;
 char *gl_hint_set EWRAM_BSS;
 
+const struct lang_games *gl_games EWRAM_BSS;
+
 // Popups and confirmations (ui.h)
 char *gl_pop_choose EWRAM_BSS;
 char *gl_pop_ok EWRAM_BSS;
@@ -506,6 +508,32 @@ const char en_sd_changed[] = "Changed";
 const char en_sd_save[] = "Save";
 const char en_sd_no_save[] = "No save yet";
 
+// The game lists, their popup and Game info, and the cheat screen. L held
+// with A (or with Play in the popup) starts a game with a hard reset: Game
+// info's last line says so
+static const struct lang_games en_games = {
+	.empty = "No games here",
+	.hint_play = "play",
+	.hint_menu = "menu",
+	.hint_letter = "letter",
+	.hint_save_type = "save type",
+	.hint_pick = "pick",
+	.pop = {"Play", "Favourite", "Clean boot", "Boot with addon", "Rename", "Game info", "Delete"},
+	.off = "off",
+	.on = "on",
+	.delete_text = "The save stays.",
+	.delete_button = "Delete",
+	.info_keys = {"Console", "Size", "Folder", "Played", "Save type", "Hard reset"},
+	.consoles = {"GBA", "GBC", "GB", "NES"},
+	.nor = "Game NOR",
+	.hard_reset = "hold L with A",
+	.save_types = {"Auto", "SRAM", "EEPROM 8K", "EEPROM 512", "Flash 64K", "Flash 128K"},
+	.size_kb = "KB",
+	.size_mb = "MB",
+	.fact_size = "Size",
+	.fact_played = "Last",
+};
+
 //---------------------------------------------------------------------------------
 void LoadEnglish(void)
 {
@@ -651,6 +679,7 @@ void LoadEnglish(void)
 	gl_sd_changed = (char *)en_sd_changed;
 	gl_sd_save = (char *)en_sd_save;
 	gl_sd_no_save = (char *)en_sd_no_save;
+	gl_games = &en_games;
 }
 //---------------------------------------------------------------------------------
 // The languages Settings offers. A new language adds its strings and a

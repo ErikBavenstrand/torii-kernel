@@ -48,6 +48,19 @@ enum {
 // Returns only if no game started (see the top).
 u32 action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset);
 
+// What a GBA game on the SD card starts with, read from the card: its save
+// type (what its .mde file says, 0 AUTO if none; ACTION_SAVE_TYPES for a GB,
+// GBC or NES game or a NOR: entry) and its cheat file (Check_cheat_file's
+// handle, 0 none). Returns 0 if path isn't a game the cart starts.
+struct action_facts {
+	u32 save_type;
+	u32 cheats;
+};
+u32 action_game_facts(const char *path, struct action_facts *out);
+// Sets a GBA game's save type (0 AUTO, 1-5 a type: ACTION_SAVE_TYPES) in
+// its .mde file in /SAVER, which its next launch uses. 1 if written.
+int action_set_save_type(const char *path, u32 save_type);
+
 // Deletes the file at path (a full path; a folder is refused). Its save stays (T11); it leaves
 // Recent, the favourites and the library index. 1 if it was deleted.
 int action_delete_file(const char *path);

@@ -277,6 +277,11 @@ static void image_draw(u8 node)
 			rows[y * 32 + tx + x] = ui_entry(st->first + y * w + x, st->bank);
 }
 
+u32 ui_image_bank(u8 node)
+{
+	return ((const struct image_state *)ui_node_state(node))->bank;
+}
+
 static const struct ui_ops image_ops = {sizeof(struct image_state), image_measure, image_init, 0, 0, image_draw};
 
 // --- Progress bar --------------------------------------------------------

@@ -172,30 +172,41 @@ u16 lib_build_folder(struct lib_build *b, const char *path)
 	return b->folders++;
 }
 
-// Writes name and its key into text as the pool keeps them, each NUL-ended
-// and padded with a NUL to a halfword; their bytes. *gap: the key's offset
-// from the name's, halved (lib_rec.name's top byte).
+// Writes name, its key and its display name into text as the pool keeps
+// them, each NUL-ended and padded with a NUL to a halfword; their bytes.
+// display may be lib_build_display(b)'s buffer. *gap: the key's offset from
+// the name's, halved (lib_rec.name's top byte).
 static u32 name_and_key(struct lib_build *b, const char *name, const char *display, u32 *prefix, u32 *gap)
 {
+	char *shown = lib_build_display(b);
+	if (!display)
+		gamename_clean(shown, name);
+	else if (display != shown) {
+		u32 n = (u32)strnlen(display, LIBRARY_NAME_MAX);
+		memcpy(shown, display, n);
+		shown[n] = 0;
+	}
 	u32 len = (u32)strlen(name);
 	u32 name_bytes = even(len + 1);
 	memcpy(b->text, name, len);
 	b->text[len] = b->text[name_bytes - 1] = 0;
-	if (!display) {
-		gamename_clean(b->display, name);
-		display = b->display;
-	}
 	char *key = b->text + name_bytes;
-	u32 key_len = library_sort_key(key, LIBRARY_KEY_MAX + 1, display);
+	u32 key_len = library_sort_key(key, LIBRARY_KEY_MAX + 1, shown);
 	u32 key_bytes = even(key_len + 1);
 	key[key_bytes - 1] = 0;
+	// The display name after the key (it was past both)
+	u32 shown_len = (u32)strnlen(shown, LIBRARY_NAME_MAX);
+	u32 shown_bytes = even(shown_len + 1);
+	char *to = key + key_bytes;
+	memmove(to, shown, shown_len);
+	to[shown_len] = to[shown_bytes - 1] = 0;
 	*prefix = library_key_prefix(key);
 	*gap = name_bytes / 2;
-	return name_bytes + key_bytes;
+	return name_bytes + key_bytes + shown_bytes;
 }
 
 int lib_build_game(struct lib_build *b, u16 folder, const char *name, const char *display, u32 size, u32 console,
-		   int has_save)
+		   u32 flags)
 {
 	if (console >= LIB_CONSOLES || strnlen(name, LIBRARY_NAME_MAX + 1) > LIBRARY_NAME_MAX)
 		return LIB_BAD_NAME;
@@ -214,7 +225,7 @@ int lib_build_game(struct lib_build *b, u16 folder, const char *name, const char
 	}
 	r.name = at | gap << 24;
 	r.folder = folder;
-	r.flags = (u16)(console | (has_save ? LIB_F_SAVE : 0));
+	r.flags = (u16)(console | (flags & (LIB_F_SAVE | LIB_F_CUSTOM)));
 	r.size = size;
 	b->put(b->slot + LIB_OFF_RECORDS + b->records * 16u, &r, sizeof(r));
 	b->records++;
@@ -252,6 +263,12 @@ const char *lib_key(const u8 *slot, u32 rec)
 {
 	u32 name = lib_rec_at(slot, rec)->name;
 	return lib_str(slot, (name & LIB_NAME_OFFSET) + (name >> 24) * 2);
+}
+
+const char *lib_display(const u8 *slot, u32 rec)
+{
+	const char *key = lib_key(slot, rec);
+	return key + even((u32)strlen(key) + 1);
 }
 
 const char *lib_folder(const u8 *slot, u32 rec)
@@ -427,6 +444,26 @@ u32 lib_nth(const u8 *slot, u32 console, u32 n)
 	return lib_order(slot)[lib_console_start(slot, console) + n];
 }
 
+u32 lib_position(const u8 *slot, u32 rec)
+{
+	if (rec >= lib_hdr(slot)->records || (lib_rec_at(slot, rec)->flags & LIB_F_GONE))
+		return LIBRARY_NONE;
+	u32 console = lib_rec_at(slot, rec)->flags & LIB_F_CONSOLE, start = lib_console_start(slot, console);
+	u32 lo = 0, hi = lib_hdr(slot)->counts[console];
+	const u16 *order = lib_order(slot) + start;
+	while (lo < hi) {
+		u32 mid = lo + (hi - lo) / 2;
+		int c = lib_compare(slot, order[mid], rec);
+		if (!c)
+			return mid;
+		if (c < 0)
+			lo = mid + 1;
+		else
+			hi = mid;
+	}
+	return LIBRARY_NONE;
+}
+
 u32 lib_path(const u8 *slot, u32 rec, char *out, u32 size)
 {
 	const char *folder = lib_folder(slot, rec), *name = lib_name(slot, rec);
@@ -549,6 +586,7 @@ int lib_rename(u8 *slot, lib_put_fn put, u32 rec, const char *new_name, struct l
 	h = *lib_hdr(slot);
 	h.pool_bytes = pool;
 	r.name = at | gap << 24;
+	r.flags &= (u16)~LIB_F_CUSTOM;  // its cleaned name until the walk reads names.txt again
 	put(slot + LIB_OFF_RECORDS + rec * 16u, &r, sizeof(r));
 	// Its place among the rest of its console's games
 	u32 start = lib_console_start(slot, console), lo = start, hi = start + h.counts[console];
@@ -583,6 +621,9 @@ int lib_body_ok(const u8 *slot, u32 *seen)
 		u32 name = r->name & LIB_NAME_OFFSET, key = name + (r->name >> 24) * 2;
 		if (r->folder >= h->folders || key <= name || key >= h->pool_bytes ||
 		    (r->flags & LIB_F_CONSOLE) >= LIB_CONSOLES)
+			return 0;
+		// The display name after the key, inside the pool too
+		if (key + even((u32)strnlen(lib_str(slot, key), h->pool_bytes - key) + 1) >= h->pool_bytes)
 			return 0;
 		if (!(r->flags & LIB_F_GONE))
 			counts[r->flags & LIB_F_CONSOLE]++;

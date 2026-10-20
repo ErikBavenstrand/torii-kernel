@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "nav.h"
+#include "games.h"
 #include "home.h"
 #include "info.h"
 #include "nor.h"
@@ -242,8 +243,8 @@ static const struct nav_page empty_page = {empty_enter, 0, empty_clock, 0, 0};
 
 // Each item's page: a page ticket puts its own here
 static const struct nav_page *const pages[NAV_ITEMS] = {
-	[NAV_RECENT] = &empty_page, [NAV_FAV] = &empty_page, [NAV_GBA] = &empty_page, [NAV_GBC] = &empty_page,
-	[NAV_GB] = &empty_page,     [NAV_NES] = &empty_page, [NAV_SD] = &sdcard_page, [NAV_NOR] = &nor_page,
+	[NAV_RECENT] = &games_page, [NAV_FAV] = &games_page, [NAV_GBA] = &games_page, [NAV_GBC] = &games_page,
+	[NAV_GB] = &games_page,     [NAV_NES] = &games_page, [NAV_SD] = &sdcard_page, [NAV_NOR] = &nor_page,
 	[NAV_SET] = &settings_page, [NAV_INFO] = &info_page,
 };
 

@@ -186,6 +186,45 @@ extern char *gl_sd_changed;
 extern char *gl_sd_save;
 extern char *gl_sd_no_save;
 
+// The game lists (screens/games.c), their popup and Game info card, and the
+// cheat screen (showcht.c)
+enum {
+	LANG_POP_PLAY,
+	LANG_POP_FAV,
+	LANG_POP_CLEAN,
+	LANG_POP_ADDON,
+	LANG_POP_RENAME,
+	LANG_POP_INFO,
+	LANG_POP_DELETE,
+	LANG_POP_ITEMS,
+};
+enum {
+	LANG_INFO_CONSOLE,
+	LANG_INFO_SIZE,
+	LANG_INFO_FOLDER,
+	LANG_INFO_PLAYED,
+	LANG_INFO_SAVE_TYPE,
+	LANG_INFO_HARD_RESET,
+	LANG_INFO_KEYS,
+};
+struct lang_games {
+	const char *empty;  // a list with no game (left)
+	const char *hint_play, *hint_menu, *hint_letter, *hint_save_type, *hint_pick;
+	const char *pop[LANG_POP_ITEMS];  // the game popup's items
+	const char *off, *on;  // Favourite's value
+	const char *delete_text;  // under the Delete confirmation's "Delete <name>?" (EN_GAME_DELETE)
+	const char *delete_button;
+	const char *info_keys[LANG_INFO_KEYS];  // Game info's lines
+	const char *consoles[4];  // by LIB_GBA...: Game info's Console
+	const char *nor;  // a game NOR game's folder
+	const char *hard_reset;  // Game info's Hard reset line: how
+	const char *save_types[6];  // by save type (actions.h: 0 AUTO ...)
+	const char *size_kb, *size_mb;
+	const char *fact_size, *fact_played;  // list with art: the facts under the box
+};
+extern const struct lang_games *gl_games;
+#define EN_GAME_DELETE "Delete %s?"
+
 extern u32 gl_lang; // index of the current language in lang_packs
 
 void LoadEnglish(void);

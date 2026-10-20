@@ -15,7 +15,9 @@
 //	          the one the menu reads and the one a walk builds, to 3.5 MB
 //	3.5 MB    favourites and recents (B5), PSRAM_USERDATA_BASE
 //	4 MB      the cover cache (engine/cover.h), COVER_PSRAM_BYTES
-//	4.5 MB    reserved, PSRAM_RESERVED_BASE (the SD themes' until v0.4)
+//	4.5 MB    the Favourites page's A-Z order (screens/games.c), PSRAM_GAMES_BASE,
+//	          16 KB; the rest reserved, PSRAM_RESERVED_BASE (the SD themes'
+//	          until v0.4)
 //	5 MB      /torii/names.db (namesdb.h), up to PSRAM_NAMES_DB_BYTES
 //	6.75 MB   the CRC cache's table (namesdb.h), NAMES_CACHE_BYTES
 //	7.5-8 MB  reserved (v0.4.1 art lookups, v0.9 language tables)
@@ -41,6 +43,9 @@
 #define PSRAM_ASSET_BASE (PSRAM_WINDOW + 0x00400000u)
 // Reserved, 512 KB past the cover cache's start
 #define PSRAM_RESERVED_BASE (PSRAM_ASSET_BASE + 0x00080000u)
+// The Favourites page's order: a word a favourite (screens/games.c)
+#define PSRAM_GAMES_BASE PSRAM_RESERVED_BASE
+#define PSRAM_GAMES_BYTES 0x4000u
 // Recent and the favourites (userdata_store.c), up to the cover cache
 #define PSRAM_USERDATA_BYTES 0x00080000u
 #define PSRAM_USERDATA_BASE (PSRAM_ASSET_BASE - PSRAM_USERDATA_BYTES)

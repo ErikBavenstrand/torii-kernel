@@ -131,6 +131,7 @@ static struct {
 			struct lib_build b;
 			struct lib_sort sort;
 			struct gamename_custom custom;
+			u8 custom_name;  // walk_display's name was a custom one
 			u32 lines[GAMENAME_CUSTOM_MAX];  // names.txt's line offsets
 			u16 folder[LIB_DEPTH];  // the depth's folder number, once it has a game
 			u16 path_len[LIB_DEPTH];
@@ -433,15 +434,16 @@ static void walk_full_path(void)
 
 // The name the lists show for the game just read (its path in
 // lib.u.walk.full): its custom name if names.txt has one, else crc_name
-// (the names database's), else its cleaned file name (gamename_display)
+// (the names database's), else its cleaned file name (gamename_display);
+// custom_name says it isn't the cleaned one (never told apart by tags)
 static const char *walk_display(const char *crc_name)
 {
 	if (!lib.u.walk.names_ok && !crc_name)
 		return NULL;  // lib_build_game cleans the file name
-	gamename_display(lib.u.walk.b.display, lib.u.walk.full, lib.u.walk.names_ok ? &lib.u.walk.custom : NULL,
-			 crc_name);
-	return lib.u.walk.b.display;
-}
+	char *out = lib_build_display(&lib.u.walk.b);
+	lib.u.walk.custom_name = gamename_display(out, lib.u.walk.full, lib.u.walk.names_ok ? &lib.u.walk.custom : NULL,
+						  crc_name) != GAMENAME_CLEAN;
+	return out;}
 
 // One entry of the folder at the walk's depth; sub, when the entry is a
 // folder, is already open on it (f_readdir_sub)
@@ -498,8 +500,11 @@ static void walk_entry(DIR *sub)
 	// The display name only for a game that has room: a custom name costs a
 	// search of names.txt
 	int room = lib.u.walk.b.records < LIBRARY_GAMES_MAX && folder != LIBRARY_NONE;
-	if (lib_build_game(&lib.u.walk.b, folder, fi->fname, room ? walk_display(crc_name) : NULL, (u32)fi->fsize,
-			   console, has_save) == LIB_BAD_NAME) {
+	lib.u.walk.custom_name = 0;
+	const char *display = room ? walk_display(crc_name) : NULL;
+	u32 rec_flags = (has_save ? LIB_F_SAVE : 0) | (lib.u.walk.custom_name ? LIB_F_CUSTOM : 0);
+	if (lib_build_game(&lib.u.walk.b, folder, fi->fname, display, (u32)fi->fsize, console, rec_flags) ==
+	    LIB_BAD_NAME) {
 		lib.u.walk.too_long++;
 		tlog("library: %s/%s: the name is too long to index", d ? lib.u.walk.path : "", fi->fname);
 	}
@@ -1089,9 +1094,24 @@ static int rec_ok(u32 rec)
 	return lib.valid && rec < lib_hdr(active_slot())->records;
 }
 
+u32 library_position(u32 rec)
+{
+	return rec_ok(rec) ? lib_position(active_slot(), rec) : LIBRARY_NONE;
+}
+
 const char *library_name(u32 rec)
 {
 	return rec_ok(rec) ? lib_name(active_slot(), rec) : "";
+}
+
+const char *library_display(u32 rec)
+{
+	return rec_ok(rec) ? lib_display(active_slot(), rec) : "";
+}
+
+const char *library_key(u32 rec)
+{
+	return rec_ok(rec) ? lib_key(active_slot(), rec) : "";
 }
 
 u32 library_size(u32 rec)

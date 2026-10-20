@@ -57,6 +57,8 @@ static const struct {
 	{"letter_sorted", test_letter_sorted},
 	{"letter_jump", test_letter_jump},
 	{"letter_one", test_letter_one},
+	{"gamelist_size", test_gamelist_size},
+	{"gamelist_sort", test_gamelist_sort},
 	{"colour_bldy", test_colour_bldy},
 	{"crc32_words", test_crc32_words},
 	{"namesdb_header", test_namesdb_header},
