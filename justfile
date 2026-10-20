@@ -272,6 +272,11 @@ font:
     uv run -q tools/font.py assets/fonts/galmuri/Galmuri9.bdf --name body --line-height 12 --squeeze --clip -o source/engine/font_body
     uv run -q tools/font.py assets/fonts/galmuri/Galmuri11-Bold.bdf --name heading --line-height 16 --squeeze --clip -o source/engine/font_heading
 
+# Convert the menu's art in assets/ui (icons, carousel objects, shadows, the placeholder box) to C:
+# source/ui/art_data.c and art_ids.h (committed; tests/asset_test.py checks they match)
+assets:
+    uv run -q tools/asset.py ui
+
 # Redraw the font candidates' preview sheets in docs/research/fonts, e.g. `just font-preview galmuri`
 font-preview *keys:
     uv run -q tools/font_preview.py {{keys}}

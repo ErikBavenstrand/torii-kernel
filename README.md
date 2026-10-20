@@ -151,3 +151,12 @@ Not modelled yet: the in-game menu's real-time saves, and firmware updates.
 
 `docs/research/omega-de-hardware.md` describes how the cart works: the
 upgrade file, the FPGA firmware, the cart registers, game loading and saves.
+
+## Credits
+
+The menu's Game Boy Advance, Game Boy Color and Game Boy pictures
+(`assets/ui/sprites/gba.png`, `gbc.png`, `gb.png`) are redrawn on the
+outlines of [KyleBing's retro game console icons](https://github.com/KyleBing/retro-game-console-icons),
+licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The menu's
+fonts are [Galmuri](https://github.com/quiple/galmuri), under the SIL Open
+Font License (`assets/fonts/galmuri`).

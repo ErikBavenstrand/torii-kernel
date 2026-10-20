@@ -8,6 +8,8 @@ source/engine/font_heading.c
 # Generated tables, written as their tool writes them.
 source/engine/ease_lut.c
 tests/kernel/asset_data.c
+source/ui/art_data.c
+source/ui/art_ids.h
 source/perf_budget.h
 source/ui/palette.c
 source/ui/palette.h

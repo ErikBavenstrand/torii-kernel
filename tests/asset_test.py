@@ -5,7 +5,9 @@
 # ///
 """Tests for tools/asset.py's PNG converter, run by `just test-host`: round
 trips, colour reduction, indexed PNGs, the limits it shares with the C
-headers, the LZ77 stream, and determinism."""
+headers, the LZ77 stream, and determinism; then the menu's art (`asset.py
+ui`): the committed C matches assets/ui, the tiles decode back to the
+pictures, and broken pictures are refused."""
 
 import contextlib
 import io
@@ -225,6 +227,150 @@ class AssetTest(unittest.TestCase):
             with contextlib.redirect_stdout(io.StringIO()) as said:
                 self.assertEqual(asset.main(args), 1)
             self.assertIn("asset.py:", said.getvalue())
+
+
+def tile_pixels(words: bytes, w: int, h: int) -> list[list[int]]:
+    """Rows of colour indices from 4bpp tiles in 1D order, w x h pixels."""
+    rows = []
+    for y in range(h):
+        row = []
+        for x in range(w):
+            b = words[((y // 8) * (w // 8) + x // 8) * 32 + (y % 8) * 4 + (x % 8) // 2]
+            row.append(b >> 4 if x % 2 else b & 15)
+        rows.append(row)
+    return rows
+
+
+class ArtTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def png(self, name: str, img: Image.Image) -> Path:
+        path = self.dir / name
+        img.save(path)
+        return path
+
+    def test_committed_art_is_current(self):
+        with contextlib.redirect_stdout(io.StringIO()) as said:
+            status = asset.main(["ui", "--check"])
+        self.assertEqual(status, 0, said.getvalue())
+
+    def test_limits_come_from_art_h(self):
+        self.assertEqual(asset.SPRITE_SIZE, 64)
+        self.assertEqual(asset.SHADOW_INDEX, 15)
+        self.assertLess(asset.SPRITE_COLOURS, asset.SHADOW_INDEX)
+        self.assertEqual(asset.BOX_SIZE, 80)
+
+    def test_every_picture_round_trips(self):
+        ids, _ = asset.art_sources()
+        self.assertIn("ART_ITEM_COUNT", ids)
+        manifest = asset.tomllib.loads(
+            (asset.ART_DIR / "art.toml").read_text(encoding="utf-8")
+        )
+        names, icons, banks, bank_of = asset.art_icons16(manifest["icon16_banks"])
+        for name, rows, b in zip(names, icons, bank_of, strict=True):
+            src = asset.rgba_pixels(asset.ART_DIR / "icons16" / f"{name}.png")
+            back = tile_pixels(asset.tiles_of(rows, 4), 16, 16)
+            bank = banks[b]
+            for y in range(16):
+                for x in range(16):
+                    c = src[y][x]
+                    self.assertEqual(back[y][x] == 0, c is None, name)
+                    if c is not None:
+                        self.assertEqual(bank[back[y][x]], asset.bgr555(*c), name)
+        for path in asset.art_files("sprites"):
+            rows, palette, w, h = asset.art_sprite(path)
+            src = asset.rgba_pixels(path)
+            ys = [y for y, r in enumerate(src) if any(c is not None for c in r)]
+            xs = [x for r in src for x, c in enumerate(r) if c is not None]
+            x0, y0 = (64 - w) // 2, 64 - h
+            back = tile_pixels(asset.tiles_of(rows, 4), 64, 64)
+            for y in range(h):
+                for x in range(w):
+                    c = src[min(ys) + y][min(xs) + x]
+                    i = back[y0 + y][x0 + x]
+                    self.assertEqual(i == 0, c is None, path.name)
+                    if c is not None:
+                        self.assertEqual(palette[i], asset.bgr555(*c), path.name)
+            self.assertEqual(sum(map(any, back)), h, path.name)  # nothing outside
+        for path in asset.art_files("shadows"):
+            half, width, _ = asset.art_shadow(path)
+            src = asset.rgba_pixels(path)
+            for y in range(8):
+                full = half[y] + half[y][::-1]
+                self.assertEqual(
+                    [bool(v) for v in full], [c is not None for c in src[y]], path.name
+                )
+            self.assertEqual(width, int(path.stem[1:]))
+
+    def test_icons8_keep_their_shape(self):
+        img = Image.new("RGBA", (8, 8))
+        img.putpixel((0, 0), (10, 20, 30, 255))
+        img.putpixel((7, 3), (10, 20, 30, 255))
+        rows = asset.one_colour(self.dir, asset.rgba_pixels(self.png("a.png", img)))
+        self.assertEqual(rows[0][0], 1)
+        self.assertEqual(rows[3][7], 1)
+        self.assertEqual(sum(map(sum, rows)), 2)
+        img.putpixel((4, 4), (200, 20, 30, 255))
+        with self.assertRaisesRegex(asset.ArtError, "2 colours"):
+            asset.one_colour(
+                self.dir / "b.png", asset.rgba_pixels(self.png("b.png", img))
+            )
+
+    def test_broken_pictures_are_refused(self):
+        many = Image.new("RGBA", (40, 40))
+        many.putdata(
+            [(i * 8, 0, 0, 255) for i in range(15)] + [(0, 0, 0, 255)] * (1600 - 15)
+        )
+        with self.assertRaisesRegex(asset.ArtError, "more than 14 colours"):
+            asset.art_sprite(self.png("many.png", many))
+        with self.assertRaisesRegex(asset.ArtError, "65x10"):
+            asset.art_sprite(
+                self.png("wide.png", Image.new("RGBA", (65, 10), (9, 9, 9, 255)))
+            )
+        with self.assertRaisesRegex(asset.ArtError, "empty"):
+            asset.art_sprite(self.png("none.png", Image.new("RGBA", (8, 8))))
+        lopsided = Image.new("RGBA", (64, 8))
+        lopsided.putpixel((10, 4), (9, 9, 9, 255))
+        with self.assertRaisesRegex(asset.ArtError, "mirrored"):
+            asset.art_shadow(self.png("w16.png", lopsided))
+        lopsided.putpixel((53, 4), (9, 9, 9, 255))
+        with self.assertRaisesRegex(asset.ArtError, "44 px drawn"):
+            asset.art_shadow(self.png("w16.png", lopsided))
+        with self.assertRaisesRegex(asset.ArtError, "wNN"):
+            asset.art_shadow(self.png("big.png", lopsided))
+        with self.assertRaisesRegex(asset.ArtError, "indexed 80x80"):
+            asset.art_box(self.png("box.png", Image.new("RGB", (80, 80))))
+        with self.assertRaisesRegex(asset.ArtError, "put icons16/fav.png"):
+            asset.art_icons16([["file"]])
+        with self.assertRaisesRegex(asset.ArtError, "which icons16/ hasn't"):
+            asset.art_icons16(
+                [
+                    [n]
+                    for n in (
+                        "fav",
+                        "file",
+                        "folder",
+                        "gb",
+                        "gba",
+                        "gbc",
+                        "info",
+                        "nes",
+                        "nor",
+                        "recent",
+                        "sd",
+                        "set",
+                        "torii",
+                        "home",
+                    )
+                ]
+            )
+        with self.assertRaisesRegex(asset.ArtError, "lower-case"):
+            asset.art_name(Path("Icon-A.png"))
 
 
 if __name__ == "__main__":
