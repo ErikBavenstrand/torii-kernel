@@ -114,3 +114,10 @@ logged "home: 6 items"
 boot 2 -w "nav: home ready" -f 300
 ! grep -q "library: new index" "$log" || fail "the boot after the delete rebuilt the index"
 echo "PASS: a deleted game leaves home, the favourites and the library index at once"
+
+# The test hook takes an action only with its magic word (nav.h): a stray
+# write to EWRAM can't start one
+new_cart hook
+boot 1 -P 60:nav_test_path:/Hello.gba -p 60:nav_test_action:1 -f 300
+! grep -q "nav: test hook" "$log" || fail "the hook ran an action without its magic"
+echo "PASS: the test hook takes no action without its magic word"

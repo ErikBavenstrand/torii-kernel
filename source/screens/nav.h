@@ -53,7 +53,7 @@ void nav_back(void);
 void nav_defer(void (*fn)(u32 arg), u32 arg);
 
 // For home and the pages: an item's name, and what it holds ("176 games",
-// "1,204 files"; "" for none)
+// "1,204 files", "one page"; "" for Info)
 const char *nav_item_name(u32 item);
 const char *nav_item_count(u32 item);
 // The clock as the title bar shows it ("14:32", "2:32 PM"; "" while it
@@ -62,9 +62,12 @@ const char *nav_clock(void);
 
 // Tests: tests/nav.sh's hook. mgba-shot writes a path into nav_test_path
 // and then an action into nav_test_action (NAV_TEST_*, with bits 8-15 the
-// save type plus 1, 0 for the game's own, and bit 16 a hard reset); the
-// menu runs it through actions.h once it is up and still, as a page would.
-// Both stay 0 on a cart.
+// save type plus 1, 0 for the game's own, bit 16 a hard reset, and bits
+// 24-31 NAV_TEST_MAGIC); the menu runs it through actions.h once it is up
+// and still, as a page would. Both stay 0 on a cart, and the menu takes
+// the hook only in the emulator, with the magic: a stray write to EWRAM
+// can't erase the user's NOR.
+#define NAV_TEST_MAGIC 0x7Eu
 enum {
 	NAV_TEST_NONE,
 	NAV_TEST_CLEAN,      // action_launch(path, ACTION_CLEAN)

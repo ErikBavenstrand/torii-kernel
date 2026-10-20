@@ -7,6 +7,6 @@
 # (v0.3.2: 65535, the erased slot's value).
 #! settings 1=1
 -w "nav: home ready"
--P "@8:nav_test_path:/Hello.gba" -p @8:nav_test_action:2
+-P "@8:nav_test_path:/Hello.gba" -p @8:nav_test_action:0x7E000002
 -w "BOOT WITH ADDON: reset 1, savestate 0, sleep 0, cheats 0 "
 -s @0:addons.png

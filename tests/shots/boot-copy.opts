@@ -8,7 +8,7 @@
 #! sd-file "/Big Adventure - The Longest Subtitle (Europe) (En,Fr,De).gba" 0x400000 tests/roms/hello/hello.gba
 #! env OMEGA_COPY_RATE=0x8000
 -w "nav: home ready"
--P "@8:nav_test_path:/Big Adventure - The Longest Subtitle (Europe) (En,Fr,De).gba" -p @8:nav_test_action:1
+-P "@8:nav_test_path:/Big Adventure - The Longest Subtitle (Europe) (En,Fr,De).gba" -p @8:nav_test_action:0x7E000001
 -w ", CLEAN BOOT"
 -H @6:@12
 -T @1:@130

@@ -107,7 +107,8 @@ nav_info_page() { _nav_fail "the Info page's pages come with B17 (nav_info_page 
 
 # _nav_hook ACTION PATH [OPTIONS...]: the hook's pokes (nav.h's NAV_TEST_*):
 # the path first, then the action word with the save type + 1 (or a NOR
-# game's index) in bits 8-15 and a hard reset in bit 16
+# game's index) in bits 8-15, a hard reset in bit 16 and NAV_TEST_MAGIC in
+# bits 24-31
 _nav_hook() {
   local action=$1 path=$2 at=30 arg=0 hard=0 opt
   shift 2
@@ -123,7 +124,7 @@ _nav_hook() {
       ;;
     esac
   done
-  _nav_file "-P \"$at:nav_test_path:$path\"" "-p $at:nav_test_action:$((action | arg << 8 | hard << 16))"
+  _nav_file "-P \"$at:nav_test_path:$path\"" "-p $at:nav_test_action:$((0x7E000000 | action | arg << 8 | hard << 16))"
 }
 
 nav_launch() {

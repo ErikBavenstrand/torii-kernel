@@ -199,7 +199,7 @@ def power_on(cart: Path, keys, frames: int, extra: list[str] = ()) -> tuple[str,
         if key.startswith("hook:"):
             _, action, path = key.split(":", 2)
             args += ["-P", f"{frame}:nav_test_path:{path}"]
-            args += ["-p", f"{frame}:nav_test_action:{action}"]
+            args += ["-p", f"{frame}:nav_test_action:{0x7E000000 | int(action)}"]
             continue
         args += ["-k", f"{frame}:{key}"]
         if key != "-":

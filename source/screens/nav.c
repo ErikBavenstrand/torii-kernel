@@ -415,8 +415,13 @@ static void after_action(void)
 	if (!ui_active())
 		nav.engine = 0;
 	if (!nav.engine) {
+		// In from black; a page whose item the action hid (the last game
+		// of a console deleted) gives home facing the nearest item
 		struct registry_place p = nav.place;
-		show(&p, UI_TR_LEAVE, 0);  // in from black
+		count_items();
+		if (p.open && registry_index(nav.shown, nav.shown_count, p.item) >= nav.shown_count)
+			p.open = 0;
+		show(&p, UI_TR_LEAVE, 0);
 		return;
 	}
 	count_items();
@@ -440,6 +445,8 @@ static void test_hook(void)
 {
 	u32 word = nav_test_action;
 	nav_test_action = 0;
+	if (word >> 24 != NAV_TEST_MAGIC || !tlog_in_emulator())
+		return;
 	u32 action = word & 0xFF, save = (word >> 8) & 0xFF, hard = (word >> 16) & 1;
 	nav_test_path[USERDATA_PATH_MAX - 1] = 0;
 	tlog("nav: test hook %lu %s", (unsigned long)action, nav_test_path);
@@ -475,10 +482,12 @@ static void test_hook(void)
 
 // --- The loop ---------------------------------------------------------------------
 
-// The clock under a dialog (dialog_set_tick), while the place is still up
+// The clock under a dialog (dialog_set_tick), while the place is still up:
+// not in a session of the dialogs' own (a launch's), whose views have no
+// ctx
 static void clock_tick(void)
 {
-	if (nav.engine)
+	if (nav.engine && ui_depth() && ui_view_at(0)->ctx)
 		clock_read();
 }
 

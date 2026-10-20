@@ -83,7 +83,7 @@ struct game_pick {
 // Fills g for g->name: 0 if it isn't a game. A GBA game reads its cheat and
 // save type files; an emulated one starts only with Game_launch's line 0.
 u32 Game_pick(struct game_pick *g);
-// Launches g as line menu_line of the v0.3 game menu said (0 CLEAN BOOT, 1 BOOT WITH ADDON,
+// Launches g as the v0.3 game menu's line menu_line did (0 CLEAN BOOT, 1 BOOT WITH ADDON,
 // 2 WRITE TO NOR CLEAN, 3 WRITE TO NOR ADDON), L held for a hard reset,
 // with no engine session up (its dialogs run their own). Returns only if it
 // didn't start a game: 0 nothing written, 1 the game NOR may have changed,

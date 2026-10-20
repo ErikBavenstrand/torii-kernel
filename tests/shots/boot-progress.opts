@@ -2,6 +2,6 @@
 # through the menu's test hook (tests/nav.sh), the game's name as its
 # title, as it comes up.
 -w "nav: home ready"
--P "@8:nav_test_path:/Hello.gba" -p @8:nav_test_action:1
+-P "@8:nav_test_path:/Hello.gba" -p @8:nav_test_action:0x7E000001
 -w "screen ready: progress"
 -s @1:screen.png

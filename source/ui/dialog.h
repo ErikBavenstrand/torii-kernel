@@ -115,7 +115,7 @@ void dialog_progress_drew(u32 x);
 
 // A function the dialogs call every DIALOG_PROGRESS_FRAMES or so while they
 // hold the screen (NULL: none), for the screen under them, whose own loop
-// waits meanwhile: the lists keep their clock going under a question or a
+// waits meanwhile: the menu keeps its clock going under a question or a
 // 4-minute erase. It runs before a frame, from the dialogs' loops, never
 // from inside ui_frame; it must check that its screen is still up.
 void dialog_set_tick(void (*tick)(void));

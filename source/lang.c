@@ -336,7 +336,7 @@ void LoadEnglish(void)
 	gl_pop_cancel_button = (char *)en_pop_cancel_button;
 }
 //---------------------------------------------------------------------------------
-// The languages offered in SETTINGS. A new language adds its strings and a
+// The languages Settings offers. A new language adds its strings and a
 // Load function above, and a row here with an id no other row uses.
 const LANG_PACK lang_packs[] = {
 	{0xE1E1, en_lang, LoadEnglish},

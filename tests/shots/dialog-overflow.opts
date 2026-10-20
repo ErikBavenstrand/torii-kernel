@@ -4,7 +4,7 @@
 # padded). B closes it, and home comes back.
 #! sd-file /Big.gba 0x2000004 tests/roms/hello/hello.gba
 -w "nav: home ready"
--P "@8:nav_test_path:/Big.gba" -p @8:nav_test_action:1
+-P "@8:nav_test_path:/Big.gba" -p @8:nav_test_action:0x7E000001
 -w "screen ready: dialog"
 -s @1:dialog.png
 -k @10:B -k @14:-

@@ -7,6 +7,6 @@
 #! sd-fragmented /Frag.gba 0x100000 62 tests/roms/hello/hello.gba
 #! expect-error error 7:
 -w "nav: home ready"
--P "@8:nav_test_path:/Frag.gba" -p @8:nav_test_action:1
+-P "@8:nav_test_path:/Frag.gba" -p @8:nav_test_action:0x7E000001
 -w "screen ready: dialog"
 -s @1:dialog.png

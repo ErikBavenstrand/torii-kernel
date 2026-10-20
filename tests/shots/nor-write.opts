@@ -4,7 +4,7 @@
 # dialog closes (source/progress.h)
 #! sd-file /Big.gba 0x400000 tests/roms/hello/hello.gba
 -w "nav: home ready"
--P "@8:nav_test_path:/Big.gba" -p @8:nav_test_action:3
+-P "@8:nav_test_path:/Big.gba" -p @8:nav_test_action:0x7E000003
 -w "screen ready: progress"
 -s @760:half.png
 -w "nor: list saved"

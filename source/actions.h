@@ -43,7 +43,8 @@ enum {
 // Starts the game at path, an SD file's full path ("/GBA/Advance Wars.gba"),
 // or "NOR:" and a game NOR game's name (a Recent entry). GB, GBC and NES
 // games start clean whatever how says, and only GBA games are written to
-// NOR. hard_reset: the game starts through the BIOS's hard reset (L held).
+// NOR (a page never offers the others that: they are only logged).
+// hard_reset: the game starts through the BIOS's hard reset (L held).
 // Returns only if no game started (see the top).
 u32 action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset);
 

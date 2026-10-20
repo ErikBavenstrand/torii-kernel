@@ -7,10 +7,10 @@
 #! sd-file /SAVER 16 tests/roms/hello/hello.gba
 #! expect-error error 2:
 -w "nav: home ready"
--P "@8:nav_test_path:/Hello.gba" -p @8:nav_test_action:3
+-P "@8:nav_test_path:/Hello.gba" -p @8:nav_test_action:0x7E000003
 -w "nor: list saved"
 -w "nav: home ready"
--p @8:nav_test_action:6
+-p @8:nav_test_action:0x7E000006
 -w "screen ready: dialog"
 -s @1:error.png
 -k @8:B -k @12:-

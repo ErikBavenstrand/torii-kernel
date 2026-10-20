@@ -1253,7 +1253,7 @@ u32 Game_pick(struct game_pick *g)
 	return 1;
 }
 //---------------------------------------------------------------------------------
-// The launch itself, from the game menu's line MENU_line (0 CLEAN BOOT, 1
+// The launch itself, as the v0.3 game menu's line MENU_line did (0 CLEAN BOOT, 1
 // BOOT WITH ADDON, 2 WRITE TO NOR CLEAN, 3 WRITE TO NOR ADDON), with no
 // engine session up.
 static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8 old_Save_num, u32 key_L)
