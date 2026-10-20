@@ -6,6 +6,20 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** lists take any row pitch from 8 to 32 px: rows lie in one
+  tile canvas whose map is written once and scrolled by the BG scroll alone
+  (14 px rows hold 60 fps; a held scroll's worst frame is 80,864 cycles). The
+  selection is a sliding pill of sprites under the text on lists over a card,
+  and a drawn pill on lists with paper; the UI builds OAM each frame. Strided
+  VRAM copies and DMA fills and copies: a 14 px row clears in 2.6k cycles and
+  copies from the cache in 6.6k (B9, R5; `a3200ac`, `49e4b74`, `503a4dd`,
+  `206ea0b`).
+- **Added:** Paper clean widgets, every size in the theme: cards, the title
+  bar, the hint bar of key chips or an explanation, path pills, a storage
+  bar, section labels with 8x8 icons, a thinner scroll bar, and a reading
+  view for long texts (B9; `49e4b74`, `206ea0b`).
+- **Changed:** light ink3 `#8C847B` and dark NES ink `#EF7B84`, for 3:1 hint
+  labels and 4.5:1 danger text on floating cards (B9; `49e4b74`).
 - **Added:** the library index: boot loads `/torii/library.idx` (every game
   by extension, sorted per console by the name shown, custom names first, up
   to 4,096) into PSRAM, or builds it with a progress dialog once that is

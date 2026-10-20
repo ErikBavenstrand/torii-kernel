@@ -323,6 +323,8 @@ Bugs and loose ends the v0.4 ticket sessions and the conductor's reviews found a
 - The `diag-tests` golden failed once at frame 4 while the colima VM was busy, then passed unchanged: possibly flaky under load (B2).
 - Diagnostics' line list (`source/diag.c` `lines_fetch`) doesn't refresh a line that leaves its window, so a cached row could show old text if the list scrolled back; can't show today (B7; B17's reading view replaces it).
 - Parsing a large `/torii/names.txt` runs as one step of the library rebuild: 0.26 s for 1,000 sorted lines, 0.82 s unsorted, a one-off menu stall (`gamename_custom_parse`; B3).
+- `tr-tab`'s `settings2-in` and `settings2-back` goldens catch a plain backdrop frame since B9 (v0.3 Settings page 2 comes in a frame later); B10 deletes those screens (B9).
+- A list already at its last scroll sends a cursor event with an unchanged index on every DOWN (`ui_list.c` `set_cursor`; B9 review).
 
 ## v0.5 Saves
 
