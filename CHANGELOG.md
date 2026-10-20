@@ -6,6 +6,16 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** the Info page: Controls, In game, Your cart and About open
+  reading pages (UP/DOWN scroll, L/R page, B back); In game follows the
+  hotkey settings as games are patched; Your cart shows what the card, NOR
+  and lists hold; About shows the version, build ID, cart revision, FPGA
+  firmware, the card's size and free space, and the credits; Diagnostics runs
+  from its row (after any library write finishes) and B comes back (B17;
+  `b5b99ad`, `e8d765e`, `89445e5`, `15ae5e2`).
+- **Fixed:** a reading view at its last scroll no longer reports a move on
+  DOWN; Diagnostics' log blanks a line leaving its 32-line window, so a
+  cached row can't show old text (B17; `b5b99ad`).
 - **Added:** names database: `just names-update SD_PATH` downloads
   libretro-database's No-Intro dats (CC BY-SA 4.0) on the PC and writes
   `/torii/names.db` and the card's CRCs to `/torii/crc.txt`; the library walk

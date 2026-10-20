@@ -323,10 +323,10 @@ What the v0.4 ticket sessions, the conductor's reviews and the research left ope
 
 - The launch copy's VBlank hook sets the VBlank handler back to none afterwards instead of restoring the previous one; harmless while the engine installs none (`source/progress.c`; B8 review).
 - The `diag-tests` golden failed once at frame 4 while the colima VM was busy, then passed unchanged: possibly flaky under load (B2).
-- Diagnostics' line list (`source/diag.c` `lines_fetch`) doesn't refresh a line that leaves its window, so a cached row could show old text if the list scrolled back; can't show today (B7; B17's reading view replaces it).
+- ~~Diagnostics' line list (`source/diag.c` `lines_fetch`) doesn't refresh a line that leaves its window (B7).~~ Fixed by B17 (`b5b99ad`).
 - Parsing a large `/torii/names.txt` runs as one step of the library rebuild: 0.26 s for 1,000 sorted lines, 0.82 s unsorted, a one-off menu stall (`gamename_custom_parse`; B3).
 - `tr-tab`'s `settings2-in` and `settings2-back` goldens catch a plain backdrop frame since B9 (v0.3 Settings page 2 comes in a frame later); B10 deletes those screens (B9).
-- A list already at its last scroll sends a cursor event with an unchanged index on every DOWN (`ui_list.c` `set_cursor`; B9 review).
+- ~~A list already at its last scroll sends a cursor event with an unchanged index on every DOWN (B9 review).~~ Fixed by B17 (`b5b99ad`).
 - A popup's first draw (143k cycles) and a confirmation's (170k) land a frame late while the library's background scan runs (B11).
 - While an overlay moves, only one list clips, so a page with two lists shows the second's spare rows for 4–6 frames; over a popup, the confirmation's rounded corners show the dimmed page for 1–2 px (B11).
 - Deleting the running log file with LOGGING on stops SD logging until the next boot (pre-existing; B10).
@@ -351,6 +351,7 @@ Made during the build without the user; each is cheap to change.
 - **The "played ago" words** and the unset clock counting as before 2026-10-01 (B5).
 - **Mockups for Settings and the rename keyboard,** approved by the conductor for the build (`docs/design/v0.4/settings-*.png`, `keyboard-*.png`).
 - **Dropped v0.3 features:** the NOR menu's load and back-up of a save; the help QR code; the cheat screen, per-game save type, hard reset and write to NOR with addon come back in B13/B14 (B10).
+- **Info texts:** all wording, card sizes in binary GB/MB, Your cart's contents (B17); Controls must be re-checked once every page has landed (B20).
 - **Names database:** names-update computes CRCs on the PC; a romhack missing from the dat shows its base game's name via the GBA game code; no CRC at launch (B21).
 - **The boot position is written after 5 s idle,** a new SD write in the menu (B10).
 - **Popups and confirmations:** keys pressed while one closes: moves reach the page, A/B/START/SELECT are dropped; the confirmation's dim toward white also fades the hint bar's labels in light; L/R page by 8 rows (B11).
