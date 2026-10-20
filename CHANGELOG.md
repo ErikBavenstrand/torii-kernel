@@ -6,6 +6,17 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** names database: `just names-update SD_PATH` downloads
+  libretro-database's No-Intro dats (CC BY-SA 4.0) on the PC and writes
+  `/torii/names.db` and the card's CRCs to `/torii/crc.txt`; the library walk
+  names games by CRC, then GBA game code, and sorts by those names; Identify
+  library and the games on Recent get CRCs in the background after boot
+  (only on cards with names.db, crc.txt or art) (B21; `81b80a7`, `ff4968d`,
+  `1d1f80a`, `0fecaec`, `7d60271`, `ac754b9`, `4359e99`).
+- **Changed:** CRC32 runs from an EWRAM table a word at a time: 17 cycles a
+  byte instead of 39 (B21; `81b80a7`).
+- **Fixed:** a safe file over its size cap counts as a failed read, so
+  nothing writes over it (B21; `4359e99`).
 - **Changed:** the new menu replaces the v0.3 screens (T1): home lists the
   items (Recent, Favourites and each console while they hold games, then SD
   card, NOR, Settings, Info) until the carousel, each opening a page frame

@@ -331,6 +331,8 @@ What the v0.4 ticket sessions, the conductor's reviews and the research left ope
 - While an overlay moves, only one list clips, so a page with two lists shows the second's spare rows for 4–6 frames; over a popup, the confirmation's rounded corners show the dimmed page for 1–2 px (B11).
 - Deleting the running log file with LOGGING on stops SD logging until the next boot (pre-existing; B10).
 - Non-canonical paths such as `/deep/../x.gba` launch and are stored in Recent as given (only the test hook can make one today; B10).
+- A large crc.txt loads slowly after each boot: about 6 s of background work for 3,000 records (emulated), mostly hashing paths (B21).
+- A read-only crc.txt is never updated: dates are re-adopted and Recent games re-identified every boot (B21).
 
 ### Decisions to review
 
@@ -349,6 +351,7 @@ Made during the build without the user; each is cheap to change.
 - **The "played ago" words** and the unset clock counting as before 2026-10-01 (B5).
 - **Mockups for Settings and the rename keyboard,** approved by the conductor for the build (`docs/design/v0.4/settings-*.png`, `keyboard-*.png`).
 - **Dropped v0.3 features:** the NOR menu's load and back-up of a save; the help QR code; the cheat screen, per-game save type, hard reset and write to NOR with addon come back in B13/B14 (B10).
+- **Names database:** names-update computes CRCs on the PC; a romhack missing from the dat shows its base game's name via the GBA game code; no CRC at launch (B21).
 - **The boot position is written after 5 s idle,** a new SD write in the menu (B10).
 - **Popups and confirmations:** keys pressed while one closes: moves reach the page, A/B/START/SELECT are dropped; the confirmation's dim toward white also fades the hint bar's labels in light; L/R page by 8 rows (B11).
 - **Look values read off the mockups** where spec.md is silent: shadows, scroll bar, hint chips, pill size and spring, path pill colour (B1, B9).
@@ -356,6 +359,7 @@ Made during the build without the user; each is cheap to change.
 ### Open questions and assumptions
 
 - **Unmeasured on a real cart:** the cart's ROM copy rate (B8's bar estimate); the library walk and first-scan times (emulated SD is about 5x slower than the cart); the theme wipe's HBlank palette DMA (mGBA can't show tearing); how the carousel's scaled pixel art reads at 0.6x and 1.9x; the 14 px rows' feel.
+- **Names database timings on a cart:** Identify about 1.6 s per MB in the foreground (estimate); crc.txt write steps about 10 ms each (B21).
 - **Licences:** No-Intro's terms for a derived name table (the names database is built on the user's machine and never bundled); libretro-thumbnails art has no licence grant (fetched locally, never committed).
 - **Design questions for later tickets:** Settings' 12 px rows inside section cards that scroll (B16); whether WIN0 and WIN1 suffice when the popup, the list clip, the dim, the zoom and the wipe overlap (B11, B19); the 8x8 GBA and Info icons need a redraw.
 - **PSRAM map:** the user was unsure about fixing it; it now holds SD names (832 KB), two library index slots (1–3.5 MB), recents and favourites (3.5–4 MB), the cover cache (4 MB) and reserves.
