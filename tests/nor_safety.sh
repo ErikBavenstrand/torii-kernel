@@ -178,22 +178,38 @@ for cut in kernel:erase:1@0x7A0000 kernel:program:1@0x7A0000 kernel:program:4240
   fi
 done
 
-# Delete latest erases the whole game and drops it from the list. A later
+# start_home: Start on Home (slot 32 = 2), so each power-on's route starts
+# on home whatever page the last one stayed on (Last place)
+start_home() {
+  [ -f "$cart/kernel-nor.bin" ] || head -c $((8 << 20)) /dev/zero | tr '\0' '\377' >"$cart/kernel-nor.bin"
+  printf '\002\000' | dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7B0000 + 2 * 32)) conv=notrunc status=none
+}
+
+# On the NOR page: Delete on a game that isn't the latest only says so, and
+# B on the latest game's question keeps it; both erase nothing. Then Delete
+# answered yes erases the whole game and drops it from the list. A later
 # write with the same header, cut after its first block, is not listed.
-# (B on the NOR page's question, which keeps the game, comes back with B15.)
 if shard_case; then
-  echo "SKIP (waiting for B15): B on the NOR page's delete question keeps the game"
   new_cart delete A.gba B.gba B2.gba C.gba
+  start_home
   write 1
   write 2
   # shellcheck disable=SC2046
-  boot $(nav_nor_delete at=130) -f 400
+  boot $(nav_nor_open 0 delete) -w "screen ready: dialog" -k @30:-
+  ! grep -q 'nor: deleting' "$cart/$runs.log" || fail "Delete on the first of two games deleted"
+  # shellcheck disable=SC2046
+  boot $(nav_nor_delete_page 1 no) -w "nor: delete 1: cancelled" -k @30:-
+  ! grep -q 'nor: deleting' "$cart/$runs.log" || fail "B on the delete question deleted"
+  holds 0x20000 B.gba || fail "B on the delete question changed B.gba"
+  # shellcheck disable=SC2046
+  boot $(nav_nor_delete_page 1 yes) -w "nav: page nor ready" -k @30:-
+  grep -q 'nor: deleting B.gba' "$cart/$runs.log" || fail "Delete on the NOR page didn't delete B.gba"
   erased 0x20000 0x20000 || fail "delete latest left B.gba's data"
   write 3 game:program:4097
   write 4
   holds 0 A.gba || fail "A.gba was overwritten"
   holds 0x20000 C.gba || fail "C.gba is not at 0x20000: the half-written B2.gba is listed"
-  echo "PASS: delete latest erases the game, and a half-written game with its header isn't listed"
+  echo "PASS: the NOR page deletes only the latest game, B keeps it, Delete erases it, and a half-written game with its header isn't listed"
 fi
 
 # A power cut while a game's data is written: the game isn't listed.
@@ -370,7 +386,7 @@ if shard_case; then
   new_cart recent A.gba
   write 1
   # shellcheck disable=SC2046
-  boot $(nav_nor_launch 0 at=130) -f 400
+  boot $(nav_nor_launch_page 0) -w "launch: loading A.gba from NOR" -k @200:-
   grep -q 'mode game from NOR offset 000000$' "$cart/$runs.log" || fail "A.gba didn't start from NOR"
   recent=$(mtype -i "$cart/sd.img" ::/torii/recent.txt 2>/dev/null | grep -v '^[#@]' | cut -f2 || true)
   [ "$recent" = "NOR:A.gba" ] || fail "Recent has '$recent', expected NOR:A.gba"

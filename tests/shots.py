@@ -21,6 +21,11 @@ bytes, to DEST in RUNS runs of clusters (tools/sdimg.sh put-fragmented): a
 game too fragmented to start (dialog-fragmented). A "kernel error:" line
 fails a scenario unless an "#! expect-error TEXT" line expects it (it starts
 with TEXT); an expected one that isn't logged fails it too.
+"#! nor-game NAME SIZE ROM" puts a game on the game NOR as an older kernel
+lists it (the boot saves the list in Torii's format): ROM's bytes at the
+next free 128 KB block, its area SIZE bytes rounded up to whole blocks, and
+an entry named NAME, so a NOR page shows games of any size without writing
+them through the menu (nor-page).
 "#! env NAME=VALUE" sets an environment variable for the emulated cart, as
 OMEGA_COPY_RATE=BYTES (bytes the cart's ROM copy moves per frame), which
 makes a launch's copy take as long as the cart's (boot-copy). A scenario with
@@ -79,6 +84,9 @@ LONG_NAME = (
 DEEP_FILES = 300
 SETTINGS = 0x7B0000  # settings sector in the kernel NOR (as tests/settings.sh)
 KERNEL_NOR_SIZE = 8 << 20
+GAME_NOR_SIZE = 64 << 20
+NOR_LIST_A = 0x7A0000  # the game NOR's list, as the official kernel keeps it
+NOR_BLOCK = 0x20000
 
 HEADER = """\
 # Golden screen hashes for tests/shots.py, written by `just shots-update`.
@@ -261,6 +269,9 @@ def boot(name: str, sd: Path, cart: Path, out: Path, extra: list[str] = ()):
             padded.unlink()
             # The files that split it up go; its clusters stay where they are
             run(["mdel", "-i", str(cart / "sd.img"), "::/FILL*.BIN"])
+        elif line.startswith("#! nor-game "):
+            _, _, name, size, src = shlex.split(line)
+            nor_game(cart, name, int(size, 0), Path(src).read_bytes())
         elif line.startswith("#! env "):
             name, _, value = line.split(maxsplit=2)[2].partition("=")
             cart_env[name] = value
@@ -278,6 +289,44 @@ def boot(name: str, sd: Path, cart: Path, out: Path, extra: list[str] = ()):
     env.update(cart_env)
     cmd = [SHOT, kernel, "-C", str(EPOCH), "-O", str(out), "-i", str(opts), *extra]
     return subprocess.run(cmd, env=env, capture_output=True, text=True, check=False)
+
+
+def nor_game(cart: Path, name: str, size: int, rom: bytes) -> None:
+    """Adds a game to the cart's game NOR and an older kernel's list entry
+    for it (FM_NOR_FS, source/ezkernel.h) after the entries already there."""
+    kernel, game = cart / "kernel-nor.bin", cart / "game-nor.bin"
+    for path, length in ((kernel, KERNEL_NOR_SIZE), (game, GAME_NOR_SIZE)):
+        if not path.exists():
+            path.write_bytes(b"\xff" * length)
+    area = -(-max(size, len(rom)) // NOR_BLOCK) * NOR_BLOCK
+    with kernel.open("r+b") as k, game.open("r+b") as g:
+        k.seek(NOR_LIST_A)
+        offset, index = 0, 0
+        while True:
+            entry = k.read(132)
+            filesize = struct.unpack_from("<I", entry, 108)[0]
+            if filesize in (0, 0xFFFFFFFF):
+                break
+            offset += filesize
+            index += 1
+        g.seek(offset)
+        g.write(rom)
+        k.seek(NOR_LIST_A + 132 * index)
+        k.write(
+            struct.pack(
+                "<100sHHHHIBBH16s",
+                name.encode(),
+                offset >> 17,
+                0,
+                0,
+                0,
+                area,
+                0x11,
+                0,
+                0,
+                rom[0xA0:0xB0],
+            )
+        )
 
 
 def expected_errors(opts: Path) -> list[str]:
