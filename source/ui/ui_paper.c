@@ -101,8 +101,7 @@ static int measure_tiles(u8 node, struct engine_budget *need, u32 cols_sets)
 
 // A rounded bar: [x, x + w) x [y, y + h) of role, its ends rounded by
 // radius, only its columns in [cx0, cx1)
-static void round_bar(const struct text_window *win, u32 x, u32 y, u32 w, u32 h, u32 radius, u32 role, u32 cx0,
-		      u32 cx1)
+static void round_bar(const struct text_window *win, u32 x, u32 y, u32 w, u32 h, u32 radius, u32 role, u32 cx0, u32 cx1)
 {
 	for (u32 i = 0; i < h; i++) {
 		u32 e = i < h - 1 - i ? i : h - 1 - i, inset = ui_round_inset(radius, e);
@@ -145,8 +144,8 @@ u32 ui_key_chip(const struct text_window *win, u32 x, u32 top, const char *key, 
 		round_bar(win, x, top, cw, l->hint_chip_h, l->hint_chip_radius, UI_ROLE_TRACK, 0, ww);
 		draw_text(win, font, x + l->hint_chip_pad, y, kw + 1, UI_ROLE_DIM, key);
 		if (lw && x + cw + l->hint_label_gap < ww)
-			draw_text(win, font, x + cw + l->hint_label_gap, y, ww - x - cw - l->hint_label_gap, UI_ROLE_FAINT,
-				  label);
+			draw_text(win, font, x + cw + l->hint_label_gap, y, ww - x - cw - l->hint_label_gap,
+				  UI_ROLE_FAINT, label);
 	}
 	return cw + (lw ? l->hint_label_gap + lw : 0);
 }
@@ -208,11 +207,11 @@ static void make_card(u32 *tiles, const struct ui_card_config *c, u32 paper)
 				s32 x = (s32)((t % 3) * 8 + px), y = (s32)((t / 3) * 8 + py);
 				u32 role = 0;
 				if (card_body(x, y, x0, y0, x1, y1, r)) {
-					int edge = (c->flags & UI_CARD_EDGE) &&
-						   !(card_body(x - 1, y, x0, y0, x1, y1, r) &&
-						     card_body(x + 1, y, x0, y0, x1, y1, r) &&
-						     card_body(x, y - 1, x0, y0, x1, y1, r) &&
-						     card_body(x, y + 1, x0, y0, x1, y1, r));
+					int edge =
+						(c->flags & UI_CARD_EDGE) && !(card_body(x - 1, y, x0, y0, x1, y1, r) &&
+									       card_body(x + 1, y, x0, y0, x1, y1, r) &&
+									       card_body(x, y - 1, x0, y0, x1, y1, r) &&
+									       card_body(x, y + 1, x0, y0, x1, y1, r));
 					role = edge ? UI_ROLE_BORDER : paper;
 				} else if (sh && card_body(x, y - (s32)sh, x0, y0, x1, y1, r)) {
 					role = UI_ROLE_SHADOW;
@@ -408,8 +407,7 @@ void ui_title_set_right(u8 node, const char *text)
 	ui_dirty(node, TITLE_RIGHT);
 }
 
-const struct ui_ops ui_title_ops = {sizeof(struct title_state), title_measure, title_init, 0, title_update,
-					title_draw};
+const struct ui_ops ui_title_ops = {sizeof(struct title_state), title_measure, title_init, 0, title_update, title_draw};
 
 // --- Hint bar ------------------------------------------------------------------
 
@@ -539,7 +537,9 @@ static void path_draw(u8 node)
 	u32 step = sep + 2u * l->path_gap;  // between pills
 	text_clear(&win, 0, 0, w, h, ui_paper(node, UI_ROLE_PANEL));
 	// The segments, their starts and lengths
-	enum { SEGS = 16 };
+	enum {
+		SEGS = 16
+	};
 	const char *seg[SEGS];
 	u32 len[SEGS], count = 0;
 	for (const char *s = st->path; *s && count < SEGS;) {
@@ -580,7 +580,8 @@ static void path_draw(u8 node)
 			round_bar(&win, x, top, sw, ch, l->hint_chip_radius, current ? UI_ROLE_TINT : UI_ROLE_BG, 0, w);
 			struct text_line line;
 			text_layout(font, seg[i], len[i], sw - 2u * l->hint_chip_pad, &line);
-			text_draw_line(&win, font, x + l->hint_chip_pad, y, current ? UI_ROLE_TEXT : UI_ROLE_FAINT, &line);
+			text_draw_line(&win, font, x + l->hint_chip_pad, y, current ? UI_ROLE_TEXT : UI_ROLE_FAINT,
+				       &line);
 		}
 		x += sw;
 		if (!current && x + step < w) {
@@ -664,5 +665,4 @@ void ui_storage_set(u8 node, const u32 *parts, u32 count, u32 total)
 	ui_dirty(node, 0xFF);
 }
 
-const struct ui_ops ui_storage_ops = {sizeof(struct storage_state), storage_measure, storage_init, 0, 0,
-					  storage_draw};
+const struct ui_ops ui_storage_ops = {sizeof(struct storage_state), storage_measure, storage_init, 0, 0, storage_draw};

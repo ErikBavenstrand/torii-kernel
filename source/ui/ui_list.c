@@ -505,11 +505,14 @@ static void set_cursor(u8 node, struct list_state *st, u32 cursor, u16 key)
 		st->target = target;
 		if (!st->glide_key)
 			motion_spring_target(st->motion, FIX(target - st->base));
-		// The pill slides from the old row to the new (within a viewport)
-		s32 off = st->pill_off + FIX(((s32)old - (s32)cursor) * st->ring.rh), most = FIX(st->ring.h);
-		off = off > most ? most : off < -most ? -most : off;
-		motion_spring_shift(st->pill_motion, off - st->pill_off);
-		motion_spring_target(st->pill_motion, 0);
+		// The pill slides from the old row to the new (within a viewport),
+		// unless the theme's pill_spring is 0: then it jumps
+		if (ui_theme()->motion.pill_spring) {
+			s32 off = st->pill_off + FIX(((s32)old - (s32)cursor) * st->ring.rh), most = FIX(st->ring.h);
+			off = off > most ? most : off < -most ? -most : off;
+			motion_spring_shift(st->pill_motion, off - st->pill_off);
+			motion_spring_target(st->pill_motion, 0);
+		}
 	}
 	ui_dirty(node, 1);
 }
