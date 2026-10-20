@@ -1,0 +1,10 @@
+clrmamepro (
+	name "Nintendo - Game Boy"
+	description "Nintendo - Game Boy (Torii test fixture)"
+	version "2026.01.02"
+)
+
+game (
+	name "Mono Game (Japan)"
+	rom ( name "Mono Game (Japan).gb" size 2048 crc 8AA94607 )
+)

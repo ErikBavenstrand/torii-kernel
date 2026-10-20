@@ -82,6 +82,7 @@ enum settings_id {
 	SET_SLEEP_KEYS,
 	// Library
 	SET_RESCAN,
+	SET_IDENTIFY,  // CRCs for the names database (namesdb.h)
 	SET_SHOW_ALL,  // the SD card page shows hidden files
 	// System
 	SET_LOGGING,   // TLOG_OFF to TLOG_DEBUG (tlog.h)
@@ -115,6 +116,7 @@ enum settings_start {
 enum settings_action {
 	SET_ACTION_NONE,
 	SET_ACTION_RESCAN,  // rescans the library index
+	SET_ACTION_IDENTIFY,  // names_identify: Identify library
 };
 
 // Row flags

@@ -1,6 +1,12 @@
 #include "crc32.h"
 
-static const u32 crc32tab[] = {
+#include <stdint.h>
+
+// In EWRAM: the table in ROM made each byte cost 39 cycles at the menu's
+// wait states (66 at the BIOS's); from EWRAM, a word at a time, about 17.
+// The CRC of a whole game, when Identify library names it, is most of its
+// time.
+static u32 crc32tab[256] EWRAM_DATA = {
 	0x00000000L, 0x77073096L, 0xee0e612cL, 0x990951baL, 0x076dc419L, 0x706af48fL, 0xe963a535L, 0x9e6495a3L,
 	0x0edb8832L, 0x79dcb8a4L, 0xe0d5e91eL, 0x97d2d988L, 0x09b64c2bL, 0x7eb17cbdL, 0xe7b82d07L, 0x90bf1d91L,
 	0x1db71064L, 0x6ab020f2L, 0xf3b97148L, 0x84be41deL, 0x1adad47dL, 0x6ddde4ebL, 0xf4d4b551L, 0x83d385c7L,
@@ -33,12 +39,25 @@ static const u32 crc32tab[] = {
 	0xaed16a4aL, 0xd9d65adcL, 0x40df0b66L, 0x37d83bf0L, 0xa9bcae53L, 0xdebb9ec5L, 0x47b2cf7fL, 0x30b5ffe9L,
 	0xbdbdf21cL, 0xcabac28aL, 0x53b39330L, 0x24b4a3a6L, 0xbad03605L, 0xcdd70693L, 0x54de5729L, 0x23d967bfL,
 	0xb3667a2eL, 0xc4614ab8L, 0x5d681b02L, 0x2a6f2b94L, 0xb40bbe37L, 0xc30c8ea1L, 0x5a05df1bL, 0x2d02ef8dL};
+typedef u32 __attribute__((may_alias)) crc_word;
+
 u32 crc32_update(u32 crc, const void *data, u32 size)
 {
-	const u8 *buf = data;
+	const u8 *p = data;
+	const u32 *t = crc32tab;
 	crc ^= 0xFFFFFFFF;
-	for (u32 i = 0; i < size; i++)
-		crc = crc32tab[(crc ^ buf[i]) & 0xff] ^ (crc >> 8);
+	for (; size && ((uintptr_t)p & 3); size--)
+		crc = t[(crc ^ *p++) & 0xff] ^ (crc >> 8);
+	// Whole words, little-endian as the bytes come
+	for (; size >= 4; size -= 4, p += 4) {
+		crc ^= *(const crc_word *)p;
+		crc = t[crc & 0xff] ^ (crc >> 8);
+		crc = t[crc & 0xff] ^ (crc >> 8);
+		crc = t[crc & 0xff] ^ (crc >> 8);
+		crc = t[crc & 0xff] ^ (crc >> 8);
+	}
+	for (; size; size--)
+		crc = t[(crc ^ *p++) & 0xff] ^ (crc >> 8);
 	return crc ^ 0xFFFFFFFF;
 }
 

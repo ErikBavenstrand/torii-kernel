@@ -1,0 +1,597 @@
+// The kernel's CRC names (namesdb.h, "The kernel's names"): names.db and
+// crc.txt loaded into PSRAM, the walk's checks of the cache, Identify
+// library's job and the cache's writes.
+#include <stdio.h>
+#include <string.h>
+
+#include "namesdb.h"
+#include "crc32.h"
+#include "ff.h"
+#include "library.h"
+#include "safefile.h"
+#include "tlog.h"
+#include "userdata.h"
+#include "engine/cover.h"
+#include "engine/cycles.h"
+#include "engine/jobs.h"
+#include "engine/psram.h"
+#include "ui/ui.h"
+
+#define NAMES_CACHE_FILE "/torii/crc.txt"
+#define NAMES_CACHE_FILE_MAX 0x100000u  // the most of crc.txt read (1 MB)
+#define NAMES_IO_BYTES 2048  // a read per step: about 35,000 cycles of CRC
+#define NAMES_CLEAR_BYTES 2048  // the cache's slots emptied per step
+#define NAMES_STEP_CYCLES 30000  // one job call's work, as the library's
+#define NAMES_KEY_REST 30  // the job waits for the keys to rest this many frames
+#define NAMES_RENAME_EVERY 32  // new names before the index is sorted again
+#define NAMES_WRITE_EVERY 64  // CRCs computed before crc.txt is written
+#define NAMES_CYCLES_PER_MS 16780u
+
+#define DB ((u8 *)PSRAM_NAMES_DB_BASE)
+
+_Static_assert(NAMES_CACHE_BYTES <= PSRAM_NAMES_CACHE_BYTES, "the CRC cache's PSRAM");
+_Static_assert(PSRAM_NAMES_CACHE_BASE + PSRAM_NAMES_CACHE_BYTES <= PSRAM_WINDOW + PSRAM_WINDOW_BYTES,
+	       "the CRC cache ends in the window");
+_Static_assert(SAFEFILE_LINE_MAX >= NAMES_PATH_MAX + 40, "a line of crc.txt fits safefile_lines");
+
+enum {
+	P_START,  // nothing loaded
+	P_DB,  // names.db's body, a chunk a step
+	P_CLEAR,  // the cache's slots
+	P_CACHE,  // crc.txt
+	P_DONE,
+};
+
+enum {
+	M_NONE,
+	M_RECENT,  // the games on Recent that have no CRC yet: the ones just played
+	M_ALL,  // Identify library
+};
+
+enum {
+	I_NEXT,
+	I_READ,
+	I_DONE,
+};
+
+// The lines of crc.txt as safefile_lines asks for them: a comment, then each
+// record that is alive and was on the card at the last walk
+struct line_cursor {
+	u32 rec;  // the record after the last line given
+};
+
+static struct {
+	u8 phase;
+	u8 db_ok;  // names.db is loaded
+	u8 cache_ok;  // crc.txt was read whole: it may be written back
+	u8 dirty;  // the cache differs from crc.txt
+	u8 seen_ok;  // seen[] holds the last whole walk's files
+	u8 job;
+	u8 mode, step;
+	u8 file_open;
+	u8 want_recent;  // check Recent once the menu runs
+	u8 console;
+	u8 logged_full;
+	u32 at;  // names.db bytes loaded, or slot bytes cleared
+	u32 started;
+	struct names_cache cache;
+	u32 cursor;  // M_RECENT: the Recent entry; M_ALL: console << 16 | the game in its list
+	u32 lib_gen;
+	u32 total, done, computed, named, bytes, since_write, since_rename;
+	u32 crc, size, date, code, read;
+	u8 seen[NAMES_CACHE_MAX / 8];
+	char path[NAMES_PATH_MAX + 1];
+	struct line_cursor lc;
+	union {
+		FIL fil;
+		FILINFO fi;
+	} u;
+	union {
+		u8 buf[NAMES_IO_BYTES];
+		struct safefile_lines lines;
+	} ALIGN(4) io;
+} N EWRAM_BSS;
+
+static void put(void *dst, const void *src, u32 bytes)
+{
+	psram_write(dst, src, bytes);
+}
+
+static u32 ms_since(u32 start)
+{
+	return cycles_since(start) / NAMES_CYCLES_PER_MS;
+}
+
+static const struct namesdb_header *db_header(void)
+{
+	return (const struct namesdb_header *)DB;
+}
+
+static void close_file(void)
+{
+	if (N.file_open) {
+		f_close(&N.u.fil);
+		N.file_open = 0;
+	}
+}
+
+static void mark_seen(u32 n)
+{
+	if (n < NAMES_CACHE_MAX)
+		N.seen[n >> 3] |= (u8)(1 << (n & 7));
+}
+
+static int was_seen(u32 n)
+{
+	return n < NAMES_CACHE_MAX && (N.seen[n >> 3] >> (n & 7) & 1);
+}
+
+// --- Loading ------------------------------------------------------------------
+
+void names_boot(void)
+{
+	memset(&N, 0, sizeof(N));
+	N.job = JOB_NONE;
+}
+
+static void db_failed(const char *why)
+{
+	close_file();
+	tlog("names: %s not loaded (%s)", NAMESDB_FILE, why);
+	N.db_ok = 0;
+	N.phase = P_CLEAR;
+	N.at = 0;
+}
+
+// names.db's header, then the body a chunk at a time, into PSRAM
+static void db_step(void)
+{
+	UINT got = 0;
+	if (N.phase == P_START) {
+		N.started = cycles_now();
+		N.db_ok = 0;
+		FRESULT fr = f_open(&N.u.fil, NAMESDB_FILE, FA_READ);
+		if (fr != FR_OK) {
+			if (fr == FR_NO_FILE || fr == FR_NO_PATH)
+				tlog("names: no %s (just names-update makes it)", NAMESDB_FILE);
+			else
+				tlog_error("names: can't open %s (FatFs error %d)", NAMESDB_FILE, fr);
+			N.phase = P_CLEAR;
+			N.at = 0;
+			return;
+		}
+		N.file_open = 1;
+		struct namesdb_header *h = (struct namesdb_header *)N.io.buf;
+		if (f_read(&N.u.fil, h, sizeof(*h), &got) != FR_OK || got != sizeof(*h)) {
+			db_failed("a short header");
+			return;
+		}
+		if (!namesdb_header_ok(h, PSRAM_NAMES_DB_BYTES) || f_size(&N.u.fil) != h->file_bytes) {
+			db_failed("another version, too large, or damaged");
+			return;
+		}
+		put(DB, h, sizeof(*h));
+		N.at = sizeof(*h);
+		N.phase = P_DB;
+		return;
+	}
+	u32 total = db_header()->file_bytes, n = total - N.at;
+	if (n > NAMES_IO_BYTES)
+		n = NAMES_IO_BYTES;
+	if (f_read(&N.u.fil, N.io.buf, n, &got) != FR_OK || got != n) {
+		db_failed("a short read");
+		return;
+	}
+	put(DB + N.at, N.io.buf, n);
+	N.at += n;
+	if (N.at < total)
+		return;
+	close_file();
+	if (!namesdb_body_ok(DB)) {
+		db_failed("its names don't end");
+		return;
+	}
+	const struct namesdb_header *h = db_header();
+	N.db_ok = 1;
+	tlog("names: %s from %.16s: GBA %lu, GBC %lu, GB %lu, NES %lu, %lu codes, %lu KB in %lu ms", NAMESDB_FILE,
+	     h->dat_version, (unsigned long)h->crc_count[LIB_GBA], (unsigned long)h->crc_count[LIB_GBC],
+	     (unsigned long)h->crc_count[LIB_GB], (unsigned long)h->crc_count[LIB_NES], (unsigned long)h->code_count,
+	     (unsigned long)(total >> 10), (unsigned long)ms_since(N.started));
+	N.phase = P_CLEAR;
+	N.at = 0;
+}
+
+// crc.txt into the cache, in one step: B5's safe file has one FIL, which
+// the menu's own lists may use between steps
+static void cache_step(void)
+{
+	u32 start = cycles_now(), lines = 0, bad = 0;
+	N.cache_ok = 1;
+	if (safefile_open(NAMES_CACHE_FILE, NAMES_CACHE_FILE_MAX) != SAFEFILE_NONE) {
+		char *line = (char *)N.io.buf;
+		for (;;) {
+			int len = safefile_line(line, sizeof(N.io.buf));
+			if (len == SAFEFILE_END)
+				break;
+			struct names_line l;
+			if (len == SAFEFILE_LONG || !names_parse_line(line, &l)) {
+				bad += len == SAFEFILE_LONG || (line[0] && line[0] != '#');
+				continue;
+			}
+			if (names_cache_put(&N.cache, l.path, l.size, l.date, l.crc, l.code, l.flags) ==
+			    NAMES_CACHE_NONE)
+				bad++;
+			else
+				lines++;
+		}
+		if (safefile_failed())
+			N.cache_ok = 0;  // what was read may be short: never written back
+		safefile_close();
+	}
+	N.dirty = 0;
+	N.phase = P_DONE;
+	N.want_recent = 1;
+	tlog("names: %lu files' CRCs from %s in %lu ms%s", (unsigned long)lines, NAMES_CACHE_FILE,
+	     (unsigned long)ms_since(start), N.cache_ok ? "" : " (a read failed: it isn't written back)");
+	if (bad)
+		tlog("names: %lu lines of %s left out (unreadable, or the cache is full)", (unsigned long)bad,
+		     NAMES_CACHE_FILE);
+}
+
+int names_load_step(void)
+{
+	switch (N.phase) {
+	case P_START:
+	case P_DB:
+		psram_begin();
+		db_step();
+		return 0;
+	case P_CLEAR:
+		psram_begin();
+		if (N.at == 0)
+			names_cache_init(&N.cache, (u8 *)PSRAM_NAMES_CACHE_BASE, put);
+		if (names_cache_clear_part(&N.cache, N.at, NAMES_CLEAR_BYTES))
+			N.phase = P_CACHE;
+		N.at += NAMES_CLEAR_BYTES;
+		return 0;
+	case P_CACHE:
+		psram_begin();
+		cache_step();
+		return 1;
+	default:
+		return 1;
+	}
+}
+
+// --- The walk ----------------------------------------------------------------------
+
+void names_walk_begin(void)
+{
+	memset(N.seen, 0, sizeof(N.seen));
+	N.seen_ok = 0;
+}
+
+void names_walk_end(int whole)
+{
+	N.seen_ok = (u8)whole;
+}
+
+const char *names_walk_seen(const char *path, u32 size, u32 date, u32 console)
+{
+	if (N.phase != P_DONE)
+		return NULL;
+	u32 n = names_cache_find(&N.cache, path);
+	if (n == NAMES_CACHE_NONE)
+		return NULL;
+	mark_seen(n);
+	const struct names_rec *r = names_cache_rec(&N.cache, n);
+	switch (names_cache_fits(r, size, date)) {
+	case NAMES_STALE:
+		if (!(names_rec_flags(r) & NAMES_DEAD)) {
+			tlog("names: %s changed since its CRC: forgotten", path);
+			names_cache_drop(&N.cache, n);
+			N.dirty = 1;
+		}
+		return NULL;
+	case NAMES_FIT_DATED:
+		names_cache_set_date(&N.cache, n, date);
+		N.dirty = 1;
+		break;
+	default:
+		break;
+	}
+	return N.db_ok ? names_db_name(DB, r, console) : NULL;
+}
+
+u32 names_identity(void)
+{
+	if (N.phase != P_DONE || !N.db_ok)
+		return 0;
+	u32 id = db_header()->body_crc ^ (names_cache_ident(&N.cache) * 0x9E3779B1u);
+	return id ? id : 1;
+}
+
+const char *names_lookup(const char *path, u32 size, u32 console)
+{
+	if (N.phase != P_DONE || !N.db_ok)
+		return NULL;
+	u32 n = names_cache_find(&N.cache, path);
+	if (n == NAMES_CACHE_NONE)
+		return NULL;
+	const struct names_rec *r = names_cache_rec(&N.cache, n);
+	return r->size == size ? names_db_name(DB, r, console) : NULL;
+}
+
+const char *names_dat_version(void)
+{
+	return N.phase == P_DONE && N.db_ok ? db_header()->dat_version : NULL;
+}
+
+// --- Writing crc.txt -------------------------------------------------------------
+
+static u32 cache_line(void *ctx, u32 n, char *buf, u32 size)
+{
+	struct line_cursor *lc = ctx;
+	if (n == 0) {
+		lc->rec = 0;
+		return (u32)snprintf(buf, size, "# Torii's CRC cache: CRC32, GBA game code, size, date, path\n");
+	}
+	for (; lc->rec < N.cache.count; lc->rec++) {
+		if (N.seen_ok && !was_seen(lc->rec))
+			continue;  // not on the card at the last walk
+		u32 len = names_format_line(&N.cache, lc->rec, buf, size);
+		if (len) {
+			lc->rec++;
+			return len;
+		}
+	}
+	return 0;
+}
+
+static void write_cache(void)
+{
+	N.since_write = 0;
+	if (!N.dirty)
+		return;
+	if (!N.cache_ok) {
+		tlog("names: %s isn't written: reading it failed", NAMES_CACHE_FILE);
+		N.dirty = 0;
+		return;
+	}
+	u32 start = cycles_now();
+	memset(&N.io.lines, 0, sizeof(N.io.lines));
+	N.io.lines.line = cache_line;
+	N.io.lines.ctx = &N.lc;
+	if (safefile_write(NAMES_CACHE_FILE, NAMES_CACHE_FILE_MAX, safefile_lines_fill, &N.io.lines))
+		tlog("names: wrote %s in %lu ms", NAMES_CACHE_FILE, (unsigned long)ms_since(start));
+	N.dirty = 0;  // a failed write is logged by safefile; the next change tries again
+}
+
+// --- Identify library ------------------------------------------------------------
+
+// The next game to identify into N.path, N.console; 0 when there is none
+static int next_game(void)
+{
+	if (N.mode == M_RECENT) {
+		while (N.cursor < userdata_recent_count()) {
+			const char *p = userdata_recent_path(N.cursor++);
+			if (userdata_nor_name(p) || strlen(p) > NAMES_PATH_MAX)
+				continue;
+			strcpy(N.path, p);  // out of PSRAM before FatFs sees it
+			// Only the library's games: crc.txt keeps no others
+			if (library_find(N.path) == LIBRARY_NONE)
+				continue;
+			N.console = (u8)library_console_of(N.path);
+			N.total++;
+			return 1;
+		}
+		return 0;
+	}
+	if (library_generation() != N.lib_gen) {
+		// The index changed (a new one, a game deleted): from the start
+		// again, which skips what has its CRC quickly
+		N.lib_gen = library_generation();
+		N.cursor = 0;
+	}
+	for (;;) {
+		u32 console = N.cursor >> 16, i = N.cursor & 0xFFFF;
+		if (console >= LIB_CONSOLES)
+			return 0;
+		if (i >= library_count(console)) {
+			N.cursor = (console + 1) << 16;
+			continue;
+		}
+		N.cursor++;
+		u32 rec = library_game(console, i);
+		if (rec == LIBRARY_NONE || !library_path(rec, N.path, sizeof(N.path)))
+			continue;
+		N.console = (u8)console;
+		return 1;
+	}
+}
+
+static void identify_finish(void)
+{
+	close_file();
+	write_cache();
+	if (N.since_rename)
+		library_changed();
+	tlog("names: identified %lu of %lu games (%lu KB) in %lu ms; %lu have a database name",
+	     (unsigned long)N.computed, (unsigned long)N.done, (unsigned long)(N.bytes >> 10),
+	     (unsigned long)ms_since(N.started), (unsigned long)N.named);
+	N.mode = M_NONE;
+}
+
+// One step: the next game's stat, or a chunk of its file
+static int identify_step(void)
+{
+	UINT got = 0;
+	switch (N.step) {
+	case I_NEXT: {
+		if (!next_game()) {
+			identify_finish();
+			return JOB_DONE;
+		}
+		N.done++;
+		FRESULT fr = f_stat(N.path, &N.u.fi);
+		u32 n = names_cache_find(&N.cache, N.path);
+		if (fr != FR_OK) {
+			tlog("names: %s can't be read (FatFs error %d)", N.path, fr);
+			return JOB_MORE;
+		}
+		N.size = (u32)N.u.fi.fsize;
+		N.date = (u32)N.u.fi.fdate << 16 | N.u.fi.ftime;
+		if (n != NAMES_CACHE_NONE) {
+			const struct names_rec *r = names_cache_rec(&N.cache, n);
+			int fits = names_cache_fits(r, N.size, N.date);
+			if (fits != NAMES_STALE && (names_rec_flags(r) & NAMES_CRC)) {
+				if (fits == NAMES_FIT_DATED) {
+					names_cache_set_date(&N.cache, n, N.date);
+					N.dirty = 1;
+				}
+				return JOB_MORE;  // known
+			}
+		}
+		fr = f_open(&N.u.fil, N.path, FA_READ);
+		if (fr != FR_OK) {
+			tlog("names: %s can't be opened (FatFs error %d)", N.path, fr);
+			return JOB_MORE;
+		}
+		N.file_open = 1;
+		N.crc = N.read = N.code = 0;
+		N.step = I_READ;
+		return JOB_MORE;
+	}
+	case I_READ:
+		if (f_read(&N.u.fil, N.io.buf, NAMES_IO_BYTES, &got) != FR_OK) {
+			tlog_error("names: reading %s failed at %lu bytes", N.path, (unsigned long)N.read);
+			close_file();
+			N.step = I_NEXT;
+			return JOB_MORE;
+		}
+		// A GBA game's code, from its header
+		if (N.read == 0 && N.console == LIB_GBA && got >= 0xB0)
+			N.code = namesdb_code(N.io.buf + 0xAC);
+		N.crc = crc32_update(N.crc, N.io.buf, got);
+		N.read += got;
+		if (got == NAMES_IO_BYTES && N.read < N.size)
+			return JOB_MORE;
+		close_file();
+		N.step = I_DONE;
+		return JOB_MORE;
+	default: {
+		N.step = I_NEXT;
+		if (N.read != N.size) {
+			tlog_error("names: %s gave %lu of its %lu bytes", N.path, (unsigned long)N.read,
+				   (unsigned long)N.size);
+			return JOB_MORE;
+		}
+		u32 n = names_cache_put(&N.cache, N.path, N.read, N.date, N.crc, N.code, NAMES_CRC | NAMES_DATE);
+		if (n == NAMES_CACHE_NONE) {
+			if (!N.logged_full)
+				tlog("names: the CRC cache is full: %s and later games aren't kept", N.path);
+			N.logged_full = 1;
+			return JOB_MORE;
+		}
+		mark_seen(n);
+		N.dirty = 1;
+		N.computed++;
+		N.bytes += N.read;
+		const char *name = N.db_ok ? names_db_name(DB, names_cache_rec(&N.cache, n), N.console) : NULL;
+		tlog_debug("names: %s is %08lX%s%s", N.path, (unsigned long)N.crc, name ? ": " : "", name ? name : "");
+		if (name) {
+			N.named++;
+			if (++N.since_rename >= NAMES_RENAME_EVERY) {
+				N.since_rename = 0;
+				library_changed();
+			}
+		}
+		if (++N.since_write >= NAMES_WRITE_EVERY)
+			write_cache();
+		return JOB_MORE;
+	}
+	}
+}
+
+static void identify_begin(u32 mode)
+{
+	close_file();
+	N.mode = (u8)mode;
+	N.step = I_NEXT;
+	N.cursor = 0;
+	N.lib_gen = library_generation();
+	N.total = N.done = N.computed = N.named = N.bytes = N.since_write = N.since_rename = 0;
+	N.logged_full = 0;
+	N.started = cycles_now();
+	if (mode == M_ALL)
+		for (u32 c = 0; c < LIB_CONSOLES; c++)
+			N.total += library_count(c);
+}
+
+static int names_job(struct job *job)
+{
+	if (job->state == JOB_CANCEL) {
+		close_file();
+		return JOB_DONE;
+	}
+	if (N.phase != P_DONE || N.mode == M_NONE)
+		return JOB_DONE;
+	// As the library's job: the covers and the library first, and what
+	// the user moves keeps its frames
+	const struct ui_view *top = ui_top();
+	if (cover_loading() || library_busy() || ui_idle_frames() < NAMES_KEY_REST || ui_transitioning() ||
+	    (top && (top->opening || (top->spec->flags & UI_VIEW_MODAL))))
+		return JOB_WAIT;
+	psram_begin();
+	u32 start = cycles_now();
+	int r;
+	do
+		r = identify_step();
+	while (r == JOB_MORE && cycles_since(start) < NAMES_STEP_CYCLES);
+	return r;
+}
+
+void names_identify(void)
+{
+	if (N.mode == M_ALL)
+		return;
+	tlog("names: identifying the library");
+	identify_begin(M_ALL);
+}
+
+int names_identifying(u32 *done, u32 *total)
+{
+	if (done)
+		*done = N.done;
+	if (total)
+		*total = N.total;
+	return N.mode == M_ALL;
+}
+
+void names_poll(void)
+{
+	if (N.phase != P_DONE)
+		return;
+	if (N.want_recent && N.mode == M_NONE && library_ready() && !library_busy()) {
+		N.want_recent = 0;
+		identify_begin(M_RECENT);
+	}
+	if (N.mode != M_NONE && !job_running(N.job))
+		N.job = job_start(names_job, 0, JOB_OWNER_NONE);
+}
+
+void names_before_launch(void)
+{
+	if (job_running(N.job))
+		job_cancel(N.job);
+	N.job = JOB_NONE;
+	close_file();
+	if (N.mode != M_NONE)
+		tlog("names: identifying stopped for a launch (%lu of %lu games done)", (unsigned long)N.done,
+		     (unsigned long)N.total);
+	N.mode = M_NONE;
+	if (N.phase == P_DONE)
+		write_cache();  // PSRAM is about to hold the game
+	N.phase = P_START;
+	N.db_ok = 0;
+}

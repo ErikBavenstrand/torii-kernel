@@ -260,6 +260,7 @@ test-host: emu-image
     @uv run -q tests/font_test.py
     @uv run -q tests/asset_test.py
     @uv run -q tests/image_test.py
+    @uv run -q tests/names_db_test.py
 
 # Convert docs/design/v0.4/palette.json to C: source/ui/palette.c and palette.h
 # (committed; tests/host.sh checks they match), then `just shots-update` for the screens
@@ -324,6 +325,13 @@ _cart-copy mode +files:
     rm -rf dist/.cart-add && mkdir -p dist/.cart-add && shift && cp "$@" dist/.cart-add/
     {{fresh}} sync --all dist/.cart-add
     {{emu_docker}} tools/cart_copy.sh {{mode}} {{cart}}/sd.img dist/.cart-add/*; status=$?; rm -rf dist/.cart-add; exit $status
+
+# Write the game names database to an SD card, e.g. `just names-update /Volumes/OMEGA`: /torii/names.db
+# from the No-Intro dats of libretro-database (CC BY-SA 4.0; downloaded once to the git-ignored
+# dist/dats, never bundled) and the CRCs of the card's games in /torii/crc.txt. --help lists the options
+[positional-arguments]
+names-update sd_path *args:
+    uv run -q tools/names_db.py update "$@"
 
 # Copy games (files or whole folders) into roms/ and list them in roms/games.toml, e.g. `just game-add ~/roms`
 [positional-arguments]

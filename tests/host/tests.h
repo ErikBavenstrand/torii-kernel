@@ -157,6 +157,14 @@ void test_library_file_round_trip(void);
 void test_library_forget_rename(void);
 void test_library_custom_display(void);
 void test_library_pinned_keys(void);
+void test_crc32_words(void);
+void test_namesdb_header(void);
+void test_namesdb_lookup(void);
+void test_names_cache_table(void);
+void test_names_cache_fits(void);
+void test_names_cache_full(void);
+void test_names_lines(void);
+void test_names_db_name(void);
 
 void test_letter_of(void);
 void test_letter_sorted(void);

@@ -1,0 +1,33 @@
+clrmamepro (
+	name "Nintendo - Game Boy Advance"
+	description "Nintendo - Game Boy Advance (Torii test fixture)"
+	version "2026.01.02"
+)
+
+game (
+	name "Advance Wars (USA) (Beta)"
+	serial "AWRE"
+	rom ( name "Advance Wars (USA) (Beta).gba" size 4096 crc A3605C52 )
+)
+
+game (
+	name "Advance Wars (USA)"
+	serial "AWRE"
+	rom ( name "Advance Wars (USA).gba" size 4096 crc 5D5C613E )
+)
+
+game (
+	name "Legend of Zelda, The - The Minish Cap (USA)"
+	rom ( name "Legend of Zelda, The - The Minish Cap (USA).gba" size 8192 crc 079EFED0 serial "BZME" )
+)
+
+game (
+	name "Quote \"Test\" (World)"
+	rom ( name "Quote \"Test\" (World).gba" size 1024 crc 100BAE73 )
+)
+
+game (
+	name "Unseen (Europe)"
+	serial "UNSP"
+	rom ( name "Unseen (Europe).gba" size 64 crc 57FC4313 )
+)
