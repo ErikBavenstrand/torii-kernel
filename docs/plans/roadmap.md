@@ -278,10 +278,10 @@ Planned in the interview and design rounds of 2026-10-19 and 2026-10-20. [v0.4-d
 
 - **Navigation, all new:** a carousel home (Recent, Favourites, each console with games, SD card, NOR, Settings, Info) on a ring of five visible objects; A zooms into the item's page, B comes back. No tab bar, and none of the official keys.
 - **Pages:** game lists per console, Recent and Favourites (compact or with a placeholder box, letter jump, a game popup), an SD card browser, NOR with storage and Format all, Settings on one page of section cards, and Info (controls, help, about, Diagnostics).
-- **Look:** "Paper clean" in light and dark themes, one accent colour per item, a new icon set, a red torii glyph in the corner, and the carousel, opening and popup motions.
+- **Look:** "Paper clean" in built-in light and dark themes (SD themes dropped), one accent colour per item, a new icon set, a red torii glyph in the corner, and the carousel, opening and popup motions.
 - **Library index:** the whole card scanned by extension into `/torii/library.idx`, up to 4,096 games, rescanned when the card changes.
 - **Names:** custom names, then cleaned file names (no extension or bracket tags); system folders and dot files hidden, with a "Show all files" setting.
-- **Favourites and recents** on SD (`/torii/favorites.txt`, `/torii/recent.txt`), favourites with no cap; boot returns to where you left off, and holding START at power-on launches the last game.
+- **Favourites and recents** on SD (`/torii/favorites.txt`, `/torii/recent.txt`), favourites with no cap; a "Start on" setting picks where boot starts (where you left off by default).
 - **Settings:** a 12/24-hour clock and a time editor.
 - **Limits:** 1,024 entries per SD folder.
 
