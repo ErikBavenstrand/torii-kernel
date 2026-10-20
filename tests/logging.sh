@@ -14,12 +14,10 @@
 #           is left alone, and logging goes on in the next
 #   full    a full card stops the logging and the idle flush, not the kernel
 #   settings LOGGING turned on in Settings makes the file in the background
-#           (SKIP until B16)
 #   open    that background open meets a delete, a cut-off and LOGGING off
-#           (SKIP until B16)
 #   flood   screens changing for seconds: frame-cycles go to the card as
 #           summaries
-#   hang    the log is on the card as the Settings page opens (SKIP until B16)
+#   hang    the log is on the card as the Settings page opens
 # Every part checks the card with fsck.fat. Runs inside the torii-emu container.
 set -euo pipefail
 # shellcheck source=tests/carts.sh
@@ -447,17 +445,78 @@ full)
   ;;
 
 settings)
-  # LOGGING turned on in Settings makes the log file in the background
-  # (tlog_flush_soon) while the screen takes keys, and its line reaches the
-  # card from the menu's idle flush: the Settings page's (B16).
-  echo "SKIP (waiting for B16): LOGGING turned on in Settings makes the log file in the background"
+  # LOGGING turned on in Settings on a new card: leaving the page writes it,
+  # and the log file (64 KB of zeros) is then made a sector at a time in a
+  # job (tlog_flush_soon), so home takes keys meanwhile: the screen froze
+  # for 80 frames before v0.3.2 and lost the keys pressed then. The line
+  # saying so reaches the card from the menu's idle flush.
+  new_card 65536 32
+  # Logging: A, RIGHT RIGHT (Errors, then Info), A keeps it, B leaves; home
+  # then moves at once, and rests for its idle flush
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot $(nav_setting logging) $(nav_press A RIGHT RIGHT A B) -w "nav: home ready" -k @8:DOWN -k @12:- -k @420:-
+  moved=$(grep -n 'frame-cycles: home-move' "$cart/kernel.log" | head -1 | cut -d: -f1)
+  opened=$(grep -n 'log: opened in the background' "$cart/kernel.log" | head -1 | cut -d: -f1)
+  [ -n "$moved" ] && [ -n "$opened" ] || fail "LOGGING wasn't saved, home didn't move, or the log wasn't opened in the background"
+  [ "$moved" -lt "$opened" ] || fail "DOWN while the log was being made didn't move home at once"
+  [ "$(mtype -i "$cart/sd.img" ::/torii/logs/torii-0.log | wc -c)" = 65536 ] || fail "the log file isn't 64 KB"
+  [ "$(log 0 | head -1)" = "torii log 00000001     " ] || fail "header: $(log 0 | head -1)"
+  has "settings: LOGGING is info"
+  card_ok
+  lines_ok
+  zeros_ok
+  echo "PASS: turning LOGGING on in Settings makes the log file in the background, keys still act, and its line reaches the card"
   ;;
 
 open)
-  # The background open (tlog_flush_soon, held part way by the test hook
-  # tlog_open_steps_test) meeting a delete, a cut-off and LOGGING off: it
-  # starts from the Settings page's LOGGING row (B16).
-  echo "SKIP (waiting for B16): the background open meets a delete, a cut-off and LOGGING off"
+  # The background open (tlog_flush_soon) held part way by the test hook
+  # tlog_open_steps_test (hex: 14 lets it make 19 steps, 8 to look and
+  # begin, then 11 sectors of zeros; 1 none), while other code acts.
+  hold=14
+  # LOGGING set to Info on the Settings page, which B leaves for home
+  to_info() {
+    # shellcheck disable=SC2046 # nav.sh's options
+    echo "-p 30:tlog_open_steps_test:$1 $(nav_setting logging | tr "\n" " ") $(nav_press A RIGHT RIGHT A B) -w \"nav: home ready\""
+  }
+
+  # A delete meanwhile: the open holds the file it makes (FatFs keeps no
+  # lock), so it finishes first (tlog_open_now), whatever is deleted.
+  rm -rf "$cart" && mkdir -p "$cart" && new_card 65536 32
+  # shellcheck disable=SC2046
+  eval boot "$(to_info $hold)" $(nav_delete /Hello.gba at=@8) -k @420:-
+  grep -q 'log: opened at once' "$cart/kernel.log" || fail "the delete didn't finish the open first"
+  ! grep -q 'log: opened in the background' "$cart/kernel.log" || fail "the hook didn't hold the open"
+  ! mtype -i "$cart/sd.img" ::/Hello.gba >/dev/null 2>&1 || fail "Hello.gba wasn't deleted"
+  [ "$(log 0 | head -1)" = "torii log 00000001     " ] || fail "header: $(log 0 | head -1)"
+  has "settings: LOGGING is info"
+  card_ok
+  lines_ok
+  zeros_ok
+
+  # Cut off part way (a reset, power loss): the card loses nothing, and the
+  # log, a file without a header, is made again at the next boot.
+  rm -rf "$cart" && mkdir -p "$cart" && new_card 65536 32
+  eval boot "$(to_info $hold)" -k @60:-
+  ! grep -q 'log: opened' "$cart/kernel.log" || fail "the hook didn't hold the open"
+  [ -z "$(log 0 2>/dev/null)" ] || fail "the file cut off has text: $(log 0 | head -1)"
+  card_ok
+  boot -f 260
+  [ "$(log 0 | head -1)" = "torii log 00000001     " ] || fail "after the cut, header: $(log 0 | head -1)"
+  has "logging info, build main"
+  card_ok
+  lines_ok
+  zeros_ok
+
+  # LOGGING turned off again (a second visit to Settings, which doesn't
+  # wait for the open) before the open made a step: the card stays untouched.
+  rm -rf "$cart" && mkdir -p "$cart" && new_card 65536 32
+  # shellcheck disable=SC2046
+  eval boot "$(to_info 1)" $(nav_press A) -w \"nav: page settings ready\" \
+    $(nav_press UP A LEFT LEFT A B) -w \"settings: LOGGING is off\" -k @60:-
+  grep -q 'log: LOGGING is off: the open stops' "$cart/kernel.log" || fail "the open didn't stop"
+  ! mdir -i "$cart/sd.img" ::/torii/logs >/dev/null 2>&1 || fail "the open went on with LOGGING off"
+  card_ok
+  echo "PASS: a delete finishes the background open first, one cut off leaves the card whole and is made again, and LOGGING off stops it"
   ;;
 
 flood)
@@ -489,8 +548,15 @@ flood)
 hang)
   # A hang in Settings (v0.3.2: THEME after WRITE TO NOR froze the cart, and
   # took the lines that led there along): what came before is on the card
-  # as the Settings page opens (B16).
-  echo "SKIP (waiting for B16): the log is on the card as the Settings page opens"
+  # as the Settings page opens. The run stops there, as a power-off would.
+  new_card 65536 32
+  settings 26=3 # LOGGING Debug
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot $(nav_to settings)
+  has "nav: open settings"
+  lines_ok
+  card_ok
+  echo "PASS: the log is on the card as the Settings page opens"
   ;;
 
 *)

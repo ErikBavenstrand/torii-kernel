@@ -9,6 +9,8 @@
 set -euo pipefail
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
+# shellcheck source=tests/nav.sh
+. tests/nav.sh
 local_carts "dist/cart-settings${1:+-$1}"
 
 cart=$carts/settings
@@ -57,9 +59,49 @@ booted "$defaults"
 write 30=0 31=1 32=4 33=1
 booted "24-hour clock Off, game view List + art, start on SD card, show all files On"
 [ "$(slots 30 4)" = "0000 0001 0004 0001" ] || fail "a boot changed slots 30-33: $(slots 30 4)"
+# The visits below start from home (Start on SD card opens its page)
+write 32=2
 
-# Saving one setting on the Settings page writes the whole sector, keeping
-# the slots the kernel doesn't know: the page comes with B16.
-echo "SKIP (waiting for B16): a save on the Settings page keeps the slots the kernel doesn't know"
+# visit ROW KEYS...: power on, go to the Settings page's ROW, press KEYS
+# there, then B, which leaves the page (writing the NOR once, if a value
+# changed); the run's log goes to $cart/visit.log
+visit() {
+  local row=$1
+  shift
+  # shellcheck disable=SC2046 # nav.sh's options
+  OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_setting "$row") $(nav_press "$@" B) \
+    -w "nav: home ready" >"$cart/visit.log" 2>&1 || fail "the visit to $row didn't get back home: $(tail -3 "$cart/visit.log")"
+}
+writes() { grep -c 'nor: wrote the settings' "$cart/visit.log" || true; }
 
-echo "PASS: unwritten settings read 0xFFFF, and the v0.4 ones as their defaults"
+# Saving one setting on the Settings page (Auto save, A RIGHT A) writes the
+# whole sector once as the page closes, keeping the slots the kernel
+# doesn't know, the hidden LANGUAGE and the hotkeys it didn't touch
+visit auto-save A RIGHT A
+[ "$(writes)" = 1 ] || fail "a save wrote the settings $(writes) times"
+[ "$(slots 14 1)" = 0001 ] || fail "Auto save not saved: $(slots 14 1)"
+[ "$(slots 0 14)" = "$(ffff 14)" ] || fail "slots 0-13 changed: $(slots 0 14)"
+[ "$(slots 15 11)" = "$(ffff 11)" ] || fail "slots 15-25 changed: $(slots 15 11)"
+[ "$(slots 26 4)" = "$(ffff 4)" ] || fail "slots 26-29 changed: $(slots 26 4)"
+[ "$(slots 30 4)" = "0000 0001 0002 0001" ] || fail "the save lost slots 30-33: $(slots 30 4)"
+[ "$(slots 34 31)" = "$(ffff 31)" ] || fail "slots 34-64 changed: $(slots 34 31)"
+[ "$(slots 65 1)" = 0000 ] || fail "slot 65: $(slots 65 1)"
+booted "24-hour clock Off, game view List + art, start on Home, show all files On"
+
+# One write a visit: two values changed (Game view, Dim screen), then a
+# visit that changes nothing, and one that changes a value and back
+visit game-view A RIGHT A DOWN DOWN A RIGHT A
+[ "$(writes)" = 1 ] || fail "two changes wrote the settings $(writes) times"
+[ "$(slots 31 1)" = 0000 ] || fail "Game view not saved: $(slots 31 1)"
+[ "$(slots 27 1)" = 0001 ] || fail "Dim screen not saved: $(slots 27 1)"
+visit theme
+[ "$(writes)" = 0 ] || fail "a visit that changed nothing wrote the settings"
+visit auto-save A RIGHT A A LEFT A
+[ "$(writes)" = 0 ] || fail "a change and back wrote the settings"
+grep -q 'settings: nothing changed, not written' "$cart/visit.log" || fail "the change and back wasn't staged"
+[ "$(slots 14 1)" = 0001 ] || fail "Auto save changed: $(slots 14 1)"
+# B on an edit puts the value back: nothing to write
+visit auto-save A RIGHT B
+[ "$(writes)" = 0 ] || fail "an edit B cancelled wrote the settings"
+
+echo "PASS: unwritten settings read 0xFFFF, the v0.4 ones as their defaults, and the Settings page writes once a visit, only a change, keeping the slots it doesn't know"
