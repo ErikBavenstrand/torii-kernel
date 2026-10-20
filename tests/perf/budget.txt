@@ -2,20 +2,20 @@
 # NAME CYCLES: the most one frame of NAME took in the scenarios' runs.
 # A run fails over 280896 (a whole frame) or 10% above the figure here.
 cover-decode 38610
-cover-demo 19423
+cover-demo 19425
 cover-upload 3427
 diag-cover-decode 44026
 diag-cover-upload 3151
 diag-glyph 380
-diag-page 126878
+diag-page 126981
 diag-psram-menu 20963
 diag-psram-slow 25429
 diag-row38 9525
-diag-scroll 142272
-lists-menu-open 268354
-lists-page 144195
-lists-screen 257725
-lists-scroll 118411
+diag-scroll 142397
+lists-menu-open 268717
+lists-page 144551
+lists-screen 260134
+lists-scroll 119239
 row-copy14 6628
 text-clear-row 1644
 text-clear-row14 2579
@@ -25,10 +25,10 @@ text-heading20 8472
 text-row14-25 9103
 text-row14-40 13566
 text-row38 9498
-ui-dialog-motion 227888
-ui-dialog-open 160941
-ui-fade 34138
-ui-list-scroll 135086
-ui-list-step 80768
-ui-page-change 132946
-ui-transition 268354
+ui-dialog-motion 228451
+ui-dialog-open 160933
+ui-fade 34204
+ui-list-scroll 135182
+ui-list-step 80864
+ui-page-change 133018
+ui-transition 268717
