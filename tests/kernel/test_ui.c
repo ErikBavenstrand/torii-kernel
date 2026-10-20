@@ -29,9 +29,9 @@ static int t_fetch(void *ctx, u32 index, struct ui_item *out)
 }
 
 static const struct ui_list_model t_model = {t_count, t_fetch, 0};
-static const struct ui_list_config t_list = {&t_model, 16, UI_LIST_WRAP, 0};
-static const struct ui_list_config t_tall = {&t_model, 32, 0, 0};
-static const struct ui_label_config t_title = {"Title", UI_FONT_HEADING, UI_ALIGN_LEFT, UI_LABEL_SWAP};
+static const struct ui_list_config t_list = {&t_model, 16, UI_LIST_WRAP, 0, 0};
+static const struct ui_list_config t_tall = {&t_model, 32, 0, 0, 0};
+static const struct ui_label_config t_title = {"Title", UI_FONT_HEADING, UI_ALIGN_LEFT, UI_LABEL_SWAP, 0};
 static const struct ui_scrollbar_config t_bar = {2};
 
 static const struct ui_spec main_nodes[] = {
@@ -44,11 +44,11 @@ static const struct ui_spec main_nodes[] = {
 static const struct ui_view_spec main_view = {"test-main", main_nodes, 5, 0, 2, 0, 0};
 
 static const struct ui_spec tall_nodes[] = {
-	{UI_LIST, 1, UI_NONE, 3, UI_FILL, UI_FOCUSABLE, 0, 0, 0, 16, 0, 0, &t_tall},
+	{UI_LIST, 1, UI_NONE, 3, UI_FILL, UI_FOCUSABLE, 0, 0, 0, 32, 0, 0, &t_tall},
 };
 static const struct ui_view_spec tall_view = {"test-tall", tall_nodes, 1, 0, 0, 0, 0};
 
-static const struct ui_label_config t_text = {"Open?", UI_FONT_BODY, UI_ALIGN_CENTER, 0};
+static const struct ui_label_config t_text = {"Open?", UI_FONT_BODY, UI_ALIGN_CENTER, 0, 0};
 static const struct ui_spec dialog_nodes[] = {
 	{UI_PANEL, 1, UI_NONE, 0, UI_HCENTER | UI_VCENTER, 0, 0, 0, 0, 0, 128, 48, 0},
 	{UI_LABEL, 2, 0, 0, UI_FILL, 0, 0, UI_ROLE_PANEL, 8, 8, 8, 8, &t_text},
@@ -62,7 +62,7 @@ static const struct ui_spec image_nodes[] = {
 };
 static const struct ui_view_spec image_view = {"test-image", image_nodes, 1, 0, UI_NONE, 0, 0};
 
-static const struct ui_list_config bad_rows = {&t_model, 24, 0, 0};
+static const struct ui_list_config bad_rows = {&t_model, 40, 0, 0, 0};
 static const struct ui_spec bad_nodes[] = {
 	{UI_LIST, 1, UI_NONE, 1, UI_FILL, 0, 0, 0, 0, 0, 0, 0, &bad_rows},
 };
@@ -95,11 +95,12 @@ void test_ui_pool_and_arenas(void)
 	}
 	CHECK_EQ(ui_nodes_used(), 5);
 	CHECK(ui_arena_used() > 0 && ui_arena_used() <= UI_ARENA_BYTES);
-	CHECK_EQ(motion_count(), 1);  // the list's scroll spring
-	// Tiles: the list's 11 slots of 29x2 tiles in character block 1, the
-	// two label sets, the bars, and three maps
+	CHECK_EQ(motion_count(), 2);  // the list's scroll spring and its pill's
+	// Tiles: the list's canvas of 29x24 tiles in character block 1 (12
+	// slots of 16 px), the two label sets, the bars, and the maps (the
+	// list's two screenblocks)
 	u16 used = (u16)(free0 - pool_free_units(bg, 0));
-	CHECK(used >= 11 * 29 * 2 + 3 * 64);
+	CHECK(used >= 29 * 24 + 4 * 64);
 	CHECK_EQ(ui_list_cursor(2), 0);
 	u32 content, view, scroll;
 	ui_list_scroll_info(2, &content, &view, &scroll);
@@ -122,7 +123,7 @@ void test_ui_pool_and_arenas(void)
 		ui_core_pop();
 	}
 	CHECK_EQ(res_mark(), mark1);
-	CHECK_EQ(motion_count(), 1);
+	CHECK_EQ(motion_count(), 2);
 	CHECK_EQ(pool_free_units(bg, 0), (u16)(free0 - used));
 
 	// A list of 32 px rows doesn't fit on top of the list: refused with a
@@ -130,11 +131,11 @@ void test_ui_pool_and_arenas(void)
 	CHECK_EQ(ui_core_push(&tall_view, 0), 0);
 	CHECK(ui_error()[0] != 0);
 	CHECK_EQ(res_mark(), mark1);
-	CHECK_EQ(motion_count(), 1);
+	CHECK_EQ(motion_count(), 2);
 
 	// A list whose rows can't work is refused, readably, and leaves nothing
 	CHECK_EQ(ui_core_push(&bad_view, 0), 0);
-	CHECK(strstr(ui_error(), "16 or 32") != 0);
+	CHECK(strstr(ui_error(), "8 to 32") != 0);
 	CHECK_EQ(res_mark(), mark1);
 
 	// The stack's cap
@@ -146,7 +147,7 @@ void test_ui_pool_and_arenas(void)
 		ui_core_pop();
 	// The list of 32 px rows alone fits
 	CHECK(ui_core_push(&tall_view, 0) != 0);
-	CHECK_EQ(motion_count(), 1);
+	CHECK_EQ(motion_count(), 2);
 	ui_core_pop();
 	CHECK_EQ(ui_depth(), 0);
 	CHECK_EQ(pool_free_units(bg, 0), free0);

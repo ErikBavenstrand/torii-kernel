@@ -5,7 +5,9 @@
 #include "../../source/engine/jobs.h"
 #include "../../source/engine/res.h"
 #include "../../source/ui/ring.h"
+#include "../../source/engine/text.h"
 #include "../../source/ui/ui.h"
+#include "../../source/ui/ui_reading.h"
 #include "../kernel/torii_test.h"
 #include "tests.h"
 
@@ -136,30 +138,85 @@ void test_ui_ring_setup(void)
 {
 	struct ui_ring r;
 	const char *why;
-	CHECK(!ring_setup(&r, 128, 24, &why) && why);
-	CHECK(!ring_setup(&r, 12, 16, &why) && why);
-	CHECK(!ring_setup(&r, 168, 16, &why) && why);
-	CHECK(ring_setup(&r, 128, 16, &why));
+	CHECK(!ring_setup(&r, 128, 7, 0, &why) && why);
+	CHECK(!ring_setup(&r, 128, 33, 0, &why) && why);
+	CHECK(!ring_setup(&r, 12, 16, 0, &why) && why);
+	CHECK(!ring_setup(&r, 168, 16, 0, &why) && why);
+	CHECK(!ring_setup(&r, 124, 16, 0, &why) && why);  // not whole tiles
+	CHECK(!ring_setup(&r, 160, 8, 0, &why) && why);   // 26 slots
+	CHECK(ring_setup(&r, 128, 16, 0, &why));
 	CHECK_EQ(r.visible, 9);  // a row cut at each end
 	CHECK_EQ(r.step, 2);
 	CHECK_EQ(r.k, 12);  // visible + 1 + step
-	CHECK_EQ(r.ring_rows, 16);
-	CHECK(ring_setup(&r, 160, 16, &why));
+	CHECK_EQ(r.period, 192);
+	CHECK(ring_setup(&r, 160, 16, 0, &why));
 	CHECK_EQ(r.k, 14);
-	CHECK(ring_setup(&r, 160, 32, &why));
+	CHECK(ring_setup(&r, 160, 32, 0, &why));
 	CHECK_EQ(r.step, 1);  // 32 px a frame either way
 	CHECK_EQ(r.k, 8);
-	CHECK_EQ(r.ring_rows, 8);
-	CHECK(ring_setup(&r, 120, 16, &why));
+	CHECK_EQ(r.period, 256);
+	CHECK(ring_setup(&r, 120, 16, 0, &why));
 	CHECK_EQ(r.visible, 9);
-	CHECK_EQ(ring_map_row(&r, 17), 2);  // row 17 is ring row 1: map rows 2-3
+	// 14 px rows in 112 px: 9 rows partly on screen, 2 a frame, 12 slots
+	// (a multiple of 4: 168 lines, 21 whole tile rows)
+	CHECK(ring_setup(&r, 112, 14, 0, &why));
+	CHECK_EQ(r.visible, 9);
+	CHECK_EQ(r.step, 2);
+	CHECK_EQ(r.k, 12);
+	CHECK_EQ(r.period, 168);
+	CHECK_EQ(ring_slot_line(&r, ring_slot(&r, 13)), 14u);  // row 13 is slot 1
+	CHECK(ring_setup(&r, 120, 14, 0, &why));
+	CHECK_EQ(r.k, 16);  // 10 + 1 + 2 = 13, rounded up to a multiple of 4
+	// 12 px rows in 120 px: 11 + 1 + 2 = 14, even
+	CHECK(ring_setup(&r, 120, 12, 0, &why));
+	CHECK_EQ(r.k, 14);
+	CHECK_EQ(r.period, 168);
+	CHECK(ring_setup(&r, 160, 12, 0, &why));  // the tallest at 12 px
+	CHECK_EQ(r.k, 18);
+	// A fixed list: a slot per whole row, rounded up to whole tiles
+	CHECK(ring_setup(&r, 80, 16, 1, &why));
+	CHECK_EQ(r.k, 5);
+	CHECK(ring_setup(&r, 80, 14, 1, &why));
+	CHECK_EQ(r.k, 8);  // 5 rows, rounded up to a multiple of 4
+	CHECK_EQ(r.period, 112);
+}
+
+// The BG scroll puts content line scroll at the viewport's top through the
+// fixed map (map row m shows canvas tile row m % (period / 8)): every line
+// the viewport shows is content line scroll + y's canvas line, inside the
+// map's 512 lines
+void test_ui_ring_vofs(void)
+{
+	static const u32 heights[] = {112, 120, 160, 128, 160, 64};
+	static const u32 rhs[] = {14, 12, 12, 16, 32, 14};
+	for (u32 g = 0; g < 6; g++) {
+		struct ui_ring r;
+		const char *why;
+		CHECK(ring_setup(&r, heights[g], rhs[g], 0, &why));
+		u32 tile_rows = r.period / 8u;
+		for (s32 scroll = 0; scroll < 3000; scroll += 7) {
+			for (s32 top = 0; top <= 160 - (s32)r.h; top += 24) {
+				u32 vofs = ring_vofs(&r, scroll, top);
+				for (u32 y = 0; y < r.h; y++) {
+					// The BG line screen line top + y shows (the BG wraps at
+					// 512): the period's from scroll's on, never across the wrap
+					u32 bg = (vofs + (u32)top + y) & 511;
+					CHECK_EQ(bg, (u32)scroll % r.period + y);
+					u32 canvas = (bg / 8 % tile_rows) * 8 + bg % 8;
+					CHECK_EQ(canvas, ((u32)scroll + y) % r.period);
+				}
+			}
+			if (torii_test_failures > 20)
+				return;
+		}
+	}
 }
 
 void test_ui_ring_windows(void)
 {
 	struct ui_ring r;
 	const char *why;
-	ring_setup(&r, 128, 16, &why);
+	ring_setup(&r, 128, 16, 0, &why);
 	u32 lo, hi;
 	ring_resident(&r, 0, 0, 1000, &lo, &hi);
 	CHECK_EQ(lo, 0);
@@ -214,13 +271,13 @@ void test_ui_ring_windows(void)
 // (ui_list.c's spare slots), under the same rule.
 void test_ui_ring_invariant(void)
 {
-	static const u32 heights[] = {128, 160, 120, 64, 16};
-	static const u32 rhs[] = {16, 16, 16, 32, 16};
+	static const u32 heights[] = {128, 160, 120, 64, 16, 112, 120, 112, 160, 144};
+	static const u32 rhs[] = {16, 16, 16, 32, 16, 14, 12, 16, 12, 14};
 	u32 seed = 12345;
-	for (u32 g = 0; g < 5; g++) {
+	for (u32 g = 0; g < 10; g++) {
 		struct ui_ring r;
 		const char *why;
-		CHECK(ring_setup(&r, heights[g], rhs[g], &why));
+		CHECK(ring_setup(&r, heights[g], rhs[g], 0, &why));
 		u32 rows = 700;
 		s32 max = ring_max_scroll(&r, rows), shown = 0, want = 0;
 		u16 slot_row[UI_RING_MAX_SLOTS];
@@ -245,12 +302,12 @@ void test_ui_ring_invariant(void)
 			for (u32 row = spare_lo; row <= spare_hi; row++) {
 				u32 s = ring_slot(&r, row);
 				if (slot_row[s] != row) {
-					// A row given a slot now: the slot's old row and
-					// its ring row must be off screen
+					// A row given a slot now: the slot's old row is
+					// off screen, and so are the slot's canvas lines
 					u32 old = slot_row[s];
 					CHECK(old == UI_ITEM_NONE || old < on_lo || old > on_hi);
-					for (u32 on = on_lo; on <= on_hi; on++)
-						CHECK(on == row || ring_map_row(&r, on) != ring_map_row(&r, row));
+					CHECK(old == UI_ITEM_NONE ||
+					      !ring_lines_show(&r, (u32)shown % r.period, ring_slot_line(&r, s), r.rh));
 					slot_row[s] = (u16)row;
 				}
 			}
@@ -474,4 +531,51 @@ void test_ui_focus_and_keys(void)
 	CHECK_EQ(ui_depth(), 1);
 	ui_core_pop();
 	CHECK_EQ(motion_count(), 0);
+}
+
+// --- Reading views --------------------------------------------------------
+
+// A text wrapped into rows: headings, key rows (wrapped on at the key
+// column), plain rows broken at the last space that fits, a word longer
+// than a row broken inside it, empty lines kept; every row fits its width
+void test_ui_reading(void)
+{
+	static const char text[] = "# Home\n"
+				   "A\topen the item and everything about it, at length\n"
+				   "\n"
+				   "Turn the carousel with the left and right keys, held to keep turning\n"
+				   "Supercalifragilisticexpialidociousandmoreandmore";
+	u16 start[32];
+	u8 len[32], kind[32];
+	struct ui_reading r = {text, start, len, kind, 32, 0};
+	const struct torii_font *font = &font_body;
+	u32 width = 120, key_w = 40;
+	u32 rows = ui_reading_wrap(&r, font, width, key_w);
+	CHECK(rows >= 7);
+	CHECK_EQ(kind[0], UI_READ_HEADING);
+	CHECK_EQ(kind[1], UI_READ_KEY);
+	CHECK_EQ(kind[2], UI_READ_MORE);
+	u32 empty = 0;
+	for (u32 i = 0; i < rows; i++) {
+		struct ui_item item = {0};
+		CHECK_EQ(ui_reading_model.fetch(&r, i, &item), UI_ITEM_READY);
+		u32 w = text_width(font, item.text, item.len);
+		CHECK(w <= (item.key ? width - key_w : width));
+		CHECK(item.text[0] != ' ' || item.len == 1);  // no row starts with a space
+		empty += item.len == 1 && item.text[0] == ' ';
+		if (kind[i] == UI_READ_HEADING) {
+			CHECK_EQ(item.ink, UI_ROLE_ACCENT_INK);
+			CHECK(!strncmp(item.text, "Home", 4));
+		}
+		if (kind[i] == UI_READ_KEY) {
+			CHECK_EQ(item.key_len, 1);
+			CHECK_EQ(item.key[0], 'A');
+		}
+	}
+	CHECK_EQ(empty, 1u);
+	CHECK_EQ(ui_reading_model.count(&r), rows);
+	// Too many rows for the arrays: the first are kept, and it says so
+	struct ui_reading small = {text, start, len, kind, 3, 0};
+	CHECK_EQ(ui_reading_wrap(&small, font, width, key_w), 0u);
+	CHECK_EQ(small.count, 3);
 }

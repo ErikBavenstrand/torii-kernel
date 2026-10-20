@@ -30,10 +30,10 @@ enum res_kind {
 #define RES_OBJ_UNITS 1024
 #define RES_PAL_BANKS 16
 #define RES_AFFINE_MATS 32
-#define RES_BG_BLOCKS 24
+#define RES_BG_BLOCKS 40  // a Paper clean page: a dozen widgets, two tile sets each
 #define RES_OBJ_BLOCKS 24
 // The allocation log's capacity: references held at once through res_*
-#define RES_LOG_CAP 48
+#define RES_LOG_CAP 64
 
 #define RES_NONE POOL_NONE
 #define RES_UNIT_BYTES 32

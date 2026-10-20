@@ -96,8 +96,44 @@ void ui_queue_keys(u16 keys);
 // budget. Otherwise it waits for the next frame.
 int ui_draw_room(u32 cycles, u32 budget);
 
-// The ops of lists (ui/ui_list.c).
+// --- Sprites ----------------------------------------------------------------
+// Widgets show sprites by adding them in their update, every frame they
+// show (ui_frame rebuilds OAM around the update): the view's OBJ priority
+// goes into attr2, under the view's front planes (a list's text) and over
+// the rest (its card). Colours: the UI's sprite bank (ui_obj_bank) holds
+// bank 0's roles (UI_ROLE_*), following the theme and item.
+
+// Adds a sprite for node's view (attr2 with its tile and palette bank, the
+// priority bits set here: the view's); 0 if the
+// view's sprites don't show now (a view above blends over it with sprites
+// of its own, or no priority is left under its text) or OAM is full.
+int ui_obj_add(u8 node, u16 attr0, u16 attr1, u16 attr2);
+// The UI's sprite palette bank, for attr2's palette bits.
+u32 ui_obj_bank(void);
+// Marks the view as showing sprites behind plane front (and plane 0).
+void ui_view_uses_objs(struct ui_view *v, u32 front);
+// px the view's planes are moved sideways (a transition's slide): its
+// sprites move with them.
+s32 ui_view_dx(const struct ui_view *v);
+// 1 while plane fades in or out for a page change (ui_plane_reveal,
+// ui_plane_fade_out): sprites drawn with it fade too as semi-transparent
+// ones (the blend's first target is the plane alone).
+int ui_plane_blending(u32 plane);
+
+// The inset of the row e px from a rounded end of radius px, at the edge
+// (e 0) and inwards (0 from e = radius on): the menu's one rounding, for
+// cards, pills and chips. Hardware-free (ui/ui_theme.c).
+u32 ui_round_inset(u32 radius, u32 e);
+
+// The ops of lists (ui/ui_list.c) and the Paper clean widgets (ui/ui_paper.c).
 extern const struct ui_ops ui_list_ops;
+extern const struct ui_ops ui_card_ops, ui_title_ops, ui_hints_ops, ui_path_ops, ui_storage_ops;
+
+struct text_window;
+// A key chip at x on a band of the look's hint_chip_h from line top of a
+// window: a soft pill with the key's name, then the label in FAINT (NULL
+// or "": none); returns the px it takes, drawn (draw 1) or not.
+u32 ui_key_chip(const struct text_window *win, u32 x, u32 top, const char *key, const char *label, int draw);
 // Forgets the rows lists keep drawn in the row cache (a theme change).
 void ui_list_cache_clear(void);
 

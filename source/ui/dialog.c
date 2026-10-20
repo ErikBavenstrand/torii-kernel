@@ -40,9 +40,9 @@ enum {
 };
 
 static const struct ui_panel_config border_panel = {UI_PANEL_BORDER};
-static const struct ui_label_config title_label = {"", UI_FONT_HEADING, UI_ALIGN_CENTER, 0};
-static const struct ui_label_config text_label = {"", UI_FONT_BODY, UI_ALIGN_CENTER, 0};
-static const struct ui_label_config hint_label = {"", UI_FONT_BODY, UI_ALIGN_CENTER, 0};
+static const struct ui_label_config title_label = {"", UI_FONT_HEADING, UI_ALIGN_CENTER, 0, 0};
+static const struct ui_label_config text_label = {"", UI_FONT_BODY, UI_ALIGN_CENTER, 0, 0};
+static const struct ui_label_config hint_label = {"", UI_FONT_BODY, UI_ALIGN_CENTER, 0, 0};
 
 // Everything on plane 0 (overlay and dialog text), so the screen under it
 // keeps its other planes. Nothing is hidden: a hidden node blanks its

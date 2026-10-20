@@ -3,11 +3,11 @@
 
 #include <stdint.h>
 
-int ring_setup(struct ui_ring *r, u32 h, u32 rh, const char **why)
+int ring_setup(struct ui_ring *r, u32 h, u32 rh, int fixed, const char **why)
 {
 	*why = 0;
-	if (rh != 16 && rh != 32) {
-		*why = "a row is 16 or 32 px tall";
+	if (rh < UI_RING_MIN_ROW || rh > UI_RING_MAX_ROW) {
+		*why = "a row is 8 to 32 px tall";
 		return 0;
 	}
 	if (h < rh || h > 160 || h % 8) {
@@ -18,10 +18,13 @@ int ring_setup(struct ui_ring *r, u32 h, u32 rh, const char **why)
 	r->rh = (u8)rh;
 	r->visible = (u8)((h - 1) / rh + 2);
 	r->step = (u8)(32 / rh);
-	r->k = (u8)(r->visible + 1 + r->step);
-	r->ring_rows = (u8)(256 / rh);
-	if (r->k > UI_RING_MAX_SLOTS || r->k > r->ring_rows) {
-		*why = "the viewport needs more row slots than the ring holds";
+	u32 k = fixed ? h / rh : r->visible + 1u + r->step;
+	while (k * rh % 8)
+		k++;  // whole tile rows: at most 3 more (rh * 4 is a multiple of 8)
+	r->k = (u8)k;
+	r->period = (u16)(k * rh);
+	if (k > UI_RING_MAX_SLOTS || r->period + h > UI_RING_MAP_LINES) {
+		*why = "the viewport needs more row slots than a list may have";
 		return 0;
 	}
 	return 1;

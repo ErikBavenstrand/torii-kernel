@@ -69,13 +69,11 @@ void test_theme_banks_neutral(void)
 		for (u32 item = 0; item < PAL_ITEMS; item++) {
 			ui_theme_banks(themes[t], item, pal);
 			CHECK_EQ(pal[0], s->bg);  // the backdrop
-			// The neutrals, the same in every bank but the pill's paper
+			// The neutrals, the same in every bank
 			for (u32 b = 0; b < UI_BANKS; b++) {
 				const u16 *bank = pal + b * 16;
-				if (b != UI_BANK_SELECTED) {
-					CHECK_EQ(bank[UI_ROLE_BG], s->bg);
-					CHECK_EQ(bank[UI_ROLE_PANEL], s->card);
-				}
+				CHECK_EQ(bank[UI_ROLE_BG], s->bg);
+				CHECK_EQ(bank[UI_ROLE_PANEL], s->card);
 				CHECK_EQ(bank[UI_ROLE_BORDER], s->edge);
 				CHECK_EQ(bank[UI_ROLE_SHADOW], s->shadow);
 				CHECK_EQ(bank[UI_ROLE_TRACK], s->soft);
@@ -105,37 +103,28 @@ void test_theme_banks_item(void)
 		for (u32 item = 0; item < PAL_ITEMS; item++) {
 			const struct pal_accent *a = &pal_accents[t][item];
 			ui_theme_banks(th, item, pal);
-			const u16 *normal = pal, *selected = pal + 16;
-			// Bank 0 and 1 hold the item's accent at the same indices
-			for (u32 b = 0; b < 2; b++) {
-				const u16 *bank = pal + b * 16;
-				CHECK_EQ(bank[UI_ROLE_ACCENT], a->base);
-				CHECK_EQ(bank[UI_ROLE_TINT], a->tint);
-				CHECK_EQ(bank[UI_ROLE_ACCENT_INK], a->ink);
-				CHECK_EQ(bank[UI_ROLE_ACCENT_TEXT], a->on);
-				CHECK_EQ(bank[UI_ROLE_DANGER], pal_accents[t][PAL_DANGER].ink);
-			}
+			const u16 *normal = pal;
+			// Bank 0 holds the item's accent
+			CHECK_EQ(normal[UI_ROLE_ACCENT], a->base);
+			CHECK_EQ(normal[UI_ROLE_TINT], a->tint);
+			CHECK_EQ(normal[UI_ROLE_ACCENT_INK], a->ink);
+			CHECK_EQ(normal[UI_ROLE_ACCENT_TEXT], a->on);
+			CHECK_EQ(normal[UI_ROLE_DANGER], pal_accents[t][PAL_DANGER].ink);
 			CHECK_EQ(normal[UI_ROLE_GROUND], ui_colour_mix(s->bg, a->base, th->backdrop_mix));
 			CHECK_EQ(normal[UI_ROLE_FLOAT], ui_colour_mix(s->card, s->ink, th->float_mix));
-			// The pill: paper turns tint, text stays neutral
-			CHECK_EQ(selected[UI_ROLE_BG], a->tint);
-			CHECK_EQ(selected[UI_ROLE_PANEL], a->tint);
-			CHECK_EQ(selected[UI_ROLE_TEXT], s->ink);
-			// Switching item changes only banks 0 and 1's accent indices
+			// Switching item changes only bank 0's accent indices
 			u16 other[UI_BANKS * 16];
 			ui_theme_banks(th, (item + 1) % PAL_ITEMS, other);
 			for (u32 i = 0; i < UI_BANKS * 16; i++) {
 				u32 b = i / 16, role = i % 16;
 				int accent = role >= UI_ROLE_ACCENT && role <= UI_ROLE_GROUND;
-				if (b == UI_BANK_NORMAL     ? !accent
-				    : b == UI_BANK_SELECTED ? !accent && role > UI_ROLE_PANEL
-							    : 1)
+				if (b != UI_BANK_NORMAL || !accent)
 					CHECK_EQ(other[i], pal[i]);
 			}
 		}
-		// Bank 2: the console inks; bank 3: danger and the NOR bar
+		// Bank 1: the console inks; bank 2: danger and the NOR bar
 		ui_theme_banks(th, PAL_SD, pal);
-		const u16 *consoles = pal + 32, *alert = pal + 48;
+		const u16 *consoles = pal + 16, *alert = pal + 32;
 		CHECK_EQ(consoles[UI_ROLE_INK_GBA], pal_accents[t][PAL_GBA].ink);
 		CHECK_EQ(consoles[UI_ROLE_INK_GBC], pal_accents[t][PAL_GBC].ink);
 		CHECK_EQ(consoles[UI_ROLE_INK_GB], pal_accents[t][PAL_GB].ink);
@@ -161,8 +150,6 @@ void test_theme_banks_item(void)
 static const u8 text_roles[UI_BANKS][8] = {
 	[UI_BANK_NORMAL] = {UI_ROLE_TEXT, UI_ROLE_DIM, UI_ROLE_FAINT, UI_ROLE_ACCENT_INK, UI_ROLE_ACCENT_TEXT,
 			    UI_ROLE_DANGER},
-	[UI_BANK_SELECTED] = {UI_ROLE_TEXT, UI_ROLE_DIM, UI_ROLE_FAINT, UI_ROLE_ACCENT_INK, UI_ROLE_ACCENT_TEXT,
-			      UI_ROLE_DANGER},
 	[UI_BANK_CONSOLES] = {UI_ROLE_TEXT, UI_ROLE_DIM, UI_ROLE_FAINT, UI_ROLE_INK_GBA, UI_ROLE_INK_GBC,
 			      UI_ROLE_INK_GB, UI_ROLE_INK_NES},
 	[UI_BANK_ALERT] = {UI_ROLE_TEXT, UI_ROLE_DIM, UI_ROLE_FAINT, UI_ROLE_ALERT_INK, UI_ROLE_NOR_INK},
@@ -194,6 +181,21 @@ void test_theme_text_contrast(void)
 		CHECK(contrast(s->ink, s->card) >= 700);
 		CHECK(contrast(s->ink2, s->card) >= 450);
 		CHECK(contrast(s->ink2, s->bg) >= 450);
+		// B9's hint bar: labels in ink3 on the paper (and secondary text
+		// in it on cards), key names in ink2 on the soft chip: 3:1
+		// (B1's review found light ink3 on a card at 2.98)
+		CHECK(contrast(s->ink3, s->bg) >= 300);
+		CHECK(contrast(s->ink3, s->card) >= 300);
+		CHECK(contrast(s->ink2, s->soft) >= 300);
+		// Danger text (Delete, Format) on a floating card, a popup's or a
+		// confirmation's: 4.5:1 (B1's review: 4.1 in the dark theme)
+		u16 float_card = ui_colour_mix(s->card, s->ink, themes[t]->float_mix);
+		CHECK(contrast(themes[t]->accent[PAL_DANGER].ink, float_card) >= 450);
+		// An item's ink on its own tint is for marks only (8x8 icons, the
+		// star, the save dot on a selected row): 3:1. Text on the pill is
+		// the neutral ink (above)
+		for (u32 item = 0; item < PAL_ITEMS; item++)
+			CHECK(contrast(pal_accents[t][item].ink, pal_accents[t][item].tint) >= 300);
 	}
 	// The light theme's weak bases are the ones the spec names
 	const struct pal_surfaces *light = &pal_surfaces[PAL_LIGHT];

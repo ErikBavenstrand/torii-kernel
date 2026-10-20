@@ -328,7 +328,7 @@ struct ui_view *ui_core_push(const struct ui_view_spec *spec, void *ctx)
 	for (u32 p = 0; ok && p < UI_PLANES; p++) {
 		if (!(v->planes >> p & 1))
 			continue;
-		v->maps[p] = res_bg_map(1, 0);
+		v->maps[p] = res_bg_map(v->tall >> p & 1 ? 2 : 1, 0);
 		if (v->maps[p] == RES_NONE) {
 			ui_set_error("view %s: no room for plane %lu's map", spec->name, (unsigned long)p);
 			ok = 0;
