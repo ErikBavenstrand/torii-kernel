@@ -145,7 +145,7 @@ static struct {
 	u8 label_tiles;  // its block, for its address
 	u8 pal_first;
 	u8 matrix[RING_OBJECTS];
-	u8 slot_entry[SLOTS];   // the entry whose tiles a slot holds, SLOT_NONE
+	u8 slot_sprite[SLOTS];  // the object (ART_SPRITE_*) whose tiles a slot holds, SLOT_NONE
 	u32 slot_ticket[SLOTS];  // its copy's queue ticket
 	// Label sets: the one the sprites show, and which sets the sprites of
 	// this frame and the last use (bit per set: a set is drawn only when
@@ -153,6 +153,9 @@ static struct {
 	struct label_set set[2];
 	u8 shown;
 	u8 used_now, used_last;
+	u8 stale[2];  // a set's texts changed (carousel_refresh): shown until redrawn
+	// Object slots the sprites of this frame and those still maybe on screen use
+	u8 slots_now, slots_last;
 	// The backdrop's three BG tiles
 	u16 back_first;
 } car EWRAM_BSS;
@@ -277,7 +280,7 @@ static int car_init(u8 node)
 		for (u32 w = 0; w < ART_SHADOW_HALF_TILES * 8; w++)
 			sh[i * ART_SHADOW_HALF_TILES * 8 + w] = art_shadow_tiles[i][w];
 	for (u32 i = 0; i < SLOTS; i++)
-		car.slot_entry[i] = SLOT_NONE;
+		car.slot_sprite[i] = SLOT_NONE;
 	car.set[0].entry = car.set[1].entry = SET_NONE;
 	car.shown = 0;
 	ring_motion_rest(&car.m, 0);
@@ -290,13 +293,14 @@ static int car_init(u8 node)
 
 static u32 slot_of(u32 entry)
 {
+	u32 sprite = car.items[entry].sprite % ART_SPRITE_COUNT;
 	for (u32 i = 0; i < SLOTS; i++)
-		if (car.slot_entry[i] == entry)
+		if (car.slot_sprite[i] == sprite)
 			return i;
 	return SLOT_NONE;
 }
 
-// Every entry within reach of the position or the target gets a slot, its
+// Every object within reach of the position or the target gets a slot, its
 // tiles queued; the rest give theirs up
 static void slots_update(void)
 {
@@ -313,38 +317,43 @@ static void slots_update(void)
 	u8 want[2 * RING_OBJECTS];
 	u32 wants = 0;
 	for (u32 i = 0; i < n + t; i++) {
-		u32 e = ring_item(i < n ? now[i].k : then[i - n].k, car.count);
+		u32 sp = car.items[ring_item(i < n ? now[i].k : then[i - n].k, car.count)].sprite % ART_SPRITE_COUNT;
 		u32 seen = 0;
 		for (u32 j = 0; j < wants; j++)
-			seen |= want[j] == e;
+			seen |= want[j] == sp;
 		if (!seen)
-			want[wants++] = (u8)e;
+			want[wants++] = (u8)sp;
 	}
-	u8 keep[SLOTS] = {0};
+	// A slot that sprites still on screen may show (an older OAM, while the
+	// commit holds OAM back) isn't refilled: its copy would show under them
+	u8 keep[SLOTS];
+	for (u32 i = 0; i < SLOTS; i++)
+		keep[i] = (car.slots_last >> i) & 1;
+	for (u32 j = 0; j < wants; j++)
+		for (u32 i = 0; i < SLOTS; i++)
+			if (car.slot_sprite[i] == want[j])
+				keep[i] = 1;
 	for (u32 j = 0; j < wants; j++) {
-		u32 s = slot_of(want[j]);
-		if (s != SLOT_NONE)
-			keep[s] = 1;
-	}
-	for (u32 j = 0; j < wants; j++) {
-		if (slot_of(want[j]) != SLOT_NONE)
+		u32 have = 0;
+		for (u32 i = 0; i < SLOTS; i++)
+			have |= car.slot_sprite[i] == want[j];
+		if (have)
 			continue;
 		u32 s = 0;
 		while (s < SLOTS && keep[s])
 			s++;
-		if (s == SLOTS) {
-			car.slots_dirty = 1;  // more than the slots hold: the rest wait
+		// More than the free slots hold, or the queue is full: next frame
+		if (s == SLOTS || gfx_queue_len() >= GFX_QUEUE_CAP) {
+			car.slots_dirty = 1;
 			break;
 		}
-		// No sprite this frame uses the slot (it isn't kept): the copy lands
-		// in VBlank before anything shows it again
-		car.slot_entry[s] = SLOT_NONE;
-		const u32 *src = art_sprite_tiles[car.items[want[j]].sprite % ART_SPRITE_COUNT];
-		if (!gfx_queue_copy(obj_tiles(car.slot_first + s * ART_SPRITE_TILES), src, ART_SPRITE_TILES * 32)) {
-			car.slots_dirty = 1;  // the queue is full: next frame
+		car.slot_sprite[s] = SLOT_NONE;
+		if (!gfx_queue_copy(obj_tiles(car.slot_first + s * ART_SPRITE_TILES), art_sprite_tiles[want[j]],
+				    ART_SPRITE_TILES * 32)) {
+			car.slots_dirty = 1;
 			break;
 		}
-		car.slot_entry[s] = want[j];
+		car.slot_sprite[s] = want[j];
 		car.slot_ticket[s] = gfx_queue_ticket();
 		keep[s] = 1;
 	}
@@ -438,7 +447,7 @@ static int car_event(u8 node, const struct ui_event *e)
 // 1 if a label set holds entry's label
 static int has_label(u32 entry)
 {
-	return car.set[0].entry == entry || car.set[1].entry == entry;
+	return (car.set[0].entry == entry && !car.stale[0]) || (car.set[1].entry == entry && !car.stale[1]);
 }
 
 // --- Update: the sprites ---------------------------------------------------------
@@ -477,10 +486,18 @@ static void car_update(u8 node, u32 dt)
 		ui_item_set(car.items[carousel_facing(node)].accent);
 		ui_emit(node, UI_EV_CURSOR, carousel_facing(node));
 	}
+	// What may be on screen: the last frame's sprites, or, while the commit
+	// holds OAM back (a view coming in waits for its uploads), every
+	// frame's since the last OAM written
+	if (gfx_dirty_regs & GFX_DIRTY_OAM) {  // the last frame's OAM wasn't written
+		car.used_last |= car.used_now;
+		car.slots_last |= car.slots_now;
+	} else {
+		car.used_last = car.used_now;
+		car.slots_last = car.slots_now;
+	}
+	car.used_now = car.slots_now = 0;
 	slots_update();
-
-	car.used_last = car.used_now;
-	car.used_now = 0;
 	const struct ui_node *n = ui_node(node);
 	const struct ui_view *v = ui_node_view(node);
 	if ((n->flags & UI_N_HIDDEN) || !ui_node_shown(node) || !ui_plane_owned(node))
@@ -495,9 +512,9 @@ static void car_update(u8 node, u32 dt)
 	u32 fade = (u32)(u < 0 ? -u : u) >> 7;  // 0-256
 	s32 slide = -((u * 2 * (s32)theme()->motion.label_slide) >> 16);
 	struct label_set *ls = &car.set[car.shown];
-	if (ls->entry != entry) {
+	if (ls->entry != entry || car.stale[car.shown]) {
 		u32 other = car.shown ^ 1u;
-		if (car.set[other].entry == entry) {
+		if (car.set[other].entry == entry && !car.stale[other]) {
 			car.shown = (u8)other;
 			ls = &car.set[other];
 			car.pal_dirty = 1;
@@ -547,6 +564,7 @@ static void car_update(u8 node, u32 dt)
 		if (x <= -ART_SPRITE_SIZE || x >= 240 || y <= -ART_SPRITE_SIZE || y >= 160)
 			continue;
 		gfx_affine_set(car.matrix[j], (s16)pd, 0, 0, (s16)pd);
+		car.slots_now |= (u8)(1u << s);
 		drawn[j] = ui_obj_add(
 			node, (u16)(OBJ_AFFINE | (y & 0xFF)), (u16)(OBJ_SIZE_3 | car.matrix[j] << 9 | (x & 0x1FF)),
 			(u16)((car.slot_first + s * ART_SPRITE_TILES) | (car.pal_first + BANK_OBJECTS + j) << 12));
@@ -666,6 +684,7 @@ static void draw_label(u32 set, u32 entry)
 	ls->dots_x = (s16)(look.centre_x - strip / 2);
 	ls->dot_cols = (u8)((strip + 7) / 8);
 	ls->entry = (u8)entry;
+	car.stale[set] = 0;
 }
 
 static void car_draw(u8 node)
@@ -708,10 +727,11 @@ void carousel_set(u8 node, const struct carousel_entry *entries, u32 count, u32 
 	car.items = entries;
 	car.count = (u8)(count < CAROUSEL_MAX ? count : CAROUSEL_MAX);
 	ring_motion_rest(&car.m, (s32)(facing < car.count ? facing : 0));
-	for (u32 i = 0; i < SLOTS; i++)
-		car.slot_entry[i] = SLOT_NONE;
-	slots_redo();
+	slots_redo();  // slots are kept by object: the ones still on the ring keep their tiles
 	carousel_refresh(node);
+	// Other items: the sets' entries mean others now, so the label waits
+	// for its new texts
+	car.set[0].entry = car.set[1].entry = SET_NONE;
 	car.settled = 1;
 	if (car.count)
 		ui_item_set(entries[carousel_facing(node)].accent);
@@ -727,7 +747,8 @@ void carousel_refresh(u8 node)
 {
 	if (car.node != node)
 		return;
-	car.set[0].entry = car.set[1].entry = SET_NONE;
+	// Both sets go stale; the one shown stays until the new texts are drawn
+	car.stale[0] = car.stale[1] = 1;
 	car.pal_dirty = 1;
 	ui_dirty(node, DIRTY_LABEL);
 }
