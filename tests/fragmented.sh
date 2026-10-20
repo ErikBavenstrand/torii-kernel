@@ -8,6 +8,8 @@
 set -euo pipefail
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
+# shellcheck source=tests/nav.sh
+. tests/nav.sh
 local_carts "dist/cart-fragmented${1:+-$1}"
 
 fail() {
@@ -30,8 +32,9 @@ run_case() {
     python3 tools/fat16_eoc.py "$cart/sd.img" >/dev/null
   fi
 
-  # Open the game (it sorts first) and pick CLEAN BOOT
-  OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -k 100:A -k 106:- -k 160:A -k 166:- \
+  # CLEAN BOOT of the game
+  # shellcheck disable=SC2046 # nav.sh's options
+  OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch /AGAME.GBA at=160) \
     -s 400:"$shots/game.png" -f 400 >"$log" 2>&1 || fail "$label: the emulator failed: $(tail -3 "$log")"
 }
 

@@ -6,6 +6,8 @@
 set -euo pipefail
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
+# shellcheck source=tests/nav.sh
+. tests/nav.sh
 local_carts "dist/cart-smoke${1:+-$1}"
 
 cart=$carts/smoke
@@ -29,14 +31,15 @@ save_bytes() {
   mtype -i "$cart/sd.img" ::/SAVER/Hello.sav 2>/dev/null | head -c 5 | od -A n -t x1 | tr -d ' \n'
 }
 
-# Power-on 0: the boot goes to the list with no notice before it (v0.3.2:
+# Power-on 0: the boot goes to home with no notice before it (v0.3.2:
 # "microSD card ready / Loading..." flashed for 3 frames).
-OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -w "screen ready: sd-list" >/dev/null 2>"$cart/boot.log" || true
-grep -q '^kernel: screen ready: sd-list' "$cart/boot.log" || fail "the boot didn't reach the SD list"
-! grep -q '^kernel: ui: pushed notice' "$cart/boot.log" || fail "the boot showed a notice before the list"
+OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -w "screen ready: home" >/dev/null 2>"$cart/boot.log" || true
+grep -q '^kernel: screen ready: home' "$cart/boot.log" || fail "the boot didn't reach home"
+! grep -q '^kernel: ui: pushed notice' "$cart/boot.log" || fail "the boot showed a notice before home"
 
-# Power-on 1: Hello.gba is the only entry. Open it, then pick CLEAN BOOT.
-boot -k 100:A -k 106:- -k 160:A -k 166:- -s 400:$shots/1-game.png
+# Power-on 1: CLEAN BOOT of Hello.gba.
+# shellcheck disable=SC2046 # nav.sh's options
+boot $(nav_launch /Hello.gba) -s 400:$shots/1-game.png
 od -A n -t x1 -N 5 "$cart/sram.bin" | tr -d ' \n' | grep -q '4f4d525801' ||
   fail "game did not write its first boot to SRAM"
 
@@ -44,8 +47,9 @@ od -A n -t x1 -N 5 "$cart/sram.bin" | tr -d ' \n' | grep -q '4f4d525801' ||
 boot -s 90:$shots/2-prompt.png -k 100:A -k 106:- -s 300:$shots/2-menu.png
 [ "$(save_bytes)" = 4f4d525801 ] || fail "save not written back to SD (got $(save_bytes))"
 
-# Power-on 3: SAVER sorts first, so move down to the game and launch it.
-boot -k 100:DOWN -k 106:- -k 120:A -k 126:- -k 180:A -k 186:- -s 500:$shots/3-game.png
+# Power-on 3: launch it again.
+# shellcheck disable=SC2046 # nav.sh's options
+boot $(nav_launch /Hello.gba) -s 500:$shots/3-game.png
 od -A n -t x1 -N 5 "$cart/sram.bin" | tr -d ' \n' | grep -q '4f4d525802' ||
   fail "save was not loaded back into SRAM on the next launch"
 

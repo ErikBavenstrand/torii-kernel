@@ -1,0 +1,12 @@
+# Home (source/screens/home.c), the stand-in list until B12's carousel: the
+# items the card holds (Recent from its v0.3 list, GBA's games) in the
+# carousel's order with what each holds, the torii glyph and the hint bar.
+# DOWN moves to the next item, whose accent the pill takes (the pill's
+# slide hashed every frame); UP at the top wraps to Info.
+-w "nav: home ready"
+-s @1:screen.png
+-k @8:DOWN -k @12:-
+-H @8:@20
+-s @24:down.png
+-k @30:UP -k @34:- -k @42:UP -k @46:-
+-s @70:wrapped.png

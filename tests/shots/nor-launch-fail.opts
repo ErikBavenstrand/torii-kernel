@@ -1,21 +1,16 @@
 # A NOR game whose launch fails (/SAVER is a file, so its save can't be
-# made): WRITE TO NOR CLEAN puts Hello.gba on the game NOR, its NOR game
-# menu's BOOT shows the error, and after it the NOR list comes back whole,
-# its rows drawn without a key (it stayed black until one before v0.3.2)
+# made): WRITE TO NOR CLEAN puts Hello.gba on the game NOR, and its launch
+# (both through the menu's test hook) shows the error; after it home comes
+# back whole, drawn without a key (the list stayed black until one before
+# v0.3.2)
 #! sd-rm /SAVER
 #! sd-file /SAVER 16 tests/roms/hello/hello.gba
 #! expect-error error 2:
--w "screen ready: sd-list"
--k @8:DOWN -k @12:- -k @16:DOWN -k @20:- -k @24:DOWN -k @28:-
--k @36:A -k @40:-
--w "screen ready: file-menu"
--k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:A -k @36:-
+-w "nav: home ready"
+-P "@8:nav_test_path:/Hello.gba" -p @8:nav_test_action:3
 -w "nor: list saved"
--w "screen ready: nor-list"
--s @1:list.png
--k @8:A -k @12:-
--w "screen ready: nor-menu"
--k @8:A -k @12:-
+-w "nav: home ready"
+-p @8:nav_test_action:6
 -w "screen ready: dialog"
 -s @1:error.png
 -k @8:B -k @12:-

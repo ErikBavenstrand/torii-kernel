@@ -32,6 +32,7 @@ jobs=(
   "tests/names.sh exfat"
   "tests/stale_recent.sh"
   "tests/userdata.sh"
+  "tests/navigation.sh"
   "tests/fragmented.sh"
   "tests/listing.sh"
   "tests/library.sh 1/4"

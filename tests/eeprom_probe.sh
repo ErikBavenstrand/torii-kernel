@@ -8,6 +8,8 @@
 set -euo pipefail
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
+# shellcheck source=tests/nav.sh
+. tests/nav.sh
 local_carts "dist/cart-eeprom-probe${1:+-$1}"
 
 fail() {
@@ -25,22 +27,19 @@ keys() {
   done
 }
 
-# type  save-type-menu-steps  width-key  width
+# type  save-type  width-key  width
 run_case() {
-  local type=$1 rights=$2 key=$3 width=$4
+  local type=$1 save=$2 key=$3 width=$4
   local cart=$carts/eeprom-$type-$width shots=dist/shots/eeprom-$type-$width
   rm -rf "$cart" "$shots"
   mkdir -p "$cart" "$shots"
   mkfs.fat -C -F 32 -n EEPROM "$cart/sd.img" 65536 >/dev/null
   mcopy -i "$cart/sd.img" tests/roms/eeprom/eeprom.gba ::/Probe.gba
-  local right_keys=()
-  for _ in $(seq "$rights"); do right_keys+=(RIGHT); done
-  # Open Probe.gba, set SAVE TYPE, back up to CLEAN BOOT, launch; pick the
-  # width, then A goes back to the kernel, whose boot logs the report. A at
-  # its "Save sav?" keeps the probe's EEPROM.
+  # CLEAN BOOT of Probe.gba with its save type; pick the width, then A goes
+  # back to the kernel, whose boot logs the report. A at its "Save sav?"
+  # keeps the probe's EEPROM.
   # shellcheck disable=SC2046
-  OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(keys 100 A) \
-    $(keys 150 DOWN DOWN DOWN DOWN "${right_keys[@]}" UP UP UP UP A) \
+  OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch /Probe.gba "save=$save" at=230) \
     -s 600:"$shots/1-probe.png" $(keys 640 "$key") -s 700:"$shots/2-verdict.png" $(keys 720 A) \
     -s 1000:"$shots/3-save.png" $(keys 1010 A) -s 1300:"$shots/4-menu.png" -f 1300 >"$cart/out.log" 2>"$cart/kernel.log" || true
   ! grep -q '^crash at frame' "$cart/kernel.log" || fail "$type $width-bit: the emulator caught a crash"

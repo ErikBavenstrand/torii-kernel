@@ -98,10 +98,18 @@ KERNEL_SAVE = {
     0x33: "flash64k",
 }
 CHECKS = ["boots", "save type", "clock", "save cycle", "in-game menu"]
-# The SAVER folder sorts before the game, so: down, open, CLEAN BOOT. GB, GBC
-# and NES games start on open, with no menu.
-LAUNCH = [(100, "DOWN"), (120, "A"), (180, "A")]
-LAUNCH_EMU = LAUNCH[:2]
+# Launches go as the menu's pages will run them, through actions.c and the
+# menu's test hook (source/screens/nav.h, tests/nav.sh): a "hook" key pokes
+# the game's path and the action (1 CLEAN BOOT, 2 BOOT WITH ADDON), which
+# the menu runs once it is up. GB, GBC and NES games start clean.
+HOOK_CLEAN = 1
+HOOK_ADDON = 2
+
+
+def launch_keys(sd_name: str, action: int, frame: int) -> list[tuple[int, str]]:
+    return [(frame, f"hook:{action}:/{sd_name}")]
+
+
 # The kernel has handed over to the game by now: with the menu's transitions
 # (v0.3 F2) it finishes loading a 32 MB game and its save about 320 frames in
 GAME_START = 360
@@ -116,8 +124,6 @@ MENU_SETTINGS = {0: 0xE1E1, 1: 1, 2: 1, 3: 0, 4: 0, 5: 9, 6: 8, 7: 2, 8: 9, 9: 8
 MENU_SETTINGS |= {10: 3, 11: 1, 12: 0, 13: 1, 25: 1}
 KERNEL_NOR_SIZE = 0x800000
 SETTINGS = 0x7B0000
-# Down to the game, open it, then BOOT WITH ADDON.
-LAUNCH_ADDON = [(100, "DOWN"), (120, "A"), (180, "DOWN"), (200, "A")]
 HOOK_WATCH = "tests/hook_watch.lua"
 IRQ_LITERALS = (0x03007FFC, 0x03FFFFFC)  # what the kernel's ROM scan patches
 PATCH_SLOTS = 32  # EMax in source/GBApatch.h: literals past this stay unpatched
@@ -190,6 +196,11 @@ def power_on(cart: Path, keys, frames: int, extra: list[str] = ()) -> tuple[str,
     """Run the cart once from power-on; return (stdout, cart trace)."""
     args = [SHOT, KERNEL, "-f", str(frames), *extra]
     for frame, key in keys:
+        if key.startswith("hook:"):
+            _, action, path = key.split(":", 2)
+            args += ["-P", f"{frame}:nav_test_path:{path}"]
+            args += ["-p", f"{frame}:nav_test_action:{action}"]
+            continue
         args += ["-k", f"{frame}:{key}"]
         if key != "-":
             args += ["-k", f"{frame + 6}:-"]
@@ -499,7 +510,10 @@ def check_menu(result: Result, rom: Path, sd_name: str, table: dict) -> None:
     frames = 400 + (len(data) >> 20) * 150 + 1800
     hashes = [a for f in range(30, frames + 1, 30) for a in ("-h", str(f))]
     out, trace = power_on(
-        cart, LAUNCH_ADDON, frames, ["-L", HOOK_WATCH, "-u", "hook watch done", *hashes]
+        cart,
+        launch_keys(sd_name, HOOK_ADDON, 200),
+        frames,
+        ["-L", HOOK_WATCH, "-u", "hook watch done", *hashes],
     )
     events = [
         (int(f), text)
@@ -647,7 +661,7 @@ def run_game(result: Result, roms: dict, saves: dict, table: dict) -> None:
     for hw in g.get("hardware", []):
         result.notes.append(f"{hw} not emulated")
     size = SAVE_SIZE.get(g["save"])
-    launch = LAUNCH if system == "gba" else LAUNCH_EMU
+    launch = launch_keys(sd_name, HOOK_CLEAN, 180 if system == "gba" else 120)
     started = time.time()
 
     # Power-on 1: launch, then play (a key script, or mashing).

@@ -1,9 +1,8 @@
-# The launch's progress dialog loading a 4 MB GBC game (Hello.gba padded)
-# for the emulator: the bar part of the way, and "Loading the game" with no
+# The launch's loading card loading a 4 MB GBC game (Hello.gba padded) for
+# the emulator: the bar part of the way, and "Loading the game" with no
 # percentage: the bar alone shows the whole start (source/progress.h)
 #! sd-file /Big.gbc 0x400000 tests/roms/hello/hello.gba
--w "screen ready: sd-list"
--k @8:DOWN -k @12:- -k @16:DOWN -k @20:- -k @24:DOWN -k @28:- -k @32:DOWN -k @36:-
--k @44:A -k @48:-
+-w "nav: home ready"
+-P "@8:nav_test_path:/Big.gbc" -p @8:nav_test_action:1
 -w "screen ready: progress"
 -s @200:loading.png

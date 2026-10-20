@@ -1,3 +1,0 @@
-# The SD card's root folder, cursor on the first entry
--w "screen ready: sd-list"
--s @1:screen.png
