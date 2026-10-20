@@ -23,6 +23,7 @@
 #define NAMES_CACHE_FILE_MAX 0x100000u  // the most of crc.txt read (1 MB)
 #define NAMES_IO_BYTES 2048  // a read or write per step: a read's CRC takes about 35,000 cycles
 #define NAMES_CLEAR_BYTES 2048  // the cache's slots emptied per step
+#define NAMES_LOAD_BYTES 512  // crc.txt read per step: a line costs about 15,000 cycles to keep
 #define NAMES_STEP_CYCLES 30000  // one job call's work, as the library's
 #define NAMES_KEY_REST 30  // the job waits for the keys to rest this many frames
 #define NAMES_WRITE_IDLE 120  // and this long before it writes crc.txt (as the library's index)
@@ -41,7 +42,9 @@ enum {
 	P_START,  // nothing loaded
 	P_DB,  // names.db's body, a chunk a step
 	P_CLEAR,  // the cache's slots
-	P_CACHE,  // crc.txt
+	P_SCAN_MAIN,  // crc.txt's CRC checked, a chunk a step
+	P_SCAN_BAK,  // and crc.txt.bak's, when crc.txt doesn't hold
+	P_READ,  // the copy that holds, read into the cache a chunk a step
 	P_DONE,
 };
 
@@ -88,6 +91,11 @@ static struct {
 	// reader doesn't take now, so the other stays whole until it is done
 	u8 main_first;
 	u32 wpos, wcrc, wstarted;
+	// crc.txt's load (safefile.h's rules, in steps through N.u.fil)
+	struct safefile_scan scan_main, scan_bak;
+	u8 has_main, has_bak, first_line, line_long;
+	u16 line_len;
+	u32 limit, rd_done, lines_read, lines_bad;
 	u32 at;  // names.db bytes loaded, or slot bytes cleared
 	u32 started;
 	struct names_cache cache;
@@ -95,6 +103,7 @@ static struct {
 	u32 total, done, computed, named, bytes, since_write, since_rename;
 	u32 crc, size, date, code, read;
 	u8 seen[NAMES_CACHE_MAX / 8];
+	u32 walk_names;  // the names the walk under way found: names_identity
 	char path[NAMES_PATH_MAX + 1];
 	struct line_cursor lc;
 	struct safefile_lines lines;
@@ -214,45 +223,159 @@ static void db_step(void)
 	N.at = 0;
 }
 
-// crc.txt into the cache, in one step: B5's safe file has one FIL, which
-// the menu's own lists may use between steps
-static void cache_step(void)
+// --- crc.txt, in steps -------------------------------------------------------
+//
+// safefile.h's reader (safefile_pick's choice of copy, a BOM, CR, blank and
+// '#' lines) a chunk a step through a FIL of its own: B5's module reads a
+// whole file in one call, which for a large cache held the menu for seconds.
+// The line being read collects in N.lines.buf, unused until a write.
+
+static void load_done(void)
 {
-	u32 start = cycles_now(), lines = 0, bad = 0;
-	N.cache_ok = 1;
-	int from = safefile_open(NAMES_CACHE_FILE, NAMES_CACHE_FILE_MAX);
-	// The next write leaves the copy read now whole until the other is
-	// written (safefile_write's order)
-	N.main_first = from == SAFEFILE_BAK;
-	if (from != SAFEFILE_NONE) {
-		char *line = (char *)N.buf;
-		for (;;) {
-			int len = safefile_line(line, sizeof(N.buf));
-			if (len == SAFEFILE_END)
-				break;
-			struct names_line l;
-			if (len == SAFEFILE_LONG || !names_parse_line(line, &l)) {
-				bad += len == SAFEFILE_LONG || (line[0] && line[0] != '#');
-				continue;
-			}
-			if (names_cache_put(&N.cache, l.path, l.size, l.date, l.crc, l.code, l.flags) ==
-			    NAMES_CACHE_NONE)
-				bad++;
-			else
-				lines++;
-		}
-		if (safefile_failed())
-			N.cache_ok = 0;  // what was read may be short: never written back
-		safefile_close();
+	close_file();
+	if (N.cache.full) {
+		N.cache_ok = 0;  // writing back would lose the lines left out
+		tlog("names: the CRC cache is full: %s isn't written back", NAMES_CACHE_FILE);
 	}
 	N.dirty = 0;
 	N.phase = P_DONE;
 	N.want_recent = 1;
-	tlog("names: %lu files' CRCs from %s in %lu ms%s", (unsigned long)lines, NAMES_CACHE_FILE,
-	     (unsigned long)ms_since(start), N.cache_ok ? "" : " (a read failed: it isn't written back)");
-	if (bad)
-		tlog("names: %lu lines of %s left out (unreadable, or the cache is full)", (unsigned long)bad,
+	tlog("names: %lu files' CRCs from %s in %lu ms%s", (unsigned long)N.lines_read, NAMES_CACHE_FILE,
+	     (unsigned long)ms_since(N.started), N.cache_ok ? "" : " (it isn't written back)");
+	if (N.lines_bad)
+		tlog("names: %lu lines of %s left out (unreadable, or the cache is full)", (unsigned long)N.lines_bad,
 		     NAMES_CACHE_FILE);
+}
+
+// Opens a copy to read; 0 if it isn't there (a card error marks the cache
+// unwritable) or is larger than the cap
+static int open_copy(const char *path)
+{
+	FRESULT fr = f_open(&N.u.fil, path, FA_READ);
+	if (fr != FR_OK) {
+		if (fr != FR_NO_FILE && fr != FR_NO_PATH) {
+			tlog_error("names: can't open %s (FatFs error %d)", path, fr);
+			N.cache_ok = 0;
+		}
+		return 0;
+	}
+	N.file_open = 1;
+	if (f_size(&N.u.fil) > NAMES_CACHE_FILE_MAX) {
+		tlog("names: %s is over %lu bytes: left alone", path, (unsigned long)NAMES_CACHE_FILE_MAX);
+		close_file();
+		return 0;
+	}
+	return 1;
+}
+
+// A chunk of the copy being scanned; 1 once it is all scanned (or failed:
+// *ok 0)
+static int scan_chunk(struct safefile_scan *sc, int *ok)
+{
+	UINT got = 0;
+	FRESULT fr = f_read(&N.u.fil, N.buf, NAMES_LOAD_BYTES, &got);
+	*ok = fr == FR_OK;
+	if (!*ok) {
+		tlog_error("names: reading %s failed (FatFs error %d)", NAMES_CACHE_FILE, fr);
+		N.cache_ok = 0;
+		close_file();
+		return 1;
+	}
+	safefile_scan_feed(sc, N.buf, got);
+	if (got == NAMES_LOAD_BYTES)
+		return 0;
+	safefile_scan_end(sc);
+	close_file();
+	return 1;
+}
+
+// The scans are done: open the copy safefile_pick takes
+static void read_begin(void)
+{
+	int from = safefile_pick(N.has_main ? &N.scan_main : NULL, N.has_bak ? &N.scan_bak : NULL);
+	// The next write leaves the copy read now whole until the other is
+	// written (safefile_write's order)
+	N.main_first = from == SAFEFILE_BAK;
+	if (from == SAFEFILE_NONE) {
+		if ((N.has_main && N.scan_main.size) || (N.has_bak && N.scan_bak.size))
+			tlog_error("names: %s: neither copy holds up: read as empty", NAMES_CACHE_FILE);
+		load_done();
+		return;
+	}
+	const struct safefile_scan *sc = from == SAFEFILE_BAK ? &N.scan_bak : &N.scan_main;
+	if (from != SAFEFILE_MAIN)
+		tlog("names: %s: %s", NAMES_CACHE_FILE,
+		     from == SAFEFILE_BAK ? "read the backup copy" : "edited by hand: read as it is");
+	if (!open_copy(from == SAFEFILE_BAK ? NAMES_CACHE_BAK : NAMES_CACHE_FILE)) {
+		load_done();
+		return;
+	}
+	N.limit = sc->valid ? sc->body : sc->size;
+	N.rd_done = 0;
+	N.line_len = 0;
+	N.line_long = 0;
+	N.first_line = 1;
+	N.phase = P_READ;
+}
+
+// The line collected in N.lines.buf is complete
+static void line_end(void)
+{
+	char *line = N.lines.buf;
+	u32 len = N.line_len;
+	while (len && line[len - 1] == '\r')
+		len--;
+	line[len] = 0;
+	if (N.first_line && len >= 3 && !memcmp(line, "\xEF\xBB\xBF", 3))
+		line += 3;  // a BOM from a Windows editor
+	N.first_line = 0;
+	struct names_line l;
+	if (N.line_long)
+		N.lines_bad++;
+	else if (names_parse_line(line, &l)) {
+		if (names_cache_put(&N.cache, l.path, l.size, l.date, l.crc, l.code, l.flags) == NAMES_CACHE_NONE)
+			N.lines_bad++;
+		else
+			N.lines_read++;
+	} else if (line[0] && line[0] != '#')
+		N.lines_bad++;
+	N.line_len = 0;
+	N.line_long = 0;
+}
+
+static void read_chunk(void)
+{
+	UINT got = 0;
+	u32 want = N.limit - N.rd_done;
+	if (want > NAMES_LOAD_BYTES)
+		want = NAMES_LOAD_BYTES;
+	if (want && f_read(&N.u.fil, N.buf, want, &got) != FR_OK) {
+		tlog_error("names: reading %s failed", NAMES_CACHE_FILE);
+		N.cache_ok = 0;
+		got = 0;
+		want = 0;
+	}
+	N.rd_done += got;
+	// A line at a time, as safefile_scan_feed does
+	const u8 *p = N.buf, *end = N.buf + got;
+	while (p < end) {
+		const u8 *nl = memchr(p, '\n', (size_t)(end - p));
+		u32 text = (u32)((nl ? nl : end) - p), room = (u32)sizeof(N.lines.buf) - 1 - N.line_len;
+		if (text > room) {
+			N.line_long = 1;
+			text = room;
+		}
+		memcpy(N.lines.buf + N.line_len, p, text);
+		N.line_len = (u16)(N.line_len + text);
+		p = nl ? nl + 1 : end;
+		if (nl)
+			line_end();
+	}
+	if (want && got == want && N.rd_done < N.limit)
+		return;
+	if (N.line_len || N.line_long)
+		line_end();  // a last line with no newline
+	load_done();
 }
 
 int names_load_step(void)
@@ -267,14 +390,47 @@ int names_load_step(void)
 		psram_begin();
 		if (N.at == 0)
 			names_cache_init(&N.cache, (u8 *)PSRAM_NAMES_CACHE_BASE, put);
-		if (names_cache_clear_part(&N.cache, N.at, NAMES_CLEAR_BYTES))
-			N.phase = P_CACHE;
+		if (names_cache_clear_part(&N.cache, N.at, NAMES_CLEAR_BYTES)) {
+			N.phase = P_SCAN_MAIN;
+			N.started = cycles_now();
+			N.cache_ok = 1;
+			N.has_main = N.has_bak = 0;
+			N.lines_read = N.lines_bad = 0;
+		}
 		N.at += NAMES_CLEAR_BYTES;
 		return 0;
-	case P_CACHE:
+	case P_SCAN_MAIN:
+	case P_SCAN_BAK: {
+		int main = N.phase == P_SCAN_MAIN, ok;
+		struct safefile_scan *sc = main ? &N.scan_main : &N.scan_bak;
+		if (!N.file_open) {
+			if (!open_copy(main ? NAMES_CACHE_FILE : NAMES_CACHE_BAK)) {
+				if (main)
+					N.phase = P_SCAN_BAK;
+				else
+					read_begin();
+				return 0;
+			}
+			safefile_scan_begin(sc);
+		}
+		if (!scan_chunk(sc, &ok))
+			return 0;
+		if (main) {
+			N.has_main = (u8)ok;
+			if (ok && sc->valid)
+				read_begin();  // crc.txt holds: the backup doesn't matter
+			else
+				N.phase = P_SCAN_BAK;
+		} else {
+			N.has_bak = (u8)ok;
+			read_begin();
+		}
+		return 0;
+	}
+	case P_READ:
 		psram_begin();
-		cache_step();
-		return 1;
+		read_chunk();
+		return N.phase == P_DONE;
 	default:
 		return 1;
 	}
@@ -286,6 +442,7 @@ void names_walk_begin(void)
 {
 	memset(N.seen, 0, sizeof(N.seen));
 	N.seen_ok = 0;
+	N.walk_names = 0;
 }
 
 void names_walk_end(int whole)
@@ -317,14 +474,22 @@ const char *names_walk_seen(const char *path, u32 size, u32 date, u32 console)
 	default:
 		break;
 	}
-	return N.db_ok ? names_db_name(DB, r, console) : NULL;
+	const char *name = N.db_ok ? names_db_name(DB, r, console) : NULL;
+	if (name) {
+		// Which game has which name, in any order: a CRC that finds no name
+		// changes nothing the lists sort by
+		u32 x = r->hash ^ ((u32)name * 0x9E3779B1u);
+		x ^= x >> 15;
+		N.walk_names ^= x * 0x2C1B3C6Du;
+	}
+	return name;
 }
 
 u32 names_identity(void)
 {
 	if (N.phase != P_DONE || !N.db_ok)
 		return 0;
-	u32 id = db_header()->body_crc ^ (names_cache_ident(&N.cache) * 0x9E3779B1u);
+	u32 id = db_header()->body_crc ^ N.walk_names;
 	return id ? id : 1;
 }
 
@@ -373,7 +538,7 @@ static void write_begin(void)
 {
 	N.since_write = 0;
 	if (!N.cache_ok) {
-		tlog("names: %s isn't written: reading it failed", NAMES_CACHE_FILE);
+		tlog("names: %s isn't written: reading or writing it failed this session", NAMES_CACHE_FILE);
 		N.dirty = 0;
 		return;
 	}
@@ -399,6 +564,7 @@ static void write_failed(const char *what, FRESULT fr)
 	}
 	close_file();
 	N.wphase = X_IDLE;
+	N.cache_ok = 0;  // no more tries (and errors) this session: a read-only file, say
 }
 
 // One step of the write: a copy opened, or a chunk of its text

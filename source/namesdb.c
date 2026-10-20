@@ -133,24 +133,11 @@ u32 names_path_hash(const char *path)
 	return h;
 }
 
-// A live record's share of the identity
-static u32 mix(const struct names_rec *r)
-{
-	u32 flags = names_rec_flags(r);
-	if (flags & NAMES_DEAD)
-		return 0;
-	u32 x = r->hash ^ ((flags & NAMES_CRC) ? r->crc * 0x9E3779B1u + 1 : 0) ^ r->code * 0x85EBCA77u;
-	x ^= x >> 15;
-	x *= 0x2C1B3C6Du;
-	x ^= x >> 13;
-	return x ? x : 1;
-}
-
 void names_cache_init(struct names_cache *c, u8 *base, names_put_fn put)
 {
 	c->base = base;
 	c->put = put;
-	c->count = c->pool = c->ident = 0;
+	c->count = c->pool = 0;
 	c->full = 0;
 }
 
@@ -168,11 +155,21 @@ int names_cache_clear_part(struct names_cache *c, u32 at, u32 bytes)
 	return end == NAMES_CACHE_SLOTS * 2u;
 }
 
-u32 names_cache_find(const struct names_cache *c, const char *path)
+// A hash's first slot. FNV's low bits depend only on the bytes' low bits,
+// so paths that differ in a few digits crowded a few slots: mix first
+static u32 first_slot(u32 h)
 {
-	u32 h = names_path_hash(path);
+	h ^= h >> 16;
+	h *= 0x7FEB352Du;
+	h ^= h >> 15;
+	return h & (NAMES_CACHE_SLOTS - 1);
+}
+
+// The record of path, whose hash is h
+static u32 find_hashed(const struct names_cache *c, const char *path, u32 h)
+{
 	const u16 *s = slots(c);
-	for (u32 i = h & (NAMES_CACHE_SLOTS - 1), probes = 0; probes < NAMES_CACHE_SLOTS;
+	for (u32 i = first_slot(h), probes = 0; probes < NAMES_CACHE_SLOTS;
 	     i = (i + 1) & (NAMES_CACHE_SLOTS - 1), probes++) {
 		u32 n = s[i];
 		if (n >= c->count)
@@ -182,6 +179,11 @@ u32 names_cache_find(const struct names_cache *c, const char *path)
 			return n;
 	}
 	return NAMES_CACHE_NONE;
+}
+
+u32 names_cache_find(const struct names_cache *c, const char *path)
+{
+	return find_hashed(c, path, names_path_hash(path));
 }
 
 static void write_rec(struct names_cache *c, u32 n, const struct names_rec *r)
@@ -197,13 +199,11 @@ u32 names_cache_put(struct names_cache *c, const char *path, u32 size, u32 date,
 	flags &= NAMES_CRC | NAMES_DATE;
 	struct names_rec r = {names_path_hash(path),         size, (flags & NAMES_DATE) ? date : 0,
 			      (flags & NAMES_CRC) ? crc : 0, code, 0};
-	u32 n = names_cache_find(c, path);
+	u32 n = find_hashed(c, path, r.hash);
 	if (n != NAMES_CACHE_NONE) {
 		const struct names_rec *old = names_cache_rec(c, n);
-		c->ident ^= mix(old);
 		r.path = (old->path & 0xFFFFFFu) | flags << 24;
 		write_rec(c, n, &r);
-		c->ident ^= mix(&r);
 		return n;
 	}
 	// The pool takes the path padded to halfwords (psram_write's unit)
@@ -220,9 +220,8 @@ u32 names_cache_put(struct names_cache *c, const char *path, u32 size, u32 date,
 	c->pool += bytes;
 	n = c->count++;
 	write_rec(c, n, &r);
-	c->ident ^= mix(&r);
 	const u16 *s = slots(c);
-	u32 i = r.hash & (NAMES_CACHE_SLOTS - 1);
+	u32 i = first_slot(r.hash);
 	// The next empty slot: NAMES_CACHE_MAX < NAMES_CACHE_SLOTS keeps one
 	for (u32 probes = 0; s[i] < n && probes < NAMES_CACHE_SLOTS; probes++)
 		i = (i + 1) & (NAMES_CACHE_SLOTS - 1);
@@ -236,7 +235,6 @@ void names_cache_drop(struct names_cache *c, u32 n)
 	if (n >= c->count)
 		return;
 	struct names_rec r = *names_cache_rec(c, n);
-	c->ident ^= mix(&r);
 	r.path |= NAMES_DEAD << 24;
 	write_rec(c, n, &r);
 }
@@ -248,7 +246,7 @@ void names_cache_set_date(struct names_cache *c, u32 n, u32 date)
 	struct names_rec r = *names_cache_rec(c, n);
 	r.date = date;
 	r.path |= NAMES_DATE << 24;
-	write_rec(c, n, &r);  // the identity leaves dates out
+	write_rec(c, n, &r);
 }
 
 int names_cache_fits(const struct names_rec *r, u32 size, u32 date)

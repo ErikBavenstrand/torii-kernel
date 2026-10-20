@@ -6,8 +6,8 @@
 // gamename_display cleans it like a file name.
 //
 // The first part of this file is hardware-free, and tests/host builds it:
-// the database's format and lookups, and the cache's table, lines and
-// identity. names_store.c ("The kernel's names" below) loads both into
+// the database's format and lookups, and the cache's table and lines.
+// names_store.c ("The kernel's names" below) loads both into
 // PSRAM, computes CRCs and writes the cache.
 //
 // names.db, little-endian, read in place (in PSRAM, which reads like ROM):
@@ -90,14 +90,14 @@ u32 namesdb_code(const u8 *bytes);
 // its base (NAMES_CACHE_OFF_*). Reads go straight to memory; writes through
 // put (psram_write in the kernel, memcpy on the host), in halfwords.
 
-#define NAMES_CACHE_MAX 6144  // records
+#define NAMES_CACHE_MAX 4608  // records: the library's 4,096 games and room for more
 #define NAMES_CACHE_SLOTS 8192  // hash slots, a power of 2
 #define NAMES_CACHE_NONE 0xFFFFu
 #define NAMES_PATH_MAX 511  // bytes, without the NUL
 #define NAMES_CACHE_OFF_SLOTS 0x0u
 #define NAMES_CACHE_OFF_RECS (NAMES_CACHE_OFF_SLOTS + NAMES_CACHE_SLOTS * 2u)
 #define NAMES_CACHE_OFF_POOL (NAMES_CACHE_OFF_RECS + NAMES_CACHE_MAX * 24u)
-#define NAMES_CACHE_POOL_BYTES 0x50000u  // 320 KB of paths
+#define NAMES_CACHE_POOL_BYTES 0xA0000u  // 640 KB of paths: 4,608 of 142 bytes
 #define NAMES_CACHE_BYTES (NAMES_CACHE_OFF_POOL + NAMES_CACHE_POOL_BYTES)
 
 // names_rec.flags
@@ -122,7 +122,6 @@ struct names_cache {
 	names_put_fn put;
 	u32 count;  // records used
 	u32 pool;  // pool bytes used
-	u32 ident;  // names_cache_ident
 	u8 full;  // a put found no room since the last clear
 };
 
@@ -168,14 +167,6 @@ enum {
 	NAMES_STALE,
 };
 int names_cache_fits(const struct names_rec *r, u32 size, u32 date);
-// A value that changes whenever a live record's path, CRC or code does (an
-// XOR over them): the library walk hashes it, so new CRC names rebuild the
-// index. Sizes and dates aren't part of it: the walk itself sets dates.
-static inline u32 names_cache_ident(const struct names_cache *c)
-{
-	return c->ident;
-}
-
 // Parses one line of crc.txt in place (it cuts the fields with NULs): 1
 // with its fields, 0 for a comment, a blank line or one that doesn't read.
 struct names_line {
@@ -222,8 +213,9 @@ void names_walk_end(int whole);
 // The walk found a game of console (LIB_*): checks its record as above;
 // returns the database's full name for it, or NULL.
 const char *names_walk_seen(const char *path, u32 size, u32 date, u32 console);
-// A value that changes with the names the walk would find; 0 without a
-// database (so an index built without one stays valid).
+// A value that changes with the names the walk just found (which game has
+// which name; a CRC that finds none doesn't count): the walk hashes it at
+// its end. 0 without a database, so an index built without one stays valid.
 u32 names_identity(void);
 // For a screen: the database's name of a game (its path, size and console),
 // or NULL. Points into PSRAM.

@@ -37,31 +37,33 @@ static void end_line(struct safefile_scan *s)
 	}
 }
 
+// A line at a time (memchr finds the newlines and NULs a word at a time):
+// byte by byte, with the fields in EWRAM, a large file cost about 100
+// cycles a byte
 void safefile_scan_feed(struct safefile_scan *s, const void *data, u32 bytes)
 {
-	const u8 *p = data;
-	u32 seg = 0;  // bytes of p before seg are in s->crc
-	for (u32 i = 0; i < bytes; i++) {
-		u32 at = s->size + i;
-		if (at == s->line_start) {
-			s->crc = crc32_update(s->crc, p + seg, i - seg);
-			seg = i;
-			s->line_crc = s->crc;
+	const u8 *p = data, *end = p + bytes;
+	while (p < end) {
+		if (s->size == s->line_start)
+			s->line_crc = s->crc;  // the CRC of every byte before this line
+		const u8 *nl = memchr(p, '\n', (size_t)(end - p));
+		u32 text = (u32)((nl ? nl : end) - p), n = text + (nl != NULL);
+		if (!s->has_nul && memchr(p, 0, n))
+			s->has_nul = 1;
+		if (s->line_len < sizeof(s->line)) {
+			u32 room = (u32)sizeof(s->line) - s->line_len;
+			memcpy(s->line + s->line_len, p, text < room ? text : room);
 		}
-		u8 b = p[i];
-		s->has_nul |= b == 0;
-		if (b == '\n') {
+		s->line_len += text;
+		s->crc = crc32_update(s->crc, p, n);
+		s->size += n;
+		p += n;
+		if (nl) {
 			end_line(s);
-			s->line_start = at + 1;
+			s->line_start = s->size;
 			s->line_len = 0;
-		} else {
-			if (s->line_len < sizeof(s->line))
-				s->line[s->line_len] = (char)b;
-			s->line_len++;
 		}
 	}
-	s->crc = crc32_update(s->crc, p + seg, bytes - seg);
-	s->size += bytes;
 }
 
 void safefile_scan_end(struct safefile_scan *s)

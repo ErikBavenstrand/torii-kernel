@@ -161,3 +161,22 @@ logged "$cart/1.log" "library: wrote /torii/library.bak (generation 2)"
 [ "$(gba_order "$cart" | head -1)" = /GBA/Wars.gba ] || fail "Wars isn't first: $(gba_order "$cart")"
 no_errors "$cart/1.log"
 echo "PASS: the games on Recent get their CRCs and names after the boot"
+
+# A large crc.txt (3,000 records of 100-byte paths, as No-Intro names in
+# console folders make) loads whole, in steps, beside a loaded index
+cart=$carts/large
+fixture_card "$cart"
+boot "$cart" "$cart/1.log" -f 900 -u "names: wrote /torii/crc.txt"
+python3 -c 'import sys; sys.path.insert(0, "tools"); import names_db
+text = names_db.read_safe(sys.argv[1] + "/files/torii/crc.txt")
+pad = "x" * 70
+text += "".join(f"{i:08X}\t-\t4096\t-\t/Nintendo - Game Boy Advance/{pad} {i:04d}.gba\n" for i in range(3000))
+names_db.write_safe(sys.argv[1] + "/files/torii/crc.txt", text)' "$cart"
+mcopy -o -i "$cart/sd.img" "$cart/files/torii/crc.txt" "$cart/files/torii/crc.txt.bak" ::/torii/
+boot "$cart" "$cart/2.log" -f 1500 -u "library: unchanged"
+logged "$cart/2.log" "library: loaded 8 games"
+logged "$cart/2.log" "names: 3008 files' CRCs from /torii/crc.txt"
+logged "$cart/2.log" "library: unchanged"
+grep "kernel: names: 3008" "$cart/2.log" | sed 's/^kernel: /  /'
+no_errors "$cart/2.log"
+echo "PASS: a crc.txt of 3,000 records loads whole in the background"

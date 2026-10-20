@@ -224,25 +224,18 @@ void test_names_cache_table(void)
 	CHECK(strcmp(names_cache_path(&c, r), "/GBA/Zelda.gba") == 0);
 	CHECK_EQ(names_rec_flags(r), NAMES_CRC | NAMES_DATE);
 	CHECK_EQ(r->crc, 0x5A0E6E6Au);
-	u32 id = names_cache_ident(&c);
-	CHECK(id != 0);
-	// Dates and sizes leave the identity alone; the CRC doesn't
+	// A date, then a change: the record stays where it is
 	names_cache_set_date(&c, a, 0x11112222);
-	CHECK_EQ(names_cache_ident(&c), id);
-	CHECK_EQ(names_cache_put(&c, "/GBA/Zelda.gba", 200, 0, 0x5A0E6E6Au, 0, NAMES_CRC), a);
-	CHECK_EQ(names_cache_ident(&c), id);
-	CHECK_EQ(c.count, 1);
+	CHECK_EQ(r->date, 0x11112222);
 	CHECK_EQ(names_cache_put(&c, "/GBA/Zelda.gba", 200, 0, 0x5A0E6E6Bu, 0, NAMES_CRC), a);
-	CHECK(names_cache_ident(&c) != id);
-	CHECK_EQ(names_cache_put(&c, "/GBA/Zelda.gba", 100, 0, 0x5A0E6E6Au, 0, NAMES_CRC), a);
-	CHECK_EQ(names_cache_ident(&c), id);
-	// Dropped and revived: the identity comes back
+	CHECK_EQ(c.count, 1);
+	CHECK_EQ(r->size, 200);
+	CHECK_EQ(names_rec_flags(r), NAMES_CRC);
+	// Dropped and revived
 	names_cache_drop(&c, a);
-	CHECK(names_cache_ident(&c) != id);
 	CHECK(names_rec_flags(r) & NAMES_DEAD);
 	CHECK_EQ(names_cache_find(&c, "/GBA/Zelda.gba"), a);
 	CHECK_EQ(names_cache_put(&c, "/GBA/Zelda.gba", 100, 0, 0x5A0E6E6Au, 0, NAMES_CRC), a);
-	CHECK_EQ(names_cache_ident(&c), id);
 	CHECK(!(names_rec_flags(r) & NAMES_DEAD));
 	// Paths the cache doesn't take
 	CHECK_EQ(names_cache_put(&c, "GBA/Zelda.gba", 1, 0, 0, 0, 0), NAMES_CACHE_NONE);

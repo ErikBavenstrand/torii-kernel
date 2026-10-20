@@ -18,7 +18,7 @@
 //	4.5 MB    reserved, PSRAM_RESERVED_BASE (the SD themes' until v0.4)
 //	5 MB      /torii/names.db (namesdb.h), up to PSRAM_NAMES_DB_BYTES
 //	6.75 MB   the CRC cache's table (namesdb.h), NAMES_CACHE_BYTES
-//	7.25-8 MB reserved (v0.4.1 art lookups, v0.9 language tables)
+//	7.5-8 MB  reserved (v0.4.1 art lookups, v0.9 language tables)
 //
 // A game launch fills PSRAM with the game, so everything here is lost then:
 // the launch calls cover_cache_invalidate first.
@@ -50,7 +50,7 @@
 #define PSRAM_NAMES_DB_BASE (PSRAM_WINDOW + 0x00500000u)
 #define PSRAM_NAMES_DB_BYTES 0x001C0000u
 #define PSRAM_NAMES_CACHE_BASE (PSRAM_NAMES_DB_BASE + PSRAM_NAMES_DB_BYTES)
-#define PSRAM_NAMES_CACHE_BYTES 0x00080000u
+#define PSRAM_NAMES_CACHE_BYTES 0x000C0000u
 
 // 1 if [p, p + bytes) lies in the PSRAM window.
 static inline int psram_holds(const void *p, u32 bytes)

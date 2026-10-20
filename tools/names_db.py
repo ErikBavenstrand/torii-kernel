@@ -75,7 +75,11 @@ HIDDEN_ROOT = {
 }
 DEPTH = 8
 CRC_FILE = "crc.txt"
-CACHE_MAX = 6144  # NAMES_CACHE_MAX (source/namesdb.h)
+CACHE_MAX = 4608  # NAMES_CACHE_MAX (source/namesdb.h)
+CACHE_POOL = (
+    0xA0000  # NAMES_CACHE_POOL_BYTES: the paths, each padded to 2 bytes with its NUL
+)
+CACHE_FILE_MAX = 0x100000  # names_store.c's NAMES_CACHE_FILE_MAX
 CRC_HEADER = "# Torii's CRC cache: CRC32, GBA game code, size, date, path\n"
 
 # Tags of dumps a game code shouldn't name first: the retail game wins
@@ -443,7 +447,13 @@ def update_cache(sd, games):
     if computed and sys.stderr.isatty():
         print("\r\033[K", end="", file=sys.stderr)
     torii.mkdir(exist_ok=True)
-    write_safe(torii / CRC_FILE, "".join(lines))
+    text = "".join(lines)
+    if len(text.encode("utf-8")) > CACHE_FILE_MAX - 32:
+        print(
+            f"warning: crc.txt is over {CACHE_FILE_MAX} bytes: the kernel won't read it",
+            file=sys.stderr,
+        )
+    write_safe(torii / CRC_FILE, text)
     return found, computed, reused
 
 
@@ -482,9 +492,11 @@ def update(args):
     if args.no_crc:
         return
     games = walk_card(sd)
-    if len(games) > CACHE_MAX:
+    pool = sum((len(p.encode("utf-8")) + 2) & ~1 for p, _, _ in games)
+    if len(games) > CACHE_MAX or pool > CACHE_POOL:
         print(
-            f"warning: {len(games)} games; the kernel keeps the CRCs of the first {CACHE_MAX}",
+            f"warning: {len(games)} games with {pool} bytes of paths; the kernel keeps "
+            f"{CACHE_MAX} games and {CACHE_POOL} bytes, and leaves crc.txt alone when it holds more",
             file=sys.stderr,
         )
     found, computed, reused = update_cache(sd, games)
