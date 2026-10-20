@@ -321,6 +321,7 @@ Bugs and loose ends the v0.4 ticket sessions and the conductor's reviews found a
 
 - The launch copy's VBlank hook sets the VBlank handler back to none afterwards instead of restoring the previous one; harmless while the engine installs none (`source/progress.c`; B8 review).
 - The `diag-tests` golden failed once at frame 4 while the colima VM was busy, then passed unchanged: possibly flaky under load (B2).
+- Diagnostics' line list (`source/diag.c` `lines_fetch`) doesn't refresh a line that leaves its window, so a cached row could show old text if the list scrolled back; can't show today (B7; B17's reading view replaces it).
 
 ## v0.5 Saves
 

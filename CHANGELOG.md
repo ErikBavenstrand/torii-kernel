@@ -6,6 +6,17 @@ git log, not here.
 
 ## Unreleased
 
+- **Removed:** grids (`UI_GRID`): v0.4 has none (B7, T13, E4; `e2d81cd`).
+- **Changed:** a palette fade works out only the banks in use (a fade frame
+  drops from 58,819 to 27,877 cycles); `frame_measure` keeps several names a
+  frame; `ui_list_autoscroll` emits cursor events (B7, E2, E13, E14;
+  `5bb9f3c`).
+- **Changed:** a list's page change fades the old page out before the new one
+  fades in, instead of blanking it; its rows are drawn ahead into a new 24 KB
+  row cache keyed by item, within 140k cycles a frame, so page-change frames
+  peak at about 150k instead of 249k; rows scrolled back to come from the
+  cache (B7, E1, E3, E12; `16a6a3d`, `58efcdd`, `941172b`, `e54976d`,
+  `8aa5545`).
 - **Added:** menu art as engine assets: icons, carousel objects, ground
   shadows and the placeholder box live in `assets/ui/` and convert with
   `just assets` into `source/ui/art_data.c`, read by id through `art.h`, so
