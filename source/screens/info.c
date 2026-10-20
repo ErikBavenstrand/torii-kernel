@@ -16,6 +16,7 @@
 #include "../Ezcard_OP.h"
 #include "../lang.h"
 #include "../library.h"
+#include "../namesdb.h"
 #include "../settings_model.h"
 #include "../tlog.h"
 #include "../userdata.h"
@@ -260,7 +261,7 @@ static void about_text(void)
 	}
 	put(INFO_S_ABOUT_CREDITS, 0, 0, 0);
 	FILINFO names;
-	if (f_stat("/torii/names.db", &names) == FR_OK)
+	if (f_stat(NAMESDB_FILE, &names) == FR_OK)
 		put(INFO_S_ABOUT_NAMES, 0, 0, 0);
 }
 
