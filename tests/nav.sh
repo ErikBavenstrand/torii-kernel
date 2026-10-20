@@ -34,7 +34,11 @@
 # confirmation), delete-no (Delete, then Cancel, then B), info (File info,
 # then A closes it), or open (no popup: A on the row, which starts a game).
 # Later options count from the route's last wait (-w): the popup's line, or
-# the folder's with open.
+# the folder's with open. Limits: the route starts from home's first row, so
+# the card must start on home there (Start on Home, or a fresh card: Last
+# place may open the SD card page, or home facing another item); and log
+# lines are cut at 240 characters, so a path of about 225 bytes or more
+# never matches its wait.
 #
 # The NOR page's (B15), each from power-on through nav_to nor:
 #   nav_nor_game INDEX         the cursor on game INDEX (0 the first written),

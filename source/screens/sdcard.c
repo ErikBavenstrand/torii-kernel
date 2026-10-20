@@ -12,6 +12,7 @@
 // outside ui_frame. A folder's item count is found by a job (engine/jobs.h)
 // while the page rests: one f_readdir at a time, in the frame's spare
 // cycles, the rows near the cursor first.
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -101,7 +102,7 @@ static struct {
 	char detail[24];
 	char note[40];
 	char ask[GAME_NAME_MAX + 16];
-	char info[160];
+	char info[320];
 	char save[SAVE_NAME_MAX + 8];   // File info's save path
 	char back[MAX_path_len];        // the folder a failed open goes back to
 	u32 memo_hash[MEMO_FOLDERS];
@@ -328,13 +329,20 @@ static void memo_store(void)
 	sd.memo_cursor[at] = (u16)cursor();
 }
 
-static u32 memo_get(void)
+// The cursor folder path was left with, or SDLIST_NONE
+static u32 memo_find(const char *path)
 {
-	u32 h = path_hash(currentpath);
+	u32 h = path_hash(path);
 	for (u32 i = 0; i < MEMO_FOLDERS; i++)
 		if (sd.memo_hash[i] == h)
 			return sd.memo_cursor[i];
-	return 0;
+	return SDLIST_NONE;
+}
+
+static u32 memo_get(void)
+{
+	u32 at = memo_find(currentpath);
+	return at == SDLIST_NONE ? 0 : at;
 }
 
 // --- Counting folders' entries ---------------------------------------------------
@@ -385,7 +393,9 @@ static int count_open(u32 i)
 static int count_step(struct job *job)
 {
 	if (job->state == JOB_CANCEL) {
-		sd.counting = SDLIST_NONE;  // the DIR needs no closing (FF_FS_LOCK 0)
+		if (sd.counting != SDLIST_NONE)
+			f_closedir(&sd.count_dir);  // nothing to free with FF_FS_LOCK 0, but tidy
+		sd.counting = SDLIST_NONE;
 		return JOB_DONE;
 	}
 	// What the user does keeps its frames: the job waits while keys act, a
@@ -503,9 +513,11 @@ static void folder_up(u32 arg)
 	if (!currentpath[0])
 		memcpy(currentpath, "/", 2);
 	tlog_debug("sdcard: up to %s", currentpath);
-	list_folder();
+	int ok = list_folder();
 	u32 at = sdlist_find(&sd.list, sd.name);
 	relist(at != SDLIST_NONE ? at : memo_get());
+	if (!ok)
+		error(0);
 }
 
 // --- Actions ----------------------------------------------------------------------
@@ -528,8 +540,21 @@ static const char *const how_words[ACTION_HOWS] = {"launch", "launch with addon"
 // with the engine left; the shell brings the page back
 static void launch(u32 how, u32 hard)
 {
+	memo_store();  // the cursor the page comes back with if no game starts
 	tlog_debug("sdcard: %s %s%s", how_words[how], sd.full, hard ? " (hard reset)" : "");
 	action_launch(sd.full, how, ACTION_SAVE_KEEP, hard);
+}
+
+// Appends to [p, end), never past it; returns where the text ends
+__attribute__((format(printf, 3, 4))) static char *put_text(char *p, char *end, const char *format, ...)
+{
+	if (p >= end)
+		return end;
+	va_list args;
+	va_start(args, format);
+	int n = vsnprintf(p, (size_t)(end - p), format, args);
+	va_end(args);
+	return n < 0 ? p : n >= end - p ? end - 1 : p + n;
 }
 
 static void info(u32 i)
@@ -539,26 +564,26 @@ static void info(u32 i)
 	u32 console = sdlist_console(r);
 	const char *const consoles[LIB_CONSOLES] = {gl_item_gba, gl_item_gbc, gl_item_gb, gl_item_nes};
 	if (sdlist_is_dir(r))
-		p += snprintf(p, (size_t)(end - p), "%s", gl_sd_kind_folder);
+		p = put_text(p, end, "%s", gl_sd_kind_folder);
 	else if (console < LIB_CONSOLES)
-		p += snprintf(p, (size_t)(end - p), "%s %s", consoles[console], gl_sd_kind_game);
+		p = put_text(p, end, "%s %s", consoles[console], gl_sd_kind_game);
 	else
-		p += snprintf(p, (size_t)(end - p), "%s", gl_sd_kind_file);
+		p = put_text(p, end, "%s", gl_sd_kind_file);
 	char a[24], b[16];
 	if (sdlist_is_dir(r)) {
 		sdlist_count_text(a, sizeof(a), r->count, gl_sd_item, gl_sd_items, gl_sd_items_none);
 		if (a[0] && p < end)
-			p += snprintf(p, (size_t)(end - p), "\n%s", a);
+			p = put_text(p, end, "\n%s", a);
 	} else if (p < end) {
 		sdlist_size_text(a, sizeof(a), r->size);
 		sdlist_number(b, sizeof(b), r->size);
-		p += snprintf(p, (size_t)(end - p), "\n%s (%s %s)", a, b, gl_sd_bytes);
+		p = put_text(p, end, "\n%s (%s %s)", a, b, gl_sd_bytes);
 	}
 	if (p < end && f_stat(sd.full, &fileinfo) == FR_OK && fileinfo.fdate) {
 		u32 d = fileinfo.fdate, t = fileinfo.ftime;
-		p += snprintf(p, (size_t)(end - p), "\n%s %04lu-%02lu-%02lu %02lu:%02lu", gl_sd_changed,
-			      (unsigned long)((d >> 9) + 1980), (unsigned long)((d >> 5) & 15), (unsigned long)(d & 31),
-			      (unsigned long)(t >> 11), (unsigned long)((t >> 5) & 63));
+		p = put_text(p, end, "\n%s %04lu-%02lu-%02lu %02lu:%02lu", gl_sd_changed,
+			     (unsigned long)((d >> 9) + 1980), (unsigned long)((d >> 5) & 15), (unsigned long)(d & 31),
+			     (unsigned long)(t >> 11), (unsigned long)((t >> 5) & 63));
 	}
 	if (p < end && console < LIB_CONSOLES) {
 		memcpy(sd.save, "/SAVER/", 7);
@@ -771,9 +796,12 @@ static struct ui_view *sd_enter(u32 item, u32 row)
 	sd.hints[1] = (struct ui_hint){"START", gl_hint_menu};
 	sd.hints[2] = (struct ui_hint){"B", gl_hint_back};
 	ui_hints_set(node(N_HINTS), sd.hints, 3);
-	// From home: the cursor the folder was left with; a place (Last place,
-	// or back from a launch that didn't start): its row
-	u32 at = row ? row : memo_get();
+	// The cursor the folder was left with (from home, or back from a
+	// launch that didn't start); else the place's row (Last place, at the
+	// card's root, as the menu starts there)
+	u32 at = memo_find(currentpath);
+	if (at == SDLIST_NONE)
+		at = row;
 	ui_list_reset(node(N_LIST), at);
 	show_folder();
 	ui_title_set_right(node(N_TITLE), position_text(ui_list_cursor(node(N_LIST))));
@@ -782,9 +810,16 @@ static struct ui_view *sd_enter(u32 item, u32 row)
 	return v;
 }
 
+// For Last place: the root's row, as the next power-on starts at the root
+// (inside a folder, the row the root was left on)
 static u32 sd_row(void)
 {
-	return up() ? cursor() : 0;
+	if (!up())
+		return 0;
+	if (at_root())
+		return cursor();
+	u32 at = memo_find("/");
+	return at == SDLIST_NONE ? 0 : at;
 }
 
 static void sd_poll(void)
