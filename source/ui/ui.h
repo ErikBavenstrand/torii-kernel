@@ -775,6 +775,10 @@ void ui_list_move(u8 node, u32 cursor, u16 key);
 // but from the update: its handler must not push or pop views.
 void ui_list_autoscroll(u8 node, s32 rate);
 u32 ui_list_cursor(u8 node);
+// Shows (1, the default) or hides (0) a sprite pill list's selection: for a
+// page whose cursor can leave the list for a row of its own (the NOR page's
+// Format all). The cursor stays where it is.
+void ui_list_mark(u8 node, int shown);
 // 1 while a page change hides or draws the list's page: a handler taking A
 // itself waits until it is up, as the list's own A does
 int ui_list_paging(u8 node);

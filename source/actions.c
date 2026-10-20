@@ -109,6 +109,10 @@ u32 action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset)
 			game.save_num = (u8)save_type;
 		session_end();
 		res = Game_launch(&game, how, hard_reset);
+		// A write to NOR lists its game in pNorFS but leaves the count:
+		// the NOR page and home's count read them
+		if (res != ACTION_NOTHING)
+			action_nor_read();
 	}
 	memcpy(currentpath, saved_path, MAX_path_len);
 	f_chdir(currentpath[0] ? currentpath : "/");

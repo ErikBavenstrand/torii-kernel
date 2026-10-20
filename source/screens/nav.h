@@ -52,6 +52,10 @@ void nav_back(void);
 // engine session (a launch that didn't start), the shell brings the page
 // back afterwards. One at a time: a second before the first ran replaces it.
 void nav_defer(void (*fn)(u32 arg), u32 arg);
+// From a deferred fn whose action changed what its page shows (a NOR game
+// deleted): the place fades out and is shown again from scratch, its page's
+// enter called with the row it is on, once the fn returns
+void nav_reshow(void);
 
 // For home and the pages: an item's name, and what it holds ("176 games",
 // "1,204 files", "one page"; "" for Info)

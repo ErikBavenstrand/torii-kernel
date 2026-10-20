@@ -1,0 +1,21 @@
+# The NOR page in dark, on its latest game (the only one Delete takes):
+# START, then Delete asks over the popup (Cancel preselected, the save
+# stays); B goes back to the popup, B closes it.
+#! nor-game "Pokemon Emerald (USA).gba" 0x1000000 tests/roms/hello/hello.gba
+#! nor-game "Metroid Fusion (USA).gba" 0x800000 tests/roms/hello/hello.gba
+#! nor-game "Minish Cap.gba" 0x1000000 tests/roms/hello/hello.gba
+-w "nav: home ready"
+-k @8:UP -k @12:- -k @16:UP -k @20:- -k @24:UP -k @28:- -k @32:A -k @36:-
+-w "nav: page nor ready"
+-k @8:DOWN -k @12:- -k @20:DOWN -k @24:-
+-w "nor: row 2"
+-s @20:page.png
+-k @24:START -k @28:-
+-w "screen ready: popup"
+-k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:A -k @36:-
+-w "screen ready: confirm"
+-s @8:delete.png
+-k @12:B -k @16:-
+-s @30:popup.png
+-k @36:B -k @40:-
+-s @60:closed.png

@@ -82,6 +82,30 @@ char *gl_pop_ok EWRAM_BSS;
 char *gl_pop_close EWRAM_BSS;
 char *gl_pop_cancel EWRAM_BSS;
 char *gl_pop_cancel_button EWRAM_BSS;
+char *gl_size_mb EWRAM_BSS;
+char *gl_size_kb EWRAM_BSS;
+char *gl_nor_used EWRAM_BSS;
+char *gl_nor_free_of EWRAM_BSS;
+char *gl_nor_empty EWRAM_BSS;
+char *gl_nor_format EWRAM_BSS;
+char *gl_nor_format_detail EWRAM_BSS;
+char *gl_hint_launch EWRAM_BSS;
+char *gl_hint_menu EWRAM_BSS;
+char *gl_hint_format EWRAM_BSS;
+char *gl_nor_launch EWRAM_BSS;
+char *gl_nor_info EWRAM_BSS;
+char *gl_nor_delete EWRAM_BSS;
+char *gl_nor_delete_text EWRAM_BSS;
+char *gl_nor_deleting EWRAM_BSS;
+char *gl_nor_latest_only EWRAM_BSS;
+char *gl_nor_format_ask EWRAM_BSS;
+char *gl_nor_format_one EWRAM_BSS;
+char *gl_nor_format_many EWRAM_BSS;
+char *gl_nor_format_time EWRAM_BSS;
+char *gl_nor_format_takes EWRAM_BSS;
+char *gl_nor_format_button EWRAM_BSS;
+char *gl_nor_states EWRAM_BSS;
+char **gl_nor_saves EWRAM_BSS;
 
 // The Info page (screens/info.h)
 char **gl_info EWRAM_BSS;
@@ -364,6 +388,41 @@ const char *en_info[INFO_STRINGS] = {
 };
 #undef LR
 
+// The NOR page: units, the storage line, Format all's row, the hint bar's
+// labels, the game popup, its questions and Game info (a confirmation's
+// lines are one line each: about 30 characters)
+const char en_size_mb[] = "MB";
+const char en_size_kb[] = "KB";
+const char en_nor_used[] = "used";
+const char en_nor_free_of[] = "free of";
+const char en_nor_empty[] = "No games on NOR";
+const char en_nor_format[] = "Format all";
+const char en_nor_format_detail[] = "erases every game";
+const char en_hint_launch[] = "launch";
+const char en_hint_menu[] = "menu";
+const char en_hint_format[] = "format";
+const char en_nor_launch[] = "Launch";
+const char en_nor_info[] = "Game info";
+const char en_nor_delete[] = "Delete";
+const char en_nor_delete_text[] = "Its save on the SD card stays.";
+const char en_nor_deleting[] = "Deleting from NOR";
+const char en_nor_latest_only[] = "Only the last game on NOR can be deleted.";
+const char en_nor_format_ask[] = "Format all of NOR?";
+const char en_nor_format_one[] = "1 game goes.";
+const char en_nor_format_many[] = "games go.";
+const char en_nor_format_time[] = "About 4 minutes.";
+const char en_nor_format_takes[] = "It takes about 4 minutes.";
+const char en_nor_format_button[] = "Format";
+const char en_nor_states[] = "Save states on";
+const char *en_nor_saves[NOR_SAVES] = {
+	[NOR_SAVE_NONE] = "No save",
+	[NOR_SAVE_SRAM] = "SRAM",
+	[NOR_SAVE_EEPROM_512] = "EEPROM 512 B",
+	[NOR_SAVE_EEPROM_8K] = "EEPROM 8 KB",
+	[NOR_SAVE_FLASH_64K] = "Flash 64 KB",
+	[NOR_SAVE_FLASH_128K] = "Flash 128 KB",
+};
+
 //---------------------------------------------------------------------------------
 void LoadEnglish(void)
 {
@@ -450,6 +509,30 @@ void LoadEnglish(void)
 	gl_pop_cancel_button = (char *)en_pop_cancel_button;
 	//
 	gl_info = (char **)en_info;
+	gl_size_mb = (char *)en_size_mb;
+	gl_size_kb = (char *)en_size_kb;
+	gl_nor_used = (char *)en_nor_used;
+	gl_nor_free_of = (char *)en_nor_free_of;
+	gl_nor_empty = (char *)en_nor_empty;
+	gl_nor_format = (char *)en_nor_format;
+	gl_nor_format_detail = (char *)en_nor_format_detail;
+	gl_hint_launch = (char *)en_hint_launch;
+	gl_hint_menu = (char *)en_hint_menu;
+	gl_hint_format = (char *)en_hint_format;
+	gl_nor_launch = (char *)en_nor_launch;
+	gl_nor_info = (char *)en_nor_info;
+	gl_nor_delete = (char *)en_nor_delete;
+	gl_nor_delete_text = (char *)en_nor_delete_text;
+	gl_nor_deleting = (char *)en_nor_deleting;
+	gl_nor_latest_only = (char *)en_nor_latest_only;
+	gl_nor_format_ask = (char *)en_nor_format_ask;
+	gl_nor_format_one = (char *)en_nor_format_one;
+	gl_nor_format_many = (char *)en_nor_format_many;
+	gl_nor_format_time = (char *)en_nor_format_time;
+	gl_nor_format_takes = (char *)en_nor_format_takes;
+	gl_nor_format_button = (char *)en_nor_format_button;
+	gl_nor_states = (char *)en_nor_states;
+	gl_nor_saves = (char **)en_nor_saves;
 }
 //---------------------------------------------------------------------------------
 // The languages Settings offers. A new language adds its strings and a
