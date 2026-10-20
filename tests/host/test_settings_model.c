@@ -296,7 +296,14 @@ void test_settings_hotkeys(void)
 	CHECK_EQ(settings_set_keys(&v, SET_THEME, L | R), SET_KEYS_COUNT);
 	CHECK_EQ(settings_get(&v, SET_SLEEP_KEYS), SELECT | UP);
 	CHECK_EQ(settings_set_keys(&v, SET_RESET_KEYS, UP | SELECT | B), SET_KEYS_TAKEN);  // holds UP+SELECT
-	CHECK_EQ(settings_set_keys(&v, SET_RESET_KEYS, START | SELECT), SET_KEYS_OK);  // only Sleep can't
+	// Within a game's soft reset (A+B+START+SELECT): refused for both
+	CHECK_EQ(settings_set_keys(&v, SET_RESET_KEYS, START | SELECT), SET_KEYS_SOFT_RESET);
+	CHECK_EQ(settings_set_keys(&v, SET_RESET_KEYS, A | B | START), SET_KEYS_SOFT_RESET);
+	CHECK_EQ(settings_set_keys(&v, SET_SLEEP_KEYS, B | SELECT), SET_KEYS_SOFT_RESET);
+	CHECK_EQ(settings_set_keys(&v, SET_RESET_KEYS, R | START | SELECT), SET_KEYS_OK);
+	// The other hotkey counts even while it is off
+	CHECK_EQ(settings_get(&v, SET_SLEEP_ON), 0);
+	CHECK_EQ(settings_set_keys(&v, SET_RESET_KEYS, UP | SELECT), SET_KEYS_TAKEN);
 	CHECK_EQ(settings_set_keys(&v, SET_RESET_KEYS, L | R | B), SET_KEYS_OK);
 	CHECK_EQ(settings_get(&v, SET_RESET_KEYS), L | R | B);
 	// Bits past L aren't keys

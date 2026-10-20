@@ -54,6 +54,7 @@ static const u8 sleep_default[3] = {9, 8, 2};  // L + R + SELECT
 // it: SELECT, START, R and L
 #define KEYS_MODIFIERS 0x030C
 #define KEYS_WAKE 0x000C  // START+SELECT wake a game from sleep
+#define KEYS_SOFT_RESET 0x000F  // A+B+START+SELECT, most games' own reset
 static const char *const key_names[KEY_BITS] = {"A", "B", "SELECT", "START", "RIGHT", "LEFT", "UP", "DOWN", "R", "L"};
 
 // DIM's steps
@@ -275,7 +276,12 @@ u32 settings_set_keys(struct settings_values *v, u32 id, u16 mask)
 	// Sleep wakes on START+SELECT (gba_sleep_patch.s), so it can't sleep on them
 	if (id == SET_SLEEP_KEYS && (mask & KEYS_WAKE) == mask)
 		return SET_KEYS_WAKE;
-	// The other hotkey's, or one holding it or held in it: the smaller fires first
+	// Inside a game's own soft reset, A+B+START+SELECT, it would fire first
+	if ((mask & KEYS_SOFT_RESET) == mask)
+		return SET_KEYS_SOFT_RESET;
+	// The other hotkey's, or one holding it or held in it: the smaller fires
+	// first. Checked even while the other is off, as turning it on checks
+	// nothing
 	u32 other = id == SET_SLEEP_KEYS ? SET_RESET_KEYS : SET_SLEEP_KEYS;
 	u16 taken = settings_get(v, other);
 	if ((taken & mask) == taken || (taken & mask) == mask)

@@ -191,6 +191,7 @@ enum {
 	SET_KEYS_NO_MODIFIER,  // none of L, R, START and SELECT
 	SET_KEYS_TAKEN,        // the other hotkey's, or holding it or held in it
 	SET_KEYS_WAKE,         // Sleep on START+SELECT, the keys that wake it
+	SET_KEYS_SOFT_RESET,   // within A+B+START+SELECT, games' own soft reset
 };
 // Sets a SET_KEYS row to the keys held (a KEYINPUT mask, 1 = held); a
 // combination it refuses changes nothing
