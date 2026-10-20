@@ -5,7 +5,7 @@
 #! nor-game "Metroid Fusion (USA).gba" 0x800000 tests/roms/hello/hello.gba
 #! nor-game "Minish Cap.gba" 0x1000000 tests/roms/hello/hello.gba
 -w "nav: home ready"
--k @8:UP -k @12:- -k @16:UP -k @20:- -k @24:UP -k @28:- -k @32:A -k @36:-
+-k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:LEFT -k @28:- -k @32:A -k @36:-
 -w "nav: page nor ready"
 -k @8:DOWN -k @12:- -k @20:DOWN -k @24:-
 -w "nor: row 2"

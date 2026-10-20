@@ -122,7 +122,7 @@ nav_game() { _nav_fail "the game lists come with B13 (nav_game $*)"; }
 _nav_nor_to() {
   local index=$1 keys=() i
   for ((i = 0; i < index; i++)); do keys+=(DOWN); done
-  printf '%s\n' '-w "nav: home ready"' "$(_nav_keys 8 UP UP UP A)" '-w "nav: page nor ready"'
+  printf '%s\n' '-w "nav: home ready"' "$(_nav_keys 8 LEFT LEFT LEFT A)" '-w "nav: page nor ready"'
   if [ "$index" -gt 0 ]; then
     _nav_keys 8 "${keys[@]}"
     printf -- '-w "nor: row %d"\n' "$index"
