@@ -25,7 +25,7 @@ boot-copy/frames 4-4 79637CFA5A407195
 boot-copy/frames 5-5 9A7602C8EC8401A5
 boot-copy/frames 6-6 530538A8D9BD3395
 boot-progress/screen 6C9065ED205438C3
-boot-progress-big/loading C0FD04D97D4C0FA3
+boot-progress-big/loading 27A93C9A5301C243
 boot-slow/list 4CBEED8A656D0CA6
 boot-slow/notice 6C39139CBB65B8C3
 boot-slow/frames 0-1 7C573B18E65FE325
@@ -747,13 +747,13 @@ tr-deeper/frames 30-31 BA317DBDD10D87B2
 tr-deeper/frames 32-39 AA03BB211F5691F2
 tr-deeper/frames 40-40 0B6B462BB42C6244
 tr-deeper/frames 41-41 0B165D23E719C642
-tr-deeper/frames 42-43 7B90E77090ED8325
-tr-deeper/frames 44-44 DA84C308817E1DC5
-tr-deeper/frames 45-45 32EE37AA891CF301
-tr-deeper/frames 46-46 4063A593833E9E2B
-tr-deeper/frames 47-47 8EABC076DAFA103C
-tr-deeper/frames 48-48 592F9B7AD39A2B2F
-tr-deeper/frames 49-58 3102C0C7CE9B87AB
+tr-deeper/frames 42-44 7B90E77090ED8325
+tr-deeper/frames 45-45 DA84C308817E1DC5
+tr-deeper/frames 46-46 32EE37AA891CF301
+tr-deeper/frames 47-47 4063A593833E9E2B
+tr-deeper/frames 48-48 8EABC076DAFA103C
+tr-deeper/frames 49-49 592F9B7AD39A2B2F
+tr-deeper/frames 50-58 3102C0C7CE9B87AB
 tr-deeper/frames 59-59 0123269C46A5D174
 tr-deeper/frames 60-60 32D8D457D9B17DC5
 tr-deeper/frames 61-62 7B90E77090ED8325
