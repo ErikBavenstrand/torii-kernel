@@ -58,6 +58,7 @@ static const struct {
 	{"settings_visible_rows", test_settings_visible_rows},
 	{"settings_clock_format", test_settings_clock_format},
 	{"settings_clock_editor", test_settings_clock_editor},
+	{"settings_clock_apply", test_settings_clock_apply},
 	{"text_width", test_text_width},
 	{"text_layout", test_text_layout},
 	{"text_layout_window", test_text_layout_window},

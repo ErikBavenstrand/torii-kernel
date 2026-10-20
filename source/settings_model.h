@@ -5,7 +5,10 @@
 //
 // A page loads the slots into a struct settings_values, changes them there
 // with settings_step, settings_set and settings_set_keys, and stages and
-// commits them once as it closes (settings.h). Slots no row changed keep
+// commits them once as it closes (settings.h). What reads the settings
+// through Read_SET_info (the theme, as ui_theme_setting does) sees a change
+// only once it is staged: a live theme preview stages, or sets the theme
+// itself. Slots no row changed keep
 // what they held, erased (0xFFFF) ones too, so a visit that changes nothing,
 // or changes a value and back, writes nothing.
 #ifndef TORII_SETTINGS_MODEL_H
@@ -160,7 +163,10 @@ struct settings_clock {
 struct settings_values {
 	u16 slot[assress_max];    // as they are to be staged
 	u16 loaded[assress_max];  // as they were loaded
-	struct settings_clock clock;  // the clock as last read, for SET_TIME_ROW and SET_DATE_ROW
+	// The clock as last read, for SET_TIME_ROW and SET_DATE_ROW: a page
+	// reads it again (settings_read_clock) every few frames to keep them
+	// current
+	struct settings_clock clock;
 };
 
 // Starts values from slots (assress_max of them, as Read_SET_info reads them)
@@ -175,6 +181,8 @@ u16 settings_get(const struct settings_values *v, u32 id);
 void settings_set(struct settings_values *v, u32 id, u16 value);
 // LEFT (dir < 0) or RIGHT on a row: the previous or next value, wrapping
 void settings_step(struct settings_values *v, u32 id, int dir);
+// Puts back a row's slots as loaded (B on an edit), whatever they held
+void settings_restore(struct settings_values *v, u32 id);
 
 // What settings_set_keys says about a combination
 enum {
@@ -182,6 +190,7 @@ enum {
 	SET_KEYS_COUNT,        // not 2 or 3 keys (the patches read three)
 	SET_KEYS_NO_MODIFIER,  // none of L, R, START and SELECT
 	SET_KEYS_TAKEN,        // the other hotkey's, or holding it or held in it
+	SET_KEYS_WAKE,         // Sleep on START+SELECT, the keys that wake it
 };
 // Sets a SET_KEYS row to the keys held (a KEYINPUT mask, 1 = held); a
 // combination it refuses changes nothing
@@ -227,7 +236,9 @@ void settings_clock_to_rtc(const struct settings_clock *c, u8 *dec);
 
 // The field editor for SET_TIME_ROW (hour, minute, and AM/PM in 12-hour
 // mode) and SET_DATE_ROW (year, month, day): LEFT/RIGHT pick a field,
-// UP/DOWN change it, both wrapping; the day keeps within its month
+// UP/DOWN change it, both wrapping; the day keeps within its month. In
+// 12-hour mode the hour cycles 12, 1 ... 11 within its half of the day
+// (11 AM, UP: 12 AM) and AM/PM moves it by 12.
 enum settings_field {
 	SET_FIELD_HOUR,
 	SET_FIELD_MINUTE,
@@ -249,5 +260,9 @@ void settings_editor_move(struct settings_editor *e, int dir);  // LEFT (< 0) or
 void settings_editor_step(struct settings_editor *e, int dir);  // DOWN (< 0) or UP
 // Field pos's text: "14", "02", "PM", "2026", "10"
 void settings_editor_text(const struct settings_editor *e, u32 pos, char *out, u32 size);
+// Copies what e edits into now, the clock read again as it is set: the
+// time editor's hour and minute (seconds 0), the date editor's date, so
+// the rest isn't put back by however long the editor was open
+void settings_editor_apply(const struct settings_editor *e, struct settings_clock *now);
 
 #endif

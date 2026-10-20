@@ -160,6 +160,12 @@ void test_settings_defaults(void)
 	CHECK_EQ(settings_get(&v, SET_THEME), 0);
 	v.slot[assress_theme] = 1;
 	CHECK_EQ(settings_get(&v, SET_THEME), 1);
+	// ... and choosing Dark over it stores dark, not the SD theme back
+	v.slot[assress_theme] = v.loaded[assress_theme] = 2;
+	settings_step(&v, SET_THEME, 1);
+	settings_step(&v, SET_THEME, 1);
+	CHECK_EQ(v.slot[assress_theme], 0);
+	v.slot[assress_theme] = v.loaded[assress_theme] = 0xFFFF;
 	v.slot[assress_dim] = 61;
 	CHECK_EQ(settings_get(&v, SET_DIM), 0);
 	v.slot[assress_dim] = 7;
@@ -272,12 +278,13 @@ void test_settings_hotkeys(void)
 	CHECK_EQ(v.slot[assress_edit_rtshotkey_2], 1);
 	check_text(SET_RESET_KEYS, "L+R+B");
 	// Two keys: the last one twice, as the patches read three slots
-	CHECK_EQ(settings_set_keys(&v, SET_SLEEP_KEYS, SELECT | START), SET_KEYS_OK);
-	CHECK_EQ(v.slot[assress_edit_sleephotkey_0], 3);
+	CHECK_EQ(settings_set_keys(&v, SET_SLEEP_KEYS, SELECT | START), SET_KEYS_WAKE);  // they wake it
+	CHECK_EQ(settings_set_keys(&v, SET_SLEEP_KEYS, SELECT | UP), SET_KEYS_OK);
+	CHECK_EQ(v.slot[assress_edit_sleephotkey_0], 6);
 	CHECK_EQ(v.slot[assress_edit_sleephotkey_1], 2);
 	CHECK_EQ(v.slot[assress_edit_sleephotkey_2], 2);
-	CHECK_EQ(settings_get(&v, SET_SLEEP_KEYS), SELECT | START);
-	check_text(SET_SLEEP_KEYS, "START+SELECT");
+	CHECK_EQ(settings_get(&v, SET_SLEEP_KEYS), SELECT | UP);
+	check_text(SET_SLEEP_KEYS, "UP+SELECT");
 	// One key, four keys, no L, R, START or SELECT, or the other hotkey's,
 	// or holding it, or held in it: refused, nothing changes
 	CHECK_EQ(settings_set_keys(&v, SET_SLEEP_KEYS, L), SET_KEYS_COUNT);
@@ -287,8 +294,10 @@ void test_settings_hotkeys(void)
 	CHECK_EQ(settings_set_keys(&v, SET_SLEEP_KEYS, L | R | B), SET_KEYS_TAKEN);
 	CHECK_EQ(settings_set_keys(&v, SET_SLEEP_KEYS, L | B), SET_KEYS_TAKEN);  // held in L+R+B
 	CHECK_EQ(settings_set_keys(&v, SET_THEME, L | R), SET_KEYS_COUNT);
-	CHECK_EQ(settings_get(&v, SET_SLEEP_KEYS), SELECT | START);
-	CHECK_EQ(settings_set_keys(&v, SET_RESET_KEYS, START | SELECT | B), SET_KEYS_TAKEN);  // holds START+SELECT
+	CHECK_EQ(settings_get(&v, SET_SLEEP_KEYS), SELECT | UP);
+	CHECK_EQ(settings_set_keys(&v, SET_RESET_KEYS, UP | SELECT | B), SET_KEYS_TAKEN);  // holds UP+SELECT
+	CHECK_EQ(settings_set_keys(&v, SET_RESET_KEYS, START | SELECT), SET_KEYS_OK);  // only Sleep can't
+	CHECK_EQ(settings_set_keys(&v, SET_RESET_KEYS, L | R | B), SET_KEYS_OK);
 	CHECK_EQ(settings_get(&v, SET_RESET_KEYS), L | R | B);
 	// Bits past L aren't keys
 	CHECK_EQ(settings_set_keys(&v, SET_SLEEP_KEYS, (u16)(UP | A | R | 0x8000)), SET_KEYS_OK);
@@ -297,6 +306,21 @@ void test_settings_hotkeys(void)
 	CHECK_EQ(settings_set_keys(&v, SET_SLEEP_KEYS, L | R | SELECT), SET_KEYS_OK);
 	CHECK_EQ(settings_set_keys(&v, SET_RESET_KEYS, L | R | START), SET_KEYS_OK);
 	CHECK(!settings_dirty(&v));
+	// B on an edit puts back what was loaded, even a combination the
+	// rules refuse now (a v0.3 card's A+A+B)
+	v.loaded[assress_edit_rtshotkey_0] = 0;
+	v.loaded[assress_edit_rtshotkey_1] = 0;
+	v.loaded[assress_edit_rtshotkey_2] = 1;
+	CHECK_EQ(settings_set_keys(&v, SET_RESET_KEYS, L | R | B), SET_KEYS_OK);
+	settings_restore(&v, SET_RESET_KEYS);
+	CHECK_EQ(settings_get(&v, SET_RESET_KEYS), A | B);
+	CHECK(!settings_dirty(&v));
+	settings_set(&v, SET_THEME, 1);
+	settings_restore(&v, SET_THEME);
+	settings_restore(&v, SET_TIME_ROW);
+	settings_restore(&v, SET_ROWS);
+	CHECK(!settings_dirty(&v));
+	erased();
 	u8 keys[3];
 	CHECK_EQ(settings_keys_list(L | R | START, keys), 3);
 	CHECK_EQ(keys[0], 9);
@@ -517,4 +541,32 @@ void test_settings_clock_editor(void)
 	settings_editor_step(&e, 1);
 	CHECK_EQ(e.clock.month, 1);
 	check_field(&e, 3, "");
+}
+
+// The editors set only what they edit over the clock read as it is set
+void test_settings_clock_apply(void)
+{
+	struct settings_editor e;
+	const struct settings_clock opened = {2026, 10, 20, 23, 59, 30};
+	struct settings_clock now = {2026, 10, 21, 0, 4, 12};  // read again, past midnight
+	settings_editor_open(&e, SET_TIME, &opened, 1);
+	settings_editor_move(&e, 1);
+	settings_editor_step(&e, -1);  // 23:58
+	settings_editor_apply(&e, &now);
+	CHECK_EQ(now.year, 2026);
+	CHECK_EQ(now.month, 10);
+	CHECK_EQ(now.day, 21);  // the new day stays
+	CHECK_EQ(now.hour, 23);
+	CHECK_EQ(now.minute, 58);
+	CHECK_EQ(now.second, 0);
+	struct settings_clock later = {2026, 10, 21, 0, 9, 45};
+	settings_editor_open(&e, SET_DATE, &opened, 1);
+	settings_editor_step(&e, 1);  // 2027-10-20
+	settings_editor_apply(&e, &later);
+	CHECK_EQ(later.year, 2027);
+	CHECK_EQ(later.month, 10);
+	CHECK_EQ(later.day, 20);
+	CHECK_EQ(later.hour, 0);  // the time keeps running
+	CHECK_EQ(later.minute, 9);
+	CHECK_EQ(later.second, 45);
 }

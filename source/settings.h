@@ -31,11 +31,14 @@ void settings_load(struct settings_values *v);
 // Stages v's slots: Read_SET_info reads them, nothing is written yet
 void settings_stage(const struct settings_values *v);
 // Writes what is staged to the kernel NOR, once and only if a slot changed,
-// ends the staging and applies the settings (the launches' switches, the
-// LED, the strings, DIM, LOGGING). Returns 1 if it wrote.
+// ends the staging and, if it wrote, applies the settings (the launches'
+// switches, the LED, the strings, DIM, LOGGING). Returns 1 if it wrote.
 u32 settings_commit(void);
 void settings_read_clock(struct settings_clock *c);
 void settings_write_clock(const struct settings_clock *c);
+// Sets the RTC to what the field editor e edited, over the clock as it is
+// now (settings_editor_apply)
+void settings_write_edit(const struct settings_editor *e);
 // Logs the v0.4 settings nothing shows yet, at boot
 void settings_log(void);
 

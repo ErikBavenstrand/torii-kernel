@@ -121,5 +121,6 @@ void test_settings_hotkeys(void);
 void test_settings_visible_rows(void);
 void test_settings_clock_format(void);
 void test_settings_clock_editor(void);
+void test_settings_clock_apply(void);
 
 #endif

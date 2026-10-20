@@ -27,15 +27,23 @@ void settings_stage(const struct settings_values *v)
 
 u32 settings_commit(void)
 {
-	u32 wrote = Commit_SET_info(SET_info_buffer);
+	if (!Commit_SET_info(SET_info_buffer))
+		return 0;
 	// What the settings decide outside the page: the launches' switches and
 	// the LED, the strings, DIM and LOGGING (the page shows THEME as it
 	// changes, and the menu's next session reads it)
 	CheckSwitch();
 	CheckLanguage();
 	ui_dim_set_minutes(ui_dim_setting());
-	tlog_set_level(tlog_level_setting());
-	return wrote;
+	u32 level = tlog_level_setting();
+	if (level != tlog_level) {
+		// Logged at the higher of the two levels, so a change to off is too
+		if (level > tlog_level)
+			tlog_set_level(level);
+		tlog("settings: LOGGING is %s", tlog_level_name(level));
+		tlog_set_level(level);
+	}
+	return 1;
 }
 
 void settings_read_clock(struct settings_clock *c)
@@ -59,11 +67,22 @@ void settings_write_clock(const struct settings_clock *c)
 	     (unsigned)c->day, (unsigned)c->hour, (unsigned)c->minute, (unsigned)c->second);
 }
 
+void settings_write_edit(const struct settings_editor *e)
+{
+	struct settings_clock now;
+	settings_read_clock(&now);
+	settings_editor_apply(e, &now);
+	settings_write_clock(&now);
+}
+
 void settings_log(void)
 {
 	struct settings_values v;
 	char view[16], start[16], h24[8], all[8];
-	settings_load(&v);
+	u16 slots[assress_max];
+	for (u32 a = 0; a < assress_max; a++)
+		slots[a] = Read_SET_info(a);
+	settings_values_init(&v, slots);  // no clock: nothing here shows it
 	settings_value_text(&v, SET_GAME_VIEW, view, sizeof(view));
 	settings_value_text(&v, SET_START_ON, start, sizeof(start));
 	settings_value_text(&v, SET_CLOCK_24H, h24, sizeof(h24));

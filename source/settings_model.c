@@ -53,6 +53,7 @@ static const u8 sleep_default[3] = {9, 8, 2};  // L + R + SELECT
 // A hotkey holds one of these, so a game's own single presses can't fire
 // it: SELECT, START, R and L
 #define KEYS_MODIFIERS 0x030C
+#define KEYS_WAKE 0x000C  // START+SELECT wake a game from sleep
 static const char *const key_names[KEY_BITS] = {"A", "B", "SELECT", "START", "RIGHT", "LEFT", "UP", "DOWN", "R", "L"};
 
 // DIM's steps
@@ -76,7 +77,7 @@ int settings_dirty(const struct settings_values *v)
 
 static u32 slots_of(const struct settings_row *r)
 {
-	if (r->slot == SET_NO_SLOT)
+	if (!r || r->slot == SET_NO_SLOT)
 		return 0;
 	return r->kind == SET_KEYS || r->kind == SET_COLOUR ? 3 : 1;
 }
@@ -160,7 +161,12 @@ static void store(struct settings_values *v, u32 id, u16 value)
 {
 	const struct settings_row *r = row_of(id);
 	u32 n = slots_of(r);
-	if (value_in(v->loaded, id) == value) {
+	if (!n || r->slot + n > assress_max)
+		return;
+	// The dropped SD theme (THEME 2) reads as dark here but not to the
+	// menu until B1 removes it: dark is then stored as such
+	int sd_theme = id == SET_THEME && v->loaded[r->slot] == 2;
+	if (value_in(v->loaded, id) == value && !sd_theme) {
 		memcpy(&v->slot[r->slot], &v->loaded[r->slot], n * sizeof(u16));
 		return;
 	}
@@ -169,6 +175,8 @@ static void store(struct settings_values *v, u32 id, u16 value)
 	case SET_KEYS: {
 		u8 keys[3];
 		u32 count = settings_keys_list(value, keys);
+		if (!count)
+			return;
 		for (u32 i = 0; i < 3; i++)  // two keys: the last one twice
 			s[i] = keys[i < count ? i : count - 1];
 		break;
@@ -228,6 +236,14 @@ void settings_step(struct settings_values *v, u32 id, int dir)
 	store(v, id, value);
 }
 
+void settings_restore(struct settings_values *v, u32 id)
+{
+	const struct settings_row *r = row_of(id);
+	u32 n = slots_of(r);
+	if (n && r->slot + n <= assress_max)
+		memcpy(&v->slot[r->slot], &v->loaded[r->slot], n * sizeof(u16));
+}
+
 u32 settings_keys_list(u16 mask, u8 keys[3])
 {
 	u32 n = 0;
@@ -256,6 +272,9 @@ u32 settings_set_keys(struct settings_values *v, u32 id, u16 mask)
 		return SET_KEYS_COUNT;
 	if (!(mask & KEYS_MODIFIERS))
 		return SET_KEYS_NO_MODIFIER;
+	// Sleep wakes on START+SELECT (gba_sleep_patch.s), so it can't sleep on them
+	if (id == SET_SLEEP_KEYS && (mask & KEYS_WAKE) == mask)
+		return SET_KEYS_WAKE;
 	// The other hotkey's, or one holding it or held in it: the smaller fires first
 	u32 other = id == SET_SLEEP_KEYS ? SET_RESET_KEYS : SET_SLEEP_KEYS;
 	u16 taken = settings_get(v, other);
@@ -545,5 +564,18 @@ void settings_editor_text(const struct settings_editor *e, u32 pos, char *out, u
 	default:
 		snprintf(out, size, "%02u", (unsigned)c->day);
 		break;
+	}
+}
+
+void settings_editor_apply(const struct settings_editor *e, struct settings_clock *now)
+{
+	if (e->kind == SET_DATE) {
+		now->year = e->clock.year;
+		now->month = e->clock.month;
+		now->day = e->clock.day;
+	} else {
+		now->hour = e->clock.hour;
+		now->minute = e->clock.minute;
+		now->second = 0;
 	}
 }

@@ -102,9 +102,9 @@ static void read_slots(struct settings_values *v)
 }
 
 static const u16 test_dims[] = {0, 1, 7, 60};
-// L+R+SELECT, L+R+START, START+SELECT, R+B, R+UP+DOWN: no two in a row
+// L+R+SELECT, L+R+START, L+START+SELECT, R+B, R+UP+DOWN: no two in a row
 // hold each other
-static const u16 test_combos[] = {0x0304, 0x0308, 0x000C, 0x0102, 0x01C0};
+static const u16 test_combos[] = {0x0304, 0x0308, 0x020C, 0x0102, 0x01C0};
 #define COUNT(a) (sizeof(a) / sizeof((a)[0]))
 
 // How many values the round trip tries on row id, and the i-th
