@@ -92,7 +92,9 @@ void registry_start(u32 start_on, const struct userdata_boot *boot, const u8 *sh
 				open_or_face(i, 0, shown, count, out);
 		return;
 	}
-	const char *word = boot ? boot->item : "";
+	if (!boot)
+		return;  // no place kept: the first item
+	const char *word = boot->item;
 	u32 prefix = sizeof(REGISTRY_HOME_PREFIX) - 1;
 	if (!strncmp(word, REGISTRY_HOME_PREFIX, prefix)) {
 		u32 item = registry_find(word + prefix);

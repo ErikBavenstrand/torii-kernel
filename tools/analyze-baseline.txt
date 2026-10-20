@@ -31,7 +31,6 @@ clang-tidy source/ezkernelnew.c clang-analyzer-deadcode.DeadStores: Value stored
 clang-tidy source/ezkernelnew.c clang-analyzer-deadcode.DeadStores: Value stored to 'res' is never read
 clang-tidy source/ezkernelnew.c clang-analyzer-deadcode.DeadStores: Value stored to 'res' is never read
 clang-tidy source/ezkernelnew.c clang-analyzer-deadcode.DeadStores: Value stored to 'res' is never read
-clang-tidy source/ezkernelnew.c clang-analyzer-deadcode.DeadStores: Value stored to 'res' is never read
 clang-tidy source/ezkernelnew.c clang-analyzer-security.insecureAPI.strcpy: Call to function 'strcpy' is insecure as it does not provide bounding of the memory buffer. Replace unbounded copy functions with analogous functions that support length arguments such as 'strlcpy'. CWE-119
 clang-tidy source/gamename.c bugprone-not-null-terminated-result: the result from calling 'memcpy' is not null-terminated
 clang-tidy source/library.c bugprone-not-null-terminated-result: the result from calling 'memcpy' is not null-terminated
@@ -60,7 +59,6 @@ cppcheck source/ezkernelnew.c duplicateBreak: Consecutive return, break, continu
 cppcheck source/ezkernelnew.c duplicateBreak: Consecutive return, break, continue, goto or throw statements are unnecessary.
 cppcheck source/ezkernelnew.c redundantAssignment: Variable 'res' is reassigned a value before the old one has been used.
 cppcheck source/ezkernelnew.c unreadVariable: Variable 'filesize' is assigned a value that is never used.
-cppcheck source/ezkernelnew.c unreadVariable: Variable 'res' is assigned a value that is never used.
 cppcheck source/ezkernelnew.c unreadVariable: Variable 'res' is assigned a value that is never used.
 cppcheck source/ezkernelnew.c unreadVariable: Variable 'res' is assigned a value that is never used.
 cppcheck source/ezkernelnew.c unreadVariable: Variable 'res' is assigned a value that is never used.

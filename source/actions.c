@@ -81,7 +81,7 @@ u32 action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset)
 		return launch_nor_entry(nor, hard_reset);
 	const char *slash = strrchr(path_copy, '/');
 	u32 dir_len = slash ? (u32)(slash - path_copy) : 0;
-	if (path_copy[0] != '/' || !slash[1] || dir_len >= MAX_path_len || strlen(slash + 1) > GAME_NAME_MAX) {
+	if (!slash || path_copy[0] != '/' || !slash[1] || dir_len >= MAX_path_len || strlen(slash + 1) > GAME_NAME_MAX) {
 		tlog_error("launch %s: not a file's full path", path_copy);
 		return ACTION_NOTHING;
 	}
