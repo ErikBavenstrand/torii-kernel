@@ -299,9 +299,10 @@ static int list_folder(void)
 	sdlist_number(n, sizeof(n), entries());
 	snprintf(sd.note, sizeof(sd.note), "%s %s", gl_sd_first, n);
 	sd.count_next = 0;
+	u32 ms = cycles_since(start) / (ENGINE_FRAME_CYCLES * 60u / 1000u);
 	tlog_debug("sdcard: listed %s: %lu folders, %lu files%s (%lu ms)", currentpath, (unsigned long)sd.list.folders,
 		   (unsigned long)(entries() - sd.list.folders), sd.list.truncated ? ", truncated" : "",
-		   (unsigned long)(cycles_since(start) / (ENGINE_FRAME_CYCLES * 60u / 1000u)));
+		   (unsigned long)ms);
 	if (res != FR_OK)
 		tlog("sdcard: %s: FatFs %u", currentpath, (unsigned)res);
 	return res == FR_OK;
@@ -580,10 +581,9 @@ static void info(u32 i)
 		p = put_text(p, end, "\n%s (%s %s)", a, b, gl_sd_bytes);
 	}
 	if (p < end && f_stat(sd.full, &fileinfo) == FR_OK && fileinfo.fdate) {
-		u32 d = fileinfo.fdate, t = fileinfo.ftime;
-		p = put_text(p, end, "\n%s %04lu-%02lu-%02lu %02lu:%02lu", gl_sd_changed,
-			     (unsigned long)((d >> 9) + 1980), (unsigned long)((d >> 5) & 15), (unsigned long)(d & 31),
-			     (unsigned long)(t >> 11), (unsigned long)((t >> 5) & 63));
+		unsigned d = fileinfo.fdate, t = fileinfo.ftime;
+		p = put_text(p, end, "\n%s %04u-%02u-%02u %02u:%02u", gl_sd_changed, (d >> 9) + 1980, (d >> 5) & 15,
+			     d & 31, t >> 11, (t >> 5) & 63);
 	}
 	if (p < end && console < LIB_CONSOLES) {
 		memcpy(sd.save, "/SAVER/", 7);
