@@ -482,6 +482,7 @@ static int nor_event(struct ui_view *v, const struct ui_event *e)
 	const InputState *in = ui_input();
 	u16 pressed = e->keys & in->pressed;
 	if (pressed & INPUT_B) {
+		nor.next_row_set = 0;
 		nav_back();
 		return 1;
 	}
@@ -493,7 +494,7 @@ static int nor_event(struct ui_view *v, const struct ui_event *e)
 	if (pressed & INPUT_A) {
 		if (nor.sel == nor.count)
 			nav_defer(format, 0);
-		else if (!ui_list_paging(at(N_LIST)))  // the game it shows once it is up
+		else  // the page's cursor, even while the list's page change draws it
 			nav_defer(launch, nor.sel | hard_reset() << 16);
 		return 1;
 	}
@@ -513,7 +514,7 @@ static struct ui_view *nor_enter(u32 item, u32 row)
 	nor.count = game_total_NOR < MAX_NOR ? game_total_NOR : MAX_NOR;
 	if (nor.next_row_set)
 		row = nor.next_row;
-	nor.next_row_set = 0;
+	nor.next_row_set = 0;  // used once, by this enter
 	nor.sel = row < nor.count ? row : nor.count;  // Last place may hold any row: past the games, Format all
 	memset(nor.name_of, NAME_NONE, sizeof(nor.name_of));
 	u32 used = 0;
