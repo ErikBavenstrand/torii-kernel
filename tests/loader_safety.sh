@@ -8,7 +8,8 @@
 # and a write there stops the emulator with status 76.
 #
 # Every path that erases or programs the kernel NOR runs here, each on its own
-# cart, with logging on: the boot's NOR list migration, settings saves on both pages, the
+# cart, with logging on: the boot's NOR list migration, settings saves on both pages
+# (settings_commit, which v0.4's Settings page writes through too), the
 # pending-save record and its clearing, WRITE TO NOR, delete latest,
 # FORMAT ALL, Diagnostics, power cuts in the middle of those writes and the boot after
 # them, and the same writes on the other kernel NOR chip (S29GL064A, buffered

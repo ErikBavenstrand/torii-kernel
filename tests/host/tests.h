@@ -114,4 +114,13 @@ void test_gamename_custom_io(void);
 void test_gamename_display(void);
 void test_gamename_hidden(void);
 
+void test_settings_table(void);
+void test_settings_defaults(void);
+void test_settings_staged_values(void);
+void test_settings_hotkeys(void);
+void test_settings_visible_rows(void);
+void test_settings_clock_format(void);
+void test_settings_clock_editor(void);
+void test_settings_clock_apply(void);
+
 #endif

@@ -1251,6 +1251,7 @@ int main(void)
 
 	CheckLanguage();
 	CheckSwitch();
+	settings_log();
 
 	// The boot's screens (a card error, the save question)
 	// share one engine session. A card that mounts shows nothing unless the
