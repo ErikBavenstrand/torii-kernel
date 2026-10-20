@@ -95,7 +95,9 @@ static const struct carousel_look {
 
 // Sprite banks, from pal_first
 enum {
-	BANK_OBJECTS = 0,  // RING_OBJECTS of them, in drawing order
+	BANK_OBJECTS = 0,  // RING_OBJECTS of them, by k modulo RING_OBJECTS: the objects
+			   // showing are at most that many consecutive k, so each keeps
+			   // its bank (and matrix) as long as it shows
 	BANK_TEXT = RING_OBJECTS,
 	BANK_ICON,
 	BANK_DOTS,
@@ -375,7 +377,7 @@ static void backdrop_colours(u16 sky)
 	u16 bank[16];
 	memcpy(bank, &gfx_pal_unfaded[UI_BANK_CONSOLES * 16], sizeof(bank));
 	bank[UI_ROLE_SKY] = sky;
-	bank[UI_ROLE_FLOOR] = mix(sky, 0, theme()->floor_mix);
+	bank[UI_ROLE_FLOOR] = ui_floor_colour(theme(), sky);
 	gfx_pal_load(UI_BANK_CONSOLES, bank, 16);
 }
 
@@ -535,14 +537,14 @@ static void car_update(u8 node, u32 dt)
 		car.pal_dirty = 0;
 		backdrop_colours(sky);
 		label_colours(sky, text ? fade : 256, ls);
-		u16 tone = mix(mix(sky, 0, theme()->floor_mix), 0,
+		u16 tone = mix(ui_floor_colour(theme(), sky), 0,
 			       look.shadow_mix[theme() == &ui_theme_light ? PAL_LIGHT : PAL_DARK]);
 		for (u32 j = 0; j < count; j++) {
 			u16 c[16];
 			art_sprite_colours(car.items[ring_item(obj[j].k, car.count)].sprite, tone, c);
 			for (u32 i = 1; i < 16; i++)
 				c[i] = mix(c[i], sky, obj[j].fog);
-			bank_load(BANK_OBJECTS + j, c);
+			bank_load(BANK_OBJECTS + ring_item(obj[j].k, RING_OBJECTS), c);
 		}
 	}
 
@@ -563,11 +565,12 @@ static void car_update(u8 node, u32 dt)
 		s32 y = feet - ART_SPRITE_SIZE / 2 - ring_foot_dy(pd) + dy;
 		if (x <= -ART_SPRITE_SIZE || x >= 240 || y <= -ART_SPRITE_SIZE || y >= 160)
 			continue;
-		gfx_affine_set(car.matrix[j], (s16)pd, 0, 0, (s16)pd);
+		u32 b = ring_item(o->k, RING_OBJECTS);  // its own bank and matrix while it shows
+		gfx_affine_set(car.matrix[b], (s16)pd, 0, 0, (s16)pd);
 		car.slots_now |= (u8)(1u << s);
 		drawn[j] = ui_obj_add(
-			node, (u16)(OBJ_AFFINE | (y & 0xFF)), (u16)(OBJ_SIZE_3 | car.matrix[j] << 9 | (x & 0x1FF)),
-			(u16)((car.slot_first + s * ART_SPRITE_TILES) | (car.pal_first + BANK_OBJECTS + j) << 12));
+			node, (u16)(OBJ_AFFINE | (y & 0xFF)), (u16)(OBJ_SIZE_3 | car.matrix[b] << 9 | (x & 0x1FF)),
+			(u16)((car.slot_first + s * ART_SPRITE_TILES) | (car.pal_first + BANK_OBJECTS + b) << 12));
 	}
 	for (u32 j = 0; j < count; j++) {
 		if (!drawn[j])
@@ -577,7 +580,7 @@ static void car_update(u8 node, u32 dt)
 			&art_sprites[car.items[ring_item(o->k, car.count)].sprite % ART_SPRITE_COUNT];
 		u32 shadow = art_shadow_for((u32)art_shadows[sp->shadow].width * o->scale >> 8);
 		u16 tile = (u16)((car.shadow_first + shadow * ART_SHADOW_HALF_TILES) |
-				 (car.pal_first + BANK_OBJECTS + j) << 12);
+				 (car.pal_first + BANK_OBJECTS + ring_item(o->k, RING_OBJECTS)) << 12);
 		s32 y = o->feet - ART_SHADOW_RISE + dy, x = o->x + dx;  // centred on the ground row
 		if (y <= -8 || y >= 160)
 			continue;
@@ -741,6 +744,14 @@ u32 carousel_facing(u8 node)
 {
 	(void)node;
 	return car.count ? ring_item(car.m.to, car.count) : 0;
+}
+
+void carousel_colours(u8 node)
+{
+	if (car.node != node)
+		return;
+	car.pal_dirty = 1;
+	ui_wake();
 }
 
 void carousel_refresh(u8 node)

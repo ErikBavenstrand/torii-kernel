@@ -89,7 +89,7 @@ const struct ui_theme ui_theme_dark = {
 	.accent = pal_accents[PAL_DARK],
 	.pill_mix = PAL_DARK_PILL_MIX,
 	.backdrop_mix = 20,  // 8 %
-	.floor_mix = 10,     // 4 % darker (spec.md)
+	.floor_step = {1, 1, 1},  // a step lighter, as the mockups' dark floor
 	.float_mix = 13,     // 5 %
 	.modal_dim = 8,
 	.confirm_dim = 6,  // towards black: the page's cards near the shadow colour, as spec.md asks
@@ -103,7 +103,7 @@ const struct ui_theme ui_theme_light = {
 	.accent = pal_accents[PAL_LIGHT],
 	.pill_mix = PAL_LIGHT_PILL_MIX,
 	.backdrop_mix = 15,  // 6 %
-	.floor_mix = 10,     // 4 % darker (spec.md)
+	.floor_step = {-1, -1, 0},  // about 4 % darker (spec.md), as the mockups' light floor
 	.float_mix = 0,
 	.modal_dim = 6,
 	.confirm_dim = 8,  // half way to white, within a level or two of half way to the paper
@@ -163,6 +163,16 @@ u16 ui_colour_mix(u16 a, u16 b, u32 amount)
 	return (u16)out;
 }
 
+u16 ui_floor_colour(const struct ui_theme *theme, u16 sky)
+{
+	u32 out = 0;
+	for (u32 i = 0; i < 3; i++) {
+		s32 c = (s32)((sky >> (5 * i)) & 31) + theme->floor_step[i];
+		out |= (u32)(c < 0 ? 0 : c > 31 ? 31 : c) << (5 * i);
+	}
+	return (u16)out;
+}
+
 u16 ui_colour_bldy(u16 c, u32 evy, int brighten)
 {
 	if (evy > 16)
@@ -212,7 +222,7 @@ void ui_theme_banks(const struct ui_theme *theme, u32 item, u16 out[UI_BANKS * 1
 	consoles[UI_ROLE_INK_GB] = theme->accent[PAL_GB].ink;
 	consoles[UI_ROLE_INK_NES] = theme->accent[PAL_NES].ink;
 	consoles[UI_ROLE_SKY] = normal[UI_ROLE_GROUND];
-	consoles[UI_ROLE_FLOOR] = ui_colour_mix(normal[UI_ROLE_GROUND], 0, theme->floor_mix);
+	consoles[UI_ROLE_FLOOR] = ui_floor_colour(theme, normal[UI_ROLE_GROUND]);
 
 	alert[UI_ROLE_ALERT_INK] = danger->ink;
 	alert[UI_ROLE_ALERT_TINT] = danger->tint;

@@ -115,8 +115,12 @@ void test_theme_banks_item(void)
 			// Bank 1's backdrop: the ground above the horizon, a shade darker below
 			const u16 *consoles = pal + 16;
 			CHECK_EQ(consoles[UI_ROLE_SKY], normal[UI_ROLE_GROUND]);
-			CHECK_EQ(consoles[UI_ROLE_FLOOR], ui_colour_mix(normal[UI_ROLE_GROUND], 0, th->floor_mix));
-			CHECK(luminance(consoles[UI_ROLE_FLOOR]) <= luminance(consoles[UI_ROLE_SKY]));
+			CHECK_EQ(consoles[UI_ROLE_FLOOR], ui_floor_colour(th, normal[UI_ROLE_GROUND]));
+			// Darker in light, lighter in dark: a horizon shows in both
+			if (t == PAL_LIGHT)
+				CHECK(luminance(consoles[UI_ROLE_FLOOR]) < luminance(consoles[UI_ROLE_SKY]));
+			else
+				CHECK(luminance(consoles[UI_ROLE_FLOOR]) > luminance(consoles[UI_ROLE_SKY]));
 			// Switching item changes only bank 0's accent indices and bank 1's backdrop
 			u16 other[UI_BANKS * 16];
 			ui_theme_banks(th, (item + 1) % PAL_ITEMS, other);

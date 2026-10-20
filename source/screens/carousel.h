@@ -45,5 +45,8 @@ void carousel_set(u8 node, const struct carousel_entry *entries, u32 count, u32 
 u32 carousel_facing(u8 node);
 // The entries' texts changed (a count): the label draws again
 void carousel_refresh(u8 node);
+// The theme's colours changed (B19's theme wipe): the fog, the label's and
+// dots' colours and the backdrop are worked out again in the next update
+void carousel_colours(u8 node);
 
 #endif

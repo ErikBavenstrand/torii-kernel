@@ -94,7 +94,7 @@ enum ui_role {
 	UI_ROLE_INK_GB,
 	UI_ROLE_INK_NES,
 	UI_ROLE_SKY,    // the carousel's backdrop above its horizon: GROUND
-	UI_ROLE_FLOOR,  // and below it: GROUND with floor_mix of black
+	UI_ROLE_FLOOR,  // and below it: GROUND moved by floor_step (ui_floor_colour)
 	// Bank 2: danger and the NOR storage bar
 	UI_ROLE_ALERT_INK = UI_ROLE_ACCENT,  // the danger item's ink
 	UI_ROLE_ALERT_TINT,                  // and its tint
@@ -228,8 +228,9 @@ struct ui_motions {
 //                       in 256ths (palette.json's; the tints are made with it)
 //   backdrop_mix        how much of the item's base the carousel backdrop
 //                       mixes into bg (GROUND), in 256ths
-//   floor_mix           how much black the carousel's ground below its
-//                       horizon mixes into GROUND (FLOOR), in 256ths
+//   floor_step          the carousel's ground below its horizon (FLOOR):
+//                       GROUND moved this many 5-bit steps per channel (red,
+//                       green, blue): darker in light, lighter in dark
 //   float_mix           how much ink a popup's card mixes in (FLOAT), in 256ths
 //   bar_shade_mix       how much card each next shade of the NOR bar mixes in
 //   look, motion        the shared sizes and motions
@@ -260,7 +261,7 @@ struct ui_theme {
 	const char *name;
 	u8 pill_mix;
 	u8 backdrop_mix;
-	u8 floor_mix;
+	s8 floor_step[3];
 	u8 float_mix;
 	u8 bar_shade_mix;
 	const struct pal_surfaces *surface;
@@ -298,6 +299,9 @@ extern const struct ui_theme ui_theme_light;
 // The UI's palette banks (UI_BANKS x 16 colours) for theme with item's
 // accent (enum pal_item). Hardware-free.
 void ui_theme_banks(const struct ui_theme *theme, u32 item, u16 out[UI_BANKS * 16]);
+// The carousel's floor for a sky colour: sky moved by theme's floor_step,
+// each channel clamped to 0-31. Hardware-free.
+u16 ui_floor_colour(const struct ui_theme *theme, u16 sky);
 // a mixed with amount/256 of b, per 5-bit channel, rounded. Hardware-free.
 u16 ui_colour_mix(u16 a, u16 b, u32 amount);
 // c as the brightness blend (BLDY) shows it at evy (0-16): towards white
