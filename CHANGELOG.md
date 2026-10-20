@@ -6,6 +6,15 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** the NOR page: one card with the storage line (used, and free
+  of 64 MB) over a bar of each game's share, and the games in written order;
+  Format all in a card of its own. A launches (L held: a hard reset, as in
+  v0.3); START opens Launch, Game info and Delete. Delete takes only the
+  latest game, asks first with Cancel preselected and checks the NOR still
+  holds that game; Format all asks first, with the game count and its 4
+  minutes. A write to NOR now updates home's NOR count; an older kernel's NOR
+  list entries are cut at their 100th byte (B15; `1d7ff84`, `4cca8fe`,
+  `bd09e1e`, `65fe71f`, `d8f6d4b`, `f40afb0`, `16f632e`).
 - **Added:** home is the carousel: the items' objects on a ring of affine
   sprites seen from above, the front one lowest and largest, the others
   smaller and fogged toward the backdrop, over soft ground shadows; the

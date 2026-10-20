@@ -332,6 +332,9 @@ What the v0.4 ticket sessions, the conductor's reviews and the research left ope
 - Deleting the running log file with LOGGING on stops SD logging until the next boot (pre-existing; B10).
 - Non-canonical paths such as `/deep/../x.gba` launch and are stored in Recent as given (only the test hook can make one today; B10).
 - `gfx_hold_regs` keeps stale bits after a hold ends (`gfx.c` clears only dirty regions); nothing reads it as "a hold is on" today (pre-existing; B12).
+- After a power cut drops a half-erased NOR game, a "kernel error: … dropped" line repeats every boot until the next list save (pre-existing; B15).
+- Behind the NOR Delete question, the popup's edge and Delete row show beside the confirmation (B11's design; B15).
+- `tests/nav.sh` page routes assume the menu starts on home; scripts set Start on = Home first (B14, B15).
 - A large crc.txt loads slowly after each boot: about 6 s of background work for 3,000 records (emulated), mostly hashing paths (B21).
 - A read-only crc.txt is never updated: dates are re-adopted and Recent games re-identified every boot (B21).
 
@@ -352,6 +355,7 @@ Made during the build without the user; each is cheap to change.
 - **The "played ago" words** and the unset clock counting as before 2026-10-01 (B5).
 - **Mockups for Settings and the rename keyboard,** approved by the conductor for the build (`docs/design/v0.4/settings-*.png`, `keyboard-*.png`).
 - **Dropped v0.3 features:** the NOR menu's load and back-up of a save; the help QR code; the cheat screen, per-game save type, hard reset and write to NOR with addon come back in B13/B14 (B10).
+- **NOR page:** one card with four rows, only the latest game deletable, no hold-A for Format all, L/R don't page (B15).
 - **Carousel:** neighbours at 0.89 and far items at 0.60 scale read close to the front; held-turn speed; one item showing at both ends mid-turn with 2–5 items; far dark objects nearly invisible in dark (B12).
 - **Info texts:** all wording, card sizes in binary GB/MB, Your cart's contents (B17); Controls must be re-checked once every page has landed (B20).
 - **Names database:** names-update computes CRCs on the PC; a romhack missing from the dat shows its base game's name via the GBA game code; no CRC at launch (B21).
