@@ -691,6 +691,10 @@ void ui_list_mark(u8 node, int shown)
 {
 	struct list_state *st = ui_node_state(node);
 	st->unmarked = !shown;
+	// The row's name scrolls only while it shows as chosen: back to its start
+	marquee_reset(node, st);
+	if (st->unmarked)
+		st->mq = MQ_OFF;
 	ui_wake();  // the pill's sprites change with the next update
 }
 
@@ -852,7 +856,7 @@ static void row_icon8(const struct text_window *win, u32 x, u32 y, const u32 *ic
 
 static void marquee_tick(u8 node, struct list_state *st, u32 dt)
 {
-	if (st->mq == MQ_OFF || st->page != PAGE_NONE || st->shown != st->base + FIX_ROUND(st->spring))
+	if (st->mq == MQ_OFF || st->unmarked || st->page != PAGE_NONE || st->shown != st->base + FIX_ROUND(st->spring))
 		return;
 	const struct ui_theme *t = ui_theme();
 	if (st->mq_wait > dt) {

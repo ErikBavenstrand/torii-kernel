@@ -336,8 +336,10 @@ static void nor_load_legacy(const u8 *a)
 				  pNorFS[nor_list_stored].filesize != 0xFFFFFFFF;
 	     nor_list_stored++)
 		;
-	for (u32 i = 0; i < MAX_NOR; i++)
+	for (u32 i = 0; i < MAX_NOR; i++) {
 		pNorFS[i].reserved1 = 0;
+		pNorFS[i].filename[sizeof(pNorFS[i].filename) - 1] = 0;  // pages print it
+	}
 }
 
 // Logs which list Read_NOR_info read, when it differs from the last time: the

@@ -105,6 +105,7 @@ char *gl_nor_format_time EWRAM_BSS;
 char *gl_nor_format_takes EWRAM_BSS;
 char *gl_nor_format_button EWRAM_BSS;
 char *gl_nor_states EWRAM_BSS;
+char *gl_nor_changed EWRAM_BSS;
 char **gl_nor_saves EWRAM_BSS;
 
 // The Info page (screens/info.h)
@@ -414,6 +415,7 @@ const char en_nor_format_time[] = "About 4 minutes.";
 const char en_nor_format_takes[] = "It takes about 4 minutes.";
 const char en_nor_format_button[] = "Format";
 const char en_nor_states[] = "Save states on";
+const char en_nor_changed[] = "The NOR changed: nothing was deleted.";
 const char *en_nor_saves[NOR_SAVES] = {
 	[NOR_SAVE_NONE] = "No save",
 	[NOR_SAVE_SRAM] = "SRAM",
@@ -532,6 +534,7 @@ void LoadEnglish(void)
 	gl_nor_format_takes = (char *)en_nor_format_takes;
 	gl_nor_format_button = (char *)en_nor_format_button;
 	gl_nor_states = (char *)en_nor_states;
+	gl_nor_changed = (char *)en_nor_changed;
 	gl_nor_saves = (char **)en_nor_saves;
 }
 //---------------------------------------------------------------------------------

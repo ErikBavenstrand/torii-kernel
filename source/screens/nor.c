@@ -33,6 +33,8 @@
 #define KB 0x400u
 
 // --- Look, px (spec.md's grid: title bar 0-18, content 20-143, hints at 147) ---
+#define NOR_DETAIL_W 48  // a row's size ("16 MB"): the list's config needs constants
+#define NOR_LIST_PAD 4   // a row's text inset
 static const struct nor_look {
 	u8 title_h;       // the title bar's rectangle: whole tiles under its line
 	u8 hints_h;
@@ -43,8 +45,6 @@ static const struct nor_look {
 	u8 bar_y, bar_h;  // the bar is the theme's storage_h tall, in the middle of this
 	u8 list_x, list_y, list_w;
 	u8 list_rows;     // rows the games card shows at most: 4 (56 px, whole tiles and rows)
-	u8 detail_w;      // a row's size ("16 MB")
-	u8 list_pad;      // a row's text inset
 	u8 card_pad;      // px of card under the last row, at least
 	u8 note_y, note_h;  // "No games on NOR", in the first row's place
 	u8 format_h;      // the Format all card's rectangle, under the games card's
@@ -67,8 +67,6 @@ static const struct nor_look {
 	.list_y = 56,
 	.list_w = 216,
 	.list_rows = 4,
-	.detail_w = 48,
-	.list_pad = 4,
 	.card_pad = 3,
 	.note_y = 56,
 	.note_h = 16,
@@ -152,7 +150,7 @@ static void storage_text(u32 used)
 	else
 		snprintf(n, sizeof(n), "0 %s", gl_size_mb);
 	snprintf(nor.used, sizeof(nor.used), "%s %s", n, gl_nor_used);
-	if (room >= MB)
+	if (room >= MB || !room)
 		snprintf(n, sizeof(n), "%lu %s", (unsigned long)(room / MB), gl_size_mb);
 	else
 		snprintf(n, sizeof(n), "%lu %s", (unsigned long)(room / KB), gl_size_kb);
@@ -171,6 +169,8 @@ static u32 name_slot(u32 i)
 	char clean[GAMENAME_MAX + 1];
 	// Never longer than the file name, which the list keeps to 99 bytes
 	u32 len = gamename_clean(clean, pNorFS[i].filename);
+	if (!len)  // a name that cleans to nothing ("   .gba"): the file name
+		len = (u32)snprintf(clean, sizeof(clean), "%s", pNorFS[i].filename);
 	len = len < sizeof(nor.name[s]) - 1 ? len : sizeof(nor.name[s]) - 1;
 	memcpy(nor.name[s], clean, len);
 	nor.name[s][len] = 0;
@@ -228,7 +228,8 @@ static const struct ui_label_config line_left = {"", UI_FONT_BODY, UI_ALIGN_LEFT
 static const struct ui_label_config line_right = {"", UI_FONT_BODY, UI_ALIGN_RIGHT, 0, 0};
 static const struct ui_label_config note_label = {"", UI_FONT_BODY, UI_ALIGN_CENTER, 0, 0};
 static const struct ui_label_config format_label = {"", UI_FONT_BODY, UI_ALIGN_LEFT, 0, ART_ICON8_CHIP + 1};
-static const struct ui_list_config list_config = {&model, UI_ROW_PITCH_LIST, UI_LIST_MARQUEE, 0, 0};
+static const struct ui_list_config list_config = {&model, UI_ROW_PITCH_LIST, UI_LIST_MARQUEE, NOR_DETAIL_W,
+						  NOR_LIST_PAD};
 static const struct ui_scrollbar_config scroll_config = {N_LIST};
 
 static int nor_event(struct ui_view *v, const struct ui_event *e);
@@ -308,6 +309,15 @@ static void position_show(void)
 	ui_title_set_right(at(N_TITLE), nor.position);
 }
 
+// Shows Format all's card shown over other (the same rectangle): it draws
+// alone, so it is the one drawn last; a draw of other still pending (a
+// quick move back and forth while a map copy waited) is dropped
+static void card_show(u8 shown, u8 other)
+{
+	ui_node(at(other))->flags &= (u8)~UI_N_DIRTY;
+	ui_dirty(at(shown), 0xFF);
+}
+
 // Moves the page's cursor to row to, by key (a move: the list glides on a
 // held key; 0: a jump)
 static void choose(u32 to, u16 key)
@@ -319,7 +329,7 @@ static void choose(u32 to, u16 key)
 	if (to < nor.count) {
 		if (from == nor.count) {
 			ui_list_mark(at(N_LIST), 1);
-			ui_dirty(at(nor.panel), 0xFF);  // drawn last, so it shows
+			card_show(nor.panel, nor.lift);
 			ui_list_set_cursor(at(N_LIST), to);
 		} else {
 			ui_list_move(at(N_LIST), to, key);
@@ -327,7 +337,7 @@ static void choose(u32 to, u16 key)
 		tlog_debug("nor: row %lu", (unsigned long)to);
 	} else {
 		ui_list_mark(at(N_LIST), 0);
-		ui_dirty(at(nor.lift), 0xFF);
+		card_show(nor.lift, nor.panel);
 		tlog_debug("nor: row format");
 	}
 	if ((from == nor.count) != (to == nor.count))
@@ -359,7 +369,8 @@ static void info(u32 game)
 			 save_type_name(e->savemode));
 	if (e->have_RTS && n > 0 && (u32)n < sizeof(nor.text))
 		snprintf(nor.text + n, sizeof(nor.text) - (u32)n, "\n%s", gl_nor_states);
-	dialog_message(nor.name[name_slot(game)], nor.text, DIALOG_INFO);
+	snprintf(nor.title, sizeof(nor.title), "%s", nor.name[name_slot(game)]);
+	dialog_message(nor.title, nor.text, DIALOG_INFO);
 }
 
 static void delete_latest(u32 game)
@@ -370,9 +381,10 @@ static void delete_latest(u32 game)
 	char name[sizeof(pNorFS[0].filename)];
 	memcpy(name, pNorFS[game].filename, sizeof(name));
 	action_nor_read();
-	if (game + 1 != game_total_NOR || memcmp(name, pNorFS[game].filename, sizeof(name)) != 0) {
+	if (game + 1 != game_total_NOR || strncmp(name, pNorFS[game].filename, sizeof(name)) != 0) {
 		tlog_error("nor: delete %lu: the NOR's list changed (%lu games): nothing deleted", (unsigned long)game,
 			   (unsigned long)game_total_NOR);
+		dialog_message(NULL, gl_nor_changed, DIALOG_ERROR);
 		nor.next_row = game;
 		nor.next_row_set = 1;
 		nav_reshow();

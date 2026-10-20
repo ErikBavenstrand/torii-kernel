@@ -132,6 +132,7 @@ extern char *gl_nor_format_time;
 extern char *gl_nor_format_takes;
 extern char *gl_nor_format_button;
 extern char *gl_nor_states;
+extern char *gl_nor_changed;
 enum nor_save {
 	NOR_SAVE_NONE,
 	NOR_SAVE_SRAM,
