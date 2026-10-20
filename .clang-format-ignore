@@ -9,3 +9,5 @@ source/engine/font_heading.c
 source/engine/ease_lut.c
 tests/kernel/asset_data.c
 source/perf_budget.h
+source/ui/palette.c
+source/ui/palette.h

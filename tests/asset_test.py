@@ -5,7 +5,7 @@
 # ///
 """Tests for tools/asset.py's PNG converter, run by `just test-host`: round
 trips, colour reduction, indexed PNGs, the limits it shares with the C
-headers, the LZ77 stream, determinism, and the example theme's wallpaper."""
+headers, the LZ77 stream, and determinism."""
 
 import contextlib
 import io
@@ -95,9 +95,6 @@ class AssetTest(unittest.TestCase):
         self.assertEqual(asset.TILE_BYTES_MAX, 0x2000)
         self.assertEqual(asset.FILE_MAX, 0x4000)
         self.assertEqual(asset.TILES_PER_SIDE_MAX, 32)
-        self.assertEqual(asset.WALLPAPER_TILES, 256)
-        # A wallpaper at its tile limit fits the asset format's decoded cap
-        self.assertLessEqual(asset.WALLPAPER_TILES * 32, asset.TILE_BYTES_MAX)
 
     def test_round_trip_keeps_every_pixel(self):
         rnd = random.Random(15)
@@ -177,12 +174,6 @@ class AssetTest(unittest.TestCase):
             asset.encode_png(self.png("wide.png", Image.new("RGB", (264, 8))), 4)
         with self.assertRaisesRegex(ValueError, "bytes of tiles"):
             asset.encode_png(self.png("big8.png", Image.new("RGB", (128, 72))), 8)
-        # A wallpaper: 256 tiles fit, 257 or more don't
-        ok, line = asset.encode_wallpaper(self.png("w.png", self.gradient(128, 128)))
-        self.assertIn("256 of 256 tiles", line)
-        self.assertEqual(asset.read_asset(ok)[0][0], 4)
-        with self.assertRaisesRegex(ValueError, "a wallpaper takes 256"):
-            asset.encode_wallpaper(self.png("w2.png", Image.new("RGB", (136, 128))))
 
     def test_lz77_round_trip_and_no_distance_1(self):
         rnd = random.Random(7)
@@ -207,25 +198,19 @@ class AssetTest(unittest.TestCase):
         self.assertEqual((magic, bpp, w, h, flags, reserved), (b"TAS1", 4, 2, 3, 0, 0))
         self.assertEqual(len(packed), 16 + (colours * 2 + 3) // 4 * 4 + lz)
 
-    def test_example_wallpaper_is_the_converters_output(self):
-        theme = ROOT / "themes" / "example"
-        made, _ = asset.encode_wallpaper(theme / "wallpaper.png")
-        self.assertEqual(made, (theme / "wallpaper.tas").read_bytes())
-
     def test_command_line(self):
         out = self.dir / "w.tas"
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
             status = asset.main(
-                ["wallpaper", str(self.png("cl.png", self.gradient(32, 16))), str(out)]
+                ["encode", str(self.png("cl.png", self.gradient(32, 16))), str(out)]
             )
         self.assertEqual(status, 0)
-        self.assertIn("8 of 256 tiles", buf.getvalue())
         self.assertTrue(out.exists())
         with contextlib.redirect_stdout(io.StringIO()):
             bad = asset.main(
                 [
-                    "wallpaper",
+                    "encode",
                     str(self.png("bad.png", Image.new("RGB", (10, 10)))),
                     str(out),
                 ]
@@ -234,8 +219,7 @@ class AssetTest(unittest.TestCase):
         junk = self.dir / "junk.png"
         junk.write_bytes(b"not a picture")
         for args in (
-            ["wallpaper", str(self.dir / "none.png"), str(out)],
-            ["wallpaper", str(junk), str(out)],
+            ["encode", str(self.dir / "none.png"), str(out)],
             ["encode", str(junk), str(out)],
         ):
             with contextlib.redirect_stdout(io.StringIO()) as said:

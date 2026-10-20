@@ -37,11 +37,11 @@ void test_engine_jobs(void);
 void test_engine_cycles(void);
 void test_engine_hold_for_queue(void);
 void test_ui_pool_and_arenas(void);
+void test_theme_switch_loads_banks(void);
 void test_asset_lz77_decode(void);
 void test_asset_psram_round_trip(void);
 void test_asset_sd_read(void);
 void test_asset_cover_cache(void);
-void test_theme_load(void);
 
 // Test assets (asset_data.c, written by tools/asset.py demo)
 #include <gba_base.h>

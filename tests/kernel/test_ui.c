@@ -70,7 +70,7 @@ static void reset(int quiet)
 	jobs_init();
 	motion_reset();
 	ui_core_reset();
-	ui_theme_select(&ui_theme_dark, UI_ACCENT_THEME);
+	ui_theme_select(&ui_theme_dark);
 	res_errors_quiet = (u8)quiet;
 }
 

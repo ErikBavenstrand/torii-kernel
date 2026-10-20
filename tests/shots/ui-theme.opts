@@ -1,7 +1,7 @@
 #! kernel test
 # The UI demo's themes and DIM (tests/kernel/ui_demo.c): START fades to
 # black, switches to the light theme and fades back (every frame hashed);
-# again for dark with the orange accent. Left alone for 20 s, the screen
+# again for dark with Recent's orange accent. Left alone for 20 s, the screen
 # dims; a key brightens it and does nothing else (A opens no dialog).
 -k 1:L+SELECT
 -w "screen ready: ui-demo"

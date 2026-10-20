@@ -148,8 +148,8 @@ format_no=$(keys 200 R A DOWN DOWN A B)
 # leaving it: L on page 2, then L on page 1 to the NOR list.
 # THEME on SETTINGS page 2 set to LIGHT and saved, through save_set2_info
 save_theme="$(keys 200 R) $(keys 220 R) $(keys 270 R) $(keys 320 DOWN DOWN DOWN DOWN DOWN A A RIGHT A) $(keys 410 L) $(keys 450 L)"
-# ACCENT on SETTINGS page 2 set to Blue and saved
-save_accent="$(keys 200 R) $(keys 220 R) $(keys 270 R) $(keys 320 DOWN DOWN DOWN DOWN DOWN DOWN A A RIGHT A) $(keys 410 L) $(keys 450 L)"
+# DIM on SETTINGS page 2 set to its next preset (1 minute) and saved
+save_dim="$(keys 200 R) $(keys 220 R) $(keys 270 R) $(keys 320 DOWN DOWN DOWN DOWN DOWN DOWN A A RIGHT A) $(keys 410 L) $(keys 450 L)"
 save_setting="-k 200:R -k 206:- -k 220:R -k 226:- -k 270:DOWN -k 276:- -k 285:DOWN -k 291:- -k 300:A -k 306:- -k 340:A -k 346:- -k 370:L -k 376:-"
 # AUTO SAVE on page 2 turned over and saved COUNT times (A, LEFT, A, RIGHT,
 # A on OK), then SETTINGS left: toggles COUNT
@@ -210,21 +210,21 @@ EOF
     [ "$(slot 28)" = 1 ] || bad "THEME wasn't saved: slot 28 holds $(slot 28)"
     [ "$(slot 26)" = 2 ] || bad "the save lost LOGGING: slot 26 holds $(slot 26)"
     [ "$(slot 27)" = 65535 ] || bad "DIM was written: slot 27 holds $(slot 27)"
-    [ "$(slot 29)" = 65535 ] || bad "ACCENT was written: slot 29 holds $(slot 29)"
+    [ "$(slot 29)" = 65535 ] || bad "slot 29 (ACCENT until v0.4) was written: it holds $(slot 29)"
     boot -f 200
     [ "$(slot 28)" = 1 ] || bad "THEME didn't survive a power-on: slot 28 holds $(slot 28)"
     pass "a settings save on page 2 (THEME), kept after a power-on"
   fi
 
   if shard_case; then
-    new_cart settings-accent
-    boot $save_accent -f 540
+    new_cart settings-dim
+    boot $save_dim -f 540
     logged "nor: wrote the settings"
-    logged "settings: THEME DARK, ACCENT BLUE"
-    [ "$(slot 29)" = 1 ] || bad "ACCENT wasn't saved as Blue: slot 29 holds $(slot 29)"
+    logged "settings: THEME DARK, DIM 1"
+    [ "$(slot 27)" = 1 ] || bad "DIM wasn't saved as 1 minute: slot 27 holds $(slot 27)"
     [ "$(slot 28)" = 65535 ] || bad "THEME was written: slot 28 holds $(slot 28)"
-    [ "$(slot 27)" = 65535 ] || bad "DIM was written: slot 27 holds $(slot 27)"
-    pass "an ACCENT save on page 2 writes only its slot"
+    [ "$(slot 29)" = 65535 ] || bad "slot 29 (ACCENT until v0.4) was written: it holds $(slot 29)"
+    pass "a DIM save on page 2 writes only its slot"
   fi
 
   # Five saves on page 2 write the kernel NOR once, as SETTINGS closes

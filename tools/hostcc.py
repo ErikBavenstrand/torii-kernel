@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Builds a host program from kernel and test sources under ASan and UBSan,
-for tests/host.sh and the theme checker (tools/theme_check.py), in the
-torii-emu container.
+for tests/host.sh, in the torii-emu container.
 
 Each source compiles to its own object, in parallel, cached in dist/host/obj
 under a hash of its preprocessed text and the flags, so an unchanged file is

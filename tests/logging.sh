@@ -448,7 +448,7 @@ settings)
   # lists' idle flush once SETTINGS closes.
   new_card 65536 32
   down=() # down to LOGGING
-  for i in $(seq 0 7); do
+  for i in $(seq 0 6); do
     down+=(-k "@$((8 + 12 * i)):DOWN" -k "@$((12 + 12 * i)):-")
   done
   # A edits it, A A step it to Info, RIGHT A keep it; L at once goes to page
@@ -479,7 +479,7 @@ open)
   # begin, then 11 sectors of zeros; 1 none), while other code acts.
   hold=14
   down=() # SETTINGS page 2, down to LOGGING
-  for i in $(seq 0 7); do
+  for i in $(seq 0 6); do
     down+=(-k "@$((8 + 12 * i)):DOWN" -k "@$((12 + 12 * i)):-")
   done
   to_logging=(-w "screen ready: sd-list" -p "@2:tlog_open_steps_test:$hold" -k @8:R -k @12:- -w "screen ready: nor-list" -k @8:R -k @12:-

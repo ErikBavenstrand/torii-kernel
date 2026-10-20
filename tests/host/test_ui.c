@@ -83,7 +83,7 @@ static void reset_all(void)
 	res_init();
 	motion_reset();
 	ui_core_reset();
-	ui_theme_select(&ui_theme_dark, UI_ACCENT_THEME);
+	ui_theme_select(&ui_theme_dark);
 	inits = 0;
 	init_fail_at = 0xFFFFFFFF;
 	wakes = popped_hooks = cancelled_owner = 0;
@@ -96,7 +96,7 @@ static struct ui_node lay(u8 anchor, s16 x, s16 y, s16 w, s16 h, const struct ui
 	struct ui_spec s = {UI_LABEL, 0, UI_NONE, 0, anchor, 0, 0, 0, x, y, w, h, 0};
 	struct ui_node out;
 	memset(&out, 0, sizeof(out));
-	ui_layout(&s, 0, parent, &out);
+	ui_layout(&s, parent, &out);
 	return out;
 }
 
@@ -128,75 +128,6 @@ void test_ui_layout_anchors(void)
 	CHECK_EQ(n.x, 40 + 160 - 8 - 32);
 	CHECK_EQ(n.y, 32 + 8);
 	CHECK_EQ(n.h, 96 - 8 - 8);
-}
-
-static const struct ui_theme patched_theme = {
-	.name = "Patched",
-	.body = &font_body,
-	.heading = &font_heading,
-	.row_h = 16,
-	.patch_count = 5,
-	.patches =
-		{
-			{9, 3, UI_FIELD_X, 0, 24},
-			{9, 3, UI_FIELD_ANCHOR, 0, UI_RIGHT},
-			{9, 3, UI_FIELD_X, 0, 16},  // the last wins
-			{9, 4, UI_FIELDS, 0, 1},    // outside the closed set: ignored
-			{8, 3, UI_FIELD_W, 0, 8},   // another view
-		},
-};
-
-void test_ui_patches(void)
-{
-	reset_all();
-	s16 v = 0;
-	CHECK(ui_theme_patch(&patched_theme, 9, 3, UI_FIELD_X, &v));
-	CHECK_EQ(v, 16);
-	CHECK(!ui_theme_patch(&patched_theme, 9, 4, UI_FIELDS, &v));
-	CHECK(!ui_theme_patch(&patched_theme, 9, 3, UI_FIELD_Y, &v));
-	CHECK(!ui_theme_patch(&ui_theme_dark, 9, 3, UI_FIELD_X, &v));
-	// Applied by the layout: node 3 of view 9 moves to the right edge
-	ui_theme_select(&patched_theme, UI_ACCENT_THEME);
-	struct ui_spec s = {UI_LABEL, 3, UI_NONE, 0, UI_LEFT, 0, 0, 0, 8, 8, 64, 16, 0};
-	struct ui_node out;
-	ui_layout(&s, 9, 0, &out);
-	CHECK_EQ(out.x, 240 - 16 - 64);
-	CHECK_EQ(out.w, 64);
-	ui_layout(&s, 8, 0, &out);  // view 8 patches only the width
-	CHECK_EQ(out.x, 8);
-	CHECK_EQ(out.w, 8);
-	s.id = 0;  // no id: never patched
-	ui_layout(&s, 9, 0, &out);
-	CHECK_EQ(out.x, 8);
-	ui_theme_select(&ui_theme_dark, UI_ACCENT_THEME);
-}
-
-void test_ui_palette(void)
-{
-	u16 pal[32];
-	const struct ui_theme *t = &ui_theme_dark;
-	ui_theme_palette(t, UI_ACCENT_THEME, pal);
-	CHECK_EQ(pal[0], t->colour[UI_C_BG]);  // the backdrop
-	CHECK_EQ(pal[UI_ROLE_TEXT], t->colour[UI_C_TEXT]);
-	CHECK_EQ(pal[UI_ROLE_SHADOW], t->colour[UI_C_SHADOW]);
-	CHECK_EQ(pal[UI_ROLE_ICON + 5], t->colour[UI_C_ICON + 5]);
-	// Bank 1: the same roles on the selection
-	CHECK_EQ(pal[16 + UI_ROLE_BG], t->colour[UI_C_SELECTION]);
-	CHECK_EQ(pal[16 + UI_ROLE_PANEL], t->colour[UI_C_SELECTION]);
-	CHECK_EQ(pal[16 + UI_ROLE_TEXT], t->colour[UI_C_SELECTION_TEXT]);
-	CHECK_EQ(pal[16 + UI_ROLE_TRACK], t->colour[UI_C_TRACK]);
-	CHECK(pal[16 + UI_ROLE_DIM] != t->colour[UI_C_SELECTION_TEXT]);
-	// An accent swaps the accent and the selection, nothing else
-	u16 acc[32];
-	ui_theme_palette(t, 0x001F, acc);
-	CHECK_EQ(acc[UI_ROLE_ACCENT], 0x001F);
-	CHECK_EQ(acc[16 + UI_ROLE_BG], 0x001F);
-	CHECK_EQ(acc[UI_ROLE_TEXT], pal[UI_ROLE_TEXT]);
-	CHECK_EQ(acc[UI_ROLE_BG], pal[UI_ROLE_BG]);
-	for (u32 i = 0; i < ui_accent_count; i++)
-		CHECK(ui_accents[i].name && !(ui_accents[i].colour & 0x8000));
-	ui_theme_palette(&ui_theme_light, UI_ACCENT_THEME, pal);
-	CHECK_EQ(pal[0], ui_theme_light.colour[UI_C_BG]);
 }
 
 // --- The ring -------------------------------------------------------------

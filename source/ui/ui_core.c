@@ -1,5 +1,5 @@
 // The hardware-free core of the UI (ui.h): the node pool, the view stack
-// and its arena, layouts and patches, focus and key dispatch. tests/host
+// and its arena, layouts, focus and key dispatch. tests/host
 // runs it with widget ops of its own.
 #include <stdarg.h>
 #include <stdio.h>
@@ -124,25 +124,15 @@ void ui_show(u8 index, int shown)
 	ui_dirty(index, 0xFF);
 }
 
-static u8 patched(u8 node, u8 field, u8 value)
-{
-	const struct ui_view *v = ui_node_view(node);
-	const struct ui_spec *s = ui_node_spec(node);
-	s16 p;
-	if (s->id && v->spec->id && ui_theme_patch(ui_theme(), v->spec->id, s->id, field, &p))
-		return p >= 0 && p < 16 ? (u8)p : 0;  // a palette index, or the default
-	return value;
-}
-
 u8 ui_ink(u8 node, u8 def)
 {
-	u8 ink = patched(node, UI_FIELD_INK, ui_node_spec(node)->ink);
+	u8 ink = ui_node_spec(node)->ink;
 	return ink ? ink : def;
 }
 
 u8 ui_paper(u8 node, u8 def)
 {
-	u8 paper = patched(node, UI_FIELD_PAPER, ui_node_spec(node)->paper);
+	u8 paper = ui_node_spec(node)->paper;
 	return paper ? paper : def;
 }
 
@@ -169,18 +159,8 @@ static void place(u32 anchor, s16 pos, s16 len, s16 pstart, s16 plen, s16 *start
 	}
 }
 
-void ui_layout(const struct ui_spec *spec, u8 view_id, const struct ui_node *parent, struct ui_node *out)
+void ui_layout(const struct ui_spec *spec, const struct ui_node *parent, struct ui_node *out)
 {
-	s16 v[4] = {spec->x, spec->y, spec->w, spec->h};
-	s16 anchor = spec->anchor, p;
-	const struct ui_theme *t = ui_theme();
-	if (spec->id && view_id) {
-		for (u32 f = UI_FIELD_X; f <= UI_FIELD_H; f++)
-			if (ui_theme_patch(t, view_id, spec->id, (u8)f, &p))
-				v[f] = p;
-		if (ui_theme_patch(t, view_id, spec->id, UI_FIELD_ANCHOR, &p))
-			anchor = p;
-	}
 	s16 px = 0, py = 0, pw = SCREEN_W, ph = SCREEN_H;
 	if (parent) {
 		px = parent->x;
@@ -188,8 +168,8 @@ void ui_layout(const struct ui_spec *spec, u8 view_id, const struct ui_node *par
 		pw = parent->w;
 		ph = parent->h;
 	}
-	place((u32)anchor, v[0], v[2], px, pw, &out->x, &out->w);
-	place((u32)anchor >> 2, v[1], v[3], py, ph, &out->y, &out->h);
+	place((u32)spec->anchor, spec->x, spec->w, px, pw, &out->x, &out->w);
+	place((u32)spec->anchor >> 2, spec->y, spec->h, py, ph, &out->y, &out->h);
 }
 
 // Checks a layout's caps before anything is taken; 0 with the error recorded.
@@ -254,11 +234,8 @@ static int place_nodes(struct ui_view *v)
 		node->child = node->next = UI_NONE;
 		node->state = offset;
 		offset = (u16)(offset + ((ui_kind_ops[s->kind]->state_size + 3u) & ~3u));
-		ui_layout(s, spec->id, node->parent == UI_NONE ? 0 : &nodes[node->parent], node);
-		s16 hidden;
-		if ((s->flags & UI_HIDDEN) ||
-		    (s->id && spec->id && ui_theme_patch(ui_theme(), spec->id, s->id, UI_FIELD_HIDDEN, &hidden) &&
-		     hidden))
+		ui_layout(s, node->parent == UI_NONE ? 0 : &nodes[node->parent], node);
+		if (s->flags & UI_HIDDEN)
 			node->flags |= UI_N_HIDDEN;
 		if ((node->x | node->y | node->w | node->h) & 7 || node->w <= 0 || node->h <= 0 || node->x < 0 ||
 		    node->y < 0 || node->x + node->w > SCREEN_W || node->y + node->h > SCREEN_H) {

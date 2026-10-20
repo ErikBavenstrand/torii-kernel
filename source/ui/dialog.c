@@ -95,7 +95,7 @@ static const struct ui_label_config hint_label = {"", UI_FONT_BODY, UI_ALIGN_CEN
 		    .data = &hint_label}
 
 static const struct ui_spec message_nodes[N_BAR] = {DIALOG_NODES(UI_ROLE_TEXT, 48)};
-static const struct ui_spec error_nodes[N_BAR] = {DIALOG_NODES(UI_ROLE_ICON + 3, 48)};  // red
+static const struct ui_spec error_nodes[N_BAR] = {DIALOG_NODES(UI_ROLE_DANGER, 48)};
 static const struct ui_spec progress_nodes[N_COUNT] = {
 	DIALOG_NODES(UI_ROLE_TEXT, 40),
 	[N_BAR] = {.kind = UI_PROGRESS,
@@ -235,12 +235,9 @@ void dialog_hand_over(void)
 	memset(&dlg.notice, 0, sizeof(dlg.notice));
 	dlg.opens = 0;
 	dlg.owned = 0;
-	// What a new session would read: the SD theme may have loaded since
-	// (only if it differs: setting it decodes the wallpaper again)
-	u16 accent;
-	const struct ui_theme *t = ui_theme_setting(&accent);
-	if (t != ui_theme() || accent != ui_accent())
-		ui_theme_set(t, accent);
+	// What a new session would read
+	if (ui_theme_setting() != ui_theme())
+		ui_theme_set(ui_theme_setting());
 	ui_dim_set_minutes(ui_dim_setting());
 	tlog_debug("dialog: engine session handed over");
 }

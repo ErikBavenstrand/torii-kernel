@@ -32,7 +32,6 @@
 #include "diag.h"
 #include "engine/cover.h"
 #include "screens/lists.h"
-#include "ui/sdtheme.h"
 #include "progress.h"
 
 #include "jagoombacolor.h"
@@ -136,16 +135,6 @@ static void Boot_notice_check(void)
 	boot_noticed = 1;
 	tlog_debug("boot: still busy %lu frames after mounting", (unsigned long)(torii_frames - boot_mounted));
 	dialog_notice(NULL, gl_Loading, DIALOG_INFO);
-}
-//---------------------------------------------------------------------------------
-// Torii: says on the boot screen why the SD theme the THEME setting picks
-// didn't load (ui/sdtheme.h), for two seconds; the menu then uses Dark
-static void Show_theme_error(void)
-{
-	// In the text: the heading font can't fit gl_theme_error on the title line
-	Show_boot_notice(gl_theme_error, ui_theme_error(), DIALOG_ERROR);
-	for (u32 i = 0; i < 120; i++)
-		ui_frame();
 }
 //---------------------------------------------------------------------------------
 // Reads Recently Played into p_recently_play; returns how many rows it holds.
@@ -1263,7 +1252,7 @@ int main(void)
 	CheckLanguage();
 	CheckSwitch();
 
-	// The boot's screens (a card error, the save question, a theme error)
+	// The boot's screens (a card error, the save question)
 	// share one engine session. A card that mounts shows nothing unless the
 	// rest of the boot is slow (Boot_notice_check): it takes a few frames,
 	// and a notice ("microSD card ready / Loading...") only flashed before
@@ -1292,8 +1281,6 @@ int main(void)
 		dialog_close();  // Diagnostics runs its own session
 		Diagnostics();   // back only if B didn't start it: the menu starts as usual
 	}
-	if (!ui_theme_boot())
-		Show_theme_error();
 
 	f_chdir("/");
 	//TCHAR currentpath[MAX_path_len];

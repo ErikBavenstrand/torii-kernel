@@ -5,7 +5,6 @@
 
 #include "ui_priv.h"
 #include "keyq.h"
-#include "sdtheme.h"
 #include "../engine/cycles.h"
 #include "../engine/frame.h"
 #include "../engine/gfx.h"
@@ -43,7 +42,7 @@ enum {
 };
 // How a transition fades
 enum {
-	TR_ALPHA,    // the screen's planes over the backdrop and wallpaper
+	TR_ALPHA,    // the screen's planes over the backdrop
 	TR_DARKEN,   // BLDY towards black: under a dialog, and out of the engine
 };
 #define TR_MOSAIC_MAX 7  // mosaic blocks of 8 px when a screen has gone
@@ -80,7 +79,7 @@ static struct {
 	u16 *stage;        // the staging area in VRAM
 	u16 stage_used;    // words given out since the queue was last empty
 	u8 stage_map;      // its res handle
-	u8 palette;        // res handle of the two theme banks
+	u8 palette;        // res handle of the theme's banks (UI_BANKS)
 	u8 shared[3];      // shared tiles of each character block planes use
 	u16 shared_first[3];
 	struct stage_span spans[STAGE_SPANS];
@@ -130,7 +129,6 @@ static struct {
 	MotionId dim_motion;
 	s16 dim_y;         // BLDY of DIM (0-16)
 	u8 dimmed;
-	u8 wall_retry;     // after a push or pop: put the wallpaper back where it fits (sdtheme.h)
 } ui EWRAM_BSS;
 
 void ui_wake(void)
@@ -390,18 +388,24 @@ static void fade_set(void *ctx, s32 value)
 
 static void load_palette(void)
 {
-	u16 pal[32];
-	ui_theme_palette(ui_theme(), ui_accent(), pal);
-	gfx_pal_load(0, pal, 32);
+	u16 pal[UI_BANKS * 16];
+	ui_theme_banks(ui_theme(), ui_item(), pal);
+	gfx_pal_load(0, pal, UI_BANKS * 16);
 	if (gfx_pal_faded_on)
 		fade_set(0, motion_value(ui.fade));
 }
 
-void ui_theme_set(const struct ui_theme *theme, u16 accent)
+void ui_theme_set(const struct ui_theme *theme)
 {
-	ui_theme_select(theme, accent);
+	ui_theme_select(theme);
 	ui.in.timing = &ui_theme()->input;
-	ui_wallpaper_setup();
+	load_palette();
+	ui_wake();
+}
+
+void ui_item_set(u32 item)
+{
+	ui_item_select(item);
 	load_palette();
 	ui_wake();
 }
@@ -816,7 +820,7 @@ static void regs_update(void)
 	const struct ui_view *tv = anim_view(&da);
 	int modal = tv != 0;
 	int tr = ui.tr_phase != TR_IDLE;
-	// A screen that has gone shows nothing (the backdrop, the wallpaper)
+	// A screen that has gone shows nothing (the backdrop)
 	int gone = tr && ui.tr_level >= UI_OPEN;
 	ui.gap_regs = (u8)gone;
 	u16 mosaic = (u16)(tr && (ui.tr_effects & UI_TR_MOSAIC) ? BGCNT_MOSAIC : 0);
@@ -836,17 +840,6 @@ static void regs_update(void)
 			lower |= LAYER_BG(p);
 		else if (modal)
 			top_planes |= LAYER_BG(p);
-	}
-	// The SD theme's wallpaper, behind everything, while no view takes plane 3
-	u32 d3, wall_layer = 0;
-	u16 wall;
-	if (!plane_owner(3, &d3) && ui_wallpaper_bgcnt(&wall)) {
-		gfx_set_bgcnt(3, wall);
-		gfx_set_scroll(3, 0, 0);
-		dispcnt |= (u16)DISP_BG(3);
-		wall_layer = LAYER_BG(3);
-		if (modal)
-			lower |= LAYER_BG(3);
 	}
 	// Static planes follow their view's slide; lists set their own scroll
 	// (with the view's offset), and are moved sideways here
@@ -941,7 +934,7 @@ static void regs_update(void)
 		ui.reveal = REVEAL_OFF;
 		if (ui.tr_mode == TR_ALPHA && !modal) {
 			u32 eva = 16 - ((u32)ui.tr_level * 16 + UI_OPEN / 2) / UI_OPEN;
-			gfx_set_blend((u16)(BLEND_ALPHA | shown | LAYER_OBJ | (LAYER_BD | wall_layer) << 8),
+			gfx_set_blend((u16)(BLEND_ALPHA | shown | LAYER_OBJ | LAYER_BD << 8),
 				      (u16)(eva | (16 - eva) << 8), 0);
 		} else {
 			// Under a dialog its planes stay as they are and the dim carries on
@@ -979,33 +972,21 @@ static void regs_update(void)
 
 // --- The stack ----------------------------------------------------------------
 
-const struct ui_theme *ui_theme_setting(u16 *accent)
+const struct ui_theme *ui_theme_setting(void)
 {
-	// Stored as index + 1, so 0 and erased (0xFFFF) both mean the theme's own
-	u16 a = Read_SET_info(assress_accent);
-	*accent = a >= 1 && a <= ui_accent_count ? ui_accents[a - 1].colour : UI_ACCENT_THEME;
-	u16 t = Read_SET_info(assress_theme);
-	if (t == UI_THEME_SD && ui_theme_sd())
-		return ui_theme_sd();
-	return t == 1 ? &ui_theme_light : &ui_theme_dark;
+	return Read_SET_info(assress_theme) == 1 ? &ui_theme_light : &ui_theme_dark;
 }
 
 void ui_init(const struct ui_theme *theme)
 {
-	u16 accent = UI_ACCENT_THEME;
 	memset(&ui, 0, sizeof(ui));
 	ui_core_reset();
-	if (!theme)
-		theme = ui_theme_setting(&accent);
-	ui_theme_select(theme, accent);
+	ui_theme_select(theme ? theme : ui_theme_setting());
 	input_init(&ui.in, &ui_theme()->input);
 	// Keys already held (from the screen before) count as held, not pressed
 	input_poll(&ui.in, 1);
-	ui.palette = res_palette(RES_BG_PAL, 2, TAG_PALETTE);
+	ui.palette = res_palette(RES_BG_PAL, UI_BANKS, TAG_PALETTE);
 	TLOG_ASSERT(ui.palette != RES_NONE && res_start(RES_BG_PAL, ui.palette) == 0);
-	// A wallpaper left among the maps goes first, as before a push
-	// (sdtheme.h): the staging map and block 2's tiles take the top
-	ui_wallpaper_yield();
 	for (u32 cb = 0; cb < 3; cb++) {
 		// Blocks 0's and 1's at their bottom, block 2's at the top of its
 		// reach, so they don't split the long runs lists need: block 1's
@@ -1024,7 +1005,6 @@ void ui_init(const struct ui_theme *theme)
 	TLOG_ASSERT(ui.stage_map != RES_NONE);
 	ui.stage = res_bg_addr(ui.stage_map);
 	ui_dim_set_minutes(ui_dim_setting());
-	ui_wallpaper_setup();
 	load_palette();
 	gfx_set_dispcnt(DISP_MODE0_OBJ1D | DISP_OBJ);
 	ui.active = 1;
@@ -1062,33 +1042,7 @@ struct ui_view *ui_push(const struct ui_view_spec *spec, void *ctx)
 		ui_set_error("view %s: failed for a test (ui_push_fail_test)", spec->name);
 		return 0;
 	}
-	u32 d3;
-	u16 wall;
-	int wall_up = ui_wallpaper_bgcnt(&wall);
-	int wall_shown = wall_up && !plane_owner(3, &d3);
-	// Among the maps, the wallpaper goes before the view takes any (sdtheme.h)
-	ui_wallpaper_yield();
 	struct ui_view *v = ui_core_push(spec, ctx);
-	// A screen the SD theme breaks (patches, row height) gets its base theme
-	const struct ui_theme *base = v ? 0 : ui_theme_fallback_base();
-	if (base) {
-		const struct ui_theme *sd_theme = ui_theme();
-		u16 accent = ui_accent();
-		ui_theme_set(base, accent);
-		v = ui_core_push(spec, ctx);
-		if (v)
-			ui_theme_fell_back(ui_error());
-		else
-			ui_theme_set(sd_theme, accent);
-	}
-	if (wall_up && !ui_wallpaper_bgcnt(&wall)) {
-		// It goes up again where it fits once regs are in. If it showed, the
-		// view waits as after a pop and draws once regs without the
-		// wallpaper are committed, or its tiles would show on plane 3
-		ui.wall_retry = 1;
-		if (wall_shown)
-			ui.pop_wait = 1;
-	}
 	if (!v)
 		return 0;
 	// Its maps are cleared and drawn once nothing popped shows their VRAM.
@@ -1122,7 +1076,6 @@ void ui_hook_popped(u8 planes)
 	} else {
 		ui.pop_wait = 1;
 	}
-	ui.wall_retry = 1;
 	keyq_drop_queued(&ui.keys);
 	// A dialog pushed next keeps the dim this one left (a menu replaced by a
 	// question); the next frame forgets it
@@ -1297,16 +1250,6 @@ u32 ui_frame(void)
 	top = ui_top();
 	if (top && !(top->flags & UI_V_SHOWN))
 		frame_wake();
-	// Once nothing popped shows its VRAM any more (sdtheme.h), in a frame of
-	// its own: not with a new view's drawing
-	if (ui.wall_retry) {
-		if (!ui.pop_wait && (!top || (top->flags & UI_V_SHOWN)) && !gfx_queue_len()) {
-			ui.wall_retry = 0;
-			if (ui_wallpaper_setup())
-				frame_measure("ui-wallpaper");
-		}
-		frame_wake();
-	}
 	if (!frame_idle()) {
 		jobs_run(JOB_DEADLINE);
 		frame_split();  // jobs
