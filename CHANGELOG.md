@@ -6,6 +6,15 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** home is the carousel: the items' objects on a ring of affine
+  sprites seen from above, the front one lowest and largest, the others
+  smaller and fogged toward the backdrop, over soft ground shadows; the
+  backdrop takes the facing item's tint over a low horizon; under the ring
+  the item's icon, name and count, and a dot per item. LEFT/RIGHT turn in 10
+  frames, a held key glides, the ring wraps, and four or fewer items each
+  show once at rest; A opens the facing item. The red torii glyph sits top
+  left and the clock top right (B12; `e6fdd7c`, `0a5afe8`, `db631eb`,
+  `d080e82`).
 - **Added:** the Info page: Controls, In game, Your cart and About open
   reading pages (UP/DOWN scroll, L/R page, B back); In game follows the
   hotkey settings as games are patched; Your cart shows what the card, NOR
