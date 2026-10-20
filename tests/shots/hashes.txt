@@ -237,9 +237,32 @@ info-read/frames 13-13 6FB49346DC4823FA
 info-read/frames 14-22 54C881529D44B1FA
 nav-push-fail/error 8DA1D73368B07BC5
 nav-push-fail/page B62B7D8B2814CB3F
+nor-dark/closed 103858B351148F30
+nor-dark/delete A519865C050A00F3
+nor-dark/page 103858B351148F30
+nor-dark/popup EC4C702F27808839
+nor-empty/page D44A4EAE0EFBB59E
 nor-launch-fail/back 8F72D70C3D1C3CBE
 nor-launch-fail/error D7AF97C28CF37374
 nor-launch-fail/later 8F72D70C3D1C3CBE
+nor-many/format 41AE8FF625FAB1C6
+nor-many/info 51A8F7D6E43FD19E
+nor-many/last 23F86A67C7175154
+nor-many/wrapped 63605A1D5DBF4C64
+nor-page/cancelled 1C38372849AAC6C4
+nor-page/confirm 6F15E2D599B096BC
+nor-page/down 580DA092DAB62C4F
+nor-page/format 1C38372849AAC6C4
+nor-page/page 4983C783D2F371B6
+nor-page/popup 6E3D2E9C10BBA5E8
+nor-page/frames 0-0 4983C783D2F371B6
+nor-page/frames 1-1 1934C189E771A55E
+nor-page/frames 2-2 6C87DB47A740880F
+nor-page/frames 3-3 3F9FF60AE71655FA
+nor-page/frames 4-5 29B212327BA60947
+nor-page/frames 6-12 580DA092DAB62C4F
+nor-page/frames 13-13 4B476809DBED488E
+nor-page/frames 14-17 1C38372849AAC6C4
 nor-write/done 3B8472BCA67DAA9D
 nor-write/half C18C045DA0E5C751
 page-empty/back 2BF873AFA4C47009

@@ -64,7 +64,8 @@ new_cart() {
   OMEGA_DIR=$cart emu/build-linux/mgba-shot "$kernel" -f 1 >/dev/null 2>&1
   [ "$(tail -c +$((0x7C00A0 + 1)) "$cart/kernel-nor.bin" | head -c 12)" = "TORII LOADER" ] ||
     bad "the emulator didn't seed the loader"
-  settings 26=2
+  # Logging on, and Start on Home: the NOR page's routes start from home
+  settings 26=2 32=2
   seeded=$(loader)
 }
 
@@ -122,15 +123,19 @@ logged() { [ $ok = 0 ] || grep -qF -- "$1" "$log" || bad "power-on $runs didn't 
 
 # The writes, as the pages will run them (actions.c, through tests/nav.sh's
 # hook), from frame 200 (logging slows the boot): WRITE TO NOR CLEAN of A.gba
-# or B.gba, delete latest, FORMAT ALL, Test.gba launched with SAVE TYPE
-# Flash 128K, and Diagnostics from L+R+SELECT at power-on with its questions
-# skipped. The Settings page's saves come back with B16, and the NOR page's
-# questions answered no with B15: until then their cases say SKIP (the
-# settings sector's write still runs, from a first WRITE TO NOR).
+# or B.gba, Test.gba launched with SAVE TYPE Flash 128K, and Diagnostics
+# from L+R+SELECT at power-on with its questions skipped; and through the
+# NOR page's keys, delete latest (the popup's Delete on B.gba, then Delete)
+# and FORMAT ALL (Format all, then Format), each also answered no. The
+# Settings page's saves come back with B16: until then their cases say SKIP
+# (the settings sector's write still runs, from a first WRITE TO NOR).
 write_a=$(nav_launch /A.gba nor at=200)
 write_b=$(nav_launch /B.gba nor at=200)
-delete=$(nav_nor_delete at=200)
-format=$(nav_nor_format at=200)
+# (each waits for the page to come back after the action, then 30 frames)
+delete="$(nav_nor_delete_page 1 yes) $(_nav_file '-w "nav: page nor ready"' '-k @30:-')"
+delete_no="$(nav_nor_delete_page 1 no) $(_nav_file '-w "nor: delete 1: cancelled"' '-k @30:-')"
+format="$(nav_nor_format_page yes) $(_nav_file '-w "nav: page nor ready"' '-k @30:-')"
+format_no="$(nav_nor_format_page no) $(_nav_file '-w "nor: format: cancelled"' '-k @30:-')"
 launch=$(nav_launch /Test.gba save=5 at=200)
 # (A starts it once its first page is up, and the keys held at power-on,
 # let go at frame 60, are up too.)
@@ -195,25 +200,32 @@ EOF
     new_cart nor-delete
     boot $write_a -f 700
     boot $write_b -f 700
-    boot $delete -f 500
+    boot $delete_no
+    [ $ok = 0 ] || ! grep -qE 'nor: deleting|nor: list saved' "$log" || bad "B on the delete question wrote the NOR"
+    boot $delete
     logged "nor: deleting B.gba"
     logged "nor: list saved, 1 games"
-    pass "delete latest"
+    pass "delete latest, from the NOR page (and answered no first)"
   fi
 
   # FORMAT ALL
   if shard_case; then
     new_cart nor-format
     boot $write_a -f 700
-    boot $format -f 900
+    boot $format
     logged "nor: erased the game NOR"
     logged "nor: list saved, 0 games"
-    pass "FORMAT ALL"
+    pass "FORMAT ALL, from the NOR page"
   fi
 
   # FORMAT ALL answered with B: nothing is erased or written
   if shard_case; then
-    echo "SKIP (waiting for B15): the NOR page's FORMAT ALL question answered no"
+    new_cart nor-format-no
+    boot $write_a -f 700
+    boot $format_no
+    logged "nor: format: cancelled"
+    [ $ok = 0 ] || ! grep -qE 'nor: erased|nor: list saved' "$log" || bad "B on the format question wrote the NOR"
+    pass "the NOR page's FORMAT ALL question answered no"
   fi
 
   if shard_case; then

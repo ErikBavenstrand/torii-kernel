@@ -1,0 +1,27 @@
+# The NOR page with more games than its card shows (dark): six games of 128
+# KB to 32 MB, the scroll bar, DOWN past the fourth row scrolling the list,
+# on to Format all after the last game, DOWN again wrapping to the first
+# (a page change), and Game info on the last game.
+#! nor-game "Advance Wars (USA).gba" 0x800000 tests/roms/hello/hello.gba
+#! nor-game "Golden Sun (USA).gba" 0x800000 tests/roms/hello/hello.gba
+#! nor-game "Kirby - Nightmare in Dream Land (USA).gba" 0x800000 tests/roms/hello/hello.gba
+#! nor-game "Mario Kart - Super Circuit (USA).gba" 0x400000 tests/roms/hello/hello.gba
+#! nor-game "Mother 3 (Japan) (Translated En).gba" 0x2000000 tests/roms/hello/hello.gba
+#! nor-game "Tiny.gba" 0x20000 tests/roms/hello/hello.gba
+-w "nav: home ready"
+-k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:LEFT -k @28:- -k @32:A -k @36:-
+-w "nav: page nor ready"
+-k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:DOWN -k @48:- -k @56:DOWN -k @60:-
+-w "nor: row 5"
+-s @30:last.png
+-k @36:DOWN -k @40:-
+-s @60:format.png
+-k @66:DOWN -k @70:-
+-s @100:wrapped.png
+-k @110:UP -k @114:- -k @126:UP -k @130:-
+-w "nor: row 5"
+-k @30:START -k @34:-
+-w "screen ready: popup"
+-k @8:DOWN -k @12:- -k @20:A -k @24:-
+-w "screen ready: dialog"
+-s @10:info.png

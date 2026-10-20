@@ -701,9 +701,13 @@ static void storage_draw(u8 node)
 	u32 x = 0;
 	for (u32 i = 0; i < st->count && st->total; i++) {
 		sum += st->parts[i];
-		u32 end = sum >= st->total ? w : (u32)(sum * w / st->total);
-		if (end > x)
-			round_bar(&win, 0, top, w, bh, r, shades[i % 3], x, end);
+		u32 end = sum >= st->total ? w : (u32)(sum * w / st->total), shown = end;
+		// A part under a pixel still shows one (a 128 KB game of 64 MB); the
+		// next part starts where this one really ends, so they don't add up
+		if (st->parts[i] && shown <= x && x < w)
+			shown = x + 1;
+		if (shown > x)
+			round_bar(&win, 0, top, w, bh, r, shades[i % 3], x, shown);
 		x = end;
 	}
 	if (!paint_end(node, &st->paint, set, UI_BANK_ALERT))

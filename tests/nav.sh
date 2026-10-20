@@ -20,6 +20,17 @@
 # Routes into a page (a file on the SD card page, a game's popup, a Settings
 # row) come with the page's ticket: until then they fail, saying which one.
 #
+# The NOR page's (B15), each from power-on through nav_to nor:
+#   nav_nor_game INDEX         the cursor on game INDEX (0 the first written),
+#                              waiting there
+#   nav_nor_open INDEX ITEM    then START and the popup's ITEM: launch, info or
+#                              delete (A on it once the popup is up)
+#   nav_nor_launch_page INDEX [hard]  A on game INDEX (hard: L held, a hard reset)
+#   nav_nor_delete_page INDEX yes|no  the popup's Delete, then the confirmation
+#                              answered: yes chooses Delete, no is B (Cancel)
+#   nav_nor_format_page yes|no UP from the first row to Format all, A, and the
+#                              confirmation answered the same way
+#
 # nav_launch PATH [HOW] [save=N] [hard] [at=FRAME]: the menu runs a launch
 # through actions.c (action_launch) once it is up and still, as a page will:
 # the tests' hook (nav.h). HOW: clean (CLEAN BOOT, the default), addon
@@ -102,7 +113,81 @@ nav_to() {
 # Routes into pages, until their tickets land
 nav_file() { _nav_fail "the SD card page's files come with B14 (nav_file $*)"; }
 nav_game() { _nav_fail "the game lists come with B13 (nav_game $*)"; }
-nav_nor_game() { _nav_fail "the NOR page's games come with B15 (nav_nor_game $*)"; }
+
+# The NOR page's routes (B15; the top says what each does). They start from
+# home: on a cart that may have been left on a page for 5 s (Last place),
+# set Start on to Home first (slot 32 = 2).
+
+# _nav_nor_to INDEX: the lines from power-on to game INDEX
+_nav_nor_to() {
+  local index=$1 keys=() i
+  for ((i = 0; i < index; i++)); do keys+=(DOWN); done
+  printf '%s\n' '-w "nav: home ready"' "$(_nav_keys 8 LEFT LEFT LEFT A)" '-w "nav: page nor ready"'
+  if [ "$index" -gt 0 ]; then
+    _nav_keys 8 "${keys[@]}"
+    printf -- '-w "nor: row %d"\n' "$index"
+  fi
+}
+
+# _nav_answer yes|no: the lines answering a confirmation once it is up
+_nav_answer() {
+  printf '%s\n' '-w "screen ready: confirm"'
+  case $1 in
+  yes) _nav_keys 8 RIGHT A ;;
+  no) _nav_keys 8 B ;;
+  *)
+    echo "nav.sh: answer yes or no, not $1" >&2
+    return 1
+    ;;
+  esac
+}
+
+nav_nor_game() {
+  _nav_file "$(_nav_nor_to "$1")"
+}
+
+nav_nor_open() {
+  local index=$1 item=$2 downs=()
+  case $item in
+  launch) ;;
+  info) downs=(DOWN) ;;
+  delete) downs=(DOWN DOWN) ;;
+  *)
+    _nav_fail "no NOR popup item $item"
+    return 1
+    ;;
+  esac
+  _nav_file "$(_nav_nor_to "$index")" "$(_nav_keys 8 START)" '-w "screen ready: popup"' \
+    "$(_nav_keys 8 "${downs[@]}" A)"
+}
+
+nav_nor_launch_page() {
+  local keys
+  keys=$(_nav_keys 8 A)
+  # L held, then A with it
+  [ "${2:-}" = hard ] && keys='-k @8:L -k @16:L+A -k @20:-'
+  _nav_file "$(_nav_nor_to "$1")" "$keys"
+}
+
+nav_nor_delete_page() {
+  local answer
+  if ! answer=$(_nav_answer "${2:-}"); then
+    _nav_fail "nav_nor_delete_page INDEX yes|no"
+    return 1
+  fi
+  _nav_file "$(_nav_nor_to "$1")" "$(_nav_keys 8 START)" '-w "screen ready: popup"' \
+    "$(_nav_keys 8 DOWN DOWN A)" "$answer"
+}
+
+nav_nor_format_page() {
+  local answer
+  if ! answer=$(_nav_answer "${1:-}"); then
+    _nav_fail "nav_nor_format_page yes|no"
+    return 1
+  fi
+  _nav_file "$(_nav_nor_to 0)" "$(_nav_keys 8 UP)" '-w "nor: row format"' "$(_nav_keys 8 A)" "$answer"
+}
+
 nav_setting() { _nav_fail "the Settings page's rows come with B16 (nav_setting $*)"; }
 
 # nav_info_page PAGE: from power-on to one of the Info page's rows opened

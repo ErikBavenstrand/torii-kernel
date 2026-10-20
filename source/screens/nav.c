@@ -14,6 +14,7 @@
 #include "nav.h"
 #include "home.h"
 #include "info.h"
+#include "nor.h"
 #include "../actions.h"
 #include "../ezkernel.h"
 #include "../Ezcard_OP.h"
@@ -57,6 +58,7 @@ static struct {
 	u8 engine;     // the menu's engine session is up, a screen showing
 	u8 open;       // home's A: the item to open + 1, after the frame
 	u8 back;       // a page's B: home, after the frame
+	u8 reshow;     // nav_reshow: the page again, after its action
 	u8 announced;  // "nav: ... ready" logged for this place
 	u8 h24;        // the clock shows 24 hours
 	u8 boot_flush_tried;  // the boot position's idle write was tried this idle spell
@@ -239,7 +241,7 @@ static const struct nav_page empty_page = {empty_enter, 0, empty_clock, 0};
 // Each item's page: a page ticket puts its own here
 static const struct nav_page *const pages[NAV_ITEMS] = {
 	[NAV_RECENT] = &empty_page, [NAV_FAV] = &empty_page, [NAV_GBA] = &empty_page, [NAV_GBC] = &empty_page,
-	[NAV_GB] = &empty_page,     [NAV_NES] = &empty_page, [NAV_SD] = &empty_page,  [NAV_NOR] = &empty_page,
+	[NAV_GB] = &empty_page,     [NAV_NES] = &empty_page, [NAV_SD] = &empty_page,  [NAV_NOR] = &nor_page,
 	[NAV_SET] = &empty_page,    [NAV_INFO] = &info_page,
 };
 
@@ -387,6 +389,11 @@ void nav_back(void)
 	nav.back = 1;
 }
 
+void nav_reshow(void)
+{
+	nav.reshow = 1;
+}
+
 void nav_defer(void (*fn)(u32 arg), u32 arg)
 {
 	nav.deferred = fn;
@@ -414,14 +421,17 @@ static void after_action(void)
 {
 	if (!ui_active())
 		nav.engine = 0;
-	if (!nav.engine) {
-		// In from black; a page whose item the action hid (the last game
-		// of a console deleted) gives home facing the nearest item
+	if (!nav.engine || nav.reshow) {
+		// In from black, or faded (nav_reshow); a page whose item the
+		// action hid (the last game of a console deleted) gives home facing
+		// the nearest item
+		u32 kind = nav.engine ? UI_TR_FADE : UI_TR_LEAVE;
 		struct registry_place p = nav.place;
+		nav.reshow = 0;
 		count_items();
 		if (p.open && registry_index(nav.shown, nav.shown_count, p.item) >= nav.shown_count)
 			p.open = 0;
-		show(&p, UI_TR_LEAVE, 0);
+		show(&p, kind, 0);
 		return;
 	}
 	count_items();
@@ -477,6 +487,7 @@ static void test_hook(void)
 		tlog_error("nav: no test action %lu", (unsigned long)action);
 		break;
 	}
+	nav.reshow = nav.place.open;  // a page shows what the action changed
 	after_action();
 }
 

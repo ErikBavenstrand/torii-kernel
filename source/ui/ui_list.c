@@ -101,6 +101,7 @@ struct list_state {
 	u8 page;
 	u8 sel_ok;  // the rows show the selection at sel_drawn
 	u8 plain;   // UI_LIST_PLAIN: nothing shows as selected
+	u8 unmarked;  // ui_list_mark(node, 0): the sprite pill is hidden for now
 	u8 opaque;  // rows on their paper, the pill drawn under the selected one's text
 	u8 queued_a;  // A pressed during a page change: dispatched once it is drawn
 	u8 predrawn;  // a page change's rows are all in the cache
@@ -686,6 +687,17 @@ static void autoscroll(u8 node, struct list_state *st, u32 dt)
 	ui_dispatching = was;
 }
 
+void ui_list_mark(u8 node, int shown)
+{
+	struct list_state *st = ui_node_state(node);
+	st->unmarked = !shown;
+	// The row's name scrolls only while it shows as chosen: back to its start
+	marquee_reset(node, st);
+	if (st->unmarked)
+		st->mq = MQ_OFF;
+	ui_wake();  // the pill's sprites change with the next update
+}
+
 u32 ui_list_cursor(u8 node)
 {
 	return ((const struct list_state *)ui_node_state(node))->cursor;
@@ -844,7 +856,7 @@ static void row_icon8(const struct text_window *win, u32 x, u32 y, const u32 *ic
 
 static void marquee_tick(u8 node, struct list_state *st, u32 dt)
 {
-	if (st->mq == MQ_OFF || st->page != PAGE_NONE || st->shown != st->base + FIX_ROUND(st->spring))
+	if (st->mq == MQ_OFF || st->unmarked || st->page != PAGE_NONE || st->shown != st->base + FIX_ROUND(st->spring))
 		return;
 	const struct ui_theme *t = ui_theme();
 	if (st->mq_wait > dt) {
@@ -933,7 +945,7 @@ static void keep_resting(u8 node, struct list_state *st)
 // 1 if the pill shows: a sprite pill on a list that shows its page
 static int pill_shown(u8 node, const struct list_state *st)
 {
-	return st->pill != RES_NONE && st->count && ui_node_shown(node) && ui_plane_owned(node) &&
+	return st->pill != RES_NONE && st->count && !st->unmarked && ui_node_shown(node) && ui_plane_owned(node) &&
 	       (st->page == PAGE_NONE || st->page == PAGE_FADING);
 }
 

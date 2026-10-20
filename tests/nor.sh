@@ -31,6 +31,10 @@ head -c $((64 << 20)) /dev/urandom >"$cart/game-nor.bin"
 mkfs.fat -C -F 32 -n NOR "$cart/sd.img" 65536 >/dev/null
 mcopy -i "$cart/sd.img" "$hello" ::/Hello.gba
 mcopy -i "$cart/sd.img" "$world" ::/World.gba
+# Start on Home (slot 32 = 2): a NOR launch leaves Last place on the NOR
+# page, and the page's routes start from home
+head -c $((8 << 20)) /dev/zero | tr '\0' '\377' >"$cart/kernel-nor.bin"
+printf '\002\000' | dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7B0000 + 2 * 32)) conv=notrunc status=none
 
 fail() {
   echo "FAIL: $*" >&2
@@ -86,9 +90,9 @@ hex_at() { # file offset -> 5 bytes as hex
 boot 1-write $(nav_launch /Hello.gba nor at=130) -s 400:$shots/1-nor-list.png -f 400
 nor_holds 0 "$hello" || fail "Hello.gba was not written to NOR at 0"
 
-# Power-on 2: boot Hello, the NOR's first game.
+# Power-on 2: boot Hello, the NOR's first game: A on the NOR page.
 # shellcheck disable=SC2046
-boot 2-hello $(nav_nor_launch 0 at=130) -s 500:$shots/2-hello.png -f 500
+boot 2-hello $(nav_nor_launch_page 0) -w "launch: loading Hello.gba from NOR" -s @300:$shots/2-hello.png
 grep -q 'mode game from NOR offset 000000$' "$cart/2-hello.log" || fail "Hello did not boot from NOR at 0"
 [ "$(hex_at "$cart/sram.bin" 0)" = 4f4d525801 ] || fail "Hello did not run from NOR (SRAM $(hex_at "$cart/sram.bin" 0))"
 
@@ -101,10 +105,11 @@ boot 3-write -k 100:A -k 104:- $(nav_launch /World.gba nor save=5 at=400) -s 380
 nor_holds 0x20000 "$world" || fail "World.gba was not written to NOR at 0x20000"
 nor_holds 0 "$hello" || fail "writing World.gba changed Hello.gba"
 
-# Power-on 4: World from NOR, reading its ROM on both sides of the 8 MB page.
+# Power-on 4: World from NOR (the page's second row), reading its ROM on
+# both sides of the 8 MB page.
 # shellcheck disable=SC2046
-boot 4-world $(nav_nor_launch 1 at=130) -m 500:0x080000A0:16 -m 500:0x087DFFF0:16 -m 500:0x087E0000:16 \
-  -m 500:0x0883FFF0:16 -s 500:$shots/4-world.png -f 500
+boot 4-world $(nav_nor_launch_page 1) -w "launch: loading World.gba from NOR" -m @300:0x080000A0:16 \
+  -m @300:0x087DFFF0:16 -m @300:0x087E0000:16 -m @300:0x0883FFF0:16 -s @300:$shots/4-world.png
 grep -q 'mode game from NOR offset 020000$' "$cart/4-world.log" || fail "World did not boot from NOR at 0x20000"
 rom_seen "$cart/4-world.log" "$world" 0xA0 0x7DFFF0 0x7E0000 0x83FFF0 || fail "World's ROM reads wrong from NOR"
 

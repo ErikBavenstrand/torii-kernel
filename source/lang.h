@@ -106,6 +106,44 @@ extern char *gl_pop_cancel_button;
 // The Info page (screens/info.h): by enum info_string
 extern char **gl_info;
 
+// The NOR page (screens/nor.h): sizes' units ("16 MB"), the storage line
+// ("40 MB used", "24 MB free of 64"), its rows, hints, popup and questions,
+// and Game info's save types (enum nor_save)
+extern char *gl_size_mb;
+extern char *gl_size_kb;
+extern char *gl_nor_used;
+extern char *gl_nor_free_of;
+extern char *gl_nor_empty;
+extern char *gl_nor_format;
+extern char *gl_nor_format_detail;
+extern char *gl_hint_launch;
+extern char *gl_hint_menu;
+extern char *gl_hint_format;
+extern char *gl_nor_launch;
+extern char *gl_nor_info;
+extern char *gl_nor_delete;
+extern char *gl_nor_delete_text;
+extern char *gl_nor_deleting;
+extern char *gl_nor_latest_only;
+extern char *gl_nor_format_ask;
+extern char *gl_nor_format_one;
+extern char *gl_nor_format_many;
+extern char *gl_nor_format_time;
+extern char *gl_nor_format_takes;
+extern char *gl_nor_format_button;
+extern char *gl_nor_states;
+extern char *gl_nor_changed;
+enum nor_save {
+	NOR_SAVE_NONE,
+	NOR_SAVE_SRAM,
+	NOR_SAVE_EEPROM_512,
+	NOR_SAVE_EEPROM_8K,
+	NOR_SAVE_FLASH_64K,
+	NOR_SAVE_FLASH_128K,
+	NOR_SAVES,
+};
+extern char **gl_nor_saves;
+
 extern u32 gl_lang; // index of the current language in lang_packs
 
 void LoadEnglish(void);
