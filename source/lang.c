@@ -200,7 +200,7 @@ const char en_ago_month[] = "1 month";
 const char en_ago_months[] = " months";
 const char en_ago_year[] = "1 year";
 const char en_ago_years[] = " years";
-struct userdata_ago_words gl_ago;
+struct userdata_ago_words gl_ago EWRAM_BSS;
 
 const char en_cart[] = "     CART";
 const char en_clock[] = "CLOCK";
