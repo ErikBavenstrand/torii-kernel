@@ -47,12 +47,14 @@ int gamename_cmp(const char *a, const char *b);
 // bytes) must hold names[self]'s cleaned name (gamename_display's
 // GAMENAME_CLEAN result) on entry; returns its new length, never past
 // GAMENAME_MAX. Each keeps the tags that tell it apart from the others
-// ("Pokemon Emerald (USA)", "Pokemon Emerald (Europe)"); a name with no
+// ("Pokemon Emerald (USA)", "Pokemon Emerald (Europe)"), each in
+// parentheses whatever its brackets ("[!]" shows as "(!)"); a name with no
 // tag where the other has one keeps none; a tag in the kept-tags table
 // (gamename.c: Rev, Beta, Proto, ...) is preferred over an earlier
-// difference. Two names with the same tags add their folder's name; that
-// doesn't separate two folders of the same name (/A/X and /B/X), which
-// stay alike. The caller groups the colliding names of one console (never
+// difference. Names with the same tags add their folder's name when the
+// other is in another folder and their extension when it is in the same
+// one; two folders of the same name (/A/X and /B/X) stay alike. The caller
+// groups the colliding names of one console (never
 // across consoles: sort with gamename_cmp, then take runs where
 // gamename_same) and calls this once per member; with count 1 out stays as
 // it is. One call scans the tags of all count names.
@@ -90,28 +92,39 @@ u32 gamename_custom_parse(struct gamename_custom *c, const char *text, u32 len, 
 const char *gamename_custom_get(const struct gamename_custom *c, const char *path, u32 *len);
 
 // Writes the whole names file with path's name changed into out (cap
-// bytes) and returns its length, or GAMENAME_TOO_BIG when it doesn't fit or
-// c isn't complete (writing would lose names). name NULL or blank removes
-// path's line; control characters in name become spaces, and it is trimmed
-// and cut to GAMENAME_MAX bytes. To follow a renamed file, get the old
-// path's name, set it on the new path, parse the result and remove the old.
-// out must not overlap c->text, which is read while out is written.
-#define GAMENAME_TOO_BIG 0xFFFFFFFFu
+// bytes) and returns its length, or one of the codes below. name NULL or
+// blank removes path's line; control characters in name become spaces, and
+// it is trimmed and cut to GAMENAME_MAX bytes. out must not overlap
+// c->text, which is read while out is written.
+#define GAMENAME_TOO_BIG 0xFFFFFFFFu  // the file doesn't fit in cap bytes
+#define GAMENAME_INCOMPLETE 0xFFFFFFFEu  // c isn't complete: writing would lose names
+#define GAMENAME_BAD_PATH 0xFFFFFFFDu  // not from the root, or holds a tab or line break
+#define GAMENAME_UNCHANGED 0xFFFFFFFCu  // gamename_custom_move: nothing to move
+#define GAMENAME_FAILED(len) ((len) >= GAMENAME_UNCHANGED)
 u32 gamename_custom_set(const struct gamename_custom *c, const char *path, const char *name, char *out, u32 cap);
+
+// The same for a renamed file (B18): old_path's name moves to new_path (in
+// one pass, replacing any name new_path had). GAMENAME_UNCHANGED when
+// old_path has no custom name: then there is nothing to write.
+u32 gamename_custom_move(const struct gamename_custom *c, const char *old_path, const char *new_path, char *out,
+			 u32 cap);
 
 // How the names file reaches the card, so the safe write (B5's temporary
 // file and rename) plugs in without touching the format code.
 struct gamename_io {
 	// Reads the whole file into buf (cap bytes): its length, 0 when it
 	// doesn't exist, GAMENAME_IO_FAIL when it can't be read or is longer.
+	// A length of cap counts as a failure too (the file may go on), so give
+	// it a buffer larger than any names file it accepts.
 	u32 (*read)(char *buf, u32 cap);
 	// Replaces the file with len bytes of buf: 1 when done.
 	int (*write)(const char *buf, u32 len);
 };
 #define GAMENAME_IO_FAIL 0xFFFFFFFFu
 
-// Reads the file into buf (cap bytes) and parses it into c. A failed read
-// leaves c empty and not complete, so no later set overwrites the file.
+// Reads the file into buf (cap bytes) and parses it into c. A failed read,
+// or one that fills buf, leaves c empty and not complete, so no later set
+// overwrites the file.
 // Returns c->count.
 u32 gamename_custom_load(struct gamename_custom *c, const struct gamename_io *io, char *buf, u32 cap, u32 *line,
 			 u32 line_cap);
@@ -120,6 +133,11 @@ u32 gamename_custom_load(struct gamename_custom *c, const struct gamename_io *io
 // indexes the old text; load again to see the change.
 int gamename_custom_store(const struct gamename_custom *c, const struct gamename_io *io, const char *path,
 			  const char *name, char *out, u32 cap);
+
+// gamename_custom_move into out, then writes it: 1 when written or when
+// there was nothing to move.
+int gamename_custom_store_move(const struct gamename_custom *c, const struct gamename_io *io, const char *old_path,
+			       const char *new_path, char *out, u32 cap);
 
 // --- The display name --------------------------------------------------------
 

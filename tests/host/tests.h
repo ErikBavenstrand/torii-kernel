@@ -112,6 +112,7 @@ void test_gamename_clean_limits(void);
 void test_gamename_dedupe(void);
 void test_gamename_custom_parse(void);
 void test_gamename_custom_set(void);
+void test_gamename_custom_move(void);
 void test_gamename_custom_io(void);
 void test_gamename_display(void);
 void test_gamename_hidden(void);

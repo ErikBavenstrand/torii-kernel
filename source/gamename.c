@@ -348,24 +348,35 @@ static int tag_kept(const struct tags *t, u32 k)
 	return 0;
 }
 
-// Appends a space and len bytes of s to out (holding *n bytes), in
-// parentheses if brackets, with s cut at a character boundary to fit
-// GAMENAME_MAX; nothing when none of s fits
-static void append(char *out, u32 *n, const char *s, u32 len, int brackets)
+// Appends a space and len bytes of s in parentheses to out (holding *n
+// bytes), with underscores as spaces if spaces, and s cut at a character
+// boundary to fit GAMENAME_MAX; nothing when none of s fits
+static void append(char *out, u32 *n, const char *s, u32 len, int spaces)
 {
-	u32 extra = brackets ? 3 : 1, room = GAMENAME_MAX - *n;
-	if (room <= extra)
+	u32 room = GAMENAME_MAX - *n;
+	if (room <= 3)
 		return;
-	len = utf8_cut(s, len, room - extra);
+	len = utf8_cut(s, len, room - 3);
 	if (len == 0)
 		return;
 	out[(*n)++] = ' ';
-	if (brackets)
-		out[(*n)++] = '(';
+	out[(*n)++] = '(';
 	for (u32 i = 0; i < len; i++)
-		out[(*n)++] = s[i];
-	if (brackets)
-		out[(*n)++] = ')';
+		out[(*n)++] = spaces && s[i] == '_' ? ' ' : s[i];
+	out[(*n)++] = ')';
+}
+
+// 1 if two paths are in the same folder (without ASCII case)
+static int same_folder(const char *a, const char *b)
+{
+	u32 alen = (u32)(base_of(a) - a), blen = (u32)(base_of(b) - b);
+	if (alen != blen)
+		return 0;
+	for (u32 i = 0; i < alen; i++) {
+		if (lower(a[i]) != lower(b[i]))
+			return 0;
+	}
+	return 1;
 }
 
 u32 gamename_dedupe(char *out, const char *const *names, u32 count, u32 self)
@@ -375,7 +386,7 @@ u32 gamename_dedupe(char *out, const char *const *names, u32 count, u32 self)
 	struct tags mine, other;
 	tags_of(&mine, names[self]);
 	u32 positions = 0;  // bit k: tag k tells this name from another
-	int same_tags = 0;
+	int same_folder_seen = 0, other_folder_seen = 0;  // among names with the same tags
 	for (u32 h = 0; h < count; h++) {
 		if (h == self)
 			continue;
@@ -390,27 +401,33 @@ u32 gamename_dedupe(char *out, const char *const *names, u32 count, u32 self)
 			if (kept < 0 && (tag_kept(&mine, k) || tag_kept(&other, k)))
 				kept = (int)k;
 		}
-		if (first < 0)
-			same_tags = 1;
-		else
+		if (first < 0) {
+			if (same_folder(names[self], names[h]))
+				same_folder_seen = 1;
+			else
+				other_folder_seen = 1;
+		} else
 			positions |= 1u << (kept >= 0 ? kept : first);
 	}
 	u32 n = (u32)strlen(out);
+	// Tags in parentheses whatever their brackets ("[!]" shows as "(!)"),
+	// with underscores as spaces where cleaning made them spaces
+	int spaces = strchr(mine.s, ' ') == NULL;
 	for (u32 k = 0; k < mine.count; k++) {
-		if (!(positions & (1u << k)))
-			continue;
-		append(out, &n, mine.s + mine.at[k], mine.len[k], 0);
+		if (positions & (1u << k))
+			append(out, &n, mine.s + mine.at[k] + 1, mine.len[k] - 2u, spaces);
 	}
-	if (same_tags) {
+	const char *name = names[self], *base = base_of(name);
+	if (other_folder_seen && base > name + 1) {
 		// The folder the name is in, if it isn't the root
-		const char *name = names[self], *end = base_of(name);
-		if (end > name + 1) {
-			const char *folder = end - 1;
-			while (folder > name && folder[-1] != '/')
-				folder--;
-			append(out, &n, folder, (u32)(end - 1 - folder), 1);
-		}
+		const char *folder = base - 1;
+		while (folder > name && folder[-1] != '/')
+			folder--;
+		append(out, &n, folder, (u32)(base - 1 - folder), 0);
 	}
+	const char *dot = strrchr(base, '.');
+	if (same_folder_seen && dot && dot > base)  // the same folder: the extension
+		append(out, &n, dot + 1, (u32)strlen(dot + 1), 0);
 	out[n] = 0;
 	return n;
 }
@@ -575,21 +592,17 @@ static int put_line(char *out, u32 cap, u32 *n, const char *path, u32 path_len, 
 	return put(out, cap, n, "\n", 1);
 }
 
-u32 gamename_custom_set(const struct gamename_custom *c, const char *path, const char *name, char *out, u32 cap)
+// Checks a path for names.txt: from the root, nothing that breaks a line
+static int path_ok(const char *path)
 {
-	u32 path_len = (u32)strlen(path);
-	if (!c->complete || path[0] != '/' || strpbrk(path, "\t\r\n"))
-		return GAMENAME_TOO_BIG;
-	// The new name, trimmed of spaces and control characters at both ends
-	u32 name_len = 0;
-	if (name) {
-		while (*name && ((unsigned char)*name <= ' ' || *name == 0x7F))
-			name++;
-		name_len = (u32)strlen(name);
-		while (name_len > 0 && ((unsigned char)name[name_len - 1] <= ' ' || name[name_len - 1] == 0x7F))
-			name_len--;
-		name_len = utf8_cut(name, name_len, GAMENAME_MAX);
-	}
+	return path[0] == '/' && !strpbrk(path, "\t\r\n");
+}
+
+// The whole names file into out without the lines of drop and path, and
+// with path named name (len bytes; none when 0)
+static u32 custom_edit(const struct gamename_custom *c, const char *drop, const char *path, const char *name,
+		       u32 name_len, char *out, u32 cap)
+{
 	u32 n = 0;
 	// Lines that aren't names (comments, notes) stay, first and in order
 	u32 at = c->len >= 3 && memcmp(c->text, "\xEF\xBB\xBF", 3) == 0 ? 3 : 0;
@@ -606,11 +619,11 @@ u32 gamename_custom_set(const struct gamename_custom *c, const char *path, const
 	for (u32 i = 0; i <= c->count; i++) {
 		int d = i < c->count ? path_cmp_key(c, c->line[i], path) : 1;
 		if (d > 0 && !placed) {
-			if (!put_line(out, cap, &n, path, path_len, name, name_len))
+			if (!put_line(out, cap, &n, path, (u32)strlen(path), name, name_len))
 				return GAMENAME_TOO_BIG;
 			placed = 1;
 		}
-		if (i == c->count || d == 0)
+		if (i == c->count || d == 0 || path_cmp_key(c, c->line[i], drop) == 0)
 			continue;
 		u32 from = c->line[i], len;
 		const char *tab = memchr(c->text + from, '\t', c->len - from);
@@ -621,11 +634,44 @@ u32 gamename_custom_set(const struct gamename_custom *c, const char *path, const
 	return n;
 }
 
+u32 gamename_custom_set(const struct gamename_custom *c, const char *path, const char *name, char *out, u32 cap)
+{
+	if (!path_ok(path))
+		return GAMENAME_BAD_PATH;
+	if (!c->complete)
+		return GAMENAME_INCOMPLETE;
+	// The new name, trimmed of spaces and control characters at both ends
+	u32 name_len = 0;
+	if (name) {
+		while (*name && ((unsigned char)*name <= ' ' || *name == 0x7F))
+			name++;
+		name_len = (u32)strlen(name);
+		while (name_len > 0 && ((unsigned char)name[name_len - 1] <= ' ' || name[name_len - 1] == 0x7F))
+			name_len--;
+		name_len = utf8_cut(name, name_len, GAMENAME_MAX);
+	}
+	return custom_edit(c, path, path, name, name_len, out, cap);
+}
+
+u32 gamename_custom_move(const struct gamename_custom *c, const char *old_path, const char *new_path, char *out,
+			 u32 cap)
+{
+	if (!path_ok(old_path) || !path_ok(new_path))
+		return GAMENAME_BAD_PATH;
+	if (!c->complete)
+		return GAMENAME_INCOMPLETE;
+	u32 len;
+	const char *name = gamename_custom_get(c, old_path, &len);
+	if (!name)
+		return GAMENAME_UNCHANGED;
+	return custom_edit(c, old_path, new_path, name, len, out, cap);
+}
+
 u32 gamename_custom_load(struct gamename_custom *c, const struct gamename_io *io, char *buf, u32 cap, u32 *line,
 			 u32 line_cap)
 {
 	u32 len = io->read(buf, cap);
-	if (len == GAMENAME_IO_FAIL || len > cap) {
+	if (len == GAMENAME_IO_FAIL || len >= cap) {  // a full buffer may have cut the file
 		gamename_custom_parse(c, NULL, 0, line, line_cap);
 		c->complete = 0;
 		return 0;
@@ -637,7 +683,16 @@ int gamename_custom_store(const struct gamename_custom *c, const struct gamename
 			  const char *name, char *out, u32 cap)
 {
 	u32 len = gamename_custom_set(c, path, name, out, cap);
-	return len != GAMENAME_TOO_BIG && io->write(out, len);
+	return !GAMENAME_FAILED(len) && io->write(out, len);
+}
+
+int gamename_custom_store_move(const struct gamename_custom *c, const struct gamename_io *io, const char *old_path,
+			       const char *new_path, char *out, u32 cap)
+{
+	u32 len = gamename_custom_move(c, old_path, new_path, out, cap);
+	if (len == GAMENAME_UNCHANGED)
+		return 1;
+	return !GAMENAME_FAILED(len) && io->write(out, len);
 }
 
 // --- The display name -----------------------------------------------------------

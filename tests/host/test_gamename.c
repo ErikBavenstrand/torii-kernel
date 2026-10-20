@@ -182,15 +182,27 @@ void test_gamename_dedupe(void)
 
 	// GoodTools dump tags
 	const char *dumps[] = {"/Game (U) [!].gba", "/Game (U) [b1].gba", "/Game [T+Eng].gba"};
-	check_dedupe(dumps, 3, 0, "Game (U) [!]");
-	check_dedupe(dumps, 3, 1, "Game (U) [b1]");
-	check_dedupe(dumps, 3, 2, "Game [T+Eng]");
+	check_dedupe(dumps, 3, 0, "Game (U) (!)");
+	check_dedupe(dumps, 3, 1, "Game (U) (b1)");
+	check_dedupe(dumps, 3, 2, "Game (T+Eng)");
+	// Underscores in a tag are spaces where cleaning made them spaces
+	const char *scene[] = {"/Game_[T+Eng_v1.0].gba", "/Game (U).gba", "/A Game [T+Eng_v2].gba", "/A Game.gba"};
+	check_dedupe(scene, 2, 0, "Game (T+Eng v1.0)");
+	check_dedupe(scene, 2, 1, "Game (U)");
+	check_dedupe(scene + 2, 2, 0, "A Game (T+Eng_v2)");
 
 	// Same tags: the folder tells them apart; the root adds none
 	const char *folders[] = {"/GBA/Hacks/Game (USA).gba", "/GBA/Game (USA).gba", "/Game (USA).gba"};
 	check_dedupe(folders, 3, 0, "Game (Hacks)");
 	check_dedupe(folders, 3, 1, "Game (GBA)");
 	check_dedupe(folders, 3, 2, "Game");
+	// In the same folder: the extension
+	const char *exts[] = {"/A/G.gb", "/a/G.gbc", "/B/G.gb", "/G.gb", "/G.gbc"};
+	check_dedupe(exts, 2, 0, "G (gb)");
+	check_dedupe(exts, 2, 1, "G (gbc)");
+	check_dedupe(exts, 3, 0, "G (A) (gb)");
+	check_dedupe(exts, 3, 2, "G (B)");
+	check_dedupe(exts + 3, 2, 0, "G (gb)");
 
 	// Underscores and case clean the same, so they collide too
 	const char *spelled[] = {"/Super_Game_(J).gba", "/super game (U).gba"};
@@ -273,10 +285,10 @@ static void check_set(struct custom *m, const char *path, const char *name, cons
 {
 	char out[1024];
 	u32 len = gamename_custom_set(&m->c, path, name, out, sizeof(out));
-	int ok = expected ? len == strlen(expected) && memcmp(out, expected, len) == 0 : len == GAMENAME_TOO_BIG;
+	int ok = expected ? len == strlen(expected) && memcmp(out, expected, len) == 0 : GAMENAME_FAILED(len);
 	if (!ok) {
 		tlog_error("FAIL %s: setting %s gives \"%.*s\", expected \"%s\"", __FILE__, path,
-			   len == GAMENAME_TOO_BIG ? 3 : (int)len, len == GAMENAME_TOO_BIG ? "BIG" : out,
+			   GAMENAME_FAILED(len) ? 6 : (int)len, GAMENAME_FAILED(len) ? "failed" : out,
 			   expected ? expected : "too big");
 		++torii_test_failures;
 	}
@@ -320,6 +332,9 @@ void test_gamename_custom_parse(void)
 	check_get(m, "/a", "A");
 	check_get(m, "/c", "C");
 	check_set(m, "/d", "D", NULL);  // would lose /b
+	char code[64];
+	CHECK_EQ(gamename_custom_set(&m->c, "/d", "D", code, sizeof(code)), GAMENAME_INCOMPLETE);
+	CHECK_EQ(gamename_custom_move(&m->c, "/a", "/d", code, sizeof(code)), GAMENAME_INCOMPLETE);
 
 	// A name past GAMENAME_MAX reads cut
 	char longest[400];
@@ -359,6 +374,10 @@ void test_gamename_custom_set(void)
 	check_set(m, "/b.gba", NULL, "");
 	check_set(m, "b.gba", "Bee", NULL);  // not a path from the root
 	check_set(m, "/b\t.gba", "Bee", NULL);
+	char code[64];
+	CHECK_EQ(gamename_custom_set(&m->c, "b.gba", "Bee", code, sizeof(code)), GAMENAME_BAD_PATH);
+	CHECK_EQ(gamename_custom_set(&m->c, "/b\n", "Bee", code, sizeof(code)), GAMENAME_BAD_PATH);
+	CHECK_EQ(gamename_custom_set(&m->c, "/b.gba", "Bee", code, 4), GAMENAME_TOO_BIG);
 
 	// Written back sorted, one line per path, the junk gone
 	custom_parse(m, "/c.gba\tSee\r\n# note\n/A.gba\tAy\n/a.gba\tAy two\n", GAMENAME_CUSTOM_MAX);
@@ -415,6 +434,34 @@ static int io_write(const char *buf, u32 len)
 	return 1;
 }
 
+// Moves old's name to new and checks the whole new file
+static void check_move(struct custom *m, const char *old, const char *new_path, const char *expected)
+{
+	char out[1024];
+	u32 len = gamename_custom_move(&m->c, old, new_path, out, sizeof(out));
+	if (len != strlen(expected) || memcmp(out, expected, len) != 0) {
+		tlog_error("FAIL %s: moving %s to %s gives \"%.*s\", expected \"%s\"", __FILE__, old, new_path,
+			   GAMENAME_FAILED(len) ? 6 : (int)len, GAMENAME_FAILED(len) ? "failed" : out, expected);
+		++torii_test_failures;
+	}
+}
+
+void test_gamename_custom_move(void)
+{
+	struct custom *m = calloc(1, sizeof(*m));
+	custom_parse(m, "# keep\n/a.gba\tAy\n/c.gba\tSee\n", GAMENAME_CUSTOM_MAX);
+	check_move(m, "/a.gba", "/b.gba", "# keep\n/b.gba\tAy\n/c.gba\tSee\n");
+	check_move(m, "/A.GBA", "/z/a.gba", "# keep\n/c.gba\tSee\n/z/a.gba\tAy\n");
+	check_move(m, "/a.gba", "/c.gba", "# keep\n/c.gba\tAy\n");  // replaces the name there
+	check_move(m, "/a.gba", "/A.gba", "# keep\n/A.gba\tAy\n/c.gba\tSee\n");  // only the case changes
+	char out[64];
+	CHECK_EQ(gamename_custom_move(&m->c, "/x.gba", "/y.gba", out, sizeof(out)), GAMENAME_UNCHANGED);
+	CHECK_EQ(gamename_custom_move(&m->c, "/a.gba", "y.gba", out, sizeof(out)), GAMENAME_BAD_PATH);
+	CHECK_EQ(gamename_custom_move(&m->c, "/a.gba", "/b.gba", out, 8), GAMENAME_TOO_BIG);
+	free(m->text);
+	free(m);
+}
+
 void test_gamename_custom_io(void)
 {
 	static const struct gamename_io io = {io_read, io_write};
@@ -445,6 +492,19 @@ void test_gamename_custom_io(void)
 	CHECK(!gamename_custom_store(&c, &io, "/c.gba", "See", out, sizeof(out)));
 	CHECK_EQ(io_writes, 2);
 	CHECK_EQ(io_len, strlen("/a.gba\tAy\n/b.gba\tBee\n"));
+	// Nor one that fills the buffer exactly: it may go on
+	CHECK_EQ(gamename_custom_load(&c, &io, buf, io_len, line, 8), 0);
+	CHECK(!c.complete);
+	CHECK_EQ(gamename_custom_load(&c, &io, buf, io_len + 1, line, 8), 2);
+
+	// A renamed file takes its name along, in one write
+	CHECK(gamename_custom_store_move(&c, &io, "/a.gba", "/z.gba", out, sizeof(out)));
+	CHECK_EQ(io_writes, 3);
+	CHECK(io_len == strlen("/b.gba\tBee\n/z.gba\tAy\n") &&
+	      memcmp(io_file, "/b.gba\tBee\n/z.gba\tAy\n", io_len) == 0);
+	CHECK_EQ(gamename_custom_load(&c, &io, buf, sizeof(buf), line, 8), 2);
+	CHECK(gamename_custom_store_move(&c, &io, "/nothing.gba", "/y.gba", out, sizeof(out)));
+	CHECK_EQ(io_writes, 3);  // nothing to move: nothing written
 }
 
 void test_gamename_display(void)
