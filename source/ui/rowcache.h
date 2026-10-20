@@ -21,7 +21,7 @@
 #include <gba_base.h>
 
 // Bytes of row pixels the kernel's cache holds: about 12 full-width 16 px
-// rows (1,920 bytes each), or 14 of 14 px
+// rows (1,920 bytes each), or 14 of B9's 14 px ones
 #define ROW_CACHE_BYTES (24 * 1024)
 #define ROW_CACHE_ENTRIES 32
 #define ROW_CACHE_HINTS 32  // a power of two

@@ -57,6 +57,9 @@ u32 frame_count(void);
 // screen's own and the UI's transition, say), each logged once.
 #define FRAME_MEASURES 4
 void frame_measure(const char *name);
+// Takes name off this frame's names (a measurement that another replaced in
+// this frame: the frame is the new one's).
+void frame_measure_drop(const char *name);
 // Marks the end of a stretch of the frame. The slowest of a run of
 // measured frames goes to mGBA's console (not the card, as frame-cycles
 // lines), on the first frame after them, as

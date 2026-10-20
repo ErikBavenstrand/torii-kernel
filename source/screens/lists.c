@@ -612,8 +612,12 @@ static u32 cursor(void)
 
 static void measure(const char *name, u32 frames)
 {
+	// This frame is the new measurement's, not the one it replaces
+	if (lists.measure_left && lists.measure != name)
+		frame_measure_drop(lists.measure);
 	lists.measure = name;
 	lists.measure_left = frames;
+	frame_measure(name);  // this frame too
 }
 
 static void count_update(u32 at)

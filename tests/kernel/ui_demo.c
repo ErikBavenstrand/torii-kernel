@@ -191,6 +191,9 @@ static void make_icons(void)
 
 static void measure(const char *name, u32 frames)
 {
+	// This frame is the new measurement's, not the one it replaces
+	if (demo.measure_left && demo.measure != name)
+		frame_measure_drop(demo.measure);
 	demo.measure = name;
 	demo.measure_left = frames;
 	frame_measure(name);  // this frame too

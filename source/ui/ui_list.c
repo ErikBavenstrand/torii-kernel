@@ -80,6 +80,7 @@ struct list_state {
 	u8 predrawn;  // a page change's rows are all in the cache
 	u8 keep_next; // the next slot keep_resting looks at; ring.k: done
 	u32 owner;    // its rows' owner in the row cache
+	u32 clears;   // cache_clears when its slots were last checked (keep_resting)
 	u32 count, rows;
 	u32 cursor;
 	u32 sel_drawn;  // the item whose map entries are in the selected bank
@@ -142,6 +143,7 @@ static const struct ui_list_config *config(u8 node)
 // The row cache every list shares
 static u32 cache_arena[ROW_CACHE_BYTES / 4] EWRAM_BSS ALIGN(4);
 static struct row_cache cache EWRAM_BSS;
+static u32 cache_clears EWRAM_BSS;  // ui_list_cache_clear calls
 
 static struct row_cache *row_cache(void)
 {
@@ -153,6 +155,7 @@ static struct row_cache *row_cache(void)
 void ui_list_cache_clear(void)
 {
 	row_cache_clear(row_cache());
+	cache_clears++;
 }
 
 static const u32 *cached_row(const struct list_state *st, u32 r)
@@ -447,6 +450,7 @@ void ui_list_reset(u8 node, u32 cursor)
 {
 	struct list_state *st = ui_node_state(node);
 	st->owner = row_cache_owner(row_cache());  // a new model: no row drawn yet
+	st->clears = cache_clears;
 	st->count = model_count(node);
 	st->rows = st->count;
 	if (cursor >= st->count)
@@ -707,6 +711,14 @@ static int refresh_pending(u8 node, u32 s);
 static void keep_resting(u8 node, struct list_state *st)
 {
 	u32 lines = st->rt * 8u;
+	if (st->clears != cache_clears) {
+		// The cache was cleared (a theme change): the rows on screen may
+		// show the old look, so none goes in until it is drawn again
+		st->clears = cache_clears;
+		for (u32 s = 0; s < st->ring.k; s++)
+			if (st->drawn_row[s] != UI_ITEM_NONE)
+				st->stale |= 1u << s;
+	}
 	while (st->keep_next < st->ring.k) {
 		u32 s = st->keep_next++, r = st->drawn_row[s], bit = 1u << s;
 		if (r == UI_ITEM_NONE || st->slot_row[s] != r || ((st->blank | st->stale | st->dirty) & bit) ||
@@ -939,7 +951,9 @@ static void predraw(u8 node, struct list_state *st, const struct row_ctx *rc)
 {
 	u32 lo, hi, lines = st->rt * 8u;
 	ring_resident(&st->ring, st->page_target, 0, st->rows, &lo, &hi);
-	if (lo > hi || (hi - lo + 1) * st->tw * lines > ROW_CACHE_BYTES / 4) {
+	// Rows never straddle the arena's end, so up to a row's words less fit
+	u32 words = st->tw * lines;
+	if (lo > hi || (hi - lo + 1) * words > ROW_CACHE_BYTES / 4 - words + 1) {
 		st->predrawn = 1;
 		return;
 	}

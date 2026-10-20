@@ -147,3 +147,13 @@ void frame_measure(const char *name)
 	else
 		tlog_error("frame: more than %d names measure one frame (%s)", FRAME_MEASURES, name);
 }
+
+void frame_measure_drop(const char *name)
+{
+	for (u32 i = 0; i < measure_count; i++) {
+		if (measure_names[i] == name || !strcmp(measure_names[i], name)) {
+			measure_names[i] = measure_names[--measure_count];
+			return;
+		}
+	}
+}

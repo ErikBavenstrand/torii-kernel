@@ -73,8 +73,8 @@ void ui_plane_reveal(u32 plane);
 // Fades a shown plane out over the theme's page_fade_out frames before a
 // page change hides it (alpha blending, as the fade-in): 0 if it can't (no
 // frames, another plane's fade running, a darken blend on), and the caller
-// hides it at once. Once ui_plane_fading_out goes 0, the plane shows at
-// the last step's level until the caller hides it in that frame.
+// hides it at once. Once ui_plane_fading_out goes 0 the blend is off: the
+// caller hides the plane in that frame.
 int ui_plane_fade_out(u32 plane);
 int ui_plane_fading_out(u32 plane);
 // Keys a widget held back (A during a list's page change), dispatched with
