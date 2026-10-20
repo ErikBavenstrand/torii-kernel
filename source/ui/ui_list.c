@@ -23,11 +23,12 @@
 //   UI_PAGE_BUDGET (the rest fill in later), and the plane fades in from the
 //   next VBlank (ui_plane_reveal).
 // - Drawn rows are kept in a cache keyed by item (ui/rowcache.h), in EWRAM:
-//   a row is copied there from its slot when the slot goes to another row
-//   (so a screen's first page costs nothing more to draw), and a row
-//   scrolled back to is copied in, not drawn. A model says when an item's
-//   row changes (ui_list_refresh, or ui_list_reset for a new model), which
-//   drops it.
+//   while the list rests, its rows are copied there from their slots, one
+//   a frame (frames that would otherwise do nothing: scrolling never pays
+//   for it), and a row scrolled back to is copied in (about 4,400 cycles
+//   for a 16 px row) instead of drawn (13,000-24,000). A model says when an
+//   item's row changes (ui_list_refresh, or ui_list_reset for a new model),
+//   which drops it.
 // - With UI_LIST_MARQUEE, a cut name on the selected row scrolls after the
 //   cursor rests: two extra slots, wider than a row, take turns, flipped by
 //   map in VBlank. Glyphs slide in and out at both edges: the slots have
@@ -61,7 +62,7 @@ enum {
 
 #define MQ_MARGIN 2  // hidden tile columns each side of a marquee slot
 #define ROW_GUESS 30000  // cycles a row may take, before one has been timed
-#define ROW_COPY 4000    // cycles a row copied from the cache takes, at most
+#define ROW_COPY 5000    // cycles a row copied from the cache takes, at most
 // The scroll's spring brakes stiffer when a glide ends, so the list stops
 // within about a row of where the key was let go
 #define SPRING_BRAKE 0x18000  // 1.5
@@ -77,6 +78,7 @@ struct list_state {
 	u8 plain;   // UI_LIST_PLAIN: nothing shows as selected
 	u8 queued_a;  // A pressed during a page change: dispatched once it is drawn
 	u8 predrawn;  // a page change's rows are all in the cache
+	u8 keep_next; // the next slot keep_resting looks at; ring.k: done
 	u32 owner;    // its rows' owner in the row cache
 	u32 count, rows;
 	u32 cursor;
@@ -151,6 +153,11 @@ static struct row_cache *row_cache(void)
 void ui_list_cache_clear(void)
 {
 	row_cache_clear(row_cache());
+}
+
+static const u32 *cached_row(const struct list_state *st, u32 r)
+{
+	return row_cache_find(row_cache(), st->owner, r, st->tw, st->rt * 8u);
 }
 
 static int marquee(u8 node)
@@ -233,6 +240,7 @@ static void give_slot(struct list_state *st, u32 r)
 		st->slot_row[s] = (u16)r;
 		st->dirty |= 1u << s;
 		st->fresh |= 1u << s;
+		st->keep_next = 0;  // once it rests, keep its rows again
 	}
 }
 
@@ -278,6 +286,7 @@ static void forget_slots(struct list_state *st)
 	st->hi = 0;
 	st->plo = st->phi = 0xFFFFFFFF;
 	st->dirty = st->fresh = st->stale = 0;
+	st->keep_next = 0;
 }
 
 static s32 goal_px(const struct list_state *st)
@@ -458,6 +467,7 @@ void ui_list_refresh(u8 node, u32 lo, u32 hi)
 	struct list_state *st = ui_node_state(node);
 	row_cache_forget(row_cache(), st->owner, lo, hi);
 	st->predrawn = 0;
+	st->keep_next = 0;
 	for (u32 s = 0; s < st->ring.k; s++) {
 		u32 r = st->slot_row[s];
 		if (r != UI_ITEM_NONE && r >= lo && r <= hi)
@@ -689,6 +699,27 @@ static void marquee_tick(u8 node, struct list_state *st, u32 dt)
 	ui_wake();
 }
 
+static int refresh_pending(u8 node, u32 s);
+
+// While the list rests: the next row a slot holds as the model has it now
+// goes into the row cache, if it isn't there yet. One a frame, one pass
+// over the slots (so rows that don't all fit never take turns).
+static void keep_resting(u8 node, struct list_state *st)
+{
+	u32 lines = st->rt * 8u;
+	while (st->keep_next < st->ring.k) {
+		u32 s = st->keep_next++, r = st->drawn_row[s], bit = 1u << s;
+		if (r == UI_ITEM_NONE || st->slot_row[s] != r || ((st->blank | st->stale | st->dirty) & bit) ||
+		    refresh_pending(node, s) || cached_row(st, r))
+			continue;
+		u32 *row = row_cache_put(row_cache(), st->owner, r, st->tw, lines);
+		if (row)
+			row_cache_copy_in(row, tile_addr(ui_node_spec(node)->plane, slot_tile(st, s)), st->tw, lines,
+					  lines);
+		return;  // the next one next frame
+	}
+}
+
 static void list_update(u8 node, u32 dt)
 {
 	struct list_state *st = ui_node_state(node);
@@ -749,10 +780,14 @@ static void list_update(u8 node, u32 dt)
 			motion_spring_shift(st->motion, -FIX(shift));
 		}
 		assign(node, st, dir);
-		if (st->shown != want)
+		if (st->shown != want) {
 			ui_wake();
-		else if (still && !st->dirty && ui_node_shown(node))
+		} else if (still && !st->dirty && ui_node_shown(node)) {
 			fill_spare(st);
+			// Every row drawn: they go into the row cache
+			if (!st->dirty)
+				keep_resting(node, st);
+		}
 	}
 	// Not while a view above shows its own plane there
 	if (ui_plane_owned(node))
@@ -882,11 +917,6 @@ static void draw_marquee(const struct list_state *st, const struct row_ctx *rc, 
 		draw_detail(&win, rc, m, item.detail, &line);
 }
 
-static const u32 *cached_row(const struct list_state *st, u32 r)
-{
-	return row_cache_find(row_cache(), st->owner, r, st->tw, st->rt * 8u);
-}
-
 // Puts row r into a slot's tiles (or the refresh pool's): copied from the
 // row cache (cached: row_cache_find's answer), or drawn, cleared first
 // unless blank. 1 if anything but paper is there.
@@ -900,21 +930,6 @@ static int render_row(struct list_state *st, const struct row_ctx *rc, u32 *tile
 	int drew = draw_row(st, rc, tiles, r, blank);
 	st->row_cycles = cycles_since(start);
 	return drew;
-}
-
-static int refresh_pending(u8 node, u32 s);
-
-// Before slot s of node's list takes another row: the row its tiles hold
-// goes into the row cache, if they hold it as the model has it now and it
-// isn't there yet
-static void keep_row(u8 node, struct list_state *st, u32 s)
-{
-	u32 r = st->drawn_row[s], bit = 1u << s, lines = st->rt * 8u;
-	if (r == UI_ITEM_NONE || ((st->blank | st->stale) & bit) || refresh_pending(node, s) || cached_row(st, r))
-		return;
-	u32 *row = row_cache_put(row_cache(), st->owner, r, st->tw, lines);
-	if (row)
-		row_cache_copy_in(row, tile_addr(ui_node_spec(node)->plane, slot_tile(st, s)), st->tw, lines, lines);
 }
 
 // While a page change fades the old page out and hides it, the new page's
@@ -1033,10 +1048,7 @@ static void list_draw(u8 node)
 			continue;
 		u32 r = st->slot_row[s];
 		const u32 *cached = r != UI_ITEM_NONE ? cached_row(st, r) : 0;
-		// The row's draw or copy, and keep_row's copy of the row it replaces
 		u32 need = cached ? ROW_COPY : st->row_cycles ? st->row_cycles : ROW_GUESS;
-		if ((st->fresh & bit) && st->drawn_row[s] != UI_ITEM_NONE)
-			need += ROW_COPY;
 		u32 budget = st->page == PAGE_DRAW ? UI_PAGE_BUDGET : UI_DRAW_BUDGET;
 		if (hidden && !ui_draw_room(need, budget)) {
 			ui_dirty(node, 1);  // the rest next frame
@@ -1058,10 +1070,6 @@ static void list_draw(u8 node)
 				TLOG_ASSERT(!map_row_live(node, st, ring_map_row(&st->ring, r)));
 				if (st->drawn_row[s] != UI_ITEM_NONE)
 					TLOG_ASSERT(!map_row_live(node, st, ring_map_row(&st->ring, st->drawn_row[s])));
-			}
-			if ((st->fresh & bit) && st->drawn_row[s] != UI_ITEM_NONE) {
-				keep_row(node, st, s);
-				cached = cached_row(st, r);  // keeping it may have taken r's space
 			}
 			st->drawn_row[s] = (u16)r;
 			u32 *tiles = tile_addr(spec->plane, slot_tile(st, s));
