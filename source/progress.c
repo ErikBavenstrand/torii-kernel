@@ -22,12 +22,10 @@ void progress_step(const char *status, u32 lo, u32 hi)
 	step.hi = (u16)(hi < PROGRESS_FULL ? hi : PROGRESS_FULL);
 	if (!dialog_progress_active())
 		return;
+	dialog_progress_set(step.lo, PROGRESS_FULL, NULL);
 	if (status) {
 		step.status = status;
-		dialog_progress_set(step.lo, PROGRESS_FULL, NULL);
 		dialog_progress_status(status);  // drawn now
-	} else {
-		dialog_progress_set(step.lo, PROGRESS_FULL, NULL);
 	}
 }
 
@@ -91,7 +89,11 @@ void progress_cart_copy(u32 *fat, u32 bytes, u32 hi)
 		dialog_progress_drew(hook.bar.x);
 	}
 	step.lo = step.hi = (u16)(hi < PROGRESS_FULL ? hi : PROGRESS_FULL);
-	tlog("launch: the cart copied %lu KB in %lu frames, %lu bytes a frame (the estimate: %lu frames)",
-	     (unsigned long)(bytes >> 10), (unsigned long)took, (unsigned long)(took ? bytes / took : bytes),
-	     (unsigned long)frames);
+	if (took)
+		tlog("launch: the cart copied %lu KB in %lu frames, %lu bytes a frame (the estimate: %lu frames)",
+		     (unsigned long)(bytes >> 10), (unsigned long)took, (unsigned long)(bytes / took),
+		     (unsigned long)frames);
+	else
+		tlog("launch: the cart copied %lu KB within a frame (the estimate: %lu frames)",
+		     (unsigned long)(bytes >> 10), (unsigned long)frames);
 }
