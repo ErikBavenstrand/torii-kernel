@@ -8,8 +8,8 @@
 //   A           a dialog for the item (A or B closes it)
 //   START       the next theme and item accent, through a fade
 // It logs "screen ready: ui-demo", "ui-dialog" (tests/shots ui-*.opts) and
-// frame-cycles figures for scrolling, page changes and the dialog
-// (tests/perf/budget.txt).
+// frame-cycles figures for scrolling, page changes, the dialog and the
+// theme's fades (tests/perf/budget.txt).
 #ifdef TORII_TEST_KERNEL
 #include <gba_interrupt.h>
 #include <stdio.h>
@@ -343,6 +343,8 @@ void ui_demo(void)
 			frame_measure(demo.measure);
 			demo.measure_left--;
 		}
+		if (ui_fading())
+			frame_measure("ui-fade");
 		ui_frame();
 		theme_step();
 	}

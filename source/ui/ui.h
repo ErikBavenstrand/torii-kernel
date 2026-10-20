@@ -637,7 +637,7 @@ void ui_list_set_cursor(u8 node, u32 cursor);
 void ui_list_move(u8 node, u32 cursor, u16 key);
 // Moves the cursor by itself, rate items a frame (16.16: INPUT_ONE is one;
 // negative goes up), the list gliding with it as with a held key, until
-// rate 0 or the list's end. For demos: it emits no UI_EV_CURSOR.
+// rate 0 or the list's end. Each move emits UI_EV_CURSOR, as a key's does.
 void ui_list_autoscroll(u8 node, s32 rate);
 u32 ui_list_cursor(u8 node);
 // 1 while a page change hides or draws the list's page: a handler taking A

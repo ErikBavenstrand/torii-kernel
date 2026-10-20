@@ -381,8 +381,9 @@ static void fade_set(void *ctx, s32 value)
 		gfx_pal_use_faded(0);
 		return;
 	}
-	palette_fade(gfx_pal_faded, gfx_pal_unfaded, 512, ui.fade_colour, (u32)f);
-	gfx_pal_mark(0xFFFFFFFF);
+	// Only the banks in use: a whole-palette fade cost about 45k cycles a frame
+	palette_fade_banks(gfx_pal_faded, gfx_pal_unfaded, gfx_pal_used, ui.fade_colour, (u32)f);
+	gfx_pal_mark(gfx_pal_used);
 	gfx_pal_use_faded(1);
 }
 
@@ -1241,11 +1242,11 @@ u32 ui_frame(void)
 		frame_wake();
 	modal_tick(dt);
 	tr_tick(dt);
-	// Their frames are measured, in mGBA only (the tests' figures), unless the
-	// screen measures its own
-	if ((ui.tr_phase != TR_IDLE || (ui_top() && ui_top()->opening)) && tlog_in_emulator() && !frame_measuring())
+	// Their frames are measured, in mGBA only (the tests' figures)
+	if ((ui.tr_phase != TR_IDLE || (ui_top() && ui_top()->opening)) && tlog_in_emulator())
 		frame_measure(ui.tr_phase != TR_IDLE ? "ui-transition" : "ui-dialog-motion");
 	update_all(dt);
+	ui_apply_pops();  // asked for by handlers of events in the update (autoscroll)
 	frame_split();  // motion and update
 	// A view still to be shown (one pushed after a pop waits a frame) wakes
 	// the frames until it is: nothing else may (a view without a list)

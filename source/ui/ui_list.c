@@ -450,7 +450,8 @@ void ui_list_autoscroll(u8 node, s32 rate)
 }
 
 // One frame of ui_list_autoscroll: the cursor moves an item each time the
-// phase passes a whole one; at the list's end it stops
+// phase passes a whole one, and the view hears of it as of a key's move; at
+// the list's end it stops
 static void autoscroll(u8 node, struct list_state *st, u32 dt)
 {
 	if (!st->auto_rate || st->page != PAGE_NONE)
@@ -470,6 +471,11 @@ static void autoscroll(u8 node, struct list_state *st, u32 dt)
 	st->auto_move = 1;
 	set_cursor(node, st, st->auto_rate > 0 ? st->cursor + 1 : st->cursor - 1, 0);
 	st->auto_move = 0;
+	// In the update phase: pops the handler asks for wait until it ends
+	u8 was = ui_dispatching;
+	ui_dispatching = 1;
+	ui_emit(node, UI_EV_CURSOR, st->cursor);
+	ui_dispatching = was;
 }
 
 u32 ui_list_cursor(u8 node)

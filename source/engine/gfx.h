@@ -74,6 +74,9 @@ extern u16 gfx_live_bgofs[8];
 extern u32 gfx_dirty_regs;  // GFX_DIRTY_* bits
 extern u32 gfx_hold_regs;  // regions gfx_hold_for_queue holds back
 extern u32 gfx_dirty_pal;  // bit n: palette bank n (0-15 BG, 16-31 sprites)
+// Banks gfx_pal_load has written since gfx_init: the only ones a fade
+// needs to work out (the rest stay black in both buffers)
+extern u32 gfx_pal_used;
 extern u16 gfx_pal_unfaded[512];
 extern u16 gfx_pal_faded[512];
 extern u8 gfx_pal_faded_on;
@@ -100,7 +103,8 @@ void gfx_set_mosaic(u16 value);
 void gfx_set_blend(u16 bldcnt, u16 bldalpha, u16 bldy);
 
 // Copies colours into the unfaded buffer from colour index bank * 16 (bank
-// 0-31), and marks the banks they cover dirty. The faded buffer is the fade's.
+// 0-31), and marks the banks they cover dirty and used. The faded buffer is
+// the fade's.
 void gfx_pal_load(u32 bank, const u16 *colours, u32 count);
 // Marks banks dirty (bit n: bank n), after writing a buffer directly.
 void gfx_pal_mark(u32 banks);

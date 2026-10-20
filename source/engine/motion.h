@@ -164,6 +164,9 @@ void motion_free_owner(u8 owner);
 // channel, rounded to the nearest (halves away from zero, so fades towards
 // white and black are symmetric). factor over 256 counts as 256. dst may be src.
 void palette_fade(u16 *dst, const u16 *src, u32 count, u16 color, u32 factor);
+// The same for the 16-colour banks of a 512-colour palette set in banks
+// (bit n: bank n, colours n * 16 to n * 16 + 15); the others are left alone.
+void palette_fade_banks(u16 *dst, const u16 *src, u32 banks, u16 color, u32 factor);
 
 #define FADE_BLACK 0x0000
 #define FADE_WHITE 0x7FFF

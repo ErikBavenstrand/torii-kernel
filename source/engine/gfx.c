@@ -35,6 +35,7 @@ u32 gfx_dirty_regs;
 u32 gfx_hold_regs;
 static u8 gfx_frozen;
 u32 gfx_dirty_pal;
+u32 gfx_pal_used;
 u16 gfx_pal_unfaded[512] EWRAM_BSS ALIGN(4);
 u16 gfx_pal_faded[512] EWRAM_BSS ALIGN(4);
 u8 gfx_pal_faded_on;
@@ -59,6 +60,7 @@ void gfx_init(void)
 	memset(gfx_pal_unfaded, 0, sizeof(gfx_pal_unfaded));
 	memset(gfx_pal_faded, 0, sizeof(gfx_pal_faded));
 	gfx_pal_faded_on = 0;
+	gfx_pal_used = 0;
 	for (u32 i = 0; i < GFX_OAM_ENTRIES; i++) {
 		gfx_oam[i].attr0 = GFX_OBJ_HIDDEN;
 		gfx_oam[i].attr1 = gfx_oam[i].attr2 = 0;
@@ -132,8 +134,10 @@ void gfx_pal_load(u32 bank, const u16 *colours, u32 count)
 		count = 512 - first;
 	memcpy(&gfx_pal_unfaded[first], colours, count * 2);
 	u32 last = (first + count - 1) / 16;
-	for (u32 b = bank; b <= last; b++)
+	for (u32 b = bank; b <= last; b++) {
 		gfx_dirty_pal |= 1u << b;
+		gfx_pal_used |= 1u << b;
+	}
 }
 
 void gfx_pal_mark(u32 banks)
