@@ -588,7 +588,7 @@ static void names_step(void)
 	lib.buf[staged++] = 0;  // an even end; the parser stops at names_len
 	u32 tail = staged & 1;
 	lib.buf[staged] = 0;
-	staged = names_flush(staged + tail);
+	names_flush(staged + tail);
 	lib.u.walk.names_len -= 1 + tail;
 	// One step (it sorts the lines unless the file is sorted, as the kernel
 	// writes it), logged for the cart's figure
