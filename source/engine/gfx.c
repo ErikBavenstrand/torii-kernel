@@ -214,7 +214,7 @@ static struct queue_entry *queue_push(u32 dst, u32 src, u32 bytes, u16 kind)
 {
 	// Palette, VRAM and OAM only: a stray address must never reach the cart
 	if ((dst | bytes | (kind == QUEUE_COPY ? src : 0)) & 3 || !bytes || bytes > 0xFFFF || dst < 0x05000000 ||
-	    dst + bytes > 0x07000400) {
+	    dst > 0x07000400 || bytes > 0x07000400 - dst) {
 		res_set_error("bad VRAM copy: %08lX from %08lX, %lu bytes (words, under 64 KB, into video memory)",
 			      (unsigned long)dst, (unsigned long)src, (unsigned long)bytes);
 		return 0;
@@ -396,6 +396,13 @@ static void write_regs(u32 dirty)
 			io[0x28 + i] = gfx_regs.blend[i];
 }
 
+static void write_oam(void)
+{
+	DMA3SAD = (u32)gfx_oam;
+	DMA3DAD = OAM_RAM;
+	DMA3CNT = DMA_ON_32 | sizeof(gfx_oam) / 4;
+}
+
 void gfx_freeze(int on)
 {
 	gfx_frozen = (u8)(on != 0);
@@ -439,10 +446,11 @@ void gfx_commit(void)
 	}
 	gfx_dirty_pal = 0;
 
-	if ((dirty & GFX_DIRTY_OAM) && !gfx_oam_building) {
-		DMA3SAD = (u32)gfx_oam;
-		DMA3DAD = OAM_RAM;
-		DMA3CNT = DMA_ON_32 | sizeof(gfx_oam) / 4;
+	// Sprites go with the planes they sit on: while DISPCNT or the scrolls
+	// wait for the queue, so does OAM
+	int oam_held = (held & (GFX_DIRTY_DISPCNT | GFX_DIRTY_BGOFS)) != 0;
+	if ((dirty & GFX_DIRTY_OAM) && !gfx_oam_building && !oam_held) {
+		write_oam();
 		dirty &= ~(u32)GFX_DIRTY_OAM;
 	}
 	dirty &= GFX_DIRTY_OAM;
@@ -455,6 +463,10 @@ void gfx_commit(void)
 			write_regs(held);
 			gfx_hold_regs &= ~held;
 			held = 0;
+			if ((dirty & GFX_DIRTY_OAM) && !gfx_oam_building) {
+				write_oam();
+				dirty &= ~(u32)GFX_DIRTY_OAM;
+			}
 		}
 	}
 	gfx_dirty_regs = dirty | held;

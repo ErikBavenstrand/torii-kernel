@@ -34,9 +34,10 @@ static u32 *tile_addr(u8 node, u32 tile)
 struct paint {
 	u16 first[2];
 	u8 tiles[2];
-	u8 cur;   // the set the map shows
-	u8 sets;  // 1 or 2
+	u8 cur;     // the set the map shows
+	u8 sets;    // 1 or 2
 	u8 tx, tw;
+	u8 mapped;  // the map shows set cur (not blank: paint_hide)
 };
 
 static int paint_init(u8 node, struct paint *p, u32 tx, u32 tw, u32 sets)
@@ -58,7 +59,7 @@ static int paint_init(u8 node, struct paint *p, u32 tx, u32 tw, u32 sets)
 static int paint_begin(u8 node, struct paint *p, struct text_window *win, u32 *set)
 {
 	const struct ui_node *n = ui_node(node);
-	int flip = p->sets == 2 && ui_node_shown(node) && (n->flags & UI_N_DRAWN);
+	int flip = p->sets == 2 && ui_node_shown(node) && p->mapped;
 	if (flip && ui_map_busy(node, (u32)n->y / 8, (u32)n->h / 8))
 		return 0;
 	*set = flip ? p->cur ^ 1u : p->cur;
@@ -72,7 +73,7 @@ static int paint_begin(u8 node, struct paint *p, struct text_window *win, u32 *s
 static int paint_end(u8 node, struct paint *p, u32 set, u32 bank)
 {
 	const struct ui_node *n = ui_node(node);
-	if (set != p->cur || !(n->flags & UI_N_DRAWN)) {
+	if (set != p->cur || !p->mapped) {
 		u32 tx = (u32)n->x / 8 + p->tx, ty = (u32)n->y / 8, h = (u32)n->h / 8;
 		u16 *rows = ui_map_rows(node, ty, h);
 		if (!rows)
@@ -82,14 +83,25 @@ static int paint_end(u8 node, struct paint *p, u32 set, u32 bank)
 				rows[y * 32 + tx + x] = ui_entry(p->first[set] + x * h + y, bank);
 	}
 	p->cur = (u8)set;
+	p->mapped = 1;
 	return 1;
 }
 
-// A hidden node: its rectangle blank; 0 to try again
-static int paint_hide(u8 node)
+// A hidden node: its rectangle blank (its paints mapped again when it
+// shows); 0 to try again
+static int paint_hide(u8 node, struct paint *a, struct paint *b)
 {
-	struct ui_node *n = ui_node(node);
-	n->flags &= (u8)~UI_N_DRAWN;
+	if (!ui_map_fill(node, ui_shared_entry(ui_node_spec(node)->plane, UI_TILE_BLANK)))
+		return 0;
+	a->mapped = 0;
+	if (b)
+		b->mapped = 0;
+	return 1;
+}
+
+// A node's map without its paints (a card's): blank while hidden
+static int map_hide(u8 node)
+{
 	return ui_map_fill(node, ui_shared_entry(ui_node_spec(node)->plane, UI_TILE_BLANK));
 }
 
@@ -171,9 +183,10 @@ static int card_measure(u8 node, struct engine_budget *need)
 	const struct ui_look *l = look();
 	u32 r = l->card_radius;
 	if (n->w < 16 || n->h < 16 || c->inset_l + r > 8 || c->inset_r + r > 8 || c->inset_t + r > 8 ||
-	    c->inset_b + r > 8 || c->inset_b < l->shadow_offset) {
-		ui_set_error("view %s: a card is 2 tiles or more a side, its insets and corners within a tile, the "
-			     "shadow inside",
+	    c->inset_b + r > 8 || c->inset_b < l->shadow_offset ||
+	    (c->inset_l | c->inset_t | c->inset_r | c->inset_b) > 7) {
+		ui_set_error("view %s: a card is 2 tiles or more a side, its insets (under 8 px) and corners within "
+			     "a tile, the shadow inside",
 			     ui_node_view(node)->spec->name);
 		return 0;
 	}
@@ -249,7 +262,7 @@ static void card_draw(u8 node)
 	struct card_state *st = ui_node_state(node);
 	struct ui_node *n = ui_node(node);
 	if (n->flags & UI_N_HIDDEN) {
-		if (!paint_hide(node))
+		if (!map_hide(node))
 			ui_dirty(node, 0xFF);
 		return;
 	}
@@ -310,7 +323,7 @@ static int title_measure(u8 node, struct engine_budget *need)
 		need->obj_tiles = (u16)(need->obj_tiles + ART_ICON16_TILES);
 		need->obj_banks++;
 	}
-	return measure_tiles(node, need, hw + 2 * rw);
+	return measure_tiles(node, need, 2 * (hw + rw));
 }
 
 static int title_init(u8 node)
@@ -319,7 +332,7 @@ static int title_init(u8 node)
 	const struct ui_title_config *c = title_config(node);
 	u32 hx, hw, rx, rw;
 	title_columns(node, &hx, &hw, &rx, &rw);
-	if ((hw && !paint_init(node, &st->heading, hx, hw, 1)) || !paint_init(node, &st->right, rx, rw, 2))
+	if ((hw && !paint_init(node, &st->heading, hx, hw, 2)) || !paint_init(node, &st->right, rx, rw, 2))
 		return 0;
 	st->text = c->text ? c->text : "";
 	st->right_text = c->right;
@@ -344,6 +357,8 @@ static void title_update(u8 node, u32 dt)
 		return;
 	const struct ui_view *v = ui_node_view(node);
 	s32 x = n->x + ui_view_dx(v) + look()->title_icon_x, y = n->y + v->offset + look()->title_icon_y;
+	if (y <= -16 || y >= 160 || x <= -16 || x >= 240)
+		return;  // off screen (attr0's y would wrap to the top)
 	ui_obj_add(node, (u16)(y & 0xFF), (u16)(OBJ_SIZE_16 | (x & 0x1FF)), (u16)(st->icon_tile | st->icon_bank << 12));
 }
 
@@ -352,27 +367,30 @@ static void title_draw(u8 node)
 	struct title_state *st = ui_node_state(node);
 	struct ui_node *n = ui_node(node);
 	if (n->flags & UI_N_HIDDEN) {
-		if (!paint_hide(node))
+		if (!paint_hide(node, &st->heading, &st->right))
 			ui_dirty(node, 0xFF);
 		return;
 	}
 	const struct ui_theme *t = ui_theme();
 	const struct ui_look *l = &t->look;
 	u32 paper = ui_paper(node, UI_ROLE_NONE), h = (u32)n->h;
-	u8 todo = (n->flags & UI_N_DRAWN) ? n->dirty : (u8)(TITLE_HEADING | TITLE_RIGHT);
+	u8 todo = st->right.mapped ? n->dirty : (u8)(TITLE_HEADING | TITLE_RIGHT);
 	n->dirty = 0;  // what fails sets its bit again
 	struct text_window win;
 	u32 set;
 	if ((todo & TITLE_HEADING) && st->heading.tw) {
 		// Its window starts on the tile column at or before title_text_x
-		paint_begin(node, &st->heading, &win, &set);
+		if (!paint_begin(node, &st->heading, &win, &set)) {
+			ui_dirty(node, todo);  // the last flip hasn't landed: both next frame
+			return;
+		}
 		u32 x = l->title_text_x - st->heading.tx * 8u, ww = st->heading.tw * 8u;
 		text_clear(&win, 0, 0, ww, h, paper);
 		if (l->title_text_y + t->heading->line_height <= h && x < ww)
 			draw_text(&win, t->heading, x, l->title_text_y, ww - x, ui_ink(node, UI_ROLE_TEXT), st->text);
 		if (!paint_end(node, &st->heading, set, UI_BANK_NORMAL)) {
-			ui_dirty(node, TITLE_HEADING);
-			todo &= (u8)~TITLE_RIGHT;  // the map again next frame, both at once
+			ui_dirty(node, todo);  // the flip next frame, with the right-hand text's
+			return;
 		}
 	}
 	if (todo & TITLE_RIGHT) {
@@ -439,7 +457,7 @@ static void hints_draw(u8 node)
 	struct hints_state *st = ui_node_state(node);
 	struct ui_node *n = ui_node(node);
 	if (n->flags & UI_N_HIDDEN) {
-		if (!paint_hide(node))
+		if (!paint_hide(node, &st->paint, 0))
 			ui_dirty(node, 0xFF);
 		return;
 	}
@@ -520,7 +538,7 @@ static void path_draw(u8 node)
 	struct path_state *st = ui_node_state(node);
 	struct ui_node *n = ui_node(node);
 	if (n->flags & UI_N_HIDDEN) {
-		if (!paint_hide(node))
+		if (!paint_hide(node, &st->paint, 0))
 			ui_dirty(node, 0xFF);
 		return;
 	}
@@ -536,13 +554,14 @@ static void path_draw(u8 node)
 	u32 y = text_top(font, top, ch), pad = ui_theme()->pad, sep = text_width(font, "/", 1);
 	u32 step = sep + 2u * l->path_gap;  // between pills
 	text_clear(&win, 0, 0, w, h, ui_paper(node, UI_ROLE_PANEL));
-	// The segments, their starts and lengths
+	// The last SEGS segments, their starts and lengths (a ring: deeper
+	// paths keep their current folder; the ones before give way to "...")
 	enum {
 		SEGS = 16
 	};
-	const char *seg[SEGS];
-	u32 len[SEGS], count = 0;
-	for (const char *s = st->path; *s && count < SEGS;) {
+	const char *ring[SEGS];
+	u32 ring_len[SEGS], total_segs = 0;
+	for (const char *s = st->path; *s;) {
 		while (*s == '/')
 			s++;
 		if (!*s)
@@ -550,14 +569,22 @@ static void path_draw(u8 node)
 		const char *e = s;
 		while (*e && *e != '/')
 			e++;
-		seg[count] = s;
-		len[count++] = (u32)(e - s);
+		ring[total_segs % SEGS] = s;
+		ring_len[total_segs % SEGS] = (u32)(e - s);
+		total_segs++;
 		s = e;
+	}
+	u32 count = total_segs < SEGS ? total_segs : SEGS, skipped = total_segs - count;
+	const char *seg[SEGS];
+	u32 len[SEGS];
+	for (u32 i = 0; i < count; i++) {
+		seg[i] = ring[(skipped + i) % SEGS];
+		len[i] = ring_len[(skipped + i) % SEGS];
 	}
 	// Leading folders give way to "..." until the rest fits
 	u32 first = 0, ell = text_width(font, "...", 3);
 	for (;;) {
-		u32 total = first ? ell + step : 0;
+		u32 total = first || skipped ? ell + step : 0;
 		for (u32 i = first; i < count; i++)
 			total += seg_width(font, seg[i], len[i]) + (i + 1 < count ? step : 0u);
 		if (total + 2 * pad <= w || first + 1 >= count)
@@ -565,7 +592,7 @@ static void path_draw(u8 node)
 		first++;
 	}
 	u32 x = pad;
-	if (first) {
+	if (first || skipped) {
 		draw_text(&win, font, x, y, ell + 1, UI_ROLE_FAINT, "...");
 		x += ell + l->path_gap;
 		draw_text(&win, font, x, y, sep + 1, UI_ROLE_FAINT, "/");
@@ -627,7 +654,7 @@ static void storage_draw(u8 node)
 	struct storage_state *st = ui_node_state(node);
 	struct ui_node *n = ui_node(node);
 	if (n->flags & UI_N_HIDDEN) {
-		if (!paint_hide(node))
+		if (!paint_hide(node, &st->paint, 0))
 			ui_dirty(node, 0xFF);
 		return;
 	}

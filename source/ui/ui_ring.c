@@ -18,7 +18,7 @@ int ring_setup(struct ui_ring *r, u32 h, u32 rh, int fixed, const char **why)
 	r->rh = (u8)rh;
 	r->visible = (u8)((h - 1) / rh + 2);
 	r->step = (u8)(32 / rh);
-	u32 k = fixed ? h / rh : r->visible + 1u + r->step;
+	u32 k = fixed ? (h + rh - 1) / rh : r->visible + 1u + r->step;  // fixed: the viewport's rows, a cut one too
 	while (k * rh % 8)
 		k++;  // whole tile rows: at most 3 more (rh * 4 is a multiple of 8)
 	r->k = (u8)k;

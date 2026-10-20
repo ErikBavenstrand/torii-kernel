@@ -14,16 +14,19 @@ static u32 fit(const struct torii_font *font, const char *s, u32 len, u32 width,
 		return len;
 	}
 	u32 pos = 0, last_space = 0, last_fit = 0;
+	int spaced = 0;
 	while (pos < len) {
 		u32 at = pos;
 		text_next_glyph(s, len, &pos);
 		if (text_width(font, s, pos) > width)
 			break;
 		last_fit = pos;
-		if (s[at] == ' ')
+		if (s[at] == ' ' && at) {
 			last_space = at;
+			spaced = 1;
+		}
 	}
-	if (last_space) {
+	if (spaced) {
 		u32 skip = last_space;
 		while (skip < len && s[skip] == ' ')
 			skip++;
@@ -39,7 +42,7 @@ static u32 fit(const struct torii_font *font, const char *s, u32 len, u32 width,
 // Adds a row; 0 if the arrays are full
 static int add_row(struct ui_reading *r, u32 start, u32 len, u32 kind)
 {
-	if (r->count >= r->cap)
+	if (r->count >= r->cap || start > 0xFFFF)
 		return 0;
 	r->start[r->count] = (u16)start;
 	r->len[r->count] = (u8)(len > 255 ? 255 : len);
@@ -79,7 +82,10 @@ u32 ui_reading_wrap(struct ui_reading *r, const struct torii_font *font, u32 wid
 			u32 pos = body, first = 1;
 			while (pos < len) {
 				u32 next, n = fit(font, line + pos, len - pos, w, &next);
-				u32 row_kind = first ? kind : kind == UI_READ_KEY ? UI_READ_MORE : kind;
+				u32 row_kind = first                     ? kind
+					       : kind == UI_READ_KEY     ? UI_READ_MORE
+					       : kind == UI_READ_HEADING ? UI_READ_HEADING_MORE
+									 : kind;
 				u32 start = first ? at : at + pos, row_len = first ? pos + n : n;
 				if (row_len > 255)
 					row_len = 255;  // a row's length is a byte: longer never fits a row
@@ -124,6 +130,11 @@ static int reading_fetch(void *ctx, u32 i, struct ui_item *out)
 		out->len = (u16)(len - tab - 1);
 		break;
 	}
+	case UI_READ_HEADING_MORE:
+		out->text = s;
+		out->len = (u16)len;
+		out->ink = UI_ROLE_ACCENT_INK;
+		break;
 	case UI_READ_MORE:
 		out->key = s;  // the key column, no chip
 		out->key_len = 0;

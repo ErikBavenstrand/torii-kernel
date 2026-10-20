@@ -173,12 +173,14 @@ void test_ui_ring_setup(void)
 	CHECK_EQ(r.period, 168);
 	CHECK(ring_setup(&r, 160, 12, 0, &why));  // the tallest at 12 px
 	CHECK_EQ(r.k, 18);
-	// A fixed list: a slot per whole row, rounded up to whole tiles
+	// A fixed list: a slot per row on screen, rounded up to whole tiles
 	CHECK(ring_setup(&r, 80, 16, 1, &why));
 	CHECK_EQ(r.k, 5);
 	CHECK(ring_setup(&r, 80, 14, 1, &why));
-	CHECK_EQ(r.k, 8);  // 5 rows, rounded up to a multiple of 4
+	CHECK_EQ(r.k, 8);  // 6 rows (one cut), rounded up to a multiple of 4
 	CHECK_EQ(r.period, 112);
+	CHECK(ring_setup(&r, 40, 16, 1, &why));
+	CHECK(r.period >= 40);  // a cut row has its own slot, not row 0 again
 }
 
 // The BG scroll puts content line scroll at the viewport's top through the
@@ -540,7 +542,7 @@ void test_ui_focus_and_keys(void)
 // than a row broken inside it, empty lines kept; every row fits its width
 void test_ui_reading(void)
 {
-	static const char text[] = "# Home\n"
+	static const char text[] = "# Home, where every item of the card waits\n"
 				   "A\topen the item and everything about it, at length\n"
 				   "\n"
 				   "Turn the carousel with the left and right keys, held to keep turning\n"
@@ -553,8 +555,12 @@ void test_ui_reading(void)
 	u32 rows = ui_reading_wrap(&r, font, width, key_w);
 	CHECK(rows >= 7);
 	CHECK_EQ(kind[0], UI_READ_HEADING);
-	CHECK_EQ(kind[1], UI_READ_KEY);
-	CHECK_EQ(kind[2], UI_READ_MORE);
+	CHECK_EQ(kind[1], UI_READ_HEADING_MORE);  // wrapped on: its text whole
+	u32 k = 1;
+	while (kind[k] == UI_READ_HEADING_MORE)
+		k++;
+	CHECK_EQ(kind[k], UI_READ_KEY);
+	CHECK_EQ(kind[k + 1], UI_READ_MORE);
 	u32 empty = 0;
 	for (u32 i = 0; i < rows; i++) {
 		struct ui_item item = {0};
@@ -566,6 +572,10 @@ void test_ui_reading(void)
 		if (kind[i] == UI_READ_HEADING) {
 			CHECK_EQ(item.ink, UI_ROLE_ACCENT_INK);
 			CHECK(!strncmp(item.text, "Home", 4));
+		}
+		if (kind[i] == UI_READ_HEADING_MORE) {
+			CHECK_EQ(item.ink, UI_ROLE_ACCENT_INK);
+			CHECK(item.text[0] != '#' && item.len < 100);
 		}
 		if (kind[i] == UI_READ_KEY) {
 			CHECK_EQ(item.key_len, 1);

@@ -25,6 +25,7 @@ enum {
 	UI_READ_HEADING,
 	UI_READ_KEY,   // a key line's first: its key, a tab, its text
 	UI_READ_MORE,  // a key line wrapped on: text at the key column
+	UI_READ_HEADING_MORE,  // a heading wrapped on: no "# " of its own
 };
 
 struct ui_reading {
@@ -39,7 +40,7 @@ struct ui_reading {
 // Wraps r->text into rows width px wide in font (key rows' text key_w px
 // in): at the last space that fits, or inside a word longer than a row.
 // Returns the rows, or 0 if they didn't all fit in r->cap (the first cap
-// are kept).
+// are kept) or the text passes 64 KB.
 u32 ui_reading_wrap(struct ui_reading *r, const struct torii_font *font, u32 width, u32 key_w);
 
 // The list model over a struct ui_reading, which must be the view's ctx

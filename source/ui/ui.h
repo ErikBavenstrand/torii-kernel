@@ -58,7 +58,7 @@
 
 #define UI_NODE_CAP 48       // nodes across every view on the stack
 #define UI_VIEW_CAP 4        // views on the stack
-#define UI_ARENA_BYTES 1024  // widget state across every view on the stack
+#define UI_ARENA_BYTES 1536  // widget state across every view on the stack (a list's is about 256)
 #define UI_SCROLLERS 2      // lists resident at once (hardware windows)
 #define UI_PLANES 4
 #define UI_NONE 0xFF
@@ -510,8 +510,8 @@ struct ui_card_config {
 // The title bar: the item's 16x16 icon (a sprite), the heading, and a
 // right-hand text (the position or the clock) in DIM, at the look's
 // title_* places. Its rectangle spans the screen's width from the top,
-// whole tiles under the heading's line; the right-hand text changes
-// without tearing (two tile sets), the heading in place.
+// whole tiles under the heading's line; both texts change without
+// tearing (two tile sets each).
 #define UI_TITLE_NO_ICON 0xFFFF
 struct ui_title_config {
 	const char *text;   // the heading; ui_title_set replaces it

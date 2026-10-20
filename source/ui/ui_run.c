@@ -1093,9 +1093,12 @@ static int lower_blended(const struct ui_view *tv)
 
 // This frame's priorities, before the update adds the sprites: from the top
 // view down, each takes a level for its planes, and one more for its
-// sprites and the planes behind them; none show past level 3. Sprites of
-// views under the animated one hide while it blends over them with sprites
-// of its own (both would take its blend)
+// sprites and the planes behind them; none show past level 3. Sprites hide
+// where a blend can't take them: those of views under the animated one
+// while it blends over them with sprites of its own (both would take its
+// blend), the animated view's own while it fades in or out (a sprite on
+// its card has no second target under it, so it would show unfaded), and
+// every view's past the middle of a screen's alpha fade (the same)
 static void obj_levels(void)
 {
 	u32 da = 0;
@@ -1103,12 +1106,17 @@ static void obj_levels(void)
 	ui.obj_top = 0;
 	for (u32 d = da; tv && d < ui_depth(); d++)
 		ui.obj_top |= (ui_view_at(d)->flags & UI_V_OBJS) != 0;
-	int blended = lower_blended(tv);
+	// Not before it shows: until then the views under it show as they were
+	int shown = tv && (tv->flags & UI_V_SHOWN);
+	int blended = shown && lower_blended(tv);
+	int fading = shown && tv->open_blend < UI_OPEN && tv->open_blend <= OPEN_FADE;
+	int gone = ui.tr_phase != TR_IDLE && ui.tr_mode == TR_ALPHA && ui.tr_level * 2 > UI_OPEN;
 	u32 level = 0;
 	ui.obj_lower = 0;
 	for (u32 d = ui_depth(); d-- > 0;) {
 		const struct ui_view *v = ui_view_at(d);
-		int objs = (v->flags & UI_V_OBJS) && !(tv && d < da && blended && ui.obj_top);
+		int objs = (v->flags & UI_V_OBJS) && !gone && !(tv && d < da && blended && ui.obj_top) &&
+			   !(tv && d >= da && fading);
 		ui.level[d] = (u8)(level < 3 ? level : 3);
 		if (objs && level + 1 <= 3) {
 			ui.obj_prio[d] = (u8)(level + 1);

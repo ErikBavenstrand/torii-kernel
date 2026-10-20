@@ -50,7 +50,7 @@ struct ui_ring {
 
 // Sets r up; 0 and a sentence in *why if the geometry can't work (a row
 // height outside 8-32, or a viewport too tall for the ring). fixed: a list
-// that never scrolls (UI_LIST_FIXED) gets a slot per whole row only.
+// that never scrolls (UI_LIST_FIXED) gets a slot per row the viewport shows.
 int ring_setup(struct ui_ring *r, u32 h, u32 rh, int fixed, const char **why);
 
 static inline u32 ring_slot(const struct ui_ring *r, u32 row)
