@@ -135,7 +135,7 @@ static struct {
 	u32 since_turn;  // frames since the last turn began
 	u8 pal_dirty;    // the colours need working out again
 	u8 slots_dirty;  // the slots need working out again (the ring reached
-	                 // another item, or a copy waited for the queue)
+			 // another item, or a copy waited for the queue)
 	s32 slots_at;    // the whole item the ring was past when they were
 	u8 settled;      // UI_EV_CURSOR sent for the rest the ring is at
 	// Sprite resources
@@ -206,7 +206,6 @@ static s32 round_fix(s32 v)
 {
 	return (v + 0x8000) >> 16;
 }
-
 
 // --- Widget -----------------------------------------------------------------------
 
@@ -512,7 +511,7 @@ static void car_update(u8 node, u32 dt)
 		backdrop_colours(sky);
 		label_colours(sky, text ? fade : 256, ls);
 		u16 tone = mix(mix(sky, 0, theme()->floor_mix), 0,
-					 look.shadow_mix[theme() == &ui_theme_light ? PAL_LIGHT : PAL_DARK]);
+			       look.shadow_mix[theme() == &ui_theme_light ? PAL_LIGHT : PAL_DARK]);
 		for (u32 j = 0; j < count; j++) {
 			u16 c[16];
 			art_sprite_colours(car.items[ring_item(obj[j].k, car.count)].sprite, tone, c);
@@ -540,17 +539,19 @@ static void car_update(u8 node, u32 dt)
 		if (x <= -ART_SPRITE_SIZE || x >= 240 || y <= -ART_SPRITE_SIZE || y >= 160)
 			continue;
 		gfx_affine_set(car.matrix[j], (s16)pd, 0, 0, (s16)pd);
-		drawn[j] = ui_obj_add(node, (u16)(OBJ_AFFINE | (y & 0xFF)),
-				      (u16)(OBJ_SIZE_3 | car.matrix[j] << 9 | (x & 0x1FF)),
-				      (u16)((car.slot_first + s * ART_SPRITE_TILES) | (car.pal_first + BANK_OBJECTS + j) << 12));
+		drawn[j] = ui_obj_add(
+			node, (u16)(OBJ_AFFINE | (y & 0xFF)), (u16)(OBJ_SIZE_3 | car.matrix[j] << 9 | (x & 0x1FF)),
+			(u16)((car.slot_first + s * ART_SPRITE_TILES) | (car.pal_first + BANK_OBJECTS + j) << 12));
 	}
 	for (u32 j = 0; j < count; j++) {
 		if (!drawn[j])
 			continue;
 		const struct ring_object *o = &obj[j];
-		const struct art_sprite *sp = &art_sprites[car.items[ring_item(o->k, car.count)].sprite % ART_SPRITE_COUNT];
+		const struct art_sprite *sp =
+			&art_sprites[car.items[ring_item(o->k, car.count)].sprite % ART_SPRITE_COUNT];
 		u32 shadow = art_shadow_for((u32)art_shadows[sp->shadow].width * o->scale >> 8);
-		u16 tile = (u16)((car.shadow_first + shadow * ART_SHADOW_HALF_TILES) | (car.pal_first + BANK_OBJECTS + j) << 12);
+		u16 tile = (u16)((car.shadow_first + shadow * ART_SHADOW_HALF_TILES) |
+				 (car.pal_first + BANK_OBJECTS + j) << 12);
 		s32 y = o->feet - ART_SHADOW_RISE + dy, x = o->x + dx;  // centred on the ground row
 		if (y <= -8 || y >= 160)
 			continue;
@@ -560,7 +561,8 @@ static void car_update(u8 node, u32 dt)
 	// The dot strip, from the set shown (which moves at the half way point)
 	if (ls->entry != SET_NONE)
 		for (u32 c = 0; c < ls->dot_cols; c++)
-			ui_obj_add(node, (u16)((look.dots_y + dy) & 0xFF), (u16)((ls->dots_x + dx + (s32)c * 8) & 0x1FF),
+			ui_obj_add(node, (u16)((look.dots_y + dy) & 0xFF),
+				   (u16)((ls->dots_x + dx + (s32)c * 8) & 0x1FF),
 				   (u16)((car.label_first + car.shown * SET_TILES + SET_DOTS + c) |
 					 (car.pal_first + BANK_DOTS) << 12));
 }
@@ -644,7 +646,8 @@ static void draw_label(u32 set, u32 entry)
 			u32 top = look.dot_top - (look.dot_on_h - look.dot_size + 1u) / 2u;
 			for (u32 r = 0; r < look.dot_on_h; r++) {
 				int end = r == 0 || r + 1 == look.dot_on_h;  // rounded ends
-				dot_row(&win, c - look.dot_on_w / 2 + end, top + r, look.dot_on_w - 2 * end, INK_DOT_ON);
+				dot_row(&win, c - look.dot_on_w / 2 + end, top + r, look.dot_on_w - 2 * end,
+					INK_DOT_ON);
 			}
 		} else {
 			for (u32 r = 0; r < look.dot_size; r++)
