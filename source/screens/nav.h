@@ -26,7 +26,8 @@ struct ui_view;
 
 struct nav_page {
 	// Pushes the page's views for item with its cursor on row (as Last
-	// place left it, or 0); returns the page's first view, or NULL if it
+	// place left it, or 0: recent.txt may hold any number, so the page
+	// clamps it to its rows); returns the page's first view, or NULL if it
 	// didn't fit (the reason in ui_error)
 	struct ui_view *(*enter)(u32 item, u32 row);
 	// The row the page is on, for Last place (NULL: 0)

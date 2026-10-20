@@ -48,7 +48,7 @@ enum {
 // Returns only if no game started (see the top).
 u32 action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset);
 
-// Deletes the file at path (a full path). Its save stays (T11); it leaves
+// Deletes the file at path (a full path; a folder is refused). Its save stays (T11); it leaves
 // Recent, the favourites and the library index. 1 if it was deleted.
 int action_delete_file(const char *path);
 

@@ -15,6 +15,7 @@
 // while it starts; what they held comes back after (the SD card page keeps
 // its folder there)
 extern TCHAR currentpath[MAX_path_len];
+extern FILINFO fileinfo;  // ezkernelnew.c's
 static TCHAR saved_path[MAX_path_len] EWRAM_BSS;
 // The path asked for, in RAM: it may be in PSRAM (the library's names),
 // which a launch overwrites and the cart hides while it reads the card
@@ -118,8 +119,13 @@ int action_delete_file(const char *path)
 {
 	if (!copy_path(path) || path_copy[0] != '/')
 		return 0;
+	FRESULT res = f_stat(path_copy, &fileinfo);  // the kernel's, off the stack
+	if (res == FR_OK && (fileinfo.fattrib & AM_DIR)) {
+		tlog("delete %s: a folder, not a file", path_copy);  // f_unlink takes empty ones
+		return 0;
+	}
 	tlog_open_now();  // the file may be the log the background open holds
-	FRESULT res = f_unlink(path_copy);
+	res = f_unlink(path_copy);
 	if (res != FR_OK) {
 		tlog("delete %s: FatFs %u", path_copy, (unsigned)res);
 		return 0;
