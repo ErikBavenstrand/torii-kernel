@@ -11,7 +11,7 @@
 #include "tlog.h"
 #include "ui/ui.h"
 
-extern u16 SET_info_buffer[0x200];
+u16 SET_info_buffer[0x200] EWRAM_BSS;
 
 void settings_load(struct settings_values *v)
 {

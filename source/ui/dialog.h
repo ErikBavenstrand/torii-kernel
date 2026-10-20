@@ -70,10 +70,10 @@ void dialog_hand_over(void);
 // held as held, so a key that closed a screen doesn't act again.
 void dialog_blank(void);
 
-// Shows text until A or B is pressed and let go. Hint: gl_close_btn, "[A]OK".
+// Shows text until A or B is pressed and let go, with an "A OK" key chip.
 void dialog_message(const char *title, const char *text, u32 kind);
-// Asks a yes/no question: A (1) or B (0), once the key is released. Hint: gl_menu_btn,
-// "[B]CANCEL [A]OK".
+// Asks a yes/no question: A (1) or B (0), once the key is released, with
+// "B cancel" and "A OK" key chips.
 int dialog_confirm(const char *title, const char *text, u32 kind);
 
 // A notice: a message with no keys, which stays up while the caller works

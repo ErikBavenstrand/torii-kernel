@@ -309,8 +309,8 @@ static void bar_rows(u32 h, u32 *top, u32 *rows)
 }
 
 // Columns [a, b) of a progress bar w px wide in role: a pill, its four
-// corner pixels left transparent (bars 3 px or more thick)
-static void progress_span(const struct text_window *win, u32 a, u32 b, u32 w, u32 top, u32 rows, u32 role)
+// corner pixels in back, what is behind it (bars 3 px or more thick)
+static void progress_span(const struct text_window *win, u32 a, u32 b, u32 w, u32 top, u32 rows, u32 role, u32 back)
 {
 	if (a >= b)
 		return;
@@ -318,12 +318,12 @@ static void progress_span(const struct text_window *win, u32 a, u32 b, u32 w, u3
 	if (rows < 3)
 		return;
 	if (a == 0) {
-		text_clear(win, 0, top, 1, 1, UI_ROLE_NONE);
-		text_clear(win, 0, top + rows - 1, 1, 1, UI_ROLE_NONE);
+		text_clear(win, 0, top, 1, 1, back);
+		text_clear(win, 0, top + rows - 1, 1, 1, back);
 	}
 	if (b == w) {
-		text_clear(win, w - 1, top, 1, 1, UI_ROLE_NONE);
-		text_clear(win, w - 1, top + rows - 1, 1, 1, UI_ROLE_NONE);
+		text_clear(win, w - 1, top, 1, 1, back);
+		text_clear(win, w - 1, top + rows - 1, 1, 1, back);
 	}
 }
 
@@ -340,10 +340,10 @@ static void progress_draw(u8 node)
 	struct text_window win = window_of(node, st->first);
 	u32 top, rows;
 	bar_rows((u32)n->h, &top, &rows);
-	u32 ink = ui_ink(node, UI_ROLE_ACCENT), track = ui_paper(node, UI_ROLE_TRACK), w = (u32)n->w;
+	u32 ink = ui_ink(node, UI_ROLE_ACCENT), back = ui_paper(node, UI_ROLE_NONE), w = (u32)n->w;
 	if (!(n->flags & UI_N_DRAWN)) {
-		text_clear(&win, 0, 0, w, (u32)n->h, UI_ROLE_NONE);
-		progress_span(&win, 0, w, w, top, rows, track);
+		text_clear(&win, 0, 0, w, (u32)n->h, back);
+		progress_span(&win, 0, w, w, top, rows, UI_ROLE_TRACK, back);
 		st->drawn1 = 0;
 		if (!map_window(node, st->first, UI_BANK_NORMAL)) {
 			ui_dirty(node, 0xFF);
@@ -352,9 +352,9 @@ static void progress_draw(u8 node)
 	}
 	// Only the pixels that change: no frame shows the bar half redrawn
 	if (st->want1 > st->drawn1)
-		progress_span(&win, st->drawn1, st->want1, w, top, rows, ink);
+		progress_span(&win, st->drawn1, st->want1, w, top, rows, ink, back);
 	else if (st->want1 < st->drawn1)
-		progress_span(&win, st->want1, st->drawn1, w, top, rows, track);
+		progress_span(&win, st->want1, st->drawn1, w, top, rows, UI_ROLE_TRACK, back);
 	st->drawn1 = st->want1;
 }
 

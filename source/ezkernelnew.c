@@ -32,7 +32,7 @@
 #include "diag.h"
 #include "engine/cover.h"
 #include "library.h"
-#include "screens/lists.h"
+#include "screens/nav.h"
 #include "progress.h"
 #include "userdata.h"
 
@@ -54,7 +54,6 @@ void readcache_poison(void)
 }
 
 TCHAR currentpath[MAX_path_len];//
-TCHAR currentpath_temp[MAX_path_len];
 TCHAR current_filename[GAME_NAME_MAX + 1] EWRAM_BSS;
 
 u32 game_total_SD;
@@ -758,7 +757,6 @@ u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU)
 	return 0;
 }
 //---------------------------------------------------------------------------------
-extern u16 SET_info_buffer[0x200] EWRAM_BSS;
 //---------------------------------------------------------------------------------
 // Torii: the library's extension table (library.h), the one list of them
 u32 Check_file_type(TCHAR *pfilename)
@@ -999,15 +997,14 @@ static void Check_save_flag(void)
 	pending_save_clear();
 }
 
-// Torii: before anything hands cart SRAM to another game (a launch, LOAD
-// SAVE). A save still waiting to be copied (a power-on copy the card
-// couldn't take) would be lost, and its record would name the wrong game:
-// the next power-on would copy the other game's SRAM over its file. So the
-// copy runs again (the card may have room now); if it fails again, the
-// user picks: go on anyway (the record goes, the save is lost) or keep it.
-// load: before LOAD SAVE, not a launch (the question says which).
-// 1: go on, 0: don't (the record stays).
-static int pending_save_settle(int load)
+// Torii: before a launch hands cart SRAM to another game. A save still
+// waiting to be copied (a power-on copy the card couldn't take) would be
+// lost, and its record would name the wrong game: the next power-on would
+// copy the other game's SRAM over its file. So the copy runs again (the
+// card may have room now); if it fails again, the user picks: launch anyway
+// (the record goes, the save is lost) or keep it. 1: go on, 0: don't (the
+// record stays).
+static int pending_save_settle(void)
 {
 	u32 size;
 	if (!pending_save(&size))
@@ -1019,15 +1016,9 @@ static int pending_save_settle(int load)
 	if (pending_save_copy(size) == SAVE_FAILED) {
 		char msg[160];
 		int cut = (int)charset_cut(name, 80);
-		if (load)
-			snprintf(msg, sizeof(msg), EN_SAVE_UNSAVED_LOAD, cut, name);
-		else
-			snprintf(msg, sizeof(msg), EN_SAVE_UNSAVED, cut, name);
+		snprintf(msg, sizeof(msg), EN_SAVE_UNSAVED, cut, name);
 		go = dialog_confirm(NULL, msg, DIALOG_ERROR);
-		tlog("save: %s isn't on the card: %s", name,
-		     !go    ? "B, kept"
-		     : load ? "A, load anyway, it is lost"
-			    : "A, launch anyway, it is lost");
+		tlog("save: %s isn't on the card: %s", name, go ? "A, launch anyway, it is lost" : "B, kept");
 	}
 	dialog_close();
 	if (go)
@@ -1119,7 +1110,6 @@ int main(void)
 	f_chdir("/");
 	//TCHAR currentpath[MAX_path_len];
 	memset(currentpath, 00, MAX_path_len);
-	memset(currentpath_temp, 0x00, MAX_path_len);
 
 	res = f_getcwd(currentpath, sizeof currentpath / sizeof *currentpath);
 
@@ -1133,10 +1123,10 @@ int main(void)
 	library_boot();  // the index, or the first scan
 	Boot_notice_check();
 	tlog_debug("boot: handing over %lu frames after mounting", (unsigned long)(torii_frames - boot_mounted));
-	dialog_hand_over();  // a notice fades out; the lists run in this session
+	dialog_hand_over();  // a notice fades out; the menu runs in this session
 
 	cartlog_phase(PHASE_MENU, 0, NULL);
-	lists_run();  // the menu: never returns
+	nav_run();  // the menu: never returns
 }
 //---------------------------------------------------------------
 // Torii: the last step of every launch. Logs the rest of the launch record,
@@ -1244,13 +1234,12 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 }
 //---------------------------------------------------------------
 
-// A game picked on the SD list or Recently Played (ezkernel.h).
+// A game on its way to its launch (ezkernel.h).
 u32 Game_pick(struct game_pick *g)
 {
 	g->is_emu = Check_file_type(g->name);
 	g->havecht = 0;
 	g->save_num = g->old_save_num = 0;
-	g->menu_max = 0;
 	if (g->is_emu == 0xff)  //can not boot
 		return 0;
 	if (g->is_emu) {  //GB, GBC and NES games only have CLEAN BOOT: start them without the menu
@@ -1261,7 +1250,6 @@ u32 Game_pick(struct game_pick *g)
 	g->havecht = Check_cheat_file(g->name);
 	g->old_save_num = Check_mde_file(g->name);
 	g->save_num = g->old_save_num;
-	g->menu_max = 4 + ((gl_cheat_on == 1) ? ((g->havecht > 0) ? 1 : 0) : 0);
 	return 1;
 }
 //---------------------------------------------------------------------------------
@@ -1544,7 +1532,7 @@ u8 Game_launch(struct game_pick *g, u32 menu_line, u32 key_L)
 {
 	// CLEAN BOOT and BOOT WITH ADDON load the game's save into cart SRAM
 	// (WRITE TO NOR doesn't touch it)
-	if (menu_line < 2 && !pending_save_settle(0))
+	if (menu_line < 2 && !pending_save_settle())
 		return 0;
 	// A launch loads and patches the game in PSRAM, writes never measured
 	// faster than the BIOS's wait states (waitcnt.h)
@@ -1558,56 +1546,11 @@ u8 Game_launch(struct game_pick *g, u32 menu_line, u32 key_L)
 //---------------------------------------------------------------------------------
 void NOR_launch(u32 index, u32 key_L)
 {
-	if (!pending_save_settle(0))
+	if (!pending_save_settle())
 		return;
 	REG_WAITCNT_CART = WAITCNT_BIOS;  // as Game_launch
 	Boot_NOR_game(0, index, key_L);  // returns only if it failed
 	dialog_progress_end();  // a black screen
 	REG_WAITCNT_CART = WAITCNT_MENU;
 	cartlog_phase(PHASE_MENU, 0, NULL);
-}
-//---------------------------------------------------------------
-// The first NOR game's save (ezkernel.h): OP 0 looks for its file (0x10 if
-// there, 0 if not), 1 loads it into the cart's SRAM (0, or 3 if it isn't
-// there, 4 if the user kept a save still waiting to be copied:
-// pending_save_settle), 2 writes the SRAM to it (0, or 3 if it couldn't be
-// written whole).
-// 2: the SAVER folder failed.
-u8 FRAM_save_op(u8 OP)
-{
-	u32 res;
-	TCHAR savfilename[SAVE_NAME_MAX];
-
-	res = f_mkdir(SAVER_FOLDER);  //"/SAVER"
-	if ((res != FR_OK) && (res != FR_EXIST)) {
-		return 2;
-	}
-	res = f_chdir(SAVER_FOLDER);
-	if (res != FR_OK) {
-		return 2;
-	}
-	save_name(savfilename, pNorFS[0].filename, 0);
-	res = f_open(&gfile, savfilename, FA_OPEN_EXISTING);
-	if (res == FR_OK)
-		f_close(&gfile);
-	if (OP == 0)
-		return res == FR_OK ? 0x10 : 0;
-	if (OP == 1) {  //load to fram
-		if (res != FR_OK)
-			return 3;
-		if (!pending_save_settle(1))  // Torii: SRAM holds another game's save
-			return 4;
-		Bank_Switching(0);
-		Loadsavefile(savfilename);
-		return 0;
-	}
-	//bak fram save, with a progress dialog while it saves
-	dialog_progress_begin(gl_saving, savfilename);
-	progress_step(gl_save_ing, 0, PROGRESS_FULL);
-	u32 saved = Save_savefile(savfilename, Get_savefilesize(pNorFS[0].savemode));
-	if (saved == SAVE_WRITTEN)
-		progress_done(gl_done);
-	dialog_progress_end();
-	// A game with no save type (SAVE_NOTHING) writes no file, as before
-	return saved == SAVE_FAILED ? 3 : 0;
 }

@@ -468,7 +468,11 @@ static void hints_draw(u8 node)
 		return;
 	}
 	const struct ui_look *l = look();
-	u32 w = (u32)n->w, top = l->hint_y > n->y ? l->hint_y - (u32)n->y : 0, margin = l->margin;
+	// The chips at the look's hint_y in the page's bar; in a bar elsewhere
+	// (a dialog's), centred in its height
+	u32 w = (u32)n->w, h = (u32)n->h, margin = l->margin;
+	u32 top = l->hint_y >= n->y && l->hint_y + l->hint_chip_h <= n->y + h ? l->hint_y - (u32)n->y
+									      : (h - l->hint_chip_h) / 2;
 	text_clear(&win, 0, 0, w, (u32)n->h, ui_paper(node, UI_ROLE_NONE));
 	if (top + l->hint_chip_h <= (u32)n->h && w > 2 * margin) {
 		if (st->text) {

@@ -11,73 +11,9 @@ char *gl_library_scanning;
 char *gl_library_found;
 char *gl_library_saving;
 char *gl_file_overflow;
-
-char *gl_menu_btn;
-char *gl_close_btn;
-char *gl_lastest_game;
-
 char *gl_writing;
-
-char *gl_time;
-char *gl_Mon;
-char *gl_Tues;
-char *gl_Wed;
-char *gl_Thur;
-char *gl_Fri;
-char *gl_Sat;
-char *gl_Sun;
-
-char *gl_addon;
-char *gl_reset;
-char *gl_rts;
-char *gl_sleep;
-char *gl_cheat;
-
-char *gl_hot_key;
-char *gl_hot_key2;
-char *gl_save_key EWRAM_BSS;
-char *gl_load_key EWRAM_BSS;
-
-char *gl_settings_title EWRAM_BSS;
-char *gl_help_title EWRAM_BSS;
-char *gl_on EWRAM_BSS;
-char *gl_off EWRAM_BSS;
-char *gl_theme EWRAM_BSS;
-char **gl_theme_names EWRAM_BSS;
-char *gl_dim EWRAM_BSS;
-char *gl_minutes EWRAM_BSS;
-
-char *gl_language;
-char *gl_set_btn;
-char *gl_ok_btn;
-
-char *gl_formatnor_info;
-
 char *gl_loading_game;
-
-char *gl_engine;
-char *gl_use_engine;
-
-char *gl_recently_play;
-
-char *gl_START_help;
-char *gl_L_A_help;
-char *gl_LSTART_help;
-char *gl_online_manual;
-
-char *gl_no_game_played;
 char *gl_list_failed;
-char *gl_nor_title;
-
-char *gl_cart_str;
-char *gl_clock_str;
-//char* gl_offRTC_powersave;
-char *gl_rumble_str;
-
-char *gl_logging;
-char **gl_log_levels;
-char *gl_diagnose;
-char *gl_diag_run;
 
 char *gl_error_0;
 char *gl_error_1;
@@ -93,37 +29,36 @@ char *gl_error_9;
 char *gl_save_sav;
 char *gl_save_ing;
 
-char *gl_save;
-char *gl_auto_save;
-
-char *gl_modeB_INITstr;
-char *gl_modeB_RUMBLE;
-char *gl_modeB_RAM;
-char *gl_modeB_LINK;
-
-char *gl_led;
-char *gl_led_open;
-
-char *gl_Breathing_light;
-char *gl_SD_working;
-
 char *gl_NOR_full;
-char *gl_save_loaded;
-char *gl_save_saved;
-char *gl_file_exist;
-char *gl_file_noexist;
-char *gl_delete_ask EWRAM_BSS;
-char *gl_nor_delete_ask EWRAM_BSS;
-char *gl_no_game_nor EWRAM_BSS;
 char *gl_saving EWRAM_BSS;
 char *gl_format_title EWRAM_BSS;
 char *gl_erasing EWRAM_BSS;
 char *gl_done EWRAM_BSS;
 char *gl_patching EWRAM_BSS;
 char *gl_keep_power EWRAM_BSS;
-//--
-char **gl_rom_menu;
-char **gl_nor_op;
+
+// The menu's items, what they hold, and the hint bar's labels (screens/nav.c)
+char *gl_item_recent EWRAM_BSS;
+char *gl_item_fav EWRAM_BSS;
+char *gl_item_gba EWRAM_BSS;
+char *gl_item_gbc EWRAM_BSS;
+char *gl_item_gb EWRAM_BSS;
+char *gl_item_nes EWRAM_BSS;
+char *gl_item_sd EWRAM_BSS;
+char *gl_item_nor EWRAM_BSS;
+char *gl_item_settings EWRAM_BSS;
+char *gl_item_info EWRAM_BSS;
+char *gl_count_game EWRAM_BSS;
+char *gl_count_games EWRAM_BSS;
+char *gl_count_file EWRAM_BSS;
+char *gl_count_files EWRAM_BSS;
+char *gl_count_page EWRAM_BSS;
+char *gl_page_empty EWRAM_BSS;
+char *gl_hint_open EWRAM_BSS;
+char *gl_hint_move EWRAM_BSS;
+char *gl_hint_back EWRAM_BSS;
+char *gl_hint_ok EWRAM_BSS;
+char *gl_hint_cancel EWRAM_BSS;
 
 // The v0.4 Settings page (settings_model.h)
 char **gl_set_sections EWRAM_BSS;
@@ -157,52 +92,11 @@ const char en_library_found[] = "games found";
 // ... and its write before a launch, when the menu hadn't rested long enough
 const char en_library_saving[] = "Saving the game list";
 const char en_file_overflow[] = "Too big to start from the SD card (over 32 MB). Write it to NOR instead.";
-
-const char en_menu_btn[] = "[B]CANCEL    [A]OK";
-const char en_close_btn[] = "[A]OK";
 const char en_writing[] = "Writing to NOR";
-const char en_lastest_game[] = "Only the last game in NOR can be deleted";
-
-const char en_time[] = "     TIME";
-const char en_Mon[] = "MON";
-const char en_Tues[] = "TUE";
-const char en_Wed[] = "WED";
-const char en_Thur[] = "THU";
-const char en_Fri[] = "FRI";
-const char en_Sat[] = "SAT";
-const char en_Sun[] = "SUN";
-
-const char en_addon[] = "    ADDON";
-const char en_reset[] = "RESET";
-const char en_rts[] = "SAVESTATE";
-const char en_sleep[] = "SLEEP";
-const char en_cheat[] = "CHEAT";
-
-const char en_hot_key[] = "SLEEP KEY";
-const char en_hot_key2[] = " MENU KEY";
-
-const char en_language[] = " LANGUAGE";
 const char en_lang[] = "ENGLISH";
-const char en_set_btn[] = "SET";
-const char en_ok_btn[] = " OK";
-
-const char en_formatnor_info[] = "Erase every game in NOR? It takes about 4 minutes.";
-
 const char en_loading_game[] = "Loading the game";
-
-const char en_engine[] = "   ENGINE";
-const char en_use_engine[] = "FAST PATCH ENGINE";
-
-const char en_recently_play[] = "RECENTLY PLAYED";
-
-const char en_START_help[] = "Open recently played list";
-const char en_L_A_help[] = "Multiboot";
-const char en_LSTART_help[] = "Delete file";
-const char en_online_manual[] = "Online manual";
-
-const char en_no_game_played[] = "No game played yet";
+// A screen that didn't fit (screens/nav.c), which comes in again after this
 const char en_list_failed[] = "Can't show the list. It is tried again once this closes.";
-const char en_nor_title[] = "NOR";  // the NOR list's title bar
 
 // How long ago a game was played (userdata_ago): whole texts, or the
 // words after a number
@@ -219,26 +113,6 @@ const char en_ago_year[] = "1 year";
 const char en_ago_years[] = " years";
 struct userdata_ago_words gl_ago EWRAM_BSS;
 
-const char en_cart[] = "     CART";
-const char en_clock[] = "CLOCK";
-const char en_rumble[] = "RUMBLE";
-
-const char en_logging[] = "  LOGGING";
-const char *en_log_levels[4] = {"OFF", "ERRORS", "INFO", "DEBUG"};
-const char en_diagnose[] = " DIAGNOSE";
-const char en_diag_run[] = "RUN TESTS AND PROBES";
-
-const char en_save_key[] = "SAVE KEY";
-const char en_load_key[] = "LOAD KEY";
-const char en_settings_title[] = "SETTINGS";
-const char en_help_title[] = "HELP";
-const char en_on[] = "ON";
-const char en_off[] = "OFF";
-const char en_theme[] = "THEME";
-const char *en_theme_names[2] = {"DARK", "LIGHT"};
-const char en_dim[] = "DIM";
-const char en_minutes[] = "MIN";
-
 const char en_error_0[] = "Can't open the folder";
 const char en_error_1[] = "Can't open the file";
 const char en_error_2[] = "Can't open the SAVER folder";
@@ -252,27 +126,8 @@ const char en_error_9[] = "The folder path is too long";
 
 const char en_save_sav[] = "Save to SD card?";
 const char en_save_ing[] = "Saving";
-const char en_save[] = "     SAVE";
-const char en_auto_save[] = "AUTO SAVE";
-
-const char en_modeB_INITstr[] = "   MODE B";
-const char en_modeB_RUMBLE[] = "RUMBLE";
-const char en_modeB_RAM[] = "RAM";
-const char en_modeB_LINK[] = "LINK";
-
-const char en_led[] = "      LED";
-const char en_led_open[] = "ENABLE LED";
-const char en_Breathing_light[] = "BREATHING";
-const char en_SD_working[] = "   SD LED";
 
 const char en_NOR_full[] = "Not enough room in NOR";
-const char en_save_loaded[] = "Save loaded";
-const char en_save_saved[] = "Save written to the SD card";
-const char en_file_exist[] = "There is a save file already. Replace it?";
-const char en_file_noexist[] = "No save file found";
-const char en_delete_ask[] = "Delete this file?";
-const char en_nor_delete_ask[] = "Delete this game from NOR?";
-const char en_no_game_nor[] = "No games in NOR";
 const char en_saving[] = "Saving to SD card";
 const char en_format_title[] = "Erasing NOR";
 const char en_erasing[] = "Erasing";
@@ -280,12 +135,31 @@ const char en_done[] = "Done";
 const char en_patching[] = "Patching the game";
 const char en_keep_power[] = "Don't turn the power off.";
 
-const char *en_rom_menu[] = {
-	"CLEAN BOOT", "BOOT WITH ADDON", "WRITE TO NOR CLEAN", "WRITE TO NOR ADDON", "SAVE TYPE", "CHEAT",
-};
-const char *en_nor_op[5] = {
-	"DIRECT BOOT", "DELETE", "FORMAT ALL", "LOAD SAVE", "BACK UP SAVE",
-};
+// The menu's items (screens/registry.h), in the carousel's order; what an
+// item holds (a number, then the word: "1,204 files"); the empty frame a
+// page shows until its ticket lands; and the hint bar's labels, after a key
+// chip ("A open")
+const char en_item_recent[] = "Recent";
+const char en_item_fav[] = "Favourites";
+const char en_item_gba[] = "Game Boy Advance";
+const char en_item_gbc[] = "Game Boy Color";
+const char en_item_gb[] = "Game Boy";
+const char en_item_nes[] = "NES";
+const char en_item_sd[] = "SD card";
+const char en_item_nor[] = "NOR";
+const char en_item_settings[] = "Settings";
+const char en_item_info[] = "Info";
+const char en_count_game[] = "1 game";
+const char en_count_games[] = "games";
+const char en_count_file[] = "1 file";
+const char en_count_files[] = "files";
+const char en_count_page[] = "one page";
+const char en_page_empty[] = "Coming in a later build";
+const char en_hint_open[] = "open";
+const char en_hint_move[] = "move";
+const char en_hint_back[] = "back";
+const char en_hint_ok[] = "OK";
+const char en_hint_cancel[] = "cancel";
 
 // The v0.4 Settings page: section names, then each row's label and its
 // one-line explanation, which shows in the hint bar (at most 38 characters
@@ -389,72 +263,15 @@ void LoadEnglish(void)
 	gl_library_saving = (char *)en_library_saving;
 	gl_file_overflow = (char *)en_file_overflow;
 
-	gl_menu_btn = (char *)en_menu_btn;
-	gl_close_btn = (char *)en_close_btn;
 	gl_writing = (char *)en_writing;
-	gl_lastest_game = (char *)en_lastest_game;
-
-	gl_time = (char *)en_time;
-	gl_Mon = (char *)en_Mon;
-	gl_Tues = (char *)en_Tues;
-	gl_Wed = (char *)en_Wed;
-	gl_Thur = (char *)en_Thur;
-	gl_Fri = (char *)en_Fri;
-	gl_Sat = (char *)en_Sat;
-	gl_Sun = (char *)en_Sun;
-	gl_addon = (char *)en_addon;
-	gl_reset = (char *)en_reset;
-	gl_rts = (char *)en_rts;
-	gl_sleep = (char *)en_sleep;
-	gl_cheat = (char *)en_cheat;
-
-	gl_hot_key = (char *)en_hot_key;
-	gl_hot_key2 = (char *)en_hot_key2;
-
-	gl_language = (char *)en_language;
-	gl_set_btn = (char *)en_set_btn;
-	gl_ok_btn = (char *)en_ok_btn;
-	gl_formatnor_info = (char *)en_formatnor_info;
 
 	gl_loading_game = (char *)en_loading_game;
 
-	gl_engine = (char *)en_engine;
-	gl_use_engine = (char *)en_use_engine;
-
-	gl_recently_play = (char *)en_recently_play;
-
-	gl_START_help = (char *)en_START_help;
-	gl_L_A_help = (char *)en_L_A_help;
-	gl_LSTART_help = (char *)en_LSTART_help;
-	gl_online_manual = (char *)en_online_manual;
-
-	gl_no_game_played = (char *)en_no_game_played;
 	gl_list_failed = (char *)en_list_failed;
 
 	gl_ago = (struct userdata_ago_words){en_ago_now,    en_ago_minutes, en_ago_hours, en_ago_yesterday,
 					     en_ago_days,   en_ago_week,    en_ago_weeks, en_ago_month,
 					     en_ago_months, en_ago_year,    en_ago_years};
-
-	gl_cart_str = (char *)en_cart;
-	gl_clock_str = (char *)en_clock;
-	//gl_offRTC_powersave = (char*)en_offRTC_powersave;
-	gl_rumble_str = (char *)en_rumble;
-
-	gl_logging = (char *)en_logging;
-	gl_log_levels = (char **)en_log_levels;
-	gl_diagnose = (char *)en_diagnose;
-	gl_diag_run = (char *)en_diag_run;
-
-	gl_save_key = (char *)en_save_key;
-	gl_load_key = (char *)en_load_key;
-	gl_settings_title = (char *)en_settings_title;
-	gl_help_title = (char *)en_help_title;
-	gl_on = (char *)en_on;
-	gl_off = (char *)en_off;
-	gl_theme = (char *)en_theme;
-	gl_theme_names = (char **)en_theme_names;
-	gl_dim = (char *)en_dim;
-	gl_minutes = (char *)en_minutes;
 
 	gl_error_0 = (char *)en_error_0;
 	gl_error_1 = (char *)en_error_1;
@@ -469,27 +286,8 @@ void LoadEnglish(void)
 
 	gl_save_sav = (char *)en_save_sav;
 	gl_save_ing = (char *)en_save_ing;
-	gl_save = (char *)en_save;
-	gl_auto_save = (char *)en_auto_save;
-
-	gl_modeB_INITstr = (char *)en_modeB_INITstr;
-	gl_modeB_RUMBLE = (char *)en_modeB_RUMBLE;
-	gl_modeB_RAM = (char *)en_modeB_RAM;
-	gl_modeB_LINK = (char *)en_modeB_LINK;
-
-	gl_led = (char *)en_led;
-	gl_led_open = (char *)en_led_open;
-	gl_Breathing_light = (char *)en_Breathing_light;
-	gl_SD_working = (char *)en_SD_working;
 
 	gl_NOR_full = (char *)en_NOR_full;
-	gl_save_loaded = (char *)en_save_loaded;
-	gl_save_saved = (char *)en_save_saved;
-	gl_file_exist = (char *)en_file_exist;
-	gl_file_noexist = (char *)en_file_noexist;
-	gl_delete_ask = (char *)en_delete_ask;
-	gl_nor_delete_ask = (char *)en_nor_delete_ask;
-	gl_no_game_nor = (char *)en_no_game_nor;
 	gl_saving = (char *)en_saving;
 	gl_format_title = (char *)en_format_title;
 	gl_erasing = (char *)en_erasing;
@@ -497,8 +295,27 @@ void LoadEnglish(void)
 	gl_patching = (char *)en_patching;
 	gl_keep_power = (char *)en_keep_power;
 	//
-	gl_rom_menu = (char **)en_rom_menu;
-	gl_nor_op = (char **)en_nor_op;
+	gl_item_recent = (char *)en_item_recent;
+	gl_item_fav = (char *)en_item_fav;
+	gl_item_gba = (char *)en_item_gba;
+	gl_item_gbc = (char *)en_item_gbc;
+	gl_item_gb = (char *)en_item_gb;
+	gl_item_nes = (char *)en_item_nes;
+	gl_item_sd = (char *)en_item_sd;
+	gl_item_nor = (char *)en_item_nor;
+	gl_item_settings = (char *)en_item_settings;
+	gl_item_info = (char *)en_item_info;
+	gl_count_game = (char *)en_count_game;
+	gl_count_games = (char *)en_count_games;
+	gl_count_file = (char *)en_count_file;
+	gl_count_files = (char *)en_count_files;
+	gl_count_page = (char *)en_count_page;
+	gl_page_empty = (char *)en_page_empty;
+	gl_hint_open = (char *)en_hint_open;
+	gl_hint_move = (char *)en_hint_move;
+	gl_hint_back = (char *)en_hint_back;
+	gl_hint_ok = (char *)en_hint_ok;
+	gl_hint_cancel = (char *)en_hint_cancel;
 	//
 	gl_set_sections = (char **)en_set_sections;
 	gl_set_labels = (char **)en_set_labels;
@@ -517,7 +334,6 @@ void LoadEnglish(void)
 	gl_pop_close = (char *)en_pop_close;
 	gl_pop_cancel = (char *)en_pop_cancel;
 	gl_pop_cancel_button = (char *)en_pop_cancel_button;
-	gl_nor_title = (char *)en_nor_title;
 }
 //---------------------------------------------------------------------------------
 // The languages offered in SETTINGS. A new language adds its strings and a

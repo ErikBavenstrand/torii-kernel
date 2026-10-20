@@ -47,8 +47,6 @@ void test_clock_and_rumble_are_separate(void)
 	gl_game_uses = uses;
 }
 
-extern u16 SET_info_buffer[0x200];
-
 // SETTINGS stages its saves and writes the kernel NOR once, as it closes,
 // only if a slot changed (Stage_SET_info, Commit_SET_info). Nothing here
 // writes the NOR: Diagnostics runs these tests on the cart. A changed slot is
