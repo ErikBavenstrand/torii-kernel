@@ -71,6 +71,8 @@ NO_COMPAT = {
     "source/ui/palette.c",
     "source/ui/palette.h",
     "source/ui/ring.h",
+    "source/ui/rowcache.c",
+    "source/ui/rowcache.h",
     "source/ui/ui.h",
     "source/ui/ui_core.c",
     "source/ui/ui_list.c",
