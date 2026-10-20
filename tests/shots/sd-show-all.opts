@@ -2,6 +2,6 @@
 # Torii's folder and the system folders too
 #! settings 28=1 33=1
 -w "nav: home ready"
--k @8:UP -k @12:- -k @16:UP -k @20:- -k @24:UP -k @28:- -k @32:UP -k @36:- -k @40:A -k @44:-
+-k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:LEFT -k @28:- -k @32:LEFT -k @36:- -k @40:A -k @44:-
 -w "sdcard: counted /"
 -s @2:root.png

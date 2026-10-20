@@ -1,8 +1,10 @@
 // A folder's entries as the SD card page lists them (v0.4 decisions, B14):
 // raw file names, folders first, then files, each A-Z by R3's sort key
 // (case and accents folded, numbers by value) of the name without its
-// extension, ties by the raw name. Up to SDLIST_MAX entries: past that the
-// list says it is truncated (the "showing the first N" note).
+// extension, ties by the raw name. Up to SDLIST_MAX files and, apart from
+// them, up to SDLIST_MAX folders (so a folder past the files' cap still
+// lists every subfolder): past either the list says it is truncated (the
+// "showing the first N" note).
 //
 // The entries live in an area of their own (PSRAM in the kernel, the SD
 // names area of engine/psram.h; plain memory in tests/host), written only
@@ -27,8 +29,9 @@
 
 #include "library.h"
 
-#define SDLIST_MAX 1024  // entries a folder lists (D16)
-#define SDLIST_ORDER_BYTES (SDLIST_MAX * 4u)
+#define SDLIST_MAX 1024  // files a folder lists (D16), and folders, apart
+#define SDLIST_ENTRIES (2 * SDLIST_MAX)
+#define SDLIST_ORDER_BYTES (SDLIST_ENTRIES * 4u)
 #define SDLIST_NONE 0xFFFFFFFFu
 #define SDLIST_NAME_MAX LIBRARY_NAME_MAX  // a file name's bytes, without the NUL
 
@@ -60,11 +63,11 @@ _Static_assert(sizeof(struct sdlist_rec) == 16, "a record is 16 bytes");
 #define SDLIST_SORT_WORDS 3  // key words the sort keeps in RAM
 
 struct sdlist_scratch {
-	u32 offset[SDLIST_MAX];  // each entry's record, in the order added
-	u32 key[SDLIST_MAX][SDLIST_SORT_WORDS];  // its key's first bytes, big-endian, 0 past its end
-	u8 dir[SDLIST_MAX];      // 1 for a folder
-	u16 order[SDLIST_MAX];   // entries, sorting
-	u16 tmp[SDLIST_MAX];
+	u32 offset[SDLIST_ENTRIES];  // each entry's record, in the order added
+	u32 key[SDLIST_ENTRIES][SDLIST_SORT_WORDS];  // its key's first bytes, big-endian, 0 past its end
+	u8 dir[SDLIST_ENTRIES];      // 1 for a folder
+	u16 order[SDLIST_ENTRIES];   // entries, sorting
+	u16 tmp[SDLIST_ENTRIES];
 	u16 rec[SDLIST_REC_MAX / 2];  // a record on its way to the area
 };
 
@@ -76,14 +79,16 @@ struct sdlist {
 	u32 top;    // bytes of records used, from SDLIST_ORDER_BYTES
 	u32 count;  // entries listed
 	u32 folders;  // of them folders (the first ones, once finished)
-	u8 truncated;  // more entries than fitted (the cap or the area)
+	u8 truncated;  // more entries than fitted (a cap or the area)
+	u8 full;       // nothing more fits: the area is full, or both caps reached
 };
 
 // Starts a new listing in the area base (cap bytes, at least
 // SDLIST_ORDER_BYTES; base word-aligned) with scratch.
 void sdlist_begin(struct sdlist *l, u8 *base, u32 cap, lib_put_fn put, struct sdlist_scratch *scratch);
-// Adds an entry: 1 if listed, 0 if it didn't fit (then truncated), and 0
-// with nothing set for a name over SDLIST_NAME_MAX bytes or empty.
+// Adds an entry: 1 if listed, 0 if it didn't fit (then truncated; full once
+// nothing more can), and 0 with nothing set for a name over SDLIST_NAME_MAX
+// bytes or empty.
 int sdlist_add(struct sdlist *l, const char *name, u32 size, int is_dir);
 // Sorts what was added and writes the order: the list reads from then on,
 // and the scratch is free.

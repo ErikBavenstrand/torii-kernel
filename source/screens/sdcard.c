@@ -49,6 +49,10 @@
 #define LIST_H 112    // 8 rows of 14 px: whole rows (B9's contract)
 #define LIST_PAD 4    // the icon's inset in its row
 #define DETAIL_W 60   // the size or the count ("1,024+ items")
+#define NOTE_X 48     // an empty folder's note, in the card's middle (narrow: plane
+#define NOTE_Y 72     // 2's tiles are the popups' and confirmations' too)
+#define NOTE_W 144
+#define NOTE_H 16
 #define HINTS_H 16
 static const struct ui_card_config card = {4, 4, 4, 1, 0};
 
@@ -61,9 +65,10 @@ static const struct ui_card_config card = {4, 4, 4, 1, 0};
 #define ARG_HARD 0x10000u        // nav_defer's arg: L was held (a hard reset)
 
 _Static_assert(PSRAM_WINDOW + PSRAM_NAMES_BYTES <= PSRAM_LIBRARY_SCRATCH, "the listing reaches the library's scratch");
-_Static_assert(READCACHE_SDLIST + sizeof(struct sdlist_scratch) <= READCACHE_USERDATA,
+_Static_assert(READCACHE_SDLIST + sizeof(struct sdlist_scratch) <= MAX_pReadCache_size,
 	       "the listing's scratch passes its room");
-_Static_assert(READCACHE_SDLIST >= READCACHE_LIBRARY + 0x400, "the listing's scratch meets the library's");
+_Static_assert(READCACHE_SDLIST >= READCACHE_USERDATA + READCACHE_USERDATA_SIZE,
+	       "the listing's scratch meets the user data's");
 
 extern TCHAR currentpath[MAX_path_len];
 extern FILINFO fileinfo;  // ezkernelnew.c's
@@ -74,6 +79,7 @@ extern u8 pReadCache[];
 enum {
 	POP_OPEN,
 	POP_LAUNCH,
+	POP_CLEAN,
 	POP_NOR,
 	POP_NOR_ADDON,
 	POP_FAV,
@@ -125,21 +131,14 @@ static u32 entries(void)
 static u32 model_count(void *ctx)
 {
 	(void)ctx;
-	// A note last: "Showing the first 1,024", or an empty folder's (a row,
-	// not a label: plane 2's tiles are the popups' too)
-	return entries() + (sd.list.truncated || !entries() ? 1u : 0u);
+	return entries();
 }
 
 static int model_fetch(void *ctx, u32 i, struct ui_item *out)
 {
 	(void)ctx;
-	if (i >= entries()) {
-		if (i > entries() || (entries() && !sd.list.truncated))
-			return UI_ITEM_PENDING;
-		out->text = entries() ? sd.note : gl_sd_empty;
-		out->ink = UI_ROLE_FAINT;
-		return UI_ITEM_READY;
-	}
+	if (i >= entries())
+		return UI_ITEM_PENDING;
 	const struct sdlist_rec *r = sdlist_at(&sd.list, i);
 	out->text = sdlist_name(r);
 	if (sdlist_is_dir(r)) {
@@ -162,6 +161,7 @@ enum {
 	N_PATH,
 	N_HINTS,
 	N_CARD,
+	N_NOTE,
 	N_LIST,
 	N_BAR,
 	N_NODES
@@ -169,6 +169,7 @@ enum {
 
 static const struct ui_title_config title = {"", "", ART_ICON16_SD};
 static const struct ui_hints_config hints_config = {0, 0};  // enter's
+static const struct ui_label_config note_label = {"", UI_FONT_BODY, UI_ALIGN_CENTER, 0, 0};
 static const struct ui_list_config list = {&model, UI_ROW_PITCH_LIST, UI_LIST_WRAP | UI_LIST_MARQUEE | UI_LIST_ICON8,
 					   DETAIL_W, LIST_PAD};
 static const struct ui_scrollbar_config bar = {N_LIST};
@@ -178,8 +179,10 @@ static const struct ui_spec nodes[N_NODES] = {
 	[N_PATH] = {UI_PATH, 2, UI_NONE, 2, UI_LEFT, UI_HIDDEN, 0, UI_ROLE_BG, PATH_X, 0, PATH_W, PATH_H, 0},
 	[N_HINTS] = {UI_HINTS, 3, UI_NONE, 3, UI_HFILL | UI_BOTTOM, 0, 0, 0, 0, 0, 0, HINTS_H, &hints_config},
 	[N_CARD] = {UI_CARD, 4, UI_NONE, 2, UI_HFILL, 0, 0, 0, 0, CARD_Y, 0, CARD_H, &card},
-	[N_LIST] = {UI_LIST, 5, UI_NONE, 1, UI_LEFT, UI_FOCUSABLE, 0, 0, LIST_X, LIST_Y, LIST_W, LIST_H, &list},
-	[N_BAR] = {UI_SCROLLBAR, 6, UI_NONE, 2, UI_LEFT, 0, 0, UI_ROLE_PANEL, LIST_X + LIST_W, LIST_Y, 8, LIST_H, &bar},
+	[N_NOTE] = {UI_LABEL, 5, UI_NONE, 2, UI_LEFT, 0, UI_ROLE_FAINT, UI_ROLE_PANEL, NOTE_X, NOTE_Y, NOTE_W, NOTE_H,
+		    &note_label},
+	[N_LIST] = {UI_LIST, 6, UI_NONE, 1, UI_LEFT, UI_FOCUSABLE, 0, 0, LIST_X, LIST_Y, LIST_W, LIST_H, &list},
+	[N_BAR] = {UI_SCROLLBAR, 7, UI_NONE, 2, UI_LEFT, 0, 0, UI_ROLE_PANEL, LIST_X + LIST_W, LIST_Y, 8, LIST_H, &bar},
 };
 
 static int sd_event(struct ui_view *v, const struct ui_event *e);
@@ -231,6 +234,15 @@ static void show_folder(void)
 	snprintf(sd.pills, sizeof(sd.pills), "SD%s", root ? "" : currentpath);
 	ui_path_set(node(N_PATH), sd.pills);
 	ui_show(node(N_PATH), !root);
+	ui_label_set(node(N_NOTE), entries() ? "" : gl_sd_empty);  // a label hidden would cut a hole in the card
+}
+
+// The hint bar: the keys, or on a truncated folder's last entry the note
+// that more weren't listed (the end, where it is wondered about)
+static void hint_for(u32 at)
+{
+	int note = sd.list.truncated && entries() && at + 1 >= entries();
+	ui_hints_text(node(N_HINTS), note ? sd.note : NULL);
 }
 
 // --- Listing ----------------------------------------------------------------------
@@ -288,16 +300,19 @@ static int list_folder(void)
 				continue;
 			u32 size =
 				fileinfo.fsize > 0xFFFFFFFFu ? 0xFFFFFFFFu : (u32)fileinfo.fsize;  // exFAT's past 4 GB
+			// Past the files' cap, folders still list: read on until
+			// nothing more fits
 			if (!sdlist_add(&sd.list, fileinfo.fname, size, (fileinfo.fattrib & AM_DIR) != 0) &&
-			    sd.list.truncated)
-				break;  // full: the rest go unread
+			    sd.list.full)
+				break;
 		}
 		f_closedir(&dir);
 	}
 	sdlist_finish(&sd.list);
 	char n[12];
-	sdlist_number(n, sizeof(n), entries());
-	snprintf(sd.note, sizeof(sd.note), "%s %s", gl_sd_first, n);
+	u32 files = entries() - sd.list.folders, by_files = files >= SDLIST_MAX || sd.list.folders < SDLIST_MAX;
+	sdlist_number(n, sizeof(n), by_files ? files : sd.list.folders);
+	snprintf(sd.note, sizeof(sd.note), "%s %s %s", gl_sd_first, n, by_files ? gl_count_files : gl_sd_folders);
 	sd.count_next = 0;
 	u32 ms = cycles_since(start) / (ENGINE_FRAME_CYCLES * 60u / 1000u);
 	tlog_debug("sdcard: listed %s: %lu folders, %lu files%s (%lu ms)", currentpath, (unsigned long)sd.list.folders,
@@ -452,6 +467,7 @@ static void relist(u32 at)
 	ui_list_reset(l, at);
 	show_folder();
 	ui_list_page_label(l, node(N_TITLE), position_text(ui_list_cursor(l)));
+	hint_for(ui_list_cursor(l));
 	count_start();
 	sd.announce = 1;
 	sd.measure_left = 16;
@@ -478,6 +494,12 @@ static int take_entry(u32 i)
 	sd.full[dl] = '/';
 	memcpy(sd.full + dl + sep, sd.name, nl + 1);
 	return 1;
+}
+
+static void list_failed(u32 arg)
+{
+	(void)arg;
+	error(0);
 }
 
 static void folder_in(u32 i)
@@ -523,9 +545,12 @@ static void folder_up(u32 arg)
 
 // --- Actions ----------------------------------------------------------------------
 
+// 1 if Settings turns any BOOT WITH ADDON switch on, from the slots as the
+// launch reads them (the gl_*_on copies are only read at a launch)
 static int any_addon(void)
 {
-	return (gl_reset_on | gl_rts_on | gl_sleep_on | gl_cheat_on) != 0;
+	return Read_SET_info(assress_v_reset) == 1 || Read_SET_info(assress_v_rts) == 1 ||
+	       Read_SET_info(assress_v_sleep) == 1 || Read_SET_info(assress_v_cheat) == 1;
 }
 
 // Launch, and A on a game: with the addons Settings turns on, if any
@@ -644,6 +669,8 @@ static void file_popup(u32 arg)
 		pop_add(POP_OPEN, gl_sd_open, 0);
 	} else if (console != LIB_CONSOLE_NONE) {
 		pop_add(POP_LAUNCH, gl_sd_launch, 0);
+		if (any_addon())  // a game patches break can always start clean
+			pop_add(POP_CLEAN, gl_sd_clean, 0);
 		if (console == LIB_GBA) {  // only GBA games go to the game NOR
 			pop_add(POP_NOR, gl_sd_nor, 0);
 			if (any_addon())
@@ -693,6 +720,9 @@ static void file_popup(u32 arg)
 		case POP_LAUNCH:
 			launch(launch_how(), hard);
 			break;
+		case POP_CLEAN:
+			launch(ACTION_CLEAN, hard);
+			break;
 		case POP_NOR:
 			launch(ACTION_NOR, hard);
 			break;
@@ -736,6 +766,7 @@ static int sd_event(struct ui_view *v, const struct ui_event *e)
 	switch (e->type) {
 	case UI_EV_CURSOR:
 		ui_title_set_right(node(N_TITLE), position_text(e->index));
+		hint_for(e->index);
 		frame_measure("sd-move");
 		return 1;
 	case UI_EV_ACTIVATE:
@@ -784,9 +815,10 @@ static struct ui_view *sd_enter(u32 item, u32 row)
 	(void)item;
 	sd.job = JOB_NONE;
 	sd.counting = SDLIST_NONE;
+	int listed;
 	art_icon8_tile(ART_ICON8_FOLDER, UI_ROLE_ACCENT_INK, sd.icons[0]);
 	art_icon8_tile(ART_ICON8_FILE, UI_ROLE_FAINT, sd.icons[1]);
-	list_folder();
+	listed = list_folder();
 	struct ui_view *v = ui_push(&view, &sd);
 	if (!v)
 		return 0;
@@ -805,8 +837,11 @@ static struct ui_view *sd_enter(u32 item, u32 row)
 	ui_list_reset(node(N_LIST), at);
 	show_folder();
 	ui_title_set_right(node(N_TITLE), position_text(ui_list_cursor(node(N_LIST))));
+	hint_for(ui_list_cursor(node(N_LIST)));
 	count_start();
 	sd.announce = 1;
+	if (!listed)
+		nav_defer(list_failed, 0);  // after the frame: no dialog while the shell pushes the page
 	return v;
 }
 

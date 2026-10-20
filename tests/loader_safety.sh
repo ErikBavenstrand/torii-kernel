@@ -133,6 +133,7 @@ logged() { [ $ok = 0 ] || grep -qF -- "$1" "$log" || bad "power-on $runs didn't 
 # (the settings sector's write still runs, from a first WRITE TO NOR).
 write_a=$(nav_file /A.gba 0 nor)
 write_b=$(nav_file /B.gba 1 nor)
+write_addon=$(nav_file /A.gba 0 nor-addon)
 # (each waits for the page to come back after the action, then 30 frames)
 delete="$(nav_nor_delete_page 1 yes) $(_nav_file '-w "nav: page nor ready"' '-k @30:-')"
 delete_no="$(nav_nor_delete_page 1 no) $(_nav_file '-w "nor: delete 1: cancelled"' '-k @30:-')"
@@ -198,6 +199,16 @@ EOF
     pass "WRITE TO NOR"
   fi
 
+  # WRITE TO NOR with addon (RESET on: the popup offers it), through the page
+  if shard_case; then
+    new_cart nor-write-addon
+    settings 1=1
+    boot $write_addon -f 900
+    logged "sdcard: write to NOR with addon /A.gba"
+    logged "nor: list saved, 1 games"
+    pass "WRITE TO NOR with addon"
+  fi
+
   if shard_case; then
     new_cart nor-delete
     boot $write_a -f 900
@@ -223,7 +234,7 @@ EOF
   # FORMAT ALL answered with B: nothing is erased or written
   if shard_case; then
     new_cart nor-format-no
-    boot $write_a -f 700
+    boot $write_a -f 900
     boot $format_no
     logged "nor: format: cancelled"
     [ $ok = 0 ] || ! grep -qE 'nor: erased|nor: list saved' "$log" || bad "B on the format question wrote the NOR"

@@ -13,7 +13,7 @@ void sdlist_begin(struct sdlist *l, u8 *base, u32 cap, lib_put_fn put, struct sd
 	l->scratch = scratch;
 	l->top = SDLIST_ORDER_BYTES;
 	l->count = l->folders = 0;
-	l->truncated = 0;
+	l->truncated = l->full = 0;
 }
 
 int sdlist_add(struct sdlist *l, const char *name, u32 size, int is_dir)
@@ -21,8 +21,10 @@ int sdlist_add(struct sdlist *l, const char *name, u32 size, int is_dir)
 	u32 len = (u32)strnlen(name, SDLIST_NAME_MAX + 1);
 	if (!len || len > SDLIST_NAME_MAX)
 		return 0;
-	if (l->count >= SDLIST_MAX) {
+	u32 files = l->count - l->folders;
+	if (is_dir ? l->folders >= SDLIST_MAX : files >= SDLIST_MAX) {
 		l->truncated = 1;
+		l->full = l->folders >= SDLIST_MAX && files >= SDLIST_MAX;
 		return 0;
 	}
 	struct sdlist_rec *r = (struct sdlist_rec *)l->scratch->rec;
@@ -40,7 +42,7 @@ int sdlist_add(struct sdlist *l, const char *name, u32 size, int is_dir)
 	u32 used = (u32)sizeof(*r) + key + ((key_len + 2) & ~1u),
 	    bytes = (used + 3) & ~3u;  // the next starts on a word
 	if (l->top + bytes > l->cap) {
-		l->truncated = 1;
+		l->truncated = l->full = 1;
 		return 0;
 	}
 	u32 console = is_dir ? LIB_CONSOLE_NONE : library_console_of(name);

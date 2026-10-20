@@ -20,7 +20,7 @@
 # Routes into a page (a game's popup, a Settings row) come with the page's
 # ticket: until then they fail, saying which one.
 #
-# nav_file PATH ROW... [ACTION] [hard]: from power-on into the SD card page
+# nav_file PATH ROW... [ACTION] [hard] [addon]: from power-on into the SD card page
 # (source/screens/sdcard.c) and down PATH's folders to its file, one ROW per
 # part of PATH: the row it has in its folder's listing (folders first, then
 # files, A-Z as the page sorts them, hidden entries left out), which the
@@ -28,13 +28,15 @@
 # START opens its popup, and the route waits for the page to log that
 # popup's path, so a wrong row stops the run there. ACTION then picks from
 # the popup: popup (none: it stays open), launch (Launch; with hard, L held:
-# a hard reset), nor (Write to NOR), nor-addon (Write to NOR with addon,
-# which shows only while an addon is on), fav (Add to or Remove from
+# a hard reset), clean (Clean boot), nor (Write to NOR), nor-addon (Write
+# to NOR with addon), fav (Add to or Remove from
 # favourites, then B closes it), delete (Delete, then Delete in the
 # confirmation), delete-no (Delete, then Cancel, then B), info (File info,
 # then A closes it), or open (no popup: A on the row, which starts a game).
+# Clean boot and Write to NOR with addon show only while an addon is on:
+# say addon then (clean and nor-addon imply it), so the route counts them.
 # Later options count from the route's last wait (-w): the popup's line, or
-# the folder's with open. Limits: the route starts from home's first row, so
+# the folder's with open. Limits: the route starts from home, facing its first item, so
 # the card must start on home there (Start on Home, or a fresh card: Last
 # place may open the SD card page, or home facing another item); and log
 # lines are cut at 240 characters, so a path of about 225 bytes or more
@@ -131,14 +133,15 @@ nav_to() {
 }
 
 nav_file() {
-  local path=$1 hard=0 action=popup folder='' part parts=() rows=() lines=() keys=() i
+  local path=$1 hard=0 addon=0 action=popup folder='' part parts=() rows=() lines=() keys=() i
   shift
   IFS=/ read -r -a parts <<<"${path#/}"
   while [ $# -gt 0 ]; do
     case $1 in
     [0-9]*) rows+=("$1") ;;
     hard) hard=1 ;;
-    popup | launch | nor | nor-addon | fav | delete | delete-no | info | open) action=$1 ;;
+    addon) addon=1 ;;
+    popup | launch | clean | nor | nor-addon | fav | delete | delete-no | info | open) action=$1 ;;
     *)
       _nav_fail "nav_file: unknown option $1"
       return 1
@@ -150,7 +153,7 @@ nav_file() {
     _nav_fail "nav_file $path: ${#parts[@]} parts but ${#rows[@]} rows"
     return 1
   fi
-  lines=('-w "nav: home ready"' "$(_nav_keys 8 UP UP UP UP A)" '-w "sdcard: ready /"')
+  lines=('-w "nav: home ready"' "$(_nav_keys 8 LEFT LEFT LEFT LEFT A)" '-w "sdcard: ready /"')
   for ((i = 0; i < ${#parts[@]}; i++)); do
     part=${parts[$i]}
     keys=()
@@ -171,8 +174,9 @@ nav_file() {
     case $action in
     popup) keys=() ;;
     launch) keys=("$a") ;;
-    nor) keys=(DOWN "$a") ;;
-    nor-addon) keys=(DOWN DOWN "$a") ;;
+    clean) keys=(DOWN "$a") ;;
+    nor) if [ "$addon" = 1 ]; then keys=(DOWN DOWN "$a"); else keys=(DOWN "$a"); fi ;;
+    nor-addon) keys=(DOWN DOWN DOWN "$a") ;;
     fav) keys=(UP UP UP A B) ;;
     delete) keys=(UP UP A RIGHT A) ;;
     delete-no) keys=(UP UP A A B) ;;

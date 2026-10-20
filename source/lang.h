@@ -145,7 +145,7 @@ enum nor_save {
 extern char **gl_nor_saves;
 
 // The SD card page (screens/sdcard.c): gl_sd_first is followed by a
-// number, gl_sd_delete_ask by a name and "?", and gl_sd_kind_game follows a
+// number and "files" or gl_sd_folders, gl_sd_delete_ask by a name and "?", and gl_sd_kind_game follows a
 // console's name
 extern char *gl_hint_menu;
 extern char *gl_sd_item;
@@ -155,6 +155,8 @@ extern char *gl_sd_first;
 extern char *gl_sd_empty;
 extern char *gl_sd_open;
 extern char *gl_sd_launch;
+extern char *gl_sd_clean;
+extern char *gl_sd_folders;
 extern char *gl_sd_nor;
 extern char *gl_sd_nor_addon;
 extern char *gl_sd_fav_add;

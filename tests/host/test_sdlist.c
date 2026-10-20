@@ -130,10 +130,20 @@ void test_sdlist_cap(void)
 	}
 	CHECK_EQ(added, (u32)SDLIST_MAX);
 	CHECK(l.truncated);
+	CHECK(!l.full);
+	// Folders still list past the files' cap, up to a cap of their own
+	for (u32 i = 0; i < SDLIST_MAX + 1; i++) {
+		snprintf(name, sizeof(name), "Folder %04u", (unsigned)i);
+		CHECK_EQ(sdlist_add(&l, name, 0, 1), i < SDLIST_MAX ? 1 : 0);
+	}
+	CHECK(l.full);
 	sdlist_finish(&l);
-	CHECK_EQ(l.count, (u32)SDLIST_MAX);
+	CHECK_EQ(l.count, 2u * SDLIST_MAX);
+	CHECK_EQ(l.folders, (u32)SDLIST_MAX);
+	CHECK(sdlist_is_dir(sdlist_at(&l, SDLIST_MAX - 1)));
+	CHECK(!sdlist_is_dir(sdlist_at(&l, SDLIST_MAX)));
 	u32 prev = 0;
-	for (u32 i = 0; i < l.count; i++) {
+	for (u32 i = SDLIST_MAX; i < l.count; i++) {
 		unsigned n = 0;
 		CHECK(sscanf(sdlist_name(sdlist_at(&l, i)), "Game %u.gba", &n) == 1);
 		CHECK(n > prev && n != dropped);
@@ -180,9 +190,9 @@ void test_sdlist_area_full(void)
 
 void test_sdlist_counts(void)
 {
-	u8 *area = new_area(8192);
+	u8 *area = new_area(SDLIST_ORDER_BYTES + 4096);
 	struct sdlist l;
-	sdlist_begin(&l, area, 8192, put, &scratch);
+	sdlist_begin(&l, area, SDLIST_ORDER_BYTES + 4096, put, &scratch);
 	CHECK(sdlist_add(&l, "B", 0, 1));
 	CHECK(sdlist_add(&l, "A", 0, 1));
 	sdlist_finish(&l);
