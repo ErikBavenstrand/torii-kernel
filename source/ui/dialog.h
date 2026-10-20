@@ -57,7 +57,7 @@ void dialog_close(void);
 
 // Ends a session the dialogs started (the boot's) without ending the engine:
 // the screen goes to black (ui_leave), every dialog goes, and the session
-// is the caller's from then on (the menu's), with the THEME, ACCENT and DIM
+// is the caller's from then on (the menu's), with the THEME and DIM
 // settings applied as a new session would. Nothing if no such session runs.
 void dialog_hand_over(void);
 

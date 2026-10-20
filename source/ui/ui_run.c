@@ -386,11 +386,13 @@ static void fade_set(void *ctx, s32 value)
 	gfx_pal_use_faded(1);
 }
 
-static void load_palette(void)
+// Loads the first banks of the UI's (an item switch changes only banks 0
+// and 1; a theme switch all of them)
+static void load_palette(u32 banks)
 {
 	u16 pal[UI_BANKS * 16];
 	ui_theme_banks(ui_theme(), ui_item(), pal);
-	gfx_pal_load(UI_THEME_RUN_FIRST / 16, pal, UI_THEME_RUN_COLOURS);
+	gfx_pal_load(UI_THEME_RUN_FIRST / 16, pal, banks * 16);
 	if (gfx_pal_faded_on)
 		fade_set(0, motion_value(ui.fade));
 }
@@ -399,14 +401,14 @@ void ui_theme_set(const struct ui_theme *theme)
 {
 	ui_theme_select(theme);
 	ui.in.timing = &ui_theme()->input;
-	load_palette();
+	load_palette(UI_BANKS);
 	ui_wake();
 }
 
 void ui_item_set(u32 item)
 {
 	ui_item_select(item);
-	load_palette();
+	load_palette(UI_BANK_SELECTED + 1);
 	ui_wake();
 }
 
@@ -1005,7 +1007,7 @@ void ui_init(const struct ui_theme *theme)
 	TLOG_ASSERT(ui.stage_map != RES_NONE);
 	ui.stage = res_bg_addr(ui.stage_map);
 	ui_dim_set_minutes(ui_dim_setting());
-	load_palette();
+	load_palette(UI_BANKS);
 	gfx_set_dispcnt(DISP_MODE0_OBJ1D | DISP_OBJ);
 	ui.active = 1;
 	ui_wake();

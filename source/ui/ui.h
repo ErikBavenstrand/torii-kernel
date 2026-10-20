@@ -284,8 +284,8 @@ void ui_item_select(u32 item);
 // VBlank; nothing is redrawn. The built-ins share their fonts and layout,
 // so they can switch while views are up.
 void ui_theme_set(const struct ui_theme *theme);
-// Makes item's accent the current one: loads banks 0 and 1's accent
-// colours in the next VBlank; nothing is redrawn.
+// Makes item's accent the current one: loads banks 0 and 1 (32 colours, 14
+// of them the item's) in the next VBlank; nothing is redrawn.
 void ui_item_set(u32 item);
 const struct ui_theme *ui_theme(void);
 u32 ui_item(void);
