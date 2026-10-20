@@ -13,7 +13,7 @@
 //   (theme dialog_in), and closes the same way backwards (dialog_out)
 //   before the call returns. The screen's loop goes on as before.
 // - From plain code (no view up), the call sets up the engine itself
-//   (engine_init, ui_init with the THEME and ACCENT settings) and, when
+//   (engine_init, ui_init with the THEME setting) and, when
 //   done, shuts it down on a black screen (dialog_blank).
 //
 // dialog_open() and dialog_close() keep that engine session over several

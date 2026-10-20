@@ -108,6 +108,14 @@ enum ui_bank {
 	UI_BANK_ALERT,     // neutrals, danger and the NOR bar
 	UI_BANKS,
 };
+// The colours a theme switch changes in BG palette RAM: one contiguous run,
+// so the theme wipe (B19, research override R7) can swap it in one HBlank
+// DMA (32 words). The UI's banks are always banks 0-3 (ui_init), nothing in
+// them is the same in both themes worth leaving out, and nothing outside them
+// depends on the theme. OBJ colours that follow the theme (the carousel's fog)
+// go in a contiguous run of OBJ banks of their own (B12).
+#define UI_THEME_RUN_FIRST 0
+#define UI_THEME_RUN_COLOURS (UI_BANKS * 16)
 
 // --- Themes ------------------------------------------------------------------
 // Two built-in themes, light and dark, with one layout: switching between

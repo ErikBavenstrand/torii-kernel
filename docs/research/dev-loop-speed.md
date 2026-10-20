@@ -36,7 +36,7 @@ other sessions testing in the same VM (load 5–7): 193.5 s before the changes b
   `nor_safety.sh` also stopped writing a 64 MB 0xFF game NOR per case (1.3 s each through `tr`); the emulator fills a new or short file with 0xFF itself.
 - **Shards.** `tests/all.sh` runs `nor_safety.sh` as 3 jobs and `loader_safety.sh` as 4 (`N/M` argument: every Mth case from the Nth), 2–2.7 s each.
 - **Host tests.** `tools/hostcc.py` compiles each file to its own object in parallel, cached in `dist/host/obj` by a hash of its preprocessed text (not times, which virtiofs can show late).
-  The theme checker shares the objects. Its 19 runs in `tests/themecheck_test.py` took 0.55 s each, nearly all LeakSanitizer's check at exit; they now run 8 at a time.
+  The theme checker (removed in v0.4 with the SD themes) shared the objects. Its 19 runs in `tests/themecheck_test.py` took 0.55 s each, nearly all LeakSanitizer's check at exit; they ran 8 at a time.
   `just test-host`: 18.5 s to 3.7 s warm.
 
 What remains: about 4 s of `test-host` and docker starts, then `tests/all.sh` (about 15 s), whose slowest jobs are `tests/shots.py` (7 s alone) and `saves.sh full` (5 s).

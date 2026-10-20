@@ -155,7 +155,9 @@ void test_theme_banks_item(void)
 	CHECK(!memcmp(pal, def, sizeof(pal)));
 }
 
-// The roles drawn as text or marks, by bank
+// The roles drawn as text or marks, by bank. Keep it in step with the
+// widgets: tests/host.sh also fails when a node's or row's ink is a fill
+// (ACCENT, TINT, GROUND, NOR_FILL*).
 static const u8 text_roles[UI_BANKS][8] = {
 	[UI_BANK_NORMAL] = {UI_ROLE_TEXT, UI_ROLE_DIM, UI_ROLE_FAINT, UI_ROLE_ACCENT_INK, UI_ROLE_ACCENT_TEXT,
 			    UI_ROLE_DANGER},

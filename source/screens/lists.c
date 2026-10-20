@@ -403,7 +403,7 @@ static int menu_fetch(void *ctx, u32 i, struct ui_item *out)
 		if (lists.game.havecht && gl_cheat_on == 0)
 			out->ink = UI_ROLE_DIM;  // the CHEAT addon is off
 		else if (gl_cheat_count)
-			out->ink = UI_ROLE_ACCENT;
+			out->ink = UI_ROLE_ACCENT_INK;
 	}
 	return UI_ITEM_READY;
 }

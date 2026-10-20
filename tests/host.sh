@@ -29,6 +29,12 @@ fi
 if [ "$status" = 0 ] && ! python3 tools/palette.py --check; then
   status=1
 fi
+# Text is drawn in inks, never in a fill colour (ui.h's roles): an accent's
+# base, tint or ground, or the NOR bar's shades, can be too light to read
+if [ "$status" = 0 ] && grep -rnE --include='*.c' --include='*.h' '(\.|->)ink = UI_ROLE_(ACCENT|TINT|GROUND|NOR_FILL[A-Z_]*)\b' source tests/kernel; then
+  echo "a text ink above is a fill colour: use UI_ROLE_ACCENT_INK or another ink"
+  status=1
+fi
 if [ "$status" = 0 ]; then
   echo "PASS: host unit tests"
 else

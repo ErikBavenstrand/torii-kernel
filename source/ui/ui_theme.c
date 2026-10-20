@@ -156,6 +156,7 @@ void ui_theme_banks(const struct ui_theme *theme, u32 item, u16 out[UI_BANKS * 1
 	normal[UI_ROLE_DANGER] = danger->ink;
 	normal[UI_ROLE_FLOAT] = ui_colour_mix(s->card, s->ink, theme->float_mix);
 
+	// Indices a bank doesn't use stay black: nothing draws with them
 	for (u32 i = 0; i < 16; i++)
 		selected[i] = consoles[i] = alert[i] = i <= UI_ROLE_FAINT ? normal[i] : 0;
 	for (u32 i = UI_ROLE_ACCENT; i < 16; i++)

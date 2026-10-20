@@ -685,7 +685,7 @@ static int cs_fetch(void *ctx, u32 i, struct ui_item *out)
 	out->text = cs->row;
 	out->len = (u16)(3 + len);
 	if (line->select) {
-		out->ink = UI_ROLE_ACCENT;
+		out->ink = UI_ROLE_ACCENT_INK;
 		out->detail = "[x]";
 	}
 	return UI_ITEM_READY;

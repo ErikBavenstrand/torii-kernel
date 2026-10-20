@@ -390,7 +390,7 @@ static void load_palette(void)
 {
 	u16 pal[UI_BANKS * 16];
 	ui_theme_banks(ui_theme(), ui_item(), pal);
-	gfx_pal_load(0, pal, UI_BANKS * 16);
+	gfx_pal_load(UI_THEME_RUN_FIRST / 16, pal, UI_THEME_RUN_COLOURS);
 	if (gfx_pal_faded_on)
 		fade_set(0, motion_value(ui.fade));
 }
