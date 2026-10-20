@@ -30,8 +30,8 @@ int namesdb_header_ok(const struct namesdb_header *h, u32 max)
 {
 	if (h->magic != NAMESDB_MAGIC || h->version != NAMESDB_VERSION || h->header_bytes != sizeof(*h))
 		return 0;
-	if (h->header_crc != namesdb_header_crc(h))
-		return 0;
+	if (h->header_crc != namesdb_header_crc(h) || h->dat_version[NAMESDB_VERSION_LEN - 1])
+		return 0;  // and the version ends in NUL
 	u32 bytes = namesdb_file_bytes(h);
 	return bytes && bytes == h->file_bytes && bytes <= max && h->pool_bytes >= 4 && !(h->pool_bytes & 3);
 }

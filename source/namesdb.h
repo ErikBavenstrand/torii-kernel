@@ -51,7 +51,7 @@ struct namesdb_header {
 	u16 header_bytes;  // 64
 	u32 file_bytes;
 	u32 body_crc;  // CRC32 of the file after the header
-	char dat_version[NAMESDB_VERSION_LEN];  // NUL-padded
+	char dat_version[NAMESDB_VERSION_LEN];  // NUL-padded, at most 15 characters
 	u32 crc_count[NAMESDB_CONSOLES];
 	u32 code_count;
 	u32 pool_bytes;  // a multiple of 4, ending in NUL

@@ -146,6 +146,10 @@ void test_namesdb_header(void)
 	bad.file_bytes += 2;
 	bad.header_crc = namesdb_header_crc(&bad);
 	CHECK(!namesdb_header_ok(&bad, 1u << 20));  // a pool not padded to 4
+	bad = h;
+	memset(bad.dat_version, '9', sizeof(bad.dat_version));  // no NUL to end it
+	bad.header_crc = namesdb_header_crc(&bad);
+	CHECK(!namesdb_header_ok(&bad, 1u << 20));
 	// A pool that doesn't end in NUL
 	db[bytes - 1] = 'x';
 	CHECK(!namesdb_body_ok(db));

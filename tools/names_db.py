@@ -75,6 +75,7 @@ HIDDEN_ROOT = {
 }
 DEPTH = 8
 CRC_FILE = "crc.txt"
+CACHE_MAX = 6144  # NAMES_CACHE_MAX (source/namesdb.h)
 CRC_HEADER = "# Torii's CRC cache: CRC32, GBA game code, size, date, path\n"
 
 # Tags of dumps a game code shouldn't name first: the retail game wins
@@ -215,7 +216,7 @@ def build_db(tables, codes, version):
         HEADER.size,
         file_bytes,
         zlib.crc32(body),
-        version.encode("ascii", "replace")[:16],
+        version.encode("ascii", "replace")[:15],  # the kernel wants a NUL
         *[len(t) for t in tables],
         len(codes),
         len(pool),
@@ -339,7 +340,7 @@ def walk_card(sd):
 
 def safe_text(data):
     """A safe file's text without its CRC line, if the line holds; else None."""
-    m = re.search(rb"(?:^|\n)(#crc32 ([0-9a-fA-F]{8})[ \t\r]*\n?)$", data)
+    m = re.search(rb"(?:^|\n)(#crc32 ([0-9a-fA-F]{8})[ \t\r]*(?:\n[ \t\r]*)*)$", data)
     if not m:
         return None
     body = data[: m.start(1)]
@@ -481,6 +482,11 @@ def update(args):
     if args.no_crc:
         return
     games = walk_card(sd)
+    if len(games) > CACHE_MAX:
+        print(
+            f"warning: {len(games)} games; the kernel keeps the CRCs of the first {CACHE_MAX}",
+            file=sys.stderr,
+        )
     found, computed, reused = update_cache(sd, games)
     print(
         f"wrote {torii / CRC_FILE}: {len(found)} games, {computed} CRCs computed, {reused} kept"

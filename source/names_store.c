@@ -84,7 +84,9 @@ static struct {
 	// crc.txt's write (safefile.h's two copies, in steps through N.u.fil)
 	u8 wphase;
 	u8 wcopy;  // 0: the first copy, 1: the second
-	u8 main_first;  // crc.txt.bak is the copy a reader takes now: crc.txt goes first
+	// The copy to write next is crc.txt (else crc.txt.bak): the one a
+	// reader doesn't take now, so the other stays whole until it is done
+	u8 main_first;
 	u32 wpos, wcrc, wstarted;
 	u32 at;  // names.db bytes loaded, or slot bytes cleared
 	u32 started;
@@ -383,7 +385,7 @@ static void write_begin(void)
 
 static const char *write_name(void)
 {
-	return (N.wcopy == 0) == N.main_first ? NAMES_CACHE_FILE : NAMES_CACHE_BAK;
+	return N.main_first ? NAMES_CACHE_FILE : NAMES_CACHE_BAK;
 }
 
 // A copy that can't be written whole is left empty, so a reader takes the
@@ -445,6 +447,9 @@ static void write_step(void)
 		return;
 	}
 	if (N.wcopy++ == 0) {
+		// This copy is whole: should the write stop before the other, the
+		// next one leaves it alone and starts with the other
+		N.main_first = !N.main_first;
 		N.wphase = X_OPEN;
 		return;
 	}
@@ -508,6 +513,11 @@ static int identify_step(void)
 			return JOB_DONE;
 		}
 		N.done++;
+		u32 known = names_cache_find(&N.cache, N.path);
+		if (known != NAMES_CACHE_NONE && was_seen(known) && N.seen_ok &&
+		    (names_rec_flags(names_cache_rec(&N.cache, known)) & (NAMES_CRC | NAMES_DATE | NAMES_DEAD)) ==
+			    (NAMES_CRC | NAMES_DATE))
+			return JOB_MORE;  // the walk checked it against its file: no stat
 		FRESULT fr = f_stat(N.path, &N.u.fi);
 		if (fr != FR_OK) {
 			tlog("names: %s can't be read (FatFs error %d)", N.path, fr);
@@ -589,7 +599,10 @@ static int identify_step(void)
 
 static void identify_begin(u32 mode)
 {
-	close_file();
+	// The FIL may be names.db's load or crc.txt's write: close only a game
+	// Identify was reading
+	if (N.mode != M_NONE && N.step == I_READ)
+		close_file();
 	N.mode = (u8)mode;
 	N.step = I_NEXT;
 	N.cursor = 0;
@@ -630,10 +643,14 @@ static int has_work(void)
 static int names_job(struct job *job)
 {
 	if (job->state == JOB_CANCEL) {
+		if (N.wphase != X_IDLE && N.file_open) {
+			// A copy left half written would read as a hand edit: empty it,
+			// so the other holds; the write starts over later
+			f_lseek(&N.u.fil, 0);
+			f_truncate(&N.u.fil);
+		}
 		close_file();
 		if (N.wphase != X_IDLE) {
-			// A copy left half written reads as broken, so the other holds;
-			// the write starts over later
 			N.wphase = X_IDLE;
 			N.dirty = 1;
 		}
