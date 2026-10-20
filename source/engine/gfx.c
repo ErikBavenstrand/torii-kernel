@@ -19,6 +19,7 @@
 enum {
 	QUEUE_COPY,
 	QUEUE_FILL,
+	QUEUE_COPY2D,  // runs of run bytes, src_stride and dst_stride apart (gfx_queue_copy2d)
 };
 
 struct queue_entry {
@@ -26,6 +27,8 @@ struct queue_entry {
 	u32 dst;
 	u16 bytes;  // left to do
 	u16 kind;
+	u16 run;  // QUEUE_COPY2D: bytes a run, and the strides from one run to the next
+	u16 src_stride, dst_stride;
 };
 
 struct gfx_regs gfx_regs EWRAM_BSS;
@@ -207,11 +210,11 @@ void gfx_affine_set(u32 matrix, s16 pa, s16 pb, s16 pc, s16 pd)
 	gfx_dirty_regs |= GFX_DIRTY_OAM;
 }
 
-static int queue_push(u32 dst, u32 src, u32 bytes, u16 kind)
+static struct queue_entry *queue_push(u32 dst, u32 src, u32 bytes, u16 kind)
 {
 	// Palette, VRAM and OAM only: a stray address must never reach the cart
 	if ((dst | bytes | (kind == QUEUE_COPY ? src : 0)) & 3 || !bytes || bytes > 0xFFFF || dst < 0x05000000 ||
-	    bytes > 0x07000400 - dst) {
+	    dst + bytes > 0x07000400) {
 		res_set_error("bad VRAM copy: %08lX from %08lX, %lu bytes (words, under 64 KB, into video memory)",
 			      (unsigned long)dst, (unsigned long)src, (unsigned long)bytes);
 		return 0;
@@ -225,19 +228,47 @@ static int queue_push(u32 dst, u32 src, u32 bytes, u16 kind)
 	e->dst = dst;
 	e->bytes = (u16)bytes;
 	e->kind = kind;
+	e->run = 0;
 	queue_count++;
 	queue_pushed++;
-	return 1;
+	return e;
 }
 
 int gfx_queue_copy(void *dst, const void *src, u32 bytes)
 {
-	return queue_push((u32)dst, (u32)src, bytes, QUEUE_COPY);
+	return queue_push((u32)dst, (u32)src, bytes, QUEUE_COPY) != 0;
 }
 
 int gfx_queue_fill(void *dst, u32 value, u32 bytes)
 {
-	return queue_push((u32)dst, value, bytes, QUEUE_FILL);
+	return queue_push((u32)dst, value, bytes, QUEUE_FILL) != 0;
+}
+
+int gfx_queue_copy2d(void *dst, u32 dst_stride, const void *src, u32 src_stride, u32 run, u32 count)
+{
+	u32 d = (u32)dst, last = d + (count ? count - 1 : 0) * dst_stride;
+	// The whole span must be video memory (queue_push checks the bytes from
+	// the last run's start), and runs a word multiple, at word strides
+	if (!count || !run || run > GFX_CHUNK || (run | src_stride | dst_stride | (u32)src) & 3 ||
+	    src_stride > 0xFFFF || dst_stride > 0xFFFF || run * count > 0xFFFF || last < d || last + run < last) {
+		res_set_error("bad VRAM copy: %lu runs of %lu bytes", (unsigned long)count, (unsigned long)run);
+		return 0;
+	}
+	struct queue_entry *e = queue_push(last, (u32)src, run, QUEUE_COPY2D);
+	if (!e)
+		return 0;
+	e->dst = d;
+	e->bytes = (u16)(run * count);
+	e->run = (u16)run;
+	e->src_stride = (u16)src_stride;
+	e->dst_stride = (u16)dst_stride;
+	if (d < 0x05000000) {  // queue_push checked the last run only
+		queue_count--;
+		queue_pushed--;
+		res_set_error("bad VRAM copy: %08lX", (unsigned long)d);
+		return 0;
+	}
+	return 1;
 }
 
 u32 gfx_queue_len(void)
@@ -274,6 +305,8 @@ u32 IWRAM_CODE gfx_commit_queue(u32 byte_cap, u32 last_line)
 		if (line < 160 || line >= last_line)
 			break;
 		struct queue_entry *e = &queue[queue_head];
+		if (e->kind == QUEUE_COPY2D)
+			break;  // gfx_commit_vram's, from ROM
 		u32 n = e->bytes;
 		if (n > GFX_CHUNK)
 			n = GFX_CHUNK;
@@ -300,6 +333,46 @@ u32 IWRAM_CODE gfx_commit_queue(u32 byte_cap, u32 last_line)
 		}
 	}
 	return done;
+}
+
+// A strided copy at the queue's head, a run at a time, from ROM (no IWRAM to
+// spare): the runs of one list row are short, so the loop's speed matters
+// little. Returns the bytes moved; stops where gfx_commit_queue would.
+static u32 commit_2d(u32 byte_cap, u32 last_line)
+{
+	struct queue_entry *e = &queue[queue_head];
+	u32 done = 0;
+	while (e->bytes) {
+		u32 line = REG_VCOUNT_;
+		if (line < 160 || line >= last_line || e->run > byte_cap - done)
+			break;
+		DMA3SAD = e->src;
+		DMA3DAD = e->dst;
+		DMA3CNT = DMA_ON_32 | e->run / 4u;
+		e->src += e->src_stride;
+		e->dst += e->dst_stride;
+		e->bytes = (u16)(e->bytes - e->run);
+		done += e->run;
+	}
+	if (!e->bytes) {
+		queue_head = (queue_head + 1) & (GFX_QUEUE_CAP - 1);
+		queue_count--;
+	}
+	return done;
+}
+
+u32 gfx_commit_vram(u32 byte_cap, u32 last_line)
+{
+	u32 done = 0;
+	for (;;) {
+		done += gfx_commit_queue(byte_cap - done, last_line);
+		if (!queue_count || queue[queue_head].kind != QUEUE_COPY2D)
+			return done;
+		u32 moved = commit_2d(byte_cap - done, last_line);
+		done += moved;
+		if (queue_count && queue[queue_head].kind == QUEUE_COPY2D)
+			return done;  // out of time or bytes
+	}
 }
 
 static void write_regs(u32 dirty)
@@ -333,7 +406,7 @@ void gfx_commit(void)
 	if (gfx_frozen) {
 		// The screen shows what it showed: only the queue runs, and what
 		// changed stays marked for the commit after the freeze
-		gfx_commit_bytes = gfx_commit_queue(gfx_commit_max_bytes, gfx_commit_last_line);
+		gfx_commit_bytes = gfx_commit_vram(gfx_commit_max_bytes, gfx_commit_last_line);
 		gfx_commit_left = 0;
 		for (u32 i = 0; i < queue_count; i++)
 			gfx_commit_left += queue[(queue_head + i) & (GFX_QUEUE_CAP - 1)].bytes;
@@ -374,7 +447,7 @@ void gfx_commit(void)
 	}
 	dirty &= GFX_DIRTY_OAM;
 
-	gfx_commit_bytes = gfx_commit_queue(gfx_commit_max_bytes, gfx_commit_last_line);
+	gfx_commit_bytes = gfx_commit_vram(gfx_commit_max_bytes, gfx_commit_last_line);
 	if (held && !queue_count) {
 		// The queue finished: the held regions go now if VBlank lasts
 		u32 line = REG_VCOUNT_;

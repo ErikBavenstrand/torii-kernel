@@ -68,6 +68,17 @@ u32 text_draw(const struct text_window *win, const struct torii_font *font, u32 
 	return text_draw_line(win, font, x, y, ink, &line);
 }
 
+#ifdef __arm__
+#define DMA3SAD (*(vu32 *)0x040000D4)
+#define DMA3DAD (*(vu32 *)0x040000D8)
+#define DMA3CNT (*(vu32 *)0x040000DC)
+#define DMA3_FILL32 0x85000000u  // on, 32-bit, fixed source
+// Columns at least this tall fill by DMA, one start a column: from ROM it
+// is several times the store loop's speed (a 14 px list row's 28 columns:
+// about 1,400 cycles against 5,100)
+#define DMA_FILL_MIN 8
+#endif
+
 // h words of each of n tile columns, column_words apart, to fill
 static void fill_columns(u32 *p, u32 n, u32 h, u32 column_words, u32 fill)
 {
@@ -82,6 +93,17 @@ static void fill_columns(u32 *p, u32 n, u32 h, u32 column_words, u32 fill)
 			p[i] = fill;
 		return;
 	}
+#ifdef __arm__
+	if (h >= DMA_FILL_MIN) {
+		vu32 src = fill;  // read by the DMA, which halts the CPU till done
+		for (; n; n--, p += column_words) {
+			DMA3SAD = (u32)&src;
+			DMA3DAD = (u32)p;
+			DMA3CNT = DMA3_FILL32 | h;
+		}
+		return;
+	}
+#endif
 	for (; n; n--, p += column_words) {
 		u32 *q = p, *end = p + h;
 		for (; q + 4 <= end; q += 4) {

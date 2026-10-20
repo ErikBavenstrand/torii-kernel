@@ -11,6 +11,7 @@
 #include "../../source/engine/cycles.h"
 #include "../../source/diag_priv.h"
 #include "../../source/engine/text.h"
+#include "../../source/ui/rowcache.h"
 #include "../../source/waitcnt.h"
 #include "text_bench.h"
 #include "torii_test.h"
@@ -276,6 +277,43 @@ void test_text_cycles(void)
 	REG_IME = ime;
 	cycles_report("text-clear-row", clear);
 	cycles_report("text-clear-row8-unaligned", clear8);
+
+	// v0.4's 14 px rows (B9): slot 5 of a 12-slot canvas (168 lines, 21
+	// tile rows) 28 tiles wide, in hidden sprite VRAM: clearing the slot,
+	// a 25- and a 40-glyph name drawn at its text line, and the slot copied
+	// in from the row cache's layout (28 runs of 14 words)
+	struct text_window canvas = {(u32 *)0x06010000, 28, 21};
+	static const char name25[] = "Mario & Luigi: Superstar ";
+	static const char name40[] = "The Legend of Zelda: The Minish Cap (EU)";
+	u32 y14 = 5 * 14;
+	REG_IME = 0;
+	REG_WAITCNT_CART = WAITCNT_MENU;
+	cycles_init();
+	start = cycles_now();
+	text_clear(&canvas, 0, y14, 224, 14, 0);
+	u32 clear14 = cycles_since(start);
+	REG_WAITCNT_CART = waitcnt;
+	REG_IME = ime;
+	text_layout(&font_body, name25, sizeof(name25) - 1, 224, &line);
+	CHECK_EQ(line.count, 25);
+	struct text_run run25 = {canvas.tiles, 168, &font_body, line.glyphs, line.count, 6, y14 + 1, 6};
+	u32 row25 = cycles(text_blit, &run25);
+	text_layout(&font_body, name40, sizeof(name40) - 1, 224, &line);
+	CHECK_EQ(line.count, 40);
+	struct text_run run40 = {canvas.tiles, 168, &font_body, line.glyphs, line.count, 6, y14 + 1, 6};
+	u32 row40 = cycles(text_blit, &run40);
+	REG_IME = 0;
+	REG_WAITCNT_CART = WAITCNT_MENU;
+	cycles_init();
+	start = cycles_now();
+	row_cache_copy_out((const u32 *)0x02000000, canvas.tiles + y14, 28, 14, 168);
+	u32 copy14 = cycles_since(start);
+	REG_WAITCNT_CART = waitcnt;
+	REG_IME = ime;
+	cycles_report("text-clear-row14", clear14);
+	cycles_report("text-row14-25", row25 + clear14);
+	cycles_report("text-row14-40", row40 + clear14);
+	cycles_report("row-copy14", copy14);
 
 #ifdef TORII_TEST_KERNEL
 	text_layout(&font_body, row38, sizeof(row38) - 1, 240, &line);

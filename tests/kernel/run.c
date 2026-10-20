@@ -37,6 +37,7 @@ static const struct {
 	{"engine_res_alloc", test_engine_res_alloc},
 	{"engine_budget", test_engine_budget},
 	{"engine_queue_caps", test_engine_queue_caps},
+	{"engine_queue_2d", test_engine_queue_2d},
 	{"engine_commit", test_engine_commit},
 	{"engine_jobs", test_engine_jobs},
 	{"engine_cycles", test_engine_cycles},

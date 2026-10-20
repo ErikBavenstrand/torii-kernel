@@ -191,6 +191,58 @@ void test_engine_queue_caps(void)
 	engine_quiet(0);
 }
 
+// Strided copies (a list row's columns): runs land stride apart, in order
+// with the copies around them, and only whole runs move in a short VBlank
+void test_engine_queue_2d(void)
+{
+	engine_quiet(1);
+	const u32 *rom = (const u32 *)0x08000000;
+	for (u32 i = 0; i < 1024; i++)
+		TEST_VRAM[i] = 0;
+	// Bad ones: unaligned runs or strides, none, and outside video memory
+	CHECK(!gfx_queue_copy2d(TEST_VRAM, 64, rom, 56, 6, 4));
+	CHECK(!gfx_queue_copy2d(TEST_VRAM, 66, rom, 56, 56, 4));
+	CHECK(!gfx_queue_copy2d(TEST_VRAM, 64, rom, 56, 56, 0));
+	CHECK(!gfx_queue_copy2d((void *)0x04000000, 64, rom, 56, 56, 4));
+	CHECK(!gfx_queue_copy2d((void *)0x07000000, 0x400, rom, 56, 56, 4));
+	CHECK_EQ(gfx_queue_len(), 0);
+
+	// 3 runs of 14 words, 16 words apart in the source and 168 in VRAM,
+	// between a fill before and a copy after
+	CHECK(gfx_queue_fill(TEST_VRAM, 0x11111111, 4));
+	CHECK(gfx_queue_copy2d(TEST_VRAM + 2, 168 * 4, rom, 16 * 4, 14 * 4, 3));
+	CHECK(gfx_queue_copy(TEST_VRAM + 600, rom, 8));
+	wait_vblank_start();
+	CHECK_EQ(gfx_commit_vram(GFX_COMMIT_BYTES, 228), 4 + 3 * 56 + 8);
+	CHECK_EQ(gfx_queue_len(), 0);
+	CHECK_EQ(TEST_VRAM[0], 0x11111111);
+	u32 wrong = 0;
+	for (u32 r = 0; r < 3; r++) {
+		for (u32 i = 0; i < 14; i++)
+			wrong += TEST_VRAM[2 + r * 168 + i] != rom[r * 16 + i];
+		wrong += TEST_VRAM[2 + r * 168 + 14] != 0;  // nothing past the run
+	}
+	CHECK_EQ(wrong, 0);
+	CHECK_EQ(TEST_VRAM[600], rom[0]);
+	CHECK_EQ(TEST_VRAM[601], rom[1]);
+
+	// A byte cap stops between whole runs; the rest goes next time
+	CHECK(gfx_queue_copy2d(TEST_VRAM, 64, rom, 56, 56, 4));
+	wait_vblank_start();
+	CHECK_EQ(gfx_commit_vram(120, 228), 112);
+	CHECK_EQ(gfx_queue_len(), 1);
+	wait_vblank_start();
+	CHECK_EQ(gfx_commit_vram(GFX_COMMIT_BYTES, 228), 112);
+	CHECK_EQ(gfx_queue_len(), 0);
+	// Nothing outside VBlank
+	CHECK(gfx_queue_copy2d(TEST_VRAM, 64, rom, 56, 56, 4));
+	while (REG_VCOUNT_T >= 160)
+		;
+	CHECK_EQ(gfx_commit_vram(GFX_COMMIT_BYTES, 228), 0);
+	gfx_queue_clear();
+	engine_quiet(0);
+}
+
 void test_engine_commit(void)
 {
 	engine_quiet(1);
