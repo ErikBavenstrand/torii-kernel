@@ -6,6 +6,14 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** the library index: boot loads `/torii/library.idx` (every game
+  by extension, sorted per console by the name shown, custom names first, up
+  to 4,096) into PSRAM, or builds it with a progress dialog once that is
+  slow; a background walk rebuilds it only when games, saves, custom names or
+  the card change, and it is written alternately to `library.idx` and
+  `library.bak`, so a power cut keeps the newer one. The SD list hides
+  Torii's folder. FatFs gains `f_readdir_sub`, so wide folders no longer make
+  the walk quadratic (B3, R1, R3; `4a8b6a7`, `d64cc77`).
 - **Changed:** Recent and favourites move to `/torii/recent.txt` (time
   played, newest first, 32 games, the boot position) and
   `/torii/favorites.txt`, held in PSRAM and written as two copies each ending
