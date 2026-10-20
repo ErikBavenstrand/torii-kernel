@@ -6,6 +6,14 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** the loading card shows the game's name and one bar for the
+  whole start, with status only for the slow steps (Loading the game,
+  Patching the game, Writing to NOR) and no percentages; the quick checks are
+  logged instead. The NOR write's card is titled with the game's name too
+  (B8, E16-E18; `27eff60`, `cf80986`).
+- **Added:** during the cart's own ROM copy, a 124-byte IWRAM VBlank handler
+  moves the bar on an estimate from the file size (`PROGRESS_COPY_RATE`);
+  each launch logs the copy's real time to tune it (B8, E15; `27eff60`).
 - **Added:** names and hidden files: hardware-free `gamename.c` turns file
   names into clean display names, tells colliding games apart by their
   differing tags, reads and writes `/torii/names.txt` (custom names, moved

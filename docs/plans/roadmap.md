@@ -315,6 +315,12 @@ Planned in the interview and design rounds of 2026-10-19 and 2026-10-20. [v0.4-d
 - **Names** from a No-Intro CRC database, built by a `just` tool and not bundled.
 - **Tools:** `just art-add` for custom art and `just art-scrape` from libretro-thumbnails (check their terms first).
 
+## v0.4.2 Fixes from the v0.4 build
+
+Bugs and loose ends the v0.4 ticket sessions and the conductor's reviews found and left open, one line each with where it came from. Each is struck out once fixed.
+
+- The launch copy's VBlank hook sets the VBlank handler back to none afterwards instead of restoring the previous one; harmless while the engine installs none (`source/progress.c`; B8 review).
+
 ## v0.5 Saves
 
 ### SD layout
