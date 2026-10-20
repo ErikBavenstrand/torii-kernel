@@ -142,6 +142,8 @@ static struct {
 	MotionId dim_motion;
 	s16 dim_y;         // BLDY of DIM (0-16)
 	u8 dimmed;
+	// A popup's, a confirmation's or the letter card's window, slide and dim
+	struct ui_overlay ov;
 } ui EWRAM_BSS;
 
 void ui_wake(void)
@@ -865,6 +867,64 @@ void ui_close(void)
 	}
 }
 
+// --- Overlays -------------------------------------------------------------------
+
+void ui_overlay_set(const struct ui_overlay *overlay)
+{
+	ui.ov = *overlay;
+	ui_wake();
+}
+
+void ui_overlay_drop(const void *owner)
+{
+	if (ui.ov.owner != owner)
+		return;
+	memset(&ui.ov, 0, sizeof(ui.ov));
+	ui_wake();
+}
+
+static s32 view_dx(const struct ui_view *v);
+
+// The windows while an overlay's window is on: WIN0 is its, the first list
+// (of lists, top view first) clips with WIN1 (a second goes unclipped for
+// those frames), and plane 0 shows only in WIN0
+static void overlay_windows(u32 lists, const u32 *list_plane, const struct ui_node *const *list_node, u16 *dispcnt)
+{
+	const struct ui_overlay *o = &ui.ov;
+	u32 outside = LAYER_ALL & ~LAYER_BG(0);
+	if (lists > 1)
+		lists = 1;
+	if (lists)
+		outside &= ~LAYER_BG(list_plane[0]);
+	s32 x0 = o->x0 < 0 ? 0 : o->x0, x1 = o->x1 > 240 ? 240 : o->x1;
+	s32 y0 = o->y0 < 0 ? 0 : o->y0, y1 = o->y1 > 160 ? 160 : o->y1;
+	x1 = x1 < x0 ? x0 : x1;
+	y1 = y1 < y0 ? y0 : y1;
+	u32 in0 = outside | LAYER_BG(0), in1 = 0;
+	if (lists) {
+		// A list's columns past its width are blank, so it clips by its lines:
+		// it shows in WIN0 too when WIN0 is within them
+		const struct ui_node *n = list_node[0];
+		const struct ui_view *v = ui_view_at(n->view);
+		s32 ly0 = n->y + v->offset, ly1 = ly0 + n->h, lx0 = n->x + view_dx(v), lx1 = lx0 + n->w;
+		ly0 = ly0 < 0 ? 0 : ly0 > 160 ? 160 : ly0;
+		ly1 = ly1 < 0 ? 0 : ly1 > 160 ? 160 : ly1;
+		lx0 = lx0 < 0 ? 0 : lx0 > 240 ? 240 : lx0;
+		lx1 = lx1 < 0 ? 0 : lx1 > 240 ? 240 : lx1;
+		gfx_set_win(1, (u16)(lx0 << 8 | lx1));
+		gfx_set_win(3, (u16)(ly0 << 8 | ly1));
+		in1 = outside | LAYER_BG(list_plane[0]);
+		if (y0 >= ly0 && y1 <= ly1)
+			in0 |= LAYER_BG(list_plane[0]);
+		*dispcnt |= DISP_WIN1;
+	}
+	gfx_set_win(0, (u16)(x0 << 8 | x1));
+	gfx_set_win(2, (u16)(y0 << 8 | y1));
+	gfx_set_win(4, (u16)((in0 | WIN_EFFECTS) | (in1 | WIN_EFFECTS) << 8));
+	gfx_set_win(5, (u16)(outside | WIN_EFFECTS));
+	*dispcnt |= DISP_WIN0;
+}
+
 // --- Registers ------------------------------------------------------------------
 
 // The px a view's planes are moved sideways (a transition's slide)
@@ -966,9 +1026,11 @@ static void regs_update(void)
 		u32 d;
 		struct ui_view *v = plane_owner(p, &d);
 		if (v && !(list_planes >> p & 1))
-			gfx_set_scroll(p, (u16)(-view_dx(v)), (u16)(-v->offset));
+			gfx_set_scroll(p, (u16)(-view_dx(v) - (p ? 0 : ui.ov.dx)), (u16)(-v->offset));
 	}
-	if (scrollers) {
+	if (ui.ov.window) {
+		overlay_windows(scrollers, win_plane, win_node, &dispcnt);
+	} else if (scrollers) {
 		u32 outside = LAYER_ALL;
 		for (u32 w = 0; w < scrollers; w++)
 			outside &= ~LAYER_BG(win_plane[w]);
@@ -1052,6 +1114,13 @@ static void regs_update(void)
 	} else if (modal && modal_y > 0) {
 		reveal_drop();
 		gfx_set_blend((u16)(BLEND_DARKEN | lower | LAYER_BD), 0, (u16)modal_y);
+	} else if (ui.ov.dim > 0) {
+		// A confirmation: plane 0 holds it (and a popup under it, dimmed by
+		// its palette), so it stays as it is
+		reveal_drop();
+		gfx_set_blend((u16)((ui_theme()->confirm_brighten ? BLEND_BRIGHTEN : BLEND_DARKEN) |
+				    (LAYER_ALL & ~LAYER_BG(0)) | LAYER_BD),
+			      0, (u16)(ui.ov.dim > 16 ? 16 : ui.ov.dim));
 	} else if (ui.reveal != REVEAL_OFF) {
 		// The list's plane over everything behind it
 		u32 p = LAYER_BG(ui.reveal_plane), eva = reveal_eva(ui.reveal_step);
@@ -1197,6 +1266,7 @@ void ui_shutdown(void)
 	ui.tr_phase = TR_IDLE;
 	keyq_clear(&ui.keys);
 	ui.capture = 0;
+	memset(&ui.ov, 0, sizeof(ui.ov));
 	res_release(RES_BG_VRAM, ui.stage_map);
 	for (u32 cb = 0; cb < 3; cb++)
 		res_release(RES_BG_VRAM, ui.shared[cb]);
@@ -1258,6 +1328,9 @@ void ui_hook_popped(u8 planes)
 		ui.carry_dim = ui.last_dim;
 	ui.hidden &= (u8)~planes;
 	ui.hide_pending &= (u8)~planes;
+	// An overlay's window or dim goes with its plane's view
+	if (planes & 1)
+		memset(&ui.ov, 0, sizeof(ui.ov));
 	if (planes >> ui.reveal_plane & 1)
 		ui.reveal = REVEAL_OFF;
 	// The view under it shows again as it was: its maps were left alone

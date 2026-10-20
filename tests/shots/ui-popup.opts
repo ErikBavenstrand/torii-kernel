@@ -1,0 +1,72 @@
+#! kernel test
+# The popups (B11) on the UI demo's ui-popup screen (tests/kernel/ui_demo.c),
+# in light (B switches at once), then in dark: the game popup at the top
+# row and in the middle (clamped above the hint bar, as mockup #9), its
+# Favourite toggling in place, Delete asking over it (Cancel, then the
+# action chosen), a short popup at the bottom row whose Format all asks on
+# its own, and the letter card (LEFT from Z skips the empty X). Every frame
+# of each opening and closing is hashed, and watched for tears.
+-k 1:L+SELECT
+-w "screen ready: ui-demo"
+-k @2:- -k @10:SELECT -k @14:-
+-w "screen ready: ui-widgets"
+-k @10:SELECT -k @14:-
+-w "screen ready: ui-reading"
+-k @10:SELECT -k @14:-
+-w "screen ready: ui-popup"
+-k @10:B -k @14:-
+-s @24:list-light.png
+# The game popup at the top row: it opens from the notch, and B closes it
+-k @30:START -k @34:-
+-H @30:@44
+-T @30:@44
+-w "screen ready: popup"
+-s @1:popup-top.png
+-k @10:B -k @14:-
+-H @10:@18
+-T @10:@18
+# Three rows down: the popup in the middle; Favourite toggles in place
+-k @30:DOWN -k @34:- -k @40:DOWN -k @44:- -k @50:DOWN -k @54:-
+-k @64:START -k @68:-
+-w "screen ready: popup"
+-s @1:popup-middle.png
+-k @10:DOWN -k @14:- -k @20:A -k @24:-
+-T @10:@30
+-s @30:popup-favourite.png
+# Up past Play to Delete (it wraps), which asks over the popup
+-k @40:UP -k @44:- -k @50:UP -k @54:-
+-k @64:A -k @68:-
+-H @64:@78
+-T @64:@78
+-w "screen ready: confirm"
+-s @1:confirm.png
+-k @10:RIGHT -k @14:-
+-T @10:@20
+-s @20:confirm-action.png
+-k @30:B -k @34:-
+-H @30:@38
+-s @40:confirm-cancelled.png
+-k @50:B -k @54:-
+# The last game (L to the top, UP wraps): A's short popup at the bottom
+-k @70:L -k @74:- -k @84:UP -k @88:-
+-k @110:A -k @114:-
+-w "screen ready: popup"
+-s @1:popup-bottom.png
+-k @10:DOWN -k @14:- -k @20:DOWN -k @24:- -k @30:A -k @34:-
+-w "screen ready: confirm"
+-s @1:confirm-alone.png
+-k @10:B -k @14:-
+# A letter jump: the card at once, then it stays and closes
+-k @30:LEFT -k @34:-
+-s @33:letter.png
+-H @30:@62
+-T @30:@62
+# Dark: the game popup and its confirmation
+-k @80:B -k @84:-
+-k @100:START -k @104:-
+-w "screen ready: popup"
+-s @1:popup-dark.png
+-k @10:UP -k @14:- -k @24:A -k @28:-
+-w "screen ready: confirm"
+-s @1:confirm-dark.png
+-k @10:B -k @14:-

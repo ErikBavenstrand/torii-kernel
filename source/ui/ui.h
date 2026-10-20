@@ -210,6 +210,8 @@ struct ui_motions {
 	u8 popup_slide;              // px it slides in from
 	struct ui_move theme_wipe;   // the top-down switch between light and dark
 	u8 wipe_edge;                // px of its dithered edge
+	u8 letter_linger;            // frames the letter card stays after the last jump
+	struct ui_move letter_close;  // and how it goes (opening: at once)
 	s32 pill_spring;             // the selection pill's slide to the cursor's row: a
 				     // spring's stiffness (16.16, motion.h SPRING_*); 0 jumps
 };
@@ -229,6 +231,8 @@ struct ui_motions {
 //   row_h               list row height, 16 or 32 px
 //   pad                 text inset from a row's or label's edges, px
 //   modal_dim           how far a modal view darkens the views under it (BLDY, 0-16)
+//   confirm_dim         how far a confirmation dims the page (BLDY, 0-16): towards
+//                       white with confirm_brighten (light), towards black without
 //   idle_dim            how far DIM darkens the screen (BLDY, 0-16)
 //   fade_frames         frames of a palette fade (ui_fade)
 //   slide               px a modal view slides up from as it opens (0: none)
@@ -261,6 +265,8 @@ struct ui_theme {
 	u8 row_h;
 	u8 pad;
 	u8 modal_dim;
+	u8 confirm_dim;
+	u8 confirm_brighten;
 	u8 idle_dim;
 	u8 fade_frames;
 	u8 slide;
@@ -287,6 +293,10 @@ extern const struct ui_theme ui_theme_light;
 void ui_theme_banks(const struct ui_theme *theme, u32 item, u16 out[UI_BANKS * 16]);
 // a mixed with amount/256 of b, per 5-bit channel, rounded. Hardware-free.
 u16 ui_colour_mix(u16 a, u16 b, u32 amount);
+// c as the brightness blend (BLDY) shows it at evy (0-16): towards white
+// (brighten) or black, per 5-bit channel, as the hardware rounds.
+// Hardware-free.
+u16 ui_colour_bldy(u16 c, u32 evy, int brighten);
 
 // Records theme as the current one, without touching the palette
 // (hardware-free: ui_theme_set does both).
@@ -320,6 +330,10 @@ enum ui_kind {
 	UI_HINTS,
 	UI_PATH,
 	UI_STORAGE,
+	// Popups, confirmations and the letter card (ui/ui_popup.c)
+	UI_POPUP,
+	UI_CONFIRM,
+	UI_LETTER,
 	UI_KINDS,
 };
 
@@ -753,6 +767,103 @@ void ui_list_page_label(u8 node, u8 label, const char *text);
 int ui_list_still(u8 node);
 // For a scroll bar: content and viewport height, and scroll, in px.
 void ui_list_scroll_info(u8 node, u32 *content, u32 *view, u32 *scroll);
+// The screen line the cursor's row will rest at (its top, the view's slide
+// left out), and the row's height
+void ui_list_cursor_row(u8 node, s32 *y, u32 *h);
+
+// --- Popups, confirmations and the letter card (ui/ui_popup.c) -------------
+// Every page's popups follow the same rules (docs/plans/v0.4-decisions.md,
+// B11; spec.md's popup section; research override R9). Each sits on plane 0
+// over the page, which stays as it is under it:
+//
+// - A popup is a menu card beside a list's selected row, with a notch at
+//   the row (which keeps its pill). It never covers the title bar. It opens
+//   from the notch (motion.popup_open: a window growing up and down while
+//   the card slides in by popup_slide px) and closes the same way
+//   (popup_close). UP/DOWN choose, A picks, B closes.
+// - A confirmation is a small centred card: the page dims (theme
+//   confirm_dim) while the card fades in, both over popup_open frames. Its
+//   two buttons are Cancel, preselected as a solid pill in the item's base,
+//   and the action, in danger ink when it destroys something. LEFT/RIGHT
+//   choose, A answers, B cancels. Over a popup, the popup stays, dimmed.
+// - The letter card shows the letter a list jumped to (LEFT/RIGHT in an A-Z
+//   list), with the letters the next jumps would reach. It shows at once,
+//   stays motion.letter_linger frames after the last jump and closes over
+//   letter_close.
+//
+// Like dialogs (dialog.h), the popup and the confirmation run frames until
+// answered: call them from a screen's loop, never from inside ui_frame (an
+// event handler sets a flag; the loop calls them after ui_frame returns).
+// While they are up, the page's hint bar (hints, a UI_HINTS node; UI_NONE
+// none) shows their keys, and gets its own back after.
+//
+//	struct ui_pop_item items[] = {{"Play"}, {"Favourite", "on"}, {"Delete", 0, UI_POP_DANGER}};
+//	struct ui_popup menu = {name, ART_ICON8_GBA + 1, items, 3, 0};
+//	if (ui_popup_open(list, hints, &menu)) {
+//		s32 i;
+//		while ((i = ui_popup_choose()) == FAVOURITE) {  // it stays up
+//			toggle();
+//			items[1].value = ...;
+//			ui_popup_changed(FAVOURITE);
+//		}
+//		struct ui_confirm ask = {title, text, "Delete", 1};
+//		if (i == DELETE && ui_confirm(hints, &ask))
+//			delete_it();
+//		ui_popup_close();  // after B too: it does nothing then
+//	}
+
+#define UI_POPUP_ITEMS 8  // items in a popup, at most
+enum {
+	UI_POP_DANGER = 1,  // ui_pop_item.flags: in danger ink (Delete, Format), and last
+};
+struct ui_pop_item {
+	const char *text;
+	const char *value;  // right-aligned in the item's ink ("on"); NULL none
+	u8 flags;           // UI_POP_*
+};
+// The popup's contents, kept by pointer while it is up
+struct ui_popup {
+	const char *title;  // its heading (the game's name), cut to fit; NULL none
+	u8 icon8;           // an 8x8 icon before the title, in the item's ink: ART_ICON8_* + 1; 0 none
+	const struct ui_pop_item *items;
+	u8 count;   // 1 to UI_POPUP_ITEMS
+	u8 cursor;  // the item chosen first (the primary action: 0)
+};
+// Opens a popup beside list's selected row (a list on the top view): it
+// starts opening, and the call returns. 0 if it can't (logged, ui_error()).
+int ui_popup_open(u8 list, u8 hints, const struct ui_popup *popup);
+// Runs frames until A picks an item (its index; the popup stays up) or B
+// (-1; the popup has closed). -1 if no popup is up.
+s32 ui_popup_choose(void);
+// The popup's item changed (its value, its text): it draws again, in the
+// next VBlank (a few items a frame, if several change).
+void ui_popup_changed(u32 item);
+// Closes the popup (motion.popup_close), if one is up. Keys pressed
+// meanwhile go to the page.
+void ui_popup_close(void);
+
+struct ui_confirm {
+	const char *title;   // one line: "Delete Metroid Fusion?"
+	const char *text;    // one line under it, in ink2: "The save stays."; NULL none
+	const char *action;  // the right-hand button: "Delete"
+	u8 danger;           // 1: the action destroys something (danger ink)
+};
+// Asks for a confirmation: 1 if the action was chosen, 0 for Cancel or B
+// (or if it can't open, logged). It has closed when the call returns.
+int ui_confirm(u8 hints, const struct ui_confirm *confirm);
+
+// The letter card's node, for a list page's layout (plane 0, which the page
+// leaves to it): a rectangle at the list card's top right, which holds the
+// card where the popup look table (ui/ui_popup.c) puts it.
+#define UI_LETTER_NODE(id) {UI_LETTER, (id), UI_NONE, 0, UI_LEFT, 0, 0, 0, 184, 24, 48, 48, 0}
+// Letters (ui/letter.h): 1-26 for A-Z, 0 and 27 for "#" (what sorts
+// before A and after Z); UI_LETTER_NONE nothing.
+#define UI_LETTER_NONE 0xFF
+// Shows letter on the card, with prev and next (the letters LEFT and RIGHT
+// would jump to) beside it; it stays the theme's letter_linger frames.
+void ui_letter_show(u8 node, u32 letter, u32 prev, u32 next);
+// Takes the card down at once (the page changed under it).
+void ui_letter_hide(u8 node);
 
 // --- Effects ----------------------------------------------------------------
 

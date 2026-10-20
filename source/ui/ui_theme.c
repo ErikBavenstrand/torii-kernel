@@ -70,6 +70,8 @@
 		.popup_slide = 8, \
 		.theme_wipe = {16, EASE_SMOOTHSTEP}, \
 		.wipe_edge = 4, \
+		.letter_linger = 20, \
+		.letter_close = {4, EASE_OUT_QUAD}, \
 		.pill_spring = SPRING_FAST, \
 	}
 
@@ -88,6 +90,8 @@ const struct ui_theme ui_theme_dark = {
 	.backdrop_mix = 20,  // 8 %
 	.float_mix = 13,     // 5 %
 	.modal_dim = 8,
+	.confirm_dim = 6,  // towards black: the page's cards near the shadow colour, as spec.md asks
+	.confirm_brighten = 0,
 	SHARED,
 };
 
@@ -99,6 +103,8 @@ const struct ui_theme ui_theme_light = {
 	.backdrop_mix = 15,  // 6 %
 	.float_mix = 0,
 	.modal_dim = 6,
+	.confirm_dim = 8,  // half way to white, within a level or two of half way to the paper
+	.confirm_brighten = 1,
 	SHARED,
 };
 
@@ -150,6 +156,19 @@ u16 ui_colour_mix(u16 a, u16 b, u32 amount)
 	for (u32 shift = 0; shift < 15; shift += 5) {
 		u32 ca = (a >> shift) & 31, cb = (b >> shift) & 31;
 		out |= ((ca * (256 - amount) + cb * amount + 128) >> 8) << shift;
+	}
+	return (u16)out;
+}
+
+u16 ui_colour_bldy(u16 c, u32 evy, int brighten)
+{
+	if (evy > 16)
+		evy = 16;
+	u32 out = 0;
+	for (u32 shift = 0; shift < 15; shift += 5) {
+		u32 i = (c >> shift) & 31;
+		i = brighten ? i + ((31 - i) * evy >> 4) : i - (i * evy >> 4);
+		out |= i << shift;
 	}
 	return (u16)out;
 }

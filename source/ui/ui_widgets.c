@@ -76,8 +76,7 @@ static int label_init(u8 node)
 	return 1;
 }
 
-// An 8x8 icon (art.h) at pixel (x, y) of a window, in ink
-static void label_icon(const struct text_window *win, u32 x, u32 y, u32 id, u32 ink)
+void ui_icon8(const struct text_window *win, u32 x, u32 y, u32 id, u32 ink)
 {
 	if (id >= ART_ICON8_COUNT || y + 8 > win->height * 8u || x + 8 > win->width * 8u)
 		return;
@@ -125,8 +124,7 @@ static void label_draw(u8 node)
 	u32 clip = w > 2 * pad ? w - 2 * pad : w;
 	if (c->icon8 && pad + 8 <= w) {
 		// A section label: its 8x8 icon first, centred on the first line
-		label_icon(&win, pad, y + (font->line_height > 8 ? (font->line_height - 8) / 2 : 0), c->icon8 - 1u,
-			   ink);
+		ui_icon8(&win, pad, y + (font->line_height > 8 ? (font->line_height - 8) / 2 : 0), c->icon8 - 1u, ink);
 		u32 used = 8u + t->look.section_icon_gap;
 		pad += used;
 		clip = clip > used ? clip - used : 0;
@@ -538,8 +536,9 @@ static const struct ui_ops scrollbar_ops = {
 // --- Every kind ---------------------------------------------------------
 
 const struct ui_ops *const ui_kind_ops[UI_KINDS] = {
-	[UI_LABEL] = &label_ops,  [UI_PANEL] = &panel_ops,         [UI_LIST] = &ui_list_ops,
-	[UI_IMAGE] = &image_ops,  [UI_SCROLLBAR] = &scrollbar_ops, [UI_PROGRESS] = &progress_ops,
-	[UI_CARD] = &ui_card_ops, [UI_TITLE] = &ui_title_ops,      [UI_HINTS] = &ui_hints_ops,
-	[UI_PATH] = &ui_path_ops, [UI_STORAGE] = &ui_storage_ops,
+	[UI_LABEL] = &label_ops,        [UI_PANEL] = &panel_ops,         [UI_LIST] = &ui_list_ops,
+	[UI_IMAGE] = &image_ops,        [UI_SCROLLBAR] = &scrollbar_ops, [UI_PROGRESS] = &progress_ops,
+	[UI_CARD] = &ui_card_ops,       [UI_TITLE] = &ui_title_ops,      [UI_HINTS] = &ui_hints_ops,
+	[UI_PATH] = &ui_path_ops,       [UI_STORAGE] = &ui_storage_ops,  [UI_POPUP] = &ui_popup_ops,
+	[UI_CONFIRM] = &ui_confirm_ops, [UI_LETTER] = &ui_letter_ops,
 };

@@ -156,6 +156,14 @@ extern char **gl_set_log_levels;
 extern char **gl_set_ampm;
 extern char *gl_set_minutes;  // the unit after DIM's minutes
 
+// Popups and confirmations (ui.h): the hint bar's labels while one is up,
+// and the confirmation's Cancel button
+extern char *gl_pop_choose;
+extern char *gl_pop_ok;
+extern char *gl_pop_close;
+extern char *gl_pop_cancel;
+extern char *gl_pop_cancel_button;
+
 extern u32 gl_lang; // index of the current language in lang_packs
 
 void LoadEnglish(void);

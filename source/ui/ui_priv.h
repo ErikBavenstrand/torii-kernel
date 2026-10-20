@@ -125,9 +125,41 @@ int ui_plane_blending(u32 plane);
 // cards, pills and chips. Hardware-free (ui/ui_theme.c).
 u32 ui_round_inset(u32 radius, u32 e);
 
-// The ops of lists (ui/ui_list.c) and the Paper clean widgets (ui/ui_paper.c).
+// The ops of lists (ui/ui_list.c), the Paper clean widgets (ui/ui_paper.c)
+// and the popups (ui/ui_popup.c).
 extern const struct ui_ops ui_list_ops;
 extern const struct ui_ops ui_card_ops, ui_title_ops, ui_hints_ops, ui_path_ops, ui_storage_ops;
+extern const struct ui_ops ui_popup_ops, ui_confirm_ops, ui_letter_ops;
+
+// --- Overlays ----------------------------------------------------------------
+// What a popup, a confirmation or the letter card (ui/ui_popup.c) asks of
+// the registers (research override R9), in the next regs:
+//   window  1: plane 0 shows only inside [x0, x1) x [y0, y1) (WIN0; lists
+//           clip with WIN1 meanwhile, one of them), while it opens or closes
+//   dx      px plane 0 is moved right (a popup sliding in)
+//   dim     the brightness blend on every plane but 0, and the sprites and
+//           backdrop (0-16): towards white or black, as the theme's
+//           confirm_brighten says
+//   owner   whose it is (ui_overlay_drop)
+struct ui_overlay {
+	s16 x0, y0, x1, y1;
+	s16 dx;
+	u8 window;
+	u8 dim;
+	const void *owner;
+};
+// Sets it. One at a time: the last set wins. A pop of a view with plane 0
+// drops it.
+void ui_overlay_set(const struct ui_overlay *overlay);
+// Drops it if owner's is the one set.
+void ui_overlay_drop(const void *owner);
+
+// The hint bar's keys and text (ui_hints_set, ui_hints_text), to give them
+// back after a popup
+void ui_hints_get(u8 node, const struct ui_hint **hints, u32 *count, const char **text);
+// An 8x8 icon (art.h, ART_ICON8_*) at pixel (x, y) of a window, in ink
+struct text_window;
+void ui_icon8(const struct text_window *win, u32 x, u32 y, u32 id, u32 ink);
 
 struct text_window;
 // A key chip at x on a band of the look's hint_chip_h from line top of a

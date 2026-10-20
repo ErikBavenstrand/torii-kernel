@@ -191,6 +191,12 @@ void test_theme_text_contrast(void)
 		// confirmation's: 4.5:1 (B1's review: 4.1 in the dark theme)
 		u16 float_card = ui_colour_mix(s->card, s->ink, themes[t]->float_mix);
 		CHECK(contrast(themes[t]->accent[PAL_DANGER].ink, float_card) >= 450);
+		// A confirmation's destructive button, chosen: the card colour on a
+		// danger fill (B11), and Cancel's on-colour on the item's base
+		CHECK(contrast(float_card, themes[t]->accent[PAL_DANGER].ink) >= 450);
+		// Its text line and the letter card's neighbours are faint (ink3) on
+		// the floating card: 3:1
+		CHECK(contrast(s->ink3, float_card) >= 300);
 		// An item's ink on its own tint is for marks only (8x8 icons, the
 		// star, the save dot on a selected row): 3:1. Text on the pill is
 		// the neutral ink (above)
