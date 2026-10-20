@@ -180,3 +180,21 @@ logged "$cart/2.log" "library: unchanged"
 grep "kernel: names: 3008" "$cart/2.log" | sed 's/^kernel: /  /'
 no_errors "$cart/2.log"
 echo "PASS: a crc.txt of 3,000 records loads whole in the background"
+
+# A card that uses no CRCs (no names.db, no crc.txt, no /torii/art) gets
+# no crc.txt and no CRC pass, whatever Recent holds
+cart=$carts/unused
+new_card "$cart"
+mkdir -p "$cart/files"
+python3 tests/names/fixture.py roms "$cart/files"
+mcopy -s -i "$cart/sd.img" "$cart/files/"* ::/
+printf '1790900000\t/GBA/Wars.gba\n' >"$cart/recent.txt"
+mmd -i "$cart/sd.img" ::/torii
+mcopy -i "$cart/sd.img" "$cart/recent.txt" ::/torii/recent.txt
+boot "$cart" "$cart/1.log" -f 900
+logged "$cart/1.log" "library: wrote /torii/library.idx"
+not_logged "$cart/1.log" "names: identified"
+not_logged "$cart/1.log" "names: wrote"
+if mdir -i "$cart/sd.img" ::/torii/crc.txt >/dev/null 2>&1; then fail "crc.txt was made"; fi
+no_errors "$cart/1.log"
+echo "PASS: a card without names.db or art gets no crc.txt"

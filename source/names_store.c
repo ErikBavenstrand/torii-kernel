@@ -20,6 +20,7 @@
 #define NAMES_CACHE_FILE "/torii/crc.txt"
 #define NAMES_CACHE_BAK "/torii/crc.txt.bak"
 #define NAMES_DIR "/torii"
+#define NAMES_ART_DIR "/torii/art"  // B22's covers, looked up by CRC
 #define NAMES_CACHE_FILE_MAX 0x100000u  // the most of crc.txt read (1 MB)
 #define NAMES_IO_BYTES 2048  // a read or write per step: a read's CRC takes about 35,000 cycles
 #define NAMES_CLEAR_BYTES 2048  // the cache's slots emptied per step
@@ -47,6 +48,12 @@ enum {
 	P_READ,  // the copy that holds, read into the cache a chunk a step
 	P_DONE,
 };
+
+// What N.dirty says: the walk's changes (dates taken, records forgotten)
+// wait for an idle moment, as the next walk finds them again anyway; new
+// CRCs are written before a launch too
+#define DIRTY_SOFT 1
+#define DIRTY_HARD 2
 
 enum {
 	M_NONE,
@@ -76,7 +83,8 @@ static struct {
 	u8 phase;
 	u8 db_ok;  // names.db is loaded
 	u8 cache_ok;  // crc.txt was read whole: it may be written back
-	u8 dirty;  // the cache differs from crc.txt
+	u8 dirty;  // the cache differs from crc.txt: DIRTY_* bits
+	u8 active;  // crc.txt may be made and Recent identified: names_active
 	u8 seen_ok;  // seen[] holds the last whole walk's files
 	u8 job;
 	u8 mode, step;
@@ -233,6 +241,10 @@ static void db_step(void)
 static void load_done(void)
 {
 	close_file();
+	// CRCs are kept only on a card that uses them: one with names.db, a
+	// crc.txt already (names-update's), or art (B22 looks covers up by CRC)
+	FILINFO *fi = &N.u.fi;
+	N.active = N.db_ok || N.has_main || N.has_bak || f_stat(NAMES_ART_DIR, fi) == FR_OK;
 	if (N.cache.full) {
 		N.cache_ok = 0;  // writing back would lose the lines left out
 		tlog("names: the CRC cache is full: %s isn't written back", NAMES_CACHE_FILE);
@@ -263,6 +275,7 @@ static int open_copy(const char *path)
 	if (f_size(&N.u.fil) > NAMES_CACHE_FILE_MAX) {
 		tlog("names: %s is over %lu bytes: left alone", path, (unsigned long)NAMES_CACHE_FILE_MAX);
 		close_file();
+		N.cache_ok = 0;  // never written over: it holds the PC's CRCs
 		return 0;
 	}
 	return 1;
@@ -462,12 +475,12 @@ const char *names_walk_seen(const char *path, u32 size, u32 date, u32 console)
 		if (!(names_rec_flags(r) & NAMES_DEAD)) {
 			tlog("names: %s changed since its CRC: forgotten", path);
 			names_cache_drop(&N.cache, n);
-			N.dirty = 1;
+			N.dirty |= DIRTY_SOFT;
 		}
 		return NULL;
 	case NAMES_FIT_DATED:
 		names_cache_set_date(&N.cache, n, date);
-		N.dirty = 1;
+		N.dirty |= DIRTY_SOFT;
 		break;
 	default:
 		break;
@@ -535,6 +548,10 @@ static u32 cache_line(void *ctx, u32 n, char *buf, u32 size)
 static void write_begin(void)
 {
 	N.since_write = 0;
+	if (!N.active) {
+		N.dirty = 0;  // nothing uses CRCs on this card: crc.txt isn't made
+		return;
+	}
 	if (!N.cache_ok) {
 		tlog("names: %s isn't written: reading or writing it failed this session", NAMES_CACHE_FILE);
 		N.dirty = 0;
@@ -696,7 +713,7 @@ static int identify_step(void)
 			if (fits != NAMES_STALE && (names_rec_flags(r) & NAMES_CRC)) {
 				if (fits == NAMES_FIT_DATED) {
 					names_cache_set_date(&N.cache, n, N.date);
-					N.dirty = 1;
+					N.dirty |= DIRTY_SOFT;
 				}
 				return JOB_MORE;  // known
 			}
@@ -743,7 +760,7 @@ static int identify_step(void)
 			return JOB_MORE;
 		}
 		mark_seen(n);
-		N.dirty = 1;
+		N.dirty |= DIRTY_HARD;
 		N.computed++;
 		N.since_write++;
 		N.bytes += N.read;
@@ -816,7 +833,7 @@ static int names_job(struct job *job)
 		close_file();
 		if (N.wphase != X_IDLE) {
 			N.wphase = X_IDLE;
-			N.dirty = 1;
+			N.dirty |= DIRTY_HARD;
 		}
 		return JOB_DONE;
 	}
@@ -839,6 +856,7 @@ static int names_job(struct job *job)
 
 void names_identify(void)
 {
+	N.active = 1;  // asked for: crc.txt may be made
 	if (N.mode == M_ALL)
 		return;
 	tlog("names: identifying the library");
@@ -878,7 +896,7 @@ void names_poll(void)
 {
 	if (N.phase != P_DONE)
 		return;
-	if (N.want_recent && N.mode == M_NONE && library_ready() && !library_busy()) {
+	if (N.want_recent && N.active && N.mode == M_NONE && library_ready() && !library_busy()) {
 		N.want_recent = 0;
 		identify_begin(M_RECENT);
 	}
@@ -896,7 +914,7 @@ void names_before_launch(void)
 		tlog("names: identifying stopped for a launch (%lu of %lu games done)", (unsigned long)N.done,
 		     (unsigned long)N.total);
 	N.mode = M_NONE;
-	if (N.phase == P_DONE && (N.dirty || N.wphase != X_IDLE)) {
+	if (N.phase == P_DONE && ((N.dirty & DIRTY_HARD) || N.wphase != X_IDLE)) {
 		// PSRAM is about to hold the game: what changed goes to the card first
 		psram_begin();
 		write_begin();

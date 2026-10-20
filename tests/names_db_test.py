@@ -159,19 +159,31 @@ class Card(unittest.TestCase):
 
     def test_kept_and_recomputed(self):
         update(self.sd)
-        # The kernel took a date for one; a file changed size; a game left
+        # The kernel took each file's date; one date is another's, one
+        # record has none yet; a file changed size; a game left
         path = self.sd / "torii" / "crc.txt"
-        text = names_db.read_safe(path).replace(
-            "\t4096\t-\t/GBA/Wars.gba", "\t4096\t5A3C7B20\t/GBA/Wars.gba"
-        )
-        names_db.write_safe(path, text)
+        out_lines = []
+        for old in names_db.read_safe(path).splitlines(keepends=True):
+            f = old.rstrip("\n").split("\t")
+            row = old
+            if len(f) == 5 and f[4] != "/NES/Famicom.nes":
+                f[3] = names_db.fat_date(self.sd / f[4].lstrip("/"))
+                if f[4] == "/GBA/Wars.gba":
+                    f[3] = "5A3C7B20"
+                row = "\t".join(f) + "\n"
+            out_lines.append(row)
+        names_db.write_safe(path, "".join(out_lines))
         (self.sd / "GB" / "Mono.gb").write_bytes(b"changed" * 100)
         os.remove(self.sd / "Colour.gbc")
         status, out, err = update(self.sd)
         self.assertEqual(status, 0, err)
-        self.assertIn("8 games, 1 CRCs computed, 7 kept", out)
+        self.assertIn("8 games, 3 CRCs computed, 5 kept", out)
         lines = {line[4]: line for line in cache_lines(self.sd)}
-        self.assertEqual(lines["/GBA/Wars.gba"][3], "5A3C7B20")  # kept with its date
+        hb = "/GBA/Homebrew.gba"
+        self.assertEqual(
+            lines[hb][3], names_db.fat_date(self.sd / hb.lstrip("/"))
+        )  # kept with its date
+        self.assertEqual(lines["/GBA/Wars.gba"][3], "-")  # computed again
         self.assertEqual(
             lines["/GB/Mono.gb"][:4],
             [f"{zlib.crc32(b'changed' * 100):08X}", "-", "700", "-"],

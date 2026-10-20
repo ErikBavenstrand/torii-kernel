@@ -532,7 +532,9 @@ static void walk_end(void)
 	u32 names = names_identity();
 	if (names)
 		hash_bytes(&names, sizeof(names));
-	names_walk_end(1);
+	// A walk that couldn't open a folder isn't whole: its games' CRC
+	// records stay in crc.txt
+	names_walk_end(!lib.u.walk.skipped && !lib.u.walk.unreadable);
 	u32 ms = ms_since(lib.started);
 	tlog("library: %s walk: %lu entries, %lu folders, %lu files, %lu games, %lu saves in %lu ms; %lu folders "
 	     "not opened, %lu unreadable, %lu names too long",

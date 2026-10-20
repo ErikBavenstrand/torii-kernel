@@ -47,6 +47,7 @@ static int scan(const char *path, struct safefile_scan *s, u32 max)
 		tlog("safefile: %s is %lu bytes, over %lu: left alone", path, (unsigned long)f_size(&sf_file),
 		     (unsigned long)max);
 		f_close(&sf_file);
+		sf_failed = 1;  // as a failed read: nothing writes over it
 		return 0;
 	}
 	UINT got = 0;

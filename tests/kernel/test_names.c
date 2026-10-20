@@ -159,15 +159,16 @@ void test_names_identify(void)
 	library_boot();  // a first scan again, which loads them
 	wars = name_of(0);
 	CHECK(wars && !strcmp(wars, "Advance Wars (USA)"));
-	// A change still to write when a game starts goes to the card first: a
-	// walk that found Wars changed (another date) forgets it
+	// What a walk changed (here it took Wars for changed) isn't written in
+	// the way of a launch: the next walk finds the file as it is
 	CHECK(names_walk_seen(files[0].path, files[0].size, 0x12345678, LIB_GBA) == NULL);
 	CHECK(name_of(0) == NULL);
 	library_before_launch();
 	f_unlink("/torii/library.idx");
 	f_unlink("/torii/library.bak");
 	library_boot();
-	CHECK(name_of(0) == NULL);
+	wars = name_of(0);
+	CHECK(wars && !strcmp(wars, "Advance Wars (USA)"));
 	hack = name_of(1);
 	CHECK(hack && !strcmp(hack, "Minish Cap (USA)"));
 

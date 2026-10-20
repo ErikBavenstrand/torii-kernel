@@ -35,6 +35,7 @@ import os
 import re
 import struct
 import sys
+import time
 import urllib.parse
 import urllib.request
 import zlib
@@ -403,6 +404,23 @@ def parse_cache(text):
     return out
 
 
+def fat_date(path):
+    """The file's FAT date and time as FatFs gives them (fdate << 16 | ftime,
+    local time, seconds in twos) in crc.txt's form, from its mtime."""
+    t = time.localtime(os.path.getmtime(path))
+    if t.tm_year < 1980:
+        return None
+    value = (
+        (t.tm_year - 1980) << 25
+        | t.tm_mon << 21
+        | t.tm_mday << 16
+        | t.tm_hour << 11
+        | t.tm_min << 5
+        | t.tm_sec // 2
+    )
+    return f"{value:08X}"
+
+
 def file_crc(path):
     crc, code, size = 0, None, 0
     with open(path, "rb") as f:
@@ -425,7 +443,15 @@ def update_cache(sd, games):
     for n, (card_path, file_path, console) in enumerate(games):
         size = os.path.getsize(file_path)
         rec = old.get(card_path.lower())
-        if rec and rec[0] is not None and rec[2] == size:
+        # A CRC holds while the file keeps its size and the date the kernel
+        # took for it; one without a date (written here, the cart not yet
+        # seen) is computed again
+        if (
+            rec
+            and rec[0] is not None
+            and rec[2] == size
+            and rec[3] == fat_date(file_path)
+        ):
             crc, code, date = rec[0], rec[1], rec[3]
             reused += 1
         else:
