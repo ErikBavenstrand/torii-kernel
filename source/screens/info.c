@@ -592,4 +592,4 @@ static void info_poll(void)
 	}
 }
 
-const struct nav_page info_page = {info_enter, info_row, 0, info_poll};
+const struct nav_page info_page = {info_enter, info_row, 0, info_poll, 0};

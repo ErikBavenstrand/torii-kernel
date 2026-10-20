@@ -347,6 +347,8 @@ const char *settings_label(const struct settings_values *v, u32 id)
 
 const char *settings_explain(const struct settings_values *v, u32 id)
 {
+	if (id == SET_RESET_ON && (settings_get(v, SET_RTS) || settings_get(v, SET_CHEATS)))
+		return gl_set_explain[SET_LABEL_RESET_ARMED];
 	return id < SET_ROWS ? gl_set_explain[label_of(v, id)] : "";
 }
 

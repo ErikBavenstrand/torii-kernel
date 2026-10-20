@@ -876,4 +876,4 @@ static void sd_poll(void)
 	}
 }
 
-const struct nav_page sdcard_page = {sd_enter, sd_row, 0, sd_poll};
+const struct nav_page sdcard_page = {sd_enter, sd_row, 0, sd_poll, 0};

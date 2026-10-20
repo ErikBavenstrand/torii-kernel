@@ -37,6 +37,11 @@ struct nav_page {
 	void (*clock)(const char *text);
 	// Each pass of the menu's loop, after the frame (NULL: none)
 	void (*poll)(void);
+	// The page is about to be left: another place replaces it (once its
+	// screen has gone out), or an action may leave the engine (a launch).
+	// It keeps what it holds (Settings writes its values); its views may
+	// still be up after (an action that started nothing). NULL: none
+	void (*leave)(void);
 };
 
 // The menu, from the boot (ezkernelnew.c); never returns. Launches and NOR

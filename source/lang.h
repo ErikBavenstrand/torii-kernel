@@ -94,6 +94,18 @@ extern char **gl_set_colours;
 extern char **gl_set_log_levels;
 extern char **gl_set_ampm;
 extern char *gl_set_minutes;  // the unit after DIM's minutes
+// The page itself (screens/settings_page.c): an action's value while it
+// runs, the hotkey capture's texts, why a combination was refused (by
+// settings_set_keys' answer; SET_KEYS_TAKEN's is followed by the other
+// row's label), and the hint bar's labels while a value is edited
+extern char *gl_set_scanning;
+extern char *gl_set_press;
+extern char *gl_set_press_hint;
+extern char **gl_set_refused;
+extern char *gl_hint_change;
+extern char *gl_hint_done;
+extern char *gl_hint_field;
+extern char *gl_hint_set;
 
 // Popups and confirmations (ui.h): the hint bar's labels while one is up,
 // and the confirmation's Cancel button

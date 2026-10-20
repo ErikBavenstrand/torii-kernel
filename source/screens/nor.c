@@ -554,4 +554,4 @@ static u32 nor_row(void)
 	return nor.sel;
 }
 
-const struct nav_page nor_page = {nor_enter, nor_row, 0, 0};
+const struct nav_page nor_page = {nor_enter, nor_row, 0, 0, 0};

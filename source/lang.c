@@ -75,6 +75,14 @@ char **gl_set_colours EWRAM_BSS;
 char **gl_set_log_levels EWRAM_BSS;
 char **gl_set_ampm EWRAM_BSS;
 char *gl_set_minutes EWRAM_BSS;
+char *gl_set_scanning EWRAM_BSS;
+char *gl_set_press EWRAM_BSS;
+char *gl_set_press_hint EWRAM_BSS;
+char **gl_set_refused EWRAM_BSS;
+char *gl_hint_change EWRAM_BSS;
+char *gl_hint_done EWRAM_BSS;
+char *gl_hint_field EWRAM_BSS;
+char *gl_hint_set EWRAM_BSS;
 
 // Popups and confirmations (ui.h)
 char *gl_pop_choose EWRAM_BSS;
@@ -255,6 +263,7 @@ const char *en_set_labels[SET_LABELS] = {
 	[SET_LANGUAGE] = "Language",
 	[SET_LABEL_SAVE_KEYS] = "Save state keys",
 	[SET_LABEL_LOAD_KEYS] = "Load state keys",
+	[SET_LABEL_RESET_ARMED] = "Reset hotkey",
 };
 const char *en_set_explain[SET_LABELS] = {
 	[SET_THEME] = "Light paper or dark graphite.",
@@ -285,6 +294,7 @@ const char *en_set_explain[SET_LABELS] = {
 	[SET_LANGUAGE] = "The menu's language.",
 	[SET_LABEL_SAVE_KEYS] = "Saves a state in game. A sets them.",
 	[SET_LABEL_LOAD_KEYS] = "Loads the state in game. A sets them.",
+	[SET_LABEL_RESET_ARMED] = "On anyway with Save states or cheats.",
 };
 const char *en_set_onoff[2] = {"Off", "On"};
 const char *en_set_themes[2] = {"Dark", "Light"};
@@ -302,6 +312,22 @@ const char *en_set_colours[8] = {"Off", "Blue", "Green", "Cyan", "Red", "Magenta
 const char *en_set_log_levels[4] = {"Off", "Errors", "Info", "Debug"};
 const char *en_set_ampm[2] = {"AM", "PM"};
 const char en_set_minutes[] = "min";
+const char en_set_scanning[] = "Scanning...";
+const char en_set_press[] = "Press keys...";
+const char en_set_press_hint[] = "Press keys... let go to set.";
+// By settings_set_keys' answer (at most 38 characters, as the explanations)
+const char *en_set_refused[SET_KEYS_SOFT_RESET + 1] = {
+	[SET_KEYS_OK] = "",
+	[SET_KEYS_COUNT] = "Use 2 or 3 keys.",
+	[SET_KEYS_NO_MODIFIER] = "Use L, R, START or SELECT too.",
+	[SET_KEYS_TAKEN] = "Already used by",
+	[SET_KEYS_WAKE] = "START+SELECT wakes a sleeping game.",
+	[SET_KEYS_SOFT_RESET] = "Games reset on A+B+START+SELECT.",
+};
+const char en_hint_change[] = "change";
+const char en_hint_done[] = "done";
+const char en_hint_field[] = "field";
+const char en_hint_set[] = "set";
 
 // Popups and confirmations: the hint bar's labels, and the Cancel button
 const char en_pop_choose[] = "choose";
@@ -559,6 +585,14 @@ void LoadEnglish(void)
 	gl_set_log_levels = (char **)en_set_log_levels;
 	gl_set_ampm = (char **)en_set_ampm;
 	gl_set_minutes = (char *)en_set_minutes;
+	gl_set_scanning = (char *)en_set_scanning;
+	gl_set_press = (char *)en_set_press;
+	gl_set_press_hint = (char *)en_set_press_hint;
+	gl_set_refused = (char **)en_set_refused;
+	gl_hint_change = (char *)en_hint_change;
+	gl_hint_done = (char *)en_hint_done;
+	gl_hint_field = (char *)en_hint_field;
+	gl_hint_set = (char *)en_hint_set;
 	gl_pop_choose = (char *)en_pop_choose;
 	gl_pop_ok = (char *)en_pop_ok;
 	gl_pop_close = (char *)en_pop_close;

@@ -95,6 +95,9 @@ enum settings_id {
 enum {
 	SET_LABEL_SAVE_KEYS = SET_ROWS,  // SET_SLEEP_KEYS's
 	SET_LABEL_LOAD_KEYS,             // SET_RESET_KEYS's
+	// SET_RESET_ON's explanation while Save states or Cheats is on: their
+	// patch arms the reset keys whatever the row says (GBApatch.c)
+	SET_LABEL_RESET_ARMED,
 	SET_LABELS
 };
 

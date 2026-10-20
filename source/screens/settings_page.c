@@ -1,0 +1,1002 @@
+// The Settings page (settings_page.h).
+//
+// The page is one list (ui_list) of 12 px slots, settings_layout.h's: a
+// section's label, its rows and a gap under its card. The model paints each
+// slot whole (ui_list_model.paint): the card's part of the slot (its rounded
+// top in the label's slot, its body behind the rows, its bottom and shadow
+// in the gap), the selection pill, the label and the value, so the cards,
+// their edges and the section labels scroll with the rows as one plane, by
+// the pixel, and a row or card the view cuts is clipped by the list's window
+// like any list row. The pill is drawn into the selected row (the cards are
+// on the list's own plane, so a sprite pill behind it wouldn't show); the
+// LED colours' swatches are sprites (ui_list_model.objs) in a palette bank
+// of their own, as the BG banks have no room for seven LED colours.
+//
+// The values are a working copy (struct settings_values, here in EWRAM).
+// The theme and the LED show an edit at once (ui_theme_set, Set_LED_control)
+// without staging it; nothing is staged until the page is left (nav's
+// leave): then it is staged and committed in one go, so no exit can leave a
+// staged copy behind. An edit B cancels is put back with its preview.
+#include <stdio.h>
+#include <string.h>
+
+#include "settings_page.h"
+#include "settings_layout.h"
+#include "../Ezcard_OP.h"
+#include "../lang.h"
+#include "../library.h"
+#include "../settings.h"
+#include "../tlog.h"
+#include "../engine/frame.h"
+#include "../engine/gfx.h"
+#include "../engine/res.h"
+#include "../engine/text.h"
+#include "../ui/art_ids.h"
+#include "../ui/ui.h"
+
+// --- Look (mockups-b16-b18.md, "Settings page"), px and frames ----------------
+// The layout's rectangles (constant expressions for the node table): the
+// title bar, the list's viewport (10 slots of 12 px, under the title bar to
+// above the hint bar) and its width (to the scroll bar's column), the scroll
+// bar's column, the hint bar
+#define TITLE_H 24
+#define VIEW_Y 24
+#define VIEW_H 120
+#define LIST_W 232
+#define BAR_X 224
+#define BAR_Y 24
+#define BAR_H 120
+#define HINTS_H 16
+
+static const struct settings_look {
+	u8 card_x, card_w;   // a section's card
+	u8 card_pad;         // above its first row and below its last
+	u8 label_skip;       // a section label's line top, this far above its slot's top
+	u8 icon_x;           // the label's 8x8 icon (on the line's caps)
+	u8 name_x;           // its name
+	u8 text_x;           // a row's label
+	u8 value_r;          // where values end (exclusive)
+	u8 pill_x, pill_w;   // the selection pill (the theme's height and radius)
+	u8 mark_gap;         // between « » and the value they hold
+	u8 chip_gap;         // between a hotkey's key chips
+	u8 chip_min;         // a key chip's narrowest
+	u8 swatch_w, swatch_h, swatch_r;  // an LED colour's swatch
+	u8 swatch_gap;       // between swatches while edited
+	u8 swatch_text_gap;  // between a swatch and its colour's name
+	u8 chevron_gap;      // an action's chevron, this far in from the value edge
+	u8 chevron_w, chevron_h;
+	u8 bar_w, bar_h, bar_r, bar_gap;  // the capture's countdown in the hint bar
+	u8 hold;             // frames a hotkey's keys are held to count
+	u16 capture_wait;    // frames with nothing pressed before a capture gives up
+	u8 refusal;          // frames a refused hotkey's reason shows
+	u8 clock_poll;       // frames between clock reads (the Time and Date rows)
+	u32 led[8];          // the swatches' colours by value (0: Off, drawn empty)
+	u8 led_edge;         // a swatch's edge: its colour this much toward black, in 256ths
+} look = {
+	.card_x = 4,
+	.card_w = 223,
+	.card_pad = 2,
+	.label_skip = 2,
+	.icon_x = 8,
+	.name_x = 20,
+	.text_x = 13,
+	.value_r = 218,
+	.pill_x = 7,
+	.pill_w = 216,
+	.mark_gap = 3,
+	.chip_gap = 2,
+	.chip_min = 13,
+	.swatch_w = 12,
+	.swatch_h = 10,
+	.swatch_r = 2,
+	.swatch_gap = 2,
+	.swatch_text_gap = 4,
+	.chevron_gap = 4,
+	.chevron_w = 3,
+	.chevron_h = 5,
+	.bar_w = 40,
+	.bar_h = 3,
+	.bar_r = 1,
+	.bar_gap = 6,
+	.hold = 18,
+	.capture_wait = 300,
+	.refusal = 90,
+	.clock_poll = 30,
+	.led = {0, 0x3973E7, 0x39B54A, 0x29BDD6, 0xE73939, 0xD642C6, 0xEFC621, 0xFFFFFF},
+	.led_edge = 72,  // 28 %
+};
+
+#define SWATCH_COLOURS 7  // the lit ones, 1-7
+#define SWATCH_TILES 4    // a 16x16 sprite each
+#define TAG_SWATCH 0x5530
+#define TAG_SWATCH_PAL 0x5531
+#define OBJ_SIZE_16 0x4000  // attr1: 16x16, with the square shape (attr0 0)
+#define MARK_L "\xC2\xAB"  // «
+#define MARK_R "\xC2\xBB"  // »
+#define KEY_UPDOWN "^v"
+#define KEY_LEFTRIGHT MARK_L MARK_R
+#define LABEL_COLS 12  // a section label's scratch, tile columns
+
+enum {
+	MODE_BROWSE,
+	MODE_EDIT,     // a value edited in place
+	MODE_CAPTURE,  // a hotkey's keys being pressed
+};
+
+static struct {
+	struct settings_values v;  // the working copy
+	struct settings_layout lay;
+	struct settings_capture cap;
+	struct settings_editor ed;  // the Time or Date field card's
+	struct ui_fields fields;
+	char field_text[UI_FIELDS_MAX][8];
+	struct ui_hint field_keys[4];
+	u8 first;     // the view's first node
+	u8 live;      // entered and not left: what leave commits
+	u8 cursor;    // the selected slot
+	u8 mode;
+	u8 edit_id;   // the row edited or captured
+	u8 scanning;  // Rescan library runs
+	u8 redraw;    // leave ended an edit: draw it all again if still up
+	u8 swatch_bank;
+	u16 swatch_tile;  // ART_NONE-like 0xFFFF: no swatches
+	u16 refused_left;  // frames the refusal's reason stays
+	u16 clock_wait;
+	u8 bar_fill;  // the countdown as drawn
+	char pos[12];
+	char refused[48];
+	const char *keys_label;  // the Reset keys row's label as drawn
+	struct ui_hint hints[4];
+} sp EWRAM_BSS;
+
+// The label scratch: a section's name is drawn here, then copied into its
+// slot a few lines up (its line starts above the slot)
+static u32 label_scratch[LABEL_COLS * 16] EWRAM_BSS ALIGN(4);
+
+enum {
+	N_TITLE,
+	N_HINTS,
+	N_LIST,
+	N_BAR,
+	N_NODES
+};
+
+static u8 node(u32 n)
+{
+	return (u8)(sp.first + n);
+}
+
+static u32 pitch(void)
+{
+	return ui_theme()->look.settings_pitch;
+}
+
+static const struct settings_slot *slot_at(u32 s)
+{
+	return &sp.lay.slot[s < sp.lay.count ? s : 0];
+}
+
+static u32 cursor_id(void)
+{
+	return slot_at(sp.cursor)->id;
+}
+
+static int editing(u32 id)
+{
+	return sp.mode == MODE_EDIT && sp.edit_id == id;
+}
+
+// --- Painting ---------------------------------------------------------------
+
+static void fill(const struct ui_paint *p, s32 x, u32 line, s32 w, u32 lines, u32 role)
+{
+	if (x < 0) {
+		w += x;
+		x = 0;
+	}
+	if (w > 0 && lines)
+		text_clear(p->win, p->x + (u32)x, p->y + line, (u32)w, lines, role);
+}
+
+// A rounded rectangle of role at (x, y) in the row, w x h, its corners r
+static void round_fill(const struct ui_paint *p, s32 x, s32 y, s32 w, s32 h, u32 r, u32 role)
+{
+	if (2 * r > (u32)h)
+		r = (u32)h / 2;
+	for (u32 e = 0; e < r; e++) {
+		s32 in = (s32)ui_round_inset(r, e);
+		fill(p, x + in, (u32)(y + (s32)e), w - 2 * in, 1, role);
+		fill(p, x + in, (u32)(y + h - 1 - (s32)e), w - 2 * in, 1, role);
+	}
+	fill(p, x, (u32)(y + (s32)r), w, (u32)(h - 2 * (s32)r), role);
+}
+
+// Its 1 px outline: a pixel in from the outside at each row of the corners
+// (wider where a corner turns), and the sides
+static void round_line(const struct ui_paint *p, s32 x, s32 y, s32 w, s32 h, u32 r, u32 role)
+{
+	for (u32 e = 0; e < r; e++) {
+		s32 in = (s32)ui_round_inset(r, e), out = e ? (s32)ui_round_inset(r, e - 1) : (w + 1) / 2;
+		s32 len = out > in + 1 ? out - in : 1;
+		for (u32 side = 0; side < 2; side++) {
+			u32 row = (u32)(side ? y + h - 1 - (s32)e : y + (s32)e);
+			fill(p, x + in, row, len, 1, role);
+			fill(p, x + w - in - len, row, len, 1, role);
+		}
+	}
+	fill(p, x, (u32)(y + (s32)r), 1, (u32)(h - 2 * (s32)r), role);
+	fill(p, x + w - 1, (u32)(y + (s32)r), 1, (u32)(h - 2 * (s32)r), role);
+}
+
+// The card's body on page line y (px from the page's top) of section sec:
+// [*a, *b), 0 if the line isn't in it
+static int card_body(u32 sec, s32 y, s32 *a, s32 *b)
+{
+	s32 rh = (s32)pitch(), r = (s32)ui_theme()->look.card_radius;
+	s32 top = sp.lay.first[sec] * rh - look.card_pad, bottom = (sp.lay.last[sec] + 1) * rh + look.card_pad;
+	if (sp.lay.first[sec] == SET_LAYOUT_NONE || y < top || y >= bottom)
+		return 0;
+	s32 e = y - top < bottom - 1 - y ? y - top : bottom - 1 - y;
+	s32 in = e < r ? (s32)ui_round_inset((u32)r, (u32)e) : 0;
+	*a = look.card_x + in;
+	*b = look.card_x + look.card_w - in;
+	return 1;
+}
+
+// Slot s's part of its section's card, line by line, runs of equal lines in
+// one fill: the body in PANEL, and its shadow (the body one line down,
+// where the body leaves it showing), as ui_paper's cards draw it
+static void paint_card(const struct ui_paint *p, u32 s)
+{
+	u32 sec = slot_at(s)->section, rh = p->rh;
+	u32 sh = ui_theme()->look.shadow_offset;
+	s32 run_a = 0, run_b = 0;
+	u32 run_from = 0, run_on = 0;
+	for (u32 l = 0; l <= rh; l++) {
+		s32 a = 0, b = 0, y = (s32)(s * rh + l);
+		u32 on = l < rh && card_body(sec, y, &a, &b);
+		if (l == rh || on != run_on || a != run_a || b != run_b) {
+			if (run_on)
+				fill(p, run_a, run_from, run_b - run_a, l - run_from, UI_ROLE_PANEL);
+			run_from = l;
+			run_on = on;
+			run_a = a;
+			run_b = b;
+		}
+		if (l == rh || !sh)
+			continue;
+		// The shadow: where the body sh lines up reaches past this line's
+		s32 sa, sb;
+		if (!card_body(sec, y - (s32)sh, &sa, &sb))
+			continue;
+		if (!on) {
+			fill(p, sa, l, sb - sa, 1, UI_ROLE_SHADOW);
+		} else {
+			if (sa < a)
+				fill(p, sa, l, a - sa, 1, UI_ROLE_SHADOW);
+			if (sb > b)
+				fill(p, b, l, sb - b, 1, UI_ROLE_SHADOW);
+		}
+	}
+}
+
+static u32 extent(const char *s)
+{
+	struct text_line line;
+	text_layout(ui_theme()->body, s, strlen(s), 240, &line);
+	return line.extent;
+}
+
+// Text at x, its line's top at the row's; returns the px it ends at
+static s32 text_at(const struct ui_paint *p, s32 x, u32 clip, u32 ink, const char *s)
+{
+	struct text_line line;
+	if (!s || !*s || x < 0)
+		return x;
+	text_layout(ui_theme()->body, s, strlen(s), clip, &line);
+	text_draw_line(p->win, ui_theme()->body, p->x + (u32)x, p->y, ink, &line);
+	return x + (s32)line.extent;
+}
+
+// Text ending at right (exclusive); returns where it starts
+static s32 text_right(const struct ui_paint *p, s32 right, u32 ink, const char *s)
+{
+	s32 x = right - (s32)extent(s);
+	text_at(p, x, (u32)(right - x) + 1, ink, s);
+	return x;
+}
+
+// A section's label: its 8x8 icon and name in the item's ink, the line's
+// top label_skip px above the slot (the card starts at the slot's end)
+static int paint_label(const struct ui_paint *p, u32 sec)
+{
+	static const u8 icons[SET_SECTIONS] = {
+		[SET_SEC_LOOK] = ART_ICON8_LOOK,    [SET_SEC_CLOCK] = ART_ICON8_CLOCK,
+		[SET_SEC_GAMES] = ART_ICON8_GAMES,  [SET_SEC_CART] = ART_ICON8_CART,
+		[SET_SEC_HOTKEYS] = ART_ICON8_KEYS, [SET_SEC_LIBRARY] = ART_ICON8_LIBRARY,
+		[SET_SEC_SYSTEM] = ART_ICON8_CHIP,
+	};
+	const struct torii_font *font = ui_theme()->body;
+	u32 skip = look.label_skip, lines = p->rh - look.card_pad;
+	ui_icon8(p->win, p->x + look.icon_x, p->y, icons[sec], UI_ROLE_ACCENT_INK);
+	struct text_line line;
+	const char *name = settings_section_name(sec);
+	u32 x0 = look.name_x & 7, cols = LABEL_COLS;
+	struct text_window scratch = {label_scratch, (u8)cols, 2};
+	text_layout(font, name, strlen(name), cols * 8 - x0, &line);
+	memset(label_scratch, 0, sizeof(label_scratch));
+	text_draw_line(&scratch, font, x0, 0, UI_ROLE_ACCENT_INK, &line);
+	u32 used = (x0 + line.extent + 7) / 8, column = p->win->height * 8u;
+	u32 *dst = p->win->tiles + ((p->x + look.name_x) / 8) * column + p->y;
+	for (u32 c = 0; c < used && (p->x + look.name_x) / 8 + c < p->win->width; c++)
+		for (u32 l = 0; l < lines; l++)
+			dst[c * column + l] = label_scratch[c * 16 + skip + l];
+	return 1;
+}
+
+// Key chips for mask's keys, L first, ending at right; accent: the capture's
+// (the item's base, on text); returns where they start
+static s32 paint_chips(const struct ui_paint *p, s32 right, u16 mask, int accent)
+{
+	const struct ui_look *l = &ui_theme()->look;
+	const char *names[10];
+	u32 n = 0, total = 0, w[10];
+	for (u32 bit = 10; bit-- > 0;)
+		if (mask >> bit & 1) {
+			names[n] = settings_key_name(bit);
+			u32 cw = extent(names[n]) + 2u * l->hint_chip_pad;
+			w[n] = cw < look.chip_min ? look.chip_min : cw;
+			total += w[n] + (n ? look.chip_gap : 0u);
+			n++;
+		}
+	s32 x = right - (s32)total, top = ((s32)p->rh - (s32)l->hint_chip_h) / 2, start = x;
+	for (u32 i = 0; i < n; i++) {
+		round_fill(p, x, top, (s32)w[i], l->hint_chip_h, l->hint_chip_radius,
+			   accent ? UI_ROLE_ACCENT : UI_ROLE_TRACK);
+		s32 tx = x + ((s32)w[i] - (s32)extent(names[i])) / 2;
+		text_at(p, tx, w[i], accent ? UI_ROLE_ACCENT_TEXT : UI_ROLE_DIM, names[i]);
+		x += (s32)w[i] + look.chip_gap;
+	}
+	return start;
+}
+
+// Where row id's swatches lie: the value's, or all eight while it is edited
+// (x in the row, and each one's colour); returns how many
+static u32 swatch_layout(u32 id, s32 *xs, u8 *cs)
+{
+	u32 c = settings_get(&sp.v, id);
+	if (editing(id)) {
+		s32 right = look.value_r - (s32)extent(MARK_R) - look.mark_gap;
+		s32 x = right - (8 * look.swatch_w + 7 * look.swatch_gap);
+		for (u32 i = 0; i < 8; i++) {
+			xs[i] = x + (s32)i * (look.swatch_w + look.swatch_gap);
+			cs[i] = (u8)i;
+		}
+		return 8;
+	}
+	xs[0] = look.value_r - (s32)extent(gl_set_colours[c]) - look.swatch_text_gap - look.swatch_w;
+	cs[0] = (u8)c;
+	return 1;
+}
+
+// A swatch's BG part (the sprite fills the lit ones): Off is the card
+// with a slash, edged in ink3, White's edge is ink3 too; ring: the chosen
+// one while edited, ringed in ink
+static void paint_swatch(const struct ui_paint *p, s32 x, u32 c, int ring)
+{
+	s32 w = look.swatch_w, h = look.swatch_h, y = ((s32)p->rh - h) / 2;
+	if (ring)
+		round_line(p, x - 1, y - 1, w + 2, h + 2, look.swatch_r + 1u, UI_ROLE_TEXT);
+	if (c && c < SWATCH_COLOURS)
+		return;
+	round_line(p, x, y, w, h, look.swatch_r, UI_ROLE_FAINT);
+	if (c)
+		return;
+	for (s32 i = 0; i < w - 2; i++)  // the slash, bottom left to top right
+		fill(p, x + 1 + i, (u32)(y + h - 2 - i * (h - 3) / (w - 3)), 1, 1, UI_ROLE_FAINT);
+}
+
+// Row id's value ending at right, in ink; returns where it starts
+static s32 paint_value(const struct ui_paint *p, u32 id, s32 right, u32 ink)
+{
+	const struct settings_row *r = &settings_rows[id];
+	char text[24];
+	switch (r->kind) {
+	case SET_ACTION: {
+		if (id == SET_RESCAN && sp.scanning)
+			return text_right(p, right, ink, gl_set_scanning);
+		// A chevron, chevron_gap in from the edge
+		s32 x = right - look.chevron_gap - look.chevron_w, y = ((s32)p->rh - look.chevron_h) / 2;
+		for (s32 i = 0; i < look.chevron_h; i++) {
+			s32 dx = i < look.chevron_h / 2 ? i : look.chevron_h - 1 - i;
+			fill(p, x + dx, (u32)(y + i), 1, 1, ink);
+		}
+		return x;
+	}
+	case SET_KEYS:
+		if (sp.mode == MODE_CAPTURE && sp.edit_id == id) {
+			s32 at = right - (s32)extent(MARK_R);
+			text_at(p, at, 16, UI_ROLE_ACCENT_INK, MARK_R);
+			at -= look.mark_gap;
+			at = sp.cap.held ? paint_chips(p, at, sp.cap.held, 1)
+					 : text_right(p, at, UI_ROLE_TEXT, gl_set_press);
+			return text_right(p, at - look.mark_gap, UI_ROLE_ACCENT_INK, MARK_L);
+		}
+		return paint_chips(p, right, settings_get(&sp.v, id), 0);
+	case SET_COLOUR: {
+		s32 xs[8];
+		u8 cs[8];
+		u32 n = swatch_layout(id, xs, cs), c = settings_get(&sp.v, id);
+		if (n == 1) {
+			paint_swatch(p, xs[0], c, 0);
+			text_right(p, right, ink, gl_set_colours[c]);
+			return xs[0];
+		}
+		for (u32 i = 0; i < n; i++)
+			paint_swatch(p, xs[i], cs[i], cs[i] == c);
+		return xs[0];
+	}
+	default:
+		settings_value_text(&sp.v, id, text, sizeof(text));
+		return text_right(p, right, ink, text);
+	}
+}
+
+static int paint_row(const struct ui_paint *p, u32 id)
+{
+	const struct ui_look *l = &ui_theme()->look;
+	if (p->selected)
+		round_fill(p, look.pill_x, ((s32)p->rh - l->pill_h) / 2, look.pill_w, l->pill_h, l->pill_radius,
+			   UI_ROLE_TINT);
+	s32 right = look.value_r;
+	int edit = editing(id) && settings_rows[id].kind != SET_KEYS;
+	if (edit) {
+		right = text_right(p, right, UI_ROLE_ACCENT_INK, MARK_R) - look.mark_gap;
+		s32 left = paint_value(p, id, right, UI_ROLE_TEXT);
+		right = text_right(p, left - look.mark_gap, UI_ROLE_ACCENT_INK, MARK_L);
+	} else {
+		right = paint_value(p, id, right, p->selected ? UI_ROLE_DIM : UI_ROLE_FAINT);
+	}
+	s32 clip = right - 4 - look.text_x;
+	text_at(p, look.text_x, clip > 8 ? (u32)clip : 8, p->selected ? UI_ROLE_TEXT : UI_ROLE_DIM,
+		settings_label(&sp.v, id));
+	return 1;
+}
+
+static int model_paint(void *ctx, const struct ui_paint *p)
+{
+	(void)ctx;
+	if (p->index >= sp.lay.count)
+		return 0;
+	const struct settings_slot *s = slot_at(p->index);
+	paint_card(p, p->index);
+	if (s->kind == SET_SLOT_LABEL)
+		return paint_label(p, s->section);
+	if (s->kind == SET_SLOT_ROW)
+		return paint_row(p, s->id);
+	return 1;  // the gap: the card's end and its shadow
+}
+
+static u32 model_count(void *ctx)
+{
+	(void)ctx;
+	return sp.lay.count;
+}
+
+static int model_fetch(void *ctx, u32 i, struct ui_item *out)
+{
+	(void)ctx;
+	if (i >= sp.lay.count)
+		return UI_ITEM_PENDING;
+	const struct settings_slot *s = slot_at(i);
+	out->text = s->kind == SET_SLOT_ROW ? settings_label(&sp.v, s->id) : settings_section_name(s->section);
+	return UI_ITEM_READY;
+}
+
+// The swatches' sprites, over the rows that show whole
+static void model_objs(void *ctx, u8 list, const struct ui_list_objs *o)
+{
+	(void)ctx;
+	if (sp.swatch_tile == 0xFFFF)
+		return;
+	u32 rh = o->rh, s1 = ((u32)o->scroll + o->h + rh - 1) / rh;
+	for (u32 s = (u32)o->scroll / rh; s < s1 && s < sp.lay.count; s++) {
+		const struct settings_slot *sl = slot_at(s);
+		if (sl->kind != SET_SLOT_ROW || settings_rows[sl->id].kind != SET_COLOUR)
+			continue;
+		s32 top = o->top + (s32)(s * rh) - o->scroll;
+		if (top < o->top || top + (s32)rh > o->top + (s32)o->h)
+			continue;  // cut by the view: left out with the row
+		s32 xs[8];
+		u8 cs[8];
+		u32 n = swatch_layout(sl->id, xs, cs);
+		s32 y = top + ((s32)rh - look.swatch_h) / 2;
+		for (u32 i = 0; i < n; i++) {
+			if (!cs[i])
+				continue;
+			s32 x = o->x + xs[i];
+			ui_obj_add(list, (u16)((y & 0xFF) | o->attr0), (u16)(OBJ_SIZE_16 | (x & 0x1FF)),
+				   (u16)((sp.swatch_tile + (cs[i] - 1u) * SWATCH_TILES) | (u32)sp.swatch_bank << 12));
+		}
+	}
+}
+
+static const struct ui_list_model model = {model_count, model_fetch, 0, model_paint, model_objs};
+
+// The swatches' sprite tiles and palette: colour c's 12x10 shape, rounded,
+// in index c with its edge in c + 7; White's edge left clear (its BG
+// outline shows), so it matches the theme's ink3 as Off's does
+static void swatch_load(void)
+{
+	sp.swatch_tile = 0xFFFF;
+	u8 pal = res_palette(RES_OBJ_PAL, 1, TAG_SWATCH_PAL);
+	u8 tiles = pal == RES_NONE ? RES_NONE : res_obj_tiles(SWATCH_COLOURS * SWATCH_TILES, 0, TAG_SWATCH);
+	if (tiles == RES_NONE) {
+		tlog_error("settings: no room for the LED swatches");
+		return;
+	}
+	sp.swatch_bank = (u8)res_start(RES_OBJ_PAL, pal);
+	u16 colours[16] = {0};
+	for (u32 c = 1; c < 8; c++) {
+		u32 rgb = look.led[c], keep = 256u - look.led_edge;
+		u32 r = rgb >> 16 & 0xFF, g = rgb >> 8 & 0xFF, b = rgb & 0xFF;
+		colours[c] = (u16)(r >> 3 | (g >> 3) << 5 | (b >> 3) << 10);
+		colours[c + 7] =
+			(u16)((r * keep >> 8) >> 3 | ((g * keep >> 8) >> 3) << 5 | ((b * keep >> 8) >> 3) << 10);
+	}
+	gfx_pal_load(16u + sp.swatch_bank, colours, 16);
+	sp.swatch_tile = res_start(RES_OBJ_VRAM, tiles);
+	if (!res_fresh(RES_OBJ_VRAM))
+		return;
+	u32 *t = res_obj_addr(tiles);
+	s32 w = look.swatch_w, h = look.swatch_h;
+	u32 r = look.swatch_r;
+	for (u32 c = 1; c < 8; c++) {
+		u32 *sprite = t + (c - 1) * SWATCH_TILES * 8;
+		memset(sprite, 0, SWATCH_TILES * 32);
+		for (s32 y = 0; y < h; y++)
+			for (s32 x = 0; x < w; x++) {
+				// Inside its rounded corners, and on its edge (a neighbour outside)
+				int in[5];
+				static const s8 d[5][2] = {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+				for (u32 k = 0; k < 5; k++) {
+					s32 px = x + d[k][0], py = y + d[k][1];
+					s32 ey = py < h - 1 - py ? py : h - 1 - py,
+					    ex = px < w - 1 - px ? px : w - 1 - px;
+					in[k] = px >= 0 && px < w && py >= 0 && py < h &&
+						((u32)ey >= r || (u32)ex >= ui_round_inset(r, (u32)ey));
+				}
+				if (!in[0])
+					continue;
+				int edge = !(in[1] && in[2] && in[3] && in[4]);
+				u32 index = edge ? (c == SWATCH_COLOURS ? 0 : c + 7) : c;
+				u32 tile = (u32)(y / 8) * 2 + (u32)(x / 8);
+				sprite[tile * 8 + (u32)(y & 7)] |= index << (4 * (x & 7));
+			}
+	}
+}
+
+// --- The page ----------------------------------------------------------------
+
+static int settings_event(struct ui_view *v, const struct ui_event *e);
+
+static const struct ui_title_config title = {"", 0, ART_ICON16_SET};
+static const struct ui_hints_config hints_config = {0, 0};
+static const struct ui_list_config list_config = {&model, UI_ROW_PITCH_SETTINGS, UI_LIST_DRAWN_PILL, 0, 0};
+static const struct ui_scrollbar_config bar = {N_LIST};
+
+static const struct ui_spec nodes[N_NODES] = {
+	[N_TITLE] = {UI_TITLE, 1, UI_NONE, 3, UI_HFILL, 0, 0, 0, 0, 0, 0, TITLE_H, &title},
+	[N_HINTS] = {UI_HINTS, 2, UI_NONE, 3, UI_HFILL | UI_BOTTOM, 0, 0, 0, 0, 0, 0, HINTS_H, &hints_config},
+	[N_LIST] = {UI_LIST, 3, UI_NONE, 1, UI_LEFT, 0, 0, 0, 0, VIEW_Y, LIST_W, VIEW_H, &list_config},
+	[N_BAR] = {UI_SCROLLBAR, 4, UI_NONE, 2, UI_LEFT, 0, 0, 0, BAR_X, BAR_Y, 8, BAR_H, &bar},
+};
+
+static const struct ui_view_spec view = {"settings", nodes, N_NODES, 0, UI_NONE, 0, settings_event};
+
+// 1 while the page's view is up (at the stack's bottom: popups go over it)
+static int up(void)
+{
+	return ui_depth() && ui_view_at(0)->spec == &view;
+}
+
+static void refresh_slot(u32 s)
+{
+	if (s < sp.lay.count)
+		ui_list_refresh(node(N_LIST), s, s);
+}
+
+static void refresh_id(u32 id)
+{
+	refresh_slot(settings_layout_slot_of(&sp.lay, id));
+}
+
+// The hint bar: the selected row's explanation, a refusal's reason, or an
+// edit's keys
+static void hints_show(void)
+{
+	u8 h = node(N_HINTS);
+	u32 id = cursor_id();
+	if (sp.mode == MODE_EDIT) {
+		const char *change =
+			settings_rows[id].kind == SET_COLOUR ? gl_set_colours[settings_get(&sp.v, id)] : gl_hint_change;
+		sp.hints[0] = (struct ui_hint){KEY_LEFTRIGHT, change};
+		sp.hints[1] = (struct ui_hint){"A", gl_hint_done};
+		sp.hints[2] = (struct ui_hint){"B", gl_hint_cancel};
+		ui_hints_set(h, sp.hints, 3);
+	} else if (sp.mode == MODE_CAPTURE) {
+		u32 left = settings_capture_left(&sp.cap);
+		struct ui_hint_note note = {
+			UI_ROLE_DIM, look.bar_w,   look.bar_h,
+			look.bar_r,  look.bar_gap, (u8)((left * look.bar_w + sp.cap.timeout - 1) / sp.cap.timeout)};
+		sp.bar_fill = note.fill;
+		ui_hints_note(h, gl_set_press_hint, &note);
+	} else if (sp.refused_left) {
+		struct ui_hint_note note = {UI_ROLE_DANGER, 0, 0, 0, 0, 0};
+		ui_hints_note(h, sp.refused, &note);
+	} else {
+		ui_hints_text(h, settings_explain(&sp.v, id));
+	}
+}
+
+// The title's position, "5/24"
+static void position_show(void)
+{
+	snprintf(sp.pos, sizeof(sp.pos), "%lu/%lu", (unsigned long)settings_layout_position(&sp.lay, sp.cursor),
+		 (unsigned long)sp.lay.rows);
+	ui_title_set_right(node(N_TITLE), sp.pos);
+}
+
+static void moved(void)
+{
+	tlog_debug("settings: row %lu", (unsigned long)cursor_id());  // tests/nav.sh's nav_setting waits for it
+	sp.refused_left = 0;
+	position_show();
+	hints_show();
+	frame_measure("settings-move");
+}
+
+// The LED as the working copy has it (as CheckSwitch sets it from the NOR)
+static void led_show(void)
+{
+	u32 idle = settings_get(&sp.v, SET_LED_IDLE), sd = settings_get(&sp.v, SET_LED_SD);
+	Set_LED_control((u16)(settings_get(&sp.v, SET_LED) << 7 | (idle & 7) << 3 | (sd & 7)));
+}
+
+// The rows shown changed (LED on or off): laid out again, the cursor kept
+// on its row and the scroll where it was
+static void relayout(void)
+{
+	u32 id = cursor_id();
+	settings_layout_build(&sp.lay, &sp.v);
+	u32 s = settings_layout_slot_of(&sp.lay, id);
+	sp.cursor = (u8)(s != SET_LAYOUT_NONE ? s : settings_layout_row_at(&sp.lay, sp.cursor));
+	ui_list_recount(node(N_LIST), sp.cursor);
+	position_show();
+}
+
+// What a value's change shows beyond its row: the theme and the LED at once,
+// the rows it lays out, labels or texts
+static void previews(u32 id, int ui)
+{
+	switch (id) {
+	case SET_THEME:
+		ui_theme_set(settings_get(&sp.v, SET_THEME) == 1 ? &ui_theme_light : &ui_theme_dark);
+		break;
+	case SET_LED:
+		led_show();
+		if (ui)
+			relayout();
+		break;
+	case SET_LED_IDLE:
+	case SET_LED_SD:
+		led_show();
+		break;
+	case SET_RTS:
+	case SET_CHEATS:
+	case SET_RESET_ON:
+	case SET_SLEEP_ON:
+		// Real-time save alone renames the hotkeys' rows (cached rows too)
+		if (ui && settings_label(&sp.v, SET_RESET_KEYS) != sp.keys_label) {
+			sp.keys_label = settings_label(&sp.v, SET_RESET_KEYS);
+			refresh_id(SET_RESET_KEYS);
+			refresh_id(SET_SLEEP_KEYS);
+		}
+		break;
+	case SET_CLOCK_24H:
+		if (ui)
+			refresh_id(SET_TIME_ROW);
+		break;
+	default:
+		break;
+	}
+}
+
+static void changed(u32 id)
+{
+	char text[24];
+	settings_value_text(&sp.v, id, text, sizeof(text));
+	tlog_debug("settings: row %lu set to %s", (unsigned long)id, text);
+	refresh_id(id);
+	previews(id, 1);
+	hints_show();
+	frame_measure("settings-edit");
+}
+
+static void edit_end(int keep)
+{
+	u32 id = sp.edit_id;
+	sp.mode = MODE_BROWSE;
+	if (!keep) {
+		settings_restore(&sp.v, id);
+		previews(id, 1);
+	}
+	refresh_id(id);
+	hints_show();
+}
+
+static void refuse(u32 why, u32 id)
+{
+	if (why == SET_KEYS_TAKEN)
+		snprintf(sp.refused, sizeof(sp.refused), "%s %s.", gl_set_refused[why],
+			 settings_label(&sp.v, id == SET_SLEEP_KEYS ? SET_RESET_KEYS : SET_SLEEP_KEYS));
+	else
+		snprintf(sp.refused, sizeof(sp.refused), "%s", why <= SET_KEYS_SOFT_RESET ? gl_set_refused[why] : "");
+	sp.refused_left = look.refusal;
+	tlog_debug("settings: keys refused: %s", sp.refused);
+}
+
+static void capture_end(void)
+{
+	sp.mode = MODE_BROWSE;
+	refresh_id(sp.edit_id);
+	hints_show();
+}
+
+// The Time or Date row's field card, after the frame (nav_defer): UP/DOWN
+// change a field, LEFT/RIGHT pick one, A sets the clock, B leaves it
+static void fields_text(void)
+{
+	struct ui_fields *f = &sp.fields;
+	for (u32 i = 0; i < sp.ed.fields; i++) {
+		settings_editor_text(&sp.ed, i, sp.field_text[i], sizeof(sp.field_text[i]));
+		f->text[i] = sp.field_text[i];
+	}
+	f->active = sp.ed.field;
+}
+
+static void time_edit(u32 id)
+{
+	if (!up())
+		return;
+	u32 kind = settings_rows[id].kind;
+	settings_read_clock(&sp.v.clock);
+	settings_editor_open(&sp.ed, kind, &sp.v.clock, settings_clock_24h(&sp.v));
+	struct ui_fields *f = &sp.fields;
+	memset(f, 0, sizeof(*f));
+	f->title = settings_label(&sp.v, id);
+	f->icon8 = ART_ICON8_CLOCK + 1;
+	f->count = sp.ed.fields;
+	f->sep[0] = kind == SET_DATE ? "-" : " : ";
+	f->sep[1] = kind == SET_DATE ? "-" : " ";
+	fields_text();
+	struct ui_hint *keys = sp.field_keys;
+	keys[0] = (struct ui_hint){KEY_UPDOWN, gl_hint_change};
+	keys[1] = (struct ui_hint){KEY_LEFTRIGHT, gl_hint_field};
+	keys[2] = (struct ui_hint){"A", gl_hint_set};
+	keys[3] = (struct ui_hint){"B", gl_hint_cancel};
+	if (!ui_fields_open(node(N_LIST), node(N_HINTS), f, keys, 4))
+		return;
+	for (;;) {
+		u16 k = ui_fields_key();
+		if (!k || k == INPUT_B)
+			break;
+		if (k == INPUT_A) {
+			settings_write_edit(&sp.ed);
+			settings_read_clock(&sp.v.clock);
+			refresh_id(SET_TIME_ROW);
+			refresh_id(SET_DATE_ROW);
+			break;
+		}
+		if (k & (INPUT_UP | INPUT_DOWN))
+			settings_editor_step(&sp.ed, k == INPUT_UP ? 1 : -1);
+		else
+			settings_editor_move(&sp.ed, k == INPUT_LEFT ? -1 : 1);
+		fields_text();
+		ui_fields_changed();
+	}
+	ui_popup_close();
+}
+
+static void activate(u32 id)
+{
+	const struct settings_row *r = &settings_rows[id];
+	switch (r->kind) {
+	case SET_TIME:
+	case SET_DATE:
+		nav_defer(time_edit, id);
+		break;
+	case SET_KEYS:
+		sp.mode = MODE_CAPTURE;
+		sp.edit_id = (u8)id;
+		sp.refused_left = 0;
+		settings_capture_start(&sp.cap, ui_input()->held, look.hold, look.capture_wait);
+		refresh_id(id);
+		hints_show();
+		break;
+	case SET_ACTION:
+		if (r->action == SET_ACTION_RESCAN && !sp.scanning) {
+			tlog("settings: rescan library");
+			library_rescan();
+			sp.scanning = 1;
+			refresh_id(id);
+		}
+		break;
+	default:
+		sp.mode = MODE_EDIT;
+		sp.edit_id = (u8)id;
+		refresh_id(id);
+		hints_show();
+		break;
+	}
+}
+
+static void move_to(u32 s, u16 key)
+{
+	if (s == sp.cursor || s >= sp.lay.count)
+		return;
+	sp.cursor = (u8)s;
+	if (key)
+		ui_list_move(node(N_LIST), s, key);
+	else
+		ui_list_set_cursor(node(N_LIST), s);
+	moved();
+}
+
+static int settings_event(struct ui_view *v, const struct ui_event *e)
+{
+	(void)v;
+	if (e->type != UI_EV_KEYS)
+		return 0;
+	const InputState *in = ui_input();
+	u16 k = e->keys;
+	u32 id = cursor_id();
+	if (sp.mode == MODE_CAPTURE)
+		return 1;  // the keys are the combination (settings_poll)
+	if (sp.mode == MODE_EDIT) {
+		if (k & INPUT_B) {
+			edit_end(0);
+		} else if (k & INPUT_A) {
+			edit_end(1);
+		} else if (k & (INPUT_LEFT | INPUT_RIGHT)) {
+			u16 key = k & INPUT_LEFT ? INPUT_LEFT : INPUT_RIGHT;
+			// Only number rows step on a held key's repeats
+			if (settings_rows[id].kind == SET_NUMBER || (in->pressed & key)) {
+				settings_step(&sp.v, id, key == INPUT_LEFT ? -1 : 1);
+				changed(id);
+			}
+		}
+		return 1;
+	}
+	if (k & INPUT_B) {
+		nav_back();
+	} else if (k & INPUT_A) {
+		if (!ui_list_paging(node(N_LIST)) && (in->pressed & INPUT_A))
+			activate(id);
+	} else if (k & (INPUT_UP | INPUT_DOWN)) {
+		u16 key = k & INPUT_UP ? INPUT_UP : INPUT_DOWN;
+		// A fresh press wraps from an end; a held key's repeats stop there
+		move_to(settings_layout_step(&sp.lay, sp.cursor, key == INPUT_UP ? -1 : 1, (in->pressed & key) != 0),
+			key);
+	} else if (k & (INPUT_L | INPUT_R)) {
+		move_to(settings_layout_section(&sp.lay, sp.cursor, k & INPUT_L ? -1 : 1), 0);
+	}
+	return 1;
+}
+
+static struct ui_view *settings_enter(u32 item, u32 row)
+{
+	// What led here goes to the card first, in case the page hangs (v0.3.2)
+	tlog_flush();
+	memset(&sp, 0, sizeof(sp));
+	settings_load(&sp.v);
+	settings_layout_build(&sp.lay, &sp.v);
+	struct ui_view *v = ui_push(&view, &sp);
+	if (!v)
+		return 0;
+	sp.first = v->first;
+	swatch_load();
+	u32 s = row < SET_ROWS ? settings_layout_slot_of(&sp.lay, row) : SET_LAYOUT_NONE;
+	sp.cursor = (u8)(s != SET_LAYOUT_NONE ? s : settings_layout_row_at(&sp.lay, 0));
+	sp.live = 1;
+	sp.keys_label = settings_label(&sp.v, SET_RESET_KEYS);
+	ui_title_set(node(N_TITLE), nav_item_name(item));
+	ui_list_reset(node(N_LIST), sp.cursor);
+	position_show();
+	hints_show();
+	return v;
+}
+
+static u32 settings_row(void)
+{
+	return cursor_id();
+}
+
+// Once a frame: the capture's keys, a refusal's time, the rescan's end, the
+// clock's rows
+static void settings_poll(void)
+{
+	if (!up())
+		return;
+	u8 list = node(N_LIST);
+	if (sp.redraw) {
+		// leave ended an edit and an action left the page up
+		sp.redraw = 0;
+		ui_list_refresh(list, 0, sp.lay.count);
+		hints_show();
+	}
+	if (sp.mode == MODE_CAPTURE) {
+		u16 shown = sp.cap.held;
+		u32 r = settings_capture_step(&sp.cap, ui_input()->held, 1);
+		if (r == SET_CAPTURE_DONE) {
+			u32 why = settings_set_keys(&sp.v, sp.edit_id, sp.cap.best);
+			if (why != SET_KEYS_OK)
+				refuse(why, sp.edit_id);
+			else
+				tlog_debug("settings: keys set");
+			capture_end();
+		} else if (r == SET_CAPTURE_CANCEL) {
+			capture_end();
+		} else {
+			if (sp.cap.held != shown)
+				refresh_id(sp.edit_id);
+			u32 left = settings_capture_left(&sp.cap);
+			if ((left * look.bar_w + sp.cap.timeout - 1) / sp.cap.timeout != sp.bar_fill)
+				hints_show();
+		}
+	} else if (sp.refused_left && !--sp.refused_left) {
+		hints_show();
+	}
+	if (sp.scanning && !library_busy()) {
+		sp.scanning = 0;
+		refresh_id(SET_RESCAN);
+	}
+	if (sp.clock_wait) {
+		sp.clock_wait--;
+	} else {
+		sp.clock_wait = look.clock_poll;
+		struct settings_clock c;
+		settings_read_clock(&c);
+		if (c.minute != sp.v.clock.minute || c.hour != sp.v.clock.hour || c.day != sp.v.clock.day ||
+		    c.month != sp.v.clock.month || c.year != sp.v.clock.year) {
+			sp.v.clock = c;
+			refresh_id(SET_TIME_ROW);
+			refresh_id(SET_DATE_ROW);
+		}
+	}
+	if (!ui_list_still(list))
+		frame_measure("settings-scroll");
+}
+
+// Leaving (nav's leave): an edit still open is put back, then the values are
+// staged and written in one go, only if one changed (settings_commit: one
+// NOR write through Save_info), and the working copy starts over from them
+static void settings_leave(void)
+{
+	if (!sp.live)
+		return;
+	if (sp.mode == MODE_EDIT) {
+		settings_restore(&sp.v, sp.edit_id);
+		previews(sp.edit_id, 0);
+	}
+	if (sp.mode != MODE_BROWSE)
+		sp.redraw = 1;
+	sp.mode = MODE_BROWSE;
+	u32 level = tlog_level;
+	settings_stage(&sp.v);
+	if (settings_commit() && level == TLOG_OFF && tlog_level != TLOG_OFF)
+		tlog_flush_soon();  // the log file is made a sector a frame, the menu still answering
+	memcpy(sp.v.loaded, sp.v.slot, sizeof(sp.v.loaded));
+}
+
+const struct nav_page settings_page = {settings_enter, settings_row, 0, settings_poll, settings_leave};

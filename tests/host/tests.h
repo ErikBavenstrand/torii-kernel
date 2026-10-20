@@ -125,6 +125,9 @@ void test_settings_visible_rows(void);
 void test_settings_clock_format(void);
 void test_settings_clock_editor(void);
 void test_settings_clock_apply(void);
+void test_settings_layout_slots(void);
+void test_settings_layout_moves(void);
+void test_settings_capture(void);
 
 void test_safefile_crc_line(void);
 void test_safefile_scan(void);
