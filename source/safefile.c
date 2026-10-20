@@ -20,6 +20,7 @@ static struct {
 	u32 have;   // bytes in sf_chunk
 	u32 at;     // the next of them
 	u8 open;
+	u8 first;  // the next line is the first: a UTF-8 BOM before it is skipped
 } rd EWRAM_BSS;
 
 // path's backup copy's name into out (SAFEFILE_PATH_MAX bytes); 0 if too long
@@ -28,14 +29,21 @@ static int bak_name(char *out, const char *path)
 	return (u32)snprintf(out, SAFEFILE_PATH_MAX, "%s.bak", path) < SAFEFILE_PATH_MAX;
 }
 
-// Reads the copy at path through s; 0 if it isn't there or can't be read
-static int scan(const char *path, struct safefile_scan *s, u32 prefix_len)
+// Reads the copy at path through s; 0 if it isn't there, can't be read or
+// is larger than max bytes (a hand edit gone wrong: reading it would stall)
+static int scan(const char *path, struct safefile_scan *s, u32 prefix_len, u32 max)
 {
 	safefile_scan_begin(s, prefix_len);
 	FRESULT res = f_open(&sf_file, path, FA_READ);
 	if (res != FR_OK) {
 		if (res != FR_NO_FILE && res != FR_NO_PATH)
 			tlog_error("safefile: can't open %s (FatFs %u)", path, (unsigned)res);
+		return 0;
+	}
+	if (f_size(&sf_file) > max) {
+		tlog_error("safefile: %s is %lu bytes, over %lu: left alone", path, (unsigned long)f_size(&sf_file),
+			   (unsigned long)max);
+		f_close(&sf_file);
 		return 0;
 	}
 	UINT got = 0;
@@ -55,28 +63,28 @@ static int scan(const char *path, struct safefile_scan *s, u32 prefix_len)
 
 // Scans path's copies and returns the one to read (safefile_pick); the scans
 // are left in sf_main and sf_bak
-static int pick(const char *path, const char *bak)
+static int pick(const char *path, const char *bak, u32 max)
 {
-	int has_main = scan(path, &sf_main, 0);
+	int has_main = scan(path, &sf_main, 0, max);
 	if (has_main && sf_main.valid)
 		return SAFEFILE_MAIN;  // NAME.bak doesn't matter
-	int has_bak = scan(bak, &sf_bak, has_main ? sf_main.size : 0);
-	int from = safefile_pick(has_main ? &sf_main : NULL, has_bak ? &sf_bak : NULL);
-	if (from == SAFEFILE_NONE && ((has_main && sf_main.size) || has_bak))
-		tlog_error("safefile: %s: neither copy holds up: read as empty", path);
-	return from;
+	int has_bak = scan(bak, &sf_bak, has_main ? sf_main.size : 0, max);
+	return safefile_pick(has_main ? &sf_main : NULL, has_bak ? &sf_bak : NULL);
 }
 
-int safefile_open(const char *path)
+int safefile_open(const char *path, u32 max)
 {
 	char bak[SAFEFILE_PATH_MAX];
 	TLOG_ASSERT(!rd.open);
 	safefile_close();
 	if (!bak_name(bak, path))
 		return SAFEFILE_NONE;
-	int from = pick(path, bak);
-	if (from == SAFEFILE_NONE)
+	int from = pick(path, bak, max);
+	if (from == SAFEFILE_NONE) {
+		if (sf_main.size || sf_bak.size)
+			tlog_error("safefile: %s: neither copy holds up: read as empty", path);
 		return from;
+	}
 	const struct safefile_scan *s = from == SAFEFILE_BAK ? &sf_bak : &sf_main;
 	FRESULT res = f_open(&sf_file, from == SAFEFILE_BAK ? bak : path, FA_READ);
 	if (res != FR_OK) {
@@ -86,6 +94,7 @@ int safefile_open(const char *path)
 	memset(&rd, 0, sizeof(rd));
 	rd.limit = s->valid ? s->body : s->size;
 	rd.open = 1;
+	rd.first = 1;
 	if (from != SAFEFILE_MAIN)
 		tlog("safefile: %s: %s", path,
 		     from == SAFEFILE_BAK ? "read the backup copy" : "edited by hand: read as it is");
@@ -125,6 +134,11 @@ int safefile_line(char *buf, u32 size)
 		return SAFEFILE_END;
 	while (len && buf[len - 1] == '\r')
 		len--;
+	if (rd.first && len >= 3 && memcmp(buf, "\xEF\xBB\xBF", 3) == 0) {
+		len -= 3;  // a BOM from a Windows editor
+		memmove(buf, buf + 3, len);
+	}
+	rd.first = 0;
 	if (size)
 		buf[len] = 0;
 	return cut ? SAFEFILE_LONG : (int)len;
@@ -177,13 +191,19 @@ static int write_copy(const char *name, safefile_fill fill, void *ctx)
 		n = safefile_crc_line((char *)sf_chunk, crc);
 		ok = f_write(&sf_file, sf_chunk, n, &put) == FR_OK && put == n;
 	}
+	if (!ok) {
+		// A part of the text (the card full) would read as a hand edit and
+		// outrank the other copy: leave the copy empty, as a cut write does
+		f_lseek(&sf_file, 0);
+		f_truncate(&sf_file);
+	}
 	ok = (f_close(&sf_file) == FR_OK) && ok;
 	if (!ok)
 		tlog_error("safefile: writing %s failed", name);
 	return ok;
 }
 
-int safefile_write(const char *path, safefile_fill fill, void *ctx)
+int safefile_write(const char *path, u32 max, safefile_fill fill, void *ctx)
 {
 	char bak[SAFEFILE_PATH_MAX];
 	TLOG_ASSERT(!rd.open);
@@ -191,7 +211,7 @@ int safefile_write(const char *path, safefile_fill fill, void *ctx)
 	if (!bak_name(bak, path))
 		return 0;
 	// The copy a reader takes now stays whole until the other is written
-	int bak_first = pick(path, bak) != SAFEFILE_BAK;
+	int bak_first = pick(path, bak, max) != SAFEFILE_BAK;
 	tlog_debug("safefile: writing %s, %s first", path, bak_first ? "the backup" : "the main copy");
 	if (!write_copy(bak_first ? bak : path, fill, ctx))
 		return 0;

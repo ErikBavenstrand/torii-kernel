@@ -97,7 +97,7 @@ void test_safefile(void)
 		return;
 	char line[32];
 	remove_files();
-	CHECK_EQ(safefile_open(T_SAFE), SAFEFILE_NONE);
+	CHECK_EQ(safefile_open(T_SAFE, 4096), SAFEFILE_NONE);
 	// The main copy: its lines, without the CRC line
 	static const char text[] = "one\ntwo\n";
 	u32 len = sizeof(text) - 1;
@@ -105,7 +105,7 @@ void test_safefile(void)
 	memcpy(sealed, text, len);
 	safefile_crc_line(sealed + len, crc32(text, len));
 	CHECK(put_file(T_SAFE, sealed, (u32)strlen(sealed)));
-	CHECK_EQ(safefile_open(T_SAFE), SAFEFILE_MAIN);
+	CHECK_EQ(safefile_open(T_SAFE, 4096), SAFEFILE_MAIN);
 	CHECK_EQ(safefile_line(line, sizeof(line)), 3);
 	CHECK(strcmp(line, "one") == 0);
 	CHECK_EQ(safefile_line(line, sizeof(line)), 3);
@@ -115,16 +115,18 @@ void test_safefile(void)
 	// A write cut short leaves NAME empty: NAME.bak is read
 	CHECK(put_file(T_SAFE ".bak", sealed, (u32)strlen(sealed)));
 	CHECK(put_file(T_SAFE, "", 0));
-	CHECK_EQ(safefile_open(T_SAFE), SAFEFILE_BAK);
+	CHECK_EQ(safefile_open(T_SAFE, 4096), SAFEFILE_BAK);
 	CHECK_EQ(safefile_line(line, sizeof(line)), 3);
 	safefile_close();
 	// Zeros (a cut that left a size) are no text either
 	CHECK(put_file(T_SAFE, "\0\0\0\0\0\0\0\0", 8));
-	CHECK_EQ(safefile_open(T_SAFE), SAFEFILE_BAK);
+	CHECK_EQ(safefile_open(T_SAFE, 4096), SAFEFILE_BAK);
 	safefile_close();
-	// Edited by hand: no CRC line, CRLF, a line too long for the buffer
-	CHECK(put_file(T_SAFE, "mine\r\nan overlong line here\r\nlast", 33));
-	CHECK_EQ(safefile_open(T_SAFE), SAFEFILE_HAND);
+	// Edited by hand: a BOM, no CRC line, CRLF, a line too long for the buffer
+	CHECK(put_file(T_SAFE, "\xEF\xBB\xBFmine\r\nan overlong line here\r\nlast", 36));
+	CHECK_EQ(safefile_open(T_SAFE, 35), SAFEFILE_BAK);  // over the size given: as missing
+	safefile_close();
+	CHECK_EQ(safefile_open(T_SAFE, 4096), SAFEFILE_HAND);
 	CHECK_EQ(safefile_line(line, sizeof(line)), 4);
 	CHECK(strcmp(line, "mine") == 0);
 	CHECK_EQ(safefile_line(line, 8), SAFEFILE_LONG);
@@ -233,8 +235,14 @@ void test_userdata_fav_store(void)
 	// Off, a rename, a NOR game gone, a deleted file
 	CHECK(userdata_fav_set("/z.gba", 0));
 	CHECK(!userdata_fav_has("/z.gba"));
+	userdata_invalidate();  // the rename reads the favourites itself
 	CHECK(userdata_rename("/a.gba", "/b.gba"));
-	CHECK(userdata_fav_has("/b.gba") && !userdata_fav_has("/a.gba"));
+	CHECK_EQ(userdata_fav_count(), 2);
+	CHECK(userdata_fav_has("/b.gba") && !userdata_fav_has("/a.gba") && userdata_fav_has("NOR:n.gba"));
+	userdata_invalidate();
+	CHECK(userdata_rename("/x.gba", "/y.gba"));  // not a favourite: nothing changes
+	CHECK_EQ(userdata_fav_count(), 2);
+	CHECK(!userdata_fav_has("/y.gba"));
 	CHECK(userdata_forget_nor(NULL));
 	CHECK_EQ(userdata_fav_count(), 1);
 	CHECK(userdata_fav_set(userdata_fav_path(0), 0));  // a path from the store itself

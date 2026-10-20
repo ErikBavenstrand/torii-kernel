@@ -30,10 +30,12 @@
 #define SAFEFILE_PATH_MAX 64
 
 // Opens the copy of path to read (SAFEFILE_MAIN, _HAND or _BAK), or returns
-// SAFEFILE_NONE with nothing open (no copy, or none that holds up).
-int safefile_open(const char *path);
+// SAFEFILE_NONE with nothing open (no copy, or none that holds up). A copy
+// larger than max bytes counts as missing: the file's caller knows how large
+// its text can be, and a huge hand edit would stall the menu.
+int safefile_open(const char *path, u32 max);
 // The next line of the open copy into buf (size bytes), without its '\r' and
-// '\n'; the CRC line is left out. Returns its length, SAFEFILE_END after the
+// '\n', or a UTF-8 BOM before the first; the CRC line is left out. Returns its length, SAFEFILE_END after the
 // last line, or SAFEFILE_LONG for a line that doesn't fit (skipped whole).
 #define SAFEFILE_END (-1)
 #define SAFEFILE_LONG (-2)
@@ -44,8 +46,10 @@ void safefile_close(void);
 // needed. fill(ctx, pos, buf, max) puts up to max bytes of the text from
 // byte pos into buf and returns how many, 0 at the end; it is called through
 // the text twice, from pos 0 each time, and must give the same text both
-// times (it may read PSRAM). Returns 1 once both copies are written.
+// times (it may read PSRAM). max is safefile_open's. A copy whose write
+// fails (a full card) is left empty, so the other one is read. Returns 1
+// once both copies are written.
 typedef u32 (*safefile_fill)(void *ctx, u32 pos, char *buf, u32 max);
-int safefile_write(const char *path, safefile_fill fill, void *ctx);
+int safefile_write(const char *path, u32 max, safefile_fill fill, void *ctx);
 
 #endif

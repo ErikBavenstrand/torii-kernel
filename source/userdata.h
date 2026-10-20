@@ -49,6 +49,10 @@
 #define USERDATA_PATH_MAX (USERDATA_DIR_MAX + USERDATA_NAME_MAX + 1)  // with its NUL
 // A line of recent.txt: the time, a TAB, a path and its newline
 #define USERDATA_LINE_MAX (USERDATA_PATH_MAX + 16)
+// The largest files the store reads (a larger copy counts as missing): room
+// for every game a list keeps at the longest lines, and comments
+#define USERDATA_RECENT_FILE_MAX 0x10000u
+#define USERDATA_FAV_FILE_MAX 0x200000u
 // The boot position's item: a word of letters, digits, '-' and '_'
 #define USERDATA_ITEM_MAX 16  // with its NUL
 
@@ -153,8 +157,9 @@ void userdata_ago(char *out, u32 size, u32 then, u32 now, const struct userdata_
 
 // PSRAM is about to be overwritten (a launch): read the card again next time.
 void userdata_invalidate(void);
-// Reads both lists now if they aren't in PSRAM (the boot, or after a launch
-// that didn't start), so no later call reads the card while a screen draws.
+// Reads both lists now if they aren't in PSRAM, so no later call reads the
+// card while a screen draws: for the boot and pages to call before they draw
+// (nothing calls it yet; the v0.3 Recent list reads it before it draws).
 void userdata_load(void);
 
 u32 userdata_recent_count(void);

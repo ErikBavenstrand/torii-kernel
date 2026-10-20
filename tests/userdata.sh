@@ -158,3 +158,33 @@ for n in $(seq 1 "$writes"); do
 done
 [ "$(md5sum <"$cart/kernel-nor.bin")" = "$nor" ] || fail "the power cuts wrote the kernel's NOR"
 echo "PASS: a power cut before any of the $writes SD writes of a save of Recent leaves a whole list ($results)"
+
+# A full card: recent.txt is empty (a cut write) and recent.txt.bak holds 32
+# long entries. Launching Hello.gba (the last of them, UP from the top)
+# writes recent.txt first, which runs out of room: that copy is left empty,
+# so the next boot reads recent.txt.bak whole, not the part that fit.
+cart=$carts/full
+rm -rf "$cart"
+mkdir -p "$cart"
+mkfs.fat -C -s 4 -S 512 "$cart/sd.img" 16384 >/dev/null
+mmd -i "$cart/sd.img" ::/SAVER ::/torii
+mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/Hello.gba
+head -c 65536 /dev/zero >"$cart/hello.sav"
+mcopy -i "$cart/sd.img" "$cart/hello.sav" ::/SAVER/Hello.sav
+python3 -c '
+for i in range(31): print("0\t/%s%02d.gba" % ("L" * 200, i))
+print("0\t/Hello.gba")' >"$cart/list.txt"
+sealed "$(cat "$cart/list.txt")\n" >"$cart/bak.txt"
+mcopy -i "$cart/sd.img" "$cart/bak.txt" ::/torii/recent.txt.bak
+put /torii/recent.txt ''
+free=$(mdir -i "$cart/sd.img" :: | grep -o '[0-9 ]* bytes free' | tr -dc 0-9)
+head -c $((free - 2048)) /dev/zero >"$cart/filler.bin"
+mcopy -i "$cart/sd.img" "$cart/filler.bin" ::/filler.bin
+boot 1.log -C $now -k 100:START -k 104:- -k 130:UP -k 134:- -k 150:A -k 154:- -k 190:A -k 194:- -f 450
+grep -q 'safefile: writing /torii/recent.txt failed' "$cart/1.log" || fail "the write didn't run out of room"
+[ "$(mtype -i "$cart/sd.img" ::/torii/recent.txt | wc -c)" = 0 ] || fail "the failed copy isn't empty"
+# B at "Save sav?", then START
+boot 2.log -k 100:B -k 104:- -k 170:START -k 174:- -f 300
+grep -q 'userdata: Recent: 32 games from /torii/recent.txt' "$cart/2.log" ||
+  fail "after the full card, Recent has: $(grep 'userdata: Recent' "$cart/2.log")"
+echo "PASS: a write the full card can't take leaves its copy empty, and the other is read whole"

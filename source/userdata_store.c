@@ -62,7 +62,6 @@ _Static_assert(sizeof(struct work) <= READCACHE_USERDATA_SIZE, "the store's RAM 
 
 static struct {
 	u8 recent_ok, fav_ok;  // read since the last userdata_invalidate
-	u8 migrate;            // Recent came from the v0.3 list: delete it once recent.txt is written
 	u8 boot_set;           // the boot position changed since recent.txt was written
 	u32 recent_count;
 	u32 fav_count;
@@ -106,14 +105,12 @@ static void load_recent(void)
 	struct userdata_boot boot = {{0}, 0};
 	const char *from_file = recent_file();
 	u32 count = 0, dropped = 0;
-	int from = safefile_open(from_file);
-	st.migrate = 0;
+	int from = safefile_open(from_file, USERDATA_RECENT_FILE_MAX);
 	if (from == SAFEFILE_NONE) {
 		// No recent.txt yet: the v0.3 list, if there is one, until the
 		// first write takes it over
 		from_file = old_file();
-		from = safefile_open(from_file);
-		st.migrate = from != SAFEFILE_NONE;
+		from = safefile_open(from_file, USERDATA_RECENT_FILE_MAX);
 	}
 	int len;
 	while (from != SAFEFILE_NONE && (len = safefile_line(W->line, sizeof(W->line))) != SAFEFILE_END) {
@@ -187,14 +184,13 @@ static int recent_put(u32 count)
 	st.recent_count = count;
 	W->lines.line = recent_line;
 	W->lines.ctx = NULL;
-	if (!safefile_write(recent_file(), safefile_lines_fill, &W->lines))
+	if (!safefile_write(recent_file(), USERDATA_RECENT_FILE_MAX, safefile_lines_fill, &W->lines))
 		return 0;
 	st.boot_set = 0;
-	if (st.migrate) {
-		FRESULT res = f_unlink(old_file());
-		tlog("userdata: took over %s (FatFs %u)", old_file(), (unsigned)res);
-		st.migrate = 0;
-	}
+	// recent.txt holds its games now: the v0.3 list goes (also when a power
+	// cut before this left it beside a recent.txt)
+	if (f_unlink(old_file()) == FR_OK)
+		tlog("userdata: took over %s", old_file());
 	return 1;
 }
 
@@ -266,7 +262,7 @@ int userdata_flush(void)
 static void load_fav(void)
 {
 	u32 count = 0, used = 0, dropped = 0;
-	int from = safefile_open(fav_file());
+	int from = safefile_open(fav_file(), USERDATA_FAV_FILE_MAX);
 	int len;
 	psram_begin();
 	while (from != SAFEFILE_NONE && (len = safefile_line(W->line, sizeof(W->line))) != SAFEFILE_END) {
@@ -342,7 +338,7 @@ static int fav_write(void)
 {
 	W->lines.line = fav_line;
 	W->lines.ctx = &W->edit;
-	int ok = safefile_write(fav_file(), safefile_lines_fill, &W->lines);
+	int ok = safefile_write(fav_file(), USERDATA_FAV_FILE_MAX, safefile_lines_fill, &W->lines);
 	st.fav_ok = 0;
 	ensure_fav();
 	return ok;
@@ -376,8 +372,9 @@ static int fav_change(const char *add, int (*drop)(const char *path, const char 
 	memset(e, 0, sizeof(*e));
 	if (add) {
 		e->add_at = userdata_find(FAV_TABLE_PS, st.fav_count, add, fav_str, &found);
-		if (!found &&
-		    (st.fav_count == USERDATA_FAV_MAX || st.fav_used + WORD_UP(strlen(add) + 1) > FAV_POOL_BYTES)) {
+		// A rename drops a path as it adds one: never full then
+		int full = st.fav_count == USERDATA_FAV_MAX || st.fav_used + WORD_UP(strlen(add) + 1) > FAV_POOL_BYTES;
+		if (!found && full && !(drop && fav_matches(drop, arg))) {
 			tlog_error("userdata: the favourites are full");
 			return 0;
 		}
@@ -462,6 +459,9 @@ int userdata_rename(const char *from, const char *to)
 {
 	if (!userdata_path_ok(to))
 		return 0;
+	// Both lists read first: reading the favourites uses W->pad
+	ensure_recent();
+	ensure_fav();
 	snprintf(W->path, sizeof(W->path), "%s", to);
 	snprintf(W->pad, sizeof(W->pad), "%s", from);
 	u32 count = recent_get();
