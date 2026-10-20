@@ -164,10 +164,7 @@ static void store(struct settings_values *v, u32 id, u16 value)
 	u32 n = slots_of(r);
 	if (!n || r->slot + n > assress_max)
 		return;
-	// The dropped SD theme (THEME 2) reads as dark here but not to the
-	// menu until B1 removes it: dark is then stored as such
-	int sd_theme = id == SET_THEME && v->loaded[r->slot] == 2;
-	if (value_in(v->loaded, id) == value && !sd_theme) {
+	if (value_in(v->loaded, id) == value) {
 		memcpy(&v->slot[r->slot], &v->loaded[r->slot], n * sizeof(u16));
 		return;
 	}

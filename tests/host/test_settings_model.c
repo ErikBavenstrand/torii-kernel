@@ -160,11 +160,11 @@ void test_settings_defaults(void)
 	CHECK_EQ(settings_get(&v, SET_THEME), 0);
 	v.slot[assress_theme] = 1;
 	CHECK_EQ(settings_get(&v, SET_THEME), 1);
-	// ... and choosing Dark over it stores dark, not the SD theme back
+	// ... as the menu reads it: Dark and back keeps the 2
 	v.slot[assress_theme] = v.loaded[assress_theme] = 2;
 	settings_step(&v, SET_THEME, 1);
 	settings_step(&v, SET_THEME, 1);
-	CHECK_EQ(v.slot[assress_theme], 0);
+	CHECK_EQ(v.slot[assress_theme], 2);
 	v.slot[assress_theme] = v.loaded[assress_theme] = 0xFFFF;
 	v.slot[assress_dim] = 61;
 	CHECK_EQ(settings_get(&v, SET_DIM), 0);
