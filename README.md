@@ -33,6 +33,7 @@ the update.
 | `just build` | `dist/ezkernelnew.bin`, the file you flash to the cart |
 | `just sd /Volumes/OMEGA [game.gba...]` | copies the kernel (and games) to a real SD card and ejects it; hold R while switching on to install |
 | `just logs /Volumes/OMEGA` | copies the kernel's logs off a real SD card into `dist/logs/torii.log`, naming the code addresses in crash dumps (see below); `--tag v0.2.1` names them with that release's symbols |
+| `just names-update /Volumes/OMEGA` | writes the game names database to a real SD card: `/torii/names.db` from the No-Intro dats of [libretro-database](https://github.com/libretro/libretro-database) (CC BY-SA 4.0; downloaded once to the git-ignored `dist/dats`, never bundled) and the CRCs of the card's games in `/torii/crc.txt`, so the lists show No-Intro names |
 | `just play [game.gba...]` | runs the kernel on an emulated cart, first copying any games given onto its SD card unless they are already there |
 | `just dev` | like `play`, rebuilding whenever `source/` changes |
 | `just test` | host and kernel unit tests, then homebrew games through the kernel: boot, every save type across power cycles, crash reports and save states |

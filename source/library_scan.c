@@ -15,6 +15,7 @@
 // After ff.h, whose types it uses
 #include "diskio.h"
 #include "lang.h"
+#include "namesdb.h"
 #include "safefile.h"
 #include "savename.h"
 #include "tlog.h"
@@ -80,6 +81,7 @@ enum {
 
 enum {
 	W_START,
+	W_NAMESDB,
 	W_CLEAR,
 	W_NAMES,
 	W_SAVER_OPEN,
@@ -406,6 +408,7 @@ static void walk_failed(FRESULT fr)
 {
 	tlog_error("library: the walk stopped at %s (FatFs error %d); the index stays as it was",
 		   lib.u.walk.path[0] ? lib.u.walk.path : "/", fr);
+	names_walk_end(0);
 	lib.state = S_IDLE;
 }
 
@@ -418,18 +421,25 @@ static u16 walk_folder(void)
 	return lib.u.walk.folder[d];
 }
 
-// The name the lists show for the game just read: its custom name if
-// names.txt has one, else its cleaned file name (gamename_display)
-static const char *walk_display(void)
+// The game just read's path into lib.u.walk.full
+static void walk_full_path(void)
 {
-	if (!lib.u.walk.names_ok)
-		return NULL;  // lib_build_game cleans the file name
 	u32 len = lib.u.walk.path_len[lib.u.walk.depth];
 	char *full = lib.u.walk.full;
 	memcpy(full, lib.u.walk.path, len);
 	full[len] = '/';
 	memcpy(full + len + 1, lib.u.walk.fi.fname, strnlen(lib.u.walk.fi.fname, LIBRARY_NAME_MAX) + 1);
-	gamename_display(lib.u.walk.b.display, full, &lib.u.walk.custom, NULL);
+}
+
+// The name the lists show for the game just read (its path in
+// lib.u.walk.full): its custom name if names.txt has one, else crc_name
+// (the names database's), else its cleaned file name (gamename_display)
+static const char *walk_display(const char *crc_name)
+{
+	if (!lib.u.walk.names_ok && !crc_name)
+		return NULL;  // lib_build_game cleans the file name
+	gamename_display(lib.u.walk.b.display, lib.u.walk.full, lib.u.walk.names_ok ? &lib.u.walk.custom : NULL,
+			 crc_name);
 	return lib.u.walk.b.display;
 }
 
@@ -473,6 +483,10 @@ static void walk_entry(DIR *sub)
 		return;
 	lib.u.walk.games++;
 	hash_entry('F', fi, 1);
+	// Its CRC cache record checked against the file, every walk
+	walk_full_path();
+	const char *crc_name =
+		names_walk_seen(lib.u.walk.full, (u32)fi->fsize, (u32)fi->fdate << 16 | fi->ftime, console);
 	if (!lib.build)
 		return;
 	int has_save = 0;
@@ -484,8 +498,8 @@ static void walk_entry(DIR *sub)
 	// The display name only for a game that has room: a custom name costs a
 	// search of names.txt
 	int room = lib.u.walk.b.records < LIBRARY_GAMES_MAX && folder != LIBRARY_NONE;
-	if (lib_build_game(&lib.u.walk.b, folder, fi->fname, room ? walk_display() : NULL, (u32)fi->fsize, console,
-			   has_save) == LIB_BAD_NAME) {
+	if (lib_build_game(&lib.u.walk.b, folder, fi->fname, room ? walk_display(crc_name) : NULL, (u32)fi->fsize,
+			   console, has_save) == LIB_BAD_NAME) {
 		lib.u.walk.too_long++;
 		tlog("library: %s/%s: the name is too long to index", d ? lib.u.walk.path : "", fi->fname);
 	}
@@ -514,6 +528,13 @@ static int same_as_active(void)
 
 static void walk_end(void)
 {
+	// The names the database gives: when they change, the index sorts again
+	u32 names = names_identity();
+	if (names)
+		hash_bytes(&names, sizeof(names));
+	// A walk that couldn't open a folder isn't whole: its games' CRC
+	// records stay in crc.txt
+	names_walk_end(!lib.u.walk.skipped && !lib.u.walk.unreadable);
 	u32 ms = ms_since(lib.started);
 	tlog("library: %s walk: %lu entries, %lu folders, %lu files, %lu games, %lu saves in %lu ms; %lu folders "
 	     "not opened, %lu unreadable, %lu names too long",
@@ -611,7 +632,13 @@ static void walk_step(void)
 		lib.u.walk.serial = volume_serial();
 		if (lib.build)
 			lib_build_begin(&lib.u.walk.b, slot_at(lib.valid ? !lib.active : 0), put);
-		lib.phase = lib.build ? W_CLEAR : W_NAMES;
+		names_walk_begin();
+		lib.phase = W_NAMESDB;
+		return;
+	case W_NAMESDB:
+		// names.db and the CRC cache, once after the boot or a game
+		if (names_load_step())
+			lib.phase = lib.build ? W_CLEAR : W_NAMES;
 		return;
 	case W_CLEAR:
 		// The save table emptied a chunk a step (32 KB at the slow WAITCNT
@@ -930,6 +957,7 @@ void library_poll(void)
 	}
 	if (has_work() && !job_running(lib.job))
 		lib.job = job_start(library_job, 0, JOB_OWNER_NONE);
+	names_poll();
 }
 
 // The first scan's dialog: the share of folders walked, then the sort
@@ -952,6 +980,7 @@ static void first_scan_progress(void)
 
 void library_boot(void)
 {
+	names_boot();
 	memset(&lib, 0, sizeof(lib));
 	lib.job = JOB_NONE;
 	lib.newest = 0xFF;
@@ -1013,6 +1042,7 @@ void library_before_launch(void)
 		job_cancel(lib.job);
 	lib.job = JOB_NONE;
 	close_file();
+	names_before_launch();
 	lib.state = S_LOST;
 	lib.valid = 0;
 	lib.want_write = 0;
@@ -1097,6 +1127,11 @@ int library_truncated(void)
 u32 library_games_seen(void)
 {
 	return lib.valid ? lib_hdr(active_slot())->games_seen : 0;
+}
+
+u32 library_records(void)
+{
+	return lib.valid ? lib_hdr(active_slot())->records : 0;
 }
 
 // After the menu changed the card: a walk follows (a walk under way may

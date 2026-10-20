@@ -16,7 +16,9 @@
 //	3.5 MB    favourites and recents (B5), PSRAM_USERDATA_BASE
 //	4 MB      the cover cache (engine/cover.h), COVER_PSRAM_BYTES
 //	4.5 MB    reserved, PSRAM_RESERVED_BASE (the SD themes' until v0.4)
-//	5-8 MB    reserved (v0.4.1 art lookups, v0.9 language tables)
+//	5 MB      /torii/names.db (namesdb.h), up to PSRAM_NAMES_DB_BYTES
+//	6.75 MB   the CRC cache's table (namesdb.h), NAMES_CACHE_BYTES
+//	7.5-8 MB  reserved (v0.4.1 art lookups, v0.9 language tables)
 //
 // A game launch fills PSRAM with the game, so everything here is lost then:
 // the launch calls cover_cache_invalidate first.
@@ -44,6 +46,11 @@
 #define PSRAM_USERDATA_BASE (PSRAM_ASSET_BASE - PSRAM_USERDATA_BYTES)
 // The library's slots end where the user's lists start (library_scan.c asserts it)
 #define PSRAM_LIBRARY_END PSRAM_USERDATA_BASE
+// The names database and the CRC cache (names_store.c asserts the sizes)
+#define PSRAM_NAMES_DB_BASE (PSRAM_WINDOW + 0x00500000u)
+#define PSRAM_NAMES_DB_BYTES 0x001C0000u
+#define PSRAM_NAMES_CACHE_BASE (PSRAM_NAMES_DB_BASE + PSRAM_NAMES_DB_BYTES)
+#define PSRAM_NAMES_CACHE_BYTES 0x000C0000u
 
 // 1 if [p, p + bytes) lies in the PSRAM window.
 static inline int psram_holds(const void *p, u32 bytes)

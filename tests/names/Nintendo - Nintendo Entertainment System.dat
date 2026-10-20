@@ -1,0 +1,10 @@
+clrmamepro (
+	name "Nintendo - Nintendo Entertainment System"
+	description "Nintendo - Nintendo Entertainment System (Torii test fixture)"
+	version "2026.01.02"
+)
+
+game (
+	name "Famicom Game (Japan)"
+	rom ( name "Famicom Game (Japan).nes" size 16400 crc 0C6CB870 )
+)

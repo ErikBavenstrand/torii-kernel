@@ -64,6 +64,7 @@ cppcheck source/ezkernelnew.c unreadVariable: Variable 'res' is assigned a value
 cppcheck source/ezkernelnew.c unreadVariable: Variable 'res' is assigned a value that is never used.
 cppcheck source/ezkernelnew.c unreadVariable: Variable 'res' is assigned a value that is never used.
 cppcheck source/library_scan.c constParameterCallback: Parameter 'job' can be declared as pointer to const. However it seems that 'library_job' is a callback function, if 'job' is declared with const you might also need to cast function pointer(s).
+cppcheck source/names_store.c constParameterCallback: Parameter 'job' can be declared as pointer to const. However it seems that 'names_job' is a callback function, if 'job' is declared with const you might also need to cast function pointer(s).
 cppcheck source/showcht.c unreadVariable: Variable 'is_section' is assigned a value that is never used.
 cppcheck source/showcht.c unreadVariable: Variable 'text_comment' is assigned a value that is never used.
 cppcheck source/showcht.c unreadVariable: Variable 'text_comment' is assigned a value that is never used.

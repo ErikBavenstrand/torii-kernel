@@ -50,6 +50,8 @@ void test_art_obj_budget(void);
 void test_art_ring(void);
 void test_library_psram(void);
 void test_library_boot(void);
+void test_names_identify(void);
+void names_bench(void);
 
 // Test assets (asset_data.c, written by tools/asset.py demo)
 #include <gba_base.h>

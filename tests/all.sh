@@ -30,6 +30,7 @@ jobs=(
   "tests/nes.sh"
   "tests/names.sh fat32"
   "tests/names.sh exfat"
+  "tests/names_db.sh"
   "tests/stale_recent.sh"
   "tests/userdata.sh"
   "tests/navigation.sh"

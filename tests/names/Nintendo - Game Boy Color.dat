@@ -1,0 +1,15 @@
+clrmamepro (
+	name "Nintendo - Game Boy Color"
+	description "Nintendo - Game Boy Color (Torii test fixture)"
+	version "2026.01.02"
+)
+
+game (
+	name "Colour Game (USA)"
+	rom ( name "Colour Game (USA).gbc" size 2048 crc 79F840AB )
+)
+
+game (
+	name "Colour Named Gb (World)"
+	rom ( name "Colour Named Gb (World).gbc" size 2048 crc C85A63AE )
+)
