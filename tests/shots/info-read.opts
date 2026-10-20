@@ -1,0 +1,25 @@
+# An Info reading page (mockup #22) in the light theme: A on Controls fades
+# the rows out and the page in (every frame hashed): its title ("Controls"
+# with a faint "Info" after it, the position at the right), headings and
+# key chips on a card, the scroll bar. DOWN scrolls a row; R pages to the
+# last screenful, where DOWN does nothing; B fades back to the rows, on
+# Controls.
+#! settings 28=1
+-w "nav: home ready"
+-P @2:info_version:0.4.0
+-P @2:info_build:0000B17A
+-k @8:UP -k @12:- -k @16:A -k @20:-
+-w "screen ready: info"
+-k @8:A -k @12:-
+-H @8:@30
+-w "screen ready: info-controls"
+-s @1:controls.png
+-k @8:DOWN -k @12:-
+-s @30:scrolled.png
+-k @36:R -k @40:- -k @48:R -k @52:- -k @60:R -k @64:- -k @72:R -k @76:-
+-s @100:last.png
+-k @104:DOWN -k @108:-
+-s @124:last-down.png
+-k @130:B -k @134:-
+-w "screen ready: info"
+-s @1:back.png

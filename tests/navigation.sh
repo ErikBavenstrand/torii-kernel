@@ -76,6 +76,31 @@ grep -q "gbc isn't on home" "$cart/err.txt" || fail "nav_to gbc said: $(cat "$ca
 grep -q "come with B14" "$cart/err.txt" || fail "nav_file said: $(cat "$cart/err.txt")"
 echo "PASS: tests/nav.sh reaches home and every page, and a route not built yet fails clearly"
 
+# The Info page's routes: each reading page fills in and wraps its text
+# (an assert fails one that doesn't fit), and Diagnostics' first page comes
+# up from its row
+new_cart info
+cp -r "$cart" "$carts/info-new"
+for page in controls ingame cart about diag; do
+  rm -rf "$cart" && cp -r "$carts/info-new" "$cart"
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot "info-$page" $(nav_info_page $page)
+  [ $page = diag ] || logged "info: info-$page,"
+done
+! nav_info_page help >/dev/null 2>"$cart/err.txt" || fail "nav_info_page help didn't fail"
+echo "PASS: tests/nav.sh reaches each Info page and Diagnostics from Info"
+
+# Last place on a reading page is its row on the Info page: the boot after
+# comes back to the rows, on Your cart
+rm -rf "$cart" && cp -r "$carts/info-new" "$cart"
+# shellcheck disable=SC2046
+boot info-last $(nav_info_page cart) -k @400:- -f 900
+mtype -i "$cart/sd.img" ::/torii/recent.txt | grep -qx '@boot info 2' ||
+  fail "recent.txt's boot position on Your cart: $(mtype -i "$cart/sd.img" ::/torii/recent.txt | head -1)"
+boot info-last-2 -w "screen ready: info" -f 300
+logged "nav: start on 0: info, row 2"
+echo "PASS: Last place on an Info page comes back to its row"
+
 # Start on: each value, from the log (registry_start's tests cover the rest)
 new_cart start
 for case in "0 home-recent" "1 recent" "2 home-recent" "3 fav" "4 sd" "5 gba" "6 home-gb" "7 gb" "8 home-sd"; do

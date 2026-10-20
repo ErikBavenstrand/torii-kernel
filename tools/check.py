@@ -64,6 +64,8 @@ NO_COMPAT = {
     "source/gamename.c",
     "source/gamename.h",
     "source/screens/home.c",
+    "source/screens/info.c",
+    "source/screens/info.h",
     "source/screens/registry.c",
     "source/ui/art.c",
     "source/ui/art.h",

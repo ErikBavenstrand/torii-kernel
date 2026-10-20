@@ -102,6 +102,9 @@ extern char *gl_pop_close;
 extern char *gl_pop_cancel;
 extern char *gl_pop_cancel_button;
 
+// The Info page (screens/info.h): by enum info_string
+extern char **gl_info;
+
 extern u32 gl_lang; // index of the current language in lang_packs
 
 void LoadEnglish(void);

@@ -50,6 +50,7 @@ static const struct {
 	{"ui_pool_and_arenas", test_ui_pool_and_arenas},
 	{"theme_switch_loads_banks", test_theme_switch_loads_banks},
 	{"ui_image_queue_full", test_ui_image_queue_full},
+	{"ui_scroll_end", test_ui_scroll_end},
 	{"asset_lz77_decode", test_asset_lz77_decode},
 	{"asset_psram_round_trip", test_asset_psram_round_trip},
 	{"asset_sd_read", test_asset_sd_read},

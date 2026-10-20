@@ -163,6 +163,7 @@ struct row_ctx {
 	u32 x;         // where a row's name starts: pad, or after the icon column
 	u32 clip;      // the name's width
 	int icons;     // UI_LIST_ICONS
+	int icon8;     // UI_LIST_ICON8
 	u32 paper, ink;
 	u32 sel;       // the row drawn with the pill (opaque lists), UI_ITEM_NONE none
 };
@@ -481,15 +482,22 @@ static s32 scroll_for(u8 node, const struct list_state *st, u32 cursor, s32 from
 	return ring_scroll_for(&st->ring, cursor, from, st->rows, 1);
 }
 
-static void set_cursor(u8 node, struct list_state *st, u32 cursor, u16 key)
+// Where the cursor can go: a row of the list (UI_LIST_SCROLL: no further
+// than the top row of the last scroll)
+static u32 cursor_limit(u8 node, const struct list_state *st, u32 cursor)
 {
 	if (cursor >= st->count)
 		cursor = st->count ? st->count - 1 : 0;
 	if (config(node)->flags & UI_LIST_SCROLL) {
-		// The cursor is the top row: no further than the last scroll shows
 		u32 rh = st->ring.rh, last = ((u32)ring_max_scroll(&st->ring, st->rows) + rh - 1) / rh;
 		cursor = cursor > last ? last : cursor;
 	}
+	return cursor;
+}
+
+static void set_cursor(u8 node, struct list_state *st, u32 cursor, u16 key)
+{
+	cursor = cursor_limit(node, st, cursor);
 	u32 old = st->cursor;
 	st->cursor = cursor;
 	marquee_reset(node, st);
@@ -765,10 +773,11 @@ static int list_event(u8 node, const struct ui_event *e)
 			s32 t = (s32)st->cursor + delta;
 			to = t < 0 ? 0 : (u32)t >= st->count ? st->count - 1 : (u32)t;
 		}
+		// A reading view already at its last scroll doesn't move, and its
+		// view hears of no move
+		to = cursor_limit(node, st, to);
 		if (to != st->cursor) {
 			set_cursor(node, st, to, key);
-			if (st->cursor != to)
-				to = st->cursor;  // UI_LIST_SCROLL stops at the last page
 			ui_emit(node, UI_EV_CURSOR, to);
 		}
 		return 1;
@@ -786,8 +795,10 @@ static u32 row_pad(u8 node)
 // Where a list row's name starts: after the icon column, if it has one
 static u32 text_x(u8 node)
 {
-	u32 pad = row_pad(node);
-	return (config(node)->flags & UI_LIST_ICONS) ? UI_LIST_ICON_W + pad / 2 : pad;
+	u32 pad = row_pad(node), flags = config(node)->flags;
+	if (flags & UI_LIST_ICON8)
+		return pad + UI_LIST_ICON8_W + ui_theme()->look.section_icon_gap;
+	return (flags & UI_LIST_ICONS) ? UI_LIST_ICON_W + pad / 2 : pad;
 }
 
 // Pixels a list row's name may use
@@ -809,6 +820,24 @@ static void row_icon(const struct text_window *win, u32 y, const u32 *icon)
 			u32 px = src[i];
 			u32 set = (px | px >> 1 | px >> 2 | px >> 3) & 0x11111111u;
 			dst[i] = (dst[i] & ~(set * 0xF)) | px;
+		}
+	}
+}
+
+// Draws an 8x8 icon (one 4bpp tile) at pixel (x, y) of a window, over what
+// is there: colour 0 lets it show
+static void row_icon8(const struct text_window *win, u32 x, u32 y, const u32 *icon)
+{
+	u32 column = win->height * 8u, c = x / 8, shift = (x % 8) * 4;
+	if (c >= win->width)
+		return;
+	for (u32 i = 0; i < 8; i++) {
+		u32 px = icon[i], set = ((px | px >> 1 | px >> 2 | px >> 3) & 0x11111111u) * 0xF;
+		u32 *dst = win->tiles + c * column + y + i;
+		*dst = (*dst & ~(set << shift)) | px << shift;
+		if (shift && c + 1 < win->width) {
+			dst += column;
+			*dst = (*dst & ~(set >> (32 - shift))) | px >> (32 - shift);
 		}
 	}
 }
@@ -1033,6 +1062,7 @@ static void row_ctx_init(u8 node, const struct list_state *st, struct row_ctx *r
 	rc->pad = row_pad(node);
 	rc->x = text_x(node);
 	rc->icons = (config(node)->flags & UI_LIST_ICONS) != 0;
+	rc->icon8 = (config(node)->flags & UI_LIST_ICON8) != 0;
 	rc->clip = text_clip(node, st);
 	rc->paper = ui_paper(node, UI_ROLE_NONE);
 	rc->ink = ui_ink(node, UI_ROLE_TEXT);
@@ -1134,6 +1164,8 @@ static int draw_row(const struct list_state *st, const struct row_ctx *rc, const
 			draw_pill(win, rc, x0, y0, right, ww);
 		}
 	}
+	if (item.icon && rc->icon8 && rc->rh >= 8)
+		row_icon8(win, x0 + rc->pad, y0 + (rc->rh - 8) / 2, item.icon);
 	if (item.icon && rc->icons && rc->rh >= 16) {
 		struct text_window at = *win;
 		at.tiles += (x0 / 8) * win->height * 8u;

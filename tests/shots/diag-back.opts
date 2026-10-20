@@ -1,0 +1,15 @@
+# Diagnostics from the Info page: A on its last row ends the menu's
+# session and Diagnostics' first page comes up; B there comes back to the
+# Info page, on Diagnostics' row.
+#! settings 28=1
+-w "nav: home ready"
+-P @2:info_version:0.4.0
+-P @2:info_build:0000B17A
+-k @8:UP -k @12:- -k @16:A -k @20:-
+-w "screen ready: info"
+-k @8:UP -k @12:- -k @20:A -k @24:-
+-w "screen ready: diag-start"
+-s @1:diag.png
+-k @8:B -k @12:-
+-w "screen ready: info"
+-s @1:back.png

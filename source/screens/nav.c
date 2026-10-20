@@ -13,6 +13,7 @@
 
 #include "nav.h"
 #include "home.h"
+#include "info.h"
 #include "../actions.h"
 #include "../ezkernel.h"
 #include "../Ezcard_OP.h"
@@ -93,10 +94,9 @@ const char *nav_clock(void)
 	return nav.clock;
 }
 
-// n with thousands separators ("1,204"), then the unit
-static void count_words(char *out, u32 size, u32 n, const char *one, const char *many)
+void nav_count_words(char *out, u32 size, u32 n, const char *one, const char *many)
 {
-	if (n == 1) {
+	if (n == 1 && one) {
 		snprintf(out, size, "%s", one);
 		return;
 	}
@@ -107,7 +107,7 @@ static void count_words(char *out, u32 size, u32 n, const char *one, const char 
 			out[o++] = ',';
 		out[o++] = digits[i];
 	}
-	snprintf(out + o, size - o, " %s", many);
+	snprintf(out + o, size - o, "%s%s", many ? " " : "", many ? many : "");
 }
 
 // What each item holds, and which items show (registry_shown)
@@ -130,13 +130,13 @@ static void count_items(void)
 	for (u32 i = 0; i < NAV_ITEMS; i++) {
 		char *t = nav.count_text[i];
 		if (i == NAV_SD)
-			count_words(t, sizeof(nav.count_text[i]), c[i], gl_count_file, gl_count_files);
+			nav_count_words(t, sizeof(nav.count_text[i]), c[i], gl_count_file, gl_count_files);
 		else if (i == NAV_SET)
 			snprintf(t, sizeof(nav.count_text[i]), "%s", gl_count_page);
 		else if (i == NAV_INFO)
 			t[0] = 0;
 		else
-			count_words(t, sizeof(nav.count_text[i]), c[i], gl_count_game, gl_count_games);
+			nav_count_words(t, sizeof(nav.count_text[i]), c[i], gl_count_game, gl_count_games);
 	}
 	nav.shown_count = (u8)registry_shown(c, nav.shown);
 	nav.lib_generation = library_generation();
@@ -238,9 +238,9 @@ static const struct nav_page empty_page = {empty_enter, 0, empty_clock, 0};
 
 // Each item's page: a page ticket puts its own here
 static const struct nav_page *const pages[NAV_ITEMS] = {
-	[NAV_RECENT] = &empty_page, [NAV_FAV] = &empty_page,  [NAV_GBA] = &empty_page, [NAV_GBC] = &empty_page,
-	[NAV_GB] = &empty_page,     [NAV_NES] = &empty_page,  [NAV_SD] = &empty_page,  [NAV_NOR] = &empty_page,
-	[NAV_SET] = &empty_page,    [NAV_INFO] = &empty_page,
+	[NAV_RECENT] = &empty_page, [NAV_FAV] = &empty_page, [NAV_GBA] = &empty_page, [NAV_GBC] = &empty_page,
+	[NAV_GB] = &empty_page,     [NAV_NES] = &empty_page, [NAV_SD] = &empty_page,  [NAV_NOR] = &empty_page,
+	[NAV_SET] = &empty_page,    [NAV_INFO] = &info_page,
 };
 
 // --- The clock ------------------------------------------------------------------
