@@ -106,5 +106,15 @@ void test_asset_check_refuses(void);
 void test_cover_cache_wants(void);
 void test_cover_cache_eviction(void);
 void test_affine_rotscale(void);
+void test_gamename_clean_real_names(void);
+void test_gamename_clean_rules(void);
+void test_gamename_clean_limits(void);
+void test_gamename_dedupe(void);
+void test_gamename_custom_parse(void);
+void test_gamename_custom_set(void);
+void test_gamename_custom_move(void);
+void test_gamename_custom_io(void);
+void test_gamename_display(void);
+void test_gamename_hidden(void);
 
 #endif
