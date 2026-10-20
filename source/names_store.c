@@ -330,15 +330,13 @@ static void line_end(void)
 		line += 3;  // a BOM from a Windows editor
 	N.first_line = 0;
 	struct names_line l;
-	if (N.line_long)
-		N.lines_bad++;
-	else if (names_parse_line(line, &l)) {
-		if (names_cache_put(&N.cache, l.path, l.size, l.date, l.crc, l.code, l.flags) == NAMES_CACHE_NONE)
-			N.lines_bad++;
-		else
-			N.lines_read++;
-	} else if (line[0] && line[0] != '#')
-		N.lines_bad++;
+	int kept = 0, text = N.line_long || (line[0] && line[0] != '#');
+	if (!N.line_long && names_parse_line(line, &l))
+		kept = names_cache_put(&N.cache, l.path, l.size, l.date, l.crc, l.code, l.flags) != NAMES_CACHE_NONE;
+	if (kept)
+		N.lines_read++;
+	else if (text)
+		N.lines_bad++;  // too long, unreadable, or no room
 	N.line_len = 0;
 	N.line_long = 0;
 }
