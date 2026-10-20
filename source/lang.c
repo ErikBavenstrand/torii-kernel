@@ -523,6 +523,7 @@ static const struct lang_games en_games = {
 	.on = "on",
 	.delete_text = "The save stays.",
 	.delete_button = "Delete",
+	.delete_failed = "The file couldn't be deleted.",
 	.info_keys = {"Console", "Size", "Folder", "Played", "Save type", "Hard reset"},
 	.consoles = {"GBA", "GBC", "GB", "NES"},
 	.nor = "Game NOR",

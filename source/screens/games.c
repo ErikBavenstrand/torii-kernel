@@ -30,6 +30,7 @@
 #include "../engine/engine.h"
 #include "../engine/psram.h"
 #include "../ui/art.h"
+#include "../ui/dialog.h"
 #include "../ui/letter.h"
 #include "../ui/ui.h"
 
@@ -97,7 +98,6 @@ static struct {
 	char ago[USERDATA_RECENT_MAX][AGO_MAX];
 	char position[16];  // the title's "101/176"
 	char fact_keys[24], fact_values[32];
-	char note[32];
 	struct ui_hint hints[4];
 	u16 box_palette[16];
 	// What fetch draws from: valid until the next fetch (a row draws at once)
@@ -139,7 +139,6 @@ struct game {
 	u32 rec;           // its record in the index, LIBRARY_NONE if none
 	const char *path;  // its path (Recent's or a favourite's, in PSRAM); NULL: the record's
 	u32 console;       // LIB_*, LIB_CONSOLE_NONE if unknown
-	u32 time;          // when it was played (Recent's), 0 unknown
 };
 
 static u32 console_of(u32 rec, const char *path)
@@ -156,7 +155,6 @@ static int game_at(u32 i, struct game *g)
 {
 	if (i >= games.count)
 		return 0;
-	g->time = 0;
 	if (games.kind == KIND_CONSOLE) {
 		g->rec = library_game(games.console, i);
 		g->path = NULL;
@@ -166,7 +164,6 @@ static int game_at(u32 i, struct game *g)
 	if (games.kind == KIND_RECENT) {
 		g->rec = games.recent_rec[i];
 		g->path = userdata_recent_path(i);
-		g->time = userdata_recent_time(i);
 	} else {
 		u32 e = fav_entry(i);
 		g->rec = FAV_REC(e) == FAV_NO_REC ? LIBRARY_NONE : FAV_REC(e);
@@ -193,7 +190,8 @@ static int game_path(const struct game *g, char *out)
 static int same_name(u32 console, u32 m, const char *display)
 {
 	u32 rec = library_game(console, m);
-	return rec != LIBRARY_NONE && !(library_flags(rec) & LIB_F_CUSTOM) && gamename_same(library_display(rec), display);
+	return rec != LIBRARY_NONE && !(library_flags(rec) & LIB_F_CUSTOM) &&
+	       gamename_same(library_display(rec), display);
 }
 
 // The name a record shows: its display name, and when games of its console
@@ -344,32 +342,54 @@ static const struct ui_list_config list_plain = {&model, UI_ROW_PITCH_LIST, LIST
 static const struct ui_list_config list_marks = {&model, UI_ROW_PITCH_LIST, LIST_FLAGS | UI_LIST_MARKS, DETAIL_W,
 						 LIST_PAD};
 static const struct ui_list_config art_plain = {&model, UI_ROW_PITCH_LIST, LIST_FLAGS, ART_DETAIL_W, LIST_PAD};
-static const struct ui_list_config art_marks = {&model, UI_ROW_PITCH_LIST, LIST_FLAGS | UI_LIST_MARKS,
-						ART_DETAIL_W, LIST_PAD};
+static const struct ui_list_config art_marks = {&model, UI_ROW_PITCH_LIST, LIST_FLAGS | UI_LIST_MARKS, ART_DETAIL_W,
+						LIST_PAD};
 
 #define NODES(list_w, bar) \
 	[N_TITLE] = {UI_TITLE, 1, UI_NONE, 3, UI_HFILL, 0, 0, 0, 0, 0, 0, TITLE_H, &title_config}, \
 	[N_HINTS] = {UI_HINTS, 2, UI_NONE, 3, UI_HFILL | UI_BOTTOM, 0, 0, 0, 0, 0, 0, HINTS_H, &no_hints}, \
 	[N_CARD] = {UI_CARD, 3, UI_NONE, 2, UI_HFILL, 0, 0, 0, 0, CARD_Y, 0, CARD_H, &card}, \
-	[N_BAR] = {UI_SCROLLBAR, 5, UI_NONE, 2, UI_LEFT, 0, 0, UI_ROLE_PANEL, LIST_X + (list_w), LIST_Y, 8, LIST_H, &(bar)}, \
-	[N_NOTE] = {UI_LABEL, 6, UI_NONE, 2, UI_LEFT, 0, UI_ROLE_FAINT, UI_ROLE_PANEL, LIST_X + NOTE_IN, NOTE_Y, \
-		    (list_w) - 2 * NOTE_IN, NOTE_H, &note_label}, \
+	[N_BAR] = {UI_SCROLLBAR,      5,      UI_NONE, 2,      UI_LEFT, 0, 0, UI_ROLE_PANEL, \
+		   LIST_X + (list_w), LIST_Y, 8,       LIST_H, &(bar)}, \
+	[N_NOTE] = {UI_LABEL, \
+		    6, \
+		    UI_NONE, \
+		    2, \
+		    UI_LEFT, \
+		    0, \
+		    UI_ROLE_FAINT, \
+		    UI_ROLE_PANEL, \
+		    LIST_X + NOTE_IN, \
+		    NOTE_Y, \
+		    (list_w) - 2 * NOTE_IN, \
+		    NOTE_H, \
+		    &note_label}, \
 	[N_LETTER] = UI_LETTER_NODE(7)
 
 #define LIST_NODE(index, list_config, list_w) \
-	[index] = {UI_LIST, 4, UI_NONE, 1, UI_LEFT, UI_FOCUSABLE, 0, 0, LIST_X, LIST_Y, (list_w), LIST_H, &(list_config)}
+	[index] = {UI_LIST, 4,      UI_NONE, 1,        UI_LEFT, UI_FOCUSABLE,  0, \
+		   0,       LIST_X, LIST_Y,  (list_w), LIST_H,  &(list_config)}
 
 #define ART_NODES \
 	[N_BOX] = {UI_IMAGE, 8, UI_NONE, 2, UI_LEFT, 0, 0, 0, BOX_X, BOX_Y, ART_BOX_SIZE, ART_BOX_SIZE, &box_image}, \
-	[N_FACT_KEYS] = {UI_LABEL, 9, UI_NONE, 2, UI_LEFT, 0, UI_ROLE_FAINT, UI_ROLE_PANEL, BOX_X, FACTS_Y, FACT_KEYS_W, \
-			 FACTS_H, &keys_label}, \
-	[N_FACT_VALUES] = {UI_LABEL, 10, UI_NONE, 2, UI_LEFT, 0, UI_ROLE_TEXT, UI_ROLE_PANEL, BOX_X + FACT_KEYS_W, \
-			   FACTS_Y, FACT_VALUES_W, FACTS_H, &values_label}
+	[N_FACT_KEYS] = {UI_LABEL,      9,     UI_NONE, 2,           UI_LEFT, 0,          UI_ROLE_FAINT, \
+			 UI_ROLE_PANEL, BOX_X, FACTS_Y, FACT_KEYS_W, FACTS_H, &keys_label}, \
+	[N_FACT_VALUES] = {UI_LABEL, \
+			   10, \
+			   UI_NONE, \
+			   2, \
+			   UI_LEFT, \
+			   0, \
+			   UI_ROLE_TEXT, \
+			   UI_ROLE_PANEL, \
+			   BOX_X + FACT_KEYS_W, \
+			   FACTS_Y, \
+			   FACT_VALUES_W, \
+			   FACTS_H, \
+			   &values_label}
 
-static const struct ui_spec nodes_plain[] = {NODES(LIST_W, bar_compact),
-					     LIST_NODE(N_LIST_COMPACT, list_plain, LIST_W)};
-static const struct ui_spec nodes_marks[] = {NODES(LIST_W, bar_compact),
-					     LIST_NODE(N_LIST_COMPACT, list_marks, LIST_W)};
+static const struct ui_spec nodes_plain[] = {NODES(LIST_W, bar_compact), LIST_NODE(N_LIST_COMPACT, list_plain, LIST_W)};
+static const struct ui_spec nodes_marks[] = {NODES(LIST_W, bar_compact), LIST_NODE(N_LIST_COMPACT, list_marks, LIST_W)};
 static const struct ui_spec nodes_art_plain[] = {NODES(ART_LIST_W, bar_art), ART_NODES,
 						 LIST_NODE(N_LIST_ART, art_plain, ART_LIST_W)};
 static const struct ui_spec nodes_art_marks[] = {NODES(ART_LIST_W, bar_art), ART_NODES,
@@ -604,7 +624,8 @@ static void show_facts(void)
 			memcpy(ago, games.ago[games.cursor], sizeof(ago));
 		else if (game_path(&g, games.path))
 			userdata_ago_text(ago, sizeof(ago), played_time(games.path));
-		snprintf(games.fact_keys, sizeof(games.fact_keys), "%s\n%s", gl_games->fact_size, gl_games->fact_played);
+		snprintf(games.fact_keys, sizeof(games.fact_keys), "%s\n%s", gl_games->fact_size,
+			 gl_games->fact_played);
 		snprintf(games.fact_values, sizeof(games.fact_values), "%s\n%s", size, ago);
 	}
 	ui_label_set(node(N_FACT_KEYS), games.fact_keys);
@@ -677,7 +698,8 @@ static void games_poll(void)
 		return;
 	if (games.l_valid && !(ui_input()->held & INPUT_L))
 		games.l_valid = 0;
-	if (games.lib_generation != library_generation() && !library_busy()) {
+	// At once: Recent's and the favourites' records are the old index's
+	if (games.lib_generation != library_generation()) {
 		tlog_debug("games: a new index");
 		relist(ui_list_cursor(list_node()));
 		return;
@@ -775,8 +797,8 @@ static void game_info(const struct game *g)
 		u32 o = 0;
 		for (u32 k = 0; k < LANG_INFO_KEYS && o < sizeof(games.info_keys); k++)
 			if (k != LANG_INFO_SAVE_TYPE || games.info_type < ACTION_SAVE_TYPES)
-				o += (u32)snprintf(games.info_keys + o, sizeof(games.info_keys) - o, "%s%s", o ? "\n" : "",
-						   s->info_keys[k]);
+				o += (u32)snprintf(games.info_keys + o, sizeof(games.info_keys) - o, "%s%s",
+						   o ? "\n" : "", s->info_keys[k]);
 		ui_label_set((u8)(v->first + I_KEYS), games.info_keys);
 		info_values(v);
 		u32 n = 0;
@@ -911,6 +933,8 @@ static void popup_run(u32 i)
 			ui_popup_close();
 			if (action_delete_file(games.pick))
 				relist(i);
+			else
+				dialog_message(NULL, gl_games->delete_failed, DIALOG_ERROR);
 			return;
 		}
 		ui_popup_close();
@@ -953,7 +977,8 @@ static void play_run(u32 arg)
 static void letter_jump_key(u16 keys)
 {
 	u8 list = list_node();
-	u32 to = letter_jump(games.count, ui_list_cursor(list), (keys & INPUT_LEFT) ? -1 : 1, row_letter, 0), prev, next;
+	u32 to = letter_jump(games.count, ui_list_cursor(list), (keys & INPUT_LEFT) ? -1 : 1, row_letter, 0), prev,
+	    next;
 	ui_list_set_cursor(list, to);
 	games.cursor = to;
 	games.l_valid = 0;

@@ -48,7 +48,9 @@ static int by_value(void *ctx, u32 a, u32 b)
 
 void test_gamelist_sort(void)
 {
-	enum { N = 1000 };
+	enum {
+		N = 1000
+	};
 	static u16 keys[N], items[N], tmp[N];
 	srand(7);
 	for (u32 n = 0; n <= N; n = n ? n * 3 + 1 : 1) {

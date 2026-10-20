@@ -386,6 +386,10 @@ static void show(const struct registry_place *p, u32 kind, s32 way)
 		engine_leave();
 		engine_enter();
 	}
+	// The place the menu started on, as its page shows it (a Last place
+	// row past the list's end clamps): staying there writes nothing
+	if (!nav.left_start && p->item == nav.start.item && p->open == nav.start.open)
+		current_place(&nav.start);
 	remember();
 	measure("nav-screen", SCREEN_MEASURE_FRAMES);
 }
