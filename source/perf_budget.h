@@ -22,7 +22,7 @@ static const struct {
 	{"diag-psram-slow", 25429},
 	{"diag-row38", 9525},
 	{"diag-scroll", 142466},
-	{"home-move", 29098},
+	{"home-move", 28791},
 	{"info-page", 233820},
 	{"letter-show", 96297},
 	{"nav-screen", 212562},

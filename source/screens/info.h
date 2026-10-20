@@ -45,6 +45,7 @@ enum info_string {
 	INFO_S_CART_GAMES,  // "# Games on the card"
 	INFO_S_CART_CONSOLE,  // %s: a console, %s: its count ("176 games")
 	INFO_S_CART_FILES,    // %s: files on the card ("1,204 files")
+	INFO_S_CART_COUNTING,  // in their place while the library isn't loaded
 	INFO_S_CART_NOR,      // %s: its games ("3 games"), %s MB used, %s MB in all
 	INFO_S_CART_NOR_EMPTY,
 	INFO_S_CART_LISTS,  // %s favourites, %s on Recent, %s: Recent's most
@@ -55,6 +56,7 @@ enum info_string {
 	INFO_S_ABOUT_REV_A,  // the revisions' names
 	INFO_S_ABOUT_REV_B,
 	INFO_S_ABOUT_CARD,   // %s: its size, %s: free, %s: its file system
+	INFO_S_ABOUT_CARD_NO_FREE,  // %s: its size, %s: its file system (no free count on the card)
 	INFO_S_ABOUT_CARD_UNKNOWN,
 	INFO_S_ABOUT_CREDITS,
 	INFO_S_ABOUT_NAMES,  // with /torii/names.db on the card

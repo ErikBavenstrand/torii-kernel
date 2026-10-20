@@ -118,7 +118,7 @@ info/frames 7-20 1E613DC933A7D889
 info-about/about 60DC178D50FA75F6
 info-about/about-end 1FBECA9B24D5C3DC
 info-about/cart A9C987376B088C44
-info-about/ingame 001FF409A6E2CE10
+info-about/ingame A32AC854989A417E
 info-read/back E434584DE986A1E1
 info-read/controls 54C881529D44B1FA
 info-read/last 37F6085E6552C39D

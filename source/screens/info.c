@@ -77,6 +77,8 @@ enum {
 char info_version[16] EWRAM_BSS;
 char info_build[12] EWRAM_BSS;
 
+extern FATFS EZcardFs;  // ezkernelnew.c
+
 static struct {
 	u8 first;  // the view up's first node
 	u8 page;   // the reading page up: its row + 1; 0 the rows
@@ -213,14 +215,18 @@ static void cart_text(void)
 	number(a, sizeof(a), NOR_MB);
 	put(INFO_S_CART_START, a, 0, 0);
 	put(INFO_S_CART_GAMES, 0, 0, 0);
-	static const u8 consoles[] = {NAV_GBA, NAV_GBC, NAV_GB, NAV_NES};
-	for (u32 i = 0; i < sizeof(consoles); i++) {
-		u32 n = library_ready() ? library_count(registry_items[consoles[i]].console) : 0;
-		nav_count_words(b, sizeof(b), n, gl_count_game, gl_count_games);
-		put(INFO_S_CART_CONSOLE, nav_item_name(consoles[i]), b, 0);
+	if (library_ready()) {
+		static const u8 consoles[] = {NAV_GBA, NAV_GBC, NAV_GB, NAV_NES};
+		for (u32 i = 0; i < sizeof(consoles); i++) {
+			u32 n = library_count(registry_items[consoles[i]].console);
+			nav_count_words(b, sizeof(b), n, gl_count_game, gl_count_games);
+			put(INFO_S_CART_CONSOLE, nav_item_name(consoles[i]), b, 0);
+		}
+		nav_count_words(a, sizeof(a), library_total_files(), gl_count_file, gl_count_files);
+		put(INFO_S_CART_FILES, a, 0, 0);
+	} else {
+		put(INFO_S_CART_COUNTING, 0, 0, 0);  // the index loads again after a launch, or the first scan runs
 	}
-	nav_count_words(a, sizeof(a), library_ready() ? library_total_files() : 0, gl_count_file, gl_count_files);
-	put(INFO_S_CART_FILES, a, 0, 0);
 	if (game_total_NOR) {
 		nav_count_words(a, sizeof(a), game_total_NOR, gl_count_game, gl_count_games);
 		number(b, sizeof(b), nor_used_mb());
@@ -247,13 +253,24 @@ static void about_text(void)
 	char a[24], b[24];
 	number(a, sizeof(a), fpga & 0xFF);
 	put(INFO_S_ABOUT_CART, str(lx16 ? INFO_S_ABOUT_REV_B : INFO_S_ABOUT_REV_A), a, 0);
+	// The free space: exFAT's comes from its bitmap (a few hundred sectors at
+	// most), FAT's from FSInfo. A FAT card without a valid FSInfo count
+	// would make f_getfree read the whole FAT, seconds on a big card, so its
+	// free space isn't shown
+	FATFS *fs = &EZcardFs;
+	const char *type = fs->fs_type == FS_EXFAT ? "exFAT" : fs->fs_type == FS_FAT32 ? "FAT32" : "FAT";
+	unsigned long long cluster = (unsigned long long)fs->csize * 512;
 	DWORD clusters;
-	FATFS *fs;
-	if (f_getfree("", &clusters, &fs) == FR_OK && fs->n_fatent > 2) {
-		unsigned long long cluster = (unsigned long long)fs->csize * 512;
+	if (fs->n_fatent <= 2) {
+		tlog_error("info: the card isn't mounted");
+		put(INFO_S_ABOUT_CARD_UNKNOWN, 0, 0, 0);
+	} else if (fs->fs_type != FS_EXFAT && fs->free_clst > fs->n_fatent - 2) {
+		tlog("info: no free cluster count on the card, so no free space");
+		size_words(a, sizeof(a), (unsigned long long)(fs->n_fatent - 2) * cluster);
+		put(INFO_S_ABOUT_CARD_NO_FREE, a, type, 0);
+	} else if (f_getfree("", &clusters, &fs) == FR_OK) {
 		size_words(a, sizeof(a), (unsigned long long)(fs->n_fatent - 2) * cluster);
 		size_words(b, sizeof(b), clusters * cluster);
-		const char *type = fs->fs_type == FS_EXFAT ? "exFAT" : fs->fs_type == FS_FAT32 ? "FAT32" : "FAT";
 		put(INFO_S_ABOUT_CARD, a, b, type);
 	} else {
 		tlog_error("info: the card's free space didn't read");
@@ -360,6 +377,10 @@ static void run_diag(u32 arg)
 {
 	(void)arg;
 	tlog("info: Diagnostics");
+	// A write of library.idx or crc.txt under way finishes now: Diagnostics'
+	// unit tests reset the engine, which drops the jobs, and its end restarts
+	// the kernel. The menu loads the index again if B brings it back
+	library_before_launch();
 	if (ui_active()) {
 		ui_leave(UI_TR_LEAVE, 0);
 		ui_shutdown();

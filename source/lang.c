@@ -305,8 +305,9 @@ const char *en_info[INFO_STRINGS] = {
 		"# At power-on\n"
 		"Hold L, R and SELECT as you switch on to run Diagnostics, even when the menu won't start.",
 	[INFO_S_INGAME_START] = "# Hotkeys\n"
-				"They work in games started with their addons on (Boot with addon). Settings, "
-				"Hotkeys changes them.\n",
+				"They work in GBA games started with their addons on (Boot with addon). Settings, "
+				"Hotkeys sets them; Save states and Cheats are in Settings, Games. A game on the NOR "
+				"keeps the hotkeys it was written with.\n",
 	[INFO_S_INGAME_STATES] = "# Save states\n"
 				 "Hold %s to save the game's state, and %s to load it. Save before you load: with "
 				 "no state saved, a game can crash.\n",
@@ -330,6 +331,7 @@ const char *en_info[INFO_STRINGS] = {
 	[INFO_S_CART_GAMES] = "# Games on the card\n",
 	[INFO_S_CART_CONSOLE] = "%s: %s\n",
 	[INFO_S_CART_FILES] = "%s on the card, games or not\n",
+	[INFO_S_CART_COUNTING] = "Still counting them: open this page again in a moment.\n",
 	[INFO_S_CART_NOR] = "# On the NOR\n"
 			    "%s, %s MB of %s MB used\n",
 	[INFO_S_CART_NOR_EMPTY] = "# On the NOR\n"
@@ -349,6 +351,8 @@ const char *en_info[INFO_STRINGS] = {
 	[INFO_S_ABOUT_REV_B] = "Revision B (LX16)",
 	[INFO_S_ABOUT_CARD] = "# The SD card\n"
 			      "%s, %s free, %s\n",
+	[INFO_S_ABOUT_CARD_NO_FREE] = "# The SD card\n"
+				      "%s, %s; its free space isn't recorded on the card.\n",
 	[INFO_S_ABOUT_CARD_UNKNOWN] = "# The SD card\n"
 				      "Its size didn't read.\n",
 	[INFO_S_ABOUT_CREDITS] = "# Credits\n"
