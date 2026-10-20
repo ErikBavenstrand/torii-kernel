@@ -156,19 +156,14 @@ static u32 label_scratch[LABEL_COLS * 16] EWRAM_BSS ALIGN(4);
 enum {
 	N_TITLE,
 	N_HINTS,
+	N_BAR,   // before the list: drawn first, so the list's first draw keeps within its budget
 	N_LIST,
-	N_BAR,
 	N_NODES
 };
 
 static u8 node(u32 n)
 {
 	return (u8)(sp.first + n);
-}
-
-static u32 pitch(void)
-{
-	return ui_theme()->look.settings_pitch;
 }
 
 static const struct settings_slot *slot_at(u32 s)
@@ -203,12 +198,22 @@ static void round_fill(const struct ui_paint *p, s32 x, s32 y, s32 w, s32 h, u32
 {
 	if (2 * r > (u32)h)
 		r = (u32)h / 2;
-	for (u32 e = 0; e < r; e++) {
+	// Its core in one fill, every line; then the ends, a few px each (a
+	// fill costs per tile column it crosses)
+	s32 in0 = r ? (s32)ui_round_inset(r, 0) : 0, rr = (s32)r;
+	fill(p, x + in0, (u32)y, w - 2 * in0, (u32)h, role);
+	if (!in0)
+		return;
+	fill(p, x, (u32)(y + rr), in0, (u32)(h - 2 * rr), role);
+	fill(p, x + w - in0, (u32)(y + rr), in0, (u32)(h - 2 * rr), role);
+	for (u32 e = 1; e < r; e++) {
 		s32 in = (s32)ui_round_inset(r, e);
-		fill(p, x + in, (u32)(y + (s32)e), w - 2 * in, 1, role);
-		fill(p, x + in, (u32)(y + h - 1 - (s32)e), w - 2 * in, 1, role);
+		for (u32 side = 0; side < 2 && in < in0; side++) {
+			u32 line = (u32)(side ? y + h - 1 - (s32)e : y + (s32)e);
+			fill(p, x + in, line, in0 - in, 1, role);
+			fill(p, x + w - in0, line, in0 - in, 1, role);
+		}
 	}
-	fill(p, x, (u32)(y + (s32)r), w, (u32)(h - 2 * (s32)r), role);
 }
 
 // Its 1 px outline: a pixel in from the outside at each row of the corners
@@ -228,54 +233,63 @@ static void round_line(const struct ui_paint *p, s32 x, s32 y, s32 w, s32 h, u32
 	fill(p, x + w - 1, (u32)(y + (s32)r), 1, (u32)(h - 2 * (s32)r), role);
 }
 
-// The card's body on page line y (px from the page's top) of section sec:
-// [*a, *b), 0 if the line isn't in it
-static int card_body(u32 sec, s32 y, s32 *a, s32 *b)
+// A section's card, in page lines (px from the page's top): its body
+// [top, bottom), its corners' radius
+struct card {
+	s32 top, bottom, r;
+};
+
+static int card_of(u32 sec, u32 rh, struct card *c)
 {
-	s32 rh = (s32)pitch(), r = (s32)ui_theme()->look.card_radius;
-	s32 top = sp.lay.first[sec] * rh - look.card_pad, bottom = (sp.lay.last[sec] + 1) * rh + look.card_pad;
-	if (sp.lay.first[sec] == SET_LAYOUT_NONE || y < top || y >= bottom)
+	if (sp.lay.first[sec] == SET_LAYOUT_NONE)
 		return 0;
-	s32 e = y - top < bottom - 1 - y ? y - top : bottom - 1 - y;
-	s32 in = e < r ? (s32)ui_round_inset((u32)r, (u32)e) : 0;
-	*a = look.card_x + in;
-	*b = look.card_x + look.card_w - in;
+	c->top = sp.lay.first[sec] * (s32)rh - look.card_pad;
+	c->bottom = (sp.lay.last[sec] + 1) * (s32)rh + look.card_pad;
+	c->r = (s32)ui_theme()->look.card_radius;
 	return 1;
 }
 
-// Slot s's part of its section's card, line by line, runs of equal lines in
-// one fill: the body in PANEL, and its shadow (the body one line down,
-// where the body leaves it showing), as ui_paper's cards draw it
+// The body's inset on page line y, -1 if the line isn't in it
+static s32 card_inset(const struct card *c, s32 y)
+{
+	if (y < c->top || y >= c->bottom)
+		return -1;
+	s32 e = y - c->top < c->bottom - 1 - y ? y - c->top : c->bottom - 1 - y;
+	return e < c->r ? (s32)ui_round_inset((u32)c->r, (u32)e) : 0;
+}
+
+// Slot s's part of its section's card: the body in PANEL (its straight
+// lines in one fill, its rounded ones a fill each), and the shadow under
+// it, the body shadow_offset lines down where the body leaves it showing,
+// as ui_paper's cards draw it
 static void paint_card(const struct ui_paint *p, u32 s)
 {
-	u32 sec = slot_at(s)->section, rh = p->rh;
-	u32 sh = ui_theme()->look.shadow_offset;
-	s32 run_a = 0, run_b = 0;
-	u32 run_from = 0, run_on = 0;
-	for (u32 l = 0; l <= rh; l++) {
-		s32 a = 0, b = 0, y = (s32)(s * rh + l);
-		u32 on = l < rh && card_body(sec, y, &a, &b);
-		if (l == rh || on != run_on || a != run_a || b != run_b) {
-			if (run_on)
-				fill(p, run_a, run_from, run_b - run_a, l - run_from, UI_ROLE_PANEL);
-			run_from = l;
-			run_on = on;
-			run_a = a;
-			run_b = b;
-		}
-		if (l == rh || !sh)
+	struct card c;
+	if (!card_of(slot_at(s)->section, p->rh, &c))
+		return;
+	s32 y0 = (s32)(s * p->rh), y1 = y0 + (s32)p->rh, sh = (s32)ui_theme()->look.shadow_offset;
+	s32 x0 = look.card_x, w = look.card_w;
+	s32 a = c.top > y0 ? c.top : y0, b = c.bottom < y1 ? c.bottom : y1;
+	s32 sa = c.top + c.r > a ? c.top + c.r : a, sb = c.bottom - c.r < b ? c.bottom - c.r : b;
+	if (sa < sb)
+		fill(p, x0, (u32)(sa - y0), w, (u32)(sb - sa), UI_ROLE_PANEL);
+	for (s32 y = a; y < b; y++) {
+		if (y >= sa && y < sb)
 			continue;
-		// The shadow: where the body sh lines up reaches past this line's
-		s32 sa, sb;
-		if (!card_body(sec, y - (s32)sh, &sa, &sb))
+		s32 in = card_inset(&c, y);
+		fill(p, x0 + in, (u32)(y - y0), w - 2 * in, 1, UI_ROLE_PANEL);
+	}
+	// The shadow shows only where the body narrows or ends: its last lines
+	s32 from = c.bottom - c.r > y0 ? c.bottom - c.r : y0, to = c.bottom + sh < y1 ? c.bottom + sh : y1;
+	for (s32 y = from; sh && y < to; y++) {
+		s32 up = card_inset(&c, y - sh), in = card_inset(&c, y);
+		if (up < 0)
 			continue;
-		if (!on) {
-			fill(p, sa, l, sb - sa, 1, UI_ROLE_SHADOW);
-		} else {
-			if (sa < a)
-				fill(p, sa, l, a - sa, 1, UI_ROLE_SHADOW);
-			if (sb > b)
-				fill(p, b, l, sb - b, 1, UI_ROLE_SHADOW);
+		if (in < 0) {
+			fill(p, x0 + up, (u32)(y - y0), w - 2 * up, 1, UI_ROLE_SHADOW);
+		} else if (in > up) {
+			fill(p, x0 + up, (u32)(y - y0), in - up, 1, UI_ROLE_SHADOW);
+			fill(p, x0 + w - in, (u32)(y - y0), in - up, 1, UI_ROLE_SHADOW);
 		}
 	}
 }
@@ -287,22 +301,33 @@ static u32 extent(const char *s)
 	return line.extent;
 }
 
-// Text at x, its line's top at the row's; returns the px it ends at
+// A laid-out line at x, its line's top at the row's
+static void line_at(const struct ui_paint *p, s32 x, u32 ink, const struct text_line *line)
+{
+	if (x >= 0 && line->count)
+		text_draw_line(p->win, ui_theme()->body, p->x + (u32)x, p->y, ink, line);
+}
+
+// Text at x, cut to clip px; returns the px it ends at
 static s32 text_at(const struct ui_paint *p, s32 x, u32 clip, u32 ink, const char *s)
 {
 	struct text_line line;
 	if (!s || !*s || x < 0)
 		return x;
 	text_layout(ui_theme()->body, s, strlen(s), clip, &line);
-	text_draw_line(p->win, ui_theme()->body, p->x + (u32)x, p->y, ink, &line);
+	line_at(p, x, ink, &line);
 	return x + (s32)line.extent;
 }
 
 // Text ending at right (exclusive); returns where it starts
 static s32 text_right(const struct ui_paint *p, s32 right, u32 ink, const char *s)
 {
-	s32 x = right - (s32)extent(s);
-	text_at(p, x, (u32)(right - x) + 1, ink, s);
+	struct text_line line;
+	if (!s || !*s)
+		return right;
+	text_layout(ui_theme()->body, s, strlen(s), 240, &line);
+	s32 x = right - (s32)line.extent;
+	line_at(p, x, ink, &line);
 	return x;
 }
 
@@ -339,12 +364,13 @@ static int paint_label(const struct ui_paint *p, u32 sec)
 static s32 paint_chips(const struct ui_paint *p, s32 right, u16 mask, int accent)
 {
 	const struct ui_look *l = &ui_theme()->look;
-	const char *names[10];
-	u32 n = 0, total = 0, w[10];
-	for (u32 bit = 10; bit-- > 0;)
+	const char *names[4];  // a chip a key, L first (a capture may hold more: the first four)
+	u32 n = 0, total = 0, w[4], tw[4];
+	for (u32 bit = 10; bit-- > 0 && n < 4;)
 		if (mask >> bit & 1) {
 			names[n] = settings_key_name(bit);
-			u32 cw = extent(names[n]) + 2u * l->hint_chip_pad;
+			tw[n] = text_width(ui_theme()->body, names[n], strlen(names[n])) - 1;  // less the gap after
+			u32 cw = tw[n] + 2u * l->hint_chip_pad;
 			w[n] = cw < look.chip_min ? look.chip_min : cw;
 			total += w[n] + (n ? look.chip_gap : 0u);
 			n++;
@@ -353,8 +379,8 @@ static s32 paint_chips(const struct ui_paint *p, s32 right, u16 mask, int accent
 	for (u32 i = 0; i < n; i++) {
 		round_fill(p, x, top, (s32)w[i], l->hint_chip_h, l->hint_chip_radius,
 			   accent ? UI_ROLE_ACCENT : UI_ROLE_TRACK);
-		s32 tx = x + ((s32)w[i] - (s32)extent(names[i])) / 2;
-		text_at(p, tx, w[i], accent ? UI_ROLE_ACCENT_TEXT : UI_ROLE_DIM, names[i]);
+		text_at(p, x + ((s32)w[i] - (s32)tw[i]) / 2, w[i], accent ? UI_ROLE_ACCENT_TEXT : UI_ROLE_DIM,
+			names[i]);
 		x += (s32)w[i] + look.chip_gap;
 	}
 	return start;
@@ -588,8 +614,8 @@ static const struct ui_scrollbar_config bar = {N_LIST};
 static const struct ui_spec nodes[N_NODES] = {
 	[N_TITLE] = {UI_TITLE, 1, UI_NONE, 3, UI_HFILL, 0, 0, 0, 0, 0, 0, TITLE_H, &title},
 	[N_HINTS] = {UI_HINTS, 2, UI_NONE, 3, UI_HFILL | UI_BOTTOM, 0, 0, 0, 0, 0, 0, HINTS_H, &hints_config},
-	[N_LIST] = {UI_LIST, 3, UI_NONE, 1, UI_LEFT, 0, 0, 0, 0, VIEW_Y, LIST_W, VIEW_H, &list_config},
-	[N_BAR] = {UI_SCROLLBAR, 4, UI_NONE, 2, UI_LEFT, 0, 0, 0, BAR_X, BAR_Y, 8, BAR_H, &bar},
+	[N_BAR] = {UI_SCROLLBAR, 3, UI_NONE, 2, UI_LEFT, 0, 0, 0, BAR_X, BAR_Y, 8, BAR_H, &bar},
+	[N_LIST] = {UI_LIST, 4, UI_NONE, 1, UI_LEFT, 0, 0, 0, 0, VIEW_Y, LIST_W, VIEW_H, &list_config},
 };
 
 static const struct ui_view_spec view = {"settings", nodes, N_NODES, 0, UI_NONE, 0, settings_event};
