@@ -103,7 +103,28 @@ nav_file() { _nav_fail "the SD card page's files come with B14 (nav_file $*)"; }
 nav_game() { _nav_fail "the game lists come with B13 (nav_game $*)"; }
 nav_nor_game() { _nav_fail "the NOR page's games come with B15 (nav_nor_game $*)"; }
 nav_setting() { _nav_fail "the Settings page's rows come with B16 (nav_setting $*)"; }
-nav_info_page() { _nav_fail "the Info page's pages come with B17 (nav_info_page $*)"; }
+
+# nav_info_page PAGE: from power-on to one of the Info page's rows opened
+# (source/screens/info.c), waiting there: controls, ingame, cart or about
+# (a reading page), or diag (Diagnostics' first page)
+nav_info_page() {
+  local page=${1:-} downs=() wait
+  case $page in
+  controls) ;;
+  ingame) downs=(DOWN) ;;
+  cart) downs=(DOWN DOWN) ;;
+  about) downs=(DOWN DOWN DOWN) ;;
+  diag) downs=(UP) ;;
+  *)
+    _nav_fail "no Info page $page"
+    return 1
+    ;;
+  esac
+  wait="screen ready: info-$page"
+  [ "$page" = diag ] && wait="screen ready: diag-start"
+  _nav_file '-w "nav: home ready"' "$(_nav_keys 8 UP A)" '-w "screen ready: info"' \
+    "$(_nav_keys 8 "${downs[@]}" A)" "-w \"$wait\""
+}
 
 # _nav_hook ACTION PATH [OPTIONS...]: the hook's pokes (nav.h's NAV_TEST_*):
 # the path first, then the action word with the save type + 1 (or a NOR

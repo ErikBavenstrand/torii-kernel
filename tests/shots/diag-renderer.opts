@@ -2,7 +2,7 @@
 # frame-cycles figures are the emulator's in tests/perf/budget.txt: the cart
 # compares its own with them. The shot is the list it scrolls (its page shows
 # the figures, which change with any change to the code).
-# Diagnostics from L+R+SELECT held at power-on (B17 moves it to Info), A
+# Diagnostics from L+R+SELECT held at power-on (diag-back starts it from Info), A
 # once its first page is up and those keys are let go
 -k 1:L+R+SELECT
 -w "screen ready: diag-start"

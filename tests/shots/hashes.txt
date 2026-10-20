@@ -73,6 +73,8 @@ cover-demo/frames 28-28 DE528E2C9590DC52
 cover-demo/frames 29-29 0690C16F9D9454FC
 cover-demo/frames 30-30 23A2E3B708CF46A1
 cover-demo/frames 31-32 3CCAC1492B95FF7A
+diag-back/back 1E613DC933A7D889
+diag-back/diag 34448463644198B5
 diag-pages/clock BAA544CE8D033053
 diag-pages/eeprom D9F2B92149C63653
 diag-pages/loader E959FD44168F7705
@@ -102,6 +104,36 @@ home/frames 4-5 4F4F709DE800A418
 home/frames 6-12 B43AE5E8AC85D6F0
 home-light/screen D4096E5EA949D9F8
 home-start-on/screen C32495D7B3593283
+info/about 7C0AF09F17FC8D4D
+info/back-up 7C0AF09F17FC8D4D
+info/diag 1E613DC933A7D889
+info/rows E434584DE986A1E1
+info/frames 0-0 7C0AF09F17FC8D4D
+info/frames 1-1 3BF6C5A324920F84
+info/frames 2-2 AA7A2DCD99AD688C
+info/frames 3-3 223478AAB8976B35
+info/frames 4-4 47C86D2879D02970
+info/frames 5-6 FF9E1149CB958B11
+info/frames 7-20 1E613DC933A7D889
+info-about/about 60DC178D50FA75F6
+info-about/about-end 1FBECA9B24D5C3DC
+info-about/cart A9C987376B088C44
+info-about/ingame 001FF409A6E2CE10
+info-read/back E434584DE986A1E1
+info-read/controls BF93E2F0217B5148
+info-read/last 37F6085E6552C39D
+info-read/last-down 37F6085E6552C39D
+info-read/scrolled 4EB6AAF78B8B19F2
+info-read/frames 0-1 E434584DE986A1E1
+info-read/frames 2-2 2F0DB67D39E5384B
+info-read/frames 3-3 76E98C19EAC6FE78
+info-read/frames 4-8 47778893E1D42B25
+info-read/frames 9-9 1D69BA9FE51C372C
+info-read/frames 10-10 CACA718907D1DDB3
+info-read/frames 11-11 7E6A16460A1823D3
+info-read/frames 12-12 1A2565267E9A6031
+info-read/frames 13-13 DA7FF4E4607EC348
+info-read/frames 14-22 BF93E2F0217B5148
 nav-push-fail/error 8DA1D73368B07BC5
 nav-push-fail/page B62B7D8B2814CB3F
 nor-launch-fail/back F0C1005F0AD879FC

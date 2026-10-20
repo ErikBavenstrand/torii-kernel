@@ -15,7 +15,8 @@ diag-psram-menu 20963
 diag-psram-slow 25429
 diag-row38 9525
 diag-scroll 142466
-home-move 28791
+home-move 29098
+info-page 42779
 letter-show 96297
 nav-screen 212562
 popup-draw 143145

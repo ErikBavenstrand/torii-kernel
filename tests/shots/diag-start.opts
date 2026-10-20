@@ -1,5 +1,5 @@
 # Diagnostics' first page
-# Diagnostics from L+R+SELECT held at power-on (B17 moves it to Info), A
+# Diagnostics from L+R+SELECT held at power-on (diag-back starts it from Info), A
 # once its first page is up and those keys are let go
 -k 1:L+R+SELECT
 -w "screen ready: diag-start"
