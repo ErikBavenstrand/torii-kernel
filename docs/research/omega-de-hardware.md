@@ -307,9 +307,15 @@ While SD control is 3 the port returns status; `0xEEE1` means busy.
 2. `Send_FATbuffer` writes the table to the port with buffer control 1, then
    sets buffer control 3. In load mode the FPGA copies the file into PSRAM and
    the port reads non-zero, then not 1, when done. The kernel spins on the
-   port (IWRAM code) the whole time, so it can't move a progress bar during
-   the copy: the launch's bar stands at its "Loading the game" step until the
-   copy ends (source/progress.h).
+   port (IWRAM code) the whole time. IRQs stay on and their dispatch runs
+   from IWRAM (`torii_irq`, libgba's `IntrMain`), so a VBlank handler in
+   IWRAM moves the launch's bar meanwhile, on an estimate from the file size
+   (`progress_cart_copy`, `source/progress.h`); it writes only VRAM and EWRAM.
+   Each launch logs how long the copy took in frames, the figure the
+   estimate's rate is tuned from (`docs/release-checklist.md`). The emulated
+   cart copies at once unless `OMEGA_COPY_RATE` (bytes a frame) is set, as
+   the golden `boot-copy` does: then the port reads 0 until the copy's time
+   is up.
 3. With patches enabled the kernel loads the ROM itself through the PSRAM
    window instead, patching each 128 KB block on the way.
 4. `SetRompageWithHardReset(0x200)` maps PSRAM at `0x08000000` and soft-resets

@@ -330,17 +330,45 @@ static void progress_draw(u8 node)
 	st->drawn1 = st->want1;
 }
 
-void ui_progress_set(u8 node, u32 value, u32 max)
+// The column value of max fills a bar w px wide to
+static u32 bar_px(u32 w, u32 value, u32 max)
 {
-	struct bar_state *st = ui_node_state(node);
-	u32 w = (u32)ui_node(node)->w;
 	u32 px = max ? (value >= max ? w : (u32)((unsigned long long)value * w / max)) : 0;
 	if (value && max && px < 2)
 		px = 2;  // any progress shows: the bar's rounded end
+	return px;
+}
+
+void ui_progress_set(u8 node, u32 value, u32 max)
+{
+	struct bar_state *st = ui_node_state(node);
+	u32 px = bar_px((u32)ui_node(node)->w, value, max);
 	if (px != st->want1) {
 		st->want1 = (u16)px;
 		ui_dirty(node, 1);
 	}
+}
+
+int ui_progress_pixels(u8 node, u32 value, u32 max, struct ui_bar_pixels *out)
+{
+	const struct bar_state *st = ui_node_state(node);
+	const struct ui_node *n = ui_node(node);
+	if ((n->flags & (UI_N_HIDDEN | UI_N_DRAWN | UI_N_DIRTY)) != UI_N_DRAWN || st->drawn1 != st->want1)
+		return 0;
+	struct text_window win = window_of(node, st->first);
+	out->tiles = win.tiles;
+	out->column_words = (u32)win.height * 8;
+	bar_rows((u32)n->h, &out->top, &out->rows);
+	out->ink = ui_ink(node, UI_ROLE_ACCENT);
+	out->x = st->drawn1;
+	out->px = bar_px((u32)n->w, value, max);
+	return 1;
+}
+
+void ui_progress_drew(u8 node, u32 x)
+{
+	struct bar_state *st = ui_node_state(node);
+	st->drawn1 = st->want1 = (u16)x;
 }
 
 static const struct ui_ops progress_ops = {sizeof(struct bar_state), bar_measure, bar_init, 0, 0, progress_draw};

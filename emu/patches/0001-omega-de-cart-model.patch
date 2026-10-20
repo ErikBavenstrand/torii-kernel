@@ -12,10 +12,10 @@ index 59ca1c1..1dd19c0 100644
  	EXTDATA_MAX
 diff --git a/include/mgba/internal/gba/cart/omega.h b/include/mgba/internal/gba/cart/omega.h
 new file mode 100644
-index 0000000..cba1cc5
+index 0000000..f4e4cff
 --- /dev/null
 +++ b/include/mgba/internal/gba/cart/omega.h
-@@ -0,0 +1,174 @@
+@@ -0,0 +1,179 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -139,6 +139,11 @@ index 0000000..cba1cc5
 +	uint8_t saveMode;
 +	uint32_t saveSize;
 +	uint32_t gameSize;
++	// OMEGA_COPY_RATE=BYTES: the FPGA's ROM copy takes the game's size over
++	// BYTES per frame, the port reading busy (0) until copyEnd (global
++	// cycles), as the real cart's copy does. Unset, the copy is instant.
++	uint32_t copyRate;
++	uint64_t copyEnd;
 +	// True while a game runs with mGBA's savedata emulating its save chip;
 +	// its contents go back into the cart SRAM at power-off. Pages past the
 +	// save memory stay plain RAM in game mode.
@@ -316,10 +321,10 @@ index 1d0c0dd..b77704a 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..94f20ef
+index 0000000..3080684
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1416 @@
+@@ -0,0 +1,1430 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -935,7 +940,14 @@ index 0000000..94f20ef
 +	mLOG(GBA_OMEGA, INFO, "Loaded ROM into PSRAM from %u cluster runs", i / 2);
 +}
 +
-+static uint16_t _portRead(struct GBAOmega* omega, uint32_t offset) {
++static uint16_t _portRead(struct GBA* gba, uint32_t offset) {
++	struct GBAOmega* omega = &gba->memory.omega;
++	if (omega->copyEnd) {
++		if (omega->bufferControl == 3 && mTimingGlobalTime(&gba->timing) < omega->copyEnd) {
++			return 0;  // Still copying
++		}
++		omega->copyEnd = 0;
++	}
 +	if (omega->spiControl) {
 +		return omega->fpgaVersion;
 +	}
@@ -1174,6 +1186,10 @@ index 0000000..94f20ef
 +			       _portWord(omega, FAT_PARAM_INDEX) == FAT_SET_PARAMETER_MODE ? "parameters only" : "load ROM");
 +			if (_portWord(omega, FAT_PARAM_INDEX) != FAT_SET_PARAMETER_MODE) {
 +				_loadRomFromFatTable(omega);
++				if (omega->copyRate) {
++					omega->copyEnd = mTimingGlobalTime(&gba->timing) +
++					                 (uint64_t) omega->gameSize * VIDEO_TOTAL_LENGTH / omega->copyRate;
++				}
 +			}
 +		}
 +		break;
@@ -1360,6 +1376,9 @@ index 0000000..94f20ef
 +	omega->romPage = ROM_PAGE_BOOT;
 +	const char* trace = getenv("OMEGA_TRACE");
 +	omega->trace = trace && *trace && strcmp(trace, "0");
++	const char* rate = getenv("OMEGA_COPY_RATE");
++	omega->copyRate = rate ? strtoul(rate, NULL, 0) : 0;
++	omega->copyEnd = 0;
 +	_parsePowerCut();
 +	_cutOmega = omega;
 +	omega->enabled = true;
@@ -1583,7 +1602,7 @@ index 0000000..94f20ef
 +		return omega->gpio[(offset - GPIO_FIRST) >> 1];
 +	}
 +	if (offset >= PORT_BASE && offset < PORT_END && _portActive(omega)) {
-+		return _portRead(omega, offset - PORT_BASE);
++		return _portRead(gba, offset - PORT_BASE);
 +	}
 +	if (_isKernelMode(omega) && omega->sdControl) {
 +		// SD mode: on the real cart, reads anywhere else in the cart's ROM

@@ -23,7 +23,10 @@ so a later sd-file can put a file in its place (nor-launch-fail).
 bytes, to DEST in RUNS runs of clusters (tools/sdimg.sh put-fragmented): a
 game too fragmented to start (dialog-fragmented). A "kernel error:" line
 fails a scenario unless an "#! expect-error TEXT" line expects it (it starts
-with TEXT); an expected one that isn't logged fails it too. A scenario with
+with TEXT); an expected one that isn't logged fails it too.
+"#! env NAME=VALUE" sets an environment variable for the emulated cart, as
+OMEGA_COPY_RATE=BYTES (bytes the cart's ROM copy moves per frame), which
+makes a launch's copy take as long as the cart's (boot-copy). A scenario with
 -T FROM:TO runs mgba-shot's tear watch over those frames: any "tear:" line
 (a register, palette or on-screen VRAM write while lines 0-159 scan out)
 fails it.
@@ -227,6 +230,7 @@ def boot(
     cart.mkdir(parents=True)
     shutil.copy(sd, cart / "sd.img")
     kernel = KERNEL
+    cart_env: dict[str, str] = {}
     for line in opts.read_text(encoding="utf-8").splitlines():
         if line.split() == ["#!", "kernel", "test"]:
             kernel = TEST_KERNEL
@@ -297,6 +301,9 @@ def boot(
             padded.unlink()
             # The files that split it up go; its clusters stay where they are
             run(["mdel", "-i", str(cart / "sd.img"), "::/FILL*.BIN"])
+        elif line.startswith("#! env "):
+            name, _, value = line.split(maxsplit=2)[2].partition("=")
+            cart_env[name] = value
         elif line.startswith("#! settings"):
             nor = cart / "kernel-nor.bin"
             if not nor.exists():
@@ -308,6 +315,7 @@ def boot(
                     f.write(struct.pack("<H", value))
     env = dict(os.environ, OMEGA_DIR=str(cart), TZ="UTC")
     env.pop("OMEGA_TRACE", None)
+    env.update(cart_env)
     cmd = [SHOT, kernel, "-C", str(EPOCH), "-O", str(out), "-i", str(opts), *extra]
     return subprocess.run(cmd, env=env, capture_output=True, text=True, check=False)
 

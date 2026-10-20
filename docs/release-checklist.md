@@ -60,6 +60,7 @@ on, NES with no NES launch) as "unconfirmed" in its summary.
 | A game written to NOR starts | WRITE TO NOR CLEAN, then start it from the NOR list (R). Power off and on: the cart must start the kernel, not safe mode |
 | Deleting a NOR game | in the NOR list, delete the latest game. Power off and on: the cart must start the kernel, the game gone from the list |
 | Rumble in a game | Drill Dozer, BOOT WITH ADDON or CLEAN BOOT: does the cart rumble? |
+| The loading bar during the cart's copy | CLEAN BOOT of a big GBA game (16 or 32 MB): the bar moves steadily through "Loading the game" without long stalls or a big jump at the end. See below |
 | The EEPROM probe | `eeprom.gba`, CLEAN BOOT with SAVE TYPE EEPROM 512: A (6-bit addresses), then again with B (14-bit). Then the same two with EEPROM 8K. See below |
 
 **The EEPROM probe** writes blocks 1–4 four different ways, reads them back
@@ -69,6 +70,14 @@ four green OK lines; a 14-bit run also says "1024 BLOCKS: 8 KB" (or "WRAPS
 AT 64 BLOCKS: 512 B"). Note what each run's screen says, in particular any
 red line, then press A: the kernel's boot logs every step ("eeprom probe:")
 and its verdict.
+
+**The copy's estimate:** during a CLEAN BOOT the cart copies the game into
+PSRAM by itself, and the bar moves on an estimate from the file size
+(`PROGRESS_COPY_RATE` in `source/progress.h`, bytes a frame). Each launch
+logs the real figure: `launch: the cart copied N KB in F frames, B bytes a
+frame (the estimate: E frames)`. If B differs from `PROGRESS_COPY_RATE` by
+more than about 10% over two or three big games, set the constant to their
+average.
 
 ## In Diagnostics
 

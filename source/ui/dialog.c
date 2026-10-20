@@ -548,15 +548,25 @@ void dialog_progress_set(u32 value, u32 max, const char *status)
 	dlg.last_pump = torii_frames;
 }
 
+int dialog_progress_pixels(u32 value, struct ui_bar_pixels *out)
+{
+	if (!dialog_progress_active())
+		return 0;
+	apply();
+	settle(&dlg.progress, 4);  // a frame at least: what apply set is drawn
+	return ui_progress_pixels((u8)(dlg.progress.view->first + N_BAR), value, dlg.max, out);
+}
+
+void dialog_progress_drew(u32 x)
+{
+	if (dialog_progress_active())
+		ui_progress_drew((u8)(dlg.progress.view->first + N_BAR), x);
+}
+
 void dialog_progress_end(void)
 {
 	if (!dialog_progress_active())
 		return;
 	hide(&dlg.progress);
 	dialog_close();
-}
-
-void ShowbootProgress(const char *str)
-{
-	dialog_progress_status(str);
 }
