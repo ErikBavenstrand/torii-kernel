@@ -62,7 +62,7 @@ u32 action_game_facts(const char *path, struct action_facts *out);
 int action_set_save_type(const char *path, u32 save_type);
 
 // Deletes the file at path (a full path; a folder is refused). Its save stays (T11); it leaves
-// Recent, the favourites and the library index. 1 if it was deleted.
+// Recent, the favourites and the library index. 1 if it was deleted, or wasn't on the card.
 int action_delete_file(const char *path);
 
 // The game NOR's list, read into pNorFS and game_total_NOR (writes nothing)

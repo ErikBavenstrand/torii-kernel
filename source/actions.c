@@ -175,7 +175,11 @@ int action_delete_file(const char *path)
 	}
 	tlog_open_now();  // the file may be the log the background open holds
 	res = f_unlink(path_copy);
-	if (res != FR_OK) {
+	if (res == FR_NO_FILE || res == FR_NO_PATH) {
+		// Gone already (taken off the card on a PC): it leaves the lists all
+		// the same, as a deleted one does
+		tlog("delete %s: not on the card", path_copy);
+	} else if (res != FR_OK) {
 		tlog("delete %s: FatFs %u", path_copy, (unsigned)res);
 		return 0;
 	}

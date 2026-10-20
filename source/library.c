@@ -622,8 +622,10 @@ int lib_body_ok(const u8 *slot, u32 *seen)
 		if (r->folder >= h->folders || key <= name || key >= h->pool_bytes ||
 		    (r->flags & LIB_F_CONSOLE) >= LIB_CONSOLES)
 			return 0;
-		// The display name after the key, inside the pool too
-		if (key + even((u32)strnlen(lib_str(slot, key), h->pool_bytes - key) + 1) >= h->pool_bytes)
+		// The display name after the key, inside the pool too, and ended there
+		u32 shown = key + even((u32)strnlen(lib_str(slot, key), h->pool_bytes - key) + 1);
+		if (shown >= h->pool_bytes ||
+		    strnlen(lib_str(slot, shown), h->pool_bytes - shown) >= h->pool_bytes - shown)
 			return 0;
 		if (!(r->flags & LIB_F_GONE))
 			counts[r->flags & LIB_F_CONSOLE]++;

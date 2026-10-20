@@ -78,7 +78,8 @@ static int label_init(u8 node)
 
 void ui_icon8(const struct text_window *win, u32 x, u32 y, u32 id, u32 ink)
 {
-	if (id >= ART_ICON8_COUNT || y + 8 > win->height * 8u || x + 8 > win->width * 8u)
+	if (id >= ART_ICON8_COUNT || win->height * 8u < 8 || y > win->height * 8u - 8 || win->width * 8u < 8 ||
+	    x > win->width * 8u - 8)
 		return;
 	const u8 *bits = art_icon8_bits[id];
 	u32 column = win->height * 8u;

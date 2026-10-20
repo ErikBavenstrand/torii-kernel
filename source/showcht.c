@@ -823,9 +823,8 @@ static const struct ui_spec cs_nodes[CS_NODES] = {
 		       CS_LIST_H, &cs_bar},
 };
 
-// One view spec per title icon: the title bar takes its icon from its spec
-#define CS_VIEW {"cheats", cs_nodes, CS_NODES, 0, CS_LIST, UI_VIEW_LR_PAGES, cs_event}
-static const struct ui_view_spec cs_view = CS_VIEW;
+// The title's icon is the caller's (ui_title_icon_set)
+static const struct ui_view_spec cs_view = {"cheats", cs_nodes, CS_NODES, 0, CS_LIST, UI_VIEW_LR_PAGES, cs_event};
 
 // Runs the screen until START, or B is released, and returns with it still
 // up; 0 if it couldn't be shown
@@ -913,6 +912,8 @@ u32 Open_cht_file(TCHAR *gamefilename, u32 havecht, const char *title, u16 icon)
 					Analyze_KEYVAL(&gfile, cs.count);
 				tlog("cheats: %s with %lu codes", result == CHEATS_PLAY ? "play" : "back",
 				     (unsigned long)gl_cheat_count);
+			} else {
+				result = CHEATS_BACK;  // it couldn't show: no launch the user didn't see
 			}
 			if (own) {
 				ui_shutdown();

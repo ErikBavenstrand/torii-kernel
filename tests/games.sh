@@ -54,3 +54,33 @@ grep -q '^kernel: games: row 0 played just now' "$cart/2.log" ||
 grep -q '^kernel: games: row 0 played 1m ago' "$cart/2.log" ||
   fail "the played text didn't follow the clock: $(grep '^kernel: games' "$cart/2.log" | tail -3)"
 echo "PASS: a launched game is first on Recent, played just now, and the text follows the clock"
+
+# A launch that fails (a name too long for its save record) brings the page
+# back on the same row, without "No games here" while the index loads again
+cart=$carts/games-fail
+rm -rf "$cart" && mkdir -p "$cart"
+mkfs.fat -C -F 32 -n GAMES "$cart/sd.img" 65536 >/dev/null
+long=$(printf 'L%.0s' $(seq 249)).gba
+for g in A.gba B.gba "$long"; do mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba "::/$g"; done
+# shellcheck disable=SC2046 # nav.sh's options
+boot "$cart/1.log" $(nav_game gba 2) -k @30:A -k @34:- -w "screen ready: dialog" -k @20:B -k @24:- \
+  -w "games: a new index" -k @20:START -k @24:- -w "screen ready: game-popup" -f 2400
+grep -q '^kernel: screen ready: game-popup LLL' "$cart/1.log" ||
+  fail "after the failed launch the page isn't on the same row: $(grep '^kernel: screen ready: game-popup' "$cart/1.log")"
+echo "PASS: a failed launch brings the page back on the same row"
+
+# Delete on a Recent entry whose file is already gone: it leaves Recent
+cart=$carts/games-gone
+rm -rf "$cart" && mkdir -p "$cart"
+mkfs.fat -C -F 32 -n GAMES "$cart/sd.img" 65536 >/dev/null
+mmd -i "$cart/sd.img" ::/SAVER
+mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/A.gba
+printf '/Gone.gba\n/A.gba\n' >"$cart/recent.txt"
+mcopy -i "$cart/sd.img" "$cart/recent.txt" "::/SAVER/Recently play.txt"
+NAV_SHOWN="recent gba"
+# shellcheck disable=SC2046 # nav.sh's options
+boot "$cart/1.log" $(nav_game_delete recent 0) -w "delete: /Gone.gba" -f 900
+grep -q '^kernel: delete /Gone.gba: not on the card' "$cart/1.log" || fail "no delete of the gone entry: $(grep '^kernel: delete' "$cart/1.log")"
+recent=$(mtype -i "$cart/sd.img" ::/torii/recent.txt | grep -v '^[#@]' | cut -f2 | tr '\n' ' ')
+[ "$recent" = "/A.gba " ] || fail "after deleting the gone entry, Recent has '$recent'"
+echo "PASS: Delete on an entry whose file is gone takes it off the list"

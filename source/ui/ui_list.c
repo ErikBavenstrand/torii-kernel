@@ -260,6 +260,8 @@ static int list_measure(u8 node, struct engine_budget *need)
 		TLOG_ASSERT(v->first + i == node ||
 			    ui_node_spec((u8)(v->first + i))->plane != ui_node_spec(node)->plane);
 	TLOG_ASSERT(st->opaque || st->plain || (config(node)->flags & UI_LIST_FIXED) || st->ring.h % st->ring.rh == 0);
+	// Bank 1 has no tint for a drawn pill: a consoles list's rows lie over a card
+	TLOG_ASSERT(!(st->opaque && (config(node)->flags & UI_LIST_CONSOLES)));
 	need->bg_tiles = (u16)(need->bg_tiles + st->tw * st->ct);
 	// Its plane's map is two screenblocks (UI_RING_MAP_LINES): one more
 	need->bg_maps++;

@@ -69,8 +69,8 @@ static const struct ui_card_config card = {4, 4, 4, 1, 0};
 #define AGO_MAX 16      // a "played" text's bytes, with its NUL
 #define DEDUPE_RUN 8    // games that clean to one name told apart, at most
 #define HASH_BUCKETS 1024  // the resolver's (a power of 2)
-#define GAMES_KEYS 1024    // favourites outside the index that sort by their own key
-#define GAMES_KEY_BYTES 16  // the bytes of it they sort by
+#define GAMES_KEYS USERDATA_FAV_MAX  // favourites outside the index sort by their own key,
+#define GAMES_KEY_BYTES 12           // by this many bytes of it
 
 enum {
 	KIND_CONSOLE,
@@ -91,7 +91,9 @@ static struct {
 	u32 count;
 	u32 cursor;  // the list's cursor, as last seen
 	u32 l_from;
-	u32 row;     // where the page opened (games_row before it shows)
+	u32 row;     // the row the page was asked to open on (games_row before it shows)
+	u8 unloaded;  // it opened while the index wasn't loaded (after a launch): a new
+		      // index lists it again at row
 	u32 lib_generation;
 	u32 ago_wait;
 	u16 recent_rec[USERDATA_RECENT_MAX];  // each Recent game's record, LIBRARY_NONE none
@@ -112,10 +114,10 @@ static struct {
 	u8 actions[LANG_POP_ITEMS];
 	struct ui_popup popup;
 	// Game info
-	char info_keys[96], info_values[GAMENAME_MAX + 96];
+	char info_keys[96], info_values[GAMENAME_MAX + 96], info_size[AGO_MAX];
 	struct ui_hint info_hints[2];
 	u32 info_type;  // the save type shown, ACTION_SAVE_TYPES: none (not a GBA game on the card)
-	u32 info_rec, info_console;  // the game's
+	u32 info_console;  // the game's
 	u8 info_done;
 } games EWRAM_BSS;
 
@@ -506,7 +508,9 @@ static int fav_cmp(void *ctx, u32 a, u32 b)
 {
 	const struct build *bd = ctx;
 	int c = strcmp(fav_key(bd, a), fav_key(bd, b));
-	return c ? c : strcmp(fav_path(a), fav_path(b));  // ties by path, as the library's
+	if (!c)
+		c = strcmp(file_name(fav_path(a)), file_name(fav_path(b)));  // ties as the library's
+	return c ? c : strcmp(fav_path(a), fav_path(b));
 }
 
 static void build_recent(void)
@@ -643,6 +647,13 @@ static void show_hints(void)
 	ui_hints_set(node(N_HINTS), games.hints, n);
 }
 
+// "No games here", once the index can say so (not while it loads again
+// after a launch)
+static const char *note_text(void)
+{
+	return games.count || games.unloaded ? "" : gl_games->empty;
+}
+
 // After the list changed under the page: it lists again from cursor
 static void relist(u32 cursor)
 {
@@ -653,7 +664,7 @@ static void relist(u32 cursor)
 		return;
 	ui_list_reset(list_node(), games.cursor);
 	ui_letter_hide(node(N_LETTER));
-	ui_label_set(node(N_NOTE), games.count ? "" : gl_games->empty);
+	ui_label_set(node(N_NOTE), note_text());
 	show_position();
 	show_facts();
 }
@@ -668,8 +679,9 @@ static struct ui_view *games_enter(u32 item, u32 row)
 	games.az = games.kind != KIND_RECENT;
 	games.art = Read_SET_info(assress_game_view) == 1;
 	build();
+	games.unloaded = !library_ready();
 	games.cursor = games.count ? (row < games.count ? row : games.count - 1) : 0;
-	games.row = games.cursor;
+	games.row = games.unloaded ? row : games.cursor;
 	games.l_valid = 0;
 	struct ui_view *v = ui_push(&views[games.art][games.kind != KIND_CONSOLE], &games);
 	if (!v)
@@ -677,7 +689,7 @@ static struct ui_view *games_enter(u32 item, u32 row)
 	games.first = v->first;
 	ui_title_set(node(N_TITLE), nav_item_name(item));
 	ui_title_icon_set(node(N_TITLE), registry_items[item].icon16);
-	ui_label_set(node(N_NOTE), games.count ? "" : gl_games->empty);
+	ui_label_set(node(N_NOTE), note_text());
 	show_hints();
 	ui_list_reset(list_node(), games.cursor);
 	show_position();
@@ -701,7 +713,10 @@ static void games_poll(void)
 	// At once: Recent's and the favourites' records are the old index's
 	if (games.lib_generation != library_generation()) {
 		tlog_debug("games: a new index");
-		relist(ui_list_cursor(list_node()));
+		// Opened before the index was back: at the row it was asked for
+		u32 row = games.unloaded ? games.row : ui_list_cursor(list_node());
+		games.unloaded = !library_ready();
+		relist(row);
 		return;
 	}
 	if (games.ago_wait && --games.ago_wait)
@@ -747,16 +762,14 @@ static const struct ui_view_spec info_view = {"game-info", info_nodes, I_NODES, 
 static void info_values(struct ui_view *v)
 {
 	const struct lang_games *s = gl_games;
-	char size[AGO_MAX] = "", ago[AGO_MAX] = "", type[24] = "";
-	if (games.info_rec != LIBRARY_NONE)
-		gamelist_size(size, sizeof(size), library_size(games.info_rec), s->size_kb, s->size_mb);
+	char ago[AGO_MAX] = "", type[24] = "";
 	userdata_ago_text(ago, sizeof(ago), played_time(games.pick));
 	if (games.info_type < ACTION_SAVE_TYPES)
 		snprintf(type, sizeof(type), "\xC2\xAB %s \xC2\xBB\n", s->save_types[games.info_type]);
 	const char *nor = userdata_nor_name(games.pick), *slash = strrchr(games.pick, '/');
 	int folder_len = nor ? (int)strlen(s->nor) : slash == games.pick ? 1 : (int)(slash - games.pick);
 	snprintf(games.info_values, sizeof(games.info_values), "%s\n%s\n%.*s\n%s\n%s%s",
-		 games.info_console < LIB_CONSOLES ? s->consoles[games.info_console] : "", size, folder_len,
+		 games.info_console < LIB_CONSOLES ? s->consoles[games.info_console] : "", games.info_size, folder_len,
 		 nor ? s->nor : games.pick, ago, type, s->hard_reset);
 	ui_label_set((u8)(v->first + I_VALUES), games.info_values);
 }
@@ -783,8 +796,12 @@ static void game_info(const struct game *g)
 	struct action_facts facts;
 	action_game_facts(games.pick, &facts);
 	games.info_type = facts.save_type;
-	games.info_rec = g->rec;
 	games.info_console = g->console;
+	// Now: the index may change while the page shows
+	games.info_size[0] = 0;
+	if (g->rec != LIBRARY_NONE)
+		gamelist_size(games.info_size, sizeof(games.info_size), library_size(g->rec), gl_games->size_kb,
+			      gl_games->size_mb);
 	games.info_done = 0;
 	ui_leave(UI_TR_DEEPER, 1);
 	while (ui_depth())
@@ -825,8 +842,13 @@ static void game_info(const struct game *g)
 // no game started; at row
 static void reshow(u32 row)
 {
-	if (ui_active() && !ui_depth() && !games_enter(games.item, row))
-		tlog_error("games: %s", ui_error());
+	if (!ui_active() || ui_depth() || games_enter(games.item, row))
+		return;
+	// No room for it: the session ends, and nav brings the place back from
+	// black in a new one (as after a launch)
+	tlog_error("games: %s", ui_error());
+	ui_shutdown();
+	dialog_blank();
 }
 
 // Starts the picked game: the menu's session ends, and nav brings the page
@@ -851,12 +873,16 @@ static void boot_with_addon(u32 hard)
 	if (gl_cheat_on && action_game_facts(games.pick, &facts) && facts.cheats) {
 		u32 row = ui_list_cursor(list_node());
 		static TCHAR file[GAME_NAME_MAX + 1] EWRAM_BSS;
+		static TCHAR kept[MAX_path_len] EWRAM_BSS;
 		snprintf(file, sizeof(file), "%s", file_name(games.pick));
 		// It takes the page's place in the menu's session (both don't fit)
 		ui_leave(UI_TR_DEEPER, 1);
 		while (ui_depth())
 			ui_pop();
+		// A cheat file found by game code moves currentpath to its folder
+		memcpy(kept, currentpath, sizeof(kept));
 		u32 r = Open_cht_file(file, facts.cheats, games.title, registry_items[games.item].icon16);
+		memcpy(currentpath, kept, sizeof(kept));
 		f_chdir(currentpath[0] ? currentpath : "/");
 		if (r == CHEATS_BACK) {
 			reshow(row);
@@ -938,6 +964,10 @@ static void popup_run(u32 i)
 			return;
 		}
 		ui_popup_close();
+		// A favourite dropped leaves the Favourites page before a launch
+		// that may come back (Game info lists the page again itself)
+		if (fav != fav_was && games.kind == KIND_FAV && action != LANG_POP_INFO)
+			relist(i);
 		switch (action) {
 		case LANG_POP_PLAY:
 			launch(ACTION_ADDON, 0, hard);
@@ -950,8 +980,6 @@ static void popup_run(u32 i)
 			return;
 		case LANG_POP_INFO:
 			game_info(&g);
-			if (fav != fav_was && games.kind == KIND_FAV)
-				relist(i);
 			return;
 		default:
 			return;
