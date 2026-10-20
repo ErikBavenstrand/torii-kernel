@@ -315,9 +315,11 @@ Planned in the interview and design rounds of 2026-10-19 and 2026-10-20. [v0.4-d
 - **Names** from a No-Intro CRC database, built by a `just` tool and not bundled.
 - **Tools:** `just art-add` for custom art and `just art-scrape` from libretro-thumbnails (check their terms first).
 
-## v0.4.2 Fixes from the v0.4 build
+## v0.4.2 Fixes and review from the v0.4 build
 
-Bugs and loose ends the v0.4 ticket sessions and the conductor's reviews found and left open, one line each with where it came from. Each is struck out once fixed.
+What the v0.4 ticket sessions, the conductor's reviews and the research left open: bugs to fix, the choices the build made that the user may want to change, and the assumptions that still need a real cart or a decision. [v0.4-decisions.md](v0.4-decisions.md)'s ticket log has the detail. Each item is struck out once fixed or settled.
+
+### Bugs
 
 - The launch copy's VBlank hook sets the VBlank handler back to none afterwards instead of restoring the previous one; harmless while the engine installs none (`source/progress.c`; B8 review).
 - The `diag-tests` golden failed once at frame 4 while the colima VM was busy, then passed unchanged: possibly flaky under load (B2).
@@ -325,6 +327,31 @@ Bugs and loose ends the v0.4 ticket sessions and the conductor's reviews found a
 - Parsing a large `/torii/names.txt` runs as one step of the library rebuild: 0.26 s for 1,000 sorted lines, 0.82 s unsorted, a one-off menu stall (`gamename_custom_parse`; B3).
 - `tr-tab`'s `settings2-in` and `settings2-back` goldens catch a plain backdrop frame since B9 (v0.3 Settings page 2 comes in a frame later); B10 deletes those screens (B9).
 - A list already at its last scroll sends a cursor event with an unchanged index on every DOWN (`ui_list.c` `set_cursor`; B9 review).
+
+### Decisions to review
+
+Made during the build without the user; each is cheap to change.
+
+- **Research overrides R1–R9** (v0.4-decisions.md): no folder-date check (a background re-walk instead), two-copy safe writes, sort order (case and accents folded, numbers by value, "The" counts), the name-cleaning rules, the 14 px row canvas with a sprite pill, double-size sprites only for the zooming object, a hard-edged theme wipe, the title bar on its own layer during the open, the confirmation's dim toward white in light.
+- **Favourites are capped at 4,096** although the decisions said no cap (B5).
+- **Palette changed for contrast:** light ink3 `#8C847B`, dark danger ink `#EF7B84` (B9).
+- **16x16 icons keep their PNG colours** instead of the item's base colour, the same in light and dark (B2).
+- **A page change fades out, then in:** it lands about 9 frames after the key instead of 6 (B7).
+- **Loading card:** titled with the file name; the copy estimate is a guess (64 KB a frame) until measured; a launch with a pending save still shows a separate "Saving…" card first; a launch with an unsaved library index shows "Saving the game list" first (B8, B3).
+- **Hotkeys:** 2–3 keys including L, R, START or SELECT, no overlap with the other hotkey even while it's off, nothing inside A+B+START+SELECT; with Save states on, the reset keys are armed whatever "Reset hotkey" says (B6).
+- **Settings rows, labels and defaults** (Game view List, Show all files Off, 24-hour clock On, Start on Last place; Start on can't pick NOR, Settings or Info) (B6).
+- **Hidden files:** PATCH and CHEAT hidden too, and every file the kernel can't start (`.sav`, `.txt`, `.cht`) on the SD card page; `.sgb` and dot-less files no longer launch (B4, B3).
+- **Name cleaning:** 4–5 digit scene prefixes dropped except 1900–2099; the article table can misfire ("Rock, Paper, A"); colliding games show their first differing tag, preferring Rev/Beta/translation tags (B4).
+- **The "played ago" words** and the unset clock counting as before 2026-10-01 (B5).
+- **Mockups for Settings and the rename keyboard,** approved by the conductor for the build (`docs/design/v0.4/settings-*.png`, `keyboard-*.png`).
+- **Look values read off the mockups** where spec.md is silent: shadows, scroll bar, hint chips, pill size and spring, path pill colour (B1, B9).
+
+### Open questions and assumptions
+
+- **Unmeasured on a real cart:** the cart's ROM copy rate (B8's bar estimate); the library walk and first-scan times (emulated SD is about 5x slower than the cart); the theme wipe's HBlank palette DMA (mGBA can't show tearing); how the carousel's scaled pixel art reads at 0.6x and 1.9x; the 14 px rows' feel.
+- **Licences:** No-Intro's terms for a derived name table (the names database is built on the user's machine and never bundled); libretro-thumbnails art has no licence grant (fetched locally, never committed).
+- **Design questions for later tickets:** Settings' 12 px rows inside section cards that scroll (B16); whether WIN0 and WIN1 suffice when the popup, the list clip, the dim, the zoom and the wipe overlap (B11, B19); the 8x8 GBA and Info icons need a redraw.
+- **PSRAM map:** the user was unsure about fixing it; it now holds SD names (832 KB), two library index slots (1–3.5 MB), recents and favourites (3.5–4 MB), the cover cache (4 MB) and reserves.
 
 ## v0.5 Saves
 
