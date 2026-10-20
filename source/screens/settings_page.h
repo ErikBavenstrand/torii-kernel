@@ -5,7 +5,7 @@
 // Keys: UP/DOWN pick a row, L/R jump a section, B goes back home. A edits
 // the row: a value in place as « value » (LEFT/RIGHT change it, A keeps it,
 // B puts it back), Time and Date in a field card, a hotkey by pressing the
-// combination, an action (Rescan library) runs. The theme and the LED
+// combination, an action (Rescan library, Identify library) runs. The theme and the LED
 // preview live while edited. The values are written to the kernel NOR once,
 // as the page is left (settings_commit), and only if one changed.
 #ifndef TORII_SCREENS_SETTINGS_PAGE_H

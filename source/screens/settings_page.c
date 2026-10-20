@@ -25,6 +25,7 @@
 #include "../Ezcard_OP.h"
 #include "../lang.h"
 #include "../library.h"
+#include "../namesdb.h"
 #include "../settings.h"
 #include "../tlog.h"
 #include "../engine/frame.h"
@@ -70,6 +71,7 @@ static const struct settings_look {
 	u16 capture_wait;    // frames with nothing pressed before a capture gives up
 	u8 refusal;          // frames a refused hotkey's reason shows
 	u8 clock_poll;       // frames between clock reads (the Time and Date rows)
+	u8 identify_poll;    // frames between looks at Identify library's progress
 	u32 led[8];          // the swatches' colours by value (0: Off, drawn empty)
 	u8 led_edge;         // a swatch's edge: its colour this much toward black, in 256ths
 } look = {
@@ -102,6 +104,7 @@ static const struct settings_look {
 	.capture_wait = 300,
 	.refusal = 90,
 	.clock_poll = 30,
+	.identify_poll = 15,
 	.led = {0, 0x3973E7, 0x39B54A, 0x29BDD6, 0xE73939, 0xD642C6, 0xEFC621, 0xFFFFFF},
 	.led_edge = 72,  // 28 %
 };
@@ -115,7 +118,8 @@ static const struct settings_look {
 #define MARK_R "\xC2\xBB"  // »
 #define KEY_UPDOWN "^v"
 #define KEY_LEFTRIGHT MARK_L MARK_R
-#define LABEL_COLS 12  // a section label's scratch, tile columns
+#define LABEL_COLS 12
+#define IDENTIFY_IDLE 0xFFFFFFFFu  // a section label's scratch, tile columns
 
 enum {
 	MODE_BROWSE,
@@ -137,6 +141,8 @@ static struct {
 	u8 mode;
 	u8 edit_id;   // the row edited or captured
 	u8 scanning;  // Rescan library runs
+	u8 identify_wait;   // frames before Identify library's progress is looked at again
+	u32 identify_done;  // its progress as drawn (games looked at), IDENTIFY_IDLE: not running
 	u8 redraw;    // leave ended an edit: draw it all again if still up
 	u8 swatch_bank;
 	u16 swatch_tile;  // ART_NONE-like 0xFFFF: no swatches
@@ -145,6 +151,7 @@ static struct {
 	u8 bar_fill;  // the countdown as drawn
 	char pos[12];
 	char refused[48];
+	char progress[16];  // Identify library's value while it runs: 12/176
 	const char *keys_label;  // the Reset keys row's label as drawn
 	u16 edit_from[3];        // the edited row's slots as they were before A (B puts them back)
 	struct ui_hint hints[4];
@@ -432,6 +439,8 @@ static s32 paint_value(const struct ui_paint *p, u32 id, s32 right, u32 ink)
 	case SET_ACTION: {
 		if (id == SET_RESCAN && sp.scanning)
 			return text_right(p, right, ink, gl_set_scanning);
+		if (id == SET_IDENTIFY && sp.identify_done != IDENTIFY_IDLE)
+			return text_right(p, right, ink, sp.progress);
 		// A chevron, chevron_gap in from the edge
 		s32 x = right - look.chevron_gap - look.chevron_w, y = ((s32)p->rh - look.chevron_h) / 2;
 		for (s32 i = 0; i < look.chevron_h; i++) {
@@ -871,6 +880,10 @@ static void activate(u32 id)
 			library_rescan();
 			sp.scanning = 1;
 			refresh_id(id);
+		} else if (r->action == SET_ACTION_IDENTIFY && sp.identify_done == IDENTIFY_IDLE) {
+			tlog("settings: identify library");
+			names_identify();
+			sp.identify_wait = 0;  // its progress at once
 		}
 		break;
 	default:
@@ -951,6 +964,7 @@ static struct ui_view *settings_enter(u32 item, u32 row)
 	u32 s = row < SET_ROWS ? settings_layout_slot_of(&sp.lay, row) : SET_LAYOUT_NONE;
 	sp.cursor = (u8)(s != SET_LAYOUT_NONE ? s : settings_layout_row_at(&sp.lay, 0));
 	sp.live = 1;
+	sp.identify_done = IDENTIFY_IDLE;
 	sp.keys_label = settings_label(&sp.v, SET_RESET_KEYS);
 	ui_title_set(node(N_TITLE), nav_item_name(item));
 	ui_list_reset(node(N_LIST), sp.cursor);
@@ -1005,6 +1019,19 @@ static void settings_poll(void)
 	if (sp.scanning && !library_busy()) {
 		sp.scanning = 0;
 		refresh_id(SET_RESCAN);
+	}
+	// Identify library's progress, looked at every identify_poll frames
+	if (sp.identify_wait) {
+		sp.identify_wait--;
+	} else {
+		sp.identify_wait = look.identify_poll;
+		u32 done = 0, total = 0, now = names_identifying(&done, &total) ? done : IDENTIFY_IDLE;
+		if (now != sp.identify_done) {
+			sp.identify_done = now;
+			snprintf(sp.progress, sizeof(sp.progress), "%lu/%lu", (unsigned long)done,
+				 (unsigned long)total);
+			refresh_id(SET_IDENTIFY);
+		}
 	}
 	if (sp.clock_wait) {
 		sp.clock_wait--;
