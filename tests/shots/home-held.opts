@@ -1,0 +1,7 @@
+# A held turn: LEFT held for 80 frames keeps the ring turning, gliding from
+# item to item round the end (every frame hashed); released, it comes to
+# rest on the item it was turning to
+-w "nav: home ready"
+-k @8:LEFT -k @88:-
+-H @8:@110
+-s @120:rest.png

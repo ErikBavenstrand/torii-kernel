@@ -1,0 +1,5 @@
+# Home in the dark theme (the default), turned to Game Boy Advance (#2)
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-w "home: facing gba"
+-s @1:gba.png

@@ -29,7 +29,7 @@ void test_theme_switch_loads_banks(void)
 	ui_theme_banks(&ui_theme_light, PAL_NOR, want);
 	CHECK(!memcmp(gfx_pal_unfaded, want, sizeof(want)));
 	CHECK_EQ(gfx_pal_unfaded[UI_ROLE_ACCENT], pal_accents[PAL_LIGHT][PAL_NOR].base);
-	CHECK_EQ(gfx_dirty_pal, 1u | obj);  // bank 0, and the sprites'
+	CHECK_EQ(gfx_dirty_pal, 3u | obj);  // banks 0 and 1 (the backdrop), and the sprites'
 	CHECK_EQ(gfx_pal_unfaded[256 + ui_obj_bank() * 16 + UI_ROLE_TINT], pal_accents[PAL_LIGHT][PAL_NOR].tint);
 	// Nothing past the UI's banks
 	for (u32 i = UI_BANKS * 16; i < 256; i++)

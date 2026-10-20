@@ -1,12 +1,20 @@
-# Home (source/screens/home.c), the stand-in list until B12's carousel: the
-# items the card holds (Recent from its v0.3 list, GBA's games) in the
-# carousel's order with what each holds, the torii glyph and the hint bar.
-# DOWN moves to the next item, whose accent the pill takes (the pill's
-# slide hashed every frame); UP at the top wraps to Info.
+# Home (source/screens/home.c; the carousel, source/screens/carousel.c) in
+# the light theme with the clock set (12:34 at the right): the default
+# card's items (Recent from its v0.3 list, GBA's games, SD card, NOR,
+# Settings, Info) with Recent at the front, as at boot (#1). RIGHT turns to
+# Game Boy Advance (#2), every frame of the step hashed (#4); three LEFTs go
+# back round the end past Info to Settings (#3), two more to SD card (#23).
+#! settings 28=1
+-C 1792586096
 -w "nav: home ready"
--s @1:screen.png
--k @8:DOWN -k @12:-
+-s @1:recent.png
+-k @8:RIGHT -k @12:-
 -H @8:@20
--s @24:down.png
--k @30:UP -k @34:- -k @42:UP -k @46:-
--s @70:wrapped.png
+-w "home: facing gba"
+-s @1:gba.png
+-k @8:LEFT -k @12:- -k @24:LEFT -k @28:- -k @40:LEFT -k @44:-
+-w "home: facing settings"
+-s @1:settings.png
+-k @8:LEFT -k @12:- -k @24:LEFT -k @28:-
+-w "home: facing sd"
+-s @1:sd.png

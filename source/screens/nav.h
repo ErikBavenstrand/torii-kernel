@@ -5,8 +5,8 @@
 // walk, writes the log and the boot position while the menu waits, and
 // keeps the clock going.
 //
-// Keys: on home UP/DOWN pick an item (B12's carousel turns with LEFT and
-// RIGHT) and A opens it; on a page B goes back home, facing its item.
+// Keys: on home LEFT/RIGHT turn the carousel and A opens the item it
+// faces; on a page B goes back home, facing its item.
 // Opening and going back are plain fades until B19.
 //
 // A page is a struct nav_page: it pushes its views when the shell opens it

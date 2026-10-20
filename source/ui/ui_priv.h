@@ -130,6 +130,8 @@ u32 ui_round_inset(u32 radius, u32 e);
 extern const struct ui_ops ui_list_ops;
 extern const struct ui_ops ui_card_ops, ui_title_ops, ui_hints_ops, ui_path_ops, ui_storage_ops;
 extern const struct ui_ops ui_popup_ops, ui_confirm_ops, ui_letter_ops;
+// The home carousel's (screens/carousel.c)
+extern const struct ui_ops ui_carousel_ops;
 
 // --- Overlays ----------------------------------------------------------------
 // What a popup, a confirmation or the letter card (ui/ui_popup.c) asks of

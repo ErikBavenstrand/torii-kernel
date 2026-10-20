@@ -74,6 +74,7 @@ extern char *gl_count_files;
 extern char *gl_count_page;
 extern char *gl_page_empty;
 extern char *gl_hint_open;
+extern char *gl_hint_turn;
 extern char *gl_hint_move;
 extern char *gl_hint_back;
 extern char *gl_hint_ok;

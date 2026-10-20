@@ -344,7 +344,7 @@ fi
 
 # A list whose games fill all 64 MB (here one older kernel's entry): the scan
 # used to return without turning interrupts back on, and the menu then hung
-# in its first wait for VBlank. DOWN must still move home's cursor.
+# in its first wait for VBlank. RIGHT must still turn home's carousel.
 if shard_case; then
   new_cart full A.gba
   dd if="$root/A.gba" of="$cart/game-nor.bin" conv=notrunc status=none
@@ -357,10 +357,10 @@ entry = struct.pack("<100sHHHHIBBH16s", b"A.gba", 0, 0, 0, 0, 0x4000000, 0, 0, 0
 k[0x7A0000:0x7A0000 + len(entry)] = entry
 open(sys.argv[1], "wb").write(k)
 EOF
-  boot -k 200:DOWN -k 204:- -h 190 -h 300 -f 300
+  boot -k 200:RIGHT -k 204:- -h 190 -h 300 -f 300
   [ "$(grep -c '^hash frame' "$cart/$runs.log")" = 2 ] || fail "no screen hashes"
   [ "$(grep '^hash frame' "$cart/$runs.log" | cut -d: -f2 | sort -u | wc -l)" = 2 ] ||
-    fail "DOWN didn't move home's cursor: the menu hung"
+    fail "RIGHT didn't turn home's carousel: the menu hung"
   echo "PASS: a NOR list that fills the game NOR leaves interrupts on"
 fi
 

@@ -89,6 +89,7 @@ const struct ui_theme ui_theme_dark = {
 	.accent = pal_accents[PAL_DARK],
 	.pill_mix = PAL_DARK_PILL_MIX,
 	.backdrop_mix = 20,  // 8 %
+	.floor_mix = 10,     // 4 % darker (spec.md)
 	.float_mix = 13,     // 5 %
 	.modal_dim = 8,
 	.confirm_dim = 6,  // towards black: the page's cards near the shadow colour, as spec.md asks
@@ -102,6 +103,7 @@ const struct ui_theme ui_theme_light = {
 	.accent = pal_accents[PAL_LIGHT],
 	.pill_mix = PAL_LIGHT_PILL_MIX,
 	.backdrop_mix = 15,  // 6 %
+	.floor_mix = 10,     // 4 % darker (spec.md)
 	.float_mix = 0,
 	.modal_dim = 6,
 	.confirm_dim = 8,  // half way to white, within a level or two of half way to the paper
@@ -209,6 +211,8 @@ void ui_theme_banks(const struct ui_theme *theme, u32 item, u16 out[UI_BANKS * 1
 	consoles[UI_ROLE_INK_GBC] = theme->accent[PAL_GBC].ink;
 	consoles[UI_ROLE_INK_GB] = theme->accent[PAL_GB].ink;
 	consoles[UI_ROLE_INK_NES] = theme->accent[PAL_NES].ink;
+	consoles[UI_ROLE_SKY] = normal[UI_ROLE_GROUND];
+	consoles[UI_ROLE_FLOOR] = ui_colour_mix(normal[UI_ROLE_GROUND], 0, theme->floor_mix);
 
 	alert[UI_ROLE_ALERT_INK] = danger->ink;
 	alert[UI_ROLE_ALERT_TINT] = danger->tint;

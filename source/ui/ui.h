@@ -87,11 +87,14 @@ enum ui_role {
 	UI_ROLE_GROUND,       // the carousel backdrop: bg with backdrop_mix of base
 	UI_ROLE_DANGER,       // Delete, Format, failures: the danger item's ink
 	UI_ROLE_FLOAT,        // popups and confirmations: card with float_mix of ink
-	// Bank 1: the console inks, for the marks of Recent's and Favourites' rows
+	// Bank 1: the console inks, for the marks of Recent's and Favourites' rows,
+	// and the carousel's backdrop
 	UI_ROLE_INK_GBA = UI_ROLE_ACCENT,
 	UI_ROLE_INK_GBC,
 	UI_ROLE_INK_GB,
 	UI_ROLE_INK_NES,
+	UI_ROLE_SKY,    // the carousel's backdrop above its horizon: GROUND
+	UI_ROLE_FLOOR,  // and below it: GROUND with floor_mix of black
 	// Bank 2: danger and the NOR storage bar
 	UI_ROLE_ALERT_INK = UI_ROLE_ACCENT,  // the danger item's ink
 	UI_ROLE_ALERT_TINT,                  // and its tint
@@ -225,6 +228,8 @@ struct ui_motions {
 //                       in 256ths (palette.json's; the tints are made with it)
 //   backdrop_mix        how much of the item's base the carousel backdrop
 //                       mixes into bg (GROUND), in 256ths
+//   floor_mix           how much black the carousel's ground below its
+//                       horizon mixes into GROUND (FLOOR), in 256ths
 //   float_mix           how much ink a popup's card mixes in (FLOAT), in 256ths
 //   bar_shade_mix       how much card each next shade of the NOR bar mixes in
 //   look, motion        the shared sizes and motions
@@ -255,6 +260,7 @@ struct ui_theme {
 	const char *name;
 	u8 pill_mix;
 	u8 backdrop_mix;
+	u8 floor_mix;
 	u8 float_mix;
 	u8 bar_shade_mix;
 	const struct pal_surfaces *surface;
@@ -309,9 +315,9 @@ void ui_item_select(u32 item);
 // VBlank; nothing is redrawn. The built-ins share their fonts and layout,
 // so they can switch while views are up.
 void ui_theme_set(const struct ui_theme *theme);
-// Makes item's accent the current one: loads bank 0 (16 colours, 7 of
-// them the item's) and the UI's sprite bank, its copy, in the next VBlank;
-// nothing is redrawn.
+// Makes item's accent the current one: loads banks 0 and 1 (bank 0's
+// accent roles and bank 1's backdrop are the item's) and the UI's sprite
+// bank, bank 0's copy, in the next VBlank; nothing is redrawn.
 void ui_item_set(u32 item);
 const struct ui_theme *ui_theme(void);
 u32 ui_item(void);
@@ -335,6 +341,8 @@ enum ui_kind {
 	UI_POPUP,
 	UI_CONFIRM,
 	UI_LETTER,
+	// The home carousel (screens/carousel.h)
+	UI_CAROUSEL,
 	UI_KINDS,
 };
 
