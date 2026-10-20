@@ -506,6 +506,14 @@ void ui_hints_text(u8 node, const char *text)
 	ui_dirty(node, 0xFF);
 }
 
+void ui_hints_get(u8 node, const struct ui_hint **hints, u32 *count, const char **text)
+{
+	const struct hints_state *st = ui_node_state(node);
+	*hints = st->hints;
+	*count = st->count;
+	*text = st->text;
+}
+
 const struct ui_ops ui_hints_ops = {sizeof(struct hints_state), hints_measure, hints_init, 0, 0, hints_draw};
 
 // --- Path pills -------------------------------------------------------------------

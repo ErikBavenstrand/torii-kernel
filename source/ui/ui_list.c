@@ -716,6 +716,14 @@ void ui_list_scroll_info(u8 node, u32 *content, u32 *view, u32 *scroll)
 	*scroll = st->shown > 0 ? (u32)st->shown : 0;
 }
 
+void ui_list_cursor_row(u8 node, s32 *y, u32 *h)
+{
+	const struct list_state *st = ui_node_state(node);
+	s32 rest = st->page == PAGE_NONE ? st->target : st->page_target;
+	*y = ui_node(node)->y + (s32)(st->cursor * st->ring.rh) - rest;
+	*h = st->ring.rh;
+}
+
 static int list_event(u8 node, const struct ui_event *e)
 {
 	struct list_state *st = ui_node_state(node);

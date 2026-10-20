@@ -6,6 +6,13 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** popups, confirmations and the letter card: a popup beside a
+  list's selected row that opens from a notch at the row (6 frames, closing
+  in 4) and never covers the title bar; a centred confirmation that dims the
+  page (towards white in light, black in dark) with Cancel preselected and
+  destructive actions in danger ink; a letter card for A-Z jumps that skip
+  empty letters. Lists clip with WIN1 while an overlay moves (B11, R9;
+  `753c913`, `e577d54`, `d4b9828`).
 - **Changed:** lists take any row pitch from 8 to 32 px: rows lie in one
   tile canvas whose map is written once and scrolled by the BG scroll alone
   (14 px rows hold 60 fps; a held scroll's worst frame is 80,864 cycles). The

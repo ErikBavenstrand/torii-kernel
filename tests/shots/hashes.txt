@@ -1087,6 +1087,53 @@ ui-paper/reading-scrolled 306E2522F0D23624
 ui-paper/widgets-dark ADFDD6C29FC07940
 ui-paper/widgets-light 408E0C8638D760CE
 ui-paper/widgets-moved B8F56C91674A7EB0
+ui-popup/confirm 3C25E081F8CC77DE
+ui-popup/confirm-action 549F30903182D711
+ui-popup/confirm-alone A1E4A7EBF63BDBD2
+ui-popup/confirm-cancelled 7B0139B017449BB0
+ui-popup/confirm-dark 100530FABE630F95
+ui-popup/letter 833CFE03F60461C6
+ui-popup/list-light 582C0D04D6548492
+ui-popup/popup-bottom 90F1B1F805BD039B
+ui-popup/popup-dark 92727FF924A65E20
+ui-popup/popup-favourite 9D40FDB7B1965CA3
+ui-popup/popup-middle FAFB59850E36282B
+ui-popup/popup-top 7D10DF48F0B55C93
+ui-popup/frames 0-1 582C0D04D6548492
+ui-popup/frames 2-2 E54A43E956A8D55C
+ui-popup/frames 3-3 D895F8685D361BFE
+ui-popup/frames 4-4 0CA3579B7CD0840D
+ui-popup/frames 5-5 FAF3BA9C7492A0FB
+ui-popup/frames 6-6 67617D0CFFB06947
+ui-popup/frames 7-16 7D10DF48F0B55C93
+ui-popup/frames 17-17 54E2F2B43A25BA72
+ui-popup/frames 18-18 41DB1D6A9D260394
+ui-popup/frames 19-19 B786A30271BB7390
+ui-popup/frames 20-20 97C351B01A8D5DD2
+ui-popup/frames 21-23 582C0D04D6548492
+ui-popup/frames 24-25 7B0139B017449BB0
+ui-popup/frames 26-26 F8001FA3A8579B1C
+ui-popup/frames 27-27 C0EF1A9BEF8EAB38
+ui-popup/frames 28-28 C901CE688745144D
+ui-popup/frames 29-29 66462FC9D2CC1A50
+ui-popup/frames 30-30 F98C6F810A4D1FAF
+ui-popup/frames 31-38 3C25E081F8CC77DE
+ui-popup/frames 39-40 549F30903182D711
+ui-popup/frames 41-41 D0485C1A15517C58
+ui-popup/frames 42-42 7693AC6D93A32F63
+ui-popup/frames 43-43 E9B0EE9A35CEC363
+ui-popup/frames 44-44 AD8CAFB80B18DCF6
+ui-popup/frames 45-47 7B0139B017449BB0
+ui-popup/frames 48-48 3A2A2111D6876610
+ui-popup/frames 49-49 2510838693D1DBD2
+ui-popup/frames 50-50 F8E50659BFE3BCE6
+ui-popup/frames 51-51 833CFE03F60461C6
+ui-popup/frames 52-53 117B7FADB9532665
+ui-popup/frames 54-68 28650FD029128F51
+ui-popup/frames 69-69 FC8098310BB6A716
+ui-popup/frames 70-70 319B6EEA3AABD031
+ui-popup/frames 71-71 6B6C646D669C3B44
+ui-popup/frames 72-80 3721024997134B08
 ui-theme/awake D9A31419E2536F43
 ui-theme/dimmed A09935EB7E4618BC
 ui-theme/light 6907E551DCA443BC

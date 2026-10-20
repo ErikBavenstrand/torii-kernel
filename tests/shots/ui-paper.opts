@@ -4,8 +4,8 @@
 # bar, hint bar), then SELECT to the widgets screen (path pills, storage
 # bar, section label, 12 px rows with their explanation in the hint bar)
 # and the reading view, each in the dark theme; then the light theme
-# (START) on the reading view, back round to the list (SELECT) and the
-# widgets screen in light.
+# (START) on the reading view, back round past the popups' screen to the
+# list (SELECT) and the widgets screen in light.
 -k 1:L+SELECT
 -w "screen ready: ui-demo"
 -k @2:-
@@ -23,6 +23,8 @@
 -k @50:START -k @54:-
 -s @90:reading-light.png
 -k @100:SELECT -k @104:-
+-w "screen ready: ui-popup"
+-k @10:SELECT -k @14:-
 -w "screen ready: ui-demo"
 -s @3:list-light.png
 -k @10:SELECT -k @14:-

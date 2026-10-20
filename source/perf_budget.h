@@ -8,6 +8,9 @@ static const struct {
 	const char *name;
 	unsigned long cycles;
 } perf_budget[] = {
+	{"confirm-draw", 169605},
+	{"confirm-motion", 79316},
+	{"confirm-move", 84488},
 	{"cover-decode", 38610},
 	{"cover-demo", 19425},
 	{"cover-upload", 3427},
@@ -19,10 +22,14 @@ static const struct {
 	{"diag-psram-slow", 25429},
 	{"diag-row38", 9525},
 	{"diag-scroll", 142397},
+	{"letter-show", 96611},
 	{"lists-menu-open", 268717},
 	{"lists-page", 144551},
 	{"lists-screen", 260134},
 	{"lists-scroll", 119239},
+	{"popup-draw", 143211},
+	{"popup-motion", 68122},
+	{"popup-move", 89524},
 	{"row-copy14", 6628},
 	{"text-clear-row", 1644},
 	{"text-clear-row14", 2579},

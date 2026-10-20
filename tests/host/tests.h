@@ -154,4 +154,10 @@ void test_library_forget_rename(void);
 void test_library_custom_display(void);
 void test_library_pinned_keys(void);
 
+void test_letter_of(void);
+void test_letter_sorted(void);
+void test_letter_jump(void);
+void test_letter_one(void);
+void test_colour_bldy(void);
+
 #endif

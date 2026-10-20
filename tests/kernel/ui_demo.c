@@ -10,7 +10,12 @@
 //               explanation shows in the hint bar
 //   ui-reading  a reading view (ui/ui_reading.h): headings and key chips,
 //               UP and DOWN scrolling a line
-// Keys on every screen:
+//   ui-popup    the popups (B11) over an A-Z game list: START the game
+//               popup (Favourite toggles in place, Delete asks over it), A
+//               a short NOR-like popup whose Format all asks on its own,
+//               LEFT/RIGHT a letter jump with the letter card, B light or
+//               dark at once
+// Keys on every screen (but ui-popup's above):
 //   d-pad, L/R  move and page (wrapping at the ends on a fresh press)
 //   A           a dialog for the item (A or B closes it)
 //   START       the next theme and item accent, through a fade
@@ -28,7 +33,9 @@
 #include "ui_demo.h"
 #include "../../source/cartlog.h"
 #include "../../source/engine/engine.h"
+#include "../../source/lang.h"
 #include "../../source/ui/art.h"
+#include "../../source/ui/letter.h"
 #include "../../source/ui/ui.h"
 #include "../../source/ui/ui_reading.h"
 #include "../../source/waitcnt.h"
@@ -46,6 +53,7 @@ static struct {
 	u8 fading;
 	u8 screen;     // the screen shown (SCREEN_*)
 	u8 next;       // SELECT: the screen to go to, SCREEN_NONE none
+	u8 action;     // ui-popup: the popup to open after the frame (ACT_*)
 	u32 dialog_item;
 } demo EWRAM_BSS;
 
@@ -53,6 +61,7 @@ enum {
 	SCREEN_LIST,
 	SCREEN_WIDGETS,
 	SCREEN_READING,
+	SCREEN_POPUP,
 	SCREENS,
 	SCREEN_NONE = 0xFF,
 };
@@ -298,6 +307,192 @@ static const struct ui_spec reading_nodes[] = {
 
 static const struct ui_view_spec reading_view = {"ui-reading", reading_nodes, N_LIST_NODES, 0, N_LIST, 0, screen_event};
 
+// --- Popups ------------------------------------------------------------------
+
+// A-Z as the lists sort (library_sort_key), with no game under E, I, J, L,
+// O, Q, U, V or X, and one under "#"
+static const char *const games[] = {
+	"007: Everything or Nothing",
+	"Advance Wars",
+	"Advance Wars 2",
+	"Astro Boy",
+	"Banjo-Kazooie",
+	"Boktai",
+	"Castlevania",
+	"Columns Crown",
+	"Donkey Kong Country",
+	"Dragon Quest",
+	"F-Zero",
+	"Final Fantasy VI Advance",
+	"Fire Emblem",
+	"Golden Sun",
+	"Golden Sun: The Lost Age",
+	"Harvest Moon",
+	"Kirby & the Amazing Mirror",
+	"Kuru Kuru Kururin",
+	"Mario & Luigi: Superstar Saga",
+	"Mario Kart: Super Circuit",
+	"Mega Man Zero 3",
+	"Metroid Fusion",
+	"Metroid: Zero Mission",
+	"Minish Cap",
+	"Mother 3",
+	"Ninja Five-0",
+	"Pokemon Emerald",
+	"Pokemon Pinball",
+	"Rhythm Tengoku",
+	"Riviera",
+	"Sonic Advance",
+	"Sword of Mana",
+	"Tactics Ogre",
+	"Tony Hawk's Pro Skater 2",
+	"Wario Ware",
+	"Yoshi's Island",
+	"Zelda: Four Swords",
+};
+#define GAMES (sizeof(games) / sizeof(games[0]))
+static const char *const game_sizes[] = {"4 MB", "8 MB", "16 MB", "32 MB"};
+static u8 game_fav[GAMES] EWRAM_BSS;
+static char ask_buf[64] EWRAM_BSS;
+static struct ui_pop_item menu_items[7] EWRAM_BSS;
+static struct ui_popup menu EWRAM_BSS;
+
+enum {
+	ACT_NONE,
+	ACT_MENU,   // START: the game popup
+	ACT_SHORT,  // A: the NOR-like popup
+};
+
+static u32 games_count(void *ctx)
+{
+	(void)ctx;
+	return GAMES;
+}
+
+static int games_fetch(void *ctx, u32 i, struct ui_item *out)
+{
+	(void)ctx;
+	out->text = games[i];
+	out->detail = game_sizes[i % 4];
+	return UI_ITEM_READY;
+}
+
+static u32 game_letter(void *ctx, u32 i)
+{
+	(void)ctx;
+	return letter_of(games[i]);
+}
+
+static const struct ui_list_model games_model = {games_count, games_fetch, 0};
+static const struct ui_title_config popup_title = {"Game Boy Advance", "A-Z", ART_ICON16_GBA};
+static const struct ui_hint popup_hints[] = {
+	{"START", "menu"}, {"A", "more"}, {"\xC2\xAB\xC2\xBB", "letter"}, {"B", "theme"}};
+static const struct ui_hints_config popup_hints_config = {popup_hints, 4};
+static const struct ui_list_config games_list = {&games_model, UI_ROW_PITCH_LIST, UI_LIST_WRAP, 40, 4};
+
+enum {
+	P_TITLE,
+	P_HINTS,
+	P_CARD,
+	P_LIST,
+	P_BAR,
+	P_LETTER,
+	P_NODES
+};
+
+static const struct ui_spec popup_nodes[] = {
+	[P_TITLE] = {UI_TITLE, 1, UI_NONE, 3, UI_HFILL, 0, 0, 0, 0, 0, 0, 24, &popup_title},
+	[P_HINTS] = HINTS(&popup_hints_config),
+	[P_CARD] = {UI_CARD, 3, UI_NONE, 2, UI_HFILL, 0, 0, 0, 0, 16, 0, 128, &page_card},
+	[P_LIST] = {UI_LIST, 4, UI_NONE, 1, UI_LEFT, UI_FOCUSABLE, 0, 0, LIST_X, 24, LIST_W, 112, &games_list},
+	[P_BAR] = {UI_SCROLLBAR, 5, UI_NONE, 2, UI_LEFT, 0, 0, UI_ROLE_PANEL, LIST_X + LIST_W, 24, 8, 112, &bar_config},
+	[P_LETTER] = UI_LETTER_NODE(6),
+};
+_Static_assert(P_LIST == N_LIST_BAR_TARGET, "the scroll bar's target");
+
+static const struct ui_view_spec popup_view = {"ui-popup", popup_nodes,      P_NODES,     0,
+					       P_LIST,     UI_VIEW_LR_PAGES, screen_event};
+
+static int popup_screen_keys(struct ui_view *v, u16 keys)
+{
+	if (keys & INPUT_START) {
+		demo.action = ACT_MENU;
+		return 1;
+	}
+	if (keys & INPUT_B) {
+		ui_theme_set(ui_theme() == &ui_theme_light ? &ui_theme_dark : &ui_theme_light);
+		return 1;
+	}
+	if (keys & (INPUT_LEFT | INPUT_RIGHT)) {
+		u8 list = (u8)(v->first + P_LIST);
+		u32 to = letter_jump(GAMES, ui_list_cursor(list), keys & INPUT_LEFT ? -1 : 1, game_letter, 0), prev,
+		    next;
+		ui_list_set_cursor(list, to);
+		letter_around(GAMES, to, game_letter, 0, &prev, &next);
+		ui_letter_show((u8)(v->first + P_LETTER), game_letter(0, to), prev, next);
+		return 1;
+	}
+	return 0;
+}
+
+// The popups, after a frame (they run frames of their own)
+static void popup_action(void)
+{
+	struct ui_view *v = ui_top();
+	u32 action = demo.action;
+	demo.action = ACT_NONE;
+	if (!v || v->spec != &popup_view)
+		return;
+	u8 list = (u8)(v->first + P_LIST), hints = (u8)(v->first + P_HINTS);
+	u32 i = ui_list_cursor(list);
+	if (action == ACT_MENU) {
+		static const char *const texts[7] = {"Play",   "Favourite", "Clean boot", "Boot with addon",
+						     "Rename", "Game info", "Delete"};
+		for (u32 k = 0; k < 7; k++)
+			menu_items[k] = (struct ui_pop_item){texts[k], 0, k == 6 ? UI_POP_DANGER : 0};
+		menu_items[1].value = game_fav[i] ? "on" : "off";
+		menu = (struct ui_popup){games[i], ART_ICON8_GBA + 1, menu_items, 7, 0};
+		if (!ui_popup_open(list, hints, &menu))
+			return;
+		// Favourite toggles in place; Delete asks, and Cancel goes back to
+		// the popup
+		s32 pick;
+		for (;;) {
+			pick = ui_popup_choose();
+			if (pick == 1) {
+				game_fav[i] ^= 1;
+				menu_items[1].value = game_fav[i] ? "on" : "off";
+				ui_popup_changed(1);
+				continue;
+			}
+			if (pick == 6) {
+				snprintf(ask_buf, sizeof(ask_buf), "Delete %s?", games[i]);
+				struct ui_confirm ask = {ask_buf, "The save stays.", "Delete", 1};
+				int yes = ui_confirm(hints, &ask);
+				tlog("ui-demo: delete %s", yes ? "yes" : "no");
+				if (!yes)
+					continue;
+			}
+			break;
+		}
+		ui_popup_close();
+		tlog("ui-demo: popup picked %ld", (long)pick);
+	} else if (action == ACT_SHORT) {
+		menu_items[0] = (struct ui_pop_item){"Launch", 0, 0};
+		menu_items[1] = (struct ui_pop_item){"Game info", 0, 0};
+		menu_items[2] = (struct ui_pop_item){"Format all", 0, UI_POP_DANGER};
+		menu = (struct ui_popup){games[i], ART_ICON8_NOR + 1, menu_items, 3, 0};
+		if (!ui_popup_open(list, hints, &menu))
+			return;
+		s32 pick = ui_popup_choose();
+		ui_popup_close();
+		if (pick == 2) {
+			struct ui_confirm ask = {"Format all of NOR?", "3 games go. Saves on SD stay.", "Format", 1};
+			tlog("ui-demo: format %s", ui_confirm(hints, &ask) ? "yes" : "no");
+		}
+	}
+}
+
 // --- The dialog ------------------------------------------------------------
 
 static const struct ui_label_config ask_label = {"Open this game?", UI_FONT_HEADING, UI_ALIGN_CENTER, 0, 0};
@@ -366,6 +561,8 @@ static int screen_event(struct ui_view *v, const struct ui_event *e)
 		return 1;
 	}
 	case UI_EV_ACTIVATE: {
+		if (demo.screen == SCREEN_POPUP)
+			demo.action = ACT_SHORT;
 		if (demo.screen != SCREEN_LIST)
 			return 1;
 		struct ui_item item = {0};
@@ -378,6 +575,8 @@ static int screen_event(struct ui_view *v, const struct ui_event *e)
 		return 1;
 	}
 	case UI_EV_KEYS:
+		if (demo.screen == SCREEN_POPUP && popup_screen_keys(v, e->keys))
+			return 1;
 		if (e->keys & INPUT_START) {
 			if (!demo.fading) {
 				ui_fade(FADE_BLACK, FADE_MAX, 6);
@@ -411,7 +610,8 @@ static void theme_step(void)
 // Shows screen s (the first, or after SELECT: the last goes out first)
 static void show(u32 s)
 {
-	static const struct ui_view_spec *const views[SCREENS] = {&list_view, &widgets_view, &reading_view};
+	static const struct ui_view_spec *const views[SCREENS] = {&list_view, &widgets_view, &reading_view,
+								  &popup_view};
 	if (ui_depth()) {
 		ui_leave(UI_TR_TAB, 1);
 		while (ui_depth())
@@ -433,6 +633,7 @@ static void show(u32 s)
 void ui_demo(void)
 {
 	REG_WAITCNT_CART = WAITCNT_MENU;  // as the menu runs
+	LoadEnglish();                    // the popups' strings
 	irqInit();
 	cartlog_install();
 	engine_init();
@@ -455,6 +656,8 @@ void ui_demo(void)
 			frame_measure("ui-fade");
 		ui_frame();
 		theme_step();
+		if (demo.action)
+			popup_action();
 		if (demo.next != SCREEN_NONE && ui_depth() == 1) {
 			u32 next = demo.next;
 			demo.next = SCREEN_NONE;

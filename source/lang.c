@@ -139,6 +139,13 @@ char **gl_set_log_levels EWRAM_BSS;
 char **gl_set_ampm EWRAM_BSS;
 char *gl_set_minutes EWRAM_BSS;
 
+// Popups and confirmations (ui.h)
+char *gl_pop_choose EWRAM_BSS;
+char *gl_pop_ok EWRAM_BSS;
+char *gl_pop_close EWRAM_BSS;
+char *gl_pop_cancel EWRAM_BSS;
+char *gl_pop_cancel_button EWRAM_BSS;
+
 //英文
 const char en_init_error[] = "microSD card error";
 const char en_power_off[] = "Turn the power off";
@@ -363,6 +370,13 @@ const char *en_set_log_levels[4] = {"Off", "Errors", "Info", "Debug"};
 const char *en_set_ampm[2] = {"AM", "PM"};
 const char en_set_minutes[] = "min";
 
+// Popups and confirmations: the hint bar's labels, and the Cancel button
+const char en_pop_choose[] = "choose";
+const char en_pop_ok[] = "ok";
+const char en_pop_close[] = "close";
+const char en_pop_cancel[] = "cancel";
+const char en_pop_cancel_button[] = "Cancel";
+
 //---------------------------------------------------------------------------------
 void LoadEnglish(void)
 {
@@ -498,6 +512,11 @@ void LoadEnglish(void)
 	gl_set_log_levels = (char **)en_set_log_levels;
 	gl_set_ampm = (char **)en_set_ampm;
 	gl_set_minutes = (char *)en_set_minutes;
+	gl_pop_choose = (char *)en_pop_choose;
+	gl_pop_ok = (char *)en_pop_ok;
+	gl_pop_close = (char *)en_pop_close;
+	gl_pop_cancel = (char *)en_pop_cancel;
+	gl_pop_cancel_button = (char *)en_pop_cancel_button;
 	gl_nor_title = (char *)en_nor_title;
 }
 //---------------------------------------------------------------------------------
