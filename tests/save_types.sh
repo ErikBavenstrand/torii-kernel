@@ -54,10 +54,9 @@ run_case() {
   [ "$(hex_at "$sav" "$offset")" = 4f4d525801 ] ||
     fail "$name: save file has $(hex_at "$sav" "$offset") at $offset, expected the first boot record"
 
-  # Power-on 3: SAVER and torii (the first launch's Recent) sort first; move
-  # down to the game, open it, launch.
+  # Power-on 3: SAVER sorts first; move down to the game, open it, launch.
   # shellcheck disable=SC2046
-  boot $(keys 100 DOWN DOWN A) $(keys 180 A) -s 600:"$shots/3-game.png"
+  boot $(keys 100 DOWN A) $(keys 180 A) -s 600:"$shots/3-game.png"
   [ "$(hex_at "$cart/sram.bin" "$offset")" = 4f4d525802 ] ||
     fail "$name: cart SRAM has $(hex_at "$cart/sram.bin" "$offset") at $offset, expected the second boot"
 

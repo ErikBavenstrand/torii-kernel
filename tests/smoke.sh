@@ -44,9 +44,8 @@ od -A n -t x1 -N 5 "$cart/sram.bin" | tr -d ' \n' | grep -q '4f4d525801' ||
 boot -s 90:$shots/2-prompt.png -k 100:A -k 106:- -s 300:$shots/2-menu.png
 [ "$(save_bytes)" = 4f4d525801 ] || fail "save not written back to SD (got $(save_bytes))"
 
-# Power-on 3: SAVER and torii (the first launch's Recent) sort first, so
-# move down to the game and launch it.
-boot -k 100:DOWN -k 106:- -k 112:DOWN -k 118:- -k 124:A -k 130:- -k 184:A -k 190:- -s 500:$shots/3-game.png
+# Power-on 3: SAVER sorts first, so move down to the game and launch it.
+boot -k 100:DOWN -k 106:- -k 120:A -k 126:- -k 180:A -k 186:- -s 500:$shots/3-game.png
 od -A n -t x1 -N 5 "$cart/sram.bin" | tr -d ' \n' | grep -q '4f4d525802' ||
   fail "save was not loaded back into SRAM on the next launch"
 

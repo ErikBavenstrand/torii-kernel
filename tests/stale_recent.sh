@@ -62,11 +62,11 @@ printf '/Games/Gone.gba\n' >"$cart/recent.txt"
 mcopy -i "$cart/sd.img" "$cart/recent.txt" "::/SAVER/Recently play.txt"
 # START, open the entry, CLEAN BOOT: File error; B back to Recently Played
 # (it went to the SD list before v0.3.2), B to the SD list (Games, SAVER,
-# torii, which forgetting the entry made, Hello.gba), then down to
-# Hello.gba, open it, CLEAN BOOT
+# Hello.gba; the list hides torii, which forgetting the entry made), then
+# down to Hello.gba, open it, CLEAN BOOT
 OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -k 100:START -k 104:- -k 130:A -k 134:- \
-  -k 170:A -k 174:- -k 250:B -k 254:- -k 300:B -k 304:- -k 340:DOWN -k 344:- -k 356:DOWN -k 360:- -k 372:DOWN -k 376:- \
-  -k 388:A -k 392:- -k 436:A -k 440:- -f 650 >"$cart/kernel.log" 2>&1
+  -k 170:A -k 174:- -k 250:B -k 254:- -k 300:B -k 304:- -k 340:DOWN -k 344:- -k 356:DOWN -k 360:- \
+  -k 372:A -k 376:- -k 420:A -k 424:- -f 650 >"$cart/kernel.log" 2>&1
 back=$(sed -n '/launch Gone.gba: can.t open it/,$p' "$cart/kernel.log" | grep -o 'screen ready: [a-z-]*' | grep -m1 -v dialog || true)
 [ "$back" = "screen ready: recent" ] || fail "after the error, B brought '$back', not Recently Played"
 grep -q '^kernel: launch Hello.gba: code' "$cart/kernel.log" ||

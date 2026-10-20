@@ -98,10 +98,9 @@ case $part in
 copy)
   first_launch
   first_copy
-  # Power-on 3: the game again (SAVER and torii, the first launch's Recent,
-  # sort first), then B at "Save sav?".
+  # Power-on 3: the game again (SAVER sorts first), then B at "Save sav?".
   # shellcheck disable=SC2046
-  boot $(keys 100 DOWN DOWN A) $(keys 180 A) -f 600
+  boot $(keys 100 DOWN A) $(keys 180 A) -f 600
   logged "save: Test.sav exists, 131072 bytes, save type 31"
   logged "save: loaded Test.sav into cart SRAM, 131072 bytes"
   boot -k 100:B -k 106:- -f 300
@@ -115,10 +114,9 @@ copy)
 full)
   first_launch
   first_copy
-  # Power-on 3: the game again (SAVER and torii, the first launch's Recent,
-  # sort first), which sets the record.
+  # Power-on 3: the game again (SAVER sorts first), which sets the record.
   # shellcheck disable=SC2046
-  boot $(keys 100 DOWN DOWN A) $(keys 180 A) -f 600
+  boot $(keys 100 DOWN A) $(keys 180 A) -f 600
   # Then the card loses Test.sav and fills up to 64 KB free: too little for
   # the 128 KB copy. The filler is a .gba, so the SD list shows it (and the
   # kernel can delete it, below).
@@ -146,11 +144,11 @@ full)
   mtype -i "$cart/sd.img" ::/SAVER/Test.sav >"$cart/short.sav"
 
   # Power-on 5: the copy fails again; then CLEAN BOOT of Test.gba (rows:
-  # SAVER, torii, Filler.gba, Test.gba) would hand cart SRAM to a game, so
-  # the launch tries the copy again, fails, and asks; B keeps the save
-  # waiting and launches nothing.
+  # SAVER, Filler.gba, Test.gba) would hand cart SRAM to a game, so the
+  # launch tries the copy again, fails, and asks; B keeps the save waiting
+  # and launches nothing.
   boot -k 100:A -k 106:- -w "error 3: Can't write the save" -k @30:B -k @34:- \
-    -w "screen ready: sd-list" -k @10:DOWN -k @14:- -k @22:DOWN -k @26:- -k @34:DOWN -k @38:- -k @46:A -k @50:- \
+    -w "screen ready: sd-list" -k @10:DOWN -k @14:- -k @22:DOWN -k @26:- -k @34:A -k @38:- \
     -w "screen ready: file-menu" -k @10:A -k @14:- \
     -w "still waits to be copied" -w "screen ready: dialog" -s @20:"$shots/5-launch-anyway.png" -k @30:B -k @34:- \
     -w "screen ready: sd-list"
@@ -177,11 +175,10 @@ full)
   head -c $((free - 16384)) /dev/urandom >"$cart/filler.bin"
   mcopy -i "$cart/sd.img" "$cart/filler.bin" ::/Filler.gba
   # Power-on 5a: B on the power-on copy's error, then CLEAN BOOT of
-  # Other.gba (rows: SAVER, torii, Filler.gba, Other.gba, Test.gba); the
-  # copy fails again, and A on the question launches it: the record goes
-  # first.
+  # Other.gba (rows: SAVER, Filler.gba, Other.gba, Test.gba); the copy fails
+  # again, and A on the question launches it: the record goes first.
   boot -k 100:A -k 106:- -w "error 3: Can't write the save" -k @30:B -k @34:- \
-    -w "screen ready: sd-list" -k @10:DOWN -k @14:- -k @22:DOWN -k @26:- -k @34:DOWN -k @38:- -k @46:A -k @50:- \
+    -w "screen ready: sd-list" -k @10:DOWN -k @14:- -k @22:DOWN -k @26:- -k @34:A -k @38:- \
     -w "screen ready: file-menu" -k @10:A -k @14:- \
     -w "still waits to be copied" -w "screen ready: dialog" -k @30:A -k @34:- \
     -w "launch: starting the game"
@@ -209,7 +206,7 @@ full)
   # of Test.gba tries the copy again:
   # it is written whole, the record goes, and the game starts.
   boot -k 100:A -k 106:- -w "error 3: Can't write the save" -k @30:B -k @34:- \
-    -w "screen ready: sd-list" -k @10:DOWN -k @14:- -k @22:DOWN -k @26:- -k @34:L -k @38:L+START -k @42:- \
+    -w "screen ready: sd-list" -k @10:DOWN -k @14:- -k @22:L -k @26:L+START -k @30:- \
     -w "screen ready: dialog" -k @20:A -k @24:- \
     -w "screen ready: sd-list" -k @20:A -k @24:- \
     -w "screen ready: file-menu" -k @10:A -k @14:- \
@@ -226,10 +223,9 @@ full)
 nearly-full)
   first_launch
   first_copy
-  # Power-on 3: the game again (SAVER and torii, the first launch's Recent,
-  # sort first), which sets the record.
+  # Power-on 3: the game again (SAVER sorts first), which sets the record.
   # shellcheck disable=SC2046
-  boot $(keys 100 DOWN DOWN A) $(keys 180 A) -f 600
+  boot $(keys 100 DOWN A) $(keys 180 A) -f 600
   # Then the card loses Test.sav and fills up to exactly 128 KB free: just
   # room for the copy, through its progress dialog.
   mdel -i "$cart/sd.img" ::/SAVER/Test.sav
