@@ -857,6 +857,21 @@ static s32 view_dx(const struct ui_view *v)
 	return animated(v) ? 0 : ui.tr_dx;
 }
 
+// Another blend takes over from a page's fade: a fade-in just shows; a
+// fade-out's plane goes in these regs (DISPCNT is written already), so the
+// old page doesn't come back at full for a frame before the list hides it
+static void reveal_drop(void)
+{
+	if (ui.reveal != REVEAL_OFF && ui.reveal_out) {
+		u32 p = ui.reveal_plane;
+		ui.hidden |= (u8)(1u << p);
+		ui.hide_pending &= (u8) ~(1u << p);
+		ui.hide_frame[p] = frame_count();
+		gfx_set_dispcnt((u16)(gfx_regs.dispcnt & ~DISP_BG(p)));
+	}
+	ui.reveal = REVEAL_OFF;
+}
+
 static void regs_update(void)
 {
 	if (ui.tr_phase == TR_GAP && ui.tr_pushed && all_shown())
@@ -978,10 +993,10 @@ static void regs_update(void)
 	ui.carry_dim = 0;
 	if (ui.dim_y > 0) {
 		s32 y = ui.dim_y > modal_y ? ui.dim_y : modal_y;
-		ui.reveal = REVEAL_OFF;  // the page just shows
+		reveal_drop();  // the page just shows
 		gfx_set_blend((u16)(BLEND_DARKEN | LAYER_ALL | LAYER_BD), 0, (u16)(y > 16 ? 16 : y));
 	} else if (tr && (ui.tr_effects & UI_TR_FADES) && !gone && ui.tr_level > 0) {
-		ui.reveal = REVEAL_OFF;
+		reveal_drop();
 		if (ui.tr_mode == TR_ALPHA && !modal) {
 			u32 eva = 16 - ((u32)ui.tr_level * 16 + UI_OPEN / 2) / UI_OPEN;
 			gfx_set_blend((u16)(BLEND_ALPHA | shown | LAYER_OBJ | LAYER_BD << 8),
@@ -995,16 +1010,16 @@ static void regs_update(void)
 			gfx_set_blend((u16)(BLEND_DARKEN | targets), 0, (u16)y);
 		}
 	} else if (tr && (ui.tr_effects & UI_TR_FADES) && gone && ui.tr_mode == TR_DARKEN) {
-		ui.reveal = REVEAL_OFF;
+		reveal_drop();
 		gfx_set_blend((u16)(BLEND_DARKEN | LAYER_ALL | LAYER_BD), 0, 16);  // black
 	} else if (modal && tv->open_blend < UI_OPEN && tv->open_blend <= OPEN_FADE && !tr) {
 		// The dialog fades in over the screen
-		ui.reveal = REVEAL_OFF;
+		reveal_drop();
 		u32 eva = ((u32)tv->open_blend * 16 + OPEN_FADE / 2) / OPEN_FADE;
 		gfx_set_blend((u16)(BLEND_ALPHA | top_planes | (lower | LAYER_BD) << 8), (u16)(eva | (16 - eva) << 8),
 			      0);
 	} else if (modal && modal_y > 0) {
-		ui.reveal = REVEAL_OFF;
+		reveal_drop();
 		gfx_set_blend((u16)(BLEND_DARKEN | lower | LAYER_BD), 0, (u16)modal_y);
 	} else if (ui.reveal != REVEAL_OFF) {
 		// The list's plane over everything behind it

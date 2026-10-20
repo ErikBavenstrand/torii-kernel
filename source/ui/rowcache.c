@@ -18,7 +18,9 @@ static void copy_words(u32 *dst, const u32 *src, u32 words)
 		return;
 	}
 #endif
-	memcpy(dst, src, words * 4);
+	// Word by word: dst may be VRAM, which takes no byte stores
+	while (words--)
+		*dst++ = *src++;
 }
 
 void row_cache_init(struct row_cache *c, u32 *arena, u32 words)
