@@ -35,7 +35,7 @@ boot-slow/frames 5-5 E28B6198EE4EC8F6
 boot-slow/frames 6-6 961EFA0906407F5A
 boot-slow/frames 7-7 B0A7C155298FF964
 boot-slow/frames 8-12 1F73F83DB4B12863
-boot-slow/frames 13-13 98FCA12C764127A5
+boot-slow/frames 13-13 49A1856F17D23E0D
 boot-slow/frames 14-15 1F73F83DB4B12863
 boot-slow/frames 16-16 C06A5CEEB9ABEEEC
 boot-slow/frames 17-17 1DA9A452A082DCA0
