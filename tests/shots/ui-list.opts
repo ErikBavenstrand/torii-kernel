@@ -30,3 +30,11 @@
 # and stops at 1000: a held key never wraps (v0.3.2)
 -k @370:R -k @440:-
 -s @460:held-r.png
+# B9: a held DOWN glides the 14 px rows (the pill rides with the cursor),
+# every frame hashed and watched for tears, then UP held back the other way
+-k @480:DOWN -k @600:-
+-H @480:@630
+-T @480:@700
+-s @630:glided.png
+-k @640:UP -k @700:-
+-s @720:glided-up.png

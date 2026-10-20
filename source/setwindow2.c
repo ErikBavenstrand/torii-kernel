@@ -411,7 +411,7 @@ static int page2_event(struct ui_view *view, const struct ui_event *e)
 	return 1;
 }
 
-static const struct ui_list_config page2_list = {&settings_model, SETTINGS_ROW_H, 0, 232 - 2 * 6 - SETTINGS_NAME_W};
+static const struct ui_list_config page2_list = {&settings_model, SETTINGS_ROW_H, 0, 232 - 2 * 6 - SETTINGS_NAME_W, 0};
 static const struct ui_scrollbar_config page2_bar = {SETTINGS_LIST};
 
 static const struct ui_spec page2_nodes[] = {

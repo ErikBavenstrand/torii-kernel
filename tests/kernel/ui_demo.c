@@ -1,15 +1,24 @@
 // The UI demo, in the test kernel only: with L held at boot (mgba-shot
 // ezkerneltest.gba -k 1:L) after the unit tests, or with L and SELECT
-// held on the emulated cart (tests/shots/ui-*.opts) straight away, it shows a
-// list of 1000 synthetic items with smooth scrolling, a scroll bar, a
-// progress bar and a dialog, palette fades and theme switching, and DIM
-// after 20 s idle. Keys:
+// held on the emulated cart (tests/shots/ui-*.opts) straight away. It shows
+// the Paper clean widgets (B9) on three screens, SELECT going to the next:
+//   ui-demo     a game list page: the title bar, a card holding a list of
+//               1000 synthetic items in 14 px rows with the sliding pill, a
+//               scroll bar, the hint bar
+//   ui-widgets  path pills and a storage bar on a card, a section label with
+//               its 8x8 icon, a card of 12 px Settings-like rows whose
+//               explanation shows in the hint bar
+//   ui-reading  a reading view (ui/ui_reading.h): headings and key chips,
+//               UP and DOWN scrolling a line
+// Keys on every screen:
 //   d-pad, L/R  move and page (wrapping at the ends on a fresh press)
 //   A           a dialog for the item (A or B closes it)
 //   START       the next theme and item accent, through a fade
-// It logs "screen ready: ui-demo", "ui-dialog" (tests/shots ui-*.opts) and
-// frame-cycles figures for scrolling, page changes, the dialog and the
-// theme's fades (tests/perf/budget.txt).
+//   SELECT      the next screen
+// DIM comes on after 20 s idle. It logs "screen ready: ..." for each screen
+// and "ui-dialog" (tests/shots ui-*.opts), and frame-cycles figures for
+// scrolling, page changes, the dialog and the theme's fades
+// (tests/perf/budget.txt).
 #ifdef TORII_TEST_KERNEL
 #include <gba_interrupt.h>
 #include <stdio.h>
@@ -19,7 +28,9 @@
 #include "ui_demo.h"
 #include "../../source/cartlog.h"
 #include "../../source/engine/engine.h"
+#include "../../source/ui/art.h"
 #include "../../source/ui/ui.h"
+#include "../../source/ui/ui_reading.h"
 #include "../../source/waitcnt.h"
 
 #define ITEMS 1000
@@ -28,14 +39,23 @@ static char name_buf[160] EWRAM_BSS;
 static char detail_buf[16] EWRAM_BSS;
 static char count_buf[24] EWRAM_BSS;
 static char dialog_buf[48] EWRAM_BSS;
-static u32 icons[4][32] EWRAM_BSS ALIGN(4);
 static struct {
 	const char *measure;
 	u32 measure_left;
 	u32 theme;
 	u8 fading;
+	u8 screen;     // the screen shown (SCREEN_*)
+	u8 next;       // SELECT: the screen to go to, SCREEN_NONE none
 	u32 dialog_item;
 } demo EWRAM_BSS;
+
+enum {
+	SCREEN_LIST,
+	SCREEN_WIDGETS,
+	SCREEN_READING,
+	SCREENS,
+	SCREEN_NONE = 0xFF,
+};
 
 static const char *const words[] = {"Advance", "Castle", "Dragon", "Echo",   "Forest", "Golden",
 				    "Harbor",  "Island", "Jungle", "Knight", "Legend", "Moon"};
@@ -67,6 +87,8 @@ static void put_num(char **p, u32 n)
 		*(*p)++ = digits[--count];
 }
 
+// Game-list-like names: two words, a number and a region; every seventh a
+// long one that the row cuts (and the marquee scrolls)
 static int demo_fetch(void *ctx, u32 i, struct ui_item *out)
 {
 	(void)ctx;
@@ -77,13 +99,12 @@ static int demo_fetch(void *ctx, u32 i, struct ui_item *out)
 	if (i % 7 == 3) {
 		put(&p, " - The Long Journey ");
 		put(&p, regions[i % 4]);
-		put(&p, " (En,Fr,De,Es,It) (Rev 1).gba");
+		put(&p, " (En,Fr,De,Es,It) (Rev 1)");
 	} else {
 		put(&p, " ");
 		put_num(&p, i + 1);
 		put(&p, " ");
 		put(&p, regions[i % 4]);
-		put(&p, ".gba");
 	}
 	*p = 0;
 	p = detail_buf;
@@ -93,101 +114,10 @@ static int demo_fetch(void *ctx, u32 i, struct ui_item *out)
 	out->text = name_buf;
 	out->detail = detail_buf;
 	out->ink = i % 11 == 5 ? UI_ROLE_DIM : 0;
-	out->icon = icons[i % 4];
 	return UI_ITEM_READY;
 }
 
 static const struct ui_list_model demo_model = {demo_count, demo_fetch, 0};
-
-// The art's letters: A amber, B purple, C green, D red, E light, F dark, as
-// the item's colours until the new icons replace these (ui.h roles)
-static const u8 icon_ink[6] = {UI_ROLE_ACCENT, UI_ROLE_ACCENT_INK, UI_ROLE_ACCENT_INK,
-			       UI_ROLE_DANGER, UI_ROLE_PANEL,      UI_ROLE_TEXT};
-
-// 16x16 icons: a folder, a cartridge, a handheld, a disc
-static void make_icons(void)
-{
-	static const char *const art[4] = {
-		"................"
-		".AAAAA.........."
-		"AAAAAAA........."
-		"AAAAAAAAAAAAAAA."
-		"AAAAAAAAAAAAAAA."
-		"AAAAAAAAAAAAAAA."
-		"AAAAAAAAAAAAAAA."
-		"AAAAAAAAAAAAAAA."
-		"AAAAAAAAAAAAAAA."
-		"AAAAAAAAAAAAAAA."
-		"AAAAAAAAAAAAAAA."
-		"AAAAAAAAAAAAAAA."
-		"AAAAAAAAAAAAAAA."
-		".AAAAAAAAAAAAA.."
-		"................"
-		"................",
-		"................"
-		"..BBBBBBBBBBBB.."
-		"..BBBBBBBBBBBB.."
-		"..BEEEEEEEEEEB.."
-		"..BEBBBBBBBBEB.."
-		"..BEBBBBBBBBEB.."
-		"..BEBBBBBBBBEB.."
-		"..BEEEEEEEEEEB.."
-		"..BBBBBBBBBBBB.."
-		"..BBBBBBBBBBBB.."
-		"..BBFBFBFBFBBB.."
-		"..BBFBFBFBFBBB.."
-		"..BBBBBBBBBBBB.."
-		"................"
-		"................"
-		"................",
-		"................"
-		"...CCCCCCCCCC..."
-		"...CEEEEEEEEC..."
-		"...CEFFFFFFEC..."
-		"...CEFFFFFFEC..."
-		"...CEFFFFFFEC..."
-		"...CEEEEEEEEC..."
-		"...CCCCCCCCCC..."
-		"...CCFCCCCDCC..."
-		"...CFFFCCDCDC..."
-		"...CCFCCCCDCC..."
-		"...CCCCCCCCCC..."
-		"...CCCCCCCCCC..."
-		"....CCCCCCCC...."
-		"................"
-		"................",
-		"................"
-		".....DDDDDD....."
-		"...DDDDDDDDDD..."
-		"..DDDDDDDDDDDD.."
-		"..DDDDDEEDDDDD.."
-		".DDDDDEEEEDDDDD."
-		".DDDDEEFFEEDDDD."
-		".DDDDEFFFFEDDDD."
-		".DDDDEFFFFEDDDD."
-		".DDDDEEFFEEDDDD."
-		"..DDDDEEEEDDDD.."
-		"..DDDDDEEDDDDD.."
-		"...DDDDDDDDDD..."
-		".....DDDDDD....."
-		"................"
-		"................",
-	};
-	for (u32 k = 0; k < 4; k++) {
-		for (u32 t = 0; t < 4; t++) {
-			u32 tx = t & 1, ty = t >> 1;
-			for (u32 y = 0; y < 8; y++) {
-				u32 row = 0;
-				for (u32 x = 0; x < 8; x++) {
-					char c = art[k][(ty * 8 + y) * 16 + tx * 8 + x];
-					u32 index = c == '.' ? 0 : icon_ink[c - 'A'];
-					row |= index << (4 * x);
-				}
-				icons[k][t * 8 + y] = row;
-			}
-		}
-	}
-}
 
 static void measure(const char *name, u32 frames)
 {
@@ -199,45 +129,180 @@ static void measure(const char *name, u32 frames)
 	frame_measure(name);  // this frame too
 }
 
-// --- The list screen -----------------------------------------------------
+// --- What every screen shares ------------------------------------------------
+//
+// The planes: BG3 the paper's own (title and hint bars, section labels),
+// BG2 cards and what sits on them, BG1 a card's list, BG0 dialogs.
 
-static const struct ui_label_config title_label = {"Torii UI", UI_FONT_HEADING, UI_ALIGN_LEFT, 0};
-static const struct ui_label_config count_label = {"1 / 1000", UI_FONT_BODY, UI_ALIGN_RIGHT, UI_LABEL_SWAP};
-static const struct ui_label_config hint_label = {"A open  START theme", UI_FONT_BODY, UI_ALIGN_LEFT, 0};
-static const struct ui_list_config list_config = {&demo_model, 16, UI_LIST_WRAP | UI_LIST_MARQUEE, 40};
-static const struct ui_scrollbar_config bar_config = {3};
+#define TITLE {UI_TITLE, 1, UI_NONE, 3, UI_HFILL, 0, 0, 0, 0, 0, 0, 24, &title_config}
+#define HINTS(config) {UI_HINTS, 2, UI_NONE, 3, UI_HFILL | UI_BOTTOM, 0, 0, 0, 0, 0, 0, 16, config}
+// A card from y 16 (its body from 20) to 144, a pixel of shadow under it
+static const struct ui_card_config page_card = {4, 4, 4, 1, 0};
+// A list in it, 8 px in from each side but the scroll bar's column
+#define LIST_X 8
+#define LIST_W 216
+// The lists' node indices (their scroll bars name them)
+#define N_LIST_BAR_TARGET 3
+#define W_LIST_TARGET 9
+
+static int screen_event(struct ui_view *v, const struct ui_event *e);
+
+// --- The game list -------------------------------------------------------------
+
+static const struct ui_title_config title_config = {"Game Boy Advance", "1/1000", ART_ICON16_GBA};
+static const struct ui_hint list_hints[] = {{"A", "open"}, {"START", "theme"}, {"SELECT", "more"}, {"B", "back"}};
+static const struct ui_hints_config list_hints_config = {list_hints, 4};
+static const struct ui_list_config list_config = {&demo_model, UI_ROW_PITCH_LIST, UI_LIST_WRAP | UI_LIST_MARQUEE, 40,
+						  4};
+static const struct ui_scrollbar_config bar_config = {N_LIST_BAR_TARGET};
 
 enum {
-	N_TITLE_BAR,
 	N_TITLE,
-	N_COUNT,
+	N_HINTS,
+	N_CARD,
 	N_LIST,
 	N_BAR,
-	N_STATUS,
-	N_HINT,
-	N_PROGRESS
+	N_LIST_NODES
 };
 
 static const struct ui_spec list_nodes[] = {
-	[N_TITLE_BAR] = {UI_PANEL, 1, UI_NONE, 2, UI_HFILL, 0, 0, UI_ROLE_PANEL, 0, 0, 0, 16, 0},
-	[N_TITLE] = {UI_LABEL, 2, N_TITLE_BAR, 2, UI_LEFT | UI_VFILL, 0, 0, UI_ROLE_PANEL, 0, 0, 120, 0, &title_label},
-	[N_COUNT] = {UI_LABEL, 3, N_TITLE_BAR, 2, UI_RIGHT | UI_VFILL, 0, UI_ROLE_DIM, UI_ROLE_PANEL, 0, 0, 104, 0,
-		     &count_label},
-	[N_LIST] = {UI_LIST, 4, UI_NONE, 1, UI_FILL, UI_FOCUSABLE, 0, UI_ROLE_BG, 0, 16, 8, 16, &list_config},
-	[N_BAR] = {UI_SCROLLBAR, 5, UI_NONE, 2, UI_RIGHT | UI_VFILL, 0, 0, 0, 0, 16, 8, 16, &bar_config},
-	[N_STATUS] = {UI_PANEL, 6, UI_NONE, 2, UI_HFILL | UI_BOTTOM, 0, 0, UI_ROLE_PANEL, 0, 0, 0, 16, 0},
-	[N_HINT] = {UI_LABEL, 7, N_STATUS, 2, UI_FILL, 0, UI_ROLE_DIM, UI_ROLE_PANEL, 0, 0, 48, 0, &hint_label},
-	[N_PROGRESS] = {UI_PROGRESS, 8, UI_NONE, 0, UI_RIGHT | UI_BOTTOM, 0, 0, 0, 8, 0, 40, 16, 0},
+	[N_TITLE] = TITLE,
+	[N_HINTS] = HINTS(&list_hints_config),
+	[N_CARD] = {UI_CARD, 3, UI_NONE, 2, UI_HFILL, 0, 0, 0, 0, 16, 0, 128, &page_card},
+	[N_LIST] = {UI_LIST, 4, UI_NONE, 1, UI_LEFT, UI_FOCUSABLE, 0, 0, LIST_X, 24, LIST_W, 112, &list_config},
+	[N_BAR] = {UI_SCROLLBAR, 5, UI_NONE, 2, UI_LEFT, 0, 0, UI_ROLE_PANEL, LIST_X + LIST_W, 24, 8, 112, &bar_config},
+};
+_Static_assert(N_LIST == N_LIST_BAR_TARGET, "the scroll bar's target");
+
+static const struct ui_view_spec list_view = {"ui-demo", list_nodes, N_LIST_NODES, 0, N_LIST, 0, screen_event};
+
+// --- Widgets -----------------------------------------------------------------
+
+struct setting {
+	const char *name, *value, *why;
+};
+static const struct setting settings[] = {
+	{"Theme", "Light", "The menu in light or dark."},
+	{"Game view", "List", "Lists with or without box art."},
+	{"Start on", "Last place", "Where the menu opens at power-on."},
+	{"Dim screen", "5 min", "Dim the screen when left alone."},
+	{"Time", "14:32", "The cart's clock."},
+	{"Date", "2026-10-20", "The cart's calendar."},
+	{"24-hour clock", "On", "14:32 or 2:32 PM."},
+	{"Clock for games", "On", "Games see the cart's clock."},
+};
+#define SETTINGS (sizeof(settings) / sizeof(settings[0]))
+
+static u32 settings_count(void *ctx)
+{
+	(void)ctx;
+	return SETTINGS;
+}
+
+static int settings_fetch(void *ctx, u32 i, struct ui_item *out)
+{
+	(void)ctx;
+	out->text = settings[i].name;
+	out->detail = settings[i].value;
+	return UI_ITEM_READY;
+}
+
+static const struct ui_list_model settings_model = {settings_count, settings_fetch, 0};
+static const struct ui_title_config widgets_title = {"Widgets", "12:34", ART_ICON16_SET};
+static const struct ui_hints_config widgets_hints = {0, 0};
+static const struct ui_list_config settings_list = {&settings_model, UI_ROW_PITCH_SETTINGS, UI_LIST_WRAP, 80, 4};
+static const struct ui_label_config look_label = {"Look", UI_FONT_BODY, UI_ALIGN_LEFT, 0, ART_ICON8_LOOK + 1};
+static const struct ui_label_config used_label = {"40 MB used", UI_FONT_BODY, UI_ALIGN_LEFT, 0, 0};
+static const struct ui_label_config free_label = {"24 MB free of 64", UI_FONT_BODY, UI_ALIGN_RIGHT, 0, 0};
+static const struct ui_card_config top_card = {4, 4, 4, 1, 0};
+static const struct ui_card_config low_card = {4, 4, 4, 1, 0};
+static const struct ui_scrollbar_config settings_bar = {W_LIST_TARGET};
+static const u32 nor_games[] = {16, 8, 16};  // MB
+
+enum {
+	W_TITLE,
+	W_HINTS,
+	W_TOP,
+	W_PATH,
+	W_USED,
+	W_FREE,
+	W_STORAGE,
+	W_LOOK,
+	W_LOW,
+	W_LIST,
+	W_BAR,
+	W_NODES
 };
 
-static int list_event(struct ui_view *v, const struct ui_event *e);
-static const struct ui_view_spec list_view = {"ui-demo", list_nodes, 8, 1, N_LIST, 0, list_event};
+static const struct ui_spec widget_nodes[] = {
+	[W_TITLE] = {UI_TITLE, 1, UI_NONE, 3, UI_HFILL, 0, 0, 0, 0, 0, 0, 24, &widgets_title},
+	[W_HINTS] = HINTS(&widgets_hints),
+	// The top card (y 16 to 72): path pills, then the storage bar's texts and bar
+	[W_TOP] = {UI_CARD, 3, UI_NONE, 2, UI_HFILL, 0, 0, 0, 0, 16, 0, 56, &top_card},
+	[W_PATH] = {UI_PATH, 4, UI_NONE, 2, UI_HFILL, 0, 0, UI_ROLE_PANEL, 8, 24, 8, 16, 0},
+	[W_USED] = {UI_LABEL, 5, UI_NONE, 2, UI_LEFT, 0, 0, UI_ROLE_PANEL, 8, 40, 112, 16, &used_label},
+	[W_FREE] = {UI_LABEL, 6, UI_NONE, 2, UI_RIGHT, 0, UI_ROLE_FAINT, UI_ROLE_PANEL, 8, 40, 112, 16, &free_label},
+	[W_STORAGE] = {UI_STORAGE, 7, UI_NONE, 2, UI_HFILL, 0, 0, UI_ROLE_PANEL, 8, 56, 8, 8, 0},
+	// A section label on the paper, its icon in the item's ink
+	[W_LOOK] = {UI_LABEL, 8, UI_NONE, 3, UI_HFILL, 0, UI_ROLE_ACCENT_INK, 0, 0, 72, 0, 16, &look_label},
+	// The lower card (y 88 to 144): 12 px rows
+	[W_LOW] = {UI_CARD, 9, UI_NONE, 2, UI_HFILL, 0, 0, 0, 0, 88, 0, 56, &low_card},
+	[W_LIST] = {UI_LIST, 10, UI_NONE, 1, UI_LEFT, UI_FOCUSABLE, 0, 0, LIST_X, 96, LIST_W, 40, &settings_list},
+	[W_BAR] = {UI_SCROLLBAR, 11, UI_NONE, 2, UI_LEFT, 0, 0, UI_ROLE_PANEL, LIST_X + LIST_W, 96, 8, 40,
+		   &settings_bar},
+};
+_Static_assert(W_LIST == W_LIST_TARGET, "the scroll bar's target");
+
+static const struct ui_view_spec widgets_view = {"ui-widgets", widget_nodes, W_NODES, 0, W_LIST, 0, screen_event};
+
+// --- Reading -------------------------------------------------------------------
+
+static const char controls_text[] =
+	"# Home\n"
+	"\xC2\xAB\xC2\xBB\tturn the carousel\n"
+	"A\topen the item\n"
+	"# Every page\n"
+	"B\tback to the carousel, facing the item you came from\n"
+	"L R\tpage up, page down\n"
+	"# Game lists\n"
+	"^v\tmove\n"
+	"\xC2\xAB\xC2\xBB\tjump by letter\n"
+	"START\tthe game's menu: play, favourite, clean boot, rename, delete\n"
+	"\n"
+	"Held keys keep going: a held UP or DOWN glides through the list, a held L or R pages "
+	"through it.\n"
+	"# In game\n"
+	"L R START\treset to the menu\n"
+	"L R SELECT\tsleep";
+#define READING_ROWS 48
+static u16 reading_start[READING_ROWS] EWRAM_BSS;
+static u8 reading_len[READING_ROWS] EWRAM_BSS;
+static u8 reading_kind[READING_ROWS] EWRAM_BSS;
+static struct ui_reading reading EWRAM_BSS;
+
+static const struct ui_title_config reading_title = {"Controls", "Info", ART_ICON16_INFO};
+static const struct ui_hint reading_hints[] = {{"^v", "scroll"}, {"SELECT", "more"}, {"B", "back"}};
+static const struct ui_hints_config reading_hints_config = {reading_hints, 3};
+static const struct ui_list_config reading_list = {&ui_reading_model, UI_ROW_PITCH_SETTINGS,
+						   UI_LIST_PLAIN | UI_LIST_SCROLL, 0, 4};
+static const struct ui_scrollbar_config reading_bar = {N_LIST_BAR_TARGET};
+
+static const struct ui_spec reading_nodes[] = {
+	[N_TITLE] = {UI_TITLE, 1, UI_NONE, 3, UI_HFILL, 0, 0, 0, 0, 0, 0, 24, &reading_title},
+	[N_HINTS] = HINTS(&reading_hints_config),
+	[N_CARD] = {UI_CARD, 3, UI_NONE, 2, UI_HFILL, 0, 0, 0, 0, 16, 0, 128, &page_card},
+	[N_LIST] = {UI_LIST, 4, UI_NONE, 1, UI_LEFT, UI_FOCUSABLE, 0, 0, LIST_X, 24, LIST_W, 112, &reading_list},
+	[N_BAR] = {UI_SCROLLBAR, 5, UI_NONE, 2, UI_LEFT, 0, 0, UI_ROLE_PANEL, LIST_X + LIST_W, 24, 8, 112,
+		   &reading_bar},
+};
+
+static const struct ui_view_spec reading_view = {"ui-reading", reading_nodes, N_LIST_NODES, 0, N_LIST, 0, screen_event};
 
 // --- The dialog ------------------------------------------------------------
 
-static const struct ui_label_config ask_label = {"Open this game?", UI_FONT_HEADING, UI_ALIGN_CENTER, 0};
-static const struct ui_label_config name_label = {"", UI_FONT_BODY, UI_ALIGN_CENTER, 0};
-static const struct ui_label_config yes_label = {"A open    B cancel", UI_FONT_BODY, UI_ALIGN_CENTER, 0};
+static const struct ui_label_config ask_label = {"Open this game?", UI_FONT_HEADING, UI_ALIGN_CENTER, 0, 0};
+static const struct ui_label_config name_label = {"", UI_FONT_BODY, UI_ALIGN_CENTER, 0, 0};
+static const struct ui_label_config yes_label = {"A open    B cancel", UI_FONT_BODY, UI_ALIGN_CENTER, 0, 0};
 static const struct ui_panel_config border_panel = {UI_PANEL_BORDER};
 
 static const struct ui_spec dialog_nodes[] = {
@@ -265,33 +330,44 @@ static const struct {
 	const struct ui_theme *theme;
 	u32 item;  // whose accent (enum pal_item)
 } looks[] = {
-	{&ui_theme_dark, UI_ITEM_DEFAULT},
-	{&ui_theme_light, UI_ITEM_DEFAULT},
+	{&ui_theme_dark, PAL_GBA},
+	{&ui_theme_light, PAL_GBA},
 	{&ui_theme_dark, PAL_RECENT},
 	{&ui_theme_light, PAL_GBC},
 };
 
-static int list_event(struct ui_view *v, const struct ui_event *e)
+static int screen_event(struct ui_view *v, const struct ui_event *e)
 {
 	switch (e->type) {
 	case UI_EV_CURSOR: {
 		static u32 last;
 		u32 jump = e->index > last ? e->index - last : last - e->index;
 		last = e->index;
+		if (demo.screen == SCREEN_WIDGETS) {
+			ui_hints_text((u8)(v->first + W_HINTS), settings[e->index].why);
+			return 1;
+		}
+		if (demo.screen != SCREEN_LIST)
+			return 1;
+		// A row (a tap, or a held key's glide), a screenful (L, R), or a
+		// jump too far to scroll (a wrap): a page change
 		if (jump > 9)
 			measure("ui-page-change", 12);
-		else
+		else if (jump > 1)
 			measure("ui-list-scroll", 16);
+		else
+			measure("ui-list-step", 16);
 		char *p = count_buf;
 		put_num(&p, e->index + 1);
-		put(&p, " / ");
+		put(&p, "/");
 		put_num(&p, ITEMS);
 		*p = 0;
-		ui_label_set((u8)(v->first + N_COUNT), count_buf);
-		ui_progress_set((u8)(v->first + N_PROGRESS), e->index + 1, ITEMS);
+		ui_list_page_label((u8)(v->first + N_LIST), (u8)(v->first + N_TITLE), count_buf);
 		return 1;
 	}
 	case UI_EV_ACTIVATE: {
+		if (demo.screen != SCREEN_LIST)
+			return 1;
 		struct ui_item item = {0};
 		demo_fetch(0, e->index, &item);
 		snprintf(dialog_buf, sizeof(dialog_buf), "%s", item.text);
@@ -307,6 +383,10 @@ static int list_event(struct ui_view *v, const struct ui_event *e)
 				ui_fade(FADE_BLACK, FADE_MAX, 6);
 				demo.fading = 1;
 			}
+			return 1;
+		}
+		if (e->keys & INPUT_SELECT) {
+			demo.next = (u8)((demo.screen + 1) % SCREENS);
 			return 1;
 		}
 		return 0;
@@ -328,6 +408,28 @@ static void theme_step(void)
 	tlog("ui-demo: theme %s, item %lu", ui_theme()->name, (unsigned long)ui_item());
 }
 
+// Shows screen s (the first, or after SELECT: the last goes out first)
+static void show(u32 s)
+{
+	static const struct ui_view_spec *const views[SCREENS] = {&list_view, &widgets_view, &reading_view};
+	if (ui_depth()) {
+		ui_leave(UI_TR_TAB, 1);
+		while (ui_depth())
+			ui_pop();
+	}
+	demo.screen = (u8)s;
+	struct ui_view *v = ui_push(views[s], s == SCREEN_READING ? &reading : 0);
+	if (!v) {
+		tlog_error("ui-demo: %s", ui_error());
+		return;
+	}
+	if (s == SCREEN_WIDGETS) {
+		ui_path_set((u8)(v->first + W_PATH), "SD/GBA/RPG");
+		ui_storage_set((u8)(v->first + W_STORAGE), nor_games, 3, 64);
+		ui_hints_text((u8)(v->first + W_HINTS), settings[0].why);
+	}
+}
+
 void ui_demo(void)
 {
 	REG_WAITCNT_CART = WAITCNT_MENU;  // as the menu runs
@@ -335,12 +437,15 @@ void ui_demo(void)
 	cartlog_install();
 	engine_init();
 	ui_init(&ui_theme_dark);
-	ui_item_set(UI_ITEM_DEFAULT);
+	ui_item_set(PAL_GBA);
 	memset(&demo, 0, sizeof(demo));
-	make_icons();
+	demo.next = SCREEN_NONE;
 	ui_dim_set_frames(20 * 60);
-	if (!ui_push(&list_view, 0))
-		tlog_error("ui-demo: %s", ui_error());
+	// The reading view's text, wrapped once for its list
+	reading = (struct ui_reading){controls_text, reading_start, reading_len, reading_kind, READING_ROWS, 0};
+	if (!ui_reading_wrap(&reading, ui_theme()->body, LIST_W - 2 * 4, ui_theme()->look.reading_key_w))
+		tlog_error("ui-demo: the reading text has more than %d rows", READING_ROWS);
+	show(SCREEN_LIST);
 	for (;;) {
 		if (demo.measure_left) {
 			frame_measure(demo.measure);
@@ -350,6 +455,11 @@ void ui_demo(void)
 			frame_measure("ui-fade");
 		ui_frame();
 		theme_step();
+		if (demo.next != SCREEN_NONE && ui_depth() == 1) {
+			u32 next = demo.next;
+			demo.next = SCREEN_NONE;
+			show(next);
+		}
 	}
 }
 #endif

@@ -87,8 +87,8 @@ static u32 row_count EWRAM_BSS;
 static u32 row_hash[SETTINGS_ROWS_MAX] EWRAM_BSS;
 static char row_value[64] EWRAM_BSS;
 
-const struct ui_label_config settings_title_config = {"", UI_FONT_HEADING, UI_ALIGN_LEFT, 0};
-const struct ui_label_config settings_corner_config = {"", UI_FONT_BODY, UI_ALIGN_RIGHT, 0};
+const struct ui_label_config settings_title_config = {"", UI_FONT_HEADING, UI_ALIGN_LEFT, 0, 0};
+const struct ui_label_config settings_corner_config = {"", UI_FONT_BODY, UI_ALIGN_RIGHT, 0, 0};
 
 static const struct settings_page *const pages[] = {&settings_page1, &settings_page2, &settings_help};
 
@@ -733,7 +733,7 @@ static void page1_poll(void)
 		settings_sync();
 }
 
-static const struct ui_list_config page1_list = {&settings_model, SETTINGS_ROW_H, 0, 240 - 2 * 6 - SETTINGS_NAME_W};
+static const struct ui_list_config page1_list = {&settings_model, SETTINGS_ROW_H, 0, 240 - 2 * 6 - SETTINGS_NAME_W, 0};
 
 static const struct ui_spec page1_nodes[] = {
 	SETTINGS_HEADER,

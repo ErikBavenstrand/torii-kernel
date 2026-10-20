@@ -123,6 +123,11 @@ void gfx_affine_set(u32 matrix, s16 pa, s16 pb, s16 pc, s16 pd);
 // not be a stack buffer or anything changed before then.
 int gfx_queue_copy(void *dst, const void *src, u32 bytes);
 int gfx_queue_fill(void *dst, u32 value, u32 bytes);
+// Queues count runs of run bytes (words, at most GFX_CHUNK), the nth from
+// src + n * src_stride to dst + n * dst_stride: one entry for a list row's
+// columns, which lie apart in VRAM. 0 if the queue is full or the arguments
+// are bad (logged).
+int gfx_queue_copy2d(void *dst, u32 dst_stride, const void *src, u32 src_stride, u32 run, u32 count);
 u32 gfx_queue_len(void);
 // Tickets: each queued copy or fill counts one, and they finish in order.
 // gfx_queue_ticket() is the latest one's; gfx_queue_done(t) is 1 once that
@@ -154,7 +159,12 @@ void gfx_queue_clear(void);
 // OAM, then the queue. It needs the kernel's ROM mapped (as all menu code).
 void gfx_commit(void);
 // Runs queued work until done, byte_cap bytes, or VCOUNT outside
-// [160, last_line); returns the bytes moved. In IWRAM: the commit's hot loop.
+// [160, last_line); returns the bytes moved. In IWRAM: the commit's hot
+// loop. It stops at a strided copy (gfx_queue_copy2d), which
+// gfx_commit_vram runs from ROM.
 u32 IWRAM_CODE gfx_commit_queue(u32 byte_cap, u32 last_line);
+// The whole queue as gfx_commit_queue runs it, strided copies included (a
+// run at a time, whole runs only).
+u32 gfx_commit_vram(u32 byte_cap, u32 last_line);
 
 #endif

@@ -23,10 +23,13 @@ struct sim {
 	int braking;
 };
 
+// The row pitch the simulations use (16 but where a test sets it)
+static u32 s_rh = 16;
+
 static void sim_init(struct sim *s, u32 h, u32 rows, u32 cursor, u16 key, s32 delta)
 {
 	const char *why;
-	CHECK(ring_setup(&s->r, h, 16, &why));
+	CHECK(ring_setup(&s->r, h, s_rh, 0, &why));
 	input_init(&s->in, NULL);
 	if (key & (INPUT_LEFT | INPUT_RIGHT))
 		input_page_keys(&s->in, INPUT_LEFT | INPUT_RIGHT);
@@ -99,21 +102,24 @@ static void sim_frame(struct sim *s, int held)
 
 static int on_screen(const struct sim *s)
 {
-	s32 top = (s32)(s->cursor * 16) - s->shown;
-	return top >= 0 && top + 16 <= (s32)s->r.h;
+	s32 rh = s->r.rh, top = (s32)s->cursor * rh - s->shown;
+	return top >= 0 && top + rh <= (s32)s->r.h;
 }
 
-// DOWN held 3 s in 302 rows: once the cursor reaches the screen's bottom
-// row of context the list scrolls with it, its speed rising smoothly to 40
-// rows a second, the cursor always on screen; let go, it brakes within two
-// rows to a whole row and stops, never backing up
-void test_ui_glide_held(void)
+// DOWN held 3 s in 302 rows of rh px in a viewport h px tall: once the
+// cursor reaches the screen's bottom row of context the list scrolls with
+// it, its speed rising smoothly to 30 rows a second (top px a frame), the
+// cursor always on screen; let go, it brakes within two rows to a whole row
+// and stops, never backing up. slack: px the speed may pass top by for a
+// frame (12 px rows: the glide catches up with the cursor's row of context)
+static void glide_held(u32 rh, u32 h, s32 top, s32 slack)
 {
 	static const u16 keys[] = {INPUT_DOWN, INPUT_UP};
+	s_rh = rh;
 	for (u32 k = 0; k < 2; k++) {
 		struct sim s;
 		s32 dir = k ? -1 : 1;
-		sim_init(&s, 144, 302, k ? 301 : 0, keys[k], dir);
+		sim_init(&s, h, 302, k ? 301 : 0, keys[k], dir);
 		s32 last_v = 0, top_v = 0, prev = s.shown;
 		u32 moving = 0;
 		for (u32 f = 0; f < 180; f++) {
@@ -130,14 +136,13 @@ void test_ui_glide_held(void)
 			// At the top of the ramp every frame moves the same whole
 			// number of px: uneven steps read as judder
 			if (f >= 100)
-				CHECK_EQ(v, 8);
+				CHECK_EQ(v, top);
 			last_v = v;
 			prev = s.shown;
 		}
 		CHECK(moving > 120);
-		// 30 rows a second at the top of the ramp: 8 px a frame
-		CHECK_EQ(top_v, 8);
-		CHECK_EQ(last_v, 8);
+		CHECK(top_v >= top && top_v <= top + slack);
+		CHECK_EQ(last_v, top);
 		CHECK_EQ(s.far, 0u);
 		// Let go
 		s32 at = s.shown;
@@ -145,16 +150,31 @@ void test_ui_glide_held(void)
 			sim_frame(&s, 0);
 			s32 v = (s.shown - prev) * dir;
 			CHECK(v >= 0);
-			CHECK(v <= last_v + 1);  // only slows down (but for a pixel's rounding)
+			CHECK(v <= last_v + 1 + slack);  // only slows down (but for a pixel's rounding)
 			CHECK(on_screen(&s));
 			last_v = v;
 			prev = s.shown;
 		}
 		CHECK_EQ(last_v, 0);
-		CHECK((s.shown - at) * dir <= 2 * 16);  // stops within two rows
-		CHECK_EQ(s.shown % 16, 0);  // a whole row (144 is 9 rows)
+		CHECK((s.shown - at) * dir <= 2 * (s32)rh);  // stops within two rows
+		CHECK_EQ(s.shown % (s32)rh, 0);  // a whole row (the viewport is whole rows)
 		CHECK(!motion_running(s.m));
 	}
+	s_rh = 16;
+}
+
+// 16 px rows in 144 px (9 rows): 8 px a frame at the top of the ramp
+void test_ui_glide_held(void)
+{
+	glide_held(16, 144, 8, 0);
+}
+
+// The v0.4 lists: 14 px rows in 112 px (8 rows), 7 px a frame; and
+// Settings' 12 px rows in 144 px (12 rows), 6 px a frame
+void test_ui_glide_held_pitches(void)
+{
+	glide_held(14, 112, 7, 0);
+	glide_held(12, 144, 6, 1);
 }
 
 // The key still held but the cursor no longer moving (a view above took

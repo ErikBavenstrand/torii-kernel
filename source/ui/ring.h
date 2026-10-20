@@ -1,29 +1,38 @@
 // The maths of a list's ring of rows (ui/ui_list.c), hardware-free so
 // tests/host runs it.
 //
-// A list shows rows of rh pixels (16 or 32) in a viewport h pixels
-// tall, on a BG of its own whose 32x32 map wraps every 256 pixels. Content
-// row r lives in map rows (r % ring_rows) * rh / 8 onwards, so the BG's
-// vertical scroll is just the content scroll minus the viewport's top, mod
-// 256. Only k rows have tiles (slots): row r draws into slot r % k. Rows
-// enter one ahead of the scroll, off-screen; a slot is only reused by a row
-// k rows away, which isn't on screen.
+// A list shows rows of rh pixels (8 to 32) in a viewport h pixels tall, on
+// a BG of its own. Only k rows have tiles: their slots lie back to back in
+// one column-major canvas of tiles, slot s on canvas lines [s * rh, s * rh +
+// rh), and content row r draws into slot r % k. The canvas is period = k *
+// rh lines tall, a whole number of tile rows (k is rounded up for that), so
+// content line y is canvas line y % period, and a row never straddles the
+// canvas's end. The list's map never changes: map row m shows canvas tile
+// row m % (period / 8), and the BG's vertical scroll puts content line
+// scroll at the viewport's top (ring_vofs). Rows at any pitch thus scroll
+// by the BG scroll alone; rows share tiles, never a pixel row (a word).
 //
-// The shown scroll moves at most step rows a frame (ring_step; step is
-// 32 / rh, so 32 px a frame at either row height). Before a frame's commit
-// at most visible rows are on screen (visible: the most rows partly on
-// screen at once); after it, the rows resident at the new scroll reach at
-// most step rows past them, plus one ahead. So at most visible + step + 1
-// distinct rows are on screen or being drawn, and with k = visible + 1 +
-// step slots (and as many ring rows) no row is drawn into a slot or map row
-// on screen. A jump further than ring_far allows is a page change, drawn
-// while the list is hidden.
+// Rows enter one ahead of the scroll, off-screen; a slot is only reused by a
+// row k rows away, which isn't on screen. The shown scroll moves at most
+// step rows a frame (ring_step; step is 32 / rh, so 24-32 px a frame).
+// Before a frame's commit at most visible rows are on screen (visible: the
+// most rows partly on screen at once); after it, the rows resident at the
+// new scroll reach at most step rows past them, plus one ahead. So at most
+// visible + step + 1 distinct rows are on screen or being drawn, and with k
+// >= visible + 1 + step slots no row is drawn into a slot on screen. A jump
+// further than ring_far allows is a page change, drawn while the list is
+// hidden.
 #ifndef TORII_UI_RING_H
 #define TORII_UI_RING_H
 
 #include <gba_base.h>
 
-#define UI_RING_MAX_SLOTS 16  // slots one list may have (a u32 dirty mask, the ring's rows)
+#define UI_RING_MAX_SLOTS 20  // slots one list may have (u32 slot masks; 12 px rows in 160 px need 18)
+#define UI_RING_MIN_ROW 8     // row heights a list takes, px
+#define UI_RING_MAX_ROW 32
+// The map a list's plane gets: 32 x 64 tiles, so the lines a viewport shows
+// (ring_vofs) never pass its 512 px wrap
+#define UI_RING_MAP_LINES 512
 #define UI_ITEM_NONE 0xFFFF   // a slot showing no row
 #define UI_LIST_MAX 0xFFFF    // rows (and items) a list may have
 // The scroll spring is kept within this many pixels of its base (motion
@@ -32,26 +41,47 @@
 
 struct ui_ring {
 	u16 h;          // viewport height, px
-	u8 rh;          // row height, px: 16 or 32
+	u16 period;     // canvas lines: k * rh, a multiple of 8
+	u8 rh;          // row height, px
 	u8 visible;     // the most rows partly on screen at once: (h - 1) / rh + 2
-	u8 k;           // slots: visible + 1 + step
-	u8 ring_rows;   // rows the 256 px map holds: 256 / rh
+	u8 k;           // slots: visible + 1 + step, rounded up so period is whole tiles
 	u8 step;        // rows the shown scroll may move a frame: 32 / rh
 };
 
 // Sets r up; 0 and a sentence in *why if the geometry can't work (a row
-// height other than 16 or 32, or a viewport too tall for the ring).
-int ring_setup(struct ui_ring *r, u32 h, u32 rh, const char **why);
+// height outside 8-32, or a viewport too tall for the ring). fixed: a list
+// that never scrolls (UI_LIST_FIXED) gets a slot per row the viewport shows.
+int ring_setup(struct ui_ring *r, u32 h, u32 rh, int fixed, const char **why);
 
 static inline u32 ring_slot(const struct ui_ring *r, u32 row)
 {
 	return r->k ? row % r->k : 0;
 }
 
-// The first map row (in tiles) of content row row.
-static inline u32 ring_map_row(const struct ui_ring *r, u32 row)
+// The canvas line a slot starts on.
+static inline u32 ring_slot_line(const struct ui_ring *r, u32 slot)
 {
-	return (row % r->ring_rows) * (r->rh / 8u);
+	return slot * r->rh;
+}
+
+// The BG's vertical scroll that puts content line scroll at screen line top
+// (the viewport's top): the visible lines then lie in [scroll % period,
+// scroll % period + h), inside the map (ring_setup keeps period + h within
+// UI_RING_MAP_LINES).
+static inline u32 ring_vofs(const struct ui_ring *r, s32 scroll, s32 top)
+{
+	s32 p = (s32)r->period, line = scroll % p;
+	if (line < 0)
+		line += p;
+	return (u32)(line - top) & (UI_RING_MAP_LINES - 1);
+}
+
+// 1 if canvas lines [line, line + n) show in a viewport whose top shows
+// canvas line top (the lines it shows wrap at the period).
+static inline int ring_lines_show(const struct ui_ring *r, u32 top, u32 line, u32 n)
+{
+	u32 p = r->period, d = (line + p - top % p) % p;
+	return d < r->h || d + n > p;
 }
 
 // The largest scroll: the last row's bottom at the viewport's bottom.
@@ -66,7 +96,7 @@ void ring_resident(const struct ui_ring *r, s32 scroll, int dir, u32 rows, u32 *
 // (fewer if the viewport is small), moving scroll as little as possible.
 s32 ring_scroll_for(const struct ui_ring *r, u32 row, s32 scroll, u32 rows, u32 margin);
 
-// One frame towards want from shown, at most step rows (32 px).
+// One frame towards want from shown, at most step rows (24-32 px).
 s32 ring_step(const struct ui_ring *r, s32 shown, s32 want);
 
 // 1 if moving the shown scroll from shown to target needs a page change:

@@ -60,7 +60,10 @@ enum {
 };
 
 #define TAG_PALETTE 0x5500
+#define TAG_OBJ_PALETTE 0x5501
 #define TAG_SHARED 0x5510  // + character block
+#define BGCNT_32X64 0x8000  // a list's map (UI_RING_MAP_LINES)
+#define PRIO_NONE 0xFF      // a view whose sprites don't show
 #define STAGE_WORDS 512    // the staging area: one 2 KB screenblock
 #define STAGE_SPANS 8      // map row spans staged until the queue empties
 
@@ -81,10 +84,18 @@ static struct {
 	u16 stage_used;    // words given out since the queue was last empty
 	u8 stage_map;      // its res handle
 	u8 palette;        // res handle of the theme's banks (UI_BANKS)
+	u8 obj_palette;    // and of the sprites' bank (bank 0's roles)
 	u8 shared[3];      // shared tiles of each character block planes use
 	u16 shared_first[3];
 	struct stage_span spans[STAGE_SPANS];
 	u8 span_count;
+	// Priorities this frame (obj_levels): each view's planes from level[d]
+	// on, its front planes there and the rest (and its sprites, unless
+	// obj_prio[d] is PRIO_NONE) a level down
+	u8 level[UI_VIEW_CAP];
+	u8 obj_prio[UI_VIEW_CAP];
+	u8 obj_lower;      // sprites of views under the topmost animated one show: its blends take them
+	u8 obj_top;        // that view (or one over it) shows sprites
 	u8 hidden;         // planes hidden for a page change
 	u8 hide_pending;   // hidden, but no DISPCNT without them written yet
 	u32 hide_frame[UI_PLANES];  // the frame whose regs hid them
@@ -222,7 +233,11 @@ u16 ui_shared_entry(u32 plane, u32 tile)
 u8 ui_tiles(u8 node, u32 count, u16 tag, u16 *first)
 {
 	u32 cb = ui_plane_cb(ui_node_spec(node)->plane);
-	u8 h = res_bg_tiles((u16)count, 0, (u8)cb, tag);
+	// Block 2's (plane 3's) from the top of its reach, as its shared tiles
+	// are: from the bottom, they would split the long run block 1's list
+	// takes from [512, 1536)
+	u16 lo = (u16)(cb * 512);
+	u8 h = res_alloc(RES_BG_VRAM, (u16)count, 1, lo, (u16)(lo + 1024), tag, cb == 2 ? POOL_TOP : 0);
 	*first = h == RES_NONE ? 0 : res_bg_tile_index(h, 0, (u8)cb);
 	return h;
 }
@@ -433,13 +448,14 @@ static void fade_set(void *ctx, s32 value)
 	gfx_pal_use_faded(1);
 }
 
-// Loads the first banks of the UI's (an item switch changes only banks 0
-// and 1; a theme switch all of them)
+// Loads the first banks of the UI's (an item switch changes only bank 0;
+// a theme switch all of them), and the sprites' bank
 static void load_palette(u32 banks)
 {
 	u16 pal[UI_BANKS * 16];
 	ui_theme_banks(ui_theme(), ui_item(), pal);
 	gfx_pal_load(UI_THEME_RUN_FIRST / 16, pal, banks * 16);
+	gfx_pal_load(16 + ui_obj_bank(), pal, 16);  // the sprites': bank 0's roles
 	if (gfx_pal_faded_on)
 		fade_set(0, motion_value(ui.fade));
 }
@@ -456,7 +472,7 @@ void ui_theme_set(const struct ui_theme *theme)
 void ui_item_set(u32 item)
 {
 	ui_item_select(item);
-	load_palette(UI_BANK_SELECTED + 1);
+	load_palette(UI_BANK_NORMAL + 1);
 	ui_wake();
 }
 
@@ -857,6 +873,11 @@ static s32 view_dx(const struct ui_view *v)
 	return animated(v) ? 0 : ui.tr_dx;
 }
 
+s32 ui_view_dx(const struct ui_view *v)
+{
+	return view_dx(v);
+}
+
 // Another blend takes over from a page's fade: a fade-in just shows; a
 // fade-out's plane goes in these regs (DISPCNT is written already), so the
 // old page doesn't come back at full for a frame before the list hides it
@@ -888,16 +909,19 @@ static void regs_update(void)
 	// A screen that has gone shows nothing (the backdrop)
 	int gone = tr && ui.tr_level >= UI_OPEN;
 	ui.gap_regs = (u8)gone;
+	if (gone)
+		dispcnt &= (u16)~DISP_OBJ;  // the screen's sprites go with it
 	u16 mosaic = (u16)(tr && (ui.tr_effects & UI_TR_MOSAIC) ? BGCNT_MOSAIC : 0);
 	for (u32 p = 0; p < UI_PLANES; p++) {
 		u32 d;
 		struct ui_view *v = plane_owner(p, &d);
 		if (!v)
 			continue;
-		u32 prio = top - 1 - d;
+		u32 prio = ui.level[d] + (ui.obj_prio[d] != PRIO_NONE && !(v->front >> p & 1));
 		if (prio > 3)
 			prio = 3;
-		gfx_set_bgcnt(p, (u16)(prio | ui_plane_cb(p) << 2 | (u32)res_bg_screenblock(v->maps[p]) << 8 | mosaic));
+		gfx_set_bgcnt(p, (u16)(prio | ui_plane_cb(p) << 2 | (u32)res_bg_screenblock(v->maps[p]) << 8 | mosaic |
+				       (v->tall >> p & 1 ? BGCNT_32X64 : 0)));
 		if (!((ui.hidden | ui.lists_hidden) >> p & 1) && !gone)
 			dispcnt |= (u16)DISP_BG(p);
 		shown |= LAYER_BG(p);
@@ -906,6 +930,13 @@ static void regs_update(void)
 		else if (modal)
 			top_planes |= LAYER_BG(p);
 	}
+	// Sprites blend with the planes of their views: those under the
+	// animated view darken with them, unless it shows sprites itself
+	// (obj_levels hides theirs then), which then fade in with it
+	if (modal && ui.obj_lower)
+		lower |= LAYER_OBJ;
+	else if (modal && ui.obj_top)
+		top_planes |= LAYER_OBJ;
 	// Static planes follow their view's slide; lists set their own scroll
 	// (with the view's offset), and are moved sideways here
 	u32 scrollers = 0, list_planes = 0, win_plane[UI_SCROLLERS] = {0, 0};
@@ -1035,6 +1066,78 @@ static void regs_update(void)
 	}
 }
 
+// --- Sprites -------------------------------------------------------------------
+
+u32 ui_obj_bank(void)
+{
+	return res_start(RES_OBJ_PAL, ui.obj_palette);
+}
+
+void ui_view_uses_objs(struct ui_view *v, u32 front)
+{
+	v->flags |= UI_V_OBJS;
+	v->front |= (u8)(1u << front | 1u);
+}
+
+int ui_plane_blending(u32 plane)
+{
+	return ui.reveal != REVEAL_OFF && ui.reveal_plane == plane;
+}
+
+// 1 if the topmost animated view (at da) blends over the views under it
+// now: fading in, or dimming them
+static int lower_blended(const struct ui_view *tv)
+{
+	return tv && ((tv->open_blend < UI_OPEN && tv->open_blend <= OPEN_FADE) || modal_dim_now() > 0);
+}
+
+// This frame's priorities, before the update adds the sprites: from the top
+// view down, each takes a level for its planes, and one more for its
+// sprites and the planes behind them; none show past level 3. Sprites hide
+// where a blend can't take them: those of views under the animated one
+// while it blends over them with sprites of its own (both would take its
+// blend), the animated view's own while it fades in or out (a sprite on
+// its card has no second target under it, so it would show unfaded), and
+// every view's past the middle of a screen's alpha fade (the same)
+static void obj_levels(void)
+{
+	u32 da = 0;
+	const struct ui_view *tv = anim_view(&da);
+	ui.obj_top = 0;
+	for (u32 d = da; tv && d < ui_depth(); d++)
+		ui.obj_top |= (ui_view_at(d)->flags & UI_V_OBJS) != 0;
+	// Not before it shows: until then the views under it show as they were
+	int shown = tv && (tv->flags & UI_V_SHOWN);
+	int blended = shown && lower_blended(tv);
+	int fading = shown && tv->open_blend < UI_OPEN && tv->open_blend <= OPEN_FADE;
+	int gone = ui.tr_phase != TR_IDLE && ui.tr_mode == TR_ALPHA && ui.tr_level * 2 > UI_OPEN;
+	u32 level = 0;
+	ui.obj_lower = 0;
+	for (u32 d = ui_depth(); d-- > 0;) {
+		const struct ui_view *v = ui_view_at(d);
+		int objs = (v->flags & UI_V_OBJS) && !gone && !(tv && d < da && blended && ui.obj_top) &&
+			   !(tv && d >= da && fading);
+		ui.level[d] = (u8)(level < 3 ? level : 3);
+		if (objs && level + 1 <= 3) {
+			ui.obj_prio[d] = (u8)(level + 1);
+			level += 2;
+			if (tv && d < da)
+				ui.obj_lower = 1;
+		} else {
+			ui.obj_prio[d] = PRIO_NONE;
+			level++;
+		}
+	}
+}
+
+int ui_obj_add(u8 node, u16 attr0, u16 attr1, u16 attr2)
+{
+	u32 d = ui_node(node)->view, prio = d < UI_VIEW_CAP ? ui.obj_prio[d] : PRIO_NONE;
+	if (prio == PRIO_NONE)
+		return 0;
+	return gfx_oam_add(attr0, attr1, (u16)((attr2 & ~0x0C00u) | prio << 10)) != GFX_OAM_NONE;
+}
+
 // --- The stack ----------------------------------------------------------------
 
 const struct ui_theme *ui_theme_setting(void)
@@ -1053,6 +1156,8 @@ void ui_init(const struct ui_theme *theme)
 	input_poll(&ui.in, 1);
 	ui.palette = res_palette(RES_BG_PAL, UI_BANKS, TAG_PALETTE);
 	TLOG_ASSERT(ui.palette != RES_NONE && res_start(RES_BG_PAL, ui.palette) == 0);
+	ui.obj_palette = res_palette(RES_OBJ_PAL, 1, TAG_OBJ_PALETTE);
+	TLOG_ASSERT(ui.obj_palette != RES_NONE);
 	for (u32 cb = 0; cb < 3; cb++) {
 		// Blocks 0's and 1's at their bottom, block 2's at the top of its
 		// reach, so they don't split the long runs lists need: block 1's
@@ -1096,7 +1201,11 @@ void ui_shutdown(void)
 	for (u32 cb = 0; cb < 3; cb++)
 		res_release(RES_BG_VRAM, ui.shared[cb]);
 	res_release(RES_BG_PAL, ui.palette);
+	res_release(RES_OBJ_PAL, ui.obj_palette);
 	gfx_set_blend(0, 0, 0);
+	// No sprite of the UI's stays up
+	gfx_oam_begin();
+	gfx_oam_end();
 }
 
 u32 ui_push_fail_test EWRAM_BSS;
@@ -1189,7 +1298,8 @@ static void draw_all(void)
 						continue;
 					u32 blank = ui_shared_entry(p, UI_TILE_BLANK);
 					blank |= blank << 16;
-					CpuFastSet(&blank, res_bg_addr(v->maps[p]), 512 | 1 << 24);
+					CpuFastSet(&blank, res_bg_addr(v->maps[p]),
+						   (v->tall >> p & 1 ? 1024u : 512u) | 1 << 24);
 				}
 				v->flags |= UI_V_CLEARED;
 			}
@@ -1308,7 +1418,10 @@ u32 ui_frame(void)
 	// Their frames are measured, in mGBA only (the tests' figures)
 	if ((ui.tr_phase != TR_IDLE || (ui_top() && ui_top()->opening)) && tlog_in_emulator())
 		frame_measure(ui.tr_phase != TR_IDLE ? "ui-transition" : "ui-dialog-motion");
+	obj_levels();
+	gfx_oam_begin();
 	update_all(dt);
+	gfx_oam_end();
 	ui_apply_pops();  // asked for by handlers of events in the update (autoscroll)
 	frame_split();  // motion and update
 	// A view still to be shown (one pushed after a pop waits a frame) wakes

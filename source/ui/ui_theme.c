@@ -3,6 +3,7 @@
 // that more than one screen shares is here, from docs/design/v0.4/spec.md;
 // the colours are docs/design/v0.4/palette.json (ui/palette.c).
 #include "ui.h"
+#include "ui_priv.h"
 
 // Screen transitions, the same in both
 #define TRANSITIONS \
@@ -21,7 +22,10 @@
 		.title_icon_x = 5, \
 		.title_icon_y = 1, \
 		.title_text_x = 25, \
+		.title_text_y = 1, \
 		.title_right = 235, \
+		.title_right_y = 2, \
+		.title_right_w = 64, \
 		.content_top = 20, \
 		.content_bottom = 143, \
 		.list_rows = 8, \
@@ -29,14 +33,21 @@
 		.settings_pitch = 12, \
 		.pill_h = 12, \
 		.pill_radius = 3, \
+		.pill_out_l = 1, \
+		.pill_out_r = 1, \
 		.card_radius = 4, \
 		.button_radius = 7, \
 		.edge = 1, \
 		.shadow_offset = 1, \
 		.scrollbar_w = 3, \
+		.scrollbar_x = 5, \
+		.section_icon_gap = 3, \
+		.path_gap = 3, \
+		.storage_h = 5, \
+		.reading_key_w = 44, \
 		.hint_y = 147, \
 		.hint_chip_h = 10, \
-		.hint_chip_radius = 5, \
+		.hint_chip_radius = 3, \
 		.hint_chip_pad = 3, \
 		.hint_label_gap = 2, \
 		.hint_gap = 8, \
@@ -59,6 +70,7 @@
 		.popup_slide = 8, \
 		.theme_wipe = {16, EASE_SMOOTHSTEP}, \
 		.wipe_edge = 4, \
+		.pill_spring = SPRING_FAST, \
 	}
 
 // What the v0.3 widgets and the rest share
@@ -117,6 +129,19 @@ u32 ui_item(void)
 	return current.item_chosen ? current.item : UI_ITEM_DEFAULT;
 }
 
+u32 ui_round_inset(u32 radius, u32 e)
+{
+	// The pixels a circle of the radius covers, centred on the corner's
+	// grid point, a little fuller than the true circle (r^2 + r - 1), as
+	// the mockups round: 2,1,0 at r3, 3,1,1,0 at r4, 3,2,1,0,0 at r5
+	if (e >= radius)
+		return 0;
+	u32 dy = radius - e, limit = radius * radius + radius - 1, x = 0;
+	while (x < radius && (radius - x) * (radius - x) + dy * dy > limit)
+		x++;
+	return x;
+}
+
 u16 ui_colour_mix(u16 a, u16 b, u32 amount)
 {
 	if (amount > 256)
@@ -135,7 +160,7 @@ void ui_theme_banks(const struct ui_theme *theme, u32 item, u16 out[UI_BANKS * 1
 	const struct pal_accent *a = &theme->accent[item < PAL_ITEMS ? item : UI_ITEM_DEFAULT];
 	const struct pal_accent *danger = &theme->accent[PAL_DANGER];
 	const struct pal_accent *nor = &theme->accent[PAL_NOR];
-	u16 *normal = out, *selected = out + 16, *consoles = out + 32, *alert = out + 48;
+	u16 *normal = out, *consoles = out + 16, *alert = out + 32;
 
 	// The neutrals, in every bank; index 0 (transparent) shows as the backdrop
 	normal[UI_ROLE_NONE] = s->bg;
@@ -158,12 +183,7 @@ void ui_theme_banks(const struct ui_theme *theme, u32 item, u16 out[UI_BANKS * 1
 
 	// Indices a bank doesn't use stay black: nothing draws with them
 	for (u32 i = 0; i < 16; i++)
-		selected[i] = consoles[i] = alert[i] = i <= UI_ROLE_FAINT ? normal[i] : 0;
-	for (u32 i = UI_ROLE_ACCENT; i < 16; i++)
-		selected[i] = normal[i];
-	// The pill: a row's paper, swapped into this bank, is the tint; its text
-	// stays the neutral ink
-	selected[UI_ROLE_BG] = selected[UI_ROLE_PANEL] = a->tint;
+		consoles[i] = alert[i] = i <= UI_ROLE_FAINT ? normal[i] : 0;
 
 	consoles[UI_ROLE_INK_GBA] = theme->accent[PAL_GBA].ink;
 	consoles[UI_ROLE_INK_GBC] = theme->accent[PAL_GBC].ink;

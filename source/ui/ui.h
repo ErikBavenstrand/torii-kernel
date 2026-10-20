@@ -58,7 +58,7 @@
 
 #define UI_NODE_CAP 48       // nodes across every view on the stack
 #define UI_VIEW_CAP 4        // views on the stack
-#define UI_ARENA_BYTES 1024  // widget state across every view on the stack
+#define UI_ARENA_BYTES 1536  // widget state across every view on the stack (a list's is about 256)
 #define UI_SCROLLERS 2      // lists resident at once (hardware windows)
 #define UI_PLANES 4
 #define UI_NONE 0xFF
@@ -66,7 +66,7 @@
 // --- Palette roles -----------------------------------------------------------
 // Widgets draw with palette indices, never colours: a theme maps each index
 // (a role) to a colour, so retheming is a palette change and nothing is
-// redrawn. The UI owns BG banks 0-3 (UI_BANKS). Every bank holds the
+// redrawn. The UI owns BG banks 0-2 (UI_BANKS). Every bank holds the
 // theme's neutral surfaces (palette.json's names in brackets) at indices
 // 1-8, so paper and text look the same in any bank; 9-15 are the bank's own.
 enum ui_role {
@@ -79,20 +79,20 @@ enum ui_role {
 	UI_ROLE_TEXT,      // [ink]
 	UI_ROLE_DIM,       // secondary text: sizes, values [ink2]
 	UI_ROLE_FAINT,     // hint labels, disabled text [ink3]
-	// Banks 0 and 1: the current item's accent (ui_item_set), and more
+	// Bank 0: the current item's accent (ui_item_set), and more
 	UI_ROLE_ACCENT,       // 16x16 icons, scroll bar thumb, bars, solid buttons [base]
-	UI_ROLE_TINT,         // the selection pill [tint]
+	UI_ROLE_TINT,         // the selection pill, the current path pill [tint]
 	UI_ROLE_ACCENT_INK,   // 8x8 icons, section labels, stars, marks [ink]; never base
 	UI_ROLE_ACCENT_TEXT,  // text on an ACCENT fill [on]
 	UI_ROLE_GROUND,       // the carousel backdrop: bg with backdrop_mix of base
 	UI_ROLE_DANGER,       // Delete, Format, failures: the danger item's ink
 	UI_ROLE_FLOAT,        // popups and confirmations: card with float_mix of ink
-	// Bank 2: the console inks, for the marks of Recent's and Favourites' rows
+	// Bank 1: the console inks, for the marks of Recent's and Favourites' rows
 	UI_ROLE_INK_GBA = UI_ROLE_ACCENT,
 	UI_ROLE_INK_GBC,
 	UI_ROLE_INK_GB,
 	UI_ROLE_INK_NES,
-	// Bank 3: danger and the NOR storage bar
+	// Bank 2: danger and the NOR storage bar
 	UI_ROLE_ALERT_INK = UI_ROLE_ACCENT,  // the danger item's ink
 	UI_ROLE_ALERT_TINT,                  // and its tint
 	UI_ROLE_NOR_FILL,                    // used space, one shade a game: NOR's base,
@@ -102,18 +102,17 @@ enum ui_role {
 };
 enum ui_bank {
 	UI_BANK_NORMAL,    // neutrals and the current item
-	UI_BANK_SELECTED,  // the same, with BG and PANEL the item's tint: a
-			   // row swapped into it shows the selection pill
 	UI_BANK_CONSOLES,  // neutrals and the console inks
 	UI_BANK_ALERT,     // neutrals, danger and the NOR bar
 	UI_BANKS,
 };
 // The colours a theme switch changes in BG palette RAM: one contiguous run,
 // so the theme wipe (B19, research override R7) can swap it in one HBlank
-// DMA (32 words). The UI's banks are always banks 0-3 (ui_init), nothing in
+// DMA (24 words). The UI's banks are always banks 0-2 (ui_init), nothing in
 // them is the same in both themes worth leaving out, and nothing outside them
-// depends on the theme. OBJ colours that follow the theme (the carousel's fog)
-// go in a contiguous run of OBJ banks of their own (B12).
+// depends on the theme. OBJ colours that follow the theme go in OBJ banks:
+// the UI's sprite bank (ui_obj_bank, a copy of bank 0: the list's pill) and
+// the carousel's fog (B12).
 #define UI_THEME_RUN_FIRST 0
 #define UI_THEME_RUN_COLOURS (UI_BANKS * 16)
 
@@ -158,7 +157,10 @@ struct ui_look {
 	u8 title_icon_x;    // its 16x16 icon
 	u8 title_icon_y;
 	u8 title_text_x;    // its heading
+	u8 title_text_y;    // its heading's line top
 	u8 title_right;     // where the position or clock ends
+	u8 title_right_y;   // its line top
+	u8 title_right_w;   // px kept for it (two tile sets: whole tiles)
 	u8 content_top;     // the page between the title and hint bars
 	u8 content_bottom;  // its last row
 	u8 list_rows;       // rows in a list card
@@ -166,11 +168,18 @@ struct ui_look {
 	u8 settings_pitch;  // a Settings row's height
 	u8 pill_h;          // the selection pill's height, in its row
 	u8 pill_radius;
+	u8 pill_out_l;      // how far the pill reaches past a list's left edge
+	u8 pill_out_r;      // and past its right edge
 	u8 card_radius;
 	u8 button_radius;
 	u8 edge;            // a card's hairline
 	u8 shadow_offset;   // how far a card's shadow falls, down and right
 	u8 scrollbar_w;
+	u8 scrollbar_x;     // its thumb's left column, in its 8 px column
+	u8 section_icon_gap;  // between a section label's 8x8 icon and its text
+	u8 path_gap;        // between a path's pill and its "/"
+	u8 storage_h;       // a storage bar's thickness
+	u8 reading_key_w;   // a reading line's key chip column (ui_reading)
 	u8 hint_y;          // the hint bar's key chips
 	u8 hint_chip_h;
 	u8 hint_chip_radius;
@@ -201,6 +210,8 @@ struct ui_motions {
 	u8 popup_slide;              // px it slides in from
 	struct ui_move theme_wipe;   // the top-down switch between light and dark
 	u8 wipe_edge;                // px of its dithered edge
+	s32 pill_spring;             // the selection pill's slide to the cursor's row: a
+				     // spring's stiffness (16.16, motion.h SPRING_*); 0 jumps
 };
 
 // A theme, in ROM. Fields:
@@ -287,8 +298,9 @@ void ui_item_select(u32 item);
 // VBlank; nothing is redrawn. The built-ins share their fonts and layout,
 // so they can switch while views are up.
 void ui_theme_set(const struct ui_theme *theme);
-// Makes item's accent the current one: loads banks 0 and 1 (32 colours, 14
-// of them the item's) in the next VBlank; nothing is redrawn.
+// Makes item's accent the current one: loads bank 0 (16 colours, 7 of
+// them the item's) and the UI's sprite bank, its copy, in the next VBlank;
+// nothing is redrawn.
 void ui_item_set(u32 item);
 const struct ui_theme *ui_theme(void);
 u32 ui_item(void);
@@ -302,6 +314,12 @@ enum ui_kind {
 	UI_IMAGE,
 	UI_SCROLLBAR,
 	UI_PROGRESS,
+	// The Paper clean widgets (ui/ui_paper.c)
+	UI_CARD,
+	UI_TITLE,
+	UI_HINTS,
+	UI_PATH,
+	UI_STORAGE,
 	UI_KINDS,
 };
 
@@ -383,11 +401,13 @@ enum {
 
 // A label: one or more lines ("\n"), clipped with "..." to its width. ink
 // defaults to TEXT. Lines are laid out from the top, centred in the height.
+// With an 8x8 icon (a section label), the icon comes first, in the ink.
 struct ui_label_config {
 	const char *text;  // UTF-8; ui_label_set replaces it
 	u8 font;           // UI_FONT_*
 	u8 align;          // UI_ALIGN_*
 	u8 flags;          // UI_LABEL_*
+	u8 icon8;          // an 8x8 icon before the text: ART_ICON8_* + 1; 0 none
 };
 
 enum {
@@ -405,10 +425,12 @@ struct ui_item {
 	const char *text;    // UTF-8
 	u16 len;             // 0: up to the NUL
 	u8 ink;              // role of the text, 0: TEXT
-	u8 pad;
+	u8 key_len;          // key's bytes: 0 draws no chip (the text still at its column)
 	const char *detail;  // right-aligned in DIM (a size, a date); NULL none
 	const u32 *icon;     // a list with UI_LIST_ICONS: 2x2 4bpp tiles in row order,
 			     // colours 10-15 (0 shows the row's paper); NULL none
+	const char *key;     // a reading row's key chip (ui/ui_reading.h): the text
+			     // starts at the look's reading_key_w; NULL none
 };
 
 enum {
@@ -433,17 +455,25 @@ enum {
 	UI_LIST_FIXED = 8,    // list: never more items than whole rows fit, so it never scrolls
 			      // and needs no spare row slots (a menu in a dialog); more are cut
 	UI_LIST_PLAIN = 16,   // no row shows as selected (a log): the cursor only scrolls
+	UI_LIST_SCROLL = 32,  // the cursor is the top row: UP and DOWN scroll a row (a
+			      // reading view, with PLAIN), up to the last page
 };
 #define UI_LIST_ICON_W 16
 
-// A list. ink defaults to TEXT and paper to BG. The viewport is the
-// node's rectangle.
+// A list. ink defaults to TEXT. The viewport is the node's rectangle.
+// paper 0 (none): rows are drawn transparent over what is behind them (a
+// card on a plane further back), and the selection is a pill of sprites
+// between the two that slides to the cursor's row. A paper: rows are drawn
+// on it, the selected one with the pill under its text (a menu on a panel).
 struct ui_list_config {
 	const struct ui_list_model *model;
-	u8 row_h;     // 16 or 32 px; 0: the theme's
+	u8 row_h;     // px, 8 to 32; 0: the theme's row_h; UI_ROW_PITCH_*: the look's
 	u8 flags;     // UI_LIST_*
 	u8 detail_w;  // list: px kept for the detail at the right
+	u8 pad;       // the text's inset from a row's edges; 0: the theme's pad
 };
+#define UI_ROW_PITCH_LIST 0xFF      // row_h: the look's list_pitch (14 px)
+#define UI_ROW_PITCH_SETTINGS 0xFE  // row_h: the look's settings_pitch (12 px)
 
 // An image from 4bpp tiles in ROM (a sprite or cover image comes later, T7).
 struct ui_image_config {
@@ -452,12 +482,64 @@ struct ui_image_config {
 	u16 tag;              // shares tiles and palette between views (nonzero)
 };
 
-// A vertical scroll bar showing a list's position.
+// A vertical scroll bar showing a list's position: a 1 px track in the
+// card's hairline colour (BORDER) and a thumb in ink (the item's base) on
+// paper (none: transparent; PANEL on a card), at the look's scrollbar_x.
 struct ui_scrollbar_config {
 	u8 target;  // index of the list in the same layout
 };
 
 // A progress bar: ink (ACCENT) fills paper's track (TRACK). data may be NULL.
+
+// A card (spec.md: cards r4 with a soft shadow): a rounded surface of paper
+// (PANEL; FLOAT for a popup's) inside the rectangle, its body inset from
+// the rectangle's edges by px, so a card can sit off the tile grid (the
+// list card at y 20). The shadow falls shadow_offset px below the body,
+// into the bottom inset. Each inset plus the corner radius stays within a
+// tile (8 px). Widgets drawn over it go on the same plane, later in the
+// layout, with its paper (a path, a storage bar, a section's rows), or on
+// a plane in front (a list).
+enum {
+	UI_CARD_EDGE = 1,  // a hairline round the body, in BORDER (floating cards)
+};
+struct ui_card_config {
+	u8 inset_l, inset_t, inset_r, inset_b;
+	u8 flags;  // UI_CARD_*
+};
+
+// The title bar: the item's 16x16 icon (a sprite), the heading, and a
+// right-hand text (the position or the clock) in DIM, at the look's
+// title_* places. Its rectangle spans the screen's width from the top,
+// whole tiles under the heading's line; both texts change without
+// tearing (two tile sets each).
+#define UI_TITLE_NO_ICON 0xFFFF
+struct ui_title_config {
+	const char *text;   // the heading; ui_title_set replaces it
+	const char *right;  // ui_title_set_right replaces it; NULL none
+	u16 icon;           // ART_ICON16_* (ui/art_ids.h), UI_TITLE_NO_ICON none
+};
+
+// The hint bar: up to the look's hint_max key chips with their labels, from
+// the right edge in (spec.md: soft-grey key pill, ink3 label), or one line of
+// text in their place (the selected row's explanation, T25). Changes swap
+// whole tile sets, so they never tear.
+struct ui_hint {
+	const char *key;    // the chip's text: "A", "START", "«»"
+	const char *label;  // what it does: "play"
+};
+struct ui_hints_config {
+	const struct ui_hint *hints;
+	u8 count;
+};
+
+// A path as pills (the SD card page's): "SD/GBA/RPG", each folder in a pill
+// on the card, the last (the current one) tinted; leading folders give way
+// to "..." when they don't fit. paper is the card's (PANEL). data may be
+// NULL; ui_path_set sets it.
+
+// A storage bar (the NOR page's): parts of a whole, each in the next of
+// the NOR bar's three shades, on a soft track with rounded ends.
+// ui_storage_set sets it. data may be NULL.
 
 // --- Views and nodes ------------------------------------------------------
 
@@ -492,7 +574,8 @@ struct ui_view {
 	u16 open;         // a modal view: how far it has opened, 0-UI_OPEN (slide)
 	u16 open_blend;   // and its fade and the dim under it, 0-UI_OPEN
 	s8 opening;       // 1 opening, -1 closing (ui_close), 0 still
-	u8 pad;
+	u8 front;         // with UI_V_OBJS: planes in front of its sprites (bit p)
+	u8 tall;          // planes whose map is 32 x 64 tiles (a list's, bit p)
 };
 #define UI_OPEN 256
 
@@ -502,6 +585,8 @@ enum {
 	UI_V_READY = 2,   // "screen ready" logged
 	UI_V_CLEARED = 4,  // its maps were cleared for the first draw
 	UI_V_ANIM = 8,     // a modal view that opens and closes with motion
+	UI_V_OBJS = 16,    // it shows sprites (a list's pill): its planes in front of
+			   // them take a better priority than the rest (ui_obj_add)
 };
 
 // --- Events -------------------------------------------------------------------
@@ -614,6 +699,14 @@ int ui_emit(u8 index, u8 type, u32 value);
 void ui_label_set(u8 node, const char *text);
 // value of max (max 0 counts as empty).
 void ui_progress_set(u8 node, u32 value, u32 max);
+// The Paper clean widgets' contents. Texts and arrays are kept by pointer,
+// as a label's text is: valid and unchanged until replaced or the view pops.
+void ui_title_set(u8 node, const char *text);
+void ui_title_set_right(u8 node, const char *text);
+void ui_hints_set(u8 node, const struct ui_hint *hints, u32 count);
+void ui_hints_text(u8 node, const char *text);  // NULL: back to the chips
+void ui_path_set(u8 node, const char *path);
+void ui_storage_set(u8 node, const u32 *parts, u32 count, u32 total);
 // A drawn progress bar's pixels, for code that fills it from an interrupt
 // while the kernel waits in IWRAM (progress.c, during the cart's ROM copy):
 // pixel (x, y) is nibble x % 8 of word tiles[x / 8 * column_words + y],
@@ -650,10 +743,11 @@ u32 ui_list_cursor(u8 node);
 // 1 while a page change hides or draws the list's page: a handler taking A
 // itself waits until it is up, as the list's own A does
 int ui_list_paging(u8 node);
-// Sets label's text (ui_label_set) in the frame the list's page change draws
-// its new page, so a title changes with the page: a label with
-// UI_LABEL_SWAP then flips in the same VBlank as the page shows. At once if
-// no page change is hiding the old page.
+// Sets label's text (ui_label_set; a UI_TITLE's right-hand text,
+// ui_title_set_right) in the frame the list's page change draws its new
+// page, so a title changes with the page: a label with UI_LABEL_SWAP (or a
+// title's right-hand text) then flips in the same VBlank as the page shows.
+// At once if no page change is hiding the old page.
 void ui_list_page_label(u8 node, u8 label, const char *text);
 // 1 once no page change is under way and the scroll is at rest
 int ui_list_still(u8 node);

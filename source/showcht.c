@@ -794,9 +794,9 @@ static int cs_event(struct ui_view *v, const struct ui_event *e)
 	}
 }
 
-static const struct ui_label_config cs_title = {"", UI_FONT_HEADING, UI_ALIGN_LEFT, 0};
-static const struct ui_label_config cs_counter = {"", UI_FONT_BODY, UI_ALIGN_RIGHT, UI_LABEL_SWAP};
-static const struct ui_list_config cs_list = {&cs_model, 0, UI_LIST_MARQUEE, 24};
+static const struct ui_label_config cs_title = {"", UI_FONT_HEADING, UI_ALIGN_LEFT, 0, 0};
+static const struct ui_label_config cs_counter = {"", UI_FONT_BODY, UI_ALIGN_RIGHT, UI_LABEL_SWAP, 0};
+static const struct ui_list_config cs_list = {&cs_model, 0, UI_LIST_MARQUEE, 24, 0};
 static const struct ui_scrollbar_config cs_bar = {CS_LIST};
 
 static const struct ui_spec cs_nodes[CS_NODES] = {

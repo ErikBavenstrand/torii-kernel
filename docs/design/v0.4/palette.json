@@ -7,7 +7,7 @@
       "soft": "#D6CEC6",
       "ink": "#292931",
       "ink2": "#6B635A",
-      "ink3": "#9C948C",
+      "ink3": "#8C847B",
       "shadow": "#DED6CE"
     },
     "dark": {
@@ -217,14 +217,14 @@
       "dark": {
         "base": "#D63942",
         "tint": "#5A2931",
-        "ink": "#E76B73",
+        "ink": "#EF7B84",
         "on": "#FFFFFF",
         "outline": "#733139",
         "contrast": {
-          "ink_on_card": 4.64,
-          "ink_on_bg": 5.66,
+          "ink_on_card": 5.38,
+          "ink_on_bg": 6.58,
           "text_on_pill": 10.12,
-          "ink_on_pill": 3.76,
+          "ink_on_pill": 4.36,
           "on_on_base": 4.64,
           "base_on_card": 3.11
         }

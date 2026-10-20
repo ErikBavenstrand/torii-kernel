@@ -2,6 +2,7 @@
 // and the table of every kind's ops. Lists are in ui/ui_list.c.
 #include <string.h>
 
+#include "art.h"
 #include "ui_priv.h"
 #include "../engine/gfx.h"
 #include "../engine/res.h"
@@ -50,7 +51,7 @@ struct label_state {
 
 static const struct ui_label_config *label_config(u8 node)
 {
-	static const struct ui_label_config none = {"", UI_FONT_BODY, UI_ALIGN_LEFT, 0};
+	static const struct ui_label_config none = {"", UI_FONT_BODY, UI_ALIGN_LEFT, 0, 0};
 	const struct ui_label_config *c = ui_node_spec(node)->data;
 	return c ? c : &none;
 }
@@ -73,6 +74,21 @@ static int label_init(u8 node)
 			return 0;
 	}
 	return 1;
+}
+
+// An 8x8 icon (art.h) at pixel (x, y) of a window, in ink
+static void label_icon(const struct text_window *win, u32 x, u32 y, u32 id, u32 ink)
+{
+	if (id >= ART_ICON8_COUNT || y + 8 > win->height * 8u || x + 8 > win->width * 8u)
+		return;
+	const u8 *bits = art_icon8_bits[id];
+	u32 column = win->height * 8u;
+	for (u32 r = 0; r < 8; r++)
+		for (u32 c = 0; c < 8; c++)
+			if (bits[r] >> c & 1) {
+				u32 px = x + c, *word = win->tiles + (px / 8) * column + y + r, sh = (px & 7) * 4;
+				*word = (*word & ~(15u << sh)) | (ink & 15) << sh;
+			}
 }
 
 static void label_draw(u8 node)
@@ -107,6 +123,14 @@ static void label_draw(u8 node)
 	u32 y = lines * font->line_height < h ? (h - lines * font->line_height) / 2 : 0;
 	u32 pad = c->align == UI_ALIGN_CENTER ? 0 : t->pad;
 	u32 clip = w > 2 * pad ? w - 2 * pad : w;
+	if (c->icon8 && pad + 8 <= w) {
+		// A section label: its 8x8 icon first, centred on the first line
+		label_icon(&win, pad, y + (font->line_height > 8 ? (font->line_height - 8) / 2 : 0), c->icon8 - 1u,
+			   ink);
+		u32 used = 8u + t->look.section_icon_gap;
+		pad += used;
+		clip = clip > used ? clip - used : 0;
+	}
 	while (y + font->line_height <= h) {
 		u32 len = 0;
 		while (s[len] && s[len] != '\n')
@@ -444,15 +468,15 @@ static void scrollbar_update(u8 node, u32 dt)
 	}
 }
 
-// A scroll bar row: the track's 1 px line, the thumb's 3 px, or a thumb's
-// rounded end (its first and last rows, the middle pixel only). The bar
-// keeps to the right of its 8 px column, clear of a list's detail column.
+// A scroll bar row: the track's 1 px line (the card's hairline colour), the
+// thumb's 3 px (the item's base), or a thumb's rounded end (its first and
+// last rows, the middle pixel only). The thumb's left column in its 8 px
+// column is the look's scrollbar_x.
 enum {
 	SB_TRACK,
 	SB_THUMB,
 	SB_END
 };
-#define SB_X 4  // the thumb's left column
 static u32 scrollbar_row(u32 y, u32 t0, u32 t1)
 {
 	if (y < t0 || y >= t1)
@@ -460,31 +484,22 @@ static u32 scrollbar_row(u32 y, u32 t0, u32 t1)
 	return (y == t0 || y == t1 - 1) && t1 - t0 > 2 ? SB_END : SB_THUMB;
 }
 
-// Rows [a, b) of the bar as kind (SB_*)
-static void scrollbar_paint(const struct text_window *win, u32 a, u32 b, u32 kind, u32 ink, u32 track)
-{
-	if (a >= b)
-		return;
-	u32 mid = kind == SB_TRACK ? track : ink, side = kind == SB_THUMB ? ink : UI_ROLE_NONE;
-	text_clear(win, SB_X, a, 1, b - a, side);
-	text_clear(win, SB_X + 1, a, 1, b - a, mid);
-	text_clear(win, SB_X + 2, a, 1, b - a, side);
-}
-
-// The whole bar, its thumb at [t0, t1), into set's tiles
+// The whole bar, its thumb at [t0, t1), into set's tiles: each row of its
+// first tile column one word (8 pixels), the track's, the thumb's or a
+// thumb end's, on paper
 static void scrollbar_paint_set(u8 node, const struct scrollbar_state *st, u32 set, u32 t0, u32 t1)
 {
 	const struct ui_node *n = ui_node(node);
 	struct text_window win = window_of(node, st->first[set]);
-	u32 ink = ui_ink(node, UI_ROLE_ACCENT), track = ui_paper(node, UI_ROLE_TRACK), h = (u32)n->h;
-	text_clear(&win, 0, 0, (u32)n->w, h, UI_ROLE_NONE);
-	for (u32 y = 0; y < h;) {
-		u32 kind = scrollbar_row(y, t0, t1), end = y + 1;
-		while (end < h && scrollbar_row(end, t0, t1) == kind)
-			end++;
-		scrollbar_paint(&win, y, end, kind, ink, track);
-		y = end;
-	}
+	u32 ink = ui_ink(node, UI_ROLE_ACCENT) & 15, paper = ui_paper(node, UI_ROLE_NONE) & 15, h = (u32)n->h;
+	text_clear(&win, 8, 0, (u32)n->w, h, paper);  // columns past the bar's, if any
+	u32 x = ui_theme()->look.scrollbar_x, sh = 4 * (x > 5 ? 5 : x), base = paper * 0x11111111u;
+	u32 mask = 0xFFFu << sh, word[3];
+	word[SB_TRACK] = (base & ~mask) | (paper | (u32)UI_ROLE_BORDER << 4 | paper << 8) << sh;
+	word[SB_THUMB] = (base & ~mask) | (ink * 0x111u) << sh;
+	word[SB_END] = (base & ~mask) | (paper | ink << 4 | paper << 8) << sh;
+	for (u32 y = 0; y < h; y++)
+		win.tiles[y] = word[scrollbar_row(y, t0, t1)];
 }
 
 static void scrollbar_draw(u8 node)
@@ -523,6 +538,8 @@ static const struct ui_ops scrollbar_ops = {
 // --- Every kind ---------------------------------------------------------
 
 const struct ui_ops *const ui_kind_ops[UI_KINDS] = {
-	[UI_LABEL] = &label_ops, [UI_PANEL] = &panel_ops,         [UI_LIST] = &ui_list_ops,
-	[UI_IMAGE] = &image_ops, [UI_SCROLLBAR] = &scrollbar_ops, [UI_PROGRESS] = &progress_ops,
+	[UI_LABEL] = &label_ops,  [UI_PANEL] = &panel_ops,         [UI_LIST] = &ui_list_ops,
+	[UI_IMAGE] = &image_ops,  [UI_SCROLLBAR] = &scrollbar_ops, [UI_PROGRESS] = &progress_ops,
+	[UI_CARD] = &ui_card_ops, [UI_TITLE] = &ui_title_ops,      [UI_HINTS] = &ui_hints_ops,
+	[UI_PATH] = &ui_path_ops, [UI_STORAGE] = &ui_storage_ops,
 };

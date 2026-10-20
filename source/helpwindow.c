@@ -44,9 +44,9 @@ static int help_event(struct ui_view *view, const struct ui_event *e)
 	return 0;
 }
 
-static const struct ui_label_config keys_config = {"START\nL + A\nL+START", UI_FONT_BODY, UI_ALIGN_LEFT, 0};
-static const struct ui_label_config text_config = {"", UI_FONT_BODY, UI_ALIGN_LEFT, 0};
-static const struct ui_label_config manual_config = {"", UI_FONT_BODY, UI_ALIGN_CENTER, 0};
+static const struct ui_label_config keys_config = {"START\nL + A\nL+START", UI_FONT_BODY, UI_ALIGN_LEFT, 0, 0};
+static const struct ui_label_config text_config = {"", UI_FONT_BODY, UI_ALIGN_LEFT, 0, 0};
+static const struct ui_label_config manual_config = {"", UI_FONT_BODY, UI_ALIGN_CENTER, 0, 0};
 static const u16 qr_palette[16] = {0, 0x7FFF, 0x0000};
 static const struct ui_image_config qr_config = {help_qr_tiles, qr_palette, 0x4851};  // "HQ"
 

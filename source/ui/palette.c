@@ -3,7 +3,7 @@
 #include "palette.h"
 
 const struct pal_surfaces pal_surfaces[PAL_THEMES] = {
-	[PAL_LIGHT] = {.bg = 0x73BE, .card = 0x7FFF, .edge = 0x6B7C, .soft = 0x633A, .ink = 0x18A5, .ink2 = 0x2D8D, .ink3 = 0x4653, .shadow = 0x675B},
+	[PAL_LIGHT] = {.bg = 0x73BE, .card = 0x7FFF, .edge = 0x6B7C, .soft = 0x633A, .ink = 0x18A5, .ink2 = 0x2D8D, .ink3 = 0x3E11, .shadow = 0x675B},
 	[PAL_DARK] = {.bg = 0x1063, .card = 0x18A5, .edge = 0x1CE7, .soft = 0x2509, .ink = 0x73BD, .ink2 = 0x52B6, .ink3 = 0x39F0, .shadow = 0x0842},
 };
 
@@ -29,7 +29,7 @@ const struct pal_accent pal_accents[PAL_THEMES][PAL_ITEMS] = {
 			[PAL_GBA] = {.base = 0x61AF, .tint = 0x2CE8, .ink = 0x6A33, .on = 0x7FFF},
 			[PAL_GBC] = {.base = 0x4A61, .tint = 0x2523, .ink = 0x4E82, .on = 0x1063},
 			[PAL_GB] = {.base = 0x0A6D, .tint = 0x1127, .ink = 0x0E8E, .on = 0x1063},
-			[PAL_NES] = {.base = 0x20FA, .tint = 0x18AB, .ink = 0x39BC, .on = 0x7FFF},
+			[PAL_NES] = {.base = 0x20FA, .tint = 0x18AB, .ink = 0x41FD, .on = 0x7FFF},
 			[PAL_SD] = {.base = 0x6DE5, .tint = 0x3105, .ink = 0x724A, .on = 0x7FFF},
 			[PAL_NOR] = {.base = 0x0A7C, .tint = 0x112C, .ink = 0x0A7C, .on = 0x1063},
 			[PAL_SET] = {.base = 0x4DEC, .tint = 0x2907, .ink = 0x5650, .on = 0x7FFF},
