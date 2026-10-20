@@ -46,21 +46,6 @@ extern u16 gl_cheat_on;
 void CheckLanguage(void);
 void CheckSwitch(void);
 u32 Game_hardware(u32 is_EMU, const u8 *gamecode, u8 gb_cart_type);
-u32 Recently_play_add(const char *entry, u32 count);
-#define RECENT_NOR "NOR:"
-// A Recently Played row holds the longest entry Recently_play_load keeps and
-// the kernel writes: a folder under MAX_path_len, '/', and a GAME_NAME_MAX name.
-#define RECENT_LEN (MAX_path_len + GAME_NAME_MAX + 1)
-extern char p_recently_play[10][RECENT_LEN];
-const char *Recently_play_nor(const char *entry);
-u32 Recently_play_load(void);
-// Drops entry from the count rows in p_recently_play; returns the new count.
-u32 Recently_play_remove(const char *entry, u32 count);
-// Drops entry, a path, from Recently Played's file (a file deleted from the card).
-void Recently_play_forget(const char *entry);
-// Drops the NOR game name's entry from Recently Played's file (a game gone
-// from the game NOR), or with name NULL every NOR game's (FORMAT ALL).
-void Recently_play_forget_nor(const char *name);
 // The game NOR list's game named name, or game_total_NOR if none.
 u32 NOR_game_named(const char *name);
 // The text of error error_num (gl_error_*), as Show_error_num shows it.

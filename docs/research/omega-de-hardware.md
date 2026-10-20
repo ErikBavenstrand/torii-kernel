@@ -444,7 +444,8 @@ listed, and a game with a mark the list lacks is put back. A power cut
 during FORMAT ALL's chip erase can still leave a half-erased game whose
 header and mark survive; format again. Erase and program
 take the model no time, so `OMEGA_POWER_CUT` (`emu/mgba/src/gba/cart/omega.c`) cuts the
-power between operations for `tests/nor_safety.sh`.
+power between operations for `tests/nor_safety.sh`; `OMEGA_POWER_CUT=sd:write:N`
+cuts it before the Nth SD write command, for `tests/userdata.sh`.
 
 **Kernel NOR and the boot loader.** From the official *EZ-FLASH OMEGA DE
 DOCUMENT.pdf* (its NOR allocation lists 16-bit word addresses, so double

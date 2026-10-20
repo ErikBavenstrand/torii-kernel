@@ -128,4 +128,17 @@ void test_settings_clock_format(void);
 void test_settings_clock_editor(void);
 void test_settings_clock_apply(void);
 
+void test_safefile_crc_line(void);
+void test_safefile_scan(void);
+void test_safefile_pick(void);
+void test_safefile_lines(void);
+void test_userdata_paths(void);
+void test_userdata_parse(void);
+void test_userdata_recent_lines(void);
+void test_userdata_recent_edits(void);
+void test_userdata_favourites(void);
+void test_userdata_sort_big(void);
+void test_userdata_clock(void);
+void test_userdata_ago(void);
+
 #endif

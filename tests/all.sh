@@ -31,6 +31,7 @@ jobs=(
   "tests/names.sh fat32"
   "tests/names.sh exfat"
   "tests/stale_recent.sh"
+  "tests/userdata.sh"
   "tests/fragmented.sh"
   "tests/listing.sh"
   "tests/cheats.sh"

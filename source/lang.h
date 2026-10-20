@@ -61,6 +61,8 @@ extern char *gl_LSTART_help;
 extern char *gl_online_manual;
 
 extern char *gl_no_game_played;
+// "Played ago" words (userdata.h)
+extern struct userdata_ago_words gl_ago;
 extern char *gl_list_failed;
 extern char *gl_nor_title;
 

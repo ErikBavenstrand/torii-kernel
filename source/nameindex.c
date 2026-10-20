@@ -6,7 +6,7 @@
 #include "savename.h"
 #include "tlog.h"
 
-_Static_assert(NAMES_BASE + NAMES_BYTES <= PSRAM_ASSET_BASE, "the names reach the cover cache");
+_Static_assert(NAMES_BASE + NAMES_BYTES <= PSRAM_USERDATA_BASE, "the names reach the user's lists");
 
 static u32 names_top EWRAM_BSS;
 

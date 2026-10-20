@@ -8,8 +8,9 @@
 // the same, in case something left another page selected. Within it the
 // cover cache (engine/cover.h) uses COVER_PSRAM_BYTES from
 // PSRAM_ASSET_BASE; the 512 KB from PSRAM_RESERVED_BASE (the SD themes'
-// until v0.4) are reserved; the first 4 MB stay free for other menu data
-// (a name index, T9).
+// until v0.4) are reserved; the first 4 MB hold other menu data: the SD
+// list's names (nameindex.h) and, in their last PSRAM_USERDATA_BYTES, Recent
+// and the favourites (userdata.h).
 //
 // A game launch fills PSRAM with the game, so everything here is lost then:
 // the launch calls cover_cache_invalidate first.
@@ -28,6 +29,9 @@
 #define PSRAM_ASSET_BASE (PSRAM_WINDOW + 0x00400000u)
 // Reserved, 512 KB past the cover cache's start
 #define PSRAM_RESERVED_BASE (PSRAM_ASSET_BASE + 0x00080000u)
+// Recent and the favourites (userdata_store.c), up to the cover cache
+#define PSRAM_USERDATA_BYTES 0x00080000u
+#define PSRAM_USERDATA_BASE (PSRAM_ASSET_BASE - PSRAM_USERDATA_BYTES)
 
 // 1 if [p, p + bytes) lies in the PSRAM window.
 static inline int psram_holds(const void *p, u32 bytes)

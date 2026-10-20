@@ -111,11 +111,12 @@ case $part in
 launch)
   new_card 65536 32
   boot -f 200
-  # Off: no folder on the card, nothing in cart RAM page 0xF0, even after a launch.
+  # Off: no log folder on the card, nothing in cart RAM page 0xF0, even after a
+  # launch (which writes /torii/recent.txt).
   # shellcheck disable=SC2046 # $(keys) is a list of options
   boot $(keys 100 A) $(keys 160 A) -f 400
   grep -q '^kernel: launch: starting the game' "$cart/kernel.log" || fail "Hello.gba didn't launch"
-  ! mdir -i "$cart/sd.img" ::/torii >/dev/null 2>&1 || fail "logging off made /torii"
+  ! mdir -i "$cart/sd.img" ::/torii/logs >/dev/null 2>&1 || fail "logging off made /torii/logs"
   blank 0xF0000 0x2000 || fail "logging off wrote cart RAM page 0xF0"
   card_ok
 

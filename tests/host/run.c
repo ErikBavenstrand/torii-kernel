@@ -162,6 +162,18 @@ static const struct {
 	{"gamename_custom_io", test_gamename_custom_io},
 	{"gamename_display", test_gamename_display},
 	{"gamename_hidden", test_gamename_hidden},
+	{"safefile_crc_line", test_safefile_crc_line},
+	{"safefile_scan", test_safefile_scan},
+	{"safefile_pick", test_safefile_pick},
+	{"safefile_lines", test_safefile_lines},
+	{"userdata_paths", test_userdata_paths},
+	{"userdata_parse", test_userdata_parse},
+	{"userdata_recent_lines", test_userdata_recent_lines},
+	{"userdata_recent_edits", test_userdata_recent_edits},
+	{"userdata_favourites", test_userdata_favourites},
+	{"userdata_sort_big", test_userdata_sort_big},
+	{"userdata_clock", test_userdata_clock},
+	{"userdata_ago", test_userdata_ago},
 };
 
 int main(void)
