@@ -28,7 +28,7 @@ static int t_fetch(void *ctx, u32 index, struct ui_item *out)
 	return UI_ITEM_READY;
 }
 
-static const struct ui_list_model t_model = {t_count, t_fetch, 0};
+static const struct ui_list_model t_model = {t_count, t_fetch, 0, 0, 0};
 static const struct ui_list_config t_list = {&t_model, 16, UI_LIST_WRAP, 0, 0};
 static const struct ui_list_config t_tall = {&t_model, 32, 0, 0, 0};
 static const struct ui_label_config t_title = {"Title", UI_FONT_HEADING, UI_ALIGN_LEFT, UI_LABEL_SWAP, 0};

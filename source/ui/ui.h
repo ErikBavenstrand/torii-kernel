@@ -466,6 +466,27 @@ enum {
 	UI_ITEM_PENDING = 0,  // not loaded yet: drawn blank until ui_list_refresh
 };
 
+struct text_window;
+
+// A row a model paints itself (ui_list_model.paint): its rh lines from line
+// y of win, w px from column x (px), over the row's paper, which is drawn
+struct ui_paint {
+	const struct text_window *win;
+	u32 x, y;
+	u32 w, rh;
+	u32 index;
+	u8 selected;  // drawn with the selection (a list with UI_LIST_DRAWN_PILL)
+};
+
+// Where the list is on screen this frame, for its sprites
+// (ui_list_model.objs): row r's top is top + r * rh - scroll
+struct ui_list_objs {
+	s32 x, top;   // the viewport's left and top, screen px
+	s32 scroll;   // content px at the viewport's top
+	u32 h, rh;    // the viewport's height, a row's height
+	u16 attr0;    // attr0 bits the sprites take (semi-transparent while the page fades)
+};
+
 // Where a list's rows come from. count and fetch run in draw; fetch must
 // not call FatFs or switch the ROM page: slow data comes through prefetch
 // and jobs (engine/jobs.h), which then call ui_list_refresh. ctx is the
@@ -474,6 +495,15 @@ struct ui_list_model {
 	u32 (*count)(void *ctx);
 	int (*fetch)(void *ctx, u32 index, struct ui_item *out);
 	void (*prefetch)(void *ctx, u32 lo, u32 hi);  // items about to show; may be NULL
+	// May be NULL: draws a row whole (text, values, its own paper such as a
+	// card), in place of the item's text, detail and icon, and the selection
+	// too (p->selected). For lists whose rows aren't all alike (the Settings
+	// page's section labels and cards). Returns 1 if it drew anything but
+	// transparent paper. fetch still names the row (its text).
+	int (*paint)(void *ctx, const struct ui_paint *p);
+	// May be NULL: the list's sprites over its rows, added with ui_obj_add
+	// (node: the list's) each frame the list shows its page, in its update
+	void (*objs)(void *ctx, u8 node, const struct ui_list_objs *o);
 };
 
 enum {
@@ -487,6 +517,9 @@ enum {
 			      // reading view, with PLAIN), up to the last page
 	UI_LIST_ICON8 = 64,   // list: an 8x8 item.icon at the row's pad, the name after it
 			      // and the look's section_icon_gap (the Info page's rows)
+	UI_LIST_DRAWN_PILL = 128,  // with no paper: the selection drawn into the selected row (by
+				   // the model's paint, or the list's pill), as on a list with
+				   // one, not a sprite pill behind it (rows painted opaque)
 };
 #define UI_LIST_ICON_W 16
 #define UI_LIST_ICON8_W 8
@@ -739,7 +772,18 @@ void ui_title_set(u8 node, const char *text);
 void ui_title_set_right(u8 node, const char *text);
 void ui_title_set_sub(u8 node, const char *text);
 void ui_hints_set(u8 node, const struct ui_hint *hints, u32 count);
-void ui_hints_text(u8 node, const char *text);  // NULL: back to the chips
+void ui_hints_text(u8 node, const char *text);  // centred; NULL: back to the chips
+// The text line's look (ui_hints_note): its ink, and a short bar before it
+// (the Settings page's countdown while it waits for a hotkey), the two
+// centred together
+struct ui_hint_note {
+	u8 ink;           // the text's role, 0: DIM
+	u8 bar_w, bar_h;  // the bar (0 wide: none): a TRACK pill, ACCENT for fill px of it
+	u8 bar_r, bar_gap;  // its ends' radius, and px between it and the text
+	u8 fill;
+};
+// ui_hints_text with a look (NULL: the plain line); note is copied
+void ui_hints_note(u8 node, const char *text, const struct ui_hint_note *note);
 void ui_path_set(u8 node, const char *path);
 void ui_storage_set(u8 node, const u32 *parts, u32 count, u32 total);
 // A drawn progress bar's pixels, for code that fills it from an interrupt
@@ -759,6 +803,10 @@ void ui_progress_drew(u8 node, u32 x);
 // The list's model changed (a new folder): the cursor goes to cursor and
 // the list redraws as a page change.
 void ui_list_reset(u8 node, u32 cursor);
+// The model's count changed (rows added or removed in place): as
+// ui_list_reset, but the scroll stays as near where it is as the cursor
+// allows.
+void ui_list_recount(u8 node, u32 cursor);
 // Items lo to hi have loaded (or changed): rows showing them redraw. A row
 // on screen redraws in place, so it may tear for one frame. Lists keep
 // drawn rows in a cache keyed by item (ui/rowcache.h) and show them again
@@ -796,6 +844,22 @@ void ui_list_scroll_info(u8 node, u32 *content, u32 *view, u32 *scroll);
 // (its top, in the view's own lines: add the view's offset for the
 // screen's), and the row's height
 void ui_list_cursor_row(u8 node, s32 *y, u32 *h);
+
+// --- Painting rows -------------------------------------------------------------
+// For a model that paints its rows (ui_list_model.paint, objs).
+
+// The inset of the row e px from a rounded end of radius px, at the edge
+// (e 0) and inwards (0 from e = radius on): the menu's one rounding, for
+// cards, pills and chips. Hardware-free (ui/ui_theme.c).
+u32 ui_round_inset(u32 radius, u32 e);
+// An 8x8 icon (art.h, ART_ICON8_*) at pixel (x, y) of a window, in ink
+void ui_icon8(const struct text_window *win, u32 x, u32 y, u32 id, u32 ink);
+// Adds a sprite for node's view (attr2 with its tile and palette bank, the
+// priority bits set here: the view's); 0 if the
+// view's sprites don't show now (a view above blends over it with sprites
+// of its own, or no priority is left under its text) or OAM is full. Only
+// from a widget's update (OAM is rebuilt each frame around it).
+int ui_obj_add(u8 node, u16 attr0, u16 attr1, u16 attr2);
 
 // --- Popups, confirmations and the letter card (ui/ui_popup.c) -------------
 // Every page's popups follow the same rules (docs/plans/v0.4-decisions.md,
@@ -868,8 +932,39 @@ s32 ui_popup_choose(void);
 // next VBlank (a few items a frame, if several change).
 void ui_popup_changed(u32 item);
 // Closes the popup (motion.popup_close), if one is up. Keys pressed
-// meanwhile go to the page.
+// meanwhile go to the page. Closes a field card (ui_fields_open) too.
 void ui_popup_close(void);
+
+// A field card: the popup's card beside a list's selected row, with a title
+// (an 8x8 icon and a name) over up to UI_FIELDS_MAX fields in the heading
+// font, centred, the active one in a tint box with arrows above and below
+// (the Settings page's Time and Date editor, #20). It opens and closes as a
+// popup; while it is up the hint bar shows keys (up to 4).
+//
+//	if (ui_fields_open(list, hints, &f, keys, 4)) {
+//		for (u16 k; (k = ui_fields_key()) && !(k & (INPUT_A | INPUT_B));) {
+//			... change f.text[] or f.active ...
+//			ui_fields_changed();
+//		}
+//		ui_popup_close();
+//	}
+#define UI_FIELDS_MAX 3
+struct ui_fields {
+	const char *title;
+	u8 icon8;   // ART_ICON8_* + 1, 0 none
+	u8 count;   // 1 to UI_FIELDS_MAX
+	u8 active;  // the field in the box
+	const char *text[UI_FIELDS_MAX];
+	const char *sep[UI_FIELDS_MAX - 1];  // between fields, in FAINT
+};
+// Opens it, kept by pointer (and keys) while it is up; 0 if it can't
+int ui_fields_open(u8 list, u8 hints, const struct ui_fields *fields, const struct ui_hint *keys, u32 key_count);
+// Runs frames until UP, DOWN, LEFT, RIGHT (held: they repeat), A or B fires
+// on it, and returns that key (one bit); A only once it has opened. 0 if no
+// field card is up.
+u16 ui_fields_key(void);
+// Its fields changed (texts, the active one): they draw again
+void ui_fields_changed(void);
 
 struct ui_confirm {
 	const char *title;   // one line: "Delete Metroid Fusion?"

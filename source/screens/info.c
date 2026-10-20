@@ -336,7 +336,7 @@ static int menu_fetch(void *ctx, u32 i, struct ui_item *out)
 	return UI_ITEM_READY;
 }
 
-static const struct ui_list_model menu_model = {menu_count, menu_fetch, 0};
+static const struct ui_list_model menu_model = {menu_count, menu_fetch, 0, 0, 0};
 
 enum {
 	M_TITLE,

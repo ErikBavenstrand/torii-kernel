@@ -51,6 +51,19 @@ static const struct popup_look {
 	u8 pop_value_r;      // where its value ends, from the card's right
 	u8 pop_value_gap;    // at least this between the text and the value
 	u8 pop_pill_in;      // the selection pill's inset from the card's sides
+	// The field card (the Settings page's Time and Date, #20), in the
+	// popup's card
+	u8 fld_h;            // its height
+	u8 fld_icon_x, fld_icon_y;  // the title's 8x8 icon
+	u8 fld_title_x, fld_title_y;  // the title's text, its line top
+	u8 fld_rule_y;       // the hairline under the title
+	u8 fld_rule_in;      // and how far in from the card's sides it stops
+	u8 fld_line_y;       // the fields' line top (the heading font)
+	u8 fld_box_pad;      // the active field's tint box: px each side of its text,
+	u8 fld_box_h;        // its height, from a px above the line
+	u8 fld_box_r;
+	u8 fld_arrow_w, fld_arrow_h;  // the arrows above and below it,
+	u8 fld_arrow_gap;    // this far from the box
 	// The confirmation (#10). Card and shadow fill whole tiles, so over a
 	// popup no blank part of its tiles hides the popup.
 	u8 conf_x, conf_y, conf_w, conf_h;  // its card
@@ -88,6 +101,20 @@ static const struct popup_look {
 	.pop_value_r = 8,
 	.pop_value_gap = 6,
 	.pop_pill_in = 3,
+	.fld_h = 60,
+	.fld_icon_x = 6,
+	.fld_icon_y = 4,
+	.fld_title_x = 17,
+	.fld_title_y = 2,
+	.fld_rule_y = 15,
+	.fld_rule_in = 4,
+	.fld_line_y = 29,
+	.fld_box_pad = 3,
+	.fld_box_h = 17,
+	.fld_box_r = 3,
+	.fld_arrow_w = 5,
+	.fld_arrow_h = 3,
+	.fld_arrow_gap = 2,
 	.conf_x = 32,
 	.conf_y = 48,
 	.conf_w = 175,
@@ -437,7 +464,8 @@ struct run {
 	u16 keys_after;   // keys pressed while it closed: the page's
 	struct ui_spec node_spec;
 	struct ui_view_spec view_spec;
-	struct ui_hint hint[3];
+	struct ui_hint hint[4];
+	u8 hint_count;
 	const struct ui_hint *old_hints;
 	u32 old_count;
 	const char *old_text;
@@ -445,8 +473,10 @@ struct run {
 
 static struct {
 	struct run pop, conf;
-	// The popup
+	// The popup, or the field card
 	const struct ui_popup *menu;
+	const struct ui_fields *fields;  // a field card's (menu NULL)
+	u16 key;                         // the key ui_fields_key returns, 0 none yet
 	s16 top;      // its card's top, screen px
 	s16 notch_y;  // the notch's line (the row's middle)
 	u16 h;        // its card's height
@@ -508,7 +538,7 @@ static int run_tick(struct run *r, u32 dt, const struct ui_move *open, const str
 			// draws a lot: they needn't share a frame)
 			ui_hints_get(r->hints, &r->old_hints, &r->old_count, &r->old_text);
 			r->hints_view = ui_node_view(r->hints)->spec;
-			ui_hints_set(r->hints, r->hint, 3);
+			ui_hints_set(r->hints, r->hint, r->hint_count);
 			r->hinted = 1;
 		}
 	}
@@ -602,6 +632,48 @@ static s32 item_top(u32 i)
 	return pp.top + (pp.menu->title ? look.pop_head_h : look.pop_pad_top) + (s32)(i * look.pop_pitch);
 }
 
+// The field card's fields at (x, y), the card's top left: centred, the
+// active one in its box, with arrows
+static void fields_render(const struct pen *p, s32 x, s32 y)
+{
+	const struct ui_theme *t = ui_theme();
+	const struct torii_font *font = t->body, *big = t->heading;
+	const struct ui_fields *f = pp.fields;
+	s32 w = look.pop_w;
+	if (f->icon8)
+		pen_icon8(p, x + look.fld_icon_x, y + look.fld_icon_y, f->icon8 - 1u, UI_ROLE_TEXT);
+	pen_text(p, font, x + look.fld_title_x, y + look.fld_title_y, (u32)(w - look.fld_title_x - look.fld_rule_in),
+		 UI_ROLE_TEXT, f->title, PEN_LEFT);
+	pen_fill(p, x + look.fld_rule_in, y + look.fld_rule_y, w - 2 * look.fld_rule_in, 1, UI_ROLE_BORDER);
+	u32 n = f->count < UI_FIELDS_MAX ? f->count : UI_FIELDS_MAX, fw[UI_FIELDS_MAX], sw[UI_FIELDS_MAX], total = 0;
+	for (u32 i = 0; i < n; i++) {
+		fw[i] = f->text[i] ? text_width(big, f->text[i], strlen(f->text[i])) : 0;
+		sw[i] = i + 1 < n && f->sep[i] ? text_width(big, f->sep[i], strlen(f->sep[i])) : 0;
+		total += fw[i] + sw[i];
+	}
+	s32 fx = x + (w - (s32)total) / 2, ly = y + look.fld_line_y;
+	for (u32 i = 0; i < n; i++) {
+		if (i == f->active) {
+			s32 bx = fx - look.fld_box_pad, bw = (s32)fw[i] + 2 * look.fld_box_pad, by = ly - 1;
+			pen_round(p, bx, by, bw, look.fld_box_h, look.fld_box_r, UI_ROLE_TINT);
+			// Arrows: a point above the box, widening down; one below, narrowing
+			s32 ax = bx + (bw - look.fld_arrow_w) / 2;
+			for (s32 r = 0; r < look.fld_arrow_h; r++) {
+				s32 half = r, up = by - look.fld_arrow_gap - look.fld_arrow_h + r;
+				s32 down = by + look.fld_box_h + look.fld_arrow_gap + (look.fld_arrow_h - 1 - r);
+				s32 cx = ax + look.fld_arrow_w / 2;
+				pen_fill(p, cx - half, up, 2 * half + 1, 1, UI_ROLE_ACCENT_INK);
+				pen_fill(p, cx - half, down, 2 * half + 1, 1, UI_ROLE_ACCENT_INK);
+			}
+		}
+		pen_text(p, big, fx, ly, fw[i] + 1, i == f->active ? UI_ROLE_TEXT : UI_ROLE_DIM, f->text[i], PEN_LEFT);
+		fx += (s32)fw[i];
+		if (sw[i])
+			pen_text(p, big, fx, ly, sw[i] + 1, UI_ROLE_FAINT, f->sep[i], PEN_LEFT);
+		fx += (s32)sw[i];
+	}
+}
+
 static void popup_render(u8 node, const struct pen *p)
 {
 	const struct ui_node *n = ui_node(node);
@@ -620,6 +692,10 @@ static void popup_render(u8 node, const struct pen *p)
 	}
 	if (k >= 2)
 		pen_fill(p, x, ny - (k - 2), 1, 2 * (k - 2) + 1, UI_ROLE_FLOAT);
+	if (pp.fields) {
+		fields_render(p, x, y);
+		return;
+	}
 	if (m->title) {
 		s32 tx = look.pop_text_x;
 		if (m->icon8) {
@@ -703,6 +779,14 @@ static int popup_event(u8 node, const struct ui_event *e)
 		r->keys_after |= e->keys & KEYS_AFTER;  // for the page, once it has closed
 		return 1;
 	}
+	if (pp.fields) {
+		// The first of B, A (once open), then the d-pad
+		static const u16 order[] = {INPUT_B, INPUT_A, INPUT_UP, INPUT_DOWN, INPUT_LEFT, INPUT_RIGHT};
+		for (u32 i = 0; i < sizeof(order) / sizeof(order[0]) && !pp.key; i++)
+			if ((e->keys & order[i]) && (order[i] != INPUT_A || !r->dir))
+				pp.key = order[i];
+		return 1;
+	}
 	if (e->keys & INPUT_B) {
 		r->answer = ANSWER_B;
 	} else if (e->keys & INPUT_A) {
@@ -743,6 +827,21 @@ static void popup_draw(u8 node)
 		measure("popup-draw");
 		return;
 	}
+	if (pp.fields) {
+		// The fields' band: from the arrow above the box to the one below
+		s32 a = pp.top + look.fld_line_y - 1 - look.fld_arrow_gap - look.fld_arrow_h - ui_node(node)->y;
+		s32 b = a + look.fld_arrow_h + look.fld_arrow_gap + look.fld_box_h + look.fld_arrow_gap +
+			look.fld_arrow_h;
+		if (!pp.redraw)
+			return;
+		if (canvas_band(node, &st->c, a, b, popup_render)) {
+			pp.redraw = 0;
+			measure("fields-move");
+		} else {
+			ui_dirty(node, 1);
+		}
+		return;
+	}
 	for (u32 i = 0; i < UI_POPUP_ITEMS; i++) {
 		if (!(pp.redraw >> i & 1))
 			continue;
@@ -759,6 +858,42 @@ static void popup_draw(u8 node)
 const struct ui_ops ui_popup_ops = {
 	sizeof(struct popup_state), popup_measure, popup_init, popup_event, popup_update, popup_draw};
 
+// Opens the popup's card, h px tall, beside list's selected row (pp.menu
+// or pp.fields set): 0 if it can't
+static int card_open(u8 list, u8 hints, u32 h)
+{
+	TLOG_ASSERT(hints == UI_NONE || ui_node_spec(hints)->kind == UI_HINTS);
+	// Beside the row where it will rest, its top clamped under the title bar
+	// and over the hint bar
+	s32 row, top;
+	u32 rh;
+	ui_list_cursor_row(list, &row, &rh);
+	row += ui_node_view(list)->offset;
+	u32 r = ui_theme()->look.card_radius, k = look.pop_notch;
+	top = row - look.pop_above;
+	top = top > (s32)look.pop_bottom_max - (s32)h ? (s32)look.pop_bottom_max - (s32)h : top;
+	top = top < look.pop_top_min ? look.pop_top_min : top;
+	s32 mid = row + (s32)rh / 2, lo = top + (s32)(r + k), hi = top + (s32)h - 1 - (s32)(r + k);
+	pp.top = (s16)top;
+	pp.h = (u16)h;
+	pp.notch_y = (s16)(mid < lo ? lo : mid > hi ? hi : mid);
+	pp.redraw = 0;
+	pp.key = 0;
+	s16 rect[4];
+	card_rect(look.pop_x - (s32)k, top, look.pop_w + (s32)k, (s32)h, rect);
+	run_spec(&pp.pop, "popup", UI_POPUP, rect);
+	struct ui_view *v = ui_push(&pp.pop.view_spec, 0);
+	if (!v) {
+		tlog_error("popup: %s", ui_error());
+		return 0;
+	}
+	pp.pop.drawn_frame = 0;
+	run_start(&pp.pop, v, hints);
+	run_first_step(&pp.pop, &ui_theme()->motion.popup_open);
+	popup_overlay(pp.pop.open);
+	return 1;
+}
+
 int ui_popup_open(u8 list, u8 hints, const struct ui_popup *popup)
 {
 	TLOG_ASSERT(!ui_dispatching);
@@ -770,49 +905,63 @@ int ui_popup_open(u8 list, u8 hints, const struct ui_popup *popup)
 		tlog_error("%s", ui_error());
 		return 0;
 	}
-	TLOG_ASSERT(hints == UI_NONE || ui_node_spec(hints)->kind == UI_HINTS);
-	// Beside the row where it will rest, its top clamped under the title bar
-	// and over the hint bar
-	s32 row, top;
-	u32 rh;
-	ui_list_cursor_row(list, &row, &rh);
-	row += ui_node_view(list)->offset;
-	u32 r = ui_theme()->look.card_radius, k = look.pop_notch;
-	u32 h = (popup->title ? look.pop_head_h : look.pop_pad_top) + popup->count * look.pop_pitch +
-		look.pop_pad_bottom;
-	top = row - look.pop_above;
-	top = top > (s32)look.pop_bottom_max - (s32)h ? (s32)look.pop_bottom_max - (s32)h : top;
-	top = top < look.pop_top_min ? look.pop_top_min : top;
-	s32 mid = row + (s32)rh / 2, lo = top + (s32)(r + k), hi = top + (s32)h - 1 - (s32)(r + k);
 	pp.menu = popup;
-	pp.top = (s16)top;
-	pp.h = (u16)h;
-	pp.notch_y = (s16)(mid < lo ? lo : mid > hi ? hi : mid);
+	pp.fields = 0;
 	pp.cursor = popup->cursor < popup->count ? popup->cursor : 0;
-	pp.redraw = 0;
-	s16 rect[4];
-	card_rect(look.pop_x - (s32)k, top, look.pop_w + (s32)k, (s32)h, rect);
-	run_spec(&pp.pop, "popup", UI_POPUP, rect);
-	struct ui_view *v = ui_push(&pp.pop.view_spec, 0);
-	if (!v) {
-		tlog_error("popup: %s", ui_error());
-		return 0;
-	}
 	pp.pop.hint[0] = (struct ui_hint){KEY_UPDOWN, gl_pop_choose};
 	pp.pop.hint[1] = (struct ui_hint){"A", gl_pop_ok};
 	pp.pop.hint[2] = (struct ui_hint){"B", gl_pop_close};
-	pp.pop.drawn_frame = 0;
-	run_start(&pp.pop, v, hints);
-	run_first_step(&pp.pop, &ui_theme()->motion.popup_open);
-	popup_overlay(pp.pop.open);
-	return 1;
+	pp.pop.hint_count = 3;
+	return card_open(list, hints,
+			 (popup->title ? look.pop_head_h : look.pop_pad_top) + popup->count * look.pop_pitch +
+				 look.pop_pad_bottom);
+}
+
+int ui_fields_open(u8 list, u8 hints, const struct ui_fields *fields, const struct ui_hint *keys, u32 key_count)
+{
+	TLOG_ASSERT(!ui_dispatching);
+	if (run_live(&pp.pop))
+		ui_popup_close();
+	if (!fields || !fields->count || fields->count > UI_FIELDS_MAX || list == UI_NONE ||
+	    ui_node_spec(list)->kind != UI_LIST) {
+		ui_set_error("fields: 1 to %d fields, beside a list", UI_FIELDS_MAX);
+		tlog_error("%s", ui_error());
+		return 0;
+	}
+	pp.menu = 0;
+	pp.fields = fields;
+	u32 n = key_count < 4 ? key_count : 4;
+	for (u32 i = 0; i < n; i++)
+		pp.pop.hint[i] = keys[i];
+	pp.pop.hint_count = (u8)n;
+	return card_open(list, hints, look.fld_h);
+}
+
+u16 ui_fields_key(void)
+{
+	TLOG_ASSERT(!ui_dispatching);
+	struct run *r = &pp.pop;
+	if (!run_live(r) || !pp.fields)
+		return 0;
+	pp.key = 0;
+	while (!pp.key && ui_top() == r->view)
+		ui_frame();
+	return ui_top() == r->view ? pp.key : 0;
+}
+
+void ui_fields_changed(void)
+{
+	if (!run_live(&pp.pop) || !pp.fields)
+		return;
+	pp.redraw = 1;
+	ui_dirty(pp.pop.node, 1);
 }
 
 s32 ui_popup_choose(void)
 {
 	TLOG_ASSERT(!ui_dispatching);
 	struct run *r = &pp.pop;
-	if (!run_live(r))
+	if (!run_live(r) || !pp.menu)
 		return -1;
 	r->answer = ANSWER_NONE;
 	while (r->answer == ANSWER_NONE && ui_top() == r->view)
@@ -826,7 +975,7 @@ s32 ui_popup_choose(void)
 
 void ui_popup_changed(u32 item)
 {
-	if (!run_live(&pp.pop) || item >= pp.menu->count)
+	if (!run_live(&pp.pop) || !pp.menu || item >= pp.menu->count)
 		return;
 	pp.redraw |= (u16)(1u << item);
 	ui_dirty(pp.pop.node, 1);
@@ -1035,6 +1184,7 @@ int ui_confirm(u8 hints, const struct ui_confirm *confirm)
 	pp.conf.hint[0] = (struct ui_hint){KEY_LEFTRIGHT, gl_pop_choose};
 	pp.conf.hint[1] = (struct ui_hint){"A", gl_pop_ok};
 	pp.conf.hint[2] = (struct ui_hint){"B", gl_pop_cancel};
+	pp.conf.hint_count = 3;
 	pp.conf.drawn_frame = 0;
 	run_start(&pp.conf, v, hints);
 	run_first_step(&pp.conf, &ui_theme()->motion.popup_open);

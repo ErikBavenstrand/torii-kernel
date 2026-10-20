@@ -103,11 +103,7 @@ int ui_draw_room(u32 cycles, u32 budget);
 // the rest (its card). Colours: the UI's sprite bank (ui_obj_bank) holds
 // bank 0's roles (UI_ROLE_*), following the theme and item.
 
-// Adds a sprite for node's view (attr2 with its tile and palette bank, the
-// priority bits set here: the view's); 0 if the
-// view's sprites don't show now (a view above blends over it with sprites
-// of its own, or no priority is left under its text) or OAM is full.
-int ui_obj_add(u8 node, u16 attr0, u16 attr1, u16 attr2);
+// ui_obj_add (ui.h) adds them.
 // The UI's sprite palette bank, for attr2's palette bits.
 u32 ui_obj_bank(void);
 // Marks the view as showing sprites behind plane front (and plane 0).
@@ -119,11 +115,6 @@ s32 ui_view_dx(const struct ui_view *v);
 // ui_plane_fade_out): sprites drawn with it fade too as semi-transparent
 // ones (the blend's first target is the plane alone).
 int ui_plane_blending(u32 plane);
-
-// The inset of the row e px from a rounded end of radius px, at the edge
-// (e 0) and inwards (0 from e = radius on): the menu's one rounding, for
-// cards, pills and chips. Hardware-free (ui/ui_theme.c).
-u32 ui_round_inset(u32 radius, u32 e);
 
 // The ops of lists (ui/ui_list.c), the Paper clean widgets (ui/ui_paper.c)
 // and the popups (ui/ui_popup.c).
@@ -159,9 +150,6 @@ void ui_overlay_drop(const void *owner);
 // The hint bar's keys and text (ui_hints_set, ui_hints_text), to give them
 // back after a popup
 void ui_hints_get(u8 node, const struct ui_hint **hints, u32 *count, const char **text);
-// An 8x8 icon (art.h, ART_ICON8_*) at pixel (x, y) of a window, in ink
-struct text_window;
-void ui_icon8(const struct text_window *win, u32 x, u32 y, u32 id, u32 ink);
 
 struct text_window;
 // A key chip at x on a band of the look's hint_chip_h from line top of a

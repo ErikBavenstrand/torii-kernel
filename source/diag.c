@@ -103,7 +103,7 @@ static int lines_fetch(void *ctx, u32 index, struct ui_item *out)
 	return UI_ITEM_READY;
 }
 
-static const struct ui_list_model lines_model = {lines_count, lines_fetch, 0};
+static const struct ui_list_model lines_model = {lines_count, lines_fetch, 0, 0, 0};
 
 // The checklist's colour bars, 240x24 px: red, green, blue and white bars 56
 // px wide, as 30x3 tiles in a palette of their own (colours 1-4)

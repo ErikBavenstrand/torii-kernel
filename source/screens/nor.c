@@ -218,7 +218,7 @@ static int model_fetch(void *ctx, u32 i, struct ui_item *out)
 	return UI_ITEM_READY;
 }
 
-static const struct ui_list_model model = {model_count, model_fetch, 0};
+static const struct ui_list_model model = {model_count, model_fetch, 0, 0, 0};
 
 // --- The layout -------------------------------------------------------------------
 

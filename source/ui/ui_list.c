@@ -240,7 +240,7 @@ static int geometry(u8 node, struct list_state *st)
 	}
 	st->tw = (u8)(n->w / 8);
 	st->ct = (u8)(st->ring.period / 8);
-	st->opaque = ui_paper(node, UI_ROLE_NONE) != UI_ROLE_NONE;
+	st->opaque = ui_paper(node, UI_ROLE_NONE) != UI_ROLE_NONE || (c->flags & UI_LIST_DRAWN_PILL);
 	st->plain = (c->flags & UI_LIST_PLAIN) != 0;
 	return 1;
 }
@@ -597,7 +597,9 @@ static int list_init(u8 node)
 	return 1;
 }
 
-void ui_list_reset(u8 node, u32 cursor)
+// A new model (ui_list_reset), or rows added or removed (ui_list_recount):
+// the scroll for cursor is reckoned from from
+static void reset(u8 node, u32 cursor, s32 from)
 {
 	struct list_state *st = ui_node_state(node);
 	st->owner = row_cache_owner(row_cache());  // a new model: no row drawn yet
@@ -609,12 +611,23 @@ void ui_list_reset(u8 node, u32 cursor)
 	st->cursor = cursor;
 	st->sel_ok = 0;
 	marquee_reset(node, st);
-	s32 target = scroll_for(node, st, cursor, 0);
+	s32 target = scroll_for(node, st, cursor, from);
 	if (ui_node_shown(node)) {
 		forget_slots(st);
 		st->page = PAGE_NONE;
 	}
 	page_change(node, st, target);
+}
+
+void ui_list_reset(u8 node, u32 cursor)
+{
+	reset(node, cursor, 0);
+}
+
+void ui_list_recount(u8 node, u32 cursor)
+{
+	const struct list_state *st = ui_node_state(node);
+	reset(node, cursor, st->page != PAGE_NONE ? st->page_target : st->target);
 }
 
 void ui_list_refresh(u8 node, u32 lo, u32 hi)
@@ -982,6 +995,24 @@ static void pill_objs(u8 node, struct list_state *st)
 	}
 }
 
+// The model's sprites (ui_list_model.objs), while the list shows its page
+static void model_objs(u8 node, const struct list_state *st)
+{
+	const struct ui_list_model *m = config(node)->model;
+	if (!m->objs || !st->count || !ui_node_shown(node) || !ui_plane_owned(node) ||
+	    (st->page != PAGE_NONE && st->page != PAGE_FADING))
+		return;
+	const struct ui_node *n = ui_node(node);
+	const struct ui_view *v = ui_node_view(node);
+	struct ui_list_objs o = {n->x + ui_view_dx(v),
+				 n->y + v->offset,
+				 st->shown,
+				 st->ring.h,
+				 st->ring.rh,
+				 (u16)(ui_plane_blending(ui_node_spec(node)->plane) ? OBJ_SEMI : 0)};
+	m->objs(v->ctx, node, &o);
+}
+
 static void list_update(u8 node, u32 dt)
 {
 	struct list_state *st = ui_node_state(node);
@@ -1060,6 +1091,7 @@ static void list_update(u8 node, u32 dt)
 		ui_dirty(node, 1);
 	marquee_tick(node, st, dt);
 	pill_objs(node, st);
+	model_objs(node, st);
 }
 
 static void row_ctx_init(u8 node, const struct list_state *st, struct row_ctx *rc, u32 sel)
@@ -1136,6 +1168,13 @@ static int draw_row(const struct list_state *st, const struct row_ctx *rc, const
 	if (!blank)
 		text_clear(win, 0, y0, ww, rc->rh, rc->paper);
 	int picked = r != UI_ITEM_NONE && r == rc->sel;
+	if (rc->model->paint) {
+		// The model draws the row whole, the selection too
+		if (r >= st->count)
+			return 0;
+		struct ui_paint p = {win, x0, y0, rc->w, rc->rh, r, (u8)picked};
+		return rc->model->paint(rc->ctx, &p) || picked;
+	}
 	if (picked)
 		draw_pill(win, rc, x0, y0, 0, ww);
 	struct ui_item item = {0};
