@@ -99,13 +99,13 @@ games-cheats/picked 7A30C1D452B22270
 games-cheats/screen 666C1C7A8C10C858
 games-dedupe/screen 67E86C46698E404E
 games-fav/screen 5F5922C2D6F31804
-games-fav/starred 9420B42D7CAE4C1D
-games-fav/toggled 7CEBC3F5B0C881EB
+games-fav/starred 017306DC53C8BC2C
+games-fav/toggled A34C627E265FBBD3
 games-gb/popup 73FBC530961EE51B
 games-gb/screen A47EFAC3B4A4039F
 games-gba/cancelled A8DF39A7F87C26AE
 games-gba/closed 7C5107676E6593E0
-games-gba/delete 415C0C1AB8F1D510
+games-gba/delete 91DAB5F33422BD04
 games-gba/down 5FDFD6D57D176F66
 games-gba/info 4AB5CA097C79575E
 games-gba/info-sram D90679922BFDE48A
@@ -329,7 +329,7 @@ info-read/frames 18-22 58C6DE28040EB31D
 nav-push-fail/error 8DA1D73368B07BC5
 nav-push-fail/page 7857C96979E6C7B0
 nor-dark/closed AA30BC826BEEF216
-nor-dark/delete CA69568607994B68
+nor-dark/delete BF2BA6B86FF023DF
 nor-dark/page AA30BC826BEEF216
 nor-dark/popup CEF488E2E6F2945B
 nor-empty/page 042FF99D33EEF37C
@@ -387,17 +387,17 @@ rename/latin 307B33D0767DC9EF
 rename/prefilled 1017306268906A3D
 rename/shifted FBDD010AC1E7FCF2
 rename-dark/prefilled 1747112F0822FB93
-sd-confirm-tall/again 38FC8C00CD2004B7
-sd-confirm-tall/back B2C6B6888A227E94
-sd-confirm-tall/confirm 360337AD75235181
-sd-confirm-tall/popup 38FC8C00CD2004B7
+sd-confirm-tall/again 8D89101C0586EE3E
+sd-confirm-tall/back 089394670A0A6A39
+sd-confirm-tall/confirm 68FFE3FC5F8C3BC1
+sd-confirm-tall/popup 8D89101C0586EE3E
 sd-dark/folder AABEF294AE26B97E
 sd-dark/root DCB61BC334730AB2
 sd-empty/empty 4FBA4DEC6BFBD4AA
 sd-many/end 009F0545412ADE2B
 sd-many/root 71B7F9E83B290287
 sd-root/back E1A26AC1D32F7650
-sd-root/confirm C586B1DE9FA0017A
+sd-root/confirm E79A2798444115F5
 sd-root/file-info 1D6589D91811BE54
 sd-root/folder EE84177EF9E20E06
 sd-root/popup 2C9FF18BEEAFA43A
@@ -411,7 +411,7 @@ sd-root/frames 18-18 77FF67C5CAC2B1DE
 sd-root/frames 19-19 A2C46D299D4933C2
 sd-root/frames 20-20 A3B05621660A0116
 sd-root/frames 21-24 EE84177EF9E20E06
-sd-show-all/root 2D2B9617745CFBCD
+sd-show-all/root 5B54333358329E11
 settings/bottom 5AF32CE5D4C02BB3
 settings/capture 0AF22C9A1E1502E2
 settings/edit C0BF0D2D90ABDB36
@@ -420,11 +420,11 @@ settings/refused 6E4E63CCA8FDB1B7
 settings/swatch 9B1C82F67762B39C
 settings/top F250FAF385F3750C
 settings/frames 0-1 18F86487AC5B1BF0
-settings/frames 2-2 51630D1D68817AA4
-settings/frames 3-3 E4049A0674CEA2FA
-settings/frames 4-4 B00E5F639C3F9772
-settings/frames 5-5 A3741D997DF9F346
-settings/frames 6-6 1A6DD0D4E5A68D53
+settings/frames 2-2 CD25B7A837C35CA8
+settings/frames 3-3 7BE2CED891B66110
+settings/frames 4-4 9F6E5624C19B6A2B
+settings/frames 5-5 5B48120BE9A09886
+settings/frames 6-6 C226830AB3046627
 settings/frames 7-12 164E58151216E5F3
 settings/frames 13-13 F250FAF385F3750C
 settings/frames 14-14 48802FD651B11744
@@ -715,11 +715,11 @@ ui-paper/reading-scrolled 982D66A82475F397
 ui-paper/widgets-dark C289308ACD933D17
 ui-paper/widgets-light DAD09D6451D41280
 ui-paper/widgets-moved AEF244826D50C777
-ui-popup/confirm A8AD6F5DE20AF7A6
-ui-popup/confirm-action AEB1EA3DFB9182D9
+ui-popup/confirm C0CFA9AFDF63FF41
+ui-popup/confirm-action 599642BF6BCA258E
 ui-popup/confirm-alone A1E4A7EBF63BDBD2
 ui-popup/confirm-cancelled 2EFC3E8BDC597950
-ui-popup/confirm-dark 620EB732E0D5E5AD
+ui-popup/confirm-dark 42263CBE8F805401
 ui-popup/letter 833CFE03F60461C6
 ui-popup/list-light 582C0D04D6548492
 ui-popup/popup-bottom 90F1B1F805BD039B
@@ -744,25 +744,25 @@ ui-popup/frames 13-13 6F26953A5119E56B
 ui-popup/frames 14-14 980C90DE902F5DBE
 ui-popup/frames 15-15 95476FD6D4698A92
 ui-popup/frames 16-21 582C0D04D6548492
-ui-popup/frames 22-22 E09B029B66DF858C
-ui-popup/frames 23-23 FE8EEEA75AD9942E
-ui-popup/frames 24-24 58EFC355C16A1C1D
-ui-popup/frames 25-25 71783BBE616205BB
+ui-popup/frames 22-22 9B2D0B38A52011C5
+ui-popup/frames 23-23 29127B5D1302AC5D
+ui-popup/frames 24-24 C19A0C5D05F7DDFB
+ui-popup/frames 25-25 DFE6B7CD5C1828D1
 ui-popup/frames 26-26 B4F4EB4DC01ECC37
 ui-popup/frames 27-36 C49AF6536034BC83
-ui-popup/frames 37-37 15D463BA76A5A7B2
-ui-popup/frames 38-38 C251BF4170A05984
-ui-popup/frames 39-39 D20D98EAABEE7900
-ui-popup/frames 40-40 97C351B01A8D5DD2
+ui-popup/frames 37-37 AD0144847F8E875B
+ui-popup/frames 38-38 A0450F8188278C34
+ui-popup/frames 39-39 84CA1FCD3BE9E966
+ui-popup/frames 40-40 CD27FB0226A6398B
 ui-popup/frames 41-43 582C0D04D6548492
 ui-popup/frames 44-45 2EFC3E8BDC597950
-ui-popup/frames 46-46 E433743C96F4918C
-ui-popup/frames 47-47 2C1169F82EEAC058
-ui-popup/frames 48-48 69C60809A5427AD5
-ui-popup/frames 49-49 F13C013EDCA806D0
-ui-popup/frames 50-50 283C2303500968D7
-ui-popup/frames 51-58 A8AD6F5DE20AF7A6
-ui-popup/frames 59-60 AEB1EA3DFB9182D9
+ui-popup/frames 46-46 E53C4348E0DA88E4
+ui-popup/frames 47-47 836DF3892F8D9A0F
+ui-popup/frames 48-48 928F505F869BF067
+ui-popup/frames 49-49 7A3C25C75D50A446
+ui-popup/frames 50-50 34B0EA4F4B30F5E8
+ui-popup/frames 51-58 C0CFA9AFDF63FF41
+ui-popup/frames 59-60 599642BF6BCA258E
 ui-popup/frames 61-61 54C18E56D2ACDE88
 ui-popup/frames 62-62 D0FDEFB751DE49B7
 ui-popup/frames 63-63 5B73DC07C1F82437
