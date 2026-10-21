@@ -3,12 +3,14 @@
 usage: uv run --with pillow python -I tools/mockup/boxes.py [SHEET.png [REF]]
 
 Draws assets/ui/boxes/*.png (then run `just assets`): each console's box
-as its real boxes are laid out (GBA's band down the left, the Game Boys'
-band across the top, NES's black box), with a skeleton where the game's art
-and name would be: a muted torii gate before a pale sun, on a ground plate
-that holds two title bars, so it reads as "no art yet". The PNGs are drawn
-in the light theme's colours; art.toml's box_dark replaces some in the dark
-theme. SHEET, if given, shows the boxes on both themes' cards at 1x and 4x,
+as its real (US) boxes are laid out, redrawn at 80x80: the Game Boys' silver
+band down the left with the console's name reading up it, the rating box
+and the Nintendo oval or ONLY FOR corner at the bottom; the NES black box
+with its sprite drawn on a grid; a slate band for the rest. Where the game's
+art and name would be is a skeleton, so it reads as "no art yet": title bars
+over a muted torii gate before a pale sun (on the NES, a pixel torii before
+a red sun). The PNGs are drawn in the light theme's colours; art.toml's
+box_dark replaces some in the dark theme. SHEET, if given, shows the boxes on both themes' cards at 1x and 4x,
 under the boxes at git revision REF when that is given.
 """
 
@@ -37,9 +39,6 @@ GATE = C("#D0B0A8")  # the gate, the title bars and the GBA seal: a faded vermil
 EDGE = C("#A8A098")  # the box's outline
 SHADOW = C("#D8D0C8")
 LIGHT_TONES = (SKY, SUN, GROUND, GATE)
-# The NES picture window's own tones, cooler, lifted in the dark theme
-NES_TONES = (C("#E0E0E8"), C("#F0F0F8"), C("#D8D8E0"), C("#B8B8C8"))
-INK = C("#283028")  # the Game Boys' logo
 
 # 3x5 letters (the GBA band, GBC's COLOR) and bold italic 6x7 ones (GAME BOY)
 FONT = {
@@ -56,6 +55,23 @@ FONT = {
     "R": ["##.", "#.#", "##.", "#.#", "#.#"],
     "V": ["#.#", "#.#", "#.#", "#.#", ".#."],
     "Y": ["#.#", "#.#", ".#.", ".#.", ".#."],
+    " ": ["..", "..", "..", "..", ".."],
+}
+# 4x5 letters, wider for the bands' bold words
+WIDE = {
+    "A": [".##.", "#..#", "####", "#..#", "#..#"],
+    "B": ["###.", "#..#", "###.", "#..#", "###."],
+    "C": [".###", "#...", "#...", "#...", ".###"],
+    "D": ["###.", "#..#", "#..#", "#..#", "###."],
+    "E": ["####", "#...", "###.", "#...", "####"],
+    "G": [".###", "#...", "#.##", "#..#", ".###"],
+    "L": ["#...", "#...", "#...", "#...", "####"],
+    "M": ["#...#", "##.##", "#.#.#", "#...#", "#...#"],
+    "N": ["#..#", "##.#", "#.##", "#..#", "#..#"],
+    "O": [".##.", "#..#", "#..#", "#..#", ".##."],
+    "R": ["###.", "#..#", "###.", "#.#.", "#..#"],
+    "V": ["#...#", "#...#", ".#.#.", ".#.#.", "..#.."],
+    "Y": ["#...#", ".#.#.", "..#..", "..#..", "..#.."],
     " ": ["..", "..", "..", "..", ".."],
 }
 BOLD = {
@@ -159,27 +175,23 @@ class Pic:
             if ch != " ":
                 i += 1
 
-    def vtext(s, txt, x, ybottom, colour):
-        """txt in the 3x5 font turned to read upwards from ybottom; colour(i)
-        gives letter i's colour."""
+    def vtext(s, txt, x, ybottom, colour, font=FONT, gap=1):
+        """txt turned to read upwards from ybottom, its glyphs' rows going
+        right from column x; colour(i) gives letter i's colour. Returns the
+        row above the last letter."""
         yy = ybottom
         for i, ch in enumerate(txt):
-            g = FONT[ch]
+            g = font[ch]
             for gy, row in enumerate(g):
                 for gx, b in enumerate(row):
                     if b == "#":
                         s.p(x + gy, yy - gx, colour(i))
-            yy -= len(g[0]) + 1
+            yy -= len(g[0]) + gap
+        return yy
 
-    def logo(s, txt, x, y, c):
-        """txt in the bold italic letters (the Game Boys' logo)."""
-        for ch in txt:
-            g = BOLD[ch]
-            for gy, row in enumerate(g):
-                for gx, b in enumerate(row):
-                    if b == "#":
-                        s.p(x + gx + (1 if gy < 3 else 0), y + gy, c)
-            x += len(g[0]) + 1
+    @staticmethod
+    def vlength(txt, font=FONT, gap=1):
+        return sum(len(font[ch][0]) for ch in txt) + gap * (len(txt) - 1)
 
 
 def frame(pic, body):
@@ -203,7 +215,7 @@ def corners(pic):
         pic.p(x, y, EDGE)
 
 
-def skeleton(pic, x0, y0, x1, y1, plate, tones=LIGHT_TONES, small=False):
+def skeleton(pic, x0, y0, x1, y1, plate, tones=LIGHT_TONES, small=False, above=0):
     """The "no art" picture in (x0, y0)-(x1, y1): sky, a sun behind a torii
     gate standing on a ground plate `plate` rows tall. Returns the plate's
     top row."""
@@ -221,92 +233,118 @@ def skeleton(pic, x0, y0, x1, y1, plate, tones=LIGHT_TONES, small=False):
         pic.rect(x, gy - round(h), x, y1, ground)
     w = (x1 - x0 + 1) * (44 if small else 62) // 100 // 2 * 2
     rows = torii(w, small)
-    room = gy - y0
+    room = gy - y0 - above
     height = max(
         len(rows) + 2, min(int(room * 0.84), int(w * (0.78 if small else 0.9)))
     )
     gx = (x0 + x1 + 1) // 2 - w // 2
-    top = gy - height
+    ty = gy - height
     # The sun, framed by the gate under its beams
     r = w * 0.28
-    pic.disc(gx + w / 2 - 0.5, top + height * 0.45, r, sun, x0, y0, x1, gy - 1)
-    pic.sprite(rows, gx, top, gate, height)
+    pic.disc(gx + w / 2 - 0.5, ty + height * 0.45, r, sun, x0, y0, x1, gy - 1)
+    pic.sprite(rows, gx, ty, gate, height)
     return gy
 
 
-def title_bars(pic, x, gy, colour, widths=(34, 20)):
-    """Two skeleton title bars on the ground plate from its row gy."""
-    pic.pill(x, gy + 3, widths[0], 4, colour)
-    pic.pill(x, gy + 9, widths[1], 3, colour)
+SILVER = C("#F0F0F0")  # the Game Boys' band
+SILVERD = C("#C0C0C8")  # its edge
+BAND_X = 13  # the band's last column, its edge
+ART_X = BAND_X + 1
+
+
+def band(pic):
+    """The Game Boys' silver band down the left edge."""
+    pic.rect(1, 1, BAND_X - 1, 77, SILVER)
+    pic.rect(BAND_X, 1, BAND_X, 77, SILVERD)
+
+
+def title_bars(pic, x0, x1, y, colour):
+    """Two skeleton title bars centred in x0..x1 from row y, as the games'
+    logos sit at the top of their art."""
+    w = x1 - x0 + 1
+    cx = x0 + w // 2
+    for share, height, dy in ((70, 5, 0), (44, 3, 7)):
+        width = w * share // 100 // 2 * 2
+        pic.pill(cx - width // 2, y + dy, width, height, colour)
+
+
+def rating(pic, x, y):
+    """The rating box at the art's bottom left, as an outline."""
+    pic.rect(x, y, x + 6, y + 8, GATE)
+    pic.rect(x + 1, y + 1, x + 5, y + 7, GROUND)
+    pic.rect(x + 2, y + 2, x + 4, y + 4, GATE)
+    pic.rect(x + 2, y + 6, x + 4, y + 6, GATE)
+
+
+def nintendo(pic, x, y, ring, inside):
+    """The Nintendo oval, 14x7: a ring round a word of dashes."""
+    pic.pill(x, y, 14, 7, ring)
+    pic.pill(x + 1, y + 1, 12, 5, inside)
+    for dx in (3, 4, 6, 7, 8, 10):
+        pic.p(x + dx, y + 3, ring)
 
 
 boxes = {}
+TONES_TOP = 20  # the art's rows above the gate's room: the title bars
 
-# --- GBA: a dark band down the left edge, GAME BOY ADVANCE reading up it
+# --- GBA: the silver band with GAME BOY ADVANCE reading up it in grey, the
+# word ADVANCE bold
 p = Pic()
 frame(p, SKY)
-BAND = C("#202038")
-LOGO = C("#F0F0F0")
-ADV = C("#A098F0")
-LINE = C("#5848C8")
-p.rect(1, 1, 11, 77, BAND)
-p.rect(12, 1, 12, 77, LINE)
-p.vtext("GAME BOY ADVANCE", 4, 73, lambda i: LOGO if i < 8 else ADV)
-gy = skeleton(p, 13, 1, 77, 77, 15)
-title_bars(p, 18, gy, GATE, (30, 18))
-p.pill(61, gy + 3, 12, 7, GATE)  # the seal
-p.pill(62, gy + 4, 10, 5, GROUND)
-p.rect(64, gy + 6, 69, gy + 6, GATE)
+band(p)
+GREY = C("#383838")
+y = p.vtext("GAME BOY", 5, 74, lambda i: GREY)
+p.vtext("ADVANCE", 4, y - 3, lambda i: GREY, WIDE)
+gy = skeleton(p, ART_X, 1, 77, 77, 12, above=TONES_TOP)
+title_bars(p, ART_X, 77, 6, GATE)
+rating(p, ART_X + 4, 67)
+p.pill(62, 69, 12, 6, GATE)  # the publisher
 corners(p)
 boxes["gba"] = p
 
-# --- GB: a grey band with GAME BOY over the DMG's navy and magenta lines,
-# and the Nintendo oval
+# --- GB: the band with a big indigo GAME BOY and the red Nintendo mark
+# above it; the Nintendo oval at the bottom right
 p = Pic()
 frame(p, SKY)
-BANDG = C("#C8C8B8")
-NAVY = C("#283890")
-MAG = C("#A02870")
-RED = C("#C83030")
+band(p)
+INDIGO = C("#3038A0")
+RED = C("#D02828")
 WHITE = C("#F8F8F0")
-p.rect(1, 1, 77, 15, BANDG)
-p.logo("GAME BOY", 5, 4, INK)
-p.pill(61, 4, 14, 7, RED)
-p.pill(62, 5, 12, 5, WHITE)
-for x in (64, 65, 67, 68, 69, 71):
-    p.p(x, 7, RED)
-p.rect(1, 16, 77, 16, NAVY)
-p.rect(1, 17, 77, 17, MAG)
-gy = skeleton(p, 1, 18, 77, 77, 15)
-title_bars(p, 6, gy, GATE)
+y0 = 74
+p.vtext("GAME BOY", 3, y0, lambda i: INDIGO, BOLD)
+p.pill(2, 3, 10, 5, RED)  # Nintendo
+for x in (4, 6, 8, 9):
+    p.p(x, 5, WHITE)
+gy = skeleton(p, ART_X, 1, 77, 77, 12, above=TONES_TOP)
+title_bars(p, ART_X, 77, 6, GATE)
+rating(p, ART_X + 4, 67)
+nintendo(p, 61, 69, RED, WHITE)
 corners(p)
 boxes["gb"] = p
 
-# --- GBC: a white band, GAME BOY over a five-colour COLOR, a teal corner
+# --- GBC: the band with GAME BOY in indigo and COLOR in five colours, and
+# the black ONLY FOR corner at the bottom right
 p = Pic()
 frame(p, SKY)
-TEAL = C("#089C94")
-TEALD = C("#087068")
-p.rect(1, 1, 77, 19, WHITE)
-p.logo("GAME BOY", 5, 4, INK)
-p.text(
-    "COLOR",
-    39,
-    13,
-    [C("#D82830"), C("#7838B8"), C("#48A030"), C("#E8B010"), C("#2860D0")],
-)
-for i in range(14):
-    for x in range(64 + i, 78):
-        p.p(x, 1 + i, TEAL)
-    p.p(64 + i, 1 + i, TEALD)
-p.rect(1, 20, 77, 20, TEAL)
-gy = skeleton(p, 1, 21, 77, 77, 15)
-title_bars(p, 6, gy, GATE)
+band(p)
+NAVY = C("#283898")
+RAINBOW = [C("#D82830"), C("#7838B8"), C("#48A030"), C("#E8B010"), C("#2860D0")]
+y = p.vtext("GAME BOY", 4, 74, lambda i: NAVY, WIDE)
+p.vtext("COLOR", 4, y - 3, lambda i: RAINBOW[i], WIDE)
+gy = skeleton(p, ART_X, 1, 77, 77, 12, above=TONES_TOP)
+title_bars(p, ART_X, 77, 6, GATE)
+rating(p, ART_X + 4, 67)
+CORNER = C("#101018")
+for i in range(19):
+    p.rect(77 - i, 59 + i, 77, 59 + i, CORNER)
+for i, c in enumerate(RAINBOW):  # COLOR, along its edge
+    x, y = 66 + i * 2, 74 - i * 2
+    p.rect(x, y, x + 1, y + 1, c)
 corners(p)
 boxes["gbc"] = p
 
-# --- NES: the black box: the title on black, the picture in a window, the
-# grid with a game's sprite on it (a torii), the red seal
+# --- NES: the black box: the title on black over the grid, the game's
+# sprite drawn on the grid (a torii before the sun), the seal
 p = Pic()
 BLACK = C("#181820")
 frame(p, BLACK)
@@ -314,34 +352,52 @@ DIM = C("#505060")
 GRID = C("#282838")
 SEAL = C("#C82830")
 SEALW = C("#E0E0E0")
+# The sprite's tones, the same in both themes on the black box
+CELL_SUN = C("#985060")
+CELL_GROUND = C("#383848")
+CELL_GATE = C("#C8C8D8")
 p.pill(6, 5, 44, 5, DIM)
 p.pill(6, 12, 28, 3, DIM)
-p.rect(8, 18, 70, 53, DIM)
-skeleton(p, 9, 19, 69, 52, 7, NES_TONES, small=True)
-# The grid, and a sprite on it: each cell 4x3, the lines between
-for y in range(57, 78, 3):
+for y in range(18, 65, 3):
     p.rect(1, y, 77, y, GRID)
 for x in range(3, 78, 4):
-    p.rect(x, 57, x, 77, GRID)
+    p.rect(x, 18, x, 64, GRID)
 SPRITE = [
-    "#########",
-    ".#######.",
-    "..#####..",
-    "..#...#..",
-    ".#######.",
-    "..#...#..",
+    "...................",
+    "...................",
+    "...#...........#...",
+    "...#############...",
+    "....###########....",
+    "......#..#..#......",
+    ".....#########.....",
+    "......#.....#......",
+    "......#.....#......",
+    "......#.....#......",
+    "......#.....#......",
+    ".....##.....##.....",
+    "ggggggggggggggggggg",
+    "ggggggggggggggggggg",
+    "ggggggggggggggggggg",
 ]
-PIXEL = C("#686878")
+
+
+def cell(cx, cy, c):
+    x, y = 4 + cx * 4, 19 + cy * 3
+    p.rect(x, y, min(x + 2, 77), y + 1, c)
+
+
+for cy in range(15):
+    for cx in range(19):
+        if (cx - 9) ** 2 + (cy - 7) ** 2 <= 4.2**2:
+            cell(cx, cy, CELL_SUN)
 for cy, row in enumerate(SPRITE):
     for cx, b in enumerate(row):
         if b == "#":
-            x, y = 40 + cx * 4, 58 + cy * 3
-            p.rect(x, y, x + 2, y + 1, PIXEL)
-p.pill(6, 64, 20, 9, SEAL)
-p.pill(7, 65, 18, 7, SEALW)
-p.pill(8, 66, 16, 5, SEAL)
-for x in (10, 11, 13, 14, 15, 17, 18, 20, 21):
-    p.p(x, 68, SEALW)
+            cell(cx, cy, CELL_GATE)
+        elif b == "g":
+            cell(cx, cy, CELL_GROUND)
+nintendo(p, 6, 68, SEAL, SEALW)  # the seal
+p.pill(44, 70, 28, 3, DIM)  # Nintendo Entertainment System
 corners(p)
 boxes["nes"] = p
 
@@ -354,8 +410,8 @@ p.rect(1, 1, 77, 15, SLATE)
 p.pill(6, 4, 34, 4, SLATEL)
 p.pill(6, 10, 20, 3, SLATEL)
 p.rect(1, 16, 77, 16, SLATEL)
-gy = skeleton(p, 1, 17, 77, 77, 15)
-title_bars(p, 6, gy, GATE)
+gy = skeleton(p, 1, 17, 77, 77, 12, above=4)
+rating(p, 5, 67)
 corners(p)
 boxes["other"] = p
 

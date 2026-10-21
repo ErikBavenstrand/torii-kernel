@@ -2,9 +2,9 @@
 # SCENARIO/KEY HASH: the key frame tests/shots/png/SCENARIO.KEY.png shows.
 # SCENARIO/frames FIRST-LAST HASH: frames of a -H range (counted from 0)
 # that all hash the same.
-art-sheet/boxes-dark 8AFD2466F4EBEE1B
-art-sheet/boxes-light A02A33A6915422D4
-art-sheet/icons 8A8EB6072EC645D5
+art-sheet/boxes-dark 799CEBF7B3C5EA84
+art-sheet/boxes-light F9084C411817C62B
+art-sheet/icons 5D66C4A0A38CB897
 art-sheet/sprites1 251BEEB4DCEA16AC
 art-sheet/sprites2 456A349A1C29F1C0
 boot/screen 818B02E74B016B0D
@@ -80,11 +80,11 @@ dialog-overflow/dialog 065D88663C13E179
 dialog-overflow/home 818B02E74B016B0D
 games-art/gba E4D66E146FB6D219
 games-art/gba-crc EAE4B45AD06AF276
-games-art/gba-none 1D610B8816A82C05
-games-art/recent BE32015497FF1F67
-games-art-box/gba 8D6D96D8B098EF94
+games-art/gba-none 7A533A78D3E4D987
+games-art/recent D6B09D15BF64F7E1
+games-art-box/gba D190CBFE3772B2F2
 games-art-dark/gba 743CC2D257F80E8A
-games-art-dark/gba-none 895648118340399E
+games-art-dark/gba-none 6DD7FD2BF9FD37DC
 games-cheats/back DE60914D027457D0
 games-cheats/picked BFDAFB041DCC8050
 games-cheats/screen C49F10B375086F38
