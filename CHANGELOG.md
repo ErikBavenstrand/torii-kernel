@@ -6,10 +6,19 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** Start on only picks which carousel item home faces at
+  power-on; it never opens a page. Its choices are Last place and the items
+  home shows (NES only with NES games, Recent and Favourites only while
+  they hold games); a chosen item that isn't shown falls back to Last
+  place, then the first item. Turning away from the boot item and back no
+  longer rewrites `recent.txt` (D1).
+- **Changed:** one placeholder box per console, drawn by the kernel and
+  redesigned (a light left band with the system's name, a soft torii);
+  `just art-scrape` no longer builds card placeholders and deletes the
+  `box-*.bin` files it made (D2).
 - **Changed:** a game without box art shows a placeholder box per console
   (GBA's left band, GB and GBC's top band and badge, NES's black box) with a
-  muted torii skeleton where the art would be; `just art-scrape` builds the
-  card's own placeholders on the PC from a real box per console. The
+  muted torii skeleton where the art would be (redrawn in D2). The
   Settings, Info, NOR, SD card, torii and 8x8 GBA icons are redrawn (C2;
   `cd8ddf0`).
 - **Changed:** Settings writes a value when it is confirmed (A on an edit,

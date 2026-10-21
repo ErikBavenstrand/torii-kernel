@@ -388,6 +388,7 @@ Made during the build without the user; each is cheap to change.
 - **A starts games with the enabled addons** (Play, Launch); Clean boot is a separate entry; v0.3's A, A was a clean boot (conductor, B13/B14).
 - **Rename:** B never cancels the keyboard; Rename only for indexed SD games; SD rename moves files, not folders; with an addon on, the SD Delete confirmation closes the popup first (B18).
 - **Art scraper:** one timeout stops fetching for the run; existing art never refreshed; romhacks get base-game art (B23).
+- **Placeholder boxes:** Nintendo-style trade dress in original pixels; the NES box's pixel torii needs a clearer gate (D2 review).
 - **Box art:** custom art shared by same-named files in different folders; covers load after 8 frames of rest with no fade (B22).
 - **Game lists:** Favourites shows no stars; list with art shows two facts; Game info is a page; GB/GBC/NES offer only Play (B13).
 - **SD card page:** Delete reaches `/torii` and `/SAVER` with Show all files on; the first 1,024 files the card lists are shown in a bigger folder; folder icons blue (B14).
