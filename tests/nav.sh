@@ -265,7 +265,6 @@ nav_nor_format_page() {
   _nav_file "$(_nav_nor_to 0)" "$(_nav_keys 8 UP)" '-w "nor: row format"' "$(_nav_keys 8 A)" "$answer"
 }
 
-
 # nav_setting ROW: from power-on to the Settings page with ROW selected,
 # waiting there. ROW is a row of source/settings_model.h, in page order
 # (_nav_setting_rows); with NAV_LED_OFF=1 the LED colours are hidden, as
@@ -273,20 +272,20 @@ nav_nor_format_page() {
 _nav_setting_rows=(theme game-view start-on dim time date 24h game-clock fast-patching auto-save save-states
   cheats rumble mode-b led led-colour sd-light reset-hotkey reset-keys sleep sleep-keys rescan identify show-all logging)
 nav_setting() {
-  local want=$1 id=0 downs=0 word keys=()
+  local want=$1 id=0 steps=0 word keys=()
   for word in "${_nav_setting_rows[@]}"; do
     [ "$word" = "$want" ] && break
     id=$((id + 1))
     case $word in led-colour | sd-light) [ "${NAV_LED_OFF:-0}" = 1 ] && continue ;; esac
-    downs=$((downs + 1))
+    steps=$((steps + 1))
   done
   if [ $id = ${#_nav_setting_rows[@]} ]; then
     _nav_fail "no Settings row $want"
     return 1
   fi
   nav_to settings || return 1
-  [ $downs = 0 ] && return 0
-  for (( ; downs > 0; downs--)); do keys+=(DOWN); done
+  [ $steps = 0 ] && return 0
+  for (( ; steps > 0; steps--)); do keys+=(DOWN); done
   # The row's enum settings_id, as the page logs it
   _nav_file "$(_nav_keys 8 "${keys[@]}")" "-w \"settings: row $id\""
 }
