@@ -4,9 +4,9 @@ A custom kernel for the EZ-Flash Omega Definitive Edition, in the making.
 Named after the shrine gate you pass through into another world, like every
 game you launch. Not affiliated with EZ-Flash.
 
-Right now the kernel is EZ-Flash's official 1.06 with bug fixes. What this repo
-adds so far is the groundwork: a reproducible build, an emulated cart to run
-the kernel on, and tests.
+It starts from EZ-Flash's official 1.06 source, with its bugs fixed, a new
+menu drawn by a 60 fps tile engine, and the groundwork under it: a
+reproducible build, an emulated cart to run the kernel on, and tests.
 
 ## Download
 
@@ -16,6 +16,44 @@ or from the `ezkernelnew` download of any
 [CI run](https://github.com/ErikBavenstrand/torii-kernel/actions). Copy it to
 the root of the cart's SD card, hold R while switching the GBA on, and confirm
 the update.
+
+## The menu
+
+Home is a carousel of the places on the card: **Recent** and **Favourites**
+(while they hold games), one item per console the card has games for (GBA,
+GBC, GB, NES), **SD card**, **NOR**, **Settings** and **Info**. LEFT and
+RIGHT turn it, A opens the item facing you, and B on any page goes back to
+it. Info's Controls page lists every key.
+
+- **Game lists** (a console, Recent, Favourites): UP/DOWN move, L/R page,
+  LEFT/RIGHT jump to the next or previous first letter, A plays the game
+  with the addons Settings turns on, and START opens its menu: Play,
+  Favourite, Clean boot, Boot with addon, Rename (a name of your own, kept
+  in `/torii/names.txt`; the file stays), Game info and Delete (the save
+  stays). Hold L as you pick a way to start in the game's menu, and it
+  starts with the GBA's boot screen (held as you press A, L pages first,
+  then A starts the game shown). Games show
+  their cleaned file names, or No-Intro's names with `just names-update`;
+  Settings' Game view shows a list, or a list with box art (`just art-add`,
+  `just art-scrape`).
+- **SD card:** the card's folders as they are, folders first. A opens a
+  folder or starts a game, B goes up a folder, START opens the file's menu
+  (Launch, Clean boot, Write to NOR, favourites, Rename, which renames the
+  file with its save, Delete, File info). Torii's own folders and files it
+  can't start stay hidden unless Settings' Show all files is on.
+- **NOR:** what the cart's 64 MB game NOR holds, its games (A starts one,
+  START opens Launch, Game info, Delete) and Format all.
+- **Settings:** one page of sections (Look, Clock, Games, Cart, Hotkeys,
+  Library, System). A changes the selected value in place, L/R jump between
+  sections, and the values are written once, as you leave the page. Look
+  has the light and dark themes.
+- **Info:** Controls, In game (the hotkeys), Your cart, About, and
+  Diagnostics.
+
+At power-on the menu opens where you left it (Settings' Start on picks
+another place). A library index of the card's games (`/torii/library.idx`)
+is rebuilt in the background when the card changes; `/torii` also keeps
+`recent.txt`, `favorites.txt` and the logs.
 
 ## Setup
 
@@ -67,15 +105,15 @@ of the same ID.
 
 ## Logs and Diagnostics
 
-To bring back a report from a real cart, set LOGGING (settings page 2) to
-ERRORS, INFO or DEBUG. The kernel then writes what it does to
+To bring back a report from a real cart, set Logging (Settings, System) to
+Errors, Info or Debug. The kernel then writes what it does to
 `/torii/logs` on the card: every boot, every launch with the patches it
 applied, errors, and how the previous session ended. Off, the default, it
 writes nothing. A kernel crash is kept in cart RAM and logged at the next
-boot, even with LOGGING off. With LOGGING on, the in-game menu has a DEBUG
+boot, even with Logging off. With Logging on, the in-game menu has a DEBUG
 entry that saves the game's registers and memory for the next boot's log.
 
-DIAGNOSE on the same page (or L+R+SELECT held while switching on) runs
+Info's Diagnostics row (or L+R+SELECT held while switching on) runs
 **Diagnostics**: the unit tests, hardware probes and timings, then a few
 questions; [docs/release-checklist.md](docs/release-checklist.md) lists
 them. Read the results with `just logs`.

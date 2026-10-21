@@ -132,11 +132,6 @@ void frame_split(void)
 		split_at[split_count++] = cycles_now();
 }
 
-int frame_measuring(void)
-{
-	return measure_count != 0;
-}
-
 void frame_measure(const char *name)
 {
 	for (u32 i = 0; i < measure_count; i++)

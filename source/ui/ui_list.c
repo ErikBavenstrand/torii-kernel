@@ -164,7 +164,6 @@ struct row_ctx {
 	u32 pad;       // the inset from a row's edges
 	u32 x;         // where a row's name starts: pad, or after the icon column
 	u32 clip;      // the name's width
-	int icons;     // UI_LIST_ICONS
 	int icon8;     // UI_LIST_ICON8
 	u16 flags;     // the config's UI_LIST_*
 	u32 paper, ink;
@@ -828,8 +827,6 @@ static u32 text_x(u8 node)
 	u32 pad = row_pad(node), flags = config(node)->flags;
 	if (flags & UI_LIST_ICON8)
 		return pad + UI_LIST_ICON8_W + ui_theme()->look.section_icon_gap;
-	if (flags & UI_LIST_ICONS)
-		return UI_LIST_ICON_W + pad / 2;
 	return flags & UI_LIST_MARKS ? pad + 8u + ui_theme()->look.row_mark_gap : pad;
 }
 
@@ -838,22 +835,6 @@ static u32 text_clip(u8 node, const struct list_state *st)
 {
 	u32 w = st->tw * 8u, used = text_x(node) + row_pad(node) + config(node)->detail_w;
 	return w > used + 8 ? w - used : 8;
-}
-
-// Draws a 16x16 icon (2x2 tiles in row order) at x 0 and line y of a
-// window, over what is there: colour 0 lets it show
-static void row_icon(const struct text_window *win, u32 y, const u32 *icon)
-{
-	u32 column = win->height * 8u;
-	for (u32 t = 0; t < 4; t++) {
-		u32 *dst = win->tiles + (t & 1) * column + y + (t >> 1) * 8;
-		const u32 *src = &icon[t * 8];
-		for (u32 i = 0; i < 8; i++) {
-			u32 px = src[i];
-			u32 set = (px | px >> 1 | px >> 2 | px >> 3) & 0x11111111u;
-			dst[i] = (dst[i] & ~(set * 0xF)) | px;
-		}
-	}
 }
 
 // Draws an 8x8 icon (one 4bpp tile) at pixel (x, y) of a window, over what
@@ -1120,7 +1101,6 @@ static void row_ctx_init(u8 node, const struct list_state *st, struct row_ctx *r
 	rc->y = rc->rh > rc->font->line_height ? (rc->rh - rc->font->line_height) / 2 : 0;
 	rc->pad = row_pad(node);
 	rc->x = text_x(node);
-	rc->icons = (config(node)->flags & UI_LIST_ICONS) != 0;
 	rc->icon8 = (config(node)->flags & UI_LIST_ICON8) != 0;
 	rc->flags = config(node)->flags;
 	rc->clip = text_clip(node, st);
@@ -1239,11 +1219,6 @@ static int draw_row(const struct list_state *st, const struct row_ctx *rc, const
 	}
 	if (item.icon && rc->icon8 && rc->rh >= 8)
 		row_icon8(win, x0 + rc->pad, y0 + (rc->rh - 8) / 2, item.icon);
-	if (item.icon && rc->icons && rc->rh >= 16) {
-		struct text_window at = *win;
-		at.tiles += (x0 / 8) * win->height * 8u;
-		row_icon(&at, y0 + (rc->rh - 16) / 2, item.icon);
-	}
 	// The 8x8 icons, after the marquee's clears: the mark in its column, the
 	// badge after the name, the dot left of the detail
 	if (item.mark && (rc->flags & UI_LIST_MARKS))

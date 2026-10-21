@@ -244,7 +244,13 @@ if shard_case; then
   logged "$cart/2.log" "library: loaded 4096 games"
   logged "$cart/2.log" "library: unchanged"
   grep -E "kernel: library: (loaded|checking walk)" "$cart/2.log" | sed 's/^kernel: /  /'
-  echo "PASS: past 4,096 games the index keeps 4,096 and says the card has more"
+  # Power-on 3: the GBA page's last row (UP wraps to it) says so in the
+  # hint bar, and its first doesn't
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot "$cart" "$cart/3.log" $(nav_to gba) -k @8:UP -k @12:- -w "games: Showing the first 4,096 games"
+  [ "$(grep -c "games: Showing the first" "$cart/3.log")" = 1 ] || fail "the cap note showed on the first row too"
+  no_errors "$cart/3.log"
+  echo "PASS: past 4,096 games the index keeps 4,096 and says the card has more, and the GBA page's last row says so"
 fi
 
 if shard_case; then

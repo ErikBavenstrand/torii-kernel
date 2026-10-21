@@ -1,0 +1,10 @@
+# An empty folder on the SD card page: "Nothing here", and the hint bar
+# shows only B back (A and START do nothing there; B20)
+#! sd-file /Empty/x.gba 0 /dev/null
+#! sd-rm /Empty/x.gba
+-w "nav: home ready"
+-k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:LEFT -k @28:- -k @32:LEFT -k @36:- -k @40:A -k @44:-
+-w "sdcard: ready /"
+-k @8:A -k @12:-
+-w "sdcard: ready /Empty"
+-s @1:empty.png

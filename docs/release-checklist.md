@@ -3,8 +3,8 @@
 What to check on a real Omega DE before a release, beyond `just test` and
 `just compat`. It lists only what no real-cart test has confirmed yet; the
 rest is in `docs/research/cart-test-2026-10-18.md` and
-`cart-test-2026-10-18b.md`. Most of it ends in **Diagnostics** (settings
-page 2, DIAGNOSE, or hold L+R+SELECT while switching the console on), which
+`cart-test-2026-10-18b.md`. Most of it ends in **Diagnostics** (Info,
+Diagnostics, or hold L+R+SELECT while switching the console on), which
 logs every answer to `/torii/logs` at Debug level. Bring the card back and
 run `just logs /Volumes/OMEGA` (your card's mount point) to read the report
 in `dist/logs/torii.log`.
@@ -34,9 +34,10 @@ in `dist/logs/torii.log`.
 
 4. Delete `SAVER/EEPROM Probe.sav` from the card, so the probe's 8K runs
    start from a fresh 8 KB save.
-5. In settings page 1, turn RESET, SAVESTATE, SLEEP and CHEAT on (under
-   ADDON); in page 2, set LOGGING to DEBUG. Save, so every session below
-   is logged and sleep and cheats can be tried.
+5. In Settings, turn Save states and Cheats (Games) and Reset hotkey and
+   Sleep (Hotkeys) on, and set Logging (System) to Debug. Leave the page
+   with B, which writes them, so every session below is logged and sleep
+   and cheats can be tried.
 6. Have on the card: Pokémon Emerald (or another game with a save), a GB
    or GBC game, a NES game, and Drill Dozer for rumble if you have it.
 
@@ -50,20 +51,39 @@ on, NES with no NES launch) as "unconfirmed" in its summary.
 
 | Check | How |
 |---|---|
-| The in-game menu opens | BOOT WITH ADDON with RESET and SAVESTATE on, then L+R+START in the game |
+| The in-game menu opens | Boot with addon (the game's menu, START) with Reset hotkey and Save states on, then L+R+START in the game |
 | A save state saves and loads | in the menu, SAVE; play on; open the menu again and LOAD: the game is back where you saved |
 | DEBUG reaches the log | with LOGGING on: L+R+START, DEBUG; it says DEBUG SAVED and picks RESET. Choose RESET, not power-off: the snapshot is in cart RAM, which a power-off clears. The kernel's boot logs "debug info" |
-| Sleep sleeps and wakes | SLEEP on, BOOT WITH ADDON, L+R+SELECT in the game: the screen goes off; the wake keys bring the game back where it was |
-| A cheat works | `hello.gba` BOOT WITH ADDON (it finds `CHEAT/Hello.cht`), then L+R+START, CHEAT ON, and back to the game. Hello doesn't react to buttons; a green square in its top right corner shows the cheat at work (no square before CHEAT ON) |
-| A GB or GBC game runs | from the SD list; note the game's title |
-| A NES game runs | from the SD list |
-| A game written to NOR starts | WRITE TO NOR CLEAN, then start it from the NOR list (R). Power off and on: the cart must start the kernel, not safe mode |
-| Deleting a NOR game | in the NOR list, delete the latest game. Power off and on: the cart must start the kernel, the game gone from the list |
-| Rumble in a game | Drill Dozer, BOOT WITH ADDON or CLEAN BOOT: does the cart rumble? |
-| The loading bar during the cart's copy | CLEAN BOOT of a big GBA game (16 or 32 MB): the bar moves steadily through "Loading the game" without long stalls or a big jump at the end. See below |
+| Sleep sleeps and wakes | Sleep on, Boot with addon, L+R+SELECT in the game: the screen goes off; the wake keys bring the game back where it was |
+| A cheat works | `hello.gba` Boot with addon (it finds `CHEAT/Hello.cht`), then L+R+START, CHEAT ON, and back to the game. Hello doesn't react to buttons; a green square in its top right corner shows the cheat at work (no square before CHEAT ON) |
+| A GB or GBC game runs | from its console's list or the SD card page; note the game's title |
+| A NES game runs | from the NES list or the SD card page |
+| A game written to NOR starts | SD card page, START on a GBA game, Write to NOR, then start it from the NOR page. Power off and on: the cart must start the kernel, not safe mode |
+| Deleting a NOR game | on the NOR page, START on the latest game, Delete. Power off and on: the cart must start the kernel, the game gone from the page |
+| Rumble in a game | Drill Dozer, Boot with addon or Clean boot: does the cart rumble? |
+| The loading bar during the cart's copy | Clean boot of a big GBA game (16 or 32 MB): the bar moves steadily through "Loading the game" without long stalls or a big jump at the end. See below |
 | Opening and going back | A on a home item: its object zooms and fades into the paper, the title bar slides in, the card rises; B plays it backwards. No stutter, no flash of the old screen, the object's first and last frames where the carousel shows it |
 | The theme wipe | Settings, Theme, flip it: the new theme comes down from the top behind one clean, straight edge. Look for a ragged or flickering line at the edge (the palette copy running late on the cart, which the emulator can't show) and for the selection pill switching with its row |
-| The EEPROM probe | `eeprom.gba`, CLEAN BOOT with SAVE TYPE EEPROM 512: A (6-bit addresses), then again with B (14-bit). Then the same two with EEPROM 8K. See below |
+| The EEPROM probe | `eeprom.gba`: set its save type to EEPROM 512 in Game info (the game's menu, LEFT/RIGHT on Save type), then Clean boot: A (6-bit addresses), then again with B (14-bit). Then the same two with EEPROM 8K. See below |
+
+### The v0.4 menu
+
+The emulator runs the menu at its frame budget but can't show how it feels
+on the cart's screen, how fast the real card is, or what an old card's files
+do. With Logging on Debug, each of these leaves lines in the log.
+
+| Check | How |
+|---|---|
+| The carousel at 60 fps | turn home with LEFT/RIGHT, tapped and held: every object slides smoothly, nothing flickers or drops out (sprites past a line's limit vanish for a line), the far objects' fog reads on the screen |
+| The zoom at 60 fps | open and close every item: as "Opening and going back" above, with no frame held at the turn from zoom to card |
+| The 14 px rows | hold DOWN through a long game list and the SD card's biggest folder: is the speed right, does the pill keep up, are the rows easy to read at 14 px? Note anything that tears |
+| The theme wipe's edge | as "The theme wipe" above, both ways, on the cart's own screen (an IPS kit re-scans the picture and may show its own tearing) |
+| A full card's first scan | a card with hundreds of games and no `/torii/library.idx`: time from power-on to the menu, and from there until the consoles' counts settle. The log's `library:` lines give the walk's and the index write's times; compare with the emulator's (about 5x slower than a cart) |
+| An old card's recents | a card last used with v0.3 (with `SAVER/Recently play.txt`, NOR games in it too): Recent lists the same games, newest first, and after the first launch `/torii/recent.txt` exists and the old file is gone |
+| Covers loading | with art on the card (`just art-scrape` or `art-add`), Settings, Game view, List + art: covers appear soon after the cursor rests, the list never stutters while one loads, and a held scroll shows the placeholder |
+| Rename on a real card | rename a game from its menu (the name only), then an SD card file with a save from the SD card page: the file and its `.sav` both renamed, the game still in Recent and Favourites, its save still loading in the game |
+| Diagnostics from Info | Info, Diagnostics: its first page comes up, and B there comes back to Info, on its row; run it through once from there too |
+| The copy estimate | see "The copy's estimate" below: set `PROGRESS_COPY_RATE` from two or three big games |
 
 **The EEPROM probe** writes blocks 1–4 four different ways, reads them back
 a frame later, and shows one line for each way: OK in green, or which bytes
@@ -73,7 +93,7 @@ AT 64 BLOCKS: 512 B"). Note what each run's screen says, in particular any
 red line, then press A: the kernel's boot logs every step ("eeprom probe:")
 and its verdict.
 
-**The copy's estimate:** during a CLEAN BOOT the cart copies the game into
+**The copy's estimate:** during a Clean boot the cart copies the game into
 PSRAM by itself, and the bar moves on an estimate from the file size
 (`PROGRESS_COPY_RATE` in `source/progress.h`, bytes a frame). Each launch
 logs the real figure: `launch: the cart copied N KB in F frames, B bytes a

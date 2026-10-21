@@ -824,7 +824,7 @@ static const struct ui_spec cs_nodes[CS_NODES] = {
 };
 
 // The title's icon is the caller's (ui_title_icon_set)
-static const struct ui_view_spec cs_view = {"cheats", cs_nodes, CS_NODES, 0, CS_LIST, UI_VIEW_LR_PAGES, cs_event};
+static const struct ui_view_spec cs_view = {"cheats", cs_nodes, CS_NODES, CS_LIST, UI_VIEW_LR_PAGES, cs_event};
 
 // Runs the screen until START, or B is released, and returns with it still
 // up; 0 if it couldn't be shown

@@ -36,7 +36,8 @@
 // - READCACHE_RENAME, the last 4 KB: an SD file's rename (actions.c), within
 //   the call: its paths and its other files' names, kept while it calls
 //   gamename_store_move, userdata_rename and library_renamed (whose shares
-//   end before it).
+//   end before it); at boot, action_rename_recover reads the rename journal's
+//   line from the start, nothing else running.
 #define MAX_pReadCache_size 0x20000
 #define READCACHE_STAGE 0x0
 #define READCACHE_STAGE_SIZE 0x8000
@@ -115,10 +116,10 @@
 #define assress_edit_rtshotkey_1 9
 #define assress_edit_rtshotkey_2 10
 #define assress_engine_sel 11
-#define assress_show_Thumbnail 12
+//12 was the official kernel's thumbnail switch (slot 34 is the Box art row's)
 #define assress_game_clock 13 //games can read the cart's clock
 #define assress_auto_save_sel 14
-#define assress_ModeB_INIT 15
+#define assress_ModeB_INIT 15 //Mode B, what the cart is in a DS: the kernel only stores it
 #define assress_led_open_sel 16
 #define assress_Breathing_R 17
 #define assress_Breathing_G 18

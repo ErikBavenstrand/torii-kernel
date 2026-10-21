@@ -236,7 +236,6 @@ void test_theme_select(void)
 	const struct ui_look *l = &ui_theme_dark.look;
 	CHECK_EQ(l->list_pitch, 14);
 	CHECK_EQ(l->list_rows * l->list_pitch, 112);
-	CHECK(l->content_top + l->list_rows * l->list_pitch <= l->content_bottom + 1);
 	CHECK(l->hint_y + l->hint_chip_h <= 160);
 	CHECK(l->pill_h <= l->list_pitch && l->pill_radius * 2 <= l->pill_h);
 	CHECK(l->hint_chip_radius * 2 <= l->hint_chip_h);

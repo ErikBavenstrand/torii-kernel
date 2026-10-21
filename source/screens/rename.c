@@ -492,7 +492,7 @@ static const struct ui_spec nodes[N_NODES] = {
 };
 
 static int rename_event(struct ui_view *v, const struct ui_event *e);
-static const struct ui_view_spec view = {"rename", nodes, N_NODES, 0, UI_NONE, 0, rename_event};
+static const struct ui_view_spec view = {"rename", nodes, N_NODES, UI_NONE, 0, rename_event};
 
 // --- Changes ---------------------------------------------------------------------
 

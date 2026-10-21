@@ -41,32 +41,32 @@ static const struct ui_spec main_nodes[] = {
 	{UI_SCROLLBAR, 4, UI_NONE, 2, UI_RIGHT | UI_VFILL, 0, 0, 0, 0, 16, 8, 16, &t_bar},
 	{UI_PROGRESS, 5, UI_NONE, 0, UI_HFILL | UI_BOTTOM, 0, 0, 0, 8, 0, 8, 8, 0},
 };
-static const struct ui_view_spec main_view = {"test-main", main_nodes, 5, 0, 2, 0, 0};
+static const struct ui_view_spec main_view = {"test-main", main_nodes, 5, 2, 0, 0};
 
 static const struct ui_spec tall_nodes[] = {
 	{UI_LIST, 1, UI_NONE, 3, UI_FILL, UI_FOCUSABLE, 0, 0, 0, 32, 0, 0, &t_tall},
 };
-static const struct ui_view_spec tall_view = {"test-tall", tall_nodes, 1, 0, 0, 0, 0};
+static const struct ui_view_spec tall_view = {"test-tall", tall_nodes, 1, 0, 0, 0};
 
 static const struct ui_label_config t_text = {"Open?", UI_FONT_BODY, UI_ALIGN_CENTER, 0, 0};
 static const struct ui_spec dialog_nodes[] = {
 	{UI_PANEL, 1, UI_NONE, 0, UI_HCENTER | UI_VCENTER, 0, 0, 0, 0, 0, 128, 48, 0},
 	{UI_LABEL, 2, 0, 0, UI_FILL, 0, 0, UI_ROLE_PANEL, 8, 8, 8, 8, &t_text},
 };
-static const struct ui_view_spec dialog_view = {"test-dialog", dialog_nodes, 2, 0, UI_NONE, UI_VIEW_MODAL, 0};
+static const struct ui_view_spec dialog_view = {"test-dialog", dialog_nodes, 2, UI_NONE, UI_VIEW_MODAL, 0};
 
 static const u32 t_image_tiles[4][8] = {{0x11111111}, {0x22222222}, {0x33333333}, {0x44444444}};
 static const struct ui_image_config t_image = {&t_image_tiles[0][0], 0, 0x5601};
 static const struct ui_spec image_nodes[] = {
 	{UI_IMAGE, 1, UI_NONE, 1, 0, 0, 0, 0, 8, 8, 16, 16, &t_image},
 };
-static const struct ui_view_spec image_view = {"test-image", image_nodes, 1, 0, UI_NONE, 0, 0};
+static const struct ui_view_spec image_view = {"test-image", image_nodes, 1, UI_NONE, 0, 0};
 
 static const struct ui_list_config bad_rows = {&t_model, 40, 0, 0, 0};
 static const struct ui_spec bad_nodes[] = {
 	{UI_LIST, 1, UI_NONE, 1, UI_FILL, 0, 0, 0, 0, 0, 0, 0, &bad_rows},
 };
-static const struct ui_view_spec bad_view = {"test-bad", bad_nodes, 1, 0, 0, 0, 0};
+static const struct ui_view_spec bad_view = {"test-bad", bad_nodes, 1, 0, 0, 0};
 
 static void reset(int quiet)
 {
@@ -192,7 +192,7 @@ static const struct ui_list_config t_scroll = {&t_model, 16, UI_LIST_PLAIN | UI_
 static const struct ui_spec scroll_nodes[] = {
 	{UI_LIST, 1, UI_NONE, 1, UI_LEFT, UI_FOCUSABLE, 0, 0, 0, 16, 64, 64, &t_scroll},
 };
-static const struct ui_view_spec scroll_view = {"test-scroll", scroll_nodes, 1, 0, 0, 0, scroll_event};
+static const struct ui_view_spec scroll_view = {"test-scroll", scroll_nodes, 1, 0, 0, scroll_event};
 
 void test_ui_scroll_end(void)
 {

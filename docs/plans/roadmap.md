@@ -276,44 +276,46 @@ Bugs found while building v0.3 and v0.3.1. Each is struck out here once a ticket
 
 Planned in the interview and design rounds of 2026-10-19 and 2026-10-20. [v0.4-decisions.md](v0.4-decisions.md) has every decision, and [docs/design/v0.4](../design/v0.4/README.md) has the mockups in light and dark. They are a first version: expect to tune much of the look and motion once it runs on a cart.
 
-- **Navigation, all new:** a carousel home (Recent, Favourites, each console with games, SD card, NOR, Settings, Info) on a ring of five visible objects; A zooms into the item's page, B comes back. No tab bar, and none of the official keys.
-- **Pages:** game lists per console, Recent and Favourites (compact or with a placeholder box, letter jump, a game popup), an SD card browser, NOR with storage and Format all, Settings on one page of section cards, and Info (controls, help, about, Diagnostics).
-- **Look:** "Paper clean" in built-in light and dark themes (SD themes dropped), one accent colour per item, a new icon set, a red torii glyph in the corner, and the carousel, opening and popup motions.
-- **Library index:** the whole card scanned by extension into `/torii/library.idx`, up to 4,096 games, rescanned when the card changes.
-- **Names:** custom names, then cleaned file names (no extension or bracket tags); system folders and dot files hidden, with a "Show all files" setting.
-- **Favourites and recents** on SD (`/torii/favorites.txt`, `/torii/recent.txt`), favourites with no cap; a "Start on" setting picks where boot starts (where you left off by default).
-- **Settings:** a 12/24-hour clock and a time editor.
-- **Limits:** 1,024 entries per SD folder.
+Built in tickets B1–B23 (reports in [v0.4-reports](v0.4-reports/)); the cart checks in [docs/release-checklist.md](../release-checklist.md) come before v0.4.0. What the build left open is under v0.4.2.
+
+- ~~**Navigation, all new:** a carousel home (Recent, Favourites, each console with games, SD card, NOR, Settings, Info) on a ring of five visible objects; A zooms into the item's page, B comes back. No tab bar, and none of the official keys.~~ Done (B10, B12, B19).
+- ~~**Pages:** game lists per console, Recent and Favourites (compact or with a placeholder box, letter jump, a game popup), an SD card browser, NOR with storage and Format all, Settings on one page of section cards, and Info (controls, help, about, Diagnostics).~~ Done (B11, B13–B18); Info holds Controls, In game, Your cart, About and Diagnostics.
+- ~~**Look:** "Paper clean" in built-in light and dark themes (SD themes dropped), one accent colour per item, a new icon set, a red torii glyph in the corner, and the carousel, opening and popup motions.~~ Done (B1, B2, B9, B11, B12, B19).
+- ~~**Library index:** the whole card scanned by extension into `/torii/library.idx`, up to 4,096 games, rescanned when the card changes.~~ Done (B3; a background re-walk notices the change, R1).
+- ~~**Names:** custom names, then cleaned file names (no extension or bracket tags); system folders and dot files hidden, with a "Show all files" setting.~~ Done (B4, B18).
+- ~~**Favourites and recents** on SD (`/torii/favorites.txt`, `/torii/recent.txt`), favourites with no cap; a "Start on" setting picks where boot starts (where you left off by default).~~ Done (B5, B10); favourites are capped at 4,096.
+- ~~**Settings:** a 12/24-hour clock and a time editor.~~ Done (B6, B16).
+- ~~**Limits:** 1,024 entries per SD folder.~~ Done (B14).
 
 - **Engine follow-ups from v0.3, all in v0.4 (session reports, 2026-10-19):**
   - **Smoothness:**
-    - A page change still blanks the list for a frame before it fades in. Fade out first (F1).
-    - A whole-palette fade costs about 45k cycles a frame. Fade only the banks in use, or use the brightness registers for fades to black (`palette_fade`) (F1).
-    - A page change's hidden draw peaks at about 248k cycles of a 281k frame (`UI_DRAW_BUDGET`) (F1).
-    - Grids don't glide on held LEFT/RIGHT (F1).
+    - ~~A page change still blanks the list for a frame before it fades in. Fade out first (F1).~~ Done (E1, B7).
+    - ~~A whole-palette fade costs about 45k cycles a frame. Fade only the banks in use, or use the brightness registers for fades to black (`palette_fade`) (F1).~~ Done (E2, B7).
+    - ~~A page change's hidden draw peaks at about 248k cycles of a 281k frame (`UI_DRAW_BUDGET`) (F1).~~ Done (E3, B7).
+    - ~~Grids don't glide on held LEFT/RIGHT (F1).~~ Closed: grids were removed (E4, B7).
   - **Transitions:**
-    - A true cross-fade between screens needs both resident; today they fade through the background (F2).
-    - Mosaic transitions exist but no theme or golden uses them (F2).
-    - Parent/child transitions could scale, with affine BGs or sprites (F2).
+    - ~~A true cross-fade between screens needs both resident; today they fade through the background (F2).~~ Closed by the zoom, which carries home's object across; two full screens don't fit at once (E5, B19).
+    - ~~Mosaic transitions exist but no theme or golden uses them (F2).~~ Removed (E6, B19).
+    - ~~Parent/child transitions could scale, with affine BGs or sprites (F2).~~ Done: the open zoom (E7, B19).
     - ~~The `KIND_effects` theme key could take names (`fade+slide_x`) instead of a bitmask (F2).~~ Closed in v0.4: SD themes and `theme.ini` were dropped (E8, B1).
-    - Dialogs in a session of their own (launch, firmware) appear without motion, and dialogs popped by a screen change pop without motion (F2).
-    - A menu that comes up with its screen shows at full brightness over a list fading in (F2).
+    - ~~Dialogs in a session of their own (launch, firmware) appear without motion, and dialogs popped by a screen change pop without motion (F2).~~ Done (E9, E10, B19).
+    - ~~A menu that comes up with its screen shows at full brightness over a list fading in (F2).~~ Done (E11, B19).
   - **Data:**
-    - There is no row cache keyed by item (VRAM has no room for more slots; EWRAM could hold one) (F1).
-    - `ui_list_autoscroll` sends no cursor events (F1).
-    - `frame_measure` keeps one name per frame (F2).
+    - ~~There is no row cache keyed by item (VRAM has no room for more slots; EWRAM could hold one) (F1).~~ Done (E12, B7).
+    - ~~`ui_list_autoscroll` sends no cursor events (F1).~~ Done (E13, B7).
+    - ~~`frame_measure` keeps one name per frame (F2).~~ Done (E14, B7).
   - **Progress:**
-    - Show progress during the cart's own ROM copy (`Send_FATbuffer`'s IWRAM busy loop) with an IWRAM VBlank hook; it needs a cart test (F4).
-    - The bar shows overall progress and the status the step's percentage: pick one.
-    - The NOR write's dialog title.
-    - Trim the launch's 0.3 s of step texts if users notice it.
+    - ~~Show progress during the cart's own ROM copy (`Send_FATbuffer`'s IWRAM busy loop) with an IWRAM VBlank hook; it needs a cart test (F4).~~ Done (E15, B8); its rate is still to be measured on a cart.
+    - ~~The bar shows overall progress and the status the step's percentage: pick one.~~ Done: the bar (E16, B8).
+    - ~~The NOR write's dialog title.~~ Done (E17, B8).
+    - ~~Trim the launch's 0.3 s of step texts if users notice it.~~ Done: only the slow steps show (E18, B8).
 
 ## v0.4.1 Art
 
-- **Box art** (about square for GBA and GB), pre-converted on the PC, loaded after the cursor rests.
-- **Lookup:** custom art by file name first (romhacks keep their own art), then CRC or GBA game code, then the placeholder.
-- **Names** from a No-Intro CRC database, built by a `just` tool and not bundled.
-- **Tools:** `just art-add` for custom art and `just art-scrape` from libretro-thumbnails (check their terms first).
+- ~~**Box art** (about square for GBA and GB), pre-converted on the PC, loaded after the cursor rests.~~ Done (B22).
+- ~~**Lookup:** custom art by file name first (romhacks keep their own art), then CRC or GBA game code, then the placeholder.~~ Done (B22).
+- ~~**Names** from a No-Intro CRC database, built by a `just` tool and not bundled.~~ Done (B21: `just names-update`).
+- ~~**Tools:** `just art-add` for custom art and `just art-scrape` from libretro-thumbnails (check their terms first).~~ Done (B22, B23).
 
 ## v0.4.2 Fixes and review from the v0.4 build
 
@@ -355,6 +357,15 @@ What the v0.4 ticket sessions, the conductor's reviews and the research left ope
 - The shared-save check before an SD rename sees only indexed games: a game in a hidden folder sharing the save name loses it (B18 review).
 - A large crc.txt loads slowly after each boot: about 6 s of background work for 3,000 records (emulated), mostly hashing paths (B21).
 - A read-only crc.txt is never updated: dates are re-adopted and Recent games re-identified every boot (B21).
+- ~~Past the library's 4,096 games no page says so: the decisions' "showing the first N" note exists only for SD folders; `library_truncated` and `library_games_seen` have no caller (B20).~~ Fixed by B20 (`26b8886`): a console's last row shows the note (`library_games_seen` still has no caller).
+- Eight icons are drawn by nothing: the 8x8 Favourites, Recent, SD, Settings, torii and up icons and the 16x16 file and folder icons (`assets/ui`; only `tests/kernel/test_assets.c` reads them) (B20).
+- `action_launch`'s result (`ACTION_NOR_MAYBE`, `ACTION_NOR_WRITTEN`) is ignored by all three callers: use it or drop it (B20).
+- The SD card page's item count job costs up to 194k cycles a frame while it counts a folder's entries (within a frame; seen in the UI walk, `sd-folder`) (B20).
+- ~~Keys pressed during the open zoom reach the page before it shows: A, A on home within about 4–9 frames starts Recent's first game without the list ever showing, and START opens the game popup over the page still sliding in; a 1-frame B during the zoom is lost while the A after it isn't (B20's tester).~~ Fixed by B20 (`665de8b`, `b5db4bf`): A, START and SELECT are dropped while no page shows.
+- START and B mashed 3–4 frames apart over a game popup can drop a START and pass the next B to the list, which goes home (B20's tester; not reachable by hand).
+- ~~An empty SD folder still shows the hints "A open · START menu" (B20's tester).~~ Fixed by B20 (`1d1146b`).
+- The UI walk (`tests/shots/data/walk.txt`) uses 55 of mgba-shot's 64 waits (`MAX_WAITS`): raise it or split the walk before it grows (B20).
+- Settings' Mode B is only stored: the kernel never reads it (as in v0.3); confirm on a cart in a DS that something does, or drop the row (B20).
 
 ### Decisions to review
 

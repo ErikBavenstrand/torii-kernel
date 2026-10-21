@@ -26,6 +26,7 @@
 #include "../lang.h"
 #include "../library.h"
 #include "../namesdb.h"
+#include "../sdlist.h"
 #include "../showcht.h"
 #include "../tlog.h"
 #include "../userdata.h"
@@ -105,6 +106,9 @@ static struct {
 	char position[16];  // the title's "101/176"
 	char fact_keys[24], fact_values[32];
 	struct ui_hint hints[4];
+	u8 hint_count;
+	u8 cap_note;       // the hint bar shows the library cap's note
+	char cap_text[40];  // "Showing the first 4,096 games"
 	u16 box_palette[16];
 	// What fetch draws from: valid until the next fetch (a row draws at once)
 	char name[GAMENAME_MAX + 1];
@@ -403,7 +407,7 @@ static const struct ui_spec nodes_art_marks[] = {NODES(ART_LIST_W, bar_art), ART
 						 LIST_NODE(N_LIST_ART, art_marks, ART_LIST_W)};
 
 static int page_event(struct ui_view *v, const struct ui_event *e);
-#define VIEW(name, nodes, list) {(name), (nodes), (list) + 1, 0, (list), UI_VIEW_LR_PAGES, page_event}
+#define VIEW(name, nodes, list) {(name), (nodes), (list) + 1, (list), UI_VIEW_LR_PAGES, page_event}
 static const struct ui_view_spec views[2][2] = {
 	{VIEW("games", nodes_plain, N_LIST_COMPACT), VIEW("games", nodes_marks, N_LIST_COMPACT)},
 	{VIEW("games-art", nodes_art_plain, N_LIST_ART), VIEW("games-art", nodes_art_marks, N_LIST_ART)},
@@ -603,6 +607,8 @@ static void build(void)
 
 // --- What the page shows beside the list ----------------------------------------
 
+static void show_cap_note(void);
+
 static void show_position(void)
 {
 	if (games.count)
@@ -611,6 +617,7 @@ static void show_position(void)
 	else
 		games.position[0] = 0;
 	ui_title_set_right(node(N_TITLE), games.position);
+	show_cap_note();
 }
 
 // List with art: the selected game's box art, or the placeholder box in its
@@ -652,7 +659,29 @@ static void show_hints(void)
 	if (games.az)
 		games.hints[n++] = (struct ui_hint){"\xC2\xAB\xC2\xBB", gl_games->hint_letter};
 	games.hints[n++] = (struct ui_hint){"B", gl_hint_back};
+	games.hint_count = (u8)n;
+	games.cap_note = 0;
 	ui_hints_set(node(N_HINTS), games.hints, n);
+}
+
+// Past the library's cap (LIBRARY_GAMES_MAX games), a console's last row
+// says only the first were indexed, where the hint bar's keys were (as the
+// SD card page does at a big folder's end)
+static void show_cap_note(void)
+{
+	u8 note = games.kind == KIND_CONSOLE && games.count && games.cursor + 1 >= games.count && library_truncated();
+	if (note == games.cap_note)
+		return;  // a change redraws the bar: not on every move
+	games.cap_note = note;
+	if (!note) {
+		ui_hints_set(node(N_HINTS), games.hints, games.hint_count);
+		return;
+	}
+	char n[12];
+	sdlist_number(n, sizeof(n), LIBRARY_GAMES_MAX);
+	snprintf(games.cap_text, sizeof(games.cap_text), "%s %s %s", gl_sd_first, n, gl_count_games);
+	ui_hints_text(node(N_HINTS), games.cap_text);
+	tlog_debug("games: %s", games.cap_text);  // tests/library.sh
 }
 
 // "No games here", once the index can say so (not while it loads again
@@ -776,7 +805,7 @@ static const struct ui_spec info_nodes[I_NODES] = {
 };
 
 static int info_event(struct ui_view *v, const struct ui_event *e);
-static const struct ui_view_spec info_view = {"game-info", info_nodes, I_NODES, 0, UI_NONE, 0, info_event};
+static const struct ui_view_spec info_view = {"game-info", info_nodes, I_NODES, UI_NONE, 0, info_event};
 
 // The values' lines, the save type's between « » while it can change
 static void info_values(struct ui_view *v)
@@ -1101,6 +1130,7 @@ static void letter_jump_key(u16 keys)
 	games.cursor = to;
 	letter_around(games.count, to, row_letter, 0, &prev, &next);
 	ui_letter_show(node(N_LETTER), row_letter(0, to), prev, next);
+	tlog_debug("games: letter %s, row %lu", letter_text(row_letter(0, to)), (unsigned long)to);  // tests/shots walk
 	show_position();
 	show_facts();
 }

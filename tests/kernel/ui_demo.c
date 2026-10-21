@@ -183,7 +183,7 @@ static const struct ui_spec list_nodes[] = {
 };
 _Static_assert(N_LIST == N_LIST_BAR_TARGET, "the scroll bar's target");
 
-static const struct ui_view_spec list_view = {"ui-demo", list_nodes, N_LIST_NODES, 0, N_LIST, 0, screen_event};
+static const struct ui_view_spec list_view = {"ui-demo", list_nodes, N_LIST_NODES, N_LIST, 0, screen_event};
 
 // --- Widgets -----------------------------------------------------------------
 
@@ -262,7 +262,7 @@ static const struct ui_spec widget_nodes[] = {
 };
 _Static_assert(W_LIST == W_LIST_TARGET, "the scroll bar's target");
 
-static const struct ui_view_spec widgets_view = {"ui-widgets", widget_nodes, W_NODES, 0, W_LIST, 0, screen_event};
+static const struct ui_view_spec widgets_view = {"ui-widgets", widget_nodes, W_NODES, W_LIST, 0, screen_event};
 
 // --- Reading -------------------------------------------------------------------
 
@@ -305,7 +305,7 @@ static const struct ui_spec reading_nodes[] = {
 		   &reading_bar},
 };
 
-static const struct ui_view_spec reading_view = {"ui-reading", reading_nodes, N_LIST_NODES, 0, N_LIST, 0, screen_event};
+static const struct ui_view_spec reading_view = {"ui-reading", reading_nodes, N_LIST_NODES, N_LIST, 0, screen_event};
 
 // --- Popups ------------------------------------------------------------------
 
@@ -410,7 +410,7 @@ static const struct ui_spec popup_nodes[] = {
 };
 _Static_assert(P_LIST == N_LIST_BAR_TARGET, "the scroll bar's target");
 
-static const struct ui_view_spec popup_view = {"ui-popup", popup_nodes,      P_NODES,     0,
+static const struct ui_view_spec popup_view = {"ui-popup", popup_nodes,      P_NODES,
 					       P_LIST,     UI_VIEW_LR_PAGES, screen_event};
 
 static int popup_screen_keys(struct ui_view *v, u16 keys)
@@ -517,7 +517,7 @@ static int dialog_event(struct ui_view *v, const struct ui_event *e)
 	return 0;
 }
 
-static const struct ui_view_spec dialog_view = {"ui-dialog", dialog_nodes, 4, 2, UI_NONE, UI_VIEW_MODAL, dialog_event};
+static const struct ui_view_spec dialog_view = {"ui-dialog", dialog_nodes, 4, UI_NONE, UI_VIEW_MODAL, dialog_event};
 
 // --- Events ------------------------------------------------------------------
 
@@ -613,7 +613,7 @@ static void show(u32 s)
 	static const struct ui_view_spec *const views[SCREENS] = {&list_view, &widgets_view, &reading_view,
 								  &popup_view};
 	if (ui_depth()) {
-		ui_leave(UI_TR_TAB, 1);
+		ui_leave(UI_TR_DEEPER, 1);
 		while (ui_depth())
 			ui_pop();
 	}

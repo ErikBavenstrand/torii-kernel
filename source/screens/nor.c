@@ -233,7 +233,7 @@ static const struct ui_list_config list_config = {&model, UI_ROW_PITCH_LIST, UI_
 static const struct ui_scrollbar_config scroll_config = {N_LIST};
 
 static int nor_event(struct ui_view *v, const struct ui_event *e);
-static const struct ui_view_spec view = {"nor", nodes, N_NODES, 0, UI_NONE, 0, nor_event};
+static const struct ui_view_spec view = {"nor", nodes, N_NODES, UI_NONE, 0, nor_event};
 
 static void node(u32 i, u8 kind, u8 plane, u8 anchor, u8 flags, u8 ink, u8 paper, s32 x, s32 y, s32 w, s32 h,
 		 const void *data)

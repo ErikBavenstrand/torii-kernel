@@ -617,7 +617,7 @@ static void run_spec(struct run *r, const char *name, u8 kind, const s16 *rect)
 					(s16)(rect[2] - rect[0]),
 					(s16)(rect[3] - rect[1]),
 					0};
-	r->view_spec = (struct ui_view_spec){name, &r->node_spec, 1, 0, 0, 0, 0};
+	r->view_spec = (struct ui_view_spec){name, &r->node_spec, 1, 0, 0, 0};
 }
 
 // --- The popup -------------------------------------------------------------
@@ -968,9 +968,11 @@ s32 ui_popup_choose(void)
 	while (r->answer == ANSWER_NONE && ui_top() == r->view)
 		ui_frame();
 	if (r->answer < 0) {
+		tlog_debug("popup: closed");  // tests/shots' walks wait for these
 		ui_popup_close();
 		return -1;
 	}
+	tlog_debug("popup: item %ld", (long)r->answer);
 	return r->answer;
 }
 
@@ -1206,6 +1208,7 @@ int ui_confirm(u8 hints, const struct ui_confirm *confirm)
 	while (pp.conf.answer == ANSWER_NONE && ui_top() == v)
 		ui_frame();
 	s32 answer = pp.conf.answer;
+	tlog_debug("confirm: %s", answer == 1 ? "yes" : "cancel");
 	if (ui_top() == v) {
 		pp.card_off = 1;
 		ui_dirty(pp.conf.node, 1);

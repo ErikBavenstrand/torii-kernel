@@ -14,6 +14,16 @@ boot/frames 6-6 7BD036CD6C2B8568
 boot/frames 7-7 55081198873B040D
 boot/frames 8-40 2BF873AFA4C47009
 boot-addon/addons 9D5EA05F12ADBBF3
+boot-addon-copy/copied 834EDB23818102AF
+boot-addon-copy/fast FBE248636174EBAF
+boot-addon-copy/slow E2D938F1A5943537
+boot-addon-copy/frames 0-0 0FB99C4ED1E17723
+boot-addon-copy/frames 1-1 F0C05EFF2FAC10CB
+boot-addon-copy/frames 2-2 8FFCE4904A9B4E93
+boot-addon-copy/frames 3-3 D57E99F8522AC4F7
+boot-addon-copy/frames 4-4 5E84A98E27022AAF
+boot-addon-copy/frames 5-5 DD25A6D07C8CF437
+boot-addon-copy/frames 6-6 F260379DC897224F
 boot-copy/copied D31E83436AD1B5A9
 boot-copy/fast 64FAB574734CCC7D
 boot-copy/slow 51F957460CF08751
@@ -54,9 +64,9 @@ diag-pages/loader E959FD44168F7705
 diag-renderer/demo 52A803C198A28138
 diag-start/screen ADFC6EB5D635C905
 diag-tests/back B90CE70EFD54137F
-diag-tests/frames 0-3 1E5D6D87A291C43F
-diag-tests/frames 4-4 9D648B1181E3A93F
-diag-tests/frames 5-12 B90CE70EFD54137F
+diag-tests/frames 0-4 1E5D6D87A291C43F
+diag-tests/frames 5-5 9D648B1181E3A93F
+diag-tests/frames 6-12 B90CE70EFD54137F
 diag-turn/save-memory 6BA4A63E83E92D75
 diag-turn/timings 27617EE944E332C5
 diag-turn/frames 0-1 10E6FB0374762B6D
@@ -282,22 +292,22 @@ info/frames 7-20 1E613DC933A7D889
 info-about/about 60DC178D50FA75F6
 info-about/about-end 1FBECA9B24D5C3DC
 info-about/cart A9C987376B088C44
-info-about/ingame A32AC854989A417E
+info-about/ingame 09047680961A4752
 info-read/back E434584DE986A1E1
-info-read/controls 54C881529D44B1FA
-info-read/last 37F6085E6552C39D
-info-read/last-down 37F6085E6552C39D
-info-read/scrolled E7C516944F344150
+info-read/controls A9508593442B9EEA
+info-read/last 1CF05C7FA5C4E6E1
+info-read/last-down A52BB7502C81F373
+info-read/scrolled 66551C96D24AED78
 info-read/frames 0-1 E434584DE986A1E1
 info-read/frames 2-2 2F0DB67D39E5384B
 info-read/frames 3-3 76E98C19EAC6FE78
-info-read/frames 4-8 47778893E1D42B25
-info-read/frames 9-9 7C6306319EBB10AA
-info-read/frames 10-10 1792FB52E36632D5
-info-read/frames 11-11 30B5EE137AEFFF25
-info-read/frames 12-12 8F8A72A0CEF7815F
-info-read/frames 13-13 6FB49346DC4823FA
-info-read/frames 14-22 54C881529D44B1FA
+info-read/frames 4-9 47778893E1D42B25
+info-read/frames 10-10 9745CEE310D095B6
+info-read/frames 11-11 C36DCB0CF78A20F1
+info-read/frames 12-12 05BE4DA23CFE3541
+info-read/frames 13-13 95C062C1ED0AEF3B
+info-read/frames 14-14 E3890342A69848EA
+info-read/frames 15-22 A9508593442B9EEA
 nav-push-fail/error 8DA1D73368B07BC5
 nav-push-fail/page 4389D7B1FD5DF9A8
 nor-dark/closed 103858B351148F30
@@ -365,6 +375,7 @@ sd-confirm-tall/confirm 7486889B33771F34
 sd-confirm-tall/popup B6169D621332EB7C
 sd-dark/folder DFD4D3341592285D
 sd-dark/root 225FC0C5D082ACA9
+sd-empty/empty 7755B244E1738A1D
 sd-many/end EE2CB6E1FAC3923C
 sd-many/root ABB8F464CD451D8C
 sd-root/back 7639FAE28B4FA9BF
@@ -761,3 +772,5 @@ ui-theme/frames 9-9 C99E92911907DC6E
 ui-theme/frames 10-10 B7DFF0BEF77ADE16
 ui-theme/frames 11-11 4888E885AB4AB9FC
 ui-theme/frames 12-20 6907E551DCA443BC
+walk-dark/frames 0-0 5D22EC0B1246A328
+walk-light/frames 0-0 C185AB9C9DEEDA41

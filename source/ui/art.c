@@ -115,19 +115,3 @@ void art_drop(u8 handle)
 {
 	res_unref(RES_OBJ_VRAM, handle);
 }
-
-u16 art_load_box(u8 charblock, u8 *bank)
-{
-	u8 pal = res_palette(RES_BG_PAL, 1, ART_TAG_BOX_PAL);
-	if (pal == RES_NONE)
-		return ART_NONE;
-	*bank = (u8)res_start(RES_BG_PAL, pal);
-	if (res_fresh(RES_BG_PAL))
-		gfx_pal_load(*bank, art_box_palette, 16);
-	u8 h = res_bg_tiles(ART_BOX_TILES, 0, charblock, ART_TAG_BOX);
-	if (h == RES_NONE || !upload(RES_BG_VRAM, h, res_bg_addr(h), art_box_tiles, ART_BOX_TILES, 1)) {
-		res_release(RES_BG_PAL, pal);
-		return ART_NONE;
-	}
-	return res_bg_tile_index(h, 0, charblock);
-}

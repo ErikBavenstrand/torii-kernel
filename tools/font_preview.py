@@ -9,7 +9,7 @@ usage: font_preview.py [--out DIR] [--cache DIR] [KEY...]
 
 Downloads each candidate's font files once into the cache (default
 dist/fonts/candidates, checked against the SHA-256 below), converts them with
-tools/font.py and draws, at 240x160, an SD list and a heading sample, in a
+tools/font.py and draws, at 240x160, a list and a heading sample, in a
 light and a dark palette. The text is drawn from the packed bitmaps the kernel
 would get, so the sheet shows exactly what the blitter will draw. Writes
 OUT/sheet.png (every candidate at 1x) and OUT/KEY@3x.png (one, 3x), and

@@ -628,7 +628,7 @@ static const struct ui_spec nodes[N_NODES] = {
 	[N_LIST] = {UI_LIST, 4, UI_NONE, 1, UI_LEFT, 0, 0, 0, 0, VIEW_Y, LIST_W, VIEW_H, &list_config},
 };
 
-static const struct ui_view_spec view = {"settings", nodes, N_NODES, 0, UI_NONE, 0, settings_event};
+static const struct ui_view_spec view = {"settings", nodes, N_NODES, UI_NONE, 0, settings_event};
 
 // 1 while the page's view is up (at the stack's bottom: popups go over it)
 static int up(void)
