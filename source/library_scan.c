@@ -105,6 +105,7 @@ static struct {
 	u8 active;  // which slot
 	u8 want_walk;
 	u8 want_write;  // the active index isn't on the card yet
+	u8 cant_keep;  // the index file can't be made this boot: no write is tried
 	u8 force;  // the next walk rebuilds whatever the hash says (Rescan)
 	u8 build;  // this walk builds an index (else it only hashes)
 	u8 file_open;  // io.fil
@@ -744,7 +745,7 @@ static void sort_step(void)
 	lib.active = lib.u.walk.b.slot == slot_at(1);
 	lib.valid = 1;
 	lib.force = 0;
-	lib.want_write = 1;
+	lib.want_write = !lib.cant_keep;
 	lib.state = S_IDLE;
 	changed();
 	tlog("library: new index: %u games (GBA %u, GBC %u, GB %u, NES %u), %lu files, built in %lu ms", h->records,
@@ -763,10 +764,20 @@ static void write_failed(const char *what, FRESULT fr)
 	close_file();
 	if (opened)
 		f_unlink(file);
-	if (fr == FR_DENIED && opened)
+	if (fr == FR_DENIED && opened) {
 		tlog("library: the card is full; %s isn't written", file);
-	else
+	} else if (!opened) {
+		// It can't be made (/torii a file, a write-protected card): the index
+		// stays in RAM, and isn't tried again this boot
+		FRESULT st = f_stat(LIB_DIR, &lib.u.walk.fi);  // the write is over: io is free
+		int not_dir = st == FR_OK && !(lib.u.walk.fi.fattrib & AM_DIR);
+		tlog_error("library: can't make %s (FatFs error %d%s): the index is kept in RAM, and the next boot "
+			   "scans the card again",
+			   file, fr, not_dir ? "; " LIB_DIR " is a file" : "");
+		lib.cant_keep = 1;
+	} else {
 		tlog_error("library: can't write %s: %s (FatFs error %d)", file, what, fr);
+	}
 	lib.want_write = 0;
 	lib.state = S_IDLE;
 }

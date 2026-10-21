@@ -115,6 +115,10 @@ enum {
 	ACTION_FILES,
 };
 u32 action_rename_taken(void);
+// Tests only (tests/kernel/test_rename.c): the move of the game's file
+// ACTION_FILE_* + 1 fails as if the card refused it, to try the rollback.
+// 0 otherwise.
+extern u8 action_rename_fail_file;
 // At boot, before the library or a launch reads the card: a rename the
 // power cut short (its journal, /torii/rename.txt) is finished, or undone
 // if the game's file hadn't moved, and the journal goes.

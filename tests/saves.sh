@@ -8,6 +8,9 @@
 #         its progress dialog, and the menu comes back
 #   delete  Delete in a game list's popup removes the ROM and its save
 #         stays (T11): the game copied back starts with it
+#   rename-cut, rename-cut-split  a power cut before each of a rename's SD
+#         writes leaves one game with its save; -split fills the folders'
+#         first sectors, so a cut inside f_rename leaves two names on a file
 #   rename  Rename in the SD card page's popup renames the ROM, its save
 #         and its save type, Recent follows, and the game starts with its
 #         save under the new name
@@ -111,11 +114,23 @@ delete)
   echo "PASS: saves delete: Delete removes the ROM, its save stays and loads when the game comes back"
   ;;
 
-rename-cut)
+rename-cut | rename-cut-split)
   first_launch
   first_copy
   cp "$cart/test.sav" "$cart/kept.sav"
-  cp -r "$cart" "$carts/cut-start"
+  if [ "$part" = rename-cut-split ]; then
+    # Folders whose first sector is full: each new name's entries land in
+    # another sector than the old one's, so a cut inside f_rename can leave
+    # both names on one cluster chain
+    : >"$cart/pad.txt"
+    for i in $(seq -w 1 20); do
+      mcopy -i "$cart/sd.img" "$cart/pad.txt" "::/PAD$i.TXT"
+      mcopy -i "$cart/sd.img" "$cart/pad.txt" "::/SAVER/PAD$i.TXT"
+    done
+  fi
+  rm -rf "$carts/cut-start-$part"
+  cp -r "$cart" "$carts/cut-start-$part"
+  : >"$carts/aliases-$part.txt"
   # The rename through the keys, as rename's power-on 3; the SD writes
   # before it and its own, counted from the cart trace
   rename_keys=$(nav_file /Test.gba 0)
@@ -128,7 +143,7 @@ rename-cut)
   [ "$writes" -ge 6 ] || fail "the rename made only $writes SD writes"
   results=""
   for n in $(seq 1 "$writes"); do
-    rm -rf "$cart" && cp -r "$carts/cut-start" "$cart"
+    rm -rf "$cart" && cp -r "$carts/cut-start-$part" "$cart"
     status=0
     # shellcheck disable=SC2086 # nav.sh's options
     OMEGA_POWER_CUT=sd:write:$((first + n)) OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin \
@@ -138,12 +153,18 @@ rename-cut)
     # The next power-on finishes or undoes it: one game, its save and save
     # type beside it, whole, Recent naming it, no journal left
     boot -f 300
+    grep -h 'second name' "$cart/run.log" >>"$carts/aliases-$part.txt" || true
     if mtype -i "$cart/sd.img" ::/Testq.gba >/dev/null 2>&1; then to=Testq other=Test results+="done "; else to=Test other=Testq results+="undone "; fi
     ! mtype -i "$cart/sd.img" "::/$other.gba" >/dev/null 2>&1 || fail "cut before write $n: both names are on the card"
     mtype -i "$cart/sd.img" "::/SAVER/$to.sav" | cmp -s - "$cart/kept.sav" || fail "cut before write $n: $to.sav isn't the save"
     ! mtype -i "$cart/sd.img" "::/SAVER/$other.sav" >/dev/null 2>&1 || fail "cut before write $n: $other.sav is left"
     mtype -i "$cart/sd.img" "::/SAVER/$to.mde" >/dev/null 2>&1 || fail "cut before write $n: $to.mde is missing"
     ! mtype -i "$cart/sd.img" ::/torii/rename.txt >/dev/null 2>&1 || fail "cut before write $n: the journal is left"
+    # No damage (two names on one chain, a broken one); clusters a cut write
+    # left allocated are only lost room
+    fsck.fat -n "$cart/sd.img" >"$cart/fsck.txt" 2>&1 || true
+    ! grep -vE '^(fsck\.fat |Reclaimed [0-9]+ unused clusters? |Free cluster summary |  (Auto-)?correct|Leaving filesystem unchanged|.*: [0-9]+ files, |$)' \
+      "$cart/fsck.txt" >"$cart/fsck-bad.txt" || fail "cut before write $n: fsck.fat: $(head -4 "$cart/fsck-bad.txt")"
     # (the copy a reader takes: recent.txt, or its backup when the cut broke it)
     {
       mtype -i "$cart/sd.img" ::/torii/recent.txt
@@ -151,7 +172,15 @@ rename-cut)
     } 2>/dev/null |
       grep "	/$to.gba$" >/dev/null || fail "cut before write $n: Recent doesn't name /$to.gba"
   done
-  echo "PASS: saves rename-cut: a power cut before any of the rename's $writes SD writes leaves one game with its save ($results)"
+  if [ "$part" = rename-cut-split ]; then
+    # Some cuts came inside an f_rename: the next power-on dropped the
+    # second name, of the game and of its save
+    grep -qF '/Test.gba was a second name of /Testq.gba' "$carts/aliases-$part.txt" ||
+      fail "no cut left the game under two names: $(cat "$carts/aliases-$part.txt")"
+    grep -qF '/SAVER/Test.sav was a second name of /SAVER/Testq.sav' "$carts/aliases-$part.txt" ||
+      fail "no cut left the save under two names: $(cat "$carts/aliases-$part.txt")"
+  fi
+  echo "PASS: saves $part: a power cut before any of the rename's $writes SD writes leaves one game with its save ($results)"
   ;;
 
 rename)

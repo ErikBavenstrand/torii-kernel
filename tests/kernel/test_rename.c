@@ -119,6 +119,18 @@ static const char *const files[] = {
 	"/torii/art/custom/Game.gba.bin",
 	"/torii/art/custom/New.gba.bin",
 	"/torii/art/custom/new.gba.bin",
+	T_DIR "/Roll.gba",
+	T_DIR "/Rolled.gba",
+	"/SAVER/Roll.sav",
+	"/SAVER/Rolled.sav",
+	"/SAVER/Roll.mde",
+	"/SAVER/Rolled.mde",
+	"/RTS/Roll.rts",
+	"/RTS/Rolled.rts",
+	T_DIR "/Two.gba",
+	T_DIR "/Two2.gba",
+	"/SAVER/Two.sav",
+	"/SAVER/Two2.sav",
 	T_DIR "/notes.txt",
 	T_DIR "/read me.txt",
 	GAMENAME_FILE,
@@ -223,6 +235,44 @@ void test_rename_file(void)
 	CHECK(!there("/SAVER/Back2.sav") && holds("/SAVER/Back.sav", "back save") && there(T_DIR "/Back.gba"));
 	CHECK(!there("/torii/rename.txt"));
 	action_rename_recover();  // no journal: nothing
+	// Both names there as two files (the new name another game's: a cut
+	// after f_rename refused it): nothing moves either way
+	CHECK(put(T_DIR "/Two.gba", "two"));
+	CHECK(put(T_DIR "/Two2.gba", "another game"));
+	CHECK(put("/SAVER/Two.sav", "two's save"));
+	CHECK(put("/torii/rename.txt", T_DIR "/Two.gba\t" T_DIR "/Two2.gba\n"));
+	action_rename_recover();
+	CHECK(holds(T_DIR "/Two.gba", "two") && holds(T_DIR "/Two2.gba", "another game"));
+	CHECK(holds("/SAVER/Two.sav", "two's save") && !there("/SAVER/Two2.sav"));
+	CHECK(!there("/torii/rename.txt"));
+
+	// A move the card refuses (the save states, after the save and save
+	// type moved): everything goes back, the lists stay
+	CHECK(put(T_DIR "/Roll.gba", "roll"));
+	CHECK(put("/SAVER/Roll.sav", "roll save"));
+	CHECK(put("/SAVER/Roll.mde", "roll mde"));
+	CHECK(put("/RTS/Roll.rts", "roll states"));
+	CHECK(gamename_store_set(T_DIR "/Roll.gba", "Rolling"));
+	CHECK(userdata_fav_set(T_DIR "/Roll.gba", 1));
+	action_rename_fail_file = ACTION_FILE_STATES + 1;
+	CHECK_EQ(action_rename_file(T_DIR "/Roll.gba", "Rolled.gba"), ACTION_RENAME_FAILED);
+	action_rename_fail_file = 0;
+	CHECK(holds(T_DIR "/Roll.gba", "roll") && !there(T_DIR "/Rolled.gba"));
+	CHECK(holds("/SAVER/Roll.sav", "roll save") && !there("/SAVER/Rolled.sav"));
+	CHECK(holds("/SAVER/Roll.mde", "roll mde") && !there("/SAVER/Rolled.mde"));
+	CHECK(holds("/RTS/Roll.rts", "roll states") && !there("/RTS/Rolled.rts"));
+	CHECK(has_line(GAMENAME_FILE, T_DIR "/Roll.gba\tRolling\n"));
+	CHECK(userdata_fav_has(T_DIR "/Roll.gba") && !userdata_fav_has(T_DIR "/Rolled.gba"));
+	CHECK(!there("/torii/rename.txt") && !there("/torii/rename.txt.bak"));
+	// The first move refused: nothing had moved but the game
+	action_rename_fail_file = ACTION_FILE_SAVE + 1;
+	CHECK_EQ(action_rename_file(T_DIR "/Roll.gba", "Rolled.gba"), ACTION_RENAME_FAILED);
+	action_rename_fail_file = 0;
+	CHECK(holds(T_DIR "/Roll.gba", "roll") && !there(T_DIR "/Rolled.gba"));
+	CHECK(holds("/SAVER/Roll.sav", "roll save") && !there("/SAVER/Rolled.sav"));
+	// And with nothing refused it renames
+	CHECK_EQ(action_rename_file(T_DIR "/Roll.gba", "Rolled.gba"), ACTION_RENAMED);
+	CHECK(holds("/RTS/Rolled.rts", "roll states") && holds("/SAVER/Rolled.sav", "roll save"));
 
 	tidy();
 	f_unlink("/torii/art/custom");

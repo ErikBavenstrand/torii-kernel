@@ -5109,6 +5109,79 @@ FRESULT f_unlink (
 
 
 /*-----------------------------------------------------------------------*/
+/* Torii: Remove a File's Second Name                                    */
+/*-----------------------------------------------------------------------*/
+/* A power cut inside f_rename can leave the new entry written and the old
+   one still there: two names on one cluster chain. f_unlink on either
+   would free the chain the other still uses. This removes path's directory
+   entry and nothing else, only when path is a file whose first cluster is
+   other's (another entry, not other's own under another case). FR_DENIED
+   when they don't share a chain (or have none), or path is a directory. */
+
+/* The first cluster of the object dj was just followed to (0 for none) */
+static DWORD torii_first_clust (DIR* dj)
+{
+	FATFS *fs = dj->obj.fs;
+#if FF_FS_EXFAT
+	if (fs->fs_type == FS_EXFAT) {
+		FFOBJID obj;
+		obj.fs = fs;
+		init_alloc_info(fs, &obj);	/* From fs->dirbuf, which follow_path filled */
+		return obj.sclust;
+	}
+#endif
+	return ld_clust(fs, dj->dir);
+}
+
+FRESULT f_unlink_alias (
+	const TCHAR* path,		/* The name to remove */
+	const TCHAR* other		/* The name that keeps the chain */
+)
+{
+	FRESULT res;
+	FATFS *fs;
+	DIR dj, dk;
+	DWORD keep, clst;
+	DEF_NAMBUF
+
+
+	res = mount_volume(&other, &fs, FA_WRITE);
+	if (res == FR_OK) {
+		dk.obj.fs = fs;
+		INIT_NAMBUF(fs);
+		res = follow_path(&dk, other);
+		if (res == FR_OK && (dk.fn[NSFLAG] & (NS_DOT | NS_NONAME))) res = FR_INVALID_NAME;
+		keep = res == FR_OK ? torii_first_clust(&dk) : 0;
+		if (res == FR_OK) {
+			const TCHAR *p = path;
+			res = mount_volume(&p, &fs, FA_WRITE);
+			if (res == FR_OK) {
+				dj.obj.fs = fs;
+				res = follow_path(&dj, p);
+			}
+		}
+		if (res == FR_OK && (dj.fn[NSFLAG] & (NS_DOT | NS_NONAME))) res = FR_INVALID_NAME;
+		if (res == FR_OK) {
+			clst = torii_first_clust(&dj);
+			if ((dj.obj.attr & AM_DIR) || !keep || clst != keep ||
+				(dj.obj.sclust == dk.obj.sclust && dj.dptr == dk.dptr)) {	/* One entry: other's own */
+				res = FR_DENIED;
+			}
+		}
+		if (res == FR_OK) {
+			res = dir_remove(&dj);		/* The entry only: the chain stays other's */
+			if (res == FR_OK) res = sync_fs(fs);
+		}
+		FREE_NAMBUF();
+	}
+
+	LEAVE_FF(fs, res);
+}
+
+
+
+
+/*-----------------------------------------------------------------------*/
 /* Create a Directory                                                    */
 /*-----------------------------------------------------------------------*/
 

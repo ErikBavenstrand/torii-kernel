@@ -384,12 +384,14 @@ static void journal_clear(void)
 
 // Moves sidecar i of game name to game to_name, for console; FR_OK too when
 // it has none
+u8 action_rename_fail_file;
+
 static FRESULT side_move(u32 i, const char *name, const char *to_name, u32 console)
 {
 	struct rename_work *w = RW;
 	if (!side_path(w->from, &sidecars[i], name, console) || !side_path(w->to, &sidecars[i], to_name, console))
 		return FR_OK;
-	FRESULT res = f_rename(w->from, w->to);
+	FRESULT res = action_rename_fail_file == i + 1 ? FR_DENIED : f_rename(w->from, w->to);
 	tlog("rename: %s to %s (FatFs %u)", w->from, w->to, (unsigned)res);
 	return res;
 }
@@ -495,6 +497,18 @@ u32 action_rename_file(const char *path, const char *new_name)
 	return partly ? ACTION_RENAME_PARTLY : ACTION_RENAMED;
 }
 
+// 1 if path was a second name of keep's file (a cut inside f_rename), now
+// removed without touching the file
+static int drop_alias(const char *path, const char *keep)
+{
+	FRESULT res = f_unlink_alias(path, keep);
+	if (res == FR_OK)
+		tlog("rename: %s was a second name of %s: it goes, the file stays", path, keep);
+	else if (res != FR_DENIED)
+		tlog_error("rename: %s: can't drop a second name (FatFs %u)", path, (unsigned)res);
+	return res == FR_OK;
+}
+
 u32 action_rename_taken(void)
 {
 	return RW->taken;
@@ -525,21 +539,38 @@ void action_rename_recover(void)
 	}
 	memcpy(w->name, a + 1, strlen(a + 1) + 1);
 	u32 console = library_console_of(w->name);
-	int old_there = there(w->old_path);
-	if (!old_there && !there(w->new_path)) {
+	int old_there = there(w->old_path), new_there = there(w->new_path);
+	int case_only = same_name(w->name, b + 1);  // one entry: both paths find it
+	if (!old_there && !new_there) {
 		tlog("rename: %s, cut short, is gone: the journal goes", w->old_path);
 		journal_clear();
 		return;
 	}
-	int forward = !old_there || same_name(w->name, b + 1) || there(w->new_path);
+	if (old_there && new_there && !case_only) {
+		// Both names: the cut came inside f_rename, which writes the new
+		// entry before it removes the old, so they share one cluster chain
+		// (f_unlink would free it under the new name); or two files, the
+		// new name another game's, and nothing moved
+		if (!drop_alias(w->old_path, w->new_path)) {
+			tlog("rename: %s and %s are two files: nothing was renamed", w->old_path, w->new_path);
+			journal_clear();
+			return;
+		}
+		old_there = 0;
+	}
+	int forward = !old_there || case_only;
 	tlog("rename: a rename of %s to %s was cut short: %s", w->old_path, b + 1, forward ? "finished" : "undone");
-	// Each file still to move moves (forward), or each that moved goes back
+	// Each file still to move moves (forward), or each that moved goes back;
+	// one left under both names (a cut inside its f_rename) loses the name
+	// it isn't going to
 	for (u32 i = 0; console != LIB_CONSOLE_NONE && i < SIDECARS; i++) {
 		if (sidecars[i].cache || !side_path(w->from, &sidecars[i], w->name, console) ||
 		    !side_path(w->to, &sidecars[i], b + 1, console))
 			continue;
 		int from = there(w->from), to = there(w->to);
-		if (forward ? from && !to : to && !from)
+		if (from && to && !case_only)
+			drop_alias(forward ? w->from : w->to, forward ? w->to : w->from);
+		else if (forward ? from && !to : to && !from)
 			side_move(i, forward ? w->name : b + 1, forward ? b + 1 : w->name, console);
 	}
 	if (forward) {
