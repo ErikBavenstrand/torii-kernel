@@ -4,10 +4,10 @@ Torii is a custom kernel for the EZ-Flash Omega DE, forked from EZ-Flash's offic
 
 ## Kernel source
 
-- To release, rename `## Unreleased` in `CHANGELOG.md` to the version, set `TORII_VERSION` in `source/version.h` to it (HELP shows it and every boot logs it), commit, and push a tag like `v0.1.0`: CI publishes a GitHub Release with `ezkernelnew.bin` and that section as its notes.
+- To release, rename `## Unreleased` in `CHANGELOG.md` to the version, set `TORII_VERSION` in `source/version.h` to it (Info's About shows it and every boot logs it), commit, and push a tag like `v0.1.0`: CI publishes a GitHub Release with `ezkernelnew.bin` and that section as its notes.
 - **Mandatory:** log every change to `source/` in `CHANGELOG.md`, under Unreleased: what changed and why, with the commit's short hash, in two or three lines. Commit the change first, then add the entry with its hash (one follow-up commit can log several changes).
 - Every screen draws through the tile engine (`source/engine`, `source/ui`); there is no bitmap mode. Code outside a screen (the boot, launches, the firmware update) shows messages, questions and progress with `source/ui/dialog.h`, which starts an engine session when none is up. A screen that ends its session calls `ui_shutdown()`, then `dialog_blank()`.
-- Language strings live in `source/lang.c` as `en_*` strings, wired up in `LoadEnglish`. `lang_packs` lists the languages SETTINGS offers; English is the only one until v0.9.
+- Language strings live in `source/lang.c` as `en_*` strings, wired up in `LoadEnglish`. `lang_packs` lists the languages Settings offers; English is the only one until v0.9, and Settings' Language row stays hidden until then.
 - File names are UTF-8: FatFs uses its UTF-8 API (`FF_LFN_UNICODE 2`), so every name lists and opens as it is; `FF_CODE_PAGE` matters only for 8.3-only names. The menu's tile fonts (`source/engine/font.h`) cover Latin-1, and `charset_next_latin1()` in `source/charset.c` picks a glyph per character.
 - `just font` generates the tile fonts into `source/engine/font_body.c` and `font_heading.c` from `assets/fonts`; they are committed, never edited by hand, and `tests/font_test.py` fails when they are stale.
 - `just assets` generates the menu's art (`source/ui/art_data.c`, `art_ids.h`) from the PNGs in `assets/ui`, the same way: committed, never edited by hand, and `tests/asset_test.py` fails when stale. Screens take art by id through `source/ui/art.h`.
