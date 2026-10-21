@@ -347,6 +347,7 @@ What the v0.4 ticket sessions, the conductor's reviews and the research left ope
 - The theme wipe needs a commit every VBlank: a frame that overruns during the 16-frame wipe shows the old theme whole-screen for that frame (B19).
 - A launch shows about 8 black frames between home's fade-out and the loading card (pre-existing; B19).
 - ~~`gfx_hold_regs` keeps stale bits after a hold ends (B12).~~ Fixed by B19 (`ed91130`).
+- A cover landing during a palette fade could show wrong colours; one frame of new palette on old tiles is possible if the VRAM queue is ever overfull (B22, not seen).
 - A large crc.txt loads slowly after each boot: about 6 s of background work for 3,000 records (emulated), mostly hashing paths (B21).
 - A read-only crc.txt is never updated: dates are re-adopted and Recent games re-identified every boot (B21).
 
@@ -368,6 +369,7 @@ Made during the build without the user; each is cheap to change.
 - **Mockups for Settings and the rename keyboard,** approved by the conductor for the build (`docs/design/v0.4/settings-*.png`, `keyboard-*.png`).
 - **Dropped v0.3 features:** the NOR menu's load and back-up of a save; the help QR code; the cheat screen, per-game save type, hard reset and write to NOR with addon come back in B13/B14 (B10).
 - **A starts games with the enabled addons** (Play, Launch); Clean boot is a separate entry; v0.3's A, A was a clean boot (conductor, B13/B14).
+- **Box art:** custom art shared by same-named files in different folders; covers load after 8 frames of rest with no fade (B22).
 - **Game lists:** Favourites shows no stars; list with art shows two facts; Game info is a page; GB/GBC/NES offer only Play (B13).
 - **SD card page:** Delete reaches `/torii` and `/SAVER` with Show all files on; the first 1,024 files the card lists are shown in a bigger folder; folder icons blue (B14).
 - **Settings:** a black pause while the NOR is written on leaving; Time/Date write the clock at once; edits lost on power-off before leaving; the pill jumps rather than slides (B16).
@@ -385,6 +387,7 @@ Made during the build without the user; each is cheap to change.
 - **Unmeasured on a real cart:** the cart's ROM copy rate (B8's bar estimate); the library walk and first-scan times (emulated SD is about 5x slower than the cart); the theme wipe's HBlank palette DMA (mGBA can't show tearing); how the carousel's scaled pixel art reads at 0.6x and 1.9x; the 14 px rows' feel.
 - **SD folder open time** on a cart (0.2 s per 300 files emulated) and the 251k-cycle frame on a folder of 1,024+ subfolders (B14).
 - **Raster split on a cart:** a late VCOUNT interrupt could make the wipe's edge ragged; the open at 233k cycles a frame (B19).
+- **Opening a cover in an art folder of thousands of files** on a real cart (B22).
 - **Names database timings on a cart:** Identify about 1.6 s per MB in the foreground (estimate); crc.txt write steps about 10 ms each (B21).
 - **Licences:** No-Intro's terms for a derived name table (the names database is built on the user's machine and never bundled); libretro-thumbnails art has no licence grant (fetched locally, never committed).
 - **Design questions for later tickets:** Settings' 12 px rows inside section cards that scroll (B16); whether WIN0 and WIN1 suffice when the popup, the list clip, the dim, the zoom and the wipe overlap (B11, B19); the 8x8 GBA and Info icons need a redraw.

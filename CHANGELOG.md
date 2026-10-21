@@ -6,6 +6,15 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** box art: List + art shows a game's cover in place of the
+  placeholder: custom art by file name (`/torii/art/custom/<file name>.bin`),
+  then matched art by CRC (`/torii/art/<CRC32>.bin`) or GBA game code from
+  crc.txt; the card's art is listed once into PSRAM so lookups never read
+  the card; covers load after the cursor rests and stay cached in PSRAM;
+  Settings' Look gains Box art (On/Off). `just art-add ROM_OR_FILE_NAME
+  IMAGE SD_PATH` makes custom art from any picture. Covers go to BG tiles
+  from a raw asset format the GBA copies as is (B22; `19dc20f`, `e877511`,
+  `7b0dabb`, `739c7e5`, `b768626`).
 - **Added:** opening an item zooms its carousel object into the page: the
   object grows to 1.9x and fades into the paper as the backdrop's tint goes,
   the title's heading slides in from the left, then the card rises 12 px and
