@@ -20,6 +20,8 @@ git log, not here.
   `art/<CRC32>.bin`; its index is read into PSRAM and its cluster link map
   built a few clusters a frame, so a cover reads at its offset with a quick
   seek (F3; `b3abac5`, review fixes `8b4a77f`).
+- **Fixed:** a split art pack never stalls a frame: with no link map, a seek
+  walks 16 clusters a step, and the map holds 254 pieces, not 62 (`3e6f3dd`).
 
 ## v0.4.1 (2026-10-21)
 

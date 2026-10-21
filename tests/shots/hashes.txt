@@ -81,7 +81,7 @@ games-art/gba E4D66E146FB6D219
 games-art/gba-crc EAE4B45AD06AF276
 games-art/gba-none 7A533A78D3E4D987
 games-art/recent D6B09D15BF64F7E1
-games-art-box/gba B283B0831EAA819C
+games-art-box/gba D190CBFE3772B2F2
 games-art-dark/gba 743CC2D257F80E8A
 games-art-dark/gba-none 6DD7FD2BF9FD37DC
 games-box-switch/gb 46FF5145036E9096

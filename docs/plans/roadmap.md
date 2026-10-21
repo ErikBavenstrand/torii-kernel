@@ -92,7 +92,7 @@ Everything the v0.2–v0.4.1 work left open, checked against the code on 2026-10
 - IWRAM free is 4,604 bytes on main (CLAUDE.md records 5,980 at v0.4.1): find what took it, and update CLAUDE.md's figures; about 2 KB stays above the stack estimate.
 - No test drives Identify (`names_store.c`, the identify step) with a record a few hours off; it shares the walk's check.
 - names-update recomputes the CRC of a file dated before 1980 on every run.
-- A `/torii/art.pak` in more than 62 pieces seeks the slow way, many frames a cover on small clusters (logged; a chunked seek would fix it). The relist after a custom-art rename (`boxart_forget`) has no test. art-pack's downloaded counter can read low under threads.
+- ~~A `/torii/art.pak` in more than 62 pieces seeks the slow way, many frames a cover on small clusters.~~ Fixed (`3e6f3dd`): a seek with no map walks 16 clusters a step; the map holds 254 pieces. The relist after a custom-art rename (`boxart_forget`) has no test. art-pack's downloaded counter can read low under threads.
 - First real `just art-pack` run not yet done: pack size (about 20 MB estimated) and download time (about 40 min, 0.5–1 GB) unmeasured.
 
 ### Decisions
