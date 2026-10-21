@@ -976,6 +976,19 @@ static int has_work(void)
 	return lib.state != S_IDLE || lib.want_walk || (lib.want_write && lib.valid);
 }
 
+void library_load_now(void)
+{
+	if (lib.state == S_LOST) {
+		load_begin();
+		lib.want_walk = 1;
+	}
+	if (lib.state != S_LOAD || cover_loading())
+		return;
+	psram_begin();
+	while (lib.state == S_LOAD)
+		library_step();
+}
+
 void library_poll(void)
 {
 	if (lib.state == S_LOST) {

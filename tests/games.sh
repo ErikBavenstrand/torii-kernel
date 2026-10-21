@@ -58,7 +58,8 @@ grep -q '^kernel: games: row 0 played 1m ago' "$cart/2.log" ||
 echo "PASS: a launched game is first on Recent, played just now, and the text follows the clock"
 
 # A launch that fails (a name too long for its save record) brings the page
-# back on the same row, without "No games here" while the index loads again
+# back on the same row, listed at once: it loads the index again first,
+# never showing an empty card while it loads
 cart=$carts/games-fail
 rm -rf "$cart" && mkdir -p "$cart"
 mkfs.fat -C -F 32 -n GAMES "$cart/sd.img" 65536 >/dev/null
@@ -66,10 +67,11 @@ long=$(printf 'L%.0s' $(seq 249)).gba
 for g in A.gba B.gba "$long"; do mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba "::/$g"; done
 # shellcheck disable=SC2046 # nav.sh's options
 boot "$cart/1.log" $(nav_game gba 2) -k @30:A -k @34:- -w "screen ready: dialog" -k @20:B -k @24:- \
-  -w "games: a new index" -k @20:START -k @24:- -w "screen ready: game-popup" -f 2400
+  -w "nav: page gba ready" -k @20:START -k @24:- -w "screen ready: game-popup" -f 2400
 grep -q '^kernel: screen ready: game-popup LLL' "$cart/1.log" ||
   fail "after the failed launch the page isn't on the same row: $(grep '^kernel: screen ready: game-popup' "$cart/1.log")"
-echo "PASS: a failed launch brings the page back on the same row"
+! grep -q '^kernel: games: a new index' "$cart/1.log" || fail "the page came back before the index, empty"
+echo "PASS: a failed launch brings the page back on the same row, listed at once"
 
 # Delete on a Recent entry whose file is already gone: it leaves Recent
 cart=$carts/games-gone

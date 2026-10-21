@@ -957,6 +957,7 @@ static struct ui_view *games_enter(u32 item, u32 row)
 	games.kind = item == NAV_RECENT ? KIND_RECENT : item == NAV_FAV ? KIND_FAV : KIND_CONSOLE;
 	games.az = games.kind != KIND_RECENT;
 	games.art = Read_SET_info(assress_game_view) == 1;
+	library_load_now();  // after a launch that failed: the page lists the index, not nothing
 	build();
 	games.unloaded = !library_ready();
 	games.cursor = games.count ? (row < games.count ? row : games.count - 1) : 0;

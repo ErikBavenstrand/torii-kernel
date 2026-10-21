@@ -302,6 +302,9 @@ int lib_rename_shown(u8 *slot, lib_put_fn put, u32 rec, const char *new_name, co
 void library_boot(void);
 // Each pass of the menu's loop: starts the job when there is work.
 void library_poll(void);
+// Loads the index a launch dropped (or finishes loading it) at once, unless
+// covers are loading: for a page that lists it.
+void library_load_now(void);
 // Before PSRAM page 0 is overwritten: finishes a write under way or due
 // (the card then has the index), stops the job and forgets the index.
 void library_before_launch(void);
