@@ -79,12 +79,7 @@ pass() { [ $ok = 0 ] || echo "PASS: $case: $*"; }
 
 # settings SLOT=VALUE...: write settings slots (source/ez_define.h) directly
 settings() {
-  local slot value
-  for slot in "$@"; do
-    value=${slot#*=}
-    printf %b "\\x$(printf %02x $((value & 0xFF)))\\x$(printf %02x $((value >> 8)))" |
-      dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7B0000 + 2 * ${slot%=*})) conv=notrunc status=none
-  done
+  python3 tests/setnor.py set "$cart/kernel-nor.bin" "$@"
 }
 
 # boot [-c CUT] [-g] OPTIONS...: one power-on; -c cuts the power at CUT
@@ -169,7 +164,7 @@ settings_none="$(nav_setting auto-save) $(nav_press A RIGHT B A A A RIGHT LEFT A
 settings_out="$(nav_to settings) $(nav_press B) $home"
 # slot SLOT: a settings slot's value, as the kernel NOR holds it
 slot() {
-  od -An -tu2 -j $((0x7B0000 + 2 * $1)) -N 2 "$cart/kernel-nor.bin" | tr -d ' '
+  python3 tests/setnor.py get "$cart/kernel-nor.bin" "$1"
 }
 
 # older_list: the official kernel's NOR list (no trailer, no copy B) with
@@ -444,6 +439,73 @@ EOF
       pass "a power cut at $cut in a settings save, and the boot after it"
     fi
   done
+
+  # The settings' two copies (source/setrecord.h), A at 0x7B0000 and B at
+  # 0x7B2000: a power cut at each erase and program of a save leaves the
+  # values from before it or after it, never the defaults, and the next
+  # save works. The first save from an older kernel's A (new_cart's) writes
+  # B, then A; the next writes B, the one after A. A word program and a
+  # buffer write (the S29GL064A: 16 a copy) each count one program. On the
+  # bottom-boot S29GL064A both copies share one 64 KB sector, so a cut there
+  # may lose everything, as the single copy did: it only checks the loader.
+  settings_cuts() { # CHIP SAVE(1-3) CUT...
+    local chip=$1 nth=$2 cut a=0x7B0000 b=0x7B2000 last=256
+    shift 2
+    [ "$chip" = pl064 ] || last=16
+    for cut in "$@"; do
+      cut=${cut//LAST/$last}
+      cut=${cut//MID/$((last / 2))}
+      cut=${cut//@A/@$a}
+      cut=${cut//@B/@$b}
+      if shard_case; then
+        new_cart "cut-copies-$chip-$nth-${cut//[:@]/-}"
+        local before=65535 after=1 slot=28 saves=("$save_theme" "$save_dim" "$save_setting") i read_from
+        for ((i = 0; i < nth - 1; i++)); do
+          KERNEL_NOR=${chip#pl064} boot ${saves[i]}
+          logged "nor: wrote the settings"
+        done
+        case $nth in
+        2) before=65535 after=1 slot=27 ;;
+        3) before=$(slot 14) after=x slot=14 ;;
+        esac
+        KERNEL_NOR=${chip#pl064} boot -c "kernel:$cut" ${saves[nth - 1]}
+        KERNEL_NOR=${chip#pl064} boot -f 200
+        read_from=lost
+        if [ "$(slot 26)" != 2 ]; then
+          # Only where both copies share a sector; logging back on for the rest
+          [ "$chip" = gl064 ] || bad "the cut lost LOGGING: slot 26 holds $(slot 26)"
+          settings 26=2 32=2
+        else
+          read_from="$(python3 tests/setnor.py pick "$cart/kernel-nor.bin"), slot $slot $(slot $slot)"
+          case ${read_from%%,*} in
+          A) logged "nor: settings read from copy A" ;;
+          B) logged "nor: settings read from copy B" ;;
+          *) logged "nor: settings read from A as it is" ;;
+          esac
+          [ "$(slot 32)" = 2 ] || bad "the cut lost Start on: slot 32 holds $(slot 32)"
+          [ "$(slot $slot)" = "$before" ] || [ "$after" = x ] || [ "$(slot $slot)" = "$after" ] ||
+            bad "slot $slot holds $(slot $slot), neither $before nor $after"
+          [ "$after" != x ] || [ "$(slot 14)" = 0 ] || [ "$(slot 14)" = 1 ] || [ "$(slot 14)" = 65535 ] ||
+            bad "Auto save holds $(slot 14)"
+        fi
+        # ... and the next save is read back
+        local auto
+        auto=$(slot 14)
+        KERNEL_NOR=${chip#pl064} boot $save_setting
+        logged "nor: wrote the settings"
+        KERNEL_NOR=${chip#pl064} boot -f 200
+        [ "$(slot 14)" != "$auto" ] || bad "the save after the cut didn't change Auto save ($auto)"
+        [ "$(slot 26)" = 2 ] || bad "the save after the cut lost LOGGING: slot 26 holds $(slot 26)"
+        pass "a power cut at $cut in settings save $nth on the $chip (read from: $read_from), and the boots after it"
+      fi
+    done
+  }
+  settings_cuts pl064 1 erase:1@B program:1@B program:MID@B program:LAST@B erase:1@A program:1@A program:MID@A program:LAST@A
+  settings_cuts pl064 2 erase:1@B program:1@B program:LAST@B
+  settings_cuts pl064 3 erase:1@A program:1@A program:LAST@A
+  settings_cuts gl064top 1 erase:1@B program:MID@B erase:1@A program:LAST@A
+  settings_cuts gl064top 3 erase:1@A program:LAST@A
+  settings_cuts gl064 1 erase:1@B program:MID@B erase:2@B program:LAST@A
 }
 
 exit $failed

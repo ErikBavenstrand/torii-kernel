@@ -2,8 +2,9 @@
 # Settings sector test on the emulated cart. A new cart's kernel NOR is
 # erased flash, so settings the kernel never wrote read 0xFFFF, as on a real
 # cart, and the kernel falls back to its defaults. Saving one setting
-# rewrites the whole 512-byte sector: slots it doesn't know stay 0xFFFF,
-# and slots from 65 (assress_max) on become 0 (the rest of an EWRAM buffer).
+# writes the whole 512-byte record to one of its two copies (tests/setnor.py
+# reads the one the kernel reads): slots it doesn't know stay 0xFFFF, and
+# slots from 65 (assress_max) to the trailer become 0.
 # The v0.4 slots (source/settings_model.h) read as their defaults until set.
 # Runs inside the torii-emu container.
 set -euo pipefail
@@ -25,7 +26,8 @@ fail() {
 
 # Halfwords from settings slot $1, $2 of them, as hex.
 slots() {
-  od -A n -t x2 -v -j $((0x7B0000 + 2 * $1)) -N $((2 * $2)) "$cart/kernel-nor.bin" | tr -s ' \n' ' ' | sed 's/^ //; s/ $//'
+  local v
+  for v in $(python3 tests/setnor.py get "$cart/kernel-nor.bin" "$1" "$2"); do printf '%04x ' "$v"; done | sed 's/ $//'
 }
 ffff() {
   printf 'ffff%.0s ' $(seq "$1") | sed 's/ $//'
@@ -33,12 +35,7 @@ ffff() {
 
 # write SLOT=VALUE...: settings slots written straight into the kernel NOR
 write() {
-  local slot value
-  for slot in "$@"; do
-    value=${slot#*=}
-    printf %b "\\x$(printf %02x $((value & 0xFF)))\\x$(printf %02x $((value >> 8)))" |
-      dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7B0000 + 2 * ${slot%=*})) conv=notrunc status=none
-  done
+  python3 tests/setnor.py set "$cart/kernel-nor.bin" "$@"
 }
 # booted TEXT: a power-on logs the v0.4 settings as TEXT (settings_log)
 booted() {

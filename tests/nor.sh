@@ -34,7 +34,7 @@ mcopy -i "$cart/sd.img" "$world" ::/World.gba
 # Start on Home (slot 32 = 2): a NOR launch leaves Last place on the NOR
 # page, and the page's routes start from home
 head -c $((8 << 20)) /dev/zero | tr '\0' '\377' >"$cart/kernel-nor.bin"
-printf '\002\000' | dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7B0000 + 2 * 32)) conv=notrunc status=none
+python3 tests/setnor.py set "$cart/kernel-nor.bin" 32=2
 
 fail() {
   echo "FAIL: $*" >&2

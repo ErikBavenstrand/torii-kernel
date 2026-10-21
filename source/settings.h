@@ -21,7 +21,8 @@ void settings_load(struct settings_values *v);
 void settings_stage(const struct settings_values *v);
 // Writes what is staged to the kernel NOR, once and only if a slot changed,
 // ends the staging and, if it wrote, applies the settings (the launches'
-// switches, the LED, the strings, DIM, LOGGING). Returns 1 if it wrote.
+// switches, the LED, the strings, DIM, LOGGING). Returns Commit_SET_info's
+// SET_COMMIT_*: on SET_COMMIT_FAILED the slots stay staged.
 u32 settings_commit(void);
 void settings_read_clock(struct settings_clock *c);
 void settings_write_clock(const struct settings_clock *c);

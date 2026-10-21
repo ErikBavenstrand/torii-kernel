@@ -28,8 +28,9 @@ void settings_stage(const struct settings_values *v)
 
 u32 settings_commit(void)
 {
-	if (!Commit_SET_info(SET_info_buffer))
-		return 0;
+	u32 done = Commit_SET_info(SET_info_buffer);
+	if (done != SET_COMMIT_WRITTEN)
+		return done;
 	// What the settings decide outside the page: the launches' switches and
 	// the LED, the strings, DIM and LOGGING (the page shows THEME as it
 	// changes, and the menu's next session reads it)
@@ -44,7 +45,7 @@ u32 settings_commit(void)
 		tlog("settings: LOGGING is %s", tlog_level_name(level));
 		tlog_set_level(level);
 	}
-	return 1;
+	return done;
 }
 
 void settings_read_clock(struct settings_clock *c)

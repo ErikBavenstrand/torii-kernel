@@ -3,6 +3,7 @@
 
 #include "../../source/bootloader.h"
 #include "../../source/norlist.h"
+#include "../../source/setrecord.h"
 #include "../kernel/torii_test.h"
 #include "tests.h"
 
@@ -32,6 +33,14 @@ void test_kernel_nor_records(void)
 	CHECK(!kernel_nor_record_ok(0x7B0000, 0x2002));
 	CHECK(!kernel_nor_record_ok(0x7B0000, 0xFFFFFFFF));
 	CHECK(kernel_nor_record_ok(0x7B0000, 0x2000));
+	// The settings' copy B, and the other 8 KB boot sectors, up to the window's end
+	CHECK(kernel_nor_record_ok(SET_RECORD_B, SET_RECORD_BYTES));
+	CHECK(kernel_nor_record_ok(0x7BE000, 0x2000));
+	CHECK(!kernel_nor_record_ok(0x7BE000, 0x2002));
+	CHECK(!kernel_nor_record_ok(0x7B1000, 0x200));
+	CHECK(!kernel_nor_record_ok(0x7BF000, 0x200));
+	CHECK(!kernel_nor_record_ok(0x7B2002, 0x200));
+	CHECK(!kernel_nor_record_ok(0x7BFFFE, 2));
 }
 
 static u8 image[LOADER_SIZE];

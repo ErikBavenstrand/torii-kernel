@@ -72,6 +72,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(1, str(Path(__file__).parent.parent / "tools"))
 import names_db
 import perf
+import setnor
 from games import png_lines
 
 SHOTS = Path("tests/shots")
@@ -96,7 +97,6 @@ LONG_NAME = (
     " which now lists, scrolls, opens and saves whole (Rev 1).gba"
 )
 DEEP_FILES = 300
-SETTINGS = 0x7B0000  # settings sector in the kernel NOR (as tests/settings.sh)
 KERNEL_NOR_SIZE = 8 << 20
 GAME_NOR_SIZE = 64 << 20
 NOR_LIST_A = 0x7A0000  # the game NOR's list, as the official kernel keeps it
@@ -321,13 +321,17 @@ def boot(name: str, sd: Path, cart: Path, out: Path, extra: list[str] = ()):
             cart_env[name] = value
         elif line.startswith("#! settings"):
             nor = cart / "kernel-nor.bin"
-            if not nor.exists():
-                nor.write_bytes(b"\xff" * KERNEL_NOR_SIZE)
-            with nor.open("r+b") as f:
-                for slot in line.split()[2:]:
-                    index, value = (int(x, 0) for x in slot.split("="))
-                    f.seek(SETTINGS + 2 * index)
-                    f.write(struct.pack("<H", value))
+            image = bytearray(
+                nor.read_bytes() if nor.exists() else b"\xff" * KERNEL_NOR_SIZE
+            )
+            setnor.write(
+                image,
+                {
+                    int(s, 0): int(v, 0)
+                    for s, v in (a.split("=") for a in line.split()[2:])
+                },
+            )
+            nor.write_bytes(image)
     if names:
         sd_names(cart, names)
     env = dict(os.environ, OMEGA_DIR=str(cart), TZ="UTC")

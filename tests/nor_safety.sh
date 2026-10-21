@@ -182,7 +182,7 @@ done
 # on home whatever page the last one stayed on (Last place)
 start_home() {
   [ -f "$cart/kernel-nor.bin" ] || head -c $((8 << 20)) /dev/zero | tr '\0' '\377' >"$cart/kernel-nor.bin"
-  printf '\002\000' | dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7B0000 + 2 * 32)) conv=notrunc status=none
+  python3 tests/setnor.py set "$cart/kernel-nor.bin" 32=2
 }
 
 # On the NOR page: Delete on a game that isn't the latest only says so, and

@@ -25,16 +25,11 @@ fail() {
   exit 1
 }
 
-# Settings slots (source/ez_define.h) in the kernel NOR at 0x7B0000, as in
+# Settings slots (source/ez_define.h) in the kernel NOR (tests/setnor.py), as in
 # tests/menu.sh but with the scan engine: English, RESET and SAVESTATE on,
 # sleep key L+R+SELECT, menu key L+R+START, scan engine, clock and rumble on.
 settings() {
-  local slot value
-  for slot in "$@"; do
-    value=${slot#*=}
-    printf %b "\\x$(printf %02x $((value & 0xFF)))\\x$(printf %02x $((value >> 8)))" |
-      dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7B0000 + 2 * ${slot%=*})) conv=notrunc status=none
-  done
+  python3 tests/setnor.py set "$cart/kernel-nor.bin" "$@"
 }
 head -c $((8 << 20)) /dev/zero | tr '\0' '\377' >"$cart/kernel-nor.bin"
 settings 0=0xE1E1 1=1 2=1 3=0 4=0 5=9 6=8 7=2 8=9 9=8 10=3 11=0 12=0 13=1 25=1

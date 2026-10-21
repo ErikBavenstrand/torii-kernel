@@ -23,15 +23,23 @@ u16 IWRAM_CODE Game_GPIO_status(void);
 void ReadSram(u32 address, u8 *data, u32 size);
 void WriteSram(u32 address, u8 *data, u32 size);
 void IWRAM_CODE Save_sav_info(u16 *SAV_info_buffer, u32 buffersize);
-void IWRAM_CODE Save_SET_info(u16 *SET_info_buffer, u32 buffersize);
+// Torii: writes the settings record, its slots [0, assress_max) from
+// SET_info_buffer, to the kernel NOR copy not read from (setrecord.h); 1 if
+// it read back whole. Read_SET_info then reads the new copy.
+u32 Save_SET_info(u16 *SET_info_buffer);
 // A settings slot (ez_define.h): as SETTINGS staged it, while it has staged
 // its saves, else as the kernel NOR holds it
 u16 IWRAM_CODE Read_SET_info(u32 offset);
 // Torii: SETTINGS writes the kernel NOR once, as it closes, not on every
 // save. A save stages a buffer's slots [0, assress_max) in RAM, where
 // Read_SET_info reads them; Commit_SET_info writes the staged slots through
-// SET_info_buffer (whose slots from assress_max are written as they are) if
-// any differs from the NOR's. It returns 1 if it wrote, and ends the staging.
+// SET_info_buffer (Save_SET_info) if any differs from the NOR's, and ends the
+// staging, unless the write failed: the slots then stay staged for a retry.
+enum {
+	SET_COMMIT_NONE,  // nothing staged, or nothing changed
+	SET_COMMIT_WRITTEN,
+	SET_COMMIT_FAILED,
+};
 void Stage_SET_info(const u16 *SET_info_buffer);
 u32 Commit_SET_info(u16 *SET_info_buffer);
 // Ends the staging without writing anything (the unit tests)

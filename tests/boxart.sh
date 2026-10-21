@@ -45,8 +45,7 @@ new_cart() {
   set_slot 31 1
 }
 set_slot() {
-  printf %b "\\x$(printf %02x $(($2 & 0xFF)))\\x$(printf %02x $(($2 >> 8)))" |
-    dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7B0000 + 2 * $1)) conv=notrunc status=none
+  python3 tests/setnor.py set "$cart/kernel-nor.bin" "$1=$2"
 }
 boot() { # log [mgba-shot options]
   local log=$1

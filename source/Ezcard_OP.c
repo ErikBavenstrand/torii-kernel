@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "ez_define.h"
+#include "setrecord.h"
 #include "ezkernel.h"
 #include "ui/dialog.h"
 #include "ui/ui.h"
@@ -410,9 +411,72 @@ void IWRAM_CODE Save_sav_info(u16 *SAV_info_buffer, u32 buffersize)
 		       buffersize, Save_info(SAVE_info_offset, SAV_info_buffer, buffersize));
 }
 // --------------------------------------------------------------------
-void IWRAM_CODE Save_SET_info(u16 *SET_info_buffer, u32 buffersize)
+// Torii: the settings record's two copies (setrecord.h). set_copy is the
+// window offset Read_SET_info reads, 0 until set_pick runs; in IWRAM, as
+// set_staging.
+_Static_assert(SET_RECORD_A == SET_info_offset && SET_RECORD_A >= KERNEL_NOR_SMALL &&
+		       SET_RECORD_B + SET_RECORD_BYTES <= KERNEL_NOR_WINDOW &&
+		       SET_RECORD_B - SET_RECORD_A == KERNEL_NOR_SMALL_SECTOR,
+	       "the settings' copies are 8 KB boot sectors of the kernel's data (bootloader.h)");
+static u32 set_copy;
+static u32 set_seq;
+static u8 set_read;  // SET_COPY_A, SET_COPY_B, or SET_COPY_NONE: A as it is
+
+// Not inlined into Read_SET_info: it runs once, from ROM
+static __attribute__((noinline)) void set_pick(void)
 {
-	log_info_write("the settings", buffersize, Save_info(SET_info_offset, SET_info_buffer, buffersize));
+	const u16 *a = (const u16 *)(FlashBase_S71 + SET_RECORD_A);
+	const u16 *b = (const u16 *)(FlashBase_S71 + SET_RECORD_B);
+	set_read = (u8)set_record_pick(a, b, &set_seq);
+	set_copy = set_read == SET_COPY_B ? SET_RECORD_B : SET_RECORD_A;
+	tlog("nor: settings read from %s (%lu)",
+	     set_read == SET_COPY_A   ? "copy A"
+	     : set_read == SET_COPY_B ? "copy B"
+				      : "A as it is (no whole copy)",
+	     (unsigned long)set_seq);
+}
+
+// Seals the record in buffer with seq and writes it at offset; 1 if it
+// read back whole
+static u32 set_write(u32 offset, u16 *buffer, u32 seq)
+{
+	set_record_seal(buffer, assress_max, seq);
+	u32 wrong = Save_info(offset, buffer, SET_RECORD_BYTES);
+	if (wrong)
+		tlog_error("nor: writing the settings' copy %c: %lu of %lu halfwords read back wrong",
+			   offset == SET_RECORD_A ? 'A' : 'B', (unsigned long)wrong, (unsigned long)SET_RECORD_SLOTS);
+	return !wrong;
+}
+
+u32 Save_SET_info(u16 *SET_info_buffer)
+{
+	if (!set_copy)
+		set_pick();
+	u32 seq = set_seq + 1;
+	if (set_read == SET_COPY_A || set_read == SET_COPY_B) {
+		// The copy not read from, so a cut leaves that one whole
+		u32 to = set_read == SET_COPY_A ? SET_RECORD_B : SET_RECORD_A;
+		if (!set_write(to, SET_info_buffer, seq))
+			return 0;
+		set_read = to == SET_RECORD_A ? SET_COPY_A : SET_COPY_B;
+		set_copy = to;
+		set_seq = seq;
+		tlog("nor: wrote the settings, copy %c (%lu)", to == SET_RECORD_A ? 'A' : 'B', (unsigned long)seq);
+		return 1;
+	}
+	// No whole copy (a new cart, or an older kernel's A): B, then A, so a
+	// cut keeps A as it was until B is whole
+	if (!set_write(SET_RECORD_B, SET_info_buffer, seq))
+		return 0;
+	set_read = SET_COPY_B;
+	set_copy = SET_RECORD_B;
+	set_seq = seq;
+	if (set_write(SET_RECORD_A, SET_info_buffer, seq)) {
+		set_read = SET_COPY_A;
+		set_copy = SET_RECORD_A;
+	}
+	tlog("nor: wrote the settings, copies B and A (%lu)", (unsigned long)seq);
+	return 1;
 }
 // --------------------------------------------------------------------
 // Torii: SETTINGS' saves, staged (Stage_SET_info) until Commit_SET_info writes them
@@ -423,7 +487,9 @@ u16 IWRAM_CODE Read_SET_info(u32 offset)
 {
 	if (set_staging && offset < assress_max)
 		return set_staged[offset];
-	return *((vu16 *)(FlashBase_S71 + SET_info_offset + offset * 2));
+	if (!set_copy)
+		set_pick();
+	return *((vu16 *)(FlashBase_S71 + set_copy + offset * 2));
 }
 // --------------------------------------------------------------------
 void Stage_SET_info(const u16 *SET_info_buffer)
@@ -441,7 +507,7 @@ void Discard_SET_info(void)
 u32 Commit_SET_info(u16 *SET_info_buffer)
 {
 	if (!set_staging)
-		return 0;
+		return SET_COMMIT_NONE;
 	set_staging = 0;  // Read_SET_info reads the NOR again
 	u32 changed = 0;
 	for (u32 address = 0; address < assress_max; address++)
@@ -449,11 +515,14 @@ u32 Commit_SET_info(u16 *SET_info_buffer)
 			changed++;
 	if (!changed) {
 		tlog_debug("settings: nothing changed, not written");
-		return 0;
+		return SET_COMMIT_NONE;
 	}
 	memcpy(SET_info_buffer, set_staged, sizeof(set_staged));
-	Save_SET_info(SET_info_buffer, 0x200);
-	return 1;
+	if (!Save_SET_info(SET_info_buffer)) {
+		set_staging = 1;  // still what Read_SET_info reads, for a retry
+		return SET_COMMIT_FAILED;
+	}
+	return SET_COMMIT_WRITTEN;
 }
 // --------------------------------------------------------------------
 u16 IWRAM_CODE Read_sav_info(u32 offset)

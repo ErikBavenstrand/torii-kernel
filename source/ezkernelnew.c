@@ -1033,7 +1033,7 @@ static void Set_saveMODE(BYTE saveMODE)
 	SET_info_buffer[assress_saveMODE] = saveMODE;
 
 	//save to nor
-	Save_SET_info(SET_info_buffer, 0x200);
+	Save_SET_info(SET_info_buffer);
 }
 //---------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------

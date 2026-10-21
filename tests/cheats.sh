@@ -36,7 +36,7 @@ mcopy -i "$cart/sd.img" "$cart/Hello.cht" ::/CHEAT/Hello.cht
 boot() { OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin "$@"; }
 # The first boot makes the kernel's NOR; then turn the CHEAT addon on (slot 4)
 boot -f 60 >/dev/null 2>&1
-printf '\x01\x00' | dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7B0000 + 2 * 4)) conv=notrunc status=none
+python3 tests/setnor.py set "$cart/kernel-nor.bin" 4=1
 # Each run starts from this cart (a launch leaves a save to copy and the
 # menu on the GBA page)
 mkdir -p "$cart/clean"

@@ -60,12 +60,7 @@ count() {
 
 # Settings slots (source/ez_define.h) in the kernel NOR, as SLOT=VALUE.
 settings() {
-  local slot value
-  for slot in "$@"; do
-    value=${slot#*=}
-    printf %b "\\x$(printf %02x $((value & 0xFF)))\\x$(printf %02x $((value >> 8)))" |
-      dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7B0000 + 2 * ${slot%=*})) conv=notrunc status=none
-  done
+  python3 tests/setnor.py set "$cart/kernel-nor.bin" "$@"
 }
 
 # keys FRAME KEY... -> mgba-shot press/release pairs, one key every 8 frames.
