@@ -76,8 +76,6 @@ static const struct ui_card_config card = {4, 4, 4, 1, 0};
 #define DEDUPE_RUN 8    // games that clean to one name told apart, at most
 _Static_assert(DEDUPE_RUN *USERDATA_PATH_MAX <= READCACHE_DEDUPE_SIZE, "a run's paths fit their part of pReadCache");
 #define HASH_BUCKETS 1024  // the resolver's (a power of 2)
-#define GAMES_KEYS USERDATA_FAV_MAX  // favourites outside the index sort by their own key,
-#define GAMES_KEY_BYTES 12           // by this many bytes of it
 
 enum {
 	KIND_CONSOLE,
@@ -102,7 +100,12 @@ static struct {
 		      // index lists it again at row
 	u32 lib_generation;
 	u32 ago_wait;
-	u16 recent_rec[USERDATA_RECENT_MAX];  // each Recent game's record, LIBRARY_NONE none
+	u16 recent_rec[USERDATA_RECENT_MAX];
+	// The favourites' A-Z order kept in PSRAM (build_favs): valid while
+	// fav_key is the index's generation, whether it was loaded and the
+	// favourites' version, and the words still sum to fav_sum
+	u8 fav_cached;
+	u32 fav_key[3], fav_count, fav_sum;  // each Recent game's record, LIBRARY_NONE none
 	char ago[USERDATA_RECENT_MAX][AGO_MAX];
 	char position[16];  // the title's "101/176"
 	char fact_keys[24], fact_values[32];
@@ -310,12 +313,16 @@ static int model_fetch(void *ctx, u32 i, struct ui_item *out)
 static const struct ui_list_model model = {model_count, model_fetch, 0, 0, 0};
 
 // The letter row i files under (A-Z lists, in library_sort_key order)
-static u32 key_letter(const char *key)
+static u32 key_letter_byte(u32 c)
 {
-	u8 c = (u8)key[0];
 	if (c >= 'a' && c <= 'z')
 		return LETTER_A + (u32)(c - 'a');
 	return c < 'a' ? LETTER_HASH_LOW : LETTER_HASH_HIGH;
+}
+
+static u32 key_letter(const char *key)
+{
+	return key_letter_byte((u8)key[0]);
 }
 
 static u32 row_letter(void *ctx, u32 i)
@@ -445,14 +452,17 @@ static u8 list_node(void)
 // Recent's and the favourites' records, and the favourites' order, are
 // worked out in pReadCache (READCACHE_GAMES) while the page opens.
 
+#define KEY_BYTES 12  // a favourite's key's bytes kept for the merge (whole words)
+#define KEY_WORDS (KEY_BYTES / 4)
+
 struct build {
 	u16 head[HASH_BUCKETS];
 	u16 next[USERDATA_FAV_MAX];  // the resolver's chains, then (with tmp) the favourites' words
-	u16 tmp[USERDATA_FAV_MAX];   // the sort's scratch
+	u16 tmp[USERDATA_FAV_MAX];   // the merges' scratch
 	u16 rec[USERDATA_FAV_MAX];   // each path's record
-	u16 order[USERDATA_FAV_MAX];
-	u16 key_slot[USERDATA_FAV_MAX];  // a favourite the index doesn't hold: its key's slot
-	char keys[GAMES_KEYS][GAMES_KEY_BYTES];
+	u16 order[USERDATA_FAV_MAX];  // the paths found, in the index's order; then A-Z
+	u16 hash[USERDATA_FAV_MAX];   // each path's file name's hash, past the bucket's bits
+	u32 key[USERDATA_FAV_MAX][KEY_WORDS];  // each favourite's key's first bytes, big-endian
 };
 _Static_assert(sizeof(struct build) <= READCACHE_GAMES_SIZE, "the build fits its share of pReadCache");
 
@@ -461,44 +471,101 @@ static struct build *build_area(void)
 	return (struct build *)(pReadCache + READCACHE_GAMES);
 }
 
-static u32 name_hash(const char *s)
-{
-	u32 h = 2166136261u;
-	while (*s)
-		h = (h ^ (u8)*s++) * 16777619u;
-	return h & (HASH_BUCKETS - 1);
-}
-
 static const char *file_name(const char *path)
 {
 	const char *slash = strrchr(path, '/');
 	return slash ? slash + 1 : path;
 }
 
+// 1 if path is folder's file name (folder "/": the root's)
+int IWRAM_CODE games_path_is(const char *folder, const char *name, const char *path);
+int IWRAM_CODE games_path_is(const char *folder, const char *name, const char *path)
+{
+	if (folder[0] == '/' && !folder[1])
+		folder++;
+	while (*folder)
+		if (*folder++ != *path++)
+			return 0;
+	if (*path++ != '/')
+		return 0;
+	while (*name)
+		if (*name++ != *path++)
+			return 0;
+	return !*path;
+}
+
+#define HASH_CHECK(h) ((u16)((h) >> 16))  // a hash's bits kept to check a match
+
+// Copies key's first KEY_BYTES into words, big-endian, zero-padded
+void IWRAM_CODE games_key_words(const char *key, u32 *words);
+void IWRAM_CODE games_key_words(const char *key, u32 *words)
+{
+	u32 w = 0;
+	for (u32 i = 0; i < KEY_BYTES; i++) {
+		u32 c = (u8)*key;
+		key += c != 0;
+		w = w << 8 | c;
+		if ((i & 3) == 3)
+			*words++ = w;
+	}
+}
+
+// The paths' records from one console's A-Z list (count records of the
+// index slot from order): each record's file name hashed and looked up in
+// b's chains, a hash that matches comparing the whole path (path(i)); found
+// ones get their key's first words and are appended to b->order from
+// found, up to n. Returns the new found. The build's hot loop, so in IWRAM.
+u32 IWRAM_CODE games_match(struct build *b, const u8 *slot, const u16 *order, u32 count, u32 found, u32 n,
+			   const char *(*path)(u32));
+u32 IWRAM_CODE games_match(struct build *b, const u8 *slot, const u16 *order, u32 count, u32 found, u32 n,
+			   const char *(*path)(u32))
+{
+	const u32 *folders = (const u32 *)(slot + LIB_OFF_FOLDERS);
+	for (u32 k = 0; k < count && found < n; k++) {
+		u32 rec = order[k];
+		const struct lib_rec *r = lib_rec_at(slot, rec);
+		u32 off = r->name & LIB_NAME_OFFSET;
+		const char *name = lib_str(slot, off);
+		u32 h = userdata_name_hash(name);
+		for (u32 i = b->head[h & (HASH_BUCKETS - 1)]; i != 0xFFFF; i = b->next[i])
+			if (b->hash[i] == HASH_CHECK(h) && b->rec[i] == LIBRARY_NONE &&
+			    games_path_is(lib_str(slot, folders[r->folder]), name, path(i))) {
+				b->rec[i] = (u16)rec;
+				b->order[found++] = (u16)i;
+				games_key_words(lib_str(slot, off + (r->name >> 24) * 2), b->key[i]);
+				break;
+			}
+	}
+	return found;
+}
+
 // Finds the records of n paths (path(i)) in one pass over the index: their
-// file names hashed, then every record's name looked up; a name that
-// matches compares the whole path. b->rec[i] gets each, LIBRARY_NONE none.
-static void resolve(struct build *b, u32 n, const char *(*path)(u32))
+// file names' hashes (hash(i)) chained, then every record's looked up (games_match). b->rec[i]
+// gets each, LIBRARY_NONE none, b->key[i] its key's first words, and
+// b->order the paths found in the index's order: console by console, each
+// A-Z. Returns how many; ends[c] where console c's run ends in it.
+static u32 resolve(struct build *b, u32 n, const char *(*path)(u32), u32 (*hash)(u32), u32 *ends)
 {
 	memset(b->head, 0xFF, sizeof(b->head));
 	for (u32 i = 0; i < n; i++) {
 		b->rec[i] = LIBRARY_NONE;
-		const char *p = path(i);
-		if (*p != '/')
+		if (*path(i) != '/')
 			continue;  // a NOR game
-		u32 h = name_hash(file_name(p));
-		b->next[i] = b->head[h];
-		b->head[h] = (u16)i;
+		u32 h = hash(i);
+		b->hash[i] = HASH_CHECK(h);
+		b->next[i] = b->head[h & (HASH_BUCKETS - 1)];
+		b->head[h & (HASH_BUCKETS - 1)] = (u16)i;
 	}
-	for (u32 c = 0; c < LIB_CONSOLES; c++)
-		for (u32 k = 0, count = library_count(c); k < count; k++) {
-			u32 rec = library_game(c, k);
-			const char *name = library_name(rec);
-			for (u32 i = b->head[name_hash(name)]; i != 0xFFFF; i = b->next[i])
-				if (b->rec[i] == LIBRARY_NONE && !strcmp(file_name(path(i)), name) &&
-				    library_path(rec, games.path, sizeof(games.path)) && !strcmp(games.path, path(i)))
-					b->rec[i] = (u16)rec;
-		}
+	const u8 *slot = library_slot();
+	u32 found = 0;
+	for (u32 c = 0; c < LIB_CONSOLES; c++) {
+		if (slot)
+			found = games_match(b, slot, lib_order(slot) + lib_console_start(slot, c), library_count(c),
+					    found, n, path);
+		if (ends)
+			ends[c] = found;
+	}
+	return found;
 }
 
 static const char *recent_path(u32 i)
@@ -506,26 +573,62 @@ static const char *recent_path(u32 i)
 	return userdata_recent_path(i);
 }
 
+static u32 recent_hash(u32 i)
+{
+	return userdata_name_hash(userdata_recent_path(i));
+}
+
 static const char *fav_path(u32 i)
 {
 	return userdata_fav_path(i);
 }
 
-// A favourite's key: its record's, or its cleaned name's (cut to a slot)
-static const char *fav_key(const struct build *b, u32 i)
+// A favourite's key's first KEY_BYTES as words, big-endian, zero-padded:
+// its record's key, or its cleaned name's (cut to fit, so it ends inside)
+static void fav_key(u32 rec, const char *path, u32 *words)
 {
-	if (b->rec[i] != LIBRARY_NONE)
-		return library_key(b->rec[i]);
-	return b->key_slot[i] < GAMES_KEYS ? b->keys[b->key_slot[i]] : "";
+	if (rec != LIBRARY_NONE) {
+		games_key_words(library_key(rec), words);
+		return;
+	}
+	const char *nor = userdata_nor_name(path);
+	char key[KEY_BYTES];
+	gamename_clean(games.name, nor ? nor : path);
+	library_sort_key(key, KEY_BYTES, games.name);
+	games_key_words(key, words);
+}
+
+// Favourites a and b (userdata's order) by their keys' first words (ka,
+// kb), the rest of their keys, then as the library ties: file names, then
+// paths
+static int key_cmp(const u32 *ka, u32 ra, u32 a, const u32 *kb, u32 rb, u32 b)
+{
+	for (u32 w = 0; w < KEY_WORDS; w++)
+		if (ka[w] != kb[w])
+			return ka[w] < kb[w] ? -1 : 1;
+	int c = 0;
+	if ((ka[KEY_WORDS - 1] & 0xFF) && ra != LIBRARY_NONE && rb != LIBRARY_NONE)
+		c = strcmp(library_key(ra) + KEY_BYTES, library_key(rb) + KEY_BYTES);  // both go on
+	if (!c)
+		c = strcmp(file_name(fav_path(a)), file_name(fav_path(b)));
+	return c ? c : strcmp(fav_path(a), fav_path(b));
 }
 
 static int fav_cmp(void *ctx, u32 a, u32 b)
 {
 	const struct build *bd = ctx;
-	int c = strcmp(fav_key(bd, a), fav_key(bd, b));
-	if (!c)
-		c = strcmp(file_name(fav_path(a)), file_name(fav_path(b)));  // ties as the library's
-	return c ? c : strcmp(fav_path(a), fav_path(b));
+	return key_cmp(bd->key[a], bd->rec[a], a, bd->key[b], bd->rec[b], b);
+}
+
+// Merges the sorted runs order[0, mid) and order[mid, end) into one
+static void merge(struct build *b, u32 mid, u32 end)
+{
+	u32 i = 0, j = mid, k = 0;
+	while (i < mid && j < end)
+		b->tmp[k++] = fav_cmp(b, b->order[j], b->order[i]) < 0 ? b->order[j++] : b->order[i++];
+	while (i < mid)
+		b->tmp[k++] = b->order[i++];
+	memcpy(b->order, b->tmp, k * sizeof(u16));  // the rest of the second run is in place
 }
 
 static void build_recent(void)
@@ -533,42 +636,161 @@ static void build_recent(void)
 	u32 n = userdata_recent_count();
 	games.count = n < USERDATA_RECENT_MAX ? n : USERDATA_RECENT_MAX;
 	struct build *b = build_area();
-	resolve(b, games.count, recent_path);
+	resolve(b, games.count, recent_path, recent_hash, NULL);
 	memcpy(games.recent_rec, b->rec, games.count * sizeof(u16));
+}
+
+// --- The favourites' order, kept ------------------------------------------------
+// The words in PSRAM stay between visits: they are the list while the
+// index, its being loaded and the favourites are as they were, and PSRAM
+// holds what was written (a launch fills it with the game). The page's own
+// favourite changes update them in place.
+
+static u32 words_sum(const u32 *words, u32 n)
+{
+	u32 s = n;
+	for (u32 i = 0; i < n; i++)
+		s = (s << 1 | s >> 31) ^ words[i];
+	return s;
+}
+
+static void cache_key(u32 *key)
+{
+	key[0] = library_generation();
+	key[1] = (u32)library_ready();
+	key[2] = userdata_fav_version();
+}
+
+// 1 if the words in PSRAM are the favourites' order
+static int cache_ok(void)
+{
+	u32 key[3];
+	cache_key(key);
+	return games.fav_cached && !memcmp(key, games.fav_key, sizeof(key)) &&
+	       words_sum((const u32 *)PSRAM_GAMES_BASE, games.fav_count) == games.fav_sum;
+}
+
+// Writes n words as the favourites' order; 0 if PSRAM refused them
+static int cache_put(const u32 *words, u32 n)
+{
+	games.fav_cached = 0;
+	psram_begin();
+	if (n && !psram_write((void *)PSRAM_GAMES_BASE, words, n * 4))
+		return 0;
+	games.fav_count = n;
+	games.fav_sum = words_sum(words, n);
+	cache_key(games.fav_key);
+	games.fav_cached = 1;
+	return 1;
+}
+
+static u32 fav_word(u32 i, u32 rec, const u32 *key)
+{
+	return i | (rec == LIBRARY_NONE ? FAV_NO_REC : rec) << 12 | key_letter_byte(key[0] >> 24) << 25;
 }
 
 static void build_favs(void)
 {
+	if (cache_ok()) {
+		games.count = games.fav_count;
+		tlog_debug("games: %lu favourites kept", (unsigned long)games.count);
+		return;
+	}
 	u32 start = torii_frames;
 	u32 n = userdata_fav_count();
 	if (n > USERDATA_FAV_MAX)
 		n = USERDATA_FAV_MAX;
 	struct build *b = build_area();
-	resolve(b, n, fav_path);
-	u32 slots = 0;
-	for (u32 i = 0; i < n; i++) {
-		b->order[i] = (u16)i;
-		b->key_slot[i] = GAMES_KEYS;
-		if (b->rec[i] != LIBRARY_NONE || slots >= GAMES_KEYS)
-			continue;
-		// Not in the index: its cleaned file name's key
-		const char *p = fav_path(i), *nor = userdata_nor_name(p);
-		gamename_clean(games.name, nor ? nor : p);
-		library_sort_key(b->keys[slots], GAMES_KEY_BYTES, games.name);
-		b->key_slot[i] = (u16)slots++;
+	u32 ends[LIB_CONSOLES];
+	u32 found = resolve(b, n, fav_path, userdata_fav_hash, ends);
+	// The rest, not in the index, after them
+	u32 m = found;
+	for (u32 i = 0; i < n; i++)
+		if (b->rec[i] == LIBRARY_NONE) {
+			fav_key(LIBRARY_NONE, fav_path(i), b->key[i]);
+			b->order[m++] = (u16)i;
+		}
+	gamelist_sort(b->order + found, b->tmp, n - found, fav_cmp, b);
+	// Each console's run is A-Z already: merged one by one, then the rest
+	u32 done = ends[0];
+	for (u32 c = 1; c < LIB_CONSOLES; c++) {
+		if (ends[c] > done && done)
+			merge(b, done, ends[c]);
+		done = ends[c];
 	}
-	gamelist_sort(b->order, b->tmp, n, fav_cmp, b);
+	if (n > found && found)
+		merge(b, found, n);
 	// The words, over the chains and the scratch (done with)
 	u32 *words = (u32 *)b->next;
 	for (u32 j = 0; j < n; j++) {
-		u32 i = b->order[j], rec = b->rec[i] == LIBRARY_NONE ? FAV_NO_REC : b->rec[i];
-		words[j] = i | rec << 12 | key_letter(fav_key(b, i)) << 25;
+		u32 i = b->order[j];
+		words[j] = fav_word(i, b->rec[i], b->key[i]);
 	}
-	psram_begin();
-	if (n && !psram_write((void *)PSRAM_GAMES_BASE, words, n * 4))
-		n = 0;
-	games.count = n;
+	games.count = cache_put(words, n) ? n : 0;
 	tlog("games: %lu favourites sorted in %lu frames", (unsigned long)n, (unsigned long)(torii_frames - start));
+}
+
+// After the page turned favourite path on or off (rec its record):
+// userdata's version was ver, and changed if the favourites did. Its word
+// goes in or out of the kept order in place, if that was kept; else the
+// next visit sorts them again.
+static void cache_changed(const char *path, u32 rec, int on, u32 ver)
+{
+	u32 now = userdata_fav_version();
+	if (now == ver)
+		return;  // nothing changed
+	u32 key[3];
+	cache_key(key);
+	int ok = games.fav_cached && now == ver + 1 && key[0] == games.fav_key[0] && key[1] == games.fav_key[1] &&
+		 games.fav_key[2] == ver && words_sum((const u32 *)PSRAM_GAMES_BASE, games.fav_count) == games.fav_sum;
+	games.fav_cached = 0;
+	int found;
+	u32 idx = userdata_fav_find(path, &found), n = games.fav_count;
+	if (!ok || found != on || (on && n >= USERDATA_FAV_MAX))
+		return;
+	u32 *words = (u32 *)build_area()->next;
+	memcpy(words, (const u32 *)PSRAM_GAMES_BASE, n * 4);
+	if (on) {
+		// The later favourites one on, then its word where it sorts
+		for (u32 j = 0; j < n; j++)
+			if (FAV_INDEX(words[j]) >= idx)
+				words[j]++;
+		u32 kn[KEY_WORDS], kj[KEY_WORDS], lo = 0, hi = n;
+		fav_key(rec, path, kn);
+		while (lo < hi) {
+			u32 mid = lo + (hi - lo) / 2, e = words[mid], i = FAV_INDEX(e);
+			u32 rj = FAV_REC(e) == FAV_NO_REC ? LIBRARY_NONE : FAV_REC(e);
+			fav_key(rj, fav_path(i), kj);
+			if (key_cmp(kn, rec, idx, kj, rj, i) < 0)
+				hi = mid;
+			else
+				lo = mid + 1;
+		}
+		memmove(words + lo + 1, words + lo, (n - lo) * 4);
+		words[lo] = fav_word(idx, rec, kn);
+		n++;
+	} else {
+		// Its word out (idx is where it was), the later ones one back
+		u32 k = 0;
+		for (u32 j = 0; j < n; j++) {
+			u32 e = words[j], i = FAV_INDEX(e);
+			if (i == idx)
+				continue;
+			words[k++] = i > idx ? e - 1 : e;
+		}
+		if (k != n - 1)
+			return;
+		n = k;
+	}
+	if (!cache_put(words, n) || !tlog_in_emulator())
+		return;
+	tlog_debug("games: favourite %s %s in place", path, on ? "in" : "out");
+	// In the emulator, checked against a whole sort
+	u32 sum = games.fav_sum, count = games.count;
+	games.fav_cached = 0;
+	build_favs();
+	games.count = count;  // the page's, until it lists again
+	TLOG_ASSERT(games.fav_count == n && games.fav_sum == sum);
 }
 
 // Recent's "played" texts as the clock reads now; 1 if one changed (and
@@ -1094,8 +1316,10 @@ static void popup_run(u32 i)
 			break;
 		u32 action = games.actions[pick], hard = (ui_input()->held & INPUT_L) != 0;
 		if (action == LANG_POP_FAV) {
+			u32 ver = userdata_fav_version();
 			if (userdata_fav_set(games.pick, !fav))
 				fav = !fav;
+			cache_changed(games.pick, g.rec, fav, ver);
 			games.items[fav_item].value = fav ? gl_games->on : gl_games->off;
 			ui_popup_changed(fav_item);
 			if (games.kind != KIND_FAV)

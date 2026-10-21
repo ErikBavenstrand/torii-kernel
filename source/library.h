@@ -339,6 +339,9 @@ const char *library_key(u32 rec);
 u32 library_size(u32 rec);
 u32 library_flags(u32 rec);
 u32 library_path(u32 rec, char *out, u32 size);
+// The index's slot for the lib_* queries (NULL while none is loaded): for
+// hot loops, read only, until the next library call.
+const u8 *library_slot(void);
 // The record with this full path, or LIBRARY_NONE.
 u32 library_find(const char *path);
 // lib_find_names in the index: the records of games named names (a NOR

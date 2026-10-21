@@ -195,6 +195,16 @@ u32 userdata_fav_count(void);
 // Favourite i's path, in byte order ("" past the end).
 const char *userdata_fav_path(u32 i);
 int userdata_fav_has(const char *path);
+// Where path is or would go among the favourites (byte order); *found 1 if it is.
+u32 userdata_fav_find(const char *path, int *found);
+// Favourite i's file name hashed (userdata_name_hash), kept beside it.
+u32 userdata_fav_hash(u32 i);
+// The hash of path's file name (the bytes after its last '/'): FNV-1a.
+// In IWRAM, for the Favourites page's hot loop.
+u32 userdata_name_hash(const char *path);
+// Counts each read of the favourites (every change reads them back): equal
+// numbers, the same list.
+u32 userdata_fav_version(void);
 // Adds (on) or removes path; 0 if the card or the store is full or failed.
 int userdata_fav_set(const char *path, int on);
 

@@ -1156,6 +1156,11 @@ u32 library_path(u32 rec, char *out, u32 size)
 	return rec_ok(rec) ? lib_path(active_slot(), rec, out, size) : 0;
 }
 
+const u8 *library_slot(void)
+{
+	return lib.valid ? active_slot() : NULL;
+}
+
 u32 library_find(const char *path)
 {
 	return lib.valid ? lib_find(active_slot(), path) : LIBRARY_NONE;
