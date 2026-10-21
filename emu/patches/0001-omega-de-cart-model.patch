@@ -321,10 +321,10 @@ index 1d0c0dd..b77704a 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..461225e
+index 0000000..6f7f4bd
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1545 @@
+@@ -0,0 +1,1557 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -494,7 +494,9 @@ index 0000000..461225e
 +// Power cuts for tests: OMEGA_POWER_CUT=CHIP:OP:N[@OFFSET] (CHIP game or
 +// kernel, OP erase or program) cuts the power just before the Nth such
 +// operation, counting only those in the sector at OFFSET when given. A word
-+// program and a buffer confirm (29) each count as one program.
++// program and a buffer confirm (29) each count as one program. OP erasing
++// cuts it inside the Nth erase instead, after the chip's first pass, which
++// programs the whole sector to 0: the sector is left all 0.
 +// OMEGA_POWER_CUT=sd:write:N cuts it just before the Nth SD write command
 +// (of one or more sectors). The model finishes each operation at once, so
 +// this cuts between operations: the cart files are synced and the emulator
@@ -506,12 +508,14 @@ index 0000000..461225e
 +	bool sd;
 +	bool game;
 +	bool erase;
++	bool zero;  // erasing: the sector left at 0
 +	long countdown;
 +	bool sector;
 +	uint32_t offset;
 +} _cut;
 +
 +static uint32_t _norSectorBase(const struct GBAOmegaNor* nor, uint32_t offset);
++static uint32_t _norSectorSize(const struct GBAOmegaNor* nor, uint32_t offset);
 +
 +static void _parsePowerCut(void) {
 +	const char* spec = getenv("OMEGA_POWER_CUT");
@@ -525,7 +529,7 @@ index 0000000..461225e
 +	bool parsed = sscanf(spec, "%7[a-z]:%7[a-z]:%ld%n", chip, op, &count, &used) == 3 && count >= 1;
 +	bool sd = parsed && !strcmp(chip, "sd") && !strcmp(op, "write");
 +	bool nor = parsed && (!strcmp(chip, "game") || !strcmp(chip, "kernel")) &&
-+	           (!strcmp(op, "erase") || !strcmp(op, "program"));
++	           (!strcmp(op, "erase") || !strcmp(op, "erasing") || !strcmp(op, "program"));
 +	if (!sd && !nor) {
 +		fprintf(stderr, "omega: bad OMEGA_POWER_CUT %s (CHIP:OP:N[@OFFSET])\n", spec);
 +		exit(2);
@@ -534,7 +538,8 @@ index 0000000..461225e
 +	_cut.sector = !sd && spec[used] == '@';
 +	_cut.offset = _cut.sector ? strtoul(spec + used + 1, NULL, 0) : 0;
 +	_cut.game = !strcmp(chip, "game");
-+	_cut.erase = !strcmp(op, "erase");
++	_cut.zero = !strcmp(op, "erasing");
++	_cut.erase = !strcmp(op, "erase") || _cut.zero;
 +	_cut.countdown = count;
 +	_cut.armed = true;
 +}
@@ -568,6 +573,13 @@ index 0000000..461225e
 +	}
 +	if (--_cut.countdown) {
 +		return;
++	}
++	if (_cut.zero) {
++		uint32_t base = _norSectorBase(nor, offset);
++		memset(&nor->data[base], 0, _norSectorSize(nor, offset));
++		fprintf(stderr, "omega: power cut inside %s erase at %06X, the sector left at 0\n",
++		        _cut.game ? "game" : "kernel", offset);
++		_powerCut(omega);
 +	}
 +	fprintf(stderr, "omega: power cut before %s %s at %06X\n", _cut.game ? "game" : "kernel",
 +	        erase ? "erase" : "program", offset);

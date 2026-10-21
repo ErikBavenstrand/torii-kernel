@@ -32,15 +32,28 @@ u32 set_record_check(const u16 *record, u32 *seq)
 	return 1;
 }
 
+// Whether record is what an older kernel writes: its slots, not all 0, then
+// only 0. A torn Torii program leaves the last slot erased or partly
+// programmed, never 0; a torn erase leaves it all 0, or 0s and 1s at random.
+static u32 set_record_legacy(const u16 *record)
+{
+	u32 any = 0;
+	for (u32 slot = 0; slot < SET_RECORD_LEGACY_SLOTS; slot++)
+		any |= record[slot];
+	for (u32 slot = SET_RECORD_LEGACY_SLOTS; slot < SET_RECORD_SLOTS; slot++)
+		if (record[slot])
+			return 0;
+	return any != 0;
+}
+
 u32 set_record_pick(const u16 *a, const u16 *b, u32 *seq)
 {
 	u32 seq_a, seq_b;
 	u32 has_a = set_record_check(a, &seq_a);
 	u32 has_b = set_record_check(b, &seq_b);
 	*seq = 0;
-	// An older kernel wrote A (its last slot 0) after Torii's copies; a torn
-	// write of Torii's leaves that slot erased or partly programmed, never 0
-	if (!has_a && a[SET_RECORD_SLOTS - 1] == 0)
+	// An older kernel wrote A after Torii's copies
+	if (!has_a && set_record_legacy(a))
 		return SET_COPY_NONE;
 	if (has_a && (!has_b || (s32)(seq_b - seq_a) <= 0)) {
 		*seq = seq_a;

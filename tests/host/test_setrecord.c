@@ -97,6 +97,19 @@ void test_settings_record(void)
 	memset(copy_b, 0xFF, SET_RECORD_BYTES);
 	CHECK_EQ(set_record_pick(copy_a, copy_b, &seq), SET_COPY_NONE);
 
+	// An erase cut off: A all 0 (pre-programmed), or 0s and 1s, loses to a
+	// whole B; an older kernel's A is never all 0
+	record(copy_a, 100, 7);
+	record(copy_b, 200, 8);
+	memset(copy_a, 0, SET_RECORD_BYTES);
+	CHECK_EQ(set_record_pick(copy_a, copy_b, &seq), SET_COPY_B);
+	for (u32 i = 0; i < SET_RECORD_SLOTS; i++)
+		copy_a[i] = (u16)(i * 0x9E37u);
+	CHECK_EQ(set_record_pick(copy_a, copy_b, &seq), SET_COPY_B);
+	legacy(copy_a, 300);
+	copy_a[KERNEL_SLOTS] = 1;  // a slot past the older kernels' not 0
+	CHECK_EQ(set_record_pick(copy_a, copy_b, &seq), SET_COPY_B);
+
 	// A power cut at every step of a save leaves the old values or the new,
 	// from each starting point: a new cart, an older kernel's A, after one
 	// save, after two

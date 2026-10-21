@@ -85,9 +85,10 @@ u32 IWRAM_CODE Read_SD_sectors(u32 address, u16 count, u8 *SDbuffer)
 	u16 i;
 	u16 blocks;
 	u32 res;
-	u32 times = 2;
+	u32 times;
 	for (i = 0; i < count; i += 4) {
 		blocks = (count - i > 4) ? 4 : (count - i);
+		times = 2;  // Torii: each chunk gets its retry
 
 	read_again:
 		*(vu16 *)0x9fe0000 = 0xd200;
@@ -421,6 +422,7 @@ void IWRAM_CODE Save_sav_info(u16 *SAV_info_buffer, u32 buffersize)
 // Torii: the settings record's two copies (setrecord.h). set_copy is the
 // window offset Read_SET_info reads, 0 until set_pick runs; in IWRAM, as
 // set_staging.
+_Static_assert(SET_RECORD_LEGACY_SLOTS == assress_max && assress_max < SET_RECORD_SEQ, "the slots older kernels write");
 _Static_assert(SET_RECORD_A == SET_info_offset && SET_RECORD_A >= KERNEL_NOR_SMALL &&
 		       SET_RECORD_B + SET_RECORD_BYTES <= KERNEL_NOR_WINDOW &&
 		       SET_RECORD_B - SET_RECORD_A == KERNEL_NOR_SMALL_SECTOR,
@@ -478,10 +480,16 @@ u32 Save_SET_info(u16 *SET_info_buffer)
 	set_read = SET_COPY_B;
 	set_copy = SET_RECORD_B;
 	set_seq = seq;
-	if (set_write(SET_RECORD_A, SET_info_buffer, seq)) {
-		set_read = SET_COPY_A;
-		set_copy = SET_RECORD_A;
+	if (!set_write(SET_RECORD_A, SET_info_buffer, seq)) {
+		// Read again: where both share a sector, A's erase took B too
+		set_pick();
+		if (set_read != SET_COPY_B)
+			return 0;
+		tlog("nor: wrote the settings, copy B (%lu); A next time", (unsigned long)seq);
+		return 1;
 	}
+	set_read = SET_COPY_A;
+	set_copy = SET_RECORD_A;
 	tlog("nor: wrote the settings, copies B and A (%lu)", (unsigned long)seq);
 	return 1;
 }

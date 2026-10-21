@@ -20,6 +20,7 @@ COPY_B = 0x7B2000
 SLOTS = 256
 SEQ, CRC, MAGIC_SLOT = 248, 252, 254
 MAGIC = 0x31455354  # "TSE1"
+LEGACY = 65  # the slots older kernels write; they write the rest as 0
 KERNEL_NOR_SIZE = 0x800000
 
 
@@ -40,7 +41,7 @@ def pick(nor: bytes) -> str:
     """The copy the kernel reads (set_record_pick): A, B, or none (A as it is)"""
     a, b = _copy(nor, COPY_A), _copy(nor, COPY_B)
     seq_a, seq_b = _whole(a), _whole(b)
-    if seq_a is None and a[SLOTS - 1] == 0:
+    if seq_a is None and any(a[:LEGACY]) and not any(a[LEGACY:]):
         return "none"
     newer_b = seq_b is not None and (
         seq_a is None or 0 < (seq_b - seq_a) & 0xFFFFFFFF < 0x80000000
@@ -56,8 +57,8 @@ def read(nor: bytes) -> list[int]:
 
 
 def write(nor: bytearray, changes: dict[int, int]) -> None:
-    """Sets slots as an older kernel would: all of them to A, trailer 0"""
-    slots = read(nor)[:SEQ] + [0] * (SLOTS - SEQ)
+    """Sets slots as an older kernel would: its slots to A, the rest 0"""
+    slots = read(nor)[:LEGACY] + [0] * (SLOTS - LEGACY)
     for slot, value in changes.items():
         slots[slot] = value & 0xFFFF
     struct.pack_into(f"<{SLOTS}H", nor, COPY_A, *slots)

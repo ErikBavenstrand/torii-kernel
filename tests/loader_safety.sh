@@ -459,7 +459,8 @@ EOF
   # values from before it or after it, never the defaults, and the next
   # save works. The first save from an older kernel's A (new_cart's) writes
   # B, then A; the next writes B, the one after A. A word program and a
-  # buffer write (the S29GL064A: 16 a copy) each count one program. On the
+  # buffer write (the S29GL064A: 16 a copy) each count one program; erasing
+  # cuts inside an erase, the sector left at 0 (the chip's first pass). On the
   # bottom-boot S29GL064A both copies share one 64 KB sector, so a cut there
   # may lose everything, as the single copy did: it only checks the loader.
   settings_cuts() { # CHIP SAVE(1-3) CUT...
@@ -514,11 +515,12 @@ EOF
       fi
     done
   }
-  settings_cuts pl064 1 erase:1@B program:1@B program:MID@B program:LAST@B erase:1@A program:1@A program:MID@A program:LAST@A
-  settings_cuts pl064 2 erase:1@B program:1@B program:LAST@B
-  settings_cuts pl064 3 erase:1@A program:1@A program:LAST@A
-  settings_cuts gl064top 1 erase:1@B program:MID@B erase:1@A program:LAST@A
-  settings_cuts gl064top 3 erase:1@A program:LAST@A
+  settings_cuts pl064 1 erase:1@B program:1@B program:MID@B program:LAST@B erase:1@A program:1@A program:MID@A \
+    program:LAST@A erasing:1@B erasing:1@A
+  settings_cuts pl064 2 erase:1@B program:1@B program:LAST@B erasing:1@B
+  settings_cuts pl064 3 erase:1@A program:1@A program:LAST@A erasing:1@A
+  settings_cuts gl064top 1 erase:1@B program:MID@B erase:1@A program:LAST@A erasing:1@A
+  settings_cuts gl064top 3 erase:1@A program:LAST@A erasing:1@A
   settings_cuts gl064 1 erase:1@B program:MID@B erase:2@B program:LAST@A
 }
 

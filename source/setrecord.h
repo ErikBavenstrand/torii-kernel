@@ -10,9 +10,12 @@
 // copy with the higher number.
 //
 // Older kernels (the official one, Torii before v0.4.2) write only A, with
-// the trailer's slots 0. Such an A wins over any copy, as the newer write, and
-// with no whole copy the settings are read from A as they are. The first save
-// after either writes B, then A.
+// every slot from SET_RECORD_LEGACY_SLOTS 0. Such an A wins over any copy, as
+// the newer write, and with no whole copy the settings are read from A as
+// they are. The first save after either writes B, then A. An erase cut off
+// can leave A all 0 (the chip programs a sector to 0 before erasing it) or
+// with bits of both: neither counts as an older kernel's, as its own slots
+// are never all 0 (the hotkeys).
 //
 // On a chip whose top 64 KB is one sector (a bottom-boot S29GL064A) both
 // copies share it: each erase clears both, as the single copy before did.
@@ -31,6 +34,8 @@
 #define SET_RECORD_SEQ 248
 #define SET_RECORD_CRC 252
 #define SET_RECORD_MAGIC_SLOT 254
+// The slots older kernels write (assress_max): they write the rest as 0
+#define SET_RECORD_LEGACY_SLOTS 65
 
 // Zeroes the slots from first up to the trailer, and fills in the trailer.
 void set_record_seal(u16 *record, u32 first, u32 seq);

@@ -146,6 +146,13 @@ void test_settings_capture(void)
 	CHECK_EQ(hold(&c, 0, 1), SET_CAPTURE_DONE);
 	CHECK_EQ(c.best, L | R | B);
 	CHECK_EQ(c.after, 0);
+	// ... and keys rolled over (START held as L+R go) are the hold too
+	settings_capture_start(&c, 0, 18, 300);
+	CHECK_EQ(hold(&c, L | R, 20), SET_CAPTURE_WAIT);
+	CHECK_EQ(hold(&c, L | R | START, 2), SET_CAPTURE_WAIT);
+	CHECK_EQ(hold(&c, START | SELECT, 20), SET_CAPTURE_WAIT);
+	CHECK_EQ(hold(&c, 0, 1), SET_CAPTURE_DONE);
+	CHECK_EQ(c.best, START | SELECT);
 	// Nothing pressed for 5 s gives up; a key held restarts the time
 	settings_capture_start(&c, 0, 18, 300);
 	CHECK_EQ(settings_capture_left(&c), 300);

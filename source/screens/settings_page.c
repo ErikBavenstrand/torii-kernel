@@ -1149,8 +1149,8 @@ static void settings_leave(void)
 		save_now();
 		sp.redraw = 1;  // the hint bar's explanation back, if the page stays up
 		if (sp.unsaved) {
-			// Failed again: nothing may stay staged past the page (a
-			// launch reuses EWRAM), so the NOR's values are back
+			// Failed (its last try): nothing may stay staged past the
+			// page (a launch reuses EWRAM), so the NOR's values are back
 			Discard_SET_info();
 			tlog_error("settings: not saved, the page left");
 		}
