@@ -107,10 +107,12 @@ u32 home_facing(void)
 	return home.facing;
 }
 
-void home_items(const u8 *items, u32 count)
+void home_items(const u8 *items, u32 count, u32 face)
 {
-	int same = count == home.count && !memcmp(items, home.items, count);
 	u32 item = home_facing();
+	int same = count == home.count && !memcmp(items, home.items, count) && (face >= NAV_ITEMS || face == item);
+	if (face < NAV_ITEMS && registry_index(items, count, face) < count)
+		item = face;
 	entries(items, count);
 	u32 at = registry_nearest(items, count, item);
 	tlog_debug("home: %lu items, facing %s", (unsigned long)count, registry_items[items[at]].word);
