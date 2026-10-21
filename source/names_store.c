@@ -352,8 +352,10 @@ static void read_begin(void)
 	// written (safefile_write's order)
 	N.main_first = from == SAFEFILE_BAK;
 	if (from == SAFEFILE_NONE) {
-		if ((N.has_main && N.scan_main.size) || (N.has_bak && N.scan_bak.size))
+		if ((N.has_main && N.scan_main.size) || (N.has_bak && N.scan_bak.size)) {
 			tlog_error("names: %s: neither copy holds up: read as empty", NAMES_CACHE_FILE);
+			N.cache_ok = 0;  // never written over: their text may still be saved on a PC
+		}
 		load_done();
 		return;
 	}
