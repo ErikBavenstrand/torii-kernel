@@ -68,7 +68,7 @@ static u8 oam_count, oam_shown, oam_changed, oam_full_logged;
 static struct gfx_split split EWRAM_BSS, split_live EWRAM_BSS;  // as set, and as committed
 static u8 split_dirty, split_on;
 u32 gfx_split_data[GFX_SPLIT_WORDS] SPLIT_IWRAM;
-static u32 split_dma[GFX_SPLIT_PARTS * 3] EWRAM_BSS;
+u32 gfx_split_dma[GFX_SPLIT_PARTS * 3] EWRAM_BSS;  // gfx_split.s reads it
 
 void gfx_init(void)
 {
@@ -99,13 +99,6 @@ void gfx_init(void)
 }
 
 // --- Raster split -------------------------------------------------------------
-
-void IWRAM_CODE gfx_split_irq(void)
-{
-	vu32 *dma = DMA0_REGS;
-	for (u32 i = 0; i < GFX_SPLIT_PARTS * 3; i++)
-		dma[i] = split_dma[i];
-}
 
 void gfx_split_off(void)
 {
@@ -174,7 +167,7 @@ static void commit_split(void)
 	split_live = split;
 	for (u32 i = 0; i < GFX_SPLIT_PARTS; i++) {
 		const struct gfx_split_part *p = &split.part[i];
-		u32 *dma = &split_dma[i * 3];
+		u32 *dma = &gfx_split_dma[i * 3];
 		dma[2] = 0;
 		if (!part_ok(p))
 			continue;

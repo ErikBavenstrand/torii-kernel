@@ -192,7 +192,9 @@ void gfx_set_split(const struct gfx_split *split);
 // Ends a split at once: the interrupt and both DMAs off (before a game, or
 // ui_shutdown)
 void gfx_split_off(void);
-// The VCOUNT handler (libgba's dispatcher calls it): arms the DMAs
+// The VCOUNT handler (gfx_split.s; libgba's dispatcher calls it): writes
+// DMA0 and DMA1 from gfx_split_dma, which each commit sets
+extern u32 gfx_split_dma[GFX_SPLIT_PARTS * 3];
 void IWRAM_CODE gfx_split_irq(void);
 
 // The commit. Call it in VBlank, as frame_begin does: registers, palettes,
