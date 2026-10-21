@@ -40,8 +40,7 @@ boot-progress/screen 985A0C30AC9AC713
 boot-progress/frames 0-1 818B02E74B016B0D
 boot-progress/frames 2-2 DF83FD5B30B3838E
 boot-progress/frames 3-3 ED1577E2D566A2E4
-boot-progress/frames 4-6 7C573B18E65FE325
-boot-progress/frames 7-7 7B90E77090ED8325
+boot-progress/frames 4-7 7C573B18E65FE325
 boot-progress/frames 8-12 985A0C30AC9AC713
 boot-progress/frames 13-28 9D5EA05F12ADBBF3
 boot-progress-big/loading 4D1AC309F55D96DF
