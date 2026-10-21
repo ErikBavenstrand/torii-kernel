@@ -116,7 +116,7 @@ echo "PASS: rename: a names.txt too large to read is logged once and Rename says
 printf '/Hello.gba\tCustom Hello\n' >"$cart/names.txt"
 mcopy -o -i "$cart/sd.img" "$cart/names.txt" ::/torii/names.txt
 mdel -i "$cart/sd.img" ::/torii/names.txt.bak ::/Helloq.gba 2>/dev/null || true
-boot -u "library: wrote" -f 900  # the index takes the name
+boot -u "library: wrote" -f 900 # the index takes the name
 logged "library: 1 custom names parsed"
 # shellcheck disable=SC2046 # nav.sh's options
 boot $(nav_file /Hello.gba 0) -k @12:UP -k @16:- -k @20:UP -k @24:- -k @28:UP -k @32:- -k @40:A -k @44:- \
