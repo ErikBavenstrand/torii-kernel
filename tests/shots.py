@@ -242,6 +242,12 @@ def boot(name: str, sd: Path, cart: Path, out: Path, extra: list[str] = ()):
             data = Path(src).read_bytes()
             padded = cart / Path(dest).name
             padded.write_bytes(data + b"\xff" * (int(size, 0) - len(data)))
+            # Its folders first, if the card doesn't hold them (/torii)
+            parts = dest.strip("/").split("/")[:-1]
+            for i in range(len(parts)):
+                folder = "::/" + "/".join(parts[: i + 1])
+                if subprocess.run(["mdir", "-i", str(cart / "sd.img"), folder], capture_output=True).returncode:
+                    run(["mmd", "-i", str(cart / "sd.img"), folder])
             run(
                 [
                     "mcopy",
