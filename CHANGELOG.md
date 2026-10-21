@@ -4,8 +4,41 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.4.1 (2026-10-21)
 
+The new menu: a carousel home, game lists, SD card, NOR, Settings and Info
+pages, rename, light and dark themes, a library index, No-Intro names and box
+art, and the fixes from the first cart tests.
+
+- **Fixed:** SD read errors reach FatFs: a save or ROM the card can't read
+  stops the launch with an error, so nothing is copied over the good save,
+  and a NOR write stops instead of burning bad data. Settings are kept as
+  two copies with a sequence number and CRC, both written each save, so a
+  power cut can't wipe them and older kernels read the current ones; a failed
+  write says so and is retried. Smaller: the hotkey capture's B, the Time
+  card pausing the library, a deleted log reopened, a dropped NOR entry
+  logged once, the launch hook restoring the VBlank handler (E1; `a71b042`).
+- **Fixed:** an SD rename survives a power cut and rolls back a failed move;
+  the shared-save check sees games outside the index; large `names.txt` files
+  are read; a write-protected card doesn't rescan every boot; paths are
+  canonical; clashing hotkeys from older kernels fall back to defaults; the
+  cheat parser keeps spaces and terminates its keys; same-named games in
+  different folders are told apart; NOR rows show custom and database names
+  (E2; `1d880bd`).
+- **Fixed:** Favourites open fast with thousands of entries; names.txt and
+  crc.txt work no longer stalls the menu; popups and confirmations open on
+  time during a library scan, clip cleanly and keep the selected row; keys
+  mashed around popups and page changes act as pressed; the SD popup offers
+  both Clean boot and Boot with addon; the SD item count stays within a
+  frame (E3; `6d07d0c`).
+- **Fixed:** the theme wipe survives a slow frame; a launch goes to the
+  loading card after 3 black frames instead of 8; covers keep their colours
+  through fades; Start on waits for the library on a first boot; Diagnostics
+  passes show in green; the NES placeholder's torii is redrawn (E4;
+  `4befcfb`).
+- **Removed:** dead code (unused icons, loaders, return values, the GBA
+  game-code column of `names.db` and `crc.txt`); the tools report a
+  read-only or full card clearly (E5; `0d6f91e`).
 - **Docs:** source comments point to the new design docs
   (`docs/design/engine.md`, `docs/design/v0.4/decisions.md`) and the
   hardware notes instead of the deleted planning logs; no code change
