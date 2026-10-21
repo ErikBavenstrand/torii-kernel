@@ -56,8 +56,9 @@
 #define FACT_KEYS_W 32
 #define FACT_VALUES_W 48
 #define FACTS_H 32       // two lines
-#define NOTE_W 88        // "No games here", in the list's middle: narrow, as plane 2's tiles are
-		// the popups' and confirmations' too (a tall popup and a confirmation fill them)
+// "No games here", in the list's middle: narrow, as plane 2's tiles are the
+// popups' and confirmations' too (a tall popup and a confirmation fill them)
+#define NOTE_W 88
 #define NOTE_Y 72
 #define NOTE_H 16
 static const struct ui_card_config card = {4, 4, 4, 1, 0};
@@ -69,12 +70,12 @@ static const struct ui_card_config card = {4, 4, 4, 1, 0};
 #define INFO_VALUES_W 136
 #define INFO_LINES_H 72  // six lines
 
-#define AGO_POLL 30  // frames between checks of Recent's "played" texts
-#define AGO_MAX 16  // a "played" text's bytes, with its NUL
-#define DEDUPE_RUN 8  // games that clean to one name told apart, at most
+#define AGO_POLL 30     // frames between checks of Recent's "played" texts
+#define AGO_MAX 16      // a "played" text's bytes, with its NUL
+#define DEDUPE_RUN 8    // games that clean to one name told apart, at most
 #define HASH_BUCKETS 1024  // the resolver's (a power of 2)
 #define GAMES_KEYS USERDATA_FAV_MAX  // favourites outside the index sort by their own key,
-#define GAMES_KEY_BYTES 12  // by this many bytes of it
+#define GAMES_KEY_BYTES 12           // by this many bytes of it
 
 enum {
 	KIND_CONSOLE,
@@ -85,18 +86,18 @@ enum {
 // --- State -------------------------------------------------------------------
 
 static struct {
-	u8 item;  // enum nav_item
+	u8 item;     // enum nav_item
 	u8 kind;
 	u8 console;  // a console page's LIB_*
-	u8 art;  // the list-with-art view
-	u8 az;  // A-Z: LEFT/RIGHT jump by letter
-	u8 first;  // the view's first node
+	u8 art;      // the list-with-art view
+	u8 az;       // A-Z: LEFT/RIGHT jump by letter
+	u8 first;    // the view's first node
 	u32 count;
 	u32 cursor;  // the list's cursor, as last seen
 	u32 defer_generation;  // library_generation() when A or START asked for a row
-	u32 row;  // the row the page was asked to open on (games_row before it shows)
+	u32 row;     // the row the page was asked to open on (games_row before it shows)
 	u8 unloaded;  // it opened while the index wasn't loaded (after a launch): a new
-	// index lists it again at row
+		      // index lists it again at row
 	u32 lib_generation;
 	u32 ago_wait;
 	u16 recent_rec[USERDATA_RECENT_MAX];  // each Recent game's record, LIBRARY_NONE none
@@ -127,9 +128,9 @@ static struct {
 
 // The favourites in A-Z order, while the Favourites page is up: one word
 // each, FAV_* fields (PSRAM_GAMES_BASE, written by psram_write)
-#define FAV_INDEX(e) ((e) & 0xFFFu)  // in userdata_fav_path's order
-#define FAV_REC(e) (((e) >> 12) & 0x1FFFu)  // the library record, FAV_NO_REC none
-#define FAV_LETTER(e) ((e) >> 25)  // letter_of its name
+#define FAV_INDEX(e) ((e) & 0xFFFu)            // in userdata_fav_path's order
+#define FAV_REC(e) (((e) >> 12) & 0x1FFFu)     // the library record, FAV_NO_REC none
+#define FAV_LETTER(e) ((e) >> 25)              // letter_of its name
 #define FAV_NO_REC 0x1FFFu
 _Static_assert(USERDATA_FAV_MAX <= 0x1000 && LIBRARY_GAMES_MAX < FAV_NO_REC, "a favourite's word holds them");
 _Static_assert(USERDATA_FAV_MAX * 4 <= PSRAM_GAMES_BYTES, "the favourites' order fits its PSRAM");
@@ -142,9 +143,9 @@ static u32 fav_entry(u32 i)
 // --- One game ------------------------------------------------------------------
 
 struct game {
-	u32 rec;  // its record in the index, LIBRARY_NONE if none
+	u32 rec;           // its record in the index, LIBRARY_NONE if none
 	const char *path;  // its path (Recent's or a favourite's, in PSRAM); NULL: the record's
-	u32 console;  // LIB_*, LIB_CONSOLE_NONE if unknown
+	u32 console;       // LIB_*, LIB_CONSOLE_NONE if unknown
 };
 
 static u32 console_of(u32 rec, const char *path)
@@ -327,7 +328,7 @@ enum {
 	N_BAR,
 	N_NOTE,
 	N_LETTER,
-	N_LIST_COMPACT,  // the compact view's list, its last node
+	N_LIST_COMPACT,          // the compact view's list, its last node
 	N_BOX = N_LIST_COMPACT,  // the list with art's
 	N_FACT_KEYS,
 	N_FACT_VALUES,
@@ -437,8 +438,8 @@ static u8 list_node(void)
 struct build {
 	u16 head[HASH_BUCKETS];
 	u16 next[USERDATA_FAV_MAX];  // the resolver's chains, then (with tmp) the favourites' words
-	u16 tmp[USERDATA_FAV_MAX];  // the sort's scratch
-	u16 rec[USERDATA_FAV_MAX];  // each path's record
+	u16 tmp[USERDATA_FAV_MAX];   // the sort's scratch
+	u16 rec[USERDATA_FAV_MAX];   // each path's record
 	u16 order[USERDATA_FAV_MAX];
 	u16 key_slot[USERDATA_FAV_MAX];  // a favourite the index doesn't hold: its key's slot
 	char keys[GAMES_KEYS][GAMES_KEY_BYTES];
