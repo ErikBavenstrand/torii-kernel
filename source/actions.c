@@ -4,6 +4,7 @@
 
 #include "actions.h"
 #include "ezkernel.h"
+#include "GBApatch.h"
 #include "library.h"
 #include "NORflash_OP.h"
 #include "tlog.h"
@@ -71,6 +72,31 @@ static u32 launch_nor_entry(const char *name, u32 hard_reset)
 	return ACTION_NOTHING;
 }
 
+// Makes path_copy (an SD file's full path) the launch path's folder and
+// file name, keeping what they held; 0 if it isn't one (logged as what)
+static int game_enter(const char *what)
+{
+	const char *slash = strrchr(path_copy, '/');
+	u32 dir_len = slash ? (u32)(slash - path_copy) : 0;
+	if (!slash || path_copy[0] != '/' || !slash[1] || dir_len >= MAX_path_len ||
+	    strlen(slash + 1) > GAME_NAME_MAX) {
+		tlog_error("%s %s: not a file's full path", what, path_copy);
+		return 0;
+	}
+	memcpy(saved_path, currentpath, MAX_path_len);
+	memset(currentpath, 0, MAX_path_len);
+	memcpy(currentpath, path_copy, dir_len ? dir_len : 1);  // the root: "/"
+	snprintf(current_filename, sizeof(current_filename), "%s", slash + 1);
+	return 1;
+}
+
+// What game_enter changed comes back
+static void game_leave(void)
+{
+	memcpy(currentpath, saved_path, MAX_path_len);
+	f_chdir(currentpath[0] ? currentpath : "/");
+}
+
 u32 action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset)
 {
 	if (!copy_path(path) || how >= ACTION_HOWS) {
@@ -80,17 +106,8 @@ u32 action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset)
 	const char *nor = userdata_nor_name(path_copy);
 	if (nor)
 		return launch_nor_entry(nor, hard_reset);
-	const char *slash = strrchr(path_copy, '/');
-	u32 dir_len = slash ? (u32)(slash - path_copy) : 0;
-	if (!slash || path_copy[0] != '/' || !slash[1] || dir_len >= MAX_path_len ||
-	    strlen(slash + 1) > GAME_NAME_MAX) {
-		tlog_error("launch %s: not a file's full path", path_copy);
+	if (!game_enter("launch"))
 		return ACTION_NOTHING;
-	}
-	memcpy(saved_path, currentpath, MAX_path_len);
-	memset(currentpath, 0, MAX_path_len);
-	memcpy(currentpath, path_copy, dir_len ? dir_len : 1);  // the root: "/"
-	snprintf(current_filename, sizeof(current_filename), "%s", slash + 1);
 
 	u32 res = ACTION_NOTHING;
 	struct game_pick game = {.name = current_filename};
@@ -114,9 +131,40 @@ u32 action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset)
 		if (res != ACTION_NOTHING)
 			action_nor_read();
 	}
-	memcpy(currentpath, saved_path, MAX_path_len);
-	f_chdir(currentpath[0] ? currentpath : "/");
+	game_leave();
 	return res;
+}
+
+u32 action_game_facts(const char *path, struct action_facts *out)
+{
+	memset(out, 0, sizeof(*out));
+	out->save_type = ACTION_SAVE_TYPES;
+	if (!copy_path(path) || userdata_nor_name(path_copy) || !game_enter("facts"))
+		return 0;
+	struct game_pick game = {.name = current_filename};
+	u32 ok = Game_pick(&game);  // reads the .mde file and looks for a cheat file
+	if (ok && !game.is_emu) {
+		out->save_type = game.save_num < ACTION_SAVE_TYPES ? game.save_num : 0;
+		out->cheats = game.havecht;
+	}
+	game_leave();
+	return ok;
+}
+
+int action_set_save_type(const char *path, u32 save_type)
+{
+	if (save_type >= ACTION_SAVE_TYPES || !copy_path(path) || userdata_nor_name(path_copy) ||
+	    !game_enter("save type"))
+		return 0;
+	// /SAVER/<name>.mde, read by the next launch's Game_pick (as v0.3's SAVE
+	// TYPE line left it when the game started); a new card has no /SAVER yet
+	FRESULT made = f_mkdir(SAVER_FOLDER);
+	if (made != FR_OK && made != FR_EXIST)
+		tlog("save type: %s: FatFs %u", SAVER_FOLDER, (unsigned)made);
+	u8 res = Make_mde_file(current_filename, (u8)save_type);
+	tlog("save type of %s: %lu (%u)", path_copy, (unsigned long)save_type, res);
+	game_leave();
+	return res == FR_OK;
 }
 
 int action_delete_file(const char *path)
@@ -130,7 +178,11 @@ int action_delete_file(const char *path)
 	}
 	tlog_open_now();  // the file may be the log the background open holds
 	res = f_unlink(path_copy);
-	if (res != FR_OK) {
+	if (res == FR_NO_FILE || res == FR_NO_PATH) {
+		// Gone already (taken off the card on a PC): it leaves the lists all
+		// the same, as a deleted one does
+		tlog("delete %s: not on the card", path_copy);
+	} else if (res != FR_OK) {
 		tlog("delete %s: FatFs %u", path_copy, (unsigned)res);
 		return 0;
 	}

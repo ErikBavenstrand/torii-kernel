@@ -1,21 +1,18 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2317,SC2329 # skipped until B13 (below)
-# A cheat file whose names are in Latin-1 or GBK, not UTF-8: every section and
-# entry must still parse, as the kernel reads .cht files byte for byte (FatFs's
-# own line reader decodes UTF-8 and drops other bytes). Opens the cheat screen
-# and reads the parsed list from memory.
+# The cheat screen (source/showcht.c), opened from the game popup's Boot
+# with addon while Cheats is on: a cheat file whose names are in Latin-1 or
+# GBK, not UTF-8, must still parse every section and entry, as the kernel
+# reads .cht files byte for byte (FatFs's own line reader decodes UTF-8 and
+# drops other bytes); a picked cheat is applied at the launch (START), and B
+# goes back to the list with none.
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and building tests/roms/hello.
 set -euo pipefail
 
-# The cheat screen opened from the v0.3 game menu, which went with B10; the
-# game popup that opens it again comes with B13, which brings this back on
-# its route.
-echo "SKIP (waiting for B13): a Latin-1 or GBK cheat file parses on the cheat screen"
-exit 0
-
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
+# shellcheck source=tests/nav.sh
+. tests/nav.sh
 local_carts "dist/cart-cheats${1:+-$1}"
 
 fail() {
@@ -39,14 +36,23 @@ boot() { OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin "$@"; }
 # The first boot makes the kernel's NOR; then turn the CHEAT addon on (slot 4)
 boot -f 60 >/dev/null 2>&1
 printf '\x01\x00' | dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7B0000 + 2 * 4)) conv=notrunc status=none
+# Each run starts from this cart (a launch leaves a save to copy and the
+# menu on the GBA page)
+mkdir -p "$cart/clean"
+cp "$cart/sd.img" "$cart/kernel-nor.bin" "$cart/clean/"
+fresh() {
+  cp "$cart/clean/sd.img" "$cart/clean/kernel-nor.bin" "$cart/"
+  rm -f "$cart/sram.bin"
+}
 
-# Down to the game (CHEAT sorts first), open it, then CHEAT, the sixth row;
-# dump the parsed list, whose names lose their spaces
+# Hello's popup on the GBA page, Boot with addon (its fourth item), then the
+# cheat screen; dump the parsed list, whose names lose their spaces
 list=$((16#$(sed -n 's/^\([0-9a-f]*\) [A-Za-z] pReadCache$/\1/p' dist/ezkernelnew.nm) + 0x2000))
-boot -k 100:DOWN -k 104:- -k 116:A -k 120:- -k 150:DOWN -k 154:- -k 162:DOWN -k 166:- -k 174:DOWN -k 178:- -k 186:DOWN -k 190:- \
-  -k 198:DOWN -k 202:- -k 214:A -k 218:- -s 300:"$shots/cheats.png" -m "300:$(printf 0x%x "$list"):1024" -f 300 \
-  >"$cart/out.txt" 2>&1
-sed -n 's/^mem frame 300 [0-9A-F]*: //p' "$cart/out.txt" | python3 -c 'import sys; sys.stdout.buffer.write(bytes.fromhex(sys.stdin.read()))' >"$cart/list.bin"
+# shellcheck disable=SC2046 # nav.sh's options
+boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @20:DOWN -k @24:- -k @28:DOWN -k @32:- -k @40:A -k @44:- \
+  -w "screen ready: cheats" -s "@4:$shots/cheats.png" -m "@4:$(printf 0x%x "$list"):1024" -f 2000 \
+  >"$cart/out.txt" 2>"$cart/err.txt" || fail "the cheat screen didn't open: $(grep '^kernel' "$cart/err.txt" | tail -3)"
+sed -n 's/^mem frame [0-9]* [0-9A-F]*: //p' "$cart/out.txt" | python3 -c 'import sys; sys.stdout.buffer.write(bytes.fromhex(sys.stdin.read()))' >"$cart/list.bin"
 [ -s "$cart/list.bin" ] || fail "no memory dump: $(tail -3 "$cart/out.txt")"
 for name in $'Vieinfinie\xe9' $'\xbd\xf0\xc7\xae' Plain; do
   grep -qaF -- "$name" "$cart/list.bin" || fail "the cheat list lacks section $(printf %q "$name")"
@@ -55,12 +61,25 @@ done
   fail "the cheat list has $(grep -aoF ON "$cart/list.bin" | wc -l) entries, expected 3"
 echo "PASS: cheat files in Latin-1 and GBK parse"
 
-# Picking a cheat applies it: A on the first entry (the cursor starts there),
-# release B to leave, then BOOT WITH ADDON (the row the menu returns to). The
-# launch logs the cheat count; its one write is "1234,56"
-boot -k 100:DOWN -k 104:- -k 116:A -k 120:- -k 150:DOWN -k 154:- -k 162:DOWN -k 166:- -k 174:DOWN -k 178:- -k 186:DOWN -k 190:- \
-  -k 198:DOWN -k 202:- -k 214:A -k 218:- -k 250:A -k 254:- -k 270:B -k 274:- -k 310:A -k 314:- \
-  -u "launch: loading" -f 600 >"$cart/apply.txt" 2>&1 || true
+# Picking a cheat applies it: A on the first entry (the cursor starts
+# there), then START plays. The launch logs the cheat count; its one write
+# is "1234,56"
+fresh
+# shellcheck disable=SC2046 # nav.sh's options
+boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @20:DOWN -k @24:- -k @28:DOWN -k @32:- -k @40:A -k @44:- \
+  -w "screen ready: cheats" -k @8:A -k @12:- -k @24:START -k @28:- \
+  -u "launch: loading" -f 2000 >"$cart/apply.txt" 2>&1 || true
 grep -q "launch: loading.*cheats 1 (1)" "$cart/apply.txt" ||
   fail "a picked cheat isn't applied: $(grep -a "launch:" "$cart/apply.txt" | tail -1)"
 echo "PASS: a picked cheat is applied at launch"
+
+# B (released) goes back to the list, with no cheat kept: Play then starts
+# Hello with the addons alone
+fresh
+# shellcheck disable=SC2046 # nav.sh's options
+boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @20:DOWN -k @24:- -k @28:DOWN -k @32:- -k @40:A -k @44:- \
+  -w "screen ready: cheats" -k @8:A -k @12:- -k @24:B -k @28:- -w "cheats: back" \
+  -w "screen ready: games" -k @20:A -k @24:- -u "launch: loading" -f 2000 >"$cart/back.txt" 2>&1 || true
+grep -q "launch: loading.*cheats 1 (0)" "$cart/back.txt" ||
+  fail "after B, the launch logged: $(grep -a "launch:" "$cart/back.txt" | tail -1)"
+echo "PASS: B on the cheat screen goes back to the list, and the next launch has no cheats"

@@ -19,8 +19,9 @@
 //	folders  u32 pool offsets of each folder's path ("/" for the root)
 //	pool     NUL-ended strings, each starting on a halfword: a game's file
 //	         name, then its sort key (the record has both offsets, so a
-//	         comparison never measures the name); and the folder paths.
-//	         Padded to 4.
+//	         comparison never measures the name), then its display name
+//	         (right after the key: the name the lists show, a custom one
+//	         or the cleaned file name); and the folder paths. Padded to 4.
 //
 // In a slot each section starts at a fixed offset (LIB_OFF_*), so a slot
 // holds an index of any size up to the caps; in the file they follow each
@@ -38,7 +39,7 @@
 #include <gba_base.h>
 
 #define LIBRARY_MAGIC 0x42494C54u  // "TLIB"
-#define LIBRARY_VERSION 2
+#define LIBRARY_VERSION 3
 #define LIBRARY_GAMES_MAX 4096
 #define LIBRARY_FOLDERS_MAX 2048  // folders holding games
 #define LIBRARY_CONSOLE_SLOTS 8  // header room, for the v0.6 systems
@@ -64,6 +65,7 @@ enum {
 #define LIB_F_CONSOLE 0x000Fu  // the console (LIB_GBA...)
 #define LIB_F_SAVE 0x0010u  // /SAVER holds its save
 #define LIB_F_GONE 0x0020u  // deleted or renamed away since the scan (lib_forget)
+#define LIB_F_CUSTOM 0x0040u  // its display name is a custom one (names.txt), never deduplicated
 
 #define LIB_NAME_OFFSET 0x00FFFFFFu  // lib_rec.name's offset bits
 
@@ -130,6 +132,11 @@ u32 library_key_prefix(const char *key);
 
 // --- Building a slot --------------------------------------------------------
 
+// A game's name, key and display name on their way to the pool: the name
+// from the start, its key after it, and the display name at LIB_TEXT_DISPLAY
+// (lib_build_display) until it moves to the key's end
+#define LIB_TEXT_DISPLAY (LIBRARY_NAME_MAX + 1 + LIBRARY_KEY_MAX + 1)
+#define LIB_TEXT_BYTES (LIB_TEXT_DISPLAY + LIBRARY_NAME_MAX + 1 + 2)
 struct lib_build {
 	u8 *slot;
 	lib_put_fn put;
@@ -139,18 +146,23 @@ struct lib_build {
 	u32 pool;  // bytes used
 	u32 games_seen;
 	u16 flags;  // LIB_H_TRUNCATED once full
-	// A game's name, display name and key on their way to the pool
-	char text[LIBRARY_NAME_MAX + 1 + LIBRARY_KEY_MAX + 1 + 2] ALIGN(4);
-	char display[LIBRARY_NAME_MAX + 1];  // gamename_clean's (GAMENAME_MAX + 1)
+	char text[LIB_TEXT_BYTES] ALIGN(4);
 };
+// Where a caller writes a display name (GAMENAME_MAX + 1 bytes) to hand to
+// lib_build_game
+static inline char *lib_build_display(struct lib_build *b)
+{
+	return b->text + LIB_TEXT_DISPLAY;
+}
 
 void lib_build_begin(struct lib_build *b, u8 *slot, lib_put_fn put);
 // Adds a folder's path ("/" or "/GBA/RPG"); returns its number, or
 // LIBRARY_NONE if the table or the pool is full (then LIB_H_TRUNCATED) or
 // the path is over LIBRARY_NAME_MAX bytes (no flag).
 u16 lib_build_folder(struct lib_build *b, const char *path);
-// Adds a game in folder, sorted by display (the name the lists show; NULL:
-// gamename_clean's). Returns LIB_ADDED; LIB_FULL if the table or the pool
+// Adds a game in folder, sorted by display (the name the lists show, kept
+// beside it; NULL: gamename_clean's), with flags LIB_F_SAVE (/SAVER holds its
+// save) and LIB_F_CUSTOM (display is a custom name). Returns LIB_ADDED; LIB_FULL if the table or the pool
 // is full (then LIB_H_TRUNCATED; every such call counts in games_seen);
 // LIB_BAD_NAME for a name over LIBRARY_NAME_MAX bytes or no console (not
 // counted, no flag: the caller logs it).
@@ -160,7 +172,7 @@ enum {
 	LIB_BAD_NAME = 2,
 };
 int lib_build_game(struct lib_build *b, u16 folder, const char *name, const char *display, u32 size, u32 console,
-		   int has_save);
+		   u32 flags);
 // Fills a header for what was built (its order still to sort, lib_sort),
 // and writes it to the slot. body_crc and header_crc stay 0 (the file's).
 void lib_build_header(struct lib_build *b, struct lib_header *h, u32 walk_hash, u32 volume_serial, u32 total_files);
@@ -232,9 +244,13 @@ static inline const char *lib_str(const u8 *slot, u32 off)
 u32 lib_console_start(const u8 *slot, u32 console);
 // The record of a console's nth game in list order, or LIBRARY_NONE.
 u32 lib_nth(const u8 *slot, u32 console, u32 n);
-// A record's file name and sort key.
+// The other way: where record rec is in its console's list (n), or
+// LIBRARY_NONE if it is gone. A binary search.
+u32 lib_position(const u8 *slot, u32 rec);
+// A record's file name, sort key and display name.
 const char *lib_name(const u8 *slot, u32 rec);
 const char *lib_key(const u8 *slot, u32 rec);
+const char *lib_display(const u8 *slot, u32 rec);
 // A record's folder path.
 const char *lib_folder(const u8 *slot, u32 rec);
 // Writes a record's full path into out (size bytes); returns its length, or
@@ -293,11 +309,18 @@ u32 library_generation(void);
 // (LIBRARY_NONE past the end).
 u32 library_count(u32 console);
 u32 library_game(u32 console, u32 n);
+// Where a record is in its console's A-Z list, or LIBRARY_NONE.
+u32 library_position(u32 rec);
 // A record's file name, size, flags (LIB_F_*) and full path (its length, 0
 // if it doesn't fit). The name points into PSRAM: read it, never write it,
 // and copy it to RAM before handing it to FatFs (the cart hides PSRAM while
 // it talks to the card) or keeping it past a launch.
 const char *library_name(u32 rec);
+// Its display name (the name the lists show, before telling apart games
+// that clean to the same name: LIB_F_CUSTOM says it is a custom one) and
+// sort key, in PSRAM too ("" for no such record)
+const char *library_display(u32 rec);
+const char *library_key(u32 rec);
 u32 library_size(u32 rec);
 u32 library_flags(u32 rec);
 u32 library_path(u32 rec, char *out, u32 size);

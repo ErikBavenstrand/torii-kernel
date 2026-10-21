@@ -1,0 +1,12 @@
+# Recent (source/screens/games.c, mockup #11) in the light theme: the two
+# games of the card's v0.3 list, each with its console mark; their times
+# weren't kept (as for games played while the clock isn't set, T4), so no
+# row says when it was played. DOWN moves the pill. (tests/games.sh checks
+# Recent after a launch, and its "played" texts following the clock.)
+#! settings 28=1
+-w "nav: home ready"
+-k @8:A -k @12:-
+-w "nav: page recent ready"
+-s @2:screen.png
+-k @8:DOWN -k @12:-
+-s @30:down.png

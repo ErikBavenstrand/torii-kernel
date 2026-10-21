@@ -20,7 +20,7 @@ import zlib
 
 CONSOLES = ["GBA", "GBC", "GB", "NES"]
 HEADER = struct.Struct("<IHHHHHH8HIIIIIIII")
-VERSION = 2
+VERSION = 3
 
 
 def four(n):

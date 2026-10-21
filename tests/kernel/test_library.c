@@ -48,7 +48,7 @@ void test_library_psram(void)
 	u16 sub = lib_build_folder(b, "/GBA");
 	for (u32 i = 0; i < 6; i++)
 		CHECK(lib_build_game(b, i & 1 ? sub : root, names[i], NULL, 100 + i, library_console_of(names[i]),
-				     i == 0));
+				     i == 0 ? LIB_F_SAVE : 0));
 	struct lib_header h;
 	lib_build_header(b, &h, 1, 2, 6);
 	lib_sort_begin(s, slot, (u8 *)PSRAM_LIBRARY_SCRATCH + 0x8000, 6, put);

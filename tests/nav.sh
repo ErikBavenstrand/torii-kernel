@@ -17,8 +17,8 @@
 # the end for the four that always show, then A (which opens the item the
 # ring is turning to, so the presses needn't wait for it).
 #
-# Routes into a page (a game's popup, a Settings row) come with the page's
-# ticket: until then they fail, saying which one.
+# Routes into a page (a Settings row) come with the page's ticket: until
+# then they fail, saying which one.
 #
 # nav_file PATH ROW... [ACTION] [hard] [addon]: from power-on into the SD card page
 # (source/screens/sdcard.c) and down PATH's folders to its file, one ROW per
@@ -41,6 +41,14 @@
 # place may open the SD card page, or home facing another item); and log
 # lines are cut at 240 characters, so a path of about 225 bytes or more
 # never matches its wait.
+#
+# nav_game PLACE ROW: nav_to a game list (recent, fav or a console), then
+# DOWN ROW times, 8 frames apart from @8: the game at ROW is selected from
+# @$((8 + 8 * ROW)) on (counted from "nav: page PLACE ready"; ROW < 8 keeps
+# the pill still before it). nav_game_menu PLACE ROW: that, then START:
+# waits for its game popup ("screen ready: game-popup"), later @N count from
+# it. nav_game_delete PLACE ROW: the popup's Delete (UP wraps to it, the
+# last item), asked, and Delete answered (RIGHT, A): "delete: PATH" is logged.
 #
 # The NOR page's (B15), each from power-on through nav_to nor:
 #   nav_nor_game INDEX         the cursor on game INDEX (0 the first written),
@@ -189,7 +197,38 @@ nav_file() {
 }
 
 # Routes into pages, until their tickets land
-nav_game() { _nav_fail "the game lists come with B13 (nav_game $*)"; }
+nav_game() {
+  local place=$1 row=${2:-0} keys=() to
+  to=$(nav_to "$place") || {
+    printf '%s\n' "$to"
+    return 1
+  }
+  for ((i = 0; i < row; i++)); do keys+=(DOWN); done
+  # nav_to printed "-i FILE": the DOWNs go on in its file
+  [ ${#keys[@]} = 0 ] || _nav_keys 8 "${keys[@]}" >>"${to#-i }"
+  printf '%s\n' "$to"
+}
+
+nav_game_menu() {
+  local row=${2:-0} to
+  to=$(nav_game "$@") || {
+    printf '%s\n' "$to"
+    return 1
+  }
+  printf '%s\n' "$(_nav_keys $((16 + 8 * row)) START)" '-w "screen ready: game-popup"' >>"${to#-i }"
+  printf '%s\n' "$to"
+}
+
+nav_game_delete() {
+  local to
+  to=$(nav_game_menu "$@") || {
+    printf '%s\n' "$to"
+    return 1
+  }
+  _nav_keys 12 UP A >>"${to#-i }"
+  printf '%s\n' '-w "screen ready: confirm"' "$(_nav_keys 12 RIGHT A)" >>"${to#-i }"
+  printf '%s\n' "$to"
+}
 
 # The NOR page's routes (B15; the top says what each does). They start from
 # home: on a cart that may have been left on a page for 5 s (Last place),

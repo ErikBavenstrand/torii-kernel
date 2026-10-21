@@ -248,6 +248,37 @@ if shard_case; then
 fi
 
 if shard_case; then
+  # Delete in a game list's popup (Cancel preselected; RIGHT, A deletes):
+  # the game leaves the index at once (the page lists it no more, and the
+  # walk then writes the index without it), Recent and the favourites; its
+  # save stays (T11)
+  cart=$carts/delete
+  nested_card "$cart"
+  boot "$cart" "$cart/1.log" -f 300
+  logged "$cart/1.log" "library: wrote /torii/library.idx"
+  printf '/GBA/RPG/Golden Sun.gba\n/Tetris.gb\n' >"$cart/favorites.txt"
+  mcopy -i "$cart/sd.img" "$cart/favorites.txt" ::/torii/favorites.txt
+  printf '/Tetris.gb\n/GBA/RPG/Golden Sun.gba\n' >"$cart/recent.txt"
+  mcopy -i "$cart/sd.img" "$cart/recent.txt" "::/SAVER/Recently play.txt"
+  # Golden Sun is the GBA page's first row
+  NAV_SHOWN="recent fav gba gbc gb nes"
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot "$cart" "$cart/2.log" $(nav_game_delete gba 0) \
+    -w "delete: /GBA/RPG/Golden Sun.gba" -u "library: wrote" -f 2000
+  logged "$cart/2.log" "delete: /GBA/RPG/Golden Sun.gba"
+  no_errors "$cart/2.log"
+  index "$cart" | grep -q "Golden Sun" && fail "the index still lists Golden Sun:
+$(index "$cart")"
+  mdir -b -i "$cart/sd.img" ::/GBA/RPG | grep -q "Golden Sun.gba" && fail "Golden Sun.gba is still on the card"
+  mtype -i "$cart/sd.img" "::/SAVER/Golden Sun.sav" | cmp -s - "$game" || fail "Golden Sun's save didn't stay as it was"
+  favs=$(mtype -i "$cart/sd.img" ::/torii/favorites.txt | grep '^/' | tr '\n' ' ')
+  [ "$favs" = "/Tetris.gb " ] || fail "after the delete, the favourites are '$favs'"
+  recent=$(mtype -i "$cart/sd.img" ::/torii/recent.txt | grep -v '^[#@]' | cut -f2 | tr '\n' ' ')
+  [ "$recent" = "/Tetris.gb " ] || fail "after the delete, Recent has '$recent'"
+  echo "PASS: Delete in a game list's popup removes the ROM, leaves the index, Recent and the favourites; the save stays"
+fi
+
+if shard_case; then
   # The index survives a launch: a failed one (a name too long for its
   # save record) loads it again, a game's next boot loads it from the card
   cart=$carts/launch

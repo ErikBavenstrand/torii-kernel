@@ -150,6 +150,7 @@ struct list_state {
 	u16 mq_wait;
 	u16 mq_px;
 	u16 mq_width;
+	u16 mq_clip;  // the name's width on its row (item_clip)
 	u16 mq_row;  // the row whose slot shows a marquee step, UI_ITEM_NONE none
 };
 
@@ -165,6 +166,7 @@ struct row_ctx {
 	u32 clip;      // the name's width
 	int icons;     // UI_LIST_ICONS
 	int icon8;     // UI_LIST_ICON8
+	u16 flags;     // the config's UI_LIST_*
 	u32 paper, ink;
 	u32 sel;       // the row drawn with the pill (opaque lists), UI_ITEM_NONE none
 };
@@ -258,6 +260,8 @@ static int list_measure(u8 node, struct engine_budget *need)
 		TLOG_ASSERT(v->first + i == node ||
 			    ui_node_spec((u8)(v->first + i))->plane != ui_node_spec(node)->plane);
 	TLOG_ASSERT(st->opaque || st->plain || (config(node)->flags & UI_LIST_FIXED) || st->ring.h % st->ring.rh == 0);
+	// Bank 1 has no tint for a drawn pill: a consoles list's rows lie over a card
+	TLOG_ASSERT(!(st->opaque && (config(node)->flags & UI_LIST_CONSOLES)));
 	need->bg_tiles = (u16)(need->bg_tiles + st->tw * st->ct);
 	// Its plane's map is two screenblocks (UI_RING_MAP_LINES): one more
 	need->bg_maps++;
@@ -817,13 +821,16 @@ static u32 row_pad(u8 node)
 	return pad ? pad : ui_theme()->pad;
 }
 
-// Where a list row's name starts: after the icon column, if it has one
+// Where a list row's name starts: after the icon or mark column, if it has
+// one
 static u32 text_x(u8 node)
 {
 	u32 pad = row_pad(node), flags = config(node)->flags;
 	if (flags & UI_LIST_ICON8)
 		return pad + UI_LIST_ICON8_W + ui_theme()->look.section_icon_gap;
-	return (flags & UI_LIST_ICONS) ? UI_LIST_ICON_W + pad / 2 : pad;
+	if (flags & UI_LIST_ICONS)
+		return UI_LIST_ICON_W + pad / 2;
+	return flags & UI_LIST_MARKS ? pad + 8u + ui_theme()->look.row_mark_gap : pad;
 }
 
 // Pixels a list row's name may use
@@ -867,6 +874,13 @@ static void row_icon8(const struct text_window *win, u32 x, u32 y, const u32 *ic
 	}
 }
 
+// Pixels item's name may use of clip, the row's: less its badge's room
+static u32 item_clip(u32 clip, const struct ui_item *item)
+{
+	u32 badge = item->badge ? 8u + ui_theme()->look.row_badge_gap : 0;
+	return clip > badge + 8 ? clip - badge : 8;
+}
+
 static void marquee_tick(u8 node, struct list_state *st, u32 dt)
 {
 	if (st->mq == MQ_OFF || st->unmarked || st->page != PAGE_NONE || st->shown != st->base + FIX_ROUND(st->spring))
@@ -890,7 +904,8 @@ static void marquee_tick(u8 node, struct list_state *st, u32 dt)
 		}
 		u32 len = item.len ? item.len : strlen(item.text);
 		st->mq_width = (u16)text_width(t->body, item.text, len);
-		if (st->mq_width <= text_clip(node, st)) {
+		st->mq_clip = (u16)item_clip(text_clip(node, st), &item);
+		if (st->mq_width <= st->mq_clip) {
 			st->mq = MQ_OFF;
 			return;
 		}
@@ -912,7 +927,7 @@ static void marquee_tick(u8 node, struct list_state *st, u32 dt)
 			ui_dirty(node, 2);
 		}
 		st->mq_acc = (u8)(acc % 60);
-		if (st->mq_px + text_clip(node, st) >= (u32)st->mq_width + t->marquee_gap) {
+		if (st->mq_px + st->mq_clip >= (u32)st->mq_width + t->marquee_gap) {
 			st->mq = MQ_END;
 			st->mq_wait = t->marquee_pause;
 		}
@@ -1107,6 +1122,7 @@ static void row_ctx_init(u8 node, const struct list_state *st, struct row_ctx *r
 	rc->x = text_x(node);
 	rc->icons = (config(node)->flags & UI_LIST_ICONS) != 0;
 	rc->icon8 = (config(node)->flags & UI_LIST_ICON8) != 0;
+	rc->flags = config(node)->flags;
 	rc->clip = text_clip(node, st);
 	rc->paper = ui_paper(node, UI_ROLE_NONE);
 	rc->ink = ui_ink(node, UI_ROLE_TEXT);
@@ -1114,13 +1130,16 @@ static void row_ctx_init(u8 node, const struct list_state *st, struct row_ctx *r
 }
 
 // The detail, right-aligned in the row, its window starting x0 px left of
-// the row (line is scratch)
-static void draw_detail(const struct text_window *win, const struct row_ctx *rc, u32 x0, u32 y, const char *detail,
-			struct text_line *line)
+// the row (line is scratch); returns where its text starts
+static u32 draw_detail(const struct text_window *win, const struct row_ctx *rc, u32 x0, u32 y, const char *detail,
+		       struct text_line *line)
 {
 	text_layout(rc->font, detail, strlen(detail), rc->w, line);
-	if (!line->truncated && line->advance + rc->pad < rc->w)
-		text_draw_line(win, rc->font, x0 + rc->w + 1 - rc->pad - line->advance, y, UI_ROLE_DIM, line);
+	if (line->truncated || line->advance + rc->pad >= rc->w)
+		return x0 + rc->w - rc->pad;
+	u32 x = x0 + rc->w + 1 - rc->pad - line->advance;
+	text_draw_line(win, rc->font, x, y, UI_ROLE_DIM, line);
+	return x;
 }
 
 // 1 if canvas lines of slot s show on screen now, as the last commit left
@@ -1181,10 +1200,11 @@ static int draw_row(const struct list_state *st, const struct row_ctx *rc, const
 	if (r >= st->count || !rc->model->fetch(rc->ctx, r, &item) || !item.text)
 		return picked;  // drawn when ui_list_refresh says it loaded
 	u32 len = item.len ? item.len : strlen(item.text);
-	u32 ink = item.ink ? item.ink : rc->ink, y = y0 + rc->y, tx = x0 + rc->x, clip = rc->clip;
+	u32 ink = item.ink ? item.ink : rc->ink, y = y0 + rc->y, tx = x0 + rc->x, clip = item_clip(rc->clip, &item);
+	const struct ui_look *look = &ui_theme()->look;
+	u32 icon_y = y + (font->line_height > 8 ? (font->line_height - 8) / 2 : 0), badge_x;
 	if (item.key) {
 		// A reading row: its key's chip, the text at the key column
-		const struct ui_look *look = &ui_theme()->look;
 		if (item.key_len) {
 			char key[16];
 			u32 n = item.key_len < sizeof(key) - 1 ? item.key_len : sizeof(key) - 1;
@@ -1199,14 +1219,16 @@ static int draw_row(const struct list_state *st, const struct row_ctx *rc, const
 	if (!x0) {
 		text_layout(font, item.text, len, clip, &line);
 		text_draw_line(win, font, tx, y, ink, &line);
+		badge_x = tx + line.advance;
 	} else {
 		// A marquee step: glyphs partly in the name's span drawn whole,
 		// into the margins and the strips beside the name, which are then
 		// cleared back to what is under the name, so glyphs slide in and
 		// out at both edges
 		s32 lead;
-		u32 left = x0 + rc->x, right = left + rc->clip;
-		text_layout_span(font, item.text, len, skip, rc->clip, &line, &lead);
+		u32 left = x0 + rc->x, right = left + clip;
+		badge_x = right;
+		text_layout_span(font, item.text, len, skip, clip, &line, &lead);
 		text_draw_line(win, font, (u32)((s32)left + lead), y, ink, &line);
 		text_clear(win, 0, y0, left, rc->rh, rc->paper);
 		text_clear(win, right, y0, ww - right, rc->rh, rc->paper);
@@ -1222,8 +1244,18 @@ static int draw_row(const struct list_state *st, const struct row_ctx *rc, const
 		at.tiles += (x0 / 8) * win->height * 8u;
 		row_icon(&at, y0 + (rc->rh - 16) / 2, item.icon);
 	}
+	// The 8x8 icons, after the marquee's clears: the mark in its column, the
+	// badge after the name, the dot left of the detail
+	if (item.mark && (rc->flags & UI_LIST_MARKS))
+		ui_icon8(win, x0 + rc->pad, icon_y, item.mark - 1u, item.mark_ink ? item.mark_ink : UI_ROLE_ACCENT_INK);
+	if (item.badge)
+		ui_icon8(win, badge_x + look->row_badge_gap, icon_y, item.badge - 1u,
+			 item.badge_ink ? item.badge_ink : UI_ROLE_ACCENT_INK);
+	u32 detail_x = x0 + rc->w - rc->pad;
 	if (item.detail)
-		draw_detail(win, rc, x0, y, item.detail, &line);
+		detail_x = draw_detail(win, rc, x0, y, item.detail, &line) - look->row_dot_gap;
+	if (item.dot)
+		ui_icon8(win, detail_x - 8u, icon_y, item.dot - 1u, item.dot_ink ? item.dot_ink : UI_ROLE_DIM);
 	return 1;
 }
 
@@ -1386,7 +1418,8 @@ static void canvas_setup(u8 node, struct list_state *st)
 	u16 *map = ui_map(node), *row = map;  // from column 0: the BG scroll puts it at the node's x
 	u32 tw = st->tw, ct = st->ct;
 	for (u32 t = 0; t < ct; t++, row += 32) {
-		u32 e = ui_entry(st->first + t, UI_BANK_NORMAL);
+		u32 e = ui_entry(st->first + t,
+				 (config(node)->flags & UI_LIST_CONSOLES) ? UI_BANK_CONSOLES : UI_BANK_NORMAL);
 		for (u32 x = 0; x < tw; x++, e += ct)
 			row[x] = (u16)e;
 	}

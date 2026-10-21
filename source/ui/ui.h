@@ -88,13 +88,14 @@ enum ui_role {
 	UI_ROLE_DANGER,       // Delete, Format, failures: the danger item's ink
 	UI_ROLE_FLOAT,        // popups and confirmations: card with float_mix of ink
 	// Bank 1: the console inks, for the marks of Recent's and Favourites' rows,
-	// and the carousel's backdrop
+	// the carousel's backdrop, and the favourites' ink, for the game lists' stars
 	UI_ROLE_INK_GBA = UI_ROLE_ACCENT,
 	UI_ROLE_INK_GBC,
 	UI_ROLE_INK_GB,
 	UI_ROLE_INK_NES,
-	UI_ROLE_SKY,    // the carousel's backdrop above its horizon: GROUND
-	UI_ROLE_FLOOR,  // and below it: GROUND moved by floor_step (ui_floor_colour)
+	UI_ROLE_SKY,      // the carousel's backdrop above its horizon: GROUND
+	UI_ROLE_FLOOR,    // and below it: GROUND moved by floor_step (ui_floor_colour)
+	UI_ROLE_INK_FAV,  // the favourites' ink
 	// Bank 2: danger and the NOR storage bar
 	UI_ROLE_ALERT_INK = UI_ROLE_ACCENT,  // the danger item's ink
 	UI_ROLE_ALERT_TINT,                  // and its tint
@@ -105,7 +106,7 @@ enum ui_role {
 };
 enum ui_bank {
 	UI_BANK_NORMAL,    // neutrals and the current item
-	UI_BANK_CONSOLES,  // neutrals and the console inks
+	UI_BANK_CONSOLES,  // neutrals, the console inks and the favourites' ink
 	UI_BANK_ALERT,     // neutrals, danger and the NOR bar
 	UI_BANKS,
 };
@@ -184,6 +185,9 @@ struct ui_look {
 	u8 path_gap;        // between a path's pill and its "/"
 	u8 storage_h;       // a storage bar's thickness
 	u8 reading_key_w;   // a reading line's key chip column (ui_reading)
+	u8 row_mark_gap;    // a list row's mark (ui_item.mark) to its text
+	u8 row_badge_gap;   // its text to its badge (a favourite's star)
+	u8 row_dot_gap;     // its dot (a save) to its detail
 	u8 hint_y;          // the hint bar's key chips
 	u8 hint_chip_h;
 	u8 hint_chip_radius;
@@ -459,6 +463,14 @@ struct ui_item {
 			     // one 8x8 4bpp tile (art_icon8_tile), any colour; NULL none
 	const char *key;     // a reading row's key chip (ui/ui_reading.h): the text
 			     // starts at the look's reading_key_w; NULL none
+	// 8x8 icons (ART_ICON8_* + 1; 0 none), each in its ink role (0: the
+	// default given): a mark before the text, in its column (a list with
+	// UI_LIST_MARKS; default ACCENT_INK), a badge right after it (a
+	// favourite's star; default ACCENT_INK), and a dot left of the detail
+	// (a save; default DIM)
+	u8 mark, mark_ink;
+	u8 badge, badge_ink;
+	u8 dot, dot_ink;
 };
 
 enum {
@@ -520,6 +532,9 @@ enum {
 	UI_LIST_DRAWN_PILL = 128,  // with no paper: the selection drawn into the selected row (by
 				   // the model's paint, or the list's pill), as on a list with
 				   // one, not a sprite pill behind it (rows painted opaque)
+	UI_LIST_MARKS = 256,       // list: rows keep a column for item.mark before the text
+	UI_LIST_CONSOLES = 512,    // list: rows draw in UI_BANK_CONSOLES (the console inks and
+				   // the favourites' ink for marks; no item accent)
 };
 #define UI_LIST_ICON_W 16
 #define UI_LIST_ICON8_W 8
@@ -532,7 +547,7 @@ enum {
 struct ui_list_config {
 	const struct ui_list_model *model;
 	u8 row_h;     // px, 8 to 32; 0: the theme's row_h; UI_ROW_PITCH_*: the look's
-	u8 flags;     // UI_LIST_*
+	u16 flags;    // UI_LIST_*
 	u8 detail_w;  // list: px kept for the detail at the right
 	u8 pad;       // the text's inset from a row's edges; 0: the theme's pad
 };
@@ -766,11 +781,17 @@ int ui_emit(u8 index, u8 type, u32 value);
 void ui_label_set(u8 node, const char *text);
 // value of max (max 0 counts as empty).
 void ui_progress_set(u8 node, u32 value, u32 max);
+// An image's BG palette bank (one of its own when its config has a
+// palette): a screen may load other colours into it (gfx_pal_load).
+u32 ui_image_bank(u8 node);
 // The Paper clean widgets' contents. Texts and arrays are kept by pointer,
 // as a label's text is: valid and unchanged until replaced or the view pops.
 void ui_title_set(u8 node, const char *text);
 void ui_title_set_right(u8 node, const char *text);
 void ui_title_set_sub(u8 node, const char *text);
+// Another 16x16 icon (ART_ICON16_*) for a title whose layout has one; 0 if
+// it can't (no room: the old icon stays)
+int ui_title_icon_set(u8 node, u32 icon);
 void ui_hints_set(u8 node, const struct ui_hint *hints, u32 count);
 void ui_hints_text(u8 node, const char *text);  // centred; NULL: back to the chips
 // The text line's look (ui_hints_note): its ink, and a short bar before it
@@ -908,6 +929,7 @@ int ui_obj_add(u8 node, u16 attr0, u16 attr1, u16 attr2);
 #define UI_POPUP_ITEMS 8  // items in a popup, at most
 enum {
 	UI_POP_DANGER = 1,  // ui_pop_item.flags: in danger ink (Delete, Format), and last
+	UI_POP_DIM = 2,     // greyed out (ink3): nothing to do now; A still picks it
 };
 struct ui_pop_item {
 	const char *text;

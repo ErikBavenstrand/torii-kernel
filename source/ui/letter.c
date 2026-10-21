@@ -36,6 +36,18 @@ static u32 first_from(u32 count, u32 letter, letter_at_fn at, void *ctx)
 	return lo;
 }
 
+static int is_hash(u32 letter)
+{
+	return letter == LETTER_HASH_LOW || letter == LETTER_HASH_HIGH;
+}
+
+// 1 when the list has both "#" runs, the one before A and the one after Z:
+// across the lap's wrap they are one stop, at the first run's start (0)
+static int hash_merged(u32 count, letter_at_fn at, void *ctx)
+{
+	return at(ctx, 0) == LETTER_HASH_LOW && at(ctx, count - 1) == LETTER_HASH_HIGH;
+}
+
 u32 letter_jump(u32 count, u32 cursor, s32 dir, letter_at_fn at, void *ctx)
 {
 	if (!count)
@@ -43,9 +55,23 @@ u32 letter_jump(u32 count, u32 cursor, s32 dir, letter_at_fn at, void *ctx)
 	if (cursor >= count)
 		cursor = count - 1;
 	u32 letter = at(ctx, cursor);
+	int merged = hash_merged(count, at, ctx);
+	if (merged && is_hash(letter)) {
+		// From the "#" stop: RIGHT to A's run, LEFT to the run before the
+		// second "#" run; the stop itself when the list has nothing else
+		if (dir > 0) {
+			u32 next = first_from(count, LETTER_A, at, ctx);
+			return at(ctx, next) != LETTER_HASH_HIGH ? next : 0;
+		}
+		u32 high = first_from(count, LETTER_HASH_HIGH, at, ctx);
+		u32 before = at(ctx, high - 1);
+		return before != LETTER_HASH_LOW ? first_from(count, before, at, ctx) : 0;
+	}
 	if (dir > 0) {
 		u32 next = first_from(count, letter + 1, at, ctx);
-		return next < count ? next : 0;
+		if (next >= count || (merged && at(ctx, next) == LETTER_HASH_HIGH))
+			return 0;
+		return next;
 	}
 	u32 start = first_from(count, letter, at, ctx);
 	u32 before = start ? start - 1 : count - 1;
@@ -60,9 +86,11 @@ void letter_around(u32 count, u32 index, letter_at_fn at, void *ctx, u32 *prev, 
 	if (index >= count)
 		index = count - 1;
 	u32 letter = at(ctx, index);
-	u32 start = first_from(count, letter, at, ctx), end = first_from(count, letter + 1, at, ctx);
-	if (!start && end >= count)
-		return;  // one letter only
-	*next = at(ctx, end < count ? end : 0);
-	*prev = at(ctx, start ? start - 1 : count - 1);
+	u32 to_next = at(ctx, letter_jump(count, index, 1, at, ctx));
+	u32 to_prev = at(ctx, letter_jump(count, index, -1, at, ctx));
+	// One stop only: RIGHT comes back to it
+	if (to_next == letter || (is_hash(to_next) && is_hash(letter) && hash_merged(count, at, ctx)))
+		return;
+	*next = to_next;
+	*prev = to_prev;
 }

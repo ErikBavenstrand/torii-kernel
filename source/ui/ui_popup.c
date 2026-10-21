@@ -724,6 +724,7 @@ static void popup_render(u8 node, const struct pen *p)
 		if (clip > 0)
 			pen_text(p, font, x + look.pop_text_x, iy, (u32)clip,
 				 (it->flags & UI_POP_DANGER) ? UI_ROLE_DANGER
+				 : (it->flags & UI_POP_DIM)  ? UI_ROLE_FAINT
 				 : i == pp.cursor            ? UI_ROLE_TEXT
 							     : UI_ROLE_DIM,
 				 it->text, PEN_LEFT);

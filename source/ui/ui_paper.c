@@ -440,6 +440,20 @@ void ui_title_set_right(u8 node, const char *text)
 	ui_dirty(node, TITLE_RIGHT);
 }
 
+int ui_title_icon_set(u8 node, u32 icon)
+{
+	struct title_state *st = ui_node_state(node);
+	if (st->icon_tile == ART_NONE || icon >= ART_ICON16_COUNT)
+		return 0;  // a title laid out without an icon has no room for one
+	u8 bank;
+	u16 tile = art_load_icon16(icon, &bank);
+	if (tile == ART_NONE)
+		return 0;
+	st->icon_tile = tile;
+	st->icon_bank = bank;
+	return 1;
+}
+
 const struct ui_ops ui_title_ops = {sizeof(struct title_state), title_measure, title_init, 0, title_update, title_draw};
 
 // --- Hint bar ------------------------------------------------------------------

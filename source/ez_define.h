@@ -22,6 +22,10 @@
 // - READCACHE_SDLIST, 43 KB in READCACHE_SAVE's room (no save runs during a
 //   listing): the SD card page's folder listing on its way to PSRAM
 //   (sdlist.h's scratch), within one listing.
+// - READCACHE_GAMES, 96 KB from READCACHE_USERDATA (its bytes, the save's
+//   and the SD listing's): a game list's build as its page opens
+//   (screens/games.c), between userdata calls: Recent's and the favourites' records, and the
+//   favourites' A-Z order on its way to PSRAM, within the call.
 #define MAX_pReadCache_size 0x20000
 #define READCACHE_STAGE 0x0
 #define READCACHE_STAGE_SIZE 0x8000
@@ -30,6 +34,9 @@
 #define READCACHE_USERDATA_SIZE 0x8000
 #define READCACHE_LIBRARY 0x1800  // sizeof(struct lib_build), up to 0x1C00
 #define READCACHE_SAVE 0x10000  // 64 KB, to the end
+#define READCACHE_GAMES 0x8000
+#define READCACHE_GAMES_SIZE 0x18000
+
 #define MAX_NOR 0x40
 
 #define MAX_path_len 0x100

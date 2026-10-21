@@ -78,7 +78,8 @@ static int label_init(u8 node)
 
 void ui_icon8(const struct text_window *win, u32 x, u32 y, u32 id, u32 ink)
 {
-	if (id >= ART_ICON8_COUNT || y + 8 > win->height * 8u || x + 8 > win->width * 8u)
+	if (id >= ART_ICON8_COUNT || win->height * 8u < 8 || y > win->height * 8u - 8 || win->width * 8u < 8 ||
+	    x > win->width * 8u - 8)
 		return;
 	const u8 *bits = art_icon8_bits[id];
 	u32 column = win->height * 8u;
@@ -275,6 +276,11 @@ static void image_draw(u8 node)
 	for (u32 y = 0; y < h; y++)
 		for (u32 x = 0; x < w; x++)
 			rows[y * 32 + tx + x] = ui_entry(st->first + y * w + x, st->bank);
+}
+
+u32 ui_image_bank(u8 node)
+{
+	return ((const struct image_state *)ui_node_state(node))->bank;
 }
 
 static const struct ui_ops image_ops = {sizeof(struct image_state), image_measure, image_init, 0, 0, image_draw};

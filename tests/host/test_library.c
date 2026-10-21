@@ -138,7 +138,7 @@ static void build_samples(u8 *slot, struct lib_build *b)
 	CHECK_EQ(sub, 1);
 	for (u32 i = 0; i < SAMPLES; i++)
 		CHECK(lib_build_game(b, i & 1 ? sub : root, sample_names[i], NULL, 1000 + i,
-				     library_console_of(sample_names[i]), i == 3));
+				     library_console_of(sample_names[i]), i == 3 ? LIB_F_SAVE : 0));
 	struct lib_header h;
 	lib_build_header(b, &h, 0x1234, 0xBEEF, 99);
 }
@@ -383,14 +383,31 @@ void test_library_custom_display(void)
 	lib_build_begin(&b, slot, put);
 	u16 root = lib_build_folder(&b, "/");
 	CHECK_EQ(lib_build_game(&b, root, "Alpha.gba", NULL, 1, LIB_GBA, 0), LIB_ADDED);
-	CHECK_EQ(lib_build_game(&b, root, "Beta.gba", "Zeta, my hack", 1, LIB_GBA, 0), LIB_ADDED);
-	CHECK_EQ(lib_build_game(&b, root, "Gamma.gba", NULL, 1, LIB_GBA, 0), LIB_ADDED);
+	CHECK_EQ(lib_build_game(&b, root, "Beta.gba", "Zeta, my hack", 1, LIB_GBA, LIB_F_CUSTOM), LIB_ADDED);
+	CHECK_EQ(lib_build_game(&b, root, "Gamma (USA) [!].gba", NULL, 1, LIB_GBA, LIB_F_SAVE), LIB_ADDED);
+	// A display name written into the build's own buffer, as the walk does
+	strcpy(lib_build_display(&b), "Delta Custom");
+	CHECK_EQ(lib_build_game(&b, root, "Delta.gba", lib_build_display(&b), 1, LIB_GBA, LIB_F_CUSTOM), LIB_ADDED);
 	struct lib_header h;
-	lib_build_header(&b, &h, 0, 0, 3);
+	lib_build_header(&b, &h, 0, 0, 4);
 	sort_all(slot, 4);
 	CHECK(!strcmp(lib_name(slot, lib_nth(slot, LIB_GBA, 0)), "Alpha.gba"));
-	CHECK(!strcmp(lib_name(slot, lib_nth(slot, LIB_GBA, 1)), "Gamma.gba"));
-	CHECK(!strcmp(lib_name(slot, lib_nth(slot, LIB_GBA, 2)), "Beta.gba"));
+	CHECK(!strcmp(lib_name(slot, lib_nth(slot, LIB_GBA, 1)), "Delta.gba"));
+	CHECK(!strcmp(lib_name(slot, lib_nth(slot, LIB_GBA, 2)), "Gamma (USA) [!].gba"));
+	CHECK(!strcmp(lib_name(slot, lib_nth(slot, LIB_GBA, 3)), "Beta.gba"));
+	// Each keeps the name the lists show, after its key, and its flags
+	CHECK(!strcmp(lib_display(slot, lib_nth(slot, LIB_GBA, 0)), "Alpha"));
+	CHECK(!strcmp(lib_display(slot, lib_nth(slot, LIB_GBA, 1)), "Delta Custom"));
+	CHECK(!strcmp(lib_display(slot, lib_nth(slot, LIB_GBA, 2)), "Gamma"));
+	CHECK(!strcmp(lib_display(slot, lib_nth(slot, LIB_GBA, 3)), "Zeta, my hack"));
+	CHECK(!strcmp(lib_key(slot, lib_nth(slot, LIB_GBA, 3)), "zeta, my hack"));
+	CHECK_EQ(lib_rec_at(slot, lib_nth(slot, LIB_GBA, 3))->flags, LIB_GBA | LIB_F_CUSTOM);
+	CHECK_EQ(lib_rec_at(slot, lib_nth(slot, LIB_GBA, 2))->flags, LIB_GBA | LIB_F_SAVE);
+	CHECK(lib_body_ok(slot, seen));
+	// And back from a record to its place in the list
+	for (u32 n = 0; n < 4; n++)
+		CHECK_EQ(lib_position(slot, lib_nth(slot, LIB_GBA, n)), n);
+	CHECK_EQ(lib_position(slot, 99), LIBRARY_NONE);
 	free(slot);
 }
 
@@ -412,7 +429,7 @@ void test_library_pinned_keys(void)
 		{"Castlevania - Aria of Sorrow (USA) (Rev 1).gba", "castlevania - aria of sorrow"},
 		{"(Unlicensed).gba", "(unlicensed)"},
 	};
-	CHECK_EQ(LIBRARY_VERSION, 2);
+	CHECK_EQ(LIBRARY_VERSION, 3);
 	for (u32 i = 0; i < sizeof(pinned) / sizeof(pinned[0]); i++) {
 		char display[GAMENAME_MAX + 1], k[LIBRARY_KEY_MAX + 1];
 		gamename_clean(display, pinned[i].file);

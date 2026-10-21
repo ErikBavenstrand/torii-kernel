@@ -59,12 +59,14 @@ void test_letter_jump(void)
 	CHECK_EQ(letter_jump(NAMES, 2, 1, name_letter, 0), 3);  // and from inside A
 	CHECK_EQ(letter_jump(NAMES, 4, 1, name_letter, 0), 5);  // C to M: D-L have none
 	CHECK_EQ(letter_jump(NAMES, 6, 1, name_letter, 0), 8);  // M to R
-	CHECK_EQ(letter_jump(NAMES, 10, 1, name_letter, 0), 11);  // Y to the "#" after Z
-	CHECK_EQ(letter_jump(NAMES, 11, 1, name_letter, 0), 0);   // wraps to the first
+	// The two "#" runs (before A, after Z) are one stop a lap, at the first's start
+	CHECK_EQ(letter_jump(NAMES, 10, 1, name_letter, 0), 0);  // Y to "#"
+	CHECK_EQ(letter_jump(NAMES, 11, 1, name_letter, 0), 1);  // from the second run: on to A
 	// LEFT: the first game of the letter before
 	CHECK_EQ(letter_jump(NAMES, 7, -1, name_letter, 0), 4);  // M to C
 	CHECK_EQ(letter_jump(NAMES, 2, -1, name_letter, 0), 0);  // A to #
-	CHECK_EQ(letter_jump(NAMES, 0, -1, name_letter, 0), 11);  // wraps to the last
+	CHECK_EQ(letter_jump(NAMES, 0, -1, name_letter, 0), 10);  // wraps past the second "#" run to Y
+	CHECK_EQ(letter_jump(NAMES, 11, -1, name_letter, 0), 10);
 	CHECK_EQ(letter_jump(NAMES, 8, -1, name_letter, 0), 5);   // R to M's first
 	CHECK_EQ(letter_jump(0, 3, 1, name_letter, 0), 3);
 	// The card's neighbours: where LEFT and RIGHT go
@@ -73,8 +75,11 @@ void test_letter_jump(void)
 	CHECK_EQ(prev, LETTER_A + 2);  // C
 	CHECK_EQ(next, LETTER_A + 17);  // R
 	letter_around(NAMES, 0, name_letter, 0, &prev, &next);
-	CHECK_EQ(prev, LETTER_HASH_HIGH);
+	CHECK_EQ(prev, LETTER_A + 24);  // Y
 	CHECK_EQ(next, LETTER_A);
+	letter_around(NAMES, 10, name_letter, 0, &prev, &next);
+	CHECK_EQ(prev, LETTER_A + 22);  // W
+	CHECK_EQ(next, LETTER_HASH_LOW);
 	letter_around(3, 1, name_letter, 0, &prev, &next);  // "2 Games", Advance Wars, Astro Boy
 	CHECK_EQ(prev, LETTER_HASH_LOW);
 	CHECK_EQ(next, LETTER_HASH_LOW);
@@ -99,6 +104,19 @@ void test_letter_one(void)
 	letter_around(3, 1, same_letter, ctx, &prev, &next);
 	CHECK_EQ(prev, LETTER_NONE);
 	CHECK_EQ(next, LETTER_NONE);
+	// Only the two "#" runs: one stop
+	static const char *const hashes[] = {"1942", "\xE3\x83\x9D"};
+	ctx = (void *)hashes;
+	CHECK_EQ(letter_jump(2, 1, 1, same_letter, ctx), 0);
+	CHECK_EQ(letter_jump(2, 0, -1, same_letter, ctx), 0);
+	letter_around(2, 1, same_letter, ctx, &prev, &next);
+	CHECK_EQ(prev, LETTER_NONE);
+	CHECK_EQ(next, LETTER_NONE);
+	// Only the run after Z: a stop of its own, as any letter
+	static const char *const high[] = {"Advance", "\xE3\x83\x9D"};
+	ctx = (void *)high;
+	CHECK_EQ(letter_jump(2, 0, 1, same_letter, ctx), 1);
+	CHECK_EQ(letter_jump(2, 1, 1, same_letter, ctx), 0);
 }
 
 void test_colour_bldy(void)

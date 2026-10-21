@@ -46,6 +46,9 @@
 		.path_gap = 3, \
 		.storage_h = 5, \
 		.reading_key_w = 44, \
+		.row_mark_gap = 4, \
+		.row_badge_gap = 3, \
+		.row_dot_gap = 2, \
 		.hint_y = 147, \
 		.hint_chip_h = 10, \
 		.hint_chip_radius = 3, \
@@ -223,6 +226,7 @@ void ui_theme_banks(const struct ui_theme *theme, u32 item, u16 out[UI_BANKS * 1
 	consoles[UI_ROLE_INK_NES] = theme->accent[PAL_NES].ink;
 	consoles[UI_ROLE_SKY] = normal[UI_ROLE_GROUND];
 	consoles[UI_ROLE_FLOOR] = ui_floor_colour(theme, normal[UI_ROLE_GROUND]);
+	consoles[UI_ROLE_INK_FAV] = theme->accent[PAL_FAV].ink;
 
 	alert[UI_ROLE_ALERT_INK] = danger->ink;
 	alert[UI_ROLE_ALERT_TINT] = danger->tint;

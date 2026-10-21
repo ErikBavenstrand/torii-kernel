@@ -139,6 +139,7 @@ void test_theme_banks_item(void)
 		CHECK_EQ(consoles[UI_ROLE_INK_GBC], pal_accents[t][PAL_GBC].ink);
 		CHECK_EQ(consoles[UI_ROLE_INK_GB], pal_accents[t][PAL_GB].ink);
 		CHECK_EQ(consoles[UI_ROLE_INK_NES], pal_accents[t][PAL_NES].ink);
+		CHECK_EQ(consoles[UI_ROLE_INK_FAV], pal_accents[t][PAL_FAV].ink);
 		CHECK_EQ(alert[UI_ROLE_ALERT_INK], pal_accents[t][PAL_DANGER].ink);
 		CHECK_EQ(alert[UI_ROLE_ALERT_TINT], pal_accents[t][PAL_DANGER].tint);
 		CHECK_EQ(alert[UI_ROLE_NOR_FILL], pal_accents[t][PAL_NOR].base);
@@ -161,7 +162,7 @@ static const u8 text_roles[UI_BANKS][8] = {
 	[UI_BANK_NORMAL] = {UI_ROLE_TEXT, UI_ROLE_DIM, UI_ROLE_FAINT, UI_ROLE_ACCENT_INK, UI_ROLE_ACCENT_TEXT,
 			    UI_ROLE_DANGER},
 	[UI_BANK_CONSOLES] = {UI_ROLE_TEXT, UI_ROLE_DIM, UI_ROLE_FAINT, UI_ROLE_INK_GBA, UI_ROLE_INK_GBC,
-			      UI_ROLE_INK_GB, UI_ROLE_INK_NES},
+			      UI_ROLE_INK_GB, UI_ROLE_INK_NES, UI_ROLE_INK_FAV},
 	[UI_BANK_ALERT] = {UI_ROLE_TEXT, UI_ROLE_DIM, UI_ROLE_FAINT, UI_ROLE_ALERT_INK, UI_ROLE_NOR_INK},
 };
 

@@ -54,7 +54,6 @@ char *gl_count_games EWRAM_BSS;
 char *gl_count_file EWRAM_BSS;
 char *gl_count_files EWRAM_BSS;
 char *gl_count_page EWRAM_BSS;
-char *gl_page_empty EWRAM_BSS;
 char *gl_hint_open EWRAM_BSS;
 char *gl_hint_turn EWRAM_BSS;
 char *gl_hint_move EWRAM_BSS;
@@ -83,6 +82,8 @@ char *gl_hint_change EWRAM_BSS;
 char *gl_hint_done EWRAM_BSS;
 char *gl_hint_field EWRAM_BSS;
 char *gl_hint_set EWRAM_BSS;
+
+const struct lang_games *gl_games EWRAM_BSS;
 
 // Popups and confirmations (ui.h)
 char *gl_pop_choose EWRAM_BSS;
@@ -200,9 +201,8 @@ const char en_patching[] = "Patching the game";
 const char en_keep_power[] = "Don't turn the power off.";
 
 // The menu's items (screens/registry.h), in the carousel's order; what an
-// item holds (a number, then the word: "1,204 files"); the empty frame a
-// page shows until its ticket lands; and the hint bar's labels, after a key
-// chip ("A open")
+// item holds (a number, then the word: "1,204 files"); and the hint bar's
+// labels, after a key chip ("A open")
 const char en_item_recent[] = "Recent";
 const char en_item_fav[] = "Favourites";
 const char en_item_gba[] = "Game Boy Advance";
@@ -218,7 +218,6 @@ const char en_count_games[] = "games";
 const char en_count_file[] = "1 file";
 const char en_count_files[] = "files";
 const char en_count_page[] = "one page";
-const char en_page_empty[] = "Coming in a later build";
 const char en_hint_open[] = "open";
 const char en_hint_turn[] = "turn";
 const char en_hint_move[] = "move";
@@ -506,6 +505,33 @@ const char en_sd_changed[] = "Changed";
 const char en_sd_save[] = "Save";
 const char en_sd_no_save[] = "No save yet";
 
+// The game lists, their popup and Game info, and the cheat screen. L held
+// with A (or with Play in the popup) starts the selected game with a hard
+// reset: Game info's last line says so
+static const struct lang_games en_games = {
+	.empty = "No games here",
+	.hint_play = "play",
+	.hint_menu = "menu",
+	.hint_letter = "letter",
+	.hint_save_type = "save type",
+	.hint_pick = "pick",
+	.pop = {"Play", "Favourite", "Clean boot", "Boot with addon", "Rename", "Game info", "Delete"},
+	.off = "off",
+	.on = "on",
+	.delete_text = "The save stays.",
+	.delete_button = "Delete",
+	.save_type_failed = "Can't keep the save type",
+	.info_keys = {"Console", "Size", "Folder", "Played", "Save type", "Hard reset"},
+	.consoles = {"GBA", "GBC", "GB", "NES"},
+	.nor = "Game NOR",
+	.hard_reset = "hold L with A",
+	.save_types = {"Auto", "SRAM", "EEPROM 8K", "EEPROM 512", "Flash 64K", "Flash 128K"},
+	.size_kb = "KB",
+	.size_mb = "MB",
+	.fact_size = "Size",
+	.fact_played = "Last",
+};
+
 //---------------------------------------------------------------------------------
 void LoadEnglish(void)
 {
@@ -565,7 +591,6 @@ void LoadEnglish(void)
 	gl_count_file = (char *)en_count_file;
 	gl_count_files = (char *)en_count_files;
 	gl_count_page = (char *)en_count_page;
-	gl_page_empty = (char *)en_page_empty;
 	gl_hint_open = (char *)en_hint_open;
 	gl_hint_turn = (char *)en_hint_turn;
 	gl_hint_move = (char *)en_hint_move;
@@ -651,6 +676,7 @@ void LoadEnglish(void)
 	gl_sd_changed = (char *)en_sd_changed;
 	gl_sd_save = (char *)en_sd_save;
 	gl_sd_no_save = (char *)en_sd_no_save;
+	gl_games = &en_games;
 }
 //---------------------------------------------------------------------------------
 // The languages Settings offers. A new language adds its strings and a
