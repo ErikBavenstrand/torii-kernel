@@ -355,6 +355,7 @@ What the v0.4 ticket sessions, the conductor's reviews and the research left ope
 - After an SD rename of a game with a custom name, the row shows the cleaned name until the walk puts the custom or database name back (a few seconds; B18).
 - The rename's rollback on a failed move is checked only by reading the code; no test forces a move failure (B18).
 - The shared-save check before an SD rename sees only indexed games: a game in a hidden folder sharing the save name loses it (B18 review).
+- `just art-scrape` reports "not fetched" for `Pokemon Trading Card Game 1.gbc` on every run (one request, no picture, no clear reason given); seen preparing the user's card (conductor).
 - A large crc.txt loads slowly after each boot: about 6 s of background work for 3,000 records (emulated), mostly hashing paths (B21).
 - A read-only crc.txt is never updated: dates are re-adopted and Recent games re-identified every boot (B21).
 - ~~Past the library's 4,096 games no page says so: the decisions' "showing the first N" note exists only for SD folders; `library_truncated` and `library_games_seen` have no caller (B20).~~ Fixed by B20 (`26b8886`): a console's last row shows the note (`library_games_seen` still has no caller).
