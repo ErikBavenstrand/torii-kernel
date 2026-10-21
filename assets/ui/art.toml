@@ -47,15 +47,15 @@ icon16_banks = [
 # becomes its value (any other stays). The skeleton artwork and the box's
 # edge follow the card; the consoles' bands only dim a little.
 [box_dark]
-"#E8E0D8" = "#303038"  # the artwork's fill
+"#E8E0D8" = "#303038"  # the artwork's sky
+"#F8F0E8" = "#404048"  # its sun
 "#E0D8D0" = "#383840"  # its ground
-"#D0C8C0" = "#484850"  # the torii gate and the title bars
-"#F0E8E0" = "#383840"  # the shimmer across it
+"#D0B0A8" = "#605058"  # the torii gate, the title bars and the GBA seal
 "#A8A098" = "#101018"  # the box's edge
 "#D8D0C8" = "#101010"  # its shadow
-"#F8F8F0" = "#D0D0C8"  # the Game Boy Color's white band
-"#C0C8B0" = "#A0A890"  # the Game Boy's grey band
-"#E0E0E8" = "#484858"  # the NES picture window's fill, lifted off the black box
+"#F8F8F0" = "#D0D0C8"  # the Game Boy Color's white band, the Nintendo oval
+"#C8C8B8" = "#A0A090"  # the Game Boy's grey band
+"#E0E0E8" = "#484858"  # the NES picture window's sky, lifted off the black box
+"#F0F0F8" = "#50505F"  # its sun
 "#D8D8E0" = "#404050"  # its ground
-"#C8C8D0" = "#70707E"  # its torii gate
-"#F0F0F8" = "#50505F"  # its shimmer
+"#B8B8C8" = "#70707E"  # its torii gate

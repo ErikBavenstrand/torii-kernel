@@ -1,12 +1,12 @@
 # The list with art on a card that still holds a placeholder v0.4's first
 # builds made (/torii/art/box-gba.bin; a test picture stands in for it):
-# the kernel ignores it, so a game without art keeps the drawn GBA box once
-# the art is listed and the cursor has rested.
+# the kernel ignores it (it lists no art), so a game without art keeps the
+# drawn GBA box once the cursor has rested.
 #! settings 31=1
 #! sd-file /torii/art/box-gba.bin 0 tests/shots/data/art-night.bin
 -w "nav: home ready"
 -k @8:RIGHT -k @12:-
 -k @20:A -k @24:-
 -w "nav: page gba ready"
--w "box art: 1 files listed"
+-w "box art: 0 files listed"
 -s @40:gba.png

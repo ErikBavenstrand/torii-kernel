@@ -10,7 +10,7 @@ These are a first target, not a contract: expect to change a lot once the first 
 - `palette.json`, `palette.png`: surfaces and one accent per item, in both themes, snapped to 15-bit colour.
 - `settings-light.png`, `settings-dark.png`, `keyboard-light.png`, `keyboard-dark.png`: the Settings page (B16) and the rename keyboard (B18), explained in `mockups-b16-b18.md` and drawn by `tools/mockup/`.
 - `icons-c2.png`: the icons before and after the cart-test polish (C2: Settings, Info, NOR, SD card, the torii's beam, the 8x8 GBA and Info), on both themes' paper and cards, at 4x (`tools/mockup/icons_sheet.py`).
-- `boxes-c2.png`: the kernel's own placeholder boxes, one a console, in both themes, at 3x (`tools/mockup/boxes.py`). List with art shows them for a game without art only when the card has no placeholder of its own: `just art-scrape` makes those from official boxes (`tools/art_boxes.py`), on the PC, never committed.
+- `boxes-d2.png`: the placeholder boxes list with art shows for a game without art, one a console: on each theme's cards, C2's boxes above D2's redrawn ones, at 1x and then 4x (`tools/mockup/boxes.py boxes-d2.png REF`).
 - `icons@4x.png`: 16x16 and 8x8 icons for every item and list marker, as first designed. The icons and the carousel objects themselves now live in `assets/ui` (`just assets` converts them for the kernel).
 
 ## Credits
