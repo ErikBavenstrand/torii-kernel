@@ -70,6 +70,15 @@ void IWRAM_CODE progress_copy_vblank(void)
 		hook.bar.x = to;
 }
 
+// The VBlank handler libgba's dispatcher has now, or NULL
+static IntFn vblank_handler(void)
+{
+	for (u32 i = 0; i < MAX_INTS && IntrTable[i].mask; i++)
+		if (IntrTable[i].mask == IRQ_VBLANK)
+			return IntrTable[i].handler;
+	return NULL;
+}
+
 void progress_cart_copy(u32 *fat, u32 bytes, u32 hi)
 {
 	u32 frames = bytes / PROGRESS_COPY_RATE;
@@ -77,6 +86,7 @@ void progress_cart_copy(u32 *fat, u32 bytes, u32 hi)
 	// column 0: it would square off the bar's rounded end
 	dialog_progress_set(step.hi, PROGRESS_FULL, NULL);
 	int hooked = dialog_progress_pixels(hi, &hook.bar) && hook.bar.x > 0;
+	IntFn before = vblank_handler();  // put back after (none while the engine installs none)
 	if (hooked) {
 		progress_copy_plan(&hook.copy, hook.bar.x, hook.bar.px, frames);
 		irqSet(IRQ_VBLANK, progress_copy_vblank);
@@ -85,7 +95,7 @@ void progress_cart_copy(u32 *fat, u32 bytes, u32 hi)
 	Send_FATbuffer(fat, 0);
 	u32 took = torii_frames - start;
 	if (hooked) {
-		irqSet(IRQ_VBLANK, NULL);
+		irqSet(IRQ_VBLANK, before);
 		dialog_progress_drew(hook.bar.x);
 	}
 	step.lo = step.hi = (u16)(hi < PROGRESS_FULL ? hi : PROGRESS_FULL);
