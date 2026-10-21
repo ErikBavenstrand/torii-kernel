@@ -43,6 +43,7 @@ yourself: never commit or publish them.
 """
 
 import argparse
+import contextlib
 import http.client
 import os
 import re
@@ -67,6 +68,7 @@ import names_db
 BASE_URL = "https://thumbnails.libretro.com/"
 CACHE = ROOT / "dist" / "art-cache"
 MISSES = "misses.txt"
+PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 USER_AGENT = "torii-kernel art-scrape (https://github.com/ErikBavenstrand/torii-kernel)"
 DELAY = 0.5  # seconds between requests
 RETRIES = 3  # attempts after a server error
@@ -158,12 +160,12 @@ def card_games(sd):
     """(card path, file path, console) of each game: the walk's, and any the
     index lists that the walk missed and the card still has."""
     games = names_db.walk_card(sd)
-    seen = {p.lower() for p, _, _ in games}
+    seen = {folded(p) for p, _, _ in games}
     for path, console in sorted(index_games(sd).items()):
         file = Path(sd) / path.lstrip("/")
-        if path.lower() not in seen and file.is_file():
+        if folded(path) not in seen and file.is_file():
             games.append((path, str(file), console))
-            seen.add(path.lower())
+            seen.add(folded(path))
     return games
 
 
@@ -194,11 +196,16 @@ def folded(name):
     return unicodedata.normalize("NFC", name).lower()
 
 
-def listing(folder):
+def ascii_lower(name):
+    """A name folded as the kernel folds it (source/artkey.c): ASCII case only."""
+    return "".join(c.lower() if c < "\x80" else c for c in name)
+
+
+def listing(folder, fold=folded):
     """The folded names of a folder's files, or an empty set."""
     try:
         return {
-            folded(e.name)
+            fold(e.name)
             for e in os.scandir(folder)
             if e.is_file() and not e.name.startswith("._")
         }
@@ -225,10 +232,9 @@ class Fetcher:
         self.last = 0.0
         self.misses_file = self.cache / MISSES
         self.misses = set()
+        # --retry-missing only skips the list: a miss asked again is added again
         if self.misses_file.exists() and not retry_missing:
             self.misses = set(self.misses_file.read_text("utf-8").splitlines())
-        elif retry_missing and self.misses_file.exists():
-            self.misses_file.unlink()
 
     def path(self, system, name):
         return self.cache / SYSTEMS[system] / (name + ".png")
@@ -305,11 +311,21 @@ class Fetcher:
                     f"can't reach {self.base_url} ({getattr(e, 'reason', e)})"
                 )
                 return None
+        if not data.startswith(PNG_MAGIC):
+            # Not taken for a miss or cached: a proxy's page, say
+            print(f"art-scrape: {url}: not a PNG", file=sys.stderr)
+            return None
         path = self.path(system, name)
-        path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_name(path.name + ".part")
-        tmp.write_bytes(data)
-        tmp.replace(path)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp.write_bytes(data)
+            tmp.replace(path)
+        except (OSError, ValueError) as e:
+            print(f"art-scrape: can't cache {path}: {e}", file=sys.stderr)
+            with contextlib.suppress(OSError, ValueError):
+                tmp.unlink(missing_ok=True)
+            return None
         self.downloaded += 1
         return path
 
@@ -319,8 +335,13 @@ class Fetcher:
 
 def write_art(path, data):
     tmp = path.with_name(path.name + ".part")
-    tmp.write_bytes(data)
-    tmp.replace(path)
+    try:
+        tmp.write_bytes(data)
+        tmp.replace(path)
+    except OSError as e:
+        with contextlib.suppress(OSError):
+            tmp.unlink(missing_ok=True)
+        raise ScrapeError(f"can't write {path}: {e}") from e
 
 
 def scrape_one(fetcher, picks, out, dry_run):
@@ -390,7 +411,7 @@ def scrape(args):
 
     art_dir = sd / ART_DIR
     have = listing(art_dir)
-    custom = listing(art_dir / "custom")
+    custom = listing(art_dir / "custom", ascii_lower)
     fetcher = Fetcher(
         args.base_url,
         args.cache,
@@ -413,7 +434,7 @@ def scrape(args):
             )
         crc, code = crcs[card_path]
         file = f"{crc:08X}{art.EXT}"
-        if folded(Path(card_path).name + art.EXT) in custom:
+        if ascii_lower(Path(card_path).name + art.EXT) in custom:
             how, what = "custom", None
         elif folded(file) in have or (code and folded(code + art.EXT) in have):
             # Art by CRC, or by game code (which the kernel takes when it has

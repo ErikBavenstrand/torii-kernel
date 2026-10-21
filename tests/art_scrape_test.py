@@ -421,6 +421,15 @@ class Scrape(unittest.TestCase):
         self.server.routes[thumb(GBA_SYS, "Advance Wars (USA)")] = b"<html>oops</html>"
         status, out, err = self.run_tool("--console", "GBA")
         self.assertEqual(status, 0)
+        self.assertIn("not a PNG", err)
+        self.assertIn("/GBA/Wars.gba: not fetched", out)
+        self.assertNotIn("Advance Wars (USA)", (self.cache / "misses.txt").read_text())
+        # A PNG that doesn't decode is dropped from the cache
+        self.server.routes[thumb(GBA_SYS, "Advance Wars (USA)")] = (
+            b"\x89PNG\r\n\x1a\nbroken"
+        )
+        status, out, err = self.run_tool("--console", "GBA")
+        self.assertEqual(status, 0)
         self.assertIn("not a picture art.py reads", err)
         self.assertIn("/GBA/Wars.gba: no thumbnail", out)  # the short name isn't there
         self.assertFalse((self.cache / GBA_SYS / "Advance Wars (USA).png").exists())
