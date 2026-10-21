@@ -1,4 +1,4 @@
-// Generic dialogs on the engine (docs/plans/v0.3-decisions.md, T12, T13): a
+// Generic dialogs on the engine (docs/design/engine.md): a
 // message, a yes/no question, a notice and a progress dialog, for every
 // screen and for the plain code between screens (the boot, the firmware
 // update, a launch).

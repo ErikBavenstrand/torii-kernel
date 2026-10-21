@@ -1,6 +1,6 @@
 // The library index: every game on the card, found by extension, kept in
-// /torii/library.idx and, while the menu runs, in PSRAM (docs/plans/
-// v0.4-decisions.md, B3 and R1; docs/research/v0.4/research-v04-library.md).
+// /torii/library.idx and, while the menu runs, in PSRAM (docs/design/
+// v0.4/decisions.md, Library and data, and R1; docs/research/v0.4/research-v04-library.md).
 //
 // This file is the hardware-free part, which tests/host builds too: the
 // extension table, the sort key, the index image (its records, folder table,

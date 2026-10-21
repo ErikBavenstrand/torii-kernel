@@ -20,7 +20,7 @@ enum {
 };
 
 // How a write waited for the chip. On the real cart, writes polled at once
-// lost their last byte (docs/research/cart-test-2026-10-18b.md), so the
+// lost their last byte (docs/research/omega-de-hardware.md), so the
 // probe tries each way on its own block.
 enum {
 	EEPROM_PROBE_POLL_AT_ONCE = 1,  // polled right after the stop bit, as v0.2.1's probe did

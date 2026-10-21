@@ -198,10 +198,12 @@ Any mGBA Lua script also runs with `MGBA_SCRIPT=script.lua` in the window or
 
 Not modelled yet: the in-game menu's real-time saves, and firmware updates.
 
-## Research
+## Research and plans
 
 `docs/research/omega-de-hardware.md` describes how the cart works: the
 upgrade file, the FPGA firmware, the cart registers, game loading and saves.
+`docs/design/` holds the menu's design (`engine.md`, `v0.4/`), and
+`docs/plans/roadmap.md` what is done, what is still open, and what comes next.
 
 ## Credits
 

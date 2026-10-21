@@ -1,4 +1,4 @@
-// The CRC name database (v0.4.1, docs/plans/v0.4-decisions.md B21): the
+// The CRC name database (v0.4.1, docs/design/v0.4/decisions.md): the
 // No-Intro names of /torii/names.db, which `just names-update` builds on the
 // user's PC from libretro-database's dats (tools/names_db.py), and the CRC
 // cache, /torii/crc.txt, which says which file has which CRC. A game's CRC

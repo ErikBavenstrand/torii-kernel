@@ -1,4 +1,4 @@
-// Diagnostics' renderer step (docs/plans/v0.3-decisions.md, Testing: "On the
+// Diagnostics' renderer step (docs/design/engine.md, Testing: "On the
 // cart"): times the engine's drawing and asset paths on the cart with the
 // engine's cycle counter (engine/cycles.h), logs each figure as
 // "frame-cycles: NAME N", and flags any more than 20% above the figure the

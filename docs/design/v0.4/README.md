@@ -1,6 +1,6 @@
 # v0.4 design
 
-The mockups the v0.4 UI is built from, drawn at the GBA's 240x160 in the menu's own Galmuri fonts. `docs/plans/v0.4-decisions.md` says what was decided and why. The full design canvas, with every round of variants, is <https://claude.ai/artifact/NPcgyfpzpP8LwFE5EYeWqL>.
+The mockups the v0.4 UI is built from, drawn at the GBA's 240x160 in the menu's own Galmuri fonts. [decisions.md](decisions.md) says what was decided and why. The full design canvas, with every round of variants, is <https://claude.ai/artifact/NPcgyfpzpP8LwFE5EYeWqL>.
 
 These are a first target, not a contract: expect to change a lot once the first version runs on a real cart.
 

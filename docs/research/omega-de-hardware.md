@@ -315,7 +315,9 @@ While SD control is 3 the port returns status; `0xEEE1` means busy.
    estimate's rate is tuned from (`docs/release-checklist.md`). The emulated
    cart copies at once unless `OMEGA_COPY_RATE` (bytes a frame) is set, as
    the golden `boot-copy` does: then the port reads 0 until the copy's time
-   is up.
+   is up. The ROM's bytes never pass through the CPU here, so anything that
+   needs them (a CRC for the names database) costs a full extra read, about
+   1 s per MB; a CRC loop takes 17 cycles a byte from ROM, 9 from IWRAM.
 3. With patches enabled the kernel loads the ROM itself through the PSRAM
    window instead, patching each 128 KB block on the way.
 4. `SetRompageWithHardReset(0x200)` maps PSRAM at `0x08000000` and soft-resets
@@ -558,12 +560,13 @@ emulated cart can't tell, which the real cart's logs will:
   `0x0000`: writes to the control registers, transfers through the SD buffer
   at `0x09E00000`, NOR erases and writes, the RTC's serial lines, and
   launching, with its PSRAM writes. Games start at `0x0000`. In
-  mGBA, opening a folder of 300 files takes 23 frames instead of 40. Whether
-  the real cart runs the menu's code correctly at `0x4018` is still to be
-  confirmed. Diagnostics times faster settings and checks their data against
-  the default's.
-- **EEPROM 512 vs 8K** (cart test of v0.2.1, `cart-test-2026-10-18b.md`,
-  with the probe ROM `tests/roms/eeprom` started as a game):
+  mGBA, opening a folder of 300 files takes 23 frames instead of 40. The
+  real cart ran v0.2.1's menu at `0x4018` (browsing, launches from SD and
+  NOR, Diagnostics) without errors. WAITCNT reads `0x0000` at boot.
+  Diagnostics times faster settings and checks their data against the
+  default's.
+- **EEPROM 512 vs 8K** (cart test of v0.2.1, with the probe ROM
+  `tests/roms/eeprom` started as a game):
   - The address width is decided per request: at save types `0x21` and
     `0x22`, 6-bit and 14-bit requests both read and write.
   - Even at `0x21`, the EEPROM holds 1024 distinct 8-byte blocks: 14-bit
@@ -573,7 +576,11 @@ emulated cart can't tell, which the real cart's logs will:
   - Commercial games' writes keep all 64 bits (Crash Bandicoot XS's save).
     The probe's own writes lost their last byte (it read `FF`), polling for
     ready right after the stop bit; Crash's EEPROM_V122 library waits over
-    100 cycles first. v0.2.2's probe tries four ways to write to settle it.
+    100 cycles first. v0.2.2's probe waits before polling and tries four
+    ways to write; the kernel accepts a match on bytes 0–6.
+  - Settled: 8K mode serves 6-bit requests, so games the save table lists
+    as EEPROM 8K that are really 512 bytes keep their saves in the first
+    512 bytes; the table needs no change.
   - In kernel mode (no game started), reads at `0x0DFFFF00` return `AAAA…`
     at both types and widths: the EEPROM answers only in game mode. The
     emulated cart answers as an EEPROM only once a BIOS SoftReset or
@@ -582,6 +589,14 @@ emulated cart can't tell, which the real cart's logs will:
   `0x096A0000` bit 0 and a ROM page other than the kernel's; pulses and a
   held 2 at `0x08001000` both work, the writes don't reach the PSRAM, and
   GPIO pin 3 drives it in game mode (*RTC and rumble*).
+- **The crash handler** caught and dumped Diagnostics' deliberate crash on
+  the real cart (2026-10-18).
+- **Measured on the real cart** (Diagnostics, 2026-10-18; a black EZODE PCB,
+  LX16 Rev.B, FPGA firmware 7, kernel NOR ID `2202`, game NOR ID `223D`):
+  SD reads 1,710 KB/s, SD writes 200 KB/s with a sync; BIOS LZ77 to WRAM
+  1,083 KB/s; NOR and PSRAM reads 3,640 KB/s at WS0 4/2 and up to 4,368 KB/s
+  at 2/1. The emulated card is slower (reads about 336 KB/s, writes about
+  40 KB/s), so emulated walk, scan and write times overstate the cart's.
 - **SD writes through `Write_SD_sectors` use 16-bit DMA** from the
   caller's buffer, and FatFs passes whole sectors straight from the
   buffer given to `f_write`. A buffer at an odd address shifts the data by

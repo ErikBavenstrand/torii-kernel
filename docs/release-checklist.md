@@ -1,9 +1,9 @@
 # Release checklist
 
 What to check on a real Omega DE before a release, beyond `just test` and
-`just compat`. It lists only what no real-cart test has confirmed yet; the
-rest is in `docs/research/cart-test-2026-10-18.md` and
-`cart-test-2026-10-18b.md`. Most of it ends in **Diagnostics** (Info,
+`just compat`. It lists only what no real-cart test has confirmed yet; what the
+cart tests of v0.2.0 and v0.2.1 settled is in
+`docs/research/omega-de-hardware.md`. Most of it ends in **Diagnostics** (Info,
 Diagnostics, or hold L+R+SELECT while switching the console on), which
 logs every answer to `/torii/logs` at Debug level. Bring the card back and
 run `just logs /Volumes/OMEGA` (your card's mount point) to read the report
@@ -84,6 +84,8 @@ do. With Logging on Debug, each of these leaves lines in the log.
 | Rename on a real card | rename a game from its menu (the name only), then an SD card file with a save from the SD card page: the file and its `.sav` both renamed, the game still in Recent and Favourites, its save still loading in the game |
 | Diagnostics from Info | Info, Diagnostics: its first page comes up, and B there comes back to Info, on its row; run it through once from there too |
 | The copy estimate | see "The copy's estimate" below: set `PROGRESS_COPY_RATE` from two or three big games |
+| The scroll's brake | let go of a held scroll at top speed: it should stop within about two rows. If it overshoots, raise `SPRING_BRAKE` (`source/ui/ui_list.c`) |
+| Format all's time | time a real Format all on the NOR page (it erases every NOR game) and set `CHIP_ERASE_FRAMES` (`source/NORflash_OP.c`) from it; its bar is only an estimate |
 
 **The EEPROM probe** writes blocks 1–4 four different ways, reads them back
 a frame later, and shows one line for each way: OK in green, or which bytes

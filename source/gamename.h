@@ -1,5 +1,5 @@
 // What a game is called in the game lists, and which SD entries stay out of
-// sight (docs/plans/v0.4-decisions.md, Library and data; the cleaning rules
+// sight (docs/design/v0.4/decisions.md, Library and data; the cleaning rules
 // are docs/research/v0.4/research-v04-names-art.md, "Recommendations for B4").
 // Hardware-free: tests/host runs it under ASan and UBSan.
 //
