@@ -1,0 +1,11 @@
+# The whole menu by its keys, in the light theme: tests/shots/data/walk.txt
+# (its top says what it visits). It waits for each place's log line in turn,
+# so a key that stops working anywhere in the navigation times the run out;
+# the tear watch covers every frame, the run's frame-cycles go to the budget
+# check, and a "kernel error:" line (an assert too) fails it. One hash, of
+# home after a held turn, is its only golden.
+#! settings 28=1
+#! sd-file /Zelda.gb 32768 /dev/null
+#! nor-game "Hello.gba" 0x40000 tests/roms/hello/hello.gba
+#! sd-file /torii/favorites.txt 0 tests/shots/data/walk-favorites.txt
+-i tests/shots/data/walk.txt

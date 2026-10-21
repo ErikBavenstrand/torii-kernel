@@ -1,0 +1,6 @@
+# The whole menu by its keys, in the dark theme (the default): the same walk
+# as walk-light (tests/shots/data/walk.txt).
+#! sd-file /Zelda.gb 32768 /dev/null
+#! nor-game "Hello.gba" 0x40000 tests/roms/hello/hello.gba
+#! sd-file /torii/favorites.txt 0 tests/shots/data/walk-favorites.txt
+-i tests/shots/data/walk.txt

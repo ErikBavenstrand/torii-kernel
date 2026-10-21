@@ -1,0 +1,22 @@
+# BOOT WITH ADDON of a 4 MB game with RESET on, the cart's ROM copy taking
+# 128 frames (OMEGA_COPY_RATE, 32 KB a frame), as boot-copy does for CLEAN
+# BOOT: the addon launch's own copy path, with the bar moved by the VBlank
+# estimate (source/progress.h) while the cart copies. The game's IRQ hook
+# comes from its PATCH/ file (as on a second launch, made by one launch of
+# this game: tests/shots/data/addon-copy.pat), so the cart copies the ROM
+# before the kernel patches it; a first launch scans the ROM instead. Every
+# frame of the copy is hashed and watched for tears. The launch goes
+# through the menu's test hook (tests/nav.sh).
+#! settings 1=1
+#! sd-file "/Big Adventure (Europe).gba" 0x400000 tests/roms/hello/hello.gba
+#! sd-file "/PATCH/Big Adventure (Europe).pat" 0 tests/shots/data/addon-copy.pat
+#! env OMEGA_COPY_RATE=0x8000
+-w "nav: home ready"
+-P "@8:nav_test_path:/Big Adventure (Europe).gba" -p @8:nav_test_action:0x7E000002
+-w "BOOT WITH ADDON: reset 1"
+-H @6:@12
+-T @1:@130
+-s @40:fast.png
+-s @110:slow.png
+-w "launch: the cart copied"
+-s @0:copied.png

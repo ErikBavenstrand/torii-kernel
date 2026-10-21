@@ -14,6 +14,16 @@ boot/frames 6-6 7BD036CD6C2B8568
 boot/frames 7-7 55081198873B040D
 boot/frames 8-40 2BF873AFA4C47009
 boot-addon/addons 9D5EA05F12ADBBF3
+boot-addon-copy/copied 834EDB23818102AF
+boot-addon-copy/fast FBE248636174EBAF
+boot-addon-copy/slow E2D938F1A5943537
+boot-addon-copy/frames 0-0 0FB99C4ED1E17723
+boot-addon-copy/frames 1-1 F0C05EFF2FAC10CB
+boot-addon-copy/frames 2-2 8FFCE4904A9B4E93
+boot-addon-copy/frames 3-3 D57E99F8522AC4F7
+boot-addon-copy/frames 4-4 5E84A98E27022AAF
+boot-addon-copy/frames 5-5 DD25A6D07C8CF437
+boot-addon-copy/frames 6-6 F260379DC897224F
 boot-copy/copied D31E83436AD1B5A9
 boot-copy/fast 64FAB574734CCC7D
 boot-copy/slow 51F957460CF08751
@@ -761,3 +771,5 @@ ui-theme/frames 9-9 C99E92911907DC6E
 ui-theme/frames 10-10 B7DFF0BEF77ADE16
 ui-theme/frames 11-11 4888E885AB4AB9FC
 ui-theme/frames 12-20 6907E551DCA443BC
+walk-dark/frames 0-0 5D22EC0B1246A328
+walk-light/frames 0-0 C185AB9C9DEEDA41
