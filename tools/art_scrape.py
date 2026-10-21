@@ -183,11 +183,12 @@ def read_crcs(sd, games):
     names_db.update_cache decides), else computed; nothing is written."""
     torii = Path(sd) / "torii"
     old = names_db.parse_cache(names_db.read_safe(torii / names_db.CRC_FILE))
+    written = names_db.cache_mtime(torii)
     out = {}
     for card_path, file_path, _ in games:
         size = os.path.getsize(file_path)
         rec = old.get(card_path.lower())
-        if names_db.record_holds(rec, file_path, size):
+        if names_db.record_holds(rec, file_path, size, written):
             out[card_path] = rec[0]
         else:
             out[card_path] = names_db.file_crc(file_path)[0]

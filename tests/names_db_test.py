@@ -33,6 +33,26 @@ def update(sd, *extra):
     return status, out.getvalue(), err.getvalue()
 
 
+def cart_dates(sd, shift=0, only=None):
+    """Dates crc.txt's records as the cart's walk does, shift seconds off the
+    PC's local time (the cart reads exFAT dates an hour off in summer)."""
+    path = Path(sd) / "torii" / "crc.txt"
+    rows = []
+    for old in names_db.read_safe(path).splitlines(keepends=True):
+        f = old.rstrip("\n").split("\t")
+        row = old
+        if len(f) == 4 and (only is None or f[3] in only):
+            t = os.path.getmtime(Path(sd) / f[3].lstrip("/")) + shift
+            with_shift = Path(sd) / "torii" / "stamp"
+            with_shift.write_bytes(b"")
+            os.utime(with_shift, (t, t))
+            f[2] = names_db.fat_date(with_shift)
+            with_shift.unlink()
+            row = "\t".join(f) + "\n"
+        rows.append(row)
+    names_db.write_safe(path, "".join(rows))
+
+
 def cache_lines(sd):
     text = names_db.read_safe(Path(sd) / "torii" / "crc.txt")
     return [
@@ -397,9 +417,7 @@ class Card(unittest.TestCase):
             [
                 f"{zlib.crc32(fixture.rom(1, 4096, 'AWRE')):08X}",
                 "4096",
-                names_db.fat_date(
-                    self.sd / "GBA" / "Wars.gba"
-                ),  # as the kernel reads it
+                "-",  # the cart dates it: the PC's date can be hours off
             ],
         )
         self.assertEqual(lines["/NES/Famicom.nes"][1], "16400")
@@ -418,9 +436,22 @@ class Card(unittest.TestCase):
         status, out, err = update(self.sd)
         self.assertEqual(status, 0, err)
         self.assertIn("9 games, 0 CRCs computed, 9 kept", out)
+        # The cart dated the records an hour off the PC (DST): they hold,
+        # with the cart's dates
+        cart_dates(self.sd, shift=3600)
+        dated = {line[3]: line[2] for line in cache_lines(self.sd)}
+        status, out, err = update(self.sd)
+        self.assertIn("9 games, 0 CRCs computed, 9 kept", out)
+        self.assertEqual({line[3]: line[2] for line in cache_lines(self.sd)}, dated)
         # A file of the same size with another date (a romhack unzipped over
         # a game, with the archive's older date) is read again
         os.utime(self.sd / "GBA" / "Wars.gba", (1_500_000_000, 1_500_000_000))
+        status, out, err = update(self.sd)
+        self.assertIn("9 games, 1 CRCs computed, 8 kept", out)
+        # An undated record holds only while its file is older than crc.txt
+        crc_txt = self.sd / "torii" / "crc.txt"
+        t = os.path.getmtime(crc_txt) + 10
+        os.utime(self.sd / "GBA" / "Wars.gba", (t, t))
         status, out, err = update(self.sd)
         self.assertIn("9 games, 1 CRCs computed, 8 kept", out)
 
@@ -458,8 +489,9 @@ class Card(unittest.TestCase):
 
     def test_kept_and_recomputed(self):
         update(self.sd)
-        # One date is another's, one record has none (v0.4.1's tools); a
-        # file changed size; a game left
+        cart_dates(self.sd)
+        # One date is another's, one record has none (it holds: its file is
+        # older than crc.txt); a file changed size; a game left
         path = self.sd / "torii" / "crc.txt"
         out_lines = []
         for old in names_db.read_safe(path).splitlines(keepends=True):
@@ -474,22 +506,21 @@ class Card(unittest.TestCase):
         os.remove(self.sd / "Colour.gbc")
         status, out, err = update(self.sd)
         self.assertEqual(status, 0, err)
-        self.assertIn("8 games, 3 CRCs computed, 5 kept", out)
+        self.assertIn("8 games, 2 CRCs computed, 6 kept", out)
         lines = {line[3]: line for line in cache_lines(self.sd)}
         hb = "/GBA/Homebrew.gba"
         self.assertEqual(
             lines[hb][2], names_db.fat_date(self.sd / hb.lstrip("/"))
         )  # kept with its date
         wars = self.sd / "GBA" / "Wars.gba"
-        self.assertEqual(
-            lines["/GBA/Wars.gba"][2], names_db.fat_date(wars)
-        )  # computed again
+        self.assertEqual(lines["/GBA/Wars.gba"][2], "-")  # computed again
+        self.assertTrue(wars.exists())
         self.assertEqual(
             lines["/GB/Mono.gb"][:3],
             [
                 f"{zlib.crc32(b'changed' * 100):08X}",
                 "700",
-                names_db.fat_date(self.sd / "GB" / "Mono.gb"),
+                "-",
             ],
         )
         self.assertNotIn("/Colour.gbc", lines)
