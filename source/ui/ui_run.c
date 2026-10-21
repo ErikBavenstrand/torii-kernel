@@ -543,6 +543,16 @@ int ui_wiping(void)
 	return ui.wipe != 0;
 }
 
+void ui_wipe_finish(void)
+{
+	if (!ui.wipe)
+		return;
+	wipe_end();
+	// One frame commits it: the split off, every line on the new theme
+	if (!ui_dispatching && ui.active)
+		ui_frame();
+}
+
 void ui_theme_set(const struct ui_theme *theme)
 {
 	ui.wipe = 0;  // ends at once on this theme
@@ -564,7 +574,8 @@ void ui_theme_switch(const struct ui_theme *theme)
 	}
 	if (theme == ui_theme())
 		return;
-	// Not under a screen change or a zoom, which own the split
+	// Not under a screen change or a zoom: a screen change ends a wipe, and
+	// a zoom's motion and the wipe's edge aren't run together
 	if (!ui.active || !theme->motion.theme_wipe.frames || ui.tr_phase != TR_IDLE || ui.zoom) {
 		ui_theme_set(theme);
 		return;

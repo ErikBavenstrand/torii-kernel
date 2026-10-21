@@ -28,26 +28,19 @@ boot-progress/screen 985A0C30AC9AC713
 boot-progress/frames 0-1 2BF873AFA4C47009
 boot-progress/frames 2-2 F3A93D9EE4A57242
 boot-progress/frames 3-3 4354ABF96CD61278
-boot-progress/frames 4-11 7C573B18E65FE325
-boot-progress/frames 12-12 99F8F840D175049E
-boot-progress/frames 13-13 0891E6C62B407316
-boot-progress/frames 14-14 80A6C1D6E60B5A74
-boot-progress/frames 15-15 338132EC0F45F59C
-boot-progress/frames 16-16 A3495406F9EF488A
-boot-progress/frames 17-17 D3CD4C9BD9B43B94
-boot-progress/frames 18-25 985A0C30AC9AC713
-boot-progress/frames 26-28 9D5EA05F12ADBBF3
+boot-progress/frames 4-10 7C573B18E65FE325
+boot-progress/frames 11-11 7B90E77090ED8325
+boot-progress/frames 12-16 985A0C30AC9AC713
+boot-progress/frames 17-28 9D5EA05F12ADBBF3
 boot-progress-big/loading 4D1AC309F55D96DF
 boot-slow/home 2BF873AFA4C47009
 boot-slow/notice 1F73F83DB4B12863
 boot-slow/frames 0-2 7C573B18E65FE325
-boot-slow/frames 3-3 FA1AFB96662CCDA6
-boot-slow/frames 4-4 BE8A884F27AF0686
-boot-slow/frames 5-5 445D896853B3F16C
-boot-slow/frames 6-6 C88757A5023C1294
-boot-slow/frames 7-7 E7B01CDFFB02B41A
-boot-slow/frames 8-8 B0A7C155298FF964
-boot-slow/frames 9-12 1F73F83DB4B12863
+boot-slow/frames 3-3 48AEEA84960CFCFC
+boot-slow/frames 4-4 445D896853B3F16C
+boot-slow/frames 5-5 E7B01CDFFB02B41A
+boot-slow/frames 6-6 B0A7C155298FF964
+boot-slow/frames 7-12 1F73F83DB4B12863
 boot-slow/frames 13-13 49A1856F17D23E0D
 boot-slow/frames 14-15 1F73F83DB4B12863
 boot-slow/frames 16-16 C06A5CEEB9ABEEEC

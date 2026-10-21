@@ -1065,6 +1065,7 @@ static void settings_leave(void)
 	if (sp.mode != MODE_BROWSE)
 		sp.redraw = 1;
 	sp.mode = MODE_BROWSE;
+	ui_wipe_finish();  // the write below blocks: the wipe (Theme put back) ends first
 	u32 level = tlog_level;
 	settings_stage(&sp.v);
 	if (settings_commit() && level == TLOG_OFF && tlog_level != TLOG_OFF)

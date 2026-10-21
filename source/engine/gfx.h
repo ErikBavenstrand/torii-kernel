@@ -155,8 +155,8 @@ void gfx_queue_clear(void);
 
 // --- Raster split -------------------------------------------------------------
 // From one line down the screen shows other values in palette RAM or an I/O
-// register: the theme wipe's old colours under its edge, the open's title
-// bar slid sideways over its bottom line (B19, research overrides R7 and R8).
+// register: the theme wipe's old colours under its edge (B19, research
+// override R7).
 // Each VBlank the commit copies every part's top values (what the lines
 // above the split show) into place and arms a VCOUNT interrupt on the line
 // before the split; its handler, in IWRAM, starts DMA0 and DMA1 in HBlank

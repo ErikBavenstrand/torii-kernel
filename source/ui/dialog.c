@@ -221,6 +221,7 @@ static int dialog_event(struct ui_view *view, const struct ui_event *e)
 
 void dialog_open(void)
 {
+	ui_wipe_finish();  // a dialog blocks: no split may run under it
 	dlg.opens++;
 	if (dlg.opens == 1 && !ui_active()) {
 		// From plain code: a black screen while the engine sets up (mode 0
@@ -400,10 +401,11 @@ static int show(struct shown *s, u32 use, const char *title, const char *text, u
 						  ? (kind == DIALOG_ERROR ? &notice_error_view : &notice_view)
 					  : kind == DIALOG_ERROR ? &error_view
 								 : &message_view;
-	// Over nothing (the boot's notice, the loading card, a launch's
-	// questions) it comes in from black rising, as a screen does (E9): a
-	// dialog's own fade needs a screen under it
-	if (!ui_depth() && !ui_transitioning() && !dlg.replacing)
+	// Over nothing (the boot's notice, a launch's questions and errors)
+	// it comes in from black rising, as a screen does (E9): a dialog's
+	// own fade needs a screen under it. The loading card just shows: a
+	// launch waits for nothing
+	if (!ui_depth() && !ui_transitioning() && !dlg.replacing && use != USE_PROGRESS)
 		ui_enter(UI_TR_CARD, 1);
 	s->view = ui_push(spec, 0);
 	if (!s->view) {

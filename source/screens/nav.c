@@ -396,6 +396,7 @@ static void run_deferred(void)
 	nav.deferred = 0;
 	remember();  // a launch writes recent.txt, with the place
 	readcache_poison();  // nothing is in it between two actions
+	ui_wipe_finish();    // an action may block: the theme wipe ends first
 	fn(nav.deferred_arg);
 	after_action();
 }

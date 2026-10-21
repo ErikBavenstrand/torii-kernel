@@ -12,7 +12,7 @@
 		[UI_TR_DEEPER] = {UI_TR_FADES | UI_TR_SLIDE_Y, 3, 8, 12}, \
 		[UI_TR_FADE] = {UI_TR_FADES, 3, 6, 0}, \
 		[UI_TR_LEAVE] = {UI_TR_FADES, 3, 8, 0}, \
-		[UI_TR_CARD] = {UI_TR_FADES | UI_TR_SLIDE_Y, 3, 10, 8}, \
+		[UI_TR_CARD] = {UI_TR_FADES | UI_TR_SLIDE_Y, 3, 6, 8}, \
 		[UI_TR_OPEN] = {UI_TR_FADES, 3, 6, 0},  /* without a zoom set */ \
 		[UI_TR_CLOSE] = {UI_TR_FADES, 3, 6, 0}, \
 	}

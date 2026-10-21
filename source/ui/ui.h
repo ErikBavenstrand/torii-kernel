@@ -137,7 +137,8 @@ enum ui_tr_kind {
 		       // cheats, help), or back out
 	UI_TR_FADE,    // the same screen redrawn (after a delete, a format, a failed launch)
 	UI_TR_LEAVE,   // out of the engine to black (a launch), or in from black
-	UI_TR_CARD,    // in from black, rising: a dialog in a session of its own (the loading card)
+	UI_TR_CARD,    // in from black, rising: a dialog in a session of its own (a launch's
+		       // question or error, the boot notice; the loading card just shows)
 	UI_TR_OPEN,    // home's item zooming into its page (ui_zoom_set first; else a fade)
 	UI_TR_CLOSE,   // the page back into home's item: the open backwards
 	UI_TR_KINDS,
@@ -345,6 +346,10 @@ void ui_item_set(u32 item);
 void ui_theme_switch(const struct ui_theme *theme);
 // 1 while the wipe runs
 int ui_wiping(void);
+// Ends a wipe at once on the theme it was going to, and runs a frame that
+// commits that: call it before blocking work (a NOR write, a dialog), as a
+// split needs a commit every VBlank (gfx_set_split). Nothing if none runs.
+void ui_wipe_finish(void);
 const struct ui_theme *ui_theme(void);
 u32 ui_item(void);
 
