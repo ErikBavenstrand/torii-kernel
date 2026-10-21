@@ -1,0 +1,22 @@
+# The open and the close (B19, mockup #5) in the light theme with the clock
+# set: RIGHT turns home to Game Boy Advance, A zooms its object and fogs it
+# out over the paper while the game list draws, the title bar's heading
+# slides in from the left, then the card rises and fades in. B plays it
+# backwards: the card falls and fades, the heading slides out, the object
+# comes back out of the fog, and home shows facing the item. Every frame of
+# both is hashed and watched for tears.
+#! settings 28=1
+-C 1792586096
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-w "home: facing gba"
+-k @8:A -k @12:-
+-H @8:@32
+-T @8:@32
+-w "nav: page gba ready"
+-s @1:page.png
+-k @8:B -k @12:-
+-H @8:@26
+-T @8:@26
+-w "nav: home ready"
+-s @1:back.png

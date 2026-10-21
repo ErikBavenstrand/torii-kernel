@@ -13,7 +13,7 @@
 // of their own, as the BG banks have no room for seven LED colours.
 //
 // The values are a working copy (struct settings_values, here in EWRAM).
-// The theme and the LED show an edit at once (ui_theme_set, Set_LED_control)
+// The theme and the LED show an edit at once (ui_theme_switch, Set_LED_control)
 // without staging it; nothing is staged until the page is left (nav's
 // leave): then it is staged and committed in one go, so no exit can leave a
 // staged copy behind. An edit B cancels is put back with its preview.
@@ -718,7 +718,8 @@ static void previews(u32 id, int ui)
 {
 	switch (id) {
 	case SET_THEME:
-		ui_theme_set(settings_get(&sp.v, SET_THEME) == 1 ? &ui_theme_light : &ui_theme_dark);
+		// The theme wipe (B19): asked again mid-way, its edge goes back
+		ui_theme_switch(settings_get(&sp.v, SET_THEME) == 1 ? &ui_theme_light : &ui_theme_dark);
 		break;
 	case SET_LED:
 		led_show();
