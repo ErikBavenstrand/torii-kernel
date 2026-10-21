@@ -84,7 +84,7 @@ void test_settings_table(void)
 			CHECK_EQ(used[a]++, 0);      // no two rows share a slot
 		}
 	}
-	for (u32 id = SET_ROWS; id < SET_LABELS; id++) {  // explanations alone
+	for (u32 id = SET_ROWS; id < SET_EXPLAINS; id++) {  // explanations alone
 		check_fits("explanation", gl_set_explain[id], EXPLAIN_W);
 		CHECK(strlen(gl_set_explain[id]) <= EXPLAIN_CHARS);
 	}
