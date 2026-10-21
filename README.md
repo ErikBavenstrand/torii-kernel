@@ -30,7 +30,9 @@ it. Info's Controls page lists every key.
   with the addons Settings turns on, and START opens its menu: Play,
   Favourite, Clean boot, Boot with addon, Rename (a name of your own, kept
   in `/torii/names.txt`; the file stays), Game info and Delete (the save
-  stays). Hold L as a game starts for the GBA's boot screen. Games show
+  stays). Hold L as you pick a way to start in the game's menu, and it
+  starts with the GBA's boot screen (held as you press A, L pages first,
+  then A starts the game shown). Games show
   their cleaned file names, or No-Intro's names with `just names-update`;
   Settings' Game view shows a list, or a list with box art (`just art-add`,
   `just art-scrape`).

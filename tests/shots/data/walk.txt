@@ -17,7 +17,7 @@
 -w "home: facing fav"
 -k @8:LEFT -k @12:-
 -w "home: facing recent"
--k @8:A -k @9:- -k @12:A -k @13:- -k @15:START -k @16:- -k @17:A -k @18:-
+-k @8:A -k @9:- -k @12:A -k @13:- -k @14:START -k @15:-
 -w "nav: page recent ready"
 -k @8:DOWN -k @12:-
 -k @20:B -k @24:-
