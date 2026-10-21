@@ -95,6 +95,7 @@ static struct {
 	u8 show_all;  // the Show all files setting, as the listing read it
 	u8 announce;  // log "sdcard: ready" once the list rests
 	u8 measure_left;  // frames of a folder change to measure
+	u8 hint_note;     // the hint bar shows the truncation note
 	u32 counting;  // the folder being counted, SDLIST_NONE none
 	u32 counted;   // its entries so far
 	u32 count_next;  // where the counting goes on past the cursor's rows
@@ -241,7 +242,10 @@ static void show_folder(void)
 // that more weren't listed (the end, where it is wondered about)
 static void hint_for(u32 at)
 {
-	int note = sd.list.truncated && entries() && at + 1 >= entries();
+	u8 note = sd.list.truncated && entries() && at + 1 >= entries();
+	if (note == sd.hint_note)
+		return;  // a change redraws the bar: not on every move
+	sd.hint_note = note;
 	ui_hints_text(node(N_HINTS), note ? sd.note : NULL);
 }
 
@@ -828,6 +832,7 @@ static struct ui_view *sd_enter(u32 item, u32 row)
 	sd.hints[1] = (struct ui_hint){"START", gl_hint_menu};
 	sd.hints[2] = (struct ui_hint){"B", gl_hint_back};
 	ui_hints_set(node(N_HINTS), sd.hints, 3);
+	sd.hint_note = 0;
 	// The cursor the folder was left with (from home, or back from a
 	// launch that didn't start); else the place's row (Last place, at the
 	// card's root, as the menu starts there)

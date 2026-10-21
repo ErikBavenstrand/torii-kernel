@@ -32,7 +32,7 @@ static const struct {
 	{"popup-move", 89540},
 	{"row-copy14", 6628},
 	{"sd-folder", 145992},
-	{"sd-move", 125245},
+	{"sd-move", 138800},
 	{"text-clear-row", 1644},
 	{"text-clear-row14", 2579},
 	{"text-clear-row8-unaligned", 2235},
