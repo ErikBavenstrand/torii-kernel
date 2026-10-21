@@ -145,7 +145,10 @@ rename-cut)
     mtype -i "$cart/sd.img" "::/SAVER/$to.mde" >/dev/null 2>&1 || fail "cut before write $n: $to.mde is missing"
     ! mtype -i "$cart/sd.img" ::/torii/rename.txt >/dev/null 2>&1 || fail "cut before write $n: the journal is left"
     # (the copy a reader takes: recent.txt, or its backup when the cut broke it)
-    { mtype -i "$cart/sd.img" ::/torii/recent.txt; mtype -i "$cart/sd.img" ::/torii/recent.txt.bak; } 2>/dev/null |
+    {
+      mtype -i "$cart/sd.img" ::/torii/recent.txt
+      mtype -i "$cart/sd.img" ::/torii/recent.txt.bak
+    } 2>/dev/null |
       grep "	/$to.gba$" >/dev/null || fail "cut before write $n: Recent doesn't name /$to.gba"
   done
   echo "PASS: saves rename-cut: a power cut before any of the rename's $writes SD writes leaves one game with its save ($results)"
