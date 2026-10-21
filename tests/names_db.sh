@@ -177,7 +177,7 @@ mcopy -i "$cart/sd.img" "$carts/recent/recent.txt" ::/torii/recent.txt
 boot "$cart" "$cart/1.log" -w "names: identified 2 of 2" $(nav_launch /GBA/Homebrew.gba at=@1) -u "launch: loading" -f 2000
 logged "$cart/1.log" "names: wrote 2 CRCs to /torii/crc.new"
 not_logged "$cart/1.log" "names: wrote /torii/crc.txt"
-boot "$cart" "$cart/2.log" -k 100:A -k 106:- -f 2000 -u "names: wrote /torii/crc.txt"  # A: "Save sav?"
+boot "$cart" "$cart/2.log" -k 100:A -k 106:- -f 2000 -u "names: wrote /torii/crc.txt" # A: "Save sav?"
 logged "$cart/2.log" "names: 2 CRCs from /torii/crc.new"
 logged "$cart/2.log" "names: wrote /torii/crc.txt"
 not_logged "$cart/2.log" "names: identified 2 of 2"
