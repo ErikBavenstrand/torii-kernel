@@ -26,8 +26,9 @@ extension and in any case ("Pokemon - Glazed.png" or "pokemon - glazed.gba.jpg"
 for "Pokemon - Glazed.gba"), becomes that game's custom art, as above; every
 game on the card with that file name gets it. It prints the games each
 picture went to and the pictures that matched no game. A picture is
-converted again only when it is newer than the game's art (--force: all of
-them); --dry-run converts nothing and writes nothing.
+converted again only when it changed: the art takes its picture's date
+(--force: all of them). Two pictures for one game: the first by name wins,
+and the other is reported. --dry-run converts nothing and writes nothing.
 
 convert: the same conversion into OUT.bin, anywhere (B23's scraper uses it).
 
@@ -315,7 +316,8 @@ def add_folder(
     by_name = names_db.games_by_name(names_db.walk_card(sd))
     out_dir = sd / CUSTOM_DIR
     written = skipped = 0
-    misses, broken = [], []
+    misses, broken, doubles = [], [], []
+    taken = {}  # art file: the picture it comes from in this run
     for picture in pictures:
         games = by_name.get(names_db.fold(picture.stem), [])
         try:
@@ -327,10 +329,19 @@ def add_folder(
             misses.append(picture.name)
             continue
         data = None
+        when = picture.stat().st_mtime
         for art in arts:
             out = out_dir / art
             name = art[: -len(EXT)]
-            fresh = out.exists() and out.stat().st_mtime >= picture.stat().st_mtime
+            if art in taken:
+                doubles.append(
+                    f"{picture.name}: {name} has art from {taken[art]}: skipped"
+                )
+                continue
+            taken[art] = picture.name
+            # The art takes its picture's date: another date is another picture.
+            # FAT keeps dates to 2 s
+            fresh = out.exists() and abs(out.stat().st_mtime - when) < 2.5
             if fresh and not force:
                 skipped += 1
                 print(f"  {picture.name} -> {name}: up to date")
@@ -346,14 +357,15 @@ def add_folder(
             if not dry_run:
                 out_dir.mkdir(parents=True, exist_ok=True)
                 out.write_bytes(data)
+                os.utime(out, (when, when))
     for name in misses:
         print(f"  {name}: no game on the card has that file name")
-    for why in broken:
+    for why in broken + doubles:
         print(f"  {why}")
     print(
         f"{len(pictures)} pictures in {folder}: {written} art files "
         f"{'to write' if dry_run else 'written'}, {skipped} up to date, "
-        f"{len(misses)} matched no game, {len(broken)} failed"
+        f"{len(misses)} matched no game, {len(doubles)} doubles, {len(broken)} failed"
     )
     return written, len(broken)
 

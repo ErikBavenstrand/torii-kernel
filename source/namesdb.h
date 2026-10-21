@@ -2,9 +2,9 @@
 // No-Intro names of /torii/names.db, which `just names-update` builds on the
 // user's PC from libretro-database's dats (tools/names_db.py), and the CRC
 // cache, /torii/crc.txt, which says which file has which CRC. A game's CRC
-// name is the database's entry for its CRC, never its GBA game code, which a romhack shares with its base game (C4): a
-// game the dats don't list keeps its file name. gamename_display cleans the
-// name like a file name.
+// name is the database's entry for its CRC, never its GBA game code, which
+// a romhack shares with its base game (C4): a game the dats don't list
+// keeps its file name. gamename_display cleans the name like a file name.
 //
 // The first part of this file is hardware-free, and tests/host builds it:
 // the database's format and lookups, and the cache's table and lines.

@@ -10,6 +10,7 @@ are its output for tests/art. No network."""
 
 import contextlib
 import io
+import os
 import struct
 import sys
 import tempfile
@@ -227,7 +228,7 @@ class ArtTest(unittest.TestCase):
         self.assertIn("  Nobody.png: no game on the card has that file name", out)
         self.assertIn(
             "5 pictures in " + str(src) + ": 4 art files written, 0 up to date, "
-            "2 matched no game, 0 failed",
+            "2 matched no game, 0 doubles, 0 failed",
             out,
         )
 
@@ -239,6 +240,21 @@ class ArtTest(unittest.TestCase):
             self.assertEqual(art.main(["add", str(sd), "--force"]), 0)
         self.assertIn("4 art files written, 0 up to date", said.getvalue())
 
+        # A picture replaced by an older one is another picture: converted again
+        os.utime(src / "Tetris.jpg", (1_000_000_000, 1_000_000_000))
+        with contextlib.redirect_stdout(io.StringIO()) as said:
+            self.assertEqual(art.main(["add", str(sd)]), 0)
+        self.assertIn("2 art files written, 2 up to date", said.getvalue())
+        # Two pictures for one game: the first wins, the other is reported
+        Image.new("RGB", (60, 60)).save(src / "wars (usa).png")
+        with contextlib.redirect_stdout(io.StringIO()) as said:
+            self.assertEqual(art.main(["add", str(sd)]), 0)
+        self.assertIn(
+            "  wars (usa).png: Wars (USA).gba has art from Wars (USA).gba.png: skipped",
+            said.getvalue(),
+        )
+        (src / "wars (usa).png").unlink()
+
         # A folder given; a picture that doesn't convert is reported, the rest go on
         other = self.dir / "pics"
         other.mkdir()
@@ -249,7 +265,8 @@ class ArtTest(unittest.TestCase):
         out = said.getvalue()
         self.assertIn("  Tetris.png: ", out)
         self.assertIn(
-            "1 art files written, 0 up to date, 0 matched no game, 1 failed", out
+            "1 art files written, 0 up to date, 0 matched no game, 0 doubles, 1 failed",
+            out,
         )
         self.assertEqual(
             (custom / "Wars (USA).gba.bin").read_bytes(),

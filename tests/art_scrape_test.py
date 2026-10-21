@@ -33,7 +33,7 @@ import names_db
 
 DATS = ROOT / "tests" / "names"
 GBA_SYS = "Nintendo - Game Boy Advance"
-PATCHED = "/GBA/Legend of Zelda, The - The Minish Cap (Fixed).gba"
+PATCHED = "/GBA/Legend of Zelda, The - The Minish Cap (USA) [0badc0de].gba"
 GBC_SYS = "Nintendo - Game Boy Color"
 GB_SYS = "Nintendo - Game Boy"
 NES_SYS = "Nintendo - Nintendo Entertainment System"
@@ -184,7 +184,7 @@ class Names(unittest.TestCase):
                 0,
                 hack,
                 "BZME",
-                "The Legend of Zelda - The Minish Cap (Fixed).gba",
+                "The Legend of Zelda - The Minish Cap (U).gba",
             ),
             [(0, "Legend of Zelda, The - The Minish Cap (USA)")],
         )

@@ -108,11 +108,32 @@ class Romhacks(unittest.TestCase):
         codes = {names_db.code_key("BPEE"): "Pokemon - Emerald Version (USA, Europe)"}
         match = names_db.code_match
         name = "Pokemon - Emerald Version (USA, Europe)"
-        # A patched dump of the game, under its title
-        self.assertEqual(
-            match(codes, 0, "BPEE", "Pokemon - Emerald Version (Erik).gba"), name
-        )
+        # A patched dump of the game, under its title, its dat tags, a region
+        # or a checksum
         self.assertEqual(match(codes, 0, "BPEE", "pokemon emerald version.gba"), name)
+        self.assertEqual(
+            match(codes, 0, "BPEE", "Pokemon - Emerald Version (USA, Europe).gba"), name
+        )
+        self.assertEqual(
+            match(codes, 0, "BPEE", "Pokemon - Emerald Version (U) [!].gba"), name
+        )
+        self.assertEqual(
+            match(codes, 0, "BPEE", "Pokemon - Emerald Version [b3e036ae].gba"), name
+        )
+        # Under its title with a tag of its own: a hack, a translation, or
+        # anything else the dat name doesn't say
+        for hack in (
+            "(Hack by X)",
+            "[Hack]",
+            "(Kaizo)",
+            "[T-Eng]",
+            "[h1]",
+            "(Erik)",
+            "(Europe)",
+        ):
+            self.assertIsNone(
+                match(codes, 0, "BPEE", f"Pokemon - Emerald Version {hack}.gba"), hack
+            )
         # Romhacks keep their base game's code under their own titles
         self.assertIsNone(match(codes, 0, "BPEE", "Pokemon - Glazed.gba"))
         self.assertIsNone(match(codes, 0, "BPEE", "Pokemon Emerald Rogue.gba"))
@@ -210,6 +231,18 @@ class NamesAdd(unittest.TestCase):
         status, out, _ = add(self.sd, "Tetris\t\n")
         self.assertEqual(status, 0)
         self.assertNotIn("Tetris", names_db.read_safe(self.names))
+
+    def test_lines_split_as_the_kernel_splits_them(self):
+        # Only LF (and CRLF) ends a line; other separators in a name go
+        self.names.write_text(
+            "/GB/Tetris.gb\tA\u2028B\r\n/GBA/Wars.gba\t \n", newline=""
+        )
+        status, _, err = add(self.sd, "Wars\tW\u0085ars\r\n")
+        self.assertEqual(status, 0, err)
+        self.assertEqual(
+            names_db.read_safe(self.names),
+            names_db.NAMES_HEADER + "/GB/Tetris.gb\tA\u2028B\n/GBA/Wars.gba\tWars\n",
+        )
 
     def test_new_names_txt_and_refusals(self):
         status, _, err = add(self.sd, "Wars\tWars!\n")

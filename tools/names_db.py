@@ -349,18 +349,36 @@ def title_key(name):
     return "".join(c for c in text.casefold() if c.isascii() and c.isalnum())
 
 
+# Tags a dump's file name may have beyond its dat name's and still be that
+# game: GoodTools' regions and verified mark, and a checksum
+PLAIN_TAG = re.compile(r"[ujewk]|ue|eu|uj|ju|!|[0-9a-f]{8}", re.IGNORECASE)
+
+
+def tags(name):
+    """The (...) and [...] tags of a name, their text case folded."""
+    return {
+        t[1:-1].strip().casefold() for t in re.findall(r"\([^()]*\)|\[[^\[\]]*\]", name)
+    }
+
+
 def code_match(codes, console, code, file_name):
     """For a GBA game the dats don't list by CRC: the dats' name of its game
-    code, but only when its file name is that game's title too ("Pokemon -
-    Emerald Version (Erik).gba", a patched dump of the game), never a romhack
-    with its base game's code ("Pokemon - Radical Red.gba"). None otherwise.
-    `just art-scrape` takes art for such a game; the kernel names it by its
-    file name, which cleans to the same title."""
+    code, but only when its file name is that game's title, with no tags but
+    the dat name's, a region or a checksum ("Pokemon - FireRed Version.gba",
+    "Pokemon - LeafGreen Version [b3e036ae].gba", a patched dump of the
+    game). Never a romhack with its base game's code under its own title
+    ("Pokemon - Radical Red.gba") or a tag ("Metroid Fusion (Hack).gba",
+    "Mother 3 [T-Eng].gba"). None otherwise. `just art-scrape` takes art for
+    such a game; the kernel names it by its file name, which cleans to the
+    same title."""
     if console != GBA or not code or code_key(code) not in codes:
         return None
     name = codes[code_key(code)]
     key = title_key(file_name)
-    return name if key and key == title_key(name) else None
+    if not key or key != title_key(name):
+        return None
+    extra = tags(file_name) - tags(name)
+    return None if any(not PLAIN_TAG.fullmatch(t) for t in extra) else name
 
 
 # --- The card ---------------------------------------------------------------------
@@ -504,9 +522,10 @@ def parse_names(text):
     """names.txt as gamename.h reads it: ([other lines], {folded path: (path,
     name)}), a later line for a path winning."""
     other, names = [], {}
-    for line in text.lstrip("\ufeff").splitlines():
+    for raw in text.lstrip("\ufeff").split("\n"):  # LF only, as the kernel splits
+        line = raw.removesuffix("\r")
         path, tab, name = line.partition("\t")
-        if path.startswith("/") and tab and name:
+        if path.startswith("/") and tab and name.strip():
             names[ascii_fold(path)] = (path, name)
         elif line.strip() and not (path.startswith("/") and tab):
             other.append(line)
@@ -523,7 +542,11 @@ def format_names(other, names):
 def clean_name(name):
     """A name as Rename keeps it: control characters dropped, the ends
     trimmed. NamesError if it's too long."""
-    name = "".join(c for c in name if c >= " " and c != "\x7f").strip()
+    # Control characters and line or paragraph separators, which would split
+    # the line on the PC
+    name = "".join(
+        c for c in name if not unicodedata.category(c).startswith(("C", "Zl", "Zp"))
+    ).strip()
     if len(name.encode("utf-8")) > NAME_BYTES:
         raise NamesError(f"{name[:40]}...: longer than {NAME_BYTES} bytes")
     return name
@@ -536,7 +559,7 @@ def add_names(args):
             f"{sd} isn't a folder: give the card's folder, e.g. /Volumes/OMEGA"
         )
     try:
-        wanted = Path(args.file).read_text("utf-8-sig").splitlines()
+        wanted = Path(args.file).read_text("utf-8-sig").split("\n")
     except (OSError, UnicodeError) as e:
         raise NamesError(f"{args.file}: {e}") from None
     games = walk_card(sd)
@@ -551,7 +574,7 @@ def add_names(args):
     for n, line in enumerate(wanted, 1):
         if not line.strip() or line.startswith("#"):
             continue
-        key, tab, name = line.partition("\t")
+        key, tab, name = line.removesuffix("\r").partition("\t")
         key = key.strip()
         if not tab or not key:
             bad.append(f"line {n}: no tab between the file name and the name")
