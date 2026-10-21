@@ -1035,7 +1035,7 @@ void ui_popup_close(void);
 // popup; while it is up the hint bar shows keys (up to 4).
 //
 //	if (ui_fields_open(list, hints, &f, keys, 4)) {
-//		for (u16 k; (k = ui_fields_key()) && !(k & (INPUT_A | INPUT_B));) {
+//		for (u16 k; (k = ui_fields_key(0)) && !(k & (INPUT_A | INPUT_B));) {
 //			... change f.text[] or f.active ...
 //			ui_fields_changed();
 //		}
@@ -1054,8 +1054,9 @@ struct ui_fields {
 int ui_fields_open(u8 list, u8 hints, const struct ui_fields *fields, const struct ui_hint *keys, u32 key_count);
 // Runs frames until UP, DOWN, LEFT, RIGHT (held: they repeat), A or B fires
 // on it, and returns that key (one bit); A only once it has opened. 0 if no
-// field card is up.
-u16 ui_fields_key(void);
+// field card is up. between, if any, runs after each frame (the menu's
+// background work, which would otherwise wait for the card).
+u16 ui_fields_key(void (*between)(void));
 // Its fields changed (texts, the active one): they draw again
 void ui_fields_changed(void);
 

@@ -100,6 +100,7 @@ extern char *gl_set_minutes;  // the unit after DIM's minutes
 // row's label), and the hint bar's labels while a value is edited
 extern char *gl_set_scanning;
 extern char *gl_set_saving;
+extern char *gl_set_save_failed;  // the hint bar when a settings write failed
 extern char *gl_set_press;
 extern char *gl_set_press_hint;
 extern char **gl_set_refused;

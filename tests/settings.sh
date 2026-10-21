@@ -144,4 +144,32 @@ OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_setting the
 grep -n 'nor: wrote the settings\|nav: back from settings' "$cart/visit.log" | head -1 | grep -q 'nor: wrote' ||
   fail "the write ran on the way out"
 [ "$(slots 28 1)" = 0001 ] || fail "Theme not saved before leaving: $(slots 28 1)"
+# A write that fails (a NOR word that won't program, OMEGA_NOR_STUCK; a new
+# cart's first save writes copy B first: Auto save's slot there): the hint bar says so,
+# the value stays, and the next confirm tries again; leaving tries once more
+# and then drops it, the NOR keeping what it held
+failing() { # NAME STUCK ROW KEYS...: a visit to ROW on a new cart whose write fails STUCK
+  local name=$1 stuck=$2 row=$3
+  shift 3
+  cart=$carts/$name
+  mkdir -p "$cart"
+  mkfs.fat -C -F 32 -n SETTINGS "$cart/sd.img" 65536 >/dev/null
+  write 32=2
+  OMEGA_NOR_STUCK=$stuck visit "$row" "$@"
+}
+failing fail-always 0x7B201C auto-save A RIGHT A
+grep -q 'settings: not saved, tried again at the next confirm or on leaving' "$cart/visit.log" ||
+  fail "a failed write wasn't noticed: $(grep -E 'nor:|settings:' "$cart/visit.log" | tail -3)"
+grep -q 'settings: not saved, the page left' "$cart/visit.log" || fail "leaving didn't try the write again"
+[ "$(writes)" = 0 ] || fail "a failed write was logged as written"
+[ "$(slots 14 1)" = ffff ] || fail "the failed write changed Auto save: $(slots 14 1)"
+failing fail-once 0x7B201C:1 auto-save A RIGHT A A A
+[ "$(grep -c 'settings: not saved' "$cart/visit.log")" = 1 ] || fail "the write failed other than once"
+[ "$(writes)" = 1 ] || fail "the next confirm wrote the settings $(writes) times"
+[ "$(slots 14 1)" = 0001 ] || fail "the next confirm didn't save Auto save: $(slots 14 1)"
+failing fail-leave 0x7B201C:1 auto-save A RIGHT A
+[ "$(writes)" = 1 ] || fail "leaving wrote the settings $(writes) times"
+[ "$(slots 14 1)" = 0001 ] || fail "leaving didn't save Auto save: $(slots 14 1)"
+echo "PASS: a failed settings write says so, keeps the value and is tried again at the next confirm and on leaving"
+
 echo "PASS: unwritten settings read 0xFFFF, the v0.4 ones as their defaults, and the Settings page writes once a confirmed change, nothing for a cancel or no change, keeping the slots it doesn't know"

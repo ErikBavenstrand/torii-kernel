@@ -321,10 +321,10 @@ index 1d0c0dd..b77704a 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..a6193ce
+index 0000000..461225e
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1508 @@
+@@ -0,0 +1,1545 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -698,11 +698,47 @@ index 0000000..a6193ce
 +	}
 +}
 +
++// A kernel NOR word that won't program, for tests: OMEGA_NOR_STUCK=OFFSET[:N]
++// (in kernel-nor.bin's window order). Its first N programs, or all, leave it
++// as it was and finish as if they worked, as a worn cell the chip doesn't
++// flag: only a read-back sees it.
++static struct {
++	bool armed;
++	uint32_t offset;
++	long left;  // < 0: no limit
++} _stuck;
++
++static void _parseStuck(void) {
++	const char* spec = getenv("OMEGA_NOR_STUCK");
++	memset(&_stuck, 0, sizeof(_stuck));
++	if (!spec || !*spec) {
++		return;
++	}
++	char* end;
++	_stuck.offset = strtoul(spec, &end, 0) & ~1u;
++	_stuck.left = -1;
++	if (*end == ':') {
++		_stuck.left = strtol(end + 1, &end, 0);
++	}
++	if (end == spec || *end || !_stuck.left) {
++		fprintf(stderr, "omega: bad OMEGA_NOR_STUCK %s (OFFSET[:N])\n", spec);
++		exit(2);
++	}
++	_stuck.armed = true;
++}
++
 +// Returns false when the word can't be programmed: programming only clears
 +// bits, so a 1 over a 0 never verifies.
 +static bool _norProgram(struct GBAOmegaNor* nor, uint32_t offset, uint16_t value) {
 +	offset &= ~1;
 +	if (offset + 2 > nor->size) {
++		return true;
++	}
++	if (_stuck.armed && _stuck.left && offset == _stuck.offset && _cutOmega && nor == &_cutOmega->kernelNor) {
++		if (_stuck.left > 0) {
++			--_stuck.left;
++		}
++		fprintf(stderr, "omega: NOR program at %06X didn't take (OMEGA_NOR_STUCK)\n", offset);
 +		return true;
 +	}
 +	uint16_t old = nor->data[offset] | (nor->data[offset + 1] << 8);
@@ -1458,6 +1494,7 @@ index 0000000..a6193ce
 +	omega->copyEnd = 0;
 +	_parsePowerCut();
 +	_parseSdError();
++	_parseStuck();
 +	_cutOmega = omega;
 +	omega->enabled = true;
 +	_remap(gba);
