@@ -271,6 +271,23 @@ class ArtTest(unittest.TestCase):
                     [bool(v) for v in full], [c is not None for c in src[y]], path.name
                 )
             self.assertEqual(width, int(path.stem[1:]))
+        manifest_dark = manifest.get("box_dark", {})
+        dark = {
+            asset.hex_colour(k): asset.hex_colour(v) for k, v in manifest_dark.items()
+        }
+        for path in asset.art_files("boxes"):
+            rows, light, shade = asset.art_box(path, dark)
+            src = asset.rgba_pixels(path)
+            back = tile_pixels(asset.tiles_of(rows, 4), 80, 80)
+            for y in range(80):
+                for x in range(80):
+                    c, i = src[y][x], back[y][x]
+                    self.assertEqual(i == 0, c is None, path.name)
+                    if c is not None:
+                        self.assertEqual(light[i], asset.bgr555(*c), path.name)
+                        self.assertEqual(
+                            shade[i], asset.bgr555(*dark.get(c, c)), path.name
+                        )
 
     def test_icons8_keep_their_shape(self):
         img = Image.new("RGBA", (8, 8))
@@ -308,8 +325,16 @@ class ArtTest(unittest.TestCase):
             asset.art_shadow(self.png("w16.png", lopsided))
         with self.assertRaisesRegex(asset.ArtError, "wNN"):
             asset.art_shadow(self.png("big.png", lopsided))
-        with self.assertRaisesRegex(asset.ArtError, "indexed 80x80"):
-            asset.art_box(self.png("box.png", Image.new("RGB", (80, 80))))
+        with self.assertRaisesRegex(asset.ArtError, "79x80"):
+            asset.art_box(self.png("gba.png", Image.new("RGBA", (79, 80))), {})
+        many = Image.new("RGBA", (80, 80))
+        many.putdata([(i * 8, 0, 0, 255) for i in range(16)] + [(0, 0, 0, 0)] * 6384)
+        with self.assertRaisesRegex(asset.ArtError, "more than 15 colours"):
+            asset.art_box(self.png("gba.png", many), {})
+        with self.assertRaisesRegex(asset.ArtError, "no box uses"):
+            asset.art_boxes({"#123456": "#000000"})
+        with self.assertRaisesRegex(asset.ArtError, "no #RRGGBB"):
+            asset.art_boxes({"red": "#000000"})
         with self.assertRaisesRegex(asset.ArtError, "put icons16/fav.png"):
             asset.art_icons16([["file"]])
         with self.assertRaisesRegex(asset.ArtError, "which icons16/ hasn't"):

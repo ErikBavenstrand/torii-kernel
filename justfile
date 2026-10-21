@@ -275,7 +275,7 @@ font:
     uv run -q tools/font.py assets/fonts/galmuri/Galmuri9.bdf --name body --line-height 12 --squeeze --clip -o source/engine/font_body
     uv run -q tools/font.py assets/fonts/galmuri/Galmuri11-Bold.bdf --name heading --line-height 16 --squeeze --clip -o source/engine/font_heading
 
-# Convert the menu's art in assets/ui (icons, carousel objects, shadows, the placeholder box) to C:
+# Convert the menu's art in assets/ui (icons, carousel objects, shadows, the placeholder boxes) to C:
 # source/ui/art_data.c and art_ids.h (committed; tests/asset_test.py checks they match)
 assets:
     uv run -q tools/asset.py ui
@@ -352,7 +352,8 @@ art-add +args:
 
 # Fetch box art for an SD card's games from libretro-thumbnails, e.g. `just art-scrape /Volumes/OMEGA`:
 # /torii/art/<CRC32>.bin, matched by CRC through the No-Intro dats (dist/dats), keeping custom art and
-# art already there. Pictures are cached in the git-ignored dist/art-cache. Box art has no licence
+# art already there, and each console's placeholder, /torii/art/box-<console>.bin (an official box with
+# a torii for its artwork). Pictures are cached in the git-ignored dist/art-cache. Box art has no licence
 # grant: keep it on your card, never publish it. --dry-run, --offline, --console: see --help
 [positional-arguments]
 art-scrape sd_path *args:

@@ -1,4 +1,5 @@
-# The list with art in the dark theme, with a game's custom box art.
+# The list with art in the dark theme, with a game's custom box art, then
+# the next game, which has none: the GBA placeholder box in dark colours.
 #! settings 31=1
 #! sd-file "/torii/art/custom/A name too long to fit on its row.gba.bin" 0 tests/shots/data/art-sunset.bin
 -w "nav: home ready"
@@ -7,3 +8,5 @@
 -w "nav: page gba ready"
 -w "box art: cover BE104D91 shown"
 -s @2:gba.png
+-k @2:DOWN -k @6:-
+-s @10:gba-none.png

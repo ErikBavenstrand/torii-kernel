@@ -1,0 +1,14 @@
+# The list with art with the card's own placeholder for GBA games
+# (/torii/art/box-gba.bin, which `just art-scrape` makes from an official
+# box; a test picture stands in for it): a game without art shows it in
+# place of the kernel's placeholder box, once the cursor rests.
+#! settings 31=1
+#! sd-file /torii/art/box-gba.bin 0 tests/shots/data/art-night.bin
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-w "box art: cover"
+-s @2:gba.png
+-k @6:DOWN -k @10:-
+-s @14:next.png

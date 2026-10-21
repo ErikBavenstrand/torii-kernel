@@ -4,8 +4,10 @@
 //
 //	page 1  the 16x16 icons in their banks; the 8x8 icons as BG tiles in
 //	        ink and, below, in the first item's colour; the ground shadows;
-//	        the placeholder box in its own colours
+//	        the GBA placeholder box
 //	page 2+ the carousel objects, six a page, each on its suggested shadow
+//	then    the placeholder boxes in the light theme's colours, on its
+//	        paper, then in the dark theme's on its
 //
 // A shows the next page (the last wraps to the first). Each page logs
 // "screen ready: art-sheet-N" once its tiles are in VRAM.
@@ -27,9 +29,13 @@
 
 #define PAPER 0x73BE  // #F7EFE7, the light theme's bg
 #define INK 0x18A5  // #292931
+#define GRAPHITE 0x1063  // #181821, the dark theme's bg
 #define SHADOW_TONE 0x5AF7  // a soft grey-brown under the objects
 #define PER_PAGE 6
-#define PAGES (1 + (ART_SPRITE_COUNT + PER_PAGE - 1) / PER_PAGE)
+#define SPRITE_PAGES ((ART_SPRITE_COUNT + PER_PAGE - 1) / PER_PAGE)
+#define BOX_PAGE (1 + SPRITE_PAGES)  // light, then dark
+#define PAGES (BOX_PAGE + 2)
+#define BOXES_A_ROW 3
 
 // OBJ attributes: shapes and sizes
 #define SQUARE 0x0000
@@ -130,16 +136,51 @@ static void setup_icons(void)
 	queue_room();
 	TLOG_ASSERT(gfx_queue_copy(res_bg_addr(icons), icon8_tiles, sizeof(icon8_tiles)));
 	queue_room();
-	TLOG_ASSERT(gfx_queue_copy(res_bg_addr(box), art_box_tiles, sizeof(art_box_tiles)));
+	TLOG_ASSERT(gfx_queue_copy(res_bg_addr(box), art_box_tiles[ART_BOX_GBA], sizeof(art_box_tiles[0])));
 	queue_room();
 	TLOG_ASSERT(gfx_queue_copy(res_bg_addr(m), map, sizeof(map)));
 	const u16 neutrals[3] = {0, INK, 0x627E};  // 2: the fav ink, a stand-in item colour
 	gfx_pal_load(bank, neutrals, 3);
 	static const u16 paper = PAPER;
 	gfx_pal_load(0, &paper, 1);  // the backdrop
-	gfx_pal_load(bank + 1u, art_box_palette, 16);
+	gfx_pal_load(bank + 1u, art_box_palettes[ART_BOX_GBA][0], 16);
 	gfx_set_bgcnt(0, (u16)(res_bg_screenblock(m) << 8));
 	gfx_set_dispcnt(0x0100 | 0x1000 | 0x0040);  // mode 0, BG0, sprites, 1D tiles
+}
+
+// Every placeholder box at 1:1, three a row, in a theme's colours (dark 0
+// or 1) on its paper
+static void setup_boxes(u32 dark)
+{
+	u8 box = res_bg_tiles(ART_BOX_COUNT * ART_BOX_TILES + 1, 0, 0, TAG_BOX);  // + a blank
+	u8 m = res_bg_map(1, TAG_MAP);
+	u8 pal = res_palette(RES_BG_PAL, ART_BOX_COUNT, TAG_BG_PAL);
+	TLOG_ASSERT(box != RES_NONE && m != RES_NONE && pal != RES_NONE);
+	u16 bank = res_start(RES_BG_PAL, pal), first = res_bg_tile_index(box, 0, 0);
+	u8 *tiles = res_bg_addr(box);
+	u16 blank = (u16)(first + ART_BOX_COUNT * ART_BOX_TILES);
+	static const u32 blank_tile[8] = {0};
+	queue_room();
+	TLOG_ASSERT(gfx_queue_copy(tiles + (blank - first) * 32u, blank_tile, sizeof(blank_tile)));
+	for (u32 i = 0; i < 32 * 32; i++)
+		map[i] = blank;
+	for (u32 b = 0; b < ART_BOX_COUNT; b++) {
+		u32 x0 = (b % BOXES_A_ROW) * 10, y0 = (b / BOXES_A_ROW) * 10;
+		for (u32 y = 0; y < 10; y++)
+			for (u32 x = 0; x < 10; x++)
+				map[(y0 + y) * 32 + x0 + x] =
+					(u16)((bank + b) << 12 | (first + b * ART_BOX_TILES + y * 10 + x));
+		queue_room();
+		TLOG_ASSERT(gfx_queue_copy(tiles + b * sizeof(art_box_tiles[0]), art_box_tiles[b],
+					   sizeof(art_box_tiles[0])));
+		gfx_pal_load(bank + b, art_box_palettes[b][dark], 16);
+	}
+	queue_room();
+	TLOG_ASSERT(gfx_queue_copy(res_bg_addr(m), map, sizeof(map)));
+	static const u16 paper[2] = {PAPER, GRAPHITE};
+	gfx_pal_load(0, &paper[dark], 1);
+	gfx_set_bgcnt(0, (u16)(res_bg_screenblock(m) << 8));
+	gfx_set_dispcnt(0x0100 | 0x0040);  // mode 0, BG0
 }
 
 static void setup_sprites(u32 page)
@@ -172,7 +213,9 @@ static void add_shadow(u32 shadow, s32 cx, s32 foot, u32 bank)
 static void draw(void)
 {
 	gfx_oam_begin();
-	if (sheet.page == 0) {
+	if (sheet.page >= BOX_PAGE) {
+		// BG only
+	} else if (sheet.page == 0) {
 		for (u32 i = 0; i < ART_ICON16_COUNT; i++)
 			gfx_oam_add((u16)(SQUARE | 8), (u16)(SIZE_16 | (6 + i * 18)),
 				    (u16)(sheet.icon_bank[i] << 12 | sheet.icon_tile[i]));
@@ -198,6 +241,8 @@ static void show(u32 page)
 	sheet.page = (u8)page;
 	if (page == 0)
 		setup_icons();
+	else if (page >= BOX_PAGE)
+		setup_boxes(page - BOX_PAGE);
 	else
 		setup_sprites(page);
 	draw();

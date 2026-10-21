@@ -1,6 +1,6 @@
 // Box art in the game lists' list with art (decisions doc, Art): which
-// cover a game has, and showing it in the page's 80x80 box in place of
-// B2's placeholder.
+// cover a game has, and showing it in the page's 80x80 box in place of the
+// placeholder.
 //
 // The lookup, the first that exists (artkey.h has the card's layout):
 //	1. custom art by the game's file name, /torii/art/custom/<name>.bin, so a
@@ -8,7 +8,11 @@
 //	2. matched art by the game's CRC32, from the CRC cache (/torii/crc.txt,
 //	   namesdb.h); never by a GBA game code, which a romhack shares with its
 //	   base game (C4);
-//	3. the placeholder.
+//	3. the card's placeholder for the game's console, /torii/art/box-gba.bin
+//	   and so on: an official box with its artwork replaced by a torii,
+//	   which `just art-scrape` makes on the PC (nothing of it is in the
+//	   kernel);
+//	4. the kernel's own placeholder box for the console (ui/art.h).
 // Lookups never touch the card: a background job lists /torii/art and
 // /torii/art/custom once (after each boot, and after anything overwrote
 // PSRAM) into a set in PSRAM (PSRAM_ART_BASE), so a game without art costs
@@ -25,8 +29,8 @@
 // A page's use, while its view is up (the box an untagged UI_IMAGE of
 // ART_BOX_SIZE square):
 //	boxart_open(image, row_fn);      // as the page shows
-//	boxart_select(cursor, palette);  // the cursor's row, and the
-//	                                 // placeholder's colours for it
+//	boxart_select(cursor, box);      // the cursor's row, and the
+//	                                 // placeholder box (ART_BOX_*) for it
 //	boxart_poll();                   // each pass of the menu's loop
 #ifndef TORII_BOXART_H
 #define TORII_BOXART_H
@@ -41,10 +45,9 @@ typedef int (*boxart_row_fn)(u32 row, char *path, u32 *size);
 // The page shows with its box in image: reads the Box art setting and
 // starts listing the card's art if it hasn't yet.
 void boxart_open(u8 image, boxart_row_fn row);
-// The cursor is on row (again): its cover if cached, else the placeholder
-// (art_box_tiles) in palette's 16 colours, which must stay valid while the
-// page is up.
-void boxart_select(u32 row, const u16 *palette);
+// The cursor is on row (again): its cover if cached, else placeholder box
+// box (ART_BOX_*, ui/art.h) in the theme's colours.
+void boxart_select(u32 row, u32 box);
 // Each pass of the menu's loop while the page is up: wants the covers once
 // the cursor has rested, and shows the cursor's when it is ready.
 void boxart_poll(void);
