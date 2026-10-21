@@ -24,6 +24,7 @@ nor-move 95905
 popup-draw 147281
 popup-motion 83168
 popup-move 103247
+rename-key 128373
 row-copy14 6628
 sd-folder 144092
 sd-move 140171

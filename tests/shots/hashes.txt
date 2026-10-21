@@ -76,17 +76,17 @@ games-cheats/picked BFDAFB041DCC8050
 games-cheats/screen C49F10B375086F38
 games-fav/screen F4F29DECE25888B4
 games-fav/starred 9420B42D7CAE4C1D
-games-fav/toggled 376D659394F85307
-games-gb/popup CAE90C9F7E72FC3F
+games-fav/toggled F5E03C42E89C47BB
+games-gb/popup 73FBC530961EE51B
 games-gb/screen A47EFAC3B4A4039F
-games-gba/cancelled 4E7E09A34A9111A6
+games-gba/cancelled 085362FE7AE98236
 games-gba/closed B88B3D39DA8F0380
-games-gba/delete 4DCAA772D3601205
+games-gba/delete 2620FE2220F1C4F4
 games-gba/down 868A87D837F73236
 games-gba/info A55D559BE43F67FD
 games-gba/info-sram 99125B196A679359
 games-gba/letter 9C53BFCA8051B309
-games-gba/popup 9052A1F0C2261F4E
+games-gba/popup A02021D2CC12773E
 games-gba/screen D09CACFAFDCF7472
 games-gba/frames 0-0 D09CACFAFDCF7472
 games-gba/frames 1-1 FA38672EB8F094DE
@@ -354,14 +354,23 @@ open/frames 31-31 2A77D2108C1BB261
 open/frames 32-32 F8444D0B9DA29589
 open/frames 33-33 DA2571E201D3DEDB
 open/frames 34-41 97819D6CD90264D7
+rename/full 1FA894DE3AF0E22E
+rename/latin 307B33D0767DC9EF
+rename/prefilled 1017306268906A3D
+rename/shifted FBDD010AC1E7FCF2
+rename-dark/prefilled 1747112F0822FB93
+sd-confirm-tall/again B6169D621332EB7C
+sd-confirm-tall/back F69FCFF2C9DF954F
+sd-confirm-tall/confirm 7486889B33771F34
+sd-confirm-tall/popup B6169D621332EB7C
 sd-dark/folder DFD4D3341592285D
 sd-dark/root 225FC0C5D082ACA9
 sd-many/end EE2CB6E1FAC3923C
 sd-many/root ABB8F464CD451D8C
 sd-root/back 7639FAE28B4FA9BF
-sd-root/confirm 5C09254428F1A147
+sd-root/confirm 071B9025F5B619C2
 sd-root/folder 4EFA74E715B11C85
-sd-root/popup E7E39D7ED3081EC0
+sd-root/popup 08CC3976690F7BAD
 sd-root/root 0B86CD9E94EA7AD7
 sd-root/frames 0-13 9D9FF35D00B0331F
 sd-root/frames 14-14 55B3C73B6B6FB745

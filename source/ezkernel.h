@@ -57,6 +57,17 @@ u32 Loadsavefile(TCHAR *filename);
 #define SAVE_WRITTEN 1  // all of it reached the card
 #define SAVE_NOTHING 2  // savesize 0: nothing to write, no file touched
 u32 Save_savefile(TCHAR *filename, u32 savesize);
+// The pending-save record in the kernel's NOR: 0x11, the size in 512-byte
+// units, then the save's file name from halfword 2. Torii keeps the save
+// type at halfword SAV_INFO_TYPE, past the longest name, for the log (0
+// from older kernels).
+#define SAV_INFO_TYPE 0x80
+// The longest save file name the record holds, from byte 4 to SAV_INFO_TYPE
+#define SAV_INFO_NAME_MAX (SAV_INFO_TYPE * 2 - 4 - 1)
+// 1 if the pending-save record (a save waiting to be copied from cart SRAM
+// to /SAVER, the next power-on or launch tries again) names the save file
+// save (a file name in /SAVER): a rename must leave that file's name alone.
+int pending_save_named(const char *save);
 u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU);
 
 void delay(u32 R0);

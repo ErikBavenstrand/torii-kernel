@@ -368,6 +368,19 @@ void test_library_forget_rename(void)
 	CHECK(!lib_body_ok(slot, seen));
 	order[1] = keep;
 	CHECK(lib_body_ok(slot, seen));
+	// A display name of its own (Rename in a game list): the file stays, the
+	// game sorts by the name, marked custom; without one it is cleaned again
+	CHECK(lib_rename_shown(slot, put, aw, "AAA.gba", "Zzz My Game", &scratch));
+	CHECK(lib_body_ok(slot, seen));
+	CHECK_EQ(lib_find(slot, "/GBA/Old/AAA.gba"), aw);
+	CHECK(!strcmp(lib_display(slot, aw), "Zzz My Game"));
+	CHECK(lib_rec_at(slot, aw)->flags & LIB_F_CUSTOM);
+	CHECK(lib_rec_at(slot, aw)->flags & LIB_F_SAVE);
+	CHECK_EQ(lib_nth(slot, LIB_GBA, lib_hdr(slot)->counts[LIB_GBA] - 1), aw);
+	CHECK(lib_rename_shown(slot, put, aw, "AAA.gba", NULL, &scratch));
+	CHECK(!strcmp(lib_display(slot, aw), "AAA"));
+	CHECK(!(lib_rec_at(slot, aw)->flags & LIB_F_CUSTOM));
+	CHECK_EQ(lib_nth(slot, LIB_GBA, 1), aw);
 	// A rename keeps the order sorted
 	for (u32 c = 0; c < LIB_CONSOLES; c++)
 		for (u32 n = 1; n < lib_hdr(slot)->counts[c]; n++)

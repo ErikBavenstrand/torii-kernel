@@ -49,6 +49,8 @@
 # waits for its game popup ("screen ready: game-popup"), later @N count from
 # it. nav_game_delete PLACE ROW: the popup's Delete (UP wraps to it, the
 # last item), asked, and Delete answered (RIGHT, A): "delete: PATH" is logged.
+# nav_game_rename PLACE ROW: the popup's Rename (UP three times wraps to it
+# on a GBA game), waiting for the keyboard ("screen ready: rename").
 #
 # The NOR page's (B15), each from power-on through nav_to nor:
 #   nav_nor_game INDEX         the cursor on game INDEX (0 the first written),
@@ -216,6 +218,17 @@ nav_game_menu() {
     return 1
   }
   printf '%s\n' "$(_nav_keys $((16 + 8 * row)) START)" '-w "screen ready: game-popup"' >>"${to#-i }"
+  printf '%s\n' "$to"
+}
+
+nav_game_rename() {
+  local to
+  to=$(nav_game_menu "$@") || {
+    printf '%s\n' "$to"
+    return 1
+  }
+  _nav_keys 12 UP UP UP A >>"${to#-i }"
+  printf '%s\n' '-w "screen ready: rename"' >>"${to#-i }"
   printf '%s\n' "$to"
 }
 

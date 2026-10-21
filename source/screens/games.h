@@ -10,8 +10,8 @@
 // Keys: UP/DOWN move, L/R page by a screenful, LEFT/RIGHT jump to the
 // previous or next first letter with the letter card (A-Z lists only), A
 // plays (with the addons Settings turns on; L held: a hard reset), START
-// opens the game popup (Play, Favourite, Clean boot, Boot with addon, Game
-// info, Delete), B goes back home. SELECT does nothing (T8).
+// opens the game popup (Play, Favourite, Clean boot, Boot with addon,
+// Rename, Game info, Delete), B goes back home. SELECT does nothing (T8).
 #ifndef TORII_SCREENS_GAMES_H
 #define TORII_SCREENS_GAMES_H
 

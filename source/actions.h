@@ -65,6 +65,42 @@ int action_set_save_type(const char *path, u32 save_type);
 // Recent, the favourites and the library index. 1 if it was deleted, or wasn't on the card.
 int action_delete_file(const char *path);
 
+// What action_rename_file did
+enum {
+	ACTION_RENAMED,            // the file and its other files have the new name
+	ACTION_RENAME_TAKEN,       // another file in its folder has that name
+	ACTION_RENAME_BAD,         // a name the card can't take (\/:*?"<>|, too long), or a folder
+	ACTION_RENAME_HIDDEN,      // a name starting with '.', which the menu hides
+	ACTION_RENAME_SIDE_TAKEN,  // a save (or save type, save states, cheats, art) under the new
+				   // name is there already, another game's: nothing renamed
+	ACTION_RENAME_PENDING,     // a save (its own, or one under the new name) still waits to be
+				   // copied from the cart: nothing renamed
+	ACTION_RENAME_SHARED,      // another game in the library uses its save: nothing renamed
+	ACTION_RENAME_FAILED,      // the card refused: nothing renamed
+	ACTION_RENAME_PARTLY,      // renamed, but one of its other files or lists didn't follow (logged)
+};
+// Renames the file at path (a full path) to new_name in its folder (a file
+// name, the extension and so the console kept). A game's save, save type,
+// save states, cheats, patch cache and custom art move with it, and its
+// custom name, Recent, the favourites and the library index follow it. It
+// asks nothing.
+u32 action_rename_file(const char *path, const char *new_name);
+// After ACTION_RENAME_SIDE_TAKEN: which of the game's files was in the way
+enum {
+	ACTION_FILE_SAVE,
+	ACTION_FILE_SAVE_TYPE,
+	ACTION_FILE_STATES,
+	ACTION_FILE_CHEATS,
+	ACTION_FILE_PATCH,  // never: a stale patch cache is replaced
+	ACTION_FILE_ART,
+	ACTION_FILES,
+};
+u32 action_rename_taken(void);
+// At boot, before the library or a launch reads the card: a rename the
+// power cut short (its journal, /torii/rename.txt) is finished, or undone
+// if the game's file hadn't moved, and the journal goes.
+void action_rename_recover(void);
+
 // The game NOR's list, read into pNorFS and game_total_NOR (writes nothing)
 void action_nor_read(void);
 // Starts the game NOR's game index (from the list action_nor_read read).

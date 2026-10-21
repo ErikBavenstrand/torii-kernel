@@ -77,7 +77,8 @@ grep -q "box art: 1 files listed" "$cart/1.log" || fail "the art wasn't listed o
 echo "PASS: matched art by GBA game code shows, and again from the cache on the next visit"
 
 # A broken art file (no cover's size) by CRC: the placeholder stays, the
-# error is logged, and the next game's cover still loads
+# error is logged, and the next game's cover still loads (both lines, in
+# either order: the run goes on past the first)
 new_cart broken
 printf '%s\t-\t3248\t-\t/Zed.gba\n' "$crc" >"$cart/crc.txt"
 mcopy -i "$cart/sd.img" "$cart/crc.txt" ::/torii/crc.txt
@@ -87,7 +88,7 @@ mcopy -i "$cart/sd.img" "$cart/short.bin" "::/torii/art/$crc.bin"
 mmd -i "$cart/sd.img" ::/torii/art/custom
 mcopy -i "$cart/sd.img" tests/shots/data/art-night.bin ::/torii/art/custom/Code.gba.bin
 # shellcheck disable=SC2046 # nav.sh's options
-boot "$cart/2.log" $(nav_game gba 1) -k @90:UP -k @94:- -u "shown" -f 3000
+boot "$cart/2.log" $(nav_game gba 1) -k @90:UP -k @94:- -f 900
 grep -q "kernel error: engine: cover $(id 2 "0x$crc"): the file is shorter than its header says" "$cart/2.log" ||
   fail "the broken file's error wasn't logged: $(grep 'error' "$cart/2.log" | head -3)"
 ! grep -q "box art: cover $(id 2 "0x$crc") shown" "$cart/2.log" || fail "the broken file showed"

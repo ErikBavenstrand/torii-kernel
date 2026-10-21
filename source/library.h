@@ -268,6 +268,11 @@ int lib_forget(u8 *slot, lib_put_fn put, u32 rec);
 // Returns 0 if the pool is full or the new name has no console (then the
 // caller rescans).
 int lib_rename(u8 *slot, lib_put_fn put, u32 rec, const char *new_name, struct lib_build *scratch);
+// The same with a display name: display shows (a custom name, LIB_F_CUSTOM)
+// in place of new_name's cleaned one. new_name may be the record's own name
+// (a game renamed in names.txt, its file left alone).
+int lib_rename_shown(u8 *slot, lib_put_fn put, u32 rec, const char *new_name, const char *display,
+		     struct lib_build *scratch);
 
 // --- The kernel's index (library_scan.c) --------------------------------------
 //
@@ -343,6 +348,10 @@ u32 library_records(void);
 // a walk then writes it.
 void library_forget(const char *path);
 void library_renamed(const char *old_path, const char *new_name);
+// A game's display name changed (Rename in a game list, written to
+// /torii/names.txt): display, or with NULL its cleaned name; its list
+// re-sorts at once, and a walk then writes the index.
+void library_named(const char *path, const char *display);
 // Something else on the card changed that the lists sort by (a custom name
 // written to /torii/names.txt): a walk follows, and rebuilds.
 void library_changed(void);

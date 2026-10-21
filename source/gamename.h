@@ -139,6 +139,21 @@ int gamename_custom_store(const struct gamename_custom *c, const struct gamename
 int gamename_custom_store_move(const struct gamename_custom *c, const struct gamename_io *io, const char *old_path,
 			       const char *new_path, char *out, u32 cap);
 
+// --- The kernel's names file (gamename_store.c) ------------------------------
+//
+// Rename's writes of /torii/names.txt, through safefile.h's two copies. They
+// read the file first (PSRAM_NAMES_TEXT_BYTES at most, GAMENAME_CUSTOM_MAX
+// names) and write nothing when it can't be read whole. They borrow
+// pReadCache (READCACHE_NAMES) and PSRAM within the call; call them where
+// FatFs calls may run.
+
+// Sets path's name (a path from the card's root), or removes it (name
+// NULL): 1 once written.
+int gamename_store_set(const char *path, const char *name);
+// A file renamed from old_path to new_path keeps its name: 1 once written,
+// or when old_path has none.
+int gamename_store_move(const char *old_path, const char *new_path);
+
 // --- The display name --------------------------------------------------------
 
 enum gamename_source {

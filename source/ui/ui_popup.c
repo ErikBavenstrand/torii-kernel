@@ -1177,7 +1177,20 @@ int ui_confirm(u8 hints, const struct ui_confirm *confirm)
 	s16 rect[4];
 	card_rect(look.conf_x, look.conf_y, look.conf_w, look.conf_h, rect);
 	run_spec(&pp.conf, "confirm", UI_CONFIRM, rect);
+	u8 quiet = res_errors_quiet;
+	res_errors_quiet = pp.over_popup ? 1 : quiet;  // a first try that may not fit
 	struct ui_view *v = ui_push(&pp.conf.view_spec, 0);
+	res_errors_quiet = quiet;
+	if (!v && pp.over_popup) {
+		// No room beside the popup (a tall one on a page whose tiles fill
+		// block 0): the popup goes first, and the answer comes back to the
+		// page, not to it
+		tlog("confirm: no room over the popup: it closes first");
+		ui_popup_close();
+		pp.over_popup = 0;
+		run_spec(&pp.conf, "confirm", UI_CONFIRM, rect);
+		v = ui_push(&pp.conf.view_spec, 0);
+	}
 	if (!v) {
 		tlog_error("confirm: %s", ui_error());
 		return 0;

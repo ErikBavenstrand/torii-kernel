@@ -788,3 +788,65 @@ void ui_storage_set(u8 node, const u32 *parts, u32 count, u32 total)
 }
 
 const struct ui_ops ui_storage_ops = {sizeof(struct storage_state), storage_measure, storage_init, 0, 0, storage_draw};
+
+// --- Canvas ----------------------------------------------------------------------
+
+struct canvas_state {
+	struct paint paint;
+	u8 painted;  // bit s: set s has been painted
+};
+
+static int canvas_measure(u8 node, struct engine_budget *need)
+{
+	const struct ui_canvas_config *c = ui_node_spec(node)->data;
+	if (!c || !c->paint) {
+		ui_set_error("view %s: a canvas needs its paint", ui_node_view(node)->spec->name);
+		return 0;
+	}
+	return measure_tiles(node, need, 2u * (u32)(ui_node(node)->w / 8));
+}
+
+static int canvas_init(u8 node)
+{
+	struct canvas_state *st = ui_node_state(node);
+	st->painted = 0;
+	return paint_init(node, &st->paint, 0, (u32)ui_node(node)->w / 8, 2);
+}
+
+static void canvas_draw(u8 node)
+{
+	struct canvas_state *st = ui_node_state(node);
+	struct ui_node *n = ui_node(node);
+	if (n->flags & UI_N_HIDDEN) {
+		if (!paint_hide(node, &st->paint, 0))
+			ui_dirty(node, 0xFF);
+		return;
+	}
+	struct text_window win;
+	u32 set;
+	if (!paint_begin(node, &st->paint, &win, &set)) {
+		ui_dirty(node, 0xFF);
+		return;
+	}
+	const struct ui_canvas_config *c = ui_node_spec(node)->data;
+	int fresh = !(st->painted >> set & 1);
+	// A whole paint that would pass the frame's budget waits for the next
+	// frame (a first draw then takes two, as a list's rows may)
+	if (fresh && !ui_draw_room(c->cycles, UI_DRAW_BUDGET)) {
+		ui_dirty(node, 0xFF);
+		return;
+	}
+	if (fresh)
+		text_clear(&win, 0, 0, (u32)n->w, (u32)n->h, ui_paper(node, UI_ROLE_NONE));
+	c->paint(ui_node_view(node)->ctx, node, &win, set, fresh);
+	st->painted |= (u8)(1u << set);
+	if (!paint_end(node, &st->paint, set, UI_BANK_NORMAL))
+		ui_dirty(node, 0xFF);
+}
+
+void ui_canvas_redraw(u8 node)
+{
+	ui_dirty(node, 0xFF);
+}
+
+const struct ui_ops ui_canvas_ops = {sizeof(struct canvas_state), canvas_measure, canvas_init, 0, 0, canvas_draw};
