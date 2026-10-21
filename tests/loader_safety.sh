@@ -8,8 +8,8 @@
 # and a write there stops the emulator with status 76.
 #
 # Every path that erases or programs the kernel NOR runs here, each on its own
-# cart, with logging on: the boot's NOR list migration, settings saves
-# (settings_commit, SKIP until B16's Settings page), the
+# cart, with logging on: the boot's NOR list migration, the Settings page's
+# saves (settings_commit), the
 # pending-save record and its clearing, WRITE TO NOR, delete latest,
 # FORMAT ALL, Diagnostics, power cuts in the middle of those writes and the boot after
 # them, and the same writes on the other kernel NOR chip (S29GL064A, buffered
@@ -128,9 +128,7 @@ logged() { [ $ok = 0 ] || grep -qF -- "$1" "$log" || bad "power-on $runs didn't 
 # (actions.c) from frame 200 (logging slows the boot), Test.gba launched with SAVE TYPE Flash 128K, and Diagnostics
 # from L+R+SELECT at power-on with its questions skipped; and through the
 # NOR page's keys, delete latest (the popup's Delete on B.gba, then Delete)
-# and FORMAT ALL (Format all, then Format), each also answered no. The
-# Settings page's saves come back with B16: until then their cases say SKIP
-# (the settings sector's write still runs, from a first WRITE TO NOR).
+# and FORMAT ALL (Format all, then Format), each also answered no.
 write_a=$(nav_file /A.gba 0 nor)
 write_b=$(nav_file /B.gba 1 nor)
 write_addon=$(nav_file /A.gba 0 nor-addon)
@@ -147,6 +145,30 @@ diag="$diag_start $(for f in $(seq 2000 24 4400); do printf -- '-k %d:START -k %
 # Diagnostics with its questions answered yes, A every 24 frames: the rumble
 # step sets the ROM page to PSRAM and back.
 diag_rumble="$diag_start $(for f in $(seq 2000 24 3600); do printf -- '-k %d:A -k %d:- ' "$f" $((f + 4)); done)"
+
+# The Settings page's saves: it writes the kernel NOR (settings_commit,
+# through Save_info) once as B leaves it, if a value changed. Each sequence
+# goes to a row, edits it (A, RIGHT, A) and leaves, waiting for home.
+home=$(_nav_file '-w "nav: home ready"')
+# Auto save turned over
+save_setting="$(nav_setting auto-save) $(nav_press A RIGHT A B) $home"
+# THEME set to Light, DIM to its next preset (1 minute)
+save_theme="$(nav_setting theme) $(nav_press A RIGHT A B) $home"
+save_dim="$(nav_setting dim) $(nav_press A RIGHT A B) $home"
+# Auto save turned over COUNT times, then the page left: toggles it COUNT times
+toggles() {
+  local keys=() i
+  for ((i = 0; i < $1; i++)); do keys+=(A RIGHT A); done
+  echo "$(nav_setting auto-save) $(nav_press "${keys[@]}" B) $home"
+}
+toggles5=$(toggles 5)
+toggles2=$(toggles 2)
+# The page opened and left, nothing changed
+settings_out="$(nav_to settings) $(nav_press B) $home"
+# slot SLOT: a settings slot's value, as the kernel NOR holds it
+slot() {
+  od -An -tu2 -j $((0x7B0000 + 2 * $1)) -N 2 "$cart/kernel-nor.bin" | tr -d ' '
+}
 
 # older_list: the official kernel's NOR list (no trailer, no copy B) with
 # A.gba at 0 in the game NOR, as on a cart coming from EZ-Flash's 1.06
@@ -177,7 +199,54 @@ EOF
   # The Settings page's saves (settings_commit through Save_info): once per
   # visit, only for a change, and kept after a power-on
   if shard_case; then
-    echo "SKIP (waiting for B16): settings saves on the Settings page"
+    new_cart settings
+    boot $save_setting
+    logged "nor: wrote the settings"
+    pass "a settings save"
+  fi
+
+  if shard_case; then
+    new_cart settings-theme
+    boot $save_theme
+    logged "nor: wrote the settings"
+    [ "$(slot 28)" = 1 ] || bad "THEME wasn't saved: slot 28 holds $(slot 28)"
+    [ "$(slot 26)" = 2 ] || bad "the save lost LOGGING: slot 26 holds $(slot 26)"
+    [ "$(slot 27)" = 65535 ] || bad "DIM was written: slot 27 holds $(slot 27)"
+    [ "$(slot 29)" = 65535 ] || bad "slot 29 (ACCENT until v0.4) was written: it holds $(slot 29)"
+    boot -f 200
+    [ "$(slot 28)" = 1 ] || bad "THEME didn't survive a power-on: slot 28 holds $(slot 28)"
+    pass "a THEME save, kept after a power-on"
+  fi
+
+  if shard_case; then
+    new_cart settings-dim
+    boot $save_dim
+    logged "nor: wrote the settings"
+    [ "$(slot 27)" = 1 ] || bad "DIM wasn't saved as 1 minute: slot 27 holds $(slot 27)"
+    [ "$(slot 28)" = 65535 ] || bad "THEME was written: slot 28 holds $(slot 28)"
+    [ "$(slot 29)" = 65535 ] || bad "slot 29 (ACCENT until v0.4) was written: it holds $(slot 29)"
+    pass "a DIM save writes only its slot"
+  fi
+
+  # Five changes on the page write the kernel NOR once, as it closes
+  # (v0.3.2: each save erased the sector); changes that cancel out, and the
+  # page left without a change, don't write it
+  if shard_case; then
+    new_cart settings-once
+    boot $toggles5
+    logged "nor: wrote the settings"
+    [ $ok = 0 ] || [ "$(grep -c 'nor: wrote the settings' "$log")" = 1 ] ||
+      bad "five changes wrote the settings $(grep -c 'nor: wrote the settings' "$log") times"
+    auto=$(slot 14)
+    [ "$auto" != 65535 ] || bad "AUTO SAVE wasn't saved: slot 14 holds $auto"
+    boot $toggles2
+    logged "settings: staged"
+    [ $ok = 0 ] || ! grep -q 'nor: wrote the settings' "$log" || bad "two changes that cancel out wrote the settings"
+    [ "$(slot 14)" = "$auto" ] || bad "AUTO SAVE changed: slot 14 holds $(slot 14), not $auto"
+    boot $settings_out
+    logged "screen ready: settings"
+    [ $ok = 0 ] || ! grep -q 'nor: wrote the settings' "$log" || bad "the page left without a change wrote the settings"
+    pass "the Settings page writes the kernel NOR once as it closes, and only for a change"
   fi
 
   if shard_case; then
@@ -303,6 +372,8 @@ EOF
     logged "nor: saving an older kernel's list of 1 games"
     boot -g $write_b -f 900
     logged "nor: list saved, 2 games"
+    boot -g $save_setting
+    logged "nor: wrote the settings"
     boot -g $launch -f 700
     logged "nor: wrote the pending-save record"
     pass "the same writes on the S29GL064A"
@@ -364,7 +435,10 @@ EOF
     fi
 
     if shard_case; then
-      echo "SKIP (waiting for B16): a power cut at $cut in a settings save"
+      new_cart "cut-settings-${cut//:/-}"
+      boot -c "$cut" $save_setting
+      boot -f 200
+      pass "a power cut at $cut in a settings save, and the boot after it"
     fi
   done
 }

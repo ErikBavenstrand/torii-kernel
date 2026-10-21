@@ -153,4 +153,4 @@ static int reading_fetch(void *ctx, u32 i, struct ui_item *out)
 	return UI_ITEM_READY;
 }
 
-const struct ui_list_model ui_reading_model = {reading_count, reading_fetch, 0};
+const struct ui_list_model ui_reading_model = {reading_count, reading_fetch, 0, 0, 0};

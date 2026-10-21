@@ -347,12 +347,24 @@ const char *settings_label(const struct settings_values *v, u32 id)
 
 const char *settings_explain(const struct settings_values *v, u32 id)
 {
+	if (id == SET_RESET_ON && (settings_get(v, SET_RTS) || settings_get(v, SET_CHEATS)))
+		return gl_set_explain[SET_LABEL_RESET_ARMED];
 	return id < SET_ROWS ? gl_set_explain[label_of(v, id)] : "";
 }
 
 int settings_clock_24h(const struct settings_values *v)
 {
 	return settings_get(v, SET_CLOCK_24H) != 0;
+}
+
+// s into out (size bytes), cut to fit: snprintf's "%s" without its cost
+// (the Settings page draws values every row)
+static void copy_text(char *out, u32 size, const char *s)
+{
+	u32 n = 0;
+	for (; n + 1 < size && s[n]; n++)
+		out[n] = s[n];
+	out[n] = 0;
 }
 
 void settings_value_text(const struct settings_values *v, u32 id, char *out, u32 size)
@@ -366,19 +378,19 @@ void settings_value_text(const struct settings_values *v, u32 id, char *out, u32
 	u16 value = settings_get(v, id);
 	switch (r->kind) {
 	case SET_CHOICE:
-		snprintf(out, size, "%s", id == SET_LANGUAGE ? lang_packs[value].name : (*r->options)[value]);
+		copy_text(out, size, id == SET_LANGUAGE ? lang_packs[value].name : (*r->options)[value]);
 		break;
 	case SET_COLOUR:
-		snprintf(out, size, "%s", (*r->options)[value]);
+		copy_text(out, size, (*r->options)[value]);
 		break;
 	case SET_ONOFF:
-		snprintf(out, size, "%s", gl_set_onoff[value]);
+		copy_text(out, size, gl_set_onoff[value]);
 		break;
 	case SET_NUMBER:
 		if (value)
 			snprintf(out, size, "%u %s", (unsigned)value, gl_set_minutes);
 		else
-			snprintf(out, size, "%s", gl_set_onoff[0]);
+			copy_text(out, size, gl_set_onoff[0]);
 		break;
 	case SET_TIME:
 		settings_format_time(out, size, v->clock.hour, v->clock.minute, settings_clock_24h(v));

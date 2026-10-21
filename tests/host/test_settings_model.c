@@ -345,6 +345,16 @@ void test_settings_hotkeys(void)
 	CHECK(!strcmp(settings_explain(&v, SET_RESET_KEYS), gl_set_explain[SET_LABEL_LOAD_KEYS]));
 	settings_set(&v, SET_SLEEP_ON, 1);
 	CHECK(!strcmp(settings_label(&v, SET_SLEEP_KEYS), "Sleep keys"));
+	// Save states, or Cheats, arm the reset keys whatever Reset hotkey says
+	// (GBApatch.c): its explanation says so while either is on
+	erased();
+	CHECK(!strcmp(settings_explain(&v, SET_RESET_ON), gl_set_explain[SET_RESET_ON]));
+	settings_set(&v, SET_RTS, 1);
+	CHECK(!strcmp(settings_explain(&v, SET_RESET_ON), gl_set_explain[SET_LABEL_RESET_ARMED]));
+	CHECK(!strcmp(settings_label(&v, SET_RESET_ON), "Reset hotkey"));
+	settings_set(&v, SET_RTS, 0);
+	settings_set(&v, SET_CHEATS, 1);
+	CHECK(!strcmp(settings_explain(&v, SET_RESET_ON), gl_set_explain[SET_LABEL_RESET_ARMED]));
 }
 
 void test_settings_visible_rows(void)

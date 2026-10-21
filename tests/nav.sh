@@ -265,7 +265,34 @@ nav_nor_format_page() {
   _nav_file "$(_nav_nor_to 0)" "$(_nav_keys 8 UP)" '-w "nor: row format"' "$(_nav_keys 8 A)" "$answer"
 }
 
-nav_setting() { _nav_fail "the Settings page's rows come with B16 (nav_setting $*)"; }
+# nav_setting ROW: from power-on to the Settings page with ROW selected,
+# waiting there. ROW is a row of source/settings_model.h, in page order
+# (_nav_setting_rows); with NAV_LED_OFF=1 the LED colours are hidden, as
+# the page hides them while the LED is off.
+_nav_setting_rows=(theme game-view start-on dim time date 24h game-clock fast-patching auto-save save-states
+  cheats rumble mode-b led led-colour sd-light reset-hotkey reset-keys sleep sleep-keys rescan identify show-all logging)
+nav_setting() {
+  local want=$1 id=0 steps=0 word keys=()
+  for word in "${_nav_setting_rows[@]}"; do
+    [ "$word" = "$want" ] && break
+    id=$((id + 1))
+    case $word in led-colour | sd-light) [ "${NAV_LED_OFF:-0}" = 1 ] && continue ;; esac
+    steps=$((steps + 1))
+  done
+  if [ $id = ${#_nav_setting_rows[@]} ]; then
+    _nav_fail "no Settings row $want"
+    return 1
+  fi
+  nav_to settings || return 1
+  [ $steps = 0 ] && return 0
+  for (( ; steps > 0; steps--)); do keys+=(DOWN); done
+  # The row's enum settings_id, as the page logs it
+  _nav_file "$(_nav_keys 8 "${keys[@]}")" "-w \"settings: row $id\""
+}
+
+# nav_press KEY...: presses the keys 8 frames apart, from 8 frames after
+# the last wait (a KEY of mgba-shot's -k, as A or L+R)
+nav_press() { _nav_file "$(_nav_keys 8 "$@")"; }
 
 # nav_info_page PAGE: from power-on to one of the Info page's rows opened
 # (source/screens/info.c), waiting there: controls, ingame, cart or about

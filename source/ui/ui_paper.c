@@ -449,6 +449,7 @@ struct hints_state {
 	const struct ui_hint *hints;
 	const char *text;  // in place of the chips, NULL none
 	u8 count;
+	struct ui_hint_note note;  // the text's look
 };
 
 static int hints_measure(u8 node, struct engine_budget *need)
@@ -491,9 +492,24 @@ static void hints_draw(u8 node)
 	text_clear(&win, 0, 0, w, (u32)n->h, ui_paper(node, UI_ROLE_NONE));
 	if (top + l->hint_chip_h <= (u32)n->h && w > 2 * margin) {
 		if (st->text) {
+			// The line centred, after its bar if it has one
 			const struct torii_font *font = ui_theme()->body;
-			draw_text(&win, font, margin, text_top(font, top, l->hint_chip_h), w - 2 * margin, UI_ROLE_DIM,
-				  st->text);
+			const struct ui_hint_note *nt = &st->note;
+			struct text_line line;
+			u32 room = w - 2 * margin, bar = nt->bar_w ? nt->bar_w + nt->bar_gap : 0u;
+			text_layout(font, st->text, strlen(st->text), room > bar + 8 ? room - bar : 8, &line);
+			u32 total = bar + line.extent, x = margin + (total < room ? (room - total) / 2 : 0);
+			if (nt->bar_w) {
+				u32 bh = nt->bar_h < l->hint_chip_h ? nt->bar_h : l->hint_chip_h;
+				u32 by = top + (l->hint_chip_h - bh) / 2;
+				round_bar(&win, x, by, nt->bar_w, bh, nt->bar_r, UI_ROLE_TRACK, 0, w);
+				if (nt->fill)
+					round_bar(&win, x, by, nt->bar_w, bh, nt->bar_r, UI_ROLE_ACCENT, 0,
+						  x + (nt->fill < nt->bar_w ? nt->fill : nt->bar_w));
+				x += bar;
+			}
+			text_draw_line(&win, font, x, text_top(font, top, l->hint_chip_h),
+				       nt->ink ? nt->ink : UI_ROLE_DIM, &line);
 		} else {
 			// From the right edge in: the hints' widths first
 			u32 count = st->count < l->hint_max ? st->count : l->hint_max, total = 0;
@@ -520,8 +536,17 @@ void ui_hints_set(u8 node, const struct ui_hint *hints, u32 count)
 
 void ui_hints_text(u8 node, const char *text)
 {
+	ui_hints_note(node, text, 0);
+}
+
+void ui_hints_note(u8 node, const char *text, const struct ui_hint_note *note)
+{
 	struct hints_state *st = ui_node_state(node);
 	st->text = text;
+	if (note)
+		st->note = *note;
+	else
+		memset(&st->note, 0, sizeof(st->note));
 	ui_dirty(node, 0xFF);
 }
 

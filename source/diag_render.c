@@ -160,7 +160,7 @@ static int demo_fetch(void *ctx, u32 i, struct ui_item *out)
 	return UI_ITEM_READY;
 }
 
-static const struct ui_list_model demo_model = {demo_count, demo_fetch, 0};
+static const struct ui_list_model demo_model = {demo_count, demo_fetch, 0, 0, 0};
 static const struct ui_label_config demo_title = {"Renderer demo", UI_FONT_HEADING, UI_ALIGN_LEFT, 0, 0};
 static const struct ui_list_config demo_list = {&demo_model, 16, 0, 40, 0};
 

@@ -153,7 +153,7 @@ static int model_fetch(void *ctx, u32 i, struct ui_item *out)
 	return UI_ITEM_READY;
 }
 
-static const struct ui_list_model model = {model_count, model_fetch, 0};
+static const struct ui_list_model model = {model_count, model_fetch, 0, 0, 0};
 
 // --- The layout -------------------------------------------------------------------
 
@@ -876,4 +876,4 @@ static void sd_poll(void)
 	}
 }
 
-const struct nav_page sdcard_page = {sd_enter, sd_row, 0, sd_poll};
+const struct nav_page sdcard_page = {sd_enter, sd_row, 0, sd_poll, 0};

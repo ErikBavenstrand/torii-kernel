@@ -16,6 +16,7 @@
 #include "info.h"
 #include "nor.h"
 #include "sdcard.h"
+#include "settings_page.h"
 #include "../actions.h"
 #include "../ezkernel.h"
 #include "../Ezcard_OP.h"
@@ -237,14 +238,21 @@ static void empty_clock(const char *text)
 		ui_title_set_right((u8)(nav.page_first + P_TITLE), text);
 }
 
-static const struct nav_page empty_page = {empty_enter, 0, empty_clock, 0};
+static const struct nav_page empty_page = {empty_enter, 0, empty_clock, 0, 0};
 
 // Each item's page: a page ticket puts its own here
 static const struct nav_page *const pages[NAV_ITEMS] = {
 	[NAV_RECENT] = &empty_page, [NAV_FAV] = &empty_page, [NAV_GBA] = &empty_page, [NAV_GBC] = &empty_page,
 	[NAV_GB] = &empty_page,     [NAV_NES] = &empty_page, [NAV_SD] = &sdcard_page, [NAV_NOR] = &nor_page,
-	[NAV_SET] = &empty_page,    [NAV_INFO] = &info_page,
+	[NAV_SET] = &settings_page, [NAV_INFO] = &info_page,
 };
+
+// The page up is about to be left (nav_page.leave)
+static void page_leave(void)
+{
+	if (nav.place.open && pages[nav.place.item]->leave)
+		pages[nav.place.item]->leave();
+}
 
 // --- The clock ------------------------------------------------------------------
 
@@ -351,6 +359,7 @@ static void show(const struct registry_place *p, u32 kind, s32 way)
 {
 	if (nav.engine)
 		ui_leave(kind, way);  // before the slow reads, so a key answers at once
+	page_leave();     // the page going keeps what it holds (Settings: a NOR write)
 	read_settings();  // the clock's hours, as Settings may have changed them
 	count_items();
 	engine_enter();
@@ -461,6 +470,7 @@ static void test_hook(void)
 	u32 action = word & 0xFF, save = (word >> 8) & 0xFF, hard = (word >> 16) & 1;
 	nav_test_path[USERDATA_PATH_MAX - 1] = 0;
 	tlog("nav: test hook %lu %s", (unsigned long)action, nav_test_path);
+	page_leave();  // a launch may leave the engine
 	remember();
 	readcache_poison();
 	switch (action) {

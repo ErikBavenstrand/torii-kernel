@@ -1,0 +1,6 @@
+# The Settings page opened by Last place at boot on Sleep keys, a heavy row
+# (key chips) near the page's end: its hidden first draw (nav-screen) keeps
+# its margin under a frame (tests/perf/budget.txt).
+#! sd-file /torii/recent.txt 0 tests/shots/data/boot-settings.txt
+-w "nav: page settings ready"
+-s @2:screen.png

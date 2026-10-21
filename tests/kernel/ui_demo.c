@@ -126,7 +126,7 @@ static int demo_fetch(void *ctx, u32 i, struct ui_item *out)
 	return UI_ITEM_READY;
 }
 
-static const struct ui_list_model demo_model = {demo_count, demo_fetch, 0};
+static const struct ui_list_model demo_model = {demo_count, demo_fetch, 0, 0, 0};
 
 static void measure(const char *name, u32 frames)
 {
@@ -216,7 +216,7 @@ static int settings_fetch(void *ctx, u32 i, struct ui_item *out)
 	return UI_ITEM_READY;
 }
 
-static const struct ui_list_model settings_model = {settings_count, settings_fetch, 0};
+static const struct ui_list_model settings_model = {settings_count, settings_fetch, 0, 0, 0};
 static const struct ui_title_config widgets_title = {"Widgets", "12:34", ART_ICON16_SET};
 static const struct ui_hints_config widgets_hints = {0, 0};
 static const struct ui_list_config settings_list = {&settings_model, UI_ROW_PITCH_SETTINGS, UI_LIST_WRAP, 80, 4};
@@ -383,7 +383,7 @@ static u32 game_letter(void *ctx, u32 i)
 	return letter_of(games[i]);
 }
 
-static const struct ui_list_model games_model = {games_count, games_fetch, 0};
+static const struct ui_list_model games_model = {games_count, games_fetch, 0, 0, 0};
 static const struct ui_title_config popup_title = {"Game Boy Advance", "A-Z", ART_ICON16_GBA};
 static const struct ui_hint popup_hints[] = {
 	{"START", "menu"}, {"A", "more"}, {"\xC2\xAB\xC2\xBB", "letter"}, {"B", "theme"}};

@@ -691,7 +691,7 @@ static int cs_fetch(void *ctx, u32 i, struct ui_item *out)
 	return UI_ITEM_READY;
 }
 
-static const struct ui_list_model cs_model = {cs_count, cs_fetch, 0};
+static const struct ui_list_model cs_model = {cs_count, cs_fetch, 0, 0, 0};
 
 // The nearest entry from line i in direction dir (1 or -1), i included;
 // count if there is none

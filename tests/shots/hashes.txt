@@ -280,7 +280,7 @@ page-empty/frames 12-21 B62B7D8B2814CB3F
 page-empty/frames 22-22 A1CB849A5F1C97D8
 sd-dark/folder DFD4D3341592285D
 sd-dark/root 225FC0C5D082ACA9
-sd-many/end BB72E1C5C486A00C
+sd-many/end EE2CB6E1FAC3923C
 sd-many/root ABB8F464CD451D8C
 sd-root/back 7639FAE28B4FA9BF
 sd-root/confirm 5C09254428F1A147
@@ -297,6 +297,93 @@ sd-root/frames 19-19 26DE9A96260D3839
 sd-root/frames 20-20 98567999AC9BFE75
 sd-root/frames 21-24 4EFA74E715B11C85
 sd-show-all/root 5A2B75D8F32FD93E
+settings/bottom 497D650AB68B1957
+settings/capture 9AC481D4797B7106
+settings/edit DF5864C41278B3B3
+settings/fields 545DF1F086DDEA88
+settings/refused 433810675F66A026
+settings/swatch E4F5BA8F59E48BF4
+settings/top 06F01F61F582B030
+settings/frames 0-1 134C596697AF4A74
+settings/frames 2-2 CF7A1D0A924A7859
+settings/frames 3-3 AC80BF4C4F3695BD
+settings/frames 4-4 FD88B0FD2A5E0E45
+settings/frames 5-5 420A46C72CAF9BE8
+settings/frames 6-6 885F66E8E36626BB
+settings/frames 7-12 F9F77E8A6C49380F
+settings/frames 13-13 06F01F61F582B030
+settings/frames 14-14 AD913B1BFC5B4790
+settings/frames 15-15 F6D78E83E161B254
+settings/frames 16-28 72AE9090B8564A94
+settings/frames 29-29 8726C35522567938
+settings/frames 30-30 C3A233BF87D51E38
+settings/frames 31-32 D79E2518624F74F8
+settings/frames 33-33 05F71DD49FD05F78
+settings/frames 34-34 C49014D0209A5F58
+settings/frames 35-36 90C467666A5E9DD8
+settings/frames 37-37 3E03F4F709BB617C
+settings/frames 38-38 911CF8C247A8CC78
+settings/frames 39-39 6947C76FC39DD995
+settings/frames 40-40 A34823265B2C3372
+settings/frames 41-41 4CFE78388AB2DD57
+settings/frames 42-42 5E3FB754A2CAA8BF
+settings/frames 43-43 BFB0C14447BA0C99
+settings/frames 44-44 9A0F9B299A59088F
+settings/frames 45-45 B5E9DA864926138B
+settings/frames 46-46 22273674E21A9F33
+settings/frames 47-47 2DE8C997D3A7E7AF
+settings/frames 48-48 A276BF86DBFB62D1
+settings/frames 49-49 B692B05DA1193EBE
+settings/frames 50-50 691350EE09187F9B
+settings/frames 51-51 4B026237B183B4C3
+settings/frames 52-52 F7C680AF46B3950D
+settings/frames 53-53 534D9646D4355135
+settings/frames 54-54 CD87B01E35BDD445
+settings/frames 55-55 9A60DBA00E5D9383
+settings/frames 56-56 E4D2A20CC6C2C00D
+settings/frames 57-57 7655C37BB18D5322
+settings/frames 58-58 E9794E582B1C39EE
+settings/frames 59-59 2C766F53262164C1
+settings/frames 60-60 85B8220E83C3A20A
+settings/frames 61-61 4484BACA5D05D86A
+settings/frames 62-62 38751890DABAC2C1
+settings/frames 63-63 B5EEC02D67F2716A
+settings/frames 64-64 1C8B89824AA3A0F3
+settings/frames 65-65 1A7E36A9AF56A28F
+settings/frames 66-66 1ADB8E6F256988DD
+settings/frames 67-67 86315A07FD0593EA
+settings/frames 68-68 F72EC8B0ECE8C383
+settings/frames 69-69 A8CC9C735F07CF9A
+settings/frames 70-70 D8119804C113EFB1
+settings/frames 71-71 5A5D9C21BF49DE57
+settings/frames 72-72 47DA36B711B761FC
+settings/frames 73-73 EAF3F76EB74F121F
+settings/frames 74-74 FACF007AE0127138
+settings/frames 75-75 1B33493CA025A7F1
+settings/frames 76-76 33D702955E4A563A
+settings/frames 77-77 ED5D2818433CF80F
+settings/frames 78-78 BBD3F04FD3A8FED0
+settings/frames 79-79 BDCBB15CC659AB8C
+settings/frames 80-80 33EF1B5EA90E60EA
+settings/frames 81-81 1DA701CCB8AAC449
+settings/frames 82-82 21F7500B9008BB4D
+settings/frames 83-83 77BC6C8299AB9664
+settings/frames 84-84 D56D8E707CDE6CF7
+settings/frames 85-85 56FC4763D96B8BDB
+settings/frames 86-86 D01134AFB3852936
+settings/frames 87-87 C4B03F92B8B659EE
+settings/frames 88-88 1B30636CC8A8FC21
+settings/frames 89-89 D50CE1ACB180BFCC
+settings/frames 90-90 9B0783FEFE5B84FD
+settings/frames 91-91 2D12B3F767A3FC8E
+settings/frames 92-92 6F5CEABCFCC92A4E
+settings/frames 93-93 44267106A0BE1A93
+settings/frames 94-233 497D650AB68B1957
+settings-dark/back 7FDC165A8C8B0D41
+settings-dark/cart 0774128194F409FF
+settings-dark/dim 8EF016283C3E8DCF
+settings-dark/theme E44F8F4A13754C81
+settings-last/screen 14EE21B59161A719
 ui-dialog/closed 942FEA8E68027B47
 ui-dialog/dialog 1EC3EDCC05C5D114
 ui-dialog/frames 0-0 942FEA8E68027B47
@@ -473,9 +560,9 @@ ui-paper/list-light 6907E551DCA443BC
 ui-paper/reading-dark B90386822C5EED99
 ui-paper/reading-light 038F0B55FD89C805
 ui-paper/reading-scrolled 306E2522F0D23624
-ui-paper/widgets-dark 0BB2A81996997CB6
-ui-paper/widgets-light 91BAFF51A9D01A49
-ui-paper/widgets-moved 61879DB421AE0036
+ui-paper/widgets-dark D3D174B82C94CE16
+ui-paper/widgets-light 93021BC6757FA789
+ui-paper/widgets-moved 69C54D68883438B6
 ui-popup/confirm 3C25E081F8CC77DE
 ui-popup/confirm-action 549F30903182D711
 ui-popup/confirm-alone A1E4A7EBF63BDBD2
