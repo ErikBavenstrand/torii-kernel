@@ -1,146 +1,102 @@
-// Cover streaming: cover art from SD (or ROM) into sprites, through a cache
-// of decoded covers in PSRAM (decisions doc, Covers). For T6's widgets and
-// v0.4's carousels.
+// Box art from SD through a cache in PSRAM (decisions doc, Art): a screen
+// says which covers it wants, a job reads them a step at a time into their
+// PSRAM slots, and the screen copies a ready one into its own BG tiles
+// (ui_image_show), straight from PSRAM: covers are made on the PC in the
+// tiles' own format (engine/asset.h), so the GBA decodes nothing.
 //
-// The route: SD, read a few KB a step into PSRAM (engine/sdread.h); one
-// step decodes the cover with the BIOS's LZ77 into the stage (engine/
-// stage.h) and writes it to its PSRAM slot; then a sprite slot that shows
-// it gets sprite tiles and a palette bank, and the VBlank queue copies the
-// tiles from PSRAM (COVER_UPLOADS_PER_FRAME covers a frame at most). Covers
-// are assets (engine/asset.h); where an id's file is, the client says
-// (cover_locate_fn), so the cover format and folder stay v0.4's choice.
+// A cover is an asset of COVER_TILES_W x COVER_TILES_H 4bpp tiles with up
+// to 16 colours, COVER_FILE_BYTES at most. Where an id's file is, the
+// client says (cover_locate_fn): the ids and the card's folders are its
+// (boxart.h).
 //
-// A screen's use:
+// A screen's use, after cover_init:
 //
-//	cover_init(locate, owner);               // after engine_init
-//	each frame, after input and motion:
-//		cover_wants_begin();
-//		cover_want(id, distance) ...      // neighbours, to prefetch
-//		cover_wants_end();
-//		cover_slot_show(slot, id) ...     // what is on screen
-//		cover_update();                   // uploads, states, callbacks
-//		then draw: a slot whose state is COVER_SLOT_READY goes in OAM
-//		with cover_slot_attr0/1/2 (or_ed with position and matrix)
-//	cover_shutdown();                        // when the screen goes
+//	cover_wants_begin();
+//	cover_want(id, distance) ...      // the cursor's at 0, neighbours further
+//	cover_wants_end();                // starts the loader if there is work
+//	...
+//	u8 e = cover_pin(id);             // once READY: its tiles stay put
+//	copy cover_tiles(e) and cover_palette(e) to VRAM (the VBlank queue),
+//	then cover_unpin(e) once the copy has landed (gfx_queue_done)
 //
-// Sprite slots show distance 0 on their own, and their covers are pinned:
-// never evicted while shown. 4bpp covers each get a palette bank (shared by
-// slots showing the same cover). 8bpp covers get none: 8bpp sprites all use
-// the one 256-colour sprite palette, so covers shown together must share a
-// palette, which the screen loads (cover_load_palette8 loads a cover's).
+// The loader is one job of no view's (it lives as long as the cache), which
+// the client may pause (cover_pause_fn) while other SD work goes first: it
+// then starts no new cover, and ends; the next cover_wants_end starts it
+// again. A cover it is reading is finished first.
 //
-// Memory: the cache table, the slots and the loader (with its FIL) take
-// about 1 KB of EWRAM; PSRAM holds COVER_PSRAM_BYTES (engine/psram.h).
-// A game launch overwrites PSRAM: it calls cover_cache_invalidate first.
+// Memory: the cache table and the loader (with its FIL) take about 1 KB of
+// EWRAM; PSRAM holds COVER_PSRAM_BYTES (engine/psram.h). A game launch
+// overwrites PSRAM: it calls cover_cache_invalidate first.
 #ifndef TORII_ENGINE_COVER_H
 #define TORII_ENGINE_COVER_H
 
 #include <gba_base.h>
+#include "asset.h"
 #include "covercache.h"
 
-#define COVER_SLOTS 8
-#define COVER_UPLOADS_PER_FRAME 2
-// Bytes the loader reads per step
-#define COVER_READ_CHUNK 4096
-// A 4bpp cover's palette bank is tagged with this plus its cache entry
-#define COVER_PAL_TAG 0xC000
+#define COVER_TILES_W 10
+#define COVER_TILES_H 10
+#define COVER_TILE_BYTES (COVER_TILES_W * COVER_TILES_H * 32)
+#define COVER_COLOURS 16
+#define COVER_FILE_BYTES (ASSET_HEADER_BYTES + COVER_COLOURS * 2 + COVER_TILE_BYTES)
 #define COVER_PATH_MAX 256
 
-enum {
-	COVER_SRC_NONE = 0,  // the id has no cover
-	COVER_SRC_FILE,  // an asset file on SD, at the path written
-	COVER_SRC_ROM,  // an asset in ROM, word-aligned
-};
-
-struct cover_src {
-	u8 kind;
-	const void *data;  // COVER_SRC_ROM: the asset
-	u32 bytes;  // COVER_SRC_ROM: its size
-};
-
-// Says where id's cover is: a path written into path (size bytes, NUL
-// ended) for COVER_SRC_FILE, or data and bytes for COVER_SRC_ROM. Called
-// from the loader's job step, so it may not call FatFs itself.
-typedef void (*cover_locate_fn)(u32 id, struct cover_src *src, char *path, u32 size);
-// Called when a slot's cover is ready to show (ok) or can't be (not ok).
-typedef void (*cover_ready_fn)(u8 slot, u32 id, int ok);
-
-enum {
-	COVER_SLOT_EMPTY = 0,
-	COVER_SLOT_LOADING,  // in the cache's queue, or being read and decoded
-	COVER_SLOT_UPLOADING,  // tiles queued for VRAM
-	COVER_SLOT_READY,  // in sprite VRAM: show it
-	COVER_SLOT_FAILED,  // no cover, a bad file, or no room in sprite VRAM
-};
+// Writes the path of id's cover into path (size bytes, NUL ended) and
+// returns 1, or 0 if it has none. Called from the loader's job step, so it
+// may not call FatFs itself.
+typedef int (*cover_locate_fn)(u32 id, char *path, u32 size);
+// Nonzero while the loader should start no new cover.
+typedef int (*cover_pause_fn)(void);
 
 // Figures for frame-cycles lines and Diagnostics, since cover_init: the
-// slowest decode step (LZ77 and PSRAM write together), and of its parts
-// the slowest LZ77 decode and PSRAM write; covers decoded. (mGBA's BIOS
-// emulation times LZ77 its own way: the cart's figure is T8's to measure.)
+// slowest loader step (an open, or a read with its PSRAM write), and the
+// covers loaded and refused.
 struct cover_stats {
-	u32 decode_max;
-	u32 lz77_max;
-	u32 write_max;
-	u32 decoded;
+	u32 step_max;
+	u32 loaded;
+	u32 failed;
 };
 extern struct cover_stats cover_stats;
 
-// Empties the cache and the slots. owner is the view the loader job belongs
-// to (jobs_cancel_owner), or JOB_OWNER_NONE.
-void cover_init(cover_locate_fn locate, u8 owner);
-void cover_on_ready(cover_ready_fn ready);
-// Forgets everything without releasing anything, as before cover_init: for
-// when engine_init (or res_init and jobs_init) has reset what the slots and
-// the loader held. Closes the loader's file if open.
+// Empties the cache. pause may be NULL.
+void cover_init(cover_locate_fn locate, cover_pause_fn pause);
+// 1 between cover_init and a reset (cover_reset, cover_cache_invalidate):
+// a client that keeps covers calls cover_init again when it reads 0.
+int cover_active(void);
+// Forgets everything, releasing nothing, as before cover_init; closes the
+// loader's file if open. For when engine_init (jobs_init) has dropped the
+// loader, and for tests.
 void cover_reset(void);
-// Stops the loader (closing its file) and empties every slot, freeing
-// their sprite tiles and palette banks. The cache keeps what it decoded.
-void cover_shutdown(void);
 // PSRAM is about to be overwritten (a game launch): stops the loader
-// (closing its file) and forgets everything as cover_reset does, releasing
-// nothing; cover_init again to stream. Does nothing before cover_init.
+// (closing its file) and forgets everything as cover_reset does. Does
+// nothing before cover_init.
 void cover_cache_invalidate(void);
 
-// 1 while the loader job runs (reading or decoding a cover): other SD jobs
-// (the library walk) wait, since they share FatFs's sector window.
+// 1 while the loader is reading a cover: other SD jobs (the library walk)
+// wait for it.
 int cover_loading(void);
 
 // A batch of wants (see covercache.h): begin, want each id with its
-// distance from the cursor, end (starts the loader if there is work).
+// distance from the cursor, end (starts the loader if there is work and
+// the client doesn't pause it).
 void cover_wants_begin(void);
 void cover_want(u32 id, u16 dist);
 void cover_wants_end(void);
 
-// Shows id in slot (0 to COVER_SLOTS - 1), replacing what it showed; the
-// same id again changes nothing. Returns 0 for a bad slot.
-int cover_slot_show(u8 slot, u32 id);
-// Empties slot, freeing its tiles and palette bank (once its upload, if
-// still queued, has landed).
-void cover_slot_clear(u8 slot);
-u8 cover_slot_state(u8 slot);
-u32 cover_slot_id(u8 slot);
-// For OAM once READY: attribute 0's shape and colour bits (or in y and the
-// affine bits), attribute 1's size bits (or in x and the matrix), attribute
-// 2 whole (tile number and palette bank). 0 for a slot not READY.
-u16 cover_slot_attr0(u8 slot);
-u16 cover_slot_attr1(u8 slot);
-u16 cover_slot_attr2(u8 slot);
-// The cover's size in pixels; 0 for a slot not READY.
-u32 cover_slot_width(u8 slot);
-u32 cover_slot_height(u8 slot);
-
-// Loads the palette of a READY slot's cover into the sprite palette from
-// colour 0 (8bpp covers). 0 if the slot isn't READY.
-int cover_load_palette8(u8 slot);
-
-// Once a frame before drawing: moves slots on (allocating sprite tiles and
-// queueing uploads as their covers are decoded), calls the ready callback,
-// and keeps the loader running while covers are wanted.
-void cover_update(void);
+// Where id stands: COVER_FREE (not in the cache), COVER_WANTED,
+// COVER_LOADING, COVER_READY or COVER_FAILED (no file, or a bad one).
+u8 cover_state(u32 id);
+// Pins id's cover while it is READY, so it is neither evicted nor loaded
+// over: returns its entry, or COVER_NONE. Each pin needs an unpin.
+u8 cover_pin(u32 id);
+void cover_unpin(u8 entry);
+// A pinned entry's tiles (COVER_TILE_BYTES, word-aligned) and palette, in
+// PSRAM, and its colour count (at most COVER_COLOURS).
+const u32 *cover_tiles(u8 entry);
+const u16 *cover_palette(u8 entry);
+u32 cover_colours(u8 entry);
 
 // The cache, for queries and tests.
 const struct cover_cache *cover_cache(void);
-// A cache entry's PSRAM slot.
-u8 *cover_psram_slot(u8 entry);
 
 #endif

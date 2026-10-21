@@ -9,6 +9,7 @@
 const struct settings_row settings_rows[SET_ROWS] = {
 	[SET_THEME] = {SET_SEC_LOOK, SET_CHOICE, assress_theme, 0, 0, 2, &gl_set_themes, 0},
 	[SET_GAME_VIEW] = {SET_SEC_LOOK, SET_CHOICE, assress_game_view, 0, 0, 2, &gl_set_views, 0},
+	[SET_BOX_ART] = {SET_SEC_LOOK, SET_ONOFF, assress_box_art, SET_WITH_ART, 1, 2, 0, 0},
 	[SET_START_ON] = {SET_SEC_LOOK, SET_CHOICE, assress_start_on, 0, SET_START_LAST, SET_STARTS, &gl_set_starts, 0},
 	[SET_DIM] = {SET_SEC_LOOK, SET_NUMBER, assress_dim, 0, 0, 60, 0, 0},
 	[SET_TIME_ROW] = {SET_SEC_CLOCK, SET_TIME, SET_NO_SLOT, 0, 0, 0, 0, 0},
@@ -36,7 +37,7 @@ const struct settings_row settings_rows[SET_ROWS] = {
 };
 
 const struct settings_section_info settings_sections[SET_SECTIONS] = {
-	[SET_SEC_LOOK] = {SET_ICON_LOOK, SET_THEME, 4},
+	[SET_SEC_LOOK] = {SET_ICON_LOOK, SET_THEME, 5},
 	[SET_SEC_CLOCK] = {SET_ICON_CLOCK, SET_TIME_ROW, 4},
 	[SET_SEC_GAMES] = {SET_ICON_GAMES, SET_ENGINE, 4},
 	[SET_SEC_CART] = {SET_ICON_CART, SET_RUMBLE, 5},
@@ -303,6 +304,8 @@ int settings_visible(const struct settings_values *v, u32 id)
 {
 	const struct settings_row *r = row_of(id);
 	if (!r || (r->flags & SET_HIDDEN))
+		return 0;
+	if ((r->flags & SET_WITH_ART) && settings_get(v, SET_GAME_VIEW) != 1)
 		return 0;
 	return !(r->flags & SET_WITH_LED) || settings_get(v, SET_LED);
 }

@@ -40,7 +40,7 @@ void test_ui_pool_and_arenas(void);
 void test_theme_switch_loads_banks(void);
 void test_ui_image_queue_full(void);
 void test_ui_scroll_end(void);
-void test_asset_lz77_decode(void);
+void test_asset_raw(void);
 void test_asset_psram_round_trip(void);
 void test_asset_sd_read(void);
 void test_asset_cover_cache(void);
@@ -54,22 +54,12 @@ void names_bench(void);
 
 // Test assets (asset_data.c, written by tools/asset.py demo)
 #include <gba_base.h>
-struct test_asset {
-	const u32 *data;
-	u32 bytes;
-};
 extern const u32 test_asset_small[];
 extern const u32 test_asset_small_bytes;
 extern const u32 test_asset_small_crc;
-#ifdef TORII_TEST_KERNEL
-#define DEMO_COVERS 8
-extern const struct test_asset demo_covers[DEMO_COVERS];
-#endif
 
 // The asset tests alone, with the cart (tests/assets.sh): returns how many failed.
 int torii_asset_tests(void);
-// The test kernel's cover demo (cover_demo.c), after the asset tests.
-void cover_demo(void) __attribute__((noreturn));
 
 // The test kernel's sheet of the menu's art (art_sheet.c).
 void art_sheet(void) __attribute__((noreturn));

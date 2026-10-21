@@ -49,6 +49,10 @@ EVERYTHING = {LINT, TEST, SIZE, ANALYZE, COMPAT}
 # it, as launching code includes them (only menu code includes the text
 # engine's); nor does lang.c, whose strings it uses.
 NO_COMPAT = {
+    "source/artkey.c",
+    "source/artkey.h",
+    "source/boxart.c",
+    "source/boxart.h",
     "source/charset.c",
     "source/engine/ease_lut.c",
     "source/engine/font.h",
@@ -166,7 +170,12 @@ RULES = [
     (
         ["tools/asset.py"],
         {LINT, TEST_HOST, TEST},
-        "asset converter: test-host checks its test assets, the kernel tests decode them",
+        "asset converter: test-host checks its test assets, the kernel tests read them",
+    ),
+    (
+        ["tools/art.py", "tests/art_test.py", "tests/art/*"],
+        {LINT, TEST_HOST, TEST},
+        "box art converter: test-host runs its tests, the games-art shots show its covers",
     ),
     (
         ["tools/ease_lut.py"],

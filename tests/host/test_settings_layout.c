@@ -42,17 +42,21 @@ void test_settings_layout_slots(void)
 	CHECK_EQ(lay.last[SET_SEC_LOOK], 4);
 	CHECK_EQ(lay.first[SET_SEC_CLOCK], 7);
 	// Each row once, in the model's order, with its section's label before
-	u32 id = 0;
+	// (Box art only in list with art)
+	CHECK_EQ(settings_layout_slot_of(&lay, SET_BOX_ART), SET_LAYOUT_NONE);
+	u32 id = 0, shown = 0;
 	for (u32 s = 0; s < lay.count; s++) {
 		const struct settings_slot *sl = &lay.slot[s];
 		if (sl->kind != SET_SLOT_ROW)
 			continue;
+		if (id == SET_BOX_ART)
+			id++;
 		CHECK_EQ(sl->id, id);
 		CHECK_EQ(sl->section, settings_rows[id].section);
 		CHECK(s >= lay.first[sl->section] && s <= lay.last[sl->section]);
 		CHECK_EQ(lay.slot[lay.first[sl->section] - 1].kind, SET_SLOT_LABEL);
 		CHECK_EQ(settings_layout_slot_of(&lay, id), s);
-		CHECK_EQ(settings_layout_position(&lay, s), id + 1);
+		CHECK_EQ(settings_layout_position(&lay, s), ++shown);
 		id++;
 	}
 	CHECK_EQ(id, SET_LOGGING + 1);  // Language hidden
@@ -63,6 +67,12 @@ void test_settings_layout_slots(void)
 	CHECK_EQ(lay.rows, 23);
 	CHECK_EQ(settings_layout_slot_of(&lay, SET_LED_IDLE), SET_LAYOUT_NONE);
 	CHECK_EQ(settings_layout_slot_of(&lay, SET_RESET_ON), settings_layout_slot_of(&lay, SET_LED) + 3);
+	// List with art shows Box art under Game view
+	settings_set(&v, SET_GAME_VIEW, 1);
+	settings_layout_build(&lay, &v);
+	CHECK_EQ(lay.rows, 24);
+	CHECK_EQ(settings_layout_slot_of(&lay, SET_BOX_ART), settings_layout_slot_of(&lay, SET_GAME_VIEW) + 1);
+	CHECK_EQ(lay.last[SET_SEC_LOOK], 5);
 }
 
 void test_settings_layout_moves(void)

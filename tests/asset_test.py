@@ -5,7 +5,7 @@
 # ///
 """Tests for tools/asset.py's PNG converter, run by `just test-host`: round
 trips, colour reduction, indexed PNGs, the limits it shares with the C
-headers, the LZ77 stream, and determinism; then the menu's art (`asset.py
+headers, the raw tiles, and determinism; then the menu's art (`asset.py
 ui`): the committed C matches assets/ui, the tiles decode back to the
 pictures, and broken pictures are refused."""
 
@@ -48,27 +48,6 @@ def rgb15(c: tuple[int, ...]) -> int:
     return asset.bgr555(c[0], c[1], c[2])
 
 
-def lz77_distances(packed: bytes) -> list[int]:
-    """Every match distance in an LZ77 stream."""
-    size = int.from_bytes(packed[1:4], "little")
-    out, i, dists = 0, 4, []
-    while out < size:
-        flags = packed[i]
-        i += 1
-        for bit in range(8):
-            if out >= size:
-                break
-            if flags & (0x80 >> bit):
-                v = packed[i] << 8 | packed[i + 1]
-                i += 2
-                dists.append((v & 0xFFF) + 1)
-                out += (v >> 12) + 3
-            else:
-                i += 1
-                out += 1
-    return dists
-
-
 class AssetTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -95,7 +74,7 @@ class AssetTest(unittest.TestCase):
 
     def test_limits_come_from_the_headers(self):
         self.assertEqual(asset.TILE_BYTES_MAX, 0x2000)
-        self.assertEqual(asset.FILE_MAX, 0x4000)
+        self.assertEqual(asset.FILE_MAX, 0x2400)
         self.assertEqual(asset.TILES_PER_SIDE_MAX, 32)
 
     def test_round_trip_keeps_every_pixel(self):
@@ -141,8 +120,8 @@ class AssetTest(unittest.TestCase):
             self.assertEqual(len(palette), len(set(palette[1:])) + 1)
             self.assertTrue(all(0 < i < len(palette) for row in rows for i in row))
         # Pinned Pillow, integer maths: the same bytes on every machine
-        self.assertEqual(zlib.crc32(asset.encode_png(path, 4)), 0xBAD66578)
-        self.assertEqual(zlib.crc32(asset.encode_png(path, 4, True)), 0x505E0D19)
+        self.assertEqual(zlib.crc32(asset.encode_png(path, 4)), 0x449C2115)
+        self.assertEqual(zlib.crc32(asset.encode_png(path, 4, True)), 0xF03B2CB6)
         self.assertNotEqual(asset.encode_png(path, 4), asset.encode_png(path, 4, True))
 
     def test_8bpp_takes_255_colours(self):
@@ -177,28 +156,14 @@ class AssetTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "bytes of tiles"):
             asset.encode_png(self.png("big8.png", Image.new("RGB", (128, 72))), 8)
 
-    def test_lz77_round_trip_and_no_distance_1(self):
-        rnd = random.Random(7)
-        samples = [
-            b"",
-            b"\0" * 5000,
-            bytes(rnd.randrange(4) for _ in range(6000)),
-            bytes(rnd.randrange(256) for _ in range(3000)),
-            b"ab" * 2000,
-        ]
-        for data in samples:
-            packed = asset.lz77_compress(data)
-            self.assertEqual(len(packed) % 4, 0)
-            self.assertEqual(asset.lz77_decompress(packed), data)
-            self.assertNotIn(1, lz77_distances(packed))
-
     def test_header_fields(self):
         packed = asset.encode_png(self.png("h.png", self.gradient(16, 24)), 4)
-        magic, bpp, w, h, flags, colours, reserved, lz = struct.unpack_from(
+        magic, bpp, w, h, flags, colours, reserved, size = struct.unpack_from(
             "<4sBBBBHHI", packed
         )
-        self.assertEqual((magic, bpp, w, h, flags, reserved), (b"TAS1", 4, 2, 3, 0, 0))
-        self.assertEqual(len(packed), 16 + (colours * 2 + 3) // 4 * 4 + lz)
+        self.assertEqual((magic, bpp, w, h, flags, reserved), (b"TAS2", 4, 2, 3, 0, 0))
+        self.assertEqual(size, 2 * 3 * 32)  # raw tiles
+        self.assertEqual(len(packed), 16 + (colours * 2 + 3) // 4 * 4 + size)
 
     def test_command_line(self):
         out = self.dir / "w.tas"

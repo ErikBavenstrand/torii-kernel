@@ -254,13 +254,14 @@ compat *filters: build emu-headless
     {{emu_docker}} python3 tests/games.py "$@"
 
 # Build the hardware-free kernel code with tests/host for the host, under ASan and UBSan, and run it;
-# test tools/font.py, tools/asset.py, the palette and the upgrade file's layout
+# test tools/font.py, tools/asset.py, tools/art.py, the palette and the upgrade file's layout
 test-host: emu-image
     {{emu_docker}} tests/host.sh
     @uv run -q tests/font_test.py
     @uv run -q tests/asset_test.py
     @uv run -q tests/image_test.py
     @uv run -q tests/names_db_test.py
+    @uv run -q tests/art_test.py
 
 # Convert docs/design/v0.4/palette.json to C: source/ui/palette.c and palette.h
 # (committed; tests/host.sh checks they match), then `just shots-update` for the screens
@@ -332,6 +333,13 @@ _cart-copy mode +files:
 [positional-arguments]
 names-update sd_path *args:
     uv run -q tools/names_db.py update "$@"
+
+# Make custom box art for a game from any picture (PNG, JPEG...) on an SD card, e.g.
+# `just art-add "Pokemon Prism.gbc" ~/prism.jpg /Volumes/OMEGA`: /torii/art/custom/NAME.bin,
+# cropped to a square, 80x80, 15 colours dithered. --align and --preview: see --help
+[positional-arguments]
+art-add rom image sd_path *args:
+    uv run -q tools/art.py add "$@"
 
 # Copy games (files or whole folders) into roms/ and list them in roms/games.toml, e.g. `just game-add ~/roms`
 [positional-arguments]

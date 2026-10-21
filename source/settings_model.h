@@ -57,6 +57,7 @@ enum settings_id {
 	// Look
 	SET_THEME,      // 0 dark, 1 light
 	SET_GAME_VIEW,  // 0 list, 1 list with art
+	SET_BOX_ART,    // list with art shows covers (boxart.h)
 	SET_START_ON,   // where the menu opens: enum settings_start
 	SET_DIM,        // idle minutes before the screen dims, 0 off
 	// Clock
@@ -125,6 +126,7 @@ enum settings_action {
 // Row flags
 #define SET_HIDDEN 1   // not shown (LANGUAGE until v0.9)
 #define SET_WITH_LED 2  // shown only while SET_LED is on
+#define SET_WITH_ART 4  // shown only while SET_GAME_VIEW is list with art
 
 #define SET_NO_SLOT 0xFF
 // At most this many rows in a section card (T25)
@@ -209,7 +211,8 @@ const char *settings_key_name(u32 bit);
 // returns how many (at most 3)
 u32 settings_keys_list(u16 mask, u8 keys[3]);
 
-// 1 if a row shows: not hidden, and a SET_WITH_LED row only while the LED is on
+// 1 if a row shows: not hidden, a SET_WITH_LED row only while the LED is on,
+// and a SET_WITH_ART row only in list with art
 int settings_visible(const struct settings_values *v, u32 id);
 // A section's visible rows into ids (SET_CARD_ROWS of room); returns how many
 u32 settings_section_rows(const struct settings_values *v, u32 section, u8 *ids);

@@ -1075,6 +1075,11 @@ int library_busy(void)
 	return has_work();
 }
 
+int library_walking(void)
+{
+	return lib.state == S_LOAD || lib.state == S_WALK || lib.state == S_SORT;
+}
+
 u32 library_generation(void)
 {
 	return lib.gen;

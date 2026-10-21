@@ -5,9 +5,6 @@ carousel-step 110619
 confirm-draw 170415
 confirm-motion 80000
 confirm-move 85123
-cover-decode 38610
-cover-demo 19503
-cover-upload 3427
 diag-cover-decode 44026
 diag-cover-upload 3151
 diag-glyph 380
