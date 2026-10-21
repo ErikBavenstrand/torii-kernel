@@ -2,7 +2,8 @@
 # The names database (source/namesdb.h, names_store.c) on the emulated cart:
 # `just names-update`'s names.db and crc.txt (tools/names_db.py, from the
 # fixture dats in tests/names: no network) name the card's games at once, by
-# CRC or by GBA game code, and the index sorts by those names; the boot's walk
+# CRC only (a romhack with a listed game's code keeps its file name), and the
+# index sorts by those names; the boot's walk
 # gives crc.txt's records their files' dates and forgets one whose file
 # changed; the games on Recent without a CRC get one after the boot.
 # Runs inside the torii-emu container after `just build` and `just
@@ -101,14 +102,15 @@ cart=$carts/pc
 fixture_card "$cart"
 grep -q "8 games, 8 CRCs computed" "$cart/tool.log" || fail "names_db.py: $(cat "$cart/tool.log")"
 boot "$cart" "$cart/1.log" -f 900 -u "names: wrote /torii/crc.txt"
-logged "$cart/1.log" "names: /torii/names.db from 2026.01.02: GBA 5, GBC 2, GB 1, NES 1, 3 codes"
+logged "$cart/1.log" "names: /torii/names.db from 2026.01.02: GBA 5, GBC 2, GB 1, NES 1, 0 codes"
 logged "$cart/1.log" "names: 8 files' CRCs from /torii/crc.txt"
 logged "$cart/1.log" "library: new index: 8 games (GBA 4, GBC 1, GB 2, NES 1)"
 no_errors "$cart/1.log"
-# Without names, file-name order: Hack of Minish, Homebrew, Wars, zz Minish
+# Without names, file-name order: Hack of Minish, Homebrew, Wars, zz Minish.
+# Hack of Minish, a romhack with the Minish Cap's code, keeps its file name
 want="/GBA/Wars.gba
-/GBA/Homebrew.gba
 /GBA/Hack of Minish.gba
+/GBA/Homebrew.gba
 /GBA/zz Minish.gba"
 [ "$(gba_order "$cart")" = "$want" ] || fail "the GBA games sort as
 $(gba_order "$cart")"
@@ -117,7 +119,7 @@ $(gba_order "$cart")"
 if crc_lines "$cart" | awk -F'\t' '$4 == "-"' | grep -q .; then
   fail "records without a date: $(crc_lines "$cart")"
 fi
-echo "PASS: names-update's names.db and crc.txt name the games by CRC and game code, and the index sorts by them"
+echo "PASS: names-update's names.db and crc.txt name the games by CRC, not a romhack by its game code, and the index sorts by them"
 
 # Power-on 2: nothing changed: nothing rebuilt or written
 boot "$cart" "$cart/2.log" -f 600 -u "library: unchanged"
@@ -135,8 +137,8 @@ mcopy -o -m -i "$cart/sd.img" "$cart/files/GBA/Wars.gba" ::/GBA/Wars.gba
 boot "$cart" "$cart/3.log" -f 900 -u "names: wrote /torii/crc.txt"
 logged "$cart/3.log" "names: /GBA/Wars.gba changed since its CRC: forgotten"
 logged "$cart/3.log" "library: the card changed: building a new index"
-want="/GBA/Homebrew.gba
-/GBA/Hack of Minish.gba
+want="/GBA/Hack of Minish.gba
+/GBA/Homebrew.gba
 /GBA/zz Minish.gba
 /GBA/Wars.gba"
 [ "$(gba_order "$cart")" = "$want" ] || fail "after the change the GBA games sort as

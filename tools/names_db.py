@@ -15,8 +15,10 @@ on this PC (a mounted card, say /Volumes/OMEGA), and:
    cache; --refresh downloads them again, --offline never does. --dats
    reads and caches them in another folder.
 2. Writes SD_PATH/torii/names.db: per console the CRC32 of each game in the
-   dats and its No-Intro name, and the Game Boy Advance games' codes
-   (source/namesdb.h has the format).
+   dats and its No-Intro name (source/namesdb.h has the format). A game is
+   named only by its CRC: one the dats don't list (a romhack, a translation,
+   a patched or bad dump) keeps its file name, even when its header's game
+   code is a listed game's, since a romhack keeps its base game's code.
 3. Computes the CRC32 of every game on the card (by extension, outside the
    folders the kernel hides) and writes SD_PATH/torii/crc.txt, so the card
    shows the names at once. A file whose path and size crc.txt already has
@@ -36,6 +38,7 @@ import re
 import struct
 import sys
 import time
+import unicodedata
 import urllib.parse
 import urllib.request
 import zlib
@@ -291,16 +294,62 @@ def make_tables(dat_texts):
     return tables, codes, max((v for v in versions if v), default="")
 
 
-def db_name(tables, codes, console, crc, code):
-    """The name the kernel shows (source/namesdb.c, names_db_name) and how it
-    found it: ("...", "crc"), ("...", "code") or (None, None)."""
+def db_name(tables, console, crc):
+    """The name the kernel shows (source/namesdb.c, names_db_name): the dats'
+    name of the CRC, in the console's table or, for a GB or GBC file, the
+    other's; None for a CRC they don't list."""
     other = {1: 2, 2: 1}.get(console)
     for i in (console, other):
         if i is not None and crc is not None and crc in tables[i]:
-            return tables[i][crc], "crc"
-    if console == GBA and code and code_key(code) in codes:
-        return codes[code_key(code)], "code"
-    return None, None
+            return tables[i][crc]
+    return None
+
+
+# --- Romhacks (C4) -----------------------------------------------------------------
+
+# Trailing articles No-Intro moves behind the title ("Legend of Zelda, The")
+ARTICLE = re.compile(
+    r"^(.*), (the|an?|les?|la|l'|der|die|das|el|los|las|il|lo|gli|de|het|een)$",
+    re.IGNORECASE,
+)
+GROUP = re.compile(r"\([^()]*\)|\[[^\[\]]*\]")
+
+
+def title_key(name):
+    """A title to compare a file's name with a dat's: no extension, (...) and
+    [...] tags or scene number, the article in front, and only the letters
+    and digits, accents and case folded. "" if nothing is left."""
+    low = name.lower()
+    if any(low.endswith(e) for _, _, exts in CONSOLES for e in exts):
+        name = name[: name.rindex(".")]
+    if " " not in name:
+        name = name.replace("_", " ")
+    while True:  # inner groups first, so nested ones go too
+        cut = GROUP.sub(" ", name)
+        if cut == name:
+            break
+        name = cut
+    name = re.sub(r"^\s*\d{4,5}\s*-\s*", "", name)
+    title, sep, rest = " ".join(name.split()).partition(" - ")
+    m = ARTICLE.match(title)
+    if m:
+        title = f"{m.group(2)} {m.group(1)}"
+    text = unicodedata.normalize("NFKD", title + sep + rest)
+    return "".join(c for c in text.casefold() if c.isascii() and c.isalnum())
+
+
+def code_match(codes, console, code, file_name):
+    """For a GBA game the dats don't list by CRC: the dats' name of its game
+    code, but only when its file name is that game's title too ("Pokemon -
+    Emerald Version (Erik).gba", a patched dump of the game), never a romhack
+    with its base game's code ("Pokemon - Radical Red.gba"). None otherwise.
+    `just art-scrape` takes art for such a game; the kernel names it by its
+    file name, which cleans to the same title."""
+    if console != GBA or not code or code_key(code) not in codes:
+        return None
+    name = codes[code_key(code)]
+    key = title_key(file_name)
+    return name if key and key == title_key(name) else None
 
 
 # --- The card ---------------------------------------------------------------------
@@ -498,8 +547,8 @@ def update(args):
         texts.append(
             fetch(dats, file, args.offline, args.refresh).read_text("utf-8", "replace")
         )
-    tables, codes, version = make_tables(texts)
-    db = build_db(tables, codes, version)
+    tables, _, version = make_tables(texts)
+    db = build_db(tables, {}, version)  # no game codes: the kernel names by CRC only
     if len(db) > DB_MAX:
         raise NamesError(
             f"names.db would be {len(db)} bytes, over the kernel's {DB_MAX}"
@@ -513,7 +562,7 @@ def update(args):
         f"{c[0]} {len(t)}" for c, t in zip(CONSOLES, tables, strict=True)
     )
     print(
-        f"wrote {torii / 'names.db'}: dats {version or '(no version)'}, {counts}, {len(codes)} GBA codes, {len(db)} bytes"
+        f"wrote {torii / 'names.db'}: dats {version or '(no version)'}, {counts}, {len(db)} bytes"
     )
     if args.no_crc:
         return
@@ -530,14 +579,13 @@ def update(args):
         f"wrote {torii / CRC_FILE}: {len(found)} games, {computed} CRCs computed, {reused} kept"
     )
     for i, (label, _, _) in enumerate(CONSOLES):
-        mine = [found[p] for p, _, c in games if c == i and p in found]
+        mine = [(p, *found[p]) for p, _, c in games if c == i and p in found]
         if not mine:
             continue
-        how = [db_name(tables, codes, i, crc, code)[1] for crc, code in mine]
-        by_crc, by_code = how.count("crc"), how.count("code")
+        by_crc = sum(db_name(tables, i, crc) is not None for _, crc, _ in mine)
         print(
-            f"  {label}: {len(mine)} games, {by_crc} named by CRC, {by_code} by game code, "
-            f"{len(mine) - by_crc - by_code} keep their file names"
+            f"  {label}: {len(mine)} games, {by_crc} named by CRC, "
+            f"{len(mine) - by_crc} keep their file names (not in the dats: romhacks, translations, other dumps)"
         )
 
 
