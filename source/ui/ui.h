@@ -341,8 +341,8 @@ void ui_item_set(u32 item);
 // at once on its new theme.
 void ui_theme_switch(const struct ui_theme *theme);
 // Ends a wipe at once on the theme it was going to, and runs a frame that
-// commits that: call it before blocking work (a NOR write, a dialog), as a
-// split needs a commit every VBlank (gfx_set_split). Nothing if none runs.
+// commits that: call it before blocking work (a NOR write, a dialog), which
+// would hold the wipe's edge where it is. Nothing if none runs.
 void ui_wipe_finish(void);
 // 1 while a theme wipe runs.
 int ui_wiping(void);

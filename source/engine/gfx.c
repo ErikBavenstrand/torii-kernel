@@ -513,7 +513,7 @@ static void write_oam(void)
 
 void gfx_freeze(int on)
 {
-	// A split needs its commit every VBlank (its tops put back): it ends
+	// A frozen screen shows no split: it ends, its tops put back
 	if (on && split_on) {
 		split_tops(&split_live);
 		gfx_split_off();
