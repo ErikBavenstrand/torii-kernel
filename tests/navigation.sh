@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # The navigation shell (source/screens/nav.c): tests/nav.sh's routes reach
 # every item's page and fail clearly where a page isn't built yet; each
-# Start on value starts where it says, a hidden item giving home facing the
-# nearest one (T19); Last place comes back after a power cycle as home
-# facing the item last faced (a page's or home's); every Start on value
-# holds through power cycles, a game and the Reset hotkey, set in Settings
-# too; and a deleted game leaves home's counts at once.
+# Start on value starts on home facing its item, never in its page, a
+# hidden one falling back to Last place, then to the first item (T19, as D1
+# changed it); Last place comes back after a power cycle as home facing the
+# item last faced (a page's or home's); every Start on value holds through
+# power cycles, a game and the Reset hotkey, set in Settings too, which
+# offers only the items home shows; and a deleted game leaves home's counts
+# at once.
 # Runs inside the torii-emu container after `just build` and `just
 # emu-headless`.
 set -euo pipefail
@@ -102,16 +104,28 @@ boot info-last-2 -w "nav: home ready" -f 300
 logged "nav: start on 0: home-info"
 echo "PASS: Last place on an Info page comes back as home facing Info"
 
-# Start on: each value, from the log (registry_start's tests cover the rest)
+# Start on: each value, from the log (registry_start's tests cover the
+# rest). No place kept yet: Last place, and GBC and NES (no games) through
+# it, face the first item; an older kernel's Home (2) too
 new_cart start
-for case in "0 home-recent" "1 recent" "2 home-recent" "3 fav" "4 sd" "5 gba" "6 home-gb" "7 gb" "8 home-sd"; do
-  read -r value place <<<"$case"
+start_case() {
+  read -r value place <<<"$1"
   start_on "$value"
   boot "start-$value" -w "nav: start on $value:" -f 300
-  logged "nav: start on $value: $place"
   grep -qxF "kernel: nav: start on $value: $place" "$log" || fail "start on $value: $(grep -o 'nav: start on.*' "$log")"
+}
+for case in "0 home-recent" "1 home-recent" "2 home-recent" "3 home-fav" "4 home-sd" "5 home-gba" "6 home-recent" \
+  "7 home-gb" "8 home-recent" "9 home-nor" "10 home-settings" "11 home-info"; do
+  start_case "$case"
 done
-echo "PASS: Start on starts on Last place, Recent, Home, Favourites, SD card and each console, hidden ones on home facing the nearest"
+# A hidden choice with a place kept: the place; that hidden too: the first item
+printf '@boot gb\n/Hello.gba\n' >"$cart/recent.txt"
+mcopy -o -i "$cart/sd.img" "$cart/recent.txt" ::/torii/recent.txt
+start_case "8 home-gb"
+printf '@boot gbc\n/Hello.gba\n' >"$cart/recent.txt"
+mcopy -o -i "$cart/sd.img" "$cart/recent.txt" ::/torii/recent.txt
+start_case "8 home-recent"
+echo "PASS: Start on faces each item on home, never its page; a hidden one falls back to Last place, then to the first item"
 
 # Last place: a page left open is kept as its item once the menu rested
 # long enough to write it, and comes back as home facing that item; then
@@ -173,18 +187,27 @@ boot 5 -w "nav: home ready" -k @8:RIGHT -k @12:- -k @16:RIGHT -k @20:- -k @24:RI
   -w "nav: page sd ready" -k @20:A -k @24:- -w "launch: starting" -f @600
 boot 6 -w "nav: start on" -f @300
 started "0: home-sd"
-# Settings sets Start on GBA (Last place, Recent, Home, Favourites, SD card,
-# GBA), saved as it is confirmed, B at once; the next power-on opens GBA
+# Settings offers Last place and the items home shows, in its order (no
+# GBC, no NES): a lap, then B puts it back and writes nothing
 # shellcheck disable=SC2046
 boot 7 -w "nav: home ready" -k @8:RIGHT -k @12:- -k @16:RIGHT -k @20:- -k @24:A -k @28:- -w "nav: page settings ready" \
-  $(nav_press DOWN DOWN DOWN A RIGHT RIGHT RIGHT RIGHT RIGHT A B) -w "nav: home ready" -f @30
+  $(nav_press DOWN DOWN DOWN A RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT B B) -w "nav: home ready" -f @30
+offered=$(grep -o 'settings: row 3 set to .*' "$log" | sed 's/settings: row 3 set to //' | tr '\n' ',')
+[ "$offered" = "Recent,Favourites,GBA,GB,SD card,NOR,Settings,Info,Last place," ] || fail "Start on offered $offered"
+! grep -q "nor: wrote the settings" "$log" || fail "B on Start on wrote the settings"
+# Start on GBA (RIGHT three times), saved as it is confirmed, B at once;
+# the next power-on faces GBA on home
+# shellcheck disable=SC2046
+boot 8 -w "nav: home ready" -k @8:RIGHT -k @12:- -k @16:RIGHT -k @20:- -k @24:A -k @28:- -w "nav: page settings ready" \
+  $(nav_press DOWN DOWN DOWN A RIGHT RIGHT RIGHT A B) -w "nav: home ready" -f @30
 logged "settings: row 3 set to GBA"
-boot 8 -w "nav: start on" -f @300
-started "5: gba"
+boot 9 -w "nav: start on" -f @300
+started "5: home-gba"
 # Every other value: a power-on, a game from the menu (the tests' hook), and
 # a power-on after it, which starts in the same place (the launch leaves
-# the setting alone)
-for case in "1 recent" "2 home-recent" "3 fav" "4 sd" "5 gba" "6 home-gb" "7 gb" "8 home-sd"; do
+# the setting alone). GBC and NES aren't on home: Last place, SD card
+for case in "1 home-recent" "2 home-recent" "3 home-fav" "4 home-sd" "5 home-gba" "6 home-sd" "7 home-gb" \
+  "8 home-sd" "9 home-nor" "10 home-settings" "11 home-info"; do
   read -r value place <<<"$case"
   start_on "$value"
   # shellcheck disable=SC2046
@@ -193,7 +216,7 @@ for case in "1 recent" "2 home-recent" "3 fav" "4 sd" "5 gba" "6 home-gb" "7 gb"
   boot "after-$value" -w "nav: start on" -f @300
   started "$value: $place"
 done
-echo "PASS: each Start on value, set in Settings or on the cart, starts where it says after power cycles, a game and the Reset hotkey; Last place faces the item a game started from"
+echo "PASS: each Start on value, set in Settings (which offers what home shows) or on the cart, faces its item after power cycles, a game and the Reset hotkey; Last place faces the item a game started from"
 
 # A deleted game (as a page will delete it, through actions.c) leaves home
 # at once: Zelda.gb was the only GB game and the only favourite

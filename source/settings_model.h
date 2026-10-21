@@ -47,7 +47,7 @@ enum settings_id {
 	SET_THEME,      // 0 dark, 1 light
 	SET_GAME_VIEW,  // 0 list, 1 list with art
 	SET_BOX_ART,    // list with art shows covers (boxart.h)
-	SET_START_ON,   // where the menu opens: enum settings_start
+	SET_START_ON,   // the carousel item home faces at power-on: enum settings_start
 	SET_DIM,        // idle minutes before the screen dims, 0 off
 	// Clock
 	SET_TIME_ROW,
@@ -86,23 +86,31 @@ enum settings_id {
 enum {
 	SET_LABEL_RESET_STATES = SET_ROWS,  // Save states on: the menu in every game
 	SET_LABEL_RESET_CHEATS,             // Cheats alone: in a game with a cheat file
+	SET_LABEL_START_HIDDEN,             // Start on's item isn't on home now
 	SET_LABELS
 };
 
-// SET_START_ON's values, stored as they are. Consoles go last, in carousel
-// order, so later systems add values
+// SET_START_ON's values: a code per carousel item, stored as it is. The
+// codes never change; a new item takes the next one. Start on offers Last
+// place and the items home shows (settings_values.start_shown), in the
+// carousel's order (settings_step)
 enum settings_start {
-	SET_START_LAST,  // the carousel item and row last left (recent.txt's @boot line)
+	SET_START_LAST,  // the carousel item last faced (recent.txt's @boot line)
 	SET_START_RECENT,
-	SET_START_HOME,
+	SET_START_HOME,  // older kernels' Home: the first item shown; no longer offered
 	SET_START_FAVOURITES,
 	SET_START_SD,
 	SET_START_GBA,
 	SET_START_GBC,
 	SET_START_GB,
 	SET_START_NES,
+	SET_START_NOR,
+	SET_START_SETTINGS,
+	SET_START_INFO,
 	SET_STARTS
 };
+// Every code home can show (bit per enum settings_start)
+#define SET_STARTS_ALL ((u16)(((1u << SET_STARTS) - 1) & ~(1u << SET_START_HOME)))
 
 // SET_BOOT_MODE's values, stored as they are
 enum settings_boot {
@@ -167,6 +175,11 @@ struct settings_values {
 	// reads it again (settings_read_clock) every few frames to keep them
 	// current
 	struct settings_clock clock;
+	// SET_START_ON: the items home shows now, a bit per enum
+	// settings_start (SET_STARTS_ALL until the page sets it): the choices
+	// Start on offers. A stored item home doesn't show stays stored, and
+	// power-on falls back to Last place (registry_start)
+	u16 start_shown;
 };
 
 // Starts values from slots (assress_max of them, as Read_SET_info reads them)

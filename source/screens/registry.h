@@ -30,14 +30,13 @@ enum nav_item {
 };
 
 #define NAV_NO_CONSOLE 0xFF
-#define NAV_NO_START 0xFF
 
 struct registry_item {
 	const char *word;  // its name in recent.txt's @boot line (userdata.h)
 	u8 accent;         // enum pal_item: its colour (ui/palette.h)
 	u8 icon16;         // ART_ICON16_*: the title bar's icon (ui/art_ids.h)
 	u8 console;        // LIB_GBA...: the library's console, NAV_NO_CONSOLE for none
-	u8 start;          // the Start on value that opens it (enum settings_start), NAV_NO_START none
+	u8 start;          // its Start on code (enum settings_start)
 	u8 hides;          // 1: hidden while its count is 0
 };
 extern const struct registry_item registry_items[NAV_ITEMS];
@@ -60,12 +59,17 @@ struct registry_place {
 	u8 open;  // 1: its page is open
 	u32 row;  // the page's row (open only)
 };
-// Where the menu starts (T19), from the Start on setting start_on (enum
-// settings_start) and the boot position boot: Last place is home facing
-// the carousel item last faced (boot->item, the item's word; a hidden one
-// gives the nearest, one never set the first), Home is home facing the
-// first item, and Recent or a chosen item opens its page (home facing the
-// nearest item if it's hidden).
+// The item whose Start on code is start_on, NAV_ITEMS if none (Last place).
+u32 registry_of_start(u32 start_on);
+// The Start on codes of the count items shown, a bit each: the choices
+// Settings offers (settings_values.start_shown).
+u16 registry_start_shown(const u8 *shown, u32 count);
+// Where the menu starts (T19, as D1 changed it), from the Start on setting
+// start_on (enum settings_start) and the boot position boot: always home,
+// never a page. A chosen item faces that item; Last place, or a chosen item
+// home doesn't show, faces the item last faced (boot->item, the item's
+// word); one hidden, never set or unknown, and an older kernel's Home, face
+// the first item.
 void registry_start(u32 start_on, const struct userdata_boot *boot, const u8 *shown, u32 count,
 		    struct registry_place *out);
 // Older kernels' boot position on home: this, then the item's word

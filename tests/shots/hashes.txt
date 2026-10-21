@@ -282,7 +282,7 @@ home-held/frames 82-82 36C60FA09114E32A
 home-held/frames 83-83 FB23BF03A6E39D61
 home-held/frames 84-84 FDC1F4BEE41BC9CE
 home-held/frames 85-102 FA1E464A824D7D2B
-home-start-on/screen 8420BA3DE023DA87
+home-start-on/screen 818B02E74B016B0D
 info/about 7AB813DD8E3FC60E
 info/back-up 7AB813DD8E3FC60E
 info/diag 96DF71E9EB3496DE
@@ -299,20 +299,20 @@ info-about/about-end D816CD17868D38AF
 info-about/cart B11EBBCBB761FEAF
 info-about/ingame 24E5C82EDE395875
 info-read/back F3D1D76C241AA2D2
-info-read/controls 0450CC8B33B405F7
-info-read/last 732ACCA96ABE0BAA
-info-read/last-down 70938220104DE2EA
-info-read/scrolled 0004EC497C8DFFD9
+info-read/controls 58C6DE28040EB31D
+info-read/last 0995C0F437A29678
+info-read/last-down AFF60B000D3A84E8
+info-read/scrolled FC2885411A153C33
 info-read/frames 0-1 F3D1D76C241AA2D2
 info-read/frames 2-2 5BF1B516875CF024
 info-read/frames 3-3 94836A2D8203DC90
 info-read/frames 4-12 47778893E1D42B25
-info-read/frames 13-13 129516B456F67144
-info-read/frames 14-14 1C81614D2FC92ECC
-info-read/frames 15-15 44834E419BE8F63F
-info-read/frames 16-16 235CB570C87CD264
-info-read/frames 17-17 CCBC440CDFB043F7
-info-read/frames 18-22 0450CC8B33B405F7
+info-read/frames 13-13 7350206A573CA6DD
+info-read/frames 14-14 57BD66D7D58C467D
+info-read/frames 15-15 30A49A89D757BF91
+info-read/frames 16-16 0EB1CADB6D26281C
+info-read/frames 17-17 26D5CBC998640A1D
+info-read/frames 18-22 58C6DE28040EB31D
 nav-push-fail/error 8DA1D73368B07BC5
 nav-push-fail/page 7857C96979E6C7B0
 nor-dark/closed AA30BC826BEEF216
@@ -419,9 +419,9 @@ settings/frames 16-28 6CF0F75C610E0FE0
 settings/frames 29-29 7BE3FC0CB8F0402C
 settings/frames 30-30 C5ED44064C6B0838
 settings/frames 31-32 66DED67536AE6A44
-settings/frames 33-33 2AA2A4D116A37FED
-settings/frames 34-34 4F716515761E6959
-settings/frames 35-36 042B15C491B66739
+settings/frames 33-33 86F80D4D7BAB5B75
+settings/frames 34-34 59345636EA221B41
+settings/frames 35-36 C6D77EDE3DC36DA1
 settings/frames 37-37 C93A8AC0D031E05D
 settings/frames 38-38 EEEF984F066FA3ED
 settings/frames 39-40 B8A60EF5B0396A95
@@ -521,6 +521,7 @@ settings-dark/frames 36-36 1238DE1E35EEF829
 settings-dark/frames 37-37 8044C5E451BFB596
 settings-dark/frames 38-38 51FFBF10A8AFCD19
 settings-dark/frames 39-45 D1DF1A862421F799
+settings-start-hidden/row B8A96E29F85DE79A
 ui-dialog/closed 942FEA8E68027B47
 ui-dialog/dialog 1EC3EDCC05C5D114
 ui-dialog/frames 0-0 942FEA8E68027B47

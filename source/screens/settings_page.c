@@ -1003,6 +1003,7 @@ static struct ui_view *settings_enter(u32 item, u32 row)
 	tlog_flush();
 	memset(&sp, 0, sizeof(sp));
 	settings_load(&sp.v);
+	sp.v.start_shown = nav_start_shown();  // Start on offers what home shows
 	settings_layout_build(&sp.lay, &sp.v);
 	struct ui_view *v = ui_push(&view, &sp);
 	if (!v)

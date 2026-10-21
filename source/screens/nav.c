@@ -87,6 +87,11 @@ const char *nav_clock(void)
 	return nav.clock;
 }
 
+u16 nav_start_shown(void)
+{
+	return registry_start_shown(nav.shown, nav.shown_count);
+}
+
 void nav_count_words(char *out, u32 size, u32 n, const char *one, const char *many)
 {
 	if (n == 1 && one) {

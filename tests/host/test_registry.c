@@ -85,31 +85,37 @@ void test_registry_start(void)
 	const u8 gba[] = {NAV_GBA, NAV_SD, NAV_NOR, NAV_SET, NAV_INFO};
 	struct registry_place p;
 
-	// Home: facing the first item, whatever the boot position
+	// An older kernel's Home: facing the first item, whatever the boot position
 	p = start(SET_START_HOME, "gba", all, 10);
 	CHECK_PLACE(p, NAV_RECENT, 0, 0);
 	p = start(SET_START_HOME, "", fresh, 4);
 	CHECK_PLACE(p, NAV_SD, 0, 0);
-	// A chosen item opens its page at its first row
+	// A chosen item: home facing it, never its page
 	p = start(SET_START_RECENT, "gba", all, 10);
-	CHECK_PLACE(p, NAV_RECENT, 1, 0);
+	CHECK_PLACE(p, NAV_RECENT, 0, 0);
 	p = start(SET_START_SD, "", fresh, 4);
-	CHECK_PLACE(p, NAV_SD, 1, 0);
+	CHECK_PLACE(p, NAV_SD, 0, 0);
 	p = start(SET_START_FAVOURITES, "", all, 10);
-	CHECK_PLACE(p, NAV_FAV, 1, 0);
+	CHECK_PLACE(p, NAV_FAV, 0, 0);
 	p = start(SET_START_GBC, "", all, 10);
-	CHECK_PLACE(p, NAV_GBC, 1, 0);
+	CHECK_PLACE(p, NAV_GBC, 0, 0);
 	p = start(SET_START_NES, "", all, 10);
-	CHECK_PLACE(p, NAV_NES, 1, 0);
-	// ... and a hidden one gives home facing the nearest item that shows
+	CHECK_PLACE(p, NAV_NES, 0, 0);
+	p = start(SET_START_NOR, "gba", all, 10);
+	CHECK_PLACE(p, NAV_NOR, 0, 0);
+	p = start(SET_START_SETTINGS, "", fresh, 4);
+	CHECK_PLACE(p, NAV_SET, 0, 0);
+	p = start(SET_START_INFO, "", fresh, 4);
+	CHECK_PLACE(p, NAV_INFO, 0, 0);
+	// ... and one home doesn't show: Last place, else the first item
+	p = start(SET_START_NES, "gba", gba, 5);
+	CHECK_PLACE(p, NAV_GBA, 0, 0);
+	p = start(SET_START_NES, "nor", gba, 5);
+	CHECK_PLACE(p, NAV_NOR, 0, 0);
 	p = start(SET_START_RECENT, "", gba, 5);
 	CHECK_PLACE(p, NAV_GBA, 0, 0);
-	p = start(SET_START_FAVOURITES, "", fresh, 4);
+	p = start(SET_START_FAVOURITES, "fav", fresh, 4);
 	CHECK_PLACE(p, NAV_SD, 0, 0);
-	p = start(SET_START_NES, "", gba, 5);
-	CHECK_PLACE(p, NAV_SD, 0, 0);
-	p = start(SET_START_GB, "", gba, 5);
-	CHECK_PLACE(p, NAV_SD, 0, 0);  // GBA and SD both 2 away: the later
 	// Last place: home facing the item last faced, never its page (an older
 	// kernel's "home-" before the word is dropped)
 	p = start(SET_START_LAST, "gba", all, 10);
@@ -120,8 +126,10 @@ void test_registry_start(void)
 	CHECK_PLACE(p, NAV_INFO, 0, 0);
 	p = start(SET_START_LAST, "recent", all, 10);
 	CHECK_PLACE(p, NAV_RECENT, 0, 0);
-	// ... hidden since: home facing the nearest; never set or unknown: the first
+	// ... hidden since, never set or unknown: the first item
 	p = start(SET_START_LAST, "fav", gba, 5);
+	CHECK_PLACE(p, NAV_GBA, 0, 0);
+	p = start(SET_START_LAST, "gb", gba, 5);
 	CHECK_PLACE(p, NAV_GBA, 0, 0);
 	p = start(SET_START_LAST, "home-recent", fresh, 4);
 	CHECK_PLACE(p, NAV_SD, 0, 0);
@@ -131,9 +139,20 @@ void test_registry_start(void)
 	CHECK_PLACE(p, NAV_RECENT, 0, 0);
 	p = start(SET_START_LAST, "carousel", all, 10);
 	CHECK_PLACE(p, NAV_RECENT, 0, 0);
-	// A Start on value from a later kernel: home
+	// A Start on value from a later kernel: Last place
 	p = start(SET_STARTS + 3, "gba", all, 10);
-	CHECK_PLACE(p, NAV_RECENT, 0, 0);
+	CHECK_PLACE(p, NAV_GBA, 0, 0);
+	// Each item has its own code, and the codes Settings offers are the
+	// items shown
+	for (u32 i = 0; i < NAV_ITEMS; i++) {
+		CHECK(registry_items[i].start < SET_STARTS && registry_items[i].start != SET_START_HOME &&
+		      registry_items[i].start != SET_START_LAST);
+		CHECK_EQ(registry_of_start(registry_items[i].start), i);
+	}
+	CHECK_EQ(registry_of_start(SET_START_LAST), NAV_ITEMS);
+	CHECK_EQ(registry_start_shown(all, 10), SET_STARTS_ALL & ~(1u << SET_START_LAST));
+	CHECK_EQ(registry_start_shown(gba, 5), (1u << SET_START_GBA) | (1u << SET_START_SD) | (1u << SET_START_NOR) |
+						       (1u << SET_START_SETTINGS) | (1u << SET_START_INFO));
 }
 
 void test_registry_boot_word(void)
