@@ -782,10 +782,11 @@ static u8 mde_write(TCHAR *gamefilename, u32 at, u8 value)
 
 	res = f_open(&gfile, mdenamebuf, FA_READ | FA_WRITE | FA_OPEN_ALWAYS);
 	if (res == FR_OK) {
-		if (f_read(&gfile, w_buffer, sizeof(w_buffer), &done) != FR_OK)
-			memset(w_buffer, 0x00, sizeof(w_buffer));
+		// A failed read writes nothing: the other byte would be lost
+		res = f_read(&gfile, w_buffer, sizeof(w_buffer), &done);
 		w_buffer[at] = value;
-		res = f_lseek(&gfile, 0x0000);
+		if (res == FR_OK)
+			res = f_lseek(&gfile, 0x0000);
 		if (res == FR_OK)
 			res = f_write(&gfile, (void *)w_buffer, sizeof(w_buffer), &done);
 		u32 closed = f_close(&gfile);

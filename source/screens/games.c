@@ -812,6 +812,7 @@ static const struct ui_view_spec info_view = {"game-info", info_nodes, I_NODES, 
 
 #define INFO_PICKED "\xC2\xAB %s \xC2\xBB\n"  // the line LEFT/RIGHT change
 #define INFO_OTHER "%s\n"
+_Static_assert(sizeof(((struct lang_games *)0)->boot_modes) / sizeof(char *) == ACTION_BOOTS, "a name per boot mode");
 
 // The values' lines, the picked one's between « »
 static void info_values(struct ui_view *v)
@@ -904,10 +905,11 @@ static void game_info(const struct game *g)
 	} else {
 		tlog_error("games: %s", ui_error());
 	}
-	if (games.info_type != facts.save_type && !action_set_save_type(games.pick, games.info_type))
-		dialog_message(NULL, gl_games->save_type_failed, DIALOG_ERROR);
-	else if (games.info_boot != facts.boot_mode && !action_set_boot_mode(games.pick, games.info_boot))
-		dialog_message(NULL, gl_games->boot_mode_failed, DIALOG_ERROR);
+	// Each written on its own: one failing keeps the other's change
+	int type_ok = games.info_type == facts.save_type || action_set_save_type(games.pick, games.info_type);
+	int boot_ok = games.info_boot == facts.boot_mode || action_set_boot_mode(games.pick, games.info_boot);
+	if (!type_ok || !boot_ok)
+		dialog_message(NULL, type_ok ? gl_games->boot_mode_failed : gl_games->save_type_failed, DIALOG_ERROR);
 	reshow(row);
 }
 
