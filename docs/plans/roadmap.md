@@ -45,7 +45,7 @@ Everything the v0.2–v0.4.1 work left open, checked against the code on 2026-10
 - ~~Reset keys and Sleep keys that already clash (written by v0.3 or by hand) are used as they are; only new combinations are checked (`source/settings_model.c`).~~ Fixed by E2 (`0d4e2b2`, `8fd8817`): `settings_hotkeys` falls back to the defaults for Settings and the launch's patches, logged at boot.
 - ~~The cheat parser's `Get_KEY_val` and `Get_CHT_val` fill a 50-byte `_paramk` with no NUL and pass it to `strcmp` (`source/showcht.c`).~~ Fixed by E2 (`01ee08b`, `8fd8817`); names keep their inner spaces too.
 - ~~E2's findings: with `/torii` a file Recent, the favourites and names.txt logged an error at every write; one damaged folder blocked every rename of a game with a save; the cheat list and a cheat's value split long lines differently; a NOR row took the first SD file of its name whatever its size.~~ Fixed by E2 (`faded2a`). Left: the rename's card walk blocks the keyboard for its length, unmeasured on a cart (about 1 s per 2,000 files estimated).
-- The launch copy's VBlank hook sets the handler back to none instead of restoring the previous one; harmless while the engine installs none (`source/progress.c`).
+- The launch copy's VBlank hook sets the handler back to none instead of restoring the previous one; harmless while the engine installs none (`source/progress.c`). The theme wipe's split installs one too and puts back the one it replaced (E4, `dd43987`).
 
 ### Bugs: menu
 
@@ -58,17 +58,17 @@ Everything the v0.2–v0.4.1 work left open, checked against the code on 2026-10
 - While the Time/Date card is open only `ui_frame` runs: the library walk and a Rescan pause until it closes (`settings_page.c`).
 - ~~The selected row's marquee keeps scrolling under an open popup, about 13k cycles a frame (`source/ui/ui_list.c`).~~ Fixed by E3 (`7065c18`).
 - ~~A first visit to a game page right after a failed launch briefly shows an empty card until the index reloads (`games.c`).~~ Fixed by E3 (`37ea646`): the page loads the index first.
-- On a boot with no index yet the consoles count 0, so a Start on console falls back to Last place (`source/screens/nav.c`).
+- ~~On a boot with no index yet the consoles count 0, so a Start on console falls back to Last place (`source/screens/nav.c`).~~ Fixed by E4 (`49dccf7`).
 - ~~After an SD rename of a game with a custom name, the row shows the cleaned name for a few seconds until the walk restores it.~~ Fixed by E2 (`84fc3ef`).
 - ~~Two games that clean to the same name in different folders with the same tags show the same name: rows pass file names, not paths, to the dedupe (`games.c`, `source/gamename.c`).~~ Fixed by E2 (`84fc3ef`).
 - ~~NOR rows show cleaned file names, never custom or database names (`source/screens/nor.c`).~~ Fixed by E2 (`84fc3ef`): the library record with the same file name gives the name.
-- The theme wipe needs a commit every VBlank: a frame that overruns during the 16-frame wipe shows the old theme whole-screen (`source/ui/ui_run.c`).
-- A launch shows about 8 black frames between home's fade-out and the loading card.
-- A cover landing during a palette fade could show wrong colours (not seen; `source/engine/cover.c`).
-- A failed `job_start` for the art listing is retried every frame and logs each time (`source/boxart.c`).
+- ~~The theme wipe needs a commit every VBlank: a frame that overruns during the 16-frame wipe shows the old theme whole-screen (`source/ui/ui_run.c`).~~ Fixed by E4 (`c237835`, `dd43987`).
+- ~~A launch shows about 8 black frames between home's fade-out and the loading card.~~ Shortened by E4 (`218546e`, `dd43987`): 3 black frames, then the card.
+- ~~A cover landing during a palette fade could show wrong colours (not seen; `source/engine/cover.c`).~~ Fixed by E4 (`d420e57`).
+- ~~A failed `job_start` for the art listing is retried every frame and logs each time (`source/boxart.c`).~~ Fixed by E4 (`695ec12`).
 - ~~The SD page's item count job costs up to 194k cycles a frame while it counts a folder (`sdcard.c`).~~ Fixed by E3 (`09dff4f`): one step a frame, 92k at most.
-- Diagnostics' first page draws its prompt lines a frame after `screen ready: diag-start` (`source/diag.c`); passes show in plain text, as the palette has no green (`source/diag_priv.h`).
-- `ui_hints_get` doesn't give back a hint note's ink, so a popup over a danger or countdown line restores it as plain text (can't happen today; `source/ui/`).
+- ~~Diagnostics' first page draws its prompt lines a frame after `screen ready: diag-start` (`source/diag.c`); passes show in plain text, as the palette has no green (`source/diag_priv.h`).~~ Fixed by E4 (`3ca6e5a`).
+- ~~`ui_hints_get` doesn't give back a hint note's ink, so a popup over a danger or countdown line restores it as plain text (can't happen today; `source/ui/`).~~ Fixed by E4 (`9c7aad1`).
 - ~~BG block 0's tiles on list pages are nearly full with a popup and a confirmation up (9–20 spare); a taller popup falls back to closing the popup. The popup's 8 entries (`UI_POPUP_ITEMS`) are full on the SD file popup.~~ Fixed by E3 (`09dff4f`): a confirmation borrows the popup's tiles when its own don't fit; popups hold 9 items (9 without a title), and the SD popup offers both.
 
 ### Dead code and cleanup
@@ -101,7 +101,7 @@ Made during the build without the user; each is cheap to change. The user's answ
 - **Hidden files:** PATCH and CHEAT hidden too, and every file the kernel can't start on the SD page; `.sgb` and dot-less files no longer launch.
 - **Name cleaning:** 4–5 digit scene prefixes dropped except 1900–2099; the article table can misfire ("Rock, Paper, A"); colliding games show their first differing tag, preferring Rev, Beta and translation tags. Names over 255 bytes use their 8.3 name for the save, so two such files can share one (v0.3).
 - **Names and art (C4, v0.4.1):** CRC-only lookup; CRCs computed on the PC; games in hidden folders never get names; played games get theirs after the next boot; art-scrape deletes stale romhack art by default; a dump renamed with its own tag loses its art; existing art is never refreshed; one timeout stops a scrape; custom art is shared by same-named files in different folders; covers load after 8 frames of rest with no fade; Game info shows no cover; at most 8,192 art files.
-- **Placeholder boxes (D2):** Nintendo-style trade dress in original pixels (a conscious yes before release); the NES box's torii reads like a skull; the three Game Boy boxes share the silver band.
+- **Placeholder boxes (D2):** Nintendo-style trade dress in original pixels (a conscious yes before release); ~~the NES box's torii reads like a skull~~ (redrawn by E4, `6da7ef3`); the three Game Boy boxes share the silver band.
 - **Look:** palette changed for contrast (light ink3 `#8C847B`, dark danger `#EF7B84`); 16x16 icons keep their PNG colours in both themes; look values read off the mockups where spec.md is silent; the Settings and keyboard mockups were approved by the conductor, not the user.
 - **Motion:** a page change fades out, then in (about 9 frames, not 6); the zoom's pieces and timing; the hard-edged 16-frame wipe; dialogs rise in 6 frames, the loading card shows at once; in light, text looks lighter than the paper for a frame or two of the card fade.
 - **Carousel:** neighbours at 0.89 scale and the far pair at 0.60; held-turn speed; with 2–5 items one item shows at both ends mid-turn; far objects nearly vanish in dark; a fast held turn can miss a label for a frame.
