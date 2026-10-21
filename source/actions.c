@@ -5,6 +5,8 @@
 #include "actions.h"
 #include "ezkernel.h"
 #include "GBApatch.h"
+#include "artkey.h"
+#include "boxart.h"
 #include "gamename.h"
 #include "library.h"
 #include "NORflash_OP.h"
@@ -213,8 +215,8 @@ struct sidecar {
 	u8 cache;  // a cache the next launch makes again: one already under the new name goes
 	char ext[4];
 };
-#define ART_CUSTOM_DIR "/torii/art/custom"  // B22's custom art: <file name>.bin
-#define ART_CUSTOM_EXT ".bin"
+#define ART_CUSTOM_DIR "/torii/art/custom"  // B22's custom art: <file name>.bin (artkey.h)
+#define ART_CUSTOM_EXT ARTKEY_EXT
 static const struct sidecar sidecars[] = {
 	{SAVER_FOLDER, SIDE_SAVE, 0, ""}, {SAVER_FOLDER, SIDE_EXT, 0, "mde"}, {"/RTS", SIDE_EXT, 0, "rts"},
 	{"/CHEAT", SIDE_EXT, 0, "cht"},   {"/PATCH", SIDE_EXT, 1, "pat"},     {ART_CUSTOM_DIR, SIDE_ART, 0, ""},
@@ -390,6 +392,8 @@ u32 action_rename_file(const char *path, const char *new_name)
 		res = f_rename(w->from, w->to);
 		tlog("rename: %s to %s (FatFs %u)", w->from, w->to, (unsigned)res);
 		partly |= res != FR_OK;
+		if (s->kind == SIDE_ART && res == FR_OK)
+			boxart_forget();  // its listing of the card's art follows
 	}
 	if (!gamename_store_move(path, w->new_path))
 		partly = 1;
