@@ -631,6 +631,9 @@ static void show_facts(void)
 		snprintf(games.fact_keys, sizeof(games.fact_keys), "%s\n%s", gl_games->fact_size,
 			 gl_games->fact_played);
 		snprintf(games.fact_values, sizeof(games.fact_values), "%s\n%s", size, ago);
+	} else {
+		memcpy(games.box_palette, art_box_palette, sizeof(games.box_palette));
+		boxart_select(games.cursor, games.box_palette);  // no game: the placeholder
 	}
 	ui_label_set(node(N_FACT_KEYS), games.fact_keys);
 	ui_label_set(node(N_FACT_VALUES), games.fact_values);

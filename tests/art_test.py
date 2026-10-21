@@ -197,6 +197,10 @@ class ArtTest(unittest.TestCase):
             self.assertIn("art.py:", said.getvalue())
         self.assertFalse((sd / "torii").exists())  # nothing written
 
+    def test_names_are_nfc(self):
+        # macOS may give a decomposed name; cards hold the composed one
+        self.assertEqual(art.custom_name("/x/Pokemo\u0301n.gb"), "Pokem\u00f3n.gb.bin")
+
     def test_convert_writes_anywhere(self):
         pic = self.picture("g.png", self.gradient(90, 60))
         out = self.dir / "out.bin"

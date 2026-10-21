@@ -21,7 +21,8 @@ convert: the same conversion into OUT.bin, anywhere (B23's scraper uses it).
 
 The conversion, made to look good at 80x80 on the GBA's screen: the picture
 is cropped to a square (--align picks which part of a tall or wide picture
-stays: top, centre or bottom, left, centre or right; centre by default),
+stays: top, centre or bottom, left, centre or right; by default the top of
+a tall picture, where box art has its title, and the centre of a wide one),
 scaled down with Lanczos, and reduced to 15 colours of the GBA's 15-bit
 range (median cut refined by k-means), with a gentle serpentine Floyd-
 Steinberg dither at three quarters strength, so gradients don't band and
@@ -36,6 +37,7 @@ on your card, and don't publish them.
 
 import argparse
 import sys
+import unicodedata
 from pathlib import Path
 
 from PIL import Image, ImageOps
@@ -223,8 +225,9 @@ def preview(data: bytes, scale: int = 3) -> Image.Image:
 
 
 def custom_name(rom: str) -> str:
-    """The art file's name for a game: its file name and EXT."""
-    name = Path(rom).name
+    """The art file's name for a game: its file name (in NFC, as cards and
+    most PCs write names; macOS may hand over NFD) and EXT."""
+    name = unicodedata.normalize("NFC", Path(rom).name)
     if not name or name in (".", ".."):
         raise ArtError(f"{rom!r} names no file")
     art = name + EXT

@@ -55,6 +55,7 @@ cppcheck source/GBApatch.c redundantAssignment: Variable 'res' is reassigned a v
 cppcheck source/GBApatch.c redundantAssignment: Variable 'res' is reassigned a value before the old one has been used.
 cppcheck source/GBApatch.c redundantAssignment: Variable 'res' is reassigned a value before the old one has been used.
 cppcheck source/GBApatch.c unreadVariable: Variable 'res' is assigned a value that is never used.
+cppcheck source/boxart.c constParameterCallback: Parameter 'job' can be declared as pointer to const. However it seems that 'list_job' is a callback function, if 'job' is declared with const you might also need to cast function pointer(s).
 cppcheck source/ezkernelnew.c duplicateBreak: Consecutive return, break, continue, goto or throw statements are unnecessary.
 cppcheck source/ezkernelnew.c duplicateBreak: Consecutive return, break, continue, goto or throw statements are unnecessary.
 cppcheck source/ezkernelnew.c redundantAssignment: Variable 'res' is reassigned a value before the old one has been used.

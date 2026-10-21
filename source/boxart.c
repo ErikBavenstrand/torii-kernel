@@ -28,6 +28,9 @@
 #define BOXART_REST 8
 #define BOXART_AHEAD 1
 #define BOXART_WANTS (1 + 2 * BOXART_AHEAD)
+// Polls between checks of the resting cursor's cover: names (CRCs) that
+// load or are identified later can give it one
+#define BOXART_RECHECK 30
 // The listing job: cycles of work a step, and the frames the keys rest
 // before it steps (it reads the card, as the library walk does)
 #define LIST_STEP_CYCLES 40000
@@ -77,6 +80,7 @@ static struct {
 	struct artset set;
 	u32 row;  // the cursor's
 	u32 rest;  // polls since the cursor moved
+	u32 recheck;  // polls to the next check of the cursor's cover
 	u32 want_id;  // the cover the box should show, 0 the placeholder
 	u32 shown;  // the one it shows (its copy queued), 0 the placeholder
 	u8 placeholder_due;  // the placeholder's tiles and colours are to be (re)loaded
@@ -404,7 +408,9 @@ void boxart_open(u8 image, boxart_row_fn row)
 	B.want_id = 0;
 	B.signature = 0;
 	B.rest = 0;
+	// The last page's wants go with their names (a pick now would find none)
 	B.wanted = 0;
+	cover_wants_begin();
 	if (B.on)
 		boxart_poll();
 }
@@ -419,7 +425,10 @@ void boxart_select(u32 row, const u16 *palette)
 	B.palette = palette;
 	B.placeholder_due = 1;
 	struct want w;
-	B.want_id = B.on && cover_active() ? row_cover(row, &w, BOXART_WANTS) : 0;
+	u32 id = B.on && cover_active() ? row_cover(row, &w, BOXART_WANTS) : 0;
+	if (id != B.want_id)
+		B.signature = 0;  // another cover on this row (a relist): wanted anew
+	B.want_id = id;
 	sync();
 }
 
@@ -448,8 +457,18 @@ void boxart_poll(void)
 		sync();  // a show the full VRAM queue put off
 		return;
 	}
-	if (B.list != LIST_DONE)
+	if (B.list != LIST_DONE) {
+		sync();
 		return;
+	}
+	if (B.recheck) {
+		B.recheck--;
+	} else {
+		B.recheck = BOXART_RECHECK;
+		struct want w;
+		if (row_cover(B.row, &w, BOXART_WANTS) != B.want_id)
+			B.signature = 0;  // names arrived: the row has a cover now (or another)
+	}
 	u32 signature = (B.row + 1) * 0x9E3779B1u ^ library_generation() * 0x85EBCA6Bu ^ (u32)library_walking();
 	if (signature != B.signature) {
 		B.signature = signature;
