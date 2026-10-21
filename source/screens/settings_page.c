@@ -1024,10 +1024,14 @@ static void settings_poll(void)
 		relayout();
 		hints_show();
 	}
-	if (sp.saving && ((ui_settled() && !ui_wiping()) || !--sp.saving)) {
-		// "Saving..." is on screen: the write, the page staying up
-		save_now();
-		hints_show();
+	if (sp.saving) {
+		// Once "Saving..." is on screen (or after save_wait frames): the
+		// write, the page staying up
+		sp.saving--;
+		if (!sp.saving || (ui_settled() && !ui_wiping())) {
+			save_now();
+			hints_show();
+		}
 	}
 	if (sp.mode == MODE_CAPTURE) {
 		u16 shown = sp.cap.held;

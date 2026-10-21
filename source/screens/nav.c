@@ -212,13 +212,14 @@ static void current_place(struct registry_place *p)
 
 // Keeps the carousel item for Last place (home's facing item, or the open
 // page's), written with the next write of recent.txt or by the idle flush,
-// once the user has left the item the menu started on: a boot where it
-// stays the same writes nothing to the card
+// once the user has moved from where the menu started (another item, or
+// its page opened or left): a boot where nothing moves writes nothing to
+// the card, and an item already kept isn't written again
 static void remember(void)
 {
 	current_place(&nav.place);  // home's facing item, the page's row, as they are now
 	if (!nav.left_start) {
-		if (nav.place.item == nav.start.item)
+		if (nav.place.item == nav.start.item && nav.place.open == nav.start.open)
 			return;
 		nav.left_start = 1;
 	}

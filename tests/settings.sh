@@ -117,9 +117,9 @@ visit dim A RIGHT A A RIGHT B
 
 # A hotkey accepted writes once; a capture B cancels writes nothing
 # (the keys held 24 frames: a capture takes them after 18)
-capture="$(_nav_file '-k @8:A -k @12:- -k @24:L+R+DOWN -k @48:-')"
 # shellcheck disable=SC2046 # nav.sh's options
-OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_setting sleep-keys) $capture \
+OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_setting sleep-keys) \
+  $(_nav_file '-k @8:A -k @12:- -k @24:L+R+DOWN -k @48:-') \
   -w "settings: keys set" $(nav_press B) -w "nav: home ready" >"$cart/visit.log" 2>&1 ||
   fail "the hotkey capture didn't set the keys: $(tail -3 "$cart/visit.log")"
 [ "$(writes)" = 1 ] || fail "an accepted hotkey wrote the settings $(writes) times"
