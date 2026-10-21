@@ -10,6 +10,7 @@
 #include "gamename.h"
 #include "library.h"
 #include "NORflash_OP.h"
+#include "safefile.h"
 #include "tlog.h"
 #include "userdata.h"
 #include "ui/dialog.h"
@@ -202,13 +203,19 @@ int action_delete_file(const char *path)
 // card's root: its save (save_name), save type, save states, cheats and
 // patch cache (name_with_ext), and its custom box art (B22). They move with
 // it, and the save state and the rest never land on another game's: the
-// rename is refused first if one would.
+// rename is refused first if one would. A move that fails puts back what
+// moved. A journal, /torii/rename.txt (B5's safe file: the old path, a tab,
+// the new one), lasts from before the first move to after the lists follow:
+// a power cut in between is finished, or undone, at the next boot
+// (action_rename_recover).
 
 enum {
 	SIDE_SAVE,   // save_name's
 	SIDE_EXT,    // name_with_ext's, ext; GBA games only
 	SIDE_ART,    // the file name and ".bin"
 };
+#define RENAME_JOURNAL "/torii/rename.txt"
+#define RENAME_JOURNAL_MAX (2 * USERDATA_PATH_MAX + 64)  // its one line, and the CRC line
 struct sidecar {
 	const char *dir;
 	u8 kind;
@@ -227,11 +234,13 @@ static const struct sidecar sidecars[] = {
 // calls the names file, the user's lists and the library, which borrow
 // shares before it
 struct rename_work {
+	char old_path[USERDATA_PATH_MAX];  // the journal's, at boot
 	char new_path[USERDATA_PATH_MAX];
 	char name[GAME_NAME_MAX + 1];  // the old file name
 	char from[GAME_NAME_MAX + 24];  // a file's path in its folder
 	char to[GAME_NAME_MAX + 24];
 	u8 has[SIDECARS];  // the old one is there
+	u8 taken;          // ACTION_RENAME_SIDE_TAKEN: the sidecar in the way (ACTION_FILE_*)
 };
 _Static_assert(sizeof(struct rename_work) <= READCACHE_RENAME_SIZE, "the rename's share of pReadCache");
 #define RW ((struct rename_work *)(void *)(pReadCache + READCACHE_RENAME))
@@ -312,6 +321,45 @@ static u32 name_check(const char *name)
 	return ACTION_RENAMED;
 }
 
+struct journal_text {
+	const char *from, *to;
+};
+
+static u32 journal_fill(void *ctx, u32 pos, char *buf, u32 max)
+{
+	const struct journal_text *j = ctx;
+	u32 a = (u32)strlen(j->from), b = (u32)strlen(j->to), len = a + b + 2, n = 0;
+	for (; pos + n < len && n < max; n++) {
+		u32 at = pos + n;
+		buf[n] = at < a ? j->from[at] : at == a ? '\t' : at < len - 1 ? j->to[at - a - 1] : '\n';
+	}
+	return n;
+}
+
+static int journal_write(const char *from, const char *to)
+{
+	struct journal_text j = {from, to};
+	return safefile_write(RENAME_JOURNAL, RENAME_JOURNAL_MAX, journal_fill, &j);
+}
+
+static void journal_clear(void)
+{
+	f_unlink(RENAME_JOURNAL);
+	f_unlink(RENAME_JOURNAL ".bak");
+}
+
+// Moves sidecar i of game name to game to_name, for console; FR_OK too when
+// it has none
+static FRESULT side_move(u32 i, const char *name, const char *to_name, u32 console)
+{
+	struct rename_work *w = RW;
+	if (!side_path(w->from, &sidecars[i], name, console) || !side_path(w->to, &sidecars[i], to_name, console))
+		return FR_OK;
+	FRESULT res = f_rename(w->from, w->to);
+	tlog("rename: %s to %s (FatFs %u)", w->from, w->to, (unsigned)res);
+	return res;
+}
+
 u32 action_rename_file(const char *path, const char *new_name)
 {
 	struct rename_work *w = RW;
@@ -364,46 +412,107 @@ u32 action_rename_file(const char *path, const char *new_name)
 				continue;
 			if (there(w->to)) {
 				tlog("rename %s: %s is there already", path, w->to);
+				w->taken = (u8)i;
 				return ACTION_RENAME_SIDE_TAKEN;
 			}
 		}
 	}
+	if (!journal_write(path, w->new_path)) {
+		tlog("rename %s: the journal can't be written", path);
+		return ACTION_RENAME_FAILED;
+	}
 	FRESULT res = f_rename(path, w->new_path);
 	if (res != FR_OK) {
 		tlog("rename %s to %s: FatFs %u", path, new_name, (unsigned)res);
+		journal_clear();
 		return res == FR_EXIST          ? ACTION_RENAME_TAKEN
 		       : res == FR_INVALID_NAME ? ACTION_RENAME_BAD
 						: ACTION_RENAME_FAILED;
 	}
 	tlog("rename: %s to %s", path, new_name);
-	u32 partly = 0;
 	for (u32 i = 0; console != LIB_CONSOLE_NONE && i < SIDECARS; i++) {
 		const struct sidecar *s = &sidecars[i];
-		if (!side_path(w->from, s, w->name, console) || !side_path(w->to, s, new_name, console))
-			continue;
 		// A cache under the new name, another game's (a deleted one's),
 		// goes: the next launch makes it again
-		if (s->cache && !case_only && there(w->to)) {
+		if (s->cache && !case_only && side_path(w->to, s, new_name, console) && there(w->to)) {
 			res = f_unlink(w->to);
 			tlog("rename: %s goes (FatFs %u)", w->to, (unsigned)res);
 		}
-		if (!w->has[i])
+		if (!w->has[i] || side_move(i, w->name, new_name, console) == FR_OK)
 			continue;
-		res = f_rename(w->from, w->to);
-		tlog("rename: %s to %s (FatFs %u)", w->from, w->to, (unsigned)res);
-		partly |= res != FR_OK;
-		if (s->kind == SIDE_ART && res == FR_OK)
-			boxart_forget();  // its listing of the card's art follows
+		// It didn't move: what did goes back, the game first-to-last undone
+		while (i-- > 0)
+			if (w->has[i])
+				side_move(i, new_name, w->name, console);
+		res = f_rename(w->new_path, path);
+		tlog("rename %s: undone (FatFs %u)", path, (unsigned)res);
+		journal_clear();
+		return ACTION_RENAME_FAILED;
 	}
-	if (!gamename_store_move(path, w->new_path))
-		partly = 1;
-	if (!userdata_rename(path, w->new_path))
-		partly = 1;
+	if (console != LIB_CONSOLE_NONE && w->has[SIDECARS - 1])
+		boxart_forget();  // its listing of the card's art follows
+	u32 partly = !gamename_store_move(path, w->new_path);
+	partly |= !userdata_rename(path, w->new_path);
+	journal_clear();
 	if (console != LIB_CONSOLE_NONE)
 		library_renamed(path, new_name);
 	else
 		library_changed();  // the card's files: the walk counts them again
 	return partly ? ACTION_RENAME_PARTLY : ACTION_RENAMED;
+}
+
+u32 action_rename_taken(void)
+{
+	return RW->taken;
+}
+
+void action_rename_recover(void)
+{
+	struct rename_work *w = RW;
+	char *line = (char *)pReadCache;  // the stage: nothing runs beside the boot
+	if (safefile_open(RENAME_JOURNAL, RENAME_JOURNAL_MAX) == SAFEFILE_NONE)
+		return;
+	int n = safefile_line(line, 2 * USERDATA_PATH_MAX);
+	safefile_close();
+	char *tab = n > 0 ? memchr(line, '\t', (u32)n) : NULL;
+	u32 la = tab ? (u32)(tab - line) : 0, lb = tab ? (u32)n - la - 1 : 0;
+	w->old_path[0] = w->new_path[0] = 0;
+	if (tab && la < USERDATA_PATH_MAX && lb < USERDATA_PATH_MAX) {
+		memcpy(w->old_path, line, la);
+		w->old_path[la] = 0;
+		memcpy(w->new_path, tab + 1, lb);
+		w->new_path[lb] = 0;
+	}
+	const char *a = strrchr(w->old_path, '/'), *b = strrchr(w->new_path, '/');
+	if (!a || !b || strlen(a + 1) > GAME_NAME_MAX || strlen(b + 1) > GAME_NAME_MAX) {
+		tlog_error("rename: %s can't be read: it goes", RENAME_JOURNAL);
+		journal_clear();
+		return;
+	}
+	memcpy(w->name, a + 1, strlen(a + 1) + 1);
+	u32 console = library_console_of(w->name);
+	int old_there = there(w->old_path);
+	if (!old_there && !there(w->new_path)) {
+		tlog("rename: %s, cut short, is gone: the journal goes", w->old_path);
+		journal_clear();
+		return;
+	}
+	int forward = !old_there || same_name(w->name, b + 1) || there(w->new_path);
+	tlog("rename: a rename of %s to %s was cut short: %s", w->old_path, b + 1, forward ? "finished" : "undone");
+	// Each file still to move moves (forward), or each that moved goes back
+	for (u32 i = 0; console != LIB_CONSOLE_NONE && i < SIDECARS; i++) {
+		if (sidecars[i].cache || !side_path(w->from, &sidecars[i], w->name, console) ||
+		    !side_path(w->to, &sidecars[i], b + 1, console))
+			continue;
+		int from = there(w->from), to = there(w->to);
+		if (forward ? from && !to : to && !from)
+			side_move(i, forward ? w->name : b + 1, forward ? b + 1 : w->name, console);
+	}
+	if (forward) {
+		gamename_store_move(w->old_path, w->new_path);
+		userdata_rename(w->old_path, w->new_path);
+	}
+	journal_clear();
 }
 
 void action_nor_launch(u32 index, u32 hard_reset)

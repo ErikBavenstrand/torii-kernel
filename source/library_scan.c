@@ -41,7 +41,8 @@ static const char *const lib_files[2] = {"/torii/library.idx", "/torii/library.b
 #define LIB_DEPTH 8  // folders deeper than this are skipped
 #define LIB_SAVES_SLOTS 8192  // the save names' hash table, 32 KB of PSRAM
 #define LIB_SAVES_MAX (LIB_SAVES_SLOTS * 3 / 4)
-#define LIB_NAMES_MAX 0x20000u  // the most of /torii/names.txt the walk reads (128 KB)
+#define LIB_NAMES_MAX \
+	PSRAM_NAMES_TEXT_BYTES  // the most of /torii/names.txt the walk reads: what Rename reads too (116 KB)
 #define LIB_PROGRESS_FRAMES 30  // a first scan shows its dialog after this
 #define LIB_KEY_REST 30  // the job waits for the keys to rest this many frames
 #define LIB_WRITE_IDLE 120  // a background write waits for the keys to rest this long

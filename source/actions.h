@@ -85,6 +85,21 @@ enum {
 // custom name, Recent, the favourites and the library index follow it. It
 // asks nothing.
 u32 action_rename_file(const char *path, const char *new_name);
+// After ACTION_RENAME_SIDE_TAKEN: which of the game's files was in the way
+enum {
+	ACTION_FILE_SAVE,
+	ACTION_FILE_SAVE_TYPE,
+	ACTION_FILE_STATES,
+	ACTION_FILE_CHEATS,
+	ACTION_FILE_PATCH,  // never: a stale patch cache is replaced
+	ACTION_FILE_ART,
+	ACTION_FILES,
+};
+u32 action_rename_taken(void);
+// At boot, before the library or a launch reads the card: a rename the
+// power cut short (its journal, /torii/rename.txt) is finished, or undone
+// if the game's file hadn't moved, and the journal goes.
+void action_rename_recover(void);
 
 // The game NOR's list, read into pNorFS and game_total_NOR (writes nothing)
 void action_nor_read(void);

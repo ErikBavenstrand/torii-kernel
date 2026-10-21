@@ -111,6 +111,46 @@ delete)
   echo "PASS: saves delete: Delete removes the ROM, its save stays and loads when the game comes back"
   ;;
 
+rename-cut)
+  first_launch
+  first_copy
+  cp "$cart/test.sav" "$cart/kept.sav"
+  cp -r "$cart" "$carts/cut-start"
+  # The rename through the keys, as rename's power-on 3; the SD writes
+  # before it and its own, counted from the cart trace
+  rename_keys=$(nav_file /Test.gba 0)
+  # shellcheck disable=SC2086 # nav.sh's options
+  OMEGA_TRACE=1 boot $rename_keys -k @12:UP -k @16:- -k @20:UP -k @24:- -k @28:UP -k @32:- -k @40:A -k @44:- \
+    -w "screen ready: rename" -k @10:A -k @14:- -k @24:START -k @28:- -w "rename: kept" -f 2400
+  logged "rename: /Test.gba to Testq.gba"
+  first=$(sed -n '1,/safefile: writing \/torii\/rename.txt/p' "$cart/run.log" | grep -c '^omega [0-9]*: sd write' || true)
+  writes=$(sed -n '/safefile: writing \/torii\/rename.txt/,/rename: kept/p' "$cart/run.log" | grep -c '^omega [0-9]*: sd write' || true)
+  [ "$writes" -ge 6 ] || fail "the rename made only $writes SD writes"
+  results=""
+  for n in $(seq 1 "$writes"); do
+    rm -rf "$cart" && cp -r "$carts/cut-start" "$cart"
+    status=0
+    # shellcheck disable=SC2086 # nav.sh's options
+    OMEGA_POWER_CUT=sd:write:$((first + n)) OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin \
+      $rename_keys -k @12:UP -k @16:- -k @20:UP -k @24:- -k @28:UP -k @32:- -k @40:A -k @44:- \
+      -w "screen ready: rename" -k @10:A -k @14:- -k @24:START -k @28:- -f 2400 >"$cart/cut.log" 2>&1 || status=$?
+    [ $status = 75 ] || fail "no power cut before SD write $n of the rename (exit $status)"
+    # The next power-on finishes or undoes it: one game, its save and save
+    # type beside it, whole, Recent naming it, no journal left
+    boot -f 300
+    if mtype -i "$cart/sd.img" ::/Testq.gba >/dev/null 2>&1; then to=Testq other=Test results+="done "; else to=Test other=Testq results+="undone "; fi
+    ! mtype -i "$cart/sd.img" "::/$other.gba" >/dev/null 2>&1 || fail "cut before write $n: both names are on the card"
+    mtype -i "$cart/sd.img" "::/SAVER/$to.sav" | cmp -s - "$cart/kept.sav" || fail "cut before write $n: $to.sav isn't the save"
+    ! mtype -i "$cart/sd.img" "::/SAVER/$other.sav" >/dev/null 2>&1 || fail "cut before write $n: $other.sav is left"
+    mtype -i "$cart/sd.img" "::/SAVER/$to.mde" >/dev/null 2>&1 || fail "cut before write $n: $to.mde is missing"
+    ! mtype -i "$cart/sd.img" ::/torii/rename.txt >/dev/null 2>&1 || fail "cut before write $n: the journal is left"
+    # (the copy a reader takes: recent.txt, or its backup when the cut broke it)
+    { mtype -i "$cart/sd.img" ::/torii/recent.txt; mtype -i "$cart/sd.img" ::/torii/recent.txt.bak; } 2>/dev/null |
+      grep "	/$to.gba$" >/dev/null || fail "cut before write $n: Recent doesn't name /$to.gba"
+  done
+  echo "PASS: saves rename-cut: a power cut before any of the rename's $writes SD writes leaves one game with its save ($results)"
+  ;;
+
 rename)
   first_launch
   first_copy

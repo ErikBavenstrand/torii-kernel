@@ -88,6 +88,14 @@ static int has_line(const char *path, const char *line)
 }
 
 static const char *const files[] = {
+	T_DIR "/Fwd2.gba",
+	"/SAVER/Fwd.sav",
+	"/SAVER/Fwd2.sav",
+	T_DIR "/Back.gba",
+	"/SAVER/Back.sav",
+	"/SAVER/Back2.sav",
+	"/torii/rename.txt",
+	"/torii/rename.txt.bak",
 	T_DIR "/Game.gba",
 	T_DIR "/New.gba",
 	T_DIR "/new.gba",
@@ -195,6 +203,26 @@ void test_rename_file(void)
 	CHECK(put(T_DIR "/notes.txt", "notes"));
 	CHECK_EQ(action_rename_file(T_DIR "/notes.txt", "read me.txt"), ACTION_RENAMED);
 	CHECK(holds(T_DIR "/read me.txt", "notes") && !there(T_DIR "/notes.txt"));
+	CHECK(!there("/torii/rename.txt") && !there("/torii/rename.txt.bak"));  // the journal went
+
+	// A rename the power cut short, at the next boot: the game had moved, so
+	// what is left moves and the lists follow
+	CHECK(put(T_DIR "/Fwd2.gba", "fwd"));
+	CHECK(put("/SAVER/Fwd.sav", "fwd save"));
+	CHECK(userdata_fav_set(T_DIR "/Fwd.gba", 1));
+	CHECK(put("/torii/rename.txt", T_DIR "/Fwd.gba\t" T_DIR "/Fwd2.gba\n"));
+	action_rename_recover();
+	CHECK(!there("/SAVER/Fwd.sav") && holds("/SAVER/Fwd2.sav", "fwd save"));
+	CHECK(userdata_fav_has(T_DIR "/Fwd2.gba") && !userdata_fav_has(T_DIR "/Fwd.gba"));
+	CHECK(!there("/torii/rename.txt"));
+	// The game hadn't moved: what had goes back
+	CHECK(put(T_DIR "/Back.gba", "back"));
+	CHECK(put("/SAVER/Back2.sav", "back save"));
+	CHECK(put("/torii/rename.txt", T_DIR "/Back.gba\t" T_DIR "/Back2.gba\n"));
+	action_rename_recover();
+	CHECK(!there("/SAVER/Back2.sav") && holds("/SAVER/Back.sav", "back save") && there(T_DIR "/Back.gba"));
+	CHECK(!there("/torii/rename.txt"));
+	action_rename_recover();  // no journal: nothing
 
 	tidy();
 	f_unlink("/torii/art/custom");

@@ -577,7 +577,7 @@ static const char *rename_submit(void *ctx, const char *stem)
 	case ACTION_RENAME_HIDDEN:
 		return gl_rename->hidden;
 	case ACTION_RENAME_SIDE_TAKEN:
-		return gl_rename->side_taken;
+		return gl_rename->side_taken[action_rename_taken() % ACTION_FILES];
 	case ACTION_RENAME_PENDING:
 		return gl_rename->pending;
 	case ACTION_RENAME_SHARED:

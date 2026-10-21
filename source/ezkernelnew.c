@@ -10,6 +10,7 @@
 #include <stdarg.h>
 #include <gba_timers.h>
 
+#include "actions.h"
 #include "ez_define.h"
 #include "ff.h"
 #include "ui/dialog.h"
@@ -1128,6 +1129,7 @@ int main(void)
 	// glitch), and the next write then went over them.
 	game_total_NOR = GetFileListFromNor();//initialize to prevent direct writes to NOR without page turning
 	Migrate_NOR_list(game_total_NOR);
+	action_rename_recover();  // a rename the power cut short, before anything reads the card's games
 	library_boot();  // the index, or the first scan
 	Boot_notice_check();
 	tlog_debug("boot: handing over %lu frames after mounting", (unsigned long)(torii_frames - boot_mounted));

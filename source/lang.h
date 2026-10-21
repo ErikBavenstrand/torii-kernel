@@ -230,7 +230,8 @@ struct lang_rename {
 	const char *title;  // its title bar
 	const char *hint_type, *hint_delete, *hint_case, *hint_ok;  // A, B, SELECT, START
 	const char *key_lower, *key_upper, *key_latin, *key_space, *key_cancel, *key_ok;  // the function row
-	const char *empty, *taken, *bad, *hidden, *side_taken, *pending, *shared, *failed;  // OK refused
+	const char *empty, *taken, *bad, *hidden, *pending, *shared, *failed;  // OK refused
+	const char *side_taken[6];  // a file in the way, by actions.h's ACTION_FILE_*
 	const char *partly;       // renamed, but not everything followed (a dialog after)
 	const char *name_failed;  // a game's name couldn't be written (a dialog after)
 	const char *discard, *discard_button;  // Cancel with changes: the confirmation
