@@ -411,10 +411,14 @@ Since v0.4.2 Torii keeps two copies (`source/setrecord.h`): A at `+0x7B0000`
 and B at `+0x7B2000`, the next 8 KB boot sector. Slots 248–255 hold a
 sequence number, a CRC-32 and the magic `TSE1`, whose second half (slot 255)
 is programmed last. A save writes the copy the settings weren't read from;
-the reader takes the whole copy with the higher number. An A whose slot 255
-is `0` was written by an older kernel (the official one, or Torii before
-v0.4.2) and wins over both, so a downgrade's changes stay; a torn Torii write
-never leaves that slot `0`. With no whole copy the kernel reads A as it is,
+the reader takes the whole copy with the higher number. An A whose slots
+0–64 aren't all `0` and whose slots 65–255 are all `0` was written by an older
+kernel (the official one, or Torii before v0.4.2) and wins over both, so a
+downgrade's changes stay. A torn Torii program never leaves slot 255 `0`; a
+torn erase can (the chip programs the sector to `0` before erasing it), but
+leaves slots 0–64 `0` too, or 0s and 1s at random, so B wins. The emulated
+cart's `OMEGA_POWER_CUT=kernel:erasing:N` leaves a sector at `0` this way.
+With no whole copy the kernel reads A as it is,
 and its next save writes B, then A. On a bottom-boot S29GL064A the window's
 top 64 KB is one sector, so both copies share it and a cut can still lose
 both, as the single copy could. The hotkey slots 5–10 are written as the defaults the settings page
