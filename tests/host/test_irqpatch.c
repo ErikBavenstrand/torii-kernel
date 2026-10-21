@@ -1,4 +1,4 @@
-// Find_irq_table_entry and Hotkey_value (source/irqpatch.c), with the kernel's
+// Find_irq_table_entry (source/irqpatch.c), with the kernel's
 // real table. The tables tested here are heap copies, so AddressSanitizer
 // catches a read past their end.
 #include <stdlib.h>
@@ -85,22 +85,12 @@ void test_irq_literals(void)
 	CHECK(!Is_irq_literal(0));
 }
 
-void test_hotkey_value(void)
+void test_hotkey_off(void)
 {
-	static const u16 sleep[3] = {9, 8, 2}, menu[3] = {9, 8, 3};
-
-	// L+R+START: the KEYINPUT bits that must read 0 (held).
-	CHECK_EQ(Hotkey_value((const u16[]){9, 8, 3}, menu), 0x308);
-	CHECK_EQ(Hotkey_value((const u16[]){9, 8, 2}, sleep), 0x304);
-	CHECK_EQ(Hotkey_value((const u16[]){0, 1, 2}, sleep), 0x007);
-	// Erased slots read 0xFFFF and fall back to the keys the settings page
-	// shows; before, 1 << 0xFFFF made the key "no key held".
-	CHECK_EQ(Hotkey_value((const u16[]){0xFFFF, 0xFFFF, 0xFFFF}, menu), 0x308);
-	CHECK_EQ(Hotkey_value((const u16[]){10, 8, 0xFFFF}, sleep), 0x304);
-
 	// The patched handler's match: every key of the hotkey held (0), any
-	// others too, as tst KEYINPUT, key does. L+R+START+DOWN opens the menu.
-	u16 key = Hotkey_value(menu, menu);
+	// others too, as tst KEYINPUT, key does. L+R+START+DOWN opens the menu
+	// on L+R+START (0x308, settings_hotkeys).
+	const u16 key = 0x308;
 	CHECK_EQ(0x3FF & ~(0x308 | 0x080) & key, 0);
 	CHECK((0x3FF & ~0x300) & key);  // L+R only: no
 	CHECK_EQ(0x3FF & ~0x3FF & key, 0);  // everything held: yes

@@ -105,7 +105,7 @@ RTS_irq:
 
 	ldr 		r2,[r0,#REG_P1]
 	
-	@; Torii: a hotkey is the mask of its keys (Hotkey_value), and matches when
+	@; Torii: a hotkey is the mask of its keys (settings_hotkeys), and matches when
 	@; they are all held (0 in REG_P1), whatever else is: an extra or stuck key
 	@; used to block it. HOTKEY_OFF needs all ten held, which the D-pad can't.
 	@;check ingamemenu

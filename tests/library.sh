@@ -311,3 +311,28 @@ if shard_case; then
   no_errors "$cart/4.log"
   echo "PASS: the index is loaded again after a failed launch and after a game"
 fi
+
+if shard_case; then
+  # /torii a file: the index can't be kept on the card. Each boot scans,
+  # keeps the index in RAM and says so once, as an error; a Rescan doesn't
+  # try the write again
+  cart=$carts/torii-file
+  new_card "$cart"
+  put "$cart" "/Root Game.gba"
+  printf 'not a folder\n' >"$cart/torii"
+  mcopy -i "$cart/sd.img" "$cart/torii" ::/torii
+  for n in 1 2; do
+    boot "$cart" "$cart/$n.log" -f 600
+    logged "$cart/$n.log" "library: new index: 1 games"
+    [ "$(grep -c '^kernel error:' "$cart/$n.log")" = 1 ] || fail "boot $n's errors: $(grep '^kernel error:' "$cart/$n.log")"
+    grep -q '^kernel error: library: can.t make /torii/library.idx (FatFs error [0-9]*; /torii is a file): the index is kept in RAM' \
+      "$cart/$n.log" || fail "boot $n didn't say why the index isn't kept: $(grep '^kernel error:' "$cart/$n.log")"
+  done
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot "$cart" "$cart/3.log" $(nav_setting rescan) $(nav_press A) -f 1500
+  [ "$(grep -c 'kernel: library: new index: 1 games' "$cart/3.log")" = 2 ] || fail "Rescan didn't build the index"
+  # (the user's lists, written after Settings, can't be kept either: their own errors)
+  [ "$(grep -c '^kernel error: library:' "$cart/3.log")" = 1 ] ||
+    fail "Rescan tried the write again: $(grep '^kernel error: library:' "$cart/3.log")"
+  echo "PASS: with /torii a file, each boot keeps the index in RAM and says so once"
+fi

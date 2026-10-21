@@ -194,3 +194,19 @@ grep -q '^kernel: nor: erased the game NOR' "$format/3-format.log" ||
 recent=$(recent_list "$format")
 [ "$recent" = "/Other.gba " ] || fail "after FORMAT ALL, Recent has '$recent'"
 echo "PASS: FORMAT ALL takes every NOR game off Recent"
+
+# A path with "." and ".." parts starts its game and goes on Recent as the
+# plain path (v0.4.1 stored it as given)
+cart=$carts/stale-canonical
+rm -rf "$cart" && mkdir -p "$cart"
+mkfs.fat -C -F 32 -n STALE "$cart/sd.img" 65536 >/dev/null
+mmd -i "$cart/sd.img" ::/SAVER ::/deep
+mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/Hello.gba
+# shellcheck disable=SC2046 # nav.sh's options
+OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch /deep/./../Hello.gba at=130) -f 600 \
+  >"$cart/launch.log" 2>&1 || fail "the emulator failed: $(tail -3 "$cart/launch.log")"
+grep -q 'launch: loading' "$cart/launch.log" ||
+  fail "/deep/./../Hello.gba didn't start: $(grep '^kernel' "$cart/launch.log" | tail -3)"
+recent=$(recent_list "$cart")
+[ "$recent" = "/Hello.gba " ] || fail "after /deep/./../Hello.gba, Recent has '$recent'"
+echo "PASS: a path with . and .. parts starts its game and goes on Recent plain"

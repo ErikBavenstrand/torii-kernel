@@ -579,6 +579,7 @@ static const struct lang_rename en_rename = {
 	.failed = "The card didn't take it.",
 	.partly = "Renamed, but not all of its files",
 	.name_failed = "Can't keep the name",
+	.names_full = "names.txt is too large to change",
 	.discard = "Discard changes?",
 	.discard_button = "Discard",
 };

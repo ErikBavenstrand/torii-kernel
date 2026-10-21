@@ -27,8 +27,9 @@ mkdir -p "$cart" "$shots"
 mkfs.fat -C -F 32 -n CHEATS "$cart/sd.img" 65536 >/dev/null
 mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/Hello.gba
 mmd -i "$cart/sd.img" ::/CHEAT
-# Sections named in Latin-1 (e acute) and GBK, each with one entry, then ASCII
-printf '[Vie infinie \xe9]\r\nON=1234,56;\r\n\r\n[\xbd\xf0\xc7\xae]\r\nON=1235,57;\r\n\r\n[Plain]\r\nON=1236,58;\r\n\r\n[GameInfo]\r\nName=Hello\r\n' \
+# Sections named in Latin-1 (e acute) and GBK, each with one entry, then ASCII;
+# names keep their inner spaces, padding around names and values is dropped
+printf '[ Vie infinie \xe9 ]\r\nON = 1234, 56;\r\n\r\n[\xbd\xf0\xc7\xae]\r\nON=1235,57;\r\n\r\n[Plain]\r\nON hold =1236,58;\r\n\r\n[GameInfo]\r\nName=Hello\r\n' \
   >"$cart/Hello.cht"
 mcopy -i "$cart/sd.img" "$cart/Hello.cht" ::/CHEAT/Hello.cht
 
@@ -46,7 +47,7 @@ fresh() {
 }
 
 # Hello's popup on the GBA page, Boot with addon (its fourth item), then the
-# cheat screen; dump the parsed list, whose names lose their spaces
+# cheat screen; dump the parsed list
 list=$((16#$(sed -n 's/^\([0-9a-f]*\) [A-Za-z] pReadCache$/\1/p' dist/ezkernelnew.nm) + 0x2000))
 # shellcheck disable=SC2046 # nav.sh's options
 boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @20:DOWN -k @24:- -k @28:DOWN -k @32:- -k @40:A -k @44:- \
@@ -54,8 +55,11 @@ boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @20:DOWN -k @24:- -k @28:DOW
   >"$cart/out.txt" 2>"$cart/err.txt" || fail "the cheat screen didn't open: $(grep '^kernel' "$cart/err.txt" | tail -3)"
 sed -n 's/^mem frame [0-9]* [0-9A-F]*: //p' "$cart/out.txt" | python3 -c 'import sys; sys.stdout.buffer.write(bytes.fromhex(sys.stdin.read()))' >"$cart/list.bin"
 [ -s "$cart/list.bin" ] || fail "no memory dump: $(tail -3 "$cart/out.txt")"
-for name in $'Vieinfinie\xe9' $'\xbd\xf0\xc7\xae' Plain; do
+for name in $'Vie infinie \xe9' $'\xbd\xf0\xc7\xae' Plain 'ON hold'; do
   grep -qaF -- "$name" "$cart/list.bin" || fail "the cheat list lacks section $(printf %q "$name")"
+done
+for pad in ' Vie' $'\xe9 ' 'hold '; do
+  ! grep -qaF -- "$pad" "$cart/list.bin" || fail "a cheat name kept its padding: $(printf %q "$pad")"
 done
 [ "$(grep -aoF ON "$cart/list.bin" | wc -l)" -eq 3 ] ||
   fail "the cheat list has $(grep -aoF ON "$cart/list.bin" | wc -l) entries, expected 3"

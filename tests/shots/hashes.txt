@@ -95,8 +95,9 @@ games-box-switch/frames 3-3 D4DD55491F22C7F2
 games-box-switch/frames 4-5 E3A4AD640FBC14D2
 games-box-switch/frames 6-28 9F73E48DF1E05512
 games-cheats/back DE60914D027457D0
-games-cheats/picked BFDAFB041DCC8050
-games-cheats/screen C49F10B375086F38
+games-cheats/picked 7A30C1D452B22270
+games-cheats/screen 666C1C7A8C10C858
+games-dedupe/screen 67E86C46698E404E
 games-fav/screen 5F5922C2D6F31804
 games-fav/starred 9420B42D7CAE4C1D
 games-fav/toggled 7CEBC3F5B0C881EB

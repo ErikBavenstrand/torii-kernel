@@ -239,6 +239,7 @@ struct lang_rename {
 	const char *side_taken[6];  // a file in the way, by actions.h's ACTION_FILE_*
 	const char *partly;       // renamed, but not everything followed (a dialog after)
 	const char *name_failed;  // a game's name couldn't be written (a dialog after)
+	const char *names_full;   // ... as names.txt is too large or holds too many names
 	const char *discard, *discard_button;  // Cancel with changes: the confirmation
 };
 extern const struct lang_rename *gl_rename;

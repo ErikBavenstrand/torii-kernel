@@ -18,13 +18,6 @@ int Is_irq_literal(u32 word);
 // blank) is never listed.
 int Find_irq_table_entry(const u32 *table, u32 words, const u8 code[4], u32 *pos, const u32 **offsets);
 
-// The KEYINPUT bits of the three keys in slots[] (0 A, 1 B, 2 SELECT,
-// 3 START, 4 RIGHT, 5 LEFT, 6 UP, 7 DOWN, 8 R, 9 L). The patched IRQ handler
-// matches when they all read 0 (held), whatever the other keys do. A slot
-// past 9, such as erased NOR's 0xFFFF, counts as the key in defaults[], as
-// the settings page shows it.
-u16 Hotkey_value(const u16 slots[3], const u16 defaults[3]);
-
 // A hotkey that is off: all ten keys, which the D-pad can't hold at once.
 #define HOTKEY_OFF 0x3FF
 

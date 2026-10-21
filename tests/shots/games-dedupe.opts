@@ -1,0 +1,12 @@
+# Two games in different folders that clean to one name with the same tags
+# (gamename_dedupe): each row adds its folder's name, "Hello (USA) (A)" and
+# "Hello (USA) (B)", as the rows pass their paths (v0.4.1 passed file names,
+# and both showed one name). RIGHT jumps a letter: B, G, then H.
+#! sd-file "/A/Hello (USA).gba" 0 tests/roms/hello/hello.gba
+#! sd-file "/B/Hello (USA).gba" 0 tests/roms/hello/hello.gba
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-k @8:RIGHT -k @12:- -k @40:RIGHT -k @44:- -k @72:RIGHT -k @76:-
+-s @110:screen.png

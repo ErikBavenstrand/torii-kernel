@@ -187,7 +187,15 @@ static int write_copy(const char *name, safefile_fill fill, void *ctx)
 		res = f_open(&sf_file, name, FA_WRITE | FA_CREATE_ALWAYS);
 	}
 	if (res != FR_OK) {
-		tlog_error("safefile: can't write %s (FatFs %u)", name, (unsigned)res);
+		// A file the card won't make (/torii a file, a write-protected
+		// card) fails every write the same way: an error once a boot
+		static u8 told;
+		int unmakeable = res == FR_NO_PATH || res == FR_EXIST || res == FR_DENIED || res == FR_WRITE_PROTECTED;
+		if (unmakeable && told)
+			tlog("safefile: can't write %s (FatFs %u)", name, (unsigned)res);
+		else
+			tlog_error("safefile: can't write %s (FatFs %u)", name, (unsigned)res);
+		told |= (u8)unmakeable;
 		return 0;
 	}
 	u32 crc = 0, pos = 0, n;

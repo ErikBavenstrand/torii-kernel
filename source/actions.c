@@ -14,6 +14,7 @@
 #include "safefile.h"
 #include "tlog.h"
 #include "userdata.h"
+#include "engine/cycles.h"
 #include "ui/dialog.h"
 #include "ui/ui.h"
 
@@ -52,6 +53,7 @@ static int copy_path(const char *path)
 	if (len >= sizeof(path_copy))
 		return 0;
 	memcpy(path_copy, path, len + 1);
+	userdata_canonical(path_copy);  // "/deep/../x.gba" starts, and goes on Recent, as "/x.gba"
 	return 1;
 }
 
@@ -336,6 +338,103 @@ static int there_shared(const char *path, const char *save)
 	return 0;
 }
 
+// The walk for another game with the save (share_walk): the folders open on
+// the way down, the entry read and the path of the folder it's in
+#define SHARE_DEPTH 16  // twice the library's walk; a deeper folder can't be checked
+struct share_walk {
+	DIR dirs[SHARE_DEPTH];  // first: word-aligned
+	FILINFO fi;
+	char path[USERDATA_PATH_MAX];
+	char save[SAVE_NAME_MAX];
+	u16 len[SHARE_DEPTH];
+};
+_Static_assert(sizeof(struct share_walk) <= READCACHE_SHARE_SIZE, "the share walk's part of pReadCache");
+_Static_assert(READCACHE_SHARE + READCACHE_SHARE_SIZE <= READCACHE_RENAME, "the share walk reaches the rename's");
+#define SW ((struct share_walk *)(void *)(pReadCache + READCACHE_SHARE))
+
+enum {
+	SHARE_NONE,
+	SHARE_FOUND,
+	SHARE_UNSURE
+};
+
+// Whether a game file other than path has the save file save or save2
+// (the name it would move to), on the whole card: hidden folders and games
+// the index doesn't hold too (past its cap, names too long). SHARE_UNSURE
+// when a folder can't be read or is too deep.
+static u32 share_walk(const char *path, const char *save, const char *save2)
+{
+	struct share_walk *sw = SW;
+	u32 start = cycles_now(), files = 0, result = SHARE_NONE;
+	s32 depth = 0;
+	if (f_opendir(&sw->dirs[0], "/") != FR_OK)
+		return SHARE_UNSURE;
+	sw->path[0] = 0;
+	sw->len[0] = 0;
+	for (;;) {
+		DIR *dir = &sw->dirs[depth], *sub = depth + 1 < SHARE_DEPTH ? &sw->dirs[depth + 1] : NULL;
+		FRESULT fr = f_readdir_sub(dir, &sw->fi, sub);
+		const char *name = sw->fi.fname;
+		if (fr == FR_INT_ERR && depth > 0) {
+			// A damaged folder, which the library's walk leaves out too:
+			// skipped, so one can't block every rename on the card
+			tlog("rename: %s can't be read (FatFs %u): its games aren't checked for the save", sw->path,
+			     (unsigned)fr);
+			f_closedir(dir);
+			sw->path[sw->len[--depth]] = 0;
+			continue;
+		}
+		if (fr != FR_OK) {
+			tlog("rename: %s can't be read (FatFs %u): its games' saves can't be checked",
+			     depth ? sw->path : "/", (unsigned)fr);
+			result = SHARE_UNSURE;
+			break;
+		}
+		if (!name[0]) {  // the folder is done
+			f_closedir(dir);
+			if (depth-- == 0)
+				break;
+			sw->path[sw->len[depth]] = 0;
+			continue;
+		}
+		if (sw->fi.fattrib & 0x08)
+			continue;  // a volume label
+		u32 n = (u32)strlen(name), len = sw->len[depth];
+		if (sw->fi.fattrib & AM_DIR) {
+			if (!sub || !sub->obj.fs || len + 1 + n >= sizeof(sw->path)) {
+				if (sub && sub->obj.fs)
+					f_closedir(sub);
+				tlog("rename: %s/%s is too deep to check for its save", sw->path, name);
+				result = SHARE_UNSURE;
+				break;
+			}
+			sw->path[len] = '/';
+			memcpy(sw->path + len + 1, name, n + 1);
+			sw->len[++depth] = (u16)(len + 1 + n);
+			continue;
+		}
+		u32 console = library_console_of(name);
+		if (console == LIB_CONSOLE_NONE)
+			continue;
+		files++;
+		save_name(sw->save, name, console);
+		if (!same_name(sw->save, save) && !same_name(sw->save, save2))
+			continue;
+		// The file itself: its folder and name are path's
+		const char *slash = strrchr(path, '/');
+		if ((u32)(slash - path) == len && !strncmp(path, sw->path, len) && same_name(slash + 1, name))
+			continue;
+		tlog("rename %s: %s/%s has the save %s", path, sw->path, name, sw->save);
+		result = SHARE_FOUND;
+		break;
+	}
+	while (result != SHARE_NONE && depth >= 0)
+		f_closedir(&sw->dirs[depth--]);  // the folders the walk left open
+	tlog("rename: %lu games on the card checked for the save in %lu ms", (unsigned long)files,
+	     (unsigned long)(cycles_since(start) / 16780u));
+	return result;
+}
+
 // 1 if a new name for a file is one the card and the menu keep
 static u32 name_check(const char *name)
 {
@@ -381,12 +480,14 @@ static void journal_clear(void)
 
 // Moves sidecar i of game name to game to_name, for console; FR_OK too when
 // it has none
+u8 action_rename_fail_file;
+
 static FRESULT side_move(u32 i, const char *name, const char *to_name, u32 console)
 {
 	struct rename_work *w = RW;
 	if (!side_path(w->from, &sidecars[i], name, console) || !side_path(w->to, &sidecars[i], to_name, console))
 		return FR_OK;
-	FRESULT res = f_rename(w->from, w->to);
+	FRESULT res = action_rename_fail_file == i + 1 ? FR_DENIED : f_rename(w->from, w->to);
 	tlog("rename: %s to %s (FatFs %u)", w->from, w->to, (unsigned)res);
 	return res;
 }
@@ -422,23 +523,44 @@ u32 action_rename_file(const char *path, const char *new_name)
 		if (strlen(save) > SAV_INFO_NAME_MAX)
 			return ACTION_RENAME_BAD;  // the pending-save record couldn't name it
 		int pending = pending_save_named(save);
+		char save_to[SAVE_NAME_MAX];
+		memcpy(save_to, save, sizeof(save_to));
 		save_name(save, w->name, console);
 		if (pending || pending_save_named(save)) {
 			tlog("rename %s: a save still waits to be copied", path);
 			return ACTION_RENAME_PENDING;
 		}
+		int any = 0;
+		for (u32 i = 0; i < SIDECARS; i++) {
+			w->has[i] = side_path(w->from, &sidecars[i], w->name, console) && there(w->from);
+			any |= w->has[i] && !sidecars[i].cache;
+		}
 		// A save another game shares (the same name in another folder, or
-		// a .gb and .gbc of one name) stays with it: moving it would take
-		// it away
-		if (!case_only && there_shared(path, save)) {
-			tlog("rename %s: another game uses its save %s", path, save);
+		// a .gb and .gbc of one name) stays with it: moving it, or its save
+		// type or states, would take them away; and one moved to the save
+		// name of another game (that has none yet) would be that game's too.
+		// The index first, then the whole card (hidden folders, games past
+		// the index's cap); when a folder can't be checked, nothing moves
+		if (!case_only && there(w->new_path)) {  // its folder has the name: say that, not the save
+			tlog("rename %s: %s is there already", path, w->new_path);
+			return ACTION_RENAME_TAKEN;
+		}
+		u32 shared = SHARE_NONE;
+		if (!case_only && any)
+			shared = there_shared(path, save) || there_shared(path, save_to)
+					 ? SHARE_FOUND
+					 : share_walk(path, save, save_to);
+		if (shared != SHARE_NONE) {
+			tlog("rename %s: %s %s or %s", path,
+			     shared == SHARE_FOUND ? "another game uses the save"
+						   : "can't check who else uses the save",
+			     save, save_to);
 			return ACTION_RENAME_SHARED;
 		}
 		// Nothing lands on another game's file, its own or one a deleted
 		// game left (a new case of its own name keeps its own files)
 		for (u32 i = 0; i < SIDECARS; i++) {
 			const struct sidecar *s = &sidecars[i];
-			w->has[i] = side_path(w->from, s, w->name, console) && there(w->from);
 			if (s->cache || case_only || !side_path(w->to, s, new_name, console))
 				continue;
 			if (there(w->to)) {
@@ -492,6 +614,40 @@ u32 action_rename_file(const char *path, const char *new_name)
 	return partly ? ACTION_RENAME_PARTLY : ACTION_RENAMED;
 }
 
+// Drops path, a second name of keep's file (a cut inside f_rename), without
+// touching the file: FR_OK once dropped, FR_DENIED if they are two files
+static FRESULT drop_alias(const char *path, const char *keep)
+{
+	FRESULT res = f_unlink_alias(path, keep);
+	if (res == FR_OK)
+		tlog("rename: %s was a second name of %s: it goes, the file stays", path, keep);
+	else if (res != FR_DENIED)
+		tlog_error("rename: %s: can't drop a second name (FatFs %u)", path, (unsigned)res);
+	return res;
+}
+
+// The same after a case-only rename, whose two names a path can't tell
+// apart: the names in path's folder that are path's but for case, on its
+// file's chain, go. 0 on a card error
+static int drop_case_aliases(const char *path)
+{
+	char dir[USERDATA_PATH_MAX];
+	const char *slash = strrchr(path, '/');
+	u32 len = slash ? (u32)(slash - path) : 0;
+	if (!slash || len >= sizeof(dir))
+		return 1;
+	memcpy(dir, path, len);
+	dir[len ? len : 1] = 0;
+	if (!len)
+		dir[0] = '/';
+	FRESULT res = f_unlink_case_aliases(dir, slash + 1, &fileinfo);
+	if (res == FR_OK)
+		tlog("rename: another case of %s was a second name of it: it goes, the file stays", path);
+	else if (res != FR_NO_FILE && res != FR_NO_PATH)  // (no such folder: nothing there)
+		tlog_error("rename: %s: can't drop a second name (FatFs %u)", path, (unsigned)res);
+	return res == FR_OK || res == FR_NO_FILE || res == FR_NO_PATH;
+}
+
 u32 action_rename_taken(void)
 {
 	return RW->taken;
@@ -522,28 +678,70 @@ void action_rename_recover(void)
 	}
 	memcpy(w->name, a + 1, strlen(a + 1) + 1);
 	u32 console = library_console_of(w->name);
-	int old_there = there(w->old_path);
-	if (!old_there && !there(w->new_path)) {
+	int old_there = there(w->old_path), new_there = there(w->new_path);
+	int case_only = same_name(w->name, b + 1);  // one entry: both paths find it
+	if (!old_there && !new_there) {
 		tlog("rename: %s, cut short, is gone: the journal goes", w->old_path);
 		journal_clear();
 		return;
 	}
-	int forward = !old_there || same_name(w->name, b + 1) || there(w->new_path);
+	if (old_there && new_there && !case_only) {
+		// Both names: the cut came inside f_rename, which writes the new
+		// entry before it removes the old, so they share one cluster chain
+		// (f_unlink would free it under the new name); or two files, the
+		// new name another game's, and nothing moved
+		FRESULT res = drop_alias(w->old_path, w->new_path);
+		if (res == FR_DENIED) {
+			tlog("rename: %s and %s are two files: nothing was renamed", w->old_path, w->new_path);
+			journal_clear();
+		}
+		if (res != FR_OK)
+			return;  // a card error: the journal stays for the next boot
+		old_there = 0;
+	}
+	if (case_only && !drop_case_aliases(w->new_path))
+		return;
+	int forward = !old_there || case_only, failed = 0, kept = 1;
 	tlog("rename: a rename of %s to %s was cut short: %s", w->old_path, b + 1, forward ? "finished" : "undone");
-	// Each file still to move moves (forward), or each that moved goes back
-	for (u32 i = 0; console != LIB_CONSOLE_NONE && i < SIDECARS; i++) {
+	// Each file still to move moves (forward), or each that moved goes back;
+	// one left under both names (a cut inside its f_rename) loses the name
+	// it isn't going to
+	for (u32 i = 0; console != LIB_CONSOLE_NONE && i < SIDECARS && !failed; i++) {
 		if (sidecars[i].cache || !side_path(w->from, &sidecars[i], w->name, console) ||
 		    !side_path(w->to, &sidecars[i], b + 1, console))
 			continue;
+		if (case_only) {
+			kept &= drop_case_aliases(w->to);
+			continue;
+		}
 		int from = there(w->from), to = there(w->to);
-		if (forward ? from && !to : to && !from)
-			side_move(i, forward ? w->name : b + 1, forward ? b + 1 : w->name, console);
+		if (from && to) {
+			FRESULT res = drop_alias(forward ? w->from : w->to, forward ? w->to : w->from);
+			kept &= res == FR_OK || res == FR_DENIED;
+		} else if ((forward ? from && !to : to && !from) &&
+			   side_move(i, forward ? w->name : b + 1, forward ? b + 1 : w->name, console) != FR_OK) {
+			failed = forward;  // going back, what stays is the game's still
+		}
+	}
+	if (failed) {
+		// A file that won't move (a full card): the rename is undone, as a
+		// live rename's is, so the game and its save keep one name
+		for (u32 i = 0; i < SIDECARS; i++)
+			if (!sidecars[i].cache && side_path(w->from, &sidecars[i], w->name, console) &&
+			    side_path(w->to, &sidecars[i], b + 1, console) && there(w->to) && !there(w->from))
+				side_move(i, b + 1, w->name, console);
+		FRESULT res = f_rename(w->new_path, w->old_path);
+		tlog_error("rename: finishing %s's rename failed: undone (FatFs %u)", w->old_path, (unsigned)res);
+		if (res == FR_OK)
+			journal_clear();
+		return;
 	}
 	if (forward) {
 		gamename_store_move(w->old_path, w->new_path);
 		userdata_rename(w->old_path, w->new_path);
 	}
-	journal_clear();
+	if (kept)
+		journal_clear();  // else a card error: the next boot looks again
 }
 
 void action_nor_launch(u32 index, u32 hard_reset)

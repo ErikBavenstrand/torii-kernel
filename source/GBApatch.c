@@ -15,6 +15,7 @@
 #include "irqpatch.h"
 #include "progress.h"
 #include "savename.h"
+#include "settings_model.h"
 #include "tlog.h"
 
 u32 windows_offset;
@@ -311,10 +312,16 @@ static void Patch_B_address(void)
 	}
 }
 //------------------------------------------------------------------
-//Torii: the hotkeys the settings page shows for unset (erased) slots:
-//L R SELECT and L R START. Without them an erased slot gave 1 << 0xFFFF.
-static const u16 sleep_hotkey_default[3] = {9, 8, 2};
-static const u16 rts_hotkey_default[3] = {9, 8, 3};
+//Torii: the hotkeys as Settings shows them (settings_hotkeys): an erased
+//slot, or a stored pair Settings wouldn't accept, falls back to L R START
+//and L R SELECT.
+static void Read_hotkeys(u16 *reset, u16 *sleep)
+{
+	u16 slots[assress_max];
+	for (u32 a = 0; a < assress_max; a++)
+		slots[a] = Read_SET_info(a);
+	settings_hotkeys(slots, reset, sleep);
+}
 static void Patch_Reset_Sleep(u32 *Data)
 {
 	(void)Data;
@@ -331,14 +338,8 @@ static void Patch_Reset_Sleep(u32 *Data)
 	dmaCopy((void *)p_patch_start, patchbuffer, p_patch_end - p_patch_start);
 	*(vu32 *)(patchbuffer + Return_address_offset) = Return_address;//修改gba_sleep_patch_bin里面的返回地址
 
-	u16 read5 = Read_SET_info(assress_edit_sleephotkey_0);
-	u16 read6 = Read_SET_info(assress_edit_sleephotkey_1);
-	u16 read7 = Read_SET_info(assress_edit_sleephotkey_2);
-	u16 read8 = Read_SET_info(assress_edit_rtshotkey_0);
-	u16 read9 = Read_SET_info(assress_edit_rtshotkey_1);
-	u16 read10 = Read_SET_info(assress_edit_rtshotkey_2);
-	u16 sleep_key = Hotkey_value((const u16[]){read5, read6, read7}, sleep_hotkey_default);
-	u16 reset_key = Hotkey_value((const u16[]){read8, read9, read10}, rts_hotkey_default);
+	u16 sleep_key, reset_key;
+	Read_hotkeys(&reset_key, &sleep_key);
 
 	u32 Reset_key_offset = (u8 *)Reset_key - p_patch_start;
 	u32 Sleep_key_offset = (u8 *)Sleep_key - p_patch_start;
@@ -378,14 +379,8 @@ static void Patch_RTS_Cheat(u32 *Data)
 		*(vu32 *)(patchbuffer + Return_address_offset + 4) = spend_address;
 	}
 
-	u16 read5 = Read_SET_info(assress_edit_sleephotkey_0);
-	u16 read6 = Read_SET_info(assress_edit_sleephotkey_1);
-	u16 read7 = Read_SET_info(assress_edit_sleephotkey_2);
-	u16 read8 = Read_SET_info(assress_edit_rtshotkey_0);
-	u16 read9 = Read_SET_info(assress_edit_rtshotkey_1);
-	u16 read10 = Read_SET_info(assress_edit_rtshotkey_2);
-	u16 RTS_sleep_key_val = Hotkey_value((const u16[]){read5, read6, read7}, sleep_hotkey_default);
-	u16 RTS_reset_key_val = Hotkey_value((const u16[]){read8, read9, read10}, rts_hotkey_default);
+	u16 RTS_sleep_key_val, RTS_reset_key_val;
+	Read_hotkeys(&RTS_reset_key_val, &RTS_sleep_key_val);
 
 	u32 RTS_Reset_key_offset = (u8 *)RTS_Reset_key - p_patch_start;
 	u32 RTS_Sleep_key_offset = (u8 *)RTS_Sleep_key - p_patch_start;

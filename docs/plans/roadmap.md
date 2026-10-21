@@ -34,16 +34,17 @@ Everything the v0.2–v0.4.1 work left open, checked against the code on 2026-10
 - `Read_SD_sectors` always returns 0, so FatFs never sees a card read error and every "read failed, don't write back" path above it is unreachable on a real cart (`source/Ezcard_OP.c`, `source/ff15/diskio.c`). Fix before v0.5's save work relies on read checks.
 - A power cut during a settings write leaves the whole settings sector erased, so every setting reads its default: `Save_info` erases one sector and programs it with no second copy. Since C3 every confirmed change is a sector write, so it happens more often, and wears the NOR more (`source/Ezcard_OP.c` `Save_info`; `source/screens/settings_page.c`).
 - A failed settings write isn't retried and shows no message; the live theme stays (`settings_page.c`).
-- An SD rename's `f_rename` cut by power can leave two names on one cluster chain; the rename journal's recovery leaves both (`source/actions.c`). The rollback of a failed move is checked only by reading the code: no test forces a move failure.
-- The shared-save check before an SD rename sees only indexed games, so a game in a hidden folder sharing the save name loses it (`actions.c`).
-- A hand-edited `/torii/names.txt` over 116 KB is silently ignored by the walk and by Rename (`LIB_NAMES_MAX`, `source/library_scan.c`).
-- With `/torii` as a file or a write-protected card, the index is never saved, so every boot logs the error and scans again (`library_scan.c`).
+- ~~An SD rename's `f_rename` cut by power can leave two names on one cluster chain; the rename journal's recovery leaves both (`source/actions.c`). The rollback of a failed move is checked only by reading the code: no test forces a move failure.~~ Fixed by E2 (`a3a746c`, `8fd8817`): recovery drops the second name without freeing the chain (`f_unlink_alias`, `f_unlink_case_aliases` in `ff.c`); `tests/saves.sh rename-cut-split` and `rename-cut-case` sweep every cut; the rollback has a kernel test (`action_rename_fail_file`).
+- ~~The shared-save check before an SD rename sees only indexed games, so a game in a hidden folder sharing the save name loses it (`actions.c`).~~ Fixed by E2 (`fa59a3f`, `8fd8817`): a walk of the whole card checks the old and the new save name; a folder it can't read or past 16 levels refuses.
+- ~~A hand-edited `/torii/names.txt` over 116 KB is silently ignored by the walk and by Rename (`LIB_NAMES_MAX`, `source/library_scan.c`).~~ Fixed by E2 (`ba2ebcd`): the walk logs it once a boot as an error and Rename says "names.txt is too large to change"; the cap stays (Rename's buffer and the PC tool share it).
+- ~~With `/torii` as a file or a write-protected card, the index is never saved, so every boot logs the error and scans again (`library_scan.c`).~~ Fixed by E2 (`a3a746c`, `1edc9f1`): the index stays in RAM, one error a boot, no write tried again that boot; each boot still scans.
 - D1's cart logs: after a session that ran Rescan and Identify, the next boot found "nothing in cart RAM" (page `0xF0`'s magic cleared?), and the index loaded from `library.bak` on several boots (maybe just the copies alternating). Not reproduced (`source/cartlog.c`, `library_scan.c`).
 - Deleting the running log file with LOGGING on stops SD logging until the next boot (`source/tlog.c`).
 - After a power cut drops a half-erased NOR game, a "kernel error: … dropped" line repeats every boot until the next list save (the NOR list reader).
-- Non-canonical paths such as `/deep/../x.gba` launch and are stored in Recent as given (only the test hook can make one; `source/userdata.c`).
-- Reset keys and Sleep keys that already clash (written by v0.3 or by hand) are used as they are; only new combinations are checked (`source/settings_model.c`).
-- The cheat parser's `Get_KEY_val` and `Get_CHT_val` fill a 50-byte `_paramk` with no NUL and pass it to `strcmp` (`source/showcht.c`).
+- ~~Non-canonical paths such as `/deep/../x.gba` launch and are stored in Recent as given (only the test hook can make one; `source/userdata.c`).~~ Fixed by E2 (`492cb53`): `userdata_canonical` at launch, Recent and favourites.
+- ~~Reset keys and Sleep keys that already clash (written by v0.3 or by hand) are used as they are; only new combinations are checked (`source/settings_model.c`).~~ Fixed by E2 (`0d4e2b2`, `8fd8817`): `settings_hotkeys` falls back to the defaults for Settings and the launch's patches, logged at boot.
+- ~~The cheat parser's `Get_KEY_val` and `Get_CHT_val` fill a 50-byte `_paramk` with no NUL and pass it to `strcmp` (`source/showcht.c`).~~ Fixed by E2 (`01ee08b`, `8fd8817`); names keep their inner spaces too.
+- ~~E2's findings: with `/torii` a file Recent, the favourites and names.txt logged an error at every write; one damaged folder blocked every rename of a game with a save; the cheat list and a cheat's value split long lines differently; a NOR row took the first SD file of its name whatever its size.~~ Fixed by E2 (`faded2a`). Left: the rename's card walk blocks the keyboard for its length, unmeasured on a cart (about 1 s per 2,000 files estimated).
 - The launch copy's VBlank hook sets the handler back to none instead of restoring the previous one; harmless while the engine installs none (`source/progress.c`).
 
 ### Bugs: menu
@@ -58,9 +59,9 @@ Everything the v0.2–v0.4.1 work left open, checked against the code on 2026-10
 - The selected row's marquee keeps scrolling under an open popup, about 13k cycles a frame (`source/ui/ui_list.c`).
 - A first visit to a game page right after a failed launch briefly shows an empty card until the index reloads (`games.c`).
 - On a boot with no index yet the consoles count 0, so a Start on console falls back to Last place (`source/screens/nav.c`).
-- After an SD rename of a game with a custom name, the row shows the cleaned name for a few seconds until the walk restores it.
-- Two games that clean to the same name in different folders with the same tags show the same name: rows pass file names, not paths, to the dedupe (`games.c`, `source/gamename.c`).
-- NOR rows show cleaned file names, never custom or database names (`source/screens/nor.c`).
+- ~~After an SD rename of a game with a custom name, the row shows the cleaned name for a few seconds until the walk restores it.~~ Fixed by E2 (`84fc3ef`).
+- ~~Two games that clean to the same name in different folders with the same tags show the same name: rows pass file names, not paths, to the dedupe (`games.c`, `source/gamename.c`).~~ Fixed by E2 (`84fc3ef`).
+- ~~NOR rows show cleaned file names, never custom or database names (`source/screens/nor.c`).~~ Fixed by E2 (`84fc3ef`): the library record with the same file name gives the name.
 - The theme wipe needs a commit every VBlank: a frame that overruns during the 16-frame wipe shows the old theme whole-screen (`source/ui/ui_run.c`).
 - A launch shows about 8 black frames between home's fade-out and the loading card.
 - A cover landing during a palette fade could show wrong colours (not seen; `source/engine/cover.c`).

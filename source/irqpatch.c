@@ -33,15 +33,6 @@ int Find_irq_table_entry(const u32 *table, u32 words, const u8 code[4], u32 *pos
 	return -1;
 }
 
-u16 Hotkey_value(const u16 slots[3], const u16 defaults[3])
-{
-	u16 held = 0;
-
-	for (int k = 0; k < 3; k++)
-		held |= 1 << (slots[k] <= 9 ? slots[k] : defaults[k]);
-	return held;
-}
-
 // Games that overwrite the in-game hook at 0x3007FFC in ways the general
 // patching can't find without running them. All are the EU dumps tested in
 // docs/research/hook-coverage.md; other regions and revisions don't match.

@@ -5109,6 +5109,164 @@ FRESULT f_unlink (
 
 
 /*-----------------------------------------------------------------------*/
+/* Torii: Remove a File's Second Name                                    */
+/*-----------------------------------------------------------------------*/
+/* A power cut inside f_rename can leave the new entry written and the old
+   one still there: two names on one cluster chain. f_unlink on either
+   would free the chain the other still uses. This removes path's directory
+   entry and nothing else, only when path is a file whose first cluster is
+   other's (another entry, not other's own under another case). FR_DENIED
+   when they don't share a chain (or have none), or path is a directory. */
+
+/* The first cluster of the object dj was just followed to (0 for none) */
+static DWORD torii_first_clust (DIR* dj)
+{
+	FATFS *fs = dj->obj.fs;
+#if FF_FS_EXFAT
+	if (fs->fs_type == FS_EXFAT) {
+		FFOBJID obj;
+		obj.fs = fs;
+		init_alloc_info(fs, &obj);	/* From fs->dirbuf, which follow_path filled */
+		return obj.sclust;
+	}
+#endif
+	return ld_clust(fs, dj->dir);
+}
+
+FRESULT f_unlink_alias (
+	const TCHAR* path,		/* The name to remove */
+	const TCHAR* other		/* The name that keeps the chain */
+)
+{
+	FRESULT res;
+	FATFS *fs;
+	DIR dj, dk;
+	DWORD keep, clst;
+	DEF_NAMBUF
+
+
+	res = mount_volume(&other, &fs, FA_WRITE);
+	if (res == FR_OK) {
+		dk.obj.fs = fs;
+		INIT_NAMBUF(fs);
+		res = follow_path(&dk, other);
+		if (res == FR_OK && (dk.fn[NSFLAG] & (NS_DOT | NS_NONAME))) res = FR_INVALID_NAME;
+		keep = res == FR_OK ? torii_first_clust(&dk) : 0;
+		if (res == FR_OK) {
+			const TCHAR *p = path;
+			res = mount_volume(&p, &fs, FA_WRITE);
+			if (res == FR_OK) {
+				dj.obj.fs = fs;
+				res = follow_path(&dj, p);
+			}
+		}
+		if (res == FR_OK && (dj.fn[NSFLAG] & (NS_DOT | NS_NONAME))) res = FR_INVALID_NAME;
+		if (res == FR_OK) {
+			clst = torii_first_clust(&dj);
+			if ((dj.obj.attr & AM_DIR) || !keep || clst != keep ||
+				(dj.obj.sclust == dk.obj.sclust && dj.dptr == dk.dptr)) {	/* One entry: other's own */
+				res = FR_DENIED;
+			}
+		}
+		if (res == FR_OK) {
+			res = dir_remove(&dj);		/* The entry only: the chain stays other's */
+			if (res == FR_OK) res = sync_fs(fs);
+		}
+		FREE_NAMBUF();
+	}
+
+	LEAVE_FF(fs, res);
+}
+
+
+
+
+/*-----------------------------------------------------------------------*/
+/* Torii: Remove the Second Names a Case-only Rename Left                */
+/*-----------------------------------------------------------------------*/
+/* A case-only rename ("game.sav" to "Game.sav") cut inside f_rename leaves
+   two entries that differ only in case on one chain, which a path can't
+   tell apart. In folder dir, this removes each file entry whose name is
+   name's but for case, not byte for byte, and whose first cluster is the
+   exactly named entry's; their chain stays. FR_NO_FILE when there is none
+   to remove. fno is scratch. */
+
+#define TORII_CASE_ALIASES 4
+
+/* 1 if two UTF-8 names are equal but for case, as FatFs compares them */
+static int torii_same_name (const TCHAR* a, const TCHAR* b)
+{
+	while (*a && *b) {
+		DWORD ca = tchar2uni(&a), cb = tchar2uni(&b);
+		if (ca == 0xFFFFFFFF || cb == 0xFFFFFFFF) return 0;
+		if (ca < 0x10000) ca = ff_wtoupper(ca);
+		if (cb < 0x10000) cb = ff_wtoupper(cb);
+		if (ca != cb) return 0;
+	}
+	return !*a && !*b;
+}
+
+FRESULT f_unlink_case_aliases (
+	const TCHAR* dir,		/* The folder */
+	const TCHAR* name,		/* The name to keep, byte for byte */
+	FILINFO* fno			/* Scratch */
+)
+{
+	FRESULT res;
+	FATFS *fs;
+	DIR dj, drop[TORII_CASE_ALIASES];
+	DWORD keep = 0, clst[TORII_CASE_ALIASES];
+	UINT n = 0, removed = 0;
+
+
+	res = f_opendir(&dj, dir);
+	if (res != FR_OK) return res;
+	fs = dj.obj.fs;
+	for (;;) {
+		res = DIR_READ_FILE(&dj);
+		if (res != FR_OK) break;
+		get_fileinfo(&dj, fno);
+		if (!(dj.obj.attr & AM_DIR) && torii_same_name(fno->fname, name)) {
+			DWORD c;
+#if FF_FS_EXFAT
+			if (fs->fs_type == FS_EXFAT) {
+				FFOBJID obj;
+				obj.fs = fs;
+				init_alloc_info(fs, &obj);	/* From the entry block dir_read loaded */
+				c = obj.sclust;
+			} else
+#endif
+			{
+				c = ld_clust(fs, dj.dir);	/* From the entry still in the window */
+			}
+			const TCHAR *x = fno->fname, *y = name;
+			while (*x && *x == *y) { x++; y++; }
+			if (*x == *y) {			/* Byte for byte */
+				keep = c;
+			} else if (n < TORII_CASE_ALIASES) {
+				drop[n] = dj;	/* Where its entries are, for dir_remove */
+				clst[n++] = c;
+			}
+		}
+		res = dir_next(&dj, 0);
+		if (res != FR_OK) break;
+	}
+	if (res == FR_NO_FILE) res = FR_OK;
+	for (UINT i = 0; res == FR_OK && keep && i < n; i++) {
+		if (clst[i] != keep) continue;
+		res = dir_remove(&drop[i]);	/* The entries only: the chain stays the kept name's */
+		if (res == FR_OK) removed++;
+	}
+	if (res == FR_OK && removed) res = sync_fs(fs);
+	if (res == FR_OK && !removed) res = FR_NO_FILE;
+	f_closedir(&dj);
+	LEAVE_FF(fs, res);
+}
+
+
+
+
+/*-----------------------------------------------------------------------*/
 /* Create a Directory                                                    */
 /*-----------------------------------------------------------------------*/
 

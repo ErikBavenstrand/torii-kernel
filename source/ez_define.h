@@ -38,6 +38,12 @@
 //   gamename_store_move, userdata_rename and library_renamed (whose shares
 //   end before it); at boot, action_rename_recover reads the rename journal's
 //   line from the start, nothing else running.
+// - READCACHE_DEDUPE, 4 KB from the start: the paths of a game list row's
+//   games that clean to one name (screens/games.c record_name), within the
+//   call; it never runs inside the operations here that borrow the start.
+// - READCACHE_SHARE, 4 KB from the start: the rename's walk of the card for
+//   another game with its save (actions.c), within action_rename_file,
+//   before it calls anything else that borrows pReadCache.
 #define MAX_pReadCache_size 0x20000
 #define READCACHE_STAGE 0x0
 #define READCACHE_STAGE_SIZE 0x8000
@@ -54,6 +60,10 @@
 #define READCACHE_NAMES_SIZE 0x1F000
 #define READCACHE_RENAME 0x1F000
 #define READCACHE_RENAME_SIZE 0x1000
+#define READCACHE_SHARE 0x0
+#define READCACHE_DEDUPE 0x0
+#define READCACHE_DEDUPE_SIZE 0x1000
+#define READCACHE_SHARE_SIZE 0x1000
 
 #define MAX_NOR 0x40
 

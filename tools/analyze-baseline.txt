@@ -11,9 +11,6 @@ clang-tidy source/GBApatch.c clang-analyzer-deadcode.DeadStores: Value stored to
 clang-tidy source/GBApatch.c clang-analyzer-deadcode.DeadStores: Value stored to 'res' is never read
 clang-tidy source/GBApatch.c clang-analyzer-deadcode.DeadStores: Value stored to 'res' is never read
 clang-tidy source/GBApatch.c clang-analyzer-deadcode.DeadStores: Value stored to 'res' is never read
-clang-tidy source/GBApatch.c clang-analyzer-deadcode.DeadStores: Value stored to 'res' is never read
-clang-tidy source/GBApatch.c clang-analyzer-security.PointerSub: Subtraction of two pointers that do not point into the same array is undefined behavior
-clang-tidy source/GBApatch.c clang-analyzer-security.PointerSub: Subtraction of two pointers that do not point into the same array is undefined behavior
 clang-tidy source/GBApatch.c clang-analyzer-security.PointerSub: Subtraction of two pointers that do not point into the same array is undefined behavior
 clang-tidy source/GBApatch.c clang-analyzer-security.PointerSub: Subtraction of two pointers that do not point into the same array is undefined behavior
 clang-tidy source/GBApatch.c clang-analyzer-security.PointerSub: Subtraction of two pointers that do not point into the same array is undefined behavior
@@ -48,7 +45,6 @@ clang-tidy source/showcht.c clang-analyzer-deadcode.DeadStores: Value stored to 
 clang-tidy source/showcht.c clang-analyzer-deadcode.DeadStores: Value stored to 'text_comment' is never read
 clang-tidy source/showcht.c clang-analyzer-security.ArrayBound: Out of bound access to memory after the end of the region
 clang-tidy source/showcht.c clang-analyzer-security.insecureAPI.strcpy: Call to function 'strcpy' is insecure as it does not provide bounding of the memory buffer. Replace unbounded copy functions with analogous functions that support length arguments such as 'strlcpy'. CWE-119
-cppcheck source/GBApatch.c redundantAssignment: Variable 'res' is reassigned a value before the old one has been used.
 cppcheck source/GBApatch.c redundantAssignment: Variable 'res' is reassigned a value before the old one has been used.
 cppcheck source/GBApatch.c redundantAssignment: Variable 'res' is reassigned a value before the old one has been used.
 cppcheck source/GBApatch.c redundantAssignment: Variable 'res' is reassigned a value before the old one has been used.

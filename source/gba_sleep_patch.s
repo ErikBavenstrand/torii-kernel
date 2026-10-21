@@ -106,7 +106,7 @@ my_irq:
 	@;tst r2,#0x0300	@L+R?
 	@;ldrne pc,[r0,#-(0x04000000-0x03FFFFB4)] @to IRQ routine if not pressed
 	
-	@; Torii: a hotkey is the mask of its keys (Hotkey_value), and matches when
+	@; Torii: a hotkey is the mask of its keys (settings_hotkeys), and matches when
 	@; they are all held (0 in REG_P1), whatever else is: an extra or stuck key
 	@; used to block it. HOTKEY_OFF needs all ten held, which the D-pad can't.
 	adr r3,Reset_key @

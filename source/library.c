@@ -500,6 +500,50 @@ u32 lib_find(const u8 *slot, const char *path)
 	return LIBRARY_NONE;
 }
 
+// 1 if a file of size bytes takes a NOR area of area bytes: whole 128 KB
+// blocks, and one more when it ends within a block's last bytes
+static int nor_area_fits(u32 size, u32 area)
+{
+	u32 blocks = (size + 0x1FFFFu) & ~0x1FFFFu;
+	return area == blocks || area == blocks + 0x20000u;
+}
+
+// One pass: the first record of each name (and, with areas, the size)
+static u32 find_pass(const u8 *slot, const char *const *names, const u32 *areas, u32 count, u16 *recs)
+{
+	u32 firsts[8] = {0}, left = 0;
+	for (u32 j = 0; j < count; j++)
+		if (recs[j] == LIBRARY_NONE) {
+			u8 c = (u8)names[j][0];
+			firsts[c >> 5] |= 1u << (c & 31);
+			left++;
+		}
+	const struct lib_header *h = lib_hdr(slot);
+	for (u32 i = 0; i < h->records && left; i++) {
+		const char *name = lib_name(slot, i);
+		u8 c = (u8)name[0];
+		const struct lib_rec *r = lib_rec_at(slot, i);
+		if (!(firsts[c >> 5] & (1u << (c & 31))) || (r->flags & LIB_F_GONE))
+			continue;
+		for (u32 j = 0; j < count; j++)
+			if (recs[j] == LIBRARY_NONE && (u8)names[j][0] == c &&
+			    (!areas || nor_area_fits(r->size, areas[j])) && !bytes_cmp(name, names[j])) {
+				recs[j] = (u16)i;
+				left--;
+			}
+	}
+	return left;
+}
+
+void lib_find_names(const u8 *slot, const char *const *names, const u32 *areas, u32 count, u16 *recs)
+{
+	for (u32 j = 0; j < count; j++)
+		recs[j] = LIBRARY_NONE;
+	// A file of the size first, then any of the name
+	if (find_pass(slot, names, areas, count, recs) && areas)
+		find_pass(slot, names, NULL, count, recs);
+}
+
 // Where rec is in the order, or LIBRARY_NONE
 static u32 order_pos(const u8 *slot, u32 rec)
 {

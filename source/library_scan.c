@@ -105,6 +105,7 @@ static struct {
 	u8 active;  // which slot
 	u8 want_walk;
 	u8 want_write;  // the active index isn't on the card yet
+	u8 cant_keep;  // the index file can't be made this boot: no write is tried
 	u8 force;  // the next walk rebuilds whatever the hash says (Rescan)
 	u8 build;  // this walk builds an index (else it only hashes)
 	u8 file_open;  // io.fil
@@ -588,8 +589,16 @@ static u32 names_flush(u32 staged)
 // a building walk copies them to PSRAM for gamename_custom.
 static void names_step(void)
 {
-	if (safefile_open(GAMENAME_FILE, LIB_NAMES_MAX) == SAFEFILE_NONE)
+	static u8 told;  // the walk says once a boot that names.txt is too large
+	if (safefile_open(GAMENAME_FILE, LIB_NAMES_MAX) == SAFEFILE_NONE) {
+		if (!told && safefile_failed() && f_stat(GAMENAME_FILE, &lib.u.walk.fi) == FR_OK &&
+		    lib.u.walk.fi.fsize > LIB_NAMES_MAX) {
+			tlog_error("library: %s is %lu bytes, over the %u the menu reads: its names aren't shown",
+				   GAMENAME_FILE, (unsigned long)lib.u.walk.fi.fsize, (unsigned)LIB_NAMES_MAX);
+			told = 1;
+		}
 		return;
+	}
 	char *line = (char *)lib.buf + LIB_IO_BYTES / 2;
 	u32 staged = 0;
 	lib.u.walk.names_ok = lib.build;
@@ -736,7 +745,7 @@ static void sort_step(void)
 	lib.active = lib.u.walk.b.slot == slot_at(1);
 	lib.valid = 1;
 	lib.force = 0;
-	lib.want_write = 1;
+	lib.want_write = !lib.cant_keep;
 	lib.state = S_IDLE;
 	changed();
 	tlog("library: new index: %u games (GBA %u, GBC %u, GB %u, NES %u), %lu files, built in %lu ms", h->records,
@@ -755,10 +764,21 @@ static void write_failed(const char *what, FRESULT fr)
 	close_file();
 	if (opened)
 		f_unlink(file);
-	if (fr == FR_DENIED && opened)
+	if (fr == FR_DENIED && opened) {
 		tlog("library: the card is full; %s isn't written", file);
-	else
+	} else if (!opened && (fr == FR_NO_PATH || fr == FR_EXIST || fr == FR_DENIED || fr == FR_WRITE_PROTECTED ||
+			       fr == FR_INVALID_NAME)) {
+		// It can't be made (/torii a file, a write-protected card): the index
+		// stays in RAM, and isn't tried again this boot
+		FRESULT st = f_stat(LIB_DIR, &lib.u.walk.fi);  // the write is over: io is free
+		int not_dir = st == FR_OK && !(lib.u.walk.fi.fattrib & AM_DIR);
+		tlog_error("library: can't make %s (FatFs error %d%s): the index is kept in RAM, and the next boot "
+			   "scans the card again",
+			   file, fr, not_dir ? "; " LIB_DIR " is a file" : "");
+		lib.cant_keep = 1;
+	} else {
 		tlog_error("library: can't write %s: %s (FatFs error %d)", file, what, fr);
+	}
 	lib.want_write = 0;
 	lib.state = S_IDLE;
 }
@@ -1141,6 +1161,16 @@ u32 library_find(const char *path)
 	return lib.valid ? lib_find(active_slot(), path) : LIBRARY_NONE;
 }
 
+void library_find_names(const char *const *names, const u32 *areas, u32 count, u16 *recs)
+{
+	if (lib.valid) {
+		lib_find_names(active_slot(), names, areas, count, recs);
+		return;
+	}
+	for (u32 j = 0; j < count; j++)
+		recs[j] = LIBRARY_NONE;
+}
+
 u32 library_total_files(void)
 {
 	return lib.valid ? lib_hdr(active_slot())->total_files : 0;
@@ -1206,7 +1236,16 @@ void library_renamed(const char *old_path, const char *new_name)
 	if (rec != LIBRARY_NONE) {
 		psram_begin();
 		struct lib_build *scratch = (struct lib_build *)(pReadCache + READCACHE_LIBRARY);
-		if (!lib_rename(slot_at(lib.active), put, rec, new_name, scratch))
+		// A custom name followed the file (gamename_store_move): it shows
+		// at once, not the cleaned name until the walk. In RAM: the rename
+		// writes the pool it is in
+		char display[GAMENAME_MAX + 1] = "";
+		int custom = (library_flags(rec) & LIB_F_CUSTOM) != 0;
+		if (custom)
+			snprintf(display, sizeof(display), "%s", library_display(rec));
+		if (lib_rename_shown(slot_at(lib.active), put, rec, new_name, custom ? display : NULL, scratch))
+			tlog_debug("library: %s is %s now, shown as %s", old_path, new_name, library_display(rec));
+		else
 			lib_forget(slot_at(lib.active), put, rec);  // the walk adds it back
 		changed();
 	}

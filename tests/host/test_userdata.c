@@ -62,6 +62,32 @@ void test_userdata_paths(void)
 	CHECK(!userdata_item_ok("0123456789abcdef"));  // 16: one too many
 }
 
+static void check_canonical(const char *in, const char *want)
+{
+	char path[64];
+	snprintf(path, sizeof(path), "%s", in);
+	userdata_canonical(path);
+	if (strcmp(path, want) != 0)
+		tlog_error("FAIL %s: %s reads as %s, expected %s", __FILE__, in, path, want);
+	CHECK(strcmp(path, want) == 0);
+}
+
+void test_userdata_canonical(void)
+{
+	check_canonical("/deep/../x.gba", "/x.gba");
+	check_canonical("/a/./b//c.gba", "/a/b/c.gba");
+	check_canonical("/a/b/../../c/x.gba", "/c/x.gba");
+	check_canonical("/../x.gba", "/x.gba");  // above the root: the root
+	check_canonical("/a/..", "/");
+	check_canonical("/", "/");
+	check_canonical("//", "/");
+	check_canonical("/games/", "/games");
+	check_canonical("/..x/.y/x..gba", "/..x/.y/x..gba");  // dots inside names stay
+	check_canonical("/GBA/Pokemon - Ruby.gba", "/GBA/Pokemon - Ruby.gba");
+	check_canonical("NOR:a/../b", "NOR:a/../b");  // a NOR entry is a name
+	check_canonical("", "");
+}
+
 void test_userdata_parse(void)
 {
 	char line[USERDATA_LINE_MAX];

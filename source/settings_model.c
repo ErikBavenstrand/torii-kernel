@@ -121,8 +121,11 @@ static u16 value_in(const u16 *slots, u32 id)
 		return 0;
 	const u16 *s = &slots[r->slot];
 	switch (r->kind) {
-	case SET_KEYS:
-		return keys_mask(s, keys_default_of(id));
+	case SET_KEYS: {
+		u16 keys[2];
+		settings_hotkeys(slots, &keys[0], &keys[1]);
+		return keys[id == SET_SLEEP_KEYS];
+	}
 	case SET_COLOUR: {
 		u16 c = 0;
 		for (u32 i = 0; i < 3; i++) {
@@ -173,7 +176,9 @@ static void store(struct settings_values *v, u32 id, u16 value)
 	u32 n = slots_of(r);
 	if (!n || r->slot + n > assress_max)
 		return;
-	if (value_in(v->loaded, id) == value) {
+	// (a keys row's own slots: its value as used depends on the other row's)
+	if (r->kind == SET_KEYS ? keys_mask(&v->loaded[r->slot], keys_default_of(id)) == value
+				: value_in(v->loaded, id) == value) {
 		memcpy(&v->slot[r->slot], &v->loaded[r->slot], n * sizeof(u16));
 		return;
 	}
@@ -294,12 +299,11 @@ static u32 bits(u16 mask)
 	return n;
 }
 
-u32 settings_set_keys(struct settings_values *v, u32 id, u16 mask)
+// What's wrong with mask as row id's keys, on its own (SET_KEYS_OK: nothing)
+static u32 keys_problem(u32 id, u16 mask)
 {
-	const struct settings_row *r = row_of(id);
-	if (!r || r->kind != SET_KEYS)
+	if (mask & ~((1u << KEY_BITS) - 1))
 		return SET_KEYS_COUNT;
-	mask &= (1u << KEY_BITS) - 1;
 	u32 n = bits(mask);
 	if (n < 2 || n > 3)
 		return SET_KEYS_COUNT;
@@ -311,14 +315,63 @@ u32 settings_set_keys(struct settings_values *v, u32 id, u16 mask)
 	// Inside a game's own soft reset, A+B+START+SELECT, it would fire first
 	if ((mask & KEYS_SOFT_RESET) == mask)
 		return SET_KEYS_SOFT_RESET;
-	// The other hotkey's, or one holding it or held in it: the smaller fires
-	// first. Checked even while the other is off, as turning it on checks
-	// nothing
+	return SET_KEYS_OK;
+}
+
+// 1 if two hotkeys are the same, or one holds the other: the smaller fires first
+static int keys_clash(u16 a, u16 b)
+{
+	return (a & b) == a || (a & b) == b;
+}
+
+u32 settings_hotkeys(const u16 *slots, u16 *reset, u16 *sleep)
+{
+	u32 fixed = 0;
+	u16 r = keys_mask(&slots[settings_rows[SET_RESET_KEYS].slot], reset_default);
+	u16 s = keys_mask(&slots[settings_rows[SET_SLEEP_KEYS].slot], sleep_default);
+	if (keys_problem(SET_RESET_KEYS, r) != SET_KEYS_OK) {
+		r = settings_keys_default(SET_RESET_KEYS);
+		fixed |= SET_HOTKEYS_RESET_FIXED;
+	}
+	if (keys_problem(SET_SLEEP_KEYS, s) != SET_KEYS_OK) {
+		s = settings_keys_default(SET_SLEEP_KEYS);
+		fixed |= SET_HOTKEYS_SLEEP_FIXED;
+	}
+	// A clash: the reset keys fall back first, then Sleep's (the defaults don't clash)
+	if (keys_clash(r, s) && r != settings_keys_default(SET_RESET_KEYS)) {
+		r = settings_keys_default(SET_RESET_KEYS);
+		fixed |= SET_HOTKEYS_RESET_FIXED;
+	}
+	if (keys_clash(r, s)) {
+		s = settings_keys_default(SET_SLEEP_KEYS);
+		fixed |= SET_HOTKEYS_SLEEP_FIXED;
+	}
+	*reset = r;
+	*sleep = s;
+	return fixed;
+}
+
+u32 settings_set_keys(struct settings_values *v, u32 id, u16 mask)
+{
+	const struct settings_row *r = row_of(id);
+	if (!r || r->kind != SET_KEYS)
+		return SET_KEYS_COUNT;
+	mask &= (1u << KEY_BITS) - 1;
+	u32 problem = keys_problem(id, mask);
+	if (problem != SET_KEYS_OK)
+		return problem;
+	// The other hotkey's, or one holding it or held in it. Checked even
+	// while the other is off, as turning it on checks nothing
 	u32 other = id == SET_SLEEP_KEYS ? SET_RESET_KEYS : SET_SLEEP_KEYS;
 	u16 taken = settings_get(v, other);
-	if ((taken & mask) == taken || (taken & mask) == mask)
+	if (keys_clash(taken, mask))
 		return SET_KEYS_TAKEN;
 	store(v, id, mask);
+	// The other row keeps what it showed: a stored pair that fell back to
+	// its default gets the default written, so the edit can't bring the
+	// stored keys back
+	if (keys_mask(&v->slot[settings_rows[other].slot], keys_default_of(other)) != taken)
+		store(v, other, taken);
 	return SET_KEYS_OK;
 }
 
