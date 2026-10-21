@@ -1,6 +1,7 @@
-# The SD card page with an addon on (B18): a game's popup has eight items,
-# so Delete's confirmation has no room for its tiles over it: the popup
-# closes first (source/ui/ui_popup.c), and B comes back to the page.
+# The SD card page with an addon on (B18): a game's popup has nine items,
+# so Delete's confirmation has no room for tiles of its own in BG block 0:
+# it borrows the popup's (source/ui/ui_popup.c), and B (Cancel) brings the
+# popup back, drawn again; B closes it and START opens it again.
 #! settings 1=1
 -w "nav: home ready"
 -k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:LEFT -k @28:- -k @32:LEFT -k @36:- -k @40:A -k @44:-
@@ -12,6 +13,7 @@
 -s @70:confirm.png
 -k @80:B -k @84:-
 -s @110:back.png
--k @120:START -k @124:-
+-k @114:B -k @118:-
+-k @140:START -k @144:-
 -w "sdcard: popup"
 -s @12:again.png

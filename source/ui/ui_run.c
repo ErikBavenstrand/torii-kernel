@@ -147,6 +147,7 @@ static struct {
 	u8 tr_in_frames;  // for the half coming in
 	u8 capture;       // ui_close: keys wait for the view under it (keys.held)
 	u8 hold_keys;     // ui_keys_hold: keys wait for the view on top once it ends
+	u8 heavy;         // ui_draw_heavy: the next frame's jobs take one step
 	u8 gap_regs;      // the last regs show no view (a screen gone)
 	u8 tr_pushed;     // TR_GAP: a view was pushed since the screen went
 	u8 active;        // between ui_init and ui_shutdown
@@ -196,6 +197,12 @@ static struct {
 void ui_wake(void)
 {
 	frame_wake();
+}
+
+void ui_draw_heavy(void)
+{
+	ui.heavy = 1;
+	ui_wake();
 }
 
 void ui_keys_hold(int on)
@@ -1439,39 +1446,45 @@ void ui_overlay_drop(const void *owner)
 
 static s32 view_dx(const struct ui_view *v);
 
-// The windows while an overlay's window is on: WIN0 is its, the first list
-// (of lists, top view first) clips with WIN1 (a second goes unclipped for
-// those frames), and plane 0 shows only in WIN0
+// The windows while an overlay's window is on: WIN0 is its, and the lists
+// clip with WIN1, and plane 0 shows only in WIN0. Two lists clip to the box
+// round both (exact for lists side by side on the same lines, the layout a
+// page with two has): with the overlay's, the GBA's two windows are used up.
 static void overlay_windows(u32 lists, const u32 *list_plane, const struct ui_node *const *list_node, u16 *dispcnt)
 {
 	const struct ui_overlay *o = &ui.ov;
-	u32 outside = LAYER_ALL & ~LAYER_BG(0);
-	if (lists > 1)
-		lists = 1;
-	if (lists)
-		outside &= ~LAYER_BG(list_plane[0]);
+	u32 outside = LAYER_ALL & ~LAYER_BG(0), planes = 0;
 	s32 x0 = o->x0 < 0 ? 0 : o->x0, x1 = o->x1 > 240 ? 240 : o->x1;
 	s32 y0 = o->y0 < 0 ? 0 : o->y0, y1 = o->y1 > 160 ? 160 : o->y1;
 	x1 = x1 < x0 ? x0 : x1;
 	y1 = y1 < y0 ? y0 : y1;
+	s32 lx0 = 240, lx1 = 0, ly0 = 160, ly1 = 0;
+	for (u32 w = 0; w < lists; w++) {
+		const struct ui_node *n = list_node[w];
+		const struct ui_view *v = ui_view_at(n->view);
+		s32 a0 = n->y + v->offset, a1 = a0 + n->h, b0 = n->x + view_dx(v), b1 = b0 + n->w;
+		ly0 = a0 < ly0 ? a0 : ly0;
+		ly1 = a1 > ly1 ? a1 : ly1;
+		lx0 = b0 < lx0 ? b0 : lx0;
+		lx1 = b1 > lx1 ? b1 : lx1;
+		planes |= LAYER_BG(list_plane[w]);
+	}
+	outside &= ~planes;
 	u32 in0 = outside | LAYER_BG(0), in1 = 0;
 	if (lists) {
-		// The list shows in WIN0 too where their lines meet: an overlay's
+		// The lists show in WIN0 too where their lines meet: an overlay's
 		// card covers most of WIN0, and the list's pixels beside it (a
 		// popup's notch, its corners) matter more than a ring row peeking
 		// out past the list's lines for the few frames of the motion
-		const struct ui_node *n = list_node[0];
-		const struct ui_view *v = ui_view_at(n->view);
-		s32 ly0 = n->y + v->offset, ly1 = ly0 + n->h, lx0 = n->x + view_dx(v), lx1 = lx0 + n->w;
 		ly0 = ly0 < 0 ? 0 : ly0 > 160 ? 160 : ly0;
 		ly1 = ly1 < 0 ? 0 : ly1 > 160 ? 160 : ly1;
 		lx0 = lx0 < 0 ? 0 : lx0 > 240 ? 240 : lx0;
 		lx1 = lx1 < 0 ? 0 : lx1 > 240 ? 240 : lx1;
 		gfx_set_win(1, (u16)(lx0 << 8 | lx1));
 		gfx_set_win(3, (u16)(ly0 << 8 | ly1));
-		in1 = outside | LAYER_BG(list_plane[0]);
+		in1 = outside | planes;
 		if (y0 < ly1 && y1 > ly0)
-			in0 |= LAYER_BG(list_plane[0]);
+			in0 |= planes;
 		*dispcnt |= DISP_WIN1;
 	}
 	gfx_set_win(0, (u16)(x0 << 8 | x1));
@@ -2094,8 +2107,13 @@ u32 ui_frame(void)
 	if (!frame_idle()) {
 		// None under the wipe: a job's card read holds DMA3 for lines,
 		// which would hold the split's interrupt back (a jumping edge)
+		// A view's first draw (a popup's is about half a frame) or a draw
+		// asked for as heavy: the jobs take one step, so it lands this frame
+		top = ui_top();
+		u32 deadline = (top && !(top->flags & UI_V_SHOWN)) || ui.heavy ? 0 : JOB_DEADLINE;
+		ui.heavy = 0;
 		if (!ui.wipe)
-			jobs_run(JOB_DEADLINE);
+			jobs_run(deadline);
 		frame_split();  // jobs
 		draw_all();
 		frame_split();  // draw

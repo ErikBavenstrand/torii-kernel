@@ -989,7 +989,7 @@ int ui_obj_add(u8 node, u16 attr0, u16 attr1, u16 attr2);
 //		ui_popup_close();  // after B too: it does nothing then
 //	}
 
-#define UI_POPUP_ITEMS 8  // items in a popup, at most
+#define UI_POPUP_ITEMS 9  // items in a popup, at most (past 8 it has no room for its title)
 enum {
 	UI_POP_DANGER = 1,  // ui_pop_item.flags: in danger ink (Delete, Format), and last
 	UI_POP_DIM = 2,     // greyed out (ink3): nothing to do now; A still picks it

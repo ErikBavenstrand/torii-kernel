@@ -61,7 +61,7 @@ static const struct ui_card_config card = {4, 4, 4, 1, 0};
 #define PAGE_ROWS 8              // LEFT/RIGHT move a screenful (L and R don't: L is the hard reset's)
 #define MEMO_FOLDERS 16          // folders whose cursor is remembered
 #define COUNT_REST 8             // frames the keys rest before folders are counted
-#define COUNT_CYCLES 40000       // cycles a counting step may take (a sector read or two)
+#define COUNT_CYCLES 24000       // cycles a frame's counting step may take, and a sector read or two past it
 #define COUNT_NEAR 8             // rows either side of the cursor counted first
 #define ARG_HARD 0x10000u        // nav_defer's arg: L was held (a hard reset)
 
@@ -441,6 +441,9 @@ static int count_step(struct job *job)
 	if (!up() || ui_top() != sd.view || ui_idle_frames() < COUNT_REST || ui_transitioning() ||
 	    !ui_list_still(node(N_LIST)))
 		return JOB_WAIT;
+	// One step a frame (a directory read can hold a sector read, about
+	// 30,000 cycles, past the budget): counting never takes a frame's room
+	frame_measure("sd-count");
 	u32 start = cycles_now();
 	while (cycles_since(start) < COUNT_CYCLES) {
 		if (sd.counting == SDLIST_NONE) {
@@ -469,7 +472,7 @@ static int count_step(struct job *job)
 			count_done(sd.counted);  // "1,024+ items": the rest go unread
 		}
 	}
-	return JOB_MORE;
+	return JOB_WAIT;  // more next frame
 }
 
 static void count_start(void)
@@ -638,18 +641,6 @@ static int any_addon(void)
 	       Read_SET_info(assress_v_sleep) == 1 || Read_SET_info(assress_v_cheat) == 1;
 }
 
-// 1 if Launch starts the game at sd.full clean: its own boot mode says so,
-// or it has none and Settings' GBA boot mode does
-static int boots_clean(void)
-{
-	struct action_facts facts;
-	if (!action_game_facts(sd.full, &facts))
-		return 0;
-	if (facts.boot_mode != ACTION_BOOT_DEFAULT)
-		return facts.boot_mode == ACTION_BOOT_CLEAN;
-	return Read_SET_info(assress_boot_mode) == 1;
-}
-
 static const char *const how_words[ACTION_HOWS + 1] = {"launch", "launch with addon", "write to NOR",
 						       "write to NOR with addon", "launch by boot mode"};
 
@@ -775,13 +766,14 @@ static int file_popup_open(u32 i)
 		pop_add(POP_OPEN, gl_sd_open, 0);
 	} else if (console != LIB_CONSOLE_NONE) {
 		pop_add(POP_LAUNCH, gl_sd_launch, 0);
-		// The other way to start it than Launch's: clean (a game patches
-		// break can always start clean), or a GBA game that boots clean with
-		// its addons (a popup has no room for both)
-		if (any_addon() && console == LIB_GBA && boots_clean())
-			pop_add(POP_ADDON, gl_games->pop[LANG_POP_ADDON], 0);
-		else if (any_addon())
+		// With an addon on, the other ways to start it than Launch's (by its
+		// boot mode): clean (a game patches break can always start clean),
+		// and a GBA game with its addons, as the game popup offers
+		if (any_addon()) {
 			pop_add(POP_CLEAN, gl_sd_clean, 0);
+			if (console == LIB_GBA)
+				pop_add(POP_ADDON, gl_games->pop[LANG_POP_ADDON], 0);
+		}
 		if (console == LIB_GBA) {  // only GBA games go to the game NOR
 			pop_add(POP_NOR, gl_sd_nor, 0);
 			if (any_addon())
