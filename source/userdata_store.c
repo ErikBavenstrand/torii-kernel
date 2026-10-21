@@ -62,12 +62,13 @@ _Static_assert(sizeof(struct work) <= READCACHE_USERDATA_SIZE, "the store's RAM 
 
 static struct {
 	u8 recent_ok, fav_ok;  // read since the last userdata_invalidate
-	u8 boot_set;           // the boot position changed since recent.txt was written
+	u8 boot_set;           // the boot position differs from the one on the card
 	u8 recent_bad, fav_bad;  // the read failed: never write the list back from it
 	u32 recent_count;
 	u32 fav_count;
 	u32 fav_used;  // pool bytes
 	struct userdata_boot boot;
+	struct userdata_boot card_boot;  // the one recent.txt holds, as last read or written
 	const char *recent_path, *fav_path, *old_path;  // tests' files; NULL for the user's
 	struct userdata_boot kept_boot;                 // the user's, while the tests run
 	u8 kept_boot_set;
@@ -143,6 +144,7 @@ static void load_recent(void)
 	st.recent_ok = 1;
 	if (st.recent_bad)
 		tlog_error("userdata: reading Recent failed: it isn't written until it reads whole");
+	st.card_boot = boot;
 	if (!st.boot_set)
 		st.boot = boot;  // a place set since the last write wins
 	if (from != SAFEFILE_NONE)
@@ -194,6 +196,7 @@ static int recent_put(u32 count)
 	W->lines.ctx = NULL;
 	if (!safefile_write(recent_file(), USERDATA_RECENT_FILE_MAX, safefile_lines_fill, &W->lines))
 		return 0;
+	st.card_boot = st.boot;
 	st.boot_set = 0;
 	// recent.txt holds its games now: the v0.3 list goes (also when a power
 	// cut before this left it beside a recent.txt)
@@ -254,7 +257,8 @@ void userdata_boot_set(const char *item)
 	if (strcmp(st.boot.item, item) == 0)
 		return;
 	snprintf(st.boot.item, sizeof(st.boot.item), "%s", item);
-	st.boot_set = 1;
+	// Turned away and back since the last write: nothing to write
+	st.boot_set = strcmp(st.boot.item, st.card_boot.item) != 0;
 }
 
 int userdata_flush(void)
