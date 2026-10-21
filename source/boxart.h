@@ -8,11 +8,14 @@
 //	2. matched art by the game's CRC32, from the CRC cache (/torii/crc.txt,
 //	   namesdb.h); never by a GBA game code, which a romhack shares with its
 //	   base game (C4);
-//	3. the placeholder box drawn for the game's console (ui/art.h).
+//	3. the full art pack, /torii/art.pak (artpack.h, `just art-pack`), by
+//	   the same CRC32;
+//	4. the placeholder box drawn for the game's console (ui/art.h).
 // Lookups never touch the card: a background job lists /torii/art and
 // /torii/art/custom once (after each boot, and after anything overwrote
-// PSRAM) into a set in PSRAM (PSRAM_ART_BASE), so a game without art costs
-// no SD access, and only a cover the set holds is opened.
+// PSRAM) into a set in PSRAM (PSRAM_ART_BASE), and reads the pack's index
+// into PSRAM (PSRAM_ARTPACK_BASE), so a game without art costs no SD
+// access, and only a cover the set or the index holds is read.
 //
 // Covers load through the cover cache (engine/cover.h) once the cursor has
 // rested BOXART_REST frames, with the rows next to it after, as a job that
@@ -20,7 +23,7 @@
 // boot's check walk goes on beside it) and while a menu or dialog is up.
 // A cover already cached
 // shows at once, even while the cursor moves. With the Box art setting off,
-// or no /torii/art on the card, the box is always the placeholder.
+// or no art and no pack on the card, the box is always the placeholder.
 //
 // A page's use, while its view is up (the box an untagged UI_IMAGE of
 // ART_BOX_SIZE square):

@@ -186,6 +186,7 @@ static const struct {
 	{"asset_header", test_asset_header},
 	{"asset_check_refuses", test_asset_check_refuses},
 	{"artkey_names", test_artkey_names},
+	{"artpack", test_artpack},
 	{"artset", test_artset},
 	{"cover_cache_wants", test_cover_cache_wants},
 	{"cover_cache_eviction", test_cover_cache_eviction},

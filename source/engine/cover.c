@@ -111,7 +111,8 @@ static int loader_step(struct job *job)
 		loader.entry = e;
 		char *path = (char *)stage_buffer() + STAGE_PATH;
 		path[0] = 0;
-		int found = loader.locate && loader.locate(cache.entry[e].id, path, COVER_PATH_MAX);
+		struct cover_where where = {0, 0};
+		int found = loader.locate && loader.locate(cache.entry[e].id, path, COVER_PATH_MAX, &where);
 		path[COVER_PATH_MAX - 1] = 0;
 		if (!found || !path[0]) {
 			tlog_debug("cover %08lX: none", (unsigned long)cache.entry[e].id);
@@ -121,6 +122,8 @@ static int loader_step(struct job *job)
 		// Opening is this step's SD work; the read is the next one's
 		psram_begin();
 		sd_read_init(&loader.rd, path, slot_of(e), COVER_SLOT_BYTES, COVER_READ_CHUNK);
+		if (where.offset)
+			sd_read_range(&loader.rd, where.offset, COVER_FILE_BYTES, where.map);
 		loader.rd.finish = 0;
 		sd_read_step(&loader.rd);
 	} else {

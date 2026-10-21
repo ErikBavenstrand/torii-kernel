@@ -39,8 +39,8 @@ it. Info's Controls page lists every key.
   their cleaned file names. No-Intro names a game only by its CRC: a
   romhack or translation keeps its own file name and the placeholder art,
   never its base game's.
-  Settings' Game view shows a list, or a list with box art (`just art-add`,
-  `just art-scrape`).
+  Settings' Game view shows a list, or a list with box art (`just art-pack`
+  once, then `just art-add` for romhacks; `just art-scrape`).
 - **SD card:** the card's folders as they are, folders first. A opens a
   folder or starts a game (L held: a hard reset), LEFT/RIGHT page, B goes
   up a folder, START opens the file's menu (Launch, Clean boot or Boot
@@ -87,6 +87,7 @@ is rebuilt in the background when the card changes; `/torii` also keeps
 | `just play [game.gba...]` | runs the kernel on an emulated cart, first copying any games given onto its SD card unless they are already there |
 | `just dev` | like `play`, rebuilding whenever `source/` changes |
 | `just test` | host and kernel unit tests, then homebrew games through the kernel: boot, every save type across power cycles, crash reports and save states |
+| `just art-pack /Volumes/OMEGA` | run once: builds `/torii/art.pak`, box art for every No-Intro GBA, GBC and GB game (NES too when the card has NES games, or with `--console`) that [libretro-thumbnails](https://thumbnails.libretro.com) has, about 20 MB, so an official game you put on the card later gets its cover on the cart with no PC. The kernel tries custom art first, then `/torii/art/<CRC32>.bin`, then the pack; a romhack is in no dat, so it still needs `just art-add`. Each picture is stored once, however many CRCs (regions, revisions) share it. Four requests at a time, at most four a second; pictures, conversions and the names the server lacks are cached in the git-ignored `dist/art-cache`, so a run that stops (Ctrl-C, the server asking for fewer requests) still writes what it has, and the next run picks up where it left off; it shows progress and the time left. The first run makes about 8,000 requests (some 40 minutes); `--offline` uses only the cache. Box art is the publishers' work: the pack stays on your card; never commit or publish it |
 | `just cart-add game.gba` | copies a file onto the emulated SD card |
 | `just game-add PATH...` | copies games you own (files or whole folders) into the git-ignored `roms/` and lists them in `roms/games.toml` |
 | `just test-host` | builds the hardware-free kernel code (sorting, cheat parsing) for Linux in the tools container with AddressSanitizer and UndefinedBehaviorSanitizer and runs `tests/host` (also part of `just test`) |

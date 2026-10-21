@@ -254,7 +254,7 @@ compat *filters: build emu-headless
     {{emu_docker}} python3 tests/games.py "$@"
 
 # Build the hardware-free kernel code with tests/host for the host, under ASan and UBSan, and run it;
-# test tools/font.py, tools/asset.py, tools/art.py, tools/art_scrape.py, the palette and the upgrade file's layout
+# test tools/font.py, tools/asset.py, tools/art.py, tools/art_scrape.py, tools/art_pack.py, the palette and the upgrade file's layout
 test-host: emu-image
     {{emu_docker}} tests/host.sh
     @uv run -q tests/font_test.py
@@ -263,6 +263,7 @@ test-host: emu-image
     @uv run -q tests/names_db_test.py
     @uv run -q tests/art_test.py
     @uv run -q tests/art_scrape_test.py
+    @uv run -q tests/art_pack_test.py
 
 # Convert docs/design/v0.4/palette.json to C: source/ui/palette.c and palette.h
 # (committed; tests/host.sh checks they match), then `just shots-update` for the screens
@@ -358,6 +359,15 @@ art-add +args:
 [positional-arguments]
 art-scrape sd_path *args:
     uv run -q tools/art_scrape.py "$@"
+
+# Build the full art pack on an SD card once, e.g. `just art-pack /Volumes/OMEGA`: /torii/art.pak, box art
+# for every No-Intro GBA, GBC and GB game (NES too if the card has NES games) that libretro-thumbnails
+# has, so new official games get covers with no PC (romhacks still need `just art-add`). Downloads are
+# cached in dist/art-cache, so a stopped run resumes. Keep the pack on your card, never publish it.
+# --console, --offline, --jobs: see --help
+[positional-arguments]
+art-pack sd_path *args:
+    uv run -q tools/art_pack.py "$@"
 
 # Copy games (files or whole folders) into roms/ and list them in roms/games.toml, e.g. `just game-add ~/roms`
 [positional-arguments]

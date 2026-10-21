@@ -48,8 +48,12 @@ struct sd_read {
 	u32 max;  // room at dst (a multiple of 4)
 	u32 size;  // the file's size, once open
 	u32 done;  // bytes read so far
+	u32 offset;  // where in the file the read starts (sd_read_range)
+	u32 length;  // bytes to read from there, 0 for the whole file
+	u32 *map;  // the file's cluster link map (FatFs fast seek), or 0
 	u16 chunk;  // bytes per step: a multiple of 512, 512-8192
 	u8 open;  // fil is open
+	u8 seek_due;  // opened: the next step seeks to offset
 	s8 result;  // SD_READ_BUSY, then SD_READ_OK or an error
 	// Called once when result is set (finished, failed or cancelled); may be NULL
 	void (*finish)(struct sd_read *r);
@@ -65,6 +69,14 @@ void sd_read_init(struct sd_read *r, const char *path, void *dst, u32 max, u16 c
 // One step: opens, reads a chunk, or closes. JOB_MORE until result is set,
 // then JOB_DONE.
 int sd_read_step(struct sd_read *r);
+// After sd_read_init: reads only length bytes from offset (size is then
+// length), seeking in a step of its own after the open: with map, the
+// file's cluster link map (FatFs fast seek's table, made earlier: f_lseek
+// CREATE_LINKMAP, or by walking the chain as boxart.c does),
+// the seek is quick, without it FatFs walks the cluster chain. A file shorter than
+// offset + length fails with SD_READ_ERR_READ. offset must be a multiple of 4
+// (else SD_READ_ERR_ARGS): the card's DMA takes whole sectors word-aligned.
+void sd_read_range(struct sd_read *r, u32 offset, u32 length, u32 *map);
 // Closes the file if open; result becomes SD_READ_CANCELLED unless set.
 void sd_read_cancel(struct sd_read *r);
 // sd_read_init, then a job (engine/jobs.h) that runs the steps. Returns the

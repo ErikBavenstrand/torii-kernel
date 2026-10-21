@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "../../source/artkey.h"
+#include "../../source/artpack.h"
 #include "../../source/crc32.h"
 #include "../../source/engine/affine.h"
 #include "../../source/engine/asset.h"
@@ -272,4 +273,56 @@ void test_artset(void)
 		found += artset_has(slots, artkey_id(ARTKEY_CRC, i));
 	CHECK_EQ(found, ARTSET_MAX - 4);
 	free(slots);
+}
+
+// --- The art pack (source/artpack.h) ---------------------------------------
+
+void test_artpack(void)
+{
+	// tools/art_pack.py's layout: 3 CRCs, 2 images
+	struct artpack_header h = {ARTPACK_MAGIC, ARTPACK_VERSION, 0, 3, 2, ARTPACK_RECORD_BYTES, 0};
+	u32 bytes = ARTPACK_HEADER_BYTES + 3 * ARTPACK_ENTRY_BYTES + 2 * ARTPACK_RECORD_BYTES;
+	CHECK(artpack_check(&h, bytes));
+	CHECK(!artpack_check(&h, bytes - 1));  // cut short
+	CHECK(!artpack_check(&h, bytes + 1));
+	h.version = 2;  // another version: no pack
+	CHECK(!artpack_check(&h, bytes));
+	h.version = ARTPACK_VERSION;
+	h.magic ^= 1;
+	CHECK(!artpack_check(&h, bytes));
+	h.magic = ARTPACK_MAGIC;
+	h.record_bytes = 3200;
+	CHECK(!artpack_check(&h, bytes));
+	h.record_bytes = ARTPACK_RECORD_BYTES;
+	h.images = 4;  // more images than CRCs
+	CHECK(!artpack_check(&h, ARTPACK_HEADER_BYTES + 3 * 8 + 4 * ARTPACK_RECORD_BYTES));
+	h.entries = ARTPACK_MAX + 1;  // more than the PSRAM index holds
+	h.images = 1;
+	CHECK(!artpack_check(&h, ARTPACK_HEADER_BYTES + h.entries * 8 + ARTPACK_RECORD_BYTES));
+	h.entries = 0;
+	h.images = 0;
+	CHECK(!artpack_check(&h, ARTPACK_HEADER_BYTES));
+	h.entries = ARTPACK_MAX;  // counts that would wrap a u32 are refused first
+	h.images = 0xFFFFFFFFu;
+	CHECK(!artpack_check(&h, 0));
+
+	// Binary search: every CRC, the top of u32, and the gaps
+	static struct artpack_entry index[1000];
+	for (u32 i = 0; i < 1000; i++) {
+		index[i].crc = i * 4000007u + 1;
+		index[i].image = i / 3;
+	}
+	index[999].crc = 0xFFFFFFFFu;
+	u32 bad = 0;
+	for (u32 i = 0; i < 1000; i++)
+		bad += artpack_find(index, 1000, index[i].crc) != (s32)(i / 3);
+	CHECK_EQ(bad, 0);
+	for (u32 i = 0; i < 999; i++)
+		bad += artpack_find(index, 1000, index[i].crc + 1) != -1;
+	CHECK_EQ(bad, 0);
+	CHECK_EQ(artpack_find(index, 1000, 0), -1);
+	CHECK_EQ(artpack_find(index, 0, 1), -1);
+	CHECK_EQ(artpack_find(index, 1, 1), 0);
+	CHECK_EQ(artpack_image_offset(3, 0), 48);
+	CHECK_EQ(artpack_image_offset(3, 2), 48 + 2 * ARTPACK_RECORD_BYTES);
 }

@@ -18,8 +18,9 @@
 //	          cover.c asserts it ends below 4.5 MB)
 //	4.5 MB    the Favourites page's A-Z order (screens/games.c), PSRAM_GAMES_BASE,
 //	          16 KB; /torii/names.txt while Rename changes it
-//	          (gamename_store.c), PSRAM_NAMES_TEXT_BASE, 116 KB; the rest
-//	          reserved, PSRAM_RESERVED_BASE
+//	          (gamename_store.c), PSRAM_NAMES_TEXT_BASE, 116 KB; the full
+//	          art pack's index (artpack.h, boxart.c), PSRAM_ARTPACK_BASE,
+//	          128 KB; the rest reserved, PSRAM_RESERVED_BASE
 //	5 MB      /torii/names.db (namesdb.h), up to PSRAM_NAMES_DB_BYTES
 //	6.75 MB   the CRC cache's table (namesdb.h), NAMES_CACHE_BYTES
 //	7.5 MB    box art's lookups (boxart.c): the set of art files on the card
@@ -54,6 +55,10 @@
 // one call: what the kernel writes back (the walk reads up to 128 KB)
 #define PSRAM_NAMES_TEXT_BASE (PSRAM_GAMES_BASE + PSRAM_GAMES_BYTES)
 #define PSRAM_NAMES_TEXT_BYTES 0x1D000u
+// The full art pack's index (artpack.h), read by box art's listing job;
+// boxart.c asserts it ends below the names database
+#define PSRAM_ARTPACK_BASE (PSRAM_NAMES_TEXT_BASE + PSRAM_NAMES_TEXT_BYTES)
+#define PSRAM_ARTPACK_BYTES 0x20000u
 // Recent and the favourites (userdata_store.c), up to the cover cache
 #define PSRAM_USERDATA_BYTES 0x00080000u
 #define PSRAM_USERDATA_BASE (PSRAM_ASSET_BASE - PSRAM_USERDATA_BYTES)

@@ -42,10 +42,19 @@
 // A path's bytes with its NUL: /torii/art/custom/, a 255-byte game name, .bin
 #define COVER_PATH_MAX 512
 
+// Where a cover is inside a bigger file (the art pack, artpack.h): its
+// COVER_FILE_BYTES start at offset, and map, if not 0, is the file's
+// cluster link map (sdread.h: sd_read_range), which must outlive the read.
+struct cover_where {
+	u32 offset;
+	u32 *map;
+};
+
 // Writes the path of id's cover into path (size bytes, NUL ended) and
-// returns 1, or 0 if it has none. Called from the loader's job step, so it
-// may not call FatFs itself.
-typedef int (*cover_locate_fn)(u32 id, char *path, u32 size);
+// returns 1, or 0 if it has none. where starts zeroed, a file of its own; a
+// cover inside a bigger file sets it. Called from the loader's job step, so
+// it may not call FatFs itself.
+typedef int (*cover_locate_fn)(u32 id, char *path, u32 size, struct cover_where *where);
 // Nonzero while the loader should start no new cover.
 typedef int (*cover_pause_fn)(void);
 
