@@ -19,12 +19,18 @@
 
 #define NAMES_CACHE_FILE "/torii/crc.txt"
 #define NAMES_CACHE_BAK "/torii/crc.txt.bak"
+// CRCs a launch came before crc.txt took (a safe file of crc.txt's lines):
+// the next load adds them, and the next write of crc.txt takes them over
+#define NAMES_JOURNAL "/torii/crc.new"
+#define NAMES_JOURNAL_BAK "/torii/crc.new.bak"
+#define NAMES_JOURNAL_MAX 0x10000u
 #define NAMES_DIR "/torii"
 #define NAMES_ART_DIR "/torii/art"  // B22's covers, looked up by CRC
 #define NAMES_CACHE_FILE_MAX 0x100000u  // the most of crc.txt read (1 MB)
 #define NAMES_IO_BYTES 2048  // a read or write per step: a read's CRC takes about 35,000 cycles
 #define NAMES_CLEAR_BYTES 2048  // the cache's slots emptied per step
-#define NAMES_LOAD_BYTES 512  // crc.txt read per step: a line costs about 15,000 cycles to keep
+#define NAMES_LOAD_BYTES 2048  // crc.txt read and scanned per step (about 45,000 cycles)
+#define NAMES_LINES_CYCLES 24000  // crc.txt's lines kept per step
 #define NAMES_STEP_CYCLES 30000  // one job call's work, as the library's
 #define NAMES_KEY_REST 30  // the job waits for the keys to rest this many frames
 #define NAMES_WRITE_IDLE 120  // and this long before it writes crc.txt (as the library's index)
@@ -102,7 +108,10 @@ static struct {
 	// crc.txt's load (safefile.h's rules, in steps through N.u.fil)
 	struct safefile_scan scan_main, scan_bak;
 	u8 has_main, has_bak, first_line, line_long;
+	u8 main_end;  // crc.txt is scanned to its end (its last lines may wait in N.buf)
+	u8 again;  // the cache is emptied again for the backup copy
 	u16 line_len;
+	u16 rd_pos, rd_got;  // the chunk in N.buf being read: its next byte, its bytes
 	u32 limit, rd_done, lines_read, lines_bad;
 	u32 at;  // names.db bytes loaded, or slot bytes cleared
 	u32 started;
@@ -111,6 +120,11 @@ static struct {
 	u32 total, done, computed, named, bytes, since_write, since_rename;
 	u32 crc, size, date, read;
 	u8 seen[NAMES_CACHE_MAX / 8];
+	// Records whose CRCs crc.txt doesn't hold yet: new since the last write
+	// began, and in the write under way
+	u8 fresh[NAMES_CACHE_MAX / 8], writing[NAMES_CACHE_MAX / 8];
+	u8 journal;  // crc.new is on the card: the next whole write deletes it
+	u8 read_only;  // crc.txt is: nothing is written, Recent isn't identified
 	u32 walk_names;  // the names the walk under way found: names_identity
 	char path[NAMES_PATH_MAX + 1];
 	struct line_cursor lc;
@@ -155,6 +169,22 @@ static int was_seen(u32 n)
 {
 	return n < NAMES_CACHE_MAX && (N.seen[n >> 3] >> (n & 7) & 1);
 }
+
+static void mark_fresh(u32 n)
+{
+	if (n < NAMES_CACHE_MAX)
+		N.fresh[n >> 3] |= (u8)(1 << (n & 7));
+}
+
+// A write of crc.txt failed or stopped: what it held is new again
+static void write_lost(void)
+{
+	for (u32 i = 0; i < sizeof(N.fresh); i++)
+		N.fresh[i] |= N.writing[i];
+	memset(N.writing, 0, sizeof(N.writing));
+}
+
+static void journal_read(void);
 
 // --- Loading ------------------------------------------------------------------
 
@@ -241,17 +271,25 @@ static void db_step(void)
 static void load_done(void)
 {
 	close_file();
+	FILINFO *fi = &N.u.fi;
+	// A read-only crc.txt is never written: the CRCs Recent's games would
+	// get each boot are lost at the next
+	N.read_only = (N.has_main || N.has_bak) && f_stat(NAMES_CACHE_FILE, fi) == FR_OK && (fi->fattrib & AM_RDO);
+	if (N.read_only) {
+		N.cache_ok = 0;
+		tlog("names: %s is read-only: not written, and Recent isn't identified", NAMES_CACHE_FILE);
+	}
+	journal_read();
 	// CRCs are kept only on a card that uses them: one with names.db, a
 	// crc.txt already (names-update's), or art (B22 looks covers up by CRC)
-	FILINFO *fi = &N.u.fi;
 	N.active = N.db_ok || N.has_main || N.has_bak || f_stat(NAMES_ART_DIR, fi) == FR_OK;
 	if (N.cache.full) {
 		N.cache_ok = 0;  // writing back would lose the lines left out
 		tlog("names: the CRC cache is full: %s isn't written back", NAMES_CACHE_FILE);
 	}
-	N.dirty = 0;
+	N.dirty = N.journal ? DIRTY_HARD : 0;  // the journal's lines go into crc.txt
 	N.phase = P_DONE;
-	N.want_recent = 1;
+	N.want_recent = !N.read_only;
 	tlog("names: %lu files' CRCs from %s in %lu ms%s", (unsigned long)N.lines_read, NAMES_CACHE_FILE,
 	     (unsigned long)ms_since(N.started), N.cache_ok ? "" : " (it isn't written back)");
 	if (N.lines_bad)
@@ -295,12 +333,16 @@ static int scan_chunk(struct safefile_scan *sc, int *ok)
 		return 1;
 	}
 	safefile_scan_feed(sc, N.buf, got);
+	N.rd_pos = 0;
+	N.rd_got = (u16)got;
 	if (got == NAMES_LOAD_BYTES)
 		return 0;
 	safefile_scan_end(sc);
 	close_file();
 	return 1;
 }
+
+static void lines_begin(void);
 
 // The scans are done: open the copy safefile_pick takes
 static void read_begin(void)
@@ -325,9 +367,7 @@ static void read_begin(void)
 	}
 	N.limit = sc->valid ? sc->body : sc->size;
 	N.rd_done = 0;
-	N.line_len = 0;
-	N.line_long = 0;
-	N.first_line = 1;
+	lines_begin();
 	N.phase = P_READ;
 }
 
@@ -354,23 +394,15 @@ static void line_end(void)
 	N.line_long = 0;
 }
 
-static void read_chunk(void)
+// The lines of the chunk in N.buf from N.rd_pos, until NAMES_LINES_CYCLES
+// have passed (a line costs about 6,000 cycles to keep)
+static void parse_lines(void)
 {
-	UINT got = 0;
-	u32 want = N.limit - N.rd_done;
-	if (want > NAMES_LOAD_BYTES)
-		want = NAMES_LOAD_BYTES;
-	if (want && f_read(&N.u.fil, N.buf, want, &got) != FR_OK) {
-		tlog_error("names: reading %s failed", NAMES_CACHE_FILE);
-		N.cache_ok = 0;
-		got = 0;
-		want = 0;
-	}
-	N.rd_done += got;
-	// A line at a time, as safefile_scan_feed does
-	const u8 *p = N.buf, *end = N.buf + got;
-	while (p < end) {
-		const u8 *nl = memchr(p, '\n', (size_t)(end - p));
+	u32 start = cycles_now();
+	const u8 *p = N.buf + N.rd_pos, *end = N.buf + N.rd_got;
+	while (p < end && cycles_since(start) < NAMES_LINES_CYCLES) {
+		u8 nul;
+		const u8 *nl = safefile_scan_line(p, end, &nul);
 		u32 text = (u32)((nl ? nl : end) - p), room = (u32)sizeof(N.lines.buf) - 1 - N.line_len;
 		if (text > room) {
 			N.line_long = 1;
@@ -382,11 +414,72 @@ static void read_chunk(void)
 		if (nl)
 			line_end();
 	}
-	if (want && got == want && N.rd_done < N.limit)
+	N.rd_pos = (u16)(p - N.buf);
+}
+
+static void lines_begin(void)
+{
+	N.rd_pos = N.rd_got = 0;
+	N.line_len = 0;
+	N.line_long = 0;
+	N.first_line = 1;
+}
+
+// A piece of the backup copy (crc.txt didn't hold): a chunk read when the
+// last is parsed, else its lines
+static void read_chunk(void)
+{
+	if (N.rd_pos < N.rd_got) {
+		parse_lines();
 		return;
+	}
+	UINT got = 0;
+	u32 want = N.limit - N.rd_done;
+	if (want > NAMES_LOAD_BYTES)
+		want = NAMES_LOAD_BYTES;
+	if (want && f_read(&N.u.fil, N.buf, want, &got) != FR_OK) {
+		tlog_error("names: reading %s failed", NAMES_CACHE_FILE);
+		N.cache_ok = 0;
+		got = 0;
+	}
+	N.rd_done += got;
+	N.rd_pos = 0;
+	N.rd_got = (u16)got;
+	if (got)
+		return;  // its lines next
 	if (N.line_len || N.line_long)
 		line_end();  // a last line with no newline
 	load_done();
+}
+
+// crc.txt is scanned whole, its lines kept as they come (most often it
+// holds: one read). Then the copy safefile_pick takes: crc.txt, read; or
+// the backup (or nothing), which the cache is emptied for.
+static void main_scanned(void)
+{
+	if (N.line_len || N.line_long)
+		line_end();  // a last line with no newline
+	if (N.has_main && N.scan_main.valid) {
+		N.main_first = 0;
+		load_done();
+		return;
+	}
+	N.phase = P_SCAN_BAK;
+}
+
+static void bak_scanned(void)
+{
+	int from = safefile_pick(N.has_main ? &N.scan_main : NULL, N.has_bak ? &N.scan_bak : NULL);
+	if (from == SAFEFILE_HAND) {
+		tlog("names: %s: edited by hand: read as it is", NAMES_CACHE_FILE);
+		N.main_first = 0;
+		load_done();
+		return;
+	}
+	// The lines kept were crc.txt's, which doesn't hold: empty again
+	N.phase = P_CLEAR;
+	N.at = 0;
+	N.again = 1;
 }
 
 int names_load_step(void)
@@ -399,43 +492,65 @@ int names_load_step(void)
 		return 0;
 	case P_CLEAR:
 		psram_begin();
-		if (N.at == 0)
+		if (N.at == 0) {
 			names_cache_init(&N.cache, (u8 *)PSRAM_NAMES_CACHE_BASE, put);
+			memset(N.fresh, 0, sizeof(N.fresh));  // the journal says again what is new
+			memset(N.writing, 0, sizeof(N.writing));
+		}
 		if (names_cache_clear_part(&N.cache, N.at, NAMES_CLEAR_BYTES)) {
+			N.lines_read = N.lines_bad = 0;
+			if (N.again) {
+				N.again = 0;
+				read_begin();  // the backup, or nothing
+				return 0;
+			}
 			N.phase = P_SCAN_MAIN;
 			N.started = cycles_now();
 			N.cache_ok = 1;
 			N.has_main = N.has_bak = 0;
-			N.lines_read = N.lines_bad = 0;
+			N.main_end = 0;
 		}
 		N.at += NAMES_CLEAR_BYTES;
 		return 0;
-	case P_SCAN_MAIN:
-	case P_SCAN_BAK: {
-		int main = N.phase == P_SCAN_MAIN, ok;
-		struct safefile_scan *sc = main ? &N.scan_main : &N.scan_bak;
+	case P_SCAN_MAIN: {
+		int ok;
+		if (N.rd_pos < N.rd_got) {
+			psram_begin();
+			parse_lines();  // the chunk's lines first
+			return 0;
+		}
+		if (N.main_end) {
+			main_scanned();
+			return 0;
+		}
 		if (!N.file_open) {
-			if (!open_copy(main ? NAMES_CACHE_FILE : NAMES_CACHE_BAK)) {
-				if (main)
-					N.phase = P_SCAN_BAK;
-				else
-					read_begin();
+			if (!open_copy(NAMES_CACHE_FILE)) {
+				N.phase = P_SCAN_BAK;
 				return 0;
 			}
-			safefile_scan_begin(sc);
+			safefile_scan_begin(&N.scan_main);
+			lines_begin();
 		}
-		if (!scan_chunk(sc, &ok))
+		if (!scan_chunk(&N.scan_main, &ok))
 			return 0;
-		if (main) {
-			N.has_main = (u8)ok;
-			if (ok && sc->valid)
-				read_begin();  // crc.txt holds: the backup doesn't matter
-			else
-				N.phase = P_SCAN_BAK;
-		} else {
-			N.has_bak = (u8)ok;
-			read_begin();
+		N.has_main = (u8)ok;
+		N.main_end = 1;
+		return 0;
+	}
+	case P_SCAN_BAK: {
+		int ok;
+		if (!N.file_open) {
+			if (!open_copy(NAMES_CACHE_BAK)) {
+				bak_scanned();
+				return 0;
+			}
+			safefile_scan_begin(&N.scan_bak);
 		}
+		if (!scan_chunk(&N.scan_bak, &ok))
+			return 0;
+		N.has_bak = (u8)ok;
+		N.rd_pos = N.rd_got = 0;  // scanned only
+		bak_scanned();
 		return 0;
 	}
 	case P_READ:
@@ -573,6 +688,9 @@ static void write_begin(void)
 		return;
 	}
 	N.dirty = 0;  // a change from now on writes again
+	for (u32 i = 0; i < sizeof(N.fresh); i++)
+		N.writing[i] |= N.fresh[i];
+	memset(N.fresh, 0, sizeof(N.fresh));
 	N.wphase = X_OPEN;
 	N.wcopy = 0;
 	N.wstarted = cycles_now();
@@ -595,6 +713,7 @@ static void write_failed(const char *what, FRESULT fr)
 	close_file();
 	N.wphase = X_IDLE;
 	N.cache_ok = 0;  // no more tries (and errors) this session: a read-only file, say
+	write_lost();
 }
 
 // One step of the write: a copy opened, or a chunk of its text
@@ -651,6 +770,13 @@ static void write_step(void)
 	}
 	N.wphase = X_IDLE;
 	N.main_first = 0;  // both whole: crc.txt is the one a reader takes
+	memset(N.writing, 0, sizeof(N.writing));
+	if (N.journal) {
+		// crc.txt holds the journal's lines now
+		f_unlink(NAMES_JOURNAL);
+		f_unlink(NAMES_JOURNAL_BAK);
+		N.journal = 0;
+	}
 	tlog("names: wrote %s in %lu ms", NAMES_CACHE_FILE, (unsigned long)ms_since(N.wstarted));
 }
 
@@ -772,6 +898,7 @@ static int identify_step(void)
 			return JOB_MORE;
 		}
 		mark_seen(n);
+		mark_fresh(n);
 		N.dirty |= DIRTY_HARD;
 		N.computed++;
 		N.since_write++;
@@ -846,6 +973,7 @@ static int names_job(struct job *job)
 		if (N.wphase != X_IDLE) {
 			N.wphase = X_IDLE;
 			N.dirty |= DIRTY_HARD;
+			write_lost();
 		}
 		return JOB_DONE;
 	}
@@ -916,6 +1044,61 @@ void names_poll(void)
 		N.job = job_start(names_job, 0, JOB_OWNER_NONE);
 }
 
+// 1 if a record's CRC isn't in crc.txt yet
+static int journal_due(void)
+{
+	for (u32 i = 0; i < sizeof(N.fresh); i++)
+		if (N.fresh[i] | N.writing[i])
+			return 1;
+	return 0;
+}
+
+// The journal's lines: the records crc.txt doesn't hold yet (lc->rec
+// counts them once the text is done)
+static u32 journal_line(void *ctx, u32 n, char *buf, u32 size)
+{
+	struct line_cursor *lc = ctx;
+	if (n == 0) {
+		lc->rec = 0;
+		N.cursor = 0;  // no Identify runs now: its cursor walks the records
+	}
+	for (; N.cursor < N.cache.count; N.cursor++) {
+		u32 r = N.cursor;
+		if (!((N.fresh[r >> 3] | N.writing[r >> 3]) >> (r & 7) & 1))
+			continue;
+		u32 len = names_format_line(&N.cache, r, buf, size);
+		if (len) {
+			N.cursor++;
+			lc->rec++;
+			return len;
+		}
+	}
+	return 0;
+}
+
+// The journal a launch left, into the cache (just loaded): its records are
+// new, so the next write of crc.txt takes them
+static void journal_read(void)
+{
+	if (!N.cache_ok || safefile_open(NAMES_JOURNAL, NAMES_JOURNAL_MAX) == SAFEFILE_NONE)
+		return;
+	N.journal = 1;
+	u32 kept = 0;
+	int len;
+	while ((len = safefile_line(N.lines.buf, sizeof(N.lines.buf))) != SAFEFILE_END) {
+		struct names_line l;
+		if (len == SAFEFILE_LONG || !names_parse_line(N.lines.buf, &l))
+			continue;
+		u32 n = names_cache_put(&N.cache, l.path, l.size, l.date, l.crc, l.flags);
+		if (n != NAMES_CACHE_NONE) {
+			mark_fresh(n);
+			kept++;
+		}
+	}
+	safefile_close();
+	tlog("names: %lu CRCs from %s", (unsigned long)kept, NAMES_JOURNAL);
+}
+
 void names_before_launch(void)
 {
 	if (job_running(N.job))
@@ -926,12 +1109,18 @@ void names_before_launch(void)
 		tlog("names: identifying stopped for a launch (%lu of %lu games done)", (unsigned long)N.done,
 		     (unsigned long)N.total);
 	N.mode = M_NONE;
-	if (N.phase == P_DONE && ((N.dirty & DIRTY_HARD) || N.wphase != X_IDLE)) {
-		// PSRAM is about to hold the game: what changed goes to the card first
+	if (N.phase == P_DONE && N.cache_ok && N.active && journal_due()) {
+		// PSRAM is about to hold the game: the CRCs crc.txt doesn't hold
+		// go to the journal, a few lines (crc.txt's rewrite would take
+		// about half a second per thousand records)
 		psram_begin();
-		write_begin();
-		while (N.wphase != X_IDLE)
-			write_step();
+		memset(&N.lines, 0, sizeof(N.lines));
+		N.lines.line = journal_line;
+		N.lines.ctx = &N.lc;
+		u32 start = cycles_now();
+		if (safefile_write(NAMES_JOURNAL, NAMES_JOURNAL_MAX, safefile_lines_fill, &N.lines))
+			tlog("names: wrote %lu CRCs to %s in %lu ms", (unsigned long)N.lc.rec, NAMES_JOURNAL,
+			     (unsigned long)ms_since(start));
 	}
 	N.phase = P_START;
 	N.db_ok = 0;

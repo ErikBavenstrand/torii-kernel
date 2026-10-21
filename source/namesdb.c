@@ -93,12 +93,12 @@ static u16 *slots(const struct names_cache *c)
 	return (u16 *)(c->base + NAMES_CACHE_OFF_SLOTS);
 }
 
-static int lower(int ch)
+static inline __attribute__((always_inline)) int lower(int ch)
 {
 	return ch >= 'A' && ch <= 'Z' ? ch + 32 : ch;
 }
 
-static int same_path(const char *a, const char *b)
+static inline __attribute__((always_inline)) int same_path(const char *a, const char *b)
 {
 	while (*a && lower((u8)*a) == lower((u8)*b)) {
 		a++;
@@ -107,12 +107,23 @@ static int same_path(const char *a, const char *b)
 	return !*a && !*b;
 }
 
+u32 IWRAM_CODE names_path_hash_len(const char *path, u32 *len)
+{
+	const char *p = path;
+	u32 h = 2166136261u;
+	for (u32 ch; (ch = (u8)*p) != 0; p++) {
+		if (ch - 'A' < 26u)
+			ch += 32;
+		h = (h ^ ch) * 16777619u;
+	}
+	*len = (u32)(p - path);
+	return h;
+}
+
 u32 names_path_hash(const char *path)
 {
-	u32 h = 2166136261u;
-	for (; *path; path++)
-		h = (h ^ (u32)lower((u8)*path)) * 16777619u;
-	return h;
+	u32 len;
+	return names_path_hash_len(path, &len);
 }
 
 void names_cache_init(struct names_cache *c, u8 *base, names_put_fn put)
@@ -175,12 +186,11 @@ static void write_rec(struct names_cache *c, u32 n, const struct names_rec *r)
 
 u32 names_cache_put(struct names_cache *c, const char *path, u32 size, u32 date, u32 crc, u32 flags)
 {
-	u32 len = (u32)strnlen(path, NAMES_PATH_MAX + 1);
+	u32 len, hash = names_path_hash_len(path, &len);
 	if (path[0] != '/' || len > NAMES_PATH_MAX)
 		return NAMES_CACHE_NONE;
 	flags &= NAMES_CRC | NAMES_DATE;
-	struct names_rec r = {names_path_hash(path), size, (flags & NAMES_DATE) ? date : 0,
-			      (flags & NAMES_CRC) ? crc : 0, 0};
+	struct names_rec r = {hash, size, (flags & NAMES_DATE) ? date : 0, (flags & NAMES_CRC) ? crc : 0, 0};
 	u32 n = find_hashed(c, path, r.hash);
 	if (n != NAMES_CACHE_NONE) {
 		const struct names_rec *old = names_cache_rec(c, n);
@@ -244,13 +254,15 @@ int names_cache_fits(const struct names_rec *r, u32 size, u32 date)
 // --- crc.txt's lines -----------------------------------------------------------------
 
 // The next tab-separated field of *s, NUL-ended in place; NULL if none
-static char *field(char **s)
+static inline __attribute__((always_inline)) char *field(char **s)
 {
 	char *start = *s;
 	if (!start)
 		return NULL;
-	char *tab = strchr(start, '\t');
-	if (tab) {
+	char *tab = start;
+	while (*tab && *tab != '\t')
+		tab++;
+	if (*tab) {
 		*tab = 0;
 		*s = tab + 1;
 	} else {
@@ -260,7 +272,7 @@ static char *field(char **s)
 }
 
 // Parses up to 8 hex digits (exactly 8 if exact) into *out
-static int hex(const char *s, u32 *out, int exact)
+static inline __attribute__((always_inline)) int hex(const char *s, u32 *out, int exact)
 {
 	u32 v = 0, n = 0;
 	for (; *s; s++, n++) {
@@ -277,7 +289,7 @@ static int hex(const char *s, u32 *out, int exact)
 	return n && (!exact || n == 8);
 }
 
-static int decimal(const char *s, u32 *out)
+static inline __attribute__((always_inline)) int decimal(const char *s, u32 *out)
 {
 	u32 v = 0;
 	if (!*s)
@@ -292,8 +304,13 @@ static int decimal(const char *s, u32 *out)
 	return 1;
 }
 
+static inline __attribute__((always_inline)) int dash(const char *s)
+{
+	return s[0] == '-' && !s[1];
+}
+
 // 1 if s is a GBA game code: four characters 0-9 or A-Z
-static int game_code(const char *s)
+static inline __attribute__((always_inline)) int game_code(const char *s)
 {
 	for (u32 i = 0; i < 4; i++)
 		if (!((s[i] >= '0' && s[i] <= '9') || (s[i] >= 'A' && s[i] <= 'Z')))
@@ -301,7 +318,7 @@ static int game_code(const char *s)
 	return !s[4];
 }
 
-int names_parse_line(char *line, struct names_line *out)
+int IWRAM_CODE names_parse_line(char *line, struct names_line *out)
 {
 	if (line[0] == '#' || !line[0])
 		return 0;
@@ -309,7 +326,7 @@ int names_parse_line(char *line, struct names_line *out)
 	char *crc = field(&rest), *size = field(&rest), *date = field(&rest);
 	if (rest && rest[0] != '/') {  // v0.4.1's line: the code came second
 		const char *code = size;
-		if (!code || !(strcmp(code, "-") == 0 || game_code(code)))
+		if (!code || !(dash(code) || game_code(code)))
 			return 0;
 		size = date;
 		date = field(&rest);
@@ -317,16 +334,16 @@ int names_parse_line(char *line, struct names_line *out)
 	char *path = rest;  // the rest of the line: a path may hold anything but a line break
 	if (!crc || !size || !date || !path || path[0] != '/')
 		return 0;
-	memset(out, 0, sizeof(*out));
+	*out = (struct names_line){0};
 	out->path = path;
-	if (strcmp(crc, "-") != 0) {
+	if (!dash(crc)) {
 		if (!hex(crc, &out->crc, 1))
 			return 0;
 		out->flags |= NAMES_CRC;
 	}
 	if (!decimal(size, &out->size))
 		return 0;
-	if (strcmp(date, "-") != 0) {
+	if (!dash(date)) {
 		if (!hex(date, &out->date, 1))
 			return 0;
 		out->flags |= NAMES_DATE;

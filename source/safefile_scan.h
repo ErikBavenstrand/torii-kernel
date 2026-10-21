@@ -33,6 +33,9 @@ struct safefile_scan {
 };
 
 void safefile_scan_begin(struct safefile_scan *s);
+// The first newline in [p, end), or NULL; *nul set to 1 if a NUL comes
+// before it (the feed's one pass over the bytes).
+const u8 *IWRAM_CODE safefile_scan_line(const u8 *p, const u8 *end, u8 *nul);
 void safefile_scan_feed(struct safefile_scan *s, const void *data, u32 bytes);
 void safefile_scan_end(struct safefile_scan *s);
 

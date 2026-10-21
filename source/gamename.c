@@ -534,55 +534,109 @@ static const char *line_name(const struct gamename_custom *c, u32 at, u32 *len)
 	return c->text + from;
 }
 
-u32 gamename_custom_parse(struct gamename_custom *c, const char *text, u32 len, u32 *line, u32 line_cap)
+enum {
+	CP_INDEX,  // the lines found
+	CP_CHECK,  // their order checked: a file the kernel wrote is sorted
+	CP_HEAP,   // else heap sorted by path: the heap built,
+	CP_SORT,   // then taken apart
+	CP_DEDUPE,  // all but the last line of each path dropped
+	CP_DONE,
+};
+
+void gamename_custom_begin(struct gamename_custom *c, const char *text, u32 len, u32 *line, u32 line_cap)
 {
 	c->text = text;
 	c->len = text ? len : 0;
 	c->line = line;
 	c->count = 0;
 	c->complete = 1;
-	if (!text)
-		return 0;
-	u32 at = 0;
-	if (c->len >= 3 && memcmp(text, "\xEF\xBB\xBF", 3) == 0)
-		at = 3;
-	while (at < c->len) {
-		u32 end = line_end(c, at);
-		const char *tab = memchr(text + at, '\t', end - at);
-		if (text[at] == '/' && tab) {
-			u32 name_len;
-			line_name(c, at, &name_len);
-			if (name_len > 0) {
-				if (c->count < line_cap)
-					line[c->count++] = at;
-				else
-					c->complete = 0;
+	c->cap = line_cap;
+	c->phase = text ? CP_INDEX : CP_DONE;
+	c->at = c->len >= 3 && memcmp(text, "\xEF\xBB\xBF", 3) == 0 ? 3 : 0;
+}
+
+int gamename_custom_step(struct gamename_custom *c, u32 work)
+{
+	u32 *line = c->line;
+	for (; work && c->phase != CP_DONE; work--) {
+		switch (c->phase) {
+		case CP_INDEX:
+			if (c->at >= c->len) {
+				c->phase = CP_CHECK;
+				c->i = 1;
+				break;
 			}
+			{
+				u32 at = c->at, end = line_end(c, at);
+				const char *tab = memchr(c->text + at, '\t', end - at);
+				if (c->text[at] == '/' && tab) {
+					u32 name_len;
+					line_name(c, at, &name_len);
+					if (name_len > 0) {
+						if (c->count < c->cap)
+							line[c->count++] = at;
+						else
+							c->complete = 0;
+					}
+				}
+				c->at = end + 1;
+			}
+			break;
+		case CP_CHECK:
+			if (c->i >= c->count) {
+				c->phase = CP_DEDUPE;  // sorted: one pass saw it
+				c->i = c->n = 0;
+			} else if (!line_before(c, line[c->i - 1], line[c->i])) {
+				c->phase = CP_HEAP;
+				c->i = c->count / 2;
+			} else {
+				c->i++;
+			}
+			break;
+		case CP_HEAP:
+			if (!c->i) {
+				c->phase = CP_SORT;
+				c->n = c->count;
+				break;
+			}
+			sift_down(c, line, --c->i, c->count);
+			break;
+		case CP_SORT:
+			if (c->n <= 1) {
+				c->phase = CP_DEDUPE;
+				c->i = c->n = 0;
+				break;
+			}
+			{
+				u32 t = line[0];
+				line[0] = line[c->n - 1];
+				line[c->n - 1] = t;
+				c->n--;
+				sift_down(c, line, 0, c->n);
+			}
+			break;
+		case CP_DEDUPE:
+			// c->n lines kept so far
+			if (c->i >= c->count) {
+				c->count = c->n;
+				c->phase = CP_DONE;
+				break;
+			}
+			if (!(c->i + 1 < c->count && path_cmp_lines(c, line[c->i], line[c->i + 1]) == 0))
+				line[c->n++] = line[c->i];
+			c->i++;
+			break;
 		}
-		at = end + 1;
 	}
-	// Heap sort by path, then drop all but the last line of each path. A file
-	// gamename_custom_set wrote is sorted already: one pass sees it (the
-	// library parses the file on every rebuild, from PSRAM, B3)
-	u32 sorted = 1;
-	for (u32 i = 1; i < c->count && sorted; i++)
-		sorted = line_before(c, line[i - 1], line[i]);
-	for (u32 i = c->count / 2; !sorted && i-- > 0;)
-		sift_down(c, line, i, c->count);
-	for (u32 n = c->count; !sorted && n > 1; n--) {
-		u32 t = line[0];
-		line[0] = line[n - 1];
-		line[n - 1] = t;
-		sift_down(c, line, 0, n - 1);
-	}
-	u32 kept = 0;
-	for (u32 i = 0; i < c->count; i++) {
-		if (i + 1 < c->count && path_cmp_lines(c, line[i], line[i + 1]) == 0)
-			continue;
-		line[kept++] = line[i];
-	}
-	c->count = kept;
-	return kept;
+	return c->phase == CP_DONE;
+}
+
+u32 gamename_custom_parse(struct gamename_custom *c, const char *text, u32 len, u32 *line, u32 line_cap)
+{
+	gamename_custom_begin(c, text, len, line, line_cap);
+	while (!gamename_custom_step(c, 0xFFFFFFFFu))
+		;
+	return c->count;
 }
 
 const char *gamename_custom_get(const struct gamename_custom *c, const char *path, u32 *len)

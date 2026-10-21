@@ -8,6 +8,6 @@
 // whose 8-bit bus returns one byte for a word load. Copy SRAM to RAM first.
 u32 crc32(const void *data, u32 size);
 // Continues a CRC32: crc32_update(crc32(a), b) is the CRC of a then b.
-u32 crc32_update(u32 crc, const void *data, u32 size);
+u32 IWRAM_CODE crc32_update(u32 crc, const void *data, u32 size);
 
 #endif

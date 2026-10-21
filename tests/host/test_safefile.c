@@ -181,3 +181,29 @@ void test_safefile_lines(void)
 	safefile_lines_fill(&l, 0, got, 3);
 	CHECK_EQ(safefile_lines_fill(&l, 5, got, 3), 0);
 }
+
+// safefile_scan_line against a byte-by-byte search, from every alignment
+// and with the newline and a NUL at every place in a word
+void test_safefile_scan_line(void)
+{
+	u8 buf[40] __attribute__((aligned(4)));
+	for (u32 start = 0; start < 4; start++)
+		for (u32 at = start; at < 24; at++)
+			for (u32 kind = 0; kind < 3; kind++) {
+				memset(buf, 'a', sizeof(buf));
+				if (kind == 0)
+					buf[at] = '\n';
+				else if (kind == 1)
+					buf[at] = 0;
+				else
+					buf[at] = 0, buf[at + 3] = '\n';
+				u8 nul = 0;
+				const u8 *nl = safefile_scan_line(buf + start, buf + 30, &nul);
+				const u8 *want = kind == 0 ? buf + at : kind == 2 ? buf + at + 3 : NULL;
+				CHECK(nl == want);
+				CHECK_EQ(nul, kind != 0);
+			}
+	u8 nul = 0;
+	CHECK(safefile_scan_line(buf, buf, &nul) == NULL);
+	CHECK_EQ(nul, 0);
+}

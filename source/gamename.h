@@ -80,12 +80,20 @@ struct gamename_custom {
 	u32 *line;  // count offsets in text of the kept lines, sorted by path
 	u32 count;
 	u8 complete;  // 1 when every line was kept and the file read whole
+	// A parse in steps (gamename_custom_begin): where it is
+	u8 phase;
+	u32 cap, at, i, n;
 };
 
 // Indexes the len bytes at text (which must outlive c) into c, using line
 // (line_cap u32s) for the offsets; returns c->count. text may be NULL with
 // len 0 (no file yet).
 u32 gamename_custom_parse(struct gamename_custom *c, const char *text, u32 len, u32 *line, u32 line_cap);
+// The same in steps, for the library's walk: begin, then step until it
+// returns 1, each doing up to work pieces (a line found, compared or moved).
+// c isn't ready for lookups until then.
+void gamename_custom_begin(struct gamename_custom *c, const char *text, u32 len, u32 *line, u32 line_cap);
+int gamename_custom_step(struct gamename_custom *c, u32 work);
 
 // The custom name of path: its bytes (not NUL-terminated) and length, or
 // NULL when it has none.
