@@ -4,6 +4,15 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Added:** the full art pack, `/torii/art.pak` (`just art-pack`, once):
+  covers for every No-Intro game libretro-thumbnails has, so a new official
+  game gets its box with no PC. Looked up after custom art and
+  `art/<CRC32>.bin`; its index is read into PSRAM and its cluster link map
+  built a few clusters a frame, so a cover reads at its offset with a quick
+  seek (F3; `b3abac5`, review fixes `8b4a77f`).
+
 ## v0.4.1 (2026-10-21)
 
 The new menu: a carousel home, game lists, SD card, NOR, Settings and Info
