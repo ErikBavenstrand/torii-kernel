@@ -348,6 +348,7 @@ What the v0.4 ticket sessions, the conductor's reviews and the research left ope
 - A launch shows about 8 black frames between home's fade-out and the loading card (pre-existing; B19).
 - ~~`gfx_hold_regs` keeps stale bits after a hold ends (B12).~~ Fixed by B19 (`ed91130`).
 - A cover landing during a palette fade could show wrong colours; one frame of new palette on old tiles is possible if the VRAM queue is ever overfull (B22, not seen).
+- `just art-scrape` and `just names-update` print a Python traceback on a read-only or full card instead of a clear message (catch `OSError` in `main`); a 403 or other 4xx isn't remembered as a miss (B23 review).
 - A large crc.txt loads slowly after each boot: about 6 s of background work for 3,000 records (emulated), mostly hashing paths (B21).
 - A read-only crc.txt is never updated: dates are re-adopted and Recent games re-identified every boot (B21).
 
@@ -369,6 +370,7 @@ Made during the build without the user; each is cheap to change.
 - **Mockups for Settings and the rename keyboard,** approved by the conductor for the build (`docs/design/v0.4/settings-*.png`, `keyboard-*.png`).
 - **Dropped v0.3 features:** the NOR menu's load and back-up of a save; the help QR code; the cheat screen, per-game save type, hard reset and write to NOR with addon come back in B13/B14 (B10).
 - **A starts games with the enabled addons** (Play, Launch); Clean boot is a separate entry; v0.3's A, A was a clean boot (conductor, B13/B14).
+- **Art scraper:** one timeout stops fetching for the run; existing art never refreshed; romhacks get base-game art (B23).
 - **Box art:** custom art shared by same-named files in different folders; covers load after 8 frames of rest with no fade (B22).
 - **Game lists:** Favourites shows no stars; list with art shows two facts; Game info is a page; GB/GBC/NES offer only Play (B13).
 - **SD card page:** Delete reaches `/torii` and `/SAVER` with Show all files on; the first 1,024 files the card lists are shown in a bigger folder; folder icons blue (B14).
