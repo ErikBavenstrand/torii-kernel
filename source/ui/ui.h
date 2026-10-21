@@ -1010,6 +1010,10 @@ struct ui_popup {
 // Opens a popup beside list's selected row (a list on the top view): it
 // starts opening, and the call returns. 0 if it can't (logged, ui_error()).
 int ui_popup_open(u8 list, u8 hints, const struct ui_popup *popup);
+// Holds the keys pressed from now (on 1) for the view on top once on is 0
+// again: a page that runs frames before it opens a popup (a list still
+// paging) gives the popup the keys pressed meanwhile, not itself.
+void ui_keys_hold(int on);
 // Runs frames until A picks an item (its index; the popup stays up) or B
 // (-1; the popup has closed). -1 if no popup is up.
 s32 ui_popup_choose(void);

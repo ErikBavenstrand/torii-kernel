@@ -868,6 +868,10 @@ static void marquee_tick(u8 node, struct list_state *st, u32 dt)
 {
 	if (st->mq == MQ_OFF || st->unmarked || st->page != PAGE_NONE || st->shown != st->base + FIX_ROUND(st->spring))
 		return;
+	// Paused where it is under a popup or a dialog: the row barely shows,
+	// and its steps cost the frames the card above draws in
+	if (ui_node_view(node) != ui_top())
+		return;
 	const struct ui_theme *t = ui_theme();
 	if (st->mq_wait > dt) {
 		st->mq_wait = (u16)(st->mq_wait - dt);

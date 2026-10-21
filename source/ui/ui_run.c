@@ -146,6 +146,7 @@ static struct {
 	u8 tr_wait;       // TR_IN: the regs showing the screen are not on screen yet
 	u8 tr_in_frames;  // for the half coming in
 	u8 capture;       // ui_close: keys wait for the view under it (keys.held)
+	u8 hold_keys;     // ui_keys_hold: keys wait for the view on top once it ends
 	u8 gap_regs;      // the last regs show no view (a screen gone)
 	u8 tr_pushed;     // TR_GAP: a view was pushed since the screen went
 	u8 active;        // between ui_init and ui_shutdown
@@ -195,6 +196,15 @@ static struct {
 void ui_wake(void)
 {
 	frame_wake();
+}
+
+void ui_keys_hold(int on)
+{
+	ui.hold_keys = (u8)(on != 0);
+	if (!on) {
+		keyq_release(&ui.keys);
+		ui_wake();
+	}
 }
 
 void ui_queue_keys(u16 keys)
@@ -2030,7 +2040,7 @@ u32 ui_frame(void)
 			     ? (u16)(INPUT_A | INPUT_START | INPUT_SELECT)
 			     : 0;
 	fire &= (u16)~unseen;
-	if (ui.capture || ui.tr_phase == TR_OUT || ui.tr_phase == TR_GAP) {
+	if (ui.capture || ui.hold_keys || ui.tr_phase == TR_OUT || ui.tr_phase == TR_GAP) {
 		// A screen going out or a dialog closing: for the view after it
 		keyq_hold(&ui.keys, fire, ui.in.pressed);
 		fire = 0;

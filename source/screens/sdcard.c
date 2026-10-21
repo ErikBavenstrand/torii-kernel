@@ -740,17 +740,32 @@ static const char *fav_text(void)
 }
 
 // START (or A on a file the cart can't start): the entry's popup
+static int file_popup_open(u32 i);
+static void file_popup_run(u32 i);
+
 static void file_popup(u32 arg)
 {
 	u8 l = node(N_LIST);
+	// Beside the row where it will rest: keys pressed while the list pages
+	// are the popup's (DOWN then would have moved the row away from it)
+	ui_keys_hold(1);
 	while (up() && ui_list_paging(l))
-		ui_frame();  // beside the row where it will rest
-	u32 i = arg & 0xFFFF;
+		ui_frame();
+	int open = file_popup_open(arg & 0xFFFF);
+	ui_keys_hold(0);
+	if (open)
+		file_popup_run(arg & 0xFFFF);
+}
+
+// The popup of entry i, opened; 0 if it isn't (the keys held go to the page)
+static int file_popup_open(u32 i)
+{
+	u8 l = node(N_LIST);
 	if (!up() || i >= entries() || i != cursor())
-		return;
+		return 0;
 	if (!take_entry(i)) {
 		error(8);
-		return;
+		return 0;
 	}
 	const struct sdlist_rec *r = sdlist_at(&sd.list, i);
 	u32 console = sdlist_console(r);
@@ -780,8 +795,15 @@ static void file_popup(u32 arg)
 	}
 	pop_add(POP_INFO, gl_sd_info, 0);
 	if (!ui_popup_open(l, node(N_HINTS), &sd.popup))
-		return;
+		return 0;
 	tlog_debug("sdcard: popup %s", sd.full);
+	return 1;
+}
+
+static void file_popup_run(u32 i)
+{
+	const struct sdlist_rec *r = sdlist_at(&sd.list, i);
+	u32 console = sdlist_console(r);
 	for (;;) {
 		s32 pick = ui_popup_choose();
 		if (pick < 0)

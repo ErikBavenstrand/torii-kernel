@@ -504,9 +504,12 @@ static int run_live(struct run *r)
 }
 
 // Keys pressed while a run closes that the view under it gets: moves only.
-// A, B, START or SELECT then could act on a page the user can't see yet
-// (B then A would play the game under the popup).
+// A, B or SELECT then could act on a page the user can't see yet (B then A
+// would play the game under the popup). START, which opens the popup, goes
+// on after a popup's close: START and B mashed open and close it, and a
+// START dropped let the next B reach the page.
 #define KEYS_AFTER (INPUT_DPAD | INPUT_L | INPUT_R)
+#define KEYS_AFTER_POPUP (KEYS_AFTER | INPUT_START)
 
 static void run_start(struct run *r, struct ui_view *v, u8 hints)
 {
@@ -777,7 +780,7 @@ static int popup_event(u8 node, const struct ui_event *e)
 	if (e->type != UI_EV_KEYS || !r->view)
 		return 0;
 	if (r->dir < 0) {
-		r->keys_after |= e->keys & KEYS_AFTER;  // for the page, once it has closed
+		r->keys_after |= e->keys & KEYS_AFTER_POPUP;  // for the page, once it has closed
 		return 1;
 	}
 	if (pp.fields) {
