@@ -430,7 +430,7 @@ void Stage_SET_info(const u16 *SET_info_buffer)
 {
 	memcpy(set_staged, SET_info_buffer, sizeof(set_staged));
 	set_staging = 1;
-	tlog_debug("settings: staged, written as SETTINGS closes");
+	tlog_debug("settings: staged");
 }
 // --------------------------------------------------------------------
 void Discard_SET_info(void)

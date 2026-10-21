@@ -147,8 +147,8 @@ diag="$diag_start $(for f in $(seq 2000 24 4400); do printf -- '-k %d:START -k %
 diag_rumble="$diag_start $(for f in $(seq 2000 24 3600); do printf -- '-k %d:A -k %d:- ' "$f" $((f + 4)); done)"
 
 # The Settings page's saves: it writes the kernel NOR (settings_commit,
-# through Save_info) once as B leaves it, if a value changed. Each sequence
-# goes to a row, edits it (A, RIGHT, A) and leaves, waiting for home.
+# through Save_info) as A confirms a changed value. Each sequence goes to a
+# row, edits it (A, RIGHT, A) and leaves, waiting for home.
 home=$(_nav_file '-w "nav: home ready"')
 # Auto save turned over
 save_setting="$(nav_setting auto-save) $(nav_press A RIGHT A B) $home"
@@ -161,8 +161,10 @@ toggles() {
   for ((i = 0; i < $1; i++)); do keys+=(A RIGHT A); done
   echo "$(nav_setting auto-save) $(nav_press "${keys[@]}" B) $home"
 }
-toggles5=$(toggles 5)
-toggles2=$(toggles 2)
+toggles3=$(toggles 3)
+# Edits that write nothing: one B cancels, one confirmed unchanged, one
+# stepped there and back
+settings_none="$(nav_setting auto-save) $(nav_press A RIGHT B A A A RIGHT LEFT A B) $home"
 # The page opened and left, nothing changed
 settings_out="$(nav_to settings) $(nav_press B) $home"
 # slot SLOT: a settings slot's value, as the kernel NOR holds it
@@ -228,25 +230,26 @@ EOF
     pass "a DIM save writes only its slot"
   fi
 
-  # Five changes on the page write the kernel NOR once, as it closes
-  # (v0.3.2: each save erased the sector); changes that cancel out, and the
-  # page left without a change, don't write it
+  # Each confirmed change writes the kernel NOR once, as A confirms it (the
+  # user's choice for v0.4; v0.3.2 wrote once as the page closed); an edit
+  # B cancels, one confirmed unchanged, and the page left without a
+  # change, don't write it
   if shard_case; then
     new_cart settings-once
-    boot $toggles5
+    boot $toggles3
     logged "nor: wrote the settings"
-    [ $ok = 0 ] || [ "$(grep -c 'nor: wrote the settings' "$log")" = 1 ] ||
-      bad "five changes wrote the settings $(grep -c 'nor: wrote the settings' "$log") times"
+    [ $ok = 0 ] || [ "$(grep -c 'nor: wrote the settings' "$log")" = 3 ] ||
+      bad "three changes wrote the settings $(grep -c 'nor: wrote the settings' "$log") times"
     auto=$(slot 14)
     [ "$auto" != 65535 ] || bad "AUTO SAVE wasn't saved: slot 14 holds $auto"
-    boot $toggles2
-    logged "settings: staged"
-    [ $ok = 0 ] || ! grep -q 'nor: wrote the settings' "$log" || bad "two changes that cancel out wrote the settings"
+    boot $settings_none
+    logged "screen ready: settings"
+    [ $ok = 0 ] || ! grep -q 'nor: wrote the settings' "$log" || bad "a cancelled or unchanged edit wrote the settings"
     [ "$(slot 14)" = "$auto" ] || bad "AUTO SAVE changed: slot 14 holds $(slot 14), not $auto"
     boot $settings_out
     logged "screen ready: settings"
     [ $ok = 0 ] || ! grep -q 'nor: wrote the settings' "$log" || bad "the page left without a change wrote the settings"
-    pass "the Settings page writes the kernel NOR once as it closes, and only for a change"
+    pass "the Settings page writes the kernel NOR once a confirmed change, and only for a change"
   fi
 
   if shard_case; then

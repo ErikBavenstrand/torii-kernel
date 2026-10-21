@@ -96,7 +96,6 @@
 -k @60:DOWN -k @64:- -k @72:DOWN -k @76:- -k @84:R -k @88:- -k @96:R -k @100:- -k @108:L -k @112:-
 -w "settings: row 5"
 -k @20:B -k @24:-
--w "settings: nothing changed, not written"
 -w "nav: home ready"
 -k @8:RIGHT -k @12:-
 -w "home: facing info"

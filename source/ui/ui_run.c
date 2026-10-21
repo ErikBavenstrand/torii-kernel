@@ -549,6 +549,11 @@ void ui_wipe_finish(void)
 		ui_frame();
 }
 
+int ui_wiping(void)
+{
+	return ui.wipe != 0;
+}
+
 void ui_theme_set(const struct ui_theme *theme)
 {
 	ui.wipe = 0;  // ends at once on this theme

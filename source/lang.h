@@ -99,6 +99,7 @@ extern char *gl_set_minutes;  // the unit after DIM's minutes
 // settings_set_keys' answer; SET_KEYS_TAKEN's is followed by the other
 // row's label), and the hint bar's labels while a value is edited
 extern char *gl_set_scanning;
+extern char *gl_set_saving;
 extern char *gl_set_press;
 extern char *gl_set_press_hint;
 extern char **gl_set_refused;
