@@ -156,9 +156,9 @@ void ui_overlay_set(const struct ui_overlay *overlay);
 // Drops it if owner's is the one set.
 void ui_overlay_drop(const void *owner);
 
-// The hint bar's keys and text (ui_hints_set, ui_hints_text), to give them
-// back after a popup
-void ui_hints_get(u8 node, const struct ui_hint **hints, u32 *count, const char **text);
+// The hint bar's keys, text and the text's look (ui_hints_set,
+// ui_hints_note), to give them back after a popup
+void ui_hints_get(u8 node, const struct ui_hint **hints, u32 *count, const char **text, struct ui_hint_note *note);
 
 struct text_window;
 // A key chip at x on a band of the look's hint_chip_h from line top of a
