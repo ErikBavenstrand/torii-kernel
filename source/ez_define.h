@@ -9,7 +9,7 @@
 //   Diagnostics, and the unit tests (in Diagnostics, and at boot in a test build).
 // - READCACHE_STAGE: the engine's asset jobs (engine/stage.h), within one job
 //   step: an SD chunk on its way to PSRAM, the path being opened, box art's
-//   folder entry and zeros (boxart.c). Nothing in it outlives the step, and steps run only from
+//   folder entry and zeros and a chunk of the art pack's index (boxart.c). Nothing in it outlives the step, and steps run only from
 //   jobs_run, never inside one of the operations above, so it can overlap
 //   them all. An owner that wants to keep data here across frames that run
 //   jobs must stop the asset jobs first (cover_shutdown).
@@ -127,9 +127,9 @@
 #define assress_edit_rtshotkey_2 10
 #define assress_engine_sel 11
 //12 was the official kernel's thumbnail switch (slot 34 is the Box art row's)
-#define assress_game_clock 13 //games can read the cart's clock
+#define assress_game_clock 13  //games can read the cart's clock
 #define assress_auto_save_sel 14
-#define assress_ModeB_INIT 15 //Mode B: the cart reads it in mode B (the A/B switch), the kernel only stores it
+#define assress_ModeB_INIT 15  //Mode B: the cart reads it in mode B (the A/B switch), the kernel only stores it
 #define assress_led_open_sel 16
 #define assress_Breathing_R 17
 #define assress_Breathing_G 18
@@ -138,19 +138,19 @@
 #define assress_SD_G 21
 #define assress_SD_B 22
 //23 and 24 are DS Style's reset and backup toggles
-#define assress_game_rumble 25 //games can use the cart's rumble motor
-#define assress_logging 26 //Torii: LOGGING level, source/tlog.h (0xFFFF: off)
-#define assress_dim 27 //Torii: DIM, idle minutes before the screen dims, 1-60 (else off), source/ui/ui.h
-#define assress_theme 28 //Torii: THEME, 1 light (else dark; 2, the SD theme until v0.4, too), source/ui/ui.h
+#define assress_game_rumble 25  //games can use the cart's rumble motor
+#define assress_logging 26  //Torii: LOGGING level, source/tlog.h (0xFFFF: off)
+#define assress_dim 27  //Torii: DIM, idle minutes before the screen dims, 1-60 (else off), source/ui/ui.h
+#define assress_theme 28  //Torii: THEME, 1 light (else dark; 2, the SD theme until v0.4, too), source/ui/ui.h
 //29 was Torii's ACCENT until v0.4: never reuse it, old carts hold a value there
 // Torii v0.4's (source/settings_model.h, which reads an unknown value as the default)
-#define assress_clock_24h 30 //the clock shows 24 hours: 0 12-hour, else 24-hour
-#define assress_game_view 31 //game lists: 1 list with art, else list
-#define assress_start_on 32 //where the menu opens at power-on: enum settings_start (else last place)
-#define assress_show_all 33 //the SD card page shows hidden files: 1 on, else off
-#define assress_box_art 34 //list with art shows box art from /torii/art: 0 off, else on (source/boxart.h)
+#define assress_clock_24h 30  //the clock shows 24 hours: 0 12-hour, else 24-hour
+#define assress_game_view 31  //game lists: 1 list with art, else list
+#define assress_start_on 32  //where the menu opens at power-on: enum settings_start (else last place)
+#define assress_show_all 33  //the SD card page shows hidden files: 1 on, else off
+#define assress_box_art 34  //list with art shows box art from /torii/art: 0 off, else on (source/boxart.h)
 #define assress_boot_mode \
-	35 //how A, Play and Launch start a GBA game: 1 clean, else with the addons (source/actions.h)
+	35  //how A, Play and Launch start a GBA game: 1 clean, else with the addons (source/actions.h)
 
 #define assress_saveMODE 64
 #define assress_max 65

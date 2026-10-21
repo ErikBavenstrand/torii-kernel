@@ -230,6 +230,48 @@ void test_asset_sd_read(void)
 	CHECK_EQ(reader.result, SD_READ_ERR_ARGS);
 	CHECK_EQ(sd_read_start(&reader, TEST_FILE, ram + 2, 0x3000, 4096, JOB_OWNER_NONE), JOB_NONE);
 
+	// A range (the art pack's covers): an open step, a seek step, the reads
+	memset(ram, 0, 0x3000);
+	sd_read_start(&reader, TEST_FILE, ram, 0x3000, 4096, JOB_OWNER_NONE);
+	sd_read_range(&reader, 3004, 1000, 0);
+	CHECK_EQ(run_jobs(10), 3);
+	CHECK_EQ(reader.result, SD_READ_OK);
+	CHECK_EQ(reader.size, 1000);
+	bad = 0;
+	for (u32 i = 0; i < 1000; i++)
+		bad += ram[i] != pattern(3004 + i);
+	CHECK_EQ(bad, 0);
+	CHECK_EQ(ram[1000], 0);
+	// An offset off a word is refused: the card's DMA would land off a word
+	sd_read_start(&reader, TEST_FILE, ram, 0x3000, 4096, JOB_OWNER_NONE);
+	sd_read_range(&reader, 3001, 1000, 0);
+	CHECK_EQ(reader.result, SD_READ_ERR_ARGS);
+	run_jobs(5);
+	CHECK_EQ(reader.open, 0);
+	// With the file's cluster link map, made on an earlier open (fast seek)
+	u32 map[16];
+	FIL *fil = (FIL *)(stage_buffer() + 0x7400);
+	CHECK_EQ(f_open(fil, TEST_FILE, FA_READ), FR_OK);
+	fil->cltbl = (DWORD *)map;
+	map[0] = 16;
+	CHECK_EQ(f_lseek(fil, CREATE_LINKMAP), FR_OK);
+	f_close(fil);
+	memset(ram, 0, 0x3000);
+	sd_read_start(&reader, TEST_FILE, ram, 0x3000, 4096, JOB_OWNER_NONE);
+	sd_read_range(&reader, 8000, 2000, map);
+	CHECK_EQ(run_jobs(10), 3);
+	CHECK_EQ(reader.result, SD_READ_OK);
+	bad = 0;
+	for (u32 i = 0; i < 2000; i++)
+		bad += ram[i] != pattern(8000 + i);
+	CHECK_EQ(bad, 0);
+	// Past the file's end: refused at the open, which closes it
+	sd_read_start(&reader, TEST_FILE, ram, 0x3000, 4096, JOB_OWNER_NONE);
+	sd_read_range(&reader, TEST_FILE_BYTES - 8, 9, 0);
+	run_jobs(5);
+	CHECK_EQ(reader.result, SD_READ_ERR_READ);
+	CHECK_EQ(reader.open, 0);
+
 	f_unlink(TEST_FILE);
 	reset_engine(0);
 }
@@ -278,8 +320,9 @@ static int write_covers(void)
 
 static u32 cover_paused EWRAM_BSS;
 
-static int locate(u32 id, char *path, u32 size)
+static int locate(u32 id, char *path, u32 size, struct cover_where *where)
 {
+	(void)where;
 	if (id == 1 || id >= 10)
 		strncpy(path, COVER_GOOD, size);
 	else if (id == 2)

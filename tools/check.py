@@ -51,6 +51,8 @@ EVERYTHING = {LINT, TEST, SIZE, ANALYZE, COMPAT}
 NO_COMPAT = {
     "source/artkey.c",
     "source/artkey.h",
+    "source/artpack.c",
+    "source/artpack.h",
     "source/boxart.c",
     "source/boxart.h",
     "source/charset.c",
@@ -196,6 +198,16 @@ RULES = [
         ["tools/art_scrape.py", "tests/art_scrape_test.py"],
         {LINT, TEST_HOST},
         "box art scraper: test-host runs its tests against a local server",
+    ),
+    (
+        ["tools/art_pack.py", "tests/art_pack_test.py"],
+        {LINT, TEST_HOST},
+        "art pack builder: test-host runs its tests against a local server",
+    ),
+    (
+        ["tools/artpack.py"],
+        {LINT, TEST_HOST, TEST},
+        "art pack format: test-host checks it, tests/boxart.sh writes packs with it",
     ),
     (
         ["tests/library_idx.py"],

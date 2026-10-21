@@ -27,6 +27,7 @@ enum {
 	ARTKEY_NONE = 0,
 	ARTKEY_CUSTOM,
 	ARTKEY_CRC,
+	ARTKEY_PACK,  // an image of the art pack (artpack.h), its number the key
 };
 
 // The kind of a file name in /torii/art (ARTKEY_CRC) with its key, the

@@ -9,12 +9,17 @@ git log, not here.
 - **Fixed:** the walk keeps a `crc.txt` date up to 14 whole hours off its
   file's, as names-update writes it from a PC in another local time (DST),
   and takes the cart's date; any other date still forgets the CRC (F1; `e04827c`).
-
 - **Added:** games added to the card get their CRC, and with it their No-Intro
   name and box art, in the background after the boot's walk (Recent's first),
   with no PC tool or launch; a launch stops it and the next boot goes on. The
   game lists keep the cursor on its game when new names sort them again
   (F2; `6ab146f`, `e86624d`).
+- **Added:** the full art pack, `/torii/art.pak` (`just art-pack`, once):
+  covers for every No-Intro game libretro-thumbnails has, so a new official
+  game gets its box with no PC. Looked up after custom art and
+  `art/<CRC32>.bin`; its index is read into PSRAM and its cluster link map
+  built a few clusters a frame, so a cover reads at its offset with a quick
+  seek (F3; `b3abac5`, review fixes `8b4a77f`).
 
 ## v0.4.1 (2026-10-21)
 

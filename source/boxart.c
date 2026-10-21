@@ -4,6 +4,7 @@
 
 #include "boxart.h"
 #include "artkey.h"
+#include "artpack.h"
 #include "ez_define.h"
 #include "Ezcard_OP.h"
 #include "ff.h"
@@ -41,6 +42,12 @@
 #define LIST_RETRY_FRAMES 60
 #define CLEAR_CHUNK 0x1000  // bytes of the set cleared at a time
 #define USERDATA_PATH_MAX_ALIGNED ((USERDATA_PATH_MAX + 3) & ~3u)
+// The art pack's index: read this many bytes a step (as the cover loader)
+#define PACK_CHUNK 4096
+// Clusters the link map walks a call: a seek each, some 3,000 cycles from
+// ROM, so the listing's LIST_STEP_CYCLES stays near its mark
+#define PACK_LINKS 4
+#define PACK_INDEX ((const struct artpack_entry *)PSRAM_ARTPACK_BASE)
 
 // PSRAM: the set, then each want's file name (custom art)
 #define SET_BASE ((u32 *)PSRAM_ART_BASE)
@@ -55,6 +62,12 @@ _Static_assert(PSRAM_ART_BASE + PSRAM_ART_BYTES <= PSRAM_WINDOW + PSRAM_WINDOW_B
 _Static_assert(USERDATA_PATH_MAX_ALIGNED + NAME_BYTES <= READCACHE_BOXART_SIZE,
 	       "a path and a name fit box art's scratch");
 _Static_assert(sizeof(FILINFO) <= READCACHE_STAGE_SIZE - CLEAR_CHUNK, "the listing's entry and zeros share the stage");
+_Static_assert(ARTPACK_INDEX_MAX_BYTES <= PSRAM_ARTPACK_BYTES, "the art pack's index fits its PSRAM");
+_Static_assert(PSRAM_ARTPACK_BASE + PSRAM_ARTPACK_BYTES <= PSRAM_NAMES_DB_BASE,
+	       "the art pack's index ends below the names database");
+_Static_assert(ARTPACK_RECORD_BYTES == COVER_FILE_BYTES, "a pack's image is a cover's file");
+_Static_assert(sizeof(struct artpack_header) == ARTPACK_HEADER_BYTES, "the pack's header is packed");
+_Static_assert(PACK_CHUNK <= READCACHE_STAGE_SIZE, "a chunk of the index fits the stage");
 
 enum {
 	LIST_NONE,  // not listed: the job starts at the next poll
@@ -63,7 +76,10 @@ enum {
 	LIST_ART,
 	LIST_OPEN_CUSTOM,
 	LIST_CUSTOM,
-	LIST_DONE,  // listed (perhaps nothing: no /torii/art)
+	LIST_OPEN_PACK,  // /torii/art.pak: its header checked
+	LIST_PACK,  // its index into PSRAM
+	LIST_PACK_MAP,  // its cluster link map
+	LIST_DONE,  // listed (perhaps nothing: no /torii/art, no pack)
 };
 
 struct want {
@@ -79,6 +95,8 @@ static struct {
 	u8 list;  // LIST_*
 	u8 job;  // the listing's, JOB_NONE
 	u8 dir_open;
+	u8 pack_open;  // the pack's file, in place of the folder
+	u8 pack_logged;  // why there's no pack is logged (once a boot)
 	u8 full_logged;
 	boxart_row_fn row_fn;
 	u8 box;  // the placeholder box for the cursor's row (ART_BOX_*)
@@ -87,7 +105,18 @@ static struct {
 	u32 started;  // torii_frames when the listing started
 	u32 retry_at;  // torii_frames from which a job that couldn't start is tried again, 0 none
 	u8 start_failed;  // that failure is logged
-	DIR dir;
+	union {
+		DIR dir;  // the folder listed
+		FIL pack;  // then the pack's file
+	} f;
+	struct artpack_header pack_header;  // word-aligned for f_read
+	u32 pack_entries;  // index entries in PSRAM, 0: no pack
+	u32 pack_read;  // the index's bytes read so far
+	u32 pack_map[ARTPACK_MAP_WORDS];  // its cluster link map (FatFs fast seek)
+	u8 pack_mapped;  // pack_map holds it
+	u32 map_next;  // the next cluster (its number in the file) pack_link walks to
+	u32 map_at;  // pack_map's word of the last fragment's count
+	u32 map_sclust, map_bytes;  // the file pack_map is of: its first cluster and size
 	struct artset set;
 	u32 row;  // the cursor's
 	u32 rest;  // polls since the cursor moved
@@ -128,9 +157,152 @@ static void set_put(u32 *slot, u32 id)
 static void close_dir(void)
 {
 	if (B.dir_open) {
-		f_closedir(&B.dir);
+		f_closedir(&B.f.dir);
 		B.dir_open = 0;
 	}
+	if (B.pack_open) {
+		f_close(&B.f.pack);
+		B.pack_open = 0;
+	}
+}
+
+// No pack, and why: logged once a boot (a card without one is the usual case)
+static void no_pack(int error, const char *why)
+{
+	close_dir();
+	B.pack_entries = 0;
+	B.pack_mapped = 0;
+	B.list = LIST_DONE;
+	if (B.pack_logged)
+		return;
+	B.pack_logged = 1;
+	if (error)
+		tlog_error("box art: %s %s; it is left out (run `just art-pack` again)", ARTPACK_PATH, why);
+	else
+		tlog("box art: no %s", ARTPACK_PATH);
+}
+
+// Opens the pack and checks its header: next its index, or no pack
+static void pack_open(void)
+{
+	if (f_open(&B.f.pack, ARTPACK_PATH, FA_READ) != FR_OK) {
+		no_pack(0, 0);
+		return;
+	}
+	B.pack_open = 1;
+	UINT got = 0;
+	memset(&B.pack_header, 0, sizeof(B.pack_header));
+	if (f_read(&B.f.pack, &B.pack_header, ARTPACK_HEADER_BYTES, &got) != FR_OK || got != ARTPACK_HEADER_BYTES ||
+	    !artpack_check(&B.pack_header, f_size(&B.f.pack))) {
+		int other = B.pack_header.magic == ARTPACK_MAGIC && B.pack_header.version != ARTPACK_VERSION;
+		no_pack(1, other ? "is another version" : "is damaged");
+		return;
+	}
+	B.pack_read = 0;
+	B.list = LIST_PACK;
+}
+
+// A chunk of the pack's index into PSRAM
+static void pack_step(void)
+{
+	u32 bytes = B.pack_header.entries * ARTPACK_ENTRY_BYTES;
+	u32 n = bytes - B.pack_read;
+	if (n > PACK_CHUNK)
+		n = PACK_CHUNK;
+	u8 *buf = stage_buffer();
+	UINT got = 0;
+	if (f_read(&B.f.pack, buf, n, &got) != FR_OK || got != n ||
+	    !psram_write((u8 *)PSRAM_ARTPACK_BASE + B.pack_read, buf, n)) {
+		no_pack(1, "can't be read");
+		return;
+	}
+	B.pack_read += n;
+	if (B.pack_read < bytes)
+		return;
+	B.list = LIST_PACK_MAP;
+	B.map_next = 0;
+}
+
+// The pack ready: covers can come from it
+static void pack_done(void)
+{
+	close_dir();
+	B.pack_entries = B.pack_header.entries;
+	B.list = LIST_DONE;
+	tlog("box art: %s: %lu CRCs, %lu covers, %lu pieces on the card", ARTPACK_PATH, (unsigned long)B.pack_entries,
+	     (unsigned long)B.pack_header.images, (unsigned long)(B.pack_mapped ? (B.map_at + 1) / 2 : 0));
+}
+
+// The pack's cluster link map (FatFs fast seek's table: its size, then a
+// clusters, first cluster pair a fragment, then 0), so a cover's seek
+// needn't walk the cluster chain (12M cycles to a 20 MB pack's end in 512
+// byte clusters). FatFs makes one in a single call (CREATE_LINKMAP), as
+// long as that walk; this walks PACK_LINKS clusters a call, by seeking
+// forward a cluster at a time (FatFs goes on from the cluster it is at), so
+// the listing keeps to its cycles a frame. Each seek is to a cluster's end:
+// FatFs then stops in that cluster and reads no sector (to the middle of a
+// sector it reads it, an SD read a cluster). A pack in more pieces than the
+// table holds gets none: its covers seek the slow way.
+static void pack_link(void)
+{
+	FIL *fp = &B.f.pack;
+	u32 bcs = (u32)fp->obj.fs->csize * FF_MAX_SS;
+	u32 clusters = (f_size(fp) + bcs - 1) / bcs;
+	if (B.map_next == 0) {
+		// Listed again (boxart_forget, a launch): the pack can't change
+		// while the kernel runs, so the map stands; it isn't rewritten
+		// under a cover read that may be using it
+		if (B.pack_mapped && B.map_sclust == fp->obj.sclust && B.map_bytes == f_size(fp)) {
+			pack_done();
+			return;
+		}
+		B.pack_mapped = 0;
+		B.map_sclust = fp->obj.sclust;
+		B.map_bytes = f_size(fp);
+		if (f_lseek(fp, bcs) != FR_OK) {  // the first cluster
+			pack_done();
+			return;
+		}
+		B.pack_map[0] = ARTPACK_MAP_WORDS;
+		B.pack_map[1] = 1;
+		B.pack_map[2] = fp->clust;
+		B.map_at = 1;  // the fragment's count
+		B.map_next = 1;
+#if FF_FS_EXFAT
+		if (fp->obj.stat == 2) {  // exFAT, in one piece: no chain to walk
+			B.pack_map[1] = clusters;
+			B.map_next = clusters;
+		}
+#endif
+	}
+	for (u32 i = 0; i < PACK_LINKS && B.map_next < clusters; i++, B.map_next++) {
+		if (f_lseek(fp, ((FSIZE_t)B.map_next + 1) * bcs) != FR_OK) {
+			pack_done();
+			return;
+		}
+		u32 c = fp->clust;
+		if (c == B.pack_map[B.map_at + 1] + B.pack_map[B.map_at]) {
+			B.pack_map[B.map_at]++;
+			continue;
+		}
+		if (B.map_at + 4 >= ARTPACK_MAP_WORDS) {  // a new pair and the end's 0 don't fit
+			if (!B.pack_logged) {
+				B.pack_logged = 1;
+				tlog("box art: %s is in more than %u pieces on the card: covers load slower",
+				     ARTPACK_PATH, (ARTPACK_MAP_WORDS - 4) / 2);
+			}
+			pack_done();
+			return;
+		}
+		B.map_at += 2;
+		B.pack_map[B.map_at] = 1;
+		B.pack_map[B.map_at + 1] = c;
+	}
+	if (B.map_next < clusters)
+		return;
+	B.pack_map[B.map_at + 2] = 0;
+	B.pack_mapped = 1;
+	pack_done();
 }
 
 static void add(u32 kind, u32 key)
@@ -145,7 +317,7 @@ static void add(u32 kind, u32 key)
 static int list_entry(int custom)
 {
 	FILINFO *fi = (FILINFO *)(stage_buffer() + CLEAR_CHUNK);
-	if (f_readdir(&B.dir, fi) != FR_OK || !fi->fname[0]) {
+	if (f_readdir(&B.f.dir, fi) != FR_OK || !fi->fname[0]) {
 		close_dir();
 		return 0;
 	}
@@ -179,11 +351,11 @@ static void list_step_one(void)
 	case LIST_OPEN_ART:
 	case LIST_OPEN_CUSTOM: {
 		int custom = B.list == LIST_OPEN_CUSTOM;
-		if (f_opendir(&B.dir, custom ? CUSTOM_DIR : ART_DIR) == FR_OK) {
+		if (f_opendir(&B.f.dir, custom ? CUSTOM_DIR : ART_DIR) == FR_OK) {
 			B.dir_open = 1;
 			B.list = custom ? LIST_CUSTOM : LIST_CLEAR;
 		} else {
-			B.list = LIST_DONE;  // no folder: nothing (more) to list
+			B.list = LIST_OPEN_PACK;  // no folder: nothing (more) in it
 		}
 		break;
 	}
@@ -193,7 +365,16 @@ static void list_step_one(void)
 		break;
 	case LIST_CUSTOM:
 		if (!list_entry(1))
-			B.list = LIST_DONE;
+			B.list = LIST_OPEN_PACK;
+		break;
+	case LIST_OPEN_PACK:
+		pack_open();
+		break;
+	case LIST_PACK_MAP:
+		pack_link();
+		break;
+	case LIST_PACK:
+		pack_step();
 		break;
 	default:
 		break;
@@ -225,9 +406,11 @@ static int list_job(struct job *job)
 	frame_measure("games-artlist");  // the frames it reads the card in, for the cycle budget
 	psram_begin();
 	u32 start = cycles_now();
+	// The pack's open (a scan of /torii) starts a frame of its own, not
+	// the end of one the folders' listing filled
 	do
 		list_step_one();
-	while (B.list != LIST_DONE && cycles_since(start) < LIST_STEP_CYCLES);
+	while (B.list != LIST_DONE && B.list != LIST_OPEN_PACK && cycles_since(start) < LIST_STEP_CYCLES);
 	if (B.list != LIST_DONE)
 		return JOB_MORE;
 	tlog("box art: %lu files listed in %lu frames", (unsigned long)B.set.count,
@@ -247,6 +430,8 @@ static void list_poll(void)
 	B.list = LIST_OPEN_ART;
 	B.clear_at = 0;
 	B.full_logged = 0;
+	B.pack_open = 0;
+	B.pack_entries = 0;
 	B.set.slots = SET_BASE;
 	B.set.put = set_put;
 	B.set.count = 0;
@@ -276,15 +461,17 @@ static void list_poll(void)
 // 0 for none
 static u32 lookup(const char *path, u32 size, struct want *w)
 {
-	if (B.list != LIST_DONE || !B.set.count)
+	if (B.list != LIST_DONE || (!B.set.count && !B.pack_entries))
 		return 0;
-	const char *name = strrchr(path, '/');
-	name = name ? name + 1 : path;
-	w->kind = ARTKEY_CUSTOM;
-	w->key = artkey_name(name, strlen(name));
-	w->id = artkey_id(ARTKEY_CUSTOM, w->key);
-	if (artset_has(SET_BASE, w->id))
-		return w->id;
+	if (B.set.count) {
+		const char *name = strrchr(path, '/');
+		name = name ? name + 1 : path;
+		w->kind = ARTKEY_CUSTOM;
+		w->key = artkey_name(name, strlen(name));
+		w->id = artkey_id(ARTKEY_CUSTOM, w->key);
+		if (artset_has(SET_BASE, w->id))
+			return w->id;
+	}
 	// Matched art by CRC only: a romhack shares its base game's code
 	u32 crc;
 	if (!size || !names_crc(path, size, &crc))
@@ -292,7 +479,16 @@ static u32 lookup(const char *path, u32 size, struct want *w)
 	w->kind = ARTKEY_CRC;
 	w->key = crc;
 	w->id = artkey_id(ARTKEY_CRC, crc);
-	return artset_has(SET_BASE, w->id) ? w->id : 0;
+	if (B.set.count && artset_has(SET_BASE, w->id))
+		return w->id;
+	// Last, the pack: a binary search of its index in PSRAM
+	s32 image = B.pack_entries ? artpack_find(PACK_INDEX, B.pack_entries, crc) : -1;
+	if (image < 0 || (u32)image >= B.pack_header.images)
+		return 0;  // none, or a damaged entry (its offset past the images)
+	w->kind = ARTKEY_PACK;
+	w->key = (u32)image;
+	w->id = artkey_id(ARTKEY_PACK, w->key);
+	return w->id;
 }
 
 // row's cover into *w (and, for custom art, its file name into the want's
@@ -318,15 +514,21 @@ static u32 row_cover(u32 row, struct want *w, u32 n)
 }
 
 // The loader's locate: the path of a wanted cover
-static int locate(u32 id, char *path, u32 size)
+static int locate(u32 id, char *path, u32 size, struct cover_where *where)
 {
 	for (u32 i = 0; i < B.wanted; i++) {
 		const struct want *w = &B.wants[i];
 		if (w->id != id)
 			continue;
-		if (w->kind == ARTKEY_CRC)
+		if (w->kind == ARTKEY_CRC) {
 			snprintf(path, size, ART_DIR "/%08lX" ARTKEY_EXT, (unsigned long)w->key);
-		else
+		} else if (w->kind == ARTKEY_PACK) {
+			if (!B.pack_entries)
+				return 0;  // listed again since: no pack yet
+			snprintf(path, size, "%s", ARTPACK_PATH);
+			where->offset = artpack_image_offset(B.pack_entries, w->key);
+			where->map = B.pack_mapped ? B.pack_map : 0;
+		} else
 			snprintf(path, size, CUSTOM_DIR "/%s" ARTKEY_EXT, (const char *)(NAMES_BASE + i * NAME_BYTES));
 		return 1;
 	}
@@ -450,7 +652,9 @@ static void want_covers(void)
 
 static int paused(void)
 {
-	return library_walking() || ui_busy();
+	// A listing first: a pack cover located mid-listing (no pack yet) would
+	// fail for good (the cache doesn't want a failed cover again)
+	return library_walking() || ui_busy() || B.list != LIST_DONE;
 }
 
 void boxart_open(u8 image, boxart_row_fn row)

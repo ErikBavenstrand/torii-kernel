@@ -92,6 +92,8 @@ Everything the v0.2–v0.4.1 work left open, checked against the code on 2026-10
 - IWRAM free is 4,604 bytes on main (CLAUDE.md records 5,980 at v0.4.1): find what took it, and update CLAUDE.md's figures; about 2 KB stays above the stack estimate.
 - No test drives Identify (`names_store.c`, the identify step) with a record a few hours off; it shares the walk's check.
 - names-update recomputes the CRC of a file dated before 1980 on every run.
+- A `/torii/art.pak` in more than 62 pieces seeks the slow way, many frames a cover on small clusters (logged; a chunked seek would fix it). The relist after a custom-art rename (`boxart_forget`) has no test. art-pack's downloaded counter can read low under threads.
+- First real `just art-pack` run not yet done: pack size (about 20 MB estimated) and download time (about 40 min, 0.5–1 GB) unmeasured.
 
 ### Decisions
 
@@ -101,7 +103,7 @@ F1–F3 (new games named and boxed on the cart) made these, open to change:
 
 - F1 (`e04827c`): the kernel keeps a CRC whose date is 1–14 whole hours off the file's, minutes and seconds equal, for every record (nothing marks the tool's); a different same-size file with such a date keeps the old CRC. A kernel before v0.4.2 forgets tool-written dates.
 - F2 (to confirm): a card with names.db (or art) but no crc.txt has every game new, so the background identifies the whole library across boots, an Identify library that nobody asked for; the queue is Recent's games, then walk order (not the games on screen or the newest); the background runs one job call a frame (Identify library keeps the frame's spare half); a new name sorts the index again, so the list redraws and the cursor's game can move away under a resting cursor.
-- F3: the art pack's index takes 128 KB of PSRAM after `PSRAM_NAMES_TEXT`, out of the 384 KB left for v0.9's language tables; NES art only with `--console NES`.
+- F3 (`b3abac5`, `8b4a77f`): the art pack's index takes 128 KB of PSRAM after `PSRAM_NAMES_TEXT`, out of the 384 KB left for v0.9's language tables; NES art is fetched when the card has NES games, else only with `--console NES`; 4 requests at a time, about 4 a second (art-scrape: 1 per 0.5 s); a stopped run replaces a good pack with what came in (a rerun completes it from the cache); fast seek (`FF_USE_FASTSEEK`) is on for all of FatFs (4 bytes a FIL); fixed 3,248-byte records; duplicate covers are found by identical converted bytes; pack covers appear once the link map is built, a few seconds after boot on a small-cluster FAT32 card.
 
 ### Open questions and cart checks
 
