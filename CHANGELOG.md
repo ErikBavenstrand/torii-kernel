@@ -6,6 +6,11 @@ git log, not here.
 
 ## Unreleased
 
+- **Docs:** source comments point to the new design docs
+  (`docs/design/engine.md`, `docs/design/v0.4/decisions.md`) and the
+  hardware notes instead of the deleted planning logs; no code change
+  (`2441c25`).
+
 - **Changed:** Start on only picks which carousel item home faces at
   power-on; it never opens a page. Its choices are Last place and the items
   home shows (NES only with NES games, Recent and Favourites only while
