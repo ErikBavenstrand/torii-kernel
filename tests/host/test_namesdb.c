@@ -284,6 +284,58 @@ void test_names_cache_fits(void)
 	CHECK_EQ(names_cache_fits(names_cache_rec(&c, a), 100, 0x1234), NAMES_STALE);
 }
 
+// FAT's fdate << 16 | ftime
+static u32 fat(u32 y, u32 mo, u32 d, u32 h, u32 mi, u32 s)
+{
+	return (y - 1980) << 25 | mo << 21 | d << 16 | h << 11 | mi << 5 | s / 2;
+}
+
+// What a record dated rec says about a file of the same size dated file
+static int skew(u32 rec, u32 file)
+{
+	struct names_cache c;
+	fresh(&c);
+	u32 n = names_cache_put(&c, "/A.gba", 100, rec, 1, NAMES_CRC | NAMES_DATE);
+	return names_cache_fits(names_cache_rec(&c, n), 100, file);
+}
+
+void test_names_cache_fits_skew(void)
+{
+	u32 t = fat(2026, 1, 15, 12, 34, 56);
+	CHECK_EQ(skew(t, t), NAMES_FIT);
+	CHECK_EQ(skew(t, fat(2026, 1, 15, 13, 34, 56)), NAMES_FIT_DATED);  // +1 h
+	CHECK_EQ(skew(t, fat(2026, 1, 15, 11, 34, 56)), NAMES_FIT_DATED);  // -1 h
+	CHECK_EQ(skew(t, fat(2026, 1, 16, 2, 34, 56)), NAMES_FIT_DATED);  // +14 h
+	CHECK_EQ(skew(t, fat(2026, 1, 14, 22, 34, 56)), NAMES_FIT_DATED);  // -14 h
+	CHECK_EQ(skew(t, fat(2026, 1, 16, 3, 34, 56)), NAMES_STALE);  // +15 h
+	CHECK_EQ(skew(t, fat(2026, 1, 14, 21, 34, 56)), NAMES_STALE);  // -15 h
+	CHECK_EQ(skew(t, fat(2026, 1, 16, 12, 34, 56)), NAMES_STALE);  // a day
+	CHECK_EQ(skew(t, fat(2026, 1, 15, 13, 35, 56)), NAMES_STALE);  // a minute
+	CHECK_EQ(skew(t, fat(2026, 1, 15, 13, 34, 58)), NAMES_STALE);  // two seconds
+	CHECK_EQ(skew(t, fat(2026, 1, 15, 12, 35, 56)), NAMES_STALE);
+	// An hour across midnight, a month's end, a year's end and a leap day
+	CHECK_EQ(skew(fat(2026, 3, 9, 23, 0, 0), fat(2026, 3, 10, 0, 0, 0)), NAMES_FIT_DATED);
+	CHECK_EQ(skew(fat(2026, 4, 30, 23, 59, 58), fat(2026, 5, 1, 0, 59, 58)), NAMES_FIT_DATED);
+	CHECK_EQ(skew(fat(2026, 1, 1, 0, 10, 0), fat(2025, 12, 31, 23, 10, 0)), NAMES_FIT_DATED);
+	CHECK_EQ(skew(fat(2024, 2, 29, 23, 0, 0), fat(2024, 3, 1, 0, 0, 0)), NAMES_FIT_DATED);
+	CHECK_EQ(skew(fat(2023, 2, 28, 23, 0, 0), fat(2023, 3, 1, 0, 0, 0)), NAMES_FIT_DATED);
+	CHECK_EQ(skew(fat(2023, 2, 28, 23, 0, 0), fat(2023, 3, 2, 0, 0, 0)), NAMES_STALE);
+	CHECK_EQ(skew(fat(1980, 1, 1, 0, 0, 0), fat(1980, 1, 1, 14, 0, 0)), NAMES_FIT_DATED);
+	CHECK_EQ(skew(fat(2107, 12, 31, 23, 0, 0), fat(2107, 12, 31, 9, 0, 0)), NAMES_FIT_DATED);
+	// Dates that name no moment: never a skew
+	CHECK_EQ(skew(fat(2026, 0, 15, 12, 0, 0), fat(2026, 0, 15, 13, 0, 0)), NAMES_STALE);  // month 0
+	CHECK_EQ(skew(fat(2026, 13, 15, 12, 0, 0), fat(2026, 13, 15, 13, 0, 0)), NAMES_STALE);  // month 13
+	CHECK_EQ(skew(fat(2026, 1, 0, 12, 0, 0), fat(2026, 1, 0, 13, 0, 0)), NAMES_STALE);  // day 0
+	CHECK_EQ(skew(fat(2026, 4, 31, 0, 0, 0), fat(2026, 4, 30, 23, 0, 0)), NAMES_STALE);  // 31 April
+	CHECK_EQ(skew(fat(2023, 2, 29, 0, 0, 0), fat(2023, 2, 28, 23, 0, 0)), NAMES_STALE);  // no leap day
+	CHECK_EQ(skew(fat(2100, 2, 29, 0, 0, 0), fat(2100, 2, 28, 23, 0, 0)), NAMES_STALE);  // nor in 2100
+	CHECK_EQ(skew(fat(2026, 1, 15, 24, 0, 0), fat(2026, 1, 15, 23, 0, 0)), NAMES_STALE);  // hour 24
+	CHECK_EQ(skew(fat(2026, 1, 15, 23, 0, 0), fat(2026, 1, 15, 24, 0, 0)), NAMES_STALE);
+	CHECK_EQ(skew(fat(2026, 1, 15, 12, 60, 0), fat(2026, 1, 15, 13, 60, 0)), NAMES_STALE);  // minute 60
+	CHECK_EQ(skew(fat(2026, 1, 15, 12, 0, 60), fat(2026, 1, 15, 13, 0, 60)), NAMES_STALE);  // second 60
+	CHECK_EQ(skew(0, 1u << 11), NAMES_STALE);  // FatFs's no date
+}
+
 void test_names_cache_full(void)
 {
 	struct names_cache c;

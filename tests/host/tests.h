@@ -179,6 +179,7 @@ void test_namesdb_header(void);
 void test_namesdb_lookup(void);
 void test_names_cache_table(void);
 void test_names_cache_fits(void);
+void test_names_cache_fits_skew(void);
 void test_names_cache_full(void);
 void test_names_lines(void);
 void test_names_db_name(void);
