@@ -76,9 +76,8 @@ writes() { grep -c 'nor: wrote the settings' "$cart/visit.log" || true; }
 
 # Saving one setting on the Settings page (Auto save, A RIGHT A) writes the
 # whole sector once as the page closes, keeping the slots the kernel
-# doesn't know, the hidden LANGUAGE and the hotkeys it didn't touch (the
-# card is in list with art, so the page shows Box art)
-NAV_ART=1 visit auto-save A RIGHT A
+# doesn't know, the hidden LANGUAGE and the hotkeys it didn't touch
+visit auto-save A RIGHT A
 [ "$(writes)" = 1 ] || fail "a save wrote the settings $(writes) times"
 [ "$(slots 14 1)" = 0001 ] || fail "Auto save not saved: $(slots 14 1)"
 [ "$(slots 0 14)" = "$(ffff 14)" ] || fail "slots 0-13 changed: $(slots 0 14)"
@@ -91,7 +90,7 @@ booted "24-hour clock Off, game view List + art, start on Home, show all files O
 
 # One write a visit: two values changed (Game view, Dim screen), then a
 # visit that changes nothing, and one that changes a value and back
-visit game-view A RIGHT A DOWN DOWN A RIGHT A
+visit game-view A RIGHT A DOWN DOWN DOWN A RIGHT A
 [ "$(writes)" = 1 ] || fail "two changes wrote the settings $(writes) times"
 [ "$(slots 31 1)" = 0000 ] || fail "Game view not saved: $(slots 31 1)"
 [ "$(slots 27 1)" = 0001 ] || fail "Dim screen not saved: $(slots 27 1)"

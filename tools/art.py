@@ -36,6 +36,7 @@ on your card, and don't publish them.
 """
 
 import argparse
+import os
 import sys
 import unicodedata
 from pathlib import Path
@@ -53,7 +54,11 @@ COLOURS = _COVER_H["COVER_COLOURS"]  # 16 entries, 0 left unused
 FILE_BYTES = asset.HEADER.size + COLOURS * 2 + SIZE * SIZE // 2
 CUSTOM_DIR = Path("torii") / "art" / "custom"
 EXT = ".bin"
-NAME_MAX = 255  # bytes of a FAT long name
+NAME_MAX = 255  # UTF-16 units of a FAT long name
+# Bytes of a game's name the kernel starts
+GAME_NAME_MAX = asset.c_defines(asset.ROOT / "source" / "userdata.h")[
+    "USERDATA_NAME_MAX"
+]
 GAME_EXTS = (".gba", ".gbc", ".gb", ".nes")
 DITHER = (3, 4)  # the share of each pixel's error passed on
 ALIGNS = ("centre", "center", "top", "bottom", "left", "right")
@@ -224,16 +229,33 @@ def preview(data: bytes, scale: int = 3) -> Image.Image:
     return img.resize((w * 8 * scale, h * 8 * scale), Image.Resampling.NEAREST)
 
 
+def game_name(rom: str) -> str:
+    """The game's file name: as the card lists it when rom is a file there
+    (byte for byte, as the kernel looks it up), else as typed, in NFC (as
+    cards and most PCs write names; macOS may hand a typed name over NFD)."""
+    path = Path(rom)
+    if path.is_file():
+        want = unicodedata.normalize("NFC", path.name)
+        for entry in sorted(os.listdir(path.parent)):
+            if unicodedata.normalize("NFC", entry) == want:
+                return entry
+        return path.name
+    return unicodedata.normalize("NFC", path.name)
+
+
 def custom_name(rom: str) -> str:
-    """The art file's name for a game: its file name (in NFC, as cards and
-    most PCs write names; macOS may hand over NFD) and EXT."""
-    name = unicodedata.normalize("NFC", Path(rom).name)
+    """The art file's name for a game: its file name (game_name) and EXT."""
+    name = game_name(rom)
     if not name or name in (".", ".."):
         raise ArtError(f"{rom!r} names no file")
     art = name + EXT
-    if len(art.encode("utf-8")) > NAME_MAX:
+    if len(name.encode("utf-8")) > GAME_NAME_MAX:
         raise ArtError(
-            f"{name}: too long a name for its art file ({NAME_MAX} bytes with {EXT})"
+            f"{name}: longer than the {GAME_NAME_MAX} bytes a game's name may have"
+        )
+    if len(art.encode("utf-16-le")) // 2 > NAME_MAX:
+        raise ArtError(
+            f"{name}: too long a name for its art file (FAT names hold {NAME_MAX} characters with {EXT})"
         )
     return art
 

@@ -197,8 +197,17 @@ class ArtTest(unittest.TestCase):
             self.assertIn("art.py:", said.getvalue())
         self.assertFalse((sd / "torii").exists())  # nothing written
 
-    def test_names_are_nfc(self):
-        # macOS may give a decomposed name; cards hold the composed one
+    def test_names(self):
+        # A typed name goes to NFC (macOS may hand over a decomposed one);
+        # a file on the card keeps its name byte for byte
+        nfd = self.dir / "Pokemo\u0301n.gb"
+        nfd.write_bytes(b"")
+        self.assertEqual(art.custom_name(str(nfd)), "Pokemo\u0301n.gb.bin")
+        self.assertEqual(art.GAME_NAME_MAX, 255)
+        # FAT counts UTF-16 units: 255 bytes of name are 128 characters here
+        self.assertEqual(
+            art.custom_name("\u00e9" * 126 + ".gb"), "\u00e9" * 126 + ".gb.bin"
+        )
         self.assertEqual(art.custom_name("/x/Pokemo\u0301n.gb"), "Pokem\u00f3n.gb.bin")
 
     def test_convert_writes_anywhere(self):

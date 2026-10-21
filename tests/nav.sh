@@ -307,8 +307,7 @@ nav_nor_format_page() {
 # nav_setting ROW: from power-on to the Settings page with ROW selected,
 # waiting there. ROW is a row of source/settings_model.h, in page order
 # (_nav_setting_rows); with NAV_LED_OFF=1 the LED colours are hidden, as
-# the page hides them while the LED is off, and Box art shows only with
-# NAV_ART=1, as the page shows it only in list with art.
+# the page hides them while the LED is off.
 _nav_setting_rows=(theme game-view box-art start-on dim time date 24h game-clock fast-patching auto-save save-states
   cheats rumble mode-b led led-colour sd-light reset-hotkey reset-keys sleep sleep-keys rescan identify show-all logging)
 nav_setting() {
@@ -317,7 +316,6 @@ nav_setting() {
     [ "$word" = "$want" ] && break
     id=$((id + 1))
     case $word in led-colour | sd-light) [ "${NAV_LED_OFF:-0}" = 1 ] && continue ;; esac
-    [ "$word" = box-art ] && [ "${NAV_ART:-0}" != 1 ] && continue
     steps=$((steps + 1))
   done
   if [ $id = ${#_nav_setting_rows[@]} ]; then

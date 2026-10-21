@@ -15,7 +15,9 @@
 //
 // Covers load through the cover cache (engine/cover.h) once the cursor has
 // rested BOXART_REST frames, with the rows next to it after, as a job that
-// waits while the library walks (library_walking). A cover already cached
+// waits while the library builds or sorts its index (library_walking; the
+// boot's check walk goes on beside it) and while a menu or dialog is up.
+// A cover already cached
 // shows at once, even while the cursor moves. With the Box art setting off,
 // or no /torii/art on the card, the box is always the placeholder.
 //

@@ -39,7 +39,8 @@
 #define COVER_TILE_BYTES (COVER_TILES_W * COVER_TILES_H * 32)
 #define COVER_COLOURS 16
 #define COVER_FILE_BYTES (ASSET_HEADER_BYTES + COVER_COLOURS * 2 + COVER_TILE_BYTES)
-#define COVER_PATH_MAX 256
+// A path's bytes with its NUL: /torii/art/custom/, a 255-byte game name, .bin
+#define COVER_PATH_MAX 512
 
 // Writes the path of id's cover into path (size bytes, NUL ended) and
 // returns 1, or 0 if it has none. Called from the loader's job step, so it

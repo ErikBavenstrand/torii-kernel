@@ -699,7 +699,7 @@ static void led_show(void)
 	Set_LED_control((u16)(settings_get(&sp.v, SET_LED) << 7 | (idle & 7) << 3 | (sd & 7)));
 }
 
-// The rows shown changed (LED on or off, the game view): laid out again, the cursor kept
+// The rows shown changed (LED on or off): laid out again, the cursor kept
 // on its row and the scroll where it was
 static void relayout(void)
 {
@@ -723,10 +723,6 @@ static void previews(u32 id, int ui)
 		break;
 	case SET_LED:
 		led_show();
-		if (ui)
-			relayout();
-		break;
-	case SET_GAME_VIEW:  // shows or hides Box art
 		if (ui)
 			relayout();
 		break;

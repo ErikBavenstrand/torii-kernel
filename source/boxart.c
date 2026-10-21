@@ -44,6 +44,10 @@
 #define NAMES_BASE (PSRAM_ART_BASE + ARTSET_SLOTS * 4u)
 _Static_assert(ARTSET_SLOTS * 4u + BOXART_WANTS * NAME_BYTES <= PSRAM_ART_BYTES, "box art's lookups fit their PSRAM");
 _Static_assert(USERDATA_NAME_MAX < NAME_BYTES, "a want's file name fits its slot");
+_Static_assert(sizeof(CUSTOM_DIR "/" ARTKEY_EXT) + USERDATA_NAME_MAX <= COVER_PATH_MAX,
+	       "any game's custom art path fits");
+_Static_assert(PSRAM_ART_BASE + PSRAM_ART_BYTES <= PSRAM_WINDOW + PSRAM_WINDOW_BYTES,
+	       "the art region ends inside the window");
 _Static_assert(USERDATA_PATH_MAX_ALIGNED + NAME_BYTES <= READCACHE_BOXART_SIZE,
 	       "a path and a name fit box art's scratch");
 _Static_assert(sizeof(FILINFO) <= READCACHE_STAGE_SIZE - CLEAR_CHUNK, "the listing's entry and zeros share the stage");
@@ -185,6 +189,15 @@ static void list_step_one(void)
 	}
 }
 
+// 1 while a view opens or a modal one (a menu, a dialog) is up: another
+// operation may be under way, so box art reads nothing (as the library's
+// and the names' jobs)
+static int ui_busy(void)
+{
+	const struct ui_view *top = ui_top();
+	return top && (top->opening || (top->spec->flags & UI_VIEW_MODAL));
+}
+
 static int list_job(struct job *job)
 {
 	// A launch (or Diagnostics) took PSRAM over (cover_cache_invalidate):
@@ -196,7 +209,7 @@ static int list_job(struct job *job)
 		return JOB_DONE;
 	}
 	// The user's frames first, and the library's walk
-	if (library_walking() || ui_idle_frames() < LIST_KEY_REST || ui_transitioning())
+	if (library_walking() || ui_idle_frames() < LIST_KEY_REST || ui_transitioning() || ui_busy())
 		return JOB_WAIT;
 	frame_measure("games-artlist");  // the frames it reads the card in, for the cycle budget
 	psram_begin();
@@ -386,7 +399,7 @@ static void want_covers(void)
 
 static int paused(void)
 {
-	return library_walking();
+	return library_walking() || ui_busy();
 }
 
 void boxart_open(u8 image, boxart_row_fn row)
