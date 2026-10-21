@@ -25,23 +25,26 @@ GBC, GB, NES), **SD card**, **NOR**, **Settings** and **Info**. LEFT and
 RIGHT turn it, A opens the item facing you, and B on any page goes back to
 it. Info's Controls page lists every key.
 
-- **Game lists** (a console, Recent, Favourites): UP/DOWN move, L/R page,
+- **Game lists** (a console, Recent, Favourites): UP/DOWN move,
   LEFT/RIGHT jump to the next or previous first letter, A plays the game
-  with the addons Settings turns on, and START opens its menu: Play,
-  Favourite, Clean boot, Boot with addon, Rename (a name of your own, kept
-  in `/torii/names.txt`; the file stays), Game info and Delete (the save
-  stays). Hold L as you pick a way to start in the game's menu, and it
-  starts with the GBA's boot screen (held as you press A, L pages first,
-  then A starts the game shown). Games show
-  your own name if you gave one (Rename, or `just names-add`), else
-  No-Intro's name with `just names-update`, else their cleaned file names.
-  No-Intro names a game only by its CRC: a romhack or translation keeps its
-  own file name and the placeholder art, never its base game's.
+  as Settings' GBA boot mode says (with the addons Settings turns on, or
+  clean), and START opens its menu: Play, Favourite, Clean boot, Boot with
+  addon, Rename (a name of your own, kept in `/torii/names.txt`; the file
+  stays), Game info (the save type, and a boot mode of the game's own) and
+  Delete (the save stays). Hold L as you press A, or as you pick a way to
+  start in the game's menu, and it starts with the GBA's boot screen; L and
+  R do nothing else here. A floppy mark beside the size means the game has
+  a save. Games show your own name if you gave one (Rename, or
+  `just names-add`), else No-Intro's name with `just names-update`, else
+  their cleaned file names. No-Intro names a game only by its CRC: a
+  romhack or translation keeps its own file name and the placeholder art,
+  never its base game's.
   Settings' Game view shows a list, or a list with box art (`just art-add`,
   `just art-scrape`).
 - **SD card:** the card's folders as they are, folders first. A opens a
-  folder or starts a game, B goes up a folder, START opens the file's menu
-  (Launch, Clean boot, Write to NOR, favourites, Rename, which renames the
+  folder or starts a game (L held: a hard reset), LEFT/RIGHT page, B goes
+  up a folder, START opens the file's menu (Launch, Clean boot or Boot
+  with addon, Write to NOR, favourites, Rename, which renames the
   file with its save, Delete, File info). Torii's own folders and files it
   can't start stay hidden unless Settings' Show all files is on.
 - **NOR:** what the cart's 64 MB game NOR holds, its games (A starts one,

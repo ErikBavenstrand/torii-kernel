@@ -139,6 +139,8 @@
 #define assress_start_on 32 //where the menu opens at power-on: enum settings_start (else last place)
 #define assress_show_all 33 //the SD card page shows hidden files: 1 on, else off
 #define assress_box_art 34 //list with art shows box art from /torii/art: 0 off, else on (source/boxart.h)
+#define assress_boot_mode \
+	35 //how A, Play and Launch start a GBA game: 1 clean, else with the addons (source/actions.h)
 
 #define assress_saveMODE 64
 #define assress_max 65

@@ -47,7 +47,7 @@
 		.reading_key_w = 44, \
 		.row_mark_gap = 4, \
 		.row_badge_gap = 3, \
-		.row_dot_gap = 2, \
+		.row_dot_gap = 4, \
 		.hint_y = 147, \
 		.hint_chip_h = 10, \
 		.hint_chip_radius = 3, \

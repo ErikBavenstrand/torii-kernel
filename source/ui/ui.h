@@ -186,7 +186,7 @@ struct ui_look {
 	u8 reading_key_w;   // a reading line's key chip column (ui_reading)
 	u8 row_mark_gap;    // a list row's mark (ui_item.mark) to its text
 	u8 row_badge_gap;   // its text to its badge (a favourite's star)
-	u8 row_dot_gap;     // its dot (a save) to its detail
+	u8 row_dot_gap;     // its save mark (ui_item.dot) to its detail
 	u8 hint_y;          // the hint bar's key chips
 	u8 hint_chip_h;
 	u8 hint_chip_radius;
@@ -551,6 +551,7 @@ enum {
 	UI_LIST_MARKS = 256,       // list: rows keep a column for item.mark before the text
 	UI_LIST_CONSOLES = 512,    // list: rows draw in UI_BANK_CONSOLES (the console inks and
 				   // the favourites' ink for marks; no item accent)
+	UI_LIST_NO_SHOULDERS = 1024,  // L and R don't page: held, L picks a hard reset with A
 };
 #define UI_LIST_ICON8_W 8
 

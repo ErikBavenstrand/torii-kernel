@@ -4,6 +4,7 @@
 
 #include "actions.h"
 #include "ezkernel.h"
+#include "Ezcard_OP.h"
 #include "GBApatch.h"
 #include "artkey.h"
 #include "boxart.h"
@@ -101,9 +102,24 @@ static void game_leave(void)
 	f_chdir(currentpath[0] ? currentpath : "/");
 }
 
+// How ACTION_DEFAULT starts game: its own boot mode, else Settings'; with
+// addons, but none on, is a clean boot (nothing to patch in)
+static u32 default_how(const struct game_pick *game)
+{
+	u32 own = game->boot_mode == ACTION_BOOT_ADDONS || game->boot_mode == ACTION_BOOT_CLEAN;
+	u32 mode = own                                     ? game->boot_mode
+		   : Read_SET_info(assress_boot_mode) == 1 ? ACTION_BOOT_CLEAN
+							   : ACTION_BOOT_ADDONS;
+	u32 any = Read_SET_info(assress_v_reset) == 1 || Read_SET_info(assress_v_rts) == 1 ||
+		  Read_SET_info(assress_v_sleep) == 1 || Read_SET_info(assress_v_cheat) == 1;
+	tlog("launch: boot mode %s (%s)%s", mode == ACTION_BOOT_CLEAN ? "clean" : "with addons",
+	     own ? "the game's" : "Settings'", mode == ACTION_BOOT_ADDONS && !any ? ", none on" : "");
+	return mode == ACTION_BOOT_CLEAN || !any ? ACTION_CLEAN : ACTION_ADDON;
+}
+
 u32 action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset)
 {
-	if (!copy_path(path) || how >= ACTION_HOWS) {
+	if (!copy_path(path) || how > ACTION_DEFAULT) {
 		tlog_error("launch: can't take %.40s (how %lu)", path, (unsigned long)how);
 		return ACTION_NOTHING;
 	}
@@ -115,7 +131,10 @@ u32 action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset)
 
 	u32 res = ACTION_NOTHING;
 	struct game_pick game = {.name = current_filename};
-	if (!Game_pick(&game)) {
+	u32 ok = Game_pick(&game);
+	if (ok && how == ACTION_DEFAULT)
+		how = game.is_emu ? ACTION_CLEAN : default_how(&game);
+	if (!ok) {
 		tlog("launch %s: not a game the cart starts", path_copy);
 	} else if (game.is_emu && how >= ACTION_NOR) {
 		tlog("launch %s: only GBA games go to the game NOR", path_copy);
@@ -149,6 +168,7 @@ u32 action_game_facts(const char *path, struct action_facts *out)
 	u32 ok = Game_pick(&game);  // reads the .mde file and looks for a cheat file
 	if (ok && !game.is_emu) {
 		out->save_type = game.save_num < ACTION_SAVE_TYPES ? game.save_num : 0;
+		out->boot_mode = game.boot_mode < ACTION_BOOTS ? game.boot_mode : ACTION_BOOT_DEFAULT;
 		out->cheats = game.havecht;
 	}
 	game_leave();
@@ -167,6 +187,19 @@ int action_set_save_type(const char *path, u32 save_type)
 		tlog("save type: %s: FatFs %u", SAVER_FOLDER, (unsigned)made);
 	u8 res = Make_mde_file(current_filename, (u8)save_type);
 	tlog("save type of %s: %lu (%u)", path_copy, (unsigned long)save_type, res);
+	game_leave();
+	return res == FR_OK;
+}
+
+int action_set_boot_mode(const char *path, u32 boot_mode)
+{
+	if (boot_mode >= ACTION_BOOTS || !copy_path(path) || userdata_nor_name(path_copy) || !game_enter("boot mode"))
+		return 0;
+	FRESULT made = f_mkdir(SAVER_FOLDER);
+	if (made != FR_OK && made != FR_EXIST)
+		tlog("boot mode: %s: FatFs %u", SAVER_FOLDER, (unsigned)made);
+	u8 res = Make_mde_boot(current_filename, (u8)boot_mode);
+	tlog("boot mode of %s: %lu (%u)", path_copy, (unsigned long)boot_mode, res);
 	game_leave();
 	return res == FR_OK;
 }

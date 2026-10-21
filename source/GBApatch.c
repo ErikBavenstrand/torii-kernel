@@ -732,80 +732,79 @@ static void make_mde_name(TCHAR *mdenamebuf, TCHAR *gamefilename)
 	name_with_ext(mdenamebuf, gamefilename, "mde");
 }
 //------------------------------------------------------------------
-u8 Check_mde_file(TCHAR *gamefilename)
+u8 Check_mde_file(TCHAR *gamefilename, u8 *boot_mode)
 {
-	UINT ret;
-	u32 find_the_mdefile;
-	u32 mdefilesize;
+	UINT ret = 0;
 	u32 res;
+	// Torii: its first byte is the save type and its second the game's boot
+	// mode (GBApatch.h); only those are read. A bigger file overran
+	// pReadCache, and an empty or unreadable one gave an earlier owner's byte
+	u8 bytes[4] ALIGN(4) = {0};
 
 	TCHAR mdenamebuf[GAME_NAME_MAX + 1];
 	make_mde_name(mdenamebuf, gamefilename);
 
+	*boot_mode = 0;
 	res = f_chdir("/SAVER");
-	if (res == FR_OK) {
-		res = f_open(&gfile, mdenamebuf, FA_OPEN_EXISTING);
-
-		if (res == FR_OK)//have a old file
-		{
-			f_open(&gfile, mdenamebuf, FA_READ);
-			mdefilesize = f_size(&gfile);
-			//Torii: only its first byte, the mode, is used: a bigger file overran
-			//pReadCache, and an empty or unreadable one gave an earlier owner's byte
-			if (mdefilesize > 4)
-				mdefilesize = 4;
-			find_the_mdefile = f_read(&gfile, pReadCache, mdefilesize, &ret) == FR_OK && ret >= 1;
-			f_close(&gfile);
-		} else {
-			find_the_mdefile = 0;
-		}
-	} else//cant fine folder
-	{
-		find_the_mdefile = 0;
-	}
-
-	if (find_the_mdefile) {
-		//read
-		return (pReadCache[0]);
-	} else {
+	if (res != FR_OK)
 		return 0;
-	}
+	res = f_open(&gfile, mdenamebuf, FA_READ);
+	if (res != FR_OK)
+		return 0;
+	if (f_read(&gfile, bytes, sizeof(bytes), &ret) != FR_OK)
+		ret = 0;
+	f_close(&gfile);
+	if (ret >= 2)
+		*boot_mode = bytes[1];
+	return ret >= 1 ? bytes[0] : 0;
 }
 //------------------------------------------------------------------
-u8 Make_mde_file(TCHAR *gamefilename, u8 Save_num)
+// Sets byte at of a game's .mde file to value, keeping the others (a new
+// file: zeros); 2 if /SAVER isn't there, else FatFs's answer
+static u8 mde_write(TCHAR *gamefilename, u32 at, u8 value)
 {
 	u32 res;
-	u32 written;
-	u8 w_buffer[16];
+	UINT done = 0;
+	u8 w_buffer[16] ALIGN(4);
 
 	TCHAR currentpath[256];
 	memset(currentpath, 00, 256);
 	res = f_getcwd(currentpath, sizeof currentpath / sizeof *currentpath);
 
-	//res = f_mkdir(SAVER_FOLDER);
 	res = f_chdir(SAVER_FOLDER);
 	if (res != FR_OK) {
 		return 2;
 	}
 
 	memset(w_buffer, 0x00, sizeof(w_buffer));
+	TCHAR mdenamebuf[GAME_NAME_MAX + 1];
+	make_mde_name(mdenamebuf, gamefilename);
 
+	res = f_open(&gfile, mdenamebuf, FA_READ | FA_WRITE | FA_OPEN_ALWAYS);
 	if (res == FR_OK) {
-		TCHAR mdenamebuf[GAME_NAME_MAX + 1];
-		make_mde_name(mdenamebuf, gamefilename);
-
-		res = f_open(&gfile, mdenamebuf, FA_WRITE | FA_OPEN_ALWAYS);
-		if (res == FR_OK) {
-			f_lseek(&gfile, 0x0000);
-
-			w_buffer[0] = Save_num;
-			res = f_write(&gfile, (void *)w_buffer, sizeof(w_buffer), (UINT *)&written);
-
-			f_close(&gfile);
-		}
+		// A failed read writes nothing: the other byte would be lost
+		res = f_read(&gfile, w_buffer, sizeof(w_buffer), &done);
+		w_buffer[at] = value;
+		if (res == FR_OK)
+			res = f_lseek(&gfile, 0x0000);
+		if (res == FR_OK)
+			res = f_write(&gfile, (void *)w_buffer, sizeof(w_buffer), &done);
+		u32 closed = f_close(&gfile);
+		if (res == FR_OK)
+			res = closed;
 	}
-	res = f_chdir(currentpath);
-	return res;
+	u32 back = f_chdir(currentpath);
+	return (u8)(res != FR_OK ? res : back);
+}
+//------------------------------------------------------------------
+u8 Make_mde_file(TCHAR *gamefilename, u8 Save_num)
+{
+	return mde_write(gamefilename, 0, Save_num);
+}
+//------------------------------------------------------------------
+u8 Make_mde_boot(TCHAR *gamefilename, u8 boot_mode)
+{
+	return mde_write(gamefilename, 1, boot_mode);
 }
 //------------------------------------------------------------------
 u32 Check_RTS(TCHAR *gamefilename)

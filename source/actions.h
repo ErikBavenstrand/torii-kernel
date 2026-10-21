@@ -24,6 +24,9 @@ enum action_how {
 	ACTION_NOR,        // WRITE TO NOR, clean
 	ACTION_NOR_ADDON,  // WRITE TO NOR with the addons
 	ACTION_HOWS,
+	// A, Play and Launch: a GBA game's boot mode (its Game info's), else
+	// Settings' GBA boot mode: ACTION_ADDON or ACTION_CLEAN
+	ACTION_DEFAULT = ACTION_HOWS,
 };
 
 // The save type a GBA game starts with: what its .mde file says (the type
@@ -32,6 +35,15 @@ enum action_how {
 // 512, 4 FLASH 64K, 5 FLASH 128K)
 #define ACTION_SAVE_KEEP 0xFF
 #define ACTION_SAVE_TYPES 6
+
+// A GBA game's own boot mode, kept with its save type (GBApatch.h's .mde
+// file) and set in Game info
+enum {
+	ACTION_BOOT_DEFAULT,  // as Settings' GBA boot mode says (and any unknown value)
+	ACTION_BOOT_ADDONS,   // with the addons Settings turns on
+	ACTION_BOOT_CLEAN,
+	ACTION_BOOTS,
+};
 
 // What action_launch returns when no game started
 enum {
@@ -44,22 +56,29 @@ enum {
 // or "NOR:" and a game NOR game's name (a Recent entry). GB, GBC and NES
 // games start clean whatever how says, and only GBA games are written to
 // NOR (a page never offers the others that: they are only logged).
+// how: an enum action_how, or ACTION_DEFAULT.
 // hard_reset: the game starts through the BIOS's hard reset (L held).
 // Returns only if no game started (see the top).
 u32 action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset);
 
 // What a GBA game on the SD card starts with, read from the card: its save
 // type (what its .mde file says, 0 AUTO if none; ACTION_SAVE_TYPES for a GB,
-// GBC or NES game or a NOR: entry) and its cheat file (Check_cheat_file's
-// handle, 0 none). Returns 0 if path isn't a game the cart starts.
+// GBC or NES game or a NOR: entry), its own boot mode (ACTION_BOOT_*,
+// GBApatch.h: ACTION_BOOT_DEFAULT unless Game info set one) and its cheat file
+// (Check_cheat_file's handle, 0 none). Returns 0 if path isn't a game the
+// cart starts.
 struct action_facts {
 	u32 save_type;
+	u32 boot_mode;
 	u32 cheats;
 };
 u32 action_game_facts(const char *path, struct action_facts *out);
 // Sets a GBA game's save type (0 AUTO, 1-5 a type: ACTION_SAVE_TYPES) in
 // its .mde file in /SAVER, which its next launch uses. 1 if written.
 int action_set_save_type(const char *path, u32 save_type);
+// Sets a GBA game's own boot mode (ACTION_BOOT_*) in the same file, which A,
+// Play and Launch then use instead of Settings'. 1 if written.
+int action_set_boot_mode(const char *path, u32 boot_mode);
 
 // Deletes the file at path (a full path; a folder is refused). Its save stays (T11); it leaves
 // Recent, the favourites and the library index. 1 if it was deleted, or wasn't on the card.

@@ -128,6 +128,7 @@ void test_settings_defaults(void)
 		{SET_DIM, 0, "Off"},
 		{SET_CLOCK_24H, 1, "On"},
 		{SET_GAME_CLOCK, 1, "On"},
+		{SET_BOOT_MODE, SET_BOOT_ADDONS, "With addons"},
 		{SET_ENGINE, 1, "On"},
 		{SET_AUTO_SAVE, 0, "Off"},
 		{SET_RTS, 0, "Off"},

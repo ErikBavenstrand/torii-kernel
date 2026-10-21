@@ -32,15 +32,17 @@ boot() { # log [mgba-shot options]
 # 2026-10-21 12:00 UTC: a set clock
 t0=1792584000
 
-# Power-on 1: on Other (the GBA page's second row), L held pages up to
-# Hello, and A with L still held starts Hello, the row shown and selected,
-# with a hard reset
+# Power-on 1: on Other (the GBA page's second row), L held doesn't page (L
+# and R do nothing in game lists), and A with L still held starts Other
+# with a hard reset, by Settings' GBA boot mode (with addons, the default)
 # shellcheck disable=SC2046 # nav.sh's options
-boot "$cart/1.log" -C $t0 $(nav_game gba 1) -k @24:L -k @40:L+A -k @44:- -u "launch: loading" -f 1500
-grep -q '^kernel: games: start /Hello.gba (how 1, hard reset)' "$cart/1.log" ||
-  fail "L+A didn't start Hello.gba with a hard reset: $(grep '^kernel: games' "$cart/1.log" | tail -2)"
-grep -q '^kernel: launch: loading Hello.gba' "$cart/1.log" || fail "Hello.gba didn't load: $(grep '^kernel: launch' "$cart/1.log" | tail -2)"
-echo "PASS: L held with A starts the selected row with a hard reset"
+boot "$cart/1.log" -C $t0 $(nav_game gba 1) -k @24:L -k @60:L+A -k @64:- -u "launch: loading" -f 1500
+grep -q '^kernel: games: start /Other.gba (how 4, hard reset)' "$cart/1.log" ||
+  fail "L+A didn't start Other.gba with a hard reset: $(grep '^kernel: games' "$cart/1.log" | tail -2)"
+grep -q "^kernel: launch: boot mode with addons (Settings')" "$cart/1.log" ||
+  fail "A didn't follow Settings' boot mode: $(grep '^kernel: launch' "$cart/1.log" | head -3)"
+grep -q '^kernel: launch: loading Other.gba' "$cart/1.log" || fail "Other.gba didn't load: $(grep '^kernel: launch' "$cart/1.log" | tail -2)"
+echo "PASS: L held doesn't page a game list, and L+A starts the selected row with a hard reset"
 
 # Power-on 2, 30 s later on a running clock: A at "Save sav?", then
 # Recent's first row is Hello, played "just now"; a minute on it says "1m
@@ -98,3 +100,65 @@ boot "$cart/1.log" $(nav_game_menu gba 0) -k @12:UP -k @16:- -k @24:UP -k @28:- 
 grep -q '^kernel: save type of /A.gba: 1 (0)' "$cart/1.log" || fail "the save type wasn't kept: $(grep '^kernel: save type' "$cart/1.log")"
 mdir -b -i "$cart/sd.img" ::/SAVER | grep -q 'A.mde' || fail "no /SAVER/A.mde"
 echo "PASS: Game info's save type is kept in /SAVER, made when missing"
+
+# The boot mode (Settings' GBA boot mode, a game's own in Game info): kept
+# in byte 1 of the game's .mde file, beside the save type in byte 0
+cart=$carts/games-boot
+rm -rf "$cart" && mkdir -p "$cart"
+mkfs.fat -C -F 32 -n GAMES "$cart/sd.img" 65536 >/dev/null
+mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/A.gba
+mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/B.gba
+mde() { mtype -i "$cart/sd.img" "::/SAVER/$1.mde" | od -An -tx1 -N2 | tr -d ' '; }
+NAV_SHOWN=gba
+# Game info on A: Save type RIGHT (SRAM), DOWN to Boot mode, RIGHT twice
+# (Clean), B: both are kept
+# shellcheck disable=SC2046 # nav.sh's options
+boot "$cart/1.log" $(nav_game_menu gba 0) -k @12:UP -k @16:- -k @24:UP -k @28:- -k @36:A -k @40:- \
+  -w "screen ready: game-info" -k @20:RIGHT -k @24:- -k @32:DOWN -k @36:- -k @44:RIGHT -k @48:- \
+  -k @56:RIGHT -k @60:- -k @72:B -k @76:- -w "boot mode of" -f 1500
+grep -q '^kernel: save type of /A.gba: 1 (0)' "$cart/1.log" || fail "the save type wasn't kept: $(grep '^kernel: save type' "$cart/1.log")"
+grep -q '^kernel: boot mode of /A.gba: 2 (0)' "$cart/1.log" || fail "the boot mode wasn't kept: $(grep '^kernel: boot mode' "$cart/1.log")"
+[ "$(mde A)" = 0102 ] || fail "A.mde holds $(mde A), not 01 02"
+echo "PASS: Game info keeps a game's boot mode beside its save type"
+
+# Settings slots in the kernel NOR (made by the first power-on) at 0x7B0000
+setting() { printf %b "\\x$(printf %02x "$2")\\x00" | dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7B0000 + 2 * $1)) conv=notrunc status=none; }
+# Start on Home, so each power-on's route starts there; Auto save on (no
+# question at power-on after a launch); the Reset hotkey on, an addon to
+# start with
+setting 32 2
+setting 14 1
+setting 1 1
+
+# A on A (row 0) starts it clean, its own boot mode, while Settings says with addons
+# shellcheck disable=SC2046 # nav.sh's options
+boot "$cart/2.log" $(nav_game gba 0) -k @20:A -k @24:- -u "launch: loading" -f 1500
+grep -q "^kernel: launch: boot mode clean (the game's)" "$cart/2.log" ||
+  fail "A didn't follow the game's boot mode: $(grep '^kernel: launch' "$cart/2.log" | head -3)"
+grep -q '^kernel: launch: loading A.gba, CLEAN BOOT' "$cart/2.log" || fail "A.gba didn't start clean: $(grep '^kernel: launch' "$cart/2.log" | tail -2)"
+echo "PASS: A starts a game by its own boot mode"
+
+# A on B (row 1, no boot mode of its own) starts it with the addons, as
+# Settings' GBA boot mode says by default
+NAV_SHOWN="recent gba"
+# shellcheck disable=SC2046 # nav.sh's options
+boot "$cart/3.log" $(nav_game gba 1) -k @20:A -k @24:- -u "launch: loading" -f 1500
+grep -q "^kernel: launch: boot mode with addons (Settings')$" "$cart/3.log" ||
+  fail "A didn't follow Settings' boot mode: $(grep '^kernel: launch' "$cart/3.log" | head -3)"
+grep -q '^kernel: launch: loading B.gba, BOOT WITH ADDON' "$cart/3.log" || fail "B.gba didn't start with addons: $(grep '^kernel: launch' "$cart/3.log" | tail -2)"
+echo "PASS: A starts a game with its addons by default"
+
+# Settings' GBA boot mode Clean (slot 35): B starts clean
+setting 35 1
+# shellcheck disable=SC2046 # nav.sh's options
+boot "$cart/4.log" $(nav_game gba 1) -k @20:A -k @24:- -u "launch: loading" -f 1500
+grep -q "^kernel: launch: boot mode clean (Settings')" "$cart/4.log" ||
+  fail "A didn't follow Settings' boot mode Clean: $(grep '^kernel: launch' "$cart/4.log" | head -3)"
+grep -q '^kernel: launch: loading B.gba, CLEAN BOOT' "$cart/4.log" || fail "B.gba didn't start clean: $(grep '^kernel: launch' "$cart/4.log" | tail -2)"
+echo "PASS: Settings' GBA boot mode Clean starts a game clean"
+
+# A launch that changes the save type keeps the boot mode (byte 1)
+# shellcheck disable=SC2046 # nav.sh's options
+boot "$cart/5.log" $(nav_launch /A.gba addon save=3) -u "launch: loading" -f 1500
+[ "$(mde A)" = 0302 ] || fail "after a launch with save type 3, A.mde holds $(mde A), not 03 02"
+echo "PASS: a launch's save type keeps the game's boot mode"

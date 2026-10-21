@@ -68,6 +68,7 @@ char **gl_set_explain EWRAM_BSS;
 char **gl_set_onoff EWRAM_BSS;
 char **gl_set_themes EWRAM_BSS;
 char **gl_set_views EWRAM_BSS;
+char **gl_set_boots EWRAM_BSS;
 char **gl_set_starts EWRAM_BSS;
 char **gl_set_modes_b EWRAM_BSS;
 char **gl_set_colours EWRAM_BSS;
@@ -244,6 +245,7 @@ const char *en_set_labels[SET_ROWS] = {
 	[SET_DATE_ROW] = "Date",
 	[SET_CLOCK_24H] = "24-hour clock",
 	[SET_GAME_CLOCK] = "Clock for games",
+	[SET_BOOT_MODE] = "GBA boot mode",
 	[SET_ENGINE] = "Fast patching",
 	[SET_AUTO_SAVE] = "Auto save",
 	[SET_RTS] = "Save states",
@@ -273,6 +275,7 @@ const char *en_set_explain[SET_LABELS] = {
 	[SET_DATE_ROW] = "The cart's date. A sets it.",
 	[SET_CLOCK_24H] = "14:32 when on, 2:32 PM when off.",
 	[SET_GAME_CLOCK] = "Lets games read the cart's clock.",
+	[SET_BOOT_MODE] = "How A, Play, Launch start GBA games.",
 	[SET_ENGINE] = "Patches from a built-in table first.",
 	[SET_AUTO_SAVE] = "Copies saves to the card, no question.",
 	[SET_RTS] = "Save and load from the in-game menu.",
@@ -297,6 +300,7 @@ const char *en_set_explain[SET_LABELS] = {
 const char *en_set_onoff[2] = {"Off", "On"};
 const char *en_set_themes[2] = {"Dark", "Light"};
 const char *en_set_views[2] = {"List", "List + art"};
+const char *en_set_boots[SET_BOOTS] = {[SET_BOOT_ADDONS] = "With addons", [SET_BOOT_CLEAN] = "Clean"};
 const char *en_set_starts[SET_STARTS] = {
 	[SET_START_LAST] = "Last place", [SET_START_RECENT] = "Recent",
 	[SET_START_HOME] = "Home",       [SET_START_FAVOURITES] = "Favourites",
@@ -358,22 +362,21 @@ const char *en_info[INFO_STRINGS] = {
 		"# Every page\n"
 		"^v\tmove\n"
 		"B\tback, towards the carousel\n"
-		"# Game lists\n"
-		"L R\tpage up, page down\n" LR "\tthe next or previous letter (A-Z lists)\n"
+		"# Game lists\n" LR "\tthe next or previous letter (A-Z lists)\n"
 		"A\tplay the game\n"
 		"START\tthe game's menu\n"
-		"In its Game info, " LR " changes a GBA game's save type.\n"
+		"In its Game info, ^v picks a GBA game's save type or boot mode, and " LR " changes it.\n"
 		"# SD card\n"
 		"A\topen the folder, or start the game\n"
-		"START\tthe file's menu\n"
-		"L R " LR "\tpage up, page down\n"
+		"START\tthe file's menu\n" LR "\tpage up, page down\n"
 		"B\tup a folder; at the top, back to the carousel\n"
 		"# NOR\n"
 		"A\tstart the game\n"
 		"START\tthe game's menu\n"
 		"# Starting a game\n"
-		"L\thold it as you pick a way to start in the game's menu: it starts with the GBA's boot "
-		"screen. Held as you press A, L pages first, then A starts the game shown.\n"
+		"A\tGBA games start as Settings' GBA boot mode says, or as their Game info's Boot mode does\n"
+		"L\thold it as you press A, or as you pick a way to start in the game's menu: the game "
+		"starts with the GBA's boot screen.\n"
 		"# Settings\n"
 		"L R\tthe previous or next section\n"
 		"A\tchange the value: " LR " picks, A keeps it, B puts it back\n"
@@ -396,10 +399,11 @@ const char *en_info[INFO_STRINGS] = {
 		"# At power-on\n"
 		"Hold L, R and SELECT as you switch on to run Diagnostics, even when the menu won't start.",
 	[INFO_S_INGAME_START] = "# Hotkeys\n"
-				"They work in GBA games started with their addons: A, Play, Launch and Boot with addon "
-				"start a game with the ones Settings turns on, Clean boot without. Settings, "
-				"Hotkeys sets them; Save states and Cheats are in Settings, Games. A game on the NOR "
-				"keeps the hotkeys it was written with.\n",
+				"They work in GBA games started with their addons: Boot with addon starts a game with "
+				"the ones Settings turns on, Clean boot without, and A, Play and Launch as Settings' "
+				"GBA boot mode says (or the game's Boot mode in its Game info). Settings, Hotkeys sets "
+				"them; Save states and Cheats are in Settings, Games. A game on the NOR keeps the "
+				"hotkeys it was written with.\n",
 	[INFO_S_INGAME_MENU] = "# The in-game menu\n"
 			       "Hold %s to open it: back to the menu, save or load a state, and the game's cheats.\n",
 	[INFO_S_INGAME_RESET] = "# Back to menu\n"
@@ -524,7 +528,6 @@ static const struct lang_games en_games = {
 	.hint_play = "play",
 	.hint_menu = "menu",
 	.hint_letter = "letter",
-	.hint_save_type = "save type",
 	.hint_pick = "pick",
 	.pop = {"Play", "Favourite", "Clean boot", "Boot with addon", "Rename", "Game info", "Delete"},
 	.off = "off",
@@ -532,11 +535,13 @@ static const struct lang_games en_games = {
 	.delete_text = "The save stays.",
 	.delete_button = "Delete",
 	.save_type_failed = "Can't keep the save type",
-	.info_keys = {"Console", "Size", "Folder", "Played", "Save type", "Hard reset"},
+	.boot_mode_failed = "Can't keep the boot mode",
+	.info_keys = {"Console", "Size", "Folder", "Played", "Save type", "Boot mode", "Hard reset"},
 	.consoles = {"GBA", "GBC", "GB", "NES"},
 	.nor = "Game NOR",
 	.hard_reset = "hold L with A",
 	.save_types = {"Auto", "SRAM", "EEPROM 8K", "EEPROM 512", "Flash 64K", "Flash 128K"},
+	.boot_modes = {"Default", "With addons", "Clean"},
 	.size_kb = "KB",
 	.size_mb = "MB",
 	.fact_size = "Size",
@@ -645,6 +650,7 @@ void LoadEnglish(void)
 	gl_set_onoff = (char **)en_set_onoff;
 	gl_set_themes = (char **)en_set_themes;
 	gl_set_views = (char **)en_set_views;
+	gl_set_boots = (char **)en_set_boots;
 	gl_set_starts = (char **)en_set_starts;
 	gl_set_modes_b = (char **)en_set_modes_b;
 	gl_set_colours = (char **)en_set_colours;

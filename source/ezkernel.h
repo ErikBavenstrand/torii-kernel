@@ -88,6 +88,7 @@ struct game_pick {
 	u32 havecht;      // Check_cheat_file: 0 no cheat file
 	u8 save_num;      // the SAVE TYPE line: 0 AUTO, 1-5 a type
 	u8 old_save_num;  // what its .mde file says
+	u8 boot_mode;     // its .mde file's ACTION_BOOT_* (actions.h): its own boot mode
 };
 // Fills g for g->name: 0 if it isn't a game. A GBA game reads its cheat and
 // save type files; an emulated one starts only with Game_launch's line 0.

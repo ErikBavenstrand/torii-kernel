@@ -61,8 +61,15 @@ void GBApatch_NOR(u32 *address, int filesize, u32 offset);
 u32 Check_pat(TCHAR *gamefilename);
 void Make_pat_file(char *filename);
 u32 Check_RTS(TCHAR *gamefilename);
-u8 Check_mde_file(TCHAR *gamefilename);
+// A GBA game's /SAVER/<name>.mde file: byte 0 its save type (0 AUTO, 1-5),
+// byte 1 its boot mode (Torii v0.4: ACTION_BOOT_*, actions.h; v0.3 and the
+// official kernel read byte 0 only and write zeros past it), 16 bytes in all.
+// Its save type (0 if it has no file) and, into boot_mode, its boot mode
+u8 Check_mde_file(TCHAR *gamefilename, u8 *boot_mode);
+// Write one of its bytes, keeping the other (from the current folder, which
+// they come back to); 0 if written, 2 if there is no /SAVER
 u8 Make_mde_file(TCHAR *gamefilename, u8 Save_num);
+u8 Make_mde_boot(TCHAR *gamefilename, u8 boot_mode);
 
 u32 use_internal_engine(u8 gamecode[], TCHAR *gamefilename);
 void Apply_rom_patches(void);
