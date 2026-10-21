@@ -4,6 +4,14 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Fixed:** the library's walk keeps a `/torii/crc.txt` record whose date is
+  a whole number of hours off its file's (up to 14, minutes and seconds
+  equal), as `just names-update` writes it on a PC whose local time isn't the
+  card's (DST), and takes the cart's date; any other date still forgets the
+  CRC (e04827c).
+
 ## v0.4.1 (2026-10-21)
 
 The new menu: a carousel home, game lists, SD card, NOR, Settings and Info
