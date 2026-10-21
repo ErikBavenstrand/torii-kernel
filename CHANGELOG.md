@@ -4,7 +4,10 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.4.2 (2026-10-21)
+
+New games get their names and box art on the cart: CRCs in the background,
+the full art pack, and names-update's dates kept across a time-zone skew.
 
 - **Fixed:** the walk keeps a `crc.txt` date up to 14 whole hours off its
   file's, as names-update writes it from a PC in another local time (DST),
