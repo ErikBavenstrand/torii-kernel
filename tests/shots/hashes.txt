@@ -93,6 +93,93 @@ diag-turn/frames 4-7 C230B72F2FDF7BF4
 dialog-fragmented/dialog DF9AAC285CD0CD2A
 dialog-overflow/dialog 065D88663C13E179
 dialog-overflow/home 2BF873AFA4C47009
+games-art/gba A9C905A2C0117574
+games-art/recent 09EAAB0DAA7D2445
+games-cheats/back DE60914D027457D0
+games-cheats/picked BFDAFB041DCC8050
+games-cheats/screen C49F10B375086F38
+games-fav/screen F4F29DECE25888B4
+games-fav/starred 9420B42D7CAE4C1D
+games-fav/toggled 376D659394F85307
+games-gb/popup CAE90C9F7E72FC3F
+games-gb/screen A47EFAC3B4A4039F
+games-gba/cancelled 4E7E09A34A9111A6
+games-gba/closed B88B3D39DA8F0380
+games-gba/delete 4DCAA772D3601205
+games-gba/down 868A87D837F73236
+games-gba/info A55D559BE43F67FD
+games-gba/info-sram 99125B196A679359
+games-gba/letter 9C53BFCA8051B309
+games-gba/popup 9052A1F0C2261F4E
+games-gba/screen D09CACFAFDCF7472
+games-gba/frames 0-0 D09CACFAFDCF7472
+games-gba/frames 1-1 FA38672EB8F094DE
+games-gba/frames 2-2 852BF6534D3CBDFE
+games-gba/frames 3-3 60E79ABEE43F5A46
+games-gba/frames 4-5 63854085D6B489A6
+games-gba/frames 6-12 868A87D837F73236
+games-light/held 621380C02B053ACF
+games-light/screen FB15C1A231E27AD1
+games-light/frames 0-0 FB15C1A231E27AD1
+games-light/frames 1-1 42019BDED40EA959
+games-light/frames 2-2 BF5E377CB19DCAED
+games-light/frames 3-3 2308D0383D31A6BD
+games-light/frames 4-5 D95B679DAF379A8A
+games-light/frames 6-15 6EA149A9070B803A
+games-light/frames 16-16 3FAE6049653AD2F4
+games-light/frames 17-17 09D20E7FCE544BD7
+games-light/frames 18-18 FF721C9FA4AC8BC4
+games-light/frames 19-19 A47C4E49686B0534
+games-light/frames 20-20 C81554F4446E1872
+games-light/frames 21-21 7F52AFB1424003B5
+games-light/frames 22-22 9A065F6FEEF5421D
+games-light/frames 23-23 B06E195D223F7EB5
+games-light/frames 24-24 69C2351FA998AA97
+games-light/frames 25-25 63368EE9CD3E608C
+games-light/frames 26-26 F0A95B7879E51D74
+games-light/frames 27-27 13BAA3F730026707
+games-light/frames 28-28 CAD7F22DC07B13FC
+games-light/frames 29-29 86639907266F555F
+games-light/frames 30-30 554DFB5CDF8225FC
+games-light/frames 31-31 55BF8DDC2FC923F0
+games-light/frames 32-32 FB7D0B7A63C49AA3
+games-light/frames 33-33 2C1BAA573337C26E
+games-light/frames 34-34 2D1A99CC5DC97160
+games-light/frames 35-35 822D879EE8C1FA25
+games-light/frames 36-36 16646A86A56DF6F3
+games-light/frames 37-37 159BEDFB70837B3A
+games-light/frames 38-38 AB1D86BA1F6DF916
+games-light/frames 39-39 A26EF677F8EDED6B
+games-light/frames 40-40 2F7CA2CEAEC94FFF
+games-light/frames 41-41 9EFC5A3212D3D395
+games-light/frames 42-42 BC52EA973C988AE1
+games-light/frames 43-43 97CA7D3D0BCC725A
+games-light/frames 44-44 73F31BE602466491
+games-light/frames 45-45 72C82475CEFA86A6
+games-light/frames 46-46 6606E34CE5077007
+games-light/frames 47-47 30F1F86D28ACC4C5
+games-light/frames 48-48 1583FCACE50D0062
+games-light/frames 49-49 80ED2627B8D37E1D
+games-light/frames 50-50 E98958B061BEA339
+games-light/frames 51-51 0240CCC7F28CF438
+games-light/frames 52-52 18E4EFEFB6FE835F
+games-light/frames 53-53 A21FC50786779864
+games-light/frames 54-54 EC988E79FB7BCCFC
+games-light/frames 55-55 039477E1C204D0DF
+games-light/frames 56-56 C1405A76EB4DDE75
+games-light/frames 57-57 56B916231A1DE278
+games-light/frames 58-58 A07E0D70CC7B5853
+games-light/frames 59-59 E42D67F288E5214E
+games-light/frames 60-60 522C0FEC4775B5D3
+games-light/frames 61-61 1984A154285E3412
+games-light/frames 62-62 1FC0CF5FBEC300F1
+games-light/frames 63-63 B402F573E1D971A4
+games-light/frames 64-64 6DBFEDABCAA3D49C
+games-light/frames 65-65 7D50D3B1581729DB
+games-light/frames 66-66 A1753B24548C8447
+games-light/frames 67-82 621380C02B053ACF
+games-recent/down E429A6434C3893A7
+games-recent/screen D25387039F27FFDF
 home/gba 97819D6CD90264D7
 home/recent 14389C861140929F
 home/sd 539D15A61F3FE2CC
@@ -236,7 +323,7 @@ info-read/frames 12-12 8F8A72A0CEF7815F
 info-read/frames 13-13 6FB49346DC4823FA
 info-read/frames 14-22 54C881529D44B1FA
 nav-push-fail/error 8DA1D73368B07BC5
-nav-push-fail/page B62B7D8B2814CB3F
+nav-push-fail/page 4389D7B1FD5DF9A8
 nor-dark/closed 103858B351148F30
 nor-dark/delete A519865C050A00F3
 nor-dark/page 103858B351148F30
@@ -265,19 +352,19 @@ nor-page/frames 13-13 4B476809DBED488E
 nor-page/frames 14-17 1C38372849AAC6C4
 nor-write/done 3B8472BCA67DAA9D
 nor-write/half C18C045DA0E5C751
-page-empty/back 2BF873AFA4C47009
-page-empty/page B62B7D8B2814CB3F
-page-empty/frames 0-1 2BF873AFA4C47009
-page-empty/frames 2-2 74A9AE0093C13ED0
-page-empty/frames 3-3 7FF4DBA63BF38DF9
+page-empty/back E99B47A3CC167F35
+page-empty/page 842974757E964F9C
+page-empty/frames 0-1 E99B47A3CC167F35
+page-empty/frames 2-2 B2EF93D9465A3EAC
+page-empty/frames 3-3 E9D4163D55C6D00A
 page-empty/frames 4-6 7B90E77090ED8325
-page-empty/frames 7-7 157B4B679AEFCB64
-page-empty/frames 8-8 A1CB849A5F1C97D8
-page-empty/frames 9-9 5655BE772A02F3D0
-page-empty/frames 10-10 76C0480B490D7FC3
-page-empty/frames 11-11 AC9324EBF1A166BF
-page-empty/frames 12-21 B62B7D8B2814CB3F
-page-empty/frames 22-22 A1CB849A5F1C97D8
+page-empty/frames 7-7 D91F8A65952E68FE
+page-empty/frames 8-8 6DAA99E6C30B76D5
+page-empty/frames 9-9 075C82CE1BDC3926
+page-empty/frames 10-10 36F0AAA31A41C28C
+page-empty/frames 11-11 646044647DEB4A9C
+page-empty/frames 12-21 842974757E964F9C
+page-empty/frames 22-22 6DAA99E6C30B76D5
 sd-dark/folder DFD4D3341592285D
 sd-dark/root 225FC0C5D082ACA9
 sd-many/end EE2CB6E1FAC3923C

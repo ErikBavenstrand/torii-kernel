@@ -214,7 +214,7 @@ struct lang_games {
 	const char *off, *on;  // Favourite's value
 	const char *delete_text;  // under the Delete confirmation's "Delete <name>?" (EN_GAME_DELETE)
 	const char *delete_button;
-	const char *delete_failed;  // when the card refused
+	const char *save_type_failed;  // Game info's save type couldn't be written
 	const char *info_keys[LANG_INFO_KEYS];  // Game info's lines
 	const char *consoles[4];  // by LIB_GBA...: Game info's Console
 	const char *nor;  // a game NOR game's folder

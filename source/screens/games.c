@@ -87,10 +87,9 @@ static struct {
 	u8 art;      // the list-with-art view
 	u8 az;       // A-Z: LEFT/RIGHT jump by letter
 	u8 first;    // the view's first node
-	u8 l_valid;  // l_from holds the row L paged away from, while L is held
 	u32 count;
 	u32 cursor;  // the list's cursor, as last seen
-	u32 l_from;
+	u32 defer_generation;  // library_generation() when A or START asked for a row
 	u32 row;     // the row the page was asked to open on (games_row before it shows)
 	u8 unloaded;  // it opened while the index wasn't loaded (after a launch): a new
 		      // index lists it again at row
@@ -659,7 +658,6 @@ static void relist(u32 cursor)
 {
 	build();
 	games.cursor = games.count ? (cursor < games.count ? cursor : games.count - 1) : 0;
-	games.l_valid = 0;
 	if (!up())
 		return;
 	ui_list_reset(list_node(), games.cursor);
@@ -682,7 +680,6 @@ static struct ui_view *games_enter(u32 item, u32 row)
 	games.unloaded = !library_ready();
 	games.cursor = games.count ? (row < games.count ? row : games.count - 1) : 0;
 	games.row = games.unloaded ? row : games.cursor;
-	games.l_valid = 0;
 	struct ui_view *v = ui_push(&views[games.art][games.kind != KIND_CONSOLE], &games);
 	if (!v)
 		return 0;
@@ -703,13 +700,11 @@ static u32 games_row(void)
 }
 
 // Each pass of the menu's loop: a new index lists again; Recent's "played"
-// texts follow the clock; L let go ends its hard-reset row
+// texts follow the clock
 static void games_poll(void)
 {
 	if (!up())
 		return;
-	if (games.l_valid && !(ui_input()->held & INPUT_L))
-		games.l_valid = 0;
 	// At once: Recent's and the favourites' records are the old index's
 	if (games.lib_generation != library_generation()) {
 		tlog_debug("games: a new index");
@@ -833,8 +828,8 @@ static void game_info(const struct game *g)
 	} else {
 		tlog_error("games: %s", ui_error());
 	}
-	if (games.info_type != facts.save_type)
-		action_set_save_type(games.pick, games.info_type);
+	if (games.info_type != facts.save_type && !action_set_save_type(games.pick, games.info_type))
+		dialog_message(NULL, gl_games->save_type_failed, DIALOG_ERROR);
 	reshow(row);
 }
 
@@ -910,11 +905,23 @@ static void popup_add(u32 action, const char *value, u8 flags)
 	games.popup.count = (u8)(n + 1);
 }
 
+// 1 if row i still is the game the key was pressed on: a console's rows are
+// the index's, which may have been swapped since (Recent's and the
+// favourites' are paths)
+static int row_still(u32 i)
+{
+	if (games.kind != KIND_CONSOLE || games.defer_generation == library_generation())
+		return 1;
+	tlog("games: a new index came before row %lu opened; nothing started", (unsigned long)i);
+	relist(i);
+	return 0;
+}
+
 // The game popup for row i, run after the frame
 static void popup_run(u32 i)
 {
 	struct game g;
-	if (!up() || !game_at(i, &g) || !game_path(&g, games.pick))
+	if (!up() || !row_still(i) || !game_at(i, &g) || !game_path(&g, games.pick))
 		return;
 	u8 list = list_node(), hints = node(N_HINTS);
 	const char *name = game_name(&g, games.name);
@@ -962,7 +969,7 @@ static void popup_run(u32 i)
 			if (action_delete_file(games.pick))
 				relist(i);
 			else
-				dialog_message(NULL, gl_games->delete_failed, DIALOG_ERROR);
+				dialog_message(NULL, gl_sd_delete_failed, DIALOG_ERROR);
 			return;
 		}
 		ui_popup_close();
@@ -997,7 +1004,7 @@ static void play_run(u32 arg)
 {
 	u32 i = arg & 0xFFFF, hard = arg >> 16;
 	struct game g;
-	if (!up() || !game_at(i, &g) || !game_path(&g, games.pick))
+	if (!up() || !row_still(i) || !game_at(i, &g) || !game_path(&g, games.pick))
 		return;
 	launch(ACTION_ADDON, 0, hard);
 }
@@ -1011,7 +1018,6 @@ static void letter_jump_key(u16 keys)
 	    next;
 	ui_list_set_cursor(list, to);
 	games.cursor = to;
-	games.l_valid = 0;
 	letter_around(games.count, to, row_letter, 0, &prev, &next);
 	ui_letter_show(node(N_LETTER), row_letter(0, to), prev, next);
 	show_position();
@@ -1024,28 +1030,16 @@ static int page_event(struct ui_view *v, const struct ui_event *e)
 	const InputState *in = ui_input();
 	switch (e->type) {
 	case UI_EV_CURSOR:
-		// L pages up: the row it left is the one L with A starts (a hard
-		// reset of the game the cursor was on), while L stays held
-		if ((in->pressed & INPUT_L) && !games.l_valid) {
-			games.l_from = games.cursor;
-			games.l_valid = 1;
-		} else if (!(in->held & INPUT_L) || (in->pressed & ~INPUT_L)) {
-			games.l_valid = 0;
-		}
 		games.cursor = e->index;
 		show_position();
 		show_facts();
 		frame_measure("games-move");
 		return 1;
 	case UI_EV_ACTIVATE: {
+		// L held: a hard reset of the row shown and selected now (L pages
+		// first, as anywhere)
 		u32 i = e->index, hard = (in->held & INPUT_L) != 0;
-		if (hard && games.l_valid && games.l_from < games.count) {
-			i = games.l_from;  // the row L paged away from
-			ui_list_set_cursor(list_node(), i);
-			games.cursor = i;
-			show_position();
-		}
-		games.l_valid = 0;
+		games.defer_generation = library_generation();
 		if (i < games.count)
 			nav_defer(play_run, i | hard << 16);
 		return 1;
@@ -1056,8 +1050,10 @@ static int page_event(struct ui_view *v, const struct ui_event *e)
 			return 1;
 		}
 		if (e->keys & in->pressed & INPUT_START) {
-			if (games.count && !ui_list_paging(list_node()))
+			if (games.count && !ui_list_paging(list_node())) {
+				games.defer_generation = library_generation();
 				nav_defer(popup_run, ui_list_cursor(list_node()));
+			}
 			return 1;
 		}
 		if ((e->keys & (INPUT_LEFT | INPUT_RIGHT)) && games.az && games.count) {

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The game lists (source/screens/games.c): A on a row starts its game, with
-# a hard reset while L is held (the game L paged away from); the game goes
+# a hard reset while L is held (the row selected then); the game goes
 # on Recent with the time it was started, and the Recent page's "played"
 # text follows the clock.
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
@@ -32,15 +32,15 @@ boot() { # log [mgba-shot options]
 # 2026-10-21 12:00 UTC: a set clock
 t0=1792584000
 
-# Power-on 1: L held, then A on Hello (the GBA page's first row): L pages
-# (wrapping to the last page), and A starts the row it left, Hello, with a
-# hard reset
+# Power-on 1: on Other (the GBA page's second row), L held pages up to
+# Hello, and A with L still held starts Hello, the row shown and selected,
+# with a hard reset
 # shellcheck disable=SC2046 # nav.sh's options
-boot "$cart/1.log" -C $t0 $(nav_game gba 0) -k @20:L -k @30:L+A -k @34:- -u "launch: loading" -f 1500
+boot "$cart/1.log" -C $t0 $(nav_game gba 1) -k @24:L -k @40:L+A -k @44:- -u "launch: loading" -f 1500
 grep -q '^kernel: games: start /Hello.gba (how 1, hard reset)' "$cart/1.log" ||
   fail "L+A didn't start Hello.gba with a hard reset: $(grep '^kernel: games' "$cart/1.log" | tail -2)"
 grep -q '^kernel: launch: loading Hello.gba' "$cart/1.log" || fail "Hello.gba didn't load: $(grep '^kernel: launch' "$cart/1.log" | tail -2)"
-echo "PASS: L held with A starts the row L paged away from, with a hard reset"
+echo "PASS: L held with A starts the selected row with a hard reset"
 
 # Power-on 2, 30 s later on a running clock: A at "Save sav?", then
 # Recent's first row is Hello, played "just now"; a minute on it says "1m
@@ -84,3 +84,17 @@ grep -q '^kernel: delete /Gone.gba: not on the card' "$cart/1.log" || fail "no d
 recent=$(mtype -i "$cart/sd.img" ::/torii/recent.txt | grep -v '^[#@]' | cut -f2 | tr '\n' ' ')
 [ "$recent" = "/A.gba " ] || fail "after deleting the gone entry, Recent has '$recent'"
 echo "PASS: Delete on an entry whose file is gone takes it off the list"
+
+# Game info's save type on a card with no /SAVER yet: the folder is made and
+# the .mde file kept
+cart=$carts/games-mde
+rm -rf "$cart" && mkdir -p "$cart"
+mkfs.fat -C -F 32 -n GAMES "$cart/sd.img" 65536 >/dev/null
+mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/A.gba
+NAV_SHOWN=gba
+# shellcheck disable=SC2046 # nav.sh's options
+boot "$cart/1.log" $(nav_game_menu gba 0) -k @12:UP -k @16:- -k @24:UP -k @28:- -k @36:A -k @40:- \
+  -w "screen ready: game-info" -k @20:RIGHT -k @24:- -k @36:B -k @40:- -w "save type of" -f 1500
+grep -q '^kernel: save type of /A.gba: 1 (0)' "$cart/1.log" || fail "the save type wasn't kept: $(grep '^kernel: save type' "$cart/1.log")"
+mdir -b -i "$cart/sd.img" ::/SAVER | grep -q 'A.mde' || fail "no /SAVER/A.mde"
+echo "PASS: Game info's save type is kept in /SAVER, made when missing"

@@ -509,8 +509,8 @@ const char en_sd_save[] = "Save";
 const char en_sd_no_save[] = "No save yet";
 
 // The game lists, their popup and Game info, and the cheat screen. L held
-// with A (or with Play in the popup) starts a game with a hard reset: Game
-// info's last line says so
+// with A (or with Play in the popup) starts the selected game with a hard
+// reset: Game info's last line says so
 static const struct lang_games en_games = {
 	.empty = "No games here",
 	.hint_play = "play",
@@ -523,7 +523,7 @@ static const struct lang_games en_games = {
 	.on = "on",
 	.delete_text = "The save stays.",
 	.delete_button = "Delete",
-	.delete_failed = "The file couldn't be deleted.",
+	.save_type_failed = "Can't keep the save type",
 	.info_keys = {"Console", "Size", "Folder", "Played", "Save type", "Hard reset"},
 	.consoles = {"GBA", "GBC", "GB", "NES"},
 	.nor = "Game NOR",

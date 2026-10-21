@@ -157,7 +157,10 @@ int action_set_save_type(const char *path, u32 save_type)
 	    !game_enter("save type"))
 		return 0;
 	// /SAVER/<name>.mde, read by the next launch's Game_pick (as v0.3's SAVE
-	// TYPE line left it when the game started)
+	// TYPE line left it when the game started); a new card has no /SAVER yet
+	FRESULT made = f_mkdir(SAVER_FOLDER);
+	if (made != FR_OK && made != FR_EXIST)
+		tlog("save type: %s: FatFs %u", SAVER_FOLDER, (unsigned)made);
 	u8 res = Make_mde_file(current_filename, (u8)save_type);
 	tlog("save type of %s: %lu (%u)", path_copy, (unsigned long)save_type, res);
 	game_leave();
