@@ -323,6 +323,11 @@ int library_walking(void);
 // Changes whenever the index changes (a new one, a forget, a rename, a
 // launch): a screen holding record numbers lists again.
 u32 library_generation(void);
+// The path of the nth game of console in A-Z order in the index of
+// generation gen, while it is the index now or the one the last new index
+// replaced (kept until a walk builds over it); 0 if neither (or past the
+// end): for a page that keeps its cursor on its game across a new sort.
+u32 library_old_path(u32 gen, u32 console, u32 n, char *out, u32 size);
 // Games of a console (LIB_GBA...) and the record of its nth in A-Z order
 // (LIBRARY_NONE past the end).
 u32 library_count(u32 console);

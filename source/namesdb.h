@@ -197,10 +197,13 @@ const char *names_db_name(const u8 *db, const struct names_rec *r, u32 console);
 //
 // CRCs are computed by a job between frames, paused while the user moves,
 // covers load or the library walks: for every library game without one
-// (names_identify, Settings' "Identify library"), and after each boot for
-// the games on Recent without one, so a game played gets its name without a
-// pass of its own during the launch. Records go to crc.txt every
-// NAMES_WRITE_EVERY CRCs, at the end, and before a launch.
+// (names_identify, Settings' "Identify library"), and after any walk that
+// found games without one (new on the card, or changed): Recent's first,
+// then the library's, so a game added gets its name and art without a PC
+// or a launch. A CRC the database doesn't know is kept all the same, so a
+// romhack is read once. Records go to crc.txt every NAMES_WRITE_EVERY CRCs,
+// at the end, and before a launch; a launch stops the job, and the next
+// boot's walk starts it again.
 
 // The boot, before library_boot: forgets everything.
 void names_boot(void);
@@ -233,6 +236,9 @@ void names_identify(void);
 void names_identify_now(void);
 // 1 while Identify library runs, with the games looked at and their total.
 int names_identifying(u32 *done, u32 *total);
+// CRCs computed this session: a screen that shows box art looks again when
+// it changes.
+u32 names_changes(void);
 // Each pass of the menu's loop (library_poll calls it): starts the job.
 void names_poll(void);
 // Before a launch fills PSRAM: stops the job and writes crc.txt if it changed.

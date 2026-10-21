@@ -119,6 +119,10 @@ static struct {
 	u16 progress;  // the first scan's bar, in thousandths
 	u32 file_gen[2];  // the generation of each valid file
 	u32 gen;
+	// The other slot still holds the index of generation old_gen, the one
+	// the last new index replaced (until a walk builds over it)
+	u8 old_ok;
+	u32 old_gen;
 	u32 started;  // cycles_now when the load, walk or write began
 	union {
 		struct {
@@ -320,6 +324,7 @@ static void load_step(void)
 
 static void load_begin(void)
 {
+	lib.old_ok = 0;
 	lib.state = S_LOAD;
 	lib.phase = L_PROBE;
 }
@@ -647,8 +652,10 @@ static void walk_step(void)
 		lib.started = cycles_now();
 		TLOG_ASSERT(irq_handlers_in_ram());
 		lib.u.walk.serial = volume_serial();
-		if (lib.build)
+		if (lib.build) {
+			lib.old_ok = 0;  // built over
 			lib_build_begin(&lib.u.walk.b, slot_at(lib.valid ? !lib.active : 0), put);
+		}
 		names_walk_begin();
 		lib.phase = W_NAMESDB;
 		return;
@@ -752,6 +759,8 @@ static void sort_step(void)
 	if (!lib_sort_step(&lib.u.walk.sort, LIB_SORT_BUDGET))
 		return;
 	const struct lib_header *h = lib_hdr(lib.u.walk.b.slot);
+	lib.old_ok = lib.valid;  // the index replaced stays in the other slot
+	lib.old_gen = lib.gen;
 	lib.active = lib.u.walk.b.slot == slot_at(1);
 	lib.valid = 1;
 	lib.force = 0;
@@ -1127,6 +1136,19 @@ int library_walking(void)
 u32 library_generation(void)
 {
 	return lib.gen;
+}
+
+u32 library_old_path(u32 gen, u32 console, u32 n, char *out, u32 size)
+{
+	const u8 *slot;
+	if (lib.valid && gen == lib.gen)
+		slot = active_slot();
+	else if (lib.valid && lib.old_ok && gen == lib.old_gen)
+		slot = slot_at(!lib.active);
+	else
+		return 0;
+	u32 rec = lib_nth(slot, console, n);
+	return rec != LIBRARY_NONE ? lib_path(slot, rec, out, size) : 0;
 }
 
 u32 library_count(u32 console)

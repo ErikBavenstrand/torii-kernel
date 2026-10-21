@@ -5,8 +5,10 @@
 # CRC only (a romhack with a listed game's code keeps its file name), and the
 # index sorts by those names; the boot's walk
 # gives crc.txt's records their files' dates and forgets one whose file
-# changed; the games on Recent without a CRC get one after the boot; your
-# own names (`just names-add`) win over the dats' and hold through a rebuild.
+# changed; games without a CRC (new on the card, or changed) get one in the
+# background after the walk, Recent's first, and a launch stops that and
+# the next boot goes on; your own names (`just names-add`) win over the
+# dats' and hold through a rebuild.
 # Runs inside the torii-emu container after `just build` and `just
 # emu-headless`.
 #
@@ -129,8 +131,8 @@ not_logged "$cart/2.log" "names: wrote"
 no_errors "$cart/2.log"
 echo "PASS: a later boot loads the names, and changes and writes nothing"
 
-# A file replaced (the same size, another date): its record is forgotten
-# and it sorts by its file name
+# A file replaced (the same size, another date): its record is forgotten,
+# it sorts by its file name, and the background gives it its new CRC
 python3 -c 'import sys; sys.path.insert(0, "tests/names"); import fixture
 open(sys.argv[1], "wb").write(fixture.rom(21, 4096, "AWRE"))' "$cart/files/GBA/Wars.gba"
 touch -d '2025-06-01 12:00' "$cart/files/GBA/Wars.gba"
@@ -138,56 +140,75 @@ mcopy -o -m -i "$cart/sd.img" "$cart/files/GBA/Wars.gba" ::/GBA/Wars.gba
 boot "$cart" "$cart/3.log" -f 900 -u "names: wrote /torii/crc.txt"
 logged "$cart/3.log" "names: /GBA/Wars.gba changed since its CRC: forgotten"
 logged "$cart/3.log" "library: the card changed: building a new index"
+logged "$cart/3.log" "names: identified 1 of 1 new games"
 want="/GBA/Hack of Minish.gba
 /GBA/Homebrew.gba
 /GBA/zz Minish.gba
 /GBA/Wars.gba"
 [ "$(gba_order "$cart")" = "$want" ] || fail "after the change the GBA games sort as
 $(gba_order "$cart")"
-if crc_lines "$cart" | grep -q '/GBA/Wars.gba'; then fail "crc.txt keeps the changed file"; fi
+crc=$(python3 -c 'import sys, zlib; print("%08X" % zlib.crc32(open(sys.argv[1], "rb").read()))' "$cart/files/GBA/Wars.gba")
+[ "$(crc_lines "$cart" | awk -F'\t' '$4 == "/GBA/Wars.gba" { print $1 }')" = "$crc" ] ||
+  fail "crc.txt doesn't hold the changed file's new CRC $crc: $(crc_lines "$cart")"
 no_errors "$cart/3.log"
-echo "PASS: a file changed since its CRC loses its name and its record"
+echo "PASS: a file changed since its CRC loses its name and its record, and gets its new CRC in the background"
 
-# The games on Recent get their CRCs after the boot: a game played is named
-# without a pass of its own in the launch
+# Games added on a PC without names-update (no crc.txt) get their CRCs and
+# names in the background after the boot, Recent's first, with no launch;
+# a CRC the dats don't list (the romhack) is kept too, so the next boot
+# reads nothing
 cart=$carts/recent
 fixture_card "$cart" --no-crc
 printf '1790900000\t/GBA/Wars.gba\n1790800000\t/NES/Famicom.nes\n1790700000\t/SAVER/gone.gba\n' >"$cart/recent.txt"
 mcopy -i "$cart/sd.img" "$cart/recent.txt" ::/torii/recent.txt
-boot "$cart" "$cart/1.log" -f 2000 -u "names: wrote /torii/crc.txt"
-logged "$cart/1.log" "names: identified 2 of 2 games"
+boot "$cart" "$cart/1.log" -f 3000 -u "names: wrote /torii/crc.txt"
+logged "$cart/1.log" "names: identified 8 of 8 new games"
 logged "$cart/1.log" "names: wrote /torii/crc.txt"
 logged "$cart/1.log" "library: the card changed: building a new index"
 logged "$cart/1.log" "library: wrote /torii/library.bak (generation 2)"
-[ "$(crc_lines "$cart" | cut -f4 | sort | tr '\n' ' ')" = "/GBA/Wars.gba /NES/Famicom.nes " ] ||
-  fail "crc.txt holds $(crc_lines "$cart")"
+[ "$(grep -oE '^kernel: names: /[^ ]+ is [0-9A-F]{8}' "$cart/1.log" | head -2 | cut -d' ' -f3 | tr '\n' ' ')" = \
+  "/GBA/Wars.gba /NES/Famicom.nes " ] || fail "Recent's games weren't first: $(grep -E '^kernel: names: /' "$cart/1.log")"
+[ "$(crc_lines "$cart" | wc -l)" = 8 ] || fail "crc.txt holds $(crc_lines "$cart")"
+crc_lines "$cart" | grep -q '/GBA/Hack of Minish.gba' || fail "crc.txt has no record of the romhack"
 [ "$(gba_order "$cart" | head -1)" = /GBA/Wars.gba ] || fail "Wars isn't first: $(gba_order "$cart")"
 no_errors "$cart/1.log"
-echo "PASS: the games on Recent get their CRCs and names after the boot"
+boot "$cart" "$cart/2.log" -f 900 -u "library: unchanged"
+logged "$cart/2.log" "library: unchanged"
+not_logged "$cart/2.log" "names: identified"
+if grep -qE "^kernel: names: /.* is [0-9A-F]{8}" "$cart/2.log"; then fail "a CRC computed again"; fi
+not_logged "$cart/2.log" "names: wrote"
+no_errors "$cart/2.log"
+echo "PASS: new games get their CRCs and names in the background, Recent's first, and a later boot reads none"
 
-# A launch before crc.txt took the new CRCs writes them to the journal
-# (crc.new), not the whole cache; the next boot reads it, and its write of
-# crc.txt takes the lines over and deletes it
+# A launch stops the background's CRCs (here in a 2 MB game) before
+# crc.txt took the ones done: they go to the journal (crc.new), not the
+# whole cache; the next boot reads it, goes on with the rest, and its write
+# of crc.txt takes the lines over and deletes it
 cart=$carts/journal
 fixture_card "$cart" --no-crc
-mcopy -i "$cart/sd.img" "$carts/recent/recent.txt" ::/torii/recent.txt
+head -c 2097152 /dev/urandom >"$cart/Big.gba"
+mcopy -i "$cart/sd.img" "$cart/Big.gba" ::/GBA/Big.gba
+printf '1790900000\t/GBA/Wars.gba\n1790800000\t/GBA/Big.gba\n1790700000\t/NES/Famicom.nes\n' >"$cart/recent.txt"
+mcopy -i "$cart/sd.img" "$cart/recent.txt" ::/torii/recent.txt
 # shellcheck source=tests/nav.sh
 . tests/nav.sh
 # shellcheck disable=SC2046 # nav.sh's options
-boot "$cart" "$cart/1.log" -w "names: identified 2 of 2" $(nav_launch /GBA/Homebrew.gba at=@1) -u "launch: loading" -f 2000
-logged "$cart/1.log" "names: wrote 2 CRCs to /torii/crc.new"
+boot "$cart" "$cart/1.log" -w "names: /GBA/Wars.gba is" $(nav_launch /GBA/Homebrew.gba at=@60) -u "launch: loading" -f 3000
+logged "$cart/1.log" "names: identifying new games stopped for a launch (1 done)"
+logged "$cart/1.log" "names: wrote 1 CRCs to /torii/crc.new"
 not_logged "$cart/1.log" "names: wrote /torii/crc.txt"
-boot "$cart" "$cart/2.log" -k 100:A -k 106:- -f 2000 -u "names: wrote /torii/crc.txt" # A: "Save sav?"
-logged "$cart/2.log" "names: 2 CRCs from /torii/crc.new"
+not_logged "$cart/1.log" "names: /GBA/Big.gba is"
+boot "$cart" "$cart/2.log" -k 100:A -k 106:- -f 6000 -u "names: wrote /torii/crc.txt" # A: "Save sav?"
+logged "$cart/2.log" "names: 1 CRCs from /torii/crc.new"
+logged "$cart/2.log" "names: identified 8 of 8 new games"
 logged "$cart/2.log" "names: wrote /torii/crc.txt"
-not_logged "$cart/2.log" "names: identified 2 of 2"
-# (Homebrew, played now, gets its CRC this boot)
-[ "$(crc_lines "$cart" | cut -f4 | sort | tr '\n' ' ')" = "/GBA/Homebrew.gba /GBA/Wars.gba /NES/Famicom.nes " ] ||
-  fail "crc.txt holds $(crc_lines "$cart")"
+not_logged "$cart/2.log" "names: /GBA/Wars.gba is"
+grep "kernel: names: identified" "$cart/2.log" | sed 's/^kernel: /  /'
+[ "$(crc_lines "$cart" | wc -l)" = 9 ] || fail "crc.txt holds $(crc_lines "$cart")"
 if mdir -i "$cart/sd.img" ::/torii/crc.new >/dev/null 2>&1; then fail "crc.new is still there"; fi
 no_errors "$cart/1.log"
 no_errors "$cart/2.log"
-echo "PASS: a launch writes only the new CRCs, which the next boot puts into crc.txt"
+echo "PASS: a launch stops the background's CRCs and writes only the new ones, and the next boot goes on"
 
 # crc.txt cut short by a write (left with zeros): its lines read in the
 # same pass as its check are dropped, and the backup's taken
