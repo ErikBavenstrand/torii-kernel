@@ -327,7 +327,7 @@ What the v0.4 ticket sessions, the conductor's reviews and the research left ope
 - The `diag-tests` golden failed once at frame 4 while the colima VM was busy, then passed unchanged: possibly flaky under load (B2).
 - ~~Diagnostics' line list (`source/diag.c` `lines_fetch`) doesn't refresh a line that leaves its window (B7).~~ Fixed by B17 (`b5b99ad`).
 - Parsing a large `/torii/names.txt` runs as one step of the library rebuild: 0.26 s for 1,000 sorted lines, 0.82 s unsorted, a one-off menu stall (`gamename_custom_parse`; B3).
-- `tr-tab`'s `settings2-in` and `settings2-back` goldens catch a plain backdrop frame since B9 (v0.3 Settings page 2 comes in a frame later); B10 deletes those screens (B9).
+- ~~`tr-tab`'s `settings2-*` goldens catch a plain backdrop frame (B9).~~ Gone with the v0.3 screens (B10).
 - ~~A list already at its last scroll sends a cursor event with an unchanged index on every DOWN (B9 review).~~ Fixed by B17 (`b5b99ad`).
 - A popup's first draw (143k cycles) and a confirmation's (170k) land a frame late while the library's background scan runs (B11).
 - While an overlay moves, only one list clips, so a page with two lists shows the second's spare rows for 4–6 frames; over a popup, the confirmation's rounded corners show the dimmed page for 1–2 px (B11).
@@ -394,6 +394,7 @@ Made during the build without the user; each is cheap to change.
 - **NOR page:** one card with four rows, only the latest game deletable, no hold-A for Format all, L/R don't page (B15).
 - **Motion:** the opening zoom's pieces and timing; a hard-edged 16-frame theme wipe; dialogs rise in 6 frames, the loading card shows at once (B19, conductor).
 - **Carousel:** neighbours at 0.89 and far items at 0.60 scale read close to the front; held-turn speed; one item showing at both ends mid-turn with 2–5 items; far dark objects nearly invisible in dark (B12).
+- **A, A from home opens Recent and stops** (keys are dropped during the zoom), so T19's "A, A resumes" needs a short pause (B20).
 - **Info texts:** all wording, card sizes in binary GB/MB, Your cart's contents (B17); Controls must be re-checked once every page has landed (B20).
 - **Names database:** names-update computes CRCs on the PC; a romhack missing from the dat shows its base game's name via the GBA game code; no CRC at launch (B21).
 - **The boot position is written after 5 s idle,** a new SD write in the menu (B10).
@@ -408,8 +409,8 @@ Made during the build without the user; each is cheap to change.
 - **Opening a cover in an art folder of thousands of files** on a real cart (B22).
 - **Names database timings on a cart:** Identify about 1.6 s per MB in the foreground (estimate); crc.txt write steps about 10 ms each (B21).
 - **Licences:** No-Intro's terms for a derived name table (the names database is built on the user's machine and never bundled); libretro-thumbnails art has no licence grant (fetched locally, never committed).
-- **Design questions for later tickets:** Settings' 12 px rows inside section cards that scroll (B16); whether WIN0 and WIN1 suffice when the popup, the list clip, the dim, the zoom and the wipe overlap (B11, B19); the 8x8 GBA and Info icons need a redraw.
-- **PSRAM map:** the user was unsure about fixing it; it now holds SD names (832 KB), two library index slots (1–3.5 MB), recents and favourites (3.5–4 MB), the cover cache (4 MB) and reserves.
+- **Design questions:** the 8x8 GBA and Info icons need a redraw; block 0's BG tiles are nearly full on list pages (B18).
+- **PSRAM map** (the user was unsure about fixing it): SD names 0–832 KB, library index slots 1–3.5 MB, recents and favourites 3.5–4 MB, covers 4 MB, Favourites order and names.txt text 4.5 MB, names.db 5–6.75 MB, CRC cache 6.75–7.5 MB, art set 7.5 MB; v0.9's language tables have little room left.
 
 ## v0.5 Saves
 

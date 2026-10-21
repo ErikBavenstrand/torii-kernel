@@ -6,6 +6,18 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** A, START and SELECT pressed while a screen goes out, in the
+  gap, or during the open zoom's sprite phase are dropped, so a quick A, A on
+  home no longer starts a game unseen; once the page shows they act (B20;
+  `665de8b`, `b5db4bf`).
+- **Fixed:** an empty SD folder shows only B in the hint bar; past the
+  library's 4,096 games a console list's last row says "Showing the first
+  4,096 games" (B20; `1d1146b`, `26b8886`).
+- **Changed:** Info's Controls and In game texts follow every page's final
+  keys (B20; `171ab18`, `7c1207c`).
+- **Removed:** dead code from before v0.4: unused functions, the tab
+  transition, list icons, view spec ids, look fields, the thumbnail and
+  Mode B globals, and comments naming old screens (B20; `a6d8513`).
 - **Added:** Rename in the game and SD file popups, with an on-screen
   keyboard (10-column QWERTY grid with digits, Latin-1 page, L/R caret,
   SELECT shift, START OK). A game's Rename sets its name in
