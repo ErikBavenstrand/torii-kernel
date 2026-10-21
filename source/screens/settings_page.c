@@ -154,6 +154,8 @@ static struct {
 	u8 redraw;    // leave ended an edit: draw it all again if still up
 	u8 saving;    // frames a confirmed change may still wait to be written, 0: none
 	u8 leaving;   // B came while saving: the page goes once it's written
+	u8 unsaved;   // the last write failed: its values are staged, not on the NOR
+	u8 warned;    // B was refused once for it: the next B leaves, dropping them
 	u8 swatch_bank;
 	u16 swatch_tile;  // ART_NONE-like 0xFFFF: no swatches
 	u16 refused_left;  // frames the refusal's reason stays
@@ -782,11 +784,38 @@ static void save_now(void)
 	}
 	u32 level = tlog_level;
 	settings_stage(&sp.v);
-	if (settings_commit() && level == TLOG_OFF && tlog_level != TLOG_OFF)
-		tlog_flush_soon();  // the log file is made a sector a frame, the menu still answering
-	memcpy(sp.v.loaded, sp.v.slot, sizeof(sp.v.loaded));
+	u32 done = settings_commit();
+	if (done == SET_COMMIT_FAILED) {
+		// The old values stay on the NOR, these staged: the next confirm,
+		// or leaving, tries again (loaded still differs)
+		snprintf(sp.refused, sizeof(sp.refused), "%s", gl_set_save_failed);
+		sp.refused_left = look.refusal;
+		sp.unsaved = 1;
+		tlog_error("settings: not saved, tried again at the next confirm or on leaving");
+	} else {
+		if (done == SET_COMMIT_WRITTEN && level == TLOG_OFF && tlog_level != TLOG_OFF)
+			tlog_flush_soon();  // the log file is made a sector a frame, the menu still answering
+		memcpy(sp.v.loaded, sp.v.slot, sizeof(sp.v.loaded));
+		sp.unsaved = 0;
+		sp.warned = 0;
+	}
 	if (edit)
 		memcpy(sp.v.slot, preview, sizeof(preview));
+}
+
+// B with a failed write: tried once more, and if that fails too the page
+// stays, saying so (save_now); a second B leaves, dropping the values.
+// 1 if the page stays
+static int keep_unsaved(void)
+{
+	if (!sp.unsaved || sp.warned)
+		return 0;
+	save_now();
+	hints_show();
+	if (!sp.unsaved)
+		return 0;
+	sp.warned = 1;
+	return 1;
 }
 
 // A value was confirmed: if it changed anything, the hint bar says so and
@@ -879,7 +908,7 @@ static void time_edit(u32 id)
 	if (!ui_fields_open(node(N_LIST), node(N_HINTS), f, keys, 4))
 		return;
 	for (;;) {
-		u16 k = ui_fields_key();
+		u16 k = ui_fields_key(library_poll);  // the walk and a Rescan go on meanwhile
 		if (!k || k == INPUT_B)
 			break;
 		if (k == INPUT_A) {
@@ -981,7 +1010,7 @@ static int settings_event(struct ui_view *v, const struct ui_event *e)
 	if (k & INPUT_B) {
 		if (sp.saving)
 			sp.leaving = 1;  // the write first, from settings_poll
-		else
+		else if (!keep_unsaved())
 			nav_back();
 	} else if (k & INPUT_A) {
 		if (!ui_list_paging(node(N_LIST)) && (in->pressed & INPUT_A))
@@ -1053,7 +1082,8 @@ static void settings_poll(void)
 	}
 	if (sp.leaving && !sp.saving) {
 		sp.leaving = 0;
-		nav_back();
+		if (!keep_unsaved())
+			nav_back();
 	}
 	if (sp.mode == MODE_CAPTURE) {
 		u16 shown = sp.cap.held;
@@ -1076,6 +1106,10 @@ static void settings_poll(void)
 			if ((left * look.bar_w + sp.cap.timeout - 1) / sp.cap.timeout != sp.bar_fill)
 				hints_show();
 		}
+		// B pressed on the frame the keys were let go: the page's B, which
+		// leaves it (above, next frame; a save first)
+		if (r != SET_CAPTURE_WAIT && (sp.cap.after & INPUT_B))
+			sp.leaving = 1;
 	} else if (sp.refused_left) {
 		sp.refused_left--;
 		if (!sp.refused_left)
@@ -1129,9 +1163,15 @@ static void settings_leave(void)
 	if (sp.mode != MODE_BROWSE)
 		sp.redraw = 1;
 	sp.mode = MODE_BROWSE;
-	if (sp.saving) {
+	if (sp.saving || sp.unsaved) {
 		save_now();
 		sp.redraw = 1;  // the hint bar's explanation back, if the page stays up
+		if (sp.unsaved) {
+			// Failed (its last try): nothing may stay staged past the
+			// page (a launch reuses EWRAM), so the NOR's values are back
+			Discard_SET_info();
+			tlog_error("settings: not saved, the page left");
+		}
 	}
 }
 

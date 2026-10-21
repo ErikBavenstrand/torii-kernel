@@ -6,6 +6,8 @@
 #         and each step logs what it did
 #   nearly-full  a copy that just fits the card is written whole, through
 #         its progress dialog, and the menu comes back
+#   read-error  a save the card can't read (OMEGA_SD_READ_ERROR) stops the
+#         launch before its pending-save record, so nothing copies over it
 #   delete  Delete in a game list's popup removes the ROM and its save
 #         stays (T11): the game copied back starts with it
 #   rename-cut, rename-cut-split  a power cut before each of a rename's SD
@@ -95,6 +97,25 @@ first_copy() {
 }
 
 case $part in
+read-error)
+  first_launch
+  first_copy
+  cp "$cart/test.sav" "$cart/kept.sav"
+  # Power-on 3: the card stops answering while Test.sav loads: no launch,
+  # no pending-save record, so power-on 4 copies nothing over the file
+  sectors=$(sd_sectors "$cart/sd.img" /SAVER/Test.sav)
+  # shellcheck disable=SC2046 # nav.sh's options
+  OMEGA_SD_READ_ERROR=$sectors boot $(nav_launch /Test.gba at=180) -f 900
+  logged_error "save: loading Test.sav into cart SRAM"
+  ! grep -q 'launch: starting the game' "$cart/run.log" || fail "the game started after its save's read failed"
+  ! grep -qF 'nor: wrote the pending-save record' "$cart/run.log" || fail "a pending-save record was written"
+  [ "$(pending)" = 0000 ] || fail "the pending-save record is set"
+  boot -k 100:A -k 106:- -f 300
+  ! grep -qF 'Save sav?' "$cart/run.log" || fail "the next power-on asked to copy the save"
+  mtype -i "$cart/sd.img" ::/SAVER/Test.sav | cmp -s - "$cart/kept.sav" || fail "Test.sav changed"
+  echo "PASS: saves read-error: a save the card can't read stops the launch, and nothing is copied over it"
+  ;;
+
 delete)
   first_launch
   first_copy

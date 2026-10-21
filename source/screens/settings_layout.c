@@ -103,6 +103,15 @@ u32 settings_capture_step(struct settings_capture *c, u16 held, u32 dt)
 {
 	c->ignore &= held;  // a key held at the start counts once let go
 	u16 k = held & ~c->ignore & KEYS_ALL;
+	if (k && c->best && !(k & c->best) && !(c->held & ~c->best)) {
+		// The answer let go and other keys pressed on the same frame, no
+		// frame with every key up between: the answer stands, and the new
+		// keys are presses of their own (after), not part of the hold. Keys
+		// rolled over (one held as the answer's go) are still the hold
+		c->after = k;
+		c->held = 0;
+		return c->best == KEY_B ? SET_CAPTURE_CANCEL : SET_CAPTURE_DONE;
+	}
 	c->seen |= k;
 	if (k != c->run) {
 		c->run = k;

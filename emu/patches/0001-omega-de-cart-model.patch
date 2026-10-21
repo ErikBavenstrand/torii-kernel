@@ -321,10 +321,10 @@ index 1d0c0dd..b77704a 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..0670335
+index 0000000..6f7f4bd
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1452 @@
+@@ -0,0 +1,1557 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -494,7 +494,9 @@ index 0000000..0670335
 +// Power cuts for tests: OMEGA_POWER_CUT=CHIP:OP:N[@OFFSET] (CHIP game or
 +// kernel, OP erase or program) cuts the power just before the Nth such
 +// operation, counting only those in the sector at OFFSET when given. A word
-+// program and a buffer confirm (29) each count as one program.
++// program and a buffer confirm (29) each count as one program. OP erasing
++// cuts it inside the Nth erase instead, after the chip's first pass, which
++// programs the whole sector to 0: the sector is left all 0.
 +// OMEGA_POWER_CUT=sd:write:N cuts it just before the Nth SD write command
 +// (of one or more sectors). The model finishes each operation at once, so
 +// this cuts between operations: the cart files are synced and the emulator
@@ -506,12 +508,14 @@ index 0000000..0670335
 +	bool sd;
 +	bool game;
 +	bool erase;
++	bool zero;  // erasing: the sector left at 0
 +	long countdown;
 +	bool sector;
 +	uint32_t offset;
 +} _cut;
 +
 +static uint32_t _norSectorBase(const struct GBAOmegaNor* nor, uint32_t offset);
++static uint32_t _norSectorSize(const struct GBAOmegaNor* nor, uint32_t offset);
 +
 +static void _parsePowerCut(void) {
 +	const char* spec = getenv("OMEGA_POWER_CUT");
@@ -525,7 +529,7 @@ index 0000000..0670335
 +	bool parsed = sscanf(spec, "%7[a-z]:%7[a-z]:%ld%n", chip, op, &count, &used) == 3 && count >= 1;
 +	bool sd = parsed && !strcmp(chip, "sd") && !strcmp(op, "write");
 +	bool nor = parsed && (!strcmp(chip, "game") || !strcmp(chip, "kernel")) &&
-+	           (!strcmp(op, "erase") || !strcmp(op, "program"));
++	           (!strcmp(op, "erase") || !strcmp(op, "erasing") || !strcmp(op, "program"));
 +	if (!sd && !nor) {
 +		fprintf(stderr, "omega: bad OMEGA_POWER_CUT %s (CHIP:OP:N[@OFFSET])\n", spec);
 +		exit(2);
@@ -534,7 +538,8 @@ index 0000000..0670335
 +	_cut.sector = !sd && spec[used] == '@';
 +	_cut.offset = _cut.sector ? strtoul(spec + used + 1, NULL, 0) : 0;
 +	_cut.game = !strcmp(chip, "game");
-+	_cut.erase = !strcmp(op, "erase");
++	_cut.zero = !strcmp(op, "erasing");
++	_cut.erase = !strcmp(op, "erase") || _cut.zero;
 +	_cut.countdown = count;
 +	_cut.armed = true;
 +}
@@ -569,6 +574,13 @@ index 0000000..0670335
 +	if (--_cut.countdown) {
 +		return;
 +	}
++	if (_cut.zero) {
++		uint32_t base = _norSectorBase(nor, offset);
++		memset(&nor->data[base], 0, _norSectorSize(nor, offset));
++		fprintf(stderr, "omega: power cut inside %s erase at %06X, the sector left at 0\n",
++		        _cut.game ? "game" : "kernel", offset);
++		_powerCut(omega);
++	}
 +	fprintf(stderr, "omega: power cut before %s %s at %06X\n", _cut.game ? "game" : "kernel",
 +	        erase ? "erase" : "program", offset);
 +	_powerCut(omega);
@@ -581,6 +593,54 @@ index 0000000..0670335
 +	}
 +	fprintf(stderr, "omega: power cut before sd write at sector %u\n", lba);
 +	_powerCut(omega);
++}
++
++// SD read errors for tests: OMEGA_SD_READ_ERROR=FIRST[-LAST][:N] makes reads
++// that touch sectors FIRST to LAST never finish: the data port's status stays
++// busy (0xEEE1) until the next command, as a card that stops answering. Only
++// the first N such reads fail when N is given (the kernel tries each read
++// twice), every one otherwise.
++static struct {
++	bool armed;
++	bool busy;
++	uint32_t first;
++	uint32_t last;
++	long left;  // < 0: no limit
++} _sdError;
++
++static void _parseSdError(void) {
++	const char* spec = getenv("OMEGA_SD_READ_ERROR");
++	memset(&_sdError, 0, sizeof(_sdError));
++	if (!spec || !*spec) {
++		return;
++	}
++	char* end;
++	_sdError.first = strtoul(spec, &end, 0);
++	_sdError.last = _sdError.first;
++	if (*end == '-') {
++		_sdError.last = strtoul(end + 1, &end, 0);
++	}
++	_sdError.left = -1;
++	if (*end == ':') {
++		_sdError.left = strtol(end + 1, &end, 0);
++	}
++	if (end == spec || *end || _sdError.last < _sdError.first || !_sdError.left) {
++		fprintf(stderr, "omega: bad OMEGA_SD_READ_ERROR %s (FIRST[-LAST][:N])\n", spec);
++		exit(2);
++	}
++	_sdError.armed = true;
++}
++
++// Whether the read of count sectors at lba fails (OMEGA_SD_READ_ERROR)
++static bool _sdReadFails(uint32_t lba, unsigned count) {
++	if (!_sdError.armed || !_sdError.left || lba > _sdError.last || lba + count <= _sdError.first) {
++		return false;
++	}
++	if (_sdError.left > 0) {
++		--_sdError.left;
++	}
++	fprintf(stderr, "omega: sd read error at sector %u\n", lba);
++	return true;
 +}
 +
 +static uint32_t _norChip(const struct GBAOmegaNor* nor, uint32_t offset) {
@@ -650,11 +710,47 @@ index 0000000..0670335
 +	}
 +}
 +
++// A kernel NOR word that won't program, for tests: OMEGA_NOR_STUCK=OFFSET[:N]
++// (in kernel-nor.bin's window order). Its first N programs, or all, leave it
++// as it was and finish as if they worked, as a worn cell the chip doesn't
++// flag: only a read-back sees it.
++static struct {
++	bool armed;
++	uint32_t offset;
++	long left;  // < 0: no limit
++} _stuck;
++
++static void _parseStuck(void) {
++	const char* spec = getenv("OMEGA_NOR_STUCK");
++	memset(&_stuck, 0, sizeof(_stuck));
++	if (!spec || !*spec) {
++		return;
++	}
++	char* end;
++	_stuck.offset = strtoul(spec, &end, 0) & ~1u;
++	_stuck.left = -1;
++	if (*end == ':') {
++		_stuck.left = strtol(end + 1, &end, 0);
++	}
++	if (end == spec || *end || !_stuck.left) {
++		fprintf(stderr, "omega: bad OMEGA_NOR_STUCK %s (OFFSET[:N])\n", spec);
++		exit(2);
++	}
++	_stuck.armed = true;
++}
++
 +// Returns false when the word can't be programmed: programming only clears
 +// bits, so a 1 over a 0 never verifies.
 +static bool _norProgram(struct GBAOmegaNor* nor, uint32_t offset, uint16_t value) {
 +	offset &= ~1;
 +	if (offset + 2 > nor->size) {
++		return true;
++	}
++	if (_stuck.armed && _stuck.left && offset == _stuck.offset && _cutOmega && nor == &_cutOmega->kernelNor) {
++		if (_stuck.left > 0) {
++			--_stuck.left;
++		}
++		fprintf(stderr, "omega: NOR program at %06X didn't take (OMEGA_NOR_STUCK)\n", offset);
 +		return true;
 +	}
 +	uint16_t old = nor->data[offset] | (nor->data[offset + 1] << 8);
@@ -911,6 +1007,10 @@ index 0000000..0670335
 +		sectors = OMEGA_PORT_SIZE / SECTOR_SIZE;
 +	}
 +	_trace(gba, "sd %s sector %u count %u", write ? "write" : "read", omega->sdLba, sectors);
++	_sdError.busy = !write && _sdReadFails(omega->sdLba, sectors);
++	if (_sdError.busy) {
++		return;  // the port keeps what it held
++	}
 +	if (!omega->sd) {
 +		if (!write) {
 +			memset(omega->port, 0, sectors * SECTOR_SIZE);
@@ -975,6 +1075,9 @@ index 0000000..0670335
 +	}
 +	if (omega->spiWrite) {
 +		return 0;  // Firmware page written
++	}
++	if (omega->sdControl == 3 && _sdError.busy) {
++		return 0xEEE1;  // Still busy: the read never finishes (OMEGA_SD_READ_ERROR)
 +	}
 +	if (omega->bufferControl == 3 || omega->sdControl == 3) {
 +		return 2;  // Operation finished
@@ -1402,6 +1505,8 @@ index 0000000..0670335
 +	omega->copyRate = rate ? strtoul(rate, NULL, 0) : 0;
 +	omega->copyEnd = 0;
 +	_parsePowerCut();
++	_parseSdError();
++	_parseStuck();
 +	_cutOmega = omega;
 +	omega->enabled = true;
 +	_remap(gba);

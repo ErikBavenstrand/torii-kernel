@@ -459,7 +459,8 @@ void cartlog_boot_report(void)
 	} else if (prev_crashed) {
 		tlog_error("previous session: the kernel crashed (cart RAM had no state saying where)");
 	} else if (!prev_magic_ok) {
-		tlog("previous session: nothing in cart RAM (the first boot with logging on, or cart RAM lost power)");
+		// Page 0xF0 keeps only through a soft reset: a power-off clears it
+		tlog("previous session: nothing in cart RAM (the first boot with logging on, or the cart was off)");
 	} else {
 		switch (prev_phase) {
 		case PHASE_MENU:

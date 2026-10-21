@@ -731,6 +731,21 @@ void tlog_flush(void)
 		return;
 	log_path(path, cur_slot);
 	res = f_open(&log_file, path, FA_WRITE | FA_OPEN_EXISTING);
+	if (res == FR_NO_FILE || res == FR_NO_PATH) {
+		// The file or its folder was deleted meanwhile (the SD page): the
+		// files are looked for again, a new one made if need be
+		sd_state = SD_MOUNTED;
+		tlog("log: %s was deleted: opening the log again", path);
+		if (ui_active()) {
+			// A new file is made a sector a frame; the text waits in the ring
+			tlog_flush_soon();
+			return;
+		}
+		if (!sd_open())
+			return;
+		log_path(path, cur_slot);
+		res = f_open(&log_file, path, FA_WRITE | FA_OPEN_EXISTING);
+	}
 	if (res != FR_OK) {
 		sd_failed("opening the log", res);
 		return;

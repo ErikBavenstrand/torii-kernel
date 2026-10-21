@@ -959,15 +959,18 @@ int ui_fields_open(u8 list, u8 hints, const struct ui_fields *fields, const stru
 	return card_open(list, hints, look.fld_h);
 }
 
-u16 ui_fields_key(void)
+u16 ui_fields_key(void (*between)(void))
 {
 	TLOG_ASSERT(!ui_dispatching);
 	struct run *r = &pp.pop;
 	if (!run_live(r) || !pp.fields)
 		return 0;
 	pp.key = 0;
-	while (!pp.key && ui_top() == r->view)
+	while (!pp.key && ui_top() == r->view) {
 		ui_frame();
+		if (between)
+			between();
+	}
 	return ui_top() == r->view ? pp.key : 0;
 }
 

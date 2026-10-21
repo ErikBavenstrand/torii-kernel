@@ -295,11 +295,14 @@ u32 Loadsavefile(TCHAR *filename)
 		}
 		f_close(&file);
 		SetRampage(0x0);
-		if (res != FR_OK || res2 != FR_OK || got != filesize)
+		if (res != FR_OK || res2 != FR_OK || got != filesize) {
+			// Torii: no launch: its pending-save record would have the next
+			// power-on copy this cart SRAM over the good file
 			tlog_error("save: loading %s into cart SRAM: f_read gave %d and %d, %u of %u bytes", filename,
 				   res, res2, got, filesize);
-		else
-			tlog("save: loaded %s into cart SRAM, %u bytes", filename, filesize);
+			return 0;
+		}
+		tlog("save: loaded %s into cart SRAM, %u bytes", filename, filesize);
 		return 1;
 	}
 	default:
@@ -518,6 +521,18 @@ u8 Get_saveMODE(u8 Save_num, u32 gamefilesize)
 	return saveMODE;
 }
 //---------------------------------------------------------------
+// Torii: whether a block read of a ROM at blocknum failed: an error, or
+// short of the file's end. Logs it. Not inlined into the IWRAM loaders.
+static __attribute__((noinline)) int rom_read_failed(const TCHAR *filename, FRESULT res, u32 blocknum, UINT got,
+						     u32 filesize)
+{
+	if (res == FR_OK && (got == 0x20000 || blocknum + got >= filesize))
+		return 0;
+	tlog_error("launch: reading %s at %lu failed (FatFs %d, %u bytes)", filename, (unsigned long)blocknum, res,
+		   got);
+	return 1;
+}
+//---------------------------------------------------------------
 u32 IWRAM_CODE Loadfile2PSRAM(TCHAR *filename)
 {
 	UINT ret;
@@ -537,7 +552,12 @@ u32 IWRAM_CODE Loadfile2PSRAM(TCHAR *filename)
 		for (blocknum = 0x0000; blocknum < filesize; blocknum += 0x20000) {
 			// Torii: the launch's step (progress.h), between blocks
 			progress_part(blocknum, filesize);
-			f_read(&gfile, pReadCache, 0x20000, &ret);//pReadCache max 0x20000 Byte
+			res = f_read(&gfile, pReadCache, 0x20000, &ret);//pReadCache max 0x20000 Byte
+			if (rom_read_failed(filename, res, blocknum, ret, filesize)) {
+				f_close(&gfile);
+				SetPSRampage(0);
+				return 1;
+			}
 
 			if ((gl_reset_on == 1) || (gl_rts_on == 1) || (gl_sleep_on == 1) || (gl_cheat_on == 1)) {
 				PatchInternal((u32 *)pReadCache, 0x20000, blocknum);
@@ -711,7 +731,12 @@ u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU)
 			// Torii: the launch's step (progress.h), between blocks
 			progress_part(blocknum, filesize);
 			//f_lseek(&gfile, blocknum);
-			f_read(&gfile, pReadCache, 0x20000, &ret);//pReadCache max 0x20000 Byte
+			res = f_read(&gfile, pReadCache, 0x20000, &ret);//pReadCache max 0x20000 Byte
+			if (rom_read_failed(filename, res, blocknum, ret, filesize)) {
+				f_close(&gfile);
+				SetPSRampage(0);
+				return 1;
+			}
 
 			Address = blocknum;
 			while (Address >= 0x800000) {
@@ -881,6 +906,8 @@ static u8 Process_savefile(u32 is_EMU, TCHAR *pfilename, u32 gamefilesize, BYTE 
 	if (savefilesize) {
 		Bank_Switching(0);
 		res = Loadsavefile(savfilename);
+		if (!res)
+			return 4;  // "Can't read the save": not launched, no record
 
 		/*Save_savefile("dump.bin",0x8000);	
 		DEBUG_printf("dump finish");
@@ -1033,7 +1060,8 @@ static void Set_saveMODE(BYTE saveMODE)
 	SET_info_buffer[assress_saveMODE] = saveMODE;
 
 	//save to nor
-	Save_SET_info(SET_info_buffer, 0x200);
+	if (!Save_SET_info(SET_info_buffer))
+		tlog_error("nor: the first NOR game's save type %02X wasn't saved", saveMODE);
 }
 //---------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------
@@ -1366,6 +1394,10 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 		Send_FATbuffer(FAT_table_buffer, 1);
 
 		res = LoadEMU2PSRAM(pfilename, is_EMU);
+		if (res) {  // Torii: not started from a ROM read in part
+			Show_error_num(1);
+			return 0;
+		}
 		progress_done(NULL);
 		Launch_now(0x200, key_L, (is_EMU == 3) ? "plugin PocketNES" : "plugin Jagoomba Color");
 		while (1)
@@ -1426,9 +1458,14 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 					f_chdir(currentpath);  //return to game folder
 					//get the location for the patch
 					res = f_open(&gfile, pfilename, FA_READ);
-					f_lseek(&gfile, (gamefilesize - 1) & 0xFFFE0000);
-					f_read(&gfile, pReadCache, 0x20000, (UINT *)&ret);
+					u32 last = (gamefilesize - 1) & 0xFFFE0000;
+					if (res == FR_OK && f_lseek(&gfile, last) == FR_OK)
+						res = f_read(&gfile, pReadCache, 0x20000, (UINT *)&ret);
 					f_close(&gfile);
+					if (rom_read_failed(pfilename, res, last, ret, gamefilesize)) {
+						Show_error_num(1);  // Torii: no hook placed from a failed read
+						return 0;
+					}
 					SetTrimSize(pReadCache, gamefilesize, 0x20000, 0x0, SAVEMODE);
 					if (gl_engine_sel == 0) {
 						tlog("launch: IRQ hook from a scan of the ROM (scan engine)");
@@ -1437,6 +1474,10 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 						Send_FATbuffer(FAT_table_buffer, 1);
 						progress_step(NULL, LAUNCH_STATES, LAUNCH_SCAN);
 						res = Loadfile2PSRAM(pfilename);
+						if (res) {  // Torii: not started from a ROM read in part
+							Show_error_num(1);
+							return 0;
+						}
 						progress_step(NULL, LAUNCH_SCAN, LAUNCH_PATCH);
 						tlog("launch: saving the hook's place in PATCH/");
 						Make_pat_file(pfilename);
@@ -1504,9 +1545,15 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 				//get the location of the patch
 				res = f_open(&gfile, pfilename, FA_READ);
 				if (res == FR_OK) {
-					f_lseek(&gfile, (gamefilesize - 1) & 0xFFFE0000);
-					f_read(&gfile, pReadCache, 0x20000, (UINT *)&ret);
+					u32 last = (gamefilesize - 1) & 0xFFFE0000;
+					res = f_lseek(&gfile, last);
+					if (res == FR_OK)
+						res = f_read(&gfile, pReadCache, 0x20000, (UINT *)&ret);
 					f_close(&gfile);
+					if (rom_read_failed(pfilename, res, last, ret, gamefilesize)) {
+						Show_error_num(1);  // Torii: nothing burned from a failed read
+						return 1;
+					}
 					SetTrimSize(pReadCache, gamefilesize, 0x20000, 0x1, SAVEMODE);
 				}
 				needpatch = 1;

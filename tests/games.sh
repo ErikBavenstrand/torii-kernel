@@ -123,8 +123,8 @@ grep -q '^kernel: boot mode of /A.gba: 2 (0)' "$cart/1.log" || fail "the boot mo
 [ "$(mde A)" = 0102 ] || fail "A.mde holds $(mde A), not 01 02"
 echo "PASS: Game info keeps a game's boot mode beside its save type"
 
-# Settings slots in the kernel NOR (made by the first power-on) at 0x7B0000
-setting() { printf %b "\\x$(printf %02x "$2")\\x00" | dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7B0000 + 2 * $1)) conv=notrunc status=none; }
+# Settings slots in the kernel NOR (made by the first power-on; tests/setnor.py)
+setting() { python3 tests/setnor.py set "$cart/kernel-nor.bin" "$1=$2"; }
 # Start on Home, so each power-on's route starts there; Auto save on (no
 # question at power-on after a launch); the Reset hotkey on, an addon to
 # start with

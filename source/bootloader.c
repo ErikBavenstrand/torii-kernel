@@ -2,11 +2,13 @@
 
 int kernel_nor_record_ok(u32 offset, u32 size)
 {
-	if (size == 0 || size > 0x10000 || (offset & 0xFFFF))
+	if (size == 0 || size > 0x10000 || offset < KERNEL_NOR_DATA || offset >= KERNEL_NOR_WINDOW ||
+	    size > KERNEL_NOR_WINDOW - offset)
 		return 0;
-	if (offset < KERNEL_NOR_DATA || offset >= KERNEL_NOR_WINDOW || size > KERNEL_NOR_WINDOW - offset)
-		return 0;
-	return offset < KERNEL_NOR_SMALL || size <= KERNEL_NOR_SMALL_SECTOR;
+	if (offset < KERNEL_NOR_SMALL)
+		return !(offset & 0xFFFF);
+	// The boot sectors: one 8 KB sector each
+	return !(offset & (KERNEL_NOR_SMALL_SECTOR - 1)) && size <= KERNEL_NOR_SMALL_SECTOR;
 }
 
 static int blank(const u8 *p, u32 size)

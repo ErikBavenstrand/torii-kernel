@@ -11,8 +11,9 @@
 // v0.2.1 and v0.2.2 did, writing their NOR list's second copy at 0x7C0000.
 //
 // So the kernel writes only its data sectors, KERNEL_NOR_DATA up to
-// KERNEL_NOR_WINDOW (window offsets): the save info, both NOR list copies and
-// the settings, one 64 KB-aligned record each.
+// KERNEL_NOR_WINDOW (window offsets): the save info and both NOR list copies,
+// one 64 KB-aligned record each, and the settings' two copies, in the 8 KB
+// boot sectors from KERNEL_NOR_SMALL (setrecord.h).
 #ifndef TORII_BOOTLOADER_H
 #define TORII_BOOTLOADER_H
 
@@ -36,8 +37,10 @@
 #define DE_BIN_CRC32 0x89544B57
 
 // Whether Save_info may erase the sector at window offset OFFSET and program
-// SIZE bytes there: a whole 64 KB-aligned sector of the kernel's data, the
-// record fitting in the sector the erase clears.
+// SIZE bytes there: a 64 KB-aligned sector of the kernel's data, or an 8 KB-
+// aligned one from KERNEL_NOR_SMALL, the record fitting in the sector the
+// erase clears (on a chip whose top 64 KB is one sector, an erase there
+// clears all of it: still the kernel's data).
 int kernel_nor_record_ok(u32 offset, u32 size);
 
 enum loader_state {

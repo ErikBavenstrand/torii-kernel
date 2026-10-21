@@ -77,6 +77,7 @@ char **gl_set_ampm EWRAM_BSS;
 char *gl_set_minutes EWRAM_BSS;
 char *gl_set_scanning EWRAM_BSS;
 char *gl_set_saving EWRAM_BSS;
+char *gl_set_save_failed EWRAM_BSS;
 char *gl_set_press EWRAM_BSS;
 char *gl_set_press_hint EWRAM_BSS;
 char **gl_set_refused EWRAM_BSS;
@@ -319,6 +320,7 @@ const char *en_set_ampm[2] = {"AM", "PM"};
 const char en_set_minutes[] = "min";
 const char en_set_scanning[] = "Scanning...";
 const char en_set_saving[] = "Saving...";
+const char en_set_save_failed[] = "Couldn't save. A tries again.";
 const char en_set_press[] = "Press keys...";
 const char en_set_press_hint[] = "Press keys... let go to set.";
 // By settings_set_keys' answer (at most 38 characters, as the explanations)
@@ -665,6 +667,7 @@ void LoadEnglish(void)
 	gl_set_minutes = (char *)en_set_minutes;
 	gl_set_scanning = (char *)en_set_scanning;
 	gl_set_saving = (char *)en_set_saving;
+	gl_set_save_failed = (char *)en_set_save_failed;
 	gl_set_press = (char *)en_set_press;
 	gl_set_press_hint = (char *)en_set_press_hint;
 	gl_set_refused = (char **)en_set_refused;

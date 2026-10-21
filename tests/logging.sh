@@ -60,12 +60,7 @@ count() {
 
 # Settings slots (source/ez_define.h) in the kernel NOR, as SLOT=VALUE.
 settings() {
-  local slot value
-  for slot in "$@"; do
-    value=${slot#*=}
-    printf %b "\\x$(printf %02x $((value & 0xFF)))\\x$(printf %02x $((value >> 8)))" |
-      dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7B0000 + 2 * ${slot%=*})) conv=notrunc status=none
-  done
+  python3 tests/setnor.py set "$cart/kernel-nor.bin" "$@"
 }
 
 # keys FRAME KEY... -> mgba-shot press/release pairs, one key every 8 frames.
@@ -520,7 +515,21 @@ open)
   grep -q 'log: LOGGING is off: the open stops' "$cart/kernel.log" || fail "the open didn't stop"
   ! mdir -i "$cart/sd.img" ::/torii/logs >/dev/null 2>&1 || fail "the open went on with LOGGING off"
   card_ok
-  echo "PASS: a delete finishes the background open first, one cut off leaves the card whole and is made again, and LOGGING off stops it"
+
+  # The log file deleted while LOGGING is on (the SD page's Delete, through
+  # the test hook): the next flush makes the log again, and logging goes on
+  rm -rf "$cart" && mkdir -p "$cart" && new_card 65536 32
+  settings 26=2 32=2
+  boot -f 200
+  # shellcheck disable=SC2046
+  boot $(nav_delete /torii/logs/torii-0.log at=160) $(nav_launch /Hello.gba at=400) -f 700
+  grep -q 'delete: /torii/logs/torii-0.log' "$cart/kernel.log" || fail "the log file wasn't deleted"
+  ! grep -q 'no more SD logging' "$cart/kernel.log" || fail "logging stopped after the delete"
+  has "log: /torii/logs/torii-0.log was deleted: opening the log again"
+  has "launch: loading Hello.gba"
+  card_ok
+  lines_ok
+  echo "PASS: a delete finishes the background open first, one cut off leaves the card whole and is made again, LOGGING off stops it, and a deleted log is made again"
   ;;
 
 flood)

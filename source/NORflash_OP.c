@@ -223,6 +223,7 @@ _Static_assert(CHEAT_PATCH_LENGTH >= RTS_PATCH_LENGTH, "NOR_PATCH_MAX");
 static u32 nor_list_stored;  // games on the copy Read_NOR_info read
 static u32 nor_list_from = NOR_LIST_A;  // the copy it read
 static u32 nor_list_legacy;  // it read an older kernel's list, with no trailer
+static u32 nor_list_short;  // GetFileListFromNor dropped the list's last entry
 
 // Copies len bytes at offset in the game NOR, which shows 8 MB at a time.
 // len stays within one 8 MB page.
@@ -391,6 +392,14 @@ void Read_NOR_info(void)
 
 void Migrate_NOR_list(u32 count)
 {
+	if (nor_list_short && !nor_list_legacy) {
+		// Its last game half-erased (a power cut in delete latest): saved
+		// without it, so later boots don't drop it again
+		nor_list_short = 0;
+		tlog("nor: saving the list without the entry it dropped, %lu games", (unsigned long)count);
+		Save_NOR_list(count);
+		return;
+	}
 	if (!nor_list_legacy)
 		return;
 	// Only a list the game NOR bears out in full: an older kernel's list
@@ -503,9 +512,16 @@ static u32 Loadfile2NOR_slow(TCHAR *filename, u32 NORaddress, u16 have_patch, u8
 
 		filesize = f_size(&gfile);
 		f_lseek(&gfile, 0xa0);
-		f_read(&gfile, temp, 0x10, (UINT *)&ret);//read game name
-		f_lseek(&gfile, 0xB0);
-		f_read(&gfile, flag, 0x4, (UINT *)&ret);//read flag
+		res = f_read(&gfile, temp, 0x10, (UINT *)&ret);//read game name
+		if (res == FR_OK && ret == 0x10) {
+			f_lseek(&gfile, 0xB0);
+			res = f_read(&gfile, flag, 0x4, (UINT *)&ret);//read flag
+		}
+		if (res != FR_OK || ret != 0x4) {  // Torii: nothing burned from a failed read
+			tlog_error("nor: reading %s's header failed (%lu)", filename, (unsigned long)res);
+			f_close(&gfile);
+			return 3;
+		}
 
 		if (memcmp(flag, "5G", 2) == 0) {
 			flag_64MBrom = 1;
@@ -671,6 +687,7 @@ u32 GetFileListFromNor(void)
 	struct nor_mark mark;
 	u32 offset, count = nor_walk(&offset);
 
+	nor_list_short = 0;
 	if (count < nor_list_stored) {
 		count = nor_walk(&offset);  // a second look before dropping games
 		if (count < nor_list_stored)
@@ -678,6 +695,9 @@ u32 GetFileListFromNor(void)
 				   "after it are dropped",
 				   (unsigned long)count, pNorFS[count].filename, (unsigned long)offset,
 				   (unsigned long)(nor_list_stored - count - 1));
+		// Only the last: what a power cut in delete latest leaves. More is
+		// left as it is (a misread mustn't be saved short)
+		nor_list_short = count + 1 == nor_list_stored;
 	}
 	// Games written in full that the list lacks: a power cut before the list
 	// was saved, or a list lost

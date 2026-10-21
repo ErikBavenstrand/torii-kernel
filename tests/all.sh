@@ -20,6 +20,7 @@ jobs=(
   "tests/saves.sh full"
   "tests/saves.sh nearly-full"
   "tests/saves.sh delete"
+  "tests/saves.sh read-error"
   "tests/saves.sh rename"
   "tests/saves.sh rename-cut"
   "tests/saves.sh rename-cut-split"

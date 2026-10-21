@@ -37,16 +37,11 @@ boot -k 100:A -k 106:- -f 300 >/dev/null 2>&1
 [ "$(mtype -i "$cart/sd.img" ::/SAVER/Hello.sav | head -c 5 | od -A n -t x1 | tr -d ' \n')" = 4f4d525801 ] ||
   fail "no first save to start from"
 
-# Settings slots (source/ez_define.h) in the kernel NOR at 0x7B0000: English,
+# Settings slots (source/ez_define.h) in the kernel NOR (tests/setnor.py): English,
 # RESET and SAVESTATE on, sleep key L+R+SELECT, menu key L+R+START, fast patch
 # engine, clock and rumble on.
 settings() {
-  local slot value
-  for slot in "$@"; do
-    value=${slot#*=}
-    printf %b "\\x$(printf %02x $((value & 0xFF)))\\x$(printf %02x $((value >> 8)))" |
-      dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7B0000 + 2 * ${slot%=*})) conv=notrunc status=none
-  done
+  python3 tests/setnor.py set "$cart/kernel-nor.bin" "$@"
 }
 settings 0=0xE1E1 1=1 2=1 3=0 4=0 5=9 6=8 7=2 8=9 9=8 10=3 11=1 12=0 13=1 25=1
 rm -rf "$cart-state"

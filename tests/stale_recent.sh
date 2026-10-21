@@ -148,7 +148,7 @@ mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/Other.gba
 printf '/Other.gba\n' >"$cart/recent.txt"
 mcopy -i "$cart/sd.img" "$cart/recent.txt" "::/SAVER/Recently play.txt"
 head -c $((8 << 20)) /dev/zero | tr '\0' '\377' >"$cart/kernel-nor.bin"
-printf '\001\000' | dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7B0000 + 2 * 1)) conv=notrunc status=none
+python3 tests/setnor.py set "$cart/kernel-nor.bin" 1=1
 # shellcheck disable=SC2046 # nav.sh's options
 OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch /Hello.gba nor-addon at=150) -f 600 \
   >"$cart/1-write.log" 2>&1

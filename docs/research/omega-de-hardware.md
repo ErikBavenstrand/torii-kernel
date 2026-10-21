@@ -401,11 +401,32 @@ wrote read `0xFFFF`. The emulated cart does the same, since it creates
 `kernel-nor.bin` filled with `0xFF` (`tests/settings.sh`). At boot
 `CheckSwitch` maps every value it doesn't know to a default: English,
 addons off, fast patch engine, thumbnails off, CLOCK and RUMBLE on (slots 13
-and 25), auto-save off, LED defaults. Saving any setting erases the sector
-and writes slots 0–255 back. The kernel's own slots get their values, slots
-14–64 keep what they read (so DS Style's 23 and 24 stay `0xFFFF` until DS
-Style writes them), and 65–255 become `0` from the unused part of the
-buffer. The hotkey slots 5–10 are written as the defaults the settings page
+and 25), auto-save off, LED defaults. The official kernel saves any setting
+by erasing the sector and writing slots 0–255 back. The kernel's own slots
+get their values, slots 14–64 keep what they read (so DS Style's 23 and 24
+stay `0xFFFF` until DS Style writes them), and 65–255 become `0` from the
+unused part of the buffer.
+
+Since v0.4.2 Torii keeps two copies (`source/setrecord.h`): A at `+0x7B0000`
+and B at `+0x7B2000`, the next 8 KB boot sector. Slots 248–255 hold a
+sequence number, a CRC-32 and the magic `TSE1`, whose second half (slot 255)
+is programmed last. A save writes both copies, the one the settings weren't
+read from first, so a cut leaves the other whole and A ends up current for
+older kernels, which read only A; the reader takes the whole copy with the
+higher number, A on a tie. An A that looks written by an older kernel (the
+official one, or Torii before v0.4.2: slots 65–255 all `0`, the switches 0,
+1 or unset, the hotkeys key numbers 0–9 or unset, some slot holding a value)
+wins over both, so a downgrade's changes stay. A torn Torii program never
+leaves slot 255 `0`; a torn erase can (the chip programs the sector to `0`
+before erasing it), but leaves the sector all `0` or random bits, which
+those rules reject, so B wins. The emulated cart's
+`OMEGA_POWER_CUT=kernel:erasing:N` leaves a sector at `0` this way.
+With no whole copy the kernel reads A as it is,
+and its next save writes B, then A. On a bottom-boot S29GL064A the window's
+top 64 KB is one sector, so both copies share it and a cut can still lose
+both, as the single copy could.
+
+The hotkey slots 5–10 are written as the defaults the settings page
 shows (L R SELECT, L R START) the first time any row is saved.
 
 **Mode B (slot 15: 0 Rumble, 1 RAM, 2 Link) is read by the cart, not the
@@ -465,6 +486,15 @@ header and mark survive; format again. Erase and program
 take the model no time, so `OMEGA_POWER_CUT` (`emu/mgba/src/gba/cart/omega.c`) cuts the
 power between operations for `tests/nor_safety.sh`; `OMEGA_POWER_CUT=sd:write:N`
 cuts it before the Nth SD write command, for `tests/userdata.sh`.
+`OMEGA_SD_READ_ERROR=FIRST[-LAST][:N]` makes SD reads touching those sectors
+never finish (the port stays `0xEEE1`), the first N of them or all.
+
+**SD read errors.** The only failure the kernel can see is a read that never
+finishes: the port stays `0xEEE1` (busy). `Read_SD_sectors` polls about a
+million times, tries once more after a pause, and since v0.4.2 then returns 1,
+which `disk_read` passes to FatFs as `RES_ERROR` (the official kernel copied
+the stale buffer and returned 0, so FatFs never saw an error). What other
+status values mean, if any mean a CRC error, isn't known.
 
 **Kernel NOR and the boot loader.** From the official *EZ-FLASH OMEGA DE
 DOCUMENT.pdf* (its NOR allocation lists 16-bit word addresses, so double
@@ -506,7 +536,7 @@ for `Save_info`, `FlashBase_S71`, the command bytes `0x30`, `0xA0`, `0x25`,
 
 | Path | Writes | Through |
 |---|---|---|
-| Settings saved (`Save_SET_info`: SETTINGS, a game's save type) | `0x7B0000`, 512 bytes | `Save_info` |
+| Settings saved (`Save_SET_info`: SETTINGS, a game's save type) | `0x7B2000` then `0x7B0000` (A then B if only B was whole), 512 bytes each | `Save_info` |
 | Pending-save record set at launch, cleared at the next boot (`Save_sav_info`) | `0x790000`, 512 bytes | `Save_info` |
 | NOR list saved: WRITE TO NOR, delete latest, FORMAT ALL, the boot's migration of an older list (`Save_NOR_list`) | `0x780000` then `0x7A0000` (or the other way), 0x2120 bytes each | `Save_info` |
 | `Read_S71NOR_ID` (in `Save_info` and Diagnostics' first step) | autoselect `90` and reset `F0` at `0x0AAA`/`0x0554`/0: commands, no erase or program | — |
@@ -516,8 +546,8 @@ for `Save_info`, `FlashBase_S71`, the command bytes `0x30`, `0xA0`, `0x25`,
 `Save_info` (`source/Ezcard_OP.c`) is the only code that erases or programs
 the kernel NOR. It refuses, writing nothing, any record that
 `kernel_nor_record_ok` (`source/bootloader.c`, host tested) rejects: one
-that isn't a 64 KB-aligned sector between `0x780000` and `0x7BFFFF` holding
-up to 64 KB, or, at `0x7B0000`, more than 8 KB. Game NOR writes
+that isn't a 64 KB-aligned sector between `0x780000` and `0x7AFFFF` holding
+up to 64 KB, or an 8 KB-aligned one from `0x7B0000` holding up to 8 KB. Game NOR writes
 (`NORflash_OP.c`) go to `0x09000000`, a different chip. Nothing else sets
 ROM page `0x8000`: the in-game menu's reset sets `0x8002`, launches set a
 game page, and `cartlog.c` sets `gl_currentpage`. Static asserts in

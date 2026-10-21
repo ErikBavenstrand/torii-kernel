@@ -54,7 +54,7 @@ boot() {
 logged() { grep -qF -- "$1" "$log" || fail "$(basename "$log") didn't log '$1'"; }
 
 # setting SLOT VALUE: a settings slot in the kernel NOR (source/ez_define.h)
-setting() { printf %b "\\x$(printf %02x "$2")\\x00" | dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7B0000 + 2 * $1)) conv=notrunc status=none; }
+setting() { python3 tests/setnor.py set "$cart/kernel-nor.bin" "$1=$2"; }
 # start_on VALUE: the Start on setting (slot 32, source/settings_model.h)
 start_on() { setting 32 "$1"; }
 

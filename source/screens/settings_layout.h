@@ -54,8 +54,9 @@ u32 settings_layout_section(const struct settings_layout *l, u32 s, int dir);
 // --- Hotkey capture -----------------------------------------------------------
 // A starts it on a key row: the keys then held (A) are left out until let
 // go. Each frame takes the keys held. The largest set held for hold frames
-// in a row is the answer, offered once every key is up. Nothing held for
-// timeout frames, or B alone, cancels.
+// in a row is the answer, offered once every key is up, or once none of its
+// keys is (after: the keys pressed instead). Nothing held for timeout
+// frames, or B alone, cancels.
 enum {
 	SET_CAPTURE_WAIT,
 	SET_CAPTURE_DONE,    // best holds the keys
@@ -70,6 +71,7 @@ struct settings_capture {
 	u16 seen;    // every key pressed since the start
 	u16 idle;    // frames with nothing held, since the last change
 	u16 hold, timeout;
+	u16 after;   // keys pressed on the frame the answer was let go: the page's
 };
 void settings_capture_start(struct settings_capture *c, u16 held, u32 hold, u32 timeout);
 u32 settings_capture_step(struct settings_capture *c, u16 held, u32 dt);
