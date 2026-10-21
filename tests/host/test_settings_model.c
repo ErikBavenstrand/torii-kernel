@@ -200,9 +200,43 @@ void test_settings_staged_values(void)
 	CHECK(!settings_dirty(&v));
 	// Steps wrap
 	settings_step(&v, SET_START_ON, -1);
-	CHECK_EQ(settings_get(&v, SET_START_ON), SET_START_NES);
+	CHECK_EQ(settings_get(&v, SET_START_ON), SET_START_INFO);
 	settings_step(&v, SET_START_ON, 1);
 	CHECK_EQ(v.slot[assress_start_on], 0xFFFF);
+	// Start on offers Last place and the items home shows, in the
+	// carousel's order: here Recent, GBA, NES, SD card, NOR, Settings, Info
+	v.start_shown = (u16)(1u << SET_START_RECENT | 1u << SET_START_GBA | 1u << SET_START_NES | 1u << SET_START_SD |
+			      1u << SET_START_NOR | 1u << SET_START_SETTINGS | 1u << SET_START_INFO);
+	static const u16 order[] = {SET_START_RECENT, SET_START_GBA,      SET_START_NES,  SET_START_SD,
+				    SET_START_NOR,    SET_START_SETTINGS, SET_START_INFO, SET_START_LAST};
+	for (u32 i = 0; i < sizeof(order) / sizeof(order[0]); i++) {
+		settings_step(&v, SET_START_ON, 1);
+		CHECK_EQ(settings_get(&v, SET_START_ON), order[i]);
+	}
+	check_text(SET_START_ON, "Last place");
+	settings_step(&v, SET_START_ON, -1);
+	check_text(SET_START_ON, "Info");
+	CHECK(strcmp(settings_explain(&v, SET_START_ON), "The item home faces at power-on.") == 0);
+	// A stored item home doesn't show stays, explained; a step leaves it
+	// for its neighbours, and it isn't offered again
+	settings_set(&v, SET_START_ON, SET_START_GB);
+	check_text(SET_START_ON, "GB");
+	CHECK(strcmp(settings_explain(&v, SET_START_ON), "Not on home now: Last place instead.") == 0);
+	settings_step(&v, SET_START_ON, 1);
+	CHECK_EQ(settings_get(&v, SET_START_ON), SET_START_NES);
+	settings_step(&v, SET_START_ON, -1);
+	CHECK_EQ(settings_get(&v, SET_START_ON), SET_START_GBA);
+	// An older kernel's Home reads as it is, and steps from Last place
+	v.slot[assress_start_on] = v.loaded[assress_start_on] = SET_START_HOME;
+	check_text(SET_START_ON, "Home");
+	CHECK(strcmp(settings_explain(&v, SET_START_ON), "The item home faces at power-on.") == 0);
+	settings_step(&v, SET_START_ON, 1);
+	CHECK_EQ(settings_get(&v, SET_START_ON), SET_START_RECENT);
+	v.slot[assress_start_on] = SET_START_HOME;
+	settings_step(&v, SET_START_ON, -1);
+	CHECK_EQ(settings_get(&v, SET_START_ON), SET_START_INFO);
+	v.slot[assress_start_on] = v.loaded[assress_start_on] = 0xFFFF;
+	v.start_shown = SET_STARTS_ALL;
 	settings_step(&v, SET_LOGGING, -1);
 	check_text(SET_LOGGING, "Debug");
 	settings_step(&v, SET_LED_SD, -1);

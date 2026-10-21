@@ -71,6 +71,8 @@ void nav_count_words(char *out, u32 size, u32 n, const char *one, const char *ma
 // The clock as the title bar shows it ("14:32", "2:32 PM"; "" while it
 // isn't set)
 const char *nav_clock(void);
+// The Start on codes of the items home shows (registry_start_shown)
+u16 nav_start_shown(void);
 
 // Tests: tests/nav.sh's hook. mgba-shot writes a path into nav_test_path
 // and then an action into nav_test_action (NAV_TEST_*, with bits 8-15 the

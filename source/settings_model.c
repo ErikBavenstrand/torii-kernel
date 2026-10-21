@@ -63,6 +63,11 @@ static const char *const key_names[KEY_BITS] = {"A", "B", "SELECT", "START", "RI
 // DIM's steps
 static const u8 dim_presets[] = {0, 1, 2, 5, 10, 15, 30, 60};
 
+const u8 settings_start_order[SET_STARTS - 1] = {
+	SET_START_LAST, SET_START_RECENT, SET_START_FAVOURITES, SET_START_GBA,      SET_START_GBC,  SET_START_GB,
+	SET_START_NES,  SET_START_SD,     SET_START_NOR,        SET_START_SETTINGS, SET_START_INFO,
+};
+
 static const struct settings_row *row_of(u32 id)
 {
 	return id < SET_ROWS ? &settings_rows[id] : 0;
@@ -72,6 +77,7 @@ void settings_values_init(struct settings_values *v, const u16 *slots)
 {
 	memcpy(v->slot, slots, sizeof(v->slot));
 	memcpy(v->loaded, slots, sizeof(v->loaded));
+	v->start_shown = SET_STARTS_ALL;
 }
 
 int settings_dirty(const struct settings_values *v)
@@ -217,13 +223,39 @@ static u16 dim_step(u16 minutes, int dir)
 	return dim_presets[n - 1];
 }
 
+// 1 if Start on offers code: Last place, or an item home shows
+static int start_offered(const struct settings_values *v, u32 code)
+{
+	return code == SET_START_LAST || (code < SET_STARTS && code != SET_START_HOME && (v->start_shown >> code & 1));
+}
+
+// The next choice Start on offers from code, one way: a hidden item (or
+// Home, which sits with Last place) steps from its place in the order
+static u16 start_step(const struct settings_values *v, u16 code, int dir)
+{
+	const u32 n = sizeof(settings_start_order);
+	u32 at = 0;
+	while (at < n && settings_start_order[at] != code)
+		at++;
+	if (at == n)
+		at = 0;
+	for (u32 i = 1; i < n; i++) {
+		u32 next = dir < 0 ? (at + n - i) % n : (at + i) % n;
+		if (start_offered(v, settings_start_order[next]))
+			return settings_start_order[next];
+	}
+	return SET_START_LAST;
+}
+
 void settings_step(struct settings_values *v, u32 id, int dir)
 {
 	const struct settings_row *r = row_of(id);
 	if (!r || !slots_of(r) || r->kind == SET_KEYS)
 		return;
 	u16 value = settings_get(v, id);
-	if (r->kind == SET_NUMBER) {
+	if (id == SET_START_ON) {
+		value = start_step(v, value, dir);
+	} else if (r->kind == SET_NUMBER) {
 		value = dim_step(value, dir);
 	} else {
 		u32 n = r->kind == SET_ONOFF    ? 2
@@ -343,6 +375,11 @@ const char *settings_explain(const struct settings_values *v, u32 id)
 		return gl_set_explain[SET_LABEL_RESET_STATES];
 	if (id == SET_RESET_ON && settings_get(v, SET_CHEATS))
 		return gl_set_explain[SET_LABEL_RESET_CHEATS];
+	if (id == SET_START_ON) {
+		u16 code = settings_get(v, id);
+		if (code != SET_START_HOME && !start_offered(v, code))
+			return gl_set_explain[SET_LABEL_START_HIDDEN];
+	}
 	return id < SET_ROWS ? gl_set_explain[id] : "";
 }
 

@@ -270,7 +270,7 @@ const char *en_set_explain[SET_LABELS] = {
 	[SET_THEME] = "Light paper or dark graphite.",
 	[SET_GAME_VIEW] = "Game lists: names alone, or box art.",
 	[SET_BOX_ART] = "Covers from /torii/art, or none.",
-	[SET_START_ON] = "Where the menu opens at power-on.",
+	[SET_START_ON] = "The item home faces at power-on.",
 	[SET_DIM] = "Dims the screen after idle minutes.",
 	[SET_TIME_ROW] = "The cart's clock. A sets it.",
 	[SET_DATE_ROW] = "The cart's date. A sets it.",
@@ -297,17 +297,19 @@ const char *en_set_explain[SET_LABELS] = {
 	[SET_LANGUAGE] = "The menu's language.",
 	[SET_LABEL_RESET_STATES] = "Opens the in-game menu instead.",
 	[SET_LABEL_RESET_CHEATS] = "With a cheat file: the in-game menu.",
+	[SET_LABEL_START_HIDDEN] = "Not on home now: Last place instead.",
 };
 const char *en_set_onoff[2] = {"Off", "On"};
 const char *en_set_themes[2] = {"Dark", "Light"};
 const char *en_set_views[2] = {"List", "List + art"};
 const char *en_set_boots[SET_BOOTS] = {[SET_BOOT_ADDONS] = "With addons", [SET_BOOT_CLEAN] = "Clean"};
 const char *en_set_starts[SET_STARTS] = {
-	[SET_START_LAST] = "Last place", [SET_START_RECENT] = "Recent",
-	[SET_START_HOME] = "Home",       [SET_START_FAVOURITES] = "Favourites",
-	[SET_START_SD] = "SD card",      [SET_START_GBA] = "GBA",
-	[SET_START_GBC] = "GBC",         [SET_START_GB] = "GB",
-	[SET_START_NES] = "NES",
+	[SET_START_LAST] = "Last place",   [SET_START_RECENT] = "Recent",
+	[SET_START_HOME] = "Home",         [SET_START_FAVOURITES] = "Favourites",
+	[SET_START_SD] = "SD card",        [SET_START_GBA] = "GBA",
+	[SET_START_GBC] = "GBC",           [SET_START_GB] = "GB",
+	[SET_START_NES] = "NES",           [SET_START_NOR] = "NOR",
+	[SET_START_SETTINGS] = "Settings", [SET_START_INFO] = "Info",
 };
 const char *en_set_modes_b[3] = {"Rumble", "RAM", "Link"};
 // By value: red 4, green 2, blue 1
@@ -399,6 +401,7 @@ const char *en_info[INFO_STRINGS] = {
 		"B\tclose\n"
 		"In a question, " LR " chooses and B cancels.\n"
 		"# At power-on\n"
+		"Home faces the item you were last on, or the one Settings' Start on picks.\n"
 		"Hold L, R and SELECT as you switch on to run Diagnostics, even when the menu won't start.",
 	[INFO_S_INGAME_START] = "# Hotkeys\n"
 				"They work in GBA games started with their addons: Boot with addon starts a game with "

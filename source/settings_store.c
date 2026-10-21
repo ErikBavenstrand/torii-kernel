@@ -17,6 +17,7 @@ void settings_load(struct settings_values *v)
 {
 	for (u32 a = 0; a < assress_max; a++)
 		v->slot[a] = v->loaded[a] = Read_SET_info(a);
+	v->start_shown = SET_STARTS_ALL;
 	settings_read_clock(&v->clock);
 }
 

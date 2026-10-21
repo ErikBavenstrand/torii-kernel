@@ -56,8 +56,10 @@ it. Info's Controls page lists every key.
 - **Info:** Controls, In game (the hotkeys), Your cart, About, and
   Diagnostics.
 
-At power-on the carousel faces the item you were last on, such as GBA
-(Settings' Start on picks another place, or a page to open). A library index of the card's games (`/torii/library.idx`)
+At power-on the carousel faces the item you were last on, such as GBA.
+Settings' Start on picks an item to face instead, from those home shows;
+if that item is gone (no NES games any more, say), the carousel faces the
+item you were last on. A library index of the card's games (`/torii/library.idx`)
 is rebuilt in the background when the card changes; `/torii` also keeps
 `recent.txt`, `favorites.txt` and the logs.
 

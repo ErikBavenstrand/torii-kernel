@@ -20,9 +20,9 @@ const struct registry_item registry_items[NAV_ITEMS] = {
 	[NAV_GB] = {"gb", PAL_GB, ART_ICON16_GB, LIB_GB, SET_START_GB, 1},
 	[NAV_NES] = {"nes", PAL_NES, ART_ICON16_NES, LIB_NES, SET_START_NES, 1},
 	[NAV_SD] = {"sd", PAL_SD, ART_ICON16_SD, NAV_NO_CONSOLE, SET_START_SD, 0},
-	[NAV_NOR] = {"nor", PAL_NOR, ART_ICON16_NOR, NAV_NO_CONSOLE, NAV_NO_START, 0},
-	[NAV_SET] = {"settings", PAL_SET, ART_ICON16_SET, NAV_NO_CONSOLE, NAV_NO_START, 0},
-	[NAV_INFO] = {"info", PAL_INFO, ART_ICON16_INFO, NAV_NO_CONSOLE, NAV_NO_START, 0},
+	[NAV_NOR] = {"nor", PAL_NOR, ART_ICON16_NOR, NAV_NO_CONSOLE, SET_START_NOR, 0},
+	[NAV_SET] = {"settings", PAL_SET, ART_ICON16_SET, NAV_NO_CONSOLE, SET_START_SETTINGS, 0},
+	[NAV_INFO] = {"info", PAL_INFO, ART_ICON16_INFO, NAV_NO_CONSOLE, SET_START_INFO, 0},
 };
 
 u32 registry_shown(const u32 counts[NAV_ITEMS], u8 shown[NAV_ITEMS])
@@ -64,16 +64,20 @@ u32 registry_find(const char *word)
 	return NAV_ITEMS;
 }
 
-// A page to open at its first row, or home facing the nearest item if it's hidden
-static void open_or_face(u32 item, const u8 *shown, u32 count, struct registry_place *out)
+u32 registry_of_start(u32 start_on)
 {
-	u32 at = registry_index(shown, count, item);
-	if (at < count) {
-		out->item = (u8)item;
-		out->open = 1;
-	} else {
-		out->item = shown[registry_nearest(shown, count, item)];
-	}
+	for (u32 i = 0; i < NAV_ITEMS; i++)
+		if (registry_items[i].start == start_on)
+			return i;
+	return NAV_ITEMS;
+}
+
+u16 registry_start_shown(const u8 *shown, u32 count)
+{
+	u16 mask = 0;
+	for (u32 i = 0; i < count; i++)
+		mask |= (u16)(1u << registry_items[shown[i]].start);
+	return mask;
 }
 
 void registry_start(u32 start_on, const struct userdata_boot *boot, const u8 *shown, u32 count,
@@ -83,21 +87,22 @@ void registry_start(u32 start_on, const struct userdata_boot *boot, const u8 *sh
 	out->open = 0;
 	out->row = 0;
 	if (start_on == SET_START_HOME)
-		return;
-	if (start_on != SET_START_LAST) {
-		for (u32 i = 0; i < NAV_ITEMS; i++)
-			if (registry_items[i].start == start_on)
-				open_or_face(i, shown, count, out);
+		return;  // an older kernel's Home: the first item
+	u32 item = registry_of_start(start_on);
+	if (item < NAV_ITEMS && registry_index(shown, count, item) < count) {
+		out->item = (u8)item;
 		return;
 	}
+	// Last place, also for a chosen item home doesn't show: the item last
+	// faced if it shows (an older kernel's "home-" before its word is
+	// dropped), else the first
 	if (!boot)
-		return;  // no place kept: the first item
-	// Home facing the item; an older kernel's "home-" before it is dropped
+		return;
 	const char *word = boot->item;
 	u32 prefix = sizeof(REGISTRY_OLD_HOME_PREFIX) - 1;
 	if (!strncmp(word, REGISTRY_OLD_HOME_PREFIX, prefix))
 		word += prefix;
-	u32 item = registry_find(word);
-	if (item < NAV_ITEMS)
-		out->item = shown[registry_nearest(shown, count, item)];
+	item = registry_find(word);
+	if (item < NAV_ITEMS && registry_index(shown, count, item) < count)
+		out->item = (u8)item;
 }

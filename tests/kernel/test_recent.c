@@ -183,6 +183,19 @@ void test_userdata_recent_store(void)
 	CHECK(both_copies(T_RECENT, want));
 	userdata_test_paths(T_RECENT, T_FAV, T_OLD);  // forgets the place: read it back
 	CHECK(strcmp(userdata_boot_get()->item, "gba") == 0);
+	// Turned away and back to the item on the card: nothing to write (a
+	// write would make the backup again)
+	CHECK_EQ(f_unlink(T_RECENT ".bak"), FR_OK);
+	userdata_boot_set("sd");
+	userdata_boot_set("gba");
+	CHECK(userdata_flush());
+	CHECK(!exists(T_RECENT ".bak"));
+	userdata_boot_set("sd");
+	CHECK(userdata_flush());
+	snprintf(want, sizeof(want), "@boot sd\n%lu\t/Games/c.gb\n0\t/a.gba\n0\tNOR:b.gba\n", (unsigned long)now);
+	CHECK(both_copies(T_RECENT, want));
+	userdata_boot_set("gba");
+	CHECK(userdata_flush());
 	// Forgetting: a file, a NOR game, every NOR game
 	CHECK(userdata_forget("/a.gba"));
 	CHECK_EQ(userdata_recent_count(), 2);

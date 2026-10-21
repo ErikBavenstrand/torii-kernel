@@ -37,8 +37,9 @@
 # say addon then (clean and nor-addon imply it), so the route counts them.
 # Later options count from the route's last wait (-w): the popup's line, or
 # the folder's with open. Limits: the route starts from home, facing its first item, so
-# the card must start on home there (Start on Home, or a fresh card: Last
-# place may open the SD card page, or home facing another item); and log
+# the card must start facing it (Start on Home, an older kernel's value
+# that faces the first item, or a fresh card; Last place may face another
+# item); and log
 # lines are cut at 240 characters, so a path of about 225 bytes or more
 # never matches its wait.
 #
@@ -244,8 +245,8 @@ nav_game_delete() {
 }
 
 # The NOR page's routes (B15; the top says what each does). They start from
-# home: on a cart that may have been left on a page for 5 s (Last place),
-# set Start on to Home first (slot 32 = 2).
+# home's first item: on a cart left facing another item for 5 s (Last
+# place), set Start on to Home first (slot 32 = 2).
 
 # _nav_nor_to INDEX: the lines from power-on to game INDEX
 _nav_nor_to() {

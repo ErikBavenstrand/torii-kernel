@@ -54,12 +54,13 @@ OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -f 200 >/dev/null
 # defaults; values they hold as they are
 defaults="24-hour clock On, game view List, start on Last place, show all files Off"
 booted "$defaults"
-write 30=7 31=2 32=9 33=2
+write 30=7 31=2 32=12 33=2
 booted "$defaults"
 write 30=0 31=1 32=4 33=1
 booted "24-hour clock Off, game view List + art, start on SD card, show all files On"
 [ "$(slots 30 4)" = "0000 0001 0004 0001" ] || fail "a boot changed slots 30-33: $(slots 30 4)"
-# The visits below start from home (Start on SD card opens its page)
+# The visits below start from home facing its first item (Start on SD card
+# faces SD card; an older kernel's Home, 2, faces the first item)
 write 32=2
 
 # visit ROW KEYS...: power on, go to the Settings page's ROW, press KEYS
