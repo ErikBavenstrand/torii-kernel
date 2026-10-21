@@ -88,10 +88,18 @@ Everything the v0.2–v0.4.1 work left open, checked against the code on 2026-10
 - ~~The UI walk (`tests/shots/data/walk.txt`) uses 54 of mgba-shot's 64 waits (`MAX_WAITS`, `emu/mgba-shot.c`): raise it or split the walk.~~ Fixed by E5 (`8c3e7ae`): 256.
 - ~~A failing animation frame writes only its actual PNG, no expected or diff (`tests/shots.py`); mGBA zero-fills RAM where the cart doesn't, so goldens can't catch uninitialised reads (only `pReadCache` is poisoned).~~ Fixed by E5 (`8c3e7ae`, `691815d`): frames kept by hash in `dist/shots-frames` give expected and diff PNGs; mgba-shot fills EWRAM and IWRAM with 0xA5 at power-on (the suite passes).
 - ~~No golden covers About's "free space isn't recorded" branch, Your cart's "still counting", File info's date, No-Intro names with odd characters, or a box switching between consoles with no cover between.~~ Fixed by E5 (`691815d`): info-no-free, info-counting, sd-root/file-info, games-names, games-box-switch.
+- IWRAM free is 4,604 bytes on main (CLAUDE.md records 5,980 at v0.4.1): find what took it, and update CLAUDE.md's figures; about 2 KB stays above the stack estimate.
+- No test drives Identify (`names_store.c`, the identify step) with a record a few hours off; it shares the walk's check.
+- names-update recomputes the CRC of a file dated before 1980 on every run.
 
 ### Decisions
 
 The user accepted every decision the build made on their behalf (2026-10-21); [docs/design/v0.4/decisions.md](../design/v0.4/decisions.md) records them. Change any of them as a normal roadmap item.
+
+F1–F3 (new games named and boxed on the cart) made these, open to change:
+
+- F1 (`e04827c`): the kernel keeps a CRC whose date is 1–14 whole hours off the file's, minutes and seconds equal, for every record (nothing marks the tool's); a different same-size file with such a date keeps the old CRC. A kernel before v0.4.2 forgets tool-written dates.
+- F3: the art pack's index takes 128 KB of PSRAM after `PSRAM_NAMES_TEXT`, out of the 384 KB left for v0.9's language tables; NES art only with `--console NES`.
 
 ### Open questions and cart checks
 
