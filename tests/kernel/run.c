@@ -55,7 +55,7 @@ static const struct {
 	{"asset_cover_cache", test_asset_cover_cache},
 	{"art_table", test_art_table},
 	{"art_obj_budget", test_art_obj_budget},
-	{"art_ring", test_art_ring},
+	{"art_colours", test_art_colours},
 };
 
 // The tests that need the cart (PSRAM, the card), run alone by

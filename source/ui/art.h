@@ -29,15 +29,13 @@
 //   art shows them). Each looks like its console's box with a skeleton
 //   picture, for a game without art; art_box_colours gives its colours in
 //   the current theme.
-// - Items (ART_ITEM_*, in the carousel's order): each item's 16x16 icon,
-//   8x8 icon and carousel object.
+// - Items (ART_ITEM_*, in the carousel's order): each item's 16x16 icon and
+//   carousel object.
 //
 // The loaders put art into VRAM through the engine (engine/res.h, shared by
 // tag, so loading it again is free; the current view owns it) and queue the
-// copy for VBlank. A screen that loads and drops objects on its own schedule
-// (the carousel's ring, turning) takes them unlogged with art_take_* and
-// drops each with art_drop, as the cover streamer does, so a long run of
-// turns never fills the engine's allocation log.
+// copy for VBlank. The carousel streams its objects into slots of its own
+// instead (art_sprite_tiles, art_shadow_tiles).
 #ifndef TORII_UI_ART_H
 #define TORII_UI_ART_H
 
@@ -74,7 +72,7 @@ struct art_shadow {
 };
 
 struct art_item {
-	u8 icon16, icon8, sprite;
+	u8 icon16, sprite;
 };
 
 extern const u32 art_icon16_tiles[ART_ICON16_COUNT][ART_ICON16_TILES * 8];
@@ -115,11 +113,5 @@ u16 art_load_icon16(u32 icon, u8 *bank);
 u16 art_load_sprite(u32 sprite);
 // A ground shadow's 32x8 half.
 u16 art_load_shadow(u32 shadow);
-// The same, unlogged when unlogged is nonzero: *handle gets the block, for
-// art_drop. Taking one already held shares it (each take needs a drop).
-u16 art_take_sprite(u32 sprite, u8 *handle, int unlogged);
-u16 art_take_shadow(u32 shadow, u8 *handle, int unlogged);
-// Drops what an unlogged art_take_* took.
-void art_drop(u8 handle);
 
 #endif

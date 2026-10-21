@@ -47,7 +47,7 @@ void test_asset_sd_read(void);
 void test_asset_cover_cache(void);
 void test_art_table(void);
 void test_art_obj_budget(void);
-void test_art_ring(void);
+void test_art_colours(void);
 void test_library_psram(void);
 void test_library_boot(void);
 void test_names_identify(void);

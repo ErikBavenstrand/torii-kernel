@@ -16,26 +16,25 @@
 #             80x80, at most 15 colours, drawn for the light theme;
 #             box_dark below replaces colours in the dark theme
 
-# The carousel's items, in its order: each item's 16x16 icon, 8x8 icon and
-# carousel object (file names without .png).
+# The carousel's items, in its order: each item's 16x16 icon and carousel
+# object (file names without .png).
 items = [
-	{ id = "recent", icon16 = "recent", icon8 = "recent", sprite = "recent" },
-	{ id = "fav", icon16 = "fav", icon8 = "fav", sprite = "fav" },
-	{ id = "gba", icon16 = "gba", icon8 = "gba", sprite = "gba" },
-	{ id = "gbc", icon16 = "gbc", icon8 = "gbc", sprite = "gbc" },
-	{ id = "gb", icon16 = "gb", icon8 = "gb", sprite = "gb" },
-	{ id = "nes", icon16 = "nes", icon8 = "nes", sprite = "nes" },
-	{ id = "sd", icon16 = "sd", icon8 = "sd", sprite = "sd" },
-	{ id = "nor", icon16 = "nor", icon8 = "nor", sprite = "nor" },
-	{ id = "set", icon16 = "set", icon8 = "set", sprite = "gear" },
-	{ id = "info", icon16 = "info", icon8 = "info", sprite = "book" },
+	{ id = "recent", icon16 = "recent", sprite = "recent" },
+	{ id = "fav", icon16 = "fav", sprite = "fav" },
+	{ id = "gba", icon16 = "gba", sprite = "gba" },
+	{ id = "gbc", icon16 = "gbc", sprite = "gbc" },
+	{ id = "gb", icon16 = "gb", sprite = "gb" },
+	{ id = "nes", icon16 = "nes", sprite = "nes" },
+	{ id = "sd", icon16 = "sd", sprite = "sd" },
+	{ id = "nor", icon16 = "nor", sprite = "nor" },
+	{ id = "set", icon16 = "set", sprite = "gear" },
+	{ id = "info", icon16 = "info", sprite = "book" },
 ]
 
 # The 16x16 icons' palette banks: two icons each (or one), every icon in one
 # of them. A new icon goes into a bank here.
 icon16_banks = [
-	["fav", "file"],
-	["folder", "gb"],
+	["fav", "gb"],
 	["gba", "gbc"],
 	["info", "nes"],
 	["nor", "recent"],

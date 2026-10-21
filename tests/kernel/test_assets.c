@@ -385,7 +385,6 @@ void test_art_table(void)
 {
 	for (u32 i = 0; i < ART_ITEM_COUNT; i++) {
 		CHECK(art_items[i].icon16 < ART_ICON16_COUNT);
-		CHECK(art_items[i].icon8 < ART_ICON8_COUNT);
 		CHECK(art_items[i].sprite < ART_SPRITE_COUNT);
 	}
 	for (u32 i = 0; i < ART_ICON16_COUNT; i++) {
@@ -558,46 +557,9 @@ void test_art_obj_budget(void)
 	reset_engine(0);
 }
 
-// The carousel's ring turned 200 times: each turn drops the object (and
-// shadow) leaving the slots and takes the one coming in, unlogged, so the
-// engine's allocation log stays as it was however long the ring turns.
-void test_art_ring(void)
+// An object's colours with the ground tone in the shadow's slot.
+void test_art_colours(void)
 {
-	reset_engine(1);
-	u8 keep = res_alloc(RES_OBJ_VRAM, 512, 1, 0, RES_OBJ_UNITS, 0, 0);
-	CHECK_EQ(res_start(RES_OBJ_VRAM, keep), 0);
-	struct pool *obj = res_pool(RES_OBJ_VRAM);
-	u16 free0 = pool_free_units(obj, 1);
-	u8 mark = res_mark();
-	u8 sprite[CAROUSEL_SLOTS], shadow[CAROUSEL_SLOTS];
-	for (u32 i = 0; i < CAROUSEL_SLOTS; i++) {
-		const struct art_sprite *a = &art_sprites[art_items[i % ART_ITEM_COUNT].sprite];
-		CHECK(art_take_sprite(art_items[i % ART_ITEM_COUNT].sprite, &sprite[i], 1) != ART_NONE);
-		CHECK(art_take_shadow(a->shadow, &shadow[i], 1) != ART_NONE);
-		gfx_queue_clear();
-	}
-	for (u32 turn = 0; turn < 200; turn++) {
-		u32 slot = turn % CAROUSEL_SLOTS;
-		u32 item = (turn + CAROUSEL_SLOTS) % ART_ITEM_COUNT;
-		art_drop(sprite[slot]);
-		art_drop(shadow[slot]);
-		u32 s = art_items[item].sprite;
-		CHECK(art_take_sprite(s, &sprite[slot], 1) != ART_NONE);
-		CHECK(art_take_shadow(art_sprites[s].shadow, &shadow[slot], 1) != ART_NONE);
-		gfx_queue_clear();
-		CHECK_EQ(res_mark(), mark);
-		// At most every slot's object and shadow held (slots share shadows;
-		// dropped blocks are cached, which counts as free)
-		CHECK(free0 - pool_free_units(obj, 1) <= CAROUSEL_SLOTS * (ART_SPRITE_TILES + ART_SHADOW_HALF_TILES));
-	}
-	for (u32 i = 0; i < CAROUSEL_SLOTS; i++) {
-		art_drop(sprite[i]);
-		art_drop(shadow[i]);
-	}
-	CHECK_EQ(pool_free_units(obj, 1), free0);
-	CHECK_EQ(res_mark(), mark);
-
-	// An object's colours with the ground tone in the shadow's slot
 	u16 c[16];
 	art_sprite_colours(ART_SPRITE_GBA, 0x1234, c);
 	CHECK_EQ(c[ART_SHADOW_INDEX], 0x1234);
