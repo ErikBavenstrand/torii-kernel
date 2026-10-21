@@ -477,8 +477,8 @@ settings/frames 94-94 523956ADCD88BA18
 settings/frames 95-96 41593FC543AF1DEB
 settings/frames 97-97 89ADDE63BFEF4066
 settings/frames 98-233 F88C4FB86C4FEB7A
-settings-armed/after-a B1ABD5A4D930FCCE
-settings-armed/armed B1ABD5A4D930FCCE
+settings-armed/after-a 1460E775A37A3AF7
+settings-armed/armed 9EB06A867D403ED2
 settings-dark/back 38E29370DD745F6C
 settings-dark/cart 01E3A041AF1043EE
 settings-dark/dim 94843D147B275658
