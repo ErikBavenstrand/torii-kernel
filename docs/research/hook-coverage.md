@@ -31,10 +31,10 @@ ROM as it loads (`source/GBApatch.c`):
    L+R+START opens the menu (RESET / SAVE / LOAD, and cheats). Then it jumps
    to the game's handler at `0x3007FF4`.
 
-SAVESTATE on its own works differently: it uses the `RTS_only` patch, where
-L+R+START loads a state at once and L+R+SELECT saves one. Loading with no
-saved state crashed Advance Wars. The menu needs SAVESTATE with RESET, SLEEP
-or cheats.
+SAVESTATE on its own used to work differently, with an `RTS_only` patch
+where L+R+START loaded a state at once and L+R+SELECT saved one; loading with
+no saved state crashed Advance Wars. v0.4 removed it: SAVESTATE now always
+gets the menu.
 
 So the menu is missed when:
 
@@ -46,8 +46,8 @@ So the menu is missed when:
 ## How it is measured
 
 `just compat` has an **in-game menu** column. For every GBA game that boots,
-it makes a second cart, writes settings into its kernel NOR (SAVESTATE and
-RESET on, menu key L+R+START), launches with BOOT WITH ADDON, and runs
+it makes a second cart, writes settings into its kernel NOR (SAVESTATE on
+alone, menu key L+R+START), launches with BOOT WITH ADDON, and runs
 `tests/hook_watch.lua`. That script reads only memory and the CPU state, so
 it checks the hook from outside the kernel:
 

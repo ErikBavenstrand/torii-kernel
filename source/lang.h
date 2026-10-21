@@ -80,7 +80,7 @@ extern char *gl_hint_ok;
 extern char *gl_hint_cancel;
 
 // The v0.4 Settings page (settings_model.h): by enum settings_section, by
-// row (and SET_LABELS' extra labels), and each SET_CHOICE's options by value
+// row (explanations to SET_LABELS, with its extra ones), and each SET_CHOICE's options by value
 extern char **gl_set_sections;
 extern char **gl_set_labels;
 extern char **gl_set_explain;

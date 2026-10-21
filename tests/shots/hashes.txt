@@ -394,10 +394,10 @@ sd-root/frames 20-20 98567999AC9BFE75
 sd-root/frames 21-24 4EFA74E715B11C85
 sd-show-all/root 5A2B75D8F32FD93E
 settings/bottom 023EBD909DE66D17
-settings/capture 0744D5D623576312
+settings/capture 92488621CCC658CB
 settings/edit 01F99474A4C143A2
 settings/fields C7B67E8966D18DF8
-settings/refused FC43203B413C1F82
+settings/refused 938D152D09510F26
 settings/swatch 745701A3167A55A8
 settings/top 13353C9D6A736E0C
 settings/frames 0-1 5E63589D814E6050
@@ -438,8 +438,8 @@ settings/frames 55-55 D0B2998C7148895C
 settings/frames 56-56 71FED535CEB7968C
 settings/frames 57-57 F4EEF363D8D9E2DF
 settings/frames 58-58 C1095E75CC9718F6
-settings/frames 59-59 4EB113BCDEEB0496
-settings/frames 60-60 944057C2FF78A013
+settings/frames 59-59 402DB46714BFC806
+settings/frames 60-60 74A385F941212D63
 settings/frames 61-61 65A72C02A9BAE606
 settings/frames 62-62 F884E096F5E6170C
 settings/frames 63-63 514126614DB13879
@@ -454,20 +454,20 @@ settings/frames 71-71 018C43696B6C0A72
 settings/frames 72-72 6A29B0E8A10702FE
 settings/frames 73-73 61C731A14581D3A7
 settings/frames 74-74 B34370516BFADFA8
-settings/frames 75-75 1D06368CE9CE0177
-settings/frames 76-76 FE9EB201E57D6468
-settings/frames 77-77 9690D13A370D0238
-settings/frames 78-78 7C479C7A401BD3A3
-settings/frames 79-79 CB10532E1207B8FB
-settings/frames 80-80 02B0651E439F622C
-settings/frames 81-81 4660A0EB2A80F834
-settings/frames 82-82 6AFBE303C7DD1816
-settings/frames 83-83 9A2789908EC61AB8
-settings/frames 84-84 E63D8953B02C13DC
-settings/frames 85-85 96A8CACB7F2C4A6D
-settings/frames 86-86 A5CFA4AA1094003A
-settings/frames 87-87 EA28F7975689CC02
-settings/frames 88-88 5CEFF587F39C7D3B
+settings/frames 75-75 01D085F789E4B7FB
+settings/frames 76-76 26D37E8B3427D675
+settings/frames 77-77 4389747D90B141E1
+settings/frames 78-78 75C9AA141AC04A49
+settings/frames 79-79 04ABE2A11D3B12B0
+settings/frames 80-80 EEF9E46910322000
+settings/frames 81-81 E02E887F3F4DD6D9
+settings/frames 82-82 85A699A65C5D78D7
+settings/frames 83-83 C397B7B1F5BC2CF9
+settings/frames 84-84 AA7F04CB864AA865
+settings/frames 85-85 EB6269B1C5D4D82C
+settings/frames 86-86 AAB6F4E7226B6FE2
+settings/frames 87-87 12668F95D6E2AE57
+settings/frames 88-88 32AC48EA4667C4B6
 settings/frames 89-89 31CAC815EAC73C2E
 settings/frames 90-90 621AB02578971A35
 settings/frames 91-91 DD3A423BD179C4E0
@@ -475,6 +475,8 @@ settings/frames 92-92 B2E42BF4BB2A65BD
 settings/frames 93-94 78815A381341660E
 settings/frames 95-95 28A10404B3E8F053
 settings/frames 96-233 023EBD909DE66D17
+settings-armed/after-a 569A75F411F23195
+settings-armed/armed 569A75F411F23195
 settings-dark/back 09939A909A496F59
 settings-dark/cart EE04F6461CB0C3D3
 settings-dark/dim 1A3EDCB5ADF2C589
@@ -512,7 +514,7 @@ settings-dark/frames 36-36 1C34C61D9B65FDE9
 settings-dark/frames 37-37 35718B735B953A56
 settings-dark/frames 38-38 012CF9F8CCA874D9
 settings-dark/frames 39-45 09939A909A496F59
-settings-last/screen E0FFA6AEF47EE2D9
+settings-last/screen CCDD48BCF88BE0B5
 ui-dialog/closed 942FEA8E68027B47
 ui-dialog/dialog 1EC3EDCC05C5D114
 ui-dialog/frames 0-0 942FEA8E68027B47

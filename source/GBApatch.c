@@ -449,51 +449,6 @@ static void Patch_RTS_Cheat(u32 *Data)
 	Write(iTrimSize, patchbuffer, copysize);
 }
 //------------------------------------------------------------------
-static void Patch_RTS_only(u32 *Data)
-{
-	(void)Data;
-	Patch_B_address();
-	u32 Return_address = 0x8000000 + EA_offset * 4 + 8;
-
-	u8 *p_patch_start = (u8 *)RTS_only_ReplaceIRQ_start;
-	u8 *p_patch_end = (u8 *)RTS_only_ReplaceIRQ_end;
-	u8 *p_patch_Return_address_L = (u8 *)RTS_only_Return_address_L;
-
-	u8 *patchbuffer = (u8 *)_UnusedVram;
-	u32 Return_address_offset = p_patch_Return_address_L - p_patch_start;
-
-	dmaCopy((void *)p_patch_start, patchbuffer, p_patch_end - p_patch_start);
-	*(vu32 *)(patchbuffer + Return_address_offset) = Return_address;//modify gba_sleep_patch_bin return address
-
-	if (spend_address != 0x0) {
-		*(vu32 *)(patchbuffer + Return_address_offset + 4) = spend_address;
-	}
-
-	u16 read5 = Read_SET_info(assress_edit_sleephotkey_0);
-	u16 read6 = Read_SET_info(assress_edit_sleephotkey_1);
-	u16 read7 = Read_SET_info(assress_edit_sleephotkey_2);
-	u16 read8 = Read_SET_info(assress_edit_rtshotkey_0);
-	u16 read9 = Read_SET_info(assress_edit_rtshotkey_1);
-	u16 read10 = Read_SET_info(assress_edit_rtshotkey_2);
-	u16 RTS_only_SAVE_key_val = Hotkey_value((const u16[]){read5, read6, read7}, sleep_hotkey_default);
-	u16 RTS_only_LOAD_key_val = Hotkey_value((const u16[]){read8, read9, read10}, rts_hotkey_default);
-
-	u32 RTS_only_SAVE_key_offset = (u8 *)RTS_only_SAVE_key - p_patch_start;
-	u32 RTS_only_LOAD_key_offset = (u8 *)RTS_only_LOAD_key - p_patch_start;
-
-	*(vu32 *)(patchbuffer + RTS_only_SAVE_key_offset) = RTS_only_SAVE_key_val & 0x3FF;
-	*(vu32 *)(patchbuffer + RTS_only_LOAD_key_offset) = RTS_only_LOAD_key_val & 0x3FF;
-
-	u32 copysize = p_patch_end - p_patch_start;
-
-	if (iTrimSize + copysize > 0x2000000) {
-		copysize = 0x2000000 - iTrimSize; //????
-	}
-	//DEBUG_printf("iTrimSize =%x %x", iTrimSize,copysize);
-
-	Write(iTrimSize, patchbuffer, copysize);
-}
-//------------------------------------------------------------------
 void GBApatch_Cleanrom(u32 *address, int filesize)//Only once
 {
 	(void)filesize;
@@ -566,11 +521,7 @@ void GBApatch_PSRAM(u32 *address, int filesize)//Only once
 	PatchDragonBallZ(address);
 	Patch_somegame(address);
 
-	if ((gl_rts_on == 1) && (gl_cheat_on == 0) && (gl_reset_on == 0) && (gl_sleep_on == 0)) {
-		spend_address = Get_spend_address(address);
-		Patch_RTS_only(address);
-		patch_kind = "savestate keys (RTS_only)";
-	} else if ((gl_rts_on == 1) || ((gl_cheat_on == 1) && (gl_cheat_count > 0))) {
+	if ((gl_rts_on == 1) || ((gl_cheat_on == 1) && (gl_cheat_count > 0))) {
 		spend_address = Get_spend_address(address);
 		//DEBUG_printf("spend_address =%x",spend_address);
 		Patch_RTS_Cheat(address);
@@ -634,9 +585,7 @@ void GBApatch_NOR(u32 *address, int filesize, u32 offset)
 	PatchDragonBallZ(address);
 	//Check_Fire_Emblem();
 
-	if ((gl_rts_on == 1) && (gl_cheat_on == 0) && (gl_reset_on == 0) && (gl_sleep_on == 0)) {
-		Patch_RTS_only(address);
-	} else if ((gl_rts_on == 1) || ((gl_cheat_on == 1) && (gl_cheat_count > 0))) {
+	if ((gl_rts_on == 1) || ((gl_cheat_on == 1) && (gl_cheat_count > 0))) {
 		Patch_RTS_Cheat(address);
 	} else {
 		Patch_Reset_Sleep(address);

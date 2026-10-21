@@ -234,7 +234,7 @@ const char *en_set_sections[SET_SECTIONS] = {
 	[SET_SEC_CART] = "Cart",     [SET_SEC_HOTKEYS] = "Hotkeys", [SET_SEC_LIBRARY] = "Library",
 	[SET_SEC_SYSTEM] = "System",
 };
-const char *en_set_labels[SET_LABELS] = {
+const char *en_set_labels[SET_ROWS] = {
 	[SET_THEME] = "Theme",
 	[SET_GAME_VIEW] = "Game view",
 	[SET_BOX_ART] = "Box art",
@@ -253,8 +253,8 @@ const char *en_set_labels[SET_LABELS] = {
 	[SET_LED] = "LED",
 	[SET_LED_IDLE] = "LED colour",
 	[SET_LED_SD] = "SD card light",
-	[SET_RESET_ON] = "Reset hotkey",
-	[SET_RESET_KEYS] = "Reset keys",
+	[SET_RESET_ON] = "Back to menu",
+	[SET_RESET_KEYS] = "Menu keys",
 	[SET_SLEEP_ON] = "Sleep",
 	[SET_SLEEP_KEYS] = "Sleep keys",
 	[SET_RESCAN] = "Rescan library",
@@ -262,9 +262,6 @@ const char *en_set_labels[SET_LABELS] = {
 	[SET_SHOW_ALL] = "Show all files",
 	[SET_LOGGING] = "Logging",
 	[SET_LANGUAGE] = "Language",
-	[SET_LABEL_SAVE_KEYS] = "Save state keys",
-	[SET_LABEL_LOAD_KEYS] = "Load state keys",
-	[SET_LABEL_RESET_ARMED] = "Reset hotkey",
 };
 const char *en_set_explain[SET_LABELS] = {
 	[SET_THEME] = "Light paper or dark graphite.",
@@ -278,25 +275,24 @@ const char *en_set_explain[SET_LABELS] = {
 	[SET_GAME_CLOCK] = "Lets games read the cart's clock.",
 	[SET_ENGINE] = "Patches from a built-in table first.",
 	[SET_AUTO_SAVE] = "Copies saves to the card, no question.",
-	[SET_RTS] = "Save and load a game's state in game.",
+	[SET_RTS] = "Save and load from the in-game menu.",
 	[SET_CHEATS] = "Applies a game's cheat file.",
 	[SET_RUMBLE] = "Lets games use the cart's rumble.",
 	[SET_MODE_B] = "What the cart is in a DS (mode B).",
 	[SET_LED] = "The cart's light.",
 	[SET_LED_IDLE] = "The light's colour while idle.",
 	[SET_LED_SD] = "The light while the SD card works.",
-	[SET_RESET_ON] = "The keys leave a game for the menu.",
+	[SET_RESET_ON] = "Hold the keys to leave a game.",
 	[SET_RESET_KEYS] = "Held together in game. A sets them.",
-	[SET_SLEEP_ON] = "The keys put a game to sleep.",
+	[SET_SLEEP_ON] = "Screen off. START+SELECT wakes it.",
 	[SET_SLEEP_KEYS] = "Held together in game. A sets them.",
 	[SET_RESCAN] = "Looks for games on the card again.",
 	[SET_IDENTIFY] = "Looks up each game in names.db.",
 	[SET_SHOW_ALL] = "The SD card page shows hidden files.",
 	[SET_LOGGING] = "Writes a log to /torii/logs.",
 	[SET_LANGUAGE] = "The menu's language.",
-	[SET_LABEL_SAVE_KEYS] = "Saves a state in game. A sets them.",
-	[SET_LABEL_LOAD_KEYS] = "Loads the state in game. A sets them.",
-	[SET_LABEL_RESET_ARMED] = "On anyway with Save states or cheats.",
+	[SET_LABEL_RESET_STATES] = "Opens the in-game menu instead.",
+	[SET_LABEL_RESET_CHEATS] = "With a cheat file: the in-game menu.",
 };
 const char *en_set_onoff[2] = {"Off", "On"};
 const char *en_set_themes[2] = {"Dark", "Light"};
@@ -402,15 +398,12 @@ const char *en_info[INFO_STRINGS] = {
 				"start a game with the ones Settings turns on, Clean boot without. Settings, "
 				"Hotkeys sets them; Save states and Cheats are in Settings, Games. A game on the NOR "
 				"keeps the hotkeys it was written with.\n",
-	[INFO_S_INGAME_STATES] = "# Save states\n"
-				 "Hold %s to save the game's state, and %s to load it. Save before you load: with "
-				 "no state saved, a game can crash.\n",
 	[INFO_S_INGAME_MENU] = "# The in-game menu\n"
 			       "Hold %s to open it: back to the menu, save or load a state, and the game's cheats.\n",
-	[INFO_S_INGAME_RESET] = "# Back to the menu\n"
+	[INFO_S_INGAME_RESET] = "# Back to menu\n"
 				"Hold %s to leave the game for the menu.\n",
-	[INFO_S_INGAME_RESET_OFF] = "# Back to the menu\n"
-				    "Off: turn Reset hotkey on in Settings, or switch the GBA off and on.\n",
+	[INFO_S_INGAME_RESET_OFF] = "# Back to menu\n"
+				    "Off: turn Back to menu on in Settings, or switch the GBA off and on.\n",
 	[INFO_S_INGAME_CHEATS] = "In a game with a cheat file, %s still opens the in-game menu, with its cheats.\n",
 	[INFO_S_INGAME_SLEEP] = "# Sleep\n"
 				"Hold %s to put the game to sleep: the screen goes off. START and SELECT wake it.\n",

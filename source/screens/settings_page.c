@@ -152,7 +152,6 @@ static struct {
 	char pos[12];
 	char refused[48];
 	char progress[16];  // Identify library's value while it runs: 12/176
-	const char *keys_label;  // the Reset keys row's label as drawn
 	u16 edit_from[3];        // the edited row's slots as they were before A (B puts them back)
 	struct ui_hint hints[4];
 } sp EWRAM_BSS;
@@ -708,7 +707,6 @@ static void relayout(void)
 	u32 s = settings_layout_slot_of(&sp.lay, id);
 	sp.cursor = (u8)(s != SET_LAYOUT_NONE ? s : settings_layout_row_at(&sp.lay, sp.cursor));
 	ui_list_recount(node(N_LIST), sp.cursor);
-	sp.keys_label = settings_label(&sp.v, SET_RESET_KEYS);  // every row draws again
 	position_show();
 }
 
@@ -731,15 +729,9 @@ static void previews(u32 id, int ui)
 		led_show();
 		break;
 	case SET_RTS:
-	case SET_CHEATS:
-	case SET_RESET_ON:
-	case SET_SLEEP_ON:
-		// Real-time save alone renames the hotkeys' rows (cached rows too)
-		if (ui && settings_label(&sp.v, SET_RESET_KEYS) != sp.keys_label) {
-			sp.keys_label = settings_label(&sp.v, SET_RESET_KEYS);
-			refresh_id(SET_RESET_KEYS);
-			refresh_id(SET_SLEEP_KEYS);
-		}
+		// Save states show Back to menu as On (settings_reset_armed)
+		if (ui)
+			refresh_id(SET_RESET_ON);
 		break;
 	case SET_CLOCK_24H:
 		if (ui)
@@ -888,6 +880,8 @@ static void activate(u32 id)
 		}
 		break;
 	default:
+		if (id == SET_RESET_ON && settings_reset_armed(&sp.v))
+			break;  // On while Save states are; its explanation says why
 		sp.mode = MODE_EDIT;
 		sp.edit_id = (u8)id;
 		edit_slots(id, 0);
@@ -966,7 +960,6 @@ static struct ui_view *settings_enter(u32 item, u32 row)
 	sp.cursor = (u8)(s != SET_LAYOUT_NONE ? s : settings_layout_row_at(&sp.lay, 0));
 	sp.live = 1;
 	sp.identify_done = IDENTIFY_IDLE;
-	sp.keys_label = settings_label(&sp.v, SET_RESET_KEYS);
 	ui_title_set(node(N_TITLE), nav_item_name(item));
 	ui_list_reset(node(N_LIST), sp.cursor);
 	position_show();

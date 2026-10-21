@@ -2,7 +2,7 @@
 # light: the top with Theme selected (#18); Start on edited in place (#19),
 # B putting it back; Time's field card (#20) opening (every frame hashed)
 # with its hour changed; the LED colour's swatches being chosen; Sleep keys
-# waiting for keys, then L+R+START refused (the Reset keys'); and a held
+# waiting for keys, then L+R+START refused (the Menu keys'); and a held
 # DOWN from the top through every section to Logging (every frame hashed).
 #! settings 28=1
 -w "nav: home ready"
