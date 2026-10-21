@@ -56,8 +56,8 @@ boot() { # log [mgba-shot options]
 }
 
 crc_of() { python3 -c "import sys, zlib; print(f'{zlib.crc32(open(sys.argv[1], \"rb\").read()):08X}')" "$1"; }
-crc=$(crc_of tests/shots/data/art-sunset.bin)  # Zed.gba's
-code_crc=$(crc_of tests/shots/data/art-night.bin)  # Code.gba's
+crc=$(crc_of tests/shots/data/art-sunset.bin)     # Zed.gba's
+code_crc=$(crc_of tests/shots/data/art-night.bin) # Code.gba's
 code=$(id 2 "0x$code_crc")
 
 # Matched art by CRC: it shows; leaving the page and opening it again shows
