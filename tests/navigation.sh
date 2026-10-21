@@ -51,11 +51,10 @@ boot() {
 }
 logged() { grep -qF -- "$1" "$log" || fail "$(basename "$log") didn't log '$1'"; }
 
+# setting SLOT VALUE: a settings slot in the kernel NOR (source/ez_define.h)
+setting() { printf %b "\\x$(printf %02x "$2")\\x00" | dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7B0000 + 2 * $1)) conv=notrunc status=none; }
 # start_on VALUE: the Start on setting (slot 32, source/settings_model.h)
-start_on() {
-  printf %b "\\x$(printf %02x "$1")\\x00" |
-    dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7B0000 + 2 * 32)) conv=notrunc status=none
-}
+start_on() { setting 32 "$1"; }
 
 # Every route, from power-on on a card new to the menu (a route starts on
 # home: Last place would start where the one before left)
@@ -143,14 +142,13 @@ done
 printf '@boot gb\n/Hello.gba\n' >"$cart/recent.txt"
 mcopy -o -i "$cart/sd.img" "$cart/recent.txt" ::/torii/recent.txt
 boot 4 -w "nav: home ready" -k @10:RIGHT -k @14:- -k @22:A -k @26:- -w "nav: page sd ready" -k @10:B -k @14:- \
-  -w "nav: home ready" -k @10:LEFT -k @14:- -k @400:- -f 900
+  -w "nav: home ready" -k @10:LEFT -k @14:- -k @400:- -f @400
 logged "nav: start on 0: home-gb"
 ! grep -q "safefile: writing" "$log" || fail "turning away and back to the boot item wrote recent.txt"
 echo "PASS: Last place comes back as home facing the item last faced, older kernels' lines read as their item, and a boot that stays on its item writes nothing"
 
 # Start on through power cycles and games (D1), with Auto save on (no
 # question at power-on after a game) and the Reset hotkey on (L+R+START)
-setting() { printf %b "\\x$(printf %02x "$2")\\x00" | dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7B0000 + 2 * $1)) conv=notrunc status=none; }
 started() { grep -o "nav: start on .*" "$log" | sed -n "${2:-1}p" | grep -qxF "nav: start on $1" || fail "$(basename "$log") didn't start on $1: $(grep -o 'nav: start on.*' "$log" | tr '\n' ' ')"; }
 new_cart cycle
 setting 14 1
@@ -184,10 +182,11 @@ logged "settings: row 3 set to GBA"
 boot 8 -w "nav: start on" -f @300
 started "5: gba"
 # Every other value: a power-on, a game from the menu (the tests' hook), and
-# a power-on after it, which starts in the same place
+# a power-on after it, which starts in the same place (the launch leaves
+# the setting alone)
 for case in "1 recent" "2 home-recent" "3 fav" "4 sd" "5 gba" "6 home-gb" "7 gb" "8 home-sd"; do
   read -r value place <<<"$case"
-  setting 32 "$value"
+  start_on "$value"
   # shellcheck disable=SC2046
   boot "game-$value" $(nav_launch /Hello.gba) -w "launch: starting" -f @300
   started "$value: $place"
