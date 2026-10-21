@@ -188,6 +188,16 @@ RULES = [
         "names database tool: test-host runs its tests, tests/names_db.sh reads its files on the cart",
     ),
     (
+        ["tools/art_scrape.py", "tests/art_scrape_test.py"],
+        {LINT, TEST_HOST},
+        "box art scraper: test-host runs its tests against a local server",
+    ),
+    (
+        ["tests/library_idx.py"],
+        {LINT, TEST_HOST, TEST},
+        "library index reader: the library tests and art-scrape's tests use it",
+    ),
+    (
         sorted(NO_COMPAT),
         {LINT, TEST, SIZE, ANALYZE},
         "menu or text only, listed in NO_COMPAT",

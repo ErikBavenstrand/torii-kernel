@@ -254,7 +254,7 @@ compat *filters: build emu-headless
     {{emu_docker}} python3 tests/games.py "$@"
 
 # Build the hardware-free kernel code with tests/host for the host, under ASan and UBSan, and run it;
-# test tools/font.py, tools/asset.py, tools/art.py, the palette and the upgrade file's layout
+# test tools/font.py, tools/asset.py, tools/art.py, tools/art_scrape.py, the palette and the upgrade file's layout
 test-host: emu-image
     {{emu_docker}} tests/host.sh
     @uv run -q tests/font_test.py
@@ -262,6 +262,7 @@ test-host: emu-image
     @uv run -q tests/image_test.py
     @uv run -q tests/names_db_test.py
     @uv run -q tests/art_test.py
+    @uv run -q tests/art_scrape_test.py
 
 # Convert docs/design/v0.4/palette.json to C: source/ui/palette.c and palette.h
 # (committed; tests/host.sh checks they match), then `just shots-update` for the screens
@@ -340,6 +341,14 @@ names-update sd_path *args:
 [positional-arguments]
 art-add rom image sd_path *args:
     uv run -q tools/art.py add "$@"
+
+# Fetch box art for an SD card's games from libretro-thumbnails, e.g. `just art-scrape /Volumes/OMEGA`:
+# /torii/art/<CRC32>.bin, matched by CRC through the No-Intro dats (dist/dats), keeping custom art and
+# art already there. Pictures are cached in the git-ignored dist/art-cache. Box art has no licence
+# grant: keep it on your card, never publish it. --dry-run, --offline, --console: see --help
+[positional-arguments]
+art-scrape sd_path *args:
+    uv run -q tools/art_scrape.py "$@"
 
 # Copy games (files or whole folders) into roms/ and list them in roms/games.toml, e.g. `just game-add ~/roms`
 [positional-arguments]

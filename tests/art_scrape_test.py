@@ -1,0 +1,461 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["pillow==13.0.0"]
+# ///
+"""Tests for tools/art_scrape.py, run by `just test-host`: the match chain,
+the polite fetcher and what lands on the card, against a local fixture HTTP
+server standing in for thumbnails.libretro.com, with the fixture dats and
+games of tests/names. No network."""
+
+import contextlib
+import http.server
+import io
+import socket
+import struct
+import sys
+import tempfile
+import threading
+import unittest
+import urllib.parse
+import zlib
+from pathlib import Path
+
+from PIL import Image
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "tools"))
+sys.path.append(str(ROOT / "tests" / "names"))
+import art
+import art_scrape
+import fixture
+import names_db
+
+DATS = ROOT / "tests" / "names"
+GBA_SYS = "Nintendo - Game Boy Advance"
+GBC_SYS = "Nintendo - Game Boy Color"
+GB_SYS = "Nintendo - Game Boy"
+NES_SYS = "Nintendo - Nintendo Entertainment System"
+
+
+def png(colour):
+    out = io.BytesIO()
+    img = Image.new("RGB", (120, 160), colour)
+    img.paste((255, 255, 255), (10, 10, 110, 40))
+    img.save(out, "PNG")
+    return out.getvalue()
+
+
+def thumb(system, name):
+    return f"/{system}/Named_Boxarts/{name}.png"
+
+
+class Server:
+    """A fixture thumbnail server: routes map a path to a PNG's bytes, an
+    HTTP status, or a list of statuses and bytes given in turn."""
+
+    def __init__(self, routes):
+        self.routes = dict(routes)
+        self.requests = []
+        server = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                path = urllib.parse.unquote(self.path)
+                server.requests.append((path, self.headers.get("User-Agent")))
+                answer = server.routes.get(path, 404)
+                if isinstance(answer, list):
+                    answer = answer.pop(0) if len(answer) > 1 else answer[0]
+                if isinstance(answer, int):
+                    self.send_error(answer)
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Content-Length", str(len(answer)))
+                self.end_headers()
+                self.wfile.write(answer)
+
+            def log_message(self, *args):
+                pass
+
+        self.httpd = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self.httpd.server_address[1]}/"
+        self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
+        self.thread.start()
+
+    def paths(self):
+        return [p for p, _ in self.requests]
+
+    def close(self):
+        self.httpd.shutdown()
+        self.httpd.server_close()
+
+
+def crc_of(path, sd):
+    return f"{zlib.crc32((Path(sd) / path.lstrip('/')).read_bytes()):08X}"
+
+
+def library_idx(games):
+    """A library index (source/library.h, version 3) listing games: (card
+    path, console)."""
+    folders, pool, recs = [], bytearray(), []
+
+    def put(text):
+        off = len(pool)
+        pool.extend(text.encode("utf-8") + b"\0")
+        return off
+
+    folder_offs = {}
+    for path, console in games:
+        parent, name = path.rsplit("/", 1)
+        parent += "/"
+        if parent not in folder_offs:
+            folder_offs[parent] = len(folders)
+            folders.append(put(parent))
+        recs.append((folder_offs[parent], console, 1024, put(name), 0))
+    counts = [0] * 8
+    for _, console in games:
+        counts[console] += 1
+    order = list(range(len(recs)))
+    body = b"".join(struct.pack("<HHIII", *r) for r in recs)
+    o = struct.pack(f"<{len(order)}H", *order)
+    body += o + b"\0" * (-len(o) % 4)
+    body += struct.pack(f"<{len(folders)}I", *folders)
+    pool_bytes = len(pool)
+    body += bytes(pool) + b"\0" * (-len(pool) % 4)
+    head = struct.pack(
+        "<IHHHHHH8HIIIIIIII",
+        0x42494C54,
+        3,
+        64,
+        16,
+        0,
+        len(recs),
+        len(folders),
+        *counts,
+        len(recs),
+        pool_bytes,
+        0,
+        0,
+        zlib.crc32(body),
+        len(recs),
+        1,
+        0,
+    )
+    return head[:60] + struct.pack("<I", zlib.crc32(head[:60])) + body
+
+
+class Names(unittest.TestCase):
+    def test_thumbnail_names(self):
+        self.assertEqual(
+            art_scrape.thumbnail_name('Quote "Test" & A/B: <c>? `d` \\ e|f* (World)'),
+            "Quote _Test_ _ A_B_ _c__ _d_ _ e_f_ (World)",
+        )
+        self.assertEqual(art_scrape.short_name("Game (USA) (Rev 1)"), "Game")
+        self.assertIsNone(art_scrape.short_name("Game"))
+        self.assertIsNone(art_scrape.short_name("(Unl) Game"))
+
+    def test_tries(self):
+        picks = art_scrape.tries([(0, "A: B (USA)"), (0, "A: B (Europe)")])
+        self.assertEqual(picks, [(0, "A_ B (USA)"), (0, "A_ B"), (0, "A_ B (Europe)")])
+
+    def test_url_is_quoted(self):
+        f = art_scrape.Fetcher("https://x/", "/nonexistent", 0, 0, True, False)
+        self.assertEqual(
+            f.url(0, "Advance Wars (USA)"),
+            "https://x/Nintendo%20-%20Game%20Boy%20Advance/Named_Boxarts/Advance%20Wars%20%28USA%29.png",
+        )
+
+    def test_candidates(self):
+        texts = [(DATS / d).read_text() for d in fixture.DATS]
+        tables, codes, _ = names_db.make_tables(texts)
+        hack = zlib.crc32(fixture.rom(9, 4096, "BZME"))
+        self.assertEqual(
+            art_scrape.candidates(tables, codes, 0, hack, "BZME"),
+            [(0, "Legend of Zelda, The - The Minish Cap (USA)")],
+        )
+        # A .gb in the GBC dat looks in the GBC thumbnails
+        gb = zlib.crc32(fixture.rom(6, 2048))
+        self.assertEqual(
+            art_scrape.candidates(tables, codes, 2, gb, None),
+            [(1, "Colour Named Gb (World)")],
+        )
+        self.assertEqual(art_scrape.candidates(tables, codes, 0, 1, None), [])
+
+
+class Scrape(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        base = Path(self.tmp.name)
+        self.sd = base / "sd"
+        self.cache = base / "cache"
+        self.sd.mkdir()
+        fixture.write_roms(self.sd)
+        self.pics = {
+            "wars": png((200, 30, 30)),
+            "minish": png((30, 160, 40)),
+            "colour": png((240, 200, 0)),
+            "colgb": png((0, 120, 200)),
+            "nes": png((90, 0, 90)),
+        }
+        self.server = Server(
+            {
+                thumb(GBA_SYS, "Advance Wars (USA)"): self.pics["wars"],
+                # Only the name cut at "(": the fallback
+                thumb(GBA_SYS, "Legend of Zelda, The - The Minish Cap"): self.pics[
+                    "minish"
+                ],
+                # Two server errors, then the picture
+                thumb(GBC_SYS, "Colour Game (USA)"): [500, 503, self.pics["colour"]],
+                thumb(GBC_SYS, "Colour Named Gb (World)"): self.pics["colgb"],
+                thumb(NES_SYS, "Famicom Game (Japan)"): self.pics["nes"],
+            }
+        )
+
+    def tearDown(self):
+        self.server.close()
+        self.tmp.cleanup()
+
+    def run_tool(self, *extra, url=None):
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            status = art_scrape.main(
+                [
+                    str(self.sd),
+                    "--dats",
+                    str(DATS),
+                    "--cache",
+                    str(self.cache),
+                    "--base-url",
+                    url or self.server.url,
+                    "--delay",
+                    "0",
+                    "--retry-wait",
+                    "0",
+                    *extra,
+                ]
+            )
+        return status, out.getvalue(), err.getvalue()
+
+    def art(self, card_path):
+        return self.sd / "torii" / "art" / f"{crc_of(card_path, self.sd)}.bin"
+
+    def test_scrape(self):
+        status, out, err = self.run_tool()
+        self.assertEqual(status, 0, err)
+        for path in (
+            "/GBA/Wars.gba",
+            "/GBA/zz Minish.gba",
+            "/GBA/Hack of Minish.gba",  # by its game code
+            "/Colour.gbc",
+            "/Colour named GB.gb",
+            "/NES/Famicom.nes",
+        ):
+            data = self.art(path).read_bytes()
+            self.assertEqual(len(data), art.FILE_BYTES, path)
+            self.assertEqual(data[:4], b"TAS2")
+        self.assertFalse(self.art("/GB/Mono.gb").exists())
+        self.assertFalse(self.art("/GBA/Homebrew.gba").exists())
+        self.assertEqual(
+            self.art("/GBA/zz Minish.gba").read_bytes(),
+            self.art("/GBA/Hack of Minish.gba").read_bytes(),
+        )
+        self.assertIn(
+            "GBA: 4 games, 3 with art (75%): 2 downloaded, 1 from the cache, 1 not in the dats",
+            out,
+        )
+        self.assertIn("GB: 2 games, 1 with art (50%)", out)
+        self.assertIn("GBC: 1 games, 1 with art (100%)", out)
+        self.assertIn("NES: 1 games, 1 with art (100%)", out)
+        self.assertIn("/GB/Mono.gb: no thumbnail", out)
+        self.assertIn("/GBA/Homebrew.gba: not in the dats", out)
+        # One request per picture tried, the retries, each with the User-Agent
+        paths = self.server.paths()
+        self.assertEqual(paths.count(thumb(GBC_SYS, "Colour Game (USA)")), 3)
+        self.assertEqual(
+            paths.count(thumb(GBA_SYS, "Legend of Zelda, The - The Minish Cap (USA)")),
+            1,
+        )
+        self.assertEqual(
+            paths.count(thumb(GBA_SYS, "Legend of Zelda, The - The Minish Cap")), 1
+        )
+        self.assertIn(thumb(GB_SYS, "Mono Game"), paths)
+        self.assertTrue(
+            all(ua == art_scrape.USER_AGENT for _, ua in self.server.requests)
+        )
+        # crc.txt now has every game, so the kernel finds the art
+        self.assertEqual(
+            len(
+                names_db.parse_cache(names_db.read_safe(self.sd / "torii" / "crc.txt"))
+            ),
+            8,
+        )
+        # The cache holds the pictures and the misses
+        self.assertEqual(
+            (self.cache / GBA_SYS / "Advance Wars (USA).png").read_bytes(),
+            self.pics["wars"],
+        )
+        self.assertIn(
+            f"{GB_SYS}/Mono Game (Japan)", (self.cache / "misses.txt").read_text()
+        )
+
+        # A second run asks for nothing: the art is on the card
+        before = len(self.server.requests)
+        status, out, _ = self.run_tool()
+        self.assertEqual(status, 0)
+        self.assertEqual(len(self.server.requests), before)
+        self.assertIn("GBA: 4 games, 3 with art (75%): 3 already on the card", out)
+
+        # --retry-missing asks the server again for what it hadn't
+        status, _, _ = self.run_tool("--retry-missing")
+        self.assertEqual(status, 0)
+        self.assertIn(thumb(GB_SYS, "Mono Game (Japan)"), self.server.paths()[before:])
+
+    def test_keeps_custom_and_existing_art(self):
+        custom = self.sd / "torii" / "art" / "custom"
+        custom.mkdir(parents=True)
+        (custom / "Wars.gba.bin").write_bytes(b"mine")
+        self.art("/NES/Famicom.nes").write_bytes(b"old")
+        (custom.parent / "bzme.bin").write_bytes(b"by code")  # the Minish games' code
+        status, out, err = self.run_tool()
+        self.assertEqual(status, 0, err)
+        self.assertNotIn(thumb(GBA_SYS, "Advance Wars (USA)"), self.server.paths())
+        self.assertNotIn(thumb(NES_SYS, "Famicom Game (Japan)"), self.server.paths())
+        self.assertFalse(self.art("/GBA/Wars.gba").exists())
+        self.assertEqual((custom / "Wars.gba.bin").read_bytes(), b"mine")
+        self.assertEqual(self.art("/NES/Famicom.nes").read_bytes(), b"old")
+        self.assertNotIn("Minish", " ".join(self.server.paths()))
+        self.assertFalse(self.art("/GBA/zz Minish.gba").exists())
+        self.assertIn(
+            "GBA: 4 games, 3 with art (75%): 2 already on the card, 1 custom", out
+        )
+        self.assertIn("NES: 1 games, 1 with art (100%): 1 already on the card", out)
+
+    def test_dry_run_changes_nothing(self):
+        status, out, err = self.run_tool("--dry-run")
+        self.assertEqual(status, 0, err)
+        self.assertEqual(self.server.requests, [])
+        self.assertFalse((self.sd / "torii").exists())
+        self.assertFalse(self.cache.exists())
+        self.assertIn(
+            "would fetch: /GBA/Wars.gba: "
+            + self.server.url
+            + GBA_SYS
+            + "/Named_Boxarts/Advance Wars (USA).png",
+            out,
+        )
+        self.assertIn(
+            "GBA: 4 games, 0 with art now or from the cache (0%): 3 to download, 1 not in the dats",
+            out,
+        )
+
+    def test_offline_uses_the_cache(self):
+        self.run_tool()
+        before = len(self.server.requests)
+        art_dir = self.sd / "torii" / "art"
+        wars = self.art("/GBA/Wars.gba").read_bytes()
+        for f in art_dir.glob("*.bin"):
+            f.unlink()
+        status, out, err = self.run_tool("--offline")
+        self.assertEqual(status, 0, err)
+        self.assertEqual(len(self.server.requests), before)
+        self.assertEqual(self.art("/GBA/Wars.gba").read_bytes(), wars)
+        self.assertIn("GBA: 4 games, 3 with art (75%): 3 from the cache", out)
+        # Offline, an unasked picture isn't a miss
+        for f in art_dir.glob("*.bin"):
+            f.unlink()
+        (self.cache / GBA_SYS / "Advance Wars (USA).png").unlink()
+        _, out, _ = self.run_tool("--offline")
+        self.assertIn("/GBA/Wars.gba: not fetched", out)
+
+    def test_console_filter(self):
+        status, out, err = self.run_tool("--console", "gb,NES")
+        self.assertEqual(status, 0, err)
+        self.assertTrue(
+            all(
+                p.startswith((f"/{GB_SYS}/", f"/{GBC_SYS}/", f"/{NES_SYS}/"))
+                for p in self.server.paths()
+            )
+        )
+        self.assertNotIn("GBA:", out)
+        self.assertIn("GB: 2 games", out)
+        self.assertEqual(
+            len(
+                names_db.parse_cache(names_db.read_safe(self.sd / "torii" / "crc.txt"))
+            ),
+            8,
+        )
+        status, _, err = self.run_tool("--console", "SNES")
+        self.assertEqual(status, 1)
+        self.assertIn("--console takes GBA, GBC, GB, NES", err)
+
+    def test_server_errors_stop_fetching(self):
+        self.server.routes[thumb(GB_SYS, "Mono Game (Japan)")] = 503
+        status, out, err = self.run_tool("--console", "GB")
+        self.assertEqual(status, 0)
+        # One picture, then the retries; nothing is taken for a miss
+        self.assertEqual(len(self.server.requests), 1 + 1 + art_scrape.RETRIES)
+        self.assertIn("stopped fetching: the server keeps failing (503)", err)
+        self.assertIn("/GB/Mono.gb: not fetched", out)
+        self.assertFalse((self.cache / "misses.txt").exists())
+
+    def test_too_many_requests_stops_at_once(self):
+        self.server.routes[thumb(GB_SYS, "Mono Game (Japan)")] = 429
+        status, _, err = self.run_tool("--console", "GB")
+        self.assertEqual(status, 0)
+        self.assertEqual(len(self.server.requests), 2)
+        self.assertIn("(429)", err)
+
+    def test_unreachable(self):
+        with socket.socket() as s:
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]
+        status, out, err = self.run_tool(
+            "--console", "GBA", url=f"http://127.0.0.1:{port}/"
+        )
+        self.assertEqual(status, 0)
+        self.assertIn("stopped fetching: can't reach", err)
+        self.assertIn("/GBA/Wars.gba: not fetched", out)
+
+    def test_not_a_picture(self):
+        self.server.routes[thumb(GBA_SYS, "Advance Wars (USA)")] = b"<html>oops</html>"
+        status, out, err = self.run_tool("--console", "GBA")
+        self.assertEqual(status, 0)
+        self.assertIn("not a PNG", err)
+        self.assertIn("/GBA/Wars.gba: not fetched", out)
+        self.assertNotIn("Advance Wars (USA)", (self.cache / "misses.txt").read_text())
+        # A PNG that doesn't decode is dropped from the cache
+        self.server.routes[thumb(GBA_SYS, "Advance Wars (USA)")] = (
+            b"\x89PNG\r\n\x1a\nbroken"
+        )
+        status, out, err = self.run_tool("--console", "GBA")
+        self.assertEqual(status, 0)
+        self.assertIn("not a picture art.py reads", err)
+        self.assertIn("/GBA/Wars.gba: no thumbnail", out)  # the short name isn't there
+        self.assertFalse((self.cache / GBA_SYS / "Advance Wars (USA).png").exists())
+        self.assertFalse(self.art("/GBA/Wars.gba").exists())
+
+    def test_reads_the_library_index(self):
+        # A game only the index lists (here in a folder the walk skips)
+        odd = self.sd / "RTS" / "Odd.nes"
+        odd.parent.mkdir()
+        odd.write_bytes(fixture.rom(7, 16400))
+        torii = self.sd / "torii"
+        torii.mkdir()
+        (torii / "library.idx").write_bytes(
+            library_idx([("/RTS/Odd.nes", 3), ("/GBA/Wars.gba", 0), ("/Gone.gba", 0)])
+        )
+        games = {p: c for p, _, c in art_scrape.card_games(self.sd)}
+        self.assertEqual(games["/RTS/Odd.nes"], 3)
+        self.assertNotIn("/Gone.gba", games)  # no longer on the card
+        self.assertEqual(len(games), 9)
+
+    def test_no_card(self):
+        self.sd = self.sd / "nope"
+        status, _, err = self.run_tool()
+        self.assertEqual(status, 1)
+        self.assertIn("isn't a folder", err)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=1)
