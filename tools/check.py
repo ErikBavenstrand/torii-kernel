@@ -161,6 +161,7 @@ RULES = [
         "font converter, tested by test-host",
     ),
     (["tools/font_preview.py"], {LINT}, "font preview sheets"),
+    (["tools/mockup/*"], {LINT}, "design mockups (docs/design/v0.4)"),
     (
         ["assets/ui/*"],
         {LINT, TEST_HOST, TEST},

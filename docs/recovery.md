@@ -132,8 +132,8 @@ install Torii, and step 6 can't put a safe kernel on them. The loader
 itself is EZ-Flash's, and Torii can't change what it accepts
 (`docs/research/omega-de-hardware.md`, *How EZ-Flash's loader installs it*).
 
-To see which chip a cart has, open Torii's Diagnostics (settings page 2,
-DIAGNOSE) on a cart that runs Torii: it shows `kernel NOR id XXXX`. On a
+To see which chip a cart has, open Torii's Diagnostics (Info,
+Diagnostics) on a cart that runs Torii: it shows `kernel NOR id XXXX`. On a
 cart that never ran Torii, the `Bad NOR ID` message at the update is the
 sign. Ask EZ-Flash about such a cart: an official loader or kernel that
 accepts `0x220C` is the only way to update it.
@@ -143,6 +143,6 @@ accepts `0x220C` is the only way to update it.
 - The loader image stays at byte `0x200` on the card, harmless below the
   file system. Keep it there on a test card (`docs/release-checklist.md`):
   if a test bricks the cart, step 5 works at once.
-- Torii's Diagnostics (settings page 2, DIAGNOSE) reads the loader and logs
+- Torii's Diagnostics (Info, Diagnostics) reads the loader and logs
   its CRC and state ("boot loader present"), whether it is this DE.BIN, and
   warns if it's blank, erased or overwritten.
