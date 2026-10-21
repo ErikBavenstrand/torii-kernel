@@ -5,11 +5,12 @@
 # ///
 """Tests for tools/art.py, run by `just test-host`: the box art converter
 (crop, size, colours, dither, determinism, the asset it writes), `art-add`'s
-card layout and refusals, and that the goldens' covers in tests/shots/data
+card layout, its folder of pictures matched to games, and refusals, and that the goldens' covers in tests/shots/data
 are its output for tests/art. No network."""
 
 import contextlib
 import io
+import os
 import struct
 import sys
 import tempfile
@@ -172,6 +173,120 @@ class ArtTest(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()) as said:
             self.assertEqual(art.main(["add", "readme", str(pic), str(sd)]), 0)
         self.assertIn("no game extension", said.getvalue())
+
+    def test_add_folder_matches_pictures_to_games(self):
+        sd = self.dir / "card"
+        for game in (
+            "GBA/Pokemon - Glazed.gba",
+            "Hacks/Pokemon - Glazed.gba",  # a copy: one art file for both
+            "GB/Tetris.gb",
+            "GBC/Tetris.gbc",
+            "GBA/Wars (USA).gba",
+            "torii/Hidden.gba",  # in a folder the kernel hides
+        ):
+            (sd / game).parent.mkdir(parents=True, exist_ok=True)
+            (sd / game).write_bytes(b"\0" * 256)
+        src = sd / "torii" / "art" / "custom-src"
+        src.mkdir(parents=True)
+        glazed = self.gradient(90, 90)
+        glazed.save(src / "pokemon - GLAZED.png")  # without the extension, any case
+        Image.new("RGB", (60, 60), (200, 0, 0)).save(
+            src / "Tetris.jpg"
+        )  # both Tetris games
+        Image.new("RGB", (60, 60), (0, 0, 200)).save(
+            src / "Wars (USA).gba.png"
+        )  # with it
+        Image.new("RGB", (60, 60)).save(src / "Hidden.png")
+        Image.new("RGB", (60, 60)).save(src / "Nobody.png")
+        (src / "notes.txt").write_text("not a picture")
+        (src / ".DS_Store").write_bytes(b"x")
+        custom = sd / "torii" / "art" / "custom"
+
+        with contextlib.redirect_stdout(io.StringIO()) as said:
+            self.assertEqual(art.main(["add", str(sd), "--dry-run"]), 0)
+        self.assertFalse(custom.exists())
+        self.assertIn("4 art files to write", said.getvalue())
+
+        with contextlib.redirect_stdout(io.StringIO()) as said:
+            self.assertEqual(art.main(["add", str(sd)]), 0)
+        out = said.getvalue()
+        self.assertEqual(
+            sorted(f.name for f in custom.iterdir()),
+            [
+                "Pokemon - Glazed.gba.bin",
+                "Tetris.gb.bin",
+                "Tetris.gbc.bin",
+                "Wars (USA).gba.bin",
+            ],
+        )
+        self.assertEqual(
+            (custom / "Pokemon - Glazed.gba.bin").read_bytes(),
+            art.convert(src / "pokemon - GLAZED.png"),
+        )
+        self.assertIn("  pokemon - GLAZED.png -> Pokemon - Glazed.gba\n", out)
+        self.assertIn("  Hidden.png: no game on the card has that file name", out)
+        self.assertIn("  Nobody.png: no game on the card has that file name", out)
+        self.assertIn(
+            "5 pictures in " + str(src) + ": 4 art files written, 0 up to date, "
+            "2 matched no game, 0 doubles, 0 failed",
+            out,
+        )
+
+        # Again: nothing newer, nothing converted; --force does them all
+        with contextlib.redirect_stdout(io.StringIO()) as said:
+            self.assertEqual(art.main(["add", str(sd)]), 0)
+        self.assertIn("0 art files written, 4 up to date", said.getvalue())
+        with contextlib.redirect_stdout(io.StringIO()) as said:
+            self.assertEqual(art.main(["add", str(sd), "--force"]), 0)
+        self.assertIn("4 art files written, 0 up to date", said.getvalue())
+
+        # A picture replaced by an older one is another picture: converted again
+        os.utime(src / "Tetris.jpg", (1_000_000_000, 1_000_000_000))
+        with contextlib.redirect_stdout(io.StringIO()) as said:
+            self.assertEqual(art.main(["add", str(sd)]), 0)
+        self.assertIn("2 art files written, 2 up to date", said.getvalue())
+        # Two pictures for one game: the first wins, the other is reported
+        Image.new("RGB", (60, 60)).save(src / "wars (usa).png")
+        with contextlib.redirect_stdout(io.StringIO()) as said:
+            self.assertEqual(art.main(["add", str(sd)]), 0)
+        self.assertIn(
+            "  wars (usa).png: Wars (USA).gba has art from Wars (USA).gba.png: skipped",
+            said.getvalue(),
+        )
+        (src / "wars (usa).png").unlink()
+
+        # A folder given; a picture that doesn't convert is reported, the rest go on
+        other = self.dir / "pics"
+        other.mkdir()
+        (other / "Tetris.png").write_bytes(b"not a picture")
+        Image.new("RGB", (60, 60), (0, 200, 0)).save(other / "wars (usa).bmp")
+        # After Tetris.png fails, the next picture for Tetris.gb still counts
+        Image.new("RGB", (60, 60), (9, 9, 9)).save(other / "tetris.gb.png")
+        with contextlib.redirect_stdout(io.StringIO()) as said:
+            self.assertEqual(art.main(["add", str(sd), str(other), "--force"]), 1)
+        out = said.getvalue()
+        self.assertIn("  Tetris.png: ", out)
+        self.assertIn(
+            "2 art files written, 0 up to date, 0 matched no game, 0 doubles, 1 failed",
+            out,
+        )
+        self.assertEqual(
+            (custom / "Wars (USA).gba.bin").read_bytes(),
+            art.convert(other / "wars (usa).bmp"),
+        )
+        self.assertEqual(
+            (custom / "Tetris.gb.bin").read_bytes(),
+            art.convert(other / "tetris.gb.png"),
+        )
+
+        # No folder of pictures, no card
+        for args in (
+            ["add", str(sd), str(self.dir / "none")],
+            ["add", str(self.dir / "nope")],
+        ):
+            with contextlib.redirect_stdout(io.StringIO()) as said:
+                self.assertEqual(art.main(args), 1)
+            self.assertIn("art.py:", said.getvalue())
 
     def test_refusals(self):
         sd = self.dir / "card"

@@ -6,7 +6,7 @@
 """Fetch box art for an SD card's games from libretro-thumbnails.
 
 usage: art_scrape.py SD_PATH [--console C[,C...]] [--dry-run] [--offline]
-                     [--retry-missing] [--delay S] [--cache DIR] [--dats DIR]
+                     [--keep-stale] [--retry-missing] [--delay S] [--cache DIR] [--dats DIR]
 
 `just art-scrape SD_PATH` runs this. SD_PATH is the card's folder on this PC
 (a mounted card, say /Volumes/OMEGA). For every game on the card (the ones
@@ -15,12 +15,19 @@ kernel hides) it:
 
 1. Takes the game's CRC32 from /torii/crc.txt, or computes it and writes
    crc.txt as `just names-update` does, so the kernel finds the art at once.
-2. Keeps what the card has: custom art (/torii/art/custom/<file name>.bin,
-   from `just art-add`) and art already at /torii/art/<CRC32>.bin (or, for
-   a GBA game, /torii/art/<game code>.bin).
+2. Deletes the art v0.4.1's scraper gave romhacks: /torii/art/<CRC32>.bin
+   of a game on the card that step 3 finds no art for (it took the base
+   game's box by the game code). --keep-stale only lists them. Custom art
+   is never touched.
+   Then keeps what the card has: custom art (/torii/art/custom/<file name>.bin,
+   from `just art-add`) and art already at /torii/art/<CRC32>.bin.
 3. Looks the CRC up in libretro-database's No-Intro dats (downloaded once to
-   dist/dats, shared with `just names-update`), then for a GBA game its
-   game code. Each No-Intro name found, with &*/:`<>?\\|"
+   dist/dats, shared with `just names-update`). A game they don't list (a
+   romhack, a translation, a patched dump) gets no art, so a romhack never
+   shows its base game's box: give it custom art. Only a GBA game whose
+   file name is the title of the game its header's code names ("Pokemon -
+   Emerald Version (Erik).gba") takes that game's art. Each No-Intro name
+   found, with &*/:`<>?\\|"
    replaced by _, names the picture:
    https://thumbnails.libretro.com/<System>/Named_Boxarts/<name>.png,
    and failing that the name cut at its first "(" ("Game (USA)": "Game").
@@ -104,20 +111,17 @@ def short_name(name):
     return cut if cut and cut != name else None
 
 
-def candidates(tables, codes, console, crc, code):
-    """The (system, No-Intro name) pairs to look for, in order: the CRC in the
-    console's dat (a GB or GBC file in either's), then a GBA game code's name."""
-    out = []
-    other = {GBC: GB, GB: GBC}.get(console)
-    for i in (console, other):
-        if i is not None and crc is not None and crc in tables[i]:
-            out.append((i, tables[i][crc]))
-            break
-    if console == GBA and code and names_db.code_key(code) in codes:
-        pair = (GBA, codes[names_db.code_key(code)])
-        if pair not in out:
-            out.append(pair)
-    return out
+def candidates(tables, codes, console, crc, code, file_name):
+    """The (system, No-Intro name) pairs to look for: the CRC's in the
+    console's dat (a GB or GBC file in either's); for a GBA game the dats
+    don't list, its game code's, if its file name is that game's title
+    (names_db.code_match). [] for a romhack."""
+    name = names_db.db_name(tables, console, crc)
+    if name is not None:
+        system = console if crc in tables[console] else {GBC: GB, GB: GBC}[console]
+        return [(system, name)]
+    name = names_db.code_match(codes, console, code, file_name)
+    return [(GBA, name)] if name else []
 
 
 def tries(pairs):
@@ -377,6 +381,21 @@ def scrape_one(fetcher, picks, out, dry_run):
     return ("not fetched" if unasked else "missing"), None
 
 
+def stale_art(games, crcs, tables, codes, have):
+    """Matched art (<CRC32>.bin) of games on the card that no longer get art
+    by their CRC: a romhack that v0.4.1's scraper gave its base game's box
+    by its game code. {art file: [card paths]}; custom art isn't looked at."""
+    out = {}
+    for card_path, _, console in games:
+        crc, code = crcs[card_path]
+        file = f"{crc:08X}{art.EXT}"
+        if folded(file) in have and not candidates(
+            tables, codes, console, crc, code, Path(card_path).name
+        ):
+            out.setdefault(file, []).append(card_path)
+    return out
+
+
 def scrape(args):
     sd = Path(args.sd_path)
     if not sd.is_dir():
@@ -411,6 +430,31 @@ def scrape(args):
 
     art_dir = sd / ART_DIR
     have = listing(art_dir)
+    by_code = sorted(f for f in have if re.fullmatch(r"[0-9a-z]{4}\.bin", f))
+    if by_code:
+        # v0.4.1's kernel read art by GBA game code (made by hand: no tool wrote it)
+        print(
+            f"art-scrape: {art_dir} has {len(by_code)} files named like game codes ({by_code[0]}...), "
+            "which Torii doesn't read",
+            file=sys.stderr,
+        )
+    stale = stale_art(games, crcs, tables, codes, have)
+    if stale:
+        # v0.4.1's scraper gave a romhack its base game's box by its game
+        # code, under the romhack's own CRC
+        how = (
+            "would delete"
+            if args.dry_run
+            else "kept (--keep-stale)"
+            if args.keep_stale
+            else "deleted"
+        )
+        print(f"art for games the dats don't list (romhacks), {how}:")
+        for file, paths in stale.items():
+            print(f"  {file}: {', '.join(paths)}")
+            if not args.dry_run and not args.keep_stale:
+                (art_dir / file).unlink()
+                have.discard(folded(file))
     custom = listing(art_dir / "custom", ascii_lower)
     fetcher = Fetcher(
         args.base_url,
@@ -436,12 +480,12 @@ def scrape(args):
         file = f"{crc:08X}{art.EXT}"
         if ascii_lower(Path(card_path).name + art.EXT) in custom:
             how, what = "custom", None
-        elif folded(file) in have or (code and folded(code + art.EXT) in have):
-            # Art by CRC, or by game code (which the kernel takes when it has
-            # no art by CRC, so art written by CRC would hide it)
+        elif folded(file) in have:
             how, what = "on card", None
         else:
-            picks = tries(candidates(tables, codes, console, crc, code))
+            picks = tries(
+                candidates(tables, codes, console, crc, code, Path(card_path).name)
+            )
             if not picks:
                 how, what = "unknown", None
             else:
@@ -524,6 +568,11 @@ def main(argv):
         "--dry-run",
         action="store_true",
         help="download no pictures, change nothing on the card",
+    )
+    p.add_argument(
+        "--keep-stale",
+        action="store_true",
+        help="list romhacks' base-game art (v0.4.1's), don't delete it",
     )
     p.add_argument(
         "--offline", action="store_true", help="never download: use the caches"

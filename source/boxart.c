@@ -258,25 +258,14 @@ static u32 lookup(const char *path, u32 size, struct want *w)
 	w->id = artkey_id(ARTKEY_CUSTOM, w->key);
 	if (artset_has(SET_BASE, w->id))
 		return w->id;
-	u32 crc, code;
-	int has_crc;
-	if (!size || !names_ids(path, size, &crc, &has_crc, &code))
+	// Matched art by CRC only: a romhack shares its base game's code
+	u32 crc;
+	if (!size || !names_crc(path, size, &crc))
 		return 0;
-	if (has_crc) {
-		w->kind = ARTKEY_CRC;
-		w->key = crc;
-		w->id = artkey_id(ARTKEY_CRC, crc);
-		if (artset_has(SET_BASE, w->id))
-			return w->id;
-	}
-	if (code) {
-		w->kind = ARTKEY_CODE;
-		w->key = code;
-		w->id = artkey_id(ARTKEY_CODE, code);
-		if (artset_has(SET_BASE, w->id))
-			return w->id;
-	}
-	return 0;
+	w->kind = ARTKEY_CRC;
+	w->key = crc;
+	w->id = artkey_id(ARTKEY_CRC, crc);
+	return artset_has(SET_BASE, w->id) ? w->id : 0;
 }
 
 // row's cover into *w (and, for custom art, its file name into the want's
@@ -310,9 +299,6 @@ static int locate(u32 id, char *path, u32 size)
 			continue;
 		if (w->kind == ARTKEY_CRC)
 			snprintf(path, size, ART_DIR "/%08lX" ARTKEY_EXT, (unsigned long)w->key);
-		else if (w->kind == ARTKEY_CODE)
-			snprintf(path, size, ART_DIR "/%c%c%c%c" ARTKEY_EXT, (char)w->key, (char)(w->key >> 8),
-				 (char)(w->key >> 16), (char)(w->key >> 24));
 		else
 			snprintf(path, size, CUSTOM_DIR "/%s" ARTKEY_EXT, (const char *)(NAMES_BASE + i * NAME_BYTES));
 		return 1;

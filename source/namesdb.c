@@ -85,13 +85,6 @@ const char *namesdb_by_crc(const u8 *db, u32 console, u32 crc)
 	return search(db, table(db, console), hdr(db)->crc_count[console], crc);
 }
 
-const char *namesdb_by_code(const u8 *db, u32 code)
-{
-	if (!db || !code)
-		return NULL;
-	return search(db, table(db, NAMESDB_CONSOLES), hdr(db)->code_count, code);
-}
-
 u32 namesdb_code(const u8 *bytes)
 {
 	u32 code = 0;
@@ -379,7 +372,5 @@ const char *names_db_name(const u8 *db, const struct names_rec *r, u32 console)
 		if (!name && (console == LIB_GBC || console == LIB_GB))
 			name = namesdb_by_crc(db, console == LIB_GBC ? LIB_GB : LIB_GBC, r->crc);
 	}
-	if (!name && console == LIB_GBA)
-		name = namesdb_by_code(db, r->code);
 	return name;
 }

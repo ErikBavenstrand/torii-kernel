@@ -6,6 +6,7 @@
 """Make box art for the kernel's game lists from any picture.
 
 usage: art.py add ROM_OR_FILE_NAME IMAGE SD_PATH [--align A] [--preview PNG]
+       art.py add SD_PATH [FOLDER] [--align A] [--force] [--dry-run]
        art.py convert IMAGE OUT.bin [--align A] [--preview PNG]
 
 add (`just art-add`): converts IMAGE (a PNG, JPEG or anything else Pillow
@@ -16,6 +17,19 @@ ROM_OR_FILE_NAME is the game's file on the card, or only its file name
 copies of a game in different folders share it, and a romhack never gets
 its base game's art. The list with art shows it in place of the matched art
 or the placeholder.
+
+add SD_PATH [FOLDER] (`just art-add /Volumes/OMEGA`): custom art for many
+games at once. Every picture in FOLDER (by default the card's
+/torii/art/custom-src; not its subfolders) whose name, less its picture
+extension, is a game's file name on the card, with or without the game's
+extension and in any case ("Pokemon - Glazed.png" or "pokemon - glazed.gba.jpg"
+for "Pokemon - Glazed.gba"), becomes that game's custom art, as above; every
+game on the card with that file name gets it. It prints the games each
+picture went to and the pictures that matched no game. A picture is
+converted again only when it changed: the art takes its picture's date
+(--force converts all of them, as a new --align needs). Two pictures for
+one game: the first by name that converts wins, and the other is reported.
+--dry-run converts nothing and writes nothing.
 
 convert: the same conversion into OUT.bin, anywhere (B23's scraper uses it).
 
@@ -45,6 +59,7 @@ from PIL import Image, ImageOps
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import asset
+import names_db
 
 _COVER_H = asset.c_defines(asset.ROOT / "source" / "engine" / "cover.h")
 TILES = _COVER_H["COVER_TILES_W"]
@@ -273,6 +288,92 @@ def add(rom: str, image: Path, sd: Path, align: str) -> tuple[Path, bytes]:
     return out, data
 
 
+# Pictures the batch form reads (Pillow reads all of them)
+PICTURE_EXTS = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tif", ".tiff")
+SOURCE_DIR = Path("torii") / "art" / "custom-src"
+
+
+def add_folder(
+    sd: Path, folder: Path | None, align: str, force: bool, dry_run: bool
+) -> tuple[int, int]:
+    """Custom art for every picture in folder named after games on the card
+    at sd (the batch form); (art files written, pictures that didn't convert
+    or whose game's name can't name an art file)."""
+    if not sd.is_dir():
+        raise ArtError(f"{sd}: not a folder (the card's, such as /Volumes/OMEGA)")
+    folder = folder or sd / SOURCE_DIR
+    if not folder.is_dir():
+        raise ArtError(
+            f"{folder}: no such folder; put pictures named after your games there "
+            f"(or give the folder)"
+        )
+    pictures = sorted(
+        e
+        for e in folder.iterdir()
+        if e.is_file()
+        and not e.name.startswith(".")
+        and e.suffix.lower() in PICTURE_EXTS
+    )
+    by_name = names_db.games_by_name(names_db.walk_card(sd))
+    out_dir = sd / CUSTOM_DIR
+    written = skipped = 0
+    misses, broken, doubles = [], [], []
+    taken = {}  # art file: the picture it comes from in this run
+    for picture in pictures:
+        games = by_name.get(names_db.fold(picture.stem), [])
+        try:
+            arts = sorted({custom_name(str(file)) for _, file, _ in games})
+        except ArtError as e:
+            broken.append(f"{picture.name}: {e}")
+            continue
+        if not arts:
+            misses.append(picture.name)
+            continue
+        data = None
+        when = picture.stat().st_mtime
+        for art in arts:
+            out = out_dir / art
+            name = art[: -len(EXT)]
+            if art in taken:
+                doubles.append(
+                    f"{picture.name}: {name} has art from {taken[art]}: skipped"
+                )
+                continue
+            # The art takes its picture's date: another date is another picture.
+            # FAT keeps dates to 2 s
+            fresh = out.exists() and abs(out.stat().st_mtime - when) < 2.5
+            if fresh and not force:
+                taken[art] = picture.name
+                skipped += 1
+                print(f"  {picture.name} -> {name}: up to date")
+                continue
+            if not dry_run and data is None:
+                try:
+                    data = convert(picture, align)
+                except (ArtError, OSError) as e:
+                    broken.append(f"{picture.name}: {e}")
+                    break
+            taken[art] = (
+                picture.name
+            )  # only once it converted: else the next picture may
+            print(f"  {picture.name} -> {name}")
+            written += 1
+            if not dry_run:
+                out_dir.mkdir(parents=True, exist_ok=True)
+                out.write_bytes(data)
+                os.utime(out, (when, when))
+    for name in misses:
+        print(f"  {name}: no game on the card has that file name")
+    for why in broken + doubles:
+        print(f"  {why}")
+    print(
+        f"{len(pictures)} pictures in {folder}: {written} art files "
+        f"{'to write' if dry_run else 'written'}, {skipped} up to date, "
+        f"{len(misses)} matched no game, {len(doubles)} doubles, {len(broken)} failed"
+    )
+    return written, len(broken)
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(
         prog="art.py",
@@ -280,10 +381,20 @@ def main(argv: list[str]) -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     sub = parser.add_subparsers(dest="command", required=True)
-    p_add = sub.add_parser("add", help="custom art for a game, onto the card")
-    p_add.add_argument("rom", metavar="ROM_OR_FILE_NAME")
-    p_add.add_argument("image", metavar="IMAGE", type=Path)
-    p_add.add_argument("sd", metavar="SD_PATH", type=Path)
+    p_add = sub.add_parser(
+        "add",
+        help="custom art for a game, or for every picture in a folder, onto the card",
+        usage="art.py add (ROM_OR_FILE_NAME IMAGE SD_PATH | SD_PATH [FOLDER]) [options]",
+    )
+    p_add.add_argument("paths", nargs="+", metavar="PATH")
+    p_add.add_argument(
+        "--force", action="store_true", help="folder: convert pictures already done"
+    )
+    p_add.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="folder: print the matches, write nothing",
+    )
     p_conv = sub.add_parser("convert", help="a picture into box art, anywhere")
     p_conv.add_argument("image", metavar="IMAGE", type=Path)
     p_conv.add_argument("out", metavar="OUT.bin", type=Path)
@@ -299,11 +410,24 @@ def main(argv: list[str]) -> int:
         )
     args = parser.parse_args(argv)
     try:
-        if args.command == "add":
-            out, data = add(args.rom, args.image, args.sd, args.align)
-            if Path(args.rom).suffix.lower() not in GAME_EXTS:
+        if args.command == "add" and len(args.paths) in (1, 2):
+            if args.preview:
+                raise ArtError("--preview is for one game's art")
+            folder = Path(args.paths[1]) if len(args.paths) == 2 else None
+            _, failed = add_folder(
+                Path(args.paths[0]), folder, args.align, args.force, args.dry_run
+            )
+            return 1 if failed else 0
+        elif args.command == "add":
+            if len(args.paths) != 3:
+                raise ArtError(
+                    "give ROM_OR_FILE_NAME IMAGE SD_PATH, or SD_PATH and a folder of pictures"
+                )
+            rom, image, sd = args.paths[0], Path(args.paths[1]), Path(args.paths[2])
+            out, data = add(rom, image, sd, args.align)
+            if Path(rom).suffix.lower() not in GAME_EXTS:
                 print(
-                    f"note: {Path(args.rom).name} has no game extension ({', '.join(GAME_EXTS)})"
+                    f"note: {Path(rom).name} has no game extension ({', '.join(GAME_EXTS)})"
                 )
             print(f"wrote {out}")
         else:

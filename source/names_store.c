@@ -515,7 +515,7 @@ const char *names_lookup(const char *path, u32 size, u32 console)
 	return r->size == size ? names_db_name(DB, r, console) : NULL;
 }
 
-int names_ids(const char *path, u32 size, u32 *crc, int *has_crc, u32 *code)
+int names_crc(const char *path, u32 size, u32 *crc)
 {
 	if (N.phase != P_DONE)
 		return 0;
@@ -524,11 +524,9 @@ int names_ids(const char *path, u32 size, u32 *crc, int *has_crc, u32 *code)
 		return 0;
 	const struct names_rec *r = names_cache_rec(&N.cache, n);
 	u32 flags = names_rec_flags(r);
-	if (r->size != size || (flags & NAMES_DEAD))
+	if (r->size != size || (flags & (NAMES_DEAD | NAMES_CRC)) != NAMES_CRC)
 		return 0;
-	*has_crc = (flags & NAMES_CRC) != 0;
 	*crc = r->crc;
-	*code = r->code;
 	return 1;
 }
 

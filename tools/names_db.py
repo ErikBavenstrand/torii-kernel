@@ -5,6 +5,7 @@
 """Make the names database for an SD card: /torii/names.db and /torii/crc.txt.
 
 usage: names_db.py update SD_PATH [--no-crc] [--offline] [--refresh] [--dats DIR]
+       names_db.py add SD_PATH FILE [--dry-run]
 
 `just names-update SD_PATH` runs this. It needs SD_PATH, the card's folder
 on this PC (a mounted card, say /Volumes/OMEGA), and:
@@ -15,13 +16,25 @@ on this PC (a mounted card, say /Volumes/OMEGA), and:
    cache; --refresh downloads them again, --offline never does. --dats
    reads and caches them in another folder.
 2. Writes SD_PATH/torii/names.db: per console the CRC32 of each game in the
-   dats and its No-Intro name, and the Game Boy Advance games' codes
-   (source/namesdb.h has the format).
+   dats and its No-Intro name (source/namesdb.h has the format). A game is
+   named only by its CRC: one the dats don't list (a romhack, a translation,
+   a patched or bad dump) keeps its file name, even when its header's game
+   code is a listed game's, since a romhack keeps its base game's code.
 3. Computes the CRC32 of every game on the card (by extension, outside the
    folders the kernel hides) and writes SD_PATH/torii/crc.txt, so the card
    shows the names at once. A file whose path and size crc.txt already has
    isn't read again. --no-crc leaves crc.txt alone: the kernel's Identify
    library and its launches compute CRCs too, far more slowly.
+
+`just names-add SD_PATH FILE` runs `add`: your own names for many games at
+once, into SD_PATH/torii/names.txt, the file the cart's Rename writes (your
+names win over every other). FILE has a line per game: the game's file name
+(with or without its extension, any case; or its path on the card, from
+"/"), a tab, and its name; an empty name removes the game's own name, and
+lines starting with # are skipped. Every game on the card with that file
+name gets the name (copies in different folders too). It prints which lines
+named which games and which named none, and keeps the names and comments
+names.txt has.
 
 Licence: the dats are libretro-database's (CC BY-SA 4.0), which imports them
 from No-Intro (https://no-intro.org). They are downloaded to this PC at your
@@ -36,6 +49,7 @@ import re
 import struct
 import sys
 import time
+import unicodedata
 import urllib.parse
 import urllib.request
 import zlib
@@ -291,16 +305,80 @@ def make_tables(dat_texts):
     return tables, codes, max((v for v in versions if v), default="")
 
 
-def db_name(tables, codes, console, crc, code):
-    """The name the kernel shows (source/namesdb.c, names_db_name) and how it
-    found it: ("...", "crc"), ("...", "code") or (None, None)."""
+def db_name(tables, console, crc):
+    """The name the kernel shows (source/namesdb.c, names_db_name): the dats'
+    name of the CRC, in the console's table or, for a GB or GBC file, the
+    other's; None for a CRC they don't list."""
     other = {1: 2, 2: 1}.get(console)
     for i in (console, other):
         if i is not None and crc is not None and crc in tables[i]:
-            return tables[i][crc], "crc"
-    if console == GBA and code and code_key(code) in codes:
-        return codes[code_key(code)], "code"
-    return None, None
+            return tables[i][crc]
+    return None
+
+
+# --- Romhacks (C4) -----------------------------------------------------------------
+
+# Trailing articles No-Intro moves behind the title ("Legend of Zelda, The")
+ARTICLE = re.compile(
+    r"^(.*), (the|an?|les?|la|l'|der|die|das|el|los|las|il|lo|gli|de|het|een)$",
+    re.IGNORECASE,
+)
+GROUP = re.compile(r"\([^()]*\)|\[[^\[\]]*\]")
+
+
+def title_key(name):
+    """A title to compare a file's name with a dat's: no extension, (...) and
+    [...] tags or scene number, the article in front, and only the letters
+    and digits, accents and case folded. "" if nothing is left."""
+    low = name.lower()
+    if any(low.endswith(e) for _, _, exts in CONSOLES for e in exts):
+        name = name[: name.rindex(".")]
+    if " " not in name:
+        name = name.replace("_", " ")
+    while True:  # inner groups first, so nested ones go too
+        cut = GROUP.sub(" ", name)
+        if cut == name:
+            break
+        name = cut
+    name = re.sub(r"^\s*\d{4,5}\s*-\s*", "", name)
+    title, sep, rest = " ".join(name.split()).partition(" - ")
+    m = ARTICLE.match(title)
+    if m:
+        title = f"{m.group(2)} {m.group(1)}"
+    text = unicodedata.normalize("NFKD", title + sep + rest)
+    return "".join(c for c in text.casefold() if c.isascii() and c.isalnum())
+
+
+# Tags a dump's file name may have beyond its dat name's and still be that
+# game: GoodTools' regions and verified mark, and a checksum
+PLAIN_TAG = re.compile(r"[ujewk]|ue|eu|uj|ju|!|[0-9a-f]{8}", re.IGNORECASE)
+
+
+def tags(name):
+    """The (...) and [...] tags of a name, their text case folded."""
+    return {
+        t[1:-1].strip().casefold() for t in re.findall(r"\([^()]*\)|\[[^\[\]]*\]", name)
+    }
+
+
+def code_match(codes, console, code, file_name):
+    """For a GBA game the dats don't list by CRC: the dats' name of its game
+    code, but only when its file name is that game's title, with no tags but
+    the dat name's, a region or a checksum ("Pokemon - FireRed Version.gba",
+    "Pokemon - LeafGreen Version [b3e036ae].gba", a patched dump of the
+    game). Never a romhack with its base game's code under its own title
+    ("Pokemon - Radical Red.gba") or a tag ("Metroid Fusion (Hack).gba",
+    "Mother 3 [T-Eng].gba"). None otherwise. `just art-scrape` takes art for
+    such a game; the kernel names it by its file name, which cleans to the
+    same title."""
+    if console != GBA or not code or code_key(code) not in codes:
+        return None
+    name = codes[code_key(code)]
+    key = title_key(file_name)
+    if not key or key != title_key(name):
+        return None
+    extra = tags(file_name) - tags(name)
+    return None if any(not PLAIN_TAG.fullmatch(t) for t in extra) else name
 
 
 # --- The card ---------------------------------------------------------------------
@@ -404,6 +482,144 @@ def parse_cache(text):
     return out
 
 
+# --- Games by file name (names-add, art-add) ---------------------------------------
+
+
+def fold(name):
+    """A file name as names-add and art-add match it: NFC, case folded."""
+    return unicodedata.normalize("NFC", name).casefold()
+
+
+def games_by_name(games):
+    """walk_card's games by their folded file name and by that name without
+    its extension: {name: [(card path, file path, console), ...]}."""
+    out = {}
+    for game in games:
+        name = Path(game[0]).name
+        keys = {fold(name), fold(name[: name.rindex(".")])}
+        for key in keys:
+            out.setdefault(key, []).append(game)
+    return out
+
+
+# --- Your own names: /torii/names.txt (names-add) -------------------------------------
+
+NAMES_FILE = "names.txt"
+NAMES_MAX = 1024  # GAMENAME_CUSTOM_MAX (source/gamename.h)
+NAME_BYTES = 255  # GAMENAME_MAX
+# The text Rename and the walk read: PSRAM_NAMES_TEXT_BYTES less the CRC line
+# and its newline (source/gamename_store.c's TEXT_CAP)
+NAMES_TEXT_MAX = 0x1D000 - 15 - 2
+NAMES_HEADER = "# Torii's own names: a game's path, a tab, its name\n"
+
+
+def ascii_fold(path):
+    """A path folded as the kernel folds it: ASCII case only."""
+    return "".join(c.lower() if c < "\x80" else c for c in path)
+
+
+def parse_names(text):
+    """names.txt as gamename.h reads it: ([other lines], {folded path: (path,
+    name)}), a later line for a path winning."""
+    other, names = [], {}
+    for raw in text.lstrip("\ufeff").split("\n"):  # LF only, as the kernel splits
+        line = raw.removesuffix("\r")
+        path, tab, name = line.partition("\t")
+        if path.startswith("/") and tab and name.strip():
+            names[ascii_fold(path)] = (path, name)
+        elif line.strip() and not (path.startswith("/") and tab):
+            other.append(line)
+    return other, names
+
+
+def format_names(other, names):
+    """names.txt's text as the kernel writes it: the other lines, then a line
+    per game sorted by path."""
+    lines = other + [f"{p}\t{n}" for _, (p, n) in sorted(names.items())]
+    return "".join(line + "\n" for line in lines)
+
+
+def clean_name(name):
+    """A name as Rename keeps it (source/rename_edit.c, rename_edit_result):
+    ASCII control characters dropped, spaces at the ends trimmed. NamesError
+    if it's too long."""
+    name = "".join(c for c in name if c >= " " and c != "\x7f").strip(" ")
+    if len(name.encode("utf-8")) > NAME_BYTES:
+        raise NamesError(f"{name[:40]}...: longer than {NAME_BYTES} bytes")
+    return name
+
+
+def add_names(args):
+    sd = Path(args.sd_path)
+    if not sd.is_dir():
+        raise NamesError(
+            f"{sd} isn't a folder: give the card's folder, e.g. /Volumes/OMEGA"
+        )
+    try:
+        wanted = Path(args.file).read_text("utf-8-sig").split("\n")
+    except (OSError, UnicodeError) as e:
+        raise NamesError(f"{args.file}: {e}") from None
+    games = walk_card(sd)
+    by_name = games_by_name(games)
+    by_path = {ascii_fold(g[0]): g for g in games}
+    target = sd / "torii" / NAMES_FILE
+    other, names = parse_names(read_safe(target))
+    if not other:
+        other = [NAMES_HEADER.rstrip("\n")]
+    named = removed = 0
+    misses, bad = [], []
+    for n, line in enumerate(wanted, 1):
+        if not line.strip() or line.startswith("#"):
+            continue
+        key, tab, name = line.removesuffix("\r").partition("\t")
+        key = key.strip()
+        if not tab or not key:
+            bad.append(f"line {n}: no tab between the file name and the name")
+            continue
+        try:
+            name = clean_name(name)
+        except NamesError as e:
+            bad.append(f"line {n}: {e}")
+            continue
+        if key.startswith("/"):
+            found = [by_path[ascii_fold(key)]] if ascii_fold(key) in by_path else []
+        else:
+            found = by_name.get(fold(key), [])
+        if not found:
+            misses.append(key)
+            continue
+        for path, _, _ in found:
+            if name:
+                print(f"  {path}: {name}")
+                names[ascii_fold(path)] = (path, name)
+                named += 1
+            elif names.pop(ascii_fold(path), None):
+                print(f"  {path}: own name removed")
+                removed += 1
+    if bad:
+        raise NamesError(
+            f"{args.file} has lines that don't read:\n  " + "\n  ".join(bad)
+        )
+    text = format_names(other, names)
+    if len(names) > NAMES_MAX or len(text.encode("utf-8")) > NAMES_TEXT_MAX:
+        raise NamesError(
+            f"names.txt would hold {len(names)} names in {len(text.encode('utf-8'))} bytes; "
+            f"the kernel reads {NAMES_MAX} names in {NAMES_TEXT_MAX} bytes"
+        )
+    for key in misses:
+        print(f"  {key}: no game on the card has that file name")
+    print(
+        f"{named} games named, {removed} names removed, {len(misses)} lines named no game; "
+        f"names.txt holds {len(names)} names"
+    )
+    if args.dry_run:
+        print("(dry run: names.txt not written)")
+        return
+    target.parent.mkdir(exist_ok=True)
+    write_safe(target, text)
+    print(f"wrote {target}")
+
+
 def fat_date(path):
     """The file's FAT date and time as FatFs gives them (fdate << 16 | ftime,
     local time, seconds in twos) in crc.txt's form, from its mtime."""
@@ -498,8 +714,8 @@ def update(args):
         texts.append(
             fetch(dats, file, args.offline, args.refresh).read_text("utf-8", "replace")
         )
-    tables, codes, version = make_tables(texts)
-    db = build_db(tables, codes, version)
+    tables, _, version = make_tables(texts)
+    db = build_db(tables, {}, version)  # no game codes: the kernel names by CRC only
     if len(db) > DB_MAX:
         raise NamesError(
             f"names.db would be {len(db)} bytes, over the kernel's {DB_MAX}"
@@ -513,7 +729,7 @@ def update(args):
         f"{c[0]} {len(t)}" for c, t in zip(CONSOLES, tables, strict=True)
     )
     print(
-        f"wrote {torii / 'names.db'}: dats {version or '(no version)'}, {counts}, {len(codes)} GBA codes, {len(db)} bytes"
+        f"wrote {torii / 'names.db'}: dats {version or '(no version)'}, {counts}, {len(db)} bytes"
     )
     if args.no_crc:
         return
@@ -530,14 +746,13 @@ def update(args):
         f"wrote {torii / CRC_FILE}: {len(found)} games, {computed} CRCs computed, {reused} kept"
     )
     for i, (label, _, _) in enumerate(CONSOLES):
-        mine = [found[p] for p, _, c in games if c == i and p in found]
+        mine = [(p, *found[p]) for p, _, c in games if c == i and p in found]
         if not mine:
             continue
-        how = [db_name(tables, codes, i, crc, code)[1] for crc, code in mine]
-        by_crc, by_code = how.count("crc"), how.count("code")
+        by_crc = sum(db_name(tables, i, crc) is not None for _, crc, _ in mine)
         print(
-            f"  {label}: {len(mine)} games, {by_crc} named by CRC, {by_code} by game code, "
-            f"{len(mine) - by_crc - by_code} keep their file names"
+            f"  {label}: {len(mine)} games, {by_crc} named by CRC, "
+            f"{len(mine) - by_crc} keep their file names (not in the dats: romhacks, translations, other dumps)"
         )
 
 
@@ -560,11 +775,18 @@ def main(argv):
         default=str(DATS),
         help=f"the dats' cache (default {DATS.relative_to(ROOT)})",
     )
+    a = sub.add_parser("add", help="your own names for many games, into names.txt")
+    a.add_argument("sd_path", help="the card's folder on this PC")
+    a.add_argument("file", help="lines of a game's file name, a tab and its name")
+    a.add_argument("--dry-run", action="store_true", help="print, write nothing")
     args = p.parse_args(argv)
     try:
-        update(args)
+        if args.cmd == "add":
+            add_names(args)
+        else:
+            update(args)
     except NamesError as e:
-        print(f"names-update: {e}", file=sys.stderr)
+        print(f"names-{args.cmd}: {e}", file=sys.stderr)
         return 1
     return 0
 

@@ -33,6 +33,7 @@ import names_db
 
 DATS = ROOT / "tests" / "names"
 GBA_SYS = "Nintendo - Game Boy Advance"
+PATCHED = "/GBA/Legend of Zelda, The - The Minish Cap (USA) [0badc0de].gba"
 GBC_SYS = "Nintendo - Game Boy Color"
 GB_SYS = "Nintendo - Game Boy"
 NES_SYS = "Nintendo - Nintendo Entertainment System"
@@ -96,7 +97,7 @@ def crc_of(path, sd):
 
 
 def library_idx(games):
-    """A library index (source/library.h, version 3) listing games: (card
+    """A library index (source/library.h, version art_scrape.library_idx.VERSION) listing games: (card
     path, console)."""
     folders, pool, recs = [], bytearray(), []
 
@@ -126,7 +127,7 @@ def library_idx(games):
     head = struct.pack(
         "<IHHHHHH8HIIIIIIII",
         0x42494C54,
-        3,
+        art_scrape.library_idx.VERSION,
         64,
         16,
         0,
@@ -170,17 +171,30 @@ class Names(unittest.TestCase):
         texts = [(DATS / d).read_text() for d in fixture.DATS]
         tables, codes, _ = names_db.make_tables(texts)
         hack = zlib.crc32(fixture.rom(9, 4096, "BZME"))
+        # A romhack has its base game's code, but not its title: no art
         self.assertEqual(
-            art_scrape.candidates(tables, codes, 0, hack, "BZME"),
+            art_scrape.candidates(tables, codes, 0, hack, "BZME", "Hack of Minish.gba"),
+            [],
+        )
+        # A patched dump under the game's title takes its art
+        self.assertEqual(
+            art_scrape.candidates(
+                tables,
+                codes,
+                0,
+                hack,
+                "BZME",
+                "The Legend of Zelda - The Minish Cap (U).gba",
+            ),
             [(0, "Legend of Zelda, The - The Minish Cap (USA)")],
         )
         # A .gb in the GBC dat looks in the GBC thumbnails
         gb = zlib.crc32(fixture.rom(6, 2048))
         self.assertEqual(
-            art_scrape.candidates(tables, codes, 2, gb, None),
+            art_scrape.candidates(tables, codes, 2, gb, None, "Colour named GB.gb"),
             [(1, "Colour Named Gb (World)")],
         )
-        self.assertEqual(art_scrape.candidates(tables, codes, 0, 1, None), [])
+        self.assertEqual(art_scrape.candidates(tables, codes, 0, 1, None, "x.gba"), [])
 
 
 class Scrape(unittest.TestCase):
@@ -191,6 +205,8 @@ class Scrape(unittest.TestCase):
         self.cache = base / "cache"
         self.sd.mkdir()
         fixture.write_roms(self.sd)
+        # A patched dump of a listed game, under its title: art by its game code
+        (self.sd / PATCHED[1:]).write_bytes(fixture.rom(13, 4096, "BZME"))
         self.pics = {
             "wars": png((200, 30, 30)),
             "minish": png((30, 160, 40)),
@@ -246,7 +262,7 @@ class Scrape(unittest.TestCase):
         for path in (
             "/GBA/Wars.gba",
             "/GBA/zz Minish.gba",
-            "/GBA/Hack of Minish.gba",  # by its game code
+            PATCHED,  # by its game code, as its file name is the game's title
             "/Colour.gbc",
             "/Colour named GB.gb",
             "/NES/Famicom.nes",
@@ -257,11 +273,13 @@ class Scrape(unittest.TestCase):
         self.assertFalse(self.art("/GB/Mono.gb").exists())
         self.assertFalse(self.art("/GBA/Homebrew.gba").exists())
         self.assertEqual(
-            self.art("/GBA/zz Minish.gba").read_bytes(),
-            self.art("/GBA/Hack of Minish.gba").read_bytes(),
+            self.art("/GBA/zz Minish.gba").read_bytes(), self.art(PATCHED).read_bytes()
         )
+        # A romhack gets no art: not its base game's by its game code
+        self.assertFalse(self.art("/GBA/Hack of Minish.gba").exists())
+        self.assertIn("/GBA/Hack of Minish.gba: not in the dats", out)
         self.assertIn(
-            "GBA: 4 games, 3 with art (75%): 2 downloaded, 1 from the cache, 1 not in the dats",
+            "GBA: 5 games, 3 with art (60%): 2 downloaded, 1 from the cache, 2 not in the dats",
             out,
         )
         self.assertIn("GB: 2 games, 1 with art (50%)", out)
@@ -288,7 +306,7 @@ class Scrape(unittest.TestCase):
             len(
                 names_db.parse_cache(names_db.read_safe(self.sd / "torii" / "crc.txt"))
             ),
-            8,
+            9,
         )
         # The cache holds the pictures and the misses
         self.assertEqual(
@@ -304,7 +322,7 @@ class Scrape(unittest.TestCase):
         status, out, _ = self.run_tool()
         self.assertEqual(status, 0)
         self.assertEqual(len(self.server.requests), before)
-        self.assertIn("GBA: 4 games, 3 with art (75%): 3 already on the card", out)
+        self.assertIn("GBA: 5 games, 3 with art (60%): 3 already on the card", out)
 
         # --retry-missing asks the server again for what it hadn't
         status, _, _ = self.run_tool("--retry-missing")
@@ -316,7 +334,8 @@ class Scrape(unittest.TestCase):
         custom.mkdir(parents=True)
         (custom / "Wars.gba.bin").write_bytes(b"mine")
         self.art("/NES/Famicom.nes").write_bytes(b"old")
-        (custom.parent / "bzme.bin").write_bytes(b"by code")  # the Minish games' code
+        # Art by the Minish games' code, which v0.4.1's kernel read: no longer
+        (custom.parent / "bzme.bin").write_bytes(b"by code")
         status, out, err = self.run_tool()
         self.assertEqual(status, 0, err)
         self.assertNotIn(thumb(GBA_SYS, "Advance Wars (USA)"), self.server.paths())
@@ -324,12 +343,45 @@ class Scrape(unittest.TestCase):
         self.assertFalse(self.art("/GBA/Wars.gba").exists())
         self.assertEqual((custom / "Wars.gba.bin").read_bytes(), b"mine")
         self.assertEqual(self.art("/NES/Famicom.nes").read_bytes(), b"old")
-        self.assertNotIn("Minish", " ".join(self.server.paths()))
-        self.assertFalse(self.art("/GBA/zz Minish.gba").exists())
         self.assertIn(
-            "GBA: 4 games, 3 with art (75%): 2 already on the card, 1 custom", out
+            "1 files named like game codes (bzme.bin...), which Torii doesn't read",
+            err,
+        )
+        self.assertTrue(self.art("/GBA/zz Minish.gba").exists())
+        self.assertFalse(self.art("/GBA/Hack of Minish.gba").exists())
+        self.assertIn(
+            "GBA: 5 games, 3 with art (60%): 1 downloaded, 1 from the cache, 1 custom, 2 not in the dats",
+            out,
         )
         self.assertIn("NES: 1 games, 1 with art (100%): 1 already on the card", out)
+
+    def test_deletes_romhack_art_from_v041(self):
+        # v0.4.1 gave the romhack the Minish Cap's box under its own CRC; a
+        # patched dump's art and custom art for the romhack stay
+        art_dir = self.sd / "torii" / "art"
+        (art_dir / "custom").mkdir(parents=True)
+        hack, patched = self.art("/GBA/Hack of Minish.gba"), self.art(PATCHED)
+        hack.write_bytes(b"base box")
+        patched.write_bytes(b"its box")
+        (art_dir / "custom" / "Hack of Minish.gba.bin").write_bytes(b"mine")
+        name = hack.name
+
+        for extra, kept in (
+            (["--dry-run"], True),
+            (["--keep-stale"], True),
+            ([], False),
+        ):
+            status, out, err = self.run_tool(*extra)
+            self.assertEqual(status, 0, err)
+            self.assertIn(f"  {name}: /GBA/Hack of Minish.gba", out)
+            self.assertEqual(hack.exists(), kept, extra)
+        self.assertIn("art for games the dats don't list (romhacks), deleted:", out)
+        self.assertEqual(patched.read_bytes(), b"its box")
+        self.assertEqual(
+            (art_dir / "custom" / "Hack of Minish.gba.bin").read_bytes(), b"mine"
+        )
+        status, out, _ = self.run_tool()
+        self.assertNotIn("romhacks", out)
 
     def test_dry_run_changes_nothing(self):
         status, out, err = self.run_tool("--dry-run")
@@ -345,7 +397,7 @@ class Scrape(unittest.TestCase):
             out,
         )
         self.assertIn(
-            "GBA: 4 games, 0 with art now or from the cache (0%): 3 to download, 1 not in the dats",
+            "GBA: 5 games, 0 with art now or from the cache (0%): 3 to download, 2 not in the dats",
             out,
         )
 
@@ -360,7 +412,9 @@ class Scrape(unittest.TestCase):
         self.assertEqual(status, 0, err)
         self.assertEqual(len(self.server.requests), before)
         self.assertEqual(self.art("/GBA/Wars.gba").read_bytes(), wars)
-        self.assertIn("GBA: 4 games, 3 with art (75%): 3 from the cache", out)
+        self.assertIn(
+            "GBA: 5 games, 3 with art (60%): 3 from the cache, 2 not in the dats", out
+        )
         # Offline, an unasked picture isn't a miss
         for f in art_dir.glob("*.bin"):
             f.unlink()
@@ -383,7 +437,7 @@ class Scrape(unittest.TestCase):
             len(
                 names_db.parse_cache(names_db.read_safe(self.sd / "torii" / "crc.txt"))
             ),
-            8,
+            9,
         )
         status, _, err = self.run_tool("--console", "SNES")
         self.assertEqual(status, 1)
@@ -435,6 +489,12 @@ class Scrape(unittest.TestCase):
         self.assertFalse((self.cache / GBA_SYS / "Advance Wars (USA).png").exists())
         self.assertFalse(self.art("/GBA/Wars.gba").exists())
 
+    def test_index_version_is_the_kernels(self):
+        # art-scrape reads the card's index: a stale version makes it walk instead
+        header = (ROOT / "source" / "library.h").read_text()
+        want = int(header.split("#define LIBRARY_VERSION ", 1)[1].split()[0])
+        self.assertEqual(art_scrape.library_idx.VERSION, want)
+
     def test_reads_the_library_index(self):
         # A game only the index lists (here in a folder the walk skips)
         odd = self.sd / "RTS" / "Odd.nes"
@@ -448,7 +508,7 @@ class Scrape(unittest.TestCase):
         games = {p: c for p, _, c in art_scrape.card_games(self.sd)}
         self.assertEqual(games["/RTS/Odd.nes"], 3)
         self.assertNotIn("/Gone.gba", games)  # no longer on the card
-        self.assertEqual(len(games), 9)
+        self.assertEqual(len(games), 10)
 
     def test_no_card(self):
         self.sd = self.sd / "nope"

@@ -2,9 +2,11 @@
 # The names database (source/namesdb.h, names_store.c) on the emulated cart:
 # `just names-update`'s names.db and crc.txt (tools/names_db.py, from the
 # fixture dats in tests/names: no network) name the card's games at once, by
-# CRC or by GBA game code, and the index sorts by those names; the boot's walk
+# CRC only (a romhack with a listed game's code keeps its file name), and the
+# index sorts by those names; the boot's walk
 # gives crc.txt's records their files' dates and forgets one whose file
-# changed; the games on Recent without a CRC get one after the boot.
+# changed; the games on Recent without a CRC get one after the boot; your
+# own names (`just names-add`) win over the dats' and hold through a rebuild.
 # Runs inside the torii-emu container after `just build` and `just
 # emu-headless`.
 #
@@ -101,14 +103,15 @@ cart=$carts/pc
 fixture_card "$cart"
 grep -q "8 games, 8 CRCs computed" "$cart/tool.log" || fail "names_db.py: $(cat "$cart/tool.log")"
 boot "$cart" "$cart/1.log" -f 900 -u "names: wrote /torii/crc.txt"
-logged "$cart/1.log" "names: /torii/names.db from 2026.01.02: GBA 5, GBC 2, GB 1, NES 1, 3 codes"
+logged "$cart/1.log" "names: /torii/names.db from 2026.01.02: GBA 5, GBC 2, GB 1, NES 1, 0 codes"
 logged "$cart/1.log" "names: 8 files' CRCs from /torii/crc.txt"
 logged "$cart/1.log" "library: new index: 8 games (GBA 4, GBC 1, GB 2, NES 1)"
 no_errors "$cart/1.log"
-# Without names, file-name order: Hack of Minish, Homebrew, Wars, zz Minish
+# Without names, file-name order: Hack of Minish, Homebrew, Wars, zz Minish.
+# Hack of Minish, a romhack with the Minish Cap's code, keeps its file name
 want="/GBA/Wars.gba
-/GBA/Homebrew.gba
 /GBA/Hack of Minish.gba
+/GBA/Homebrew.gba
 /GBA/zz Minish.gba"
 [ "$(gba_order "$cart")" = "$want" ] || fail "the GBA games sort as
 $(gba_order "$cart")"
@@ -117,7 +120,7 @@ $(gba_order "$cart")"
 if crc_lines "$cart" | awk -F'\t' '$4 == "-"' | grep -q .; then
   fail "records without a date: $(crc_lines "$cart")"
 fi
-echo "PASS: names-update's names.db and crc.txt name the games by CRC and game code, and the index sorts by them"
+echo "PASS: names-update's names.db and crc.txt name the games by CRC, not a romhack by its game code, and the index sorts by them"
 
 # Power-on 2: nothing changed: nothing rebuilt or written
 boot "$cart" "$cart/2.log" -f 600 -u "library: unchanged"
@@ -135,8 +138,8 @@ mcopy -o -m -i "$cart/sd.img" "$cart/files/GBA/Wars.gba" ::/GBA/Wars.gba
 boot "$cart" "$cart/3.log" -f 900 -u "names: wrote /torii/crc.txt"
 logged "$cart/3.log" "names: /GBA/Wars.gba changed since its CRC: forgotten"
 logged "$cart/3.log" "library: the card changed: building a new index"
-want="/GBA/Homebrew.gba
-/GBA/Hack of Minish.gba
+want="/GBA/Hack of Minish.gba
+/GBA/Homebrew.gba
 /GBA/zz Minish.gba
 /GBA/Wars.gba"
 [ "$(gba_order "$cart")" = "$want" ] || fail "after the change the GBA games sort as
@@ -198,3 +201,29 @@ not_logged "$cart/1.log" "names: wrote"
 if mdir -i "$cart/sd.img" ::/torii/crc.txt >/dev/null 2>&1; then fail "crc.txt was made"; fi
 no_errors "$cart/1.log"
 echo "PASS: a card without names.db or art gets no crc.txt"
+
+# Your own names (`just names-add`, into names.txt as Rename keeps them) win
+# over the dats' and name a romhack, and hold when the index is built again
+# (as Settings' Rescan library builds it)
+cart=$carts/own
+fixture_card "$cart"
+printf 'Wars\tUltimate Wars\nhack of minish.gba\tZeta Hack\nNobody\tNo one\n' >"$cart/names.tsv"
+python3 tools/names_db.py add "$cart/files" "$cart/names.tsv" >"$cart/add.log"
+grep -q "2 games named, 0 names removed, 1 lines named no game" "$cart/add.log" || fail "names-add: $(cat "$cart/add.log")"
+mcopy -o -i "$cart/sd.img" "$cart/files/torii/names.txt" "$cart/files/torii/names.txt.bak" ::/torii/
+want="/GBA/Homebrew.gba
+/GBA/zz Minish.gba
+/GBA/Wars.gba
+/GBA/Hack of Minish.gba"
+boot "$cart" "$cart/1.log" -f 900 -u "names: wrote /torii/crc.txt"
+logged "$cart/1.log" "library: 2 custom names parsed"
+[ "$(gba_order "$cart")" = "$want" ] || fail "with own names the GBA games sort as
+$(gba_order "$cart")"
+mdel -i "$cart/sd.img" ::/torii/library.idx ::/torii/library.bak 2>/dev/null || true
+boot "$cart" "$cart/2.log" -f 900 -u "library: wrote /torii/library.idx"
+logged "$cart/2.log" "library: 2 custom names parsed"
+[ "$(gba_order "$cart")" = "$want" ] || fail "after a rebuild the GBA games sort as
+$(gba_order "$cart")"
+no_errors "$cart/1.log"
+no_errors "$cart/2.log"
+echo "PASS: your own names win over the dats', name a romhack and hold through a rebuilt index"

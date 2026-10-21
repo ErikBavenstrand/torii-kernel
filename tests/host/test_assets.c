@@ -214,10 +214,8 @@ void test_artkey_names(void)
 	CHECK_EQ(key, 0x5D5C613Eu);
 	CHECK_EQ(artkey_parse("5d5c613e.BIN", &key), ARTKEY_CRC);  // FAT's case
 	CHECK_EQ(key, 0x5D5C613Eu);
-	CHECK_EQ(artkey_parse("AWRE.bin", &key), ARTKEY_CODE);
-	CHECK_EQ(key, 'A' | 'W' << 8 | 'R' << 16 | (u32)'E' << 24);  // namesdb_code's word
-	CHECK_EQ(artkey_parse("awre.bin", &key), ARTKEY_CODE);
-	CHECK_EQ(key, 'A' | 'W' << 8 | 'R' << 16 | (u32)'E' << 24);
+	// Art by GBA game code (v0.4.1 read it) isn't read: a romhack has its base's code
+	CHECK_EQ(artkey_parse("AWRE.bin", &key), ARTKEY_NONE);
 	CHECK_EQ(artkey_parse("5D5C613G.bin", &key), ARTKEY_NONE);  // not hex
 	CHECK_EQ(artkey_parse("5D5C613E.png", &key), ARTKEY_NONE);
 	CHECK_EQ(artkey_parse("5D5C613.bin", &key), ARTKEY_NONE);
@@ -232,9 +230,8 @@ void test_artkey_names(void)
 	CHECK_EQ(artkey_name("Advance Wars (USA).gba", 22), artkey_name("ADVANCE WARS (usa).GBA", 22));
 	CHECK(artkey_name("Pokemon.gb", 10) != artkey_name("Pokemon.gbc", 11));
 	// Ids: never 0, and a key of one kind isn't the same key of another
-	CHECK(artkey_id(ARTKEY_CRC, 0x5D5C613Eu) != artkey_id(ARTKEY_CODE, 0x5D5C613Eu));
 	CHECK(artkey_id(ARTKEY_CRC, 0x5D5C613Eu) != artkey_id(ARTKEY_CUSTOM, 0x5D5C613Eu));
-	for (u32 kind = ARTKEY_CUSTOM; kind <= ARTKEY_CODE; kind++)
+	for (u32 kind = ARTKEY_CUSTOM; kind <= ARTKEY_CRC; kind++)
 		for (u32 k = 0; k < 4096; k++)
 			CHECK(artkey_id(kind, k * 0x10001u) != 0);
 }
@@ -264,7 +261,7 @@ void test_artset(void)
 	// Full at ARTSET_MAX: a new id is refused, one there still counts
 	for (u32 i = 0; s.count < ARTSET_MAX; i++)
 		CHECK(artset_add(&s, artkey_id(ARTKEY_CRC, i)));
-	CHECK(!artset_add(&s, artkey_id(ARTKEY_CODE, 7)));
+	CHECK(!artset_add(&s, artkey_id(ARTKEY_CUSTOM, 7)));
 	CHECK(artset_add(&s, 1));
 	CHECK_EQ(s.count, ARTSET_MAX);
 	u32 found = 0;

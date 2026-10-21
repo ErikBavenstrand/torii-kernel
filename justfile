@@ -335,11 +335,19 @@ _cart-copy mode +files:
 names-update sd_path *args:
     uv run -q tools/names_db.py update "$@"
 
-# Make custom box art for a game from any picture (PNG, JPEG...) on an SD card, e.g.
-# `just art-add "Pokemon Prism.gbc" ~/prism.jpg /Volumes/OMEGA`: /torii/art/custom/NAME.bin,
-# cropped to a square, 80x80, 15 colours dithered. --align and --preview: see --help
+# Your own names for many games on an SD card, e.g. `just names-add /Volumes/OMEGA names.tsv`: FILE has
+# a line per game, its file name (with or without the extension), a tab and its name; they go into
+# /torii/names.txt, as Rename's do. --dry-run: see --help
 [positional-arguments]
-art-add rom image sd_path *args:
+names-add sd_path file *args:
+    uv run -q tools/names_db.py add "$@"
+
+# Make custom box art from any pictures (PNG, JPEG...) on an SD card: `just art-add /Volumes/OMEGA`
+# converts every picture in /torii/art/custom-src (or a folder given after the card) named after a
+# game's file name, `just art-add "Pokemon Prism.gbc" ~/prism.jpg /Volumes/OMEGA` one game's:
+# /torii/art/custom/NAME.bin, cropped to a square, 80x80, 15 colours dithered. Options: see --help
+[positional-arguments]
+art-add +args:
     uv run -q tools/art.py add "$@"
 
 # Fetch box art for an SD card's games from libretro-thumbnails, e.g. `just art-scrape /Volumes/OMEGA`:

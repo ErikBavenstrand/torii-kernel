@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Box art in the game lists' list with art (source/boxart.c): matched art
-# by GBA game code, a cover cached across visits, a broken art file, a card
+# by CRC, never by GBA game code (a romhack's), a cover cached across visits, a broken art file, a card
 # without /torii/art, and the Box art setting off. (tests/shots/games-art*
 # show custom and CRC art.) Runs inside the torii-emu container after `just
 # build` and `just emu-headless`.
@@ -16,7 +16,7 @@ fail() {
   exit 1
 }
 
-# id KIND KEY: box art's id for a file (artkey.h: 1 custom, 2 CRC, 3 code)
+# id KIND KEY: box art's id for a file (artkey.h: 1 custom, 2 CRC)
 id() {
   python3 - "$1" "$2" <<'EOF'
 import sys
@@ -55,26 +55,43 @@ boot() { # log [mgba-shot options]
   ! grep -qE 'assert failed|^crash at frame' "$log" || fail "a crash or failed assert: $(grep -E 'assert|crash' "$log" | head -2)"
 }
 
-code=$(id 3 0x45525741) # "AWRE" as namesdb_code's word
-crc=$(python3 -c "import zlib; print(f'{zlib.crc32(open(\"tests/shots/data/art-sunset.bin\",\"rb\").read()):08X}')")
+crc_of() { python3 -c "import sys, zlib; print(f'{zlib.crc32(open(sys.argv[1], \"rb\").read()):08X}')" "$1"; }
+crc=$(crc_of tests/shots/data/art-sunset.bin)     # Zed.gba's
+code_crc=$(crc_of tests/shots/data/art-night.bin) # Code.gba's
+code=$(id 2 "0x$code_crc")
 
-# Matched art by GBA game code (crc.txt knows Code.gba's code but not its
-# CRC): it shows; leaving the page and opening it again shows it from the
-# cache, not the card
-new_cart code
-printf '%s\tAWRE\t3248\t-\t/Code.gba\n' - >"$cart/crc.txt"
+# Matched art by CRC: it shows; leaving the page and opening it again shows
+# it from the cache, not the card
+new_cart crc
+printf '%s\tAWRE\t3248\t-\t/Code.gba\n' "$code_crc" >"$cart/crc.txt"
 mcopy -i "$cart/sd.img" "$cart/crc.txt" ::/torii/crc.txt
 mmd -i "$cart/sd.img" ::/torii/art
-mcopy -i "$cart/sd.img" tests/shots/data/art-night.bin ::/torii/art/AWRE.bin
+mcopy -i "$cart/sd.img" tests/shots/data/art-night.bin "::/torii/art/$code_crc.bin"
 # shellcheck disable=SC2046 # nav.sh's options
 boot "$cart/1.log" $(nav_to gba) -w "box art: cover $code shown" -k @8:B -k @12:- \
   -w "nav: home ready" -k @8:A -k @12:- -w "nav: page gba ready" -f 1200
 [ "$(grep -c "^kernel: box art: cover $code shown" "$cart/1.log")" = 2 ] ||
-  fail "the code's art didn't show on both visits: $(grep 'box art\|cover' "$cart/1.log" | tail -4)"
+  fail "the CRC's art didn't show on both visits: $(grep 'box art\|cover' "$cart/1.log" | tail -4)"
 [ "$(grep -c "^kernel: cover $code loaded" "$cart/1.log")" = 1 ] ||
   fail "the second visit read the card again: $(grep -c "cover $code loaded" "$cart/1.log") loads"
 grep -q "box art: 1 files listed" "$cart/1.log" || fail "the art wasn't listed once: $(grep 'files listed' "$cart/1.log")"
-echo "PASS: matched art by GBA game code shows, and again from the cache on the next visit"
+echo "PASS: matched art by CRC shows, and again from the cache on the next visit"
+
+# A romhack: Code.gba has a listed game's code (AWRE) but a CRC the dats
+# don't list. Art by that code (<CODE>.bin, which v0.4.1 read) isn't
+# read, so it keeps the placeholder, while Zed.gba's art by CRC shows
+new_cart romhack
+printf '%s\tAWRE\t3248\t-\t/Code.gba\n%s\t-\t3248\t-\t/Zed.gba\n' "$code_crc" "$crc" >"$cart/crc.txt"
+mcopy -i "$cart/sd.img" "$cart/crc.txt" ::/torii/crc.txt
+mmd -i "$cart/sd.img" ::/torii/art
+mcopy -i "$cart/sd.img" tests/shots/data/art-night.bin ::/torii/art/AWRE.bin
+mcopy -i "$cart/sd.img" tests/shots/data/art-sunset.bin "::/torii/art/$crc.bin"
+# shellcheck disable=SC2046 # nav.sh's options
+boot "$cart/5.log" $(nav_game gba 1) -w "box art: cover $(id 2 "0x$crc") shown" -k @4:UP -k @8:- -h @120 -f 3000
+grep -q "box art: 1 files listed" "$cart/5.log" || fail "AWRE.bin was listed: $(grep 'files listed' "$cart/5.log")"
+[ "$(grep -cE "^kernel: box art: cover [0-9A-F]{8} shown" "$cart/5.log")" = 1 ] ||
+  fail "the romhack showed art: $(grep 'box art' "$cart/5.log" | tail -4)"
+echo "PASS: a romhack keeps the placeholder: no art by its game code"
 
 # A broken art file (no cover's size) by CRC: the placeholder stays, the
 # error is logged, and the next game's cover still loads (both lines, in

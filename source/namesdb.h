@@ -2,8 +2,9 @@
 // No-Intro names of /torii/names.db, which `just names-update` builds on the
 // user's PC from libretro-database's dats (tools/names_db.py), and the CRC
 // cache, /torii/crc.txt, which says which file has which CRC. A game's CRC
-// name is the database's entry for its CRC, else for its GBA game code;
-// gamename_display cleans it like a file name.
+// name is the database's entry for its CRC, never its GBA game code, which
+// a romhack shares with its base game (C4): a game the dats don't list
+// keeps its file name. gamename_display cleans the name like a file name.
 //
 // The first part of this file is hardware-free, and tests/host builds it:
 // the database's format and lookups, and the cache's table and lines.
@@ -21,7 +22,8 @@
 //	        name's pool offset), sorted by CRC
 //	codes   code_count entries: a GBA game code (header 0xAC, as a
 //	        little-endian u32 of its four characters) and the name of the
-//	        first game the dat lists with it, sorted by code
+//	        first game the dat lists with it, sorted by code. Unused since
+//	        C4 (a romhack has its base game's code); names_db.py writes none
 //	pool    the full No-Intro names, UTF-8, NUL-ended, padded with NULs to 4
 //
 // /torii/crc.txt, a safe file (safefile.h) of one line per file:
@@ -77,8 +79,6 @@ int namesdb_header_ok(const struct namesdb_header *h, u32 max);
 int namesdb_body_ok(const u8 *db);
 // The full name of the game whose CRC32 is crc in console's table, or NULL.
 const char *namesdb_by_crc(const u8 *db, u32 console, u32 crc);
-// The name the dat gives a GBA game code, or NULL.
-const char *namesdb_by_code(const u8 *db, u32 code);
 // A GBA game code from the four header bytes at 0xAC, as the database keys
 // it; 0 unless they are 0-9 or A-Z.
 u32 namesdb_code(const u8 *bytes);
@@ -182,7 +182,8 @@ u32 names_format_line(const struct names_cache *c, u32 n, char *buf, u32 size);
 
 // The database's name for a cached file of console: by its CRC (a .gb in
 // the GBC table and the other way round too, since the extension doesn't
-// always say), else by its game code. NULL without either.
+// always say). NULL without one: a CRC the dats don't list is a romhack, a
+// translation or a bad dump, which keeps its own name.
 const char *names_db_name(const u8 *db, const struct names_rec *r, u32 console);
 
 // --- The kernel's names (names_store.c) ----------------------------------------
@@ -220,11 +221,10 @@ u32 names_identity(void);
 // For a screen: the database's name of a game (its path, size and console),
 // or NULL. Points into PSRAM.
 const char *names_lookup(const char *path, u32 size, u32 console);
-// For box art: a game's CRC32 (*crc, with *has_crc 1 when known) and GBA
-// game code (*code, 0 for none) from the CRC cache, whether or not names.db
-// is there. 0 if the cache has no live record of it at that size (or isn't
-// loaded yet).
-int names_ids(const char *path, u32 size, u32 *crc, int *has_crc, u32 *code);
+// For box art: 1 with a game's CRC32 in *crc from the CRC cache, whether or
+// not names.db is there; 0 if the cache has no live record of it at that
+// size with a CRC (or isn't loaded yet).
+int names_crc(const char *path, u32 size, u32 *crc);
 // The dats' version names.db was made from ("2026.10.07"), or NULL.
 const char *names_dat_version(void);
 // Settings' "Identify library": CRCs for every library game without one.

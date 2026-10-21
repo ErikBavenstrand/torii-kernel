@@ -1,7 +1,7 @@
 // The names database on the cart (source/namesdb.h): a small names.db and a
 // few games on the card. The first scan loads the database; Identify library
 // computes the games' CRCs into crc.txt, and the database names them by CRC
-// or by game code. Asset tests: run by tests/assets.sh on the emulated cart,
+// only: never by the game code a romhack shares with its base game (C4). Asset tests: run by tests/assets.sh on the emulated cart,
 // and never in Diagnostics (they write the card and PSRAM's names).
 #include <string.h>
 
@@ -27,7 +27,7 @@ static const struct {
 	const char *code;
 } files[] = {
 	{N_DIR "/Wars.gba", 1, 4096, "AWRE"},  // named by its CRC
-	{N_DIR "/Hack.gba", 9, 4096, "BZME"},  // by its code: a hack of a listed game
+	{N_DIR "/Hack.gba", 9, 4096, "BZME"},  // a hack with a listed game's code: keeps its name
 	{N_DIR "/Plain.gba", 11, 3001, NULL},  // in no table: keeps its file name
 	{N_DIR "/Mono.gbc", 5, 2048, NULL},  // a GB game named .gbc: the GB table
 	{N_DIR "/Odd.nes", 7, 1234, NULL},
@@ -66,7 +66,7 @@ static void put_entry(u8 *db, u32 *at, u32 key, u32 name)
 	*at += sizeof(e);
 }
 
-// names.db with Wars's CRC (GBA), Mono's (GB) and the code BZME
+// names.db with Wars's CRC (GBA), Mono's (GB) and, as v0.4.1 wrote it, the code BZME
 static u32 make_db(u8 *db)
 {
 	static const char pool[] = "Advance Wars (USA)\0Mono Game (Japan)\0Minish Cap (USA)\0\0\0";
@@ -140,7 +140,7 @@ void test_names_identify(void)
 	CHECK(!names_identifying(NULL, NULL));
 	const char *wars = name_of(0), *hack = name_of(1), *mono = name_of(3);
 	CHECK(wars && !strcmp(wars, "Advance Wars (USA)"));
-	CHECK(hack && !strcmp(hack, "Minish Cap (USA)"));
+	CHECK(hack == NULL);
 	CHECK(name_of(2) == NULL);
 	CHECK(mono && !strcmp(mono, "Mono Game (Japan)"));
 	CHECK(name_of(4) == NULL);
@@ -169,8 +169,7 @@ void test_names_identify(void)
 	library_boot();
 	wars = name_of(0);
 	CHECK(wars && !strcmp(wars, "Advance Wars (USA)"));
-	hack = name_of(1);
-	CHECK(hack && !strcmp(hack, "Minish Cap (USA)"));
+	CHECK(name_of(1) == NULL);
 
 	library_before_launch();
 	for (u32 i = 0; i < FILES; i++)
