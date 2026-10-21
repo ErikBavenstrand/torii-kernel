@@ -356,7 +356,8 @@ void test_settings_hotkeys(void)
 	v.loaded[assress_edit_rtshotkey_2] = 1;
 	CHECK_EQ(settings_set_keys(&v, SET_RESET_KEYS, L | R | B), SET_KEYS_OK);
 	settings_restore(&v, SET_RESET_KEYS);
-	CHECK_EQ(settings_get(&v, SET_RESET_KEYS), A | B);
+	CHECK_EQ(v.slot[assress_edit_rtshotkey_2], 1);
+	CHECK_EQ(settings_get(&v, SET_RESET_KEYS), L | R | START);  // used as the default
 	CHECK(!settings_dirty(&v));
 	settings_set(&v, SET_THEME, 1);
 	settings_restore(&v, SET_THEME);
@@ -636,4 +637,58 @@ void test_settings_clock_apply(void)
 	CHECK_EQ(later.hour, 0);  // the time keeps running
 	CHECK_EQ(later.minute, 9);
 	CHECK_EQ(later.second, 45);
+}
+
+// Stored hotkeys Settings wouldn't accept (v0.3's, or a hand edit's) read
+// as the defaults, here and in the launch's patches (GBApatch.c)
+static u32 stored_keys(const u8 reset[3], const u8 sleep[3], u16 *r, u16 *sl)
+{
+	u16 slots[assress_max];
+	for (u32 a = 0; a < assress_max; a++)
+		slots[a] = 0xFFFF;
+	for (u32 i = 0; i < 3; i++) {
+		slots[assress_edit_rtshotkey_0 + i] = reset[i];
+		slots[assress_edit_sleephotkey_0 + i] = sleep[i];
+	}
+	settings_values_init(&v, slots);
+	return settings_hotkeys(slots, r, sl);
+}
+
+void test_settings_hotkeys_stored(void)
+{
+	const u16 A = 1 << 0, B = 1 << 1, SELECT = 1 << 2, START = 1 << 3, UP = 1 << 6, R = 1 << 8, L = 1 << 9;
+	const u16 LRSTART = L | R | START, LRSELECT = L | R | SELECT;
+	u16 r, s;
+	// Erased slots: the defaults, nothing to say
+	CHECK_EQ(stored_keys((const u8[]){0xFF, 0xFF, 0xFF}, (const u8[]){0xFF, 0xFF, 0xFF}, &r, &s), 0);
+	CHECK_EQ(r, LRSTART);
+	CHECK_EQ(s, LRSELECT);
+	// Good keys stay
+	CHECK_EQ(stored_keys((const u8[]){9, 8, 1}, (const u8[]){6, 2, 2}, &r, &s), 0);
+	CHECK_EQ(r, L | R | B);
+	CHECK_EQ(s, UP | SELECT);
+	// No modifier (v0.3's A+A+B), one key, Sleep on its wake keys, inside the soft reset
+	CHECK_EQ(stored_keys((const u8[]){0, 0, 1}, (const u8[]){3, 3, 2}, &r, &s),
+		 SET_HOTKEYS_RESET_FIXED | SET_HOTKEYS_SLEEP_FIXED);
+	CHECK_EQ(r, LRSTART);
+	CHECK_EQ(s, LRSELECT);
+	CHECK_EQ(settings_get(&v, SET_RESET_KEYS), LRSTART);
+	CHECK_EQ(settings_get(&v, SET_SLEEP_KEYS), LRSELECT);
+	CHECK_EQ(stored_keys((const u8[]){9, 9, 9}, (const u8[]){0, 1, 3}, &r, &s),
+		 SET_HOTKEYS_RESET_FIXED | SET_HOTKEYS_SLEEP_FIXED);
+	// The same keys twice: the reset keys fall back
+	CHECK_EQ(stored_keys((const u8[]){9, 8, 1}, (const u8[]){9, 8, 1}, &r, &s), SET_HOTKEYS_RESET_FIXED);
+	CHECK_EQ(r, LRSTART);
+	CHECK_EQ(s, L | R | B);
+	// One held in the other, clashing with the reset default too: both fall back
+	CHECK_EQ(stored_keys((const u8[]){9, 8, 1}, (const u8[]){9, 8, 8}, &r, &s),
+		 SET_HOTKEYS_RESET_FIXED | SET_HOTKEYS_SLEEP_FIXED);
+	CHECK_EQ(r, LRSTART);
+	CHECK_EQ(s, LRSELECT);
+	// The reset default and a Sleep holding it: Sleep falls back
+	CHECK_EQ(stored_keys((const u8[]){9, 8, 3}, (const u8[]){9, 8, 3}, &r, &s), SET_HOTKEYS_SLEEP_FIXED);
+	CHECK_EQ(r, LRSTART);
+	CHECK_EQ(s, LRSELECT);
+	(void)A;
+	erased();
 }

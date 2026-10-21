@@ -216,6 +216,13 @@ enum {
 u32 settings_set_keys(struct settings_values *v, u32 id, u16 mask);
 // The combination a SET_KEYS row starts with: L+R+START or L+R+SELECT
 u16 settings_keys_default(u32 id);
+// Both hotkeys as stored in slots and as every reader uses them (KEYINPUT
+// masks): one Settings wouldn't accept, or a pair that clashes (written by
+// v0.3 or by hand), falls back to the default. Returns SET_HOTKEYS_*_FIXED
+// bits for what fell back
+#define SET_HOTKEYS_RESET_FIXED 1u
+#define SET_HOTKEYS_SLEEP_FIXED 2u
+u32 settings_hotkeys(const u16 *slots, u16 *reset, u16 *sleep);
 // A key's name by its KEYINPUT bit (0 A ... 9 L), "" past them
 const char *settings_key_name(u32 bit);
 // Writes mask's keys into keys, L first (the order the hotkeys read), and

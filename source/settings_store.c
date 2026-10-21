@@ -84,6 +84,12 @@ void settings_log(void)
 	for (u32 a = 0; a < assress_max; a++)
 		slots[a] = Read_SET_info(a);
 	settings_values_init(&v, slots);  // no clock: nothing here shows it
+	u16 reset, sleep;
+	u32 fixed = settings_hotkeys(slots, &reset, &sleep);
+	if (fixed)  // v0.3, or a hand edit, stored a pair Settings wouldn't take
+		tlog("settings: stored %s%s%s not allowed or clashing; using the default%s",
+		     fixed & SET_HOTKEYS_RESET_FIXED ? "menu keys" : "", fixed == 3 ? " and " : "",
+		     fixed & SET_HOTKEYS_SLEEP_FIXED ? "sleep keys" : "", fixed == 3 ? "s" : "");
 	settings_value_text(&v, SET_GAME_VIEW, view, sizeof(view));
 	settings_value_text(&v, SET_START_ON, start, sizeof(start));
 	settings_value_text(&v, SET_CLOCK_24H, h24, sizeof(h24));
