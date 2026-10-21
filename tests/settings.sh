@@ -161,7 +161,7 @@ failing() { # NAME STUCK ROW KEYS...: a visit to ROW on a new cart whose write f
 failing fail-always 0x7B201C auto-save A RIGHT A B
 grep -q 'settings: not saved, tried again at the next confirm or on leaving' "$cart/visit.log" ||
   fail "a failed write wasn't noticed: $(grep -E 'nor:|settings:' "$cart/visit.log" | tail -3)"
-[ "$(grep -c 'settings: not saved, tried again' "$cart/visit.log")" = 2 ] || fail "the first B didn't try again and stay"
+[ "$(grep -c 'settings: not saved, tried again' "$cart/visit.log")" = 3 ] || fail "the first B didn't try again and stay"
 grep -q 'settings: not saved, the page left' "$cart/visit.log" || fail "leaving didn't try the write again"
 [ "$(writes)" = 0 ] || fail "a failed write was logged as written"
 [ "$(slots 14 1)" = ffff ] || fail "the failed write changed Auto save: $(slots 14 1)"
