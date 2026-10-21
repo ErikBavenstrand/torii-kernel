@@ -36,6 +36,7 @@ extern u8 pReadCache[];
 static const char *const lib_files[2] = {"/torii/library.idx", "/torii/library.bak"};
 #define LIB_DIR "/torii"
 #define LIB_IO_BYTES 2048  // a chunk of the file per step
+#define LIB_PARSE_WORK 16  // names.txt's lines found, compared or moved per step
 #define LIB_STEP_CYCLES 30000  // one job call's work, about a ninth of a frame
 #define LIB_SORT_BUDGET 48  // merged entries per step
 #define LIB_DEPTH 8  // folders deeper than this are skipped
@@ -85,6 +86,7 @@ enum {
 	W_NAMESDB,
 	W_CLEAR,
 	W_NAMES,
+	W_NAMES_PARSE,
 	W_SAVER_OPEN,
 	W_SAVER,
 	W_ROOT,
@@ -144,6 +146,7 @@ static struct {
 			u32 hash, serial, files, games, entries, folders_seen, folders_done, saves, skipped, cleared;
 			u32 unreadable, names_len, too_long;
 			u8 names_ok;  // names.txt read whole into LIB_NAMES_TEXT
+			u32 parse_started;  // when its parse began
 		} walk;
 	} u;
 	u8 buf[LIB_IO_BYTES] ALIGN(4);
@@ -627,14 +630,11 @@ static void names_step(void)
 	lib.buf[staged] = 0;
 	names_flush(staged + tail);
 	lib.u.walk.names_len -= 1 + tail;
-	// One step (it sorts the lines unless the file is sorted, as the kernel
-	// writes it), logged for the cart's figure
-	u32 start = cycles_now();
-	gamename_custom_parse(&lib.u.walk.custom, (const char *)LIB_NAMES_TEXT, lib.u.walk.names_len, lib.u.walk.lines,
+	// Parsed in steps (W_NAMES_PARSE): it sorts the lines unless the file
+	// is sorted, as the kernel writes it
+	lib.u.walk.parse_started = cycles_now();
+	gamename_custom_begin(&lib.u.walk.custom, (const char *)LIB_NAMES_TEXT, lib.u.walk.names_len, lib.u.walk.lines,
 			      GAMENAME_CUSTOM_MAX);
-	tlog("library: %lu custom names parsed in %lu ms", (unsigned long)lib.u.walk.custom.count,
-	     (unsigned long)ms_since(start));
-	lib.u.walk.names_ok = lib.u.walk.custom.count != 0;
 }
 
 static void walk_step(void)
@@ -667,6 +667,15 @@ static void walk_step(void)
 		return;
 	case W_NAMES:
 		names_step();
+		lib.phase = lib.u.walk.names_ok ? W_NAMES_PARSE : W_SAVER_OPEN;
+		return;
+	case W_NAMES_PARSE:
+		// A few lines a step: a large names.txt took a step of seconds
+		if (!gamename_custom_step(&lib.u.walk.custom, LIB_PARSE_WORK))
+			return;
+		tlog("library: %lu custom names parsed in %lu ms", (unsigned long)lib.u.walk.custom.count,
+		     (unsigned long)ms_since(lib.u.walk.parse_started));
+		lib.u.walk.names_ok = lib.u.walk.custom.count != 0;
 		lib.phase = W_SAVER_OPEN;
 		return;
 	case W_SAVER_OPEN:
@@ -976,6 +985,19 @@ static int has_work(void)
 	return lib.state != S_IDLE || lib.want_walk || (lib.want_write && lib.valid);
 }
 
+void library_load_now(void)
+{
+	if (lib.state == S_LOST) {
+		load_begin();
+		lib.want_walk = 1;
+	}
+	if (lib.state != S_LOAD || cover_loading())
+		return;
+	psram_begin();
+	while (lib.state == S_LOAD)
+		library_step();
+}
+
 void library_poll(void)
 {
 	if (lib.state == S_LOST) {
@@ -1154,6 +1176,11 @@ u32 library_flags(u32 rec)
 u32 library_path(u32 rec, char *out, u32 size)
 {
 	return rec_ok(rec) ? lib_path(active_slot(), rec, out, size) : 0;
+}
+
+const u8 *library_slot(void)
+{
+	return lib.valid ? active_slot() : NULL;
 }
 
 u32 library_find(const char *path)

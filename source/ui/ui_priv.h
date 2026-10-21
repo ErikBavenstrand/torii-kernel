@@ -83,6 +83,10 @@ int ui_plane_fading_out(u32 plane);
 // pressed.
 void ui_queue_keys(u16 keys);
 
+// The next frame's draw is heavy (half a frame or more): its jobs take one
+// step, so the draw lands in it.
+void ui_draw_heavy(void);
+
 // Cycles into the frame by which drawing that nobody sees yet ends, so the
 // frame still ends before the next VBlank (a frame is 280,896 cycles) with
 // room for the nodes drawn after: a view not shown yet (nothing moves while

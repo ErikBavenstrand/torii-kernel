@@ -135,6 +135,7 @@ void test_safefile_crc_line(void);
 void test_safefile_scan(void);
 void test_safefile_pick(void);
 void test_safefile_lines(void);
+void test_safefile_scan_line(void);
 void test_carousel_window(void);
 void test_carousel_rest(void);
 void test_carousel_turning(void);

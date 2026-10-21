@@ -259,3 +259,25 @@ new_cart hook
 boot 1 -P 60:nav_test_path:/Hello.gba -p 60:nav_test_action:1 -f 300
 ! grep -q "nav: test hook" "$log" || fail "the hook ran an action without its magic"
 echo "PASS: the test hook takes no action without its magic word"
+
+# Keys around a popup (ui_keys_hold, ui_popup.c): DOWN pressed while START
+# waits for a folder's page to come in goes to the popup, which still opens
+# on the row START was pressed on; START and B mashed 4 frames apart open
+# and close the popup, never letting B reach the page
+cart=$carts/popup-keys
+rm -rf "$cart" && mkdir -p "$cart"
+mkfs.fat -C -F 32 -n NAV "$cart/sd.img" 65536 >/dev/null
+mmd -i "$cart/sd.img" ::/F
+for i in $(seq -w 1 12); do mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba "::/F/H$i.gba"; done
+OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -f 1 >/dev/null 2>&1
+NAV_SHOWN=gba
+# shellcheck disable=SC2046
+boot 1 $(NAV_SHOWN=gba nav_to sd) -k @20:A -k @21:- -k @22:START -k @23:- -k @24:DOWN -k @25:- \
+  -w "screen ready: popup" -f 400
+logged "sdcard: popup /F/H01.gba"
+# shellcheck disable=SC2046
+boot 2 $(NAV_SHOWN=gba nav_to sd) -k @20:START -k @21:- -k @24:B -k @25:- -k @28:START -k @29:- -k @32:B -k @33:- \
+  -k @36:START -k @37:- -k @40:B -k @41:- -f 400
+[ "$(grep -c '^kernel: sdcard: popup /F$' "$log")" = 3 ] || fail "START and B mashed didn't open the popup 3 times"
+! grep -q "nav: back from sd" "$log" || fail "a mashed B reached the SD page"
+echo "PASS: keys around a popup's open and close go to the popup"

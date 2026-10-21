@@ -165,6 +165,57 @@ logged "$cart/1.log" "library: wrote /torii/library.bak (generation 2)"
 no_errors "$cart/1.log"
 echo "PASS: the games on Recent get their CRCs and names after the boot"
 
+# A launch before crc.txt took the new CRCs writes them to the journal
+# (crc.new), not the whole cache; the next boot reads it, and its write of
+# crc.txt takes the lines over and deletes it
+cart=$carts/journal
+fixture_card "$cart" --no-crc
+mcopy -i "$cart/sd.img" "$carts/recent/recent.txt" ::/torii/recent.txt
+# shellcheck source=tests/nav.sh
+. tests/nav.sh
+# shellcheck disable=SC2046 # nav.sh's options
+boot "$cart" "$cart/1.log" -w "names: identified 2 of 2" $(nav_launch /GBA/Homebrew.gba at=@1) -u "launch: loading" -f 2000
+logged "$cart/1.log" "names: wrote 2 CRCs to /torii/crc.new"
+not_logged "$cart/1.log" "names: wrote /torii/crc.txt"
+boot "$cart" "$cart/2.log" -k 100:A -k 106:- -f 2000 -u "names: wrote /torii/crc.txt" # A: "Save sav?"
+logged "$cart/2.log" "names: 2 CRCs from /torii/crc.new"
+logged "$cart/2.log" "names: wrote /torii/crc.txt"
+not_logged "$cart/2.log" "names: identified 2 of 2"
+# (Homebrew, played now, gets its CRC this boot)
+[ "$(crc_lines "$cart" | cut -f4 | sort | tr '\n' ' ')" = "/GBA/Homebrew.gba /GBA/Wars.gba /NES/Famicom.nes " ] ||
+  fail "crc.txt holds $(crc_lines "$cart")"
+if mdir -i "$cart/sd.img" ::/torii/crc.new >/dev/null 2>&1; then fail "crc.new is still there"; fi
+no_errors "$cart/1.log"
+no_errors "$cart/2.log"
+echo "PASS: a launch writes only the new CRCs, which the next boot puts into crc.txt"
+
+# crc.txt cut short by a write (left with zeros): its lines read in the
+# same pass as its check are dropped, and the backup's taken
+cart=$carts/backup
+fixture_card "$cart"
+mcopy -o -i "$cart/sd.img" "$cart/files/torii/crc.txt" ::/torii/crc.txt.bak
+head -c 600 "$cart/files/torii/crc.txt" >"$cart/cut.txt"
+head -c 200 /dev/zero >>"$cart/cut.txt"
+mcopy -o -i "$cart/sd.img" "$cart/cut.txt" ::/torii/crc.txt
+boot "$cart" "$cart/1.log" -f 900
+logged "$cart/1.log" "names: /torii/crc.txt: read the backup copy"
+logged "$cart/1.log" "names: 8 files' CRCs from /torii/crc.txt"
+no_errors "$cart/1.log"
+echo "PASS: a crc.txt cut short is passed over for its backup"
+
+# A read-only crc.txt isn't written, and Recent's games aren't identified
+# each boot for nothing
+cart=$carts/read-only
+fixture_card "$cart"
+mcopy -i "$cart/sd.img" "$carts/recent/recent.txt" ::/torii/recent.txt
+mattrib -i "$cart/sd.img" +r ::/torii/crc.txt
+boot "$cart" "$cart/1.log" -f 900
+logged "$cart/1.log" "names: /torii/crc.txt is read-only"
+not_logged "$cart/1.log" "names: identified"
+not_logged "$cart/1.log" "names: wrote"
+no_errors "$cart/1.log"
+echo "PASS: a read-only crc.txt is left alone, and nothing is identified for it"
+
 # A large crc.txt (3,000 records of 100-byte paths, as No-Intro names in
 # console folders make) loads whole, in steps, beside a loaded index; its
 # records are in v0.4.1's form, with a code column, which still reads

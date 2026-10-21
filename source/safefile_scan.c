@@ -1,6 +1,7 @@
 // The checks behind safe file writes (safefile_scan.h).
 #include "safefile_scan.h"
 
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -40,15 +41,48 @@ static void end_line(struct safefile_scan *s)
 // A line at a time (memchr finds the newlines and NULs a word at a time):
 // byte by byte, with the fields in EWRAM, a large file cost about 100
 // cycles a byte
+typedef u32 __attribute__((may_alias)) scan_word;
+
+// The first newline in [p, end), or NULL; *nul set if a NUL comes before
+// it. One pass, in IWRAM: a large file's scan spends its time here.
+const u8 *IWRAM_CODE safefile_scan_line(const u8 *p, const u8 *end, u8 *nul)
+{
+	// Whole words where neither byte can be: a byte that is 0 or '\n'
+	// makes (x - 0x01010101) & ~x & 0x80808080 nonzero for x = the word, or
+	// the word ^ 0x0A0A0A0A
+	for (; p < end && ((uintptr_t)p & 3); p++) {
+		if (*p == '\n')
+			return p;
+		if (!*p)
+			*nul = 1;
+	}
+	for (; end - p >= 4; p += 4) {
+		u32 w = *(const scan_word *)p, x = w ^ 0x0A0A0A0Au;
+		if (((w - 0x01010101u) & ~w) & 0x80808080u || ((x - 0x01010101u) & ~x) & 0x80808080u)
+			break;
+	}
+	for (; p < end; p++) {
+		u32 c = *p;
+		if (c <= '\n') {
+			if (c == '\n')
+				return p;
+			if (!c)
+				*nul = 1;
+		}
+	}
+	return NULL;
+}
+
 void safefile_scan_feed(struct safefile_scan *s, const void *data, u32 bytes)
 {
 	const u8 *p = data, *end = p + bytes;
 	while (p < end) {
 		if (s->size == s->line_start)
 			s->line_crc = s->crc;  // the CRC of every byte before this line
-		const u8 *nl = memchr(p, '\n', (size_t)(end - p));
+		u8 nul = 0;
+		const u8 *nl = safefile_scan_line(p, end, &nul);
 		u32 text = (u32)((nl ? nl : end) - p), n = text + (nl != NULL);
-		if (!s->has_nul && memchr(p, 0, n))
+		if (nul)
 			s->has_nul = 1;
 		if (s->line_len < sizeof(s->line)) {
 			u32 room = (u32)sizeof(s->line) - s->line_len;

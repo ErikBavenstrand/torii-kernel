@@ -302,6 +302,9 @@ int lib_rename_shown(u8 *slot, lib_put_fn put, u32 rec, const char *new_name, co
 void library_boot(void);
 // Each pass of the menu's loop: starts the job when there is work.
 void library_poll(void);
+// Loads the index a launch dropped (or finishes loading it) at once, unless
+// covers are loading: for a page that lists it.
+void library_load_now(void);
 // Before PSRAM page 0 is overwritten: finishes a write under way or due
 // (the card then has the index), stops the job and forgets the index.
 void library_before_launch(void);
@@ -339,6 +342,9 @@ const char *library_key(u32 rec);
 u32 library_size(u32 rec);
 u32 library_flags(u32 rec);
 u32 library_path(u32 rec, char *out, u32 size);
+// The index's slot for the lib_* queries (NULL while none is loaded): for
+// hot loops, read only, until the next library call.
+const u8 *library_slot(void);
 // The record with this full path, or LIBRARY_NONE.
 u32 library_find(const char *path);
 // lib_find_names in the index: the records of games named names (a NOR

@@ -989,7 +989,7 @@ int ui_obj_add(u8 node, u16 attr0, u16 attr1, u16 attr2);
 //		ui_popup_close();  // after B too: it does nothing then
 //	}
 
-#define UI_POPUP_ITEMS 8  // items in a popup, at most
+#define UI_POPUP_ITEMS 9  // items in a popup, at most (past 8 it has no room for its title)
 enum {
 	UI_POP_DANGER = 1,  // ui_pop_item.flags: in danger ink (Delete, Format), and last
 	UI_POP_DIM = 2,     // greyed out (ink3): nothing to do now; A still picks it
@@ -1010,6 +1010,10 @@ struct ui_popup {
 // Opens a popup beside list's selected row (a list on the top view): it
 // starts opening, and the call returns. 0 if it can't (logged, ui_error()).
 int ui_popup_open(u8 list, u8 hints, const struct ui_popup *popup);
+// Holds the keys pressed from now (on 1) for the view on top once on is 0
+// again: a page that runs frames before it opens a popup (a list still
+// paging) gives the popup the keys pressed meanwhile, not itself.
+void ui_keys_hold(int on);
 // Runs frames until A picks an item (its index; the popup stays up) or B
 // (-1; the popup has closed). -1 if no popup is up.
 s32 ui_popup_choose(void);
@@ -1059,6 +1063,9 @@ struct ui_confirm {
 };
 // Asks for a confirmation: 1 if the action was chosen, 0 for Cancel or B
 // (or if it can't open, logged). It has closed when the call returns.
+// Asked over a popup it takes the popup's place (the popup is back, still
+// up, when it returns), borrowing the popup's tiles when BG block 0 has no
+// room for its own.
 int ui_confirm(u8 hints, const struct ui_confirm *confirm);
 
 // The letter card's node, for a list page's layout (plane 0, which the page

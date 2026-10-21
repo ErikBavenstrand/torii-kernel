@@ -202,6 +202,7 @@ static const struct {
 	{"safefile_scan", test_safefile_scan},
 	{"safefile_pick", test_safefile_pick},
 	{"safefile_lines", test_safefile_lines},
+	{"safefile_scan_line", test_safefile_scan_line},
 	{"carousel_window", test_carousel_window},
 	{"carousel_rest", test_carousel_rest},
 	{"carousel_turning", test_carousel_turning},

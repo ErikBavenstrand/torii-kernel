@@ -3,7 +3,8 @@
 //
 // PSRAM, from PSRAM_USERDATA_BASE: Recent's games as struct userdata_recent
 // (newest first), then the favourites as a table of handles in path order,
-// then their paths, each NUL-padded to a word (a handle is its offset). A
+// then their paths, each NUL-padded to a word after a word of its file
+// name's hash (userdata_name_hash; a handle is the path's offset). A
 // change to Recent is made on a copy in RAM, then written to PSRAM and the
 // card; a change to the favourites is written to the card, which is then
 // read back into PSRAM, so the store always holds what the card does.
@@ -67,6 +68,7 @@ static struct {
 	u32 recent_count;
 	u32 fav_count;
 	u32 fav_used;  // pool bytes
+	u32 fav_version;  // reads of the favourites
 	struct userdata_boot boot;
 	struct userdata_boot card_boot;  // the one recent.txt holds, as last read or written
 	const char *recent_path, *fav_path, *old_path;  // tests' files; NULL for the user's
@@ -286,15 +288,17 @@ static void load_fav(void)
 			continue;
 		u32 n = (u32)strlen(path);
 		u32 bytes = WORD_UP(n + 1);
-		if (count == USERDATA_FAV_MAX || used + bytes > FAV_POOL_BYTES) {
+		if (count == USERDATA_FAV_MAX || used + 4 + bytes > FAV_POOL_BYTES) {
 			dropped++;
 			continue;
 		}
+		u32 hash = userdata_name_hash(path);
 		memcpy(W->pad, path, n + 1);
 		memset(W->pad + n + 1, 0, bytes - n - 1);
-		psram_write((void *)(FAV_POOL_PS + used), W->pad, bytes);
-		W->u.fav[count++] = used;
-		used += bytes;
+		psram_write((void *)(FAV_POOL_PS + used), &hash, 4);
+		psram_write((void *)(FAV_POOL_PS + used + 4), W->pad, bytes);
+		W->u.fav[count++] = used + 4;
+		used += 4 + bytes;
 	}
 	st.fav_bad = (u8)safefile_failed();
 	safefile_close();
@@ -311,6 +315,7 @@ static void load_fav(void)
 	st.fav_count = count;
 	st.fav_used = used;
 	st.fav_ok = 1;
+	st.fav_version++;
 	if (from != SAFEFILE_NONE)
 		tlog("userdata: %lu favourites, %lu lines dropped", (unsigned long)count, (unsigned long)dropped);
 }
@@ -392,7 +397,8 @@ static int fav_change(const char *add, int (*drop)(const char *path, const char 
 	if (add) {
 		e->add_at = userdata_find(FAV_TABLE_PS, st.fav_count, add, fav_str, &found);
 		// A rename drops a path as it adds one: never full then
-		int full = st.fav_count == USERDATA_FAV_MAX || st.fav_used + WORD_UP(strlen(add) + 1) > FAV_POOL_BYTES;
+		int full =
+			st.fav_count == USERDATA_FAV_MAX || st.fav_used + 4 + WORD_UP(strlen(add) + 1) > FAV_POOL_BYTES;
 		if (!found && full && !(drop && fav_matches(drop, arg))) {
 			tlog_error("userdata: the favourites are full");
 			return 0;
@@ -424,6 +430,32 @@ int userdata_fav_has(const char *path)
 	ensure_fav();
 	userdata_find(FAV_TABLE_PS, st.fav_count, path, fav_str, &found);
 	return found;
+}
+
+u32 userdata_fav_find(const char *path, int *found)
+{
+	ensure_fav();
+	return userdata_find(FAV_TABLE_PS, st.fav_count, path, fav_str, found);
+}
+
+u32 userdata_fav_hash(u32 i)
+{
+	ensure_fav();
+	return i < st.fav_count ? *(const u32 *)(FAV_POOL_PS + FAV_TABLE_PS[i] - 4) : 0;
+}
+
+u32 IWRAM_CODE userdata_name_hash(const char *path)
+{
+	u32 h = 2166136261u;
+	for (u32 c; (c = (u8)*path) != 0; path++)
+		h = c == '/' ? 2166136261u : (h ^ c) * 16777619u;
+	return h;
+}
+
+u32 userdata_fav_version(void)
+{
+	ensure_fav();
+	return st.fav_version;
 }
 
 int userdata_fav_set(const char *path, int on)

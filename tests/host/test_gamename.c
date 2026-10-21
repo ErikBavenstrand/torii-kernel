@@ -264,6 +264,17 @@ static void custom_parse(struct custom *m, const char *text, u32 cap)
 	if (text)
 		memcpy(m->text, text, strlen(text));  // no NUL: the parser must not need one
 	gamename_custom_parse(&m->c, m->text, text ? (u32)strlen(text) : 0, m->line, cap);
+	// The same a piece a step, as the library's walk parses
+	static u32 stepped[GAMENAME_CUSTOM_MAX];
+	struct gamename_custom c;
+	gamename_custom_begin(&c, m->text, text ? (u32)strlen(text) : 0, stepped, cap);
+	u32 steps = 0;
+	while (!gamename_custom_step(&c, 1))
+		steps++;
+	CHECK_EQ(c.count, m->c.count);
+	CHECK_EQ(c.complete, m->c.complete);
+	CHECK(!memcmp(stepped, m->line, m->c.count * sizeof(u32)));
+	CHECK(steps < 64u * (m->c.count + 4));
 }
 
 static void check_get(struct custom *m, const char *path, const char *expected)

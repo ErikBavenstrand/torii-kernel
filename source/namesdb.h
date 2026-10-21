@@ -130,6 +130,8 @@ void names_cache_init(struct names_cache *c, u8 *base, names_put_fn put);
 int names_cache_clear_part(struct names_cache *c, u32 at, u32 bytes);
 // The FNV-1a hash of a path, ASCII case folded as FAT matches names.
 u32 names_path_hash(const char *path);
+// The same, and the path's length (in IWRAM: crc.txt's load hashes every line).
+u32 IWRAM_CODE names_path_hash_len(const char *path, u32 *len);
 // A record by number, and its path and flags.
 static inline const struct names_rec *names_cache_rec(const struct names_cache *c, u32 n)
 {
@@ -170,7 +172,7 @@ struct names_line {
 	const char *path;
 	u32 size, date, crc, flags;
 };
-int names_parse_line(char *line, struct names_line *out);
+int IWRAM_CODE names_parse_line(char *line, struct names_line *out);
 // Writes record n's line, with its newline, into buf (size bytes); returns
 // its length, 0 for a dead record or if it doesn't fit.
 u32 names_format_line(const struct names_cache *c, u32 n, char *buf, u32 size);

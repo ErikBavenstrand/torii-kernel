@@ -41,7 +41,9 @@ static u32 crc32tab[256] EWRAM_DATA = {
 	0xb3667a2eL, 0xc4614ab8L, 0x5d681b02L, 0x2a6f2b94L, 0xb40bbe37L, 0xc30c8ea1L, 0x5a05df1bL, 0x2d02ef8dL};
 typedef u32 __attribute__((may_alias)) crc_word;
 
-u32 crc32_update(u32 crc, const void *data, u32 size)
+// In IWRAM too: Identify's CRCs of whole games and crc.txt's scans spend
+// most of their time here
+u32 IWRAM_CODE crc32_update(u32 crc, const void *data, u32 size)
 {
 	const u8 *p = data;
 	const u32 *t = crc32tab;

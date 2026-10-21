@@ -36,7 +36,7 @@
 # favourites, then B closes it), delete (Delete, then Delete in the
 # confirmation), delete-no (Delete, then Cancel, then B), info (File info,
 # then A closes it), or open (no popup: A on the row, which starts a game).
-# Clean boot and Write to NOR with addon show only while an addon is on:
+# Clean boot, Boot with addon (GBA games) and Write to NOR with addon show only while an addon is on:
 # say addon then (clean and nor-addon imply it), so the route counts them.
 # Later options count from the route's last wait (-w): the popup's line, or
 # the folder's with open. The kernel cuts a log line's text at 240 bytes,
@@ -206,8 +206,8 @@ nav_file() {
     popup) keys=() ;;
     launch) keys=("$a") ;;
     clean) keys=(DOWN "$a") ;;
-    nor) if [ "$addon" = 1 ]; then keys=(DOWN DOWN "$a"); else keys=(DOWN "$a"); fi ;;
-    nor-addon) keys=(DOWN DOWN DOWN "$a") ;;
+    nor) if [ "$addon" = 1 ]; then keys=(DOWN DOWN DOWN "$a"); else keys=(DOWN "$a"); fi ;;
+    nor-addon) keys=(DOWN DOWN DOWN DOWN "$a") ;;
     fav) keys=(UP UP UP A B) ;;
     delete) keys=(UP UP A RIGHT A) ;;
     delete-no) keys=(UP UP A A B) ;;

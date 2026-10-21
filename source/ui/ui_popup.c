@@ -8,10 +8,14 @@
 // registers (a window while they open or close, a slide, the dim) goes
 // through ui_overlay_set (ui/ui_run.c).
 //
-// A confirmation over a popup keeps it on screen: the confirmation's map
-// holds the popup's entries too, in a bank of their own whose colours the
-// dim's maths darkens or brightens (the dim leaves plane 0 alone), and the
-// card itself is drawn in a bank that fades in from the dimmed page.
+// A confirmation over a popup takes its place: the popup goes while the
+// question is up (a sliver of it beside the card read as a glitch), and
+// comes back dimmed as the answer's dim fades out, through the
+// confirmation's map, in a bank of their own whose colours the dim's maths
+// darkens or brightens (the dim leaves plane 0 alone). The card itself is
+// drawn in a bank that fades in from the dimmed page. When BG block 0 has
+// no room for its tiles, it borrows the popup's (pp.share), and the popup
+// is drawn again before it shows.
 #include <string.h>
 
 #include "art.h"
@@ -479,15 +483,20 @@ static struct {
 	u16 key;                         // the key ui_fields_key returns, 0 none yet
 	s16 top;      // its card's top, screen px
 	s16 notch_y;  // the notch's line (the row's middle)
+	s16 row_y0, row_y1;  // the row's lines (in the card): the card opens from them
 	u16 h;        // its card's height
 	u8 cursor;
+	u8 titled;    // it shows its title (it has one, and room for it)
 	u16 redraw;   // items to draw again, a bit each
 	// The confirmation
 	const struct ui_confirm *ask;
 	u8 sel;            // 0 Cancel, 1 the action
 	u8 redraw_buttons;
 	u8 card_off;       // answered: its card comes off the map
-	u8 over_popup;     // it opened over the popup, which it keeps
+	u8 over_popup;     // it opened over the popup, which comes back after
+	u8 share;          // its card is drawn in the popup's tiles (SHARE_*)
+	u32 share_ticket;  // the map change that hid one or the other
+	u8 back;           // answered: the popup is back on its map
 	u8 bank;           // its two palette banks: the dimmed popup's, then its own
 	u16 base[16];      // bank 0 of the theme, which both follow
 } pp EWRAM_BSS;
@@ -504,9 +513,12 @@ static int run_live(struct run *r)
 }
 
 // Keys pressed while a run closes that the view under it gets: moves only.
-// A, B, START or SELECT then could act on a page the user can't see yet
-// (B then A would play the game under the popup).
+// A, B or SELECT then could act on a page the user can't see yet (B then A
+// would play the game under the popup). START, which opens the popup, goes
+// on after a popup's close: START and B mashed open and close it, and a
+// START dropped let the next B reach the page.
 #define KEYS_AFTER (INPUT_DPAD | INPUT_L | INPUT_R)
+#define KEYS_AFTER_POPUP (KEYS_AFTER | INPUT_START)
 
 static void run_start(struct run *r, struct ui_view *v, u8 hints)
 {
@@ -583,7 +595,9 @@ static void run_finish(struct run *r, const struct ui_move *close)
 	r->step = 0;
 	r->waiting = 0;
 	r->view->opening = -1;
-	for (u32 guard = 0; guard < 4u * 60 && r->step < close->frames && r->open && ui_top() == r->view; guard++)
+	for (u32 guard = 0; guard < 4u * 60 && ui_top() == r->view &&
+			    ((r->step < close->frames && r->open) || (r == &pp.conf && pp.card_off && !pp.back));
+	     guard++)
 		ui_frame();
 	u16 keys = r->keys_after;
 	TLOG_ASSERT(ui_top() == r->view);
@@ -629,7 +643,7 @@ struct popup_state {
 // An item's top, screen px
 static s32 item_top(u32 i)
 {
-	return pp.top + (pp.menu->title ? look.pop_head_h : look.pop_pad_top) + (s32)(i * look.pop_pitch);
+	return pp.top + (pp.titled ? look.pop_head_h : look.pop_pad_top) + (s32)(i * look.pop_pitch);
 }
 
 // The field card's fields at (x, y), the card's top left: centred, the
@@ -696,7 +710,7 @@ static void popup_render(u8 node, const struct pen *p)
 		fields_render(p, x, y);
 		return;
 	}
-	if (m->title) {
+	if (pp.titled) {
 		s32 tx = look.pop_text_x;
 		if (m->icon8) {
 			pen_icon8(p, x + look.pop_icon_x, y + look.pop_title_y + ((s32)font->line_height - 8) / 2,
@@ -731,17 +745,18 @@ static void popup_render(u8 node, const struct pen *p)
 	}
 }
 
-// The registers for the popup open by e (Q15): a window from the notch's
-// line up and down to the card's, and the card slid right by what's left
+// The registers for the popup open by e (Q15): a window from the row's
+// lines up and down to the card's (so no sliver of the row shows above or
+// below it), and the card slid right by what's left
 static void popup_overlay(u32 e)
 {
 	s32 slide = (s32)((ui_theme()->motion.popup_slide * (EASE_ONE - e) + EASE_ONE / 2) >> 15);
-	s32 top = pp.top, bottom = pp.top + pp.h + look.shadow_y, mid = pp.notch_y;
+	s32 top = pp.top, bottom = pp.top + pp.h + look.shadow_y, r0 = pp.row_y0, r1 = pp.row_y1;
 	struct ui_overlay o = {
 		(s16)(look.pop_x - look.pop_notch + slide),
-		(s16)(mid - (((mid - top) * (s32)e + EASE_ONE / 2) >> 15)),
+		(s16)(r0 - (((r0 - top) * (s32)e + EASE_ONE / 2) >> 15)),
 		(s16)(look.pop_x + look.pop_w + look.shadow_x + slide),
-		(s16)(mid + (((bottom - mid) * (s32)e + EASE_ONE / 2) >> 15)),
+		(s16)(r1 + (((bottom - r1) * (s32)e + EASE_ONE / 2) >> 15)),
 		(s16)slide,
 		(u8)(e < EASE_ONE),
 		0,
@@ -777,7 +792,7 @@ static int popup_event(u8 node, const struct ui_event *e)
 	if (e->type != UI_EV_KEYS || !r->view)
 		return 0;
 	if (r->dir < 0) {
-		r->keys_after |= e->keys & KEYS_AFTER;  // for the page, once it has closed
+		r->keys_after |= e->keys & KEYS_AFTER_POPUP;  // for the page, once it has closed
 		return 1;
 	}
 	if (pp.fields) {
@@ -878,6 +893,9 @@ static int card_open(u8 list, u8 hints, u32 h)
 	pp.top = (s16)top;
 	pp.h = (u16)h;
 	pp.notch_y = (s16)(mid < lo ? lo : mid > hi ? hi : mid);
+	s32 r0 = row < top ? top : row, r1 = row + (s32)rh > top + (s32)h ? top + (s32)h : row + (s32)rh;
+	pp.row_y0 = (s16)(r0 < r1 ? r0 : pp.notch_y);
+	pp.row_y1 = (s16)(r0 < r1 ? r1 : pp.notch_y);
 	pp.redraw = 0;
 	pp.key = 0;
 	s16 rect[4];
@@ -913,9 +931,11 @@ int ui_popup_open(u8 list, u8 hints, const struct ui_popup *popup)
 	pp.pop.hint[1] = (struct ui_hint){"A", gl_pop_ok};
 	pp.pop.hint[2] = (struct ui_hint){"B", gl_pop_close};
 	pp.pop.hint_count = 3;
-	return card_open(list, hints,
-			 (popup->title ? look.pop_head_h : look.pop_pad_top) + popup->count * look.pop_pitch +
-				 look.pop_pad_bottom);
+	// A title only where the card still fits between the bars with it (8
+	// items do; the SD file popup's 9 go without, the row beside it named)
+	u32 items = popup->count * look.pop_pitch + look.pop_pad_bottom;
+	pp.titled = popup->title && look.pop_head_h + items <= (u32)(look.pop_bottom_max - look.pop_top_min);
+	return card_open(list, hints, (pp.titled ? look.pop_head_h : look.pop_pad_top) + items);
 }
 
 int ui_fields_open(u8 list, u8 hints, const struct ui_fields *fields, const struct ui_hint *keys, u32 key_count)
@@ -992,6 +1012,15 @@ void ui_popup_close(void)
 
 // --- The confirmation ------------------------------------------------------
 
+enum {
+	SHARE_NO,      // its own tiles
+	SHARE_HIDE,    // the popup's: the popup's map entries go first,
+	SHARE_HIDING,  // and once that has landed, the card is drawn over its tiles
+	SHARE_DRAWN,
+	SHARE_BACK,    // answered: the card's map entries went; once that has
+		       // landed, the popup is drawn back in its tiles
+};
+
 struct confirm_state {
 	struct canvas c;
 	u8 banks;  // res handle of pp.bank's two
@@ -1049,14 +1078,25 @@ static void confirm_colours(u32 e)
 static int confirm_measure(u8 node, struct engine_budget *need)
 {
 	need->bg_banks = (u8)(need->bg_banks + 2);
-	return canvas_measure(node, need);
+	return pp.share ? 1 : canvas_measure(node, need);
+}
+
+// The popup's canvas, which a sharing confirmation draws over
+static struct canvas *popup_canvas(void)
+{
+	return &((struct popup_state *)ui_node_state(pp.pop.node))->c;
 }
 
 static int confirm_init(u8 node)
 {
 	struct confirm_state *st = ui_node_state(node);
-	if (!canvas_init(node, &st->c))
+	if (pp.share) {
+		st->c.first = popup_canvas()->first;
+		st->c.tiles = RES_NONE;  // the popup's
+		st->c.mapped = 0;
+	} else if (!canvas_init(node, &st->c)) {
 		return 0;
+	}
 	st->banks = res_palette(RES_BG_PAL, 2, 0);
 	if (st->banks == RES_NONE) {
 		ui_set_error("view %s: no palette banks left for a confirmation", ui_node_view(node)->spec->name);
@@ -1108,16 +1148,51 @@ static void confirm_update(u8 node, u32 dt)
 }
 
 // The popup's map entries in the dimmed bank, into map rows [ty0, ty1) of
-// to (to's first row is ty0): its cells inside the card's tiles too, or not
-static void popup_entries(u8 node, u16 *to, s32 ty0, s32 ty1, int inside)
+// to (to's first row is ty0), from its canvas (its own map may be staged)
+static void popup_entries(u16 *to, s32 ty0, s32 ty1)
+{
+	const struct ui_node *pn = ui_node(pp.pop.node);
+	const struct canvas *pc = popup_canvas();
+	s32 px = pn->x / 8, py = pn->y / 8, pw = pn->w / 8, ph = pn->h / 8;
+	for (s32 y = py > ty0 ? py : ty0; y < py + ph && y < ty1; y++)
+		for (s32 x = px; x < px + pw; x++)
+			to[(y - ty0) * 32 + x] = ui_entry(pc->first + (u32)((x - px) * ph + (y - py)), pp.bank);
+}
+
+// Answered: the card's entries off the confirmation's map (card), and the
+// popup's on it, dimmed (popup); 0 to try again
+static int card_off_map(u8 node, int card, int popup)
 {
 	const struct ui_node *n = ui_node(node), *pn = ui_node(pp.pop.node);
-	const u16 *from = res_bg_addr(pp.pop.view->maps[0]);
-	s32 y0 = pn->y / 8 > ty0 ? pn->y / 8 : ty0, y1 = (pn->y + pn->h) / 8 < ty1 ? (pn->y + pn->h) / 8 : ty1;
-	for (s32 y = y0; y < y1; y++)
-		for (s32 x = pn->x / 8; x < (pn->x + pn->w) / 8; x++)
-			if (inside || x < n->x / 8 || x >= (n->x + n->w) / 8 || y < n->y / 8 || y >= (n->y + n->h) / 8)
-				to[(y - ty0) * 32 + x] = (u16)((from[y * 32 + x] & 0x0FFF) | (u32)pp.bank << 12);
+	popup = popup && pp.over_popup && run_live(&pp.pop);
+	s32 ty0 = n->y / 8, ty1 = (n->y + n->h) / 8;
+	if (popup) {
+		ty0 = pn->y / 8 < ty0 ? pn->y / 8 : ty0;
+		ty1 = (pn->y + pn->h) / 8 > ty1 ? (pn->y + pn->h) / 8 : ty1;
+	}
+	u16 *rows = ui_map_rows(node, (u32)ty0, (u32)(ty1 - ty0));
+	if (!rows)
+		return 0;
+	if (card) {
+		u16 blank = ui_shared_entry(0, UI_TILE_BLANK);
+		for (s32 y = n->y / 8; y < (n->y + n->h) / 8; y++)
+			for (s32 x = n->x / 8; x < (n->x + n->w) / 8; x++)
+				rows[(y - ty0) * 32 + x] = blank;
+	}
+	if (popup)
+		popup_entries(rows, ty0, ty1);
+	return 1;
+}
+
+// 1 once the map change of pp.share_ticket has landed; else asks for
+// another frame, whose draw (a whole canvas) is heavy
+static int share_landed(u8 node)
+{
+	if (gfx_queue_done(pp.share_ticket))
+		return 1;
+	ui_dirty(node, 1);
+	ui_draw_heavy();
+	return 0;
 }
 
 static void confirm_draw(u8 node)
@@ -1125,29 +1200,67 @@ static void confirm_draw(u8 node)
 	struct confirm_state *st = ui_node_state(node);
 	const struct ui_node *n = ui_node(node);
 	if (pp.card_off) {
-		// Answered: the card goes at once, and the dim fades out alone
-		if (!st->c.mapped)
+		// Answered: the card goes at once, and the dim fades out alone over
+		// the popup, which comes back dimmed
+		if (pp.share == SHARE_DRAWN) {
+			// Its tiles hold the card: the card's entries go first
+			if (!card_off_map(node, 1, 0)) {
+				ui_dirty(node, 1);
+				return;
+			}
+			st->c.mapped = 0;
+			pp.share = SHARE_BACK;
+			pp.share_ticket = gfx_queue_ticket();
+			ui_dirty(node, 1);
+			ui_draw_heavy();
 			return;
-		s32 ty = n->y / 8, th = n->h / 8;
-		u16 *rows = ui_map_rows(node, (u32)ty, (u32)th);
-		if (!rows) {
+		}
+		if (pp.share == SHARE_BACK) {
+			// Then the popup drawn back in its tiles, unseen: no map shows
+			// them now
+			if (!share_landed(node))
+				return;
+			canvas_whole(pp.pop.node, popup_canvas(), popup_render);
+			pp.share = SHARE_HIDING;
+		}
+		if (pp.share == SHARE_HIDING) {
+			// Its tiles hold it: on its map again
+			if (!canvas_map(pp.pop.node, popup_canvas(), UI_BANK_NORMAL)) {
+				ui_dirty(node, 1);
+				return;
+			}
+		}
+		pp.share = SHARE_NO;
+		if (pp.back)
+			return;
+		if (!card_off_map(node, st->c.mapped, 1)) {
 			ui_dirty(node, 1);
 			return;
 		}
-		u16 blank = ui_shared_entry(0, UI_TILE_BLANK);
-		for (s32 y = 0; y < th; y++)
-			for (s32 x = n->x / 8; x < (n->x + n->w) / 8; x++)
-				rows[y * 32 + x] = blank;
-		if (pp.over_popup && run_live(&pp.pop))
-			popup_entries(node, rows, ty, ty + th, 1);
 		st->c.mapped = 0;
+		pp.back = 1;
 		return;
 	}
 	if (!st->c.mapped) {
+		if (pp.share == SHARE_HIDE) {
+			// The popup's entries off its map first: its tiles are about to
+			// hold the card
+			if (!ui_map_fill(pp.pop.node, ui_shared_entry(0, UI_TILE_BLANK))) {
+				ui_dirty(node, 1);
+				return;
+			}
+			pp.share = SHARE_HIDING;
+			pp.share_ticket = gfx_queue_ticket();
+			ui_dirty(node, 1);
+			return;
+		}
+		if (pp.share == SHARE_HIDING) {
+			if (!share_landed(node))
+				return;
+			pp.share = SHARE_DRAWN;
+		}
 		canvas_whole(node, &st->c, confirm_render);
-		if (pp.over_popup && run_live(&pp.pop))
-			popup_entries(node, ui_map(node), 0, 32, 0);  // not shown yet: straight into the map
-		canvas_map(node, &st->c, pp.bank + 1u);
+		canvas_map(node, &st->c, pp.bank + 1u);  // not shown yet: straight into the map
 		pp.conf.drawn_frame = frame_count();
 		measure("confirm-draw");
 		return;
@@ -1176,6 +1289,8 @@ int ui_confirm(u8 hints, const struct ui_confirm *confirm)
 	pp.redraw_buttons = 0;
 	TLOG_ASSERT(hints == UI_NONE || ui_node_spec(hints)->kind == UI_HINTS);
 	pp.over_popup = run_live(&pp.pop) && ui_top() == pp.pop.view;
+	pp.share = SHARE_NO;
+	pp.back = 0;
 	s16 rect[4];
 	card_rect(look.conf_x, look.conf_y, look.conf_w, look.conf_h, rect);
 	run_spec(&pp.conf, "confirm", UI_CONFIRM, rect);
@@ -1183,10 +1298,20 @@ int ui_confirm(u8 hints, const struct ui_confirm *confirm)
 	res_errors_quiet = pp.over_popup ? 1 : quiet;  // a first try that may not fit
 	struct ui_view *v = ui_push(&pp.conf.view_spec, 0);
 	res_errors_quiet = quiet;
-	if (!v && pp.over_popup) {
+	const struct ui_node *pn = pp.over_popup ? ui_node(pp.pop.node) : 0;
+	if (!v && pn && (pn->w / 8) * (pn->h / 8) >= ((rect[2] - rect[0]) / 8) * ((rect[3] - rect[1]) / 8)) {
 		// No room beside the popup (a tall one on a page whose tiles fill
-		// block 0): the popup goes first, and the answer comes back to the
-		// page, not to it
+		// block 0): the card borrows the popup's tiles
+		tlog("confirm: no room beside the popup: it takes the popup's tiles");
+		pp.share = SHARE_HIDE;
+		run_spec(&pp.conf, "confirm", UI_CONFIRM, rect);
+		v = ui_push(&pp.conf.view_spec, 0);
+		if (!v)
+			pp.share = SHARE_NO;
+	}
+	if (!v && pp.over_popup) {
+		// Still none: the popup goes first, and the answer comes back to
+		// the page, not to it
 		tlog("confirm: no room over the popup: it closes first");
 		ui_popup_close();
 		pp.over_popup = 0;
