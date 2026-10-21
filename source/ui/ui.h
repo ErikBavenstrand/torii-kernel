@@ -1063,6 +1063,9 @@ struct ui_confirm {
 };
 // Asks for a confirmation: 1 if the action was chosen, 0 for Cancel or B
 // (or if it can't open, logged). It has closed when the call returns.
+// Asked over a popup it takes the popup's place (the popup is back, still
+// up, when it returns), borrowing the popup's tiles when BG block 0 has no
+// room for its own.
 int ui_confirm(u8 hints, const struct ui_confirm *confirm);
 
 // The letter card's node, for a list page's layout (plane 0, which the page

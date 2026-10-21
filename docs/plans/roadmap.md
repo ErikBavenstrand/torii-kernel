@@ -49,15 +49,15 @@ Everything the v0.2–v0.4.1 work left open, checked against the code on 2026-10
 
 ### Bugs: menu
 
-- Opening Favourites with thousands of entries blocks for up to about 1.8 s (3,367 favourites), and again after un-favouriting or a new index (`source/screens/games.c`).
-- Slow work on the menu's thread: parsing a big `names.txt` is one walk step (0.26 s per 1,000 sorted lines, 0.82 s unsorted; `gamename_custom_parse`); a large `crc.txt` takes about 6 s of background work after each boot (3,000 records, emulated); before a launch, unwritten CRCs are written synchronously, about 0.5 s per 1,000 records (`names_before_launch`, `source/names_store.c`). A read-only `crc.txt` is never updated, so its work repeats every boot.
-- A popup's first draw (143k cycles) and a confirmation's (170k) land a frame late while the library's background scan runs (`source/ui/ui_popup.c`).
-- While an overlay moves only one list clips, so a page with two lists shows the second's spare rows for 4–6 frames; over a popup, the confirmation's corners show the dimmed page for 1–2 px; behind NOR's Delete question the popup's edge and Delete row show; a popup over row 0 lets the row's size peek out above it (`ui_popup.c`).
-- A key pressed while START waits for an SD page change reaches the page after the popup closes; START and B mashed 3–4 frames apart over a popup can drop the START and pass B to the list (`source/screens/sdcard.c`, `ui_popup.c`).
+- ~~Opening Favourites with thousands of entries blocks for up to about 1.8 s (3,367 favourites), and again after un-favouriting or a new index (`source/screens/games.c`).~~ Fixed by E3 (`b4bf219`): 3,400 favourites over 4,096 games sort in 26 frames (198 before), and the order is kept between visits and changed in place.
+- ~~Slow work on the menu's thread: parsing a big `names.txt` is one walk step (0.26 s per 1,000 sorted lines, 0.82 s unsorted; `gamename_custom_parse`); a large `crc.txt` takes about 6 s of background work after each boot (3,000 records, emulated); before a launch, unwritten CRCs are written synchronously, about 0.5 s per 1,000 records (`names_before_launch`, `source/names_store.c`). A read-only `crc.txt` is never updated, so its work repeats every boot.~~ Fixed by E3 (`8839032`): `names.txt` parses in steps; crc.txt loads in one pass with its hot loops in IWRAM (3,008 records: 6.2 s of background frames, 9.3 s before); a launch writes only the new CRCs, to `/torii/crc.new`; a read-only crc.txt is detected and skipped.
+- ~~A popup's first draw (143k cycles) and a confirmation's (170k) land a frame late while the library's background scan runs (`source/ui/ui_popup.c`).~~ Fixed by E3 (`09dff4f`): a frame with a view's first draw runs one job step; a confirmation's first draw is 146k now.
+- ~~While an overlay moves only one list clips, so a page with two lists shows the second's spare rows for 4–6 frames; over a popup, the confirmation's corners show the dimmed page for 1–2 px; behind NOR's Delete question the popup's edge and Delete row show; a popup over row 0 lets the row's size peek out above it (`ui_popup.c`).~~ Fixed by E3 (`09dff4f`): two lists clip to the box round both; a confirmation takes its popup's place; a popup opens from its row's lines.
+- ~~A key pressed while START waits for an SD page change reaches the page after the popup closes; START and B mashed 3–4 frames apart over a popup can drop the START and pass B to the list (`source/screens/sdcard.c`, `ui_popup.c`).~~ Fixed by E3 (`7065c18`).
 - B pressed on the frame a hotkey combination is released counts as part of the hold (`settings_page.c`).
 - While the Time/Date card is open only `ui_frame` runs: the library walk and a Rescan pause until it closes (`settings_page.c`).
-- The selected row's marquee keeps scrolling under an open popup, about 13k cycles a frame (`source/ui/ui_list.c`).
-- A first visit to a game page right after a failed launch briefly shows an empty card until the index reloads (`games.c`).
+- ~~The selected row's marquee keeps scrolling under an open popup, about 13k cycles a frame (`source/ui/ui_list.c`).~~ Fixed by E3 (`7065c18`).
+- ~~A first visit to a game page right after a failed launch briefly shows an empty card until the index reloads (`games.c`).~~ Fixed by E3 (`37ea646`): the page loads the index first.
 - On a boot with no index yet the consoles count 0, so a Start on console falls back to Last place (`source/screens/nav.c`).
 - ~~After an SD rename of a game with a custom name, the row shows the cleaned name for a few seconds until the walk restores it.~~ Fixed by E2 (`84fc3ef`).
 - ~~Two games that clean to the same name in different folders with the same tags show the same name: rows pass file names, not paths, to the dedupe (`games.c`, `source/gamename.c`).~~ Fixed by E2 (`84fc3ef`).
@@ -66,10 +66,10 @@ Everything the v0.2–v0.4.1 work left open, checked against the code on 2026-10
 - A launch shows about 8 black frames between home's fade-out and the loading card.
 - A cover landing during a palette fade could show wrong colours (not seen; `source/engine/cover.c`).
 - A failed `job_start` for the art listing is retried every frame and logs each time (`source/boxart.c`).
-- The SD page's item count job costs up to 194k cycles a frame while it counts a folder (`sdcard.c`).
+- ~~The SD page's item count job costs up to 194k cycles a frame while it counts a folder (`sdcard.c`).~~ Fixed by E3 (`09dff4f`): one step a frame, 92k at most.
 - Diagnostics' first page draws its prompt lines a frame after `screen ready: diag-start` (`source/diag.c`); passes show in plain text, as the palette has no green (`source/diag_priv.h`).
 - `ui_hints_get` doesn't give back a hint note's ink, so a popup over a danger or countdown line restores it as plain text (can't happen today; `source/ui/`).
-- BG block 0's tiles on list pages are nearly full with a popup and a confirmation up (9–20 spare); a taller popup falls back to closing the popup. The popup's 8 entries (`UI_POPUP_ITEMS`) are full on the SD file popup.
+- ~~BG block 0's tiles on list pages are nearly full with a popup and a confirmation up (9–20 spare); a taller popup falls back to closing the popup. The popup's 8 entries (`UI_POPUP_ITEMS`) are full on the SD file popup.~~ Fixed by E3 (`09dff4f`): a confirmation borrows the popup's tiles when its own don't fit; popups hold 9 items (9 without a title), and the SD popup offers both.
 
 ### Dead code and cleanup
 
@@ -94,7 +94,7 @@ Made during the build without the user; each is cheap to change. The user's answ
 
 - **Research overrides R1–R9** ([decisions](../design/v0.4/decisions.md#research-overrides)): a background re-walk instead of folder dates, two-copy safe writes, the sort order, the name-cleaning rules, 14 px rows with a sprite pill, double-size sprites only when zooming, a hard-edged theme wipe, the title slide, the confirmation's dim toward white in light.
 - **Favourites are capped at 4,096** although the decisions said no cap (`source/userdata.h`).
-- **Starting games (C1):** Play with every addon off boots clean; the SD popup offers only the alternative to Launch (the 8-entry cap), and its Boot with addon skips the cheat screen; Game info's Default doesn't say what Settings' mode is; NOR games ignore the boot mode.
+- **Starting games (C1):** Play with every addon off boots clean; the SD popup offers both Clean boot and Boot with addon (9 items, so no title; E3), and its Boot with addon skips the cheat screen; Game info's Default doesn't say what Settings' mode is; NOR games ignore the boot mode.
 - **Settings:** Back to menu can't be edited while Save states is on (C5); a value is lost if the power goes off in the 30 frames before its write; keys during the write are lost; Settings opens on Theme; L/R jump sections; Dim screen has no live preview; Time and Date set the clock at once.
 - **Start on (D1):** its choices are counted when Settings opens (a Rescan inside doesn't refresh them); a hidden stored choice keeps its name.
 - **Hotkey rules:** 2–3 keys including L, R, START or SELECT, no overlap with the other hotkey even while it's off, nothing inside A+B+START+SELECT.
@@ -107,7 +107,7 @@ Made during the build without the user; each is cheap to change. The user's answ
 - **Carousel:** neighbours at 0.89 scale and the far pair at 0.60; held-turn speed; with 2–5 items one item shows at both ends mid-turn; far objects nearly vanish in dark; a fast held turn can miss a label for a frame.
 - **Loading card:** titled with the file name; a pending save shows a separate "Saving…" card first, an unsaved index "Saving the game list".
 - **Pages:** Favourites shows no stars; list with art shows two facts; SD Delete reaches `/torii` and `/SAVER` with Show all files on; a folder over 1,024 shows the first 1,024 the card lists; SD folder icons blue; LEFT/RIGHT page the SD page and B climbs only on a fresh press; NOR is one card, only its latest game deletable, Format all offered on an empty NOR, tinted amber, not danger; no coloured dots before NOR games (14 px rows can draw them now).
-- **Popups:** keys pressed while one closes: moves reach the page, A, B, START and SELECT are dropped; the dim toward white also fades the hint labels in light.
+- **Popups:** keys pressed while one closes: moves and START reach the page (START opens it again), A, B and SELECT are dropped; keys pressed while START waits for the list go to the popup; a confirmation hides the popup it asks over (E3); the dim toward white also fades the hint labels in light.
 - **Rename:** B never cancels the keyboard; Rename only for indexed SD games; SD rename moves files, not folders.
 - **Info:** all wording; card sizes in binary units labelled GB/MB.
 - **The boot position is written after 5 s idle,** an SD write in the menu.
