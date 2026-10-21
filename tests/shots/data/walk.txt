@@ -1,7 +1,9 @@
 # The UI walk (walk-light, walk-dark): home and every page by their keys,
 # on the shots card plus a GB game, a favourite and a NOR game, so home
 # shows Recent, Favourites, GBA, GB, SD card, NOR, Settings and Info. Home
-# turns both ways; Recent and Favourites open and close; on GBA the list
+# turns both ways; Recent opens under a quick A, A, START, A (only the
+# first may act: the others come before the page shows, B20) and closes;
+# Favourites opens and closes; on GBA the list
 # moves, pages, jumps a letter each way, opens the game popup and closes it,
 # then its Delete is answered Cancel; GB opens; the SD card goes into Games,
 # opens a file's popup, comes back up; NOR opens a game's popup and moves to
@@ -15,7 +17,7 @@
 -w "home: facing fav"
 -k @8:LEFT -k @12:-
 -w "home: facing recent"
--k @8:A -k @12:-
+-k @8:A -k @9:- -k @12:A -k @13:- -k @15:START -k @16:- -k @17:A -k @18:-
 -w "nav: page recent ready"
 -k @8:DOWN -k @12:-
 -k @20:B -k @24:-
