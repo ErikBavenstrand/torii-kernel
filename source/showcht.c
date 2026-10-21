@@ -65,6 +65,13 @@ char *Read_line(char *line, int len, FIL *fp)
 	line[n] = 0;
 	return line;
 }
+// Drops a name's trailing spaces ("Name = 1"); returns its new length
+static int cht_rtrim(char *s, int len)
+{
+	while (len > 0 && s[len - 1] == ' ')
+		s[--len] = 0;
+	return len;
+}
 //------------------------------------------------------------------
 static void Get_KEY_val(FIL *file, char *KEY_section, char *KEY_secval, char getbuff[])
 {
@@ -112,7 +119,10 @@ static void Get_KEY_val(FIL *file, char *KEY_section, char *KEY_secval, char get
 		//int _val_len=0;
 
 		for (i = 0; i < buf_len; ++i) {
-			if (buf[i] == ' ')
+			// Spaces count only inside a name or value: "Name = Infinite
+			// lives" keeps its inner one, padding loses its
+			if (buf[i] == ' ' && !(is_section == 1 && section_len > 0) &&
+			    !(is_section == 0 && in_section == 1 && (_kv == 0 ? _klen : _vlen) > 0))
 				continue;
 
 			if (buf[i] == '[') {
@@ -128,6 +138,7 @@ static void Get_KEY_val(FIL *file, char *KEY_section, char *KEY_secval, char get
 					section[section_len++] = buf[i];
 				continue;
 			} else if (buf[i] == ']') {
+				section_len = cht_rtrim(section, section_len);
 				is_section = 0;
 				in_section = 1;
 				//_val_len = 0;
@@ -137,11 +148,11 @@ static void Get_KEY_val(FIL *file, char *KEY_section, char *KEY_secval, char get
 			if (in_section == 1) {
 				// scan param key name
 				if (_kv == 0 && buf[i] != '=') {
-					if (_klen >= MAX_KEY_LEN)
-						break;
-					_paramk[_klen++] = buf[i];
+					if (_klen < MAX_KEY_LEN - 1)  // room for the NUL; longer names are cut
+						_paramk[_klen++] = buf[i];
 					continue;
 				} else if (buf[i] == '=') {
+					_klen = cht_rtrim(_paramk, _klen);
 					_kv = 1;
 					continue;
 				}
@@ -153,7 +164,8 @@ static void Get_KEY_val(FIL *file, char *KEY_section, char *KEY_secval, char get
 				key_value[_vlen++] = buf[i];
 			}
 		}
-		//DEBUG_printf("KEY_section %s, section %s",KEY_section,section);
+		_klen = cht_rtrim(_paramk, _klen);
+		_vlen = cht_rtrim(key_value, _vlen);
 		if (strcmp(KEY_section, section) == 0) {
 			if (strcmp(KEY_secval, _paramk) == 0) {
 				strcpy(getbuff, key_value);
@@ -215,7 +227,10 @@ static u32 Get_CHT_val(FIL *file, char *KEY_section, char *KEY_secval /*,char ge
 		//int _val_len=0;
 
 		for (i = 0; i < buf_len; ++i) {
-			if (buf[i] == ' ')
+			// Spaces count only inside a name: "[Infinite lives]" keeps its
+			// inner one, values and padding lose theirs
+			if (buf[i] == ' ' && !(is_section == 1 && section_len > 0) &&
+			    !(is_section == 0 && in_section == 1 && _kv == 0 && _klen > 0))
 				continue;
 
 			if (buf[i] == '[') {
@@ -231,6 +246,7 @@ static u32 Get_CHT_val(FIL *file, char *KEY_section, char *KEY_secval /*,char ge
 					section[section_len++] = buf[i];
 				continue;
 			} else if (buf[i] == ']') {
+				section_len = cht_rtrim(section, section_len);
 				is_section = 0;
 				in_section = 1;
 				//_val_len = 0;
@@ -240,11 +256,11 @@ static u32 Get_CHT_val(FIL *file, char *KEY_section, char *KEY_secval /*,char ge
 			if (in_section == 1) {
 				// scan param key name
 				if (_kv == 0 && buf[i] != '=') {
-					if (_klen >= MAX_KEY_LEN)
-						break;
-					_paramk[_klen++] = buf[i];
+					if (_klen < MAX_KEY_LEN - 1)  // room for the NUL; longer names are cut
+						_paramk[_klen++] = buf[i];
 					continue;
 				} else if (buf[i] == '=') {
+					_klen = cht_rtrim(_paramk, _klen);
 					_kv = 1;
 					continue;
 				}
@@ -256,7 +272,7 @@ static u32 Get_CHT_val(FIL *file, char *KEY_section, char *KEY_secval /*,char ge
 			}
 		}
 
-		//DEBUG_printf("KEY_section %s, section %s",KEY_section,section);
+		_klen = cht_rtrim(_paramk, _klen);
 		if (strcmp(KEY_section, section) == 0) {
 			if (strcmp(KEY_secval, _paramk) == 0) {
 				//0111 Multi-line
@@ -297,7 +313,7 @@ static u32 Get_CHT_val(FIL *file, char *KEY_section, char *KEY_secval /*,char ge
 				return _vlen;
 			}
 		}
-		if (strcmp(_paramk, "") == 0 || strcmp(_paramv, "") == 0)
+		if (_klen == 0 || _vlen == 0)  // _paramv has no NUL
 			continue;
 
 		memset(buf, 0, MAX_KEY_LEN);
@@ -361,7 +377,10 @@ static u32 Get_all_Section_val(FIL *file)
 		//int _val_len=0;
 
 		for (i = 0; i < buf_len; ++i) {
-			if (line_buf[i] == ' ')
+			// Spaces count only inside a name: "[Infinite lives]" keeps its
+			// inner one, values and padding lose theirs
+			if (line_buf[i] == ' ' && !(is_section == 1 && section_len > 0) &&
+			    !(is_section == 0 && in_section == 1 && _kv == 0 && _klen > 0))
 				continue;
 
 			if (line_buf[i] == '[') {
@@ -377,6 +396,7 @@ static u32 Get_all_Section_val(FIL *file)
 					section[section_len++] = line_buf[i];
 				continue;
 			} else if (line_buf[i] == ']') {
+				section_len = cht_rtrim(section, section_len);
 				memcpy(tmpCHTFS.LINEname, section, section_len);
 				tmpCHTFS.is_section = 1;
 				tmpCHTFS.len = section_len;
@@ -395,12 +415,11 @@ static u32 Get_all_Section_val(FIL *file)
 			if (in_section == 1) {
 				// scan param key name
 				if (_kv == 0 && line_buf[i] != '=') {
-					if (_klen >= MAX_KEY_LEN)
-						break;
-					_paramk[_klen++] = line_buf[i];
+					if (_klen < MAX_KEY_LEN - 1)  // room for the NUL; longer names are cut
+						_paramk[_klen++] = line_buf[i];
 					continue;
 				} else if (line_buf[i] == '=') {
-					//DEBUG_printf(":%s ",_paramk);
+					_klen = cht_rtrim(_paramk, _klen);
 					memcpy(tmpCHTFS.LINEname, _paramk, _klen);
 					tmpCHTFS.is_section = 0;
 
