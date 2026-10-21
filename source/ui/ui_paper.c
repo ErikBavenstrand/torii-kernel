@@ -231,10 +231,10 @@ static void make_card(u32 *tiles, const struct ui_card_config *c, u32 paper)
 			u32 row = 0;
 			for (u32 px = 0; px < 8; px++) {
 				u32 bit = 1u << (tx * 8 + px);
-				u32 role = edge & bit     ? UI_ROLE_BORDER
-					   : body & bit   ? paper
-					   : shadow & bit ? UI_ROLE_SHADOW
-							  : 0;
+				u32 role = (edge & bit)     ? UI_ROLE_BORDER
+					   : (body & bit)   ? paper
+					   : (shadow & bit) ? UI_ROLE_SHADOW
+							    : 0;
 				row |= role << (4 * px);
 			}
 			tiles[((y / 8) * 3 + tx) * 8 + y % 8] = row;
