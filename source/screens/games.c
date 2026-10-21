@@ -26,6 +26,7 @@
 #include "../lang.h"
 #include "../library.h"
 #include "../namesdb.h"
+#include "../sdlist.h"
 #include "../showcht.h"
 #include "../tlog.h"
 #include "../userdata.h"
@@ -105,6 +106,9 @@ static struct {
 	char position[16];  // the title's "101/176"
 	char fact_keys[24], fact_values[32];
 	struct ui_hint hints[4];
+	u8 hint_count;
+	u8 cap_note;       // the hint bar shows the library cap's note
+	char cap_text[40];  // "Showing the first 4,096 games"
 	u16 box_palette[16];
 	// What fetch draws from: valid until the next fetch (a row draws at once)
 	char name[GAMENAME_MAX + 1];
@@ -603,6 +607,8 @@ static void build(void)
 
 // --- What the page shows beside the list ----------------------------------------
 
+static void show_cap_note(void);
+
 static void show_position(void)
 {
 	if (games.count)
@@ -611,6 +617,7 @@ static void show_position(void)
 	else
 		games.position[0] = 0;
 	ui_title_set_right(node(N_TITLE), games.position);
+	show_cap_note();
 }
 
 // List with art: the selected game's box art, or the placeholder box in its
@@ -652,7 +659,29 @@ static void show_hints(void)
 	if (games.az)
 		games.hints[n++] = (struct ui_hint){"\xC2\xAB\xC2\xBB", gl_games->hint_letter};
 	games.hints[n++] = (struct ui_hint){"B", gl_hint_back};
+	games.hint_count = (u8)n;
+	games.cap_note = 0;
 	ui_hints_set(node(N_HINTS), games.hints, n);
+}
+
+// Past the library's cap (LIBRARY_GAMES_MAX games), a console's last row
+// says only the first were indexed, where the hint bar's keys were (as the
+// SD card page does at a big folder's end)
+static void show_cap_note(void)
+{
+	u8 note = games.kind == KIND_CONSOLE && games.count && games.cursor + 1 >= games.count && library_truncated();
+	if (note == games.cap_note)
+		return;  // a change redraws the bar: not on every move
+	games.cap_note = note;
+	if (!note) {
+		ui_hints_set(node(N_HINTS), games.hints, games.hint_count);
+		return;
+	}
+	char n[12];
+	sdlist_number(n, sizeof(n), LIBRARY_GAMES_MAX);
+	snprintf(games.cap_text, sizeof(games.cap_text), "%s %s %s", gl_sd_first, n, gl_count_games);
+	ui_hints_text(node(N_HINTS), games.cap_text);
+	tlog_debug("games: %s", games.cap_text);  // tests/library.sh
 }
 
 // "No games here", once the index can say so (not while it loads again
