@@ -17,6 +17,7 @@
 #include "engine/gfx.h"
 #include "engine/jobs.h"
 #include "engine/psram.h"
+#include "engine/res.h"
 #include "engine/stage.h"
 #include "ui/art.h"
 #include "ui/ui.h"
@@ -35,6 +36,9 @@
 // before it steps (it reads the card, as the library walk does)
 #define LIST_STEP_CYCLES 40000
 #define LIST_KEY_REST 8
+// Frames to wait before trying again when the listing's job can't start (all
+// job slots taken); the failure logs once
+#define LIST_RETRY_FRAMES 60
 #define CLEAR_CHUNK 0x1000  // bytes of the set cleared at a time
 #define USERDATA_PATH_MAX_ALIGNED ((USERDATA_PATH_MAX + 3) & ~3u)
 
@@ -81,6 +85,8 @@ static struct {
 	u8 box_shown;  // the one whose tiles the image holds, ART_BOX_COUNT: none
 	u32 clear_at;
 	u32 started;  // torii_frames when the listing started
+	u32 retry_at;  // torii_frames from which a job that couldn't start is tried again, 0 none
+	u8 start_failed;  // that failure is logged
 	DIR dir;
 	struct artset set;
 	u32 row;  // the cursor's
@@ -244,8 +250,24 @@ static void list_poll(void)
 	B.set.slots = SET_BASE;
 	B.set.put = set_put;
 	B.set.count = 0;
+	if (B.retry_at && (s32)(torii_frames - B.retry_at) < 0)
+		return;
 	B.started = torii_frames;
+	// No slot (every job taken): tried again a second later, logged once
+	u8 quiet = res_errors_quiet;
+	res_errors_quiet = 1;
 	B.job = job_start(list_job, 0, JOB_OWNER_NONE);
+	res_errors_quiet = quiet;
+	if (B.job == JOB_NONE) {
+		if (!B.start_failed)
+			tlog_error("box art: the listing can't start: %s", res_error());
+		B.start_failed = 1;
+		B.retry_at = torii_frames + LIST_RETRY_FRAMES;
+		B.retry_at += !B.retry_at;
+		return;
+	}
+	B.retry_at = 0;
+	B.start_failed = 0;
 }
 
 // --- Lookups ---------------------------------------------------------------------
