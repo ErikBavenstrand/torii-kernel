@@ -116,6 +116,7 @@ static struct {
 	u8 pack_mapped;  // pack_map holds it
 	u32 map_next;  // the next cluster (its number in the file) pack_link walks to
 	u32 map_at;  // pack_map's word of the last fragment's count
+	u32 map_sclust, map_bytes;  // the file pack_map is of: its first cluster and size
 	struct artset set;
 	u32 row;  // the cursor's
 	u32 rest;  // polls since the cursor moved
@@ -248,7 +249,16 @@ static void pack_link(void)
 	u32 bcs = (u32)fp->obj.fs->csize * FF_MAX_SS;
 	u32 clusters = (f_size(fp) + bcs - 1) / bcs;
 	if (B.map_next == 0) {
+		// Listed again (boxart_forget, a launch): the pack can't change
+		// while the kernel runs, so the map stands; it isn't rewritten
+		// under a cover read that may be using it
+		if (B.pack_mapped && B.map_sclust == fp->obj.sclust && B.map_bytes == f_size(fp)) {
+			pack_done();
+			return;
+		}
 		B.pack_mapped = 0;
+		B.map_sclust = fp->obj.sclust;
+		B.map_bytes = f_size(fp);
 		if (f_lseek(fp, bcs) != FR_OK) {  // the first cluster
 			pack_done();
 			return;
@@ -279,7 +289,7 @@ static void pack_link(void)
 			if (!B.pack_logged) {
 				B.pack_logged = 1;
 				tlog("box art: %s is in more than %u pieces on the card: covers load slower",
-				     ARTPACK_PATH, (ARTPACK_MAP_WORDS - 2) / 2);
+				     ARTPACK_PATH, (ARTPACK_MAP_WORDS - 4) / 2);
 			}
 			pack_done();
 			return;
@@ -422,7 +432,6 @@ static void list_poll(void)
 	B.full_logged = 0;
 	B.pack_open = 0;
 	B.pack_entries = 0;
-	B.pack_mapped = 0;
 	B.set.slots = SET_BASE;
 	B.set.put = set_put;
 	B.set.count = 0;
@@ -474,8 +483,8 @@ static u32 lookup(const char *path, u32 size, struct want *w)
 		return w->id;
 	// Last, the pack: a binary search of its index in PSRAM
 	s32 image = B.pack_entries ? artpack_find(PACK_INDEX, B.pack_entries, crc) : -1;
-	if (image < 0)
-		return 0;
+	if (image < 0 || (u32)image >= B.pack_header.images)
+		return 0;  // none, or a damaged entry (its offset past the images)
 	w->kind = ARTKEY_PACK;
 	w->key = (u32)image;
 	w->id = artkey_id(ARTKEY_PACK, w->key);
@@ -643,7 +652,9 @@ static void want_covers(void)
 
 static int paused(void)
 {
-	return library_walking() || ui_busy();
+	// A listing first: a pack cover located mid-listing (no pack yet) would
+	// fail for good (the cache doesn't want a failed cover again)
+	return library_walking() || ui_busy() || B.list != LIST_DONE;
 }
 
 void boxart_open(u8 image, boxart_row_fn row)

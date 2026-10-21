@@ -130,6 +130,8 @@ class Pack:
         self.crcs = [crc for crc, _ in self.index]
         if self.crcs != sorted(set(self.crcs)):
             raise PackError("its index isn't sorted")
+        if any(n >= images for _, n in self.index):
+            raise PackError("its index names an image past the last")
 
     def find(self, crc):
         """The image number of crc, or None (artpack_find)."""

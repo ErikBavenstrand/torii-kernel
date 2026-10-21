@@ -64,6 +64,11 @@ class Format(unittest.TestCase):
         with self.assertRaises(artpack.PackError):
             artpack.build({i: cover(1) for i in range(artpack.MAX + 1)})
         good = artpack.build({1: cover(1)})
+        # An index entry naming an image past the last
+        past = bytearray(good)
+        past[24 + 4 : 24 + 8] = (1).to_bytes(4, "little")
+        with self.assertRaises(artpack.PackError):
+            artpack.Pack(bytes(past))
         for bad in (
             good[:-1],
             good + b"\0",
@@ -201,6 +206,40 @@ class Tool(unittest.TestCase):
         self.assertIsNone(first.find(MONO))
         status, _, err = self.run_tool()
         self.assertEqual(status, 0, err)
+        self.assertEqual(len(self.pack().crcs), 6)
+
+    def test_a_bad_picture_falls_back_to_the_next_name(self):
+        # The beta's own name is a PNG Pillow can't read: the run goes on to
+        # its short name, and remembers the bad one as a miss
+        bad = b"\x89PNG\r\n\x1a\n" + b"junk" * 50
+        self.server.routes[thumb(GBA_SYS, "Advance Wars (USA) (Beta)")] = bad
+        status, _, err = self.run_tool()
+        self.assertEqual(status, 0, err)
+        self.assertIn("not a picture art.py reads", err)
+        p = self.pack()
+        self.assertEqual(p.find(BETA), p.find(WARS))
+        before = len(self.server.requests)
+        self.assertEqual(self.run_tool()[0], 0)
+        self.assertEqual(len(self.server.requests), before)
+
+    def test_ctrl_c_while_fetching_still_writes_a_pack(self):
+        real = art_pack.concurrent.futures.as_completed
+
+        def interrupted(futures):
+            for n, f in enumerate(real(futures)):
+                if n == 2:
+                    raise KeyboardInterrupt
+                yield f
+
+        art_pack.concurrent.futures.as_completed = interrupted
+        try:
+            status, _, err = self.run_tool("--jobs", "1")
+        finally:
+            art_pack.concurrent.futures.as_completed = real
+        self.assertEqual(status, 3)
+        self.assertIn("Ctrl-C", err)
+        self.assertGreater(len(self.pack().crcs), 0)
+        self.assertEqual(self.run_tool()[0], 0)
         self.assertEqual(len(self.pack().crcs), 6)
 
     def test_offline(self):

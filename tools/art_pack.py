@@ -30,7 +30,7 @@ error is retried, and a 429 or an unreachable server stops fetching. The
 pictures and their conversions are cached in dist/art-cache (shared with
 `just art-scrape`; git-ignored), and the names the server doesn't have are
 remembered there, so a second run downloads only what is new, and a run
-that was stopped (Ctrl-C, a 429, a lost connection) picks up where it left
+that was stopped (Ctrl-C while fetching, a 429, a lost connection) picks up where it left
 off. A stopped run still writes a pack of what it has; run it again to
 finish. --offline uses only the caches. The first run makes about 8,000
 requests for GBA, GBC and GB (some 40 minutes) and writes a pack of about
@@ -174,7 +174,8 @@ def picks_by_crc(tables, consoles):
 
 def converted(cache, fetcher, system, name):
     """The cover of a cached picture, converted once and cached; None if it
-    isn't a picture art.py reads (the picture is then dropped)."""
+    isn't a picture art.py reads: it is dropped and remembered as a miss, so
+    later runs try the next name (--retry-missing asks for it again)."""
     png = fetcher.path(system, name)
     out = Path(cache) / f"pack-{CONVERTER}" / png.parent.name / (png.stem + ".bin")
     if out.is_file():
@@ -186,6 +187,7 @@ def converted(cache, fetcher, system, name):
             f"art-pack: {png.name}: not a picture art.py reads ({e})", file=sys.stderr
         )
         fetcher.forget(system, name)
+        fetcher.miss(system, name)
         return None
     out.parent.mkdir(parents=True, exist_ok=True)
     art_scrape.write_art(out, data)
@@ -208,6 +210,9 @@ def fetch_round(fetcher, wanted, jobs):
             progress.step(f", {fetcher.downloaded} new" if fetcher.downloaded else "")
             if fetcher.stopped:
                 break
+    except KeyboardInterrupt:
+        # Ctrl-C: the pack is still written, of what has come in
+        fetcher.stopped = "you stopped it (Ctrl-C)"
     finally:
         # A stop (Ctrl-C, a 429) cancels what hasn't started; what has
         # finishes, and its picture is cached for the next run
@@ -241,44 +246,51 @@ def pack(args):
         args.retry_missing,
     )
 
-    # Round by round: every CRC's first picture, then the next for those
-    # whose first the server hasn't (the name cut at "(")
-    found = {}  # crc: (system, name) of its picture
-    pending = dict(picks)
-    for _ in range(max((len(p) for p in picks.values()), default=0)):
+    # Round by round: every CRC's first picture, then its next name (the
+    # name cut at "(") if the first isn't there, wasn't fetched (offline, a
+    # stop, a page that wasn't a PNG) or isn't a picture art.py reads. Each
+    # round moves every CRC on, so it ends; a picture is converted once.
+    mapping = {}  # crc: its cover
+    covers = {}  # (system, name): its cover, None if it didn't convert
+    pending = {crc: tries for crc, tries in picks.items() if tries}
+    while pending:
         for crc, tries in list(pending.items()):
-            left = [t for t in tries if fetcher.known(*t) != "missing"]
-            if not left:
-                del pending[crc]
-            else:
+            left = [
+                t
+                for t in tries
+                if fetcher.known(*t) != "missing" and covers.get(t, b"") is not None
+            ]
+            if left:
                 pending[crc] = left
+            else:
+                del pending[crc]
         wanted = sorted(
             {t[0] for t in pending.values() if fetcher.known(*t[0]) is None}
         )
         if not fetcher.offline and not fetcher.stopped:
             fetch_round(fetcher, wanted, args.jobs)
-        for crc, tries in list(pending.items()):
-            state = fetcher.known(*tries[0])
-            if state == "cached":
-                found[crc] = tries[0]
-                del pending[crc]
-            elif state == "missing" or fetcher.offline or fetcher.stopped:
-                # Not there, or not asked (a later run asks): the next name
-                pending[crc] = tries[1:]
-        if not pending:
-            break
-
-    # Convert each picture once; CRCs whose pictures are equal share an image
-    progress = Progress("converting", len(set(found.values())))
-    covers, mapping = {}, {}
-    for crc in sorted(found):
-        key = found[crc]
-        if key not in covers:
+        fresh = sorted(
+            {
+                t[0]
+                for t in pending.values()
+                if t[0] not in covers and fetcher.known(*t[0]) == "cached"
+            }
+        )
+        progress = Progress("converting", len(fresh))
+        for key in fresh:
             covers[key] = converted(args.cache, fetcher, *key)
             progress.step()
-        if covers[key] is not None:
-            mapping[crc] = covers[key]
-    progress.end()
+        progress.end()
+        for crc, tries in list(pending.items()):
+            cover = covers.get(tries[0])
+            if cover is not None:
+                mapping[crc] = cover
+                del pending[crc]
+            elif len(tries) > 1:
+                pending[crc] = tries[1:]
+            else:
+                del pending[crc]
+
     if not mapping:
         raise art_scrape.ScrapeError(
             "no box art found: nothing to pack (offline with an empty cache?)"
