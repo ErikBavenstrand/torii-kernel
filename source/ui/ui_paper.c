@@ -5,6 +5,7 @@
 // (ui/ui_widgets.c).
 #include <string.h>
 
+#include "../tlog.h"
 #include "art.h"
 #include "ui_priv.h"
 #include "../engine/gfx.h"
@@ -194,44 +195,49 @@ static int card_measure(u8 node, struct engine_budget *need)
 	return 1;
 }
 
-// 1 if pixel (x, y) of a card's body [x0, x1) x [y0, y1) is inside its
-// rounded corners
-static int card_body(s32 x, s32 y, s32 x0, s32 y0, s32 x1, s32 y1, u32 r)
+// A card's body on a 24x24 px grid, a bit a pixel: row y + 1 for y from -1
+// (for the edge test above it) to 24, rounded at the corners
+static void card_rows(u32 *rows, const struct ui_card_config *c, u32 radius)
 {
-	if (x < x0 || x >= x1 || y < y0 || y >= y1)
-		return 0;
-	s32 dx = x - x0 < x1 - 1 - x ? x - x0 : x1 - 1 - x;  // from the nearest side
-	s32 dy = y - y0 < y1 - 1 - y ? y - y0 : y1 - 1 - y;
-	return (u32)dy >= r || (u32)dx >= ui_round_inset(r, (u32)dy);
+	s32 x0 = c->inset_l, y0 = c->inset_t, x1 = 24 - c->inset_r, y1 = 24 - c->inset_b;
+	for (s32 y = -1; y < 25; y++) {
+		u32 m = 0;
+		if (y >= y0 && y < y1) {
+			u32 dy = (u32)(y - y0 < y1 - 1 - y ? y - y0 : y1 - 1 - y);  // from the nearest side
+			s32 in = (s32)ui_round_inset(radius, dy);
+			m = ((1u << (x1 - in)) - 1) & ~((1u << (x0 + in)) - 1);
+		}
+		rows[y + 1] = m;
+	}
 }
 
 // The 9 tiles of a card's 3x3 classes, from a card drawn on 24x24 px: its
 // corners in the corner tiles, its edges in the middle ones (no corner
-// reaches them: card_measure), its paper in the middle
+// reaches them: card_measure), its paper in the middle. Rows are bit masks:
+// the launch's loading card draws this at the BIOS's wait states
 static void make_card(u32 *tiles, const struct ui_card_config *c, u32 paper)
 {
 	const struct ui_look *l = look();
-	s32 x0 = c->inset_l, y0 = c->inset_t, x1 = 24 - c->inset_r, y1 = 24 - c->inset_b;
-	u32 r = l->card_radius, sh = l->shadow_offset;
-	for (u32 t = 0; t < 9; t++) {
-		for (u32 py = 0; py < 8; py++) {
+	u32 sh = l->shadow_offset;
+	u32 rows[26];
+	card_rows(rows, c, l->card_radius);
+	for (u32 y = 0; y < 24; y++) {
+		u32 body = rows[y + 1];
+		u32 edge = 0;
+		if (c->flags & UI_CARD_EDGE)
+			edge = body & ~(body << 1 & body >> 1 & rows[y] & rows[y + 2]);
+		u32 shadow = sh && y + 1 >= sh ? rows[y + 1 - sh] & ~body : 0;
+		for (u32 tx = 0; tx < 3; tx++) {
 			u32 row = 0;
 			for (u32 px = 0; px < 8; px++) {
-				s32 x = (s32)((t % 3) * 8 + px), y = (s32)((t / 3) * 8 + py);
-				u32 role = 0;
-				if (card_body(x, y, x0, y0, x1, y1, r)) {
-					int edge =
-						(c->flags & UI_CARD_EDGE) && !(card_body(x - 1, y, x0, y0, x1, y1, r) &&
-									       card_body(x + 1, y, x0, y0, x1, y1, r) &&
-									       card_body(x, y - 1, x0, y0, x1, y1, r) &&
-									       card_body(x, y + 1, x0, y0, x1, y1, r));
-					role = edge ? UI_ROLE_BORDER : paper;
-				} else if (sh && card_body(x, y - (s32)sh, x0, y0, x1, y1, r)) {
-					role = UI_ROLE_SHADOW;
-				}
+				u32 bit = 1u << (tx * 8 + px);
+				u32 role = edge & bit     ? UI_ROLE_BORDER
+					   : body & bit   ? paper
+					   : shadow & bit ? UI_ROLE_SHADOW
+							  : 0;
 				row |= role << (4 * px);
 			}
-			tiles[t * 8 + py] = row;
+			tiles[((y / 8) * 3 + tx) * 8 + y % 8] = row;
 		}
 	}
 }
