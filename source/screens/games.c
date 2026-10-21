@@ -1101,6 +1101,7 @@ static void letter_jump_key(u16 keys)
 	games.cursor = to;
 	letter_around(games.count, to, row_letter, 0, &prev, &next);
 	ui_letter_show(node(N_LETTER), row_letter(0, to), prev, next);
+	tlog_debug("games: letter %s, row %lu", letter_text(row_letter(0, to)), (unsigned long)to);  // tests/shots walk
 	show_position();
 	show_facts();
 }
