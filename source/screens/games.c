@@ -292,7 +292,7 @@ static int model_fetch(void *ctx, u32 i, struct ui_item *out)
 	return UI_ITEM_READY;
 }
 
-static const struct ui_list_model model = {model_count, model_fetch, 0};
+static const struct ui_list_model model = {model_count, model_fetch, 0, 0, 0};
 
 // The letter row i files under (A-Z lists, in library_sort_key order)
 static u32 key_letter(const char *key)
@@ -723,7 +723,7 @@ static void games_poll(void)
 		show_facts();
 }
 
-const struct nav_page games_page = {games_enter, games_row, 0, games_poll};
+const struct nav_page games_page = {games_enter, games_row, 0, games_poll, 0};
 
 // --- Game info -----------------------------------------------------------------------
 // A page in the list's place: the game's name and console in the title bar,

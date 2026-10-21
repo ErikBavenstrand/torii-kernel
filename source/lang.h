@@ -56,7 +56,7 @@ extern char *gl_keep_power;    // FORMAT ALL's text, under its title
 #define EN_FW_DONE "Done. Turn the power off."
 
 // The menu's items (screens/registry.h) and what they hold ("1 game", then
-// a number and "games"), a page's empty frame, and the hint bar's labels
+// a number and "games"), and the hint bar's labels
 extern char *gl_item_recent;
 extern char *gl_item_fav;
 extern char *gl_item_gba;
@@ -72,7 +72,6 @@ extern char *gl_count_games;
 extern char *gl_count_file;
 extern char *gl_count_files;
 extern char *gl_count_page;
-extern char *gl_page_empty;
 extern char *gl_hint_open;
 extern char *gl_hint_turn;
 extern char *gl_hint_move;

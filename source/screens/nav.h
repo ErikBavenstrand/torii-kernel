@@ -12,9 +12,7 @@
 // A page is a struct nav_page: it pushes its views when the shell opens it
 // and reads its keys in its own handlers. Its handlers ask for what can't
 // run inside a frame (going back, an action from actions.h) with nav_back
-// and nav_defer; the loop does it after the frame. Pages whose ticket
-// hasn't landed show an empty frame: the title bar, an empty card and the
-// hint bar.
+// and nav_defer; the loop does it after the frame.
 #ifndef TORII_SCREENS_NAV_H
 #define TORII_SCREENS_NAV_H
 

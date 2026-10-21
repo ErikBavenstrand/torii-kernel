@@ -37,16 +37,6 @@
 #define IDLE_FLUSH_FRAMES 30        // frames with no key held before a flush of a half-full log
 #define IDLE_FLUSH_ALL_FRAMES 300   // and before a flush of any log line, or of the boot position
 
-// --- The empty page's look, px (spec.md's grid) ------------------------------
-#define PAGE_TITLE_H 24  // the title bar's rectangle: whole tiles under its line
-#define PAGE_CARD_Y 16   // the card's rectangle; its body starts 4 px in
-#define PAGE_CARD_H 128
-#define PAGE_HINTS_H 16
-#define EMPTY_X 8        // the card's note: across the card, in its middle
-#define EMPTY_Y 72
-#define EMPTY_H 16
-static const struct ui_card_config page_card = {4, 4, 4, 1, 0};
-
 volatile u32 nav_test_action EWRAM_BSS;
 char nav_test_path[USERDATA_PATH_MAX] EWRAM_BSS ALIGN(4);
 
@@ -65,8 +55,6 @@ static struct {
 	u8 announced;  // "nav: ... ready" logged for this place
 	u8 h24;        // the clock shows 24 hours
 	u8 boot_flush_tried;  // the boot position's idle write was tried this idle spell
-	u8 page_first;  // the empty page's first node
-	struct ui_hint page_hint;
 	u32 lib_generation;
 	u32 clock_wait;
 	char clock[12];
@@ -159,89 +147,7 @@ static u32 read_settings(void)
 	return settings_get(&v, SET_START_ON);
 }
 
-// --- The empty page -------------------------------------------------------------
-// The frame every page shows until its ticket lands: the item's title bar,
-// an empty card saying so, and the hint bar.
-
-enum {
-	P_TITLE,
-	P_HINTS,
-	P_CARD,
-	P_NOTE,
-	P_NODES
-};
-
-#define PAGE_TITLE(icon) {"", 0, (icon)}
-static const struct ui_title_config page_titles[NAV_ITEMS] = {
-	[NAV_RECENT] = PAGE_TITLE(ART_ICON16_RECENT), [NAV_FAV] = PAGE_TITLE(ART_ICON16_FAV),
-	[NAV_GBA] = PAGE_TITLE(ART_ICON16_GBA),       [NAV_GBC] = PAGE_TITLE(ART_ICON16_GBC),
-	[NAV_GB] = PAGE_TITLE(ART_ICON16_GB),         [NAV_NES] = PAGE_TITLE(ART_ICON16_NES),
-	[NAV_SD] = PAGE_TITLE(ART_ICON16_SD),         [NAV_NOR] = PAGE_TITLE(ART_ICON16_NOR),
-	[NAV_SET] = PAGE_TITLE(ART_ICON16_SET),       [NAV_INFO] = PAGE_TITLE(ART_ICON16_INFO),
-};
-static const struct ui_hints_config page_hints_config = {0, 0};  // empty_enter's
-static const struct ui_label_config note_label = {"", UI_FONT_BODY, UI_ALIGN_CENTER, 0, 0};
-
-#define PAGE_NODES(item) \
-	{ \
-		[P_TITLE] = {UI_TITLE, 1, UI_NONE, 3, UI_HFILL, 0, 0, 0, 0, 0, 0, PAGE_TITLE_H, &page_titles[item]}, \
-		[P_HINTS] = {UI_HINTS, 2, UI_NONE, 3, UI_HFILL | UI_BOTTOM, 0, 0, 0, 0, 0, 0, PAGE_HINTS_H, \
-			     &page_hints_config}, \
-		[P_CARD] = {UI_CARD, 3, UI_NONE, 2, UI_HFILL, 0, 0, 0, 0, PAGE_CARD_Y, 0, PAGE_CARD_H, &page_card}, \
-		[P_NOTE] = {UI_LABEL, 4, UI_NONE, 2, UI_HFILL, 0, UI_ROLE_FAINT, UI_ROLE_PANEL, EMPTY_X, EMPTY_Y, \
-			    EMPTY_X, EMPTY_H, &note_label}, \
-	}
-static const struct ui_spec page_nodes[NAV_ITEMS][P_NODES] = {
-	PAGE_NODES(NAV_RECENT), PAGE_NODES(NAV_FAV), PAGE_NODES(NAV_GBA), PAGE_NODES(NAV_GBC), PAGE_NODES(NAV_GB),
-	PAGE_NODES(NAV_NES),    PAGE_NODES(NAV_SD),  PAGE_NODES(NAV_NOR), PAGE_NODES(NAV_SET), PAGE_NODES(NAV_INFO),
-};
-
-static int page_event(struct ui_view *v, const struct ui_event *e);
-#define PAGE_VIEW(item) {"page-empty", page_nodes[item], P_NODES, 0, UI_NONE, 0, page_event}
-static const struct ui_view_spec page_views[NAV_ITEMS] = {
-	PAGE_VIEW(NAV_RECENT), PAGE_VIEW(NAV_FAV), PAGE_VIEW(NAV_GBA), PAGE_VIEW(NAV_GBC), PAGE_VIEW(NAV_GB),
-	PAGE_VIEW(NAV_NES),    PAGE_VIEW(NAV_SD),  PAGE_VIEW(NAV_NOR), PAGE_VIEW(NAV_SET), PAGE_VIEW(NAV_INFO),
-};
-
-static int page_event(struct ui_view *v, const struct ui_event *e)
-{
-	(void)v;
-	if (e->type != UI_EV_KEYS)
-		return 0;
-	if (e->keys & ui_input()->pressed & INPUT_B)
-		nav_back();
-	return 1;
-}
-
-static int empty_up(void)
-{
-	return ui_depth() && ui_view_at(0)->spec == &page_views[nav.place.item];
-}
-
-static struct ui_view *empty_enter(u32 item, u32 row)
-{
-	(void)row;
-	struct ui_view *v = ui_push(&page_views[item], &nav);
-	if (!v)
-		return 0;
-	nav.page_first = v->first;
-	ui_title_set((u8)(v->first + P_TITLE), nav_item_name(item));
-	ui_title_set_right((u8)(v->first + P_TITLE), nav.clock);
-	ui_label_set((u8)(v->first + P_NOTE), gl_page_empty);
-	nav.page_hint = (struct ui_hint){"B", gl_hint_back};
-	ui_hints_set((u8)(v->first + P_HINTS), &nav.page_hint, 1);
-	return v;
-}
-
-static void empty_clock(const char *text)
-{
-	if (empty_up())
-		ui_title_set_right((u8)(nav.page_first + P_TITLE), text);
-}
-
-static const struct nav_page empty_page = {empty_enter, 0, empty_clock, 0, 0};
-
-// Each item's page: a page ticket puts its own here
+// Each item's page
 static const struct nav_page *const pages[NAV_ITEMS] = {
 	[NAV_RECENT] = &games_page, [NAV_FAV] = &games_page, [NAV_GBA] = &games_page, [NAV_GBC] = &games_page,
 	[NAV_GB] = &games_page,     [NAV_NES] = &games_page, [NAV_SD] = &sdcard_page, [NAV_NOR] = &nor_page,

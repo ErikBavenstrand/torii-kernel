@@ -54,7 +54,6 @@ char *gl_count_games EWRAM_BSS;
 char *gl_count_file EWRAM_BSS;
 char *gl_count_files EWRAM_BSS;
 char *gl_count_page EWRAM_BSS;
-char *gl_page_empty EWRAM_BSS;
 char *gl_hint_open EWRAM_BSS;
 char *gl_hint_turn EWRAM_BSS;
 char *gl_hint_move EWRAM_BSS;
@@ -202,9 +201,8 @@ const char en_patching[] = "Patching the game";
 const char en_keep_power[] = "Don't turn the power off.";
 
 // The menu's items (screens/registry.h), in the carousel's order; what an
-// item holds (a number, then the word: "1,204 files"); the empty frame a
-// page shows until its ticket lands; and the hint bar's labels, after a key
-// chip ("A open")
+// item holds (a number, then the word: "1,204 files"); and the hint bar's
+// labels, after a key chip ("A open")
 const char en_item_recent[] = "Recent";
 const char en_item_fav[] = "Favourites";
 const char en_item_gba[] = "Game Boy Advance";
@@ -220,7 +218,6 @@ const char en_count_games[] = "games";
 const char en_count_file[] = "1 file";
 const char en_count_files[] = "files";
 const char en_count_page[] = "one page";
-const char en_page_empty[] = "Coming in a later build";
 const char en_hint_open[] = "open";
 const char en_hint_turn[] = "turn";
 const char en_hint_move[] = "move";
@@ -594,7 +591,6 @@ void LoadEnglish(void)
 	gl_count_file = (char *)en_count_file;
 	gl_count_files = (char *)en_count_files;
 	gl_count_page = (char *)en_count_page;
-	gl_page_empty = (char *)en_page_empty;
 	gl_hint_open = (char *)en_hint_open;
 	gl_hint_turn = (char *)en_hint_turn;
 	gl_hint_move = (char *)en_hint_move;
