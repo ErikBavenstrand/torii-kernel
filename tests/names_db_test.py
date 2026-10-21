@@ -8,6 +8,7 @@ from the fixture dats in tests/names, with no network."""
 import contextlib
 import io
 import os
+import struct
 import sys
 import tempfile
 import unittest
@@ -276,17 +277,41 @@ class Db(unittest.TestCase):
         return names_db.make_tables([(DATS / d).read_text() for d in fixture.DATS])
 
     def test_round_trip(self):
-        tables, codes, version = self.tables()
-        data = names_db.build_db(tables, codes, version)
+        tables, _, version = self.tables()
+        data = names_db.build_db(tables, version)
         self.assertEqual(len(data) % 4, 0)
-        v, back, back_codes = names_db.read_db(data)
+        self.assertEqual(struct.unpack_from("<H", data, 4)[0], 2)
+        self.assertEqual(struct.unpack_from("<I", data, 48)[0], 0)  # no code table
+        v, back = names_db.read_db(data)
         self.assertEqual(v, "2026.01.02")
         self.assertEqual(back, tables)
-        self.assertEqual(back_codes, codes)
+
+    def test_version_1_reads(self):
+        # v0.4.1's names.db: version 1, with a code table between the CRCs
+        # and the pool
+        tables, _, version = self.tables()
+        data = bytearray(names_db.build_db(tables, version))
+        entries = sum(len(t) for t in tables)
+        at = 64 + entries * 8
+        pool = data[at:]
+        codes = struct.pack("<II", names_db.code_key("AWRE"), 0)
+        body = data[64:at] + codes + pool
+        head = bytearray(data[:64])
+        struct.pack_into("<H", head, 4, 1)
+        struct.pack_into("<I", head, 8, 64 + len(body))
+        struct.pack_into("<I", head, 12, zlib.crc32(body))
+        struct.pack_into("<I", head, 48, 1)
+        struct.pack_into("<I", head, 60, zlib.crc32(head[:60]))
+        self.assertEqual(names_db.read_db(bytes(head + body)), (version, tables))
+        # A code table in version 2 doesn't read
+        struct.pack_into("<H", head, 4, 2)
+        struct.pack_into("<I", head, 60, zlib.crc32(head[:60]))
+        with self.assertRaises(names_db.NamesError):
+            names_db.read_db(bytes(head + body))
 
     def test_damage_is_caught(self):
-        tables, codes, version = self.tables()
-        data = bytearray(names_db.build_db(tables, codes, version))
+        tables, _, version = self.tables()
+        data = bytearray(names_db.build_db(tables, version))
         for at in (0, 8, 64, len(data) - 8):
             bad = bytearray(data)
             bad[at] ^= 1
@@ -296,8 +321,37 @@ class Db(unittest.TestCase):
             names_db.read_db(bytes(data[:-4]))
 
     def test_empty(self):
-        data = names_db.build_db([{}, {}, {}, {}], {}, "")
-        self.assertEqual(names_db.read_db(data), ("", [{}, {}, {}, {}], {}))
+        data = names_db.build_db([{}, {}, {}, {}], "")
+        self.assertEqual(names_db.read_db(data), ("", [{}, {}, {}, {}]))
+
+
+class Cache(unittest.TestCase):
+    def test_lines(self):
+        text = (
+            "# Torii's CRC cache: CRC32, size, date, path\n"
+            "5A0E6E6A\t16777216\t5A3C7B20\t/GBA/Minish Cap.gba\n"
+            "-\t40976\t-\t/NES/Odd\tname.nes\n"
+            # v0.4.1's lines, with a GBA game code second
+            "8C5D6F2B\tAWRE\t4096\t-\t/GBA/Wars.gba\n"
+            "-\t-\t300\t5A3C7B20\t/Odd\tdate.gb\n"
+            "1234ABCD\tawre\t4096\t-\t/GBA/bad code.gba\n"
+            "1234ABCD\t4096\t-\tno root.gba\n"
+        )
+        got = names_db.parse_cache(text)
+        self.assertEqual(
+            got,
+            {
+                "/gba/minish cap.gba": (
+                    0x5A0E6E6A,
+                    16777216,
+                    "5A3C7B20",
+                    "/GBA/Minish Cap.gba",
+                ),
+                "/nes/odd\tname.nes": (None, 40976, None, "/NES/Odd\tname.nes"),
+                "/gba/wars.gba": (0x8C5D6F2B, 4096, None, "/GBA/Wars.gba"),
+                "/odd\tdate.gb": (None, 300, "5A3C7B20", "/Odd\tdate.gb"),
+            },
+        )
 
 
 class Card(unittest.TestCase):
@@ -327,27 +381,66 @@ class Card(unittest.TestCase):
         status, out, err = update(self.sd)
         self.assertEqual(status, 0, err)
         names_db.read_db((self.sd / "torii" / "names.db").read_bytes())
-        lines = {line[4]: line for line in cache_lines(self.sd)}
+        lines = {line[3]: line for line in cache_lines(self.sd)}
         want = {p for p, _ in fixture.FILES} | {"/1/2/3/4/5/6/7/seven.gba"}
         self.assertEqual(set(lines), want)
         wars = lines["/GBA/Wars.gba"]
         self.assertEqual(
-            wars[:4],
-            [f"{zlib.crc32(fixture.rom(1, 4096, 'AWRE')):08X}", "AWRE", "4096", "-"],
+            wars[:3], [f"{zlib.crc32(fixture.rom(1, 4096, 'AWRE')):08X}", "4096", "-"]
         )
-        self.assertEqual(lines["/Colour.gbc"][1], "-")  # codes are GBA's only
-        self.assertEqual(lines["/NES/Famicom.nes"][2], "16400")
-        self.assertIn("GBA: 5 games, 2 named by CRC, 3 keep their file names", out)
+        self.assertEqual(lines["/NES/Famicom.nes"][1], "16400")
         # No game codes: a romhack ("Hack of Minish") keeps its file name
-        self.assertEqual(
-            names_db.read_db((self.sd / "torii" / "names.db").read_bytes())[2], {}
-        )
+        self.assertIn("GBA: 5 games, 2 named by CRC, 3 keep their file names", out)
         self.assertIn("GB: 2 games, 2 named by CRC", out)
         # Both copies, the same, each sealed by its CRC line
         main = (self.sd / "torii" / "crc.txt").read_bytes()
         self.assertEqual(main, (self.sd / "torii" / "crc.txt.bak").read_bytes())
         self.assertIsNotNone(names_db.safe_text(main))
-        self.assertTrue(main.startswith(b"# Torii's CRC cache"))
+        self.assertTrue(
+            main.startswith(b"# Torii's CRC cache: CRC32, size, date, path\n")
+        )
+        # A run right after reads nothing again: the records written here
+        # have no date yet, and their files are no newer than crc.txt
+        status, out, err = update(self.sd)
+        self.assertEqual(status, 0, err)
+        self.assertIn("9 games, 0 CRCs computed, 9 kept", out)
+        # A file changed since (newer than crc.txt) is read again
+        later = os.path.getmtime(self.sd / "torii" / "crc.txt") + 10
+        os.utime(self.sd / "GBA" / "Wars.gba", (later, later))
+        status, out, err = update(self.sd)
+        self.assertIn("9 games, 1 CRCs computed, 8 kept", out)
+
+    def test_old_cache_is_kept(self):
+        # v0.4.1's crc.txt, with codes: its CRCs hold, written back without them
+        update(self.sd)
+        path = self.sd / "torii" / "crc.txt"
+        rows = []
+        for line in names_db.read_safe(path).splitlines():
+            f = line.split("\t")
+            if len(f) == 4:
+                date = names_db.fat_date(self.sd / f[3].lstrip("/"))
+                f = [f[0], "-", f[1], date, f[3]]
+            rows.append("\t".join(f) + "\n")
+        names_db.write_safe(path, "".join(rows))
+        status, out, err = update(self.sd)
+        self.assertEqual(status, 0, err)
+        self.assertIn("9 games, 0 CRCs computed, 9 kept", out)
+        self.assertTrue(all(len(line) == 4 for line in cache_lines(self.sd)))
+
+    def test_read_only_card(self):
+        update(self.sd)
+        torii = self.sd / "torii"
+        for p in torii.iterdir():
+            p.chmod(0o444)
+        torii.chmod(0o555)
+        try:
+            status, _, err = update(self.sd)
+        finally:
+            torii.chmod(0o755)
+        self.assertEqual(status, 1)
+        self.assertIn("names-update: ", err)
+        self.assertIn("stopped there", err)
+        self.assertNotIn("Traceback", err)
 
     def test_kept_and_recomputed(self):
         update(self.sd)
@@ -358,27 +451,30 @@ class Card(unittest.TestCase):
         for old in names_db.read_safe(path).splitlines(keepends=True):
             f = old.rstrip("\n").split("\t")
             row = old
-            if len(f) == 5 and f[4] != "/NES/Famicom.nes":
-                f[3] = names_db.fat_date(self.sd / f[4].lstrip("/"))
-                if f[4] == "/GBA/Wars.gba":
-                    f[3] = "5A3C7B20"
+            if len(f) == 4 and f[3] != "/NES/Famicom.nes":
+                f[2] = names_db.fat_date(self.sd / f[3].lstrip("/"))
+                if f[3] == "/GBA/Wars.gba":
+                    f[2] = "5A3C7B20"
                 row = "\t".join(f) + "\n"
             out_lines.append(row)
         names_db.write_safe(path, "".join(out_lines))
+        # Famicom has no date and is newer than crc.txt: read again
+        later = os.path.getmtime(path) + 10
+        os.utime(self.sd / "NES" / "Famicom.nes", (later, later))
         (self.sd / "GB" / "Mono.gb").write_bytes(b"changed" * 100)
         os.remove(self.sd / "Colour.gbc")
         status, out, err = update(self.sd)
         self.assertEqual(status, 0, err)
         self.assertIn("8 games, 3 CRCs computed, 5 kept", out)
-        lines = {line[4]: line for line in cache_lines(self.sd)}
+        lines = {line[3]: line for line in cache_lines(self.sd)}
         hb = "/GBA/Homebrew.gba"
         self.assertEqual(
-            lines[hb][3], names_db.fat_date(self.sd / hb.lstrip("/"))
+            lines[hb][2], names_db.fat_date(self.sd / hb.lstrip("/"))
         )  # kept with its date
-        self.assertEqual(lines["/GBA/Wars.gba"][3], "-")  # computed again
+        self.assertEqual(lines["/GBA/Wars.gba"][2], "-")  # computed again
         self.assertEqual(
-            lines["/GB/Mono.gb"][:4],
-            [f"{zlib.crc32(b'changed' * 100):08X}", "-", "700", "-"],
+            lines["/GB/Mono.gb"][:3],
+            [f"{zlib.crc32(b'changed' * 100):08X}", "700", "-"],
         )
         self.assertNotIn("/Colour.gbc", lines)
 

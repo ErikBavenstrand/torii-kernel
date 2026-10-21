@@ -44,6 +44,7 @@ crediting No-Intro and libretro-database and checking No-Intro's terms.
 """
 
 import argparse
+import errno
 import os
 import re
 import struct
@@ -72,7 +73,7 @@ CONSOLES = [
 GBA = 0
 
 MAGIC = 0x42444E54  # "TNDB"
-VERSION = 1
+VERSION = 2  # 1 (v0.4.1) had a GBA game code table; read_db still reads it
 HEADER = struct.Struct("<IHHII16s4IIIII")
 assert HEADER.size == 64
 DB_MAX = 0x1C0000  # PSRAM_NAMES_DB_BYTES (source/engine/psram.h)
@@ -95,7 +96,7 @@ CACHE_POOL = (
     0xA0000  # NAMES_CACHE_POOL_BYTES: the paths, each padded to 2 bytes with its NUL
 )
 CACHE_FILE_MAX = 0x100000  # names_store.c's NAMES_CACHE_FILE_MAX
-CRC_HEADER = "# Torii's CRC cache: CRC32, GBA game code, size, date, path\n"
+CRC_HEADER = "# Torii's CRC cache: CRC32, size, date, path\n"
 
 # Tags of dumps a game code shouldn't name first: the retail game wins
 LESSER = re.compile(
@@ -105,6 +106,18 @@ LESSER = re.compile(
 
 class NamesError(Exception):
     pass
+
+
+def os_error(e):
+    """An OSError as a line for the user: a read-only or full card, say."""
+    what = {
+        errno.EROFS: "the card is read-only (its lock switch?)",
+        errno.ENOSPC: "the card is full",
+        errno.EACCES: "no permission",
+        errno.EPERM: "no permission",
+    }.get(e.errno, e.strerror or str(e))
+    where = f"{e.filename}: " if e.filename else ""
+    return f"{where}{what}: stopped there"
 
 
 # --- The dats ------------------------------------------------------------------
@@ -206,8 +219,8 @@ def fetch(dats, file, offline, refresh):
 # --- names.db ------------------------------------------------------------------
 
 
-def build_db(tables, codes, version):
-    """names.db's bytes. tables: per console {crc: name}; codes: {code: name}."""
+def build_db(tables, version):
+    """names.db's bytes (version 2). tables: per console {crc: name}."""
     pool = bytearray()
     offsets = {}
 
@@ -221,8 +234,6 @@ def build_db(tables, codes, version):
     for table in tables:
         for crc in sorted(table):
             body += struct.pack("<II", crc, name_off(table[crc]))
-    for key in sorted(codes):
-        body += struct.pack("<II", key, name_off(codes[key]))
     while len(pool) % 4:
         pool.append(0)
     if not pool:
@@ -237,7 +248,7 @@ def build_db(tables, codes, version):
         zlib.crc32(body),
         version.encode("ascii", "replace")[:15],  # the kernel wants a NUL
         *[len(t) for t in tables],
-        len(codes),
+        0,  # version 1's code table: none
         len(pool),
         0,
         0,
@@ -247,15 +258,17 @@ def build_db(tables, codes, version):
 
 
 def read_db(data):
-    """names.db's tables back, checking it as the kernel does: (version,
-    [ {crc: name} per console ], {code: name})."""
+    """names.db's tables back, checking it as the kernel does: (dats' version,
+    [ {crc: name} per console ]). Version 1's code table is skipped."""
     if len(data) < HEADER.size:
         raise NamesError("shorter than its header")
     f = HEADER.unpack_from(data)
     magic, version, header_bytes, file_bytes, body_crc, dat_version = f[:6]
     counts, code_count, pool_bytes, _, header_crc = f[6:10], f[10], f[11], f[12], f[13]
-    if magic != MAGIC or version != VERSION or header_bytes != 64:
+    if magic != MAGIC or not 1 <= version <= VERSION or header_bytes != 64:
         raise NamesError("not a names.db this reads")
+    if version > 1 and code_count:
+        raise NamesError("a code table in a version 2 file")
     if zlib.crc32(data[:60]) != header_crc:
         raise NamesError("bad header CRC")
     entries = sum(counts) + code_count
@@ -281,7 +294,7 @@ def read_db(data):
             t[key] = name(off)
         tables.append(t)
         at += 8 * n
-    return dat_version.rstrip(b"\0").decode("ascii"), tables[:4], tables[4]
+    return dat_version.rstrip(b"\0").decode("ascii"), tables[:4]
 
 
 def make_tables(dat_texts):
@@ -459,19 +472,24 @@ def write_safe(path, text):
 
 
 def parse_cache(text):
-    """crc.txt's records: {folded path: (crc or None, code or None, size, date or None, path)}."""
+    """crc.txt's records: {folded path: (crc or None, size, date or None, path)}.
+    Reads v0.4.1's lines too, which had a GBA game code second (source/namesdb.h)."""
     out = {}
     for line in text.splitlines():
         if not line or line.startswith("#"):
             continue
-        parts = line.split("\t", 4)
-        if len(parts) != 5 or not parts[4].startswith("/"):
+        parts = line.split("\t", 3)
+        if len(parts) == 4 and not parts[3].startswith("/"):
+            parts = line.split("\t", 4)  # CRC, code, size, date, path
+            if len(parts) != 5 or not re.fullmatch(r"-|[0-9A-Z]{4}", parts[1]):
+                continue
+            del parts[1]
+        if len(parts) != 4 or not parts[3].startswith("/"):
             continue
-        crc, code, size, date, path = parts
+        crc, size, date, path = parts
         try:
             rec = (
                 None if crc == "-" else int(crc, 16),
-                None if code == "-" else code,
                 int(size),
                 None if date == "-" else date,
                 path,
@@ -638,37 +656,59 @@ def fat_date(path):
 
 
 def file_crc(path):
-    crc, code, size = 0, None, 0
+    crc, size = 0, 0
     with open(path, "rb") as f:
         while chunk := f.read(1 << 20):
-            if size == 0 and len(chunk) >= 0xB0:
-                head = chunk[0xAC:0xB0]
-                if re.fullmatch(rb"[0-9A-Z]{4}", head):
-                    code = head.decode("ascii")
             crc = zlib.crc32(chunk, crc)
             size += len(chunk)
-    return crc, code, size
+    return crc, size
+
+
+def header_code(path):
+    """A GBA game's code from its header (0xAC), or None."""
+    try:
+        with open(path, "rb") as f:
+            f.seek(0xAC)
+            head = f.read(4)
+    except OSError:
+        return None
+    return head.decode("ascii") if re.fullmatch(rb"[0-9A-Z]{4}", head) else None
+
+
+def cache_written(torii):
+    """When crc.txt (or its backup) was last written, or None."""
+    for p in (torii / CRC_FILE, torii / (CRC_FILE + ".bak")):
+        try:
+            return os.path.getmtime(p)
+        except OSError:
+            pass
+    return None
+
+
+def record_holds(rec, file_path, size, written):
+    """Whether a parse_cache record's CRC holds for the file: it keeps its
+    size and its date, the one the kernel took for it or, for a record
+    written on a PC and not yet seen by the cart (no date), a file no newer
+    than crc.txt (written: cache_written's)."""
+    if not rec or rec[0] is None or rec[1] != size:
+        return False
+    if rec[2] is not None:
+        return rec[2] == fat_date(file_path)
+    return written is not None and os.path.getmtime(file_path) <= written
 
 
 def update_cache(sd, games):
     """Computes the CRCs crc.txt lacks and writes it; returns its records
-    as {card path: (crc, code)} and (computed, reused)."""
+    as {card path: crc} and (computed, reused)."""
     torii = Path(sd) / "torii"
     old = parse_cache(read_safe(torii / CRC_FILE))
+    written = cache_written(torii)
     lines, found, computed, reused = [CRC_HEADER], {}, 0, 0
-    for n, (card_path, file_path, console) in enumerate(games):
+    for n, (card_path, file_path, _) in enumerate(games):
         size = os.path.getsize(file_path)
         rec = old.get(card_path.lower())
-        # A CRC holds while the file keeps its size and the date the kernel
-        # took for it; one without a date (written here, the cart not yet
-        # seen) is computed again
-        if (
-            rec
-            and rec[0] is not None
-            and rec[2] == size
-            and rec[3] == fat_date(file_path)
-        ):
-            crc, code, date = rec[0], rec[1], rec[3]
+        if record_holds(rec, file_path, size, written):
+            crc, date = rec[0], rec[2]
             reused += 1
         else:
             if sys.stderr.isatty():
@@ -677,15 +717,13 @@ def update_cache(sd, games):
                     end="",
                     file=sys.stderr,
                 )
-            crc, code, size2 = file_crc(file_path)
+            crc, size2 = file_crc(file_path)
             if size2 != size:
                 continue
-            if console != GBA:
-                code = None
             date = None  # the kernel's walk takes the file's FAT date
             computed += 1
-        found[card_path] = (crc, code if console == GBA else None)
-        lines.append(f"{crc:08X}\t{code or '-'}\t{size}\t{date or '-'}\t{card_path}\n")
+        found[card_path] = crc
+        lines.append(f"{crc:08X}\t{size}\t{date or '-'}\t{card_path}\n")
     if computed and sys.stderr.isatty():
         print("\r\033[K", end="", file=sys.stderr)
     torii.mkdir(exist_ok=True)
@@ -715,7 +753,7 @@ def update(args):
             fetch(dats, file, args.offline, args.refresh).read_text("utf-8", "replace")
         )
     tables, _, version = make_tables(texts)
-    db = build_db(tables, {}, version)  # no game codes: the kernel names by CRC only
+    db = build_db(tables, version)  # no game codes: the kernel names by CRC only
     if len(db) > DB_MAX:
         raise NamesError(
             f"names.db would be {len(db)} bytes, over the kernel's {DB_MAX}"
@@ -746,10 +784,10 @@ def update(args):
         f"wrote {torii / CRC_FILE}: {len(found)} games, {computed} CRCs computed, {reused} kept"
     )
     for i, (label, _, _) in enumerate(CONSOLES):
-        mine = [(p, *found[p]) for p, _, c in games if c == i and p in found]
+        mine = [found[p] for p, _, c in games if c == i and p in found]
         if not mine:
             continue
-        by_crc = sum(db_name(tables, i, crc) is not None for _, crc, _ in mine)
+        by_crc = sum(db_name(tables, i, crc) is not None for crc in mine)
         print(
             f"  {label}: {len(mine)} games, {by_crc} named by CRC, "
             f"{len(mine) - by_crc} keep their file names (not in the dats: romhacks, translations, other dumps)"
@@ -787,6 +825,9 @@ def main(argv):
             update(args)
     except NamesError as e:
         print(f"names-{args.cmd}: {e}", file=sys.stderr)
+        return 1
+    except OSError as e:
+        print(f"names-{args.cmd}: {os_error(e)}", file=sys.stderr)
         return 1
     return 0
 

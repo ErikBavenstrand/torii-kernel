@@ -41,8 +41,8 @@ own placeholder boxes and reads them no more.
 Fetching is polite: one request at a time, --delay seconds apart (default
 0.5), with a User-Agent; only a server error (5xx) is retried. Pictures are
 kept in dist/art-cache (git-ignored), so a second run downloads nothing it
-has, and the names the server doesn't have are remembered there too
-(--retry-missing asks again). --offline uses only that cache. --dry-run
+has, and the names the server doesn't have (any 4xx but 429) are remembered
+there too (--retry-missing asks again). --offline uses only that cache. --dry-run
 downloads no pictures and changes nothing on the card: it prints what it
 would fetch. --console limits the run to GBA, GBC, GB or NES. At the end it
 prints, per console, how many games have art.
@@ -64,6 +64,7 @@ import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
+import zlib
 from pathlib import Path
 
 from PIL import Image
@@ -178,26 +179,28 @@ def card_games(sd):
 
 
 def read_crcs(sd, games):
-    """{card path: (crc, code)} from crc.txt where it holds (as
+    """{card path: crc} from crc.txt where it holds (as
     names_db.update_cache decides), else computed; nothing is written."""
-    old = names_db.parse_cache(
-        names_db.read_safe(Path(sd) / "torii" / names_db.CRC_FILE)
-    )
+    torii = Path(sd) / "torii"
+    old = names_db.parse_cache(names_db.read_safe(torii / names_db.CRC_FILE))
+    written = names_db.cache_written(torii)
     out = {}
-    for card_path, file_path, console in games:
+    for card_path, file_path, _ in games:
         size = os.path.getsize(file_path)
         rec = old.get(card_path.lower())
-        if (
-            rec
-            and rec[0] is not None
-            and rec[2] == size
-            and rec[3] == names_db.fat_date(file_path)
-        ):
-            crc, code = rec[0], rec[1]
+        if names_db.record_holds(rec, file_path, size, written):
+            out[card_path] = rec[0]
         else:
-            crc, code, _ = names_db.file_crc(file_path)
-        out[card_path] = (crc, code if console == GBA else None)
+            out[card_path] = names_db.file_crc(file_path)[0]
     return out
+
+
+def game_code(tables, console, crc, file_path):
+    """The header's game code of a GBA game the dats don't list by CRC (all
+    candidates needs it for), else None."""
+    if console != GBA or names_db.db_name(tables, console, crc) is not None:
+        return None
+    return names_db.header_code(file_path)
 
 
 def folded(name):
@@ -240,12 +243,31 @@ class Fetcher:
         self.last = 0.0
         self.misses_file = self.cache / MISSES
         self.misses = set()
+        self.listed = {}  # system: file names in its cache folder, for adopt
         # --retry-missing only skips the list: a miss asked again is added again
         if self.misses_file.exists() and not retry_missing:
             self.misses = set(self.misses_file.read_text("utf-8").splitlines())
 
     def path(self, system, name):
-        return self.cache / SYSTEMS[system] / (name + ".png")
+        # The name's CRC keeps names that differ only in case apart on a
+        # case-insensitive disk (macOS, Windows)
+        return (
+            self.cache / SYSTEMS[system] / f"{name}.{zlib.crc32(name.encode()):08x}.png"
+        )
+
+    def adopt(self, system, name):
+        """Moves a picture an older run cached as <name>.png to path(), if
+        the file there has exactly this name (not one differing in case)."""
+        folder = self.cache / SYSTEMS[system]
+        if system not in self.listed:
+            try:
+                self.listed[system] = set(os.listdir(folder))
+            except OSError:
+                self.listed[system] = set()
+        if name + ".png" in self.listed[system]:
+            self.listed[system].discard(name + ".png")
+            with contextlib.suppress(OSError):
+                (folder / (name + ".png")).replace(self.path(system, name))
 
     def url(self, system, name):
         return self.base_url + urllib.parse.quote(
@@ -254,6 +276,8 @@ class Fetcher:
 
     def known(self, system, name):
         """ "cached", "missing" (the server hasn't it) or None (not asked yet)."""
+        if not self.path(system, name).is_file():
+            self.adopt(system, name)
         if self.path(system, name).is_file():
             return "cached"
         if f"{SYSTEMS[system]}/{name}" in self.misses:
@@ -297,7 +321,9 @@ class Fetcher:
                 data = self.request(url)
                 break
             except urllib.error.HTTPError as e:
-                if e.code in (404, 410):
+                if 400 <= e.code < 500 and e.code != 429:
+                    # 404 mostly; libretro-thumbnails answers 403 for some
+                    # names (a link to a picture it lacks), every time
                     self.miss(system, name)
                     return None
                 if 500 <= e.code < 600 and attempt < RETRIES:
@@ -307,12 +333,10 @@ class Fetcher:
                     self.stopped = (
                         "the server asks for fewer requests (429): run again later"
                     )
-                elif e.code >= 500:
+                else:
                     self.stopped = (
                         f"the server keeps failing ({e.code}): run again later"
                     )
-                else:
-                    print(f"art-scrape: {url}: HTTP {e.code}", file=sys.stderr)
                 return None
             except (urllib.error.URLError, OSError, http.client.HTTPException) as e:
                 self.stopped = (
@@ -390,11 +414,16 @@ def stale_art(games, crcs, tables, codes, have):
     by their CRC: a romhack that v0.4.1's scraper gave its base game's box
     by its game code. {art file: [card paths]}; custom art isn't looked at."""
     out = {}
-    for card_path, _, console in games:
-        crc, code = crcs[card_path]
+    for card_path, file_path, console in games:
+        crc = crcs[card_path]
         file = f"{crc:08X}{art.EXT}"
         if folded(file) in have and not candidates(
-            tables, codes, console, crc, code, Path(card_path).name
+            tables,
+            codes,
+            console,
+            crc,
+            game_code(tables, console, crc, file_path),
+            Path(card_path).name,
         ):
             out.setdefault(file, []).append(card_path)
     return out
@@ -499,20 +528,21 @@ def scrape(args):
 
     results = {i: [] for i in range(len(SYSTEMS))}
     tty = sys.stderr.isatty()
-    for n, (card_path, _, console) in enumerate(games):
+    for n, (card_path, file_path, console) in enumerate(games):
         if tty:
             print(
                 f"\r\033[Kart {n + 1}/{len(games)}: {card_path[-60:]}",
                 end="",
                 file=sys.stderr,
             )
-        crc, code = crcs[card_path]
+        crc = crcs[card_path]
         file = f"{crc:08X}{art.EXT}"
         if ascii_lower(Path(card_path).name + art.EXT) in custom:
             how, what = "custom", None
         elif folded(file) in have:
             how, what = "on card", None
         else:
+            code = game_code(tables, console, crc, file_path)
             picks = tries(
                 candidates(tables, codes, console, crc, code, Path(card_path).name)
             )
@@ -637,6 +667,10 @@ def main(argv):
         scrape(args)
     except (ScrapeError, names_db.NamesError) as e:
         print(f"art-scrape: {e}", file=sys.stderr)
+        return 1
+    except OSError as e:
+        # A card that's read-only, full or pulled out mid-run
+        print(f"art-scrape: {names_db.os_error(e)}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:
         print("\nart-scrape: stopped", file=sys.stderr)

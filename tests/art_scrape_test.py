@@ -253,6 +253,10 @@ class Scrape(unittest.TestCase):
             )
         return status, out.getvalue(), err.getvalue()
 
+    def cached(self, system, name):
+        """The download cache's file of a picture."""
+        return self.cache / system / f"{name}.{zlib.crc32(name.encode()):08x}.png"
+
     def art(self, card_path):
         return self.sd / "torii" / "art" / f"{crc_of(card_path, self.sd)}.bin"
 
@@ -310,7 +314,7 @@ class Scrape(unittest.TestCase):
         )
         # The cache holds the pictures and the misses
         self.assertEqual(
-            (self.cache / GBA_SYS / "Advance Wars (USA).png").read_bytes(),
+            self.cached(GBA_SYS, "Advance Wars (USA)").read_bytes(),
             self.pics["wars"],
         )
         self.assertIn(
@@ -418,7 +422,7 @@ class Scrape(unittest.TestCase):
         # Offline, an unasked picture isn't a miss
         for f in art_dir.glob("*.bin"):
             f.unlink()
-        (self.cache / GBA_SYS / "Advance Wars (USA).png").unlink()
+        self.cached(GBA_SYS, "Advance Wars (USA)").unlink()
         _, out, _ = self.run_tool("--offline")
         self.assertIn("/GBA/Wars.gba: not fetched", out)
 
@@ -453,6 +457,60 @@ class Scrape(unittest.TestCase):
         self.assertIn("/GB/Mono.gb: not fetched", out)
         self.assertFalse((self.cache / "misses.txt").exists())
 
+    def test_client_errors_are_misses(self):
+        # libretro-thumbnails answers 403 for some names, every time: a miss
+        # like 404, remembered, so the next run doesn't ask again
+        self.server.routes[thumb(GB_SYS, "Mono Game (Japan)")] = 403
+        status, out, err = self.run_tool("--console", "GB")
+        self.assertEqual(status, 0, err)
+        self.assertIn("/GB/Mono.gb: no thumbnail", out)
+        self.assertIn(
+            f"{GB_SYS}/Mono Game (Japan)", (self.cache / "misses.txt").read_text()
+        )
+        before = len(self.server.requests)
+        self.run_tool("--console", "GB")
+        self.assertNotIn(
+            thumb(GB_SYS, "Mono Game (Japan)"), self.server.paths()[before:]
+        )
+
+    def test_cache_names_keep_case(self):
+        # Names differing only in case get files of their own, on a
+        # case-insensitive disk too; an older run's <name>.png is taken in
+        # only by the name it was written for
+        f = art_scrape.Fetcher(self.server.url, self.cache, 0, 0, True, False)
+        self.assertNotEqual(
+            f.path(art_scrape.GBA, "Game (USA)").name.lower(),
+            f.path(art_scrape.GBA, "GAME (USA)").name.lower(),
+        )
+        old = self.cache / GBA_SYS / "Advance Wars (USA).png"
+        old.parent.mkdir(parents=True)
+        old.write_bytes(self.pics["wars"])
+        self.assertIsNone(f.known(art_scrape.GBA, "ADVANCE WARS (USA)"))
+        self.assertEqual(f.known(art_scrape.GBA, "Advance Wars (USA)"), "cached")
+        self.assertEqual(
+            self.cached(GBA_SYS, "Advance Wars (USA)").read_bytes(), self.pics["wars"]
+        )
+        self.assertFalse(old.exists())
+
+    def test_read_only_card(self):
+        self.run_tool()
+        torii = self.sd / "torii"
+        for p in list(torii.iterdir()) + list((torii / "art").iterdir()):
+            p.chmod(0o555 if p.is_dir() else 0o444)
+        torii.chmod(0o555)
+        (self.sd / "GBA" / "Wars.gba").write_bytes(
+            b"changed" * 100
+        )  # crc.txt must be written
+        try:
+            status, _, err = self.run_tool()
+        finally:
+            torii.chmod(0o755)
+            (torii / "art").chmod(0o755)
+        self.assertEqual(status, 1)
+        self.assertIn("art-scrape: ", err)
+        self.assertIn("stopped there", err)
+        self.assertNotIn("Traceback", err)
+
     def test_too_many_requests_stops_at_once(self):
         self.server.routes[thumb(GB_SYS, "Mono Game (Japan)")] = 429
         status, _, err = self.run_tool("--console", "GB")
@@ -486,7 +544,7 @@ class Scrape(unittest.TestCase):
         self.assertEqual(status, 0)
         self.assertIn("not a picture art.py reads", err)
         self.assertIn("/GBA/Wars.gba: no thumbnail", out)  # the short name isn't there
-        self.assertFalse((self.cache / GBA_SYS / "Advance Wars (USA).png").exists())
+        self.assertFalse(self.cached(GBA_SYS, "Advance Wars (USA)").exists())
         self.assertFalse(self.art("/GBA/Wars.gba").exists())
 
     def test_index_version_is_the_kernels(self):
