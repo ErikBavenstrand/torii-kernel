@@ -135,7 +135,7 @@ void gfx_set_split(const struct gfx_split *s)
 // next frame's top would show)
 static int part_ok(const struct gfx_split_part *p)
 {
-	return p->dst && p->offset + (p->half ? (p->count + 1u) / 2u : p->count) <= GFX_SPLIT_WORDS;
+	return p->dst && p->count && p->offset + (p->half ? (p->count + 1u) / 2u : p->count) <= GFX_SPLIT_WORDS;
 }
 
 // The parts' top values into place (in VBlank: every line shows them until
