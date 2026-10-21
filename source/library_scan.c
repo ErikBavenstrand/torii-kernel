@@ -1161,10 +1161,10 @@ u32 library_find(const char *path)
 	return lib.valid ? lib_find(active_slot(), path) : LIBRARY_NONE;
 }
 
-void library_find_names(const char *const *names, u32 count, u16 *recs)
+void library_find_names(const char *const *names, const u32 *areas, u32 count, u16 *recs)
 {
 	if (lib.valid) {
-		lib_find_names(active_slot(), names, count, recs);
+		lib_find_names(active_slot(), names, areas, count, recs);
 		return;
 	}
 	for (u32 j = 0; j < count; j++)

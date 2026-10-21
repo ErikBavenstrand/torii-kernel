@@ -167,9 +167,12 @@ static void storage_text(u32 used)
 static void match_records(void)
 {
 	const char *names[MAX_NOR] = {0};
-	for (u32 i = 0; i < nor.count; i++)
+	u32 areas[MAX_NOR] = {0};
+	for (u32 i = 0; i < nor.count; i++) {
 		names[i] = pNorFS[i].filename;
-	library_find_names(names, nor.count, nor.rec_of);
+		areas[i] = pNorFS[i].filesize;  // the game's area: its file size in whole blocks
+	}
+	library_find_names(names, areas, nor.count, nor.rec_of);
 	nor.rec_gen = library_generation();
 	u32 found = 0;
 	for (u32 i = 0; i < nor.count; i++)

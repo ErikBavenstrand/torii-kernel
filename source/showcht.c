@@ -326,7 +326,7 @@ static u32 Get_CHT_val(FIL *file, char *KEY_section, char *KEY_secval /*,char ge
 static u32 Get_all_Section_val(FIL *file)
 {
 	(void)file;
-	char line_buf[MAX_sectionVAL_LEN];
+	char *const line_buf = buf;  // lines as long as Get_CHT_val reads, so both split a file alike
 	int text_comment = 0;
 
 	int in_section = 0;
@@ -338,7 +338,7 @@ static u32 Get_all_Section_val(FIL *file)
 
 	//fseek(file,0x0,SEEK_SET);
 	f_lseek(&gfile, 0x0);
-	while (Read_line(line_buf, MAX_sectionVAL_LEN, &gfile) != NULL) {
+	while (Read_line(line_buf, MAX_BUF_LEN, &gfile) != NULL) {
 		if (Line >= CHT_LINES_MAX) {  // the list would reach buf and _paramv
 			tlog("cheats: the list is full at %lu lines; the rest are left out", (unsigned long)Line);
 			break;

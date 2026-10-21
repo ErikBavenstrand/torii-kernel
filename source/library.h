@@ -262,7 +262,9 @@ u32 lib_find(const u8 *slot, const char *path);
 // For each of names[0..count) (bare file names), the first record not gone
 // with that file name, byte for byte, into recs (LIBRARY_NONE for none):
 // one pass over the records, a name's first byte picking its candidates.
-void lib_find_names(const u8 *slot, const char *const *names, u32 count, u16 *recs);
+// With areas (a NOR game's area, bytes), one whose size takes that area
+// comes first, then any of the name.
+void lib_find_names(const u8 *slot, const char *const *names, const u32 *areas, u32 count, u16 *recs);
 // Takes a record out of the lists: marks it gone, removes it from the order
 // and counts. Returns 0 if it was gone already.
 int lib_forget(u8 *slot, lib_put_fn put, u32 rec);
@@ -341,7 +343,7 @@ u32 library_path(u32 rec, char *out, u32 size);
 u32 library_find(const char *path);
 // lib_find_names in the index: the records of games named names (a NOR
 // game's file name, the SD file it was written from), LIBRARY_NONE for none.
-void library_find_names(const char *const *names, u32 count, u16 *recs);
+void library_find_names(const char *const *names, const u32 *areas, u32 count, u16 *recs);
 // Files on the card outside the hidden folders, games or not.
 u32 library_total_files(void);
 // 1 if the card has more games than the index holds ("showing the first

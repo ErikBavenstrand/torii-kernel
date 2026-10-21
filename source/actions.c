@@ -377,6 +377,15 @@ static u32 share_walk(const char *path, const char *save, const char *save2)
 		DIR *dir = &sw->dirs[depth], *sub = depth + 1 < SHARE_DEPTH ? &sw->dirs[depth + 1] : NULL;
 		FRESULT fr = f_readdir_sub(dir, &sw->fi, sub);
 		const char *name = sw->fi.fname;
+		if (fr == FR_INT_ERR && depth > 0) {
+			// A damaged folder, which the library's walk leaves out too:
+			// skipped, so one can't block every rename on the card
+			tlog("rename: %s can't be read (FatFs %u): its games aren't checked for the save", sw->path,
+			     (unsigned)fr);
+			f_closedir(dir);
+			sw->path[sw->len[--depth]] = 0;
+			continue;
+		}
 		if (fr != FR_OK) {
 			tlog("rename: %s can't be read (FatFs %u): its games' saves can't be checked",
 			     depth ? sw->path : "/", (unsigned)fr);
