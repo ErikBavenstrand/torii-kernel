@@ -116,7 +116,7 @@
 #define assress_edit_rtshotkey_1 9
 #define assress_edit_rtshotkey_2 10
 #define assress_engine_sel 11
-//12 was the official kernel's thumbnail switch (box art has 34)
+//12 was the official kernel's thumbnail switch (slot 34 is the Box art row's)
 #define assress_game_clock 13 //games can read the cart's clock
 #define assress_auto_save_sel 14
 #define assress_ModeB_INIT 15 //Mode B, what the cart is in a DS: the kernel only stores it

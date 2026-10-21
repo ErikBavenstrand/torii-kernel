@@ -363,7 +363,7 @@ const char *en_info[INFO_STRINGS] = {
 		"^v\tmove\n"
 		"B\tback, towards the carousel\n"
 		"# Game lists\n"
-		"L R\tpage up, page down\n" LR "\tjump to the next or previous letter\n"
+		"L R\tpage up, page down\n" LR "\tthe next or previous letter (A-Z lists)\n"
 		"A\tplay the game\n"
 		"START\tthe game's menu\n"
 		"In its Game info, " LR " changes a GBA game's save type.\n"
@@ -376,7 +376,8 @@ const char *en_info[INFO_STRINGS] = {
 		"A\tstart the game\n"
 		"START\tthe game's menu\n"
 		"# Starting a game\n"
-		"L\thold it as you press A, or pick Play or Launch: the game starts with the GBA's boot screen\n"
+		"L\thold it as you pick a way to start in the game's menu: it starts with the GBA's boot "
+		"screen. Held as you press A, L pages first, then A starts the game shown.\n"
 		"# Settings\n"
 		"L R\tthe previous or next section\n"
 		"A\tchange the value: " LR " picks, A keeps it, B puts it back\n"
@@ -388,7 +389,7 @@ const char *en_info[INFO_STRINGS] = {
 		"B\tdelete a letter\n"
 		"L R\tmove along the name\n"
 		"SELECT\tcapitals\n"
-		"START\tkeep the name\n"
+		"START\tkeep the name; the Cancel key leaves it as it was\n"
 		"# Menus\n"
 		"^v\tchoose\n"
 		"A\tpick\n"
@@ -397,7 +398,7 @@ const char *en_info[INFO_STRINGS] = {
 		"# At power-on\n"
 		"Hold L, R and SELECT as you switch on to run Diagnostics, even when the menu won't start.",
 	[INFO_S_INGAME_START] = "# Hotkeys\n"
-				"They work in GBA games started with their addons: A, Play and Boot with addon "
+				"They work in GBA games started with their addons: A, Play, Launch and Boot with addon "
 				"start a game with the ones Settings turns on, Clean boot without. Settings, "
 				"Hotkeys sets them; Save states and Cheats are in Settings, Games. A game on the NOR "
 				"keeps the hotkeys it was written with.\n",
@@ -428,7 +429,7 @@ const char *en_info[INFO_STRINGS] = {
 	[INFO_S_CART_NOR] = "# On the NOR\n"
 			    "%s, %s MB of %s MB used\n",
 	[INFO_S_CART_NOR_EMPTY] = "# On the NOR\n"
-				  "No games. Write to NOR in a game's menu copies one there.\n",
+				  "No games. Write to NOR in a file's menu on the SD card page copies one there.\n",
 	[INFO_S_CART_LISTS] = "# Your lists\n"
 			      "Favourites: %s\n"
 			      "Recent: %s, of the last %s played\n",
