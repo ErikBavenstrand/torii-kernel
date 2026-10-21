@@ -6,6 +6,18 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** game lists: one page for Recent, Favourites and each console,
+  8 rows of 14 px with the name shown, a favourite's star, a save dot and the
+  size (Recent: when it was played); A-Z letter jumps with the letter card;
+  A plays with the enabled addons (L held: a hard reset of the row shown);
+  START opens the game popup: Play, Favourite in place, Clean boot, Boot
+  with addon (the cheat screen when Cheats is on and the game has a cheat
+  file; greyed out with every addon off), Game info (LEFT/RIGHT change the
+  save type, kept in its `.mde`) and Delete (Cancel preselected; the save
+  stays). List with art shows the placeholder box. The cheat screen comes
+  back in the page look. The library index keeps each game's display name
+  (LIBRARY_VERSION 3: every card is indexed again once) (B13; `4787903`,
+  `6f94faf`, `9d8ea25`, `a433d64`, `aa2932d`, `b9cb2b5`, `ff4a788`).
 - **Added:** the Settings page: one scrolling page of section cards whose
   edges and labels scroll with the rows, the selected row's explanation in
   the hint bar; A edits a value in place as « value », Time and Date in a

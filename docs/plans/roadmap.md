@@ -340,6 +340,11 @@ What the v0.4 ticket sessions, the conductor's reviews and the research left ope
 - A failed settings write isn't retried within the visit and shows no message; the live theme stays (B16).
 - `ui_hints_get` doesn't give back a hint note's ink, so a popup over a danger or countdown line restores it as plain text (can't happen today; B16).
 - While the Time/Date field card is open only `ui_frame` runs: the library walk and a Rescan pause until it closes (B16 review).
+- Opening Favourites with thousands of entries blocks for up to about 1.8 s (3,367 favourites), and again after un-favouriting or a new index; cache across visits or make it a job (B13).
+- The cheat parser drops spaces from cheat names ("Infinitelives"; pre-existing in v0.3).
+- The selected row's marquee keeps scrolling under an open popup (about 13k cycles a frame; B13).
+- A first visit to a game page right after a failed launch briefly shows an empty card until the index reloads (B13).
+- The game popup over row 0 lets the row's size peek out clipped above the popup's top (B13).
 - A large crc.txt loads slowly after each boot: about 6 s of background work for 3,000 records (emulated), mostly hashing paths (B21).
 - A read-only crc.txt is never updated: dates are re-adopted and Recent games re-identified every boot (B21).
 
@@ -361,6 +366,7 @@ Made during the build without the user; each is cheap to change.
 - **Mockups for Settings and the rename keyboard,** approved by the conductor for the build (`docs/design/v0.4/settings-*.png`, `keyboard-*.png`).
 - **Dropped v0.3 features:** the NOR menu's load and back-up of a save; the help QR code; the cheat screen, per-game save type, hard reset and write to NOR with addon come back in B13/B14 (B10).
 - **A starts games with the enabled addons** (Play, Launch); Clean boot is a separate entry; v0.3's A, A was a clean boot (conductor, B13/B14).
+- **Game lists:** Favourites shows no stars; list with art shows two facts; Game info is a page; GB/GBC/NES offer only Play (B13).
 - **SD card page:** Delete reaches `/torii` and `/SAVER` with Show all files on; the first 1,024 files the card lists are shown in a bigger folder; folder icons blue (B14).
 - **Settings:** a black pause while the NOR is written on leaving; Time/Date write the clock at once; edits lost on power-off before leaving; the pill jumps rather than slides (B16).
 - **NOR page:** one card with four rows, only the latest game deletable, no hold-A for Format all, L/R don't page (B15).
