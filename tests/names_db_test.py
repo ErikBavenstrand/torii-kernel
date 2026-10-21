@@ -417,7 +417,9 @@ class Card(unittest.TestCase):
             [
                 f"{zlib.crc32(fixture.rom(1, 4096, 'AWRE')):08X}",
                 "4096",
-                "-",  # the cart dates it: the PC's date can be hours off
+                # The PC's date: the cart allows it whole hours off, and
+                # forgets the CRC if the file changes before its walk
+                names_db.fat_date(self.sd / "GBA" / "Wars.gba"),
             ],
         )
         self.assertEqual(lines["/NES/Famicom.nes"][1], "16400")
@@ -448,8 +450,18 @@ class Card(unittest.TestCase):
         os.utime(self.sd / "GBA" / "Wars.gba", (1_500_000_000, 1_500_000_000))
         status, out, err = update(self.sd)
         self.assertIn("9 games, 1 CRCs computed, 8 kept", out)
-        # An undated record holds only while its file is older than crc.txt
+        # An undated record (names-update's before v0.4.2) holds only while
+        # its file is older than crc.txt
         crc_txt = self.sd / "torii" / "crc.txt"
+        rows = []
+        for line in names_db.read_safe(crc_txt).splitlines(keepends=True):
+            f = line.split("\t")
+            if len(f) == 4 and f[3] == "/GBA/Wars.gba\n":
+                f[2] = "-"
+            rows.append("\t".join(f))
+        names_db.write_safe(crc_txt, "".join(rows))
+        status, out, err = update(self.sd)
+        self.assertIn("9 games, 0 CRCs computed, 9 kept", out)
         t = os.path.getmtime(crc_txt) + 10
         os.utime(self.sd / "GBA" / "Wars.gba", (t, t))
         status, out, err = update(self.sd)
@@ -513,14 +525,16 @@ class Card(unittest.TestCase):
             lines[hb][2], names_db.fat_date(self.sd / hb.lstrip("/"))
         )  # kept with its date
         wars = self.sd / "GBA" / "Wars.gba"
-        self.assertEqual(lines["/GBA/Wars.gba"][2], "-")  # computed again
+        self.assertEqual(
+            lines["/GBA/Wars.gba"][2], names_db.fat_date(wars)
+        )  # computed again
         self.assertTrue(wars.exists())
         self.assertEqual(
             lines["/GB/Mono.gb"][:3],
             [
                 f"{zlib.crc32(b'changed' * 100):08X}",
                 "700",
-                "-",
+                names_db.fat_date(self.sd / "GB" / "Mono.gb"),
             ],
         )
         self.assertNotIn("/Colour.gbc", lines)

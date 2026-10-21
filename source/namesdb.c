@@ -241,6 +241,26 @@ void names_cache_set_date(struct names_cache *c, u32 n, u32 date)
 	write_rec(c, n, &r);
 }
 
+// Hours since 1980 of a FAT date and time (fdate << 16 | ftime), or -1 for
+// one that names no moment. The days are Howard Hinnant's days from civil,
+// counted from 1 March of year 0.
+static s32 fat_hours(u32 date)
+{
+	static const u8 month_days[12] = {31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+	u32 y = 1980 + (date >> 25), m = date >> 21 & 15, d = date >> 16 & 31;
+	u32 hour = date >> 11 & 31, minute = date >> 5 & 63, secs = date & 31;
+	if (m < 1 || m > 12 || d < 1 || d > month_days[m - 1] || hour > 23 || minute > 59 || secs > 29)
+		return -1;
+	if (m == 2 && d == 29 && (y % 4 || (y % 100 == 0 && y % 400)))
+		return -1;
+	if (m <= 2)
+		y--;
+	u32 era = y / 400, yoe = y - era * 400;
+	u32 doy = (153 * (m > 2 ? m - 3 : m + 9) + 2) / 5 + d - 1;
+	u32 days = era * 146097 + yoe * 365 + yoe / 4 - yoe / 100 + doy;
+	return (s32)((days - 723120u) * 24 + hour);  // 723120: 1 January 1980
+}
+
 int names_cache_fits(const struct names_rec *r, u32 size, u32 date)
 {
 	u32 flags = names_rec_flags(r);
@@ -248,7 +268,17 @@ int names_cache_fits(const struct names_rec *r, u32 size, u32 date)
 		return NAMES_STALE;
 	if (!(flags & NAMES_DATE))
 		return NAMES_FIT_DATED;
-	return r->date == date ? NAMES_FIT : NAMES_STALE;
+	if (r->date == date)
+		return NAMES_FIT;
+	// A whole number of hours off, minutes and seconds equal: names-update's
+	// date, from a PC whose local time isn't the one the card's driver wrote
+	if ((r->date ^ date) & 0x7FFu)
+		return NAMES_STALE;
+	s32 a = fat_hours(r->date), b = fat_hours(date);
+	if (a < 0 || b < 0)
+		return NAMES_STALE;
+	s32 hours = a > b ? a - b : b - a;
+	return hours <= NAMES_DATE_SKEW_HOURS ? NAMES_FIT_DATED : NAMES_STALE;
 }
 
 // --- crc.txt's lines -----------------------------------------------------------------

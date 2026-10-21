@@ -23,8 +23,13 @@ on this PC (a mounted card, say /Volumes/OMEGA), and:
 3. Computes the CRC32 of every game on the card (by extension, outside the
    folders the kernel hides) and writes SD_PATH/torii/crc.txt, so the card
    shows the names at once. A file whose path, size and date crc.txt
-   already has isn't read again (the cart dates each record on its next
-   walk; until then, one older than crc.txt holds). --no-crc leaves crc.txt alone: the kernel's Identify
+   already has isn't read again; a date may be a whole number of hours
+   off, as the cart's often is (same_moment). Each record gets the file's
+   date as this PC sees it, and the cart's next walk takes its own date
+   (it allows the same hours); a kernel before v0.4.2 forgets a record
+   whose date is off. A record without a date (names-update between
+   v0.4.1 and v0.4.2 wrote them) holds while its file is older than
+   crc.txt. --no-crc leaves crc.txt alone: the kernel's Identify
    library and its launches compute CRCs too, far more slowly.
 
 `just names-add SD_PATH FILE` runs `add`: your own names for many games at
@@ -702,7 +707,8 @@ def same_moment(a, b):
     """Whether two crc.txt dates name one moment, give or take a whole
     number of hours: the cart reads exFAT's local time as the PC's driver
     wrote it, which for a file dated in winter is an hour off the PC's own
-    local time in summer (DST), and further off on a PC in another zone."""
+    local time in summer (DST), and further off on a PC in another zone.
+    The kernel allows the same (source/namesdb.c, names_cache_fits)."""
     ta, tb = fat_moment(a), fat_moment(b)
     if ta is None or tb is None:
         return False
@@ -712,9 +718,10 @@ def same_moment(a, b):
 
 def record_holds(rec, file_path, size, cache_mtime=None):
     """Whether a parse_cache record's CRC holds for the file: it keeps its
-    size, and its date (the cart's, give or take a whole hour) is the file's.
-    One without a date, which this tool writes and the cart dates on its
-    next walk, holds while the file is older than crc.txt (cache_mtime)."""
+    size, and its date (the cart's or this tool's, give or take whole hours)
+    is the file's. One without a date, which names-update wrote between
+    v0.4.1 and v0.4.2 and the cart dates on its next walk, holds while the
+    file is older than crc.txt (cache_mtime)."""
     if not rec or rec[0] is None or rec[1] != size:
         return False
     if rec[2] is None:
@@ -754,10 +761,11 @@ def update_cache(sd, games):
             crc, size2 = file_crc(file_path)
             if size2 != size:
                 continue
-            # No date: the PC's FAT date can be hours off the cart's (see
-            # same_moment), which made the cart forget every CRC it was
-            # given. The cart's walk dates the record from its own read.
-            date = None
+            # The PC's date, so the cart forgets the CRC if the file
+            # changes before its next walk. It can be whole hours off the
+            # cart's (same_moment): the kernel (v0.4.2 on) allows that and
+            # takes its own date.
+            date = fat_date(file_path)
             computed += 1
         found[card_path] = crc
         lines.append(f"{crc:08X}\t{size}\t{date or '-'}\t{card_path}\n")

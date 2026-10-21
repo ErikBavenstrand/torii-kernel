@@ -115,7 +115,7 @@ want="/GBA/Wars.gba
 /GBA/zz Minish.gba"
 [ "$(gba_order "$cart")" = "$want" ] || fail "the GBA games sort as
 $(gba_order "$cart")"
-# The walk gave every record its file's date, and crc.txt was written again
+# Every record has its file's date (names-update's, which the walk checked)
 [ "$(crc_lines "$cart" | wc -l)" = 8 ] || fail "crc.txt holds $(crc_lines "$cart")"
 if crc_lines "$cart" | awk -F'\t' '$3 == "-"' | grep -q .; then
   fail "records without a date: $(crc_lines "$cart")"
@@ -147,6 +147,32 @@ $(gba_order "$cart")"
 if crc_lines "$cart" | grep -q '/GBA/Wars.gba'; then fail "crc.txt keeps the changed file"; fi
 no_errors "$cart/3.log"
 echo "PASS: a file changed since its CRC loses its name and its record"
+
+# names-update's dates as a PC in another local time writes them: one a
+# whole hour off its file's (DST) holds and takes the cart's date; one a
+# minute off (a file swapped in since) is forgotten
+cart=$carts/skew
+fixture_card "$cart"
+python3 -c 'import sys; sys.path.insert(0, "tools"); import names_db
+path = sys.argv[1] + "/files/torii/crc.txt"
+rows = []
+for line in names_db.read_safe(path).splitlines(keepends=True):
+    f = line.split("\t")
+    if len(f) == 4 and f[3] in ("/GBA/Wars.gba\n", "/GBA/Homebrew.gba\n"):
+        f[2] = "%08X" % (int(f[2], 16) + (1 << 11 if "Wars" in f[3] else 1 << 5))
+    rows.append("\t".join(f))
+names_db.write_safe(path, "".join(rows))' "$cart"
+mcopy -o -i "$cart/sd.img" "$cart/files/torii/crc.txt" "$cart/files/torii/crc.txt.bak" ::/torii/
+boot "$cart" "$cart/1.log" -f 900 -u "names: wrote /torii/crc.txt"
+logged "$cart/1.log" "names: /GBA/Homebrew.gba changed since its CRC: forgotten"
+not_logged "$cart/1.log" "names: /GBA/Wars.gba changed"
+wars_date=$(python3 -c 'import sys; sys.path.insert(0, "tools"); import names_db
+print(names_db.fat_date(sys.argv[1]))' "$cart/files/GBA/Wars.gba")
+[ "$(crc_lines "$cart" | awk -F'\t' '$4 == "/GBA/Wars.gba" { print $3 }')" = "$wars_date" ] ||
+  fail "Wars's record isn't dated $wars_date: $(crc_lines "$cart")"
+if crc_lines "$cart" | grep -q '/GBA/Homebrew.gba'; then fail "crc.txt keeps Homebrew's record"; fi
+no_errors "$cart/1.log"
+echo "PASS: a names-update date a whole hour off holds and takes the cart's date; a minute off is forgotten"
 
 # The games on Recent get their CRCs after the boot: a game played is named
 # without a pass of its own in the launch

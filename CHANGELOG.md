@@ -4,6 +4,12 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Fixed:** the walk keeps a `crc.txt` date up to 14 whole hours off its
+  file's, as names-update writes it from a PC in another local time (DST),
+  and takes the cart's date; any other date still forgets the CRC (F1; `e04827c`).
+
 ## v0.4.1 (2026-10-21)
 
 The new menu: a carousel home, game lists, SD card, NOR, Settings and Info

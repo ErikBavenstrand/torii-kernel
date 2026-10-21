@@ -68,6 +68,7 @@ static const struct {
 	{"namesdb_lookup", test_namesdb_lookup},
 	{"names_cache_table", test_names_cache_table},
 	{"names_cache_fits", test_names_cache_fits},
+	{"names_cache_fits_skew", test_names_cache_fits_skew},
 	{"names_cache_full", test_names_cache_full},
 	{"names_lines", test_names_lines},
 	{"names_db_name", test_names_db_name},

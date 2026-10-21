@@ -30,8 +30,9 @@
 //
 // CRC32 as 8 hex digits, or "-" while unknown; SIZE in bytes; DATE FatFs's fdate << 16 |
 // ftime as 8 hex digits (`just names-update` writes the file's as the PC
-// sees it), or "-" where it isn't known (v0.4.1's tools: the next walk takes
-// the file's); PATH from the card's root. '#' lines are
+// sees it, which can be whole hours off the cart's: names_cache_fits), or
+// "-" where it isn't known (names-update between v0.4.1 and v0.4.2: the
+// next walk takes the file's); PATH from the card's root. '#' lines are
 // comments. An entry counts only while its file keeps that size (and date,
 // once known): the walk drops one that doesn't. v0.4.1 wrote a GBA game code
 // after the CRC (CRC32, CODE, SIZE, DATE, PATH): such lines still read, and
@@ -158,8 +159,14 @@ void names_cache_drop(struct names_cache *c, u32 n);
 // Gives a record a date (the walk's, for one written on a PC).
 void names_cache_set_date(struct names_cache *c, u32 n, u32 date);
 // What a record says about its file, now that it has this size and date:
-// NAMES_FIT (it holds), NAMES_FIT_DATED (it holds but has no date yet:
-// set_date), or NAMES_STALE (the file changed: drop it).
+// NAMES_FIT (it holds), NAMES_FIT_DATED (it holds but has no date of the
+// cart's yet: set_date), or NAMES_STALE (the file changed: drop it). A
+// date a whole number of hours off the file's, at most
+// NAMES_DATE_SKEW_HOURS, with minutes and seconds equal, fits dated: it is
+// names-update's, from a PC whose local time isn't the one the card's
+// driver wrote (a file dated in winter reads an hour off in summer: DST;
+// a PC in another zone, further). A kernel before v0.4.2 forgets it.
+#define NAMES_DATE_SKEW_HOURS 14
 enum {
 	NAMES_FIT,
 	NAMES_FIT_DATED,
@@ -191,9 +198,9 @@ const char *names_db_name(const u8 *db, const struct names_rec *r, u32 console);
 // library's first walk after the boot or a game, a piece per step
 // (names_load_step). The walk then checks each game's cache record against
 // its file (names_walk_seen): a changed file's record is dropped, a record
-// written on a PC takes the file's date, and the database's name for it
-// goes into the index's sort key. The walk's fingerprint includes
-// names_identity, so new names rebuild the index.
+// written on a PC takes the file's date (names_cache_fits), and the
+// database's name for it goes into the index's sort key. The walk's
+// fingerprint includes names_identity, so new names rebuild the index.
 //
 // CRCs are computed by a job between frames, paused while the user moves,
 // covers load or the library walks: for every library game without one
