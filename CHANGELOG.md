@@ -6,6 +6,17 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** Rename in the game and SD file popups, with an on-screen
+  keyboard (10-column QWERTY grid with digits, Latin-1 page, L/R caret,
+  SELECT shift, START OK). A game's Rename sets its name in
+  `/torii/names.txt` and re-sorts its list at once; an SD file's renames the
+  file with its save, save type, save states, cheats, patch cache and custom
+  art, and Recent, the favourites, names.txt and the index follow. A failed
+  move is undone, and a journal (`/torii/rename.txt`) finishes or undoes a
+  rename a power cut interrupted at the next boot. With the extra popup item,
+  a Delete confirmation that doesn't fit beside a tall popup closes the popup
+  first (B18; `0a0d254`, `38389d6`, `7593f09`, `7aa020f`, `8f69930`,
+  `dc0840c`, `f81f161`).
 - **Added:** box art: List + art shows a game's cover in place of the
   placeholder: custom art by file name (`/torii/art/custom/<file name>.bin`),
   then matched art by CRC (`/torii/art/<CRC32>.bin`) or GBA game code from
