@@ -26,6 +26,10 @@ lists it (the boot saves the list in Torii's format): ROM's bytes at the
 next free 128 KB block, its area SIZE bytes rounded up to whole blocks, and
 an entry named NAME, so a NOR page shows games of any size without writing
 them through the menu (nor-page).
+"#! sd-name DEST SRC NAME" names the card's file DEST (a copy of SRC) NAME
+in a names.db and crc.txt made for the scenario, as `just names-update`
+would (games-names). "#! sd-fsinfo-unknown" marks the card's free cluster
+count as not recorded (info-no-free).
 "#! sd-many FOLDER COUNT" makes FOLDER on the card with COUNT small games,
 "Game 0001.gba" on, in that order (sd-many: a folder past the SD card page's
 1,024 entries).
@@ -38,7 +42,9 @@ fails it.
 
 Check (the default): every key frame's screen hash, and every animation's
 frame hashes, must equal tests/shots/hashes.txt. On a mismatch the actual,
-expected and diff PNGs go to dist/shots-failed/. Then every
+expected and diff PNGs go to dist/shots-failed/; an animation's expected
+frame comes from dist/shots-frames, where every run keeps each animation
+frame it hashed by its hash (none on a fresh checkout). Then every
 "frame-cycles: NAME N" line the runs logged is checked against
 tests/perf/budget.txt (tests/perf.py).
 
@@ -63,6 +69,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(1, str(Path(__file__).parent.parent / "tools"))
+import names_db
 import perf
 from games import png_lines
 
@@ -71,6 +79,9 @@ MANIFEST = SHOTS / "hashes.txt"
 PNGS = SHOTS / "png"
 RUNS = Path("dist/shots-run")
 FAILED = Path("dist/shots-failed")
+# Every animation frame's screen by its hash (mgba-shot -D), kept between
+# runs, so a frame that changes has its expected picture from an earlier run
+FRAMES = Path("dist/shots-frames")
 # The scenarios' carts, on the container's own disk: the emulator syncs the
 # memory-mapped cart files at each power-off, which takes about 0.5 s on the
 # virtiofs mount (tests/carts.sh)
@@ -159,8 +170,7 @@ def build_sd(path: Path) -> None:
         "/Hello.gba\n/Games/Idle.gba\n", encoding="utf-8"
     )
     path.unlink(missing_ok=True)
-    # A fixed volume ID; mtools stamps files with the host's time, which no
-    # screen shows.
+    # A fixed volume ID; mtools stamps files with EPOCH's time (run)
     run(
         [
             "mkfs.fat",
@@ -194,7 +204,10 @@ def many_cheats() -> bytes:
 
 
 def run(cmd: list[str]) -> None:
-    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
+    # mtools stamps what it writes with SOURCE_DATE_EPOCH's time, so File
+    # info's date is the same on every machine
+    env = dict(os.environ, SOURCE_DATE_EPOCH=str(EPOCH), TZ="UTC")
+    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, env=env)
 
 
 class Result:
@@ -231,6 +244,7 @@ def boot(name: str, sd: Path, cart: Path, out: Path, extra: list[str] = ()):
     shutil.copy(sd, cart / "sd.img")
     kernel = KERNEL
     cart_env: dict[str, str] = {}
+    names: list[tuple[str, bytes, str]] = []
     for line in opts.read_text(encoding="utf-8").splitlines():
         if line.split() == ["#!", "kernel", "test"]:
             kernel = TEST_KERNEL
@@ -282,6 +296,11 @@ def boot(name: str, sd: Path, cart: Path, out: Path, extra: list[str] = ()):
             padded.unlink()
             # The files that split it up go; its clusters stay where they are
             run(["mdel", "-i", str(cart / "sd.img"), "::/FILL*.BIN"])
+        elif line.startswith("#! sd-name "):
+            _, _, dest, src, title = shlex.split(line)
+            names.append((dest, Path(src).read_bytes(), title))
+        elif line.split() == ["#!", "sd-fsinfo-unknown"]:
+            fsinfo_unknown(cart / "sd.img")
         elif line.startswith("#! nor-game "):
             _, _, name, size, src = shlex.split(line)
             nor_game(cart, name, int(size, 0), Path(src).read_bytes())
@@ -309,11 +328,49 @@ def boot(name: str, sd: Path, cart: Path, out: Path, extra: list[str] = ()):
                     index, value = (int(x, 0) for x in slot.split("="))
                     f.seek(SETTINGS + 2 * index)
                     f.write(struct.pack("<H", value))
+    if names:
+        sd_names(cart, names)
     env = dict(os.environ, OMEGA_DIR=str(cart), TZ="UTC")
     env.pop("OMEGA_TRACE", None)
     env.update(cart_env)
-    cmd = [SHOT, kernel, "-C", str(EPOCH), "-O", str(out), "-i", str(opts), *extra]
+    FRAMES.mkdir(parents=True, exist_ok=True)
+    cmd = [SHOT, kernel, "-C", str(EPOCH), "-O", str(out), "-D", str(FRAMES)]
+    cmd += ["-i", str(opts), *extra]
     return subprocess.run(cmd, env=env, capture_output=True, text=True, check=False)
+
+
+def fsinfo_unknown(img: Path) -> None:
+    """Marks the FAT32 card's free cluster count (FSInfo) as not recorded,
+    as a card some PCs leave: the kernel then shows no free space."""
+    with img.open("r+b") as f:
+        f.seek(48)
+        sector = struct.unpack("<H", f.read(2))[0]
+        f.seek(sector * 512 + 488)
+        f.write(b"\xff" * 8)  # the free count and the next free cluster
+
+
+def sd_names(cart: Path, names: list[tuple[str, bytes, str]]) -> None:
+    """/torii/names.db naming each game by its CRC, and /torii/crc.txt
+    giving the games' CRCs, as `just names-update` writes them."""
+    tables: list[dict[int, str]] = [{} for _ in names_db.CONSOLES]
+    lines = [names_db.CRC_HEADER]
+    for dest, data, title in names:
+        console = names_db.console_of(Path(dest).name)
+        crc = zlib.crc32(data)
+        tables[console][crc] = title
+        lines.append(f"{crc:08X}\t{len(data)}\t-\t{dest}\n")
+    stage = cart / "names"
+    stage.mkdir()
+    (stage / "names.db").write_bytes(names_db.build_db(tables, "2026.01.02"))
+    names_db.write_safe(stage / "crc.txt", "".join(lines))
+    files = [str(stage / n) for n in ("names.db", "crc.txt", "crc.txt.bak")]
+    img = str(cart / "sd.img")
+    if subprocess.run(
+        ["mdir", "-i", img, "::/torii"], capture_output=True, check=False
+    ).returncode:
+        run(["mmd", "-i", img, "::/torii"])
+    run(["mcopy", "-Q", "-o", "-i", str(cart / "sd.img"), *files, "::/torii/"])
+    shutil.rmtree(stage)
 
 
 def nor_game(cart: Path, name: str, size: int, rom: bytes) -> None:
@@ -520,9 +577,23 @@ def check(results: list[Result], want: dict[str, str], sd: Path) -> list[str]:
             what = f"{r.name}/frames: {len(got_frames)} frames hashed, {len(want_frames)} recorded"
             if i < len(r.frames):
                 frame = r.frames[i][0]
-                png = FAILED / f"{r.name}.frame{i}.actual.png"
-                shot_at(r, frame, png, sd)
-                what += f"; frame {i} (absolute {frame}) differs first ({png})"
+                stem = FAILED / f"{r.name}.frame{i}"
+                png = Path(f"{stem}.actual.png")
+                seen = FRAMES / f"{got_frames[i]}.png"
+                if seen.exists():
+                    shutil.copy(seen, png)
+                else:
+                    shot_at(r, frame, png, sd)
+                what += f"; frame {i} (absolute {frame}) differs first ({stem}.*)"
+                golden = (
+                    FRAMES / f"{want_frames[i]}.png" if i < len(want_frames) else None
+                )
+                if golden and golden.exists() and png.exists():
+                    shutil.copy(golden, f"{stem}.expected.png")
+                    n = diff_png(png, golden, Path(f"{stem}.diff.png"))
+                    what += f", {n} pixels"
+                elif golden:
+                    what += "; no expected picture (dist/shots-frames has none from an earlier run)"
             failures.append(what)
         stale = set(mine) - set(got)
         stale -= {k for k in stale if "/frames " in k}
@@ -579,6 +650,17 @@ def update(
     )
 
 
+def binaries() -> list[int]:
+    """CRCs of the kernels and the emulator the scenarios run."""
+    out = []
+    for path in (KERNEL, TEST_KERNEL, SHOT):
+        try:
+            out.append(zlib.crc32(Path(path).read_bytes()))
+        except OSError:
+            out.append(-1)
+    return out
+
+
 def main() -> int:
     args = sys.argv[1:]
     mode = "check"
@@ -596,8 +678,15 @@ def main() -> int:
         shutil.rmtree(FAILED, ignore_errors=True)
     sd = RUNS / "sd.img"
     build_sd(sd)
+    before = binaries()
     with ThreadPoolExecutor(max_workers=4) as pool:
         results = list(pool.map(lambda n: scenario(n, sd), names))
+    if binaries() != before:
+        # A build during the runs (or a late view of one through the colima
+        # VM's virtiofs mount) gives some scenarios another kernel: their
+        # screens would fail for no fault of their own
+        print("FAIL: shots: the kernel or emulator changed during the runs: run again")
+        return 1
 
     errors = [
         f"{r.name}: {r.error} (log: {RUNS / r.name / 'log.txt'})"

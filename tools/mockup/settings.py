@@ -126,13 +126,13 @@ SECTIONS = [
         "keys",
         "Hotkeys",
         [
-            ("Reset hotkey", "The keys leave a game for the menu.", "On"),
+            ("Back to menu", "Hold the keys to leave a game.", "On"),
             (
-                "Reset keys",
+                "Menu keys",
                 "Held together in game. A sets them.",
                 ("keys", ["L", "R", "START"]),
             ),
-            ("Sleep", "The keys put a game to sleep.", "On"),
+            ("Sleep", "Screen off. START+SELECT wakes it.", "On"),
             (
                 "Sleep keys",
                 "Held together in game. A sets them.",
@@ -450,7 +450,7 @@ def screens(name):
         countdown_hint(img, t, "Press keys... let go to set.", 0.7)
         out.append((img, "6 Sleep keys: press the combination"))
         img = settings_page(t, keys, (4, 3))
-        hint_text(img, t, "Already used by Reset keys.", t.danger)
+        hint_text(img, t, "Already used by Menu keys.", t.danger)
         out.append((img, "7 Refused: the old keys stay (90 f)"))
         out.append((browse(t, bottom, (5, 0)), "8 The bottom: Library and System"))
     else:

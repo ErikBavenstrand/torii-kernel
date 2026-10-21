@@ -480,7 +480,6 @@ def art_sources() -> tuple[str, str]:
                 (
                     item["id"],
                     icon16_names.index(item["icon16"]),
-                    icon8_names.index(item["icon8"]),
                     sprite_names.index(item["sprite"]),
                 )
             )
@@ -589,10 +588,10 @@ def art_sources() -> tuple[str, str]:
         ]
     data += ["};", ""]
     data += ["const struct art_item art_items[ART_ITEM_COUNT] = {"]
-    for item, icon16, icon8, sprite in items:
+    for item, icon16, sprite in items:
         data.append(
             f"\t[{c_id('ART_ITEM', item)}] = {{{c_id('ART_ICON16', icon16_names[icon16])}, "
-            f"{c_id('ART_ICON8', icon8_names[icon8])}, {c_id('ART_SPRITE', sprite_names[sprite])}}},"
+            f"{c_id('ART_SPRITE', sprite_names[sprite])}}},"
         )
     data += ["};"]
     return "\n".join(ids) + "\n", "\n".join(data) + "\n"

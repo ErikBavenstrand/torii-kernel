@@ -266,7 +266,7 @@ const char *en_set_labels[SET_ROWS] = {
 	[SET_LOGGING] = "Logging",
 	[SET_LANGUAGE] = "Language",
 };
-const char *en_set_explain[SET_LABELS] = {
+const char *en_set_explain[SET_EXPLAINS] = {
 	[SET_THEME] = "Light paper or dark graphite.",
 	[SET_GAME_VIEW] = "Game lists: names alone, or box art.",
 	[SET_BOX_ART] = "Covers from /torii/art, or none.",
@@ -295,9 +295,9 @@ const char *en_set_explain[SET_LABELS] = {
 	[SET_SHOW_ALL] = "The SD card page shows hidden files.",
 	[SET_LOGGING] = "Writes a log to /torii/logs.",
 	[SET_LANGUAGE] = "The menu's language.",
-	[SET_LABEL_RESET_STATES] = "Opens the in-game menu instead.",
-	[SET_LABEL_RESET_CHEATS] = "With a cheat file: the in-game menu.",
-	[SET_LABEL_START_HIDDEN] = "Not on home now: Last place instead.",
+	[SET_EXPLAIN_RESET_STATES] = "Opens the in-game menu instead.",
+	[SET_EXPLAIN_RESET_CHEATS] = "With a cheat file: the in-game menu.",
+	[SET_EXPLAIN_START_HIDDEN] = "Not on home now: Last place instead.",
 };
 const char *en_set_onoff[2] = {"Off", "On"};
 const char *en_set_themes[2] = {"Dark", "Light"};

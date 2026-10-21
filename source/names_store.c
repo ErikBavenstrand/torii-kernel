@@ -109,7 +109,7 @@ static struct {
 	struct names_cache cache;
 	u32 cursor;  // M_RECENT: the Recent entry; M_ALL: the library record
 	u32 total, done, computed, named, bytes, since_write, since_rename;
-	u32 crc, size, date, code, read;
+	u32 crc, size, date, read;
 	u8 seen[NAMES_CACHE_MAX / 8];
 	u32 walk_names;  // the names the walk under way found: names_identity
 	char path[NAMES_PATH_MAX + 1];
@@ -223,10 +223,10 @@ static void db_step(void)
 	}
 	const struct namesdb_header *h = db_header();
 	N.db_ok = 1;
-	tlog("names: %s from %.16s: GBA %lu, GBC %lu, GB %lu, NES %lu, %lu codes, %lu KB in %lu ms", NAMESDB_FILE,
+	tlog("names: %s v%u from %.16s: GBA %lu, GBC %lu, GB %lu, NES %lu, %lu KB in %lu ms", NAMESDB_FILE, h->version,
 	     h->dat_version, (unsigned long)h->crc_count[LIB_GBA], (unsigned long)h->crc_count[LIB_GBC],
-	     (unsigned long)h->crc_count[LIB_GB], (unsigned long)h->crc_count[LIB_NES], (unsigned long)h->code_count,
-	     (unsigned long)(total >> 10), (unsigned long)ms_since(N.started));
+	     (unsigned long)h->crc_count[LIB_GB], (unsigned long)h->crc_count[LIB_NES], (unsigned long)(total >> 10),
+	     (unsigned long)ms_since(N.started));
 	N.phase = P_CLEAR;
 	N.at = 0;
 }
@@ -345,7 +345,7 @@ static void line_end(void)
 	struct names_line l;
 	int kept = 0, text = N.line_long || (line[0] && line[0] != '#');
 	if (!N.line_long && names_parse_line(line, &l))
-		kept = names_cache_put(&N.cache, l.path, l.size, l.date, l.crc, l.code, l.flags) != NAMES_CACHE_NONE;
+		kept = names_cache_put(&N.cache, l.path, l.size, l.date, l.crc, l.flags) != NAMES_CACHE_NONE;
 	if (kept)
 		N.lines_read++;
 	else if (text)
@@ -546,7 +546,7 @@ static u32 cache_line(void *ctx, u32 n, char *buf, u32 size)
 	struct line_cursor *lc = ctx;
 	if (n == 0) {
 		lc->rec = 0;
-		return (u32)snprintf(buf, size, "# Torii's CRC cache: CRC32, GBA game code, size, date, path\n");
+		return (u32)snprintf(buf, size, "# Torii's CRC cache: CRC32, size, date, path\n");
 	}
 	for (; lc->rec < N.cache.count; lc->rec++) {
 		if (N.seen_ok && !was_seen(lc->rec))
@@ -739,7 +739,7 @@ static int identify_step(void)
 			return JOB_MORE;
 		}
 		N.file_open = 1;
-		N.crc = N.read = N.code = 0;
+		N.crc = N.read = 0;
 		N.step = I_READ;
 		return JOB_MORE;
 	}
@@ -750,9 +750,6 @@ static int identify_step(void)
 			N.step = I_NEXT;
 			return JOB_MORE;
 		}
-		// A GBA game's code, from its header
-		if (N.read == 0 && N.console == LIB_GBA && got >= 0xB0)
-			N.code = namesdb_code(N.buf + 0xAC);
 		N.crc = crc32_update(N.crc, N.buf, got);
 		N.read += got;
 		if (got == NAMES_IO_BYTES && N.read < N.size)
@@ -767,7 +764,7 @@ static int identify_step(void)
 				   (unsigned long)N.size);
 			return JOB_MORE;
 		}
-		u32 n = names_cache_put(&N.cache, N.path, N.read, N.date, N.crc, N.code, NAMES_CRC | NAMES_DATE);
+		u32 n = names_cache_put(&N.cache, N.path, N.read, N.date, N.crc, NAMES_CRC | NAMES_DATE);
 		if (n == NAMES_CACHE_NONE) {
 			if (!N.logged_full)
 				tlog("names: the CRC cache is full: %s and later games aren't kept", N.path);

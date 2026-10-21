@@ -372,13 +372,13 @@ const char *settings_label(const struct settings_values *v, u32 id)
 const char *settings_explain(const struct settings_values *v, u32 id)
 {
 	if (id == SET_RESET_ON && settings_reset_armed(v))
-		return gl_set_explain[SET_LABEL_RESET_STATES];
+		return gl_set_explain[SET_EXPLAIN_RESET_STATES];
 	if (id == SET_RESET_ON && settings_get(v, SET_CHEATS))
-		return gl_set_explain[SET_LABEL_RESET_CHEATS];
+		return gl_set_explain[SET_EXPLAIN_RESET_CHEATS];
 	if (id == SET_START_ON) {
 		u16 code = settings_get(v, id);
 		if (code != SET_START_HOME && !start_offered(v, code))
-			return gl_set_explain[SET_LABEL_START_HIDDEN];
+			return gl_set_explain[SET_EXPLAIN_START_HIDDEN];
 	}
 	return id < SET_ROWS ? gl_set_explain[id] : "";
 }

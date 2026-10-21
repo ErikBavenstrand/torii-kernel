@@ -61,7 +61,7 @@ static u32 build_db(u8 *out, u32 cap, struct entry *crcs[NAMESDB_CONSOLES], cons
 	struct namesdb_header h;
 	memset(&h, 0, sizeof(h));
 	h.magic = NAMESDB_MAGIC;
-	h.version = NAMESDB_VERSION;
+	h.version = code_count ? 1 : NAMESDB_VERSION;  // only v0.4.1's version 1 had codes
 	h.header_bytes = sizeof(h);
 	snprintf(h.dat_version, sizeof(h.dat_version), "%s", version);
 	u32 entries = code_count;
@@ -69,13 +69,14 @@ static u32 build_db(u8 *out, u32 cap, struct entry *crcs[NAMESDB_CONSOLES], cons
 		h.crc_count[c] = counts[c];
 		entries += counts[c];
 	}
-	h.code_count = code_count;
+	h.old_codes = code_count;
 	u32 at = sizeof(h), pool_at = at + entries * 8, pool = 0;
 	memset(out, 0, cap);
 	for (u32 t = 0; t <= NAMESDB_CONSOLES; t++) {
 		struct entry *e = t < NAMESDB_CONSOLES ? crcs[t] : codes;
 		u32 n = t < NAMESDB_CONSOLES ? counts[t] : code_count;
-		qsort(e, n, sizeof(*e), by_key);
+		if (n)
+			qsort(e, n, sizeof(*e), by_key);
 		for (u32 i = 0; i < n; i++) {
 			struct namesdb_entry ne = {e[i].key, pool};
 			memcpy(out + at, &ne, sizeof(ne));
@@ -105,13 +106,21 @@ static struct entry gba[] = {
 static struct entry gbc[] = {{0x11111111u, "Colour Game (USA)"}};
 static struct entry gb[] = {{0x22222222u, "Mono Game (Japan)"}};
 static struct entry nes[] = {{0x33333333u, "Famicom Game (Japan)"}, {0x44444444u, "Headered (USA)"}};
-// A v0.4.1 names.db's code table, which the kernel no longer reads (C4)
+// A v0.4.1 names.db's code table (version 1), which the kernel skips (C4)
 static struct entry codes[] = {
 	{0x45575841u, "Advance Wars (USA)"},  // "AXWE"
 	{0x45525A42u, "Legend of Zelda, The - The Minish Cap (USA)"},  // "BZRE"
 };
 
 static u32 make_db(void)
+{
+	struct entry *tables[NAMESDB_CONSOLES] = {gba, gbc, gb, nes};
+	const u32 counts[NAMESDB_CONSOLES] = {4, 1, 1, 2};
+	return build_db(db, sizeof(db), tables, counts, NULL, 0, "2026.10.07");
+}
+
+// The same as v0.4.1 wrote it: version 1, with a code table
+static u32 make_db_v1(void)
 {
 	struct entry *tables[NAMESDB_CONSOLES] = {gba, gbc, gb, nes};
 	const u32 counts[NAMESDB_CONSOLES] = {4, 1, 1, 2};
@@ -130,11 +139,20 @@ void test_namesdb_header(void)
 	bad.magic ^= 1;
 	CHECK(!namesdb_header_ok(&bad, 1u << 20));
 	bad = h;
-	bad.version = 2;
+	bad.version = NAMESDB_VERSION + 1;
 	bad.header_crc = namesdb_header_crc(&bad);
 	CHECK(!namesdb_header_ok(&bad, 1u << 20));
 	bad = h;
-	bad.code_count++;  // the header's CRC catches it
+	bad.version = 0;
+	bad.header_crc = namesdb_header_crc(&bad);
+	CHECK(!namesdb_header_ok(&bad, 1u << 20));
+	bad = h;
+	bad.old_codes = 1;  // only version 1 has codes
+	bad.file_bytes += 8;
+	bad.header_crc = namesdb_header_crc(&bad);
+	CHECK(!namesdb_header_ok(&bad, 1u << 20));
+	bad = h;
+	bad.crc_count[0]++;  // the header's CRC catches it
 	CHECK(!namesdb_header_ok(&bad, 1u << 20));
 	bad.header_crc = namesdb_header_crc(&bad);  // and the size, once the CRC agrees
 	CHECK(!namesdb_header_ok(&bad, 1u << 20));
@@ -155,6 +173,14 @@ void test_namesdb_header(void)
 	db[bytes - 1] = 'x';
 	CHECK(!namesdb_body_ok(db));
 	db[bytes - 1] = 0;
+	// v0.4.1's version 1 still reads, its code table skipped
+	bytes = make_db_v1();
+	memcpy(&h, db, sizeof(h));
+	CHECK_EQ(h.version, 1);
+	CHECK(namesdb_header_ok(&h, bytes));
+	CHECK(namesdb_body_ok(db));
+	CHECK(strcmp(namesdb_by_crc(db, LIB_NES, 0x44444444u), "Headered (USA)") == 0);
+	CHECK(namesdb_by_crc(db, LIB_GBA, 0x45575841u) == NULL);  // a code isn't a CRC
 }
 
 void test_namesdb_lookup(void)
@@ -180,13 +206,6 @@ void test_namesdb_lookup(void)
 	CHECK(namesdb_by_crc(db, LIB_GBA, e.key) == NULL);
 	e.name = good;
 	memcpy(db + sizeof(struct namesdb_header), &e, sizeof(e));
-	// Game codes from a header
-	CHECK_EQ(namesdb_code((const u8 *)"AXWE"), 0x45575841u);
-	CHECK_EQ(namesdb_code((const u8 *)"B24E"), 0x45343242u);
-	CHECK_EQ(namesdb_code((const u8 *)"axwe"), 0);
-	CHECK_EQ(namesdb_code((const u8 *)"AX E"), 0);
-	CHECK_EQ(namesdb_code((const u8 *)"\0\0\0\0"), 0);
-	CHECK_EQ(namesdb_code((const u8 *)"\xFF\xFF\xFF\xFF"), 0);
 }
 
 // --- The cache ---------------------------------------------------------------------
@@ -214,7 +233,7 @@ void test_names_cache_table(void)
 	struct names_cache c;
 	fresh(&c);
 	CHECK_EQ(names_cache_find(&c, "/GBA/Zelda.gba"), NAMES_CACHE_NONE);
-	u32 a = names_cache_put(&c, "/GBA/Zelda.gba", 100, 0x12345678, 0x5A0E6E6Au, 0, NAMES_CRC | NAMES_DATE);
+	u32 a = names_cache_put(&c, "/GBA/Zelda.gba", 100, 0x12345678, 0x5A0E6E6Au, NAMES_CRC | NAMES_DATE);
 	CHECK_EQ(a, 0);
 	CHECK_EQ(names_cache_find(&c, "/gba/ZELDA.GBA"), a);  // without ASCII case, as FAT
 	CHECK_EQ(names_cache_find(&c, "/GBA/Zelda.gb"), NAMES_CACHE_NONE);
@@ -225,7 +244,7 @@ void test_names_cache_table(void)
 	// A date, then a change: the record stays where it is
 	names_cache_set_date(&c, a, 0x11112222);
 	CHECK_EQ(r->date, 0x11112222);
-	CHECK_EQ(names_cache_put(&c, "/GBA/Zelda.gba", 200, 0, 0x5A0E6E6Bu, 0, NAMES_CRC), a);
+	CHECK_EQ(names_cache_put(&c, "/GBA/Zelda.gba", 200, 0, 0x5A0E6E6Bu, NAMES_CRC), a);
 	CHECK_EQ(c.count, 1);
 	CHECK_EQ(r->size, 200);
 	CHECK_EQ(names_rec_flags(r), NAMES_CRC);
@@ -233,18 +252,18 @@ void test_names_cache_table(void)
 	names_cache_drop(&c, a);
 	CHECK(names_rec_flags(r) & NAMES_DEAD);
 	CHECK_EQ(names_cache_find(&c, "/GBA/Zelda.gba"), a);
-	CHECK_EQ(names_cache_put(&c, "/GBA/Zelda.gba", 100, 0, 0x5A0E6E6Au, 0, NAMES_CRC), a);
+	CHECK_EQ(names_cache_put(&c, "/GBA/Zelda.gba", 100, 0, 0x5A0E6E6Au, NAMES_CRC), a);
 	CHECK(!(names_rec_flags(r) & NAMES_DEAD));
 	// Paths the cache doesn't take
-	CHECK_EQ(names_cache_put(&c, "GBA/Zelda.gba", 1, 0, 0, 0, 0), NAMES_CACHE_NONE);
-	CHECK_EQ(names_cache_put(&c, "", 1, 0, 0, 0, 0), NAMES_CACHE_NONE);
+	CHECK_EQ(names_cache_put(&c, "GBA/Zelda.gba", 1, 0, 0, 0), NAMES_CACHE_NONE);
+	CHECK_EQ(names_cache_put(&c, "", 1, 0, 0, 0), NAMES_CACHE_NONE);
 	char longest[NAMES_PATH_MAX + 2];
 	memset(longest, 'a', sizeof(longest));
 	longest[0] = '/';
 	longest[NAMES_PATH_MAX + 1] = 0;
-	CHECK_EQ(names_cache_put(&c, longest, 1, 0, 0, 0, 0), NAMES_CACHE_NONE);
+	CHECK_EQ(names_cache_put(&c, longest, 1, 0, 0, 0), NAMES_CACHE_NONE);
 	longest[NAMES_PATH_MAX] = 0;
-	CHECK(names_cache_put(&c, longest, 1, 0, 0, 0, 0) != NAMES_CACHE_NONE);
+	CHECK(names_cache_put(&c, longest, 1, 0, 0, 0) != NAMES_CACHE_NONE);
 	CHECK(!c.full);
 }
 
@@ -252,8 +271,8 @@ void test_names_cache_fits(void)
 {
 	struct names_cache c;
 	fresh(&c);
-	u32 a = names_cache_put(&c, "/A.gba", 100, 0x1234, 1, 0, NAMES_CRC | NAMES_DATE);
-	u32 b = names_cache_put(&c, "/B.gba", 100, 0, 1, 0, NAMES_CRC);  // from a PC: no date
+	u32 a = names_cache_put(&c, "/A.gba", 100, 0x1234, 1, NAMES_CRC | NAMES_DATE);
+	u32 b = names_cache_put(&c, "/B.gba", 100, 0, 1, NAMES_CRC);  // from a PC: no date
 	CHECK_EQ(names_cache_fits(names_cache_rec(&c, a), 100, 0x1234), NAMES_FIT);
 	CHECK_EQ(names_cache_fits(names_cache_rec(&c, a), 100, 0x1235), NAMES_STALE);
 	CHECK_EQ(names_cache_fits(names_cache_rec(&c, a), 101, 0x1234), NAMES_STALE);
@@ -273,7 +292,7 @@ void test_names_cache_full(void)
 	u32 i;
 	for (i = 0; i < NAMES_CACHE_MAX + 10; i++) {
 		snprintf(path, sizeof(path), "/Games/Game number %u.gba", i);
-		u32 n = names_cache_put(&c, path, i, 0, i * 7, 0, NAMES_CRC);
+		u32 n = names_cache_put(&c, path, i, 0, i * 7, NAMES_CRC);
 		if (n == NAMES_CACHE_NONE)
 			break;
 		CHECK_EQ(n, i);
@@ -291,7 +310,7 @@ void test_names_cache_full(void)
 	snprintf(path, sizeof(path), "/Games/Game number %u.gba", NAMES_CACHE_MAX);
 	CHECK_EQ(names_cache_find(&c, path), NAMES_CACHE_NONE);
 	// A full table still changes the records it has
-	CHECK_EQ(names_cache_put(&c, "/Games/Game number 5.gba", 5, 0, 1, 0, NAMES_CRC), 5);
+	CHECK_EQ(names_cache_put(&c, "/Games/Game number 5.gba", 5, 0, 1, NAMES_CRC), 5);
 	// The pool fills before the table with long paths
 	fresh(&c);
 	char longp[NAMES_PATH_MAX + 1];
@@ -302,7 +321,7 @@ void test_names_cache_full(void)
 		longp[1] = (char)('A' + i % 26);
 		longp[2] = (char)('A' + i / 26 % 26);
 		longp[3] = (char)('A' + i / 676 % 26);
-		if (names_cache_put(&c, longp, 1, 0, 0, 0, 0) == NAMES_CACHE_NONE)
+		if (names_cache_put(&c, longp, 1, 0, 0, 0) == NAMES_CACHE_NONE)
 			break;
 	}
 	CHECK_EQ(i, NAMES_CACHE_POOL_BYTES / (NAMES_PATH_MAX + 1));
@@ -313,26 +332,44 @@ void test_names_lines(void)
 {
 	struct names_line l;
 	char line[256];
-	strcpy(line, "5A0E6E6A\tBZRE\t16777216\t5A3C7B20\t/GBA/Minish Cap.gba");
+	strcpy(line, "5A0E6E6A\t16777216\t5A3C7B20\t/GBA/Minish Cap.gba");
 	CHECK(names_parse_line(line, &l));
 	CHECK_EQ(l.crc, 0x5A0E6E6Au);
-	CHECK_EQ(l.code, 0x45525A42u);
 	CHECK_EQ(l.size, 16777216);
 	CHECK_EQ(l.date, 0x5A3C7B20u);
 	CHECK_EQ(l.flags, NAMES_CRC | NAMES_DATE);
 	CHECK(strcmp(l.path, "/GBA/Minish Cap.gba") == 0);
-	strcpy(line, "-\t-\t40976\t-\t/NES/Odd\tname.nes");  // a tab in a path is the path's
+	strcpy(line, "-\t40976\t-\t/NES/Odd\tname.nes");  // a tab in a path is the path's
 	CHECK(names_parse_line(line, &l));
 	CHECK_EQ(l.flags, 0);
-	CHECK_EQ(l.code, 0);
+	CHECK(strcmp(l.path, "/NES/Odd\tname.nes") == 0);
+	strcpy(line, "5a0e6e6a\t1\t-\t/a.gb");
+	CHECK(names_parse_line(line, &l) && l.crc == 0x5A0E6E6Au && l.flags == NAMES_CRC);
+	strcpy(line, "-\t4294967295\t-\t/big.gba");  // the largest size
+	CHECK(names_parse_line(line, &l) && l.size == 0xFFFFFFFFu);
+	// v0.4.1's lines, with a GBA game code second, read the same
+	strcpy(line, "5A0E6E6A\tBZRE\t16777216\t5A3C7B20\t/GBA/Minish Cap.gba");
+	CHECK(names_parse_line(line, &l));
+	CHECK(l.crc == 0x5A0E6E6Au && l.size == 16777216 && l.date == 0x5A3C7B20u);
+	CHECK(l.flags == (NAMES_CRC | NAMES_DATE) && strcmp(l.path, "/GBA/Minish Cap.gba") == 0);
+	strcpy(line, "-\t-\t40976\t-\t/NES/Odd\tname.nes");
+	CHECK(names_parse_line(line, &l) && l.flags == 0 && l.size == 40976);
 	CHECK(strcmp(l.path, "/NES/Odd\tname.nes") == 0);
 	strcpy(line, "5a0e6e6a\t-\t1\t-\t/a.gb");
-	CHECK(names_parse_line(line, &l) && l.crc == 0x5A0E6E6Au && l.flags == NAMES_CRC);
+	CHECK(names_parse_line(line, &l) && l.crc == 0x5A0E6E6Au && l.flags == NAMES_CRC && l.size == 1);
 	static const char *const bad[] = {
 		"",
 		"# Torii's CRC cache",
 		"#crc32 1a2b3c4d",
-		"5A0E6E6\t-\t1\t-\t/a.gb",  // 7 digits
+		"5A0E6E6\t1\t-\t/a.gb",  // 7 digits
+		"5A0E6E6A0\t1\t-\t/a.gb",  // 9
+		"5A0E6E6A\t\t-\t/a.gb",  // no size
+		"5A0E6E6A\t12x\t-\t/a.gb",
+		"5A0E6E6A\t1\t1234\t/a.gb",  // a date of 4 digits
+		"5A0E6E6A\t1\t-\ta.gb",  // not from the root
+		"5A0E6E6A\t1\t-",
+		"5A0E6E6A\t1",
+		"5A0E6E6\t-\t1\t-\t/a.gb",  // v0.4.1's: 7 digits
 		"5A0E6E6A0\t-\t1\t-\t/a.gb",  // 9
 		"5A0E6E6G\t-\t1\t-\t/a.gb",
 		"5A0E6E6A\tbzre\t1\t-\t/a.gb",  // a code in lower case
@@ -352,14 +389,13 @@ void test_names_lines(void)
 	// Records write as they read
 	struct names_cache c;
 	fresh(&c);
-	u32 a = names_cache_put(&c, "/GBA/Minish Cap.gba", 16777216, 0x5A3C7B20, 0x5A0E6E6Au, 0x45525A42u,
-				NAMES_CRC | NAMES_DATE);
-	u32 b = names_cache_put(&c, "/NES/Mario.nes", 40976, 0, 0, 0, 0);
+	u32 a = names_cache_put(&c, "/GBA/Minish Cap.gba", 16777216, 0x5A3C7B20, 0x5A0E6E6Au, NAMES_CRC | NAMES_DATE);
+	u32 b = names_cache_put(&c, "/NES/Mario.nes", 40976, 0, 0, 0);
 	char out[256];
-	CHECK_EQ(names_format_line(&c, a, out, sizeof(out)), 52);
-	CHECK(strcmp(out, "5A0E6E6A\tBZRE\t16777216\t5A3C7B20\t/GBA/Minish Cap.gba\n") == 0);
+	CHECK_EQ(names_format_line(&c, a, out, sizeof(out)), 47);
+	CHECK(strcmp(out, "5A0E6E6A\t16777216\t5A3C7B20\t/GBA/Minish Cap.gba\n") == 0);
 	CHECK(names_format_line(&c, b, out, sizeof(out)) > 0);
-	CHECK(strcmp(out, "-\t-\t40976\t-\t/NES/Mario.nes\n") == 0);
+	CHECK(strcmp(out, "-\t40976\t-\t/NES/Mario.nes\n") == 0);
 	CHECK_EQ(names_format_line(&c, b, out, 10), 0);  // doesn't fit
 	CHECK_EQ(names_format_line(&c, 2, out, sizeof(out)), 0);  // past the records
 	names_cache_drop(&c, b);
@@ -367,7 +403,7 @@ void test_names_lines(void)
 	names_format_line(&c, a, out, sizeof(out));
 	out[strlen(out) - 1] = 0;
 	CHECK(names_parse_line(out, &l));
-	CHECK(l.crc == 0x5A0E6E6Au && l.code == 0x45525A42u && l.size == 16777216 && l.date == 0x5A3C7B20u);
+	CHECK(l.crc == 0x5A0E6E6Au && l.size == 16777216 && l.date == 0x5A3C7B20u);
 }
 
 void test_names_db_name(void)
@@ -375,25 +411,22 @@ void test_names_db_name(void)
 	make_db();
 	struct names_cache c;
 	fresh(&c);
-	u32 hit = names_cache_put(&c, "/a.gba", 1, 0, 0x8C5D6F2Bu, 0, NAMES_CRC);
-	u32 by_code = names_cache_put(&c, "/hack.gba", 1, 0, 0xDEADBEEFu, 0x45525A42u, NAMES_CRC);
-	u32 code_only = names_cache_put(&c, "/b.gba", 1, 0, 0, 0x45575841u, 0);
-	u32 miss = names_cache_put(&c, "/c.gba", 1, 0, 0xDEADBEEFu, 0x41414141u, NAMES_CRC);
-	u32 colour = names_cache_put(&c, "/colour.gb", 1, 0, 0x11111111u, 0, NAMES_CRC);
-	u32 mono = names_cache_put(&c, "/mono.gbc", 1, 0, 0x22222222u, 0, NAMES_CRC);
-	u32 nes_code = names_cache_put(&c, "/x.nes", 1, 0, 0xDEADBEEFu, 0x45575841u, NAMES_CRC);
+	u32 hit = names_cache_put(&c, "/a.gba", 1, 0, 0x8C5D6F2Bu, NAMES_CRC);
+	u32 unknown = names_cache_put(&c, "/b.gba", 1, 0, 0, 0);
+	u32 miss = names_cache_put(&c, "/c.gba", 1, 0, 0xDEADBEEFu, NAMES_CRC);
+	u32 colour = names_cache_put(&c, "/colour.gb", 1, 0, 0x11111111u, NAMES_CRC);
+	u32 mono = names_cache_put(&c, "/mono.gbc", 1, 0, 0x22222222u, NAMES_CRC);
+	u32 nes_miss = names_cache_put(&c, "/x.nes", 1, 0, 0xDEADBEEFu, NAMES_CRC);
 #define NAME(n, console) names_db_name(db, names_cache_rec(&c, n), console)
 	CHECK(strcmp(NAME(hit, LIB_GBA), "Advance Wars (USA)") == 0);
-	// A CRC miss never falls back to the game code, which the database still
-	// lists: a romhack keeps its own name, not its base game's (C4)
-	CHECK(NAME(by_code, LIB_GBA) == NULL);
-	CHECK(NAME(code_only, LIB_GBA) == NULL);
+	// A CRC miss keeps its own name: a romhack, not its base game's (C4)
+	CHECK(NAME(unknown, LIB_GBA) == NULL);
 	CHECK(NAME(miss, LIB_GBA) == NULL);
 	// The other Game Boy table, when the extension misleads
 	CHECK(strcmp(NAME(colour, LIB_GB), "Colour Game (USA)") == 0);
 	CHECK(strcmp(NAME(mono, LIB_GBC), "Mono Game (Japan)") == 0);
 	CHECK(NAME(colour, LIB_NES) == NULL);
-	CHECK(NAME(nes_code, LIB_NES) == NULL);
+	CHECK(NAME(nes_miss, LIB_NES) == NULL);
 	CHECK(NAME(hit, LIB_GBC) == NULL);
 	names_cache_drop(&c, hit);
 	CHECK(NAME(hit, LIB_GBA) == NULL);

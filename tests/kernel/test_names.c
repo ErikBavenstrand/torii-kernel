@@ -66,24 +66,25 @@ static void put_entry(u8 *db, u32 *at, u32 key, u32 name)
 	*at += sizeof(e);
 }
 
-// names.db with Wars's CRC (GBA), Mono's (GB) and, as v0.4.1 wrote it, the code BZME
+// names.db with Wars's CRC (GBA), Mono's (GB) and the code BZME, in v0.4.1's
+// version 1 (which had a code table; the kernel skips it)
 static u32 make_db(u8 *db)
 {
 	static const char pool[] = "Advance Wars (USA)\0Mono Game (Japan)\0Minish Cap (USA)\0\0\0";
 	struct namesdb_header h;
 	memset(&h, 0, sizeof(h));
 	h.magic = NAMESDB_MAGIC;
-	h.version = NAMESDB_VERSION;
+	h.version = 1;
 	h.header_bytes = sizeof(h);
 	memcpy(h.dat_version, "2026.01.02", 10);
 	h.crc_count[LIB_GBA] = 1;
 	h.crc_count[LIB_GB] = 1;
-	h.code_count = 1;
+	h.old_codes = 1;
 	h.pool_bytes = sizeof(pool) - 1;  // 56, a multiple of 4
 	u32 at = sizeof(h);
 	put_entry(db, &at, crc_of(0), 0);
 	put_entry(db, &at, crc_of(3), 19);
-	put_entry(db, &at, namesdb_code((const u8 *)"BZME"), 37);
+	put_entry(db, &at, 0x454D5A42u, 37);  // "BZME"
 	memcpy(db + at, pool, h.pool_bytes);
 	h.file_bytes = at + h.pool_bytes;
 	h.body_crc = crc32(db + sizeof(h), h.file_bytes - sizeof(h));

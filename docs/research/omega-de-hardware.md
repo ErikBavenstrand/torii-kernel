@@ -408,6 +408,23 @@ Style writes them), and 65–255 become `0` from the unused part of the
 buffer. The hotkey slots 5–10 are written as the defaults the settings page
 shows (L R SELECT, L R START) the first time any row is saved.
 
+**Mode B (slot 15: 0 Rumble, 1 RAM, 2 Link) is read by the cart, not the
+kernel.** The cart's A/B switch picks the mode at power-on; in mode B the
+kernel never runs, and the cart acts as a DS Rumble Pak, a DS Memory
+Expansion Pak (RAM) or, with Link, boots the game NOR's game for GBA-DS link
+play, as slot 15 says. No kernel code reads the slot: EZ-Flash's 1.06 source
+only reads it for its settings page and writes it back
+(`setwindow2.c`, `gl_ModeB_init`), and neither GBApatch nor the in-game menu
+touch it, so whatever reads it in mode B (the boot loader or the FPGA) reads
+`+0x7B001E` itself. Users report that changing and saving the setting in
+mode A changes what mode B does
+([ConsoleMods](https://consolemods.org/wiki/GBA:EZ_Flash_Omega_/_Definitive),
+[GBAtemp](https://gbatemp.net/threads/ez-flash-omega-de-mode-b-nor-roms.586802/),
+[EZ-Flash's site](https://www.ezflashomega.com/news/8/EZ-Flash-Omega-vs-EZ-Flash-Omega-Definitive-Edition.html);
+secondary sources, not checked on Torii's cart). So the slot and its values
+must stay as the official kernel wrote them. Settings keeps the row
+(`SET_MODE_B`).
+
 The in-game key masks in `GBApatch.c` used to build `1 << value` from
 slots 5–10 with no range check, so an erased slot gave `0x3FF`, "no key
 held". Since `b736015`, slots past 9 count as the defaults the settings page
@@ -607,6 +624,8 @@ emulated cart can't tell, which the real cart's logs will:
 
 - What the `0x09E00000` status values mean beyond `0xEEE1` (busy) and `0x0000/0x0001` handshakes.
 - What `0x096C0000` (auto-save) does in current firmware.
+- Which part of the cart reads Mode B's slot in mode B (the boot loader or the FPGA), and
+  whether it reads anything else from the settings sector.
 - What logic the extra 130-word frames at minor `0x17` hold (likely BRAM/IOB tail frames).
 - What `0x09700000` (`Set_64MROM_flag`) changes in the ROM map. The emulated cart stores it and
   maps only 32 MB of a NOR game. Its NOR erases and writes also finish at once, so emulation

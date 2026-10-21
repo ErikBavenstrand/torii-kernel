@@ -19,7 +19,7 @@ u32 namesdb_header_crc(const struct namesdb_header *h)
 
 u32 namesdb_file_bytes(const struct namesdb_header *h)
 {
-	unsigned long long entries = h->code_count;
+	unsigned long long entries = h->old_codes;
 	for (u32 c = 0; c < NAMESDB_CONSOLES; c++)
 		entries += h->crc_count[c];
 	unsigned long long bytes = sizeof(*h) + entries * sizeof(struct namesdb_entry) + h->pool_bytes;
@@ -28,7 +28,8 @@ u32 namesdb_file_bytes(const struct namesdb_header *h)
 
 int namesdb_header_ok(const struct namesdb_header *h, u32 max)
 {
-	if (h->magic != NAMESDB_MAGIC || h->version != NAMESDB_VERSION || h->header_bytes != sizeof(*h))
+	if (h->magic != NAMESDB_MAGIC || h->version < 1 || h->version > NAMESDB_VERSION ||
+	    h->header_bytes != sizeof(*h) || (h->version > 1 && h->old_codes))
 		return 0;
 	if (h->header_crc != namesdb_header_crc(h) || h->dat_version[NAMESDB_VERSION_LEN - 1])
 		return 0;  // and the version ends in NUL
@@ -83,18 +84,6 @@ const char *namesdb_by_crc(const u8 *db, u32 console, u32 crc)
 	if (!db || console >= NAMESDB_CONSOLES)
 		return NULL;
 	return search(db, table(db, console), hdr(db)->crc_count[console], crc);
-}
-
-u32 namesdb_code(const u8 *bytes)
-{
-	u32 code = 0;
-	for (u32 i = 0; i < 4; i++) {
-		u8 c = bytes[i];
-		if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z')))
-			return 0;
-		code |= (u32)c << (8 * i);
-	}
-	return code;
 }
 
 // --- The cache's table ----------------------------------------------------------
@@ -184,14 +173,14 @@ static void write_rec(struct names_cache *c, u32 n, const struct names_rec *r)
 	c->put((u8 *)names_cache_rec(c, n), r, sizeof(*r));
 }
 
-u32 names_cache_put(struct names_cache *c, const char *path, u32 size, u32 date, u32 crc, u32 code, u32 flags)
+u32 names_cache_put(struct names_cache *c, const char *path, u32 size, u32 date, u32 crc, u32 flags)
 {
 	u32 len = (u32)strnlen(path, NAMES_PATH_MAX + 1);
 	if (path[0] != '/' || len > NAMES_PATH_MAX)
 		return NAMES_CACHE_NONE;
 	flags &= NAMES_CRC | NAMES_DATE;
-	struct names_rec r = {names_path_hash(path),         size, (flags & NAMES_DATE) ? date : 0,
-			      (flags & NAMES_CRC) ? crc : 0, code, 0};
+	struct names_rec r = {names_path_hash(path), size, (flags & NAMES_DATE) ? date : 0,
+			      (flags & NAMES_CRC) ? crc : 0, 0};
 	u32 n = find_hashed(c, path, r.hash);
 	if (n != NAMES_CACHE_NONE) {
 		const struct names_rec *old = names_cache_rec(c, n);
@@ -294,12 +283,22 @@ static int decimal(const char *s, u32 *out)
 	if (!*s)
 		return 0;
 	for (; *s; s++) {
-		if (*s < '0' || *s > '9' || v > (0xFFFFFFFFu - 9) / 10)
+		u32 d = (u32)(*s - '0');
+		if (*s < '0' || *s > '9' || v > (0xFFFFFFFFu - d) / 10)
 			return 0;
-		v = v * 10 + (u32)(*s - '0');
+		v = v * 10 + d;
 	}
 	*out = v;
 	return 1;
+}
+
+// 1 if s is a GBA game code: four characters 0-9 or A-Z
+static int game_code(const char *s)
+{
+	for (u32 i = 0; i < 4; i++)
+		if (!((s[i] >= '0' && s[i] <= '9') || (s[i] >= 'A' && s[i] <= 'Z')))
+			return 0;
+	return !s[4];
 }
 
 int names_parse_line(char *line, struct names_line *out)
@@ -307,9 +306,16 @@ int names_parse_line(char *line, struct names_line *out)
 	if (line[0] == '#' || !line[0])
 		return 0;
 	char *rest = line;
-	char *crc = field(&rest), *code = field(&rest), *size = field(&rest), *date = field(&rest);
+	char *crc = field(&rest), *size = field(&rest), *date = field(&rest);
+	if (rest && rest[0] != '/') {  // v0.4.1's line: the code came second
+		const char *code = size;
+		if (!code || !(strcmp(code, "-") == 0 || game_code(code)))
+			return 0;
+		size = date;
+		date = field(&rest);
+	}
 	char *path = rest;  // the rest of the line: a path may hold anything but a line break
-	if (!crc || !code || !size || !date || !path || path[0] != '/')
+	if (!crc || !size || !date || !path || path[0] != '/')
 		return 0;
 	memset(out, 0, sizeof(*out));
 	out->path = path;
@@ -317,11 +323,6 @@ int names_parse_line(char *line, struct names_line *out)
 		if (!hex(crc, &out->crc, 1))
 			return 0;
 		out->flags |= NAMES_CRC;
-	}
-	if (strcmp(code, "-") != 0) {
-		out->code = strlen(code) == 4 ? namesdb_code((const u8 *)code) : 0;
-		if (!out->code)
-			return 0;
 	}
 	if (!decimal(size, &out->size))
 		return 0;
@@ -341,18 +342,12 @@ u32 names_format_line(const struct names_cache *c, u32 n, char *buf, u32 size)
 	u32 flags = names_rec_flags(r);
 	if (flags & NAMES_DEAD)
 		return 0;
-	char crc[9] = "-", code[5] = "-", date[9] = "-";
+	char crc[9] = "-", date[9] = "-";
 	if (flags & NAMES_CRC)
 		snprintf(crc, sizeof(crc), "%08lX", (unsigned long)r->crc);
-	if (r->code) {
-		for (u32 i = 0; i < 4; i++)
-			code[i] = (char)(r->code >> (8 * i));
-		code[4] = 0;
-	}
 	if (flags & NAMES_DATE)
 		snprintf(date, sizeof(date), "%08lX", (unsigned long)r->date);
-	int len = snprintf(buf, size, "%s\t%s\t%lu\t%s\t%s\n", crc, code, (unsigned long)r->size, date,
-			   names_cache_path(c, r));
+	int len = snprintf(buf, size, "%s\t%lu\t%s\t%s\n", crc, (unsigned long)r->size, date, names_cache_path(c, r));
 	return len > 0 && (u32)len < size ? (u32)len : 0;
 }
 

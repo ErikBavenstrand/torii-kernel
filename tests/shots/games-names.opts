@@ -1,0 +1,17 @@
+# A No-Intro name with odd characters (names.db and crc.txt as `just
+# names-update` writes them): Hello.gba's name has an accent, an
+# ampersand, a tilde, a plus and a character the fonts lack (Omega, drawn
+# as the fallback); its tags are cleaned off on the GBA page, which sorts by
+# it, and in Game info's title.
+#! settings 28=1
+#! sd-name /Hello.gba tests/roms/hello/hello.gba "Café & Co ~ Ruby+ Ω (Japan) (Rev 1)"
+-w "nav: home ready"
+-k @8:RIGHT -k @12:- -k @20:A -k @24:-
+-w "nav: page gba ready"
+-s @30:gba.png
+-k @32:DOWN -k @36:- -k @44:DOWN -k @48:-
+-k @60:START -k @64:-
+-w "screen ready: game-popup"
+-k @12:UP -k @16:- -k @24:UP -k @28:- -k @40:A -k @44:-
+-w "screen ready: game-info"
+-s @20:info.png

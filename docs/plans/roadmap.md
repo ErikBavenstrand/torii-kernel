@@ -72,20 +72,20 @@ Everything the v0.2–v0.4.1 work left open, checked against the code on 2026-10
 
 ### Dead code and cleanup
 
-- Eight icons are drawn by nothing (8x8 Favourites, Recent, SD, Settings, torii and up; 16x16 file and folder; `assets/ui`).
-- `action_launch`'s result (`ACTION_NOR_MAYBE`, `ACTION_NOR_WRITTEN`) is ignored by every caller (`source/actions.c`); `library_games_seen` has no caller (`library_scan.c`); `art_drop` and B2's unlogged loaders are dead (`source/ui/art.c`); `struct gamename_io` and `gamename_custom_load`/`_store`/`_store_move` run only in host tests (`gamename.c`).
-- Settings' Mode B is only stored, as in v0.3: confirm on a cart in a DS that something reads it, or drop the row (`settings_model.c`).
-- `crc.txt` still writes the GBA game-code column and `names.db` keeps an empty code table, unused since C4 (`tools/names_db.py`, `source/namesdb.h`).
-- `SET_LABELS` and `SET_LABEL_RESET_*` now index explanations only (`source/lang.c`); `tools/mockup/settings.py` uses the old hotkey row names; `docs/design/v0.4/palette.png` predates B9's contrast change.
+- ~~Eight icons are drawn by nothing (8x8 Favourites, Recent, SD, Settings, torii and up; 16x16 file and folder; `assets/ui`).~~ Fixed by E5 (`dd4414a`): deleted.
+- ~~`action_launch`'s result (`ACTION_NOR_MAYBE`, `ACTION_NOR_WRITTEN`) is ignored by every caller (`source/actions.c`); `library_games_seen` has no caller (`library_scan.c`); `art_drop` and B2's unlogged loaders are dead (`source/ui/art.c`); `struct gamename_io` and `gamename_custom_load`/`_store`/`_store_move` run only in host tests (`gamename.c`).~~ Fixed by E5 (`dd4414a`, `c57ceb8`): all dropped; `action_launch` already reads the NOR list again after a write.
+- ~~Settings' Mode B is only stored, as in v0.3: confirm on a cart in a DS that something reads it, or drop the row (`settings_model.c`).~~ Settled by E5 (`73807f9`): the cart reads slot 15 itself in mode B (its A/B switch), so the row stays; `docs/research/omega-de-hardware.md` says so, from secondary sources (not checked on a cart).
+- ~~`crc.txt` still writes the GBA game-code column and `names.db` keeps an empty code table, unused since C4 (`tools/names_db.py`, `source/namesdb.h`).~~ Fixed by E5 (`6a028ec`): names.db version 2, crc.txt without codes; v0.4.1's files still read.
+- ~~`SET_LABELS` and `SET_LABEL_RESET_*` now index explanations only (`source/lang.c`); `tools/mockup/settings.py` uses the old hotkey row names; `docs/design/v0.4/palette.png` predates B9's contrast change.~~ Fixed by E5 (`d4fc1ea`, `ae9fbd2`, `f13f7de`): `SET_EXPLAIN_*`; `tools/mockup/palette_sheet.py` draws palette.png.
 
 ### Tools and tests
 
-- `just art-scrape` and `just names-update` print a traceback on a read-only or full card instead of a message (catch `OSError` in `main`); a 403 or other 4xx isn't remembered as a miss; `Pokemon Trading Card Game 1.gbc` is "not fetched" on every run; a run right after `names-update` recomputes CRCs; names differing only in case share a cache file on macOS (`tools/art_scrape.py`, `tools/names_db.py`).
-- The `diag-tests` golden failed once while the colima VM was busy, then passed unchanged; the Settings held-scroll golden hashes every frame, so code-layout changes force a re-record.
-- `tests/nav.sh` routes assume the card starts on home facing its first item, and its log lines are cut at 240 characters, so routes to paths of about 225 bytes never match.
-- The UI walk (`tests/shots/data/walk.txt`) uses 54 of mgba-shot's 64 waits (`MAX_WAITS`, `emu/mgba-shot.c`): raise it or split the walk.
-- A failing animation frame writes only its actual PNG, no expected or diff (`tests/shots.py`); mGBA zero-fills RAM where the cart doesn't, so goldens can't catch uninitialised reads (only `pReadCache` is poisoned).
-- No golden covers About's "free space isn't recorded" branch, Your cart's "still counting", File info's date, No-Intro names with odd characters, or a box switching between consoles with no cover between.
+- ~~`just art-scrape` and `just names-update` print a traceback on a read-only or full card instead of a message (catch `OSError` in `main`); a 403 or other 4xx isn't remembered as a miss; `Pokemon Trading Card Game 1.gbc` is "not fetched" on every run; a run right after `names-update` recomputes CRCs; names differing only in case share a cache file on macOS (`tools/art_scrape.py`, `tools/names_db.py`).~~ Fixed by E5 (`bb677fb`, `7221cf0`): the TCG's No-Intro name gets a 403 from libretro-thumbnails every time, now a remembered miss; names-update writes each file's FAT date, so records hold whoever wrote them.
+- ~~The `diag-tests` golden failed once while the colima VM was busy, then passed unchanged;~~ (E5, `691815d`: not reproduced in 16 parallel runs under load, and the emulation reads no host time; `tests/shots.py` now fails a run whose kernel or emulator changed under it, the likely cause) the Settings held-scroll golden hashes every frame, so code-layout changes force a re-record.
+- ~~`tests/nav.sh` routes assume the card starts on home facing its first item, and its log lines are cut at 240 characters, so routes to paths of about 225 bytes never match.~~ Fixed by E5 (`8e799d1`): a test hook turns home to its first item; waits are cut at 240 bytes as the kernel cuts them.
+- ~~The UI walk (`tests/shots/data/walk.txt`) uses 54 of mgba-shot's 64 waits (`MAX_WAITS`, `emu/mgba-shot.c`): raise it or split the walk.~~ Fixed by E5 (`8c3e7ae`): 256.
+- ~~A failing animation frame writes only its actual PNG, no expected or diff (`tests/shots.py`); mGBA zero-fills RAM where the cart doesn't, so goldens can't catch uninitialised reads (only `pReadCache` is poisoned).~~ Fixed by E5 (`8c3e7ae`, `691815d`): frames kept by hash in `dist/shots-frames` give expected and diff PNGs; mgba-shot fills EWRAM and IWRAM with 0xA5 at power-on (the suite passes).
+- ~~No golden covers About's "free space isn't recorded" branch, Your cart's "still counting", File info's date, No-Intro names with odd characters, or a box switching between consoles with no cover between.~~ Fixed by E5 (`691815d`): info-no-free, info-counting, sd-root/file-info, games-names, games-box-switch.
 
 ### Decisions to review
 

@@ -81,13 +81,14 @@ enum settings_id {
 	SET_ROWS
 };
 
-// Explanations past the rows': SET_RESET_ON's while Save states or Cheats
-// put the in-game menu on the reset keys (GBApatch.c)
+// Explanations past the rows' (gl_set_explain is indexed by row, then
+// these): SET_RESET_ON's while Save states or Cheats put the in-game menu on
+// the reset keys (GBApatch.c), and SET_START_ON's for a hidden item
 enum {
-	SET_LABEL_RESET_STATES = SET_ROWS,  // Save states on: the menu in every game
-	SET_LABEL_RESET_CHEATS,             // Cheats alone: in a game with a cheat file
-	SET_LABEL_START_HIDDEN,             // Start on's item isn't on home now
-	SET_LABELS
+	SET_EXPLAIN_RESET_STATES = SET_ROWS,  // Save states on: the menu in every game
+	SET_EXPLAIN_RESET_CHEATS,             // Cheats alone: in a game with a cheat file
+	SET_EXPLAIN_START_HIDDEN,             // Start on's item isn't on home now
+	SET_EXPLAINS
 };
 
 // SET_START_ON's values: a code per carousel item, stored as it is. The

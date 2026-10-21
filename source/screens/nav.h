@@ -92,6 +92,7 @@ enum {
 	NAV_TEST_NOR_LAUNCH,  // action_nor_launch(bits 8-15)
 	NAV_TEST_NOR_DELETE,  // action_nor_delete()
 	NAV_TEST_NOR_FORMAT,  // action_nor_format()
+	NAV_TEST_HOME,        // home, facing its first item (tests/nav.sh's routes start there)
 	NAV_TEST_ACTIONS,
 };
 extern volatile u32 nav_test_action;

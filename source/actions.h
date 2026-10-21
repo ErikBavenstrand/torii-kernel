@@ -45,21 +45,15 @@ enum {
 	ACTION_BOOTS,
 };
 
-// What action_launch returns when no game started
-enum {
-	ACTION_NOTHING,      // nothing changed (an error was shown, or it isn't a game)
-	ACTION_NOR_MAYBE,    // a write to NOR failed: the game NOR may have changed
-	ACTION_NOR_WRITTEN,  // the game was written to the game NOR
-};
-
 // Starts the game at path, an SD file's full path ("/GBA/Advance Wars.gba"),
 // or "NOR:" and a game NOR game's name (a Recent entry). GB, GBC and NES
 // games start clean whatever how says, and only GBA games are written to
 // NOR (a page never offers the others that: they are only logged).
 // how: an enum action_how, or ACTION_DEFAULT.
 // hard_reset: the game starts through the BIOS's hard reset (L held).
-// Returns only if no game started (see the top).
-u32 action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset);
+// Returns only if no game started (an error was shown, or it isn't a game),
+// with the game NOR's list read again if a write may have changed it.
+void action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset);
 
 // What a GBA game on the SD card starts with, read from the card: its save
 // type (what its .mde file says, 0 AUTO if none; ACTION_SAVE_TYPES for a GB,

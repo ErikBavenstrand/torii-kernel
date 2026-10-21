@@ -6,8 +6,9 @@
 //   -s FRAME:PATH    write a PNG of the screen after FRAME
 //   -S PATH          write the emulated save chip's contents when done
 //   -i FILE          read more options from FILE, whitespace-separated
-//                    (# starts a comment, "double quotes" keep blanks in a
-//                    word), for long input scripts
+//                    (a word starting with # starts a comment; "double
+//                    quotes" keep blanks and # in a word, where a backslash
+//                    escapes " and itself), for long input scripts
 //   -g PORT          wait for gdb on PORT (all addresses) before running
 //   -y SYMFILE       symbols for crash reports (default: the ROM's .sym)
 //   -m FRAME:ADDR:LEN  after FRAME, print LEN bytes of memory from ADDR (hex)
@@ -42,11 +43,17 @@
 //   -C EPOCH         as -c, but the clock stands still at EPOCH, so a screen
 //                    showing the time looks the same whenever it is drawn
 //   -O DIR           write -s PNGs given relative paths into DIR
+//   -D DIR           write each -H frame's screen as DIR/HASH.png, unless
+//                    one is there (tests/shots.py keeps the expected frames
+//                    of animations so)
 //   -T FROM:TO       watch frames FROM to TO (as -H takes them) for tears:
 //                    a store that changes what the screen shows while lines
 //                    0-159 scan out prints a "tear:" line (see the tear
 //                    watch below); the run ends with "tears: N". The window
 //                    doesn't make the run longer: -T 1:99999 watches it all
+//
+// RAM starts filled with 0xA5 (poison_ram), as the cart's holds junk at
+// power-on.
 //
 // If the CPU hits an illegal opcode or jumps to an invalid address, it prints
 // a crash report (registers, and code addresses found on the stack with their
@@ -73,6 +80,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 struct event {
 	unsigned frame;  // or, after a -w, the offset from the frame it was met
@@ -82,7 +90,7 @@ struct event {
 };
 
 // -w steps, met in order.
-#define MAX_WAITS 64
+#define MAX_WAITS 256
 struct wait {
 	const char *text;
 	unsigned hit;  // the frame its line came in; 0 until then
@@ -668,6 +676,7 @@ struct options {
 	struct events ranges;
 	struct events tears;
 	const char *outDir;
+	const char *frameDir;
 	long long epoch;
 	int pinClock;
 	const char *loadState;
@@ -694,32 +703,41 @@ static void parse_file(struct options *opts, const char *path)
 	char **argv = malloc(cap * sizeof(*argv));
 	char line[1024];
 	while (fgets(line, sizeof(line), f)) {
-		char *hash = strchr(line, '#');
-		if (hash) {
-			*hash = '\0';
-		}
-		// Words split at blanks; "a quoted word" keeps its blanks
+		// Words split at blanks; a word starting with # starts a comment;
+		// "a quoted word" keeps its blanks and #, a backslash escaping " and
+		// itself in it
 		for (char *p = line;;) {
 			p += strspn(p, " \t\r\n");
-			if (!*p) {
+			if (!*p || *p == '#') {
 				break;
 			}
-			char *end;
+			char *end, *word, *next;
 			if (*p == '"') {
-				end = strchr(++p, '"');
-				if (!end) {
+				char *out = word = ++p;
+				for (; *p && *p != '"'; p++) {
+					if (*p == '\\' && (p[1] == '"' || p[1] == '\\')) {
+						p++;
+					}
+					*out++ = *p;
+				}
+				if (*p != '"') {
 					fprintf(stderr, "%s: unclosed quote\n", path);
 					exit(2);
 				}
+				next = p + 1;
+				*out = '\0';
+				end = out;
 			} else {
+				word = p;
 				end = p + strcspn(p, " \t\r\n");
+				next = *end ? end + 1 : end;
 			}
 			if (argc == cap) {
 				cap *= 2;
 				argv = realloc(argv, cap * sizeof(*argv));
 			}
-			argv[argc++] = strndup(p, (size_t)(end - p));
-			p = *end ? end + 1 : end;
+			argv[argc++] = strndup(word, (size_t)(end - word));
+			p = next;
 		}
 	}
 	fclose(f);
@@ -796,6 +814,8 @@ static void parse_options(struct options *opts, int argc, char **argv)
 			opts->pinClock = 2;
 		} else if (!strcmp(argv[i], "-O")) {
 			opts->outDir = argv[++i];
+		} else if (!strcmp(argv[i], "-D")) {
+			opts->frameDir = argv[++i];
 		} else if (!strcmp(argv[i], "-t")) {
 			opts->realtime = 1;
 		} else if (!strcmp(argv[i], "-L") && opts->nscripts < 16) {
@@ -898,6 +918,20 @@ static void print_hash(unsigned frame, const color_t *pixels, unsigned width, un
 	printf("hash frame %u: %016llX\n", frame, (unsigned long long)hash_screen(pixels, width, height));
 }
 
+// mGBA starts with RAM zeroed; the cart's doesn't (its boot loader ran in
+// it first). Fill EWRAM, and IWRAM up to the BIOS's area at 0x3007E00, so
+// code reading memory it never wrote (past its sections, below the stack)
+// sees junk here too and fails the tests, as the kernel's scratch buffer
+// does ("scratch free"). The kernel's startup clears its own sections.
+#define POISON 0xA5A5A5A5u
+static void poison_ram(struct mCore *core)
+{
+	for (uint32_t a = 0x02000000; a < 0x02040000; a += 4)
+		core->busWrite32(core, a, POISON);
+	for (uint32_t a = 0x03000000; a < 0x03007E00; a += 4)
+		core->busWrite32(core, a, POISON);
+}
+
 static int save_png(const char *path, const color_t *pixels, unsigned width, unsigned height)
 {
 	struct VFile *vf = VFileOpen(path, O_CREAT | O_TRUNC | O_WRONLY);
@@ -964,6 +998,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	core->reset(core);
+	poison_ram(core);
 	crash_core = core;
 	current_frame = 1;  // lines before the first frame (from -L scripts) count as frame 1's
 #ifdef ENABLE_SCRIPTING
@@ -1120,6 +1155,23 @@ int main(int argc, char **argv)
 		for (size_t i = 0; i < opts.ranges.count; ++i) {
 			if (in_range(&opts.ranges.list[i], frame)) {
 				print_hash(frame, buffer, width, height);
+				if (opts.frameDir) {
+					char path[1024];
+					snprintf(path, sizeof(path), "%s/%016llX.png", opts.frameDir,
+						 (unsigned long long)hash_screen(buffer, width, height));
+					FILE *have = fopen(path, "rb");
+					if (have) {
+						fclose(have);
+					} else {
+						// Whole or not at all: runs in parallel share DIR
+						char tmp[1100];
+						snprintf(tmp, sizeof(tmp), "%s.%ld.part", path, (long)getpid());
+						if (!save_png(tmp, buffer, width, height) || rename(tmp, path)) {
+							fprintf(stderr, "cannot write %s\n", path);
+							remove(tmp);
+						}
+					}
+				}
 				break;  // once, if ranges overlap
 			}
 		}

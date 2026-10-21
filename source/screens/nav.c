@@ -435,6 +435,13 @@ static void test_hook(void)
 	case NAV_TEST_NOR_FORMAT:
 		action_nor_format();
 		break;
+	case NAV_TEST_HOME:
+		if (nav.shown_count)
+			nav.place = (struct registry_place){nav.shown[0], 0, 0};
+		nav.place.open = 0;
+		nav.reshow = 1;  // "nav: home ready" again, once it faces the first item
+		after_action();
+		return;
 	default:
 		tlog_error("nav: no test action %lu", (unsigned long)action);
 		break;

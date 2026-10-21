@@ -1,0 +1,3 @@
+0	/Zelda.gb
+0	/Hello.gba
+0	/Games/Idle.gba

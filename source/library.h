@@ -338,9 +338,8 @@ u32 library_find(const char *path);
 // Files on the card outside the hidden folders, games or not.
 u32 library_total_files(void);
 // 1 if the card has more games than the index holds ("showing the first
-// N"); games_seen is how many it has.
+// N").
 int library_truncated(void);
-u32 library_games_seen(void);
 // Records in the index, in the walk's order (some may be gone: library_flags
 // says LIB_F_GONE). A rebuild keeps the order while the card's files stay.
 u32 library_records(void);
