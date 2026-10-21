@@ -97,7 +97,7 @@ static struct {
 	u8 show_all;  // the Show all files setting, as the listing read it
 	u8 announce;  // log "sdcard: ready" once the list rests
 	u8 measure_left;  // frames of a folder change to measure
-	u8 hint_note;     // the hint bar shows the truncation note
+	u8 hint_note;     // what the hint bar shows: HINTS_*
 	u8 find;          // the next listing puts the cursor on the file named sd.ask (a rename's)
 	u8 renamed_partly;  // the rename left something behind: said once the page is back
 	u32 counting;  // the folder being counted, SDLIST_NONE none
@@ -242,15 +242,27 @@ static void show_folder(void)
 	ui_label_set(node(N_NOTE), entries() ? "" : gl_sd_empty);  // a label hidden would cut a hole in the card
 }
 
-// The hint bar: the keys, or on a truncated folder's last entry the note
-// that more weren't listed (the end, where it is wondered about)
+// The hint bar: the keys; only B in an empty folder (A and START do
+// nothing there); or on a truncated folder's last entry the note that
+// more weren't listed (the end, where it is wondered about)
+enum {
+	HINTS_KEYS,
+	HINTS_NOTE,
+	HINTS_EMPTY,
+	HINTS_NONE
+};
 static void hint_for(u32 at)
 {
-	u8 note = sd.list.truncated && entries() && at + 1 >= entries();
-	if (note == sd.hint_note)
+	u8 state = !entries() ? HINTS_EMPTY : sd.list.truncated && at + 1 >= entries() ? HINTS_NOTE : HINTS_KEYS;
+	if (state == sd.hint_note)
 		return;  // a change redraws the bar: not on every move
-	sd.hint_note = note;
-	ui_hints_text(node(N_HINTS), note ? sd.note : NULL);
+	sd.hint_note = state;
+	if (state == HINTS_NOTE)
+		ui_hints_text(node(N_HINTS), sd.note);
+	else if (state == HINTS_EMPTY)
+		ui_hints_set(node(N_HINTS), &sd.hints[2], 1);  // B back
+	else
+		ui_hints_set(node(N_HINTS), sd.hints, 3);
 }
 
 // --- Listing ----------------------------------------------------------------------
@@ -903,8 +915,7 @@ static struct ui_view *sd_enter(u32 item, u32 row)
 	sd.hints[0] = (struct ui_hint){"A", gl_hint_open};
 	sd.hints[1] = (struct ui_hint){"START", gl_hint_menu};
 	sd.hints[2] = (struct ui_hint){"B", gl_hint_back};
-	ui_hints_set(node(N_HINTS), sd.hints, 3);
-	sd.hint_note = 0;
+	sd.hint_note = HINTS_NONE;  // hint_for sets the bar
 	// The cursor the folder was left with (from home, or back from a
 	// launch that didn't start); else the place's row (Last place, at the
 	// card's root, as the menu starts there)
