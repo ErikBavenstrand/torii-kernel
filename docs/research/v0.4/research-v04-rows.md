@@ -112,7 +112,7 @@
 4. [tests/perf/budget.txt; tests/kernel/test_text.c](/Users/erik.bavenstrand/Code/torii-kernel/tests/perf/budget.txt) · 2026-10 · primary (measurements)
 5. [source/engine/gfx.h](/Users/erik.bavenstrand/Code/torii-kernel/source/engine/gfx.h) · 2026-10 · primary (code)
 6. [source/ui/ui_run.c, source/ui/ui_core.c (window clip)](/Users/erik.bavenstrand/Code/torii-kernel/source/ui/ui_run.c) · 2026-10 · primary (code)
-7. [docs/design/v0.4/spec.md; docs/plans/v0.4-decisions.md (T9, B9)](/Users/erik.bavenstrand/Code/torii-kernel/docs/design/v0.4/spec.md) · 2026-10-20 · primary (design)
+7. [docs/design/v0.4/spec.md; docs/design/v0.4/decisions.md (R5)](/Users/erik.bavenstrand/Code/torii-kernel/docs/design/v0.4/spec.md) · 2026-10-20 · primary (design)
 8. [GBATEK: memory map / LCD timing](https://problemkaputt.de/gbatek.htm) · n.d. · primary (read through a fetch summary)
 9. [GBATEK: DMA transfers](https://problemkaputt.de/gbatek-gba-dma-transfers.htm) · n.d. · primary
 10. [Tonc: DMA](https://gbadev.net/tonc/dma.html) · n.d. · secondary

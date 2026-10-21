@@ -171,7 +171,7 @@ void test_eeprom_probe_verdict(void)
 	add(&p, EEPROM_PROBE_READ, 1, earlier);
 	CHECK_EQ(eeprom_probe_verdict(&p), 0);
 
-	// The real cart in v0.2.1 (cart-test-2026-10-18b): every write lost its
+	// The real cart in v0.2.1 (docs/research/omega-de-hardware.md, EEPROM 512 vs 8K): every write lost its
 	// last byte, which read FF. Bytes 0-6 still say which write it was, so
 	// the size checks go on.
 	u8 lost[8], lost65[8], lost1023[8];

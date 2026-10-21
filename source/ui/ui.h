@@ -1,5 +1,5 @@
-// Views, widgets and themes on the tile engine (docs/plans/v0.3-decisions.md,
-// "Views and widgets"; v0.4's Paper widgets and themes: docs/plans/v0.4-decisions.md).
+// Views, widgets and themes on the tile engine (docs/design/engine.md,
+// "Views and widgets"; v0.4's Paper widgets and themes: docs/design/v0.4/decisions.md).
 //
 // A screen is a const layout in ROM: an array of ui_spec, one per widget,
 // with fixed rectangles and anchors, plus a ui_view_spec naming it and its
@@ -946,8 +946,8 @@ void ui_icon8(const struct text_window *win, u32 x, u32 y, u32 id, u32 ink);
 int ui_obj_add(u8 node, u16 attr0, u16 attr1, u16 attr2);
 
 // --- Popups, confirmations and the letter card (ui/ui_popup.c) -------------
-// Every page's popups follow the same rules (docs/plans/v0.4-decisions.md,
-// B11; spec.md's popup section; research override R9). Each sits on plane 0
+// Every page's popups follow the same rules (docs/design/v0.4/decisions.md,
+// Navigation; spec.md's popup section; research override R9). Each sits on plane 0
 // over the page, which stays as it is under it:
 //
 // - A popup is a menu card beside a list's selected row, with a notch at

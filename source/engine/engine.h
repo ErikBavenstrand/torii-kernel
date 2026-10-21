@@ -1,4 +1,4 @@
-// The v0.3 tile engine (docs/plans/v0.3-decisions.md): mode 0, a fixed
+// The v0.3 tile engine (docs/design/engine.md): mode 0, a fixed
 // 60 fps frame loop, shadow hardware state committed in VBlank, jobs for
 // slow work, and allocators for VRAM, palettes and affine matrices.
 //

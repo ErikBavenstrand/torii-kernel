@@ -1,6 +1,6 @@
 # v0.4 library index and user data: change detection, format, safe writes, background scan
 
-Researched 2026-10-20 for tickets B3 (library index) and B5 (favourites, recents, boot position). Sources: the vendored FatFs R0.15 (`source/ff15/ff.c`, read directly), elm-chan's FatFs docs, Linux and Windows driver sources, and launcher sources (TWiLight Menu++, MinUI, EmulationStation, RetroArch). Torii's code paths: `source/Ezcard_OP.c`, `source/engine/jobs.h`, `source/engine/sdread.h`, `source/crash.s`, and the cart speed figures in `docs/research/cart-test-2026-10-18.md`.
+Researched 2026-10-20 for tickets B3 (library index) and B5 (favourites, recents, boot position). Sources: the vendored FatFs R0.15 (`source/ff15/ff.c`, read directly), elm-chan's FatFs docs, Linux and Windows driver sources, and launcher sources (TWiLight Menu++, MinUI, EmulationStation, RetroArch). Torii's code paths: `source/Ezcard_OP.c`, `source/engine/jobs.h`, `source/engine/sdread.h`, `source/crash.s`, and the cart speed figures in `docs/research/omega-de-hardware.md`.
 
 ---
 
@@ -159,7 +159,7 @@ Hand edits on a PC: a `NAME` with no end line is taken as hand-edited when it is
 10. [FatFs f_getfree and config docs](https://elm-chan.org/fsw/ff/doc/getfree.html) · primary
 10b. [EmulationStation FileSorts.cpp, Settings.cpp](https://github.com/RetroPie/EmulationStation/blob/master/es-app/src/FileSorts.cpp) · HEAD 2026-10-20 · primary
 11. [RetroArch manual_content_scan.c](https://github.com/libretro/RetroArch/blob/master/manual_content_scan.c) · HEAD 2026-10-20 · primary (grep only)
-12. [Torii cart test 2026-10-18](/Users/erik.bavenstrand/Code/torii-kernel/docs/research/cart-test-2026-10-18.md) · 2026-10-18 · primary (measured)
+12. [Torii cart test 2026-10-18, now in omega-de-hardware.md](../omega-de-hardware.md) · 2026-10-18 · primary (measured)
 13. [source/Ezcard_OP.c, omega-de-hardware.md](/Users/erik.bavenstrand/Code/torii-kernel/source/Ezcard_OP.c) · primary (code)
 14. [source/engine/jobs.h, sdread.h](/Users/erik.bavenstrand/Code/torii-kernel/source/engine/jobs.h) · primary (code)
 15. [FatFs f_rename](https://elm-chan.org/fsw/ff/doc/rename.html) · primary

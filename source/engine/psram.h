@@ -6,7 +6,7 @@
 // menu runs (every other PSRAM user puts it back to 0), so nothing has to
 // switch pages back. psram_begin() selects it once per batch of writes all
 // the same, in case something left another page selected. The map of page 0
-// while the menu runs (docs/plans/v0.4-decisions.md, PSRAM map):
+// while the menu runs (docs/design/v0.4/decisions.md, Library and data):
 //
 //	0 MB      the SD card page's folder listing (sdlist.h), PSRAM_NAMES_BYTES
 //	0.81 MB   the library walk's scratch: its save table, sort buffer and

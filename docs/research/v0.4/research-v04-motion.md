@@ -113,6 +113,6 @@
 3. butano source, master 2026: `hw/include/bn_hw_sprite_affine_mats_constants.h`, `src/bn_sprite_affine_mats_manager.cpp`, `include/bn_affine_mat_attributes.h`, `include/bn_reciprocal_lut.h`, `include/bn_sin_lut.h`, `hw/src/bn_hw_hblank_effects.s`, `src/bn_core.cpp` · primary
 4. [Tonc: affine sprites](https://www.coranac.com/tonc/text/affobj.htm), [graphic effects](https://gbadev.net/tonc/gfx.html) · undated · primary tutorial
 5. mGBA as checked out in the repo: `emu/mgba/src/gba/renderers/common.c`, `video-software.c`, `src/gba/video.c`, `include/mgba/internal/gba/video.h` · primary (code)
-6. Torii: `source/engine/affine.c/.h`, `gfx.c/.h`, `frame.c`, `motion.h`, `source/ui/ui_run.c`, `source/crash.s`, `tests/perf/budget.txt`, `docs/design/v0.4/spec.md`, `motion.png`, `docs/plans/v0.4-decisions.md` · primary (code and design)
+6. Torii: `source/engine/affine.c/.h`, `gfx.c/.h`, `frame.c`, `motion.h`, `source/ui/ui_run.c`, `source/crash.s`, `tests/perf/budget.txt`, `docs/design/v0.4/spec.md`, `motion.png`, `docs/design/v0.4/decisions.md` · primary (code and design)
 
 *deep · 2 rounds · ~20 sources read · 2 sonnet researchers + own reading of repo and mGBA*

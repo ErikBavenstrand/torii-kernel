@@ -54,7 +54,7 @@ typedef struct {
 // 0 and 15, then about 4 frames apart, closing up smoothly to 30 a second
 // (every other frame) by frame 69 (1.15 s). 30 a second moves a 16 px row
 // list exactly 8 px every frame, where 40 alternated 11, 11 and 10 px
-// steps (docs/plans/v0.3-decisions.md, v0.3.2 scroll feel). The built-in
+// steps (v0.3.2's scroll feel). The built-in
 // themes take the same figures.
 #define INPUT_TIMING_DEFAULT {15, 4, 54, 30, 20, 6}
 extern const InputTiming input_timing_default;
@@ -111,7 +111,7 @@ static inline int input_fired(const InputState *s, u16 key)
 // page) in a list of count. A move past an end stops at that end. From the
 // end itself a fresh press of key wraps to the other end; a held key's
 // repeats stay there. Every list and menu moves this way
-// (docs/plans/v0.3-decisions.md, v0.3.2).
+// (docs/design/engine.md, Motion and input).
 u32 input_move(const InputState *s, u16 key, u32 cursor, u32 count, s32 delta);
 
 #endif

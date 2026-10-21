@@ -2,7 +2,7 @@
 // at 0 (WS0 4/2, no prefetch), and games expect that when they start.
 //
 // The real cart reads its NOR and PSRAM correctly at WS0 2/1 with prefetch,
-// 20% faster (docs/research/cart-test-2026-10-18.md), so the kernel menu runs
+// 20% faster (docs/research/omega-de-hardware.md), so the kernel menu runs
 // at WAITCNT_MENU. Everything never measured at that speed keeps the BIOS
 // setting: the cart's control registers (the 0x9FE0000 unlock sequence),
 // transfers through the SD buffer, NOR erases and writes, the clock's serial
