@@ -195,6 +195,7 @@ struct shown {
 static struct {
 	u8 opens;  // dialog_open calls not yet closed
 	u8 owned;  // the session is the dialogs': the last close shuts the engine down
+	u8 replacing;  // a notice replacing another: it just shows (no entry)
 	u32 last_pump;
 	struct shown message;   // a message or question
 	struct shown progress;  // the progress dialog, under a message if both are up
@@ -402,7 +403,7 @@ static int show(struct shown *s, u32 use, const char *title, const char *text, u
 	// Over nothing (the boot's notice, the loading card, a launch's
 	// questions) it comes in from black rising, as a screen does (E9): a
 	// dialog's own fade needs a screen under it
-	if (!ui_depth() && !ui_transitioning())
+	if (!ui_depth() && !ui_transitioning() && !dlg.replacing)
 		ui_enter(UI_TR_CARD, 1);
 	s->view = ui_push(spec, 0);
 	if (!s->view) {
@@ -506,10 +507,13 @@ void dialog_notice(const char *title, const char *text, u32 kind)
 		if (ui_top() == dlg.notice.view)
 			ui_pop();
 		dlg.notice.view = 0;
+		dlg.replacing = 1;
 	} else {
 		dialog_open();
 	}
-	if (!show(&dlg.notice, USE_NOTICE, title, text, kind)) {
+	int shown = show(&dlg.notice, USE_NOTICE, title, text, kind);
+	dlg.replacing = 0;
+	if (!shown) {
 		dialog_close();
 		return;
 	}

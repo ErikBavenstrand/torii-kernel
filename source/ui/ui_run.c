@@ -61,6 +61,9 @@ enum {
 	ZP_SPRITE,  // the sprite zooms (no page shows but the open's title bar)
 	ZP_PAGE,    // the page's card comes in (open) or goes (close)
 };
+// Frames a zoom waits for its screen's uploads at most: one that keeps
+// streaming (covers, a marquee) shows anyway
+#define ZOOM_READY_WAIT 60
 // The theme wipe's split: the theme's BG run, then the UI's sprite bank
 #define WIPE_BG_WORDS (UI_THEME_RUN_COLOURS / 2)
 #define WIPE_OBJ_WORDS 8
@@ -494,10 +497,14 @@ static void fade_set(void *ctx, s32 value)
 
 // Loads the first banks of the UI's (an item switch changes banks 0 and
 // 1; a theme switch all of them), and the sprites' bank
+static u16 zoom_backdrop(void);
+
 static void load_palette(u32 banks)
 {
 	u16 pal[UI_BANKS * 16];
 	ui_theme_banks(ui_theme(), ui_item(), pal);
+	if (ui.zoom)
+		pal[0] = zoom_backdrop();  // the backdrop is the zoom's (a page pushed under it)
 	gfx_pal_load(UI_THEME_RUN_FIRST / 16, pal, banks * 16);
 	gfx_pal_load(16 + ui_obj_bank(), pal, 16);  // the sprites': bank 0's roles
 	if (gfx_pal_faded_on)
@@ -606,7 +613,7 @@ static void wipe_tick(u32 dt)
 		},
 	};
 	gfx_set_split(&split);
-	if (tlog_in_emulator())
+	if (tlog_in_emulator() && !(ui_top() && ui_top()->opening))  // a popup opening: its own figures
 		frame_measure("ui-wipe");
 	ui_wake();
 }
@@ -846,6 +853,7 @@ static void tr_set_in(u32 kind, s32 dir)
 
 static int zoom_leave(u32 kind);
 static void zoom_end(void);
+static void zoom_cut(void);
 
 void ui_enter(u32 kind, s32 dir)
 {
@@ -875,7 +883,7 @@ void ui_leave(u32 kind, s32 dir)
 		kind = UI_TR_FADE;  // no sprite to carry
 	}
 	ui.zoom_set = 0;
-	zoom_end();  // another change cuts a zoom short: the page goes from as it is
+	zoom_cut();  // another change cuts a zoom short: the screen goes from as it shows
 	const struct ui_transition *t = &ui_theme()->transition[kind];
 	s32 from = ui.tr_phase == TR_IN ? ui.tr_level : 0;
 	u8 mode = kind == UI_TR_LEAVE ? TR_DARKEN : TR_ALPHA;
@@ -1016,6 +1024,11 @@ static void zoom_phase(u32 phase)
 	ui.zoom_ready = 0;
 }
 
+static u8 m_open_frames(void)
+{
+	return ui_theme()->motion.open.frames;
+}
+
 static void zoom_end(void)
 {
 	if (!ui.zoom)
@@ -1034,6 +1047,27 @@ static void zoom_end(void)
 	ui_wake();
 }
 
+// Another screen change during a zoom: the zoom ends, and the change goes on
+// from the screen as it shows: nothing in the sprite phase (the screen drawn
+// under it hidden), the card's fade and rise as they are in the page phase
+static void zoom_cut(void)
+{
+	if (!ui.zoom)
+		return;
+	int sprite = ui.zoom_phase == ZP_SPRITE;
+	u32 eva = ui.zoom_eva > 16 ? 16 : ui.zoom_eva;
+	s16 dy = ui.tr_dy;
+	zoom_end();
+	if (sprite) {
+		ui.tr_phase = TR_GAP;
+		ui.tr_level = UI_OPEN;
+	} else {
+		ui.tr_phase = TR_IN;
+		ui.tr_level = (s16)((16 - eva) * UI_OPEN / 16);
+		ui.tr_dy = dy;
+	}
+}
+
 // Starts a zoom: 0 if it can't (no sprite set, no room, a dialog up)
 static int zoom_begin(u32 kind)
 {
@@ -1042,8 +1076,8 @@ static int zoom_begin(u32 kind)
 		return 0;
 	ui.zoom_set = 0;
 	// Where a close starts from: the open's card, if B cut it short
-	if (ui.zoom == ZOOM_OPEN && ui.zoom_phase == ZP_PAGE) {
-		ui.zoom_eva0 = ui.zoom_eva;
+	if (ui.zoom == ZOOM_OPEN) {
+		ui.zoom_eva0 = ui.zoom_eva;  // 0 and risen in its sprite phase
 		ui.zoom_dy0 = ui.tr_dy;
 		ui.zoom_title0 = ui.zoom_title;
 	} else {
@@ -1056,6 +1090,7 @@ static int zoom_begin(u32 kind)
 	ui.zoom_ticket = gfx_queue_ticket();
 	ui.zoom_started = 0;
 	ui.zoom_total = 0;
+	ui.zoom_slide = m_open_frames();
 	ui.zoom = (u8)(kind == UI_TR_OPEN ? ZOOM_OPEN : ZOOM_CLOSE);
 	zoom_phase(kind == UI_TR_OPEN ? ZP_SPRITE : ZP_PAGE);
 	ui.tr_effects = 0;
@@ -1106,7 +1141,7 @@ static void zoom_tick(u32 dt)
 		ui.zoom_started = 1;
 	if (ui.zoom_ready && ui.zoom == ZOOM_OPEN)
 		ui.zoom_total = (u16)(ui.zoom_total + dt);
-	if (!ui.zoom_ready && ui.tr_pushed && all_shown() && !gfx_queue_len()) {
+	if (!ui.zoom_ready && ui.tr_pushed && all_shown() && (!gfx_queue_len() || ui.zoom_frame >= ZOOM_READY_WAIT)) {
 		ui.zoom_ready = 1;
 		// The title bar slides in over what the open has left, half of it
 		// at least, so a page that took long to draw still slides
@@ -1166,7 +1201,9 @@ static void zoom_obj(void)
 	s32 r = (s32)z->anchor - 32;
 	s32 cy = z->cy + r * 256 / (s32)pd0 - r * 256 / (s32)pd;
 	s32 x = z->cx - 64, y = cy - 64;
-	if (x <= -128 || x >= 240 || y <= -128 || y >= 160)
+	// (y's 8 bits wrap: a box more than 96 px above the top would show its
+	// first rows at the bottom)
+	if (x <= -128 || x >= 240 || y < -96 || y >= 160)
 		return;
 	u16 bd = zoom_backdrop(), c[16];
 	c[0] = 0;

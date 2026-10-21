@@ -184,7 +184,10 @@ struct gfx_split {
 // change them only while no split uses them (before setting one).
 extern u32 gfx_split_data[GFX_SPLIT_WORDS];
 // Sets the split from the next commit on (NULL or line 0: none), as the
-// registers are shadowed. gfx_init and gfx_split_off end it.
+// registers are shadowed. gfx_init, gfx_split_off and gfx_freeze end it.
+// It needs a commit every VBlank (ui_frame's): a frame that misses one
+// shows the split values from the top too, so nothing may block while a
+// split runs.
 void gfx_set_split(const struct gfx_split *split);
 // Ends a split at once: the interrupt and both DMAs off (before a game, or
 // ui_shutdown)

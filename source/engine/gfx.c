@@ -109,7 +109,9 @@ void IWRAM_CODE gfx_split_irq(void)
 
 void gfx_split_off(void)
 {
-	irqDisable(IRQ_VCOUNT);
+	// IE and DISPSTAT straight (libgba's irqDisable would turn IME on)
+	REG_IE &= (u16)~IRQ_VCOUNT;
+	REG_DISPSTAT_ &= (u16)~DISPSTAT_VCOUNT_IRQ;
 	DMA0_REGS[2] = 0;
 	DMA0_REGS[5] = 0;
 	memset(&split, 0, sizeof(split));
@@ -159,6 +161,9 @@ static void commit_split(void)
 	if (!split_dirty && !split_on)
 		return;
 	split_dirty = 0;
+	// A copy armed late (an interrupt held past line 159) never runs now
+	DMA0_REGS[2] = 0;
+	DMA0_REGS[5] = 0;
 	// Last frame's copies changed what its lower lines showed: the top
 	// values go back first, for good once the split ends
 	split_tops(split.line ? &split : &split_live);
@@ -505,6 +510,11 @@ static void write_oam(void)
 
 void gfx_freeze(int on)
 {
+	// A split needs its commit every VBlank (its tops put back): it ends
+	if (on && split_on) {
+		split_tops(&split_live);
+		gfx_split_off();
+	}
 	gfx_frozen = (u8)(on != 0);
 }
 
