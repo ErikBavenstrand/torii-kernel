@@ -242,6 +242,17 @@ void test_asset_sd_read(void)
 		bad += ram[i] != pattern(3004 + i);
 	CHECK_EQ(bad, 0);
 	CHECK_EQ(ram[1000], 0);
+	// Without a map, a seek past SEEK_CLUSTERS clusters (16 of the test
+	// card's 512 bytes) walks the chain over steps: open, two seeks, a read
+	memset(ram, 0, 0x3000);
+	sd_read_start(&reader, TEST_FILE, ram, 0x3000, 4096, JOB_OWNER_NONE);
+	sd_read_range(&reader, 9000, 1000, 0);
+	CHECK_EQ(run_jobs(10), 4);
+	CHECK_EQ(reader.result, SD_READ_OK);
+	bad = 0;
+	for (u32 i = 0; i < 1000; i++)
+		bad += ram[i] != pattern(9000 + i);
+	CHECK_EQ(bad, 0);
 	// An offset off a word is refused: the card's DMA would land off a word
 	sd_read_start(&reader, TEST_FILE, ram, 0x3000, 4096, JOB_OWNER_NONE);
 	sd_read_range(&reader, 3001, 1000, 0);

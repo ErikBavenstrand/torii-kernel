@@ -44,8 +44,9 @@
 #define ARTPACK_MAX 16384u
 #define ARTPACK_INDEX_MAX_BYTES (ARTPACK_MAX * ARTPACK_ENTRY_BYTES)
 // Words of the pack's cluster link map (FatFs fast seek): its first word
-// is the size, then two words a fragment and a 0: 62 fragments at most
-#define ARTPACK_MAP_WORDS 128
+// is the size, then two words a fragment and a 0: 254 fragments at most
+// (2 KB of EWRAM; a pack in more pieces seeks along its chain in steps)
+#define ARTPACK_MAP_WORDS 512
 
 struct artpack_header {
 	u32 magic;

@@ -4,6 +4,10 @@
 #include "res.h"
 #include "stage.h"
 
+// Clusters a seek without a link map walks a step: some 3,000 cycles each,
+// so a step stays near 50k cycles however far the offset is
+#define SEEK_CLUSTERS 16
+
 static void set_result(struct sd_read *r, s8 result)
 {
 	if (r->result != SD_READ_BUSY)
@@ -98,9 +102,17 @@ int sd_read_step(struct sd_read *r)
 			return JOB_DONE;
 		}
 	} else if (r->seek_due) {
-		// A step of its own: without a map, f_lseek walks the cluster chain
-		r->seek_due = 0;
-		FRESULT fr = f_lseek(&r->fil, r->offset);
+		// Steps of their own: without a map, f_lseek walks the cluster chain,
+		// so it goes SEEK_CLUSTERS a step (a forward seek walks on from the
+		// file's cluster); with one, it is a single step
+		u32 to = r->offset;
+		if (!r->fil.cltbl) {
+			u32 span = (u32)r->fil.obj.fs->csize * FF_MAX_SS * SEEK_CLUSTERS;
+			if (to - (u32)r->fil.fptr > span)
+				to = (u32)r->fil.fptr + span;
+		}
+		r->seek_due = to != r->offset;
+		FRESULT fr = f_lseek(&r->fil, to);
 		if (fr != FR_OK) {
 			res_set_error("SD read: can't seek to %lu (FatFs error %d)", (unsigned long)r->offset, fr);
 			close_file(r);

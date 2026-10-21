@@ -170,13 +170,13 @@ holes() {
   head -c $((free - ($2 + 511) / 512 * 512)) /dev/zero >"$cart/filler"
   mcopy -i "$cart/sd.img" "$cart/filler" ::/filler
 }
-# A pack of 20 covers (128 clusters of 512 bytes), Zed.gba's last
+# A pack of 100 covers (635 clusters of 512 bytes), Zed.gba's last
 python3 - "$carts/pack" "$crc" <<'EOF'
 import sys
 out, zed = sys.argv[1], sys.argv[2]
 night = open("tests/shots/data/art-night.bin", "rb").read()
 args = []
-for i in range(19):
+for i in range(99):
     v = bytearray(night)
     v[16] ^= i + 1  # another colour 0: another cover
     open(f"{out}/v{i}.bin", "wb").write(v)
@@ -186,7 +186,7 @@ EOF
 # shellcheck disable=SC2046 # the CRC=file pairs
 python3 tools/artpack.py write "$carts/pack/big.pak" $(cat "$carts/pack/args")
 big_id=$(id 3 "$(python3 tools/artpack.py find "$carts/pack/big.pak" "$crc")")
-for pieces in 4 80; do
+for pieces in 4 300; do
   new_cart "pack-$pieces"
   mcopy -i "$cart/sd.img" "$carts/pack/crc.txt" ::/torii/crc.txt
   holes $((pieces - 1)) "$(stat -c %s "$carts/pack/big.pak")"
@@ -198,7 +198,7 @@ for pieces in 4 80; do
   if [ "$pieces" = 4 ]; then
     grep -q "covers, 4 pieces on the card" "$cart/p.log" || fail "the link map: $(grep 'art.pak' "$cart/p.log")"
   else
-    grep -q "art.pak is in more than 62 pieces" "$cart/p.log" || fail "no slow seek logged: $(grep 'art.pak' "$cart/p.log")"
+    grep -q "art.pak is in more than 254 pieces" "$cart/p.log" || fail "no slow seek logged: $(grep 'art.pak' "$cart/p.log")"
   fi
 done
 echo "PASS: a pack in pieces loads its covers, through the link map or without it"
