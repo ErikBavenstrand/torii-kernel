@@ -6,6 +6,12 @@ git log, not here.
 
 ## Unreleased
 
+- **Removed:** the direct save/load patch: Save states always opens the
+  in-game menu (Save, Load, Reset, Cheats). A game written to NOR by an older
+  kernel with Save states alone keeps its old patch until written again
+  (C5; `448bb16`).
+- **Changed:** the Hotkeys rows are Back to menu, Menu keys, Sleep and Sleep
+  keys, with accurate explanations and Info text (C5; `448bb16`, `9209f0d`).
 - **Changed:** A, START and SELECT pressed while a screen goes out, in the
   gap, or during the open zoom's sprite phase are dropped, so a quick A, A on
   home no longer starts a game unseen; once the page shows they act (B20;
