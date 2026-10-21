@@ -6,11 +6,13 @@
 
 #include "gamename.h"
 #include "ez_define.h"
+#include "ff.h"
 #include "safefile.h"
 #include "tlog.h"
 #include "engine/psram.h"
 
 extern u8 pReadCache[];
+extern FILINFO fileinfo;  // ezkernelnew.c's
 
 // pReadCache's share (READCACHE_NAMES): a line on its way to PSRAM, the
 // kept lines' offsets, then the new text (the line's staging comes first in
@@ -28,6 +30,8 @@ _Static_assert(PSRAM_NAMES_TEXT_BYTES <= sizeof(((struct names_area *)0)->out),
 // What a new text may hold: what load reads back, less room for the CRC line
 // safefile adds (so an edit never makes a file Rename can't read again)
 #define TEXT_CAP (PSRAM_NAMES_TEXT_BYTES - SAFEFILE_CRC_LINE_LEN - 2)
+
+static u8 full;  // the last set or move failed as the file is too large or holds too many names
 
 static struct names_area *area(void)
 {
@@ -54,9 +58,11 @@ static int load(struct gamename_custom *c)
 	u32 len = 0, staged = 0;
 	int ok = 1;
 	psram_begin();
+	full = 0;
 	if (safefile_open(GAMENAME_FILE, PSRAM_NAMES_TEXT_BYTES) == SAFEFILE_NONE) {
 		if (safefile_failed()) {
-			tlog_error("names: can't read %s", GAMENAME_FILE);
+			full = f_stat(GAMENAME_FILE, &fileinfo) == FR_OK && fileinfo.fsize > PSRAM_NAMES_TEXT_BYTES;
+			tlog_error("names: can't read %s%s", GAMENAME_FILE, full ? ": it's too large to change" : "");
 			return 0;
 		}
 		gamename_custom_parse(c, NULL, 0, a->lines, GAMENAME_CUSTOM_MAX);  // no file yet
@@ -89,8 +95,10 @@ static int load(struct gamename_custom *c)
 		return 0;
 	}
 	gamename_custom_parse(c, (const char *)PSRAM_NAMES_TEXT_BASE, text, a->lines, GAMENAME_CUSTOM_MAX);
-	if (!c->complete)
+	if (!c->complete) {
 		tlog_error("names: %s holds more than %u names: left as it is", GAMENAME_FILE, GAMENAME_CUSTOM_MAX);
+		full = 1;
+	}
 	return c->complete;
 }
 
@@ -117,6 +125,7 @@ static int store(u32 len)
 			   : len == GAMENAME_BAD_PATH  ? "not a path it keeps"
 			   : len == GAMENAME_UNCHANGED ? "nothing to move"
 						       : "not read whole");
+		full = len == GAMENAME_TOO_BIG;
 		return len == GAMENAME_UNCHANGED;
 	}
 	struct fill_ctx f = {len};
@@ -148,4 +157,9 @@ int gamename_store_move(const char *old_path, const char *new_path)
 	struct names_area *a = area();
 	tlog("names: %s's name moves to %s", old_path, new_path);
 	return store(gamename_custom_move(&c, old_path, new_path, a->out, TEXT_CAP));
+}
+
+int gamename_store_full(void)
+{
+	return full;
 }

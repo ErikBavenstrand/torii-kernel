@@ -1017,7 +1017,7 @@ static const char *rename_submit(void *ctx, const char *name)
 		gamename_clean(games.name, games.pick);
 	int own = strcmp(name, games.name) == 0;
 	if (!gamename_store_set(games.pick, own ? NULL : name))
-		return gl_rename->name_failed;
+		return gamename_store_full() ? gl_rename->names_full : gl_rename->name_failed;
 	library_named(games.pick, own ? NULL : name);  // its row moves to its new place at once
 	return NULL;
 }

@@ -87,3 +87,22 @@ logged "rename: from Hello"
 logged "rename /Hello.gba to Helloq.gba: FatFs 8"
 mtype -i "$cart/sd.img" ::/Hello.gba >/dev/null || fail "Hello.gba went"
 echo "PASS: rename: a game's name in names.txt and back, Cancel asks after a change, a taken file name is refused"
+
+# 5: a hand-edited names.txt over what the kernel reads (116 KB): the walk
+# says so once, as an error, and Rename says why it can't keep the name
+{
+  printf '/Hello.gba\tBig\n'
+  for _ in $(seq 2000); do printf '# %s\n' "$(printf '%060d' 0)"; done
+} >"$cart/names.txt"
+mcopy -o -i "$cart/sd.img" "$cart/names.txt" ::/torii/names.txt
+mdel -i "$cart/sd.img" ::/torii/names.txt.bak 2>/dev/null || true
+mdel -i "$cart/sd.img" ::/torii/recent.txt ::/torii/recent.txt.bak 2>/dev/null || true
+# shellcheck disable=SC2046 # nav.sh's options
+OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_game_rename gba 0) -k @10:A -k @14:- \
+  -k @24:START -k @28:- -w "rename: names.txt is too large to change" -s @4:"$shots/5-full.png" -f 2400 \
+  >/dev/null 2>"$cart/run.log" || fail "Rename didn't say names.txt is too large"
+[ "$(grep -c '^kernel error: library: /torii/names.txt is [0-9]* bytes, over' "$cart/run.log")" = 1 ] ||
+  fail "the walk didn't say once that names.txt is too large"
+logged "rename: from Hello"
+names | grep -q $'^/Hello.gba\tBig$' || fail "names.txt changed"
+echo "PASS: rename: a names.txt too large to read is logged once and Rename says so"

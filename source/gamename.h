@@ -153,6 +153,9 @@ int gamename_store_set(const char *path, const char *name);
 // A file renamed from old_path to new_path keeps its name: 1 once written,
 // or when old_path has none.
 int gamename_store_move(const char *old_path, const char *new_path);
+// 1 if the last set or move failed because names.txt is too large or holds
+// too many names to change (a hand edit, or a full one)
+int gamename_store_full(void);
 
 // --- The display name --------------------------------------------------------
 

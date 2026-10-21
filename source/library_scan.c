@@ -588,8 +588,16 @@ static u32 names_flush(u32 staged)
 // a building walk copies them to PSRAM for gamename_custom.
 static void names_step(void)
 {
-	if (safefile_open(GAMENAME_FILE, LIB_NAMES_MAX) == SAFEFILE_NONE)
+	static u8 told;  // the walk says once a boot that names.txt is too large
+	if (safefile_open(GAMENAME_FILE, LIB_NAMES_MAX) == SAFEFILE_NONE) {
+		if (!told && safefile_failed() && f_stat(GAMENAME_FILE, &lib.u.walk.fi) == FR_OK &&
+		    lib.u.walk.fi.fsize > LIB_NAMES_MAX) {
+			tlog_error("library: %s is %lu bytes, over the %u the menu reads: its names aren't shown",
+				   GAMENAME_FILE, (unsigned long)lib.u.walk.fi.fsize, (unsigned)LIB_NAMES_MAX);
+			told = 1;
+		}
 		return;
+	}
 	char *line = (char *)lib.buf + LIB_IO_BYTES / 2;
 	u32 staged = 0;
 	lib.u.walk.names_ok = lib.build;
