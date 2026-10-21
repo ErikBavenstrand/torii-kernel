@@ -27,7 +27,7 @@
 // it loaded after it
 #define BOXART_REST 8
 #define BOXART_AHEAD 1
-#define BOXART_WANTS (1 + 2 * BOXART_AHEAD)
+#define BOXART_WANTS (2 + 2 * BOXART_AHEAD)  // and the card's placeholder for the cursor's console
 // Polls between checks of the resting cursor's cover: names (CRCs) that
 // load or are identified later can give it one
 #define BOXART_RECHECK 30
@@ -77,7 +77,8 @@ static struct {
 	u8 dir_open;
 	u8 full_logged;
 	boxart_row_fn row_fn;
-	const u16 *palette;  // the placeholder's, for the cursor's row
+	u8 box;  // the placeholder box for the cursor's row (ART_BOX_*)
+	u8 box_shown;  // the one whose tiles the image holds, ART_BOX_COUNT: none
 	u32 clear_at;
 	u32 started;  // torii_frames when the listing started
 	DIR dir;
@@ -88,6 +89,10 @@ static struct {
 	u32 want_id;  // the cover the box should show, 0 the placeholder
 	u32 shown;  // the one it shows (its copy queued), 0 the placeholder
 	u8 placeholder_due;  // the placeholder's tiles and colours are to be (re)loaded
+	u8 colours_due;  // a picture's colours wait for its tiles (colours_ticket)
+	const u16 *colours;  // those colours, colours_count of them
+	u8 colours_count;
+	u32 colours_ticket;
 	u8 pin, old_pin;  // the shown cover's entry, and the one before until its copy lands
 	u32 old_ticket;
 	u32 signature;  // what the last wants were made from (0: none made)
@@ -268,6 +273,19 @@ static u32 lookup(const char *path, u32 size, struct want *w)
 	return artset_has(SET_BASE, w->id) ? w->id : 0;
 }
 
+// The card's placeholder for box (ART_BOX_*), box-<name>.bin, into *w; its
+// id or 0
+static u32 box_cover(u32 box, struct want *w)
+{
+	if (B.list != LIST_DONE || !B.set.count || box >= ART_BOX_COUNT || box == ART_BOX_OTHER)
+		return 0;  // the scraper makes none for other consoles
+	const char *name = art_box_names[box];
+	w->kind = ARTKEY_BOX;
+	w->key = box;
+	w->id = artkey_id(ARTKEY_BOX, artkey_name(name, strlen(name)));
+	return artset_has(SET_BASE, w->id) ? w->id : 0;
+}
+
 // row's cover into *w (and, for custom art, its file name into the want's
 // PSRAM slot n); its id or 0
 static u32 row_cover(u32 row, struct want *w, u32 n)
@@ -299,6 +317,8 @@ static int locate(u32 id, char *path, u32 size)
 			continue;
 		if (w->kind == ARTKEY_CRC)
 			snprintf(path, size, ART_DIR "/%08lX" ARTKEY_EXT, (unsigned long)w->key);
+		else if (w->kind == ARTKEY_BOX)
+			snprintf(path, size, ART_DIR "/" ARTKEY_BOX_PREFIX "%s" ARTKEY_EXT, art_box_names[w->key]);
 		else
 			snprintf(path, size, CUSTOM_DIR "/%s" ARTKEY_EXT, (const char *)(NAMES_BASE + i * NAME_BYTES));
 		return 1;
@@ -327,15 +347,50 @@ static void retire_pin(void)
 	B.pin = COVER_NONE;
 }
 
+// Shows a picture (tiles and count colours) in the box; 0 while the VRAM
+// queue is full. Colours load before the queue runs in a VBlank, so with
+// the queue empty both land in that one VBlank. Behind other copies the
+// tiles may take frames: the box is blanked to the card until they are in,
+// then gets its colours, so a picture never shows in another's colours.
+static int show(const void *tiles, const u16 *colours, u32 count)
+{
+	int busy = gfx_queue_len() != 0;
+	if (!ui_image_show(B.image, tiles, busy ? 0 : colours, count))
+		return 0;
+	B.colours_due = 0;
+	if (busy) {
+		u16 blank[16];  // gfx_pal_load copies it at once
+		u16 card = ui_theme()->surface->card;
+		for (u32 i = 0; i < 16; i++)
+			blank[i] = card;
+		gfx_pal_load(ui_image_bank(B.image), blank, 16);
+		B.colours = colours;
+		B.colours_count = (u8)count;
+		B.colours_ticket = gfx_queue_ticket();
+		B.colours_due = 1;
+	}
+	return 1;
+}
+
+// The colours show() put off, once their tiles are in
+static void colours_poll(void)
+{
+	if (B.colours_due && gfx_queue_done(B.colours_ticket)) {
+		gfx_pal_load(ui_image_bank(B.image), B.colours, B.colours_count);
+		B.colours_due = 0;
+	}
+}
+
 // Makes the box show want_id (or the placeholder); tried again next poll
 // while the VRAM queue is full
 static void sync(void)
 {
+	colours_poll();
 	if (B.want_id && B.want_id != B.shown && cover_state(B.want_id) == COVER_READY) {
 		u8 e = cover_pin(B.want_id);
 		if (e == COVER_NONE)
 			return;
-		if (!ui_image_show(B.image, cover_tiles(e), cover_palette(e), cover_colours(e))) {
+		if (!show(cover_tiles(e), cover_palette(e), cover_colours(e))) {
 			cover_unpin(e);
 			return;
 		}
@@ -348,25 +403,37 @@ static void sync(void)
 	}
 	if (B.want_id && B.want_id == B.shown)
 		return;
-	// The placeholder: its tiles only if a cover was there
-	if (B.shown) {
-		if (!ui_image_show(B.image, art_box_tiles, B.palette, 16))
+	if (B.box >= ART_BOX_COUNT)
+		return;  // no row selected since the page opened
+	// The placeholder: its tiles only if a cover or another box was there
+	if (B.shown || B.box_shown != B.box) {
+		if (!show(art_box_tiles[B.box], art_box_colours(B.box), 16))
 			return;
 		retire_pin();
 		B.shown = 0;
+		B.box_shown = B.box;
 		B.placeholder_due = 0;
-	} else if (B.placeholder_due) {
-		gfx_pal_load(ui_image_bank(B.image), B.palette, 16);
+	} else if (B.placeholder_due && !B.colours_due) {
+		gfx_pal_load(ui_image_bank(B.image), art_box_colours(B.box), 16);
 		B.placeholder_due = 0;
 	}
 }
 
-// Wants the cursor's cover and its neighbours'
+// The cursor's cover into *w: its own art, else the card's placeholder for
+// its console; its id or 0
+static u32 cursor_cover(struct want *w, u32 n)
+{
+	u32 id = row_cover(B.row, w, n);
+	return id ? id : box_cover(B.box, w);
+}
+
+// Wants the cursor's cover and its neighbours', then the card's placeholder
+// for the cursor's console (so it shows at once on the next game without art)
 static void want_covers(void)
 {
 	struct want w;
 	B.wanted = 0;
-	B.want_id = row_cover(B.row, &w, 0);
+	B.want_id = cursor_cover(&w, 0);
 	if (B.want_id)
 		B.wants[B.wanted++] = w;
 	for (u32 d = 1; d <= BOXART_AHEAD; d++) {
@@ -377,9 +444,14 @@ static void want_covers(void)
 				B.wants[B.wanted++] = w;
 		}
 	}
+	u32 box = box_cover(B.box, &w), box_at = BOXART_WANTS;  // after the neighbours
+	if (box && box != B.want_id && B.wanted < BOXART_WANTS) {
+		box_at = B.wanted;
+		B.wants[B.wanted++] = w;
+	}
 	cover_wants_begin();
 	for (u32 i = 0; i < B.wanted; i++)
-		cover_want(B.wants[i].id, i == 0 && B.want_id ? 0 : 1);
+		cover_want(B.wants[i].id, i == 0 && B.want_id ? 0 : i == box_at ? 2 : 1);
 	cover_wants_end();
 }
 
@@ -403,7 +475,10 @@ void boxart_open(u8 image, boxart_row_fn row)
 	B.image = image;
 	B.row_fn = row;
 	B.on = Read_SET_info(assress_box_art) != 0;
-	B.shown = 0;  // the image starts with the placeholder's tiles
+	B.shown = 0;  // the image starts with a placeholder's tiles: which, the
+	B.box_shown = ART_BOX_COUNT;  // first boxart_select decides
+	B.box = ART_BOX_COUNT;
+	B.colours_due = 0;
 	B.want_id = 0;
 	B.signature = 0;
 	B.rest = 0;
@@ -414,17 +489,17 @@ void boxart_open(u8 image, boxart_row_fn row)
 		boxart_poll();
 }
 
-void boxart_select(u32 row, const u16 *palette)
+void boxart_select(u32 row, u32 box)
 {
 	if (!B.started_up)
 		return;
 	if (row != B.row)
 		B.rest = 0;
 	B.row = row;
-	B.palette = palette;
+	B.box = (u8)(box < ART_BOX_COUNT ? box : ART_BOX_OTHER);
 	B.placeholder_due = 1;
 	struct want w;
-	u32 id = B.on && cover_active() ? row_cover(row, &w, BOXART_WANTS) : 0;
+	u32 id = B.on && cover_active() ? cursor_cover(&w, BOXART_WANTS) : 0;
 	if (id != B.want_id)
 		B.signature = 0;  // another cover on this row (a relist): wanted anew
 	B.want_id = id;
@@ -433,8 +508,12 @@ void boxart_select(u32 row, const u16 *palette)
 
 void boxart_poll(void)
 {
-	if (!B.started_up || !B.on)
+	if (!B.started_up)
 		return;
+	if (!B.on) {
+		sync();  // a placeholder the full VRAM queue put off
+		return;
+	}
 	if (!cover_active()) {
 		// After the boot, or PSRAM overwritten (a launch that came back):
 		// the cache and the set are gone
@@ -465,7 +544,7 @@ void boxart_poll(void)
 	} else {
 		B.recheck = BOXART_RECHECK;
 		struct want w;
-		if (row_cover(B.row, &w, BOXART_WANTS) != B.want_id)
+		if (cursor_cover(&w, BOXART_WANTS) != B.want_id)
 			B.signature = 0;  // names arrived: the row has a cover now (or another)
 	}
 	u32 signature = (B.row + 1) * 0x9E3779B1u ^ library_generation() * 0x85EBCA6Bu ^ (u32)library_walking();

@@ -1,7 +1,7 @@
 # The menu's art (source/ui/art.h). `just assets` converts the PNGs here
 # into source/ui/art_data.c and art_ids.h; tests/asset_test.py fails when
-# those are stale. Every PNG in icons16/, icons8/, sprites/ and shadows/ is
-# converted, its file name giving its id (icons16/gba.png is
+# those are stale. Every PNG in icons16/, icons8/, sprites/, shadows/ and
+# boxes/ is converted, its file name giving its id (icons16/gba.png is
 # ART_ICON16_GBA); this file says what the conversion can't tell from the
 # pictures.
 #
@@ -11,7 +11,10 @@
 #   sprites/  carousel objects, up to 64x64, at most 14 colours, drawn at
 #             1:1: draw them at the size they show at the front
 #   shadows/  wNN.png: 64x8, one colour, mirrored about the middle
-#   box.png   the placeholder box: 80x80, indexed, 1 band, 2 body, 3 shape
+#   boxes/    the placeholder boxes list with art shows for a game without
+#             art, one a console (gba, gbc, gb, nes; other for the rest):
+#             80x80, at most 15 colours, drawn for the light theme;
+#             box_dark below replaces colours in the dark theme
 
 # The carousel's items, in its order: each item's 16x16 icon, 8x8 icon and
 # carousel object (file names without .png).
@@ -39,3 +42,20 @@ icon16_banks = [
 	["sd", "set"],
 	["torii"],
 ]
+
+# The placeholder boxes' colours in the dark theme: each light colour here
+# becomes its value (any other stays). The skeleton artwork and the box's
+# edge follow the card; the consoles' bands only dim a little.
+[box_dark]
+"#E8E0D8" = "#303038"  # the artwork's fill
+"#E0D8D0" = "#383840"  # its ground
+"#D0C8C0" = "#484850"  # the torii gate and the title bars
+"#F0E8E0" = "#383840"  # the shimmer across it
+"#A8A098" = "#101018"  # the box's edge
+"#D8D0C8" = "#101010"  # its shadow
+"#F8F8F0" = "#D0D0C8"  # the Game Boy Color's white band
+"#C0C8B0" = "#A0A890"  # the Game Boy's grey band
+"#E0E0E8" = "#484858"  # the NES picture window's fill, lifted off the black box
+"#D8D8E0" = "#404050"  # its ground
+"#C8C8D0" = "#70707E"  # its torii gate
+"#F0F0F8" = "#50505F"  # its shimmer

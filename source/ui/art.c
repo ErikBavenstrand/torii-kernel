@@ -2,10 +2,16 @@
 #include "art.h"
 #include "../engine/gfx.h"
 #include "../engine/res.h"
+#include "ui.h"
 
 const u16 *art_icon16_palette(u32 icon)
 {
 	return art_icon16_palettes[art_icon16_bank[icon < ART_ICON16_COUNT ? icon : 0]];
+}
+
+const u16 *art_box_colours(u32 box)
+{
+	return art_box_palettes[box < ART_BOX_COUNT ? box : ART_BOX_OTHER][ui_theme() != &ui_theme_light];
 }
 
 void art_icon8_tile(u32 id, u32 colour, u32 out[8])

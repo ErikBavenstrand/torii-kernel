@@ -22,6 +22,7 @@
 #include "../../source/engine/sdread.h"
 #include "../../source/engine/stage.h"
 #include "../../source/ui/art.h"
+#include "../../source/ui/ui.h"
 
 extern FATFS EZcardFs;
 
@@ -460,14 +461,29 @@ void test_art_table(void)
 		CHECK_EQ(set, bits);
 	}
 
-	u32 box_max = 0;
-	for (u32 y = 0; y < ART_BOX_SIZE; y++)
-		for (u32 x = 0; x < ART_BOX_SIZE; x++) {
-			u32 p = pixel(art_box_tiles, ART_BOX_SIZE / 8, x, y);
-			if (p > box_max)
-				box_max = p;
-		}
-	CHECK_EQ(box_max, ART_BOX_SHAPE);
+	// Each placeholder box fills its square but the shadow's corners, its
+	// colours numbered from 1 with none left out, as the converter writes them
+	for (u32 b = 0; b < ART_BOX_COUNT; b++) {
+		u32 clear = 0, used = 0, top = 0;
+		for (u32 y = 0; y < ART_BOX_SIZE; y++)
+			for (u32 x = 0; x < ART_BOX_SIZE; x++) {
+				u32 p = pixel(art_box_tiles[b], ART_BOX_SIZE / 8, x, y);
+				if (!p)
+					clear++;
+				used |= 1u << p;
+				if (p > top)
+					top = p;
+			}
+		CHECK(clear < ART_BOX_SIZE);
+		CHECK_EQ(used | 1u, (2u << top) - 1);
+	}
+	const struct ui_theme *was = ui_theme();
+	ui_theme_select(&ui_theme_light);
+	CHECK(art_box_colours(ART_BOX_GBA) == art_box_palettes[ART_BOX_GBA][0]);
+	CHECK(art_box_colours(ART_BOX_COUNT) == art_box_palettes[ART_BOX_OTHER][0]);
+	ui_theme_select(&ui_theme_dark);
+	CHECK(art_box_colours(ART_BOX_NES) == art_box_palettes[ART_BOX_NES][1]);
+	ui_theme_select(was);
 }
 
 void test_art_obj_budget(void)

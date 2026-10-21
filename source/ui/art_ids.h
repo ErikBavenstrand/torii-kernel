@@ -64,6 +64,15 @@ enum {
 	ART_SPRITE_COUNT
 };
 
+enum {
+	ART_BOX_GB,
+	ART_BOX_GBA,
+	ART_BOX_GBC,
+	ART_BOX_NES,
+	ART_BOX_OTHER,
+	ART_BOX_COUNT
+};
+
 #define ART_SHADOW_COUNT 6
 
 // The carousel's items, in its order

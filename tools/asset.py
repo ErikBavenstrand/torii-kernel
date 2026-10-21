@@ -237,7 +237,6 @@ SPRITE_FOOT = _ART_H["ART_SPRITE_FOOT"]
 SPRITE_COLOURS = _ART_H["ART_SPRITE_COLOURS"]
 SHADOW_INDEX = _ART_H["ART_SHADOW_INDEX"]
 BOX_SIZE = _ART_H["ART_BOX_SIZE"]
-BOX_COLOURS = max(_ART_H[k] for k in ("ART_BOX_BAND", "ART_BOX_BODY", "ART_BOX_SHAPE"))
 assert _ART_H["ART_SPRITE_TILES"] == SPRITE_SIZE * SPRITE_SIZE // 64
 assert _ART_H["ART_BOX_TILES"] == BOX_SIZE * BOX_SIZE // 64
 assert SPRITE_COLOURS < SHADOW_INDEX <= 15
@@ -392,21 +391,47 @@ def art_shadow(path: Path) -> tuple[list[list[int]], int, int]:
     )
 
 
-def art_box(path: Path) -> tuple[list[list[int]], list[int]]:
-    """(80x80 indices, 16 colours) from an indexed PNG, taken as it is."""
-    from PIL import Image
+def hex_colour(text: str) -> tuple[int, int, int]:
+    if not re.fullmatch(r"#[0-9A-Fa-f]{6}", text):
+        raise ArtError(f"assets/ui/art.toml: {text!r} is no #RRGGBB colour")
+    return tuple(int(text[i : i + 2], 16) & 0xF8 for i in (1, 3, 5))  # type: ignore[return-value]
 
-    img = Image.open(path)
-    img.load()
-    if img.mode != "P" or img.size != (BOX_SIZE, BOX_SIZE):
-        raise ArtError(f"{rel(path)}: make it an indexed {BOX_SIZE}x{BOX_SIZE} PNG")
-    data = list(img.get_flattened_data())
-    if max(data) > BOX_COLOURS:
-        raise ArtError(f"{rel(path)}: uses index {max(data)}; it has {BOX_COLOURS}")
-    rgb = (img.getpalette() or []) + [0] * 48
-    palette = [0] + [bgr555(*rgb[3 * i : 3 * i + 3]) for i in range(1, BOX_COLOURS + 1)]
-    rows = [data[y * BOX_SIZE : (y + 1) * BOX_SIZE] for y in range(BOX_SIZE)]
-    return rows, palette + [0] * (16 - len(palette))
+
+def art_box(
+    path: Path, dark: dict[tuple[int, int, int], tuple[int, int, int]]
+) -> tuple[list[list[int]], list[int], list[int]]:
+    """(80x80 indices, light colours, dark colours): a placeholder box, its
+    colours in dark replaced in the dark theme's."""
+    rows = rgba_pixels(path)
+    sized(path, rows, BOX_SIZE, BOX_SIZE)
+    light = [0]
+    cells = index_rows(rows, light, path, 16)
+    by_value = {bgr555(*c): c for row in rows for c in row if c is not None}
+    shade = [0] + [bgr555(*dark.get(by_value[v], by_value[v])) for v in light[1:]]
+    pad = [0] * (16 - len(light))
+    return cells, light + pad, shade + pad
+
+
+def art_boxes(
+    dark_map: dict[str, str],
+) -> tuple[list[str], list[tuple[list[list[int]], list[int], list[int]]]]:
+    """(names, boxes): every placeholder box in boxes/, by name."""
+    dark = {hex_colour(k): hex_colour(v) for k, v in dark_map.items()}
+    files = art_files("boxes")
+    names = [art_name(p) for p in files]
+    if "other" not in names:
+        raise ArtError("assets/ui/boxes: draw other.png, the box for anything else")
+    clash = {"size", "tiles", "count"} & set(names)
+    if clash:
+        raise ArtError(f"assets/ui/boxes: rename {min(clash)}.png (its id is taken)")
+    boxes = [art_box(p, dark) for p in files]
+    used = {bgr555(*c) for p in files for row in rgba_pixels(p) for c in row if c}
+    for c in dark:
+        if bgr555(*c) not in used:
+            raise ArtError(
+                f"assets/ui/art.toml: box_dark replaces #{c[0]:02X}{c[1]:02X}{c[2]:02X}, which no box uses"
+            )
+    return names, boxes
 
 
 def c_words(data: bytes, indent: str = "\t") -> list[str]:
@@ -442,7 +467,7 @@ def art_sources() -> tuple[str, str]:
     for path in art_files("sprites"):
         sprite_names.append(art_name(path))
         sprites.append(art_sprite(path))
-    box_rows, box_palette = art_box(ART_DIR / "box.png")
+    box_names, boxes = art_boxes(manifest.get("box_dark", {}))
 
     def shadow_for(width: int) -> int:
         fits = [i for i, s in enumerate(shadows) if s[1] <= width]
@@ -480,6 +505,7 @@ def art_sources() -> tuple[str, str]:
         "",
         *enum("ART_ICON8", icon8_names, "ART_ICON8_COUNT"),
         *enum("ART_SPRITE", sprite_names, "ART_SPRITE_COUNT"),
+        *enum("ART_BOX", box_names, "ART_BOX_COUNT"),
         f"#define ART_SHADOW_COUNT {len(shadows)}",
         "",
         "// The carousel's items, in its order",
@@ -546,9 +572,24 @@ def art_sources() -> tuple[str, str]:
         data += ["\t{"] + c_words(tiles_of(rows, 4), "\t\t") + ["\t},"]
     data += ["};", "", "const struct art_shadow art_shadows[ART_SHADOW_COUNT] = {"]
     data += [f"\t{{{w}, {h}}}," for _, w, h in shadows]
-    data += ["};", "", "const u32 art_box_tiles[ART_BOX_TILES * 8] = {"]
-    data += c_words(tiles_of(box_rows, 4))
-    data += ["};", "", f"const u16 art_box_palette[16] = {c_halves(box_palette)};", ""]
+    data += ["};", "", "const u32 art_box_tiles[ART_BOX_COUNT][ART_BOX_TILES * 8] = {"]
+    for name, (rows, _, _) in zip(box_names, boxes, strict=True):
+        data += (
+            [f"\t[{c_id('ART_BOX', name)}] = {{"]
+            + c_words(tiles_of(rows, 4), "\t\t")
+            + ["\t},"]
+        )
+    data += ["};", "", "const u16 art_box_palettes[ART_BOX_COUNT][2][16] = {"]
+    for name, (_, light, dark) in zip(box_names, boxes, strict=True):
+        data += [
+            f"\t[{c_id('ART_BOX', name)}] = {{",
+            f"\t\t{c_halves(light)},",
+            f"\t\t{c_halves(dark)},",
+            "\t},",
+        ]
+    data += ["};", "", "const char *const art_box_names[ART_BOX_COUNT] = {"]
+    data += [f'\t[{c_id("ART_BOX", n)}] = "{n}",' for n in box_names]
+    data += ["};", ""]
     data += ["const struct art_item art_items[ART_ITEM_COUNT] = {"]
     for item, icon16, icon8, sprite in items:
         data.append(

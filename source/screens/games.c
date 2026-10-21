@@ -109,7 +109,6 @@ static struct {
 	u8 hint_count;
 	u8 cap_note;       // the hint bar shows the library cap's note
 	char cap_text[40];  // "Showing the first 4,096 games"
-	u16 box_palette[16];
 	// What fetch draws from: valid until the next fetch (a row draws at once)
 	char name[GAMENAME_MAX + 1];
 	char detail[AGO_MAX];
@@ -346,7 +345,8 @@ static const struct ui_hints_config no_hints = {0, 0};
 static const struct ui_label_config note_label = {"", UI_FONT_BODY, UI_ALIGN_CENTER, 0, 0};
 static const struct ui_label_config keys_label = {"", UI_FONT_BODY, UI_ALIGN_LEFT, 0, 0};
 static const struct ui_label_config values_label = {"", UI_FONT_BODY, UI_ALIGN_RIGHT, UI_LABEL_SWAP, 0};
-static const struct ui_image_config box_image = {art_box_tiles, art_box_palette, 0};  // its own: box art goes there
+static const struct ui_image_config box_image = {art_box_tiles[ART_BOX_OTHER], art_box_palettes[ART_BOX_OTHER][0],
+						 0};  // its own: box art goes there
 static const struct ui_scrollbar_config bar_compact = {N_LIST_COMPACT};
 static const struct ui_scrollbar_config bar_art = {N_LIST_ART};
 
@@ -622,8 +622,17 @@ static void show_position(void)
 	show_cap_note();
 }
 
-// List with art: the selected game's box art, or the placeholder box in its
-// console colour, and its size and when it was played
+// The placeholder box of each console (LIB_GBA...), for a game without art
+_Static_assert(LIB_CONSOLES == 4, "give a new console its placeholder box");
+static const u8 console_box[LIB_CONSOLES] = {
+	[LIB_GBA] = ART_BOX_GBA,
+	[LIB_GBC] = ART_BOX_GBC,
+	[LIB_GB] = ART_BOX_GB,
+	[LIB_NES] = ART_BOX_NES,
+};
+
+// List with art: the selected game's box art, or its console's placeholder
+// box, and its size and when it was played
 static void show_facts(void)
 {
 	if (!games.art)
@@ -631,10 +640,7 @@ static void show_facts(void)
 	struct game g;
 	games.fact_keys[0] = games.fact_values[0] = 0;
 	if (game_at(games.cursor, &g)) {
-		u32 console = g.console < LIB_CONSOLES ? g.console : LIB_GBA;
-		memcpy(games.box_palette, art_box_palette, sizeof(games.box_palette));
-		games.box_palette[ART_BOX_BAND] = ui_theme()->accent[PAL_GBA + console].base;
-		boxart_select(games.cursor, games.box_palette);
+		boxart_select(games.cursor, g.console < LIB_CONSOLES ? console_box[g.console] : ART_BOX_OTHER);
 		char size[AGO_MAX] = "", ago[AGO_MAX] = "";
 		if (g.rec != LIBRARY_NONE)
 			gamelist_size(size, sizeof(size), library_size(g.rec), gl_games->size_kb, gl_games->size_mb);
@@ -646,8 +652,7 @@ static void show_facts(void)
 			 gl_games->fact_played);
 		snprintf(games.fact_values, sizeof(games.fact_values), "%s\n%s", size, ago);
 	} else {
-		memcpy(games.box_palette, art_box_palette, sizeof(games.box_palette));
-		boxart_select(games.cursor, games.box_palette);  // no game: the placeholder
+		boxart_select(games.cursor, ART_BOX_OTHER);  // no game: the plain placeholder
 	}
 	ui_label_set(node(N_FACT_KEYS), games.fact_keys);
 	ui_label_set(node(N_FACT_VALUES), games.fact_values);

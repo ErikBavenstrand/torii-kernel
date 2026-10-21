@@ -1,8 +1,9 @@
 #! kernel test
 # Every piece of the menu's art at 1:1 (tests/kernel/art_sheet.c: the test
 # kernel with SELECT and R held): the icons, the 8x8 icons in two colours,
-# the ground shadows and the placeholder box, then the carousel objects on
-# their shadows, two pages. A redrawn PNG changes these (`just shots-update
+# the ground shadows and the GBA placeholder box, then the carousel objects
+# on their shadows, two pages, then the placeholder boxes in the light and
+# the dark theme. A redrawn PNG changes these (`just shots-update
 # art-sheet`).
 -k 1:SELECT+R
 -w "screen ready: art-sheet-1"
@@ -14,3 +15,9 @@
 -k @10:A -k @14:-
 -w "screen ready: art-sheet-3"
 -s @2:sprites2.png
+-k @10:A -k @14:-
+-w "screen ready: art-sheet-4"
+-s @2:boxes-light.png
+-k @10:A -k @14:-
+-w "screen ready: art-sheet-5"
+-s @2:boxes-dark.png

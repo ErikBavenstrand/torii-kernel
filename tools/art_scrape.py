@@ -34,6 +34,13 @@ kernel hides) it:
 4. Converts the picture as `just art-add` does (80x80, 15 colours) and
    writes /torii/art/<CRC32>.bin.
 
+Then, for each console, it makes the placeholder the kernel shows for a game
+without art, /torii/art/box-<console>.bin: one official box of that console
+with its artwork and title replaced by a skeleton torii (tools/art_boxes.py).
+It does so for the consoles the card has games of. One missing from the
+card is made, fetching its box if need be; one on the card is made again,
+and rewritten if it differs, only from a box already in the cache.
+
 Fetching is polite: one request at a time, --delay seconds apart (default
 0.5), with a User-Agent; only a server error (5xx) is retried. Pictures are
 kept in dist/art-cache (git-ignored), so a second run downloads nothing it
@@ -68,6 +75,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 sys.path.append(str(ROOT / "tests"))  # library_idx, after tools
 import art
+import art_boxes
 import asset
 import library_idx
 import names_db
@@ -396,6 +404,48 @@ def stale_art(games, crcs, tables, codes, have):
     return out
 
 
+def scrape_boxes(fetcher, art_dir, consoles, dry_run):
+    """Makes the placeholders (art_boxes) of consoles, the card's wanted
+    ones with games; returns (console, how) each: "new", "remade", "kept",
+    "missing", "not fetched" or "would make". A file the same as it would
+    be made is kept as it is."""
+    out = []
+    for t in art_boxes.TEMPLATES:
+        if t.system not in consoles:
+            continue
+        file = art_dir / f"box-{t.console}{art.EXT}"
+        name = thumbnail_name(t.name)
+        state = fetcher.known(t.system, name)
+        if file.exists() and state != "cached":
+            out.append((t.console, "kept"))
+            continue
+        if dry_run:
+            out.append((t.console, "missing" if state == "missing" else "would make"))
+            continue
+        path = fetcher.get(t.system, name)
+        if path is None:
+            unasked = fetcher.known(t.system, name) is None
+            out.append((t.console, "not fetched" if unasked else "missing"))
+            continue
+        try:
+            data = art_boxes.make(t, path)
+        except (art.ArtError, OSError, ValueError, Image.DecompressionBombError) as e:
+            print(
+                f"art-scrape: {path.name}: can't make the placeholder ({e})",
+                file=sys.stderr,
+            )
+            fetcher.forget(t.system, name)
+            out.append((t.console, "missing"))
+            continue
+        if file.exists() and file.read_bytes() == data:
+            out.append((t.console, "kept"))
+            continue
+        how = "remade" if file.exists() else "new"
+        write_art(file, data)
+        out.append((t.console, how))
+    return out
+
+
 def scrape(args):
     sd = Path(args.sd_path)
     if not sd.is_dir():
@@ -496,7 +546,15 @@ def scrape(args):
     if tty:
         print("\r\033[K", end="", file=sys.stderr)
 
+    boxes = scrape_boxes(fetcher, art_dir, {g[2] for g in games}, args.dry_run)
+    have |= {
+        folded(f"box-{c}{art.EXT}")
+        for c, how in boxes
+        if how in ("new", "remade", "kept")
+    }
     report(results, args.dry_run, fetcher, version)
+    if boxes:
+        print("placeholders: " + ", ".join(f"{c} {how}" for c, how in boxes))
     if fetcher.stopped:
         print(f"art-scrape: stopped fetching: {fetcher.stopped}", file=sys.stderr)
     if not args.dry_run and len(have) > ARTSET_MAX:

@@ -33,6 +33,16 @@ u32 artkey_parse(const char *name, u32 *key)
 {
 	u32 stem = artkey_custom_len(name);
 	u32 value = 0;
+	// A box first, whatever its console's name's length
+	if (stem > ARTKEY_BOX_PREFIX_LEN) {
+		u32 i = 0;
+		while (i < ARTKEY_BOX_PREFIX_LEN && lower((u8)name[i]) == (u8)ARTKEY_BOX_PREFIX[i])
+			i++;
+		if (i == ARTKEY_BOX_PREFIX_LEN) {
+			*key = artkey_name(name + i, stem - i);
+			return ARTKEY_BOX;
+		}
+	}
 	if (stem == 8) {
 		for (u32 i = 0; i < 8; i++) {
 			u32 d = hex_digit((u8)name[i]);

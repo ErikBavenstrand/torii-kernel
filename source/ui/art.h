@@ -1,5 +1,5 @@
 // The menu's art: 16x16 icons, 8x8 icons, the carousel objects, their ground
-// shadows and the placeholder box, by id, so screens never name tile
+// shadows and the placeholder boxes, by id, so screens never name tile
 // offsets. `just assets` converts the PNGs in assets/ui into art_data.c and
 // art_ids.h (the ids); redrawing one is a PNG edit and `just assets`.
 //
@@ -23,10 +23,13 @@
 //   drawn with the object's bank in colour ART_SHADOW_INDEX. The drawn rows
 //   are centred in the 8: put the halves' top ART_SHADOW_RISE rows above
 //   the foot row.
-// - The placeholder box: ART_BOX_SIZE square 4bpp BG tiles, 10 a row (map
-//   them in order; 80x80 is no sprite size), in a BG bank of its own
-//   (a ui_image, as list with art shows it) whose colours ART_BOX_* the screen recolours: its
-//   defaults are GBA indigo, a muted red and a darker red.
+// - The placeholder boxes (ART_BOX_*, one a console and ART_BOX_OTHER):
+//   ART_BOX_SIZE square 4bpp BG tiles, 10 a row (map them in order; 80x80
+//   is no sprite size), in a BG bank of their own (a ui_image, as list with
+//   art shows them). Each looks like its console's box with a skeleton
+//   picture, for a game without art; art_box_colours gives its colours in
+//   the current theme. The card's own placeholder, /torii/art/box-<name>.bin
+//   (boxart.h), shows in place of one when the scraper made it.
 // - Items (ART_ITEM_*, in the carousel's order): each item's 16x16 icon,
 //   8x8 icon and carousel object.
 //
@@ -54,10 +57,6 @@
 #define ART_SHADOW_RISE 4
 #define ART_BOX_SIZE 80
 #define ART_BOX_TILES 100
-// The placeholder box's colour indices
-#define ART_BOX_BAND 1  // the band across the top (the console's base)
-#define ART_BOX_BODY 2
-#define ART_BOX_SHAPE 3  // the hill and the ground on the body
 
 // Tags of the engine blocks the loaders take: kind << 8 | id
 #define ART_TAG_ICON16 0xA000
@@ -88,8 +87,9 @@ extern const u16 art_sprite_palettes[ART_SPRITE_COUNT][16];
 extern const struct art_sprite art_sprites[ART_SPRITE_COUNT];
 extern const u32 art_shadow_tiles[ART_SHADOW_COUNT][ART_SHADOW_HALF_TILES * 8];
 extern const struct art_shadow art_shadows[ART_SHADOW_COUNT];  // narrowest first
-extern const u32 art_box_tiles[ART_BOX_TILES * 8];
-extern const u16 art_box_palette[16];
+extern const u32 art_box_tiles[ART_BOX_COUNT][ART_BOX_TILES * 8];
+extern const u16 art_box_palettes[ART_BOX_COUNT][2][16];  // light, then dark
+extern const char *const art_box_names[ART_BOX_COUNT];  // "gba"...: the card's box-<name>.bin
 extern const struct art_item art_items[ART_ITEM_COUNT];
 
 // The 16 colours of a 16x16 icon's bank (it shares them with its pair).
@@ -101,6 +101,8 @@ void art_icon8_tile(u32 id, u32 colour, u32 out[8]);
 // The widest ground shadow no wider than width pixels (the narrowest if
 // none is).
 u32 art_shadow_for(u32 width);
+// A placeholder box's 16 colours in the current theme (ui_theme).
+const u16 *art_box_colours(u32 box);
 // A carousel object's 16 colours with ground (the shadow's tone) in
 // ART_SHADOW_INDEX, for its bank; fog steps them toward the backdrop.
 void art_sprite_colours(u32 sprite, u16 ground, u16 out[16]);
