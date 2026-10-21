@@ -26,6 +26,9 @@ lists it (the boot saves the list in Torii's format): ROM's bytes at the
 next free 128 KB block, its area SIZE bytes rounded up to whole blocks, and
 an entry named NAME, so a NOR page shows games of any size without writing
 them through the menu (nor-page).
+"#! sd-many FOLDER COUNT" makes FOLDER on the card with COUNT small games,
+"Game 0001.gba" on, in that order (sd-many: a folder past the SD card page's
+1,024 entries).
 "#! env NAME=VALUE" sets an environment variable for the emulated cart, as
 OMEGA_COPY_RATE=BYTES (bytes the cart's ROM copy moves per frame), which
 makes a launch's copy take as long as the cart's (boot-copy). A scenario with
@@ -272,6 +275,18 @@ def boot(name: str, sd: Path, cart: Path, out: Path, extra: list[str] = ()):
         elif line.startswith("#! nor-game "):
             _, _, name, size, src = shlex.split(line)
             nor_game(cart, name, int(size, 0), Path(src).read_bytes())
+        elif line.startswith("#! sd-many "):
+            _, _, folder, count = shlex.split(line)
+            stage = cart / "many"
+            stage.mkdir()
+            files = []
+            for i in range(1, int(count) + 1):
+                f = stage / f"Game {i:04d}.gba"
+                f.write_bytes(bytes(32))
+                files.append(str(f))
+            run(["mmd", "-i", str(cart / "sd.img"), f"::{folder}"])
+            run(["mcopy", "-Q", "-i", str(cart / "sd.img"), *files, f"::{folder}/"])
+            shutil.rmtree(stage)
         elif line.startswith("#! env "):
             name, _, value = line.split(maxsplit=2)[2].partition("=")
             cart_env[name] = value

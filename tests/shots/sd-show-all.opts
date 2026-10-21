@@ -1,0 +1,7 @@
+# Show all files on: the SD card page lists every entry at the root,
+# Torii's folder and the system folders too
+#! settings 28=1 33=1
+-w "nav: home ready"
+-k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:LEFT -k @28:- -k @32:LEFT -k @36:- -k @40:A -k @44:-
+-w "sdcard: counted /"
+-s @2:root.png

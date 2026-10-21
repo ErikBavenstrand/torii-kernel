@@ -20,7 +20,6 @@
 #include "RTC.h"
 #include "tlog.h"
 #include "waitcnt.h"
-#include "sort.h"
 #include "savename.h"
 #include "NORflash_OP.h"
 #include "lang.h"
@@ -43,8 +42,6 @@ FM_NOR_FS pNorFS[MAX_NOR] EWRAM_BSS;
 
 u32 FAT_table_buffer[FAT_table_size / 4] EWRAM_BSS;
 u8 pReadCache[MAX_pReadCache_size] EWRAM_BSS;  // a scratch buffer: its owners are in ez_define.h
-_Static_assert(READCACHE_SORT_WORK % 4 == 0 && READCACHE_SORT_WORK + SORT_WORK_SIZE <= 0x2000,
-	       "the sort's work buffer meets the cheat list");
 
 void readcache_poison(void)
 {
@@ -56,9 +53,7 @@ void readcache_poison(void)
 TCHAR currentpath[MAX_path_len];//
 TCHAR current_filename[GAME_NAME_MAX + 1] EWRAM_BSS;
 
-u32 game_total_SD;
 u32 game_total_NOR;
-u32 folder_total;
 
 u32 gl_currentpage;
 u32 gl_norOffset;

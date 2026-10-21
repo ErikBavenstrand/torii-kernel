@@ -38,8 +38,13 @@ static const struct {
 	const char *name;
 	void (*run)(void);
 } tests[] = {
-	{"sort_matches_kernel", test_sort_matches_kernel},
 	{"library_extensions", test_library_extensions},
+	{"sdlist_order", test_sdlist_order},
+	{"sdlist_cap", test_sdlist_cap},
+	{"sdlist_area_full", test_sdlist_area_full},
+	{"sdlist_counts", test_sdlist_counts},
+	{"sdlist_texts", test_sdlist_texts},
+	{"sdlist_random", test_sdlist_random},
 	{"library_sort_key", test_library_sort_key},
 	{"library_build_and_sort", test_library_build_and_sort},
 	{"library_sort_random", test_library_sort_random},
@@ -61,10 +66,6 @@ static const struct {
 	{"names_cache_full", test_names_cache_full},
 	{"names_lines", test_names_lines},
 	{"names_db_name", test_names_db_name},
-	{"sort_is_stable", test_sort_is_stable},
-	{"sort_limits", test_sort_limits},
-	{"sort_largest_list", test_sort_largest_list},
-	{"sort_by_accessor", test_sort_by_accessor},
 	{"cheat_parse", test_cheat_parse},
 	{"cheat_reads_only_len", test_cheat_reads_only_len},
 	{"cheat_long_fields", test_cheat_long_fields},

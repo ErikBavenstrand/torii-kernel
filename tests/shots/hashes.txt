@@ -278,6 +278,25 @@ page-empty/frames 10-10 76C0480B490D7FC3
 page-empty/frames 11-11 AC9324EBF1A166BF
 page-empty/frames 12-21 B62B7D8B2814CB3F
 page-empty/frames 22-22 A1CB849A5F1C97D8
+sd-dark/folder DFD4D3341592285D
+sd-dark/root 225FC0C5D082ACA9
+sd-many/end BB72E1C5C486A00C
+sd-many/root ABB8F464CD451D8C
+sd-root/back 7639FAE28B4FA9BF
+sd-root/confirm 5C09254428F1A147
+sd-root/folder 4EFA74E715B11C85
+sd-root/popup E7E39D7ED3081EC0
+sd-root/root 0B86CD9E94EA7AD7
+sd-root/frames 0-13 9D9FF35D00B0331F
+sd-root/frames 14-14 55B3C73B6B6FB745
+sd-root/frames 15-15 AA39F047F507D92A
+sd-root/frames 16-16 066487E22739A981
+sd-root/frames 17-17 835B691CA7776861
+sd-root/frames 18-18 AF6DDB5D7E9E7BBD
+sd-root/frames 19-19 26DE9A96260D3839
+sd-root/frames 20-20 98567999AC9BFE75
+sd-root/frames 21-24 4EFA74E715B11C85
+sd-show-all/root 5A2B75D8F32FD93E
 ui-dialog/closed 942FEA8E68027B47
 ui-dialog/dialog 1EC3EDCC05C5D114
 ui-dialog/frames 0-0 942FEA8E68027B47

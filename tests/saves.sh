@@ -190,8 +190,8 @@ full)
   fsck.fat -n "$cart/sd.img" >/dev/null || fail "fsck.fat found errors after launching anyway"
   cart=$main
 
-  # Power-on 6: the copy fails again; deleting Filler.gba (as the SD card
-  # page will, through actions.c; its question comes with B14) makes room,
+  # Power-on 6: the copy fails again; deleting Filler.gba (the action the
+  # SD card page's Delete runs after its question, through the hook) makes room,
   # and CLEAN BOOT of Test.gba tries the copy again: it is written whole,
   # the record goes, and the game starts.
   # shellcheck disable=SC2046 # nav.sh's options

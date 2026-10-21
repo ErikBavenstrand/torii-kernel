@@ -109,16 +109,18 @@ $(index "$cart")"
   index "$cart" --header | grep -qx "flags 0" || fail "the index says truncated"
   echo "PASS: the first boot indexes nested folders A-Z per console, skips hidden and too-deep ones, and finds saves"
 
-  # Power-on 2: loaded, the walk finds nothing new and writes nothing. (The
-  # SD card page not showing Torii's folder comes back with B14.)
-  echo "SKIP (waiting for B14): the SD card page doesn't show Torii's folder"
-  boot "$cart" "$cart/2.log" -f 300
+  # Power-on 2: loaded, the walk finds nothing new and writes nothing. The
+  # SD card page lists the root as the index walks it: Torii's folder and
+  # the other hidden entries left out
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot "$cart" "$cart/2.log" $(nav_to sd) -f 400
+  logged "$cart/2.log" "sdcard: listed /: 3 folders, 2 files"
   logged "$cart/2.log" "library: loaded 9 games (GBA 6, GBC 1, GB 1, NES 1)"
   logged "$cart/2.log" "library: unchanged"
   not_logged "$cart/2.log" "library: wrote"
   not_logged "$cart/2.log" "screen ready: progress"
   no_errors "$cart/2.log"
-  echo "PASS: a later boot loads the index, finds the card unchanged and writes nothing"
+  echo "PASS: a later boot loads the index, finds the card unchanged and writes nothing; the SD card page hides what it hides"
 
   # Changes from a PC: one game added in the root and one in a nested
   # folder, one removed, one renamed, and a save made

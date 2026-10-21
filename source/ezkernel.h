@@ -68,8 +68,6 @@ u32 LoadRTSfile(TCHAR *filename);
 // after: a copy in RAM, as the library's names are in PSRAM, which a launch
 // fills.
 extern TCHAR current_filename[GAME_NAME_MAX + 1];
-extern u32 game_total_SD;
-extern u32 folder_total;
 extern u32 game_total_NOR;
 
 // A game on its way to its launch (actions.c).

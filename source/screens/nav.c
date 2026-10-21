@@ -15,6 +15,7 @@
 #include "home.h"
 #include "info.h"
 #include "nor.h"
+#include "sdcard.h"
 #include "../actions.h"
 #include "../ezkernel.h"
 #include "../Ezcard_OP.h"
@@ -241,7 +242,7 @@ static const struct nav_page empty_page = {empty_enter, 0, empty_clock, 0};
 // Each item's page: a page ticket puts its own here
 static const struct nav_page *const pages[NAV_ITEMS] = {
 	[NAV_RECENT] = &empty_page, [NAV_FAV] = &empty_page, [NAV_GBA] = &empty_page, [NAV_GBC] = &empty_page,
-	[NAV_GB] = &empty_page,     [NAV_NES] = &empty_page, [NAV_SD] = &empty_page,  [NAV_NOR] = &nor_page,
+	[NAV_GB] = &empty_page,     [NAV_NES] = &empty_page, [NAV_SD] = &sdcard_page, [NAV_NOR] = &nor_page,
 	[NAV_SET] = &empty_page,    [NAV_INFO] = &info_page,
 };
 

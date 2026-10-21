@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Names past a v0.3 list entry's 100 bytes: they launch and save whole on
 # FAT32, launching or deleting one touches no other file on exFAT, and one
-# too long for the pending-save record says so. Launches and deletes go as
-# the pages will (actions.c, through tests/nav.sh's hook). What the SD card
-# page lists (read-only and no-archive entries, not hidden or system ones)
-# comes back with B14.
+# too long for the pending-save record says so. The SD card page lists
+# read-only and no-archive entries, not hidden or system ones, and starts
+# the long name; the other launches and deletes go through tests/nav.sh's
+# hook (actions.c), as the pages run them.
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and building tests/roms/hello.
 set -euo pipefail
@@ -37,7 +37,17 @@ mattrib -i "$cart/sd.img" +h ::/Hidden.gba
 mattrib -i "$cart/sd.img" +s ::/System.gba
 mattrib -i "$cart/sd.img" +r ::/RODir
 mattrib -i "$cart/sd.img" +h ::/HidDir
-echo "SKIP (waiting for B14): the SD card page shows read-only and no-archive entries, not hidden or system ones"
+# The SD card page: Plain and RODir, then the long name, NoArchive, Normal
+# and ReadOnly; A on the long name (row 2) starts it. On a copy of the
+# card: the launch leaves a save to copy at the next power-on.
+rm -rf "$cart-page" && cp -r "$cart" "$cart-page"
+# shellcheck disable=SC2046 # nav.sh's options
+OMEGA_DIR=$cart-page emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_file "/$long" 2 open) -f 600 >"$cart/page.log" 2>&1
+grep -qF "kernel: sdcard: listed /: 2 folders, 4 files" "$cart/page.log" ||
+  fail "FAT32: the page listed $(grep 'sdcard: listed' "$cart/page.log")"
+grep -qF "kernel: launch: loading $long, CLEAN BOOT" "$cart/page.log" ||
+  fail "FAT32: the page didn't start the long name: $(grep '^kernel' "$cart/page.log" | tail -2)"
+echo "PASS: the SD card page lists read-only and no-archive entries, not hidden or system ones, and starts a long name"
 
 # The long name launches whole and gets a save of its own name
 # shellcheck disable=SC2046 # nav.sh's options

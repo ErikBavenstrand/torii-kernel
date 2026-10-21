@@ -2,11 +2,6 @@
 #ifndef TORII_HOST_TESTS_H
 #define TORII_HOST_TESTS_H
 
-void test_sort_matches_kernel(void);
-void test_sort_is_stable(void);
-void test_sort_limits(void);
-void test_sort_largest_list(void);
-void test_sort_by_accessor(void);
 void test_cheat_parse(void);
 void test_cheat_reads_only_len(void);
 void test_cheat_long_fields(void);
@@ -154,6 +149,12 @@ void test_userdata_clock(void);
 void test_userdata_ago(void);
 
 void test_library_extensions(void);
+void test_sdlist_order(void);
+void test_sdlist_cap(void);
+void test_sdlist_area_full(void);
+void test_sdlist_counts(void);
+void test_sdlist_texts(void);
+void test_sdlist_random(void);
 void test_library_sort_key(void);
 void test_library_build_and_sort(void);
 void test_library_sort_random(void);

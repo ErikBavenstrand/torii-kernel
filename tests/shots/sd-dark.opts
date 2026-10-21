@@ -1,0 +1,9 @@
+# The SD card page in the dark theme (the default): the root, then a
+# folder with its path's pills
+-w "nav: home ready"
+-k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:LEFT -k @28:- -k @32:LEFT -k @36:- -k @40:A -k @44:-
+-w "sdcard: counted /"
+-s @2:root.png
+-k @8:A -k @12:-
+-w "sdcard: ready /Games"
+-s @1:folder.png

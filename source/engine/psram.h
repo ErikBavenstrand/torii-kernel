@@ -8,7 +8,7 @@
 // the same, in case something left another page selected. The map of page 0
 // while the menu runs (docs/plans/v0.4-decisions.md, PSRAM map):
 //
-//	0 MB      the SD list's file names (nameindex.h), PSRAM_NAMES_BYTES
+//	0 MB      the SD card page's folder listing (sdlist.h), PSRAM_NAMES_BYTES
 //	0.81 MB   the library walk's scratch: its save table, sort buffer and
 //	          a copy of /torii/names.txt
 //	1 MB      the library index: two slots of LIB_SLOT_BYTES (library.h),
