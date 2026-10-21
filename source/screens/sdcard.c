@@ -50,9 +50,9 @@
 #define LIST_H 112    // 8 rows of 14 px: whole rows (B9's contract)
 #define LIST_PAD 4    // the icon's inset in its row
 #define DETAIL_W 60   // the size or the count ("1,024+ items")
-#define NOTE_X 48     // an empty folder's note, in the card's middle (narrow: plane
+#define NOTE_X 72     // an empty folder's note, in the card's middle (narrow: plane
 #define NOTE_Y 72     // 2's tiles are the popups' and confirmations' too)
-#define NOTE_W 144
+#define NOTE_W 96
 #define NOTE_H 16
 #define HINTS_H 16
 static const struct ui_card_config card = {4, 4, 4, 1, 0};

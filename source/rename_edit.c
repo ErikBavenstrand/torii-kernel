@@ -83,8 +83,10 @@ int rename_edit_type(struct rename_edit *e, u32 c)
 static u32 before(const struct rename_edit *e)
 {
 	u32 at = e->caret;
-	while (at > 0 && continuation(e->text[--at]))
-		;
+	if (at > 0)
+		at--;
+	while (at > 0 && continuation(e->text[at]))
+		at--;
 	return at;
 }
 

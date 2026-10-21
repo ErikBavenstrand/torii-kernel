@@ -736,10 +736,16 @@ static void tick(struct ui_view *v)
 		kb.caret_on = !kb.caret_on;
 		ui_canvas_redraw(node(N_FIELD));
 	}
-	if (kb.counter_off && !--kb.counter_off)
-		ui_canvas_redraw(node(N_FIELD));
-	if (kb.message && !--kb.message)
-		show_hints();
+	if (kb.counter_off) {
+		kb.counter_off--;
+		if (!kb.counter_off)
+			ui_canvas_redraw(node(N_FIELD));
+	}
+	if (kb.message) {
+		kb.message--;
+		if (!kb.message)
+			show_hints();
+	}
 	u8 want = kb.want;
 	kb.want = WANT_NONE;
 	if (want == WANT_OK)
