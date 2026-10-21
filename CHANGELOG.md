@@ -6,6 +6,14 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** L and R no longer page game lists or the SD card page: hold
+  L and press A to start the selected game with a hard reset (C1).
+- **Changed:** a game with a save shows a small floppy mark beside its size
+  instead of an unexplained dot (C1).
+- **Added:** Settings' GBA boot mode (With addons or Clean) sets how A, Play
+  and Launch start GBA games; Game info's Boot mode overrides it per game,
+  kept in byte 1 of the game's `/SAVER` `.mde` file, which v0.3 ignores (C1;
+  `f6a6e66`, `ba54472`, `44ed091`).
 - **Changed:** romhacks keep their own names and art: a game is named and
   boxed by its No-Intro CRC only, never by the GBA game code a romhack shares
   with its base game; the library index is rebuilt once. Info's Controls says
