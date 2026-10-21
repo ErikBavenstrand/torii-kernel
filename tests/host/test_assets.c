@@ -214,7 +214,7 @@ void test_artkey_names(void)
 	CHECK_EQ(key, 0x5D5C613Eu);
 	CHECK_EQ(artkey_parse("5d5c613e.BIN", &key), ARTKEY_CRC);  // FAT's case
 	CHECK_EQ(key, 0x5D5C613Eu);
-	// Art by GBA game code (v0.4.1's scraper) isn't read: a romhack has its base's code
+	// Art by GBA game code (v0.4.1 read it) isn't read: a romhack has its base's code
 	CHECK_EQ(artkey_parse("AWRE.bin", &key), ARTKEY_NONE);
 	CHECK_EQ(artkey_parse("5D5C613G.bin", &key), ARTKEY_NONE);  // not hex
 	CHECK_EQ(artkey_parse("5D5C613E.png", &key), ARTKEY_NONE);

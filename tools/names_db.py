@@ -540,13 +540,10 @@ def format_names(other, names):
 
 
 def clean_name(name):
-    """A name as Rename keeps it: control characters dropped, the ends
-    trimmed. NamesError if it's too long."""
-    # Control characters and line or paragraph separators, which would split
-    # the line on the PC
-    name = "".join(
-        c for c in name if not unicodedata.category(c).startswith(("C", "Zl", "Zp"))
-    ).strip()
+    """A name as Rename keeps it (source/rename_edit.c, rename_edit_result):
+    ASCII control characters dropped, spaces at the ends trimmed. NamesError
+    if it's too long."""
+    name = "".join(c for c in name if c >= " " and c != "\x7f").strip(" ")
     if len(name.encode("utf-8")) > NAME_BYTES:
         raise NamesError(f"{name[:40]}...: longer than {NAME_BYTES} bytes")
     return name

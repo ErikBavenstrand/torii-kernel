@@ -27,8 +27,9 @@ for "Pokemon - Glazed.gba"), becomes that game's custom art, as above; every
 game on the card with that file name gets it. It prints the games each
 picture went to and the pictures that matched no game. A picture is
 converted again only when it changed: the art takes its picture's date
-(--force: all of them). Two pictures for one game: the first by name wins,
-and the other is reported. --dry-run converts nothing and writes nothing.
+(--force converts all of them, as a new --align needs). Two pictures for
+one game: the first by name that converts wins, and the other is reported.
+--dry-run converts nothing and writes nothing.
 
 convert: the same conversion into OUT.bin, anywhere (B23's scraper uses it).
 
@@ -338,11 +339,11 @@ def add_folder(
                     f"{picture.name}: {name} has art from {taken[art]}: skipped"
                 )
                 continue
-            taken[art] = picture.name
             # The art takes its picture's date: another date is another picture.
             # FAT keeps dates to 2 s
             fresh = out.exists() and abs(out.stat().st_mtime - when) < 2.5
             if fresh and not force:
+                taken[art] = picture.name
                 skipped += 1
                 print(f"  {picture.name} -> {name}: up to date")
                 continue
@@ -352,6 +353,9 @@ def add_folder(
                 except (ArtError, OSError) as e:
                     broken.append(f"{picture.name}: {e}")
                     break
+            taken[art] = (
+                picture.name
+            )  # only once it converted: else the next picture may
             print(f"  {picture.name} -> {name}")
             written += 1
             if not dry_run:

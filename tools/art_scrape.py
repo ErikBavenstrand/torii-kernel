@@ -6,7 +6,7 @@
 """Fetch box art for an SD card's games from libretro-thumbnails.
 
 usage: art_scrape.py SD_PATH [--console C[,C...]] [--dry-run] [--offline]
-                     [--retry-missing] [--delay S] [--cache DIR] [--dats DIR]
+                     [--keep-stale] [--retry-missing] [--delay S] [--cache DIR] [--dats DIR]
 
 `just art-scrape SD_PATH` runs this. SD_PATH is the card's folder on this PC
 (a mounted card, say /Volumes/OMEGA). For every game on the card (the ones
@@ -15,7 +15,11 @@ kernel hides) it:
 
 1. Takes the game's CRC32 from /torii/crc.txt, or computes it and writes
    crc.txt as `just names-update` does, so the kernel finds the art at once.
-2. Keeps what the card has: custom art (/torii/art/custom/<file name>.bin,
+2. Deletes the art v0.4.1's scraper gave romhacks: /torii/art/<CRC32>.bin
+   of a game on the card that step 3 finds no art for (it took the base
+   game's box by the game code). --keep-stale only lists them. Custom art
+   is never touched.
+   Then keeps what the card has: custom art (/torii/art/custom/<file name>.bin,
    from `just art-add`) and art already at /torii/art/<CRC32>.bin.
 3. Looks the CRC up in libretro-database's No-Intro dats (downloaded once to
    dist/dats, shared with `just names-update`). A game they don't list (a
@@ -377,6 +381,21 @@ def scrape_one(fetcher, picks, out, dry_run):
     return ("not fetched" if unasked else "missing"), None
 
 
+def stale_art(games, crcs, tables, codes, have):
+    """Matched art (<CRC32>.bin) of games on the card that no longer get art
+    by their CRC: a romhack that v0.4.1's scraper gave its base game's box
+    by its game code. {art file: [card paths]}; custom art isn't looked at."""
+    out = {}
+    for card_path, _, console in games:
+        crc, code = crcs[card_path]
+        file = f"{crc:08X}{art.EXT}"
+        if folded(file) in have and not candidates(
+            tables, codes, console, crc, code, Path(card_path).name
+        ):
+            out.setdefault(file, []).append(card_path)
+    return out
+
+
 def scrape(args):
     sd = Path(args.sd_path)
     if not sd.is_dir():
@@ -413,12 +432,29 @@ def scrape(args):
     have = listing(art_dir)
     by_code = sorted(f for f in have if re.fullmatch(r"[0-9a-z]{4}\.bin", f))
     if by_code:
-        # v0.4.1 wrote art by GBA game code, which gave romhacks their base game's box
+        # v0.4.1's kernel read art by GBA game code (made by hand: no tool wrote it)
         print(
-            f"art-scrape: {art_dir} has {len(by_code)} files named by game code ({by_code[0]}...), "
-            "which the kernel no longer reads: delete them",
+            f"art-scrape: {art_dir} has {len(by_code)} files named like game codes ({by_code[0]}...), "
+            "which Torii doesn't read",
             file=sys.stderr,
         )
+    stale = stale_art(games, crcs, tables, codes, have)
+    if stale:
+        # v0.4.1's scraper gave a romhack its base game's box by its game
+        # code, under the romhack's own CRC
+        how = (
+            "would delete"
+            if args.dry_run
+            else "kept (--keep-stale)"
+            if args.keep_stale
+            else "deleted"
+        )
+        print(f"art for games the dats don't list (romhacks), {how}:")
+        for file, paths in stale.items():
+            print(f"  {file}: {', '.join(paths)}")
+            if not args.dry_run and not args.keep_stale:
+                (art_dir / file).unlink()
+                have.discard(folded(file))
     custom = listing(art_dir / "custom", ascii_lower)
     fetcher = Fetcher(
         args.base_url,
@@ -532,6 +568,11 @@ def main(argv):
         "--dry-run",
         action="store_true",
         help="download no pictures, change nothing on the card",
+    )
+    p.add_argument(
+        "--keep-stale",
+        action="store_true",
+        help="list romhacks' base-game art (v0.4.1's), don't delete it",
     )
     p.add_argument(
         "--offline", action="store_true", help="never download: use the caches"

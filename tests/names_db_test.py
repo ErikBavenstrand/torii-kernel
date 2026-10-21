@@ -233,7 +233,8 @@ class NamesAdd(unittest.TestCase):
         self.assertNotIn("Tetris", names_db.read_safe(self.names))
 
     def test_lines_split_as_the_kernel_splits_them(self):
-        # Only LF (and CRLF) ends a line; other separators in a name go
+        # Only LF (and CRLF) ends a line: other separators stay in a name, as
+        # the kernel's Rename keeps them
         self.names.write_text(
             "/GB/Tetris.gb\tA\u2028B\r\n/GBA/Wars.gba\t \n", newline=""
         )
@@ -241,7 +242,8 @@ class NamesAdd(unittest.TestCase):
         self.assertEqual(status, 0, err)
         self.assertEqual(
             names_db.read_safe(self.names),
-            names_db.NAMES_HEADER + "/GB/Tetris.gb\tA\u2028B\n/GBA/Wars.gba\tWars\n",
+            names_db.NAMES_HEADER
+            + "/GB/Tetris.gb\tA\u2028B\n/GBA/Wars.gba\tW\u0085ars\n",
         )
 
     def test_new_names_txt_and_refusals(self):

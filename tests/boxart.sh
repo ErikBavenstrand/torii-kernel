@@ -78,7 +78,7 @@ grep -q "box art: 1 files listed" "$cart/1.log" || fail "the art wasn't listed o
 echo "PASS: matched art by CRC shows, and again from the cache on the next visit"
 
 # A romhack: Code.gba has a listed game's code (AWRE) but a CRC the dats
-# don't list. Art by that code (v0.4.1's scraper wrote <CODE>.bin) isn't
+# don't list. Art by that code (<CODE>.bin, which v0.4.1 read) isn't
 # read, so it keeps the placeholder, while Zed.gba's art by CRC shows
 new_cart romhack
 printf '%s\tAWRE\t3248\t-\t/Code.gba\n%s\t-\t3248\t-\t/Zed.gba\n' "$code_crc" "$crc" >"$cart/crc.txt"

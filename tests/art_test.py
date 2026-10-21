@@ -260,17 +260,23 @@ class ArtTest(unittest.TestCase):
         other.mkdir()
         (other / "Tetris.png").write_bytes(b"not a picture")
         Image.new("RGB", (60, 60), (0, 200, 0)).save(other / "wars (usa).bmp")
+        # After Tetris.png fails, the next picture for Tetris.gb still counts
+        Image.new("RGB", (60, 60), (9, 9, 9)).save(other / "tetris.gb.png")
         with contextlib.redirect_stdout(io.StringIO()) as said:
             self.assertEqual(art.main(["add", str(sd), str(other), "--force"]), 1)
         out = said.getvalue()
         self.assertIn("  Tetris.png: ", out)
         self.assertIn(
-            "1 art files written, 0 up to date, 0 matched no game, 0 doubles, 1 failed",
+            "2 art files written, 0 up to date, 0 matched no game, 0 doubles, 1 failed",
             out,
         )
         self.assertEqual(
             (custom / "Wars (USA).gba.bin").read_bytes(),
             art.convert(other / "wars (usa).bmp"),
+        )
+        self.assertEqual(
+            (custom / "Tetris.gb.bin").read_bytes(),
+            art.convert(other / "tetris.gb.png"),
         )
 
         # No folder of pictures, no card

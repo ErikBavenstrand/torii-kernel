@@ -31,7 +31,7 @@ enum {
 
 // The kind of a file name in /torii/art (ARTKEY_CRC) with its key, the
 // CRC32, in *key, or ARTKEY_NONE for any other name (art by GBA game code,
-// <CODE>.bin, which v0.4.1's scraper wrote, isn't read since C4).
+// <CODE>.bin, which v0.4.1 read, isn't since C4).
 u32 artkey_parse(const char *name, u32 *key);
 // The length of a custom art file's game name: name's length less ".bin"
 // (any case), or 0 if it doesn't end so or is nothing else.

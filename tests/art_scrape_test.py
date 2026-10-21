@@ -334,7 +334,7 @@ class Scrape(unittest.TestCase):
         custom.mkdir(parents=True)
         (custom / "Wars.gba.bin").write_bytes(b"mine")
         self.art("/NES/Famicom.nes").write_bytes(b"old")
-        # Art by the Minish games' code, as v0.4.1 wrote it: no longer read
+        # Art by the Minish games' code, which v0.4.1's kernel read: no longer
         (custom.parent / "bzme.bin").write_bytes(b"by code")
         status, out, err = self.run_tool()
         self.assertEqual(status, 0, err)
@@ -344,7 +344,7 @@ class Scrape(unittest.TestCase):
         self.assertEqual((custom / "Wars.gba.bin").read_bytes(), b"mine")
         self.assertEqual(self.art("/NES/Famicom.nes").read_bytes(), b"old")
         self.assertIn(
-            "1 files named by game code (bzme.bin...), which the kernel no longer reads",
+            "1 files named like game codes (bzme.bin...), which Torii doesn't read",
             err,
         )
         self.assertTrue(self.art("/GBA/zz Minish.gba").exists())
@@ -354,6 +354,34 @@ class Scrape(unittest.TestCase):
             out,
         )
         self.assertIn("NES: 1 games, 1 with art (100%): 1 already on the card", out)
+
+    def test_deletes_romhack_art_from_v041(self):
+        # v0.4.1 gave the romhack the Minish Cap's box under its own CRC; a
+        # patched dump's art and custom art for the romhack stay
+        art_dir = self.sd / "torii" / "art"
+        (art_dir / "custom").mkdir(parents=True)
+        hack, patched = self.art("/GBA/Hack of Minish.gba"), self.art(PATCHED)
+        hack.write_bytes(b"base box")
+        patched.write_bytes(b"its box")
+        (art_dir / "custom" / "Hack of Minish.gba.bin").write_bytes(b"mine")
+        name = hack.name
+
+        for extra, kept in (
+            (["--dry-run"], True),
+            (["--keep-stale"], True),
+            ([], False),
+        ):
+            status, out, err = self.run_tool(*extra)
+            self.assertEqual(status, 0, err)
+            self.assertIn(f"  {name}: /GBA/Hack of Minish.gba", out)
+            self.assertEqual(hack.exists(), kept, extra)
+        self.assertIn("art for games the dats don't list (romhacks), deleted:", out)
+        self.assertEqual(patched.read_bytes(), b"its box")
+        self.assertEqual(
+            (art_dir / "custom" / "Hack of Minish.gba.bin").read_bytes(), b"mine"
+        )
+        status, out, _ = self.run_tool()
+        self.assertNotIn("romhacks", out)
 
     def test_dry_run_changes_nothing(self):
         status, out, err = self.run_tool("--dry-run")
