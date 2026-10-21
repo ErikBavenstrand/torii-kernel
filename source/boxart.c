@@ -183,7 +183,9 @@ static void list_step_one(void)
 
 static int list_job(struct job *job)
 {
-	if (job->state == JOB_CANCEL) {
+	// A launch (or Diagnostics) took PSRAM over (cover_cache_invalidate):
+	// not a word more into it; boxart_poll lists again
+	if (job->state == JOB_CANCEL || !cover_active()) {
 		close_dir();
 		B.list = LIST_NONE;  // listed again from the start
 		B.job = JOB_NONE;
@@ -443,6 +445,7 @@ void boxart_poll(void)
 	unpin_old(0);
 	if (B.rest < BOXART_REST) {
 		B.rest++;
+		sync();  // a show the full VRAM queue put off
 		return;
 	}
 	if (B.list != LIST_DONE)
@@ -463,10 +466,4 @@ void boxart_forget(void)
 		job_cancel(B.job);
 	B.list = LIST_NONE;
 	B.signature = 0;
-}
-
-int boxart_listed(u32 *files)
-{
-	*files = B.set.count;
-	return B.list == LIST_DONE;
 }

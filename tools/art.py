@@ -41,7 +41,7 @@ from pathlib import Path
 from PIL import Image, ImageOps
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import asset  # noqa: E402
+import asset
 
 _COVER_H = asset.c_defines(asset.ROOT / "source" / "engine" / "cover.h")
 TILES = _COVER_H["COVER_TILES_W"]
@@ -129,7 +129,7 @@ def palette_of(img: Image.Image) -> list[tuple[int, int, int]]:
             best = min(range(len(palette)), key=lambda i: (distance(palette[i], *c), i))
             clusters[best][c] = n
         moved = set()
-        for i, cluster in enumerate(clusters):
+        for cluster in clusters:
             total = sum(cluster.values())
             if not total:
                 continue
@@ -137,7 +137,12 @@ def palette_of(img: Image.Image) -> list[tuple[int, int, int]]:
             if 2 * top_n >= total:
                 moved.add(top)
             else:
-                moved.add(tuple(to15(sum(c[k] * n for c, n in cluster.items()) // total) for k in range(3)))
+                moved.add(
+                    tuple(
+                        to15(sum(c[k] * n for c, n in cluster.items()) // total)
+                        for k in range(3)
+                    )
+                )
         palette = sorted(moved)
         while len(palette) < COLOURS - 1 and len(palette) < len(counts):
             worst = max(
@@ -168,7 +173,9 @@ def dither(img: Image.Image, palette: list[tuple[int, int, int]]) -> list[list[i
         xs = range(w) if step == 1 else range(w - 1, -1, -1)
         for x in xs:
             r, g, b = (min(255, max(0, v)) for v in px[y][x])
-            best = min(range(len(palette)), key=lambda i: (distance(palette[i], r, g, b), i))
+            best = min(
+                range(len(palette)), key=lambda i: (distance(palette[i], r, g, b), i)
+            )
             out[y][x] = best + 1
             err = [v - c for v, c in zip((r, g, b), palette[best], strict=True)]
             for dx, dy, share in ((step, 0, 7), (-step, 1, 3), (0, 1, 5), (step, 1, 1)):
@@ -189,10 +196,12 @@ def convert(path: Path, align: str = "top") -> bytes:
     img = img.resize((SIZE, SIZE), Image.Resampling.LANCZOS)
     # At the GBA's levels first: a flat area then matches its colour exactly
     # and passes no error on
-    img = img.point(lambda v: to15(v))
+    img = img.point(to15)
     palette = palette_of(img)
     pixels = dither(img, palette)
-    bgr = [0] + [asset.bgr555(r, g, b) for r, g, b in palette]  # bgr555 keeps the top 5 bits
+    bgr = [0] + [
+        asset.bgr555(r, g, b) for r, g, b in palette
+    ]  # bgr555 keeps the top 5 bits
     bgr += [0] * (COLOURS - len(bgr))
     data = asset.make_asset(pixels, bgr, 4)
     assert len(data) == FILE_BYTES
@@ -201,13 +210,15 @@ def convert(path: Path, align: str = "top") -> bytes:
 
 def preview(data: bytes, scale: int = 3) -> Image.Image:
     """Box art as the GBA shows it, scale times the size."""
-    (bpp, w, h, _, _), palette, tiles = asset.read_asset(data)
+    (_, w, h, _, _), palette, tiles = asset.read_asset(data)
     img = Image.new("RGB", (w * 8, h * 8))
     for y in range(h * 8):
         for x in range(w * 8):
             b = tiles[((y // 8) * w + x // 8) * 32 + (y % 8) * 4 + (x % 8) // 2]
             c = palette[b >> 4 if x % 2 else b & 15]
-            img.putpixel((x, y), (expand5(c & 31), expand5(c >> 5 & 31), expand5(c >> 10)))
+            img.putpixel(
+                (x, y), (expand5(c & 31), expand5(c >> 5 & 31), expand5(c >> 10))
+            )
     return img.resize((w * 8 * scale, h * 8 * scale), Image.Resampling.NEAREST)
 
 
@@ -218,7 +229,9 @@ def custom_name(rom: str) -> str:
         raise ArtError(f"{rom!r} names no file")
     art = name + EXT
     if len(art.encode("utf-8")) > NAME_MAX:
-        raise ArtError(f"{name}: too long a name for its art file ({NAME_MAX} bytes with {EXT})")
+        raise ArtError(
+            f"{name}: too long a name for its art file ({NAME_MAX} bytes with {EXT})"
+        )
     return art
 
 
@@ -237,7 +250,9 @@ def add(rom: str, image: Path, sd: Path, align: str) -> tuple[Path, bytes]:
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(
-        prog="art.py", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+        prog="art.py",
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     sub = parser.add_subparsers(dest="command", required=True)
     p_add = sub.add_parser("add", help="custom art for a game, onto the card")
@@ -248,14 +263,23 @@ def main(argv: list[str]) -> int:
     p_conv.add_argument("image", metavar="IMAGE", type=Path)
     p_conv.add_argument("out", metavar="OUT.bin", type=Path)
     for p in (p_add, p_conv):
-        p.add_argument("--align", default="top", choices=ALIGNS, help="the part of the picture kept")
-        p.add_argument("--preview", type=Path, metavar="PNG", help="also write the result as a PNG")
+        p.add_argument(
+            "--align",
+            default="top",
+            choices=ALIGNS,
+            help="the part of the picture kept",
+        )
+        p.add_argument(
+            "--preview", type=Path, metavar="PNG", help="also write the result as a PNG"
+        )
     args = parser.parse_args(argv)
     try:
         if args.command == "add":
             out, data = add(args.rom, args.image, args.sd, args.align)
             if Path(args.rom).suffix.lower() not in GAME_EXTS:
-                print(f"note: {Path(args.rom).name} has no game extension ({', '.join(GAME_EXTS)})")
+                print(
+                    f"note: {Path(args.rom).name} has no game extension ({', '.join(GAME_EXTS)})"
+                )
             print(f"wrote {out}")
         else:
             data = convert(args.image, args.align)

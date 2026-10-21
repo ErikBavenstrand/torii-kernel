@@ -21,22 +21,21 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
-import art  # noqa: E402
-import asset  # noqa: E402
+import art
+import asset
 
 
 def indices(data: bytes) -> list[list[int]]:
     """Box art's colour indices, rows of pixels."""
     (_, w, h, _, _), _, tiles = asset.read_asset(data)
-    return [
-        [
-            (lambda b: b >> 4 if x % 2 else b & 15)(
-                tiles[((y // 8) * w + x // 8) * 32 + (y % 8) * 4 + (x % 8) // 2]
-            )
-            for x in range(w * 8)
-        ]
-        for y in range(h * 8)
-    ]
+    rows = []
+    for y in range(h * 8):
+        row = []
+        for x in range(w * 8):
+            b = tiles[((y // 8) * w + x // 8) * 32 + (y % 8) * 4 + (x % 8) // 2]
+            row.append(b >> 4 if x % 2 else b & 15)
+        rows.append(row)
+    return rows
 
 
 class ArtTest(unittest.TestCase):
@@ -54,7 +53,13 @@ class ArtTest(unittest.TestCase):
 
     def gradient(self, w: int, h: int) -> Image.Image:
         img = Image.new("RGB", (w, h))
-        img.putdata([(x * 255 // w, y * 255 // h, (x + y) * 127 // (w + h)) for y in range(h) for x in range(w)])
+        img.putdata(
+            [
+                (x * 255 // w, y * 255 // h, (x + y) * 127 // (w + h))
+                for y in range(h)
+                for x in range(w)
+            ]
+        )
         return img
 
     def test_sizes_come_from_the_headers(self):
@@ -65,8 +70,13 @@ class ArtTest(unittest.TestCase):
     def test_an_asset_of_80x80_4bpp_tiles(self):
         data = art.convert(self.picture("g.png", self.gradient(300, 200)))
         self.assertEqual(len(data), art.FILE_BYTES)
-        magic, bpp, w, h, flags, colours, reserved, size = struct.unpack_from("<4sBBBBHHI", data)
-        self.assertEqual((magic, bpp, w, h, flags, colours, reserved, size), (b"TAS2", 4, 10, 10, 0, 16, 0, 3200))
+        magic, bpp, w, h, flags, colours, reserved, size = struct.unpack_from(
+            "<4sBBBBHHI", data
+        )
+        self.assertEqual(
+            (magic, bpp, w, h, flags, colours, reserved, size),
+            (b"TAS2", 4, 10, 10, 0, 16, 0, 3200),
+        )
         rows = indices(data)
         used = {i for row in rows for i in row}
         # Colour 0 never: on a BG it is transparent
@@ -109,7 +119,9 @@ class ArtTest(unittest.TestCase):
         self.assertEqual(colour_at(art.convert(tall_p), 40, 40), red)  # top by default
         self.assertEqual(colour_at(art.convert(tall_p, "centre"), 40, 40), blue)
         self.assertEqual(colour_at(art.convert(tall_p, "bottom"), 40, 40), blue)
-        self.assertEqual(colour_at(art.convert(wide_p), 40, 40), blue)  # wide: centred by default
+        self.assertEqual(
+            colour_at(art.convert(wide_p), 40, 40), blue
+        )  # wide: centred by default
         self.assertEqual(colour_at(art.convert(wide_p, "left"), 40, 40), red)
 
     def test_transparency_goes_white_and_jpeg_reads(self):
@@ -140,14 +152,18 @@ class ArtTest(unittest.TestCase):
         sd.mkdir()
         pic = self.picture("g.png", self.gradient(90, 90))
         with contextlib.redirect_stdout(io.StringIO()) as said:
-            status = art.main(["add", "/Volumes/X/GBA/Pokemon Prism (v1).gbc", str(pic), str(sd)])
+            status = art.main(
+                ["add", "/Volumes/X/GBA/Pokemon Prism (v1).gbc", str(pic), str(sd)]
+            )
         self.assertEqual(status, 0, said.getvalue())
         out = sd / "torii" / "art" / "custom" / "Pokemon Prism (v1).gbc.bin"
         self.assertEqual(out.read_bytes(), art.convert(pic))
         # A bare file name does too, and --preview writes a PNG
         preview = self.dir / "p.png"
         with contextlib.redirect_stdout(io.StringIO()) as said:
-            status = art.main(["add", "Mono.gb", str(pic), str(sd), "--preview", str(preview)])
+            status = art.main(
+                ["add", "Mono.gb", str(pic), str(sd), "--preview", str(preview)]
+            )
         self.assertEqual(status, 0)
         self.assertTrue((sd / "torii" / "art" / "custom" / "Mono.gb.bin").exists())
         with Image.open(preview) as shown:
@@ -168,7 +184,12 @@ class ArtTest(unittest.TestCase):
             ["add", "Game.gba", str(junk), str(sd)],
             ["add", "Game.gba", str(self.dir / "none.png"), str(sd)],
             ["add", "x" * 252 + ".gba", str(pic), str(sd)],
-            ["add", "Game.gba", str(self.picture("tiny.png", Image.new("RGB", (4, 4)))), str(sd)],
+            [
+                "add",
+                "Game.gba",
+                str(self.picture("tiny.png", Image.new("RGB", (4, 4)))),
+                str(sd),
+            ],
         ]
         for args in cases:
             with contextlib.redirect_stdout(io.StringIO()) as said:

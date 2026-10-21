@@ -76,8 +76,9 @@ writes() { grep -c 'nor: wrote the settings' "$cart/visit.log" || true; }
 
 # Saving one setting on the Settings page (Auto save, A RIGHT A) writes the
 # whole sector once as the page closes, keeping the slots the kernel
-# doesn't know, the hidden LANGUAGE and the hotkeys it didn't touch
-visit auto-save A RIGHT A
+# doesn't know, the hidden LANGUAGE and the hotkeys it didn't touch (the
+# card is in list with art, so the page shows Box art)
+NAV_ART=1 visit auto-save A RIGHT A
 [ "$(writes)" = 1 ] || fail "a save wrote the settings $(writes) times"
 [ "$(slots 14 1)" = 0001 ] || fail "Auto save not saved: $(slots 14 1)"
 [ "$(slots 0 14)" = "$(ffff 14)" ] || fail "slots 0-13 changed: $(slots 0 14)"

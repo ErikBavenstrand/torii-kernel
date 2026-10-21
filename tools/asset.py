@@ -189,6 +189,7 @@ def encode_png(path: Path, bpp: int, dither: bool = False) -> bytes:
 
 # --- The demo and test assets ---------------------------------------------------
 
+
 def checker(size: int) -> tuple[list[list[int]], list[int]]:
     """A small 4bpp test picture: a checkerboard with a diagonal."""
     pixels = [
@@ -582,7 +583,9 @@ def main(argv: list[str]) -> int:
         for name in argv[1:]:
             try:
                 (bpp, w, h, colours, size), _, _ = read_asset(Path(name).read_bytes())
-                print(f"{name}: {w * 8}x{h * 8} {bpp}bpp, {colours} colours, {size} bytes of tiles")
+                print(
+                    f"{name}: {w * 8}x{h * 8} {bpp}bpp, {colours} colours, {size} bytes of tiles"
+                )
             except (ValueError, IndexError, struct.error) as e:
                 print(f"{name}: broken: {e}")
                 failed = 1

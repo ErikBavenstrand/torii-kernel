@@ -70,10 +70,12 @@ static int check(u8 entry, u32 size)
 
 static void finish(int ok)
 {
-	if (ok)
+	if (ok) {
 		cover_stats.loaded++;
-	else
+		tlog_debug("cover %08lX loaded", (unsigned long)cache.entry[loader.entry].id);
+	} else {
 		cover_stats.failed++;
+	}
 	cc_load_finish(&cache, loader.entry, ok);
 	loader.entry = COVER_NONE;
 	frame_wake();

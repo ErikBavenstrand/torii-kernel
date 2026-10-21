@@ -45,10 +45,7 @@ void boxart_select(u32 row, const u16 *palette);
 // Each pass of the menu's loop while the page is up: wants the covers once
 // the cursor has rested, and shows the cursor's when it is ready.
 void boxart_poll(void);
-// The card's art changed (a custom art file renamed): lists it again.
+// The card's art changed (a custom art file renamed, B18): lists it again.
 void boxart_forget(void);
-
-// 1 once the card's art is listed (for tests), with the files found.
-int boxart_listed(u32 *files);
 
 #endif
