@@ -109,36 +109,6 @@ u32 gamename_custom_set(const struct gamename_custom *c, const char *path, const
 u32 gamename_custom_move(const struct gamename_custom *c, const char *old_path, const char *new_path, char *out,
 			 u32 cap);
 
-// How the names file reaches the card, so the safe write (B5's temporary
-// file and rename) plugs in without touching the format code.
-struct gamename_io {
-	// Reads the whole file into buf (cap bytes): its length, 0 when it
-	// doesn't exist, GAMENAME_IO_FAIL when it can't be read or is longer.
-	// A length of cap counts as a failure too (the file may go on), so give
-	// it a buffer larger than any names file it accepts.
-	u32 (*read)(char *buf, u32 cap);
-	// Replaces the file with len bytes of buf: 1 when done.
-	int (*write)(const char *buf, u32 len);
-};
-#define GAMENAME_IO_FAIL 0xFFFFFFFFu
-
-// Reads the file into buf (cap bytes) and parses it into c. A failed read,
-// or one that fills buf, leaves c empty and not complete, so no later set
-// overwrites the file.
-// Returns c->count.
-u32 gamename_custom_load(struct gamename_custom *c, const struct gamename_io *io, char *buf, u32 cap, u32 *line,
-			 u32 line_cap);
-
-// gamename_custom_set into out, then writes it: 1 when written. c still
-// indexes the old text; load again to see the change.
-int gamename_custom_store(const struct gamename_custom *c, const struct gamename_io *io, const char *path,
-			  const char *name, char *out, u32 cap);
-
-// gamename_custom_move into out, then writes it: 1 when written or when
-// there was nothing to move.
-int gamename_custom_store_move(const struct gamename_custom *c, const struct gamename_io *io, const char *old_path,
-			       const char *new_path, char *out, u32 cap);
-
 // --- The kernel's names file (gamename_store.c) ------------------------------
 //
 // Rename's writes of /torii/names.txt, through safefile.h's two copies. They

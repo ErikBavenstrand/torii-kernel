@@ -1151,11 +1151,6 @@ int library_truncated(void)
 	return lib.valid && (lib_hdr(active_slot())->flags & LIB_H_TRUNCATED);
 }
 
-u32 library_games_seen(void)
-{
-	return lib.valid ? lib_hdr(active_slot())->games_seen : 0;
-}
-
 u32 library_records(void)
 {
 	return lib.valid ? lib_hdr(active_slot())->records : 0;

@@ -61,7 +61,7 @@ void action_nor_read(void)
 	game_total_NOR = GetFileListFromNor();
 }
 
-static u32 launch_nor_entry(const char *name, u32 hard_reset)
+static void launch_nor_entry(const char *name, u32 hard_reset)
 {
 	action_nor_read();
 	u32 game = NOR_game_named(name);
@@ -71,10 +71,9 @@ static u32 launch_nor_entry(const char *name, u32 hard_reset)
 		tlog("launch %s: not on the game NOR", name);
 		userdata_forget_nor(name);
 		error(1);
-		return ACTION_NOTHING;
+		return;
 	}
 	action_nor_launch(game, hard_reset);
-	return ACTION_NOTHING;
 }
 
 // Makes path_copy (an SD file's full path) the launch path's folder and
@@ -117,19 +116,20 @@ static u32 default_how(const struct game_pick *game)
 	return mode == ACTION_BOOT_CLEAN || !any ? ACTION_CLEAN : ACTION_ADDON;
 }
 
-u32 action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset)
+void action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset)
 {
 	if (!copy_path(path) || how > ACTION_DEFAULT) {
 		tlog_error("launch: can't take %.40s (how %lu)", path, (unsigned long)how);
-		return ACTION_NOTHING;
+		return;
 	}
 	const char *nor = userdata_nor_name(path_copy);
-	if (nor)
-		return launch_nor_entry(nor, hard_reset);
+	if (nor) {
+		launch_nor_entry(nor, hard_reset);
+		return;
+	}
 	if (!game_enter("launch"))
-		return ACTION_NOTHING;
+		return;
 
-	u32 res = ACTION_NOTHING;
 	struct game_pick game = {.name = current_filename};
 	u32 ok = Game_pick(&game);
 	if (ok && how == ACTION_DEFAULT)
@@ -148,14 +148,12 @@ u32 action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset)
 		else if (save_type < ACTION_SAVE_TYPES)
 			game.save_num = (u8)save_type;
 		session_end();
-		res = Game_launch(&game, how, hard_reset);
 		// A write to NOR lists its game in pNorFS but leaves the count:
 		// the NOR page and home's count read them
-		if (res != ACTION_NOTHING)
+		if (Game_launch(&game, how, hard_reset))
 			action_nor_read();
 	}
 	game_leave();
-	return res;
 }
 
 u32 action_game_facts(const char *path, struct action_facts *out)

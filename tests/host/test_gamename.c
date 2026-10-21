@@ -409,31 +409,6 @@ void test_gamename_custom_set(void)
 	free(m);
 }
 
-// A names file in memory, for the I/O interface
-static char io_file[256];
-static u32 io_len, io_writes;
-static int io_fail;
-
-static u32 io_read(char *buf, u32 cap)
-{
-	if (io_fail)
-		return GAMENAME_IO_FAIL;
-	if (io_len > cap)
-		return GAMENAME_IO_FAIL;
-	memcpy(buf, io_file, io_len);
-	return io_len;
-}
-
-static int io_write(const char *buf, u32 len)
-{
-	if (io_fail || len > sizeof(io_file))
-		return 0;
-	memcpy(io_file, buf, len);
-	io_len = len;
-	io_writes++;
-	return 1;
-}
-
 // Moves old's name to new and checks the whole new file
 static void check_move(struct custom *m, const char *old, const char *new_path, const char *expected)
 {
@@ -460,51 +435,6 @@ void test_gamename_custom_move(void)
 	CHECK_EQ(gamename_custom_move(&m->c, "/a.gba", "/b.gba", out, 8), GAMENAME_TOO_BIG);
 	free(m->text);
 	free(m);
-}
-
-void test_gamename_custom_io(void)
-{
-	static const struct gamename_io io = {io_read, io_write};
-	struct gamename_custom c;
-	static u32 line[8];
-	char buf[256], out[256];
-	io_len = 0;
-	io_fail = 0;
-	io_writes = 0;
-	CHECK_EQ(gamename_custom_load(&c, &io, buf, sizeof(buf), line, 8), 0);
-	CHECK(gamename_custom_store(&c, &io, "/a.gba", "Ay", out, sizeof(out)));
-	CHECK_EQ(gamename_custom_load(&c, &io, buf, sizeof(buf), line, 8), 1);
-	CHECK(gamename_custom_store(&c, &io, "/b.gba", "Bee", out, sizeof(out)));
-	CHECK_EQ(gamename_custom_load(&c, &io, buf, sizeof(buf), line, 8), 2);
-	u32 len;
-	const char *name = gamename_custom_get(&c, "/b.gba", &len);
-	CHECK(name && len == 3 && memcmp(name, "Bee", 3) == 0);
-	CHECK_EQ(io_writes, 2);
-
-	// A file that can't be read is never written over
-	io_fail = 1;
-	CHECK_EQ(gamename_custom_load(&c, &io, buf, sizeof(buf), line, 8), 0);
-	CHECK(!c.complete);
-	io_fail = 0;
-	CHECK(!gamename_custom_store(&c, &io, "/c.gba", "See", out, sizeof(out)));
-	// Nor one too long for the buffer
-	CHECK_EQ(gamename_custom_load(&c, &io, buf, 4, line, 8), 0);
-	CHECK(!gamename_custom_store(&c, &io, "/c.gba", "See", out, sizeof(out)));
-	CHECK_EQ(io_writes, 2);
-	CHECK_EQ(io_len, strlen("/a.gba\tAy\n/b.gba\tBee\n"));
-	// Nor one that fills the buffer exactly: it may go on
-	CHECK_EQ(gamename_custom_load(&c, &io, buf, io_len, line, 8), 0);
-	CHECK(!c.complete);
-	CHECK_EQ(gamename_custom_load(&c, &io, buf, io_len + 1, line, 8), 2);
-
-	// A renamed file takes its name along, in one write
-	CHECK(gamename_custom_store_move(&c, &io, "/a.gba", "/z.gba", out, sizeof(out)));
-	CHECK_EQ(io_writes, 3);
-	CHECK(io_len == strlen("/b.gba\tBee\n/z.gba\tAy\n") &&
-	      memcmp(io_file, "/b.gba\tBee\n/z.gba\tAy\n", io_len) == 0);
-	CHECK_EQ(gamename_custom_load(&c, &io, buf, sizeof(buf), line, 8), 2);
-	CHECK(gamename_custom_store_move(&c, &io, "/nothing.gba", "/y.gba", out, sizeof(out)));
-	CHECK_EQ(io_writes, 3);  // nothing to move: nothing written
 }
 
 void test_gamename_display(void)

@@ -195,7 +195,6 @@ static const struct {
 	{"gamename_custom_parse", test_gamename_custom_parse},
 	{"gamename_custom_set", test_gamename_custom_set},
 	{"gamename_custom_move", test_gamename_custom_move},
-	{"gamename_custom_io", test_gamename_custom_io},
 	{"gamename_display", test_gamename_display},
 	{"gamename_hidden", test_gamename_hidden},
 	{"safefile_crc_line", test_safefile_crc_line},

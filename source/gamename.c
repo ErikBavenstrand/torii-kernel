@@ -701,34 +701,6 @@ u32 gamename_custom_move(const struct gamename_custom *c, const char *old_path, 
 	return custom_edit(c, old_path, new_path, name, len, out, cap);
 }
 
-u32 gamename_custom_load(struct gamename_custom *c, const struct gamename_io *io, char *buf, u32 cap, u32 *line,
-			 u32 line_cap)
-{
-	u32 len = io->read(buf, cap);
-	if (len == GAMENAME_IO_FAIL || len >= cap) {  // a full buffer may have cut the file
-		gamename_custom_parse(c, NULL, 0, line, line_cap);
-		c->complete = 0;
-		return 0;
-	}
-	return gamename_custom_parse(c, buf, len, line, line_cap);
-}
-
-int gamename_custom_store(const struct gamename_custom *c, const struct gamename_io *io, const char *path,
-			  const char *name, char *out, u32 cap)
-{
-	u32 len = gamename_custom_set(c, path, name, out, cap);
-	return !GAMENAME_FAILED(len) && io->write(out, len);
-}
-
-int gamename_custom_store_move(const struct gamename_custom *c, const struct gamename_io *io, const char *old_path,
-			       const char *new_path, char *out, u32 cap)
-{
-	u32 len = gamename_custom_move(c, old_path, new_path, out, cap);
-	if (len == GAMENAME_UNCHANGED)
-		return 1;
-	return !GAMENAME_FAILED(len) && io->write(out, len);
-}
-
 // --- The display name -----------------------------------------------------------
 
 enum gamename_source gamename_display(char *out, const char *path, const struct gamename_custom *custom,
