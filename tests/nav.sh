@@ -15,7 +15,10 @@
 # the card shows (default "gba": GBA games, nothing played, no favourites).
 # Routes go from the carousel's first item: RIGHT to the item, or LEFT round
 # the end for the four that always show, then A (which opens the item the
-# ring is turning to, so the presses needn't wait for it).
+# ring is turning to, so the presses needn't wait for it). Whatever item the
+# card starts facing (Start on, Last place), every route first turns home to
+# its first item through the tests' hook (NAV_TEST_HOME, poked at frame 30),
+# and waits for "nav: home ready" after it.
 #
 # Routes into a page (a Settings row) come with the page's ticket: until
 # then they fail, saying which one.
@@ -36,12 +39,9 @@
 # Clean boot and Write to NOR with addon show only while an addon is on:
 # say addon then (clean and nor-addon imply it), so the route counts them.
 # Later options count from the route's last wait (-w): the popup's line, or
-# the folder's with open. Limits: the route starts from home, facing its first item, so
-# the card must start facing it (Start on Home, an older kernel's value
-# that faces the first item, or a fresh card; Last place may face another
-# item); and log
-# lines are cut at 240 characters, so a path of about 225 bytes or more
-# never matches its wait.
+# the folder's with open. The kernel cuts a log line's text at 240 bytes,
+# so a wait for a longer line (a path of about 225 bytes or more) waits for
+# its first 240 bytes.
 #
 # nav_game PLACE ROW: nav_to a game list (recent, fav or a console), then
 # DOWN ROW times, 8 frames apart from @8: the game at ROW is selected from
@@ -86,6 +86,19 @@ _nav_file() {
   printf -- '-i %s\n' "$file"
 }
 
+# _nav_wait TEXT: a -w line for TEXT as the kernel logs it: its text cut at
+# 240 bytes (source/tlog.c's TEXT_MAX)
+_nav_wait() {
+  local LC_ALL=C text=$1
+  printf -- '-w "%s"\n' "${text:0:240}"
+}
+
+# The start of every route: home, facing its first item (NAV_TEST_HOME)
+_nav_home() {
+  printf -- '-p 30:nav_test_action:%d\n' $((0x7E000000 | 9))
+  printf -- '-w "nav: test hook 9 "\n-w "nav: home ready"\n'
+}
+
 _nav_fail() {
   echo "nav.sh: $*" >&2
   # A run handed this waits for a line that never comes, and fails
@@ -107,7 +120,7 @@ nav_to() {
   local place=$1
   [ "$place" = console ] && place=${2:-}
   if [ "$place" = home ]; then
-    _nav_file '-w "nav: home ready"'
+    _nav_file "$(_nav_home)"
     return 0
   fi
   local word found=0 index=0 shown=() keys=()
@@ -140,7 +153,7 @@ nav_to() {
     for (( ; index > 0; index--)); do keys+=(RIGHT); done
     ;;
   esac
-  _nav_file '-w "nav: home ready"' "$(_nav_keys 8 "${keys[@]}" A)" "-w \"nav: page $place ready\""
+  _nav_file "$(_nav_home)" "$(_nav_keys 8 "${keys[@]}" A)" "-w \"nav: page $place ready\""
 }
 
 nav_file() {
@@ -164,14 +177,14 @@ nav_file() {
     _nav_fail "nav_file $path: ${#parts[@]} parts but ${#rows[@]} rows"
     return 1
   fi
-  lines=('-w "nav: home ready"' "$(_nav_keys 8 LEFT LEFT LEFT LEFT A)" '-w "sdcard: ready /"')
+  lines=("$(_nav_home)" "$(_nav_keys 8 LEFT LEFT LEFT LEFT A)" '-w "sdcard: ready /"')
   for ((i = 0; i < ${#parts[@]}; i++)); do
     part=${parts[$i]}
     keys=()
     for ((n = 0; n < rows[i]; n++)); do keys+=(DOWN); done
     if ((i + 1 < ${#parts[@]})); then
       folder="$folder/$part"
-      lines+=("$(_nav_keys 8 "${keys[@]}" A)" "-w \"sdcard: ready $folder\"")
+      lines+=("$(_nav_keys 8 "${keys[@]}" A)" "$(_nav_wait "sdcard: ready $folder")")
       continue
     fi
     if [ "$action" = open ]; then
@@ -179,7 +192,7 @@ nav_file() {
       lines+=("$(_nav_keys 8 "${keys[@]}")")
       continue
     fi
-    lines+=("$(_nav_keys 8 "${keys[@]}" START)" "-w \"sdcard: popup $path\"")
+    lines+=("$(_nav_keys 8 "${keys[@]}" START)" "$(_nav_wait "sdcard: popup $path")")
     local a=A
     [ "$hard" = 1 ] && a=L+A
     case $action in
@@ -244,15 +257,13 @@ nav_game_delete() {
   printf '%s\n' "$to"
 }
 
-# The NOR page's routes (B15; the top says what each does). They start from
-# home's first item: on a cart left facing another item for 5 s (Last
-# place), set Start on to Home first (slot 32 = 2).
+# The NOR page's routes (B15; the top says what each does).
 
 # _nav_nor_to INDEX: the lines from power-on to game INDEX
 _nav_nor_to() {
   local index=$1 keys=() i
   for ((i = 0; i < index; i++)); do keys+=(DOWN); done
-  printf '%s\n' '-w "nav: home ready"' "$(_nav_keys 8 LEFT LEFT LEFT A)" '-w "nav: page nor ready"'
+  printf '%s\n' "$(_nav_home)" "$(_nav_keys 8 LEFT LEFT LEFT A)" '-w "nav: page nor ready"'
   if [ "$index" -gt 0 ]; then
     _nav_keys 8 "${keys[@]}"
     printf -- '-w "nor: row %d"\n' "$index"
@@ -365,7 +376,7 @@ nav_info_page() {
   esac
   wait="screen ready: info-$page"
   [ "$page" = diag ] && wait="screen ready: diag-start"
-  _nav_file '-w "nav: home ready"' "$(_nav_keys 8 LEFT A)" '-w "screen ready: info"' \
+  _nav_file "$(_nav_home)" "$(_nav_keys 8 LEFT A)" '-w "screen ready: info"' \
     "$(_nav_keys 8 "${downs[@]}" A)" "-w \"$wait\""
 }
 

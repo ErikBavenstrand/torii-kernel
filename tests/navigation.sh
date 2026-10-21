@@ -79,6 +79,17 @@ grep -q "gbc isn't on home" "$cart/err.txt" || fail "nav_to gbc said: $(cat "$ca
 grep -q "1 parts but 0 rows" "$cart/err.txt" || fail "nav_file said: $(cat "$cart/err.txt")"
 echo "PASS: tests/nav.sh reaches home and every page, and a route it can't take fails clearly"
 
+# A path past the kernel's 240-byte log text: the route waits for the cut line
+rm -rf "$cart" && cp -r "$carts/routes-new" "$cart"
+long_dir=$(printf 'F%.0s' $(seq 120))
+long_file=$(printf 'G%.0s' $(seq 120)).gba
+mmd -i "$cart/sd.img" "::/$long_dir"
+mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba "::/$long_dir/$long_file"
+# shellcheck disable=SC2046 # nav.sh's options
+boot long-path $(nav_file "/$long_dir/$long_file" 0 0)
+logged "sdcard: popup /$long_dir/GGGG"
+echo "PASS: a route to a path of 246 bytes waits for its log line as the kernel cuts it"
+
 # The Info page's routes: each reading page fills in and wraps its text
 # (an assert fails one that doesn't fit), and Diagnostics' first page comes
 # up from its row
@@ -126,6 +137,16 @@ printf '@boot gbc\n/Hello.gba\n' >"$cart/recent.txt"
 mcopy -o -i "$cart/sd.img" "$cart/recent.txt" ::/torii/recent.txt
 start_case "8 home-recent"
 echo "PASS: Start on faces each item on home, never its page; a hidden one falls back to Last place, then to the first item"
+
+# A route works whatever item the card starts facing: it turns home to the
+# first item first (NAV_TEST_HOME)
+for value in 9 10; do
+  start_on "$value"
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot "route-from-$value" $(nav_to sd)
+  logged "nav: page sd ready"
+done
+echo "PASS: tests/nav.sh's routes start from home's first item, whatever the card faced at power-on"
 
 # Last place: a page left open is kept as its item once the menu rested
 # long enough to write it, and comes back as home facing that item; then
