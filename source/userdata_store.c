@@ -103,7 +103,7 @@ void userdata_invalidate(void)
 
 static void load_recent(void)
 {
-	struct userdata_boot boot = {{0}, 0};
+	struct userdata_boot boot = {{0}};
 	const char *from_file = recent_file();
 	u32 count = 0, dropped = 0;
 	int from = safefile_open(from_file, USERDATA_RECENT_FILE_MAX);
@@ -244,17 +244,16 @@ const struct userdata_boot *userdata_boot_get(void)
 	return &st.boot;
 }
 
-void userdata_boot_set(const char *item, u32 row)
+void userdata_boot_set(const char *item)
 {
 	if (!userdata_item_ok(item)) {
 		tlog("userdata: no boot place %s", item);
 		return;
 	}
 	ensure_recent();
-	if (st.boot.row == row && strcmp(st.boot.item, item) == 0)
+	if (strcmp(st.boot.item, item) == 0)
 		return;
 	snprintf(st.boot.item, sizeof(st.boot.item), "%s", item);
-	st.boot.row = row;
 	st.boot_set = 1;
 }
 

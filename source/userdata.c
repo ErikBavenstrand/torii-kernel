@@ -84,7 +84,8 @@ int userdata_item_ok(const char *item)
 	return n >= 1 && n < USERDATA_ITEM_MAX;
 }
 
-// "@boot <item> <row>", from after the '@'
+// "@boot <item>", from after the '@'; an older kernel's row after it is
+// read and dropped
 static int parse_boot(char *s, struct userdata_boot *boot)
 {
 	if (strncmp(s, "boot", 4) != 0 || (s[4] != ' ' && s[4] != '\t'))
@@ -93,15 +94,16 @@ static int parse_boot(char *s, struct userdata_boot *boot)
 	char *item = s;
 	while (*s && *s != ' ' && *s != '\t')
 		s++;
-	if (!*s)
-		return USERDATA_BAD;
-	*s++ = 0;
-	s = trim(s);
-	u32 row;
-	if (!userdata_item_ok(item) || !number(&s, &row) || *s)
+	if (*s) {
+		*s++ = 0;
+		s = trim(s);
+		u32 row;
+		if (*s && (!number(&s, &row) || *s))
+			return USERDATA_BAD;
+	}
+	if (!userdata_item_ok(item))
 		return USERDATA_BAD;
 	snprintf(boot->item, sizeof(boot->item), "%s", item);
-	boot->row = row;
 	return USERDATA_BOOT;
 }
 
@@ -142,7 +144,7 @@ u32 userdata_recent_line(const struct userdata_recent *list, u32 count, const st
 	u32 first = boot->item[0] ? 1 : 0;
 	int len;
 	if (n < first)
-		len = snprintf(buf, size, "@boot %s %lu\n", boot->item, (unsigned long)boot->row);
+		len = snprintf(buf, size, "@boot %s\n", boot->item);
 	else if (n - first < count)
 		len = snprintf(buf, size, "%lu\t%s\n", (unsigned long)list[n - first].time, list[n - first].path);
 	else

@@ -100,7 +100,8 @@ grep -q 'userdata: Recent: 2 games from /torii/recent.txt' "$cart/1.log" || fail
 echo "PASS: an empty recent.txt (a cut write) gives way to recent.txt.bak"
 
 # Edited by hand on a PC (no CRC line): read as it is, the boot position
-# kept; the next write puts the CRC line on
+# kept (an older kernel's row after its item dropped); the next write puts
+# the CRC line on
 new_cart hand
 put /torii/recent.txt '@boot gba 3\r\n/Hello.gba\r\n'
 sealed '0\t/Other.gba\n' >"$cart/bak.txt"
@@ -109,7 +110,7 @@ mcopy -o -i "$cart/sd.img" "$cart/bak.txt" ::/torii/recent.txt.bak
 boot 1.log -C $now $(launch /Hello.gba) -f 400
 grep -q 'safefile: /torii/recent.txt: edited by hand' "$cart/1.log" || fail "the hand edit wasn't read as one"
 grep -q '^kernel: launch Hello.gba: code' "$cart/1.log" || fail "Hello.gba didn't launch from the edited list"
-copies "@boot gba 3\n$now\t/Hello.gba\n"
+copies "@boot gba\n$now\t/Hello.gba\n"
 echo "PASS: a recent.txt edited by hand is read as it is and sealed by the next write"
 
 # Neither copy holds up (zeros): Recent is empty, and the next write mends it

@@ -61,12 +61,11 @@ void test_registry_nearest(void)
 	CHECK_EQ(registry_index(tail, 4, NAV_GBA), 4);
 }
 
-static struct registry_place start(u32 start_on, const char *item, u32 row, const u8 *shown, u32 n)
+static struct registry_place start(u32 start_on, const char *item, const u8 *shown, u32 n)
 {
 	struct userdata_boot boot;
 	memset(&boot, 0, sizeof(boot));
 	strcpy(boot.item, item);
-	boot.row = row;
 	struct registry_place p;
 	registry_start(start_on, &boot, shown, n, &p);
 	return p;
@@ -87,76 +86,71 @@ void test_registry_start(void)
 	struct registry_place p;
 
 	// Home: facing the first item, whatever the boot position
-	p = start(SET_START_HOME, "gba", 7, all, 10);
+	p = start(SET_START_HOME, "gba", all, 10);
 	CHECK_PLACE(p, NAV_RECENT, 0, 0);
-	p = start(SET_START_HOME, "", 0, fresh, 4);
+	p = start(SET_START_HOME, "", fresh, 4);
 	CHECK_PLACE(p, NAV_SD, 0, 0);
 	// A chosen item opens its page at its first row
-	p = start(SET_START_RECENT, "gba", 7, all, 10);
+	p = start(SET_START_RECENT, "gba", all, 10);
 	CHECK_PLACE(p, NAV_RECENT, 1, 0);
-	p = start(SET_START_SD, "", 0, fresh, 4);
+	p = start(SET_START_SD, "", fresh, 4);
 	CHECK_PLACE(p, NAV_SD, 1, 0);
-	p = start(SET_START_FAVOURITES, "", 0, all, 10);
+	p = start(SET_START_FAVOURITES, "", all, 10);
 	CHECK_PLACE(p, NAV_FAV, 1, 0);
-	p = start(SET_START_GBC, "", 0, all, 10);
+	p = start(SET_START_GBC, "", all, 10);
 	CHECK_PLACE(p, NAV_GBC, 1, 0);
-	p = start(SET_START_NES, "", 0, all, 10);
+	p = start(SET_START_NES, "", all, 10);
 	CHECK_PLACE(p, NAV_NES, 1, 0);
 	// ... and a hidden one gives home facing the nearest item that shows
-	p = start(SET_START_RECENT, "", 0, gba, 5);
+	p = start(SET_START_RECENT, "", gba, 5);
 	CHECK_PLACE(p, NAV_GBA, 0, 0);
-	p = start(SET_START_FAVOURITES, "", 0, fresh, 4);
+	p = start(SET_START_FAVOURITES, "", fresh, 4);
 	CHECK_PLACE(p, NAV_SD, 0, 0);
-	p = start(SET_START_NES, "", 0, gba, 5);
+	p = start(SET_START_NES, "", gba, 5);
 	CHECK_PLACE(p, NAV_SD, 0, 0);
-	p = start(SET_START_GB, "", 0, gba, 5);
+	p = start(SET_START_GB, "", gba, 5);
 	CHECK_PLACE(p, NAV_SD, 0, 0);  // GBA and SD both 2 away: the later
-	// Last place: a page and its row, or home facing an item
-	p = start(SET_START_LAST, "gba", 7, all, 10);
-	CHECK_PLACE(p, NAV_GBA, 1, 7);
-	p = start(SET_START_LAST, "home-settings", 0, all, 10);
-	CHECK_PLACE(p, NAV_SET, 0, 0);
-	p = start(SET_START_LAST, "info", 3, fresh, 4);
-	CHECK_PLACE(p, NAV_INFO, 1, 3);
-	// ... hidden since: home facing the nearest; never set or unknown: the first
-	p = start(SET_START_LAST, "fav", 4, gba, 5);
+	// Last place: home facing the item last faced, never its page (an older
+	// kernel's "home-" before the word is dropped)
+	p = start(SET_START_LAST, "gba", all, 10);
 	CHECK_PLACE(p, NAV_GBA, 0, 0);
-	p = start(SET_START_LAST, "home-recent", 0, fresh, 4);
+	p = start(SET_START_LAST, "home-settings", all, 10);
+	CHECK_PLACE(p, NAV_SET, 0, 0);
+	p = start(SET_START_LAST, "info", fresh, 4);
+	CHECK_PLACE(p, NAV_INFO, 0, 0);
+	p = start(SET_START_LAST, "recent", all, 10);
+	CHECK_PLACE(p, NAV_RECENT, 0, 0);
+	// ... hidden since: home facing the nearest; never set or unknown: the first
+	p = start(SET_START_LAST, "fav", gba, 5);
+	CHECK_PLACE(p, NAV_GBA, 0, 0);
+	p = start(SET_START_LAST, "home-recent", fresh, 4);
 	CHECK_PLACE(p, NAV_SD, 0, 0);
-	p = start(SET_START_LAST, "", 0, all, 10);
+	p = start(SET_START_LAST, "", all, 10);
 	CHECK_PLACE(p, NAV_RECENT, 0, 0);
-	p = start(SET_START_LAST, "home-", 0, all, 10);
+	p = start(SET_START_LAST, "home-", all, 10);
 	CHECK_PLACE(p, NAV_RECENT, 0, 0);
-	p = start(SET_START_LAST, "carousel", 9, all, 10);
+	p = start(SET_START_LAST, "carousel", all, 10);
 	CHECK_PLACE(p, NAV_RECENT, 0, 0);
 	// A Start on value from a later kernel: home
-	p = start(SET_STARTS + 3, "gba", 2, all, 10);
+	p = start(SET_STARTS + 3, "gba", all, 10);
 	CHECK_PLACE(p, NAV_RECENT, 0, 0);
 }
 
 void test_registry_boot_word(void)
 {
-	char word[USERDATA_ITEM_MAX];
-	struct registry_place p = {NAV_FAV, 1, 12};
-	registry_boot_word(&p, word, sizeof(word));
-	CHECK(!strcmp(word, "fav"));
-	p.open = 0;
-	registry_boot_word(&p, word, sizeof(word));
-	CHECK(!strcmp(word, "home-fav"));
-	// Every word, on home too, is one recent.txt keeps and reads back
+	// Every item's word is one recent.txt keeps, and Last place reads it
+	// back as home facing that item
+	u8 all[NAV_ITEMS];
+	for (u32 k = 0; k < NAV_ITEMS; k++)
+		all[k] = (u8)k;
 	for (u32 i = 0; i < NAV_ITEMS; i++) {
-		for (u32 open = 0; open < 2; open++) {
-			struct registry_place q = {(u8)i, (u8)open, 0}, back;
-			registry_boot_word(&q, word, sizeof(word));
-			CHECK(userdata_item_ok(word));
-			struct userdata_boot boot = {{0}, 5};
-			strcpy(boot.item, word);
-			u8 all[NAV_ITEMS];
-			for (u32 k = 0; k < NAV_ITEMS; k++)
-				all[k] = (u8)k;
-			registry_start(SET_START_LAST, &boot, all, NAV_ITEMS, &back);
-			CHECK_EQ(back.item, i);
-			CHECK_EQ(back.open, open);
-		}
+		struct registry_place back;
+		struct userdata_boot boot;
+		memset(&boot, 0, sizeof(boot));
+		CHECK(userdata_item_ok(registry_items[i].word));
+		strcpy(boot.item, registry_items[i].word);
+		registry_start(SET_START_LAST, &boot, all, NAV_ITEMS, &back);
+		CHECK_EQ(back.item, i);
+		CHECK_EQ(back.open, 0);
 	}
 }

@@ -47,8 +47,8 @@ echo "PASS: L held doesn't page a game list, and L+A starts the selected row wit
 # Power-on 2, 30 s later on a running clock: A at "Save sav?", then
 # Recent's first row is Hello, played "just now"; a minute on it says "1m
 # ago" (the page refreshes the text as it changes)
-# (the menu starts where it was left: the GBA page; B, then LEFT to Recent)
-boot "$cart/2.log" -c $((t0 + 30)) -k 100:A -k 106:- -w "nav: page gba ready" -k @8:B -k @12:- \
+# (the menu starts facing the item it was left on, GBA: LEFT to Recent)
+boot "$cart/2.log" -c $((t0 + 30)) -k 100:A -k 106:- \
   -w "nav: home ready" -k @8:LEFT -k @12:- -k @24:A -k @28:- -w "nav: page recent ready" -s "@8:$cart/recent.png" \
   -u "games: row 0 played 1m ago" -f 6000
 grep -q '^kernel: games: row 0 played just now' "$cart/2.log" ||

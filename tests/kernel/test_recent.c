@@ -174,15 +174,15 @@ void test_userdata_recent_store(void)
 	CHECK_EQ(userdata_recent_time(0), now);
 	// The boot position, written with the list
 	CHECK(strcmp(userdata_boot_get()->item, "") == 0);
-	userdata_boot_set("gba", 12);
-	userdata_boot_set("not a word", 1);  // refused
+	userdata_boot_set("gba");
+	userdata_boot_set("not a word");  // refused
 	userdata_invalidate();  // a place not yet written survives a read
-	CHECK(strcmp(userdata_boot_get()->item, "gba") == 0 && userdata_boot_get()->row == 12);
+	CHECK(strcmp(userdata_boot_get()->item, "gba") == 0);
 	CHECK(userdata_flush());
-	snprintf(want, sizeof(want), "@boot gba 12\n%lu\t/Games/c.gb\n0\t/a.gba\n0\tNOR:b.gba\n", (unsigned long)now);
+	snprintf(want, sizeof(want), "@boot gba\n%lu\t/Games/c.gb\n0\t/a.gba\n0\tNOR:b.gba\n", (unsigned long)now);
 	CHECK(both_copies(T_RECENT, want));
 	userdata_test_paths(T_RECENT, T_FAV, T_OLD);  // forgets the place: read it back
-	CHECK(strcmp(userdata_boot_get()->item, "gba") == 0 && userdata_boot_get()->row == 12);
+	CHECK(strcmp(userdata_boot_get()->item, "gba") == 0);
 	// Forgetting: a file, a NOR game, every NOR game
 	CHECK(userdata_forget("/a.gba"));
 	CHECK_EQ(userdata_recent_count(), 2);

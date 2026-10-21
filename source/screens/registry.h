@@ -55,20 +55,20 @@ u32 registry_nearest(const u8 *shown, u32 count, u32 item);
 u32 registry_find(const char *word);
 
 // A place in the menu: home facing an item, or an item's page open at row
-#define REGISTRY_HOME_PREFIX "home-"
 struct registry_place {
 	u8 item;  // enum nav_item
 	u8 open;  // 1: its page is open
 	u32 row;  // the page's row (open only)
 };
 // Where the menu starts (T19), from the Start on setting start_on (enum
-// settings_start) and the boot position boot (Last place): a page that
-// can't open because its item is hidden gives home facing the nearest
-// item, and a place never set gives home facing the first.
+// settings_start) and the boot position boot: Last place is home facing
+// the carousel item last faced (boot->item, the item's word; a hidden one
+// gives the nearest, one never set the first), Home is home facing the
+// first item, and Recent or a chosen item opens its page (home facing the
+// nearest item if it's hidden).
 void registry_start(u32 start_on, const struct userdata_boot *boot, const u8 *shown, u32 count,
 		    struct registry_place *out);
-// The boot position's item word for place p, into out (USERDATA_ITEM_MAX
-// bytes): the item's word on its page, REGISTRY_HOME_PREFIX and it on home.
-void registry_boot_word(const struct registry_place *p, char *out, u32 size);
+// Older kernels' boot position on home: this, then the item's word
+#define REGISTRY_OLD_HOME_PREFIX "home-"
 
 #endif

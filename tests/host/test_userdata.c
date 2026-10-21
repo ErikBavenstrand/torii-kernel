@@ -67,7 +67,7 @@ void test_userdata_parse(void)
 	char line[USERDATA_LINE_MAX];
 	u32 t = 99;
 	char *path;
-	struct userdata_boot boot = {{0}, 0};
+	struct userdata_boot boot = {{0}};
 	snprintf(line, sizeof(line), "1792368000\t/GBA/Advance Wars.gba");
 	CHECK_EQ(userdata_parse_recent(line, &t, &path, &boot), USERDATA_GAME);
 	CHECK(t == 1792368000u && strcmp(path, "/GBA/Advance Wars.gba") == 0);
@@ -88,16 +88,20 @@ void test_userdata_parse(void)
 		CHECK_EQ(userdata_parse_recent(line, &t, &path, &boot), USERDATA_SKIP);
 	}
 	const char *bad[] = {"4294967296\t/a.gba", "12/a.gba",   "12\tnot a path", "12",
-			     "C:\\a.gba",          "@boot",      "@boot gba",      "@boot gba x",
+			     "C:\\a.gba",          "@boot",      "@boot g.ba",     "@boot gba x",
 			     "@boot two words 3",  "@bootgba 3", "@where gba 3"};
 	for (u32 i = 0; i < sizeof(bad) / sizeof(bad[0]); i++) {
 		snprintf(line, sizeof(line), "%s", bad[i]);
 		CHECK_EQ(userdata_parse_recent(line, &t, &path, &boot), USERDATA_BAD);
 	}
 	CHECK(boot.item[0] == 0);
+	// The item alone, or an older kernel's "<item> <row>" (the row dropped)
 	snprintf(line, sizeof(line), "@boot  favourites\t12 \r");
 	CHECK_EQ(userdata_parse_recent(line, &t, &path, &boot), USERDATA_BOOT);
-	CHECK(strcmp(boot.item, "favourites") == 0 && boot.row == 12);
+	CHECK(strcmp(boot.item, "favourites") == 0);
+	snprintf(line, sizeof(line), "@boot gba\r");
+	CHECK_EQ(userdata_parse_recent(line, &t, &path, &boot), USERDATA_BOOT);
+	CHECK(strcmp(boot.item, "gba") == 0);
 	// favorites.txt
 	snprintf(line, sizeof(line), " /GBA/a.gba \r");
 	CHECK_EQ(userdata_parse_fav(line, &path), USERDATA_GAME);
@@ -111,7 +115,7 @@ void test_userdata_parse(void)
 void test_userdata_recent_lines(void)
 {
 	static struct userdata_recent list[2] = {{1792368000, "/GBA/a.gba"}, {0, "NOR:b.gba"}};
-	struct userdata_boot boot = {{0}, 0};
+	struct userdata_boot boot = {{0}};
 	char buf[USERDATA_LINE_MAX];
 	CHECK_EQ(userdata_recent_line(list, 2, &boot, 0, buf, sizeof(buf)), 22);
 	CHECK(strcmp(buf, "1792368000\t/GBA/a.gba\n") == 0);
@@ -119,9 +123,8 @@ void test_userdata_recent_lines(void)
 	CHECK(strcmp(buf, "0\tNOR:b.gba\n") == 0);
 	CHECK_EQ(userdata_recent_line(list, 2, &boot, 2, buf, sizeof(buf)), 0);
 	snprintf(boot.item, sizeof(boot.item), "gba");
-	boot.row = 7;
 	userdata_recent_line(list, 2, &boot, 0, buf, sizeof(buf));
-	CHECK(strcmp(buf, "@boot gba 7\n") == 0);
+	CHECK(strcmp(buf, "@boot gba\n") == 0);
 	userdata_recent_line(list, 2, &boot, 2, buf, sizeof(buf));
 	CHECK(strcmp(buf, "0\tNOR:b.gba\n") == 0);
 	CHECK_EQ(userdata_recent_line(list, 2, &boot, 3, buf, sizeof(buf)), 0);
@@ -132,12 +135,12 @@ void test_userdata_recent_lines(void)
 	userdata_recent_line(list, 2, &boot, 1, buf, sizeof(buf));
 	u32 t;
 	char *path;
-	struct userdata_boot back = {{0}, 0};
+	struct userdata_boot back = {{0}};
 	CHECK_EQ(userdata_parse_recent(buf, &t, &path, &back), USERDATA_GAME);
 	CHECK(t == list[0].time && strcmp(path, list[0].path) == 0);
 	userdata_recent_line(list, 2, &boot, 0, buf, sizeof(buf));
 	CHECK_EQ(userdata_parse_recent(buf, &t, &path, &back), USERDATA_BOOT);
-	CHECK(strcmp(back.item, "gba") == 0 && back.row == 7);
+	CHECK(strcmp(back.item, "gba") == 0);
 }
 
 void test_userdata_recent_edits(void)

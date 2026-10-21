@@ -3,7 +3,8 @@
 // recents"; ticket B5).
 //
 // /torii/recent.txt, newest first, at most USERDATA_RECENT_MAX games:
-//     @boot <item> <row>        where the menu was left (only once set)
+//     @boot <item>              the carousel item last faced (only once set);
+//                               older kernels' "<item> <row>" reads as item
 //     <unix time><TAB><path>    one line per game; the time is 0 when the
 //                               clock wasn't set (T4), and may be left out
 // /torii/favorites.txt, one path per line, in byte order of the paths (the
@@ -69,7 +70,6 @@ struct userdata_recent {
 
 struct userdata_boot {
 	char item[USERDATA_ITEM_MAX];  // "" when never set
-	u32 row;
 };
 
 // 1 if path is one the lists keep: an SD path (from '/', folder and name
@@ -180,11 +180,11 @@ int userdata_forget_nor(const char *name);
 // A file renamed from from to to: both lists follow it.
 int userdata_rename(const char *from, const char *to);
 
-// Where the menu was left; item "" when never set.
+// The carousel item last faced; item "" when never set.
 const struct userdata_boot *userdata_boot_get(void);
-// A new place (item a word, userdata_item_ok): kept, and written with the
-// next write of recent.txt or by userdata_flush.
-void userdata_boot_set(const char *item, u32 row);
+// A new item (a word, userdata_item_ok): kept, and written with the next
+// write of recent.txt or by userdata_flush.
+void userdata_boot_set(const char *item);
 int userdata_flush(void);
 
 u32 userdata_fav_count(void);
