@@ -34,7 +34,7 @@ in `dist/logs/torii.log`.
 
 4. Delete `SAVER/EEPROM Probe.sav` from the card, so the probe's 8K runs
    start from a fresh 8 KB save.
-5. In Settings, turn Save states and Cheats (Games) and Reset hotkey and
+5. In Settings, turn Save states and Cheats (Games) and Back to menu and
    Sleep (Hotkeys) on, and set Logging (System) to Debug. Leave the page
    with B, which writes them, so every session below is logged and sleep
    and cheats can be tried.
@@ -51,7 +51,7 @@ on, NES with no NES launch) as "unconfirmed" in its summary.
 
 | Check | How |
 |---|---|
-| The in-game menu opens | Boot with addon (the game's menu, START) with Reset hotkey and Save states on, then L+R+START in the game |
+| The in-game menu opens | Boot with addon (the game's menu, START) with Save states on, then L+R+START in the game |
 | A save state saves and loads | in the menu, SAVE; play on; open the menu again and LOAD: the game is back where you saved |
 | DEBUG reaches the log | with LOGGING on: L+R+START, DEBUG; it says DEBUG SAVED and picks RESET. Choose RESET, not power-off: the snapshot is in cart RAM, which a power-off clears. The kernel's boot logs "debug info" |
 | Sleep sleeps and wakes | Sleep on, Boot with addon, L+R+SELECT in the game: the screen goes off; the wake keys bring the game back where it was |
