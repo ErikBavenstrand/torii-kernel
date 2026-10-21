@@ -1,5 +1,5 @@
 // The settings model's values on the cart (settings_store.c): read from the
-// kernel NOR's settings slots and the RTC, staged, and written once.
+// kernel NOR's settings slots and the RTC, staged, and written once a confirmed change.
 //
 // A page loads the values as it opens, changes them in its copy, and as it
 // closes stages them and commits once: the kernel NOR is written (through

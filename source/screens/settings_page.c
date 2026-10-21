@@ -18,8 +18,9 @@
 // is written at once if it changed: the hint bar says "Saving..." and, once
 // that is on screen (and a theme wipe has ended), the copy is staged and
 // committed in one go, one NOR write through Save_info, the page staying
-// up. A key pressed while it waits writes it first. An edit B cancels is
-// put back with its preview and writes nothing; so is one the page leaves.
+// up. A key pressed while it waits writes it first (but for one during a
+// theme wipe, which the write waits for). An edit B cancels is put back
+// with its preview and writes nothing; so is one the page leaves.
 #include <stdio.h>
 #include <string.h>
 
@@ -761,17 +762,28 @@ static void changed(u32 id)
 	frame_measure("settings-edit");
 }
 
+static void edit_slots(u32 id, int back);
+
 // The working copy to the kernel NOR, one write if a value differs from
-// what it holds (settings_commit, through Save_info)
+// what it holds (settings_commit, through Save_info); an edit still open
+// goes in with its value from before A, not its preview
 static void save_now(void)
 {
+	u16 preview[assress_max];
+	int edit = sp.mode == MODE_EDIT;
 	sp.saving = 0;
 	ui_wipe_finish();  // the write blocks: a wipe still running ends first
+	if (edit) {
+		memcpy(preview, sp.v.slot, sizeof(preview));
+		edit_slots(sp.edit_id, 1);
+	}
 	u32 level = tlog_level;
 	settings_stage(&sp.v);
 	if (settings_commit() && level == TLOG_OFF && tlog_level != TLOG_OFF)
 		tlog_flush_soon();  // the log file is made a sector a frame, the menu still answering
 	memcpy(sp.v.loaded, sp.v.slot, sizeof(sp.v.loaded));
+	if (edit)
+		memcpy(sp.v.slot, preview, sizeof(preview));
 }
 
 // A value was confirmed: if it changed anything, the hint bar says so and
@@ -946,8 +958,10 @@ static int settings_event(struct ui_view *v, const struct ui_event *e)
 	u32 id = cursor_id();
 	if (sp.mode == MODE_CAPTURE)
 		return 1;  // the keys are the combination (settings_poll)
-	if (sp.saving) {
-		// A key before the write: the write first, then the key
+	if (sp.saving && !ui_wiping()) {
+		// A key before the write: the write first, then the key. During a
+		// theme wipe the write waits for it (settings_poll): its split
+		// needs a commit every VBlank, which can't come from in here
 		save_now();
 		hints_show();
 	}
