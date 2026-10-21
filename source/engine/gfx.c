@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "gfx.h"
+#include "motion.h"
 #include "res.h"
 
 #define IO ((vu16 *)0x04000000)
@@ -51,6 +52,8 @@ u32 gfx_pal_used;
 u16 gfx_pal_unfaded[512] EWRAM_BSS ALIGN(4);
 u16 gfx_pal_faded[512] EWRAM_BSS ALIGN(4);
 u8 gfx_pal_faded_on;
+static u16 fade_colour;  // gfx_pal_set_fade's, while gfx_pal_faded_on
+static u32 fade_factor;
 struct gfx_obj gfx_oam[GFX_OAM_ENTRIES] EWRAM_BSS ALIGN(4);
 u8 gfx_oam_building;
 u32 gfx_commit_max_bytes = GFX_COMMIT_BYTES;
@@ -246,11 +249,27 @@ void gfx_pal_load(u32 bank, const u16 *colours, u32 count)
 	if (count > 512 - first)
 		count = 512 - first;
 	memcpy(&gfx_pal_unfaded[first], colours, count * 2);
-	u32 last = (first + count - 1) / 16;
-	for (u32 b = bank; b <= last; b++) {
-		gfx_dirty_pal |= 1u << b;
-		gfx_pal_used |= 1u << b;
+	u32 last = (first + count - 1) / 16, banks = 0;
+	for (u32 b = bank; b <= last; b++)
+		banks |= 1u << b;
+	gfx_dirty_pal |= banks;
+	gfx_pal_used |= banks;
+	if (gfx_pal_faded_on)
+		palette_fade_banks(gfx_pal_faded, gfx_pal_unfaded, banks, fade_colour, fade_factor);
+}
+
+void gfx_pal_set_fade(u16 colour, u32 factor)
+{
+	if (!factor) {
+		gfx_pal_use_faded(0);
+		return;
 	}
+	fade_colour = colour;
+	fade_factor = factor;
+	// Only the banks in use: a whole-palette fade cost about 45k cycles a frame
+	palette_fade_banks(gfx_pal_faded, gfx_pal_unfaded, gfx_pal_used, colour, factor);
+	gfx_pal_mark(gfx_pal_used);
+	gfx_pal_use_faded(1);
 }
 
 void gfx_pal_mark(u32 banks)

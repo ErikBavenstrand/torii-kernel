@@ -101,9 +101,13 @@ void gfx_set_win(u32 index, u16 value);
 void gfx_set_blend(u16 bldcnt, u16 bldalpha, u16 bldy);
 
 // Copies colours into the unfaded buffer from colour index bank * 16 (bank
-// 0-31), and marks the banks they cover dirty and used. The faded buffer is
-// the fade's.
+// 0-31), and marks the banks they cover dirty and used. While a fade is on
+// (gfx_pal_set_fade) the banks are faded with the rest at once, so colours
+// that land mid-fade (a cover) never show unfaded.
 void gfx_pal_load(u32 bank, const u16 *colours, u32 count);
+// Works out the faded buffer for the banks in use, toward colour by factor
+// (palette_fade_banks), and commits from it; factor 0 ends the fade.
+void gfx_pal_set_fade(u16 colour, u32 factor);
 // Marks banks dirty (bit n: bank n), after writing a buffer directly.
 void gfx_pal_mark(u32 banks);
 // Commits from the faded buffer (on) or the unfaded one (off); marks all dirty.

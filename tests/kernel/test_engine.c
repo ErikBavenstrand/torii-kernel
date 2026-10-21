@@ -272,6 +272,18 @@ void test_engine_commit(void)
 	gfx_dirty_pal = 1u << 31;  // keep to the last sprite bank
 	gfx_commit();
 	CHECK_EQ(OBJ_PAL_T[15 * 16 + 2], 0x1234);
+	gfx_pal_use_faded(0);
+	// A bank loaded while a fade is on is faded with the rest (a cover
+	// landing mid-fade): halfway to black, 0x7C00 is 0x3C00
+	gfx_pal_set_fade(0, 128);
+	CHECK_EQ(gfx_pal_faded[31 * 16 + 2], 0x3C00);
+	static const u16 later[16] = {0, 0, 0x03E0};
+	gfx_pal_load(31, later, 16);
+	CHECK_EQ(gfx_pal_unfaded[31 * 16 + 2], 0x03E0);
+	CHECK_EQ(gfx_pal_faded[31 * 16 + 2], 0x01E0);
+	gfx_pal_set_fade(0, 0);
+	CHECK(!gfx_pal_faded_on);
+	gfx_dirty_pal = 0;
 	for (u32 i = 0; i < 16; i++)
 		OBJ_PAL_T[15 * 16 + i] = kept[i];
 
