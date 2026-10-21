@@ -6,6 +6,12 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** a game without box art shows a placeholder box per console
+  (GBA's left band, GB and GBC's top band and badge, NES's black box) with a
+  muted torii skeleton where the art would be; `just art-scrape` builds the
+  card's own placeholders on the PC from a real box per console. The
+  Settings, Info, NOR, SD card, torii and 8x8 GBA icons are redrawn (C2;
+  `cd8ddf0`).
 - **Changed:** Settings writes a value when it is confirmed (A on an edit,
   OK on the time card, an accepted hotkey), once the page is still, with
   "Saving..." in the hint bar; leaving never pauses on black. Last place is
