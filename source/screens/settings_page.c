@@ -14,9 +14,15 @@
 //
 // The values are a working copy (struct settings_values, here in EWRAM).
 // The theme and the LED show an edit at once (ui_theme_switch, Set_LED_control)
-// without staging it; nothing is staged until the page is left (nav's
-// leave): then it is staged and committed in one go, so no exit can leave a
-// staged copy behind. An edit B cancels is put back with its preview.
+// without staging it. A confirmed value (A on an edit, a hotkey accepted)
+// is written soon if it changed: the hint bar says "Saving..." and, once
+// that is on screen and the page is still (no scroll, no theme wipe), the
+// copy is staged and committed in one go, one NOR write through Save_info,
+// the page staying up. Keys act at once meanwhile; the write never runs
+// from a key, so it never stalls a move. B waits for it: the write runs,
+// then the page goes, so leaving never pauses on black. An edit open as it
+// writes goes in with its value from before A. An edit B cancels is put
+// back with its preview and writes nothing; so is one the page leaves.
 #include <stdio.h>
 #include <string.h>
 
@@ -71,6 +77,7 @@ static const struct settings_look {
 	u16 capture_wait;    // frames with nothing pressed before a capture gives up
 	u8 refusal;          // frames a refused hotkey's reason shows
 	u8 clock_poll;       // frames between clock reads (the Time and Date rows)
+	u8 save_wait;        // frames a write waits at most for the screen to settle
 	u8 identify_poll;    // frames between looks at Identify library's progress
 	u32 led[8];          // the swatches' colours by value (0: Off, drawn empty)
 	u8 led_edge;         // a swatch's edge: its colour this much toward black, in 256ths
@@ -104,6 +111,7 @@ static const struct settings_look {
 	.capture_wait = 300,
 	.refusal = 90,
 	.clock_poll = 30,
+	.save_wait = 30,
 	.identify_poll = 15,
 	.led = {0, 0x3973E7, 0x39B54A, 0x29BDD6, 0xE73939, 0xD642C6, 0xEFC621, 0xFFFFFF},
 	.led_edge = 72,  // 28 %
@@ -144,6 +152,8 @@ static struct {
 	u8 identify_wait;   // frames before Identify library's progress is looked at again
 	u32 identify_done;  // its progress as drawn (games looked at), IDENTIFY_IDLE: not running
 	u8 redraw;    // leave ended an edit: draw it all again if still up
+	u8 saving;    // frames a confirmed change may still wait to be written, 0: none
+	u8 leaving;   // B came while saving: the page goes once it's written
 	u8 swatch_bank;
 	u16 swatch_tile;  // ART_NONE-like 0xFFFF: no swatches
 	u16 refused_left;  // frames the refusal's reason stays
@@ -652,7 +662,9 @@ static void hints_show(void)
 {
 	u8 h = node(N_HINTS);
 	u32 id = cursor_id();
-	if (sp.mode == MODE_EDIT) {
+	if (sp.saving) {
+		ui_hints_text(h, gl_set_saving);
+	} else if (sp.mode == MODE_EDIT) {
 		const char *change =
 			settings_rows[id].kind == SET_COLOUR ? gl_set_colours[settings_get(&sp.v, id)] : gl_hint_change;
 		sp.hints[0] = (struct ui_hint){KEY_LEFTRIGHT, change};
@@ -753,6 +765,40 @@ static void changed(u32 id)
 	frame_measure("settings-edit");
 }
 
+static void edit_slots(u32 id, int back);
+
+// The working copy to the kernel NOR, one write if a value differs from
+// what it holds (settings_commit, through Save_info); an edit still open
+// goes in with its value from before A, not its preview
+static void save_now(void)
+{
+	u16 preview[assress_max];
+	int edit = sp.mode == MODE_EDIT;
+	sp.saving = 0;
+	ui_wipe_finish();  // the write blocks: a wipe still running ends first
+	if (edit) {
+		memcpy(preview, sp.v.slot, sizeof(preview));
+		edit_slots(sp.edit_id, 1);
+	}
+	u32 level = tlog_level;
+	settings_stage(&sp.v);
+	if (settings_commit() && level == TLOG_OFF && tlog_level != TLOG_OFF)
+		tlog_flush_soon();  // the log file is made a sector a frame, the menu still answering
+	memcpy(sp.v.loaded, sp.v.slot, sizeof(sp.v.loaded));
+	if (edit)
+		memcpy(sp.v.slot, preview, sizeof(preview));
+}
+
+// A value was confirmed: if it changed anything, the hint bar says so and
+// settings_poll writes it once that is on screen
+static void save_soon(void)
+{
+	if (!memcmp(sp.v.slot, sp.v.loaded, sizeof(sp.v.loaded)))
+		return;
+	sp.saving = look.save_wait;
+	tlog_debug("settings: saving");
+}
+
 // The edited row's slots: kept as A starts the edit (to), or put back (B)
 static void edit_slots(u32 id, int back)
 {
@@ -770,7 +816,9 @@ static void edit_end(int keep)
 {
 	u32 id = sp.edit_id;
 	sp.mode = MODE_BROWSE;
-	if (!keep) {
+	if (keep) {
+		save_soon();
+	} else {
 		edit_slots(id, 1);
 		previews(id, 1);
 	}
@@ -913,6 +961,8 @@ static int settings_event(struct ui_view *v, const struct ui_event *e)
 	u32 id = cursor_id();
 	if (sp.mode == MODE_CAPTURE)
 		return 1;  // the keys are the combination (settings_poll)
+	if (sp.leaving)
+		return 1;  // the page goes once the write is done (settings_poll)
 	if (sp.mode == MODE_EDIT) {
 		if (k & INPUT_B) {
 			edit_end(0);
@@ -929,7 +979,10 @@ static int settings_event(struct ui_view *v, const struct ui_event *e)
 		return 1;
 	}
 	if (k & INPUT_B) {
-		nav_back();
+		if (sp.saving)
+			sp.leaving = 1;  // the write first, from settings_poll
+		else
+			nav_back();
 	} else if (k & INPUT_A) {
 		if (!ui_list_paging(node(N_LIST)) && (in->pressed & INPUT_A))
 			activate(id);
@@ -986,15 +1039,32 @@ static void settings_poll(void)
 		relayout();
 		hints_show();
 	}
+	if (sp.saving) {
+		// Once "Saving..." is on screen and the page is still, or after
+		// save_wait frames with no key held: the write, the page staying up.
+		// B asked to leave: at once (a wipe ends first), then the page goes
+		if (!ui_input()->held)
+			sp.saving--;
+		if (sp.leaving || !sp.saving || (ui_settled() && !ui_wiping())) {
+			save_now();
+			hints_show();
+		}
+	}
+	if (sp.leaving && !sp.saving) {
+		sp.leaving = 0;
+		nav_back();
+	}
 	if (sp.mode == MODE_CAPTURE) {
 		u16 shown = sp.cap.held;
 		u32 r = settings_capture_step(&sp.cap, ui_input()->held, 1);
 		if (r == SET_CAPTURE_DONE) {
 			u32 why = settings_set_keys(&sp.v, sp.edit_id, sp.cap.best);
-			if (why != SET_KEYS_OK)
+			if (why != SET_KEYS_OK) {
 				refuse(why, sp.edit_id);
-			else
+			} else {
 				tlog_debug("settings: keys set");
+				save_soon();
+			}
 			capture_end();
 		} else if (r == SET_CAPTURE_CANCEL) {
 			capture_end();
@@ -1044,9 +1114,9 @@ static void settings_poll(void)
 		frame_measure("settings-scroll");
 }
 
-// Leaving (nav's leave): an edit still open is put back, then the values are
-// staged and written in one go, only if one changed (settings_commit: one
-// NOR write through Save_info), and the working copy starts over from them
+// Leaving (nav's leave): an edit or a capture still open is dropped, its
+// preview put back (nothing is written for it), and a confirmed change still
+// waiting is written
 static void settings_leave(void)
 {
 	if (!sp.live)
@@ -1058,12 +1128,10 @@ static void settings_leave(void)
 	if (sp.mode != MODE_BROWSE)
 		sp.redraw = 1;
 	sp.mode = MODE_BROWSE;
-	ui_wipe_finish();  // the write below blocks: the wipe (Theme put back) ends first
-	u32 level = tlog_level;
-	settings_stage(&sp.v);
-	if (settings_commit() && level == TLOG_OFF && tlog_level != TLOG_OFF)
-		tlog_flush_soon();  // the log file is made a sector a frame, the menu still answering
-	memcpy(sp.v.loaded, sp.v.slot, sizeof(sp.v.loaded));
+	if (sp.saving) {
+		save_now();
+		sp.redraw = 1;  // the hint bar's explanation back, if the page stays up
+	}
 }
 
 const struct nav_page settings_page = {settings_enter, settings_row, 0, settings_poll, settings_leave};

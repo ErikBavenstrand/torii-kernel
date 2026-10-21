@@ -63,8 +63,8 @@ booted "24-hour clock Off, game view List + art, start on SD card, show all file
 write 32=2
 
 # visit ROW KEYS...: power on, go to the Settings page's ROW, press KEYS
-# there, then B, which leaves the page (writing the NOR once, if a value
-# changed); the run's log goes to $cart/visit.log
+# there (each A that confirms a changed value writes the NOR once), then B,
+# which leaves the page; the run's log goes to $cart/visit.log
 visit() {
   local row=$1
   shift
@@ -75,10 +75,13 @@ visit() {
 writes() { grep -c 'nor: wrote the settings' "$cart/visit.log" || true; }
 
 # Saving one setting on the Settings page (Auto save, A RIGHT A) writes the
-# whole sector once as the page closes, keeping the slots the kernel
-# doesn't know, the hidden LANGUAGE and the hotkeys it didn't touch
+# whole sector once as A confirms it, keeping the slots the kernel doesn't
+# know, the hidden LANGUAGE and the hotkeys it didn't touch
 visit auto-save A RIGHT A
 [ "$(writes)" = 1 ] || fail "a save wrote the settings $(writes) times"
+# ... before the page is left: the write comes before the B
+grep -n 'nor: wrote the settings\|nav: back from settings' "$cart/visit.log" | head -1 | grep -q 'nor: wrote' ||
+  fail "the save waited for the page to close"
 [ "$(slots 14 1)" = 0001 ] || fail "Auto save not saved: $(slots 14 1)"
 [ "$(slots 0 14)" = "$(ffff 14)" ] || fail "slots 0-13 changed: $(slots 0 14)"
 [ "$(slots 15 11)" = "$(ffff 11)" ] || fail "slots 15-25 changed: $(slots 15 11)"
@@ -88,17 +91,21 @@ visit auto-save A RIGHT A
 [ "$(slots 65 1)" = 0000 ] || fail "slot 65: $(slots 65 1)"
 booted "24-hour clock Off, game view List + art, start on Home, show all files On"
 
-# One write a visit: two values changed (Game view, Dim screen), then a
-# visit that changes nothing, and one that changes a value and back
+# One write a confirmed change: two values changed (Game view, Dim screen),
+# then a visit that changes nothing, a value confirmed unchanged, and a
+# change and back (two writes: each A confirmed a change)
 visit game-view A RIGHT A DOWN DOWN DOWN A RIGHT A
-[ "$(writes)" = 1 ] || fail "two changes wrote the settings $(writes) times"
+[ "$(writes)" = 2 ] || fail "two changes wrote the settings $(writes) times"
 [ "$(slots 31 1)" = 0000 ] || fail "Game view not saved: $(slots 31 1)"
 [ "$(slots 27 1)" = 0001 ] || fail "Dim screen not saved: $(slots 27 1)"
 visit theme
 [ "$(writes)" = 0 ] || fail "a visit that changed nothing wrote the settings"
+visit auto-save A A
+[ "$(writes)" = 0 ] || fail "a value confirmed unchanged wrote the settings"
+visit auto-save A RIGHT LEFT A
+[ "$(writes)" = 0 ] || fail "an edit stepped there and back wrote the settings"
 visit auto-save A RIGHT A A LEFT A
-[ "$(writes)" = 0 ] || fail "a change and back wrote the settings"
-grep -q 'settings: nothing changed, not written' "$cart/visit.log" || fail "the change and back wasn't staged"
+[ "$(writes)" = 2 ] || fail "a change and back wrote the settings $(writes) times"
 [ "$(slots 14 1)" = 0001 ] || fail "Auto save changed: $(slots 14 1)"
 # B on an edit puts the value back: nothing to write
 visit auto-save A RIGHT B
@@ -108,4 +115,35 @@ visit auto-save A RIGHT B
 visit dim A RIGHT A A RIGHT B
 [ "$(slots 27 1)" = 0002 ] || fail "B put back the page's first value, not the edit's: $(slots 27 1)"
 
-echo "PASS: unwritten settings read 0xFFFF, the v0.4 ones as their defaults, and the Settings page writes once a visit, only a change, keeping the slots it doesn't know"
+# A hotkey accepted writes once; a capture B cancels writes nothing
+# (the keys held 24 frames: a capture takes them after 18)
+# shellcheck disable=SC2046 # nav.sh's options
+OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_setting sleep-keys) \
+  $(_nav_file '-k @8:A -k @12:- -k @24:L+R+DOWN -k @48:-') \
+  -w "settings: keys set" $(nav_press B) -w "nav: home ready" >"$cart/visit.log" 2>&1 ||
+  fail "the hotkey capture didn't set the keys: $(tail -3 "$cart/visit.log")"
+[ "$(writes)" = 1 ] || fail "an accepted hotkey wrote the settings $(writes) times"
+visit sleep-keys A B
+[ "$(writes)" = 0 ] || fail "a cancelled capture wrote the settings"
+# A confirm during the theme's wipe waits for it; keys meanwhile still act,
+# and an edit opened then goes in with its old value, not its preview
+write 28=0 31=0
+# shellcheck disable=SC2046 # nav.sh's options
+OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_setting theme) \
+  $(_nav_file '-k @8:A -k @10:- -k @14:RIGHT -k @16:- -k @18:A -k @19:- -k @20:DOWN -k @21:- -k @22:A -k @23:- -k @24:RIGHT -k @25:-') \
+  -w "nor: wrote the settings" -f 100 >"$cart/visit.log" 2>&1 || fail "the save during the wipe: $(tail -3 "$cart/visit.log")"
+[ "$(writes)" = 1 ] || fail "the save during the wipe wrote the settings $(writes) times"
+[ "$(slots 28 1)" = 0001 ] || fail "Theme not saved during its wipe: $(slots 28 1)"
+[ "$(slots 31 1)" = 0000 ] || fail "Game view's preview was written: $(slots 31 1)"
+# B right after a theme confirm, inside its wipe: the write runs, then the
+# page goes (never on the leave's black screen)
+write 28=0
+# shellcheck disable=SC2046 # nav.sh's options
+OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_setting theme) \
+  $(_nav_file '-k @8:A -k @10:- -k @14:RIGHT -k @16:- -k @18:A -k @19:- -k @20:B -k @21:-') \
+  -w "nav: home ready" -f 100 >"$cart/visit.log" 2>&1 || fail "B after a theme confirm: $(tail -3 "$cart/visit.log")"
+[ "$(writes)" = 1 ] || fail "B after a theme confirm wrote the settings $(writes) times"
+grep -n 'nor: wrote the settings\|nav: back from settings' "$cart/visit.log" | head -1 | grep -q 'nor: wrote' ||
+  fail "the write ran on the way out"
+[ "$(slots 28 1)" = 0001 ] || fail "Theme not saved before leaving: $(slots 28 1)"
+echo "PASS: unwritten settings read 0xFFFF, the v0.4 ones as their defaults, and the Settings page writes once a confirmed change, nothing for a cancel or no change, keeping the slots it doesn't know"

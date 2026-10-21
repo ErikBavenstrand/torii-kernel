@@ -2,8 +2,9 @@
 # The navigation shell (source/screens/nav.c): tests/nav.sh's routes reach
 # every item's page and fail clearly where a page isn't built yet; each
 # Start on value starts where it says, a hidden item giving home facing the
-# nearest one (T19); Last place comes back after a power cycle, on a page
-# and on home; and a deleted game leaves home's counts at once.
+# nearest one (T19); Last place comes back after a power cycle as home
+# facing the item last faced (a page's or home's); and a deleted game
+# leaves home's counts at once.
 # Runs inside the torii-emu container after `just build` and `just
 # emu-headless`.
 set -euo pipefail
@@ -90,16 +91,16 @@ done
 ! nav_info_page help >/dev/null 2>"$cart/err.txt" || fail "nav_info_page help didn't fail"
 echo "PASS: tests/nav.sh reaches each Info page and Diagnostics from Info"
 
-# Last place on a reading page is its row on the Info page: the boot after
-# comes back to the rows, on Your cart
+# Last place on a reading page is the Info item, never the page or its row:
+# the boot after faces Info on home
 rm -rf "$cart" && cp -r "$carts/info-new" "$cart"
 # shellcheck disable=SC2046
 boot info-last $(nav_info_page cart) -k @400:- -f 900
-mtype -i "$cart/sd.img" ::/torii/recent.txt | grep -qx '@boot info 2' ||
+mtype -i "$cart/sd.img" ::/torii/recent.txt | grep -qx '@boot info' ||
   fail "recent.txt's boot position on Your cart: $(mtype -i "$cart/sd.img" ::/torii/recent.txt | head -1)"
-boot info-last-2 -w "screen ready: info" -f 300
-logged "nav: start on 0: info, row 2"
-echo "PASS: Last place on an Info page comes back to its row"
+boot info-last-2 -w "nav: home ready" -f 300
+logged "nav: start on 0: home-info"
+echo "PASS: Last place on an Info page comes back as home facing Info"
 
 # Start on: each value, from the log (registry_start's tests cover the rest)
 new_cart start
@@ -107,26 +108,36 @@ for case in "0 home-recent" "1 recent" "2 home-recent" "3 fav" "4 sd" "5 gba" "6
   read -r value place <<<"$case"
   start_on "$value"
   boot "start-$value" -w "nav: start on $value:" -f 300
-  logged "nav: start on $value: $place, row 0"
+  logged "nav: start on $value: $place"
+  grep -qxF "kernel: nav: start on $value: $place" "$log" || fail "start on $value: $(grep -o 'nav: start on.*' "$log")"
 done
 echo "PASS: Start on starts on Last place, Recent, Home, Favourites, SD card and each console, hidden ones on home facing the nearest"
 
-# Last place: a page left open comes back after a power cycle, once the
-# menu rested long enough to write it; then home, facing the item B left
+# Last place: a page left open is kept as its item once the menu rested
+# long enough to write it, and comes back as home facing that item; then
+# home turned to the next item; a boot that opens the item's page and
+# comes back writes nothing
 new_cart last
+boot_line() { mtype -i "$cart/sd.img" ::/torii/recent.txt | head -1; }
 # shellcheck disable=SC2046
 boot 1 $(nav_to gb) -k @400:- -f 900
 logged "safefile: writing /torii/recent.txt"
-mtype -i "$cart/sd.img" ::/torii/recent.txt | grep -qx '@boot gb 0' ||
-  fail "recent.txt's boot position: $(mtype -i "$cart/sd.img" ::/torii/recent.txt | head -1)"
-boot 2 -w "nav: page gb ready" -k @10:B -k @14:- -w "nav: home ready" -k @400:- -f 900
-logged "nav: start on 0: gb, row 0"
-mtype -i "$cart/sd.img" ::/torii/recent.txt | grep -qx '@boot home-gb 0' ||
-  fail "recent.txt's boot position after B: $(mtype -i "$cart/sd.img" ::/torii/recent.txt | head -1)"
-boot 3 -w "nav: home ready" -f 300
-logged "nav: start on 0: home-gb, row 0"
-! grep -q "safefile: writing" "$log" || fail "a boot that didn't move wrote recent.txt"
-echo "PASS: Last place comes back on a page and on home, and a boot that moves nothing writes nothing"
+[ "$(boot_line)" = "@boot gb" ] || fail "recent.txt's boot position on the GB page: $(boot_line)"
+boot 2 -w "nav: home ready" -k @10:RIGHT -k @14:- -k @400:- -f 900
+logged "nav: start on 0: home-gb"
+[ "$(boot_line)" = "@boot sd" ] || fail "recent.txt's boot position after RIGHT: $(boot_line)"
+boot 3 -w "nav: home ready" -k @10:A -k @14:- -w "nav: page sd ready" -k @10:B -k @14:- -w "nav: home ready" -k @400:- -f 900
+logged "nav: start on 0: home-sd"
+! grep -q "safefile: writing" "$log" || fail "a boot that stayed on its item wrote recent.txt"
+# An older kernel's lines (as hand edits, which win over the copy): a page
+# and its row, and home's "home-" word
+for line in "@boot gb 3" "@boot home-gb 0"; do
+  printf '%s\n/Hello.gba\n' "$line" >"$cart/recent.txt"
+  mcopy -o -i "$cart/sd.img" "$cart/recent.txt" ::/torii/recent.txt
+  boot old -w "nav: home ready" -f 300
+  logged "nav: start on 0: home-gb"
+done
+echo "PASS: Last place comes back as home facing the item last faced, older kernels' lines read as their item, and a boot that stays on its item writes nothing"
 
 # A deleted game (as a page will delete it, through actions.c) leaves home
 # at once: Zelda.gb was the only GB game and the only favourite

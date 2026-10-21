@@ -210,22 +210,20 @@ static void current_place(struct registry_place *p)
 	}
 }
 
-// Keeps the place for Last place (written with the next write of
-// recent.txt, or by the idle flush), once the user has left the one the
-// menu started on: a boot where nothing moves writes nothing to the card
+// Keeps the carousel item for Last place (home's facing item, or the open
+// page's), written with the next write of recent.txt or by the idle flush,
+// once the user has moved from where the menu started (another item, or
+// its page opened or left): a boot where nothing moves writes nothing to
+// the card, and an item already kept isn't written again
 static void remember(void)
 {
 	current_place(&nav.place);  // home's facing item, the page's row, as they are now
-	struct registry_place p = nav.place;
 	if (!nav.left_start) {
-		const struct registry_place *s = &nav.start;
-		if (p.item == s->item && p.open == s->open && (!p.open || p.row == s->row))
+		if (nav.place.item == nav.start.item && nav.place.open == nav.start.open)
 			return;
 		nav.left_start = 1;
 	}
-	char word[USERDATA_ITEM_MAX];
-	registry_boot_word(&p, word, sizeof(word));
-	userdata_boot_set(word, p.open ? p.row : 0);
+	userdata_boot_set(registry_items[nav.place.item].word);
 }
 
 static void engine_enter(void)
@@ -304,10 +302,6 @@ static void show(const struct registry_place *p, u32 kind, s32 way)
 		engine_leave();
 		engine_enter();
 	}
-	// The place the menu started on, as its page shows it (a Last place
-	// row past the list's end clamps): staying there writes nothing
-	if (!nav.left_start && p->item == nav.start.item && p->open == nav.start.open)
-		current_place(&nav.start);
 	remember();
 	measure("nav-screen", SCREEN_MEASURE_FRAMES);
 }
@@ -353,7 +347,7 @@ static void open_item(u32 item)
 // facing the nearest when the item went (its last game deleted)
 static void go_back(void)
 {
-	remember();  // the page's row, for Last place
+	remember();  // its item, for Last place
 	struct registry_place p = {nav.place.item, 0, 0};
 	struct ui_zoom zoom;
 	u32 kind = UI_TR_FADE;
@@ -506,8 +500,8 @@ void nav_run(void)
 	count_items();
 	struct registry_place p;
 	registry_start(start_on, userdata_boot_get(), nav.shown, nav.shown_count, &p);
-	tlog_debug("nav: start on %lu: %s%s, row %lu", (unsigned long)start_on, p.open ? "" : REGISTRY_HOME_PREFIX,
-		   registry_items[p.item].word, (unsigned long)p.row);
+	tlog_debug("nav: start on %lu: %s%s", (unsigned long)start_on, p.open ? "" : "home-",
+		   registry_items[p.item].word);
 	nav.start = p;
 	show(&p, UI_TR_LEAVE, 0);  // in from the boot's black screen
 	for (;;) {

@@ -1,5 +1,4 @@
 // The menu's items and where it starts (registry.h). Hardware-free.
-#include <stdio.h>
 #include <string.h>
 
 #include "registry.h"
@@ -65,14 +64,13 @@ u32 registry_find(const char *word)
 	return NAV_ITEMS;
 }
 
-// A page to open at row, or home facing the nearest item if it's hidden
-static void open_or_face(u32 item, u32 row, const u8 *shown, u32 count, struct registry_place *out)
+// A page to open at its first row, or home facing the nearest item if it's hidden
+static void open_or_face(u32 item, const u8 *shown, u32 count, struct registry_place *out)
 {
 	u32 at = registry_index(shown, count, item);
 	if (at < count) {
 		out->item = (u8)item;
 		out->open = 1;
-		out->row = row;
 	} else {
 		out->item = shown[registry_nearest(shown, count, item)];
 	}
@@ -89,26 +87,17 @@ void registry_start(u32 start_on, const struct userdata_boot *boot, const u8 *sh
 	if (start_on != SET_START_LAST) {
 		for (u32 i = 0; i < NAV_ITEMS; i++)
 			if (registry_items[i].start == start_on)
-				open_or_face(i, 0, shown, count, out);
+				open_or_face(i, shown, count, out);
 		return;
 	}
 	if (!boot)
 		return;  // no place kept: the first item
+	// Home facing the item; an older kernel's "home-" before it is dropped
 	const char *word = boot->item;
-	u32 prefix = sizeof(REGISTRY_HOME_PREFIX) - 1;
-	if (!strncmp(word, REGISTRY_HOME_PREFIX, prefix)) {
-		u32 item = registry_find(word + prefix);
-		if (item < NAV_ITEMS)
-			out->item = shown[registry_nearest(shown, count, item)];
-		return;
-	}
+	u32 prefix = sizeof(REGISTRY_OLD_HOME_PREFIX) - 1;
+	if (!strncmp(word, REGISTRY_OLD_HOME_PREFIX, prefix))
+		word += prefix;
 	u32 item = registry_find(word);
 	if (item < NAV_ITEMS)
-		open_or_face(item, boot->row, shown, count, out);
-}
-
-void registry_boot_word(const struct registry_place *p, char *out, u32 size)
-{
-	const char *word = p->item < NAV_ITEMS ? registry_items[p->item].word : registry_items[0].word;
-	snprintf(out, size, "%s%s", p->open ? "" : REGISTRY_HOME_PREFIX, word);
+		out->item = shown[registry_nearest(shown, count, item)];
 }

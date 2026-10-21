@@ -415,7 +415,7 @@ void IWRAM_CODE Save_SET_info(u16 *SET_info_buffer, u32 buffersize)
 	log_info_write("the settings", buffersize, Save_info(SET_info_offset, SET_info_buffer, buffersize));
 }
 // --------------------------------------------------------------------
-// Torii: SETTINGS' saves, staged (Stage_SET_info) until it closes
+// Torii: SETTINGS' saves, staged (Stage_SET_info) until Commit_SET_info writes them
 static u16 set_staged[assress_max] EWRAM_BSS;
 static u8 set_staging;  // in IWRAM: a launch may fill EWRAM, then read the settings
 
@@ -430,7 +430,7 @@ void Stage_SET_info(const u16 *SET_info_buffer)
 {
 	memcpy(set_staged, SET_info_buffer, sizeof(set_staged));
 	set_staging = 1;
-	tlog_debug("settings: staged, written as SETTINGS closes");
+	tlog_debug("settings: staged");
 }
 // --------------------------------------------------------------------
 void Discard_SET_info(void)

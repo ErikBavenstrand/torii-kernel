@@ -50,14 +50,14 @@ it. Info's Controls page lists every key.
 - **NOR:** what the cart's 64 MB game NOR holds, its games (A starts one,
   START opens Launch, Game info, Delete) and Format all.
 - **Settings:** one page of sections (Look, Clock, Games, Cart, Hotkeys,
-  Library, System). A changes the selected value in place, L/R jump between
-  sections, and the values are written once, as you leave the page. Look
-  has the light and dark themes.
+  Library, System). A changes the selected value in place and A again
+  keeps and saves it (B puts it back), L/R jump between sections. Look has
+  the light and dark themes.
 - **Info:** Controls, In game (the hotkeys), Your cart, About, and
   Diagnostics.
 
-At power-on the menu opens where you left it (Settings' Start on picks
-another place). A library index of the card's games (`/torii/library.idx`)
+At power-on the carousel faces the item you were last on, such as GBA
+(Settings' Start on picks another place, or a page to open). A library index of the card's games (`/torii/library.idx`)
 is rebuilt in the background when the card changes; `/torii` also keeps
 `recent.txt`, `favorites.txt` and the logs.
 

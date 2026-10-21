@@ -35,9 +35,9 @@ in `dist/logs/torii.log`.
 4. Delete `SAVER/EEPROM Probe.sav` from the card, so the probe's 8K runs
    start from a fresh 8 KB save.
 5. In Settings, turn Save states and Cheats (Games) and Back to menu and
-   Sleep (Hotkeys) on, and set Logging (System) to Debug. Leave the page
-   with B, which writes them, so every session below is logged and sleep
-   and cheats can be tried.
+   Sleep (Hotkeys) on, and set Logging (System) to Debug. Each is written
+   as A confirms it, so every session below is logged and sleep and cheats
+   can be tried.
 6. Have on the card: Pokémon Emerald (or another game with a save), a GB
    or GBC game, a NES game, and Drill Dozer for rumble if you have it.
 
