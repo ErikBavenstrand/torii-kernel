@@ -11,6 +11,10 @@
 #   4. the SD card page's Rename of a file to a name its folder has: "That
 #      name is taken." and the keyboard stays; the name back as it was, START
 #      closes it with nothing renamed
+#   5. a names.txt over 116 KB: the walk logs it once, Rename says why it
+#      can't keep the name
+#   6. the SD card page's Rename of a game with a custom name: the name
+#      follows, and the index shows it at once
 # The save that follows an SD file's rename is tests/saves.sh rename's.
 # Runs inside the torii-emu container after `just build`, `just
 # emu-headless` and building tests/roms/hello.
@@ -106,3 +110,18 @@ OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_game_rename
 logged "rename: from Hello"
 names | grep -q $'^/Hello.gba\tBig$' || fail "names.txt changed"
 echo "PASS: rename: a names.txt too large to read is logged once and Rename says so"
+
+# 6: the SD card page's Rename of a game with a custom name: the name
+# follows the file, and its row shows it at once
+printf '/Hello.gba\tCustom Hello\n' >"$cart/names.txt"
+mcopy -o -i "$cart/sd.img" "$cart/names.txt" ::/torii/names.txt
+mdel -i "$cart/sd.img" ::/torii/names.txt.bak ::/Helloq.gba 2>/dev/null || true
+boot -u "library: wrote" -f 900  # the index takes the name
+logged "library: 1 custom names parsed"
+# shellcheck disable=SC2046 # nav.sh's options
+boot $(nav_file /Hello.gba 0) -k @12:UP -k @16:- -k @20:UP -k @24:- -k @28:UP -k @32:- -k @40:A -k @44:- \
+  -w "screen ready: rename" -k @10:A -k @14:- -k @24:START -k @28:- -w "rename: kept" -f 2400
+logged "rename: /Hello.gba to Helloq.gba"
+logged "library: /Hello.gba is Helloq.gba now, shown as Custom Hello"
+names | grep -q $'^/Helloq.gba\tCustom Hello$' || fail "the custom name didn't follow the file: $(names)"
+echo "PASS: rename: a game's custom name follows its SD rename and shows at once"

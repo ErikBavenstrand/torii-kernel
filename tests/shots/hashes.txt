@@ -88,6 +88,7 @@ games-art-dark/gba-none 6DD7FD2BF9FD37DC
 games-cheats/back DE60914D027457D0
 games-cheats/picked BFDAFB041DCC8050
 games-cheats/screen C49F10B375086F38
+games-dedupe/screen 67E86C46698E404E
 games-fav/screen 5F5922C2D6F31804
 games-fav/starred 9420B42D7CAE4C1D
 games-fav/toggled 7CEBC3F5B0C881EB

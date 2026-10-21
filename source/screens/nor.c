@@ -22,6 +22,7 @@
 #include "../ezkernel.h"
 #include "../gamename.h"
 #include "../lang.h"
+#include "../library.h"
 #include "../tlog.h"
 #include "../engine/frame.h"
 #include "../ui/art_ids.h"
@@ -110,6 +111,11 @@ static struct {
 	struct ui_card_config card;
 	char used[24], free[32], position[12];
 	struct ui_hint hints_game[3], hints_format[2];
+	// Each game's record in the library (the SD file it was written from),
+	// for its display name, as of library generation rec_gen
+	u16 rec_of[MAX_NOR];
+	u32 rec_gen;
+	u8 refresh;  // rows drew from older records: nor_poll draws them again
 	// Rows' names and sizes, by game
 	u8 name_of[NAME_SLOTS];
 	u8 name_next;
@@ -157,21 +163,47 @@ static void storage_text(u32 used)
 	snprintf(nor.free, sizeof(nor.free), "%s %s %lu", n, gl_nor_free_of, (unsigned long)(NOR_TOTAL / MB));
 }
 
-// Game i's name as the lists show it (gamename.h: the cleaned file name),
-// and its size; kept for the last NAME_SLOTS games asked for
+// The games' records in the library, found by file name (one pass over it)
+static void match_records(void)
+{
+	const char *names[MAX_NOR];
+	for (u32 i = 0; i < nor.count; i++)
+		names[i] = pNorFS[i].filename;
+	library_find_names(names, nor.count, nor.rec_of);
+	nor.rec_gen = library_generation();
+	u32 found = 0;
+	for (u32 i = 0; i < nor.count; i++)
+		found += nor.rec_of[i] != LIBRARY_NONE;
+	tlog_debug("nor: %lu of %lu games named from their SD files", (unsigned long)found, (unsigned long)nor.count);
+	memset(nor.name_of, NAME_NONE, sizeof(nor.name_of));
+}
+
+// Game i's name as the game lists show it: its SD file's display name in
+// the library (a custom or database name, or the cleaned file name), else
+// its cleaned file name; and its size. Kept for the last NAME_SLOTS games
+// asked for
 static u32 name_slot(u32 i)
 {
+	if (nor.rec_gen != library_generation()) {
+		match_records();  // a new index, or one renamed: other records
+		nor.refresh = 1;  // and the rows drawn before it, other names
+	}
 	for (u32 s = 0; s < NAME_SLOTS; s++)
 		if (nor.name_of[s] == i)
 			return s;
 	u32 s = nor.name_next;
 	nor.name_next = (u8)((s + 1) % NAME_SLOTS);
 	char clean[GAMENAME_MAX + 1];
-	// Never longer than the file name, which the list keeps to 99 bytes
-	u32 len = gamename_clean(clean, pNorFS[i].filename);
+	u32 rec = i < nor.count ? nor.rec_of[i] : LIBRARY_NONE;
+	u32 len = rec != LIBRARY_NONE ? (u32)snprintf(clean, sizeof(clean), "%s", library_display(rec))
+				      : gamename_clean(clean, pNorFS[i].filename);
 	if (!len)  // a name that cleans to nothing ("   .gba"): the file name
 		len = (u32)snprintf(clean, sizeof(clean), "%s", pNorFS[i].filename);
-	len = len < sizeof(nor.name[s]) - 1 ? len : sizeof(nor.name[s]) - 1;
+	// A slot keeps 99 bytes, as the file name: a longer display name is cut
+	// at a character's start
+	if (len > sizeof(nor.name[s]) - 1)
+		for (len = sizeof(nor.name[s]) - 1; len && ((u8)clean[len] & 0xC0) == 0x80; len--)
+			;
 	memcpy(nor.name[s], clean, len);
 	nor.name[s][len] = 0;
 	size_text(nor.size[s], sizeof(nor.size[s]), pNorFS[i].filesize);
@@ -516,7 +548,7 @@ static struct ui_view *nor_enter(u32 item, u32 row)
 		row = nor.next_row;
 	nor.next_row_set = 0;  // used once, by this enter
 	nor.sel = row < nor.count ? row : nor.count;  // Last place may hold any row: past the games, Format all
-	memset(nor.name_of, NAME_NONE, sizeof(nor.name_of));
+	match_records();
 	u32 used = 0;
 	for (u32 i = 0; i < nor.count; i++) {
 		nor.parts[i] = pNorFS[i].filesize;
@@ -554,4 +586,18 @@ static u32 nor_row(void)
 	return nor.sel;
 }
 
-const struct nav_page nor_page = {nor_enter, nor_row, 0, 0, 0};
+// A new index (the walk read names.txt, say) can change the games' names
+static void nor_poll(void)
+{
+	if (!ui_depth() || ui_view_at(0)->spec != &view)
+		return;
+	if (nor.rec_gen != library_generation()) {
+		match_records();
+		nor.refresh = 1;
+	}
+	if (nor.refresh && nor.count)
+		ui_list_refresh(at(N_LIST), 0, nor.count - 1);
+	nor.refresh = 0;
+}
+
+const struct nav_page nor_page = {nor_enter, nor_row, 0, nor_poll, 0};

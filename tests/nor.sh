@@ -124,3 +124,14 @@ grep -q 'mode game from NOR offset 000000$' "$cart/5-hello.log" || fail "Hello d
 [ "$(hex_at "$cart/sram.bin" 0)" = 4f4d525802 ] || fail "Hello's save did not come back on a NOR boot (SRAM $(hex_at "$cart/sram.bin" 0))"
 
 echo "PASS: two games written over a used game NOR boot from it after power cycles, and keep their saves"
+
+# Power-on 6: the NOR page names its games as the game lists do, from their
+# SD files: World's custom name (names.txt), Hello's cleaned one (A first
+# copies Hello's save)
+printf '/World.gba\tMy Own World\n' >"$cart/names.txt"
+mcopy -o -i "$cart/sd.img" "$cart/names.txt" ::/torii/names.txt
+# shellcheck disable=SC2046
+boot 6-names -k 100:A -k 104:- $(nav_nor_game 1) -s @200:$shots/6-names.png -f 2000
+grep -q 'nor: 2 of 2 games named from their SD files' "$cart/6-names.log" ||
+  fail "the NOR page didn't find its games' SD files: $(grep 'nor: ' "$cart/6-names.log" | tail -2)"
+echo "PASS: the NOR page shows its games' names as the game lists do"

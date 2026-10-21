@@ -74,6 +74,7 @@ static const struct ui_card_config card = {4, 4, 4, 1, 0};
 #define AGO_POLL 30     // frames between checks of Recent's "played" texts
 #define AGO_MAX 16      // a "played" text's bytes, with its NUL
 #define DEDUPE_RUN 8    // games that clean to one name told apart, at most
+_Static_assert(DEDUPE_RUN *USERDATA_PATH_MAX <= READCACHE_DEDUPE_SIZE, "a run's paths fit their part of pReadCache");
 #define HASH_BUCKETS 1024  // the resolver's (a power of 2)
 #define GAMES_KEYS USERDATA_FAV_MAX  // favourites outside the index sort by their own key,
 #define GAMES_KEY_BYTES 12           // by this many bytes of it
@@ -224,11 +225,14 @@ static const char *record_name(u32 rec, char *buf)
 		hi++;
 	if (lo == hi)
 		return display;
-	// Their file names (paths would add their folders when the tags are the
-	// same; file names alone keep the run within the PSRAM it is in)
+	// Their paths, so names with the same tags in other folders add their
+	// folder's (a file name where the path doesn't fit)
 	const char *names[DEDUPE_RUN] = {0};
-	for (u32 k = lo; k <= hi; k++)
-		names[k - lo] = library_name(library_game(console, k));
+	char (*paths)[USERDATA_PATH_MAX] = (char (*)[USERDATA_PATH_MAX])(void *)(pReadCache + READCACHE_DEDUPE);
+	for (u32 k = lo; k <= hi; k++) {
+		u32 r = library_game(console, k);
+		names[k - lo] = library_path(r, paths[k - lo], USERDATA_PATH_MAX) ? paths[k - lo] : library_name(r);
+	}
 	u32 len = (u32)strnlen(display, GAMENAME_MAX);
 	memcpy(buf, display, len);
 	buf[len] = 0;

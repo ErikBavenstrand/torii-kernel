@@ -1160,6 +1160,16 @@ u32 library_find(const char *path)
 	return lib.valid ? lib_find(active_slot(), path) : LIBRARY_NONE;
 }
 
+void library_find_names(const char *const *names, u32 count, u16 *recs)
+{
+	if (lib.valid) {
+		lib_find_names(active_slot(), names, count, recs);
+		return;
+	}
+	for (u32 j = 0; j < count; j++)
+		recs[j] = LIBRARY_NONE;
+}
+
 u32 library_total_files(void)
 {
 	return lib.valid ? lib_hdr(active_slot())->total_files : 0;
@@ -1230,7 +1240,16 @@ void library_renamed(const char *old_path, const char *new_name)
 	if (rec != LIBRARY_NONE) {
 		psram_begin();
 		struct lib_build *scratch = (struct lib_build *)(pReadCache + READCACHE_LIBRARY);
-		if (!lib_rename(slot_at(lib.active), put, rec, new_name, scratch))
+		// A custom name followed the file (gamename_store_move): it shows
+		// at once, not the cleaned name until the walk. In RAM: the rename
+		// writes the pool it is in
+		char display[GAMENAME_MAX + 1];
+		int custom = (library_flags(rec) & LIB_F_CUSTOM) != 0;
+		if (custom)
+			snprintf(display, sizeof(display), "%s", library_display(rec));
+		if (lib_rename_shown(slot_at(lib.active), put, rec, new_name, custom ? display : NULL, scratch))
+			tlog_debug("library: %s is %s now, shown as %s", old_path, new_name, library_display(rec));
+		else
 			lib_forget(slot_at(lib.active), put, rec);  // the walk adds it back
 		changed();
 	}

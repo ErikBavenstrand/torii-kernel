@@ -500,6 +500,28 @@ u32 lib_find(const u8 *slot, const char *path)
 	return LIBRARY_NONE;
 }
 
+void lib_find_names(const u8 *slot, const char *const *names, u32 count, u16 *recs)
+{
+	u32 firsts[8] = {0}, left = count;
+	for (u32 j = 0; j < count; j++) {
+		u8 c = (u8)names[j][0];
+		firsts[c >> 5] |= 1u << (c & 31);
+		recs[j] = LIBRARY_NONE;
+	}
+	const struct lib_header *h = lib_hdr(slot);
+	for (u32 i = 0; i < h->records && left; i++) {
+		const char *name = lib_name(slot, i);
+		u8 c = (u8)name[0];
+		if (!(firsts[c >> 5] & (1u << (c & 31))) || (lib_rec_at(slot, i)->flags & LIB_F_GONE))
+			continue;
+		for (u32 j = 0; j < count; j++)
+			if (recs[j] == LIBRARY_NONE && (u8)names[j][0] == c && !bytes_cmp(name, names[j])) {
+				recs[j] = (u16)i;
+				left--;
+			}
+	}
+}
+
 // Where rec is in the order, or LIBRARY_NONE
 static u32 order_pos(const u8 *slot, u32 rec)
 {

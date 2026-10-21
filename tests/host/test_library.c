@@ -188,6 +188,16 @@ void test_library_build_and_sort(void)
 	CHECK_EQ(lib_path(slot, 0, path, sizeof(path)), strlen("/Mega Man 10.gba"));
 	CHECK_EQ(lib_path(slot, 0, path, 10), 0);
 	CHECK_EQ(lib_find(slot, "no slash"), LIBRARY_NONE);
+	// By file name, as the NOR page finds its games' SD files
+	const char *const names[] = {"Advance Wars.gba", "Missing.gba", "Mega Man 10.gba", "mega man 10.gba", ""};
+	u16 recs[5];
+	lib_find_names(slot, names, 5, recs);
+	CHECK_EQ(recs[0], 3);
+	CHECK_EQ(recs[1], LIBRARY_NONE);
+	CHECK_EQ(recs[2], 0);
+	CHECK_EQ(recs[3], LIBRARY_NONE);  // byte for byte
+	CHECK_EQ(recs[4], LIBRARY_NONE);
+	lib_find_names(slot, names, 0, recs);
 	free(slot);
 }
 
