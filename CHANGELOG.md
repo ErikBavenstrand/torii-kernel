@@ -6,6 +6,15 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** the Settings page: one scrolling page of section cards whose
+  edges and labels scroll with the rows, the selected row's explanation in
+  the hint bar; A edits a value in place as « value », Time and Date in a
+  field card, hotkeys by pressing the combination (refusals say why), LED
+  colours as swatches; the theme and the LED preview live; Rescan library
+  and Identify library run from it; L/R jump a section. Values are written to
+  the kernel NOR once, as the page is left, and only for a change; the log is
+  flushed as it opens (B16; `10be693`, `ccda3b2`, `4dc755c`, `11b37d2`,
+  `302cfd5`, `96fee8a`).
 - **Added:** the SD card page: the card's folders as they are, raw names,
   folders first then files A-Z, sizes and item counts, path pills in the
   title bar, up to 1,024 files (folders past it stay reachable), hidden
