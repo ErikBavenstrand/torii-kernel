@@ -61,7 +61,6 @@ u32 gl_norOffset;
 u32 gl_lang;
 u16 gl_engine_sel;
 
-u16 gl_show_Thumbnail;
 u16 gl_game_clock;
 u16 gl_game_rumble;
 
@@ -78,7 +77,6 @@ u16 gl_sleep_on;
 u16 gl_cheat_on;
 
 u16 gl_auto_save_sel;
-u16 gl_ModeB_init;
 
 u16 gl_led_open_sel;
 u16 gl_Breathing_R;
@@ -613,11 +611,6 @@ void CheckSwitch(void)
 		gl_engine_sel = 0x1;
 	}
 
-	gl_show_Thumbnail = Read_SET_info(assress_show_Thumbnail);
-	if ((gl_show_Thumbnail != 0x0) && (gl_show_Thumbnail != 0x1)) {
-		gl_show_Thumbnail = 0x0;
-	}
-
 	gl_game_clock = Read_SET_info(assress_game_clock);
 	if ((gl_game_clock != 0x0) && (gl_game_clock != 0x1)) {
 		gl_game_clock = 0x1;
@@ -631,11 +624,6 @@ void CheckSwitch(void)
 	gl_auto_save_sel = Read_SET_info(assress_auto_save_sel);
 	if ((gl_auto_save_sel != 0x0) && (gl_auto_save_sel != 0x1)) {
 		gl_auto_save_sel = 0x0;
-	}
-
-	gl_ModeB_init = Read_SET_info(assress_ModeB_INIT);
-	if ((gl_ModeB_init != 0x0) && (gl_ModeB_init != 0x1) && (gl_ModeB_init != 0x2)) {
-		gl_ModeB_init = 0x2;
 	}
 
 	gl_led_open_sel = Read_SET_info(assress_led_open_sel);
@@ -1308,9 +1296,9 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 		f_close(&gfile);
 		gl_game_uses = Game_hardware(is_EMU, GAMECODE, gb_cart_type);
 	} else {
-		// A Recently Played entry for a file that has since moved: launching
+		// A Recent entry for a file that has since moved: launching
 		// would make its save and start an emulator with no ROM. A file
-		// that is gone comes off Recently Played (not on a card error,
+		// that is gone comes off Recent (not on a card error,
 		// which may pass)
 		tlog("launch %s: can't open it (FatFs %lu)", pfilename, (unsigned long)res);
 		if (res == FR_NO_FILE || res == FR_NO_PATH)

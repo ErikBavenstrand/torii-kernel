@@ -538,11 +538,6 @@ static void wipe_end(void)
 		theme_load(t);
 }
 
-int ui_wiping(void)
-{
-	return ui.wipe != 0;
-}
-
 void ui_wipe_finish(void)
 {
 	if (!ui.wipe)
@@ -676,11 +671,6 @@ void ui_dim_set_frames(u32 frames)
 void ui_dim_set_minutes(u32 minutes)
 {
 	ui_dim_set_frames(minutes * 60 * 60);
-}
-
-int ui_dimmed(void)
-{
-	return ui.dimmed;
 }
 
 u32 ui_idle_frames(void)

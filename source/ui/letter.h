@@ -16,7 +16,7 @@
 #define LETTER_A 1
 #define LETTER_Z 26
 #define LETTER_HASH_HIGH 27
-#define LETTER_NONE 0xFF  // UI_LETTER_NONE
+#define LETTER_NONE 0xFF
 
 // The letter display files under.
 u32 letter_of(const char *display);

@@ -361,7 +361,7 @@ static const struct ui_spec menu_nodes[M_NODES] = {
 };
 
 static int menu_event(struct ui_view *v, const struct ui_event *e);
-static const struct ui_view_spec menu_view = {"info", menu_nodes, M_NODES, 0, M_LIST, 0, menu_event};
+static const struct ui_view_spec menu_view = {"info", menu_nodes, M_NODES, M_LIST, 0, menu_event};
 
 static void menu_position(void)
 {
@@ -464,7 +464,7 @@ static const struct ui_spec read_nodes[P_NODES] = {
 
 static int read_event(struct ui_view *v, const struct ui_event *e);
 // One view a page, so each logs its own "screen ready: info-..."
-#define READ_VIEW(name) {(name), read_nodes, P_NODES, 0, P_LIST, 0, read_event}
+#define READ_VIEW(name) {(name), read_nodes, P_NODES, P_LIST, 0, read_event}
 static const struct ui_view_spec read_views[R_PAGES] = {
 	READ_VIEW("info-controls"),
 	READ_VIEW("info-ingame"),

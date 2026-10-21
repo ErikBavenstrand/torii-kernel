@@ -617,7 +617,7 @@ static void run_spec(struct run *r, const char *name, u8 kind, const s16 *rect)
 					(s16)(rect[2] - rect[0]),
 					(s16)(rect[3] - rect[1]),
 					0};
-	r->view_spec = (struct ui_view_spec){name, &r->node_spec, 1, 0, 0, 0, 0};
+	r->view_spec = (struct ui_view_spec){name, &r->node_spec, 1, 0, 0, 0};
 }
 
 // --- The popup -------------------------------------------------------------

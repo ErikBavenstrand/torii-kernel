@@ -21,8 +21,6 @@ typedef struct CHT_LINE {
 } FM_CHT_LINE;
 
 //int Get_KEY_val(FIL* file,char*KEY_section,char*KEY_secval,char getbuff[]);
-int Show_all_KEY_val(FIL *file);
-u32 Check_cht_file(TCHAR *gamefilename);
 u32 Check_cheat_file(TCHAR *gamefilename);
 // What the cheat screen ended with
 enum {

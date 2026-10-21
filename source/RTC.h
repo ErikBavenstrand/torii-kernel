@@ -16,5 +16,4 @@ void rtc_cmd(int v);
 void rtc_data(int v);
 int rtc_read(void);
 int rtc_get(u8 *data);
-int rtc_gettime(u8 *data);
 void rtc_set(u8 *data);

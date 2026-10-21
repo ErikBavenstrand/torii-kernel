@@ -378,11 +378,6 @@ void ui_pop(void)
 	ui_hook_popped(planes);
 }
 
-int ui_pops_waiting(void)
-{
-	return core.pops;
-}
-
 void ui_apply_pops(void)
 {
 	while (core.pops) {

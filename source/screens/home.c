@@ -43,7 +43,7 @@ static const struct ui_spec nodes[N_NODES] = {
 };
 
 static int home_event(struct ui_view *v, const struct ui_event *e);
-static const struct ui_view_spec view = {"home", nodes, N_NODES, 0, N_CAROUSEL, 0, home_event};
+static const struct ui_view_spec view = {"home", nodes, N_NODES, N_CAROUSEL, 0, home_event};
 
 // 1 while home's view is up (at the stack's bottom: dialogs go over it)
 static int up(void)

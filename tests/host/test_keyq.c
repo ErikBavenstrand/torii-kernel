@@ -86,10 +86,10 @@ void test_keyq_carry(void)
 	frame(&s, &q, 0, 1);
 	frame(&s, &q, INPUT_R, 1);
 	keyq_release(&q);
-	CHECK_EQ(frame(&s, &q, 0, 0), INPUT_R);  // the NOR list: R to SETTINGS...
+	CHECK_EQ(frame(&s, &q, 0, 0), INPUT_R);  // the next screen: R on to a third...
 	keyq_hold_queued(&q);                    // ...which goes out at once
 	keyq_release(&q);
-	CHECK_EQ(frame(&s, &q, 0, 0), 0);  // the second R was the NOR list's: dropped
+	CHECK_EQ(frame(&s, &q, 0, 0), 0);  // the second R was the next screen's: dropped
 
 	// Keys the view never had carry over whole, second presses too.
 	keyq_clear(&q);
@@ -102,8 +102,8 @@ void test_keyq_carry(void)
 	CHECK_EQ(frame(&s, &q, 0, 0), INPUT_DOWN);
 	CHECK_EQ(frame(&s, &q, 0, 0), INPUT_DOWN);
 
-	// R, DOWN, DOWN, L while the SD list goes out: the NOR list gets R, DOWN
-	// and L, and goes back; the second DOWN doesn't follow to the SD list
+	// R, DOWN, DOWN, L while screen A goes out: screen B gets R, DOWN and
+	// L, and goes back; the second DOWN doesn't follow to screen A
 	// (the adversarial review's case).
 	keyq_clear(&q);
 	frame(&s, &q, INPUT_DOWN, 1);

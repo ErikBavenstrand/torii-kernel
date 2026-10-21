@@ -746,14 +746,6 @@ u32 carousel_facing(u8 node)
 	return car.count ? ring_item(car.m.to, car.count) : 0;
 }
 
-void carousel_colours(u8 node)
-{
-	if (car.node != node)
-		return;
-	car.pal_dirty = 1;
-	ui_wake();
-}
-
 // The zoom's sprite for object o of entry e, drawn moved by (dx, dy) over a
 // backdrop of sky, as car_update draws it
 static void zoom_of(const struct carousel_entry *e, const struct ring_object *o, u16 sky, s32 dx, s32 dy,

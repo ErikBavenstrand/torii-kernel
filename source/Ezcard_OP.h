@@ -14,7 +14,6 @@ void IWRAM_CODE SetRompage(u16 page);
 void IWRAM_CODE SetbufferControl(u16 control);
 void SetPSRampage(u16 page);
 void SetRampage(u16 page);
-void IWRAM_CODE Progress(u16 x, u16 y, u16 w, u16 h, u16 c, u8 isDrawDirect);
 void IWRAM_CODE Send_FATbuffer(u32 *buffer, u32 mode);
 void IWRAM_CODE SetRompageWithHardReset(u16 page, u32 bootmode);
 #define GAME_USES_CLOCK 1

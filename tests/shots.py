@@ -129,7 +129,7 @@ def build_sd(path: Path) -> None:
     (stage / "SAVER").mkdir()
     shutil.copy("tests/roms/hello/hello.gba", stage / "Hello.gba")
     shutil.copy("tests/roms/idle/idle.gba", stage / "Games" / "Idle.gba")
-    # Too long for its row: the SD list scrolls it, an animation to check
+    # Too long for its row: the SD card page scrolls it, an animation to check
     shutil.copy(
         "tests/roms/idle/idle.gba",
         stage / "Long" / "A name too long to fit on its row.gba",

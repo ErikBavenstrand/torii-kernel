@@ -86,22 +86,6 @@ int rtc_get(u8 *data)
 	return 0;
 }
 // --------------------------------------------------------------------
-int rtc_gettime(u8 *data)
-{
-	int i;
-	u16 waitcnt = WAITCNT_SLOW();
-	*RTC_DATA = 1;
-	*RTC_RW = 7;
-	*RTC_DATA = 1;
-	*RTC_DATA = 5;
-	rtc_cmd(RTC_CMD_READ(3));
-	*RTC_RW = 5;
-	for (i = 0; i < 3; i++)
-		data[i] = (u8)rtc_read();
-	WAITCNT_RESTORE(waitcnt);
-	return 0;
-}
-// --------------------------------------------------------------------
 void rtc_set(u8 *data)
 {
 	int i;

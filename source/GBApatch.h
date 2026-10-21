@@ -70,7 +70,6 @@ u32 Check_RTS(TCHAR *gamefilename);
 u8 Check_mde_file(TCHAR *gamefilename);
 u8 Make_mde_file(TCHAR *gamefilename, u8 Save_num);
 
-void Patch_SpecialROM_sheepmode(void);
 u32 use_internal_engine(u8 gamecode[], TCHAR *gamefilename);
 void Apply_rom_patches(void);
 // The ROM words the in-game patches change (the IRQ hook's literals and code
@@ -82,7 +81,6 @@ extern u32 iCount2;
 void Log_patches(void);
 u32 Check_cheat_file(TCHAR *gamefilename);
 void SetTrimSize(u8 *buffer, u32 romsize, u32 iSize, u32 mode, BYTE saveMODE);
-u32 Find_spend_address_SpecialROM(u32 *Data);
 void Patch_SpecialROM_TrimSize(void);
 // Fills the cart's table of the file's cluster runs (game_save_rts 1: the
 // game's, 3: the RTS file's). Returns 0, 0xffffffff if the file doesn't

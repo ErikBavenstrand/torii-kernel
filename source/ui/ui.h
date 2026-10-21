@@ -1,5 +1,5 @@
-// Views, widgets and themes on the v0.3 tile engine (docs/plans/v0.3-decisions.md,
-// "Views and widgets").
+// Views, widgets and themes on the tile engine (docs/plans/v0.3-decisions.md,
+// "Views and widgets"; v0.4's Paper widgets and themes: docs/plans/v0.4-decisions.md).
 //
 // A screen is a const layout in ROM: an array of ui_spec, one per widget,
 // with fixed rectangles and anchors, plus a ui_view_spec naming it and its
@@ -19,7 +19,7 @@
 //		if (e->type == UI_EV_KEYS && (e->keys & INPUT_B)) { ui_pop(); return 1; }
 //		return 0;
 //	}
-//	static const struct ui_view_spec files_view = {"sd-list", nodes, 3, 1, 2, 0, on_event};
+//	static const struct ui_view_spec files_view = {"sd-list", nodes, 3, 2, 0, on_event};
 //	...
 //	ui_push(&files_view, &my_state);
 //	while (ui_depth())
@@ -132,9 +132,8 @@ enum ui_bank {
 // most of BG VRAM), so the new one is drawn while nothing shows, between the
 // two halves. What a transition does is a theme's, per kind of change:
 enum ui_tr_kind {
-	UI_TR_TAB,     // to the screen beside it: the SD list, the NOR list, SETTINGS' pages
-	UI_TR_DEEPER,  // into a folder or a screen under this one (Recently Played,
-		       // cheats, help), or back out
+	UI_TR_DEEPER,  // into a screen under this one (the cheats, the rename keyboard),
+		       // or back out
 	UI_TR_FADE,    // the same screen redrawn (after a delete, a format, a failed launch)
 	UI_TR_LEAVE,   // out of the engine to black (a launch), or in from black
 	UI_TR_CARD,    // in from black, rising: a dialog in a session of its own (a launch's
@@ -169,8 +168,7 @@ struct ui_look {
 	u8 title_right_y;   // its line top
 	u8 title_right_w;   // px kept for it (two tile sets: whole tiles)
 	u8 title_sub_gap;   // between the heading and its faint after-text ("Controls Info")
-	u8 content_top;     // the page between the title and hint bars
-	u8 content_bottom;  // its last row
+	u8 content_bottom;  // the page's last row, above the hint bar
 	u8 list_rows;       // rows in a list card
 	u8 list_pitch;      // a list row's height
 	u8 settings_pitch;  // a Settings row's height
@@ -180,9 +178,7 @@ struct ui_look {
 	u8 pill_out_r;      // and past its right edge
 	u8 card_radius;
 	u8 button_radius;
-	u8 edge;            // a card's hairline
 	u8 shadow_offset;   // how far a card's shadow falls, down and right
-	u8 scrollbar_w;
 	u8 scrollbar_x;     // its thumb's left column, in its 8 px column
 	u8 section_icon_gap;  // between a section label's 8x8 icon and its text
 	u8 path_gap;        // between a path's pill and its "/"
@@ -344,8 +340,6 @@ void ui_item_set(u32 item);
 // session, it is ui_theme_set. Any screen change or ui_theme_set ends a wipe
 // at once on its new theme.
 void ui_theme_switch(const struct ui_theme *theme);
-// 1 while the wipe runs
-int ui_wiping(void);
 // Ends a wipe at once on the theme it was going to, and runs a frame that
 // commits that: call it before blocking work (a NOR write, a dialog), as a
 // split needs a commit every VBlank (gfx_set_split). Nothing if none runs.
@@ -425,7 +419,6 @@ struct ui_view_spec {
 	const char *name;  // logged as "screen ready: NAME" once shown
 	const struct ui_spec *nodes;
 	u8 count;
-	u8 id;       // unused since SD themes went (B10 drops it with the old screens)
 	u8 focus;    // index of the node focused first, UI_NONE none
 	u8 flags;    // UI_VIEW_*
 	// The screen's logic: keys no widget took, and widgets' events.
@@ -483,9 +476,8 @@ struct ui_item {
 	u8 ink;              // role of the text, 0: TEXT
 	u8 key_len;          // key's bytes: 0 draws no chip (the text still at its column)
 	const char *detail;  // right-aligned in DIM (a size, a date); NULL none
-	const u32 *icon;     // a list with UI_LIST_ICONS: 2x2 4bpp tiles in row order,
-			     // colours 10-15 (0 shows the row's paper); with UI_LIST_ICON8:
-			     // one 8x8 4bpp tile (art_icon8_tile), any colour; NULL none
+	const u32 *icon;     // a list with UI_LIST_ICON8: one 8x8 4bpp tile
+			     // (art_icon8_tile), any colour; NULL none
 	const char *key;     // a reading row's key chip (ui/ui_reading.h): the text
 			     // starts at the look's reading_key_w; NULL none
 	// 8x8 icons (ART_ICON8_* + 1; 0 none), each in its ink role (0: the
@@ -546,7 +538,6 @@ struct ui_list_model {
 enum {
 	UI_LIST_WRAP = 1,     // the cursor wraps at the ends (input.h's rules)
 	UI_LIST_MARQUEE = 2,  // the selected row's name scrolls if it is cut
-	UI_LIST_ICONS = 4,    // list: rows keep UI_LIST_ICON_W px at the left for item.icon
 	UI_LIST_FIXED = 8,    // list: never more items than whole rows fit, so it never scrolls
 			      // and needs no spare row slots (a menu in a dialog); more are cut
 	UI_LIST_PLAIN = 16,   // no row shows as selected (a log): the cursor only scrolls
@@ -561,7 +552,6 @@ enum {
 	UI_LIST_CONSOLES = 512,    // list: rows draw in UI_BANK_CONSOLES (the console inks and
 				   // the favourites' ink for marks; no item accent)
 };
-#define UI_LIST_ICON_W 16
 #define UI_LIST_ICON8_W 8
 
 // A list. ink defaults to TEXT. The viewport is the node's rectangle.
@@ -772,13 +762,13 @@ int ui_active(void);
 // --- Transitions -------------------------------------------------------------
 // A screen replacing another (the theme's transition[kind]):
 //
-//	ui_leave(UI_TR_TAB, 1);   // the screen goes out: frames run until it has
+//	ui_leave(UI_TR_DEEPER, 1);  // the screen goes out: frames run until it has
 //	read_the_new_list();      // nothing shows meanwhile
 //	while (ui_depth())
 //		ui_pop();
 //	ui_push(&next, ctx);      // drawn hidden, then it comes in
 //
-// dir: 1 forward (the next tab, a folder in), -1 back, 0 neither. Keys
+// dir: 1 forward (deeper in), -1 back, 0 neither. Keys
 // pressed while the screen goes out are held for the next one, which gets
 // them once it shows. A modal view on top goes to black with the screen
 // (the dim under it first deepens to meet it); the caller pops it with the
@@ -1074,9 +1064,8 @@ int ui_confirm(u8 hints, const struct ui_confirm *confirm);
 #define UI_LETTER_NODE(id) {UI_LETTER, (id), UI_NONE, 0, UI_LEFT, 0, 0, 0, 184, 24, 48, 48, 0}
 // Letters (ui/letter.h, whose jumps need a list in library_sort_key's
 // order: A-Z lists only, not Recent or folders-first ones): 1-26 for A-Z,
-// 0 and 27 for "#" (what sorts before A and after Z); UI_LETTER_NONE
+// 0 and 27 for "#" (what sorts before A and after Z); LETTER_NONE
 // nothing.
-#define UI_LETTER_NONE 0xFF
 // Shows letter on the card, with prev and next (the letters LEFT and RIGHT
 // would jump to) beside it; it stays the theme's letter_linger frames.
 void ui_letter_show(u8 node, u32 letter, u32 prev, u32 next);
@@ -1100,7 +1089,6 @@ int ui_fading(void);
 void ui_dim_set_minutes(u32 minutes);
 // The same in frames, for tests and demos.
 void ui_dim_set_frames(u32 frames);
-int ui_dimmed(void);
 // Frames since a key was last held.
 u32 ui_idle_frames(void);
 // The DIM setting from the kernel NOR (settings slot assress_dim): idle
@@ -1142,8 +1130,6 @@ void ui_wake(void);
 // a stub in tests/host).
 // planes: the popped view's.
 void ui_hook_popped(u8 planes);
-// ui_pop calls waiting for the end of the event phase.
-int ui_pops_waiting(void);
 // The owner id of a view's motions and jobs.
 u8 ui_owner(const struct ui_view *view);
 // 1 while the event phase runs (ui_pop waits for its end).

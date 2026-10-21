@@ -25,7 +25,7 @@
 //   the foot row.
 // - The placeholder box: ART_BOX_SIZE square 4bpp BG tiles, 10 a row (map
 //   them in order; 80x80 is no sprite size), in a BG bank of its own
-//   (art_load_box) whose colours ART_BOX_* the screen recolours: its
+//   (a ui_image, as list with art shows it) whose colours ART_BOX_* the screen recolours: its
 //   defaults are GBA indigo, a muted red and a darker red.
 // - Items (ART_ITEM_*, in the carousel's order): each item's 16x16 icon,
 //   8x8 icon and carousel object.
@@ -64,8 +64,6 @@
 #define ART_TAG_ICON16_PAL 0xA100
 #define ART_TAG_SPRITE 0xA200
 #define ART_TAG_SHADOW 0xA300
-#define ART_TAG_BOX 0xA400
-#define ART_TAG_BOX_PAL 0xA401
 
 struct art_sprite {
 	u8 width, height;  // the drawn part, centred across, its last row at ART_SPRITE_FOOT
@@ -123,9 +121,5 @@ u16 art_take_sprite(u32 sprite, u8 *handle, int unlogged);
 u16 art_take_shadow(u32 shadow, u8 *handle, int unlogged);
 // Drops what an unlogged art_take_* took.
 void art_drop(u8 handle);
-// The placeholder box's tiles in BG character block charblock: returns the
-// first tile's number from that block (map the 100 in order, 10 a row), and
-// *bank gets its BG palette bank.
-u16 art_load_box(u8 charblock, u8 *bank);
 
 #endif

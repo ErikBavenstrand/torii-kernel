@@ -403,7 +403,7 @@ static const struct ui_spec nodes_art_marks[] = {NODES(ART_LIST_W, bar_art), ART
 						 LIST_NODE(N_LIST_ART, art_marks, ART_LIST_W)};
 
 static int page_event(struct ui_view *v, const struct ui_event *e);
-#define VIEW(name, nodes, list) {(name), (nodes), (list) + 1, 0, (list), UI_VIEW_LR_PAGES, page_event}
+#define VIEW(name, nodes, list) {(name), (nodes), (list) + 1, (list), UI_VIEW_LR_PAGES, page_event}
 static const struct ui_view_spec views[2][2] = {
 	{VIEW("games", nodes_plain, N_LIST_COMPACT), VIEW("games", nodes_marks, N_LIST_COMPACT)},
 	{VIEW("games-art", nodes_art_plain, N_LIST_ART), VIEW("games-art", nodes_art_marks, N_LIST_ART)},
@@ -776,7 +776,7 @@ static const struct ui_spec info_nodes[I_NODES] = {
 };
 
 static int info_event(struct ui_view *v, const struct ui_event *e);
-static const struct ui_view_spec info_view = {"game-info", info_nodes, I_NODES, 0, UI_NONE, 0, info_event};
+static const struct ui_view_spec info_view = {"game-info", info_nodes, I_NODES, UI_NONE, 0, info_event};
 
 // The values' lines, the save type's between « » while it can change
 static void info_values(struct ui_view *v)

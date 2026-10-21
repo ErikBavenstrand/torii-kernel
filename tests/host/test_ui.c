@@ -349,36 +349,36 @@ static const struct ui_spec main_nodes[] = {
 	{UI_LABEL, 4, 0, 2, UI_LEFT, UI_FOCUSABLE | UI_HIDDEN, 0, 0, 0, 0, 8, 8, 0},
 	{UI_LIST, 5, 0, 3, UI_LEFT, UI_FOCUSABLE, 0, 0, 0, 0, 8, 8, 0},
 };
-static const struct ui_view_spec main_view = {"main", main_nodes, 5, 1, 2, 0, on_event};
+static const struct ui_view_spec main_view = {"main", main_nodes, 5, 2, 0, on_event};
 
 static const struct ui_spec dialog_nodes[] = {
 	{UI_PANEL, 1, UI_NONE, 0, UI_HCENTER | UI_VCENTER, 0, 0, 0, 0, 0, 160, 64, 0},
 	{UI_LABEL, 2, 0, 0, UI_HFILL, 0, 0, 0, 8, 8, 8, 16, 0},
 };
-static const struct ui_view_spec dialog_view = {"dialog", dialog_nodes, 2, 2, UI_NONE, UI_VIEW_MODAL, on_event};
+static const struct ui_view_spec dialog_view = {"dialog", dialog_nodes, 2, UI_NONE, UI_VIEW_MODAL, on_event};
 
-static const struct ui_view_spec dialog_view_2 = {"dialog-2", dialog_nodes, 2, 2, UI_NONE, UI_VIEW_MODAL, on_event};
+static const struct ui_view_spec dialog_view_2 = {"dialog-2", dialog_nodes, 2, UI_NONE, UI_VIEW_MODAL, on_event};
 
 // Two lists on one plane; and a view with a third list
 static const struct ui_spec shared_plane_nodes[] = {
 	{UI_LIST, 1, UI_NONE, 0, UI_LEFT, 0, 0, 0, 0, 0, 64, 64, 0},
 	{UI_LABEL, 2, UI_NONE, 0, UI_LEFT, 0, 0, 0, 64, 0, 64, 64, 0},
 };
-static const struct ui_view_spec shared_plane_view = {"shared-plane", shared_plane_nodes, 2, 0, UI_NONE, 0, 0};
+static const struct ui_view_spec shared_plane_view = {"shared-plane", shared_plane_nodes, 2, UI_NONE, 0, 0};
 static const struct ui_spec third_list_nodes[] = {
 	{UI_LIST, 1, UI_NONE, 0, UI_LEFT, 0, 0, 0, 0, 0, 64, 64, 0},
 };
-static const struct ui_view_spec third_list_view = {"third-list", third_list_nodes, 1, 0, UI_NONE, 0, 0};
+static const struct ui_view_spec third_list_view = {"third-list", third_list_nodes, 1, UI_NONE, 0, 0};
 
 static const struct ui_spec bad_rect_nodes[] = {
 	{UI_LABEL, 1, UI_NONE, 0, UI_LEFT, 0, 0, 0, 4, 0, 16, 16, 0},
 };
-static const struct ui_view_spec bad_rect_view = {"bad-rect", bad_rect_nodes, 1, 0, UI_NONE, 0, 0};
+static const struct ui_view_spec bad_rect_view = {"bad-rect", bad_rect_nodes, 1, UI_NONE, 0, 0};
 static const struct ui_spec bad_parent_nodes[] = {
 	{UI_LABEL, 1, 1, 0, UI_LEFT, 0, 0, 0, 0, 0, 16, 16, 0},
 	{UI_LABEL, 2, UI_NONE, 0, UI_LEFT, 0, 0, 0, 0, 0, 16, 16, 0},
 };
-static const struct ui_view_spec bad_parent_view = {"bad-parent", bad_parent_nodes, 2, 0, UI_NONE, 0, 0};
+static const struct ui_view_spec bad_parent_view = {"bad-parent", bad_parent_nodes, 2, UI_NONE, 0, 0};
 
 void test_ui_stack(void)
 {
@@ -460,7 +460,7 @@ void test_ui_stack(void)
 		struct ui_spec s = {UI_LABEL, 0, UI_NONE, 0, UI_LEFT, 0, 0, 0, 0, 0, 8, 8, 0};
 		many[i] = s;
 	}
-	static const struct ui_view_spec many_view = {"many", many, UI_NODE_CAP, 0, UI_NONE, 0, 0};
+	static const struct ui_view_spec many_view = {"many", many, UI_NODE_CAP, UI_NONE, 0, 0};
 	CHECK_EQ(ui_core_push(&many_view, 0), 0);
 	CHECK(strstr(ui_error(), "nodes") != 0);
 

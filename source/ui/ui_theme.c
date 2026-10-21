@@ -8,7 +8,6 @@
 // Screen transitions, the same in both
 #define TRANSITIONS \
 	{ \
-		[UI_TR_TAB] = {UI_TR_FADES | UI_TR_SLIDE_X, 3, 8, 16}, \
 		[UI_TR_DEEPER] = {UI_TR_FADES | UI_TR_SLIDE_Y, 3, 8, 12}, \
 		[UI_TR_FADE] = {UI_TR_FADES, 3, 6, 0}, \
 		[UI_TR_LEAVE] = {UI_TR_FADES, 3, 8, 0}, \
@@ -30,7 +29,6 @@
 		.title_right_y = 2, \
 		.title_right_w = 64, \
 		.title_sub_gap = 4, \
-		.content_top = 20, \
 		.content_bottom = 143, \
 		.list_rows = 8, \
 		.list_pitch = 14, \
@@ -41,9 +39,7 @@
 		.pill_out_r = 1, \
 		.card_radius = 4, \
 		.button_radius = 7, \
-		.edge = 1, \
 		.shadow_offset = 1, \
-		.scrollbar_w = 3, \
 		.scrollbar_x = 5, \
 		.section_icon_gap = 3, \
 		.path_gap = 3, \

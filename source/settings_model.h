@@ -29,17 +29,6 @@ enum settings_section {
 	SET_SECTIONS
 };
 
-// A section card's 8x8 icon: docs/design/v0.4/icons/icon8-NAME.png
-enum settings_icon {
-	SET_ICON_LOOK,     // icon8-look
-	SET_ICON_CLOCK,    // icon8-clock
-	SET_ICON_GAMES,    // icon8-games
-	SET_ICON_CART,     // icon8-cart
-	SET_ICON_KEYS,     // icon8-keys
-	SET_ICON_LIBRARY,  // icon8-library
-	SET_ICON_SYSTEM,   // icon8-system
-};
-
 // How a row's value is shown and edited
 enum settings_kind {
 	SET_CHOICE,  // one of options, LEFT/RIGHT step through them
@@ -146,8 +135,8 @@ struct settings_row {
 	u8 action;        // SET_ACTION: enum settings_action
 };
 
+// A section card (its 8x8 icon is settings_page.c's)
 struct settings_section_info {
-	u8 icon;   // enum settings_icon
 	u8 first;  // its first row (enum settings_id)
 	u8 rows;   // how many rows, hidden ones too
 };

@@ -22,7 +22,6 @@ void Diagnostics(void);
 void IWRAM_CODE diag_timer_start(void);
 u32 IWRAM_CODE diag_timer_stop(void);
 u32 IWRAM_CODE diag_read_timed(const vu32 *src, u32 words, u16 waitcnt, u32 *sum);
-void IWRAM_CODE diag_eeprom_read(u32 block, u32 addr_bits);
 void IWRAM_CODE diag_loader_read(u32 offset, u16 *dst, u32 halfwords);
 void IWRAM_CODE diag_rumble_pulses(void);
 

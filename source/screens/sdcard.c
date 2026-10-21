@@ -191,7 +191,7 @@ static const struct ui_spec nodes[N_NODES] = {
 };
 
 static int sd_event(struct ui_view *v, const struct ui_event *e);
-static const struct ui_view_spec view = {"sdcard", nodes, N_NODES, 0, N_LIST, UI_VIEW_LR_PAGES, sd_event};
+static const struct ui_view_spec view = {"sdcard", nodes, N_NODES, N_LIST, UI_VIEW_LR_PAGES, sd_event};
 
 static int up(void)
 {
