@@ -1171,8 +1171,11 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 	BYTE error_num;
 	u32 res;
 
-	// The launch's progress, until the game starts (NOR_launch ends it otherwise)
+	// The launch's progress, until the game starts (NOR_launch ends it
+	// otherwise), set up at the menu's wait states (as Game_boot's)
+	REG_WAITCNT_CART = WAITCNT_MENU;
 	dialog_progress_begin(pNorFS[show_offset + file_select].filename, NULL);
+	REG_WAITCNT_CART = WAITCNT_BIOS;
 	progress_step(gl_loading_game, 0, LAUNCH_NOR_SAVE);
 
 	init_FAT_table();
@@ -1265,8 +1268,12 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 	library_before_launch();
 	cover_cache_invalidate();
 	// The launch's progress, until the game starts (Game_launch ends it
-	// otherwise): the game's name, and the bar over every step below
+	// otherwise): the game's name, and the bar over every step below. It
+	// sets up at the menu's wait states, as the menu draws: at the BIOS's
+	// the black screen before it lasted 3 frames longer
+	REG_WAITCNT_CART = WAITCNT_MENU;
 	dialog_progress_begin(pfilename, NULL);
+	REG_WAITCNT_CART = WAITCNT_BIOS;
 
 	u32 gamefilesize = 0;
 	//u32 savefilesize=0;

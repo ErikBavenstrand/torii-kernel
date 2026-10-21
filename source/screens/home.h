@@ -16,9 +16,10 @@ struct ui_view *home_enter(const u8 *items, u32 count, u32 facing);
 // The item home faces
 u32 home_facing(void);
 // The items or their counts changed (the library's walk found a console's
-// first game): shows them again, facing the same item, or the nearest if
-// it went; only counts changing redraw the label, and a turn goes on
-void home_items(const u8 *items, u32 count);
+// first game): shows them again, facing face if it shows (NAV_ITEMS: the
+// same item), or the nearest if it went; only counts changing redraw the
+// label, and a turn goes on
+void home_items(const u8 *items, u32 count, u32 face);
 void home_clock(const char *text);
 // The zoom that opens item's page (UI_TR_OPEN): its object as home shows
 // it; 0 if home isn't up facing item, or the object doesn't show

@@ -48,6 +48,7 @@ static struct {
 	struct registry_place place;  // where the menu is (place.item: home's facing item, as last shown)
 	struct registry_place start;  // where it started
 	u8 left_start;                // the user has been elsewhere since (remember)
+	u8 start_on;                  // Start on's item while home doesn't show it yet, else NAV_ITEMS
 	u8 engine;     // the menu's engine session is up, a screen showing
 	u8 open;       // home's A: the item to open + 1, after the frame
 	u8 back;       // a page's B: home, after the frame
@@ -365,6 +366,23 @@ static void go_back(void)
 	show(&p, kind, -1);
 }
 
+// Start on's item once a new index shows it (no index at power-on, or one
+// from before its console's first game): home turns to it if the user is
+// still where the menu started; NAV_ITEMS for no change
+static u32 start_late(void)
+{
+	u32 item = nav.start_on;
+	if (item >= NAV_ITEMS || registry_index(nav.shown, nav.shown_count, item) >= nav.shown_count)
+		return NAV_ITEMS;
+	nav.start_on = NAV_ITEMS;
+	if (nav.left_start || nav.place.open || home_facing() != nav.start.item)
+		return NAV_ITEMS;
+	tlog_debug("nav: start on %s, now the index shows it", registry_items[item].word);
+	nav.start.item = (u8)item;
+	nav.place.item = (u8)item;
+	return item;
+}
+
 // After something that may have ended the engine session (a launch that
 // didn't start) or changed what the items hold: the place comes back
 static void after_action(void)
@@ -386,7 +404,7 @@ static void after_action(void)
 	}
 	count_items();
 	if (!nav.place.open)
-		home_items(nav.shown, nav.shown_count);
+		home_items(nav.shown, nav.shown_count, start_late());
 }
 
 static void run_deferred(void)
@@ -515,6 +533,9 @@ void nav_run(void)
 	tlog_debug("nav: start on %lu: %s%s", (unsigned long)start_on, p.open ? "" : "home-",
 		   registry_items[p.item].word);
 	nav.start = p;
+	// A console's item with no games in the index yet: faced once one shows
+	u32 wanted = registry_of_start(start_on);
+	nav.start_on = (u8)(wanted < NAV_ITEMS && wanted != p.item ? wanted : NAV_ITEMS);
 	show(&p, UI_TR_LEAVE, 0);  // in from the boot's black screen
 	for (;;) {
 		if (nav.measure_left) {

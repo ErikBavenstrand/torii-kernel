@@ -138,6 +138,14 @@ printf '@boot gbc\n/Hello.gba\n' >"$cart/recent.txt"
 mcopy -o -i "$cart/sd.img" "$cart/recent.txt" ::/torii/recent.txt
 start_case "8 home-recent"
 echo "PASS: Start on faces each item on home, never its page; a hidden one falls back to Last place, then to the first item"
+# Start on GBC with no GBC game in the index: home faces the first item,
+# then turns to GBC once the walk's new index shows its first game, as
+# nothing moved
+mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/Hello.gbc
+start_on 6
+boot start-late -w "nav: start on 6:" -w "nav: start on gbc, now the index shows it" -w "items, facing gbc" -f @30
+logged "nav: start on 6: home-recent"
+echo "PASS: Start on a console turns home to it once the index shows its first game"
 
 # A route works whatever item the card starts facing: it turns home to the
 # first item first (NAV_TEST_HOME)

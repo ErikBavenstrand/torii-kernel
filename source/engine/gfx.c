@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "gfx.h"
+#include "motion.h"
 #include "res.h"
 
 #define IO ((vu16 *)0x04000000)
@@ -51,6 +52,8 @@ u32 gfx_pal_used;
 u16 gfx_pal_unfaded[512] EWRAM_BSS ALIGN(4);
 u16 gfx_pal_faded[512] EWRAM_BSS ALIGN(4);
 u8 gfx_pal_faded_on;
+static u16 fade_colour;  // gfx_pal_set_fade's, while gfx_pal_faded_on
+static u32 fade_factor;
 struct gfx_obj gfx_oam[GFX_OAM_ENTRIES] EWRAM_BSS ALIGN(4);
 u8 gfx_oam_building;
 u32 gfx_commit_max_bytes = GFX_COMMIT_BYTES;
@@ -67,8 +70,22 @@ static u8 oam_count, oam_shown, oam_changed, oam_full_logged;
 // registers the handler writes (EWRAM: six reads, a few cycles more)
 static struct gfx_split split EWRAM_BSS, split_live EWRAM_BSS;  // as set, and as committed
 static u8 split_dirty, split_on;
+static IntFn split_vblank_before;  // the VBlank handler the split replaced, put back after it
+
+// The VBlank handler libgba's dispatcher has now, or NULL
+static IntFn vblank_handler(void)
+{
+	for (u32 i = 0; i < MAX_INTS && IntrTable[i].mask; i++)
+		if (IntrTable[i].mask == IRQ_VBLANK)
+			return IntrTable[i].handler;
+	return NULL;
+}
 u32 gfx_split_data[GFX_SPLIT_WORDS] SPLIT_IWRAM;
 u32 gfx_split_dma[GFX_SPLIT_PARTS * 3] EWRAM_BSS;  // gfx_split.s reads it
+u32 gfx_split_top[GFX_SPLIT_PARTS * 3] EWRAM_BSS;  // and this, in VBlank
+// The tops as the last commit wrote them, which gfx_split_vblank copies: the
+// buffers themselves may be half rewritten when a frame overruns
+static u16 split_top_copy[GFX_SPLIT_WORDS * 2] EWRAM_BSS ALIGN(4);
 
 void gfx_init(void)
 {
@@ -105,6 +122,8 @@ void gfx_split_off(void)
 	// IE and DISPSTAT straight (libgba's irqDisable would turn IME on)
 	REG_IE &= (u16)~IRQ_VCOUNT;
 	REG_DISPSTAT_ &= (u16)~DISPSTAT_VCOUNT_IRQ;
+	if (split_on && vblank_handler() == gfx_split_vblank)
+		irqSet(IRQ_VBLANK, split_vblank_before);  // the VBlank IRQ stays on: frame.c counts on it
 	DMA0_REGS[2] = 0;
 	DMA0_REGS[5] = 0;
 	memset(&split, 0, sizeof(split));
@@ -129,23 +148,34 @@ void gfx_set_split(const struct gfx_split *s)
 // next frame's top would show)
 static int part_ok(const struct gfx_split_part *p)
 {
-	return p->dst && p->offset + (p->half ? (p->count + 1u) / 2u : p->count) <= GFX_SPLIT_WORDS;
+	return p->dst && p->count && p->offset + (p->half ? (p->count + 1u) / 2u : p->count) <= GFX_SPLIT_WORDS;
 }
 
 // The parts' top values into place (in VBlank: every line shows them until
-// the split's copies)
+// the split's copies), and the copies gfx_split_vblank repeats each VBlank
 static void split_tops(const struct gfx_split *s)
 {
+	u32 copied = 0;
 	for (u32 i = 0; i < GFX_SPLIT_PARTS; i++) {
 		const struct gfx_split_part *p = &s->part[i];
 		const u16 *top = p->top;
+		u32 *vb = &gfx_split_top[i * 3];
+		vb[2] = 0;
 		if (!part_ok(p) || !top)
 			continue;
 		if (top >= gfx_pal_unfaded && top < gfx_pal_unfaded + 512 && gfx_pal_faded_on)
 			top = gfx_pal_faded + (top - gfx_pal_unfaded);
+		u32 halves = p->half ? p->count : 2u * p->count;
 		vu16 *d = (vu16 *)p->dst;
-		for (u32 h = 0; h < (p->half ? p->count : 2u * p->count); h++)
+		for (u32 h = 0; h < halves; h++)
 			d[h] = top[h];
+		if (copied + halves > sizeof(split_top_copy) / 2)
+			continue;
+		memcpy(&split_top_copy[copied], top, halves * 2);
+		vb[0] = (u32)&split_top_copy[copied];
+		copied += halves;
+		vb[1] = p->dst;
+		vb[2] = (DMA_ON_32 & ~DMA_32_) | halves;  // immediate, 16-bit
 	}
 }
 
@@ -182,6 +212,8 @@ static void commit_split(void)
 		REG_IF = IRQ_VCOUNT;
 		irqSet(IRQ_VCOUNT, gfx_split_irq);
 		irqEnable(IRQ_VCOUNT);
+		split_vblank_before = vblank_handler();
+		irqSet(IRQ_VBLANK, gfx_split_vblank);
 		split_on = 1;
 	}
 }
@@ -236,11 +268,27 @@ void gfx_pal_load(u32 bank, const u16 *colours, u32 count)
 	if (count > 512 - first)
 		count = 512 - first;
 	memcpy(&gfx_pal_unfaded[first], colours, count * 2);
-	u32 last = (first + count - 1) / 16;
-	for (u32 b = bank; b <= last; b++) {
-		gfx_dirty_pal |= 1u << b;
-		gfx_pal_used |= 1u << b;
+	u32 last = (first + count - 1) / 16, banks = 0;
+	for (u32 b = bank; b <= last; b++)
+		banks |= 1u << b;
+	gfx_dirty_pal |= banks;
+	gfx_pal_used |= banks;
+	if (gfx_pal_faded_on)
+		palette_fade_banks(gfx_pal_faded, gfx_pal_unfaded, banks, fade_colour, fade_factor);
+}
+
+void gfx_pal_set_fade(u16 colour, u32 factor)
+{
+	if (!factor) {
+		gfx_pal_use_faded(0);
+		return;
 	}
+	fade_colour = colour;
+	fade_factor = factor;
+	// Only the banks in use: a whole-palette fade cost about 45k cycles a frame
+	palette_fade_banks(gfx_pal_faded, gfx_pal_unfaded, gfx_pal_used, colour, factor);
+	gfx_pal_mark(gfx_pal_used);
+	gfx_pal_use_faded(1);
 }
 
 void gfx_pal_mark(u32 banks)
@@ -503,7 +551,7 @@ static void write_oam(void)
 
 void gfx_freeze(int on)
 {
-	// A split needs its commit every VBlank (its tops put back): it ends
+	// A frozen screen shows no split: it ends, its tops put back
 	if (on && split_on) {
 		split_tops(&split_live);
 		gfx_split_off();
@@ -532,8 +580,14 @@ void gfx_commit(void)
 	write_regs(dirty & ~held);
 	gfx_hold_regs &= ~(dirty & ~held);
 
-	// Palettes: one DMA per run of dirty banks
-	u32 banks = gfx_dirty_pal;
+	// Palettes: one DMA per run of dirty banks. While a black screen (a new
+	// session's, from dialog_blank: a black backdrop, no BG layer, no blend)
+	// waits for its first view's layers, BG bank 0 waits too: its colour 0
+	// is the backdrop, which would show alone a frame before them
+	u32 banks = gfx_dirty_pal, kept = 0;
+	if (!(gfx_live_dispcnt & 0x0F00) && !*(vu16 *)PAL_RAM && !gfx_regs.blend[0])
+		kept = banks & 1;
+	banks &= ~kept;
 	const u16 *pal = gfx_pal_faded_on ? gfx_pal_faded : gfx_pal_unfaded;
 	for (u32 bank = 0; banks;) {
 		if (!(banks & 1)) {
@@ -551,7 +605,7 @@ void gfx_commit(void)
 		DMA3CNT = DMA_ON_32 | run * 8;
 		bank += run;
 	}
-	gfx_dirty_pal = 0;
+	gfx_dirty_pal = kept;
 	commit_split();
 
 	// Sprites go with the planes they sit on: while DISPCNT or the scrolls

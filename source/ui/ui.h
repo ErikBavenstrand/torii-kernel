@@ -96,13 +96,14 @@ enum ui_role {
 	UI_ROLE_SKY,      // the carousel's backdrop above its horizon: GROUND
 	UI_ROLE_FLOOR,    // and below it: GROUND moved by floor_step (ui_floor_colour)
 	UI_ROLE_INK_FAV,  // the favourites' ink
-	// Bank 2: danger and the NOR storage bar
+	// Bank 2: danger, the NOR storage bar and success
 	UI_ROLE_ALERT_INK = UI_ROLE_ACCENT,  // the danger item's ink
 	UI_ROLE_ALERT_TINT,                  // and its tint
 	UI_ROLE_NOR_FILL,                    // used space, one shade a game: NOR's base,
 	UI_ROLE_NOR_FILL_MID,                // then bar_shade_mix of card,
 	UI_ROLE_NOR_FILL_LIGHT,              // then twice that
 	UI_ROLE_NOR_INK,
+	UI_ROLE_SUCCESS,  // passes (Diagnostics): palette.json's success ink
 };
 enum ui_bank {
 	UI_BANK_NORMAL,    // neutrals and the current item
@@ -276,6 +277,7 @@ struct ui_theme {
 	u8 bar_shade_mix;
 	const struct pal_surfaces *surface;
 	const struct pal_accent *accent;
+	const u16 *success;  // pal_success's
 	struct ui_look look;
 	struct ui_motions motion;
 	const struct torii_font *body;
@@ -341,8 +343,8 @@ void ui_item_set(u32 item);
 // at once on its new theme.
 void ui_theme_switch(const struct ui_theme *theme);
 // Ends a wipe at once on the theme it was going to, and runs a frame that
-// commits that: call it before blocking work (a NOR write, a dialog), as a
-// split needs a commit every VBlank (gfx_set_split). Nothing if none runs.
+// commits that: call it before blocking work (a NOR write, a dialog), which
+// would hold the wipe's edge where it is. Nothing if none runs.
 void ui_wipe_finish(void);
 // 1 while a theme wipe runs.
 int ui_wiping(void);
@@ -554,6 +556,8 @@ enum {
 	UI_LIST_CONSOLES = 512,    // list: rows draw in UI_BANK_CONSOLES (the console inks and
 				   // the favourites' ink for marks; no item accent)
 	UI_LIST_NO_SHOULDERS = 1024,  // L and R don't page: held, L picks a hard reset with A
+	UI_LIST_ALERT = 2048,  // list: rows draw in UI_BANK_ALERT (danger, NOR's amber and
+			       // success for their text; no item accent)
 };
 #define UI_LIST_ICON8_W 8
 

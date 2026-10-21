@@ -276,7 +276,10 @@ void dialog_hand_over(void)
 
 void dialog_blank(void)
 {
-	VBlankIntrWait();
+	// Already black (a session that ended: no layer, a black backdrop, no
+	// blending on it): no tear to wait for
+	if (REG_DISPCNT_ != 0 || BG_PALETTE_[0] != 0 || *(vu16 *)0x04000050 != 0)
+		VBlankIntrWait();
 	BG_PALETTE_[0] = 0;
 	REG_DISPCNT_ = 0;
 	// BG control and scroll, windows, mosaic and blending (BG2's and BG3's

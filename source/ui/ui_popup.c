@@ -473,6 +473,7 @@ struct run {
 	const struct ui_hint *old_hints;
 	u32 old_count;
 	const char *old_text;
+	struct ui_hint_note old_note;  // old_text's look (a danger or countdown line)
 };
 
 static struct {
@@ -548,7 +549,7 @@ static int run_tick(struct run *r, u32 dt, const struct ui_move *open, const str
 		if (r->hints != UI_NONE) {
 			// Its keys in the hint bar, a frame after its own draw (each
 			// draws a lot: they needn't share a frame)
-			ui_hints_get(r->hints, &r->old_hints, &r->old_count, &r->old_text);
+			ui_hints_get(r->hints, &r->old_hints, &r->old_count, &r->old_text, &r->old_note);
 			r->hints_view = ui_node_view(r->hints)->spec;
 			ui_hints_set(r->hints, r->hint, r->hint_count);
 			r->hinted = 1;
@@ -609,7 +610,7 @@ static void run_finish(struct run *r, const struct ui_move *close)
 	if (r->hinted && r->hints < ui_nodes_used() && ui_node_view(r->hints)->spec == r->hints_view) {
 		ui_hints_set(r->hints, r->old_hints, r->old_count);
 		if (r->old_text)
-			ui_hints_text(r->hints, r->old_text);
+			ui_hints_note(r->hints, r->old_text, &r->old_note);
 	}
 	if (keys)
 		ui_queue_keys(keys);

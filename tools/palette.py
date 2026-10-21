@@ -8,8 +8,9 @@ docs/design/v0.4/palette.json.
 usage: palette.py [--check]
 
 The JSON holds the surfaces of each theme, its pill_mix (how much of an
-accent's base the tint has over a card) and one accent per carousel item,
-with base, tint, ink and on per theme; its colours are already snapped to
+accent's base the tint has over a card), one accent per carousel item,
+with base, tint, ink and on per theme, and the success ink per theme
+(Diagnostics' passes); its colours are already snapped to
 15 bits (#RRGGBB with each channel a 5-bit value scaled up). The C tables
 keep them as RGB15. `just palette` runs this; --check compares the committed
 files instead of writing them (tests/host.sh fails when they are stale).
@@ -61,7 +62,7 @@ def keys(obj: dict, want: list[str], where: str) -> None:
 
 
 def load(data: dict) -> dict:
-    keys(data, ["surfaces", "pill_mix", "accents", "danger"], "palette.json")
+    keys(data, ["surfaces", "pill_mix", "accents", "danger", "success"], "palette.json")
     surfaces = {}
     for theme in THEMES:
         keys(data["surfaces"], [theme], "surfaces")
@@ -81,11 +82,17 @@ def load(data: dict) -> dict:
         items.append((key, accent["name"], colours))
     if data["danger"] not in data["accents"]:
         raise PaletteError(f"danger names {data['danger']!r}, which isn't an accent")
+    success = {}
+    for theme in THEMES:
+        keys(data["success"], [theme], "success")
+        keys(data["success"][theme], ["ink"], f"success.{theme}")
+        success[theme] = rgb15(data["success"][theme]["ink"])
     return {
         "surfaces": surfaces,
         "pill_mix": pill_mix,
         "items": items,
         "danger": data["danger"],
+        "success": success,
     }
 
 
@@ -134,6 +141,8 @@ struct pal_accent {{
 
 extern const struct pal_surfaces pal_surfaces[PAL_THEMES];
 extern const struct pal_accent pal_accents[PAL_THEMES][PAL_ITEMS];
+// The success ink (Diagnostics' passes), on the paper and on cards (RGB15)
+extern const u16 pal_success[PAL_THEMES];
 
 // How much of an accent's base its tint mixes into a card, in 256ths
 {pill}
@@ -175,6 +184,10 @@ def render_c(p: dict) -> str:
             lines.append(f"\t\t\t[PAL_{key.upper()}] = {{{values}}},")
         lines.append("\t\t},")
     lines.append("};")
+    values = ", ".join(
+        f"[PAL_{theme.upper()}] = {colour(p['success'][theme])}" for theme in THEMES
+    )
+    lines += ["", f"const u16 pal_success[PAL_THEMES] = {{{values}}};"]
     return "\n".join(lines) + "\n"
 
 

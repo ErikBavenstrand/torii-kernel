@@ -503,14 +503,7 @@ static void fade_set(void *ctx, s32 value)
 {
 	(void)ctx;
 	s32 f = FIX_ROUND(value);
-	if (f <= 0) {
-		gfx_pal_use_faded(0);
-		return;
-	}
-	// Only the banks in use: a whole-palette fade cost about 45k cycles a frame
-	palette_fade_banks(gfx_pal_faded, gfx_pal_unfaded, gfx_pal_used, ui.fade_colour, (u32)f);
-	gfx_pal_mark(gfx_pal_used);
-	gfx_pal_use_faded(1);
+	gfx_pal_set_fade(ui.fade_colour, f > 0 ? (u32)f : 0);
 }
 
 // Loads the first banks of the UI's (an item switch changes banks 0 and
@@ -524,9 +517,7 @@ static void load_palette(u32 banks)
 	if (ui.zoom)
 		pal[0] = zoom_backdrop();  // the backdrop is the zoom's (a page pushed under it)
 	gfx_pal_load(UI_THEME_RUN_FIRST / 16, pal, banks * 16);
-	gfx_pal_load(16 + ui_obj_bank(), pal, 16);  // the sprites': bank 0's roles
-	if (gfx_pal_faded_on)
-		fade_set(0, motion_value(ui.fade));
+	gfx_pal_load(16 + ui_obj_bank(), pal, 16);  // the sprites': bank 0's roles (faded, if a fade is on)
 }
 
 static void theme_load(const struct ui_theme *theme)
@@ -1058,8 +1049,7 @@ static void zoom_end(void)
 	if (!ui.zoom)
 		return;
 	ui.zoom = ZOOM_NONE;
-	gfx_pal_unfaded[0] = ui_theme()->surface->bg;  // the backdrop the theme gives
-	gfx_pal_mark(1);
+	gfx_pal_load(0, &ui_theme()->surface->bg, 1);  // the backdrop the theme gives (faded, if a fade is on)
 	ui.tr_phase = TR_IDLE;
 	ui.tr_level = ui.tr_dx = ui.tr_dy = 0;
 	ui.zoom_title = 0;
@@ -1265,8 +1255,8 @@ void ui_title_offset(const struct ui_view *v, s32 *shift, s32 *dy)
 static void zoom_regs(void)
 {
 	u16 dispcnt = DISP_MODE0_OBJ1D | DISP_OBJ;
-	gfx_pal_unfaded[0] = zoom_backdrop();
-	gfx_pal_mark(1);
+	u16 backdrop = zoom_backdrop();
+	gfx_pal_load(0, &backdrop, 1);
 	// The page's title bar, and its first list
 	u8 title = UI_NONE, list = UI_NONE;
 	u32 planes = 0;

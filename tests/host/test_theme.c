@@ -163,7 +163,8 @@ static const u8 text_roles[UI_BANKS][8] = {
 			    UI_ROLE_DANGER},
 	[UI_BANK_CONSOLES] = {UI_ROLE_TEXT, UI_ROLE_DIM, UI_ROLE_FAINT, UI_ROLE_INK_GBA, UI_ROLE_INK_GBC,
 			      UI_ROLE_INK_GB, UI_ROLE_INK_NES, UI_ROLE_INK_FAV},
-	[UI_BANK_ALERT] = {UI_ROLE_TEXT, UI_ROLE_DIM, UI_ROLE_FAINT, UI_ROLE_ALERT_INK, UI_ROLE_NOR_INK},
+	[UI_BANK_ALERT] = {UI_ROLE_TEXT, UI_ROLE_DIM, UI_ROLE_FAINT, UI_ROLE_ALERT_INK, UI_ROLE_NOR_INK,
+			   UI_ROLE_SUCCESS},
 };
 
 void test_theme_text_contrast(void)
@@ -208,6 +209,9 @@ void test_theme_text_contrast(void)
 		// Its text line and the letter card's neighbours are faint (ink3) on
 		// the floating card: 3:1
 		CHECK(contrast(s->ink3, float_card) >= 300);
+		// Diagnostics' passes on the paper and on cards
+		CHECK(contrast(*themes[t]->success, s->bg) >= 450);
+		CHECK(contrast(*themes[t]->success, s->card) >= 450);
 		// An item's ink on its own tint is for marks only (8x8 icons, the
 		// star, the save dot on a selected row): 3:1. Text on the pill is
 		// the neutral ink (above)
