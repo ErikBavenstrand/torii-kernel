@@ -135,4 +135,15 @@ OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_setting the
 [ "$(writes)" = 1 ] || fail "the save during the wipe wrote the settings $(writes) times"
 [ "$(slots 28 1)" = 0001 ] || fail "Theme not saved during its wipe: $(slots 28 1)"
 [ "$(slots 31 1)" = 0000 ] || fail "Game view's preview was written: $(slots 31 1)"
+# B right after a theme confirm, inside its wipe: the write runs, then the
+# page goes (never on the leave's black screen)
+write 28=0
+# shellcheck disable=SC2046 # nav.sh's options
+OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_setting theme) \
+  $(_nav_file '-k @8:A -k @10:- -k @14:RIGHT -k @16:- -k @18:A -k @19:- -k @20:B -k @21:-') \
+  -w "nav: home ready" -f 100 >"$cart/visit.log" 2>&1 || fail "B after a theme confirm: $(tail -3 "$cart/visit.log")"
+[ "$(writes)" = 1 ] || fail "B after a theme confirm wrote the settings $(writes) times"
+grep -n 'nor: wrote the settings\|nav: back from settings' "$cart/visit.log" | head -1 | grep -q 'nor: wrote' ||
+  fail "the write ran on the way out"
+[ "$(slots 28 1)" = 0001 ] || fail "Theme not saved before leaving: $(slots 28 1)"
 echo "PASS: unwritten settings read 0xFFFF, the v0.4 ones as their defaults, and the Settings page writes once a confirmed change, nothing for a cancel or no change, keeping the slots it doesn't know"

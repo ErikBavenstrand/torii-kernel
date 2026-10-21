@@ -64,14 +64,13 @@ u32 registry_find(const char *word)
 	return NAV_ITEMS;
 }
 
-// A page to open at row, or home facing the nearest item if it's hidden
-static void open_or_face(u32 item, u32 row, const u8 *shown, u32 count, struct registry_place *out)
+// A page to open at its first row, or home facing the nearest item if it's hidden
+static void open_or_face(u32 item, const u8 *shown, u32 count, struct registry_place *out)
 {
 	u32 at = registry_index(shown, count, item);
 	if (at < count) {
 		out->item = (u8)item;
 		out->open = 1;
-		out->row = row;
 	} else {
 		out->item = shown[registry_nearest(shown, count, item)];
 	}
@@ -88,7 +87,7 @@ void registry_start(u32 start_on, const struct userdata_boot *boot, const u8 *sh
 	if (start_on != SET_START_LAST) {
 		for (u32 i = 0; i < NAV_ITEMS; i++)
 			if (registry_items[i].start == start_on)
-				open_or_face(i, 0, shown, count, out);
+				open_or_face(i, shown, count, out);
 		return;
 	}
 	if (!boot)

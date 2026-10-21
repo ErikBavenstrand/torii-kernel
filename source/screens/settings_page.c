@@ -15,12 +15,14 @@
 // The values are a working copy (struct settings_values, here in EWRAM).
 // The theme and the LED show an edit at once (ui_theme_switch, Set_LED_control)
 // without staging it. A confirmed value (A on an edit, a hotkey accepted)
-// is written at once if it changed: the hint bar says "Saving..." and, once
-// that is on screen (and a theme wipe has ended), the copy is staged and
-// committed in one go, one NOR write through Save_info, the page staying
-// up. A key pressed while it waits writes it first (but for one during a
-// theme wipe, which the write waits for). An edit B cancels is put back
-// with its preview and writes nothing; so is one the page leaves.
+// is written soon if it changed: the hint bar says "Saving..." and, once
+// that is on screen and the page is still (no scroll, no theme wipe), the
+// copy is staged and committed in one go, one NOR write through Save_info,
+// the page staying up. Keys act at once meanwhile; the write never runs
+// from a key, so it never stalls a move. B waits for it: the write runs,
+// then the page goes, so leaving never pauses on black. An edit open as it
+// writes goes in with its value from before A. An edit B cancels is put
+// back with its preview and writes nothing; so is one the page leaves.
 #include <stdio.h>
 #include <string.h>
 
@@ -150,7 +152,8 @@ static struct {
 	u8 identify_wait;   // frames before Identify library's progress is looked at again
 	u32 identify_done;  // its progress as drawn (games looked at), IDENTIFY_IDLE: not running
 	u8 redraw;    // leave ended an edit: draw it all again if still up
-	u8 saving;    // frames a confirmed change still waits to be written, 0: none
+	u8 saving;    // frames a confirmed change may still wait to be written, 0: none
+	u8 leaving;   // B came while saving: the page goes once it's written
 	u8 swatch_bank;
 	u16 swatch_tile;  // ART_NONE-like 0xFFFF: no swatches
 	u16 refused_left;  // frames the refusal's reason stays
@@ -958,13 +961,8 @@ static int settings_event(struct ui_view *v, const struct ui_event *e)
 	u32 id = cursor_id();
 	if (sp.mode == MODE_CAPTURE)
 		return 1;  // the keys are the combination (settings_poll)
-	if (sp.saving && !ui_wiping()) {
-		// A key before the write: the write first, then the key. During a
-		// theme wipe the write waits for it (settings_poll): its split
-		// needs a commit every VBlank, which can't come from in here
-		save_now();
-		hints_show();
-	}
+	if (sp.leaving)
+		return 1;  // the page goes once the write is done (settings_poll)
 	if (sp.mode == MODE_EDIT) {
 		if (k & INPUT_B) {
 			edit_end(0);
@@ -981,7 +979,10 @@ static int settings_event(struct ui_view *v, const struct ui_event *e)
 		return 1;
 	}
 	if (k & INPUT_B) {
-		nav_back();
+		if (sp.saving)
+			sp.leaving = 1;  // the write first, from settings_poll
+		else
+			nav_back();
 	} else if (k & INPUT_A) {
 		if (!ui_list_paging(node(N_LIST)) && (in->pressed & INPUT_A))
 			activate(id);
@@ -1039,13 +1040,19 @@ static void settings_poll(void)
 		hints_show();
 	}
 	if (sp.saving) {
-		// Once "Saving..." is on screen (or after save_wait frames): the
-		// write, the page staying up
-		sp.saving--;
-		if (!sp.saving || (ui_settled() && !ui_wiping())) {
+		// Once "Saving..." is on screen and the page is still, or after
+		// save_wait frames with no key held: the write, the page staying up.
+		// B asked to leave: at once (a wipe ends first), then the page goes
+		if (!ui_input()->held)
+			sp.saving--;
+		if (sp.leaving || !sp.saving || (ui_settled() && !ui_wiping())) {
 			save_now();
 			hints_show();
 		}
+	}
+	if (sp.leaving && !sp.saving) {
+		sp.leaving = 0;
+		nav_back();
 	}
 	if (sp.mode == MODE_CAPTURE) {
 		u16 shown = sp.cap.held;
