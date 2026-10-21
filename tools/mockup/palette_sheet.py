@@ -13,7 +13,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from gfx import BODY, HEAD, PALETTE, ROOT, icon, icon16, rect, rgb, rrect
-
 from PIL import Image
 
 OUT = ROOT / "docs/design/v0.4/palette.png"
@@ -37,7 +36,9 @@ def panel(name: str) -> Image.Image:
     img = Image.new("RGB", (PANEL_W, PANEL_H), s["bg"])
     HEAD.draw(img, 8, 2, name, s["ink"])
     for i, label in enumerate(("base", "pill", "ink", "on")):
-        BODY.draw(img, SW_X + i * 26 + (SWATCH - BODY.width(label)) // 2, 6, label, s["ink2"])
+        BODY.draw(
+            img, SW_X + i * 26 + (SWATCH - BODY.width(label)) // 2, 6, label, s["ink2"]
+        )
     BODY.draw(img, SAMPLE_X, 6, "sample (card / pill)", s["ink2"])
     y = 22
     for item, accent in PALETTE["accents"].items():
