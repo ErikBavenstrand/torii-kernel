@@ -52,6 +52,7 @@ static int copy_path(const char *path)
 	if (len >= sizeof(path_copy))
 		return 0;
 	memcpy(path_copy, path, len + 1);
+	userdata_canonical(path_copy);  // "/deep/../x.gba" starts, and goes on Recent, as "/x.gba"
 	return 1;
 }
 

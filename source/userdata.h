@@ -77,6 +77,10 @@ struct userdata_boot {
 int userdata_path_ok(const char *path);
 // The NOR game's name in a NOR: entry, or NULL for an SD path.
 const char *userdata_nor_name(const char *path);
+// An SD path, in place, without empty, "." and ".." parts ("/deep/../x.gba"
+// reads "/x.gba"; ".." at the root stays there). Anything not starting with
+// '/', such as a NOR entry, is left as it is.
+void userdata_canonical(char *path);
 // dir and name joined into out (USERDATA_PATH_MAX bytes); 0 if too long.
 int userdata_join(char *out, const char *dir, const char *name);
 // 1 if item is a boot position's item word.

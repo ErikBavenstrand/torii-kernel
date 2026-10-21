@@ -62,6 +62,39 @@ int userdata_path_ok(const char *path)
 	return (u32)(slash - path) < USERDATA_DIR_MAX && name >= 1 && name <= USERDATA_NAME_MAX;
 }
 
+void userdata_canonical(char *path)
+{
+	if (path[0] != '/')
+		return;
+	const char *in = path;
+	u32 len = 0;  // what's written back: "/part" for each part kept
+	for (;;) {
+		while (*in == '/')
+			in++;
+		const char *part = in;
+		while (*in && *in != '/')
+			in++;
+		u32 n = (u32)(in - part);
+		if (!n)
+			break;
+		if (n == 1 && part[0] == '.')
+			continue;
+		if (n == 2 && part[0] == '.' && part[1] == '.') {
+			while (len > 0 && path[len - 1] != '/')
+				len--;
+			if (len > 0)
+				len--;
+			continue;
+		}
+		path[len++] = '/';
+		memmove(&path[len], part, n);  // behind the reading point
+		len += n;
+	}
+	if (!len)
+		path[len++] = '/';
+	path[len] = 0;
+}
+
 int userdata_join(char *out, const char *dir, const char *name)
 {
 	const char *sep = strcmp(dir, "/") == 0 ? "" : "/";

@@ -213,6 +213,7 @@ static const struct {
 	{"registry_start", test_registry_start},
 	{"registry_boot_word", test_registry_boot_word},
 	{"userdata_paths", test_userdata_paths},
+	{"userdata_canonical", test_userdata_canonical},
 	{"userdata_parse", test_userdata_parse},
 	{"userdata_recent_lines", test_userdata_recent_lines},
 	{"userdata_recent_edits", test_userdata_recent_edits},

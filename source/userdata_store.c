@@ -225,11 +225,12 @@ u32 userdata_recent_time(u32 i)
 
 int userdata_recent_add(const char *path)
 {
-	if (!userdata_path_ok(path)) {
+	snprintf(W->path, sizeof(W->path), "%s", path);  // path may be in PSRAM
+	userdata_canonical(W->path);
+	if (!userdata_path_ok(W->path)) {
 		tlog("userdata: can't keep %s on Recent", path);
 		return 0;
 	}
-	snprintf(W->path, sizeof(W->path), "%s", path);  // path may be in PSRAM
 	u32 now = userdata_now();
 	u32 count = recent_get();
 	return recent_put(userdata_recent_put(W->u.recent, count, W->path, now));
@@ -427,12 +428,13 @@ int userdata_fav_has(const char *path)
 
 int userdata_fav_set(const char *path, int on)
 {
-	if (!userdata_path_ok(path)) {
+	snprintf(W->path, sizeof(W->path), "%s", path);  // path may be in PSRAM, which the read back changes
+	userdata_canonical(W->path);
+	if (!userdata_path_ok(W->path)) {
 		tlog("userdata: can't keep %s as a favourite", path);
 		return 0;
 	}
 	ensure_fav();
-	snprintf(W->path, sizeof(W->path), "%s", path);  // path may be in PSRAM, which the read back changes
 	tlog("userdata: favourite %s %s", W->path, on ? "on" : "off");
 	return on ? fav_change(W->path, NULL, NULL) : fav_change(NULL, same_path, W->path);
 }

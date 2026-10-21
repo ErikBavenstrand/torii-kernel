@@ -146,6 +146,7 @@ void test_registry_nearest(void);
 void test_registry_start(void);
 void test_registry_boot_word(void);
 void test_userdata_paths(void);
+void test_userdata_canonical(void);
 void test_userdata_parse(void);
 void test_userdata_recent_lines(void);
 void test_userdata_recent_edits(void);
