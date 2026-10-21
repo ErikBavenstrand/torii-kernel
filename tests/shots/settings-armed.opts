@@ -1,0 +1,10 @@
+# Save states on (C5): Back to menu shows On whatever it stores, its
+# explanation says the in-game menu takes the keys, and A doesn't edit it.
+#! settings 2=1
+#! sd-file /torii/recent.txt 0 tests/shots/data/boot-settings.txt
+-w "nav: page settings ready"
+-k @8:UP -k @12:- -k @20:UP -k @24:- -k @32:UP -k @36:-
+-w "settings: row 18"
+-s @8:armed.png
+-k @12:A -k @16:- -k @24:RIGHT -k @28:-
+-s @40:after-a.png
