@@ -5,8 +5,9 @@
 // The lookup, the first that exists (artkey.h has the card's layout):
 //	1. custom art by the game's file name, /torii/art/custom/<name>.bin, so a
 //	   romhack never gets its base game's art;
-//	2. matched art by the game's CRC32, then by its GBA game code, both from
-//	   the CRC cache (/torii/crc.txt, namesdb.h);
+//	2. matched art by the game's CRC32, from the CRC cache (/torii/crc.txt,
+//	   namesdb.h); never by a GBA game code, which a romhack shares with its
+//	   base game (C4);
 //	3. the placeholder.
 // Lookups never touch the card: a background job lists /torii/art and
 // /torii/art/custom once (after each boot, and after anything overwrote

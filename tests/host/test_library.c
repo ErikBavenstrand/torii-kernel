@@ -424,9 +424,11 @@ void test_library_custom_display(void)
 	free(slot);
 }
 
-// The stored order depends on gamename_clean and the sort key: these pinned
-// keys fail when either changes, and then LIBRARY_VERSION goes up (so every
-// card's index is built again) and the keys here are updated.
+// The stored order depends on gamename_clean, the sort key and which names
+// the key is made from: these pinned keys fail when the first two change,
+// and then LIBRARY_VERSION goes up (so every card's index is built again)
+// and the keys here are updated. 4: C4's GBA romhacks are no longer named
+// by their game code.
 void test_library_pinned_keys(void)
 {
 	static const struct {
@@ -442,7 +444,7 @@ void test_library_pinned_keys(void)
 		{"Castlevania - Aria of Sorrow (USA) (Rev 1).gba", "castlevania - aria of sorrow"},
 		{"(Unlicensed).gba", "(unlicensed)"},
 	};
-	CHECK_EQ(LIBRARY_VERSION, 3);
+	CHECK_EQ(LIBRARY_VERSION, 4);
 	for (u32 i = 0; i < sizeof(pinned) / sizeof(pinned[0]); i++) {
 		char display[GAMENAME_MAX + 1], k[LIBRARY_KEY_MAX + 1];
 		gamename_clean(display, pinned[i].file);

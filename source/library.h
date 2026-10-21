@@ -39,7 +39,7 @@
 #include <gba_base.h>
 
 #define LIBRARY_MAGIC 0x42494C54u  // "TLIB"
-#define LIBRARY_VERSION 3
+#define LIBRARY_VERSION 4
 #define LIBRARY_GAMES_MAX 4096
 #define LIBRARY_FOLDERS_MAX 2048  // folders holding games
 #define LIBRARY_CONSOLE_SLOTS 8  // header room, for the v0.6 systems

@@ -105,6 +105,7 @@ static struct entry gba[] = {
 static struct entry gbc[] = {{0x11111111u, "Colour Game (USA)"}};
 static struct entry gb[] = {{0x22222222u, "Mono Game (Japan)"}};
 static struct entry nes[] = {{0x33333333u, "Famicom Game (Japan)"}, {0x44444444u, "Headered (USA)"}};
+// A v0.4.1 names.db's code table, which the kernel no longer reads (C4)
 static struct entry codes[] = {
 	{0x45575841u, "Advance Wars (USA)"},  // "AXWE"
 	{0x45525A42u, "Legend of Zelda, The - The Minish Cap (USA)"},  // "BZRE"
@@ -170,9 +171,6 @@ void test_namesdb_lookup(void)
 	CHECK(namesdb_by_crc(db, LIB_NES, 0x44444445u) == NULL);
 	CHECK(namesdb_by_crc(db, NAMESDB_CONSOLES, 1) == NULL);
 	CHECK(namesdb_by_crc(NULL, LIB_GBA, 1) == NULL);
-	CHECK(strcmp(namesdb_by_code(db, 0x45575841u), "Advance Wars (USA)") == 0);
-	CHECK(namesdb_by_code(db, 0x45575842u) == NULL);
-	CHECK(namesdb_by_code(db, 0) == NULL);
 	// A name offset past the pool reads as no name
 	struct namesdb_entry e;
 	memcpy(&e, db + sizeof(struct namesdb_header), sizeof(e));
@@ -386,15 +384,16 @@ void test_names_db_name(void)
 	u32 nes_code = names_cache_put(&c, "/x.nes", 1, 0, 0xDEADBEEFu, 0x45575841u, NAMES_CRC);
 #define NAME(n, console) names_db_name(db, names_cache_rec(&c, n), console)
 	CHECK(strcmp(NAME(hit, LIB_GBA), "Advance Wars (USA)") == 0);
-	// A CRC miss falls back to the game code: a hack shows its base game
-	CHECK(strcmp(NAME(by_code, LIB_GBA), "Legend of Zelda, The - The Minish Cap (USA)") == 0);
-	CHECK(strcmp(NAME(code_only, LIB_GBA), "Advance Wars (USA)") == 0);
+	// A CRC miss never falls back to the game code, which the database still
+	// lists: a romhack keeps its own name, not its base game's (C4)
+	CHECK(NAME(by_code, LIB_GBA) == NULL);
+	CHECK(NAME(code_only, LIB_GBA) == NULL);
 	CHECK(NAME(miss, LIB_GBA) == NULL);
 	// The other Game Boy table, when the extension misleads
 	CHECK(strcmp(NAME(colour, LIB_GB), "Colour Game (USA)") == 0);
 	CHECK(strcmp(NAME(mono, LIB_GBC), "Mono Game (Japan)") == 0);
 	CHECK(NAME(colour, LIB_NES) == NULL);
-	CHECK(NAME(nes_code, LIB_NES) == NULL);  // codes are GBA's only
+	CHECK(NAME(nes_code, LIB_NES) == NULL);
 	CHECK(NAME(hit, LIB_GBC) == NULL);
 	names_cache_drop(&c, hit);
 	CHECK(NAME(hit, LIB_GBA) == NULL);

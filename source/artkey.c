@@ -13,11 +13,6 @@ static u32 hex_digit(u8 c)
 	return c >= 'a' && c <= 'f' ? c - 'a' + 10u : 16u;
 }
 
-static u8 upper(u8 c)
-{
-	return c >= 'a' && c <= 'z' ? (u8)(c - 32) : c;
-}
-
 static u8 lower(u8 c)
 {
 	return c >= 'A' && c <= 'Z' ? (u8)(c + 32) : c;
@@ -47,16 +42,6 @@ u32 artkey_parse(const char *name, u32 *key)
 		}
 		*key = value;
 		return ARTKEY_CRC;
-	}
-	if (stem == 4) {
-		for (u32 i = 0; i < 4; i++) {
-			u8 c = upper((u8)name[i]);
-			if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z')))
-				return ARTKEY_NONE;
-			value |= (u32)c << (8 * i);
-		}
-		*key = value;
-		return ARTKEY_CODE;
 	}
 	return ARTKEY_NONE;
 }
