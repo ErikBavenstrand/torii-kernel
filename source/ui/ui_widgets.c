@@ -564,4 +564,5 @@ const struct ui_ops *const ui_kind_ops[UI_KINDS] = {
 	[UI_CARD] = &ui_card_ops,       [UI_TITLE] = &ui_title_ops,      [UI_HINTS] = &ui_hints_ops,
 	[UI_PATH] = &ui_path_ops,       [UI_STORAGE] = &ui_storage_ops,  [UI_POPUP] = &ui_popup_ops,
 	[UI_CONFIRM] = &ui_confirm_ops, [UI_LETTER] = &ui_letter_ops,    [UI_CAROUSEL] = &ui_carousel_ops,
+	[UI_CANVAS] = &ui_canvas_ops,
 };

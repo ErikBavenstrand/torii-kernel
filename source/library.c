@@ -569,6 +569,12 @@ int lib_forget(u8 *slot, lib_put_fn put, u32 rec)
 
 int lib_rename(u8 *slot, lib_put_fn put, u32 rec, const char *new_name, struct lib_build *scratch)
 {
+	return lib_rename_shown(slot, put, rec, new_name, NULL, scratch);
+}
+
+int lib_rename_shown(u8 *slot, lib_put_fn put, u32 rec, const char *new_name, const char *display,
+		     struct lib_build *scratch)
+{
 	if (rec >= lib_hdr(slot)->records || (lib_rec_at(slot, rec)->flags & LIB_F_GONE))
 		return 0;
 	u32 console = library_console_of(new_name);
@@ -576,7 +582,7 @@ int lib_rename(u8 *slot, lib_put_fn put, u32 rec, const char *new_name, struct l
 	if (console != (r.flags & LIB_F_CONSOLE) || strnlen(new_name, LIBRARY_NAME_MAX + 1) > LIBRARY_NAME_MAX)
 		return 0;
 	u32 gap;
-	u32 bytes = name_and_key(scratch, new_name, NULL, &r.prefix, &gap);
+	u32 bytes = name_and_key(scratch, new_name, display, &r.prefix, &gap);
 	struct lib_header h = *lib_hdr(slot);
 	u32 pool = h.pool_bytes;
 	u32 at = pool_add(slot, put, &pool, scratch->text, bytes);
@@ -586,7 +592,8 @@ int lib_rename(u8 *slot, lib_put_fn put, u32 rec, const char *new_name, struct l
 	h = *lib_hdr(slot);
 	h.pool_bytes = pool;
 	r.name = at | gap << 24;
-	r.flags &= (u16)~LIB_F_CUSTOM;  // its cleaned name until the walk reads names.txt again
+	// Without a display name, its cleaned name until the walk reads names.txt again
+	r.flags = (u16)(display ? r.flags | LIB_F_CUSTOM : r.flags & ~LIB_F_CUSTOM);
 	put(slot + LIB_OFF_RECORDS + rec * 16u, &r, sizeof(r));
 	// Its place among the rest of its console's games
 	u32 start = lib_console_start(slot, console), lo = start, hi = start + h.counts[console];

@@ -29,6 +29,14 @@
 // - READCACHE_BOXART, 1 KB: box art's row path and a file name on its way to
 //   PSRAM (boxart.c), within boxart_select or boxart_poll, between frames'
 //   job steps.
+// - READCACHE_NAMES, 124 KB from the start: /torii/names.txt changed by
+//   Rename (gamename_store.c), within one call: a line read, the lines'
+//   offsets and the new text on its way to the card (the old one waits in
+//   PSRAM).
+// - READCACHE_RENAME, the last 4 KB: an SD file's rename (actions.c), within
+//   the call: its paths and its other files' names, kept while it calls
+//   gamename_store_move, userdata_rename and library_renamed (whose shares
+//   end before it).
 #define MAX_pReadCache_size 0x20000
 #define READCACHE_STAGE 0x0
 #define READCACHE_STAGE_SIZE 0x8000
@@ -41,6 +49,10 @@
 #define READCACHE_SAVE 0x10000  // 64 KB, to the end
 #define READCACHE_GAMES 0x8000
 #define READCACHE_GAMES_SIZE 0x18000
+#define READCACHE_NAMES 0x0
+#define READCACHE_NAMES_SIZE 0x1F000
+#define READCACHE_RENAME 0x1F000
+#define READCACHE_RENAME_SIZE 0x1000
 
 #define MAX_NOR 0x40
 

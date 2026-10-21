@@ -5,6 +5,7 @@
 #include "actions.h"
 #include "ezkernel.h"
 #include "GBApatch.h"
+#include "gamename.h"
 #include "library.h"
 #include "NORflash_OP.h"
 #include "tlog.h"
@@ -191,6 +192,185 @@ int action_delete_file(const char *path)
 	userdata_forget(path_copy);
 	library_forget(path_copy);
 	return 1;
+}
+
+// --- Renaming a file --------------------------------------------------------
+//
+// A game's other files are named after its file name, in folders at the
+// card's root: its save (save_name), save type, save states, cheats and
+// patch cache (name_with_ext), and its custom box art (B22). They move with
+// it, and the save state and the rest never land on another game's: the
+// rename is refused first if one would.
+
+enum {
+	SIDE_SAVE,   // save_name's
+	SIDE_EXT,    // name_with_ext's, ext; GBA games only
+	SIDE_ART,    // the file name and ".bin"
+};
+struct sidecar {
+	const char *dir;
+	u8 kind;
+	u8 cache;  // a cache the next launch makes again: one already under the new name goes
+	char ext[4];
+};
+#define ART_CUSTOM_DIR "/torii/art/custom"  // B22's custom art: <file name>.bin
+#define ART_CUSTOM_EXT ".bin"
+static const struct sidecar sidecars[] = {
+	{SAVER_FOLDER, SIDE_SAVE, 0, ""}, {SAVER_FOLDER, SIDE_EXT, 0, "mde"}, {"/RTS", SIDE_EXT, 0, "rts"},
+	{"/CHEAT", SIDE_EXT, 0, "cht"},   {"/PATCH", SIDE_EXT, 1, "pat"},     {ART_CUSTOM_DIR, SIDE_ART, 0, ""},
+};
+#define SIDECARS (sizeof(sidecars) / sizeof(*sidecars))
+
+// The rename's RAM, in pReadCache (READCACHE_RENAME): what lasts while it
+// calls the names file, the user's lists and the library, which borrow
+// shares before it
+struct rename_work {
+	char new_path[USERDATA_PATH_MAX];
+	char name[GAME_NAME_MAX + 1];  // the old file name
+	char from[GAME_NAME_MAX + 24];  // a file's path in its folder
+	char to[GAME_NAME_MAX + 24];
+	u8 has[SIDECARS];  // the old one is there
+};
+_Static_assert(sizeof(struct rename_work) <= READCACHE_RENAME_SIZE, "the rename's share of pReadCache");
+#define RW ((struct rename_work *)(void *)(pReadCache + READCACHE_RENAME))
+
+// out gets sidecar s's path for the game file name (the folder's GAME_NAME_MAX
+// + 24 bytes); 0 if it has none for console, or it is too long to keep
+static int side_path(char *out, const struct sidecar *s, const char *name, u32 console)
+{
+	char file[SAVE_NAME_MAX + 8];
+	if (s->kind == SIDE_SAVE)
+		save_name(file, name, console);
+	else if (s->kind == SIDE_EXT && console == LIB_GBA)
+		name_with_ext(file, name, s->ext);
+	else if (s->kind == SIDE_ART && strlen(name) + sizeof(ART_CUSTOM_EXT) <= sizeof(file))
+		snprintf(file, sizeof(file), "%s%s", name, ART_CUSTOM_EXT);
+	else
+		return 0;
+	u32 n = (u32)snprintf(out, GAME_NAME_MAX + 24, "%s/%s", s->dir, file);
+	return n < GAME_NAME_MAX + 24;
+}
+
+static int there(const char *path)
+{
+	return f_stat(path, &fileinfo) == FR_OK;
+}
+
+// The UTF-8 character at *s, moving *s past it (a broken byte as itself)
+static u32 next_char(const char **s)
+{
+	const u8 *p = (const u8 *)*s;
+	u32 c = *p++, more = c >= 0xF0 ? 3 : c >= 0xE0 ? 2 : c >= 0xC0 ? 1 : 0;
+	c &= more ? 0x3Fu >> more : 0xFFu;
+	for (; more && (*p & 0xC0) == 0x80; more--)
+		c = c << 6 | (*p++ & 0x3F);
+	*s = (const char *)p;
+	return c;
+}
+
+// 1 if two names are one name to the card: equal but for case, as FatFs
+// compares them (ff_wtoupper), so a name and its new case are one file
+static int same_name(const char *a, const char *b)
+{
+	while (*a && *b)
+		if (ff_wtoupper(next_char(&a)) != ff_wtoupper(next_char(&b)))
+			return 0;
+	return !*a && !*b;
+}
+
+// 1 if a new name for a file is one the card and the menu keep
+static u32 name_check(const char *name)
+{
+	u32 len = (u32)strlen(name);
+	if (!len || len > GAME_NAME_MAX)
+		return ACTION_RENAME_BAD;
+	for (const char *c = name; *c; c++)
+		if ((u8)*c < 0x20 || *c == 0x7F || strchr("\\/:*?\"<>|", *c))
+			return ACTION_RENAME_BAD;
+	if (name[0] == '.')
+		return ACTION_RENAME_HIDDEN;  // the hidden rule would take it off the lists
+	return ACTION_RENAMED;
+}
+
+u32 action_rename_file(const char *path, const char *new_name)
+{
+	struct rename_work *w = RW;
+	u32 why = name_check(new_name);
+	const char *slash = strrchr(path, '/');
+	if (why != ACTION_RENAMED || path[0] != '/' || !slash || !slash[1] || strlen(slash + 1) > GAME_NAME_MAX)
+		return why != ACTION_RENAMED ? why : ACTION_RENAME_BAD;
+	u32 dir_len = (u32)(slash - path), console = library_console_of(slash + 1);
+	memcpy(w->name, slash + 1, strlen(slash + 1) + 1);
+	if (library_console_of(new_name) != console ||
+	    (u32)snprintf(w->new_path, sizeof(w->new_path), "%.*s/%s", (int)dir_len, path, new_name) >=
+		    sizeof(w->new_path) ||
+	    !userdata_path_ok(w->new_path))
+		return ACTION_RENAME_BAD;
+	if (!strcmp(w->name, new_name))
+		return ACTION_RENAMED;  // nothing to do
+	if (f_stat(path, &fileinfo) == FR_OK && (fileinfo.fattrib & AM_DIR))
+		return ACTION_RENAME_BAD;  // a folder: what is in it wouldn't follow
+	tlog_open_now();  // the file may be the log the background open holds
+	int case_only = same_name(w->name, new_name);
+	if (console != LIB_CONSOLE_NONE) {
+		// Its save must keep the record's name: the copy from the cart
+		// would come back under it
+		char save[SAVE_NAME_MAX];
+		save_name(save, w->name, console);
+		if (pending_save_named(save)) {
+			tlog("rename %s: its save %s still waits to be copied", path, save);
+			return ACTION_RENAME_PENDING;
+		}
+		save_name(save, new_name, console);
+		if (strlen(save) > SAV_INFO_NAME_MAX)
+			return ACTION_RENAME_BAD;  // the pending-save record couldn't name it
+		// Nothing lands on another game's file (a new case of its own
+		// name keeps its own files)
+		for (u32 i = 0; i < SIDECARS; i++) {
+			const struct sidecar *s = &sidecars[i];
+			w->has[i] = side_path(w->from, s, w->name, console) && there(w->from);
+			if (!w->has[i] || s->cache || case_only || !side_path(w->to, s, new_name, console))
+				continue;
+			if (there(w->to)) {
+				tlog("rename %s: %s is there already", path, w->to);
+				return ACTION_RENAME_SIDE_TAKEN;
+			}
+		}
+	}
+	FRESULT res = f_rename(path, w->new_path);
+	if (res != FR_OK) {
+		tlog("rename %s to %s: FatFs %u", path, new_name, (unsigned)res);
+		return res == FR_EXIST          ? ACTION_RENAME_TAKEN
+		       : res == FR_INVALID_NAME ? ACTION_RENAME_BAD
+						: ACTION_RENAME_FAILED;
+	}
+	tlog("rename: %s to %s", path, new_name);
+	u32 partly = 0;
+	for (u32 i = 0; console != LIB_CONSOLE_NONE && i < SIDECARS; i++) {
+		const struct sidecar *s = &sidecars[i];
+		if (!side_path(w->from, s, w->name, console) || !side_path(w->to, s, new_name, console))
+			continue;
+		// A cache under the new name, another game's (a deleted one's),
+		// goes: the next launch makes it again
+		if (s->cache && !case_only && there(w->to)) {
+			res = f_unlink(w->to);
+			tlog("rename: %s goes (FatFs %u)", w->to, (unsigned)res);
+		}
+		if (!w->has[i])
+			continue;
+		res = f_rename(w->from, w->to);
+		tlog("rename: %s to %s (FatFs %u)", w->from, w->to, (unsigned)res);
+		partly |= res != FR_OK;
+	}
+	if (!gamename_store_move(path, w->new_path))
+		partly = 1;
+	if (!userdata_rename(path, w->new_path))
+		partly = 1;
+	if (console != LIB_CONSOLE_NONE)
+		library_renamed(path, new_name);
+	else
+		library_changed();  // the card's files: the walk counts them again
+	return partly ? ACTION_RENAME_PARTLY : ACTION_RENAMED;
 }
 
 void action_nor_launch(u32 index, u32 hard_reset)

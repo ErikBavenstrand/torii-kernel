@@ -124,7 +124,7 @@ int ui_plane_blending(u32 plane);
 // The ops of lists (ui/ui_list.c), the Paper clean widgets (ui/ui_paper.c)
 // and the popups (ui/ui_popup.c).
 extern const struct ui_ops ui_list_ops;
-extern const struct ui_ops ui_card_ops, ui_title_ops, ui_hints_ops, ui_path_ops, ui_storage_ops;
+extern const struct ui_ops ui_card_ops, ui_title_ops, ui_hints_ops, ui_path_ops, ui_storage_ops, ui_canvas_ops;
 extern const struct ui_ops ui_popup_ops, ui_confirm_ops, ui_letter_ops;
 // The home carousel's (screens/carousel.c)
 extern const struct ui_ops ui_carousel_ops;

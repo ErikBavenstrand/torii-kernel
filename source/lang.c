@@ -84,6 +84,7 @@ char *gl_hint_field EWRAM_BSS;
 char *gl_hint_set EWRAM_BSS;
 
 const struct lang_games *gl_games EWRAM_BSS;
+const struct lang_rename *gl_rename EWRAM_BSS;
 
 // Popups and confirmations (ui.h)
 char *gl_pop_choose EWRAM_BSS;
@@ -534,6 +535,33 @@ static const struct lang_games en_games = {
 	.fact_played = "Last",
 };
 
+// The rename keyboard: its keys, and why OK can't keep a name (one line
+// each in the hint area, 38 characters at most)
+static const struct lang_rename en_rename = {
+	.title = "Rename",
+	.hint_type = "type",
+	.hint_delete = "delete",
+	.hint_case = "Aa",
+	.hint_ok = "OK",
+	.key_lower = "abc",
+	.key_upper = "ABC",
+	.key_latin = "\xC3\xA0\xC3\xA9&",
+	.key_space = "Space",
+	.key_cancel = "Cancel",
+	.key_ok = "OK",
+	.empty = "Type a name first.",
+	.taken = "That name is taken.",
+	.bad = "Not with \\ / : * ? \" < > |",
+	.hidden = "Names can't start with a dot.",
+	.side_taken = "A save of that name is there.",
+	.pending = "Its save isn't copied yet.",
+	.failed = "The card didn't take it.",
+	.partly = "Renamed, but not all of its files",
+	.name_failed = "Can't keep the name",
+	.discard = "Discard changes?",
+	.discard_button = "Discard",
+};
+
 //---------------------------------------------------------------------------------
 void LoadEnglish(void)
 {
@@ -679,6 +707,7 @@ void LoadEnglish(void)
 	gl_sd_save = (char *)en_sd_save;
 	gl_sd_no_save = (char *)en_sd_no_save;
 	gl_games = &en_games;
+	gl_rename = &en_rename;
 }
 //---------------------------------------------------------------------------------
 // The languages Settings offers. A new language adds its strings and a

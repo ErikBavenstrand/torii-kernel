@@ -1188,6 +1188,22 @@ void library_changed(void)
 	card_changed();
 }
 
+void library_named(const char *path, const char *display)
+{
+	u32 rec = library_find(path);
+	if (rec != LIBRARY_NONE) {
+		psram_begin();
+		struct lib_build *scratch = (struct lib_build *)(pReadCache + READCACHE_LIBRARY);
+		// Its file name from path (in RAM; the record's is in PSRAM, which the
+		// rename writes)
+		const char *slash = strrchr(path, '/');
+		if (!lib_rename_shown(slot_at(lib.active), put, rec, slash ? slash + 1 : path, display, scratch))
+			lib_forget(slot_at(lib.active), put, rec);  // the walk adds it back
+		changed();
+	}
+	card_changed();
+}
+
 void library_renamed(const char *old_path, const char *new_name)
 {
 	u32 rec = library_find(old_path);

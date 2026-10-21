@@ -374,6 +374,8 @@ enum ui_kind {
 	UI_LETTER,
 	// The home carousel (screens/carousel.h)
 	UI_CAROUSEL,
+	// Pixels a screen paints itself (the rename keyboard, ui/ui_paper.c)
+	UI_CANVAS,
 	UI_KINDS,
 };
 
@@ -647,6 +649,19 @@ struct ui_hints_config {
 // A storage bar (the NOR page's): parts of a whole, each in the next of
 // the NOR bar's three shades, on a soft track with rounded ends.
 // ui_storage_set sets it. data may be NULL.
+
+// A canvas: pixels a screen paints itself (the rename keyboard's field and
+// keys), in a window of tiles over its rectangle. It has two tile sets that
+// take turns: paint draws the whole window into the one the map doesn't
+// show, cleared to the node's paper first (0: transparent, so a card on a
+// plane further back shows through), and it flips in in VBlank, so a
+// repaint never tears. paint runs in draw, once after ui_canvas_redraw (ctx
+// is the view's); it mustn't call FatFs or switch the ROM page.
+struct ui_canvas_config {
+	void (*paint)(void *ctx, u8 node, const struct text_window *win);
+};
+// Asks for a repaint in the next draw (several calls before it, one paint)
+void ui_canvas_redraw(u8 node);
 
 // --- Views and nodes ------------------------------------------------------
 

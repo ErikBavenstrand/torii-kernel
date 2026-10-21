@@ -25,6 +25,7 @@
 #include "../gamename.h"
 #include "../lang.h"
 #include "../library.h"
+#include "../namesdb.h"
 #include "../showcht.h"
 #include "../tlog.h"
 #include "../userdata.h"
@@ -34,6 +35,7 @@
 #include "../ui/dialog.h"
 #include "../ui/letter.h"
 #include "../ui/ui.h"
+#include "rename.h"
 
 // --- Look, px (spec.md's grid: title bar 0-18, content 20-143, hints at 147) ---
 #define TITLE_H 24       // the title bar's rectangle: whole tiles under its line
@@ -119,6 +121,7 @@ static struct {
 	u32 info_type;  // the save type shown, ACTION_SAVE_TYPES: none (not a GBA game on the card)
 	u32 info_console;  // the game's
 	u8 info_done;
+	u32 rename_size, rename_console;  // the game Rename is about (games.pick)
 } games EWRAM_BSS;
 
 // The favourites in A-Z order, while the Favourites page is up: one word
@@ -935,6 +938,60 @@ static int row_still(u32 i)
 	return 0;
 }
 
+// --- Rename ----------------------------------------------------------------------------
+// A game's display name, kept in /torii/names.txt (its file stays): the
+// keyboard starts from the name it shows, and OK writes the new one; its
+// own name again (what it shows without one) takes its line out.
+
+static const char *rename_submit(void *ctx, const char *name)
+{
+	(void)ctx;
+	const char *crc = names_lookup(games.pick, games.rename_size, games.rename_console);
+	if (crc)
+		gamename_clean_title(games.name, crc);
+	else
+		gamename_clean(games.name, games.pick);
+	int own = strcmp(name, games.name) == 0;
+	if (!gamename_store_set(games.pick, own ? NULL : name))
+		return gl_rename->name_failed;
+	library_named(games.pick, own ? NULL : name);  // its row moves to its new place at once
+	return NULL;
+}
+
+// Where the renamed game (games.pick) is on the page now; row if not found
+static u32 pick_row(u32 row)
+{
+	if (games.kind == KIND_CONSOLE) {
+		u32 at = library_position(library_find(games.pick));
+		return at != LIBRARY_NONE ? at : row;
+	}
+	for (u32 j = 0; games.kind == KIND_FAV && j < games.count; j++)
+		if (!strcmp(userdata_fav_path(FAV_INDEX(fav_entry(j))), games.pick))
+			return j;
+	return row;
+}
+
+static void rename_game(u32 row)
+{
+	// Its record now: a new index may have come while the popup was up
+	u32 rec = library_find(games.pick);
+	if (rec == LIBRARY_NONE)
+		return;
+	games.rename_size = library_size(rec);
+	games.rename_console = library_flags(rec) & LIB_F_CONSOLE;
+	snprintf(games.ask, sizeof(games.ask), "%s", library_display(rec));
+	const struct rename_ask ask = {
+		registry_items[games.item].icon16, games.ask, NULL, RENAME_GAME_MAX, 0, rename_submit, 0};
+	int renamed = rename_run(&ask);
+	reshow(row);
+	if (renamed && up()) {
+		games.cursor = pick_row(row);
+		ui_list_set_cursor(list_node(), games.cursor);
+		show_position();
+		show_facts();
+	}
+}
+
 // The game popup for row i, run after the frame
 static void popup_run(u32 i)
 {
@@ -955,7 +1012,8 @@ static void popup_run(u32 i)
 		popup_add(LANG_POP_CLEAN, 0, 0);
 		popup_add(LANG_POP_ADDON, 0, addons_off() ? UI_POP_DIM : 0);
 	}
-	// Rename comes with B18
+	if (!nor && g.rec != LIBRARY_NONE)
+		popup_add(LANG_POP_RENAME, 0, 0);  // a name in names.txt, for games the lists name
 	popup_add(LANG_POP_INFO, 0, 0);
 	if (!nor)
 		popup_add(LANG_POP_DELETE, 0, UI_POP_DANGER);
@@ -992,8 +1050,8 @@ static void popup_run(u32 i)
 		}
 		ui_popup_close();
 		// A favourite dropped leaves the Favourites page before a launch
-		// that may come back (Game info lists the page again itself)
-		if (fav != fav_was && games.kind == KIND_FAV && action != LANG_POP_INFO)
+		// that may come back (Game info and Rename list the page again)
+		if (fav != fav_was && games.kind == KIND_FAV && action != LANG_POP_INFO && action != LANG_POP_RENAME)
 			relist(i);
 		switch (action) {
 		case LANG_POP_PLAY:
@@ -1007,6 +1065,9 @@ static void popup_run(u32 i)
 			return;
 		case LANG_POP_INFO:
 			game_info(&g);
+			return;
+		case LANG_POP_RENAME:
+			rename_game(i);
 			return;
 		default:
 			return;

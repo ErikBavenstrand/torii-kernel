@@ -1,0 +1,32 @@
+# The rename keyboard (source/screens/rename.c, keyboard-light.png) in the
+# light theme, from a GBA game's popup: Rename. Prefilled with the name the
+# game shows, the caret at its end, the selection on q (1); SELECT shifts to
+# capitals (2); UP twice wraps to the function row, RIGHT and A open the
+# Latin-1 page, L moves the caret back four letters, and é goes in there (3);
+# A held types é again and again on the keyboard's repeat until the cap,
+# where the counter turns red and the hint area says why (4).
+#! settings 28=1
+#! sd-file "/Metroid Fusion.gba" 0 tests/roms/hello/hello.gba
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-k @8:RIGHT -k @12:- -k @16:RIGHT -k @20:- -k @24:RIGHT -k @28:- -k @32:RIGHT -k @36:- -k @40:RIGHT -k @44:- -k @48:RIGHT -k @52:-
+-k @64:DOWN -k @68:-
+-k @80:START -k @84:-
+-w "screen ready: game-popup"
+-k @12:UP -k @16:- -k @20:UP -k @24:- -k @28:UP -k @32:-
+-k @40:A -k @44:-
+-w "screen ready: rename"
+-s @4:prefilled.png
+-k @8:SELECT -k @12:-
+-s @20:shifted.png
+-k @28:SELECT -k @32:-
+-k @40:UP -k @44:- -k @48:UP -k @52:- -k @56:RIGHT -k @60:- -k @68:A -k @72:-
+-k @80:L -k @84:- -k @88:L -k @92:- -k @96:L -k @100:- -k @104:L -k @108:-
+-k @116:UP -k @120:- -k @124:UP -k @128:- -k @132:UP -k @136:- -k @140:UP -k @144:-
+-k @152:LEFT -k @156:- -k @160:LEFT -k @164:- -k @168:LEFT -k @172:-
+-k @180:A -k @184:-
+-s @190:latin.png
+-k @200:A -k @520:-
+-s @530:full.png

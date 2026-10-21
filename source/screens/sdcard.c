@@ -35,6 +35,7 @@
 #include "../ui/art_ids.h"
 #include "../ui/dialog.h"
 #include "../ui/ui.h"
+#include "rename.h"
 
 // --- Look, px (spec.md's grid: title bar 0-18, content 20-143, hints at 147) ---
 #define TITLE_H 24    // the title bar's rectangle: whole tiles under its line
@@ -83,6 +84,7 @@ enum {
 	POP_NOR,
 	POP_NOR_ADDON,
 	POP_FAV,
+	POP_RENAME,
 	POP_DELETE,
 	POP_INFO,
 };
@@ -96,6 +98,8 @@ static struct {
 	u8 announce;  // log "sdcard: ready" once the list rests
 	u8 measure_left;  // frames of a folder change to measure
 	u8 hint_note;     // the hint bar shows the truncation note
+	u8 find;          // the next listing puts the cursor on the file named sd.ask (a rename's)
+	u8 renamed_partly;  // the rename left something behind: said once the page is back
 	u32 counting;  // the folder being counted, SDLIST_NONE none
 	u32 counted;   // its entries so far
 	u32 count_next;  // where the counting goes on past the cursor's rows
@@ -547,6 +551,65 @@ static void folder_up(u32 arg)
 		error(0);
 }
 
+// --- Rename -----------------------------------------------------------------------
+// The file's name before its extension, which stays: the keyboard starts
+// from it, and OK renames the file and what goes with it (actions.h). The
+// page comes back with the cursor on the file.
+
+static const char *rename_submit(void *ctx, const char *stem)
+{
+	(void)ctx;
+	const char *dot = strrchr(sd.name, '.');
+	const char *ext = dot && dot != sd.name ? dot : "";
+	if ((u32)snprintf(sd.ask, sizeof(sd.ask), "%s%s", stem, ext) > GAME_NAME_MAX)
+		return gl_rename->bad;
+	tlog_debug("sdcard: rename %s to %s", sd.full, sd.ask);
+	switch (action_rename_file(sd.full, sd.ask)) {
+	case ACTION_RENAMED:
+		return NULL;
+	case ACTION_RENAME_PARTLY:
+		sd.renamed_partly = 1;
+		return NULL;
+	case ACTION_RENAME_TAKEN:
+		return gl_rename->taken;
+	case ACTION_RENAME_BAD:
+		return gl_rename->bad;
+	case ACTION_RENAME_HIDDEN:
+		return gl_rename->hidden;
+	case ACTION_RENAME_SIDE_TAKEN:
+		return gl_rename->side_taken;
+	case ACTION_RENAME_PENDING:
+		return gl_rename->pending;
+	default:
+		return gl_rename->failed;
+	}
+}
+
+static struct ui_view *sd_enter(u32 item, u32 row);
+
+static void rename_file(void)
+{
+	const char *dot = strrchr(sd.name, '.');
+	u32 stem = dot && dot != sd.name ? (u32)(dot - sd.name) : (u32)strlen(sd.name);
+	snprintf(sd.info, sizeof(sd.info), "%.*s", (int)stem, sd.name);
+	const struct rename_ask ask = {ART_ICON16_SD, sd.info, sd.name + stem, RENAME_STEM_MAX, 1, rename_submit, 0};
+	memo_store();  // the cursor the page comes back with if nothing changes
+	count_stop();
+	sd.renamed_partly = 0;
+	sd.find = (u8)rename_run(&ask);
+	// The page again in the menu's session, listed afresh
+	if (!ui_active() || ui_depth())
+		return;
+	if (!sd_enter(NAV_SD, 0)) {
+		tlog_error("sdcard: %s", ui_error());
+		ui_shutdown();
+		dialog_blank();
+		return;
+	}
+	if (sd.renamed_partly)
+		dialog_message(NULL, gl_rename->partly, DIALOG_ERROR);
+}
+
 // --- Actions ----------------------------------------------------------------------
 
 // 1 if Settings turns any BOOT WITH ADDON switch on, from the slots as the
@@ -682,8 +745,10 @@ static void file_popup(u32 arg)
 		}
 		pop_add(POP_FAV, fav_text(), 0);
 	}
-	if (!sdlist_is_dir(r))
+	if (!sdlist_is_dir(r)) {
+		pop_add(POP_RENAME, gl_rename->title, 0);
 		pop_add(POP_DELETE, gl_sd_delete, UI_POP_DANGER);
+	}
 	pop_add(POP_INFO, gl_sd_info, 0);
 	if (!ui_popup_open(l, node(N_HINTS), &sd.popup))
 		return;
@@ -732,6 +797,9 @@ static void file_popup(u32 arg)
 			break;
 		case POP_NOR_ADDON:
 			launch(ACTION_NOR_ADDON, hard);
+			break;
+		case POP_RENAME:
+			rename_file();
 			break;
 		default:
 			info(i);
@@ -839,6 +907,12 @@ static struct ui_view *sd_enter(u32 item, u32 row)
 	u32 at = memo_find(currentpath);
 	if (at == SDLIST_NONE)
 		at = row;
+	if (sd.find) {
+		// Back from a rename: on the file under its new name
+		u32 found = sdlist_find(&sd.list, sd.ask);
+		at = found != SDLIST_NONE ? found : at;
+		sd.find = 0;
+	}
 	ui_list_reset(node(N_LIST), at);
 	show_folder();
 	ui_title_set_right(node(N_TITLE), position_text(ui_list_cursor(node(N_LIST))));

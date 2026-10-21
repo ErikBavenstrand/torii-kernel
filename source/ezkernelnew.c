@@ -89,13 +89,6 @@ u16 gl_SD_G;
 u16 gl_SD_B;
 
 u16 SAV_info_buffer[0x200];//Torii: IWRAM, so EWRAM data fits in 256 KB
-// The pending-save record in the kernel's NOR: 0x11, the size in 512-byte
-// units, then the save's file name from halfword 2. Torii keeps the save
-// type at halfword SAV_INFO_TYPE, past the longest name, for the log (0
-// from older kernels).
-#define SAV_INFO_TYPE 0x80
-// The longest save file name the record holds, from byte 4 to SAV_INFO_TYPE
-#define SAV_INFO_NAME_MAX (SAV_INFO_TYPE * 2 - 4 - 1)
 //******************************************************************************
 void delay(u32 R0)
 {
@@ -940,6 +933,26 @@ static int pending_save(u32 *size)
 	for (u32 i = 0; i < 0x200 / 2; i++)
 		SAV_info_buffer[i] = Read_sav_info(i + 2);
 	return 1;
+}
+
+int pending_save_named(const char *save)
+{
+	if (Read_sav_info(0) != 0x11)
+		return 0;
+	// The record's name, a halfword at a time, against save's bytes
+	for (u32 i = 0; i <= SAV_INFO_NAME_MAX; i += 2) {
+		u16 h = Read_sav_info(2 + i / 2);
+		u8 a = (u8)h, b = (u8)(h >> 8);
+		if (a != (u8)save[i])
+			return 0;
+		if (!a)
+			return 1;
+		if (b != (u8)save[i + 1])
+			return 0;
+		if (!b)
+			return 1;
+	}
+	return 0;
 }
 
 static void pending_save_clear(void)

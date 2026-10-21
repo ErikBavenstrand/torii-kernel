@@ -65,6 +65,25 @@ int action_set_save_type(const char *path, u32 save_type);
 // Recent, the favourites and the library index. 1 if it was deleted, or wasn't on the card.
 int action_delete_file(const char *path);
 
+// What action_rename_file did
+enum {
+	ACTION_RENAMED,            // the file and its other files have the new name
+	ACTION_RENAME_TAKEN,       // another file in its folder has that name
+	ACTION_RENAME_BAD,         // a name the card can't take (\/:*?"<>|, too long), or a folder
+	ACTION_RENAME_HIDDEN,      // a name starting with '.', which the menu hides
+	ACTION_RENAME_SIDE_TAKEN,  // its save (or save type, save states, cheats, art) would land on
+				   // another game's: nothing renamed
+	ACTION_RENAME_PENDING,     // its save still waits to be copied from the cart: nothing renamed
+	ACTION_RENAME_FAILED,      // the card refused: nothing renamed
+	ACTION_RENAME_PARTLY,      // renamed, but one of its other files or lists didn't follow (logged)
+};
+// Renames the file at path (a full path) to new_name in its folder (a file
+// name, the extension and so the console kept). A game's save, save type,
+// save states, cheats, patch cache and custom art move with it, and its
+// custom name, Recent, the favourites and the library index follow it. It
+// asks nothing.
+u32 action_rename_file(const char *path, const char *new_name);
+
 // The game NOR's list, read into pNorFS and game_total_NOR (writes nothing)
 void action_nor_read(void);
 // Starts the game NOR's game index (from the list action_nor_read read).
