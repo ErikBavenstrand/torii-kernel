@@ -6,6 +6,20 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** opening an item zooms its carousel object into the page: the
+  object grows to 1.9x and fades into the paper as the backdrop's tint goes,
+  the title's heading slides in from the left, then the card rises 12 px and
+  fades in; B plays it backwards (B19, E7; `ed91130`, `2304e03`, `52d12f8`).
+- **Added:** the theme switch is a top-down wipe behind a hard edge: the old
+  colours are copied back in at the edge's line by HBlank DMA armed from a
+  VCOUNT interrupt (164 bytes of IWRAM); Settings' Theme row previews with it
+  (B19, R7; `ed91130`, `2304e03`, `52d12f8`, `5c45fef`, `e3e833c`).
+- **Changed:** questions, errors and notices in a session of their own rise
+  in from black over 6 frames (the loading card shows at once); a dialog up
+  when its screen changes goes to black with it; the unused mosaic
+  transitions are gone (B19, E6, E9-E11; `ed91130`, `2304e03`, `e3e833c`).
+- **Fixed:** a register hold left over from an earlier page no longer stalls
+  the screen and its sprites behind later uploads (B19; `ed91130`).
 - **Added:** game lists: one page for Recent, Favourites and each console,
   8 rows of 14 px with the name shown, a favourite's star, a save dot and the
   size (Recent: when it was played); A-Z letter jumps with the letter card;
