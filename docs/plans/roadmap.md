@@ -88,30 +88,9 @@ Everything the v0.2–v0.4.1 work left open, checked against the code on 2026-10
 - ~~A failing animation frame writes only its actual PNG, no expected or diff (`tests/shots.py`); mGBA zero-fills RAM where the cart doesn't, so goldens can't catch uninitialised reads (only `pReadCache` is poisoned).~~ Fixed by E5 (`8c3e7ae`, `691815d`): frames kept by hash in `dist/shots-frames` give expected and diff PNGs; mgba-shot fills EWRAM and IWRAM with 0xA5 at power-on (the suite passes).
 - ~~No golden covers About's "free space isn't recorded" branch, Your cart's "still counting", File info's date, No-Intro names with odd characters, or a box switching between consoles with no cover between.~~ Fixed by E5 (`691815d`): info-no-free, info-counting, sd-root/file-info, games-names, games-box-switch.
 
-### Decisions to review
+### Decisions
 
-Made during the build without the user; each is cheap to change. The user's answers so far: settings save on confirm and boot faces a carousel item (C3, D1), romhacks keep their own names and art (C4), per-console placeholder boxes (C2, D2), the hotkey review (C5), and the cart findings (C1).
-
-- **Research overrides R1–R9** ([decisions](../design/v0.4/decisions.md#research-overrides)): a background re-walk instead of folder dates, two-copy safe writes, the sort order, the name-cleaning rules, 14 px rows with a sprite pill, double-size sprites only when zooming, a hard-edged theme wipe, the title slide, the confirmation's dim toward white in light.
-- **Favourites are capped at 4,096** although the decisions said no cap (`source/userdata.h`).
-- **Starting games (C1):** Play with every addon off boots clean; the SD popup offers both Clean boot and Boot with addon (9 items, so no title; E3), and its Boot with addon skips the cheat screen; Game info's Default doesn't say what Settings' mode is; NOR games ignore the boot mode.
-- **Settings:** Back to menu can't be edited while Save states is on (C5); a value is lost if the power goes off in the 30 frames before its write; keys during the write are lost; Settings opens on Theme; L/R jump sections; Dim screen has no live preview; Time and Date set the clock at once.
-- **Start on (D1):** its choices are counted when Settings opens (a Rescan inside doesn't refresh them); a hidden stored choice keeps its name.
-- **Hotkey rules:** 2–3 keys including L, R, START or SELECT, no overlap with the other hotkey even while it's off, nothing inside A+B+START+SELECT.
-- **Hidden files:** PATCH and CHEAT hidden too, and every file the kernel can't start on the SD page; `.sgb` and dot-less files no longer launch.
-- **Name cleaning:** 4–5 digit scene prefixes dropped except 1900–2099; the article table can misfire ("Rock, Paper, A"); colliding games show their first differing tag, preferring Rev, Beta and translation tags. Names over 255 bytes use their 8.3 name for the save, so two such files can share one (v0.3).
-- **Names and art (C4, v0.4.1):** CRC-only lookup; CRCs computed on the PC; games in hidden folders never get names; played games get theirs after the next boot; art-scrape deletes stale romhack art by default; a dump renamed with its own tag loses its art; existing art is never refreshed; one timeout stops a scrape; custom art is shared by same-named files in different folders; covers load after 8 frames of rest with no fade; Game info shows no cover; at most 8,192 art files.
-- **Placeholder boxes (D2):** Nintendo-style trade dress in original pixels (a conscious yes before release); ~~the NES box's torii reads like a skull~~ (redrawn by E4, `6da7ef3`); the three Game Boy boxes share the silver band.
-- **Look:** palette changed for contrast (light ink3 `#8C847B`, dark danger `#EF7B84`); 16x16 icons keep their PNG colours in both themes; look values read off the mockups where spec.md is silent; the Settings and keyboard mockups were approved by the conductor, not the user.
-- **Motion:** a page change fades out, then in (about 9 frames, not 6); the zoom's pieces and timing; the hard-edged 16-frame wipe; dialogs rise in 6 frames, the loading card shows at once; in light, text looks lighter than the paper for a frame or two of the card fade.
-- **Carousel:** neighbours at 0.89 scale and the far pair at 0.60; held-turn speed; with 2–5 items one item shows at both ends mid-turn; far objects nearly vanish in dark; a fast held turn can miss a label for a frame.
-- **Loading card:** titled with the file name; a pending save shows a separate "Saving…" card first, an unsaved index "Saving the game list".
-- **Pages:** Favourites shows no stars; list with art shows two facts; SD Delete reaches `/torii` and `/SAVER` with Show all files on; a folder over 1,024 shows the first 1,024 the card lists; SD folder icons blue; LEFT/RIGHT page the SD page and B climbs only on a fresh press; NOR is one card, only its latest game deletable, Format all offered on an empty NOR, tinted amber, not danger; no coloured dots before NOR games (14 px rows can draw them now).
-- **Popups:** keys pressed while one closes: moves and START reach the page (START opens it again), A, B and SELECT are dropped; keys pressed while START waits for the list go to the popup; a confirmation hides the popup it asks over (E3); the dim toward white also fades the hint labels in light.
-- **Rename:** B never cancels the keyboard; Rename only for indexed SD games; SD rename moves files, not folders.
-- **Info:** all wording; card sizes in binary units labelled GB/MB.
-- **The boot position is written after 5 s idle,** an SD write in the menu.
-- **Dropped v0.3 features:** the NOR menu's load and back-up of a save; the help QR code.
+The user accepted every decision the build made on their behalf (2026-10-21); [docs/design/v0.4/decisions.md](../design/v0.4/decisions.md) records them. Change any of them as a normal roadmap item.
 
 ### Open questions and cart checks
 
