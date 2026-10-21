@@ -6,6 +6,11 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** Settings writes a value when it is confirmed (A on an edit,
+  OK on the time card, an accepted hotkey), once the page is still, with
+  "Saving..." in the hint bar; leaving never pauses on black. Last place is
+  now the carousel item last faced: boot starts on home facing it, never
+  inside a page (C3; `55c2c88`, `6ebdeb6`, `61767bd`).
 - **Changed:** L and R no longer page game lists or the SD card page: hold
   L and press A to start the selected game with a hard reset (C1).
 - **Changed:** a game with a save shows a small floppy mark beside its size
