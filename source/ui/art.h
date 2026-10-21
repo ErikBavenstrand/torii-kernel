@@ -28,8 +28,7 @@
 //   is no sprite size), in a BG bank of their own (a ui_image, as list with
 //   art shows them). Each looks like its console's box with a skeleton
 //   picture, for a game without art; art_box_colours gives its colours in
-//   the current theme. The card's own placeholder, /torii/art/box-<name>.bin
-//   (boxart.h), shows in place of one when the scraper made it.
+//   the current theme.
 // - Items (ART_ITEM_*, in the carousel's order): each item's 16x16 icon,
 //   8x8 icon and carousel object.
 //
@@ -89,7 +88,6 @@ extern const u32 art_shadow_tiles[ART_SHADOW_COUNT][ART_SHADOW_HALF_TILES * 8];
 extern const struct art_shadow art_shadows[ART_SHADOW_COUNT];  // narrowest first
 extern const u32 art_box_tiles[ART_BOX_COUNT][ART_BOX_TILES * 8];
 extern const u16 art_box_palettes[ART_BOX_COUNT][2][16];  // light, then dark
-extern const char *const art_box_names[ART_BOX_COUNT];  // "gba"...: the card's box-<name>.bin
 extern const struct art_item art_items[ART_ITEM_COUNT];
 
 // The 16 colours of a 16x16 icon's bank (it shares them with its pair).

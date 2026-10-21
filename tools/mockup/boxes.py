@@ -1,15 +1,21 @@
 """The placeholder boxes list with art shows for a game without art.
 
-usage: uv run --with pillow python -I tools/mockup/boxes.py [PREVIEW.png]
+usage: uv run --with pillow python -I tools/mockup/boxes.py [SHEET.png [REF]]
 
 Draws assets/ui/boxes/*.png (then run `just assets`): each console's box
-as its real boxes are laid out, with a muted skeleton picture (a torii gate
-under a shimmer) and skeleton title bars where the game's art and name
-would be, so it reads as "no art yet". The PNGs are drawn in the light
-theme's colours; art.toml's box_dark replaces some in the dark theme, and
-PREVIEW, if given, shows both at 3x.
+as its real (US) boxes are laid out, redrawn at 80x80: the Game Boys' silver
+band down the left with the console's name reading up it, the rating box
+and the Nintendo oval or ONLY FOR corner at the bottom; the NES black box
+with its sprite drawn on a grid; a slate band for the rest. Where the game's
+art and name would be is a skeleton, so it reads as "no art yet": title bars
+over a muted torii gate before a pale sun (on the NES, a pixel torii before
+a red sun). The PNGs are drawn in the light theme's colours; art.toml's
+box_dark replaces some in the dark theme. SHEET, if given, shows the boxes on both themes' cards at 1x and 4x,
+under the boxes at git revision REF when that is given.
 """
 
+import io
+import subprocess
 import sys
 import tomllib
 from pathlib import Path
@@ -18,24 +24,23 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "assets/ui/boxes"
-PREV = sys.argv[1] if len(sys.argv) > 1 else None
+CLEAR = (0, 0, 0, 0)
 
 
 def C(h):
     return (int(h[1:3], 16) & 0xF8, int(h[3:5], 16) & 0xF8, int(h[5:7], 16) & 0xF8, 255)
 
 
-# skeleton tones (light; dark map in art.toml)
-S0 = C("#E8E0D8")  # art fill
-S1 = C("#E0D8D0")  # ground
-S2 = C("#D0C8C0")  # torii, title bars
-S3 = C("#F0E8E0")  # shine
-# The NES picture window's own tones, which art.toml lifts in the dark theme
-NES_TONES = (C("#E0E0E8"), C("#D8D8E0"), C("#C8C8D0"), C("#F0F0F8"))
-EDGE = C("#A8A098")  # box outline
+# The skeleton's tones, warm like the paper (art.toml turns them graphite)
+SKY = C("#E8E0D8")
+SUN = C("#F8F0E8")
+GROUND = C("#E0D8D0")
+GATE = C("#D0B0A8")  # the gate, the title bars and the GBA seal: a faded vermilion
+EDGE = C("#A8A098")  # the box's outline
 SHADOW = C("#D8D0C8")
-DARK = tomllib.loads((ROOT / "assets/ui/art.toml").read_text())["box_dark"]
+LIGHT_TONES = (SKY, SUN, GROUND, GATE)
 
+# 3x5 letters (the GBA band, GBC's COLOR) and bold italic 6x7 ones (GAME BOY)
 FONT = {
     "A": [".#.", "#.#", "###", "#.#", "#.#"],
     "B": ["##.", "#.#", "##.", "#.#", "##."],
@@ -50,7 +55,23 @@ FONT = {
     "R": ["##.", "#.#", "##.", "#.#", "#.#"],
     "V": ["#.#", "#.#", "#.#", "#.#", ".#."],
     "Y": ["#.#", "#.#", ".#.", ".#.", ".#."],
-    "S": [".##", "#..", ".#.", "..#", "##."],
+    " ": ["..", "..", "..", "..", ".."],
+}
+# 4x5 letters, wider for the bands' bold words
+WIDE = {
+    "A": [".##.", "#..#", "####", "#..#", "#..#"],
+    "B": ["###.", "#..#", "###.", "#..#", "###."],
+    "C": [".###", "#...", "#...", "#...", ".###"],
+    "D": ["###.", "#..#", "#..#", "#..#", "###."],
+    "E": ["####", "#...", "###.", "#...", "####"],
+    "G": [".###", "#...", "#.##", "#..#", ".###"],
+    "L": ["#...", "#...", "#...", "#...", "####"],
+    "M": ["#...#", "##.##", "#.#.#", "#...#", "#...#"],
+    "N": ["#..#", "##.#", "#.##", "#..#", "#..#"],
+    "O": [".##.", "#..#", "#..#", "#..#", ".##."],
+    "R": ["###.", "#..#", "###.", "#.#.", "#..#"],
+    "V": ["#...#", "#...#", ".#.#.", ".#.#.", "..#.."],
+    "Y": ["#...#", ".#.#.", "..#..", "..#..", "..#.."],
     " ": ["..", "..", "..", "..", ".."],
 }
 BOLD = {
@@ -65,29 +86,81 @@ BOLD = {
 }
 
 
-def logo(pic, txt, x, y, c):
-    for ch in txt:
-        g = BOLD[ch]
-        for gy, row in enumerate(g):
-            for gx, b in enumerate(row):
-                if b == "#":
-                    pic.p(x + gx + (1 if gy < 3 else 0), y + gy, c)
-        x += len(g[0]) + 1
+def torii(w, small=False):
+    """A torii gate w pixels wide, as rows ("#" drawn): the kasagi with
+    upturned ends, the shimaki, the gakuzuka, the nuki through the pillars,
+    then the pillars (the row ending "|" repeats down to the ground) and
+    their footings."""
+    pw = 2 if small else 3
+    inset = round(w * 0.2)
+    mid = w // 2
+
+    def row(*spans):
+        r = ["."] * w
+        for a, b in spans:
+            for x in range(a, b + 1):
+                r[x] = "#"
+        return "".join(r)
+
+    left = (inset, inset + pw - 1)
+    right = (w - 1 - inset - pw + 1, w - 1 - inset)
+    rows = [row((0, 0), (w - 1, w - 1)), row((0, w - 1)), row((1, w - 2))]
+    if not small:
+        rows.append(row())
+    rows.append(row((2, w - 3)))
+    gak = row(left, (mid - 1, mid), right)
+    rows += [gak] * (1 if small else 3)
+    nuki = row((inset - 3, w - 1 - inset + 3))
+    rows += [nuki] * (1 if small else 2)
+    rows.append(row(left, right) + "|")
+    rows.append(row((left[0] - 1, left[1] + 1), (right[0] - 1, right[1] + 1)))
+    return rows
 
 
 class Pic:
     def __init__(s):
-        s.im = Image.new("RGBA", (80, 80), (0, 0, 0, 0))
+        s.im = Image.new("RGBA", (80, 80), CLEAR)
         s.px = s.im.load()
 
     def p(s, x, y, c):
         if 0 <= x < 80 and 0 <= y < 80:
             s.px[x, y] = c
 
+    def get(s, x, y):
+        return s.px[x, y]
+
     def rect(s, x0, y0, x1, y1, c):
         for y in range(y0, y1 + 1):
             for x in range(x0, x1 + 1):
                 s.p(x, y, c)
+
+    def pill(s, x, y, w, h, c):
+        """A rounded bar: its corners keep what was under them."""
+        for yy in range(y, y + h):
+            for xx in range(x, x + w):
+                corner = xx in (x, x + w - 1) and yy in (y, y + h - 1)
+                if not corner or h < 3:
+                    s.p(xx, yy, c)
+
+    def disc(s, cx, cy, r, c, x0=0, y0=0, x1=79, y1=79):
+        """A filled circle, clipped to (x0, y0)-(x1, y1)."""
+        for y in range(max(y0, int(cy - r - 1)), min(y1, int(cy + r + 1)) + 1):
+            for x in range(max(x0, int(cx - r - 1)), min(x1, int(cx + r + 1)) + 1):
+                if (x - cx) ** 2 + (y - cy) ** 2 <= r * r + r * 0.6:
+                    s.p(x, y, c)
+
+    def sprite(s, rows, x, y, c, height):
+        """A gate (TORII), its "|" row repeated so it stands height rows."""
+        fixed = len(rows) - 1
+        yy = y
+        for row in rows:
+            n = height - fixed if row.endswith("|") else 1
+            for _ in range(n):
+                for gx, b in enumerate(row.rstrip("|")):
+                    if b == "#":
+                        s.p(x + gx, yy, c)
+                yy += 1
+        return yy
 
     def text(s, txt, x, y, colours):
         """txt in the 3x5 font, each letter in its colour (spaces take none)."""
@@ -102,238 +175,312 @@ class Pic:
             if ch != " ":
                 i += 1
 
-    def vtext(s, txt, x, ybottom, colfn):
-        # rotated 90 CCW: reads bottom to top; glyph row r -> column x+r
+    def vtext(s, txt, x, ybottom, colour, font=FONT, gap=1):
+        """txt turned to read upwards from ybottom, its glyphs' rows going
+        right from column x; colour(i) gives letter i's colour. Returns the
+        row above the last letter."""
         yy = ybottom
         for i, ch in enumerate(txt):
-            g = FONT[ch]
+            g = font[ch]
             for gy, row in enumerate(g):
                 for gx, b in enumerate(row):
                     if b == "#":
-                        s.p(x + gy, yy - gx, colfn(i, ch))
-            yy -= len(g[0]) + 1
+                        s.p(x + gy, yy - gx, colour(i))
+            yy -= len(g[0]) + gap
+        return yy
+
+    @staticmethod
+    def vlength(txt, font=FONT, gap=1):
+        return sum(len(font[ch][0]) for ch in txt) + gap * (len(txt) - 1)
 
 
 def frame(pic, body):
-    # box x0..78, y0..78, rounded by one pixel, a 1 px shadow right and below
+    """The box: 79x79 with one-pixel rounded corners, a 1 px shadow right
+    and below."""
     pic.rect(1, 1, 77, 77, body)
-    for x in range(1, 78):
-        pic.p(x, 0, EDGE)
-        pic.p(x, 78, EDGE)
-        pic.p(x + 1, 79, SHADOW)
-    for y in range(1, 78):
-        pic.p(0, y, EDGE)
-        pic.p(78, y, EDGE)
-        pic.p(79, y + 1, SHADOW)
-    pic.p(79, 79, (0, 0, 0, 0))
-    pic.p(79, 1, (0, 0, 0, 0))
-    pic.p(1, 79, (0, 0, 0, 0))
+    for i in range(1, 78):
+        pic.p(i, 0, EDGE)
+        pic.p(i, 78, EDGE)
+        pic.p(0, i, EDGE)
+        pic.p(78, i, EDGE)
+        pic.p(i + 1, 79, SHADOW)
+        pic.p(79, i + 1, SHADOW)
+    for x, y in ((1, 1), (77, 1), (1, 77), (77, 77)):
+        pic.p(x, y, EDGE)
+    pic.p(79, 79, CLEAR)
+
+
+def corners(pic):
     for x, y in ((1, 1), (77, 1), (1, 77), (77, 77)):
         pic.p(x, y, EDGE)
 
 
-def bar(pic, x, y, w, h, c):
-    pic.rect(x, y, x + w - 1, y + h - 1, c)
-    if h > 2:
-        for xx, yy in ((x, y), (x + w - 1, y), (x, y + h - 1), (x + w - 1, y + h - 1)):
-            pic.p(xx, yy, pic_bg)
+def skeleton(pic, x0, y0, x1, y1, plate, tones=LIGHT_TONES, small=False, above=0):
+    """The "no art" picture in (x0, y0)-(x1, y1): sky, a sun behind a torii
+    gate standing on a ground plate `plate` rows tall. Returns the plate's
+    top row."""
+    sky, sun, ground, gate = tones
+    pic.rect(x0, y0, x1, y1, sky)
+    gy = y1 - plate + 1
+    # The ground: the plate, rising into two low hills behind the gate
+    W = x1 - x0 + 1
+    for x in range(x0, x1 + 1):
+        h = 0.0
+        for c, r, top in ((0.12, 0.42, 0.13), (0.9, 0.5, 0.2)):
+            d = (x - x0 + 0.5 - c * W) / (r * W)
+            if abs(d) < 1:
+                h = max(h, top * (gy - y0) * (1 - d * d) ** 0.5)
+        pic.rect(x, gy - round(h), x, y1, ground)
+    w = (x1 - x0 + 1) * (44 if small else 62) // 100 // 2 * 2
+    rows = torii(w, small)
+    room = gy - y0 - above
+    height = max(
+        len(rows) + 2, min(int(room * 0.84), int(w * (0.78 if small else 0.9)))
+    )
+    gx = (x0 + x1 + 1) // 2 - w // 2
+    ty = gy - height
+    # The sun, framed by the gate under its beams
+    r = w * 0.28
+    pic.disc(gx + w / 2 - 0.5, ty + height * 0.45, r, sun, x0, y0, x1, gy - 1)
+    pic.sprite(rows, gx, ty, gate, height)
+    return gy
 
 
-def art(pic, x0, y0, x1, y1, torii_w=None, tones=None):
-    # the skeleton artwork: fill, a shimmer stripe, ground, a torii gate
-    fill, ground, gate, shine = tones or (S0, S1, S2, S3)
+SILVER = C("#F0F0F0")  # the Game Boys' band
+SILVERD = C("#C0C0C8")  # its edge
+BAND_X = 13  # the band's last column, its edge
+ART_X = BAND_X + 1
+
+
+def band(pic):
+    """The Game Boys' silver band down the left edge."""
+    pic.rect(1, 1, BAND_X - 1, 77, SILVER)
+    pic.rect(BAND_X, 1, BAND_X, 77, SILVERD)
+
+
+def title_bars(pic, x0, x1, y, colour):
+    """Two skeleton title bars centred in x0..x1 from row y, as the games'
+    logos sit at the top of their art."""
     w = x1 - x0 + 1
-    h = y1 - y0 + 1
-    pic.rect(x0, y0, x1, y1, fill)
-    for y in range(y0, y1 + 1):
-        for x in range(x0, x1 + 1):
-            d = (x - x0) + (y1 - y)  # diagonal position
-            if w * 0.45 <= d - h * 0.35 < w * 0.45 + 7:
-                pic.p(x, y, shine)
-    gy = y0 + int(h * 0.80)
-    pic.rect(x0, gy, x1, y1, ground)
-    tw = torii_w or max(18, int(w * 0.52)) // 2 * 2
-    th = int(h * 0.56)
-    cx = (x0 + x1 + 1) // 2
-    lx = cx - tw // 2
-    rx = cx + tw // 2 - 1
-    top = gy - th
-    # kasagi: upturned ends
-    pic.rect(lx - 1, top, rx + 1, top, gate)
-    pic.p(lx - 2, top - 1, gate)
-    pic.p(rx + 2, top - 1, gate)
-    pic.rect(lx, top + 1, rx, top + 2, gate)
-    # gakuzuka and nuki
-    nuki = top + 3 + max(3, th // 5)
-    pic.rect(cx - 1, top + 3, cx, nuki - 1, gate)
-    pic.rect(lx + 1, nuki, rx - 1, nuki + 1, gate)
-    pw = 3 if tw >= 24 else 2
-    inset = max(3, tw // 6)
-    pic.rect(lx + inset, top + 3, lx + inset + pw - 1, gy, gate)
-    pic.rect(rx - inset - pw + 1, top + 3, rx - inset, gy, gate)
-    # feet
-    pic.rect(lx + inset - 1, gy, lx + inset + pw, gy, gate)
-    pic.rect(rx - inset - pw, gy, rx - inset + 1, gy, gate)
+    cx = x0 + w // 2
+    for share, height, dy in ((70, 5, 0), (44, 3, 7)):
+        width = w * share // 100 // 2 * 2
+        pic.pill(cx - width // 2, y + dy, width, height, colour)
+
+
+def rating(pic, x, y):
+    """The rating box at the art's bottom left, as an outline."""
+    pic.rect(x, y, x + 6, y + 8, GATE)
+    pic.rect(x + 1, y + 1, x + 5, y + 7, GROUND)
+    pic.rect(x + 2, y + 2, x + 4, y + 4, GATE)
+    pic.rect(x + 2, y + 6, x + 4, y + 6, GATE)
+
+
+def nintendo(pic, x, y, ring, inside):
+    """The Nintendo oval, 14x7: a ring round a word of dashes."""
+    pic.pill(x, y, 14, 7, ring)
+    pic.pill(x + 1, y + 1, 12, 5, inside)
+    for dx in (3, 4, 6, 7, 8, 10):
+        pic.p(x + dx, y + 3, ring)
 
 
 boxes = {}
+TONES_TOP = 20  # the art's rows above the gate's room: the title bars
 
-# --- GBA: a dark band down the left edge, GAME BOY ADVANCE reading up it
+# --- GBA: the silver band with GAME BOY ADVANCE reading up it in grey, the
+# word ADVANCE bold
 p = Pic()
-frame(p, S0)
-BAND = C("#202030")
-LOGO = C("#E0E0F0")
-ADV = C("#9890D8")
-LINE = C("#4A39B5")
-p.rect(1, 1, 11, 77, BAND)
-for y in (1, 77):
-    p.p(1, y, EDGE)
-p.rect(12, 1, 12, 77, LINE)
-p.vtext("GAME BOY ADVANCE", 4, 74, lambda i, ch: LOGO if i < 8 else ADV)
-pic_bg = S0
-art(p, 13, 1, 77, 77)
-bar(p, 19, 6, 38, 4, S2)
-bar(p, 19, 12, 24, 3, S2)
-bar(p, 65, 67, 8, 7, S2)  # the seal
-p.p(77, 1, EDGE)
-p.p(77, 77, EDGE)
+frame(p, SKY)
+band(p)
+GREY = C("#383838")
+y = p.vtext("GAME BOY", 5, 74, lambda i: GREY)
+p.vtext("ADVANCE", 4, y - 3, lambda i: GREY, WIDE)
+gy = skeleton(p, ART_X, 1, 77, 77, 12, above=TONES_TOP)
+title_bars(p, ART_X, 77, 6, GATE)
+rating(p, ART_X + 4, 67)
+p.pill(62, 69, 12, 6, GATE)  # the publisher
+corners(p)
 boxes["gba"] = p
 
-# --- GB: a grey top band with GAME BOY, the DMG's two bezel lines, a seal badge
+# --- GB: the band with a big indigo GAME BOY and the red Nintendo mark
+# above it; the Nintendo oval at the bottom right
 p = Pic()
-frame(p, S0)
-BANDG = C("#C0C8B0")
-INK = C("#283028")
-NAVY = C("#283890")
-MAG = C("#A02870")
-RED = C("#C83030")
-p.rect(1, 1, 77, 15, BANDG)
-p.rect(1, 16, 77, 16, NAVY)
-p.rect(1, 17, 77, 17, MAG)
-logo(p, "GAME BOY", 5, 4, INK)
-# Nintendo badge: a red rounded oval at the band's right
-p.rect(64, 4, 75, 10, RED)
-for x in (66, 67, 69, 70, 71, 73):
-    p.p(x, 7, C("#F0E0D8"))
-for xy in ((64, 4), (75, 4), (64, 10), (75, 10)):
-    p.p(*xy, BANDG)
-pic_bg = S0
-art(p, 1, 18, 77, 77)
-bar(p, 6, 66, 36, 4, S2)
-bar(p, 6, 72, 22, 3, S2)
-for xy in ((1, 1), (77, 1), (1, 77), (77, 77)):
-    p.p(*xy, EDGE)
+frame(p, SKY)
+band(p)
+INDIGO = C("#3038A0")
+RED = C("#D02828")
+WHITE = C("#F8F8F0")
+y0 = 74
+p.vtext("GAME BOY", 3, y0, lambda i: INDIGO, BOLD)
+p.pill(2, 3, 10, 5, RED)  # Nintendo
+for x in (4, 6, 8, 9):
+    p.p(x, 5, WHITE)
+gy = skeleton(p, ART_X, 1, 77, 77, 12, above=TONES_TOP)
+title_bars(p, ART_X, 77, 6, GATE)
+rating(p, ART_X + 4, 67)
+nintendo(p, 61, 69, RED, WHITE)
+corners(p)
 boxes["gb"] = p
 
-# --- GBC: a white band, GAME BOY and a five-colour COLOR, a teal corner badge
+# --- GBC: the band with GAME BOY in indigo and COLOR in five colours, and
+# the black ONLY FOR corner at the bottom right
 p = Pic()
-frame(p, S0)
-WHITE = C("#F8F8F0")
-TEAL = C("#089C94")
-TEALD = C("#087068")
-p.rect(1, 1, 77, 19, WHITE)
-logo(p, "GAME BOY", 5, 4, INK)
-p.text(
-    "COLOR",
-    38,
-    13,
-    [C("#D82830"), C("#7838B8"), C("#48A030"), C("#E8B010"), C("#2860D0")],
-)
-for i in range(13):
-    for x in range(77 - 12 + i, 78):
-        p.p(x, 1 + i, TEAL)
-for i in range(13):
-    p.p(65 + i, 1 + i, TEALD)
-p.rect(1, 20, 77, 20, TEAL)
-pic_bg = S0
-art(p, 1, 21, 77, 77)
-bar(p, 6, 66, 36, 4, S2)
-bar(p, 6, 72, 22, 3, S2)
-for xy in ((1, 1), (77, 1), (1, 77), (77, 77)):
-    p.p(*xy, EDGE)
+frame(p, SKY)
+band(p)
+NAVY = C("#283898")
+RAINBOW = [C("#D82830"), C("#7838B8"), C("#48A030"), C("#E8B010"), C("#2860D0")]
+y = p.vtext("GAME BOY", 4, 74, lambda i: NAVY, WIDE)
+p.vtext("COLOR", 4, y - 3, lambda i: RAINBOW[i], WIDE)
+gy = skeleton(p, ART_X, 1, 77, 77, 12, above=TONES_TOP)
+title_bars(p, ART_X, 77, 6, GATE)
+rating(p, ART_X + 4, 67)
+CORNER = C("#101018")
+for i in range(19):
+    p.rect(77 - i, 59 + i, 77, 59 + i, CORNER)
+for i, c in enumerate(RAINBOW):  # COLOR, along its edge
+    x, y = 66 + i * 2, 74 - i * 2
+    p.rect(x, y, x + 1, y + 1, c)
+corners(p)
 boxes["gbc"] = p
 
-# --- NES: the black box: title on black, a framed picture, a grid, the red seal
+# --- NES: the black box: the title on black over the grid, the game's
+# sprite drawn on the grid (a torii before the sun), the seal
 p = Pic()
-frame(p, C("#181820"))
+BLACK = C("#181820")
+frame(p, BLACK)
 DIM = C("#505060")
 GRID = C("#282838")
 SEAL = C("#C82830")
 SEALW = C("#E0E0E0")
-pic_bg = C("#181820")
-bar(p, 6, 5, 46, 5, DIM)
-bar(p, 6, 12, 30, 3, DIM)
-for y in range(58, 78, 3):
+# The sprite's tones, the same in both themes on the black box
+CELL_SUN = C("#985060")
+CELL_GROUND = C("#383848")
+CELL_GATE = C("#C8C8D8")
+p.pill(6, 5, 44, 5, DIM)
+p.pill(6, 12, 28, 3, DIM)
+for y in range(18, 65, 3):
     p.rect(1, y, 77, y, GRID)
 for x in range(3, 78, 4):
-    p.rect(x, 58, x, 77, GRID)
-p.rect(9, 18, 69, 54, DIM)
-art(p, 10, 19, 68, 53, tones=NES_TONES)
-p.rect(5, 66, 22, 74, SEAL)
-for x in (8, 9, 11, 12, 13, 15, 16, 17, 19):
-    p.p(x, 69, SEALW)
-for x in (8, 9, 10, 12, 13, 15, 16, 17, 18, 19):
-    p.p(x, 71, SEALW)
-for xy in ((5, 66), (22, 66), (5, 74), (22, 74)):
-    p.p(*xy, C("#181820"))
-for xy in ((1, 1), (77, 1), (1, 77), (77, 77)):
-    p.p(*xy, EDGE)
+    p.rect(x, 18, x, 64, GRID)
+SPRITE = [
+    "...................",
+    "...................",
+    "...#...........#...",
+    "...#############...",
+    "....###########....",
+    "......#..#..#......",
+    ".....#########.....",
+    "......#.....#......",
+    "......#.....#......",
+    "......#.....#......",
+    "......#.....#......",
+    ".....##.....##.....",
+    "ggggggggggggggggggg",
+    "ggggggggggggggggggg",
+    "ggggggggggggggggggg",
+]
+
+
+def cell(cx, cy, c):
+    x, y = 4 + cx * 4, 19 + cy * 3
+    p.rect(x, y, min(x + 2, 77), y + 1, c)
+
+
+for cy in range(15):
+    for cx in range(19):
+        if (cx - 9) ** 2 + (cy - 7) ** 2 <= 4.2**2:
+            cell(cx, cy, CELL_SUN)
+for cy, row in enumerate(SPRITE):
+    for cx, b in enumerate(row):
+        if b == "#":
+            cell(cx, cy, CELL_GATE)
+        elif b == "g":
+            cell(cx, cy, CELL_GROUND)
+nintendo(p, 6, 68, SEAL, SEALW)  # the seal
+p.pill(44, 70, 28, 3, DIM)  # Nintendo Entertainment System
+corners(p)
 boxes["nes"] = p
 
-# --- Anything else: a plain slate band with a title bar over the artwork
+# --- Anything else: a plain slate band holding the title bars
 p = Pic()
-frame(p, S0)
+frame(p, SKY)
 SLATE = C("#586878")
 SLATEL = C("#8898A8")
-p.rect(1, 1, 77, 13, SLATE)
-pic_bg = SLATE
-bar(p, 6, 4, 34, 4, SLATEL)
-bar(p, 44, 5, 14, 3, SLATEL)
-pic_bg = S0
-art(p, 1, 14, 77, 77)
-bar(p, 6, 66, 36, 4, S2)
-bar(p, 6, 72, 22, 3, S2)
-for xy in ((1, 1), (77, 1), (1, 77), (77, 77)):
-    p.p(*xy, EDGE)
+p.rect(1, 1, 77, 15, SLATE)
+p.pill(6, 4, 34, 4, SLATEL)
+p.pill(6, 10, 20, 3, SLATEL)
+p.rect(1, 16, 77, 16, SLATEL)
+gy = skeleton(p, 1, 17, 77, 77, 12, above=4)
+rating(p, 5, 67)
+corners(p)
 boxes["other"] = p
 
-for n, pic in boxes.items():
-    cols = {pic.im.getpixel((x, y)) for x in range(80) for y in range(80)} - {
-        (0, 0, 0, 0)
-    }
-    print(n, len(cols), "colours")
-    pic.im.save(OUT / f"{n}.png")
-if not PREV:
-    sys.exit(0)
+
+def dark_map(toml_text):
+    return {C(k)[:3]: C(v) for k, v in tomllib.loads(toml_text)["box_dark"].items()}
 
 
-# preview: light card row and dark card row, at 3x
-def darken(im):
+def darken(im, dark):
     im = im.copy()
     px = im.load()
-    m = {C(k)[:3]: C(v) for k, v in DARK.items()}
     for y in range(80):
         for x in range(80):
             c = px[x, y]
-            if c[3] and c[:3] in m:
-                px[x, y] = m[c[:3]]
+            if c[3] and c[:3] in dark:
+                px[x, y] = dark[c[:3]]
     return im
 
 
-W = len(boxes) * 96 + 16
-sheet = Image.new("RGB", (W, 2 * 96 + 16), (0xF7, 0xEF, 0xE7))
-for row, (bg, card, fn) in enumerate(
-    [
-        ((0xF7, 0xEF, 0xE7), (255, 255, 255), lambda i: i),
-        ((0x18, 0x18, 0x21), (0x29, 0x29, 0x31), darken),
+def git_show(ref, path):
+    return subprocess.run(
+        ["git", "show", f"{ref}:{path}"], cwd=ROOT, check=True, capture_output=True
+    ).stdout
+
+
+def sheet(path, ref=None):
+    """Before (the boxes and dark map at git revision ref, if given) and
+    after, on the light theme's paper and card, then the dark theme's; at
+    1x above, then 4x."""
+    sets = [
+        (
+            [pic.im for pic in boxes.values()],
+            dark_map((ROOT / "assets/ui/art.toml").read_text()),
+        )
     ]
-):
-    sheet.paste(bg, (0, row * 104, W, row * 104 + 104))
-    for i, pic in enumerate(boxes.values()):
-        x = 12 + i * 96
-        y = row * 104 + 12
-        sheet.paste(card, (x - 4, y - 4, x + 84, y + 84))
-        im = fn(pic.im)
-        sheet.paste(im, (x, y), im)
-sheet = sheet.resize((sheet.width * 3, sheet.height * 3), Image.NEAREST)
-sheet.save(PREV)
+    if ref:
+        ims = [
+            Image.open(io.BytesIO(git_show(ref, f"assets/ui/boxes/{n}.png"))).convert(
+                "RGBA"
+            )
+            for n in boxes
+        ]
+        sets.insert(0, (ims, dark_map(git_show(ref, "assets/ui/art.toml").decode())))
+    themes = [
+        ((0xF7, 0xEF, 0xE7), (255, 255, 255), False),
+        ((0x18, 0x18, 0x21), (0x29, 0x29, 0x31), True),
+    ]
+    W, H = len(boxes) * 92 + 8, len(sets) * len(themes) * 92 + 8
+    small = Image.new("RGB", (W, H))
+    for t, (bg, card, dark) in enumerate(themes):
+        for k, (ims, dmap) in enumerate(sets):
+            y = (t * len(sets) + k) * 92
+            small.paste(bg, (0, y, W, y + 100))
+            for i, im in enumerate(ims):
+                x = 8 + i * 92
+                small.paste(card, (x, y + 4, x + 84, y + 88))
+                shown = darken(im, dmap) if dark else im
+                small.paste(shown, (x + 2, y + 6), shown)
+    out = Image.new("RGB", (W * 4, H * 5), (0xF7, 0xEF, 0xE7))
+    out.paste(small, (0, 0))
+    out.paste(small.resize((W * 4, H * 4), Image.NEAREST), (0, H))
+    out.save(path)
+
+
+if __name__ == "__main__":
+    for n, pic in boxes.items():
+        cols = {pic.im.getpixel((x, y)) for x in range(80) for y in range(80)} - {CLEAR}
+        print(n, len(cols), "colours")
+        assert len(cols) <= 15, n
+        pic.im.save(OUT / f"{n}.png")
+    if len(sys.argv) > 1:
+        sheet(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else None)

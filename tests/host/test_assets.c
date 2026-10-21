@@ -222,13 +222,9 @@ void test_artkey_names(void)
 	CHECK_EQ(artkey_parse("AW-E.bin", &key), ARTKEY_NONE);
 	CHECK_EQ(artkey_parse("custom", &key), ARTKEY_NONE);
 	CHECK_EQ(artkey_parse(".bin", &key), ARTKEY_NONE);
-	// A console's placeholder box, keyed by the console's name
-	CHECK_EQ(artkey_parse("box-gba.bin", &key), ARTKEY_BOX);
-	CHECK_EQ(key, artkey_name("gba", 3));
-	CHECK_EQ(artkey_parse("BOX-GB.BIN", &key), ARTKEY_BOX);
-	CHECK_EQ(key, artkey_name("gb", 2));
-	CHECK_EQ(artkey_parse("box-.bin", &key), ARTKEY_NONE);
-	CHECK_EQ(artkey_parse("boxs.bin", &key), ARTKEY_NONE);  // no dash: no box
+	// C2's placeholder boxes, which a card may still hold, are no art
+	CHECK_EQ(artkey_parse("box-gba.bin", &key), ARTKEY_NONE);
+	CHECK_EQ(artkey_parse("BOX-NES.BIN", &key), ARTKEY_NONE);
 	// Custom art: the game's file name, extension and all, before ".bin"
 	CHECK_EQ(artkey_custom_len("Advance Wars (USA).gba.bin"), 22);
 	CHECK_EQ(artkey_custom_len("Advance Wars (USA).gba.BIN"), 22);
@@ -238,7 +234,7 @@ void test_artkey_names(void)
 	CHECK(artkey_name("Pokemon.gb", 10) != artkey_name("Pokemon.gbc", 11));
 	// Ids: never 0, and a key of one kind isn't the same key of another
 	CHECK(artkey_id(ARTKEY_CRC, 0x5D5C613Eu) != artkey_id(ARTKEY_CUSTOM, 0x5D5C613Eu));
-	for (u32 kind = ARTKEY_CUSTOM; kind <= ARTKEY_BOX; kind++)
+	for (u32 kind = ARTKEY_CUSTOM; kind <= ARTKEY_CRC; kind++)
 		for (u32 k = 0; k < 4096; k++)
 			CHECK(artkey_id(kind, k * 0x10001u) != 0);
 }

@@ -27,7 +27,7 @@
 // it loaded after it
 #define BOXART_REST 8
 #define BOXART_AHEAD 1
-#define BOXART_WANTS (2 + 2 * BOXART_AHEAD)  // and the card's placeholder for the cursor's console
+#define BOXART_WANTS (1 + 2 * BOXART_AHEAD)
 // Polls between checks of the resting cursor's cover: names (CRCs) that
 // load or are identified later can give it one
 #define BOXART_RECHECK 30
@@ -273,19 +273,6 @@ static u32 lookup(const char *path, u32 size, struct want *w)
 	return artset_has(SET_BASE, w->id) ? w->id : 0;
 }
 
-// The card's placeholder for box (ART_BOX_*), box-<name>.bin, into *w; its
-// id or 0
-static u32 box_cover(u32 box, struct want *w)
-{
-	if (B.list != LIST_DONE || !B.set.count || box >= ART_BOX_COUNT || box == ART_BOX_OTHER)
-		return 0;  // the scraper makes none for other consoles
-	const char *name = art_box_names[box];
-	w->kind = ARTKEY_BOX;
-	w->key = box;
-	w->id = artkey_id(ARTKEY_BOX, artkey_name(name, strlen(name)));
-	return artset_has(SET_BASE, w->id) ? w->id : 0;
-}
-
 // row's cover into *w (and, for custom art, its file name into the want's
 // PSRAM slot n); its id or 0
 static u32 row_cover(u32 row, struct want *w, u32 n)
@@ -317,8 +304,6 @@ static int locate(u32 id, char *path, u32 size)
 			continue;
 		if (w->kind == ARTKEY_CRC)
 			snprintf(path, size, ART_DIR "/%08lX" ARTKEY_EXT, (unsigned long)w->key);
-		else if (w->kind == ARTKEY_BOX)
-			snprintf(path, size, ART_DIR "/" ARTKEY_BOX_PREFIX "%s" ARTKEY_EXT, art_box_names[w->key]);
 		else
 			snprintf(path, size, CUSTOM_DIR "/%s" ARTKEY_EXT, (const char *)(NAMES_BASE + i * NAME_BYTES));
 		return 1;
@@ -419,21 +404,12 @@ static void sync(void)
 	}
 }
 
-// The cursor's cover into *w: its own art, else the card's placeholder for
-// its console; its id or 0
-static u32 cursor_cover(struct want *w, u32 n)
-{
-	u32 id = row_cover(B.row, w, n);
-	return id ? id : box_cover(B.box, w);
-}
-
-// Wants the cursor's cover and its neighbours', then the card's placeholder
-// for the cursor's console (so it shows at once on the next game without art)
+// Wants the cursor's cover and its neighbours'
 static void want_covers(void)
 {
 	struct want w;
 	B.wanted = 0;
-	B.want_id = cursor_cover(&w, 0);
+	B.want_id = row_cover(B.row, &w, 0);
 	if (B.want_id)
 		B.wants[B.wanted++] = w;
 	for (u32 d = 1; d <= BOXART_AHEAD; d++) {
@@ -444,14 +420,9 @@ static void want_covers(void)
 				B.wants[B.wanted++] = w;
 		}
 	}
-	u32 box = box_cover(B.box, &w), box_at = BOXART_WANTS;  // after the neighbours
-	if (box && box != B.want_id && B.wanted < BOXART_WANTS) {
-		box_at = B.wanted;
-		B.wants[B.wanted++] = w;
-	}
 	cover_wants_begin();
 	for (u32 i = 0; i < B.wanted; i++)
-		cover_want(B.wants[i].id, i == 0 && B.want_id ? 0 : i == box_at ? 2 : 1);
+		cover_want(B.wants[i].id, i == 0 && B.want_id ? 0 : 1);
 	cover_wants_end();
 }
 
@@ -499,7 +470,7 @@ void boxart_select(u32 row, u32 box)
 	B.box = (u8)(box < ART_BOX_COUNT ? box : ART_BOX_OTHER);
 	B.placeholder_due = 1;
 	struct want w;
-	u32 id = B.on && cover_active() ? cursor_cover(&w, BOXART_WANTS) : 0;
+	u32 id = B.on && cover_active() ? row_cover(row, &w, BOXART_WANTS) : 0;
 	if (id != B.want_id)
 		B.signature = 0;  // another cover on this row (a relist): wanted anew
 	B.want_id = id;
@@ -544,7 +515,7 @@ void boxart_poll(void)
 	} else {
 		B.recheck = BOXART_RECHECK;
 		struct want w;
-		if (cursor_cover(&w, BOXART_WANTS) != B.want_id)
+		if (row_cover(B.row, &w, BOXART_WANTS) != B.want_id)
 			B.signature = 0;  // names arrived: the row has a cover now (or another)
 	}
 	u32 signature = (B.row + 1) * 0x9E3779B1u ^ library_generation() * 0x85EBCA6Bu ^ (u32)library_walking();

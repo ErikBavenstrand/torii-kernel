@@ -27,7 +27,6 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 sys.path.append(str(ROOT / "tests" / "names"))
 import art
-import art_boxes
 import art_scrape
 import fixture
 import names_db
@@ -511,60 +510,30 @@ class Scrape(unittest.TestCase):
         self.assertNotIn("/Gone.gba", games)  # no longer on the card
         self.assertEqual(len(games), 10)
 
-    def test_placeholders(self):
-        """Each console's placeholder is made from its template's box, kept
-        on a run that has no picture for it, remade from the cache."""
-        box = io.BytesIO()
-        band = Image.new("RGB", (512, 512), (200, 40, 40))
-        band.paste((20, 20, 160), (0, 0, 90, 512))  # the console's band
-        band.save(box, "PNG")
-        for t in art_boxes.TEMPLATES:
-            self.server.routes[
-                thumb(art_scrape.SYSTEMS[t.system], art_scrape.thumbnail_name(t.name))
-            ] = box.getvalue()
-        status, out, err = self.run_tool("--console", "GBA,NES")
-        self.assertEqual(status, 0, err)
-        self.assertIn("placeholders: gba new, nes new", out)
+    def test_old_placeholders(self):
+        """C2's placeholders, box-<console>.bin, are deleted with their
+        macOS "._" files, whatever --console says (listed on a dry run);
+        other files stay."""
         art_dir = self.sd / "torii" / "art"
+        art_dir.mkdir(parents=True)
+        for name in (
+            "box-gba.bin",
+            "._box-gba.bin",
+            "BOX-NES.BIN",
+            "box-snes.bin",
+            "boxes.bin",
+        ):
+            (art_dir / name).write_bytes(b"old")
+        status, out, err = self.run_tool("--console", "GBA", "--dry-run")
+        self.assertEqual(status, 0, err)
+        self.assertIn("would delete: ._box-gba.bin, BOX-NES.BIN, box-gba.bin", out)
+        self.assertTrue((art_dir / "box-gba.bin").exists())
+        status, out, err = self.run_tool("--console", "GBA", "--offline")
+        self.assertEqual(status, 0, err)
+        self.assertIn("deleted: ._box-gba.bin, BOX-NES.BIN, box-gba.bin", out)
         self.assertEqual(
-            sorted(p.name for p in art_dir.glob("box-*")),
-            ["box-gba.bin", "box-nes.bin"],
+            sorted(p.name for p in art_dir.glob("box*")), ["box-snes.bin", "boxes.bin"]
         )
-        data = (art_dir / "box-gba.bin").read_bytes()
-        self.assertEqual(len(data), art.FILE_BYTES)
-        (_, _, _, _, _), palette, tiles = art.asset.read_asset(data)
-
-        def pixel(x, y):
-            b = tiles[((y // 8) * 10 + x // 8) * 32 + (y % 8) * 4 + (x % 8) // 2]
-            c = palette[b >> 4 if x % 2 else b & 15]
-            return tuple(art.expand5(c >> k & 31) for k in (0, 5, 10))
-
-        self.assertEqual(
-            pixel(4, 40), tuple(art.to15(v) for v in (20, 20, 160))
-        )  # the band stays
-        self.assertEqual(
-            pixel(70, 30), art_boxes.rgb(art_boxes.LIGHT.fill)
-        )  # the art is gone
-        self.assertNotIn(
-            (art.to15(200), art.to15(40), art.to15(40)),
-            {pixel(x, y) for x in range(20, 80) for y in range(80)},
-        )
-        # On the card and cached: made again from the cache, nothing fetched;
-        # written only when it differs
-        before = len(self.server.requests)
-        status, out, _ = self.run_tool("--console", "GBA", "--offline")
-        self.assertIn("placeholders: gba kept", out)
-        (art_dir / "box-gba.bin").write_bytes(b"old")
-        status, out, _ = self.run_tool("--console", "GBA", "--offline")
-        self.assertIn("placeholders: gba remade", out)
-        self.assertEqual((art_dir / "box-gba.bin").read_bytes(), data)
-        self.assertEqual(len(self.server.requests), before)
-        # On the card, not cached: kept, nothing asked
-        status, out, _ = self.run_tool(
-            "--console", "GBA", "--cache", str(self.cache / "other")
-        )
-        self.assertIn("placeholders: gba kept", out)
-        self.assertEqual(len(self.server.requests), before)
 
     def test_no_card(self):
         self.sd = self.sd / "nope"
