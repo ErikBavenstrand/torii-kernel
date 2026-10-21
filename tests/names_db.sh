@@ -5,7 +5,8 @@
 # CRC only (a romhack with a listed game's code keeps its file name), and the
 # index sorts by those names; the boot's walk
 # gives crc.txt's records their files' dates and forgets one whose file
-# changed; the games on Recent without a CRC get one after the boot.
+# changed; the games on Recent without a CRC get one after the boot; your
+# own names (`just names-add`) win over the dats' and hold through a rebuild.
 # Runs inside the torii-emu container after `just build` and `just
 # emu-headless`.
 #
@@ -200,3 +201,29 @@ not_logged "$cart/1.log" "names: wrote"
 if mdir -i "$cart/sd.img" ::/torii/crc.txt >/dev/null 2>&1; then fail "crc.txt was made"; fi
 no_errors "$cart/1.log"
 echo "PASS: a card without names.db or art gets no crc.txt"
+
+# Your own names (`just names-add`, into names.txt as Rename keeps them) win
+# over the dats' and name a romhack, and hold when the index is built again
+# (as Settings' Rescan library builds it)
+cart=$carts/own
+fixture_card "$cart"
+printf 'Wars\tUltimate Wars\nhack of minish.gba\tZeta Hack\nNobody\tNo one\n' >"$cart/names.tsv"
+python3 tools/names_db.py add "$cart/files" "$cart/names.tsv" >"$cart/add.log"
+grep -q "2 games named, 0 names removed, 1 lines named no game" "$cart/add.log" || fail "names-add: $(cat "$cart/add.log")"
+mcopy -o -i "$cart/sd.img" "$cart/files/torii/names.txt" "$cart/files/torii/names.txt.bak" ::/torii/
+want="/GBA/Homebrew.gba
+/GBA/zz Minish.gba
+/GBA/Wars.gba
+/GBA/Hack of Minish.gba"
+boot "$cart" "$cart/1.log" -f 900 -u "names: wrote /torii/crc.txt"
+logged "$cart/1.log" "library: 2 custom names parsed"
+[ "$(gba_order "$cart")" = "$want" ] || fail "with own names the GBA games sort as
+$(gba_order "$cart")"
+mdel -i "$cart/sd.img" ::/torii/library.idx ::/torii/library.bak 2>/dev/null || true
+boot "$cart" "$cart/2.log" -f 900 -u "library: wrote /torii/library.idx"
+logged "$cart/2.log" "library: 2 custom names parsed"
+[ "$(gba_order "$cart")" = "$want" ] || fail "after a rebuild the GBA games sort as
+$(gba_order "$cart")"
+no_errors "$cart/1.log"
+no_errors "$cart/2.log"
+echo "PASS: your own names win over the dats', name a romhack and hold through a rebuilt index"

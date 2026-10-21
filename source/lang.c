@@ -380,6 +380,8 @@ const char *en_info[INFO_STRINGS] = {
 		"Time and date: A, then " LR " picks a field and ^v changes it.\n"
 		"Hotkeys: A, then hold the new keys together.\n"
 		"# Rename\n"
+		"In a game's menu, Rename gives the game a name of your own in its lists, in place of its file's "
+		"or No-Intro's: a romhack's too. On the SD card page it renames the file.\n"
 		"^v " LR "\tpick a key\n"
 		"A\ttype it\n"
 		"B\tdelete a letter\n"
