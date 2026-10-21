@@ -42,6 +42,9 @@
 //   -C EPOCH         as -c, but the clock stands still at EPOCH, so a screen
 //                    showing the time looks the same whenever it is drawn
 //   -O DIR           write -s PNGs given relative paths into DIR
+//   -D DIR           write each -H frame's screen as DIR/HASH.png, unless
+//                    one is there (tests/shots.py keeps the expected frames
+//                    of animations so)
 //   -T FROM:TO       watch frames FROM to TO (as -H takes them) for tears:
 //                    a store that changes what the screen shows while lines
 //                    0-159 scan out prints a "tear:" line (see the tear
@@ -82,7 +85,7 @@ struct event {
 };
 
 // -w steps, met in order.
-#define MAX_WAITS 64
+#define MAX_WAITS 256
 struct wait {
 	const char *text;
 	unsigned hit;  // the frame its line came in; 0 until then
@@ -668,6 +671,7 @@ struct options {
 	struct events ranges;
 	struct events tears;
 	const char *outDir;
+	const char *frameDir;
 	long long epoch;
 	int pinClock;
 	const char *loadState;
@@ -796,6 +800,8 @@ static void parse_options(struct options *opts, int argc, char **argv)
 			opts->pinClock = 2;
 		} else if (!strcmp(argv[i], "-O")) {
 			opts->outDir = argv[++i];
+		} else if (!strcmp(argv[i], "-D")) {
+			opts->frameDir = argv[++i];
 		} else if (!strcmp(argv[i], "-t")) {
 			opts->realtime = 1;
 		} else if (!strcmp(argv[i], "-L") && opts->nscripts < 16) {
@@ -1120,6 +1126,17 @@ int main(int argc, char **argv)
 		for (size_t i = 0; i < opts.ranges.count; ++i) {
 			if (in_range(&opts.ranges.list[i], frame)) {
 				print_hash(frame, buffer, width, height);
+				if (opts.frameDir) {
+					char path[1024];
+					snprintf(path, sizeof(path), "%s/%016llX.png", opts.frameDir,
+						 (unsigned long long)hash_screen(buffer, width, height));
+					FILE *have = fopen(path, "rb");
+					if (have) {
+						fclose(have);
+					} else if (!save_png(path, buffer, width, height)) {
+						fprintf(stderr, "cannot write %s\n", path);
+					}
+				}
 				break;  // once, if ranges overlap
 			}
 		}

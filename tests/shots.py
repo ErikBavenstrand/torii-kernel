@@ -38,7 +38,9 @@ fails it.
 
 Check (the default): every key frame's screen hash, and every animation's
 frame hashes, must equal tests/shots/hashes.txt. On a mismatch the actual,
-expected and diff PNGs go to dist/shots-failed/. Then every
+expected and diff PNGs go to dist/shots-failed/; an animation's expected
+frame comes from dist/shots-frames, where every run keeps each animation
+frame it hashed by its hash (none on a fresh checkout). Then every
 "frame-cycles: NAME N" line the runs logged is checked against
 tests/perf/budget.txt (tests/perf.py).
 
@@ -71,6 +73,9 @@ MANIFEST = SHOTS / "hashes.txt"
 PNGS = SHOTS / "png"
 RUNS = Path("dist/shots-run")
 FAILED = Path("dist/shots-failed")
+# Every animation frame's screen by its hash (mgba-shot -D), kept between
+# runs, so a frame that changes has its expected picture from an earlier run
+FRAMES = Path("dist/shots-frames")
 # The scenarios' carts, on the container's own disk: the emulator syncs the
 # memory-mapped cart files at each power-off, which takes about 0.5 s on the
 # virtiofs mount (tests/carts.sh)
@@ -312,7 +317,9 @@ def boot(name: str, sd: Path, cart: Path, out: Path, extra: list[str] = ()):
     env = dict(os.environ, OMEGA_DIR=str(cart), TZ="UTC")
     env.pop("OMEGA_TRACE", None)
     env.update(cart_env)
-    cmd = [SHOT, kernel, "-C", str(EPOCH), "-O", str(out), "-i", str(opts), *extra]
+    FRAMES.mkdir(parents=True, exist_ok=True)
+    cmd = [SHOT, kernel, "-C", str(EPOCH), "-O", str(out), "-D", str(FRAMES)]
+    cmd += ["-i", str(opts), *extra]
     return subprocess.run(cmd, env=env, capture_output=True, text=True, check=False)
 
 
@@ -520,9 +527,23 @@ def check(results: list[Result], want: dict[str, str], sd: Path) -> list[str]:
             what = f"{r.name}/frames: {len(got_frames)} frames hashed, {len(want_frames)} recorded"
             if i < len(r.frames):
                 frame = r.frames[i][0]
-                png = FAILED / f"{r.name}.frame{i}.actual.png"
-                shot_at(r, frame, png, sd)
-                what += f"; frame {i} (absolute {frame}) differs first ({png})"
+                stem = FAILED / f"{r.name}.frame{i}"
+                png = Path(f"{stem}.actual.png")
+                seen = FRAMES / f"{got_frames[i]}.png"
+                if seen.exists():
+                    shutil.copy(seen, png)
+                else:
+                    shot_at(r, frame, png, sd)
+                what += f"; frame {i} (absolute {frame}) differs first ({stem}.*)"
+                golden = (
+                    FRAMES / f"{want_frames[i]}.png" if i < len(want_frames) else None
+                )
+                if golden and golden.exists() and png.exists():
+                    shutil.copy(golden, f"{stem}.expected.png")
+                    n = diff_png(png, golden, Path(f"{stem}.diff.png"))
+                    what += f", {n} pixels"
+                elif golden:
+                    what += "; no expected picture (dist/shots-frames has none from an earlier run)"
             failures.append(what)
         stale = set(mine) - set(got)
         stale -= {k for k in stale if "/frames " in k}
