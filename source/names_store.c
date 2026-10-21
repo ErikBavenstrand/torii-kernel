@@ -592,8 +592,8 @@ void names_walk_end(int whole)
 {
 	N.seen_ok = (u8)whole;
 	// Games without a CRC: identified in the background (M_NEW), on a card
-	// that uses CRCs and may keep them
-	if (N.walk_new && N.active && !N.read_only)
+	// that uses CRCs and can keep them (else every boot would read them again)
+	if (N.walk_new && N.active && !N.read_only && N.cache_ok && !N.cache.full)
 		N.want_new = 1;
 }
 
@@ -962,6 +962,8 @@ static int identify_step(void)
 
 static void identify_begin(u32 mode)
 {
+	if (N.mode != M_NONE && N.since_rename)
+		publish_names();  // the run stopped found names the index hasn't sorted by
 	// The FIL may be names.db's load or crc.txt's write: close only a game
 	// Identify was reading
 	if (N.mode != M_NONE && N.step == I_READ)
@@ -992,8 +994,10 @@ static int names_step(void)
 		return JOB_MORE;
 	}
 	int between = N.step == I_NEXT;
-	if (between && N.mode == M_NEW && N.since_rename && torii_frames - N.rename_frame >= NAMES_RENAME_FRAMES)
-		publish_names();  // a name found a while ago shows now; the job waits for the walk
+	// A name found a while ago shows now, also in the middle of a big game:
+	// the job waits for the walk, its file kept open
+	if (N.mode == M_NEW && N.since_rename && torii_frames - N.rename_frame >= NAMES_RENAME_FRAMES)
+		publish_names();
 	if (N.mode != M_NONE && !(between && N.dirty && N.since_write >= NAMES_WRITE_EVERY))
 		return identify_step() == JOB_DONE && !N.dirty ? JOB_DONE : JOB_MORE;
 	if (N.dirty && ui_idle_frames() >= NAMES_WRITE_IDLE) {
@@ -1039,8 +1043,9 @@ static int names_job(struct job *job)
 	do
 		r = names_step();
 	while (r == JOB_MORE && cycles_since(start) < NAMES_STEP_CYCLES);
-	// The background's new games take one step a frame, not the frame's
-	// spare half: a marquee or a cover drawn beside it keeps its frame
+	// The background's new games take one job call a frame (a read or
+	// two), not the frame's spare half: a marquee or a cover drawn beside
+	// it keeps its frame
 	if (r == JOB_MORE && N.mode == M_NEW && N.wphase == X_IDLE)
 		return JOB_WAIT;
 	return r;

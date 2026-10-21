@@ -972,7 +972,8 @@ static void relist(u32 cursor)
 		return;
 	if (games.count && games.count == was) {
 		// As many rows (new names, sorted again): redrawn in place, the
-		// cached ones too, with no page change
+		// cached ones too; a page change only if the cursor's game sorted
+		// far from where it was
 		ui_list_refresh(list_node(), 0, games.count - 1);
 		ui_list_set_cursor(list_node(), games.cursor);
 	} else {
