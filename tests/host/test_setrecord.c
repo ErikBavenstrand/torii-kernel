@@ -17,12 +17,18 @@ static void record(u16 *r, u16 value, u32 seq)
 	set_record_seal(r, KERNEL_SLOTS, seq);
 }
 
-// An older kernel's write: its slots, the rest 0
+// An older kernel's write: its slots (switches on, the default hotkeys,
+// the rest from value), the rest 0
 static void legacy(u16 *r, u16 value)
 {
+	static const u16 keys[6] = {9, 8, 2, 9, 8, 3};
 	memset(r, 0, SET_RECORD_BYTES);
 	for (u32 i = 0; i < KERNEL_SLOTS; i++)
 		r[i] = (u16)(value + i);
+	for (u32 i = 1; i <= 4; i++)
+		r[i] = 1;
+	r[13] = r[14] = 0;
+	memcpy(&r[5], keys, sizeof(keys));
 }
 
 // What the kernel reads: the picked copy, or A as it is
@@ -42,14 +48,8 @@ static u32 save(u16 value, u32 steps, u32 half)
 	u32 pick = set_record_pick(copy_a, copy_b, &seq);
 	u16 *targets[2];
 	u32 n = 0;
-	if (pick == SET_COPY_A)
-		targets[n++] = copy_b;
-	else if (pick == SET_COPY_B)
-		targets[n++] = copy_a;
-	else {
-		targets[n++] = copy_b;
-		targets[n++] = copy_a;
-	}
+	targets[n++] = pick == SET_COPY_B ? copy_a : copy_b;
+	targets[n++] = pick == SET_COPY_B ? copy_b : copy_a;
 	u16 next[SET_RECORD_SLOTS];
 	record(next, value, seq + 1);
 	for (u32 t = 0; t < n; t++) {
@@ -109,6 +109,21 @@ void test_settings_record(void)
 	legacy(copy_a, 300);
 	copy_a[KERNEL_SLOTS] = 1;  // a slot past the older kernels' not 0
 	CHECK_EQ(set_record_pick(copy_a, copy_b, &seq), SET_COPY_B);
+	// ... nor a second pass cut early: A's slots erased, the rest still 0,
+	// or bits come back at random over a record whose rest is 0
+	memset(copy_a, 0, SET_RECORD_BYTES);
+	memset(copy_a, 0xFF, KERNEL_SLOTS * 2);
+	CHECK_EQ(set_record_pick(copy_a, copy_b, &seq), SET_COPY_B);
+	u32 rng = 1, passed = 0;
+	for (u32 t = 0; t < 1000; t++) {
+		memset(copy_a, 0, SET_RECORD_BYTES);
+		for (u32 i = 0; i < KERNEL_SLOTS; i++) {
+			rng = rng * 1103515245u + 12345u;
+			copy_a[i] = (u16)(rng >> 8);
+		}
+		passed += set_record_pick(copy_a, copy_b, &seq) != SET_COPY_B;
+	}
+	CHECK_EQ(passed, 0);
 
 	// A power cut at every step of a save leaves the old values or the new,
 	// from each starting point: a new cart, an older kernel's A, after one

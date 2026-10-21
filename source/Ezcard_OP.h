@@ -24,8 +24,8 @@ void ReadSram(u32 address, u8 *data, u32 size);
 void WriteSram(u32 address, u8 *data, u32 size);
 void IWRAM_CODE Save_sav_info(u16 *SAV_info_buffer, u32 buffersize);
 // Torii: writes the settings record, its slots [0, assress_max) from
-// SET_info_buffer, to the kernel NOR copy not read from (setrecord.h); 1 if
-// it read back whole. Read_SET_info then reads the new copy.
+// SET_info_buffer, to both kernel NOR copies, the one not read from first
+// (setrecord.h); 1 if one read back whole. Read_SET_info then reads it.
 u32 Save_SET_info(u16 *SET_info_buffer);
 // A settings slot (ez_define.h): as SETTINGS staged it, while it has staged
 // its saves, else as the kernel NOR holds it

@@ -457,8 +457,8 @@ EOF
   # The settings' two copies (source/setrecord.h), A at 0x7B0000 and B at
   # 0x7B2000: a power cut at each erase and program of a save leaves the
   # values from before it or after it, never the defaults, and the next
-  # save works. The first save from an older kernel's A (new_cart's) writes
-  # B, then A; the next writes B, the one after A. A word program and a
+  # save works. Each save writes B, then A (A, then B after a cut left
+  # only B whole). A word program and a
   # buffer write (the S29GL064A: 16 a copy) each count one program; erasing
   # cuts inside an erase, the sector left at 0 (the chip's first pass). On the
   # bottom-boot S29GL064A both copies share one 64 KB sector, so a cut there

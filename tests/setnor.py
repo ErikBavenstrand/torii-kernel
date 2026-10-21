@@ -37,11 +37,21 @@ def _whole(slots: list[int]) -> int | None:
     return word(SEQ)
 
 
+def _legacy(a: list[int]) -> bool:
+    """An older kernel's A (set_record_legacy)"""
+    return (
+        not any(a[LEGACY:])
+        and all(a[s] <= 1 or a[s] == 0xFFFF for s in (1, 2, 3, 4, 13, 14))
+        and all(a[s] <= 9 or a[s] == 0xFFFF for s in range(5, 11))
+        and any(v not in (0, 0xFFFF) for v in a[:LEGACY])
+    )
+
+
 def pick(nor: bytes) -> str:
     """The copy the kernel reads (set_record_pick): A, B, or none (A as it is)"""
     a, b = _copy(nor, COPY_A), _copy(nor, COPY_B)
     seq_a, seq_b = _whole(a), _whole(b)
-    if seq_a is None and any(a[:LEGACY]) and not any(a[LEGACY:]):
+    if seq_a is None and _legacy(a):
         return "none"
     newer_b = seq_b is not None and (
         seq_a is None or 0 < (seq_b - seq_a) & 0xFFFFFFFF < 0x80000000

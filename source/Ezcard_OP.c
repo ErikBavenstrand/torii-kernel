@@ -462,35 +462,30 @@ u32 Save_SET_info(u16 *SET_info_buffer)
 	if (!set_copy)
 		set_pick();
 	u32 seq = set_seq + 1;
-	if (set_read == SET_COPY_A || set_read == SET_COPY_B) {
-		// The copy not read from, so a cut leaves that one whole
-		u32 to = set_read == SET_COPY_A ? SET_RECORD_B : SET_RECORD_A;
-		if (!set_write(to, SET_info_buffer, seq))
-			return 0;
-		set_read = to == SET_RECORD_A ? SET_COPY_A : SET_COPY_B;
-		set_copy = to;
-		set_seq = seq;
-		tlog("nor: wrote the settings, copy %c (%lu)", to == SET_RECORD_A ? 'A' : 'B', (unsigned long)seq);
-		return 1;
-	}
-	// No whole copy (a new cart, or an older kernel's A): B, then A, so a
-	// cut keeps A as it was until B is whole
-	if (!set_write(SET_RECORD_B, SET_info_buffer, seq))
+	// Both copies, the one not read from first, so a cut leaves the other
+	// whole; A last, so older kernels, which read only A, read these values
+	u32 first = set_read == SET_COPY_B ? SET_RECORD_A : SET_RECORD_B;
+	u32 second = first == SET_RECORD_A ? SET_RECORD_B : SET_RECORD_A;
+	if (!set_write(first, SET_info_buffer, seq))
 		return 0;
-	set_read = SET_COPY_B;
-	set_copy = SET_RECORD_B;
+	set_read = first == SET_RECORD_A ? SET_COPY_A : SET_COPY_B;
+	set_copy = first;
 	set_seq = seq;
-	if (!set_write(SET_RECORD_A, SET_info_buffer, seq)) {
-		// Read again: where both share a sector, A's erase took B too
+	if (!set_write(second, SET_info_buffer, seq)) {
+		// Read again: where both share a sector, the second's erase took
+		// the first too
 		set_pick();
-		if (set_read != SET_COPY_B)
+		if (set_seq != seq || set_read == SET_COPY_NONE)
 			return 0;
-		tlog("nor: wrote the settings, copy B (%lu); A next time", (unsigned long)seq);
+		tlog("nor: wrote the settings, copy %c (%lu); the other next time", first == SET_RECORD_A ? 'A' : 'B',
+		     (unsigned long)seq);
 		return 1;
 	}
+	// Both whole with one number: A is read, as older kernels do
 	set_read = SET_COPY_A;
 	set_copy = SET_RECORD_A;
-	tlog("nor: wrote the settings, copies B and A (%lu)", (unsigned long)seq);
+	tlog("nor: wrote the settings, copies %c and %c (%lu)", first == SET_RECORD_A ? 'A' : 'B',
+	     second == SET_RECORD_A ? 'A' : 'B', (unsigned long)seq);
 	return 1;
 }
 // --------------------------------------------------------------------

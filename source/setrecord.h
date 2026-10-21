@@ -5,9 +5,10 @@
 // in its own 8 KB boot sector: A at SET_RECORD_A, where the official kernel
 // keeps its settings, and B at SET_RECORD_B. The last slots hold a trailer: a
 // sequence number, a CRC and a magic number whose second half is the last
-// slot, programmed last. A save writes the copy the settings weren't read
-// from, so a power cut leaves the other whole; the reader takes the whole
-// copy with the higher number.
+// slot, programmed last. A save writes both, the copy the settings weren't
+// read from first, so a power cut leaves the other whole, and A ends up
+// current for older kernels; the reader takes the whole copy with the
+// higher number, A on a tie.
 //
 // Older kernels (the official one, Torii before v0.4.2) write only A, with
 // every slot from SET_RECORD_LEGACY_SLOTS 0. Such an A wins over any copy, as
@@ -44,8 +45,8 @@ u32 set_record_check(const u16 *record, u32 *seq);
 
 enum {
 	SET_COPY_NONE,  // no whole copy: read A as it is, write B then A
-	SET_COPY_A,  // read A, write B
-	SET_COPY_B,  // read B, write A
+	SET_COPY_A,  // read A, write B then A
+	SET_COPY_B,  // read B, write A then B
 };
 // The copy to read; *seq is its number (0 for SET_COPY_NONE).
 u32 set_record_pick(const u16 *a, const u16 *b, u32 *seq);

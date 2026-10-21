@@ -410,18 +410,23 @@ unused part of the buffer.
 Since v0.4.2 Torii keeps two copies (`source/setrecord.h`): A at `+0x7B0000`
 and B at `+0x7B2000`, the next 8 KB boot sector. Slots 248–255 hold a
 sequence number, a CRC-32 and the magic `TSE1`, whose second half (slot 255)
-is programmed last. A save writes the copy the settings weren't read from;
-the reader takes the whole copy with the higher number. An A whose slots
-0–64 aren't all `0` and whose slots 65–255 are all `0` was written by an older
-kernel (the official one, or Torii before v0.4.2) and wins over both, so a
-downgrade's changes stay. A torn Torii program never leaves slot 255 `0`; a
-torn erase can (the chip programs the sector to `0` before erasing it), but
-leaves slots 0–64 `0` too, or 0s and 1s at random, so B wins. The emulated
-cart's `OMEGA_POWER_CUT=kernel:erasing:N` leaves a sector at `0` this way.
+is programmed last. A save writes both copies, the one the settings weren't
+read from first, so a cut leaves the other whole and A ends up current for
+older kernels, which read only A; the reader takes the whole copy with the
+higher number, A on a tie. An A that looks written by an older kernel (the
+official one, or Torii before v0.4.2: slots 65–255 all `0`, the switches 0,
+1 or unset, the hotkeys key numbers 0–9 or unset, some slot holding a value)
+wins over both, so a downgrade's changes stay. A torn Torii program never
+leaves slot 255 `0`; a torn erase can (the chip programs the sector to `0`
+before erasing it), but leaves the sector all `0` or random bits, which
+those rules reject, so B wins. The emulated cart's
+`OMEGA_POWER_CUT=kernel:erasing:N` leaves a sector at `0` this way.
 With no whole copy the kernel reads A as it is,
 and its next save writes B, then A. On a bottom-boot S29GL064A the window's
 top 64 KB is one sector, so both copies share it and a cut can still lose
-both, as the single copy could. The hotkey slots 5–10 are written as the defaults the settings page
+both, as the single copy could.
+
+The hotkey slots 5–10 are written as the defaults the settings page
 shows (L R SELECT, L R START) the first time any row is saved.
 
 **Mode B (slot 15: 0 Rumble, 1 RAM, 2 Link) is read by the cart, not the
@@ -531,7 +536,7 @@ for `Save_info`, `FlashBase_S71`, the command bytes `0x30`, `0xA0`, `0x25`,
 
 | Path | Writes | Through |
 |---|---|---|
-| Settings saved (`Save_SET_info`: SETTINGS, a game's save type) | `0x7B2000` or `0x7B0000` (the copy not read from; with no whole copy B, then A), 512 bytes | `Save_info` |
+| Settings saved (`Save_SET_info`: SETTINGS, a game's save type) | `0x7B2000` then `0x7B0000` (A then B if only B was whole), 512 bytes each | `Save_info` |
 | Pending-save record set at launch, cleared at the next boot (`Save_sav_info`) | `0x790000`, 512 bytes | `Save_info` |
 | NOR list saved: WRITE TO NOR, delete latest, FORMAT ALL, the boot's migration of an older list (`Save_NOR_list`) | `0x780000` then `0x7A0000` (or the other way), 0x2120 bytes each | `Save_info` |
 | `Read_S71NOR_ID` (in `Save_info` and Diagnostics' first step) | autoselect `90` and reset `F0` at `0x0AAA`/`0x0554`/0: commands, no erase or program | — |

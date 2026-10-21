@@ -32,18 +32,28 @@ u32 set_record_check(const u16 *record, u32 *seq)
 	return 1;
 }
 
-// Whether record is what an older kernel writes: its slots, not all 0, then
-// only 0. A torn Torii program leaves the last slot erased or partly
-// programmed, never 0; a torn erase leaves it all 0, or 0s and 1s at random.
+// Whether record is what an older kernel writes: only 0 past its slots, its
+// switches (1-4, 13, 14) 0, 1 or unset, its hotkeys (5-10) key numbers 0-9
+// or unset, and some slot set to a value (not 0 or 0xFFFF). A torn Torii
+// program leaves the last slot erased or partly programmed, never 0; a torn
+// erase leaves the sector all 0, or 0s and 1s at random, which those rules
+// all but never pass.
 static u32 set_record_legacy(const u16 *record)
 {
-	u32 any = 0;
-	for (u32 slot = 0; slot < SET_RECORD_LEGACY_SLOTS; slot++)
-		any |= record[slot];
+	static const u8 switches[] = {1, 2, 3, 4, 13, 14};
+	u32 value = 0;
 	for (u32 slot = SET_RECORD_LEGACY_SLOTS; slot < SET_RECORD_SLOTS; slot++)
 		if (record[slot])
 			return 0;
-	return any != 0;
+	for (u32 i = 0; i < sizeof(switches); i++)
+		if (record[switches[i]] > 1 && record[switches[i]] != 0xFFFF)
+			return 0;
+	for (u32 slot = 5; slot <= 10; slot++)
+		if (record[slot] > 9 && record[slot] != 0xFFFF)
+			return 0;
+	for (u32 slot = 0; slot < SET_RECORD_LEGACY_SLOTS; slot++)
+		value |= record[slot] != 0 && record[slot] != 0xFFFF;
+	return value;
 }
 
 u32 set_record_pick(const u16 *a, const u16 *b, u32 *seq)
