@@ -1,6 +1,7 @@
 // See gfx.h. Everything runs from ROM but gfx_commit_queue, the loop that
 // feeds the VRAM queue to DMA in VBlank: the rest of the commit is a few
 // register writes and DMA starts, so IWRAM wouldn't speed it up.
+#include <gba_interrupt.h>
 #include <string.h>
 
 #include "gfx.h"
@@ -15,6 +16,14 @@
 #define DMA3CNT (*(vu32 *)0x040000DC)
 #define DMA_ON_32 0x84000000u
 #define DMA_SRC_FIXED_ 0x01000000u
+#define DMA0_REGS ((vu32 *)0x040000B0)  // DMA0 then DMA1: SAD, DAD, CNT each
+#define DMA_HBLANK_ 0x20000000u
+#define DMA_32_ 0x04000000u
+#define REG_DISPSTAT_ (*(vu16 *)0x04000004)
+#define DISPSTAT_VCOUNT_IRQ 0x0020
+// IWRAM data (the linker keeps .iwram* there; IWRAM_DATA would clash with
+// the code's .iwram section in this file)
+#define SPLIT_IWRAM __attribute__((section(".iwram_split")))
 
 enum {
 	QUEUE_COPY,
@@ -53,6 +62,13 @@ static struct queue_entry queue[GFX_QUEUE_CAP] EWRAM_BSS;
 static u8 queue_head, queue_count;
 static u32 queue_pushed EWRAM_BSS;  // tickets handed out
 static u8 oam_count, oam_shown, oam_changed, oam_full_logged;
+// The split: as set (shadow), whether the commit must write it, the values
+// the DMAs copy (IWRAM, so a palette run fits an HBlank), and the DMA
+// registers the handler writes (EWRAM: six reads, a few cycles more)
+static struct gfx_split split EWRAM_BSS, split_live EWRAM_BSS;  // as set, and as committed
+static u8 split_dirty, split_on;
+u32 gfx_split_data[GFX_SPLIT_WORDS] SPLIT_IWRAM;
+static u32 split_dma[GFX_SPLIT_PARTS * 3] EWRAM_BSS;
 
 void gfx_init(void)
 {
@@ -79,11 +95,102 @@ void gfx_init(void)
 	gfx_dirty_regs = GFX_DIRTY_REGS | GFX_DIRTY_OAM;
 	gfx_hold_regs = 0;
 	gfx_dirty_pal = 0xFFFFFFFF;
+	gfx_split_off();
+}
+
+// --- Raster split -------------------------------------------------------------
+
+void IWRAM_CODE gfx_split_irq(void)
+{
+	vu32 *dma = DMA0_REGS;
+	for (u32 i = 0; i < GFX_SPLIT_PARTS * 3; i++)
+		dma[i] = split_dma[i];
+}
+
+void gfx_split_off(void)
+{
+	irqDisable(IRQ_VCOUNT);
+	DMA0_REGS[2] = 0;
+	DMA0_REGS[5] = 0;
+	memset(&split, 0, sizeof(split));
+	memset(&split_live, 0, sizeof(split_live));
+	split_dirty = split_on = 0;
+}
+
+void gfx_set_split(const struct gfx_split *s)
+{
+	if (!s || !s->line || s->line >= 160) {
+		if (split.line)
+			split_dirty = 1;
+		memset(&split, 0, sizeof(split));
+		return;
+	}
+	split = *s;
+	split_dirty = 1;  // a split is committed every frame anyway
+}
+
+// In VBlank: the parts' top values, and the DMAs and the interrupt armed for
+// this frame's split line (each frame: the split copies change what the
+// next frame's top would show)
+static int part_ok(const struct gfx_split_part *p)
+{
+	return p->dst && p->offset + (p->half ? (p->count + 1u) / 2u : p->count) <= GFX_SPLIT_WORDS;
+}
+
+// The parts' top values into place (in VBlank: every line shows them until
+// the split's copies)
+static void split_tops(const struct gfx_split *s)
+{
+	for (u32 i = 0; i < GFX_SPLIT_PARTS; i++) {
+		const struct gfx_split_part *p = &s->part[i];
+		const u16 *top = p->top;
+		if (!part_ok(p) || !top)
+			continue;
+		if (top >= gfx_pal_unfaded && top < gfx_pal_unfaded + 512 && gfx_pal_faded_on)
+			top = gfx_pal_faded + (top - gfx_pal_unfaded);
+		vu16 *d = (vu16 *)p->dst;
+		for (u32 h = 0; h < (p->half ? p->count : 2u * p->count); h++)
+			d[h] = top[h];
+	}
+}
+
+static void commit_split(void)
+{
+	if (!split_dirty && !split_on)
+		return;
+	split_dirty = 0;
+	// Last frame's copies changed what its lower lines showed: the top
+	// values go back first, for good once the split ends
+	split_tops(split.line ? &split : &split_live);
+	if (!split.line) {
+		gfx_split_off();
+		return;
+	}
+	split_live = split;
+	for (u32 i = 0; i < GFX_SPLIT_PARTS; i++) {
+		const struct gfx_split_part *p = &split.part[i];
+		u32 *dma = &split_dma[i * 3];
+		dma[2] = 0;
+		if (!part_ok(p))
+			continue;
+		dma[0] = (u32)&gfx_split_data[p->offset];
+		dma[1] = p->dst;
+		dma[2] = (p->half ? DMA_ON_32 & ~DMA_32_ : DMA_ON_32) | DMA_HBLANK_ | p->count;
+	}
+	REG_DISPSTAT_ = (u16)((REG_DISPSTAT_ & 0xFF) | DISPSTAT_VCOUNT_IRQ | (split.line - 1u) << 8);
+	if (!split_on) {
+		// A match flagged while it was off (line 0's, every frame) would
+		// call the handler now, in VBlank, with no HBlank to copy in
+		REG_IF = IRQ_VCOUNT;
+		irqSet(IRQ_VCOUNT, gfx_split_irq);
+		irqEnable(IRQ_VCOUNT);
+		split_on = 1;
+	}
 }
 
 u32 gfx_pending(void)
 {
-	return gfx_dirty_regs | gfx_dirty_pal | queue_count;
+	return gfx_dirty_regs | gfx_dirty_pal | queue_count | split_dirty | split_on;
 }
 
 static void set_reg(u16 *reg, u16 value, u32 dirty)
@@ -114,11 +221,6 @@ void gfx_set_win(u32 index, u16 value)
 {
 	if (index < 6)
 		set_reg(&gfx_regs.win[index], value, GFX_DIRTY_WIN);
-}
-
-void gfx_set_mosaic(u16 value)
-{
-	set_reg(&gfx_regs.mosaic, value, GFX_DIRTY_MOSAIC);
 }
 
 void gfx_set_blend(u16 bldcnt, u16 bldalpha, u16 bldy)
@@ -389,8 +491,6 @@ static void write_regs(u32 dirty)
 	if (dirty & GFX_DIRTY_WIN)
 		for (u32 i = 0; i < 6; i++)
 			io[0x20 + i] = gfx_regs.win[i];
-	if (dirty & GFX_DIRTY_MOSAIC)
-		io[0x26] = gfx_regs.mosaic;
 	if (dirty & GFX_DIRTY_BLEND)
 		for (u32 i = 0; i < 3; i++)
 			io[0x28 + i] = gfx_regs.blend[i];
@@ -420,7 +520,11 @@ void gfx_commit(void)
 		return;
 	}
 	u32 dirty = gfx_dirty_regs;
-	// Regions held for the queue wait while it has work
+	// Regions held for the queue wait while it has work; with none queued
+	// the hold is over, though its regions weren't changed since (else a
+	// stale hold would stall them, and OAM, behind any later upload)
+	if (!queue_count)
+		gfx_hold_regs = 0;
 	u32 held = queue_count ? dirty & gfx_hold_regs & GFX_DIRTY_REGS : 0;
 	write_regs(dirty & ~held);
 	gfx_hold_regs &= ~(dirty & ~held);
@@ -445,6 +549,7 @@ void gfx_commit(void)
 		bank += run;
 	}
 	gfx_dirty_pal = 0;
+	commit_split();
 
 	// Sprites go with the planes they sit on: while DISPCNT or the scrolls
 	// wait for the queue, so does OAM

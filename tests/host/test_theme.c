@@ -243,11 +243,12 @@ void test_theme_select(void)
 	const struct ui_motions *m = &ui_theme_dark.motion;
 	CHECK_EQ(m->step.frames, 10);
 	CHECK_EQ(m->open.frames, 12);
-	CHECK_EQ(m->open_zoom_end + m->open_card.frames, m->open.frames);
-	CHECK_EQ(m->close.frames, 10);
+	CHECK_EQ(m->open_zoom.frames + m->open_card.frames, m->open.frames);
+	CHECK_EQ(m->close_card.frames + m->close_zoom.frames, 10);
+	CHECK(m->open_scale > 256 && m->open_scale < 512);  // 1.9: a 64 px object fits the double-size box
 	CHECK_EQ(m->popup_open.frames, 6);
 	CHECK_EQ(m->theme_wipe.frames, 16);
 	CHECK(m->step.ease < EASE_COUNT && m->open_card.ease < EASE_COUNT && m->popup_open.ease < EASE_COUNT &&
 	      m->popup_close.ease < EASE_COUNT && m->theme_wipe.ease < EASE_COUNT && m->open.ease < EASE_COUNT &&
-	      m->close.ease < EASE_COUNT);
+	      m->open_zoom.ease < EASE_COUNT && m->close_card.ease < EASE_COUNT && m->close_zoom.ease < EASE_COUNT);
 }

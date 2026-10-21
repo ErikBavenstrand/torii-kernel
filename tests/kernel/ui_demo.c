@@ -420,7 +420,7 @@ static int popup_screen_keys(struct ui_view *v, u16 keys)
 		return 1;
 	}
 	if (keys & INPUT_B) {
-		ui_theme_set(ui_theme() == &ui_theme_light ? &ui_theme_dark : &ui_theme_light);
+		ui_theme_switch(ui_theme() == &ui_theme_light ? &ui_theme_dark : &ui_theme_light);
 		return 1;
 	}
 	if (keys & (INPUT_LEFT | INPUT_RIGHT)) {

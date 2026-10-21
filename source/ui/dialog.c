@@ -399,6 +399,11 @@ static int show(struct shown *s, u32 use, const char *title, const char *text, u
 						  ? (kind == DIALOG_ERROR ? &notice_error_view : &notice_view)
 					  : kind == DIALOG_ERROR ? &error_view
 								 : &message_view;
+	// Over nothing (the boot's notice, the loading card, a launch's
+	// questions) it comes in from black rising, as a screen does (E9): a
+	// dialog's own fade needs a screen under it
+	if (!ui_depth() && !ui_transitioning())
+		ui_enter(UI_TR_CARD, 1);
 	s->view = ui_push(spec, 0);
 	if (!s->view) {
 		tlog_error("dialog: %s", ui_error());
@@ -503,10 +508,6 @@ void dialog_notice(const char *title, const char *text, u32 kind)
 		dlg.notice.view = 0;
 	} else {
 		dialog_open();
-		// Over nothing (the boot's "Loading...") it comes in from black as a
-		// screen does: a dialog's own fade needs a screen under it
-		if (!ui_depth())
-			ui_enter(UI_TR_LEAVE, 0);
 	}
 	if (!show(&dlg.notice, USE_NOTICE, title, text, kind)) {
 		dialog_close();

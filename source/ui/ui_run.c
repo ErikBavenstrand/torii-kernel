@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "ui_priv.h"
+#include "art.h"
 #include "keyq.h"
 #include "../engine/cycles.h"
 #include "../engine/frame.h"
@@ -31,7 +32,12 @@
 #define BLEND_ALPHA 0x0040
 #define BLEND_BRIGHTEN 0x0080
 #define BLEND_DARKEN 0x00C0
-#define BGCNT_MOSAIC 0x0040
+// Sprite attributes (the zoom's sprite)
+#define OBJ_AFFINE 0x0100
+#define OBJ_DOUBLE 0x0200
+#define OBJ_SIZE_64 0xC000
+#define OBJ_MATRIX(m) ((m) << 9)
+#define ZOOM_PRIO 3  // the zoom's sprite: under every plane (it shares the screen only with the title bar's)
 
 // Screen transitions (ui_leave)
 enum {
@@ -45,7 +51,20 @@ enum {
 	TR_ALPHA,    // the screen's planes over the backdrop
 	TR_DARKEN,   // BLDY towards black: under a dialog, and out of the engine
 };
-#define TR_MOSAIC_MAX 7  // mosaic blocks of 8 px when a screen has gone
+// The open and close zoom (UI_TR_OPEN, UI_TR_CLOSE): which, and its phase
+enum {
+	ZOOM_NONE,
+	ZOOM_OPEN,
+	ZOOM_CLOSE,
+};
+enum {
+	ZP_SPRITE,  // the sprite zooms (no page shows but the open's title bar)
+	ZP_PAGE,    // the page's card comes in (open) or goes (close)
+};
+// The theme wipe's split: the theme's BG run, then the UI's sprite bank
+#define WIPE_BG_WORDS (UI_THEME_RUN_COLOURS / 2)
+#define WIPE_OBJ_WORDS 8
+_Static_assert(WIPE_BG_WORDS + WIPE_OBJ_WORDS <= GFX_SPLIT_WORDS, "the wipe's colours fit the split's IWRAM");
 // A modal view fades in over the first third of its opening, then dims what
 // is under it (one blend at a time); closing runs it backwards
 #define OPEN_FADE (UI_OPEN / 3)
@@ -144,6 +163,29 @@ static struct {
 	u8 dimmed;
 	// A popup's, a confirmation's or the letter card's window, slide and dim
 	struct ui_overlay ov;
+	// The open and close zoom: the sprite ui_zoom_set gave, the zoom running
+	struct ui_zoom zoom_from;
+	u8 zoom_set;      // zoom_from is for the next ui_leave
+	u8 zoom;          // ZOOM_*
+	u8 zoom_phase;    // ZP_*
+	u8 zoom_started;  // the sprite's tiles have landed: its frames count
+	u8 zoom_ready;    // the screen it waits for is drawn and in VRAM
+	u16 zoom_frame;   // frames of the phase
+	u16 zoom_total;   // frames of the open's title bar, since it showed
+	u8 zoom_slide;    // and the frames its slide takes: what the open has left then
+	u32 zoom_ticket;  // the sprite's tile copy
+	u8 zoom_tiles_h, zoom_bank_h, zoom_matrix_h;  // its resources, taken in ui_init
+	u16 zoom_tiles;
+	u8 zoom_bank, zoom_matrix;
+	u8 zoom_eva;      // this frame's: the page's blend level (0-16)
+	s16 zoom_title;   // px its title bar is moved right (negative: left)
+	u8 zoom_eva0;     // where a close starts from (an open cut short)
+	s16 zoom_dy0, zoom_title0;
+	// The theme wipe
+	const struct ui_theme *wipe_from, *wipe_to;
+	u8 wipe;          // 0 off, 1 asked (its first frame loads the theme), 2 running
+	s8 wipe_dir;      // 1 down to wipe_to, -1 back up to wipe_from
+	u8 wipe_step;     // frames of it, 0 to its frames
 } ui EWRAM_BSS;
 
 void ui_wake(void)
@@ -462,12 +504,110 @@ static void load_palette(u32 banks)
 		fade_set(0, motion_value(ui.fade));
 }
 
-void ui_theme_set(const struct ui_theme *theme)
+static void theme_load(const struct ui_theme *theme)
 {
 	ui_theme_select(theme);
 	ui_list_cache_clear();  // rows may draw differently
 	ui.in.timing = &ui_theme()->input;
 	load_palette(UI_BANKS);
+	ui_wake();
+}
+
+// --- The theme wipe ----------------------------------------------------------
+// The palette holds the new theme, so lines from the top show it; a split
+// (gfx.h) at the edge copies the old colours back in, which every line under
+// it shows. Each VBlank the split's top copy puts the new ones back.
+
+// Ends a wipe on the theme it was going to
+static void wipe_end(void)
+{
+	if (!ui.wipe)
+		return;
+	const struct ui_theme *t = ui.wipe_dir < 0 ? ui.wipe_from : ui.wipe_to;
+	int loaded = ui.wipe == 2;
+	ui.wipe = 0;
+	gfx_set_split(NULL);
+	if (!loaded || t != ui_theme())
+		theme_load(t);
+}
+
+int ui_wiping(void)
+{
+	return ui.wipe != 0;
+}
+
+void ui_theme_set(const struct ui_theme *theme)
+{
+	ui.wipe = 0;  // ends at once on this theme
+	gfx_set_split(NULL);
+	theme_load(theme);
+}
+
+void ui_theme_switch(const struct ui_theme *theme)
+{
+	theme = theme ? theme : &ui_theme_dark;
+	if (ui.wipe) {
+		// The other way: the edge goes back up, or down again
+		if (theme == ui.wipe_to || theme == ui.wipe_from)
+			ui.wipe_dir = theme == ui.wipe_to ? 1 : -1;
+		else
+			ui_theme_set(theme);
+		ui_wake();
+		return;
+	}
+	if (theme == ui_theme())
+		return;
+	// Not under a screen change or a zoom, which own the split
+	if (!ui.active || !theme->motion.theme_wipe.frames || ui.tr_phase != TR_IDLE || ui.zoom) {
+		ui_theme_set(theme);
+		return;
+	}
+	// The old colours as the screen shows them, for under the edge
+	const u16 *pal = gfx_pal_faded_on ? gfx_pal_faded : gfx_pal_unfaded;
+	memcpy(gfx_split_data, pal + UI_THEME_RUN_FIRST, WIPE_BG_WORDS * 4);
+	memcpy(gfx_split_data + WIPE_BG_WORDS, pal + 256 + 16 * ui_obj_bank(), WIPE_OBJ_WORDS * 4);
+	ui.wipe_from = ui_theme();
+	ui.wipe_to = theme;
+	ui.wipe = 1;
+	ui.wipe_dir = 1;
+	ui.wipe_step = 0;
+	ui_wake();
+}
+
+// One frame of the wipe: the edge's line from its step, eased
+static void wipe_tick(u32 dt)
+{
+	if (!ui.wipe)
+		return;
+	const struct ui_move *w = &ui.wipe_to->motion.theme_wipe;
+	if (ui.wipe == 1) {
+		// The new theme and the split's first line go in the same commit
+		theme_load(ui.wipe_to);
+		ui.wipe = 2;
+		ui.wipe_step = 1;
+	} else {
+		s32 step = ui.wipe_step + ui.wipe_dir * (s32)dt;
+		ui.wipe_step = (u8)(step < 0 ? 0 : step > w->frames ? w->frames : step);
+	}
+	if ((ui.wipe_dir > 0 && ui.wipe_step >= w->frames) || (ui.wipe_dir < 0 && !ui.wipe_step)) {
+		wipe_end();
+		return;
+	}
+	u32 e = ease_at((Ease)w->ease, (u32)ui.wipe_step * 0x10000u / w->frames);
+	u32 line = (160u * e + EASE_ONE / 2) >> 15;
+	line = line < 1 ? 1 : line > 159 ? 159 : line;
+	u32 bank = ui_obj_bank();
+	const struct gfx_split split = {
+		(u8)line,
+		{
+			{0x05000000u + UI_THEME_RUN_FIRST * 2u, &gfx_pal_unfaded[UI_THEME_RUN_FIRST], 0, WIPE_BG_WORDS,
+			 0},
+			{0x05000200u + bank * 32u, &gfx_pal_unfaded[256 + 16 * bank], WIPE_BG_WORDS, WIPE_OBJ_WORDS, 0},
+		},
+	};
+	gfx_set_split(&split);
+	if (tlog_in_emulator())
+		frame_measure("ui-wipe");
 	ui_wake();
 }
 
@@ -704,8 +844,14 @@ static void tr_set_in(u32 kind, s32 dir)
 	ui.tr_in_y = (s16)(t->effects & UI_TR_SLIDE_Y ? dir * t->px : 0);
 }
 
+static int zoom_leave(u32 kind);
+static void zoom_end(void);
+
 void ui_enter(u32 kind, s32 dir)
 {
+	wipe_end();
+	zoom_end();
+	ui.zoom_set = 0;
 	tr_set_in(kind, dir);
 	ui.tr_mode = TR_DARKEN;  // from black
 	tr_gap();
@@ -722,18 +868,22 @@ void ui_leave(u32 kind, s32 dir)
 	TLOG_ASSERT(!ui_dispatching);
 	if (kind >= UI_TR_KINDS)
 		kind = UI_TR_FADE;
+	wipe_end();  // the screen goes in the theme the wipe was going to
+	if (kind == UI_TR_OPEN || kind == UI_TR_CLOSE) {
+		if (zoom_leave(kind))
+			return;
+		kind = UI_TR_FADE;  // no sprite to carry
+	}
+	ui.zoom_set = 0;
+	zoom_end();  // another change cuts a zoom short: the page goes from as it is
 	const struct ui_transition *t = &ui_theme()->transition[kind];
 	s32 from = ui.tr_phase == TR_IN ? ui.tr_level : 0;
 	u8 mode = kind == UI_TR_LEAVE ? TR_DARKEN : TR_ALPHA;
-	// A dialog or menu goes at once; the dim under it carries on into the
-	// fade, which is then a darken over everything
-	if (ui_depth() > 1 && (ui_top()->spec->flags & UI_VIEW_MODAL)) {
-		s32 y = modal_dim_now() * (UI_OPEN / 16);
-		from = y > from ? y : from;
+	// A dialog or menu goes to black with the screen (E10): the dim under it
+	// deepens until it meets the fade, then everything darkens together
+	// (regs_update); the caller pops it with the screen
+	if (ui_depth() > 1 && (ui_top()->spec->flags & UI_VIEW_MODAL))
 		mode = TR_DARKEN;
-		while (ui_depth() > 1 && (ui_top()->spec->flags & UI_VIEW_MODAL))
-			ui_pop();
-	}
 	if (ui.tr_phase != TR_IDLE && ui.tr_mode == TR_DARKEN)
 		mode = TR_DARKEN;
 	int gone = ui.tr_phase == TR_GAP || ui.tr_phase == TR_OUT;
@@ -778,11 +928,360 @@ static int all_shown(void)
 	return 1;
 }
 
+// --- The open and close zoom ---------------------------------------------------
+// The open (UI_TR_OPEN): home goes at once and the UI's own sprite, a copy of
+// its front object, zooms and fogs out over the paper (ZP_SPRITE) while the
+// page draws hidden; the page's title bar shows as soon as the page is
+// drawn, its heading sliding in (drawn further left each frame: its plane
+// holds the hint bar too, and a plane can't scroll a part of itself), alone
+// in WIN0, where no blend reaches it. Then the
+// card rises and fades in (ZP_PAGE): the page's planes alpha-blend over the
+// paper, the front one (text) over the card, so text fades with its card
+// (research, B19). The page takes keys from then on, as a screen coming in.
+// The close plays the page phase backwards first (ui_leave's frames), then
+// the sprite comes back out of the fog while home draws hidden; home shows,
+// sprites and all, in the frame the sprite goes. No two screens are ever
+// resident at once: the sprite's tiles, bank and matrix are the UI's own.
+
+void ui_zoom_set(const struct ui_zoom *zoom)
+{
+	ui.zoom_from = *zoom;
+	ui.zoom_set = 1;
+}
+
+// t at frame of frames, eased (Q15: 0 to EASE_ONE)
+static u32 ease_frames(u32 ease, u32 frame, u32 frames)
+{
+	if (!frames || frame >= frames)
+		return EASE_ONE;
+	return ease_at((Ease)ease, frame * 0x10000u / frames);
+}
+
+static u32 eased(const struct ui_move *m, u32 frame)
+{
+	return ease_frames(m->ease, frame, m->frames);
+}
+
+static s32 lerp(s32 a, s32 b, u32 e)
+{
+	return a + (((b - a) * (s32)e) >> 15);
+}
+
+// How far the sprite has zoomed and fogged (Q15): 0 at its place, EASE_ONE
+// gone into the paper
+static u32 zoom_amount(void)
+{
+	const struct ui_motions *m = &ui_theme()->motion;
+	if (ui.zoom_phase != ZP_SPRITE)
+		return EASE_ONE;
+	return ui.zoom == ZOOM_OPEN ? eased(&m->open_zoom, ui.zoom_frame)
+				    : EASE_ONE - eased(&m->close_zoom, ui.zoom_frame);
+}
+
+// The backdrop: the item's tint while the sprite is near its place, the
+// paper once it has gone
+static u16 zoom_backdrop(void)
+{
+	return ui_colour_mix(ui.zoom_from.sky, ui_theme()->surface->bg, zoom_amount() >> 7);
+}
+
+// The page's values this frame: blend level, rise, title bar
+static void zoom_values(void)
+{
+	const struct ui_motions *m = &ui_theme()->motion;
+	s32 slide = -(s32)m->open_slide, rise = m->open_rise;
+	if (ui.zoom == ZOOM_OPEN) {
+		u32 e = ui.zoom_phase == ZP_PAGE ? eased(&m->open_card, ui.zoom_frame) : 0;
+		ui.zoom_eva = (u8)((16u * e + EASE_ONE / 2) >> 15);
+		ui.tr_dy = (s16)lerp(rise, 0, e);
+		ui.zoom_title = (s16)lerp(slide, 0, ease_frames(m->open.ease, ui.zoom_total, ui.zoom_slide));
+	} else if (ui.zoom_phase == ZP_PAGE) {
+		u32 e = eased(&m->close_card, ui.zoom_frame);
+		ui.zoom_eva = (u8)lerp(ui.zoom_eva0, 0, e);
+		ui.tr_dy = (s16)lerp(ui.zoom_dy0, rise, e);
+		ui.zoom_title = (s16)lerp(ui.zoom_title0, slide, e);
+	} else {
+		ui.zoom_eva = 0;
+		ui.tr_dy = (s16)rise;
+		ui.zoom_title = (s16)slide;
+	}
+	ui.tr_dx = 0;
+	ui.tr_level = 0;
+}
+
+static void zoom_phase(u32 phase)
+{
+	ui.zoom_phase = (u8)phase;
+	ui.zoom_frame = 0;
+	ui.zoom_ready = 0;
+}
+
+static void zoom_end(void)
+{
+	if (!ui.zoom)
+		return;
+	ui.zoom = ZOOM_NONE;
+	gfx_pal_unfaded[0] = ui_theme()->surface->bg;  // the backdrop the theme gives
+	gfx_pal_mark(1);
+	ui.tr_phase = TR_IDLE;
+	ui.tr_level = ui.tr_dx = ui.tr_dy = 0;
+	ui.zoom_title = 0;
+	ui.zoom_eva = 16;
+	keyq_release(&ui.keys);  // keys held meanwhile: the screen's now
+	for (u32 d = 0; d < ui_depth(); d++)
+		if (!animated(ui_view_at(d)))
+			ui_view_at(d)->offset = 0;
+	ui_wake();
+}
+
+// Starts a zoom: 0 if it can't (no sprite set, no room, a dialog up)
+static int zoom_begin(u32 kind)
+{
+	if (!ui.zoom_set || ui.zoom_tiles_h == RES_NONE || ui.zoom_bank_h == RES_NONE || ui.zoom_matrix_h == RES_NONE ||
+	    (ui_depth() && (ui_top()->spec->flags & UI_VIEW_MODAL)) || gfx_queue_len() >= GFX_QUEUE_CAP)
+		return 0;
+	ui.zoom_set = 0;
+	// Where a close starts from: the open's card, if B cut it short
+	if (ui.zoom == ZOOM_OPEN && ui.zoom_phase == ZP_PAGE) {
+		ui.zoom_eva0 = ui.zoom_eva;
+		ui.zoom_dy0 = ui.tr_dy;
+		ui.zoom_title0 = ui.zoom_title;
+	} else {
+		ui.zoom_eva0 = 16;
+		ui.zoom_dy0 = ui.zoom_title0 = 0;
+	}
+	if (!gfx_queue_copy((void *)(uintptr_t)(0x06010000u + ui.zoom_tiles * 32u),
+			    art_sprite_tiles[ui.zoom_from.sprite % ART_SPRITE_COUNT], ART_SPRITE_TILES * 32))
+		return 0;
+	ui.zoom_ticket = gfx_queue_ticket();
+	ui.zoom_started = 0;
+	ui.zoom_total = 0;
+	ui.zoom = (u8)(kind == UI_TR_OPEN ? ZOOM_OPEN : ZOOM_CLOSE);
+	zoom_phase(kind == UI_TR_OPEN ? ZP_SPRITE : ZP_PAGE);
+	ui.tr_effects = 0;
+	ui.tr_mode = TR_ALPHA;
+	ui.tr_pushed = 0;
+	keyq_hold_queued(&ui.keys);  // keys the old screen hasn't had are the next one's
+	zoom_values();
+	ui_wake();
+	return 1;
+}
+
+static int zoom_leave(u32 kind)
+{
+	if (!zoom_begin(kind))
+		return 0;
+	if (kind == UI_TR_OPEN) {
+		// Home goes at once: one frame puts the sprite in its place (its
+		// tiles land in that frame's VBlank), the next one's VBlank shows it
+		// alone. Only then may the caller pop home and push the page, whose
+		// first tiles go straight into VRAM home showed
+		ui.tr_phase = TR_GAP;
+		ui_frame();
+		ui_frame();
+		return 1;
+	}
+	// The page goes first, frames run meanwhile (keys held for home)
+	ui.tr_phase = TR_OUT;
+	for (u32 guard = 0; ui.zoom == ZOOM_CLOSE && ui.zoom_phase == ZP_PAGE && guard < 4u * 60; guard++)
+		ui_frame();
+	if (ui.zoom == ZOOM_CLOSE && ui.zoom_phase == ZP_PAGE) {
+		zoom_phase(ZP_SPRITE);
+		ui.tr_phase = TR_GAP;
+	}
+	// One more, whose VBlank puts up the paper alone: the caller pops the page
+	ui_frame();
+	return 1;
+}
+
+// One frame of the zoom, in place of the transition's
+static void zoom_tick(u32 dt)
+{
+	const struct ui_motions *m = &ui_theme()->motion;
+	ui_wake();
+	// The sprite's frames count from the first that shows it (its frame 0
+	// at its place, as the screen it leaves showed it)
+	u32 step = ui.zoom_phase == ZP_SPRITE && !ui.zoom_started ? 0 : dt;
+	if (!ui.zoom_started && gfx_queue_done(ui.zoom_ticket))
+		ui.zoom_started = 1;
+	if (ui.zoom_ready && ui.zoom == ZOOM_OPEN)
+		ui.zoom_total = (u16)(ui.zoom_total + dt);
+	if (!ui.zoom_ready && ui.tr_pushed && all_shown() && !gfx_queue_len()) {
+		ui.zoom_ready = 1;
+		// The title bar slides in over what the open has left, half of it
+		// at least, so a page that took long to draw still slides
+		u32 gone = ui.zoom_frame, half = m->open.frames / 2u;
+		ui.zoom_slide = (u8)(m->open.frames - (gone < half ? gone : half));
+	}
+	ui.zoom_frame = (u16)(ui.zoom_frame + step);
+	if (ui.zoom == ZOOM_OPEN && ui.zoom_phase == ZP_SPRITE) {
+		// The card comes once the sprite has gone and the page is ready;
+		// the page takes keys from then on, as a screen coming in
+		if (ui.zoom_frame >= m->open_zoom.frames && ui.zoom_ready) {
+			u8 ready = ui.zoom_ready;
+			zoom_phase(ZP_PAGE);
+			ui.zoom_ready = ready;
+			ui.tr_phase = TR_IN;
+			keyq_release(&ui.keys);
+		}
+	} else if (ui.zoom == ZOOM_OPEN) {
+		if (ui.zoom_frame >= m->open_card.frames && ui.zoom_total >= ui.zoom_slide) {
+			zoom_end();
+			return;
+		}
+	} else if (ui.zoom_phase == ZP_PAGE) {
+		if (ui.zoom_frame >= m->close_card.frames) {
+			zoom_phase(ZP_SPRITE);
+			ui.tr_phase = TR_GAP;
+			ui.tr_pushed = 0;
+		}
+	} else if (ui.zoom_frame >= m->close_zoom.frames && ui.zoom_ready) {
+		// Home, drawn and uploaded: it shows in this frame, the sprite goes
+		zoom_end();
+		return;
+	}
+	if (ui.zoom_frame > 0x7FFF)
+		ui.zoom_frame = 0x7FFF;
+	zoom_values();
+	if (tlog_in_emulator())
+		frame_measure(ui.zoom == ZOOM_OPEN ? "ui-open" : "ui-close");
+}
+
+// The sprite, in this frame's OAM: double size, scaled about its anchor row,
+// its bank fogged toward the backdrop
+static void zoom_obj(void)
+{
+	if (!ui.zoom || ui.zoom_phase != ZP_SPRITE || !ui.zoom_started)
+		return;
+	const struct ui_zoom *z = &ui.zoom_from;
+	u32 e = zoom_amount(), fog = e >> 7;
+	if (fog >= 256)
+		return;  // gone into the paper
+	u32 scale = (u32)lerp(z->scale, ui_theme()->motion.open_scale, e);
+	scale = scale < 16 ? 16 : scale;
+	u32 pd0 = (0x10000u + z->scale / 2u) / (z->scale ? z->scale : 256u);
+	u32 pd = (0x10000u + scale / 2) / scale;
+	// The anchor's screen row stays: the texel row r shows (r - 32) * 256 / pd
+	// rows from the box's centre (the hardware samples (pd * dy >> 8) + 32)
+	s32 r = (s32)z->anchor - 32;
+	s32 cy = z->cy + r * 256 / (s32)pd0 - r * 256 / (s32)pd;
+	s32 x = z->cx - 64, y = cy - 64;
+	if (x <= -128 || x >= 240 || y <= -128 || y >= 160)
+		return;
+	u16 bd = zoom_backdrop(), c[16];
+	c[0] = 0;
+	for (u32 i = 1; i < 16; i++)
+		c[i] = ui_colour_mix(z->colours[i], bd, fog);
+	gfx_pal_load(16 + ui.zoom_bank, c, 16);
+	gfx_affine_set(ui.zoom_matrix, (s16)pd, 0, 0, (s16)pd);
+	gfx_oam_add((u16)(OBJ_AFFINE | OBJ_DOUBLE | (y & 0xFF)),
+		    (u16)(OBJ_SIZE_64 | OBJ_MATRIX(ui.zoom_matrix) | (x & 0x1FF)),
+		    (u16)(ui.zoom_tiles | ZOOM_PRIO << 10 | (u32)ui.zoom_bank << 12));
+}
+
+// 1 if node's sprite shows during the zoom: the title bar's once the page
+// shows, the rest only past half way into the card's fade (a sprite
+// doesn't take the planes' blend: it would show at full over a faint card)
+static int zoom_obj_shows(u8 node)
+{
+	int title = ui_node_spec(node)->kind == UI_TITLE;
+	if (ui.zoom_phase == ZP_SPRITE)
+		return title && ui.zoom == ZOOM_OPEN && ui.zoom_ready;
+	return title || ui.zoom_eva >= 8;
+}
+
+void ui_title_offset(const struct ui_view *v, s32 *shift, s32 *dy)
+{
+	int zoom = ui.zoom && !animated(v);
+	*shift = zoom ? ui.zoom_title : 0;
+	*dy = zoom ? 0 : v->offset;
+}
+
+// The registers while a zoom runs, over what regs_update set: the paper
+// round the sprite, then the page's title bar (its plane alone in WIN0),
+// then its card fading over the paper
+static void zoom_regs(void)
+{
+	u16 dispcnt = DISP_MODE0_OBJ1D | DISP_OBJ;
+	gfx_pal_unfaded[0] = zoom_backdrop();
+	gfx_pal_mark(1);
+	// The page's title bar, and its first list
+	u8 title = UI_NONE, list = UI_NONE;
+	u32 planes = 0;
+	for (u32 p = 0; p < UI_PLANES; p++) {
+		u32 d;
+		if (plane_owner(p, &d) && !((ui.hidden | ui.lists_hidden) >> p & 1))
+			planes |= 1u << p;
+	}
+	for (u32 d = 0; d < ui_depth(); d++) {
+		const struct ui_view *v = ui_view_at(d);
+		for (u32 i = 0; i < v->count; i++) {
+			u8 n = (u8)(v->first + i);
+			u32 kind = v->spec->nodes[i].kind;
+			if (kind == UI_TITLE && title == UI_NONE)
+				title = n;
+			if (kind == UI_LIST && list == UI_NONE && !(ui_node(n)->flags & UI_N_HIDDEN))
+				list = n;
+		}
+	}
+	int page = ui.zoom_phase == ZP_PAGE || (ui.zoom == ZOOM_OPEN && ui.zoom_ready);
+	ui.gap_regs = (u8)!page;
+	if (!page || title == UI_NONE) {
+		gfx_set_dispcnt(page ? (u16)(dispcnt | planes << 8) : dispcnt);
+		gfx_set_blend(0, 0, 0);
+		return;
+	}
+	u32 tp = ui_node_spec(title)->plane, band = ui_theme()->look.title_h;
+	if (ui.zoom_phase == ZP_SPRITE)
+		planes &= 1u << tp;
+	dispcnt |= (u16)(planes << 8 | DISP_WIN0);
+	// WIN0: the title bar's band, its plane and sprites only, unblended
+	gfx_set_win(0, 240);
+	gfx_set_win(2, (u16)band);
+	u32 in0 = LAYER_BG(tp) | LAYER_OBJ, out = LAYER_OBJ, in1 = 0;
+	if (ui.zoom_phase == ZP_PAGE) {
+		out = planes | LAYER_OBJ | WIN_EFFECTS;
+		if (list != UI_NONE) {
+			// The list clips with WIN1 meanwhile
+			const struct ui_node *n = ui_node(list);
+			u32 lp = ui_node_spec(list)->plane;
+			s32 y0 = n->y + ui_view_at(n->view)->offset, y1 = y0 + n->h;
+			y0 = y0 < 0 ? 0 : y0 > 160 ? 160 : y0;
+			y1 = y1 < 0 ? 0 : y1 > 160 ? 160 : y1;
+			gfx_set_win(1, (u16)(n->x << 8 | (n->x + n->w)));
+			gfx_set_win(3, (u16)(y0 << 8 | y1));
+			in1 = out;
+			out &= ~LAYER_BG(lp);
+			dispcnt |= DISP_WIN1;
+		}
+		// The page's planes over the paper, its front one (text) over the
+		// planes behind it too
+		u32 front = planes & -planes;
+		u32 eva = ui.zoom_eva > 16 ? 16 : ui.zoom_eva;
+		gfx_set_blend((u16)(BLEND_ALPHA | planes | (((planes & ~front) | LAYER_BD) << 8)),
+			      (u16)(eva | (16 - eva) << 8), 0);
+	} else {
+		gfx_set_blend(0, 0, 0);
+	}
+	gfx_set_win(4, (u16)(in0 | in1 << 8));
+	gfx_set_win(5, (u16)out);
+	gfx_set_dispcnt(dispcnt);
+	// The title bar's plane (and the hint bar on it) never rises: its
+	// heading slides by being drawn further left (ui_title_offset). It goes
+	// in front of the card, which rises over the hint bar: a card pixel
+	// there would blend with the hints under it as its second target, and
+	// show them whole while the card is faint
+	gfx_set_scroll(tp, 0, 0);
+	gfx_set_bgcnt(tp, (u16)(gfx_regs.bgcnt[tp] & ~3u));
+}
+
 // One frame of the transition, before the widgets' update (lists read their
 // view's offset there)
 static void tr_tick(u32 dt)
 {
-	if (ui.tr_phase == TR_OUT) {
+	if (ui.zoom) {
+		zoom_tick(dt);
+	} else if (ui.tr_phase == TR_OUT) {
 		ui.tr_step = (u8)(ui.tr_step + dt > ui.tr_frames ? ui.tr_frames : ui.tr_step + dt);
 		tr_apply();
 		if (ui.tr_step >= ui.tr_frames)
@@ -957,7 +1456,7 @@ static void reveal_drop(void)
 
 static void regs_update(void)
 {
-	if (ui.tr_phase == TR_GAP && ui.tr_pushed && all_shown())
+	if (ui.tr_phase == TR_GAP && ui.tr_pushed && all_shown() && !ui.zoom)
 		tr_begin_in();
 	u32 top = ui_depth();
 	u16 dispcnt = DISP_MODE0_OBJ1D | DISP_OBJ;
@@ -973,7 +1472,6 @@ static void regs_update(void)
 	ui.gap_regs = (u8)gone;
 	if (gone)
 		dispcnt &= (u16)~DISP_OBJ;  // the screen's sprites go with it
-	u16 mosaic = (u16)(tr && (ui.tr_effects & UI_TR_MOSAIC) ? BGCNT_MOSAIC : 0);
 	for (u32 p = 0; p < UI_PLANES; p++) {
 		u32 d;
 		struct ui_view *v = plane_owner(p, &d);
@@ -982,7 +1480,7 @@ static void regs_update(void)
 		u32 prio = ui.level[d] + (ui.obj_prio[d] != PRIO_NONE && !(v->front >> p & 1));
 		if (prio > 3)
 			prio = 3;
-		gfx_set_bgcnt(p, (u16)(prio | ui_plane_cb(p) << 2 | (u32)res_bg_screenblock(v->maps[p]) << 8 | mosaic |
+		gfx_set_bgcnt(p, (u16)(prio | ui_plane_cb(p) << 2 | (u32)res_bg_screenblock(v->maps[p]) << 8 |
 				       (v->tall >> p & 1 ? BGCNT_32X64 : 0)));
 		if (!((ui.hidden | ui.lists_hidden) >> p & 1) && !gone)
 			dispcnt |= (u16)DISP_BG(p);
@@ -1075,12 +1573,6 @@ static void regs_update(void)
 		ui.pop_wait = 2;
 		ui.pop_frame = frame_count();
 	}
-	if (tr && (ui.tr_effects & UI_TR_MOSAIC)) {
-		u32 m = (u32)ui.tr_level * TR_MOSAIC_MAX / UI_OPEN;
-		gfx_set_mosaic((u16)(m | m << 4));
-	} else if (gfx_regs.mosaic) {
-		gfx_set_mosaic(0);
-	}
 	// Blending, one effect at a time: DIM darkens everything; a transition
 	// fades the screen; a dialog fades in, then darkens what is under it
 	s32 modal_y = modal_dim_now();
@@ -1097,11 +1589,15 @@ static void regs_update(void)
 			gfx_set_blend((u16)(BLEND_ALPHA | shown | LAYER_OBJ | LAYER_BD << 8),
 				      (u16)(eva | (16 - eva) << 8), 0);
 		} else {
-			// Under a dialog its planes stay as they are and the dim carries on
+			// Everything darkens with the fade, a dialog too (E10, E11),
+			// but while the fade is lighter than the dim under the dialog,
+			// the dim stays and the dialog shows as it is
 			s32 y = (ui.tr_level * 16 + UI_OPEN / 2) / UI_OPEN;
-			if (modal && modal_y > y)
+			u32 targets = LAYER_ALL | LAYER_BD;
+			if (modal && y <= modal_y) {
 				y = modal_y;
-			u32 targets = modal ? lower | LAYER_BD : LAYER_ALL | LAYER_BD;
+				targets = lower | LAYER_BD;
+			}
 			gfx_set_blend((u16)(BLEND_DARKEN | targets), 0, (u16)y);
 		}
 	} else if (tr && (ui.tr_effects & UI_TR_FADES) && gone && ui.tr_mode == TR_DARKEN) {
@@ -1135,6 +1631,8 @@ static void regs_update(void)
 	} else {
 		gfx_set_blend(0, 0, 0);
 	}
+	if (ui.zoom)
+		zoom_regs();
 }
 
 // --- Sprites -------------------------------------------------------------------
@@ -1204,7 +1702,7 @@ static void obj_levels(void)
 int ui_obj_add(u8 node, u16 attr0, u16 attr1, u16 attr2)
 {
 	u32 d = ui_node(node)->view, prio = d < UI_VIEW_CAP ? ui.obj_prio[d] : PRIO_NONE;
-	if (prio == PRIO_NONE)
+	if (prio == PRIO_NONE || (ui.zoom && !zoom_obj_shows(node)))
 		return 0;
 	return gfx_oam_add(attr0, attr1, (u16)((attr2 & ~0x0C00u) | prio << 10)) != GFX_OAM_NONE;
 }
@@ -1246,6 +1744,17 @@ void ui_init(const struct ui_theme *theme)
 	ui.stage_map = res_bg_map(1, 0);
 	TLOG_ASSERT(ui.stage_map != RES_NONE);
 	ui.stage = res_bg_addr(ui.stage_map);
+	// The zoom's sprite: the session's, as it outlives the screens it joins
+	// (without room, opening and closing are fades)
+	ui.zoom_tiles_h = res_obj_tiles(ART_SPRITE_TILES, 0, 0);
+	ui.zoom_bank_h = res_palette(RES_OBJ_PAL, 1, 0);
+	ui.zoom_matrix_h = res_affine(0);
+	if (ui.zoom_tiles_h != RES_NONE)
+		ui.zoom_tiles = res_start(RES_OBJ_VRAM, ui.zoom_tiles_h);
+	if (ui.zoom_bank_h != RES_NONE)
+		ui.zoom_bank = (u8)res_start(RES_OBJ_PAL, ui.zoom_bank_h);
+	if (ui.zoom_matrix_h != RES_NONE)
+		ui.zoom_matrix = (u8)res_start(RES_AFFINE, ui.zoom_matrix_h);
 	ui_dim_set_minutes(ui_dim_setting());
 	load_palette(UI_BANKS);
 	gfx_set_dispcnt(DISP_MODE0_OBJ1D | DISP_OBJ);
@@ -1265,6 +1774,14 @@ void ui_shutdown(void)
 		ui_core_pop();
 	motion_free(ui.fade);
 	motion_free(ui.dim_motion);
+	ui.zoom = ZOOM_NONE;
+	ui.zoom_set = 0;
+	ui.wipe = 0;
+	gfx_split_off();  // its interrupt never outlives the session (a game may follow)
+	res_release(RES_AFFINE, ui.zoom_matrix_h);
+	res_release(RES_OBJ_PAL, ui.zoom_bank_h);
+	res_release(RES_OBJ_VRAM, ui.zoom_tiles_h);
+	ui.zoom_tiles_h = ui.zoom_bank_h = ui.zoom_matrix_h = RES_NONE;
 	ui.tr_phase = TR_IDLE;
 	keyq_clear(&ui.keys);
 	ui.capture = 0;
@@ -1403,10 +1920,12 @@ static void draw_all(void)
 			// its lists have set their scroll from the offset already)
 			if (animated(v) && v->opening > 0)
 				v->open_blend = step_towards(v->open_blend, 1, 1, ui_theme()->dialog_in);
-			// A transition's blend goes with them: its first step shows with the screen
-			gfx_hold_for_queue(
-				GFX_DIRTY_DISPCNT | GFX_DIRTY_BGCNT | GFX_DIRTY_BGOFS |
-				(ui.tr_phase != TR_IDLE || animated(v) ? GFX_DIRTY_BLEND | GFX_DIRTY_MOSAIC : 0));
+			// A transition's blend goes with them: its first step shows with the
+			// screen. A zoom shows it only once its uploads are done (zoom_ready),
+			// and its sprite moves on meanwhile
+			if (!ui.zoom)
+				gfx_hold_for_queue(GFX_DIRTY_DISPCNT | GFX_DIRTY_BGCNT | GFX_DIRTY_BGOFS |
+						   (ui.tr_phase != TR_IDLE || animated(v) ? GFX_DIRTY_BLEND : 0));
 		}
 	}
 }
@@ -1490,12 +2009,15 @@ u32 ui_frame(void)
 		frame_wake();
 	modal_tick(dt);
 	tr_tick(dt);
-	// Their frames are measured, in mGBA only (the tests' figures)
-	if ((ui.tr_phase != TR_IDLE || (ui_top() && ui_top()->opening)) && tlog_in_emulator())
+	wipe_tick(dt);
+	// Their frames are measured, in mGBA only (the tests' figures); a zoom's
+	// and a wipe's by their own names
+	if (((ui.tr_phase != TR_IDLE && !ui.zoom) || (ui_top() && ui_top()->opening)) && tlog_in_emulator())
 		frame_measure(ui.tr_phase != TR_IDLE ? "ui-transition" : "ui-dialog-motion");
 	obj_levels();
 	gfx_oam_begin();
 	update_all(dt);
+	zoom_obj();
 	gfx_oam_end();
 	ui_apply_pops();  // asked for by handlers of events in the update (autoscroll)
 	frame_split();  // motion and update
@@ -1505,7 +2027,10 @@ u32 ui_frame(void)
 	if (top && !(top->flags & UI_V_SHOWN))
 		frame_wake();
 	if (!frame_idle()) {
-		jobs_run(JOB_DEADLINE);
+		// None under the wipe: a job's card read holds DMA3 for lines,
+		// which would hold the split's interrupt back (a jumping edge)
+		if (!ui.wipe)
+			jobs_run(JOB_DEADLINE);
 		frame_split();  // jobs
 		draw_all();
 		frame_split();  // draw

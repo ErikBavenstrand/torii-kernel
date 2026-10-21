@@ -1,9 +1,9 @@
 # A slow boot (source/ezkernelnew.c, Boot_notice_check): LOGGING on and a
 # card without a log, whose 64 KB file takes about 80 frames to make. The
-# "Loading..." notice comes up 20 frames after the card mounted, fading in
-# from black, then fades out before home comes in, every frame of both
-# fades hashed (v0.3.2: it cut in, after a frame of the background, and cut
-# out). A fast boot shows none (golden boot).
+# "Loading..." notice comes up 20 frames after the card mounted, coming in
+# from black as it rises (B19, E9), then fades out before home comes in,
+# every frame of both fades hashed (v0.3.2: it cut in, after a frame of the
+# background, and cut out). A fast boot shows none (golden boot).
 #! settings 26=2
 -w "boot: still busy 20 frames after mounting"
 -H @0:@12

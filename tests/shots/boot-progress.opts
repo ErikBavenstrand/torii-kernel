@@ -1,7 +1,11 @@
 # The launch's loading card (source/ui/dialog.h): CLEAN BOOT of Hello.gba
 # through the menu's test hook (tests/nav.sh), the game's name as its
-# title, as it comes up.
+# title. Home fades to black, then the card comes in from black rising, as
+# a dialog in a session of its own does (B19, E9): every frame hashed and
+# watched for tears, then the card as it stands.
 -w "nav: home ready"
 -P "@8:nav_test_path:/Hello.gba" -p @8:nav_test_action:0x7E000001
+-H @8:@36
+-T @8:@36
 -w "screen ready: progress"
 -s @1:screen.png

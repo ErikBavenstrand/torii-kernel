@@ -754,6 +754,52 @@ void carousel_colours(u8 node)
 	ui_wake();
 }
 
+// The zoom's sprite for object o of entry e, drawn moved by (dx, dy) over a
+// backdrop of sky, as car_update draws it
+static void zoom_of(const struct carousel_entry *e, const struct ring_object *o, u16 sky, s32 dx, s32 dy,
+		    struct ui_zoom *z)
+{
+	u32 sp = e->sprite % ART_SPRITE_COUNT, pd = ring_matrix(o->scale);
+	s32 feet = o->feet - (((s32)look.lift * o->scale + 128) >> 8);
+	z->sprite = (u8)sp;
+	z->cx = (s16)(o->x + dx);
+	z->cy = (s16)(feet - ring_foot_dy(pd) + dy);  // the box's top is ART_SPRITE_SIZE / 2 above
+	z->scale = o->scale;
+	z->anchor = (u16)(ART_SPRITE_FOOT + 1 - art_sprites[sp].height / 2);
+	z->sky = sky;
+	art_sprite_colours(sp, 0, z->colours);
+	for (u32 i = 1; i < 16; i++)
+		z->colours[i] = mix(z->colours[i], sky, o->fog);
+}
+
+int carousel_zoom(u8 node, struct ui_zoom *z)
+{
+	if (car.node != node || !car.count)
+		return 0;
+	u32 facing = carousel_facing(node);
+	struct ring_object obj[RING_OBJECTS];
+	u32 count = ring_objects(&look.ring, car.count, car.m.pos, obj);
+	for (u32 j = 0; j < count; j++) {
+		u32 e = ring_item(obj[j].k, car.count), s = slot_of(e);
+		// The facing item, as it shows now (a turn still going: from there)
+		if (e != facing || s == SLOT_NONE || !gfx_queue_done(car.slot_ticket[s]))
+			continue;
+		const struct ui_view *v = ui_node_view(node);
+		zoom_of(&car.items[e], &obj[j], sky_now(), ui_view_dx(v), v->offset, z);
+		return 1;
+	}
+	return 0;
+}
+
+void carousel_zoom_rest(const struct carousel_entry *entry, struct ui_zoom *z)
+{
+	struct ring_object front[RING_OBJECTS];
+	ring_objects(&look.ring, 1, 0, front);  // one item at rest: the front, fog 0
+	const struct ui_theme *t = theme();
+	u16 base = t->accent[entry->accent < PAL_ITEMS ? entry->accent : 0].base;
+	zoom_of(entry, &front[0], mix(t->surface->bg, base, t->backdrop_mix), 0, 0, z);
+}
+
 void carousel_refresh(u8 node)
 {
 	if (car.node != node)

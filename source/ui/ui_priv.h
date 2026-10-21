@@ -111,6 +111,11 @@ void ui_view_uses_objs(struct ui_view *v, u32 front);
 // px the view's planes are moved sideways (a transition's slide): its
 // sprites move with them.
 s32 ui_view_dx(const struct ui_view *v);
+// A title bar's own motion during an open or close zoom: *shift px its
+// heading and icon are moved right (negative: left; the heading is drawn
+// there, the plane stays), and *dy px its plane is below its place: 0 then,
+// as it doesn't rise with the card, else the view's offset.
+void ui_title_offset(const struct ui_view *v, s32 *shift, s32 *dy);
 // 1 while plane fades in or out for a page change (ui_plane_reveal,
 // ui_plane_fade_out): sprites drawn with it fade too as semi-transparent
 // ones (the blend's first target is the plane alone).

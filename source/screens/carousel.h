@@ -49,4 +49,13 @@ void carousel_refresh(u8 node);
 // dots' colours and the backdrop are worked out again in the next update
 void carousel_colours(u8 node);
 
+// The open's zoom (ui_zoom_set, UI_TR_OPEN): the object of the item the
+// carousel faces, as it shows now. 0 if it doesn't show (its tiles not
+// loaded yet): the open is a plain fade then.
+struct ui_zoom;
+int carousel_zoom(u8 node, struct ui_zoom *zoom);
+// The close's (UI_TR_CLOSE): entry's object as it will show at the front at
+// rest, before home is up
+void carousel_zoom_rest(const struct carousel_entry *entry, struct ui_zoom *zoom);
+
 #endif

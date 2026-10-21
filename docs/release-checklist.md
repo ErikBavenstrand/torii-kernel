@@ -61,6 +61,8 @@ on, NES with no NES launch) as "unconfirmed" in its summary.
 | Deleting a NOR game | in the NOR list, delete the latest game. Power off and on: the cart must start the kernel, the game gone from the list |
 | Rumble in a game | Drill Dozer, BOOT WITH ADDON or CLEAN BOOT: does the cart rumble? |
 | The loading bar during the cart's copy | CLEAN BOOT of a big GBA game (16 or 32 MB): the bar moves steadily through "Loading the game" without long stalls or a big jump at the end. See below |
+| Opening and going back | A on a home item: its object zooms and fades into the paper, the title bar slides in, the card rises; B plays it backwards. No stutter, no flash of the old screen, the object's first and last frames where the carousel shows it |
+| The theme wipe | Settings, Theme, flip it: the new theme comes down from the top behind one clean, straight edge. Look for a ragged or flickering line at the edge (the palette copy running late on the cart, which the emulator can't show) and for the selection pill switching with its row |
 | The EEPROM probe | `eeprom.gba`, CLEAN BOOT with SAVE TYPE EEPROM 512: A (6-bit addresses), then again with B (14-bit). Then the same two with EEPROM 8K. See below |
 
 **The EEPROM probe** writes blocks 1–4 four different ways, reads them back

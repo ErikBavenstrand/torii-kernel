@@ -7,7 +7,8 @@
 //
 // Keys: on home LEFT/RIGHT turn the carousel and A opens the item it
 // faces; on a page B goes back home, facing its item.
-// Opening and going back are plain fades until B19.
+// Opening zooms home's item into its page and B plays it backwards (B19,
+// ui.h's UI_TR_OPEN and UI_TR_CLOSE).
 //
 // A page is a struct nav_page: it pushes its views when the shell opens it
 // and reads its keys in its own handlers. Its handlers ask for what can't

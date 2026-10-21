@@ -1,6 +1,8 @@
 #! kernel test
 # The popups (B11) on the UI demo's ui-popup screen (tests/kernel/ui_demo.c),
-# in light (B switches at once), then in dark: the game popup at the top
+# in light (B's theme wipe, B19: the light theme comes down from the top
+# behind a hard edge, the list's pill sprite with it; every frame hashed and
+# watched for tears), then in dark: the game popup at the top
 # row and in the middle (clamped above the hint bar, as mockup #9), its
 # Favourite toggling in place, Delete asking over it (Cancel, then the
 # action chosen), a short popup at the bottom row whose Format all asks on
@@ -15,7 +17,9 @@
 -k @10:SELECT -k @14:-
 -w "screen ready: ui-popup"
 -k @10:B -k @14:-
--s @24:list-light.png
+-H @10:@30
+-T @10:@30
+-s @28:list-light.png
 # The game popup at the top row: it opens from the notch, and B closes it
 -k @30:START -k @34:-
 -H @30:@44
