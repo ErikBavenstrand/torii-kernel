@@ -3,8 +3,8 @@
 // user's PC from libretro-database's dats (tools/names_db.py), and the CRC
 // cache, /torii/crc.txt, which says which file has which CRC. A game's CRC
 // name is the database's entry for its CRC, never its GBA game code, which
-// a romhack shares with its base game (C4): a game the dats don't list
-// keeps its file name. gamename_display cleans the name like a file name.
+// a romhack shares with its base game (C4), so neither file keeps codes
+// since v0.4.2: a game the dats don't list keeps its file name. gamename_display cleans the name like a file name.
 //
 // The first part of this file is hardware-free, and tests/host builds it:
 // the database's format and lookups, and the cache's table and lines.
@@ -20,22 +20,22 @@
 //	        crc_count[c] entries (struct namesdb_entry: the whole file's
 //	        CRC32, NES with its iNES header as the dats count it, and the
 //	        name's pool offset), sorted by CRC
-//	codes   code_count entries: a GBA game code (header 0xAC, as a
-//	        little-endian u32 of its four characters) and the name of the
-//	        first game the dat lists with it, sorted by code. Unused since
-//	        C4 (a romhack has its base game's code); names_db.py writes none
+//	codes   version 1 only: old_codes entries of 8 bytes, GBA game codes
+//	        nothing reads (v0.4.1 wrote none); skipped
 //	pool    the full No-Intro names, UTF-8, NUL-ended, padded with NULs to 4
 //
 // /torii/crc.txt, a safe file (safefile.h) of one line per file:
 //
-//	CRC32<TAB>CODE<TAB>SIZE<TAB>DATE<TAB>PATH
+//	CRC32<TAB>SIZE<TAB>DATE<TAB>PATH
 //
-// CRC32 as 8 hex digits, or "-" while unknown; CODE the GBA game code (4
-// characters 0-9 A-Z) or "-"; SIZE in bytes; DATE FatFs's fdate << 16 |
+// CRC32 as 8 hex digits, or "-" while unknown; SIZE in bytes; DATE FatFs's fdate << 16 |
 // ftime as 8 hex digits, or "-" where it isn't known (written on a PC: the
 // next walk takes the file's); PATH from the card's root. '#' lines are
 // comments. An entry counts only while its file keeps that size (and date,
-// once known): the walk drops one that doesn't.
+// once known): the walk drops one that doesn't. v0.4.1 wrote a GBA game code
+// after the CRC (CRC32, CODE, SIZE, DATE, PATH): such lines still read, and
+// their code is skipped (the fourth field starts with '/' only in the new
+// form).
 #ifndef TORII_NAMESDB_H
 #define TORII_NAMESDB_H
 
@@ -43,7 +43,7 @@
 
 #define NAMESDB_FILE "/torii/names.db"
 #define NAMESDB_MAGIC 0x42444E54u  // "TNDB"
-#define NAMESDB_VERSION 1
+#define NAMESDB_VERSION 2  // 1 (v0.4.1, with a code table) still reads
 #define NAMESDB_CONSOLES 4  // GBA, GBC, GB, NES: library.h's LIB_* order
 #define NAMESDB_VERSION_LEN 16
 
@@ -55,14 +55,14 @@ struct namesdb_header {
 	u32 body_crc;  // CRC32 of the file after the header
 	char dat_version[NAMESDB_VERSION_LEN];  // NUL-padded, at most 15 characters
 	u32 crc_count[NAMESDB_CONSOLES];
-	u32 code_count;
+	u32 old_codes;  // version 1's code table's entries, skipped; 0 from 2
 	u32 pool_bytes;  // a multiple of 4, ending in NUL
 	u32 reserved;  // 0
 	u32 header_crc;  // CRC32 of the 60 bytes before it
 };
 
 struct namesdb_entry {
-	u32 key;  // the CRC32, or the game code
+	u32 key;  // the CRC32
 	u32 name;  // pool offset
 };
 
@@ -79,9 +79,6 @@ int namesdb_header_ok(const struct namesdb_header *h, u32 max);
 int namesdb_body_ok(const u8 *db);
 // The full name of the game whose CRC32 is crc in console's table, or NULL.
 const char *namesdb_by_crc(const u8 *db, u32 console, u32 crc);
-// A GBA game code from the four header bytes at 0xAC, as the database keys
-// it; 0 unless they are 0-9 or A-Z.
-u32 namesdb_code(const u8 *bytes);
 
 // --- The CRC cache ------------------------------------------------------------
 //
@@ -96,7 +93,7 @@ u32 namesdb_code(const u8 *bytes);
 #define NAMES_PATH_MAX 511  // bytes, without the NUL
 #define NAMES_CACHE_OFF_SLOTS 0x0u
 #define NAMES_CACHE_OFF_RECS (NAMES_CACHE_OFF_SLOTS + NAMES_CACHE_SLOTS * 2u)
-#define NAMES_CACHE_OFF_POOL (NAMES_CACHE_OFF_RECS + NAMES_CACHE_MAX * 24u)
+#define NAMES_CACHE_OFF_POOL (NAMES_CACHE_OFF_RECS + NAMES_CACHE_MAX * 20u)
 #define NAMES_CACHE_POOL_BYTES 0xA0000u  // 640 KB of paths: 4,608 of 142 bytes
 #define NAMES_CACHE_BYTES (NAMES_CACHE_OFF_POOL + NAMES_CACHE_POOL_BYTES)
 
@@ -110,10 +107,9 @@ struct names_rec {
 	u32 size;
 	u32 date;  // fdate << 16 | ftime, with NAMES_DATE
 	u32 crc;  // with NAMES_CRC
-	u32 code;  // namesdb_code's, 0 for none
 	u32 path;  // bits 0-23: pool offset; 24-31: flags
 };
-_Static_assert(sizeof(struct names_rec) == 24, "a cache record is 24 bytes");
+_Static_assert(sizeof(struct names_rec) == 20, "a cache record is 20 bytes");
 
 typedef void (*names_put_fn)(void *dst, const void *src, u32 bytes);
 
@@ -153,7 +149,7 @@ u32 names_cache_find(const struct names_cache *c, const char *path);
 // flags NAMES_CRC and NAMES_DATE say which of crc and date hold. Returns
 // its number, or NAMES_CACHE_NONE when the table or pool is full or path
 // is empty, longer than NAMES_PATH_MAX or not from the root.
-u32 names_cache_put(struct names_cache *c, const char *path, u32 size, u32 date, u32 crc, u32 code, u32 flags);
+u32 names_cache_put(struct names_cache *c, const char *path, u32 size, u32 date, u32 crc, u32 flags);
 // Marks a record dead.
 void names_cache_drop(struct names_cache *c, u32 n);
 // Gives a record a date (the walk's, for one written on a PC).
@@ -171,7 +167,7 @@ int names_cache_fits(const struct names_rec *r, u32 size, u32 date);
 // with its fields, 0 for a comment, a blank line or one that doesn't read.
 struct names_line {
 	const char *path;
-	u32 size, date, crc, code, flags;
+	u32 size, date, crc, flags;
 };
 int names_parse_line(char *line, struct names_line *out);
 // Writes record n's line, with its newline, into buf (size bytes); returns

@@ -103,7 +103,7 @@ cart=$carts/pc
 fixture_card "$cart"
 grep -q "8 games, 8 CRCs computed" "$cart/tool.log" || fail "names_db.py: $(cat "$cart/tool.log")"
 boot "$cart" "$cart/1.log" -f 900 -u "names: wrote /torii/crc.txt"
-logged "$cart/1.log" "names: /torii/names.db from 2026.01.02: GBA 5, GBC 2, GB 1, NES 1, 0 codes"
+logged "$cart/1.log" "names: /torii/names.db v2 from 2026.01.02: GBA 5, GBC 2, GB 1, NES 1,"
 logged "$cart/1.log" "names: 8 files' CRCs from /torii/crc.txt"
 logged "$cart/1.log" "library: new index: 8 games (GBA 4, GBC 1, GB 2, NES 1)"
 no_errors "$cart/1.log"
@@ -117,7 +117,7 @@ want="/GBA/Wars.gba
 $(gba_order "$cart")"
 # The walk gave every record its file's date, and crc.txt was written again
 [ "$(crc_lines "$cart" | wc -l)" = 8 ] || fail "crc.txt holds $(crc_lines "$cart")"
-if crc_lines "$cart" | awk -F'\t' '$4 == "-"' | grep -q .; then
+if crc_lines "$cart" | awk -F'\t' '$3 == "-"' | grep -q .; then
   fail "records without a date: $(crc_lines "$cart")"
 fi
 echo "PASS: names-update's names.db and crc.txt name the games by CRC, not a romhack by its game code, and the index sorts by them"
@@ -159,14 +159,15 @@ logged "$cart/1.log" "names: identified 2 of 2 games"
 logged "$cart/1.log" "names: wrote /torii/crc.txt"
 logged "$cart/1.log" "library: the card changed: building a new index"
 logged "$cart/1.log" "library: wrote /torii/library.bak (generation 2)"
-[ "$(crc_lines "$cart" | cut -f5 | sort | tr '\n' ' ')" = "/GBA/Wars.gba /NES/Famicom.nes " ] ||
+[ "$(crc_lines "$cart" | cut -f4 | sort | tr '\n' ' ')" = "/GBA/Wars.gba /NES/Famicom.nes " ] ||
   fail "crc.txt holds $(crc_lines "$cart")"
 [ "$(gba_order "$cart" | head -1)" = /GBA/Wars.gba ] || fail "Wars isn't first: $(gba_order "$cart")"
 no_errors "$cart/1.log"
 echo "PASS: the games on Recent get their CRCs and names after the boot"
 
 # A large crc.txt (3,000 records of 100-byte paths, as No-Intro names in
-# console folders make) loads whole, in steps, beside a loaded index
+# console folders make) loads whole, in steps, beside a loaded index; its
+# records are in v0.4.1's form, with a code column, which still reads
 cart=$carts/large
 fixture_card "$cart"
 boot "$cart" "$cart/1.log" -f 900 -u "names: wrote /torii/crc.txt"
