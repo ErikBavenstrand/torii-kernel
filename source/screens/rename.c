@@ -2,8 +2,8 @@
 //
 // Two canvases on plane 1 draw it, over the keyboard's card on plane 2: the
 // field (its own card, the name, the caret, the counter and the L and R
-// chips) and the keys. Each repaints whole when it changes, into the tile
-// set the screen doesn't show (ui.h, UI_CANVAS). Plane 0 stays free for the
+// chips) and the keys. Each repaints what changed into the tile set the
+// screen doesn't show (ui.h, UI_CANVAS). Plane 0 stays free for the
 // "Discard changes?" confirmation. Keys repeat on the keyboard's own
 // schedule (research-v04-ux.md, the held-key curve), counted in the loop
 // from the frames each key has been held.
@@ -89,14 +89,21 @@ static const struct rename_look {
 #define KEYS_H 104
 static const struct ui_card_config keys_card = {4, 3, 4, 3, 0};  // body 4..236 x 43..141
 
-// Pixel glyphs the fonts lack: '#' inked
-static const char *const glyph_shift[] = {"...#...", "..#.#..", ".#...#.", "##...##", ".#...#.", ".#...#.", ".#####."};
-static const char *const glyph_shift_on[] = {"...#...", "..###..", ".#####.", "#######",
-					     ".#####.", ".#####.", ".#####."};
-static const char *const glyph_delete[] = {"...########",  "..#........#", ".#..#...#..#",
-					   "#....#.#...#", "#.....#....#", "#....#.#...#",
-					   ".#..#...#..#", "..#........#", "...########"};
-#define GLYPH_ROWS(g) (sizeof(g) / sizeof(*(g)))
+// The marks the fonts lack (tools/mockup/gfx.py draws the same), as a font
+// the blitter draws (engine/font.h's format: 2-byte rows, bit 0 leftmost):
+// the shift arrow, filled while upper case is on, and delete
+enum {
+	MARK_SHIFT,
+	MARK_SHIFT_ON,
+	MARK_DELETE,
+};
+static const u16 mark_bits[] ALIGN(4) = {
+	0x08,  0x14,  0x22,  0x63,  0x22,  0x22,  0x3E,                 // shift
+	0x08,  0x1C,  0x3E,  0x7F,  0x3E,  0x3E,  0x3E,                 // shift on
+	0x7F8, 0x804, 0x912, 0x8A1, 0x841, 0x8A1, 0x912, 0x804, 0x7F8,  // delete
+};
+static const struct torii_glyph mark_glyphs[] = {{0, 8, 0, 7, 7}, {14, 8, 0, 7, 7}, {28, 13, 0, 9, 12}};
+static const struct torii_font marks = {mark_glyphs, (const uint8_t *)mark_bits, 9, 0, 2, 12};
 
 // --- State ---------------------------------------------------------------------
 
@@ -127,6 +134,10 @@ static struct {
 	u16 armed;       // repeat keys whose press the page took
 	u32 down_at[REPEATS];   // frame_count() when each went down
 	u16 held_was[REPEATS];  // and its held frames at the last look
+	struct drawn {
+		struct rename_sel sel;
+		u8 page, upper;
+	} drawn[2];  // what each of the keys' tile sets shows
 	char counter[12];
 	char msg[48];
 	struct ui_hint hints[4];
@@ -151,48 +162,138 @@ static int unchanged(void)
 }
 
 // --- Painting ------------------------------------------------------------------
+//
+// Tiles are column-major (engine/text.h), so a fill costs a call a tile
+// column: a rounded shape is one block fill with its corners cut back, and
+// each canvas repaints only what changed since the set it paints last showed
+// (kb.drawn). Text goes through the blitter in glyph runs laid out here, not
+// text_draw, whose layout (clipping, an ellipsis) costs several times the
+// blit of a letter.
 
-// [x, x + w) x [y, y + h) of role, its corners rounded by r
-static void round_fill(const struct text_window *win, s32 x, s32 y, u32 w, u32 h, u32 r, u32 role)
+// [x, x + w) x [y, y + h) in index c, a tile column at a time (whole ones
+// by plain stores): for small shapes, whose pixels cost less than
+// text_clear's setup (it pays off from whole tile columns of 8 rows on,
+// which it fills by DMA)
+static void fill(const struct text_window *win, u32 x, u32 y, u32 w, u32 h, u32 c)
 {
-	for (u32 j = 0; j < h; j++) {
-		u32 e = j < h - 1 - j ? j : h - 1 - j, in = ui_round_inset(r, e);
-		if (y + (s32)j >= 0 && x + (s32)in >= 0 && w > 2 * in)
-			text_clear(win, (u32)(x + (s32)in), (u32)(y + (s32)j), w - 2 * in, 1, role);
+	u32 cw = win->height * 8u, v = (c & 15) * 0x11111111u, end = x + w;
+	while (x < end) {
+		u32 a = x & 7, start = x & ~7u, b = end - start < 8 ? end - start : 8;
+		u32 *p = win->tiles + (x >> 3) * cw + y, *q = p + h;
+		if (b - a == 8) {
+			while (p < q)
+				*p++ = v;
+		} else {
+			u32 m = (0xFFFFFFFFu >> (32 - 4 * (b - a))) << (4 * a);
+			for (; p < q; p++)
+				*p = (*p & ~m) | (v & m);
+		}
+		x = start + 8;
 	}
 }
 
-static void glyph(const struct text_window *win, u32 x, u32 y, const char *const *rows, u32 count, u32 role)
+// The rows of a shape [x, x + w) x [y, y + h) with its corners rounded by r:
+// the rows between the corners in one block, a fill each for the rest. The
+// pixels the rounding leaves out stay as they were.
+static void round_fill(const struct text_window *win, u32 x, u32 y, u32 w, u32 h, u32 r, u32 role)
 {
-	for (u32 j = 0; j < count; j++)
-		for (u32 i = 0; rows[j][i]; i++)
-			if (rows[j][i] == '#')
-				text_clear(win, x + i, y + j, 1, 1, role);
+	u32 rows = r < h / 2 ? r : h / 2;
+	for (u32 e = 0; e < rows; e++) {
+		u32 in = ui_round_inset(r, e);
+		fill(win, x + in, y + e, w - 2 * in, 1, role);
+		fill(win, x + in, y + h - 1 - e, w - 2 * in, 1, role);
+	}
+	if (h - 2 * rows >= 8)
+		text_clear(win, x, y + rows, w, h - 2 * rows, role);  // whole columns by DMA
+	else
+		fill(win, x, y + rows, w, h - 2 * rows, role);
 }
 
-static u32 glyph_w(const char *const *rows, u32 count)
+// A page card (spec.md: r4, a shadow below): its shadow, the body's shape
+// moved off px down, then the body of paper over it. Its middle rows by
+// text_clear: a card spans the canvas.
+static void card_fill(const struct text_window *win, u32 x, u32 y, u32 w, u32 h, u32 r, u32 off, u32 paper)
 {
-	u32 w = 0;
-	for (u32 j = 0; j < count; j++)
-		w = strlen(rows[j]) > w ? (u32)strlen(rows[j]) : w;
-	return w;
+	u32 rows = r < h / 2 ? r : h / 2;
+	for (u32 k = h - rows; k < h + off; k++) {
+		u32 e = h + off - 1 - k, in = e < r ? ui_round_inset(r, e) : 0;
+		fill(win, x + in, y + k, w - 2 * in, 1, UI_ROLE_SHADOW);
+	}
+	for (u32 e = 0; e < rows; e++) {
+		u32 in = ui_round_inset(r, e);
+		fill(win, x + in, y + e, w - 2 * in, 1, paper);
+		fill(win, x + in, y + h - 1 - e, w - 2 * in, 1, paper);
+	}
+	text_clear(win, x, y + rows, w, h - 2 * rows, paper);
 }
 
-static u32 width(const struct torii_font *font, const char *s, u32 len)
+#define LABEL_MAX 16  // glyphs in a label
+
+// Text as the blitter takes it: glyph indices and their pen advance
+struct label {
+	u8 glyphs[LABEL_MAX];
+	u8 count;
+	u8 advance;  // px
+};
+
+// One glyph of font
+static void label_glyph(const struct torii_font *font, u32 g, struct label *l)
 {
-	return text_width(font, s, len);
+	l->glyphs[0] = (u8)g;
+	l->count = 1;
+	l->advance = font->glyphs[g].advance;
 }
 
-// A key chip (the hint bar's style) with its top at y
+// A Latin-1 character's glyph (the menu's fonts start at U+0020)
+static void label_char(const struct torii_font *font, u32 c, struct label *l)
+{
+	label_glyph(font, c - TORII_FONT_FIRST, l);
+}
+
+// A short UTF-8 label's glyphs (cut at LABEL_MAX)
+static void label_text(const struct torii_font *font, const char *s, struct label *l)
+{
+	u32 len = (u32)strlen(s), pos = 0, adv = 0;
+	l->count = 0;
+	while (pos < len && l->count < LABEL_MAX) {
+		int g = text_next_glyph(s, len, &pos);
+		if (g < 0)
+			continue;
+		l->glyphs[l->count++] = (u8)g;
+		adv += font->glyphs[g].advance;
+	}
+	l->advance = (u8)(adv < 255 ? adv : 255);
+}
+
+// Draws a label with its pen at x and its line's top at y; every inked pixel
+// must fall inside the window (the look puts them there)
+static void blit(const struct text_window *win, const struct torii_font *font, u32 x, u32 y, u32 ink,
+		 const struct label *l)
+{
+	struct text_run run = {win->tiles, win->height * 8u, font, l->glyphs, l->count, x, y, ink & 15};
+	if (l->count)
+		text_blit(&run);
+}
+
+// A label centred in [x, x + w), its line's top at y
+static void blit_centred(const struct text_window *win, const struct torii_font *font, u32 x, u32 y, u32 w, u32 ink,
+			 const struct label *l)
+{
+	blit(win, font, x + (w - l->advance + 1) / 2, y, ink, l);
+}
+
+// A key chip (the hint bar's style) with its top at y, on a card
 static void chip(const struct text_window *win, u32 x, u32 y, const char *key)
 {
 	const struct ui_look *l = &ui_theme()->look;
 	const struct torii_font *font = ui_theme()->body;
-	u32 tw = width(font, key, strlen(key)), w = tw + 2u * l->hint_chip_pad + 1;
+	struct label lb;
+	label_text(font, key, &lb);
+	u32 w = lb.advance + 2u * l->hint_chip_pad + 1;
 	w = w < look.chip_min ? look.chip_min : w;
-	round_fill(win, (s32)x, (s32)y, w, l->hint_chip_h, l->hint_chip_radius, UI_ROLE_TRACK);
+	round_fill(win, x, y, w, l->hint_chip_h, l->hint_chip_radius, UI_ROLE_TRACK);
 	s32 top = (s32)y + ((s32)l->hint_chip_h - (s32)font->line_height) / 2;
-	text_draw(win, font, x + (w - tw + 1) / 2, top < 0 ? 0 : (u32)top, tw + 1, UI_ROLE_DIM, key, strlen(key));
+	blit_centred(win, font, x, top < 0 ? 0 : (u32)top, w, UI_ROLE_DIM, &lb);
 }
 
 // The bytes of the character at s[at]
@@ -204,47 +305,51 @@ static u32 char_len(const char *s, u32 at, u32 len)
 	return n;
 }
 
-static void paint_field(void *ctx, u8 nd, const struct text_window *win)
+// The field: its card and chips once a set, then the name's line each time
+static void paint_field(void *ctx, u8 nd, const struct text_window *win, u32 set, int fresh)
 {
 	(void)ctx;
+	(void)set;
 	const struct ui_theme *t = ui_theme();
 	const struct torii_font *font = t->body;
-	s32 ox = ui_node(nd)->x, oy = ui_node(nd)->y;
-	s32 fx = look.field_x - ox, fy = look.field_y - oy;
-	round_fill(win, fx, fy + t->look.shadow_offset, look.field_w, look.field_h, t->look.card_radius,
-		   UI_ROLE_SHADOW);
-	round_fill(win, fx, fy, look.field_w, look.field_h, t->look.card_radius, UI_ROLE_PANEL);
-	chip(win, (u32)(look.lchip_x - ox), (u32)(look.chip_y - oy), "L");
-	chip(win, (u32)(look.rchip_x - ox), (u32)(look.chip_y - oy), "R");
-	u32 y = (u32)(look.text_y - oy), x0 = (u32)(look.text_x - ox);
+	u32 ox = (u32)ui_node(nd)->x, oy = (u32)ui_node(nd)->y;
+	if (fresh) {
+		card_fill(win, look.field_x - ox, look.field_y - oy, look.field_w, look.field_h, t->look.card_radius,
+			  t->look.shadow_offset, UI_ROLE_PANEL);
+		chip(win, look.lchip_x - ox, look.chip_y - oy, "L");
+		chip(win, look.rchip_x - ox, look.chip_y - oy, "R");
+	}
+	u32 y = look.text_y - oy, x0 = look.text_x - ox, right_end = look.counter_right - ox;
+	text_clear(win, x0, y, right_end - x0, font->line_height, UI_ROLE_PANEL);
 	// The counter, in danger ink at the cap (and hidden a moment when a key
 	// went past it)
-	u32 cw = width(font, kb.counter, strlen(kb.counter)), cx = look.counter_right - (u32)ox - cw;
+	struct label lb;
+	label_text(font, kb.counter, &lb);
+	u32 cx = right_end - lb.advance;
 	if (!kb.counter_off)
-		text_draw(win, font, cx, y, cw + 1,
-			  rename_edit_chars(&kb.e) >= kb.e.max ? UI_ROLE_DANGER : UI_ROLE_FAINT, kb.counter,
-			  strlen(kb.counter));
+		blit(win, font, cx, y, rename_edit_chars(&kb.e) >= kb.e.max ? UI_ROLE_DANGER : UI_ROLE_FAINT, &lb);
 	u32 right = cx - look.clip_gap, avail = right > x0 ? right - x0 : 0;
 	const char *s = kb.e.text, *ext = kb.ask->ext ? kb.ask->ext : "";
 	u32 caret = kb.e.caret, len = kb.e.len, start = 0;
-	u32 before = width(font, s, caret);
+	u32 before = text_width(font, s, caret);
 	// A name too long for the field scrolls to keep the caret in view: its
 	// start gives way to "..."
 	if (before + look.caret_gap + look.caret_w > avail) {
-		u32 dots = width(font, "...", 3) + 1, room = avail > dots + 2 ? avail - dots - 2 : 0;
+		label_text(font, "...", &lb);
+		u32 dots = lb.advance + 1u, room = avail > dots + 2 ? avail - dots - 2 : 0;
 		while (start < caret && before > room) {
 			u32 n = char_len(s, start, len);
-			before -= width(font, s + start, n);
+			before -= text_width(font, s + start, n);
 			start += n;
 		}
-		text_draw(win, font, x0, y, dots, UI_ROLE_FAINT, "...", 3);
+		blit(win, font, x0, y, UI_ROLE_FAINT, &lb);
 		x0 += dots;
 	}
 	u32 x = text_draw(win, font, x0, y, right > x0 ? right - x0 : 0, UI_ROLE_TEXT, s + start, caret - start);
 	if (caret == start)
 		x = x0;
 	if (kb.caret_on)
-		text_clear(win, x, y + look.caret_dy, look.caret_w, look.caret_h, UI_ROLE_ACCENT);
+		fill(win, x, y + look.caret_dy, look.caret_w, look.caret_h, UI_ROLE_ACCENT);
 	x += look.caret_gap;
 	if (x < right && len > caret)
 		x = text_draw(win, font, x, y, right - x, UI_ROLE_TEXT, s + caret, len - caret);
@@ -252,99 +357,110 @@ static void paint_field(void *ctx, u8 nd, const struct text_window *win)
 		text_draw(win, font, x, y, right - x, UI_ROLE_FAINT, ext, strlen(ext));
 }
 
-// A Latin-1 character as UTF-8 into buf; its bytes
-static u32 utf8(u32 c, char *buf)
+// Character key (r, c), its cell cleared first unless the grid was
+// (transparent: the card shows)
+static void paint_cell(const struct text_window *win, u32 ox, u32 oy, u32 r, u32 c, int clear)
 {
-	if (c < 0x80) {
-		buf[0] = (char)c;
-		return 1;
-	}
-	buf[0] = (char)(0xC0 | c >> 6);
-	buf[1] = (char)(0x80 | (c & 0x3F));
-	return 2;
+	const struct torii_font *font = ui_theme()->heading;
+	u32 x = look.grid_x + c * look.col_w - ox, y = look.grid_y + r * look.pitch - oy, in = look.key_inset;
+	if (clear)
+		fill(win, x, y, look.col_w, look.pitch, 0);
+	if (kb.sel.row == r && kb.sel.col == c)
+		round_fill(win, x + in, y + in, look.col_w - 2 * in, look.pitch - 2 * in, look.key_radius,
+			   UI_ROLE_TINT);
+	struct label lb;
+	u32 ch = rename_key(kb.page, kb.upper, r, c);
+	label_char(font, ch, &lb);
+	blit_centred(win, font, x, y, look.col_w, rename_is_letter(ch) ? UI_ROLE_TEXT : UI_ROLE_DIM, &lb);
 }
 
-// A word centred in a cell's width, its line top dy below the cell's top
-static void centre_text(const struct text_window *win, const struct torii_font *font, s32 x, s32 y, u32 w, u32 dy,
-			const char *s, u32 len, u32 role)
+// A function key's word centred in its cell, func_text_dy below its top
+static void func_word(const struct text_window *win, u32 x, u32 y, u32 w, const char *word, u32 role)
 {
-	u32 tw = width(font, s, len);
-	s32 at = x + ((s32)w - (s32)tw + 1) / 2;
-	text_draw(win, font, at < 0 ? 0 : (u32)at, (u32)(y + (s32)dy), w, role, s, len);
+	struct label lb;
+	label_text(ui_theme()->body, word, &lb);
+	blit_centred(win, ui_theme()->body, x, y + look.func_text_dy, w, role, &lb);
 }
 
-static void paint_keys(void *ctx, u8 n, const struct text_window *win)
+// The function row: paper keys, OK solid in the item's colour
+static void paint_funcs(const struct text_window *win, u32 ox, u32 oy, int clear)
 {
-	(void)ctx;
-	const struct ui_theme *t = ui_theme();
-	s32 ox = ui_node(n)->x, oy = ui_node(n)->y;
-	u32 in = look.key_inset;
-	for (u32 r = 0; r < RENAME_CHAR_ROWS; r++)
-		for (u32 c = 0; c < RENAME_COLS; c++) {
-			s32 x = look.grid_x + (s32)(c * look.col_w) - ox, y = look.grid_y + (s32)(r * look.pitch) - oy;
-			if (kb.sel.row == r && kb.sel.col == c)
-				round_fill(win, x + (s32)in, y + (s32)in, look.col_w - 2 * in, look.pitch - 2 * in,
-					   look.key_radius, UI_ROLE_TINT);
-			char buf[2];
-			u32 ch = rename_key(kb.page, kb.upper, r, c);
-			centre_text(win, t->heading, x, y, look.col_w, 0, buf, utf8(ch, buf),
-				    rename_is_letter(ch) ? UI_ROLE_TEXT : UI_ROLE_DIM);
-		}
-	// The function row: paper keys, OK solid in the item's colour
-	u32 chosen = kb.sel.row == RENAME_FUNC_ROW ? rename_func_at(kb.sel.col) : RENAME_FUNCS;
-	s32 y = look.grid_y + (s32)(RENAME_FUNC_ROW * look.pitch) - oy;
+	const struct torii_font *font = ui_theme()->body;
 	const struct lang_rename *L = gl_rename;
+	u32 chosen = kb.sel.row == RENAME_FUNC_ROW ? rename_func_at(kb.sel.col) : RENAME_FUNCS;
+	u32 y = look.grid_y + RENAME_FUNC_ROW * look.pitch - oy, h = look.pitch, in = look.key_inset;
+	if (clear)
+		text_clear(win, look.grid_x - ox, y, RENAME_COLS * look.col_w, h, 0);
 	for (u32 k = 0; k < RENAME_FUNCS; k++) {
-		s32 x = look.grid_x + (s32)(rename_func_col(k) * look.col_w) - ox;
-		u32 w = rename_func_span[k] * look.col_w, h = look.pitch;
+		u32 x = look.grid_x + rename_func_col(k) * look.col_w - ox, w = rename_func_span[k] * look.col_w;
 		int on = k == chosen;
 		if (k == RENAME_KEY_OK) {
 			u32 i = on ? look.ok_inset : in;
 			if (on)
 				round_fill(win, x, y, w, h, look.ok_radius, UI_ROLE_TEXT);
-			round_fill(win, x + (s32)i, y + (s32)i, w - 2 * i, h - 2 * i, look.key_radius, UI_ROLE_ACCENT);
-			centre_text(win, t->body, x, y, w, look.func_text_dy, L->key_ok, strlen(L->key_ok),
-				    UI_ROLE_ACCENT_TEXT);
+			round_fill(win, x + i, y + i, w - 2 * i, h - 2 * i, look.key_radius, UI_ROLE_ACCENT);
+			func_word(win, x, y, w, L->key_ok, UI_ROLE_ACCENT_TEXT);
 			continue;
 		}
 		int open = k == RENAME_KEY_LATIN && kb.page == RENAME_PAGE_LATIN;
-		round_fill(win, x + (s32)in, y + (s32)in, w - 2 * in, h - 2 * in, look.key_radius,
+		round_fill(win, x + in, y + in, w - 2 * in, h - 2 * in, look.key_radius,
 			   on     ? UI_ROLE_TINT
 			   : open ? UI_ROLE_TRACK
 				  : UI_ROLE_BG);
 		switch (k) {
 		case RENAME_KEY_SHIFT: {
 			// The arrow, filled while upper case is on, and the case
-			const char *const *g = kb.upper ? glyph_shift_on : glyph_shift;
-			const char *word = kb.upper ? L->key_upper : L->key_lower;
-			u32 gw = glyph_w(g, GLYPH_ROWS(glyph_shift)), lw = width(t->body, word, strlen(word));
-			s32 gx = x + ((s32)w - (s32)(gw + look.shift_gap + lw) + 1) / 2;
+			struct label lb, mark;
+			label_text(font, kb.upper ? L->key_upper : L->key_lower, &lb);
+			label_glyph(&marks, kb.upper ? MARK_SHIFT_ON : MARK_SHIFT, &mark);
+			u32 gw = marks.glyphs[mark.glyphs[0]].width;
+			u32 gx = x + (w - (gw + look.shift_gap + lb.advance) + 1) / 2;
 			u32 role = kb.upper ? UI_ROLE_TEXT : UI_ROLE_DIM;
-			glyph(win, (u32)gx, (u32)(y + look.shift_dy), g, GLYPH_ROWS(glyph_shift), role);
-			text_draw(win, t->body, (u32)gx + gw + look.shift_gap, (u32)(y + look.func_text_dy), lw + 1,
-				  role, word, strlen(word));
+			blit(win, &marks, gx, y + look.shift_dy, role, &mark);
+			blit(win, font, gx + gw + look.shift_gap, y + look.func_text_dy, role, &lb);
 			break;
 		}
 		case RENAME_KEY_LATIN:
-			centre_text(win, t->body, x, y, w, look.func_text_dy, L->key_latin, strlen(L->key_latin),
-				    open ? UI_ROLE_TEXT : UI_ROLE_DIM);
+			func_word(win, x, y, w, L->key_latin, open ? UI_ROLE_TEXT : UI_ROLE_DIM);
 			break;
 		case RENAME_KEY_SPACE:
-			centre_text(win, t->body, x, y, w, look.func_text_dy, L->key_space, strlen(L->key_space),
-				    UI_ROLE_DIM);
+			func_word(win, x, y, w, L->key_space, UI_ROLE_DIM);
 			break;
 		case RENAME_KEY_DELETE: {
-			u32 gw = glyph_w(glyph_delete, GLYPH_ROWS(glyph_delete)), gh = GLYPH_ROWS(glyph_delete);
-			glyph(win, (u32)(x + ((s32)w - (s32)gw + 1) / 2), (u32)(y + ((s32)h - (s32)gh) / 2 + 1),
-			      glyph_delete, gh, UI_ROLE_DIM);
+			const struct torii_glyph *g = &marks.glyphs[MARK_DELETE];
+			struct label mark;
+			label_glyph(&marks, MARK_DELETE, &mark);
+			blit(win, &marks, x + (w - g->width + 1) / 2, y + (h - g->rows) / 2 + 1, UI_ROLE_DIM, &mark);
 			break;
 		}
 		default:
-			centre_text(win, t->body, x, y, w, look.func_text_dy, L->key_cancel, strlen(L->key_cancel),
-				    UI_ROLE_DIM);
+			func_word(win, x, y, w, L->key_cancel, UI_ROLE_DIM);
 			break;
 		}
 	}
+}
+
+// The keys: what changed since this set last showed (a page or case change
+// all of them; a move the two cells, and the function row when it is in it)
+static void paint_keys(void *ctx, u8 n, const struct text_window *win, u32 set, int fresh)
+{
+	(void)ctx;
+	u32 ox = (u32)ui_node(n)->x, oy = (u32)ui_node(n)->y;
+	struct drawn *d = &kb.drawn[set & 1];
+	int all = fresh || d->page != kb.page || d->upper != kb.upper;
+	if (all && !fresh)
+		text_clear(win, look.grid_x - ox, look.grid_y - oy, RENAME_COLS * look.col_w,
+			   RENAME_CHAR_ROWS * look.pitch, 0);
+	for (u32 r = 0; r < RENAME_CHAR_ROWS; r++)
+		for (u32 c = 0; c < RENAME_COLS; c++)
+			if (all || (r == d->sel.row && c == d->sel.col) || (r == kb.sel.row && c == kb.sel.col))
+				paint_cell(win, ox, oy, r, c, !all);
+	int in_row = kb.sel.row == RENAME_FUNC_ROW, was_in = d->sel.row == RENAME_FUNC_ROW;
+	if (all || in_row != was_in || (in_row && rename_func_at(kb.sel.col) != rename_func_at(d->sel.col)))
+		paint_funcs(win, ox, oy, !fresh);
+	d->sel = kb.sel;
+	d->page = kb.page;
+	d->upper = kb.upper;
 }
 
 // --- The layout ------------------------------------------------------------------
@@ -360,8 +476,12 @@ enum {
 
 static const struct ui_title_config title_config = {"", 0, ART_ICON16_GBA};  // the icon: the page's
 static const struct ui_hints_config no_hints = {0, 0};
-static const struct ui_canvas_config field_canvas = {paint_field};
-static const struct ui_canvas_config keys_canvas = {paint_keys};
+// What a whole paint of each costs, about (frame-cycles: rename-key with
+// both new): a first draw paints the keys in a frame of their own
+#define FIELD_PAINT_CYCLES 40000
+#define KEYS_PAINT_CYCLES 100000
+static const struct ui_canvas_config field_canvas = {paint_field, FIELD_PAINT_CYCLES};
+static const struct ui_canvas_config keys_canvas = {paint_keys, KEYS_PAINT_CYCLES};
 
 static const struct ui_spec nodes[N_NODES] = {
 	[N_TITLE] = {UI_TITLE, 1, UI_NONE, 3, UI_HFILL, 0, 0, 0, 0, 0, 0, TITLE_H, &title_config},
@@ -650,6 +770,7 @@ int rename_run(const struct rename_ask *ask)
 	ui_title_icon_set(node(N_TITLE), ask->icon16);
 	show_hints();
 	field_changed();
+	tlog_debug("rename: from %s", kb.e.text);
 	while (!kb.done && ui_depth()) {
 		ui_frame();
 		tick(v);

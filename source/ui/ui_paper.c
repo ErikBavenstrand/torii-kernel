@@ -793,6 +793,7 @@ const struct ui_ops ui_storage_ops = {sizeof(struct storage_state), storage_meas
 
 struct canvas_state {
 	struct paint paint;
+	u8 painted;  // bit s: set s has been painted
 };
 
 static int canvas_measure(u8 node, struct engine_budget *need)
@@ -808,6 +809,7 @@ static int canvas_measure(u8 node, struct engine_budget *need)
 static int canvas_init(u8 node)
 {
 	struct canvas_state *st = ui_node_state(node);
+	st->painted = 0;
 	return paint_init(node, &st->paint, 0, (u32)ui_node(node)->w / 8, 2);
 }
 
@@ -826,9 +828,18 @@ static void canvas_draw(u8 node)
 		ui_dirty(node, 0xFF);
 		return;
 	}
-	text_clear(&win, 0, 0, (u32)n->w, (u32)n->h, ui_paper(node, UI_ROLE_NONE));
 	const struct ui_canvas_config *c = ui_node_spec(node)->data;
-	c->paint(ui_node_view(node)->ctx, node, &win);
+	int fresh = !(st->painted >> set & 1);
+	// A whole paint that would pass the frame's budget waits for the next
+	// frame (a first draw then takes two, as a list's rows may)
+	if (fresh && !ui_draw_room(c->cycles, UI_DRAW_BUDGET)) {
+		ui_dirty(node, 0xFF);
+		return;
+	}
+	if (fresh)
+		text_clear(&win, 0, 0, (u32)n->w, (u32)n->h, ui_paper(node, UI_ROLE_NONE));
+	c->paint(ui_node_view(node)->ctx, node, &win, set, fresh);
+	st->painted |= (u8)(1u << set);
 	if (!paint_end(node, &st->paint, set, UI_BANK_NORMAL))
 		ui_dirty(node, 0xFF);
 }

@@ -652,13 +652,18 @@ struct ui_hints_config {
 
 // A canvas: pixels a screen paints itself (the rename keyboard's field and
 // keys), in a window of tiles over its rectangle. It has two tile sets that
-// take turns: paint draws the whole window into the one the map doesn't
-// show, cleared to the node's paper first (0: transparent, so a card on a
-// plane further back shows through), and it flips in in VBlank, so a
-// repaint never tears. paint runs in draw, once after ui_canvas_redraw (ctx
-// is the view's); it mustn't call FatFs or switch the ROM page.
+// take turns: paint draws into the one the map doesn't show, which then
+// flips in in VBlank, so a repaint never tears. paint runs in draw, once
+// after ui_canvas_redraw (ctx is the view's); it mustn't call FatFs or
+// switch the ROM page. set (0 or 1) says which set it paints: a set keeps
+// what was painted into it two paints ago, so a screen may repaint only
+// what changed since (redrawn in full: cleared, then drawn). fresh: the set
+// was never painted, and has been cleared to the node's paper (0:
+// transparent, so a card on a plane further back shows through): paint all.
 struct ui_canvas_config {
-	void (*paint)(void *ctx, u8 node, const struct text_window *win);
+	void (*paint)(void *ctx, u8 node, const struct text_window *win, u32 set, int fresh);
+	u32 cycles;  // about what a whole paint costs: one that doesn't fit the frame's
+		     // budget waits for the next frame (a first draw then takes two)
 };
 // Asks for a repaint in the next draw (several calls before it, one paint)
 void ui_canvas_redraw(u8 node);

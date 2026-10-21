@@ -8,6 +8,9 @@
 #         its progress dialog, and the menu comes back
 #   delete  Delete in a game list's popup removes the ROM and its save
 #         stays (T11): the game copied back starts with it
+#   rename  Rename in the SD card page's popup renames the ROM, its save
+#         and its save type, Recent follows, and the game starts with its
+#         save under the new name
 #   full  a copy the card can't take shows an error dialog and logs how much
 #         of it was written; its record stays, and a launch tries the copy
 #         again first, asking before it loses the save (the cut-short file
@@ -106,6 +109,34 @@ delete)
   logged "save: Test.sav exists, 131072 bytes"
   logged "save: loaded Test.sav into cart SRAM, 131072 bytes"
   echo "PASS: saves delete: Delete removes the ROM, its save stays and loads when the game comes back"
+  ;;
+
+rename)
+  first_launch
+  first_copy
+  cp "$cart/test.sav" "$cart/kept.sav"
+  # Power-on 3: the SD card page's Rename on Test.gba (UP three times wraps
+  # to it from Launch), "q" typed after the name, START: the file, its save
+  # and its save type are renamed, Recent follows
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot $(nav_file /Test.gba 0) -k @12:UP -k @16:- -k @20:UP -k @24:- -k @28:UP -k @32:- -k @40:A -k @44:- \
+    -w "screen ready: rename" -k @10:A -k @14:- -k @24:START -k @28:- \
+    -w "rename: kept" -w "sdcard: ready /" -s @1:"$shots/3-renamed.png" -f 2400
+  logged "rename: /Test.gba to Testq.gba"
+  logged "rename: /SAVER/Test.sav to /SAVER/Testq.sav (FatFs 0)"
+  logged "rename: /SAVER/Test.mde to /SAVER/Testq.mde (FatFs 0)"
+  ! mtype -i "$cart/sd.img" ::/Test.gba >/dev/null 2>&1 || fail "Test.gba is still on the card"
+  ! mtype -i "$cart/sd.img" ::/SAVER/Test.sav >/dev/null 2>&1 || fail "SAVER/Test.sav is still on the card"
+  mtype -i "$cart/sd.img" ::/Testq.gba | cmp -s - tests/roms/savetest/flash128.gba || fail "Testq.gba isn't the game"
+  mtype -i "$cart/sd.img" ::/SAVER/Testq.sav | cmp -s - "$cart/kept.sav" || fail "the save didn't follow the game"
+  mtype -i "$cart/sd.img" ::/SAVER/Testq.mde >/dev/null 2>&1 || fail "the save type didn't follow the game"
+  mtype -i "$cart/sd.img" ::/torii/recent.txt | grep -q "	/Testq.gba$" || fail "Recent didn't follow the game"
+  # Power-on 4: the game under its new name starts with its save
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot $(nav_launch /Testq.gba at=180) -f 600
+  logged "save: Testq.sav exists, 131072 bytes"
+  logged "save: loaded Testq.sav into cart SRAM, 131072 bytes"
+  echo "PASS: saves rename: the SD card page's Rename moves the save and save type with the game, which starts with them"
   ;;
 
 copy)
