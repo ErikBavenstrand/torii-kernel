@@ -176,7 +176,9 @@ static void store(struct settings_values *v, u32 id, u16 value)
 	u32 n = slots_of(r);
 	if (!n || r->slot + n > assress_max)
 		return;
-	if (value_in(v->loaded, id) == value) {
+	// (a keys row's own slots: its value as used depends on the other row's)
+	if (r->kind == SET_KEYS ? keys_mask(&v->loaded[r->slot], keys_default_of(id)) == value
+				: value_in(v->loaded, id) == value) {
 		memcpy(&v->slot[r->slot], &v->loaded[r->slot], n * sizeof(u16));
 		return;
 	}
@@ -361,9 +363,15 @@ u32 settings_set_keys(struct settings_values *v, u32 id, u16 mask)
 	// The other hotkey's, or one holding it or held in it. Checked even
 	// while the other is off, as turning it on checks nothing
 	u32 other = id == SET_SLEEP_KEYS ? SET_RESET_KEYS : SET_SLEEP_KEYS;
-	if (keys_clash(settings_get(v, other), mask))
+	u16 taken = settings_get(v, other);
+	if (keys_clash(taken, mask))
 		return SET_KEYS_TAKEN;
 	store(v, id, mask);
+	// The other row keeps what it showed: a stored pair that fell back to
+	// its default gets the default written, so the edit can't bring the
+	// stored keys back
+	if (keys_mask(&v->slot[settings_rows[other].slot], keys_default_of(other)) != taken)
+		store(v, other, taken);
 	return SET_KEYS_OK;
 }
 

@@ -5182,6 +5182,91 @@ FRESULT f_unlink_alias (
 
 
 /*-----------------------------------------------------------------------*/
+/* Torii: Remove the Second Names a Case-only Rename Left                */
+/*-----------------------------------------------------------------------*/
+/* A case-only rename ("game.sav" to "Game.sav") cut inside f_rename leaves
+   two entries that differ only in case on one chain, which a path can't
+   tell apart. In folder dir, this removes each file entry whose name is
+   name's but for case, not byte for byte, and whose first cluster is the
+   exactly named entry's; their chain stays. FR_NO_FILE when there is none
+   to remove. fno is scratch. */
+
+#define TORII_CASE_ALIASES 4
+
+/* 1 if two UTF-8 names are equal but for case, as FatFs compares them */
+static int torii_same_name (const TCHAR* a, const TCHAR* b)
+{
+	while (*a && *b) {
+		DWORD ca = tchar2uni(&a), cb = tchar2uni(&b);
+		if (ca == 0xFFFFFFFF || cb == 0xFFFFFFFF) return 0;
+		if (ca < 0x10000) ca = ff_wtoupper(ca);
+		if (cb < 0x10000) cb = ff_wtoupper(cb);
+		if (ca != cb) return 0;
+	}
+	return !*a && !*b;
+}
+
+FRESULT f_unlink_case_aliases (
+	const TCHAR* dir,		/* The folder */
+	const TCHAR* name,		/* The name to keep, byte for byte */
+	FILINFO* fno			/* Scratch */
+)
+{
+	FRESULT res;
+	FATFS *fs;
+	DIR dj, drop[TORII_CASE_ALIASES];
+	DWORD keep = 0, clst[TORII_CASE_ALIASES];
+	UINT n = 0, removed = 0;
+
+
+	res = f_opendir(&dj, dir);
+	if (res != FR_OK) return res;
+	fs = dj.obj.fs;
+	for (;;) {
+		res = DIR_READ_FILE(&dj);
+		if (res != FR_OK) break;
+		get_fileinfo(&dj, fno);
+		if (!(dj.obj.attr & AM_DIR) && torii_same_name(fno->fname, name)) {
+			DWORD c;
+#if FF_FS_EXFAT
+			if (fs->fs_type == FS_EXFAT) {
+				FFOBJID obj;
+				obj.fs = fs;
+				init_alloc_info(fs, &obj);	/* From the entry block dir_read loaded */
+				c = obj.sclust;
+			} else
+#endif
+			{
+				c = ld_clust(fs, dj.dir);	/* From the entry still in the window */
+			}
+			const TCHAR *x = fno->fname, *y = name;
+			while (*x && *x == *y) { x++; y++; }
+			if (*x == *y) {			/* Byte for byte */
+				keep = c;
+			} else if (n < TORII_CASE_ALIASES) {
+				drop[n] = dj;	/* Where its entries are, for dir_remove */
+				clst[n++] = c;
+			}
+		}
+		res = dir_next(&dj, 0);
+		if (res != FR_OK) break;
+	}
+	if (res == FR_NO_FILE) res = FR_OK;
+	for (UINT i = 0; res == FR_OK && keep && i < n; i++) {
+		if (clst[i] != keep) continue;
+		res = dir_remove(&drop[i]);	/* The entries only: the chain stays the kept name's */
+		if (res == FR_OK) removed++;
+	}
+	if (res == FR_OK && removed) res = sync_fs(fs);
+	if (res == FR_OK && !removed) res = FR_NO_FILE;
+	f_closedir(&dj);
+	LEAVE_FF(fs, res);
+}
+
+
+
+
+/*-----------------------------------------------------------------------*/
 /* Create a Directory                                                    */
 /*-----------------------------------------------------------------------*/
 

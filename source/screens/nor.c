@@ -166,7 +166,7 @@ static void storage_text(u32 used)
 // The games' records in the library, found by file name (one pass over it)
 static void match_records(void)
 {
-	const char *names[MAX_NOR];
+	const char *names[MAX_NOR] = {0};
 	for (u32 i = 0; i < nor.count; i++)
 		names[i] = pNorFS[i].filename;
 	library_find_names(names, nor.count, nor.rec_of);

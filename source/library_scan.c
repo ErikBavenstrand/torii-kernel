@@ -766,7 +766,8 @@ static void write_failed(const char *what, FRESULT fr)
 		f_unlink(file);
 	if (fr == FR_DENIED && opened) {
 		tlog("library: the card is full; %s isn't written", file);
-	} else if (!opened) {
+	} else if (!opened && (fr == FR_NO_PATH || fr == FR_EXIST || fr == FR_DENIED || fr == FR_WRITE_PROTECTED ||
+			       fr == FR_INVALID_NAME)) {
 		// It can't be made (/torii a file, a write-protected card): the index
 		// stays in RAM, and isn't tried again this boot
 		FRESULT st = f_stat(LIB_DIR, &lib.u.walk.fi);  // the write is over: io is free
@@ -1243,7 +1244,7 @@ void library_renamed(const char *old_path, const char *new_name)
 		// A custom name followed the file (gamename_store_move): it shows
 		// at once, not the cleaned name until the walk. In RAM: the rename
 		// writes the pool it is in
-		char display[GAMENAME_MAX + 1];
+		char display[GAMENAME_MAX + 1] = "";
 		int custom = (library_flags(rec) & LIB_F_CUSTOM) != 0;
 		if (custom)
 			snprintf(display, sizeof(display), "%s", library_display(rec));

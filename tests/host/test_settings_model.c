@@ -689,6 +689,17 @@ void test_settings_hotkeys_stored(void)
 	CHECK_EQ(stored_keys((const u8[]){9, 8, 3}, (const u8[]){9, 8, 3}, &r, &s), SET_HOTKEYS_SLEEP_FIXED);
 	CHECK_EQ(r, LRSTART);
 	CHECK_EQ(s, LRSELECT);
-	(void)A;
+	// An edit while a stored pair fell back: the other row keeps what it
+	// showed, its default written, and the stored clash doesn't come back
+	CHECK_EQ(stored_keys((const u8[]){9, 0, 0}, (const u8[]){9, 0, 0}, &r, &s), SET_HOTKEYS_RESET_FIXED);
+	CHECK_EQ(settings_get(&v, SET_RESET_KEYS), LRSTART);
+	CHECK_EQ(settings_get(&v, SET_SLEEP_KEYS), L | A);
+	CHECK_EQ(settings_set_keys(&v, SET_SLEEP_KEYS, L | B), SET_KEYS_OK);
+	CHECK_EQ(settings_get(&v, SET_RESET_KEYS), LRSTART);
+	CHECK_EQ(settings_set_keys(&v, SET_RESET_KEYS, LRSTART), SET_KEYS_OK);  // as shown: stays
+	CHECK_EQ(settings_get(&v, SET_RESET_KEYS), LRSTART);
+	CHECK_EQ(settings_hotkeys(v.slot, &r, &s), 0);
+	CHECK_EQ(r, LRSTART);
+	CHECK_EQ(s, L | B);
 	erased();
 }

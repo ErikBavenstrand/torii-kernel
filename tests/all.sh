@@ -23,6 +23,7 @@ jobs=(
   "tests/saves.sh rename"
   "tests/saves.sh rename-cut"
   "tests/saves.sh rename-cut-split"
+  "tests/saves.sh rename-cut-case"
   "tests/games.sh"
   "tests/boxart.sh"
   "tests/eeprom_probe.sh 512"

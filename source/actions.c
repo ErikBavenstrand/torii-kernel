@@ -342,7 +342,7 @@ static int there_shared(const char *path, const char *save)
 
 // The walk for another game with the save (share_walk): the folders open on
 // the way down, the entry read and the path of the folder it's in
-#define SHARE_DEPTH 8  // as the library's walk; a deeper folder can't be checked
+#define SHARE_DEPTH 16  // twice the library's walk; a deeper folder can't be checked
 struct share_walk {
 	DIR dirs[SHARE_DEPTH];  // first: word-aligned
 	FILINFO fi;
@@ -360,10 +360,11 @@ enum {
 	SHARE_UNSURE
 };
 
-// Whether a game file other than path has the save file save, on the whole
-// card: hidden folders and games the index doesn't hold too (past its cap,
-// names too long). SHARE_UNSURE when a folder can't be read or is too deep.
-static u32 share_walk(const char *path, const char *save)
+// Whether a game file other than path has the save file save or save2
+// (the name it would move to), on the whole card: hidden folders and games
+// the index doesn't hold too (past its cap, names too long). SHARE_UNSURE
+// when a folder can't be read or is too deep.
+static u32 share_walk(const char *path, const char *save, const char *save2)
 {
 	struct share_walk *sw = SW;
 	u32 start = cycles_now(), files = 0, result = SHARE_NONE;
@@ -410,13 +411,13 @@ static u32 share_walk(const char *path, const char *save)
 			continue;
 		files++;
 		save_name(sw->save, name, console);
-		if (!same_name(sw->save, save))
+		if (!same_name(sw->save, save) && !same_name(sw->save, save2))
 			continue;
 		// The file itself: its folder and name are path's
 		const char *slash = strrchr(path, '/');
 		if ((u32)(slash - path) == len && !strncmp(path, sw->path, len) && same_name(slash + 1, name))
 			continue;
-		tlog("rename %s: %s/%s has its save %s", path, sw->path, name, save);
+		tlog("rename %s: %s/%s has the save %s", path, sw->path, name, sw->save);
 		result = SHARE_FOUND;
 		break;
 	}
@@ -515,6 +516,8 @@ u32 action_rename_file(const char *path, const char *new_name)
 		if (strlen(save) > SAV_INFO_NAME_MAX)
 			return ACTION_RENAME_BAD;  // the pending-save record couldn't name it
 		int pending = pending_save_named(save);
+		char save_to[SAVE_NAME_MAX];
+		memcpy(save_to, save, sizeof(save_to));
 		save_name(save, w->name, console);
 		if (pending || pending_save_named(save)) {
 			tlog("rename %s: a save still waits to be copied", path);
@@ -527,15 +530,24 @@ u32 action_rename_file(const char *path, const char *new_name)
 		}
 		// A save another game shares (the same name in another folder, or
 		// a .gb and .gbc of one name) stays with it: moving it, or its save
-		// type or states, would take them away. The index first, then the
-		// whole card (hidden folders, games past the index's cap); when a
-		// folder can't be checked, nothing moves
+		// type or states, would take them away; and one moved to the save
+		// name of another game (that has none yet) would be that game's too.
+		// The index first, then the whole card (hidden folders, games past
+		// the index's cap); when a folder can't be checked, nothing moves
+		if (!case_only && there(w->new_path)) {  // its folder has the name: say that, not the save
+			tlog("rename %s: %s is there already", path, w->new_path);
+			return ACTION_RENAME_TAKEN;
+		}
 		u32 shared = SHARE_NONE;
 		if (!case_only && any)
-			shared = there_shared(path, save) ? SHARE_FOUND : share_walk(path, save);
+			shared = there_shared(path, save) || there_shared(path, save_to)
+					 ? SHARE_FOUND
+					 : share_walk(path, save, save_to);
 		if (shared != SHARE_NONE) {
-			tlog("rename %s: %s its save %s", path,
-			     shared == SHARE_FOUND ? "another game uses" : "can't check who else uses", save);
+			tlog("rename %s: %s %s or %s", path,
+			     shared == SHARE_FOUND ? "another game uses the save"
+						   : "can't check who else uses the save",
+			     save, save_to);
 			return ACTION_RENAME_SHARED;
 		}
 		// Nothing lands on another game's file, its own or one a deleted
@@ -595,16 +607,38 @@ u32 action_rename_file(const char *path, const char *new_name)
 	return partly ? ACTION_RENAME_PARTLY : ACTION_RENAMED;
 }
 
-// 1 if path was a second name of keep's file (a cut inside f_rename), now
-// removed without touching the file
-static int drop_alias(const char *path, const char *keep)
+// Drops path, a second name of keep's file (a cut inside f_rename), without
+// touching the file: FR_OK once dropped, FR_DENIED if they are two files
+static FRESULT drop_alias(const char *path, const char *keep)
 {
 	FRESULT res = f_unlink_alias(path, keep);
 	if (res == FR_OK)
 		tlog("rename: %s was a second name of %s: it goes, the file stays", path, keep);
 	else if (res != FR_DENIED)
 		tlog_error("rename: %s: can't drop a second name (FatFs %u)", path, (unsigned)res);
-	return res == FR_OK;
+	return res;
+}
+
+// The same after a case-only rename, whose two names a path can't tell
+// apart: the names in path's folder that are path's but for case, on its
+// file's chain, go. 0 on a card error
+static int drop_case_aliases(const char *path)
+{
+	char dir[USERDATA_PATH_MAX];
+	const char *slash = strrchr(path, '/');
+	u32 len = slash ? (u32)(slash - path) : 0;
+	if (!slash || len >= sizeof(dir))
+		return 1;
+	memcpy(dir, path, len);
+	dir[len ? len : 1] = 0;
+	if (!len)
+		dir[0] = '/';
+	FRESULT res = f_unlink_case_aliases(dir, slash + 1, &fileinfo);
+	if (res == FR_OK)
+		tlog("rename: another case of %s was a second name of it: it goes, the file stays", path);
+	else if (res != FR_NO_FILE && res != FR_NO_PATH)  // (no such folder: nothing there)
+		tlog_error("rename: %s: can't drop a second name (FatFs %u)", path, (unsigned)res);
+	return res == FR_OK || res == FR_NO_FILE || res == FR_NO_PATH;
 }
 
 u32 action_rename_taken(void)
@@ -649,33 +683,58 @@ void action_rename_recover(void)
 		// entry before it removes the old, so they share one cluster chain
 		// (f_unlink would free it under the new name); or two files, the
 		// new name another game's, and nothing moved
-		if (!drop_alias(w->old_path, w->new_path)) {
+		FRESULT res = drop_alias(w->old_path, w->new_path);
+		if (res == FR_DENIED) {
 			tlog("rename: %s and %s are two files: nothing was renamed", w->old_path, w->new_path);
 			journal_clear();
-			return;
 		}
+		if (res != FR_OK)
+			return;  // a card error: the journal stays for the next boot
 		old_there = 0;
 	}
-	int forward = !old_there || case_only;
+	if (case_only && !drop_case_aliases(w->new_path))
+		return;
+	int forward = !old_there || case_only, failed = 0, kept = 1;
 	tlog("rename: a rename of %s to %s was cut short: %s", w->old_path, b + 1, forward ? "finished" : "undone");
 	// Each file still to move moves (forward), or each that moved goes back;
 	// one left under both names (a cut inside its f_rename) loses the name
 	// it isn't going to
-	for (u32 i = 0; console != LIB_CONSOLE_NONE && i < SIDECARS; i++) {
+	for (u32 i = 0; console != LIB_CONSOLE_NONE && i < SIDECARS && !failed; i++) {
 		if (sidecars[i].cache || !side_path(w->from, &sidecars[i], w->name, console) ||
 		    !side_path(w->to, &sidecars[i], b + 1, console))
 			continue;
+		if (case_only) {
+			kept &= drop_case_aliases(w->to);
+			continue;
+		}
 		int from = there(w->from), to = there(w->to);
-		if (from && to && !case_only)
-			drop_alias(forward ? w->from : w->to, forward ? w->to : w->from);
-		else if (forward ? from && !to : to && !from)
-			side_move(i, forward ? w->name : b + 1, forward ? b + 1 : w->name, console);
+		if (from && to) {
+			FRESULT res = drop_alias(forward ? w->from : w->to, forward ? w->to : w->from);
+			kept &= res == FR_OK || res == FR_DENIED;
+		} else if ((forward ? from && !to : to && !from) &&
+			   side_move(i, forward ? w->name : b + 1, forward ? b + 1 : w->name, console) != FR_OK) {
+			failed = forward;  // going back, what stays is the game's still
+		}
+	}
+	if (failed) {
+		// A file that won't move (a full card): the rename is undone, as a
+		// live rename's is, so the game and its save keep one name
+		for (u32 i = 0; i < SIDECARS; i++)
+			if (!sidecars[i].cache && side_path(w->from, &sidecars[i], w->name, console) &&
+			    side_path(w->to, &sidecars[i], b + 1, console) && there(w->to) && !there(w->from))
+				side_move(i, b + 1, w->name, console);
+		FRESULT res = f_rename(w->new_path, w->old_path);
+		tlog_error("rename: finishing %s's rename failed: undone (FatFs %u)", w->old_path, (unsigned)res);
+		if (res == FR_OK)
+			journal_clear();
+		return;
 	}
 	if (forward) {
 		gamename_store_move(w->old_path, w->new_path);
 		userdata_rename(w->old_path, w->new_path);
 	}
-	journal_clear();
+	if (kept)
+		journal_clear();  // else a card error: the next boot looks again
 }
 
 void action_nor_launch(u32 index, u32 hard_reset)

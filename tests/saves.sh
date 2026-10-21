@@ -11,6 +11,7 @@
 #   rename-cut, rename-cut-split  a power cut before each of a rename's SD
 #         writes leaves one game with its save; -split fills the folders'
 #         first sectors, so a cut inside f_rename leaves two names on a file
+#   rename-cut-case  the same for a rename that changes only case
 #   rename  Rename in the SD card page's popup renames the ROM, its save
 #         and its save type, Recent follows, and the game starts with its
 #         save under the new name
@@ -181,6 +182,57 @@ rename-cut | rename-cut-split)
       fail "no cut left the save under two names: $(cat "$carts/aliases-$part.txt")"
   fi
   echo "PASS: saves $part: a power cut before any of the rename's $writes SD writes leaves one game with its save ($results)"
+  ;;
+
+rename-cut-case)
+  # A case-only rename (Test to TesT: B deletes the t, SELECT shifts, t),
+  # cut before each SD write, folders' first sectors full as in -split: FatFs
+  # writes the new entry before it removes the old, so a cut between leaves
+  # two names a path can't tell apart, on one chain
+  first_launch
+  first_copy
+  cp "$cart/test.sav" "$cart/kept.sav"
+  : >"$cart/pad.txt"
+  for i in $(seq -w 1 20); do
+    mcopy -i "$cart/sd.img" "$cart/pad.txt" "::/PAD$i.TXT"
+    mcopy -i "$cart/sd.img" "$cart/pad.txt" "::/SAVER/PAD$i.TXT"
+  done
+  rm -rf "$carts/cut-start-$part"
+  cp -r "$cart" "$carts/cut-start-$part"
+  : >"$carts/aliases-$part.txt"
+  rename_keys=$(nav_file /Test.gba 0)
+  case_keys=(-k @12:UP -k @16:- -k @20:UP -k @24:- -k @28:UP -k @32:- -k @40:A -k @44:- -w "screen ready: rename"
+    -k @10:B -k @14:- -k @22:SELECT -k @26:- -k @34:RIGHT -k @38:- -k @46:RIGHT -k @50:- -k @58:RIGHT -k @62:-
+    -k @70:RIGHT -k @74:- -k @82:A -k @86:- -k @96:START -k @100:-)
+  # shellcheck disable=SC2086 # nav.sh's options
+  OMEGA_TRACE=1 boot $rename_keys "${case_keys[@]}" -w "rename: kept" -f 2400
+  logged "rename: /Test.gba to TesT.gba"
+  first=$(sed -n '1,/safefile: writing \/torii\/rename.txt/p' "$cart/run.log" | grep -c '^omega [0-9]*: sd write' || true)
+  writes=$(sed -n '/safefile: writing \/torii\/rename.txt/,/rename: kept/p' "$cart/run.log" | grep -c '^omega [0-9]*: sd write' || true)
+  [ "$writes" -ge 6 ] || fail "the rename made only $writes SD writes"
+  for n in $(seq 1 "$writes"); do
+    rm -rf "$cart" && cp -r "$carts/cut-start-$part" "$cart"
+    status=0
+    # shellcheck disable=SC2086 # nav.sh's options
+    OMEGA_POWER_CUT=sd:write:$((first + n)) OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin \
+      $rename_keys "${case_keys[@]}" -f 2400 >"$cart/cut.log" 2>&1 || status=$?
+    [ $status = 75 ] || fail "no power cut before SD write $n of the rename (exit $status)"
+    boot -f 300
+    grep -h 'second name' "$cart/run.log" >>"$carts/aliases-$part.txt" || true
+    # One entry for the game and one for its save, whatever their case
+    [ "$(mdir -b -i "$cart/sd.img" ::/ | grep -ci '^::/test\.gba$')" = 1 ] ||
+      fail "cut before write $n: the game's names: $(mdir -b -i "$cart/sd.img" ::/ | grep -i test)"
+    [ "$(mdir -b -i "$cart/sd.img" ::/SAVER | grep -ci '^::/SAVER/test\.sav$')" = 1 ] ||
+      fail "cut before write $n: the save's names: $(mdir -b -i "$cart/sd.img" ::/SAVER | grep -i test)"
+    mtype -i "$cart/sd.img" ::/SAVER/Test.sav | cmp -s - "$cart/kept.sav" || fail "cut before write $n: the save changed"
+    ! mtype -i "$cart/sd.img" ::/torii/rename.txt >/dev/null 2>&1 || fail "cut before write $n: the journal is left"
+    fsck.fat -n "$cart/sd.img" >"$cart/fsck.txt" 2>&1 || true
+    ! grep -vE '^(fsck\.fat |Reclaimed [0-9]+ unused clusters? |Free cluster summary |  (Auto-)?correct|Leaving filesystem unchanged|.*: [0-9]+ files, |$)' \
+      "$cart/fsck.txt" >"$cart/fsck-bad.txt" || fail "cut before write $n: fsck.fat: $(head -4 "$cart/fsck-bad.txt")"
+  done
+  grep -qF 'another case of /SAVER/TesT.sav was a second name of it' "$carts/aliases-$part.txt" ||
+    fail "no cut left the save under two cases: $(cat "$carts/aliases-$part.txt")"
+  echo "PASS: saves $part: a power cut before any of a case-only rename's $writes SD writes leaves one game and one save"
   ;;
 
 rename)

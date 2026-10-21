@@ -138,7 +138,7 @@ static void Get_KEY_val(FIL *file, char *KEY_section, char *KEY_secval, char get
 					section[section_len++] = buf[i];
 				continue;
 			} else if (buf[i] == ']') {
-				section_len = cht_rtrim(section, section_len);
+				cht_rtrim(section, section_len);
 				is_section = 0;
 				in_section = 1;
 				//_val_len = 0;
@@ -148,8 +148,9 @@ static void Get_KEY_val(FIL *file, char *KEY_section, char *KEY_secval, char get
 			if (in_section == 1) {
 				// scan param key name
 				if (_kv == 0 && buf[i] != '=') {
-					if (_klen < MAX_KEY_LEN - 1)  // room for the NUL; longer names are cut
-						_paramk[_klen++] = buf[i];
+					if (_klen >= MAX_KEY_LEN - 1)  // room for the NUL; a longer name is left out
+						break;
+					_paramk[_klen++] = buf[i];
 					continue;
 				} else if (buf[i] == '=') {
 					_klen = cht_rtrim(_paramk, _klen);
@@ -164,8 +165,8 @@ static void Get_KEY_val(FIL *file, char *KEY_section, char *KEY_secval, char get
 				key_value[_vlen++] = buf[i];
 			}
 		}
-		_klen = cht_rtrim(_paramk, _klen);
-		_vlen = cht_rtrim(key_value, _vlen);
+		cht_rtrim(_paramk, _klen);
+		cht_rtrim(key_value, _vlen);
 		if (strcmp(KEY_section, section) == 0) {
 			if (strcmp(KEY_secval, _paramk) == 0) {
 				strcpy(getbuff, key_value);
@@ -246,7 +247,7 @@ static u32 Get_CHT_val(FIL *file, char *KEY_section, char *KEY_secval /*,char ge
 					section[section_len++] = buf[i];
 				continue;
 			} else if (buf[i] == ']') {
-				section_len = cht_rtrim(section, section_len);
+				cht_rtrim(section, section_len);
 				is_section = 0;
 				in_section = 1;
 				//_val_len = 0;
@@ -256,8 +257,9 @@ static u32 Get_CHT_val(FIL *file, char *KEY_section, char *KEY_secval /*,char ge
 			if (in_section == 1) {
 				// scan param key name
 				if (_kv == 0 && buf[i] != '=') {
-					if (_klen < MAX_KEY_LEN - 1)  // room for the NUL; longer names are cut
-						_paramk[_klen++] = buf[i];
+					if (_klen >= MAX_KEY_LEN - 1)  // room for the NUL; a longer name is left out
+						break;
+					_paramk[_klen++] = buf[i];
 					continue;
 				} else if (buf[i] == '=') {
 					_klen = cht_rtrim(_paramk, _klen);
@@ -415,8 +417,9 @@ static u32 Get_all_Section_val(FIL *file)
 			if (in_section == 1) {
 				// scan param key name
 				if (_kv == 0 && line_buf[i] != '=') {
-					if (_klen < MAX_KEY_LEN - 1)  // room for the NUL; longer names are cut
-						_paramk[_klen++] = line_buf[i];
+					if (_klen >= MAX_KEY_LEN - 1)  // room for the NUL; a longer name is left out
+						break;
+					_paramk[_klen++] = line_buf[i];
 					continue;
 				} else if (line_buf[i] == '=') {
 					_klen = cht_rtrim(_paramk, _klen);

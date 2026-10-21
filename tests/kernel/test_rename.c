@@ -124,6 +124,9 @@ static const char *const files[] = {
 	"/SAVER/Share.sav",
 	"/SAVER/Shared.sav",
 	"/.T18h/Share.gba",
+	"/.T18h/Taken.gba",
+	T_DIR "/Taken.gba",
+	"/SAVER/Taken.sav",
 	T_DIR "/Roll.gba",
 	T_DIR "/Rolled.gba",
 	"/SAVER/Roll.sav",
@@ -259,6 +262,11 @@ void test_rename_file(void)
 	CHECK_EQ(action_rename_file(T_DIR "/Share.gba", "Shared.gba"), ACTION_RENAME_SHARED);
 	CHECK(there(T_DIR "/Share.gba") && holds("/SAVER/Share.sav", "share's save") && !there(T_DIR "/Shared.gba"));
 	f_unlink("/.T18h/Share.gba");
+	// To the name of another game with no save yet: the save would be its
+	CHECK(put("/.T18h/Taken.gba", "a hidden game, no save"));
+	CHECK_EQ(action_rename_file(T_DIR "/Share.gba", "Taken.gba"), ACTION_RENAME_SHARED);
+	CHECK(holds("/SAVER/Share.sav", "share's save") && !there("/SAVER/Taken.sav") && !there(T_DIR "/Taken.gba"));
+	f_unlink("/.T18h/Taken.gba");
 	CHECK_EQ(action_rename_file(T_DIR "/Share.gba", "Shared.gba"), ACTION_RENAMED);
 	CHECK(holds("/SAVER/Shared.sav", "share's save"));
 

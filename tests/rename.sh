@@ -88,7 +88,7 @@ boot $(nav_file /Hello.gba 0) -k @12:UP -k @16:- -k @20:UP -k @24:- -k @28:UP -k
   -k @10:A -k @14:- -k @24:START -k @28:- -w "rename: That name is taken." -s @4:"$shots/4-taken.png" \
   -k @10:B -k @14:- -k @24:START -k @28:- -w "rename: cancelled" -f 2400
 logged "rename: from Hello"
-logged "rename /Hello.gba to Helloq.gba: FatFs 8"
+logged "rename /Hello.gba: /Helloq.gba is there already"
 mtype -i "$cart/sd.img" ::/Hello.gba >/dev/null || fail "Hello.gba went"
 echo "PASS: rename: a game's name in names.txt and back, Cancel asks after a change, a taken file name is refused"
 

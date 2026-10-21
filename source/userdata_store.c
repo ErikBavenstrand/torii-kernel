@@ -227,7 +227,7 @@ int userdata_recent_add(const char *path)
 {
 	snprintf(W->path, sizeof(W->path), "%s", path);  // path may be in PSRAM
 	userdata_canonical(W->path);
-	if (!userdata_path_ok(W->path)) {
+	if (strlen(path) >= sizeof(W->path) || !userdata_path_ok(W->path)) {  // cut short: another path
 		tlog("userdata: can't keep %s on Recent", path);
 		return 0;
 	}
@@ -430,7 +430,7 @@ int userdata_fav_set(const char *path, int on)
 {
 	snprintf(W->path, sizeof(W->path), "%s", path);  // path may be in PSRAM, which the read back changes
 	userdata_canonical(W->path);
-	if (!userdata_path_ok(W->path)) {
+	if (strlen(path) >= sizeof(W->path) || !userdata_path_ok(W->path)) {  // cut short: another path
 		tlog("userdata: can't keep %s as a favourite", path);
 		return 0;
 	}
