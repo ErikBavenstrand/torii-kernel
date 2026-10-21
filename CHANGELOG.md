@@ -6,6 +6,11 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** romhacks keep their own names and art: a game is named and
+  boxed by its No-Intro CRC only, never by the GBA game code a romhack shares
+  with its base game; the library index is rebuilt once. Info's Controls says
+  Rename gives any game, a romhack too, a name of your own (C4; `a44cb04`,
+  `87386be`, `93434a6`).
 - **Removed:** the direct save/load patch: Save states always opens the
   in-game menu (Save, Load, Reset, Cheats). A game written to NOR by an older
   kernel with Save states alone keeps its old patch until written again
