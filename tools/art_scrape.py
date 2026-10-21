@@ -365,7 +365,7 @@ def scrape_one(fetcher, picks, out, dry_run):
             continue
         try:
             data = art.convert(path)
-        except (art.ArtError, OSError, Image.DecompressionBombError) as e:
+        except (art.ArtError, OSError, ValueError, Image.DecompressionBombError) as e:
             print(
                 f"art-scrape: {path.name}: not a picture art.py reads ({e})",
                 file=sys.stderr,
