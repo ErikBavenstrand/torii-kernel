@@ -246,7 +246,11 @@ def boot(name: str, sd: Path, cart: Path, out: Path, extra: list[str] = ()):
             parts = dest.strip("/").split("/")[:-1]
             for i in range(len(parts)):
                 folder = "::/" + "/".join(parts[: i + 1])
-                if subprocess.run(["mdir", "-i", str(cart / "sd.img"), folder], capture_output=True).returncode:
+                if subprocess.run(
+                    ["mdir", "-i", str(cart / "sd.img"), folder],
+                    capture_output=True,
+                    check=False,
+                ).returncode:
                     run(["mmd", "-i", str(cart / "sd.img"), folder])
             run(
                 [

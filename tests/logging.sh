@@ -451,14 +451,17 @@ settings)
   # for 80 frames before v0.3.2 and lost the keys pressed then. The line
   # saying so reaches the card from the menu's idle flush.
   new_card 65536 32
-  # Logging: A, RIGHT RIGHT (Errors, then Info), A keeps it, B leaves; home
-  # then moves at once, and rests for its idle flush
+  # Logging: A, RIGHT RIGHT (Errors, then Info), A keeps it, B leaves; the
+  # carousel then turns (LEFT), and home rests for its idle flush
   # shellcheck disable=SC2046 # nav.sh's options
-  boot $(nav_setting logging) $(nav_press A RIGHT RIGHT A B) -w "nav: home ready" -k @8:DOWN -k @12:- -k @420:-
-  moved=$(grep -n 'frame-cycles: home-move' "$cart/kernel.log" | head -1 | cut -d: -f1)
+  boot $(nav_setting logging) $(nav_press A RIGHT RIGHT A B) -w "nav: home ready" -k @8:LEFT -k @12:- -k @420:-
+  back=$(grep -n 'nav: back from settings' "$cart/kernel.log" | head -1 | cut -d: -f1)
+  ready=$(grep -n 'nav: home ready' "$cart/kernel.log" | tail -1 | cut -d: -f1)
   opened=$(grep -n 'log: opened in the background' "$cart/kernel.log" | head -1 | cut -d: -f1)
-  [ -n "$moved" ] && [ -n "$opened" ] || fail "LOGGING wasn't saved, home didn't move, or the log wasn't opened in the background"
-  [ "$moved" -lt "$opened" ] || fail "DOWN while the log was being made didn't move home at once"
+  turned=$(tail -n +"${ready:-1}" "$cart/kernel.log" | grep -c 'frame-cycles: carousel-step' || true)
+  [ -n "$back" ] && [ -n "$opened" ] || fail "LOGGING wasn't saved, or the log wasn't opened in the background"
+  [ "$opened" -gt "$back" ] || fail "the log was opened before Settings was left"
+  [ "$turned" -gt 0 ] || fail "LEFT didn't turn the carousel after Settings was left"
   [ "$(mtype -i "$cart/sd.img" ::/torii/logs/torii-0.log | wc -c)" = 65536 ] || fail "the log file isn't 64 KB"
   [ "$(log 0 | head -1)" = "torii log 00000001     " ] || fail "header: $(log 0 | head -1)"
   has "settings: LOGGING is info"
