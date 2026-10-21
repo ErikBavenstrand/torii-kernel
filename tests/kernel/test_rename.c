@@ -119,6 +119,11 @@ static const char *const files[] = {
 	"/torii/art/custom/Game.gba.bin",
 	"/torii/art/custom/New.gba.bin",
 	"/torii/art/custom/new.gba.bin",
+	T_DIR "/Share.gba",
+	T_DIR "/Shared.gba",
+	"/SAVER/Share.sav",
+	"/SAVER/Shared.sav",
+	"/.T18h/Share.gba",
 	T_DIR "/Roll.gba",
 	T_DIR "/Rolled.gba",
 	"/SAVER/Roll.sav",
@@ -246,6 +251,17 @@ void test_rename_file(void)
 	CHECK(holds("/SAVER/Two.sav", "two's save") && !there("/SAVER/Two2.sav"));
 	CHECK(!there("/torii/rename.txt"));
 
+	// Another game with its save in a hidden folder, which the index never
+	// holds: the save stays with it
+	CHECK(put(T_DIR "/Share.gba", "share"));
+	CHECK(put("/SAVER/Share.sav", "share's save"));
+	CHECK(put("/.T18h/Share.gba", "a hidden game"));
+	CHECK_EQ(action_rename_file(T_DIR "/Share.gba", "Shared.gba"), ACTION_RENAME_SHARED);
+	CHECK(there(T_DIR "/Share.gba") && holds("/SAVER/Share.sav", "share's save") && !there(T_DIR "/Shared.gba"));
+	f_unlink("/.T18h/Share.gba");
+	CHECK_EQ(action_rename_file(T_DIR "/Share.gba", "Shared.gba"), ACTION_RENAMED);
+	CHECK(holds("/SAVER/Shared.sav", "share's save"));
+
 	// A move the card refuses (the save states, after the save and save
 	// type moved): everything goes back, the lists stay
 	CHECK(put(T_DIR "/Roll.gba", "roll"));
@@ -280,5 +296,6 @@ void test_rename_file(void)
 	f_unlink("/RTS");
 	f_unlink("/PATCH");
 	f_unlink(T_DIR);
+	f_unlink("/.T18h");
 	userdata_test_paths(NULL, NULL, NULL);
 }

@@ -14,6 +14,7 @@
 #include "safefile.h"
 #include "tlog.h"
 #include "userdata.h"
+#include "engine/cycles.h"
 #include "ui/dialog.h"
 #include "ui/ui.h"
 
@@ -339,6 +340,93 @@ static int there_shared(const char *path, const char *save)
 	return 0;
 }
 
+// The walk for another game with the save (share_walk): the folders open on
+// the way down, the entry read and the path of the folder it's in
+#define SHARE_DEPTH 8  // as the library's walk; a deeper folder can't be checked
+struct share_walk {
+	DIR dirs[SHARE_DEPTH];  // first: word-aligned
+	FILINFO fi;
+	char path[USERDATA_PATH_MAX];
+	char save[SAVE_NAME_MAX];
+	u16 len[SHARE_DEPTH];
+};
+_Static_assert(sizeof(struct share_walk) <= READCACHE_SHARE_SIZE, "the share walk's part of pReadCache");
+_Static_assert(READCACHE_SHARE + READCACHE_SHARE_SIZE <= READCACHE_RENAME, "the share walk reaches the rename's");
+#define SW ((struct share_walk *)(void *)(pReadCache + READCACHE_SHARE))
+
+enum {
+	SHARE_NONE,
+	SHARE_FOUND,
+	SHARE_UNSURE
+};
+
+// Whether a game file other than path has the save file save, on the whole
+// card: hidden folders and games the index doesn't hold too (past its cap,
+// names too long). SHARE_UNSURE when a folder can't be read or is too deep.
+static u32 share_walk(const char *path, const char *save)
+{
+	struct share_walk *sw = SW;
+	u32 start = cycles_now(), files = 0, result = SHARE_NONE;
+	s32 depth = 0;
+	if (f_opendir(&sw->dirs[0], "/") != FR_OK)
+		return SHARE_UNSURE;
+	sw->path[0] = 0;
+	sw->len[0] = 0;
+	for (;;) {
+		DIR *dir = &sw->dirs[depth], *sub = depth + 1 < SHARE_DEPTH ? &sw->dirs[depth + 1] : NULL;
+		FRESULT fr = f_readdir_sub(dir, &sw->fi, sub);
+		const char *name = sw->fi.fname;
+		if (fr != FR_OK) {
+			tlog("rename: %s can't be read (FatFs %u): its games' saves can't be checked",
+			     depth ? sw->path : "/", (unsigned)fr);
+			result = SHARE_UNSURE;
+			break;
+		}
+		if (!name[0]) {  // the folder is done
+			f_closedir(dir);
+			if (depth-- == 0)
+				break;
+			sw->path[sw->len[depth]] = 0;
+			continue;
+		}
+		if (sw->fi.fattrib & 0x08)
+			continue;  // a volume label
+		u32 n = (u32)strlen(name), len = sw->len[depth];
+		if (sw->fi.fattrib & AM_DIR) {
+			if (!sub || !sub->obj.fs || len + 1 + n >= sizeof(sw->path)) {
+				if (sub && sub->obj.fs)
+					f_closedir(sub);
+				tlog("rename: %s/%s is too deep to check for its save", sw->path, name);
+				result = SHARE_UNSURE;
+				break;
+			}
+			sw->path[len] = '/';
+			memcpy(sw->path + len + 1, name, n + 1);
+			sw->len[++depth] = (u16)(len + 1 + n);
+			continue;
+		}
+		u32 console = library_console_of(name);
+		if (console == LIB_CONSOLE_NONE)
+			continue;
+		files++;
+		save_name(sw->save, name, console);
+		if (!same_name(sw->save, save))
+			continue;
+		// The file itself: its folder and name are path's
+		const char *slash = strrchr(path, '/');
+		if ((u32)(slash - path) == len && !strncmp(path, sw->path, len) && same_name(slash + 1, name))
+			continue;
+		tlog("rename %s: %s/%s has its save %s", path, sw->path, name, save);
+		result = SHARE_FOUND;
+		break;
+	}
+	while (result != SHARE_NONE && depth >= 0)
+		f_closedir(&sw->dirs[depth--]);  // the folders the walk left open
+	tlog("rename: %lu games on the card checked for the save in %lu ms", (unsigned long)files,
+	     (unsigned long)(cycles_since(start) / 16780u));
+	return result;
+}
+
 // 1 if a new name for a file is one the card and the menu keep
 static u32 name_check(const char *name)
 {
@@ -432,18 +520,28 @@ u32 action_rename_file(const char *path, const char *new_name)
 			tlog("rename %s: a save still waits to be copied", path);
 			return ACTION_RENAME_PENDING;
 		}
+		int any = 0;
+		for (u32 i = 0; i < SIDECARS; i++) {
+			w->has[i] = side_path(w->from, &sidecars[i], w->name, console) && there(w->from);
+			any |= w->has[i] && !sidecars[i].cache;
+		}
 		// A save another game shares (the same name in another folder, or
-		// a .gb and .gbc of one name) stays with it: moving it would take
-		// it away
-		if (!case_only && there_shared(path, save)) {
-			tlog("rename %s: another game uses its save %s", path, save);
+		// a .gb and .gbc of one name) stays with it: moving it, or its save
+		// type or states, would take them away. The index first, then the
+		// whole card (hidden folders, games past the index's cap); when a
+		// folder can't be checked, nothing moves
+		u32 shared = SHARE_NONE;
+		if (!case_only && any)
+			shared = there_shared(path, save) ? SHARE_FOUND : share_walk(path, save);
+		if (shared != SHARE_NONE) {
+			tlog("rename %s: %s its save %s", path,
+			     shared == SHARE_FOUND ? "another game uses" : "can't check who else uses", save);
 			return ACTION_RENAME_SHARED;
 		}
 		// Nothing lands on another game's file, its own or one a deleted
 		// game left (a new case of its own name keeps its own files)
 		for (u32 i = 0; i < SIDECARS; i++) {
 			const struct sidecar *s = &sidecars[i];
-			w->has[i] = side_path(w->from, s, w->name, console) && there(w->from);
 			if (s->cache || case_only || !side_path(w->to, s, new_name, console))
 				continue;
 			if (there(w->to)) {
