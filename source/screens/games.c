@@ -598,9 +598,22 @@ static void fav_key(u32 rec, const char *path, u32 *words)
 	games_key_words(key, words);
 }
 
+// Two paths by their folders, as the index orders its ties ("/" the root's)
+static int folder_cmp(const char *a, const char *b)
+{
+	u32 la = (u32)(file_name(a) - a), lb = (u32)(file_name(b) - b);
+	la = la > 1 ? la - 1 : la;  // without the slash, but the root's
+	lb = lb > 1 ? lb - 1 : lb;
+	for (u32 i = 0;; i++) {
+		u32 ca = i < la ? (u8)a[i] : 0, cb = i < lb ? (u8)b[i] : 0;
+		if (ca != cb || !ca)
+			return (int)ca - (int)cb;
+	}
+}
+
 // Favourites a and b (userdata's order) by their keys' first words (ka,
 // kb), the rest of their keys, then as the library ties: file names, then
-// paths
+// folders
 static int key_cmp(const u32 *ka, u32 ra, u32 a, const u32 *kb, u32 rb, u32 b)
 {
 	for (u32 w = 0; w < KEY_WORDS; w++)
@@ -611,7 +624,7 @@ static int key_cmp(const u32 *ka, u32 ra, u32 a, const u32 *kb, u32 rb, u32 b)
 		c = strcmp(library_key(ra) + KEY_BYTES, library_key(rb) + KEY_BYTES);  // both go on
 	if (!c)
 		c = strcmp(file_name(fav_path(a)), file_name(fav_path(b)));
-	return c ? c : strcmp(fav_path(a), fav_path(b));
+	return c ? c : folder_cmp(fav_path(a), fav_path(b));
 }
 
 static int fav_cmp(void *ctx, u32 a, u32 b)
@@ -734,19 +747,31 @@ static void build_favs(void)
 // userdata's version was ver, and changed if the favourites did. Its word
 // goes in or out of the kept order in place, if that was kept; else the
 // next visit sorts them again.
-static void cache_changed(const char *path, u32 rec, int on, u32 ver)
+//
+// steps writes were made since ver (done: 1 if each succeeded), and changed
+// says whether path's state differs from before them (a toggle off and on
+// again doesn't).
+static void cache_changed(const char *path, u32 rec, int on, int changed, int done, u32 ver, u32 steps)
 {
 	u32 now = userdata_fav_version();
 	if (now == ver)
 		return;  // nothing changed
 	u32 key[3];
 	cache_key(key);
-	int ok = games.fav_cached && now == ver + 1 && key[0] == games.fav_key[0] && key[1] == games.fav_key[1] &&
-		 games.fav_key[2] == ver && words_sum((const u32 *)PSRAM_GAMES_BASE, games.fav_count) == games.fav_sum;
-	games.fav_cached = 0;
+	int ok = done && games.fav_cached && now == ver + steps && key[0] == games.fav_key[0] &&
+		 key[1] == games.fav_key[1] && games.fav_key[2] == ver &&
+		 words_sum((const u32 *)PSRAM_GAMES_BASE, games.fav_count) == games.fav_sum;
+	games.fav_cached = 0;  // a failed write: sorted again next visit
+	if (!ok)
+		return;
+	if (!changed) {
+		games.fav_key[2] = now;
+		games.fav_cached = 1;
+		return;
+	}
 	int found;
 	u32 idx = userdata_fav_find(path, &found), n = games.fav_count;
-	if (!ok || found != on || (on && n >= USERDATA_FAV_MAX))
+	if (found != on || (on && n >= USERDATA_FAV_MAX))
 		return;
 	u32 *words = (u32 *)build_area()->next;
 	memcpy(words, (const u32 *)PSRAM_GAMES_BASE, n * 4);
@@ -1283,7 +1308,14 @@ static void rename_game(u32 row)
 	}
 }
 
-// The game popup for row i, run after the frame
+// The game popup for row i, run after the frame. On the Favourites page
+// its favourite's changes reach the kept order once it has closed.
+#define FAV_SETTLE() \
+	do { \
+		if (games.kind == KIND_FAV && fav_steps) \
+			cache_changed(games.pick, g.rec, fav, fav != fav_was, fav_done, fav_ver, fav_steps); \
+		fav_steps = 0; \
+	} while (0)
 static void popup_run(u32 i)
 {
 	struct game g;
@@ -1293,6 +1325,8 @@ static void popup_run(u32 i)
 	const char *name = game_name(&g, games.name);
 	snprintf(games.title, sizeof(games.title), "%s", name);
 	int nor = userdata_nor_name(games.pick) != 0, fav = userdata_fav_has(games.pick), fav_was = fav;
+	u32 fav_ver = userdata_fav_version(), fav_steps = 0;
+	int fav_done = 1;
 	int gba = !nor && g.console == LIB_GBA;
 	games.popup = (struct ui_popup){games.title, (u8)(g.console < LIB_CONSOLES ? console_icons[g.console] + 1 : 0),
 					games.items, 0, 0};
@@ -1318,9 +1352,17 @@ static void popup_run(u32 i)
 		u32 action = games.actions[pick], hard = (ui_input()->held & INPUT_L) != 0;
 		if (action == LANG_POP_FAV) {
 			u32 ver = userdata_fav_version();
-			if (userdata_fav_set(games.pick, !fav))
+			int done = userdata_fav_set(games.pick, !fav);
+			if (done)
 				fav = !fav;
-			cache_changed(games.pick, g.rec, fav, ver);
+			if (games.kind == KIND_FAV) {
+				// The page's own rows: its order changes once the popup has
+				// closed (fav_settle), not under it
+				fav_steps++;
+				fav_done &= done;
+			} else {
+				cache_changed(games.pick, g.rec, fav, 1, done, ver, 1);
+			}
 			games.items[fav_item].value = fav ? gl_games->on : gl_games->off;
 			ui_popup_changed(fav_item);
 			if (games.kind != KIND_FAV)
@@ -1335,6 +1377,7 @@ static void popup_run(u32 i)
 			if (!ui_confirm(hints, &ask))
 				continue;  // Cancel: back to the popup
 			ui_popup_close();
+			FAV_SETTLE();
 			if (action_delete_file(games.pick))
 				relist(i);
 			else
@@ -1342,6 +1385,7 @@ static void popup_run(u32 i)
 			return;
 		}
 		ui_popup_close();
+		FAV_SETTLE();
 		// A favourite dropped leaves the Favourites page before a launch
 		// that may come back (Game info and Rename list the page again)
 		if (fav != fav_was && games.kind == KIND_FAV && action != LANG_POP_INFO && action != LANG_POP_RENAME)
@@ -1367,6 +1411,7 @@ static void popup_run(u32 i)
 		}
 	}
 	ui_popup_close();
+	FAV_SETTLE();
 	if (fav != fav_was && games.kind == KIND_FAV)
 		relist(i);  // a favourite dropped leaves the page
 }

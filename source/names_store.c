@@ -494,6 +494,10 @@ int names_load_step(void)
 		psram_begin();
 		if (N.at == 0) {
 			names_cache_init(&N.cache, (u8 *)PSRAM_NAMES_CACHE_BASE, put);
+			if (!N.again) {
+				lines_begin();  // nothing of an earlier load's chunk
+				N.main_end = 0;
+			}
 			memset(N.fresh, 0, sizeof(N.fresh));  // the journal says again what is new
 			memset(N.writing, 0, sizeof(N.writing));
 		}
@@ -1044,13 +1048,16 @@ void names_poll(void)
 		N.job = job_start(names_job, 0, JOB_OWNER_NONE);
 }
 
-// 1 if a record's CRC isn't in crc.txt yet
-static int journal_due(void)
+static u32 journal_line(void *ctx, u32 n, char *buf, u32 size);
+
+// The journal's text, bytes; 0 if crc.txt holds every record
+static u32 journal_bytes(void)
 {
-	for (u32 i = 0; i < sizeof(N.fresh); i++)
-		if (N.fresh[i] | N.writing[i])
-			return 1;
-	return 0;
+	u32 bytes = 0, len;
+	struct line_cursor lc;
+	for (u32 n = 0; (len = journal_line(&lc, n, N.lines.buf, sizeof(N.lines.buf))) != 0; n++)
+		bytes += len;
+	return bytes;
 }
 
 // The journal's lines: the records crc.txt doesn't hold yet (lc->rec
@@ -1080,8 +1087,17 @@ static u32 journal_line(void *ctx, u32 n, char *buf, u32 size)
 // new, so the next write of crc.txt takes them
 static void journal_read(void)
 {
-	if (!N.cache_ok || safefile_open(NAMES_JOURNAL, NAMES_JOURNAL_MAX) == SAFEFILE_NONE)
+	if (!N.cache_ok)
 		return;
+	if (safefile_open(NAMES_JOURNAL, NAMES_JOURNAL_MAX) == SAFEFILE_NONE) {
+		if (safefile_failed()) {
+			// Too large or unreadable: never read, so it goes (its CRCs
+			// are computed again), and later launches can write one
+			f_unlink(NAMES_JOURNAL);
+			f_unlink(NAMES_JOURNAL_BAK);
+		}
+		return;
+	}
 	N.journal = 1;
 	u32 kept = 0;
 	int len;
@@ -1109,7 +1125,15 @@ void names_before_launch(void)
 		tlog("names: identifying stopped for a launch (%lu of %lu games done)", (unsigned long)N.done,
 		     (unsigned long)N.total);
 	N.mode = M_NONE;
-	if (N.phase == P_DONE && N.cache_ok && N.active && journal_due()) {
+	u32 bytes = N.phase == P_DONE && N.cache_ok && N.active ? journal_bytes() : 0;
+	if (bytes > NAMES_JOURNAL_MAX - 64) {
+		// Too many for the journal (a launch during Identify library, say):
+		// crc.txt whole, as before
+		psram_begin();
+		write_begin();
+		while (N.wphase != X_IDLE)
+			write_step();
+	} else if (bytes) {
 		// PSRAM is about to hold the game: the CRCs crc.txt doesn't hold
 		// go to the journal, a few lines (crc.txt's rewrite would take
 		// about half a second per thousand records)
@@ -1124,4 +1148,5 @@ void names_before_launch(void)
 	}
 	N.phase = P_START;
 	N.db_ok = 0;
+	N.again = 0;  // the next load starts over
 }

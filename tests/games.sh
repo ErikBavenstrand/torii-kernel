@@ -165,10 +165,11 @@ boot "$cart/5.log" $(nav_launch /A.gba addon save=3) -u "launch: loading" -f 150
 [ "$(mde A)" = 0302 ] || fail "after a launch with save type 3, A.mde holds $(mde A), not 03 02"
 echo "PASS: a launch's save type keeps the game's boot mode"
 
-# The Favourites page's order is kept between visits and changed in place:
-# B turned off and on again in its popup, then off; the rows follow (the
-# emulator checks each change against a whole sort), and only the first
-# visit sorts. Favourites in three runs: GBA, GB and one not on the card.
+# The Favourites page's order is kept between visits and changed in place
+# once a popup closes: B turned off and on again in its popup (no change),
+# then off; the rows follow (the emulator checks the change against a whole
+# sort), and only the first visit sorts. Favourites in three runs: GBA, GB
+# and one not on the card.
 cart=$carts/games-fav
 rm -rf "$cart" && mkdir -p "$cart"
 mkfs.fat -C -F 32 -n GAMES "$cart/sd.img" 65536 >/dev/null
@@ -185,7 +186,15 @@ boot "$cart/1.log" $(nav_game_menu fav 1) -k @8:DOWN -k @12:- -k @20:A -k @24:- 
   -w "popup: closed" -k @20:START -k @24:- -w "screen ready: game-popup C" -f 3000
 grep -q "^kernel: screen ready: game-popup C" "$cart/1.log" ||
   fail "after B went, row 1 isn't C: $(grep -E '^kernel: (screen ready|games|userdata)' "$cart/1.log" | tail -6)"
-[ "$(grep -c '^kernel: games: favourite /B.gba .* in place' "$cart/1.log")" = 3 ] ||
-  fail "B's changes weren't made in place: $(grep '^kernel: games' "$cart/1.log")"
+[ "$(grep -c '^kernel: games: favourite /B.gba out in place' "$cart/1.log")" = 1 ] ||
+  fail "B's going wasn't made in place: $(grep '^kernel: games' "$cart/1.log")"
 grep -q "^kernel: games: 4 favourites kept" "$cart/1.log" || fail "the page sorted again: $(grep '^kernel: games' "$cart/1.log")"
+# A favourite added from the GBA page (B, row 1) goes into the kept order
+# in place (the GB page's run and the one not on the card around it)
+# shellcheck disable=SC2046 # nav.sh's options
+boot "$cart/2.log" $(nav_game fav 0) -k @20:B -k @24:- -w "nav: home ready" -k @8:RIGHT -k @12:- -k @20:A -k @24:- \
+  -w "nav: page gba ready" -k @8:DOWN -k @12:- -k @20:START -k @24:- -w "screen ready: game-popup B" \
+  -k @12:DOWN -k @16:- -k @24:A -k @28:- -w "userdata: favourite /B.gba on" -f 3000
+grep -q '^kernel: games: favourite /B.gba in in place' "$cart/2.log" ||
+  fail "B's coming back wasn't made in place: $(grep '^kernel: games' "$cart/2.log")"
 echo "PASS: Favourites keeps its order between visits and changes it in place"

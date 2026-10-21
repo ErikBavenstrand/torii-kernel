@@ -626,6 +626,9 @@ int gamename_custom_step(struct gamename_custom *c, u32 work)
 				line[c->n++] = line[c->i];
 			c->i++;
 			break;
+		default:
+			c->phase = CP_DONE;
+			break;
 		}
 	}
 	return c->phase == CP_DONE;
