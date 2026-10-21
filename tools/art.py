@@ -127,16 +127,14 @@ def distance(a: tuple[int, int, int], r: int, g: int, b: int) -> int:
     return ((512 + mean) * dr * dr >> 8) + 4 * dg * dg + ((767 - mean) * db * db >> 8)
 
 
-def palette_of(
-    img: Image.Image, count: int = COLOURS - 1
-) -> list[tuple[int, int, int]]:
-    """Up to count (15) colours of the GBA's for img, darkest first: median cut,
+def palette_of(img: Image.Image) -> list[tuple[int, int, int]]:
+    """Up to 15 colours of the GBA's for img, darkest first: median cut,
     then each colour moved to its pixels' (refined twice). A colour most of
     whose pixels are one colour becomes that colour exactly, so flat areas
     match it and dither nothing; a slot freed so goes to the colour worst
     served."""
     reduced = img.quantize(
-        colors=count,
+        colors=COLOURS - 1,
         method=Image.Quantize.MEDIANCUT,
         kmeans=8,
         dither=Image.Dither.NONE,
@@ -168,7 +166,7 @@ def palette_of(
                     )
                 )
         palette = sorted(moved)
-        while len(palette) < count and len(palette) < len(counts):
+        while len(palette) < COLOURS - 1 and len(palette) < len(counts):
             worst = max(
                 sorted(counts.items()),
                 key=lambda kv: kv[1] * min(distance(p, *kv[0]) for p in palette),

@@ -587,8 +587,6 @@ def art_sources() -> tuple[str, str]:
             f"\t\t{c_halves(dark)},",
             "\t},",
         ]
-    data += ["};", "", "const char *const art_box_names[ART_BOX_COUNT] = {"]
-    data += [f'\t[{c_id("ART_BOX", n)}] = "{n}",' for n in box_names]
     data += ["};", ""]
     data += ["const struct art_item art_items[ART_ITEM_COUNT] = {"]
     for item, icon16, icon8, sprite in items:

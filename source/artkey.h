@@ -5,9 +5,6 @@
 //
 //	/torii/art/<CRC32>.bin           matched art by the whole file's CRC32,
 //	                                 8 hex digits (B23's scraper writes it)
-//	/torii/art/box-<console>.bin     a console's placeholder box (gba,
-//	                                 gbc, gb, nes: art_box_names), made by
-//	                                 the scraper from an official box
 //	/torii/art/custom/<name>.bin     custom art by the game's file name,
 //	                                 extension included ("Foo (USA).gba.bin",
 //	                                 `just art-add`)
@@ -30,16 +27,12 @@ enum {
 	ARTKEY_NONE = 0,
 	ARTKEY_CUSTOM,
 	ARTKEY_CRC,
-	ARTKEY_BOX,
 };
 
-#define ARTKEY_BOX_PREFIX "box-"
-#define ARTKEY_BOX_PREFIX_LEN 4
-
-// The kind of a file name in /torii/art (ARTKEY_CRC or ARTKEY_BOX) with
-// its key in *key (the CRC32, or artkey_name of the console after "box-"),
-// or ARTKEY_NONE for any other name (art by GBA game code, <CODE>.bin,
-// which v0.4.1 read, isn't since C4).
+// The kind of a file name in /torii/art (ARTKEY_CRC) with its key, the
+// CRC32, in *key, or ARTKEY_NONE for any other name (art by GBA game code,
+// <CODE>.bin, which v0.4.1 read, isn't since C4, nor C2's placeholder
+// boxes, box-<console>.bin, since D2).
 u32 artkey_parse(const char *name, u32 *key);
 // The length of a custom art file's game name: name's length less ".bin"
 // (any case), or 0 if it doesn't end so or is nothing else.

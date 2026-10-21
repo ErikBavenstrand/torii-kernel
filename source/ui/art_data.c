@@ -1415,14 +1415,6 @@ const u16 art_box_palettes[ART_BOX_COUNT][2][16] = {
 	},
 };
 
-const char *const art_box_names[ART_BOX_COUNT] = {
-	[ART_BOX_GB] = "gb",
-	[ART_BOX_GBA] = "gba",
-	[ART_BOX_GBC] = "gbc",
-	[ART_BOX_NES] = "nes",
-	[ART_BOX_OTHER] = "other",
-};
-
 const struct art_item art_items[ART_ITEM_COUNT] = {
 	[ART_ITEM_RECENT] = {ART_ICON16_RECENT, ART_ICON8_RECENT, ART_SPRITE_RECENT},
 	[ART_ITEM_FAV] = {ART_ICON16_FAV, ART_ICON8_FAV, ART_SPRITE_FAV},

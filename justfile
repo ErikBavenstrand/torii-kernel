@@ -352,9 +352,9 @@ art-add +args:
 
 # Fetch box art for an SD card's games from libretro-thumbnails, e.g. `just art-scrape /Volumes/OMEGA`:
 # /torii/art/<CRC32>.bin, matched by CRC through the No-Intro dats (dist/dats), keeping custom art and
-# art already there, and each console's placeholder, /torii/art/box-<console>.bin (an official box with
-# a torii for its artwork). Pictures are cached in the git-ignored dist/art-cache. Box art has no licence
-# grant: keep it on your card, never publish it. --dry-run, --offline, --console: see --help
+# art already there, and deleting the old placeholders /torii/art/box-<console>.bin. Pictures are
+# cached in the git-ignored dist/art-cache. Box art has no licence grant: keep it on your card, never
+# publish it. --dry-run, --offline, --console: see --help
 [positional-arguments]
 art-scrape sd_path *args:
     uv run -q tools/art_scrape.py "$@"

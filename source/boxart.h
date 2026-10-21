@@ -8,11 +8,7 @@
 //	2. matched art by the game's CRC32, from the CRC cache (/torii/crc.txt,
 //	   namesdb.h); never by a GBA game code, which a romhack shares with its
 //	   base game (C4);
-//	3. the card's placeholder for the game's console, /torii/art/box-gba.bin
-//	   and so on: an official box with its artwork replaced by a torii,
-//	   which `just art-scrape` makes on the PC (nothing of it is in the
-//	   kernel);
-//	4. the kernel's own placeholder box for the console (ui/art.h).
+//	3. the placeholder box drawn for the game's console (ui/art.h).
 // Lookups never touch the card: a background job lists /torii/art and
 // /torii/art/custom once (after each boot, and after anything overwrote
 // PSRAM) into a set in PSRAM (PSRAM_ART_BASE), so a game without art costs
