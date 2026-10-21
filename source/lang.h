@@ -87,6 +87,7 @@ extern char **gl_set_explain;
 extern char **gl_set_onoff;
 extern char **gl_set_themes;
 extern char **gl_set_views;
+extern char **gl_set_boots;
 extern char **gl_set_starts;
 extern char **gl_set_modes_b;
 extern char **gl_set_colours;
@@ -203,22 +204,25 @@ enum {
 	LANG_INFO_FOLDER,
 	LANG_INFO_PLAYED,
 	LANG_INFO_SAVE_TYPE,
+	LANG_INFO_BOOT_MODE,
 	LANG_INFO_HARD_RESET,
 	LANG_INFO_KEYS,
 };
 struct lang_games {
 	const char *empty;  // a list with no game (left)
-	const char *hint_play, *hint_menu, *hint_letter, *hint_save_type, *hint_pick;
+	const char *hint_play, *hint_menu, *hint_letter, *hint_pick;
 	const char *pop[LANG_POP_ITEMS];  // the game popup's items
 	const char *off, *on;  // Favourite's value
 	const char *delete_text;  // under the Delete confirmation's "Delete <name>?" (EN_GAME_DELETE)
 	const char *delete_button;
 	const char *save_type_failed;  // Game info's save type couldn't be written
+	const char *boot_mode_failed;  // nor its boot mode
 	const char *info_keys[LANG_INFO_KEYS];  // Game info's lines
 	const char *consoles[4];  // by LIB_GBA...: Game info's Console
 	const char *nor;  // a game NOR game's folder
 	const char *hard_reset;  // Game info's Hard reset line: how
 	const char *save_types[6];  // by save type (actions.h: 0 AUTO ...)
+	const char *boot_modes[3];  // by a game's boot mode (actions.h: ACTION_BOOT_*)
 	const char *size_kb, *size_mb;
 	const char *fact_size, *fact_played;  // list with art: the facts under the box
 };

@@ -55,6 +55,7 @@ enum settings_id {
 	SET_CLOCK_24H,
 	SET_GAME_CLOCK,  // games can read the cart's clock
 	// Games
+	SET_BOOT_MODE,  // how A, Play and Launch start GBA games: enum settings_boot
 	SET_ENGINE,     // the built-in table of patch points before scanning the ROM
 	SET_AUTO_SAVE,  // a game's save copied to the card without asking
 	SET_RTS,        // real-time save (save states)
@@ -101,6 +102,13 @@ enum settings_start {
 	SET_START_GB,
 	SET_START_NES,
 	SET_STARTS
+};
+
+// SET_BOOT_MODE's values, stored as they are
+enum settings_boot {
+	SET_BOOT_ADDONS,  // with the addons the Games rows turn on (v0.4's A)
+	SET_BOOT_CLEAN,
+	SET_BOOTS
 };
 
 enum settings_action {

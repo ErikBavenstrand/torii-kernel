@@ -58,7 +58,7 @@
 static const struct ui_card_config card = {4, 4, 4, 1, 0};
 
 // --- Behaviour -----------------------------------------------------------------
-#define PAGE_ROWS 8              // LEFT/RIGHT move a screenful, as L/R do
+#define PAGE_ROWS 8              // LEFT/RIGHT move a screenful (L and R don't: L is the hard reset's)
 #define MEMO_FOLDERS 16          // folders whose cursor is remembered
 #define COUNT_REST 8             // frames the keys rest before folders are counted
 #define COUNT_CYCLES 40000       // cycles a counting step may take (a sector read or two)
@@ -81,6 +81,7 @@ enum {
 	POP_OPEN,
 	POP_LAUNCH,
 	POP_CLEAN,
+	POP_ADDON,
 	POP_NOR,
 	POP_NOR_ADDON,
 	POP_FAV,
@@ -175,7 +176,8 @@ enum {
 static const struct ui_title_config title = {"", "", ART_ICON16_SD};
 static const struct ui_hints_config hints_config = {0, 0};  // enter's
 static const struct ui_label_config note_label = {"", UI_FONT_BODY, UI_ALIGN_CENTER, 0, 0};
-static const struct ui_list_config list = {&model, UI_ROW_PITCH_LIST, UI_LIST_WRAP | UI_LIST_MARQUEE | UI_LIST_ICON8,
+static const struct ui_list_config list = {&model, UI_ROW_PITCH_LIST,
+					   UI_LIST_WRAP | UI_LIST_MARQUEE | UI_LIST_ICON8 | UI_LIST_NO_SHOULDERS,
 					   DETAIL_W, LIST_PAD};
 static const struct ui_scrollbar_config bar = {N_LIST};
 
@@ -636,14 +638,20 @@ static int any_addon(void)
 	       Read_SET_info(assress_v_sleep) == 1 || Read_SET_info(assress_v_cheat) == 1;
 }
 
-// Launch, and A on a game: with the addons Settings turns on, if any
-static u32 launch_how(void)
+// 1 if Launch starts the game at sd.full clean: its own boot mode says so,
+// or it has none and Settings' GBA boot mode does
+static int boots_clean(void)
 {
-	return any_addon() ? ACTION_ADDON : ACTION_CLEAN;
+	struct action_facts facts;
+	if (!action_game_facts(sd.full, &facts))
+		return 0;
+	if (facts.boot_mode != ACTION_BOOT_DEFAULT)
+		return facts.boot_mode == ACTION_BOOT_CLEAN;
+	return Read_SET_info(assress_boot_mode) == 1;
 }
 
-static const char *const how_words[ACTION_HOWS] = {"launch", "launch with addon", "write to NOR",
-						   "write to NOR with addon"};
+static const char *const how_words[ACTION_HOWS + 1] = {"launch", "launch with addon", "write to NOR",
+						       "write to NOR with addon", "launch by boot mode"};
 
 // Starts the game at sd.full (actions.h): returns only if it didn't start,
 // with the engine left; the shell brings the page back
@@ -752,7 +760,12 @@ static void file_popup(u32 arg)
 		pop_add(POP_OPEN, gl_sd_open, 0);
 	} else if (console != LIB_CONSOLE_NONE) {
 		pop_add(POP_LAUNCH, gl_sd_launch, 0);
-		if (any_addon())  // a game patches break can always start clean
+		// The other way to start it than Launch's: clean (a game patches
+		// break can always start clean), or a GBA game that boots clean with
+		// its addons (a popup has no room for both)
+		if (any_addon() && console == LIB_GBA && boots_clean())
+			pop_add(POP_ADDON, gl_games->pop[LANG_POP_ADDON], 0);
+		else if (any_addon())
 			pop_add(POP_CLEAN, gl_sd_clean, 0);
 		if (console == LIB_GBA) {  // only GBA games go to the game NOR
 			pop_add(POP_NOR, gl_sd_nor, 0);
@@ -803,10 +816,13 @@ static void file_popup(u32 arg)
 			folder_in(i);
 			break;
 		case POP_LAUNCH:
-			launch(launch_how(), hard);
+			launch(ACTION_DEFAULT, hard);
 			break;
 		case POP_CLEAN:
 			launch(ACTION_CLEAN, hard);
+			break;
+		case POP_ADDON:
+			launch(ACTION_ADDON, hard);
 			break;
 		case POP_NOR:
 			launch(ACTION_NOR, hard);
@@ -825,7 +841,7 @@ static void file_popup(u32 arg)
 	}
 }
 
-// A on an entry: a folder opens, a game starts (launch_how), anything else
+// A on an entry: a folder opens, a game starts (ACTION_DEFAULT), anything else
 // shows its popup
 static void activate(u32 arg)
 {
@@ -840,7 +856,7 @@ static void activate(u32 arg)
 	} else if (!take_entry(i)) {
 		error(8);
 	} else {
-		launch(launch_how(), (arg & ARG_HARD) != 0);
+		launch(ACTION_DEFAULT, (arg & ARG_HARD) != 0);
 	}
 }
 

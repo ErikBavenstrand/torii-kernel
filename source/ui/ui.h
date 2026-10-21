@@ -551,6 +551,7 @@ enum {
 	UI_LIST_MARKS = 256,       // list: rows keep a column for item.mark before the text
 	UI_LIST_CONSOLES = 512,    // list: rows draw in UI_BANK_CONSOLES (the console inks and
 				   // the favourites' ink for marks; no item accent)
+	UI_LIST_NO_SHOULDERS = 1024,  // L and R don't page: held, L picks a hard reset with A
 };
 #define UI_LIST_ICON8_W 8
 

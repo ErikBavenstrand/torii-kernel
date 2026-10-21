@@ -1238,6 +1238,7 @@ u32 Game_pick(struct game_pick *g)
 	g->is_emu = Check_file_type(g->name);
 	g->havecht = 0;
 	g->save_num = g->old_save_num = 0;
+	g->boot_mode = 0;
 	if (g->is_emu == 0xff)  //can not boot
 		return 0;
 	if (g->is_emu) {  //GB, GBC and NES games only have CLEAN BOOT: start them without the menu
@@ -1246,7 +1247,7 @@ u32 Game_pick(struct game_pick *g)
 	}
 	f_chdir(currentpath);  //can open  re list game
 	g->havecht = Check_cheat_file(g->name);
-	g->old_save_num = Check_mde_file(g->name);
+	g->old_save_num = Check_mde_file(g->name, &g->boot_mode);
 	g->save_num = g->old_save_num;
 	return 1;
 }

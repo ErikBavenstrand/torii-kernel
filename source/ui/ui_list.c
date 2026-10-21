@@ -789,6 +789,8 @@ static int list_event(u8 node, const struct ui_event *e)
 		u16 key = keys[i];
 		if (!(e->keys & key))
 			continue;
+		if ((key & INPUT_PAGE) && (config(node)->flags & UI_LIST_NO_SHOULDERS))
+			return 0;
 		s32 delta = key == INPUT_UP || key == INPUT_DOWN ? 1 : page;
 		if (key == INPUT_UP || key == INPUT_L)
 			delta = -delta;

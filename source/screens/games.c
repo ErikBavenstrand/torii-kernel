@@ -69,7 +69,7 @@ static const struct ui_card_config card = {4, 4, 4, 1, 0};
 #define INFO_LINES_Y 32
 #define INFO_KEYS_W 72
 #define INFO_VALUES_W 136
-#define INFO_LINES_H 72  // six lines
+#define INFO_LINES_H 84  // seven lines
 
 #define AGO_POLL 30     // frames between checks of Recent's "played" texts
 #define AGO_MAX 16      // a "played" text's bytes, with its NUL
@@ -123,8 +123,10 @@ static struct {
 	struct ui_popup popup;
 	// Game info
 	char info_keys[96], info_values[GAMENAME_MAX + 96], info_size[AGO_MAX];
-	struct ui_hint info_hints[2];
+	struct ui_hint info_hints[3];
 	u32 info_type;  // the save type shown, ACTION_SAVE_TYPES: none (not a GBA game on the card)
+	u32 info_boot;  // the boot mode shown (ACTION_BOOT_*), with a save type
+	u8 info_field;  // the line LEFT/RIGHT change: 0 Save type, 1 Boot mode
 	u32 info_console;  // the game's
 	u8 info_done;
 	u32 rename_size, rename_console;  // the game Rename is about (games.pick)
@@ -289,7 +291,7 @@ static int model_fetch(void *ctx, u32 i, struct ui_item *out)
 		out->badge_ink = UI_ROLE_INK_FAV;
 	}
 	if (g.rec != LIBRARY_NONE && (library_flags(g.rec) & LIB_F_SAVE))
-		out->dot = ART_ICON8_DOT + 1;
+		out->dot = ART_ICON8_SAVE + 1;
 	if (games.art)
 		return UI_ITEM_READY;
 	if (games.kind == KIND_RECENT) {
@@ -348,7 +350,7 @@ static const struct ui_image_config box_image = {art_box_tiles, art_box_palette,
 static const struct ui_scrollbar_config bar_compact = {N_LIST_COMPACT};
 static const struct ui_scrollbar_config bar_art = {N_LIST_ART};
 
-#define LIST_FLAGS (UI_LIST_WRAP | UI_LIST_MARQUEE | UI_LIST_CONSOLES)
+#define LIST_FLAGS (UI_LIST_WRAP | UI_LIST_MARQUEE | UI_LIST_CONSOLES | UI_LIST_NO_SHOULDERS)
 static const struct ui_list_config list_plain = {&model, UI_ROW_PITCH_LIST, LIST_FLAGS, DETAIL_W, LIST_PAD};
 static const struct ui_list_config list_marks = {&model, UI_ROW_PITCH_LIST, LIST_FLAGS | UI_LIST_MARKS, DETAIL_W,
 						 LIST_PAD};
@@ -780,8 +782,9 @@ const struct nav_page games_page = {games_enter, games_row, 0, games_poll, 0};
 // --- Game info -----------------------------------------------------------------------
 // A page in the list's place: the game's name and console in the title bar,
 // and on the card its console, size, folder, when it was played, its save
-// type (a GBA game on the card: LEFT/RIGHT change it, written to its .mde
-// file as the page closes) and how to start it with a hard reset.
+// type and boot mode (a GBA game on the card: UP/DOWN pick one, LEFT/RIGHT
+// change it, written to its .mde file as the page closes) and how to start
+// it with a hard reset.
 
 static void reshow(u32 row);
 
@@ -807,14 +810,21 @@ static const struct ui_spec info_nodes[I_NODES] = {
 static int info_event(struct ui_view *v, const struct ui_event *e);
 static const struct ui_view_spec info_view = {"game-info", info_nodes, I_NODES, UI_NONE, 0, info_event};
 
-// The values' lines, the save type's between « » while it can change
+#define INFO_PICKED "\xC2\xAB %s \xC2\xBB\n"  // the line LEFT/RIGHT change
+#define INFO_OTHER "%s\n"
+
+// The values' lines, the picked one's between « »
 static void info_values(struct ui_view *v)
 {
 	const struct lang_games *s = gl_games;
-	char ago[AGO_MAX] = "", type[24] = "";
+	char ago[AGO_MAX] = "", type[48] = "";
 	userdata_ago_text(ago, sizeof(ago), played_time(games.pick));
-	if (games.info_type < ACTION_SAVE_TYPES)
-		snprintf(type, sizeof(type), "\xC2\xAB %s \xC2\xBB\n", s->save_types[games.info_type]);
+	if (games.info_type < ACTION_SAVE_TYPES) {
+		u32 o = (u32)snprintf(type, sizeof(type), games.info_field ? INFO_OTHER : INFO_PICKED,
+				      s->save_types[games.info_type]);
+		snprintf(type + o, sizeof(type) - o, games.info_field ? INFO_PICKED : INFO_OTHER,
+			 s->boot_modes[games.info_boot]);
+	}
 	const char *nor = userdata_nor_name(games.pick), *slash = strrchr(games.pick, '/');
 	int folder_len = nor ? (int)strlen(s->nor) : slash == games.pick ? 1 : (int)(slash - games.pick);
 	snprintf(games.info_values, sizeof(games.info_values), "%s\n%s\n%.*s\n%s\n%s%s",
@@ -829,22 +839,33 @@ static int info_event(struct ui_view *v, const struct ui_event *e)
 		return 0;
 	if (e->keys & ui_input()->pressed & (INPUT_A | INPUT_B)) {
 		games.info_done = 1;
-	} else if ((e->keys & (INPUT_LEFT | INPUT_RIGHT)) && games.info_type < ACTION_SAVE_TYPES) {
-		games.info_type = (e->keys & INPUT_LEFT) ? (games.info_type + ACTION_SAVE_TYPES - 1) % ACTION_SAVE_TYPES
-							 : (games.info_type + 1) % ACTION_SAVE_TYPES;
+	} else if (games.info_type >= ACTION_SAVE_TYPES) {
+		return 1;  // nothing to change
+	} else if (e->keys & ui_input()->pressed & (INPUT_UP | INPUT_DOWN)) {
+		games.info_field ^= 1;  // two lines: either key goes to the other
+		info_values(v);
+	} else if (e->keys & (INPUT_LEFT | INPUT_RIGHT)) {
+		int left = (e->keys & INPUT_LEFT) != 0;
+		u32 *value = games.info_field ? &games.info_boot : &games.info_type,
+		    n = games.info_field ? ACTION_BOOTS : ACTION_SAVE_TYPES;
+		*value = left ? (*value + n - 1) % n : (*value + 1) % n;
+		tlog_debug("games: info %s %lu", games.info_field ? "boot mode" : "save type", (unsigned long)*value);
 		info_values(v);
 	}
 	return 1;
 }
 
 // Shows Game info for the game the popup was about (g) until A or B, in the
-// list's place, then writes a changed save type and brings the list back
+// list's place, then writes a changed save type or boot mode and brings the
+// list back
 static void game_info(const struct game *g)
 {
 	u32 row = ui_list_cursor(list_node());
 	struct action_facts facts;
 	action_game_facts(games.pick, &facts);
 	games.info_type = facts.save_type;
+	games.info_boot = facts.boot_mode;
+	games.info_field = 0;
 	games.info_console = g->console;
 	// Now: the index may change while the page shows
 	games.info_size[0] = 0;
@@ -862,14 +883,17 @@ static void game_info(const struct game *g)
 		ui_title_icon_set((u8)(v->first + I_TITLE), registry_items[games.item].icon16);
 		u32 o = 0;
 		for (u32 k = 0; k < LANG_INFO_KEYS && o < sizeof(games.info_keys); k++)
-			if (k != LANG_INFO_SAVE_TYPE || games.info_type < ACTION_SAVE_TYPES)
+			if ((k != LANG_INFO_SAVE_TYPE && k != LANG_INFO_BOOT_MODE) ||
+			    games.info_type < ACTION_SAVE_TYPES)
 				o += (u32)snprintf(games.info_keys + o, sizeof(games.info_keys) - o, "%s%s",
 						   o ? "\n" : "", s->info_keys[k]);
 		ui_label_set((u8)(v->first + I_KEYS), games.info_keys);
 		info_values(v);
 		u32 n = 0;
-		if (games.info_type < ACTION_SAVE_TYPES)
-			games.info_hints[n++] = (struct ui_hint){"\xC2\xAB\xC2\xBB", s->hint_save_type};
+		if (games.info_type < ACTION_SAVE_TYPES) {
+			games.info_hints[n++] = (struct ui_hint){"^v", gl_hint_move};
+			games.info_hints[n++] = (struct ui_hint){"\xC2\xAB\xC2\xBB", gl_hint_change};
+		}
 		games.info_hints[n++] = (struct ui_hint){"B", gl_hint_back};
 		ui_hints_set((u8)(v->first + I_HINTS), games.info_hints, n);
 		while (!games.info_done && ui_depth())
@@ -882,6 +906,8 @@ static void game_info(const struct game *g)
 	}
 	if (games.info_type != facts.save_type && !action_set_save_type(games.pick, games.info_type))
 		dialog_message(NULL, gl_games->save_type_failed, DIALOG_ERROR);
+	else if (games.info_boot != facts.boot_mode && !action_set_boot_mode(games.pick, games.info_boot))
+		dialog_message(NULL, gl_games->boot_mode_failed, DIALOG_ERROR);
 	reshow(row);
 }
 
@@ -902,8 +928,8 @@ static void reshow(u32 row)
 
 // Starts the picked game: the menu's session ends, and nav brings the page
 // back if no game started (and the page here, if the session didn't end).
-// how: ACTION_CLEAN, or ACTION_ADDON with the cheats picked on the cheat
-// screen (keep) or none
+// how: ACTION_CLEAN, ACTION_DEFAULT (the game's boot mode, else Settings'),
+// or ACTION_ADDON with the cheats picked on the cheat screen (keep) or none
 static void launch(u32 how, int keep_cheats, u32 hard)
 {
 	if (!keep_cheats)
@@ -1086,7 +1112,7 @@ static void popup_run(u32 i)
 			relist(i);
 		switch (action) {
 		case LANG_POP_PLAY:
-			launch(ACTION_ADDON, 0, hard);
+			launch(ACTION_DEFAULT, 0, hard);
 			return;
 		case LANG_POP_CLEAN:
 			launch(ACTION_CLEAN, 0, hard);
@@ -1116,7 +1142,7 @@ static void play_run(u32 arg)
 	struct game g;
 	if (!up() || !row_still(i) || !game_at(i, &g) || !game_path(&g, games.pick))
 		return;
-	launch(ACTION_ADDON, 0, hard);
+	launch(ACTION_DEFAULT, 0, hard);
 }
 
 // --- Keys -------------------------------------------------------------------------------
@@ -1147,8 +1173,7 @@ static int page_event(struct ui_view *v, const struct ui_event *e)
 		frame_measure("games-move");
 		return 1;
 	case UI_EV_ACTIVATE: {
-		// L held: a hard reset of the row shown and selected now (L pages
-		// first, as anywhere)
+		// L held: a hard reset (L doesn't page here, so the row stays)
 		u32 i = e->index, hard = (in->held & INPUT_L) != 0;
 		games.defer_generation = library_generation();
 		if (i < games.count)
