@@ -3,8 +3,9 @@
 # every item's page and fail clearly where a page isn't built yet; each
 # Start on value starts where it says, a hidden item giving home facing the
 # nearest one (T19); Last place comes back after a power cycle as home
-# facing the item last faced (a page's or home's); and a deleted game
-# leaves home's counts at once.
+# facing the item last faced (a page's or home's); every Start on value
+# holds through power cycles, a game and the Reset hotkey, set in Settings
+# too; and a deleted game leaves home's counts at once.
 # Runs inside the torii-emu container after `just build` and `just
 # emu-headless`.
 set -euo pipefail
@@ -137,7 +138,63 @@ for line in "@boot gb 3" "@boot home-gb 0"; do
   boot old -w "nav: home ready" -f 300
   logged "nav: start on 0: home-gb"
 done
+# Into the next item's page and out, back to the item on the card, then
+# rested: nothing to write
+printf '@boot gb\n/Hello.gba\n' >"$cart/recent.txt"
+mcopy -o -i "$cart/sd.img" "$cart/recent.txt" ::/torii/recent.txt
+boot 4 -w "nav: home ready" -k @10:RIGHT -k @14:- -k @22:A -k @26:- -w "nav: page sd ready" -k @10:B -k @14:- \
+  -w "nav: home ready" -k @10:LEFT -k @14:- -k @400:- -f 900
+logged "nav: start on 0: home-gb"
+! grep -q "safefile: writing" "$log" || fail "turning away and back to the boot item wrote recent.txt"
 echo "PASS: Last place comes back as home facing the item last faced, older kernels' lines read as their item, and a boot that stays on its item writes nothing"
+
+# Start on through power cycles and games (D1), with Auto save on (no
+# question at power-on after a game) and the Reset hotkey on (L+R+START)
+setting() { printf %b "\\x$(printf %02x "$2")\\x00" | dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7B0000 + 2 * $1)) conv=notrunc status=none; }
+started() { grep -o "nav: start on .*" "$log" | sed -n "${2:-1}p" | grep -qxF "nav: start on $1" || fail "$(basename "$log") didn't start on $1: $(grep -o 'nav: start on.*' "$log" | tr '\n' ' ')"; }
+new_cart cycle
+setting 14 1
+setting 1 1
+# Last place: GBA's page, A on its first game; the game runs, then power-off
+boot 1 -w "nav: home ready" -k @8:RIGHT -k @12:- -k @16:RIGHT -k @20:- -k @24:A -k @28:- -w "nav: page gba ready" \
+  -k @20:A -k @24:- -w "launch: starting" -f @600
+started "0: home-recent"
+boot 2 -w "nav: start on" -f @300
+started "0: home-gba"
+# Recent's page, A on its first game, then the Reset hotkey in the game:
+# the kernel restarts facing Recent; RIGHT, rest, power-off
+boot 3 -w "nav: home ready" -k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:A -k @28:- -w "nav: page recent ready" \
+  -k @20:A -k @24:- -w "launch: starting" -k @300:L+R+START -k @330:- -w "nav: start on" -w "nav: home ready" \
+  -k @10:RIGHT -k @14:- -k @400:- -f @900
+started "0: home-gba"
+started "0: home-recent" 2
+boot 4 -w "nav: start on" -f @300
+started "0: home-fav"
+# The SD card page, A on its first file (Hello.gba)
+boot 5 -w "nav: home ready" -k @8:RIGHT -k @12:- -k @16:RIGHT -k @20:- -k @24:RIGHT -k @28:- -k @32:A -k @36:- \
+  -w "nav: page sd ready" -k @20:A -k @24:- -w "launch: starting" -f @600
+boot 6 -w "nav: start on" -f @300
+started "0: home-sd"
+# Settings sets Start on GBA (Last place, Recent, Home, Favourites, SD card,
+# GBA), saved as it is confirmed, B at once; the next power-on opens GBA
+# shellcheck disable=SC2046
+boot 7 -w "nav: home ready" -k @8:RIGHT -k @12:- -k @16:RIGHT -k @20:- -k @24:A -k @28:- -w "nav: page settings ready" \
+  $(nav_press DOWN DOWN DOWN A RIGHT RIGHT RIGHT RIGHT RIGHT A B) -w "nav: home ready" -f @30
+logged "settings: row 3 set to GBA"
+boot 8 -w "nav: start on" -f @300
+started "5: gba"
+# Every other value: a power-on, a game from the menu (the tests' hook), and
+# a power-on after it, which starts in the same place
+for case in "1 recent" "2 home-recent" "3 fav" "4 sd" "5 gba" "6 home-gb" "7 gb" "8 home-sd"; do
+  read -r value place <<<"$case"
+  setting 32 "$value"
+  # shellcheck disable=SC2046
+  boot "game-$value" $(nav_launch /Hello.gba) -w "launch: starting" -f @300
+  started "$value: $place"
+  boot "after-$value" -w "nav: start on" -f @300
+  started "$value: $place"
+done
+echo "PASS: each Start on value, set in Settings or on the cart, starts where it says after power cycles, a game and the Reset hotkey; Last place faces the item a game started from"
 
 # A deleted game (as a page will delete it, through actions.c) leaves home
 # at once: Zelda.gb was the only GB game and the only favourite
