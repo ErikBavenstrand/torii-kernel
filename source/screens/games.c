@@ -216,7 +216,7 @@ static const char *record_name(u32 rec, char *buf)
 		return display;
 	// Their file names (paths would add their folders when the tags are the
 	// same; file names alone keep the run within the PSRAM it is in)
-	const char *names[DEDUPE_RUN];
+	const char *names[DEDUPE_RUN] = {0};
 	for (u32 k = lo; k <= hi; k++)
 		names[k - lo] = library_name(library_game(console, k));
 	u32 len = (u32)strnlen(display, GAMENAME_MAX);
@@ -567,7 +567,7 @@ static int ago_update(void)
 		char text[AGO_MAX];
 		u32 then = userdata_recent_time(i);
 		userdata_ago(text, sizeof(text), then, then ? now : 0, &gl_ago);
-		if (strcmp(text, games.ago[i])) {
+		if (strcmp(text, games.ago[i]) != 0) {
 			memcpy(games.ago[i], text, sizeof(text));
 			changed = 1;
 			tlog_debug("games: row %lu played %s", (unsigned long)i, text);  // tests/games.sh reads it
@@ -601,7 +601,7 @@ static void build(void)
 static void show_position(void)
 {
 	if (games.count)
-		snprintf(games.position, sizeof(games.position), "%lu/%lu", (unsigned long)(games.cursor + 1),
+		snprintf(games.position, sizeof(games.position), "%lu/%lu", (unsigned long)games.cursor + 1,
 			 (unsigned long)games.count);
 	else
 		games.position[0] = 0;
@@ -719,8 +719,10 @@ static void games_poll(void)
 		relist(row);
 		return;
 	}
-	if (games.ago_wait && --games.ago_wait)
+	if (games.ago_wait > 1) {
+		games.ago_wait--;
 		return;
+	}
 	games.ago_wait = AGO_POLL;
 	if (ago_update() && games.art)
 		show_facts();
