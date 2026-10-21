@@ -2014,6 +2014,12 @@ u32 ui_frame(void)
 	if (dim_step(dt))
 		fire = 0;
 	fire &= (u16)~ui.wake_keys;
+	// Until the next screen has come in (a transition or the open's zoom
+	// running), A, START and SELECT would act on a page the user hasn't
+	// seen: A, A on home would start Recent's first game. They're dropped;
+	// the d-pad, L, R and B (back out) wait for it or act as before
+	if (ui.tr_phase != TR_IDLE || ui.zoom)
+		fire &= (u16) ~(INPUT_A | INPUT_START | INPUT_SELECT);
 	if (ui.capture || ui.tr_phase == TR_OUT || ui.tr_phase == TR_GAP) {
 		// A screen going out or a dialog closing: for the view after it
 		keyq_hold(&ui.keys, fire, ui.in.pressed);
