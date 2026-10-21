@@ -4,6 +4,14 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Added:** games added to the card get their CRC, and with it their No-Intro
+  name and box art, in the background after the boot's walk (Recent's first),
+  with no PC tool or launch; a launch stops it and the next boot goes on. The
+  game lists keep the cursor on its game when new names sort them again
+  (F2; `6ab146f`, `e86624d`).
+
 ## v0.4.1 (2026-10-21)
 
 The new menu: a carousel home, game lists, SD card, NOR, Settings and Info
