@@ -736,6 +736,11 @@ void tlog_flush(void)
 		// files are looked for again, a new one made if need be
 		sd_state = SD_MOUNTED;
 		tlog("log: %s was deleted: opening the log again", path);
+		if (ui_active()) {
+			// A new file is made a sector a frame; the text waits in the ring
+			tlog_flush_soon();
+			return;
+		}
 		if (!sd_open())
 			return;
 		log_path(path, cur_slot);

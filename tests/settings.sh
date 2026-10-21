@@ -146,8 +146,8 @@ grep -n 'nor: wrote the settings\|nav: back from settings' "$cart/visit.log" | h
 [ "$(slots 28 1)" = 0001 ] || fail "Theme not saved before leaving: $(slots 28 1)"
 # A write that fails (a NOR word that won't program, OMEGA_NOR_STUCK; a new
 # cart's first save writes copy B first: Auto save's slot there): the hint bar says so,
-# the value stays, and the next confirm tries again; leaving tries once more
-# and then drops it, the NOR keeping what it held
+# the value stays, and the next confirm or B tries again; a B whose try
+# fails keeps the page up, and the next leaves, dropping the value
 failing() { # NAME STUCK ROW KEYS...: a visit to ROW on a new cart whose write fails STUCK
   local name=$1 stuck=$2 row=$3
   shift 3
@@ -157,9 +157,11 @@ failing() { # NAME STUCK ROW KEYS...: a visit to ROW on a new cart whose write f
   write 32=2
   OMEGA_NOR_STUCK=$stuck visit "$row" "$@"
 }
-failing fail-always 0x7B201C auto-save A RIGHT A
+# (B tries again and, failing, stays; the second B leaves)
+failing fail-always 0x7B201C auto-save A RIGHT A B
 grep -q 'settings: not saved, tried again at the next confirm or on leaving' "$cart/visit.log" ||
   fail "a failed write wasn't noticed: $(grep -E 'nor:|settings:' "$cart/visit.log" | tail -3)"
+[ "$(grep -c 'settings: not saved, tried again' "$cart/visit.log")" = 2 ] || fail "the first B didn't try again and stay"
 grep -q 'settings: not saved, the page left' "$cart/visit.log" || fail "leaving didn't try the write again"
 [ "$(writes)" = 0 ] || fail "a failed write was logged as written"
 [ "$(slots 14 1)" = ffff ] || fail "the failed write changed Auto save: $(slots 14 1)"

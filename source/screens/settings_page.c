@@ -155,6 +155,7 @@ static struct {
 	u8 saving;    // frames a confirmed change may still wait to be written, 0: none
 	u8 leaving;   // B came while saving: the page goes once it's written
 	u8 unsaved;   // the last write failed: its values are staged, not on the NOR
+	u8 warned;    // B was refused once for it: the next B leaves, dropping them
 	u8 swatch_bank;
 	u16 swatch_tile;  // ART_NONE-like 0xFFFF: no swatches
 	u16 refused_left;  // frames the refusal's reason stays
@@ -796,9 +797,25 @@ static void save_now(void)
 			tlog_flush_soon();  // the log file is made a sector a frame, the menu still answering
 		memcpy(sp.v.loaded, sp.v.slot, sizeof(sp.v.loaded));
 		sp.unsaved = 0;
+		sp.warned = 0;
 	}
 	if (edit)
 		memcpy(sp.v.slot, preview, sizeof(preview));
+}
+
+// B with a failed write: tried once more, and if that fails too the page
+// stays, saying so (save_now); a second B leaves, dropping the values.
+// 1 if the page stays
+static int keep_unsaved(void)
+{
+	if (!sp.unsaved || sp.warned)
+		return 0;
+	save_now();
+	hints_show();
+	if (!sp.unsaved)
+		return 0;
+	sp.warned = 1;
+	return 1;
 }
 
 // A value was confirmed: if it changed anything, the hint bar says so and
@@ -993,7 +1010,7 @@ static int settings_event(struct ui_view *v, const struct ui_event *e)
 	if (k & INPUT_B) {
 		if (sp.saving)
 			sp.leaving = 1;  // the write first, from settings_poll
-		else
+		else if (!keep_unsaved())
 			nav_back();
 	} else if (k & INPUT_A) {
 		if (!ui_list_paging(node(N_LIST)) && (in->pressed & INPUT_A))
@@ -1065,7 +1082,8 @@ static void settings_poll(void)
 	}
 	if (sp.leaving && !sp.saving) {
 		sp.leaving = 0;
-		nav_back();
+		if (!keep_unsaved())
+			nav_back();
 	}
 	if (sp.mode == MODE_CAPTURE) {
 		u16 shown = sp.cap.held;
