@@ -335,6 +335,8 @@ What the v0.4 ticket sessions, the conductor's reviews and the research left ope
 - After a power cut drops a half-erased NOR game, a "kernel error: … dropped" line repeats every boot until the next list save (pre-existing; B15).
 - Behind the NOR Delete question, the popup's edge and Delete row show beside the confirmation (B11's design; B15).
 - `tests/nav.sh` page routes assume the menu starts on home; scripts set Start on = Home first (B14, B15).
+- A key pressed while START waits for an SD page change still reaches the page after the popup closes (B14).
+- A power cut in the middle of a settings write leaves the whole settings sector erased, so every setting reads its default: `Save_info` erases one sector and programs it with no second copy (pre-existing; B16's tester).
 - A large crc.txt loads slowly after each boot: about 6 s of background work for 3,000 records (emulated), mostly hashing paths (B21).
 - A read-only crc.txt is never updated: dates are re-adopted and Recent games re-identified every boot (B21).
 
@@ -355,6 +357,8 @@ Made during the build without the user; each is cheap to change.
 - **The "played ago" words** and the unset clock counting as before 2026-10-01 (B5).
 - **Mockups for Settings and the rename keyboard,** approved by the conductor for the build (`docs/design/v0.4/settings-*.png`, `keyboard-*.png`).
 - **Dropped v0.3 features:** the NOR menu's load and back-up of a save; the help QR code; the cheat screen, per-game save type, hard reset and write to NOR with addon come back in B13/B14 (B10).
+- **A starts games with the enabled addons** (Play, Launch); Clean boot is a separate entry; v0.3's A, A was a clean boot (conductor, B13/B14).
+- **SD card page:** Delete reaches `/torii` and `/SAVER` with Show all files on; the first 1,024 files the card lists are shown in a bigger folder; folder icons blue (B14).
 - **NOR page:** one card with four rows, only the latest game deletable, no hold-A for Format all, L/R don't page (B15).
 - **Carousel:** neighbours at 0.89 and far items at 0.60 scale read close to the front; held-turn speed; one item showing at both ends mid-turn with 2–5 items; far dark objects nearly invisible in dark (B12).
 - **Info texts:** all wording, card sizes in binary GB/MB, Your cart's contents (B17); Controls must be re-checked once every page has landed (B20).
@@ -366,6 +370,7 @@ Made during the build without the user; each is cheap to change.
 ### Open questions and assumptions
 
 - **Unmeasured on a real cart:** the cart's ROM copy rate (B8's bar estimate); the library walk and first-scan times (emulated SD is about 5x slower than the cart); the theme wipe's HBlank palette DMA (mGBA can't show tearing); how the carousel's scaled pixel art reads at 0.6x and 1.9x; the 14 px rows' feel.
+- **SD folder open time** on a cart (0.2 s per 300 files emulated) and the 251k-cycle frame on a folder of 1,024+ subfolders (B14).
 - **Names database timings on a cart:** Identify about 1.6 s per MB in the foreground (estimate); crc.txt write steps about 10 ms each (B21).
 - **Licences:** No-Intro's terms for a derived name table (the names database is built on the user's machine and never bundled); libretro-thumbnails art has no licence grant (fetched locally, never committed).
 - **Design questions for later tickets:** Settings' 12 px rows inside section cards that scroll (B16); whether WIN0 and WIN1 suffice when the popup, the list clip, the dim, the zoom and the wipe overlap (B11, B19); the 8x8 GBA and Info icons need a redraw.

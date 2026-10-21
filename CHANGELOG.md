@@ -6,6 +6,17 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** the SD card page: the card's folders as they are, raw names,
+  folders first then files A-Z, sizes and item counts, path pills in the
+  title bar, up to 1,024 files (folders past it stay reachable), hidden
+  entries unless Show all files is on, the cursor kept per folder. B goes up
+  a folder, then home; A opens a folder or starts a game with the enabled
+  addons (L held: a hard reset); START opens Launch, Clean boot (while an
+  addon is on), Write to NOR (and with addon), Add to favourites, Delete
+  (asks, Cancel preselected; the save stays; never a folder) and File info.
+  The listing goes to PSRAM through `sdlist.c`; `nameindex.c` and `sort.c`
+  go (B14; `085922f`, `62b3b1a`, `ee4a522`, `b1d8d78`, `fabb55f`,
+  `665034c`).
 - **Added:** the NOR page: one card with the storage line (used, and free
   of 64 MB) over a bar of each game's share, and the games in written order;
   Format all in a card of its own. A launches (L held: a hard reset, as in
