@@ -69,6 +69,7 @@ static struct gfx_split split EWRAM_BSS, split_live EWRAM_BSS;  // as set, and a
 static u8 split_dirty, split_on;
 u32 gfx_split_data[GFX_SPLIT_WORDS] SPLIT_IWRAM;
 u32 gfx_split_dma[GFX_SPLIT_PARTS * 3] EWRAM_BSS;  // gfx_split.s reads it
+u32 gfx_split_top[GFX_SPLIT_PARTS * 3] EWRAM_BSS;  // and this, in VBlank
 
 void gfx_init(void)
 {
@@ -105,6 +106,8 @@ void gfx_split_off(void)
 	// IE and DISPSTAT straight (libgba's irqDisable would turn IME on)
 	REG_IE &= (u16)~IRQ_VCOUNT;
 	REG_DISPSTAT_ &= (u16)~DISPSTAT_VCOUNT_IRQ;
+	if (split_on)
+		irqSet(IRQ_VBLANK, NULL);  // the VBlank IRQ stays on: frame.c counts on it
 	DMA0_REGS[2] = 0;
 	DMA0_REGS[5] = 0;
 	memset(&split, 0, sizeof(split));
@@ -133,19 +136,25 @@ static int part_ok(const struct gfx_split_part *p)
 }
 
 // The parts' top values into place (in VBlank: every line shows them until
-// the split's copies)
+// the split's copies), and the copies gfx_split_vblank repeats each VBlank
 static void split_tops(const struct gfx_split *s)
 {
 	for (u32 i = 0; i < GFX_SPLIT_PARTS; i++) {
 		const struct gfx_split_part *p = &s->part[i];
 		const u16 *top = p->top;
+		u32 *vb = &gfx_split_top[i * 3];
+		vb[2] = 0;
 		if (!part_ok(p) || !top)
 			continue;
 		if (top >= gfx_pal_unfaded && top < gfx_pal_unfaded + 512 && gfx_pal_faded_on)
 			top = gfx_pal_faded + (top - gfx_pal_unfaded);
+		u32 halves = p->half ? p->count : 2u * p->count;
 		vu16 *d = (vu16 *)p->dst;
-		for (u32 h = 0; h < (p->half ? p->count : 2u * p->count); h++)
+		for (u32 h = 0; h < halves; h++)
 			d[h] = top[h];
+		vb[0] = (u32)top;
+		vb[1] = p->dst;
+		vb[2] = (DMA_ON_32 & ~DMA_32_) | halves;  // immediate, 16-bit
 	}
 }
 
@@ -182,6 +191,7 @@ static void commit_split(void)
 		REG_IF = IRQ_VCOUNT;
 		irqSet(IRQ_VCOUNT, gfx_split_irq);
 		irqEnable(IRQ_VCOUNT);
+		irqSet(IRQ_VBLANK, gfx_split_vblank);
 		split_on = 1;
 	}
 }

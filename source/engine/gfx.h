@@ -185,9 +185,9 @@ struct gfx_split {
 extern u32 gfx_split_data[GFX_SPLIT_WORDS];
 // Sets the split from the next commit on (NULL or line 0: none), as the
 // registers are shadowed. gfx_init, gfx_split_off and gfx_freeze end it.
-// It needs a commit every VBlank (ui_frame's): a frame that misses one
-// shows the split values from the top too, so nothing may block while a
-// split runs.
+// A frame that misses its commit (an overrun) keeps the last committed
+// split: the VBlank interrupt puts the top values back (gfx_split_vblank)
+// and the VCOUNT one copies the split values as before.
 void gfx_set_split(const struct gfx_split *split);
 // Ends a split at once: the interrupt and both DMAs off (before a game, or
 // ui_shutdown)
@@ -196,6 +196,11 @@ void gfx_split_off(void);
 // DMA0 and DMA1 from gfx_split_dma, which each commit sets
 extern u32 gfx_split_dma[GFX_SPLIT_PARTS * 3];
 void IWRAM_CODE gfx_split_irq(void);
+// The VBlank handler while a split is on (gfx_split.s): copies the parts'
+// top values in immediate mode with DMA0 and DMA1, from gfx_split_top,
+// which each commit sets
+extern u32 gfx_split_top[GFX_SPLIT_PARTS * 3];
+void IWRAM_CODE gfx_split_vblank(void);
 
 // The commit. Call it in VBlank, as frame_begin does: registers, palettes,
 // the split, OAM, then the queue. It needs the kernel's ROM mapped (as all
