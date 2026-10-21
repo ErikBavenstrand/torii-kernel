@@ -292,12 +292,12 @@ info/frames 7-20 1E613DC933A7D889
 info-about/about 60DC178D50FA75F6
 info-about/about-end 1FBECA9B24D5C3DC
 info-about/cart A9C987376B088C44
-info-about/ingame 45B4598B047A6632
+info-about/ingame 09047680961A4752
 info-read/back E434584DE986A1E1
 info-read/controls A9508593442B9EEA
-info-read/last FAB20B8AA133D851
-info-read/last-down 9722369A2570098D
-info-read/scrolled 44CD0C73A9E01778
+info-read/last 1CF05C7FA5C4E6E1
+info-read/last-down A52BB7502C81F373
+info-read/scrolled 66551C96D24AED78
 info-read/frames 0-1 E434584DE986A1E1
 info-read/frames 2-2 2F0DB67D39E5384B
 info-read/frames 3-3 76E98C19EAC6FE78

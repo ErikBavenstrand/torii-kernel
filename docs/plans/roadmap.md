@@ -357,6 +357,15 @@ What the v0.4 ticket sessions, the conductor's reviews and the research left ope
 - The shared-save check before an SD rename sees only indexed games: a game in a hidden folder sharing the save name loses it (B18 review).
 - A large crc.txt loads slowly after each boot: about 6 s of background work for 3,000 records (emulated), mostly hashing paths (B21).
 - A read-only crc.txt is never updated: dates are re-adopted and Recent games re-identified every boot (B21).
+- Past the library's 4,096 games no page says so: the decisions' "showing the first N" note exists only for SD folders; `library_truncated` and `library_games_seen` have no caller (B20).
+- Eight icons are drawn by nothing: the 8x8 Favourites, Recent, SD, Settings, torii and up icons and the 16x16 file and folder icons (`assets/ui`; only `tests/kernel/test_assets.c` reads them) (B20).
+- `action_launch`'s result (`ACTION_NOR_MAYBE`, `ACTION_NOR_WRITTEN`) is ignored by all three callers: use it or drop it (B20).
+- The SD card page's item count job costs up to 194k cycles a frame while it counts a folder's entries (within a frame; seen in the UI walk, `sd-folder`) (B20).
+- Keys pressed during the open zoom reach the page before it shows: A, A on home within about 4–9 frames starts Recent's first game without the list ever showing, and START opens the game popup over the page still sliding in; a 1-frame B during the zoom is lost while the A after it isn't (B20's tester).
+- START and B mashed 3–4 frames apart over a game popup can drop a START and pass the next B to the list, which goes home (B20's tester; not reachable by hand).
+- An empty SD folder still shows the hints "A open · START menu" (B20's tester).
+- The UI walk (`tests/shots/data/walk.txt`) uses 55 of mgba-shot's 64 waits (`MAX_WAITS`): raise it or split the walk before it grows (B20).
+- Settings' Mode B is only stored: the kernel never reads it (as in v0.3); confirm on a cart in a DS that something does, or drop the row (B20).
 
 ### Decisions to review
 

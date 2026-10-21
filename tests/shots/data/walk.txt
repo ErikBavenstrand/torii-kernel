@@ -1,3 +1,14 @@
+# The UI walk (walk-light, walk-dark): home and every page by their keys,
+# on the shots card plus a GB game, a favourite and a NOR game, so home
+# shows Recent, Favourites, GBA, GB, SD card, NOR, Settings and Info. Home
+# turns both ways; Recent and Favourites open and close; on GBA the list
+# moves, pages, jumps a letter each way, opens the game popup and closes it,
+# then its Delete is answered Cancel; GB opens; the SD card goes into Games,
+# opens a file's popup, comes back up; NOR opens a game's popup and moves to
+# Format all; Settings flips Theme and back (the wipe both ways), keeps it,
+# jumps sections and leaves with nothing written; Info opens each reading
+# page; home wraps round and a held turn ends it. Each step waits for its
+# log line, so a key that stops working times the run out.
 -T 1:99999
 -w "nav: home ready"
 -k @8:RIGHT -k @12:-
@@ -81,7 +92,8 @@
 -w "settings: row 0 set to"
 -k @40:A -k @44:-
 -k @60:DOWN -k @64:- -k @72:DOWN -k @76:- -k @84:R -k @88:- -k @96:R -k @100:- -k @108:L -k @112:-
--k @130:B -k @134:-
+-w "settings: row 5"
+-k @20:B -k @24:-
 -w "settings: nothing changed, not written"
 -w "nav: home ready"
 -k @8:RIGHT -k @12:-

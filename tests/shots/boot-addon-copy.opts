@@ -4,8 +4,8 @@
 # estimate (source/progress.h) while the cart copies. The game's IRQ hook
 # comes from its PATCH/ file (as on a second launch, made by one launch of
 # this game: tests/shots/data/addon-copy.pat), so the cart copies the ROM
-# before the kernel patches it; a first launch scans the ROM instead. Every
-# frame of the copy is hashed and watched for tears. The launch goes
+# before the kernel patches it; a first launch scans the ROM instead. Its
+# first frames are hashed, and every frame of the copy is watched for tears. The launch goes
 # through the menu's test hook (tests/nav.sh).
 #! settings 1=1
 #! sd-file "/Big Adventure (Europe).gba" 0x400000 tests/roms/hello/hello.gba
