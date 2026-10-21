@@ -511,19 +511,26 @@ class Scrape(unittest.TestCase):
         self.assertEqual(len(games), 10)
 
     def test_old_placeholders(self):
-        """C2's placeholders, box-<console>.bin, are deleted (listed on a
-        dry run); other files stay."""
+        """C2's placeholders, box-<console>.bin, are deleted with their
+        macOS "._" files, whatever --console says (listed on a dry run);
+        other files stay."""
         art_dir = self.sd / "torii" / "art"
         art_dir.mkdir(parents=True)
-        for name in ("box-gba.bin", "BOX-NES.BIN", "box-snes.bin", "boxes.bin"):
+        for name in (
+            "box-gba.bin",
+            "._box-gba.bin",
+            "BOX-NES.BIN",
+            "box-snes.bin",
+            "boxes.bin",
+        ):
             (art_dir / name).write_bytes(b"old")
         status, out, err = self.run_tool("--console", "GBA", "--dry-run")
         self.assertEqual(status, 0, err)
-        self.assertIn("would delete: BOX-NES.BIN, box-gba.bin", out)
+        self.assertIn("would delete: ._box-gba.bin, BOX-NES.BIN, box-gba.bin", out)
         self.assertTrue((art_dir / "box-gba.bin").exists())
         status, out, err = self.run_tool("--console", "GBA", "--offline")
         self.assertEqual(status, 0, err)
-        self.assertIn("deleted: BOX-NES.BIN, box-gba.bin", out)
+        self.assertIn("deleted: ._box-gba.bin, BOX-NES.BIN, box-gba.bin", out)
         self.assertEqual(
             sorted(p.name for p in art_dir.glob("box*")), ["box-snes.bin", "boxes.bin"]
         )

@@ -406,12 +406,13 @@ OLD_BOXES = tuple(f"box-{c}{art.EXT}" for c in ("gba", "gbc", "gb", "nes"))
 
 
 def old_boxes(art_dir):
-    """The card's names of C2's placeholders in art_dir, sorted."""
+    """The card's names of C2's placeholders in art_dir, and the "._"
+    files macOS wrote beside them, sorted."""
     try:
         return sorted(
             e.name
             for e in os.scandir(art_dir)
-            if e.is_file() and folded(e.name) in OLD_BOXES
+            if e.is_file() and folded(e.name).removeprefix("._") in OLD_BOXES
         )
     except OSError:
         return []
