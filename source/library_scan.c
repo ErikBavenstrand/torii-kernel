@@ -310,9 +310,10 @@ static void load_step(void)
 		lib.valid = 1;
 		lib.state = S_IDLE;
 		changed();
-		tlog("library: loaded %u games (GBA %u, GBC %u, GB %u, NES %u) from %s in %lu ms", h->records,
-		     h->counts[LIB_GBA], h->counts[LIB_GBC], h->counts[LIB_GB], h->counts[LIB_NES],
-		     lib_files[lib.loading], (unsigned long)ms_since(lib.started));
+		// Writes alternate between the files, so either may hold the newest
+		tlog("library: loaded %u games (GBA %u, GBC %u, GB %u, NES %u) from %s (generation %lu) in %lu ms",
+		     h->records, h->counts[LIB_GBA], h->counts[LIB_GBC], h->counts[LIB_GB], h->counts[LIB_NES],
+		     lib_files[lib.loading], (unsigned long)h->generation, (unsigned long)ms_since(lib.started));
 		return;
 	}
 }
