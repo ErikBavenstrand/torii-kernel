@@ -64,9 +64,9 @@ diag-pages/loader E959FD44168F7705
 diag-renderer/demo 52A803C198A28138
 diag-start/screen ADFC6EB5D635C905
 diag-tests/back B90CE70EFD54137F
-diag-tests/frames 0-3 1E5D6D87A291C43F
-diag-tests/frames 4-4 9D648B1181E3A93F
-diag-tests/frames 5-12 B90CE70EFD54137F
+diag-tests/frames 0-4 1E5D6D87A291C43F
+diag-tests/frames 5-5 9D648B1181E3A93F
+diag-tests/frames 6-12 B90CE70EFD54137F
 diag-turn/save-memory 6BA4A63E83E92D75
 diag-turn/timings 27617EE944E332C5
 diag-turn/frames 0-1 10E6FB0374762B6D
