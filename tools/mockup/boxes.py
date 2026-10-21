@@ -362,23 +362,28 @@ for y in range(18, 65, 3):
     p.rect(1, y, 77, y, GRID)
 for x in range(3, 78, 4):
     p.rect(x, 18, x, 64, GRID)
+# A torii a little wider than the sun, whose upper half rises behind its
+# beams: the upturned kasagi, the shimaki under it, the gakuzuka between
+# them, the nuki through two tall pillars on their footings (a gate
+# narrower than the sun, the sun between its pillars, read as a skull)
 SPRITE = [
     "...................",
-    "...................",
-    "...#...........#...",
-    "...#############...",
-    "....###########....",
-    "......#..#..#......",
-    ".....#########.....",
-    "......#.....#......",
-    "......#.....#......",
-    "......#.....#......",
-    "......#.....#......",
-    ".....##.....##.....",
+    "#.................#",
+    "###################",
+    ".#################.",
+    "...##....#....##...",
+    "..###############..",
+    "...##.........##...",
+    "...##.........##...",
+    "...##.........##...",
+    "...##.........##...",
+    "...##.........##...",
+    "..####.......####..",
     "ggggggggggggggggggg",
     "ggggggggggggggggggg",
     "ggggggggggggggggggg",
 ]
+SUN = (9, 4, 4.6)  # its centre cell and radius, in cells
 
 
 def cell(cx, cy, c):
@@ -388,7 +393,7 @@ def cell(cx, cy, c):
 
 for cy in range(15):
     for cx in range(19):
-        if (cx - 9) ** 2 + (cy - 7) ** 2 <= 4.2**2:
+        if (cx - SUN[0]) ** 2 + (cy - SUN[1]) ** 2 <= SUN[2] ** 2 and cy < 12:
             cell(cx, cy, CELL_SUN)
 for cy, row in enumerate(SPRITE):
     for cx, b in enumerate(row):
