@@ -44,7 +44,8 @@ enum {
 	TR_IDLE,
 	TR_OUT,   // the screen goes out (ui_leave runs these frames)
 	TR_GAP,   // nothing shows: the next screen is set up and drawn
-	TR_IN,    // the next screen comes in; it takes keys already
+	TR_IN,    // the next screen comes in; it takes keys already (not A, START
+		  // and SELECT pressed before: ui_frame drops those)
 };
 // How a transition fades
 enum {
@@ -1152,7 +1153,8 @@ static void zoom_tick(u32 dt)
 	ui.zoom_frame = (u16)(ui.zoom_frame + step);
 	if (ui.zoom == ZOOM_OPEN && ui.zoom_phase == ZP_SPRITE) {
 		// The card comes once the sprite has gone and the page is ready;
-		// the page takes keys from then on, as a screen coming in
+		// the page takes keys from then on, as a screen coming in (the
+		// d-pad, L, R and B held meanwhile; A, START and SELECT were dropped)
 		if (ui.zoom_frame >= m->open_zoom.frames && ui.zoom_ready) {
 			u8 ready = ui.zoom_ready;
 			zoom_phase(ZP_PAGE);
@@ -2014,12 +2016,15 @@ u32 ui_frame(void)
 	if (dim_step(dt))
 		fire = 0;
 	fire &= (u16)~ui.wake_keys;
-	// Until the next screen has come in (a transition or the open's zoom
-	// running), A, START and SELECT would act on a page the user hasn't
-	// seen: A, A on home would start Recent's first game. They're dropped;
-	// the d-pad, L, R and B (back out) wait for it or act as before
-	if (ui.tr_phase != TR_IDLE || ui.zoom)
-		fire &= (u16) ~(INPUT_A | INPUT_START | INPUT_SELECT);
+	// While no page shows (a screen going out, the gap, the zoom's sprite),
+	// A, START and SELECT would act on one the user hasn't seen: A, A on
+	// home would start Recent's first game. They're dropped; the d-pad, L,
+	// R and B wait for the next screen. Once it shows (coming in, the
+	// zoom's card) every key acts
+	u16 unseen = ui.tr_phase == TR_OUT || ui.tr_phase == TR_GAP || (ui.zoom && ui.zoom_phase == ZP_SPRITE)
+			     ? (u16)(INPUT_A | INPUT_START | INPUT_SELECT)
+			     : 0;
+	fire &= (u16)~unseen;
 	if (ui.capture || ui.tr_phase == TR_OUT || ui.tr_phase == TR_GAP) {
 		// A screen going out or a dialog closing: for the view after it
 		keyq_hold(&ui.keys, fire, ui.in.pressed);
@@ -2036,6 +2041,7 @@ u32 ui_frame(void)
 			// Handlers that act on a press (L, R) see a held-back one as one
 			ui.in.pressed |= queued;
 		}
+		fire &= (u16)~unseen;  // queued ones too (ui_queue_keys)
 	}
 	// A menu or dialog still opening takes no A or START, which pick and
 	// confirm: a quick double A would open a game's menu and pick its
