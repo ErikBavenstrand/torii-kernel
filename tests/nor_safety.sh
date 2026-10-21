@@ -212,6 +212,28 @@ if shard_case; then
   echo "PASS: the NOR page deletes only the latest game, B keeps it, Delete erases it, and a half-written game with its header isn't listed"
 fi
 
+# A power cut in delete latest after the game is erased, before its list is
+# saved: the next boot drops the entry, says so and saves the list without
+# it, so the boot after says nothing; the next write goes where it was.
+if shard_case; then
+  new_cart delete-cut A.gba B.gba C.gba
+  start_home
+  write 1
+  write 2
+  # shellcheck disable=SC2046
+  boot -c kernel:erase:1 $(nav_nor_delete_page 1 yes) -w "nav: page nor ready" -k @30:-
+  grep -q 'nor: deleting B.gba' "$cart/$runs.log" || fail "delete latest didn't start"
+  boot -f 300
+  grep -q 'kernel error: nor: list entry 1 (B.gba).*dropped' "$cart/$runs.log" || fail "the half-deleted B.gba wasn't dropped"
+  grep -q 'nor: saving the list without the entry it dropped, 1 games' "$cart/$runs.log" || fail "the list wasn't saved without it"
+  boot -f 300
+  ! grep -q 'dropped' "$cart/$runs.log" || fail "the next boot dropped it again"
+  write 3
+  holds 0 A.gba || fail "A.gba was overwritten"
+  holds 0x20000 C.gba || fail "C.gba is not at 0x20000"
+  echo "PASS: a list entry a cut delete left is dropped and logged once, the list saved without it"
+fi
+
 # A power cut while a game's data is written: the game isn't listed.
 if shard_case; then
   new_cart data-cut A.gba B2.gba C.gba

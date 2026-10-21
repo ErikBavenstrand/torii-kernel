@@ -10,7 +10,8 @@
 # Every path that erases or programs the kernel NOR runs here, each on its own
 # cart, with logging on: the boot's NOR list migration, the Settings page's
 # saves (settings_commit), the
-# pending-save record and its clearing, WRITE TO NOR, delete latest,
+# pending-save record and its clearing, WRITE TO NOR, delete latest (and the
+# boot's list save after one cut off),
 # FORMAT ALL, Diagnostics, power cuts in the middle of those writes and the boot after
 # them, and the same writes on the other kernel NOR chip (S29GL064A, buffered
 # programming). After each power-on the loader must be byte-identical, and
@@ -286,6 +287,19 @@ EOF
     logged "nor: deleting B.gba"
     logged "nor: list saved, 1 games"
     pass "delete latest, from the NOR page (and answered no first)"
+  fi
+
+  # Delete latest cut off before its list save: the next boot saves the list
+  # without the entry (Migrate_NOR_list)
+  if shard_case; then
+    new_cart nor-delete-cut
+    boot $write_a -f 900
+    boot $write_b -f 900
+    boot -c kernel:erase:1 $delete
+    boot -f 300
+    logged "nor: saving the list without the entry it dropped"
+    logged "nor: list saved, 1 games"
+    pass "the boot's save of a list a cut delete left"
   fi
 
   # FORMAT ALL

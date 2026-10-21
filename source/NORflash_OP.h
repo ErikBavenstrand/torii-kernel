@@ -16,9 +16,11 @@ void Read_NOR_info(void);
 // entry whose game isn't there ends the list, and games with a completion
 // mark but no entry are added. Sets gl_norOffset to where the next one goes.
 u32 GetFileListFromNor(void);
-// If Read_NOR_info read an older kernel's list and GetFileListFromNor found
-// all of its count games, saves it in Torii's format, once. Crash-safe: B is
-// written first, and A, the older list, only once B is whole.
+// At boot, after GetFileListFromNor: if Read_NOR_info read an older kernel's
+// list and GetFileListFromNor found all of its count games, saves it in
+// Torii's format, once. Crash-safe: B is written first, and A, the older
+// list, only once B is whole. If GetFileListFromNor dropped the list's last
+// entry only, saves the count games it found, so the drop isn't logged again.
 void Migrate_NOR_list(u32 count);
 // Saves the first count games of pNorFS as both list copies; 0 when both
 // read back whole. Uses pReadCache.
