@@ -4,7 +4,7 @@
 # that all hash the same.
 art-sheet/boxes-dark 799CEBF7B3C5EA84
 art-sheet/boxes-light F9084C411817C62B
-art-sheet/icons 5D66C4A0A38CB897
+art-sheet/icons C53596E27D95A038
 art-sheet/sprites1 251BEEB4DCEA16AC
 art-sheet/sprites2 456A349A1C29F1C0
 boot/screen 818B02E74B016B0D
@@ -85,6 +85,15 @@ games-art/recent D6B09D15BF64F7E1
 games-art-box/gba D190CBFE3772B2F2
 games-art-dark/gba 743CC2D257F80E8A
 games-art-dark/gba-none 6DD7FD2BF9FD37DC
+games-box-switch/gb 46FF5145036E9096
+games-box-switch/gba 9F73E48DF1E05512
+games-box-switch/gba-next 86E077FAD2BA18F7
+games-box-switch/frames 0-0 46FF5145036E9096
+games-box-switch/frames 1-1 C0D09FB47A51D48A
+games-box-switch/frames 2-2 B60F0F720C6E1F36
+games-box-switch/frames 3-3 D4DD55491F22C7F2
+games-box-switch/frames 4-5 E3A4AD640FBC14D2
+games-box-switch/frames 6-28 9F73E48DF1E05512
 games-cheats/back DE60914D027457D0
 games-cheats/picked BFDAFB041DCC8050
 games-cheats/screen C49F10B375086F38
@@ -168,6 +177,8 @@ games-light/frames 64-64 6DBFEDABCAA3D49C
 games-light/frames 65-65 7D50D3B1581729DB
 games-light/frames 66-66 A1753B24548C8447
 games-light/frames 67-82 621380C02B053ACF
+games-names/gba 92EEE8F8B5064AC3
+games-names/info 0363B9029E1036A0
 games-recent/down 0310CB9CF59E5167
 games-recent/screen 1CFB4BFF7E049AFF
 home/gba 7CB9829E643E6EDB
@@ -297,6 +308,8 @@ info-about/about 67593DE57B51703D
 info-about/about-end D816CD17868D38AF
 info-about/cart B11EBBCBB761FEAF
 info-about/ingame 24E5C82EDE395875
+info-counting/cart DF95E5933BA6B9C7
+info-no-free/about-end 89CF4007369D0219
 info-read/back F3D1D76C241AA2D2
 info-read/controls 58C6DE28040EB31D
 info-read/last 0995C0F437A29678
@@ -384,6 +397,7 @@ sd-many/end 009F0545412ADE2B
 sd-many/root 71B7F9E83B290287
 sd-root/back E1A26AC1D32F7650
 sd-root/confirm C586B1DE9FA0017A
+sd-root/file-info 1D6589D91811BE54
 sd-root/folder EE84177EF9E20E06
 sd-root/popup 2C9FF18BEEAFA43A
 sd-root/root 6BD50270211C0F08

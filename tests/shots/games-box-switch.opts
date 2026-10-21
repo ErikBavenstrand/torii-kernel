@@ -1,0 +1,16 @@
+# The list with art on Recent, whose games are of different consoles and
+# have no art: DOWN from a GB game to a GBA game swaps the drawn GB box for
+# the GBA one with no cover between (every frame hashed), and DOWN to the
+# next GBA game keeps it.
+#! settings 28=1 31=1
+#! sd-file /Zelda.gb 32768 /dev/null
+#! sd-file /torii/recent.txt 0 tests/shots/data/recent-mixed.txt
+-w "nav: home ready"
+-k @8:A -k @12:-
+-w "nav: page recent ready"
+-s @30:gb.png
+-k @32:DOWN -k @36:-
+-H @32:@60
+-s @60:gba.png
+-k @62:DOWN -k @66:-
+-s @90:gba-next.png

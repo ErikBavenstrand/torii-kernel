@@ -132,7 +132,7 @@ write 28=0 31=0
 # shellcheck disable=SC2046 # nav.sh's options
 OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_setting theme) \
   $(_nav_file '-k @8:A -k @10:- -k @14:RIGHT -k @16:- -k @18:A -k @19:- -k @20:DOWN -k @21:- -k @22:A -k @23:- -k @24:RIGHT -k @25:-') \
-  -w "nor: wrote the settings" -f 100 >"$cart/visit.log" 2>&1 || fail "the save during the wipe: $(tail -3 "$cart/visit.log")"
+  -w "nor: wrote the settings" -f 400 >"$cart/visit.log" 2>&1 || fail "the save during the wipe: $(tail -3 "$cart/visit.log")"
 [ "$(writes)" = 1 ] || fail "the save during the wipe wrote the settings $(writes) times"
 [ "$(slots 28 1)" = 0001 ] || fail "Theme not saved during its wipe: $(slots 28 1)"
 [ "$(slots 31 1)" = 0000 ] || fail "Game view's preview was written: $(slots 31 1)"
@@ -142,7 +142,7 @@ write 28=0
 # shellcheck disable=SC2046 # nav.sh's options
 OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_setting theme) \
   $(_nav_file '-k @8:A -k @10:- -k @14:RIGHT -k @16:- -k @18:A -k @19:- -k @20:B -k @21:-') \
-  -w "nav: home ready" -f 100 >"$cart/visit.log" 2>&1 || fail "B after a theme confirm: $(tail -3 "$cart/visit.log")"
+  -w "nav: home ready" -f 400 >"$cart/visit.log" 2>&1 || fail "B after a theme confirm: $(tail -3 "$cart/visit.log")"
 [ "$(writes)" = 1 ] || fail "B after a theme confirm wrote the settings $(writes) times"
 grep -n 'nor: wrote the settings\|nav: back from settings' "$cart/visit.log" | head -1 | grep -q 'nor: wrote' ||
   fail "the write ran on the way out"

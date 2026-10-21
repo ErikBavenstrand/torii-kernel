@@ -51,6 +51,9 @@
 //                    watch below); the run ends with "tears: N". The window
 //                    doesn't make the run longer: -T 1:99999 watches it all
 //
+// RAM starts filled with 0xA5 (poison_ram), as the cart's holds junk at
+// power-on.
+//
 // If the CPU hits an illegal opcode or jumps to an invalid address, it prints
 // a crash report (registers, and code addresses found on the stack with their
 // symbols) and exits with status 3.
@@ -76,6 +79,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 struct event {
 	unsigned frame;  // or, after a -w, the offset from the frame it was met
@@ -904,6 +908,20 @@ static void print_hash(unsigned frame, const color_t *pixels, unsigned width, un
 	printf("hash frame %u: %016llX\n", frame, (unsigned long long)hash_screen(pixels, width, height));
 }
 
+// mGBA starts with RAM zeroed; the cart's doesn't (its boot loader ran in
+// it first). Fill EWRAM, and IWRAM up to the BIOS's area at 0x3007E00, so
+// code reading memory it never wrote (past its sections, below the stack)
+// sees junk here too and fails the tests, as the kernel's scratch buffer
+// does ("scratch free"). The kernel's startup clears its own sections.
+#define POISON 0xA5A5A5A5u
+static void poison_ram(struct mCore *core)
+{
+	for (uint32_t a = 0x02000000; a < 0x02040000; a += 4)
+		core->busWrite32(core, a, POISON);
+	for (uint32_t a = 0x03000000; a < 0x03007E00; a += 4)
+		core->busWrite32(core, a, POISON);
+}
+
 static int save_png(const char *path, const color_t *pixels, unsigned width, unsigned height)
 {
 	struct VFile *vf = VFileOpen(path, O_CREAT | O_TRUNC | O_WRONLY);
@@ -970,6 +988,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	core->reset(core);
+	poison_ram(core);
 	crash_core = core;
 	current_frame = 1;  // lines before the first frame (from -L scripts) count as frame 1's
 #ifdef ENABLE_SCRIPTING
@@ -1133,8 +1152,14 @@ int main(int argc, char **argv)
 					FILE *have = fopen(path, "rb");
 					if (have) {
 						fclose(have);
-					} else if (!save_png(path, buffer, width, height)) {
-						fprintf(stderr, "cannot write %s\n", path);
+					} else {
+						// Whole or not at all: runs in parallel share DIR
+						char tmp[1100];
+						snprintf(tmp, sizeof(tmp), "%s.%ld.part", path, (long)getpid());
+						if (!save_png(tmp, buffer, width, height) || rename(tmp, path)) {
+							fprintf(stderr, "cannot write %s\n", path);
+							remove(tmp);
+						}
 					}
 				}
 				break;  // once, if ranges overlap
