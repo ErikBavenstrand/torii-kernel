@@ -512,9 +512,16 @@ static u32 Loadfile2NOR_slow(TCHAR *filename, u32 NORaddress, u16 have_patch, u8
 
 		filesize = f_size(&gfile);
 		f_lseek(&gfile, 0xa0);
-		f_read(&gfile, temp, 0x10, (UINT *)&ret);//read game name
-		f_lseek(&gfile, 0xB0);
-		f_read(&gfile, flag, 0x4, (UINT *)&ret);//read flag
+		res = f_read(&gfile, temp, 0x10, (UINT *)&ret);//read game name
+		if (res == FR_OK && ret == 0x10) {
+			f_lseek(&gfile, 0xB0);
+			res = f_read(&gfile, flag, 0x4, (UINT *)&ret);//read flag
+		}
+		if (res != FR_OK || ret != 0x4) {  // Torii: nothing burned from a failed read
+			tlog_error("nor: reading %s's header failed (%lu)", filename, (unsigned long)res);
+			f_close(&gfile);
+			return 3;
+		}
 
 		if (memcmp(flag, "5G", 2) == 0) {
 			flag_64MBrom = 1;
