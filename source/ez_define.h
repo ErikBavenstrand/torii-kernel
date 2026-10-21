@@ -119,7 +119,7 @@
 //12 was the official kernel's thumbnail switch (slot 34 is the Box art row's)
 #define assress_game_clock 13 //games can read the cart's clock
 #define assress_auto_save_sel 14
-#define assress_ModeB_INIT 15 //Mode B, what the cart is in a DS: the kernel only stores it
+#define assress_ModeB_INIT 15 //Mode B: the cart reads it in mode B (the A/B switch), the kernel only stores it
 #define assress_led_open_sel 16
 #define assress_Breathing_R 17
 #define assress_Breathing_G 18
