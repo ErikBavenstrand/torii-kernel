@@ -283,9 +283,10 @@ static int decimal(const char *s, u32 *out)
 	if (!*s)
 		return 0;
 	for (; *s; s++) {
-		if (*s < '0' || *s > '9' || v > (0xFFFFFFFFu - 9) / 10)
+		u32 d = (u32)(*s - '0');
+		if (*s < '0' || *s > '9' || v > (0xFFFFFFFFu - d) / 10)
 			return 0;
-		v = v * 10 + (u32)(*s - '0');
+		v = v * 10 + d;
 	}
 	*out = v;
 	return 1;

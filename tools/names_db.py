@@ -22,8 +22,8 @@ on this PC (a mounted card, say /Volumes/OMEGA), and:
    code is a listed game's, since a romhack keeps its base game's code.
 3. Computes the CRC32 of every game on the card (by extension, outside the
    folders the kernel hides) and writes SD_PATH/torii/crc.txt, so the card
-   shows the names at once. A file whose path and size crc.txt already has
-   isn't read again. --no-crc leaves crc.txt alone: the kernel's Identify
+   shows the names at once. A file whose path, size and date crc.txt
+   already has isn't read again. --no-crc leaves crc.txt alone: the kernel's Identify
    library and its launches compute CRCs too, far more slowly.
 
 `just names-add SD_PATH FILE` runs `add`: your own names for many games at
@@ -475,7 +475,8 @@ def parse_cache(text):
     """crc.txt's records: {folded path: (crc or None, size, date or None, path)}.
     Reads v0.4.1's lines too, which had a GBA game code second (source/namesdb.h)."""
     out = {}
-    for line in text.splitlines():
+    for raw in text.split("\n"):  # as the kernel splits: not at U+2028 and the like
+        line = raw.removesuffix("\r")
         if not line or line.startswith("#"):
             continue
         parts = line.split("\t", 3)
@@ -487,16 +488,20 @@ def parse_cache(text):
         if len(parts) != 4 or not parts[3].startswith("/"):
             continue
         crc, size, date, path = parts
-        try:
-            rec = (
-                None if crc == "-" else int(crc, 16),
-                int(size),
-                None if date == "-" else date,
-                path,
-            )
-        except ValueError:
+        # The fields as the kernel reads them (names_parse_line)
+        if not (
+            re.fullmatch(r"-|[0-9A-Fa-f]{8}", crc)
+            and re.fullmatch(r"[0-9]{1,10}", size, re.ASCII)
+            and int(size) <= 0xFFFFFFFF
+            and re.fullmatch(r"-|[0-9A-Fa-f]{8}", date)
+        ):
             continue
-        out[path.lower()] = rec
+        out[path.lower()] = (
+            None if crc == "-" else int(crc, 16),
+            int(size),
+            None if date == "-" else date.upper(),
+            path,
+        )
     return out
 
 
@@ -675,26 +680,14 @@ def header_code(path):
     return head.decode("ascii") if re.fullmatch(rb"[0-9A-Z]{4}", head) else None
 
 
-def cache_written(torii):
-    """When crc.txt (or its backup) was last written, or None."""
-    for p in (torii / CRC_FILE, torii / (CRC_FILE + ".bak")):
-        try:
-            return os.path.getmtime(p)
-        except OSError:
-            pass
-    return None
-
-
-def record_holds(rec, file_path, size, written):
+def record_holds(rec, file_path, size):
     """Whether a parse_cache record's CRC holds for the file: it keeps its
-    size and its date, the one the kernel took for it or, for a record
-    written on a PC and not yet seen by the cart (no date), a file no newer
-    than crc.txt (written: cache_written's)."""
-    if not rec or rec[0] is None or rec[1] != size:
+    size and date, whoever wrote the record (this tool writes the file's FAT
+    date as the kernel reads it). One without a date (v0.4.1's tools) is
+    computed again."""
+    if not rec or rec[0] is None or rec[1] != size or rec[2] is None:
         return False
-    if rec[2] is not None:
-        return rec[2] == fat_date(file_path)
-    return written is not None and os.path.getmtime(file_path) <= written
+    return rec[2] == fat_date(file_path)
 
 
 def update_cache(sd, games):
@@ -702,12 +695,11 @@ def update_cache(sd, games):
     as {card path: crc} and (computed, reused)."""
     torii = Path(sd) / "torii"
     old = parse_cache(read_safe(torii / CRC_FILE))
-    written = cache_written(torii)
     lines, found, computed, reused = [CRC_HEADER], {}, 0, 0
     for n, (card_path, file_path, _) in enumerate(games):
         size = os.path.getsize(file_path)
         rec = old.get(card_path.lower())
-        if record_holds(rec, file_path, size, written):
+        if record_holds(rec, file_path, size):
             crc, date = rec[0], rec[2]
             reused += 1
         else:
@@ -720,7 +712,10 @@ def update_cache(sd, games):
             crc, size2 = file_crc(file_path)
             if size2 != size:
                 continue
-            date = None  # the kernel's walk takes the file's FAT date
+            # The file's FAT date, as the kernel's walk compares it: a file
+            # changed later (a same-size romhack unzipped over a game) is
+            # read again, here and on the cart
+            date = fat_date(file_path)
             computed += 1
         found[card_path] = crc
         lines.append(f"{crc:08X}\t{size}\t{date or '-'}\t{card_path}\n")

@@ -29,8 +29,9 @@
 //	CRC32<TAB>SIZE<TAB>DATE<TAB>PATH
 //
 // CRC32 as 8 hex digits, or "-" while unknown; SIZE in bytes; DATE FatFs's fdate << 16 |
-// ftime as 8 hex digits, or "-" where it isn't known (written on a PC: the
-// next walk takes the file's); PATH from the card's root. '#' lines are
+// ftime as 8 hex digits (`just names-update` writes the file's as the PC
+// sees it), or "-" where it isn't known (v0.4.1's tools: the next walk takes
+// the file's); PATH from the card's root. '#' lines are
 // comments. An entry counts only while its file keeps that size (and date,
 // once known): the walk drops one that doesn't. v0.4.1 wrote a GBA game code
 // after the CRC (CRC32, CODE, SIZE, DATE, PATH): such lines still read, and

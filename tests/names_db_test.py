@@ -336,6 +336,12 @@ class Cache(unittest.TestCase):
             "-\t-\t300\t5A3C7B20\t/Odd\tdate.gb\n"
             "1234ABCD\tawre\t4096\t-\t/GBA/bad code.gba\n"
             "1234ABCD\t4096\t-\tno root.gba\n"
+            # Fields the kernel doesn't read, nor does this
+            "1234ABC\t4096\t-\t/seven digits.gba\n"
+            "1234ABCD\t+4096\t-\t/plus.gba\n"
+            "1234ABCD\t4096\tzz\t/bad date.gba\n"
+            # The kernel splits lines at LF alone
+            "1234ABCD\t4096\t-\t/a\u2028b.gba\n"
         )
         got = names_db.parse_cache(text)
         self.assertEqual(
@@ -350,6 +356,7 @@ class Cache(unittest.TestCase):
                 "/nes/odd\tname.nes": (None, 40976, None, "/NES/Odd\tname.nes"),
                 "/gba/wars.gba": (0x8C5D6F2B, 4096, None, "/GBA/Wars.gba"),
                 "/odd\tdate.gb": (None, 300, "5A3C7B20", "/Odd\tdate.gb"),
+                "/a\u2028b.gba": (0x1234ABCD, 4096, None, "/a\u2028b.gba"),
             },
         )
 
@@ -386,7 +393,14 @@ class Card(unittest.TestCase):
         self.assertEqual(set(lines), want)
         wars = lines["/GBA/Wars.gba"]
         self.assertEqual(
-            wars[:3], [f"{zlib.crc32(fixture.rom(1, 4096, 'AWRE')):08X}", "4096", "-"]
+            wars[:3],
+            [
+                f"{zlib.crc32(fixture.rom(1, 4096, 'AWRE')):08X}",
+                "4096",
+                names_db.fat_date(
+                    self.sd / "GBA" / "Wars.gba"
+                ),  # as the kernel reads it
+            ],
         )
         self.assertEqual(lines["/NES/Famicom.nes"][1], "16400")
         # No game codes: a romhack ("Hack of Minish") keeps its file name
@@ -399,14 +413,14 @@ class Card(unittest.TestCase):
         self.assertTrue(
             main.startswith(b"# Torii's CRC cache: CRC32, size, date, path\n")
         )
-        # A run right after reads nothing again: the records written here
-        # have no date yet, and their files are no newer than crc.txt
+        # A run right after reads nothing again: the files keep their sizes
+        # and dates
         status, out, err = update(self.sd)
         self.assertEqual(status, 0, err)
         self.assertIn("9 games, 0 CRCs computed, 9 kept", out)
-        # A file changed since (newer than crc.txt) is read again
-        later = os.path.getmtime(self.sd / "torii" / "crc.txt") + 10
-        os.utime(self.sd / "GBA" / "Wars.gba", (later, later))
+        # A file of the same size with another date (a romhack unzipped over
+        # a game, with the archive's older date) is read again
+        os.utime(self.sd / "GBA" / "Wars.gba", (1_500_000_000, 1_500_000_000))
         status, out, err = update(self.sd)
         self.assertIn("9 games, 1 CRCs computed, 8 kept", out)
 
@@ -444,23 +458,18 @@ class Card(unittest.TestCase):
 
     def test_kept_and_recomputed(self):
         update(self.sd)
-        # The kernel took each file's date; one date is another's, one
-        # record has none yet; a file changed size; a game left
+        # One date is another's, one record has none (v0.4.1's tools); a
+        # file changed size; a game left
         path = self.sd / "torii" / "crc.txt"
         out_lines = []
         for old in names_db.read_safe(path).splitlines(keepends=True):
             f = old.rstrip("\n").split("\t")
             row = old
-            if len(f) == 4 and f[3] != "/NES/Famicom.nes":
-                f[2] = names_db.fat_date(self.sd / f[3].lstrip("/"))
-                if f[3] == "/GBA/Wars.gba":
-                    f[2] = "5A3C7B20"
+            if len(f) == 4 and f[3] in ("/NES/Famicom.nes", "/GBA/Wars.gba"):
+                f[2] = "-" if f[3] == "/NES/Famicom.nes" else "5A3C7B20"
                 row = "\t".join(f) + "\n"
             out_lines.append(row)
         names_db.write_safe(path, "".join(out_lines))
-        # Famicom has no date and is newer than crc.txt: read again
-        later = os.path.getmtime(path) + 10
-        os.utime(self.sd / "NES" / "Famicom.nes", (later, later))
         (self.sd / "GB" / "Mono.gb").write_bytes(b"changed" * 100)
         os.remove(self.sd / "Colour.gbc")
         status, out, err = update(self.sd)
@@ -471,10 +480,17 @@ class Card(unittest.TestCase):
         self.assertEqual(
             lines[hb][2], names_db.fat_date(self.sd / hb.lstrip("/"))
         )  # kept with its date
-        self.assertEqual(lines["/GBA/Wars.gba"][2], "-")  # computed again
+        wars = self.sd / "GBA" / "Wars.gba"
+        self.assertEqual(
+            lines["/GBA/Wars.gba"][2], names_db.fat_date(wars)
+        )  # computed again
         self.assertEqual(
             lines["/GB/Mono.gb"][:3],
-            [f"{zlib.crc32(b'changed' * 100):08X}", "700", "-"],
+            [
+                f"{zlib.crc32(b'changed' * 100):08X}",
+                "700",
+                names_db.fat_date(self.sd / "GB" / "Mono.gb"),
+            ],
         )
         self.assertNotIn("/Colour.gbc", lines)
 

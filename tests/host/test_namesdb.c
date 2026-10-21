@@ -345,6 +345,8 @@ void test_names_lines(void)
 	CHECK(strcmp(l.path, "/NES/Odd\tname.nes") == 0);
 	strcpy(line, "5a0e6e6a\t1\t-\t/a.gb");
 	CHECK(names_parse_line(line, &l) && l.crc == 0x5A0E6E6Au && l.flags == NAMES_CRC);
+	strcpy(line, "-\t4294967295\t-\t/big.gba");  // the largest size
+	CHECK(names_parse_line(line, &l) && l.size == 0xFFFFFFFFu);
 	// v0.4.1's lines, with a GBA game code second, read the same
 	strcpy(line, "5A0E6E6A\tBZRE\t16777216\t5A3C7B20\t/GBA/Minish Cap.gba");
 	CHECK(names_parse_line(line, &l));

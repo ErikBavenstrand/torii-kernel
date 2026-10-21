@@ -74,8 +74,8 @@ fixture_card() { # cart [names_db.py options]
   new_card "$cart"
   mkdir -p "$cart/files"
   python3 tests/names/fixture.py roms "$cart/files"
-  python3 tools/names_db.py update "$cart/files" --offline --dats tests/names "$@" >"$cart/tool.log"
   touch -d '2025-01-01 12:00' "$cart/files/GBA/Wars.gba"
+  python3 tools/names_db.py update "$cart/files" --offline --dats tests/names "$@" >"$cart/tool.log"
   mcopy -s -m -i "$cart/sd.img" "$cart/files/"* ::/
 }
 
