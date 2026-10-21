@@ -25,6 +25,9 @@ _Static_assert(PSRAM_NAMES_TEXT_BYTES <= sizeof(((struct names_area *)0)->out),
 	       "a names file read whole fits its writing");
 
 #define STAGE_BYTES 1024  // the text staged before each PSRAM write, at the start of out
+// What a new text may hold: what load reads back, less room for the CRC line
+// safefile adds (so an edit never makes a file Rename can't read again)
+#define TEXT_CAP (PSRAM_NAMES_TEXT_BYTES - SAFEFILE_CRC_LINE_LEN - 2)
 
 static struct names_area *area(void)
 {
@@ -131,7 +134,7 @@ int gamename_store_set(const char *path, const char *name)
 		return 0;
 	struct names_area *a = area();
 	tlog("names: %s is %s%s%s", path, name ? "\"" : "", name ? name : "its own name again", name ? "\"" : "");
-	return store(gamename_custom_set(&c, path, name, a->out, sizeof(a->out)));
+	return store(gamename_custom_set(&c, path, name, a->out, TEXT_CAP));
 }
 
 int gamename_store_move(const char *old_path, const char *new_path)
@@ -144,5 +147,5 @@ int gamename_store_move(const char *old_path, const char *new_path)
 		return 1;  // no name of its own: nothing to write
 	struct names_area *a = area();
 	tlog("names: %s's name moves to %s", old_path, new_path);
-	return store(gamename_custom_move(&c, old_path, new_path, a->out, sizeof(a->out)));
+	return store(gamename_custom_move(&c, old_path, new_path, a->out, TEXT_CAP));
 }

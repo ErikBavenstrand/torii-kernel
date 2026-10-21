@@ -155,6 +155,12 @@ void test_rename_file(void)
 	CHECK_EQ(action_rename_file(T_DIR "/Game.gba", "Game.gb"), ACTION_RENAME_BAD);
 	CHECK_EQ(action_rename_file(T_DIR "/Game.gba", "Other.gba"), ACTION_RENAME_TAKEN);
 	CHECK_EQ(action_rename_file(T_DIR "/Game.gba", "Busy.gba"), ACTION_RENAME_SIDE_TAKEN);
+	CHECK_EQ(action_rename_file(T_DIR "/notes.txt", "notes."), ACTION_RENAME_BAD);  // FatFs drops the dot
+	// A game with no save of its own doesn't take a save left there
+	CHECK(put(T_DIR "/Lone.gba", "lone"));
+	CHECK_EQ(action_rename_file(T_DIR "/Lone.gba", "Busy.gba"), ACTION_RENAME_SIDE_TAKEN);
+	CHECK(there(T_DIR "/Lone.gba") && !there(T_DIR "/Busy.gba"));
+	f_unlink(T_DIR "/Lone.gba");
 	CHECK(there(T_DIR "/Game.gba") && there("/SAVER/Game.sav") && !there(T_DIR "/Busy.gba"));
 	CHECK(holds("/SAVER/Busy.sav", "another game's save"));
 

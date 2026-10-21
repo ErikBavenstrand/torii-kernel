@@ -278,6 +278,22 @@ static int same_name(const char *a, const char *b)
 	return !*a && !*b;
 }
 
+// 1 if another game in the library has the save file save (path's own is
+// left out): its records' file names, a save name each
+static int there_shared(const char *path, const char *save)
+{
+	struct rename_work *w = RW;
+	for (u32 rec = 0, n = library_records(); rec < n; rec++) {
+		u32 flags = library_flags(rec);
+		if (flags & LIB_F_GONE)
+			continue;
+		save_name(w->from, library_name(rec), flags & LIB_F_CONSOLE);
+		if (same_name(w->from, save) && library_path(rec, w->to, sizeof(w->to)) && strcmp(w->to, path) != 0)
+			return 1;
+	}
+	return 0;
+}
+
 // 1 if a new name for a file is one the card and the menu keep
 static u32 name_check(const char *name)
 {
@@ -289,6 +305,8 @@ static u32 name_check(const char *name)
 			return ACTION_RENAME_BAD;
 	if (name[0] == '.')
 		return ACTION_RENAME_HIDDEN;  // the hidden rule would take it off the lists
+	if (name[len - 1] == '.' || name[len - 1] == ' ')
+		return ACTION_RENAME_BAD;  // FatFs drops them: the file would get another name than the lists
 	return ACTION_RENAMED;
 }
 
@@ -315,21 +333,32 @@ u32 action_rename_file(const char *path, const char *new_name)
 	if (console != LIB_CONSOLE_NONE) {
 		// Its save must keep the record's name: the copy from the cart
 		// would come back under it
+		// Its save must keep the record's name, and no other save may be
+		// waiting under the new one: the copy from the cart comes back
+		// under the record's name
 		char save[SAVE_NAME_MAX];
-		save_name(save, w->name, console);
-		if (pending_save_named(save)) {
-			tlog("rename %s: its save %s still waits to be copied", path, save);
-			return ACTION_RENAME_PENDING;
-		}
 		save_name(save, new_name, console);
 		if (strlen(save) > SAV_INFO_NAME_MAX)
 			return ACTION_RENAME_BAD;  // the pending-save record couldn't name it
-		// Nothing lands on another game's file (a new case of its own
-		// name keeps its own files)
+		int pending = pending_save_named(save);
+		save_name(save, w->name, console);
+		if (pending || pending_save_named(save)) {
+			tlog("rename %s: a save still waits to be copied", path);
+			return ACTION_RENAME_PENDING;
+		}
+		// A save another game shares (the same name in another folder, or
+		// a .gb and .gbc of one name) stays with it: moving it would take
+		// it away
+		if (!case_only && there_shared(path, save)) {
+			tlog("rename %s: another game uses its save %s", path, save);
+			return ACTION_RENAME_SHARED;
+		}
+		// Nothing lands on another game's file, its own or one a deleted
+		// game left (a new case of its own name keeps its own files)
 		for (u32 i = 0; i < SIDECARS; i++) {
 			const struct sidecar *s = &sidecars[i];
 			w->has[i] = side_path(w->from, s, w->name, console) && there(w->from);
-			if (!w->has[i] || s->cache || case_only || !side_path(w->to, s, new_name, console))
+			if (s->cache || case_only || !side_path(w->to, s, new_name, console))
 				continue;
 			if (there(w->to)) {
 				tlog("rename %s: %s is there already", path, w->to);

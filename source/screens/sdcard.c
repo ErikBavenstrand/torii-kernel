@@ -580,6 +580,8 @@ static const char *rename_submit(void *ctx, const char *stem)
 		return gl_rename->side_taken;
 	case ACTION_RENAME_PENDING:
 		return gl_rename->pending;
+	case ACTION_RENAME_SHARED:
+		return gl_rename->shared;
 	default:
 		return gl_rename->failed;
 	}
@@ -598,8 +600,10 @@ static void rename_file(void)
 	sd.renamed_partly = 0;
 	sd.find = (u8)rename_run(&ask);
 	// The page again in the menu's session, listed afresh
-	if (!ui_active() || ui_depth())
+	if (!ui_active() || ui_depth()) {
+		sd.find = 0;
 		return;
+	}
 	if (!sd_enter(NAV_SD, 0)) {
 		tlog_error("sdcard: %s", ui_error());
 		ui_shutdown();

@@ -555,6 +555,7 @@ static const struct lang_rename en_rename = {
 	.hidden = "Names can't start with a dot.",
 	.side_taken = "A save of that name is there.",
 	.pending = "Its save isn't copied yet.",
+	.shared = "Another game uses its save.",
 	.failed = "The card didn't take it.",
 	.partly = "Renamed, but not all of its files",
 	.name_failed = "Can't keep the name",

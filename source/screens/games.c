@@ -56,8 +56,7 @@
 #define FACT_KEYS_W 32
 #define FACT_VALUES_W 48
 #define FACTS_H 32       // two lines
-#define NOTE_W \
-	88        // "No games here", in the list's middle: narrow, as plane 2's tiles are
+#define NOTE_W 88        // "No games here", in the list's middle: narrow, as plane 2's tiles are
 		// the popups' and confirmations' too (a tall popup and a confirmation fill them)
 #define NOTE_Y 72
 #define NOTE_H 16

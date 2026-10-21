@@ -479,7 +479,7 @@ static const struct ui_hints_config no_hints = {0, 0};
 // What a whole paint of each costs, about (frame-cycles: rename-key with
 // both new): a first draw paints the keys in a frame of their own
 #define FIELD_PAINT_CYCLES 40000
-#define KEYS_PAINT_CYCLES 100000
+#define KEYS_PAINT_CYCLES 110000
 static const struct ui_canvas_config field_canvas = {paint_field, FIELD_PAINT_CYCLES};
 static const struct ui_canvas_config keys_canvas = {paint_keys, KEYS_PAINT_CYCLES};
 

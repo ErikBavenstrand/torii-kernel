@@ -71,9 +71,11 @@ enum {
 	ACTION_RENAME_TAKEN,       // another file in its folder has that name
 	ACTION_RENAME_BAD,         // a name the card can't take (\/:*?"<>|, too long), or a folder
 	ACTION_RENAME_HIDDEN,      // a name starting with '.', which the menu hides
-	ACTION_RENAME_SIDE_TAKEN,  // its save (or save type, save states, cheats, art) would land on
-				   // another game's: nothing renamed
-	ACTION_RENAME_PENDING,     // its save still waits to be copied from the cart: nothing renamed
+	ACTION_RENAME_SIDE_TAKEN,  // a save (or save type, save states, cheats, art) under the new
+				   // name is there already, another game's: nothing renamed
+	ACTION_RENAME_PENDING,     // a save (its own, or one under the new name) still waits to be
+				   // copied from the cart: nothing renamed
+	ACTION_RENAME_SHARED,      // another game in the library uses its save: nothing renamed
 	ACTION_RENAME_FAILED,      // the card refused: nothing renamed
 	ACTION_RENAME_PARTLY,      // renamed, but one of its other files or lists didn't follow (logged)
 };
