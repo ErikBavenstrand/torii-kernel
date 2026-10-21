@@ -792,10 +792,13 @@ static void step_timing(void)
 
 	// SD reads: 256 KB of raw sectors from the card's start.
 	diag_timer_start();
+	u32 sd_failed = 0;
 	for (u32 lba = 0; lba < 512; lba += 4)
-		Read_SD_sectors(lba, 4, pReadCache);
+		sd_failed += Read_SD_sectors(lba, 4, pReadCache);
 	u32 sd_cycles = diag_timer_stop();
 	say(WHITE, "SD reads: %lu KB/s", (unsigned long)kb_per_s(0x40000, sd_cycles));
+	if (sd_failed)
+		say(RED, "SD reads: %lu of 128 failed", (unsigned long)sd_failed);
 
 	// SD writes: 128 KB rewritten in a file of Diagnostics' own, made once.
 	FIL f;

@@ -107,6 +107,12 @@ u32 IWRAM_CODE Read_SD_sectors(u32 address, u16 count, u8 *SDbuffer)
 				delay(5000);
 				goto read_again;
 			}
+			// Torii: the card never answered, twice: a read error
+			// (the official kernel copied the stale buffer and returned 0).
+			// No other status value is known to mean an error.
+			SD_Disable();
+			WAITCNT_RESTORE(waitcnt);
+			return 1;
 		}
 		dmaCopy((void *)0x9E00000, SDbuffer + i * 512, blocks * 512);
 	}
@@ -138,6 +144,7 @@ u32 IWRAM_CODE Write_SD_sectors(u32 address, u16 count, const u8 *SDbuffer)
 
 		res = Wait_SD_Response();
 		if (res == 1) {
+			SD_Disable();  // Torii: SD mode hides the ROM we return to
 			WAITCNT_RESTORE(waitcnt);
 			return 1;
 		}

@@ -477,6 +477,15 @@ header and mark survive; format again. Erase and program
 take the model no time, so `OMEGA_POWER_CUT` (`emu/mgba/src/gba/cart/omega.c`) cuts the
 power between operations for `tests/nor_safety.sh`; `OMEGA_POWER_CUT=sd:write:N`
 cuts it before the Nth SD write command, for `tests/userdata.sh`.
+`OMEGA_SD_READ_ERROR=FIRST[-LAST][:N]` makes SD reads touching those sectors
+never finish (the port stays `0xEEE1`), the first N of them or all.
+
+**SD read errors.** The only failure the kernel can see is a read that never
+finishes: the port stays `0xEEE1` (busy). `Read_SD_sectors` polls about a
+million times, tries once more after a pause, and since v0.4.2 then returns 1,
+which `disk_read` passes to FatFs as `RES_ERROR` (the official kernel copied
+the stale buffer and returned 0, so FatFs never saw an error). What other
+status values mean, if any mean a CRC error, isn't known.
 
 **Kernel NOR and the boot loader.** From the official *EZ-FLASH OMEGA DE
 DOCUMENT.pdf* (its NOR allocation lists 16-bit word addresses, so double

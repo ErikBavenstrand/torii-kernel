@@ -44,3 +44,21 @@ shard_case() {
   _shard_n=$((_shard_n + 1))
   [ $(((_shard_n - 1) % _shard_count + 1)) = "$_shard_index" ]
 }
+
+# sd_sectors IMAGE PATH: the first and last sector of PATH's first cluster
+# run on a FAT image without partitions (mkfs.fat -C), as FIRST-LAST: what
+# OMEGA_SD_READ_ERROR takes to fail reads of the file.
+sd_sectors() {
+  python3 - "$1" "$(mshowfat -i "$1" "::$2")" <<'PY'
+import re, struct, sys
+boot = open(sys.argv[1], "rb").read(512)
+per_sector, per_cluster, reserved, fats = struct.unpack_from("<HBHB", boot, 11)
+fat16, entries = struct.unpack_from("<H", boot, 22)[0], struct.unpack_from("<H", boot, 17)[0]
+fat = fat16 or struct.unpack_from("<I", boot, 36)[0]
+root = (entries * 32 + per_sector - 1) // per_sector
+run = re.search(r"<(\d+)(?:-(\d+))?>", sys.argv[2])
+first, last = int(run[1]), int(run[2] or run[1])
+data = reserved + fats * fat + root
+print(f"{data + (first - 2) * per_cluster}-{data + (last - 1) * per_cluster - 1}")
+PY
+}

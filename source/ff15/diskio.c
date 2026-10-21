@@ -140,9 +140,12 @@ DRESULT disk_read (
 	}
 
 	return RES_PARERR;*/
-	DRESULT res;
-	res = Read_SD_sectors(sector, count, buff);
-	return res;
+	/* Torii: 1 when the card didn't answer (Read_SD_sectors) */
+	if (Read_SD_sectors(sector, count, buff)) {
+		tlog_error("sd: read of %lu sectors at %lu failed", (unsigned long)count, (unsigned long)sector);
+		return RES_ERROR;
+	}
+	return RES_OK;
 }
 
 
@@ -199,7 +202,9 @@ DRESULT disk_write (
 	TLOG_ASSERT((DWORD)buff < 0x08000000);
 	if ((DWORD)buff >= 0x08000000)
 		return RES_PARERR;
-	res = Write_SD_sectors(sector, count, buff);
+	res = Write_SD_sectors(sector, count, buff) ? RES_ERROR : RES_OK;
+	if (res != RES_OK)
+		tlog_error("sd: write of %lu sectors at %lu failed", (unsigned long)count, (unsigned long)sector);
 	return res;
 }
 
