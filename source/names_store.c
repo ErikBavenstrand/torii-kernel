@@ -35,8 +35,12 @@
 #define NAMES_KEY_REST 30  // the job waits for the keys to rest this many frames
 #define NAMES_WRITE_IDLE 120  // and this long before it writes crc.txt (as the library's index)
 #define NAMES_RENAME_EVERY 32  // new names before the index is sorted again
+// or, while new games are identified, frames a new name waits for that at
+// most (10 s): a big game's CRC takes minutes, the walk and sort seconds
+#define NAMES_RENAME_FRAMES 600
 #define NAMES_WRITE_EVERY 256  // CRCs computed before crc.txt is written again (a write rewrites it all)
 #define NAMES_CYCLES_PER_MS 16780u
+#define NAMES_FRAME_US 16743u  // a frame's microseconds (280,896 cycles)
 
 #define DB ((u8 *)PSRAM_NAMES_DB_BASE)
 
@@ -63,7 +67,9 @@ enum {
 
 enum {
 	M_NONE,
-	M_RECENT,  // the games on Recent that have no CRC yet: the ones just played
+	// The games that have no CRC yet, after a walk found some: Recent's
+	// first (the ones just played), then the library's in walk order
+	M_NEW,
 	M_ALL,  // Identify library
 };
 
@@ -95,7 +101,8 @@ static struct {
 	u8 job;
 	u8 mode, step;
 	u8 file_open;
-	u8 want_recent;  // check Recent once the menu runs
+	u8 want_new;  // the last walk found games without a CRC: M_NEW once the library rests
+	u8 pass;  // M_NEW: 0 Recent's games, 1 the library's
 	u8 console;
 	u8 logged_full;
 	// crc.txt's write (safefile.h's two copies, in steps through N.u.fil)
@@ -116,8 +123,12 @@ static struct {
 	u32 at;  // names.db bytes loaded, or slot bytes cleared
 	u32 started;
 	struct names_cache cache;
-	u32 cursor;  // M_RECENT: the Recent entry; M_ALL: the library record
+	u32 cursor;  // M_NEW: the Recent entry, then the library record; M_ALL: the library record
+	// M_NEW's total counts the games it had to read
 	u32 total, done, computed, named, bytes, since_write, since_rename;
+	u32 started_frame, rename_frame;  // torii_frames as Identify began, and at the first name since a sort
+	u32 walk_new;  // the walk under way's games without a live CRC record
+	u32 changes;  // CRCs computed this session: names_changes
 	u32 crc, size, date, read;
 	u8 seen[NAMES_CACHE_MAX / 8];
 	// Records whose CRCs crc.txt doesn't hold yet: new since the last write
@@ -289,7 +300,6 @@ static void load_done(void)
 	}
 	N.dirty = N.journal ? DIRTY_HARD : 0;  // the journal's lines go into crc.txt
 	N.phase = P_DONE;
-	N.want_recent = !N.read_only;
 	tlog("names: %lu files' CRCs from %s in %lu ms%s", (unsigned long)N.lines_read, NAMES_CACHE_FILE,
 	     (unsigned long)ms_since(N.started), N.cache_ok ? "" : " (it isn't written back)");
 	if (N.lines_bad)
@@ -575,11 +585,16 @@ void names_walk_begin(void)
 	memset(N.seen, 0, sizeof(N.seen));
 	N.seen_ok = 0;
 	N.walk_names = 0;
+	N.walk_new = 0;
 }
 
 void names_walk_end(int whole)
 {
 	N.seen_ok = (u8)whole;
+	// Games without a CRC: identified in the background (M_NEW), on a card
+	// that uses CRCs and can keep them (else every boot would read them again)
+	if (N.walk_new && N.active && !N.read_only && N.cache_ok && !N.cache.full)
+		N.want_new = 1;
 }
 
 const char *names_walk_seen(const char *path, u32 size, u32 date, u32 console)
@@ -587,8 +602,10 @@ const char *names_walk_seen(const char *path, u32 size, u32 date, u32 console)
 	if (N.phase != P_DONE)
 		return NULL;
 	u32 n = names_cache_find(&N.cache, path);
-	if (n == NAMES_CACHE_NONE)
+	if (n == NAMES_CACHE_NONE) {
+		N.walk_new++;
 		return NULL;
+	}
 	mark_seen(n);
 	const struct names_rec *r = names_cache_rec(&N.cache, n);
 	switch (names_cache_fits(r, size, date)) {
@@ -598,6 +615,7 @@ const char *names_walk_seen(const char *path, u32 size, u32 date, u32 console)
 			names_cache_drop(&N.cache, n);
 			N.dirty |= DIRTY_SOFT;
 		}
+		N.walk_new++;
 		return NULL;
 	case NAMES_FIT_DATED:
 		names_cache_set_date(&N.cache, n, date);
@@ -606,6 +624,8 @@ const char *names_walk_seen(const char *path, u32 size, u32 date, u32 console)
 	default:
 		break;
 	}
+	if ((names_rec_flags(r) & (NAMES_CRC | NAMES_DEAD)) != NAMES_CRC)
+		N.walk_new++;
 	const char *name = N.db_ok ? names_db_name(DB, r, console) : NULL;
 	if (name) {
 		// Which game has which name, in any order: a CRC that finds no name
@@ -791,7 +811,7 @@ static void write_step(void)
 // The next game to identify into N.path, N.console; 0 when there is none
 static int next_game(void)
 {
-	if (N.mode == M_RECENT) {
+	if (N.mode == M_NEW && N.pass == 0) {
 		while (N.cursor < userdata_recent_count()) {
 			const char *p = userdata_recent_path(N.cursor++);
 			u32 len = (u32)strlen(p);
@@ -802,10 +822,10 @@ static int next_game(void)
 			if (library_find(N.path) == LIBRARY_NONE)
 				continue;
 			N.console = (u8)library_console_of(N.path);
-			N.total++;
 			return 1;
 		}
-		return 0;
+		N.pass = 1;  // then the library's
+		N.cursor = 0;
 	}
 	// The records in walk order, which the rebuilds new names cause keep
 	// (sorted order would change under the cursor)
@@ -819,14 +839,28 @@ static int next_game(void)
 	return 0;
 }
 
+// The index sorts again, by the names found since it last did
+static void publish_names(void)
+{
+	N.since_rename = 0;
+	library_changed();
+}
+
 static void identify_finish(void)
 {
 	close_file();
 	if (N.since_rename)
-		library_changed();
-	tlog("names: identified %lu of %lu games (%lu KB) in %lu ms; %lu have a database name",
-	     (unsigned long)N.computed, (unsigned long)N.done, (unsigned long)(N.bytes >> 10),
-	     (unsigned long)ms_since(N.started), (unsigned long)N.named);
+		publish_names();
+	// In frames: a run of minutes outlasts the cycle counter (256 s)
+	u32 ms = (torii_frames - N.started_frame) * NAMES_FRAME_US / 1000u;
+	if (N.mode == M_ALL)
+		tlog("names: identified %lu of %lu games (%lu KB) in %lu ms; %lu have a database name",
+		     (unsigned long)N.computed, (unsigned long)N.done, (unsigned long)(N.bytes >> 10),
+		     (unsigned long)ms, (unsigned long)N.named);
+	else if (N.total)  // nothing to read (a later walk's call, say): nothing to say
+		tlog("names: identified %lu of %lu new games (%lu KB) in %lu ms; %lu have a database name",
+		     (unsigned long)N.computed, (unsigned long)N.total, (unsigned long)(N.bytes >> 10),
+		     (unsigned long)ms, (unsigned long)N.named);
 	N.mode = M_NONE;
 }
 
@@ -865,6 +899,8 @@ static int identify_step(void)
 				return JOB_MORE;  // known
 			}
 		}
+		if (N.mode == M_NEW)
+			N.total++;
 		fr = f_open(&N.u.fil, N.path, FA_READ);
 		if (fr != FR_OK) {
 			tlog("names: %s can't be opened (FatFs error %d)", N.path, fr);
@@ -906,6 +942,7 @@ static int identify_step(void)
 		mark_seen(n);
 		mark_fresh(n);
 		N.dirty |= DIRTY_HARD;
+		N.changes++;
 		N.computed++;
 		N.since_write++;
 		N.bytes += N.read;
@@ -913,10 +950,10 @@ static int identify_step(void)
 		tlog_debug("names: %s is %08lX%s%s", N.path, (unsigned long)N.crc, name ? ": " : "", name ? name : "");
 		if (name) {
 			N.named++;
-			if (++N.since_rename >= NAMES_RENAME_EVERY) {
-				N.since_rename = 0;
-				library_changed();
-			}
+			if (!N.since_rename)
+				N.rename_frame = torii_frames;
+			if (++N.since_rename >= NAMES_RENAME_EVERY)
+				publish_names();
 		}
 		return JOB_MORE;
 	}
@@ -925,6 +962,8 @@ static int identify_step(void)
 
 static void identify_begin(u32 mode)
 {
+	if (N.mode != M_NONE && N.since_rename)
+		publish_names();  // the run stopped found names the index hasn't sorted by
 	// The FIL may be names.db's load or crc.txt's write: close only a game
 	// Identify was reading
 	if (N.mode != M_NONE && N.step == I_READ)
@@ -932,9 +971,12 @@ static void identify_begin(u32 mode)
 	N.mode = (u8)mode;
 	N.step = I_NEXT;
 	N.cursor = 0;
+	N.pass = 0;
 	N.total = N.done = N.computed = N.named = N.bytes = N.since_write = N.since_rename = 0;
 	N.logged_full = 0;
+	N.want_new = 0;  // this run looks at them
 	N.started = cycles_now();
+	N.started_frame = torii_frames;
 	if (mode == M_ALL)
 		for (u32 c = 0; c < LIB_CONSOLES; c++)
 			N.total += library_count(c);
@@ -952,6 +994,10 @@ static int names_step(void)
 		return JOB_MORE;
 	}
 	int between = N.step == I_NEXT;
+	// A name found a while ago shows now, also in the middle of a big game:
+	// the job waits for the walk, its file kept open
+	if (N.mode == M_NEW && N.since_rename && torii_frames - N.rename_frame >= NAMES_RENAME_FRAMES)
+		publish_names();
 	if (N.mode != M_NONE && !(between && N.dirty && N.since_write >= NAMES_WRITE_EVERY))
 		return identify_step() == JOB_DONE && !N.dirty ? JOB_DONE : JOB_MORE;
 	if (N.dirty && ui_idle_frames() >= NAMES_WRITE_IDLE) {
@@ -997,6 +1043,11 @@ static int names_job(struct job *job)
 	do
 		r = names_step();
 	while (r == JOB_MORE && cycles_since(start) < NAMES_STEP_CYCLES);
+	// The background's new games take one job call a frame (a read or
+	// two), not the frame's spare half: a marquee or a cover drawn beside
+	// it keeps its frame
+	if (r == JOB_MORE && N.mode == M_NEW && N.wphase == X_IDLE)
+		return JOB_WAIT;
 	return r;
 }
 
@@ -1013,7 +1064,7 @@ void names_identify_now(void)
 {
 	if (N.phase != P_DONE)
 		return;
-	if (N.mode == M_NONE)
+	if (N.mode != M_ALL)
 		identify_begin(M_ALL);
 	if (job_running(N.job))
 		job_cancel(N.job);
@@ -1038,14 +1089,18 @@ int names_identifying(u32 *done, u32 *total)
 	return N.mode == M_ALL;
 }
 
+u32 names_changes(void)
+{
+	return N.changes;
+}
+
 void names_poll(void)
 {
 	if (N.phase != P_DONE)
 		return;
-	if (N.want_recent && N.active && N.mode == M_NONE && library_ready() && !library_busy()) {
-		N.want_recent = 0;
-		identify_begin(M_RECENT);
-	}
+	// After the walk (and the index it may build): its games without a CRC
+	if (N.want_new && N.mode == M_NONE && library_ready() && !library_busy())
+		identify_begin(M_NEW);
 	if (has_work() && !job_running(N.job))
 		N.job = job_start(names_job, 0, JOB_OWNER_NONE);
 }
@@ -1123,9 +1178,11 @@ void names_before_launch(void)
 		job_cancel(N.job);  // closes a file it read or wrote
 	N.job = JOB_NONE;
 	close_file();
-	if (N.mode != M_NONE)
+	if (N.mode == M_ALL)
 		tlog("names: identifying stopped for a launch (%lu of %lu games done)", (unsigned long)N.done,
 		     (unsigned long)N.total);
+	else if (N.mode == M_NEW)  // the next boot's walk finds the rest
+		tlog("names: identifying new games stopped for a launch (%lu done)", (unsigned long)N.computed);
 	N.mode = M_NONE;
 	u32 bytes = N.phase == P_DONE && N.cache_ok && N.active ? journal_bytes() : 0;
 	if (bytes > NAMES_JOURNAL_MAX - 64) {

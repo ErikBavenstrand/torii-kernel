@@ -71,6 +71,7 @@ Everything the v0.2–v0.4.1 work left open, checked against the code on 2026-10
 - ~~Diagnostics' first page draws its prompt lines a frame after `screen ready: diag-start` (`source/diag.c`); passes show in plain text, as the palette has no green (`source/diag_priv.h`).~~ Fixed by E4 (`3ca6e5a`).
 - ~~`ui_hints_get` doesn't give back a hint note's ink, so a popup over a danger or countdown line restores it as plain text (can't happen today; `source/ui/`).~~ Fixed by E4 (`9c7aad1`).
 - ~~BG block 0's tiles on list pages are nearly full with a popup and a confirmation up (9–20 spare); a taller popup falls back to closing the popup. The popup's 8 entries (`UI_POPUP_ITEMS`) are full on the SD file popup.~~ Fixed by E3 (`09dff4f`): a confirmation borrows the popup's tiles when its own don't fit; popups hold 9 items (9 without a title), and the SD popup offers both.
+- F2's findings (background CRCs for new games, `source/names_store.c`): a big game is read 2 KB a frame (about 120 KB/s emulated) and only while the keys rest, and a launch throws its partial CRC away, so with short menu visits a 32 MB game, and every game after it in walk order, may never get one (keep the partial CRC, or put big games last); every 32 names or 10 s the index is rebuilt by a full card walk (`library_changed`), seconds on a big card; an unreadable game is read again, with its error logged, after every walk; the cursor's game follows a new sort on console pages only (Favourites, also A-Z, keep the row) and only across one new index, so two indexes landing behind a nested screen leave the cursor on its row number; the in-place redraw of a new index shows mixed old and new rows for a frame or two.
 
 ### Dead code and cleanup
 
@@ -99,6 +100,7 @@ The user accepted every decision the build made on their behalf (2026-10-21); [d
 F1–F3 (new games named and boxed on the cart) made these, open to change:
 
 - F1 (`e04827c`): the kernel keeps a CRC whose date is 1–14 whole hours off the file's, minutes and seconds equal, for every record (nothing marks the tool's); a different same-size file with such a date keeps the old CRC. A kernel before v0.4.2 forgets tool-written dates.
+- F2 (to confirm): a card with names.db (or art) but no crc.txt has every game new, so the background identifies the whole library across boots, an Identify library that nobody asked for; the queue is Recent's games, then walk order (not the games on screen or the newest); the background runs one job call a frame (Identify library keeps the frame's spare half); a new name sorts the index again, so the list redraws and the cursor's game can move away under a resting cursor.
 - F3: the art pack's index takes 128 KB of PSRAM after `PSRAM_NAMES_TEXT`, out of the 384 KB left for v0.9's language tables; NES art only with `--console NES`.
 
 ### Open questions and cart checks

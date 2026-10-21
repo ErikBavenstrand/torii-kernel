@@ -99,6 +99,8 @@ static struct {
 	u8 unloaded;  // it opened while the index wasn't loaded (after a launch): a new
 		      // index lists it again at row
 	u32 lib_generation;
+	u32 names_changes;  // names_changes() when cursor_crc was last looked at
+	u8 cursor_crc;      // the cursor's game had a CRC as its box was picked
 	u32 ago_wait;
 	u16 recent_rec[USERDATA_RECENT_MAX];
 	// The favourites' A-Z order kept in PSRAM (build_favs): valid while
@@ -882,6 +884,15 @@ static const u8 console_box[LIB_CONSOLES] = {
 	[LIB_NES] = ART_BOX_NES,
 };
 
+static int art_row(u32 i, char *path, u32 *size);
+
+// 1 if the cursor's game has a CRC (box art is matched by it)
+static int cursor_crc(void)
+{
+	u32 size, crc;
+	return art_row(games.cursor, games.path, &size) && names_crc(games.path, size, &crc);
+}
+
 // List with art: the selected game's box art, or its console's placeholder
 // box, and its size and when it was played
 static void show_facts(void)
@@ -890,6 +901,8 @@ static void show_facts(void)
 		return;
 	struct game g;
 	games.fact_keys[0] = games.fact_values[0] = 0;
+	games.names_changes = names_changes();
+	games.cursor_crc = (u8)cursor_crc();
 	if (game_at(games.cursor, &g)) {
 		boxart_select(games.cursor, g.console < LIB_CONSOLES ? console_box[g.console] : ART_BOX_OTHER);
 		char size[AGO_MAX] = "", ago[AGO_MAX] = "";
@@ -952,11 +965,20 @@ static const char *note_text(void)
 // After the list changed under the page: it lists again from cursor
 static void relist(u32 cursor)
 {
+	u32 was = games.count;
 	build();
 	games.cursor = games.count ? (cursor < games.count ? cursor : games.count - 1) : 0;
 	if (!up())
 		return;
-	ui_list_reset(list_node(), games.cursor);
+	if (games.count && games.count == was) {
+		// As many rows (new names, sorted again): redrawn in place, the
+		// cached ones too; a page change only if the cursor's game sorted
+		// far from where it was
+		ui_list_refresh(list_node(), 0, games.count - 1);
+		ui_list_set_cursor(list_node(), games.cursor);
+	} else {
+		ui_list_reset(list_node(), games.cursor);
+	}
 	ui_letter_hide(node(N_LETTER));
 	ui_label_set(node(N_NOTE), note_text());
 	show_position();
@@ -1008,6 +1030,18 @@ static u32 games_row(void)
 	return up() ? ui_list_cursor(list_node()) : games.row;
 }
 
+// The row in the index now of the game at row in the one the page lists
+// (A-Z: a new name sorts it elsewhere), so the cursor stays on its game;
+// row if it isn't found
+static u32 follow_row(u32 row)
+{
+	if (games.kind != KIND_CONSOLE ||
+	    !library_old_path(games.lib_generation, games.console, row, games.path, sizeof(games.path)))
+		return row;
+	u32 at = library_position(library_find(games.path));
+	return at != LIBRARY_NONE ? at : row;
+}
+
 // Each pass of the menu's loop: a new index lists again; Recent's "played"
 // texts follow the clock
 static void games_poll(void)
@@ -1018,12 +1052,19 @@ static void games_poll(void)
 		boxart_poll();
 	// At once: Recent's and the favourites' records are the old index's
 	if (games.lib_generation != library_generation()) {
-		tlog_debug("games: a new index");
 		// Opened before the index was back: at the row it was asked for
-		u32 row = games.unloaded ? games.row : ui_list_cursor(list_node());
+		u32 row = games.unloaded ? games.row : follow_row(ui_list_cursor(list_node()));
+		tlog_debug("games: a new index (row %lu)", (unsigned long)row);
 		games.unloaded = !library_ready();
 		relist(row);
 		return;
+	}
+	if (games.art && games.names_changes != names_changes()) {
+		// CRCs found in the background: the cursor's game may have art by
+		// its CRC now
+		games.names_changes = names_changes();
+		if (!games.cursor_crc && cursor_crc())
+			show_facts();
 	}
 	if (games.ago_wait > 1) {
 		games.ago_wait--;
@@ -1116,6 +1157,8 @@ static int info_event(struct ui_view *v, const struct ui_event *e)
 // Shows Game info for the game the popup was about (g) until A or B, in the
 // list's place, then writes a changed save type or boot mode and brings the
 // list back
+static u32 pick_row(u32 row);
+
 static void game_info(const struct game *g)
 {
 	u32 row = ui_list_cursor(list_node());
@@ -1154,8 +1197,19 @@ static void game_info(const struct game *g)
 		}
 		games.info_hints[n++] = (struct ui_hint){"B", gl_hint_back};
 		ui_hints_set((u8)(v->first + I_HINTS), games.info_hints, n);
-		while (!games.info_done && ui_depth())
+		u32 gen = library_generation();
+		while (!games.info_done && ui_depth()) {
 			ui_frame();
+			if (gen != library_generation() && ui_depth()) {
+				// A new index (its name found in the background): the title follows
+				gen = library_generation();
+				struct game now = {library_find(games.pick), NULL, games.info_console};
+				if (now.rec != LIBRARY_NONE) {
+					snprintf(games.title, sizeof(games.title), "%s", game_name(&now, games.name));
+					ui_title_set((u8)(v->first + I_TITLE), games.title);
+				}
+			}
+		}
 		ui_leave(UI_TR_DEEPER, -1);
 		while (ui_depth())
 			ui_pop();
@@ -1167,7 +1221,7 @@ static void game_info(const struct game *g)
 	int boot_ok = games.info_boot == facts.boot_mode || action_set_boot_mode(games.pick, games.info_boot);
 	if (!type_ok || !boot_ok)
 		dialog_message(NULL, type_ok ? gl_games->boot_mode_failed : gl_games->save_type_failed, DIALOG_ERROR);
-	reshow(row);
+	reshow(pick_row(row));  // its row in a new index
 }
 
 // --- The popup -----------------------------------------------------------------------

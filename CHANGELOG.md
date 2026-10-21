@@ -10,6 +10,12 @@ git log, not here.
   file's, as names-update writes it from a PC in another local time (DST),
   and takes the cart's date; any other date still forgets the CRC (F1; `e04827c`).
 
+- **Added:** games added to the card get their CRC, and with it their No-Intro
+  name and box art, in the background after the boot's walk (Recent's first),
+  with no PC tool or launch; a launch stops it and the next boot goes on. The
+  game lists keep the cursor on its game when new names sort them again
+  (F2; `6ab146f`, `e86624d`).
+
 ## v0.4.1 (2026-10-21)
 
 The new menu: a carousel home, game lists, SD card, NOR, Settings and Info
