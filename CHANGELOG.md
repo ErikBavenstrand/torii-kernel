@@ -6,11 +6,9 @@ git log, not here.
 
 ## Unreleased
 
-- **Fixed:** the library's walk keeps a `/torii/crc.txt` record whose date is
-  a whole number of hours off its file's (up to 14, minutes and seconds
-  equal), as `just names-update` writes it on a PC whose local time isn't the
-  card's (DST), and takes the cart's date; any other date still forgets the
-  CRC (e04827c).
+- **Fixed:** the walk keeps a `crc.txt` date up to 14 whole hours off its
+  file's, as names-update writes it from a PC in another local time (DST),
+  and takes the cart's date; any other date still forgets the CRC (F1; `e04827c`).
 
 ## v0.4.1 (2026-10-21)
 

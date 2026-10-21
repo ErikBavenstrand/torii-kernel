@@ -198,9 +198,9 @@ const char *names_db_name(const u8 *db, const struct names_rec *r, u32 console);
 // library's first walk after the boot or a game, a piece per step
 // (names_load_step). The walk then checks each game's cache record against
 // its file (names_walk_seen): a changed file's record is dropped, a record
-// written on a PC takes the file's date (names_cache_fits), and the database's name for it
-// goes into the index's sort key. The walk's fingerprint includes
-// names_identity, so new names rebuild the index.
+// written on a PC takes the file's date (names_cache_fits), and the
+// database's name for it goes into the index's sort key. The walk's
+// fingerprint includes names_identity, so new names rebuild the index.
 //
 // CRCs are computed by a job between frames, paused while the user moves,
 // covers load or the library walks: for every library game without one
