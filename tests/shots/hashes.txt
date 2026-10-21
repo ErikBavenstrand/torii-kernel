@@ -59,16 +59,16 @@ boot-slow/frames 16-16 C06A5CEEB9ABEEEC
 boot-slow/frames 17-17 1DA9A452A082DCA0
 boot-slow/frames 18-19 7C573B18E65FE325
 diag-back/back 96DF71E9EB3496DE
-diag-back/diag 34448463644198B5
+diag-back/diag B8F9F547D9269D9B
 diag-pages/clock BAA544CE8D033053
 diag-pages/eeprom D9F2B92149C63653
-diag-pages/loader E959FD44168F7705
+diag-pages/loader 84DA2F578900D305
 diag-renderer/demo 52A803C198A28138
-diag-start/screen ADFC6EB5D635C905
-diag-tests/back B90CE70EFD54137F
+diag-start/screen 10E6FB0374762B6D
+diag-tests/back F49CEFC2750B8AE3
 diag-tests/frames 0-3 1E5D6D87A291C43F
-diag-tests/frames 4-4 9D648B1181E3A93F
-diag-tests/frames 5-12 B90CE70EFD54137F
+diag-tests/frames 4-4 9CCE4F9B24DA1B67
+diag-tests/frames 5-12 F49CEFC2750B8AE3
 diag-turn/save-memory 6BA4A63E83E92D75
 diag-turn/timings 27617EE944E332C5
 diag-turn/frames 0-1 10E6FB0374762B6D

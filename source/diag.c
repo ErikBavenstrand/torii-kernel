@@ -118,7 +118,7 @@ static const u16 bars_palette[16] = {0, RGB(31, 0, 0), RGB(0, 31, 0), RGB(0, 0, 
 // Two tile sets: a new title flips in through the VRAM queue, in the same
 // VBlank as the new page's rows (page_turn)
 static const struct ui_label_config title_config = {"", UI_FONT_HEADING, UI_ALIGN_LEFT, UI_LABEL_SWAP, 0};
-static const struct ui_list_config list_config = {&lines_model, 16, UI_LIST_PLAIN, 0, 0};
+static const struct ui_list_config list_config = {&lines_model, 16, UI_LIST_PLAIN | UI_LIST_ALERT, 0, 0};
 static const struct ui_image_config bars_config = {bars_tiles, bars_palette, 0xD1A6};
 
 static const struct ui_spec diag_nodes[N_COUNT] = {
@@ -1126,7 +1126,12 @@ void Diagnostics(void)
 	say(WHITE, "writes your saves. It takes a minute,");
 	say(WHITE, "then restarts the kernel.");
 	say(WHITE, "A: start   B: back to the menu");
-	diag_pause(3);  // drawn before the screen counts as ready
+	// Every line drawn and on screen before the screen counts as ready (the
+	// list draws a few rows a frame)
+	diag_pause(0);
+	for (u32 i = 0; i < 60 && !ui_settled(); i++)
+		ui_frame();
+	ui_frame();  // its commit shows the last rows
 	tlog_debug("screen ready: diag-start");
 	if (wait_key(KEY_A | KEY_B) & KEY_B) {
 		// Nothing changed yet: back to the caller, which starts the menu

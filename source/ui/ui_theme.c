@@ -90,6 +90,7 @@ const struct ui_theme ui_theme_dark = {
 	.name = "Dark",
 	.surface = &pal_surfaces[PAL_DARK],
 	.accent = pal_accents[PAL_DARK],
+	.success = &pal_success[PAL_DARK],
 	.pill_mix = PAL_DARK_PILL_MIX,
 	.backdrop_mix = 20,  // 8 %
 	.floor_step = {1, 1, 1},  // a step lighter, as the mockups' dark floor
@@ -104,6 +105,7 @@ const struct ui_theme ui_theme_light = {
 	.name = "Light",
 	.surface = &pal_surfaces[PAL_LIGHT],
 	.accent = pal_accents[PAL_LIGHT],
+	.success = &pal_success[PAL_LIGHT],
 	.pill_mix = PAL_LIGHT_PILL_MIX,
 	.backdrop_mix = 15,  // 6 %
 	.floor_step = {-1, -1, 0},  // about 4 % darker (spec.md), as the mockups' light floor
@@ -234,4 +236,5 @@ void ui_theme_banks(const struct ui_theme *theme, u32 item, u16 out[UI_BANKS * 1
 	alert[UI_ROLE_NOR_FILL_MID] = ui_colour_mix(nor->base, s->card, theme->bar_shade_mix);
 	alert[UI_ROLE_NOR_FILL_LIGHT] = ui_colour_mix(nor->base, s->card, 2u * theme->bar_shade_mix);
 	alert[UI_ROLE_NOR_INK] = nor->ink;
+	alert[UI_ROLE_SUCCESS] = *theme->success;
 }

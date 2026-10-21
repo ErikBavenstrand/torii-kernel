@@ -1399,8 +1399,10 @@ static void canvas_setup(u8 node, struct list_state *st)
 	u16 *map = ui_map(node), *row = map;  // from column 0: the BG scroll puts it at the node's x
 	u32 tw = st->tw, ct = st->ct;
 	for (u32 t = 0; t < ct; t++, row += 32) {
-		u32 e = ui_entry(st->first + t,
-				 (config(node)->flags & UI_LIST_CONSOLES) ? UI_BANK_CONSOLES : UI_BANK_NORMAL);
+		u32 flags = config(node)->flags;
+		u32 e = ui_entry(st->first + t, (flags & UI_LIST_CONSOLES) ? UI_BANK_CONSOLES
+						: (flags & UI_LIST_ALERT)  ? UI_BANK_ALERT
+									   : UI_BANK_NORMAL);
 		for (u32 x = 0; x < tw; x++, e += ct)
 			row[x] = (u16)e;
 	}

@@ -44,6 +44,8 @@ struct pal_accent {
 
 extern const struct pal_surfaces pal_surfaces[PAL_THEMES];
 extern const struct pal_accent pal_accents[PAL_THEMES][PAL_ITEMS];
+// The success ink (Diagnostics' passes), on the paper and on cards (RGB15)
+extern const u16 pal_success[PAL_THEMES];
 
 // How much of an accent's base its tint mixes into a card, in 256ths
 #define PAL_LIGHT_PILL_MIX 44

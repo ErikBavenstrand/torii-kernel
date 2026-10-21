@@ -494,5 +494,21 @@
       "w": "#FFF7DE"
     }
   },
-  "danger": "nes"
+  "danger": "nes",
+  "success": {
+    "light": {
+      "ink": "#297B39",
+      "contrast": {
+        "ink_on_card": 5.27,
+        "ink_on_bg": 4.63
+      }
+    },
+    "dark": {
+      "ink": "#52B563",
+      "contrast": {
+        "ink_on_card": 5.6,
+        "ink_on_bg": 6.84
+      }
+    }
+  }
 }

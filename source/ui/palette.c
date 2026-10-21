@@ -37,3 +37,5 @@ const struct pal_accent pal_accents[PAL_THEMES][PAL_ITEMS] = {
 			[PAL_TORII] = {.base = 0x153C, .tint = 0x14CC, .ink = 0x259D, .on = 0x1063},
 		},
 };
+
+const u16 pal_success[PAL_THEMES] = {[PAL_LIGHT] = 0x1DE5, [PAL_DARK] = 0x32CA};
