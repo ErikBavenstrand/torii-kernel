@@ -182,7 +182,7 @@ logged "$cart/2.log" "names: 2 CRCs from /torii/crc.new"
 logged "$cart/2.log" "names: wrote /torii/crc.txt"
 not_logged "$cart/2.log" "names: identified 2 of 2"
 # (Homebrew, played now, gets its CRC this boot)
-[ "$(crc_lines "$cart" | cut -f5 | sort | tr '\n' ' ')" = "/GBA/Homebrew.gba /GBA/Wars.gba /NES/Famicom.nes " ] ||
+[ "$(crc_lines "$cart" | cut -f4 | sort | tr '\n' ' ')" = "/GBA/Homebrew.gba /GBA/Wars.gba /NES/Famicom.nes " ] ||
   fail "crc.txt holds $(crc_lines "$cart")"
 if mdir -i "$cart/sd.img" ::/torii/crc.new >/dev/null 2>&1; then fail "crc.new is still there"; fi
 no_errors "$cart/1.log"
