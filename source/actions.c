@@ -102,16 +102,19 @@ static void game_leave(void)
 	f_chdir(currentpath[0] ? currentpath : "/");
 }
 
-// How ACTION_DEFAULT starts game: its own boot mode, else Settings'
+// How ACTION_DEFAULT starts game: its own boot mode, else Settings'; with
+// addons, but none on, is a clean boot (nothing to patch in)
 static u32 default_how(const struct game_pick *game)
 {
-	u32 mode = game->boot_mode;
-	if (mode != ACTION_BOOT_ADDONS && mode != ACTION_BOOT_CLEAN)
-		mode = Read_SET_info(assress_boot_mode) == 1 ? ACTION_BOOT_CLEAN : ACTION_BOOT_ADDONS;
-	tlog("launch: boot mode %s (%s)", mode == ACTION_BOOT_CLEAN ? "clean" : "with addons",
-	     game->boot_mode == ACTION_BOOT_ADDONS || game->boot_mode == ACTION_BOOT_CLEAN ? "the game's"
-											   : "Settings'");
-	return mode == ACTION_BOOT_CLEAN ? ACTION_CLEAN : ACTION_ADDON;
+	u32 own = game->boot_mode == ACTION_BOOT_ADDONS || game->boot_mode == ACTION_BOOT_CLEAN;
+	u32 mode = own                                     ? game->boot_mode
+		   : Read_SET_info(assress_boot_mode) == 1 ? ACTION_BOOT_CLEAN
+							   : ACTION_BOOT_ADDONS;
+	u32 any = Read_SET_info(assress_v_reset) == 1 || Read_SET_info(assress_v_rts) == 1 ||
+		  Read_SET_info(assress_v_sleep) == 1 || Read_SET_info(assress_v_cheat) == 1;
+	tlog("launch: boot mode %s (%s)%s", mode == ACTION_BOOT_CLEAN ? "clean" : "with addons",
+	     own ? "the game's" : "Settings'", mode == ACTION_BOOT_ADDONS && !any ? ", none on" : "");
+	return mode == ACTION_BOOT_CLEAN || !any ? ACTION_CLEAN : ACTION_ADDON;
 }
 
 u32 action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset)

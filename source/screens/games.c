@@ -69,7 +69,7 @@ static const struct ui_card_config card = {4, 4, 4, 1, 0};
 #define INFO_LINES_Y 32
 #define INFO_KEYS_W 72
 #define INFO_VALUES_W 136
-#define INFO_LINES_H 84  // seven lines
+#define INFO_LINES_H 88  // seven lines, in whole tiles
 
 #define AGO_POLL 30     // frames between checks of Recent's "played" texts
 #define AGO_MAX 16      // a "played" text's bytes, with its NUL

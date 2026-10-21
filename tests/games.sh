@@ -41,7 +41,7 @@ grep -q '^kernel: games: start /Other.gba (how 4, hard reset)' "$cart/1.log" ||
   fail "L+A didn't start Other.gba with a hard reset: $(grep '^kernel: games' "$cart/1.log" | tail -2)"
 grep -q "^kernel: launch: boot mode with addons (Settings')" "$cart/1.log" ||
   fail "A didn't follow Settings' boot mode: $(grep '^kernel: launch' "$cart/1.log" | head -3)"
-grep -q '^kernel: launch: loading Other.gba, BOOT WITH ADDON' "$cart/1.log" || fail "Other.gba didn't load with addons: $(grep '^kernel: launch' "$cart/1.log" | tail -2)"
+grep -q '^kernel: launch: loading Other.gba' "$cart/1.log" || fail "Other.gba didn't load: $(grep '^kernel: launch' "$cart/1.log" | tail -2)"
 echo "PASS: L held doesn't page a game list, and L+A starts the selected row with a hard reset"
 
 # Power-on 2, 30 s later on a running clock: A at "Save sav?", then
@@ -123,7 +123,12 @@ echo "PASS: Game info keeps a game's boot mode beside its save type"
 
 # Settings slots in the kernel NOR (made by the first power-on) at 0x7B0000
 setting() { printf %b "\\x$(printf %02x "$2")\\x00" | dd of="$cart/kernel-nor.bin" bs=1 seek=$((0x7B0000 + 2 * $1)) conv=notrunc status=none; }
-setting 32 2 # Start on Home, so each power-on's route starts there
+# Start on Home, so each power-on's route starts there; Auto save on (no
+# question at power-on after a launch); the Reset hotkey on, an addon to
+# start with
+setting 32 2
+setting 14 1
+setting 1 1
 
 # A on A (row 0) starts it clean, its own boot mode, while Settings says with addons
 # shellcheck disable=SC2046 # nav.sh's options
@@ -133,20 +138,27 @@ grep -q "^kernel: launch: boot mode clean (the game's)" "$cart/2.log" ||
 grep -q '^kernel: launch: loading A.gba, CLEAN BOOT' "$cart/2.log" || fail "A.gba didn't start clean: $(grep '^kernel: launch' "$cart/2.log" | tail -2)"
 echo "PASS: A starts a game by its own boot mode"
 
-# Settings' GBA boot mode Clean (slot 35): B (row 1, no boot mode of its
-# own) starts clean; Play on A with its boot mode set to With addons
-# starts with them
-setting 35 1
+# A on B (row 1, no boot mode of its own) starts it with the addons, as
+# Settings' GBA boot mode says by default
 NAV_SHOWN="recent gba"
 # shellcheck disable=SC2046 # nav.sh's options
 boot "$cart/3.log" $(nav_game gba 1) -k @20:A -k @24:- -u "launch: loading" -f 1500
-grep -q "^kernel: launch: boot mode clean (Settings')" "$cart/3.log" ||
-  fail "A didn't follow Settings' boot mode Clean: $(grep '^kernel: launch' "$cart/3.log" | head -3)"
-grep -q '^kernel: launch: loading B.gba, CLEAN BOOT' "$cart/3.log" || fail "B.gba didn't start clean: $(grep '^kernel: launch' "$cart/3.log" | tail -2)"
+grep -q "^kernel: launch: boot mode with addons (Settings')$" "$cart/3.log" ||
+  fail "A didn't follow Settings' boot mode: $(grep '^kernel: launch' "$cart/3.log" | head -3)"
+grep -q '^kernel: launch: loading B.gba, BOOT WITH ADDON' "$cart/3.log" || fail "B.gba didn't start with addons: $(grep '^kernel: launch' "$cart/3.log" | tail -2)"
+echo "PASS: A starts a game with its addons by default"
+
+# Settings' GBA boot mode Clean (slot 35): B starts clean
+setting 35 1
+# shellcheck disable=SC2046 # nav.sh's options
+boot "$cart/4.log" $(nav_game gba 1) -k @20:A -k @24:- -u "launch: loading" -f 1500
+grep -q "^kernel: launch: boot mode clean (Settings')" "$cart/4.log" ||
+  fail "A didn't follow Settings' boot mode Clean: $(grep '^kernel: launch' "$cart/4.log" | head -3)"
+grep -q '^kernel: launch: loading B.gba, CLEAN BOOT' "$cart/4.log" || fail "B.gba didn't start clean: $(grep '^kernel: launch' "$cart/4.log" | tail -2)"
 echo "PASS: Settings' GBA boot mode Clean starts a game clean"
 
 # A launch that changes the save type keeps the boot mode (byte 1)
 # shellcheck disable=SC2046 # nav.sh's options
-boot "$cart/4.log" $(nav_launch /A.gba addon save=3) -u "launch: loading" -f 1500
+boot "$cart/5.log" $(nav_launch /A.gba addon save=3) -u "launch: loading" -f 1500
 [ "$(mde A)" = 0302 ] || fail "after a launch with save type 3, A.mde holds $(mde A), not 03 02"
 echo "PASS: a launch's save type keeps the game's boot mode"

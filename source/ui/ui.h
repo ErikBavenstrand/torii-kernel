@@ -186,7 +186,7 @@ struct ui_look {
 	u8 reading_key_w;   // a reading line's key chip column (ui_reading)
 	u8 row_mark_gap;    // a list row's mark (ui_item.mark) to its text
 	u8 row_badge_gap;   // its text to its badge (a favourite's star)
-	u8 row_dot_gap;     // its dot (a save) to its detail
+	u8 row_dot_gap;     // its save mark (ui_item.dot) to its detail
 	u8 hint_y;          // the hint bar's key chips
 	u8 hint_chip_h;
 	u8 hint_chip_radius;
