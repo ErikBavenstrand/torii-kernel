@@ -32,7 +32,6 @@ enum info_string {
 	INFO_S_CONTROLS_TEXT,  // Controls, whole
 	// In game: the start, then by what Settings has on
 	INFO_S_INGAME_START,
-	INFO_S_INGAME_STATES,  // Save states alone: %s saves (the sleep keys), %s loads (the reset keys)
 	INFO_S_INGAME_MENU,    // Save states with others: %s opens the in-game menu
 	INFO_S_INGAME_RESET,   // %s: back to the menu
 	INFO_S_INGAME_RESET_OFF,

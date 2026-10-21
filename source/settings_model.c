@@ -325,32 +325,24 @@ const char *settings_section_name(u32 section)
 	return section < SET_SECTIONS ? gl_set_sections[section] : "";
 }
 
-// Real-time save alone turns the hotkeys into save and load keys (GBApatch.c)
-static int save_keys(const struct settings_values *v)
+int settings_reset_armed(const struct settings_values *v)
 {
-	return settings_get(v, SET_RTS) && !settings_get(v, SET_CHEATS) && !settings_get(v, SET_RESET_ON) &&
-	       !settings_get(v, SET_SLEEP_ON);
-}
-
-static u32 label_of(const struct settings_values *v, u32 id)
-{
-	if (save_keys(v) && id == SET_SLEEP_KEYS)
-		return SET_LABEL_SAVE_KEYS;
-	if (save_keys(v) && id == SET_RESET_KEYS)
-		return SET_LABEL_LOAD_KEYS;
-	return id;
+	return settings_get(v, SET_RTS) != 0;
 }
 
 const char *settings_label(const struct settings_values *v, u32 id)
 {
-	return id < SET_ROWS ? gl_set_labels[label_of(v, id)] : "";
+	(void)v;
+	return id < SET_ROWS ? gl_set_labels[id] : "";
 }
 
 const char *settings_explain(const struct settings_values *v, u32 id)
 {
-	if (id == SET_RESET_ON && (settings_get(v, SET_RTS) || settings_get(v, SET_CHEATS)))
-		return gl_set_explain[SET_LABEL_RESET_ARMED];
-	return id < SET_ROWS ? gl_set_explain[label_of(v, id)] : "";
+	if (id == SET_RESET_ON && settings_reset_armed(v))
+		return gl_set_explain[SET_LABEL_RESET_STATES];
+	if (id == SET_RESET_ON && settings_get(v, SET_CHEATS))
+		return gl_set_explain[SET_LABEL_RESET_CHEATS];
+	return id < SET_ROWS ? gl_set_explain[id] : "";
 }
 
 int settings_clock_24h(const struct settings_values *v)
@@ -385,7 +377,7 @@ void settings_value_text(const struct settings_values *v, u32 id, char *out, u32
 		copy_text(out, size, (*r->options)[value]);
 		break;
 	case SET_ONOFF:
-		copy_text(out, size, gl_set_onoff[value]);
+		copy_text(out, size, gl_set_onoff[id == SET_RESET_ON && settings_reset_armed(v) ? 1 : value]);
 		break;
 	case SET_NUMBER:
 		if (value)

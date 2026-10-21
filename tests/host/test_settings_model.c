@@ -84,8 +84,7 @@ void test_settings_table(void)
 			CHECK_EQ(used[a]++, 0);      // no two rows share a slot
 		}
 	}
-	for (u32 id = SET_ROWS; id < SET_LABELS; id++) {
-		check_fits("label", gl_set_labels[id], LABEL_W);
+	for (u32 id = SET_ROWS; id < SET_LABELS; id++) {  // explanations alone
 		check_fits("explanation", gl_set_explain[id], EXPLAIN_W);
 		CHECK(strlen(gl_set_explain[id]) <= EXPLAIN_CHARS);
 	}
@@ -337,24 +336,37 @@ void test_settings_hotkeys(void)
 	CHECK_EQ(keys[2], 3);
 	CHECK(!strcmp(settings_key_name(4), "RIGHT"));
 	CHECK(!strcmp(settings_key_name(10), ""));
-	// Save states alone make the hotkeys save and load a state
+	// The hotkey rows' names (C5): no row renames itself any more
+	CHECK(!strcmp(settings_label(&v, SET_RESET_ON), "Back to menu"));
+	CHECK(!strcmp(settings_label(&v, SET_RESET_KEYS), "Menu keys"));
+	CHECK(!strcmp(settings_label(&v, SET_SLEEP_ON), "Sleep"));
 	CHECK(!strcmp(settings_label(&v, SET_SLEEP_KEYS), "Sleep keys"));
 	settings_set(&v, SET_RTS, 1);
-	CHECK(!strcmp(settings_label(&v, SET_SLEEP_KEYS), "Save state keys"));
-	CHECK(!strcmp(settings_label(&v, SET_RESET_KEYS), "Load state keys"));
-	CHECK(!strcmp(settings_explain(&v, SET_RESET_KEYS), gl_set_explain[SET_LABEL_LOAD_KEYS]));
-	settings_set(&v, SET_SLEEP_ON, 1);
+	CHECK(!strcmp(settings_label(&v, SET_RESET_KEYS), "Menu keys"));
 	CHECK(!strcmp(settings_label(&v, SET_SLEEP_KEYS), "Sleep keys"));
-	// Save states, or Cheats, arm the reset keys whatever Reset hotkey says
-	// (GBApatch.c): its explanation says so while either is on
+	CHECK(!strcmp(settings_explain(&v, SET_RESET_KEYS), gl_set_explain[SET_RESET_KEYS]));
+	// Save states put the in-game menu on the menu keys in every game
+	// (GBApatch.c): Back to menu shows On, its stored value kept
 	erased();
+	char text[8];
+	CHECK(!settings_reset_armed(&v));
 	CHECK(!strcmp(settings_explain(&v, SET_RESET_ON), gl_set_explain[SET_RESET_ON]));
+	settings_value_text(&v, SET_RESET_ON, text, sizeof(text));
+	CHECK(!strcmp(text, "Off"));
 	settings_set(&v, SET_RTS, 1);
-	CHECK(!strcmp(settings_explain(&v, SET_RESET_ON), gl_set_explain[SET_LABEL_RESET_ARMED]));
-	CHECK(!strcmp(settings_label(&v, SET_RESET_ON), "Reset hotkey"));
+	CHECK(settings_reset_armed(&v));
+	CHECK(!strcmp(settings_explain(&v, SET_RESET_ON), "Opens the in-game menu instead."));
+	settings_value_text(&v, SET_RESET_ON, text, sizeof(text));
+	CHECK(!strcmp(text, "On"));
+	CHECK_EQ(settings_get(&v, SET_RESET_ON), 0);
+	// Cheats alone do it only in a game with a cheat file: the row keeps
+	// its value
 	settings_set(&v, SET_RTS, 0);
 	settings_set(&v, SET_CHEATS, 1);
-	CHECK(!strcmp(settings_explain(&v, SET_RESET_ON), gl_set_explain[SET_LABEL_RESET_ARMED]));
+	CHECK(!settings_reset_armed(&v));
+	CHECK(!strcmp(settings_explain(&v, SET_RESET_ON), "With a cheat file: the in-game menu."));
+	settings_value_text(&v, SET_RESET_ON, text, sizeof(text));
+	CHECK(!strcmp(text, "Off"));
 }
 
 void test_settings_visible_rows(void)

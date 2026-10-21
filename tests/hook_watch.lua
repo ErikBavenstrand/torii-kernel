@@ -1,6 +1,6 @@
 -- Checks the kernel's in-game IRQ hook from outside the game, for
 -- tests/games.py: run the kernel with `mgba-shot -L tests/hook_watch.lua`,
--- launch a game with BOOT WITH ADDON (SAVESTATE and RESET on), and this
+-- launch a game with BOOT WITH ADDON (SAVESTATE on alone), and this
 -- script takes over the keys once the game starts.
 --
 -- How the hook works: while loading the ROM, the kernel turns every literal

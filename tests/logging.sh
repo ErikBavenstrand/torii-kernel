@@ -193,9 +193,10 @@ EOF
 
 debug)
   new_card 65536 32
-  # English, RESET and SAVESTATE on, sleep key L+R+SELECT, menu key
-  # L+R+START, fast patch engine, CART clock and rumble on, LOGGING Info.
-  settings 0=0xE1E1 1=1 2=1 3=0 4=0 5=9 6=8 7=2 8=9 9=8 10=3 11=1 12=0 13=1 14=1 25=1 26=2
+  # English, SAVESTATE on alone (the in-game menu, RESET off), sleep key
+  # L+R+SELECT, menu key L+R+START, fast patch engine, CART clock and rumble
+  # on, LOGGING Info.
+  settings 0=0xE1E1 1=0 2=1 3=0 4=0 5=9 6=8 7=2 8=9 9=8 10=3 11=1 12=0 13=1 14=1 25=1 26=2
   boot -f 200
   cp "$cart/sram.bin" "$cart/sram-before.bin"
   # Hello.gba, BOOT WITH ADDON; in game, L+R+START, then down to DEBUG

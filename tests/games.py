@@ -116,11 +116,11 @@ GAME_START = 360
 RUN_FRAMES = 2400
 SHOTS = (600, 1500, RUN_FRAMES)
 
-# The in-game menu run: SAVESTATE and RESET on (with SAVESTATE alone the kernel
-# patches in a quick save/load instead of the menu), menu key L+R+START,
-# English, the fast patch engine, clock and rumble on: settings slots in the
-# kernel NOR (source/ez_define.h), written before power-on.
-MENU_SETTINGS = {0: 0xE1E1, 1: 1, 2: 1, 3: 0, 4: 0, 5: 9, 6: 8, 7: 2, 8: 9, 9: 8}
+# The in-game menu run: SAVESTATE on alone (it puts the menu on the reset
+# keys, whatever RESET says), menu key L+R+START, English, the fast patch
+# engine, clock and rumble on: settings slots in the kernel NOR
+# (source/ez_define.h), written before power-on.
+MENU_SETTINGS = {0: 0xE1E1, 1: 0, 2: 1, 3: 0, 4: 0, 5: 9, 6: 8, 7: 2, 8: 9, 9: 8}
 MENU_SETTINGS |= {10: 3, 11: 1, 12: 0, 13: 1, 25: 1}
 KERNEL_NOR_SIZE = 0x800000
 SETTINGS = 0x7B0000

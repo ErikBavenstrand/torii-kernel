@@ -80,14 +80,11 @@ enum settings_id {
 	SET_ROWS
 };
 
-// Labels and explanations past the rows': the hotkeys' while real-time save
-// is the only in-game addon, when they save and load a state instead
+// Explanations past the rows': SET_RESET_ON's while Save states or Cheats
+// put the in-game menu on the reset keys (GBApatch.c)
 enum {
-	SET_LABEL_SAVE_KEYS = SET_ROWS,  // SET_SLEEP_KEYS's
-	SET_LABEL_LOAD_KEYS,             // SET_RESET_KEYS's
-	// SET_RESET_ON's explanation while Save states or Cheats is on: their
-	// patch arms the reset keys whatever the row says (GBApatch.c)
-	SET_LABEL_RESET_ARMED,
+	SET_LABEL_RESET_STATES = SET_ROWS,  // Save states on: the menu in every game
+	SET_LABEL_RESET_CHEATS,             // Cheats alone: in a game with a cheat file
 	SET_LABELS
 };
 
@@ -208,6 +205,9 @@ u32 settings_section_rows(const struct settings_values *v, u32 section, u8 *ids)
 const char *settings_section_name(u32 section);
 const char *settings_label(const struct settings_values *v, u32 id);
 const char *settings_explain(const struct settings_values *v, u32 id);
+// Save states on: their in-game menu takes the reset keys in every game
+// (GBApatch.c), so Back to menu shows On and can't be changed
+int settings_reset_armed(const struct settings_values *v);
 // A row's value in plain words: "On", "Light", "5 min", "14:32",
 // "2026-10-20", "L+R+START"; "" for an action
 void settings_value_text(const struct settings_values *v, u32 id, char *out, u32 size);
