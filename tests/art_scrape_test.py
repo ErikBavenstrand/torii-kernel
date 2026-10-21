@@ -254,7 +254,7 @@ class Scrape(unittest.TestCase):
         return status, out.getvalue(), err.getvalue()
 
     def cached(self, system, name):
-        """The download cache's file of a picture."""
+        """The download cache's file of a picture (a short name's)."""
         return self.cache / system / f"{name}.{zlib.crc32(name.encode()):08x}.png"
 
     def art(self, card_path):
@@ -481,6 +481,12 @@ class Scrape(unittest.TestCase):
         self.assertNotEqual(
             f.path(art_scrape.GBA, "Game (USA)").name.lower(),
             f.path(art_scrape.GBA, "GAME (USA)").name.lower(),
+        )
+        # A name too long for a file name is cut, the CRC keeping it apart
+        long = "\u00e9" * 200 + " (USA)"
+        self.assertLessEqual(len(f.path(art_scrape.GBA, long).name.encode()) + 5, 255)
+        self.assertNotEqual(
+            f.path(art_scrape.GBA, long), f.path(art_scrape.GBA, long + "x")
         )
         old = self.cache / GBA_SYS / "Advance Wars (USA).png"
         old.parent.mkdir(parents=True)

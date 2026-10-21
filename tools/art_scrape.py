@@ -249,10 +249,12 @@ class Fetcher:
 
     def path(self, system, name):
         # The name's CRC keeps names that differ only in case apart on a
-        # case-insensitive disk (macOS, Windows)
-        return (
-            self.cache / SYSTEMS[system] / f"{name}.{zlib.crc32(name.encode()):08x}.png"
-        )
+        # case-insensitive disk (macOS, Windows); a name too long for a file
+        # name (255 bytes, with ".part" while it downloads) is cut, the CRC
+        # still the whole name's
+        tag = f".{zlib.crc32(name.encode()):08x}.png"
+        stem = name.encode()[: 255 - len(tag) - len(".part")]
+        return self.cache / SYSTEMS[system] / (stem.decode("utf-8", "ignore") + tag)
 
     def adopt(self, system, name):
         """Moves a picture an older run cached as <name>.png to path(), if

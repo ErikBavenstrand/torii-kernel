@@ -79,16 +79,17 @@ grep -q "gbc isn't on home" "$cart/err.txt" || fail "nav_to gbc said: $(cat "$ca
 grep -q "1 parts but 0 rows" "$cart/err.txt" || fail "nav_file said: $(cat "$cart/err.txt")"
 echo "PASS: tests/nav.sh reaches home and every page, and a route it can't take fails clearly"
 
-# A path past the kernel's 240-byte log text: the route waits for the cut line
+# A path past the kernel's 240-byte log text, a folder starting with # (a comment
+# in an options file but for the quotes): the route waits for the cut line
 rm -rf "$cart" && cp -r "$carts/routes-new" "$cart"
-long_dir=$(printf 'F%.0s' $(seq 120))
+long_dir="#$(printf 'F%.0s' $(seq 119))"
 long_file=$(printf 'G%.0s' $(seq 120)).gba
 mmd -i "$cart/sd.img" "::/$long_dir"
 mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba "::/$long_dir/$long_file"
 # shellcheck disable=SC2046 # nav.sh's options
 boot long-path $(nav_file "/$long_dir/$long_file" 0 0)
 logged "sdcard: popup /$long_dir/GGGG"
-echo "PASS: a route to a path of 246 bytes waits for its log line as the kernel cuts it"
+echo "PASS: a route to a path of 246 bytes, its folder starting with #, waits for its log line as the kernel cuts it"
 
 # The Info page's routes: each reading page fills in and wraps its text
 # (an assert fails one that doesn't fit), and Diagnostics' first page comes

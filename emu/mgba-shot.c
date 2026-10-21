@@ -6,8 +6,9 @@
 //   -s FRAME:PATH    write a PNG of the screen after FRAME
 //   -S PATH          write the emulated save chip's contents when done
 //   -i FILE          read more options from FILE, whitespace-separated
-//                    (# starts a comment, "double quotes" keep blanks in a
-//                    word), for long input scripts
+//                    (a word starting with # starts a comment; "double
+//                    quotes" keep blanks and # in a word, where a backslash
+//                    escapes " and itself), for long input scripts
 //   -g PORT          wait for gdb on PORT (all addresses) before running
 //   -y SYMFILE       symbols for crash reports (default: the ROM's .sym)
 //   -m FRAME:ADDR:LEN  after FRAME, print LEN bytes of memory from ADDR (hex)
@@ -702,32 +703,41 @@ static void parse_file(struct options *opts, const char *path)
 	char **argv = malloc(cap * sizeof(*argv));
 	char line[1024];
 	while (fgets(line, sizeof(line), f)) {
-		char *hash = strchr(line, '#');
-		if (hash) {
-			*hash = '\0';
-		}
-		// Words split at blanks; "a quoted word" keeps its blanks
+		// Words split at blanks; a word starting with # starts a comment;
+		// "a quoted word" keeps its blanks and #, a backslash escaping " and
+		// itself in it
 		for (char *p = line;;) {
 			p += strspn(p, " \t\r\n");
-			if (!*p) {
+			if (!*p || *p == '#') {
 				break;
 			}
-			char *end;
+			char *end, *word, *next;
 			if (*p == '"') {
-				end = strchr(++p, '"');
-				if (!end) {
+				char *out = word = ++p;
+				for (; *p && *p != '"'; p++) {
+					if (*p == '\\' && (p[1] == '"' || p[1] == '\\')) {
+						p++;
+					}
+					*out++ = *p;
+				}
+				if (*p != '"') {
 					fprintf(stderr, "%s: unclosed quote\n", path);
 					exit(2);
 				}
+				next = p + 1;
+				*out = '\0';
+				end = out;
 			} else {
+				word = p;
 				end = p + strcspn(p, " \t\r\n");
+				next = *end ? end + 1 : end;
 			}
 			if (argc == cap) {
 				cap *= 2;
 				argv = realloc(argv, cap * sizeof(*argv));
 			}
-			argv[argc++] = strndup(p, (size_t)(end - p));
-			p = *end ? end + 1 : end;
+			argv[argc++] = strndup(word, (size_t)(end - word));
+			p = next;
 		}
 	}
 	fclose(f);

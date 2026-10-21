@@ -90,7 +90,14 @@ _nav_file() {
 # 240 bytes (source/tlog.c's TEXT_MAX)
 _nav_wait() {
   local LC_ALL=C text=$1
-  printf -- '-w "%s"\n' "${text:0:240}"
+  printf -- '-w "%s"\n' "$(_nav_q "${text:0:240}")"
+}
+
+# _nav_q TEXT: TEXT for a "quoted word" in an mgba-shot -i file: \ and "
+# escaped
+_nav_q() {
+  local text=${1//\\/\\\\}
+  printf '%s' "${text//\"/\\\"}"
 }
 
 # The start of every route: home, facing its first item (NAV_TEST_HOME)
@@ -399,7 +406,7 @@ _nav_hook() {
       ;;
     esac
   done
-  _nav_file "-P \"$at:nav_test_path:$path\"" "-p $at:nav_test_action:$((0x7E000000 | action | arg << 8 | hard << 16))"
+  _nav_file "-P \"$at:nav_test_path:$(_nav_q "$path")\"" "-p $at:nav_test_action:$((0x7E000000 | action | arg << 8 | hard << 16))"
 }
 
 nav_launch() {
