@@ -123,6 +123,20 @@ void home_items(const u8 *items, u32 count)
 		carousel_set((u8)(home.first + N_CAROUSEL), home.entries, home.count, at);
 }
 
+int home_zoom_open(u32 item, struct ui_zoom *zoom)
+{
+	if (!up() || !home.count || home.items[carousel_facing((u8)(home.first + N_CAROUSEL)) % home.count] != item)
+		return 0;
+	return carousel_zoom((u8)(home.first + N_CAROUSEL), zoom);
+}
+
+void home_zoom_close(u32 item, struct ui_zoom *zoom)
+{
+	const struct carousel_entry e = {nav_item_name(item), nav_item_count(item), art_items[item].sprite,
+					 registry_items[item].icon16, registry_items[item].accent};
+	carousel_zoom_rest(&e, zoom);
+}
+
 void home_clock(const char *text)
 {
 	if (up())

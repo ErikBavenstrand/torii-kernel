@@ -264,11 +264,23 @@ static struct ui_view *push_place(const struct registry_place *p)
 // dir), p's comes in
 static void show(const struct registry_place *p, u32 kind, s32 way)
 {
+	// From home (the open) the reads go first: the zoom runs while the page
+	// is pushed, and with them that would pass a frame (a stalled sprite).
+	// Else after the screen has gone, so a key answers at once, and after
+	// the page has kept what it holds (Settings: a NOR write, which the
+	// clock's hours may follow)
+	int early = kind == UI_TR_OPEN;
+	if (early) {
+		read_settings();
+		count_items();
+	}
 	if (nav.engine)
-		ui_leave(kind, way);  // before the slow reads, so a key answers at once
-	page_leave();     // the page going keeps what it holds (Settings: a NOR write)
-	read_settings();  // the clock's hours, as Settings may have changed them
-	count_items();
+		ui_leave(kind, way);
+	page_leave();  // the page going keeps what it holds
+	if (!early) {
+		read_settings();  // the clock's hours, as Settings may have changed them
+		count_items();
+	}
 	engine_enter();
 	// What the last screen's handlers recorded (keys while it went) was for
 	// it: keys held for this one come with it (ui_leave)
@@ -321,19 +333,37 @@ void nav_defer(void (*fn)(u32 arg), u32 arg)
 	nav.deferred_arg = arg;
 }
 
+// Home's item zooms into its page (B19): its object, carried over, zooms
+// and fogs out while the page draws; a plain fade if it doesn't show
 static void open_item(u32 item)
 {
 	struct registry_place p = {(u8)item, 1, 0};
+	struct ui_zoom zoom;
+	u32 kind = UI_TR_FADE;
+	if (!nav.place.open && home_zoom_open(item, &zoom)) {
+		ui_zoom_set(&zoom);
+		kind = UI_TR_OPEN;
+	}
 	tlog_debug("nav: open %s", registry_items[item].word);
-	show(&p, UI_TR_FADE, 1);
+	show(&p, kind, 1);
 }
 
+// The page goes, then its item's object comes back out of the fog as home
+// draws (the open backwards); home faces the item, or a fade brings it
+// facing the nearest when the item went (its last game deleted)
 static void go_back(void)
 {
 	remember();  // the page's row, for Last place
 	struct registry_place p = {nav.place.item, 0, 0};
+	struct ui_zoom zoom;
+	u32 kind = UI_TR_FADE;
+	if (registry_index(nav.shown, nav.shown_count, p.item) < nav.shown_count) {
+		home_zoom_close(p.item, &zoom);
+		ui_zoom_set(&zoom);
+		kind = UI_TR_CLOSE;
+	}
 	tlog_debug("nav: back from %s", registry_items[p.item].word);
-	show(&p, UI_TR_FADE, -1);
+	show(&p, kind, -1);
 }
 
 // After something that may have ended the engine session (a launch that
@@ -366,6 +396,7 @@ static void run_deferred(void)
 	nav.deferred = 0;
 	remember();  // a launch writes recent.txt, with the place
 	readcache_poison();  // nothing is in it between two actions
+	ui_wipe_finish();    // an action may block: the theme wipe ends first
 	fn(nav.deferred_arg);
 	after_action();
 }

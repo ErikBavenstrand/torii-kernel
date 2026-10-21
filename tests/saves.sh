@@ -146,7 +146,7 @@ full)
     fail "the error doesn't say how much was written"
   logged_error "error 3: Can't write the save"
   logged "dialog: Can't write the save"
-  grep -A3 "kernel error: error 3: " "$cart/run.log" | grep -q "^kernel: screen ready: dialog" ||
+  grep -A20 "kernel error: error 3: " "$cart/run.log" | grep -q "^kernel: screen ready: dialog" ||
     fail "no error dialog after the copy ran out of room"
   grep -q "^kernel: nav: home ready" "$cart/run.log" || fail "no menu after the copy ran out of room"
   mtype -i "$cart/sd.img" ::/Filler.gba | cmp -s - "$cart/filler.bin" || fail "the other file changed"

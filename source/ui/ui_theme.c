@@ -12,6 +12,9 @@
 		[UI_TR_DEEPER] = {UI_TR_FADES | UI_TR_SLIDE_Y, 3, 8, 12}, \
 		[UI_TR_FADE] = {UI_TR_FADES, 3, 6, 0}, \
 		[UI_TR_LEAVE] = {UI_TR_FADES, 3, 8, 0}, \
+		[UI_TR_CARD] = {UI_TR_FADES | UI_TR_SLIDE_Y, 3, 6, 8}, \
+		[UI_TR_OPEN] = {UI_TR_FADES, 3, 6, 0},  /* without a zoom set */ \
+		[UI_TR_CLOSE] = {UI_TR_FADES, 3, 6, 0}, \
 	}
 
 // The Paper clean sizes, px: the same in both
@@ -63,17 +66,18 @@
 	{ \
 		.step = {10, EASE_OUT_CUBIC}, \
 		.label_slide = 14, \
-		.open = {12, EASE_LINEAR}, \
-		.open_zoom_end = 5, \
-		.open_zoom = 486, /* 1.9 in 256ths */ \
-		.open_rise = 12, \
+		.open = {12, EASE_OUT_CUBIC}, \
+		.open_slide = 128, \
+		.open_zoom = {5, EASE_OUT_QUAD}, \
+		.open_scale = 486, /* 1.9 in 256ths */ \
 		.open_card = {7, EASE_OUT_QUAD}, \
-		.close = {10, EASE_LINEAR}, \
+		.open_rise = 12, \
+		.close_card = {5, EASE_IN_CUBIC}, \
+		.close_zoom = {5, EASE_OUT_QUAD}, \
 		.popup_open = {6, EASE_OUT_QUAD}, \
 		.popup_close = {4, EASE_OUT_QUAD}, \
 		.popup_slide = 8, \
 		.theme_wipe = {16, EASE_SMOOTHSTEP}, \
-		.wipe_edge = 4, \
 		.letter_linger = 20, \
 		.letter_close = {4, EASE_OUT_QUAD}, \
 		.pill_spring = SPRING_FAST, \

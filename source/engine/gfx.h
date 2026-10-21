@@ -6,11 +6,12 @@
 // which copies what changed and then runs the queue within its caps.
 //
 // What is shadowed:
-// - registers: DISPCNT, BG control and scroll, windows, mosaic, blending;
+// - registers: DISPCNT, BG control and scroll, windows, blending;
 // - palettes: two buffers of all 512 colours (BG then sprites). Themes and
 //   assets write the unfaded one; a fade (T5) writes the faded one from it
 //   each frame and turns gfx_pal_use_faded on. The commit copies the banks
 //   marked dirty from whichever is in use;
+// - a raster split (gfx_set_split): values that change at one line;
 // - OAM: 128 entries, rebuilt between gfx_oam_begin and gfx_oam_end. The
 //   commit skips OAM while a build is open, so a half-built OAM never shows;
 //   gfx_oam_end hides every entry the build didn't fill. Affine matrices
@@ -33,7 +34,6 @@ struct gfx_regs {
 	u16 bgcnt[4];
 	u16 bgofs[8];  // BG0HOFS, BG0VOFS, BG1HOFS, ...
 	u16 win[6];  // WIN0H, WIN1H, WIN0V, WIN1V, WININ, WINOUT
-	u16 mosaic;
 	u16 blend[3];  // BLDCNT, BLDALPHA, BLDY
 };
 
@@ -43,7 +43,6 @@ enum {
 	GFX_DIRTY_BGCNT = 1 << 1,
 	GFX_DIRTY_BGOFS = 1 << 2,
 	GFX_DIRTY_WIN = 1 << 3,
-	GFX_DIRTY_MOSAIC = 1 << 4,
 	GFX_DIRTY_BLEND = 1 << 5,
 	GFX_DIRTY_OAM = 1 << 6,
 	GFX_DIRTY_REGS = 0x3F,
@@ -99,7 +98,6 @@ void gfx_set_bgcnt(u32 bg, u16 value);
 void gfx_set_scroll(u32 bg, u16 x, u16 y);
 // index: 0 WIN0H, 1 WIN1H, 2 WIN0V, 3 WIN1V, 4 WININ, 5 WINOUT
 void gfx_set_win(u32 index, u16 value);
-void gfx_set_mosaic(u16 value);
 void gfx_set_blend(u16 bldcnt, u16 bldalpha, u16 bldy);
 
 // Copies colours into the unfaded buffer from colour index bank * 16 (bank
@@ -155,8 +153,53 @@ void gfx_freeze(int on);
 // order.
 void gfx_queue_clear(void);
 
+// --- Raster split -------------------------------------------------------------
+// From one line down the screen shows other values in palette RAM or an I/O
+// register: the theme wipe's old colours under its edge (B19, research
+// override R7).
+// Each VBlank the commit copies every part's top values (what the lines
+// above the split show) into place and arms a VCOUNT interrupt on the line
+// before the split; its handler, in IWRAM, starts DMA0 and DMA1 in HBlank
+// mode, which copy the parts' split values in that line's HBlank, so the
+// split line and every line under it show them. The split values come from
+// gfx_split_data in IWRAM: a palette run from EWRAM wouldn't fit one HBlank.
+// mGBA draws each line whole at HBlank's start, so goldens show the split on
+// the line the cart does; a copy running late (a long DMA3 holding the
+// interrupt back) shows only on a cart.
+#define GFX_SPLIT_PARTS 2  // DMA0 and DMA1
+#define GFX_SPLIT_WORDS 32  // a palette run of 48 BG colours and an OBJ bank
+struct gfx_split_part {
+	u32 dst;          // palette RAM or a video register; 0: the part is unused
+	const void *top;  // the values above the split (copied in VBlank); a run of
+			  // gfx_pal_unfaded is read from gfx_pal_faded while a fade is on
+	u16 offset;       // the split values: gfx_split_data from this word
+	u16 count;        // words, or halfwords with half
+	u8 half;
+};
+struct gfx_split {
+	u8 line;  // the first line showing the split values, 1-159; 0: no split
+	struct gfx_split_part part[GFX_SPLIT_PARTS];
+};
+// In IWRAM: the split values. Written straight away, not at the commit, so
+// change them only while no split uses them (before setting one).
+extern u32 gfx_split_data[GFX_SPLIT_WORDS];
+// Sets the split from the next commit on (NULL or line 0: none), as the
+// registers are shadowed. gfx_init, gfx_split_off and gfx_freeze end it.
+// It needs a commit every VBlank (ui_frame's): a frame that misses one
+// shows the split values from the top too, so nothing may block while a
+// split runs.
+void gfx_set_split(const struct gfx_split *split);
+// Ends a split at once: the interrupt and both DMAs off (before a game, or
+// ui_shutdown)
+void gfx_split_off(void);
+// The VCOUNT handler (gfx_split.s; libgba's dispatcher calls it): writes
+// DMA0 and DMA1 from gfx_split_dma, which each commit sets
+extern u32 gfx_split_dma[GFX_SPLIT_PARTS * 3];
+void IWRAM_CODE gfx_split_irq(void);
+
 // The commit. Call it in VBlank, as frame_begin does: registers, palettes,
-// OAM, then the queue. It needs the kernel's ROM mapped (as all menu code).
+// the split, OAM, then the queue. It needs the kernel's ROM mapped (as all
+// menu code).
 void gfx_commit(void);
 // Runs queued work until done, byte_cap bytes, or VCOUNT outside
 // [160, last_line); returns the bytes moved. In IWRAM: the commit's hot

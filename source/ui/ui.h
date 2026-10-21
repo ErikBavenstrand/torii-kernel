@@ -137,6 +137,10 @@ enum ui_tr_kind {
 		       // cheats, help), or back out
 	UI_TR_FADE,    // the same screen redrawn (after a delete, a format, a failed launch)
 	UI_TR_LEAVE,   // out of the engine to black (a launch), or in from black
+	UI_TR_CARD,    // in from black, rising: a dialog in a session of its own (a launch's
+		       // question or error, the boot notice; the loading card just shows)
+	UI_TR_OPEN,    // home's item zooming into its page (ui_zoom_set first; else a fade)
+	UI_TR_CLOSE,   // the page back into home's item: the open backwards
 	UI_TR_KINDS,
 };
 // ui_transition.effects; with no effect a screen just cuts to the next
@@ -145,7 +149,6 @@ enum {
 			    // dialog, and for UI_TR_LEAVE, black) and the next one in from it
 	UI_TR_SLIDE_X = 2,  // slides px sideways: forward to the left, back to the right
 	UI_TR_SLIDE_Y = 4,  // slides px up going forward, down going back
-	UI_TR_MOSAIC = 8,   // breaks up into blocks (the mosaic registers)
 };
 struct ui_transition {
 	u8 effects;  // UI_TR_FADES ...
@@ -207,17 +210,24 @@ struct ui_move {
 struct ui_motions {
 	struct ui_move step;         // the carousel turning one item
 	u8 label_slide;              // px its label slides while it fades
-	struct ui_move open;         // opening an item, start to end
-	u8 open_zoom_end;            // the frame the zoom and fog end and the card starts
-	u16 open_zoom;               // the front object's scale at the zoom's end, in 256ths
-	u8 open_rise;                // px the page card rises while it fades in
-	struct ui_move open_card;    // its rise and fade
-	struct ui_move close;        // B: the open played backwards
+	// Opening an item (UI_TR_OPEN): the front object zooms and fogs out
+	// while the backdrop's tint fades to the page's paper (open_zoom), then
+	// the page card rises and fades in (open_card); the title bar slides in
+	// from the left over the whole open (open)
+	struct ui_move open;         // the whole open: the title bar's slide
+	u8 open_slide;               // px it slides in from
+	struct ui_move open_zoom;    // the zoom, the fog and the tint
+	u16 open_scale;              // the object's scale at the zoom's end, in 256ths
+	struct ui_move open_card;    // the card's rise and fade
+	u8 open_rise;                // px it rises
+	// B (UI_TR_CLOSE): the open backwards, the page going first
+	struct ui_move close_card;   // the card's fall and fade, the title bar sliding out
+	struct ui_move close_zoom;   // the object back out of the fog, the tint back
 	struct ui_move popup_open;   // a popup opening from its row
 	struct ui_move popup_close;
 	u8 popup_slide;              // px it slides in from
-	struct ui_move theme_wipe;   // the top-down switch between light and dark
-	u8 wipe_edge;                // px of its dithered edge
+	struct ui_move theme_wipe;   // the top-down switch between light and dark: a
+				     // hard edge, as a palette split changes whole lines (R7)
 	u8 letter_linger;            // frames the letter card stays after the last jump
 	struct ui_move letter_close;  // and how it goes (opening: at once)
 	s32 pill_spring;             // the selection pill's slide to the cursor's row: a
@@ -327,6 +337,19 @@ void ui_theme_set(const struct ui_theme *theme);
 // accent roles and bank 1's backdrop are the item's) and the UI's sprite
 // bank, bank 0's copy, in the next VBlank; nothing is redrawn.
 void ui_item_set(u32 item);
+// Makes theme the current one with the theme's wipe (motion.theme_wipe):
+// the new colours come down from the top behind a hard edge, the old ones
+// stay under it (the Settings page's live preview). Asked again for the
+// theme it is leaving, the edge goes back up; with no frames, or no engine
+// session, it is ui_theme_set. Any screen change or ui_theme_set ends a wipe
+// at once on its new theme.
+void ui_theme_switch(const struct ui_theme *theme);
+// 1 while the wipe runs
+int ui_wiping(void);
+// Ends a wipe at once on the theme it was going to, and runs a frame that
+// commits that: call it before blocking work (a NOR write, a dialog), as a
+// split needs a commit every VBlank (gfx_set_split). Nothing if none runs.
+void ui_wipe_finish(void);
 const struct ui_theme *ui_theme(void);
 u32 ui_item(void);
 
@@ -735,14 +758,34 @@ int ui_active(void);
 //
 // dir: 1 forward (the next tab, a folder in), -1 back, 0 neither. Keys
 // pressed while the screen goes out are held for the next one, which gets
-// them once it shows. A modal view on top is popped first, with no motion
-// (its dim carries on into the fade). Call these outside ui_frame, like
-// dialogs. A transition coming in can be interrupted: ui_leave goes out
-// from wherever it is.
+// them once it shows. A modal view on top goes to black with the screen
+// (the dim under it first deepens to meet it); the caller pops it with the
+// screen. Call these outside ui_frame, like dialogs. A transition coming in
+// can be interrupted: ui_leave goes out from wherever it is.
+//
+// UI_TR_OPEN and UI_TR_CLOSE carry a sprite across the change (home's front
+// object, ui_zoom_set): the open's screen goes at once and the sprite zooms
+// and fogs out over the paper while the next screen draws; its title bar
+// slides in from the left, then its card rises and fades in. The close
+// fades the card out and slides the title bar away, then the sprite comes
+// back out of the fog while the next screen (home) draws hidden; that
+// screen shows once the sprite is back, in the frame the sprite goes.
 void ui_leave(u32 kind, s32 dir);
 // The next view shown comes in as after ui_leave(kind, dir), from black: a
 // new session's first screen
 void ui_enter(u32 kind, s32 dir);
+// The sprite UI_TR_OPEN and UI_TR_CLOSE carry: home's front object as the
+// carousel draws it (screens/carousel.h fills it). For the next ui_leave
+// with either kind; without one, they are plain fades.
+struct ui_zoom {
+	u8 sprite;        // ART_SPRITE_*: its tiles
+	s16 cx, cy;       // the centre of its 64x64 box on screen
+	u16 scale;        // its scale there, 256ths (the zoom's start, or the close's end)
+	u16 anchor;       // the texel row the zoom keeps in place (its drawn part's middle)
+	u16 sky;          // the backdrop round it, which the open tints to the paper
+	u16 colours[16];  // its palette bank, unfogged
+};
+void ui_zoom_set(const struct ui_zoom *zoom);
 // 1 while a transition goes out, waits for the next screen or comes in.
 int ui_transitioning(void);
 // 1 once the top view is on screen and still: nothing left to draw or

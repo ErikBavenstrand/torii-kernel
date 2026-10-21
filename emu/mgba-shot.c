@@ -155,8 +155,10 @@ static const char *symbolize(uint32_t address)
 // the screen shows as the registers stand now (a map entry of an enabled
 // BG on screen, or the row of a tile such an entry shows, through the
 // windows, and not faded out whole). It prints "tear: frame F line L WHAT ADDR old -> new" with the
-// code storing it. Only mode 0 (text BGs) is modelled; sprite VRAM and OAM
-// are not watched, and the OBJ window counts as outside the windows.
+// code storing it. An HBlank DMA's store changes lines from the next one on,
+// whole, so it is no tear (the theme wipe's split). Only mode 0 (text BGs)
+// is modelled; sprite VRAM and OAM are not watched, and the OBJ window counts
+// as outside the windows.
 
 #define TEAR_REPORTS 40  // lines printed; the rest are counted
 #define TEAR_VRAM 0x10000  // BG VRAM in modes 0-2
@@ -326,10 +328,16 @@ static void tear_after(struct ARMCore *cpu)
 		} else if (kind == 1) {
 			tear_stale = 1;
 		}
-		// The registers as they were decide whether it showed
+		// The registers as they were decide whether it showed. An HBlank
+		// DMA's store lands between two lines, from the next one on, whole
+		// (a raster split, gfx_set_split): not a tear. A CPU store in HBlank
+		// still counts, as the CPU can't be sure to finish there
 		int blank = tear_gba->video.vcount >= 160 ||
 			    (kind == 1 && off == 0 ? tear_old[i] & 0x80 : tear_gba->memory.io[0] & 0x80);
-		if (blank || !on_screen) {
+		int dma = tear_gba->performingDMA ? tear_gba->performingDMA >> 1 : -1;
+		int hblank =
+			dma >= 0 && GBADMARegisterGetTiming(tear_gba->memory.dma[dma].reg) == GBA_DMA_TIMING_HBLANK;
+		if (blank || hblank || !on_screen) {
 			continue;
 		}
 		if (tear_count++ < TEAR_REPORTS) {

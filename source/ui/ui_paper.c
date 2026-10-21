@@ -295,6 +295,7 @@ struct title_state {
 	const char *text, *right_text, *sub;
 	u16 icon_tile;  // ART_NONE: no icon
 	u8 icon_bank;
+	s16 shift;  // px the heading is drawn right of its place (ui_title_offset)
 };
 
 static const struct ui_title_config *title_config(u8 node)
@@ -304,15 +305,15 @@ static const struct ui_title_config *title_config(u8 node)
 	return c ? c : &none;
 }
 
-// The heading's tile columns and the right-hand text's
+// The heading's tile columns and the right-hand text's: the heading's from
+// the left edge, so it can slide in from there (an open's zoom)
 static void title_columns(u8 node, u32 *hx, u32 *hw, u32 *rx, u32 *rw)
 {
 	u32 w = (u32)ui_node(node)->w / 8, right = (look()->title_right_w + 7u) / 8;
 	*rw = right < w ? right : w;
 	*rx = w - *rw;
-	*hx = look()->title_text_x / 8u;
-	*hx = *hx < *rx ? *hx : *rx;
-	*hw = *rx - *hx;
+	*hx = 0;
+	*hw = *rx;
 }
 
 static int title_measure(u8 node, struct engine_budget *need)
@@ -352,15 +353,39 @@ static int title_init(u8 node)
 static void title_update(u8 node, u32 dt)
 {
 	(void)dt;
-	const struct title_state *st = ui_node_state(node);
+	struct title_state *st = ui_node_state(node);
 	const struct ui_node *n = ui_node(node);
+	const struct ui_view *v = ui_node_view(node);
+	s32 shift, dy;
+	ui_title_offset(v, &shift, &dy);
+	if (shift != st->shift) {
+		st->shift = (s16)shift;  // the heading drawn there, this frame
+		ui_dirty(node, TITLE_HEADING);
+	}
 	if (st->icon_tile == ART_NONE || (n->flags & UI_N_HIDDEN) || !ui_node_shown(node) || !ui_plane_owned(node))
 		return;
-	const struct ui_view *v = ui_node_view(node);
-	s32 x = n->x + ui_view_dx(v) + look()->title_icon_x, y = n->y + v->offset + look()->title_icon_y;
+	s32 x = n->x + ui_view_dx(v) + shift + look()->title_icon_x, y = n->y + dy + look()->title_icon_y;
 	if (y <= -16 || y >= 160 || x <= -16 || x >= 240)
 		return;  // off screen (attr0's y would wrap to the top)
 	ui_obj_add(node, (u16)(y & 0xFF), (u16)(OBJ_SIZE_16 | (x & 0x1FF)), (u16)(st->icon_tile | st->icon_bank << 12));
+}
+
+// One line of text at (x, y), cut at the window's right edge, and at its
+// left one where x is left of it (whole glyphs left out: the blitter has no
+// left clip); the pen after the text
+static s32 slid_text(const struct text_window *win, const struct torii_font *font, s32 x, u32 y, u32 ink, const char *s)
+{
+	s32 ww = win->width * 8;
+	if (!s || !*s || x >= ww)
+		return x;
+	if (x >= 0)
+		return x + (s32)draw_text(win, font, (u32)x, y, (u32)(ww - x), ink, s);
+	struct text_line line;
+	u32 lead, len = strlen(s);
+	text_layout_window(font, s, len, (u32)-x, (u32)ww, &line, &lead);
+	if (line.count)
+		text_draw_line(win, font, lead, y, ink, &line);
+	return x + (s32)text_width(font, s, len);
 }
 
 static void title_draw(u8 node)
@@ -380,21 +405,21 @@ static void title_draw(u8 node)
 	struct text_window win;
 	u32 set;
 	if ((todo & TITLE_HEADING) && st->heading.tw) {
-		// Its window starts on the tile column at or before title_text_x
+		// Its window starts at the left edge; the heading at title_text_x, or
+		// shifted left of it (cut at the edge) while it slides in
 		if (!paint_begin(node, &st->heading, &win, &set)) {
 			ui_dirty(node, todo);  // the last flip hasn't landed: both next frame
 			return;
 		}
-		u32 x = l->title_text_x - st->heading.tx * 8u, ww = st->heading.tw * 8u;
-		text_clear(&win, 0, 0, ww, h, paper);
+		s32 x = (s32)l->title_text_x - st->heading.tx * 8 + st->shift, ww = st->heading.tw * 8;
+		text_clear(&win, 0, 0, (u32)ww, h, paper);
 		if (l->title_text_y + t->heading->line_height <= h && x < ww) {
-			x += draw_text(&win, t->heading, x, l->title_text_y, ww - x, ui_ink(node, UI_ROLE_TEXT),
-				       st->text);
+			x = slid_text(&win, t->heading, x, l->title_text_y, ui_ink(node, UI_ROLE_TEXT), st->text);
 			// The after-text, faint in the body font on the heading's baseline
 			const struct torii_font *b = t->body;
-			u32 sx = x + l->title_sub_gap, sy = l->title_text_y + t->heading->baseline - b->baseline;
-			if (st->sub && sx < ww && sy + b->line_height <= h)
-				draw_text(&win, b, sx, sy, ww - sx, UI_ROLE_FAINT, st->sub);
+			s32 sx = x + l->title_sub_gap, sy = l->title_text_y + t->heading->baseline - b->baseline;
+			if (st->sub && sx < ww && (u32)sy + b->line_height <= h)
+				slid_text(&win, b, sx, (u32)sy, UI_ROLE_FAINT, st->sub);
 		}
 		if (!paint_end(node, &st->heading, set, UI_BANK_NORMAL)) {
 			ui_dirty(node, todo);  // the flip next frame, with the right-hand text's
