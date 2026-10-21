@@ -63,13 +63,10 @@ static const char *const key_names[KEY_BITS] = {"A", "B", "SELECT", "START", "RI
 // DIM's steps
 static const u8 dim_presets[] = {0, 1, 2, 5, 10, 15, 30, 60};
 
-// Start on's choices in the order LEFT/RIGHT step through them: Last place,
-// then the carousel's order (screens/registry.c lists the items so)
-static const u8 start_order[] = {
+const u8 settings_start_order[SET_STARTS - 1] = {
 	SET_START_LAST, SET_START_RECENT, SET_START_FAVOURITES, SET_START_GBA,      SET_START_GBC,  SET_START_GB,
 	SET_START_NES,  SET_START_SD,     SET_START_NOR,        SET_START_SETTINGS, SET_START_INFO,
 };
-_Static_assert(sizeof(start_order) == SET_STARTS - 1, "every Start on code but Home, once");
 
 static const struct settings_row *row_of(u32 id)
 {
@@ -236,16 +233,16 @@ static int start_offered(const struct settings_values *v, u32 code)
 // Home, which sits with Last place) steps from its place in the order
 static u16 start_step(const struct settings_values *v, u16 code, int dir)
 {
-	const u32 n = sizeof(start_order);
+	const u32 n = sizeof(settings_start_order);
 	u32 at = 0;
-	while (at < n && start_order[at] != code)
+	while (at < n && settings_start_order[at] != code)
 		at++;
 	if (at == n)
 		at = 0;
 	for (u32 i = 1; i < n; i++) {
 		u32 next = dir < 0 ? (at + n - i) % n : (at + i) % n;
-		if (start_offered(v, start_order[next]))
-			return start_order[next];
+		if (start_offered(v, settings_start_order[next]))
+			return settings_start_order[next];
 	}
 	return SET_START_LAST;
 }

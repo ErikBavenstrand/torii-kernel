@@ -188,12 +188,13 @@ boot 5 -w "nav: home ready" -k @8:RIGHT -k @12:- -k @16:RIGHT -k @20:- -k @24:RI
 boot 6 -w "nav: start on" -f @300
 started "0: home-sd"
 # Settings offers Last place and the items home shows, in its order (no
-# GBC, no NES): a lap, then B puts it back and writes nothing
+# GBC, no NES): a lap, one more to Recent, then B puts it back and writes
+# nothing
 # shellcheck disable=SC2046
 boot 7 -w "nav: home ready" -k @8:RIGHT -k @12:- -k @16:RIGHT -k @20:- -k @24:A -k @28:- -w "nav: page settings ready" \
-  $(nav_press DOWN DOWN DOWN A RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT B B) -w "nav: home ready" -f @30
-offered=$(grep -o 'settings: row 3 set to .*' "$log" | sed 's/settings: row 3 set to //' | tr '\n' ',')
-[ "$offered" = "Recent,Favourites,GBA,GB,SD card,NOR,Settings,Info,Last place," ] || fail "Start on offered $offered"
+  $(nav_press DOWN DOWN DOWN A RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT B B) -w "nav: home ready" -f @30
+offered=$(grep -o 'settings: row 3 set to .*' "$log" | sed 's/settings: row 3 set to //' | head -10 | tr '\n' ',')
+[ "$offered" = "Recent,Favourites,GBA,GB,SD card,NOR,Settings,Info,Last place,Recent," ] || fail "Start on offered $offered"
 ! grep -q "nor: wrote the settings" "$log" || fail "B on Start on wrote the settings"
 # Start on GBA (RIGHT three times), saved as it is confirmed, B at once;
 # the next power-on faces GBA on home

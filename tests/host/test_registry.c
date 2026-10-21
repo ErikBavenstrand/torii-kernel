@@ -150,6 +150,10 @@ void test_registry_start(void)
 		CHECK_EQ(registry_of_start(registry_items[i].start), i);
 	}
 	CHECK_EQ(registry_of_start(SET_START_LAST), NAV_ITEMS);
+	// Settings steps through them in the carousel's order, after Last place
+	CHECK_EQ(settings_start_order[0], SET_START_LAST);
+	for (u32 i = 0; i < NAV_ITEMS; i++)
+		CHECK_EQ(settings_start_order[i + 1], registry_items[i].start);
 	CHECK_EQ(registry_start_shown(all, 10), SET_STARTS_ALL & ~(1u << SET_START_LAST));
 	CHECK_EQ(registry_start_shown(gba, 5), (1u << SET_START_GBA) | (1u << SET_START_SD) | (1u << SET_START_NOR) |
 						       (1u << SET_START_SETTINGS) | (1u << SET_START_INFO));

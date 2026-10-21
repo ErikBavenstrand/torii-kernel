@@ -379,7 +379,7 @@ Made during the build without the user; each is cheap to change.
 - **A page change fades out, then in:** it lands about 9 frames after the key instead of 6 (B7).
 - **Loading card:** titled with the file name; the copy estimate is a guess (64 KB a frame) until measured; a launch with a pending save still shows a separate "Saving…" card first; a launch with an unsaved library index shows "Saving the game list" first (B8, B3).
 - **Hotkeys (C5 settled the names):** 2–3 keys including L, R, START or SELECT, no overlap with the other hotkey even while it's off, nothing inside A+B+START+SELECT; with Save states on, the reset keys are armed whatever "Back to menu" says (B6).
-- **Settings rows, labels and defaults** (Game view List, Show all files Off, 24-hour clock On, Start on Last place; Start on can't pick NOR, Settings or Info) (B6).
+- **Settings rows, labels and defaults** (Game view List, Show all files Off, 24-hour clock On, Start on Last place; Start on offers Last place and the items home shows, and only faces one, D1) (B6).
 - **Hidden files:** PATCH and CHEAT hidden too, and every file the kernel can't start (`.sav`, `.txt`, `.cht`) on the SD card page; `.sgb` and dot-less files no longer launch (B4, B3).
 - **Name cleaning:** 4–5 digit scene prefixes dropped except 1900–2099; the article table can misfire ("Rock, Paper, A"); colliding games show their first differing tag, preferring Rev/Beta/translation tags (B4).
 - **The "played ago" words** and the unset clock counting as before 2026-10-01 (B5).

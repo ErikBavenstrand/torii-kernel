@@ -109,6 +109,11 @@ enum settings_start {
 	SET_START_INFO,
 	SET_STARTS
 };
+_Static_assert(SET_STARTS <= 16, "Start on's codes fit a u16 mask");
+// Start on's choices in the order LEFT/RIGHT step through them: Last place,
+// then the carousel's (tests/host/test_registry.c checks it against
+// screens/registry.c's items)
+extern const u8 settings_start_order[SET_STARTS - 1];
 // Every code home can show (bit per enum settings_start)
 #define SET_STARTS_ALL ((u16)(((1u << SET_STARTS) - 1) & ~(1u << SET_START_HOME)))
 
