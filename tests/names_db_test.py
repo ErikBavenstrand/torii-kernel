@@ -137,6 +137,105 @@ class Romhacks(unittest.TestCase):
         self.assertIsNone(names_db.db_name(tables, 0, None))
 
 
+def add(sd, lines, *extra):
+    tsv = Path(sd).parent / "names.tsv"
+    tsv.write_text(lines, encoding="utf-8")
+    out, err = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        status = names_db.main(["add", str(sd), str(tsv), *extra])
+    return status, out.getvalue(), err.getvalue()
+
+
+class NamesAdd(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.sd = Path(self.tmp.name) / "sd"
+        for game in (
+            "GBA/Pokemon - Glazed.gba",
+            "Hacks/Pokemon - Glazed.gba",
+            "GBA/Wars.gba",
+            "GB/Tetris.gb",
+            "torii/Hidden.gba",
+        ):
+            (self.sd / game).parent.mkdir(parents=True, exist_ok=True)
+            (self.sd / game).write_bytes(b"x")
+        self.names = self.sd / "torii" / "names.txt"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_adds_names_by_file_name(self):
+        # Hand-written names.txt: a comment and a name stay, a later line wins
+        self.names.write_text(
+            "# mine\n/GB/Tetris.gb\tOld\n/GB/Tetris.gb\tBlocks\n/gone.gba\tGone\n"
+        )
+        status, out, err = add(
+            self.sd,
+            "# file name, tab, name\n"
+            "pokemon - glazed\tGlazed (Emerald hack)\n"  # no extension, any case
+            "Wars.GBA\t  Advance Wars \x01\n"  # trimmed, control characters dropped
+            "/GBA/Wars.gba\tAdvance Wars\n"  # a path; the later line wins
+            "Hidden.gba\tNo\n"  # hidden from the library
+            "Nobody\tNo one\n"
+            "\n",
+        )
+        self.assertEqual(status, 0, err)
+        self.assertIn("  /Hacks/Pokemon - Glazed.gba: Glazed (Emerald hack)", out)
+        self.assertIn("  Hidden.gba: no game on the card has that file name", out)
+        self.assertIn("  Nobody: no game on the card has that file name", out)
+        self.assertIn(
+            "4 games named, 0 names removed, 2 lines named no game; names.txt holds 5 names",
+            out,
+        )
+        text = names_db.read_safe(self.names)
+        self.assertEqual(
+            text,
+            "# mine\n"
+            "/GB/Tetris.gb\tBlocks\n"
+            "/GBA/Pokemon - Glazed.gba\tGlazed (Emerald hack)\n"
+            "/GBA/Wars.gba\tAdvance Wars\n"
+            "/gone.gba\tGone\n"
+            "/Hacks/Pokemon - Glazed.gba\tGlazed (Emerald hack)\n",
+        )
+        # Both copies, sealed by the CRC line the kernel checks
+        main = self.names.read_bytes()
+        self.assertEqual(main, (self.sd / "torii" / "names.txt.bak").read_bytes())
+        self.assertIsNotNone(names_db.safe_text(main))
+
+        # An empty name removes a game's own name; --dry-run writes nothing
+        status, out, _ = add(self.sd, "Tetris.gb\t\n", "--dry-run")
+        self.assertEqual(status, 0)
+        self.assertIn("/GB/Tetris.gb: own name removed", out)
+        self.assertEqual(names_db.read_safe(self.names), text)
+        status, out, _ = add(self.sd, "Tetris\t\n")
+        self.assertEqual(status, 0)
+        self.assertNotIn("Tetris", names_db.read_safe(self.names))
+
+    def test_new_names_txt_and_refusals(self):
+        status, _, err = add(self.sd, "Wars\tWars!\n")
+        self.assertEqual(status, 0, err)
+        self.assertEqual(
+            names_db.read_safe(self.names),
+            names_db.NAMES_HEADER + "/GBA/Wars.gba\tWars!\n",
+        )
+        before = self.names.read_bytes()
+        for lines in ("Wars Advance Wars\n", "Wars\t" + "x" * 256 + "\n"):
+            status, _, err = add(self.sd, lines)
+            self.assertEqual(status, 1, lines)
+            self.assertIn("names-add:", err)
+        self.assertEqual(self.names.read_bytes(), before)  # nothing written
+        status, _, err = add(self.sd / "nope", "Wars\tW\n")
+        self.assertEqual(status, 1)
+        self.assertIn("isn't a folder", err)
+
+    def test_games_by_name(self):
+        games = [("/A/Foo.gba", "", 0), ("/B/Foo.gba", "", 0), ("/Foo.gbc", "", 1)]
+        by = names_db.games_by_name(games)
+        self.assertEqual(len(by["foo"]), 3)
+        self.assertEqual(len(by["foo.gba"]), 2)
+        self.assertEqual(names_db.fold("Poke\u0301mon"), names_db.fold("POK\u00c9MON"))
+
+
 class Db(unittest.TestCase):
     def tables(self):
         return names_db.make_tables([(DATS / d).read_text() for d in fixture.DATS])

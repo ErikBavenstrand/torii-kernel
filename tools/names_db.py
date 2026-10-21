@@ -5,6 +5,7 @@
 """Make the names database for an SD card: /torii/names.db and /torii/crc.txt.
 
 usage: names_db.py update SD_PATH [--no-crc] [--offline] [--refresh] [--dats DIR]
+       names_db.py add SD_PATH FILE [--dry-run]
 
 `just names-update SD_PATH` runs this. It needs SD_PATH, the card's folder
 on this PC (a mounted card, say /Volumes/OMEGA), and:
@@ -24,6 +25,16 @@ on this PC (a mounted card, say /Volumes/OMEGA), and:
    shows the names at once. A file whose path and size crc.txt already has
    isn't read again. --no-crc leaves crc.txt alone: the kernel's Identify
    library and its launches compute CRCs too, far more slowly.
+
+`just names-add SD_PATH FILE` runs `add`: your own names for many games at
+once, into SD_PATH/torii/names.txt, the file the cart's Rename writes (your
+names win over every other). FILE has a line per game: the game's file name
+(with or without its extension, any case; or its path on the card, from
+"/"), a tab, and its name; an empty name removes the game's own name, and
+lines starting with # are skipped. Every game on the card with that file
+name gets the name (copies in different folders too). It prints which lines
+named which games and which named none, and keeps the names and comments
+names.txt has.
 
 Licence: the dats are libretro-database's (CC BY-SA 4.0), which imports them
 from No-Intro (https://no-intro.org). They are downloaded to this PC at your
@@ -453,6 +464,142 @@ def parse_cache(text):
     return out
 
 
+# --- Games by file name (names-add, art-add) ---------------------------------------
+
+
+def fold(name):
+    """A file name as names-add and art-add match it: NFC, case folded."""
+    return unicodedata.normalize("NFC", name).casefold()
+
+
+def games_by_name(games):
+    """walk_card's games by their folded file name and by that name without
+    its extension: {name: [(card path, file path, console), ...]}."""
+    out = {}
+    for game in games:
+        name = Path(game[0]).name
+        keys = {fold(name), fold(name[: name.rindex(".")])}
+        for key in keys:
+            out.setdefault(key, []).append(game)
+    return out
+
+
+# --- Your own names: /torii/names.txt (names-add) -------------------------------------
+
+NAMES_FILE = "names.txt"
+NAMES_MAX = 1024  # GAMENAME_CUSTOM_MAX (source/gamename.h)
+NAME_BYTES = 255  # GAMENAME_MAX
+# The text Rename and the walk read: PSRAM_NAMES_TEXT_BYTES less the CRC line
+# and its newline (source/gamename_store.c's TEXT_CAP)
+NAMES_TEXT_MAX = 0x1D000 - 15 - 2
+NAMES_HEADER = "# Torii's own names: a game's path, a tab, its name\n"
+
+
+def ascii_fold(path):
+    """A path folded as the kernel folds it: ASCII case only."""
+    return "".join(c.lower() if c < "\x80" else c for c in path)
+
+
+def parse_names(text):
+    """names.txt as gamename.h reads it: ([other lines], {folded path: (path,
+    name)}), a later line for a path winning."""
+    other, names = [], {}
+    for line in text.lstrip("\ufeff").splitlines():
+        path, tab, name = line.partition("\t")
+        if path.startswith("/") and tab and name:
+            names[ascii_fold(path)] = (path, name)
+        elif line.strip() and not (path.startswith("/") and tab):
+            other.append(line)
+    return other, names
+
+
+def format_names(other, names):
+    """names.txt's text as the kernel writes it: the other lines, then a line
+    per game sorted by path."""
+    lines = other + [f"{p}\t{n}" for _, (p, n) in sorted(names.items())]
+    return "".join(line + "\n" for line in lines)
+
+
+def clean_name(name):
+    """A name as Rename keeps it: control characters dropped, the ends
+    trimmed. NamesError if it's too long."""
+    name = "".join(c for c in name if c >= " " and c != "\x7f").strip()
+    if len(name.encode("utf-8")) > NAME_BYTES:
+        raise NamesError(f"{name[:40]}...: longer than {NAME_BYTES} bytes")
+    return name
+
+
+def add_names(args):
+    sd = Path(args.sd_path)
+    if not sd.is_dir():
+        raise NamesError(
+            f"{sd} isn't a folder: give the card's folder, e.g. /Volumes/OMEGA"
+        )
+    try:
+        wanted = Path(args.file).read_text("utf-8-sig").splitlines()
+    except (OSError, UnicodeError) as e:
+        raise NamesError(f"{args.file}: {e}") from None
+    games = walk_card(sd)
+    by_name = games_by_name(games)
+    by_path = {ascii_fold(g[0]): g for g in games}
+    target = sd / "torii" / NAMES_FILE
+    other, names = parse_names(read_safe(target))
+    if not other:
+        other = [NAMES_HEADER.rstrip("\n")]
+    named = removed = 0
+    misses, bad = [], []
+    for n, line in enumerate(wanted, 1):
+        if not line.strip() or line.startswith("#"):
+            continue
+        key, tab, name = line.partition("\t")
+        key = key.strip()
+        if not tab or not key:
+            bad.append(f"line {n}: no tab between the file name and the name")
+            continue
+        try:
+            name = clean_name(name)
+        except NamesError as e:
+            bad.append(f"line {n}: {e}")
+            continue
+        if key.startswith("/"):
+            found = [by_path[ascii_fold(key)]] if ascii_fold(key) in by_path else []
+        else:
+            found = by_name.get(fold(key), [])
+        if not found:
+            misses.append(key)
+            continue
+        for path, _, _ in found:
+            if name:
+                print(f"  {path}: {name}")
+                names[ascii_fold(path)] = (path, name)
+                named += 1
+            elif names.pop(ascii_fold(path), None):
+                print(f"  {path}: own name removed")
+                removed += 1
+    if bad:
+        raise NamesError(
+            f"{args.file} has lines that don't read:\n  " + "\n  ".join(bad)
+        )
+    text = format_names(other, names)
+    if len(names) > NAMES_MAX or len(text.encode("utf-8")) > NAMES_TEXT_MAX:
+        raise NamesError(
+            f"names.txt would hold {len(names)} names in {len(text.encode('utf-8'))} bytes; "
+            f"the kernel reads {NAMES_MAX} names in {NAMES_TEXT_MAX} bytes"
+        )
+    for key in misses:
+        print(f"  {key}: no game on the card has that file name")
+    print(
+        f"{named} games named, {removed} names removed, {len(misses)} lines named no game; "
+        f"names.txt holds {len(names)} names"
+    )
+    if args.dry_run:
+        print("(dry run: names.txt not written)")
+        return
+    target.parent.mkdir(exist_ok=True)
+    write_safe(target, text)
+    print(f"wrote {target}")
+
+
 def fat_date(path):
     """The file's FAT date and time as FatFs gives them (fdate << 16 | ftime,
     local time, seconds in twos) in crc.txt's form, from its mtime."""
@@ -608,11 +755,18 @@ def main(argv):
         default=str(DATS),
         help=f"the dats' cache (default {DATS.relative_to(ROOT)})",
     )
+    a = sub.add_parser("add", help="your own names for many games, into names.txt")
+    a.add_argument("sd_path", help="the card's folder on this PC")
+    a.add_argument("file", help="lines of a game's file name, a tab and its name")
+    a.add_argument("--dry-run", action="store_true", help="print, write nothing")
     args = p.parse_args(argv)
     try:
-        update(args)
+        if args.cmd == "add":
+            add_names(args)
+        else:
+            update(args)
     except NamesError as e:
-        print(f"names-update: {e}", file=sys.stderr)
+        print(f"names-{args.cmd}: {e}", file=sys.stderr)
         return 1
     return 0
 
