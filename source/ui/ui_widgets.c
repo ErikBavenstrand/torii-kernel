@@ -7,6 +7,7 @@
 #include "../engine/gfx.h"
 #include "../engine/res.h"
 #include "../engine/text.h"
+#include "../tlog.h"
 
 // The node's tiles as a text window (column-major, its rectangle's size)
 static struct text_window window_of(u8 node, u16 first)
@@ -219,8 +220,8 @@ struct image_state {
 static int image_measure(u8 node, struct engine_budget *need)
 {
 	const struct ui_image_config *c = ui_node_spec(node)->data;
-	if (!c || !c->tiles || !c->tag) {
-		ui_set_error("view %s: an image needs tiles and a tag", ui_node_view(node)->spec->name);
+	if (!c || !c->tiles) {
+		ui_set_error("view %s: an image needs tiles", ui_node_view(node)->spec->name);
 		return 0;
 	}
 	if (c->palette)
@@ -281,6 +282,22 @@ static void image_draw(u8 node)
 u32 ui_image_bank(u8 node)
 {
 	return ((const struct image_state *)ui_node_state(node))->bank;
+}
+
+int ui_image_show(u8 node, const void *tiles, const u16 *palette, u32 colours)
+{
+	const struct image_state *st = ui_node_state(node);
+	const struct ui_image_config *c = ui_node_spec(node)->data;
+	const struct ui_node *n = ui_node(node);
+	TLOG_ASSERT(c && !c->tag);  // its tiles are its own: never cached for another push
+	if (!c || c->tag || st->tiles == RES_NONE)
+		return 0;
+	u32 bytes = (u32)(n->w / 8) * (u32)(n->h / 8) * 32;
+	if (!gfx_queue_copy(res_bg_addr(st->tiles), tiles, bytes))
+		return 0;
+	if (palette && colours)
+		gfx_pal_load(st->bank, palette, colours > 16 ? 16 : colours);
+	return 1;
 }
 
 static const struct ui_ops image_ops = {sizeof(struct image_state), image_measure, image_init, 0, 0, image_draw};

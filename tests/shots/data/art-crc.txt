@@ -1,0 +1,2 @@
+# Torii's CRC cache: CRC32, GBA game code, size, date, path
+4D148840	-	3248	-	/Sea.gba

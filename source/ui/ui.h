@@ -577,11 +577,13 @@ struct ui_list_config {
 #define UI_ROW_PITCH_LIST 0xFF      // row_h: the look's list_pitch (14 px)
 #define UI_ROW_PITCH_SETTINGS 0xFE  // row_h: the look's settings_pitch (12 px)
 
-// An image from 4bpp tiles in ROM (a sprite or cover image comes later, T7).
+// An image from 4bpp tiles in ROM. With a tag, views share its tiles and
+// palette (and a view pushed again finds them loaded); with none (0), they
+// are its own, and ui_image_show may put others there (box art).
 struct ui_image_config {
 	const u32 *tiles;     // w x h tiles in row order
 	const u16 *palette;   // 16 colours in a bank of its own; NULL: the theme's bank 0
-	u16 tag;              // shares tiles and palette between views (nonzero)
+	u16 tag;              // 0: not shared
 };
 
 // A vertical scroll bar showing a list's position: a 1 px track in the
@@ -827,6 +829,11 @@ void ui_progress_set(u8 node, u32 value, u32 max);
 // An image's BG palette bank (one of its own when its config has a
 // palette): a screen may load other colours into it (gfx_pal_load).
 u32 ui_image_bank(u8 node);
+// Shows other tiles in an untagged image (w x h 4bpp tiles in row order,
+// word-aligned, read at VBlank: they must stay put until the copy lands,
+// gfx_queue_ticket) and loads colours colours of palette into its bank
+// (none for NULL). 0 if the VRAM queue is full (try again next frame).
+int ui_image_show(u8 node, const void *tiles, const u16 *palette, u32 colours);
 // The Paper clean widgets' contents. Texts and arrays are kept by pointer,
 // as a label's text is: valid and unchanged until replaced or the view pops.
 void ui_title_set(u8 node, const char *text);

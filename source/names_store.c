@@ -515,6 +515,23 @@ const char *names_lookup(const char *path, u32 size, u32 console)
 	return r->size == size ? names_db_name(DB, r, console) : NULL;
 }
 
+int names_ids(const char *path, u32 size, u32 *crc, int *has_crc, u32 *code)
+{
+	if (N.phase != P_DONE)
+		return 0;
+	u32 n = names_cache_find(&N.cache, path);
+	if (n == NAMES_CACHE_NONE)
+		return 0;
+	const struct names_rec *r = names_cache_rec(&N.cache, n);
+	u32 flags = names_rec_flags(r);
+	if (r->size != size || (flags & NAMES_DEAD))
+		return 0;
+	*has_crc = (flags & NAMES_CRC) != 0;
+	*crc = r->crc;
+	*code = r->code;
+	return 1;
+}
+
 const char *names_dat_version(void)
 {
 	return N.phase == P_DONE && N.db_ok ? db_header()->dat_version : NULL;

@@ -57,6 +57,7 @@ enum settings_id {
 	// Look
 	SET_THEME,      // 0 dark, 1 light
 	SET_GAME_VIEW,  // 0 list, 1 list with art
+	SET_BOX_ART,    // list with art shows covers (boxart.h)
 	SET_START_ON,   // where the menu opens: enum settings_start
 	SET_DIM,        // idle minutes before the screen dims, 0 off
 	// Clock

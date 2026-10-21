@@ -49,7 +49,7 @@ static const struct {
 	{"theme_switch_loads_banks", test_theme_switch_loads_banks},
 	{"ui_image_queue_full", test_ui_image_queue_full},
 	{"ui_scroll_end", test_ui_scroll_end},
-	{"asset_lz77_decode", test_asset_lz77_decode},
+	{"asset_raw", test_asset_raw},
 	{"asset_psram_round_trip", test_asset_psram_round_trip},
 	{"asset_sd_read", test_asset_sd_read},
 	{"asset_cover_cache", test_asset_cover_cache},
@@ -64,7 +64,6 @@ static const struct {
 	const char *name;
 	void (*run)(void);
 } asset_tests[] = {
-	{"asset_lz77_decode", test_asset_lz77_decode},
 	{"asset_psram_round_trip", test_asset_psram_round_trip},
 	{"asset_sd_read", test_asset_sd_read},
 	{"asset_cover_cache", test_asset_cover_cache},
@@ -111,8 +110,8 @@ int torii_asset_tests(void)
 #ifdef TORII_TEST_KERNEL
 void torii_run_tests(void)
 {
-	// SELECT held at power-on: the cart run (tests/assets.sh and the
-	// cover-demo shot, on the emulated cart). The other tests assume no
+	// SELECT held at power-on: the cart run (tests/assets.sh, on the
+	// emulated cart). The other tests assume no
 	// cart model: under it the NOR tests write the game NOR, then crash
 	// SELECT and L: the UI demo on the cart (tests/shots/ui-*.opts)
 	if ((~REG_KEYINPUT & 0x3FF) == (KEY_SELECT | KEY_L))
@@ -128,7 +127,6 @@ void torii_run_tests(void)
 	if ((~REG_KEYINPUT & 0x3FF) == KEY_SELECT) {
 		REG_WAITCNT_CART = WAITCNT_MENU;  // as the menu runs
 		torii_asset_tests();
-		cover_demo();
 	}
 	torii_unit_tests();
 	// The engine's scene, or with L held (mgba-shot -k 1:L) the UI demo

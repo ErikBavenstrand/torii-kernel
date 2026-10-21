@@ -30,17 +30,17 @@ void test_settings_layout_slots(void)
 {
 	LoadEnglish();
 	erased();
-	// Seven sections: a label, the rows, a gap each; 25 rows with the LED on
-	CHECK_EQ(lay.rows, 25);
-	CHECK_EQ(lay.count, 25 + 2 * SET_SECTIONS);
+	// Seven sections: a label, the rows, a gap each; 26 rows with the LED on
+	CHECK_EQ(lay.rows, 26);
+	CHECK_EQ(lay.count, 26 + 2 * SET_SECTIONS);
 	CHECK_EQ(lay.slot[0].kind, SET_SLOT_LABEL);
 	CHECK_EQ(lay.slot[1].kind, SET_SLOT_ROW);
 	CHECK_EQ(lay.slot[1].id, SET_THEME);
-	CHECK_EQ(lay.slot[5].kind, SET_SLOT_GAP);
+	CHECK_EQ(lay.slot[6].kind, SET_SLOT_GAP);
 	CHECK_EQ(lay.slot[lay.count - 1].kind, SET_SLOT_GAP);
 	CHECK_EQ(lay.first[SET_SEC_LOOK], 1);
-	CHECK_EQ(lay.last[SET_SEC_LOOK], 4);
-	CHECK_EQ(lay.first[SET_SEC_CLOCK], 7);
+	CHECK_EQ(lay.last[SET_SEC_LOOK], 5);
+	CHECK_EQ(lay.first[SET_SEC_CLOCK], 8);
 	// Each row once, in the model's order, with its section's label before
 	u32 id = 0;
 	for (u32 s = 0; s < lay.count; s++) {
@@ -60,7 +60,7 @@ void test_settings_layout_slots(void)
 	// The LED off hides its colours: two rows fewer, the slots after move up
 	settings_set(&v, SET_LED, 0);
 	settings_layout_build(&lay, &v);
-	CHECK_EQ(lay.rows, 23);
+	CHECK_EQ(lay.rows, 24);
 	CHECK_EQ(settings_layout_slot_of(&lay, SET_LED_IDLE), SET_LAYOUT_NONE);
 	CHECK_EQ(settings_layout_slot_of(&lay, SET_RESET_ON), settings_layout_slot_of(&lay, SET_LED) + 3);
 }

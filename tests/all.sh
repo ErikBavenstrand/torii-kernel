@@ -21,6 +21,7 @@ jobs=(
   "tests/saves.sh nearly-full"
   "tests/saves.sh delete"
   "tests/games.sh"
+  "tests/boxart.sh"
   "tests/eeprom_probe.sh 512"
   "tests/eeprom_probe.sh 8k"
   "tests/rumble_probe.sh"

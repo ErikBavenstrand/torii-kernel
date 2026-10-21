@@ -180,6 +180,8 @@ static const struct {
 	{"budget_check", test_budget_check},
 	{"asset_header", test_asset_header},
 	{"asset_check_refuses", test_asset_check_refuses},
+	{"artkey_names", test_artkey_names},
+	{"artset", test_artset},
 	{"cover_cache_wants", test_cover_cache_wants},
 	{"cover_cache_eviction", test_cover_cache_eviction},
 	{"affine_rotscale", test_affine_rotscale},

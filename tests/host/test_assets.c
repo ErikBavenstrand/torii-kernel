@@ -1,9 +1,10 @@
 // The asset pipeline's hardware-free parts (source/engine): the asset
 // header check, the cover cache's bookkeeping and eviction, and the affine
-// matrices.
+// matrices; and box art's keys and set (source/artkey.h).
 #include <stdlib.h>
 #include <string.h>
 
+#include "../../source/artkey.h"
 #include "../../source/crc32.h"
 #include "../../source/engine/affine.h"
 #include "../../source/engine/asset.h"
@@ -14,101 +15,56 @@
 
 // --- Assets ---------------------------------------------------------------
 
-// Decodes LZ77 as the BIOS does, writing at most out_max bytes; returns the
-// size, or 0 if malformed.
-static u32 lz77_decode(const u8 *in, u32 in_size, u8 *out, u32 out_max)
-{
-	if (in_size < 4 || in[0] != 0x10)
-		return 0;
-	u32 size = in[1] | in[2] << 8 | (u32)in[3] << 16, i = 4, o = 0;
-	if (size > out_max)
-		return 0;
-	while (o < size) {
-		if (i >= in_size)
-			return 0;
-		u8 flags = in[i++];
-		for (int bit = 7; bit >= 0 && o < size; bit--) {
-			if (flags & (1 << bit)) {
-				if (i + 1 >= in_size)
-					return 0;
-				u32 v = (u32)in[i] << 8 | in[i + 1];
-				i += 2;
-				u32 len = (v >> 12) + 3, dist = (v & 0xFFF) + 1;
-				// The VRAM decoder (SWI 0x12) can't read distance 1
-				if (dist < 2 || dist > o || o + len > size)
-					return 0;
-				for (u32 k = 0; k < len; k++, o++)
-					out[o] = out[o - dist];
-			} else {
-				if (i >= in_size)
-					return 0;
-				out[o++] = in[i++];
-			}
-		}
-	}
-	return size;
-}
-
-static void check_test_asset(const u32 *data, u32 bytes)
-{
-	const struct asset_header *h = (const void *)data;
-	u32 lz_at = ASSET_HEADER_BYTES + asset_palette_bytes(h);
-	CHECK_EQ(asset_check(h, bytes, data[lz_at / 4]), ASSET_OK);
-	u8 tiles[ASSET_TILE_BYTES_MAX];
-	CHECK_EQ(lz77_decode((const u8 *)data + lz_at, h->lz_bytes, tiles, sizeof(tiles)), asset_tile_bytes(h));
-}
-
 void test_asset_header(void)
 {
-	// tools/asset.py's output: the header is right and the tiles decode
-	check_test_asset(test_asset_small, test_asset_small_bytes);
+	// tools/asset.py's output: the header is right and the tiles follow it
 	const struct asset_header *small = (const void *)test_asset_small;
+	CHECK_EQ(asset_check(small, test_asset_small_bytes), ASSET_OK);
 	CHECK_EQ(small->bpp, 4);
 	CHECK_EQ(small->width, 2);
 	CHECK_EQ(small->colours, 4);
-	u8 tiles[128];
-	u32 lz_at = ASSET_HEADER_BYTES + asset_palette_bytes(small);
-	lz77_decode((const u8 *)test_asset_small + lz_at, small->lz_bytes, tiles, sizeof(tiles));
-	CHECK_EQ(crc32(tiles, sizeof(tiles)), test_asset_small_crc);
+	CHECK_EQ(small->tile_bytes, 128);
+	CHECK_EQ(asset_tiles_at(small), ASSET_HEADER_BYTES + 8);
+	CHECK_EQ(crc32((const u8 *)test_asset_small + asset_tiles_at(small), 128), test_asset_small_crc);
 }
 
 void test_asset_check_refuses(void)
 {
-	struct asset_header h = {ASSET_MAGIC, 4, 8, 8, 0, 16, 0, 512};
-	u32 lz = 0x10 | 2048u << 8, file = 16 + 32 + 512;
-	CHECK_EQ(asset_check(&h, file, lz), ASSET_OK);
-	CHECK_EQ(asset_check(&h, 15, lz), ASSET_ERR_SHORT);
-	CHECK_EQ(asset_check(&h, file - 1, lz), ASSET_ERR_SHORT);
-	CHECK_EQ(asset_check(&h, file, lz + 0x100), ASSET_ERR_LZ77);
-	CHECK_EQ(asset_check(&h, file, (lz & ~0xFFu) | 0x11), ASSET_ERR_LZ77);
+	struct asset_header h = {ASSET_MAGIC, 4, 8, 8, 0, 16, 0, 2048};
+	u32 file = 16 + 32 + 2048;
+	CHECK_EQ(asset_check(&h, file), ASSET_OK);
+	CHECK_EQ(asset_check(&h, 15), ASSET_ERR_SHORT);
+	CHECK_EQ(asset_check(&h, file - 1), ASSET_ERR_SHORT);
 	struct asset_header bad = h;
 	bad.magic ^= 1;
-	CHECK_EQ(asset_check(&bad, file, lz), ASSET_ERR_MAGIC);
+	CHECK_EQ(asset_check(&bad, file), ASSET_ERR_MAGIC);
 	bad = h;
 	bad.bpp = 2;
-	CHECK_EQ(asset_check(&bad, file, lz), ASSET_ERR_FORMAT);
+	CHECK_EQ(asset_check(&bad, file), ASSET_ERR_FORMAT);
 	bad = h;
 	bad.colours = 17;  // over a 4bpp bank
-	CHECK_EQ(asset_check(&bad, file, lz), ASSET_ERR_FORMAT);
+	CHECK_EQ(asset_check(&bad, file), ASSET_ERR_FORMAT);
 	bad = h;
 	bad.flags = 1;
-	CHECK_EQ(asset_check(&bad, file, lz), ASSET_ERR_FORMAT);
+	CHECK_EQ(asset_check(&bad, file), ASSET_ERR_FORMAT);
 	bad = h;
 	bad.width = 0;
-	CHECK_EQ(asset_check(&bad, file, lz), ASSET_ERR_FORMAT);
+	CHECK_EQ(asset_check(&bad, file), ASSET_ERR_FORMAT);
 	bad = h;
-	bad.lz_bytes = 510;  // not words
-	CHECK_EQ(asset_check(&bad, file, lz), ASSET_ERR_FORMAT);
-	// 8bpp 64x128 is 8 KB, the most; 64x136 is too big for the stage
+	bad.tile_bytes = 2016;  // not the size's
+	CHECK_EQ(asset_check(&bad, file), ASSET_ERR_FORMAT);
+	// 8bpp 64x128 is 8 KB, the most; 64x136 is too big
 	bad = h;
 	bad.bpp = 8;
 	bad.height = 16;
-	CHECK_EQ(asset_check(&bad, file, 0x10 | 8192u << 8), ASSET_OK);
+	bad.tile_bytes = 8192;
+	CHECK_EQ(asset_check(&bad, 16 + 32 + 8192), ASSET_OK);
 	bad.height = 17;
-	CHECK_EQ(asset_check(&bad, file, 0x10 | 8704u << 8), ASSET_ERR_TOO_BIG);
+	bad.tile_bytes = 8704;
+	CHECK_EQ(asset_check(&bad, 16 + 32 + 8704), ASSET_ERR_TOO_BIG);
 	bad = h;
-	CHECK_EQ(asset_check(&bad, ASSET_FILE_MAX + 4, lz), ASSET_ERR_TOO_BIG);
-	CHECK(strcmp(asset_error_text(ASSET_ERR_LZ77), "the LZ77 data isn't the tiles' size") == 0);
+	CHECK_EQ(asset_check(&bad, ASSET_FILE_MAX + 4), ASSET_ERR_TOO_BIG);
+	CHECK(strcmp(asset_error_text(ASSET_ERR_MAGIC), "not an asset (no TAS2 magic)") == 0);
 }
 
 // --- The cover cache ------------------------------------------------------
@@ -247,4 +203,73 @@ void test_affine_rotscale(void)
 	CHECK_EQ(m[0], 0x7FFF);
 	affine_rotscale(m, 0, 0, 0x8000);
 	CHECK_EQ(m[0], -0x8000);
+}
+
+// --- Box art's keys and set ------------------------------------------------
+
+void test_artkey_names(void)
+{
+	u32 key = 0;
+	CHECK_EQ(artkey_parse("5D5C613E.bin", &key), ARTKEY_CRC);
+	CHECK_EQ(key, 0x5D5C613Eu);
+	CHECK_EQ(artkey_parse("5d5c613e.BIN", &key), ARTKEY_CRC);  // FAT's case
+	CHECK_EQ(key, 0x5D5C613Eu);
+	CHECK_EQ(artkey_parse("AWRE.bin", &key), ARTKEY_CODE);
+	CHECK_EQ(key, 'A' | 'W' << 8 | 'R' << 16 | (u32)'E' << 24);  // namesdb_code's word
+	CHECK_EQ(artkey_parse("awre.bin", &key), ARTKEY_CODE);
+	CHECK_EQ(key, 'A' | 'W' << 8 | 'R' << 16 | (u32)'E' << 24);
+	CHECK_EQ(artkey_parse("5D5C613G.bin", &key), ARTKEY_NONE);  // not hex
+	CHECK_EQ(artkey_parse("5D5C613E.png", &key), ARTKEY_NONE);
+	CHECK_EQ(artkey_parse("5D5C613.bin", &key), ARTKEY_NONE);
+	CHECK_EQ(artkey_parse("AW-E.bin", &key), ARTKEY_NONE);
+	CHECK_EQ(artkey_parse("custom", &key), ARTKEY_NONE);
+	CHECK_EQ(artkey_parse(".bin", &key), ARTKEY_NONE);
+	// Custom art: the game's file name, extension and all, before ".bin"
+	CHECK_EQ(artkey_custom_len("Advance Wars (USA).gba.bin"), 22);
+	CHECK_EQ(artkey_custom_len("Advance Wars (USA).gba.BIN"), 22);
+	CHECK_EQ(artkey_custom_len("Advance Wars (USA).gba"), 0);
+	CHECK_EQ(artkey_custom_len(".bin"), 0);
+	CHECK_EQ(artkey_name("Advance Wars (USA).gba", 22), artkey_name("ADVANCE WARS (usa).GBA", 22));
+	CHECK(artkey_name("Pokemon.gb", 10) != artkey_name("Pokemon.gbc", 11));
+	// Ids: never 0, and a key of one kind isn't the same key of another
+	CHECK(artkey_id(ARTKEY_CRC, 0x5D5C613Eu) != artkey_id(ARTKEY_CODE, 0x5D5C613Eu));
+	CHECK(artkey_id(ARTKEY_CRC, 0x5D5C613Eu) != artkey_id(ARTKEY_CUSTOM, 0x5D5C613Eu));
+	for (u32 kind = ARTKEY_CUSTOM; kind <= ARTKEY_CODE; kind++)
+		for (u32 k = 0; k < 4096; k++)
+			CHECK(artkey_id(kind, k * 0x10001u) != 0);
+}
+
+static void set_put(u32 *slot, u32 id)
+{
+	*slot = id;
+}
+
+void test_artset(void)
+{
+	u32 *slots = calloc(ARTSET_SLOTS, sizeof(u32));
+	struct artset s = {slots, set_put, 0};
+	CHECK(!artset_has(slots, 1));
+	CHECK(artset_add(&s, 1));
+	CHECK(artset_add(&s, 1));  // once
+	CHECK_EQ(s.count, 1);
+	// Ids that land in one slot probe on, past the table's end too
+	CHECK(artset_add(&s, ARTSET_SLOTS - 1));
+	CHECK(artset_add(&s, 2 * ARTSET_SLOTS - 1));
+	CHECK(artset_add(&s, 3 * ARTSET_SLOTS - 1));
+	CHECK(artset_has(slots, 3 * ARTSET_SLOTS - 1));
+	CHECK_EQ(slots[ARTSET_SLOTS - 1], ARTSET_SLOTS - 1);
+	CHECK_EQ(slots[0], 2 * ARTSET_SLOTS - 1);  // wrapped
+	CHECK_EQ(slots[2], 3 * ARTSET_SLOTS - 1);  // past id 1 in slot 1
+	CHECK(!artset_has(slots, 4 * ARTSET_SLOTS - 1));
+	// Full at ARTSET_MAX: a new id is refused, one there still counts
+	for (u32 i = 0; s.count < ARTSET_MAX; i++)
+		CHECK(artset_add(&s, artkey_id(ARTKEY_CRC, i)));
+	CHECK(!artset_add(&s, artkey_id(ARTKEY_CODE, 7)));
+	CHECK(artset_add(&s, 1));
+	CHECK_EQ(s.count, ARTSET_MAX);
+	u32 found = 0;
+	for (u32 i = 0; i < 100000; i++)
+		found += artset_has(slots, artkey_id(ARTKEY_CRC, i));
+	CHECK_EQ(found, ARTSET_MAX - 4);
+	free(slots);
 }

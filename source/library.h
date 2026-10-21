@@ -302,6 +302,10 @@ void library_rescan(void);
 int library_ready(void);
 // 1 while a walk, sort or write is under way or due.
 int library_busy(void);
+// 1 while the index loads, or a walk that builds one or its sort is under
+// way (not the boot's hash-only check walk, a walk only due, or a write):
+// box art waits for it.
+int library_walking(void);
 // Changes whenever the index changes (a new one, a forget, a rename, a
 // launch): a screen holding record numbers lists again.
 u32 library_generation(void);

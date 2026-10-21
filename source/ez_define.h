@@ -8,8 +8,8 @@
 //   the NOR list's record, save backup and restore, GameID2cht.bin,
 //   Diagnostics, and the unit tests (in Diagnostics, and at boot in a test build).
 // - READCACHE_STAGE: the engine's asset jobs (engine/stage.h), within one job
-//   step: an SD chunk on its way to PSRAM, a decoded cover, the path being
-//   opened. Nothing in it outlives the step, and steps run only from
+//   step: an SD chunk on its way to PSRAM, the path being opened, box art's
+//   folder entry and zeros (boxart.c). Nothing in it outlives the step, and steps run only from
 //   jobs_run, never inside one of the operations above, so it can overlap
 //   them all. An owner that wants to keep data here across frames that run
 //   jobs must stop the asset jobs first (cover_shutdown).
@@ -26,6 +26,9 @@
 //   and the SD listing's): a game list's build as its page opens
 //   (screens/games.c), between userdata calls: Recent's and the favourites' records, and the
 //   favourites' A-Z order on its way to PSRAM, within the call.
+// - READCACHE_BOXART, 1 KB: box art's row path and a file name on its way to
+//   PSRAM (boxart.c), within boxart_select or boxart_poll, between frames'
+//   job steps.
 #define MAX_pReadCache_size 0x20000
 #define READCACHE_STAGE 0x0
 #define READCACHE_STAGE_SIZE 0x8000
@@ -33,6 +36,8 @@
 #define READCACHE_USERDATA 0x8000
 #define READCACHE_USERDATA_SIZE 0x8000
 #define READCACHE_LIBRARY 0x1800  // sizeof(struct lib_build), up to 0x1C00
+#define READCACHE_BOXART 0x1C00
+#define READCACHE_BOXART_SIZE 0x400
 #define READCACHE_SAVE 0x10000  // 64 KB, to the end
 #define READCACHE_GAMES 0x8000
 #define READCACHE_GAMES_SIZE 0x18000
@@ -120,6 +125,7 @@
 #define assress_game_view 31 //game lists: 1 list with art, else list
 #define assress_start_on 32 //where the menu opens at power-on: enum settings_start (else last place)
 #define assress_show_all 33 //the SD card page shows hidden files: 1 on, else off
+#define assress_box_art 34 //list with art shows box art from /torii/art: 0 off, else on (source/boxart.h)
 
 #define assress_saveMODE 64
 #define assress_max 65

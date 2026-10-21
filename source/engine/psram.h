@@ -14,13 +14,16 @@
 //	1 MB      the library index: two slots of LIB_SLOT_BYTES (library.h),
 //	          the one the menu reads and the one a walk builds, to 3.5 MB
 //	3.5 MB    favourites and recents (B5), PSRAM_USERDATA_BASE
-//	4 MB      the cover cache (engine/cover.h), COVER_PSRAM_BYTES
+//	4 MB      the cover cache (engine/cover.h), COVER_PSRAM_BYTES (204 KB;
+//	          cover.c asserts it ends below 4.5 MB)
 //	4.5 MB    the Favourites page's A-Z order (screens/games.c), PSRAM_GAMES_BASE,
 //	          16 KB; the rest reserved, PSRAM_RESERVED_BASE (the SD themes'
 //	          until v0.4)
 //	5 MB      /torii/names.db (namesdb.h), up to PSRAM_NAMES_DB_BYTES
 //	6.75 MB   the CRC cache's table (namesdb.h), NAMES_CACHE_BYTES
-//	7.5-8 MB  reserved (v0.4.1 art lookups, v0.9 language tables)
+//	7.5 MB    box art's lookups (boxart.c): the set of art files on the card
+//	          and the paths of the covers wanted, PSRAM_ART_BYTES
+//	7.625-8 MB reserved (v0.9 language tables)
 //
 // A game launch fills PSRAM with the game, so everything here is lost then:
 // the launch calls cover_cache_invalidate first.
@@ -56,6 +59,9 @@
 #define PSRAM_NAMES_DB_BYTES 0x001C0000u
 #define PSRAM_NAMES_CACHE_BASE (PSRAM_NAMES_DB_BASE + PSRAM_NAMES_DB_BYTES)
 #define PSRAM_NAMES_CACHE_BYTES 0x000C0000u
+// Box art's lookups (boxart.c asserts its use fits)
+#define PSRAM_ART_BASE (PSRAM_NAMES_CACHE_BASE + PSRAM_NAMES_CACHE_BYTES)
+#define PSRAM_ART_BYTES 0x00020000u
 
 // 1 if [p, p + bytes) lies in the PSRAM window.
 static inline int psram_holds(const void *p, u32 bytes)

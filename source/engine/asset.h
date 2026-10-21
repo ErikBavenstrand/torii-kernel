@@ -1,42 +1,41 @@
-// The asset format: tiles compressed with the BIOS's LZ77, plus a palette.
-// tools/asset.py writes it (from a PNG, or a generated test pattern); the
-// cover streamer (engine/cover.h) reads it from SD or ROM. Hardware-free, so
-// the host tests check it.
+// The asset format: raw tiles and a palette, made on the PC so the GBA only
+// copies them (no decoding). tools/asset.py writes it (from a PNG, or a
+// generated test pattern) and tools/art.py writes box art in it; the cover
+// cache (engine/cover.h) reads box art from SD. Hardware-free, so the host
+// tests check it.
 //
 // A file, little-endian:
 //
 //	offset size
-//	0      4    magic "TAS1"
+//	0      4    magic "TAS2"
 //	4      1    bits per pixel: 4 or 8
 //	5      1    width in 8x8 tiles, 1-32
 //	6      1    height in tiles, 1-32
 //	7      1    flags, 0 (reserved)
 //	8      2    palette colours: 0-16 for 4bpp, 0-256 for 8bpp
 //	10     2    0 (reserved)
-//	12     4    LZ77 bytes (a multiple of 4)
+//	12     4    tile bytes: width * height * bpp * 8
 //	16          the palette, BGR555 halfwords, padded to 4 bytes
-//	...         the tiles, LZ77 (BIOS type 0x10), whose header gives
-//	            width * height * bpp * 8 bytes
+//	...         the tiles
 //
-// The tiles are in the order a sprite with 1D mapping reads them: left to
-// right, then top to bottom. Colour 0 is transparent in a sprite. A 4bpp
-// asset's palette fills one palette bank; an 8bpp asset's palette is
-// whatever the 256-colour sprite palette holds (see engine/cover.h).
+// The tiles are in row order (left to right, then top to bottom): the order
+// a sprite with 1D mapping reads them, and the order a BG map lists them.
+// Colour 0 is transparent, in a sprite and on a BG alike. A 4bpp asset's
+// palette fills one palette bank.
 //
-// The file's size is 16 + the padded palette + the LZ77 bytes, at most
-// ASSET_FILE_MAX. v0.4 (covers) and T14/T15 (theme assets) may add kinds
-// through the flags byte; a reader rejects flags it doesn't know.
+// The file's size is 16 + the padded palette + the tile bytes, at most
+// ASSET_FILE_MAX. ("TAS1", v0.3's, held LZ77 tiles; nothing reads it.)
 #ifndef TORII_ENGINE_ASSET_H
 #define TORII_ENGINE_ASSET_H
 
 #include <gba_base.h>
 
-#define ASSET_MAGIC 0x31534154u  // "TAS1" read as a little-endian word
+#define ASSET_MAGIC 0x32534154u  // "TAS2" read as a little-endian word
 #define ASSET_HEADER_BYTES 16
 #define ASSET_MAX_TILES_PER_SIDE 32
-// Decoded tiles: a 64x64 8bpp sprite is 4 KB; 8 KB leaves room for two
+// Tiles: a 64x64 8bpp sprite is 4 KB; 8 KB leaves room for two
 #define ASSET_TILE_BYTES_MAX 0x2000
-#define ASSET_FILE_MAX 0x4000
+#define ASSET_FILE_MAX 0x2400
 
 struct asset_header {
 	u32 magic;
@@ -46,7 +45,7 @@ struct asset_header {
 	u8 flags;
 	u16 colours;
 	u16 reserved;
-	u32 lz_bytes;
+	u32 tile_bytes;
 };
 
 // Why asset_check refused
@@ -54,9 +53,8 @@ enum {
 	ASSET_OK = 0,
 	ASSET_ERR_SHORT,  // fewer bytes than a header, or than the header says
 	ASSET_ERR_MAGIC,
-	ASSET_ERR_FORMAT,  // bpp, size, flags or colours out of range
-	ASSET_ERR_TOO_BIG,  // decoded tiles over ASSET_TILE_BYTES_MAX, or file over ASSET_FILE_MAX
-	ASSET_ERR_LZ77,  // the LZ77 header isn't type 0x10 with the tiles' size
+	ASSET_ERR_FORMAT,  // bpp, size, flags, colours or tile bytes out of range
+	ASSET_ERR_TOO_BIG,  // tiles over ASSET_TILE_BYTES_MAX, or file over ASSET_FILE_MAX
 };
 
 // Bytes of the palette in the file, padded to 4.
@@ -65,19 +63,20 @@ static inline u32 asset_palette_bytes(const struct asset_header *h)
 	return ((u32)h->colours * 2 + 3) & ~3u;
 }
 
-// Bytes of decoded tiles.
+// Bytes of tiles its size gives.
 static inline u32 asset_tile_bytes(const struct asset_header *h)
 {
 	return (u32)h->width * h->height * h->bpp * 8;
 }
 
-// Checks a header against the file's size and the first word of its LZ77
-// data (lz_word, the BIOS header: type 0x10, then the decoded size).
-// Returns ASSET_OK or why not. A file that passes declares at most
-// ASSET_TILE_BYTES_MAX decoded bytes; a broken stream can still make a
-// decoder that checks only between blocks write up to 17 bytes past that
-// (mGBA's does; the BIOS's is unverified), so leave 18 bytes of slack.
-int asset_check(const struct asset_header *h, u32 file_bytes, u32 lz_word);
+// Where the tiles start in the file.
+static inline u32 asset_tiles_at(const struct asset_header *h)
+{
+	return ASSET_HEADER_BYTES + asset_palette_bytes(h);
+}
+
+// Checks a header against the file's size. Returns ASSET_OK or why not.
+int asset_check(const struct asset_header *h, u32 file_bytes);
 // Words for asset_check's result, for messages.
 const char *asset_error_text(int error);
 

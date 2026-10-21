@@ -103,6 +103,8 @@ void test_rowcache_two_lists(void);
 void test_ui_focus_and_keys(void);
 void test_asset_header(void);
 void test_asset_check_refuses(void);
+void test_artkey_names(void);
+void test_artset(void);
 void test_cover_cache_wants(void);
 void test_cover_cache_eviction(void);
 void test_affine_rotscale(void);

@@ -1,7 +1,7 @@
-// The asset pipeline (source/engine): the BIOS's LZ77 on an asset, PSRAM
-// writes and reads, the SD reader job, and the cover cache from ROM and SD
-// into sprite VRAM. Then the menu's art (source/ui/art.h): its table, and
-// that the screens' scenes fit the sprite VRAM the spec gives them.
+// The asset pipeline (source/engine): an asset's header, PSRAM writes and
+// reads, the SD reader job, and the cover cache from SD into PSRAM. Then the
+// menu's art (source/ui/art.h): its table, and that the screens' scenes fit
+// the sprite VRAM the spec gives them.
 //
 // PSRAM and the card need a cart: these run in every kernel's Diagnostics
 // (a real cart) and in tests/assets.sh (the emulated one); in the plain
@@ -10,8 +10,6 @@
 // keep to sprite VRAM from 0x06014000 (below it is kept from the cover
 // slots), and the engine is reset afterwards.
 #include <string.h>
-
-#include <gba_compression.h>
 
 #include "torii_test.h"
 #include "tests.h"
@@ -27,7 +25,6 @@
 
 extern FATFS EZcardFs;
 
-#define REG_VCOUNT_A (*(vu16 *)0x04000006)
 #define TEST_FILE "/torii/asset.tmp"
 #define TEST_FILE_BYTES 10000
 
@@ -39,8 +36,7 @@ static void reset_engine(int quiet)
 	gfx_dirty_pal = 0;
 	res_init();
 	jobs_init();
-	// The pools are new: no cover slot may keep a handle into the old ones,
-	// or a later cover_cache_invalidate (a launch) would release it
+	// The jobs are new: the cover loader's is gone
 	cover_reset();
 	res_errors_quiet = (u8)quiet;
 }
@@ -89,24 +85,14 @@ static u32 run_jobs(u32 cap)
 	return steps;
 }
 
-void test_asset_lz77_decode(void)
+void test_asset_raw(void)
 {
-	cycles_init();
 	const struct asset_header *h = (const void *)test_asset_small;
-	u32 lz_at = ASSET_HEADER_BYTES + asset_palette_bytes(h);
-	const u32 *lz = test_asset_small + lz_at / 4;
-	CHECK_EQ(asset_check(h, test_asset_small_bytes, *lz), ASSET_OK);
+	CHECK_EQ(asset_check(h, test_asset_small_bytes), ASSET_OK);
 	CHECK_EQ(asset_tile_bytes(h), 128);
-	u8 *out = stage_buffer();
-	memset(out, 0xEE, 256);
-	u32 start = cycles_now();
-	LZ77UnCompWram(lz, out);
-	u32 cycles = cycles_since(start);
-	CHECK_EQ(crc32(out, 128), test_asset_small_crc);
-	CHECK_EQ(out[128], 0xEE);  // not a byte past the tiles
-	tlog("  BIOS LZ77, 128 bytes of tiles: %lu cycles", (unsigned long)cycles);
-	// The same with a wrong size in the LZ77 header: refused before the BIOS sees it
-	CHECK_EQ(asset_check(h, test_asset_small_bytes, (*lz & 0xFF) | 0x100000 << 8), ASSET_ERR_LZ77);
+	CHECK_EQ(asset_tiles_at(h) + 128, test_asset_small_bytes);
+	CHECK_EQ(crc32((const u8 *)test_asset_small + asset_tiles_at(h), 128), test_asset_small_crc);
+	CHECK_EQ(asset_check(h, test_asset_small_bytes - 1), ASSET_ERR_SHORT);
 }
 
 void test_asset_psram_round_trip(void)
@@ -115,7 +101,7 @@ void test_asset_psram_round_trip(void)
 	if (skip_without_cart())
 		return;
 	u8 *stage = stage_buffer();
-	u8 *slot = cover_psram_slot(0);
+	u8 *slot = (u8 *)PSRAM_ASSET_BASE;
 	for (u32 i = 0; i < 4096; i++)
 		stage[i] = pattern(i);
 	psram_begin();
@@ -209,7 +195,7 @@ void test_asset_sd_read(void)
 	// Into PSRAM, through the stage, 2 KB a step
 	u8 *psram = (u8 *)PSRAM_ASSET_BASE;
 	reader.finish = 0;
-	id = sd_read_start(&reader, TEST_FILE, psram, COVER_STAGE_BYTES, 2048, JOB_OWNER_NONE);
+	id = sd_read_start(&reader, TEST_FILE, psram, 0x4000, 2048, JOB_OWNER_NONE);
 	CHECK_EQ(run_jobs(20), 6);
 	CHECK_EQ(reader.result, SD_READ_OK);
 	bad = 0;
@@ -247,33 +233,66 @@ void test_asset_sd_read(void)
 	reset_engine(0);
 }
 
-// A copy of the small asset with its LZ77 size wrong, as a broken file would
-// be, in the stage (clear of what the loader uses of it)
-#define broken_asset ((u32 *)(stage_buffer() + 0x7400))
+// Test covers on the card: a good one (its tiles a pattern, its palette 16
+// colours), the small asset (no cover's size), and none
+#define COVER_GOOD "/torii/cover-good.bin"
+#define COVER_SMALL "/torii/cover-small.bin"
 
-static void locate(u32 id, struct cover_src *src, char *path, u32 size)
+static u32 cover_tile_word(u32 i)
 {
-	if (id == 1) {
-		src->kind = COVER_SRC_ROM;
-		src->data = test_asset_small;
-		src->bytes = test_asset_small_bytes;
-	} else if (id == 2) {
-		src->kind = COVER_SRC_FILE;
-		strncpy(path, "/torii/no such cover.tas", size);
-	} else if (id == 4) {
-		src->kind = COVER_SRC_ROM;
-		src->data = broken_asset;
-		src->bytes = test_asset_small_bytes;
-	}
-	// id 3: no cover
+	return i * 0x01234567u ^ 0x89ABCDEFu;
 }
 
-static u32 ready_calls EWRAM_BSS;
-
-static void on_ready(u8 slot, u32 id, int ok)
+static u16 cover_colour(u32 i)
 {
-	if (slot == 0 && id == 1 && ok)
-		ready_calls++;
+	return (u16)(i * 0x0421u);  // greys
+}
+
+static int write_file(const char *path, const void *data, u32 bytes)
+{
+	FIL f;
+	UINT done = 0;
+	int ok = f_open(&f, path, FA_WRITE | FA_CREATE_ALWAYS) == FR_OK;
+	if (ok) {
+		ok = f_write(&f, data, bytes, &done) == FR_OK && done == bytes;
+		ok = f_close(&f) == FR_OK && ok;
+	}
+	return ok;
+}
+
+static int write_covers(void)
+{
+	f_mkdir("/torii");
+	u8 *buf = stage_buffer();
+	struct asset_header h = {ASSET_MAGIC, 4, COVER_TILES_W, COVER_TILES_H, 0, COVER_COLOURS, 0, COVER_TILE_BYTES};
+	memcpy(buf, &h, sizeof(h));
+	for (u32 i = 0; i < COVER_COLOURS; i++)
+		((u16 *)(buf + ASSET_HEADER_BYTES))[i] = cover_colour(i);
+	u32 *tiles = (u32 *)(buf + ASSET_HEADER_BYTES + COVER_COLOURS * 2);
+	for (u32 i = 0; i < COVER_TILE_BYTES / 4; i++)
+		tiles[i] = cover_tile_word(i);
+	return write_file(COVER_GOOD, buf, COVER_FILE_BYTES) &&
+	       write_file(COVER_SMALL, test_asset_small, test_asset_small_bytes);
+}
+
+static u32 cover_paused EWRAM_BSS;
+
+static int locate(u32 id, char *path, u32 size)
+{
+	if (id == 1 || id >= 10)
+		strncpy(path, COVER_GOOD, size);
+	else if (id == 2)
+		strncpy(path, "/torii/no such cover.bin", size);
+	else if (id == 4)
+		strncpy(path, COVER_SMALL, size);
+	else
+		return 0;  // id 3: no cover
+	return 1;
+}
+
+static int pause_covers(void)
+{
+	return cover_paused != 0;
 }
 
 void test_asset_cover_cache(void)
@@ -281,14 +300,10 @@ void test_asset_cover_cache(void)
 	reset_engine(1);
 	if (skip_without_cart())
 		return;
-	memcpy(broken_asset, test_asset_small, test_asset_small_bytes);
-	broken_asset[(ASSET_HEADER_BYTES + 8) / 4] += 0x100;  // the LZ77 header's size
-	// Keep covers above 0x06014000, as the other engine tests do
-	u8 keep = res_alloc(RES_OBJ_VRAM, 512, 1, 0, RES_OBJ_UNITS, 0, 0);
-	CHECK_EQ(res_start(RES_OBJ_VRAM, keep), 0);
-	cover_init(locate, JOB_OWNER_NONE);
-	cover_on_ready(on_ready);
-	ready_calls = 0;
+	CHECK(write_covers());
+	cover_init(locate, pause_covers);
+	cover_paused = 0;
+	CHECK(cover_active());
 
 	cover_wants_begin();
 	for (u32 id = 1; id <= 4; id++)
@@ -296,67 +311,58 @@ void test_asset_cover_cache(void)
 	cover_wants_end();
 	CHECK_EQ(jobs_pending(), 1);
 	run_jobs(30);
-	const struct cover_cache *c = cover_cache();
-	CHECK_EQ(c->entry[cc_find(c, 1)].state, COVER_READY);
-	CHECK_EQ(c->entry[cc_find(c, 2)].state, COVER_FAILED);
-	CHECK_EQ(c->entry[cc_find(c, 3)].state, COVER_FAILED);
-	CHECK_EQ(c->entry[cc_find(c, 4)].state, COVER_FAILED);
-	CHECK_EQ(cover_stats.decoded, 1);
-	u8 *slot = cover_psram_slot(cc_find(c, 1));
-	CHECK_EQ(crc32(slot + COVER_SLOT_TILES, 128), test_asset_small_crc);
-	CHECK_EQ(((const vu16 *)(slot + COVER_SLOT_PALETTE))[1], 0x4000);
+	CHECK_EQ(cover_state(1), COVER_READY);
+	CHECK_EQ(cover_state(2), COVER_FAILED);
+	CHECK_EQ(cover_state(3), COVER_FAILED);
+	CHECK_EQ(cover_state(4), COVER_FAILED);
+	CHECK_EQ(cover_state(5), COVER_FREE);
+	CHECK_EQ(cover_stats.loaded, 1);
+	CHECK_EQ(cover_stats.failed, 3);
+	CHECK(!cover_loading());
+	tlog("  slowest cover step: %lu cycles", (unsigned long)cover_stats.step_max);
 
-	// Into a sprite slot: tiles, a palette bank, the upload in VBlank
-	CHECK(cover_slot_show(0, 1));
-	CHECK_EQ(cover_slot_state(0), COVER_SLOT_LOADING);
-	cover_update();
-	CHECK_EQ(cover_slot_state(0), COVER_SLOT_UPLOADING);
-	CHECK_EQ(jobs_pending(), 0);  // nothing more wanted
-	while (REG_VCOUNT_A >= 160)
-		;
-	while (REG_VCOUNT_A < 160)
-		;
-	gfx_commit_queue(GFX_COMMIT_BYTES, GFX_COMMIT_LAST_LINE);
-	cover_update();
-	CHECK_EQ(cover_slot_state(0), COVER_SLOT_READY);
-	CHECK_EQ(ready_calls, 1);
-	u16 attr2 = cover_slot_attr2(0);
-	CHECK((attr2 & 0x3FF) >= 512);
-	CHECK_EQ(crc32((const void *)(0x06010000 + (attr2 & 0x3FF) * 32), 128), test_asset_small_crc);
-	CHECK_EQ(gfx_pal_unfaded[(16 + (attr2 >> 12)) * 16 + 1], 0x4000);
-	CHECK_EQ(cover_slot_attr0(0), 0);  // square, 4bpp
-	CHECK_EQ(cover_slot_attr1(0), 0x4000);  // 16x16
-	CHECK_EQ(cover_slot_width(0), 16);
+	// Its tiles and palette as the file has them, word-aligned in PSRAM
+	u8 e = cover_pin(1);
+	CHECK(e != COVER_NONE);
+	CHECK_EQ(cover_pin(2), COVER_NONE);  // failed: nothing to pin
+	CHECK_EQ(cover_colours(e), COVER_COLOURS);
+	CHECK_EQ(cover_palette(e)[5], cover_colour(5));
+	const u32 *tiles = cover_tiles(e);
+	CHECK(!((u32)tiles & 3));
+	u32 bad = 0;
+	for (u32 i = 0; i < COVER_TILE_BYTES / 4; i++)
+		bad += tiles[i] != cover_tile_word(i);
+	CHECK_EQ(bad, 0);
 
-	// A slot showing a cover that failed
-	cover_slot_show(1, 3);
-	cover_update();
-	CHECK_EQ(cover_slot_state(1), COVER_SLOT_FAILED);
+	// Pinned, it outlives a batch that wants every entry for others
+	cover_wants_begin();
+	for (u32 i = 0; i < COVER_ENTRIES; i++)
+		cover_want(10 + i, 0);
+	cover_wants_end();
+	run_jobs(400);
+	CHECK_EQ(cover_state(1), COVER_READY);
+	CHECK_EQ(cover_stats.loaded, COVER_ENTRIES);  // all but one of the new ones
+	cover_unpin(e);
 
-	// Emptied with its upload still queued: its tiles stay allocated until
-	// the copy has landed, so it can't land in VRAM someone else owns
-	struct pool *obj = res_pool(RES_OBJ_VRAM);
-	cover_slot_show(2, 1);
-	cover_update();
-	CHECK_EQ(cover_slot_state(2), COVER_SLOT_UPLOADING);
-	u16 queued = pool_free_units(obj, 0);
-	cover_slot_clear(2);
-	CHECK_EQ(pool_free_units(obj, 0), queued);
-	while (REG_VCOUNT_A >= 160)
-		;
-	while (REG_VCOUNT_A < 160)
-		;
-	gfx_commit_queue(GFX_COMMIT_BYTES, GFX_COMMIT_LAST_LINE);
-	cover_update();
-	CHECK_EQ(pool_free_units(obj, 0), queued + 4);
+	// Paused, the loader starts nothing; resumed, it goes on
+	cover_paused = 1;
+	cover_wants_begin();
+	cover_want(200, 0);
+	cover_wants_end();
+	CHECK_EQ(jobs_pending(), 0);
+	CHECK_EQ(cover_state(200), COVER_WANTED);
+	cover_paused = 0;
+	cover_wants_end();
+	run_jobs(10);
+	CHECK_EQ(cover_state(200), COVER_READY);
 
-	// Clearing frees the tiles; invalidating forgets the cache
-	u16 free_before = pool_free_units(res_pool(RES_OBJ_VRAM), 0);
-	cover_slot_clear(0);
-	CHECK_EQ(pool_free_units(res_pool(RES_OBJ_VRAM), 0), free_before + 4);
+	// Invalidating (a launch) forgets the cache and stops the loader
 	cover_cache_invalidate();
-	CHECK_EQ(cc_count(c, COVER_FREE), COVER_ENTRIES);
-	CHECK_EQ(cover_slot_state(1), COVER_SLOT_EMPTY);
+	CHECK(!cover_active());
+	CHECK_EQ(cover_state(1), COVER_FREE);
+	CHECK_EQ(cc_count(cover_cache(), COVER_FREE), COVER_ENTRIES);
+	f_unlink(COVER_GOOD);
+	f_unlink(COVER_SMALL);
 	reset_engine(0);
 }
 

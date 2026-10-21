@@ -17,6 +17,7 @@
 
 #include "games.h"
 #include "../actions.h"
+#include "../boxart.h"
 #include "../ez_define.h"
 #include "../Ezcard_OP.h"
 #include "../ezkernel.h"
@@ -334,7 +335,7 @@ static const struct ui_hints_config no_hints = {0, 0};
 static const struct ui_label_config note_label = {"", UI_FONT_BODY, UI_ALIGN_CENTER, 0, 0};
 static const struct ui_label_config keys_label = {"", UI_FONT_BODY, UI_ALIGN_LEFT, 0, 0};
 static const struct ui_label_config values_label = {"", UI_FONT_BODY, UI_ALIGN_RIGHT, UI_LABEL_SWAP, 0};
-static const struct ui_image_config box_image = {art_box_tiles, art_box_palette, ART_TAG_BOX};
+static const struct ui_image_config box_image = {art_box_tiles, art_box_palette, 0};  // its own: box art goes there
 static const struct ui_scrollbar_config bar_compact = {N_LIST_COMPACT};
 static const struct ui_scrollbar_config bar_art = {N_LIST_ART};
 
@@ -607,8 +608,8 @@ static void show_position(void)
 	ui_title_set_right(node(N_TITLE), games.position);
 }
 
-// List with art: the box in the selected game's console colour, and its
-// size and when it was played
+// List with art: the selected game's box art, or the placeholder box in its
+// console colour, and its size and when it was played
 static void show_facts(void)
 {
 	if (!games.art)
@@ -619,7 +620,7 @@ static void show_facts(void)
 		u32 console = g.console < LIB_CONSOLES ? g.console : LIB_GBA;
 		memcpy(games.box_palette, art_box_palette, sizeof(games.box_palette));
 		games.box_palette[ART_BOX_BAND] = ui_theme()->accent[PAL_GBA + console].base;
-		gfx_pal_load(ui_image_bank(node(N_BOX)), games.box_palette, 16);
+		boxart_select(games.cursor, games.box_palette);
 		char size[AGO_MAX] = "", ago[AGO_MAX] = "";
 		if (g.rec != LIBRARY_NONE)
 			gamelist_size(size, sizeof(size), library_size(g.rec), gl_games->size_kb, gl_games->size_mb);
@@ -630,6 +631,9 @@ static void show_facts(void)
 		snprintf(games.fact_keys, sizeof(games.fact_keys), "%s\n%s", gl_games->fact_size,
 			 gl_games->fact_played);
 		snprintf(games.fact_values, sizeof(games.fact_values), "%s\n%s", size, ago);
+	} else {
+		memcpy(games.box_palette, art_box_palette, sizeof(games.box_palette));
+		boxart_select(games.cursor, games.box_palette);  // no game: the placeholder
 	}
 	ui_label_set(node(N_FACT_KEYS), games.fact_keys);
 	ui_label_set(node(N_FACT_VALUES), games.fact_values);
@@ -669,6 +673,16 @@ static void relist(u32 cursor)
 
 // --- Entering -----------------------------------------------------------------------
 
+// Box art's view of a row: its path and size
+static int art_row(u32 i, char *path, u32 *size)
+{
+	struct game g;
+	if (!game_at(i, &g) || !game_path(&g, path))
+		return 0;
+	*size = g.rec != LIBRARY_NONE ? library_size(g.rec) : 0;
+	return 1;
+}
+
 static struct ui_view *games_enter(u32 item, u32 row)
 {
 	games.item = (u8)item;
@@ -690,6 +704,8 @@ static struct ui_view *games_enter(u32 item, u32 row)
 	show_hints();
 	ui_list_reset(list_node(), games.cursor);
 	show_position();
+	if (games.art)
+		boxart_open(node(N_BOX), art_row);
 	show_facts();
 	return v;
 }
@@ -705,6 +721,8 @@ static void games_poll(void)
 {
 	if (!up())
 		return;
+	if (games.art)
+		boxart_poll();
 	// At once: Recent's and the favourites' records are the old index's
 	if (games.lib_generation != library_generation()) {
 		tlog_debug("games: a new index");

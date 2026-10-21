@@ -220,6 +220,11 @@ u32 names_identity(void);
 // For a screen: the database's name of a game (its path, size and console),
 // or NULL. Points into PSRAM.
 const char *names_lookup(const char *path, u32 size, u32 console);
+// For box art: a game's CRC32 (*crc, with *has_crc 1 when known) and GBA
+// game code (*code, 0 for none) from the CRC cache, whether or not names.db
+// is there. 0 if the cache has no live record of it at that size (or isn't
+// loaded yet).
+int names_ids(const char *path, u32 size, u32 *crc, int *has_crc, u32 *code);
 // The dats' version names.db was made from ("2026.10.07"), or NULL.
 const char *names_dat_version(void);
 // Settings' "Identify library": CRCs for every library game without one.
