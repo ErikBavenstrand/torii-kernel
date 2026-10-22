@@ -486,6 +486,12 @@ header and mark survive; format again. Erase and program
 take the model no time, so `OMEGA_POWER_CUT` (`emu/mgba/src/gba/cart/omega.c`) cuts the
 power between operations for `tests/nor_safety.sh`; `OMEGA_POWER_CUT=sd:write:N`
 cuts it before the Nth SD write command, for `tests/userdata.sh`.
+`mgba-shot -X N` cuts it at the Nth `cutpoint N: ...` log line (`source/cutpoint.h`),
+for `tests/cutsweep.sh`. The model writes each SD command to `sd.img` as it is
+issued, so a cut leaves exactly the sectors written so far; FatFs's window
+sector and a file's sector buffer live in kernel RAM and are lost. FatFs
+writes a new file's directory entry at `f_open` (size 0), and its data and
+size only at `f_sync`/`f_close` or when the buffer moves to another sector.
 `OMEGA_SD_READ_ERROR=FIRST[-LAST][:N]` makes SD reads touching those sectors
 never finish (the port stays `0xEEE1`), the first N of them or all.
 

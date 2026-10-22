@@ -19,6 +19,13 @@
 //                    a symbol's name from the symbol file)
 //   -P FRAME:ADDR:TEXT  before FRAME, write TEXT and a NUL to ADDR (as -p's),
 //                    e.g. a path for a test hook
+//   -X N             power loss at the Nth "cutpoint N: NAME" line the
+//                    kernel logs (source/cutpoint.h): the run stops at once,
+//                    exit status 75, with the SD image, cart SRAM and kernel
+//                    NOR as they stand (the SD card keeps the sectors the
+//                    kernel wrote; what FatFs still holds in its window
+//                    buffer is lost). Without a cut, the run ends with
+//                    "cutpoints: M" on stderr, how many were logged
 //   -u TEXT          stop after the frame in which the kernel (or a -L
 //                    script) logs TEXT
 //   -x FRAME:PATH    after FRAME, write a save state (with the cart's state)
@@ -420,6 +427,8 @@ static void tear_install(struct mCore *core)
 	cpu->memory.storeMultiple = tear_store_multiple;
 }
 
+static unsigned long cut_at, cutpoints_seen;  // -X; the last cutpoint's number
+static struct mCore *crash_core;
 static const char *until_text;
 static int until_hit;
 
@@ -434,6 +443,14 @@ static unsigned wait_start(void)
 // A line the kernel or a script logged: checks -u and the next -w.
 static void saw_line(const char *line)
 {
+	unsigned long cp;
+	if (sscanf(line, "cutpoint %lu:", &cp) == 1) {
+		cutpoints_seen = cp;
+		if (cut_at && cp == cut_at) {
+			fprintf(stderr, "omega: power cut at cutpoint %lu\n", cp);
+			GBAOmegaPowerCut(crash_core->board);
+		}
+	}
 	if (until_text && strstr(line, until_text)) {
 		until_hit = 1;
 	}
@@ -444,7 +461,6 @@ static void saw_line(const char *line)
 	}
 }
 
-static struct mCore *crash_core;
 static int crashed;
 static char crash_reason[256];
 static uint32_t crash_regs[16], crash_cpsr;
@@ -684,6 +700,7 @@ struct options {
 	size_t nscripts;
 	int realtime;
 	const char *until;
+	unsigned long cutAt;
 	unsigned frames;
 	const char *saveOut;
 	unsigned gdbPort;
@@ -822,6 +839,8 @@ static void parse_options(struct options *opts, int argc, char **argv)
 			opts->scripts[opts->nscripts++] = argv[++i];
 		} else if (!strcmp(argv[i], "-l")) {
 			opts->loadState = argv[++i];
+		} else if (!strcmp(argv[i], "-X")) {
+			opts->cutAt = strtoul(argv[++i], NULL, 10);
 		} else if (!strcmp(argv[i], "-u")) {
 			opts->until = argv[++i];
 		} else if (!strcmp(argv[i], "-y")) {
@@ -972,6 +991,7 @@ int main(int argc, char **argv)
 	frames = last_frame(&opts.states, frames);
 	unsigned last_plain = frames;  // a run with -w goes on at least to here
 	until_text = opts.until;
+	cut_at = opts.cutAt;
 	if ((until_text || nwaits) && !opts.frames) {
 		frames = frames > 36000 ? frames : 36000;  // Give up after 10 minutes of game time.
 	}
@@ -1232,6 +1252,9 @@ int main(int argc, char **argv)
 		GDBStubShutdown((struct GDBStub *)debugger);
 	}
 #endif
+	if (cutpoints_seen) {
+		fprintf(stderr, "cutpoints: %lu\n", cutpoints_seen);
+	}
 	mCoreConfigDeinit(&core->config);
 	core->deinit(core);
 	free(buffer);

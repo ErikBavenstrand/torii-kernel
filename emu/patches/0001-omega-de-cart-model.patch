@@ -12,10 +12,10 @@ index 59ca1c1..1dd19c0 100644
  	EXTDATA_MAX
 diff --git a/include/mgba/internal/gba/cart/omega.h b/include/mgba/internal/gba/cart/omega.h
 new file mode 100644
-index 0000000..f4e4cff
+index 0000000..b5c5cc9
 --- /dev/null
 +++ b/include/mgba/internal/gba/cart/omega.h
-@@ -0,0 +1,179 @@
+@@ -0,0 +1,180 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -176,6 +176,7 @@ index 0000000..f4e4cff
 +void GBAOmegaInit(struct GBAOmega*);
 +bool GBAOmegaEnable(struct GBA*, const char* dir);
 +void GBAOmegaDisable(struct GBA*);
++void GBAOmegaPowerCut(struct GBA*);
 +
 +uint16_t GBAOmegaRead16(struct GBA*, uint32_t address);
 +void GBAOmegaWrite16(struct GBA*, uint32_t address, uint16_t value);
@@ -321,10 +322,10 @@ index 1d0c0dd..b77704a 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..6f7f4bd
+index 0000000..87d86b9
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1557 @@
+@@ -0,0 +1,1562 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -560,6 +561,11 @@ index 0000000..6f7f4bd
 +	}
 +	fflush(NULL);
 +	_exit(POWER_CUT_STATUS);
++}
++
++// Power loss from outside the model (mgba-shot -X, at a cutpoint line).
++void GBAOmegaPowerCut(struct GBA* gba) {
++	_powerCut(&gba->memory.omega);
 +}
 +
 +// Called before each erase and program; cuts the power when it is due.

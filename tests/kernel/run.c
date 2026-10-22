@@ -127,6 +127,12 @@ void torii_run_tests(void)
 	// SELECT and R: the art sheet (tests/shots/art-sheet.opts)
 	if ((~REG_KEYINPUT & 0x3FF) == (KEY_SELECT | KEY_R))
 		art_sheet();
+	// SELECT and A: the power-cut rig's scenario (tests/cutpoint.sh), alone
+	if ((~REG_KEYINPUT & 0x3FF) == (KEY_SELECT | KEY_A)) {
+		REG_WAITCNT_CART = WAITCNT_MENU;
+		cut_scenario();
+		return;
+	}
 	if ((~REG_KEYINPUT & 0x3FF) == KEY_SELECT) {
 		REG_WAITCNT_CART = WAITCNT_MENU;  // as the menu runs
 		torii_asset_tests();
