@@ -4,6 +4,13 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Added:** `cutpoint(name)` (`source/cutpoint.h`), a debug log line
+  `cutpoint N: name` that marks a step boundary for the power-cut tests
+  (`mgba-shot -X N`, `tests/cutsweep.sh`); nothing else happens at runtime
+  (798691f)
+
 ## v0.4.3
 
 - **Changed:** a game list redraws only the rows whose text, marks or detail
