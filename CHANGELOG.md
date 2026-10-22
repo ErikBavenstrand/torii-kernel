@@ -15,6 +15,19 @@ git log, not here.
   trash paths, the backup history (counter order, pruning), the rename
   journal with boot recovery, and blank/identical checks. Nothing calls it
   yet (6ddae27).
+- **Changed:** the copy of cart SRAM to the card can no longer cost a good
+  save. It writes `<save>.tmp`, syncs, reads it back and compares it with the
+  chip, then renames the old save to `.bak`, the tmp file into place, and
+  removes the `.bak`; `Save_recover` finishes or undoes a cut swap at boot and
+  before each copy and launch (it drops a second name left by a cut inside
+  `f_rename` by its entry alone). A full card or a bad readback shows the write
+  error and keeps the old save; the swap needs room for the file twice. The
+  pending-save record stays until the copy checks out (ec2076e).
+- **Changed:** a blank chip (all FF or all 00) or one identical to the file
+  copies nothing; one that shares under 1/8 of the file's data bytes asks
+  before it is written over it. A game missing from the save table (type 10)
+  gets no blank 64 KB `.sav` at launch: the file is made when its chip differs
+  from blank (ec2076e).
 
 ## v0.4.3
 
