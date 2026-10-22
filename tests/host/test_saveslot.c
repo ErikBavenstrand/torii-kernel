@@ -456,4 +456,44 @@ void test_saveslot_sanity(void)
 	CHECK(saveslot_identical(p, q, 0));
 	free(q);
 	free(p);
+
+	// Does the chip look like the file
+	{
+		u8 f[1024], c[1024];
+		struct saveslot_match m = {0, 0};
+		memset(f, 0xFF, sizeof(f));
+		memset(c, 0xFF, sizeof(c));
+		saveslot_match_scan(&m, f, c, sizeof(f));
+		CHECK(saveslot_match_ok(&m)); // blank file: nothing to compare
+		for (int k = 0; k < 400; k++)
+			f[k] = (u8)(k % 200 + 1);
+		memcpy(c, f, sizeof(c));
+		m = (struct saveslot_match){0, 0};
+		saveslot_match_scan(&m, f, c, sizeof(f));
+		CHECK_EQ(m.data, 400);
+		CHECK_EQ(m.same, 400);
+		CHECK(saveslot_match_ok(&m));
+		for (int k = 0; k < 400; k += 2)
+			c[k] ^= 0x55; // a game rewrote half
+		m = (struct saveslot_match){0, 0};
+		saveslot_match_scan(&m, f, c, 512); // in chunks
+		saveslot_match_scan(&m, f + 512, c + 512, 512);
+		CHECK(saveslot_match_ok(&m));
+		memset(c, 0xFF, sizeof(c)); // another game's save
+		for (int k = 0; k < 900; k++)
+			c[k] = (u8)(k % 190 + 20);
+		for (int k = 0; k < 400; k++)
+			c[k] = (u8)(f[k] % 200 + 2);
+		m = (struct saveslot_match){0, 0};
+		saveslot_match_scan(&m, f, c, sizeof(f));
+		CHECK(!saveslot_match_ok(&m));
+		for (int k = 0; k < 10; k++)
+			f[k] = 0xFF;
+		for (int k = 10; k < 400; k++)
+			f[k] = 0xFF; // under 16 data bytes left
+		f[0] = 5;
+		m = (struct saveslot_match){0, 0};
+		saveslot_match_scan(&m, f, c, sizeof(f));
+		CHECK(saveslot_match_ok(&m));
+	}
 }

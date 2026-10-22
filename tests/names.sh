@@ -40,7 +40,7 @@ run_case() {
   grep -qF "launch $name.gba:" "$log" || fail "$fs $label: the kernel didn't launch $name.gba"
 
   # Power-on 2: confirm the save prompt so the kernel writes the save.
-  boot -k 100:A -k 106:- -s 300:"$shots/2-menu.png"
+  boot -k 100:A -k 106:- -s 300:"$shots/2-menu.png" -f 800
   tools/sdimg.sh "$cart/sd.img" ls /SAVER >"$cart/saver.txt"
   grep -qxF "$name.sav	131072" "$cart/saver.txt" ||
     fail "$fs $label: /SAVER has $(tr '\n' ' ' <"$cart/saver.txt"), expected $name.sav"

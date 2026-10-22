@@ -561,3 +561,20 @@ int saveslot_identical(const void *a, const void *b, u32 size)
 {
 	return memcmp(a, b, size) == 0;
 }
+
+void saveslot_match_scan(struct saveslot_match *m, const void *file, const void *chip, u32 size)
+{
+	const u8 *f = (const u8 *)file, *c = (const u8 *)chip;
+	for (u32 i = 0; i < size; i++) {
+		if (f[i] == 0xFF || f[i] == 0x00)
+			continue;
+		m->data++;
+		if (f[i] == c[i])
+			m->same++;
+	}
+}
+
+int saveslot_match_ok(const struct saveslot_match *m)
+{
+	return m->data < SAVESLOT_MATCH_MIN_DATA || m->same >= (m->data + 7) / 8;
+}

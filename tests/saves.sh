@@ -19,10 +19,13 @@
 #         save under the new name
 #   full  a copy the card can't take shows an error dialog and logs how much
 #         of it was written; its record stays, and a launch tries the copy
-#         again first, asking before it loses the save (the cut-short file
-#         stays until then: crash-safe saves are v0.5); B keeps it waiting,
+#         again first, asking before it loses the save (the good Test.sav
+#         stays as it was, and no .tmp file is left); B keeps it waiting,
 #         A launches another game, and the next power-on copies that game's
 #         save to its own file, not the lost one's
+#   sanity  a game missing from the save table gets no file at launch; a
+#         blank or identical chip copies nothing; a chip unlike the file
+#         asks, B keeps the file and A writes it
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and building tests/roms/savetest.
 set -euo pipefail
@@ -88,9 +91,9 @@ first_launch() {
 
 # Power-on 2: A at "Save sav?" copies the save to the card.
 first_copy() {
-  boot -k 100:A -k 106:- -s 300:"$shots/2-menu.png"
+  boot -k 100:A -k 106:- -s 300:"$shots/2-menu.png" -f 800
   logged 'save: "Save sav?" for /SAVER/Test.sav, 131072 bytes, save type 31: A, save'
-  logged "save: wrote Test.sav, 131072 bytes, f_close gave 0"
+  logged "save: wrote Test.sav, 131072 bytes, verified"
   logged "nor: wrote an empty pending-save record, 512 bytes"
   [ "$(save_record)" = 4f4d525801 ] || fail "the save has $(save_record), expected the first boot record"
   [ "$(pending)" = 0000 ] || fail "the pending-save record is still set after the copy"
@@ -110,7 +113,7 @@ read-error)
   ! grep -q 'launch: starting the game' "$cart/run.log" || fail "the game started after its save's read failed"
   ! grep -qF 'nor: wrote the pending-save record' "$cart/run.log" || fail "a pending-save record was written"
   [ "$(pending)" = 0000 ] || fail "the pending-save record is set"
-  boot -k 100:A -k 106:- -f 300
+  boot -k 100:A -k 106:- -f 800
   ! grep -qF 'Save sav?' "$cart/run.log" || fail "the next power-on asked to copy the save"
   mtype -i "$cart/sd.img" ::/SAVER/Test.sav | cmp -s - "$cart/kept.sav" || fail "Test.sav changed"
   echo "PASS: saves read-error: a save the card can't read stops the launch, and nothing is copied over it"
@@ -185,7 +188,7 @@ rename-cut | rename-cut-split)
     # No damage (two names on one chain, a broken one); clusters a cut write
     # left allocated are only lost room
     fsck.fat -n "$cart/sd.img" >"$cart/fsck.txt" 2>&1 || true
-    ! grep -vE '^(fsck\.fat |Reclaimed [0-9]+ unused clusters? |Free cluster summary |  (Auto-)?correct|Leaving filesystem unchanged|.*: [0-9]+ files, |$)' \
+    ! grep -vE '^(fsck\.fat |Reclaimed [0-9]+ unused clusters? |Free cluster summary |  (Auto-)?correct|Leaving filesystem unchanged|.*: [0-9]+ files, |FATs differ but appear to be intact|  Using first FAT|$)' \
       "$cart/fsck.txt" >"$cart/fsck-bad.txt" || fail "cut before write $n: fsck.fat: $(head -4 "$cart/fsck-bad.txt")"
     # (the copy a reader takes: recent.txt, or its backup when the cut broke it)
     {
@@ -248,7 +251,7 @@ rename-cut-case)
     mtype -i "$cart/sd.img" ::/SAVER/Test.sav | cmp -s - "$cart/kept.sav" || fail "cut before write $n: the save changed"
     ! mtype -i "$cart/sd.img" ::/torii/rename.txt >/dev/null 2>&1 || fail "cut before write $n: the journal is left"
     fsck.fat -n "$cart/sd.img" >"$cart/fsck.txt" 2>&1 || true
-    ! grep -vE '^(fsck\.fat |Reclaimed [0-9]+ unused clusters? |Free cluster summary |  (Auto-)?correct|Leaving filesystem unchanged|.*: [0-9]+ files, |$)' \
+    ! grep -vE '^(fsck\.fat |Reclaimed [0-9]+ unused clusters? |Free cluster summary |  (Auto-)?correct|Leaving filesystem unchanged|.*: [0-9]+ files, |FATs differ but appear to be intact|  Using first FAT|$)' \
       "$cart/fsck.txt" >"$cart/fsck-bad.txt" || fail "cut before write $n: fsck.fat: $(head -4 "$cart/fsck-bad.txt")"
   done
   grep -qF 'another case of /SAVER/TesT.sav was a second name of it' "$carts/aliases-$part.txt" ||
@@ -328,9 +331,10 @@ full)
   # Power-on 3: the game again, which sets the record.
   # shellcheck disable=SC2046 # nav.sh's options
   boot $(nav_launch /Test.gba at=180) -f 600
-  # Then the card loses Test.sav and fills up to 64 KB free: too little for
-  # the 128 KB copy. The filler is a .gba, which the kernel deletes below.
-  mdel -i "$cart/sd.img" ::/SAVER/Test.sav
+  # Then the card fills up to 64 KB free: too little for the 128 KB copy.
+  # Test.sav stays; the copy goes to Test.sav.tmp first. The filler is a
+  # .gba, which the kernel deletes below.
+  mtype -i "$cart/sd.img" ::/SAVER/Test.sav >"$cart/good.sav"
   free=$(mdir -i "$cart/sd.img" ::/ | sed -n 's/^ *\([0-9 ]*\) bytes free.*/\1/p' | tr -d ' ')
   head -c $((free - 65536)) /dev/urandom >"$cart/filler.bin"
   mcopy -i "$cart/sd.img" "$cart/filler.bin" ::/Filler.gba
@@ -339,8 +343,8 @@ full)
   boot -k 100:A -k 106:- -w "error 3: Can't write the save" -s @20:"$shots/4-error.png" -k @30:B -k @34:- \
     -w "nav: home ready"
   logged 'save: "Save sav?" for /SAVER/Test.sav, 131072 bytes, save type 31: A, save'
-  logged_error "save: writing Test.sav: "
-  grep -qE "kernel error: save: writing Test.sav: [0-9]+ of 131072 bytes written" "$cart/run.log" ||
+  logged_error "save: writing Test.sav.tmp: "
+  grep -qE "kernel error: save: writing Test.sav.tmp: [0-9]+ of 131072 bytes written" "$cart/run.log" ||
     fail "the error doesn't say how much was written"
   logged_error "error 3: Can't write the save"
   logged "dialog: Can't write the save"
@@ -351,6 +355,8 @@ full)
   fsck.fat -n "$cart/sd.img" >/dev/null || fail "fsck.fat found errors"
   # The pending-save record stays: the next power-on or launch tries again.
   [ "$(pending)" = 0011 ] || fail "the failed copy cleared the pending-save record"
+  mtype -i "$cart/sd.img" ::/SAVER/Test.sav | cmp -s - "$cart/good.sav" || fail "the failed copy changed the good Test.sav"
+  mdir -i "$cart/sd.img" ::/SAVER/ | grep -qi "TMP" && fail "the failed copy left a .tmp file"
   mtype -i "$cart/sd.img" ::/SAVER/Test.sav >"$cart/short.sav"
 
   # Power-on 5: the copy fails again; then CLEAN BOOT of Test.gba would hand
@@ -402,7 +408,7 @@ full)
   # record still named Test.sav, which got the other game's save).
   boot -k 100:A -k 106:- -w "nav: home ready"
   logged 'save: "Save sav?" for /SAVER/Other.sav'
-  logged "save: wrote Other.sav, "
+  logged "save: the chip is blank (all FF), Other.sav stays as it is" # hello.gba never saves
   ! grep -q '"Save sav?" for /SAVER/Test.sav' "$cart/run.log" || fail "the record still named Test.sav"
   mtype -i "$cart/sd.img" ::/SAVER/Test.sav | cmp -s - "$cart/lost.sav" || fail "Test.sav changed after A launched another game"
   [ "$(pending)" = 0000 ] || fail "the pending-save record is still set after Other.sav's copy"
@@ -428,6 +434,80 @@ full)
   echo "PASS: saves full: a copy the card can't take shows an error and stays waiting; a launch tries it again, and asks before losing it"
   ;;
 
+sanity)
+  # hello.gba is not in the save table (save type 10). It writes a few bytes
+  # of its own to the chip, so the test sets the chip between power-ons.
+  mkfs.fat -C -F 32 -n SAVES "$cart/sd.img" 65536 >/dev/null
+  mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/Hello.gba
+  sav_on_card() { mdir -i "$cart/sd.img" ::/SAVER/ 2>/dev/null | grep -qi 'Hello.sav'; }
+  leftovers() { mdir -i "$cart/sd.img" ::/SAVER/ 2>/dev/null | grep -qiE 'tmp|bak'; }
+  # A game saves: bytes over the start of the chip (cart SRAM page 0 starts
+  # sram.bin), nothing but 01 and 02 so the chip isn't blank
+  poke() { # FILE
+    dd if="$1" of="$cart/sram.bin" bs=1 seek=0 conv=notrunc 2>/dev/null
+  }
+  blank_chip() { head -c 65536 /dev/zero | tr '\000' '\377' | dd of="$cart/sram.bin" bs=65536 conv=notrunc 2>/dev/null; }
+  random_data() { head -c "$1" /dev/urandom | tr '\000\377' '\001\002'; }
+  random_data 4096 >"$cart/a.bin"
+  random_data 4096 >"$cart/b.bin"
+  # shellcheck disable=SC2046 # nav.sh's options
+  launch() { boot $(nav_launch /Hello.gba at=180) -f 600; }
+  copy_a() { boot -k 100:A -k 106:- -w "nav: home ready"; }
+
+  # 1. No file at launch; a blank chip copies nothing
+  launch
+  logged "save: no Hello.sav yet, 65536 bytes; the file is made when the chip differs from blank"
+  logged "save: blank chip loaded, 65536 bytes"
+  [ "$(pending)" = 0011 ] || fail "no pending-save record after the launch"
+  ! sav_on_card || fail "the launch made a Hello.sav"
+  blank_chip # a game that saves nothing
+  copy_a
+  logged "save: the chip is blank (all FF), Hello.sav stays as it is"
+  ! sav_on_card || fail "a blank chip made a Hello.sav"
+  [ "$(pending)" = 0000 ] || fail "the pending-save record is still set after the skip"
+
+  # 2. The game saves: the file is made
+  launch
+  poke "$cart/a.bin"
+  copy_a
+  logged "save: Hello.sav doesn't exist yet"
+  logged "save: wrote Hello.sav, 65536 bytes, verified"
+  mtype -i "$cart/sd.img" ::/SAVER/Hello.sav >"$cart/hello.sav"
+  [ "$(stat -c %s "$cart/hello.sav")" = 65536 ] || fail "Hello.sav isn't 64 KB"
+  head -c 4096 "$cart/hello.sav" | cmp -s - "$cart/a.bin" || fail "Hello.sav isn't the chip"
+  ! leftovers || fail "a .tmp or .bak file is left"
+  [ "$(pending)" = 0000 ] || fail "the pending-save record is still set after the copy"
+
+  # 3. A chip identical to the file copies nothing
+  launch
+  logged "save: loaded Hello.sav into cart SRAM, 65536 bytes"
+  poke "$cart/hello.sav" # the game left the file as it was
+  copy_a
+  logged "save: the chip is identical to Hello.sav, nothing to copy"
+  ! grep -q "kernel: save: wrote" "$cart/run.log" || fail "an identical chip was written"
+  [ "$(pending)" = 0000 ] || fail "the pending-save record is still set after the skip"
+
+  # 4. A chip that doesn't look like the file asks: B keeps the file, A writes
+  launch
+  poke "$cart/b.bin"
+  boot -k 100:A -k 106:- -w "doesn't look like" -w "screen ready: dialog" -s @20:"$shots/mismatch.png" -k @30:B -k @34:- \
+    -w "nav: home ready"
+  logged "save: the chip doesn't look like Hello.sav: B, the file stays"
+  mtype -i "$cart/sd.img" ::/SAVER/Hello.sav | cmp -s - "$cart/hello.sav" || fail "B changed Hello.sav"
+  [ "$(pending)" = 0000 ] || fail "the pending-save record is still set after B"
+  launch
+  poke "$cart/b.bin"
+  boot -k 100:A -k 106:- -w "doesn't look like" -w "screen ready: dialog" -k @30:A -k @34:- \
+    -w "nav: home ready"
+  logged "save: the chip doesn't look like Hello.sav: A, written over it"
+  logged "save: wrote Hello.sav, 65536 bytes, verified"
+  mtype -i "$cart/sd.img" ::/SAVER/Hello.sav >"$cart/hello.sav"
+  head -c 4096 "$cart/hello.sav" | cmp -s - "$cart/b.bin" || fail "A didn't write the chip"
+  ! leftovers || fail "a .tmp or .bak file is left"
+  fsck.fat -n "$cart/sd.img" >/dev/null || fail "fsck.fat found errors"
+  echo "PASS: saves sanity: no file for a blank chip; a blank or identical chip copies nothing; a chip unlike the file asks"
+  ;;
+
 nearly-full)
   first_launch
   first_copy
@@ -444,7 +524,7 @@ nearly-full)
   boot -k 100:A -k 106:- -s 116:"$shots/4-progress.png" -f 400
   logged 'save: "Save sav?" for /SAVER/Test.sav, 131072 bytes, save type 31: A, save'
   grep -q "^kernel: screen ready: progress" "$cart/run.log" || fail "no progress dialog for the copy"
-  logged "save: wrote Test.sav, 131072 bytes, f_close gave 0"
+  logged "save: wrote Test.sav, 131072 bytes, verified"
   grep -q "^kernel error:" "$cart/run.log" && fail "errors: $(grep '^kernel error:' "$cart/run.log" | head -3)"
   grep -q "^kernel: nav: home ready" "$cart/run.log" || fail "no menu after the copy"
   [ "$(save_record)" = 4f4d525802 ] || fail "the save has $(save_record), expected the second boot record"
@@ -456,7 +536,7 @@ nearly-full)
   ;;
 
 *)
-  echo "usage: $0 copy|full|nearly-full" >&2
+  echo "usage: $0 copy|full|nearly-full|sanity" >&2
   exit 2
   ;;
 esac

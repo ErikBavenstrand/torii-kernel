@@ -697,11 +697,17 @@ def run_game(result: Result, roms: dict, saves: dict, table: dict) -> None:
             scripted = False
         # The game didn't save, so test the kernel's copy path with a pattern
         # in the cart's save memory, as if the game had written it.
+        # It changes a part of the loaded save (the kernel asks before
+        # writing a chip that looks like another game's over a file)
         first = bytes((i * 37 + 11) & 0xFF for i in range(size))
+        if loaded is not None:
+            keep = bytearray(loaded[:size].ljust(size, b"\xff"))
+            keep[:256] = first[:256]
+            first = bytes(keep)
         sram.write_bytes(first + sram.read_bytes()[size:])
 
     # Power-on 2: the kernel asks to write the save to SD; confirm.
-    power_on(cart, [(100, "A")], 300)
+    power_on(cart, [(100, "A")], 800)
     written = sd_save(cart, sd_name)
     if written is None or written[:size] != first[: len(written)]:
         result.set("save cycle", "fail", "SAVER/ does not hold what the game saved")

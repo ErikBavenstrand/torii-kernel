@@ -44,6 +44,7 @@ extern char *gl_keep_power;    // FORMAT ALL's text, under its title
 // launch: a format, kept a literal so the compiler checks it (the save's
 // file, cut to at most 80 bytes at a character's start: the dialog shows 4
 // lines)
+#define EN_SAVE_MISMATCH "The save in the cart doesn't look like %.*s. Write it over that file anyway?"
 #define EN_SAVE_UNSAVED "The save of %.*s isn't on the card yet. Launching loses it. Launch anyway?"
 
 // The firmware update's texts (Ezcard_OP.c). It runs before a language is

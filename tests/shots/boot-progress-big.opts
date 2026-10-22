@@ -5,4 +5,4 @@
 -w "nav: home ready"
 -P "@8:nav_test_path:/Big.gbc" -p @8:nav_test_action:0x7E000001
 -w "screen ready: progress"
--s @200:loading.png
+-s @60:loading.png

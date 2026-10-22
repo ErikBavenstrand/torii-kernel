@@ -426,6 +426,10 @@ full)
   # Room again in the same boot: FILLER.BIN deleted (as the SD card page
   # will, through actions.c); the idle flush then writes the log, which kept
   # its lines meanwhile.
+  # The game left a few bytes in the chip, whose copy would need room for a
+  # .tmp file beside Hello.sav (the full card is not this test's subject):
+  # a blank chip copies nothing.
+  head -c 65536 /dev/zero | tr '\0' '\377' | dd of="$cart/sram.bin" bs=65536 conv=notrunc 2>/dev/null
   # shellcheck disable=SC2046
   boot $(nav_delete /FILLER.BIN at=160) -f 1400
   grep -q "the card is full; the log waits for room" "$cart/kernel.log" || fail "the card wasn't full before the delete"

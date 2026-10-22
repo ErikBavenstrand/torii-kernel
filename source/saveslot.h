@@ -172,4 +172,21 @@ int saveslot_is_blank(const void *data, u32 size);
 // 1 if both buffers hold the same size bytes
 int saveslot_identical(const void *a, const void *b, u32 size);
 
+// Does a chip look like the file that was loaded into it? A game changes a
+// part of its save, another game's save shares next to nothing with it. So
+// of the file's data bytes (not 0xFF, not 0x00) the share that the chip still
+// has at the same place says it: nothing is kept in the pending-save record,
+// the file is on the card to compare with. Fed in chunks.
+struct saveslot_match {
+	u32 data; // data bytes in the file so far
+	u32 same; // of them, the chip's byte is the same
+};
+// Adds size bytes of the file and the chip at the same offsets
+void saveslot_match_scan(struct saveslot_match *m, const void *file, const void *chip, u32 size);
+// Fewer data bytes than this say nothing: the check passes
+#define SAVESLOT_MATCH_MIN_DATA 16u
+// 1 if the chip looks like the file: too little data to tell, or at least
+// 1/8 of its data bytes kept. 0: ask before writing the chip over the file.
+int saveslot_match_ok(const struct saveslot_match *m);
+
 #endif

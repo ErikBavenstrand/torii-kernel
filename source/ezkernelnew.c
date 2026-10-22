@@ -28,6 +28,8 @@
 #include "showcht.h"
 #include "settings.h"
 #include "cartlog.h"
+#include "cutpoint.h"
+#include "saveslot.h"
 #include "charset.h"
 #include "diag.h"
 #include "engine/cover.h"
@@ -311,84 +313,304 @@ u32 Loadsavefile(TCHAR *filename)
 	}
 }
 //---------------------------------------------------------------------------------
-// Torii: f_write for Save_savefile, adding up what went to the card and
-// keeping the first error.
-static void save_write(FIL *file, const u8 *data, UINT len, u32 *total, FRESULT *first_error)
+// Torii: the copy of cart SRAM to a .sav, made so a good save survives a
+// power cut or a full card at any step (v0.5, docs/plans/roadmap.md):
+//   1. Save_check: a blank chip, or one identical to the file, writes nothing;
+//      one that doesn't look like the file asks first (pending_save_copy).
+//   2. Save_savefile writes <save>.tmp, f_sync, f_close, reads it back from the
+//      card and compares it with the chip. The save is untouched until then.
+//   3. The old save is renamed to <save>.bak, the tmp file to <save>, the .bak
+//      removed (it is not kept: the history of backups is the slots' job).
+// f_rename refuses to replace a file and isn't atomic, so Save_recover, at boot
+// and before each copy and launch, finishes or undoes whatever a cut left. The
+// pending-save record stays until the copy checks out (the callers clear it).
+#define SAVE_CHUNK 0x800
+
+static FIL save_fil EWRAM_BSS;
+static char save_tmp[SAV_INFO_NAME_MAX + 6] EWRAM_BSS;
+static char save_bak[SAV_INFO_NAME_MAX + 6] EWRAM_BSS;
+
+// Sets save_tmp and save_bak for filename; 0 if the name is too long
+static int save_names(const char *filename)
 {
-	UINT written = 0;
-	FRESULT res = f_write(file, data, len, &written);
-	*total += written;
-	if (res != FR_OK && *first_error == FR_OK)
-		*first_error = res;
+	if (strlen(filename) > SAV_INFO_NAME_MAX)
+		return 0;
+	snprintf(save_tmp, sizeof(save_tmp), "%s.tmp", filename);
+	snprintf(save_bak, sizeof(save_bak), "%s.bak", filename);
+	return 1;
 }
 
-// Copies savesize bytes of cart SRAM to filename, over the file there, and
-// logs what reached the card: SAVE_WRITTEN once all of it did, SAVE_NOTHING
-// for savesize 0 (no file touched), SAVE_FAILED if the file couldn't be made
-// or the write fell short (ezkernel.h). ROM code, as Loadsavefile: both run only in
-// the menu. Torii: the SRAM goes through pReadCache's upper half, which no
-// frame touches (ez_define.h), so the progress dialog can draw between
-// writes.
-u32 Save_savefile(TCHAR *filename, u32 savesize)
+// 1 if path is a file, 0 if there is none, -1 if the card didn't say
+static int save_exists(const char *path)
 {
-	u8 *buf = pReadCache + READCACHE_SAVE;
-	FIL file;
-	if (savesize == 0)
+	FRESULT res = f_stat(path, NULL);
+	if (res == FR_OK)
+		return 1;
+	return res == FR_NO_FILE || res == FR_NO_PATH ? 0 : -1;
+}
+
+// Reads len bytes of the save chip from offset off (not across a 64 KB page)
+static void sram_read(u8 *dst, u32 off, u32 len)
+{
+	SetRampage(off >= 0x10000 ? 0x10 : 0x0);
+	ReadSram(SRAMSaver + (off & 0xFFFF), dst, len);
+	SetRampage(0x0);
+}
+
+// The bytes of the chip that a save of savesize copies
+static u32 save_span(u32 savesize)
+{
+	return savesize > 128 * 1024 ? 128 * 1024 : savesize;
+}
+
+// Finishes or undoes what a power cut left of a copy to filename. The states,
+// by which of the save F, F.tmp (T) and F.bak (B) exist:
+//   F            nothing to do
+//   F T, F B, ...  F is whole (the rename of T onto F is the last step before
+//                T goes, and F is only ever a renamed, verified T or the old
+//                save): T and B go
+//   T B          the old save moved aside, T verified: T takes F's name
+//   B            the old save moved aside, nothing else: B takes F's name back
+//   T            nothing existed, or T was cut mid-write: T goes (the chip
+//                still holds the data, the record is still set)
+// A cut inside f_rename leaves two names on one chain: the one that isn't
+// final is dropped by its entry alone (f_unlink_alias), never f_unlink.
+void Save_recover(const TCHAR *filename)
+{
+	if (!save_names(filename))
+		return;
+	int f = save_exists(filename), t = save_exists(save_tmp), b = save_exists(save_bak);
+	if (f < 0 || t < 0 || b < 0) {
+		tlog_error("save: recovery of %s: the card didn't answer", filename);
+		return;
+	}
+	if (!t && !b)
+		return;
+	tlog("save: recovery of %s: save %d, tmp %d, bak %d", filename, f, t, b);
+	int t_ok = 1, b_ok = 1;  // safe to f_unlink
+	if (f && b) {
+		FRESULT r = f_unlink_alias(save_bak, filename);
+		if (r == FR_OK) {
+			b = 0;
+			tlog("save: recovery: the .bak was a second name of the save, dropped");
+		} else if (r != FR_DENIED) {
+			b_ok = 0;
+		}
+	}
+	if (f && t) {
+		FRESULT r = f_unlink_alias(save_tmp, filename);
+		if (r == FR_OK) {
+			t = 0;
+			tlog("save: recovery: the .tmp was a second name of the save, dropped");
+		} else if (r != FR_DENIED) {
+			t_ok = 0;
+		}
+	}
+	if (f) {
+		if (t && t_ok)
+			tlog("save: recovery: removed the .tmp, f_unlink gave %d", f_unlink(save_tmp));
+		if (b && b_ok)
+			tlog("save: recovery: removed the .bak, f_unlink gave %d", f_unlink(save_bak));
+	} else if (t && b) {
+		FRESULT r = f_rename(save_tmp, filename);
+		tlog("save: recovery: the .tmp takes the save's name, f_rename gave %d", r);
+		if (r == FR_OK)
+			f_unlink(save_bak);
+	} else if (b) {
+		tlog("save: recovery: the .bak takes the save's name back, f_rename gave %d",
+		     f_rename(save_bak, filename));
+	} else if (t) {
+		tlog("save: recovery: removed the .tmp, f_unlink gave %d", f_unlink(save_tmp));
+	}
+}
+
+// Whether the chip is worth copying over filename (the file as the game
+// loaded it, or none): SAVE_SKIPPED for a blank chip (all FF or all 00,
+// nothing was saved) or one identical to the file, SAVE_MISMATCH when it
+// doesn't look like the file (see saveslot_match_ok: another game's save), SAVE_WRITE
+// otherwise, SAVE_FAILED if the card can't be read, SAVE_NOTHING for
+// savesize 0. Writes nothing, so it runs before the progress dialog.
+u32 Save_check(TCHAR *filename, u32 savesize)
+{
+	u8 *chip = pReadCache + READCACHE_SAVE, *file = chip + SAVE_CHUNK;
+	u32 span = save_span(savesize), off;
+	if (span == 0)
 		return SAVE_NOTHING;
-	u32 ret = f_open(&file, filename, FA_WRITE | FA_CREATE_ALWAYS);
-	switch (ret) {
-	case FR_OK: {
-		u32 i;
-		u32 total = 0, expected;
-		FRESULT werr = FR_OK;
-		//memset(pReadCache,0xFF,0x200*4);
-		SetRampage(0x0);
-
-		if (savesize < 0x800) {
-			ReadSram(SRAMSaver, buf, savesize);
-			expected = (savesize + 0x1FF) / 0x200 * 0x200;
-			for (i = 0; i < (savesize + 0x1FF) / 0x200 && total == i * 0x200; i++)
-				save_write(&file, buf + 0x200 * i, 0x200, &total, &werr);
-		} else {
-			if (savesize > 64 * 1024) {
-				expected = 128 * 1024;
-				ReadSram(SRAMSaver, buf, 64 * 1024);
-				for (i = 0; i < 64 * 1024 / 0x800 && total == i * 0x800; i++) {
-					progress_part(total, expected);
-					save_write(&file, buf + 0x800 * i, 0x200 * 4, &total, &werr);
-				}
-				SetRampage(0x10);
-				ReadSram(SRAMSaver, buf, 64 * 1024);
-				// The frames progress_part runs leave cart SRAM alone, so the
-				// page stays 0x10 through them (cartlog sets its own page)
-				for (i = 0; i < 64 * 1024 / 0x800 && total == 64 * 1024 + i * 0x800; i++) {
-					progress_part(total, expected);
-					save_write(&file, buf + 0x800 * i, 0x200 * 4, &total, &werr);
-				}
-			} else {
-				expected = savesize / 0x800 * 0x800;
-				ReadSram(SRAMSaver, buf, savesize);
-				for (i = 0; i < savesize / 0x800 && total == i * 0x800; i++) {
-					progress_part(total, expected);
-					save_write(&file, buf + 0x800 * i, 0x200 * 4, &total, &werr);
-				}
-			}
-		}
-		SetRampage(0x0);  // Torii: the page was left at 0x10
-
-		FRESULT cerr = f_close(&file);
-		if (werr != FR_OK || cerr != FR_OK || total != expected) {
-			tlog_error("save: writing %s: %lu of %lu bytes written, f_write gave %d, f_close %d", filename,
-				   (unsigned long)total, (unsigned long)expected, werr, cerr);
-			return SAVE_FAILED;  // Torii: a short write (a full card) is a failure
-		}
-		tlog("save: wrote %s, %lu bytes, f_close gave %d", filename, (unsigned long)total, cerr);
-		return SAVE_WRITTEN;
-	} break;
-	default:
-		tlog_error("save: can't create %s: f_open gave %lu", filename, (unsigned long)ret);
+	u32 blank = SAVESLOT_BLANK_START;
+	for (off = 0; off < span && blank; off += SAVE_CHUNK) {
+		u32 len = span - off < SAVE_CHUNK ? span - off : SAVE_CHUNK;
+		sram_read(chip, off, len);
+		blank = saveslot_blank_scan(blank, chip, len);
+	}
+	if (blank) {
+		tlog("save: the chip is blank (all %s), %s stays as it is", blank & 1 ? "FF" : "00", filename);
+		return SAVE_SKIPPED;
+	}
+	FRESULT res = f_open(&save_fil, filename, FA_READ);
+	if (res == FR_NO_FILE || res == FR_NO_PATH) {
+		tlog("save: %s doesn't exist yet", filename);
+		return SAVE_WRITE;
+	}
+	if (res != FR_OK) {
+		tlog_error("save: can't open %s to compare: f_open gave %d", filename, res);
 		return SAVE_FAILED;
 	}
+	u32 fsize = f_size(&save_fil), common = fsize < span ? fsize : span;
+	int same = fsize == span;
+	struct saveslot_match match = {0, 0};
+	for (off = 0; off < common; off += SAVE_CHUNK) {
+		u32 len = common - off < SAVE_CHUNK ? common - off : SAVE_CHUNK;
+		UINT got = 0;
+		sram_read(chip, off, len);
+		res = f_read(&save_fil, file, len, &got);
+		if (res != FR_OK || got != len) {
+			tlog_error("save: can't read %s to compare: f_read gave %d, %u of %lu bytes", filename, res,
+				   got, (unsigned long)len);
+			f_close(&save_fil);
+			return SAVE_FAILED;
+		}
+		if (!saveslot_identical(chip, file, len))
+			same = 0;
+		saveslot_match_scan(&match, file, chip, len);
+	}
+	f_close(&save_fil);
+	if (same) {
+		tlog("save: the chip is identical to %s, nothing to copy", filename);
+		return SAVE_SKIPPED;
+	}
+	if (!saveslot_match_ok(&match)) {
+		tlog("save: the chip doesn't look like %s: %lu of its %lu data bytes are the same", filename,
+		     (unsigned long)match.same, (unsigned long)match.data);
+		return SAVE_MISMATCH;
+	}
+	return SAVE_WRITE;
+}
+
+// A step of the swap failed: undo or finish it, so a good save stays
+static u32 save_swap_failed(const TCHAR *filename, const char *what, FRESULT res)
+{
+	tlog_error("save: %s: %d", what, res);
+	Save_recover(filename);
+	return SAVE_FAILED;
+}
+
+// Copies savesize bytes of cart SRAM to filename as the comment above says:
+// SAVE_WRITTEN once the verified copy is the save, SAVE_NOTHING for savesize 0
+// (no file touched), SAVE_FAILED if anything fell short (a full card, a bad
+// readback); then the old save, if any, is as it was. ROM code, as
+// Loadsavefile: both run only in the menu. The SRAM goes through pReadCache's
+// upper half, which no frame touches (ez_define.h), so the progress dialog can
+// draw between chunks.
+u32 Save_savefile(TCHAR *filename, u32 savesize)
+{
+	u8 *chip = pReadCache + READCACHE_SAVE, *file = chip + SAVE_CHUNK;
+	u32 span = save_span(savesize), off;
+	if (span == 0)
+		return SAVE_NOTHING;
+	if (!save_names(filename)) {
+		tlog_error("save: %s is too long to copy", filename);
+		return SAVE_FAILED;
+	}
+	Save_recover(filename);
+
+	// 1. The tmp file
+	FRESULT res = f_open(&save_fil, save_tmp, FA_WRITE | FA_CREATE_ALWAYS);
+	if (res != FR_OK) {
+		tlog_error("save: can't create %s: f_open gave %d", save_tmp, res);
+		return SAVE_FAILED;
+	}
+	u32 total = 0;
+	FRESULT werr = FR_OK;
+	for (off = 0; off < span && werr == FR_OK && total == off; off += SAVE_CHUNK) {
+		u32 len = span - off < SAVE_CHUNK ? span - off : SAVE_CHUNK;
+		UINT written = 0;
+		sram_read(chip, off, len);
+		progress_part(off, span * 2);
+		werr = f_write(&save_fil, chip, len, &written);
+		total += written;
+		if (off == 0)
+			cutpoint("save: tmp first chunk written");
+	}
+	FRESULT serr = werr == FR_OK ? f_sync(&save_fil) : FR_OK;
+	FRESULT cerr = f_close(&save_fil);
+	if (werr != FR_OK || serr != FR_OK || cerr != FR_OK || total != span) {
+		tlog_error("save: writing %s: %lu of %lu bytes written, f_write gave %d, f_sync %d, f_close %d",
+			   save_tmp, (unsigned long)total, (unsigned long)span, werr, serr, cerr);
+		tlog("save: removed the .tmp, f_unlink gave %d", f_unlink(save_tmp));
+		return SAVE_FAILED;  // a short write (a full card) is a failure: the save is untouched
+	}
+	cutpoint("save: tmp written");
+
+	// 2. Read it back from the card and compare it with the chip
+	res = f_open(&save_fil, save_tmp, FA_READ);
+	if (res != FR_OK || f_size(&save_fil) != span) {
+		tlog_error("save: reading %s back: f_open gave %d, %lu bytes", save_tmp, res,
+			   res == FR_OK ? (unsigned long)f_size(&save_fil) : 0ul);
+		if (res == FR_OK)
+			f_close(&save_fil);
+		f_unlink(save_tmp);
+		return SAVE_FAILED;
+	}
+	int good = 1;
+	for (off = 0; off < span && good; off += SAVE_CHUNK) {
+		u32 len = span - off < SAVE_CHUNK ? span - off : SAVE_CHUNK;
+		UINT got = 0;
+		progress_part(span + off, span * 2);
+		sram_read(chip, off, len);
+		res = f_read(&save_fil, file, len, &got);
+		if (res != FR_OK || got != len || !saveslot_identical(chip, file, len)) {
+			tlog_error("save: %s read back wrong at %lu: f_read gave %d, %u of %lu bytes", save_tmp,
+				   (unsigned long)off, res, got, (unsigned long)len);
+			good = 0;
+		}
+	}
+	f_close(&save_fil);
+	if (!good) {
+		f_unlink(save_tmp);
+		return SAVE_FAILED;
+	}
+	cutpoint("save: tmp verified");
+
+	// 3. Swap it in
+	int had = save_exists(filename);
+	if (had < 0) {
+		tlog_error("save: the card didn't answer for %s", filename);
+		f_unlink(save_tmp);
+		return SAVE_FAILED;
+	}
+	if (had) {
+		res = f_rename(filename, save_bak);
+		if (res != FR_OK)
+			return save_swap_failed(filename, "moving the old save to .bak", res);
+		cutpoint("save: old save moved to bak");
+	}
+	res = f_rename(save_tmp, filename);
+	if (res != FR_OK)
+		return save_swap_failed(filename, "moving the .tmp into place", res);
+	cutpoint("save: tmp moved into place");
+	if (had) {
+		res = f_unlink(save_bak);
+		if (res != FR_OK)
+			tlog_error("save: removing %s: f_unlink gave %d", save_bak, res);  // recovery removes it
+		cutpoint("save: bak removed");
+	}
+	tlog("save: wrote %s, %lu bytes, verified", filename, (unsigned long)total);
+	return SAVE_WRITTEN;
+}
+//---------------------------------------------------------------------------------
+// Torii: fills the save chip with the blank chip's 0xFF, savesize bytes, for
+// a game with no .sav (Process_savefile)
+static void Blank_sram(u32 savesize)
+{
+	u32 span = save_span(savesize);
+	memset(pReadCache, 0xFF, SAVE_CHUNK);
+	for (u32 off = 0; off < span; off += SAVE_CHUNK) {
+		u32 len = span - off < SAVE_CHUNK ? span - off : SAVE_CHUNK;
+		SetRampage(off >= 0x10000 ? 0x10 : 0x0);
+		WriteSram(SRAMSaver + (off & 0xFFFF), pReadCache, len);
+	}
+	SetRampage(0x0);
+	tlog("save: blank chip loaded, %lu bytes", (unsigned long)span);
 }
 //---------------------------------------------------------------------------------
 u32 IWRAM_CODE LoadRTSfile(TCHAR *filename)
@@ -883,6 +1105,8 @@ static u8 Process_savefile(u32 is_EMU, TCHAR *pfilename, u32 gamefilesize, BYTE 
 	//wait_btn();
 	//#endif
 
+	Save_recover(savfilename);  // a copy a power cut interrupted
+	int blank_chip = 0;
 	res = f_open(&gfile, savfilename, FA_OPEN_EXISTING);
 	if (res == FR_OK)//have a old save file
 	{
@@ -892,6 +1116,13 @@ static u8 Process_savefile(u32 is_EMU, TCHAR *pfilename, u32 gamefilesize, BYTE 
 		u32 need = Get_savefilesize(saveMODE);
 		if (!is_EMU && saveMODE != 0 && savefilesize < need)
 			savefilesize = Grow_savefile(savfilename, savefilesize, need);
+	} else if (saveMODE == 0x10) {
+		// Torii: a game missing from the save table gets no file at launch:
+		// the chip starts blank, and a file is made once it differs
+		savefilesize = Get_savefilesize(saveMODE);
+		blank_chip = 1;
+		tlog("save: no %s yet, %lu bytes; the file is made when the chip differs from blank", savfilename,
+		     (unsigned long)savefilesize);
 	} else //make a new one
 	{
 		savefilesize = Get_savefilesize(saveMODE);
@@ -905,13 +1136,14 @@ static u8 Process_savefile(u32 is_EMU, TCHAR *pfilename, u32 gamefilesize, BYTE 
 
 	if (savefilesize) {
 		Bank_Switching(0);
-		res = Loadsavefile(savfilename);
-		if (!res)
-			return 4;  // "Can't read the save": not launched, no record
+		if (blank_chip) {
+			Blank_sram(savefilesize);
+		} else {
+			res = Loadsavefile(savfilename);
+			if (!res)
+				return 4;  // "Can't read the save": not launched, no record
+		}
 
-		/*Save_savefile("dump.bin",0x8000);	
-		DEBUG_printf("dump finish");
-		wait_btn();	*/
 		memset(SAV_info_buffer, 0x00, sizeof(SAV_info_buffer));
 		SAV_info_buffer[0] = 0x11;
 		SAV_info_buffer[1] = savefilesize >> 9;
@@ -977,15 +1209,33 @@ static void pending_save_clear(void)
 	Save_sav_info(SAV_info_buffer, 0x200);
 }
 
-// Copies the pending save (SAV_info_buffer names it) to /SAVER on a
-// progress dialog: SAVE_WRITTEN, SAVE_NOTHING or SAVE_FAILED (no "Done")
+// Copies the pending save (SAV_info_buffer names it) to /SAVER, safely
+// (Save_savefile): first any copy a power cut interrupted is finished or
+// undone, then a blank or unchanged chip is skipped and a chip that doesn't
+// look like the file asks, then the progress dialog. SAVE_WRITTEN,
+// SAVE_SKIPPED, SAVE_NOTHING (also when the question got B) or SAVE_FAILED
+// (no "Done"). The dialog must be open.
 static u32 pending_save_copy(u32 size)
 {
 	TCHAR *name = (TCHAR *)SAV_info_buffer;
-	dialog_progress_begin(gl_saving, name);
-	progress_step(gl_save_ing, 0, PROGRESS_FULL);
 	f_mkdir(SAVER_FOLDER);  //"/SAVER"
 	f_chdir(SAVER_FOLDER);
+	Save_recover(name);
+	u32 check = Save_check(name, size);
+	if (check == SAVE_MISMATCH) {
+		char msg[200];
+		int cut = (int)charset_cut(name, 80);
+		snprintf(msg, sizeof(msg), EN_SAVE_MISMATCH, cut, name);
+		if (!dialog_confirm(NULL, msg, DIALOG_ERROR)) {
+			tlog("save: the chip doesn't look like %s: B, the file stays", name);
+			return SAVE_NOTHING;
+		}
+		tlog("save: the chip doesn't look like %s: A, written over it", name);
+	} else if (check != SAVE_WRITE) {
+		return check;
+	}
+	dialog_progress_begin(gl_saving, name);
+	progress_step(gl_save_ing, 0, PROGRESS_FULL);
 	u32 saved = Save_savefile(name, size);
 	if (saved == SAVE_WRITTEN)
 		progress_done(gl_done);
@@ -1003,6 +1253,8 @@ static void Check_save_flag(void)
 	static const char saved_how[] = "save: \"Save sav?\" for %s/%s, %lu bytes, save type %02X: %s";
 	u16 savetype = Read_sav_info(SAV_INFO_TYPE);
 	TCHAR *name = (TCHAR *)SAV_info_buffer;
+	f_chdir(SAVER_FOLDER);
+	Save_recover(name);
 	dialog_open();
 	int save = gl_auto_save_sel || dialog_confirm(gl_save_sav, name, DIALOG_INFO);
 	tlog(saved_how, SAVER_FOLDER, name, (unsigned long)savefilesize, savetype,
@@ -1019,6 +1271,7 @@ static void Check_save_flag(void)
 	}
 	dialog_close();
 	pending_save_clear();
+	cutpoint("save: pending record cleared");
 }
 
 // Torii: before a launch hands cart SRAM to another game. A save still

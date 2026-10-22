@@ -52,11 +52,18 @@ void init_FAT_table(void);
 // IWRAM code must run from IWRAM while the ROM page changes, so it is never
 // static: GCC would inline it into callers in ROM.
 u32 Loadsavefile(TCHAR *filename);
-// Save_savefile's results
-#define SAVE_FAILED 0   // no file made, or the write fell short (a full card)
-#define SAVE_WRITTEN 1  // all of it reached the card
-#define SAVE_NOTHING 2  // savesize 0: nothing to write, no file touched
+// The save copy's results (Save_check, Save_savefile, pending_save_copy)
+#define SAVE_FAILED 0    // no file made, or the write fell short (a full card): the old save is as it was
+#define SAVE_WRITTEN 1   // the chip is on the card, verified, and is the save
+#define SAVE_NOTHING 2   // savesize 0, or the user said no to the mismatch: no file touched
+#define SAVE_SKIPPED 3   // the chip is blank or identical to the file: nothing to copy
+#define SAVE_MISMATCH 4  // Save_check: the chip doesn't look like the file; ask first
+#define SAVE_WRITE 5     // Save_check: copy the chip
+u32 Save_check(TCHAR *filename, u32 savesize);
 u32 Save_savefile(TCHAR *filename, u32 savesize);
+// Finishes or undoes a copy a power cut interrupted (the .tmp and .bak files
+// beside filename); run at boot and before a copy or launch
+void Save_recover(const TCHAR *filename);
 // The pending-save record in the kernel's NOR: 0x11, the size in 512-byte
 // units, then the save's file name from halfword 2. Torii keeps the save
 // type at halfword SAV_INFO_TYPE, past the longest name, for the log (0

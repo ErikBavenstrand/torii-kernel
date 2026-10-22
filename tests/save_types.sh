@@ -47,7 +47,7 @@ run_case() {
   boot $(nav_launch /Test.gba "save=$type" at=190) -s 600:"$shots/1-game.png"
 
   # Power-on 2: confirm the save prompt so the kernel writes Test.sav.
-  boot -k 100:A -k 106:- -s 300:"$shots/2-menu.png"
+  boot -k 100:A -k 106:- -s 300:"$shots/2-menu.png" -f 800
   local sav=$cart/test.sav
   mtype -i "$cart/sd.img" ::/SAVER/Test.sav >"$sav" 2>/dev/null || fail "$name: no SAVER/Test.sav"
   [ "$(hex_at "$sav" "$offset")" = 4f4d525801 ] ||
@@ -80,7 +80,7 @@ short_eeprom() {
   OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch /Test.gba save=2 at=270) \
     -f 600 >/dev/null 2>"$log"
   grep -q "save: grew Test.sav from 512 to 8192 bytes" "$log" || fail "eeprom8k-short: $(grep 'save: ' "$log")"
-  OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -k 100:A -k 106:- -f 300 >/dev/null 2>>"$log"
+  OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -k 100:A -k 106:- -f 800 >/dev/null 2>>"$log"
   local sav=$cart/test.sav
   mtype -i "$cart/sd.img" ::/SAVER/Test.sav >"$sav" || fail "eeprom8k-short: no SAVER/Test.sav"
   [ "$(stat -c %s "$sav")" = 8192 ] || fail "eeprom8k-short: Test.sav is $(stat -c %s "$sav") bytes"
