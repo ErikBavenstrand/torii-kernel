@@ -320,7 +320,30 @@ class Fetcher:
             return self.path(system, name)
         if state == "missing" or self.offline or self.stopped:
             return None
-        url = self.url(system, name)
+        data = self.download(system, name, self.url(system, name))
+        if data is None:
+            return None
+        if not data.startswith(PNG_MAGIC):
+            # libretro-thumbnails keeps some pictures as links to another
+            # file; the server then sends the target's name as text
+            target = alias_target(data)
+            if target is not None:
+                data = self.download(
+                    system, name, self.url(system, target), quiet_miss=True
+                )
+                if data is None:
+                    if not self.stopped:
+                        self.miss(system, name)
+                    return None
+        if not data.startswith(PNG_MAGIC):
+            # Not taken for a miss or cached: a proxy's page, say
+            print(f"art-scrape: {self.url(system, name)}: not a PNG", file=sys.stderr)
+            return None
+        return self.store(system, name, data)
+
+    def download(self, system, name, url, quiet_miss=False):
+        """The body at url; None if the server hasn't it (a miss for name,
+        unless quiet_miss) or fetching stopped."""
         for attempt in range(RETRIES + 1):
             try:
                 data = self.request(url)
@@ -329,7 +352,8 @@ class Fetcher:
                 if 400 <= e.code < 500 and e.code != 429:
                     # 404 mostly; libretro-thumbnails answers 403 for some
                     # names (a link to a picture it lacks), every time
-                    self.miss(system, name)
+                    if not quiet_miss:
+                        self.miss(system, name)
                     return None
                 if 500 <= e.code < 600 and attempt < RETRIES:
                     time.sleep(self.retry_wait * 2**attempt)
@@ -348,10 +372,9 @@ class Fetcher:
                     f"can't reach {self.base_url} ({getattr(e, 'reason', e)})"
                 )
                 return None
-        if not data.startswith(PNG_MAGIC):
-            # Not taken for a miss or cached: a proxy's page, say
-            print(f"art-scrape: {url}: not a PNG", file=sys.stderr)
-            return None
+        return data
+
+    def store(self, system, name, data):
         path = self.path(system, name)
         tmp = path.with_name(path.name + ".part")
         try:
@@ -368,6 +391,19 @@ class Fetcher:
 
     def counted(self):
         self.downloaded += 1
+
+
+def alias_target(data):
+    """The picture name a libretro-thumbnails link's text gives, else None."""
+    if len(data) > 300:
+        return None
+    try:
+        text = data.decode("utf-8").strip()
+    except UnicodeDecodeError:
+        return None
+    if not text.endswith(".png") or "\n" in text or "/" in text:
+        return None
+    return text[: -len(".png")]
 
 
 # --- The run -------------------------------------------------------------------------------

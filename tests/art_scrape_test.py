@@ -572,6 +572,30 @@ class Scrape(unittest.TestCase):
         self.assertIn("stopped fetching: can't reach", err)
         self.assertIn("/GBA/Wars.gba: not fetched", out)
 
+    def test_alias_is_followed(self):
+        # libretro-thumbnails keeps some pictures as links: the server sends
+        # the target's name as text, and the picture is that file's
+        real = self.server.routes[thumb(GBA_SYS, "Advance Wars (USA)")]
+        self.server.routes[thumb(GBA_SYS, "Advance Wars (USA)")] = (
+            b"Advance Wars Alias (USA).png"
+        )
+        self.server.routes[thumb(GBA_SYS, "Advance Wars Alias (USA)")] = real
+        status, _, err = self.run_tool("--console", "GBA")
+        self.assertEqual(status, 0, err)
+        self.assertNotIn("not a PNG", err)
+        self.assertTrue(self.cached(GBA_SYS, "Advance Wars (USA)").is_file())
+        self.assertTrue(self.art("/GBA/Wars.gba").exists())
+
+    def test_alias_to_nothing_is_a_miss(self):
+        self.server.routes[thumb(GBA_SYS, "Advance Wars (USA)")] = (
+            b"Nothing Here (USA).png"
+        )
+        status, _, err = self.run_tool("--console", "GBA")
+        self.assertEqual(status, 0, err)
+        self.assertIn(
+            f"{GBA_SYS}/Advance Wars (USA)", (self.cache / "misses.txt").read_text()
+        )
+
     def test_not_a_picture(self):
         self.server.routes[thumb(GBA_SYS, "Advance Wars (USA)")] = b"<html>oops</html>"
         status, out, err = self.run_tool("--console", "GBA")

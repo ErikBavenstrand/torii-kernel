@@ -37,7 +37,7 @@ What v0.4.2 left open, checked against the code on 2026-10-22. Strike an item ou
 - ~~Every 32 names or 10 s the index is rebuilt by a full card walk.~~ Fixed (`9fc6f29`): the names go into the index in place, one per job step (`library_name_found`), and a single walk follows the run. The index is written again; its walk hash is stale until that walk, so a run stopped by a launch costs the next boot one rebuild.
 - ~~An unreadable game is read again, with its error logged, after every walk.~~ Fixed (`d30126d`): up to 64 paths are remembered until the next boot.
 - ~~The cursor's game follows a new sort on console pages only, and only across one new index.~~ Fixed (`9fc6f29`): the page keeps the cursor game's path as the cursor moves and finds it again in the rebuilt list, on console pages and Favourites (Recent keeps its rows; its order is the clock's).
-- The in-place redraw of a new index can show mixed old and new rows for a frame or two. Now it lands twice a run (the names in place, then the walk's index) and was not measured again; settle it on a cart.
+- The in-place redraw of a new index can show mixed old and new rows: the refresh pool takes two full-width rows a frame (`REFRESH_ROWS`), so a page of about nine lands over five frames (80 ms). Left as it is: a bigger pool costs EWRAM (10 KB for a page) the kernel lacks; drawing only the rows whose text changed would end it. Confirm on a cart. Was: Now it lands twice a run (the names in place, then the walk's index) and was not measured again; settle it on a cart.
 - Left, unmeasured: what one name costs in the index (a rename in place moves two runs of the order; one per job step), and how much of the pool a run of thousands of names takes before the walk (each adds its file name, key and display name); a full pool falls back to the walk alone.
 
 ### Tools and tests
@@ -63,7 +63,7 @@ F1–F3 (new games named and boxed on the cart) made these; the user confirmed F
 - The rename's card walk blocks the keyboard for its length, unmeasured on a cart (about 1 s per 2,000 files estimated).
 - A same-size file swapped in between a names-update and the next boot, with an older date, keeps the old CRC.
 - The Settings held-scroll golden hashes every frame, so code-layout changes force a re-record.
-- 9 cached art-pack pictures weren't PNGs (libretro aliases served as text?): those games get no cover. The pack's conversion (pure-Python `art.py`, about 29 s on 14 cores) is its limit past 256 requests at a time.
+- ~~9 cached art-pack pictures weren't PNGs: those games get no cover.~~ Fixed: libretro-thumbnails keeps some pictures as links, and the server sends the target's name as text; `art_scrape` now follows one (a link to nothing is a miss). Rerun `just art-pack` to fetch them (`test_alias_is_followed`). The pack's conversion (pure-Python `art.py`, about 29 s on 14 cores) is its limit past 256 requests at a time.
 
 ### Open questions and cart checks
 
