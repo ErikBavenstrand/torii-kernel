@@ -228,17 +228,60 @@ logged "$cart/1.log" "names: identifying new games stopped for a launch (1 done)
 logged "$cart/1.log" "names: wrote 1 CRCs to /torii/crc.new"
 not_logged "$cart/1.log" "names: wrote /torii/crc.txt"
 not_logged "$cart/1.log" "names: /GBA/Big.gba is"
+# The 2 MB game was being read: where it was goes to crc.part, and the next
+# boot goes on from there
+grep -qE '^kernel: names: /GBA/Big.gba: [0-9]+ of 2097152 bytes read, kept for the next time' "$cart/1.log" ||
+  fail "the game cut off wasn't kept: $(grep -E '^kernel: names' "$cart/1.log" | tail -4)"
+mdir -i "$cart/sd.img" ::/torii/crc.part >/dev/null 2>&1 || fail "no crc.part"
 boot "$cart" "$cart/2.log" -k 100:A -k 106:- -f 6000 -u "names: wrote /torii/crc.txt" # A: "Save sav?"
 logged "$cart/2.log" "names: 1 CRCs from /torii/crc.new"
+grep -qE '^kernel: names: /GBA/Big.gba was [0-9]+ of 2097152 bytes read before the last launch' "$cart/2.log" ||
+  fail "crc.part wasn't read: $(grep -E '^kernel: names' "$cart/2.log" | head -6)"
+grep -qE '^kernel: names: /GBA/Big.gba goes on from [0-9]+ of 2097152 bytes' "$cart/2.log" ||
+  fail "the game wasn't read on: $(grep -E '^kernel: names' "$cart/2.log" | head -8)"
 logged "$cart/2.log" "names: identified 8 of 8 new games"
 logged "$cart/2.log" "names: wrote /torii/crc.txt"
 not_logged "$cart/2.log" "names: /GBA/Wars.gba is"
 grep "kernel: names: identified" "$cart/2.log" | sed 's/^kernel: /  /'
 [ "$(crc_lines "$cart" | wc -l)" = 9 ] || fail "crc.txt holds $(crc_lines "$cart")"
 if mdir -i "$cart/sd.img" ::/torii/crc.new >/dev/null 2>&1; then fail "crc.new is still there"; fi
+if mdir -i "$cart/sd.img" ::/torii/crc.part >/dev/null 2>&1; then fail "crc.part is still there"; fi
+big=$(python3 -c 'import sys, zlib; print("%08X" % zlib.crc32(open(sys.argv[1], "rb").read()))' "$cart/Big.gba")
+[ "$(crc_lines "$cart" | awk -F'\t' '$4 == "/GBA/Big.gba" { print $1 }')" = "$big" ] ||
+  fail "Big.gba's CRC isn't $big (read on from a partial): $(crc_lines "$cart")"
 no_errors "$cart/1.log"
 no_errors "$cart/2.log"
 echo "PASS: a launch stops the background's CRCs and writes only the new ones, and the next boot goes on"
+
+# The library's games after Recent's are identified smallest first, by size
+# class (names_store.c, pass_limit): a 4.5 MB game written first waits for
+# the 1.5 MB and the 100 KB game written after it
+cart=$carts/order
+fixture_card "$cart" --no-crc
+head -c 4718592 /dev/urandom >"$cart/Huge.gba"
+head -c 1572864 /dev/urandom >"$cart/Mid.gba"
+head -c 102400 /dev/urandom >"$cart/Tiny.gba"
+mcopy -i "$cart/sd.img" "$cart/Huge.gba" "$cart/Mid.gba" "$cart/Tiny.gba" ::/GBA/
+boot "$cart" "$cart/1.log" -f 9000 -u "names: wrote /torii/crc.txt"
+order=$(grep -oE '^kernel: names: /GBA/(Huge|Mid|Tiny).gba is' "$cart/1.log" | sed -E 's|.*/GBA/([A-Za-z]+.gba) is|\1|' | tr '\n' ' ')
+[ "$order" = "Tiny.gba Mid.gba Huge.gba " ] || fail "the games weren't read smallest first: $order"
+no_errors "$cart/1.log"
+echo "PASS: the library's new games are identified smallest first"
+
+# A game the card can't read is tried once a boot: the walk that a found
+# name causes (Wars's) starts the background again, which skips it
+cart=$carts/unreadable
+fixture_card "$cart" --no-crc
+head -c 307200 /dev/urandom >"$cart/Bad.gba"
+mcopy -i "$cart/sd.img" "$cart/Bad.gba" ::/GBA/Bad.gba
+# shellcheck source=tests/carts.sh
+. tests/carts.sh
+sectors=$(sd_sectors "$cart/sd.img" /GBA/Bad.gba)
+OMEGA_SD_READ_ERROR=$sectors boot "$cart" "$cart/1.log" -f 6000 -u "names: wrote /torii/crc.txt"
+[ "$(grep -c 'kernel error: names: reading /GBA/Bad.gba failed' "$cart/1.log")" = 1 ] ||
+  fail "Bad.gba was tried $(grep -c 'reading /GBA/Bad.gba failed' "$cart/1.log") times: $(grep -E '^kernel( error)?: (names|library)' "$cart/1.log" | tail -8)"
+[ "$(grep -c 'library: the card changed: building a new index' "$cart/1.log")" -ge 1 ] || fail "no walk followed the names found"
+echo "PASS: a game the card can't read is tried once a boot"
 
 # crc.txt cut short by a write (left with zeros): its lines read in the
 # same pass as its check are dropped, and the backup's taken

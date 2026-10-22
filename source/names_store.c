@@ -2,6 +2,7 @@
 // crc.txt loaded into PSRAM, the walk's checks of the cache, Identify
 // library's job and crc.txt's writes.
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "namesdb.h"
@@ -24,6 +25,12 @@
 #define NAMES_JOURNAL "/torii/crc.new"
 #define NAMES_JOURNAL_BAK "/torii/crc.new.bak"
 #define NAMES_JOURNAL_MAX 0x10000u
+// A big game's CRC read so far when a launch stopped it (crc.part, one line
+// with its own check): the next time the job reaches that game it reads on
+// from there, so a game of 32 MB isn't started over at every short visit
+#define NAMES_PART_FILE "/torii/crc.part"
+#define NAMES_PART_BAD_MAX 64  // unreadable games remembered until the next boot
+#define NAMES_SCAN_RECORDS 128  // library records looked at per call to find the next game
 #define NAMES_DIR "/torii"
 #define NAMES_ART_DIR "/torii/art"  // B22's covers, looked up by CRC
 #define NAMES_CACHE_FILE_MAX 0x100000u  // the most of crc.txt read (1 MB)
@@ -102,7 +109,7 @@ static struct {
 	u8 mode, step;
 	u8 file_open;
 	u8 want_new;  // the last walk found games without a CRC: M_NEW once the library rests
-	u8 pass;  // M_NEW: 0 Recent's games, 1 the library's
+	u8 pass;  // M_NEW: 0 Recent's games, then the library's by size class (pass_limit)
 	u8 console;
 	u8 logged_full;
 	// crc.txt's write (safefile.h's two copies, in steps through N.u.fil)
@@ -131,6 +138,16 @@ static struct {
 	u32 changes;  // CRCs computed this session: names_changes
 	u32 crc, size, date, read;
 	u8 seen[NAMES_CACHE_MAX / 8];
+	// The game a launch cut off: crc.part's, until the job reads it on
+	struct {
+		u8 valid;
+		u32 crc, read, size, date;
+		char path[NAMES_PATH_MAX + 1];
+	} part;
+	// Games that couldn't be read this boot (a hash of each path): the job
+	// doesn't try them again after every walk
+	u32 bad[NAMES_PART_BAD_MAX];
+	u8 bad_count;
 	// Records whose CRCs crc.txt doesn't hold yet: new since the last write
 	// began, and in the write under way
 	u8 fresh[NAMES_CACHE_MAX / 8], writing[NAMES_CACHE_MAX / 8];
@@ -196,6 +213,7 @@ static void write_lost(void)
 }
 
 static void journal_read(void);
+static void part_read(void);
 
 // --- Loading ------------------------------------------------------------------
 
@@ -299,6 +317,8 @@ static void load_done(void)
 		tlog("names: the CRC cache is full: %s isn't written back", NAMES_CACHE_FILE);
 	}
 	N.dirty = N.journal ? DIRTY_HARD : 0;  // the journal's lines go into crc.txt
+	if (N.active)
+		part_read();
 	N.phase = P_DONE;
 	tlog("names: %lu files' CRCs from %s in %lu ms%s", (unsigned long)N.lines_read, NAMES_CACHE_FILE,
 	     (unsigned long)ms_since(N.started), N.cache_ok ? "" : " (it isn't written back)");
@@ -806,9 +826,133 @@ static void write_step(void)
 	tlog("names: wrote %s in %lu ms", NAMES_CACHE_FILE, (unsigned long)ms_since(N.wstarted));
 }
 
+// --- Games that can't be read, and the one a launch cut off --------------------------
+
+static u32 path_hash(const char *path)
+{
+	u32 h = 2166136261u;
+	for (; *path; path++)
+		h = (h ^ (u8)*path) * 16777619u;
+	return h;
+}
+
+static int is_bad(const char *path)
+{
+	u32 h = path_hash(path);
+	for (u32 i = 0; i < N.bad_count; i++)
+		if (N.bad[i] == h)
+			return 1;
+	return 0;
+}
+
+// N.path can't be read: not tried again until the next boot
+static void mark_bad(void)
+{
+	if (N.bad_count < NAMES_PART_BAD_MAX && !is_bad(N.path))
+		N.bad[N.bad_count++] = path_hash(N.path);
+}
+
+// crc.part's text without its check: the CRC and the bytes read, the file's
+// size and date, then its path
+static u32 part_text(char *buf, u32 size)
+{
+	return (u32)snprintf(buf, size, "%08lX\t%lu\t%lu\t%08lX\t%s", (unsigned long)N.crc, (unsigned long)N.read,
+			     (unsigned long)N.size, (unsigned long)N.date, N.path);
+}
+
+// A launch cut the game being read: where it was goes to crc.part
+static void part_write(void)
+{
+	char *text = (char *)N.buf;
+	u32 len = part_text(text, sizeof(N.buf) - 16);
+	if (len >= sizeof(N.buf) - 16)
+		return;
+	len += (u32)snprintf(text + len, 16, "\t%08lX", (unsigned long)crc32(text, len));
+	FIL *f = &N.u.fil;  // the job is stopped: the union is free
+	UINT done = 0;
+	if (f_open(f, NAMES_PART_FILE, FA_WRITE | FA_CREATE_ALWAYS) != FR_OK)
+		return;
+	FRESULT fr = f_write(f, text, len, &done);
+	f_close(f);
+	if (fr != FR_OK || done != len) {
+		f_unlink(NAMES_PART_FILE);
+		return;
+	}
+	tlog("names: %s: %lu of %lu bytes read, kept for the next time", N.path, (unsigned long)N.read,
+	     (unsigned long)N.size);
+}
+
+// The partial CRC a launch left, if its line holds: N.part. A damaged or
+// missing file is no partial (the game is read from its start)
+static void part_read(void)
+{
+	N.part.valid = 0;
+	FIL *f = &N.u.fil;  // the job is stopped: the union is free
+	UINT got = 0;
+	if (f_open(f, NAMES_PART_FILE, FA_READ) != FR_OK)
+		return;
+	char *text = (char *)N.buf;
+	FRESULT fr = f_read(f, text, sizeof(N.buf) - 1, &got);
+	f_close(f);
+	f_unlink(NAMES_PART_FILE);  // used once: the game is read to its end, or started over
+	if (fr != FR_OK || got < 12)
+		return;
+	text[got] = 0;
+	char *tab = strrchr(text, '\t');
+	if (!tab || strlen(tab) != 9)
+		return;
+	u32 len = (u32)(tab - text);
+	char *end;
+	unsigned long check = strtoul(tab + 1, &end, 16);
+	if (*end || check != crc32(text, len))
+		return;
+	text[len] = 0;
+	unsigned long v[4];
+	char *at = text;
+	for (u32 i = 0; i < 4; i++) {
+		v[i] = strtoul(at, &end, i == 1 || i == 2 ? 10 : 16);
+		if (end == at || *end != '\t')
+			return;
+		at = end + 1;
+	}
+	unsigned long crc = v[0], read = v[1], size = v[2], date = v[3];
+	if (*at != '/' || strlen(at) > NAMES_PATH_MAX || !read || read >= size || read % NAMES_IO_BYTES)
+		return;
+	N.part.crc = (u32)crc;
+	N.part.read = (u32)read;
+	N.part.size = (u32)size;
+	N.part.date = (u32)date;
+	memcpy(N.part.path, at, strlen(at) + 1);
+	N.part.valid = 1;
+	tlog("names: %s was %lu of %lu bytes read before the last launch", N.part.path, (unsigned long)read,
+	     (unsigned long)size);
+}
+
 // --- Identify library ------------------------------------------------------------
 
-// The next game to identify into N.path, N.console; 0 when there is none
+// The library's games M_NEW identifies after Recent's, by size: one pass
+// per class below, smallest first, so a game of 32 MB (minutes of resting
+// menu) doesn't hold up the small ones behind it. A pass looks at the
+// records in walk order, which the rebuilds new names cause keep.
+static const u32 pass_limit[] = {1u << 20, 4u << 20, 8u << 20, 16u << 20, 0xFFFFFFFFu};
+#define PASS_LAST (sizeof(pass_limit) / sizeof(pass_limit[0]))
+
+// Whether the library record rec belongs to the pass under way
+static int in_pass(u32 rec)
+{
+	if (N.mode != M_NEW)
+		return 1;
+	u32 size = library_size(rec), lo = N.pass > 1 ? pass_limit[N.pass - 2] : 0;
+	return size >= lo && (N.pass == PASS_LAST || size < pass_limit[N.pass - 1]);
+}
+
+enum {
+	NEXT_NONE,  // no game is left
+	NEXT_GAME,  // N.path, N.console
+	NEXT_LATER,  // none yet: the records looked at this call had none
+};
+
+// The next game to identify into N.path, N.console
 static int next_game(void)
 {
 	if (N.mode == M_NEW && N.pass == 0) {
@@ -819,24 +963,32 @@ static int next_game(void)
 				continue;
 			memcpy(N.path, p, len + 1);  // out of PSRAM before FatFs sees it
 			// Only the library's games: crc.txt keeps no others
-			if (library_find(N.path) == LIBRARY_NONE)
+			if (library_find(N.path) == LIBRARY_NONE || is_bad(N.path))
 				continue;
 			N.console = (u8)library_console_of(N.path);
-			return 1;
+			return NEXT_GAME;
 		}
 		N.pass = 1;  // then the library's
 		N.cursor = 0;
 	}
-	// The records in walk order, which the rebuilds new names cause keep
-	// (sorted order would change under the cursor)
-	while (N.cursor < library_records()) {
+	// A bounded look, so a pass with few games to read costs no frame much
+	for (u32 looked = 0; looked < NAMES_SCAN_RECORDS;) {
+		if (N.cursor >= library_records()) {
+			if (N.mode != M_NEW || N.pass >= PASS_LAST)
+				return NEXT_NONE;
+			N.pass++;
+			N.cursor = 0;
+			continue;
+		}
 		u32 rec = N.cursor++;
-		if ((library_flags(rec) & LIB_F_GONE) || !library_path(rec, N.path, sizeof(N.path)))
+		looked++;
+		if ((library_flags(rec) & LIB_F_GONE) || !in_pass(rec) || !library_path(rec, N.path, sizeof(N.path)) ||
+		    is_bad(N.path))
 			continue;
 		N.console = (u8)(library_flags(rec) & LIB_F_CONSOLE);
-		return 1;
+		return NEXT_GAME;
 	}
-	return 0;
+	return NEXT_LATER;
 }
 
 // The index sorts again, by the names found since it last did
@@ -870,10 +1022,13 @@ static int identify_step(void)
 	UINT got = 0;
 	switch (N.step) {
 	case I_NEXT: {
-		if (!next_game()) {
+		int next = next_game();
+		if (next == NEXT_NONE) {
 			identify_finish();
 			return JOB_DONE;
 		}
+		if (next == NEXT_LATER)
+			return JOB_MORE;
 		N.done++;
 		u32 known = names_cache_find(&N.cache, N.path);
 		if (known != NAMES_CACHE_NONE && was_seen(known) && N.seen_ok &&
@@ -883,6 +1038,7 @@ static int identify_step(void)
 		FRESULT fr = f_stat(N.path, &N.u.fi);
 		if (fr != FR_OK) {
 			tlog("names: %s can't be read (FatFs error %d)", N.path, fr);
+			mark_bad();
 			return JOB_MORE;
 		}
 		N.size = (u32)N.u.fi.fsize;
@@ -904,16 +1060,30 @@ static int identify_step(void)
 		fr = f_open(&N.u.fil, N.path, FA_READ);
 		if (fr != FR_OK) {
 			tlog("names: %s can't be opened (FatFs error %d)", N.path, fr);
+			mark_bad();
 			return JOB_MORE;
 		}
 		N.file_open = 1;
 		N.crc = N.read = 0;
+		// The game a launch cut off goes on from where it was, if it is the
+		// file it was
+		if (N.part.valid && !strcmp(N.part.path, N.path)) {
+			if (N.part.size == N.size && N.part.date == N.date && f_lseek(&N.u.fil, N.part.read) == FR_OK &&
+			    f_tell(&N.u.fil) == N.part.read) {
+				N.crc = N.part.crc;
+				N.read = N.part.read;
+				tlog("names: %s goes on from %lu of %lu bytes", N.path, (unsigned long)N.read,
+				     (unsigned long)N.size);
+			}
+			N.part.valid = 0;
+		}
 		N.step = I_READ;
 		return JOB_MORE;
 	}
 	case I_READ:
 		if (f_read(&N.u.fil, N.buf, NAMES_IO_BYTES, &got) != FR_OK) {
 			tlog_error("names: reading %s failed at %lu bytes", N.path, (unsigned long)N.read);
+			mark_bad();
 			close_file();
 			N.step = I_NEXT;
 			return JOB_MORE;
@@ -930,6 +1100,7 @@ static int identify_step(void)
 		if (N.read != N.size) {
 			tlog_error("names: %s gave %lu of its %lu bytes", N.path, (unsigned long)N.read,
 				   (unsigned long)N.size);
+			mark_bad();
 			return JOB_MORE;
 		}
 		u32 n = names_cache_put(&N.cache, N.path, N.read, N.date, N.crc, NAMES_CRC | NAMES_DATE);
@@ -1174,10 +1345,14 @@ static void journal_read(void)
 
 void names_before_launch(void)
 {
+	// A game being read, before the cancel closes it
+	int cut = N.mode != M_NONE && N.step == I_READ && N.file_open && N.read && N.read < N.size;
 	if (job_running(N.job))
 		job_cancel(N.job);  // closes a file it read or wrote
 	N.job = JOB_NONE;
 	close_file();
+	if (cut && N.phase == P_DONE && N.cache_ok && N.active)
+		part_write();
 	if (N.mode == M_ALL)
 		tlog("names: identifying stopped for a launch (%lu of %lu games done)", (unsigned long)N.done,
 		     (unsigned long)N.total);
