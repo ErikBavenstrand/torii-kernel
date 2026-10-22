@@ -29,8 +29,8 @@ Then a line per console: games, named, with art.
 
 --write-templates writes two files into the current folder (or --out DIR),
 never onto the card: names-todo.txt in `just names-add`'s FILE format (a
-game's file name, a tab, the name it shows now, to edit) for the unnamed
-games and the possible wrong matches, and art-todo.txt, the games needing
+game's card path, a tab, its file or dats name, to edit; a line left as it
+is pins that name) for the unnamed games and the possible wrong matches, and art-todo.txt, the games needing
 `just art-add`.
 """
 
@@ -93,8 +93,19 @@ def significant(words):
     return {w for w in words if w not in STOP and (len(w) >= 3 or w.isdigit())}
 
 
-def initials(words):
-    return "".join(w if w.isdigit() else w[0] for w in words if w not in STOP)
+def initials(words, stop=STOP):
+    return "".join(w if w.isdigit() else w[0] for w in words if w not in stop)
+
+
+def acronym(short, words, subtitle):
+    """Whether short (a file name's joined words) is an acronym of the dats
+    name's words or of its subtitle (the part after " - "), with or without
+    its stop words, a trailing number allowed ("FE8", "TMC", "SML2")."""
+    core = short.rstrip("0123456789")
+    if len(core) < 2:
+        return False
+    forms = [initials(w, stop) for w in (words, subtitle) for stop in (STOP, ())]
+    return any(f and (short == f or f.startswith(core)) for f in forms)
 
 
 def unlike(file_name, dat_name):
@@ -105,10 +116,11 @@ def unlike(file_name, dat_name):
     a, b = title_words(file_name), title_words(dat_name)
     if not a or not b:
         return False
-    if significant(a) & significant(b):
+    if any(not w.isdigit() for w in significant(a) & significant(b)):
         return False
     ja, jb = "".join(a), "".join(b)
-    if ja in (initials(b), initials(b).rstrip("0123456789")) or jb == initials(a):
+    sub = title_words(dat_name.split(" - ", 1)[1]) if " - " in dat_name else []
+    if acronym(ja, b, sub) or jb == initials(a):
         return False
     if ja in jb or jb in ja:
         return False
@@ -139,7 +151,10 @@ def load_tables(sd, dats):
     if db.is_file():
         try:
             version, tables = names_db.read_db(db.read_bytes())
-            return tables, codes, f"/torii/names.db (dats {version or '?'})"
+            where = f"/torii/names.db (dats {version or '?'})"
+            if not codes:
+                where += "; no cached dats, so patched GBA dumps count as unnamed"
+            return tables, codes, where
         except (names_db.NamesError, UnicodeError, ValueError) as e:
             print(f"library-report: {db}: {e}; not used", file=sys.stderr)
     if dat_tables is not None:
@@ -188,7 +203,11 @@ def survey(sd, dats, cache):
     out = []
     for card_path, file_path, console in games:
         g = {"path": card_path, "console": console, "dat": None, "art": None}
-        size = Path(file_path).stat().st_size
+        try:
+            size = Path(file_path).stat().st_size
+        except OSError as e:
+            print(f"library-report: {card_path}: {e}; skipped", file=sys.stderr)
+            continue
         rec = records.get(card_path.lower())
         crc = rec[0] if names_db.record_holds(rec, file_path, size, written) else None
         g["crc"] = crc
@@ -305,18 +324,18 @@ def report(sd, games, where, pack, out=print):
     return no_name, no_crc, no_art, wrong
 
 
-def write_templates(folder, no_name, no_crc, wrong, no_art):
+def write_templates(folder, no_name, wrong, no_art):
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
     names = [
-        "# For `just names-add SD names-todo.txt`: a game's file name, a tab, its name.\n",
+        "# For `just names-add SD names-todo.txt`: a game's card path, a tab, its name.\n",
         "# Edit the names; delete the lines to leave alone (an empty name removes one).\n",
     ]
     seen = set()
-    for g in no_name + no_crc + wrong:
+    for g in no_name + wrong:
         if g["path"] not in seen:
             seen.add(g["path"])
-            names.append(f"{Path(g['path']).name}\t{g['name']}\n")
+            names.append(f"{g['path']}\t{g['name']}\n")
     arts = [
         "# Games without box art: put a picture named after each file (Game.png for\n",
         "# /GBA/Game.gba) in the card's /torii/art/custom-src, then `just art-add SD`.\n",
@@ -365,10 +384,10 @@ def main(argv):
     except OSError as e:
         print(f"library-report: {names_db.os_error(e)}", file=sys.stderr)
         return 1
-    no_name, no_crc, no_art, wrong = report(sd, games, where, pack)
+    no_name, _, no_art, wrong = report(sd, games, where, pack)
     if args.write_templates:
         try:
-            files = write_templates(args.out, no_name, no_crc, wrong, no_art)
+            files = write_templates(args.out, no_name, wrong, no_art)
         except OSError as e:
             print(f"library-report: {e}", file=sys.stderr)
         else:

@@ -51,12 +51,17 @@ class Compare(unittest.TestCase):
         ("DKC.gba", "Donkey Kong Country (USA)"),
         ("Oracle of Ages.gbc", "Legend of Zelda, The - Oracle of Ages (USA)"),
         ("Dragon Warrior Monsters.gbc", "Dragon Quest Monsters (Japan)"),
+        ("TMC.gba", "Legend of Zelda, The - The Minish Cap (USA)"),
+        ("AoS.gba", "Castlevania - Aria of Sorrow (USA)"),
+        ("GS2.gba", "Golden Sun - The Lost Age (USA, Europe)"),
+        ("FE8.gba", "Fire Emblem - The Sacred Stones (USA)"),
         ("ポケモン.gba", "Pocket Monsters - Ruby (Japan)"),  # nothing to compare
     )  # fmt: skip
     UNLIKE = (
         ("Zelda.gba", "Mario Kart - Super Circuit (USA)"),
         ("game1.gba", "Mario Kart - Super Circuit (USA)"),
         ("Advance Wars.gba", "Golden Sun (USA, Europe)"),
+        ("rom 1.gba", "Final Fantasy I & II - Dawn of Souls (USA)"),
     )
 
     def test_pairs(self):
@@ -152,7 +157,7 @@ No art (6): fix: `just art-add SD` (pictures named after the files)
         self.assertIn("  NES: 1 games, 1 named, 1 with art\n", out)
         names = (self.out / "names-todo.txt").read_text()
         self.assertIn(
-            "Hack of Minish.gba\tHack of Minish\nNew.gba\tNew\nZelda.gba\tAdvance Wars (USA)\n",
+            "/GBA/Hack of Minish.gba\tHack of Minish\n/GBA/Zelda.gba\tAdvance Wars (USA)\n",
             names,
         )
         arts = (self.out / "art-todo.txt").read_text().splitlines()
@@ -166,7 +171,7 @@ No art (6): fix: `just art-add SD` (pictures named after the files)
                 ["add", str(self.sd), str(self.out / "names-todo.txt"), "--dry-run"]
             )
         self.assertEqual(status, 0)
-        self.assertIn("3 games named", added.getvalue())
+        self.assertIn("2 games named", added.getvalue())
 
     def test_famicom_is_in_the_pack(self):
         # The pack's NES cover: only a missing pack leaves Famicom without art
