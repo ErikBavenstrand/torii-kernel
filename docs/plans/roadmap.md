@@ -53,7 +53,7 @@ Everything the kernel stores lives under `/torii/`. ROMs can be anywhere.
   torii.ini               settings: commented key = value, with "version ="
   layout.ini              layout version, for migrations
   saves/<rom path>/<slot>.sav
-  states/<rom path>/<slot>/<n>.state
+  states/<rom path>/<slot>/<n>.state   reserved; written from v0.7
   backups/<rom path>/<slot>/<timestamp>.sav
   games/<code>-<crc>.ini  per-game overrides (save type, RTC, cheats)
   art/<system>/{title,box}/<code or name>.lz
@@ -65,7 +65,9 @@ Everything the kernel stores lives under `/torii/`. ROMs can be anywhere.
   favorites.txt
 ```
 
-A setting can keep saves next to the ROM instead. Importing old `SAVER/` saves is deferred.
+A setting can keep saves next to the ROM instead. Old `SAVER/` saves are not imported: v0.5 keeps no backwards compatibility (decided 2026-10-22).
+
+v0.5 ships all of this at once: integrity, slots, history and both save managers are built and tested locally, then released together (decided 2026-10-22). Save states are not part of it; they come with v0.7's in-game menu.
 
 ### Integrity
 
@@ -91,13 +93,19 @@ The kernel's copy is made safe like this:
    room on a full card has already truncated the good file it replaces (`tests/saves.sh
    full` leaves a cut-short `Test.sav`); step 1's tmp file and step 2's rename end that.
 6. **Tests:** the emulated cart cuts power at every step, and the test checks that a good
-   save always survives.
+   save always survives. Each step logs a numbered `tlog` marker; the emulator cuts power at marker N, and a test loops N over all markers, checking that the save and its `.bak` survive and boot recovers.
 7. **Save-type changes:** when a game's save type changes, for example EEPROM 8K to 512, its
    existing save is converted or kept untouched in the slot's history. It is never silently
    truncated.
 
 ### Slots and history
 
+Decided 2026-10-22: a version is kept only when the chip differs from the current file, at the copy-to-SD after a play session; N defaults to 5 (Settings). Backups are named `<n>-<YYYYMMDD-HHMMSS>.sav`, where the rising counter `n` fixes the order, so a wrong clock can't reorder or overwrite history. Saves live in `/torii/saves/` by default, next to the ROM by setting. A save-type change is never converted: the old file stays untouched in the slot's history, the new type starts from the chip's blank state, and a notice is shown.
+
+- **First slot:** every game's first slot is `Main` (`Main.sav`). It can be renamed, and deleted once another slot exists.
+- **Creating a slot:** a game with one slot launches straight in. Hold Select while pressing A to open the picker, which lists the slots and a "New slot…" row; the per-game manager has the same action. A new slot asks for a name (on-screen keyboard), then "Blank" (default) or "Copy of <current slot>". A game with two or more slots shows the picker on every launch, the last slot preselected.
+- **Where things live:** the per-game manager is a "Saves" entry in the game's Start menu; the global manager is a "Saves" row in Settings. The picker stays a chooser (slots, New, Rename on X); the rest is in the manager.
+- **Slot names:** UTF-8, at most 24 characters, unique per game ignoring case; `\ / : * ? " < > |` stripped, trailing dots and spaces trimmed. A rename writes a journal entry first (old and new name) and boot recovery finishes or undoes it, like the `.bak` swap; the power-cut test sweeps rename too.
 - **Slots:** named, deliberate branches, such as Main, Nuzlocke or Speedrun. A game with more
   than one slot shows a picker at launch, with the last slot preselected.
 - **History:** each slot keeps its last N versions, with N set in settings. You don't launch
