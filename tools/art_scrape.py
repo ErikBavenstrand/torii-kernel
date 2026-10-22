@@ -20,7 +20,9 @@ kernel hides) it:
    game's box by the game code). --keep-stale only lists them. Custom art
    is never touched.
    Then keeps what the card has: custom art (/torii/art/custom/<file name>.bin,
-   from `just art-add`) and art already at /torii/art/<CRC32>.bin.
+   from `just art-add`) and art already at /torii/art/<CRC32>.bin. A game
+   whose CRC the full art pack (/torii/art.pak, `just art-pack`) covers is
+   skipped too: the kernel shows the pack's cover.
 3. Looks the CRC up in libretro-database's No-Intro dats (downloaded once to
    dist/dats, shared with `just names-update`). A game they don't list (a
    romhack, a translation, a patched dump) gets no art, so a romhack never
@@ -73,6 +75,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 sys.path.append(str(ROOT / "tests"))  # library_idx, after tools
 import art
+import artpack
 import asset
 import library_idx
 import names_db
@@ -449,6 +452,19 @@ def old_boxes(art_dir):
         return []
 
 
+def read_pack(sd):
+    """The card's /torii/art.pak as an artpack.Pack, or None (a pack that
+    doesn't read is reported and left alone)."""
+    path = Path(sd) / "torii" / "art.pak"
+    if not path.is_file():
+        return None
+    try:
+        return artpack.Pack(path.read_bytes())
+    except artpack.PackError as e:
+        print(f"art-scrape: {path}: {e}; not used", file=sys.stderr)
+        return None
+
+
 def scrape(args):
     sd = Path(args.sd_path)
     if not sd.is_dir():
@@ -517,6 +533,7 @@ def scrape(args):
                 (art_dir / file).unlink()
             have.discard(folded(file))
     custom = listing(art_dir / "custom", ascii_lower)
+    pack = read_pack(sd)
     fetcher = Fetcher(
         args.base_url,
         args.cache,
@@ -543,6 +560,8 @@ def scrape(args):
             how, what = "custom", None
         elif folded(file) in have:
             how, what = "on card", None
+        elif pack is not None and pack.find(crc) is not None:
+            how, what = "in pack", None
         else:
             code = game_code(tables, console, crc, file_path)
             picks = tries(
@@ -559,6 +578,11 @@ def scrape(args):
         print("\r\033[K", end="", file=sys.stderr)
 
     report(results, args.dry_run, fetcher, version)
+    if pack is not None:
+        covered = sum(
+            how == "in pack" for rows in results.values() for _, how, _ in rows
+        )
+        print(f"art.pak covers {covered} games (skipped)")
     if fetcher.stopped:
         print(f"art-scrape: stopped fetching: {fetcher.stopped}", file=sys.stderr)
     if not args.dry_run and len(have) > ARTSET_MAX:
@@ -568,7 +592,7 @@ def scrape(args):
         )
 
 
-WITH_ART = ("new", "cached", "on card", "custom", "would convert")
+WITH_ART = ("new", "cached", "on card", "in pack", "custom", "would convert")
 REASONS = {
     "unknown": "not in the dats",
     "missing": "no thumbnail",
@@ -590,6 +614,7 @@ def report(results, dry_run, fetcher, version):
             ("would fetch", "to download"),
             ("would convert", "in the cache"),
             ("on card", "already on the card"),
+            ("in pack", "in art.pak"),
             ("custom", "custom"),
         ):
             if hows.count(how):
