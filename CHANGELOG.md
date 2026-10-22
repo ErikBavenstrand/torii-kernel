@@ -4,6 +4,14 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Added:** `source/saveslot.c`, the hardware-free logic for v0.5's save
+  slots: name cleaning and case-insensitive uniqueness, save, backup and
+  trash paths, the backup history (counter order, pruning), the rename
+  journal with boot recovery, and blank/identical checks. Nothing calls it
+  yet (6ddae27).
+
 ## v0.4.3
 
 - **Changed:** a game list redraws only the rows whose text, marks or detail

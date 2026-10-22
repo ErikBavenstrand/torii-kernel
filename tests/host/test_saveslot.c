@@ -33,7 +33,13 @@ void test_saveslot_clean(void)
 	check_clean("Caf\xC3\xA9", "Caf\xC3\xA9");
 	// A C1 control (U+0085), a lone continuation byte, a cut sequence, an
 	// overlong slash and a surrogate go
-	check_clean("a\xC2\x85" "b\x80" "c\xE3\x81" "d\xC0\xAF" "e\xED\xA0\x80" "f", "abcdef");
+	check_clean("a\xC2\x85"
+		    "b\x80"
+		    "c\xE3\x81"
+		    "d\xC0\xAF"
+		    "e\xED\xA0\x80"
+		    "f",
+		    "abcdef");
 	// 24 characters, not bytes
 	check_clean("abcdefghijklmnopqrstuvwxyz", "abcdefghijklmnopqrstuvwx");
 	check_clean("\xE3\x81\x82\xE3\x81\x82\xE3\x81\x82\xE3\x81\x82\xE3\x81\x82\xE3\x81\x82\xE3\x81\x82\xE3\x81\x82"
@@ -142,7 +148,9 @@ void test_saveslot_path_bounds(void)
 void test_saveslot_longest(void)
 {
 	// The pending-save record (ezkernel.h's SAV_INFO_NAME_MAX) holds 251 bytes
-	enum { RECORD_NAME_MAX = 0x80 * 2 - 4 - 1 };
+	enum {
+		RECORD_NAME_MAX = 0x80 * 2 - 4 - 1
+	};
 	u32 longest = saveslot_longest_save_path(SAVESLOT_ROM_PATH_MAX);
 	CHECK_EQ(longest, 12 + 255 + 1 + 96 + 4);
 	// So a central path can outgrow the record: 368 bytes against 251
@@ -222,10 +230,7 @@ void test_saveslot_history(void)
 	// A clock that jumped back, stood still or was never set: the counter orders
 	const char *names[] = {
 		"0003-20260101-000000.sav", // newest by n, oldest by clock
-		"0001-20991231-235959.sav",
-		"0002-00000000-000000.sav",
-		"notes.txt",
-		"0004-bad.sav",
+		"0001-20991231-235959.sav",     "0002-00000000-000000.sav", "notes.txt", "0004-bad.sav",
 		"0005-20261022-130459.sav", // newest
 		"0005-20261022-130459.sav.tmp",
 	};
@@ -377,8 +382,10 @@ void test_saveslot_recovery(void)
 		u32 settled = files_after(exists, first);
 		CHECK_EQ(saveslot_recover(settled), SAVESLOT_RECOVER_NOTHING);
 		// Nothing is lost: a file present before is present (or renamed) after
-		CHECK_EQ(!!(exists & (SAVESLOT_OLD_SAVE | SAVESLOT_NEW_SAVE)), !!(settled & (SAVESLOT_OLD_SAVE | SAVESLOT_NEW_SAVE)));
-		CHECK_EQ(!!(exists & (SAVESLOT_OLD_HIST | SAVESLOT_NEW_HIST)), !!(settled & (SAVESLOT_OLD_HIST | SAVESLOT_NEW_HIST)));
+		CHECK_EQ(!!(exists & (SAVESLOT_OLD_SAVE | SAVESLOT_NEW_SAVE)),
+			 !!(settled & (SAVESLOT_OLD_SAVE | SAVESLOT_NEW_SAVE)));
+		CHECK_EQ(!!(exists & (SAVESLOT_OLD_HIST | SAVESLOT_NEW_HIST)),
+			 !!(settled & (SAVESLOT_OLD_HIST | SAVESLOT_NEW_HIST)));
 		// Only an action on a state where the save is under the new name alone
 		if (first != SAVESLOT_RECOVER_NOTHING)
 			CHECK_EQ(exists & (SAVESLOT_OLD_SAVE | SAVESLOT_NEW_SAVE), SAVESLOT_NEW_SAVE);

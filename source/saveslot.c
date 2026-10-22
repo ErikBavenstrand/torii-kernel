@@ -216,10 +216,12 @@ int saveslot_save_path(char *out, u32 size, int mode, const char *rom_path, cons
 		const char *dot = strrchr(name, '.');
 		u32 stem = dot && dot != name ? (u32)(dot - name) : (u32)strlen(name);
 		ok = add(out, size, &len, rom_path, (u32)(name - rom_path)) && add(out, size, &len, name, stem) &&
-		     add_str(out, size, &len, ".") && add_str(out, size, &len, slot) && add_str(out, size, &len, ".sav");
+		     add_str(out, size, &len, ".") && add_str(out, size, &len, slot) &&
+		     add_str(out, size, &len, ".sav");
 	} else {
 		ok = add_str(out, size, &len, SAVESLOT_SAVES_DIR) && add_str(out, size, &len, rom_path) &&
-		     add_str(out, size, &len, "/") && add_str(out, size, &len, slot) && add_str(out, size, &len, ".sav");
+		     add_str(out, size, &len, "/") && add_str(out, size, &len, slot) &&
+		     add_str(out, size, &len, ".sav");
 	}
 	return finish(out, ok, len);
 }
@@ -291,8 +293,8 @@ int saveslot_trash_path(char *out, u32 size, const char *rom_path, const char *s
 	k += put_digits(part + k, n, 1);
 	part[k] = 0;
 	int ok = add_str(out, size, &len, SAVESLOT_TRASH_DIR "/") && add_str(out, size, &len, part) &&
-		 add_str(out, size, &len, rom_path) && add_str(out, size, &len, "/") && add_str(out, size, &len, slot) &&
-		 add_str(out, size, &len, ".sav");
+		 add_str(out, size, &len, rom_path) && add_str(out, size, &len, "/") &&
+		 add_str(out, size, &len, slot) && add_str(out, size, &len, ".sav");
 	return finish(out, ok, len);
 }
 
