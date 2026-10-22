@@ -148,6 +148,11 @@ class PackFetcher(art_scrape.Fetcher):
         with self.lock:
             super().miss(system, name)
 
+    def counted(self):
+        # += isn't atomic: threads adding at once lost counts
+        with self.lock:
+            super().counted()
+
     def known(self, system, name):
         with self.lock:
             return super().known(system, name)

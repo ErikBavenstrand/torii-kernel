@@ -721,13 +721,16 @@ def record_holds(rec, file_path, size, cache_mtime=None):
     size, and its date (the cart's or this tool's, give or take whole hours)
     is the file's. One without a date, which names-update wrote between
     v0.4.1 and v0.4.2 and the cart dates on its next walk, holds while the
-    file is older than crc.txt (cache_mtime)."""
+    file is older than crc.txt (cache_mtime). So does one whose date no FAT
+    date matches: a file dated before 1980 (which FAT can't hold, so this
+    tool writes no date) or a record dated 0 by the cart (a file written
+    with no clock), else its CRC would be computed again on every run."""
     if not rec or rec[0] is None or rec[1] != size:
         return False
-    if rec[2] is None:
-        return cache_mtime is not None and os.path.getmtime(file_path) <= cache_mtime
     date = fat_date(file_path)
-    return date is not None and same_moment(rec[2], date)
+    if rec[2] is None or date is None or fat_moment(rec[2]) is None:
+        return cache_mtime is not None and os.path.getmtime(file_path) <= cache_mtime
+    return same_moment(rec[2], date)
 
 
 def cache_mtime(torii):

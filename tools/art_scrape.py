@@ -363,8 +363,11 @@ class Fetcher:
             with contextlib.suppress(OSError, ValueError):
                 tmp.unlink(missing_ok=True)
             return None
-        self.downloaded += 1
+        self.counted()
         return path
+
+    def counted(self):
+        self.downloaded += 1
 
 
 # --- The run -------------------------------------------------------------------------------

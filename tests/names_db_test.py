@@ -539,6 +539,30 @@ class Card(unittest.TestCase):
         )
         self.assertNotIn("/Colour.gbc", lines)
 
+    def test_before_1980(self):
+        # FAT holds no date before 1980: such a file gets no date, and its
+        # CRC holds while the file is older than crc.txt, also once the cart
+        # dated the record 0 (a file written with no clock)
+        old = self.sd / "GBA" / "Wars.gba"
+        os.utime(old, (100_000_000, 100_000_000))  # 1973
+        status, out, err = update(self.sd)
+        self.assertEqual(status, 0, err)
+        self.assertEqual(
+            {l[3]: l[2] for l in cache_lines(self.sd)}["/GBA/Wars.gba"], "-"
+        )
+        status, out, err = update(self.sd)
+        self.assertIn("9 games, 0 CRCs computed, 9 kept", out)
+        path = self.sd / "torii" / "crc.txt"
+        rows = []
+        for line in names_db.read_safe(path).splitlines(keepends=True):
+            f = line.split("\t")
+            if len(f) == 4 and f[3] == "/GBA/Wars.gba\n":
+                f[2] = "00000000"
+            rows.append("\t".join(f))
+        names_db.write_safe(path, "".join(rows))
+        status, out, err = update(self.sd)
+        self.assertIn("9 games, 0 CRCs computed, 9 kept", out)
+
     def test_safe_copies(self):
         torii = self.sd / "torii"
         torii.mkdir(exist_ok=True)
