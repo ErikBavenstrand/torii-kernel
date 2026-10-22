@@ -2,7 +2,8 @@
 # Box art in the game lists' list with art (source/boxart.c): matched art
 # by CRC, never by GBA game code (a romhack's), a cover cached across visits, a broken art file, a card
 # without /torii/art, the full art pack (art.pak: its covers, an art file
-# before it, a damaged one), and the Box art setting off. (tests/shots/games-art*
+# before it, a damaged one), a custom-art game renamed on the SD card page,
+# and the Box art setting off. (tests/shots/games-art*
 # show custom and CRC art.) Runs inside the torii-emu container after `just
 # build` and `just emu-headless`.
 set -euo pipefail
@@ -235,6 +236,53 @@ grep -q "kernel error: box art: /torii/art.pak is another version" "$cart/9.log"
   fail "another version's pack wasn't logged: $(grep 'art.pak' "$cart/9.log" | head -3)"
 ! grep -qE "box art: cover [0-9A-F]{8} shown" "$cart/9.log" || fail "another version's pack showed a cover"
 echo "PASS: a damaged pack, or another version's, is no pack, and logged"
+
+# A custom-art game renamed on the SD card page (actions.c), after the game
+# page showed its cover: its art file moves with it, the card's art is
+# listed again (boxart_forget), and the game page shows the cover by its new
+# name in the same session
+new_cart rename
+mmd -i "$cart/sd.img" ::/torii/art
+mmd -i "$cart/sd.img" ::/torii/art/custom
+mcopy -i "$cart/sd.img" tests/shots/data/art-sunset.bin ::/torii/art/custom/Zed.gba.bin
+custom_id() {
+  id 1 "$(python3 -c 'import sys
+h = 2166136261
+for c in sys.argv[1].lower().encode():
+    h = ((h ^ c) * 16777619) & 0xFFFFFFFF
+print(h)' "$1")"
+}
+old=$(custom_id Zed.gba) renamed=$(custom_id Zedq.gba)
+{
+  cat "$(nav_game gba 1 | sed 's/^-i //')"
+  cat <<EOF
+-w "box art: cover $old shown"
+-k @8:B -k @12:-
+-w "nav: home ready"
+-k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:LEFT -k @28:- -k @32:LEFT -k @36:- -k @40:A -k @44:-
+-w "sdcard: ready /"
+-k @8:DOWN -k @12:- -k @16:START -k @20:-
+-w "sdcard: popup /Zed.gba"
+-k @12:UP -k @16:- -k @20:UP -k @24:- -k @28:UP -k @32:- -k @40:A -k @44:-
+-w "screen ready: rename"
+-k @10:A -k @14:- -k @24:START -k @28:-
+-w "rename: kept"
+-k @20:B -k @24:-
+-w "nav: home ready"
+-k @8:RIGHT -k @12:- -k @16:RIGHT -k @20:- -k @24:RIGHT -k @28:- -k @32:RIGHT -k @36:- -k @40:A -k @44:-
+-w "nav: page gba ready"
+-k @8:DOWN -k @12:-
+-u "box art: cover $renamed shown"
+EOF
+} >"$cart/route.txt"
+boot "$cart/10.log" -i "$cart/route.txt" -f 4000
+grep -q "rename: /Zed.gba to Zedq.gba" "$cart/10.log" || fail "the rename didn't run: $(grep 'rename\|nav:' "$cart/10.log" | tail -3)"
+mtype -i "$cart/sd.img" ::/torii/art/custom/Zedq.gba.bin >/dev/null 2>&1 || fail "the custom art didn't move with the game"
+[ "$(grep -c "box art: [0-9]* files listed" "$cart/10.log")" = 2 ] ||
+  fail "the art wasn't listed again after the rename: $(grep 'files listed' "$cart/10.log")"
+grep -q "box art: cover $renamed shown" "$cart/10.log" ||
+  fail "the renamed game's cover didn't show: $(grep 'box art\|nav: page' "$cart/10.log" | tail -4)"
+echo "PASS: a custom-art game's SD rename moves its art, lists the art again, and shows it by the new name"
 
 # Box art off (slot 34 0): no listing, no covers, though the art is there
 new_cart off

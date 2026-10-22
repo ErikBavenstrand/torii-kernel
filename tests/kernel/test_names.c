@@ -3,6 +3,7 @@
 // computes the games' CRCs into crc.txt, and the database names them by CRC
 // only: never by the game code a romhack shares with its base game (C4). Asset tests: run by tests/assets.sh on the emulated cart,
 // and never in Diagnostics (they write the card and PSRAM's names).
+#include <stdio.h>
 #include <string.h>
 
 #include "torii_test.h"
@@ -11,6 +12,7 @@
 #include "../../source/ff15/ff.h"
 #include "../../source/library.h"
 #include "../../source/namesdb.h"
+#include "../../source/Ezcard_OP.h"
 #include "../../source/engine/cycles.h"
 #include "../../source/engine/psram.h"
 #include "../../source/engine/stage.h"
@@ -111,6 +113,9 @@ void test_names_identify(void)
 		tlog("  skipped: no card");
 		return;
 	}
+	// The clock on, as the menu's boot turns it on, so the files have dates
+	// (with it off the clock reads nothing, a date that names no day)
+	Set_RTC_status(1);
 	f_mkdir(N_DIR);
 	f_mkdir("/torii");
 	for (u32 i = 0; i < FILES; i++) {
@@ -148,6 +153,31 @@ void test_names_identify(void)
 	CHECK(names_lookup(files[0].path, files[0].size + 1, LIB_GBA) == NULL);  // another size
 	FILINFO fi;
 	CHECK(f_stat("/torii/crc.txt", &fi) == FR_OK && f_stat("/torii/crc.txt.bak", &fi) == FR_OK);
+	// A record a whole hour off its file's date (names-update's, from a PC
+	// in another local time): Identify's own check, with no walk to vouch
+	// for the file, keeps its CRC and takes the file's date
+	CHECK(f_stat(files[0].path, &fi) == FR_OK);
+	u32 date = (u32)fi.fdate << 16 | fi.ftime, hour = 1u << 11;
+	u32 later = (date >> 11 & 31) < 23 ? date + hour : date - hour;
+	CHECK(names_walk_seen(files[0].path, files[0].size, later, LIB_GBA) != NULL);  // the record takes it
+	names_walk_begin();  // and no walk saw the file since
+	u32 changes = names_changes();
+	names_identify();
+	names_identify_now();
+	CHECK_EQ(names_changes(), changes);  // no CRC read again
+	wars = name_of(0);
+	CHECK(wars && !strcmp(wars, "Advance Wars (USA)"));
+	{
+		char want[16], *text = (char *)stage_buffer();
+		FIL f;
+		UINT got = 0;
+		snprintf(want, sizeof(want), "\t%08lX\t", (unsigned long)date);
+		CHECK(f_open(&f, "/torii/crc.txt", FA_READ) == FR_OK);
+		CHECK(f_read(&f, text, 0x1000, &got) == FR_OK && got < 0x1000);
+		f_close(&f);
+		text[got] = 0;
+		CHECK(strstr(text, want) != NULL);  // crc.txt has the file's date again
+	}
 	// A second run reads nothing again; crc.txt survives a launch
 	names_identify();
 	names_identify_now();
