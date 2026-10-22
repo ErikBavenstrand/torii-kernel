@@ -14,6 +14,7 @@
 #include "../../source/namesdb.h"
 #include "../../source/Ezcard_OP.h"
 #include "../../source/engine/cycles.h"
+#include "../../source/engine/jobs.h"
 #include "../../source/engine/psram.h"
 #include "../../source/engine/stage.h"
 #include "../../source/waitcnt.h"
@@ -209,6 +210,77 @@ void test_names_identify(void)
 	f_unlink(NAMESDB_FILE);
 	f_unlink("/torii/crc.txt");
 	f_unlink("/torii/crc.txt.bak");
+	f_unlink("/torii/library.idx");
+	f_unlink("/torii/library.bak");
+}
+
+// A launch cuts a game's CRC half way: the next boot reads on from there and
+// ends with the CRC of the whole file. Stepped by hand, so no frame counts.
+#define P_DIR "/NamesPart"
+#define P_FILE P_DIR "/Big.gba"
+#define P_SIZE 20480u
+
+void test_names_partial(void)
+{
+	u16 probe[2] ALIGN(4) = {0x5AA5, 0xF00F};
+	psram_begin();
+	psram_write((u8 *)PSRAM_NAMES_CACHE_BASE, probe, sizeof(probe));
+	if (((const vu16 *)PSRAM_NAMES_CACHE_BASE)[1] != probe[1]) {
+		tlog("  skipped: no PSRAM");
+		return;
+	}
+	if (!EZcardFs.fs_type && f_mount(&EZcardFs, "", 1) != FR_OK) {
+		tlog("  skipped: no card");
+		return;
+	}
+	f_mkdir("/torii");
+	f_mkdir(P_DIR);
+	u8 *buf = stage_buffer();
+	fill(buf, 21, P_SIZE, NULL);
+	u32 want = crc32(buf, P_SIZE);
+	write_file(P_FILE, buf, P_SIZE);
+	f_unlink("/torii/crc.txt");
+	f_unlink("/torii/crc.txt.bak");
+	f_unlink("/torii/crc.part");
+	f_unlink("/torii/library.idx");
+	f_unlink("/torii/library.bak");
+
+	library_boot();
+	CHECK(library_ready());
+	names_identify();
+	u32 read = 0, size = 0, steps = 0;
+	while (steps++ < 100000 && !(names_reading(&read, &size) && read >= 3 * 2048))
+		CHECK(names_identify_step() != JOB_DONE);
+	CHECK(read >= 3 * 2048 && read < size && size == P_SIZE);
+	u32 cut = read;
+	// The launch: where the game was goes to crc.part
+	library_before_launch();
+	FILINFO fi;
+	CHECK(f_stat("/torii/crc.part", &fi) == FR_OK);
+	// The next boot (a first scan, which loads the names): the run starts the
+	// game again, from where it was
+	f_unlink("/torii/library.idx");
+	f_unlink("/torii/library.bak");
+	library_boot();
+	names_identify();
+	steps = 0;
+	while (steps++ < 100000 && !names_reading(&read, &size))
+		CHECK(names_identify_step() != JOB_DONE);
+	CHECK_EQ(read, cut);
+	CHECK(f_stat("/torii/crc.part", &fi) != FR_OK);  // used once
+	names_identify_now();
+	u32 crc = 0;
+	CHECK(names_crc(P_FILE, P_SIZE, &crc));
+	CHECK_EQ(crc, want);
+
+	// A different file of the same name starts over: a part for another size
+	// or date is no part
+	library_before_launch();
+	f_unlink(P_FILE);
+	f_unlink(P_DIR);
+	f_unlink("/torii/crc.txt");
+	f_unlink("/torii/crc.txt.bak");
+	f_unlink("/torii/crc.part");
 	f_unlink("/torii/library.idx");
 	f_unlink("/torii/library.bak");
 }

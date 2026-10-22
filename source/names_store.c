@@ -322,8 +322,7 @@ static void load_done(void)
 		tlog("names: the CRC cache is full: %s isn't written back", NAMES_CACHE_FILE);
 	}
 	N.dirty = N.journal ? DIRTY_HARD : 0;  // the journal's lines go into crc.txt
-	if (N.active)
-		part_read();
+	part_read();  // written only on a card that uses CRCs, so it is there only on one
 	N.phase = P_DONE;
 	tlog("names: %lu files' CRCs from %s in %lu ms%s", (unsigned long)N.lines_read, NAMES_CACHE_FILE,
 	     (unsigned long)ms_since(N.started), N.cache_ok ? "" : " (it isn't written back)");
@@ -1296,6 +1295,23 @@ void names_identify_now(void)
 		write_begin();
 	while (N.wphase != X_IDLE)
 		write_step();
+}
+
+int names_identify_step(void)
+{
+	if (N.mode == M_NONE || N.phase != P_DONE)
+		return JOB_DONE;
+	psram_begin();
+	return identify_step();
+}
+
+int names_reading(u32 *read, u32 *size)
+{
+	if (N.mode == M_NONE || N.step != I_READ || !N.file_open)
+		return 0;
+	*read = N.read;
+	*size = N.size;
+	return 1;
 }
 
 int names_identifying(u32 *done, u32 *total)

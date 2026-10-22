@@ -51,6 +51,7 @@ void test_art_colours(void);
 void test_library_psram(void);
 void test_library_boot(void);
 void test_names_identify(void);
+void test_names_partial(void);
 void names_bench(void);
 
 // Test assets (asset_data.c, written by tools/asset.py demo)

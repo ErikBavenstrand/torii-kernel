@@ -241,6 +241,11 @@ void names_identify(void);
 // Runs Identify library (or the run under way) to its end in a loop,
 // without the job: for tests, and a caller that shows its own progress.
 void names_identify_now(void);
+// One step of the run under way, with no job and no waiting: for tests that
+// stop it at a chosen point. JOB_DONE when nothing runs (or it just ended).
+int names_identify_step(void);
+// 1 while a game's file is being read, with the bytes read and its size.
+int names_reading(u32 *read, u32 *size);
 // 1 while Identify library runs, with the games looked at and their total.
 int names_identifying(u32 *done, u32 *total);
 // CRCs computed this session: a screen that shows box art looks again when

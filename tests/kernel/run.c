@@ -77,6 +77,7 @@ static const struct {
 	{"library_psram", test_library_psram},
 	{"library_boot", test_library_boot},
 	{"names_identify", test_names_identify},
+	{"names_partial", test_names_partial},
 };
 
 int torii_unit_tests(void)

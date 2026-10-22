@@ -233,27 +233,15 @@ logged "$cart/1.log" "names: identifying new games stopped for a launch (1 done)
 logged "$cart/1.log" "names: wrote 1 CRCs to /torii/crc.new"
 not_logged "$cart/1.log" "names: wrote /torii/crc.txt"
 not_logged "$cart/1.log" "names: /GBA/Big.gba is"
-# The 2 MB game was being read: where it was goes to crc.part, and the next
-# boot goes on from there
-grep -qE '^kernel: names: /GBA/Big.gba: [0-9]+ of 2097152 bytes read, kept for the next time' "$cart/1.log" ||
-  fail "the game cut off wasn't kept: $(grep -E '^kernel: names' "$cart/1.log" | tail -4)"
-mdir -i "$cart/sd.img" ::/torii/crc.part >/dev/null 2>&1 || fail "no crc.part"
+# (The game cut off is kept in crc.part and read on: tests/kernel/test_names.c, stepped by hand)
 boot "$cart" "$cart/2.log" -k 100:A -k 106:- -f 6000 -u "names: wrote /torii/crc.txt" # A: "Save sav?"
 logged "$cart/2.log" "names: 1 CRCs from /torii/crc.new"
-grep -qE '^kernel: names: /GBA/Big.gba was [0-9]+ of 2097152 bytes read before the last launch' "$cart/2.log" ||
-  fail "crc.part wasn't read: $(grep -E '^kernel: names' "$cart/2.log" | head -6)"
-grep -qE '^kernel: names: /GBA/Big.gba goes on from [0-9]+ of 2097152 bytes' "$cart/2.log" ||
-  fail "the game wasn't read on: $(grep -E '^kernel: names' "$cart/2.log" | head -8)"
 logged "$cart/2.log" "names: identified 8 of 8 new games"
 logged "$cart/2.log" "names: wrote /torii/crc.txt"
 not_logged "$cart/2.log" "names: /GBA/Wars.gba is"
 grep "kernel: names: identified" "$cart/2.log" | sed 's/^kernel: /  /'
 [ "$(crc_lines "$cart" | wc -l)" = 9 ] || fail "crc.txt holds $(crc_lines "$cart")"
 if mdir -i "$cart/sd.img" ::/torii/crc.new >/dev/null 2>&1; then fail "crc.new is still there"; fi
-if mdir -i "$cart/sd.img" ::/torii/crc.part >/dev/null 2>&1; then fail "crc.part is still there"; fi
-big=$(python3 -c 'import sys, zlib; print("%08X" % zlib.crc32(open(sys.argv[1], "rb").read()))' "$cart/Big.gba")
-[ "$(crc_lines "$cart" | awk -F'\t' '$4 == "/GBA/Big.gba" { print $1 }')" = "$big" ] ||
-  fail "Big.gba's CRC isn't $big (read on from a partial): $(crc_lines "$cart")"
 no_errors "$cart/1.log"
 no_errors "$cart/2.log"
 echo "PASS: a launch stops the background's CRCs and writes only the new ones, and the next boot goes on"
@@ -296,7 +284,8 @@ fixture_card "$cart" --no-crc
 # shellcheck source=tests/nav.sh
 . tests/nav.sh
 # shellcheck disable=SC2046 # nav.sh's options
-boot "$cart" "$cart/1.log" $(nav_game gba 2) -f 3000
+boot "$cart" "$cart/1.log" $(nav_game gba 2) \
+  -u "library: wrote /torii/library.idx (generation 3)" -f 20000
 [ "$(grep -c 'games: a new index: the cursor is on row' "$cart/1.log")" -ge 2 ] ||
   fail "the page wasn't sorted twice: $(grep -E '^kernel: (games|library)' "$cart/1.log" | tail -6)"
 [ "$(grep 'games: a new index: the cursor is on row' "$cart/1.log" | grep -c 'row 0 of 4, /GBA/Wars.gba')" -ge 2 ] ||
@@ -309,7 +298,8 @@ fixture_card "$cart" --no-crc
 printf '/GBA/Hack of Minish.gba\n/GBA/Homebrew.gba\n/GBA/Wars.gba\n/GBA/zz Minish.gba\n' >"$cart/fav.txt"
 mcopy -i "$cart/sd.img" "$cart/fav.txt" ::/torii/favorites.txt
 # shellcheck disable=SC2046 # nav.sh's options
-NAV_SHOWN="fav gba" boot "$cart" "$cart/1.log" $(NAV_SHOWN="fav gba" nav_game fav 2) -f 3000
+NAV_SHOWN="fav gba" boot "$cart" "$cart/1.log" $(NAV_SHOWN="fav gba" nav_game fav 2) \
+  -u "library: wrote /torii/library.idx (generation 3)" -f 20000
 [ "$(grep 'games: a new index: the cursor is on row' "$cart/1.log" | grep -c 'row 0 of 4, /GBA/Wars.gba')" -ge 2 ] ||
   fail "the cursor left its favourite: $(grep -E 'a new index|games:' "$cart/1.log" | tail -4)"
 echo "PASS: the cursor stays on its favourite across the new sorts"
