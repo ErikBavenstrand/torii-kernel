@@ -1291,6 +1291,7 @@ void names_identify_now(void)
 		;
 	while (N.applying)
 		apply_step();
+	library_write_now();  // the names are in the index: it is on the card too
 	if (N.dirty)
 		write_begin();
 	while (N.wphase != X_IDLE)

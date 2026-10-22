@@ -119,9 +119,10 @@ static struct {
 	char name[GAMENAME_MAX + 1];
 	char detail[AGO_MAX];
 	char path[USERDATA_PATH_MAX] ALIGN(4);
-	// The cursor's game, kept as the cursor moves (show_position): a new
-	// index sorts the list again, and the cursor goes to where this is
+	// The game the cursor rested on (follow_record, follow_row its row): a
+	// new index sorts the list again, and the cursor goes to where this is
 	char follow[USERDATA_PATH_MAX] ALIGN(4);
+	u32 follow_row;  // FOLLOW_NONE: not recorded
 	// The game the popup is about, copied: the lists move under it
 	char pick[USERDATA_PATH_MAX] ALIGN(4);
 	char title[GAMENAME_MAX + 1];
@@ -847,8 +848,11 @@ static int ago_update(void)
 
 // Lists the page's games again (a game deleted, a favourite dropped, a new
 // index), the cursor at cursor (clamped)
+#define FOLLOW_NONE 0xFFFFFFFFu
+
 static void build(void)
 {
+	games.follow_row = FOLLOW_NONE;
 	userdata_load();  // both lists, if a launch dropped them
 	readcache_poison();
 	if (games.kind == KIND_CONSOLE)
@@ -869,9 +873,6 @@ static void show_cap_note(void);
 
 static void show_position(void)
 {
-	struct game g;
-	if (!game_at(games.cursor, &g) || !game_path(&g, games.follow))
-		games.follow[0] = 0;
 	if (games.count)
 		snprintf(games.position, sizeof(games.position), "%lu/%lu", (unsigned long)games.cursor + 1,
 			 (unsigned long)games.count);
@@ -1059,6 +1060,23 @@ static u32 games_row(void)
 	return up() ? ui_list_cursor(list_node()) : games.row;
 }
 
+// The cursor's game, once the keys rest (a move costs frames enough): the path
+// a new index finds it by
+static void follow_set(u32 row)
+{
+	struct game g;
+	games.follow_row = row;
+	if (!game_at(row, &g) || !game_path(&g, games.follow))
+		games.follow[0] = 0;
+}
+
+static void follow_record(void)
+{
+	u32 row = ui_list_cursor(list_node());
+	if (row != games.follow_row && ui_idle_frames() >= 2)
+		follow_set(row);
+}
+
 // Each pass of the menu's loop: a new index lists again; Recent's "played"
 // texts follow the clock
 static void games_poll(void)
@@ -1071,13 +1089,17 @@ static void games_poll(void)
 	if (games.lib_generation != library_generation()) {
 		// Opened before the index was back: at the row it was asked for
 		u32 row = games.unloaded ? games.row : ui_list_cursor(list_node());
+		// By its game if the cursor rested on one; else (it moves) by its row
+		const char *follow = !games.unloaded && games.follow_row == row ? games.follow : NULL;
 		tlog_debug("games: a new index (row %lu)", (unsigned long)row);
 		games.unloaded = !library_ready();
-		relist(row, games.unloaded ? NULL : games.follow);
+		relist(row, follow);
+		follow_set(games.cursor);
 		tlog_debug("games: a new index: the cursor is on row %lu of %lu, %s", (unsigned long)games.cursor,
 			   (unsigned long)games.count, games.follow);
 		return;
 	}
+	follow_record();
 	if (games.art && games.names_changes != names_changes()) {
 		// CRCs found in the background: the cursor's game may have art by
 		// its CRC now

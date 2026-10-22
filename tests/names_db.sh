@@ -308,6 +308,7 @@ cart=$carts/follow-fav
 fixture_card "$cart" --no-crc
 printf '/GBA/Hack of Minish.gba\n/GBA/Homebrew.gba\n/GBA/Wars.gba\n/GBA/zz Minish.gba\n' >"$cart/fav.txt"
 mcopy -i "$cart/sd.img" "$cart/fav.txt" ::/torii/favorites.txt
+# shellcheck disable=SC2046 # nav.sh's options
 NAV_SHOWN="fav gba" boot "$cart" "$cart/1.log" $(NAV_SHOWN="fav gba" nav_game fav 2) -f 3000
 [ "$(grep 'games: a new index: the cursor is on row' "$cart/1.log" | grep -c 'row 0 of 4, /GBA/Wars.gba')" -ge 2 ] ||
   fail "the cursor left its favourite: $(grep -E 'a new index|games:' "$cart/1.log" | tail -4)"

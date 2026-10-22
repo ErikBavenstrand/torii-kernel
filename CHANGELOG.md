@@ -4,6 +4,19 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Added:** a launch keeps the big game the background was reading: its CRC so
+  far goes to `/torii/crc.part` and the next boot goes on from there, so a 32 MB
+  game isn't started over at every short visit. New games after Recent's are
+  read smallest first, by size class, and a game the card can't read is tried
+  once a boot, not after every walk (F2; `d30126d`).
+- **Changed:** the names the background finds go into the index in place,
+  32 at a time or after 10 s, one per job step, instead of a walk of the card
+  each time; one walk follows the run. The cursor stays on its game on every
+  list (Favourites too) across any number of new indexes, as the page keeps its
+  game's path, and `library_old_path` is gone (F2; `9fc6f29`).
+
 ## v0.4.2 (2026-10-21)
 
 New games get their names and box art on the cart: CRCs in the background,

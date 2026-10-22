@@ -1074,6 +1074,16 @@ void library_boot(void)
 		lib.want_walk = 1;  // the card failed: the menu's job tries again
 }
 
+void library_write_now(void)
+{
+	if (!lib.valid || !lib.want_write || lib.state != S_IDLE)
+		return;
+	psram_begin();
+	write_begin();
+	while (lib.state == S_WRITE)
+		library_step();
+}
+
 void library_before_launch(void)
 {
 	if (lib.valid && (lib.state == S_WRITE || lib.want_write)) {

@@ -305,6 +305,9 @@ void library_poll(void);
 // Loads the index a launch dropped (or finishes loading it) at once, unless
 // covers are loading: for a page that lists it.
 void library_load_now(void);
+// Writes the index at once if it isn't on the card yet and nothing else is
+// under way: for a caller that runs the background to its end by itself.
+void library_write_now(void);
 // Before PSRAM page 0 is overwritten: finishes a write under way or due
 // (the card then has the index), stops the job and forgets the index.
 void library_before_launch(void);
