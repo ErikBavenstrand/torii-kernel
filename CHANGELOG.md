@@ -6,6 +6,19 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** saves leave `/SAVER` (no import: v0.5 keeps no backwards
+  compatibility). A game's saves are in `/torii/saves/<rom path>/<slot>.sav`,
+  its first slot `Main`, and its record (save type, boot mode, current slot) is
+  `game.ini` beside them; a NOR game keeps its saves as for a ROM at
+  `/torii/nor/<name>`. Folders are made when a file is first written. The
+  pending-save record now holds the full path, so a save path over 251 bytes
+  is refused at launch with a message. New Games setting *Save location*
+  (Torii folder, or `<rom stem>.<slot>.sav` next to the ROM; the record stays
+  in `/torii/saves`). The library marks a game saved from the `.sav` files in
+  its folder or beside it, Rename moves the game's folders (saves, history) or
+  its saves beside it with it, through the same journal, and the FatFs
+  alias drop now also handles folders (b0e8b49).
+
 - **Added:** `cutpoint(name)` (`source/cutpoint.h`), a debug log line
   `cutpoint N: name` that marks a step boundary for the power-cut tests
   (`mgba-shot -X N`, `tests/cutsweep.sh`); nothing else happens at runtime
