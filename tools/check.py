@@ -205,6 +205,11 @@ RULES = [
         "art pack builder: test-host runs its tests against a local server",
     ),
     (
+        ["tools/library_report.py", "tests/library_report_test.py"],
+        {LINT, TEST_HOST},
+        "library report: test-host runs its tests on a fixture card",
+    ),
+    (
         ["tools/artpack.py"],
         {LINT, TEST_HOST, TEST},
         "art pack format: test-host checks it, tests/boxart.sh writes packs with it",

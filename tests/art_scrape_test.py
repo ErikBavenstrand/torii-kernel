@@ -28,6 +28,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 sys.path.append(str(ROOT / "tests" / "names"))
 import art
 import art_scrape
+import artpack
 import fixture
 import names_db
 
@@ -358,6 +359,42 @@ class Scrape(unittest.TestCase):
             out,
         )
         self.assertIn("NES: 1 games, 1 with art (100%): 1 already on the card", out)
+
+    def test_skips_games_the_pack_covers(self):
+        art_dir = self.sd / "torii" / "art"
+        art_dir.mkdir(parents=True)
+        pic = Path(self.tmp.name) / "cover.png"
+        pic.write_bytes(png((10, 20, 30)))
+        cover = art.convert(pic)
+        crcs = [
+            int(crc_of(p, self.sd), 16) for p in ("/GBA/Wars.gba", "/NES/Famicom.nes")
+        ]
+        artpack.write(
+            self.sd / "torii" / "art.pak", artpack.build(dict.fromkeys(crcs, cover))
+        )
+        status, out, err = self.run_tool()
+        self.assertEqual(status, 0, err)
+        self.assertNotIn(thumb(GBA_SYS, "Advance Wars (USA)"), self.server.paths())
+        self.assertNotIn(thumb(NES_SYS, "Famicom Game (Japan)"), self.server.paths())
+        self.assertFalse(self.art("/GBA/Wars.gba").exists())
+        self.assertFalse(self.art("/NES/Famicom.nes").exists())
+        self.assertTrue(self.art("/GBA/zz Minish.gba").exists())
+        self.assertIn(
+            "GBA: 5 games, 3 with art (60%): 1 downloaded, 1 from the cache, 1 in art.pak",
+            out,
+        )
+        self.assertIn("NES: 1 games, 1 with art (100%): 1 in art.pak", out)
+        self.assertNotIn("/GBA/Wars.gba:", out)
+        self.assertIn("art.pak covers 2 games (skipped)", out)
+
+    def test_a_bad_pack_is_left_alone(self):
+        (self.sd / "torii").mkdir()
+        (self.sd / "torii" / "art.pak").write_bytes(b"not a pack" * 4)
+        status, out, err = self.run_tool()
+        self.assertEqual(status, 0, err)
+        self.assertIn("art.pak: not an art pack; not used", err)
+        self.assertTrue(self.art("/GBA/Wars.gba").exists())
+        self.assertNotIn("art.pak covers", out)
 
     def test_deletes_romhack_art_from_v041(self):
         # v0.4.1 gave the romhack the Minish Cap's box under its own CRC; a

@@ -254,7 +254,7 @@ compat *filters: build emu-headless
     {{emu_docker}} python3 tests/games.py "$@"
 
 # Build the hardware-free kernel code with tests/host for the host, under ASan and UBSan, and run it;
-# test tools/font.py, tools/asset.py, tools/art.py, tools/art_scrape.py, tools/art_pack.py, the palette and the upgrade file's layout
+# test tools/font.py, tools/asset.py, tools/art.py, tools/art_scrape.py, tools/art_pack.py, tools/library_report.py, the palette and the upgrade file's layout
 test-host: emu-image
     {{emu_docker}} tests/host.sh
     @uv run -q tests/font_test.py
@@ -264,6 +264,7 @@ test-host: emu-image
     @uv run -q tests/art_test.py
     @uv run -q tests/art_scrape_test.py
     @uv run -q tests/art_pack_test.py
+    @uv run -q tests/library_report_test.py
 
 # Convert docs/design/v0.4/palette.json to C: source/ui/palette.c and palette.h
 # (committed; tests/host.sh checks they match), then `just shots-update` for the screens
@@ -368,6 +369,13 @@ art-scrape sd_path *args:
 [positional-arguments]
 art-pack sd_path *args:
     uv run -q tools/art_pack.py "$@"
+
+# Report an SD card's games that need a name or box art, e.g. `just library-report /Volumes/OMEGA`:
+# offline, reads the card only. --write-templates writes names-todo.txt (for `just names-add`) and
+# art-todo.txt here (or --out DIR). Options: see --help
+[positional-arguments]
+library-report sd_path *args:
+    uv run -q tools/library_report.py "$@"
 
 # Copy games (files or whole folders) into roms/ and list them in roms/games.toml, e.g. `just game-add ~/roms`
 [positional-arguments]
