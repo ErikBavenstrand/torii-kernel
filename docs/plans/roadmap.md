@@ -37,7 +37,7 @@ What v0.4.2 left open, checked against the code on 2026-10-22. Strike an item ou
 - ~~Every 32 names or 10 s the index is rebuilt by a full card walk.~~ Fixed (`9fc6f29`): the names go into the index in place, one per job step (`library_name_found`), and a single walk follows the run. The index is written again; its walk hash is stale until that walk, so a run stopped by a launch costs the next boot one rebuild.
 - ~~An unreadable game is read again, with its error logged, after every walk.~~ Fixed (`d30126d`): up to 64 paths are remembered until the next boot.
 - ~~The cursor's game follows a new sort on console pages only, and only across one new index.~~ Fixed (`9fc6f29`): the page keeps the cursor game's path as the cursor moves and finds it again in the rebuilt list, on console pages and Favourites (Recent keeps its rows; its order is the clock's).
-- ~~The in-place redraw of a new index can show mixed old and new rows.~~ Fixed (`fc5b3af`): `ui_list_refresh_changed` redraws only the on-screen rows whose item draws differently than when drawn (a hash of the item per slot), so most new indexes redraw none; `tests/names_db.sh` checks it.
+- ~~The in-place redraw of a new index can show mixed old and new rows.~~ Fixed (`fc5b3af`, `3380b2b`): `ui_list_refresh_changed` redraws only the on-screen rows whose item draws differently than when drawn (a hash of the item per slot), so most new indexes redraw none; `tests/names_db.sh` checks it.
 - ~~Left, unmeasured: what one name costs in the index and how much of the pool a run takes.~~ Measured on the host (`test_library_pool_headroom`): in 4,096 games with 44-letter file names the pool holds 424 KB of its 1,229 KB, and every database name in place takes it to 963 KB, so it never fills before the 4,096 cap. With 120-letter names it holds 1,047 KB already and fills after 640 names; the walk after the run rebuilds it, as designed.
 
 ### Tools and tests
@@ -60,7 +60,7 @@ F1–F3 (new games named and boxed on the cart) made these; the user confirmed F
 
 ### Left from earlier work
 
-- ~~The rename's card walk blocks the keyboard for its length.~~ Settled (`fc5b3af`): a walk past 0.33 s shows a "Checking saves" progress dialog (the user waits for the result either way, so the walk stays synchronous); `tests/saves.sh rename-walk`. Its real cost on a cart is a measurement for the cart run.
+- ~~The rename's card walk blocks the keyboard for its length.~~ Settled (`fc5b3af`, `3380b2b`): a walk past 0.33 s shows a "Checking saves" progress dialog (the user waits for the result either way, so the walk stays synchronous); `tests/saves.sh rename-walk`. Its real cost on a cart is a measurement for the cart run.
 - ~~A same-size file swapped in with an older date keeps the old CRC.~~ Accepted: catching it means reading every file again on each boot. The README says to delete `/torii/crc.txt`.
 - ~~The Settings held-scroll golden hashes every frame.~~ Settled: it checks exactly what it is for and passes unchanged; `just shots-update settings` accepts an intended Settings change.
 - ~~9 cached art-pack pictures weren't PNGs: those games get no cover.~~ Fixed: libretro-thumbnails keeps some pictures as links, and the server sends the target's name as text; `art_scrape` now follows one (a link to nothing is a miss). Rerun `just art-pack` to fetch them (`test_alias_is_followed`). The pack's conversion (pure-Python `art.py`, about 29 s on 14 cores) is its limit past 256 requests at a time.
