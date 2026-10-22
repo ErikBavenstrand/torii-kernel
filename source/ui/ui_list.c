@@ -135,6 +135,7 @@ struct list_state {
 	s16 pill_y;     // where the pill was last shown, screen px (held while the old page fades)
 	u16 slot_row[UI_RING_MAX_SLOTS];
 	u16 drawn_row[UI_RING_MAX_SLOTS];  // the row each slot's tiles hold
+	u32 drawn_sig[UI_RING_MAX_SLOTS];  // item_sig of that row as drawn (ui_list_refresh_changed)
 	u32 dirty;   // slots to draw
 	u32 fresh;   // slots given a new row while off screen: drawn in place
 	u32 blank;   // slots holding nothing but paper: no clear needed
@@ -169,6 +170,9 @@ struct row_ctx {
 	u32 paper, ink;
 	u32 sel;       // the row drawn with the pill (opaque lists), UI_ITEM_NONE none
 };
+
+static void row_ctx_init(u8 node, const struct list_state *st, struct row_ctx *rc, u32 sel);
+static u32 item_sig(const struct row_ctx *rc, const struct list_state *st, u32 r);
 
 static const struct ui_list_config *config(u8 node)
 {
@@ -649,6 +653,35 @@ void ui_list_refresh(u8 node, u32 lo, u32 hi)
 	if (st->mq_row != UI_ITEM_NONE && st->cursor >= lo && st->cursor <= hi)
 		marquee_reset(node, st);
 	ui_dirty(node, 1);
+}
+
+void ui_list_refresh_changed(u8 node)
+{
+	struct list_state *st = ui_node_state(node);
+	if (st->count)
+		row_cache_forget(row_cache(), st->owner, 0, st->count - 1);
+	st->predrawn = 0;
+	st->keep_next = 0;
+	struct row_ctx rc;
+	row_ctx_init(node, st, &rc, st->cursor);
+	u32 changed = 0;
+	for (u32 s = 0; s < st->ring.k; s++) {
+		u32 r = st->slot_row[s];
+		if (r == UI_ITEM_NONE || r >= st->count)
+			continue;
+		if (st->drawn_row[s] == r && st->drawn_sig[s] == item_sig(&rc, st, r) && !(st->dirty & (1u << s)))
+			continue;  // it would draw as it did
+		st->dirty |= 1u << s;
+		if (st->drawn_row[s] != UI_ITEM_NONE)
+			st->stale |= 1u << s;
+		changed |= 1u << s;
+		if (r == st->cursor)
+			marquee_reset(node, st);
+	}
+	tlog_debug("list: %lu of %lu rows redraw", (unsigned long)__builtin_popcount(changed),
+		   (unsigned long)st->ring.k);
+	if (changed)
+		ui_dirty(node, 1);
 }
 
 void ui_list_set_cursor(u8 node, u32 cursor)
@@ -1240,6 +1273,38 @@ static int draw_row(const struct list_state *st, const struct row_ctx *rc, const
 	return 1;
 }
 
+static u32 sig_mix(u32 h, const void *p, u32 n)
+{
+	for (const u8 *b = p; n--; b++)
+		h = (h ^ *b) * 16777619u;
+	return h;
+}
+
+// What row r draws, as a hash of its item (text, detail, key and the small
+// fields), so a row that would draw the same can be told from one that
+// wouldn't. A pending item and a model that paints its rows whole (drawn
+// from more than the item) get values of their own.
+#define SIG_PENDING 0x9E3779B1u
+#define SIG_PAINTED 0xFFFFFFFFu
+static u32 item_sig(const struct row_ctx *rc, const struct list_state *st, u32 r)
+{
+	struct ui_item item = {0};
+	if (r == UI_ITEM_NONE || rc->model->paint)
+		return SIG_PAINTED;
+	if (r >= st->count || !rc->model->fetch(rc->ctx, r, &item) || !item.text)
+		return SIG_PENDING;
+	u32 h = 2166136261u;
+	h = sig_mix(h, item.text, item.len ? item.len : (u32)strlen(item.text));
+	if (item.detail)
+		h = sig_mix(h, item.detail, (u32)strlen(item.detail) + 1);
+	if (item.key)
+		h = sig_mix(h, item.key, (u32)strlen(item.key) + 1);
+	h = sig_mix(h, &item.icon, sizeof(item.icon));
+	u8 small[] = {(u8)item.ink, item.key_len,   item.mark, item.mark_ink,
+		      item.badge,   item.badge_ink, item.dot,  item.dot_ink};
+	return sig_mix(h, small, sizeof(small));
+}
+
 // Puts row r into slot s's lines in the canvas: copied from the row cache
 // (cached: row_cache_find's answer), or drawn, cleared first unless blank.
 static void render_slot(u8 node, struct list_state *st, const struct row_ctx *rc, u32 s, u32 r, const u32 *cached)
@@ -1379,6 +1444,7 @@ static int refresh_row(u8 node, struct list_state *st, const struct row_ctx *rc,
 	refresh_owner[refresh_count] = (u8)(node + 1);
 	refresh_slot[refresh_count++] = (u8)s;
 	st->drawn_row[s] = (u16)r;
+	st->drawn_sig[s] = item_sig(rc, st, r);
 	if (marq)
 		st->mq_row = (u16)r;
 	else if (st->mq_row == r)
@@ -1466,6 +1532,7 @@ static void list_draw(u8 node)
 		if (!hidden)
 			TLOG_ASSERT(!slot_live(node, st, s));
 		st->drawn_row[s] = (u16)r;
+		st->drawn_sig[s] = item_sig(&rc, st, r);
 		st->stale &= ~bit;
 		if (r == st->mq_row)
 			st->mq_row = UI_ITEM_NONE;

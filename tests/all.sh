@@ -22,6 +22,7 @@ jobs=(
   "tests/saves.sh delete"
   "tests/saves.sh read-error"
   "tests/saves.sh rename"
+  "tests/saves.sh rename-walk"
   "tests/saves.sh rename-cut"
   "tests/saves.sh rename-cut-split"
   "tests/saves.sh rename-cut-case"

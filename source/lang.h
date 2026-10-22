@@ -242,6 +242,7 @@ struct lang_rename {
 	const char *name_failed;  // a game's name couldn't be written (a dialog after)
 	const char *names_full;   // ... as names.txt is too large or holds too many names
 	const char *discard, *discard_button;  // Cancel with changes: the confirmation
+	const char *checking, *checking_text;  // the progress dialog while the card is checked for a shared save
 };
 extern const struct lang_rename *gl_rename;
 // A key past the cap says so, with the cap

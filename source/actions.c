@@ -9,6 +9,7 @@
 #include "artkey.h"
 #include "boxart.h"
 #include "gamename.h"
+#include "lang.h"
 #include "library.h"
 #include "NORflash_OP.h"
 #include "safefile.h"
@@ -340,6 +341,7 @@ static int there_shared(const char *path, const char *save)
 
 // The walk for another game with the save (share_walk): the folders open on
 // the way down, the entry read and the path of the folder it's in
+#define SHARE_DIALOG_CYCLES (16780000u / 3)  // a walk this long (0.33 s) gets a progress dialog
 #define SHARE_DEPTH 16  // twice the library's walk; a deeper folder can't be checked
 struct share_walk {
 	DIR dirs[SHARE_DEPTH];  // first: word-aligned
@@ -365,7 +367,7 @@ enum {
 static u32 share_walk(const char *path, const char *save, const char *save2)
 {
 	struct share_walk *sw = SW;
-	u32 start = cycles_now(), files = 0, result = SHARE_NONE;
+	u32 start = cycles_now(), files = 0, result = SHARE_NONE, shown = 0;
 	s32 depth = 0;
 	if (f_opendir(&sw->dirs[0], "/") != FR_OK)
 		return SHARE_UNSURE;
@@ -417,6 +419,17 @@ static u32 share_walk(const char *path, const char *save, const char *save2)
 		if (console == LIB_CONSOLE_NONE)
 			continue;
 		files++;
+		if (!(files & 31)) {
+			// A long walk says so, so the screen doesn't look frozen; a
+			// short one (a small card) shows nothing
+			u32 total = library_records() + 1;
+			if (!shown && cycles_since(start) > SHARE_DIALOG_CYCLES) {
+				dialog_progress_begin(gl_rename->checking, gl_rename->checking_text);
+				shown = 1;
+			}
+			if (shown)
+				dialog_progress_set(files < total ? files : total, total, NULL);
+		}
 		save_name(sw->save, name, console);
 		if (!same_name(sw->save, save) && !same_name(sw->save, save2))
 			continue;
@@ -430,6 +443,8 @@ static u32 share_walk(const char *path, const char *save, const char *save2)
 	}
 	while (result != SHARE_NONE && depth >= 0)
 		f_closedir(&sw->dirs[depth--]);  // the folders the walk left open
+	if (shown)
+		dialog_progress_end();
 	tlog("rename: %lu games on the card checked for the save in %lu ms", (unsigned long)files,
 	     (unsigned long)(cycles_since(start) / 16780u));
 	return result;

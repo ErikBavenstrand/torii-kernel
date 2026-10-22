@@ -284,6 +284,28 @@ rename)
   echo "PASS: saves rename: the SD card page's Rename moves the save and save type with the game, which starts with them"
   ;;
 
+rename-walk)
+  first_launch
+  first_copy
+  # The same rename on a card with a game folder of 1,500 files: the check for
+  # another game with its save (a walk of the whole card) takes long enough
+  # to say so with a progress dialog; the short walk of the plain case
+  # above shows none
+  mkdir "$cart/fill"
+  for i in $(seq 1 1500); do : >"$cart/fill/Filler $i.gba"; done
+  mcopy -i "$cart/sd.img" -s "$cart/fill" ::/Fill
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot $(nav_file /Test.gba 1) -k @12:UP -k @16:- -k @20:UP -k @24:- -k @28:UP -k @32:- -k @40:A -k @44:- \
+    -w "screen ready: rename" -k @10:A -k @14:- -k @24:START -k @28:- \
+    -w "rename: kept" -w "sdcard: ready /" -f 12000
+  logged "rename: /Test.gba to Testq.gba"
+  grep -q "kernel: rename: [0-9]* games on the card checked for the save" "$cart/run.log" || fail "the walk wasn't logged"
+  # (the dialog comes between the keyboard and the rename itself)
+  [ "$(sed -n '/kernel: screen ready: rename/,/kernel: rename: kept/p' "$cart/run.log" | grep -c 'screen ready: progress')" = 1 ] ||
+    fail "no progress dialog while the card was checked"
+  echo "PASS: saves rename-walk: a long check of the card for a shared save shows a progress dialog"
+  ;;
+
 copy)
   first_launch
   first_copy

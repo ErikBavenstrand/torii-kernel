@@ -1004,7 +1004,7 @@ static void relist(u32 cursor, const char *follow)
 		// As many rows (new names, sorted again): redrawn in place, the
 		// cached ones too; a page change only if the cursor's game sorted
 		// far from where it was
-		ui_list_refresh(list_node(), 0, games.count - 1);
+		ui_list_refresh_changed(list_node());
 		ui_list_set_cursor(list_node(), games.cursor);
 	} else {
 		ui_list_reset(list_node(), games.cursor);

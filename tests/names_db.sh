@@ -291,6 +291,13 @@ boot "$cart" "$cart/1.log" $(nav_game gba 2) \
 [ "$(grep 'games: a new index: the cursor is on row' "$cart/1.log" | grep -c 'row 0 of 4, /GBA/Wars.gba')" -ge 2 ] ||
   fail "the cursor left its game: $(grep 'a new index: the cursor' "$cart/1.log")"
 echo "PASS: the cursor stays on its game across the new sorts the names cause"
+# Only the rows whose text changed redraw: the walk after the names in place
+# lists the same names again, so it redraws none
+grep -q 'list: 0 of [0-9]* rows redraw' "$cart/1.log" ||
+  fail "every row redrew for a list of the same names: $(grep 'rows redraw' "$cart/1.log")"
+grep -q 'list: [1-9][0-9]* of [0-9]* rows redraw' "$cart/1.log" ||
+  fail "no row redrew for the names put in place: $(grep 'rows redraw' "$cart/1.log")"
+echo "PASS: a new index redraws only the rows that changed"
 
 # The same on Favourites (A-Z), which keeps its own order of the favourites
 cart=$carts/follow-fav

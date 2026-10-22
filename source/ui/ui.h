@@ -901,6 +901,13 @@ void ui_list_recount(u8 node, u32 cursor);
 // when they scroll back: an item whose row would draw differently must be
 // refreshed even while off screen (or the list reset).
 void ui_list_refresh(u8 node, u32 lo, u32 hi);
+// The model changed under the list with its count as it was (a new sort, new
+// names): every row off screen is forgotten, and the rows on screen redraw
+// only if their item draws differently than when they were drawn, so the
+// rest of the page doesn't flicker through the refresh pool. For a list whose
+// model fetches its items (not one that paints its rows whole: those all
+// redraw).
+void ui_list_refresh_changed(u8 node);
 void ui_list_set_cursor(u8 node, u32 cursor);
 // As ui_list_set_cursor, for a move key made: a repeat of a held key makes
 // the list glide at its speed rather than spring a row at a time.

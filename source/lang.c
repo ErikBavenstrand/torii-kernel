@@ -584,6 +584,8 @@ static const struct lang_rename en_rename = {
 	.names_full = "names.txt is too large to change",
 	.discard = "Discard changes?",
 	.discard_button = "Discard",
+	.checking = "Checking saves",
+	.checking_text = "Looking for another game\nthat uses this save",
 };
 
 //---------------------------------------------------------------------------------
