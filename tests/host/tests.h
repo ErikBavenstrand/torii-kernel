@@ -193,5 +193,17 @@ void test_letter_one(void);
 void test_gamelist_size(void);
 void test_gamelist_sort(void);
 void test_colour_bldy(void);
+void test_saveslot_clean(void);
+void test_saveslot_names(void);
+void test_saveslot_paths(void);
+void test_saveslot_path_bounds(void);
+void test_saveslot_longest(void);
+void test_saveslot_backup_names(void);
+void test_saveslot_history(void);
+void test_saveslot_history_random(void);
+void test_saveslot_trash_expiry(void);
+void test_saveslot_journal(void);
+void test_saveslot_recovery(void);
+void test_saveslot_sanity(void);
 
 #endif

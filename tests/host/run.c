@@ -225,6 +225,18 @@ static const struct {
 	{"userdata_sort_big", test_userdata_sort_big},
 	{"userdata_clock", test_userdata_clock},
 	{"userdata_ago", test_userdata_ago},
+	{"saveslot_clean", test_saveslot_clean},
+	{"saveslot_names", test_saveslot_names},
+	{"saveslot_paths", test_saveslot_paths},
+	{"saveslot_path_bounds", test_saveslot_path_bounds},
+	{"saveslot_longest", test_saveslot_longest},
+	{"saveslot_backup_names", test_saveslot_backup_names},
+	{"saveslot_history", test_saveslot_history},
+	{"saveslot_history_random", test_saveslot_history_random},
+	{"saveslot_trash_expiry", test_saveslot_trash_expiry},
+	{"saveslot_journal", test_saveslot_journal},
+	{"saveslot_recovery", test_saveslot_recovery},
+	{"saveslot_sanity", test_saveslot_sanity},
 };
 
 int main(void)
