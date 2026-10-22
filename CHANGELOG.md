@@ -6,6 +6,14 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** a game list redraws only the rows whose text, marks or detail
+  changed when the index changes under it, instead of every visible row
+  through the refresh pool, so a launch or a name for an off-screen game
+  redraws nothing and a found name no longer shows old and new rows together
+  (`fc5b3af`).
+- **Added:** a rename's check of the whole card for another game with the save
+  shows a "Checking saves" progress dialog once it passes a third of a second,
+  so a big card doesn't look frozen (`fc5b3af`).
 - **Added:** a launch keeps the big game the background was reading: its CRC so
   far goes to `/torii/crc.part` and the next boot goes on from there, so a 32 MB
   game isn't started over at every short visit. New games after Recent's are

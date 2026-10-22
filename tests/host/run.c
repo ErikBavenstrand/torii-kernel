@@ -49,6 +49,7 @@ static const struct {
 	{"library_build_and_sort", test_library_build_and_sort},
 	{"library_sort_random", test_library_sort_random},
 	{"library_cap", test_library_cap},
+	{"library_pool_headroom", test_library_pool_headroom},
 	{"library_file_round_trip", test_library_file_round_trip},
 	{"library_forget_rename", test_library_forget_rename},
 	{"rename_edit", test_rename_edit},

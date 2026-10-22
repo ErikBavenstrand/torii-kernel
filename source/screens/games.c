@@ -367,7 +367,7 @@ static const struct ui_image_config box_image = {art_box_tiles[ART_BOX_OTHER], a
 static const struct ui_scrollbar_config bar_compact = {N_LIST_COMPACT};
 static const struct ui_scrollbar_config bar_art = {N_LIST_ART};
 
-#define LIST_FLAGS (UI_LIST_WRAP | UI_LIST_MARQUEE | UI_LIST_CONSOLES | UI_LIST_NO_SHOULDERS)
+#define LIST_FLAGS (UI_LIST_WRAP | UI_LIST_MARQUEE | UI_LIST_CONSOLES | UI_LIST_NO_SHOULDERS | UI_LIST_TRACK)
 static const struct ui_list_config list_plain = {&model, UI_ROW_PITCH_LIST, LIST_FLAGS, DETAIL_W, LIST_PAD};
 static const struct ui_list_config list_marks = {&model, UI_ROW_PITCH_LIST, LIST_FLAGS | UI_LIST_MARKS, DETAIL_W,
 						 LIST_PAD};

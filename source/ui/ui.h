@@ -558,6 +558,8 @@ enum {
 	UI_LIST_NO_SHOULDERS = 1024,  // L and R don't page: held, L picks a hard reset with A
 	UI_LIST_ALERT = 2048,  // list: rows draw in UI_BANK_ALERT (danger, NOR's amber and
 			       // success for their text; no item accent)
+	UI_LIST_TRACK = 4096,  // list: keeps a hash of each row's item as drawn, for
+			       // ui_list_refresh_changed (a little time a row drawn)
 };
 #define UI_LIST_ICON8_W 8
 

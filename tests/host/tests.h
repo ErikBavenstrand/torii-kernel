@@ -168,6 +168,7 @@ void test_library_sort_key(void);
 void test_library_build_and_sort(void);
 void test_library_sort_random(void);
 void test_library_cap(void);
+void test_library_pool_headroom(void);
 void test_library_file_round_trip(void);
 void test_library_forget_rename(void);
 void test_rename_edit(void);

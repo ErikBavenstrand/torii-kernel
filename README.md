@@ -104,6 +104,12 @@ is rebuilt in the background when the card changes; `/torii` also keeps
 
 `just --list` shows the rest.
 
+A game that shows another game's name or box: the kernel keeps a game's CRC
+in `/torii/crc.txt` as long as its file's size and date match, so a different
+file of the same size with an older date copied over it keeps the old CRC.
+Delete `/torii/crc.txt` and the kernel reads every game again in the
+background (about 1.6 s per MB, over a few boots).
+
 The build uses devkitARM r54, the closest available release to the r53
 EZ-Flash used, so the compiled kernel isn't bit-for-bit their file. To flash
 exactly the official kernel, use the `ezkernelnew.bin` in the repo root.

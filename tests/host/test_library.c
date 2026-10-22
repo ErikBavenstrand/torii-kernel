@@ -277,6 +277,52 @@ void test_library_cap(void)
 	free(slot);
 }
 
+// A full index (4,096 games) takes every database name put in place
+// (library_name_found) before the pool is full, with file names as long as
+// No-Intro's usual ones; with 120-letter names the pool fills first, and
+// lib_rename_shown says so (the walk after the run then rebuilds it)
+static u32 pool_after_names(u32 letters, u32 *applied)
+{
+	u8 *slot = new_slot();
+	static struct lib_build b;
+	static struct lib_build scratch;
+	lib_build_begin(&b, slot, put);
+	u16 root = lib_build_folder(&b, "/");
+	char name[LIBRARY_NAME_MAX + 1], shown[LIBRARY_NAME_MAX + 1];
+	for (u32 i = 0; i < LIBRARY_GAMES_MAX; i++) {
+		snprintf(name, sizeof(name), "%0*u.gba", (int)letters, (unsigned)i);
+		CHECK_EQ(lib_build_game(&b, root, name, NULL, i, LIB_GBA, 0), LIB_ADDED);
+	}
+	struct lib_header h;
+	lib_build_header(&b, &h, 0, 0, LIBRARY_GAMES_MAX);
+	sort_all(slot, 64);
+	u32 before = lib_hdr(slot)->pool_bytes;
+	*applied = 0;
+	for (u32 i = 0; i < LIBRARY_GAMES_MAX; i++) {
+		snprintf(name, sizeof(name), "%0*u.gba", (int)letters, (unsigned)i);
+		snprintf(shown, sizeof(shown), "%0*u (USA, Europe)", (int)letters, (unsigned)(LIBRARY_GAMES_MAX - i));
+		u32 rec = lib_find(slot, name) != LIBRARY_NONE ? lib_find(slot, name) : i;
+		if (!lib_rename_shown(slot, put, rec, name, shown, &scratch))
+			break;
+		(*applied)++;
+	}
+	CHECK(lib_body_ok(slot, seen));
+	u32 after = lib_hdr(slot)->pool_bytes;
+	printf("  pool: %u letters: %u of %u bytes before the names, %u after %u of them\n", (unsigned)letters,
+	       (unsigned)before, (unsigned)LIB_POOL_MAX, (unsigned)after, (unsigned)*applied);
+	free(slot);
+	return after;
+}
+
+void test_library_pool_headroom(void)
+{
+	u32 applied;
+	pool_after_names(44, &applied);
+	CHECK_EQ(applied, LIBRARY_GAMES_MAX);
+	pool_after_names(120, &applied);
+	CHECK(applied < LIBRARY_GAMES_MAX);
+}
+
 // Writes a slot as library_scan.c does, into file; returns its size
 static u32 write_image(const u8 *slot, u8 *file)
 {
