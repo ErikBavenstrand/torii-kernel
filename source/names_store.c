@@ -133,6 +133,11 @@ static struct {
 	u32 cursor;  // M_NEW: the Recent entry, then the library record; M_ALL: the library record
 	// M_NEW's total counts the games it had to read
 	u32 total, done, computed, named, bytes, since_write, since_rename;
+	// The names found and not in the index yet (cache record numbers), then
+	// being put there one a step; a walk follows the run (final_walk)
+	u16 pend[NAMES_RENAME_EVERY];
+	u8 pend_count, pend_at, applying, final_walk;
+	char apply_path[NAMES_PATH_MAX + 1];
 	u32 started_frame, rename_frame;  // torii_frames as Identify began, and at the first name since a sort
 	u32 walk_new;  // the walk under way's games without a live CRC record
 	u32 changes;  // CRCs computed this session: names_changes
@@ -991,11 +996,41 @@ static int next_game(void)
 	return NEXT_LATER;
 }
 
-// The index sorts again, by the names found since it last did
+// The names found since the last time go into the index, one a job step
+// (apply_step), and show at once; a walk follows the run, which builds the
+// index fresh and takes the names into its hash
+static void apply_step(void);
 static void publish_names(void)
 {
+	while (N.applying)
+		apply_step();  // the last batch is done first
+	N.pend_count = (u8)N.since_rename;
+	N.pend_at = 0;
 	N.since_rename = 0;
-	library_changed();
+	N.applying = N.pend_count != 0;
+	N.final_walk = 1;
+}
+
+// One found name into the index; when the batch is in, the lists get it
+static void apply_step(void)
+{
+	if (N.pend_at < N.pend_count) {
+		const struct names_rec *r = names_cache_rec(&N.cache, N.pend[N.pend_at++]);
+		u32 len = (u32)strnlen(names_cache_path(&N.cache, r), NAMES_PATH_MAX);
+		memcpy(N.apply_path, names_cache_path(&N.cache, r), len);
+		N.apply_path[len] = 0;
+		const char *name = names_db_name(DB, r, library_console_of(N.apply_path));
+		if (name)
+			library_name_found(N.apply_path, name);
+		if (N.pend_at < N.pend_count)
+			return;
+	}
+	N.applying = 0;
+	library_names_applied();
+	if (N.mode == M_NONE && N.final_walk) {
+		N.final_walk = 0;
+		library_changed();
+	}
 }
 
 static void identify_finish(void)
@@ -1003,6 +1038,10 @@ static void identify_finish(void)
 	close_file();
 	if (N.since_rename)
 		publish_names();
+	if (!N.applying && N.final_walk) {
+		N.final_walk = 0;
+		library_changed();  // the batches were put in place: a walk builds the index fresh
+	}
 	// In frames: a run of minutes outlasts the cycle counter (256 s)
 	u32 ms = (torii_frames - N.started_frame) * NAMES_FRAME_US / 1000u;
 	if (N.mode == M_ALL)
@@ -1123,6 +1162,7 @@ static int identify_step(void)
 			N.named++;
 			if (!N.since_rename)
 				N.rename_frame = torii_frames;
+			N.pend[N.since_rename] = (u16)n;
 			if (++N.since_rename >= NAMES_RENAME_EVERY)
 				publish_names();
 		}
@@ -1164,6 +1204,10 @@ static int names_step(void)
 		write_step();
 		return JOB_MORE;
 	}
+	if (N.applying) {
+		apply_step();
+		return JOB_MORE;
+	}
 	int between = N.step == I_NEXT;
 	// A name found a while ago shows now, also in the middle of a big game:
 	// the job waits for the walk, its file kept open
@@ -1180,7 +1224,7 @@ static int names_step(void)
 
 static int has_work(void)
 {
-	return N.phase == P_DONE && (N.mode != M_NONE || N.dirty || N.wphase != X_IDLE);
+	return N.phase == P_DONE && (N.mode != M_NONE || N.dirty || N.wphase != X_IDLE || N.applying);
 }
 
 static int names_job(struct job *job)
@@ -1245,6 +1289,8 @@ void names_identify_now(void)
 		write_step();
 	while (identify_step() == JOB_MORE)
 		;
+	while (N.applying)
+		apply_step();
 	if (N.dirty)
 		write_begin();
 	while (N.wphase != X_IDLE)
@@ -1359,6 +1405,9 @@ void names_before_launch(void)
 	else if (N.mode == M_NEW)  // the next boot's walk finds the rest
 		tlog("names: identifying new games stopped for a launch (%lu done)", (unsigned long)N.computed);
 	N.mode = M_NONE;
+	// The names not yet in the index: the next boot's walk takes them
+	N.applying = N.final_walk = 0;
+	N.since_rename = N.pend_count = N.pend_at = 0;
 	u32 bytes = N.phase == P_DONE && N.cache_ok && N.active ? journal_bytes() : 0;
 	if (bytes > NAMES_JOURNAL_MAX - 64) {
 		// Too many for the journal (a launch during Identify library, say):

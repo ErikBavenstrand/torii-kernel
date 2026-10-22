@@ -107,6 +107,7 @@ static struct {
 	u8 active;  // which slot
 	u8 want_walk;
 	u8 want_write;  // the active index isn't on the card yet
+	u16 names_applied;  // library_name_found's names since library_names_applied
 	u8 cant_keep;  // the index file can't be made this boot: no write is tried
 	u8 force;  // the next walk rebuilds whatever the hash says (Rescan)
 	u8 build;  // this walk builds an index (else it only hashes)
@@ -119,10 +120,6 @@ static struct {
 	u16 progress;  // the first scan's bar, in thousandths
 	u32 file_gen[2];  // the generation of each valid file
 	u32 gen;
-	// The other slot still holds the index of generation old_gen, the one
-	// the last new index replaced (until a walk builds over it)
-	u8 old_ok;
-	u32 old_gen;
 	u32 started;  // cycles_now when the load, walk or write began
 	union {
 		struct {
@@ -324,7 +321,6 @@ static void load_step(void)
 
 static void load_begin(void)
 {
-	lib.old_ok = 0;
 	lib.state = S_LOAD;
 	lib.phase = L_PROBE;
 }
@@ -653,7 +649,6 @@ static void walk_step(void)
 		TLOG_ASSERT(irq_handlers_in_ram());
 		lib.u.walk.serial = volume_serial();
 		if (lib.build) {
-			lib.old_ok = 0;  // built over
 			lib_build_begin(&lib.u.walk.b, slot_at(lib.valid ? !lib.active : 0), put);
 		}
 		names_walk_begin();
@@ -759,8 +754,6 @@ static void sort_step(void)
 	if (!lib_sort_step(&lib.u.walk.sort, LIB_SORT_BUDGET))
 		return;
 	const struct lib_header *h = lib_hdr(lib.u.walk.b.slot);
-	lib.old_ok = lib.valid;  // the index replaced stays in the other slot
-	lib.old_gen = lib.gen;
 	lib.active = lib.u.walk.b.slot == slot_at(1);
 	lib.valid = 1;
 	lib.force = 0;
@@ -1138,19 +1131,6 @@ u32 library_generation(void)
 	return lib.gen;
 }
 
-u32 library_old_path(u32 gen, u32 console, u32 n, char *out, u32 size)
-{
-	const u8 *slot;
-	if (lib.valid && gen == lib.gen)
-		slot = active_slot();
-	else if (lib.valid && lib.old_ok && gen == lib.old_gen)
-		slot = slot_at(!lib.active);
-	else
-		return 0;
-	u32 rec = lib_nth(slot, console, n);
-	return rec != LIBRARY_NONE ? lib_path(slot, rec, out, size) : 0;
-}
-
 u32 library_count(u32 console)
 {
 	return lib.valid && console < LIBRARY_CONSOLE_SLOTS ? lib_hdr(active_slot())->counts[console] : 0;
@@ -1278,6 +1258,42 @@ void library_named(const char *path, const char *display)
 		changed();
 	}
 	card_changed();
+}
+
+int library_name_found(const char *path, const char *crc_name)
+{
+	// Not while the index loads or is lost; a walk or sort building the other
+	// slot goes on (the final walk of a run replaces it with the same names)
+	if (!lib.valid || lib.state == S_LOAD || lib.state == S_LOST)
+		return 0;
+	u32 rec = library_find(path);
+	if (rec == LIBRARY_NONE || (library_flags(rec) & LIB_F_CUSTOM))
+		return 0;  // not indexed yet, or it has a name already (names.txt's wins)
+	char display[GAMENAME_MAX + 1];
+	if (gamename_display(display, path, NULL, crc_name) == GAMENAME_CLEAN)
+		return 0;
+	psram_begin();
+	struct lib_build *scratch = (struct lib_build *)(pReadCache + READCACHE_LIBRARY);
+	const char *slash = strrchr(path, '/');
+	if (!lib_rename_shown(slot_at(lib.active), put, rec, slash ? slash + 1 : path, display, scratch))
+		return 0;  // the pool is full: the walk after the run rebuilds it
+	lib.names_applied++;
+	return 1;
+}
+
+void library_names_applied(void)
+{
+	if (!lib.names_applied)
+		return;
+	tlog("library: %u database names put in the index in place", lib.names_applied);
+	lib.names_applied = 0;
+	if (!lib.valid)
+		return;
+	changed();
+	// The active index changed in place: it goes to the card again
+	lib.want_write = !lib.cant_keep;
+	if (lib.state == S_WRITE)
+		lib.write_dirty = 1;
 }
 
 void library_renamed(const char *old_path, const char *new_name)

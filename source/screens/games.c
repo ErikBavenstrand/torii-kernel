@@ -119,6 +119,9 @@ static struct {
 	char name[GAMENAME_MAX + 1];
 	char detail[AGO_MAX];
 	char path[USERDATA_PATH_MAX] ALIGN(4);
+	// The cursor's game, kept as the cursor moves (show_position): a new
+	// index sorts the list again, and the cursor goes to where this is
+	char follow[USERDATA_PATH_MAX] ALIGN(4);
 	// The game the popup is about, copied: the lists move under it
 	char pick[USERDATA_PATH_MAX] ALIGN(4);
 	char title[GAMENAME_MAX + 1];
@@ -866,6 +869,9 @@ static void show_cap_note(void);
 
 static void show_position(void)
 {
+	struct game g;
+	if (!game_at(games.cursor, &g) || !game_path(&g, games.follow))
+		games.follow[0] = 0;
 	if (games.count)
 		snprintf(games.position, sizeof(games.position), "%lu/%lu", (unsigned long)games.cursor + 1,
 			 (unsigned long)games.count);
@@ -963,10 +969,33 @@ static const char *note_text(void)
 }
 
 // After the list changed under the page: it lists again from cursor
-static void relist(u32 cursor)
+// The row of the game at path in the list as built now, LIBRARY_NONE if it
+// isn't there (Recent's rows follow the clock, not the names: not looked up)
+static u32 follow_find(const char *path)
+{
+	if (!*path || games.kind == KIND_RECENT)
+		return LIBRARY_NONE;
+	if (games.kind == KIND_CONSOLE)
+		return library_position(library_find(path));
+	for (u32 i = 0; i < games.count; i++) {
+		struct game g;
+		if (game_at(i, &g) && g.path && !strcmp(g.path, path))
+			return i;
+	}
+	return LIBRARY_NONE;
+}
+
+// Lists the page again: the cursor on the row cursor, or on the game at
+// follow (the cursor's game before a new sort) when it is in the list
+static void relist(u32 cursor, const char *follow)
 {
 	u32 was = games.count;
 	build();
+	if (follow) {
+		u32 at = follow_find(follow);
+		if (at != LIBRARY_NONE)
+			cursor = at;
+	}
 	games.cursor = games.count ? (cursor < games.count ? cursor : games.count - 1) : 0;
 	if (!up())
 		return;
@@ -1030,18 +1059,6 @@ static u32 games_row(void)
 	return up() ? ui_list_cursor(list_node()) : games.row;
 }
 
-// The row in the index now of the game at row in the one the page lists
-// (A-Z: a new name sorts it elsewhere), so the cursor stays on its game;
-// row if it isn't found
-static u32 follow_row(u32 row)
-{
-	if (games.kind != KIND_CONSOLE ||
-	    !library_old_path(games.lib_generation, games.console, row, games.path, sizeof(games.path)))
-		return row;
-	u32 at = library_position(library_find(games.path));
-	return at != LIBRARY_NONE ? at : row;
-}
-
 // Each pass of the menu's loop: a new index lists again; Recent's "played"
 // texts follow the clock
 static void games_poll(void)
@@ -1053,10 +1070,12 @@ static void games_poll(void)
 	// At once: Recent's and the favourites' records are the old index's
 	if (games.lib_generation != library_generation()) {
 		// Opened before the index was back: at the row it was asked for
-		u32 row = games.unloaded ? games.row : follow_row(ui_list_cursor(list_node()));
+		u32 row = games.unloaded ? games.row : ui_list_cursor(list_node());
 		tlog_debug("games: a new index (row %lu)", (unsigned long)row);
 		games.unloaded = !library_ready();
-		relist(row);
+		relist(row, games.unloaded ? NULL : games.follow);
+		tlog_debug("games: a new index: the cursor is on row %lu of %lu, %s", (unsigned long)games.cursor,
+			   (unsigned long)games.count, games.follow);
 		return;
 	}
 	if (games.art && games.names_changes != names_changes()) {
@@ -1304,7 +1323,7 @@ static int row_still(u32 i)
 	if (games.kind != KIND_CONSOLE || games.defer_generation == library_generation())
 		return 1;
 	tlog("games: a new index came before row %lu opened; nothing started", (unsigned long)i);
-	relist(i);
+	relist(i, NULL);
 	return 0;
 }
 
@@ -1433,7 +1452,7 @@ static void popup_run(u32 i)
 			ui_popup_close();
 			FAV_SETTLE();
 			if (action_delete_file(games.pick))
-				relist(i);
+				relist(i, NULL);
 			else
 				dialog_message(NULL, gl_sd_delete_failed, DIALOG_ERROR);
 			return;
@@ -1443,7 +1462,7 @@ static void popup_run(u32 i)
 		// A favourite dropped leaves the Favourites page before a launch
 		// that may come back (Game info and Rename list the page again)
 		if (fav != fav_was && games.kind == KIND_FAV && action != LANG_POP_INFO && action != LANG_POP_RENAME)
-			relist(i);
+			relist(i, NULL);
 		switch (action) {
 		case LANG_POP_PLAY:
 			launch(ACTION_DEFAULT, 0, hard);
@@ -1467,7 +1486,7 @@ static void popup_run(u32 i)
 	ui_popup_close();
 	FAV_SETTLE();
 	if (fav != fav_was && games.kind == KIND_FAV)
-		relist(i);  // a favourite dropped leaves the page
+		relist(i, NULL);  // a favourite dropped leaves the page
 }
 
 // A on a row (L held: a hard reset), run after the frame

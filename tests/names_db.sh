@@ -194,6 +194,11 @@ mcopy -i "$cart/sd.img" "$cart/recent.txt" ::/torii/recent.txt
 boot "$cart" "$cart/1.log" -f 3000 -u "names: wrote /torii/crc.txt"
 logged "$cart/1.log" "names: identified 8 of 8 new games"
 logged "$cart/1.log" "names: wrote /torii/crc.txt"
+# The names sort the lists in place first (no walk), then one walk builds the index fresh
+logged "$cart/1.log" "library: 6 database names put in the index in place"
+[ "$(grep -n -m1 'database names put in the index in place' "$cart/1.log" | cut -d: -f1)" -lt \
+  "$(grep -n -m1 'the card changed: building a new index' "$cart/1.log" | cut -d: -f1)" ] ||
+  fail "the names weren't put in place before the walk"
 logged "$cart/1.log" "library: the card changed: building a new index"
 logged "$cart/1.log" "library: wrote /torii/library.bak (generation 2)"
 [ "$(grep -oE '^kernel: names: /[^ ]+ is [0-9A-F]{8}' "$cart/1.log" | head -2 | cut -d' ' -f3 | tr '\n' ' ')" = \
@@ -282,6 +287,31 @@ OMEGA_SD_READ_ERROR=$sectors boot "$cart" "$cart/1.log" -f 6000 -u "names: wrote
   fail "Bad.gba was tried $(grep -c 'reading /GBA/Bad.gba failed' "$cart/1.log") times: $(grep -E '^kernel( error)?: (names|library)' "$cart/1.log" | tail -8)"
 [ "$(grep -c 'library: the card changed: building a new index' "$cart/1.log")" -ge 1 ] || fail "no walk followed the names found"
 echo "PASS: a game the card can't read is tried once a boot"
+
+# The cursor stays on its game while the names sort the list again, through
+# the names put in place and the walk that follows: Wars is the GBA page's
+# third game by its file name and the first by its database name
+cart=$carts/follow
+fixture_card "$cart" --no-crc
+# shellcheck source=tests/nav.sh
+. tests/nav.sh
+# shellcheck disable=SC2046 # nav.sh's options
+boot "$cart" "$cart/1.log" $(nav_game gba 2) -f 3000
+[ "$(grep -c 'games: a new index: the cursor is on row' "$cart/1.log")" -ge 2 ] ||
+  fail "the page wasn't sorted twice: $(grep -E '^kernel: (games|library)' "$cart/1.log" | tail -6)"
+[ "$(grep 'games: a new index: the cursor is on row' "$cart/1.log" | grep -c 'row 0 of 4, /GBA/Wars.gba')" -ge 2 ] ||
+  fail "the cursor left its game: $(grep 'a new index: the cursor' "$cart/1.log")"
+echo "PASS: the cursor stays on its game across the new sorts the names cause"
+
+# The same on Favourites (A-Z), which keeps its own order of the favourites
+cart=$carts/follow-fav
+fixture_card "$cart" --no-crc
+printf '/GBA/Hack of Minish.gba\n/GBA/Homebrew.gba\n/GBA/Wars.gba\n/GBA/zz Minish.gba\n' >"$cart/fav.txt"
+mcopy -i "$cart/sd.img" "$cart/fav.txt" ::/torii/favorites.txt
+NAV_SHOWN="fav gba" boot "$cart" "$cart/1.log" $(NAV_SHOWN="fav gba" nav_game fav 2) -f 3000
+[ "$(grep 'games: a new index: the cursor is on row' "$cart/1.log" | grep -c 'row 0 of 4, /GBA/Wars.gba')" -ge 2 ] ||
+  fail "the cursor left its favourite: $(grep -E 'a new index|games:' "$cart/1.log" | tail -4)"
+echo "PASS: the cursor stays on its favourite across the new sorts"
 
 # crc.txt cut short by a write (left with zeros): its lines read in the
 # same pass as its check are dropped, and the backup's taken

@@ -323,11 +323,6 @@ int library_walking(void);
 // Changes whenever the index changes (a new one, a forget, a rename, a
 // launch): a screen holding record numbers lists again.
 u32 library_generation(void);
-// The path of the nth game of console in A-Z order in the index of
-// generation gen, while it is the index now or the one the last new index
-// replaced (kept until a walk builds over it); 0 if neither (or past the
-// end): for a page that keeps its cursor on its game across a new sort.
-u32 library_old_path(u32 gen, u32 console, u32 n, char *out, u32 size);
 // Games of a console (LIB_GBA...) and the record of its nth in A-Z order
 // (LIBRARY_NONE past the end).
 u32 library_count(u32 console);
@@ -371,6 +366,13 @@ void library_renamed(const char *old_path, const char *new_name);
 // /torii/names.txt): display, or with NULL its cleaned name; its list
 // re-sorts at once, and a walk then writes the index.
 void library_named(const char *path, const char *display);
+// The names database gave a game a name (names_store.c's background): its
+// display name and place in the lists change in place, without a walk.
+// Returns 0 if nothing changed (it isn't indexed, has a custom name, or the
+// pool is full: a walk then follows the run). library_names_applied then
+// shows them all at once (a new generation) and has the index written.
+int library_name_found(const char *path, const char *crc_name);
+void library_names_applied(void);
 // Something else on the card changed that the lists sort by (a custom name
 // written to /torii/names.txt): a walk follows, and rebuilds.
 void library_changed(void);
