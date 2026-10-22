@@ -328,11 +328,12 @@ While SD control is 3 the port returns status; `0xEEE1` means busy.
    patched emulator clears memory and registers and starts at `0x08000000`
    without the intro (`tests/hard_reset.sh`).
 
-**Saves:** before launch the kernel writes the save path and size to kernel NOR
+**Saves:** before launch the kernel writes the save's full path (at most 251 bytes) and size to kernel NOR
 `+0x790000` with flag `0x11` and loads the `.sav` into SRAM (`0x0E000000`, 64 KB
 banks via `0x09C00000` or the flash-style `AA/55/B0` bank command). On the next
 power-on, if the flag is set, it asks (or auto-saves) and copies SRAM back to
-`SAVER/<game>.sav`. So a save only reaches the SD card on the next boot of the
+`/torii/saves/<rom path>/<slot>.sav` (or next to the ROM, by the Save
+location setting; v0.4 and earlier used `SAVER/<game>.sav`). So a save only reaches the SD card on the next boot of the
 kernel.
 
 **Save types:** the kernel never patches a game's save code. It sends the save
@@ -387,7 +388,7 @@ set, in kernel mode too; the kernel sets it to 1 at boot.
 **Verified with a commercial game:** Pokémon Emerald (`BPEE`, 16 MB, Flash
 128K, RTC) runs the whole cycle on the emulated cart, launched from SD: new
 game, in-game save, power-cycle with the kernel's "Save sav?" prompt writing
-`SAVER/Emerald.sav` (identical to the first 128 KB of cart SRAM), and
+`/torii/saves/Emerald.gba/Main.sav` (identical to the first 128 KB of cart SRAM), and
 Continue on the next launch. The game's save sits in cart SRAM as plain
 bytes in Emerald's own layout (4 KB sections, signature `0x08012025`); the
 kernel copies it without interpreting it. The kernel sets `0x096A0000` for
@@ -578,7 +579,7 @@ and the GL064A, and fails on v0.2.1 and v0.2.2.
 ## 5. Save prompt behaviour
 
 On power-on, if a game ran since the last save, the kernel asks "Save sav?".
-A copies cart SRAM to `SAVER/<game>.sav`. B (CANCEL) discards that session:
+A copies cart SRAM to the game's save file (`/torii/saves/<rom path>/Main.sav`). B (CANCEL) discards that session:
 the pending flag is cleared without writing, and the next launch loads the
 existing `.sav` back into SRAM. This is intended, and lets you throw away a
 session.

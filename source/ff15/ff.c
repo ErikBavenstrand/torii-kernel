@@ -5163,7 +5163,7 @@ FRESULT f_unlink_alias (
 		if (res == FR_OK && (dj.fn[NSFLAG] & (NS_DOT | NS_NONAME))) res = FR_INVALID_NAME;
 		if (res == FR_OK) {
 			clst = torii_first_clust(&dj);
-			if ((dj.obj.attr & AM_DIR) || !keep || clst != keep ||
+			if (!keep || clst != keep ||
 				(dj.obj.sclust == dk.obj.sclust && dj.dptr == dk.dptr)) {	/* One entry: other's own */
 				res = FR_DENIED;
 			}
@@ -5226,7 +5226,7 @@ FRESULT f_unlink_case_aliases (
 		res = DIR_READ_FILE(&dj);
 		if (res != FR_OK) break;
 		get_fileinfo(&dj, fno);
-		if (!(dj.obj.attr & AM_DIR) && torii_same_name(fno->fname, name)) {
+		if (torii_same_name(fno->fname, name)) {
 			DWORD c;
 #if FF_FS_EXFAT
 			if (fs->fs_type == FS_EXFAT) {

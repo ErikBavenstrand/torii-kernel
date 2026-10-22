@@ -157,7 +157,7 @@ enum gamename_source gamename_display(char *out, const char *path, const struct 
 #define GAMENAME_OPENABLE 0x4  // a file the kernel starts (a game extension, library.h)
 
 // 1 if the entry name in folder dir ("/" for the root) stays out of the SD
-// card page and the library: the root's system folders (/torii, SAVER, RTS,
+// card page and the library: the root's system folders (/torii, SAVER (older kernels' saves), RTS,
 // SYSTEM, PATCH, CHEAT, System Volume Information, without ASCII case), dot
 // files and folders anywhere, entries with the hidden or system attribute,
 // and files the kernel can't start. show_all (the "Show all files" setting,

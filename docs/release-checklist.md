@@ -32,7 +32,7 @@ in `dist/logs/torii.log`.
    Name=Hello
    ```
 
-4. Delete `SAVER/EEPROM Probe.sav` from the card, so the probe's 8K runs
+4. Delete the probe's save folder (`torii/saves/EEPROM Probe.gba`) from the card, so the probe's 8K runs
    start from a fresh 8 KB save.
 5. In Settings, turn Save states and Cheats (Games) and Back to menu and
    Sleep (Hotkeys) on, and set Logging (System) to Debug. Each is written

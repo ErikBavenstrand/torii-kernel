@@ -1,6 +1,6 @@
 // An SD file renamed by the menu (action_rename_file, source/actions.c):
-// the game's save, save type, save states, cheats, patch cache and custom
-// art move with it, its custom name, favourite and Recent entry follow it,
+// the game's folders of saves and history (or its saves beside it), save
+// states, cheats, patch cache and custom art move with it, its custom name, favourite and Recent entry follow it,
 // and a rename that would land on another file is refused before anything
 // moves. On the emulated cart (tests/assets.sh), with test lists beside the
 // user's, never in Diagnostics: it writes the card.
@@ -12,6 +12,7 @@
 #include "ff.h"
 #include "../../source/actions.h"
 #include "../../source/gamename.h"
+#include "../../source/savename.h"
 #include "../../source/userdata.h"
 #include "../../source/engine/stage.h"
 #include "torii_test.h"
@@ -87,26 +88,38 @@ static int has_line(const char *path, const char *line)
 	return strstr((const char *)stage_buffer(), line) != NULL;
 }
 
+// A game's folders of saves and history, under /torii for the games in T_DIR
+#define SV "/torii/saves/T18"
+#define BK "/torii/backups/T18"
+#define HIST "/0001-20261023-120000.sav"
+
+// The files the test makes (and whatever it renames them to), then the folders
 static const char *const files[] = {
 	T_DIR "/Fwd2.gba",
-	"/SAVER/Fwd.sav",
-	"/SAVER/Fwd2.sav",
+	SV "/Fwd.gba/Main.sav",
+	SV "/Fwd2.gba/Main.sav",
 	T_DIR "/Back.gba",
-	"/SAVER/Back.sav",
-	"/SAVER/Back2.sav",
+	SV "/Back.gba/Main.sav",
+	SV "/Back2.gba/Main.sav",
 	"/torii/rename.txt",
 	"/torii/rename.txt.bak",
 	T_DIR "/Game.gba",
 	T_DIR "/New.gba",
 	T_DIR "/new.gba",
 	T_DIR "/Other.gba",
-	"/SAVER/Game.sav",
-	"/SAVER/New.sav",
-	"/SAVER/new.sav",
-	"/SAVER/Busy.sav",
-	"/SAVER/Game.mde",
-	"/SAVER/New.mde",
-	"/SAVER/new.mde",
+	SV "/Game.gba/Main.sav",
+	SV "/Game.gba/Boss fight.sav",
+	SV "/Game.gba/game.ini",
+	SV "/New.gba/Main.sav",
+	SV "/New.gba/Boss fight.sav",
+	SV "/New.gba/game.ini",
+	SV "/new.gba/Main.sav",
+	SV "/new.gba/Boss fight.sav",
+	SV "/new.gba/game.ini",
+	SV "/Busy.gba/Main.sav",
+	BK "/Game.gba/Main" HIST,
+	BK "/New.gba/Main" HIST,
+	BK "/new.gba/Main" HIST,
 	"/RTS/Game.rts",
 	"/RTS/New.rts",
 	"/RTS/new.rts",
@@ -121,24 +134,50 @@ static const char *const files[] = {
 	"/torii/art/custom/new.gba.bin",
 	T_DIR "/Share.gba",
 	T_DIR "/Shared.gba",
-	"/SAVER/Share.sav",
-	"/SAVER/Shared.sav",
+	"/RTS/Share.rts",
+	"/RTS/Shared.rts",
+	SV "/Share.gba/Main.sav",
+	SV "/Shared.gba/Main.sav",
 	"/.T18h/Share.gba",
 	"/.T18h/Taken.gba",
 	T_DIR "/Taken.gba",
-	"/SAVER/Taken.sav",
+	T_DIR "/Lone.gba",
+	T_DIR "/Solo.gba",
+	T_DIR "/Soloed.gba",
+	SV "/Solo.gba/Main.sav",
+	SV "/Soloed.gba/Main.sav",
+	"/.T18h/Solo.gba",
 	T_DIR "/Roll.gba",
 	T_DIR "/Rolled.gba",
-	"/SAVER/Roll.sav",
-	"/SAVER/Rolled.sav",
-	"/SAVER/Roll.mde",
-	"/SAVER/Rolled.mde",
+	SV "/Roll.gba/Main.sav",
+	SV "/Roll.gba/game.ini",
+	SV "/Rolled.gba/Main.sav",
+	SV "/Rolled.gba/game.ini",
+	BK "/Roll.gba/Main" HIST,
+	BK "/Rolled.gba/Main" HIST,
 	"/RTS/Roll.rts",
 	"/RTS/Rolled.rts",
 	T_DIR "/Two.gba",
 	T_DIR "/Two2.gba",
-	"/SAVER/Two.sav",
-	"/SAVER/Two2.sav",
+	SV "/Two.gba/Main.sav",
+	SV "/Two2.gba/Main.sav",
+	T_DIR "/Side.gba",
+	T_DIR "/Sided.gba",
+	T_DIR "/Side.Main.sav",
+	T_DIR "/Side.Boss v1.2.sav",
+	T_DIR "/Sided.Main.sav",
+	T_DIR "/Sided.Boss v1.2.sav",
+	T_DIR "/Side.gbc",
+	T_DIR "/Back3.gba",
+	T_DIR "/Back3b.gba",
+	T_DIR "/Back3.Main.sav",
+	T_DIR "/Back3.Boss.sav",
+	T_DIR "/Back3b.Main.sav",
+	T_DIR "/Cased.gba",
+	T_DIR "/cased.gba",
+	T_DIR "/Cased.Main.sav",
+	T_DIR "/cased.Main.sav",
+	T_DIR "/Empty.gba",
 	T_DIR "/notes.txt",
 	T_DIR "/read me.txt",
 	GAMENAME_FILE,
@@ -149,10 +188,41 @@ static const char *const files[] = {
 	T_FAV ".bak",
 };
 
+// Deepest first
+static const char *const dirs[] = {
+	SV "/Fwd.gba",
+	SV "/Fwd2.gba",
+	SV "/Back.gba",
+	SV "/Back2.gba",
+	SV "/Game.gba",
+	SV "/New.gba",
+	SV "/new.gba",
+	SV "/Busy.gba",
+	SV "/Share.gba",
+	SV "/Shared.gba",
+	SV "/Solo.gba",
+	SV "/Soloed.gba",
+	SV "/Roll.gba",
+	SV "/Rolled.gba",
+	SV "/Two.gba",
+	SV "/Two2.gba",
+	SV "/Empty.gba",
+	SV "/Soloed.gba",
+	BK "/Game.gba",
+	BK "/New.gba",
+	BK "/new.gba",
+	BK "/Roll.gba",
+	BK "/Rolled.gba",
+	SV,
+	BK,
+};
+
 static void tidy(void)
 {
 	for (u32 i = 0; i < sizeof(files) / sizeof(*files); i++)
 		f_unlink(files[i]);
+	for (u32 i = 0; i < sizeof(dirs) / sizeof(*dirs); i++)
+		f_unlink(dirs[i]);
 }
 
 void test_rename_file(void)
@@ -163,15 +233,17 @@ void test_rename_file(void)
 	tidy();
 	userdata_test_paths(T_RECENT, T_FAV, T_OLD);
 	CHECK(put(T_DIR "/Game.gba", "game"));
-	CHECK(put("/SAVER/Game.sav", "save"));
-	CHECK(put("/SAVER/Game.mde", "mde"));
+	CHECK(put(SV "/Game.gba/Main.sav", "save"));
+	CHECK(put(SV "/Game.gba/Boss fight.sav", "boss"));
+	CHECK(put(SV "/Game.gba/game.ini", "ini"));
+	CHECK(put(BK "/Game.gba/Main" HIST, "history"));
 	CHECK(put("/RTS/Game.rts", "states"));
 	CHECK(put("/CHEAT/Game.cht", "cheats"));
 	CHECK(put("/PATCH/Game.pat", "patch"));
 	CHECK(put("/PATCH/New.pat", "a deleted game's patch"));
 	CHECK(put("/torii/art/custom/Game.gba.bin", "art"));
 	CHECK(put(T_DIR "/Other.gba", "other"));
-	CHECK(put("/SAVER/Busy.sav", "another game's save"));
+	CHECK(put(SV "/Busy.gba/Main.sav", "another game's save"));
 	CHECK(gamename_store_set(T_DIR "/Game.gba", "My Game"));
 	CHECK(userdata_fav_set(T_DIR "/Game.gba", 1));
 	CHECK(userdata_recent_add(T_DIR "/Game.gba"));
@@ -183,20 +255,30 @@ void test_rename_file(void)
 	CHECK_EQ(action_rename_file(T_DIR "/Game.gba", "Game.gb"), ACTION_RENAME_BAD);
 	CHECK_EQ(action_rename_file(T_DIR "/Game.gba", "Other.gba"), ACTION_RENAME_TAKEN);
 	CHECK_EQ(action_rename_file(T_DIR "/Game.gba", "Busy.gba"), ACTION_RENAME_SIDE_TAKEN);
+	CHECK_EQ(action_rename_taken(), ACTION_FILE_SAVE);
 	CHECK_EQ(action_rename_file(T_DIR "/notes.txt", "notes."), ACTION_RENAME_BAD);  // FatFs drops the dot
 	// A game with no save of its own doesn't take a save left there
 	CHECK(put(T_DIR "/Lone.gba", "lone"));
 	CHECK_EQ(action_rename_file(T_DIR "/Lone.gba", "Busy.gba"), ACTION_RENAME_SIDE_TAKEN);
 	CHECK(there(T_DIR "/Lone.gba") && !there(T_DIR "/Busy.gba"));
 	f_unlink(T_DIR "/Lone.gba");
-	CHECK(there(T_DIR "/Game.gba") && there("/SAVER/Game.sav") && !there(T_DIR "/Busy.gba"));
-	CHECK(holds("/SAVER/Busy.sav", "another game's save"));
+	CHECK(there(T_DIR "/Game.gba") && there(SV "/Game.gba/Main.sav") && !there(T_DIR "/Busy.gba"));
+	CHECK(holds(SV "/Busy.gba/Main.sav", "another game's save"));
+	// A name no longer than the pending-save record holds: Main's path must fit
+	{
+		char name[GAME_NAME_MAX + 1];
+		memset(name, 'n', sizeof(name));
+		memcpy(name + 235, ".gba", 5);  // /torii/saves/T18/<name>/Main.sav is 265 bytes
+		CHECK_EQ(action_rename_file(T_DIR "/Game.gba", name), ACTION_RENAME_BAD);
+		CHECK(there(T_DIR "/Game.gba"));
+	}
 
 	// The rename: everything moves, the lists follow
 	CHECK_EQ(action_rename_file(T_DIR "/Game.gba", "New.gba"), ACTION_RENAMED);
 	CHECK(!there(T_DIR "/Game.gba") && holds(T_DIR "/New.gba", "game"));
-	CHECK(!there("/SAVER/Game.sav") && holds("/SAVER/New.sav", "save"));
-	CHECK(!there("/SAVER/Game.mde") && holds("/SAVER/New.mde", "mde"));
+	CHECK(!there(SV "/Game.gba") && holds(SV "/New.gba/Main.sav", "save"));
+	CHECK(holds(SV "/New.gba/Boss fight.sav", "boss") && holds(SV "/New.gba/game.ini", "ini"));
+	CHECK(!there(BK "/Game.gba") && holds(BK "/New.gba/Main" HIST, "history"));
 	CHECK(!there("/RTS/Game.rts") && holds("/RTS/New.rts", "states"));
 	CHECK(!there("/CHEAT/Game.cht") && holds("/CHEAT/New.cht", "cheats"));
 	CHECK(!there("/PATCH/Game.pat") && holds("/PATCH/New.pat", "patch"));  // the stale one went
@@ -212,9 +294,10 @@ void test_rename_file(void)
 
 	// Only the case changes: the same files, under the new case
 	CHECK_EQ(action_rename_file(T_DIR "/New.gba", "new.gba"), ACTION_RENAMED);
-	CHECK(holds(T_DIR "/new.gba", "game") && holds("/SAVER/new.sav", "save"));
+	CHECK(holds(T_DIR "/new.gba", "game") && holds(SV "/new.gba/Main.sav", "save"));
 	static FILINFO fi EWRAM_BSS;
-	CHECK(f_stat("/SAVER/new.sav", &fi) == FR_OK && !strcmp(fi.fname, "new.sav"));
+	CHECK(f_stat(SV "/new.gba", &fi) == FR_OK && !strcmp(fi.fname, "new.gba"));
+	CHECK(holds(BK "/new.gba/Main" HIST, "history"));
 	CHECK(userdata_fav_has(T_DIR "/new.gba"));
 	// The same name: nothing to do
 	CHECK_EQ(action_rename_file(T_DIR "/new.gba", "new.gba"), ACTION_RENAMED);
@@ -228,53 +311,73 @@ void test_rename_file(void)
 	// A rename the power cut short, at the next boot: the game had moved, so
 	// what is left moves and the lists follow
 	CHECK(put(T_DIR "/Fwd2.gba", "fwd"));
-	CHECK(put("/SAVER/Fwd.sav", "fwd save"));
+	CHECK(put(SV "/Fwd.gba/Main.sav", "fwd save"));
 	CHECK(userdata_fav_set(T_DIR "/Fwd.gba", 1));
 	CHECK(put("/torii/rename.txt", T_DIR "/Fwd.gba\t" T_DIR "/Fwd2.gba\n"));
 	action_rename_recover();
-	CHECK(!there("/SAVER/Fwd.sav") && holds("/SAVER/Fwd2.sav", "fwd save"));
+	CHECK(!there(SV "/Fwd.gba") && holds(SV "/Fwd2.gba/Main.sav", "fwd save"));
 	CHECK(userdata_fav_has(T_DIR "/Fwd2.gba") && !userdata_fav_has(T_DIR "/Fwd.gba"));
 	CHECK(!there("/torii/rename.txt"));
 	// The game hadn't moved: what had goes back
 	CHECK(put(T_DIR "/Back.gba", "back"));
-	CHECK(put("/SAVER/Back2.sav", "back save"));
+	CHECK(put(SV "/Back2.gba/Main.sav", "back save"));
 	CHECK(put("/torii/rename.txt", T_DIR "/Back.gba\t" T_DIR "/Back2.gba\n"));
 	action_rename_recover();
-	CHECK(!there("/SAVER/Back2.sav") && holds("/SAVER/Back.sav", "back save") && there(T_DIR "/Back.gba"));
+	CHECK(!there(SV "/Back2.gba") && holds(SV "/Back.gba/Main.sav", "back save") && there(T_DIR "/Back.gba"));
 	CHECK(!there("/torii/rename.txt"));
 	action_rename_recover();  // no journal: nothing
 	// Both names there as two files (the new name another game's: a cut
 	// after f_rename refused it): nothing moves either way
 	CHECK(put(T_DIR "/Two.gba", "two"));
 	CHECK(put(T_DIR "/Two2.gba", "another game"));
-	CHECK(put("/SAVER/Two.sav", "two's save"));
+	CHECK(put(SV "/Two.gba/Main.sav", "two's save"));
 	CHECK(put("/torii/rename.txt", T_DIR "/Two.gba\t" T_DIR "/Two2.gba\n"));
 	action_rename_recover();
 	CHECK(holds(T_DIR "/Two.gba", "two") && holds(T_DIR "/Two2.gba", "another game"));
-	CHECK(holds("/SAVER/Two.sav", "two's save") && !there("/SAVER/Two2.sav"));
+	CHECK(holds(SV "/Two.gba/Main.sav", "two's save") && !there(SV "/Two2.gba"));
 	CHECK(!there("/torii/rename.txt"));
 
-	// Another game with its save in a hidden folder, which the index never
-	// holds: the save stays with it
+	// Another game of the name with its states in a hidden folder, which the
+	// index never holds: the states stay with it. (The saves are in folders
+	// of the path: no game shares them.)
 	CHECK(put(T_DIR "/Share.gba", "share"));
-	CHECK(put("/SAVER/Share.sav", "share's save"));
+	CHECK(put("/RTS/Share.rts", "share's states"));
+	CHECK(put(SV "/Share.gba/Main.sav", "share's save"));
 	CHECK(put("/.T18h/Share.gba", "a hidden game"));
 	CHECK_EQ(action_rename_file(T_DIR "/Share.gba", "Shared.gba"), ACTION_RENAME_SHARED);
-	CHECK(there(T_DIR "/Share.gba") && holds("/SAVER/Share.sav", "share's save") && !there(T_DIR "/Shared.gba"));
+	CHECK(there(T_DIR "/Share.gba") && holds("/RTS/Share.rts", "share's states") && !there(T_DIR "/Shared.gba"));
 	f_unlink("/.T18h/Share.gba");
-	// To the name of another game with no save yet: the save would be its
-	CHECK(put("/.T18h/Taken.gba", "a hidden game, no save"));
+	// To the name of another game with no states yet: they would be its
+	CHECK(put("/.T18h/Taken.gba", "a hidden game, no states"));
 	CHECK_EQ(action_rename_file(T_DIR "/Share.gba", "Taken.gba"), ACTION_RENAME_SHARED);
-	CHECK(holds("/SAVER/Share.sav", "share's save") && !there("/SAVER/Taken.sav") && !there(T_DIR "/Taken.gba"));
+	CHECK(holds("/RTS/Share.rts", "share's states") && !there("/RTS/Taken.rts") && !there(T_DIR "/Taken.gba"));
 	f_unlink("/.T18h/Taken.gba");
 	CHECK_EQ(action_rename_file(T_DIR "/Share.gba", "Shared.gba"), ACTION_RENAMED);
-	CHECK(holds("/SAVER/Shared.sav", "share's save"));
+	CHECK(holds("/RTS/Shared.rts", "share's states") && holds(SV "/Shared.gba/Main.sav", "share's save"));
+	// A game with only its saves has nothing another game of its name could
+	// share: it renames, and its folder goes with it
+	CHECK(put(T_DIR "/Solo.gba", "solo"));
+	CHECK(put(SV "/Solo.gba/Main.sav", "solo's save"));
+	CHECK(put("/.T18h/Solo.gba", "a hidden game"));
+	CHECK_EQ(action_rename_file(T_DIR "/Solo.gba", "Soloed.gba"), ACTION_RENAMED);
+	CHECK(holds(SV "/Soloed.gba/Main.sav", "solo's save") && !there(SV "/Solo.gba"));
+	// A folder with nothing in it (a cut left it) is no save in the way
+	CHECK(put(T_DIR "/Empty.gba", "empty"));
+	CHECK(put(SV "/Empty.gba/x", "x"));
+	f_unlink(SV "/Empty.gba/x");
+	CHECK(there(SV "/Empty.gba"));
+	CHECK(put(SV "/Soloed.gba/Main.sav", "solo's save"));
+	CHECK_EQ(action_rename_file(T_DIR "/Soloed.gba", "Empty.gba"), ACTION_RENAME_TAKEN);  // the game file is there
+	f_unlink(T_DIR "/Empty.gba");
+	CHECK_EQ(action_rename_file(T_DIR "/Soloed.gba", "Empty.gba"), ACTION_RENAMED);
+	CHECK(holds(SV "/Empty.gba/Main.sav", "solo's save"));
 
-	// A move the card refuses (the save states, after the save and save
-	// type moved): everything goes back, the lists stay
+	// A move the card refuses (the save states, after the saves and the
+	// history moved): everything goes back, the lists stay
 	CHECK(put(T_DIR "/Roll.gba", "roll"));
-	CHECK(put("/SAVER/Roll.sav", "roll save"));
-	CHECK(put("/SAVER/Roll.mde", "roll mde"));
+	CHECK(put(SV "/Roll.gba/Main.sav", "roll save"));
+	CHECK(put(SV "/Roll.gba/game.ini", "roll ini"));
+	CHECK(put(BK "/Roll.gba/Main" HIST, "roll history"));
 	CHECK(put("/RTS/Roll.rts", "roll states"));
 	CHECK(gamename_store_set(T_DIR "/Roll.gba", "Rolling"));
 	CHECK(userdata_fav_set(T_DIR "/Roll.gba", 1));
@@ -282,8 +385,9 @@ void test_rename_file(void)
 	CHECK_EQ(action_rename_file(T_DIR "/Roll.gba", "Rolled.gba"), ACTION_RENAME_FAILED);
 	action_rename_fail_file = 0;
 	CHECK(holds(T_DIR "/Roll.gba", "roll") && !there(T_DIR "/Rolled.gba"));
-	CHECK(holds("/SAVER/Roll.sav", "roll save") && !there("/SAVER/Rolled.sav"));
-	CHECK(holds("/SAVER/Roll.mde", "roll mde") && !there("/SAVER/Rolled.mde"));
+	CHECK(holds(SV "/Roll.gba/Main.sav", "roll save") && !there(SV "/Rolled.gba"));
+	CHECK(holds(SV "/Roll.gba/game.ini", "roll ini"));
+	CHECK(holds(BK "/Roll.gba/Main" HIST, "roll history") && !there(BK "/Rolled.gba"));
 	CHECK(holds("/RTS/Roll.rts", "roll states") && !there("/RTS/Rolled.rts"));
 	CHECK(has_line(GAMENAME_FILE, T_DIR "/Roll.gba\tRolling\n"));
 	CHECK(userdata_fav_has(T_DIR "/Roll.gba") && !userdata_fav_has(T_DIR "/Rolled.gba"));
@@ -293,10 +397,48 @@ void test_rename_file(void)
 	CHECK_EQ(action_rename_file(T_DIR "/Roll.gba", "Rolled.gba"), ACTION_RENAME_FAILED);
 	action_rename_fail_file = 0;
 	CHECK(holds(T_DIR "/Roll.gba", "roll") && !there(T_DIR "/Rolled.gba"));
-	CHECK(holds("/SAVER/Roll.sav", "roll save") && !there("/SAVER/Rolled.sav"));
+	CHECK(holds(SV "/Roll.gba/Main.sav", "roll save") && !there(SV "/Rolled.gba"));
 	// And with nothing refused it renames
 	CHECK_EQ(action_rename_file(T_DIR "/Roll.gba", "Rolled.gba"), ACTION_RENAMED);
-	CHECK(holds("/RTS/Rolled.rts", "roll states") && holds("/SAVER/Rolled.sav", "roll save"));
+	CHECK(holds("/RTS/Rolled.rts", "roll states") && holds(SV "/Rolled.gba/Main.sav", "roll save"));
+
+	// Saves beside the ROM: every slot's file, as many as there are, moves
+	CHECK(put(T_DIR "/Side.gba", "side"));
+	CHECK(put(T_DIR "/Side.Main.sav", "side main"));
+	CHECK(put(T_DIR "/Side.Boss v1.2.sav", "side boss"));
+	CHECK(put(T_DIR "/Sided.Main.sav", "a deleted game's save"));
+	CHECK_EQ(action_rename_file(T_DIR "/Side.gba", "Sided.gba"), ACTION_RENAME_SIDE_TAKEN);
+	CHECK_EQ(action_rename_taken(), ACTION_FILE_BESIDE);
+	CHECK(there(T_DIR "/Side.gba") && holds(T_DIR "/Side.Main.sav", "side main"));
+	f_unlink(T_DIR "/Sided.Main.sav");
+	// The saves beside it won't move: the game goes back
+	action_rename_fail_file = ACTION_FILE_BESIDE + 1;
+	CHECK_EQ(action_rename_file(T_DIR "/Side.gba", "Sided.gba"), ACTION_RENAME_FAILED);
+	action_rename_fail_file = 0;
+	CHECK(there(T_DIR "/Side.gba") && !there(T_DIR "/Sided.gba"));
+	CHECK(holds(T_DIR "/Side.Main.sav", "side main") && holds(T_DIR "/Side.Boss v1.2.sav", "side boss"));
+	// A game of the same name in another console shares them: refused
+	CHECK(put(T_DIR "/Side.gbc", "side gbc"));
+	CHECK_EQ(action_rename_file(T_DIR "/Side.gba", "Sided.gba"), ACTION_RENAME_SHARED);
+	f_unlink(T_DIR "/Side.gbc");
+	CHECK_EQ(action_rename_file(T_DIR "/Side.gba", "Sided.gba"), ACTION_RENAMED);
+	CHECK(!there(T_DIR "/Side.Main.sav") && holds(T_DIR "/Sided.Main.sav", "side main"));
+	CHECK(holds(T_DIR "/Sided.Boss v1.2.sav", "side boss") && !there(T_DIR "/Side.Boss v1.2.sav"));
+	// Only the case changes
+	CHECK(put(T_DIR "/Cased.gba", "cased"));
+	CHECK(put(T_DIR "/Cased.Main.sav", "cased save"));
+	CHECK_EQ(action_rename_file(T_DIR "/Cased.gba", "cased.gba"), ACTION_RENAMED);
+	CHECK(holds(T_DIR "/cased.Main.sav", "cased save"));
+	CHECK(f_stat(T_DIR "/cased.Main.sav", &fi) == FR_OK && !strcmp(fi.fname, "cased.Main.sav"));
+	// A cut: the game had not moved, one of the saves had
+	CHECK(put(T_DIR "/Back3.gba", "back3"));
+	CHECK(put(T_DIR "/Back3.Boss.sav", "back3 boss"));
+	CHECK(put(T_DIR "/Back3b.Main.sav", "back3 moved"));
+	CHECK(put("/torii/rename.txt", T_DIR "/Back3.gba\t" T_DIR "/Back3b.gba\n"));
+	action_rename_recover();
+	CHECK(there(T_DIR "/Back3.gba") && holds(T_DIR "/Back3.Main.sav", "back3 moved"));
+	CHECK(holds(T_DIR "/Back3.Boss.sav", "back3 boss") && !there(T_DIR "/Back3b.Main.sav"));
+	CHECK(!there("/torii/rename.txt"));
 
 	tidy();
 	f_unlink("/torii/art/custom");

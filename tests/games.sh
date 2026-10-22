@@ -89,8 +89,8 @@ recent=$(mtype -i "$cart/sd.img" ::/torii/recent.txt | grep -v '^[#@]' | cut -f2
 [ "$recent" = "/A.gba " ] || fail "after deleting the gone entry, Recent has '$recent'"
 echo "PASS: Delete on an entry whose file is gone takes it off the list"
 
-# Game info's save type on a card with no /SAVER yet: the folder is made and
-# the .mde file kept
+# Game info's save type on a card with no saves folder yet: the folders are
+# made and the game's record (game.ini) kept
 cart=$carts/games-mde
 rm -rf "$cart" && mkdir -p "$cart"
 mkfs.fat -C -F 32 -n GAMES "$cart/sd.img" 65536 >/dev/null
@@ -100,17 +100,17 @@ NAV_SHOWN=gba
 boot "$cart/1.log" $(nav_game_menu gba 0) -k @12:UP -k @16:- -k @24:UP -k @28:- -k @36:A -k @40:- \
   -w "screen ready: game-info" -k @20:RIGHT -k @24:- -k @36:B -k @40:- -w "save type of" -f 1500
 grep -q '^kernel: save type of /A.gba: 1 (0)' "$cart/1.log" || fail "the save type wasn't kept: $(grep '^kernel: save type' "$cart/1.log")"
-mdir -b -i "$cart/sd.img" ::/SAVER | grep -q 'A.mde' || fail "no /SAVER/A.mde"
-echo "PASS: Game info's save type is kept in /SAVER, made when missing"
+mdir -b -i "$cart/sd.img" ::/torii/saves/A.gba | grep -q 'game.ini' || fail "no /torii/saves/A.gba/game.ini"
+echo "PASS: Game info's save type is kept in the game's record, its folder made when missing"
 
 # The boot mode (Settings' GBA boot mode, a game's own in Game info): kept
-# in byte 1 of the game's .mde file, beside the save type in byte 0
+# in the game's record, beside the save type
 cart=$carts/games-boot
 rm -rf "$cart" && mkdir -p "$cart"
 mkfs.fat -C -F 32 -n GAMES "$cart/sd.img" 65536 >/dev/null
 mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/A.gba
 mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/B.gba
-mde() { mtype -i "$cart/sd.img" "::/SAVER/$1.mde" | od -An -tx1 -N2 | tr -d ' '; }
+record() { mtype -i "$cart/sd.img" "::/torii/saves/$1.gba/game.ini" | tr -d '\r' | tr '\n' ' '; }
 NAV_SHOWN=gba
 # Game info on A: Save type RIGHT (SRAM), DOWN to Boot mode, RIGHT twice
 # (Clean), B: both are kept
@@ -120,7 +120,7 @@ boot "$cart/1.log" $(nav_game_menu gba 0) -k @12:UP -k @16:- -k @24:UP -k @28:- 
   -k @56:RIGHT -k @60:- -k @72:B -k @76:- -w "boot mode of" -f 1500
 grep -q '^kernel: save type of /A.gba: 1 (0)' "$cart/1.log" || fail "the save type wasn't kept: $(grep '^kernel: save type' "$cart/1.log")"
 grep -q '^kernel: boot mode of /A.gba: 2 (0)' "$cart/1.log" || fail "the boot mode wasn't kept: $(grep '^kernel: boot mode' "$cart/1.log")"
-[ "$(mde A)" = 0102 ] || fail "A.mde holds $(mde A), not 01 02"
+[ "$(record A)" = "save_type = 1 boot_mode = 2 slot = Main " ] || fail "A's record holds $(record A)"
 echo "PASS: Game info keeps a game's boot mode beside its save type"
 
 # Settings slots in the kernel NOR (made by the first power-on; tests/setnor.py)
@@ -159,10 +159,10 @@ grep -q "^kernel: launch: boot mode clean (Settings')" "$cart/4.log" ||
 grep -q '^kernel: launch: loading B.gba, CLEAN BOOT' "$cart/4.log" || fail "B.gba didn't start clean: $(grep '^kernel: launch' "$cart/4.log" | tail -2)"
 echo "PASS: Settings' GBA boot mode Clean starts a game clean"
 
-# A launch that changes the save type keeps the boot mode (byte 1)
+# A launch that changes the save type keeps the boot mode
 # shellcheck disable=SC2046 # nav.sh's options
 boot "$cart/5.log" $(nav_launch /A.gba addon save=3) -u "launch: loading" -f 1500
-[ "$(mde A)" = 0302 ] || fail "after a launch with save type 3, A.mde holds $(mde A), not 03 02"
+[ "$(record A)" = "save_type = 3 boot_mode = 2 slot = Main " ] || fail "after a launch with save type 3, A's record holds $(record A)"
 echo "PASS: a launch's save type keeps the game's boot mode"
 
 # The Favourites page's order is kept between visits and changed in place

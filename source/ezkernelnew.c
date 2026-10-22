@@ -34,6 +34,7 @@
 #include "diag.h"
 #include "engine/cover.h"
 #include "library.h"
+#include "gamesave.h"
 #include "screens/nav.h"
 #include "progress.h"
 #include "userdata.h"
@@ -511,6 +512,9 @@ u32 Save_savefile(TCHAR *filename, u32 savesize)
 		tlog_error("save: %s is too long to copy", filename);
 		return SAVE_FAILED;
 	}
+	// A game's first save: its folder under /torii/saves may not be there
+	if (!gamesave_make_parents(filename))
+		return SAVE_FAILED;
 	Save_recover(filename);
 
 	// 1. The tmp file
@@ -1081,22 +1085,32 @@ static u32 Grow_savefile(TCHAR *filename, u32 size, u32 need)
 	return total;
 }
 //---------------------------------------------------------------------------------
-static u8 Process_savefile(u32 is_EMU, TCHAR *pfilename, u32 gamefilesize, BYTE saveMODE)
+// The launch's save: the current slot's file of the game at rom_path (its
+// path from the root; gamesave.h), made if the game has none. The
+// path is built here, and kept in the pending-save record. Returns 0, or the
+// error number Show_error_num shows.
+static struct {
+	char rom[GAMESAVE_PATH_BYTES];
+	char save[GAMESAVE_PATH_BYTES];
+	struct gamerec rec;
+} launch_save EWRAM_BSS;
+
+static u8 Process_savefile(u32 is_EMU, const char *rom_path, u32 gamefilesize, BYTE saveMODE)
 {
 	u32 res;
 	u32 savefilesize = 0;
-	TCHAR savfilename[SAVE_NAME_MAX];
+	TCHAR *savfilename = launch_save.save;
 
-	res = f_chdir(SAVER_FOLDER);
-	if (res != FR_OK) {
-		return 2;
-	}
-
-	save_name(savfilename, pfilename, is_EMU);
-	// The pending-save record holds the name up to SAV_INFO_TYPE: a longer one
+	gamesave_record_read(rom_path, &launch_save.rec);
+	int mode = gamesave_mode();
+	int len = gamesave_current_path(savfilename, sizeof(launch_save.save), mode, rom_path, &launch_save.rec);
+	// The pending-save record holds the path up to SAV_INFO_TYPE: a longer one
 	// would be copied back under another name. Nothing is written yet.
-	if (strlen(savfilename) > SAV_INFO_NAME_MAX) {
-		tlog("save: %s is too long for the pending-save record", savfilename);
+	if (len < 0 || len > SAV_INFO_NAME_MAX) {
+		tlog_error("save: the save path is over %u bytes, the pending-save record's room (%s, slot %s): %s",
+			   (unsigned)SAV_INFO_NAME_MAX,
+			   mode == SAVESLOT_BESIDE_ROM ? "beside the ROM" : "in /torii/saves", launch_save.rec.slot,
+			   rom_path);
 		return 8;
 	}
 	//#ifdef DEBUG
@@ -1127,6 +1141,8 @@ static u8 Process_savefile(u32 is_EMU, TCHAR *pfilename, u32 gamefilesize, BYTE 
 	{
 		savefilesize = Get_savefilesize(saveMODE);
 		tlog("save: making %s, %lu bytes", savfilename, (unsigned long)savefilesize);
+		if (savefilesize && !gamesave_make_parents(savfilename))
+			return 2;
 		res = SavefileWrite(savfilename, savefilesize);
 		if (res == 0) {
 			u8 error_num = 5;
@@ -1183,24 +1199,24 @@ static int pending_save(u32 *size)
 	return 1;
 }
 
-int pending_save_named(const char *save)
+int pending_save_under(const char *prefix)
 {
 	if (Read_sav_info(0) != 0x11)
 		return 0;
-	// The record's name, a halfword at a time, against save's bytes
+	// The record's path, a halfword at a time, against prefix's bytes
 	for (u32 i = 0; i <= SAV_INFO_NAME_MAX; i += 2) {
 		u16 h = Read_sav_info(2 + i / 2);
 		u8 a = (u8)h, b = (u8)(h >> 8);
-		if (a != (u8)save[i])
-			return 0;
-		if (!a)
+		if (!prefix[i])
 			return 1;
-		if (b != (u8)save[i + 1])
+		if (a != (u8)prefix[i])
 			return 0;
-		if (!b)
+		if (!prefix[i + 1])
 			return 1;
+		if (b != (u8)prefix[i + 1])
+			return 0;
 	}
-	return 0;
+	return 1;
 }
 
 static void pending_save_clear(void)
@@ -1209,7 +1225,7 @@ static void pending_save_clear(void)
 	Save_sav_info(SAV_info_buffer, 0x200);
 }
 
-// Copies the pending save (SAV_info_buffer names it) to /SAVER, safely
+// Copies the pending save (SAV_info_buffer holds its path) to the card, safely
 // (Save_savefile): first any copy a power cut interrupted is finished or
 // undone, then a blank or unchanged chip is skipped and a chip that doesn't
 // look like the file asks, then the progress dialog. SAVE_WRITTEN,
@@ -1218,8 +1234,6 @@ static void pending_save_clear(void)
 static u32 pending_save_copy(u32 size)
 {
 	TCHAR *name = (TCHAR *)SAV_info_buffer;
-	f_mkdir(SAVER_FOLDER);  //"/SAVER"
-	f_chdir(SAVER_FOLDER);
 	Save_recover(name);
 	u32 check = Save_check(name, size);
 	if (check == SAVE_MISMATCH) {
@@ -1250,14 +1264,13 @@ static void Check_save_flag(void)
 		return;
 	// Torii: the answer is logged. The question and the saving are
 	// dialogs on the engine (source/ui/dialog.h)
-	static const char saved_how[] = "save: \"Save sav?\" for %s/%s, %lu bytes, save type %02X: %s";
+	static const char saved_how[] = "save: \"Save sav?\" for %s, %lu bytes, save type %02X: %s";
 	u16 savetype = Read_sav_info(SAV_INFO_TYPE);
 	TCHAR *name = (TCHAR *)SAV_info_buffer;
-	f_chdir(SAVER_FOLDER);
 	Save_recover(name);
 	dialog_open();
 	int save = gl_auto_save_sel || dialog_confirm(gl_save_sav, name, DIALOG_INFO);
-	tlog(saved_how, SAVER_FOLDER, name, (unsigned long)savefilesize, savetype,
+	tlog(saved_how, name, (unsigned long)savefilesize, savetype,
 	     gl_auto_save_sel ? "auto"
 	     : save           ? "A, save"
 			      : "B, not saved");
@@ -1287,7 +1300,7 @@ static int pending_save_settle(void)
 	if (!pending_save(&size))
 		return 1;
 	TCHAR *name = (TCHAR *)SAV_info_buffer;
-	tlog("save: %s/%s still waits to be copied; trying again", SAVER_FOLDER, name);
+	tlog("save: %s still waits to be copied; trying again", name);
 	dialog_open();
 	int go = 1;
 	if (pending_save_copy(size) == SAVE_FAILED) {
@@ -1450,7 +1463,6 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 	u32 gamefilesize = 0;
 	BYTE SAVEMODE;
 	BYTE error_num;
-	u32 res;
 
 	// The launch's progress, until the game starts (NOR_launch ends it
 	// otherwise), set up at the menu's wait states (as Game_boot's)
@@ -1460,13 +1472,6 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 	progress_step(gl_loading_game, 0, LAUNCH_NOR_SAVE);
 
 	init_FAT_table();
-
-	res = f_mkdir(SAVER_FOLDER);  //"/SAVER"
-	if ((res != FR_OK) && (res != FR_EXIST)) {
-		error_num = 2;
-		Show_error_num(error_num);
-		return;
-	}
 
 	//boot nor game
 	pfilename = pNorFS[show_offset + file_select].filename;
@@ -1483,7 +1488,10 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 	tlog_flush();
 
 	//memcpy(savfilename,pfilename,100);
-	error_num = Process_savefile(0, pfilename, gamefilesize, SAVEMODE);
+	if (gamesave_nor_path(launch_save.rom, sizeof(launch_save.rom), pfilename) < 0)
+		error_num = 8;
+	else
+		error_num = Process_savefile(0, launch_save.rom, gamefilesize, SAVEMODE);
 	if (error_num != 0) {
 		Show_error_num(error_num);
 		return;
@@ -1618,14 +1626,10 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 		}
 
 		progress_step(gl_loading_game, 0, LAUNCH_SAVE);
-		res = f_mkdir(SAVER_FOLDER);  //"/SAVER"
-		if ((res != FR_OK) && (res != FR_EXIST)) {
-			error_num = 2;
-			Show_error_num(error_num);
-			return 0;
-		}
-
-		error_num = Process_savefile(is_EMU, pfilename, gamefilesize, SAVEMODE);
+		if (gamesave_rom_path_in(launch_save.rom, sizeof(launch_save.rom), currentpath, pfilename) < 0)
+			error_num = 8;
+		else
+			error_num = Process_savefile(is_EMU, launch_save.rom, gamefilesize, SAVEMODE);
 		if (error_num != 0) {
 			Show_error_num(error_num);
 			return 0;
@@ -1658,10 +1662,8 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 	} else {  //gba file
 		if (old_Save_num != Save_num) {
 			error_num = Make_mde_file(pfilename, Save_num);
-			if (error_num == 2) {
-				Show_error_num(error_num);
-				return 0;
-			}
+			if (error_num)
+				tlog_error("save type: %s's record wasn't written", pfilename);
 		}
 
 		f_chdir(currentpath);  //return to game folder

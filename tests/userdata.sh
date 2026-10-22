@@ -196,10 +196,10 @@ cart=$carts/full
 rm -rf "$cart"
 mkdir -p "$cart"
 mkfs.fat -C -s 4 -S 512 "$cart/sd.img" 16384 >/dev/null
-mmd -i "$cart/sd.img" ::/SAVER ::/torii
+mmd -i "$cart/sd.img" ::/torii ::/torii/saves ::/torii/saves/Hello.gba
 mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/Hello.gba
 head -c 65536 /dev/zero >"$cart/hello.sav"
-mcopy -i "$cart/sd.img" "$cart/hello.sav" ::/SAVER/Hello.sav
+mcopy -i "$cart/sd.img" "$cart/hello.sav" ::/torii/saves/Hello.gba/Main.sav
 python3 -c '
 for i in range(31): print("0\t/%s%02d.gba" % ("L" * 200, i))
 print("0\t/Hello.gba")' >"$cart/list.txt"

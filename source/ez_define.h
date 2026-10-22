@@ -105,8 +105,6 @@
 #define NOR_info_offset 0x7A0000
 #define SET_info_offset 0x7B0000
 
-#define SAVER_FOLDER "/SAVER"
-
 #define DMA_COPY_MODE 0X1
 #define SET_PARAMETER_MODE 0x2
 
@@ -151,6 +149,7 @@
 #define assress_box_art 34  //list with art shows box art from /torii/art: 0 off, else on (source/boxart.h)
 #define assress_boot_mode \
 	35  //how A, Play and Launch start a GBA game: 1 clean, else with the addons (source/actions.h)
+#define assress_save_location 36  //where saves are kept: 1 next to the ROM, else in /torii/saves (source/gamesave.h)
 
 #define assress_saveMODE 64
 #define assress_max 65

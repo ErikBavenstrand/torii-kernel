@@ -1122,7 +1122,7 @@ const struct nav_page games_page = {games_enter, games_row, 0, games_poll, 0};
 // A page in the list's place: the game's name and console in the title bar,
 // and on the card its console, size, folder, when it was played, its save
 // type and boot mode (a GBA game on the card: UP/DOWN pick one, LEFT/RIGHT
-// change it, written to its .mde file as the page closes) and how to start
+// change it, written to its record as the page closes) and how to start
 // it with a hard reset.
 
 static void reshow(u32 row);

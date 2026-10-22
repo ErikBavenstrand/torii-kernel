@@ -2,8 +2,8 @@
 # held DOWN glides the list (every frame hashed, games-move's cycles).
 # Games 002 and 004 have saves: the save mark beside their sizes.
 #! settings 28=1
-#! sd-file "/SAVER/Game 002.sav" 0x2000 /dev/null
-#! sd-file "/SAVER/Game 004.sav" 0x2000 /dev/null
+#! sd-file "/torii/saves/Long/Game 002.gba/Main.sav" 0x2000 /dev/null
+#! sd-file "/torii/saves/Long/Game 004.gba/Main.sav" 0x2000 /dev/null
 -w "nav: home ready"
 -k @8:RIGHT -k @12:-
 -k @20:A -k @24:-

@@ -41,8 +41,7 @@ EOF
 }
 
 # new_cart NAME FILE...: a cart with an erased game NOR (the emulator makes it,
-# filling what a test didn't write with 0xFF) and an SD card holding /SAVER
-# and the FILEs at the root (cart/FILE paths), in name order as write counts
+# filling what a test didn't write with 0xFF) and an SD card holding the FILEs at the root (cart/FILE paths), in name order as write counts
 # them.
 new_cart() {
   case=$1
@@ -51,7 +50,6 @@ new_cart() {
   cart=$root/$case
   mkdir -p "$cart"
   mkfs.fat -C -F 32 -n NOR "$cart/sd.img" 65536 >/dev/null
-  mmd -i "$cart/sd.img" ::/SAVER
   local f
   for f in "$@"; do
     mcopy -i "$cart/sd.img" "$root/$f" "::/$f"

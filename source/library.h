@@ -63,7 +63,7 @@ enum {
 
 // lib_rec.flags
 #define LIB_F_CONSOLE 0x000Fu  // the console (LIB_GBA...)
-#define LIB_F_SAVE 0x0010u  // /SAVER holds its save
+#define LIB_F_SAVE 0x0010u  // it has a save (library_scan.c)
 #define LIB_F_GONE 0x0020u  // deleted or renamed away since the scan (lib_forget)
 #define LIB_F_CUSTOM 0x0040u  // its display name is a custom one (names.txt), never deduplicated
 
@@ -161,7 +161,7 @@ void lib_build_begin(struct lib_build *b, u8 *slot, lib_put_fn put);
 // the path is over LIBRARY_NAME_MAX bytes (no flag).
 u16 lib_build_folder(struct lib_build *b, const char *path);
 // Adds a game in folder, sorted by display (the name the lists show, kept
-// beside it; NULL: gamename_clean's), with flags LIB_F_SAVE (/SAVER holds its
+// beside it; NULL: gamename_clean's), with flags LIB_F_SAVE (it has a
 // save) and LIB_F_CUSTOM (display is a custom name). Returns LIB_ADDED; LIB_FULL if the table or the pool
 // is full (then LIB_H_TRUNCATED; every such call counts in games_seen);
 // LIB_BAD_NAME for a name over LIBRARY_NAME_MAX bytes or no console (not
@@ -285,7 +285,7 @@ int lib_rename_shown(u8 *slot, lib_put_fn put, u32 rec, const char *new_name, co
 // The boot loads /torii/library.idx into PSRAM (library_boot) and the menu
 // shows it at once; then a job walks the card between frames (f_readdir
 // only) and hashes every folder's game names, sizes and dates, the save
-// names in /SAVER and the volume serial. Only when that differs from the
+// paths of the .sav files under /torii/saves and beside the games, and the volume serial. Only when that differs from the
 // index's does a second walk build a new index in the other slot, sort it
 // and switch to it (library_generation changes, and the frame wakes), and a
 // job writes the file. With no index, or a damaged one, the boot builds it

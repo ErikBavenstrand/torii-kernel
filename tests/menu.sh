@@ -34,7 +34,7 @@ fail() {
 # shellcheck disable=SC2046 # nav.sh's options
 boot $(nav_launch /Hello.gba at=160) -f 400 >/dev/null 2>&1
 boot -k 100:A -k 106:- -f 300 >/dev/null 2>&1
-[ "$(mtype -i "$cart/sd.img" ::/SAVER/Hello.sav | head -c 5 | od -A n -t x1 | tr -d ' \n')" = 4f4d525801 ] ||
+[ "$(mtype -i "$cart/sd.img" ::/torii/saves/Hello.gba/Main.sav | head -c 5 | od -A n -t x1 | tr -d ' \n')" = 4f4d525801 ] ||
   fail "no first save to start from"
 
 # Settings slots (source/ez_define.h) in the kernel NOR (tests/setnor.py): English,

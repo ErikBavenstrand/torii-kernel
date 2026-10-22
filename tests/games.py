@@ -18,7 +18,7 @@ fresh cart and three power-ons:
 1. Launch it from the kernel menu, press START and A now and then for about
    40 seconds of game time, and watch the screen.
 2. If the game wrote its save chip, power on again: the kernel must copy
-   the save to SAVER/.
+   the save to /torii/saves.
 3. Launch it again: the kernel must load that save back into the cart.
 
 A GBA game that boots also gets a cart of its own with SAVESTATE and RESET
@@ -31,7 +31,7 @@ Checks, each pass, fail, untested (the run didn't get that far) or n/a:
   error, blank or frozen screen fails
 - save type: the kernel sent the save chip the ROM's SDK strings ask for
 - clock: a game that uses the clock read it, with the cart's clock on
-- save cycle: what the game wrote reached SAVER/ and came back on relaunch;
+- save cycle: what the game wrote reached /torii/saves and came back on relaunch;
   for a game that didn't save during the run, a test pattern put in the
   cart's save memory makes the same trip
 - in-game menu: the kernel hooked the game's IRQ, the menu opened, and the
@@ -187,9 +187,10 @@ def make_cart(cart: Path, rom: Path, sd_name: str, start_save: Path | None) -> N
     size_kb = max(65536, (rom.stat().st_size >> 10) * 2 + 16384)
     mtools("mkfs.fat", "-C", "-F", "32", "-n", "GAMES", img, str(size_kb))
     mtools("mcopy", "-i", img, str(rom), f"::/{sd_name}")
-    mtools("mmd", "-i", img, "::/SAVER")
     if start_save:
-        mtools("mcopy", "-i", img, str(start_save), f"::/SAVER/{save_name(sd_name)}")
+        for folder in ("torii", "torii/saves", f"torii/saves/{sd_name}"):
+            mtools("mmd", "-i", img, f"::/{folder}")
+        mtools("mcopy", "-i", img, str(start_save), f"::/{save_path(sd_name)}")
 
 
 def power_on(cart: Path, keys, frames: int, extra: list[str] = ()) -> tuple[str, str]:
@@ -231,10 +232,9 @@ def read_keys(path: Path) -> list[tuple[int, str]]:
     return keys
 
 
-def save_name(sd_name: str) -> str:
-    """The kernel saves GBA games as .sav, its emulator's games as .esv."""
-    stem, ext = sd_name.rsplit(".", 1)
-    return f"{stem}.{'sav' if ext == 'gba' else 'esv'}"
+def save_path(sd_name: str) -> str:
+    """Where the kernel keeps the game's first slot (a game in the root)."""
+    return f"torii/saves/{sd_name}/Main.sav"
 
 
 def sd_file(cart: Path, path: str) -> bytes | None:
@@ -245,7 +245,7 @@ def sd_file(cart: Path, path: str) -> bytes | None:
 
 
 def sd_save(cart: Path, sd_name: str) -> bytes | None:
-    return sd_file(cart, f"SAVER/{save_name(sd_name)}")
+    return sd_file(cart, save_path(sd_name))
 
 
 # --- Reading results -------------------------------------------------------------
@@ -710,7 +710,9 @@ def run_game(result: Result, roms: dict, saves: dict, table: dict) -> None:
     power_on(cart, [(100, "A")], 800)
     written = sd_save(cart, sd_name)
     if written is None or written[:size] != first[: len(written)]:
-        result.set("save cycle", "fail", "SAVER/ does not hold what the game saved")
+        result.set(
+            "save cycle", "fail", "the save folder does not hold what the game saved"
+        )
         result.metrics["seconds"] = round(time.time() - started, 1)
         return
 
@@ -753,7 +755,9 @@ def run_game(result: Result, roms: dict, saves: dict, table: dict) -> None:
                 else f"{len(written)} bytes"
             )
             result.set(
-                "save cycle", "pass", f"{what} ({amount}) reached SAVER/ and came back"
+                "save cycle",
+                "pass",
+                f"{what} ({amount}) reached /torii/saves and came back",
             )
     result.metrics["seconds"] = round(time.time() - started, 1)
 

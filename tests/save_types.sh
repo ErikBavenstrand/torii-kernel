@@ -49,7 +49,7 @@ run_case() {
   # Power-on 2: confirm the save prompt so the kernel writes Test.sav.
   boot -k 100:A -k 106:- -s 300:"$shots/2-menu.png" -f 800
   local sav=$cart/test.sav
-  mtype -i "$cart/sd.img" ::/SAVER/Test.sav >"$sav" 2>/dev/null || fail "$name: no SAVER/Test.sav"
+  mtype -i "$cart/sd.img" ::/torii/saves/Test.gba/Main.sav >"$sav" 2>/dev/null || fail "$name: no torii/saves/Test.gba/Main.sav"
   [ "$(hex_at "$sav" "$offset")" = 4f4d525801 ] ||
     fail "$name: save file has $(hex_at "$sav" "$offset") at $offset, expected the first boot record"
 
@@ -72,18 +72,18 @@ short_eeprom() {
   mkfs.fat -C -F 32 -n SAVETEST "$cart/sd.img" 65536 >/dev/null
   mcopy -i "$cart/sd.img" tests/roms/savetest/eeprom8k.gba ::/Test.gba
   python3 -c 'import sys; sys.stdout.buffer.write(b"\xff" * 8 + b"OMRX\x05" + b"\xff" * 499)' >"$cart/short.sav"
-  mmd -i "$cart/sd.img" ::/SAVER
-  mcopy -i "$cart/sd.img" "$cart/short.sav" ::/SAVER/Test.sav
+  mmd -i "$cart/sd.img" ::/torii ::/torii/saves ::/torii/saves/Test.gba
+  mcopy -i "$cart/sd.img" "$cart/short.sav" ::/torii/saves/Test.gba/Main.sav
   local log=$cart/kernel.log
   # CLEAN BOOT with SAVE TYPE EEPROM 8K.
   # shellcheck disable=SC2046 # nav.sh's options
   OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch /Test.gba save=2 at=270) \
     -f 600 >/dev/null 2>"$log"
-  grep -q "save: grew Test.sav from 512 to 8192 bytes" "$log" || fail "eeprom8k-short: $(grep 'save: ' "$log")"
+  grep -q "save: grew /torii/saves/Test.gba/Main.sav from 512 to 8192 bytes" "$log" || fail "eeprom8k-short: $(grep 'save: ' "$log")"
   OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -k 100:A -k 106:- -f 800 >/dev/null 2>>"$log"
   local sav=$cart/test.sav
-  mtype -i "$cart/sd.img" ::/SAVER/Test.sav >"$sav" || fail "eeprom8k-short: no SAVER/Test.sav"
-  [ "$(stat -c %s "$sav")" = 8192 ] || fail "eeprom8k-short: Test.sav is $(stat -c %s "$sav") bytes"
+  mtype -i "$cart/sd.img" ::/torii/saves/Test.gba/Main.sav >"$sav" || fail "eeprom8k-short: no torii/saves/Test.gba/Main.sav"
+  [ "$(stat -c %s "$sav")" = 8192 ] || fail "eeprom8k-short: Main.sav is $(stat -c %s "$sav") bytes"
   [ "$(hex_at "$sav" 8)" = 4f4d525806 ] || fail "eeprom8k-short: block 1 has $(hex_at "$sav" 8), expected boot 6"
   [ "$(hex_at "$sav" 8000)" = 4f4d525806 ] || fail "eeprom8k-short: block 1000 has $(hex_at "$sav" 8000)"
   [ "$(hex_at "$sav" 4096)" = ffffffffff ] || fail "eeprom8k-short: the padding isn't FF"

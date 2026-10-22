@@ -86,8 +86,12 @@ static void make_game(const char *path)
 
 // The games it adds, in a folder of its own (the cover demo's card has others)
 #define T_DIR "/LibraryTest"
+// Gamma's save is in its folder under /torii/saves, Alpha's is beside it (the
+// slot's name has a space and a dot), and Beta has none
+#define T_SAVES "/torii/saves" T_DIR "/Old/Gamma.gba"
 static const char *const test_games[] = {T_DIR "/Beta.gba", T_DIR "/Old/Alpha.gbc", T_DIR "/Old/Gamma.gba",
-					 "/SAVER/Gamma.sav"};
+					 T_SAVES "/Main.sav", T_DIR "/Old/Alpha.Boss v1.2.sav"};
+#define TEST_GAMES (sizeof(test_games) / sizeof(*test_games))
 
 void test_library_boot(void)
 {
@@ -99,8 +103,12 @@ void test_library_boot(void)
 	}
 	f_mkdir(T_DIR);
 	f_mkdir(T_DIR "/Old");
-	f_mkdir("/SAVER");
-	for (u32 i = 0; i < 4; i++)
+	f_mkdir("/torii");
+	f_mkdir("/torii/saves");
+	f_mkdir("/torii/saves" T_DIR);
+	f_mkdir("/torii/saves" T_DIR "/Old");
+	f_mkdir(T_SAVES);
+	for (u32 i = 0; i < TEST_GAMES; i++)
 		make_game(test_games[i]);
 	f_unlink("/torii/library.idx");
 	f_unlink("/torii/library.bak");
@@ -114,6 +122,8 @@ void test_library_boot(void)
 	CHECK(!strcmp(library_name(gamma), "Gamma.gba"));
 	CHECK(library_flags(gamma) & LIB_F_SAVE);
 	CHECK(!(library_flags(beta) & LIB_F_SAVE));
+	u32 alpha = library_find(T_DIR "/Old/Alpha.gbc");
+	CHECK(library_flags(alpha) & LIB_F_SAVE);
 	CHECK_EQ(library_size(gamma), 600);
 	char path[64];
 	CHECK(library_path(gamma, path, sizeof(path)));
@@ -137,8 +147,11 @@ void test_library_boot(void)
 	CHECK_EQ(library_count(LIB_GBA), gba - 1);
 	CHECK_EQ(library_find(T_DIR "/Beta.gba"), LIBRARY_NONE);
 	library_before_launch();
-	for (u32 i = 0; i < 4; i++)
+	for (u32 i = 0; i < TEST_GAMES; i++)
 		f_unlink(test_games[i]);
+	f_unlink(T_SAVES);
+	f_unlink("/torii/saves" T_DIR "/Old");
+	f_unlink("/torii/saves" T_DIR);
 	f_unlink(T_DIR "/Old");
 	f_unlink(T_DIR);
 	f_unlink("/torii/library.idx");

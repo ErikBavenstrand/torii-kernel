@@ -65,16 +65,16 @@ u32 Save_savefile(TCHAR *filename, u32 savesize);
 // beside filename); run at boot and before a copy or launch
 void Save_recover(const TCHAR *filename);
 // The pending-save record in the kernel's NOR: 0x11, the size in 512-byte
-// units, then the save's file name from halfword 2. Torii keeps the save
+// units, then the save file's path from halfword 2. Torii keeps the save
 // type at halfword SAV_INFO_TYPE, past the longest name, for the log (0
 // from older kernels).
 #define SAV_INFO_TYPE 0x80
-// The longest save file name the record holds, from byte 4 to SAV_INFO_TYPE
+// The longest save file path the record holds, from byte 4 to SAV_INFO_TYPE
 #define SAV_INFO_NAME_MAX (SAV_INFO_TYPE * 2 - 4 - 1)
 // 1 if the pending-save record (a save waiting to be copied from cart SRAM
-// to /SAVER, the next power-on or launch tries again) names the save file
-// save (a file name in /SAVER): a rename must leave that file's name alone.
-int pending_save_named(const char *save);
+// to the card, the next power-on or launch tries again) holds a save path
+// that starts with prefix: a rename must leave that file's path alone.
+int pending_save_under(const char *prefix);
 u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU);
 
 void delay(u32 R0);
@@ -94,8 +94,8 @@ struct game_pick {
 	u32 is_emu;       // Check_file_type: 0 GBA, 1 GBC, 2 GB, 3 NES
 	u32 havecht;      // Check_cheat_file: 0 no cheat file
 	u8 save_num;      // the SAVE TYPE line: 0 AUTO, 1-5 a type
-	u8 old_save_num;  // what its .mde file says
-	u8 boot_mode;     // its .mde file's ACTION_BOOT_* (actions.h): its own boot mode
+	u8 old_save_num;  // what its record says
+	u8 boot_mode;     // its record's ACTION_BOOT_* (actions.h): its own boot mode
 };
 // Fills g for g->name: 0 if it isn't a game. A GBA game reads its cheat and
 // save type files; an emulated one starts only with Game_launch's line 0.

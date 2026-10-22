@@ -15,6 +15,9 @@
 #include "irqpatch.h"
 #include "progress.h"
 #include "savename.h"
+#include "gamesave.h"
+
+extern TCHAR currentpath[MAX_path_len];  // ezkernelnew.c's: the game's folder
 #include "settings_model.h"
 #include "tlog.h"
 
@@ -722,74 +725,37 @@ void Make_pat_file(TCHAR *gamefilename)
 	res = f_chdir("/");
 }
 //------------------------------------------------------------------
-static void make_mde_name(TCHAR *mdenamebuf, TCHAR *gamefilename)
-{
-	name_with_ext(mdenamebuf, gamefilename, "mde");
-}
-//------------------------------------------------------------------
+// A GBA game's save type and boot mode are in its record (gamerec.h), in its
+// folder of saves; gamefilename is in currentpath (not FatFs's folder, which
+// the cheat check changes)
 u8 Check_mde_file(TCHAR *gamefilename, u8 *boot_mode)
 {
-	UINT ret = 0;
-	u32 res;
-	// Torii: its first byte is the save type and its second the game's boot
-	// mode (GBApatch.h); only those are read. A bigger file overran
-	// pReadCache, and an empty or unreadable one gave an earlier owner's byte
-	u8 bytes[4] ALIGN(4) = {0};
-
-	TCHAR mdenamebuf[GAME_NAME_MAX + 1];
-	make_mde_name(mdenamebuf, gamefilename);
+	char rom[GAMESAVE_PATH_BYTES];
+	struct gamerec rec;
 
 	*boot_mode = 0;
-	res = f_chdir("/SAVER");
-	if (res != FR_OK)
+	if (gamesave_rom_path_in(rom, sizeof(rom), currentpath, gamefilename) < 0)
 		return 0;
-	res = f_open(&gfile, mdenamebuf, FA_READ);
-	if (res != FR_OK)
-		return 0;
-	if (f_read(&gfile, bytes, sizeof(bytes), &ret) != FR_OK)
-		ret = 0;
-	f_close(&gfile);
-	if (ret >= 2)
-		*boot_mode = bytes[1];
-	return ret >= 1 ? bytes[0] : 0;
+	gamesave_record_read(rom, &rec);
+	*boot_mode = rec.boot_mode;
+	return rec.save_type;
 }
 //------------------------------------------------------------------
-// Sets byte at of a game's .mde file to value, keeping the others (a new
-// file: zeros); 2 if /SAVER isn't there, else FatFs's answer
+// Sets the save type (what 0) or the boot mode (1) in a game's record, keeping
+// the rest; 0 if written
 static u8 mde_write(TCHAR *gamefilename, u32 at, u8 value)
 {
-	u32 res;
-	UINT done = 0;
-	u8 w_buffer[16] ALIGN(4);
+	char rom[GAMESAVE_PATH_BYTES];
+	struct gamerec rec;
 
-	TCHAR currentpath[256];
-	memset(currentpath, 00, 256);
-	res = f_getcwd(currentpath, sizeof currentpath / sizeof *currentpath);
-
-	res = f_chdir(SAVER_FOLDER);
-	if (res != FR_OK) {
-		return 2;
-	}
-
-	memset(w_buffer, 0x00, sizeof(w_buffer));
-	TCHAR mdenamebuf[GAME_NAME_MAX + 1];
-	make_mde_name(mdenamebuf, gamefilename);
-
-	res = f_open(&gfile, mdenamebuf, FA_READ | FA_WRITE | FA_OPEN_ALWAYS);
-	if (res == FR_OK) {
-		// A failed read writes nothing: the other byte would be lost
-		res = f_read(&gfile, w_buffer, sizeof(w_buffer), &done);
-		w_buffer[at] = value;
-		if (res == FR_OK)
-			res = f_lseek(&gfile, 0x0000);
-		if (res == FR_OK)
-			res = f_write(&gfile, (void *)w_buffer, sizeof(w_buffer), &done);
-		u32 closed = f_close(&gfile);
-		if (res == FR_OK)
-			res = closed;
-	}
-	u32 back = f_chdir(currentpath);
-	return (u8)(res != FR_OK ? res : back);
+	if (gamesave_rom_path_in(rom, sizeof(rom), currentpath, gamefilename) < 0)
+		return 1;
+	gamesave_record_read(rom, &rec);
+	if (at == 0)
+		rec.save_type = value;
+	else
+		rec.boot_mode = value;
+	return gamesave_record_write(rom, &rec) ? 0 : 1;
 }
 //------------------------------------------------------------------
 u8 Make_mde_file(TCHAR *gamefilename, u8 Save_num)

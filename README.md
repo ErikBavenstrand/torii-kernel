@@ -160,7 +160,7 @@ hardware), since Ruby and Sapphire, say, need the same of the kernel; `just
 compat --all` tests every game. Each game boots through the kernel while the
 test presses START and A; the screen must change, the save type must match
 the ROM, a clock game must find the clock on, and the save must reach
-`SAVER/` and come back on relaunch (a test pattern stands in when the game
+`/torii/saves` and come back on relaunch (a test pattern stands in when the game
 doesn't save on its own). `dist/compat/index.html` shows the results, what
 changed since each game's previous run, coverage by requirement, and
 screenshots. Add your games with `just game-add ~/path/to/roms`: it copies

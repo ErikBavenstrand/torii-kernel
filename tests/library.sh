@@ -76,9 +76,11 @@ nested_card() {
   mmd -i "$cart/sd.img" ::/GBA ::/GBA/RPG ::/GBA/RPG/Old ::/NES ::/SAVER ::/RTS ::/SYSTEM ::/torii \
     "::/System Volume Information" ::/.Trashes ::/Secret ::/Deep ::/Deep/2 ::/Deep/2/3 ::/Deep/2/3/4 \
     ::/Deep/2/3/4/5 ::/Deep/2/3/4/5/6 ::/Deep/2/3/4/5/6/7 ::/Deep/2/3/4/5/6/7/8
+  # Golden Sun's save is in its folder under /torii/saves, Mega Man 10's beside it
+  mmd -i "$cart/sd.img" ::/torii/saves ::/torii/saves/GBA ::/torii/saves/GBA/RPG "::/torii/saves/GBA/RPG/Golden Sun.gba"
   put "$cart" "/Root Game.gba" "/GBA/Metroid Fusion (USA).gba" "/GBA/Mega Man 10.gba" "/GBA/Mega Man 2.gba" \
     "/GBA/RPG/Golden Sun.gba" "/GBA/RPG/Old/Zelda.gbc" "/GBA/RPG/notes.txt" "/NES/Mario.nes" "/Tetris.gb" \
-    "/SAVER/Golden Sun.sav" "/RTS/Hidden.gba" "/SYSTEM/Hidden.gba" "/torii/Hidden.gba" \
+    "/torii/saves/GBA/RPG/Golden Sun.gba/Main.sav" "/GBA/Mega Man 10.Boss v1.2.sav" "/RTS/Hidden.gba" "/SYSTEM/Hidden.gba" "/torii/Hidden.gba" \
     "/System Volume Information/Hidden.gba" "/.Trashes/Hidden.gba" "/._Root Game.gba" "/Secret/Hidden.gba" \
     "/Deep/2/3/4/5/6/7/Seven.gba" "/Deep/2/3/4/5/6/7/8/Eight.gba"
   mattrib -i "$cart/sd.img" +h ::/Secret
@@ -86,7 +88,7 @@ nested_card() {
 
 nested_expected="GBA	/GBA/RPG/Golden Sun.gba	$sz	save
 GBA	/GBA/Mega Man 2.gba	$sz	-
-GBA	/GBA/Mega Man 10.gba	$sz	-
+GBA	/GBA/Mega Man 10.gba	$sz	save
 GBA	/GBA/Metroid Fusion (USA).gba	$sz	-
 GBA	/Root Game.gba	$sz	-
 GBA	/Deep/2/3/4/5/6/7/Seven.gba	$sz	-
@@ -127,7 +129,8 @@ $(index "$cart")"
   put "$cart" "/Added.gba" "/GBA/RPG/Old/Added Too.gb"
   mdel -i "$cart/sd.img" "::/GBA/Mega Man 2.gba"
   mren -i "$cart/sd.img" "::/GBA/RPG/Golden Sun.gba" "::/GBA/RPG/Golden Sun 2.gba"
-  put "$cart" "/SAVER/Mario.esv"
+  mmd -i "$cart/sd.img" ::/torii/saves/NES ::/torii/saves/NES/Mario.nes
+  put "$cart" "/torii/saves/NES/Mario.nes/Main.sav"
   boot "$cart" "$cart/3.log" -f 600 -u "library: wrote"
   logged "$cart/3.log" "library: loaded 9 games"
   logged "$cart/3.log" "library: the card changed: building a new index"
@@ -136,7 +139,7 @@ $(index "$cart")"
   no_errors "$cart/3.log"
   want="GBA	/Added.gba	$sz	-
 GBA	/GBA/RPG/Golden Sun 2.gba	$sz	-
-GBA	/GBA/Mega Man 10.gba	$sz	-
+GBA	/GBA/Mega Man 10.gba	$sz	save
 GBA	/GBA/Metroid Fusion (USA).gba	$sz	-
 GBA	/Root Game.gba	$sz	-
 GBA	/Deep/2/3/4/5/6/7/Seven.gba	$sz	-
@@ -276,7 +279,7 @@ if shard_case; then
   index "$cart" | grep -q "Golden Sun" && fail "the index still lists Golden Sun:
 $(index "$cart")"
   mdir -b -i "$cart/sd.img" ::/GBA/RPG | grep -q "Golden Sun.gba" && fail "Golden Sun.gba is still on the card"
-  mtype -i "$cart/sd.img" "::/SAVER/Golden Sun.sav" | cmp -s - "$game" || fail "Golden Sun's save didn't stay as it was"
+  mtype -i "$cart/sd.img" "::/torii/saves/GBA/RPG/Golden Sun.gba/Main.sav" | cmp -s - "$game" || fail "Golden Sun's save didn't stay as it was"
   favs=$(mtype -i "$cart/sd.img" ::/torii/favorites.txt | grep '^/' | tr '\n' ' ')
   [ "$favs" = "/Tetris.gb " ] || fail "after the delete, the favourites are '$favs'"
   recent=$(mtype -i "$cart/sd.img" ::/torii/recent.txt | grep -v '^[#@]' | cut -f2 | tr '\n' ' ')
@@ -289,7 +292,6 @@ if shard_case; then
   # save record) loads it again, a game's next boot loads it from the card
   cart=$carts/launch
   new_card "$cart"
-  mmd -i "$cart/sd.img" ::/SAVER
   toolong=$(printf 'L%.0s' $(seq 249)).gba
   put "$cart" "/$toolong" "/Zelda.gb"
   boot "$cart" "$cart/1.log" -f 200
@@ -298,7 +300,7 @@ if shard_case; then
   # fails and the menu comes back (B closes the error)
   # shellcheck disable=SC2046 # nav.sh's options
   boot "$cart" "$cart/2.log" $(nav_launch "/$toolong" at=180) -w "screen ready: dialog" -k @20:B -k @24:- -f 600
-  grep -q "^kernel error: error 8: The file name is too long" "$cart/2.log" || fail "the launch didn't fail"
+  grep -q "^kernel error: error 8: The save's path is too long" "$cart/2.log" || fail "the launch didn't fail"
   [ "$(grep -c 'kernel: library: loaded 2 games' "$cart/2.log")" = 2 ] ||
     fail "the index wasn't loaded again after the failed launch: $(grep 'kernel: library' "$cart/2.log")"
   # Zelda.gb starts; the next boot loads the index

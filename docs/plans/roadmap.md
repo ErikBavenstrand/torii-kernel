@@ -65,7 +65,9 @@ Everything the kernel stores lives under `/torii/`. ROMs can be anywhere.
   favorites.txt
 ```
 
-A setting can keep saves next to the ROM instead. Old `SAVER/` saves are not imported: v0.5 keeps no backwards compatibility (decided 2026-10-22).
+A setting (Settings > Games > Save location) can keep saves next to the ROM instead, as `<rom dir>/<rom stem>.<slot>.sav`. Old `SAVER/` saves are not imported: v0.5 keeps no backwards compatibility (decided 2026-10-22).
+
+What v0.5 built of this (`source/gamesave.c`, `gamerec.c`): a game's folder `/torii/saves/<rom path>/` holds its slot files and `game.ini`, its record (`save_type = 0-5`, `boot_mode = 0-2`, `slot = <current slot>`; plain text, missing keys are defaults). The record is there whatever the setting says, so changing it loses nothing. Folders are made when the first file is written (a game of unknown save type gets none until its chip differs from blank). A NOR game's saves are kept as for a ROM at `/torii/nor/<name>`, whatever the setting. A save path over 251 bytes (the pending-save record's room) is refused at launch with a message. The per-game overrides listed above as `games/<code>-<crc>.ini` (RTC, cheats) stay for v0.7; the save type and boot mode are by path, in `game.ini`.
 
 v0.5 ships all of this at once: integrity, slots, history and both save managers are built and tested locally, then released together (decided 2026-10-22). Save states are not part of it; they come with v0.7's in-game menu.
 
@@ -233,7 +235,7 @@ Small items with no version yet:
 - **Logs:** the save log line still says `"Save sav?"`; change it together with `tests/saves.sh`.
 - **Latent risks:**
   - The second half of `Save_savefile` runs frames with SRAM page 0x10 selected.
-  - `FRAM_save_op` runs frames with a file open and the working folder at `/SAVER`.
+  - `FRAM_save_op` runs frames with a file open.
   - Both are safe today and commented.
 - **Release file:** EZ-Flash's loader installs only the first 3 MB of `ezkernelnew.bin`; `tools/omega_image.py` enforces it.
 - **Emulator:**

@@ -28,7 +28,7 @@ fail() {
 }
 
 save_bytes() {
-  mtype -i "$cart/sd.img" ::/SAVER/Hello.sav 2>/dev/null | head -c 5 | od -A n -t x1 | tr -d ' \n'
+  mtype -i "$cart/sd.img" ::/torii/saves/Hello.gba/Main.sav 2>/dev/null | head -c 5 | od -A n -t x1 | tr -d ' \n'
 }
 
 # Power-on 0: the boot goes to home with no notice before it (v0.3.2:
@@ -43,7 +43,7 @@ boot $(nav_launch /Hello.gba) -s 400:$shots/1-game.png
 od -A n -t x1 -N 5 "$cart/sram.bin" | tr -d ' \n' | grep -q '4f4d525801' ||
   fail "game did not write its first boot to SRAM"
 
-# Power-on 2: the kernel asks to copy SRAM to SAVER/Hello.sav; confirm with A.
+# Power-on 2: the kernel asks to copy SRAM to torii/saves/Hello.gba/Main.sav; confirm with A.
 boot -s 90:$shots/2-prompt.png -k 100:A -k 106:- -s 300:$shots/2-menu.png
 [ "$(save_bytes)" = 4f4d525801 ] || fail "save not written back to SD (got $(save_bytes))"
 

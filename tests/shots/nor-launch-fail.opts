@@ -1,11 +1,13 @@
-# A NOR game whose launch fails (/SAVER is a file, so its save can't be
-# made): WRITE TO NOR CLEAN puts Hello.gba on the game NOR, and its launch
+# A NOR game whose launch fails (/torii/saves/torii is a file, so the folder
+# of its save can't be made; Hello's record says Flash 128K, so there is a
+# save to make): WRITE TO NOR CLEAN puts Hello.gba on the game NOR, and its launch
 # (both through the menu's test hook) shows the error; after it home comes
 # back whole, drawn without a key (the list stayed black until one before
 # v0.3.2)
-#! sd-rm /SAVER
-#! sd-file /SAVER 16 tests/roms/hello/hello.gba
+#! sd-file /torii/saves/Hello.gba/game.ini 14 tests/shots/flash128-game.ini
+#! sd-file /torii/saves/torii 16 tests/roms/hello/hello.gba
 #! expect-error error 2:
+#! expect-error save: can't make
 -w "nav: home ready"
 -P "@8:nav_test_path:/Hello.gba" -p @8:nav_test_action:0x7E000003
 -w "nor: list saved"

@@ -401,8 +401,8 @@ full)
   new_card 16384 16
   # Hello.gba's save is there already, so launching it needs no new space.
   head -c 65536 /dev/zero | tr '\0' '\377' >"$cart/Hello.sav"
-  mmd -i "$cart/sd.img" ::/SAVER
-  mcopy -i "$cart/sd.img" "$cart/Hello.sav" ::/SAVER/Hello.sav
+  mmd -i "$cart/sd.img" ::/torii ::/torii/saves ::/torii/saves/Hello.gba
+  mcopy -i "$cart/sd.img" "$cart/Hello.sav" ::/torii/saves/Hello.gba/Main.sav
   free=$(mdir -i "$cart/sd.img" ::/ | sed -n 's/^ *\([0-9 ]*\) bytes free.*/\1/p' | tr -d ' ')
   head -c $((free - 49152)) /dev/urandom >"$cart/filler.bin"
   mcopy -i "$cart/sd.img" "$cart/filler.bin" ::/FILLER.BIN

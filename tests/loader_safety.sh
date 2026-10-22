@@ -48,7 +48,7 @@ rom "$root/B.gba" tests/roms/savetest/flash64.gba
 loader() { tail -c +$((0x7C0000 + 1)) "$cart/kernel-nor.bin" | md5sum | cut -c1-32; }
 
 # new_cart NAME: an erased cart with logging on (LOGGING Info) and a card
-# holding /SAVER, A.gba (Hello), B.gba and Test.gba (Flash 128K save test),
+# holding A.gba (Hello), B.gba and Test.gba (Flash 128K save test),
 # starting on Home.
 # The first power-on, one frame long, makes the cart's files and seeds the
 # loader.
@@ -59,7 +59,6 @@ new_cart() {
   runs=0
   mkdir -p "$cart"
   mkfs.fat -C -F 32 -n LOADER "$cart/sd.img" 65536 >/dev/null
-  mmd -i "$cart/sd.img" ::/SAVER
   mcopy -i "$cart/sd.img" "$root/A.gba" ::/A.gba
   mcopy -i "$cart/sd.img" "$root/B.gba" ::/B.gba
   mcopy -i "$cart/sd.img" tests/roms/savetest/flash128.gba ::/Test.gba

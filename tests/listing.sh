@@ -56,7 +56,7 @@ grep -qF "kernel: launch: loading $long, CLEAN BOOT" "$cart/kernel.log" ||
   fail "FAT32: the long name didn't launch: $(grep '^kernel' "$cart/kernel.log" | tail -2)"
 # (a game missing from the save table gets its file when the chip differs:
 # the launch names it in the pending-save record)
-grep -qF "save: no ${long%.gba}.sav yet" "$cart/kernel.log" ||
+grep -qF "save: no /torii/saves/$long/Main.sav yet" "$cart/kernel.log" ||
   fail "FAT32: no save name for the long name: $(grep 'save:' "$cart/kernel.log" | head -3)"
 echo "PASS: a name past 99 bytes launches and saves on FAT32"
 
@@ -84,18 +84,18 @@ left=$(tools/sdimg.sh "$cart/sd.img" ls / | cut -f1 | grep -vx 'torii/\?') # the
 [ "$left" = "$short" ] || fail "exFAT: deleting the long name left: $(echo "$left" | tr '\n' ' ')"
 echo "PASS: a name past 99 bytes launches and deletes only itself on exFAT"
 
-# A name whose save name won't fit the pending-save record (over 251 bytes):
-# launching it says the name is too long and writes no save
+# A name whose save path won't fit the pending-save record (over 251 bytes):
+# launching it says the path is too long and writes no save
 cart=$carts/listing-toolong
 rm -rf "$cart" && mkdir -p "$cart"
 toolong=$(printf 'L%.0s' $(seq 249)).gba
 mkfs.fat -C -F 32 -n LISTING "$cart/sd.img" 65536 >/dev/null
-mmd -i "$cart/sd.img" ::/SAVER
 mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba "::/$toolong"
 # shellcheck disable=SC2046
 OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch "/$toolong" at=180) \
   -f 400 >"$cart/kernel.log" 2>&1
-grep -Eq '^kernel( error)?: error 8: The file name is too long' "$cart/kernel.log" ||
-  fail "a 253-byte name: no "The file name is too long": $(grep '^kernel' "$cart/kernel.log" | tail -2)"
-[ -z "$(mdir -b -i "$cart/sd.img" ::/SAVER)" ] || fail "a 253-byte name: a save was written"
+grep -Eq "^kernel( error)?: error 8: The save's path is too long" "$cart/kernel.log" ||
+  fail "a 253-byte name: no path-too-long error: $(grep '^kernel' "$cart/kernel.log" | tail -2)"
+! mdir -i "$cart/sd.img" ::/torii/saves >/dev/null 2>&1 || fail "a 253-byte name: a save folder was made"
+grep -qF "save path is over 251 bytes, the pending-save record's room" "$cart/kernel.log" || fail "a 253-byte name: not logged"
 echo "PASS: a name too long for the pending-save record says so and writes no save"

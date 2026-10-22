@@ -13,7 +13,13 @@
 #   rename-cut, rename-cut-split  a power cut before each of a rename's SD
 #         writes leaves one game with its save; -split fills the folders'
 #         first sectors, so a cut inside f_rename leaves two names on a file
+#   rename-cut-beside  the same with the Save location setting at "next to the
+#         ROM": the save is Test.Main.sav in the ROM's folder, the record still
+#         in /torii/saves
 #   rename-cut-case  the same for a rename that changes only case
+#   beside  with the setting at "next to the ROM", a game's save is made, loaded
+#         and copied back as Test.Main.sav beside it, and a rename moves it
+#         (the game's record, in /torii/saves, follows)
 #   rename  Rename in the SD card page's popup renames the ROM, its save
 #         and its save type, Recent follows, and the game starts with its
 #         save under the new name
@@ -36,6 +42,12 @@ set -euo pipefail
 local_carts "dist/cart-saves${1:+-$1}"
 
 part=$1
+# Where the current slot's save is: in /torii/saves, or next to the ROM
+# (Settings' Save location, slot 36)
+case $part in
+*beside) savep=/Test.Main.sav ;;
+*) savep=/torii/saves/Test.gba/Main.sav ;;
+esac
 cart=$carts/saves-$part shots=dist/shots/saves-$part
 rm -rf "$cart" "$shots"
 mkdir -p "$cart" "$shots"
@@ -67,7 +79,7 @@ logged_error() {
 
 # The save's boot record: Flash 128K keeps it at 0x10000 (tests/roms/savetest).
 save_record() {
-  mtype -i "$cart/sd.img" ::/SAVER/Test.sav >"$cart/test.sav" 2>/dev/null || fail "no SAVER/Test.sav"
+  mtype -i "$cart/sd.img" ::$savep >"$cart/test.sav" 2>/dev/null || fail "no save"
   hex_at "$cart/test.sav" $((0x10000))
 }
 
@@ -81,10 +93,11 @@ pending() {
 first_launch() {
   mkfs.fat -C -F 32 -n SAVES "$cart/sd.img" 65536 >/dev/null
   mcopy -i "$cart/sd.img" tests/roms/savetest/flash128.gba ::/Test.gba
+  case $part in *beside) python3 tests/setnor.py set "$cart/kernel-nor.bin" 36=1 ;; esac
   # shellcheck disable=SC2046 # nav.sh's options
   boot $(nav_launch /Test.gba save=5 at=250) -s 600:"$shots/1-game.png"
-  logged "save: made a blank Test.sav, 131072 bytes"
-  logged "save: loaded Test.sav into cart SRAM, 131072 bytes"
+  logged "save: made a blank $savep, 131072 bytes"
+  logged "save: loaded $savep into cart SRAM, 131072 bytes"
   logged "nor: wrote the pending-save record, 512 bytes"
   [ "$(pending)" = 0011 ] || fail "no pending-save record after the launch"
 }
@@ -92,8 +105,8 @@ first_launch() {
 # Power-on 2: A at "Save sav?" copies the save to the card.
 first_copy() {
   boot -k 100:A -k 106:- -s 300:"$shots/2-menu.png" -f 800
-  logged 'save: "Save sav?" for /SAVER/Test.sav, 131072 bytes, save type 31: A, save'
-  logged "save: wrote Test.sav, 131072 bytes, verified"
+  logged "save: \"Save sav?\" for $savep, 131072 bytes, save type 31: A, save"
+  logged "save: wrote $savep, 131072 bytes, verified"
   logged "nor: wrote an empty pending-save record, 512 bytes"
   [ "$(save_record)" = 4f4d525801 ] || fail "the save has $(save_record), expected the first boot record"
   [ "$(pending)" = 0000 ] || fail "the pending-save record is still set after the copy"
@@ -106,16 +119,16 @@ read-error)
   cp "$cart/test.sav" "$cart/kept.sav"
   # Power-on 3: the card stops answering while Test.sav loads: no launch,
   # no pending-save record, so power-on 4 copies nothing over the file
-  sectors=$(sd_sectors "$cart/sd.img" /SAVER/Test.sav)
+  sectors=$(sd_sectors "$cart/sd.img" /torii/saves/Test.gba/Main.sav)
   # shellcheck disable=SC2046 # nav.sh's options
   OMEGA_SD_READ_ERROR=$sectors boot $(nav_launch /Test.gba at=180) -f 900
-  logged_error "save: loading Test.sav into cart SRAM"
+  logged_error "save: loading /torii/saves/Test.gba/Main.sav into cart SRAM"
   ! grep -q 'launch: starting the game' "$cart/run.log" || fail "the game started after its save's read failed"
   ! grep -qF 'nor: wrote the pending-save record' "$cart/run.log" || fail "a pending-save record was written"
   [ "$(pending)" = 0000 ] || fail "the pending-save record is set"
   boot -k 100:A -k 106:- -f 800
   ! grep -qF 'Save sav?' "$cart/run.log" || fail "the next power-on asked to copy the save"
-  mtype -i "$cart/sd.img" ::/SAVER/Test.sav | cmp -s - "$cart/kept.sav" || fail "Test.sav changed"
+  mtype -i "$cart/sd.img" ::/torii/saves/Test.gba/Main.sav | cmp -s - "$cart/kept.sav" || fail "Test.sav changed"
   echo "PASS: saves read-error: a save the card can't read stops the launch, and nothing is copied over it"
   ;;
 
@@ -129,17 +142,17 @@ delete)
   boot $(nav_game_delete gba 0) -w "delete: /Test.gba" -f 900
   logged "delete: /Test.gba"
   ! mtype -i "$cart/sd.img" ::/Test.gba >/dev/null 2>&1 || fail "Test.gba is still on the card"
-  mtype -i "$cart/sd.img" ::/SAVER/Test.sav | cmp -s - "$cart/kept.sav" || fail "the save changed or went"
+  mtype -i "$cart/sd.img" ::/torii/saves/Test.gba/Main.sav | cmp -s - "$cart/kept.sav" || fail "the save changed or went"
   # Power-on 4: the game copied back starts with its save
   mcopy -i "$cart/sd.img" tests/roms/savetest/flash128.gba ::/Test.gba
   # shellcheck disable=SC2046 # nav.sh's options
   boot $(nav_launch /Test.gba at=180) -f 600
-  logged "save: Test.sav exists, 131072 bytes"
-  logged "save: loaded Test.sav into cart SRAM, 131072 bytes"
+  logged "save: /torii/saves/Test.gba/Main.sav exists, 131072 bytes"
+  logged "save: loaded /torii/saves/Test.gba/Main.sav into cart SRAM, 131072 bytes"
   echo "PASS: saves delete: Delete removes the ROM, its save stays and loads when the game comes back"
   ;;
 
-rename-cut | rename-cut-split)
+rename-cut | rename-cut-split | rename-cut-beside)
   first_launch
   first_copy
   cp "$cart/test.sav" "$cart/kept.sav"
@@ -150,7 +163,7 @@ rename-cut | rename-cut-split)
     : >"$cart/pad.txt"
     for i in $(seq -w 1 20); do
       mcopy -i "$cart/sd.img" "$cart/pad.txt" "::/PAD$i.TXT"
-      mcopy -i "$cart/sd.img" "$cart/pad.txt" "::/SAVER/PAD$i.TXT"
+      mcopy -i "$cart/sd.img" "$cart/pad.txt" "::/torii/saves/PAD$i.TXT"
     done
   fi
   rm -rf "$carts/cut-start-$part"
@@ -181,9 +194,14 @@ rename-cut | rename-cut-split)
     grep -h 'second name' "$cart/run.log" >>"$carts/aliases-$part.txt" || true
     if mtype -i "$cart/sd.img" ::/Testq.gba >/dev/null 2>&1; then to=Testq other=Test results+="done "; else to=Test other=Testq results+="undone "; fi
     ! mtype -i "$cart/sd.img" "::/$other.gba" >/dev/null 2>&1 || fail "cut before write $n: both names are on the card"
-    mtype -i "$cart/sd.img" "::/SAVER/$to.sav" | cmp -s - "$cart/kept.sav" || fail "cut before write $n: $to.sav isn't the save"
-    ! mtype -i "$cart/sd.img" "::/SAVER/$other.sav" >/dev/null 2>&1 || fail "cut before write $n: $other.sav is left"
-    mtype -i "$cart/sd.img" "::/SAVER/$to.mde" >/dev/null 2>&1 || fail "cut before write $n: $to.mde is missing"
+    if [ "$part" = rename-cut-beside ]; then
+      mtype -i "$cart/sd.img" "::/$to.Main.sav" | cmp -s - "$cart/kept.sav" || fail "cut before write $n: $to.Main.sav isn't the save"
+      ! mtype -i "$cart/sd.img" "::/$other.Main.sav" >/dev/null 2>&1 || fail "cut before write $n: $other.Main.sav is left"
+    else
+      mtype -i "$cart/sd.img" "::/torii/saves/$to.gba/Main.sav" | cmp -s - "$cart/kept.sav" || fail "cut before write $n: $to.gba/Main.sav isn't the save"
+      ! mtype -i "$cart/sd.img" "::/torii/saves/$other.gba/Main.sav" >/dev/null 2>&1 || fail "cut before write $n: $other.gba/Main.sav is left"
+    fi
+    mtype -i "$cart/sd.img" "::/torii/saves/$to.gba/game.ini" >/dev/null 2>&1 || fail "cut before write $n: $to.gba/game.ini is missing"
     ! mtype -i "$cart/sd.img" ::/torii/rename.txt >/dev/null 2>&1 || fail "cut before write $n: the journal is left"
     # No damage (two names on one chain, a broken one); clusters a cut write
     # left allocated are only lost room
@@ -202,7 +220,7 @@ rename-cut | rename-cut-split)
     # second name, of the game and of its save
     grep -qF '/Test.gba was a second name of /Testq.gba' "$carts/aliases-$part.txt" ||
       fail "no cut left the game under two names: $(cat "$carts/aliases-$part.txt")"
-    grep -qF '/SAVER/Test.sav was a second name of /SAVER/Testq.sav' "$carts/aliases-$part.txt" ||
+    grep -qF '/torii/saves/Test.gba was a second name of /torii/saves/Testq.gba' "$carts/aliases-$part.txt" ||
       fail "no cut left the save under two names: $(cat "$carts/aliases-$part.txt")"
   fi
   echo "PASS: saves $part: a power cut before any of the rename's $writes SD writes leaves one game with its save ($results)"
@@ -219,7 +237,7 @@ rename-cut-case)
   : >"$cart/pad.txt"
   for i in $(seq -w 1 20); do
     mcopy -i "$cart/sd.img" "$cart/pad.txt" "::/PAD$i.TXT"
-    mcopy -i "$cart/sd.img" "$cart/pad.txt" "::/SAVER/PAD$i.TXT"
+    mcopy -i "$cart/sd.img" "$cart/pad.txt" "::/torii/saves/PAD$i.TXT"
   done
   rm -rf "$carts/cut-start-$part"
   cp -r "$cart" "$carts/cut-start-$part"
@@ -246,15 +264,15 @@ rename-cut-case)
     # One entry for the game and one for its save, whatever their case
     [ "$(mdir -b -i "$cart/sd.img" ::/ | grep -ci '^::/test\.gba$')" = 1 ] ||
       fail "cut before write $n: the game's names: $(mdir -b -i "$cart/sd.img" ::/ | grep -i test)"
-    [ "$(mdir -b -i "$cart/sd.img" ::/SAVER | grep -ci '^::/SAVER/test\.sav$')" = 1 ] ||
-      fail "cut before write $n: the save's names: $(mdir -b -i "$cart/sd.img" ::/SAVER | grep -i test)"
-    mtype -i "$cart/sd.img" ::/SAVER/Test.sav | cmp -s - "$cart/kept.sav" || fail "cut before write $n: the save changed"
+    [ "$(mdir -b -i "$cart/sd.img" ::/torii/saves | grep -ci '^::/torii/saves/test\.gba/\?$')" = 1 ] ||
+      fail "cut before write $n: the save's names: $(mdir -b -i "$cart/sd.img" ::/torii/saves | grep -i test)"
+    mtype -i "$cart/sd.img" ::/torii/saves/Test.gba/Main.sav | cmp -s - "$cart/kept.sav" || fail "cut before write $n: the save changed"
     ! mtype -i "$cart/sd.img" ::/torii/rename.txt >/dev/null 2>&1 || fail "cut before write $n: the journal is left"
     fsck.fat -n "$cart/sd.img" >"$cart/fsck.txt" 2>&1 || true
     ! grep -vE '^(fsck\.fat |Reclaimed [0-9]+ unused clusters? |Free cluster summary |  (Auto-)?correct|Leaving filesystem unchanged|.*: [0-9]+ files, |FATs differ but appear to be intact|  Using first FAT|$)' \
       "$cart/fsck.txt" >"$cart/fsck-bad.txt" || fail "cut before write $n: fsck.fat: $(head -4 "$cart/fsck-bad.txt")"
   done
-  grep -qF 'another case of /SAVER/TesT.sav was a second name of it' "$carts/aliases-$part.txt" ||
+  grep -qF 'another case of /torii/saves/TesT.gba was a second name of it' "$carts/aliases-$part.txt" ||
     fail "no cut left the save under two cases: $(cat "$carts/aliases-$part.txt")"
   echo "PASS: saves $part: a power cut before any of a case-only rename's $writes SD writes leaves one game and one save"
   ;;
@@ -271,19 +289,18 @@ rename)
     -w "screen ready: rename" -k @10:A -k @14:- -k @24:START -k @28:- \
     -w "rename: kept" -w "sdcard: ready /" -s @1:"$shots/3-renamed.png" -f 2400
   logged "rename: /Test.gba to Testq.gba"
-  logged "rename: /SAVER/Test.sav to /SAVER/Testq.sav (FatFs 0)"
-  logged "rename: /SAVER/Test.mde to /SAVER/Testq.mde (FatFs 0)"
+  logged "rename: /torii/saves/Test.gba to /torii/saves/Testq.gba (FatFs 0)"
   ! mtype -i "$cart/sd.img" ::/Test.gba >/dev/null 2>&1 || fail "Test.gba is still on the card"
-  ! mtype -i "$cart/sd.img" ::/SAVER/Test.sav >/dev/null 2>&1 || fail "SAVER/Test.sav is still on the card"
+  ! mtype -i "$cart/sd.img" ::/torii/saves/Test.gba/Main.sav >/dev/null 2>&1 || fail "the save is still under Test.gba"
   mtype -i "$cart/sd.img" ::/Testq.gba | cmp -s - tests/roms/savetest/flash128.gba || fail "Testq.gba isn't the game"
-  mtype -i "$cart/sd.img" ::/SAVER/Testq.sav | cmp -s - "$cart/kept.sav" || fail "the save didn't follow the game"
-  mtype -i "$cart/sd.img" ::/SAVER/Testq.mde >/dev/null 2>&1 || fail "the save type didn't follow the game"
+  mtype -i "$cart/sd.img" ::/torii/saves/Testq.gba/Main.sav | cmp -s - "$cart/kept.sav" || fail "the save didn't follow the game"
+  mtype -i "$cart/sd.img" ::/torii/saves/Testq.gba/game.ini >/dev/null 2>&1 || fail "the record didn't follow the game"
   mtype -i "$cart/sd.img" ::/torii/recent.txt | grep -q "	/Testq.gba$" || fail "Recent didn't follow the game"
   # Power-on 4: the game under its new name starts with its save
   # shellcheck disable=SC2046 # nav.sh's options
   boot $(nav_launch /Testq.gba at=180) -f 600
-  logged "save: Testq.sav exists, 131072 bytes"
-  logged "save: loaded Testq.sav into cart SRAM, 131072 bytes"
+  logged "save: /torii/saves/Testq.gba/Main.sav exists, 131072 bytes"
+  logged "save: loaded /torii/saves/Testq.gba/Main.sav into cart SRAM, 131072 bytes"
   echo "PASS: saves rename: the SD card page's Rename moves the save and save type with the game, which starts with them"
   ;;
 
@@ -294,6 +311,10 @@ rename-walk)
   # another game with its save (a walk of the whole card) takes long enough
   # to say so with a progress dialog; the short walk of the plain case
   # above shows none
+  # (a cheat file is named after the game alone, so another game of its name
+  # could share it: the check walks the card; the saves are in the game's own folder)
+  mmd -i "$cart/sd.img" ::/CHEAT
+  mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/CHEAT/Test.cht
   mkdir "$cart/fill"
   for i in $(seq 1 1500); do : >"$cart/fill/Filler $i.gba"; done
   mcopy -i "$cart/sd.img" -s "$cart/fill" ::/Fill
@@ -309,16 +330,39 @@ rename-walk)
   echo "PASS: saves rename-walk: a long check of the card for a shared save shows a progress dialog"
   ;;
 
+beside)
+  first_launch
+  first_copy
+  cp "$cart/test.sav" "$cart/kept.sav"
+  # The save is beside the ROM; the record (save type) is in its folder under /torii/saves
+  ! mdir -b -i "$cart/sd.img" ::/torii/saves/Test.gba | grep -q 'Main.sav' || fail "a save was made in /torii/saves too"
+  mtype -i "$cart/sd.img" ::/torii/saves/Test.gba/game.ini | grep -q 'save_type = 5' || fail "the record is missing"
+  # Power-on 3: it loads again
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot $(nav_launch /Test.gba at=180) -f 600
+  logged "save: $savep exists, 131072 bytes"
+  logged "save: loaded $savep into cart SRAM, 131072 bytes"
+  # Power-on 4: the setting back to the Torii folder: a launch makes Main there
+  # (the beside file stays where it is, no longer the game's)
+  python3 tests/setnor.py set "$cart/kernel-nor.bin" 36=0
+  boot -k 100:B -k 106:- -f 300
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot $(nav_launch /Test.gba at=180) -f 600
+  logged "save: made a blank /torii/saves/Test.gba/Main.sav, 131072 bytes"
+  mtype -i "$cart/sd.img" ::$savep | cmp -s - "$cart/kept.sav" || fail "the beside save changed"
+  echo "PASS: saves beside: with the setting at next to the ROM the save is Test.Main.sav in the ROM's folder, it loads again, and the Torii folder is a separate place"
+  ;;
+
 copy)
   first_launch
   first_copy
   # Power-on 3: the game again, then B at "Save sav?".
   # shellcheck disable=SC2046 # nav.sh's options
   boot $(nav_launch /Test.gba at=180) -f 600
-  logged "save: Test.sav exists, 131072 bytes, save type 31"
-  logged "save: loaded Test.sav into cart SRAM, 131072 bytes"
+  logged "save: /torii/saves/Test.gba/Main.sav exists, 131072 bytes, save type 31"
+  logged "save: loaded /torii/saves/Test.gba/Main.sav into cart SRAM, 131072 bytes"
   boot -k 100:B -k 106:- -f 300
-  logged 'save: "Save sav?" for /SAVER/Test.sav, 131072 bytes, save type 31: B, not saved'
+  logged 'save: "Save sav?" for /torii/saves/Test.gba/Main.sav, 131072 bytes, save type 31: B, not saved'
   [ "$(save_record)" = 4f4d525801 ] || fail "B changed the save"
   [ "$(pending)" = 0000 ] || fail "B left the pending-save record"
   fsck.fat -n "$cart/sd.img" >/dev/null || fail "fsck.fat found errors"
@@ -334,7 +378,7 @@ full)
   # Then the card fills up to 64 KB free: too little for the 128 KB copy.
   # Test.sav stays; the copy goes to Test.sav.tmp first. The filler is a
   # .gba, which the kernel deletes below.
-  mtype -i "$cart/sd.img" ::/SAVER/Test.sav >"$cart/good.sav"
+  mtype -i "$cart/sd.img" ::/torii/saves/Test.gba/Main.sav >"$cart/good.sav"
   free=$(mdir -i "$cart/sd.img" ::/ | sed -n 's/^ *\([0-9 ]*\) bytes free.*/\1/p' | tr -d ' ')
   head -c $((free - 65536)) /dev/urandom >"$cart/filler.bin"
   mcopy -i "$cart/sd.img" "$cart/filler.bin" ::/Filler.gba
@@ -342,9 +386,9 @@ full)
   # dialog says so, not "Done" (v0.3.2); B closes it.
   boot -k 100:A -k 106:- -w "error 3: Can't write the save" -s @20:"$shots/4-error.png" -k @30:B -k @34:- \
     -w "nav: home ready"
-  logged 'save: "Save sav?" for /SAVER/Test.sav, 131072 bytes, save type 31: A, save'
-  logged_error "save: writing Test.sav.tmp: "
-  grep -qE "kernel error: save: writing Test.sav.tmp: [0-9]+ of 131072 bytes written" "$cart/run.log" ||
+  logged 'save: "Save sav?" for /torii/saves/Test.gba/Main.sav, 131072 bytes, save type 31: A, save'
+  logged_error "save: writing /torii/saves/Test.gba/Main.sav.tmp: "
+  grep -qE "kernel error: save: writing /torii/saves/Test.gba/Main.sav.tmp: [0-9]+ of 131072 bytes written" "$cart/run.log" ||
     fail "the error doesn't say how much was written"
   logged_error "error 3: Can't write the save"
   logged "dialog: Can't write the save"
@@ -355,9 +399,9 @@ full)
   fsck.fat -n "$cart/sd.img" >/dev/null || fail "fsck.fat found errors"
   # The pending-save record stays: the next power-on or launch tries again.
   [ "$(pending)" = 0011 ] || fail "the failed copy cleared the pending-save record"
-  mtype -i "$cart/sd.img" ::/SAVER/Test.sav | cmp -s - "$cart/good.sav" || fail "the failed copy changed the good Test.sav"
-  mdir -i "$cart/sd.img" ::/SAVER/ | grep -qi "TMP" && fail "the failed copy left a .tmp file"
-  mtype -i "$cart/sd.img" ::/SAVER/Test.sav >"$cart/short.sav"
+  mtype -i "$cart/sd.img" ::/torii/saves/Test.gba/Main.sav | cmp -s - "$cart/good.sav" || fail "the failed copy changed the good Test.sav"
+  mdir -i "$cart/sd.img" ::/torii/saves/Test.gba/ | grep -qi "TMP" && fail "the failed copy left a .tmp file"
+  mtype -i "$cart/sd.img" ::/torii/saves/Test.gba/Main.sav >"$cart/short.sav"
 
   # Power-on 5: the copy fails again; then CLEAN BOOT of Test.gba would hand
   # cart SRAM to a game, so the launch tries the copy again, fails, and
@@ -367,11 +411,11 @@ full)
     -w "nav: home ready" $(nav_launch /Test.gba at=@10) \
     -w "still waits to be copied" -w "screen ready: dialog" -s @20:"$shots/5-launch-anyway.png" -k @30:B -k @34:- \
     -w "nav: home ready"
-  logged "save: /SAVER/Test.sav still waits to be copied; trying again"
-  logged "save: Test.sav isn't on the card: B, kept"
+  logged "save: /torii/saves/Test.gba/Main.sav still waits to be copied; trying again"
+  logged "save: /torii/saves/Test.gba/Main.sav isn't on the card: B, kept"
   ! grep -q "kernel: launch: loading" "$cart/run.log" || fail "B on the question still launched"
   [ "$(pending)" = 0011 ] || fail "B on the question cleared the pending-save record"
-  mtype -i "$cart/sd.img" ::/SAVER/Test.sav | cmp -s - "$cart/short.sav" || fail "Test.sav changed though B kept it"
+  mtype -i "$cart/sd.img" ::/torii/saves/Test.gba/Main.sav | cmp -s - "$cart/short.sav" || fail "Test.sav changed though B kept it"
 
   # A on the same question, on a copy of this cart, launching another game:
   # Other.gba (tests/roms/hello, its save on the card already, so launching
@@ -385,7 +429,8 @@ full)
   mdel -i "$cart/sd.img" ::/Filler.gba
   mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/Other.gba
   head -c 65536 /dev/zero | tr '\0' '\377' >"$cart/other.sav"
-  mcopy -i "$cart/sd.img" "$cart/other.sav" ::/SAVER/Other.sav
+  mmd -i "$cart/sd.img" ::/torii/saves/Other.gba
+  mcopy -i "$cart/sd.img" "$cart/other.sav" ::/torii/saves/Other.gba/Main.sav
   free=$(mdir -i "$cart/sd.img" ::/ | sed -n 's/^ *\([0-9 ]*\) bytes free.*/\1/p' | tr -d ' ')
   head -c $((free - 16384)) /dev/urandom >"$cart/filler.bin"
   mcopy -i "$cart/sd.img" "$cart/filler.bin" ::/Filler.gba
@@ -397,20 +442,20 @@ full)
     -w "nav: home ready" $(nav_launch /Other.gba at=@10) \
     -w "still waits to be copied" -w "screen ready: dialog" -k @30:A -k @34:- \
     -w "launch: starting the game"
-  logged "save: Test.sav isn't on the card: A, launch anyway, it is lost"
+  logged "save: /torii/saves/Test.gba/Main.sav isn't on the card: A, launch anyway, it is lost"
   grep -A20 "isn't on the card: A, launch anyway" "$cart/run.log" | grep -q "kernel: nor: wrote an empty pending-save record" ||
     fail "A on the question didn't clear the pending-save record"
   logged "launch: loading Other.gba, CLEAN BOOT"
   logged "launch: starting the game"
-  mtype -i "$cart/sd.img" ::/SAVER/Test.sav >"$cart/lost.sav"
+  mtype -i "$cart/sd.img" ::/torii/saves/Test.gba/Main.sav >"$cart/lost.sav"
   # Power-on 6a: the record now names Other.gba: A at "Save sav?" copies
   # cart SRAM to Other.sav, and Test.sav stays as it was (before v0.3.2 the
   # record still named Test.sav, which got the other game's save).
   boot -k 100:A -k 106:- -w "nav: home ready"
-  logged 'save: "Save sav?" for /SAVER/Other.sav'
-  logged "save: the chip is blank (all FF), Other.sav stays as it is" # hello.gba never saves
-  ! grep -q '"Save sav?" for /SAVER/Test.sav' "$cart/run.log" || fail "the record still named Test.sav"
-  mtype -i "$cart/sd.img" ::/SAVER/Test.sav | cmp -s - "$cart/lost.sav" || fail "Test.sav changed after A launched another game"
+  logged 'save: "Save sav?" for /torii/saves/Other.gba/Main.sav'
+  logged "save: the chip is blank (all FF), /torii/saves/Other.gba/Main.sav stays as it is" # hello.gba never saves
+  ! grep -q '"Save sav?" for /torii/saves/Test.gba/Main.sav' "$cart/run.log" || fail "the record still named Test.sav"
+  mtype -i "$cart/sd.img" ::/torii/saves/Test.gba/Main.sav | cmp -s - "$cart/lost.sav" || fail "Test.sav changed after A launched another game"
   [ "$(pending)" = 0000 ] || fail "the pending-save record is still set after Other.sav's copy"
   mtype -i "$cart/sd.img" ::/Filler.gba | cmp -s - "$cart/filler.bin" || fail "the other file changed"
   fsck.fat -n "$cart/sd.img" >/dev/null || fail "fsck.fat found errors after launching anyway"
@@ -426,8 +471,8 @@ full)
     -w "delete: /Filler.gba" $(nav_launch /Test.gba at=@10) \
     -w "launch: loading Test.gba"
   logged "delete: /Filler.gba"
-  logged "save: /SAVER/Test.sav still waits to be copied; trying again"
-  logged "save: wrote Test.sav, 131072 bytes"
+  logged "save: /torii/saves/Test.gba/Main.sav still waits to be copied; trying again"
+  logged "save: wrote /torii/saves/Test.gba/Main.sav, 131072 bytes"
   ! grep -q "isn't on the card" "$cart/run.log" || fail "the question came though the copy was written"
   [ "$(save_record)" = 4f4d525802 ] || fail "the copy at the launch isn't the game's save: $(save_record)"
   fsck.fat -n "$cart/sd.img" >/dev/null || fail "fsck.fat found errors after the second copy"
@@ -439,8 +484,8 @@ sanity)
   # of its own to the chip, so the test sets the chip between power-ons.
   mkfs.fat -C -F 32 -n SAVES "$cart/sd.img" 65536 >/dev/null
   mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/Hello.gba
-  sav_on_card() { mdir -i "$cart/sd.img" ::/SAVER/ 2>/dev/null | grep -qi 'Hello.sav'; }
-  leftovers() { mdir -i "$cart/sd.img" ::/SAVER/ 2>/dev/null | grep -qiE 'tmp|bak'; }
+  sav_on_card() { mdir -i "$cart/sd.img" ::/torii/saves/Hello.gba/ 2>/dev/null | grep -qi 'Main.sav'; }
+  leftovers() { mdir -i "$cart/sd.img" ::/torii/saves/Hello.gba/ 2>/dev/null | grep -qiE 'tmp|bak'; }
   # A game saves: bytes over the start of the chip (cart SRAM page 0 starts
   # sram.bin), nothing but 01 and 02 so the chip isn't blank
   poke() { # FILE
@@ -456,13 +501,13 @@ sanity)
 
   # 1. No file at launch; a blank chip copies nothing
   launch
-  logged "save: no Hello.sav yet, 65536 bytes; the file is made when the chip differs from blank"
+  logged "save: no /torii/saves/Hello.gba/Main.sav yet, 65536 bytes; the file is made when the chip differs from blank"
   logged "save: blank chip loaded, 65536 bytes"
   [ "$(pending)" = 0011 ] || fail "no pending-save record after the launch"
   ! sav_on_card || fail "the launch made a Hello.sav"
   blank_chip # a game that saves nothing
   copy_a
-  logged "save: the chip is blank (all FF), Hello.sav stays as it is"
+  logged "save: the chip is blank (all FF), /torii/saves/Hello.gba/Main.sav stays as it is"
   ! sav_on_card || fail "a blank chip made a Hello.sav"
   [ "$(pending)" = 0000 ] || fail "the pending-save record is still set after the skip"
 
@@ -470,9 +515,9 @@ sanity)
   launch
   poke "$cart/a.bin"
   copy_a
-  logged "save: Hello.sav doesn't exist yet"
-  logged "save: wrote Hello.sav, 65536 bytes, verified"
-  mtype -i "$cart/sd.img" ::/SAVER/Hello.sav >"$cart/hello.sav"
+  logged "save: /torii/saves/Hello.gba/Main.sav doesn't exist yet"
+  logged "save: wrote /torii/saves/Hello.gba/Main.sav, 65536 bytes, verified"
+  mtype -i "$cart/sd.img" ::/torii/saves/Hello.gba/Main.sav >"$cart/hello.sav"
   [ "$(stat -c %s "$cart/hello.sav")" = 65536 ] || fail "Hello.sav isn't 64 KB"
   head -c 4096 "$cart/hello.sav" | cmp -s - "$cart/a.bin" || fail "Hello.sav isn't the chip"
   ! leftovers || fail "a .tmp or .bak file is left"
@@ -480,10 +525,10 @@ sanity)
 
   # 3. A chip identical to the file copies nothing
   launch
-  logged "save: loaded Hello.sav into cart SRAM, 65536 bytes"
+  logged "save: loaded /torii/saves/Hello.gba/Main.sav into cart SRAM, 65536 bytes"
   poke "$cart/hello.sav" # the game left the file as it was
   copy_a
-  logged "save: the chip is identical to Hello.sav, nothing to copy"
+  logged "save: the chip is identical to /torii/saves/Hello.gba/Main.sav, nothing to copy"
   ! grep -q "kernel: save: wrote" "$cart/run.log" || fail "an identical chip was written"
   [ "$(pending)" = 0000 ] || fail "the pending-save record is still set after the skip"
 
@@ -492,16 +537,16 @@ sanity)
   poke "$cart/b.bin"
   boot -k 100:A -k 106:- -w "doesn't look like" -w "screen ready: dialog" -s @20:"$shots/mismatch.png" -k @30:B -k @34:- \
     -w "nav: home ready"
-  logged "save: the chip doesn't look like Hello.sav: B, the file stays"
-  mtype -i "$cart/sd.img" ::/SAVER/Hello.sav | cmp -s - "$cart/hello.sav" || fail "B changed Hello.sav"
+  logged "save: the chip doesn't look like /torii/saves/Hello.gba/Main.sav: B, the file stays"
+  mtype -i "$cart/sd.img" ::/torii/saves/Hello.gba/Main.sav | cmp -s - "$cart/hello.sav" || fail "B changed Hello.sav"
   [ "$(pending)" = 0000 ] || fail "the pending-save record is still set after B"
   launch
   poke "$cart/b.bin"
   boot -k 100:A -k 106:- -w "doesn't look like" -w "screen ready: dialog" -k @30:A -k @34:- \
     -w "nav: home ready"
-  logged "save: the chip doesn't look like Hello.sav: A, written over it"
-  logged "save: wrote Hello.sav, 65536 bytes, verified"
-  mtype -i "$cart/sd.img" ::/SAVER/Hello.sav >"$cart/hello.sav"
+  logged "save: the chip doesn't look like /torii/saves/Hello.gba/Main.sav: A, written over it"
+  logged "save: wrote /torii/saves/Hello.gba/Main.sav, 65536 bytes, verified"
+  mtype -i "$cart/sd.img" ::/torii/saves/Hello.gba/Main.sav >"$cart/hello.sav"
   head -c 4096 "$cart/hello.sav" | cmp -s - "$cart/b.bin" || fail "A didn't write the chip"
   ! leftovers || fail "a .tmp or .bak file is left"
   fsck.fat -n "$cart/sd.img" >/dev/null || fail "fsck.fat found errors"
@@ -516,15 +561,15 @@ nearly-full)
   boot $(nav_launch /Test.gba at=180) -f 600
   # Then the card loses Test.sav and fills up to exactly 128 KB free: just
   # room for the copy, through its progress dialog.
-  mdel -i "$cart/sd.img" ::/SAVER/Test.sav
+  mdel -i "$cart/sd.img" ::/torii/saves/Test.gba/Main.sav
   free=$(mdir -i "$cart/sd.img" ::/ | sed -n 's/^ *\([0-9 ]*\) bytes free.*/\1/p' | tr -d ' ')
   head -c $((free - 131072)) /dev/urandom >"$cart/filler.bin"
   mcopy -i "$cart/sd.img" "$cart/filler.bin" ::/FILLER.BIN
   # Power-on 4: A at "Save sav?"; the copy fills the card.
   boot -k 100:A -k 106:- -s 116:"$shots/4-progress.png" -f 400
-  logged 'save: "Save sav?" for /SAVER/Test.sav, 131072 bytes, save type 31: A, save'
+  logged 'save: "Save sav?" for /torii/saves/Test.gba/Main.sav, 131072 bytes, save type 31: A, save'
   grep -q "^kernel: screen ready: progress" "$cart/run.log" || fail "no progress dialog for the copy"
-  logged "save: wrote Test.sav, 131072 bytes, verified"
+  logged "save: wrote /torii/saves/Test.gba/Main.sav, 131072 bytes, verified"
   grep -q "^kernel error:" "$cart/run.log" && fail "errors: $(grep '^kernel error:' "$cart/run.log" | head -3)"
   grep -q "^kernel: nav: home ready" "$cart/run.log" || fail "no menu after the copy"
   [ "$(save_record)" = 4f4d525802 ] || fail "the save has $(save_record), expected the second boot record"
@@ -536,7 +581,7 @@ nearly-full)
   ;;
 
 *)
-  echo "usage: $0 copy|full|nearly-full|sanity" >&2
+  echo "usage: $0 copy|full|nearly-full|sanity|beside|rename-cut-beside|..." >&2
   exit 2
   ;;
 esac

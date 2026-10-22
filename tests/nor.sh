@@ -96,11 +96,11 @@ boot 2-hello $(nav_nor_launch_page 0) -w "launch: loading Hello.gba from NOR" -s
 grep -q 'mode game from NOR offset 000000$' "$cart/2-hello.log" || fail "Hello did not boot from NOR at 0"
 [ "$(hex_at "$cart/sram.bin" 0)" = 4f4d525801 ] || fail "Hello did not run from NOR (SRAM $(hex_at "$cart/sram.bin" 0))"
 
-# Power-on 3: confirm the save copy to SAVER/Hello.sav, then write World.gba
+# Power-on 3: confirm the save copy to its NOR save, then write World.gba
 # to NOR after Hello with SAVE TYPE FLASH 128K.
 # shellcheck disable=SC2046
 boot 3-write -k 100:A -k 104:- $(nav_launch /World.gba nor save=5 at=400) -s 3800:$shots/3-nor-list.png -f 3800
-[ "$(mtype -i "$cart/sd.img" ::/SAVER/Hello.sav | head -c 5 | od -A n -t x1 | tr -d ' \n')" = 4f4d525801 ] ||
+[ "$(mtype -i "$cart/sd.img" ::/torii/saves/torii/nor/Hello.gba/Main.sav | head -c 5 | od -A n -t x1 | tr -d ' \n')" = 4f4d525801 ] ||
   fail "Hello's NOR save was not written back to SD"
 nor_holds 0x20000 "$world" || fail "World.gba was not written to NOR at 0x20000"
 nor_holds 0 "$hello" || fail "writing World.gba changed Hello.gba"
@@ -118,8 +118,8 @@ rom_seen "$cart/4-world.log" "$world" 0xA0 0x7DFFF0 0x7E0000 0x83FFF0 || fail "W
 # 260) holds its first boot at 0x10000.
 # shellcheck disable=SC2046
 boot 5-hello -k 100:A -k 104:- $(nav_nor_launch 0 at=430) -s 800:$shots/5-hello.png -f 800
-[ "$(mtype -i "$cart/sd.img" ::/SAVER/World.sav | od -A n -t x1 -j $((0x10000)) -N 5 | tr -d ' \n')" = 4f4d525801 ] ||
-  fail "World did not run from NOR (no first boot in SAVER/World.sav)"
+[ "$(mtype -i "$cart/sd.img" ::/torii/saves/torii/nor/World.gba/Main.sav | od -A n -t x1 -j $((0x10000)) -N 5 | tr -d ' \n')" = 4f4d525801 ] ||
+  fail "World did not run from NOR (no first boot in its NOR save)"
 grep -q 'mode game from NOR offset 000000$' "$cart/5-hello.log" || fail "Hello did not boot from NOR again"
 [ "$(hex_at "$cart/sram.bin" 0)" = 4f4d525802 ] || fail "Hello's save did not come back on a NOR boot (SRAM $(hex_at "$cart/sram.bin" 0))"
 

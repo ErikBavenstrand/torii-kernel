@@ -29,15 +29,14 @@ enum action_how {
 	ACTION_DEFAULT = ACTION_HOWS,
 };
 
-// The save type a GBA game starts with: what its .mde file says (the type
+// The save type a GBA game starts with: what its record says (the type
 // it was last started with, AUTO if none), or a type to use and remember
 // (the v0.3 game menu's SAVE TYPE: 0 AUTO, 1 SRAM, 2 EEPROM 8K, 3 EEPROM
 // 512, 4 FLASH 64K, 5 FLASH 128K)
 #define ACTION_SAVE_KEEP 0xFF
 #define ACTION_SAVE_TYPES 6
 
-// A GBA game's own boot mode, kept with its save type (GBApatch.h's .mde
-// file) and set in Game info
+// A GBA game's own boot mode, kept with its save type (gamerec.h) and set in Game info
 enum {
 	ACTION_BOOT_DEFAULT,  // as Settings' GBA boot mode says (and any unknown value)
 	ACTION_BOOT_ADDONS,   // with the addons Settings turns on
@@ -56,7 +55,7 @@ enum {
 void action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset);
 
 // What a GBA game on the SD card starts with, read from the card: its save
-// type (what its .mde file says, 0 AUTO if none; ACTION_SAVE_TYPES for a GB,
+// type (what its record says, 0 AUTO if none; ACTION_SAVE_TYPES for a GB,
 // GBC or NES game or a NOR: entry), its own boot mode (ACTION_BOOT_*,
 // GBApatch.h: ACTION_BOOT_DEFAULT unless Game info set one) and its cheat file
 // (Check_cheat_file's handle, 0 none). Returns 0 if path isn't a game the
@@ -68,7 +67,8 @@ struct action_facts {
 };
 u32 action_game_facts(const char *path, struct action_facts *out);
 // Sets a GBA game's save type (0 AUTO, 1-5 a type: ACTION_SAVE_TYPES) in
-// its .mde file in /SAVER, which its next launch uses. 1 if written.
+// its record in its folder of saves (gamerec.h), which its next launch uses.
+// 1 if written.
 int action_set_save_type(const char *path, u32 save_type);
 // Sets a GBA game's own boot mode (ACTION_BOOT_*) in the same file, which A,
 // Play and Launch then use instead of Settings'. 1 if written.
@@ -84,7 +84,7 @@ enum {
 	ACTION_RENAME_TAKEN,       // another file in its folder has that name
 	ACTION_RENAME_BAD,         // a name the card can't take (\/:*?"<>|, too long), or a folder
 	ACTION_RENAME_HIDDEN,      // a name starting with '.', which the menu hides
-	ACTION_RENAME_SIDE_TAKEN,  // a save (or save type, save states, cheats, art) under the new
+	ACTION_RENAME_SIDE_TAKEN,  // a save (or its history, save states, cheats, art) under the new
 				   // name is there already, another game's: nothing renamed
 	ACTION_RENAME_PENDING,     // a save (its own, or one under the new name) still waits to be
 				   // copied from the cart: nothing renamed
@@ -93,19 +93,21 @@ enum {
 	ACTION_RENAME_PARTLY,      // renamed, but one of its other files or lists didn't follow (logged)
 };
 // Renames the file at path (a full path) to new_name in its folder (a file
-// name, the extension and so the console kept). A game's save, save type,
-// save states, cheats, patch cache and custom art move with it, and its
+// name, the extension and so the console kept). A game's saves (its folder
+// of slots and record, and its history, or the saves next to it), save states,
+// cheats, patch cache and custom art move with it, and its
 // custom name, Recent, the favourites and the library index follow it. It
 // asks nothing.
 u32 action_rename_file(const char *path, const char *new_name);
 // After ACTION_RENAME_SIDE_TAKEN: which of the game's files was in the way
 enum {
 	ACTION_FILE_SAVE,
-	ACTION_FILE_SAVE_TYPE,
+	ACTION_FILE_HISTORY,
 	ACTION_FILE_STATES,
 	ACTION_FILE_CHEATS,
 	ACTION_FILE_PATCH,  // never: a stale patch cache is replaced
 	ACTION_FILE_ART,
+	ACTION_FILE_BESIDE,  // a save next to a ROM of the new name
 	ACTION_FILES,
 };
 u32 action_rename_taken(void);

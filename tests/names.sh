@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Non-ASCII file names on FAT32 and exFAT: a save test ROM named in Japanese
 # or with accented Latin letters must launch, get its save written to
-# /SAVER under its own name, and get that save back on the next launch,
+# /torii/saves/<name>/Main.sav, and get that save back on the next launch,
 # the second time from the SD card page, which lists the name whole.
 # Usage: names.sh [fat32|exfat]
 # Runs inside the torii-emu container after `just build`,
@@ -41,10 +41,10 @@ run_case() {
 
   # Power-on 2: confirm the save prompt so the kernel writes the save.
   boot -k 100:A -k 106:- -s 300:"$shots/2-menu.png" -f 800
-  tools/sdimg.sh "$cart/sd.img" ls /SAVER >"$cart/saver.txt"
-  grep -qxF "$name.sav	131072" "$cart/saver.txt" ||
-    fail "$fs $label: /SAVER has $(tr '\n' ' ' <"$cart/saver.txt"), expected $name.sav"
-  tools/sdimg.sh "$cart/sd.img" get "/SAVER/$name.sav" "$cart/game.sav"
+  tools/sdimg.sh "$cart/sd.img" ls "/torii/saves/$name.gba" >"$cart/saver.txt"
+  grep -qxF "Main.sav	131072" "$cart/saver.txt" ||
+    fail "$fs $label: /torii/saves/$name.gba has $(tr '\n' ' ' <"$cart/saver.txt"), expected Main.sav"
+  tools/sdimg.sh "$cart/sd.img" get "/torii/saves/$name.gba/Main.sav" "$cart/game.sav"
   [ "$(hex_at "$cart/game.sav" $((0x10000)))" = 4f4d525801 ] ||
     fail "$fs $label: the save has $(hex_at "$cart/game.sav" $((0x10000))), expected the first boot record"
 

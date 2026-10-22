@@ -36,6 +36,7 @@
 #include "../ui/dialog.h"
 #include "../ui/ui.h"
 #include "rename.h"
+#include "../gamesave.h"
 
 // --- Look, px (spec.md's grid: title bar 0-18, content 20-143, hints at 147) ---
 #define TITLE_H 24    // the title bar's rectangle: whole tiles under its line
@@ -115,7 +116,7 @@ static struct {
 	char note[40];
 	char ask[GAME_NAME_MAX + 16];
 	char info[320];
-	char save[SAVE_NAME_MAX + 8];   // File info's save path
+	char save[GAMESAVE_PATH_BYTES];  // File info's current slot's save path
 	char back[MAX_path_len];        // the folder a failed open goes back to
 	u32 memo_hash[MEMO_FOLDERS];
 	u16 memo_cursor[MEMO_FOLDERS];
@@ -693,10 +694,11 @@ static void info(u32 i)
 			     d & 31, t >> 11, (t >> 5) & 63);
 	}
 	if (p < end && console < LIB_CONSOLES) {
-		memcpy(sd.save, "/SAVER/", 7);
-		save_name(sd.save + 7, sd.name, console);
-		if (f_stat(sd.save, &fileinfo) == FR_OK)
-			snprintf(p, (size_t)(end - p), "\n%s: %s", gl_sd_save, sd.save + 7);
+		struct gamerec rec;
+		gamesave_record_read(sd.full, &rec);
+		if (gamesave_current_path(sd.save, sizeof(sd.save), gamesave_mode(), sd.full, &rec) > 0 &&
+		    f_stat(sd.save, &fileinfo) == FR_OK)
+			snprintf(p, (size_t)(end - p), "\n%s: %s", gl_sd_save, rec.slot);
 		else
 			snprintf(p, (size_t)(end - p), "\n%s", gl_sd_no_save);
 	}
