@@ -25,49 +25,16 @@ Each release's details are in `CHANGELOG.md`; the planning, ticket reports and r
 - **v0.4.1 Art:** box art pre-converted on the PC with a cover cache, the No-Intro names database (`just names-update`), `just art-add` and `just art-scrape`.
 - **Cart-test follow-ups (C1–C5, D1–D2, before v0.4.0):** L/R unbound in game lists so L+A hard-resets; a floppy save mark; the GBA boot mode setting with a per-game override; Settings saved on each confirm; Start on faces a carousel item; romhacks keep their own names and art (CRC only); hotkeys renamed and the direct save/load patch removed; one drawn placeholder box per console.
 - **v0.4.2 Names on the cart:** new games get their CRC, No-Intro name and box art in the background with no PC step; the full art pack `/torii/art.pak` (`just art-pack`); crc.txt dates kept across a time-zone skew; the E1–E5 fixes (two settings copies, card read errors, rename cuts, the hotkey and cheat-parser fixes, Favourites and crc.txt speed, overlay clipping, dead code).
+- **v0.4.3 Before v0.5:** the background CRCs (a launch keeps a big game's partial CRC; new games read smallest first; names put in the index in place; the cursor follows its game), a new index redraws only the rows that changed, the rename's card walk shows a progress dialog, `art_scrape` follows libretro-thumbnails links, and the measured pool headroom. Accepted limits: a same-size file swapped in with an older date keeps its CRC (delete `crc.txt`). Cart-checked 2026-10-22.
 - **v0.4 cart test (2026-10):** the manual test of v0.4–v0.4.1 on the cart (boot and migration, carousel, lists, rename, SD and NOR pages, Settings, Info, in game, both themes) passed with no findings.
 
 ## v0.4.3 Before v0.5
 
-What v0.4.2 left open, checked against the code on 2026-10-22. Strike an item out when it's fixed or settled, then drop it at the next cleanup.
-
-### Background CRCs (F2's findings)
-
-- ~~A launch throws away a partial CRC, so a big game, and every game after it, may never get one.~~ Fixed (`d30126d`): a launch writes the CRC so far to `/torii/crc.part` (a line with its own check) and the next boot goes on from there if the file's size and date still match; the library's new games after Recent's are read smallest first, in five size classes (1, 4, 8 and 16 MB), so a big game no longer holds up the rest. The cut and the resume are tested by hand-stepping in `tests/kernel/test_names.c` (`test_names_partial`), with no frame counts.
-- ~~Every 32 names or 10 s the index is rebuilt by a full card walk.~~ Fixed (`9fc6f29`): the names go into the index in place, one per job step (`library_name_found`), and a single walk follows the run. The index is written again; its walk hash is stale until that walk, so a run stopped by a launch costs the next boot one rebuild.
-- ~~An unreadable game is read again, with its error logged, after every walk.~~ Fixed (`d30126d`): up to 64 paths are remembered until the next boot.
-- ~~The cursor's game follows a new sort on console pages only, and only across one new index.~~ Fixed (`9fc6f29`): the page keeps the cursor game's path as the cursor moves and finds it again in the rebuilt list, on console pages and Favourites (Recent keeps its rows; its order is the clock's).
-- ~~The in-place redraw of a new index can show mixed old and new rows.~~ Fixed (`fc5b3af`, `3380b2b`): `ui_list_refresh_changed` redraws only the on-screen rows whose item draws differently than when drawn (a hash of the item per slot), so most new indexes redraw none; `tests/names_db.sh` checks it.
-- ~~Left, unmeasured: what one name costs in the index and how much of the pool a run takes.~~ Measured on the host (`test_library_pool_headroom`): in 4,096 games with 44-letter file names the pool holds 424 KB of its 1,229 KB, and every database name in place takes it to 963 KB, so it never fills before the 4,096 cap. With 120-letter names it holds 1,047 KB already and fills after 640 names; the walk after the run rebuilds it, as designed.
-
-### Tools and tests
-
-- ~~IWRAM free is 4,604 bytes on main (CLAUDE.md records 5,980 at v0.4.1).~~ Settled: nothing took it. v0.4.1 had 4,604 free and v0.4 had 4,620; CLAUDE.md's 5,980 was mis-recorded. CLAUDE.md now gives v0.4.2's figures (IWRAM 4,596, EWRAM 18,140 before this work, 16,268 after); the margin over the stack estimate (2,640 bytes) is about 1.9 KB.
-- ~~No test drives Identify with a record a few hours off.~~ Added (`d6f22b1`): `test_names_identify` shifts Wars's record by an hour and checks Identify keeps the CRC and takes the file's date.
-- ~~The relist after a custom-art rename has no test.~~ Added (`d6f22b1`): `tests/boxart.sh` renames a custom-art game on the SD page and checks the art moves, is listed again and shows under the new name.
-- ~~names-update recomputes the CRC of a file dated before 1980 on every run.~~ Fixed (`4bd2627`): such a record, and one the cart dated 0, holds while its file is older than crc.txt.
-- ~~art-pack's downloaded counter can read low under threads.~~ Fixed (`4bd2627`): counted under the fetcher's lock.
-
-### Decisions
-
-The user accepted every decision the v0.4 build made on their behalf (2026-10-21); [docs/design/v0.4/decisions.md](../design/v0.4/decisions.md) records them. Change any of them as a normal roadmap item.
-
-F1–F3 (new games named and boxed on the cart) made these; the user confirmed F2's on 2026-10-22:
-
-- F1 (`e04827c`): the kernel keeps a CRC whose date is 1–14 whole hours off the file's, minutes and seconds equal, for every record (nothing marks the tool's); a different same-size file with such a date keeps the old CRC. A kernel before v0.4.2 forgets tool-written dates.
-- F2 (confirmed 2026-10-22, built in `d30126d` and `9fc6f29`): a card with names.db (or art) but no crc.txt has every game new, so the background identifies the whole library across boots; the queue is Recent's games, then the rest smallest first, and a big game keeps its partial CRC across launches; a new name sorts the index again, on every list, with the cursor kept on its game.
-- F3 (`b3abac5`, `8b4a77f`): the art pack's index takes 128 KB of PSRAM after `PSRAM_NAMES_TEXT`, out of the 384 KB left for v0.9's language tables; NES art is fetched when the card has NES games, else only with `--console NES`; a stopped run replaces a good pack with what came in (a rerun completes it from the cache); fast seek (`FF_USE_FASTSEEK`) is on for all of FatFs (4 bytes a FIL); fixed 3,248-byte records; duplicate covers are found by identical converted bytes; pack covers appear once the link map is built, a few seconds after boot on a small-cluster FAT32 card.
-
-### Left from earlier work
-
-- ~~The rename's card walk blocks the keyboard for its length.~~ Settled (`fc5b3af`, `3380b2b`): a walk past 0.33 s shows a "Checking saves" progress dialog (the user waits for the result either way, so the walk stays synchronous); `tests/saves.sh rename-walk`. Its real cost on a cart is a measurement for the cart run.
-- ~~A same-size file swapped in with an older date keeps the old CRC.~~ Accepted: catching it means reading every file again on each boot. The README says to delete `/torii/crc.txt`.
-- ~~The Settings held-scroll golden hashes every frame.~~ Settled: it checks exactly what it is for and passes unchanged; `just shots-update settings` accepts an intended Settings change.
-- ~~9 cached art-pack pictures weren't PNGs: those games get no cover.~~ Fixed: libretro-thumbnails keeps some pictures as links, and the server sends the target's name as text; `art_scrape` now follows one (a link to nothing is a miss). Rerun `just art-pack` to fetch them (`test_alias_is_followed`). The pack's conversion (pure-Python `art.py`, about 29 s on 14 cores) is its limit past 256 requests at a time.
+Released (2026-10-22); its details are in `CHANGELOG.md`. What stays open for later cart runs:
 
 ### Open questions and cart checks
 
-The release gate for v0.4.3: run these on a cart after the fixes above and before the tag (decided 2026-10-22). The measurements are noted while testing; none blocks code.
+v0.4.3's cart run passed (the user's word, 2026-10-22). What it didn't cover or measure stays here for the next one; none blocks code.
 
 - **Untried on a cart since v0.2.2** (the v0.4 cart test covered sleep, cheats, a NOR write and delete, Back to menu and an in-game save): save states, DEBUG, GB/GBC, NES, rumble with a game, the EEPROM probe's verdict, the clock against real time (all in the release checklist).
 - **Unmeasured on a cart:** the ROM copy rate (`PROGRESS_COPY_RATE`); the walk of a full card; SD folder open time (0.2 s per 300 files emulated) and the 251k-cycle frame on a folder of 1,024+ subfolders; covers from an art folder of thousands of files; Identify (about 1.6 s per MB, estimated) and crc.txt's write steps; About's first free-space read on exFAT; `CHIP_ERASE_FRAMES` from a timed Format all.

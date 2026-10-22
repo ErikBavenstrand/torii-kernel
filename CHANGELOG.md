@@ -4,7 +4,7 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.4.3
 
 - **Changed:** a game list redraws only the rows whose text, marks or detail
   changed when the index changes under it, instead of every visible row
