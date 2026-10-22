@@ -24,17 +24,19 @@ stored once, however many CRCs (regions, revisions, clones) share it, in
 /torii/art.pak (source/artpack.h has the format; tools/artpack.py writes it).
 The pack is written whole or not at all: a temporary file, then a rename.
 
-Fetching is polite: --jobs requests at a time (default 4), starting at
-most one each --delay seconds (default 0.25), with a User-Agent; a server
-error is retried, and a 429 or an unreachable server stops fetching. The
-pictures and their conversions are cached in dist/art-cache (shared with
-`just art-scrape`; git-ignored), and the names the server doesn't have are
-remembered there, so a second run downloads only what is new, and a run
-that was stopped (Ctrl-C while fetching, a 429, a lost connection) picks up where it left
-off. A stopped run still writes a pack of what it has; run it again to
-finish. --offline uses only the caches. The first run makes about 8,000
-requests for GBA, GBC and GB (some 40 minutes) and writes a pack of about
-20 MB.
+Fetching is fast: --jobs requests at a time (default 256), each thread
+keeping its connection alive, and --delay seconds between request starts
+(default 0); a server error is retried, and a 429 or an unreachable server
+stops fetching. Each picture is converted as it arrives, on every core
+(--workers). The pictures and their conversions are cached in
+dist/art-cache (shared with `just art-scrape`; git-ignored), and the names
+the server doesn't have are remembered there, so a second run downloads
+only what is new, and a run that was stopped (Ctrl-C while fetching, a
+429, a lost connection) picks up where it left off. A stopped run still
+writes a pack of what it has; run it again to finish. --offline uses only
+the caches. The first run makes about 9,700 requests for GBA, GBC and GB
+and writes a pack of about 15 MB: about 35 s on a 14-core Mac (2026-10-22;
+past 256 requests at a time the conversion is the limit).
 
 Box art has no licence grant: it belongs to the games' publishers and the
 libretro-thumbnails contributors. This tool fetches it on your PC, at your
@@ -45,9 +47,13 @@ publish it, nor the cache.
 import argparse
 import concurrent.futures
 import hashlib
+import http.client
+import os
 import sys
 import threading
 import time
+import urllib.error
+import urllib.parse
 from pathlib import Path
 
 from PIL import Image
@@ -60,8 +66,11 @@ import artpack
 import names_db
 
 PACK = Path("torii") / "art.pak"
-JOBS = 4
-DELAY = 0.25
+JOBS = 256
+JOBS_MAX = 512
+DELAY = 0.0
+# Processes converting pictures (art.py is pure Python and CPU-bound)
+WORKERS = os.cpu_count() or 4
 LABELS = art_scrape.LABELS
 NES = LABELS.index("NES")
 DEFAULT = [LABELS.index(c) for c in ("GBA", "GBC", "GB")]
@@ -76,17 +85,64 @@ class PackFetcher(art_scrape.Fetcher):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.lock = threading.Lock()
+        self.local = threading.local()
+        self.on_fetched = None  # called with (system, name) as a picture comes in
 
     def request(self, url):
+        if self.delay > 0:
+            with self.lock:
+                wait = self.last + self.delay - time.monotonic()
+                if wait > 0:
+                    time.sleep(wait)
+                self.last = time.monotonic()
         with self.lock:
-            wait = self.last + self.delay - time.monotonic()
-            if wait > 0:
-                time.sleep(wait)
-            self.last = time.monotonic()
             self.requests += 1
-        req = art_scrape.urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-        with art_scrape.urllib.request.urlopen(req, timeout=art_scrape.TIMEOUT) as r:
-            return r.read()
+        # One kept-alive connection a thread: a new TLS handshake for each
+        # of 8,000 small pictures costs more than the pictures
+        u = urllib.parse.urlsplit(url)
+        conns = self.local.__dict__.setdefault("conns", {})
+        key = (u.scheme, u.netloc)
+        for attempt in range(2):
+            conn = conns.get(key)
+            if conn is None:
+                cls = (
+                    http.client.HTTPSConnection
+                    if u.scheme == "https"
+                    else http.client.HTTPConnection
+                )
+                conn = conns[key] = cls(u.netloc, timeout=art_scrape.TIMEOUT)
+            try:
+                conn.request(
+                    "GET",
+                    u.path + (f"?{u.query}" if u.query else ""),
+                    headers={"User-Agent": USER_AGENT, "Connection": "keep-alive"},
+                )
+                r = conn.getresponse()
+                data = r.read()
+            except (http.client.HTTPException, OSError):
+                # A connection the server closed between requests: once more
+                # on a new one
+                conn.close()
+                del conns[key]
+                if attempt:
+                    raise
+                continue
+            if r.will_close:
+                conn.close()
+                del conns[key]
+            if 300 <= r.status < 400 and r.getheader("Location"):
+                req = art_scrape.urllib.request.Request(
+                    urllib.parse.urljoin(url, r.getheader("Location")),
+                    headers={"User-Agent": USER_AGENT},
+                )
+                with art_scrape.urllib.request.urlopen(
+                    req, timeout=art_scrape.TIMEOUT
+                ) as rr:
+                    return rr.read()
+            if r.status >= 400:
+                raise urllib.error.HTTPError(url, r.status, r.reason, r.headers, None)
+            return data
+        raise OSError("unreachable")
 
     def miss(self, system, name):
         with self.lock:
@@ -172,26 +228,61 @@ def picks_by_crc(tables, consoles):
     return out
 
 
-def converted(cache, fetcher, system, name):
-    """The cover of a cached picture, converted once and cached; None if it
-    isn't a picture art.py reads: it is dropped and remembered as a miss, so
-    later runs try the next name (--retry-missing asks for it again)."""
-    png = fetcher.path(system, name)
-    out = Path(cache) / f"pack-{CONVERTER}" / png.parent.name / (png.stem + ".bin")
+def cover_path(cache, png):
+    return Path(cache) / f"pack-{CONVERTER}" / png.parent.name / (png.stem + ".bin")
+
+
+def convert_one(png, out):
+    """In a worker process: a cached picture's cover, converted once and
+    cached; (cover, None), or (None, why) if it isn't a picture art.py reads."""
+    out = Path(out)
     if out.is_file():
-        return out.read_bytes()
+        return out.read_bytes(), None
     try:
-        data = art.convert(png)
+        data = art.convert(Path(png))
     except (art.ArtError, OSError, ValueError, Image.DecompressionBombError) as e:
-        print(
-            f"art-pack: {png.name}: not a picture art.py reads ({e})", file=sys.stderr
-        )
-        fetcher.forget(system, name)
-        fetcher.miss(system, name)
-        return None
+        return None, str(e)
     out.parent.mkdir(parents=True, exist_ok=True)
     art_scrape.write_art(out, data)
-    return data
+    return data, None
+
+
+class Converter:
+    """Covers converted on every core, each started as its picture is
+    cached (while the rest download)."""
+
+    def __init__(self, cache, fetcher, workers):
+        self.cache, self.fetcher = cache, fetcher
+        self.pool = concurrent.futures.ProcessPoolExecutor(workers)
+        self.futures = {}
+        self.lock = threading.Lock()
+
+    def submit(self, system, name):
+        with self.lock:
+            if (system, name) not in self.futures:
+                png = self.fetcher.path(system, name)
+                self.futures[(system, name)] = self.pool.submit(
+                    convert_one, str(png), str(cover_path(self.cache, png))
+                )
+
+    def result(self, system, name):
+        """The cover, None if it didn't convert: then the picture is dropped
+        and remembered as a miss, so later runs try the next name
+        (--retry-missing asks for it again)."""
+        self.submit(system, name)
+        data, why = self.futures[(system, name)].result()
+        if data is None:
+            png = self.fetcher.path(system, name)
+            print(
+                f"art-pack: {png.name}: not a picture art.py reads ({why})",
+                file=sys.stderr,
+            )
+            self.fetcher.forget(system, name)
+            self.fetcher.miss(system, name)
+        return data
+
+    def close(self):
+        self.pool.shutdown(wait=True, cancel_futures=True)
 
 
 def fetch_round(fetcher, wanted, jobs):
@@ -203,10 +294,16 @@ def fetch_round(fetcher, wanted, jobs):
     new = 0
     pool = concurrent.futures.ThreadPoolExecutor(jobs)
     try:
-        futures = [pool.submit(fetcher.get, s, n) for s, n in wanted]
+        futures = []
+        for s, n in wanted:
+            f = pool.submit(fetcher.get, s, n)
+            f.key = (s, n)
+            futures.append(f)
         for f in concurrent.futures.as_completed(futures):
             if f.result() is not None:
                 new += 1
+                if fetcher.on_fetched:
+                    fetcher.on_fetched(f.key)
             progress.step(f", {fetcher.downloaded} new" if fetcher.downloaded else "")
             if fetcher.stopped:
                 break
@@ -253,6 +350,16 @@ def pack(args):
     mapping = {}  # crc: its cover
     covers = {}  # (system, name): its cover, None if it didn't convert
     pending = {crc: tries for crc, tries in picks.items() if tries}
+    converter = Converter(args.cache, fetcher, args.workers)
+    fetcher.on_fetched = lambda key: converter.submit(*key)
+    try:
+        convert_rounds(args, fetcher, converter, pending, covers, mapping)
+    finally:
+        converter.close()
+    return finish(args, sd, consoles, tables, picks, fetcher, mapping, version, started)
+
+
+def convert_rounds(args, fetcher, converter, pending, covers, mapping):
     while pending:
         for crc, tries in list(pending.items()):
             left = [
@@ -276,9 +383,11 @@ def pack(args):
                 if t[0] not in covers and fetcher.known(*t[0]) == "cached"
             }
         )
+        for key in fresh:
+            converter.submit(*key)
         progress = Progress("converting", len(fresh))
         for key in fresh:
-            covers[key] = converted(args.cache, fetcher, *key)
+            covers[key] = converter.result(*key)
             progress.step()
         progress.end()
         for crc, tries in list(pending.items()):
@@ -291,6 +400,8 @@ def pack(args):
             else:
                 del pending[crc]
 
+
+def finish(args, sd, consoles, tables, picks, fetcher, mapping, version, started):
     if not mapping:
         raise art_scrape.ScrapeError(
             "no box art found: nothing to pack (offline with an empty cache?)"
@@ -371,9 +482,17 @@ def main(argv):
         default=art_scrape.RETRY_WAIT,
         help=argparse.SUPPRESS,
     )
+    p.add_argument(
+        "--workers",
+        type=int,
+        default=WORKERS,
+        help=f"processes converting pictures (default {WORKERS}, the cores)",
+    )
     args = p.parse_args(argv)
-    if not 1 <= args.jobs <= 8:
-        p.error("--jobs takes 1 to 8")
+    if not 1 <= args.jobs <= JOBS_MAX:
+        p.error(f"--jobs takes 1 to {JOBS_MAX}")
+    if args.workers < 1:
+        p.error("--workers takes 1 or more")
     try:
         return pack(args)
     except (art_scrape.ScrapeError, names_db.NamesError, artpack.PackError) as e:

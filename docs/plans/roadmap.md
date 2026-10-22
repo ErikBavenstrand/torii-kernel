@@ -93,7 +93,7 @@ Everything the v0.2–v0.4.1 work left open, checked against the code on 2026-10
 - No test drives Identify (`names_store.c`, the identify step) with a record a few hours off; it shares the walk's check.
 - names-update recomputes the CRC of a file dated before 1980 on every run.
 - ~~A `/torii/art.pak` in more than 62 pieces seeks the slow way, many frames a cover on small clusters.~~ Fixed (`3e6f3dd`): a seek with no map walks 16 clusters a step; the map holds 254 pieces. The relist after a custom-art rename (`boxart_forget`) has no test. art-pack's downloaded counter can read low under threads.
-- First real `just art-pack` run (2026-10-21, `--jobs 8 --delay 0.02`): 9,713 requests in 11m42s (6 min fetching, then 5 min converting on one core: parallel conversion would halve it); 4,606 covers for 5,897 of 8,051 CRCs, 15.0 MB (GBA 87%, GB 69%, GBC 56%). 9 cached pictures weren't PNGs (libretro aliases served as text?): those games get no cover. `--jobs` stops at 8.
+- First real `just art-pack` run (2026-10-21, `--jobs 8 --delay 0.02`): 9,713 requests in 11m42s (6 min fetching, then 5 min converting on one core: parallel conversion would halve it); 4,606 covers for 5,897 of 8,051 CRCs, 15.0 MB (GBA 87%, GB 69%, GBC 56%). 9 cached pictures weren't PNGs (libretro aliases served as text?): those games get no cover. Since then (`art_pack.py`, 2026-10-22): kept-alive connections, 256 requests at a time (cap 512) and conversion on every core as pictures arrive take the first run from 11m42s to 35 s; past 256 the conversion (pure-Python `art.py`, about 29 s on 14 cores) is the limit, and libretro's server never refused (no 429 at 512).
 
 ### Decisions
 
