@@ -1,0 +1,16 @@
+# New slot, the name prompt (source/screens/slot_flow.c): the on-screen
+# keyboard titled "New slot", empty and then with "qq" typed (A types the key
+# under the selection, which starts on q).
+#! sd-file /Hello.gba 0x20000 tests/roms/hello/hello.gba
+#! sd-file "/torii/saves/Hello.gba/Main.sav" 0x2000 /dev/null
+#! sd-file "/torii/saves/Hello.gba/Boss Rush.sav" 0x10000 /dev/null
+#! sd-file "/torii/saves/Hello.gba/Pacifist.sav" 0x2000 /dev/null
+#! sd-file "/torii/saves/Hello.gba/game.ini" 0 tests/shots/data/slot-picker-game.ini
+-w "nav: home ready"
+-P "@8:nav_test_path:/Hello.gba" -p @8:nav_test_action:0x7E000001
+-w "screen ready: slot-picker"
+-k @20:DOWN -k @24:- -k @28:DOWN -k @32:- -k @40:A -k @44:-
+-w "screen ready: rename"
+-s @30:empty.png
+-k @10:A -k @14:- -k @20:A -k @24:-
+-s @30:typed.png

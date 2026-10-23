@@ -37,9 +37,7 @@ boot-copy/frames 4-4 2B69C11B7593B491
 boot-copy/frames 5-5 9EA60B8E89BE0F29
 boot-copy/frames 6-6 0F63736682A7D32D
 boot-progress/screen 985A0C30AC9AC713
-boot-progress/frames 0-1 818B02E74B016B0D
-boot-progress/frames 2-2 DF83FD5B30B3838E
-boot-progress/frames 3-3 ED1577E2D566A2E4
+boot-progress/frames 0-3 818B02E74B016B0D
 boot-progress/frames 4-7 7C573B18E65FE325
 boot-progress/frames 8-12 985A0C30AC9AC713
 boot-progress/frames 13-28 9D5EA05F12ADBBF3
@@ -539,6 +537,13 @@ settings-dark/frames 37-37 E10CE0FC5D8CEBD2
 settings-dark/frames 38-38 560AFB3B7559E375
 settings-dark/frames 39-45 AEF9F8EE6A2391F5
 settings-start-hidden/row C0D0016A8EA4EDFE
+slot-new-choice/choice FF61BAD9F73A1DBD
+slot-new-choice/copy B1A364A6FBA5CA2A
+slot-new-name/empty 6009A327E24D29AC
+slot-new-name/typed 6009A327E24D29AC
+slot-picker/picker 1FC1BE4474F0F8AB
+slot-picker/picker-down 40D9A429EC24447F
+slot-picker-light/picker A25449D0864C45A2
 ui-dialog/closed 942FEA8E68027B47
 ui-dialog/dialog 1EC3EDCC05C5D114
 ui-dialog/frames 0-0 942FEA8E68027B47

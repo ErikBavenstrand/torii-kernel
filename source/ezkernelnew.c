@@ -1899,6 +1899,23 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 	}
 	return 0;
 }  //---------------------------------------------------------------------------------
+u32 Game_save_bytes(const struct game_pick *g)
+{
+	u8 header[0x20];
+	memset(header, 0, sizeof(header));
+	f_chdir(currentpath);
+	if (f_open(&gfile, g->name, FA_READ) != FR_OK)
+		return 0;
+	UINT got = 0;
+	f_lseek(&gfile, 0xA0);
+	if (f_read(&gfile, header, sizeof(header), &got) != FR_OK || got != sizeof(header))
+		memset(header, 0, sizeof(header));
+	u32 size = f_size(&gfile);
+	f_close(&gfile);
+	memcpy(GAMECODE, header + 0xC, 4);  // as Game_boot reads it
+	return Get_savefilesize(Get_saveMODE(g->save_num, size));
+}
+//---------------------------------------------------------------------------------
 u8 Game_launch(struct game_pick *g, u32 menu_line, u32 key_L)
 {
 	// CLEAN BOOT and BOOT WITH ADDON load the game's save into cart SRAM

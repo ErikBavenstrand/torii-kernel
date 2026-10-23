@@ -90,6 +90,7 @@ char *gl_hint_set EWRAM_BSS;
 
 const struct lang_games *gl_games EWRAM_BSS;
 const struct lang_rename *gl_rename EWRAM_BSS;
+const struct lang_slots *gl_slots EWRAM_BSS;
 
 // Popups and confirmations (ui.h)
 char *gl_pop_choose EWRAM_BSS;
@@ -565,6 +566,25 @@ static const struct lang_games en_games = {
 
 // The rename keyboard: its keys, and why OK can't keep a name (one line
 // each in the hint area, 38 characters at most)
+static const struct lang_slots en_slots = {
+	.picker_title = "Save slot",
+	.new_row = "New slot...",
+	.hint_play = "play",
+	.hint_rename = "rename",
+	.hint_cancel = "cancel",
+	.new_title = "New slot",
+	.rename_title = "Rename slot",
+	.choice_title = "New slot",
+	.blank = "Blank",
+	.fresh = "new",
+	.bad = "Type a name with letters.",
+	.full = "A game has 16 slots at most.",
+	.failed = "The card didn't take it.",
+	.taken = "That name is taken.",
+	.path = "That name makes the path too long.",
+	.gone = "That slot isn't there any more.",
+};
+
 static const struct lang_rename en_rename = {
 	.title = "Rename",
 	.hint_type = "type",
@@ -748,6 +768,7 @@ void LoadEnglish(void)
 	gl_sd_no_save = (char *)en_sd_no_save;
 	gl_games = &en_games;
 	gl_rename = &en_rename;
+	gl_slots = &en_slots;
 }
 //---------------------------------------------------------------------------------
 // The languages Settings offers. A new language adds its strings and a
