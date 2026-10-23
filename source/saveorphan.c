@@ -201,11 +201,14 @@ static void add_orphan(struct orphan_scan *s, const char *rom, u32 slots, u32 by
 #define GAME_FILES 1
 #define GAME_FOLDERS 2
 
-static int walk(char *path, struct so_sum *sum, struct orphan_scan *s, orphan_progress_fn progress, void *ctx,
-		u32 phase)
+// Walks path's tree into sum. s (the saves' walk) lists the orphans; hist
+// (the history's walk, after it) adds each orphan's history folder's bytes to
+// it, in the same pass
+static int walk(char *path, struct so_sum *sum, struct orphan_scan *s, struct orphan_scan *hist,
+		orphan_progress_fn progress, void *ctx, u32 phase)
 {
 	u32 len = (u32)strlen(path), level = 0;
-	u32 base = s ? (u32)strlen(SAVESLOT_SAVES_DIR) : 0;
+	u32 base = s ? (u32)strlen(SAVESLOT_SAVES_DIR) : (u32)strlen(SAVESLOT_BACKUPS_DIR);
 	FRESULT r = f_opendir(&W->dirs[0], path);
 	if (r == FR_NO_PATH || r == FR_NO_FILE)
 		return ORPHAN_OK;
@@ -236,6 +239,15 @@ static int walk(char *path, struct so_sum *sum, struct orphan_scan *s, orphan_pr
 					else if (st != FR_OK)
 						sum->partial = 1;
 				}
+			}
+			if (hist && level > 0) {
+				// A folder's whole tree: its files and its folders'
+				for (u32 i = 0; i < hist->count; i++)
+					if (!strcmp(saveorphan_path(hist, i), path + base)) {
+						hist->bytes[i] += W->bytes[level];
+						hist->hist[i] += W->bytes[level];
+					}
+				W->bytes[level - 1] += W->bytes[level];
 			}
 			if (level == 0)
 				return ORPHAN_OK;
@@ -275,6 +287,8 @@ static int walk(char *path, struct so_sum *sum, struct orphan_scan *s, orphan_pr
 		u32 size = (u32)W->fno.fsize;
 		sum->files++;
 		sum->bytes += size;
+		if (hist)
+			W->bytes[level] += size;
 		if (s) {
 			W->bytes[level] += size;
 			if (is_sav(W->fno.fname)) {
@@ -296,7 +310,7 @@ int saveorphan_scan(struct orphan_scan *s, orphan_progress_fn progress, void *ct
 
 	memset(&sum, 0, sizeof(sum));
 	so_snprintf(path, SO_PATH, "%s", SAVESLOT_SAVES_DIR);
-	int r = walk(path, &sum, s, progress, ctx, 0);
+	int r = walk(path, &sum, s, NULL, progress, ctx, 0);
 	if (r)
 		worst = r;
 	s->saves_bytes = sum.bytes;
@@ -305,7 +319,7 @@ int saveorphan_scan(struct orphan_scan *s, orphan_progress_fn progress, void *ct
 
 	memset(&sum, 0, sizeof(sum));
 	so_snprintf(path, SO_PATH, "%s", SAVESLOT_BACKUPS_DIR);
-	r = walk(path, &sum, NULL, progress, ctx, 1);
+	r = walk(path, &sum, NULL, s, progress, ctx, 1);
 	if (r)
 		worst = r;
 	s->backups_bytes = sum.bytes;
@@ -314,22 +328,13 @@ int saveorphan_scan(struct orphan_scan *s, orphan_progress_fn progress, void *ct
 
 	memset(&sum, 0, sizeof(sum));
 	so_snprintf(path, SO_PATH, "%s", SAVESLOT_TRASH_DIR);
-	r = walk(path, &sum, NULL, progress, ctx, 2);
+	r = walk(path, &sum, NULL, NULL, progress, ctx, 2);
 	if (r)
 		worst = r;
 	s->trash_bytes = sum.bytes;
 	s->trash_files = sum.files;
 	partial |= sum.partial;
 
-	// The orphans' history
-	for (u32 i = 0; i < s->count; i++) {
-		memset(&sum, 0, sizeof(sum));
-		if (so_snprintf(path, SO_PATH, "%s%s", SAVESLOT_BACKUPS_DIR, saveorphan_path(s, i)) >= SO_PATH)
-			continue;
-		if (walk(path, &sum, NULL, progress, ctx, 3) == ORPHAN_OK)
-			s->bytes[i] += sum.bytes;
-		partial |= sum.partial;
-	}
 	s->partial = partial;
 	tlog("orphan: scan: %lu games, %lu orphans (%lu more), saves %lu, history %lu, trash %lu bytes%s",
 	     (unsigned long)s->games, (unsigned long)s->count, (unsigned long)s->more, (unsigned long)s->saves_bytes,

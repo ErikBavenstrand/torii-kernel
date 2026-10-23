@@ -68,14 +68,15 @@ struct orphan_scan {
 	u16 off[ORPHAN_MAX];  // the ROM path in pool
 	u16 slots[ORPHAN_MAX];  // slot files (.sav)
 	u32 bytes[ORPHAN_MAX];  // its saves and history, file bytes
+	u32 hist[ORPHAN_MAX];  // of those, its history's
 	u16 pool_used;
 	char pool[ORPHAN_POOL];
 };
 
-// Called now and then during a scan: phase 0 the saves, 1 the history, 2 the
-// trash, 3 the orphans' history (ORPHAN_PHASES), with the entries read so far
-// in the phase. Dialogs may run in it.
-#define ORPHAN_PHASES 4
+// Called now and then during a scan: phase 0 the saves, 1 the history (and
+// with it the orphans'), 2 the trash (ORPHAN_PHASES), with the entries read
+// so far in the phase. Dialogs may run in it.
+#define ORPHAN_PHASES 3
 typedef void (*orphan_progress_fn)(void *ctx, u32 phase, u32 entries);
 
 // Walks /torii/saves, /torii/backups and /torii/trash (read only: f_readdir

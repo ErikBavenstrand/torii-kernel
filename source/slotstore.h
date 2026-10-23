@@ -65,7 +65,8 @@ enum {
 
 struct slotstore_slot {
 	char name[SAVESLOT_NAME_BYTES];
-	u32 size;  // the file's bytes
+	u32 size;   // the file's bytes
+	u32 saved;  // when it was last written, unix time (its FAT date); 0 if the clock wasn't set
 };
 
 // A game's slots, from its .sav files (in its folder under /torii/saves). Files whose name is
@@ -90,6 +91,10 @@ int slotstore_set_current(const char *rom_path, const char *slot);
 // created as needed. SLOTSTORE_NAME, SLOTSTORE_TAKEN (also a name differing
 // only in case), SLOTSTORE_NO_SLOT (copy_from), SLOTSTORE_PATH, SLOTSTORE_CARD.
 int slotstore_create(const char *rom_path, const char *name, const char *copy_from, u32 blank_size, char *clean_out);
+// A new slot named name, a copy of the .sav at path (any file on the card),
+// which must be want bytes (slotstore_size_ok, as an import): an import that
+// overwrites nothing. SLOTSTORE_NO_FILE, SLOTSTORE_SIZE, and slotstore_create's.
+int slotstore_create_file(const char *rom_path, const char *name, const char *path, u32 want, char *clean_out);
 // A copy of slot named name: slotstore_create with copy_from = slot.
 int slotstore_duplicate(const char *rom_path, const char *slot, const char *name, char *clean_out);
 
@@ -117,6 +122,7 @@ struct slotstore_version {
 	u32 n;                      // the counter; higher is newer, whatever the clock says
 	struct saveslot_stamp when;  // the stamp in its name (all zero: the clock wasn't set)
 	u32 size;
+	u8 kept;  // a kept backup (saveslot_backup_kept): a save type change's, never pruned
 };
 
 // The versions of slot, newest first (by n), at most max of them. Returns how

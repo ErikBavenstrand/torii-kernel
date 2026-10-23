@@ -260,7 +260,7 @@ converged() {
   retire)
     if is "$l" torii/saves/G/Game.gba/Main.sav Z 8192; then :; else
       no "$l" torii/saves/G/Game.gba/Main.sav || fail "$where: Main.sav is damaged"
-      grep -qP '^torii/backups/G/Game.gba/Main/0002-[0-9-]+\.sav\t8192\tZ$' <<<"$l" || fail "$where: the old save isn't in the history"
+      grep -qP '^torii/backups/G/Game.gba/Main/0002-[0-9]{8}-[0-9]{6}-kept\.sav\t8192\tZ$' <<<"$l" || fail "$where: the old save isn't in the history"
     fi
     ;;
   purge)

@@ -100,13 +100,20 @@ u32 saveslot_max_rom_path_for(u32 limit, u32 slot_len);
 
 // "YYYYMMDD-HHMMSS" plus the NUL
 #define SAVESLOT_STAMP_BYTES 16
-// A backup's name: <n>-<YYYYMMDD-HHMMSS>.sav, n at least 4 digits, up to 9
-#define SAVESLOT_BACKUP_NAME_BYTES 32
+// A backup's name: <n>-<YYYYMMDD-HHMMSS>.sav, n at least 4 digits, up to 9;
+// a kept one (saveslot_backup_kept) ends -kept.sav
+#define SAVESLOT_BACKUP_NAME_BYTES 40
+#define SAVESLOT_KEPT_MARK "-kept"
 #define SAVESLOT_COUNTER_MAX 999999999u
 
 // Writes the backup's name for counter n (1 to SAVESLOT_COUNTER_MAX) into out
 // (SAVESLOT_BACKUP_NAME_BYTES bytes) and returns its length, or 0 for a bad n.
 u32 saveslot_backup_name(char *out, u32 n, const struct saveslot_stamp *when);
+// The same for a kept backup: one no pruning removes or counts (the save a
+// save-type change set aside, which is the only copy of that game's save).
+u32 saveslot_backup_name_kept(char *out, u32 n, const struct saveslot_stamp *when);
+// 1 if name (a valid backup name) is a kept one
+int saveslot_backup_kept(const char *name);
 // Reads a backup's name into *n and *when. 0 if name is malformed (wrong
 // shape, n 0 or past the maximum, an impossible date): such a file is not
 // part of the history, and nothing prunes or reuses it.
@@ -115,7 +122,8 @@ int saveslot_parse_backup_name(const char *name, u32 *n, struct saveslot_stamp *
 // malformed ignored), 1 for none; 0 if the counter has run out.
 u32 saveslot_next_counter(const char *const *names, u32 count);
 // Which of names to delete to keep the newest keep backups. Writes their
-// indexes to out (room for count), oldest first, and returns how many. Order
+// indexes to out (room for count), oldest first, and returns how many. Kept
+// backups are neither counted nor ever chosen. Order
 // is by n alone (ties, which only a copied file makes, by name), never by
 // the stamp.
 u32 saveslot_prune(const char *const *names, u32 count, u32 keep, u32 *out);
@@ -124,6 +132,20 @@ u32 saveslot_prune(const char *const *names, u32 count, u32 keep, u32 *out);
 // SAVESLOT_TRASH_DAYS at now. An unknown date (all zero), or now unknown, or
 // now before then, never expires: a wrong clock must not empty the trash.
 int saveslot_trash_expired(const struct saveslot_stamp *then, const struct saveslot_stamp *now);
+
+// The years a clock may read and be trusted with the trash: outside them (an
+// unset clock reads year 0; a flat battery or a bad set can read 2099)
+// nothing is purged or re-dated.
+#define SAVESLOT_CLOCK_FIRST_YEAR 2026
+#define SAVESLOT_CLOCK_LAST_YEAR 2060
+int saveslot_clock_plausible(const struct saveslot_stamp *now);
+// What the purge does with a trash folder dated then, at now:
+enum saveslot_trash_state {
+	SAVESLOT_TRASH_KEEP,    // not yet 30 days old, or now can't be trusted
+	SAVESLOT_TRASH_PURGE,   // older than SAVESLOT_TRASH_DAYS
+	SAVESLOT_TRASH_REDATE,  // dated by an unset clock or one ahead of now: it takes now's date
+};
+enum saveslot_trash_state saveslot_trash_state(const struct saveslot_stamp *then, const struct saveslot_stamp *now);
 
 /* ---- Rename journal ---- */
 

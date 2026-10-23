@@ -219,6 +219,26 @@ void test_saveslot_backup_names(void)
 	CHECK(back.year == 2026 && back.month == 10 && back.day == 22 && back.hour == 13 && back.min == 4 &&
 	      back.sec == 59);
 
+	// A kept backup: the mark before .sav; it parses, and pruning skips it
+	CHECK_EQ(saveslot_backup_name_kept(out, 7, &when), 29);
+	CHECK(strcmp(out, "0007-20261022-130459-kept.sav") == 0);
+	CHECK(saveslot_backup_kept(out));
+	CHECK(saveslot_parse_backup_name(out, &n, &back) && n == 7);
+	CHECK(saveslot_backup_name_kept(out, SAVESLOT_COUNTER_MAX, &when) > 0);
+	CHECK(strlen(out) < SAVESLOT_BACKUP_NAME_BYTES);
+	CHECK(!saveslot_backup_kept("0007-20261022-130459.sav"));
+	check_backup("0007-20261022-130459-kep.sav", 0, 0);
+	check_backup("0007-20261022-130459kept.sav", 0, 0);
+	{
+		const char *mixed[] = {"0001-20261022-130459-kept.sav", "0002-20261022-130459.sav",
+				       "0003-20261022-130459.sav", "0004-20261022-130459.sav"};
+		u32 idx[4];
+		CHECK_EQ(saveslot_prune(mixed, 4, 1, idx), 2);  // 2 and 3 go; 1 is kept
+		CHECK_EQ(idx[0], 1);
+		CHECK_EQ(idx[1], 2);
+		CHECK_EQ(saveslot_prune(mixed, 4, 0, idx), 3);
+	}
+
 	check_backup("0001-20261022-130459.sav", 1, 1);
 	check_backup("000123456-20261022-130459.sav", 1, 123456);
 	check_backup("001-20261022-130459.sav", 0, 0);       // fewer than 4 digits
@@ -328,6 +348,15 @@ void test_saveslot_trash_expiry(void)
 	CHECK(!saveslot_trash_expired(&then, &unset));
 	CHECK(!saveslot_trash_expired(&unset, &now));
 	CHECK(!saveslot_trash_expired(&then, &past));
+	// What the purge does: an untrusted clock touches nothing; a folder dated
+	// by an unset clock or one ahead takes now's date
+	struct saveslot_stamp wild = {2099, 1, 1, 0, 0, 0}, ahead = {2027, 3, 1, 0, 0, 0};
+	CHECK_EQ(saveslot_trash_state(&then, &unset), SAVESLOT_TRASH_KEEP);
+	CHECK_EQ(saveslot_trash_state(&then, &wild), SAVESLOT_TRASH_KEEP);
+	CHECK_EQ(saveslot_trash_state(&unset, &now), SAVESLOT_TRASH_REDATE);
+	CHECK_EQ(saveslot_trash_state(&ahead, &now), SAVESLOT_TRASH_REDATE);
+	CHECK_EQ(saveslot_trash_state(&now, &now), SAVESLOT_TRASH_KEEP);
+	CHECK(!saveslot_clock_plausible(&unset) && !saveslot_clock_plausible(&wild) && saveslot_clock_plausible(&now));
 }
 
 void test_saveslot_journal(void)

@@ -365,15 +365,35 @@ static int parse_stamp(const char *s, struct saveslot_stamp *t)
 	return 1;
 }
 
-u32 saveslot_backup_name(char *out, u32 n, const struct saveslot_stamp *when)
+static u32 backup_name(char *out, u32 n, const struct saveslot_stamp *when, int kept)
 {
 	if (n == 0 || n > SAVESLOT_COUNTER_MAX)
 		return 0;
 	u32 k = put_digits(out, n, 4);
 	out[k++] = '-';
 	k += put_stamp(out + k, when);
+	if (kept) {
+		memcpy(out + k, SAVESLOT_KEPT_MARK, sizeof(SAVESLOT_KEPT_MARK) - 1);
+		k += sizeof(SAVESLOT_KEPT_MARK) - 1;
+	}
 	memcpy(out + k, ".sav", 5);
 	return k + 4;
+}
+
+u32 saveslot_backup_name(char *out, u32 n, const struct saveslot_stamp *when)
+{
+	return backup_name(out, n, when, 0);
+}
+
+u32 saveslot_backup_name_kept(char *out, u32 n, const struct saveslot_stamp *when)
+{
+	return backup_name(out, n, when, 1);
+}
+
+int saveslot_backup_kept(const char *name)
+{
+	u32 len = (u32)strlen(name), m = sizeof(SAVESLOT_KEPT_MARK ".sav") - 1;
+	return len > m && strcmp(name + len - m, SAVESLOT_KEPT_MARK ".sav") == 0;
 }
 
 int saveslot_parse_backup_name(const char *name, u32 *n, struct saveslot_stamp *when)
@@ -387,7 +407,8 @@ int saveslot_parse_backup_name(const char *name, u32 *n, struct saveslot_stamp *
 	if (d < 4 || d > 9 || v == 0 || name[d] != '-')
 		return 0;
 	const char *rest = name + d + 1;
-	if (strlen(rest) != 15 + 4 || strcmp(rest + 15, ".sav") != 0)
+	if (strlen(rest) < 15 + 4 ||
+	    (strcmp(rest + 15, ".sav") != 0 && strcmp(rest + 15, SAVESLOT_KEPT_MARK ".sav") != 0))
 		return 0;
 	struct saveslot_stamp t;
 	if (!parse_stamp(rest, &t))
@@ -425,7 +446,7 @@ u32 saveslot_prune(const char *const *names, u32 count, u32 keep, u32 *out)
 	// valid - keep of them are the result
 	u32 valid = 0;
 	for (u32 i = 0; i < count; i++) {
-		if (!saveslot_parse_backup_name(names[i], NULL, NULL))
+		if (!saveslot_parse_backup_name(names[i], NULL, NULL) || saveslot_backup_kept(names[i]))
 			continue;
 		u32 j = valid++;
 		while (j > 0 && older(names[i], names[out[j - 1]])) {
@@ -437,24 +458,41 @@ u32 saveslot_prune(const char *const *names, u32 count, u32 keep, u32 *out)
 	return valid > keep ? valid - keep : 0;
 }
 
+// Days from a calendar date (Howard Hinnant's days_from_civil)
+static long civil_days(const struct saveslot_stamp *t)
+{
+	long y = t->year, m = t->month;
+	y -= m <= 2;
+	long era = y / 400;
+	long yoe = y - era * 400;
+	long doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + t->day - 1;
+	long doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+	return era * 146097 + doe;
+}
+
+int saveslot_clock_plausible(const struct saveslot_stamp *now)
+{
+	return now->year >= SAVESLOT_CLOCK_FIRST_YEAR && now->year <= SAVESLOT_CLOCK_LAST_YEAR;
+}
+
+enum saveslot_trash_state saveslot_trash_state(const struct saveslot_stamp *then, const struct saveslot_stamp *now)
+{
+	if (!saveslot_clock_plausible(now))
+		return SAVESLOT_TRASH_KEEP;
+	// Dated by a clock that was unset, or ahead of this one: today's date,
+	// so it waits its 30 days from now
+	if (then->year == 0 || civil_days(then) > civil_days(now) + 1)
+		return SAVESLOT_TRASH_REDATE;
+	return saveslot_trash_expired(then, now) ? SAVESLOT_TRASH_PURGE : SAVESLOT_TRASH_KEEP;
+}
+
 int saveslot_trash_expired(const struct saveslot_stamp *then, const struct saveslot_stamp *now)
 {
 	if (then->year == 0 || now->year == 0)
 		return 0;
-	// Days from a calendar date (Howard Hinnant's days_from_civil)
-	long days[2];
 	const struct saveslot_stamp *t[2] = {then, now};
-	for (int i = 0; i < 2; i++) {
-		long y = t[i]->year, m = t[i]->month;
-		y -= m <= 2;
-		long era = y / 400;
-		long yoe = y - era * 400;
-		long doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + t[i]->day - 1;
-		long doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-		days[i] = era * 146097 + doe;
-	}
 	// Days apart first: seconds since year 0 don't fit a 32-bit long
-	long apart = days[1] - days[0];
+	long apart = civil_days(now) - civil_days(then);
 	if (apart != SAVESLOT_TRASH_DAYS)
 		return apart > SAVESLOT_TRASH_DAYS;
 	long old = t[0]->hour * 3600L + t[0]->min * 60L + t[0]->sec;

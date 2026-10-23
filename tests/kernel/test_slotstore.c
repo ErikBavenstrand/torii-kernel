@@ -16,6 +16,7 @@
 #include "../../source/ezkernel.h"
 #include "../../source/engine/stage.h"
 #include "../../source/gamesave.h"
+#include "../../source/saveorphan.h"
 #include "../../source/slotstore.h"
 #include "tests.h"
 #include "torii_test.h"
@@ -359,6 +360,19 @@ static void test_import_export(void)
 	u32 size = 0;
 	CHECK(put("/TSL/in.sav", 'I', 512));
 	CHECK(put("/TSL/big.sav", 'J', 1024));
+	// A new slot from a file: refused for a wrong size, a missing file or a
+	// taken name; made as the file's copy, the source staying
+	char made[SAVESLOT_NAME_BYTES];
+	CHECK_EQ(slotstore_create_file(ROM, "FromFile", "/TSL/big.sav", 512, made), SLOTSTORE_SIZE);
+	CHECK_EQ(slotstore_create_file(ROM, "FromFile", "/TSL/none.sav", 512, made), SLOTSTORE_NO_FILE);
+	CHECK_EQ(slotstore_create_file(ROM, "alt", "/TSL/in.sav", 512, made), SLOTSTORE_TAKEN);
+	CHECK(!there(SAVES "/FromFile.sav"));
+	CHECK_EQ(slotstore_create_file(ROM, " FromFile ", "/TSL/in.sav", 512, made), SLOTSTORE_OK);
+	CHECK(!strcmp(made, "FromFile"));
+	CHECK(is_fill(SAVES "/FromFile.sav", 'I'));
+	CHECK(is_fill("/TSL/in.sav", 'I'));
+	CHECK_EQ(history_count("FromFile"), 0);
+	CHECK_EQ(slotstore_delete(ROM, "FromFile"), SLOTSTORE_OK);
 	CHECK_EQ(slotstore_import(ROM, "Alt", "/TSL/big.sav", 512), SLOTSTORE_SIZE);
 	CHECK_EQ(slotstore_import(ROM, "Alt", "/TSL/none.sav", 512), SLOTSTORE_NO_FILE);
 	CHECK_EQ(slotstore_import(ROM, "Nobody", "/TSL/in.sav", 512), SLOTSTORE_NO_SLOT);
@@ -547,6 +561,7 @@ static void test_retire(void)
 	CHECK(first_entry(dir, name, sizeof(name)));
 	snprintf(path, sizeof(path), "%s/%s", dir, name);
 	CHECK(is_fill(path, 'Z'));
+	CHECK(saveslot_backup_kept(name));  // no pruning takes it
 	fill_of(path, &size);
 	CHECK_EQ(size, 8192);
 	// Again (a launch after a cut): nothing to do, nothing doubled
@@ -558,18 +573,30 @@ static void test_retire(void)
 	CHECK_EQ(slotstore_retire_file(file, dir), SLOTSTORE_OK);
 	CHECK_EQ(entries(dir), 1);
 	CHECK(!there(file));
+	// Play sessions after it, pruning to one version: the kept one stays
+	CHECK(put(file, 'A', 512));
+	CHECK_EQ(slotstore_push_file(file, dir, 1), SLOTSTORE_OK);
+	CHECK(put(file, 'B', 512));
+	CHECK_EQ(slotstore_push_file(file, dir, 1), SLOTSTORE_OK);
+	CHECK(is_fill(path, 'Z'));
+	CHECK_EQ(entries(dir), 2);
+	f_unlink(file);
 }
 
 static void test_purge(void)
 {
-	struct saveslot_stamp july = {2026, 7, 2, 12, 0, 0}, unset = {0, 0, 0, 0, 0, 0}, early = {2026, 5, 1, 0, 0, 0};
+	struct saveslot_stamp july = {2026, 7, 2, 12, 0, 0}, unset = {0, 0, 0, 0, 0, 0};
+	u32 emptied = 0;
+	CHECK_EQ(saveorphan_trash_empty(NULL, NULL, &emptied), ORPHAN_OK);  // other tests' folders: none left to count
 	CHECK(put("/torii/trash/20260601-120000-1/A/B/deep.sav", 'D', 512));
 	CHECK(put("/torii/trash/20260601-120000-1/backups/A/B/Main/0001-00000000-000000.sav", 'D', 512));
 	CHECK(put("/torii/trash/20260625-120000-1/A/B/new.sav", 'N', 512));
 	CHECK(put("/torii/trash/not-a-date/keep.sav", 'K', 512));
+	struct saveslot_stamp wild = {2099, 1, 1, 0, 0, 0};
 	CHECK_EQ(slotstore_trash_purge(&unset), 0);  // an unset clock purges nothing
-	CHECK_EQ(slotstore_trash_purge(&early), 0);  // one before the folder's date, nothing
+	CHECK_EQ(slotstore_trash_purge(&wild), 0);  // nor one past SAVESLOT_CLOCK_LAST_YEAR
 	CHECK(there("/torii/trash/20260601-120000-1/A/B/deep.sav"));
+	CHECK(there("/torii/trash/20260625-120000-1/A/B/new.sav"));
 	CHECK_EQ(slotstore_trash_purge(&july), 1);  // 30 days past June 1; June 25 stays
 	CHECK(!there("/torii/trash/20260601-120000-1"));
 	CHECK(there("/torii/trash/20260625-120000-1/A/B/new.sav"));
@@ -578,6 +605,18 @@ static void test_purge(void)
 	CHECK_EQ(slotstore_trash_purge(&august), 1);
 	CHECK(!there("/torii/trash/20260625-120000-1"));
 	CHECK(there("/torii/trash/not-a-date/keep.sav"));
+	// Folders dated by an unset clock or one ahead: they take today's date,
+	// so they wait 30 days from now, never less
+	CHECK(put("/torii/trash/00000000-000000-1/A/B/unset.sav", 'U', 512));
+	CHECK(put("/torii/trash/20990101-000000-1/A/B/ahead.sav", 'F', 512));
+	CHECK_EQ(slotstore_trash_purge(&july), 0);
+	CHECK(!there("/torii/trash/00000000-000000-1"));
+	CHECK(!there("/torii/trash/20990101-000000-1"));
+	CHECK(there("/torii/trash/20260702-120000-1/A/B") && there("/torii/trash/20260702-120000-2/A/B"));
+	struct saveslot_stamp aug1 = {2026, 8, 1, 12, 0, 0}, aug2 = {2026, 8, 2, 0, 0, 0};
+	CHECK_EQ(slotstore_trash_purge(&aug1), 0);  // 30 days, not yet past
+	CHECK_EQ(slotstore_trash_purge(&aug2), 2);
+	CHECK(!there("/torii/trash/20260702-120000-1") && !there("/torii/trash/20260702-120000-2"));
 }
 
 void test_slotstore(void)
