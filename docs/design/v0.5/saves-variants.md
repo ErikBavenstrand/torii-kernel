@@ -23,7 +23,15 @@ One slot at a time. The slots are pills across the top (like the SD page's path 
 - **For:** the most direct for the common job (play, or roll back a slot); backups need no extra page; bringing a slot back from the trash.
 - **Against:** with many slots the pills scroll (L/R walks them one at a time); slots aren't seen side by side; the most new UI to build (tab strip, timeline, trash page).
 
+## The START popup (all three)
+
+`saves-popup.png` (`tools/mockup/saves_popup.py`): today's popups are the kernel's own screenshots, the proposals are drawn over the same lists.
+
+- **Today:** the GBA popup has 8 items (Play, Favourite, Clean boot, Boot with addon, Saves, Rename, Game info, Delete), Saves sits among the boot choices, and with art the title no longer fits. On the SD page the file popup is already 9 items with addons on, so **Saves is left out**.
+- **Proposal:** the two boot items become one: **Play « addons »**, where LEFT/RIGHT pick With addons or Clean for this start (A plays; the hint bar shows the arrows only on that row). **Saves** comes second and shows the active slot ("Main ›"); A opens the game's save page, which is where A, B and C differ. The GBA popup is 6 items and keeps its title everywhere; the SD popup is 7 (Launch « », Write to NOR, Saves, Add to favourites, Rename, File info, Delete), so Saves is always there. Write to NOR starts the way Launch's « » says.
+
 ## To decide
 
-1. Which direction (or which parts of each: e.g. A's page with C's trash page, or B's launch-as-the-page).
-2. Should Play ask at all with two or more slots, or always play the active slot (choosing only in Saves)?
+1. Whether the START popup merges the boot items into Play « » as proposed.
+2. Which direction (or which parts of each: e.g. A's page with C's trash page, or B's launch-as-the-page).
+3. Should Play ask at all with two or more slots, or always play the active slot (choosing only in Saves)?
