@@ -6,6 +6,24 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** the save screens, rebuilt (design direction B,
+  `docs/design/v0.5/saves-variants.md`): a game's Saves is a list and detail
+  page (`source/screens/save_page.c`): its slots with the active one marked
+  and when it was saved, RIGHT for a slot's backups (A restores), START for
+  its popup (Play, Make active, Backups, Rename, Copy to new slot, Export,
+  Delete); New slot offers Empty, a copy or a .sav file, which makes a new
+  slot and overwrites none. The launch's Play with is the same page. Settings >
+  Saves shows a storage bar, then the saves without a game and Empty trash,
+  and changes its figures in place after an action (b713e2a).
+- **Changed:** the START popups: Play (or the SD page's Play) steps its boot
+  with LEFT/RIGHT (default, clean, addons) in place of Clean boot and Boot
+  with addon, and Saves comes second, never left out; popups scroll past 7
+  rows, so a long one costs no more tiles (7902bad, b713e2a).
+- **Fixed:** a save set aside by a save type change was pruned after a few
+  play sessions: it is a kept backup now; the trash purge ignores a clock
+  outside 2026-2060 and re-dates folders an unset clock dated (ca027da).
+- **Changed:** EWRAM free goes from 5.8 KB to 12 KB: the save screens' state
+  lives in `pReadCache` while they run (b713e2a).
 - **Fixed:** START did nothing on a GBA list in the list-with-art view: Saves
   made its popup too tall for the free tiles. A popup that doesn't fit with its
   title now opens without it (7e63c81).
