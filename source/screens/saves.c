@@ -65,7 +65,7 @@ struct saves {
 	u32 cursor;     // the list's cursor as last seen
 	u32 main_cursor;  // the manager's, while the picker shows
 	u32 generation;   // the library's, when the picker was built
-	u8 mode, back, list, title, hints;
+	u8 mode, back, list, title, hints, keys_acts;
 	u8 kept[ORPHAN_MAX];
 	u8 pick_orphan;  // the orphan being relinked
 	char row[272];
@@ -237,11 +237,22 @@ static const struct ui_view_spec view = {"saves", nodes, N_COUNT, N_LIST, UI_VIE
 
 /* ---- Showing ---- */
 
+// A does something on the rows of Empty trash and of an orphan, and in the
+// picker; the totals and the "Orphaned saves" heading take no key, so their
+// hint bar shows B alone
+static int row_acts(const struct saves *s, u32 row)
+{
+	return s->mode == M_PICK || row == ROW_EMPTY || row >= ROW_FIRST;
+}
+
 static void show_keys(struct saves *s)
 {
-	s->keys[0] = (struct ui_hint){"A", s->mode == M_PICK ? gl_saves->hint_relink : gl_saves->hint_open};
-	s->keys[1] = (struct ui_hint){"B", gl_hint_back};
-	ui_hints_set(s->hints, s->keys, 2);
+	u32 n = 0;
+	if (row_acts(s, s->cursor))
+		s->keys[n++] = (struct ui_hint){"A", s->mode == M_PICK ? gl_saves->hint_relink : gl_saves->hint_open};
+	s->keys[n++] = (struct ui_hint){"B", gl_hint_back};
+	ui_hints_set(s->hints, s->keys, n);
+	s->keys_acts = (u8)row_acts(s, s->cursor);
 }
 
 static void show_title(struct saves *s)
@@ -485,6 +496,8 @@ void saves_run(void)
 	tlog("saves: %lu orphans", (unsigned long)s->scan.count);
 	while (ui_depth()) {
 		ui_frame();
+		if (s->keys_acts != row_acts(s, s->cursor))
+			show_keys(s);
 		if (s->act) {
 			u32 row = s->act - 1;
 			s->act = 0;
