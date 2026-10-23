@@ -15,7 +15,7 @@ git log, not here.
   is refused at launch with a message. The library marks a game saved from the
   `.sav` files in its folder, Rename moves the game's folders (saves, history)
   with it through the same journal, and the FatFs alias drop now also handles
-  folders (b0e8b49). There is no setting for saves next to the ROM.
+  folders. There is no setting for saves next to the ROM (b0e8b49, e98a46c).
 
 - **Added:** `cutpoint(name)` (`source/cutpoint.h`), a debug log line
   `cutpoint N: name` that marks a step boundary for the power-cut tests
