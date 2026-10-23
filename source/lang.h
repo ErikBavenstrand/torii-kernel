@@ -89,7 +89,6 @@ extern char **gl_set_onoff;
 extern char **gl_set_themes;
 extern char **gl_set_views;
 extern char **gl_set_boots;
-extern char **gl_set_locations;
 extern char **gl_set_starts;
 extern char **gl_set_modes_b;
 extern char **gl_set_colours;
@@ -239,7 +238,7 @@ struct lang_rename {
 	const char *hint_type, *hint_delete, *hint_case, *hint_ok;  // A, B, SELECT, START
 	const char *key_lower, *key_upper, *key_latin, *key_space, *key_cancel, *key_ok;  // the function row
 	const char *empty, *taken, *bad, *hidden, *pending, *shared, *failed;  // OK refused
-	const char *side_taken[7];  // a file in the way, by actions.h's ACTION_FILE_*
+	const char *side_taken[6];  // a file in the way, by actions.h's ACTION_FILE_*
 	const char *partly;       // renamed, but not everything followed (a dialog after)
 	const char *name_failed;  // a game's name couldn't be written (a dialog after)
 	const char *names_full;   // ... as names.txt is too large or holds too many names

@@ -1,16 +1,12 @@
 // Where a game's saves are on the card, and the record it keeps there (v0.5).
 //
-// A game's saves are its slots, the .sav files saveslot.h names; every game's
-// first is "Main", made at its first launch. Where they are is the Save
-// location setting: SAVESLOT_CENTRAL, /torii/saves/<rom path>/<slot>.sav, or
-// SAVESLOT_BESIDE_ROM, <rom dir>/<rom stem>.<slot>.sav. Either way the game's
-// record, game.ini (gamerec.h: save type, boot mode, current slot), is in
-// /torii/saves/<rom path>/, so changing the setting loses none of it. The
-// current slot is the one the next launch loads and its save is copied to.
-//
-// The slots a game has are its .sav files: in its folder under /torii/saves,
-// or the files of the ROM's folder named <rom stem>.<slot>.sav. A slot with
-// no file yet (the current one before the first launch) is made by the launch.
+// A game's saves are its slots, the .sav files of its folder,
+// /torii/saves/<rom path>/<slot>.sav (saveslot.h); every game's first is
+// "Main", made at its first launch. The game's record, game.ini (gamerec.h:
+// save type, boot mode, current slot), is in the same folder. The current slot
+// is the one the next launch loads and its save is copied to. The slots a game
+// has are its .sav files; a slot with no file yet (the current one before the
+// first launch) is made by the launch.
 //
 // <rom path> is the ROM's path from the root with its extension, as
 // saveslot.h says. Nothing here changes while a launch is under way.
@@ -23,9 +19,6 @@
 
 // The room a path built here needs
 #define GAMESAVE_PATH_BYTES 288
-
-// The Save location setting: SAVESLOT_CENTRAL or SAVESLOT_BESIDE_ROM
-int gamesave_mode(void);
 
 // A NOR game has no folder: its saves are kept as for a ROM at this path
 // (which no real ROM has: /torii isn't listed), whatever the setting.
@@ -46,9 +39,9 @@ void gamesave_record_read(const char *rom_path, struct gamerec *r);
 // Writes the record, making its folder. 1 if written.
 int gamesave_record_write(const char *rom_path, const struct gamerec *r);
 
-// The current slot's save file for the game, by the setting (mode) into out
+// The current slot's save file for the game into out
 // (GAMESAVE_PATH_BYTES). Returns its length, or -1 if the ROM path or slot
 // can't make a path. The caller checks it against SAV_INFO_NAME_MAX.
-int gamesave_current_path(char *out, u32 size, int mode, const char *rom_path, const struct gamerec *r);
+int gamesave_current_path(char *out, u32 size, const char *rom_path, const struct gamerec *r);
 
 #endif

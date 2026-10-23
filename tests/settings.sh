@@ -113,13 +113,6 @@ visit auto-save A RIGHT B
 visit dim A RIGHT A A RIGHT B
 [ "$(slots 27 1)" = 0002 ] || fail "B put back the page's first value, not the edit's: $(slots 27 1)"
 
-# Save location (slot 36): next to the ROM saves 1, and the kernel reads it back
-# (the row shows its value)
-visit save-location A RIGHT A
-[ "$(slots 36 1)" = 0001 ] || fail "Save location not saved: $(slots 36 1)"
-visit save-location A LEFT A
-[ "$(slots 36 1)" = 0000 ] || fail "Save location not put back: $(slots 36 1)"
-
 # A hotkey accepted writes once; a capture B cancels writes nothing
 # (the keys held 24 frames: a capture takes them after 18)
 # shellcheck disable=SC2046 # nav.sh's options

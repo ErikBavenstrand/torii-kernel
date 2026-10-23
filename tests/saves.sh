@@ -13,13 +13,7 @@
 #   rename-cut, rename-cut-split  a power cut before each of a rename's SD
 #         writes leaves one game with its save; -split fills the folders'
 #         first sectors, so a cut inside f_rename leaves two names on a file
-#   rename-cut-beside  the same with the Save location setting at "next to the
-#         ROM": the save is Test.Main.sav in the ROM's folder, the record still
-#         in /torii/saves
 #   rename-cut-case  the same for a rename that changes only case
-#   beside  with the setting at "next to the ROM", a game's save is made, loaded
-#         and copied back as Test.Main.sav beside it, and a rename moves it
-#         (the game's record, in /torii/saves, follows)
 #   rename  Rename in the SD card page's popup renames the ROM, its save
 #         and its save type, Recent follows, and the game starts with its
 #         save under the new name
@@ -42,12 +36,8 @@ set -euo pipefail
 local_carts "dist/cart-saves${1:+-$1}"
 
 part=$1
-# Where the current slot's save is: in /torii/saves, or next to the ROM
-# (Settings' Save location, slot 36)
-case $part in
-*beside) savep=/Test.Main.sav ;;
-*) savep=/torii/saves/Test.gba/Main.sav ;;
-esac
+# Where the current slot's save is
+savep=/torii/saves/Test.gba/Main.sav
 cart=$carts/saves-$part shots=dist/shots/saves-$part
 rm -rf "$cart" "$shots"
 mkdir -p "$cart" "$shots"
@@ -93,7 +83,6 @@ pending() {
 first_launch() {
   mkfs.fat -C -F 32 -n SAVES "$cart/sd.img" 65536 >/dev/null
   mcopy -i "$cart/sd.img" tests/roms/savetest/flash128.gba ::/Test.gba
-  case $part in *beside) python3 tests/setnor.py set "$cart/kernel-nor.bin" 36=1 ;; esac
   # shellcheck disable=SC2046 # nav.sh's options
   boot $(nav_launch /Test.gba save=5 at=250) -s 600:"$shots/1-game.png"
   logged "save: made a blank $savep, 131072 bytes"
@@ -152,7 +141,7 @@ delete)
   echo "PASS: saves delete: Delete removes the ROM, its save stays and loads when the game comes back"
   ;;
 
-rename-cut | rename-cut-split | rename-cut-beside)
+rename-cut | rename-cut-split)
   first_launch
   first_copy
   cp "$cart/test.sav" "$cart/kept.sav"
@@ -194,13 +183,8 @@ rename-cut | rename-cut-split | rename-cut-beside)
     grep -h 'second name' "$cart/run.log" >>"$carts/aliases-$part.txt" || true
     if mtype -i "$cart/sd.img" ::/Testq.gba >/dev/null 2>&1; then to=Testq other=Test results+="done "; else to=Test other=Testq results+="undone "; fi
     ! mtype -i "$cart/sd.img" "::/$other.gba" >/dev/null 2>&1 || fail "cut before write $n: both names are on the card"
-    if [ "$part" = rename-cut-beside ]; then
-      mtype -i "$cart/sd.img" "::/$to.Main.sav" | cmp -s - "$cart/kept.sav" || fail "cut before write $n: $to.Main.sav isn't the save"
-      ! mtype -i "$cart/sd.img" "::/$other.Main.sav" >/dev/null 2>&1 || fail "cut before write $n: $other.Main.sav is left"
-    else
-      mtype -i "$cart/sd.img" "::/torii/saves/$to.gba/Main.sav" | cmp -s - "$cart/kept.sav" || fail "cut before write $n: $to.gba/Main.sav isn't the save"
-      ! mtype -i "$cart/sd.img" "::/torii/saves/$other.gba/Main.sav" >/dev/null 2>&1 || fail "cut before write $n: $other.gba/Main.sav is left"
-    fi
+    mtype -i "$cart/sd.img" "::/torii/saves/$to.gba/Main.sav" | cmp -s - "$cart/kept.sav" || fail "cut before write $n: $to.gba/Main.sav isn't the save"
+    ! mtype -i "$cart/sd.img" "::/torii/saves/$other.gba/Main.sav" >/dev/null 2>&1 || fail "cut before write $n: $other.gba/Main.sav is left"
     mtype -i "$cart/sd.img" "::/torii/saves/$to.gba/game.ini" >/dev/null 2>&1 || fail "cut before write $n: $to.gba/game.ini is missing"
     ! mtype -i "$cart/sd.img" ::/torii/rename.txt >/dev/null 2>&1 || fail "cut before write $n: the journal is left"
     # No damage (two names on one chain, a broken one); clusters a cut write
@@ -328,29 +312,6 @@ rename-walk)
   [ "$(sed -n '/kernel: screen ready: rename/,/kernel: rename: kept/p' "$cart/run.log" | grep -c 'screen ready: progress')" = 1 ] ||
     fail "no progress dialog while the card was checked"
   echo "PASS: saves rename-walk: a long check of the card for a shared save shows a progress dialog"
-  ;;
-
-beside)
-  first_launch
-  first_copy
-  cp "$cart/test.sav" "$cart/kept.sav"
-  # The save is beside the ROM; the record (save type) is in its folder under /torii/saves
-  ! mdir -b -i "$cart/sd.img" ::/torii/saves/Test.gba | grep -q 'Main.sav' || fail "a save was made in /torii/saves too"
-  mtype -i "$cart/sd.img" ::/torii/saves/Test.gba/game.ini | grep -q 'save_type = 5' || fail "the record is missing"
-  # Power-on 3: it loads again
-  # shellcheck disable=SC2046 # nav.sh's options
-  boot $(nav_launch /Test.gba at=180) -f 600
-  logged "save: $savep exists, 131072 bytes"
-  logged "save: loaded $savep into cart SRAM, 131072 bytes"
-  # Power-on 4: the setting back to the Torii folder: a launch makes Main there
-  # (the beside file stays where it is, no longer the game's)
-  python3 tests/setnor.py set "$cart/kernel-nor.bin" 36=0
-  boot -k 100:B -k 106:- -f 300
-  # shellcheck disable=SC2046 # nav.sh's options
-  boot $(nav_launch /Test.gba at=180) -f 600
-  logged "save: made a blank /torii/saves/Test.gba/Main.sav, 131072 bytes"
-  mtype -i "$cart/sd.img" ::$savep | cmp -s - "$cart/kept.sav" || fail "the beside save changed"
-  echo "PASS: saves beside: with the setting at next to the ROM the save is Test.Main.sav in the ROM's folder, it loads again, and the Torii folder is a separate place"
   ;;
 
 copy)
@@ -581,7 +542,7 @@ nearly-full)
   ;;
 
 *)
-  echo "usage: $0 copy|full|nearly-full|sanity|beside|rename-cut-beside|..." >&2
+  echo "usage: $0 copy|full|nearly-full|sanity|..." >&2
   exit 2
   ;;
 esac

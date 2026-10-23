@@ -1102,15 +1102,12 @@ static u8 Process_savefile(u32 is_EMU, const char *rom_path, u32 gamefilesize, B
 	TCHAR *savfilename = launch_save.save;
 
 	gamesave_record_read(rom_path, &launch_save.rec);
-	int mode = gamesave_mode();
-	int len = gamesave_current_path(savfilename, sizeof(launch_save.save), mode, rom_path, &launch_save.rec);
+	int len = gamesave_current_path(savfilename, sizeof(launch_save.save), rom_path, &launch_save.rec);
 	// The pending-save record holds the path up to SAV_INFO_TYPE: a longer one
 	// would be copied back under another name. Nothing is written yet.
 	if (len < 0 || len > SAV_INFO_NAME_MAX) {
-		tlog_error("save: the save path is over %u bytes, the pending-save record's room (%s, slot %s): %s",
-			   (unsigned)SAV_INFO_NAME_MAX,
-			   mode == SAVESLOT_BESIDE_ROM ? "beside the ROM" : "in /torii/saves", launch_save.rec.slot,
-			   rom_path);
+		tlog_error("save: the save path is over %u bytes, the pending-save record's room (slot %s): %s",
+			   (unsigned)SAV_INFO_NAME_MAX, launch_save.rec.slot, rom_path);
 		return 8;
 	}
 	//#ifdef DEBUG

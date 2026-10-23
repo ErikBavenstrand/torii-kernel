@@ -332,8 +332,8 @@ While SD control is 3 the port returns status; `0xEEE1` means busy.
 `+0x790000` with flag `0x11` and loads the `.sav` into SRAM (`0x0E000000`, 64 KB
 banks via `0x09C00000` or the flash-style `AA/55/B0` bank command). On the next
 power-on, if the flag is set, it asks (or auto-saves) and copies SRAM back to
-`/torii/saves/<rom path>/<slot>.sav` (or next to the ROM, by the Save
-location setting; v0.4 and earlier used `SAVER/<game>.sav`). So a save only reaches the SD card on the next boot of the
+`/torii/saves/<rom path>/<slot>.sav` (v0.4 and earlier used
+`SAVER/<game>.sav`). So a save only reaches the SD card on the next boot of the
 kernel.
 
 **Save types:** the kernel never patches a game's save code. It sends the save

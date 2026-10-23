@@ -12,12 +12,10 @@ git log, not here.
   `game.ini` beside them; a NOR game keeps its saves as for a ROM at
   `/torii/nor/<name>`. Folders are made when a file is first written. The
   pending-save record now holds the full path, so a save path over 251 bytes
-  is refused at launch with a message. New Games setting *Save location*
-  (Torii folder, or `<rom stem>.<slot>.sav` next to the ROM; the record stays
-  in `/torii/saves`). The library marks a game saved from the `.sav` files in
-  its folder or beside it, Rename moves the game's folders (saves, history) or
-  its saves beside it with it, through the same journal, and the FatFs
-  alias drop now also handles folders (b0e8b49).
+  is refused at launch with a message. The library marks a game saved from the
+  `.sav` files in its folder, Rename moves the game's folders (saves, history)
+  with it through the same journal, and the FatFs alias drop now also handles
+  folders (b0e8b49). There is no setting for saves next to the ROM.
 
 - **Added:** `cutpoint(name)` (`source/cutpoint.h`), a debug log line
   `cutpoint N: name` that marks a step boundary for the power-cut tests
