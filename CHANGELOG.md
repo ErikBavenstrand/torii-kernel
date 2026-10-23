@@ -6,6 +6,14 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** the launch's save slot picker and the New slot and Rename flows
+  (`source/screens/slot_picker.c`, `slot_flow.c`, `slot_list.c`). A game with
+  two or more slots asks which to play on every launch (the last used chosen,
+  A plays, START renames, B starts nothing, a "New slot..." row names a slot
+  and makes it blank or a copy of the current one); a game with one starts
+  straight in, and Select held with A shows the picker anyway. The chosen slot
+  becomes the record's, so the save loaded and the pending-save record are its
+  (197b36c).
 - **Added:** the slot store (`source/slotstore.c`): a game's slots listed,
   created blank or as a copy, renamed (also by case only), duplicated and
   deleted to `/torii/trash` (purged after 30 days at boot, never on an unset
