@@ -6,6 +6,22 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** START did nothing on a GBA list in the list-with-art view: Saves
+  made its popup too tall for the free tiles. A popup that doesn't fit with its
+  title now opens without it (7e63c81).
+- **Changed:** the save copy no longer copies the old save into the history: it
+  becomes the `.bak` and is renamed in after the swap, so a 128 KB copy loses
+  the 3.7 s it spent there; restore and a save-type change rename too, and
+  recovery keeps a `.bak` as a version instead of removing it (dc64061).
+- **Changed:** opening a GBA game's popup reads nothing from the card (it read
+  the cheat table, the ROM header and the record for Saves); a save still on
+  the chip is copied before any slot is renamed, deleted, restored or imported
+  (dc64061).
+- **Fixed:** deleting a save "without a game" whose path was a folder took
+  every save beneath it; a delete changed the current slot before its journal;
+  a rename or delete stopped halfway cleared its journal; a rename onto another
+  slot's 8.3 name trashed its history; a launch now finishes slot journals
+  first; trash expiry overflowed; the library counted saves twice (dc64061).
 - **Added:** the per-game save manager (`source/screens/game_saves.c`): "Saves"
   in a GBA game's Start menu (Games lists, SD card page, game NOR page) lists
   its slots with the current one marked. A slot's actions are Launch with this
