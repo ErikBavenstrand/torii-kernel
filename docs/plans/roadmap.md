@@ -137,12 +137,12 @@ The cart test and one review round (a code reviewer and an adversarial tester) a
 - **Trash expiry overflowed a 32-bit `long`** (seconds since year 0): days are compared first.
 - **The library counted every slot file as a save twice**, filling `LIB_SAVES_MAX` early.
 - **Stack on the launch path**: the record's `FIL` and path moved to EWRAM, `Retire_oversized_save` is `noinline`; the record's folders are made only when its open says there are none, and the save copy's likewise.
-- **Open: EWRAM is down to 5.8 KB free** (18 KB at v0.4.2): the save screens' state (`gs` 4 KB, `slot_flow` 2 KB) should live in `pReadCache` while they run. Do it in the save screens' rebuild.
-- **Open: the save screens' UX.** Redesign in `docs/design/v0.5/saves.md`, waiting for the user's review.
-- **Open: a save retired by a type change is pruned like any version** after `keep` play sessions; it should be exempt (or exported).
-- **Open: the trash purge trusts the clock** (an unset clock never purges; a far-future one purges everything at once).
+- **EWRAM was down to 5.8 KB free** (18 KB at v0.4.2): the save screens' state (a game's saves, Play with, the slot flows) now lives in `pReadCache` (`READCACHE_GSAVES`, `READCACHE_FLOW`) while they run; 12 KB free.
+- **The save screens' UX** was rebuilt as direction B of `docs/design/v0.5/saves-variants.md` (the user's choice, 2026-10-23): a list and detail page (`screens/save_page.c`) for a game's slots, a slot's backups (RIGHT) and the launch's Play with; a slot's actions in a popup (START); New slot (Empty, a copy, or a .sav file, which makes a new slot and overwrites nothing); Settings > Saves as the NOR page (a storage bar, then the saves without a game and Empty trash). The START popups merge the boot items into Play « default / clean / addons » with Saves second, and popups scroll past 7 rows (`UI_POPUP_ROWS`), so their tiles stay the same.
+- **A save retired by a type change was pruned like any backup**: it is a kept backup now (`-kept` in its name), which no pruning counts or removes.
+- **The trash purge trusted the clock**: a clock outside 2026-2060 touches nothing, and a folder dated by an unset clock or one ahead takes today's date (it waits its 30 days from now, never less).
+- **Settings > Saves walked the card again after every action**: its figures change in place now (a walk only when saves past the listed ones wait), and the orphans' history bytes come from the backups' walk itself.
 - **Open: `ss_prune` sees at most 64 versions** in directory order.
-- **Open: the Saves screen rescans the whole card after each action** and walks the history twice.
 - **Open: `Save_recover` runs three times per save copy** (nine `f_stat`s).
 
 ## v0.6 Plugins
