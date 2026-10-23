@@ -55,6 +55,8 @@ static const struct popup_look {
 	u8 pop_value_r;      // where its value ends, from the card's right
 	u8 pop_value_gap;    // at least this between the text and the value
 	u8 pop_pill_in;      // the selection pill's inset from the card's sides
+	u8 pop_mark_gap;     // between a stepped value and its « » marks
+	u8 pop_bar_r;        // a scrolling popup's bar, in from the card's right
 	// The field card (the Settings page's Time and Date, #20), in the
 	// popup's card
 	u8 fld_h;            // its height
@@ -105,6 +107,8 @@ static const struct popup_look {
 	.pop_value_r = 8,
 	.pop_value_gap = 6,
 	.pop_pill_in = 3,
+	.pop_mark_gap = 3,
+	.pop_bar_r = 3,
 	.fld_h = 60,
 	.fld_icon_x = 6,
 	.fld_icon_y = 4,
@@ -487,8 +491,10 @@ static struct {
 	s16 row_y0, row_y1;  // the row's lines (in the card): the card opens from them
 	u16 h;        // its card's height
 	u8 cursor;
+	u8 first;     // the first item the card shows (it scrolls past UI_POPUP_ROWS)
+	u8 rows;      // items it shows
 	u8 titled;    // it shows its title (it has one, and room for it)
-	u16 redraw;   // items to draw again, a bit each
+	u16 redraw;   // rows to draw again, a bit each (row 0: the first shown)
 	// The confirmation
 	const struct ui_confirm *ask;
 	u8 sel;            // 0 Cancel, 1 the action
@@ -641,10 +647,16 @@ struct popup_state {
 	struct canvas c;
 };
 
-// An item's top, screen px
+// A shown row's top, screen px
+static s32 row_top(u32 row)
+{
+	return pp.top + (pp.titled ? look.pop_head_h : look.pop_pad_top) + (s32)(row * look.pop_pitch);
+}
+
+// An item's top, screen px (an item scrolled out of the card: off its rows)
 static s32 item_top(u32 i)
 {
-	return pp.top + (pp.titled ? look.pop_head_h : look.pop_pad_top) + (s32)(i * look.pop_pitch);
+	return row_top(i - pp.first);
 }
 
 // The field card's fields at (x, y), the card's top left: centred, the
@@ -722,7 +734,8 @@ static void popup_render(u8 node, const struct pen *p)
 			 m->title, PEN_LEFT);
 		pen_fill(p, x + look.pop_rule_in, y + look.pop_rule_y, w - 2 * look.pop_rule_in, 1, UI_ROLE_BORDER);
 	}
-	for (u32 i = 0; i < m->count; i++) {
+	int scrolls = m->count > pp.rows;
+	for (u32 i = pp.first; i < m->count && i < pp.first + pp.rows; i++) {
 		s32 iy = item_top(i) - n->y;
 		if (iy + look.pop_pitch <= p->ya || iy >= p->yb)
 			continue;
@@ -733,7 +746,19 @@ static void popup_render(u8 node, const struct pen *p)
 		s32 right = w - look.pop_value_r, clip = right - look.pop_text_x;
 		if (it->value && *it->value) {
 			s32 vw = (s32)text_width(font, it->value, strlen(it->value));
-			pen_text(p, font, x + right, iy, (u32)vw + 1, UI_ROLE_ACCENT_INK, it->value, PEN_RIGHT);
+			if ((it->flags & UI_POP_STEP) && i == pp.cursor) {
+				// « value »: the marks in the accent's ink, the value in ink
+				s32 mw = (s32)text_width(font, "\xC2\xBB", 2), gap = look.pop_mark_gap;
+				pen_text(p, font, x + right, iy, (u32)mw + 1, UI_ROLE_ACCENT_INK, "\xC2\xBB",
+					 PEN_RIGHT);
+				pen_text(p, font, x + right - mw - gap, iy, (u32)vw + 1, UI_ROLE_TEXT, it->value,
+					 PEN_RIGHT);
+				pen_text(p, font, x + right - mw - 2 * gap - vw, iy, (u32)mw + 1, UI_ROLE_ACCENT_INK,
+					 "\xC2\xAB", PEN_RIGHT);
+				vw += 2 * (mw + gap);
+			} else {
+				pen_text(p, font, x + right, iy, (u32)vw + 1, UI_ROLE_ACCENT_INK, it->value, PEN_RIGHT);
+			}
 			clip -= vw + look.pop_value_gap;
 		}
 		if (clip > 0)
@@ -743,6 +768,14 @@ static void popup_render(u8 node, const struct pen *p)
 				 : i == pp.cursor            ? UI_ROLE_TEXT
 							     : UI_ROLE_DIM,
 				 it->text, PEN_LEFT);
+	}
+	if (scrolls) {
+		// Where the rows are among the items: a 1 px track in the card's
+		// hairline, a thumb in the accent, inside the card's right edge
+		s32 ty = row_top(0) - n->y, th = (s32)pp.rows * look.pop_pitch, bx = x + w - look.pop_bar_r;
+		s32 t0 = ty + th * pp.first / m->count, t1 = ty + th * (pp.first + pp.rows) / m->count;
+		pen_fill(p, bx, ty, 1, th, UI_ROLE_BORDER);
+		pen_fill(p, bx - 1, t0, 3, t1 - t0, UI_ROLE_ACCENT);
 	}
 }
 
@@ -786,6 +819,24 @@ static int popup_init(u8 node)
 	return canvas_init(node, &st->c);
 }
 
+// The popup's keys in the hint bar: LEFT/RIGHT only on a stepped item
+static void popup_hints(void)
+{
+	struct run *r = &pp.pop;
+	const struct ui_popup *m = pp.menu;
+	u32 n = 0, step = (m->items[pp.cursor].flags & UI_POP_STEP) && m->step_hint;
+	if (step == (r->hint_count == 4) && r->hint_count)
+		return;  // as it is
+	r->hint[n++] = (struct ui_hint){KEY_UPDOWN, gl_pop_choose};
+	if (step)
+		r->hint[n++] = (struct ui_hint){KEY_LEFTRIGHT, m->step_hint};
+	r->hint[n++] = (struct ui_hint){"A", gl_pop_ok};
+	r->hint[n++] = (struct ui_hint){"B", gl_pop_close};
+	r->hint_count = (u8)n;
+	if (r->hinted)
+		ui_hints_set(r->hints, r->hint, n);
+}
+
 static int popup_event(u8 node, const struct ui_event *e)
 {
 	(void)node;
@@ -809,12 +860,25 @@ static int popup_event(u8 node, const struct ui_event *e)
 	} else if (e->keys & INPUT_A) {
 		if (!r->dir)  // not while it opens: a quick double press isn't a pick
 			r->answer = pp.cursor;
+	} else if ((e->keys & (INPUT_LEFT | INPUT_RIGHT)) && (pp.menu->items[pp.cursor].flags & UI_POP_STEP)) {
+		if (!r->dir)
+			r->answer = (s16)(pp.cursor | (e->keys & INPUT_LEFT ? UI_POP_LEFT : UI_POP_RIGHT));
 	} else if (e->keys & (INPUT_UP | INPUT_DOWN)) {
 		u16 key = e->keys & INPUT_UP ? INPUT_UP : INPUT_DOWN;
 		u32 to = input_move(ui_input(), key, pp.cursor, pp.menu->count, key == INPUT_UP ? -1 : 1);
 		if (to != pp.cursor) {
-			pp.redraw |= (u16)(1u << pp.cursor | 1u << to);
+			u32 first = pp.first;
+			if (to < first)
+				first = to;
+			else if (to >= first + pp.rows)
+				first = to - pp.rows + 1;
+			if (first != pp.first)
+				pp.redraw = (u16)((1u << pp.rows) - 1);  // every row moves
+			else
+				pp.redraw |= (u16)(1u << (pp.cursor - first) | 1u << (to - first));
+			pp.first = (u8)first;
 			pp.cursor = (u8)to;
+			popup_hints();
 			ui_dirty(r->node, 1);
 		}
 	}
@@ -827,6 +891,10 @@ static void popup_update(u8 node, u32 dt)
 	if (!r->view || node != r->node || r->view != ui_node_view(node) || !ui_node_shown(node))
 		return;
 	int moving = r->dir != 0;
+	// Rows a draw left for lack of band room (a scroll redraws them all):
+	// a draw can't keep its own node dirty, so the update asks again
+	if (pp.redraw && pp.menu && ((struct popup_state *)ui_node_state(node))->c.mapped)
+		ui_dirty(node, 1);
 	if (run_tick(r, dt, &ui_theme()->motion.popup_open, &ui_theme()->motion.popup_close) && moving) {
 		popup_overlay(r->open);  // open: no window, plane 0 everywhere
 		measure("popup-motion");
@@ -859,15 +927,15 @@ static void popup_draw(u8 node)
 		}
 		return;
 	}
-	for (u32 i = 0; i < UI_POPUP_ITEMS; i++) {
-		if (!(pp.redraw >> i & 1))
+	for (u32 row = 0; row < pp.rows; row++) {
+		if (!(pp.redraw >> row & 1))
 			continue;
-		if (!canvas_band(node, &st->c, item_top(i) - ui_node(node)->y,
-				 item_top(i) + look.pop_pitch - ui_node(node)->y, popup_render)) {
+		if (!canvas_band(node, &st->c, row_top(row) - ui_node(node)->y,
+				 row_top(row) + look.pop_pitch - ui_node(node)->y, popup_render)) {
 			ui_dirty(node, 1);
 			break;
 		}
-		pp.redraw &= (u16) ~(1u << i);
+		pp.redraw &= (u16) ~(1u << row);
 		measure("popup-move");
 	}
 }
@@ -932,13 +1000,13 @@ int ui_popup_open(u8 list, u8 hints, const struct ui_popup *popup)
 	pp.menu = popup;
 	pp.fields = 0;
 	pp.cursor = popup->cursor < popup->count ? popup->cursor : 0;
-	pp.pop.hint[0] = (struct ui_hint){KEY_UPDOWN, gl_pop_choose};
-	pp.pop.hint[1] = (struct ui_hint){"A", gl_pop_ok};
-	pp.pop.hint[2] = (struct ui_hint){"B", gl_pop_close};
-	pp.pop.hint_count = 3;
-	// A title only where the card still fits between the bars with it (8
-	// items do; the SD file popup's 9 go without, the row beside it named)
-	u32 items = popup->count * look.pop_pitch + look.pop_pad_bottom;
+	pp.rows = (u8)(popup->count < UI_POPUP_ROWS ? popup->count : UI_POPUP_ROWS);
+	pp.first = (u8)(pp.cursor >= pp.rows ? pp.cursor - pp.rows + 1 : 0);
+	pp.pop.hint_count = 0;
+	pp.pop.hinted = 0;
+	popup_hints();
+	// A title where the card still fits between the bars with it
+	u32 items = pp.rows * look.pop_pitch + look.pop_pad_bottom;
 	pp.titled = popup->title && look.pop_head_h + items <= (u32)(look.pop_bottom_max - look.pop_top_min);
 	// A page whose tiles leave block 0 short (the list with art) may not
 	// fit a tall titled card: it opens without its title, two tile rows less
@@ -1013,9 +1081,9 @@ s32 ui_popup_choose(void)
 
 void ui_popup_changed(u32 item)
 {
-	if (!run_live(&pp.pop) || !pp.menu || item >= pp.menu->count)
+	if (!run_live(&pp.pop) || !pp.menu || item >= pp.menu->count || item < pp.first || item >= pp.first + pp.rows)
 		return;
-	pp.redraw |= (u16)(1u << item);
+	pp.redraw |= (u16)(1u << (item - pp.first));
 	ui_dirty(pp.pop.node, 1);
 }
 

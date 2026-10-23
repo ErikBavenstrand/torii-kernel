@@ -988,7 +988,7 @@ int ui_obj_add(u8 node, u16 attr0, u16 attr1, u16 attr2);
 // none) shows their keys, and gets its own back after.
 //
 //	struct ui_pop_item items[] = {{"Play"}, {"Favourite", "on"}, {"Delete", 0, UI_POP_DANGER}};
-//	struct ui_popup menu = {name, ART_ICON8_GBA + 1, items, 3, 0};
+//	struct ui_popup menu = {name, ART_ICON8_GBA + 1, items, 3, 0, 0};
 //	if (ui_popup_open(list, hints, &menu)) {
 //		s32 i;
 //		while ((i = ui_popup_choose()) == FAVOURITE) {  // it stays up
@@ -1002,11 +1002,18 @@ int ui_obj_add(u8 node, u16 attr0, u16 attr1, u16 attr2);
 //		ui_popup_close();  // after B too: it does nothing then
 //	}
 
-#define UI_POPUP_ITEMS 9  // items in a popup, at most (past 8 it has no room for its title)
+#define UI_POPUP_ITEMS 16  // items in a popup, at most
+// Items a popup's card shows at once: past them it scrolls (a thin bar in the
+// card shows where), so its height, and the tiles it takes, stay the same
+#define UI_POPUP_ROWS 7
 enum {
 	UI_POP_DANGER = 1,  // ui_pop_item.flags: in danger ink (Delete, Format), and last
 	UI_POP_DIM = 2,     // greyed out (ink3): nothing to do now; A still picks it
+	UI_POP_STEP = 4,    // LEFT/RIGHT step its value (shown « value » while chosen):
+			    // ui_popup_choose returns the item | UI_POP_LEFT or UI_POP_RIGHT
 };
+#define UI_POP_LEFT 0x100
+#define UI_POP_RIGHT 0x200
 struct ui_pop_item {
 	const char *text;
 	const char *value;  // right-aligned in the item's ink ("on"); NULL none
@@ -1019,6 +1026,7 @@ struct ui_popup {
 	const struct ui_pop_item *items;
 	u8 count;   // 1 to UI_POPUP_ITEMS
 	u8 cursor;  // the item chosen first (the primary action: 0)
+	const char *step_hint;  // the hint bar's word for LEFT/RIGHT on a UI_POP_STEP item
 };
 // Opens a popup beside list's selected row (a list on the top view): it
 // starts opening, and the call returns. 0 if it can't (logged, ui_error()).
@@ -1027,8 +1035,9 @@ int ui_popup_open(u8 list, u8 hints, const struct ui_popup *popup);
 // again: a page that runs frames before it opens a popup (a list still
 // paging) gives the popup the keys pressed meanwhile, not itself.
 void ui_keys_hold(int on);
-// Runs frames until A picks an item (its index; the popup stays up) or B
-// (-1; the popup has closed). -1 if no popup is up.
+// Runs frames until A picks an item (its index; the popup stays up), LEFT or
+// RIGHT steps a UI_POP_STEP item (its index | UI_POP_LEFT or UI_POP_RIGHT),
+// or B (-1; the popup has closed). -1 if no popup is up.
 s32 ui_popup_choose(void);
 // The popup's item changed (its value, its text): it draws again, in the
 // next VBlank (a few items a frame, if several change).

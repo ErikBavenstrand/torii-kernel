@@ -354,13 +354,14 @@ static const char *const games[] = {
 static const char *const game_sizes[] = {"4 MB", "8 MB", "16 MB", "32 MB"};
 static u8 game_fav[GAMES] EWRAM_BSS;
 static char ask_buf[64] EWRAM_BSS;
-static struct ui_pop_item menu_items[7] EWRAM_BSS;
+static struct ui_pop_item menu_items[12] EWRAM_BSS;
 static struct ui_popup menu EWRAM_BSS;
 
 enum {
 	ACT_NONE,
 	ACT_MENU,   // START: the game popup
 	ACT_SHORT,  // A: the NOR-like popup
+	ACT_LONG,   // START with R held: a popup past UI_POPUP_ROWS, which scrolls
 };
 
 static u32 games_count(void *ctx)
@@ -416,7 +417,7 @@ static const struct ui_view_spec popup_view = {"ui-popup", popup_nodes,      P_N
 static int popup_screen_keys(struct ui_view *v, u16 keys)
 {
 	if (keys & INPUT_START) {
-		demo.action = ACT_MENU;
+		demo.action = (ui_input()->held & INPUT_R) ? ACT_LONG : ACT_MENU;
 		return 1;
 	}
 	if (keys & INPUT_B) {
@@ -451,7 +452,7 @@ static void popup_action(void)
 		for (u32 k = 0; k < 7; k++)
 			menu_items[k] = (struct ui_pop_item){texts[k], 0, k == 6 ? UI_POP_DANGER : 0};
 		menu_items[1].value = game_fav[i] ? "on" : "off";
-		menu = (struct ui_popup){games[i], ART_ICON8_GBA + 1, menu_items, 7, 0};
+		menu = (struct ui_popup){games[i], ART_ICON8_GBA + 1, menu_items, 7, 0, 0};
 		if (!ui_popup_open(list, hints, &menu))
 			return;
 		// Favourite toggles in place; Delete asks, and Cancel goes back to
@@ -477,11 +478,34 @@ static void popup_action(void)
 		}
 		ui_popup_close();
 		tlog("ui-demo: popup picked %ld", (long)pick);
+	} else if (action == ACT_LONG) {
+		// Twelve items: seven show, the rest scroll; the first steps its
+		// value with LEFT/RIGHT
+		static const char *const texts[12] = {"Play",  "Saves",  "Favourite", "Rename",  "Game info", "Cheats",
+						      "Patch", "Export", "Import",    "Backups", "Copy",      "Delete"};
+		static const char *const boots[3] = {"default", "clean", "addons"};
+		u32 boot = 0;
+		for (u32 k = 0; k < 12; k++)
+			menu_items[k] = (struct ui_pop_item){texts[k], 0, k == 11 ? UI_POP_DANGER : 0};
+		menu_items[0].value = boots[0];
+		menu_items[0].flags = UI_POP_STEP;
+		menu = (struct ui_popup){games[i], ART_ICON8_GBA + 1, menu_items, 12, 0, "boot"};
+		if (!ui_popup_open(list, hints, &menu))
+			return;
+		s32 pick;
+		while ((pick = ui_popup_choose()) >= 0 && (pick & (UI_POP_LEFT | UI_POP_RIGHT))) {
+			boot = (boot + (pick & UI_POP_LEFT ? 2u : 1u)) % 3u;
+			menu_items[0].value = boots[boot];
+			ui_popup_changed(0);
+			tlog("ui-demo: boot %s", boots[boot]);
+		}
+		ui_popup_close();
+		tlog("ui-demo: long popup picked %ld", (long)pick);
 	} else if (action == ACT_SHORT) {
 		menu_items[0] = (struct ui_pop_item){"Launch", 0, 0};
 		menu_items[1] = (struct ui_pop_item){"Game info", 0, 0};
 		menu_items[2] = (struct ui_pop_item){"Format all", 0, UI_POP_DANGER};
-		menu = (struct ui_popup){games[i], ART_ICON8_NOR + 1, menu_items, 3, 0};
+		menu = (struct ui_popup){games[i], ART_ICON8_NOR + 1, menu_items, 3, 0, 0};
 		if (!ui_popup_open(list, hints, &menu))
 			return;
 		s32 pick = ui_popup_choose();
