@@ -301,6 +301,33 @@ extern const struct lang_gsaves *gl_gsaves;
 // A key past the cap says so, with the cap
 #define EN_RENAME_TOO_LONG "Names stop at %u letters."
 
+// The global save manager (screens/saves.c, Settings > Library > Saves)
+struct lang_saves {
+	const char *title;
+	const char *hint_open, *hint_relink;  // A: on the list; in the picker
+	const char *row_saves, *row_history, *row_trash;  // "Saves", "History", "Trash"
+	const char *games[2], *versions[2], *files[2];  // a row's count: for one, for many (nav_count_words)
+	const char *empty_trash;               // "Empty trash now"
+	const char *heading, *none;            // "Orphaned saves"; "No orphaned saves"
+	const char *pop_relink, *pop_delete, *pop_keep;
+	const char *kept;                      // an orphan kept, its detail
+	const char *pick_title;                // the picker's title bar
+	const char *ask_relink, *ask_relink_button;
+	const char *ask_delete, *ask_delete_text, *ask_delete_button;
+	const char *ask_empty, *ask_empty_text, *ask_empty_button;
+	const char *scanning, *scanning_text;  // the progress dialog of the card walk
+	const char *phase[4];                  // its status line, by phase
+	const char *emptying, *emptying_text;
+	const char *moving, *moving_text;
+	const char *no_library;                // the picker needs the library
+	const char *err_card, *err_source, *err_target, *err_path, *err_stopped;
+	const char *trash_empty;               // Empty trash now with nothing in it
+};
+extern const struct lang_saves *gl_saves;
+// Formats (for the detail, a count and a size)
+#define EN_SAVES_SLOTS "%u \xC2\xB7 %s"
+#define EN_SAVES_RENAMED "%u slots took new names\nbecause the game had them."
+
 extern u32 gl_lang; // index of the current language in lang_packs
 
 void LoadEnglish(void);

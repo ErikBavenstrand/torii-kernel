@@ -14,6 +14,17 @@ git log, not here.
   current goes into the history) and Export (`/torii/export`); New slot and
   Import .sav (a folder browser, then the slot to replace) close the list
   (e0fa5e7).
+- **Added:** the global save manager: Settings > Library > Saves
+  (`source/screens/saves.c`, card side `source/saveorphan.c`). It shows the
+  space the saves, their history and the trash use, and the orphans, save
+  folders whose ROM is no longer at their path. Relink picks a library game
+  (same file name first, then the same console) and moves the save and history
+  folders there; a slot whose name the target has already comes as `<name> 2`,
+  `3`..., the target's own slots and record never change. Delete sends an orphan
+  to the trash for 30 days, Keep leaves it, Empty trash now asks first.
+  Journaled in `/torii/orphanop.txt` and finished at boot; folders move a file
+  at a time, as a folder renamed into another parent can leave a wrong `..`
+  entry after a cut (144c567).
 - **Added:** the launch's save slot picker and the New slot and Rename flows
   (`source/screens/slot_picker.c`, `slot_flow.c`, `slot_list.c`). A game with
   two or more slots asks which to play on every launch (the last used chosen,

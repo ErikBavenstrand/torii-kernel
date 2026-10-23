@@ -237,6 +237,11 @@ static const struct {
 	{"saveslot_recovery", test_saveslot_recovery},
 	{"saveslot_sanity", test_saveslot_sanity},
 	{"saveslot_import_size", test_saveslot_import_size},
+	{"orphanplan_slot_of", test_orphanplan_slot_of},
+	{"orphanplan_pick_name", test_orphanplan_pick_name},
+	{"orphanplan_pick_name_full", test_orphanplan_pick_name_full},
+	{"orphanplan_journal", test_orphanplan_journal},
+	{"orphanplan_picker", test_orphanplan_picker},
 };
 
 int main(void)

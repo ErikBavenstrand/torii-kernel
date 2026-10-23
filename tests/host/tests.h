@@ -205,5 +205,10 @@ void test_saveslot_journal(void);
 void test_saveslot_recovery(void);
 void test_saveslot_sanity(void);
 void test_saveslot_import_size(void);
+void test_orphanplan_slot_of(void);
+void test_orphanplan_pick_name(void);
+void test_orphanplan_pick_name_full(void);
+void test_orphanplan_journal(void);
+void test_orphanplan_picker(void);
 
 #endif

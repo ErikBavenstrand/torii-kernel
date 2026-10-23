@@ -33,6 +33,7 @@ const struct settings_row settings_rows[SET_ROWS] = {
 	[SET_RESCAN] = {SET_SEC_LIBRARY, SET_ACTION, SET_NO_SLOT, 0, 0, 0, 0, SET_ACTION_RESCAN},
 	[SET_IDENTIFY] = {SET_SEC_LIBRARY, SET_ACTION, SET_NO_SLOT, 0, 0, 0, 0, SET_ACTION_IDENTIFY},
 	[SET_SHOW_ALL] = {SET_SEC_LIBRARY, SET_ONOFF, assress_show_all, 0, 0, 2, 0, 0},
+	[SET_SAVES] = {SET_SEC_LIBRARY, SET_ACTION, SET_NO_SLOT, 0, 0, 0, 0, SET_ACTION_SAVES},
 	[SET_HISTORY] = {SET_SEC_SYSTEM, SET_CHOICE, assress_history, 0, SET_HISTORY_DEFAULT, SET_HISTORY_CHOICES, &gl_set_history, 0},
 	[SET_LOGGING] = {SET_SEC_SYSTEM, SET_CHOICE, assress_logging, 0, 0, 4, &gl_set_log_levels, 0},
 	[SET_LANGUAGE] = {SET_SEC_SYSTEM, SET_CHOICE, assress_language, SET_HIDDEN, 0, 0, 0, 0},
@@ -44,7 +45,7 @@ const struct settings_section_info settings_sections[SET_SECTIONS] = {
 	[SET_SEC_GAMES] = {SET_BOOT_MODE, 5},
 	[SET_SEC_CART] = {SET_RUMBLE, 5},
 	[SET_SEC_HOTKEYS] = {SET_RESET_ON, 4},
-	[SET_SEC_LIBRARY] = {SET_RESCAN, 3},
+	[SET_SEC_LIBRARY] = {SET_RESCAN, 4},
 	[SET_SEC_SYSTEM] = {SET_HISTORY, 3},
 };
 // clang-format on

@@ -89,6 +89,7 @@ char *gl_hint_set EWRAM_BSS;
 
 const struct lang_games *gl_games EWRAM_BSS;
 const struct lang_rename *gl_rename EWRAM_BSS;
+const struct lang_saves *gl_saves EWRAM_BSS;
 const struct lang_slots *gl_slots EWRAM_BSS;
 const struct lang_gsaves *gl_gsaves EWRAM_BSS;
 
@@ -267,6 +268,7 @@ const char *en_set_labels[SET_ROWS] = {
 	[SET_RESCAN] = "Rescan library",
 	[SET_IDENTIFY] = "Identify library",
 	[SET_SHOW_ALL] = "Show all files",
+	[SET_SAVES] = "Saves",
 	[SET_HISTORY] = "History",
 	[SET_LOGGING] = "Logging",
 	[SET_LANGUAGE] = "Language",
@@ -298,6 +300,7 @@ const char *en_set_explain[SET_EXPLAINS] = {
 	[SET_RESCAN] = "Looks for games on the card again.",
 	[SET_IDENTIFY] = "Looks up each game in names.db.",
 	[SET_SHOW_ALL] = "The SD card page shows hidden files.",
+	[SET_SAVES] = "Space used, orphaned saves, trash.",
 	[SET_HISTORY] = "Versions kept of each save slot.",
 	[SET_LOGGING] = "Writes a log to /torii/logs.",
 	[SET_LANGUAGE] = "The menu's language.",
@@ -643,6 +646,50 @@ static const struct lang_rename en_rename = {
 	.checking_text = "Looking for another game\nthat uses this save",
 };
 
+// The global save manager: one line each in the list (the hint bar and
+// the dialogs wrap at 4 lines)
+static const struct lang_saves en_saves = {
+	.title = "Saves",
+	.hint_open = "open",
+	.hint_relink = "relink",
+	.row_saves = "Saves",
+	.row_history = "History",
+	.row_trash = "Trash",
+	.games = {"1 game", "games"},
+	.versions = {"1 version", "versions"},
+	.files = {"1 file", "files"},
+	.empty_trash = "Empty trash now",
+	.heading = "Orphaned saves",
+	.none = "No orphaned saves",
+	.pop_relink = "Relink",
+	.pop_delete = "Delete",
+	.pop_keep = "Keep",
+	.kept = "kept",
+	.pick_title = "Relink to",
+	.ask_relink = "Relink to this game?",
+	.ask_relink_button = "Relink",
+	.ask_delete = "Delete these saves?",
+	.ask_delete_text = "They wait in the trash for 30 days.",
+	.ask_delete_button = "Delete",
+	.ask_empty = "Empty the trash?",
+	.ask_empty_text = "This can't be undone.",
+	.ask_empty_button = "Empty",
+	.scanning = "Saves",
+	.scanning_text = "Counting what the saves use",
+	.phase = {"Saves", "History", "Trash", "Orphans"},
+	.emptying = "Trash",
+	.emptying_text = "Emptying the trash",
+	.moving = "Saves",
+	.moving_text = "Moving the saves",
+	.no_library = "The library isn't ready yet.",
+	.err_card = "The card didn't take it.",
+	.err_source = "Those saves are gone.",
+	.err_target = "That game isn't on the card.",
+	.err_path = "A name or path is too long.",
+	.err_stopped = "Two different saves share a name.\nNothing was overwritten.",
+	.trash_empty = "The trash is empty.",
+};
+
 //---------------------------------------------------------------------------------
 void LoadEnglish(void)
 {
@@ -793,6 +840,7 @@ void LoadEnglish(void)
 	gl_sd_no_save = (char *)en_sd_no_save;
 	gl_games = &en_games;
 	gl_rename = &en_rename;
+	gl_saves = &en_saves;
 	gl_slots = &en_slots;
 	gl_gsaves = &en_gsaves;
 }

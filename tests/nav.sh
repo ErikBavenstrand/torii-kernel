@@ -341,7 +341,7 @@ nav_nor_format_page() {
 # (_nav_setting_rows); with NAV_LED_OFF=1 the LED colours are hidden, as
 # the page hides them while the LED is off.
 _nav_setting_rows=(theme game-view box-art start-on dim time date 24h game-clock boot-mode fast-patching auto-save save-states
-  cheats rumble mode-b led led-colour sd-light reset-hotkey reset-keys sleep sleep-keys rescan identify show-all history logging)
+  cheats rumble mode-b led led-colour sd-light reset-hotkey reset-keys sleep sleep-keys rescan identify show-all saves history logging)
 nav_setting() {
   local want=$1 id=0 steps=0 word keys=()
   for word in "${_nav_setting_rows[@]}"; do

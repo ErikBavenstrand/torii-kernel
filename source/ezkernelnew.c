@@ -29,6 +29,7 @@
 #include "settings.h"
 #include "cartlog.h"
 #include "cutpoint.h"
+#include "saveorphan.h"
 #include "slotstore.h"
 #include "saveslot.h"
 #include "charset.h"
@@ -1440,6 +1441,7 @@ int main(void)
 	}
 	boot_mounted = torii_frames;
 	slotstore_recover();  // a slot rename or delete the power cut short, before any save is touched
+	saveorphan_recover();  // a relink or delete of an orphaned save the same
 	slotstore_trash_purge(NULL);  // deleted slots past their 30 days
 
 	// Diagnostics also starts from these keys held at power-on, in case the

@@ -24,6 +24,13 @@
 //   one slotstore_* call (which may run inside Save_savefile, after its
 //   chunks are done): file objects, paths, a directory's names and two copy
 //   buffers. Nothing outlives the call; no listing (SDLIST) may run across it.
+// - READCACHE_ORPHAN, the same 16 KB: the global save manager's work area
+//   (saveorphan.c), within one saveorphan_* call, which runs no slotstore_*
+//   call inside it (they take turns). The Saves screen holds its list in EWRAM.
+// - READCACHE_SAVES, 8 KB from 0x16000, clear of the slot store's and the save
+//   copy's (and past the 2 x 2 KB at READCACHE_SAVE's start): the Saves screen's
+//   state (screens/saves.c) while it runs, in a deferred action, where nothing
+//   else borrows pReadCache between its calls.
 // - READCACHE_SDLIST, 43 KB in READCACHE_SAVE's room (no save runs during a
 //   listing): the SD card page's folder listing on its way to PSRAM
 //   (sdlist.h's scratch), within one listing.
@@ -61,6 +68,10 @@
 #define READCACHE_SAVE 0x10000  // 64 KB, to the end
 #define READCACHE_SLOTS 0x12000
 #define READCACHE_SLOTS_SIZE 0x4000
+#define READCACHE_SAVES 0x16000
+#define READCACHE_SAVES_SIZE 0x2000
+#define READCACHE_ORPHAN READCACHE_SLOTS
+#define READCACHE_ORPHAN_SIZE READCACHE_SLOTS_SIZE
 #define READCACHE_GAMES 0x8000
 #define READCACHE_GAMES_SIZE 0x18000
 #define READCACHE_NAMES 0x0

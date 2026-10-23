@@ -74,6 +74,7 @@ static const struct {
 	// An SD file renamed: its save and its lists follow it
 	{"rename_file", test_rename_file},
 	{"slotstore", test_slotstore},
+	{"saveorphan", test_saveorphan},
 	// Not in Diagnostics: they use the index's PSRAM and write games to the card
 	{"library_psram", test_library_psram},
 	{"library_boot", test_library_boot},
@@ -137,7 +138,8 @@ void torii_run_tests(void)
 	// SELECT and START: a slot store power-cut scenario (tests/slotstore.sh), alone
 	if ((~REG_KEYINPUT & 0x3FF) == (KEY_SELECT | KEY_START)) {
 		REG_WAITCNT_CART = WAITCNT_MENU;
-		slot_scenario();
+		if (!orphan_scenario())
+			slot_scenario();
 		return;
 	}
 	if ((~REG_KEYINPUT & 0x3FF) == KEY_SELECT) {
