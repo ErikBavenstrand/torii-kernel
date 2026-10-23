@@ -1,4 +1,5 @@
-# The save manager in the light theme: the slots and a slot's actions.
+# A game's saves in the light theme: the slots with the active one's facts,
+# and a slot's popup (START).
 #! settings 28=1
 #! sd-file "/torii/saves/Long/A name too long to fit on its row.gba/Main.sav" 0x10000 /dev/null
 #! sd-file "/torii/saves/Long/A name too long to fit on its row.gba/Boss Rush.sav" 0x10000 /dev/null
@@ -14,10 +15,10 @@
 -w "nav: page gba ready"
 -k @30:START -k @34:-
 -w "screen ready: game-popup"
--k @12:DOWN -k @16:- -k @20:DOWN -k @24:- -k @28:DOWN -k @32:- -k @36:DOWN -k @40:-
--k @48:A -k @52:-
+-k @12:DOWN -k @16:-
+-k @28:A -k @32:-
 -w "screen ready: game-saves"
--s @30:manager.png
--k @34:A -k @38:-
+-s @30:slots.png
+-k @34:START -k @38:-
 -w "screen ready: game-saves-slot"
--s @30:actions.png
+-s @30:options.png

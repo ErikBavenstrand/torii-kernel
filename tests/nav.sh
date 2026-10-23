@@ -30,14 +30,15 @@
 # test knows from the card it made. Each folder opens with A; on the file,
 # START opens its popup, and the route waits for the page to log that
 # popup's path, so a wrong row stops the run there. ACTION then picks from
-# the popup: popup (none: it stays open), launch (Launch; with hard, L held:
-# a hard reset), clean (Clean boot), nor (Write to NOR), nor-addon (Write
-# to NOR with addon), fav (Add to or Remove from
-# favourites, then B closes it), delete (Delete, then Delete in the
-# confirmation), delete-no (Delete, then Cancel, then B), info (File info,
-# then A closes it), or open (no popup: A on the row, which starts a game).
-# Clean boot, Boot with addon (GBA games) and Write to NOR with addon show only while an addon is on:
-# say addon then (clean and nor-addon imply it), so the route counts them.
+# the popup (a GBA game's: Play « », Write to NOR, Saves, then favourites,
+# Rename, File info, Delete): popup (none: it stays open), launch (Play;
+# with hard, L held: a hard reset), clean (Play « clean », RIGHT), nor
+# (Write to NOR), nor-addon (Play « addons », LEFT, then Write to NOR), fav
+# (Add to or Remove from favourites, then B closes it), delete (Delete, then
+# Delete in the confirmation), delete-no (Delete, then Cancel, then B), info
+# (File info, then A closes it), or open (no popup: A on the row, which
+# starts a game). Play's « » steps only while an addon is on: clean and
+# nor-addon need one (addon is kept for the routes that say it).
 # Later options count from the route's last wait (-w): the popup's line, or
 # the folder's with open. The kernel cuts a log line's text at 240 bytes,
 # so a wait for a longer line (a path of about 225 bytes or more) waits for
@@ -164,14 +165,14 @@ nav_to() {
 }
 
 nav_file() {
-  local path=$1 hard=0 addon=0 action=popup folder='' part parts=() rows=() lines=() keys=() i
+  local path=$1 hard=0 action=popup folder='' part parts=() rows=() lines=() keys=() i
   shift
   IFS=/ read -r -a parts <<<"${path#/}"
   while [ $# -gt 0 ]; do
     case $1 in
     [0-9]*) rows+=("$1") ;;
     hard) hard=1 ;;
-    addon) addon=1 ;;
+    addon) ;; # kept for the routes that say it: the popup no longer counts it
     popup | launch | clean | nor | nor-addon | fav | delete | delete-no | info | open) action=$1 ;;
     *)
       _nav_fail "nav_file: unknown option $1"
@@ -205,13 +206,13 @@ nav_file() {
     case $action in
     popup) keys=() ;;
     launch) keys=("$a") ;;
-    clean) keys=(DOWN "$a") ;;
-    nor) if [ "$addon" = 1 ]; then keys=(DOWN DOWN DOWN "$a"); else keys=(DOWN "$a"); fi ;;
-    nor-addon) keys=(DOWN DOWN DOWN DOWN "$a") ;;
-    fav) keys=(UP UP UP A B) ;;
-    delete) keys=(UP UP A RIGHT A) ;;
-    delete-no) keys=(UP UP A A B) ;;
-    info) keys=(UP A A) ;;
+    clean) keys=(RIGHT "$a") ;;
+    nor) keys=(DOWN "$a") ;;
+    nor-addon) keys=(LEFT DOWN "$a") ;;
+    fav) keys=(UP UP UP UP A B) ;;
+    delete) keys=(UP A RIGHT A) ;;
+    delete-no) keys=(UP A A B) ;;
+    info) keys=(UP UP A A) ;;
     esac
     # The popup takes A once it has opened (6 frames); a confirmation the same
     [ ${#keys[@]} -gt 0 ] && lines+=("$(_nav_keys 12 "${keys[@]}")")

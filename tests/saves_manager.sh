@@ -7,9 +7,10 @@
 #   2. Relink: the picker lists the library's games, the GBA ones for a .gba
 #      orphan; the one chosen, asked, gets the save and history folders
 #   3. the next power-on's screen lists no orphan
-#   4. an orphan's Delete (asked) moves it to the trash; Empty trash now
-#      (asked) empties it
-#   5. Keep leaves an orphan where it is
+#   4. an orphan's Delete (asked) moves it to the trash; Empty trash (asked)
+#      empties it
+#   5. B on an orphan's popup leaves it where it is
+# The rows: the saves without a game, then Empty trash.
 # Runs inside the torii-emu container after `just build`, `just
 # emu-headless` and building tests/roms.
 set -euo pipefail
@@ -75,7 +76,6 @@ to_screen=(-k @8:A -k @12:- -w "screen ready: saves")
 # 1 and 2: the figures, then Relink to Renamed.gba (the picker's second GBA game)
 # shellcheck disable=SC2046 # nav.sh's options
 boot $(nav_setting saves) "${to_screen[@]}" -s @6:"$shots/1-list.png" \
-  -k @10:DOWN -k @14:- -k @18:DOWN -k @22:- -k @26:DOWN -k @30:- -k @34:DOWN -k @38:- -k @42:DOWN -k @46:- \
   -k @56:A -k @60:- -w "saves: popup" -k @20:A -k @24:- -w "saves: picker" \
   -s @10:"$shots/2-picker.png" -k @20:DOWN -k @24:- -k @32:A -k @36:- \
   -k @60:RIGHT -k @64:- -k @72:A -k @76:- -w "orphan: relinked" -f 6000
@@ -95,12 +95,11 @@ has /torii/saves/G/Renamed.gba/Main.sav || fail "Main.sav didn't follow"
 boot $(nav_setting saves) "${to_screen[@]}" -s @6:"$shots/3-none.png" -f 1200
 logged "saves: 0 orphans"
 
-# 4: an orphan again: Delete (the popup's last item, asked) then Empty trash now (asked)
+# 4: an orphan again: Delete (the popup's second item, asked) then Empty trash (asked)
 mren -i "$img" ::/G/Renamed.gba ::/G/Moved.gba
 # shellcheck disable=SC2046 # nav.sh's options
 boot $(nav_setting saves) "${to_screen[@]}" \
-  -k @10:DOWN -k @14:- -k @18:DOWN -k @22:- -k @26:DOWN -k @30:- -k @34:DOWN -k @38:- -k @42:DOWN -k @46:- \
-  -k @56:A -k @60:- -w "saves: popup" -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:A -k @48:- \
+  -k @56:A -k @60:- -w "saves: popup" -k @20:DOWN -k @24:- -k @44:A -k @48:- \
   -k @70:RIGHT -k @74:- -k @82:A -k @86:- -w "orphan: deleted /G/Renamed.gba" -f 6000
 ! has /torii/saves/G/Renamed.gba || fail "the orphan is still in the saves"
 ! has /torii/backups/G/Renamed.gba || fail "the orphan's history is still there"
@@ -109,17 +108,16 @@ trash=$(mdir -b -i "$img" ::/torii/trash | grep -v 20260101 | head -1 | sed 's|/
 [ "$(content "/torii/trash/$trash/G/Renamed.gba/Main.sav")" = A ] || fail "the orphan's save isn't in the trash"
 # shellcheck disable=SC2046 # nav.sh's options
 boot $(nav_setting saves) "${to_screen[@]}" \
-  -k @10:DOWN -k @14:- -k @18:DOWN -k @22:- -k @26:DOWN -k @30:- -k @38:A -k @42:- \
+  -k @38:A -k @42:- \
   -k @70:RIGHT -k @74:- -k @82:A -k @86:- -w "orphan: trash /torii/trash/" -f 6000
 logged "orphan: scan: 1 games, 0 orphans"
 [ -z "$(mdir -b -i "$img" ::/torii/trash 2>/dev/null)" ] || fail "the trash isn't empty: $(mdir -b -i "$img" ::/torii/trash)"
 
-# 5: Keep leaves it
+# 5: B on its popup leaves it
 card_save K 8192 ::/torii/saves/G/Lost.gba/Main.sav
 # shellcheck disable=SC2046 # nav.sh's options
 boot $(nav_setting saves) "${to_screen[@]}" \
-  -k @10:DOWN -k @14:- -k @18:DOWN -k @22:- -k @26:DOWN -k @30:- -k @34:DOWN -k @38:- -k @42:DOWN -k @46:- \
-  -k @56:A -k @60:- -w "saves: popup" -k @20:DOWN -k @24:- -k @32:A -k @36:- \
+  -k @56:A -k @60:- -w "saves: popup" -k @20:B -k @24:- \
   -s @30:"$shots/5-kept.png" -f 800
-[ "$(content /torii/saves/G/Lost.gba/Main.sav)" = K ] || fail "Keep changed the save"
-echo "PASS: saves manager: the figures, Relink, Delete, Empty trash and Keep through the keys"
+[ "$(content /torii/saves/G/Lost.gba/Main.sav)" = K ] || fail "B on the popup changed the save"
+echo "PASS: saves manager: the figures, Relink, Delete, Empty trash and B through the keys"

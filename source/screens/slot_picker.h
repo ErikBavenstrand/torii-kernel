@@ -1,12 +1,9 @@
-// The launch's save slot picker (slot_picker.c; v0.5 decisions): a page that
-// lists a game's slots, the last-used one chosen, with a "New slot..." row.
-// A confirms (the slot becomes the game's current one), START renames the
-// highlighted slot (the GBA has no X key), B cancels. New slot and Rename are
-// slot_flow.h's.
+// The launch's save slot choice (slot_picker.c): "Play with" on the save
+// page, a game's slots with the active one chosen. A plays it (it becomes the
+// active slot), B starts nothing. Managing slots is a game's Saves page's.
 //
-// A game with one slot launches straight in, a game with two or more shows
-// the picker on every launch, and Select held with A on a game shows it
-// whatever the count (so New slot is always reachable).
+// A game with one slot (or none yet) launches straight in; one with two or
+// more asks on every launch, and Select held with A asks whatever the count.
 #ifndef TORII_SCREENS_SLOT_PICKER_H
 #define TORII_SCREENS_SLOT_PICKER_H
 

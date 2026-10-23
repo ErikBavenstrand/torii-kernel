@@ -46,11 +46,11 @@ fresh() {
   rm -f "$cart/sram.bin"
 }
 
-# Hello's popup on the GBA page, Boot with addon (its fourth item), then the
-# cheat screen; dump the parsed list
+# Hello's popup on the GBA page, Play « addons » (LEFT from « default »
+# wraps to it), then the cheat screen; dump the parsed list
 list=$((16#$(sed -n 's/^\([0-9a-f]*\) [A-Za-z] pReadCache$/\1/p' dist/ezkernelnew.nm) + 0x2000))
 # shellcheck disable=SC2046 # nav.sh's options
-boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @20:DOWN -k @24:- -k @28:DOWN -k @32:- -k @40:A -k @44:- \
+boot $(nav_game_menu gba 0) -k @12:LEFT -k @16:- -k @40:A -k @44:- \
   -w "screen ready: cheats" -s "@4:$shots/cheats.png" -m "@4:$(printf 0x%x "$list"):1024" -f 2000 \
   >"$cart/out.txt" 2>"$cart/err.txt" || fail "the cheat screen didn't open: $(grep '^kernel' "$cart/err.txt" | tail -3)"
 sed -n 's/^mem frame [0-9]* [0-9A-F]*: //p' "$cart/out.txt" | python3 -c 'import sys; sys.stdout.buffer.write(bytes.fromhex(sys.stdin.read()))' >"$cart/list.bin"
@@ -70,7 +70,7 @@ echo "PASS: cheat files in Latin-1 and GBK parse"
 # is "1234,56"
 fresh
 # shellcheck disable=SC2046 # nav.sh's options
-boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @20:DOWN -k @24:- -k @28:DOWN -k @32:- -k @40:A -k @44:- \
+boot $(nav_game_menu gba 0) -k @12:LEFT -k @16:- -k @40:A -k @44:- \
   -w "screen ready: cheats" -k @8:A -k @12:- -k @24:START -k @28:- \
   -u "launch: loading" -f 2000 >"$cart/apply.txt" 2>&1 || true
 grep -q "launch: loading.*cheats 1 (1)" "$cart/apply.txt" ||
@@ -81,7 +81,7 @@ echo "PASS: a picked cheat is applied at launch"
 # Hello with the addons alone
 fresh
 # shellcheck disable=SC2046 # nav.sh's options
-boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @20:DOWN -k @24:- -k @28:DOWN -k @32:- -k @40:A -k @44:- \
+boot $(nav_game_menu gba 0) -k @12:LEFT -k @16:- -k @40:A -k @44:- \
   -w "screen ready: cheats" -k @8:A -k @12:- -k @24:B -k @28:- -w "cheats: back" \
   -w "screen ready: games" -k @20:A -k @24:- -u "launch: loading" -f 2000 >"$cart/back.txt" 2>&1 || true
 grep -q "launch: loading.*cheats 1 (0)" "$cart/back.txt" ||

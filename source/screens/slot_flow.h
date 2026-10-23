@@ -1,7 +1,7 @@
 // The slot flows a game's saves share (slot_flow.c): asking for a slot name
-// on the on-screen keyboard, New slot (a name, then Blank or a copy of the
-// current slot) and Rename. The launch's slot picker (slot_picker.h) and the
-// per-game save manager call them; they know nothing of the picker.
+// on the on-screen keyboard, and Rename, with what the slot store's codes
+// say. A game's saves page (game_saves.h) and the launch's Play with
+// (slot_picker.h) call them.
 //
 // All of them take the place of the menu's session screen (the keyboard and
 // the choice list pop what is up, as rename_run does), so call them from a
@@ -36,14 +36,6 @@ enum {
 // keep its name or change its case. Returns SLOT_FLOW_DONE with the cleaned
 // name in out (SAVESLOT_NAME_BYTES), or SLOT_FLOW_CANCEL.
 int slot_flow_name_prompt(const char *rom, const char *title, const char *initial, const char *own, char *out);
-
-// New slot: the name prompt, then (when the game has a slot to copy: the
-// current one) a choice of Blank (first) or Copy of <current>, then
-// slotstore_create. blank_size is the game's save size in bytes
-// (Get_savefilesize; 512 to 131072, a multiple of 512). The new slot is not
-// made the current one. DONE puts its name in created (SAVESLOT_NAME_BYTES,
-// may be NULL). A game with SLOTSTORE_MAX_SLOTS slots says so without asking.
-int slot_flow_new(const char *rom, u32 blank_size, char *created);
 
 // Rename: the name prompt with the slot's name, then slotstore_rename (the
 // current-slot record follows). DONE puts the new name in renamed

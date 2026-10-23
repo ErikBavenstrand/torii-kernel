@@ -180,10 +180,10 @@ printf '/A.gba\n/B.gba\n/C.gba\n/D.gb\n/Gone.gba\n' >"$cart/fav.txt"
 mcopy -i "$cart/sd.img" "$cart/fav.txt" ::/torii/favorites.txt
 NAV_SHOWN="fav gba gb"
 # shellcheck disable=SC2046 # nav.sh's options
-boot "$cart/1.log" $(nav_game_menu fav 1) -k @8:DOWN -k @12:- -k @20:A -k @24:- \
+boot "$cart/1.log" $(nav_game_menu fav 1) -k @8:DOWN -k @12:- -k @16:DOWN -k @20:- -k @28:A -k @32:- \
   -w "userdata: favourite /B.gba off" -k @20:A -k @24:- -w "userdata: favourite /B.gba on" \
   -k @20:B -k @24:- -w "popup: closed" -k @20:START -k @24:- -w "screen ready: game-popup B" \
-  -k @8:DOWN -k @12:- -k @20:A -k @24:- -w "userdata: favourite /B.gba off" -k @20:B -k @24:- \
+  -k @8:DOWN -k @12:- -k @16:DOWN -k @20:- -k @28:A -k @32:- -w "userdata: favourite /B.gba off" -k @20:B -k @24:- \
   -w "popup: closed" -k @20:START -k @24:- -w "screen ready: game-popup C" -f 3000
 grep -q "^kernel: screen ready: game-popup C" "$cart/1.log" ||
   fail "after B went, row 1 isn't C: $(grep -E '^kernel: (screen ready|games|userdata)' "$cart/1.log" | tail -6)"
@@ -195,7 +195,7 @@ grep -q "^kernel: games: 4 favourites kept" "$cart/1.log" || fail "the page sort
 # shellcheck disable=SC2046 # nav.sh's options
 boot "$cart/2.log" $(nav_game fav 0) -k @20:B -k @24:- -w "nav: home ready" -k @8:RIGHT -k @12:- -k @20:A -k @24:- \
   -w "nav: page gba ready" -k @8:DOWN -k @12:- -k @20:START -k @24:- -w "screen ready: game-popup B" \
-  -k @12:DOWN -k @16:- -k @24:A -k @28:- -w "userdata: favourite /B.gba on" -f 3000
+  -k @12:DOWN -k @16:- -k @20:DOWN -k @24:- -k @32:A -k @36:- -w "userdata: favourite /B.gba on" -f 3000
 grep -q '^kernel: games: favourite /B.gba in in place' "$cart/2.log" ||
   fail "B's coming back wasn't made in place: $(grep '^kernel: games' "$cart/2.log")"
 echo "PASS: Favourites keeps its order between visits and changes it in place"

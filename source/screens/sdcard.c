@@ -82,10 +82,7 @@ extern u8 pReadCache[];
 enum {
 	POP_OPEN,
 	POP_LAUNCH,
-	POP_CLEAN,
-	POP_ADDON,
 	POP_NOR,
-	POP_NOR_ADDON,
 	POP_FAV,
 	POP_RENAME,
 	POP_DELETE,
@@ -124,6 +121,8 @@ static struct {
 	u16 memo_cursor[MEMO_FOLDERS];
 	u8 memo_next;
 	u8 pop_ids[UI_POPUP_ITEMS];
+	u8 boots[LANG_BOOTS];  // Play's ways to start (LANG_BOOT_*), stepped
+	u8 nboots, boot;
 	struct ui_pop_item pop_items[UI_POPUP_ITEMS];
 	struct ui_popup popup;
 	struct ui_hint hints[3];
@@ -644,7 +643,8 @@ static void rename_file(void)
 	const char *dot = strrchr(sd.name, '.');
 	u32 stem = dot && dot != sd.name ? (u32)(dot - sd.name) : (u32)strlen(sd.name);
 	snprintf(sd.info, sizeof(sd.info), "%.*s", (int)stem, sd.name);
-	const struct rename_ask ask = {ART_ICON16_SD, sd.info, sd.name + stem, RENAME_STEM_MAX, 1, rename_submit, 0, 0};
+	const struct rename_ask ask = {
+		ART_ICON16_SD, sd.info, sd.name + stem, RENAME_STEM_MAX, 1, rename_submit, 0, 0, 0};
 	memo_store();  // the cursor the page comes back with if nothing changes
 	count_stop();
 	sd.renamed_partly = 0;
@@ -794,36 +794,41 @@ static int file_popup_open(u32 i)
 	}
 	const struct sdlist_rec *r = sdlist_at(&sd.list, i);
 	u32 console = sdlist_console(r);
-	sd.popup = (struct ui_popup){sd.name, (u8)((sdlist_is_dir(r) ? ART_ICON8_FOLDER : ART_ICON8_FILE) + 1),
-				     sd.pop_items, 0, 0};
+	sd.popup = (struct ui_popup){sd.name,
+				     (u8)((sdlist_is_dir(r) ? ART_ICON8_FOLDER : ART_ICON8_FILE) + 1),
+				     sd.pop_items,
+				     0,
+				     0,
+				     gl_games->hint_boot};
 	if (sdlist_is_dir(r)) {
 		pop_add(POP_OPEN, gl_sd_open, 0);
 	} else if (console != LIB_CONSOLE_NONE) {
-		pop_add(POP_LAUNCH, gl_sd_launch, 0);
-		// With an addon on, the other ways to start it than Launch's (by its
-		// boot mode): clean (a game patches break can always start clean),
-		// and a GBA game with its addons, as the game popup offers
+		// Play: how it starts steps with LEFT/RIGHT while an addon is on
+		// (its own way, clean, and a GBA game's with addons); Write to NOR
+		// writes it the way Play says
+		sd.nboots = 0;
+		sd.boot = 0;
+		sd.boots[sd.nboots++] = LANG_BOOT_DEFAULT;
 		if (any_addon()) {
-			pop_add(POP_CLEAN, gl_sd_clean, 0);
+			sd.boots[sd.nboots++] = LANG_BOOT_CLEAN;
 			if (console == LIB_GBA)
-				pop_add(POP_ADDON, gl_games->pop[LANG_POP_ADDON], 0);
+				sd.boots[sd.nboots++] = LANG_BOOT_ADDONS;
 		}
-		if (console == LIB_GBA) {  // only GBA games go to the game NOR
+		pop_add(POP_LAUNCH, gl_sd_launch, sd.nboots > 1 ? UI_POP_STEP : 0);
+		if (sd.nboots > 1)
+			sd.pop_items[0].value = gl_games->boots[LANG_BOOT_DEFAULT];
+		if (console == LIB_GBA) {  // only GBA games go to the game NOR, and have slots
 			pop_add(POP_NOR, gl_sd_nor, 0);
-			if (any_addon())
-				pop_add(POP_NOR_ADDON, gl_sd_nor_addon, 0);
+			if (game_saves_probe(sd.full))
+				pop_add(POP_SAVES, gl_gsaves->title, 0);
 		}
-		// A GBA game's slots (the popup holds nine items at most: Favourite,
-		// Rename, Delete and File info follow)
-		if (console == LIB_GBA && sd.popup.count + 5 <= UI_POPUP_ITEMS && game_saves_probe(sd.full))
-			pop_add(POP_SAVES, gl_gsaves->title, 0);
 		pop_add(POP_FAV, fav_text(), 0);
 	}
-	if (!sdlist_is_dir(r)) {
+	if (!sdlist_is_dir(r))
 		pop_add(POP_RENAME, gl_rename->title, 0);
-		pop_add(POP_DELETE, gl_sd_delete, UI_POP_DANGER);
-	}
 	pop_add(POP_INFO, gl_sd_info, 0);
+	if (!sdlist_is_dir(r))
+		pop_add(POP_DELETE, gl_sd_delete, UI_POP_DANGER);
 	if (!ui_popup_open(l, node(N_HINTS), &sd.popup))
 		return 0;
 	tlog_debug("sdcard: popup %s", sd.full);
@@ -838,6 +843,12 @@ static void file_popup_run(u32 i)
 		s32 pick = ui_popup_choose();
 		if (pick < 0)
 			return;  // B: it has closed
+		if (pick & (UI_POP_LEFT | UI_POP_RIGHT)) {  // Play's way to start
+			sd.boot = (u8)((sd.boot + (pick & UI_POP_LEFT ? sd.nboots - 1u : 1u)) % sd.nboots);
+			sd.pop_items[0].value = gl_games->boots[sd.boots[sd.boot]];
+			ui_popup_changed(0);
+			continue;
+		}
 		u32 id = sd.pop_ids[pick];
 		u32 hard = (ui_input()->held & INPUT_L) != 0;
 		if (id == POP_FAV) {
@@ -867,20 +878,17 @@ static void file_popup_run(u32 i)
 		case POP_OPEN:
 			folder_in(i);
 			break;
-		case POP_LAUNCH:
-			launch(ACTION_DEFAULT, hard);
+		case POP_LAUNCH: {
+			u32 b = sd.nboots > 1 ? sd.boots[sd.boot] : LANG_BOOT_DEFAULT;
+			launch(b == LANG_BOOT_ADDONS  ? ACTION_ADDON
+			       : b == LANG_BOOT_CLEAN ? ACTION_CLEAN
+						      : ACTION_DEFAULT,
+			       hard);
 			break;
-		case POP_CLEAN:
-			launch(ACTION_CLEAN, hard);
-			break;
-		case POP_ADDON:
-			launch(ACTION_ADDON, hard);
-			break;
+		}
 		case POP_NOR:
-			launch(ACTION_NOR, hard);
-			break;
-		case POP_NOR_ADDON:
-			launch(ACTION_NOR_ADDON, hard);
+			launch(sd.nboots > 1 && sd.boots[sd.boot] == LANG_BOOT_ADDONS ? ACTION_NOR_ADDON : ACTION_NOR,
+			       hard);
 			break;
 		case POP_RENAME:
 			rename_file();

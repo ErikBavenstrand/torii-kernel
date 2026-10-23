@@ -131,10 +131,8 @@ char *gl_sd_first EWRAM_BSS;
 char *gl_sd_empty EWRAM_BSS;
 char *gl_sd_open EWRAM_BSS;
 char *gl_sd_launch EWRAM_BSS;
-char *gl_sd_clean EWRAM_BSS;
 char *gl_sd_folders EWRAM_BSS;
 char *gl_sd_nor EWRAM_BSS;
-char *gl_sd_nor_addon EWRAM_BSS;
 char *gl_sd_fav_add EWRAM_BSS;
 char *gl_sd_fav_remove EWRAM_BSS;
 char *gl_sd_delete EWRAM_BSS;
@@ -515,11 +513,9 @@ const char en_sd_items_none[] = "empty";
 const char en_sd_first[] = "Showing the first";
 const char en_sd_empty[] = "Nothing here";
 const char en_sd_open[] = "Open";
-const char en_sd_launch[] = "Launch";
-const char en_sd_clean[] = "Clean boot";
+const char en_sd_launch[] = "Play";
 const char en_sd_folders[] = "folders";
 const char en_sd_nor[] = "Write to NOR";
-const char en_sd_nor_addon[] = "Write to NOR with addon";
 const char en_sd_fav_add[] = "Add to favourites";
 const char en_sd_fav_remove[] = "Remove from favourites";
 const char en_sd_delete[] = "Delete";
@@ -545,7 +541,9 @@ static const struct lang_games en_games = {
 	.hint_menu = "menu",
 	.hint_letter = "letter",
 	.hint_pick = "pick",
-	.pop = {"Play", "Favourite", "Clean boot", "Boot with addon", "Rename", "Game info", "Saves", "Delete"},
+	.pop = {"Play", "Favourite", "Rename", "Game info", "Saves", "Delete"},
+	.boots = {"default", "clean", "addons"},
+	.hint_boot = "boot",
 	.off = "off",
 	.on = "on",
 	.delete_text = "The save stays.",
@@ -567,16 +565,9 @@ static const struct lang_games en_games = {
 // The rename keyboard: its keys, and why OK can't keep a name (one line
 // each in the hint area, 38 characters at most)
 static const struct lang_slots en_slots = {
-	.picker_title = "Save slot",
-	.new_row = "New slot...",
-	.hint_play = "play",
-	.hint_rename = "rename",
-	.hint_cancel = "cancel",
 	.new_title = "New slot",
+	.copy_title = "Copy to new slot",
 	.rename_title = "Rename slot",
-	.choice_title = "New slot",
-	.blank = "Blank",
-	.fresh = "new",
 	.bad = "Type a name with letters.",
 	.full = "A game has 16 slots at most.",
 	.failed = "The card didn't take it.",
@@ -584,36 +575,52 @@ static const struct lang_slots en_slots = {
 	.path = "That name makes the path too long.",
 	.gone = "That slot isn't there any more.",
 };
-
 static const struct lang_gsaves en_gsaves = {
 	.title = "Saves",
-	.slot_title = "Slot",
-	.history_title = "History",
-	.import_title = "Import .sav",
-	.into_title = "Import into",
-	.import_row = "Import .sav...",
-	.act_launch = "Launch with this slot",
-	.act_set = "Set as current",
-	.act_rename = "Rename",
-	.act_dup = "Duplicate",
-	.act_delete = "Delete",
-	.act_history = "History",
-	.act_export = "Export",
-	.dup_title = "Duplicate slot",
+	.play_title = "Play with",
+	.backups_title = "Backups",
+	.new_row = "+ New slot",
+	.active = "Active",
+	.kept = "Kept",
+	.keys = "Saved\nBackups",
+	.backup_keys = "Age\nSize",
+	.play_keys = "Saved",
+	.never = "never",
+	.unknown = "unknown",
+	.none = "none",
+	.note_active = "Play loads this one.",
+	.note_other = "START: its options.",
+	.note_play = "A plays this slot.",
+	.note_new = "Empty, a copy,\nor a .sav file.",
+	.note_backup = "A restores it; the\nsave now is kept.",
+	.note_kept = "From a type change:\nkept for good.",
+	.hint_play = "play",
+	.hint_options = "options",
+	.hint_backups = "backups",
+	.hint_new = "new slot",
 	.hint_restore = "restore",
+	.hint_slots = "slots",
+	.hint_cancel = "cancel",
+	.act_play = "Play",
+	.act_active = "Make active",
+	.act_backups = "Backups",
+	.act_rename = "Rename",
+	.act_copy = "Copy to new slot",
+	.act_export = "Export .sav",
+	.act_delete = "Delete",
+	.new_empty = "Empty",
+	.new_file = "From a .sav file",
+	.file_title = ".sav file",
 	.empty = "No .sav files here",
-	.no_slots = "Make a slot first: New slot.",
-	.delete_text = "It stays in /torii/trash\nfor 30 days.",
-	.restore_text = "The current save goes into\nthe history first.",
-	.import_text = "The slot's save goes into\nthe history first.",
+	.delete_text = "Kept in the trash 30 days.",
+	.restore_title = "Restore backup?",
+	.restore_button = "Restore",
 	.exported = "Exported to",
-	.no_history = "This slot has no history yet.",
+	.no_backups = "This slot has no backups yet.",
 	.no_save = "This game doesn't save.",
 	.last = "A game keeps at least one slot.",
 	.gone_file = "That file isn't there any more.",
-	.gone_version = "That version isn't there any more.",
-	.unknown = "unknown",
-	.current = "current",
+	.gone_version = "That backup isn't there any more.",
 };
 
 static const struct lang_rename en_rename = {
@@ -653,31 +660,25 @@ static const struct lang_saves en_saves = {
 	.title = "Saves",
 	.hint_open = "open",
 	.hint_relink = "relink",
-	.row_saves = "Saves",
-	.row_history = "History",
-	.row_trash = "Trash",
-	.games = {"1 game", "games"},
-	.versions = {"1 version", "versions"},
-	.files = {"1 file", "files"},
-	.empty_trash = "Empty trash now",
-	.heading = "Orphaned saves",
-	.none = "No orphaned saves",
-	.pop_relink = "Relink",
+	.hint_empty = "empty",
+	.slots = {"1 slot", "slots"},
+	.empty_trash = "Empty trash",
+	.heading = "Without a game",
+	.none = "Every save has its game.",
+	.pop_relink = "Relink to a game",
 	.pop_delete = "Delete",
-	.pop_keep = "Keep",
-	.kept = "kept",
 	.pick_title = "Relink to",
 	.ask_relink = "Relink to this game?",
 	.ask_relink_button = "Relink",
 	.ask_delete = "Delete these saves?",
-	.ask_delete_text = "They wait in the trash for 30 days.",
+	.ask_delete_text = "They wait in the trash 30 days.",
 	.ask_delete_button = "Delete",
 	.ask_empty = "Empty the trash?",
 	.ask_empty_text = "This can't be undone.",
 	.ask_empty_button = "Empty",
 	.scanning = "Saves",
 	.scanning_text = "Counting what the saves use",
-	.phase = {"Saves", "History", "Trash", "Orphans"},
+	.phase = {"Saves", "Backups", "Trash"},
 	.emptying = "Trash",
 	.emptying_text = "Emptying the trash",
 	.moving = "Saves",
@@ -820,10 +821,8 @@ void LoadEnglish(void)
 	gl_sd_empty = (char *)en_sd_empty;
 	gl_sd_open = (char *)en_sd_open;
 	gl_sd_launch = (char *)en_sd_launch;
-	gl_sd_clean = (char *)en_sd_clean;
 	gl_sd_folders = (char *)en_sd_folders;
 	gl_sd_nor = (char *)en_sd_nor;
-	gl_sd_nor_addon = (char *)en_sd_nor_addon;
 	gl_sd_fav_add = (char *)en_sd_fav_add;
 	gl_sd_fav_remove = (char *)en_sd_fav_remove;
 	gl_sd_delete = (char *)en_sd_delete;

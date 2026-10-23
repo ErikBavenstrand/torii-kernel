@@ -173,10 +173,8 @@ extern char *gl_sd_first;
 extern char *gl_sd_empty;
 extern char *gl_sd_open;
 extern char *gl_sd_launch;
-extern char *gl_sd_clean;
 extern char *gl_sd_folders;
 extern char *gl_sd_nor;
-extern char *gl_sd_nor_addon;
 extern char *gl_sd_fav_add;
 extern char *gl_sd_fav_remove;
 extern char *gl_sd_delete;
@@ -198,13 +196,18 @@ extern char *gl_sd_no_save;
 enum {
 	LANG_POP_PLAY,
 	LANG_POP_FAV,
-	LANG_POP_CLEAN,
-	LANG_POP_ADDON,
 	LANG_POP_RENAME,
 	LANG_POP_INFO,
 	LANG_POP_SAVES,
 	LANG_POP_DELETE,
 	LANG_POP_ITEMS,
+};
+// How Play (Launch) starts a game, stepped in the popup with LEFT/RIGHT
+enum {
+	LANG_BOOT_DEFAULT,  // the game's boot mode, else Settings' (A on the list)
+	LANG_BOOT_CLEAN,
+	LANG_BOOT_ADDONS,   // a GBA game with an addon on
+	LANG_BOOTS,
 };
 enum {
 	LANG_INFO_CONSOLE,
@@ -220,6 +223,8 @@ struct lang_games {
 	const char *empty;  // a list with no game (left)
 	const char *hint_play, *hint_menu, *hint_letter, *hint_pick;
 	const char *pop[LANG_POP_ITEMS];  // the game popup's items
+	const char *boots[LANG_BOOTS];    // Play's « » in a popup: how it starts (LANG_BOOT_*)
+	const char *hint_boot;            // its LEFT/RIGHT in the hint bar
 	const char *off, *on;  // Favourite's value
 	const char *delete_text;  // under the Delete confirmation's "Delete <name>?" (EN_GAME_DELETE)
 	const char *delete_button;
@@ -252,15 +257,10 @@ struct lang_rename {
 };
 extern const struct lang_rename *gl_rename;
 
-// The save slot picker and the New slot / Rename flows (screens/slot_picker.c, slot_flow.c)
+// The slot flows (screens/slot_flow.c): the name prompt and what the slot
+// store's codes say
 struct lang_slots {
-	const char *picker_title;  // the picker's title bar (the game's name follows it)
-	const char *new_row;       // its last row
-	const char *hint_play, *hint_rename, *hint_cancel;  // A, START, B
-	const char *new_title, *rename_title;  // the name prompt's title bar
-	const char *choice_title;  // Blank or a copy
-	const char *blank;
-	const char *fresh;    // the row of a slot with no file yet
+	const char *new_title, *copy_title, *rename_title;  // the name prompt's title bar
 	const char *bad;      // a name with nothing usable in it
 	const char *full;     // SLOTSTORE_FULL
 	const char *failed;   // SLOTSTORE_CARD
@@ -270,66 +270,74 @@ struct lang_slots {
 };
 extern const struct lang_slots *gl_slots;
 
-// The per-game save manager (screens/game_saves.c)
+// A game's saves (screens/game_saves.c, on screens/save_page.c's page): its
+// slots, a slot's backups, and the launch's Play with
 struct lang_gsaves {
-	const char *title;          // the manager's title bar, and the Start menus' entry
-	const char *slot_title, *history_title, *import_title, *into_title;
-	const char *import_row;     // the manager's last row
-	const char *act_launch, *act_set, *act_rename, *act_dup, *act_delete, *act_history, *act_export;
-	const char *dup_title;      // the name prompt's title bar
-	const char *hint_restore;   // A in the history
-	const char *empty;         // a folder with nothing to pick
-	const char *no_slots;       // import with no slot to take it
+	const char *title;          // the page's title bar, and the Start menus' entry
+	const char *play_title;     // the launch's choice of slot
+	const char *backups_title;  // a slot's backups (its name on the right)
+	const char *new_row;        // the slots' last row
+	const char *active;         // the pane's tag for the active slot
+	const char *kept;           // and for a kept backup (a save type change's)
+	const char *keys;           // a slot's facts' names, "\n" between them
+	const char *backup_keys;    // a backup's
+	const char *play_keys;      // Play with's
+	const char *never, *unknown, *none;  // a slot with no file; a time the clock didn't know; no backups
+	const char *note_active, *note_other, *note_play, *note_new, *note_backup, *note_kept;  // the pane's foot
+	const char *hint_play, *hint_options, *hint_backups, *hint_new, *hint_restore, *hint_slots, *hint_cancel;
+	const char *act_play, *act_active, *act_backups, *act_rename, *act_copy, *act_export,
+		*act_delete;  // a slot's popup
+	const char *new_empty, *new_file;  // New slot's popup (and EN_GS_COPY_OF)
+	const char *file_title;     // the .sav file browser
+	const char *empty;          // a folder with nothing to pick
 	const char *delete_text;    // under "Delete <slot>?"
-	const char *restore_text;   // under "Restore version <n>?"
-	const char *import_text;    // under "Import into <slot>?"
+	const char *restore_title;  // the restore's question
+	const char *restore_button;
 	const char *exported;       // before the path
-	const char *no_history;
-	const char *no_save;        // a game whose save type has no save
+	const char *no_backups;
+	const char *no_save;
 	const char *last;           // SLOTSTORE_LAST
 	const char *gone_file;      // SLOTSTORE_NO_FILE
 	const char *gone_version;   // SLOTSTORE_NO_VERSION
-	const char *unknown;        // a version whose clock was not set
-	const char *current;        // the title bar's mark for the current slot
 };
 extern const struct lang_gsaves *gl_gsaves;
 #define EN_GS_DELETE "Delete %s?"
-#define EN_GS_RESTORE "Restore version %lu?"
-#define EN_GS_IMPORT "Import into %s?"
-// SLOTSTORE_SIZE: the size the game's save has
+#define EN_GS_RESTORE "%s goes back to %s."
 #define EN_GS_SIZE "That file isn't %lu KB, the size of this game's save."
-#define EN_SLOT_COPY_OF "Copy of %s"
+#define EN_GS_COPY_OF "Copy of %s"
+#define EN_GS_BACKUPS "%lu"
+#define EN_GS_SAVED "%04u-%02u-%02u %02u:%02u"
 // A key past the cap says so, with the cap
 #define EN_RENAME_TOO_LONG "Names stop at %u letters."
 
 // The global save manager (screens/saves.c, Settings > Library > Saves)
 struct lang_saves {
 	const char *title;
-	const char *hint_open, *hint_relink;  // A: on the list; in the picker
-	const char *row_saves, *row_history, *row_trash;  // "Saves", "History", "Trash"
-	const char *games[2], *versions[2], *files[2];  // a row's count: for one, for many (nav_count_words)
-	const char *empty_trash;               // "Empty trash now"
-	const char *heading, *none;            // "Orphaned saves"; "No orphaned saves"
-	const char *pop_relink, *pop_delete, *pop_keep;
-	const char *kept;                      // an orphan kept, its detail
-	const char *pick_title;                // the picker's title bar
+	const char *hint_open, *hint_relink, *hint_empty;  // A: on a save without a game; in the picker; on Empty trash
+	const char *slots[2];  // an orphan's slot count: for one, for many (nav_count_words)
+	const char *empty_trash;  // the last row
+	const char *heading, *none;  // the rows' heading, and it with nothing to fix
+	const char *pop_relink, *pop_delete;
+	const char *pick_title;  // the picker's title bar
 	const char *ask_relink, *ask_relink_button;
 	const char *ask_delete, *ask_delete_text, *ask_delete_button;
 	const char *ask_empty, *ask_empty_text, *ask_empty_button;
 	const char *scanning, *scanning_text;  // the progress dialog of the card walk
-	const char *phase[4];                  // its status line, by phase
+	const char *phase[3];  // its status line, by phase (ORPHAN_PHASES)
 	const char *emptying, *emptying_text;
 	const char *moving, *moving_text;
-	const char *no_library;                // the picker needs the library
+	const char *no_library;  // the picker needs the library
 	const char *err_card, *err_source, *err_target, *err_path, *err_stopped;
-	const char *trash_empty;               // Empty trash now with nothing in it
+	const char *trash_empty;  // Empty trash with nothing in it
 };
 extern const struct lang_saves *gl_saves;
-// Formats (for the detail, a count and a size)
-#define EN_SAVES_SLOTS "%u \xC2\xB7 %s"
+// The storage card's line: the saves', backups' and trash's sizes in KB
+#define EN_SAVES_LEGEND "Saves %lu \xC2\xB7 Backups %lu \xC2\xB7 Trash %lu KB"
+// The rows' heading with a count
+#define EN_SAVES_HEADING "%s \xC2\xB7 %lu"
 #define EN_SAVES_RENAMED "%u slots took new names\nbecause the game had them."
 
-extern u32 gl_lang; // index of the current language in lang_packs
+extern u32 gl_lang;  // index of the current language in lang_packs
 
 void LoadEnglish(void);
 

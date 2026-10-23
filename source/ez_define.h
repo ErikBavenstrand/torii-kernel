@@ -31,6 +31,11 @@
 //   copy's (and past the 2 x 2 KB at READCACHE_SAVE's start): the Saves screen's
 //   state (screens/saves.c) while it runs, in a deferred action, where nothing
 //   else borrows pReadCache between its calls.
+// - READCACHE_GSAVES, the same 8 KB as READCACHE_SAVES (the two screens never
+//   run together): a game's saves page's state (screens/game_saves.c) while it
+//   runs, from a page's deferred action; and READCACHE_FLOW, the slot flows'
+//   (screens/slot_flow.c), within one of their calls. Neither overlaps the
+//   slot store's or the save copy's, and no SD listing runs meanwhile.
 // - READCACHE_SDLIST, 43 KB in READCACHE_SAVE's room (no save runs during a
 //   listing): the SD card page's folder listing on its way to PSRAM
 //   (sdlist.h's scratch), within one listing.
@@ -72,6 +77,10 @@
 #define READCACHE_SAVES_SIZE 0x2000
 #define READCACHE_ORPHAN READCACHE_SLOTS
 #define READCACHE_ORPHAN_SIZE READCACHE_SLOTS_SIZE
+#define READCACHE_GSAVES READCACHE_SAVES
+#define READCACHE_GSAVES_SIZE 0x1800
+#define READCACHE_FLOW (READCACHE_SAVES + READCACHE_GSAVES_SIZE)
+#define READCACHE_FLOW_SIZE (READCACHE_SAVES_SIZE - READCACHE_GSAVES_SIZE)
 #define READCACHE_GAMES 0x8000
 #define READCACHE_GAMES_SIZE 0x18000
 #define READCACHE_NAMES 0x0

@@ -3,8 +3,9 @@
 # left out (CHEAT, SAVER, torii); each folder's item count fills in once the
 # page rests. A on Long goes into it (the page change hashed every frame):
 # the title bar shows the path's pills, the current folder tinted. START on
-# a game opens the file popup (#15); Delete asks, Cancel preselected; Cancel
-# goes back to the popup, and File info shows the file's facts, its date
+# a game opens the file popup (#15); Delete (its last item) asks, Cancel
+# preselected; Cancel goes back to the popup, and File info (above Delete)
+# shows the file's facts, its date
 # the one mtools stamps every scenario's files with (tests/shots.py). B
 # goes up, the cursor on the folder it left.
 #! settings 28=1
@@ -19,10 +20,10 @@
 -k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:START -k @36:-
 -w "sdcard: popup"
 -s @12:popup.png
--k @20:UP -k @24:- -k @32:UP -k @36:- -k @44:A -k @48:-
+-k @20:UP -k @24:- -k @44:A -k @48:-
 -s @64:confirm.png
 -k @72:B -k @76:-
--k @96:DOWN -k @100:- -k @108:A -k @112:-
+-k @96:UP -k @100:- -k @108:A -k @112:-
 -s @140:file-info.png
 -k @150:A -k @154:-
 -k @190:B -k @194:-

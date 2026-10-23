@@ -1393,7 +1393,7 @@ static void rename_game(u32 row)
 	games.rename_console = library_flags(rec) & LIB_F_CONSOLE;
 	snprintf(games.ask, sizeof(games.ask), "%s", library_display(rec));
 	const struct rename_ask ask = {
-		registry_items[games.item].icon16, games.ask, NULL, RENAME_GAME_MAX, 0, rename_submit, 0, 0};
+		registry_items[games.item].icon16, games.ask, NULL, RENAME_GAME_MAX, 0, rename_submit, 0, 0, 0};
 	int renamed = rename_run(&ask);
 	reshow(row);
 	if (renamed && up()) {
@@ -1437,16 +1437,23 @@ static void popup_run(u32 i)
 	int fav_done = 1;
 	int gba = !nor && g.console == LIB_GBA;
 	games.popup = (struct ui_popup){games.title, (u8)(g.console < LIB_CONSOLES ? console_icons[g.console] + 1 : 0),
-					games.items, 0, 0};
-	popup_add(LANG_POP_PLAY, 0, 0);
-	popup_add(LANG_POP_FAV, fav ? gl_games->on : gl_games->off, 0);
-	u32 fav_item = 1u;
+					games.items, 0,
+					0,           gl_games->hint_boot};
+	// Play: how it starts steps with LEFT/RIGHT (a GBA game: its own way,
+	// clean, or with addons when one is on); A plays
+	u8 boots[LANG_BOOTS];
+	u32 nboots = 0, boot = 0;
+	boots[nboots++] = LANG_BOOT_DEFAULT;
 	if (gba) {
-		popup_add(LANG_POP_CLEAN, 0, 0);
-		popup_add(LANG_POP_ADDON, 0, addons_off() ? UI_POP_DIM : 0);
+		boots[nboots++] = LANG_BOOT_CLEAN;
+		if (!addons_off())
+			boots[nboots++] = LANG_BOOT_ADDONS;
 	}
+	popup_add(LANG_POP_PLAY, nboots > 1 ? gl_games->boots[boots[0]] : 0, nboots > 1 ? UI_POP_STEP : 0);
 	if (game_saves_probe(games.pick))
 		popup_add(LANG_POP_SAVES, 0, 0);
+	u32 fav_item = games.popup.count;
+	popup_add(LANG_POP_FAV, fav ? gl_games->on : gl_games->off, 0);
 	if (!nor && g.rec != LIBRARY_NONE)
 		popup_add(LANG_POP_RENAME, 0, 0);  // a name in names.txt, for games the lists name
 	popup_add(LANG_POP_INFO, 0, 0);
@@ -1459,6 +1466,12 @@ static void popup_run(u32 i)
 		s32 pick = ui_popup_choose();
 		if (pick < 0)
 			break;
+		if (pick & (UI_POP_LEFT | UI_POP_RIGHT)) {  // Play's way to start
+			boot = (boot + (pick & UI_POP_LEFT ? nboots - 1 : 1)) % nboots;
+			games.items[0].value = gl_games->boots[boots[boot]];
+			ui_popup_changed(0);
+			continue;
+		}
 		u32 action = games.actions[pick], hard = (ui_input()->held & INPUT_L) != 0;
 		if (action == LANG_POP_FAV) {
 			u32 ver = userdata_fav_version();
@@ -1479,8 +1492,6 @@ static void popup_run(u32 i)
 				ui_list_refresh(list, i, i);  // its star
 			continue;
 		}
-		if (action == LANG_POP_ADDON && addons_off())
-			continue;  // greyed out: nothing to boot with
 		if (action == LANG_POP_DELETE) {
 			snprintf(games.ask, sizeof(games.ask), EN_GAME_DELETE, games.title);
 			struct ui_confirm ask = {games.ask, gl_games->delete_text, gl_games->delete_button, 1};
@@ -1502,13 +1513,10 @@ static void popup_run(u32 i)
 			relist(i, NULL);
 		switch (action) {
 		case LANG_POP_PLAY:
-			launch(ACTION_DEFAULT, 0, hard);
-			return;
-		case LANG_POP_CLEAN:
-			launch(ACTION_CLEAN, 0, hard);
-			return;
-		case LANG_POP_ADDON:
-			boot_with_addon(hard);
+			if (boots[boot] == LANG_BOOT_ADDONS)
+				boot_with_addon(hard);
+			else
+				launch(boots[boot] == LANG_BOOT_CLEAN ? ACTION_CLEAN : ACTION_DEFAULT, 0, hard);
 			return;
 		case LANG_POP_INFO:
 			game_info(&g);

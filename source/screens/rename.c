@@ -703,7 +703,7 @@ static void ok(void)
 		char text[sizeof(kb.msg)];
 		snprintf(text, sizeof(text), EN_RENAME_TOO_LONG, kb.e.max);
 		message(text);
-	} else if (unchanged()) {
+	} else if (unchanged() && !kb.ask->suggested) {
 		kb.done = 1;  // nothing to keep
 	} else {
 		const char *why = kb.ask->submit(kb.ask->ctx, kb.e.text);

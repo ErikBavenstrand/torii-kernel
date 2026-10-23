@@ -1,7 +1,7 @@
 # The GBA page with art (Settings' game view, slot 31): START opens the game
-# popup with its 8 items (Saves among them). The art list leaves block 0's
-# free tiles too short for the titled card, so it opens without its title
-# rather than not at all (v0.5's START on the GBA list did nothing). On Game
+# popup beside the list with art, whose tiles leave block 0 short: v0.5's
+# first 8-item popup didn't fit at all (START did nothing). Its 6 items keep
+# their title; a popup that still doesn't fit opens without it. On Game
 # 001: a long name's row scrolls, which would make the shot depend on timing.
 #! settings 31=1
 #! sd-file "/torii/art/custom/A name too long to fit on its row.gba.bin" 0 tests/shots/data/art-sunset.bin

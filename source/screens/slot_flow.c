@@ -4,23 +4,24 @@
 
 #include "slot_flow.h"
 #include "rename.h"
-#include "slot_list.h"
+#include "../ez_define.h"
 #include "../lang.h"
 #include "../tlog.h"
 #include "../ui/art_ids.h"
 #include "../ui/dialog.h"
 
-static struct {
+// In pReadCache (READCACHE_FLOW) within a call: the keyboard's OK reads it
+// while the prompt runs, nothing after
+struct flow_state {
 	struct slotstore_slot slots[SLOTSTORE_MAX_SLOTS];
 	const char *rom;
 	const char *own;
 	char out[SAVESLOT_NAME_BYTES];
 	char clean[SAVESLOT_NAME_BYTES];
-	char current[SAVESLOT_NAME_BYTES];
-	char copy[SAVESLOT_NAME_BYTES + 16];
-	struct slot_list_row rows[2];
-	struct ui_hint hints[2];
-} fl EWRAM_BSS;
+};
+_Static_assert(sizeof(struct flow_state) <= READCACHE_FLOW_SIZE, "the slot flows fit READCACHE_FLOW");
+extern u8 pReadCache[];
+#define fl (*(struct flow_state *)(pReadCache + READCACHE_FLOW))
 
 int slot_flow_slots(const char *rom, const struct slotstore_slot **out)
 {
@@ -78,62 +79,12 @@ int slot_flow_name_prompt(const char *rom, const char *title, const char *initia
 	fl.rom = rom;
 	fl.own = own;
 	fl.out[0] = 0;
-	const struct rename_ask ask = {ART_ICON16_TORII, initial, NULL, SAVESLOT_NAME_CHARS, 1, name_submit, 0, title};
+	// A new slot's name from a file is a suggestion: OK keeps it as it is
+	const struct rename_ask ask = {ART_ICON16_TORII, initial, NULL,  SAVESLOT_NAME_CHARS,     1,
+				       name_submit,      0,       title, (u8)(!own && initial[0])};
 	if (!rename_run(&ask) || !fl.out[0])
 		return SLOT_FLOW_CANCEL;
 	memcpy(out, fl.out, SAVESLOT_NAME_BYTES);
-	return SLOT_FLOW_DONE;
-}
-
-int slot_flow_new(const char *rom, u32 blank_size, char *created)
-{
-	const struct slotstore_slot *slots;
-	int n = slot_flow_slots(rom, &slots);
-	if (n < 0) {
-		slot_flow_error(n);
-		return SLOT_FLOW_FAILED;
-	}
-	if (n >= SLOTSTORE_MAX_SLOTS) {
-		slot_flow_error(SLOTSTORE_FULL);
-		return SLOT_FLOW_FAILED;
-	}
-	char name[SAVESLOT_NAME_BYTES];
-	if (slot_flow_name_prompt(rom, gl_slots->new_title, "", NULL, name) != SLOT_FLOW_DONE)
-		return SLOT_FLOW_CANCEL;
-	// A copy needs a slot with a file: the current one, else the first
-	const char *copy_from = NULL;
-	if (n > 0) {
-		slotstore_current(rom, fl.current);
-		copy_from = slots[0].name;
-		for (int i = 0; i < n; i++)
-			if (!strcmp(slots[i].name, fl.current))
-				copy_from = slots[i].name;
-		snprintf(fl.copy, sizeof(fl.copy), EN_SLOT_COPY_OF, copy_from);
-		fl.rows[0] = (struct slot_list_row){gl_slots->blank, 0, 0};
-		fl.rows[1] = (struct slot_list_row){fl.copy, 0, 0};
-		fl.hints[0] = (struct ui_hint){"A", gl_hint_ok};
-		fl.hints[1] = (struct ui_hint){"B", gl_slots->hint_cancel};
-		const struct slot_list list = {
-			"slot-new-choice", gl_slots->choice_title, name, fl.rows, 2, 0, fl.hints, 2, 0};
-		u32 row;
-		if (slot_list_run(&list, &row) != SLOT_LIST_PICK)
-			return SLOT_FLOW_CANCEL;
-		if (row == 0)
-			copy_from = NULL;
-		else
-			snprintf(fl.current, sizeof(fl.current), "%s", copy_from);
-		if (row != 0)
-			copy_from = fl.current;
-	}
-	char clean[SAVESLOT_NAME_BYTES];
-	int r = slotstore_create(rom, name, copy_from, blank_size, clean);
-	tlog("slots: new %s%s%s: %d", clean, copy_from ? " copy of " : "", copy_from ? copy_from : "", r);
-	if (r != SLOTSTORE_OK) {
-		slot_flow_error(r);
-		return SLOT_FLOW_FAILED;
-	}
-	if (created)
-		memcpy(created, clean, SAVESLOT_NAME_BYTES);
 	return SLOT_FLOW_DONE;
 }
 

@@ -1,15 +1,28 @@
-# New slot, the name prompt (source/screens/slot_flow.c): the on-screen
-# keyboard titled "New slot", empty and then with "qq" typed (A types the key
-# under the selection, which starts on q).
-#! sd-file /Hello.gba 0x20000 tests/roms/hello/hello.gba
-#! sd-file "/torii/saves/Hello.gba/Main.sav" 0x2000 /dev/null
-#! sd-file "/torii/saves/Hello.gba/Boss Rush.sav" 0x10000 /dev/null
-#! sd-file "/torii/saves/Hello.gba/Pacifist.sav" 0x2000 /dev/null
-#! sd-file "/torii/saves/Hello.gba/game.ini" 0 tests/shots/data/slot-picker-game.ini
+# New slot, the name prompt (source/screens/slot_flow.c): from a game's
+# Saves, New slot's Empty opens the on-screen keyboard titled "New slot",
+# empty and then with "qq" typed (A types the key under the selection, which
+# starts on q).
+#! sd-file "/torii/saves/Long/A name too long to fit on its row.gba/Main.sav" 0x10000 /dev/null
+#! sd-file "/torii/saves/Long/A name too long to fit on its row.gba/Boss Rush.sav" 0x10000 /dev/null
+#! sd-file "/torii/saves/Long/A name too long to fit on its row.gba/game.ini" 0 tests/shots/data/game-saves-game.ini
+#! sd-file "/torii/backups/Long/A name too long to fit on its row.gba/Main/0001-00000000-000000.sav" 0x10000 /dev/null
+#! sd-file "/torii/backups/Long/A name too long to fit on its row.gba/Main/0002-20261022-183005.sav" 0x10000 /dev/null
+#! sd-file "/torii/backups/Long/A name too long to fit on its row.gba/Main/0003-20261023-091542.sav" 0x10000 /dev/null
+#! sd-file "/Long/Emerald.sav" 0x10000 /dev/null
+#! sd-file "/Long/Backups/Zelda.sav" 0x10000 /dev/null
 -w "nav: home ready"
--P "@8:nav_test_path:/Hello.gba" -p @8:nav_test_action:0x7E000001
--w "screen ready: slot-picker"
--k @20:DOWN -k @24:- -k @28:DOWN -k @32:- -k @40:A -k @44:-
+-k @8:RIGHT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-k @30:START -k @34:-
+-w "screen ready: game-popup"
+-k @12:DOWN -k @16:-
+-k @28:A -k @32:-
+-w "screen ready: game-saves"
+-k @30:DOWN -k @34:- -k @42:DOWN -k @46:-
+-k @60:A -k @64:-
+-w "screen ready: game-saves-new"
+-k @20:A -k @24:-
 -w "screen ready: rename"
 -s @30:empty.png
 -k @10:A -k @14:- -k @20:A -k @24:-

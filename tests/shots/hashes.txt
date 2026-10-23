@@ -75,15 +75,15 @@ diag-turn/frames 4-7 C230B72F2FDF7BF4
 dialog-fragmented/dialog DF9AAC285CD0CD2A
 dialog-overflow/dialog 065D88663C13E179
 dialog-overflow/home 818B02E74B016B0D
-game-saves/actions ADFBED66D7238E1D
-game-saves/delete 52751EB45E562467
-game-saves/files BCABD819DA56B8DA
-game-saves/history 1EE7ACA4A31B13D8
-game-saves/manager 2FBA5F6FD1DC48F0
-game-saves/popup BA40105E75CFE834
-game-saves/restore D218EC63334CD75A
-game-saves-light/actions 6768AC6507E773AB
-game-saves-light/manager F8F44EE35C83FF1C
+game-saves/backups F95B108A1DA61FCB
+game-saves/new CB7F3972A62A85FE
+game-saves/options 39AC0EEFA634619B
+game-saves/other C33879169D7E6C07
+game-saves/popup E56D83617488D777
+game-saves/restore 3BB8EB9B7580268C
+game-saves/slots 94658E2E5BFB7899
+game-saves-light/options ABDFEF5127B38F1A
+game-saves-light/slots B25C003D4F791D5F
 games-art/gba E4D66E146FB6D219
 games-art/gba-crc EAE4B45AD06AF276
 games-art/gba-none 7A533A78D3E4D987
@@ -91,7 +91,7 @@ games-art/recent D6B09D15BF64F7E1
 games-art-box/gba B283B0831EAA819C
 games-art-dark/gba 743CC2D257F80E8A
 games-art-dark/gba-none 6DD7FD2BF9FD37DC
-games-art-popup/popup EBAD3DC8FCF25936
+games-art-popup/popup FFB6C87985AFD153
 games-box-switch/gb 46FF5145036E9096
 games-box-switch/gba 9F73E48DF1E05512
 games-box-switch/gba-next 86E077FAD2BA18F7
@@ -107,17 +107,17 @@ games-cheats/screen 666C1C7A8C10C858
 games-dedupe/screen 67E86C46698E404E
 games-fav/screen 5F5922C2D6F31804
 games-fav/starred 017306DC53C8BC2C
-games-fav/toggled 82E3C5A8602A4256
+games-fav/toggled B72B6B874A5C61BB
 games-gb/popup 73FBC530961EE51B
 games-gb/screen A47EFAC3B4A4039F
-games-gba/cancelled 4C985C717B8B0BD3
+games-gba/cancelled 3F6800D51BAB2786
 games-gba/closed 7C5107676E6593E0
 games-gba/delete 91DAB5F33422BD04
 games-gba/down 5FDFD6D57D176F66
 games-gba/info 4AB5CA097C79575E
 games-gba/info-sram D90679922BFDE48A
 games-gba/letter 77E7DC56ADF4E619
-games-gba/popup C447BA6A5E122C5B
+games-gba/popup 11E3BFB01C79E6CD
 games-gba/screen 928ED4ADD2922192
 games-gba/frames 0-0 928ED4ADD2922192
 games-gba/frames 1-1 85DC2B75DEBC640E
@@ -395,22 +395,21 @@ rename/prefilled 1017306268906A3D
 rename/shifted FBDD010AC1E7FCF2
 rename-dark/prefilled 1747112F0822FB93
 saves-none/back 63A1A230B8AF4D78
-saves-none/empty-row E42020FBB63EDEC9
-saves-none/list 597DFF8842E34763
-saves-none/message 0AAD19084B4AB3FD
-saves-orphans/back DCAAEFC7BD8FF1E3
-saves-orphans/empty-confirm 9ED77A7D325609DB
+saves-none/list 7B3879D9BE7CD589
+saves-none/message 5017C01B26E67F34
+saves-orphans/back A9D9B141587E7429
+saves-orphans/empty-confirm 1D1B89B5F9EA0CF7
 saves-orphans/library 0631F99006C91870
-saves-orphans/list C7FEB9F556EB47F8
-saves-orphans/orphan DCAAEFC7BD8FF1E3
-saves-orphans/picker CDD0C5F1C7C7CC89
-saves-orphans/picker-down 9B5C9014DC1B34F3
-saves-orphans/popup 4D97EFD25241FD99
-saves-orphans/relink-confirm F863C40E41223C1D
-sd-confirm-tall/again 8D89101C0586EE3E
-sd-confirm-tall/back 089394670A0A6A39
+saves-orphans/list A9D9B141587E7429
+saves-orphans/orphan A9D9B141587E7429
+saves-orphans/picker 5A7AEE0899042103
+saves-orphans/picker-down 2BC55428D7728F45
+saves-orphans/popup D5F4837E38BEB463
+saves-orphans/relink-confirm 67D2BEB3CCA48E6E
+sd-confirm-tall/again 7430370C14E2916C
+sd-confirm-tall/back F3F99ED2A3A095B8
 sd-confirm-tall/confirm 68FFE3FC5F8C3BC1
-sd-confirm-tall/popup 8D89101C0586EE3E
+sd-confirm-tall/popup 7430370C14E2916C
 sd-dark/folder AABEF294AE26B97E
 sd-dark/root DCB61BC334730AB2
 sd-empty/empty 4FBA4DEC6BFBD4AA
@@ -420,7 +419,7 @@ sd-root/back E1A26AC1D32F7650
 sd-root/confirm E79A2798444115F5
 sd-root/file-info 1D6589D91811BE54
 sd-root/folder EE84177EF9E20E06
-sd-root/popup 9EF2792419D491DD
+sd-root/popup 3775107C1029B7D5
 sd-root/root 6BD50270211C0F08
 sd-root/frames 0-13 1429BF342F361240
 sd-root/frames 14-14 1BCCA04D550355D2
@@ -560,13 +559,11 @@ settings-dark/frames 37-37 E10CE0FC5D8CEBD2
 settings-dark/frames 38-38 560AFB3B7559E375
 settings-dark/frames 39-45 AEF9F8EE6A2391F5
 settings-start-hidden/row C0D0016A8EA4EDFE
-slot-new-choice/choice FF61BAD9F73A1DBD
-slot-new-choice/copy B1A364A6FBA5CA2A
-slot-new-name/empty 6009A327E24D29AC
-slot-new-name/typed 6009A327E24D29AC
-slot-picker/picker 1FC1BE4474F0F8AB
-slot-picker/picker-down 40D9A429EC24447F
-slot-picker-light/picker A25449D0864C45A2
+slot-new-name/empty 12645B2E2358B52B
+slot-new-name/typed 12645B2E2358B52B
+slot-picker/picker 9E553D082B61F036
+slot-picker/picker-down D74FAB9AF2DBBAC0
+slot-picker-light/picker D2F847BE1ED9D023
 ui-dialog/closed 942FEA8E68027B47
 ui-dialog/dialog 1EC3EDCC05C5D114
 ui-dialog/frames 0-0 942FEA8E68027B47
@@ -809,6 +806,18 @@ ui-popup/frames 89-89 FC8098310BB6A716
 ui-popup/frames 90-90 319B6EEA3AABD031
 ui-popup/frames 91-91 6B6C646D669C3B44
 ui-popup/frames 92-100 3721024997134B08
+ui-popup-scroll/scrolled 074A6DEB477F96D1
+ui-popup-scroll/stepped 98D91EA919F865A4
+ui-popup-scroll/top EB64287CE0868E10
+ui-popup-scroll/wrapped 6BC68EB514CB1876
+ui-popup-scroll/frames 0-0 E05BD4BD8B446417
+ui-popup-scroll/frames 1-1 BD58E396347556DC
+ui-popup-scroll/frames 2-2 0274555CF6687B7C
+ui-popup-scroll/frames 3-3 A5EB2B711435AF8C
+ui-popup-scroll/frames 4-4 0FEFFFA72A0ACBE4
+ui-popup-scroll/frames 5-5 3E9E86EC1FCD02EF
+ui-popup-scroll/frames 6-6 E2B66B8A8CAF861F
+ui-popup-scroll/frames 7-12 074A6DEB477F96D1
 ui-theme/awake D9A31419E2536F43
 ui-theme/dimmed A09935EB7E4618BC
 ui-theme/light 6907E551DCA443BC

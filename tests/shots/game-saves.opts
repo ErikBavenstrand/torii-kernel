@@ -1,8 +1,10 @@
-# The per-game save manager (source/screens/game_saves.c), dark theme: the
-# game's Start menu with Saves (popup.png), the slots (manager.png), a slot's
-# actions (actions.png), its history (history.png) and the restore question
-# (restore.png), the delete question (delete.png) and the Import .sav file
-# picker (files.png).
+# A game's saves (source/screens/game_saves.c on screens/save_page.c; design
+# docs/design/v0.5/saves-variants.md, direction B), dark theme: the game's
+# Start menu with Saves second (popup.png); the slots on the left, the active
+# one marked, and its facts on the right (slots.png); the next slot's
+# (other.png); RIGHT into the active slot's backups (backups.png) and A's
+# restore question (restore.png); START's popup for a slot (options.png);
+# and New slot's choices (new.png).
 #! sd-file "/torii/saves/Long/A name too long to fit on its row.gba/Main.sav" 0x10000 /dev/null
 #! sd-file "/torii/saves/Long/A name too long to fit on its row.gba/Boss Rush.sav" 0x10000 /dev/null
 #! sd-file "/torii/saves/Long/A name too long to fit on its row.gba/game.ini" 0 tests/shots/data/game-saves-game.ini
@@ -18,31 +20,27 @@
 -k @30:START -k @34:-
 -w "screen ready: game-popup"
 -s @8:popup.png
--k @12:DOWN -k @16:- -k @20:DOWN -k @24:- -k @28:DOWN -k @32:- -k @36:DOWN -k @40:-
--k @48:A -k @52:-
+-k @12:DOWN -k @16:-
+-k @28:A -k @32:-
 -w "screen ready: game-saves"
--s @30:manager.png
+-s @30:slots.png
+-k @34:DOWN -k @38:-
+-s @50:other.png
+-k @54:UP -k @58:-
+-k @70:RIGHT -k @74:-
+-w "screen ready: game-saves-backups"
+-s @30:backups.png
 -k @34:A -k @38:-
--w "screen ready: game-saves-slot"
--s @30:actions.png
--k @34:DOWN -k @38:- -k @42:DOWN -k @46:- -k @50:DOWN -k @54:- -k @58:DOWN -k @62:- -k @66:DOWN -k @70:-
--k @76:A -k @80:-
--w "screen ready: game-saves-history"
--s @30:history.png
--k @34:A -k @38:-
--w "screen ready: dialog"
+-w "screen ready: confirm"
 -s @30:restore.png
 -k @34:B -k @38:-
--w "screen ready: game-saves-history"
--k @30:B -k @34:-
--w "screen ready: game-saves-slot"
--k @30:UP -k @34:- -k @42:A -k @46:-
--w "screen ready: dialog"
--s @30:delete.png
--k @34:B -k @38:-
--w "screen ready: game-saves-slot"
--k @30:B -k @34:-
+-k @70:B -k @74:-
 -w "screen ready: game-saves"
--k @30:DOWN -k @34:- -k @42:DOWN -k @46:- -k @54:DOWN -k @58:- -k @66:A -k @70:-
--w "screen ready: game-saves-files"
--s @30:files.png
+-k @30:START -k @34:-
+-w "screen ready: game-saves-slot"
+-s @30:options.png
+-k @34:B -k @38:-
+-k @60:DOWN -k @64:- -k @72:DOWN -k @76:-
+-k @90:A -k @94:-
+-w "screen ready: game-saves-new"
+-s @30:new.png

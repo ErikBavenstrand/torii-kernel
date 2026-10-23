@@ -1,14 +1,26 @@
-// The per-game save manager (game_saves.h).
+// A game's saves (game_saves.h), on the save page (save_page.h; design:
+// docs/design/v0.5/saves-variants.md, direction B). Two pages take turns:
+// the slots (the active one marked, New slot last) and a slot's backups.
+// A slot's other actions are a popup beside its row (START), New slot's
+// choices too; the name keyboard and the .sav file browser take the whole
+// screen, so the page closes for them and opens again after.
+//
+// The state lives in pReadCache (READCACHE_GSAVES) while the page runs: no
+// other owner borrows that room meanwhile. What a probe learns before it
+// (the game's path) waits in a few bytes of EWRAM.
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "game_saves.h"
+#include "save_page.h"
 #include "slot_flow.h"
 #include "slot_list.h"
 #include "../actions.h"
+#include "../ez_define.h"
+#include "../ezkernel.h"
 #include "../ff15/ff.h"
 #include "../gamesave.h"
-#include "../ezkernel.h"
 #include "../lang.h"
 #include "../library.h"
 #include "../tlog.h"
@@ -18,62 +30,115 @@
 
 extern FILINFO fileinfo;  // ezkernelnew.c's
 extern DIR dir;
+extern u8 pReadCache[];
 
 #define EXPORT_DIR "/torii/export"
-#define HIST_ROWS SLOT_LIST_MAX
+#define BACKUP_ROWS SAVE_PAGE_ROWS
 #define FILE_ENTRIES 28
 #define FILE_NAME 48  // bytes of a listed name; longer ones are not listed
 #define PATH_BYTES 288
 
+// What the probe found: the game it was about, until the page runs
+static struct {
+	char path[PATH_BYTES];
+	u32 size;  // the game's save size; 0 until known
+	u16 icon;  // its console's ART_ICON16_*
+} probe EWRAM_BSS;
+
+// A slot's popup items
 enum {
-	ACT_LAUNCH,
-	ACT_SET,
+	ACT_PLAY,
+	ACT_ACTIVE,
+	ACT_BACKUPS,
 	ACT_RENAME,
-	ACT_DUP,
-	ACT_DELETE,
-	ACT_HISTORY,
+	ACT_COPY,
 	ACT_EXPORT,
+	ACT_DELETE,
 	ACT_COUNT
 };
+// New slot's
+enum {
+	NEW_EMPTY,
+	NEW_COPY,
+	NEW_FILE,
+	NEW_COUNT
+};
 
-static struct {
+struct gs_state {
 	const char *title;
 	char rom[GAMESAVE_PATH_BYTES];
-	u32 size;  // the game's save size
-	char current[SAVESLOT_NAME_BYTES];
+	u32 size;
+	char active[SAVESLOT_NAME_BYTES];
 	char want[SAVESLOT_NAME_BYTES];  // the slot to put the cursor on next
-	char slot[SAVESLOT_NAME_BYTES];  // the slot the action list is about
-	char detail[SLOTSTORE_MAX_SLOTS][12];
-	struct slot_list_row rows[SLOTSTORE_MAX_SLOTS + 2];
-	struct ui_hint hints[3];
+	char slot[SAVESLOT_NAME_BYTES];  // the slot a popup or the backups are about
+	struct slotstore_slot slots[SLOTSTORE_MAX_SLOTS];
+	u8 backups[SLOTSTORE_MAX_SLOTS];  // each slot's backups (capped at 255)
+	u32 count;  // slots
+	struct save_page_row rows[SAVE_PAGE_ROWS];
+	u32 versions;
+	char head[24];
+	char values[48];
+	struct ui_hint hints[4];
+	struct ui_pop_item items[ACT_COUNT];
+	u8 ids[ACT_COUNT];
+	struct ui_popup popup;
+	char copy_of[SAVESLOT_NAME_BYTES + 16];
 	char text[320];
 	char path[PATH_BYTES];
 	union {  // never up together
-		struct {
-			struct slotstore_version v[HIST_ROWS];
-			char text[HIST_ROWS][32];
-			char size[HIST_ROWS][12];
-			struct slot_list_row rows[HIST_ROWS];
-		} h;
-		struct {
-			char name[FILE_ENTRIES][FILE_NAME];
-			char size[FILE_ENTRIES][12];
-			u8 dir[FILE_ENTRIES];
+		struct {  // a slot's backups (also counting them, at the slots' read)
+			struct slotstore_version v[BACKUP_ROWS];
+			char ago[BACKUP_ROWS][20];
+		} b;
+		struct {  // the .sav file browser (slot_list.h)
+			char names[FILE_ENTRIES][FILE_NAME];
+			u8 dirs[FILE_ENTRIES];
 			struct slot_list_row rows[FILE_ENTRIES + 1];
-			char dirpath[PATH_BYTES];
+			char cwd[PATH_BYTES];
 		} f;
 	} u;
-} gs EWRAM_BSS;
+};
+_Static_assert(sizeof(struct gs_state) <= READCACHE_GSAVES_SIZE, "a game's saves fit READCACHE_GSAVES");
+#define gs (*(struct gs_state *)(pReadCache + READCACHE_GSAVES))
 
-static void size_text(char *out, u32 bytes)
+// snprintf, for strings built in pReadCache: the compiler can't tell that
+// the destination and the arguments are different fields of the state
+static int __attribute__((format(printf, 3, 4))) gs_snprintf(char *dst, u32 size, const char *fmt, ...)
 {
-	if (bytes < 1024)
-		snprintf(out, 12, "%lu B", (unsigned long)bytes);
-	else
-		snprintf(out, 12, "%lu KB", (unsigned long)bytes / 1024);
+	va_list ap;
+	va_start(ap, fmt);
+	int n = vsnprintf(dst, size, fmt, ap);
+	va_end(ap);
+	return n;
 }
 
-// What a slotstore code says: the flows' lines, and the manager's own
+/* ---- Words ---- */
+
+static void size_text(char *out, u32 room, u32 bytes)
+{
+	if (bytes < 1024)
+		gs_snprintf(out, room, "%lu B", (unsigned long)bytes);
+	else
+		gs_snprintf(out, room, "%lu KB", (unsigned long)bytes / 1024);
+}
+
+// A unix time's "10-23 18:30", or never/unknown
+static void when_text(char *out, u32 room, u32 t, int exists)
+{
+	if (!exists)
+		gs_snprintf(out, room, "%s", gl_gsaves->never);
+	else if (!t)
+		gs_snprintf(out, room, "%s", gl_gsaves->unknown);
+	else
+		save_page_when(out, room, t);
+}
+
+static u32 stamp_time(const struct saveslot_stamp *w)
+{
+	return w->year ? userdata_unix_time(w->year, w->month, w->day, w->hour, w->min, w->sec) : 0;
+}
+
+// What a slotstore code says: the flows' lines, and the page's own
 static void fail(int code)
 {
 	tlog_error("gsaves: %d", code);
@@ -88,7 +153,7 @@ static void fail(int code)
 		dialog_message(NULL, gl_gsaves->gone_version, DIALOG_ERROR);
 		break;
 	case SLOTSTORE_SIZE:
-		snprintf(gs.text, sizeof(gs.text), EN_GS_SIZE, (unsigned long)gs.size / 1024);
+		gs_snprintf(gs.text, sizeof(gs.text), EN_GS_SIZE, (unsigned long)gs.size / 1024);
 		dialog_message(NULL, gs.text, DIALOG_ERROR);
 		break;
 	default:
@@ -97,72 +162,195 @@ static void fail(int code)
 	}
 }
 
-static void hints_set(const char *a, const char *b)
-{
-	gs.hints[0] = (struct ui_hint){"A", a};
-	gs.hints[1] = (struct ui_hint){"B", b};
-}
+/* ---- The slots ---- */
 
-/* ---- History ---- */
-
-static void stamp_text(char *out, u32 n, const struct saveslot_stamp *w, u32 room)
+// The game's slots, their backups and the active one, read again; the rows
+// for them and New slot. Returns the row for gs.want (else the active slot),
+// or a negative code.
+static int slots_read(void)
 {
-	if (!w->year)
-		snprintf(out, room, "#%lu  %s", (unsigned long)n, gl_gsaves->unknown);
-	else
-		snprintf(out, room, "#%lu  %04u-%02u-%02u %02u:%02u", (unsigned long)n, w->year, w->month, w->day,
-			 w->hour, w->min);
-}
-
-static void history(const char *slot)
-{
+	int n = slotstore_list(gs.rom, gs.slots, SLOTSTORE_MAX_SLOTS);
+	if (n < 0)
+		return n;
+	gs.count = (u32)n < SLOTSTORE_MAX_SLOTS ? (u32)n : SLOTSTORE_MAX_SLOTS;
+	slotstore_current(gs.rom, gs.active);
 	u32 at = 0;
-	for (;;) {
-		int n = slotstore_history(gs.rom, slot, gs.u.h.v, HIST_ROWS);
-		if (n < 0) {
+	for (u32 i = 0; i < gs.count; i++) {
+		int b = slotstore_history(gs.rom, gs.slots[i].name, gs.u.b.v, 0);
+		gs.backups[i] = (u8)(b < 0 ? 0 : b > 255 ? 255 : b);
+		int act = !strcmp(gs.slots[i].name, gs.active);
+		gs.rows[i] = (struct save_page_row){gs.slots[i].name, (u8)(act ? ART_ICON8_SAVE + 1 : 0), 0};
+		if (gs.want[0] ? !strcmp(gs.slots[i].name, gs.want) : act)
+			at = i;
+	}
+	gs.rows[gs.count] = (struct save_page_row){gl_gsaves->new_row, 0, UI_ROLE_ACCENT_INK};
+	return (int)at;
+}
+
+static void slot_pane(void *ctx, u32 row, struct save_pane *out)
+{
+	(void)ctx;
+	if (row >= gs.count) {  // New slot
+		gs_snprintf(gs.head, sizeof(gs.head), "%s", gl_slots->new_title);
+		out->head = gs.head;
+		out->keys = "";
+		out->note = gl_gsaves->note_new;
+		return;
+	}
+	const struct slotstore_slot *s = &gs.slots[row];
+	int act = !strcmp(s->name, gs.active);
+	char when[20], backups[8];
+	save_page_ago(when, sizeof(when), s->saved);
+	if (gs.backups[row])
+		gs_snprintf(backups, sizeof(backups), EN_GS_BACKUPS, (unsigned long)gs.backups[row]);
+	else
+		gs_snprintf(backups, sizeof(backups), "%s", gl_gsaves->none);
+	gs_snprintf(gs.values, sizeof(gs.values), "%s\n%s", when, backups);
+	out->head = s->name;
+	out->tag = act ? gl_gsaves->active : NULL;
+	out->values = gs.values;
+	out->note = act ? gl_gsaves->note_active : gl_gsaves->note_other;
+}
+
+static void slot_hints(void *ctx, u32 row, const struct ui_hint **keys, u32 *count)
+{
+	(void)ctx;
+	u32 n = 0;
+	if (row >= gs.count) {
+		gs.hints[n++] = (struct ui_hint){"A", gl_gsaves->hint_new};
+	} else {
+		gs.hints[n++] = (struct ui_hint){"A", gl_gsaves->hint_play};
+		gs.hints[n++] = (struct ui_hint){"START", gl_gsaves->hint_options};
+		gs.hints[n++] = (struct ui_hint){"\xC2\xBB", gl_gsaves->hint_backups};
+	}
+	gs.hints[n++] = (struct ui_hint){"B", gl_hint_back};
+	*keys = gs.hints;
+	*count = n;
+}
+
+static struct save_page slots_page;
+
+// The slots' page, its cursor on gs.want (else the active slot); 0 if it
+// can't show
+static int slots_open(void)
+{
+	int at = slots_read();
+	if (at < 0) {
+		fail(at);
+		return 0;
+	}
+	slots_page = (struct save_page){
+		"game-saves", probe.icon, gl_gsaves->title, gs.title, gl_gsaves->keys,          gs.rows, gs.count + 1,
+		(u32)at,      slot_pane,  slot_hints,       0,        INPUT_START | INPUT_RIGHT};
+	return save_page_open(&slots_page);
+}
+
+// The rows again after a change the page shows (the active slot, a delete)
+static void slots_again(void)
+{
+	int at = slots_read();
+	if (at < 0) {
+		fail(at);
+		return;
+	}
+	save_page_rows(gs.rows, gs.count + 1, (u32)at);
+}
+
+/* ---- Backups ---- */
+
+static int backups_read(void)
+{
+	int n = slotstore_history(gs.rom, gs.slot, gs.u.b.v, BACKUP_ROWS);
+	if (n < 0)
+		return n;
+	gs.versions = (u32)n < BACKUP_ROWS ? (u32)n : BACKUP_ROWS;
+	for (u32 i = 0; i < gs.versions; i++) {
+		// When it was made, else (no clock then) its number
+		u32 t = stamp_time(&gs.u.b.v[i].when);
+		if (t)
+			when_text(gs.u.b.ago[i], sizeof(gs.u.b.ago[i]), t, 1);
+		else
+			gs_snprintf(gs.u.b.ago[i], sizeof(gs.u.b.ago[i]), "#%lu", (unsigned long)gs.u.b.v[i].n);
+		gs.rows[i] = (struct save_page_row){gs.u.b.ago[i], 0, 0};
+	}
+	return n;
+}
+
+static void backup_pane(void *ctx, u32 row, struct save_pane *out)
+{
+	(void)ctx;
+	if (row >= gs.versions)
+		return;
+	const struct slotstore_version *v = &gs.u.b.v[row];
+	char when[20], size[12];
+	save_page_ago(when, sizeof(when), stamp_time(&v->when));
+	size_text(size, sizeof(size), v->size);
+	gs_snprintf(gs.values, sizeof(gs.values), "%s\n%s", when, size);
+	out->head = gs.u.b.ago[row];
+	out->tag = v->kept ? gl_gsaves->kept : NULL;
+	out->keys = gl_gsaves->backup_keys;
+	out->values = gs.values;
+	out->note = v->kept ? gl_gsaves->note_kept : gl_gsaves->note_backup;
+}
+
+static void backup_hints(void *ctx, u32 row, const struct ui_hint **keys, u32 *count)
+{
+	(void)ctx;
+	(void)row;
+	gs.hints[0] = (struct ui_hint){"A", gl_gsaves->hint_restore};
+	gs.hints[1] = (struct ui_hint){"B", gl_gsaves->hint_slots};
+	*keys = gs.hints;
+	*count = 2;
+}
+
+static struct save_page backups_page;
+
+// A slot's backups, until B or LEFT goes back to the slots
+static void backups(void)
+{
+	int n = backups_read();
+	if (n <= 0) {
+		if (n < 0)
 			fail(n);
-			return;
-		}
-		if (n > HIST_ROWS)
-			n = HIST_ROWS;
-		if (n == 0) {
-			dialog_message(NULL, gl_gsaves->no_history, DIALOG_INFO);
-			return;
-		}
-		for (int i = 0; i < n; i++) {
-			stamp_text(gs.u.h.text[i], gs.u.h.v[i].n, &gs.u.h.v[i].when, sizeof(gs.u.h.text[i]));
-			size_text(gs.u.h.size[i], gs.u.h.v[i].size);
-			gs.u.h.rows[i] = (struct slot_list_row){gs.u.h.text[i], gs.u.h.size[i], 0};
-		}
-		hints_set(gl_gsaves->hint_restore, gl_hint_back);
-		const struct slot_list list = {"game-saves-history",
-					       gl_gsaves->history_title,
-					       slot,
-					       gs.u.h.rows,
-					       (u32)n,
-					       at < (u32)n ? at : 0,
-					       gs.hints,
-					       2,
-					       0};
+		return;
+	}
+	backups_page = (struct save_page){"game-saves-backups",
+					  probe.icon,
+					  gl_gsaves->backups_title,
+					  gs.slot,
+					  gl_gsaves->backup_keys,
+					  gs.rows,
+					  gs.versions,
+					  0,
+					  backup_pane,
+					  backup_hints,
+					  0,
+					  INPUT_LEFT};
+	if (!save_page_open(&backups_page))
+		return;
+	for (;;) {
 		u32 row;
-		if (slot_list_run(&list, &row) != SLOT_LIST_PICK)
-			return;
-		u32 ver = gs.u.h.v[row].n;
-		char date[40];
-		stamp_text(date, ver, &gs.u.h.v[row].when, sizeof(date));
-		snprintf(gs.text, sizeof(gs.text), EN_GS_RESTORE, (unsigned long)ver);
-		char body[96];
-		snprintf(body, sizeof(body), "%s\n%s", date, gl_gsaves->restore_text);
-		if (!dialog_confirm(gs.text, body, DIALOG_INFO)) {
-			at = row;
+		u16 key = save_page_wait(&row);
+		if (key != INPUT_A || row >= gs.versions)
+			break;
+		u32 ver = gs.u.b.v[row].n;
+		char when[16];
+		when_text(when, sizeof(when), stamp_time(&gs.u.b.v[row].when), 1);
+		gs_snprintf(gs.text, sizeof(gs.text), EN_GS_RESTORE, gs.slot, when);
+		struct ui_confirm ask = {gl_gsaves->restore_title, gs.text, gl_gsaves->restore_button, 0};
+		if (!ui_confirm(save_page_hints(), &ask))
 			continue;
-		}
-		int r = slotstore_restore(gs.rom, slot, ver);
-		tlog("gsaves: restore %s version %lu: %d", slot, (unsigned long)ver, r);
+		int r = slotstore_restore(gs.rom, gs.slot, ver);
+		tlog("gsaves: restore %s version %lu: %d", gs.slot, (unsigned long)ver, r);
 		if (r != SLOTSTORE_OK)
 			fail(r);
-		at = 0;
+		n = backups_read();
+		if (n <= 0)
+			break;
+		save_page_rows(gs.rows, gs.versions, 0);
 	}
+	save_page_close();
+	gs_snprintf(gs.want, sizeof(gs.want), "%s", gs.slot);
 }
 
 /* ---- Export ---- */
@@ -180,10 +368,10 @@ static void export_slot(const char *slot)
 	int r = SLOTSTORE_TAKEN;
 	for (u32 k = 1; k <= 9 && r == SLOTSTORE_TAKEN; k++) {
 		if (k == 1)
-			snprintf(gs.path, sizeof(gs.path), EXPORT_DIR "/%.*s - %s.sav", (int)stem, base, slot);
+			gs_snprintf(gs.path, sizeof(gs.path), EXPORT_DIR "/%.*s - %s.sav", (int)stem, base, slot);
 		else
-			snprintf(gs.path, sizeof(gs.path), EXPORT_DIR "/%.*s - %s (%lu).sav", (int)stem, base, slot,
-				 (unsigned long)k);
+			gs_snprintf(gs.path, sizeof(gs.path), EXPORT_DIR "/%.*s - %s (%lu).sav", (int)stem, base, slot,
+				    (unsigned long)k);
 		r = slotstore_export(gs.rom, slot, gs.path);
 	}
 	tlog("gsaves: export %s to %s: %d", slot, gs.path, r);
@@ -191,11 +379,11 @@ static void export_slot(const char *slot)
 		fail(r);
 		return;
 	}
-	snprintf(gs.text, sizeof(gs.text), "%s\n%s", gl_gsaves->exported, gs.path);
+	gs_snprintf(gs.text, sizeof(gs.text), "%s\n%s", gl_gsaves->exported, gs.path);
 	dialog_message(NULL, gs.text, DIALOG_INFO);
 }
 
-/* ---- Import: a minimal file picker ---- */
+/* ---- New slot from a .sav file: a minimal file browser ---- */
 
 static int is_sav(const char *name)
 {
@@ -204,8 +392,8 @@ static int is_sav(const char *name)
 	       (name[n - 1] | 32) == 'v';
 }
 
-// Lists dir (folders, then .sav files) into the table; returns the count, or
-// -1 if the folder can't be read
+// Lists a folder (folders, then .sav files) into the table; returns the
+// count, or -1 if it can't be read
 static int dir_list(const char *folder)
 {
 	u32 n = 0;
@@ -218,12 +406,8 @@ static int dir_list(const char *folder)
 			    (fileinfo.fattrib & (AM_HID | AM_SYS)) || strlen(fileinfo.fname) >= FILE_NAME ||
 			    (!isdir && !is_sav(fileinfo.fname)))
 				continue;
-			snprintf(gs.u.f.name[n], FILE_NAME, "%.*s", FILE_NAME - 1, fileinfo.fname);
-			gs.u.f.dir[n] = (u8)isdir;
-			if (isdir)
-				gs.u.f.size[n][0] = 0;
-			else
-				size_text(gs.u.f.size[n], (u32)fileinfo.fsize);
+			gs_snprintf(gs.u.f.names[n], FILE_NAME, "%.*s", FILE_NAME - 1, fileinfo.fname);
+			gs.u.f.dirs[n] = (u8)isdir;
 			n++;
 		}
 		f_closedir(&dir);
@@ -231,7 +415,7 @@ static int dir_list(const char *folder)
 	return (int)n;
 }
 
-// out = dir + "/" + name (out may be dir); the caller checked the room
+// out = base + "/" + name (out may be base); the caller checked the room
 static void join(char *out, const char *base, const char *name)
 {
 	u32 len = (u32)strlen(base), n = (u32)strlen(name);
@@ -245,21 +429,21 @@ static void join(char *out, const char *base, const char *name)
 	out[len + n] = 0;
 }
 
-// Picks a .sav on the card, starting in the ROM's folder; the path goes to
+// Picks a .sav on the card, starting in the ROM's folder; its path goes to
 // out (PATH_BYTES). 1 if one was picked.
 static int pick_file(char *out)
 {
-	char *cwd = gs.u.f.dirpath;
-	// The game's folder, else the root
+	char *cwd = gs.u.f.cwd;
 	const char *rom = gs.rom[0] == '/' ? gs.rom + 1 : gs.rom;
 	const char *slash = strrchr(rom, '/');
-	snprintf(cwd, PATH_BYTES, "/%.*s", slash ? (int)(slash - rom) : 0, rom);
+	gs_snprintf(cwd, PATH_BYTES, "/%.*s", slash ? (int)(slash - rom) : 0, rom);
 	char left[FILE_NAME];
 	left[0] = 0;
+	const struct ui_hint hints[2] = {{"A", gl_hint_open}, {"B", gl_gsaves->hint_cancel}};
 	for (;;) {
 		int n = dir_list(cwd);
 		if (n < 0 && strcmp(cwd, "/") != 0) {
-			snprintf(cwd, PATH_BYTES, "/");
+			gs_snprintf(cwd, PATH_BYTES, "/");
 			continue;
 		}
 		if (n < 0) {
@@ -270,24 +454,22 @@ static int pick_file(char *out)
 		if (up)
 			gs.u.f.rows[count++] = (struct slot_list_row){"..", 0, ART_ICON8_FOLDER + 1};
 		for (int i = 0; i < n && count < FILE_ENTRIES + 1; i++, count++) {
-			gs.u.f.rows[count] =
-				(struct slot_list_row){gs.u.f.name[i], gs.u.f.size[i],
-						       (u8)((gs.u.f.dir[i] ? ART_ICON8_FOLDER : ART_ICON8_FILE) + 1)};
-			if (left[0] && !strcmp(left, gs.u.f.name[i]))
+			gs.u.f.rows[count] = (struct slot_list_row){
+				gs.u.f.names[i], 0, (u8)((gs.u.f.dirs[i] ? ART_ICON8_FOLDER : ART_ICON8_FILE) + 1)};
+			if (left[0] && !strcmp(left, gs.u.f.names[i]))
 				at = count;
 		}
 		if (count == 0)
 			gs.u.f.rows[count++] = (struct slot_list_row){gl_gsaves->empty, 0, 0};
-		hints_set(gl_hint_open, gl_slots->hint_cancel);
 		const struct slot_list list = {
-			"game-saves-files", gl_gsaves->import_title, cwd, gs.u.f.rows, count, at, gs.hints, 2, 0};
+			"game-saves-files", gl_gsaves->file_title, cwd, gs.u.f.rows, count, at, hints, 2, 0};
 		u32 row;
 		if (slot_list_run(&list, &row) != SLOT_LIST_PICK)
 			return 0;
 		left[0] = 0;
-		if (up && row == 0) {  // up: the folder we left is where the cursor lands
+		if (up && row == 0) {  // up: the folder left is where the cursor lands
 			char *s = strrchr(cwd, '/');
-			snprintf(left, sizeof(left), "%s", s + 1);
+			gs_snprintf(left, sizeof(left), "%s", s + 1);
 			if (s == cwd)
 				s[1] = 0;
 			else
@@ -297,181 +479,219 @@ static int pick_file(char *out)
 		u32 i = row - up;
 		if (i >= (u32)n)
 			continue;  // the empty row
-		u32 len = (u32)strlen(cwd);
-		if (len + FILE_NAME + 2 >= PATH_BYTES) {  // too deep to build a path
+		if (strlen(cwd) + FILE_NAME + 2 >= PATH_BYTES) {  // too deep to build a path
 			fail(SLOTSTORE_PATH);
 			continue;
 		}
-		if (gs.u.f.dir[i]) {
-			join(cwd, cwd, gs.u.f.name[i]);
+		if (gs.u.f.dirs[i]) {
+			join(cwd, cwd, gs.u.f.names[i]);
 			continue;
 		}
-		join(out, cwd, gs.u.f.name[i]);
+		join(out, cwd, gs.u.f.names[i]);
 		return 1;
 	}
 }
 
-static int slots_get(const struct slotstore_slot **slots)
+enum {
+	DONE_STAY,    // the page is up as it was
+	DONE_REOPEN,  // the page closed: open it again
+	DONE_PLAY,    // play the slot (it is the active one now)
+};
+
+// Slot row's backups, if it has any (else a word over the page, which stays)
+static int open_backups(u32 row)
 {
-	int n = slot_flow_slots(gs.rom, slots);
-	if (n < 0)
-		fail(n);
-	return n;
+	if (!gs.backups[row]) {
+		dialog_message(NULL, gl_gsaves->no_backups, DIALOG_INFO);
+		return DONE_STAY;
+	}
+	gs_snprintf(gs.slot, sizeof(gs.slot), "%s", gs.slots[row].name);
+	save_page_close();
+	backups();
+	return DONE_REOPEN;
 }
 
-static void import_file(void)
+/* ---- New slot ---- */
+
+// New slot's choice (a popup beside its row), then its name, for which the
+// page closes (DONE_REOPEN); DONE_STAY if nothing was chosen
+static int new_slot(void)
 {
-	const struct slotstore_slot *slots;
-	int n = slots_get(&slots);
-	if (n < 0)
-		return;
-	if (n == 0) {
-		dialog_message(NULL, gl_gsaves->no_slots, DIALOG_INFO);
-		return;
+	if (gs.count >= SLOTSTORE_MAX_SLOTS) {
+		fail(SLOTSTORE_FULL);
+		return DONE_STAY;
 	}
-	if (!pick_file(gs.path))
-		return;
-	u32 at = 0;
-	slotstore_current(gs.rom, gs.current);
-	for (int i = 0; i < n; i++)
-		if (!strcmp(slots[i].name, gs.current))
-			at = (u32)i;
-	if (n > 1) {
-		for (int i = 0; i < n; i++) {
-			size_text(gs.detail[i], slots[i].size);
-			gs.rows[i] = (struct slot_list_row){slots[i].name, gs.detail[i], 0};
-		}
-		hints_set(gl_hint_ok, gl_slots->hint_cancel);
-		const struct slot_list list = {
-			"game-saves-target", gl_gsaves->into_title, gs.title, gs.rows, (u32)n, at, gs.hints, 2, 0};
-		u32 row;
-		if (slot_list_run(&list, &row) != SLOT_LIST_PICK)
-			return;
-		at = row;
+	// A copy needs a slot with a file: the active one, else the first
+	const char *from = gs.count ? gs.slots[0].name : NULL;
+	for (u32 i = 0; i < gs.count; i++)
+		if (!strcmp(gs.slots[i].name, gs.active))
+			from = gs.slots[i].name;
+	u32 n = 0;
+	gs.items[n] = (struct ui_pop_item){gl_gsaves->new_empty, 0, 0};
+	gs.ids[n++] = NEW_EMPTY;
+	if (from) {
+		gs_snprintf(gs.copy_of, sizeof(gs.copy_of), EN_GS_COPY_OF, from);
+		gs.items[n] = (struct ui_pop_item){gs.copy_of, 0, 0};
+		gs.ids[n++] = NEW_COPY;
 	}
-	char slot[SAVESLOT_NAME_BYTES];
-	snprintf(slot, sizeof(slot), "%s", slots[at].name);
-	const char *file = strrchr(gs.path, '/') + 1;
-	snprintf(gs.text, sizeof(gs.text), EN_GS_IMPORT, slot);
-	char body[160];
-	snprintf(body, sizeof(body), "%s\n%s", file, gl_gsaves->import_text);
-	if (!dialog_confirm(gs.text, body, DIALOG_INFO))
-		return;
-	int r = slotstore_import(gs.rom, slot, gs.path, gs.size);
-	tlog("gsaves: import %s into %s: %d", gs.path, slot, r);
+	gs.items[n] = (struct ui_pop_item){gl_gsaves->new_file, 0, 0};
+	gs.ids[n++] = NEW_FILE;
+	gs.popup = (struct ui_popup){gl_slots->new_title, ART_ICON8_SAVE + 1, gs.items, (u8)n, 0, 0};
+	if (!ui_popup_open(save_page_list(), save_page_hints(), &gs.popup))
+		return DONE_STAY;
+	tlog_debug("screen ready: game-saves-new");
+	s32 pick = ui_popup_choose();
+	ui_popup_close();
+	if (pick < 0)
+		return DONE_STAY;
+	u32 how = gs.ids[pick];
+	char copy[SAVESLOT_NAME_BYTES], name[SAVESLOT_NAME_BYTES], initial[SAVESLOT_NAME_BYTES];
+	initial[0] = 0;
+	if (from)
+		gs_snprintf(copy, sizeof(copy), "%s", from);
+	save_page_close();
+	if (how == NEW_FILE) {
+		if (!pick_file(gs.path))
+			return DONE_REOPEN;
+		// The file's name, less .sav, as the slot's first guess
+		const char *base = strrchr(gs.path, '/') + 1;
+		gs_snprintf(initial, sizeof(initial), "%.*s", (int)(strlen(base) - 4), base);
+	}
+	if (slot_flow_name_prompt(gs.rom, how == NEW_COPY ? gl_slots->copy_title : gl_slots->new_title, initial, NULL,
+				  name) != SLOT_FLOW_DONE)
+		return DONE_REOPEN;
+	int r = how == NEW_FILE   ? slotstore_create_file(gs.rom, name, gs.path, gs.size, gs.want)
+		: how == NEW_COPY ? slotstore_create(gs.rom, name, copy, 0, gs.want)
+				  : slotstore_create(gs.rom, name, NULL, gs.size, gs.want);
+	tlog("gsaves: new %s (%lu): %d", name, (unsigned long)how, r);
+	if (r != SLOTSTORE_OK) {
+		gs.want[0] = 0;
+		fail(r);
+	}
+	return DONE_REOPEN;
+}
+
+/* ---- A slot's popup ---- */
+
+static int make_active(const char *slot)
+{
+	int r = slotstore_set_current(gs.rom, slot);
+	tlog("gsaves: active %s: %d", slot, r);
 	if (r != SLOTSTORE_OK)
 		fail(r);
-	else
-		snprintf(gs.want, sizeof(gs.want), "%s", slot);
+	return r == SLOTSTORE_OK;
 }
 
-/* ---- A slot's actions ---- */
-
-// 1 if the game launches (the slot is the current one now)
-static int slot_actions(const char *name)
+static int slot_menu(u32 row)
 {
-	snprintf(gs.slot, sizeof(gs.slot), "%s", name);
-	const char *const text[ACT_COUNT] = {gl_gsaves->act_launch, gl_gsaves->act_set,    gl_gsaves->act_rename,
-					     gl_gsaves->act_dup,    gl_gsaves->act_delete, gl_gsaves->act_history,
-					     gl_gsaves->act_export};
-	for (u32 i = 0; i < ACT_COUNT; i++)
-		gs.rows[i] = (struct slot_list_row){text[i], 0, 0};
-	hints_set(gl_hint_ok, gl_hint_back);
-	u32 at = 0;
+	gs_snprintf(gs.slot, sizeof(gs.slot), "%s", gs.slots[row].name);
+	int act = !strcmp(gs.slot, gs.active);
+	static const u8 order[ACT_COUNT] = {ACT_PLAY, ACT_ACTIVE, ACT_BACKUPS, ACT_RENAME,
+					    ACT_COPY, ACT_EXPORT, ACT_DELETE};
+	const char *const text[ACT_COUNT] = {gl_gsaves->act_play,   gl_gsaves->act_active, gl_gsaves->act_backups,
+					     gl_gsaves->act_rename, gl_gsaves->act_copy,   gl_gsaves->act_export,
+					     gl_gsaves->act_delete};
+	char count[8];
+	gs_snprintf(count, sizeof(count), EN_GS_BACKUPS, (unsigned long)gs.backups[row]);
+	u32 n = 0;
+	for (u32 k = 0; k < ACT_COUNT; k++) {
+		u32 a = order[k];
+		if (a == ACT_ACTIVE && act)
+			continue;
+		gs.items[n] = (struct ui_pop_item){text[a], a == ACT_BACKUPS && gs.backups[row] ? count : 0,
+						   (u8)(a == ACT_DELETE ? UI_POP_DANGER : 0)};
+		gs.ids[n++] = (u8)a;
+	}
+	gs.popup = (struct ui_popup){gs.slot, ART_ICON8_SAVE + 1, gs.items, (u8)n, 0, 0};
+	if (!ui_popup_open(save_page_list(), save_page_hints(), &gs.popup))
+		return DONE_STAY;
+	tlog_debug("screen ready: game-saves-slot %s", gs.slot);
 	for (;;) {
-		const struct slot_list list = {
-			"game-saves-slot", gl_gsaves->slot_title, gs.slot, gs.rows, ACT_COUNT, at, gs.hints, 2, 0};
-		u32 row;
-		if (slot_list_run(&list, &row) != SLOT_LIST_PICK)
-			return 0;
-		at = row;
-		int r;
-		char out[SAVESLOT_NAME_BYTES];
-		const struct slotstore_slot *slots;
-		switch (row) {
-		case ACT_LAUNCH:
-		case ACT_SET:
-			r = slotstore_set_current(gs.rom, gs.slot);
-			tlog("gsaves: current %s: %d", gs.slot, r);
-			if (r != SLOTSTORE_OK) {
-				fail(r);
-				return 0;
-			}
-			return row == ACT_LAUNCH;
-		case ACT_RENAME:
-			if (slot_flow_rename(gs.rom, gs.slot, out) == SLOT_FLOW_DONE) {
-				snprintf(gs.slot, sizeof(gs.slot), "%s", out);
-				snprintf(gs.want, sizeof(gs.want), "%s", out);
-			}
-			return 0;
-		case ACT_DUP:
-			if (slot_flow_name_prompt(gs.rom, gl_gsaves->dup_title, "", NULL, out) != SLOT_FLOW_DONE)
-				continue;
-			r = slotstore_duplicate(gs.rom, gs.slot, out, gs.want);
-			tlog("gsaves: duplicate %s as %s: %d", gs.slot, out, r);
-			if (r != SLOTSTORE_OK) {
-				fail(r);
-				gs.want[0] = 0;
-			}
-			return 0;
-		case ACT_DELETE:
-			if (slots_get(&slots) == 1) {
+		s32 pick = ui_popup_choose();
+		if (pick < 0)
+			return DONE_STAY;
+		u32 a = gs.ids[pick];
+		if (a == ACT_DELETE) {
+			if (gs.count < 2) {
+				ui_popup_close();
 				fail(SLOTSTORE_LAST);
-				continue;
+				return DONE_STAY;
 			}
-			snprintf(gs.text, sizeof(gs.text), EN_GS_DELETE, gs.slot);
-			if (!dialog_confirm(gs.text, gl_gsaves->delete_text, DIALOG_ERROR))
-				continue;
-			r = slotstore_delete(gs.rom, gs.slot);
+			gs_snprintf(gs.text, sizeof(gs.text), EN_GS_DELETE, gs.slot);
+			struct ui_confirm ask = {gs.text, gl_gsaves->delete_text, gl_gsaves->act_delete, 1};
+			if (!ui_confirm(save_page_hints(), &ask))
+				continue;  // Cancel: back to the popup
+			ui_popup_close();
+			int r = slotstore_delete(gs.rom, gs.slot);
 			tlog("gsaves: delete %s: %d", gs.slot, r);
 			if (r != SLOTSTORE_OK)
 				fail(r);
-			return 0;
-		case ACT_HISTORY:
-			history(gs.slot);
-			continue;
+			gs.want[0] = 0;
+			slots_again();
+			return DONE_STAY;
+		}
+		ui_popup_close();
+		char out[SAVESLOT_NAME_BYTES];
+		switch (a) {
+		case ACT_PLAY:
+			return make_active(gs.slot) ? DONE_PLAY : DONE_STAY;
+		case ACT_ACTIVE:
+			if (make_active(gs.slot)) {
+				gs_snprintf(gs.want, sizeof(gs.want), "%s", gs.slot);
+				slots_again();
+			}
+			return DONE_STAY;
+		case ACT_BACKUPS:
+			return open_backups(row);
+		case ACT_RENAME:
+			save_page_close();
+			if (slot_flow_rename(gs.rom, gs.slot, out) == SLOT_FLOW_DONE)
+				gs_snprintf(gs.want, sizeof(gs.want), "%s", out);
+			else
+				gs_snprintf(gs.want, sizeof(gs.want), "%s", gs.slot);
+			return DONE_REOPEN;
+		case ACT_COPY: {
+			save_page_close();
+			gs_snprintf(gs.want, sizeof(gs.want), "%s", gs.slot);
+			if (slot_flow_name_prompt(gs.rom, gl_slots->copy_title, "", NULL, out) != SLOT_FLOW_DONE)
+				return DONE_REOPEN;
+			int r = slotstore_duplicate(gs.rom, gs.slot, out, gs.want);
+			tlog("gsaves: copy %s as %s: %d", gs.slot, out, r);
+			if (r != SLOTSTORE_OK) {
+				fail(r);
+				gs_snprintf(gs.want, sizeof(gs.want), "%s", gs.slot);
+			}
+			return DONE_REOPEN;
+		}
 		default:
 			export_slot(gs.slot);
-			continue;
+			return DONE_STAY;
 		}
 	}
 }
 
-/* ---- The manager ---- */
-
-// The rows: the slots, New slot, Import. Returns the slot count and puts the
-// cursor row in *at (the slot gs.want names, else the current one)
-static int rows_build(u32 *at)
-{
-	const struct slotstore_slot *slots;
-	int n = slot_flow_slots(gs.rom, &slots);
-	if (n < 0)
-		return n;
-	slotstore_current(gs.rom, gs.current);
-	*at = 0;
-	for (int i = 0; i < n; i++) {
-		size_text(gs.detail[i], slots[i].size);
-		int cur = !strcmp(slots[i].name, gs.current);
-		gs.rows[i] = (struct slot_list_row){slots[i].name, gs.detail[i], (u8)(cur ? ART_ICON8_SAVE + 1 : 0)};
-		if (gs.want[0] ? !strcmp(slots[i].name, gs.want) : cur)
-			*at = (u32)i;
-	}
-	gs.rows[n] = (struct slot_list_row){gl_slots->new_row, 0, 0};
-	gs.rows[n + 1] = (struct slot_list_row){gl_gsaves->import_row, 0, 0};
-	return n;
-}
+/* ---- The game's saves ---- */
 
 int game_saves_probe(const char *path)
 {
 	// No card access for a ROM (the popup opens on START): its facts are
 	// read once Saves is picked. A NOR entry's are in NOR.
-	gs.size = 0;
-	if (userdata_nor_name(path))
-		return action_game_saves(path, gs.rom, sizeof(gs.rom), &gs.size);
-	const char *name = strrchr(path, '/');
-	if (!name || library_console_of(name + 1) != LIB_GBA || strlen(path) >= sizeof(gs.path))
+	probe.size = 0;
+	probe.path[0] = 0;
+	if (strlen(path) >= sizeof(probe.path))
 		return 0;
-	memcpy(gs.path, path, strlen(path) + 1);  // fits: checked above
+	if (userdata_nor_name(path)) {
+		char rom[GAMESAVE_PATH_BYTES];
+		probe.icon = ART_ICON16_NOR;
+		if (!action_game_saves(path, rom, sizeof(rom), &probe.size))
+			return 0;
+	} else {
+		const char *name = strrchr(path, '/');
+		if (!name || library_console_of(name + 1) != LIB_GBA)
+			return 0;
+		probe.icon = ART_ICON16_GBA;
+	}
+	memcpy(probe.path, path, strlen(path) + 1);
 	return 1;
 }
 
@@ -480,50 +700,56 @@ int game_saves_run(const char *title)
 	int own = !ui_active();
 	if (own)
 		dialog_open();
-	gs.title = title;
-	gs.want[0] = 0;
 	int result = GAME_SAVES_BACK;
 	// A save still on the chip goes to the card before any slot moves
-	if (!pending_save_flush()) {
-		if (own)
-			dialog_close();
-		return result;
-	}
-	if (!gs.size && !action_game_saves(gs.path, gs.rom, sizeof(gs.rom), &gs.size)) {
+	if (!pending_save_flush())
+		goto out;
+	memset(&gs, 0, sizeof(gs));
+	gs.title = title;
+	gs.size = probe.size;
+	if (!probe.path[0] || !action_game_saves(probe.path, gs.rom, sizeof(gs.rom), &gs.size)) {
 		dialog_message(NULL, gl_gsaves->no_save, DIALOG_INFO);
-		if (own)
-			dialog_close();
-		return result;
+		goto out;
 	}
 	for (;;) {
-		u32 at;
-		int n = rows_build(&at);
-		if (n < 0) {
-			fail(n);
+		if (!slots_open())
 			break;
-		}
-		hints_set(gl_hint_open, gl_hint_back);
-		const struct slot_list list = {"game-saves", gl_gsaves->title, title, gs.rows, (u32)n + 2,
-					       at,           gs.hints,         2,     0};
-		u32 row;
-		if (slot_list_run(&list, &row) != SLOT_LIST_PICK)
-			break;
-		gs.want[0] = 0;
-		if (row < (u32)n) {
-			char name[SAVESLOT_NAME_BYTES];
-			snprintf(name, sizeof(name), "%s", gs.rows[row].text);
-			snprintf(gs.want, sizeof(gs.want), "%s", name);
-			if (slot_actions(name)) {
-				result = GAME_SAVES_LAUNCH;
-				break;
+		int again = 0;
+		while (!again) {
+			u32 row;
+			u16 key = save_page_wait(&row);
+			if (!key || key == INPUT_B) {
+				save_page_close();
+				goto out;
 			}
-		} else if (row == (u32)n) {
-			if (slot_flow_new(gs.rom, gs.size, gs.want) != SLOT_FLOW_DONE)
-				gs.want[0] = 0;
-		} else {
-			import_file();
+			if (row >= gs.count) {  // New slot
+				if (key == INPUT_A)
+					again = new_slot() == DONE_REOPEN;
+				continue;
+			}
+			gs_snprintf(gs.slot, sizeof(gs.slot), "%s", gs.slots[row].name);
+			if (key == INPUT_A) {
+				if (make_active(gs.slot)) {
+					result = GAME_SAVES_LAUNCH;
+					save_page_close();
+					goto out;
+				}
+				continue;
+			}
+			if (key == INPUT_RIGHT) {
+				again = open_backups(row) == DONE_REOPEN;
+				continue;
+			}
+			int done = slot_menu(row);
+			if (done == DONE_PLAY) {
+				result = GAME_SAVES_LAUNCH;
+				save_page_close();
+				goto out;
+			}
+			again = done == DONE_REOPEN;
 		}
 	}
+out:
 	if (own)
 		dialog_close();
 	return result;

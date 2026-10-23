@@ -33,6 +33,7 @@ struct rename_ask {
 	const char *(*submit)(void *ctx, const char *name);
 	void *ctx;
 	const char *title;  // the title bar; NULL: "Rename"
+	u8 suggested;       // name is a suggestion (a new slot's): OK keeps it unchanged too
 };
 
 // Shows the keyboard until OK keeps a name (1) or it is cancelled, or the

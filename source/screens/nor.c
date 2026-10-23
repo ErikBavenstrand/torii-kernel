@@ -477,7 +477,7 @@ static void popup(u32 game)
 	}
 	nor.ids[n] = POP_DELETE;
 	nor.items[n++] = (struct ui_pop_item){gl_nor_delete, 0, UI_POP_DANGER};
-	nor.menu = (struct ui_popup){nor.pop_title, ART_ICON8_NOR + 1, nor.items, (u8)n, 0};
+	nor.menu = (struct ui_popup){nor.pop_title, ART_ICON8_NOR + 1, nor.items, (u8)n, 0, 0};
 	if (!ui_popup_open(at(N_LIST), at(N_HINTS), &nor.menu))
 		return;
 	for (;;) {

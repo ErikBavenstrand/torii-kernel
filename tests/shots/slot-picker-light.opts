@@ -1,4 +1,4 @@
-# The launch's save slot picker in the light theme, a game with two slots
+# The launch's Play with in the light theme, a game with two slots
 # (Main and Boss Rush) and the last-used one chosen.
 #! settings 28=1
 #! sd-file /Hello.gba 0x20000 tests/roms/hello/hello.gba

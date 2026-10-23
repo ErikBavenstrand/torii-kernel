@@ -1,6 +1,6 @@
-# The global save manager in the light theme with nothing to report: the
-# card's saves belong to games that are there, so no orphan is listed, and the
-# trash is empty (Empty trash now is dimmed).
+# Settings > Saves in the light theme with nothing to fix: the card's saves
+# belong to games that are there ("Every save has its game."), and the trash
+# is empty (Empty trash, its only row, dimmed; A says so).
 #! settings 28=1
 #! sd-file "/torii/saves/Games/Idle.gba/Main.sav" 0x2000 /dev/null
 -w "nav: home ready"
@@ -13,8 +13,6 @@
 -k @8:A -k @12:-
 -w "screen ready: saves"
 -s @4:list.png
--k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:-
--s @50:empty-row.png
 -k @60:A -k @64:-
 -s @90:message.png
 -k @100:A -k @104:-
