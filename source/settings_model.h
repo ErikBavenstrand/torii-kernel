@@ -76,6 +76,7 @@ enum settings_id {
 	SET_RESCAN,
 	SET_IDENTIFY,  // CRCs for the names database (namesdb.h)
 	SET_SHOW_ALL,  // the SD card page shows hidden files
+	SET_SAVES,     // opens the global save manager (screens/saves.h)
 	// System
 	SET_HISTORY,   // versions of a save kept per slot: index into settings_history_keep
 	SET_LOGGING,   // TLOG_OFF to TLOG_DEBUG (tlog.h)
@@ -144,6 +145,7 @@ enum settings_action {
 	SET_ACTION_NONE,
 	SET_ACTION_RESCAN,  // rescans the library index
 	SET_ACTION_IDENTIFY,  // names_identify: Identify library
+	SET_ACTION_SAVES,     // the Saves screen
 };
 
 // Row flags

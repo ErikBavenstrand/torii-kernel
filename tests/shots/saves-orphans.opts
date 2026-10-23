@@ -1,0 +1,42 @@
+# The global save manager (source/screens/saves.c, Settings > Library > Saves)
+# in the dark theme: the space the saves, their history and the trash use, Empty
+# trash now, and two orphaned saves, a save folder whose game is gone. A on an
+# orphan opens its popup (Relink, Keep, Delete); Relink lists the library's
+# games, the ones with the orphan's file name first; B goes back. Empty trash
+# now asks first; Cancel leaves the trash as it is.
+#! sd-file "/torii/saves/Old/Hello.gba/Main.sav" 0x8000 /dev/null
+#! sd-file "/torii/saves/Old/Hello.gba/Boss fight.sav" 0x8000 /dev/null
+#! sd-file "/torii/saves/Old/Hello.gba/game.ini" 0x40 /dev/null
+#! sd-file "/torii/backups/Old/Hello.gba/Main/0001-20260101-000000.sav" 0x8000 /dev/null
+#! sd-file "/torii/saves/Gone/Pocket.gb/Main.sav" 0x2000 /dev/null
+#! sd-file "/torii/saves/Games/Idle.gba/Main.sav" 0x2000 /dev/null
+#! sd-file "/torii/trash/20260101-000000-1/GBA/Old.gba/Main.sav" 0x4000 /dev/null
+-w "nav: home ready"
+-k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:A -k @28:-
+-w "screen ready: settings"
+-k @8:R -k @12:- -k @20:R -k @24:- -k @32:R -k @36:- -k @44:R -k @48:- -k @56:R -k @60:-
+-w "settings: row 24"
+-k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:-
+-w "settings: row 27"
+-s @4:library.png
+-k @8:A -k @12:-
+-w "screen ready: saves"
+-s @4:list.png
+-k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:A -k @48:-
+-s @60:empty-confirm.png
+-k @70:B -k @74:-
+-k @90:DOWN -k @94:- -k @102:DOWN -k @106:-
+-s @130:orphan.png
+-k @134:A -k @138:-
+-w "saves: popup"
+-s @10:popup.png
+-k @20:A -k @24:-
+-w "saves: picker"
+-s @30:picker.png
+-k @40:DOWN -k @44:- -k @52:DOWN -k @56:- -k @64:DOWN -k @68:-
+-s @84:picker-down.png
+-k @90:A -k @94:-
+-s @120:relink-confirm.png
+-k @130:B -k @134:-
+-k @150:B -k @154:-
+-s @180:back.png

@@ -386,6 +386,19 @@ rename/latin 307B33D0767DC9EF
 rename/prefilled 1017306268906A3D
 rename/shifted FBDD010AC1E7FCF2
 rename-dark/prefilled 1747112F0822FB93
+saves-none/back 3B9152A2693261DC
+saves-none/empty-row E42020FBB63EDEC9
+saves-none/list CF83BEDEDA580809
+saves-none/message 0AAD19084B4AB3FD
+saves-orphans/back DCAAEFC7BD8FF1E3
+saves-orphans/empty-confirm 9ED77A7D325609DB
+saves-orphans/library 72E9F7A1E23B07C8
+saves-orphans/list 81A0CACC1C6ED1ED
+saves-orphans/orphan DCAAEFC7BD8FF1E3
+saves-orphans/picker CDD0C5F1C7C7CC89
+saves-orphans/picker-down 9B5C9014DC1B34F3
+saves-orphans/popup 4D97EFD25241FD99
+saves-orphans/relink-confirm F863C40E41223C1D
 sd-confirm-tall/again 8D89101C0586EE3E
 sd-confirm-tall/back 089394670A0A6A39
 sd-confirm-tall/confirm 68FFE3FC5F8C3BC1
@@ -411,134 +424,136 @@ sd-root/frames 19-19 A2C46D299D4933C2
 sd-root/frames 20-20 A3B05621660A0116
 sd-root/frames 21-24 EE84177EF9E20E06
 sd-show-all/root 5B54333358329E11
-settings/bottom 7024E587AA960000
-settings/capture AA79B95388E2A69F
-settings/edit 7757008A95B17302
-settings/fields 35E1A92754AF62F4
-settings/refused 05E93F6229295E92
-settings/swatch 6E6363A6243231C1
-settings/top 86D165D04025E428
-settings/frames 0-1 A7881AB4FA8523A4
-settings/frames 2-2 BC6FFAD7847673AC
-settings/frames 3-3 23D3AB3EA6811C34
-settings/frames 4-4 AABF61675735C11F
-settings/frames 5-5 B37362F38E03FFCA
-settings/frames 6-6 1EC47104687C89F3
-settings/frames 7-12 1BAA88E19242DD5F
-settings/frames 13-13 86D165D04025E428
-settings/frames 14-14 01354152B2245AE0
-settings/frames 15-15 54E879932DC84F50
-settings/frames 16-28 DAA26E0A51596978
-settings/frames 29-29 B1B28B5D6163568C
-settings/frames 30-30 E269B8C3E74D6B94
-settings/frames 31-32 E27C392DE6658430
-settings/frames 33-33 09295DDE35EE10D9
-settings/frames 34-34 A1DDDCA36B37EB95
-settings/frames 35-36 B3D97BCA4C4C6C95
-settings/frames 37-37 2DF4432CAF6D89C1
-settings/frames 38-38 DF5AE6A53017C541
-settings/frames 39-40 17CA5D6B25D45109
-settings/frames 41-41 C914466E438F8B4C
-settings/frames 42-42 1A1021D1FB235942
-settings/frames 43-43 3452FF3B4D547036
-settings/frames 44-44 C0789B4F5D1A0350
-settings/frames 45-45 946531AB33992398
-settings/frames 46-46 EC4E3661048275D2
-settings/frames 47-47 4D2BDFF7F407833B
-settings/frames 48-48 A696D6D6983F9F0A
-settings/frames 49-49 D788D86E79BE786C
-settings/frames 50-50 687ED8E33B46DB67
-settings/frames 51-51 5A2473440ED4DD39
-settings/frames 52-52 2CCE3AB261F64FFD
-settings/frames 53-53 3AED0771965095C4
-settings/frames 54-54 D1F4C5B92908EDFA
-settings/frames 55-55 003E83C012392E2F
-settings/frames 56-56 B213BED32AAB2B4F
-settings/frames 57-57 A3B79AC8707284FB
-settings/frames 58-58 74F727BABAE65EFA
-settings/frames 59-59 EE6BE8C1CD8801E7
-settings/frames 60-60 9954E8C608829E76
-settings/frames 61-61 CC1E4F51396B44DB
-settings/frames 62-62 1573FAC82BB51C0B
-settings/frames 63-63 44FDFCF30784D284
-settings/frames 64-64 95C3DC23735A57EE
-settings/frames 65-65 D8F90D67DF47C17F
-settings/frames 66-66 2F35BE1E9F66BF49
-settings/frames 67-67 1C747D81690A0623
-settings/frames 68-68 6FC3702F5DC44D6C
-settings/frames 69-69 2FB04AD90F4879BE
-settings/frames 70-70 711F7ADCE77E24F8
-settings/frames 71-71 41E6238C5C63FAFF
-settings/frames 72-72 B06C8A95CBBD6601
-settings/frames 73-73 BD1EEC717D5AF5C0
-settings/frames 74-74 AB6C6DFFE5B92E87
-settings/frames 75-75 414F6055D14BC06B
-settings/frames 76-76 25F984519262260E
-settings/frames 77-77 D3E7E3FFE1045266
-settings/frames 78-78 BA2F1BAED4021980
-settings/frames 79-79 193A6D4D8E94C16A
-settings/frames 80-80 B2DE76D8F444EC0E
-settings/frames 81-81 4A75915BC768FEF5
-settings/frames 82-82 75F808284AF2C2EB
-settings/frames 83-83 31AF63A11CD87D5D
-settings/frames 84-84 D4AC06F4A1A09EAD
-settings/frames 85-85 2FD01D9F3610B535
-settings/frames 86-86 8EED60AF4180519F
-settings/frames 87-87 AAC69156180A28AD
-settings/frames 88-88 64C2367571EF9E79
-settings/frames 89-89 E9095CF2126BFF1B
-settings/frames 90-90 70675E2660CC5FED
-settings/frames 91-91 54494F2D807B8B19
-settings/frames 92-92 FBBD585156BA9322
-settings/frames 93-93 09F4FC8A02683400
-settings/frames 94-94 524E72A47357EFFF
-settings/frames 95-95 651BE9BD9A0CC961
-settings/frames 96-96 C80E767F0EAAEA90
-settings/frames 97-97 ECC8D8FFC2601A6A
-settings/frames 98-98 27B8BC0492E3E167
-settings/frames 99-99 582C5BB0924EE76D
-settings/frames 100-100 8F1EDF154D583D70
-settings/frames 101-233 7024E587AA960000
-settings-armed/after-a A388692F50449786
-settings-armed/armed 392E1CFC3A1624EF
-settings-dark/back AEF9F8EE6A2391F5
-settings-dark/cart D72BB35A9F3B159F
-settings-dark/dim 203C495A3D0652A5
-settings-dark/theme 68D49E2CD3C48D3D
-settings-dark/frames 0-0 46629D3519B297E2
-settings-dark/frames 1-1 0134CFF69A366202
-settings-dark/frames 2-2 969CF59030E71EA2
-settings-dark/frames 3-3 954282640178EFB0
-settings-dark/frames 4-4 924104B4732B5F76
-settings-dark/frames 5-5 ADAF7AC73082039A
-settings-dark/frames 6-6 37677C7BB8D2452D
-settings-dark/frames 7-7 4945B522D8F9832D
-settings-dark/frames 8-8 15BFAEBC0934DA01
-settings-dark/frames 9-9 BCB3953317FB66FA
-settings-dark/frames 10-10 11730F6420648562
-settings-dark/frames 11-11 286BD846497CD419
-settings-dark/frames 12-12 C60938D4621D1F5E
-settings-dark/frames 13-13 90CD94BD9463C2A2
-settings-dark/frames 14-14 9169FF04C2C6312E
-settings-dark/frames 15-15 CF58AE6A8D5117BD
-settings-dark/frames 16-23 68D49E2CD3C48D3D
-settings-dark/frames 24-24 BF7B1B6DF390B2A0
-settings-dark/frames 25-25 5603E0BD2CEA1400
-settings-dark/frames 26-26 244030226EFC88B2
-settings-dark/frames 27-27 49ACD2619074120C
-settings-dark/frames 28-28 2974F088A25406F8
-settings-dark/frames 29-29 A334091878C05302
-settings-dark/frames 30-30 3DF991AD730C9FF2
-settings-dark/frames 31-31 655C5EDA022B5186
-settings-dark/frames 32-32 2761309579469C7D
-settings-dark/frames 33-33 7CD3571A1D04208D
-settings-dark/frames 34-34 0C4F5AF380E16AEE
-settings-dark/frames 35-35 D2839DB0F897F3A9
-settings-dark/frames 36-36 8014B3B56A5A1225
-settings-dark/frames 37-37 E10CE0FC5D8CEBD2
-settings-dark/frames 38-38 560AFB3B7559E375
-settings-dark/frames 39-45 AEF9F8EE6A2391F5
-settings-start-hidden/row C0D0016A8EA4EDFE
+settings/bottom 7679D411CFD843ED
+settings/capture 7A5E21199E7914FB
+settings/edit 9951AD48A87B2366
+settings/fields 25497BEF341834C0
+settings/refused DC97BE1B7413DBD6
+settings/swatch 8F144DCAABC49415
+settings/top A506CF001B53D174
+settings/frames 0-1 9E25B3912619B278
+settings/frames 2-2 8407E669212C5340
+settings/frames 3-3 EF9FE004B6CE7558
+settings/frames 4-4 0CA0C2ECB30C17E3
+settings/frames 5-5 6C0BF8FE7C73476E
+settings/frames 6-6 FAEF381DC1606E4F
+settings/frames 7-12 D806C7FAEB22891B
+settings/frames 13-13 A506CF001B53D174
+settings/frames 14-14 55B940F1D82C467C
+settings/frames 15-15 8DC07E3300C6FD1C
+settings/frames 16-28 261C8A08E67B1E64
+settings/frames 29-29 8FA5290F886B4B78
+settings/frames 30-30 113C6B5D39D1E8A0
+settings/frames 31-32 8AB5934A5543038C
+settings/frames 33-33 31BDBBD58D8E29A5
+settings/frames 34-34 655D26834AD6E471
+settings/frames 35-36 23F6E1CF0FA1F391
+settings/frames 37-37 C064D31C4F759FDD
+settings/frames 38-38 1FC45202FF63176D
+settings/frames 39-40 CEB83B0CFCF09C15
+settings/frames 41-41 8BF7057DD5DCEA50
+settings/frames 42-42 C283501CB830E236
+settings/frames 43-43 D495EBB74A87FF92
+settings/frames 44-44 264B05F18266FC3C
+settings/frames 45-45 7F467DF8AF8D71CC
+settings/frames 46-46 D4FF932B4C35C04A
+settings/frames 47-47 3849714305915937
+settings/frames 48-48 8C9BA488AB22A3B6
+settings/frames 49-49 F34C43DB4673A000
+settings/frames 50-50 ABE2A993717EE883
+settings/frames 51-51 63CBCB9897890CBD
+settings/frames 52-52 B9D7F7259C78C9F9
+settings/frames 53-53 D920A998FBE3C7F8
+settings/frames 54-54 E6C05A46B2649A5E
+settings/frames 55-55 00C2B350CD594E63
+settings/frames 56-56 0D4010F872C4E2A3
+settings/frames 57-57 D0E321BB1ADA26E7
+settings/frames 58-58 BD539B2DF8EAB88E
+settings/frames 59-59 7E2D92039DB9B413
+settings/frames 60-60 8ABEC3CD830BDF3A
+settings/frames 61-61 0FD39586121B81CB
+settings/frames 62-62 E8F79172726E2FFF
+settings/frames 63-63 B7FA4DEFD2E4475C
+settings/frames 64-64 FEFB42B5A0CA6322
+settings/frames 65-65 1D68C645C9CC441F
+settings/frames 66-66 07F472D9FC664B4D
+settings/frames 67-67 C2928418541E3873
+settings/frames 68-68 551BA925A27C5160
+settings/frames 69-69 AF964878E567588A
+settings/frames 70-70 C22E8CE01C169180
+settings/frames 71-71 CE3F33619D3C8477
+settings/frames 72-72 79718361D8EBEFE5
+settings/frames 73-73 C8BD6B6452697430
+settings/frames 74-74 B30EB5D5D10578DB
+settings/frames 75-75 F44FCD592C3527EB
+settings/frames 76-76 26A21D3C0FF10C92
+settings/frames 77-77 20A3DCFB557C1C72
+settings/frames 78-78 037F7BD4EE2574DC
+settings/frames 79-79 95021B2172E30B0A
+settings/frames 80-80 CE7BC400BCD88956
+settings/frames 81-81 506A1785B5390999
+settings/frames 82-82 BA88D27A9A545D07
+settings/frames 83-83 B710385DB723B075
+settings/frames 84-84 5C608F568907A67D
+settings/frames 85-85 43C39ED8C8CDD941
+settings/frames 86-86 8D57783D83F1D783
+settings/frames 87-87 DD7AF2EF486E09D1
+settings/frames 88-88 F9954DAE8F7B7159
+settings/frames 89-89 5782E587132D3932
+settings/frames 90-90 7FE61816D78501FB
+settings/frames 91-91 B21BE3E2413C5575
+settings/frames 92-92 526FECD0514296A5
+settings/frames 93-93 F4DB841EE62CC7F6
+settings/frames 94-94 9CEF5B975719A411
+settings/frames 95-95 B483255493DBA297
+settings/frames 96-96 FC23897DDC8E2EF8
+settings/frames 97-97 7F4A926AFFDB0ADA
+settings/frames 98-98 5769340CB051B6BE
+settings/frames 99-99 920E72770135C655
+settings/frames 100-100 8348F12B16C2A969
+settings/frames 101-101 22079C948C1BBA19
+settings/frames 102-102 F07599A3AE3110CD
+settings/frames 103-233 7679D411CFD843ED
+settings-armed/after-a 4A18109ABC068EA2
+settings-armed/armed A2D64F659D07F563
+settings-dark/back A37F3839416EF195
+settings-dark/cart D73B9580298D0983
+settings-dark/dim 5A6B7D9CBC51E715
+settings-dark/theme 4C24D5C40B7C6B11
+settings-dark/frames 0-0 2148CE4AE17539C2
+settings-dark/frames 1-1 7E6A6354D366D322
+settings-dark/frames 2-2 0EC09A84002DAA42
+settings-dark/frames 3-3 ADF58FC6B6D1F924
+settings-dark/frames 4-4 65FCFFC54AA8C1A2
+settings-dark/frames 5-5 4D5633695901B1FE
+settings-dark/frames 6-6 E8AD4BF2CFC00F11
+settings-dark/frames 7-7 8E084BC7B990C791
+settings-dark/frames 8-8 F10E0A039EF2D7C5
+settings-dark/frames 9-9 A27F9AA2E0FD1C1E
+settings-dark/frames 10-10 2B94C5A3C4D4DCB6
+settings-dark/frames 11-11 D88C9799120545ED
+settings-dark/frames 12-12 BF484B13583A1752
+settings-dark/frames 13-13 0B0ECA5E94670436
+settings-dark/frames 14-14 1A8654EA4951C942
+settings-dark/frames 15-15 19CE83B17FDF3191
+settings-dark/frames 16-23 4C24D5C40B7C6B11
+settings-dark/frames 24-24 C1A9E330D597070C
+settings-dark/frames 25-25 7EA36C375E9C2D6C
+settings-dark/frames 26-26 E6CFEF5E1581A992
+settings-dark/frames 27-27 3B3BC8DEA7E6DB6C
+settings-dark/frames 28-28 B6E342B4A00ED358
+settings-dark/frames 29-29 E97C2F7A10931D62
+settings-dark/frames 30-30 A3508FBAB0B7C052
+settings-dark/frames 31-31 BF2F9AFCC4F759E6
+settings-dark/frames 32-32 2D6B75168D6E841D
+settings-dark/frames 33-33 877D83462331152D
+settings-dark/frames 34-34 0B5221B2B5992CCE
+settings-dark/frames 35-35 59D6E0408E8DD749
+settings-dark/frames 36-36 BDEDDC67137966C5
+settings-dark/frames 37-37 259C1AFD34AD4EB2
+settings-dark/frames 38-38 9C96A025E02A3D15
+settings-dark/frames 39-45 A37F3839416EF195
+settings-start-hidden/row A61ADBCFF85ED5FE
 ui-dialog/closed 942FEA8E68027B47
 ui-dialog/dialog 1EC3EDCC05C5D114
 ui-dialog/frames 0-0 942FEA8E68027B47

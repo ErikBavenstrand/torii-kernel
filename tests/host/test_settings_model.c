@@ -96,6 +96,7 @@ void test_settings_table(void)
 	CHECK(!settings_visible(&v, SET_LANGUAGE));
 	CHECK_EQ(settings_rows[SET_RESCAN].action, SET_ACTION_RESCAN);
 	CHECK_EQ(settings_rows[SET_IDENTIFY].action, SET_ACTION_IDENTIFY);
+	CHECK_EQ(settings_rows[SET_SAVES].action, SET_ACTION_SAVES);
 	// Every value of every row has a name that fits
 	for (u32 id = 0; id < SET_ROWS; id++) {
 		const struct settings_row *r = &settings_rows[id];
@@ -146,6 +147,7 @@ void test_settings_defaults(void)
 		{SET_RESCAN, 0, ""},
 		{SET_IDENTIFY, 0, ""},
 		{SET_SHOW_ALL, 0, "Off"},
+		{SET_SAVES, 0, ""},
 		{SET_HISTORY, SET_HISTORY_DEFAULT, "5"},
 		{SET_LOGGING, 0, "Off"},
 		{SET_LANGUAGE, 0, "ENGLISH"},
@@ -421,9 +423,10 @@ void test_settings_visible_rows(void)
 	CHECK_EQ(settings_section_rows(&v, SET_SEC_SYSTEM, ids), 2);  // LANGUAGE hidden
 	CHECK_EQ(ids[0], SET_HISTORY);
 	CHECK_EQ(ids[1], SET_LOGGING);
-	CHECK_EQ(settings_section_rows(&v, SET_SEC_LIBRARY, ids), 3);
+	CHECK_EQ(settings_section_rows(&v, SET_SEC_LIBRARY, ids), 4);
 	CHECK_EQ(ids[0], SET_RESCAN);
 	CHECK_EQ(ids[1], SET_IDENTIFY);
+	CHECK_EQ(ids[3], SET_SAVES);
 	CHECK_EQ(settings_section_rows(&v, SET_SECTIONS, ids), 0);
 	CHECK(!settings_visible(&v, SET_ROWS));
 }

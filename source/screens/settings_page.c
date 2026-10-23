@@ -32,6 +32,7 @@
 #include "../lang.h"
 #include "../library.h"
 #include "../namesdb.h"
+#include "saves.h"
 #include "../settings.h"
 #include "../tlog.h"
 #include "../engine/frame.h"
@@ -928,6 +929,16 @@ static void time_edit(u32 id)
 	ui_popup_close();
 }
 
+// Settings > Library > Saves: the manager takes the page's place, and the page
+// comes back when it closes
+static void saves_open(u32 id)
+{
+	(void)id;
+	settings_page.leave();  // a change still waiting is written first
+	saves_run();
+	nav_reshow();
+}
+
 static void activate(u32 id)
 {
 	const struct settings_row *r = &settings_rows[id];
@@ -954,6 +965,8 @@ static void activate(u32 id)
 			tlog("settings: identify library");
 			names_identify();
 			sp.identify_wait = 0;  // its progress at once
+		} else if (r->action == SET_ACTION_SAVES) {
+			nav_defer(saves_open, id);
 		}
 		break;
 	default:
