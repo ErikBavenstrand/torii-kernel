@@ -285,7 +285,7 @@ int lib_rename_shown(u8 *slot, lib_put_fn put, u32 rec, const char *new_name, co
 // The boot loads /torii/library.idx into PSRAM (library_boot) and the menu
 // shows it at once; then a job walks the card between frames (f_readdir
 // only) and hashes every folder's game names, sizes and dates, the save
-// paths of the .sav files under /torii/saves and beside the games, and the volume serial. Only when that differs from the
+// paths of the .sav files under /torii/saves, and the volume serial. Only when that differs from the
 // index's does a second walk build a new index in the other slot, sort it
 // and switch to it (library_generation changes, and the frame wakes), and a
 // job writes the file. With no index, or a damaged one, the boot builds it

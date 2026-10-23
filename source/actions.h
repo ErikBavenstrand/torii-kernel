@@ -116,7 +116,6 @@ enum {
 	ACTION_FILE_CHEATS,
 	ACTION_FILE_PATCH,  // never: a stale patch cache is replaced
 	ACTION_FILE_ART,
-	ACTION_FILE_BESIDE,  // a save next to a ROM of the new name
 	ACTION_FILES,
 };
 u32 action_rename_taken(void);

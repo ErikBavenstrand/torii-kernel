@@ -728,7 +728,7 @@ static void info(u32 i)
 	if (p < end && console < LIB_CONSOLES) {
 		struct gamerec rec;
 		gamesave_record_read(sd.full, &rec);
-		if (gamesave_current_path(sd.save, sizeof(sd.save), gamesave_mode(), sd.full, &rec) > 0 &&
+		if (gamesave_current_path(sd.save, sizeof(sd.save), sd.full, &rec) > 0 &&
 		    f_stat(sd.save, &fileinfo) == FR_OK)
 			snprintf(p, (size_t)(end - p), "\n%s: %s", gl_sd_save, rec.slot);
 		else

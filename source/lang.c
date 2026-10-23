@@ -69,7 +69,6 @@ char **gl_set_onoff EWRAM_BSS;
 char **gl_set_themes EWRAM_BSS;
 char **gl_set_views EWRAM_BSS;
 char **gl_set_boots EWRAM_BSS;
-char **gl_set_locations EWRAM_BSS;
 char **gl_set_history EWRAM_BSS;
 char **gl_set_starts EWRAM_BSS;
 char **gl_set_modes_b EWRAM_BSS;
@@ -254,7 +253,6 @@ const char *en_set_labels[SET_ROWS] = {
 	[SET_BOOT_MODE] = "GBA boot mode",
 	[SET_ENGINE] = "Fast patching",
 	[SET_AUTO_SAVE] = "Auto save",
-	[SET_SAVE_LOCATION] = "Save location",
 	[SET_RTS] = "Save states",
 	[SET_CHEATS] = "Cheats",
 	[SET_RUMBLE] = "Rumble for games",
@@ -286,7 +284,6 @@ const char *en_set_explain[SET_EXPLAINS] = {
 	[SET_BOOT_MODE] = "How A, Play, Launch start GBA games.",
 	[SET_ENGINE] = "Patches from a built-in table first.",
 	[SET_AUTO_SAVE] = "Copies saves to the card, no question.",
-	[SET_SAVE_LOCATION] = "Where a game's saves go on the card.",
 	[SET_RTS] = "Save and load from the in-game menu.",
 	[SET_CHEATS] = "Applies a game's cheat file.",
 	[SET_RUMBLE] = "Lets games use the cart's rumble.",
@@ -312,7 +309,6 @@ const char *en_set_onoff[2] = {"Off", "On"};
 const char *en_set_themes[2] = {"Dark", "Light"};
 const char *en_set_views[2] = {"List", "List + art"};
 const char *en_set_boots[SET_BOOTS] = {[SET_BOOT_ADDONS] = "With addons", [SET_BOOT_CLEAN] = "Clean"};
-const char *en_set_locations[SET_LOCS] = {[SET_LOC_TORII] = "Torii folder", [SET_LOC_BESIDE_ROM] = "Next to the ROM"};
 const char *en_set_history[SET_HISTORY_CHOICES] = {"Off", "1", "3", "5", "10", "20"};
 const char *en_set_starts[SET_STARTS] = {
 	[SET_START_LAST] = "Last place",   [SET_START_RECENT] = "Recent",
@@ -634,8 +630,7 @@ static const struct lang_rename en_rename = {
 	.hidden = "Names can't start with a dot.",
 	.side_taken = {"A save of that name is there.", "A save history of that name is there.",
 		       "Save states of that name are there.", "A cheat file of that name is there.",
-		       "A patch file of that name is there.", "Box art of that name is there.",
-		       "A save next to a game of that name is there."},
+		       "A patch file of that name is there.", "Box art of that name is there."},
 	.pending = "Its save isn't copied yet.",
 	.shared = "Another game uses its save.",
 	.failed = "The card didn't take it.",
@@ -721,7 +716,6 @@ void LoadEnglish(void)
 	gl_set_themes = (char **)en_set_themes;
 	gl_set_views = (char **)en_set_views;
 	gl_set_boots = (char **)en_set_boots;
-	gl_set_locations = (char **)en_set_locations;
 	gl_set_history = (char **)en_set_history;
 	gl_set_starts = (char **)en_set_starts;
 	gl_set_modes_b = (char **)en_set_modes_b;

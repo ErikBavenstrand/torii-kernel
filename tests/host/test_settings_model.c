@@ -131,7 +131,6 @@ void test_settings_defaults(void)
 		{SET_BOOT_MODE, SET_BOOT_ADDONS, "With addons"},
 		{SET_ENGINE, 1, "On"},
 		{SET_AUTO_SAVE, 0, "Off"},
-		{SET_SAVE_LOCATION, SET_LOC_TORII, "Torii folder"},
 		{SET_RTS, 0, "Off"},
 		{SET_CHEATS, 0, "Off"},
 		{SET_RUMBLE, 1, "On"},

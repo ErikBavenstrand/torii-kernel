@@ -86,11 +86,10 @@ static void make_game(const char *path)
 
 // The games it adds, in a folder of its own (the cover demo's card has others)
 #define T_DIR "/LibraryTest"
-// Gamma's save is in its folder under /torii/saves, Alpha's is beside it (the
-// slot's name has a space and a dot), and Beta has none
+// Gamma's save is in its folder under /torii/saves; Alpha and Beta have none
 #define T_SAVES "/torii/saves" T_DIR "/Old/Gamma.gba"
 static const char *const test_games[] = {T_DIR "/Beta.gba", T_DIR "/Old/Alpha.gbc", T_DIR "/Old/Gamma.gba",
-					 T_SAVES "/Main.sav", T_DIR "/Old/Alpha.Boss v1.2.sav"};
+					 T_SAVES "/Main.sav"};
 #define TEST_GAMES (sizeof(test_games) / sizeof(*test_games))
 
 void test_library_boot(void)
@@ -122,8 +121,7 @@ void test_library_boot(void)
 	CHECK(!strcmp(library_name(gamma), "Gamma.gba"));
 	CHECK(library_flags(gamma) & LIB_F_SAVE);
 	CHECK(!(library_flags(beta) & LIB_F_SAVE));
-	u32 alpha = library_find(T_DIR "/Old/Alpha.gbc");
-	CHECK(library_flags(alpha) & LIB_F_SAVE);
+	CHECK(!(library_flags(library_find(T_DIR "/Old/Alpha.gbc")) & LIB_F_SAVE));
 	CHECK_EQ(library_size(gamma), 600);
 	char path[64];
 	CHECK(library_path(gamma, path, sizeof(path)));

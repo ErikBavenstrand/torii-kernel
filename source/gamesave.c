@@ -11,11 +11,6 @@
 #include "settings_model.h"
 #include "tlog.h"
 
-int gamesave_mode(void)
-{
-	return Read_SET_info(assress_save_location) == SET_LOC_BESIDE_ROM ? SAVESLOT_BESIDE_ROM : SAVESLOT_CENTRAL;
-}
-
 int gamesave_rom_path_in(char *out, u32 size, const char *dir, const char *name)
 {
 	// FatFs may give a volume prefix ("0:/..."); the root is "/" or nothing
@@ -49,7 +44,7 @@ static char file_buf[GAMEREC_BYTES + 4] ALIGN(4) EWRAM_BSS;
 int gamesave_make_parents(const char *path)
 {
 	char *dir = dir_buf;
-	// Saves beside their ROM are in a folder that is there
+	// (a path elsewhere has its folders already)
 	if (strncmp(path, SAVESLOT_SAVES_DIR "/", sizeof(SAVESLOT_SAVES_DIR)) != 0)
 		return 1;
 	u32 len = (u32)strnlen(path, GAMESAVE_PATH_BYTES);
@@ -126,7 +121,7 @@ int gamesave_record_write(const char *rom_path, const struct gamerec *r)
 	return res == FR_OK && closed == FR_OK;
 }
 
-int gamesave_current_path(char *out, u32 size, int mode, const char *rom_path, const struct gamerec *r)
+int gamesave_current_path(char *out, u32 size, const char *rom_path, const struct gamerec *r)
 {
-	return saveslot_save_path(out, size, mode, rom_path, r->slot);
+	return saveslot_save_path(out, size, SAVESLOT_CENTRAL, rom_path, r->slot);
 }

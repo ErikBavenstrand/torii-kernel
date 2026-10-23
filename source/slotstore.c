@@ -44,7 +44,7 @@ struct ss_work {
 	char scratch[SS_PATH], scratch2[SS_PATH];  // ss_mkdirs, ss_move_case, ss_drop_strays
 	char trash[SS_PATH];                       // slotstore_delete
 	char r1[SS_PATH], r2[SS_PATH], r3[SS_PATH];  // slotstore_recover
-	char pfx[SAVESLOT_NAME_BYTES + 64], base[SAVESLOT_NAME_BYTES * 2], clean[SAVESLOT_NAME_BYTES];  // ss_list
+	char base[SAVESLOT_NAME_BYTES * 2], clean[SAVESLOT_NAME_BYTES];  // ss_list
 };
 _Static_assert(sizeof(struct ss_work) <= READCACHE_SLOTS_SIZE, "the slot store's work area fits READCACHE_SLOTS");
 
@@ -59,18 +59,6 @@ static int __attribute__((format(printf, 3, 4))) ss_snprintf(char *dst, u32 size
 	int n = vsnprintf(dst, size, fmt, ap);
 	va_end(ap);
 	return n;
-}
-
-static int test_mode = -1;
-
-void slotstore_test_mode(int mode)
-{
-	test_mode = mode;
-}
-
-static int ss_mode(void)
-{
-	return test_mode >= 0 ? test_mode : gamesave_mode();
 }
 
 /* ---- The clock and the setting ---- */
@@ -527,7 +515,7 @@ static int ss_prune(const char *dir, u32 *count, u32 keep)
 // The slot's file path into out, checked to launch. The code or SLOTSTORE_OK
 static int slot_path(char *out, const char *rom, const char *slot)
 {
-	int n = saveslot_save_path(out, SS_PATH, ss_mode(), rom, slot);
+	int n = saveslot_save_path(out, SS_PATH, SAVESLOT_CENTRAL, rom, slot);
 	return n < 0 || n > SAV_INFO_NAME_MAX ? SLOTSTORE_PATH : SLOTSTORE_OK;
 }
 
@@ -552,39 +540,10 @@ static int is_sav(const char *name)
 	       (name[n - 1] | 0x20) == 'v';
 }
 
-static int prefix_nocase(const char *s, const char *prefix, u32 len)
-{
-	for (u32 i = 0; i < len; i++) {
-		char a = s[i], b = prefix[i];
-		if (a >= 'A' && a <= 'Z')
-			a = (char)(a + 32);
-		if (b >= 'A' && b <= 'Z')
-			b = (char)(b + 32);
-		if (a != b)
-			return 0;
-	}
-	return 1;
-}
-
-static int slot_dir_open(const char *rom, char *prefix, u32 *prefix_len)
+static int slot_dir_open(const char *rom)
 {
 	char *dir = W->scratch;
-	*prefix_len = 0;
-	if (ss_mode() == SAVESLOT_BESIDE_ROM) {
-		// The path of slot "x" is <rom dir>/<stem>.x.sav: <rom dir>/<stem>. is the prefix
-		int n = saveslot_save_path(W->c, SS_PATH, SAVESLOT_BESIDE_ROM, rom, "x");
-		if (n < 6)
-			return SLOTSTORE_PATH;
-		W->c[n - 5] = 0;
-		const char *slash = strrchr(W->c, '/');
-		u32 dlen = (u32)(slash - W->c);
-		memcpy(dir, W->c, dlen);
-		dir[dlen] = 0;
-		strcpy(prefix, slash + 1);
-		*prefix_len = (u32)strlen(prefix);
-		if (!dir[0])
-			strcpy(dir, "/");
-	} else if (saveslot_game_dir(dir, SS_PATH, rom) < 0) {
+	if (saveslot_game_dir(dir, SS_PATH, rom) < 0) {
 		return SLOTSTORE_PATH;
 	}
 	FRESULT r = f_opendir(&W->dir, dir);
@@ -596,9 +555,8 @@ static int slot_dir_open(const char *rom, char *prefix, u32 *prefix_len)
 // Fills W->slots with the game's slots (up to SLOTSTORE_MAX_SLOTS); returns how many exist
 static int ss_list(const char *rom)
 {
-	char *prefix = W->pfx;
-	u32 plen, found = 0;
-	int open = slot_dir_open(rom, prefix, &plen);
+	u32 found = 0;
+	int open = slot_dir_open(rom);
 	if (open == 1)
 		return 0;
 	if (open < 0)
@@ -611,13 +569,13 @@ static int ss_list(const char *rom)
 		}
 		const char *name = W->fno.fname;
 		u32 len = (u32)strlen(name);
-		if ((W->fno.fattrib & AM_DIR) || !is_sav(name) || len <= plen + 4 || !prefix_nocase(name, prefix, plen))
+		if ((W->fno.fattrib & AM_DIR) || !is_sav(name) || len <= 4)
 			continue;
 		char *base = W->base, *clean = W->clean;
-		u32 blen = len - plen - 4;
+		u32 blen = len - 4;
 		if (blen >= SAVESLOT_NAME_BYTES)
 			continue;
-		memcpy(base, name + plen, blen);
+		memcpy(base, name, blen);
 		base[blen] = 0;
 		if (saveslot_clean_name(clean, base) != blen || strcmp(clean, base))
 			continue;
@@ -689,7 +647,7 @@ int slotstore_set_current(const char *rom_path, const char *slot)
 static int journal_write(char kind, const char *rom, const char *x, const char *y)
 {
 	char *t = (char *)W->buf[0];
-	int n = ss_snprintf(t, SS_CHUNK - 12, JOURNAL_HEADER "%c%d\n%s\n%s\n%s\n", kind, ss_mode(), rom, x, y);
+	int n = ss_snprintf(t, SS_CHUNK - 12, JOURNAL_HEADER "%c%d\n%s\n%s\n%s\n", kind, SAVESLOT_CENTRAL, rom, x, y);
 	if (n <= 0 || n >= SS_CHUNK - 12)
 		return SLOTSTORE_PATH;
 	n += ss_snprintf(t + n, 12, "%08lx\n", (unsigned long)crc32(t, (u32)n));
@@ -736,15 +694,12 @@ static int record_follows(const char *rom, const char *old_name, const char *new
 // The steps of a rename, from whatever is done. recovering: decide by what
 // exists (saveslot_recover); else do all of them. Uses W->d, W->e for the old
 // and new files' paths and W->b, W->c for the history folders.
-static int rename_steps(int mode, const char *rom, const char *old_name, const char *new_name, int recovering)
+static int rename_steps(const char *rom, const char *old_name, const char *new_name, int recovering)
 {
-	int saved_mode = test_mode;
-	test_mode = mode;
 	char *os = W->d, *ns = W->e, *oh = W->b, *nh = W->c;
 	int r = both_paths(os, oh, rom, old_name);
 	if (!r)
 		r = both_paths(ns, nh, rom, new_name);
-	test_mode = saved_mode;
 	if (r)
 		return r;
 	if (saveslot_names_equal(old_name, new_name)) {
@@ -841,7 +796,7 @@ int slotstore_rename(const char *rom_path, const char *slot, const char *name, c
 	r = journal_write('R', rom_path, old_name, clean);
 	if (r)
 		return r;
-	r = rename_steps(ss_mode(), rom_path, old_name, clean, 0);
+	r = rename_steps(rom_path, old_name, clean, 0);
 	if (r) {
 		// Left for the next power-on to finish or undo, unless nothing moved
 		tlog_error("slot: rename %s to %s of %s stopped: %d", old_name, clean, rom_path, r);
@@ -930,12 +885,9 @@ static void trash_folder_of(char *dir, const char *trash_file)
 // Moves the slot's file and history under trash (the "<trash>/<stamp>-<n>"
 // folder): the file to <trash>/<rom path>/<slot>.sav, the history to
 // <trash>/backups/<rom path>/<slot>
-static int trash_steps(int mode, const char *rom, const char *slot, const char *trash)
+static int trash_steps(const char *rom, const char *slot, const char *trash)
 {
-	int saved_mode = test_mode, r;
-	test_mode = mode;
-	r = both_paths(W->a, W->b, rom, slot);
-	test_mode = saved_mode;
+	int r = both_paths(W->a, W->b, rom, slot);
 	if (r)
 		return r;
 	if (ss_snprintf(W->c, SS_PATH, "%s%s/%s.sav", trash, rom, slot) >= SS_PATH ||
@@ -1004,7 +956,7 @@ int slotstore_delete(const char *rom_path, const char *slot)
 	int r = journal_write('D', rom_path, name, trash);
 	if (r)
 		return r;
-	r = trash_steps(ss_mode(), rom_path, name, trash);
+	r = trash_steps(rom_path, name, trash);
 	if (r) {
 		tlog_error("slot: delete %s of %s stopped: %d", name, rom_path, r);
 		if (r == SLOTSTORE_TAKEN || r == SLOTSTORE_PATH || r == SLOTSTORE_NO_SLOT)
@@ -1410,7 +1362,7 @@ int slotstore_retire_file(const char *file, const char *hist_dir)
 
 // Reads the journal into W->buf[0] (NUL-ended) and splits it into lines; 0 if
 // it is none or doesn't hold up, -1 if the card didn't say
-static int journal_read(char *lines[4], char *kind, int *mode)
+static int journal_read(char *lines[4], char *kind)
 {
 	char *t = (char *)W->buf[0];
 	FRESULT r = f_open(&W->fa, JOURNAL, FA_READ);
@@ -1450,10 +1402,9 @@ static int journal_read(char *lines[4], char *kind, int *mode)
 	if (*p)
 		return 0;
 	*kind = lines[0][0];
-	*mode = lines[0][1] - '0';
-	if ((*kind != 'R' && *kind != 'D' && *kind != 'I') || lines[0][2] ||
-	    (*mode != SAVESLOT_CENTRAL && *mode != SAVESLOT_BESIDE_ROM) || lines[1][0] != '/' || !lines[2][0] ||
-	    !lines[3][0])
+	int mode = lines[0][1] - '0';
+	if ((*kind != 'R' && *kind != 'D' && *kind != 'I') || lines[0][2] || mode != SAVESLOT_CENTRAL ||
+	    lines[1][0] != '/' || !lines[2][0] || !lines[3][0])
 		return 0;
 	return 1;
 }
@@ -1461,8 +1412,7 @@ static int journal_read(char *lines[4], char *kind, int *mode)
 int slotstore_recover(void)
 {
 	char *lines[4], kind;
-	int mode;
-	int j = journal_read(lines, &kind, &mode);
+	int j = journal_read(lines, &kind);
 	if (j < 0)
 		return SLOTSTORE_CARD;
 	if (j == 0) {
@@ -1499,7 +1449,7 @@ int slotstore_recover(void)
 			return 1;
 		}
 		tlog("slot: finishing the rename of %s to %s of %s", x, y, rom);
-		r = rename_steps(mode, rom, x, y, 1);
+		r = rename_steps(rom, x, y, 1);
 	} else {
 		if (saveslot_clean_name(clean, x) != strlen(x) || strcmp(clean, x) ||
 		    strncmp(y, SAVESLOT_TRASH_DIR "/", sizeof(SAVESLOT_TRASH_DIR))) {
@@ -1507,7 +1457,7 @@ int slotstore_recover(void)
 			return 1;
 		}
 		tlog("slot: finishing the delete of %s of %s", x, rom);
-		r = trash_steps(mode, rom, x, y);
+		r = trash_steps(rom, x, y);
 		if (r == SLOTSTORE_NO_SLOT)
 			r = SLOTSTORE_OK;  // nothing left to move
 	}

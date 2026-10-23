@@ -1,5 +1,5 @@
 // An SD file renamed by the menu (action_rename_file, source/actions.c):
-// the game's folders of saves and history (or its saves beside it), save
+// the game's folders of saves and history, save
 // states, cheats, patch cache and custom art move with it, its custom name, favourite and Recent entry follow it,
 // and a rename that would land on another file is refused before anything
 // moves. On the emulated cart (tests/assets.sh), with test lists beside the
@@ -161,22 +161,6 @@ static const char *const files[] = {
 	T_DIR "/Two2.gba",
 	SV "/Two.gba/Main.sav",
 	SV "/Two2.gba/Main.sav",
-	T_DIR "/Side.gba",
-	T_DIR "/Sided.gba",
-	T_DIR "/Side.Main.sav",
-	T_DIR "/Side.Boss v1.2.sav",
-	T_DIR "/Sided.Main.sav",
-	T_DIR "/Sided.Boss v1.2.sav",
-	T_DIR "/Side.gbc",
-	T_DIR "/Back3.gba",
-	T_DIR "/Back3b.gba",
-	T_DIR "/Back3.Main.sav",
-	T_DIR "/Back3.Boss.sav",
-	T_DIR "/Back3b.Main.sav",
-	T_DIR "/Cased.gba",
-	T_DIR "/cased.gba",
-	T_DIR "/Cased.Main.sav",
-	T_DIR "/cased.Main.sav",
 	T_DIR "/Empty.gba",
 	T_DIR "/notes.txt",
 	T_DIR "/read me.txt",
@@ -401,44 +385,6 @@ void test_rename_file(void)
 	// And with nothing refused it renames
 	CHECK_EQ(action_rename_file(T_DIR "/Roll.gba", "Rolled.gba"), ACTION_RENAMED);
 	CHECK(holds("/RTS/Rolled.rts", "roll states") && holds(SV "/Rolled.gba/Main.sav", "roll save"));
-
-	// Saves beside the ROM: every slot's file, as many as there are, moves
-	CHECK(put(T_DIR "/Side.gba", "side"));
-	CHECK(put(T_DIR "/Side.Main.sav", "side main"));
-	CHECK(put(T_DIR "/Side.Boss v1.2.sav", "side boss"));
-	CHECK(put(T_DIR "/Sided.Main.sav", "a deleted game's save"));
-	CHECK_EQ(action_rename_file(T_DIR "/Side.gba", "Sided.gba"), ACTION_RENAME_SIDE_TAKEN);
-	CHECK_EQ(action_rename_taken(), ACTION_FILE_BESIDE);
-	CHECK(there(T_DIR "/Side.gba") && holds(T_DIR "/Side.Main.sav", "side main"));
-	f_unlink(T_DIR "/Sided.Main.sav");
-	// The saves beside it won't move: the game goes back
-	action_rename_fail_file = ACTION_FILE_BESIDE + 1;
-	CHECK_EQ(action_rename_file(T_DIR "/Side.gba", "Sided.gba"), ACTION_RENAME_FAILED);
-	action_rename_fail_file = 0;
-	CHECK(there(T_DIR "/Side.gba") && !there(T_DIR "/Sided.gba"));
-	CHECK(holds(T_DIR "/Side.Main.sav", "side main") && holds(T_DIR "/Side.Boss v1.2.sav", "side boss"));
-	// A game of the same name in another console shares them: refused
-	CHECK(put(T_DIR "/Side.gbc", "side gbc"));
-	CHECK_EQ(action_rename_file(T_DIR "/Side.gba", "Sided.gba"), ACTION_RENAME_SHARED);
-	f_unlink(T_DIR "/Side.gbc");
-	CHECK_EQ(action_rename_file(T_DIR "/Side.gba", "Sided.gba"), ACTION_RENAMED);
-	CHECK(!there(T_DIR "/Side.Main.sav") && holds(T_DIR "/Sided.Main.sav", "side main"));
-	CHECK(holds(T_DIR "/Sided.Boss v1.2.sav", "side boss") && !there(T_DIR "/Side.Boss v1.2.sav"));
-	// Only the case changes
-	CHECK(put(T_DIR "/Cased.gba", "cased"));
-	CHECK(put(T_DIR "/Cased.Main.sav", "cased save"));
-	CHECK_EQ(action_rename_file(T_DIR "/Cased.gba", "cased.gba"), ACTION_RENAMED);
-	CHECK(holds(T_DIR "/cased.Main.sav", "cased save"));
-	CHECK(f_stat(T_DIR "/cased.Main.sav", &fi) == FR_OK && !strcmp(fi.fname, "cased.Main.sav"));
-	// A cut: the game had not moved, one of the saves had
-	CHECK(put(T_DIR "/Back3.gba", "back3"));
-	CHECK(put(T_DIR "/Back3.Boss.sav", "back3 boss"));
-	CHECK(put(T_DIR "/Back3b.Main.sav", "back3 moved"));
-	CHECK(put("/torii/rename.txt", T_DIR "/Back3.gba\t" T_DIR "/Back3b.gba\n"));
-	action_rename_recover();
-	CHECK(there(T_DIR "/Back3.gba") && holds(T_DIR "/Back3.Main.sav", "back3 moved"));
-	CHECK(holds(T_DIR "/Back3.Boss.sav", "back3 boss") && !there(T_DIR "/Back3b.Main.sav"));
-	CHECK(!there("/torii/rename.txt"));
 
 	tidy();
 	f_unlink("/torii/art/custom");

@@ -4,8 +4,8 @@
 // card: no screen, no cart.
 //
 // A game is named by its ROM path from the root (rom_path, as saveslot.h
-// says), a slot by its clean name. Where a slot's file is depends on the Save
-// location setting (gamesave_mode()); the history of a slot is always
+// says), a slot by its clean name. A slot's file is
+// /torii/saves/<rom path>/<slot>.sav; the history of a slot is always
 // /torii/backups/<rom path>/<slot>/<n>-<YYYYMMDD-HHMMSS>.sav, n rising, the
 // order by n alone. A slot without a file does not exist: the first launch of
 // a game makes its Main.sav.
@@ -68,12 +68,11 @@ struct slotstore_slot {
 	u32 size;  // the file's bytes
 };
 
-// A game's slots, from its .sav files (in its folder under /torii/saves, or
-// <rom stem>.<slot>.sav beside the ROM, by the setting). Files whose name is
+// A game's slots, from its .sav files (in its folder under /torii/saves). Files whose name is
 // not a clean slot name, and .tmp/.bak/.new files, are not slots. Fills out
 // with up to max, in the folder's order, and returns how many there are (more
 // than max if it did not all fit), or a negative code. A game with no saves
-// folder has 0. In beside-the-ROM mode this reads the ROM's whole folder.
+// folder has 0.
 int slotstore_list(const char *rom_path, struct slotstore_slot *out, u32 max);
 
 // The game's current slot (the record's: "Main" for a game with none) into slot
@@ -179,9 +178,5 @@ int slotstore_trash_purge(const struct saveslot_stamp *now);
 
 // The clock as a stamp: all zero when it is not set or reads wrong
 void slotstore_now(struct saveslot_stamp *out);
-
-// Test hook: -1 uses the Save location setting, SAVESLOT_CENTRAL or
-// SAVESLOT_BESIDE_ROM forces that mode
-void slotstore_test_mode(int mode);
 
 #endif
