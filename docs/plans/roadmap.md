@@ -54,7 +54,7 @@ Everything the kernel stores lives under `/torii/`. ROMs can be anywhere.
   layout.ini              layout version, for migrations
   saves/<rom path>/<slot>.sav
   states/<rom path>/<slot>/<n>.state   reserved; written from v0.7
-  backups/<rom path>/<slot>/<timestamp>.sav
+  backups/<rom path>/<slot>/<n>-<YYYYMMDD-HHMMSS>.sav
   games/<code>-<crc>.ini  per-game overrides (save type, RTC, cheats)
   art/<system>/{title,box}/<code or name>.lz
   lang/<code>.lng
@@ -97,12 +97,12 @@ The kernel's copy is made safe like this:
 6. **Tests:** the emulated cart cuts power at every step, and the test checks that a good
    save always survives. Each step logs a numbered `tlog` marker; the emulator cuts power at marker N, and a test loops N over all markers, checking that the save and its `.bak` survive and boot recovers.
 7. **Save-type changes:** when a game's save type changes, for example EEPROM 8K to 512, its
-   existing save is converted or kept untouched in the slot's history. It is never silently
-   truncated.
+   existing save is kept untouched in the slot's history and the new type starts blank, with
+   a notice. It is never converted or silently truncated.
 
 ### Slots and history
 
-Decided 2026-10-22: a version is kept only when the chip differs from the current file, at the copy-to-SD after a play session; N defaults to 5 (Settings). Backups are named `<n>-<YYYYMMDD-HHMMSS>.sav`, where the rising counter `n` fixes the order, so a wrong clock can't reorder or overwrite history. Saves live in `/torii/saves/` by default, next to the ROM by setting. A save-type change is never converted: the old file stays untouched in the slot's history, the new type starts from the chip's blank state, and a notice is shown.
+Decided 2026-10-22: a version is kept only when the chip differs from the current file, at the copy-to-SD after a play session; N defaults to 5 (Settings). Backups are named `<n>-<YYYYMMDD-HHMMSS>.sav`, where the rising counter `n` fixes the order, so a wrong clock can't reorder or overwrite history. Saves live only in `/torii/saves/`. A save-type change is never converted: the old file stays untouched in the slot's history, the new type starts from the chip's blank state, and a notice is shown.
 
 - **First slot:** every game's first slot is `Main` (`Main.sav`). It can be renamed, and deleted once another slot exists.
 - **Creating a slot:** a game with one slot launches straight in. Hold Select while pressing A to open the picker, which lists the slots and a "New slot…" row; the per-game manager has the same action. A new slot asks for a name (on-screen keyboard), then "Blank" (default) or "Copy of <current slot>". A game with two or more slots shows the picker on every launch, the last slot preselected.
@@ -116,7 +116,7 @@ Decided 2026-10-22: a version is kept only when the chip differs from the curren
 - **Per-game save manager:** new, rename, duplicate and delete slots. Browse a slot's
   history, restore a version, and import or export a `.sav`. Built (`source/screens/game_saves.c`): "Saves" in a GBA game's Start menu (Games lists, SD card page, game NOR page) opens the slots with the current one marked; A on a slot lists Launch with this slot (no picker follows), Set as current, Rename, Duplicate, Delete (asks; the slot goes to `/torii/trash` for 30 days; the last slot is refused), History (A on a version asks, then restores) and Export (`/torii/export/<game> - <slot>.sav`, numbered if it exists); "New slot..." and "Import .sav..." (a folder browser from the ROM's folder showing folders and `.sav` files, then the slot to replace, then a question; a file of the wrong size is refused) close the list. Limits: a GBA game only; on the SD page the entry is left out when the popup is already full (nine rows: addons on); a folder lists 28 entries at most; tests `tests/game_saves.sh`.
 - **Global save manager:** orphaned saves whose ROM moved, relinked in one step, and the
-  total space used.
+  total space used. Built (`source/screens/saves*`, `source/saveorphan.c`; tests `tests/saves_manager.sh`): Settings, Library card, "Saves".
 - **Deleting:** a deleted slot goes to `trash/` and is removed after 30 days.
 
 What v0.5 built of slots and history (`source/slotstore.c`, API in its header; tests `tests/kernel/test_slotstore.c`, `tests/slotstore.sh`): the Settings row **History** (System section: Games' card is full at 6 rows; Off/1/3/5/10/20, default 5) sets the versions kept. The save copy pushes the version it replaces into the history before the swap (the record holds the history folder from halfword `0x82`); a repeat after a cut adds none (the newest version is compared first), and a history that can't take the version fails the copy, the file staying as it is. Restore, import and the type change always push, whatever the setting (pruning to at least 1). Restore moves the version out of the history (it is the file now). Renames, deletes and installs (restore, import) are journaled in `/torii/slotop.txt` (CRC) and `slotstore_recover()` finishes them at boot; a history folder is never moved to another parent (a cut leaves its `..` wrong): the trash takes its files one by one. A launch whose slot file is bigger than the save type needs (EEPROM 8K to 512) pushes it untouched into the history, starts the new type blank, and shows a one-time notice; a smaller file is still grown with FF, which keeps its bytes.

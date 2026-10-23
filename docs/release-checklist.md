@@ -81,7 +81,7 @@ do. With Logging on Debug, each of these leaves lines in the log.
 | A full card's first scan | a card with hundreds of games and no `/torii/library.idx`: time from power-on to the menu, and from there until the consoles' counts settle. The log's `library:` lines give the walk's and the index write's times; compare with the emulator's (about 5x slower than a cart) |
 | An old card's recents | a card last used with v0.3 (with `SAVER/Recently play.txt`, NOR games in it too): Recent lists the same games, newest first, and after the first launch `/torii/recent.txt` exists and the old file is gone |
 | Covers loading | with art on the card (`just art-scrape` or `art-add`), Settings, Game view, List + art: covers appear soon after the cursor rests, the list never stutters while one loads, and a held scroll shows the placeholder |
-| Rename on a real card | rename a game from its menu (the name only), then an SD card file with a save from the SD card page: the file and its `.sav` both renamed, the game still in Recent and Favourites, its save still loading in the game |
+| Rename on a real card | rename a game from its menu (the name only), then an SD card file with a save from the SD card page: the file renamed and its save folder under `/torii/saves` moved with it, the game still in Recent and Favourites, its save still loading in the game |
 | Diagnostics from Info | Info, Diagnostics: its first page comes up, and B there comes back to Info, on its row; run it through once from there too |
 | The copy estimate | see "The copy's estimate" below: set `PROGRESS_COPY_RATE` from two or three big games |
 | The scroll's brake | let go of a held scroll at top speed: it should stop within about two rows. If it overshoots, raise `SPRING_BRAKE` (`source/ui/ui_list.c`) |
@@ -102,6 +102,23 @@ logs the real figure: `launch: the cart copied N KB in F frames, B bytes a
 frame (the estimate: E frames)`. If B differs from `PROGRESS_COPY_RATE` by
 more than about 10% over two or three big games, set the constant to their
 average.
+
+### The v0.5 saves
+
+The emulator cuts power at every save step, but can't show a real card's
+timing or a real game's saves. Do these on the cart with Logging on Debug.
+
+| Check | How |
+|---|---|
+| A real save, safely copied | play a game that saves (Pokemon, Golden Sun), save in game, Back to menu or power off, power on: "Save sav?" then the copy; `/torii/saves/<rom path>/Main.sav` exists, no `.tmp` or `.bak` beside it, the log shows the verify |
+| Power cut during the copy | on the copy's progress bar pull power (a spare card): after the next boot the old save or the new one loads, never a short or blank file, and the retry runs |
+| History | save twice with different progress: History (Settings, System) at 5 keeps the older versions under `/torii/backups/<rom path>/Main/`; History Off keeps none |
+| A second slot | Select held with A on a game: New slot, name it, Blank; play, save; the first slot's file is untouched; the next launch shows the picker with the last slot preselected |
+| The per-game manager | START on the game, Saves: rename, duplicate, delete (the file is in `/torii/trash`), history restore (the old current save is in history), export then import a `.sav` |
+| Orphans | move a ROM on a PC, then Settings, Library, Saves: the old path is listed as an orphan; relink it to the moved ROM and the save loads in game |
+| Space used | the Saves screen's totals match `du` of `/torii/saves`, `/torii/backups`, `/torii/trash` within a few KB |
+| The long-path refusal | a ROM in a folder tree whose save path passes 251 bytes: the launch refuses with the path-too-long message, nothing written |
+| Save-type change | change a game's save type from EEPROM 8K to 512 in Game info: the old file goes to history, the notice shows once |
 
 ## In Diagnostics
 
