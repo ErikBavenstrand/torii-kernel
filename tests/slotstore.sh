@@ -20,7 +20,12 @@ set -euo pipefail
 . tests/carts.sh
 # shellcheck source=tests/cutsweep.sh
 . tests/cutsweep.sh
-part=${1:?usage: $0 SCENARIO}
+# Several scenarios run one after the other (tests/all.sh groups the short ones)
+if [ $# -gt 1 ]; then
+  for sc in "$@"; do "$0" "$sc" || exit 1; done
+  exit 0
+fi
+part=${1:?usage: $0 SCENARIO...}
 base=${part%-split}  # -split: the same, with the folders' first sectors full, and cut before every SD write
 local_carts "dist/cart-slotstore-$part"
 cart=$carts/slotstore-$part

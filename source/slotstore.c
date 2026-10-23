@@ -480,7 +480,8 @@ static int ss_scan_hist(const char *dir, u32 *count, u32 *maxn, u32 *newest)
 			note_stray(W->fno.fname);
 			continue;
 		}
-		if (strlen(W->fno.fname) >= SAVESLOT_BACKUP_NAME_BYTES || !saveslot_parse_backup_name(W->fno.fname, &n, NULL))
+		if (strlen(W->fno.fname) >= SAVESLOT_BACKUP_NAME_BYTES ||
+		    !saveslot_parse_backup_name(W->fno.fname, &n, NULL))
 			continue;
 		if (n > *maxn)
 			*maxn = n;
@@ -767,8 +768,9 @@ static int rename_steps(int mode, const char *rom, const char *old_name, const c
 			flags[1] = 0;
 		if (flags[2] && flags[3] && f_unlink_alias(nh, oh) == FR_OK)
 			flags[3] = 0;
-		enum saveslot_recovery act = saveslot_recover((u32)((flags[0] ? SAVESLOT_OLD_SAVE : 0) | (flags[1] ? SAVESLOT_NEW_SAVE : 0) |
-					     (flags[2] ? SAVESLOT_OLD_HIST : 0) | (flags[3] ? SAVESLOT_NEW_HIST : 0)));
+		enum saveslot_recovery act = saveslot_recover(
+			(u32)((flags[0] ? SAVESLOT_OLD_SAVE : 0) | (flags[1] ? SAVESLOT_NEW_SAVE : 0) |
+			      (flags[2] ? SAVESLOT_OLD_HIST : 0) | (flags[3] ? SAVESLOT_NEW_HIST : 0)));
 		tlog("slot: rename %s to %s of %s: recovery says %d", old_name, new_name, rom, act);
 		if (act == SAVESLOT_RECOVER_NOTHING)  // not started, or done but for the record
 			return flags[1] && !flags[0] ? record_follows(rom, old_name, new_name) : SLOTSTORE_OK;
@@ -902,7 +904,8 @@ int slotstore_create(const char *rom_path, const char *name, const char *copy_fr
 		return SLOTSTORE_CARD;
 	}
 	cutpoint("slot: new file in place");
-	tlog("slot: made %s of %s%s%s", clean, rom_path, copy_from ? ", a copy of " : ", blank", copy_from ? copy_from : "");
+	tlog("slot: made %s of %s%s%s", clean, rom_path, copy_from ? ", a copy of " : ", blank",
+	     copy_from ? copy_from : "");
 	return SLOTSTORE_OK;
 }
 
@@ -1112,7 +1115,7 @@ int slotstore_trash_purge(const struct saveslot_stamp *now_in)
 		return 0;
 	// The expired folders' names first: removing while reading would move the entries
 	u32 found = 0;
-	char (*gone)[SAVESLOT_STAMP_BYTES + 12] = (char (*)[SAVESLOT_STAMP_BYTES + 12])W->names;
+	char (*gone)[SAVESLOT_STAMP_BYTES + 12] = (char (*)[SAVESLOT_STAMP_BYTES + 12]) W->names;
 	_Static_assert(sizeof(W->names) >= SLOTSTORE_PURGE_MAX * (SAVESLOT_STAMP_BYTES + 12), "room for the names");
 	for (;;) {
 		FRESULT r = f_readdir(&W->dir, &W->fno);
@@ -1247,7 +1250,8 @@ int slotstore_history(const char *rom_path, const char *slot, struct slotstore_v
 static int ss_install(const char *src, const char *dest)
 {
 	char *tmp = W->tmpf, *bak = W->bakf;
-	if (ss_snprintf(tmp, SS_PATH, "%s.tmp", dest) >= SS_PATH || ss_snprintf(bak, SS_PATH, "%s.bak", dest) >= SS_PATH)
+	if (ss_snprintf(tmp, SS_PATH, "%s.tmp", dest) >= SS_PATH ||
+	    ss_snprintf(bak, SS_PATH, "%s.bak", dest) >= SS_PATH)
 		return SLOTSTORE_PATH;
 	Save_recover(dest);
 	int r = ss_copy(src, tmp);
@@ -1430,7 +1434,8 @@ static int journal_read(char *lines[4], char *kind, int *mode)
 	hex[8] = 0;
 	char want[9];
 	ss_snprintf(want, sizeof(want), "%08lx", (unsigned long)crc32(t, body));
-	if (strcmp(hex, want) || body < sizeof(JOURNAL_HEADER) - 1 || memcmp(t, JOURNAL_HEADER, sizeof(JOURNAL_HEADER) - 1))
+	if (strcmp(hex, want) || body < sizeof(JOURNAL_HEADER) - 1 ||
+	    memcmp(t, JOURNAL_HEADER, sizeof(JOURNAL_HEADER) - 1))
 		return 0;
 	t[body] = 0;
 	char *p = t + sizeof(JOURNAL_HEADER) - 1;
@@ -1446,8 +1451,9 @@ static int journal_read(char *lines[4], char *kind, int *mode)
 		return 0;
 	*kind = lines[0][0];
 	*mode = lines[0][1] - '0';
-	if ((*kind != 'R' && *kind != 'D' && *kind != 'I') || lines[0][2] || (*mode != SAVESLOT_CENTRAL && *mode != SAVESLOT_BESIDE_ROM) ||
-	    lines[1][0] != '/' || !lines[2][0] || !lines[3][0])
+	if ((*kind != 'R' && *kind != 'D' && *kind != 'I') || lines[0][2] ||
+	    (*mode != SAVESLOT_CENTRAL && *mode != SAVESLOT_BESIDE_ROM) || lines[1][0] != '/' || !lines[2][0] ||
+	    !lines[3][0])
 		return 0;
 	return 1;
 }
@@ -1487,15 +1493,16 @@ int slotstore_recover(void)
 		return 1;
 	}
 	if (kind == 'R') {
-		if (saveslot_clean_name(clean, x) != strlen(x) || strcmp(clean, x) || saveslot_clean_name(clean, y) != strlen(y) ||
-		    strcmp(clean, y)) {
+		if (saveslot_clean_name(clean, x) != strlen(x) || strcmp(clean, x) ||
+		    saveslot_clean_name(clean, y) != strlen(y) || strcmp(clean, y)) {
 			journal_clear();
 			return 1;
 		}
 		tlog("slot: finishing the rename of %s to %s of %s", x, y, rom);
 		r = rename_steps(mode, rom, x, y, 1);
 	} else {
-		if (saveslot_clean_name(clean, x) != strlen(x) || strcmp(clean, x) || strncmp(y, SAVESLOT_TRASH_DIR "/", sizeof(SAVESLOT_TRASH_DIR))) {
+		if (saveslot_clean_name(clean, x) != strlen(x) || strcmp(clean, x) ||
+		    strncmp(y, SAVESLOT_TRASH_DIR "/", sizeof(SAVESLOT_TRASH_DIR))) {
 			journal_clear();
 			return 1;
 		}
