@@ -8,9 +8,7 @@
 // A game folder is a folder under /torii/saves holding .sav files or a
 // game.ini; its ROM path is the folder's path below /torii/saves (the NOR
 // games' pseudo paths, /torii/nor/..., are never orphans). It is an orphan
-// when f_stat finds no file at that ROM path. Saves kept beside their ROM
-// (the Save location setting) are not counted or listed: they leave with
-// their ROM, and a rename moves them with it (actions.c).
+// when f_stat finds no file at that ROM path.
 //
 // Relink moves the orphan's save folder and history folder to the target's.
 // The target must be a file on the card. The target's own slots, record
@@ -22,9 +20,7 @@
 // dropped (it holds the save type and the current slot, which the target keeps).
 // A slot name that would make a path too long to launch (the pending-save
 // record's room, SAV_INFO_NAME_MAX) refuses the whole relink before anything
-// moves. Relinked saves go to /torii/saves whatever the Save location
-// setting says; with the setting at "beside the ROM" they show again when it
-// is switched back.
+// moves.
 //
 // Safety, as the slot store's (slotstore.h): nothing is overwritten, every
 // move is a rename (so a save is in the old place or the new one, never

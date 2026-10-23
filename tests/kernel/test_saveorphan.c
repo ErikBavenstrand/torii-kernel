@@ -187,9 +187,7 @@ static void test_relink_plain(void)
 	CHECK(!there("/torii/orphanop.txt"));
 	// The slot store sees its slots
 	struct slotstore_slot slots[SLOTSTORE_MAX_SLOTS];
-	slotstore_test_mode(SAVESLOT_CENTRAL);
 	CHECK_EQ(slotstore_list("/TOS/New.gba", slots, SLOTSTORE_MAX_SLOTS), 2);
-	slotstore_test_mode(-1);
 }
 
 static void test_relink_clash(void)

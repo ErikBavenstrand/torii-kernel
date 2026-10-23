@@ -612,7 +612,7 @@ static void rename_file(void)
 	const char *dot = strrchr(sd.name, '.');
 	u32 stem = dot && dot != sd.name ? (u32)(dot - sd.name) : (u32)strlen(sd.name);
 	snprintf(sd.info, sizeof(sd.info), "%.*s", (int)stem, sd.name);
-	const struct rename_ask ask = {ART_ICON16_SD, sd.info, sd.name + stem, RENAME_STEM_MAX, 1, rename_submit, 0};
+	const struct rename_ask ask = {ART_ICON16_SD, sd.info, sd.name + stem, RENAME_STEM_MAX, 1, rename_submit, 0, 0};
 	memo_store();  // the cursor the page comes back with if nothing changes
 	count_stop();
 	sd.renamed_partly = 0;
@@ -696,7 +696,7 @@ static void info(u32 i)
 	if (p < end && console < LIB_CONSOLES) {
 		struct gamerec rec;
 		gamesave_record_read(sd.full, &rec);
-		if (gamesave_current_path(sd.save, sizeof(sd.save), gamesave_mode(), sd.full, &rec) > 0 &&
+		if (gamesave_current_path(sd.save, sizeof(sd.save), sd.full, &rec) > 0 &&
 		    f_stat(sd.save, &fileinfo) == FR_OK)
 			snprintf(p, (size_t)(end - p), "\n%s: %s", gl_sd_save, rec.slot);
 		else

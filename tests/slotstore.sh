@@ -11,7 +11,7 @@
 #     record agree, no journal, .bak or .ren is left, and fsck.fat finds nothing
 # One scenario per run:
 #   push, restore, import, export, create-blank, create-copy, rename,
-#   rename-case, rename-beside, delete, delete-current, retire, purge
+#   rename-case, delete, delete-current, retire, purge
 # Saves are 512 bytes of one character, so a listing says which is which
 # (tests/slotstore_tree.py). Runs inside the torii-emu container after
 # `just build` and `just emu-headless`, with the test kernel built.
@@ -133,12 +133,6 @@ rename | rename-case)
   ini Main
   required=("A 512" "H 512")
   ;;
-rename-beside)
-  card_save A 512 ::/G/Game.Main.sav
-  card_save H 512 ::$B/Main/$H1
-  ini Main
-  required=("A 512" "H 512")
-  ;;
 delete)
   card_save A 512 ::$S/Main.sav
   card_save E 512 ::$S/Extra.sav
@@ -239,18 +233,6 @@ converged() {
     esac
     is "$l" "torii/saves/G/Game.gba/$n" A 512 || fail "$where: the save is not whole"
     ;;
-  rename-beside)
-    if no "$l" G/Game.Main.sav; then
-      is "$l" G/Game.Start.sav A 512 || fail "$where: neither name has the save"
-      is "$l" "torii/backups/G/Game.gba/Start/$H1" H 512 || fail "$where: the history didn't follow"
-      [ "$(record_slot)" = Start ] || fail "$where: the record says $(record_slot), not Start"
-    else
-      is "$l" G/Game.Main.sav A 512 || fail "$where: Game.Main.sav isn't the save"
-      no "$l" G/Game.Start.sav || fail "$where: both names have a save"
-      is "$l" "torii/backups/G/Game.gba/Main/$H1" H 512 || fail "$where: the history moved without the save"
-      [ "$(record_slot)" = Main ] || fail "$where: the record says $(record_slot), not Main"
-    fi
-    ;;
   delete)
     if is "$l" torii/saves/G/Game.gba/Extra.sav E 512; then
       is "$l" "torii/backups/G/Game.gba/Extra/$H1" F 512 || fail "$where: Extra is back without its history"
@@ -329,7 +311,6 @@ end_state() {
   create-copy) is "$l" torii/saves/G/Game.gba/Copy.sav A 512 || fail "uncut: no Copy.sav" ;;
   rename) is "$l" torii/saves/G/Game.gba/Start.sav A 512 || fail "uncut: not renamed" ;;
   rename-case) [ "$(mdir -b -i "$img" ::$S | sed 's|.*/||' | grep -i 'main.sav$')" = MAIN.sav ] || fail "uncut: not renamed" ;;
-  rename-beside) is "$l" G/Game.Start.sav A 512 || fail "uncut: not renamed" ;;
   delete) no "$l" torii/saves/G/Game.gba/Extra.sav || fail "uncut: Extra.sav is still there" ;;
   delete-current)
     no "$l" torii/saves/G/Game.gba/Main.sav || fail "uncut: Main.sav is still there"

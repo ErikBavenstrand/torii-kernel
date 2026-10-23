@@ -76,11 +76,11 @@ nested_card() {
   mmd -i "$cart/sd.img" ::/GBA ::/GBA/RPG ::/GBA/RPG/Old ::/NES ::/SAVER ::/RTS ::/SYSTEM ::/torii \
     "::/System Volume Information" ::/.Trashes ::/Secret ::/Deep ::/Deep/2 ::/Deep/2/3 ::/Deep/2/3/4 \
     ::/Deep/2/3/4/5 ::/Deep/2/3/4/5/6 ::/Deep/2/3/4/5/6/7 ::/Deep/2/3/4/5/6/7/8
-  # Golden Sun's save is in its folder under /torii/saves, Mega Man 10's beside it
+  # Golden Sun's save is in its folder under /torii/saves
   mmd -i "$cart/sd.img" ::/torii/saves ::/torii/saves/GBA ::/torii/saves/GBA/RPG "::/torii/saves/GBA/RPG/Golden Sun.gba"
   put "$cart" "/Root Game.gba" "/GBA/Metroid Fusion (USA).gba" "/GBA/Mega Man 10.gba" "/GBA/Mega Man 2.gba" \
     "/GBA/RPG/Golden Sun.gba" "/GBA/RPG/Old/Zelda.gbc" "/GBA/RPG/notes.txt" "/NES/Mario.nes" "/Tetris.gb" \
-    "/torii/saves/GBA/RPG/Golden Sun.gba/Main.sav" "/GBA/Mega Man 10.Boss v1.2.sav" "/RTS/Hidden.gba" "/SYSTEM/Hidden.gba" "/torii/Hidden.gba" \
+    "/torii/saves/GBA/RPG/Golden Sun.gba/Main.sav" "/RTS/Hidden.gba" "/SYSTEM/Hidden.gba" "/torii/Hidden.gba" \
     "/System Volume Information/Hidden.gba" "/.Trashes/Hidden.gba" "/._Root Game.gba" "/Secret/Hidden.gba" \
     "/Deep/2/3/4/5/6/7/Seven.gba" "/Deep/2/3/4/5/6/7/8/Eight.gba"
   mattrib -i "$cart/sd.img" +h ::/Secret
@@ -88,7 +88,7 @@ nested_card() {
 
 nested_expected="GBA	/GBA/RPG/Golden Sun.gba	$sz	save
 GBA	/GBA/Mega Man 2.gba	$sz	-
-GBA	/GBA/Mega Man 10.gba	$sz	save
+GBA	/GBA/Mega Man 10.gba	$sz	-
 GBA	/GBA/Metroid Fusion (USA).gba	$sz	-
 GBA	/Root Game.gba	$sz	-
 GBA	/Deep/2/3/4/5/6/7/Seven.gba	$sz	-
@@ -139,7 +139,7 @@ $(index "$cart")"
   no_errors "$cart/3.log"
   want="GBA	/Added.gba	$sz	-
 GBA	/GBA/RPG/Golden Sun 2.gba	$sz	-
-GBA	/GBA/Mega Man 10.gba	$sz	save
+GBA	/GBA/Mega Man 10.gba	$sz	-
 GBA	/GBA/Metroid Fusion (USA).gba	$sz	-
 GBA	/Root Game.gba	$sz	-
 GBA	/Deep/2/3/4/5/6/7/Seven.gba	$sz	-

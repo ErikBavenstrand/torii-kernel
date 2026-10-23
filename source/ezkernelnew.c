@@ -1146,16 +1146,13 @@ static u8 Process_savefile(u32 is_EMU, const char *rom_path, u32 gamefilesize, B
 	TCHAR *savfilename = launch_save.save;
 
 	gamesave_record_read(rom_path, &launch_save.rec);
-	int mode = gamesave_mode();
-	int len = gamesave_current_path(savfilename, sizeof(launch_save.save), mode, rom_path, &launch_save.rec);
+	int len = gamesave_current_path(savfilename, sizeof(launch_save.save), rom_path, &launch_save.rec);
 	// The pending-save record holds the path up to SAV_INFO_TYPE: a longer one
 	// would be copied back under another name. Nothing is written yet.
 	int hlen = saveslot_backup_dir(launch_save.hist, sizeof(launch_save.hist), rom_path, launch_save.rec.slot);
 	if (len < 0 || len > SAV_INFO_NAME_MAX || hlen < 0 || hlen > SAV_INFO_HIST_MAX) {
-		tlog_error("save: the save path is over %u bytes, the pending-save record's room (%s, slot %s): %s",
-			   (unsigned)SAV_INFO_NAME_MAX,
-			   mode == SAVESLOT_BESIDE_ROM ? "beside the ROM" : "in /torii/saves", launch_save.rec.slot,
-			   rom_path);
+		tlog_error("save: the save path is over %u bytes, the pending-save record's room (slot %s): %s",
+			   (unsigned)SAV_INFO_NAME_MAX, launch_save.rec.slot, rom_path);
 		return 8;
 	}
 	//#ifdef DEBUG
@@ -1901,6 +1898,23 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 	}
 	return 0;
 }  //---------------------------------------------------------------------------------
+u32 Game_save_bytes(const struct game_pick *g)
+{
+	u8 header[0x20];
+	memset(header, 0, sizeof(header));
+	f_chdir(currentpath);
+	if (f_open(&gfile, g->name, FA_READ) != FR_OK)
+		return 0;
+	UINT got = 0;
+	f_lseek(&gfile, 0xA0);
+	if (f_read(&gfile, header, sizeof(header), &got) != FR_OK || got != sizeof(header))
+		memset(header, 0, sizeof(header));
+	u32 size = f_size(&gfile);
+	f_close(&gfile);
+	memcpy(GAMECODE, header + 0xC, 4);  // as Game_boot reads it
+	return Get_savefilesize(Get_saveMODE(g->save_num, size));
+}
+//---------------------------------------------------------------------------------
 u8 Game_launch(struct game_pick *g, u32 menu_line, u32 key_L)
 {
 	// CLEAN BOOT and BOOT WITH ADDON load the game's save into cart SRAM

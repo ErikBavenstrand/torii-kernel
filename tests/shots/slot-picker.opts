@@ -1,0 +1,15 @@
+# The launch's save slot picker (source/screens/slot_picker.c), dark theme: a
+# game with three slots (Main, Boss Rush, Pacifist) shows it on every launch,
+# the last-used slot (Boss Rush, from game.ini) chosen, a New slot row last.
+# The launch goes through the menu's test hook (tests/nav.sh).
+#! sd-file /Hello.gba 0x20000 tests/roms/hello/hello.gba
+#! sd-file "/torii/saves/Hello.gba/Main.sav" 0x2000 /dev/null
+#! sd-file "/torii/saves/Hello.gba/Boss Rush.sav" 0x10000 /dev/null
+#! sd-file "/torii/saves/Hello.gba/Pacifist.sav" 0x2000 /dev/null
+#! sd-file "/torii/saves/Hello.gba/game.ini" 0 tests/shots/data/slot-picker-game.ini
+-w "nav: home ready"
+-P "@8:nav_test_path:/Hello.gba" -p @8:nav_test_action:0x7E000001
+-w "screen ready: slot-picker"
+-s @30:picker.png
+-k @40:DOWN -k @44:-
+-s @70:picker-down.png

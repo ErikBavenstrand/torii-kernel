@@ -1,0 +1,11 @@
+# The launch's save slot picker in the light theme, a game with two slots
+# (Main and Boss Rush) and the last-used one chosen.
+#! settings 28=1
+#! sd-file /Hello.gba 0x20000 tests/roms/hello/hello.gba
+#! sd-file "/torii/saves/Hello.gba/Main.sav" 0x2000 /dev/null
+#! sd-file "/torii/saves/Hello.gba/Boss Rush.sav" 0x10000 /dev/null
+#! sd-file "/torii/saves/Hello.gba/game.ini" 0 tests/shots/data/slot-picker-game.ini
+-w "nav: home ready"
+-P "@8:nav_test_path:/Hello.gba" -p @8:nav_test_action:0x7E000001
+-w "screen ready: slot-picker"
+-s @30:picker.png

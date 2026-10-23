@@ -18,6 +18,8 @@
 #include "tlog.h"
 #include "userdata.h"
 #include "engine/cycles.h"
+#include "engine/input.h"
+#include "screens/slot_picker.h"
 #include "ui/dialog.h"
 #include "ui/ui.h"
 
@@ -64,6 +66,25 @@ void action_nor_read(void)
 {
 	Read_NOR_info();
 	game_total_NOR = GetFileListFromNor();
+}
+
+// Which slot the launch plays (screens/slot_picker.h): the picker if the game
+// has two or more, or Select is held (a one-slot game goes straight in). rom
+// is the game's save path name (gamesave.h), bytes its save's size (0: it has
+// no save, so no slots), title the picker's. 1 if the launch stops (B, or a
+// failure shown); the menu's session is over then, as after a failed launch.
+static int slot_choose(const char *rom, u32 bytes, const char *title)
+{
+	if (!bytes)
+		return 0;
+	int force = ui_active() && (ui_input()->held & INPUT_SELECT) != 0;
+	if (!slot_picker_wanted(rom, force))
+		return 0;
+	if (slot_picker_run(rom, title, bytes) == SLOT_PICKER_LAUNCH)
+		return 0;
+	tlog("launch: no slot chosen, nothing started");
+	session_end();
+	return 1;
 }
 
 static void launch_nor_entry(const char *name, u32 hard_reset)
@@ -152,6 +173,14 @@ void action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset)
 			how = ACTION_CLEAN;  // GB, GBC and NES games start clean
 		else if (save_type < ACTION_SAVE_TYPES)
 			game.save_num = (u8)save_type;
+		if (how < ACTION_NOR) {  // WRITE TO NOR doesn't load a save to the cart
+			char rom[GAMESAVE_PATH_BYTES];
+			if (gamesave_rom_path_in(rom, sizeof(rom), currentpath, game.name) >= 0 &&
+			    slot_choose(rom, Game_save_bytes(&game), game.name)) {
+				game_leave();
+				return;
+			}
+		}
 		session_end();
 		// A write to NOR lists its game in pNorFS but leaves the count:
 		// the NOR page and home's count read them
@@ -231,9 +260,8 @@ int action_delete_file(const char *path)
 // A game's other files are named after it. Its saves are in folders named
 // after its path (saveslot.h): its folder of slots and record under
 // /torii/saves and its history under /torii/backups, which the rename moves
-// as they are (the folder's name is the game's file name, so one rename each),
-// or, with the Save location setting at "next to the ROM", the files
-// <stem>.<slot>.sav in its own folder, as many as it has. Its save states and
+// as they are (the folder's name is the game's file name, so one rename each).
+// Its save states and
 // cheats (name_with_ext) and patch cache are in folders at the card's root,
 // and its custom box art (B22) is in /torii/art. They move with it, and the
 // save state and the rest never land on another game's: the rename is
@@ -247,7 +275,6 @@ enum {
 	SIDE_DIR,     // dir and the game's path: a folder of its own (saves, history)
 	SIDE_EXT,     // name_with_ext's, ext; GBA games only
 	SIDE_ART,     // the file name and ".bin"
-	SIDE_BESIDE,  // the .sav files next to the ROM (any number)
 };
 #define RENAME_JOURNAL "/torii/rename.txt"
 #define RENAME_JOURNAL_MAX (2 * USERDATA_PATH_MAX + 64)  // its one line, and the CRC line
@@ -261,13 +288,9 @@ struct sidecar {
 #define ART_CUSTOM_EXT ARTKEY_EXT
 // In the order of actions.h's ACTION_FILE_*
 static const struct sidecar sidecars[] = {
-	{SAVESLOT_SAVES_DIR, SIDE_DIR, 0, ""},
-	{SAVESLOT_BACKUPS_DIR, SIDE_DIR, 0, ""},
-	{"/RTS", SIDE_EXT, 0, "rts"},
-	{"/CHEAT", SIDE_EXT, 0, "cht"},
-	{"/PATCH", SIDE_EXT, 1, "pat"},
-	{ART_CUSTOM_DIR, SIDE_ART, 0, ""},
-	{"", SIDE_BESIDE, 0, ""},
+	{SAVESLOT_SAVES_DIR, SIDE_DIR, 0, ""}, {SAVESLOT_BACKUPS_DIR, SIDE_DIR, 0, ""},
+	{"/RTS", SIDE_EXT, 0, "rts"},          {"/CHEAT", SIDE_EXT, 0, "cht"},
+	{"/PATCH", SIDE_EXT, 1, "pat"},        {ART_CUSTOM_DIR, SIDE_ART, 0, ""},
 };
 #define SIDECARS (sizeof(sidecars) / sizeof(*sidecars))
 #define SIDE_ART_AT 5  // the custom art's place in sidecars
@@ -293,14 +316,12 @@ static FRESULT drop_alias(const char *path, const char *keep);
 
 // out gets sidecar s's path for the game file name (SIDE_PATH_MAX bytes);
 // 0 if it has none for console, or it is too long to keep. A SIDE_DIR's
-// takes the game's folder (RW->dir), a SIDE_BESIDE has no single path.
+// takes the game's folder (RW->dir).
 static int side_path(char *out, const struct sidecar *s, const char *name, u32 console)
 {
 	char file[GAME_NAME_MAX + 8];
 	if (s->kind == SIDE_DIR)
 		return (u32)snprintf(out, SIDE_PATH_MAX, "%s%s/%s", s->dir, RW->dir, name) < SIDE_PATH_MAX;
-	if (s->kind == SIDE_BESIDE)
-		return 0;
 	if (s->kind == SIDE_EXT && console == LIB_GBA)
 		name_with_ext(file, name, s->ext);
 	else if (s->kind == SIDE_ART && strlen(name) + sizeof(ART_CUSTOM_EXT) <= sizeof(file))
@@ -338,103 +359,16 @@ static int same_name(const char *a, const char *b)
 	return !*a && !*b;
 }
 
-// --- Saves beside their ROM: <stem>.<slot>.sav in the game's folder (RW->dir)
-
-#define BESIDE_MAX 16  // the most a rename moves; a game has far fewer slots
-#define BESIDE_SUFFIX 112  // ".<slot>.sav": a slot's name is up to 96 bytes
-struct beside_list {
-	u32 count;
-	char suffix[BESIDE_MAX][BESIDE_SUFFIX];
-};
-_Static_assert(sizeof(struct beside_list) <= READCACHE_SHARE_SIZE, "the beside list's part of pReadCache");
-#define BL ((struct beside_list *)(void *)(pReadCache + READCACHE_SHARE))
-
-// Bytes of name that are stem (stem_len bytes) as the card compares them, or
-// 0 if name doesn't start with it
-static u32 prefix_len(const char *name, const char *stem, u32 stem_len)
-{
-	const char *a = name, *b = stem, *end = stem + stem_len;
-	while (b < end) {
-		if (!*a || ff_wtoupper(next_char(&a)) != ff_wtoupper(next_char(&b)))
-			return 0;
-	}
-	return (u32)(a - name);
-}
-
 static u32 stem_bytes(const char *name)
 {
 	const char *dot = strrchr(name, '.');
 	return dot ? (u32)(dot - name) : (u32)strlen(name);
 }
 
-// Lists into BL the suffixes (".Main.sav") of the .sav files in the game's
-// folder that start with name's stem and a dot; returns how many
-static u32 beside_collect(const char *name)
-{
-	struct beside_list *l = BL;
-	u32 stem = stem_bytes(name);
-	DIR dir;
-	l->count = 0;
-	if (!stem || f_opendir(&dir, RW->dir[0] ? RW->dir : "/") != FR_OK)
-		return 0;
-	while (f_readdir(&dir, &fileinfo) == FR_OK && fileinfo.fname[0]) {
-		const char *f = fileinfo.fname;
-		u32 len = (u32)strlen(f), pre = (fileinfo.fattrib & (AM_DIR | 0x08)) ? 0 : prefix_len(f, name, stem);
-		if (!pre || f[pre] != '.' || len - pre < 6 || f[len - 4] != '.' || (f[len - 3] | 32) != 's' ||
-		    (f[len - 2] | 32) != 'a' || (f[len - 1] | 32) != 'v')
-			continue;
-		if (l->count < BESIDE_MAX && len - pre < BESIDE_SUFFIX)
-			memcpy(l->suffix[l->count++], f + pre, len - pre + 1);
-		else
-			tlog("rename: %s is beyond the saves a rename moves beside %s", f, name);
-	}
-	f_closedir(&dir);
-	return l->count;
-}
-
-// Writes the path of the save beside the ROM name with suffix into out
-static int beside_path(char *out, const char *name, const char *suffix)
-{
-	u32 d = (u32)strlen(RW->dir), n = stem_bytes(name), x = (u32)strlen(suffix);
-	if (d + 1 + n + x >= SIDE_PATH_MAX)
-		return 0;
-	memcpy(out, RW->dir, d);
-	out[d] = '/';
-	memcpy(out + d + 1, name, n);
-	memcpy(out + d + 1 + n, suffix, x + 1);
-	return 1;
-}
-
-// Moves the saves beside the ROM name to to_name's stem, each keeping its
-// slot's name. With alias, one found under both names (a cut inside its
-// f_rename) loses the name it isn't going to keep; FR_OK once all moved
-static FRESULT beside_move(const char *name, const char *to_name, int alias)
-{
-	struct beside_list *l = BL;
-	char *from = RW->from, *to = RW->to;
-	if (!beside_collect(name))
-		return FR_OK;
-	for (u32 i = 0; i < l->count; i++) {
-		if (!beside_path(from, name, l->suffix[i]) || !beside_path(to, to_name, l->suffix[i]))
-			return FR_INVALID_NAME;
-		if (alias && there(to)) {
-			drop_alias(from, to);  // (two files: the one under the new name is another's, it stays)
-			continue;
-		}
-		FRESULT res = f_rename(from, to);
-		tlog("rename: %s to %s (FatFs %u)", from, to, (unsigned)res);
-		if (res != FR_OK)
-			return res;
-	}
-	return FR_OK;
-}
-
-// 1 if the game name has sidecar i's files (any, for the saves beside it)
+// 1 if the game name has sidecar i's files
 static int side_exists(u32 i, const char *name, u32 console)
 {
 	struct rename_work *w = RW;
-	if (sidecars[i].kind == SIDE_BESIDE)
-		return beside_collect(name) != 0;
 	return side_path(w->from, &sidecars[i], name, console) && there(w->from);
 }
 
@@ -455,15 +389,13 @@ static int side_empty_dir_gone(const char *path)
 static int side_taken(u32 i, const char *to_name, u32 console)
 {
 	struct rename_work *w = RW;
-	if (sidecars[i].kind == SIDE_BESIDE)
-		return beside_collect(to_name) != 0;
 	if (!side_path(w->to, &sidecars[i], to_name, console) || !there(w->to))
 		return 0;
 	return !(sidecars[i].kind == SIDE_DIR && (fileinfo.fattrib & AM_DIR) && side_empty_dir_gone(w->to));
 }
 
 // 1 if the pending-save record (a save not copied from the cart yet) is for
-// any save of the game dir/name, saved in either place
+// any save of the game dir/name
 static int pending_for(const char *dir, const char *name)
 {
 	char rom[GAMESAVE_PATH_BYTES], prefix[GAMESAVE_PATH_BYTES];
@@ -476,17 +408,12 @@ static int pending_for(const char *dir, const char *name)
 		if (pending_save_under(prefix))
 			return 1;
 	}
-	n = saveslot_save_path(prefix, sizeof(prefix), SAVESLOT_BESIDE_ROM, rom, "x");
-	if (n > 5) {
-		prefix[n - 5] = 0;  // "<folder>/<stem>." less "x.sav"
-		return pending_save_under(prefix);
-	}
 	return 0;
 }
 
 // out gets name less its extension: what a game's files that are named after
-// it, whatever its console, share (a Game.gba and a Game.gbc have the saves
-// beside them, and Game.sav and the like, in common)
+// it, whatever its console, share (a Game.gba and a Game.gbc have Game.rts
+// and the like in common)
 static void stem_name(char *out, const char *name)
 {
 	u32 n = stem_bytes(name);
@@ -673,8 +600,6 @@ static FRESULT side_move(u32 i, const char *name, const char *to_name, u32 conso
 	struct rename_work *w = RW;
 	if (action_rename_fail_file == i + 1)
 		return FR_DENIED;
-	if (sidecars[i].kind == SIDE_BESIDE)
-		return beside_move(name, to_name, 0);
 	if (!side_path(w->from, &sidecars[i], name, console) || !side_path(w->to, &sidecars[i], to_name, console))
 		return FR_OK;
 	FRESULT res = f_rename(w->from, w->to);
@@ -907,12 +832,6 @@ void action_rename_recover(void)
 	for (u32 i = 0; console != LIB_CONSOLE_NONE && i < SIDECARS && !failed; i++) {
 		if (sidecars[i].cache)
 			continue;
-		if (sidecars[i].kind == SIDE_BESIDE) {
-			// Each save beside the ROM still under the name it leaves
-			if (beside_move(forward ? w->name : b + 1, forward ? b + 1 : w->name, !case_only) != FR_OK)
-				failed = forward;
-			continue;
-		}
 		if (!side_path(w->from, &sidecars[i], w->name, console) ||
 		    !side_path(w->to, &sidecars[i], b + 1, console))
 			continue;
@@ -935,10 +854,8 @@ void action_rename_recover(void)
 		for (u32 i = 0; i < SIDECARS; i++) {
 			if (sidecars[i].cache)
 				continue;
-			if (sidecars[i].kind == SIDE_BESIDE)
-				beside_move(b + 1, w->name, 0);
-			else if (side_path(w->from, &sidecars[i], w->name, console) &&
-				 side_path(w->to, &sidecars[i], b + 1, console) && there(w->to) && !there(w->from))
+			if (side_path(w->from, &sidecars[i], w->name, console) &&
+			    side_path(w->to, &sidecars[i], b + 1, console) && there(w->to) && !there(w->from))
 				side_move(i, b + 1, w->name, console);
 		}
 		FRESULT res = f_rename(w->new_path, w->old_path);
@@ -961,6 +878,10 @@ void action_nor_launch(u32 index, u32 hard_reset)
 		tlog_error("launch: no NOR game %lu of %lu", (unsigned long)index, (unsigned long)game_total_NOR);
 		return;
 	}
+	char rom[GAMESAVE_PATH_BYTES];
+	if (gamesave_nor_path(rom, sizeof(rom), pNorFS[index].filename) >= 0 &&
+	    slot_choose(rom, Get_savefilesize(pNorFS[index].savemode), pNorFS[index].filename))
+		return;
 	session_end();
 	NOR_launch(index, hard_reset);  // returns only if it failed
 }

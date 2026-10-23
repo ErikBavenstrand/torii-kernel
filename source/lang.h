@@ -92,7 +92,6 @@ extern char **gl_set_onoff;
 extern char **gl_set_themes;
 extern char **gl_set_views;
 extern char **gl_set_boots;
-extern char **gl_set_locations;
 extern char **gl_set_history;
 extern char **gl_set_starts;
 extern char **gl_set_modes_b;
@@ -243,7 +242,7 @@ struct lang_rename {
 	const char *hint_type, *hint_delete, *hint_case, *hint_ok;  // A, B, SELECT, START
 	const char *key_lower, *key_upper, *key_latin, *key_space, *key_cancel, *key_ok;  // the function row
 	const char *empty, *taken, *bad, *hidden, *pending, *shared, *failed;  // OK refused
-	const char *side_taken[7];  // a file in the way, by actions.h's ACTION_FILE_*
+	const char *side_taken[6];  // a file in the way, by actions.h's ACTION_FILE_*
 	const char *partly;       // renamed, but not everything followed (a dialog after)
 	const char *name_failed;  // a game's name couldn't be written (a dialog after)
 	const char *names_full;   // ... as names.txt is too large or holds too many names
@@ -251,6 +250,25 @@ struct lang_rename {
 	const char *checking, *checking_text;  // the progress dialog while the card is checked for a shared save
 };
 extern const struct lang_rename *gl_rename;
+
+// The save slot picker and the New slot / Rename flows (screens/slot_picker.c, slot_flow.c)
+struct lang_slots {
+	const char *picker_title;  // the picker's title bar (the game's name follows it)
+	const char *new_row;       // its last row
+	const char *hint_play, *hint_rename, *hint_cancel;  // A, START, B
+	const char *new_title, *rename_title;  // the name prompt's title bar
+	const char *choice_title;  // Blank or a copy
+	const char *blank;
+	const char *fresh;    // the row of a slot with no file yet
+	const char *bad;      // a name with nothing usable in it
+	const char *full;     // SLOTSTORE_FULL
+	const char *failed;   // SLOTSTORE_CARD
+	const char *taken;    // SLOTSTORE_TAKEN, after the prompt
+	const char *path;     // SLOTSTORE_PATH
+	const char *gone;     // SLOTSTORE_NO_SLOT
+};
+extern const struct lang_slots *gl_slots;
+#define EN_SLOT_COPY_OF "Copy of %s"
 // A key past the cap says so, with the cap
 #define EN_RENAME_TOO_LONG "Names stop at %u letters."
 

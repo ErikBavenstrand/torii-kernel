@@ -58,7 +58,6 @@ enum settings_id {
 	SET_BOOT_MODE,  // how A, Play and Launch start GBA games: enum settings_boot
 	SET_ENGINE,     // the built-in table of patch points before scanning the ROM
 	SET_AUTO_SAVE,  // a game's save copied to the card without asking
-	SET_SAVE_LOCATION,  // enum settings_location: where the saves are kept
 	SET_RTS,        // real-time save (save states)
 	SET_CHEATS,
 	// Cart
@@ -133,13 +132,6 @@ enum settings_boot {
 #define SET_HISTORY_CHOICES 6
 #define SET_HISTORY_DEFAULT 3
 extern const u8 settings_history_keep[SET_HISTORY_CHOICES];
-
-// SET_SAVE_LOCATION's values, stored as they are
-enum settings_location {
-	SET_LOC_TORII,  // /torii/saves/<rom path>/<slot>.sav
-	SET_LOC_BESIDE_ROM,  // in the ROM's folder, <rom stem>.<slot>.sav
-	SET_LOCS
-};
 
 enum settings_action {
 	SET_ACTION_NONE,

@@ -40,7 +40,6 @@ static const char *const lib_files[2] = {"/torii/library.idx", "/torii/library.b
 #define LIB_STEP_CYCLES 30000  // one job call's work, about a ninth of a frame
 #define LIB_SORT_BUDGET 48  // merged entries per step
 #define LIB_DEPTH 8  // folders deeper than this are skipped
-#define LIB_FIXUP_WORK 128  // records a step of the beside-ROM saves' fix-up marks
 #define LIB_SAVES_SLOTS 8192  // the save names' hash table, 32 KB of PSRAM
 #define LIB_SAVES_MAX (LIB_SAVES_SLOTS * 3 / 4)
 #define LIB_NAMES_MAX \
@@ -92,7 +91,6 @@ enum {
 	W_SAVER,
 	W_ROOT,
 	W_TREE,
-	W_FIXUP,
 	W_END,
 };
 
@@ -146,7 +144,6 @@ static struct {
 			char path[LIBRARY_NAME_MAX + 2];
 			char full[2 * LIBRARY_NAME_MAX + 2];  // a game's path, for its custom name
 			u32 hash, serial, files, games, entries, folders_seen, folders_done, saves, skipped, cleared;
-			u32 beside, fix_i;  // saves beside their ROMs found; the records the fix-up has done
 			u32 unreadable, names_len, too_long;
 			u8 names_ok;  // names.txt read whole into LIB_NAMES_TEXT
 			u32 parse_started;  // when its parse began
@@ -463,33 +460,6 @@ static int is_save_file(const char *name)
 	       (name[len - 1] | 32) == 'v';
 }
 
-// A .sav file the tree walk found (the file just read, in the folder at the
-// walk's depth) may be a game's save beside its ROM, <stem>.<slot>.sav: the
-// table gets "<folder>/<stem>" for every dot of the name that leaves a
-// ".<slot>.sav" after it (a slot's name may have dots), and the fingerprint
-// the file
-static void beside_note(void)
-{
-	const char *name = lib.u.walk.fi.fname;
-	u32 len = lib.u.walk.path_len[lib.u.walk.depth], n = (u32)strlen(name);
-	hash_bytes("S", 1);
-	hash_bytes(lib.u.walk.path, len);
-	hash_bytes(name, n + 1);
-	if (!lib.build)
-		return;
-	char *key = lib.u.walk.full;
-	memcpy(key, lib.u.walk.path, len);
-	key[len] = '/';
-	for (u32 j = 1; j + 6 <= n; j++) {
-		if (name[j] != '.')
-			continue;
-		memcpy(key + len + 1, name, j);
-		key[len + 1 + j] = 0;
-		save_insert(key);
-		lib.u.walk.beside++;
-	}
-}
-
 // One entry of the folder at the walk's depth; sub, when the entry is a
 // folder, is already open on it (f_readdir_sub)
 static void walk_entry(DIR *sub)
@@ -499,9 +469,6 @@ static void walk_entry(DIR *sub)
 	lib.u.walk.entries++;
 	if (fi->fattrib & 0x08)
 		return;  // a volume label
-	// (not a game, so the rule below hides it: the page doesn't list it)
-	if (!(fi->fattrib & (AM_DIR | AM_HID | AM_SYS)) && fi->fname[0] != '.' && is_save_file(fi->fname))
-		beside_note();
 	u32 flags = ((fi->fattrib & AM_DIR) ? GAMENAME_DIR : 0) |
 		    ((fi->fattrib & (AM_HID | AM_SYS)) ? GAMENAME_ATTR_HIDDEN : 0) |
 		    (library_console_of(fi->fname) != LIB_CONSOLE_NONE ? GAMENAME_OPENABLE : 0);
@@ -539,8 +506,7 @@ static void walk_entry(DIR *sub)
 		names_walk_seen(lib.u.walk.full, (u32)fi->fsize, (u32)fi->fdate << 16 | fi->ftime, console);
 	if (!lib.build)
 		return;
-	// Its save folder under /torii/saves has a .sav (a saves beside its ROM
-	// are marked after the walk)
+	// Its save folder under /torii/saves has a .sav
 	int has_save = lib.u.walk.saves && save_known(lib.u.walk.full);
 	u16 folder = walk_folder();
 	// The display name only for a game that has room: a custom name costs a
@@ -564,9 +530,7 @@ static void walk_pop(DIR *dir)
 	hash_bytes("\x02", 1);
 	lib.u.walk.folders_done++;
 	if (lib.u.walk.depth == 0) {
-		// Saves beside their ROMs can come after the ROM in a folder's order:
-		// the games they belong to are marked now
-		lib.phase = lib.build && lib.u.walk.beside ? W_FIXUP : W_END;
+		lib.phase = W_END;
 		return;
 	}
 	lib.u.walk.depth--;
@@ -820,32 +784,6 @@ static void walk_step(void)
 			walk_entry(sub);
 		else
 			walk_pop(dir);
-		return;
-	}
-	case W_FIXUP: {
-		// Marks the games with a save beside them: their path less the
-		// extension is "<folder>/<stem>", which the .sav files put in the table
-		const u8 *slot = lib.u.walk.b.slot;
-		u32 end = lib.u.walk.fix_i + LIB_FIXUP_WORK;
-		if (end > lib.u.walk.b.records)
-			end = lib.u.walk.b.records;
-		for (u32 i = lib.u.walk.fix_i; i < end; i++) {
-			u16 flags = lib_rec_at(slot, i)->flags;
-			char *path = lib.u.walk.full;
-			if ((flags & LIB_F_SAVE) || !lib_path(slot, i, path, sizeof(lib.u.walk.full)))
-				continue;
-			char *dot = strrchr(path, '.');
-			if (!dot || dot < strrchr(path, '/'))
-				continue;
-			*dot = 0;
-			if (save_known(path)) {
-				flags |= LIB_F_SAVE;
-				put((u8 *)slot + LIB_OFF_RECORDS + i * sizeof(struct lib_rec) + 2, &flags, 2);
-			}
-		}
-		lib.u.walk.fix_i = end;
-		if (end >= lib.u.walk.b.records)
-			lib.phase = W_END;
 		return;
 	}
 	default:

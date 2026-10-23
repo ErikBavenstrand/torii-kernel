@@ -17,7 +17,14 @@ git log, not here.
   Journaled in `/torii/orphanop.txt` and finished at boot; folders move a file
   at a time, as a folder renamed into another parent can leave a wrong `..`
   entry after a cut (144c567).
-
+- **Added:** the launch's save slot picker and the New slot and Rename flows
+  (`source/screens/slot_picker.c`, `slot_flow.c`, `slot_list.c`). A game with
+  two or more slots asks which to play on every launch (the last used chosen,
+  A plays, START renames, B starts nothing, a "New slot..." row names a slot
+  and makes it blank or a copy of the current one); a game with one starts
+  straight in, and Select held with A shows the picker anyway. The chosen slot
+  becomes the record's, so the save loaded and the pending-save record are its
+  (197b36c).
 - **Added:** the slot store (`source/slotstore.c`): a game's slots listed,
   created blank or as a copy, renamed (also by case only), duplicated and
   deleted to `/torii/trash` (purged after 30 days at boot, never on an unset
@@ -38,12 +45,10 @@ git log, not here.
   `game.ini` beside them; a NOR game keeps its saves as for a ROM at
   `/torii/nor/<name>`. Folders are made when a file is first written. The
   pending-save record now holds the full path, so a save path over 251 bytes
-  is refused at launch with a message. New Games setting *Save location*
-  (Torii folder, or `<rom stem>.<slot>.sav` next to the ROM; the record stays
-  in `/torii/saves`). The library marks a game saved from the `.sav` files in
-  its folder or beside it, Rename moves the game's folders (saves, history) or
-  its saves beside it with it, through the same journal, and the FatFs
-  alias drop now also handles folders (b0e8b49).
+  is refused at launch with a message. The library marks a game saved from the
+  `.sav` files in its folder, Rename moves the game's folders (saves, history)
+  with it through the same journal, and the FatFs alias drop now also handles
+  folders. There is no setting for saves next to the ROM (b0e8b49, e98a46c).
 
 - **Added:** `cutpoint(name)` (`source/cutpoint.h`), a debug log line
   `cutpoint N: name` that marks a step boundary for the power-cut tests

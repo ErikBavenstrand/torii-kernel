@@ -222,7 +222,6 @@ static int journal(char kind, int mode, const char *a, const char *b, const char
 
 static void test_slots_and_current(void)
 {
-	slotstore_test_mode(SAVESLOT_CENTRAL);
 	CHECK_EQ(slot_count(ROM), 0);
 	current_is(ROM, "Main");  // a game with no record
 	CHECK_EQ(slotstore_set_current(ROM, "Main"), SLOTSTORE_NO_SLOT);
@@ -476,7 +475,6 @@ static void test_recovery(void)
 	char path[300];
 	struct gamerec rec;
 	// A rename cut after the save moved: the history follows, so does the record
-	slotstore_test_mode(SAVESLOT_CENTRAL);
 	snprintf(path, sizeof(path), "%s/New.sav", s);
 	CHECK(put(path, 'N', 512));
 	snprintf(path, sizeof(path), "%s/Old/0001-00000000-000000.sav", b);
@@ -582,32 +580,6 @@ static void test_purge(void)
 	CHECK(there("/torii/trash/not-a-date/keep.sav"));
 }
 
-static void test_beside_rom(void)
-{
-	const char *rom = "/TSL/Beside.gba";
-	char name[SAVESLOT_NAME_BYTES];
-	slotstore_test_mode(SAVESLOT_BESIDE_ROM);
-	CHECK(put("/TSL/Beside.Main.sav", 'M', 512));
-	CHECK(put("/TSL/Other.Main.sav", 'O', 512));  // another game's
-	CHECK(put("/TSL/Beside.gba", 'R', 512));      // the ROM itself
-	CHECK_EQ(slot_count(rom), 1);
-	CHECK(has_slot(rom, "Main"));
-	CHECK_EQ(slotstore_create(rom, "Alt", NULL, 512, name), SLOTSTORE_OK);
-	CHECK(is_fill("/TSL/Beside.Alt.sav", 0xFF));
-	CHECK_EQ(slotstore_rename(rom, "Alt", "Second", NULL), SLOTSTORE_OK);
-	CHECK(is_fill("/TSL/Beside.Second.sav", 0xFF));
-	CHECK(!there("/TSL/Beside.Alt.sav"));
-	CHECK_EQ(slotstore_history_push(rom, "Main"), SLOTSTORE_OK);
-	CHECK(there("/torii/backups/TSL/Beside.gba/Main"));  // the history is always central
-	CHECK_EQ(slotstore_rename(rom, "Second", "SECOND", NULL), SLOTSTORE_OK);
-	CHECK(!strcmp(stored_name("/TSL/Beside.Second.sav"), "Beside.SECOND.sav"));
-	CHECK_EQ(slotstore_delete(rom, "SECOND"), SLOTSTORE_OK);
-	CHECK(!there("/TSL/Beside.SECOND.sav"));
-	CHECK(is_fill("/TSL/Other.Main.sav", 'O'));  // untouched
-	CHECK_EQ(slotstore_delete(rom, "Main"), SLOTSTORE_LAST);
-	slotstore_test_mode(-1);
-}
-
 void test_slotstore(void)
 {
 	if (!card()) {
@@ -625,8 +597,6 @@ void test_slotstore(void)
 	test_recovery();
 	test_retire();
 	test_purge();
-	test_beside_rom();
-	slotstore_test_mode(-1);
 }
 
 /* ---- The power-cut scenarios (tests/slotstore.sh) ---- */
@@ -657,7 +627,6 @@ void slot_scenario(void)
 		tlog_error("slot scenario: no card");
 		return;
 	}
-	slotstore_test_mode(SAVESLOT_CENTRAL);
 	tlog("SLOT SCENARIO START");
 	int r = -99;
 	if (scenario_is("push")) {
@@ -676,9 +645,6 @@ void slot_scenario(void)
 		r = slotstore_rename(G_ROM, "Main", "Start", NULL);
 	} else if (scenario_is("rename-case")) {
 		r = slotstore_rename(G_ROM, "Main", "MAIN", NULL);
-	} else if (scenario_is("rename-beside")) {
-		slotstore_test_mode(SAVESLOT_BESIDE_ROM);
-		r = slotstore_rename(G_ROM, "Main", "Start", NULL);
 	} else if (scenario_is("delete")) {
 		r = slotstore_delete(G_ROM, "Extra");
 	} else if (scenario_is("delete-current")) {
