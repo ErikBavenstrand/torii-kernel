@@ -69,8 +69,8 @@ static int model_fetch(void *ctx, u32 i, struct ui_item *out)
 static const struct ui_list_model model = {model_count, model_fetch, 0, 0, 0};
 static const struct ui_title_config title_config = {"", 0, ART_ICON16_TORII};
 static const struct ui_hints_config hints_config = {0, 0};
-static const struct ui_list_config list_config = {&model, UI_ROW_PITCH_LIST, UI_LIST_MARQUEE | UI_LIST_MARKS,
-						  DETAIL_W, LIST_PAD};
+static const struct ui_list_config list_config = {&model, UI_ROW_PITCH_LIST, UI_LIST_MARQUEE | UI_LIST_MARKS, DETAIL_W,
+						  LIST_PAD};
 static const struct ui_scrollbar_config scroll_config = {N_LIST};
 
 static int event(struct ui_view *v, const struct ui_event *e);
@@ -79,8 +79,8 @@ static struct ui_view_spec view_spec EWRAM_BSS;
 
 static void node(u32 i, u8 kind, u8 plane, u8 anchor, u8 flags, s32 x, s32 y, s32 w, s32 h, const void *data)
 {
-	nodes[i] = (struct ui_spec){kind, (u8)(i + 1), UI_NONE, plane, anchor, flags, 0, 0, (s16)x, (s16)y, (s16)w, (s16)h,
-				    data};
+	nodes[i] = (struct ui_spec){kind, (u8)(i + 1), UI_NONE, plane,  anchor, flags, 0,
+				    0,    (s16)x,      (s16)y,  (s16)w, (s16)h, data};
 }
 
 static void build(void)

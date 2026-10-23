@@ -73,8 +73,8 @@ int slot_picker_run(const char *rom_path, const char *title, u32 blank_size)
 	int result = SLOT_PICKER_CANCEL;
 	for (;;) {
 		u32 cursor = rows_build(rom_path, want[0] ? want : NULL);
-		const struct slot_list list = {"slot-picker", gl_slots->picker_title, title, sp.rows, sp.count, cursor,
-					       sp.hints, 3, 1};
+		const struct slot_list list = {
+			"slot-picker", gl_slots->picker_title, title, sp.rows, sp.count, cursor, sp.hints, 3, 1};
 		u32 row;
 		int key = slot_list_run(&list, &row);
 		int slots = (int)sp.count - 1, empty = 0;

@@ -66,8 +66,7 @@ static const char *name_submit(void *ctx, const char *name)
 	if (n < 0)
 		return gl_slots->failed;
 	for (int i = 0; i < n; i++) {
-		if (saveslot_names_equal(fl.slots[i].name, fl.clean) &&
-		    !(fl.own && !strcmp(fl.slots[i].name, fl.own)))
+		if (saveslot_names_equal(fl.slots[i].name, fl.clean) && !(fl.own && !strcmp(fl.slots[i].name, fl.own)))
 			return gl_slots->taken;
 	}
 	memcpy(fl.out, fl.clean, sizeof(fl.out));
@@ -114,7 +113,8 @@ int slot_flow_new(const char *rom, u32 blank_size, char *created)
 		fl.rows[1] = (struct slot_list_row){fl.copy, 0, 0};
 		fl.hints[0] = (struct ui_hint){"A", gl_hint_ok};
 		fl.hints[1] = (struct ui_hint){"B", gl_slots->hint_cancel};
-		const struct slot_list list = {"slot-new-choice", gl_slots->choice_title, name, fl.rows, 2, 0, fl.hints, 2, 0};
+		const struct slot_list list = {
+			"slot-new-choice", gl_slots->choice_title, name, fl.rows, 2, 0, fl.hints, 2, 0};
 		u32 row;
 		if (slot_list_run(&list, &row) != SLOT_LIST_PICK)
 			return SLOT_FLOW_CANCEL;
