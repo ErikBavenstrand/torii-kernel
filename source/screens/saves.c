@@ -43,9 +43,19 @@ enum {
 	N_COUNT,
 };
 
-enum { M_MAIN, M_PICK };
+enum {
+	M_MAIN,
+	M_PICK
+};
 // The manager's rows: three of space, Empty trash, the heading (or "none"), then the orphans
-enum { ROW_SAVES, ROW_HISTORY, ROW_TRASH, ROW_EMPTY, ROW_HEAD, ROW_FIRST };
+enum {
+	ROW_SAVES,
+	ROW_HISTORY,
+	ROW_TRASH,
+	ROW_EMPTY,
+	ROW_HEAD,
+	ROW_FIRST
+};
 
 struct saves {
 	struct orphan_scan scan;

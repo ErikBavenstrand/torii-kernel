@@ -52,12 +52,12 @@ enum {
 	ORPHAN_NO_TARGET = -3,  // the target ROM isn't a file on the card
 	ORPHAN_SAME = -4,       // the target is the orphan's own path
 	ORPHAN_PATH = -5,       // a path or a name would be too long, or is bad; nothing moved
-	ORPHAN_STOPPED = -6,    // two different things in one place; nothing was overwritten, the rest stays where it is
+	ORPHAN_STOPPED = -6,  // two different things in one place; nothing was overwritten, the rest stays where it is
 };
 
 /* ---- The scan ---- */
 
-#define ORPHAN_MAX 32     // orphans listed
+#define ORPHAN_MAX 32  // orphans listed
 #define ORPHAN_POOL 2560  // bytes of their ROM paths
 
 struct orphan_scan {
@@ -65,11 +65,11 @@ struct orphan_scan {
 	// the history under /torii/backups, the trash under /torii/trash
 	u32 saves_bytes, backups_bytes, trash_bytes;
 	u32 saves_files, backups_files, trash_files;
-	u32 games;   // save folders seen (NOR games' too)
-	u32 count;   // orphans listed
-	u32 more;    // orphans past ORPHAN_MAX or the pool: they show after the first are dealt with
+	u32 games;  // save folders seen (NOR games' too)
+	u32 count;  // orphans listed
+	u32 more;  // orphans past ORPHAN_MAX or the pool: they show after the first are dealt with
 	u8 partial;  // a folder too deep or too long, or a read that failed: the figures are low
-	u16 off[ORPHAN_MAX];    // the ROM path in pool
+	u16 off[ORPHAN_MAX];  // the ROM path in pool
 	u16 slots[ORPHAN_MAX];  // slot files (.sav)
 	u32 bytes[ORPHAN_MAX];  // its saves and history, file bytes
 	u16 pool_used;

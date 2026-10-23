@@ -122,8 +122,8 @@ void test_orphanplan_journal(void)
 	free(copy);
 
 	// A trash job has no slots
-	len = orphanplan_write(buf, sizeof(buf), ORPHANPLAN_TRASH, "/GBA/Old.gba", "/torii/trash/20260801-000000-1", NULL, NULL,
-			       0);
+	len = orphanplan_write(buf, sizeof(buf), ORPHANPLAN_TRASH, "/GBA/Old.gba", "/torii/trash/20260801-000000-1",
+			       NULL, NULL, 0);
 	CHECK(len > 0);
 	copy = malloc(len + 1);
 	memcpy(copy, buf, len);

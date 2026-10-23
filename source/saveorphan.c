@@ -223,7 +223,8 @@ static int walk(char *path, struct so_sum *sum, struct orphan_scan *s, orphan_pr
 				s->games++;
 				if (!has_prefix(rom, NOR_DIR)) {
 					FRESULT st = f_stat(rom, &W->fno);
-					if (st == FR_NO_FILE || st == FR_NO_PATH || (st == FR_OK && (W->fno.fattrib & AM_DIR)))
+					if (st == FR_NO_FILE || st == FR_NO_PATH ||
+					    (st == FR_OK && (W->fno.fattrib & AM_DIR)))
 						add_orphan(s, rom, W->slots[level], W->bytes[level]);
 					else if (st != FR_OK)
 						sum->partial = 1;
@@ -508,7 +509,8 @@ static int relink_steps(const struct orphanplan_job *job)
 		}
 	}
 	// The record: the target keeps its own
-	if (so_snprintf(W->e, SO_PATH, "%s/game.ini", W->a) >= SO_PATH || so_snprintf(W->f, SO_PATH, "%s/game.ini", W->b) >= SO_PATH)
+	if (so_snprintf(W->e, SO_PATH, "%s/game.ini", W->a) >= SO_PATH ||
+	    so_snprintf(W->f, SO_PATH, "%s/game.ini", W->b) >= SO_PATH)
 		return ORPHAN_PATH;
 	if (exists(W->e) == 1) {
 		int t = exists(W->f);
@@ -610,7 +612,8 @@ static int collect_names(u32 *count, u32 *used)
 			}
 			if (!W->fno.fname[0])
 				break;
-			if ((W->fno.fattrib & AM_DIR) && !add_name(count, used, W->fno.fname, (u32)strlen(W->fno.fname))) {
+			if ((W->fno.fattrib & AM_DIR) &&
+			    !add_name(count, used, W->fno.fname, (u32)strlen(W->fno.fname))) {
 				r = ORPHAN_PATH;
 				break;
 			}

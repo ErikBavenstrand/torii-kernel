@@ -149,7 +149,8 @@ int orphanplan_read(char *data, u32 len, struct orphanplan_job *job)
 	job->from = next_line(&p);
 	job->to = next_line(&p);
 	char *count = next_line(&p);
-	if (!kind || !job->from || !job->to || !count || kind[1] || (kind[0] != ORPHANPLAN_RELINK && kind[0] != ORPHANPLAN_TRASH))
+	if (!kind || !job->from || !job->to || !count || kind[1] ||
+	    (kind[0] != ORPHANPLAN_RELINK && kind[0] != ORPHANPLAN_TRASH))
 		return 0;
 	job->kind = kind[0];
 	if (job->from[0] != '/' || job->to[0] != '/' || count[0] < '0' || count[0] > '9')
