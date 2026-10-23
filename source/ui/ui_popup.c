@@ -876,8 +876,8 @@ const struct ui_ops ui_popup_ops = {
 	sizeof(struct popup_state), popup_measure, popup_init, popup_event, popup_update, popup_draw};
 
 // Opens the popup's card, h px tall, beside list's selected row (pp.menu
-// or pp.fields set): 0 if it can't
-static int card_open(u8 list, u8 hints, u32 h)
+// or pp.fields set): 0 if it can't (logged unless quiet: a first try)
+static int card_open(u8 list, u8 hints, u32 h, int quiet)
 {
 	TLOG_ASSERT(hints == UI_NONE || ui_node_spec(hints)->kind == UI_HINTS);
 	// Beside the row where it will rest, its top clamped under the title bar
@@ -902,9 +902,13 @@ static int card_open(u8 list, u8 hints, u32 h)
 	s16 rect[4];
 	card_rect(look.pop_x - (s32)k, top, look.pop_w + (s32)k, (s32)h, rect);
 	run_spec(&pp.pop, "popup", UI_POPUP, rect);
+	u8 was_quiet = res_errors_quiet;
+	res_errors_quiet = quiet ? 1 : was_quiet;
 	struct ui_view *v = ui_push(&pp.pop.view_spec, 0);
+	res_errors_quiet = was_quiet;
 	if (!v) {
-		tlog_error("popup: %s", ui_error());
+		if (!quiet)
+			tlog_error("popup: %s", ui_error());
 		return 0;
 	}
 	pp.pop.drawn_frame = 0;
@@ -936,7 +940,14 @@ int ui_popup_open(u8 list, u8 hints, const struct ui_popup *popup)
 	// items do; the SD file popup's 9 go without, the row beside it named)
 	u32 items = popup->count * look.pop_pitch + look.pop_pad_bottom;
 	pp.titled = popup->title && look.pop_head_h + items <= (u32)(look.pop_bottom_max - look.pop_top_min);
-	return card_open(list, hints, (pp.titled ? look.pop_head_h : look.pop_pad_top) + items);
+	// A page whose tiles leave block 0 short (the list with art) may not
+	// fit a tall titled card: it opens without its title, two tile rows less
+	if (pp.titled && card_open(list, hints, look.pop_head_h + items, 1))
+		return 1;
+	if (pp.titled)
+		tlog("popup: no room for its title (%s): it opens without", ui_error());
+	pp.titled = 0;
+	return card_open(list, hints, look.pop_pad_top + items, 0);
 }
 
 int ui_fields_open(u8 list, u8 hints, const struct ui_fields *fields, const struct ui_hint *keys, u32 key_count)
@@ -956,7 +967,7 @@ int ui_fields_open(u8 list, u8 hints, const struct ui_fields *fields, const stru
 	for (u32 i = 0; i < n; i++)
 		pp.pop.hint[i] = keys[i];
 	pp.pop.hint_count = (u8)n;
-	return card_open(list, hints, look.fld_h);
+	return card_open(list, hints, look.fld_h, 0);
 }
 
 u16 ui_fields_key(void (*between)(void))

@@ -19,7 +19,7 @@ static struct {
 } res_log[RES_LOG_CAP] EWRAM_BSS;
 static u8 res_log_len EWRAM_BSS;
 #define RES_LOG_GAP 0xFF  // a log entry released on its own
-static char res_msg[120] EWRAM_BSS;
+static char res_msg[160] EWRAM_BSS;
 u8 res_errors_quiet;
 
 void res_init(void)

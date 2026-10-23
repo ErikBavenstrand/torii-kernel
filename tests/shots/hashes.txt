@@ -91,6 +91,7 @@ games-art/recent D6B09D15BF64F7E1
 games-art-box/gba B283B0831EAA819C
 games-art-dark/gba 743CC2D257F80E8A
 games-art-dark/gba-none 6DD7FD2BF9FD37DC
+games-art-popup/popup FFDAF87C34720167
 games-box-switch/gb 46FF5145036E9096
 games-box-switch/gba 9F73E48DF1E05512
 games-box-switch/gba-next 86E077FAD2BA18F7
@@ -395,12 +396,12 @@ rename/shifted FBDD010AC1E7FCF2
 rename-dark/prefilled 1747112F0822FB93
 saves-none/back 63A1A230B8AF4D78
 saves-none/empty-row E42020FBB63EDEC9
-saves-none/list CF83BEDEDA580809
+saves-none/list 597DFF8842E34763
 saves-none/message 0AAD19084B4AB3FD
 saves-orphans/back DCAAEFC7BD8FF1E3
 saves-orphans/empty-confirm 9ED77A7D325609DB
 saves-orphans/library 0631F99006C91870
-saves-orphans/list 81A0CACC1C6ED1ED
+saves-orphans/list C7FEB9F556EB47F8
 saves-orphans/orphan DCAAEFC7BD8FF1E3
 saves-orphans/picker CDD0C5F1C7C7CC89
 saves-orphans/picker-down 9B5C9014DC1B34F3
