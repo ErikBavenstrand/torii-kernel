@@ -6,6 +6,14 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** the per-game save manager (`source/screens/game_saves.c`): "Saves"
+  in a GBA game's Start menu (Games lists, SD card page, game NOR page) lists
+  its slots with the current one marked. A slot's actions are Launch with this
+  slot (no picker follows), Set as current, Rename, Duplicate, Delete (asks;
+  to `/torii/trash`, never the last slot), History (restore a version; the old
+  current goes into the history) and Export (`/torii/export`); New slot and
+  Import .sav (a folder browser, then the slot to replace) close the list
+  (e0fa5e7).
 - **Added:** the launch's save slot picker and the New slot and Rename flows
   (`source/screens/slot_picker.c`, `slot_flow.c`, `slot_list.c`). A game with
   two or more slots asks which to play on every launch (the last used chosen,
