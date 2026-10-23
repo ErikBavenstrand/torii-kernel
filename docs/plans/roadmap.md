@@ -121,6 +121,30 @@ Decided 2026-10-22: a version is kept only when the chip differs from the curren
 
 What v0.5 built of slots and history (`source/slotstore.c`, API in its header; tests `tests/kernel/test_slotstore.c`, `tests/slotstore.sh`): the Settings row **History** (System section: Games' card is full at 6 rows; Off/1/3/5/10/20, default 5) sets the versions kept. The save copy pushes the version it replaces into the history before the swap (the record holds the history folder from halfword `0x82`); a repeat after a cut adds none (the newest version is compared first), and a history that can't take the version fails the copy, the file staying as it is. Restore, import and the type change always push, whatever the setting (pruning to at least 1). Restore moves the version out of the history (it is the file now). Renames, deletes and installs (restore, import) are journaled in `/torii/slotop.txt` (CRC) and `slotstore_recover()` finishes them at boot; a history folder is never moved to another parent (a cut leaves its `..` wrong): the trash takes its files one by one. A launch whose slot file is bigger than the save type needs (EEPROM 8K to 512) pushes it untouched into the history, starts the new type blank, and shows a one-time notice; a smaller file is still grown with FF, which keeps its bytes.
 
+### Review of the first build (2026-10-23)
+
+The cart test and one review round (a code reviewer and an adversarial tester) after the first build. Fixed in place unless marked open.
+
+- **START did nothing on the GBA list with art** (the cart's log: `popup: BG VRAM: can't allocate 224 units`): Saves made the GBA popup 8 items, whose titled card no longer fit block 0's free tiles beside the art list. The popup now opens without its title when the titled card doesn't fit (`tests/shots/games-art-popup.opts`).
+- **The save copy took 7.4 s for 128 KB on the cart**, 3.7 s of it copying the old save into the history. The old save now becomes the `.bak` and is renamed into the history after the swap (`Save_bak_retire`, `slotstore_move_file`); restore and the type change rename too, and import copies only the file it brings in. A cut leaves the old save as the file, the `.bak` or a version at every step; recovery renames a `.bak` into the history (keeping at least one version) instead of removing it, and an install's journal goes forward. A history that can't take the `.bak` no longer fails the copy.
+- **Opening a GBA game's popup read the card** (the cheat lookup, 64 KB of `GameID2cht.bin`, the ROM header and the record): Saves now shows for every GBA game, and the facts are read once it is picked.
+- **Deleting an orphan whose "ROM" is a folder took every save beneath it** (a stray `.sav` in `/torii/saves/GBA/`): a save folder that holds folders is never an orphan, and relink and delete refuse one.
+- **Slot work under a save still on the chip** (a failed boot copy): rename, delete, restore or import could leave the chip's data in the wrong slot or over a restored file. Every save screen copies a pending save first (`pending_save_flush`).
+- **A delete switched the current slot before its journal**: the record now changes once the file has moved, inside the journaled steps.
+- **A rename or delete cut short by TAKEN or PATH cleared its journal after moving the save**: the journal stays unless nothing moved.
+- **A rename to a name the card knows as another slot's 8.3 alias** trashed that slot's history: the new save path must be free, and an "orphan" history folder must hold the name itself.
+- **A launch could read the record while a slot rename was half done** (a card error, the journal waiting for the next slot operation) and make a blank slot under the old name: a launch now finishes the slot and orphan journals before it reads the record.
+- **Trash expiry overflowed a 32-bit `long`** (seconds since year 0): days are compared first.
+- **The library counted every slot file as a save twice**, filling `LIB_SAVES_MAX` early.
+- **Stack on the launch path**: the record's `FIL` and path moved to EWRAM, `Retire_oversized_save` is `noinline`; the record's folders are made only when its open says there are none, and the save copy's likewise.
+- **Open: EWRAM is down to 5.8 KB free** (18 KB at v0.4.2): the save screens' state (`gs` 4 KB, `slot_flow` 2 KB) should live in `pReadCache` while they run. Do it in the save screens' rebuild.
+- **Open: the save screens' UX.** Redesign in `docs/design/v0.5/saves.md`, waiting for the user's review.
+- **Open: a save retired by a type change is pruned like any version** after `keep` play sessions; it should be exempt (or exported).
+- **Open: the trash purge trusts the clock** (an unset clock never purges; a far-future one purges everything at once).
+- **Open: `ss_prune` sees at most 64 versions** in directory order.
+- **Open: the Saves screen rescans the whole card after each action** and walks the history twice.
+- **Open: `Save_recover` runs three times per save copy** (nine `f_stat`s).
+
 ## v0.6 Plugins
 
 - **Handoff:** keep the PogoShell handoff exactly as it is, so existing emulators work
