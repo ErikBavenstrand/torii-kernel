@@ -29,6 +29,7 @@
 #include "settings.h"
 #include "cartlog.h"
 #include "cutpoint.h"
+#include "slotstore.h"
 #include "saveslot.h"
 #include "charset.h"
 #include "diag.h"
@@ -502,7 +503,7 @@ static u32 save_swap_failed(const TCHAR *filename, const char *what, FRESULT res
 // Loadsavefile: both run only in the menu. The SRAM goes through pReadCache's
 // upper half, which no frame touches (ez_define.h), so the progress dialog can
 // draw between chunks.
-u32 Save_savefile(TCHAR *filename, u32 savesize)
+u32 Save_savefile(TCHAR *filename, u32 savesize, const char *hist_dir)
 {
 	u8 *chip = pReadCache + READCACHE_SAVE, *file = chip + SAVE_CHUNK;
 	u32 span = save_span(savesize), off;
@@ -581,6 +582,19 @@ u32 Save_savefile(TCHAR *filename, u32 savesize)
 		tlog_error("save: the card didn't answer for %s", filename);
 		f_unlink(save_tmp);
 		return SAVE_FAILED;
+	}
+	// The version this replaces goes into the slot's history first (the chip
+	// differs from it: Save_check). A repeat after a cut adds none, so the old
+	// save is in the history or still the file at every step from here. If
+	// the history can't take it the copy fails and the file stays as it is.
+	u32 keep = hist_dir ? slotstore_keep() : 0;
+	if (had && keep) {
+		int pushed = slotstore_push_file(filename, hist_dir, keep);
+		if (pushed != SLOTSTORE_OK) {
+			tlog_error("save: the history of %s can't take the old save: %d", filename, pushed);
+			f_unlink(save_tmp);
+			return SAVE_FAILED;
+		}
 	}
 	if (had) {
 		res = f_rename(filename, save_bak);
@@ -1085,6 +1099,34 @@ static u32 Grow_savefile(TCHAR *filename, u32 size, u32 need)
 	return total;
 }
 //---------------------------------------------------------------------------------
+// Torii: a slot file bigger than the game's save type now needs (EEPROM 8K
+// changed to 512, Flash 128K to 64K) would be cut short or half used: it is
+// never cut or converted. The file goes into the slot's history untouched,
+// the slot starts the new type from the blank chip (the caller makes it as for
+// a new game), and a notice says so once, as the file is gone afterwards. A
+// file smaller than the type is grown by Grow_savefile: its bytes stay, so
+// nothing is lost. Returns 0, or the error number to show.
+static u32 Retire_oversized_save(const char *savfilename, const char *hist, const char *rom_path, BYTE saveMODE)
+{
+	FILINFO fno;
+	u32 need = Get_savefilesize(saveMODE);
+	if (f_stat(savfilename, &fno) != FR_OK || fno.fsize <= need)
+		return 0;
+	tlog("save: %s is %lu bytes, the save type %02X needs %lu: kept in the history, the slot starts blank",
+	     savfilename, (unsigned long)fno.fsize, saveMODE, (unsigned long)need);
+	int r = slotstore_retire_file(savfilename, hist);
+	if (r != SLOTSTORE_OK) {
+		tlog_error("save: %s can't go into the history (%d): the launch stops, the file stays", savfilename, r);
+		return 3;
+	}
+	tlog("save: type change notice shown");
+	char msg[260];
+	int cut = (int)charset_cut(rom_path, 60);
+	snprintf(msg, sizeof(msg), EN_SAVE_TYPE_CHANGED, cut, rom_path, (unsigned long)fno.fsize);
+	dialog_message(NULL, msg, DIALOG_INFO);
+	return 0;
+}
+//---------------------------------------------------------------------------------
 // The launch's save: the current slot's file of the game at rom_path (its
 // path from the root; gamesave.h), made if the game has none. The
 // path is built here, and kept in the pending-save record. Returns 0, or the
@@ -1092,6 +1134,7 @@ static u32 Grow_savefile(TCHAR *filename, u32 size, u32 need)
 static struct {
 	char rom[GAMESAVE_PATH_BYTES];
 	char save[GAMESAVE_PATH_BYTES];
+	char hist[GAMESAVE_PATH_BYTES];  // the slot's history folder
 	struct gamerec rec;
 } launch_save EWRAM_BSS;
 
@@ -1105,7 +1148,8 @@ static u8 Process_savefile(u32 is_EMU, const char *rom_path, u32 gamefilesize, B
 	int len = gamesave_current_path(savfilename, sizeof(launch_save.save), rom_path, &launch_save.rec);
 	// The pending-save record holds the path up to SAV_INFO_TYPE: a longer one
 	// would be copied back under another name. Nothing is written yet.
-	if (len < 0 || len > SAV_INFO_NAME_MAX) {
+	int hlen = saveslot_backup_dir(launch_save.hist, sizeof(launch_save.hist), rom_path, launch_save.rec.slot);
+	if (len < 0 || len > SAV_INFO_NAME_MAX || hlen < 0 || hlen > SAV_INFO_HIST_MAX) {
 		tlog_error("save: the save path is over %u bytes, the pending-save record's room (slot %s): %s",
 			   (unsigned)SAV_INFO_NAME_MAX, launch_save.rec.slot, rom_path);
 		return 8;
@@ -1117,6 +1161,11 @@ static u8 Process_savefile(u32 is_EMU, const char *rom_path, u32 gamefilesize, B
 	//#endif
 
 	Save_recover(savfilename);  // a copy a power cut interrupted
+	if (!is_EMU && saveMODE != 0) {
+		res = Retire_oversized_save(savfilename, launch_save.hist, rom_path, saveMODE);
+		if (res)
+			return (u8)res;
+	}
 	int blank_chip = 0;
 	res = f_open(&gfile, savfilename, FA_OPEN_EXISTING);
 	if (res == FR_OK)//have a old save file
@@ -1163,6 +1212,7 @@ static u8 Process_savefile(u32 is_EMU, const char *rom_path, u32 gamefilesize, B
 		//memcpy(&SAV_info_buffer[2],savfilename,100);
 		strcpy((char *)&SAV_info_buffer[2], savfilename);
 		SAV_info_buffer[SAV_INFO_TYPE] = saveMODE;
+		strcpy((char *)&SAV_info_buffer[SAV_INFO_HIST], launch_save.hist);
 		Save_sav_info(SAV_info_buffer, 0x200);
 	}
 
@@ -1222,6 +1272,17 @@ static void pending_save_clear(void)
 	Save_sav_info(SAV_info_buffer, 0x200);
 }
 
+// The history folder in the pending record that pending_save() read into
+// SAV_info_buffer, or NULL for none (a record from an older kernel)
+static const char *pending_hist_dir(void)
+{
+	const char *h = (const char *)SAV_info_buffer + (SAV_INFO_HIST - 2) * 2;
+	if (strncmp(h, SAVESLOT_BACKUPS_DIR "/", sizeof(SAVESLOT_BACKUPS_DIR)) != 0 ||
+	    strnlen(h, SAV_INFO_HIST_MAX + 1) > SAV_INFO_HIST_MAX)
+		return NULL;
+	return h;
+}
+
 // Copies the pending save (SAV_info_buffer holds its path) to the card, safely
 // (Save_savefile): first any copy a power cut interrupted is finished or
 // undone, then a blank or unchanged chip is skipped and a chip that doesn't
@@ -1247,7 +1308,7 @@ static u32 pending_save_copy(u32 size)
 	}
 	dialog_progress_begin(gl_saving, name);
 	progress_step(gl_save_ing, 0, PROGRESS_FULL);
-	u32 saved = Save_savefile(name, size);
+	u32 saved = Save_savefile(name, size, pending_hist_dir());
 	if (saved == SAVE_WRITTEN)
 		progress_done(gl_done);
 	dialog_progress_end();
@@ -1378,6 +1439,8 @@ int main(void)
 			ui_frame();
 	}
 	boot_mounted = torii_frames;
+	slotstore_recover();  // a slot rename or delete the power cut short, before any save is touched
+	slotstore_trash_purge(NULL);  // deleted slots past their 30 days
 
 	// Diagnostics also starts from these keys held at power-on, in case the
 	// menu itself is broken. Read once the card is up, a second into the boot.
@@ -1833,6 +1896,23 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 	}
 	return 0;
 }  //---------------------------------------------------------------------------------
+u32 Game_save_bytes(const struct game_pick *g)
+{
+	u8 header[0x20];
+	memset(header, 0, sizeof(header));
+	f_chdir(currentpath);
+	if (f_open(&gfile, g->name, FA_READ) != FR_OK)
+		return 0;
+	UINT got = 0;
+	f_lseek(&gfile, 0xA0);
+	if (f_read(&gfile, header, sizeof(header), &got) != FR_OK || got != sizeof(header))
+		memset(header, 0, sizeof(header));
+	u32 size = f_size(&gfile);
+	f_close(&gfile);
+	memcpy(GAMECODE, header + 0xC, 4);  // as Game_boot reads it
+	return Get_savefilesize(Get_saveMODE(g->save_num, size));
+}
+//---------------------------------------------------------------------------------
 u8 Game_launch(struct game_pick *g, u32 menu_line, u32 key_L)
 {
 	// CLEAN BOOT and BOOT WITH ADDON load the game's save into cart SRAM

@@ -6,6 +6,28 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** the launch's save slot picker and the New slot and Rename flows
+  (`source/screens/slot_picker.c`, `slot_flow.c`, `slot_list.c`). A game with
+  two or more slots asks which to play on every launch (the last used chosen,
+  A plays, START renames, B starts nothing, a "New slot..." row names a slot
+  and makes it blank or a copy of the current one); a game with one starts
+  straight in, and Select held with A shows the picker anyway. The chosen slot
+  becomes the record's, so the save loaded and the pending-save record are its
+  (197b36c).
+- **Added:** the slot store (`source/slotstore.c`): a game's slots listed,
+  created blank or as a copy, renamed (also by case only), duplicated and
+  deleted to `/torii/trash` (purged after 30 days at boot, never on an unset
+  clock); each slot's history of versions (listed, pushed, pruned, restored),
+  imports and exports of a `.sav`. Renames, deletes and installs are journaled
+  in `/torii/slotop.txt` and finished at boot. New Settings row *History*
+  (versions kept: Off/1/3/5/10/20, default 5). The save copy now puts the
+  version it replaces into the slot's history before the swap, so the old save
+  is in the history or the file at every power cut (8f7cc4d).
+- **Changed:** a save file bigger than the game's save type (EEPROM 8K changed
+  to 512) is no longer used as it is: it goes untouched into the slot's
+  history, the slot starts the new type blank, and a notice says so once. A
+  smaller file is still grown with FF (8f7cc4d).
+
 - **Changed:** saves leave `/SAVER` (no import: v0.5 keeps no backwards
   compatibility). A game's saves are in `/torii/saves/<rom path>/<slot>.sav`,
   its first slot `Main`, and its record (save type, boot mode, current slot) is

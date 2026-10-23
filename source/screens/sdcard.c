@@ -612,7 +612,7 @@ static void rename_file(void)
 	const char *dot = strrchr(sd.name, '.');
 	u32 stem = dot && dot != sd.name ? (u32)(dot - sd.name) : (u32)strlen(sd.name);
 	snprintf(sd.info, sizeof(sd.info), "%.*s", (int)stem, sd.name);
-	const struct rename_ask ask = {ART_ICON16_SD, sd.info, sd.name + stem, RENAME_STEM_MAX, 1, rename_submit, 0};
+	const struct rename_ask ask = {ART_ICON16_SD, sd.info, sd.name + stem, RENAME_STEM_MAX, 1, rename_submit, 0, 0};
 	memo_store();  // the cursor the page comes back with if nothing changes
 	count_stop();
 	sd.renamed_partly = 0;

@@ -45,6 +45,9 @@ extern char *gl_keep_power;    // FORMAT ALL's text, under its title
 // file, cut to at most 80 bytes at a character's start: the dialog shows 4
 // lines)
 #define EN_SAVE_MISMATCH "The save in the cart doesn't look like %.*s. Write it over that file anyway?"
+#define EN_SAVE_TYPE_CHANGED \
+	"The save type of %.*s changed. Its old save (%lu bytes) is kept in History, and the game starts with a new " \
+	"one."
 #define EN_SAVE_UNSAVED "The save of %.*s isn't on the card yet. Launching loses it. Launch anyway?"
 
 // The firmware update's texts (Ezcard_OP.c). It runs before a language is
@@ -89,6 +92,7 @@ extern char **gl_set_onoff;
 extern char **gl_set_themes;
 extern char **gl_set_views;
 extern char **gl_set_boots;
+extern char **gl_set_history;
 extern char **gl_set_starts;
 extern char **gl_set_modes_b;
 extern char **gl_set_colours;
@@ -246,6 +250,25 @@ struct lang_rename {
 	const char *checking, *checking_text;  // the progress dialog while the card is checked for a shared save
 };
 extern const struct lang_rename *gl_rename;
+
+// The save slot picker and the New slot / Rename flows (screens/slot_picker.c, slot_flow.c)
+struct lang_slots {
+	const char *picker_title;  // the picker's title bar (the game's name follows it)
+	const char *new_row;       // its last row
+	const char *hint_play, *hint_rename, *hint_cancel;  // A, START, B
+	const char *new_title, *rename_title;  // the name prompt's title bar
+	const char *choice_title;  // Blank or a copy
+	const char *blank;
+	const char *fresh;    // the row of a slot with no file yet
+	const char *bad;      // a name with nothing usable in it
+	const char *full;     // SLOTSTORE_FULL
+	const char *failed;   // SLOTSTORE_CARD
+	const char *taken;    // SLOTSTORE_TAKEN, after the prompt
+	const char *path;     // SLOTSTORE_PATH
+	const char *gone;     // SLOTSTORE_NO_SLOT
+};
+extern const struct lang_slots *gl_slots;
+#define EN_SLOT_COPY_OF "Copy of %s"
 // A key past the cap says so, with the cap
 #define EN_RENAME_TOO_LONG "Names stop at %u letters."
 

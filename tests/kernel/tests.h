@@ -20,6 +20,8 @@ void cut_scenario(void);
 void test_userdata_recent_store(void);
 void test_userdata_fav_store(void);
 void test_rename_file(void);
+void test_slotstore(void);
+void slot_scenario(void);
 void test_nor_info_stays_in_bounds(void);
 void test_nor_write_refused_when_list_full(void);
 void test_nor_scan_keeps_interrupts(void);

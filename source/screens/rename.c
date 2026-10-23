@@ -772,7 +772,7 @@ int rename_run(const struct rename_ask *ask)
 		return 0;
 	}
 	kb.first = v->first;
-	ui_title_set(node(N_TITLE), gl_rename->title);
+	ui_title_set(node(N_TITLE), ask->title ? ask->title : gl_rename->title);
 	ui_title_icon_set(node(N_TITLE), ask->icon16);
 	show_hints();
 	field_changed();

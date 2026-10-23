@@ -204,5 +204,6 @@ void test_saveslot_trash_expiry(void);
 void test_saveslot_journal(void);
 void test_saveslot_recovery(void);
 void test_saveslot_sanity(void);
+void test_saveslot_import_size(void);
 
 #endif

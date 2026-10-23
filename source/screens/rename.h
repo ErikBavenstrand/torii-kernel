@@ -32,6 +32,7 @@ struct rename_ask {
 	// read and write the card.
 	const char *(*submit)(void *ctx, const char *name);
 	void *ctx;
+	const char *title;  // the title bar; NULL: "Rename"
 };
 
 // Shows the keyboard until OK keeps a name (1) or it is cancelled, or the

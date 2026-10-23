@@ -497,3 +497,19 @@ void test_saveslot_sanity(void)
 		CHECK(saveslot_match_ok(&m));
 	}
 }
+
+void test_saveslot_import_size(void)
+{
+	// A known save type takes its size and no other
+	CHECK(saveslot_import_size_ok(0x8000, 0x8000));
+	CHECK(!saveslot_import_size_ok(0x10000, 0x8000));
+	CHECK(!saveslot_import_size_ok(0x200, 0x2000));
+	CHECK(!saveslot_import_size_ok(0, 0x200));
+	// An unknown one takes the sizes a chip has
+	u32 ok[] = {512, 8192, 32768, 65536, 131072};
+	for (u32 i = 0; i < sizeof(ok) / sizeof(*ok); i++)
+		CHECK(saveslot_import_size_ok(ok[i], 0));
+	CHECK(!saveslot_import_size_ok(0, 0));
+	CHECK(!saveslot_import_size_ok(1000, 0));
+	CHECK(!saveslot_import_size_ok(262144, 0));
+}

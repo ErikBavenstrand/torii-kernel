@@ -19,6 +19,11 @@
 //   the index (library_scan.c), within the call.
 // - READCACHE_SAVE, 64 KB: the SRAM on its way to a .sav (Save_savefile),
 //   clear of everything a frame writes, so its progress dialog can draw.
+// - READCACHE_SLOTS, 16 KB in READCACHE_SAVE's room, clear of the save copy's
+//   2 x 2 KB at its start: the slot store's work area (slotstore.c), within
+//   one slotstore_* call (which may run inside Save_savefile, after its
+//   chunks are done): file objects, paths, a directory's names and two copy
+//   buffers. Nothing outlives the call; no listing (SDLIST) may run across it.
 // - READCACHE_SDLIST, 43 KB in READCACHE_SAVE's room (no save runs during a
 //   listing): the SD card page's folder listing on its way to PSRAM
 //   (sdlist.h's scratch), within one listing.
@@ -54,6 +59,8 @@
 #define READCACHE_BOXART 0x1C00
 #define READCACHE_BOXART_SIZE 0x400
 #define READCACHE_SAVE 0x10000  // 64 KB, to the end
+#define READCACHE_SLOTS 0x12000
+#define READCACHE_SLOTS_SIZE 0x4000
 #define READCACHE_GAMES 0x8000
 #define READCACHE_GAMES_SIZE 0x18000
 #define READCACHE_NAMES 0x0
@@ -149,6 +156,8 @@
 #define assress_box_art 34  //list with art shows box art from /torii/art: 0 off, else on (source/boxart.h)
 #define assress_boot_mode \
 	35  //how A, Play and Launch start a GBA game: 1 clean, else with the addons (source/actions.h)
+#define assress_history \
+	37  //versions of a save kept per slot: an index into settings_history_keep, else 5 (source/slotstore.h)
 
 #define assress_saveMODE 64
 #define assress_max 65

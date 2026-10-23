@@ -1392,7 +1392,7 @@ static void rename_game(u32 row)
 	games.rename_console = library_flags(rec) & LIB_F_CONSOLE;
 	snprintf(games.ask, sizeof(games.ask), "%s", library_display(rec));
 	const struct rename_ask ask = {
-		registry_items[games.item].icon16, games.ask, NULL, RENAME_GAME_MAX, 0, rename_submit, 0};
+		registry_items[games.item].icon16, games.ask, NULL, RENAME_GAME_MAX, 0, rename_submit, 0, 0};
 	int renamed = rename_run(&ask);
 	reshow(row);
 	if (renamed && up()) {

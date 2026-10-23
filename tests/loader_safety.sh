@@ -252,7 +252,7 @@ EOF
     boot $launch -f 700
     logged "launch: loading Test.gba"
     logged "nor: wrote the pending-save record"
-    boot -k 200:A -k 204:- -f 500
+    boot -k 200:A -k 204:- -f 1500
     logged "nor: wrote an empty pending-save record"
     pass "the pending-save record, written and cleared"
   fi
@@ -441,7 +441,7 @@ EOF
     if shard_case; then
       new_cart "cut-launch-${cut//:/-}"
       boot -c "$cut" $launch -f 700
-      boot -k 200:A -k 204:- -f 500
+      boot -k 200:A -k 204:- -f 1500
       pass "a power cut at $cut in the pending-save record, and the boot after it"
     fi
 

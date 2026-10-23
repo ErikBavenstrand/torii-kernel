@@ -76,6 +76,7 @@ enum settings_id {
 	SET_IDENTIFY,  // CRCs for the names database (namesdb.h)
 	SET_SHOW_ALL,  // the SD card page shows hidden files
 	// System
+	SET_HISTORY,   // versions of a save kept per slot: index into settings_history_keep
 	SET_LOGGING,   // TLOG_OFF to TLOG_DEBUG (tlog.h)
 	SET_LANGUAGE,  // an index into lang_packs; hidden until v0.9
 	SET_ROWS
@@ -124,6 +125,12 @@ enum settings_boot {
 	SET_BOOT_CLEAN,
 	SET_BOOTS
 };
+
+// SET_HISTORY's choices (stored as the index) and the versions each keeps.
+// Off keeps none; the default is 5.
+#define SET_HISTORY_CHOICES 6
+#define SET_HISTORY_DEFAULT 3
+extern const u8 settings_history_keep[SET_HISTORY_CHOICES];
 
 enum settings_action {
 	SET_ACTION_NONE,

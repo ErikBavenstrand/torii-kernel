@@ -18,6 +18,8 @@
 #include "tlog.h"
 #include "userdata.h"
 #include "engine/cycles.h"
+#include "engine/input.h"
+#include "screens/slot_picker.h"
 #include "ui/dialog.h"
 #include "ui/ui.h"
 
@@ -64,6 +66,25 @@ void action_nor_read(void)
 {
 	Read_NOR_info();
 	game_total_NOR = GetFileListFromNor();
+}
+
+// Which slot the launch plays (screens/slot_picker.h): the picker if the game
+// has two or more, or Select is held (a one-slot game goes straight in). rom
+// is the game's save path name (gamesave.h), bytes its save's size (0: it has
+// no save, so no slots), title the picker's. 1 if the launch stops (B, or a
+// failure shown); the menu's session is over then, as after a failed launch.
+static int slot_choose(const char *rom, u32 bytes, const char *title)
+{
+	if (!bytes)
+		return 0;
+	int force = ui_active() && (ui_input()->held & INPUT_SELECT) != 0;
+	if (!slot_picker_wanted(rom, force))
+		return 0;
+	if (slot_picker_run(rom, title, bytes) == SLOT_PICKER_LAUNCH)
+		return 0;
+	tlog("launch: no slot chosen, nothing started");
+	session_end();
+	return 1;
 }
 
 static void launch_nor_entry(const char *name, u32 hard_reset)
@@ -152,6 +173,14 @@ void action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset)
 			how = ACTION_CLEAN;  // GB, GBC and NES games start clean
 		else if (save_type < ACTION_SAVE_TYPES)
 			game.save_num = (u8)save_type;
+		if (how < ACTION_NOR) {  // WRITE TO NOR doesn't load a save to the cart
+			char rom[GAMESAVE_PATH_BYTES];
+			if (gamesave_rom_path_in(rom, sizeof(rom), currentpath, game.name) >= 0 &&
+			    slot_choose(rom, Game_save_bytes(&game), game.name)) {
+				game_leave();
+				return;
+			}
+		}
 		session_end();
 		// A write to NOR lists its game in pNorFS but leaves the count:
 		// the NOR page and home's count read them
@@ -849,6 +878,10 @@ void action_nor_launch(u32 index, u32 hard_reset)
 		tlog_error("launch: no NOR game %lu of %lu", (unsigned long)index, (unsigned long)game_total_NOR);
 		return;
 	}
+	char rom[GAMESAVE_PATH_BYTES];
+	if (gamesave_nor_path(rom, sizeof(rom), pNorFS[index].filename) >= 0 &&
+	    slot_choose(rom, Get_savefilesize(pNorFS[index].savemode), pNorFS[index].filename))
+		return;
 	session_end();
 	NOR_launch(index, hard_reset);  // returns only if it failed
 }

@@ -135,7 +135,7 @@ launch)
   has "launch: CART clock on, rumble on"
   has "launch: starting the game"
   # Back in the kernel by a soft reset, cart RAM says where the session ended.
-  soft_boot -f 200
+  soft_boot -f 800 # (the save copy keeps the old file in the history)
   has "previous session: ended in Hello.gba"
   [ "$(log 0 | grep -c 'Torii kernel boot')" = 3 ] || fail "not one session marker a boot"
   # After a power cycle cart RAM holds nothing.
@@ -155,7 +155,7 @@ open('$cart/Test.gb', 'wb').write(rom)"
   # shellcheck disable=SC2046
   boot $(nav_launch /Test.gb at=160) -f 400
   has "launch: loading Test.gb with Jagoomba Color"
-  soft_boot -f 200 # cart RAM keeps the session only across a soft reset
+  soft_boot -f 800 # cart RAM keeps the session only across a soft reset
   has "previous session: ended in Test.gb (TORIITEST)"
 
   # A launch cut off (the emulator stops in the frame that logs it): after

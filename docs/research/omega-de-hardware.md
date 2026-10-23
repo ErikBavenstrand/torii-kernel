@@ -335,6 +335,10 @@ power-on, if the flag is set, it asks (or auto-saves) and copies SRAM back to
 `/torii/saves/<rom path>/<slot>.sav` (v0.4 and earlier used
 `SAVER/<game>.sav`). So a save only reaches the SD card on the next boot of the
 kernel.
+Torii keeps two more things in the 512-byte record (nothing the cart reads): the save type at
+halfword `0x80` (for the log) and, from halfword `0x82`, the slot's history folder
+(`/torii/backups/<rom path>/<slot>`, at most 251 bytes), where the copy puts the version it
+replaces.
 
 **Save types:** the kernel never patches a game's save code. It sends the save
 type to the FPGA in the FAT table's parameter block, and the FPGA presents the
