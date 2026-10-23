@@ -744,8 +744,9 @@ static void walk_step(void)
 		hash_bytes(lib.u.walk.path, lib.u.walk.path_len[d]);
 		hash_bytes(fi->fname, strlen(fi->fname) + 1);
 		if (lib.build)
-			save_insert(lib.u.walk.path);
-		lib.u.walk.saves++;
+			save_insert(lib.u.walk.path);  // counts each game's folder once
+		else
+			lib.u.walk.saves++;
 		return;
 	}
 	case W_ROOT:

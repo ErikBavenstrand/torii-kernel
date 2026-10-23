@@ -322,8 +322,10 @@ u32 Loadsavefile(TCHAR *filename)
 //      one that doesn't look like the file asks first (pending_save_copy).
 //   2. Save_savefile writes <save>.tmp, f_sync, f_close, reads it back from the
 //      card and compares it with the chip. The save is untouched until then.
-//   3. The old save is renamed to <save>.bak, the tmp file to <save>, the .bak
-//      removed (it is not kept: the history of backups is the slots' job).
+//   3. The old save is renamed to <save>.bak, the tmp file to <save>, and the
+//      .bak renamed into the slot's history as its next version
+//      (Save_bak_retire; removed with History off). Nothing is copied twice:
+//      the old save's data never moves, so the swap costs the same at any size.
 // f_rename refuses to replace a file and isn't atomic, so Save_recover, at boot
 // and before each copy and launch, finishes or undoes whatever a cut left. The
 // pending-save record stays until the copy checks out (the callers clear it).
@@ -332,6 +334,7 @@ u32 Loadsavefile(TCHAR *filename)
 static FIL save_fil EWRAM_BSS;
 static char save_tmp[SAV_INFO_NAME_MAX + 6] EWRAM_BSS;
 static char save_bak[SAV_INFO_NAME_MAX + 6] EWRAM_BSS;
+static char save_hist[SAV_INFO_NAME_MAX + 6] EWRAM_BSS;  // Save_bak_retire's history folder
 
 // Sets save_tmp and save_bak for filename; 0 if the name is too long
 static int save_names(const char *filename)
@@ -366,13 +369,66 @@ static u32 save_span(u32 savesize)
 	return savesize > 128 * 1024 ? 128 * 1024 : savesize;
 }
 
+// The versions a recovery keeps: the setting's, and one with History off, as
+// the .bak it finds may be the old save a restore or import replaced
+static u32 recover_keep(void)
+{
+	u32 k = slotstore_keep();
+	return k ? k : 1;
+}
+
+int Save_bak_retire(const TCHAR *filename, u32 keep)
+{
+	if (!save_names(filename))
+		return 0;
+	if (keep && saveslot_backup_dir_of(save_hist, sizeof(save_hist), filename) >= 0) {
+		int r = slotstore_move_file(save_bak, save_hist, keep);
+		if (r == SLOTSTORE_OK || r == SLOTSTORE_NO_SLOT)
+			return 1;
+		if (r == SLOTSTORE_CARD) {
+			tlog_error("save: %s stays: the history can't take it now", save_bak);
+			return 0;
+		}
+		tlog_error("save: the history can't take %s (%d): it is removed", save_bak, r);
+	}
+	FRESULT u = f_unlink(save_bak);
+	if (u != FR_OK && u != FR_NO_FILE) {
+		tlog_error("save: removing %s: f_unlink gave %d", save_bak, u);
+		return 0;
+	}
+	return 1;
+}
+
+void Save_install_finish(const TCHAR *filename)
+{
+	if (!save_names(filename))
+		return;
+	int f = save_exists(filename), t = save_exists(save_tmp), b = save_exists(save_bak);
+	if (f == 1 && t == 1) {
+		FRESULT r = f_unlink_alias(save_tmp, filename);
+		if (r == FR_DENIED) {
+			// The verified file waits beside the old one: the old one steps
+			// aside (after any older .bak has gone), and Save_recover goes on
+			if (b == 1 && !Save_bak_retire(filename, recover_keep()))
+				return;
+			r = f_rename(filename, save_bak);
+			tlog("save: install of %s: the old file steps aside, f_rename gave %d", filename, r);
+		}
+		if (r != FR_OK)
+			return;
+	}
+	Save_recover(filename);
+}
+
 // Finishes or undoes what a power cut left of a copy to filename. The states,
 // by which of the save F, F.tmp (T) and F.bak (B) exist:
 //   F            nothing to do
 //   F T, F B, ...  F is whole (the rename of T onto F is the last step before
 //                T goes, and F is only ever a renamed, verified T or the old
-//                save): T and B go
-//   T B          the old save moved aside, T verified: T takes F's name
+//                save): T goes, B goes into the history (Save_bak_retire,
+//                keeping at least one version: it is the old save)
+//   T B          the old save moved aside, T verified: T takes F's name, then
+//                B goes into the history
 //   B            the old save moved aside, nothing else: B takes F's name back
 //   T            nothing existed, or T was cut mid-write: T goes (the chip
 //                still holds the data, the record is still set)
@@ -413,12 +469,12 @@ void Save_recover(const TCHAR *filename)
 		if (t && t_ok)
 			tlog("save: recovery: removed the .tmp, f_unlink gave %d", f_unlink(save_tmp));
 		if (b && b_ok)
-			tlog("save: recovery: removed the .bak, f_unlink gave %d", f_unlink(save_bak));
+			Save_bak_retire(filename, recover_keep());
 	} else if (t && b) {
 		FRESULT r = f_rename(save_tmp, filename);
 		tlog("save: recovery: the .tmp takes the save's name, f_rename gave %d", r);
 		if (r == FR_OK)
-			f_unlink(save_bak);
+			Save_bak_retire(filename, recover_keep());
 	} else if (b) {
 		tlog("save: recovery: the .bak takes the save's name back, f_rename gave %d",
 		     f_rename(save_bak, filename));
@@ -514,13 +570,13 @@ u32 Save_savefile(TCHAR *filename, u32 savesize, const char *hist_dir)
 		tlog_error("save: %s is too long to copy", filename);
 		return SAVE_FAILED;
 	}
-	// A game's first save: its folder under /torii/saves may not be there
-	if (!gamesave_make_parents(filename))
-		return SAVE_FAILED;
 	Save_recover(filename);
 
-	// 1. The tmp file
+	// 1. The tmp file (a game's first save: its folder under /torii/saves
+	// may not be there yet)
 	FRESULT res = f_open(&save_fil, save_tmp, FA_WRITE | FA_CREATE_ALWAYS);
+	if (res == FR_NO_PATH && gamesave_make_parents(filename))
+		res = f_open(&save_fil, save_tmp, FA_WRITE | FA_CREATE_ALWAYS);
 	if (res != FR_OK) {
 		tlog_error("save: can't create %s: f_open gave %d", save_tmp, res);
 		return SAVE_FAILED;
@@ -584,19 +640,8 @@ u32 Save_savefile(TCHAR *filename, u32 savesize, const char *hist_dir)
 		f_unlink(save_tmp);
 		return SAVE_FAILED;
 	}
-	// The version this replaces goes into the slot's history first (the chip
-	// differs from it: Save_check). A repeat after a cut adds none, so the old
-	// save is in the history or still the file at every step from here. If
-	// the history can't take it the copy fails and the file stays as it is.
-	u32 keep = hist_dir ? slotstore_keep() : 0;
-	if (had && keep) {
-		int pushed = slotstore_push_file(filename, hist_dir, keep);
-		if (pushed != SLOTSTORE_OK) {
-			tlog_error("save: the history of %s can't take the old save: %d", filename, pushed);
-			f_unlink(save_tmp);
-			return SAVE_FAILED;
-		}
-	}
+	// The old save is the file, the .bak or (renamed, never copied) a version
+	// in the slot's history at every step from here
 	if (had) {
 		res = f_rename(filename, save_bak);
 		if (res != FR_OK)
@@ -607,12 +652,8 @@ u32 Save_savefile(TCHAR *filename, u32 savesize, const char *hist_dir)
 	if (res != FR_OK)
 		return save_swap_failed(filename, "moving the .tmp into place", res);
 	cutpoint("save: tmp moved into place");
-	if (had) {
-		res = f_unlink(save_bak);
-		if (res != FR_OK)
-			tlog_error("save: removing %s: f_unlink gave %d", save_bak, res);  // recovery removes it
-		cutpoint("save: bak removed");
-	}
+	if (had && Save_bak_retire(filename, hist_dir ? slotstore_keep() : 0))
+		cutpoint("save: old save retired");  // else recovery retires it
 	tlog("save: wrote %s, %lu bytes, verified", filename, (unsigned long)total);
 	return SAVE_WRITTEN;
 }
@@ -1107,7 +1148,8 @@ static u32 Grow_savefile(TCHAR *filename, u32 size, u32 need)
 // a new game), and a notice says so once, as the file is gone afterwards. A
 // file smaller than the type is grown by Grow_savefile: its bytes stay, so
 // nothing is lost. Returns 0, or the error number to show.
-static u32 Retire_oversized_save(const char *savfilename, const char *hist, const char *rom_path, BYTE saveMODE)
+static u32 __attribute__((noinline)) Retire_oversized_save(const char *savfilename, const char *hist,
+							   const char *rom_path, BYTE saveMODE)
 {
 	FILINFO fno;
 	u32 need = Get_savefilesize(saveMODE);
@@ -1145,6 +1187,12 @@ static u8 Process_savefile(u32 is_EMU, const char *rom_path, u32 gamefilesize, B
 	u32 savefilesize = 0;
 	TCHAR *savfilename = launch_save.save;
 
+	// A slot or orphan operation a card error left half done is finished
+	// first, so the record names the slot as it ends up
+	if (slotstore_recover() < 0 || saveorphan_recover() < 0) {
+		tlog_error("save: a slot operation can't be finished: the launch stops");
+		return 4;
+	}
 	gamesave_record_read(rom_path, &launch_save.rec);
 	int len = gamesave_current_path(savfilename, sizeof(launch_save.save), rom_path, &launch_save.rec);
 	// The pending-save record holds the path up to SAV_INFO_TYPE: a longer one
@@ -1353,6 +1401,21 @@ static void Check_save_flag(void)
 // card may have room now); if it fails again, the user picks: launch anyway
 // (the record goes, the save is lost) or keep it. 1: go on, 0: don't (the
 // record stays).
+int pending_save_flush(void)
+{
+	u32 size;
+	if (!pending_save(&size))
+		return 1;
+	tlog("save: %s waits to be copied: first that", (const char *)SAV_info_buffer);
+	dialog_open();
+	u32 r = pending_save_copy(size);
+	dialog_close();
+	if (r == SAVE_FAILED)
+		return 0;
+	pending_save_clear();
+	return 1;
+}
+
 static int pending_save_settle(void)
 {
 	u32 size;

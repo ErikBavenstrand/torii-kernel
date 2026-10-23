@@ -100,6 +100,21 @@ void test_saveslot_paths(void)
 	char out[128];
 	CHECK_EQ(saveslot_backup_dir(out, sizeof(out), "/GBA/G.gba", "Main"), 29);
 	CHECK(strcmp(out, "/torii/backups/GBA/G.gba/Main") == 0);
+	// The history folder of a save file: the same folder, from its path
+	char save[128];
+	CHECK(saveslot_save_path(save, sizeof(save), SAVESLOT_CENTRAL, "/GBA/G.v1.gba", "Boss Rush") > 0);
+	CHECK_EQ(saveslot_backup_dir_of(out, sizeof(out), save), 37);
+	CHECK(strcmp(out, "/torii/backups/GBA/G.v1.gba/Boss Rush") == 0);
+	CHECK(saveslot_backup_dir_of(out, sizeof(out), "/torii/saves/torii/nor/Game/Main.sav") > 0);
+	CHECK(strcmp(out, "/torii/backups/torii/nor/Game/Main") == 0);
+	CHECK_EQ(saveslot_backup_dir_of(out, sizeof(out), "/torii/saves/G.sav"), -1);       // no ROM folder
+	CHECK_EQ(saveslot_backup_dir_of(out, sizeof(out), "/torii/saves/G.gba/.sav"), -1);  // no slot
+	CHECK_EQ(saveslot_backup_dir_of(out, sizeof(out), "/torii/saves/../G.gba/M.sav"), -1);
+	CHECK_EQ(saveslot_backup_dir_of(out, sizeof(out), "/torii/savesX/G.gba/M.sav"), -1);
+	CHECK_EQ(saveslot_backup_dir_of(out, sizeof(out), "/torii/saves/G.gba/M.sav.tmp"), -1);
+	CHECK_EQ(saveslot_backup_dir_of(out, sizeof(out), "/SAVER/G.sav"), -1);
+	CHECK_EQ(saveslot_backup_dir_of(out, 20, save), -1);
+	CHECK_EQ(out[0], 0);
 	CHECK_EQ(saveslot_game_dir(out, sizeof(out), "/GBA/G.gba"), 22);
 	CHECK(strcmp(out, "/torii/saves/GBA/G.gba") == 0);
 	struct saveslot_stamp when = {2026, 10, 22, 9, 5, 7};

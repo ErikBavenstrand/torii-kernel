@@ -5,6 +5,7 @@
 #include "slot_picker.h"
 #include "slot_flow.h"
 #include "slot_list.h"
+#include "../ezkernel.h"
 #include "../lang.h"
 #include "../tlog.h"
 #include "../ui/art_ids.h"
@@ -65,6 +66,11 @@ int slot_picker_run(const char *rom_path, const char *title, u32 blank_size)
 	int own = !ui_active();
 	if (own)
 		dialog_open();
+	if (!pending_save_flush()) {  // before New slot or Rename can move a slot
+		if (own)
+			dialog_close();
+		return SLOT_PICKER_ERROR;
+	}
 	sp.hints[0] = (struct ui_hint){"A", gl_slots->hint_play};
 	sp.hints[1] = (struct ui_hint){"START", gl_slots->hint_rename};
 	sp.hints[2] = (struct ui_hint){"B", gl_slots->hint_cancel};

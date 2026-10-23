@@ -96,9 +96,11 @@ check_survives() {
   local n=$1 name=$2 f="$carts/now.sav"
   if card_file Main.sav "$f"; then
     is_new "$f" || is_old "$f" || fail "cut at $n ($name): Main.sav is neither the old save nor the new one"
-    # A new Main.sav means the old save went into the history first
-    if [ "$part" = unknown-replace ] && is_new "$f" && [ "$(hist_has_old)" -lt 1 ]; then
-      fail "cut at $n ($name): Main.sav is the new save and the old one is not in the history"
+    # A new Main.sav means the old save is beside it as the .bak, or was
+    # renamed into the history
+    if [ "$part" = unknown-replace ] && is_new "$f" && [ "$(hist_has_old)" -lt 1 ] &&
+      ! { card_file Main.sav.bak "$carts/bak.sav" && is_old "$carts/bak.sav"; }; then
+      fail "cut at $n ($name): Main.sav is the new save and the old one is neither the .bak nor in the history"
     fi
   elif [ "$part" = unknown-new ]; then
     : # nothing to lose yet

@@ -680,6 +680,30 @@ static int slotstore_delete_orphan_history(const char *rom_path, const char *slo
 
 /* ---- Rename ---- */
 
+// 1 if the folder of path (its parent) holds an entry whose own name is name
+// (ignoring case), 0 if path reaches another entry only through its 8.3
+// alias, negative if the card didn't answer. Uses W->dir, W->fno, W->scratch2.
+static int ss_named_in(const char *path, const char *name)
+{
+	char *dir = W->scratch2;
+	const char *slash = strrchr(path, '/');
+	if (!slash)
+		return SLOTSTORE_PATH;
+	u32 n = (u32)(slash - path);
+	ss_snprintf(dir, SS_PATH, "%.*s", (int)(n ? n : 1), path);
+	if (f_opendir(&W->dir, dir) != FR_OK)
+		return SLOTSTORE_CARD;
+	int found = 0;
+	FRESULT r;
+	while ((r = f_readdir(&W->dir, &W->fno)) == FR_OK && W->fno.fname[0])
+		if (saveslot_names_equal(W->fno.fname, name)) {
+			found = 1;
+			break;
+		}
+	f_closedir(&W->dir);
+	return r != FR_OK ? SLOTSTORE_CARD : found;
+}
+
 // The record follows a renamed slot
 static int record_follows(const char *rom, const char *old_name, const char *new_name)
 {
@@ -784,10 +808,19 @@ int slotstore_rename(const char *rom_path, const char *slot, const char *name, c
 	if (r)
 		return r;
 	if (!saveslot_names_equal(old_name, clean)) {
+		// The card may know the name as another entry's 8.3 alias (a slot
+		// "Long name slot" is LONGNA~1 too): taken, whatever the list says
+		int e = ss_exists(W->a);
+		if (e)
+			return e < 0 ? SLOTSTORE_CARD : SLOTSTORE_TAKEN;
 		// A history folder of the new name with no slot (left by a delete cut
-		// short) goes to the trash first, so the renamed slot starts clean
+		// short) goes to the trash first, so the renamed slot starts clean;
+		// one the name only reaches through an alias is another slot's
 		r = hist_path(W->c, rom_path, clean);
 		if (!r && ss_exists(W->c) == 1) {
+			e = ss_named_in(W->b, clean);
+			if (e <= 0)
+				return e < 0 ? SLOTSTORE_CARD : SLOTSTORE_TAKEN;
 			r = slotstore_delete_orphan_history(rom_path, clean);
 			if (r)
 				return r;
@@ -798,9 +831,10 @@ int slotstore_rename(const char *rom_path, const char *slot, const char *name, c
 		return r;
 	r = rename_steps(rom_path, old_name, clean, 0);
 	if (r) {
-		// Left for the next power-on to finish or undo, unless nothing moved
+		// Left for the recovery to finish or undo, unless nothing moved
+		// (rename_steps leaves the old save's path in W->d)
 		tlog_error("slot: rename %s to %s of %s stopped: %d", old_name, clean, rom_path, r);
-		if (r == SLOTSTORE_TAKEN || r == SLOTSTORE_PATH)
+		if ((r == SLOTSTORE_TAKEN || r == SLOTSTORE_PATH) && ss_exists(W->d) == 1)
 			journal_clear();
 		return r;
 	}
@@ -900,6 +934,22 @@ static int trash_steps(const char *rom, const char *slot, const char *trash)
 	} else if (ss_exists(W->c) != 1 && ss_exists(W->b) != 1) {
 		return SLOTSTORE_NO_SLOT;
 	}
+	// Once its file is gone (a step recovery redoes), another slot becomes
+	// current if this one was: Main, else the first left
+	struct gamerec rec;
+	gamesave_record_read(rom, &rec);
+	if (saveslot_names_equal(rec.slot, slot)) {
+		int n = ss_list(rom);
+		if (n < 0)
+			return n;
+		int j = find_slot((u32)n, SAVESLOT_MAIN);
+		if (n > 0) {
+			strcpy(rec.slot, W->slots[j < 0 ? 0 : j].name);
+			if (!gamesave_record_write(rom, &rec))
+				return SLOTSTORE_CARD;
+			cutpoint("delete: another slot is current");
+		}
+	}
 	if (ss_exists(W->b) == 1) {
 		if ((r = ss_move_files(W->b, W->d)))
 			return r;
@@ -922,21 +972,6 @@ int slotstore_delete(const char *rom_path, const char *slot)
 		return SLOTSTORE_LAST;
 	char name[SAVESLOT_NAME_BYTES];
 	strcpy(name, W->slots[i].name);
-	// Another slot becomes current first, if this was
-	struct gamerec rec;
-	gamesave_record_read(rom_path, &rec);
-	if (saveslot_names_equal(rec.slot, name)) {
-		int j = find_slot((u32)n, SAVESLOT_MAIN);
-		if (j < 0 || j == i) {
-			j = 0;
-			while (j == i || (u32)j >= SLOTSTORE_MAX_SLOTS)
-				j++;
-		}
-		strcpy(rec.slot, W->slots[j].name);
-		if (!gamesave_record_write(rom_path, &rec))
-			return SLOTSTORE_CARD;
-		cutpoint("delete: another slot is current");
-	}
 	// The trash folder: today's stamp, the first n not used
 	struct saveslot_stamp now;
 	slotstore_now(&now);
@@ -958,8 +993,10 @@ int slotstore_delete(const char *rom_path, const char *slot)
 		return r;
 	r = trash_steps(rom_path, name, trash);
 	if (r) {
+		// Left for the recovery unless nothing moved (trash_steps leaves
+		// the save's path in W->a)
 		tlog_error("slot: delete %s of %s stopped: %d", name, rom_path, r);
-		if (r == SLOTSTORE_TAKEN || r == SLOTSTORE_PATH || r == SLOTSTORE_NO_SLOT)
+		if ((r == SLOTSTORE_TAKEN || r == SLOTSTORE_PATH || r == SLOTSTORE_NO_SLOT) && ss_exists(W->a) == 1)
 			journal_clear();
 		return r;
 	}
@@ -1096,7 +1133,16 @@ int slotstore_trash_purge(const struct saveslot_stamp *now_in)
 
 /* ---- History ---- */
 
-int slotstore_push_file(const char *file, const char *hist_dir, u32 keep)
+// The lowest counter push may number after: a restore sets it to its scan's
+// highest, since the version it takes out may have been that one
+static u32 push_floor;
+
+// Puts file into hist_dir as the next version: a verified copy (the file
+// stays), or the file itself, renamed into the folder (move: no data is
+// copied, the file is gone after). One identical to the newest version adds
+// none (a moved one is then dropped: by its entry alone if a cut inside the
+// rename left it a second name of that version's chain). Then prunes to keep.
+static int push(const char *file, const char *hist_dir, u32 keep, int move)
 {
 	int e = ss_exists(file);
 	if (e < 0)
@@ -1115,9 +1161,19 @@ int slotstore_push_file(const char *file, const char *hist_dir, u32 keep)
 			return SLOTSTORE_CARD;
 		if (same) {
 			tlog("slot: %s is the newest version of %s already", file, hist_dir);
+			if (move) {
+				FRESULT u = f_unlink_alias(file, hp);
+				if (u == FR_DENIED)
+					u = f_unlink(file);
+				if (u != FR_OK)
+					return SLOTSTORE_CARD;
+				cutpoint("history: identical file dropped");
+			}
 			return keep ? ss_prune(hist_dir, &count, keep) : SLOTSTORE_OK;
 		}
 	}
+	if (maxn < push_floor)
+		maxn = push_floor;  // a restore's version left: its number isn't reused
 	if (maxn >= SAVESLOT_COUNTER_MAX) {
 		tlog_error("slot: the counter of %s has run out", hist_dir);
 		return SLOTSTORE_CARD;
@@ -1128,23 +1184,42 @@ int slotstore_push_file(const char *file, const char *hist_dir, u32 keep)
 	saveslot_backup_name(name, maxn + 1, &now);
 	if (ss_snprintf(hp, SS_PATH, "%s/%s", hist_dir, name) >= SS_PATH - 5)
 		return SLOTSTORE_PATH;
-	ss_snprintf(hn, SS_PATH, "%s.new", hp);
 	if ((r = ss_mkdirs(hist_dir)))
 		return r;
-	if ((r = ss_copy(file, hn)))
-		return r;
-	cutpoint("history: version written");
-	if (f_rename(hn, hp) != FR_OK) {
-		f_unlink(hn);
-		return SLOTSTORE_CARD;
+	if (move) {
+		FRESULT m = f_rename(file, hp);
+		if (m != FR_OK) {
+			tlog_error("slot: moving %s to %s: f_rename gave %d", file, hp, m);
+			return SLOTSTORE_CARD;
+		}
+		cutpoint("history: file moved in");
+	} else {
+		ss_snprintf(hn, SS_PATH, "%s.new", hp);
+		if ((r = ss_copy(file, hn)))
+			return r;
+		cutpoint("history: version written");
+		if (f_rename(hn, hp) != FR_OK) {
+			f_unlink(hn);
+			return SLOTSTORE_CARD;
+		}
+		cutpoint("history: version in place");
 	}
-	cutpoint("history: version in place");
-	tlog("slot: pushed %s to %s", file, hp);
+	tlog("slot: %s %s to %s", move ? "moved" : "pushed", file, hp);
 	if (count < SS_NAMES) {
 		strcpy(W->names[count], name);
 		count++;
 	}
 	return keep ? ss_prune(hist_dir, &count, keep) : SLOTSTORE_OK;
+}
+
+int slotstore_push_file(const char *file, const char *hist_dir, u32 keep)
+{
+	return push(file, hist_dir, keep, 0);
+}
+
+int slotstore_move_file(const char *file, const char *hist_dir, u32 keep)
+{
+	return push(file, hist_dir, keep, 1);
 }
 
 static u32 explicit_keep(void)
@@ -1196,48 +1271,68 @@ int slotstore_history(const char *rom_path, const char *slot, struct slotstore_v
 
 /* ---- Installing a file as the slot's ---- */
 
-// Makes src the file at dest, whole or not at all: through dest.tmp, and the
-// old dest moved to dest.bak and removed, as Save_savefile does it (Save_recover
-// finishes or undoes a cut one). SLOTSTORE_OK or SLOTSTORE_CARD
-static int ss_install(const char *src, const char *dest)
+// Makes src the file at dest, whole or not at all, as Save_savefile does it:
+// src becomes dest.tmp (a verified copy, or with move src itself, a version of
+// the history renamed out of it), the old dest is moved to dest.bak, dest.tmp
+// to dest, and the .bak into the history (Save_bak_retire, keeping at least
+// one version). The journal, written once dest.tmp is whole, has boot
+// recovery finish it forward (Save_install_finish). SLOTSTORE_OK or a code
+// A step of ss_install failed: a copy is undone (the .tmp goes, unless the old
+// file had moved aside), a moved version goes on (it is in no other place);
+// the journal goes once that is done
+static int install_failed(const char *dest, int move)
+{
+	if (move)
+		Save_install_finish(dest);
+	else
+		Save_recover(dest);
+	if (ss_exists(dest) == 1 && ss_exists(W->tmpf) == 0)
+		journal_clear();
+	return SLOTSTORE_CARD;
+}
+
+static int ss_install(const char *src, const char *dest, int move)
 {
 	char *tmp = W->tmpf, *bak = W->bakf;
 	if (ss_snprintf(tmp, SS_PATH, "%s.tmp", dest) >= SS_PATH ||
 	    ss_snprintf(bak, SS_PATH, "%s.bak", dest) >= SS_PATH)
 		return SLOTSTORE_PATH;
 	Save_recover(dest);
-	int r = ss_copy(src, tmp);
-	if (r)
-		return r;
-	cutpoint("install: tmp verified");
-	int had = ss_exists(dest);
-	if (had < 0) {
-		f_unlink(tmp);
-		return SLOTSTORE_CARD;
-	}
-	// Between the two renames the slot has no .sav and would not be listed:
-	// the journal has boot recovery (Save_recover) finish it
-	if ((r = journal_write('I', dest, "-", "-"))) {
-		f_unlink(tmp);
-		return r;
-	}
-	if (had) {
-		if (f_rename(dest, bak) != FR_OK) {
-			Save_recover(dest);
+	int r;
+	if (move) {
+		// The journal first: it names src, so a cut inside the rename
+		// (two names of one chain) drops the .tmp's name, not the version
+		if ((r = journal_write('I', dest, src, "-")))
+			return r;
+		if (f_rename(src, tmp) != FR_OK) {
 			journal_clear();
 			return SLOTSTORE_CARD;
 		}
+		cutpoint("install: version moved to tmp");
+	} else {
+		if ((r = ss_copy(src, tmp)))
+			return r;
+		cutpoint("install: tmp verified");
+		if ((r = journal_write('I', dest, "-", "-"))) {
+			f_unlink(tmp);
+			return r;
+		}
+	}
+	int had = ss_exists(dest);
+	if (had < 0)
+		return install_failed(dest, move);
+	if (had) {
+		if (f_rename(dest, bak) != FR_OK)
+			return install_failed(dest, move);
 		cutpoint("install: old file moved to bak");
 	}
-	if (f_rename(tmp, dest) != FR_OK) {
-		Save_recover(dest);
-		journal_clear();
-		return SLOTSTORE_CARD;
-	}
+	if (f_rename(tmp, dest) != FR_OK)
+		return install_failed(dest, move);
 	cutpoint("install: tmp in place");
 	if (had) {
-		f_unlink(bak);
-		cutpoint("install: bak removed");
+		if (!Save_bak_retire(dest, explicit_keep()))
+			return SLOTSTORE_CARD;  // the journal stays: recovery retires the .bak
+		cutpoint("install: old file in the history");
 	}
 	journal_clear();
 	return SLOTSTORE_OK;
@@ -1265,19 +1360,15 @@ int slotstore_restore(const char *rom_path, const char *slot, u32 n)
 		return SLOTSTORE_NO_VERSION;
 	if (ss_snprintf(W->c, SS_PATH, "%s/%s", W->b, W->names[found]) >= SS_PATH)
 		return SLOTSTORE_PATH;
-	// The file it replaces is safe in the history first
-	if ((r = slotstore_push_file(W->a, W->b, 0)))
+	// Renames only: the version leaves the history to be the file, and the
+	// file it replaces goes in as the newest version
+	push_floor = maxn;
+	r = ss_install(W->c, W->a, 1);
+	push_floor = 0;
+	if (r)
 		return r;
-	if ((r = ss_install(W->c, W->a)))
-		return r;
-	// The version is the file now: it leaves the history
-	if (f_unlink(W->c) == FR_OK)
-		cutpoint("restore: version taken out of the history");
-	if ((r = ss_scan_hist(W->b, &count, &maxn, &newest)))
-		return r;
-	r = ss_prune(W->b, &count, explicit_keep());
 	tlog("slot: restored version %lu of %s of %s", (unsigned long)n, slot, rom_path);
-	return r;
+	return SLOTSTORE_OK;
 }
 
 /* ---- Import, export ---- */
@@ -1298,16 +1389,10 @@ int slotstore_import(const char *rom_path, const char *slot, const char *path, u
 		return SLOTSTORE_CARD;
 	if (!had)
 		return SLOTSTORE_NO_SLOT;
-	if ((r = slotstore_push_file(W->a, W->b, 0)))
+	if ((r = ss_install(path, W->a, 0)))  // the file it replaces goes into the history
 		return r;
-	if ((r = ss_install(path, W->a)))
-		return r;
-	u32 count, maxn, newest;
-	if ((r = ss_scan_hist(W->b, &count, &maxn, &newest)))
-		return r;
-	r = ss_prune(W->b, &count, explicit_keep());
 	tlog("slot: imported %s into %s of %s", path, slot, rom_path);
-	return r;
+	return SLOTSTORE_OK;
 }
 
 int slotstore_export(const char *rom_path, const char *slot, const char *path)
@@ -1348,11 +1433,9 @@ int slotstore_retire_file(const char *file, const char *hist_dir)
 		return SLOTSTORE_CARD;
 	if (!e)
 		return SLOTSTORE_OK;
-	int r = slotstore_push_file(file, hist_dir, explicit_keep());
+	int r = slotstore_move_file(file, hist_dir, explicit_keep());
 	if (r)
 		return r;
-	if (f_unlink(file) != FR_OK)
-		return SLOTSTORE_CARD;
 	cutpoint("retire: file left the slot");
 	tlog("slot: %s kept in the history, the slot starts blank", file);
 	return SLOTSTORE_OK;
@@ -1438,7 +1521,24 @@ int slotstore_recover(void)
 			return 1;
 		}
 		tlog("slot: finishing the install of %s", rom);
-		Save_recover(rom);
+		// A version moving out of the history (restore): if a cut inside
+		// that rename left it a second name of the .tmp, the .tmp's goes;
+		// if the rename hadn't happened, nothing has
+		if (strcmp(x, "-") != 0) {
+			ss_snprintf(W->r3, SS_PATH, "%s.tmp", rom);
+			int v = ss_exists(x), t = ss_exists(W->r3);
+			if (v < 0 || t < 0)
+				return SLOTSTORE_CARD;
+			if (v && t && f_unlink_alias(W->r3, x) != FR_OK)
+				f_unlink(W->r3);  // not that version's chain: a stray
+			if (v) {
+				journal_clear();
+				return 1;
+			}
+		}
+		Save_install_finish(rom);
+		if (ss_exists(rom) != 1)
+			return SLOTSTORE_CARD;  // the journal stays
 		journal_clear();
 		return 1;
 	}

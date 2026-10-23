@@ -74,6 +74,9 @@ struct saveslot_stamp {
 int saveslot_save_path(char *out, u32 size, int mode, const char *rom_path, const char *slot);
 // The slot's history folder, whatever the mode: /torii/backups/<rom path>/<slot>
 int saveslot_backup_dir(char *out, u32 size, const char *rom_path, const char *slot);
+// The history folder of the slot whose /torii/saves file is save_path (as
+// saveslot_save_path makes it in SAVESLOT_CENTRAL mode), or -1 if it isn't one
+int saveslot_backup_dir_of(char *out, u32 size, const char *save_path);
 // The game's folder of slots under /torii/saves/<rom path>
 int saveslot_game_dir(char *out, u32 size, const char *rom_path);
 // A deleted slot's file: /torii/trash/<YYYYMMDD-HHMMSS>-<n>/<rom path>/<slot>.sav.

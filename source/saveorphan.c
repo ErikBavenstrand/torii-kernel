@@ -197,6 +197,10 @@ static void add_orphan(struct orphan_scan *s, const char *rom, u32 slots, u32 by
 // as it was) and everything under it. With s (the saves' walk) a folder
 // holding .sav files or a game.ini is a game folder, and one whose ROM isn't
 // a file is listed as an orphan.
+// walk's W->game flags for a folder: it holds a slot or a record, a folder
+#define GAME_FILES 1
+#define GAME_FOLDERS 2
+
 static int walk(char *path, struct so_sum *sum, struct orphan_scan *s, orphan_progress_fn progress, void *ctx,
 		u32 phase)
 {
@@ -218,13 +222,16 @@ static int walk(char *path, struct so_sum *sum, struct orphan_scan *s, orphan_pr
 		}
 		if (!W->fno.fname[0]) {
 			f_closedir(&W->dirs[level]);
-			if (s && level > 0 && W->game[level]) {
+			// A game's folder holds its slots and record, never a
+			// folder: one that does is another game's ancestor (/GBA
+			// for /GBA/X.gba) with a stray file in it, never an orphan,
+			// or relinking or deleting it would take every game below
+			if (s && level > 0 && W->game[level] == GAME_FILES) {
 				const char *rom = path + base;
 				s->games++;
 				if (!has_prefix(rom, NOR_DIR)) {
 					FRESULT st = f_stat(rom, &W->fno);
-					if (st == FR_NO_FILE || st == FR_NO_PATH ||
-					    (st == FR_OK && (W->fno.fattrib & AM_DIR)))
+					if (st == FR_NO_FILE || st == FR_NO_PATH)
 						add_orphan(s, rom, W->slots[level], W->bytes[level]);
 					else if (st != FR_OK)
 						sum->partial = 1;
@@ -252,6 +259,7 @@ static int walk(char *path, struct so_sum *sum, struct orphan_scan *s, orphan_pr
 			}
 			path[len] = '/';
 			memcpy(path + len + 1, W->fno.fname, nlen + 1);
+			W->game[level] |= GAME_FOLDERS;
 			if (f_opendir(&W->dirs[level + 1], path) != FR_OK) {
 				path[len] = 0;
 				sum->partial = 1;
@@ -271,9 +279,9 @@ static int walk(char *path, struct so_sum *sum, struct orphan_scan *s, orphan_pr
 			W->bytes[level] += size;
 			if (is_sav(W->fno.fname)) {
 				W->slots[level]++;
-				W->game[level] = 1;
+				W->game[level] |= GAME_FILES;
 			} else if (!strcasecmp(W->fno.fname, "game.ini")) {
-				W->game[level] = 1;
+				W->game[level] |= GAME_FILES;
 			}
 		}
 	}
@@ -397,6 +405,30 @@ static int move_slot_files(const char *src_dir, const char *dst_dir, const char 
 		cutpoint("orphan: save moved");
 	}
 	return ORPHAN_CARD;
+}
+
+// ORPHAN_OK if the game folder dir holds no folder (or isn't there),
+// ORPHAN_PATH if it does: an ancestor of other games' folders, which a
+// relink or delete would carry off whole
+static int only_files(const char *dir)
+{
+	FRESULT r = f_opendir(&W->dir, dir);
+	if (r == FR_NO_PATH || r == FR_NO_FILE)
+		return ORPHAN_OK;
+	if (r != FR_OK)
+		return ORPHAN_CARD;
+	int found = 0;
+	while ((r = f_readdir(&W->dir, &W->fno)) == FR_OK && W->fno.fname[0])
+		if (W->fno.fattrib & AM_DIR) {
+			found = 1;
+			break;
+		}
+	f_closedir(&W->dir);
+	if (r != FR_OK)
+		return ORPHAN_CARD;
+	if (found)
+		tlog_error("orphan: %s holds folders: not a game's, left alone", dir);
+	return found ? ORPHAN_PATH : ORPHAN_OK;
 }
 
 static int folders_of(const char *from, const char *to)
@@ -660,6 +692,8 @@ int saveorphan_relink(const char *from, const char *to, u32 *renamed)
 	if (!strcasecmp(from, to))
 		return ORPHAN_SAME;
 	int r = folders_of(from, to);
+	if (!r)
+		r = only_files(W->a);
 	if (r)
 		return r;
 	if (saveslot_game_dir(W->g, SO_PATH, to) < 0)  // a bad path: ".." or an empty part
@@ -740,6 +774,8 @@ int saveorphan_trash(const char *from)
 	if (!from || from[0] != '/' || strlen(from) > ORPHAN_TRASH_ROM_MAX || has_prefix(from, "/torii/"))
 		return ORPHAN_PATH;
 	int r = folders_of(from, NULL);
+	if (!r)
+		r = only_files(W->a);
 	if (r)
 		return r;
 	int e = exists(W->a);

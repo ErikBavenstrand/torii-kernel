@@ -608,6 +608,7 @@ static const struct lang_gsaves en_gsaves = {
 	.import_text = "The slot's save goes into\nthe history first.",
 	.exported = "Exported to",
 	.no_history = "This slot has no history yet.",
+	.no_save = "This game doesn't save.",
 	.last = "A game keeps at least one slot.",
 	.gone_file = "That file isn't there any more.",
 	.gone_version = "That version isn't there any more.",

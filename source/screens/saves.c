@@ -477,6 +477,8 @@ static void act(struct saves *s, u32 row)
 void saves_run(void)
 {
 	struct saves *s = S;
+	if (!pending_save_flush())  // a save still on the chip first
+		return;
 	memset(s, 0, sizeof(*s));
 	scan(s);  // over the page that opened it
 	ui_leave(UI_TR_DEEPER, 1);

@@ -130,6 +130,12 @@ int slotstore_history(const char *rom_path, const char *slot, struct slotstore_v
 // file (so a repeat after a power cut adds none). The file is left as it is.
 // This is what the save copy calls with the path in the pending-save record.
 int slotstore_push_file(const char *file, const char *hist_dir, u32 keep);
+// The same, but the file itself goes into the folder (a rename: nothing is
+// copied, so it costs the same for any size) and is gone after SLOTSTORE_OK;
+// one identical to the newest version is removed instead. A repeat after a
+// power cut inside the rename drops the file's second name. Save_bak_retire
+// calls it for the save a copy or install replaced.
+int slotstore_move_file(const char *file, const char *hist_dir, u32 keep);
 // The same for the current file of slot, always (whatever the setting), pruning
 // to the setting or to 1 version if it is Off. SLOTSTORE_NO_SLOT if no file.
 int slotstore_history_push(const char *rom_path, const char *slot);

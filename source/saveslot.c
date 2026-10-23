@@ -239,6 +239,23 @@ int saveslot_backup_dir(char *out, u32 size, const char *rom_path, const char *s
 	return finish(out, ok, len);
 }
 
+int saveslot_backup_dir_of(char *out, u32 size, const char *save_path)
+{
+	if (size == 0)
+		return -1;
+	out[0] = 0;
+	const u32 pre = sizeof(SAVESLOT_SAVES_DIR) - 1, bpre = sizeof(SAVESLOT_BACKUPS_DIR) - 1;
+	u32 n = (u32)strlen(save_path), len = 0;
+	if (strncmp(save_path, SAVESLOT_SAVES_DIR "/", pre + 1) != 0 || n < pre + 5 ||
+	    strcmp(save_path + n - 4, ".sav") != 0)
+		return -1;
+	// /torii/backups, then the rom path and the slot as they are (without
+	// .sav), checked as saveslot_backup_dir checks them: a rom part and a slot
+	int ok = add_str(out, size, &len, SAVESLOT_BACKUPS_DIR) && add(out, size, &len, save_path + pre, n - 4 - pre) &&
+		 strchr(out + bpre + 1, '/') && rom_ok(out + bpre);
+	return finish(out, ok, len);
+}
+
 int saveslot_game_dir(char *out, u32 size, const char *rom_path)
 {
 	u32 len = 0;
@@ -436,9 +453,13 @@ int saveslot_trash_expired(const struct saveslot_stamp *then, const struct saves
 		long doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
 		days[i] = era * 146097 + doe;
 	}
-	long old = days[0] * 86400L + t[0]->hour * 3600L + t[0]->min * 60L + t[0]->sec;
-	long cur = days[1] * 86400L + t[1]->hour * 3600L + t[1]->min * 60L + t[1]->sec;
-	return cur - old > (long)SAVESLOT_TRASH_DAYS * 86400L;
+	// Days apart first: seconds since year 0 don't fit a 32-bit long
+	long apart = days[1] - days[0];
+	if (apart != SAVESLOT_TRASH_DAYS)
+		return apart > SAVESLOT_TRASH_DAYS;
+	long old = t[0]->hour * 3600L + t[0]->min * 60L + t[0]->sec;
+	long cur = t[1]->hour * 3600L + t[1]->min * 60L + t[1]->sec;
+	return cur > old;
 }
 
 /* ---- Rename journal ---- */

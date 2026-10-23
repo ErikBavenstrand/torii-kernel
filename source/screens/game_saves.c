@@ -8,10 +8,13 @@
 #include "../actions.h"
 #include "../ff15/ff.h"
 #include "../gamesave.h"
+#include "../ezkernel.h"
 #include "../lang.h"
+#include "../library.h"
 #include "../tlog.h"
 #include "../ui/art_ids.h"
 #include "../ui/dialog.h"
+#include "../userdata.h"
 
 extern FILINFO fileinfo;  // ezkernelnew.c's
 extern DIR dir;
@@ -460,7 +463,16 @@ static int rows_build(u32 *at)
 
 int game_saves_probe(const char *path)
 {
-	return action_game_saves(path, gs.rom, sizeof(gs.rom), &gs.size);
+	// No card access for a ROM (the popup opens on START): its facts are
+	// read once Saves is picked. A NOR entry's are in NOR.
+	gs.size = 0;
+	if (userdata_nor_name(path))
+		return action_game_saves(path, gs.rom, sizeof(gs.rom), &gs.size);
+	const char *name = strrchr(path, '/');
+	if (!name || library_console_of(name + 1) != LIB_GBA || strlen(path) >= sizeof(gs.path))
+		return 0;
+	memcpy(gs.path, path, strlen(path) + 1);  // fits: checked above
+	return 1;
 }
 
 int game_saves_run(const char *title)
@@ -471,6 +483,18 @@ int game_saves_run(const char *title)
 	gs.title = title;
 	gs.want[0] = 0;
 	int result = GAME_SAVES_BACK;
+	// A save still on the chip goes to the card before any slot moves
+	if (!pending_save_flush()) {
+		if (own)
+			dialog_close();
+		return result;
+	}
+	if (!gs.size && !action_game_saves(gs.path, gs.rom, sizeof(gs.rom), &gs.size)) {
+		dialog_message(NULL, gl_gsaves->no_save, DIALOG_INFO);
+		if (own)
+			dialog_close();
+		return result;
+	}
 	for (;;) {
 		u32 at;
 		int n = rows_build(&at);

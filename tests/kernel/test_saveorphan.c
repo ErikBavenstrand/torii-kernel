@@ -305,6 +305,42 @@ static void test_trash(void)
 	CHECK_EQ(removed, 0);
 }
 
+/* ---- A folder that holds games' folders ---- */
+
+// A stray .sav in an ancestor of games' folders (/torii/saves/TOB, beside
+// TOB/Kid.gba): never an orphan, and neither relink nor delete takes it, so
+// the games below keep their saves
+static void test_ancestor(void)
+{
+	CHECK(put("/TOA/Kid.gba", 'R', 512));
+	CHECK(put("/torii/saves/TOA/Kid.gba/Main.sav", 'K', 512));
+	CHECK(put("/torii/saves/TOA/Stray.sav", 'S', 512));
+	CHECK(put("/torii/saves/TOB/Stray.sav", 'S', 512));
+	CHECK(put("/torii/saves/TOB/Kid.gba/Main.sav", 'K', 512));
+	do_scan();
+	CHECK(find_orphan("/TOA") < 0);
+	CHECK(find_orphan("/TOB") < 0);
+	CHECK(find_orphan("/TOB/Kid.gba") >= 0);  // its ROM is gone: an orphan of its own
+	CHECK_EQ(saveorphan_trash("/TOB"), ORPHAN_PATH);
+	u32 renamed = 0;
+	CHECK_EQ(saveorphan_relink("/TOA", "/TOA/Kid.gba", &renamed), ORPHAN_PATH);
+	CHECK(is_fill("/torii/saves/TOB/Kid.gba/Main.sav", 'K'));
+	CHECK(is_fill("/torii/saves/TOA/Kid.gba/Main.sav", 'K'));
+	CHECK(!there("/torii/orphanop.txt"));
+	const char *gone[] = {"/torii/saves/TOB/Kid.gba/Main.sav",
+			      "/torii/saves/TOB/Kid.gba",
+			      "/torii/saves/TOB/Stray.sav",
+			      "/torii/saves/TOB",
+			      "/torii/saves/TOA/Kid.gba/Main.sav",
+			      "/torii/saves/TOA/Kid.gba",
+			      "/torii/saves/TOA/Stray.sav",
+			      "/torii/saves/TOA",
+			      "/TOA/Kid.gba",
+			      "/TOA"};
+	for (u32 i = 0; i < sizeof(gone) / sizeof(gone[0]); i++)
+		f_unlink(gone[i]);
+}
+
 void test_saveorphan(void)
 {
 	if (!card()) {
@@ -317,6 +353,7 @@ void test_saveorphan(void)
 	test_relink_clash();
 	test_relink_refused();
 	test_trash();
+	test_ancestor();
 }
 
 /* ---- The power-cut scenarios (tests/saveorphan.sh) ---- */

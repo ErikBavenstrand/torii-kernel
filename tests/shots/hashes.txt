@@ -91,7 +91,7 @@ games-art/recent D6B09D15BF64F7E1
 games-art-box/gba B283B0831EAA819C
 games-art-dark/gba 743CC2D257F80E8A
 games-art-dark/gba-none 6DD7FD2BF9FD37DC
-games-art-popup/popup FFDAF87C34720167
+games-art-popup/popup EBAD3DC8FCF25936
 games-box-switch/gb 46FF5145036E9096
 games-box-switch/gba 9F73E48DF1E05512
 games-box-switch/gba-next 86E077FAD2BA18F7

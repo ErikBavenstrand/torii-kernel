@@ -40,6 +40,8 @@ int gamesave_nor_path(char *out, u32 size, const char *name)
 // reaches them
 static char dir_buf[GAMESAVE_PATH_BYTES] EWRAM_BSS;
 static char file_buf[GAMEREC_BYTES + 4] ALIGN(4) EWRAM_BSS;
+static char path_buf[GAMESAVE_PATH_BYTES] EWRAM_BSS;
+static FIL rec_fil EWRAM_BSS;
 
 int gamesave_make_parents(const char *path)
 {
@@ -84,13 +86,13 @@ void gamesave_record_read(const char *rom_path, struct gamerec *r)
 	if (record_path(rom_path) < 0)
 		return;
 	const char *path = dir_buf;
-	FIL f;
-	if (f_open(&f, path, FA_READ) != FR_OK)
+	FIL *f = &rec_fil;
+	if (f_open(f, path, FA_READ) != FR_OK)
 		return;
 	UINT got = 0;
-	if (f_read(&f, text, GAMEREC_BYTES, &got) != FR_OK)
+	if (f_read(f, text, GAMEREC_BYTES, &got) != FR_OK)
 		got = 0;
-	f_close(&f);
+	f_close(f);
 	gamerec_parse(r, text, got);
 }
 
@@ -100,24 +102,25 @@ int gamesave_record_write(const char *rom_path, const struct gamerec *r)
 	u32 len = gamerec_format(text, GAMEREC_BYTES, r);
 	if (!len || record_path(rom_path) < 0)
 		return 0;
-	char path[GAMESAVE_PATH_BYTES];
-	memcpy(path, dir_buf, sizeof(path));
-	if (!gamesave_make_parents(path))
-		return 0;
-	// In place and one sector: a cut leaves the old record or the new one
-	FIL f;
-	FRESULT res = f_open(&f, path, FA_WRITE | FA_OPEN_ALWAYS);
+	char *path = path_buf;
+	memcpy(path, dir_buf, GAMESAVE_PATH_BYTES);
+	// In place and one sector: a cut leaves the old record or the new one;
+	// its folders are made only when it has none yet
+	FIL *f = &rec_fil;
+	FRESULT res = f_open(f, path, FA_WRITE | FA_OPEN_ALWAYS);
+	if (res == FR_NO_PATH && gamesave_make_parents(path))
+		res = f_open(f, path, FA_WRITE | FA_OPEN_ALWAYS);
 	if (res != FR_OK) {
 		tlog_error("save: can't open %s (FatFs %d)", path, res);
 		return 0;
 	}
 	UINT done = 0;
-	res = f_write(&f, text, len, &done);
+	res = f_write(f, text, len, &done);
 	if (res == FR_OK && done == len)
-		res = f_truncate(&f);
+		res = f_truncate(f);
 	else
 		res = res == FR_OK ? FR_DENIED : res;
-	FRESULT closed = f_close(&f);
+	FRESULT closed = f_close(f);
 	return res == FR_OK && closed == FR_OK;
 }
 

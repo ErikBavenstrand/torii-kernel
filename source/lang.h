@@ -285,6 +285,7 @@ struct lang_gsaves {
 	const char *import_text;    // under "Import into <slot>?"
 	const char *exported;       // before the path
 	const char *no_history;
+	const char *no_save;        // a game whose save type has no save
 	const char *last;           // SLOTSTORE_LAST
 	const char *gone_file;      // SLOTSTORE_NO_FILE
 	const char *gone_version;   // SLOTSTORE_NO_VERSION

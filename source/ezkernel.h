@@ -66,6 +66,17 @@ u32 Save_savefile(TCHAR *filename, u32 savesize, const char *hist_dir);
 // Finishes or undoes a copy a power cut interrupted (the .tmp and .bak files
 // beside filename); run at boot and before a copy or launch
 void Save_recover(const TCHAR *filename);
+// The old save at <filename>.bak, which a copy or an install replaced with a
+// verified file, leaves: renamed into its slot's history as the next version
+// (slotstore_move_file), pruned to keep, or removed with keep 0 or for a file
+// outside /torii/saves. 1 once it is gone; 0 if the card said no, and then it
+// stays for the next recovery (it may be the only copy of the old save).
+int Save_bak_retire(const TCHAR *filename, u32 keep);
+// Recovery of an install (slotstore.c's journal) whose <filename>.tmp was
+// verified before the journal was written: it goes forward, the .tmp becomes
+// the file and the old one goes into the history, where Save_recover alone
+// would drop the .tmp.
+void Save_install_finish(const TCHAR *filename);
 // The pending-save record in the kernel's NOR: 0x11, the size in 512-byte
 // units, then the save file's path from halfword 2. Torii keeps the save
 // type at halfword SAV_INFO_TYPE, past the longest name, for the log (0
@@ -84,6 +95,11 @@ void Save_recover(const TCHAR *filename);
 // to the card, the next power-on or launch tries again) holds a save path
 // that starts with prefix: a rename must leave that file's path alone.
 int pending_save_under(const char *prefix);
+// Copies a pending save to the card now (pending_save_copy, its progress and
+// questions), so slot operations never work under a chip not yet saved. 1 if
+// none waits or it is copied (or skipped: blank, unchanged, or B on its
+// question); 0 if it failed, the record stays and the caller does nothing.
+int pending_save_flush(void);
 u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU);
 
 void delay(u32 R0);
