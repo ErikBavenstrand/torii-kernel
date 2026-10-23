@@ -119,6 +119,8 @@ Decided 2026-10-22: a version is kept only when the chip differs from the curren
   total space used.
 - **Deleting:** a deleted slot goes to `trash/` and is removed after 30 days.
 
+What v0.5 built of slots and history (`source/slotstore.c`, API in its header; tests `tests/kernel/test_slotstore.c`, `tests/slotstore.sh`): the Settings row **History** (System section: Games' card is full at 6 rows; Off/1/3/5/10/20, default 5) sets the versions kept. The save copy pushes the version it replaces into the history before the swap (the record holds the history folder from halfword `0x82`); a repeat after a cut adds none (the newest version is compared first), and a history that can't take the version fails the copy, the file staying as it is. Restore, import and the type change always push, whatever the setting (pruning to at least 1). Restore moves the version out of the history (it is the file now). Renames, deletes and installs (restore, import) are journaled in `/torii/slotop.txt` (CRC) and `slotstore_recover()` finishes them at boot; a history folder is never moved to another parent (a cut leaves its `..` wrong): the trash takes its files one by one. A launch whose slot file is bigger than the save type needs (EEPROM 8K to 512) pushes it untouched into the history, starts the new type blank, and shows a one-time notice; a smaller file is still grown with FF, which keeps its bytes.
+
 ## v0.6 Plugins
 
 - **Handoff:** keep the PogoShell handoff exactly as it is, so existing emulators work

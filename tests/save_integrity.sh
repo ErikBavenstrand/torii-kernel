@@ -7,6 +7,9 @@
 #     gap of the swap, Main.sav.bak is the old save or Main.sav.tmp the new
 #     (with no old save on the card, Main.sav is absent or the new one)
 #   - the pending-save record is set until the copy is done
+#   - the replaced save is never lost: it is Main.sav, or in its .bak, or a
+#     version of the slot's history (/torii/backups/Hello.gba/Main), made before
+#     the swap so a cut at any step keeps it, and a retried copy adds none twice
 #   - a power-on that answers B at "Save sav?" (no copy) still recovers: a whole
 #     save (old or new), no .tmp or .bak
 #   - one that answers A ends with the new save, no .tmp or .bak, the record
@@ -40,6 +43,18 @@ blanks() { head -c "$1" /dev/zero | tr '\000' '\377'; }
 pending() { od -A n -t x2 -j $((0x790000)) -N 2 "$cart/kernel-nor.bin" | tr -d ' '; }
 # card_file NAME OUT: the file's contents into OUT; fails if there is none
 card_file() { mtype -i "$cart/sd.img" "::/torii/saves/Hello.gba/$1" >"$2" 2>/dev/null; }
+hist_dir=::/torii/backups/Hello.gba/Main
+# hist_versions: the history's .sav files, one name a line
+hist_versions() { mdir -b -i "$cart/sd.img" "$hist_dir/" 2>/dev/null | grep -i '\.sav$' || true; }
+# hist_has_old: 1 if some version is the old save
+hist_has_old() {
+  local v n=0
+  while IFS= read -r v; do
+    [ -n "$v" ] || continue
+    mtype -i "$cart/sd.img" "$v" >"$carts/ver.sav" 2>/dev/null && is_old "$carts/ver.sav" && n=$((n + 1))
+  done < <(hist_versions)
+  echo "$n"
+}
 leftovers() { mdir -i "$cart/sd.img" ::/torii/saves/Hello.gba/ 2>/dev/null | grep -qiE 'tmp|bak'; }
 
 # Starting state: the game launched (so the pending-save record is set), then
@@ -81,9 +96,15 @@ check_survives() {
   local n=$1 name=$2 f="$carts/now.sav"
   if card_file Main.sav "$f"; then
     is_new "$f" || is_old "$f" || fail "cut at $n ($name): Main.sav is neither the old save nor the new one"
+    # A new Main.sav means the old save went into the history first
+    if [ "$part" = unknown-replace ] && is_new "$f" && [ "$(hist_has_old)" -lt 1 ]; then
+      fail "cut at $n ($name): Main.sav is the new save and the old one is not in the history"
+    fi
   elif [ "$part" = unknown-new ]; then
     : # nothing to lose yet
   elif card_file Main.sav.bak "$f" && is_old "$f"; then
+    :
+  elif [ "$(hist_has_old)" -ge 1 ]; then
     :
   elif card_file Main.sav.tmp "$f" && is_new "$f"; then
     :
@@ -104,6 +125,10 @@ check_whole() {
     [ "$part" = unknown-new ] && [ "$want" = any ] || fail "cut at $n ($name): no Main.sav after the recovery boot"
   fi
   ! leftovers || fail "cut at $n ($name): a .tmp or .bak is left after the recovery boot"
+  if [ "$part" = unknown-replace ] && [ "$want" = new ]; then
+    # The retried copy pushed the old save once, not twice
+    [ "$(hist_has_old)" = 1 ] || fail "cut at $n ($name): the old save is in the history $(hist_has_old) times, not once"
+  fi
   fsck.fat -n "$cart/sd.img" >/dev/null || fail "cut at $n ($name): fsck.fat found errors"
 }
 

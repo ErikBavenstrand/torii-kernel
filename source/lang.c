@@ -70,6 +70,7 @@ char **gl_set_themes EWRAM_BSS;
 char **gl_set_views EWRAM_BSS;
 char **gl_set_boots EWRAM_BSS;
 char **gl_set_locations EWRAM_BSS;
+char **gl_set_history EWRAM_BSS;
 char **gl_set_starts EWRAM_BSS;
 char **gl_set_modes_b EWRAM_BSS;
 char **gl_set_colours EWRAM_BSS;
@@ -266,6 +267,7 @@ const char *en_set_labels[SET_ROWS] = {
 	[SET_RESCAN] = "Rescan library",
 	[SET_IDENTIFY] = "Identify library",
 	[SET_SHOW_ALL] = "Show all files",
+	[SET_HISTORY] = "History",
 	[SET_LOGGING] = "Logging",
 	[SET_LANGUAGE] = "Language",
 };
@@ -297,6 +299,7 @@ const char *en_set_explain[SET_EXPLAINS] = {
 	[SET_RESCAN] = "Looks for games on the card again.",
 	[SET_IDENTIFY] = "Looks up each game in names.db.",
 	[SET_SHOW_ALL] = "The SD card page shows hidden files.",
+	[SET_HISTORY] = "Versions kept of each save slot.",
 	[SET_LOGGING] = "Writes a log to /torii/logs.",
 	[SET_LANGUAGE] = "The menu's language.",
 	[SET_EXPLAIN_RESET_STATES] = "Opens the in-game menu instead.",
@@ -308,6 +311,7 @@ const char *en_set_themes[2] = {"Dark", "Light"};
 const char *en_set_views[2] = {"List", "List + art"};
 const char *en_set_boots[SET_BOOTS] = {[SET_BOOT_ADDONS] = "With addons", [SET_BOOT_CLEAN] = "Clean"};
 const char *en_set_locations[SET_LOCS] = {[SET_LOC_TORII] = "Torii folder", [SET_LOC_BESIDE_ROM] = "Next to the ROM"};
+const char *en_set_history[SET_HISTORY_CHOICES] = {"Off", "1", "3", "5", "10", "20"};
 const char *en_set_starts[SET_STARTS] = {
 	[SET_START_LAST] = "Last place",   [SET_START_RECENT] = "Recent",
 	[SET_START_HOME] = "Home",         [SET_START_FAVOURITES] = "Favourites",
@@ -667,6 +671,7 @@ void LoadEnglish(void)
 	gl_set_views = (char **)en_set_views;
 	gl_set_boots = (char **)en_set_boots;
 	gl_set_locations = (char **)en_set_locations;
+	gl_set_history = (char **)en_set_history;
 	gl_set_starts = (char **)en_set_starts;
 	gl_set_modes_b = (char **)en_set_modes_b;
 	gl_set_colours = (char **)en_set_colours;

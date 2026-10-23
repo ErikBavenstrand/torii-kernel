@@ -30,9 +30,9 @@ void test_settings_layout_slots(void)
 {
 	LoadEnglish();
 	erased();
-	// Seven sections: a label, the rows, a gap each; 28 rows with the LED on
-	CHECK_EQ(lay.rows, 28);
-	CHECK_EQ(lay.count, 28 + 2 * SET_SECTIONS);
+	// Seven sections: a label, the rows, a gap each; 29 rows with the LED on
+	CHECK_EQ(lay.rows, 29);
+	CHECK_EQ(lay.count, 29 + 2 * SET_SECTIONS);
 	CHECK_EQ(lay.slot[0].kind, SET_SLOT_LABEL);
 	CHECK_EQ(lay.slot[1].kind, SET_SLOT_ROW);
 	CHECK_EQ(lay.slot[1].id, SET_THEME);
@@ -60,7 +60,7 @@ void test_settings_layout_slots(void)
 	// The LED off hides its colours: two rows fewer, the slots after move up
 	settings_set(&v, SET_LED, 0);
 	settings_layout_build(&lay, &v);
-	CHECK_EQ(lay.rows, 26);
+	CHECK_EQ(lay.rows, 27);
 	CHECK_EQ(settings_layout_slot_of(&lay, SET_LED_IDLE), SET_LAYOUT_NONE);
 	CHECK_EQ(settings_layout_slot_of(&lay, SET_RESET_ON), settings_layout_slot_of(&lay, SET_LED) + 3);
 }
@@ -70,7 +70,8 @@ void test_settings_layout_moves(void)
 	LoadEnglish();
 	erased();
 	u32 theme = settings_layout_slot_of(&lay, SET_THEME), dim = settings_layout_slot_of(&lay, SET_DIM);
-	u32 time = settings_layout_slot_of(&lay, SET_TIME_ROW), logging = settings_layout_slot_of(&lay, SET_LOGGING);
+	u32 time = settings_layout_slot_of(&lay, SET_TIME_ROW), logging = settings_layout_slot_of(&lay, SET_LOGGING),
+	    history = settings_layout_slot_of(&lay, SET_HISTORY);
 	// UP and DOWN skip the labels and gaps; an end wraps only on a fresh press
 	CHECK_EQ(settings_layout_step(&lay, theme, 1, 0), theme + 1);
 	CHECK_EQ(settings_layout_step(&lay, dim, 1, 0), time);
@@ -82,8 +83,9 @@ void test_settings_layout_moves(void)
 	// L and R: a section's first row, back to its own first, wrapping
 	CHECK_EQ(settings_layout_section(&lay, theme, 1), time);
 	CHECK_EQ(settings_layout_section(&lay, dim, -1), theme);
-	CHECK_EQ(settings_layout_section(&lay, theme, -1), logging);
+	CHECK_EQ(settings_layout_section(&lay, theme, -1), history);
 	CHECK_EQ(settings_layout_section(&lay, logging, 1), theme);
+	CHECK_EQ(settings_layout_section(&lay, history, -1), settings_layout_slot_of(&lay, SET_RESCAN));
 	// A slot that isn't a row: the next row
 	CHECK_EQ(settings_layout_row_at(&lay, 0), theme);
 	CHECK_EQ(settings_layout_row_at(&lay, dim + 1), time);

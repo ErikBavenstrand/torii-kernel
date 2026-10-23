@@ -45,6 +45,9 @@ extern char *gl_keep_power;    // FORMAT ALL's text, under its title
 // file, cut to at most 80 bytes at a character's start: the dialog shows 4
 // lines)
 #define EN_SAVE_MISMATCH "The save in the cart doesn't look like %.*s. Write it over that file anyway?"
+#define EN_SAVE_TYPE_CHANGED \
+	"The save type of %.*s changed. Its old save (%lu bytes) is kept in History, and the game starts with a new " \
+	"one."
 #define EN_SAVE_UNSAVED "The save of %.*s isn't on the card yet. Launching loses it. Launch anyway?"
 
 // The firmware update's texts (Ezcard_OP.c). It runs before a language is
@@ -90,6 +93,7 @@ extern char **gl_set_themes;
 extern char **gl_set_views;
 extern char **gl_set_boots;
 extern char **gl_set_locations;
+extern char **gl_set_history;
 extern char **gl_set_starts;
 extern char **gl_set_modes_b;
 extern char **gl_set_colours;

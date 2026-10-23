@@ -236,6 +236,7 @@ static const struct {
 	{"saveslot_journal", test_saveslot_journal},
 	{"saveslot_recovery", test_saveslot_recovery},
 	{"saveslot_sanity", test_saveslot_sanity},
+	{"saveslot_import_size", test_saveslot_import_size},
 };
 
 int main(void)

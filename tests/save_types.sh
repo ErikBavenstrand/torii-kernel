@@ -2,7 +2,7 @@
 # Save chip test on the emulated cart: for each save type, launch the matching
 # save test ROM with that type picked in the kernel menu, power-cycle so the
 # kernel writes the save to SD, and launch again to check the save came back.
-# Usage: save_types.sh [flash128|flash64|eeprom8k|eeprom8k-short|eeprom512]
+# Usage: save_types.sh [flash128|flash64|eeprom8k|eeprom8k-short|eeprom512-shrunk|eeprom512]
 # Runs inside the torii-emu container after `just build`,
 # `just emu-headless` and building tests/roms/savetest.
 set -euo pipefail
@@ -90,6 +90,50 @@ short_eeprom() {
   echo "PASS: eeprom8k-short"
 }
 
+# A save of 8 KB for a game now set to EEPROM 512 would be cut short: it is kept
+# whole in the slot's history, never converted, the slot starts blank at the new
+# size, and the notice is shown once (a second launch shows none).
+shrunk_eeprom() {
+  local cart=$carts/save-eeprom512-shrunk
+  rm -rf "$cart"
+  mkdir -p "$cart"
+  mkfs.fat -C -F 32 -n SAVETEST "$cart/sd.img" 65536 >/dev/null
+  mcopy -i "$cart/sd.img" tests/roms/savetest/eeprom512.gba ::/Test.gba
+  python3 -c 'import sys; sys.stdout.buffer.write(b"\xff" * 8 + b"OLD8K" + bytes(range(256)) * 31 + b"\xff" * 243)' >"$cart/old.sav"
+  [ "$(stat -c %s "$cart/old.sav")" = 8192 ] || fail "eeprom512-shrunk: the old save is not 8192 bytes"
+  mmd -i "$cart/sd.img" ::/torii ::/torii/saves ::/torii/saves/Test.gba
+  mcopy -i "$cart/sd.img" "$cart/old.sav" ::/torii/saves/Test.gba/Main.sav
+  local log=$cart/kernel.log
+  # CLEAN BOOT with SAVE TYPE EEPROM 512; the notice waits for a key
+  # shellcheck disable=SC2046 # nav.sh's options
+  OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch /Test.gba save=3 at=270) \
+    -w "save: type change notice shown" -k @20:A -k @26:- -f 700 >/dev/null 2>"$log"
+  grep -q "save: /torii/saves/Test.gba/Main.sav is 8192 bytes, the save type 21 needs 512" "$log" ||
+    fail "eeprom512-shrunk: no type change in the log: $(grep 'save: ' "$log")"
+  grep -q "launch: starting the game" "$log" || fail "eeprom512-shrunk: the game didn't start after the notice"
+  local sav=$cart/new.sav hist=$cart/hist.sav
+  mtype -i "$cart/sd.img" ::/torii/saves/Test.gba/Main.sav >"$sav" || fail "eeprom512-shrunk: no Main.sav"
+  [ "$(stat -c %s "$sav")" = 512 ] || fail "eeprom512-shrunk: Main.sav is $(stat -c %s "$sav") bytes, not 512"
+  ! cmp -s "$sav" <(head -c 512 "$cart/old.sav") || fail "eeprom512-shrunk: the new save is the old one cut short"
+  # The old file, untouched, is the history's first version
+  mdir -i "$cart/sd.img" ::/torii/backups/Test.gba/Main/ 2>/dev/null | grep -qi '0001-' || fail "eeprom512-shrunk: no version in the history"
+  local name
+  name=$(mdir -b -i "$cart/sd.img" ::/torii/backups/Test.gba/Main/ | grep -i '0001-' | head -1)
+  mtype -i "$cart/sd.img" "$name" >"$hist"
+  cmp -s "$hist" "$cart/old.sav" || fail "eeprom512-shrunk: the history's version isn't the old save"
+  # A second power-on (A at "Save sav?" copies the game's save, the old blank
+  # file going into the history) and launch: the file fits, no notice
+  : >"$log"
+  # shellcheck disable=SC2046 # nav.sh's options
+  OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -k 100:A -k 106:- $(nav_launch /Test.gba at=270) -f 800 \
+    >/dev/null 2>"$log"
+  grep -q "launch: starting the game" "$log" || fail "eeprom512-shrunk: the second launch didn't start the game"
+  ! grep -q "type change notice" "$log" || fail "eeprom512-shrunk: the notice came again"
+  [ "$(mdir -b -i "$cart/sd.img" ::/torii/backups/Test.gba/Main/ | grep -ci '0001-')" = 1 ] ||
+    fail "eeprom512-shrunk: version 1 of the history is not the one"
+  echo "PASS: eeprom512-shrunk"
+}
+
 # Save types (nav.sh's save=N): 1 SRAM, 2 EEPROM 8K, 3 EEPROM 512, 4 FLASH 64K, 5 FLASH 128K
 # With an argument, run only that case (tests/all.sh runs them in parallel).
 case ${1:-all} in
@@ -97,5 +141,6 @@ flash128 | all) run_case flash128 5 $((0x10000)) ;;&
 flash64 | all) run_case flash64 4 0 ;;&
 eeprom8k | all) run_case eeprom8k 2 8 ;;&
 eeprom8k-short | all) short_eeprom ;;&
+eeprom512-shrunk | all) shrunk_eeprom ;;&
 eeprom512 | all) run_case eeprom512 3 8 ;;
 esac

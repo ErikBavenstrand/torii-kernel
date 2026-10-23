@@ -578,3 +578,10 @@ int saveslot_match_ok(const struct saveslot_match *m)
 {
 	return m->data < SAVESLOT_MATCH_MIN_DATA || m->same >= (m->data + 7) / 8;
 }
+
+int saveslot_import_size_ok(u32 size, u32 want)
+{
+	if (want)
+		return size == want;
+	return size == 512 || size == 8192 || size == 32768 || size == 65536 || size == 131072;
+}

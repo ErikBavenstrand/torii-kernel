@@ -159,6 +159,14 @@ enum saveslot_recovery {
 // After the action, the same call returns SAVESLOT_RECOVER_NOTHING.
 enum saveslot_recovery saveslot_recover(u32 exists);
 
+/* ---- Imports ---- */
+
+// 1 if a file of size bytes may become a slot's save for a save type that has
+// want bytes: exactly want. With want 0 (the type isn't known) any size a save
+// chip has: 512 (EEPROM), 8192 (EEPROM), 32768 (SRAM), 65536 (Flash 64K or
+// SRAM), 131072 (Flash 128K).
+int saveslot_import_size_ok(u32 size, u32 want);
+
 /* ---- Sanity checks ---- */
 
 // Starting state for saveslot_blank_scan

@@ -161,7 +161,8 @@ echo "PASS: Settings' GBA boot mode Clean starts a game clean"
 
 # A launch that changes the save type keeps the boot mode
 # shellcheck disable=SC2046 # nav.sh's options
-boot "$cart/5.log" $(nav_launch /A.gba addon save=3) -u "launch: loading" -f 1500
+# (its save was SRAM's 32 KB: the type change keeps it in the history, and the notice takes A)
+boot "$cart/5.log" $(nav_launch /A.gba addon save=3) -w "save: type change notice shown" -k @20:A -k @26:- -u "launch: loading" -f 1500
 [ "$(record A)" = "save_type = 3 boot_mode = 2 slot = Main " ] || fail "after a launch with save type 3, A's record holds $(record A)"
 echo "PASS: a launch's save type keeps the game's boot mode"
 

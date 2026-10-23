@@ -60,7 +60,9 @@ u32 Loadsavefile(TCHAR *filename);
 #define SAVE_MISMATCH 4  // Save_check: the chip doesn't look like the file; ask first
 #define SAVE_WRITE 5     // Save_check: copy the chip
 u32 Save_check(TCHAR *filename, u32 savesize);
-u32 Save_savefile(TCHAR *filename, u32 savesize);
+// hist_dir, if not NULL and the History setting is not Off, is the folder the
+// replaced version of an existing file goes to first (slotstore_push_file)
+u32 Save_savefile(TCHAR *filename, u32 savesize, const char *hist_dir);
 // Finishes or undoes a copy a power cut interrupted (the .tmp and .bak files
 // beside filename); run at boot and before a copy or launch
 void Save_recover(const TCHAR *filename);
@@ -69,6 +71,13 @@ void Save_recover(const TCHAR *filename);
 // type at halfword SAV_INFO_TYPE, past the longest name, for the log (0
 // from older kernels).
 #define SAV_INFO_TYPE 0x80
+// The slot's history folder (/torii/backups/<rom path>/<slot>), a NUL-ended
+// path from halfword SAV_INFO_HIST to the record's end, for the copy to
+// push the replaced version into (zero from older kernels: no history). In
+// the buffer pending_save() fills, which starts at record halfword 2, it is
+// at byte (SAV_INFO_HIST - 2) * 2.
+#define SAV_INFO_HIST 0x82
+#define SAV_INFO_HIST_MAX (0x200 - SAV_INFO_HIST * 2 - 1)
 // The longest save file path the record holds, from byte 4 to SAV_INFO_TYPE
 #define SAV_INFO_NAME_MAX (SAV_INFO_TYPE * 2 - 4 - 1)
 // 1 if the pending-save record (a save waiting to be copied from cart SRAM
