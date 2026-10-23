@@ -55,6 +55,7 @@ jobs=(
   "tests/stale_recent.sh"
   "tests/rename.sh"
   "tests/slot_picker.sh"
+  "tests/game_saves.sh"
   "tests/userdata.sh"
   "tests/navigation.sh"
   "tests/fragmented.sh"

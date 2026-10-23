@@ -35,6 +35,7 @@
 #include "../ui/art_ids.h"
 #include "../ui/dialog.h"
 #include "../ui/ui.h"
+#include "game_saves.h"
 #include "rename.h"
 #include "../gamesave.h"
 
@@ -89,6 +90,7 @@ enum {
 	POP_RENAME,
 	POP_DELETE,
 	POP_INFO,
+	POP_SAVES,
 };
 
 static struct {
@@ -607,6 +609,36 @@ static const char *rename_submit(void *ctx, const char *stem)
 
 static struct ui_view *sd_enter(u32 item, u32 row);
 
+// The page again in the menu's session, listed afresh, after something took
+// its place and no game started
+static void page_again(void)
+{
+	if (!ui_active() || ui_depth())
+		return;
+	if (!sd_enter(NAV_SD, 0)) {
+		tlog_error("sdcard: %s", ui_error());
+		ui_shutdown();
+		dialog_blank();
+	}
+}
+
+static void launch(u32 how, u32 hard);
+
+// Saves: the game's save manager; Launch with this slot starts the game
+// without asking for the slot again
+static void saves_game(void)
+{
+	memo_store();  // the cursor the page comes back with
+	count_stop();
+	sd.find = 0;
+	if (game_saves_run(sd.name) == GAME_SAVES_LAUNCH) {
+		action_slot_chosen(1);
+		launch(ACTION_DEFAULT, 0);
+		action_slot_chosen(0);  // it returned: nothing started
+	}
+	page_again();
+}
+
 static void rename_file(void)
 {
 	const char *dot = strrchr(sd.name, '.');
@@ -781,6 +813,10 @@ static int file_popup_open(u32 i)
 			if (any_addon())
 				pop_add(POP_NOR_ADDON, gl_sd_nor_addon, 0);
 		}
+		// A GBA game's slots (the popup holds nine items at most: Favourite,
+		// Rename, Delete and File info follow)
+		if (console == LIB_GBA && sd.popup.count + 5 <= UI_POPUP_ITEMS && game_saves_probe(sd.full))
+			pop_add(POP_SAVES, gl_gsaves->title, 0);
 		pop_add(POP_FAV, fav_text(), 0);
 	}
 	if (!sdlist_is_dir(r)) {
@@ -848,6 +884,9 @@ static void file_popup_run(u32 i)
 			break;
 		case POP_RENAME:
 			rename_file();
+			break;
+		case POP_SAVES:
+			saves_game();
 			break;
 		default:
 			info(i);

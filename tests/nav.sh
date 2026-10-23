@@ -299,7 +299,7 @@ nav_nor_open() {
   case $item in
   launch) ;;
   info) downs=(DOWN) ;;
-  delete) downs=(DOWN DOWN) ;;
+  delete) downs=(UP) ;; # the last item, with Saves or without
   *)
     _nav_fail "no NOR popup item $item"
     return 1
@@ -324,7 +324,7 @@ nav_nor_delete_page() {
     return 1
   fi
   _nav_file "$(_nav_nor_to "$1")" "$(_nav_keys 8 START)" '-w "screen ready: popup"' \
-    "$(_nav_keys 8 DOWN DOWN A)" "$answer"
+    "$(_nav_keys 8 UP A)" "$answer"
 }
 
 nav_nor_format_page() {

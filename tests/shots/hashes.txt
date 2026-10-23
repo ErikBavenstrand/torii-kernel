@@ -75,6 +75,15 @@ diag-turn/frames 4-7 C230B72F2FDF7BF4
 dialog-fragmented/dialog DF9AAC285CD0CD2A
 dialog-overflow/dialog 065D88663C13E179
 dialog-overflow/home 818B02E74B016B0D
+game-saves/actions ADFBED66D7238E1D
+game-saves/delete 52751EB45E562467
+game-saves/files BCABD819DA56B8DA
+game-saves/history 1EE7ACA4A31B13D8
+game-saves/manager 2FBA5F6FD1DC48F0
+game-saves/popup BA40105E75CFE834
+game-saves/restore D218EC63334CD75A
+game-saves-light/actions 6768AC6507E773AB
+game-saves-light/manager F8F44EE35C83FF1C
 games-art/gba E4D66E146FB6D219
 games-art/gba-crc EAE4B45AD06AF276
 games-art/gba-none 7A533A78D3E4D987
@@ -97,17 +106,17 @@ games-cheats/screen 666C1C7A8C10C858
 games-dedupe/screen 67E86C46698E404E
 games-fav/screen 5F5922C2D6F31804
 games-fav/starred 017306DC53C8BC2C
-games-fav/toggled A34C627E265FBBD3
+games-fav/toggled 82E3C5A8602A4256
 games-gb/popup 73FBC530961EE51B
 games-gb/screen A47EFAC3B4A4039F
-games-gba/cancelled A8DF39A7F87C26AE
+games-gba/cancelled 4C985C717B8B0BD3
 games-gba/closed 7C5107676E6593E0
 games-gba/delete 91DAB5F33422BD04
 games-gba/down 5FDFD6D57D176F66
 games-gba/info 4AB5CA097C79575E
 games-gba/info-sram D90679922BFDE48A
 games-gba/letter 77E7DC56ADF4E619
-games-gba/popup 71111FA17F07B9A6
+games-gba/popup C447BA6A5E122C5B
 games-gba/screen 928ED4ADD2922192
 games-gba/frames 0-0 928ED4ADD2922192
 games-gba/frames 1-1 85DC2B75DEBC640E
@@ -328,7 +337,7 @@ nav-push-fail/page 7857C96979E6C7B0
 nor-dark/closed AA30BC826BEEF216
 nor-dark/delete BF2BA6B86FF023DF
 nor-dark/page AA30BC826BEEF216
-nor-dark/popup CEF488E2E6F2945B
+nor-dark/popup ED4141AF3E56C580
 nor-empty/page 042FF99D33EEF37C
 nor-launch-fail/back 818B02E74B016B0D
 nor-launch-fail/error ED9D43B3F289CFC0
@@ -342,7 +351,7 @@ nor-page/confirm C9598FFD94E1A80D
 nor-page/down 62E5F32BE69C59E5
 nor-page/format C74BE7B42C33C6E2
 nor-page/page 6840ACEB66350E4C
-nor-page/popup 10BD8AEA69C9B59E
+nor-page/popup 9D127E2785A2328A
 nor-page/frames 0-0 6840ACEB66350E4C
 nor-page/frames 1-1 DE0973940F1A6C9C
 nor-page/frames 2-2 364F34ED5BE30195
@@ -397,7 +406,7 @@ sd-root/back E1A26AC1D32F7650
 sd-root/confirm E79A2798444115F5
 sd-root/file-info 1D6589D91811BE54
 sd-root/folder EE84177EF9E20E06
-sd-root/popup 2C9FF18BEEAFA43A
+sd-root/popup 9EF2792419D491DD
 sd-root/root 6BD50270211C0F08
 sd-root/frames 0-13 1429BF342F361240
 sd-root/frames 14-14 1BCCA04D550355D2

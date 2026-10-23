@@ -91,6 +91,7 @@ char *gl_hint_set EWRAM_BSS;
 const struct lang_games *gl_games EWRAM_BSS;
 const struct lang_rename *gl_rename EWRAM_BSS;
 const struct lang_slots *gl_slots EWRAM_BSS;
+const struct lang_gsaves *gl_gsaves EWRAM_BSS;
 
 // Popups and confirmations (ui.h)
 char *gl_pop_choose EWRAM_BSS;
@@ -545,7 +546,7 @@ static const struct lang_games en_games = {
 	.hint_menu = "menu",
 	.hint_letter = "letter",
 	.hint_pick = "pick",
-	.pop = {"Play", "Favourite", "Clean boot", "Boot with addon", "Rename", "Game info", "Delete"},
+	.pop = {"Play", "Favourite", "Clean boot", "Boot with addon", "Rename", "Game info", "Saves", "Delete"},
 	.off = "off",
 	.on = "on",
 	.delete_text = "The save stays.",
@@ -583,6 +584,36 @@ static const struct lang_slots en_slots = {
 	.taken = "That name is taken.",
 	.path = "That name makes the path too long.",
 	.gone = "That slot isn't there any more.",
+};
+
+static const struct lang_gsaves en_gsaves = {
+	.title = "Saves",
+	.slot_title = "Slot",
+	.history_title = "History",
+	.import_title = "Import .sav",
+	.into_title = "Import into",
+	.import_row = "Import .sav...",
+	.act_launch = "Launch with this slot",
+	.act_set = "Set as current",
+	.act_rename = "Rename",
+	.act_dup = "Duplicate",
+	.act_delete = "Delete",
+	.act_history = "History",
+	.act_export = "Export",
+	.dup_title = "Duplicate slot",
+	.hint_restore = "restore",
+	.empty = "No .sav files here",
+	.no_slots = "Make a slot first: New slot.",
+	.delete_text = "It stays in /torii/trash\nfor 30 days.",
+	.restore_text = "The current save goes into\nthe history first.",
+	.import_text = "The slot's save goes into\nthe history first.",
+	.exported = "Exported to",
+	.no_history = "This slot has no history yet.",
+	.last = "A game keeps at least one slot.",
+	.gone_file = "That file isn't there any more.",
+	.gone_version = "That version isn't there any more.",
+	.unknown = "unknown",
+	.current = "current",
 };
 
 static const struct lang_rename en_rename = {
@@ -769,6 +800,7 @@ void LoadEnglish(void)
 	gl_games = &en_games;
 	gl_rename = &en_rename;
 	gl_slots = &en_slots;
+	gl_gsaves = &en_gsaves;
 }
 //---------------------------------------------------------------------------------
 // The languages Settings offers. A new language adds its strings and a

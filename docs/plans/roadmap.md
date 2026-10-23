@@ -106,7 +106,7 @@ Decided 2026-10-22: a version is kept only when the chip differs from the curren
 
 - **First slot:** every game's first slot is `Main` (`Main.sav`). It can be renamed, and deleted once another slot exists.
 - **Creating a slot:** a game with one slot launches straight in. Hold Select while pressing A to open the picker, which lists the slots and a "New slot…" row; the per-game manager has the same action. A new slot asks for a name (on-screen keyboard), then "Blank" (default) or "Copy of <current slot>". A game with two or more slots shows the picker on every launch, the last slot preselected.
-- **Where things live:** the per-game manager is a "Saves" entry in the game's Start menu; the global manager is a "Saves" row in Settings. The picker stays a chooser (slots, New, Rename on X); the rest is in the manager.
+- **Where things live:** the per-game manager is a "Saves" entry in the game's Start menu; the global manager is a "Saves" row in Settings. The picker stays a chooser (slots, New, Rename on START: the GBA has no X key); the rest is in the manager.
 - **Slot names:** UTF-8, at most 24 characters, unique per game ignoring case; `\ / : * ? " < > |` stripped, trailing dots and spaces trimmed. A rename writes a journal entry first (old and new name) and boot recovery finishes or undoes it, like the `.bak` swap; the power-cut test sweeps rename too.
 - **Slots:** named, deliberate branches, such as Main, Nuzlocke or Speedrun. A game with more
   than one slot shows a picker at launch, with the last slot preselected.
@@ -114,7 +114,7 @@ Decided 2026-10-22: a version is kept only when the chip differs from the curren
   a backup. Restoring one makes it current and pushes the old current save into the history,
   so nothing is lost and no hidden branch appears.
 - **Per-game save manager:** new, rename, duplicate and delete slots. Browse a slot's
-  history, restore a version, and import or export a `.sav`.
+  history, restore a version, and import or export a `.sav`. Built (`source/screens/game_saves.c`): "Saves" in a GBA game's Start menu (Games lists, SD card page, game NOR page) opens the slots with the current one marked; A on a slot lists Launch with this slot (no picker follows), Set as current, Rename, Duplicate, Delete (asks; the slot goes to `/torii/trash` for 30 days; the last slot is refused), History (A on a version asks, then restores) and Export (`/torii/export/<game> - <slot>.sav`, numbered if it exists); "New slot..." and "Import .sav..." (a folder browser from the ROM's folder showing folders and `.sav` files, then the slot to replace, then a question; a file of the wrong size is refused) close the list. Limits: a GBA game only; on the SD page the entry is left out when the popup is already full (nine rows: addons on); a folder lists 28 entries at most; tests `tests/game_saves.sh`.
 - **Global save manager:** orphaned saves whose ROM moved, relinked in one step, and the
   total space used.
 - **Deleting:** a deleted slot goes to `trash/` and is removed after 30 days.

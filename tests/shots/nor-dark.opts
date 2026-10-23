@@ -12,7 +12,7 @@
 -s @20:page.png
 -k @24:START -k @28:-
 -w "screen ready: popup"
--k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:A -k @36:-
+-k @8:UP -k @12:- -k @32:A -k @36:-
 -w "screen ready: confirm"
 -s @8:delete.png
 -k @12:B -k @16:-

@@ -70,6 +70,15 @@ u32 action_game_facts(const char *path, struct action_facts *out);
 // its record in its folder of saves (gamerec.h), which its next launch uses.
 // 1 if written.
 int action_set_save_type(const char *path, u32 save_type);
+// The save manager's facts about a GBA game on the card or a game NOR entry
+// (path, as action_launch takes it): its save path name (gamesave.h; rom, rom_size
+// bytes) and the size its save has (*bytes). 0 if it has no saves to manage (not
+// a GBA game, a save type of no size).
+int action_game_saves(const char *path, char *rom, u32 rom_size, u32 *bytes);
+// 1: the next launch does not ask for a slot (the save manager set the
+// current one); a launch uses it up. The manager clears it (0) when a launch
+// returns without starting.
+void action_slot_chosen(int on);
 // Sets a GBA game's own boot mode (ACTION_BOOT_*) in the same file, which A,
 // Play and Launch then use instead of Settings'. 1 if written.
 int action_set_boot_mode(const char *path, u32 boot_mode);

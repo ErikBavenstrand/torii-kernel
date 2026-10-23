@@ -73,8 +73,19 @@ void action_nor_read(void)
 // is the game's save path name (gamesave.h), bytes its save's size (0: it has
 // no save, so no slots), title the picker's. 1 if the launch stops (B, or a
 // failure shown); the menu's session is over then, as after a failed launch.
+static u8 slot_skip;
+
+void action_slot_chosen(int on)
+{
+	slot_skip = on != 0;
+}
+
 static int slot_choose(const char *rom, u32 bytes, const char *title)
 {
+	if (slot_skip) {  // the save manager chose the slot already: once
+		slot_skip = 0;
+		return 0;
+	}
 	if (!bytes)
 		return 0;
 	int force = ui_active() && (ui_input()->held & INPUT_SELECT) != 0;
@@ -202,6 +213,32 @@ u32 action_game_facts(const char *path, struct action_facts *out)
 		out->save_type = game.save_num < ACTION_SAVE_TYPES ? game.save_num : 0;
 		out->boot_mode = game.boot_mode < ACTION_BOOTS ? game.boot_mode : ACTION_BOOT_DEFAULT;
 		out->cheats = game.havecht;
+	}
+	game_leave();
+	return ok;
+}
+
+int action_game_saves(const char *path, char *rom, u32 rom_size, u32 *bytes)
+{
+	*bytes = 0;
+	if (!copy_path(path))
+		return 0;
+	const char *nor = userdata_nor_name(path_copy);
+	if (nor) {
+		action_nor_read();
+		u32 game = NOR_game_named(nor);
+		if (game >= game_total_NOR || gamesave_nor_path(rom, rom_size, pNorFS[game].filename) < 0)
+			return 0;
+		*bytes = Get_savefilesize(pNorFS[game].savemode);
+		return *bytes != 0;
+	}
+	if (!game_enter("saves"))
+		return 0;
+	struct game_pick game = {.name = current_filename};
+	int ok = 0;
+	if (Game_pick(&game) && !game.is_emu && gamesave_rom_path_in(rom, rom_size, currentpath, game.name) >= 0) {
+		*bytes = Game_save_bytes(&game);
+		ok = *bytes != 0;
 	}
 	game_leave();
 	return ok;

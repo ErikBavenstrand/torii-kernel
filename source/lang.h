@@ -203,6 +203,7 @@ enum {
 	LANG_POP_ADDON,
 	LANG_POP_RENAME,
 	LANG_POP_INFO,
+	LANG_POP_SAVES,
 	LANG_POP_DELETE,
 	LANG_POP_ITEMS,
 };
@@ -269,6 +270,34 @@ struct lang_slots {
 	const char *gone;     // SLOTSTORE_NO_SLOT
 };
 extern const struct lang_slots *gl_slots;
+
+// The per-game save manager (screens/game_saves.c)
+struct lang_gsaves {
+	const char *title;          // the manager's title bar, and the Start menus' entry
+	const char *slot_title, *history_title, *import_title, *into_title;
+	const char *import_row;     // the manager's last row
+	const char *act_launch, *act_set, *act_rename, *act_dup, *act_delete, *act_history, *act_export;
+	const char *dup_title;      // the name prompt's title bar
+	const char *hint_restore;   // A in the history
+	const char *empty;         // a folder with nothing to pick
+	const char *no_slots;       // import with no slot to take it
+	const char *delete_text;    // under "Delete <slot>?"
+	const char *restore_text;   // under "Restore version <n>?"
+	const char *import_text;    // under "Import into <slot>?"
+	const char *exported;       // before the path
+	const char *no_history;
+	const char *last;           // SLOTSTORE_LAST
+	const char *gone_file;      // SLOTSTORE_NO_FILE
+	const char *gone_version;   // SLOTSTORE_NO_VERSION
+	const char *unknown;        // a version whose clock was not set
+	const char *current;        // the title bar's mark for the current slot
+};
+extern const struct lang_gsaves *gl_gsaves;
+#define EN_GS_DELETE "Delete %s?"
+#define EN_GS_RESTORE "Restore version %lu?"
+#define EN_GS_IMPORT "Import into %s?"
+// SLOTSTORE_SIZE: the size the game's save has
+#define EN_GS_SIZE "That file isn't %lu KB, the size of this game's save."
 #define EN_SLOT_COPY_OF "Copy of %s"
 // A key past the cap says so, with the cap
 #define EN_RENAME_TOO_LONG "Names stop at %u letters."

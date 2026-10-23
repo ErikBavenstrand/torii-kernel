@@ -36,6 +36,7 @@
 #include "../ui/dialog.h"
 #include "../ui/letter.h"
 #include "../ui/ui.h"
+#include "game_saves.h"
 #include "rename.h"
 
 // --- Look, px (spec.md's grid: title bar 0-18, content 20-143, hints at 147) ---
@@ -1403,6 +1404,18 @@ static void rename_game(u32 row)
 	}
 }
 
+// The save manager for the game the popup was about; "Launch with this slot"
+// starts the game without asking for the slot again
+static void saves_game(u32 row)
+{
+	if (game_saves_run(games.title) == GAME_SAVES_LAUNCH) {
+		action_slot_chosen(1);
+		launch(ACTION_DEFAULT, 0, 0);
+		action_slot_chosen(0);  // returned: it did not start
+	}
+	reshow(row);
+}
+
 // The game popup for row i, run after the frame. On the Favourites page
 // its favourite's changes reach the kept order once it has closed.
 #define FAV_SETTLE() \
@@ -1432,6 +1445,8 @@ static void popup_run(u32 i)
 		popup_add(LANG_POP_CLEAN, 0, 0);
 		popup_add(LANG_POP_ADDON, 0, addons_off() ? UI_POP_DIM : 0);
 	}
+	if (game_saves_probe(games.pick))
+		popup_add(LANG_POP_SAVES, 0, 0);
 	if (!nor && g.rec != LIBRARY_NONE)
 		popup_add(LANG_POP_RENAME, 0, 0);  // a name in names.txt, for games the lists name
 	popup_add(LANG_POP_INFO, 0, 0);
@@ -1497,6 +1512,9 @@ static void popup_run(u32 i)
 			return;
 		case LANG_POP_INFO:
 			game_info(&g);
+			return;
+		case LANG_POP_SAVES:
+			saves_game(i);
 			return;
 		case LANG_POP_RENAME:
 			rename_game(i);
