@@ -73,7 +73,7 @@ mren -i "$img" ::/G/Old.gba ::/G/Renamed.gba
 # The Saves row (nav_setting), A on it, and the screen
 to_screen=(-k @8:A -k @12:- -w "screen ready: saves")
 
-# 1 and 2: the figures, then Relink to Renamed.gba (the picker's second GBA game)
+# 1 and 2: the figures, then Move to Renamed.gba (the picker's second GBA game)
 # shellcheck disable=SC2046 # nav.sh's options
 boot $(nav_setting saves) "${to_screen[@]}" -s @6:"$shots/1-list.png" \
   -k @56:A -k @60:- -w "saves: popup" -k @20:A -k @24:- -w "saves: picker" \

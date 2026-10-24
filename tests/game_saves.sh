@@ -3,7 +3,7 @@
 # the keys, each case on a card of its own: Hello.gba in the GBA list, START
 # for its popup, Saves (second, after Play), then the slots' page (the slots,
 # then + New slot), a slot's popup (START: Play, Make active when it isn't,
-# Backups, Rename, Copy to new slot, Export .sav, Delete) and its backups
+# Backups, Rename, Copy to new slot, Delete) and its backups
 # (RIGHT):
 #   open        the page lists the slots; B returns to the list
 #   new         New slot, Empty, named q
@@ -15,7 +15,6 @@
 #   last        Delete on the only slot is refused; Main stays
 #   backups     RIGHT lists the backups, Restore puts one in the slot and the
 #               old save in the backups as the newest
-#   export      Export writes /torii/export/Hello - Main.sav, a second is numbered
 #   import      New slot, From a .sav file: /Z.sav as a new slot Z; nothing else changes
 #   import-size a file of the wrong size is refused; nothing changes
 #   active      Make active changes the record only
@@ -241,26 +240,6 @@ echo "$h" | grep -q "^0003-" || fail "backups: the old save isn't version 3: $h"
 echo "$h" | grep -q "^0001-20260101-120000" || fail "backups: version 1 is gone: $h"
 ! echo "$h" | grep -q "^0002-" || fail "backups: version 2 stayed in the backups: $h"
 echo "PASS: game saves: Backups restores one, the old save becomes the newest backup"
-
-# export, twice
-card export Main q
-route
-k 30 START
-scr game-saves-slot
-k 20 DOWN DOWN DOWN DOWN A
-scr dialog
-k 30 A
-k 60 START
-scr game-saves-slot
-k 20 DOWN DOWN DOWN DOWN A
-scr dialog
-k 30 A
-k 60 B
-run -f 900
-logged "gsaves: export Main to /torii/export/Hello - Main.sav: 0"
-[ "$(sum "/torii/export/Hello - Main.sav")" = "$(sum $S/Main.sav)" ] || fail "export: the copy differs"
-has "/torii/export/Hello - Main (2).sav" || fail "export: the second export was not numbered"
-echo "PASS: game saves: Export writes a copy to /torii/export, a second one is numbered"
 
 # import: /Z.sav as a new slot (the browser starts in the ROM's folder, the
 # root: the torii folder, then Z.sav)

@@ -241,13 +241,15 @@ static const struct ui_view_spec pick_view = {"saves-pick", pick_nodes, N_COUNT,
 
 /* ---- Showing ---- */
 
+// A empty trash with nothing in it does nothing: its row is faint, 0 KB
+// beside it, and the hints offer only B
 static void show_keys(struct saves *s)
 {
 	u32 n = 0;
-	const char *a = s->mode == M_PICK            ? gl_saves->hint_relink
-			: s->cursor == s->scan.count ? gl_saves->hint_empty
-						     : gl_saves->hint_open;
-	s->keys[n++] = (struct ui_hint){"A", a};
+	int trash = s->mode == M_MAIN && s->cursor == s->scan.count;
+	const char *a = s->mode == M_PICK ? gl_saves->hint_relink : trash ? gl_saves->hint_empty : gl_saves->hint_open;
+	if (!trash || s->scan.trash_files)
+		s->keys[n++] = (struct ui_hint){"A", a};
 	s->keys[n++] = (struct ui_hint){"B", gl_hint_back};
 	ui_hints_set(s->hints, s->keys, n);
 }
@@ -264,8 +266,10 @@ static void show_figures(struct saves *s)
 	ui_title_set(s->title, gl_saves->title);
 	size_text(s->right, sizeof(s->right), sc->saves_bytes + sc->backups_bytes + sc->trash_bytes);
 	ui_title_set_right(s->title, s->right);
-	snprintf(s->line, sizeof(s->line), EN_SAVES_LEGEND, (unsigned long)(sc->saves_bytes + 1023) / 1024,
-		 (unsigned long)(sc->backups_bytes + 1023) / 1024, (unsigned long)(sc->trash_bytes + 1023) / 1024);
+	char saves[16], backups[16];
+	size_text(saves, sizeof(saves), sc->saves_bytes);
+	size_text(backups, sizeof(backups), sc->backups_bytes);
+	snprintf(s->line, sizeof(s->line), EN_SAVES_LEGEND, saves, backups);
 	ui_label_set((u8)(s->first + M_LINE), s->line);
 	s->parts[0] = sc->saves_bytes;
 	s->parts[1] = sc->backups_bytes;
@@ -455,10 +459,8 @@ static void orphan_menu(struct saves *s, u32 o)
 
 static void empty_trash(struct saves *s)
 {
-	if (!s->scan.trash_files) {
-		dialog_message(NULL, gl_saves->trash_empty, DIALOG_INFO);
+	if (!s->scan.trash_files)
 		return;
-	}
 	struct ui_confirm ask = {gl_saves->ask_empty, gl_saves->ask_empty_text, gl_saves->ask_empty_button, 1};
 	if (!ui_confirm(s->hints, &ask))
 		return;

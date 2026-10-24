@@ -161,21 +161,25 @@ From the cart's logs after the v0.5 save screens and a review round (a bug and p
 
 ### v0.5.2 (planned)
 
-Everything open after v0.5.1, and the memory and speed work found in a survey of the build (2026-10-24). A settings and save pages UX review runs in its own branch; its findings join this list.
+Everything open after v0.5.1, and the memory and speed work found in a survey of the build (2026-10-24). A settings and save pages UX review ran in its own branch: see UX review below.
 
 **Decisions for the owner**
 
-- **Export .sav:** the slot popup's Export copies a slot to `/torii/export/<game> - <slot>.sav`. Every slot is already a plain `.sav` at `/torii/saves/<rom path>/<slot>.sav`, and an export is only useful on a PC, where that file is at hand. Proposed: remove it (the popup drops to 6 items, no scroll; less code and strings).
-- **A quick favourite key** (SELECT in the lists; favouriting takes five presses): v0.4 keeps SELECT free.
-- **Play « default » doesn't say what default does** (the game's boot mode, else Settings'): showing it needs the record, a card read the popup avoids.
+- **Export .sav:** decided 2026-10-24: removed (UX review below). `slotstore_export` and its tests remain in `slotstore.c`, with no menu caller.
+- **A quick favourite key:** decided 2026-10-24: SELECT stays free.
+- **Play « default »:** decided 2026-10-24: stays as it is.
 
 **UX**
 
 - Game info's Played is blank for a game off Recent.
-- The backups page labels a date "Age" when the clock is behind.
-- Empty trash with nothing in it opens a message.
 - A deep SD folder takes one B a level.
-- Settings' hint bar shows the row's explanation rather than its keys.
+- The backups page's "Age", Empty trash's message and Settings' hint bar: done or decided in the UX review below.
+
+**UX review** (`docs/design/v0.5/settings-ux-review.md`, bb89ccd, 48b5e95)
+
+- **Done:** a **Saves** card in Settings after Games (Save without asking, Backups kept, Clean up saves ›), out of Games, Library and System; Auto save is **Save without asking** (*No "Save to SD card?" after a game.*); the Saves row and page are **Clean up saves** / **Clean up**; Export .sav removed (the slot popup is 6 items); the save pages' notes say what A does to a slot and what Play with picks, not the keys; backups: **Made** for Age, **Backup N** for "#N", "the newer one is kept", B back; **Move to a game** for Relink, A's hint **menu**; the storage line in KB/MB per figure (the trash's on its row); Empty trash with nothing in it is inert (no A chip, no dialog); explanations for Fast patching and Backups kept.
+- **Decided, kept:** Settings' hint bar shows the row's explanation (the keys show once editing starts).
+- **Open (owner):** Clean up listing every game with saves, each opening its Saves page; A on a slot plays at once (direction B's choice) or opens its popup; Play with's title is the file name, not the display name; a legend for the storage bar's three shades; New slot's pane heading peeks above its popup; the kept backup's note assumes save types are known; the Saves card after Games or after Library.
 
 **Speed** (the card's reads are ~2 ms a sector on the cart; most lag is sector count)
 

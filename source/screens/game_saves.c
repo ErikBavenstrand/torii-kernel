@@ -32,7 +32,6 @@ extern FILINFO fileinfo;  // ezkernelnew.c's
 extern DIR dir;
 extern u8 pReadCache[];
 
-#define EXPORT_DIR "/torii/export"
 #define BACKUP_ROWS SAVE_PAGE_ROWS
 #define FILE_ENTRIES 28
 #define FILE_NAME 48  // bytes of a listed name; longer ones are not listed
@@ -52,7 +51,6 @@ enum {
 	ACT_BACKUPS,
 	ACT_RENAME,
 	ACT_COPY,
-	ACT_EXPORT,
 	ACT_DELETE,
 	ACT_COUNT
 };
@@ -277,7 +275,7 @@ static int backups_read(void)
 		if (t)
 			when_text(gs.u.b.ago[i], sizeof(gs.u.b.ago[i]), t, 1);
 		else
-			gs_snprintf(gs.u.b.ago[i], sizeof(gs.u.b.ago[i]), "#%lu", (unsigned long)gs.u.b.v[i].n);
+			gs_snprintf(gs.u.b.ago[i], sizeof(gs.u.b.ago[i]), EN_GS_BACKUP_N, (unsigned long)gs.u.b.v[i].n);
 		gs.rows[i] = (struct save_page_row){gs.u.b.ago[i], 0, 0};
 	}
 	return n;
@@ -305,7 +303,7 @@ static void backup_hints(void *ctx, u32 row, const struct ui_hint **keys, u32 *c
 	(void)ctx;
 	(void)row;
 	gs.hints[0] = (struct ui_hint){"A", gl_gsaves->hint_restore};
-	gs.hints[1] = (struct ui_hint){"B", gl_gsaves->hint_slots};
+	gs.hints[1] = (struct ui_hint){"B", gl_hint_back};
 	*keys = gs.hints;
 	*count = 2;
 }
@@ -358,38 +356,6 @@ static void backups(void)
 	}
 	save_page_close();
 	gs_snprintf(gs.want, sizeof(gs.want), "%s", gs.slot);
-}
-
-/* ---- Export ---- */
-
-static void export_slot(const char *slot)
-{
-	f_mkdir("/torii");
-	f_mkdir(EXPORT_DIR);
-	const char *base = strrchr(gs.rom, '/');
-	base = base ? base + 1 : gs.rom;
-	u32 stem = (u32)strlen(base);
-	const char *dot = strrchr(base, '.');
-	if (dot && dot != base)
-		stem = (u32)(dot - base);
-	int r = SLOTSTORE_TAKEN;
-	dialog_notice(gl_gsaves->title, gl_gsaves->copying, DIALOG_INFO);
-	for (u32 k = 1; k <= 9 && r == SLOTSTORE_TAKEN; k++) {
-		if (k == 1)
-			gs_snprintf(gs.path, sizeof(gs.path), EXPORT_DIR "/%.*s - %s.sav", (int)stem, base, slot);
-		else
-			gs_snprintf(gs.path, sizeof(gs.path), EXPORT_DIR "/%.*s - %s (%lu).sav", (int)stem, base, slot,
-				    (unsigned long)k);
-		r = slotstore_export(gs.rom, slot, gs.path);
-	}
-	dialog_notice_end();
-	tlog("gsaves: export %s to %s: %d", slot, gs.path, r);
-	if (r != SLOTSTORE_OK) {
-		fail(r);
-		return;
-	}
-	gs_snprintf(gs.text, sizeof(gs.text), "%s\n%s", gl_gsaves->exported, gs.path);
-	dialog_message(NULL, gs.text, DIALOG_INFO);
 }
 
 /* ---- New slot from a .sav file: a minimal file browser ---- */
@@ -597,11 +563,9 @@ static int slot_menu(u32 row)
 {
 	gs_snprintf(gs.slot, sizeof(gs.slot), "%s", gs.slots[row].name);
 	int act = !strcmp(gs.slot, gs.active);
-	static const u8 order[ACT_COUNT] = {ACT_PLAY, ACT_ACTIVE, ACT_BACKUPS, ACT_RENAME,
-					    ACT_COPY, ACT_EXPORT, ACT_DELETE};
+	static const u8 order[ACT_COUNT] = {ACT_PLAY, ACT_ACTIVE, ACT_BACKUPS, ACT_RENAME, ACT_COPY, ACT_DELETE};
 	const char *const text[ACT_COUNT] = {gl_gsaves->act_play,   gl_gsaves->act_active, gl_gsaves->act_backups,
-					     gl_gsaves->act_rename, gl_gsaves->act_copy,   gl_gsaves->act_export,
-					     gl_gsaves->act_delete};
+					     gl_gsaves->act_rename, gl_gsaves->act_copy,   gl_gsaves->act_delete};
 	char count[8];
 	gs_snprintf(count, sizeof(count), EN_GS_BACKUPS, (unsigned long)gs.backups[row]);
 	u32 n = 0;
@@ -677,7 +641,6 @@ static int slot_menu(u32 row)
 			return DONE_REOPEN;
 		}
 		default:
-			export_slot(gs.slot);
 			return DONE_STAY;
 		}
 	}
