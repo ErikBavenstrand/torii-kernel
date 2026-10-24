@@ -323,6 +323,9 @@ void IWRAM_CODE Bank_Switching(u8 bank)
 // Erases one block of the kernel's NOR and writes buffersize bytes to it.
 // Returns how many halfwords read back wrong; all of them, writing nothing,
 // for a block outside the kernel's data sectors (bootloader.h).
+// Save_info's next write may program in place (Save_sav_info's clear)
+static u8 save_info_in_place;
+
 u32 IWRAM_CODE Save_info(u32 info_offset, u16 *info_buffer, u32 buffersize)
 {
 	u32 offset;
@@ -347,6 +350,33 @@ u32 IWRAM_CODE Save_info(u32 info_offset, u16 *info_buffer, u32 buffersize)
 	*((vu16 *)(FlashBase_S71)) = 0xF0;
 
 	offset = info_offset;//0x7A0000/0x7B0000 ;
+
+	// Torii: the pending-save record cleared to zeros (save_info_in_place)
+	// needs no erase, about 0.7 s of it: NOR programs 1s to 0s in place, so
+	// only the halfwords that change are programmed, the flag first. Every
+	// other record is erased and written whole, as before.
+	int erase = !save_info_in_place;
+	save_info_in_place = 0;
+	for (loopwrite = 0; loopwrite < buffersize / 2 && !erase; loopwrite++) {
+		u16 old = *((vu16 *)(FlashBase_S71 + offset + loopwrite * 2));
+		erase = (old & buf[loopwrite]) != buf[loopwrite];
+	}
+	if (!erase) {
+		written = buffersize / 2;
+		for (loopwrite = 0; loopwrite < written; loopwrite++) {
+			if (*((vu16 *)(FlashBase_S71 + offset + loopwrite * 2)) == buf[loopwrite])
+				continue;
+			*((vu16 *)(FlashBase_S71 + 0x555 * 2)) = 0xAA;
+			*((vu16 *)(FlashBase_S71 + 0x2AA * 2)) = 0x55;
+			*((vu16 *)(FlashBase_S71 + 0x555 * 2)) = 0xA0;
+			*((vu16 *)(FlashBase_S71 + offset + loopwrite * 2)) = buf[loopwrite];
+			do {
+				v1 = *((vu16 *)(FlashBase_S71 + offset + loopwrite * 2));
+				v2 = *((vu16 *)(FlashBase_S71 + offset + loopwrite * 2));
+			} while (v1 != v2);
+		}
+		goto verify;
+	}
 
 	*((vu16 *)(FlashBase_S71 + 0x555 * 2)) = 0xAA;
 	*((vu16 *)(FlashBase_S71 + 0x2AA * 2)) = 0x55;
@@ -392,6 +422,7 @@ u32 IWRAM_CODE Save_info(u32 info_offset, u16 *info_buffer, u32 buffersize)
 		}
 	}
 
+verify:
 	*((vu16 *)(FlashBase_S71)) = 0xF0;
 	// Torii: read it back
 	for (loopwrite = 0; loopwrite < written; loopwrite++)
@@ -415,6 +446,7 @@ static void log_info_write(const char *what, u32 buffersize, u32 wrong)
 
 void IWRAM_CODE Save_sav_info(u16 *SAV_info_buffer, u32 buffersize)
 {
+	save_info_in_place = SAV_info_buffer[0] != 0x11;  // a clear: zeros over the record
 	log_info_write(SAV_info_buffer[0] == 0x11 ? "the pending-save record" : "an empty pending-save record",
 		       buffersize, Save_info(SAVE_info_offset, SAV_info_buffer, buffersize));
 }
