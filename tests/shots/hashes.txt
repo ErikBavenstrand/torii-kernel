@@ -330,13 +330,13 @@ info-read/scrolled FC2885411A153C33
 info-read/frames 0-1 F3D1D76C241AA2D2
 info-read/frames 2-2 5BF1B516875CF024
 info-read/frames 3-3 94836A2D8203DC90
-info-read/frames 4-12 47778893E1D42B25
-info-read/frames 13-13 7350206A573CA6DD
-info-read/frames 14-14 57BD66D7D58C467D
-info-read/frames 15-15 30A49A89D757BF91
-info-read/frames 16-16 0EB1CADB6D26281C
-info-read/frames 17-17 26D5CBC998640A1D
-info-read/frames 18-22 58C6DE28040EB31D
+info-read/frames 4-11 47778893E1D42B25
+info-read/frames 12-12 7350206A573CA6DD
+info-read/frames 13-13 57BD66D7D58C467D
+info-read/frames 14-14 30A49A89D757BF91
+info-read/frames 15-15 0EB1CADB6D26281C
+info-read/frames 16-16 26D5CBC998640A1D
+info-read/frames 17-22 58C6DE28040EB31D
 nav-push-fail/error 8DA1D73368B07BC5
 nav-push-fail/page 7857C96979E6C7B0
 nor-dark/closed 0A43620B78FFDEF1
