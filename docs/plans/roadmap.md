@@ -233,9 +233,6 @@ v0.5.2's open items, the owner's answers to the UX review's questions (2026-10-2
 - **Emulators:** Jagoomba Color is built in as a default that the table can override.
   PocketNES and the rest load as plugins: sms, gg, sg, sv, ws, wsc, ngp, pce, z80, col, c8,
   nes, plus the viewer plugins.
-- **Extensions:** none for now. File types, launch handlers and menu actions go through
-  internal registries, so an extension system can be added once there is something to put in
-  it.
 
 ## v0.7 In-game menu
 
