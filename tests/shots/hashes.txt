@@ -41,7 +41,7 @@ boot-progress/frames 0-3 818B02E74B016B0D
 boot-progress/frames 4-7 7C573B18E65FE325
 boot-progress/frames 8-12 985A0C30AC9AC713
 boot-progress/frames 13-28 9D5EA05F12ADBBF3
-boot-progress-big/loading 6215C375000D642B
+boot-progress-big/loading 34CC6C75F5874C53
 boot-slow/home 818B02E74B016B0D
 boot-slow/notice 1F73F83DB4B12863
 boot-slow/frames 0-1 7C573B18E65FE325
@@ -88,7 +88,7 @@ games-art/gba E4D66E146FB6D219
 games-art/gba-crc EAE4B45AD06AF276
 games-art/gba-none 7A533A78D3E4D987
 games-art/recent D6B09D15BF64F7E1
-games-art-box/gba B283B0831EAA819C
+games-art-box/gba D190CBFE3772B2F2
 games-art-dark/gba 743CC2D257F80E8A
 games-art-dark/gba-none 6DD7FD2BF9FD37DC
 games-art-popup/popup FFB6C87985AFD153
@@ -114,8 +114,8 @@ games-gba/cancelled 3F6800D51BAB2786
 games-gba/closed 7C5107676E6593E0
 games-gba/delete 91DAB5F33422BD04
 games-gba/down 5FDFD6D57D176F66
-games-gba/info 4AB5CA097C79575E
-games-gba/info-sram D90679922BFDE48A
+games-gba/info 0D8039CD687EB4F4
+games-gba/info-sram 77CB7254B0D68A20
 games-gba/letter 77E7DC56ADF4E619
 games-gba/popup 11E3BFB01C79E6CD
 games-gba/screen 928ED4ADD2922192
@@ -190,7 +190,7 @@ games-light/frames 65-65 7D50D3B1581729DB
 games-light/frames 66-66 A1753B24548C8447
 games-light/frames 67-82 621380C02B053ACF
 games-names/gba 92EEE8F8B5064AC3
-games-names/info 0363B9029E1036A0
+games-names/info 2A32B60BB0746E8E
 games-recent/down 0310CB9CF59E5167
 games-recent/screen 1CFB4BFF7E049AFF
 home/gba 7CB9829E643E6EDB
@@ -330,13 +330,13 @@ info-read/scrolled FC2885411A153C33
 info-read/frames 0-1 F3D1D76C241AA2D2
 info-read/frames 2-2 5BF1B516875CF024
 info-read/frames 3-3 94836A2D8203DC90
-info-read/frames 4-12 47778893E1D42B25
-info-read/frames 13-13 7350206A573CA6DD
-info-read/frames 14-14 57BD66D7D58C467D
-info-read/frames 15-15 30A49A89D757BF91
-info-read/frames 16-16 0EB1CADB6D26281C
-info-read/frames 17-17 26D5CBC998640A1D
-info-read/frames 18-22 58C6DE28040EB31D
+info-read/frames 4-11 47778893E1D42B25
+info-read/frames 12-12 7350206A573CA6DD
+info-read/frames 13-13 57BD66D7D58C467D
+info-read/frames 14-14 30A49A89D757BF91
+info-read/frames 15-15 0EB1CADB6D26281C
+info-read/frames 16-16 26D5CBC998640A1D
+info-read/frames 17-22 58C6DE28040EB31D
 nav-push-fail/error 8DA1D73368B07BC5
 nav-push-fail/page 7857C96979E6C7B0
 nor-dark/closed 0A43620B78FFDEF1
