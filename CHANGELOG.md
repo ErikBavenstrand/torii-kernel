@@ -6,6 +6,18 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** the first file or folder made after power-on no longer
+  stalls: a background job finds the FAT's first free cluster from the
+  mount on (on a 32 GB card with games ahead of the free space, FatFs read
+  ~600 FAT sectors first: a second or more before a save copy's first write,
+  and seconds of a frozen menu inside the library's index write) (fb1cba6).
+- **Changed:** a save copy no longer erases a NOR sector to clear the
+  pending-save record (0.7 s): the record is programmed to zeros in place
+  (4a32b27); the move into the backups compares no bytes, and slot copies
+  verify by CRC with one read-back (2310fed).
+- **Changed:** copying a save (a slot copy, a slot from a file, an export)
+  shows a notice; the saves page says when it can't open; Play's « » boot
+  carries through Saves, and both START popups offer it on one rule (30f7f1f).
 - **Changed:** the save screens, rebuilt (design direction B,
   `docs/design/v0.5/saves-variants.md`): a game's Saves is a list and detail
   page (`source/screens/save_page.c`): its slots with the active one marked
