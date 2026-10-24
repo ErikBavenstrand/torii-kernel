@@ -1204,6 +1204,8 @@ static void info_values(struct ui_view *v)
 	if (games.info_type < ACTION_SAVE_TYPES) {
 		u32 o = (u32)snprintf(type, sizeof(type), games.info_field ? INFO_OTHER : INFO_PICKED,
 				      s->save_types[games.info_type]);
+		if (o >= sizeof(type))
+			o = sizeof(type) - 1;  // cut short: the second line goes nowhere
 		snprintf(type + o, sizeof(type) - o, games.info_field ? INFO_PICKED : INFO_OTHER,
 			 s->boot_modes[games.info_boot]);
 	}

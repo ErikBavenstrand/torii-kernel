@@ -611,7 +611,7 @@ static int ss_prune(const char *dir, u32 *count, u32 keep)
 			for (u32 k = 0; k < drop && !gone; k++)
 				gone = W->idx[k] == i;
 			if (!gone && kept != i) {
-				strcpy(W->names[kept], W->names[i]);
+				memcpy(W->names[kept], W->names[i], sizeof(W->names[kept]));
 				W->sizes[kept] = W->sizes[i];
 			}
 			if (!gone)
@@ -1456,7 +1456,7 @@ static int push(const char *file, const char *hist_dir, u32 keep, int how)
 	} else {
 		// The newest takes the oldest listed one's place, which is now
 		// left out like those before it
-		strcpy(W->names[oldest_listed(count)], name);
+		memcpy(W->names[oldest_listed(count)], name, sizeof(name));
 		hist_overflow = 1;
 	}
 	return keep ? ss_prune(hist_dir, &count, keep) : SLOTSTORE_OK;

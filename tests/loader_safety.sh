@@ -437,14 +437,18 @@ EOF
       pass "a power cut at $cut in the list migration, and the boot after it"
     fi
   done
-  for cut in kernel:erase:1 kernel:program:1 kernel:program:100; do
+  # A launch programs its record into an erased slot with no erase
+  # (Ezcard_OP.c), its flag last: cut at the first halfword, halfway, and
+  # just before the flag
+  for cut in kernel:program:1 kernel:program:100 kernel:program:255; do
     if shard_case; then
       new_cart "cut-launch-${cut//:/-}"
       boot -c "$cut" $launch -f 700
       boot -k 200:A -k 204:- -f 1500
       pass "a power cut at $cut in the pending-save record, and the boot after it"
     fi
-
+  done
+  for cut in kernel:erase:1 kernel:program:1 kernel:program:100; do
     if shard_case; then
       new_cart "cut-settings-${cut//:/-}"
       boot -c "$cut" $save_setting

@@ -1304,8 +1304,9 @@ static int pending_save(u32 *size)
 		return 0;
 	}
 	*size = Read_sav_info(1) << 9;
-	for (u32 i = 0; i < 0x200 / 2; i++)
+	for (u32 i = 0; i < 0x200 / 2 - 2; i++)  // the record's halfwords past the flag and size
 		SAV_info_buffer[i] = Read_sav_info(i + 2);
+	SAV_info_buffer[0x200 / 2 - 2] = SAV_info_buffer[0x200 / 2 - 1] = 0;
 	return 1;
 }
 

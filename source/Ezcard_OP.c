@@ -549,9 +549,18 @@ void IWRAM_CODE Save_sav_info(u16 *SAV_info_buffer, u32 buffersize)
 	static u16 zeros[SAV_SLOT_BYTES / 2] EWRAM_BSS;
 	u32 k = sav_slot(), wrong = 0;
 	if (SAV_info_buffer[0] != 0x11) {
-		// A clear: the live record's slot is used up (an erased one stays)
+		// A clear: the live record's slot is used up (an erased one stays),
+		// and so is any slot after it that isn't erased (damage, or a cut
+		// in the sector's erase): it would read as the record once the
+		// slots before it are used
 		if (k < SAV_SLOTS && !sav_slot_erased(k))
 			wrong = sav_slot_use(k, zeros);
+		for (u32 j = k + 1; j < SAV_SLOTS && !wrong; j++) {
+			if (!sav_slot_erased(j)) {
+				tlog("nor: a stray pending-save record slot %lu used up", (unsigned long)j);
+				wrong = sav_slot_use(j, zeros);
+			}
+		}
 		log_info_write("an empty pending-save record", buffersize, wrong);
 		return;
 	}
@@ -566,10 +575,17 @@ void IWRAM_CODE Save_sav_info(u16 *SAV_info_buffer, u32 buffersize)
 		save_info_mode = SAVE_INFO_NEW;
 		wrong = Save_info(SAVE_info_offset + k * SAV_SLOT_BYTES, SAV_info_buffer, buffersize);
 	} else if (!wrong) {
-		// Every slot used: the sector is erased, the record into slot 0
+		// Every slot used: the sector is erased (written with 0xFFFF, which
+		// programs nothing), then the record goes into slot 0 in place, its
+		// flag last as in any slot
 		tlog("nor: the pending-save record's %u slots are used: the sector is erased", SAV_SLOTS);
 		k = 0;
-		wrong = Save_info(SAVE_info_offset, SAV_info_buffer, buffersize);
+		memset(zeros, 0xFF, SAV_SLOT_BYTES);
+		wrong = Save_info(SAVE_info_offset, zeros, SAV_SLOT_BYTES);
+		if (!wrong) {
+			save_info_mode = SAVE_INFO_NEW;
+			wrong = Save_info(SAVE_info_offset, SAV_info_buffer, buffersize);
+		}
 	}
 	tlog_debug("nor: the pending-save record in slot %lu", (unsigned long)k);
 	log_info_write("the pending-save record", buffersize, wrong);
