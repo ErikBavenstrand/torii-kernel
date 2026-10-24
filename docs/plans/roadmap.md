@@ -145,6 +145,24 @@ The cart test and one review round (a code reviewer and an adversarial tester) a
 - **Open: `ss_prune` sees at most 64 versions** in directory order.
 - **Open: `Save_recover` runs three times per save copy** (nine `f_stat`s).
 
+### v0.5.1 (2026-10-24)
+
+From the cart's logs after the v0.5 save screens and a review round (a bug and performance reviewer; an independent UX agent works on navigation in its own branch).
+
+- **The first file or folder made after power-on scanned the FAT for a free cluster** (with FSINFO's next-free hint unknown or stale: on the cart's 32 GB card, ~600 FAT sectors, a second or more; the 1.3 s before a save copy's first write, and a background index write that froze the menu for seconds inside one job step). A job (`source/fathint.c`) reads the FAT from the hint (else its start), 8 sectors a step, from the mount on, and sets the hint at the first free cluster.
+- **Clearing the pending-save record erased a NOR sector** (0.7 s each save copy): `Save_info` programs in place when the new data only clears bits of what is there (NOR turns 1s to 0s without an erase), so the clear is a few halfword programs. The erase path is unchanged for everything else.
+- **The move into the history compared the whole file with the newest version** (a 128 KB save read twice): a move compares nothing; only a second name a cut left (same size, same chain) is dropped. A folder with versions isn't made again.
+- **Slot copies verified by reading both files again**: the copy's CRC is taken as it writes, and the new file is read once to check it.
+- **Slot copies, a slot from a file and an export showed nothing for seconds**: a "Copying the save" notice shows meanwhile.
+- **The slots page counted every slot's backups again after Make active**: only after changes that touch them.
+- **Play's « » boot was lost when playing from Saves**, and the two START popups offered Clean on different rules: Saves plays as Play said, and both offer default and clean for a GBA game (addons while one is on), nothing for GB, GBC and NES (they start clean).
+- **The saves page failed silently once on the cart** (BG VRAM, from the Recent page with art; not reproduced in the emulator): it says so now, its seldom-changing labels take one tile set (about 110 tiles less on plane 3), and a failed BG allocation logs the pool's blocks, so the next one can be read.
+- **Open: any new .sav makes the next boot rebuild the whole library index** (the walk's hash covers /torii/saves): keep a separate saves hash and re-mark saved games only.
+- **Open: `remove_tree` reads a trash folder again for each file** (the boot's purge): read once, unlink as it goes.
+- **Open: the library's walk log counts names.db's load and the user's pauses** in its time.
+- **Open: the save copy runs `Save_recover` three times** before writing.
+- **Open: the pending-save record's erase at each launch** (about 0.5 s): a log-structured record (a new slot per launch in an erased sector, an erase every 16) would make it rare.
+
 ## v0.6 Plugins
 
 - **Handoff:** keep the PogoShell handoff exactly as it is, so existing emulators work
