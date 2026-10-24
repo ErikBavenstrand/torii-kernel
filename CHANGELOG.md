@@ -6,6 +6,34 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** a launch no longer erases a NOR sector for the pending-save
+  record (about 0.5 s): the sector holds 128 records in slots, each launch
+  programs the next erased one in place (its flag last, so a cut never leaves
+  half a record pending), and the sector is erased once every 128 launches;
+  in-place writes are bounded by `kernel_nor_program_ok` (a6b5e1d).
+- **Changed:** the card works with fewer, larger writes: each SD write call
+  ends with the driver's 8.6 ms settle delay, so the save copy writes 8 KB a
+  call, slot copies 4 KB and a new save 8 KB, and a new folder's cluster is
+  cleared in one call (64 calls for a 32 KB cluster before: about 0.55 s a
+  folder). The save copy runs its recovery check once, not three times
+  (ae05694, 10db684).
+- **Changed:** a 12-sector write-through cache keeps the folder and FAT
+  sectors FatFs reads again and again (a slot rename read 56, now none; on a
+  cart each costs about 2 ms); each save copy, launch's save and slot
+  operation logs its card reads, writes and time, and the library walk logs
+  its own time and sectors, without names.db's load or the pauses
+  (ae05694, c3e03ca).
+- **Changed:** the kernel's own printf replaces newlib's, whose stdio, heap and
+  float code took 39 KB of ROM and 5.8 KB of IWRAM; a log line formats in
+  21,000 cycles, not 54,000. The language tables and the NES patch are
+  `const`: 1.5 KB more out of IWRAM (9adf9e5, c3e03ca, e860e93).
+- **Fixed:** the trash purge read a folder again for each file it removed, and
+  pruning saw at most 64 backups of a slot: it reaches every one (10db684).
+- **Changed:** B held on the SD page climbs a folder every third of a second
+  up to the card's root; Game info's Played says Not lately or Recently,
+  never blank (a91a367, 8013ed2).
+- **Removed:** the slot store's import and export, which no screen uses since
+  New slot makes a slot from a .sav (7b61033).
 - **Changed:** Settings has a Saves card (Save without asking, was Auto save;
   Backups kept; Clean up saves, was Library's Saves); a slot's popup no longer
   has Export .sav; Empty trash with nothing in it does nothing; the save
@@ -30,14 +58,14 @@ git log, not here.
   pending-save record (0.7 s): the record is programmed to zeros in place
   (4a32b27); the move into the backups compares no bytes, and slot copies
   verify by CRC with one read-back (2310fed).
-- **Changed:** copying a save (a slot copy, a slot from a file, an export)
-  shows a notice; the saves page says when it can't open; Play's « » boot
+- **Changed:** copying a save (a slot copy, a slot from a file) shows a
+  notice; the saves page says when it can't open; Play's « » boot
   carries through Saves, and both START popups offer it on one rule (30f7f1f).
 - **Changed:** the save screens, rebuilt (design direction B,
   `docs/design/v0.5/saves-variants.md`): a game's Saves is a list and detail
   page (`source/screens/save_page.c`): its slots with the active one marked
   and when it was saved, RIGHT for a slot's backups (A restores), START for
-  its popup (Play, Make active, Backups, Rename, Copy to new slot, Export,
+  its popup (Play, Make active, Backups, Rename, Copy to new slot,
   Delete); New slot offers Empty, a copy or a .sav file, which makes a new
   slot and overwrites none. The launch's Play with is the same page. Settings >
   Saves shows a storage bar, then the saves without a game and Empty trash,
