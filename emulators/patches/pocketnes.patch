@@ -59,3 +59,66 @@ index 6f0c3f3..72a8eaf 100644
  #endif
  	
  #if !COMPY
+diff --git a/src/rommenu.c b/src/rommenu.c
+index 3d26831..3e72f7b 100644
+--- a/src/rommenu.c
++++ b/src/rommenu.c
+@@ -263,13 +263,15 @@ void rommenu_frame(){}
+ 
+ u8 *find_nes_header(u8 *base)
+ {
+-	//look up to 256 bytes later for an INES header
++	//look up to 512 bytes later for an INES header (Torii: the kernel puts
++	//the game on a 256-byte boundary, as branches time page crossings by
++	//their ROM address, Dwedit/PocketNES#5)
+ 	u32 *p=(u32*)base;
+ 	
+ 	u32 nes_id=0x1a530000+ne;
+ 	
+ 	int i;
+-	for (i=0;i<64;i++)
++	for (i=0;i<128;i++)
+ 	{
+ 		if (*p==nes_id)
+ 		{
+diff --git a/src/sram.c b/src/sram.c
+index 9814b19..cedc930 100644
+--- a/src/sram.c
++++ b/src/sram.c
+@@ -1146,6 +1146,10 @@ void readconfig() {
+ 		gammavalue = (i & 0xE0)>>5;				//restore gamma value
+ 		i = cfg2->misc;
+ 		stime = i & 0x3;						//restore autosleep time
++		{	//Torii: and its time, which ui.c's sleepset otherwise sets
++			static const u32 sleeptimes[]={60*60*5,60*60*10,60*60*30,0x7F000000};
++			sleeptime=sleeptimes[stime];
++		}
+ 		autostate = (i & 0x60)>>5;				//restore autostate setting
+ 		flicker = ((i & 0x10)^0x10)>>4;			//restore flicker setting
+ 		*cfg=*cfg2;
+diff --git a/src/timeout.s b/src/timeout.s
+index 74f8486..e3443bb 100644
+--- a/src/timeout.s
++++ b/src/timeout.s
+@@ -805,7 +805,7 @@ addcycles:
+ 
+ @MOVE THIS CRAP SOMEWHERE ELSE
+ fiveminutes: .word 5*60*60
+-sleeptime: .word 5*60*60
++sleeptime: .word 0x7F000000 @Torii: autosleep off (stime 3)
+ 	.byte 0
+ 	.byte 0
+ 	.byte 0
+diff --git a/src/ui.c b/src/ui.c
+index 09ce396..99673fa 100644
+--- a/src/ui.c
++++ b/src/ui.c
+@@ -4,7 +4,7 @@ char *strcat_(char *dest, const char *src);
+ 
+ 
+ EWRAM_BSS u8 autoA,autoB;				//0=off, 1=on, 2=R
+-EWRAM_BSS u8 stime=0;
++u8 stime=3;	//Torii: autosleep off by default
+ EWRAM_BSS u8 autostate=0;
+ 
+ //int selected;//selected menuitem.  used by all menus.

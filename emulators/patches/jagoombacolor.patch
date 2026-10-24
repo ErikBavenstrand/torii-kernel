@@ -81,7 +81,7 @@ index a4ec3d1..fc4cbaf 100644
  	.byte 2 @request_gb_type_
  novblankwait:
 diff --git a/src/lcd.s b/src/lcd.s
-index 634594d..1a1e587 100644
+index 634594d..c08c6c9 100644
 --- a/src/lcd.s
 +++ b/src/lcd.s
 @@ -331,6 +331,11 @@ GFX_reset:	@called with CPU reset
@@ -96,6 +96,35 @@ index 634594d..1a1e587 100644
  	@get GBC palette
  	ldr_ r0,memmap_tbl
  	blx_long GetGbcPaletteNumber
+@@ -2357,8 +2362,27 @@ display_frame:	@called at vblank
+ 	bl add_ui_border
+ 	ldrb_ r0,bg_cache_updateok
+ 	movs r0,r0
+-	blne transfer_palette_
++	beq no_bg_wait
++	bl transfer_palette_
+ 
++	@Torii: at gamma 0 the palette goes over fast, and display_bg came
++	@early enough to make Pokemon Crystal stutter on hardware: wait for
++	@line 164 first (Hunter926's fix, EvilJagaGenius/jagoombacolor#46)
++	ldrb_ r0,_gammavalue
++	movs r0,r0
++	bne no_bg_wait
++	ldrb_ r0,sgb_mask		@display_bg returns at once under a mask
++	movs r0,r0
++	bne no_bg_wait
++	mov r1,#REG_BASE
++	ldrh r0,[r1,#REG_VCOUNT]
++	cmp r0,#164
++	bhs no_bg_wait
++df_wait_line:
++	ldrh r0,[r1,#REG_VCOUNT]
++	cmp r0,#164
++	blo df_wait_line
++no_bg_wait:
+ 	bl display_bg
+ 	
+ 	ldmfd sp!,{globalptr,pc}
 diff --git a/src/main.c b/src/main.c
 index b1a1a24..33eac0b 100644
 --- a/src/main.c

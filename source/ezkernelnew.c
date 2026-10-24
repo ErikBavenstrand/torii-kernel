@@ -978,8 +978,10 @@ u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU)
 	SetPSRampage(page);
 
 	// Torii: the emulator (emulators.h), through pReadCache, as a DMA from
-	// cart space to cart space loses its writes; PocketNES is bigger than
-	// pReadCache. The game goes right after it, after PocketNES's header.
+	// cart space to cart space loses its writes. The game goes right after
+	// it; a NES game after PocketNES's header, on a 256-byte boundary, as
+	// PocketNES times branches' page crossings by their ROM address
+	// (Dwedit/PocketNES#5).
 	const u8 *emu = (is_EMU == 3) ? pocketnes_gba : jagoombacolor_gba;
 	u32 emu_size = (is_EMU == 3) ? pocketnes_gba_size : jagoombacolor_gba_size;
 	for (u32 done = 0; done < emu_size; done += 0x20000) {
@@ -987,22 +989,25 @@ u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU)
 		dmaCopy((void *)(emu + done), pReadCache, n);
 		dmaCopy((void *)pReadCache, PSRAMBase_S98 + done, n);
 	}
-	u32 rom_start_address = (is_EMU == 3) ? emu_size + 0x30 : emu_size;
+	u32 rom_start_address = (is_EMU == 3) ? (emu_size + 0x30 + 0xFF) & ~0xFFu : emu_size;
 
 	res = f_open(&gfile, filename, FA_READ);
 	if (res == FR_OK) {
 		filesize = f_size(&gfile);
 
 		if (is_EMU == 3) {
-			// Torii: PocketNES's romheader, whole: the name, the
-			// size, and flags and sprite following at 0 (the
-			// defaults). Its clock is on in its build
-			vu32 *header = (vu32 *)pReadCache;
-			for (u32 i = 0; i < 0x30 / 4; i++)
-				header[i] = 0;
+			// Torii: PocketNES's romheader, whole, after zeros from
+			// the emulator's end: the name, the size, and flags and
+			// sprite following at 0 (the defaults). Its clock is on
+			// in its build
+			u32 gap = rom_start_address - emu_size;
+			vu32 *words = (vu32 *)pReadCache;
+			for (u32 i = 0; i < gap / 4; i++)
+				words[i] = 0;
+			vu32 *header = words + (gap - 0x30) / 4;
 			header[0] = 0x45564153;  // "SAVE"
 			header[8] = filesize;
-			dmaCopy((void *)pReadCache, PSRAMBase_S98 + rom_start_address - 0x30, 0x30);
+			dmaCopy((void *)pReadCache, PSRAMBase_S98 + emu_size, gap);
 		}
 
 		f_lseek(&gfile, 0x0000);

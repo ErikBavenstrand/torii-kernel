@@ -8,7 +8,9 @@ set -euo pipefail
 name=$1
 work=/tmp/torii-emulator/$name
 rm -rf "$work" && mkdir -p "$work"
-git -C "/src/emulators/$name" ls-files -z | (cd "/src/emulators/$name" && xargs -0 cp --parents -t "$work")
+# Not through git: fetch.sh rewrites the checkout's index right before, and
+# the share can show a container the old one for a second
+tar -C "/src/emulators/$name" --exclude=.git -cf - . | tar -C "$work" -xf -
 # Neither uses __DATE__ in what it links, but a fixed date keeps it so
 export SOURCE_DATE_EPOCH=0
 # The Makefiles call make again for their sub-builds: one job keeps the
