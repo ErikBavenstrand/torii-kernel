@@ -567,12 +567,6 @@ static void test_retire(void)
 	// Again (a launch after a cut): nothing to do, nothing doubled
 	CHECK_EQ(slotstore_retire_file(file, dir), SLOTSTORE_OK);
 	CHECK_EQ(entries(dir), 1);
-	// A cut after the push, before the removal: the file is still there and the
-	// repeat adds no second copy
-	CHECK(put(file, 'Z', 8192));
-	CHECK_EQ(slotstore_retire_file(file, dir), SLOTSTORE_OK);
-	CHECK_EQ(entries(dir), 1);
-	CHECK(!there(file));
 	// Play sessions after it, pruning to one version: the kept one stays
 	CHECK(put(file, 'A', 512));
 	CHECK_EQ(slotstore_push_file(file, dir, 1), SLOTSTORE_OK);

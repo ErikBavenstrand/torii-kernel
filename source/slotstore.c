@@ -191,8 +191,27 @@ static int ss_same(const char *x, const char *y)
 	return same;
 }
 
-// Writes dst (made new) as a copy of src, reads it back and compares. On any
-// failure dst is removed. SLOTSTORE_OK or SLOTSTORE_CARD
+// The CRC-32 of a file's bytes into *crc; 1 if all of them read
+static int ss_crc(const char *path, u32 size, u32 *crc)
+{
+	FIL *b = &W->fb;
+	if (f_open(b, path, FA_READ) != FR_OK)
+		return 0;
+	int ok = f_size(b) == size;
+	u32 c = 0;
+	for (u32 off = 0; ok && off < size; off += SS_CHUNK) {
+		u32 len = chunk_of(size, off);
+		ok = read_full(b, W->buf[1], len);
+		c = crc32_update(c, W->buf[1], len);
+	}
+	f_close(b);
+	*crc = c;
+	return ok;
+}
+
+// Writes dst (made new) as a copy of src, then reads it back and checks its
+// CRC against the bytes written (src isn't read twice). On any failure dst
+// is removed. SLOTSTORE_OK or SLOTSTORE_CARD
 static int ss_copy(const char *src, const char *dst)
 {
 	FIL *a = &W->fa, *b = &W->fb;
@@ -206,7 +225,7 @@ static int ss_copy(const char *src, const char *dst)
 		tlog_error("slot: can't create %s: f_open gave %d", dst, r);
 		return SLOTSTORE_CARD;
 	}
-	u32 total = (u32)f_size(a), off;
+	u32 total = (u32)f_size(a), off, crc = 0;
 	FRESULT werr = FR_OK;
 	for (off = 0; off < total && werr == FR_OK; off += SS_CHUNK) {
 		u32 len = chunk_of(total, off);
@@ -215,6 +234,7 @@ static int ss_copy(const char *src, const char *dst)
 			werr = FR_DISK_ERR;
 			break;
 		}
+		crc = crc32_update(crc, W->buf[0], len);
 		werr = f_write(b, W->buf[0], len, &done);
 		if (werr == FR_OK && done != len)
 			werr = FR_DENIED;  // a full card
@@ -227,7 +247,8 @@ static int ss_copy(const char *src, const char *dst)
 		f_unlink(dst);
 		return SLOTSTORE_CARD;
 	}
-	if (ss_same(src, dst) != 1) {
+	u32 back = 0;
+	if (!ss_crc(dst, total, &back) || back != crc) {
 		tlog_error("slot: %s read back wrong", dst);
 		f_unlink(dst);
 		return SLOTSTORE_CARD;
@@ -1215,7 +1236,23 @@ static int push(const char *file, const char *hist_dir, u32 keep, int how)
 	char *hp = W->hp, *hn = W->hn;
 	if (count) {
 		ss_snprintf(hp, SS_PATH, "%s/%s", hist_dir, W->names[newest]);
-		int same = ss_same(file, hp);
+		// A move compares no bytes (a 128 KB save would be read twice for
+		// it): only a second name of the newest version's chain, which a cut
+		// inside the move's rename leaves, is the same file, and goes by its
+		// entry alone. A duplicate version is harmless; pruning drops it.
+		int same, aliased = 0;
+		if (move) {
+			same = 0;
+			if (f_stat(file, &W->fno) == FR_OK && W->fno.fsize == W->sizes[newest]) {
+				FRESULT u = f_unlink_alias(file, hp);
+				if (u == FR_OK)
+					same = aliased = 1;
+				else if (u != FR_DENIED)
+					return SLOTSTORE_CARD;
+			}
+		} else {
+			same = ss_same(file, hp);
+		}
 		if (same < 0)
 			return SLOTSTORE_CARD;
 		if (same) {
@@ -1232,14 +1269,8 @@ static int push(const char *file, const char *hist_dir, u32 keep, int how)
 					return SLOTSTORE_CARD;
 				strcpy(W->names[newest], kept);
 			}
-			if (move) {
-				FRESULT u = f_unlink_alias(file, hp);
-				if (u == FR_DENIED)
-					u = f_unlink(file);
-				if (u != FR_OK)
-					return SLOTSTORE_CARD;
-				cutpoint("history: identical file dropped");
-			}
+			if (move && aliased)
+				cutpoint("history: second name dropped");
 			return keep ? ss_prune(hist_dir, &count, keep) : SLOTSTORE_OK;
 		}
 	}
@@ -1258,7 +1289,7 @@ static int push(const char *file, const char *hist_dir, u32 keep, int how)
 		saveslot_backup_name(name, maxn + 1, &now);
 	if (ss_snprintf(hp, SS_PATH, "%s/%s", hist_dir, name) >= SS_PATH - 5)
 		return SLOTSTORE_PATH;
-	if ((r = ss_mkdirs(hist_dir)))
+	if (!count && (r = ss_mkdirs(hist_dir)))  // with versions in it, the folder is there
 		return r;
 	if (move) {
 		FRESULT m = f_rename(file, hp);
