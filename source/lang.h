@@ -135,10 +135,8 @@ extern char *gl_nor_free_of;
 extern char *gl_nor_empty;
 extern char *gl_nor_format;
 extern char *gl_nor_format_detail;
-extern char *gl_hint_launch;
 extern char *gl_hint_menu;
 extern char *gl_hint_format;
-extern char *gl_nor_launch;
 extern char *gl_nor_info;
 extern char *gl_nor_delete;
 extern char *gl_nor_delete_text;
@@ -199,6 +197,7 @@ enum {
 	LANG_POP_RENAME,
 	LANG_POP_INFO,
 	LANG_POP_SAVES,
+	LANG_POP_UNRECENT,  // the Recent page's Remove: off Recent, the file stays
 	LANG_POP_DELETE,
 	LANG_POP_ITEMS,
 };
@@ -228,6 +227,7 @@ struct lang_games {
 	const char *off, *on;  // Favourite's value
 	const char *delete_text;  // under the Delete confirmation's "Delete <name>?" (EN_GAME_DELETE)
 	const char *delete_button;
+	const char *recent_failed;     // Remove from Recent couldn't write recent.txt
 	const char *save_type_failed;  // Game info's save type couldn't be written
 	const char *boot_mode_failed;  // nor its boot mode
 	const char *info_keys[LANG_INFO_KEYS];  // Game info's lines
@@ -284,7 +284,7 @@ struct lang_gsaves {
 	const char *play_keys;      // Play with's
 	const char *never, *unknown, *none;  // a slot with no file; a time the clock didn't know; no backups
 	const char *note_active, *note_other, *note_play, *note_new, *note_backup, *note_kept;  // the pane's foot
-	const char *hint_play, *hint_options, *hint_backups, *hint_new, *hint_restore, *hint_slots, *hint_cancel;
+	const char *hint_play, *hint_menu, *hint_backups, *hint_new, *hint_restore, *hint_slots, *hint_cancel;
 	const char *act_play, *act_active, *act_backups, *act_rename, *act_copy, *act_export,
 		*act_delete;  // a slot's popup
 	const char *new_empty, *new_file;  // New slot's popup (and EN_GS_COPY_OF)

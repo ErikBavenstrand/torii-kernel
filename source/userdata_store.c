@@ -473,6 +473,17 @@ int userdata_fav_set(const char *path, int on)
 
 // --- Both lists ------------------------------------------------------------------
 
+int userdata_recent_forget(const char *path)
+{
+	snprintf(W->path, sizeof(W->path), "%s", path);
+	u32 count = recent_get();
+	u32 left = userdata_recent_drop(W->u.recent, count, W->path);
+	if (left == count)
+		return 1;
+	tlog("recent: removed %s", W->path);
+	return recent_put(left);
+}
+
 int userdata_forget(const char *path)
 {
 	snprintf(W->path, sizeof(W->path), "%s", path);

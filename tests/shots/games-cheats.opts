@@ -4,6 +4,10 @@
 # game's name, in the game lists' look; A picks the first entry ("On" at
 # its right), and B goes back to the list.
 #! settings 28=1 4=1
+# The tests' hook: lists open on their first row (else a list opens on
+# Hello, the game Recent played last)
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
 -w "nav: home ready"
 -k @8:RIGHT -k @12:-
 -k @20:A -k @24:-

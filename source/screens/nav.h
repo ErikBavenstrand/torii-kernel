@@ -23,11 +23,16 @@
 
 struct ui_view;
 
+// A page's first open in the menu's session (nav_page.enter)
+#define NAV_ROW_FIRST 0xFFFFFFFFu
+
 struct nav_page {
-	// Pushes the page's views for item with its cursor on row (0 as it
-	// opens, or the row it was on when an action shows it again; the page
-	// clamps it to its rows); returns the page's first view, or NULL if it
-	// didn't fit (the reason in ui_error)
+	// Pushes the page's views for item with its cursor on row (the row the
+	// page was left on earlier in this session, or the row it was on when an
+	// action shows it again; the page clamps it to its rows; NAV_ROW_FIRST
+	// the first time it opens: the row it thinks best, as a game list's
+	// last-played game, else its first); returns the page's first view, or
+	// NULL if it didn't fit (the reason in ui_error)
 	struct ui_view *(*enter)(u32 item, u32 row);
 	// The row the page is on, to come back to it after an action (NULL: 0)
 	u32 (*row)(void);
@@ -92,7 +97,8 @@ enum {
 	NAV_TEST_NOR_LAUNCH,  // action_nor_launch(bits 8-15)
 	NAV_TEST_NOR_DELETE,  // action_nor_delete()
 	NAV_TEST_NOR_FORMAT,  // action_nor_format()
-	NAV_TEST_HOME,        // home, facing its first item (tests/nav.sh's routes start there)
+	NAV_TEST_HOME,        // home, facing its first item, and from then on every page opens on
+			      // its first row (tests/nav.sh's routes start there and count rows)
 	NAV_TEST_ACTIONS,
 };
 extern volatile u32 nav_test_action;

@@ -1001,7 +1001,7 @@ static struct ui_view *sd_enter(u32 item, u32 row)
 	// card's root, as the menu starts there)
 	u32 at = memo_find(currentpath);
 	if (at == SDLIST_NONE)
-		at = row;
+		at = row == NAV_ROW_FIRST ? 0 : row;
 	if (sd.find) {
 		// Back from a rename: on the file under its new name
 		u32 found = sdlist_find(&sd.list, sd.ask);

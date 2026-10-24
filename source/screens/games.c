@@ -1028,6 +1028,22 @@ static int art_row(u32 i, char *path, u32 *size)
 	return 1;
 }
 
+// The game Recent played last that this list holds ("" for none): a page
+// opened the first time starts on it (Recent's own list starts there anyway)
+static const char *last_played(void)
+{
+	u32 n = userdata_recent_count();
+	for (u32 i = 0; games.kind != KIND_RECENT && i < n && i < USERDATA_RECENT_MAX; i++) {
+		const char *path = userdata_recent_path(i);
+		u32 rec = games.kind == KIND_FAV ? LIBRARY_NONE : library_find(path);
+		u32 flags = rec != LIBRARY_NONE ? library_flags(rec) : LIB_F_GONE;
+		if (games.kind == KIND_FAV ? userdata_fav_has(path)
+					   : !(flags & LIB_F_GONE) && (flags & LIB_F_CONSOLE) == games.console)
+			return path;
+	}
+	return "";
+}
+
 static struct ui_view *games_enter(u32 item, u32 row)
 {
 	games.item = (u8)item;
@@ -1038,8 +1054,14 @@ static struct ui_view *games_enter(u32 item, u32 row)
 	library_load_now();  // after a launch that failed: the page lists the index, not nothing
 	build();
 	games.unloaded = !library_ready();
-	games.cursor = games.count ? (row < games.count ? row : games.count - 1) : 0;
-	games.row = games.unloaded ? row : games.cursor;
+	if (row == NAV_ROW_FIRST && !games.unloaded) {
+		u32 at = follow_find(last_played());
+		row = at != LIBRARY_NONE ? at : 0;
+		tlog_debug("games: opens on row %lu", (unsigned long)row);  // tests/navigation.sh
+	}
+	u32 at = row == NAV_ROW_FIRST ? 0 : row;
+	games.cursor = games.count ? (at < games.count ? at : games.count - 1) : 0;
+	games.row = games.unloaded ? row : games.cursor;  // NAV_ROW_FIRST: a new index finds it
 	struct ui_view *v = ui_push(&views[games.art][games.kind != KIND_CONSOLE], &games);
 	if (!v)
 		return 0;
@@ -1092,6 +1114,11 @@ static void games_poll(void)
 		u32 row = games.unloaded ? games.row : ui_list_cursor(list_node());
 		// By its game if the cursor rested on one; else (it moves) by its row
 		const char *follow = !games.unloaded && games.follow_row == row ? games.follow : NULL;
+		if (row == NAV_ROW_FIRST) {  // opened the first time before the index: its last game
+			row = 0;
+			if (library_ready())
+				follow = last_played();
+		}
 		tlog_debug("games: a new index (row %lu)", (unsigned long)row);
 		games.unloaded = !library_ready();
 		relist(row, follow);
@@ -1468,6 +1495,8 @@ static void popup_run(u32 i)
 	if (!nor && g.rec != LIBRARY_NONE)
 		popup_add(LANG_POP_RENAME, 0, 0);  // a name in names.txt, for games the lists name
 	popup_add(LANG_POP_INFO, 0, 0);
+	if (games.kind == KIND_RECENT)
+		popup_add(LANG_POP_UNRECENT, 0, 0);
 	if (!nor)
 		popup_add(LANG_POP_DELETE, 0, UI_POP_DANGER);
 	if (!ui_popup_open(list, hints, &games.popup))
@@ -1518,6 +1547,14 @@ static void popup_run(u32 i)
 		}
 		ui_popup_close();
 		FAV_SETTLE();
+		if (action == LANG_POP_UNRECENT) {
+			// The row goes; the cursor stays on the row below it (the next older)
+			if (userdata_recent_forget(games.pick))
+				relist(i, NULL);
+			else
+				dialog_message(NULL, gl_games->recent_failed, DIALOG_ERROR);
+			return;
+		}
 		// A favourite dropped leaves the Favourites page before a launch
 		// that may come back (Game info and Rename list the page again)
 		if (fav != fav_was && games.kind == KIND_FAV && action != LANG_POP_INFO && action != LANG_POP_RENAME)

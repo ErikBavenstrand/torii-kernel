@@ -6,6 +6,13 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** a game list opens on the game played last that it holds (after
+  a play session, A, A plays it again), and every page opens on the row it was
+  left on earlier in the session; Recent's game popup has Remove, which takes
+  a game off Recent and keeps its file (8d92e83).
+- **Changed:** one word per thing: the NOR page says Play like the others,
+  Settings' History is Backups kept, the save pages say START menu
+  (`docs/design/v0.5/ux-review.md`, 8d92e83).
 - **Changed:** a new slot, a rename or a copy in a game that has a save no
   longer makes the next boot rebuild and rewrite the library index: its
   walk counts a game's save folder once (73df309).

@@ -1,0 +1,29 @@
+# Where a game list opens (source/screens/nav.c, games.c): the first time,
+# on the game Recent played last that it lists, so A plays it again
+# (last.png: GBA on Hello, near the list's end); after that, on the row it
+# was left on (kept.png, two rows up). Then Recent's game popup, whose
+# Remove (above Delete) takes Hello off Recent and leaves its
+# file: the cursor stays on the row, now Idle (removed.png).
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-s @8:last.png
+-k @12:UP -k @16:- -k @20:UP -k @24:-
+-k @32:B -k @36:-
+-w "nav: home ready"
+-k @8:A -k @12:-
+-w "nav: page gba ready"
+-s @8:kept.png
+-k @12:B -k @16:-
+-w "nav: home ready"
+-k @8:LEFT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page recent ready"
+-k @8:START -k @12:-
+-w "screen ready: game-popup"
+-k @12:UP -k @16:- -k @20:UP -k @24:-
+-s @30:recent-popup.png
+-k @32:A -k @36:-
+-w "recent: removed /Hello.gba"
+-s @20:removed.png

@@ -56,6 +56,9 @@ static struct {
 	u8 announced;  // "nav: ... ready" logged for this place
 	u8 h24;        // the clock shows 24 hours
 	u8 boot_flush_tried;  // the boot position's idle write was tried this idle spell
+	u8 top_rows;          // the tests' hook: pages open on their first row, always (NAV_TEST_HOME)
+	u16 rows_kept;        // a bit per item: rows[item] holds the row its page was left on
+	u32 rows[NAV_ITEMS];
 	u32 lib_generation;
 	u32 clock_wait;
 	char clock[12];
@@ -337,7 +340,10 @@ void nav_defer(void (*fn)(u32 arg), u32 arg)
 // and fogs out while the page draws; a plain fade if it doesn't show
 static void open_item(u32 item)
 {
-	struct registry_place p = {(u8)item, 1, 0};
+	// On the row it was left on, earlier in this session; the first time,
+	// the page picks (a game list: the game played last)
+	u32 row = nav.top_rows ? 0 : (nav.rows_kept & 1u << item) ? nav.rows[item] : NAV_ROW_FIRST;
+	struct registry_place p = {(u8)item, 1, row};
 	struct ui_zoom zoom;
 	u32 kind = UI_TR_FADE;
 	if (!nav.place.open && home_zoom_open(item, &zoom)) {
@@ -353,7 +359,9 @@ static void open_item(u32 item)
 // facing the nearest when the item went (its last game deleted)
 static void go_back(void)
 {
-	remember();  // its item, for Last place
+	remember();  // its item, for Last place; its row, for the next open
+	nav.rows[nav.place.item] = nav.place.row;
+	nav.rows_kept |= (u16)(1u << nav.place.item);
 	struct registry_place p = {nav.place.item, 0, 0};
 	struct ui_zoom zoom;
 	u32 kind = UI_TR_FADE;
@@ -454,6 +462,7 @@ static void test_hook(void)
 		action_nor_format();
 		break;
 	case NAV_TEST_HOME:
+		nav.top_rows = 1;  // the routes count rows from each page's first
 		if (nav.shown_count)
 			nav.place = (struct registry_place){nav.shown[0], 0, 0};
 		nav.place.open = 0;
