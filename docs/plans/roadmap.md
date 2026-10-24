@@ -203,7 +203,7 @@ v0.5.2's open items, the owner's answers to the UX review's questions (2026-10-2
 - **`impure_data`**: `fmt_strtoul` replaces newlib's `strtoul` and `atoi`; IWRAM free 5,032 to 5,764 bytes.
 - **Stale objects**: `fresh.py track` counts a deleted source as changed, so its object and the linked kernel go.
 - **Kept as they are (owner):** A on a slot plays it; the Saves card after Games; the kept backup's note.
-- **Open (owner): the kept backup itself.** A save type that shrinks moves the slot's save into its history as a backup no pruning removes (the slot starts blank, so it is the only copy). The owner asked why it isn't pruned like the others; the alternative is to make it a slot of its own (slots are never pruned) and drop the special backup and its note.
+- **Kept (owner, 2026-10-24): the kept backup.** A save type that shrinks moves the slot's save into its history as a backup no pruning removes (the slot starts blank, so it is the only copy); making it a slot of its own was the alternative.
 - **Open: Game saves past 256 games** with saves aren't listed (logged).
 
 ## v0.6 Plugins
