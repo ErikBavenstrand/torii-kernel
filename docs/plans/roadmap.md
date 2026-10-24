@@ -173,14 +173,12 @@ Everything open after v0.5.1, a survey of the build's memory and speed, and a se
 - **The pending-save record's erase at each launch** (about 0.5 s): 128 slots in its sector, a launch's record programmed into the next erased one in place (flag last), the sector erased once every 128 launches (`tests/saves.sh record-slots`); in-place writes are bounded by `kernel_nor_program_ok`.
 - **The save copy ran `Save_recover` three times**: once. **The trash purge read a folder again per file**: once. **Pruning saw 64 backups at most**: it keeps the newest 64 listed and removes the older ones beyond.
 - **Open: path walks from the root** (every open under `/torii/saves/<rom path>/` scans `GBA/` again): the cache now answers most of these; relative paths (`f_chdir`) would remove the rest, but the SD page keeps its own current folder. Measure on the cart with the `sd:` lines first.
-- **Open (cart check): whether the 8.6 ms settle delay is needed** after every SD write (EZ-Flash's code; the commands inside one call run back to back without it).
 - **Open: keys tapped during a blocking write are lost** (the settings write, a save copy step): input is polled once a frame. A keypad interrupt could latch presses.
 
 **Memory**
 
 - **newlib's printf** (stdio, a heap, float code: 39 KB of ROM, 5.8 KB of IWRAM data) replaced by the kernel's own (`source/fmt.c`, host-tested against the host's printf): a log line formats in 21,000 cycles, newlib's took 54,000. The language tables and the NES patch are `const`. IWRAM free: 4,268 to 5,032 bytes with the sector cache's 6 KB in it (the deepest stack measured 1.9 KB).
 - **Open: `impure_data` (1.1 KB of IWRAM)** is still linked (newlib's `errno`, from `strtol` and others).
-- **Open: every screen's state is its own EWRAM static** (`games` 3.7 KB, `sd` 3.6 KB, `info` 2.7 KB, `nor` 1.4 KB, Diagnostics' `scr` 1.6 KB): a union of page states or a shared path scratch would free 5 to 8 KB. Not needed while the cache sits in IWRAM.
 
 **UX**
 
@@ -195,6 +193,13 @@ Everything open after v0.5.1, a survey of the build's memory and speed, and a se
 - **`tests/logging.sh open` held B for 4 frames**, inside the settings write's blocked frames once the code got faster: it holds B for 30.
 
 ## v0.6 Plugins
+
+**Fixes carried from v0.5.2 (moved 2026-10-24):**
+
+- **Cart check: whether the 8.6 ms settle delay is needed** after every SD write (EZ-Flash's code; the commands inside one call run back to back without it). Measure with the `sd:` lines; drop the delay, or shorten it, only if the card keeps up.
+- **Screens' EWRAM states**: each screen's state is its own EWRAM static (`games` 3.7 KB, `sd` 3.6 KB, `info` 2.7 KB, `nor` 1.4 KB, Diagnostics' `scr` 1.6 KB): a union of page states or a shared path scratch would free 5 to 8 KB. Do it if the plugin table or the launch path needs the room.
+
+**Plugins**
 
 - **Handoff:** keep the PogoShell handoff exactly as it is, so existing emulators work
   unchanged. The plugin goes at PSRAM 0 with the ROM after it, the argv block is at
