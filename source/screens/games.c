@@ -1404,13 +1404,24 @@ static void rename_game(u32 row)
 	}
 }
 
-// The save manager for the game the popup was about; "Launch with this slot"
-// starts the game without asking for the slot again
-static void saves_game(u32 row)
+static void boot_with_addon(u32 hard);
+
+// Starts the picked game the way Play's « » says (LANG_BOOT_*)
+static void play_as(u32 boot, u32 hard)
+{
+	if (boot == LANG_BOOT_ADDONS)
+		boot_with_addon(hard);
+	else
+		launch(boot == LANG_BOOT_CLEAN ? ACTION_CLEAN : ACTION_DEFAULT, 0, hard);
+}
+
+// The game's saves page; playing a slot there starts the game as Play's
+// « » said, without asking for the slot again
+static void saves_game(u32 row, u32 boot)
 {
 	if (game_saves_run(games.title) == GAME_SAVES_LAUNCH) {
 		action_slot_chosen(1);
-		launch(ACTION_DEFAULT, 0, 0);
+		play_as(boot, 0);
 		action_slot_chosen(0);  // returned: it did not start
 	}
 	reshow(row);
@@ -1513,16 +1524,13 @@ static void popup_run(u32 i)
 			relist(i, NULL);
 		switch (action) {
 		case LANG_POP_PLAY:
-			if (boots[boot] == LANG_BOOT_ADDONS)
-				boot_with_addon(hard);
-			else
-				launch(boots[boot] == LANG_BOOT_CLEAN ? ACTION_CLEAN : ACTION_DEFAULT, 0, hard);
+			play_as(boots[boot], hard);
 			return;
 		case LANG_POP_INFO:
 			game_info(&g);
 			return;
 		case LANG_POP_SAVES:
-			saves_game(i);
+			saves_game(i, boots[boot]);
 			return;
 		case LANG_POP_RENAME:
 			rename_game(i);

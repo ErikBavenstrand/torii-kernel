@@ -623,16 +623,17 @@ static void page_again(void)
 
 static void launch(u32 how, u32 hard);
 
-// Saves: the game's save manager; Launch with this slot starts the game
-// without asking for the slot again
+// Saves: the game's saves page; playing a slot there starts the game as
+// Play's « » said, without asking for the slot again
 static void saves_game(void)
 {
 	memo_store();  // the cursor the page comes back with
 	count_stop();
 	sd.find = 0;
 	if (game_saves_run(sd.name) == GAME_SAVES_LAUNCH) {
+		u32 b = sd.nboots > 1 ? sd.boots[sd.boot] : LANG_BOOT_DEFAULT;  // as Play's « » said
 		action_slot_chosen(1);
-		launch(ACTION_DEFAULT, 0);
+		launch(b == LANG_BOOT_ADDONS ? ACTION_ADDON : b == LANG_BOOT_CLEAN ? ACTION_CLEAN : ACTION_DEFAULT, 0);
 		action_slot_chosen(0);  // it returned: nothing started
 	}
 	page_again();
@@ -803,15 +804,15 @@ static int file_popup_open(u32 i)
 	if (sdlist_is_dir(r)) {
 		pop_add(POP_OPEN, gl_sd_open, 0);
 	} else if (console != LIB_CONSOLE_NONE) {
-		// Play: how it starts steps with LEFT/RIGHT while an addon is on
-		// (its own way, clean, and a GBA game's with addons); Write to NOR
-		// writes it the way Play says
+		// Play: a GBA game's start steps with LEFT/RIGHT (its own way,
+		// clean, and with addons while one is on); Write to NOR writes it
+		// the way Play says
 		sd.nboots = 0;
 		sd.boot = 0;
 		sd.boots[sd.nboots++] = LANG_BOOT_DEFAULT;
-		if (any_addon()) {
+		if (console == LIB_GBA) {  // as the game popup's: GB, GBC and NES start clean
 			sd.boots[sd.nboots++] = LANG_BOOT_CLEAN;
-			if (console == LIB_GBA)
+			if (any_addon())
 				sd.boots[sd.nboots++] = LANG_BOOT_ADDONS;
 		}
 		pop_add(POP_LAUNCH, gl_sd_launch, sd.nboots > 1 ? UI_POP_STEP : 0);

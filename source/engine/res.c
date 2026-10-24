@@ -53,6 +53,29 @@ void res_set_error(const char *format, ...)
 		tlog_error("engine: %s", res_msg);
 }
 
+// The pool's blocks in address order, a log line of "start+len" (u used, c
+// cached, free bare) for each few: what a failed allocation ran into
+static void res_log_blocks(const struct pool *pool)
+{
+	char line[96];
+	u32 n = 0;
+	line[0] = 0;
+	for (u8 b = pool->head; b != POOL_LINK_END; b = pool->blocks[b].link & POOL_LINK_END) {
+		u32 state = pool->blocks[b].link >> 6;
+		n += (u32)snprintf(line + n, sizeof(line) - n, " %u+%u%s", pool->blocks[b].start, pool->blocks[b].len,
+				   state == POOL_USED     ? "u"
+				   : state == POOL_CACHED ? "c"
+							  : "");
+		if (n > sizeof(line) - 16) {
+			tlog("engine: %s:%s", pool->name, line);
+			n = 0;
+			line[0] = 0;
+		}
+	}
+	if (n)
+		tlog("engine: %s:%s", pool->name, line);
+}
+
 u8 res_alloc(enum res_kind kind, u16 len, u16 align, u16 lo, u16 hi, u16 tag, u8 flags)
 {
 	struct pool *pool = &pools[kind];
@@ -69,6 +92,8 @@ u8 res_alloc(enum res_kind kind, u16 len, u16 align, u16 lo, u16 hi, u16 tag, u8
 			      pool->name, len, pool->unit_bytes, align, tag, pool_error_text(pool->error),
 			      pool_free_units(pool, 0), pool_free_units(pool, 1) - pool_free_units(pool, 0),
 			      pool_largest_free(pool, 1));
+		if (!res_errors_quiet)
+			res_log_blocks(pool);
 		return RES_NONE;
 	}
 	if (!logged)

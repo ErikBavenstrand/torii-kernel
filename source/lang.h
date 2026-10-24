@@ -296,6 +296,8 @@ struct lang_gsaves {
 	const char *exported;       // before the path
 	const char *no_backups;
 	const char *no_save;
+	const char *no_room;        // the page couldn't show (video memory)
+	const char *copying;        // a notice while a save is copied (a slot copy, a file, an export)
 	const char *last;           // SLOTSTORE_LAST
 	const char *gone_file;      // SLOTSTORE_NO_FILE
 	const char *gone_version;   // SLOTSTORE_NO_VERSION

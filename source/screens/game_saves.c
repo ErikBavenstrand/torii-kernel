@@ -164,10 +164,11 @@ static void fail(int code)
 
 /* ---- The slots ---- */
 
-// The game's slots, their backups and the active one, read again; the rows
-// for them and New slot. Returns the row for gs.want (else the active slot),
-// or a negative code.
-static int slots_read(void)
+// The game's slots and the active one, read again (with backups, each
+// slot's backups counted too: a folder read each), and the rows for them and
+// New slot. Returns the row for gs.want (else the active slot), or a
+// negative code.
+static int slots_read(int backups)
 {
 	int n = slotstore_list(gs.rom, gs.slots, SLOTSTORE_MAX_SLOTS);
 	if (n < 0)
@@ -176,8 +177,10 @@ static int slots_read(void)
 	slotstore_current(gs.rom, gs.active);
 	u32 at = 0;
 	for (u32 i = 0; i < gs.count; i++) {
-		int b = slotstore_history(gs.rom, gs.slots[i].name, gs.u.b.v, 0);
-		gs.backups[i] = (u8)(b < 0 ? 0 : b > 255 ? 255 : b);
+		if (backups) {
+			int b = slotstore_history(gs.rom, gs.slots[i].name, gs.u.b.v, 0);
+			gs.backups[i] = (u8)(b < 0 ? 0 : b > 255 ? 255 : b);
+		}
 		int act = !strcmp(gs.slots[i].name, gs.active);
 		gs.rows[i] = (struct save_page_row){gs.slots[i].name, (u8)(act ? ART_ICON8_SAVE + 1 : 0), 0};
 		if (gs.want[0] ? !strcmp(gs.slots[i].name, gs.want) : act)
@@ -234,7 +237,7 @@ static struct save_page slots_page;
 // can't show
 static int slots_open(void)
 {
-	int at = slots_read();
+	int at = slots_read(1);
 	if (at < 0) {
 		fail(at);
 		return 0;
@@ -242,13 +245,17 @@ static int slots_open(void)
 	slots_page = (struct save_page){
 		"game-saves", probe.icon, gl_gsaves->title, gs.title, gl_gsaves->keys,          gs.rows, gs.count + 1,
 		(u32)at,      slot_pane,  slot_hints,       0,        INPUT_START | INPUT_RIGHT};
-	return save_page_open(&slots_page);
+	if (save_page_open(&slots_page))
+		return 1;
+	dialog_message(NULL, gl_gsaves->no_room, DIALOG_ERROR);  // logged: the tiles it lacked
+	return 0;
 }
 
-// The rows again after a change the page shows (the active slot, a delete)
-static void slots_again(void)
+// The rows again after a change the page shows: the active slot (backups
+// as they were), a delete (counted again)
+static void slots_again(int backups)
 {
-	int at = slots_read();
+	int at = slots_read(backups);
 	if (at < 0) {
 		fail(at);
 		return;
@@ -366,6 +373,7 @@ static void export_slot(const char *slot)
 	if (dot && dot != base)
 		stem = (u32)(dot - base);
 	int r = SLOTSTORE_TAKEN;
+	dialog_notice(gl_gsaves->title, gl_gsaves->copying, DIALOG_INFO);
 	for (u32 k = 1; k <= 9 && r == SLOTSTORE_TAKEN; k++) {
 		if (k == 1)
 			gs_snprintf(gs.path, sizeof(gs.path), EXPORT_DIR "/%.*s - %s.sav", (int)stem, base, slot);
@@ -374,6 +382,7 @@ static void export_slot(const char *slot)
 				    (unsigned long)k);
 		r = slotstore_export(gs.rom, slot, gs.path);
 	}
+	dialog_notice_end();
 	tlog("gsaves: export %s to %s: %d", slot, gs.path, r);
 	if (r != SLOTSTORE_OK) {
 		fail(r);
@@ -560,9 +569,11 @@ static int new_slot(void)
 	if (slot_flow_name_prompt(gs.rom, how == NEW_COPY ? gl_slots->copy_title : gl_slots->new_title, initial, NULL,
 				  name) != SLOT_FLOW_DONE)
 		return DONE_REOPEN;
+	dialog_notice(gl_gsaves->title, gl_gsaves->copying, DIALOG_INFO);  // a copy takes a few seconds
 	int r = how == NEW_FILE   ? slotstore_create_file(gs.rom, name, gs.path, gs.size, gs.want)
 		: how == NEW_COPY ? slotstore_create(gs.rom, name, copy, 0, gs.want)
 				  : slotstore_create(gs.rom, name, NULL, gs.size, gs.want);
+	dialog_notice_end();
 	tlog("gsaves: new %s (%lu): %d", name, (unsigned long)how, r);
 	if (r != SLOTSTORE_OK) {
 		gs.want[0] = 0;
@@ -627,7 +638,7 @@ static int slot_menu(u32 row)
 			if (r != SLOTSTORE_OK)
 				fail(r);
 			gs.want[0] = 0;
-			slots_again();
+			slots_again(1);
 			return DONE_STAY;
 		}
 		ui_popup_close();
@@ -638,7 +649,7 @@ static int slot_menu(u32 row)
 		case ACT_ACTIVE:
 			if (make_active(gs.slot)) {
 				gs_snprintf(gs.want, sizeof(gs.want), "%s", gs.slot);
-				slots_again();
+				slots_again(0);
 			}
 			return DONE_STAY;
 		case ACT_BACKUPS:
@@ -655,7 +666,9 @@ static int slot_menu(u32 row)
 			gs_snprintf(gs.want, sizeof(gs.want), "%s", gs.slot);
 			if (slot_flow_name_prompt(gs.rom, gl_slots->copy_title, "", NULL, out) != SLOT_FLOW_DONE)
 				return DONE_REOPEN;
+			dialog_notice(gl_gsaves->title, gl_gsaves->copying, DIALOG_INFO);
 			int r = slotstore_duplicate(gs.rom, gs.slot, out, gs.want);
+			dialog_notice_end();
 			tlog("gsaves: copy %s as %s: %d", gs.slot, out, r);
 			if (r != SLOTSTORE_OK) {
 				fail(r);
