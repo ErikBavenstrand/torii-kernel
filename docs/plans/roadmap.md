@@ -142,8 +142,6 @@ The cart test and one review round (a code reviewer and an adversarial tester) a
 - **A save retired by a type change was pruned like any backup**: it is a kept backup now (`-kept` in its name), which no pruning counts or removes.
 - **The trash purge trusted the clock**: a clock outside 2026-2060 touches nothing, and a folder dated by an unset clock or one ahead takes today's date (it waits its 30 days from now, never less).
 - **Settings > Saves walked the card again after every action**: its figures change in place now (a walk only when saves past the listed ones wait), and the orphans' history bytes come from the backups' walk itself.
-- **Open: `ss_prune` sees at most 64 versions** in directory order.
-- **Open: `Save_recover` runs three times per save copy** (nine `f_stat`s).
 
 ### v0.5.1 (2026-10-24)
 
@@ -159,13 +157,43 @@ From the cart's logs after the v0.5 save screens and a review round (a bug and p
 - **The saves page failed silently once on the cart** (BG VRAM, from the Recent page with art; not reproduced in the emulator): it says so now, its seldom-changing labels take one tile set (about 110 tiles less on plane 3), and a failed BG allocation logs the pool's blocks, so the next one can be read.
 - **Any new .sav made the next boot rebuild the whole library index** (the walk's hash covered every slot file): a game's save folder counts once, so only a game's first save (which marks it) rebuilds.
 - **UX review** (an independent agent, `docs/design/v0.5/ux-review.md`, merged in eac14cd): game lists open on the game played last that they hold, then on the row they were left on; Recent's popup has Remove (off Recent only, no question); one word per thing (Play on the NOR page, Backups kept, START menu).
-- **Open (UX): a quick favourite key** (SELECT in the lists; favouriting takes five presses): v0.4 keeps SELECT free, the owner's call.
-- **Open (UX): Play « default » doesn't say what default does** (the game's boot mode, else Settings'): showing it needs the record, a card read the popup avoids.
-- **Open (UX):** Game info's Played is blank for a game off Recent; the backups page labels a date "Age" when the clock is behind; Empty trash with nothing in it opens a message; a deep SD folder takes one B a level; Settings' hint bar shows the row's explanation rather than its keys.
-- **Open: `remove_tree` reads a trash folder again for each file** (the boot's purge): read once, unlink as it goes.
-- **Open: the library's walk log counts names.db's load and the user's pauses** in its time.
-- **Open: the save copy runs `Save_recover` three times** before writing.
-- **Open: the pending-save record's erase at each launch** (about 0.5 s): a log-structured record (a new slot per launch in an erased sector, an erase every 16) would make it rare.
+- Open items moved to v0.5.2.
+
+### v0.5.2 (planned)
+
+Everything open after v0.5.1, and the memory and speed work found in a survey of the build (2026-10-24). A settings and save pages UX review runs in its own branch; its findings join this list.
+
+**Decisions for the owner**
+
+- **Export .sav:** the slot popup's Export copies a slot to `/torii/export/<game> - <slot>.sav`. Every slot is already a plain `.sav` at `/torii/saves/<rom path>/<slot>.sav`, and an export is only useful on a PC, where that file is at hand. Proposed: remove it (the popup drops to 6 items, no scroll; less code and strings).
+- **A quick favourite key** (SELECT in the lists; favouriting takes five presses): v0.4 keeps SELECT free.
+- **Play « default » doesn't say what default does** (the game's boot mode, else Settings'): showing it needs the record, a card read the popup avoids.
+
+**UX**
+
+- Game info's Played is blank for a game off Recent.
+- The backups page labels a date "Age" when the clock is behind.
+- Empty trash with nothing in it opens a message.
+- A deep SD folder takes one B a level.
+- Settings' hint bar shows the row's explanation rather than its keys.
+
+**Speed** (the card's reads are ~2 ms a sector on the cart; most lag is sector count)
+
+- **Count the sector reads and writes per operation** first: a counter in `diskio.c`, logged with each save copy, slot operation, launch and walk, so each fix below is measured on the cart.
+- **Path walks from the root:** every `f_open`/`f_stat`/`f_rename` under `/torii/saves/<rom path>/` scans each folder on the way, `GBA/` linearly with a few LFN entries per game (hundreds of games: tens of sectors per lookup). Slot operations, the save copy's recovery checks and the slots page make dozens. Open the game's folder once (`f_chdir`, FF_FS_RPATH is 2, or a held `DIR`) and name files relative to it.
+- **A small sector cache in `diskio.c`** (write-through, so power-cut semantics stay: the card holds every sector written): FAT and directory sectors the single FatFs window keeps evicting. Size it from the counts; it needs EWRAM (see Memory).
+- **The pending-save record's erase at each launch** (about 0.5 s): a log-structured record (a new slot per launch in an erased sector, an erase every 16), with `kernel_nor_record_ok` and `tests/loader_safety.sh` covering it.
+- **The save copy runs `Save_recover` three times** (nine `f_stat`s) before writing: once.
+- **`remove_tree` reads a trash folder again for each file** (the boot's purge): read once, unlink as it goes.
+- **`ss_prune` sees at most 64 versions** in directory order: count and prune in one pass over the folder.
+- **The library's walk log counts names.db's load and the user's pauses** in its time.
+
+**Memory** (IWRAM 4,268 bytes free, about 1.6 KB over the deepest stack; EWRAM 11,724)
+
+- **newlib's printf brings stdio, a heap and float formatting:** `snprintf` pulls `_svfprintf_r`, which pulls `_dtoa_r`, whose `__assert_func` pulls `fiprintf`, `FILE`s, libsysbase's handle table and `malloc`. That is about 26 KB of ROM and **6.6 KB of IWRAM data** (`handles` 4 KB, `impure_data` 1.1 KB, `__malloc_av_` 1 KB, `__global_locale`), for formats that are all integers and strings (`%s %lu %d %u %x %X`, widths, zero pad, `%.*s`, `%c`). A small integer `vsnprintf` of our own (host-tested against newlib's output) frees it and makes every `tlog` line cheaper. A first step that is one function: our own `__assert_func`, which cuts the stdio chain (the 4 KB handle table).
+- **Language tables in IWRAM:** `en_set_labels`, `en_set_explain`, `en_info` and the other `const char *x[]` arrays are writable pointer arrays, so they sit in IWRAM `.data` (about 0.6 KB): `const char *const`.
+- **`gba_nes_patch_bin` (832 bytes) in IWRAM `.data`:** `const` (ROM) if `Write` never runs with the ROM page switched, else EWRAM.
+- **Every screen's state is its own EWRAM static** (`games` 3.7 KB, `sd` 3.6 KB, `info` 2.7 KB, `nor` 1.4 KB, Diagnostics' `scr` 1.6 KB), each with its own path buffers, though one page is open at a time. A union of the page states (what must outlive a page, such as remembered rows, already lives in `nav.c`) or one shared path scratch would free 5 to 8 KB of EWRAM, room for the sector cache. Diagnostics can borrow `pReadCache`.
 
 ## v0.6 Plugins
 
