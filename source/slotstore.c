@@ -7,6 +7,7 @@
 #include "Ezcard_OP.h"
 #include "RTC.h"
 #include "crc32.h"
+#include "diskstat.h"
 #include "cutpoint.h"
 #include "ez_define.h"
 #include "ezkernel.h"
@@ -18,6 +19,10 @@
 
 #define SS_PATH 320
 #define SS_CHUNK 2048
+// Writes take both of the work area's buffers as one: each disk_write call
+// ends with the SD driver's settle delay (about 8.6 ms), so fewer, larger
+// writes are faster
+#define SS_WRITE_CHUNK (2 * SS_CHUNK)
 #define SS_NAMES 64
 #define SS_STRAYS 4
 #define JOURNAL "/torii/slotop.txt"
@@ -48,6 +53,8 @@ struct ss_work {
 	char base[SAVESLOT_NAME_BYTES * 2], clean[SAVESLOT_NAME_BYTES];  // ss_list
 };
 _Static_assert(sizeof(struct ss_work) <= READCACHE_SLOTS_SIZE, "the slot store's work area fits READCACHE_SLOTS");
+_Static_assert(sizeof(((struct ss_work *)0)->buf) == SS_WRITE_CHUNK,
+	       "a write chunk is both buffers, one after the other");
 
 #define W ((struct ss_work *)(pReadCache + READCACHE_SLOTS))
 
@@ -167,6 +174,11 @@ static u32 chunk_of(u32 total, u32 off)
 	return total - off < SS_CHUNK ? total - off : SS_CHUNK;
 }
 
+static u32 write_chunk_of(u32 total, u32 off)
+{
+	return total - off < SS_WRITE_CHUNK ? total - off : SS_WRITE_CHUNK;
+}
+
 // 1 if the files are the same bytes, 0 if not, -1 if one can't be read
 static int ss_same(const char *x, const char *y)
 {
@@ -227,8 +239,8 @@ static int ss_copy(const char *src, const char *dst)
 	}
 	u32 total = (u32)f_size(a), off, crc = 0;
 	FRESULT werr = FR_OK;
-	for (off = 0; off < total && werr == FR_OK; off += SS_CHUNK) {
-		u32 len = chunk_of(total, off);
+	for (off = 0; off < total && werr == FR_OK; off += SS_WRITE_CHUNK) {
+		u32 len = write_chunk_of(total, off);
 		UINT done = 0;
 		if (!read_full(a, W->buf[0], len)) {
 			werr = FR_DISK_ERR;
@@ -260,15 +272,15 @@ static int ss_copy(const char *src, const char *dst)
 static int ss_write_blank(const char *dst, u32 size)
 {
 	FIL *b = &W->fb;
-	memset(W->buf[0], 0xFF, SS_CHUNK);
+	memset(W->buf[0], 0xFF, SS_WRITE_CHUNK);
 	FRESULT r = f_open(b, dst, FA_WRITE | FA_CREATE_ALWAYS);
 	if (r != FR_OK) {
 		tlog_error("slot: can't create %s: f_open gave %d", dst, r);
 		return SLOTSTORE_CARD;
 	}
 	FRESULT werr = FR_OK;
-	for (u32 off = 0; off < size && werr == FR_OK; off += SS_CHUNK) {
-		u32 len = chunk_of(size, off);
+	for (u32 off = 0; off < size && werr == FR_OK; off += SS_WRITE_CHUNK) {
+		u32 len = write_chunk_of(size, off);
 		UINT done = 0;
 		werr = f_write(b, W->buf[0], len, &done);
 		if (werr == FR_OK && done != len)
@@ -433,6 +445,25 @@ static int ss_move_files(const char *src, const char *dst)
 // Remembers a stray <x>.new file name found in a scan; they go after it, in
 // ss_drop_strays
 static u32 stray_count;
+// The history folder held more valid versions than W->names takes: the list
+// keeps the newest SS_NAMES, and every version left out is older than all of
+// them (ss_prune removes those too)
+static u8 hist_overflow;
+
+// The listed version with the lowest number (the one a newer one replaces
+// in a full list)
+static u32 oldest_listed(u32 count)
+{
+	u32 at = 0, low = 0xFFFFFFFFu;
+	for (u32 i = 0; i < count; i++) {
+		u32 n;
+		if (saveslot_parse_backup_name(W->names[i], &n, NULL) && n < low) {
+			low = n;
+			at = i;
+		}
+	}
+	return at;
+}
 
 static void note_stray(const char *name)
 {
@@ -473,6 +504,7 @@ static int ss_scan_hist(const char *dir, u32 *count, u32 *maxn, u32 *newest)
 {
 	*count = *maxn = *newest = 0;
 	stray_count = 0;
+	hist_overflow = 0;
 	FRESULT r = f_opendir(&W->dir, dir);
 	if (r == FR_NO_PATH || r == FR_NO_FILE)
 		return SLOTSTORE_OK;
@@ -495,20 +527,63 @@ static int ss_scan_hist(const char *dir, u32 *count, u32 *maxn, u32 *newest)
 			continue;
 		if (n > *maxn)
 			*maxn = n;
-		if (*count < SS_NAMES) {
-			strcpy(W->names[*count], W->fno.fname);
-			W->sizes[*count] = (u32)W->fno.fsize;
-			if (n > top_stored) {
-				top_stored = n;
-				*newest = *count;
-			}
+		u32 at = *count;
+		if (at == SS_NAMES) {
+			// Full: a newer one takes the oldest listed one's place
+			hist_overflow = 1;
+			at = oldest_listed(SS_NAMES);
+			u32 low = 0;
+			saveslot_parse_backup_name(W->names[at], &low, NULL);
+			if (n < low)
+				continue;
+		} else {
 			(*count)++;
+		}
+		strcpy(W->names[at], W->fno.fname);
+		W->sizes[at] = (u32)W->fno.fsize;
+		if (n > top_stored) {
+			top_stored = n;
+			*newest = at;
 		}
 	}
 	f_closedir(&W->dir);
 	if (r != FR_OK)
 		return SLOTSTORE_CARD;
 	ss_drop_strays(dir);
+	return SLOTSTORE_OK;
+}
+
+// Removes every version in dir that W->names (count) doesn't list but its
+// kept ones: in an overflowing folder, all older than the listed ones
+static int ss_prune_unlisted(const char *dir, u32 count)
+{
+	char *path = W->hn;
+	FRESULT r = f_opendir(&W->dir, dir);
+	if (r != FR_OK)
+		return SLOTSTORE_CARD;
+	for (;;) {
+		r = f_readdir(&W->dir, &W->fno);
+		if (r != FR_OK || !W->fno.fname[0])
+			break;
+		if ((W->fno.fattrib & AM_DIR) || strlen(W->fno.fname) >= SAVESLOT_BACKUP_NAME_BYTES ||
+		    !saveslot_parse_backup_name(W->fno.fname, NULL, NULL) || saveslot_backup_kept(W->fno.fname))
+			continue;
+		int listed = 0;
+		for (u32 i = 0; i < count && !listed; i++)
+			listed = !strcmp(W->names[i], W->fno.fname);
+		if (listed)
+			continue;
+		ss_snprintf(path, SS_PATH, "%s/%s", dir, W->fno.fname);
+		r = f_unlink(path);
+		tlog("slot: pruned %s (past the listed versions), f_unlink gave %d", path, r);
+		if (r != FR_OK)
+			break;
+		cutpoint("history: version pruned");
+	}
+	f_closedir(&W->dir);
+	if (r != FR_OK)
+		return SLOTSTORE_CARD;
+	hist_overflow = 0;
 	return SLOTSTORE_OK;
 }
 
@@ -528,7 +603,24 @@ static int ss_prune(const char *dir, u32 *count, u32 keep)
 			return SLOTSTORE_CARD;
 		cutpoint("history: version pruned");
 	}
+	if (drop) {
+		// The list drops the pruned names (their order doesn't matter)
+		u32 kept = 0;
+		for (u32 i = 0; i < *count; i++) {
+			int gone = 0;
+			for (u32 k = 0; k < drop && !gone; k++)
+				gone = W->idx[k] == i;
+			if (!gone && kept != i) {
+				strcpy(W->names[kept], W->names[i]);
+				W->sizes[kept] = W->sizes[i];
+			}
+			if (!gone)
+				kept++;
+		}
+	}
 	*count -= drop;
+	if (hist_overflow)
+		return ss_prune_unlisted(dir, *count);
 	return SLOTSTORE_OK;
 }
 
@@ -654,7 +746,7 @@ int slotstore_current(const char *rom_path, char *slot)
 	return SLOTSTORE_OK;
 }
 
-int slotstore_set_current(const char *rom_path, const char *slot)
+static int op_set_current(const char *rom_path, const char *slot)
 {
 	int n = ss_list(rom_path);
 	if (n < 0)
@@ -668,6 +760,15 @@ int slotstore_set_current(const char *rom_path, const char *slot)
 		return SLOTSTORE_OK;
 	strcpy(rec.slot, W->slots[i].name);
 	return gamesave_record_write(rom_path, &rec) ? SLOTSTORE_OK : SLOTSTORE_CARD;
+}
+
+int slotstore_set_current(const char *rom_path, const char *slot)
+{
+	struct diskstat mark;
+	diskstat_start(&mark);
+	int r = op_set_current(rom_path, slot);
+	diskstat_log("slot set current", &mark);
+	return r;
 }
 
 /* ---- The journal ---- */
@@ -814,7 +915,7 @@ static int rename_steps(const char *rom, const char *old_name, const char *new_n
 	return r;
 }
 
-int slotstore_rename(const char *rom_path, const char *slot, const char *name, char *clean_out)
+static int op_rename(const char *rom_path, const char *slot, const char *name, char *clean_out)
 {
 	char clean[SAVESLOT_NAME_BYTES];
 	if (!saveslot_clean_name(clean, name))
@@ -877,12 +978,21 @@ int slotstore_rename(const char *rom_path, const char *slot, const char *name, c
 	return SLOTSTORE_OK;
 }
 
+int slotstore_rename(const char *rom_path, const char *slot, const char *name, char *clean_out)
+{
+	struct diskstat mark;
+	diskstat_start(&mark);
+	int r = op_rename(rom_path, slot, name, clean_out);
+	diskstat_log("slot rename", &mark);
+	return r;
+}
+
 /* ---- Create, duplicate ---- */
 
 // A new slot made blank, as a copy of the slot copy_from, or (file) as a
 // copy of the .sav at that path
-static int create(const char *rom_path, const char *name, const char *copy_from, const char *file, u32 blank_size,
-		  char *clean_out)
+static int create_steps(const char *rom_path, const char *name, const char *copy_from, const char *file, u32 blank_size,
+			char *clean_out)
 {
 	char clean[SAVESLOT_NAME_BYTES];
 	if (!saveslot_clean_name(clean, name))
@@ -942,6 +1052,16 @@ static int create(const char *rom_path, const char *name, const char *copy_from,
 	     : copy_from ? copy_from
 			 : "");
 	return SLOTSTORE_OK;
+}
+
+static int create(const char *rom_path, const char *name, const char *copy_from, const char *file, u32 blank_size,
+		  char *clean_out)
+{
+	struct diskstat mark;
+	diskstat_start(&mark);
+	int r = create_steps(rom_path, name, copy_from, file, blank_size, clean_out);
+	diskstat_log("slot create", &mark);
+	return r;
 }
 
 int slotstore_create(const char *rom_path, const char *name, const char *copy_from, u32 blank_size, char *clean_out)
@@ -1014,7 +1134,7 @@ static int trash_steps(const char *rom, const char *slot, const char *trash)
 	return SLOTSTORE_OK;
 }
 
-int slotstore_delete(const char *rom_path, const char *slot)
+static int op_delete(const char *rom_path, const char *slot)
 {
 	if (slotstore_recover() < 0)
 		return SLOTSTORE_CARD;
@@ -1059,6 +1179,15 @@ int slotstore_delete(const char *rom_path, const char *slot)
 	journal_clear();
 	tlog("slot: deleted %s of %s to %s", name, rom_path, trash);
 	return SLOTSTORE_OK;
+}
+
+int slotstore_delete(const char *rom_path, const char *slot)
+{
+	struct diskstat mark;
+	diskstat_start(&mark);
+	int r = op_delete(rom_path, slot);
+	diskstat_log("slot delete", &mark);
+	return r;
 }
 
 // A history folder with no slot of its name moves to the trash (with no file),
@@ -1112,37 +1241,48 @@ static int remove_tree(char *path)
 {
 	u32 root = (u32)strlen(path);
 	u32 len = root;
+	// Each folder is read once, its files unlinked as they come (a removed
+	// entry is skipped by the reading that goes on); a subfolder is entered
+	// at once, and its parent read again from the start once it is gone
 	for (u32 guard = 0; guard < 4096; guard++) {
 		FRESULT r = f_opendir(&W->dir, path);
 		if (r != FR_OK)
 			return r == FR_NO_PATH || r == FR_NO_FILE;
-		r = f_readdir(&W->dir, &W->fno);
+		int sub = 0;
+		for (;;) {
+			r = f_readdir(&W->dir, &W->fno);
+			if (r != FR_OK || !W->fno.fname[0])
+				break;
+			u32 nlen = (u32)strlen(W->fno.fname);
+			if (len + 1 + nlen >= SS_PATH) {
+				r = FR_INVALID_NAME;
+				break;
+			}
+			path[len] = '/';
+			memcpy(path + len + 1, W->fno.fname, nlen + 1);
+			if (W->fno.fattrib & AM_DIR) {
+				len += 1 + nlen;  // descend
+				sub = 1;
+				break;
+			}
+			r = f_unlink(path);
+			path[len] = 0;
+			if (r != FR_OK)
+				break;
+		}
 		f_closedir(&W->dir);
 		if (r != FR_OK)
 			return 0;
-		if (!W->fno.fname[0]) {  // empty: it goes, and we go up
-			if (f_unlink(path) != FR_OK)
-				return 0;
-			if (len == root)
-				return 1;
-			while (path[len - 1] != '/')
-				len--;
-			path[--len] = 0;
+		if (sub)
 			continue;
-		}
-		u32 nlen = (u32)strlen(W->fno.fname);
-		if (len + 1 + nlen >= SS_PATH)
+		// Empty: it goes, and we go up
+		if (f_unlink(path) != FR_OK)
 			return 0;
-		path[len] = '/';
-		memcpy(path + len + 1, W->fno.fname, nlen + 1);
-		if (W->fno.fattrib & AM_DIR) {
-			len += 1 + nlen;  // descend
-		} else {
-			FRESULT u = f_unlink(path);
-			path[len] = 0;
-			if (u != FR_OK)
-				return 0;
-		}
+		if (len == root)
+			return 1;
+		while (path[len - 1] != '/')
+			len--;
+		path[--len] = 0;
 	}
 	return 0;
 }
@@ -1313,6 +1453,11 @@ static int push(const char *file, const char *hist_dir, u32 keep, int how)
 	if (count < SS_NAMES) {
 		strcpy(W->names[count], name);
 		count++;
+	} else {
+		// The newest takes the oldest listed one's place, which is now
+		// left out like those before it
+		strcpy(W->names[oldest_listed(count)], name);
+		hist_overflow = 1;
 	}
 	return keep ? ss_prune(hist_dir, &count, keep) : SLOTSTORE_OK;
 }
@@ -1444,7 +1589,7 @@ static int ss_install(const char *src, const char *dest, int move)
 	return SLOTSTORE_OK;
 }
 
-int slotstore_restore(const char *rom_path, const char *slot, u32 n)
+static int op_restore(const char *rom_path, const char *slot, u32 n)
 {
 	if (slotstore_recover() < 0)
 		return SLOTSTORE_CARD;
@@ -1477,9 +1622,18 @@ int slotstore_restore(const char *rom_path, const char *slot, u32 n)
 	return SLOTSTORE_OK;
 }
 
+int slotstore_restore(const char *rom_path, const char *slot, u32 n)
+{
+	struct diskstat mark;
+	diskstat_start(&mark);
+	int r = op_restore(rom_path, slot, n);
+	diskstat_log("slot restore", &mark);
+	return r;
+}
+
 /* ---- Import, export ---- */
 
-int slotstore_import(const char *rom_path, const char *slot, const char *path, u32 want)
+static int op_import(const char *rom_path, const char *slot, const char *path, u32 want)
 {
 	if (slotstore_recover() < 0)
 		return SLOTSTORE_CARD;
@@ -1499,6 +1653,15 @@ int slotstore_import(const char *rom_path, const char *slot, const char *path, u
 		return r;
 	tlog("slot: imported %s into %s of %s", path, slot, rom_path);
 	return SLOTSTORE_OK;
+}
+
+int slotstore_import(const char *rom_path, const char *slot, const char *path, u32 want)
+{
+	struct diskstat mark;
+	diskstat_start(&mark);
+	int r = op_import(rom_path, slot, path, want);
+	diskstat_log("slot import", &mark);
+	return r;
 }
 
 int slotstore_export(const char *rom_path, const char *slot, const char *path)

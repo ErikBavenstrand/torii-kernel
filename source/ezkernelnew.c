@@ -29,6 +29,7 @@
 #include "settings.h"
 #include "cartlog.h"
 #include "cutpoint.h"
+#include "diskstat.h"
 #include "fathint.h"
 #include "saveorphan.h"
 #include "slotstore.h"
@@ -330,7 +331,17 @@ u32 Loadsavefile(TCHAR *filename)
 // f_rename refuses to replace a file and isn't atomic, so Save_recover, at boot
 // and before each copy and launch, finishes or undoes whatever a cut left. The
 // pending-save record stays until the copy checks out (the callers clear it).
-#define SAVE_CHUNK 0x800
+// Reads go a chip chunk and a file chunk at a time (the two fill READCACHE_SAVE's
+// first 8 KB, clear of READCACHE_SLOTS); the tmp file is written 8 KB at a
+// time from the chip chunk's room alone: each disk_write call ends with the
+// SD driver's settle delay (Write_SD_sectors, about 8.6 ms), so fewer, larger
+// writes are what make the copy fast
+#define SAVE_CHUNK 0x1000
+#define SAVE_WRITE_CHUNK 0x2000
+_Static_assert(READCACHE_SAVE + 2 * SAVE_CHUNK <= READCACHE_SLOTS,
+	       "the save copy's chunks stay clear of the slot store's");
+_Static_assert(READCACHE_SAVE + SAVE_WRITE_CHUNK <= READCACHE_SLOTS,
+	       "the save copy's write chunk stays clear of the slot store's");
 
 static FIL save_fil EWRAM_BSS;
 static char save_tmp[SAV_INFO_NAME_MAX + 6] EWRAM_BSS;
@@ -571,7 +582,8 @@ u32 Save_savefile(TCHAR *filename, u32 savesize, const char *hist_dir)
 		tlog_error("save: %s is too long to copy", filename);
 		return SAVE_FAILED;
 	}
-	Save_recover(filename);
+	// The caller (pending_save_copy) has run Save_recover: nothing since
+	// has touched the save's files
 
 	// 1. The tmp file (a game's first save: its folder under /torii/saves
 	// may not be there yet)
@@ -584,8 +596,8 @@ u32 Save_savefile(TCHAR *filename, u32 savesize, const char *hist_dir)
 	}
 	u32 total = 0;
 	FRESULT werr = FR_OK;
-	for (off = 0; off < span && werr == FR_OK && total == off; off += SAVE_CHUNK) {
-		u32 len = span - off < SAVE_CHUNK ? span - off : SAVE_CHUNK;
+	for (off = 0; off < span && werr == FR_OK && total == off; off += SAVE_WRITE_CHUNK) {
+		u32 len = span - off < SAVE_WRITE_CHUNK ? span - off : SAVE_WRITE_CHUNK;
 		UINT written = 0;
 		sram_read(chip, off, len);
 		progress_part(off, span * 2);
@@ -713,25 +725,17 @@ static u32 SavefileWrite(TCHAR *filename, u32 savesize)
 	u32 ret = f_open(&file, filename, FA_WRITE | FA_CREATE_ALWAYS);
 	switch (ret) {
 	case FR_OK: {
-		int i;
-		unsigned int written;
-		memset(pReadCache, 0xFF, 0x200 * 4);
-
-		u32 total = 0;
-		if (savesize < 0x800) {
-			for (i = 0; (u32)i < (savesize + 0x1FF) / 0x200; i++) {
-				f_write(&file, pReadCache, 0x200, &written);
-				total += written;
-				if (written != 0x200)
-					break;
-			}
-		} else {
-			for (i = 0; (u32)i < (savesize + 0x1FF) / 0x800; i++) {
-				f_write(&file, pReadCache, 0x200 * 4, &written);
-				total += written;
-				if (written != 0x200 * 4)
-					break;
-			}
+		// Whole sectors, or whole 2 KB for a save of 2 KB or more (as
+		// before), written 8 KB at a time
+		u32 unit = savesize < 0x800 ? 0x200 : 0x800;
+		u32 target = (savesize + unit - 1) / unit * unit, total = 0;
+		memset(pReadCache, 0xFF, SAVE_WRITE_CHUNK);
+		while (total < target) {
+			UINT chunk = target - total < SAVE_WRITE_CHUNK ? target - total : SAVE_WRITE_CHUNK, written = 0;
+			f_write(&file, pReadCache, chunk, &written);
+			total += written;
+			if (written != chunk)
+				break;
 		}
 
 		FRESULT cerr = f_close(&file);
@@ -1117,9 +1121,9 @@ static u32 Grow_savefile(TCHAR *filename, u32 size, u32 need)
 	}
 	u32 total = size;
 	if (f_lseek(&file, size) == FR_OK) {
-		memset(pReadCache, 0xFF, 0x800);
+		memset(pReadCache, 0xFF, SAVE_WRITE_CHUNK);
 		while (total < need) {
-			UINT chunk = need - total < 0x800 ? need - total : 0x800, written = 0;
+			UINT chunk = need - total < SAVE_WRITE_CHUNK ? need - total : SAVE_WRITE_CHUNK, written = 0;
 			if (f_write(&file, pReadCache, chunk, &written) != FR_OK || written != chunk) {
 				total += written;
 				break;
@@ -1182,7 +1186,7 @@ static struct {
 	struct gamerec rec;
 } launch_save EWRAM_BSS;
 
-static u8 Process_savefile(u32 is_EMU, const char *rom_path, u32 gamefilesize, BYTE saveMODE)
+static u8 Process_savefile_steps(u32 is_EMU, const char *rom_path, u32 gamefilesize, BYTE saveMODE)
 {
 	u32 res;
 	u32 savefilesize = 0;
@@ -1280,6 +1284,15 @@ static u8 Process_savefile(u32 is_EMU, const char *rom_path, u32 gamefilesize, B
 
 	return 0;
 }
+
+static u8 Process_savefile(u32 is_EMU, const char *rom_path, u32 gamefilesize, BYTE saveMODE)
+{
+	struct diskstat mark;
+	diskstat_start(&mark);
+	u8 r = Process_savefile_steps(is_EMU, rom_path, gamefilesize, saveMODE);
+	diskstat_log("launch's save", &mark);
+	return r;
+}
 //---------------------------------------------------------------------------------
 // Torii: the pending-save record (Read_sav_info): the save waiting to be
 // copied from cart SRAM to the card, its file name into SAV_info_buffer and
@@ -1358,7 +1371,10 @@ static u32 pending_save_copy(u32 size)
 	}
 	dialog_progress_begin(gl_saving, name);
 	progress_step(gl_save_ing, 0, PROGRESS_FULL);
+	struct diskstat mark;
+	diskstat_start(&mark);
 	u32 saved = Save_savefile(name, size, pending_hist_dir());
+	diskstat_log("save copy", &mark);
 	if (saved == SAVE_WRITTEN)
 		progress_done(gl_done);
 	dialog_progress_end();
@@ -1375,7 +1391,6 @@ static void Check_save_flag(void)
 	static const char saved_how[] = "save: \"Save sav?\" for %s, %lu bytes, save type %02X: %s";
 	u16 savetype = Read_sav_info(SAV_INFO_TYPE);
 	TCHAR *name = (TCHAR *)SAV_info_buffer;
-	Save_recover(name);
 	dialog_open();
 	int save = gl_auto_save_sel || dialog_confirm(gl_save_sav, name, DIALOG_INFO);
 	tlog(saved_how, name, (unsigned long)savefilesize, savetype,
@@ -1390,6 +1405,8 @@ static void Check_save_flag(void)
 		dialog_close();
 		return;
 	}
+	if (!save)
+		Save_recover(name);  // a copy a cut left (pending_save_copy's own when saving)
 	dialog_close();
 	pending_save_clear();
 	cutpoint("save: pending record cleared");

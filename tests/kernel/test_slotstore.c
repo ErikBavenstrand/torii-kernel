@@ -325,6 +325,21 @@ static void test_history(void)
 	CHECK_EQ(history_count("Main"), 2);
 	CHECK_EQ(version_fill("Main", 0, &n0), 'I');
 	CHECK_EQ(n0, 9);
+	// A folder of more versions than the store lists (SS_NAMES, 64): a push
+	// prunes the ones it left out too
+	struct saveslot_stamp t = {2026, 10, 24, 12, 0, 0};
+	for (u32 v = 1; v <= 70; v++) {
+		char name[SAVESLOT_BACKUP_NAME_BYTES], path[96];
+		saveslot_backup_name(name, v, &t);
+		snprintf(path, sizeof(path), BACKUPS "/Many/%s", name);
+		CHECK(put(path, (u8)v, 512));
+	}
+	CHECK(put(SAVES "/Many.sav", 'z', 512));
+	CHECK_EQ(slotstore_push_file(SAVES "/Many.sav", BACKUPS "/Many", 5), SLOTSTORE_OK);
+	CHECK_EQ(history_count("Many"), 5);
+	CHECK_EQ(version_fill("Many", 0, &n0), 'z');
+	CHECK_EQ(n0, 71);
+	CHECK_EQ(version_fill("Many", 4, &n1), 67);
 	// A slot with no file has nothing to push
 	CHECK_EQ(slotstore_history_push(ROM, "Nobody"), SLOTSTORE_NO_SLOT);
 	CHECK_EQ(slotstore_push_file(SAVES "/Gone.sav", dir, 5), SLOTSTORE_NO_SLOT);

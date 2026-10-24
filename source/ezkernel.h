@@ -61,7 +61,8 @@ u32 Loadsavefile(TCHAR *filename);
 #define SAVE_WRITE 5     // Save_check: copy the chip
 u32 Save_check(TCHAR *filename, u32 savesize);
 // hist_dir, if not NULL and the History setting is not Off, is the folder the
-// replaced version of an existing file goes to first (slotstore_push_file)
+// replaced version of an existing file goes to first (slotstore_push_file).
+// Run Save_recover(filename) first: the copy assumes no .tmp or .bak is left
 u32 Save_savefile(TCHAR *filename, u32 savesize, const char *hist_dir);
 // Finishes or undoes a copy a power cut interrupted (the .tmp and .bak files
 // beside filename); run at boot and before a copy or launch
