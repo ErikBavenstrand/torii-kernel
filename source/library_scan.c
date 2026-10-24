@@ -141,6 +141,7 @@ static struct {
 			u16 folder[LIB_DEPTH];  // the depth's folder number, once it has a game
 			u16 path_len[LIB_DEPTH + 1];
 			s8 depth;
+			u16 saved;  // the saves walk: bit d, the folder at depth d has a .sav (counted once)
 			char path[LIBRARY_NAME_MAX + 2];
 			char full[2 * LIBRARY_NAME_MAX + 2];  // a game's path, for its custom name
 			u32 hash, serial, files, games, entries, folders_seen, folders_done, saves, skipped, cleared;
@@ -693,6 +694,7 @@ static void walk_step(void)
 			return;
 		}
 		lib.u.walk.depth = 0;
+		lib.u.walk.saved = 0;
 		lib.u.walk.path[0] = 0;
 		lib.u.walk.path_len[0] = 0;
 		lib.phase = W_SAVER;
@@ -737,14 +739,18 @@ static void walk_step(void)
 			memcpy(lib.u.walk.path + len + 1, fi->fname, name + 1);
 			lib.u.walk.path_len[d + 1] = (u16)(len + 1 + name);
 			lib.u.walk.depth = (s8)(d + 1);
+			lib.u.walk.saved &= (u16) ~(1u << (d + 1));
 			return;
 		}
-		if (d == 0 || !is_save_file(fi->fname))
+		// A game's folder counts once, whatever its slots: what the index
+		// keeps is whether the game has a save, so a new slot, a rename or a
+		// copy in a game that has one changes nothing, and builds nothing
+		if (d == 0 || !is_save_file(fi->fname) || (lib.u.walk.saved >> d & 1))
 			return;
-		hash_bytes(lib.u.walk.path, lib.u.walk.path_len[d]);
-		hash_bytes(fi->fname, strlen(fi->fname) + 1);
+		lib.u.walk.saved |= (u16)(1u << d);
+		hash_bytes(lib.u.walk.path, lib.u.walk.path_len[d] + 1);
 		if (lib.build)
-			save_insert(lib.u.walk.path);  // counts each game's folder once
+			save_insert(lib.u.walk.path);
 		else
 			lib.u.walk.saves++;
 		return;
