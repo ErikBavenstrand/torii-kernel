@@ -6,6 +6,9 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** a new slot, a rename or a copy in a game that has a save no
+  longer makes the next boot rebuild and rewrite the library index: its
+  walk counts a game's save folder once (73df309).
 - **Changed:** the first file or folder made after power-on no longer
   stalls: a background job finds the FAT's first free cluster from the
   mount on (on a 32 GB card with games ahead of the free space, FatFs read

@@ -157,7 +157,7 @@ From the cart's logs after the v0.5 save screens and a review round (a bug and p
 - **The slots page counted every slot's backups again after Make active**: only after changes that touch them.
 - **Play's « » boot was lost when playing from Saves**, and the two START popups offered Clean on different rules: Saves plays as Play said, and both offer default and clean for a GBA game (addons while one is on), nothing for GB, GBC and NES (they start clean).
 - **The saves page failed silently once on the cart** (BG VRAM, from the Recent page with art; not reproduced in the emulator): it says so now, its seldom-changing labels take one tile set (about 110 tiles less on plane 3), and a failed BG allocation logs the pool's blocks, so the next one can be read.
-- **Open: any new .sav makes the next boot rebuild the whole library index** (the walk's hash covers /torii/saves): keep a separate saves hash and re-mark saved games only.
+- **Any new .sav made the next boot rebuild the whole library index** (the walk's hash covered every slot file): a game's save folder counts once, so only a game's first save (which marks it) rebuilds.
 - **Open: `remove_tree` reads a trash folder again for each file** (the boot's purge): read once, unlink as it goes.
 - **Open: the library's walk log counts names.db's load and the user's pauses** in its time.
 - **Open: the save copy runs `Save_recover` three times** before writing.
