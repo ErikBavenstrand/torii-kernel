@@ -1,5 +1,23 @@
+diff --git a/Makefile b/Makefile
+index 5155629..61dab62 100644
+--- a/Makefile
++++ b/Makefile
+@@ -175,11 +175,8 @@ $(OUTPUT).gba	:	$(OUTPUT).elf
+ 
+ $(OUTPUT).elf	:	$(OFILES) gba_crt0_my.o gba_cart_my.ld
+ 
+-#rule for building Multiboot version first so that bindata.s can be built
+-bindata.o: bindata.s ../pocketnes_mb.gba font2.lz77 fontpal.bin
+-
+-../pocketnes_mb.gba :
+-	$(MAKE) -C .. -f Makefile_mb
++#Torii: no multiboot copy (GOMULTIBOOT 0), so no multiboot build first
++bindata.o: bindata.s font2.lz77 fontpal.bin
+ 
+ -include $(DEPENDS)
+ 
 diff --git a/src/config.h b/src/config.h
-index 8d608fe..3d65eb9 100644
+index 8d608fe..45f49e0 100644
 --- a/src/config.h
 +++ b/src/config.h
 @@ -8,7 +8,7 @@
@@ -11,6 +29,15 @@ index 8d608fe..3d65eb9 100644
  //#define VERSION_NUMBER "DO NOT RELEASE"
  
  //default options
+@@ -43,7 +43,7 @@
+ #define USE_GAME_SPECIFIC_HACKS 1	//Fixes Magic of Scheherazade (rearranges the banks in memory)
+ #define USE_ACCELERATION 1	//Copies first 128K of ROM into EWRAM, not sure if this helps performance or not, but it does force 256 byte alignment.
+ #define MULTIBOOT 0			//Allows the Link Transfer feature
+-#define GOMULTIBOOT 1		//Allows use of the "Go Multiboot" feature (for multiboot builds)
++#define GOMULTIBOOT 0		//Allows use of the "Go Multiboot" feature (for multiboot builds) (Torii: off, the 60 KB multiboot copy it needs isn't built in)
+ 
+ //Other options
+ #define CHEATFINDER 1		//Enables the cheat finder
 diff --git a/src/main.c b/src/main.c
 index 6f0c3f3..72a8eaf 100644
 --- a/src/main.c

@@ -145,11 +145,13 @@ def stamp(directory: str, key: str, files: list[str]) -> int:
 
 
 def file_hashes(paths: list[str]) -> dict[str, str]:
+    """Hashes of the files under paths; a build output counts only when named itself (a built emulator)."""
     hashes = {}
     for root in paths:
-        candidates = [Path(root)] if Path(root).is_file() else Path(root).rglob("*")
+        named = Path(root).is_file()
+        candidates = [Path(root)] if named else Path(root).rglob("*")
         for path in candidates:
-            if path.is_file() and path.suffix not in OUTPUTS:
+            if path.is_file() and (named or path.suffix not in OUTPUTS):
                 hashes[str(path)] = hashlib.sha1(path.read_bytes()).hexdigest()
     return hashes
 
