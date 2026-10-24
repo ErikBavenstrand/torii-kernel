@@ -1,0 +1,32 @@
+# Settings > Saves > Game saves (source/screens/saves.c's third view), dark
+# theme: the library's games with saves, in its order, by display name; a
+# save without a game (/Old/Gone.gba) isn't listed. A on a game opens its
+# Saves page (game.png); B comes back to the list (back.png), then to
+# Settings.
+#! sd-file "/torii/saves/Games/Idle.gba/Main.sav" 0x2000 /dev/null
+#! sd-file "/torii/saves/Long/A name too long to fit on its row.gba/Main.sav" 0x10000 /dev/null
+#! sd-file "/torii/saves/Long/A name too long to fit on its row.gba/Boss Rush.sav" 0x10000 /dev/null
+#! sd-file "/torii/saves/Long/A name too long to fit on its row.gba/game.ini" 0 tests/shots/data/game-saves-game.ini
+#! sd-file "/torii/saves/Old/Gone.gba/Main.sav" 0x8000 /dev/null
+-w "nav: home ready"
+-k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:A -k @28:-
+-w "screen ready: settings"
+-k @8:R -k @12:- -k @20:R -k @24:- -k @32:R -k @36:-
+-w "settings: row 13"
+-k @8:DOWN -k @12:- -k @20:DOWN -k @24:-
+-w "settings: row 15"
+-s @4:settings.png
+-k @8:A -k @12:-
+-w "screen ready: saves-games"
+-s @4:list.png
+-k @8:DOWN -k @12:-
+-s @24:down.png
+-k @30:A -k @34:-
+-w "screen ready: game-saves"
+-s @30:game.png
+-k @40:B -k @44:-
+-w "screen ready: saves-games"
+-s @4:back.png
+-k @8:B -k @12:-
+-w "screen ready: settings"
+-s @20:settings-again.png

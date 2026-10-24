@@ -929,13 +929,16 @@ static void time_edit(u32 id)
 	ui_popup_close();
 }
 
-// Settings > Saves > Clean up saves: the manager takes the page's place, and the page
-// comes back when it closes
+// Settings > Saves > Game saves or Clean up saves: the screen takes the
+// page's place, and the page comes back when it closes (or a game played
+// from Game saves didn't start)
 static void saves_open(u32 id)
 {
-	(void)id;
 	settings_page.leave();  // a change still waiting is written first
-	saves_run();
+	if (id == SET_GAME_SAVES)
+		saves_games_run();
+	else
+		saves_run();
 	nav_reshow();
 }
 
@@ -965,7 +968,7 @@ static void activate(u32 id)
 			tlog("settings: identify library");
 			names_identify();
 			sp.identify_wait = 0;  // its progress at once
-		} else if (r->action == SET_ACTION_SAVES) {
+		} else if (r->action == SET_ACTION_SAVES || r->action == SET_ACTION_GAME_SAVES) {
 			nav_defer(saves_open, id);
 		}
 		break;

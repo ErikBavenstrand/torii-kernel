@@ -178,6 +178,15 @@ static int is_sav(const char *name)
 	return n > 4 && !strcasecmp(name + n - 4, ".sav");
 }
 
+int saveorphan_has(const struct orphan_scan *s, const char *rom)
+{
+	u32 key = saveorphan_key(rom);
+	for (u32 i = 0; i < s->have_count; i++)
+		if (s->have[i] == key)
+			return 1;
+	return 0;
+}
+
 static void add_orphan(struct orphan_scan *s, const char *rom, u32 slots, u32 bytes)
 {
 	u32 len = (u32)strlen(rom) + 1;
@@ -238,6 +247,10 @@ static int walk(char *path, struct so_sum *sum, struct orphan_scan *s, struct or
 						add_orphan(s, rom, W->slots[level], W->bytes[level]);
 					else if (st != FR_OK)
 						sum->partial = 1;
+					else if (s->have_count < ORPHAN_HAVE)
+						s->have[s->have_count++] = saveorphan_key(rom);
+					else
+						s->have_more++;
 				}
 			}
 			if (hist && level > 0) {

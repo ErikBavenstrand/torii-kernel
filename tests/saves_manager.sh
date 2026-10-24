@@ -10,6 +10,7 @@
 #   4. an orphan's Delete (asked) moves it to the trash; Empty trash (asked)
 #      empties it
 #   5. B on an orphan's popup leaves it where it is
+#   6. Game saves lists the games with saves; a slot played there starts it
 # The rows: the saves without a game, then Empty trash.
 # Runs inside the torii-emu container after `just build`, `just
 # emu-headless` and building tests/roms.
@@ -120,4 +121,13 @@ boot $(nav_setting saves) "${to_screen[@]}" \
   -k @56:A -k @60:- -w "saves: popup" -k @20:B -k @24:- \
   -s @30:"$shots/5-kept.png" -f 800
 [ "$(content /torii/saves/G/Lost.gba/Main.sav)" = K ] || fail "B on the popup changed the save"
-echo "PASS: saves manager: the figures, Relink, Delete, Empty trash and B through the keys"
+# 6: Game saves lists the games with saves (Third.gba, not the orphan
+# Lost.gba); A opens its Saves page, where A on the active slot plays it
+# shellcheck disable=SC2046 # nav.sh's options
+boot $(nav_setting game-saves) -k @8:A -k @12:- -w "screen ready: saves-games" \
+  -s @6:"$shots/6-games.png" -k @10:A -k @14:- -w "screen ready: game-saves" \
+  -k @30:A -k @34:- -w "launch: boot mode" -f 600
+logged "saves: 1 games with saves, 1 listed"
+logged "saves: game saves of /G/Third.gba"
+! grep -qF "screen ready: slot-picker" "$cart/run.log" || fail "the launch asked for the slot again"
+echo "PASS: saves manager: the figures, Relink, Delete, Empty trash, B, and Game saves through the keys"

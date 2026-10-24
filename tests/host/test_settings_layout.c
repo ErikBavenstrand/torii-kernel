@@ -30,9 +30,9 @@ void test_settings_layout_slots(void)
 {
 	LoadEnglish();
 	erased();
-	// Eight sections: a label, the rows, a gap each; 29 rows with the LED on
-	CHECK_EQ(lay.rows, 29);
-	CHECK_EQ(lay.count, 29 + 2 * SET_SECTIONS);
+	// Eight sections: a label, the rows, a gap each; 30 rows with the LED on
+	CHECK_EQ(lay.rows, 30);
+	CHECK_EQ(lay.count, 30 + 2 * SET_SECTIONS);
 	CHECK_EQ(lay.slot[0].kind, SET_SLOT_LABEL);
 	CHECK_EQ(lay.slot[1].kind, SET_SLOT_ROW);
 	CHECK_EQ(lay.slot[1].id, SET_THEME);
@@ -60,7 +60,7 @@ void test_settings_layout_slots(void)
 	// The LED off hides its colours: two rows fewer, the slots after move up
 	settings_set(&v, SET_LED, 0);
 	settings_layout_build(&lay, &v);
-	CHECK_EQ(lay.rows, 27);
+	CHECK_EQ(lay.rows, 28);
 	CHECK_EQ(settings_layout_slot_of(&lay, SET_LED_IDLE), SET_LAYOUT_NONE);
 	CHECK_EQ(settings_layout_slot_of(&lay, SET_RESET_ON), settings_layout_slot_of(&lay, SET_LED) + 3);
 }

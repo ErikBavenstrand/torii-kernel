@@ -63,6 +63,7 @@ enum settings_id {
 	// Saves
 	SET_AUTO_SAVE,  // a game's save copied to the card without asking
 	SET_HISTORY,    // versions of a save kept per slot: index into settings_history_keep
+	SET_GAME_SAVES, // opens Game saves, the games with saves (screens/saves.h)
 	SET_SAVES,      // opens the global save manager (screens/saves.h)
 	// Cart
 	SET_RUMBLE,     // games can use the cart's rumble motor
@@ -140,6 +141,7 @@ enum settings_action {
 	SET_ACTION_RESCAN,  // rescans the library index
 	SET_ACTION_IDENTIFY,  // names_identify: Identify library
 	SET_ACTION_SAVES,     // the Saves screen
+	SET_ACTION_GAME_SAVES,  // its Game saves list
 };
 
 // Row flags

@@ -31,8 +31,9 @@
 //   copy's (and past the 2 x 2 KB at READCACHE_SAVE's start): the Saves screen's
 //   state (screens/saves.c) while it runs, in a deferred action, where nothing
 //   else borrows pReadCache between its calls.
-// - READCACHE_GSAVES, the same 8 KB as READCACHE_SAVES (the two screens never
-//   run together): a game's saves page's state (screens/game_saves.c) while it
+// - READCACHE_GSAVES, the same 8 KB as READCACHE_SAVES (Game saves takes
+//   its view down before opening a game's page, and walks the card again
+//   after): a game's saves page's state (screens/game_saves.c) while it
 //   runs, from a page's deferred action; and READCACHE_FLOW, the slot flows'
 //   (screens/slot_flow.c), within one of their calls. Neither overlaps the
 //   slot store's or the save copy's, and no SD listing runs meanwhile.

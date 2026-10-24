@@ -10,6 +10,9 @@
 //
 // Keys: UP/DOWN and L/R move, A opens a row, B goes back (from the picker to
 // the list, from the list to Settings).
+//
+// Game saves, the same screen's third view, lists the library's games that
+// have saves (not the game NOR's: their page has Saves in START's menu).
 #ifndef TORII_SCREENS_SAVES_H
 #define TORII_SCREENS_SAVES_H
 
@@ -18,5 +21,10 @@
 // with no view up. Call it from a page's deferred action; the page shows
 // itself again (nav_reshow).
 void saves_run(void);
+// Game saves (Settings > Saves > Game saves): the library's games with saves,
+// in its order, after a walk of the card; A on one opens its Saves page
+// (game_saves.h), and a slot played there starts the game. Returns as
+// saves_run does, or with no session if a game didn't start.
+void saves_games_run(void);
 
 #endif

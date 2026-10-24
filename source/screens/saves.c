@@ -18,6 +18,8 @@
 #include "../lang.h"
 #include "../library.h"
 #include "../saveorphan.h"
+#include "../actions.h"
+#include "game_saves.h"
 #include "nav.h"
 #include "../tlog.h"
 #include "../engine/engine.h"
@@ -68,7 +70,8 @@ enum {
 
 enum {
 	M_MAIN,
-	M_PICK
+	M_PICK,
+	M_GAMES  // Game saves: the library's games with saves (the picker's look)
 };
 // The manager's rows: the saves without a game, then Empty trash
 
@@ -79,7 +82,9 @@ struct saves {
 	u32 act;        // row + 1 A asked for
 	u32 cursor;     // the list's cursor as last seen
 	u32 main_cursor;  // the manager's, while the picker shows
-	u32 generation;   // the library's, when the picker was built
+	u32 generation;   // the library's, when the picker or Game saves was built
+	u32 games_n;      // Game saves' rows
+	u16 games[ORPHAN_HAVE];  // their positions in the library's order
 	u8 mode, back, list, title, hints, first;
 	u8 pick_orphan;  // the orphan being relinked
 	char row[272];
@@ -89,7 +94,7 @@ struct saves {
 	char status[40];
 	char line[96];   // the storage line
 	char head[40];   // the rows' heading
-	u32 parts[3];    // the bar: saves, backups, trash
+	u32 parts[2];    // the bar: saves, backups
 	char from[SAVESLOT_ROM_PATH_MAX + 2];
 	char target[SAVESLOT_ROM_PATH_MAX + 2];
 	char ask[SAVESLOT_ROM_PATH_MAX + 2];
@@ -138,7 +143,7 @@ static u32 library_games(const u8 *slot)
 static u32 model_count(void *ctx)
 {
 	struct saves *s = ctx;
-	return s->mode == M_PICK ? s->pick.total : main_rows(s);
+	return s->mode == M_PICK ? s->pick.total : s->mode == M_GAMES ? s->games_n : main_rows(s);
 }
 
 static int fetch_pick(struct saves *s, u32 i, struct ui_item *out)
@@ -155,11 +160,22 @@ static int fetch_pick(struct saves *s, u32 i, struct ui_item *out)
 	return UI_ITEM_READY;
 }
 
+static int fetch_game(struct saves *s, u32 i, struct ui_item *out)
+{
+	const u8 *slot = library_or_null();
+	if (!slot || i >= s->games_n || s->generation != library_generation())
+		return UI_ITEM_PENDING;
+	out->text = lib_display(slot, lib_order(slot)[s->games[i]]);
+	return UI_ITEM_READY;
+}
+
 static int model_fetch(void *ctx, u32 i, struct ui_item *out)
 {
 	struct saves *s = ctx;
 	if (s->mode == M_PICK)
 		return fetch_pick(s, i, out);
+	if (s->mode == M_GAMES)
+		return fetch_game(s, i, out);
 	const struct orphan_scan *sc = &s->scan;
 	if (i == sc->count) {  // Empty trash, the trash's size beside it
 		size_text(s->detail, sizeof(s->detail), sc->trash_bytes);
@@ -238,6 +254,7 @@ static const struct ui_spec main_nodes[M_COUNT] = {
 
 static const struct ui_view_spec main_view = {"saves", main_nodes, M_COUNT, M_LIST, UI_VIEW_LR_PAGES, on_event};
 static const struct ui_view_spec pick_view = {"saves-pick", pick_nodes, N_COUNT, N_LIST, UI_VIEW_LR_PAGES, on_event};
+static const struct ui_view_spec games_view = {"saves-games", pick_nodes, N_COUNT, N_LIST, UI_VIEW_LR_PAGES, on_event};
 
 /* ---- Showing ---- */
 
@@ -247,7 +264,10 @@ static void show_keys(struct saves *s)
 {
 	u32 n = 0;
 	int trash = s->mode == M_MAIN && s->cursor == s->scan.count;
-	const char *a = s->mode == M_PICK ? gl_saves->hint_relink : trash ? gl_saves->hint_empty : gl_saves->hint_open;
+	const char *a = s->mode == M_PICK    ? gl_saves->hint_relink
+			: s->mode == M_GAMES ? gl_saves->hint_games
+			: trash              ? gl_saves->hint_empty
+					     : gl_saves->hint_open;
 	if (!trash || s->scan.trash_files)
 		s->keys[n++] = (struct ui_hint){"A", a};
 	s->keys[n++] = (struct ui_hint){"B", gl_hint_back};
@@ -263,6 +283,12 @@ static void show_figures(struct saves *s)
 		ui_title_set_right(s->title, base_of(s->from));
 		return;
 	}
+	if (s->mode == M_GAMES) {
+		ui_title_set(s->title, gl_saves->games_title);
+		nav_count_words(s->right, sizeof(s->right), s->games_n, gl_saves->games[0], gl_saves->games[1]);
+		ui_title_set_right(s->title, s->right);
+		return;
+	}
 	ui_title_set(s->title, gl_saves->title);
 	size_text(s->right, sizeof(s->right), sc->saves_bytes + sc->backups_bytes + sc->trash_bytes);
 	ui_title_set_right(s->title, s->right);
@@ -271,11 +297,12 @@ static void show_figures(struct saves *s)
 	size_text(backups, sizeof(backups), sc->backups_bytes);
 	snprintf(s->line, sizeof(s->line), EN_SAVES_LEGEND, saves, backups);
 	ui_label_set((u8)(s->first + M_LINE), s->line);
+	// Two shades, as the line above names two figures; the trash's size is
+	// on its own row (Empty trash)
 	s->parts[0] = sc->saves_bytes;
 	s->parts[1] = sc->backups_bytes;
-	s->parts[2] = sc->trash_bytes;
-	u32 total = s->parts[0] + s->parts[1] + s->parts[2];
-	ui_storage_set((u8)(s->first + M_BAR), s->parts, 3, total ? total : 1);
+	u32 total = s->parts[0] + s->parts[1];
+	ui_storage_set((u8)(s->first + M_BAR), s->parts, 2, total ? total : 1);
 	u32 n = sc->count + sc->more;
 	if (n)
 		snprintf(s->head, sizeof(s->head), EN_SAVES_HEADING, gl_saves->heading, (unsigned long)n);
@@ -290,13 +317,13 @@ static int show(struct saves *s, u32 cursor)
 {
 	while (ui_depth())
 		ui_pop();
-	struct ui_view *v = ui_push(s->mode == M_PICK ? &pick_view : &main_view, s);
+	struct ui_view *v = ui_push(s->mode == M_PICK ? &pick_view : s->mode == M_GAMES ? &games_view : &main_view, s);
 	if (!v) {
 		tlog_error("saves: %s", ui_error());
 		return 0;
 	}
 	s->first = v->first;
-	s->list = (u8)(v->first + (s->mode == M_PICK ? N_LIST : M_LIST));
+	s->list = (u8)(v->first + (s->mode == M_MAIN ? M_LIST : N_LIST));
 	s->title = (u8)(v->first + N_TITLE);
 	s->hints = (u8)(v->first + N_HINTS);
 	ui_list_reset(s->list, cursor);
@@ -316,12 +343,14 @@ static void progress(void *ctx, u32 phase, u32 entries)
 	dialog_progress_set(phase, ORPHAN_PHASES, s->status);
 }
 
-static void scan(struct saves *s)
+// ORPHAN_OK, or ORPHAN_CARD when the card didn't answer
+static int scan(struct saves *s)
 {
 	dialog_progress_begin(gl_saves->scanning, gl_saves->scanning_text);
 	dialog_progress_status(gl_saves->phase[0]);
-	saveorphan_scan(&s->scan, progress, s);
+	int r = saveorphan_scan(&s->scan, progress, s);
 	dialog_progress_end();
+	return r;
 }
 
 // Orphan o is no longer one (relinked or in the trash): it leaves the list,
@@ -509,17 +538,140 @@ static void pick_choose(struct saves *s, u32 row)
 	after(s, r != 0);
 }
 
-static void act(struct saves *s, u32 row)
+/* ---- Game saves ---- */
+
+// Game saves' rows: the library's games, in its order, that the walk saw
+// saves of; 0 if the library isn't there (said)
+static int build_games(struct saves *s)
 {
+	library_load_now();
+	const u8 *slot = library_or_null();
+	if (!slot) {
+		dialog_message(NULL, gl_saves->no_library, DIALOG_ERROR);
+		return 0;
+	}
+	u32 total = library_games(slot);
+	s->games_n = 0;
+	for (u32 pos = 0; pos < total && s->games_n < ORPHAN_HAVE; pos++)
+		if (lib_path(slot, lib_order(slot)[pos], s->row, sizeof(s->row)) && saveorphan_has(&s->scan, s->row))
+			s->games[s->games_n++] = (u16)pos;
+	s->generation = library_generation();
+	tlog_debug("saves: %lu games with saves, %lu listed", (unsigned long)s->scan.have_count,
+		   (unsigned long)s->games_n);
+	return 1;
+}
+
+// A walk of the card for Game saves' rows; 0 if there are none (said)
+static int games_scan(struct saves *s)
+{
+	memset(s, 0, sizeof(*s));
+	s->mode = M_GAMES;
+	if (scan(s) != ORPHAN_OK) {
+		dialog_message(NULL, gl_saves->err_card, DIALOG_ERROR);
+		return 0;
+	}
+	if (!build_games(s))
+		return 0;
+	if (!s->games_n) {
+		// A walk cut short (a card error part way) may have missed them
+		dialog_message(NULL, s->scan.partial ? gl_saves->err_card : gl_saves->games_none,
+			       s->scan.partial ? DIALOG_ERROR : DIALOG_INFO);
+		return 0;
+	}
+	if (s->scan.have_more)
+		tlog("saves: %lu more games with saves than Game saves lists", (unsigned long)s->scan.have_more);
+	return 1;
+}
+
+static int games_show(struct saves *s, u32 cursor)
+{
+	return games_scan(s) && show(s, cursor < s->games_n ? cursor : s->games_n - 1);
+}
+
+// A on a game: its Saves page in this one's place (it shares this screen's
+// memory, so the card is walked again after); a slot played there starts
+// the game. 0 once nothing is left to show.
+static int open_game(struct saves *s, u32 row)
+{
+	const u8 *slot = library_or_null();
+	if (!slot || row >= s->games_n || s->generation != library_generation())
+		return games_show(s, row);
+	u32 rec = lib_order(slot)[s->games[row]];
+	char path[SAVESLOT_ROM_PATH_MAX + 2], title[96];
+	if (!lib_path(slot, rec, path, sizeof(path)))
+		return 1;
+	snprintf(title, sizeof(title), "%s", lib_display(slot, rec));
+	if (!game_saves_probe(path)) {
+		// A record (game.ini) without a slot, or another game's key
+		tlog("saves: %s has no saves to manage", path);
+		dialog_message(NULL, gl_gsaves->no_save, DIALOG_INFO);
+		return 1;
+	}
+	tlog("saves: game saves of %s", path);
+	// Its page takes this screen's memory (READCACHE_GSAVES is
+	// READCACHE_SAVES): this one goes first, so no frame of the page's
+	// coming in reads it
+	ui_leave(UI_TR_DEEPER, 1);
+	while (ui_depth())
+		ui_pop();
+	if (game_saves_run(title) == GAME_SAVES_LAUNCH) {
+		action_slot_chosen(1);
+		action_launch_title(title);
+		action_launch(path, ACTION_DEFAULT, ACTION_SAVE_KEEP, 0);
+		action_launch_title(NULL);
+		action_slot_chosen(0);  // it returned: nothing started
+		if (!ui_active())
+			return 0;  // the session ended: Settings comes back
+	}
+	return games_show(s, row);
+}
+
+static int act(struct saves *s, u32 row)
+{
+	if (s->mode == M_GAMES)
+		return open_game(s, row);
 	if (s->mode == M_PICK)
 		pick_choose(s, row);
 	else if (row == s->scan.count)
 		empty_trash(s);
 	else if (row < s->scan.count)
 		orphan_menu(s, row);
+	return 1;
 }
 
 /* ---- The screen ---- */
+
+// Runs the screen shown until B leaves it (from the picker: to the list)
+static void run(struct saves *s)
+{
+	u32 seen = s->cursor;
+	while (ui_depth()) {
+		ui_frame();
+		if (s->cursor != seen) {
+			seen = s->cursor;
+			show_keys(s);
+		}
+		if (s->act) {
+			u32 row = s->act - 1;
+			s->act = 0;
+			if (!act(s, row))
+				break;
+			seen = s->cursor;
+		}
+		if (s->back) {
+			s->back = 0;
+			if (s->mode == M_PICK)
+				leave_pick(s);
+			else
+				break;
+		}
+	}
+	if (!ui_active())
+		return;  // a game played from Game saves didn't start: its session ended
+	ui_leave(UI_TR_DEEPER, -1);
+	while (ui_depth())
+		ui_pop();
+}
 
 void saves_run(void)
 {
@@ -535,28 +687,21 @@ void saves_run(void)
 		return;
 	}
 	tlog("saves: %lu orphans", (unsigned long)s->scan.count);
-	u32 seen = s->cursor;
-	while (ui_depth()) {
-		ui_frame();
-		if (s->cursor != seen) {
-			seen = s->cursor;
-			show_keys(s);
-		}
-		if (s->act) {
-			u32 row = s->act - 1;
-			s->act = 0;
-			act(s, row);
-			seen = s->cursor;
-		}
-		if (s->back) {
-			s->back = 0;
-			if (s->mode == M_PICK)
-				leave_pick(s);
-			else
-				break;
-		}
+	run(s);
+}
+
+void saves_games_run(void)
+{
+	struct saves *s = S;
+	if (!pending_save_flush())
+		return;
+	if (!games_scan(s))  // over the page that opened it
+		return;
+	ui_leave(UI_TR_DEEPER, 1);
+	if (!show(s, 0)) {
+		while (ui_depth())
+			ui_pop();
+		return;
 	}
-	ui_leave(UI_TR_DEEPER, -1);
-	while (ui_depth())
-		ui_pop();
+	run(s);
 }

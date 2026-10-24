@@ -28,11 +28,11 @@ extern FATFS EZcardFs;
 #define SCRATCH (pReadCache + 0x18000)
 static struct orphan_scan *scan(void)
 {
-	return (struct orphan_scan *)SCRATCH;  // about 3 KB
+	return (struct orphan_scan *)SCRATCH;  // about 4 KB
 }
 static FILINFO *info(void)
 {
-	return (FILINFO *)(SCRATCH + 0x1000);
+	return (FILINFO *)(SCRATCH + 0x2000);
 }
 
 static int card(void)
@@ -118,7 +118,10 @@ static void do_scan(void)
 static void test_scan(void)
 {
 	do_scan();
-	struct orphan_scan before = *scan();
+	struct {
+		u32 saves_bytes, saves_files, backups_bytes, backups_files, trash_bytes, games, count, have;
+	} before = {scan()->saves_bytes, scan()->saves_files, scan()->backups_bytes, scan()->backups_files,
+		    scan()->trash_bytes, scan()->games,       scan()->count,         scan()->have_count};
 	// Two orphans (one with two slots and a history, one a record only); a live
 	// game; a NOR game's pseudo path; a folder with only another folder in it
 	CHECK(put("/TOS/Live.gba", 'R', 512));
@@ -152,10 +155,17 @@ static void test_scan(void)
 		CHECK_EQ(s->bytes[r], 12);
 	}
 	CHECK_EQ(s->count - before.count, 2);
-	// The ROM comes back: no longer an orphan
+	// Game saves' list: the live game, in any case; never an orphan or a NOR game
+	CHECK_EQ(s->have_count - before.have, 1);
+	CHECK(saveorphan_has(s, "/TOS/Live.gba"));
+	CHECK(saveorphan_has(s, "/tos/LIVE.GBA"));
+	CHECK(!saveorphan_has(s, "/TOS/Gone.gba"));
+	CHECK(!saveorphan_has(s, "/torii/nor/Pseudo"));
+	// The ROM comes back: no longer an orphan, and listed
 	CHECK(put("/TOS/Gone.gba", 'R', 512));
 	do_scan();
 	CHECK(find_orphan("/TOS/Gone.gba") < 0);
+	CHECK(saveorphan_has(scan(), "/TOS/Gone.gba"));
 	f_unlink("/TOS/Gone.gba");
 }
 

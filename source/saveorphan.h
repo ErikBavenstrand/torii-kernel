@@ -55,6 +55,7 @@ enum {
 
 #define ORPHAN_MAX 32  // orphans listed
 #define ORPHAN_POOL 2560  // bytes of their ROM paths
+#define ORPHAN_HAVE 256  // games with saves remembered
 
 struct orphan_scan {
 	// The space used, in file bytes (not clusters): the saves under /torii/saves,
@@ -71,7 +72,29 @@ struct orphan_scan {
 	u32 hist[ORPHAN_MAX];  // of those, its history's
 	u16 pool_used;
 	char pool[ORPHAN_POOL];
+	// The games whose ROM is there (not NOR games'), by saveorphan_key, in
+	// walk order: Settings' Game saves lists the library's games among them
+	u16 have_count;
+	u16 have_more;  // past ORPHAN_HAVE
+	u32 have[ORPHAN_HAVE];
 };
+
+// A ROM path's key in have: FNV-1a of its bytes, ASCII letters folded (FAT
+// names match in any case)
+static inline u32 saveorphan_key(const char *rom)
+{
+	u32 h = 2166136261u;
+	for (; *rom; rom++) {
+		u8 c = (u8)*rom;
+		if (c >= 'A' && c <= 'Z')
+			c = (u8)(c | 0x20);
+		h = (h ^ c) * 16777619u;
+	}
+	return h;
+}
+
+// 1 if the scan saw saves of the game at rom (a key in have)
+int saveorphan_has(const struct orphan_scan *s, const char *rom);
 
 // Called now and then during a scan: phase 0 the saves, 1 the history (and
 // with it the orphans'), 2 the trash (ORPHAN_PHASES), with the entries read

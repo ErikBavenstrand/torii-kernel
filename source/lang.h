@@ -324,6 +324,10 @@ struct lang_saves {
 	const char *heading, *none;  // the rows' heading, and it with nothing to fix
 	const char *pop_relink, *pop_delete;
 	const char *pick_title;  // the picker's title bar
+	const char *games_title;  // Game saves' title bar
+	const char *games[2];  // its count of games, for one and for many (nav_count_words)
+	const char *games_none;  // with no game to list
+	const char *hint_games;  // A on a game
 	const char *ask_relink, *ask_relink_button;
 	const char *ask_delete, *ask_delete_text, *ask_delete_button;
 	const char *ask_empty, *ask_empty_text, *ask_empty_button;
