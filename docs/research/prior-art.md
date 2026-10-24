@@ -13,7 +13,7 @@ DS Style descends from Simple DE. Value and complexity are rated low, medium or 
 | 7 | Browse | Empty-folder messages | DS | Friendly text instead of a blank screen | low/low | ✅ |
 | 8 | Browse | 512 files via a PSRAM index | DS | Index in PSRAM 0x08FF0000; folder cap cut to 96 | high/high | ✅ idea, without the folder cut |
 | 9 | Browse | Per-extension icons | S, DS | 40+ icons | med/low | ✅ themeable |
-| 10 | Launch | PogoShell plugin launcher | S, DS | /SYSTEM/PLUG/<ext>.{bin,gba,mb,mbz} | very high/high | ✅ ABI kept, explicit table |
+| 10 | Launch | PogoShell plugin launcher | S, DS | /SYSTEM/PLUG/<ext>.{bin,gba,mb,mbz} | very high/high | ❌ GBA, GB, GBC and NES only (v0.6, owner 2026-10-25) |
 | 11 | Launch | Hard-reset toggle (BIOS intro) | S, DS | Setting; L inverts it per boot | med/low | ✅ |
 | 12 | Launch | Boot progress screen | S, DS | "Copying ROM…" with an MB counter | low/low | ✅ |
 | 13 | Launch | Boot mode Clean/Addon/Menu | DS | Skip the launch menu | high/med | ✅ |
@@ -38,9 +38,9 @@ DS Style descends from Simple DE. Value and complexity are rated low, medium or 
 | 32 | Settings | One human-editable SETTINGS.TXT | DS | Commented key=value | high/med | ✅ |
 | 33 | Settings | Hardware page (reset, backup) | S | — | med/low | ✅ |
 | 34 | Emu | Jagoomba Color v0.5 | S, DS | Newer GB/GBC emulator | high/low | ✅ |
-| 35 | Emu | PocketNES as a plugin | S, DS | Not built in | med/low | ✅ |
-| 36 | Emu | Plugin file types | S, DS | sms gg sg sv ws wsc ngp pce z80 col c8 nes… | very high/low | ✅ |
-| 37 | Media | Image/text/music viewer plugins | S, DS | External PogoShell plugins | high/n/a | ✅ through plugins |
+| 35 | Emu | PocketNES as a plugin | S, DS | Not built in | med/low | ❌ built in, from Dwedit's source |
+| 36 | Emu | Plugin file types | S, DS | sms gg sg sv ws wsc ngp pce z80 col c8 nes… | very high/low | ❌ no other systems |
+| 37 | Media | Image/text/music viewer plugins | S, DS | External PogoShell plugins | high/n/a | ❌ no plugins |
 | 38 | Media | DS text/Markdown viewer | DS | Closed 10 KB plugin | med/med | 🤷 our own later |
 | 39 | Lang | 13 languages incl. Thai | DS | JSON → headers | med/high | ⏳ English now, the system ready |
 | 40 | Lang | UTF-8 / accented filenames | DS | Limited Latin set | med/med | ✅ full Latin-1 |

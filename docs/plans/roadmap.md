@@ -58,7 +58,6 @@ Everything the kernel stores lives under `/torii/`. ROMs can be anywhere.
   games/<code>-<crc>.ini  per-game overrides (save type, RTC, cheats)
   art/<system>/{title,box}/<code or name>.lz
   lang/<code>.lng
-  plugins/plugins.ini + emulator binaries
   cheats/<code>.cht
   trash/
   recent.txt
@@ -206,33 +205,40 @@ v0.5.2's open items, the owner's answers to the UX review's questions (2026-10-2
 - **Kept (owner, 2026-10-24): the kept backup.** A save type that shrinks moves the slot's save into its history as a backup no pruning removes (the slot starts blank, so it is the only copy); making it a slot of its own was the alternative.
 - **Open: Game saves past 256 games** with saves aren't listed (logged).
 
-## v0.6 Plugins
+## v0.6 Emulators
+
+Torii plays GBA, GB, GBC and NES, and nothing else (owner, 2026-10-25): the research
+(`docs/research/gba-emulators.md`) found no other system with a fast, mature emulator and a
+library worth it, and no emulator with a licence to bundle. So there is no plugin system, no
+PogoShell handoff, no `/SYSTEM/PLUG` and no viewers: v0.6 makes the two built-in emulators
+as good as they get on the Omega DE.
 
 **Fixes carried from v0.5.2 (moved 2026-10-24):**
 
 - **Cart check: path walks from the root** (every open under `/torii/saves/<rom path>/` scans `GBA/` again): the cache now answers most of these; relative paths (`f_chdir`) would remove the rest, but the SD page keeps its own current folder. Measure on the cart with the `sd:` lines first.
 - **Cart check: whether the 8.6 ms settle delay is needed** after every SD write (EZ-Flash's code; the commands inside one call run back to back without it). Measure with the `sd:` lines; drop the delay, or shorten it, only if the card keeps up.
-- **Screens' EWRAM states**: each screen's state is its own EWRAM static (`games` 3.7 KB, `sd` 3.6 KB, `info` 2.7 KB, `nor` 1.4 KB, Diagnostics' `scr` 1.6 KB): a union of page states or a shared path scratch would free 5 to 8 KB. Do it if the plugin table or the launch path needs the room.
+- **Screens' EWRAM states**: each screen's state is its own EWRAM static (`games` 3.7 KB, `sd` 3.6 KB, `info` 2.7 KB, `nor` 1.4 KB, Diagnostics' `scr` 1.6 KB): a union of page states or a shared path scratch would free 5 to 8 KB. Do it if the emulator builds or the launch path need the room.
 
-**Plugins**
+**Emulators**
 
-- **Handoff:** keep the PogoShell handoff exactly as it is, so existing emulators work
-  unchanged. The plugin goes at PSRAM 0 with the ROM after it, the argv block is at
-  `0x0203FC00` with magic `0xFAB0BABE`, the ROM address is at `0x0203FBFC`, there is a fake
-  romfs header, and `.mb`/`.mbz` plugins run from EWRAM.
-- **Plugin table:** replace the guess-by-file-name `/SYSTEM/PLUG/<ext>.bin` lookup with
-  `plugins/plugins.ini`, listing extension, binary, save type and size, icon, display name
-  and boot method.
-- **Saves:** emulator saves use the slot system, which ends today's name collisions between
-  folders.
-- **Jagoomba from source:** build Jagoomba Color v0.5 from source in the repo, replacing
-  the prebuilt `jagoombacolor.h`. Fix the palette not persisting (ez-flash/omega-de-kernel#12)
-  there: `GFX_reset` in `lcd.s` overwrites the palette that `readconfig` loaded from the
-  game's `.esv` with the GBC BIOS palette on every boot, so apply the automatic palette only
-  when the save holds no config yet.
-- **Emulators:** Jagoomba Color is built in as a default that the table can override.
-  PocketNES and the rest load as plugins: sms, gg, sg, sv, ws, wsc, ngp, pce, z80, col, c8,
-  nes, plus the viewer plugins.
+- **Built from source:** Jagoomba Color (GB/GBC) and PocketNES (NES) build from their
+  upstream source at pinned commits, fetched like mGBA and patched from files in the repo,
+  with the kernel's devkitARM, reproducibly. They replace the prebuilt `jagoombacolor.h`
+  and `pocketnes.h`. Each is the newest working version: Jagoomba Color's master, and
+  Dwedit's PocketNES master (2025: MMC5, VRC3/4/6 IRQs, mapper 118, NES 2.0 headers), not
+  the 2013 build.
+- **Omega DE options:** the GB emulator gets the DE's rumble and clock, as Jagoomba's own
+  `_ezode` build does. PocketNES's clock is a build option, not a word the kernel writes
+  into the binary at a fixed offset.
+- **GB palette (ez-flash/omega-de-kernel#12):** a palette picked in Jagoomba's menu is kept
+  per game.
+- **Removed:** `source/goomba.h` (unused) and `emusrc/`, EZ-Flash's older Goomba Color, which
+  Jagoomba replaces.
+- **Tests:** `just compat` launches one GB/GBC game per mapper (MBC1, MBC2, MBC3+clock, MBC5,
+  MBC5+rumble), and every GB/GBC game in `roms/` boots once into a compatibility list. NES
+  is covered by homebrew test ROMs until NES games are in `roms/`.
+- **Licences:** neither emulator states one; they ship inside `ezkernelnew.bin` as they do
+  in EZ-Flash's kernel (owner, 2026-10-25).
 
 ## v0.7 In-game menu
 
@@ -353,7 +359,7 @@ DS Style (FrankieT19, Apache-2.0) descends from Simple DE (Sterophonick), and bo
 on the official kernel. Of what they added, Torii takes:
 
 - the start screen, favourites, recents, view modes, hidden system files and clean names;
-- the plugin launcher, boot modes, the quick-start hotkey, the hard-reset toggle and the boot
+- boot modes, the quick-start hotkey, the hard-reset toggle and the boot
   progress screen;
 - rotating save backups, which become slot history;
 - title, box, custom and NOR art, and a scraper;
