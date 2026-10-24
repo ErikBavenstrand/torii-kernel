@@ -479,7 +479,9 @@ open)
   # LOGGING set to Info on the Settings page, which B leaves for home
   to_info() {
     # shellcheck disable=SC2046 # nav.sh's options
-    echo "-p 30:tlog_open_steps_test:$1 $(nav_setting logging | tr "\n" " ") $(nav_press A RIGHT RIGHT A B) -w \"nav: home ready\""
+    # B is held for 30 frames: the settings write that A started blocks
+    # frames, and a 4-frame tap inside it is never seen
+    echo "-p 30:tlog_open_steps_test:$1 $(nav_setting logging | tr "\n" " ") $(nav_press A RIGHT RIGHT A) -k @40:B -k @70:- -w \"nav: home ready\""
   }
 
   # A delete meanwhile: the open holds the file it makes (FatFs keeps no
