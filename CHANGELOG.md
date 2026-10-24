@@ -6,6 +6,13 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** a game list opens on the game played last that it holds (after
+  a play session, A, A plays it again), and every page opens on the row it was
+  left on earlier in the session; Recent's game popup has Remove, which takes
+  a game off Recent and keeps its file (8d92e83).
+- **Changed:** one word per thing: the NOR page says Play like the others,
+  Settings' History is Backups kept, the save pages say START menu
+  (`docs/design/v0.5/ux-review.md`, 8d92e83).
 - **Changed:** the save screens, rebuilt (design direction B,
   `docs/design/v0.5/saves-variants.md`): a game's Saves is a list and detail
   page (`source/screens/save_page.c`): its slots with the active one marked
