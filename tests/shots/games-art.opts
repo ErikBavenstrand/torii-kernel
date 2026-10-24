@@ -12,6 +12,10 @@
 #! sd-file /Sea.gba 0 tests/shots/data/art-night.bin
 #! sd-file /torii/art/4D148840.bin 0 tests/shots/data/art-night.bin
 #! sd-file /torii/crc.txt 0 tests/shots/data/art-crc.txt
+# The tests' hook: lists open on their first row (else the GBA list opens
+# on Hello, the game Recent played last)
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
 -w "nav: home ready"
 -k @8:RIGHT -k @12:-
 -k @20:A -k @24:-

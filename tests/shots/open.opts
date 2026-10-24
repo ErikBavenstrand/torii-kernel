@@ -7,6 +7,10 @@
 # both is hashed and watched for tears.
 #! settings 28=1
 -C 1792586096
+# The tests' hook: lists open on their first row (else a list opens on
+# Hello, the game Recent played last)
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
 -w "nav: home ready"
 -k @8:RIGHT -k @12:-
 -w "home: facing gba"

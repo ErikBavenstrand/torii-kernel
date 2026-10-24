@@ -220,7 +220,7 @@ static void slot_hints(void *ctx, u32 row, const struct ui_hint **keys, u32 *cou
 		gs.hints[n++] = (struct ui_hint){"A", gl_gsaves->hint_new};
 	} else {
 		gs.hints[n++] = (struct ui_hint){"A", gl_gsaves->hint_play};
-		gs.hints[n++] = (struct ui_hint){"START", gl_gsaves->hint_options};
+		gs.hints[n++] = (struct ui_hint){"START", gl_gsaves->hint_menu};
 		gs.hints[n++] = (struct ui_hint){"\xC2\xBB", gl_gsaves->hint_backups};
 	}
 	gs.hints[n++] = (struct ui_hint){"B", gl_hint_back};

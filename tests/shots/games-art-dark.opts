@@ -2,6 +2,10 @@
 # the next game, which has none: the GBA placeholder box in dark colours.
 #! settings 31=1
 #! sd-file "/torii/art/custom/A name too long to fit on its row.gba.bin" 0 tests/shots/data/art-sunset.bin
+# The tests' hook: lists open on their first row (else the GBA list opens
+# on Hello, the game Recent played last)
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
 -w "nav: home ready"
 -k @8:RIGHT -k @12:-
 -k @20:A -k @24:-

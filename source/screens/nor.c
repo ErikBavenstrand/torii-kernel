@@ -468,7 +468,7 @@ static void popup(u32 game)
 	snprintf(path, sizeof(path), USERDATA_NOR "%s", pNorFS[game].filename);
 	u32 n = 0;
 	nor.ids[n] = POP_LAUNCH;
-	nor.items[n++] = (struct ui_pop_item){gl_nor_launch, 0, 0};
+	nor.items[n++] = (struct ui_pop_item){gl_games->pop[LANG_POP_PLAY], 0, 0};
 	nor.ids[n] = POP_INFO;
 	nor.items[n++] = (struct ui_pop_item){gl_nor_info, 0, 0};
 	if (game_saves_probe(path)) {
@@ -584,6 +584,8 @@ static struct ui_view *nor_enter(u32 item, u32 row)
 	if (nor.next_row_set)
 		row = nor.next_row;
 	nor.next_row_set = 0;  // used once, by this enter
+	if (row == NAV_ROW_FIRST)
+		row = 0;
 	nor.sel = row < nor.count ? row : nor.count;  // Last place may hold any row: past the games, Format all
 	match_records();
 	u32 used = 0;
@@ -605,7 +607,7 @@ static struct ui_view *nor_enter(u32 item, u32 row)
 	ui_label_set(at(N_NOTE), nor.count ? "" : gl_nor_empty);
 	ui_label_set(at(N_FORMAT_TEXT), gl_nor_format);
 	ui_label_set(at(N_FORMAT_DETAIL), gl_nor_format_detail);
-	nor.hints_game[0] = (struct ui_hint){"A", gl_hint_launch};
+	nor.hints_game[0] = (struct ui_hint){"A", gl_games->hint_play};
 	nor.hints_game[1] = (struct ui_hint){"START", gl_hint_menu};
 	nor.hints_game[2] = (struct ui_hint){"B", gl_hint_back};
 	nor.hints_format[0] = (struct ui_hint){"A", gl_hint_format};

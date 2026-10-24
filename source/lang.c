@@ -106,10 +106,8 @@ char *gl_nor_free_of EWRAM_BSS;
 char *gl_nor_empty EWRAM_BSS;
 char *gl_nor_format EWRAM_BSS;
 char *gl_nor_format_detail EWRAM_BSS;
-char *gl_hint_launch EWRAM_BSS;
 char *gl_hint_menu EWRAM_BSS;
 char *gl_hint_format EWRAM_BSS;
-char *gl_nor_launch EWRAM_BSS;
 char *gl_nor_info EWRAM_BSS;
 char *gl_nor_delete EWRAM_BSS;
 char *gl_nor_delete_text EWRAM_BSS;
@@ -267,7 +265,7 @@ const char *en_set_labels[SET_ROWS] = {
 	[SET_IDENTIFY] = "Identify library",
 	[SET_SHOW_ALL] = "Show all files",
 	[SET_SAVES] = "Saves",
-	[SET_HISTORY] = "History",
+	[SET_HISTORY] = "Backups kept",
 	[SET_LOGGING] = "Logging",
 	[SET_LANGUAGE] = "Language",
 };
@@ -281,7 +279,7 @@ const char *en_set_explain[SET_EXPLAINS] = {
 	[SET_DATE_ROW] = "The cart's date. A sets it.",
 	[SET_CLOCK_24H] = "14:32 when on, 2:32 PM when off.",
 	[SET_GAME_CLOCK] = "Lets games read the cart's clock.",
-	[SET_BOOT_MODE] = "How A, Play, Launch start GBA games.",
+	[SET_BOOT_MODE] = "How A and Play start GBA games.",
 	[SET_ENGINE] = "Patches from a built-in table first.",
 	[SET_AUTO_SAVE] = "Copies saves to the card, no question.",
 	[SET_RTS] = "Save and load from the in-game menu.",
@@ -298,8 +296,8 @@ const char *en_set_explain[SET_EXPLAINS] = {
 	[SET_RESCAN] = "Looks for games on the card again.",
 	[SET_IDENTIFY] = "Looks up each game in names.db.",
 	[SET_SHOW_ALL] = "The SD card page shows hidden files.",
-	[SET_SAVES] = "Space used, orphaned saves, trash.",
-	[SET_HISTORY] = "Versions kept of each save slot.",
+	[SET_SAVES] = "Space, saves without a game, trash.",
+	[SET_HISTORY] = "How many backups each slot keeps.",
 	[SET_LOGGING] = "Writes a log to /torii/logs.",
 	[SET_LANGUAGE] = "The menu's language.",
 	[SET_EXPLAIN_RESET_STATES] = "Opens the in-game menu instead.",
@@ -479,10 +477,8 @@ const char en_nor_free_of[] = "free of";
 const char en_nor_empty[] = "No games on NOR";
 const char en_nor_format[] = "Format all";
 const char en_nor_format_detail[] = "erases every game";
-const char en_hint_launch[] = "launch";
 const char en_hint_menu[] = "menu";
 const char en_hint_format[] = "format";
-const char en_nor_launch[] = "Launch";
 const char en_nor_info[] = "Game info";
 const char en_nor_delete[] = "Delete";
 const char en_nor_delete_text[] = "Its save on the SD card stays.";
@@ -541,13 +537,14 @@ static const struct lang_games en_games = {
 	.hint_menu = "menu",
 	.hint_letter = "letter",
 	.hint_pick = "pick",
-	.pop = {"Play", "Favourite", "Rename", "Game info", "Saves", "Delete"},
+	.pop = {"Play", "Favourite", "Rename", "Game info", "Saves", "Remove", "Delete"},
 	.boots = {"default", "clean", "addons"},
 	.hint_boot = "boot",
 	.off = "off",
 	.on = "on",
 	.delete_text = "The save stays.",
 	.delete_button = "Delete",
+	.recent_failed = "Can't save the Recent list",
 	.save_type_failed = "Can't keep the save type",
 	.boot_mode_failed = "Can't keep the boot mode",
 	.info_keys = {"Console", "Size", "Folder", "Played", "Save type", "Boot mode", "Hard reset"},
@@ -589,13 +586,13 @@ static const struct lang_gsaves en_gsaves = {
 	.unknown = "unknown",
 	.none = "none",
 	.note_active = "Play loads this one.",
-	.note_other = "START: its options.",
+	.note_other = "START: its menu.",
 	.note_play = "A plays this slot.",
 	.note_new = "Empty, a copy,\nor a .sav file.",
 	.note_backup = "A restores it; the\nsave now is kept.",
 	.note_kept = "From a type change:\nkept for good.",
 	.hint_play = "play",
-	.hint_options = "options",
+	.hint_menu = "menu",
 	.hint_backups = "backups",
 	.hint_new = "new slot",
 	.hint_restore = "restore",
@@ -796,10 +793,8 @@ void LoadEnglish(void)
 	gl_nor_empty = (char *)en_nor_empty;
 	gl_nor_format = (char *)en_nor_format;
 	gl_nor_format_detail = (char *)en_nor_format_detail;
-	gl_hint_launch = (char *)en_hint_launch;
 	gl_hint_menu = (char *)en_hint_menu;
 	gl_hint_format = (char *)en_hint_format;
-	gl_nor_launch = (char *)en_nor_launch;
 	gl_nor_info = (char *)en_nor_info;
 	gl_nor_delete = (char *)en_nor_delete;
 	gl_nor_delete_text = (char *)en_nor_delete_text;

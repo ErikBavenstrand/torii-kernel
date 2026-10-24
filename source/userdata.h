@@ -175,6 +175,9 @@ u32 userdata_recent_time(u32 i);
 int userdata_recent_add(const char *path);
 int userdata_recent_add_file(const char *dir, const char *name);
 
+// path off Recent alone (the Recent page's Remove); its file
+// and favourite stay.
+int userdata_recent_forget(const char *path);
 // path, or name in folder dir, is gone (deleted, or missing at launch): off
 // both lists.
 int userdata_forget(const char *path);
