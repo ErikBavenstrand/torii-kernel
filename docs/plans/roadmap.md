@@ -172,30 +172,45 @@ Everything open after v0.5.1, a survey of the build's memory and speed, and a se
 - **Each operation's card work is logged** (`source/diskstat.c`): `sd: save copy: 35 reads (259 sectors, 59 more from the cache), 55 writes (300 sectors) in 961 ms`, for the save copy, the launch's save and each slot operation; the library walk logs its own time and sectors, not names.db's load or the pauses between its steps.
 - **The pending-save record's erase at each launch** (about 0.5 s): 128 slots in its sector, a launch's record programmed into the next erased one in place (flag last), the sector erased once every 128 launches (`tests/saves.sh record-slots`); in-place writes are bounded by `kernel_nor_program_ok`.
 - **The save copy ran `Save_recover` three times**: once. **The trash purge read a folder again per file**: once. **Pruning saw 64 backups at most**: it keeps the newest 64 listed and removes the older ones beyond.
-- **Open: path walks from the root** (every open under `/torii/saves/<rom path>/` scans `GBA/` again): the cache now answers most of these; relative paths (`f_chdir`) would remove the rest, but the SD page keeps its own current folder. Measure on the cart with the `sd:` lines first.
-- **Open: keys tapped during a blocking write are lost** (the settings write, a save copy step): input is polled once a frame. A keypad interrupt could latch presses.
+- **Done in v0.5.3: keys tapped during a blocking write were lost** (the settings write, a save copy step): input is polled once a frame. A keypad interrupt could latch presses.
 
 **Memory**
 
 - **newlib's printf** (stdio, a heap, float code: 39 KB of ROM, 5.8 KB of IWRAM data) replaced by the kernel's own (`source/fmt.c`, host-tested against the host's printf): a log line formats in 21,000 cycles, newlib's took 54,000. The language tables and the NES patch are `const`. IWRAM free: 4,268 to 5,032 bytes with the sector cache's 6 KB in it (the deepest stack measured 1.9 KB).
-- **Open: `impure_data` (1.1 KB of IWRAM)** is still linked (newlib's `errno`, from `strtol` and others).
+- **Done in v0.5.3: `impure_data` (1.1 KB of IWRAM)** was still linked (newlib's `errno`, from `strtol` and others).
 
 **UX**
 
 - **Settings has a Saves card** (Save without asking, Backups kept, Clean up saves ›); the save pages' words are plainer; Empty trash with nothing in it is inert; the backups page says Made and Backup N (the review, bb89ccd).
 - **Game info's Played** says Not lately (off Recent) or Recently (no time), never blank. **B held on the SD page** climbs a folder every 20 frames up to the card's root.
 - **Kept:** Settings' hint bar shows the row's explanation (the keys show once editing starts).
-- **Open (owner):** Clean up listing every game with saves, each opening its Saves page; A on a slot plays at once (direction B's choice) or opens its popup; Play with's title is the file name, not the display name; a legend for the storage bar's three shades; New slot's pane heading peeks above its popup; the kept backup's note assumes save types are known; the Saves card after Games or after Library.
+- **Settled in v0.5.3 (owner):** Clean up listing every game with saves, each opening its Saves page; A on a slot plays at once (direction B's choice) or opens its popup; Play with's title is the file name, not the display name; a legend for the storage bar's three shades; New slot's pane heading peeks above its popup; the kept backup's note assumes save types are known; the Saves card after Games or after Library.
 
 **Tooling**
 
-- **Open: a deleted source file's object stays in `build/` and is linked** (`tools/fresh.py` rebuilds changed files only): moving `libc_printf.c` aside still linked it. Clean objects with no source.
+- **Done in v0.5.3: a deleted source file's object stayed in `build/` and was linked** (`tools/fresh.py` rebuilds changed files only): moving `libc_printf.c` aside still linked it. Clean objects with no source.
 - **`tests/logging.sh open` held B for 4 frames**, inside the settings write's blocked frames once the code got faster: it holds B for 30.
+
+### v0.5.3 (2026-10-24)
+
+v0.5.2's open items, the owner's answers to the UX review's questions (2026-10-24), and one code review round.
+
+- **Game saves** (Settings > Saves, above Clean up saves): the library's games with saves, in its order, by display name; A opens a game's Saves page, and a slot played there starts the game. The card walk (`saveorphan_scan`) keeps a key per game folder whose ROM is there (256 at most, `ORPHAN_HAVE`); the list opens the game's page in its own memory's place, so it walks the card again on the way back. Games on the game NOR aren't listed (not in the library; their page has Saves in START's menu). `tests/shots/saves-games.opts`, `tests/saves_manager.sh` case 6.
+- **Key taps during a blocking write**: the VBlank interrupt (`crash.s`) ORs the held keys into `input_keys_seen`, which `input_poll` takes: a tap inside Settings' NOR write is seen (`tests/logging.sh` settings and open tap B for 4 frames).
+- **Play with's title** is the list's display name (`action_launch_title`; `tests/shots/slot-picker-list.opts`); from the SD card and NOR pages, the file name they list.
+- **Clean up's bar**: two shades, saves and backups, as its line; the trash's size on Empty trash's row.
+- **New slot's pane heading** is blank while its popup is up.
+- **`impure_data`**: `fmt_strtoul` replaces newlib's `strtoul` and `atoi`; IWRAM free 5,032 to 5,764 bytes.
+- **Stale objects**: `fresh.py track` counts a deleted source as changed, so its object and the linked kernel go.
+- **Kept as they are (owner):** A on a slot plays it; the Saves card after Games; the kept backup's note.
+- **Open (owner): the kept backup itself.** A save type that shrinks moves the slot's save into its history as a backup no pruning removes (the slot starts blank, so it is the only copy). The owner asked why it isn't pruned like the others; the alternative is to make it a slot of its own (slots are never pruned) and drop the special backup and its note.
+- **Open: Game saves past 256 games** with saves aren't listed (logged).
 
 ## v0.6 Plugins
 
 **Fixes carried from v0.5.2 (moved 2026-10-24):**
 
+- **Cart check: path walks from the root** (every open under `/torii/saves/<rom path>/` scans `GBA/` again): the cache now answers most of these; relative paths (`f_chdir`) would remove the rest, but the SD page keeps its own current folder. Measure on the cart with the `sd:` lines first.
 - **Cart check: whether the 8.6 ms settle delay is needed** after every SD write (EZ-Flash's code; the commands inside one call run back to back without it). Measure with the `sd:` lines; drop the delay, or shorten it, only if the card keeps up.
 - **Screens' EWRAM states**: each screen's state is its own EWRAM static (`games` 3.7 KB, `sd` 3.6 KB, `info` 2.7 KB, `nor` 1.4 KB, Diagnostics' `scr` 1.6 KB): a union of page states or a shared path scratch would free 5 to 8 KB. Do it if the plugin table or the launch path needs the room.
 

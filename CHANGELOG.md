@@ -4,6 +4,24 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## v0.5.3
+
+- **Added:** Settings > Saves > Game saves lists the library's games that
+  have saves, each opening its Saves page, where a slot played starts the
+  game: saves can be found from Settings, not only from a game's START menu.
+  The game NOR's games aren't listed (their page has Saves) (093a345).
+- **Fixed:** a key tapped while a write blocks the menu (Settings' NOR write,
+  a save copy step) is no longer lost: the VBlank interrupt keeps every key
+  held since the last poll, and the next frame sees the tap (f1b6504).
+- **Changed:** Play with names the game as the list it was started from does
+  (its display name, not its file name) (c62c810). Clean up's bar shows two
+  shades, the saves and the backups its line names; the trash's size stays
+  on Empty trash's row (093a345). New slot's pane heading no longer peeks
+  above its popup (99ddea8).
+- **Changed:** the kernel parses numbers itself (`fmt_strtoul`), so newlib's
+  errno block (`impure_data`) is no longer linked: 776 bytes more IWRAM free
+  (5,764) (ebaffe8).
+
 ## v0.5.2
 
 - **Changed:** a launch no longer erases a NOR sector for the pending-save
