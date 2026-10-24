@@ -232,12 +232,12 @@ const char en_hint_cancel[] = "cancel";
 // The v0.4 Settings page: section names, then each row's label and its
 // one-line explanation, which shows in the hint bar (at most 38 characters
 // and 232 px of body text, tests/host/test_settings_model.c)
-const char *en_set_sections[SET_SECTIONS] = {
+const char *const en_set_sections[SET_SECTIONS] = {
 	[SET_SEC_LOOK] = "Look",       [SET_SEC_CLOCK] = "Clock",   [SET_SEC_GAMES] = "Games",
 	[SET_SEC_SAVES] = "Saves",     [SET_SEC_CART] = "Cart",     [SET_SEC_HOTKEYS] = "Hotkeys",
 	[SET_SEC_LIBRARY] = "Library", [SET_SEC_SYSTEM] = "System",
 };
-const char *en_set_labels[SET_ROWS] = {
+const char *const en_set_labels[SET_ROWS] = {
 	[SET_THEME] = "Theme",
 	[SET_GAME_VIEW] = "Game view",
 	[SET_BOX_ART] = "Box art",
@@ -269,7 +269,7 @@ const char *en_set_labels[SET_ROWS] = {
 	[SET_LOGGING] = "Logging",
 	[SET_LANGUAGE] = "Language",
 };
-const char *en_set_explain[SET_EXPLAINS] = {
+const char *const en_set_explain[SET_EXPLAINS] = {
 	[SET_THEME] = "Light paper or dark graphite.",
 	[SET_GAME_VIEW] = "Game lists: names alone, or box art.",
 	[SET_BOX_ART] = "Covers from /torii/art, or none.",
@@ -304,12 +304,12 @@ const char *en_set_explain[SET_EXPLAINS] = {
 	[SET_EXPLAIN_RESET_CHEATS] = "With a cheat file: the in-game menu.",
 	[SET_EXPLAIN_START_HIDDEN] = "Not on home now: Last place instead.",
 };
-const char *en_set_onoff[2] = {"Off", "On"};
-const char *en_set_themes[2] = {"Dark", "Light"};
-const char *en_set_views[2] = {"List", "List + art"};
-const char *en_set_boots[SET_BOOTS] = {[SET_BOOT_ADDONS] = "With addons", [SET_BOOT_CLEAN] = "Clean"};
-const char *en_set_history[SET_HISTORY_CHOICES] = {"Off", "1", "3", "5", "10", "20"};
-const char *en_set_starts[SET_STARTS] = {
+const char *const en_set_onoff[2] = {"Off", "On"};
+const char *const en_set_themes[2] = {"Dark", "Light"};
+const char *const en_set_views[2] = {"List", "List + art"};
+const char *const en_set_boots[SET_BOOTS] = {[SET_BOOT_ADDONS] = "With addons", [SET_BOOT_CLEAN] = "Clean"};
+const char *const en_set_history[SET_HISTORY_CHOICES] = {"Off", "1", "3", "5", "10", "20"};
+const char *const en_set_starts[SET_STARTS] = {
 	[SET_START_LAST] = "Last place",   [SET_START_RECENT] = "Recent",
 	[SET_START_HOME] = "Home",         [SET_START_FAVOURITES] = "Favourites",
 	[SET_START_SD] = "SD card",        [SET_START_GBA] = "GBA",
@@ -317,11 +317,11 @@ const char *en_set_starts[SET_STARTS] = {
 	[SET_START_NES] = "NES",           [SET_START_NOR] = "NOR",
 	[SET_START_SETTINGS] = "Settings", [SET_START_INFO] = "Info",
 };
-const char *en_set_modes_b[3] = {"Rumble", "RAM", "Link"};
+const char *const en_set_modes_b[3] = {"Rumble", "RAM", "Link"};
 // By value: red 4, green 2, blue 1
-const char *en_set_colours[8] = {"Off", "Blue", "Green", "Cyan", "Red", "Magenta", "Yellow", "White"};
-const char *en_set_log_levels[4] = {"Off", "Errors", "Info", "Debug"};
-const char *en_set_ampm[2] = {"AM", "PM"};
+const char *const en_set_colours[8] = {"Off", "Blue", "Green", "Cyan", "Red", "Magenta", "Yellow", "White"};
+const char *const en_set_log_levels[4] = {"Off", "Errors", "Info", "Debug"};
+const char *const en_set_ampm[2] = {"AM", "PM"};
 const char en_set_minutes[] = "min";
 const char en_set_scanning[] = "Scanning...";
 const char en_set_saving[] = "Saving...";
@@ -329,7 +329,7 @@ const char en_set_save_failed[] = "Couldn't save. A tries again.";
 const char en_set_press[] = "Press keys...";
 const char en_set_press_hint[] = "Press keys... let go to set.";
 // By settings_set_keys' answer (at most 38 characters, as the explanations)
-const char *en_set_refused[SET_KEYS_SOFT_RESET + 1] = {
+const char *const en_set_refused[SET_KEYS_SOFT_RESET + 1] = {
 	[SET_KEYS_OK] = "",
 	[SET_KEYS_COUNT] = "Use 2 or 3 keys.",
 	[SET_KEYS_NO_MODIFIER] = "Use L, R, START or SELECT too.",
@@ -355,7 +355,7 @@ const char en_pop_cancel_button[] = "Cancel";
 // fills in, in order. Keys as the hint bar shows them: "^v" UP/DOWN, "«»"
 // LEFT/RIGHT.
 #define LR "\xC2\xAB\xC2\xBB"  // «»
-const char *en_info[INFO_STRINGS] = {
+const char *const en_info[INFO_STRINGS] = {
 	[INFO_S_CONTROLS] = "Controls",
 	[INFO_S_INGAME] = "In game",
 	[INFO_S_CART] = "Your cart",
@@ -492,7 +492,7 @@ const char en_nor_format_takes[] = "It takes about 4 minutes.";
 const char en_nor_format_button[] = "Format";
 const char en_nor_states[] = "Save states on";
 const char en_nor_changed[] = "The NOR changed: nothing was deleted.";
-const char *en_nor_saves[NOR_SAVES] = {
+const char *const en_nor_saves[NOR_SAVES] = {
 	[NOR_SAVE_NONE] = "No save",
 	[NOR_SAVE_SRAM] = "SRAM",
 	[NOR_SAVE_EEPROM_512] = "EEPROM 512 B",
