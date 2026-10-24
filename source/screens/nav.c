@@ -342,7 +342,7 @@ static void open_item(u32 item)
 {
 	// On the row it was left on, earlier in this session; the first time,
 	// the page picks (a game list: the game played last)
-	u32 row = nav.top_rows ? 0 : nav.rows_kept & 1u << item ? nav.rows[item] : NAV_ROW_FIRST;
+	u32 row = nav.top_rows ? 0 : (nav.rows_kept & 1u << item) ? nav.rows[item] : NAV_ROW_FIRST;
 	struct registry_place p = {(u8)item, 1, row};
 	struct ui_zoom zoom;
 	u32 kind = UI_TR_FADE;
