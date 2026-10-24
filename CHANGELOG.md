@@ -6,6 +6,11 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** Settings has a Saves card (Save without asking, was Auto save;
+  Backups kept; Clean up saves, was Library's Saves); a slot's popup no longer
+  has Export .sav; Empty trash with nothing in it does nothing; the save
+  pages' words are plainer (Move to a game, Made, Backup N, what A does)
+  (`docs/design/v0.5/settings-ux-review.md`, bb89ccd, 48b5e95).
 - **Changed:** a game list opens on the game played last that it holds (after
   a play session, A, A plays it again), and every page opens on the row it was
   left on earlier in the session; Recent's game popup has Remove, which takes
