@@ -29,17 +29,17 @@ static int ours(char *out, size_t room, const char *format, ...)
 	return n;
 }
 
-#define SAME(room, ...)                                                      \
-	do {                                                                 \
-		char a[64], b[64];                                           \
-		memset(a, 'x', sizeof(a));                                   \
-		memset(b, 'x', sizeof(b));                                   \
-		int na = ours(a, room, __VA_ARGS__);                         \
-		int nb = theirs(b, room, __VA_ARGS__);                     \
-		CHECK_EQ(na, nb);                                            \
-		if (memcmp(a, b, sizeof(a)))                                 \
+#define SAME(room, ...) \
+	do { \
+		char a[64], b[64]; \
+		memset(a, 'x', sizeof(a)); \
+		memset(b, 'x', sizeof(b)); \
+		int na = ours(a, room, __VA_ARGS__); \
+		int nb = theirs(b, room, __VA_ARGS__); \
+		CHECK_EQ(na, nb); \
+		if (memcmp(a, b, sizeof(a))) \
 			printf("  fmt: \"%s\" is \"%.*s\"\n", b, (int)sizeof(a), a); \
-		CHECK(!memcmp(a, b, sizeof(a)));                             \
+		CHECK(!memcmp(a, b, sizeof(a))); \
 	} while (0)
 
 void test_fmt_formats(void)
@@ -72,7 +72,8 @@ void test_fmt_formats(void)
 #pragma GCC diagnostic ignored "-Wformat-nonliteral"
 void test_fmt_random(void)
 {
-	static const char *const forms[] = {"%d", "%u", "%x", "%X", "%08X", "%-9d|", "%5u", "%03d", "%.4u", "%lu", "%ld"};
+	static const char *const forms[] = {"%d",  "%u",   "%x",   "%X",  "%08X", "%-9d|",
+					    "%5u", "%03d", "%.4u", "%lu", "%ld"};
 	unsigned seed = 12345;
 	for (int i = 0; i < 20000; i++) {
 		seed = seed * 1103515245u + 12345u;
