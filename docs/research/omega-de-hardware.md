@@ -548,7 +548,7 @@ for `Save_info`, `FlashBase_S71`, the command bytes `0x30`, `0xA0`, `0x25`,
 | Path | Writes | Through |
 |---|---|---|
 | Settings saved (`Save_SET_info`: SETTINGS, a game's save type) | `0x7B2000` then `0x7B0000` (A then B if only B was whole), 512 bytes each | `Save_info` |
-| Pending-save record set at launch, cleared at the next boot (`Save_sav_info`) | `0x790000`, 512 bytes | `Save_info` |
+| Pending-save record set at launch, cleared at the next boot (`Save_sav_info`) | `0x790000`-`0x79FFFF`: 128 slots of 512 bytes, the first not zeroed is the record; a launch programs the next erased slot in place (flag last), a clear zeros its slot (flag first), and the sector is erased only when every slot is used (v0.5.2) | `Save_info` (in place: `kernel_nor_program_ok`) |
 | NOR list saved: WRITE TO NOR, delete latest, FORMAT ALL, the boot's migration of an older list (`Save_NOR_list`) | `0x780000` then `0x7A0000` (or the other way), 0x2120 bytes each | `Save_info` |
 | `Read_S71NOR_ID` (in `Save_info` and Diagnostics' first step) | autoselect `90` and reset `F0` at `0x0AAA`/`0x0554`/0: commands, no erase or program | — |
 | The register unlock (`SetRompage` and the other `Set*` in `Ezcard_OP.c`, the in-game menu's `.s` files) | `0x1500`/`0xD200` at `0x08000000`, `0x08020000`, `0x08040000`: not NOR commands | — |

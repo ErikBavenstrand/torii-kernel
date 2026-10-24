@@ -41,6 +41,17 @@ void test_kernel_nor_records(void)
 	CHECK(!kernel_nor_record_ok(0x7BF000, 0x200));
 	CHECK(!kernel_nor_record_ok(0x7B2002, 0x200));
 	CHECK(!kernel_nor_record_ok(0x7BFFFE, 2));
+	// In place (no erase): the record's slots anywhere in the data, never
+	// past the window (the loader) or below the data (the kernel)
+	CHECK(kernel_nor_program_ok(0x790200, 0x200));
+	CHECK(kernel_nor_program_ok(0x79FE00, 0x200));
+	CHECK(kernel_nor_program_ok(KERNEL_NOR_WINDOW - 2, 2));
+	CHECK(!kernel_nor_program_ok(KERNEL_NOR_WINDOW - 0x100, 0x200));
+	CHECK(!kernel_nor_program_ok(KERNEL_NOR_WINDOW, 2));
+	CHECK(!kernel_nor_program_ok(KERNEL_NOR_DATA - 2, 4));
+	CHECK(!kernel_nor_program_ok(0x790001, 0x200));
+	CHECK(!kernel_nor_program_ok(0x790200, 0));
+	CHECK(!kernel_nor_program_ok(0x790000, 0xFFFFFFFFu));
 }
 
 static u8 image[LOADER_SIZE];

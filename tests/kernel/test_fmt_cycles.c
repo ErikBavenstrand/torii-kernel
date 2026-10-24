@@ -26,5 +26,6 @@ void test_fmt_cycles(void)
 	start = cycles_now();
 	for (u32 i = 0; i < 100; i++)
 		snprintf(out, 64, "%s %s %lu%s.gba", "Golden", "Sun", (unsigned long)i, i & 1 ? " (USA)" : "");
-	tlog("fmt: %lu cycles a row name", (unsigned long)(cycles_since(start) / 100));  // newlib took 54,000, this about 25,000
+	tlog("fmt: %lu cycles a row name",
+	     (unsigned long)(cycles_since(start) / 100));  // newlib took 54,000, this about 25,000
 }

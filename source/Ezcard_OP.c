@@ -362,8 +362,19 @@ void IWRAM_CODE Bank_Switching(u8 bank)
 // Erases one block of the kernel's NOR and writes buffersize bytes to it.
 // Returns how many halfwords read back wrong; all of them, writing nothing,
 // for a block outside the kernel's data sectors (bootloader.h).
-// Save_info's next write may program in place (Save_sav_info's clear)
-static u8 save_info_in_place;
+// Save_info's next write: SAVE_INFO_ERASE (the sector erased, then the
+// record written), or programmed in place over what is there (NOR turns 1s
+// to 0s with no erase): SAVE_INFO_CLEAR, zeros over the pending-save
+// record with its flag first, or SAVE_INFO_NEW, a record into an erased
+// slot with its flag last. In place, a write that would need an erase is
+// refused (all halfwords wrong): an erase here would take the sector's
+// other slots with it.
+enum {
+	SAVE_INFO_ERASE,
+	SAVE_INFO_CLEAR,
+	SAVE_INFO_NEW
+};
+static u8 save_info_mode;
 
 u32 IWRAM_CODE Save_info(u32 info_offset, u16 *info_buffer, u32 buffersize)
 {
@@ -375,8 +386,12 @@ u32 IWRAM_CODE Save_info(u32 info_offset, u16 *info_buffer, u32 buffersize)
 	register u32 loopwrite;
 	vu16 v1, v2;
 	// Torii: only the kernel's data sectors; past KERNEL_NOR_WINDOW is the
-	// boot loader, and below KERNEL_NOR_DATA the kernel (bootloader.h)
-	if (!kernel_nor_record_ok(info_offset, buffersize)) {
+	// boot loader, and below KERNEL_NOR_DATA the kernel (bootloader.h). A
+	// write in place never erases: it may start anywhere inside them
+	u8 mode = save_info_mode;
+	save_info_mode = SAVE_INFO_ERASE;
+	if (!(mode == SAVE_INFO_ERASE ? kernel_nor_record_ok(info_offset, buffersize)
+				      : kernel_nor_program_ok(info_offset, buffersize))) {
 		tlog_error("nor: refused to write %lu bytes at kernel NOR %06lX, outside its data sectors",
 			   (unsigned long)buffersize, (unsigned long)info_offset);
 		WAITCNT_RESTORE(waitcnt);
@@ -390,19 +405,24 @@ u32 IWRAM_CODE Save_info(u32 info_offset, u16 *info_buffer, u32 buffersize)
 
 	offset = info_offset;//0x7A0000/0x7B0000 ;
 
-	// Torii: the pending-save record cleared to zeros (save_info_in_place)
-	// needs no erase, about 0.7 s of it: NOR programs 1s to 0s in place, so
-	// only the halfwords that change are programmed, the flag first. Every
+	// Torii: the pending-save record's slots (Save_sav_info) are programmed
+	// in place, with no erase (about 0.7 s each): only the halfwords that
+	// change, a clear's flag first (cut short, the record reads as gone) and
+	// a new record's flag last (cut short, it never reads as pending). Every
 	// other record is erased and written whole, as before.
-	int erase = !save_info_in_place;
-	save_info_in_place = 0;
-	for (loopwrite = 0; loopwrite < buffersize / 2 && !erase; loopwrite++) {
-		u16 old = *((vu16 *)(FlashBase_S71 + offset + loopwrite * 2));
-		erase = (old & buf[loopwrite]) != buf[loopwrite];
-	}
-	if (!erase) {
+	if (mode != SAVE_INFO_ERASE) {
 		written = buffersize / 2;
 		for (loopwrite = 0; loopwrite < written; loopwrite++) {
+			u16 old = *((vu16 *)(FlashBase_S71 + offset + loopwrite * 2));
+			if ((old & buf[loopwrite]) != buf[loopwrite]) {
+				*((vu16 *)(FlashBase_S71)) = 0xF0;
+				WAITCNT_RESTORE(waitcnt);
+				return written;  // it needs an erase: refused
+			}
+		}
+		for (u32 k = 0; k < written; k++) {
+			// SAVE_INFO_NEW: 1, 2, ..., the flag at 0 last
+			loopwrite = mode == SAVE_INFO_NEW ? (k + 1) % written : k;
 			if (*((vu16 *)(FlashBase_S71 + offset + loopwrite * 2)) == buf[loopwrite])
 				continue;
 			*((vu16 *)(FlashBase_S71 + 0x555 * 2)) = 0xAA;
@@ -483,11 +503,76 @@ static void log_info_write(const char *what, u32 buffersize, u32 wrong)
 		tlog("nor: wrote %s, %lu bytes", what, (unsigned long)buffersize);
 }
 
+// Torii: the pending-save record's 64 KB sector holds SAV_SLOTS records of
+// SAV_SLOT_BYTES one after another, so a launch writes its record with no
+// erase (about 0.5 s each before) and only every SAV_SLOTS launches erase.
+// A slot is erased (its flag 0xFFFF), live (0x11) or used (0x0000, zeros
+// over it). The record is the first slot not used: 0x11 is a save waiting
+// to be copied, anything else none. Older kernels wrote slot 0 only, so
+// their record reads the same.
+#define SAV_SLOT_BYTES 0x200
+#define SAV_SLOTS (0x10000 / SAV_SLOT_BYTES)
+_Static_assert(SAVE_info_offset % 0x10000 == 0 && SAVE_info_offset + 0x10000 <= KERNEL_NOR_SMALL,
+	       "the record's slots fill one 64 KB sector of the kernel's data");
+
+// The first slot not used, SAV_SLOTS if all are; read from the NOR each time
+// (the ROM page is the kernel's): nothing to go stale
+static u32 IWRAM_CODE sav_slot(void)
+{
+	u32 k;
+	for (k = 0; k < SAV_SLOTS; k++) {
+		if (*((vu16 *)(FlashBase_S71 + SAVE_info_offset + k * SAV_SLOT_BYTES)) != 0x0000)
+			break;
+	}
+	return k;
+}
+
+static int IWRAM_CODE sav_slot_erased(u32 k)
+{
+	for (u32 i = 0; i < SAV_SLOT_BYTES / 2; i++) {
+		if (*((vu16 *)(FlashBase_S71 + SAVE_info_offset + k * SAV_SLOT_BYTES + i * 2)) != 0xFFFF)
+			return 0;
+	}
+	return 1;
+}
+
+// Zeros over slot k: used from now on. The halfwords wrong
+static u32 IWRAM_CODE sav_slot_use(u32 k, u16 *zeros)
+{
+	memset(zeros, 0, SAV_SLOT_BYTES);
+	save_info_mode = SAVE_INFO_CLEAR;
+	return Save_info(SAVE_info_offset + k * SAV_SLOT_BYTES, zeros, SAV_SLOT_BYTES);
+}
+
 void IWRAM_CODE Save_sav_info(u16 *SAV_info_buffer, u32 buffersize)
 {
-	save_info_in_place = SAV_info_buffer[0] != 0x11;  // a clear: zeros over the record
-	log_info_write(SAV_info_buffer[0] == 0x11 ? "the pending-save record" : "an empty pending-save record",
-		       buffersize, Save_info(SAVE_info_offset, SAV_info_buffer, buffersize));
+	static u16 zeros[SAV_SLOT_BYTES / 2] EWRAM_BSS;
+	u32 k = sav_slot(), wrong = 0;
+	if (SAV_info_buffer[0] != 0x11) {
+		// A clear: the live record's slot is used up (an erased one stays)
+		if (k < SAV_SLOTS && !sav_slot_erased(k))
+			wrong = sav_slot_use(k, zeros);
+		log_info_write("an empty pending-save record", buffersize, wrong);
+		return;
+	}
+	// A new record goes into the first erased slot: one still live (a launch
+	// the record's save was given up for) or one a cut left half written is
+	// used up first
+	while (k < SAV_SLOTS && !sav_slot_erased(k) && !wrong) {
+		wrong = sav_slot_use(k, zeros);
+		k++;
+	}
+	if (!wrong && k < SAV_SLOTS) {
+		save_info_mode = SAVE_INFO_NEW;
+		wrong = Save_info(SAVE_info_offset + k * SAV_SLOT_BYTES, SAV_info_buffer, buffersize);
+	} else if (!wrong) {
+		// Every slot used: the sector is erased, the record into slot 0
+		tlog("nor: the pending-save record's %u slots are used: the sector is erased", SAV_SLOTS);
+		k = 0;
+		wrong = Save_info(SAVE_info_offset, SAV_info_buffer, buffersize);
+	}
+	tlog_debug("nor: the pending-save record in slot %lu", (unsigned long)k);
+	log_info_write("the pending-save record", buffersize, wrong);
 }
 // --------------------------------------------------------------------
 // Torii: the settings record's two copies (setrecord.h). set_copy is the
@@ -608,7 +693,10 @@ u32 Commit_SET_info(u16 *SET_info_buffer)
 // --------------------------------------------------------------------
 u16 IWRAM_CODE Read_sav_info(u32 offset)
 {
-	return *((vu16 *)(FlashBase_S71 + SAVE_info_offset + offset * 2));
+	u32 k = sav_slot();
+	if (k == SAV_SLOTS)
+		return 0;  // every slot used: nothing waits
+	return *((vu16 *)(FlashBase_S71 + SAVE_info_offset + k * SAV_SLOT_BYTES + offset * 2));
 }
 // --------------------------------------------------------------------
 void IWRAM_CODE SetSPIControl(u16 control)

@@ -62,3 +62,22 @@ data = reserved + fats * fat + root
 print(f"{data + (first - 2) * per_cluster}-{data + (last - 1) * per_cluster - 1}")
 PY
 }
+
+# pending_flag NOR: the pending-save record's flag in a kernel-nor.bin, as
+# the kernel reads it (Ezcard_OP.c's slots): the first of the 128 512-byte
+# slots from 0x790000 whose flag isn't 0000; 0011 when a save waits, 0000
+# for none (an erased slot, or every slot used)
+pending_flag() {
+  python3 - "$1" <<'PY'
+import struct, sys
+data = open(sys.argv[1], "rb").read()
+for k in range(128):
+    at = 0x790000 + k * 512
+    flag = struct.unpack_from("<H", data, at)[0] if at + 2 <= len(data) else 0xFFFF
+    if flag != 0:
+        print("%04x" % (flag if flag == 0x11 else 0))
+        break
+else:
+    print("0000")
+PY
+}

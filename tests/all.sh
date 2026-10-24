@@ -18,6 +18,7 @@ jobs=(
   "tests/save_types.sh eeprom8k-short"
   "tests/save_types.sh eeprom512-shrunk"
   "tests/saves.sh copy"
+  "tests/saves.sh record-slots"
   "tests/saves.sh full"
   "tests/saves.sh nearly-full"
   "tests/saves.sh sanity"

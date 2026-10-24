@@ -11,6 +11,12 @@ int kernel_nor_record_ok(u32 offset, u32 size)
 	return !(offset & (KERNEL_NOR_SMALL_SECTOR - 1)) && size <= KERNEL_NOR_SMALL_SECTOR;
 }
 
+int kernel_nor_program_ok(u32 offset, u32 size)
+{
+	return size && !(offset & 1) && !(size & 1) && offset >= KERNEL_NOR_DATA && offset < KERNEL_NOR_WINDOW &&
+	       size <= KERNEL_NOR_WINDOW - offset;
+}
+
 static int blank(const u8 *p, u32 size)
 {
 	for (u32 i = 0; i < size; i++)

@@ -42,6 +42,10 @@
 // erase clears (on a chip whose top 64 KB is one sector, an erase there
 // clears all of it: still the kernel's data).
 int kernel_nor_record_ok(u32 offset, u32 size);
+// Whether Save_info may program SIZE bytes at window offset OFFSET in place,
+// with no erase (the pending-save record's slots): halfword-aligned and
+// wholly inside the kernel's data sectors
+int kernel_nor_program_ok(u32 offset, u32 size);
 
 enum loader_state {
 	LOADER_BLANK,  // all 0xFF: the cart starts in safe mode

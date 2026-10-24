@@ -40,7 +40,7 @@ fail() {
 
 random_data() { head -c "$1" /dev/urandom | tr '\000\377' '\001\002'; }
 blanks() { head -c "$1" /dev/zero | tr '\000' '\377'; }
-pending() { od -A n -t x2 -j $((0x790000)) -N 2 "$cart/kernel-nor.bin" | tr -d ' '; }
+pending() { pending_flag "$cart/kernel-nor.bin"; }
 # card_file NAME OUT: the file's contents into OUT; fails if there is none
 card_file() { mtype -i "$cart/sd.img" "::/torii/saves/Hello.gba/$1" >"$2" 2>/dev/null; }
 hist_dir=::/torii/backups/Hello.gba/Main

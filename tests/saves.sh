@@ -74,9 +74,7 @@ save_record() {
 }
 
 # The pending-save record in the kernel NOR (SAVE_info_offset), first halfword.
-pending() {
-  od -A n -t x2 -j $((0x790000)) -N 2 "$cart/kernel-nor.bin" | tr -d ' '
-}
+pending() { pending_flag "$cart/kernel-nor.bin"; }
 
 # Power-on 1: CLEAN BOOT of Test.gba with SAVE TYPE FLASH 128K; the game
 # writes its first boot record to cart SRAM.
@@ -102,6 +100,37 @@ first_copy() {
 }
 
 case $part in
+record-slots)
+  # The pending-save record takes the next of its sector's 128 slots at each
+  # launch, with no erase; a copy uses its slot up; with every slot used the
+  # sector is erased and slot 0 taken (Ezcard_OP.c)
+  slot_flag() { od -A n -t x2 -j $((0x790000 + $1 * 512)) -N 2 "$cart/kernel-nor.bin" | tr -d ' '; }
+  first_launch
+  first_copy
+  [ "$(slot_flag 0)" = 0000 ] && [ "$(slot_flag 1)" = ffff ] || fail "after a copy: slots $(slot_flag 0) $(slot_flag 1)"
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot $(nav_launch /Test.gba at=180) -f 600
+  logged "nor: the pending-save record in slot 1"
+  [ "$(slot_flag 1)" = 0011 ] && [ "$(pending)" = 0011 ] || fail "the second launch: slot 1 is $(slot_flag 1)"
+  ! grep -q "slots are used" "$cart/run.log" || fail "the second launch erased the sector"
+  boot -k 100:A -k 106:- -f 800
+  logged "nor: wrote an empty pending-save record, 512 bytes"
+  [ "$(slot_flag 1)" = 0000 ] && [ "$(pending)" = 0000 ] || fail "the copy left slot 1 as $(slot_flag 1)"
+  # Every slot used: the next launch erases the sector and takes slot 0
+  python3 -c "
+import sys
+p = sys.argv[1]
+d = bytearray(open(p, 'rb').read())
+d[0x790000:0x7A0000] = bytes(0x10000)
+open(p, 'wb').write(d)" "$cart/kernel-nor.bin"
+  [ "$(pending)" = 0000 ] || fail "every slot used reads as $(pending)"
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot $(nav_launch /Test.gba at=180) -f 600
+  logged "nor: the pending-save record's 128 slots are used: the sector is erased"
+  [ "$(slot_flag 0)" = 0011 ] && [ "$(slot_flag 1)" = ffff ] || fail "after the erase: slots $(slot_flag 0) $(slot_flag 1)"
+  echo "PASS: saves record-slots: a launch takes the next slot with no erase, and erases once every slot is used"
+  ;;
+
 read-error)
   first_launch
   first_copy
