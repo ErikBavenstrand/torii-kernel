@@ -22,6 +22,7 @@ enum settings_section {
 	SET_SEC_LOOK,
 	SET_SEC_CLOCK,
 	SET_SEC_GAMES,
+	SET_SEC_SAVES,
 	SET_SEC_CART,
 	SET_SEC_HOTKEYS,
 	SET_SEC_LIBRARY,
@@ -57,9 +58,12 @@ enum settings_id {
 	// Games
 	SET_BOOT_MODE,  // how A, Play and Launch start GBA games: enum settings_boot
 	SET_ENGINE,     // the built-in table of patch points before scanning the ROM
-	SET_AUTO_SAVE,  // a game's save copied to the card without asking
 	SET_RTS,        // real-time save (save states)
 	SET_CHEATS,
+	// Saves
+	SET_AUTO_SAVE,  // a game's save copied to the card without asking
+	SET_HISTORY,    // versions of a save kept per slot: index into settings_history_keep
+	SET_SAVES,      // opens the global save manager (screens/saves.h)
 	// Cart
 	SET_RUMBLE,     // games can use the cart's rumble motor
 	SET_MODE_B,     // 0 rumble, 1 RAM, 2 link
@@ -75,9 +79,7 @@ enum settings_id {
 	SET_RESCAN,
 	SET_IDENTIFY,  // CRCs for the names database (namesdb.h)
 	SET_SHOW_ALL,  // the SD card page shows hidden files
-	SET_SAVES,     // opens the global save manager (screens/saves.h)
 	// System
-	SET_HISTORY,   // versions of a save kept per slot: index into settings_history_keep
 	SET_LOGGING,   // TLOG_OFF to TLOG_DEBUG (tlog.h)
 	SET_LANGUAGE,  // an index into lang_packs; hidden until v0.9
 	SET_ROWS

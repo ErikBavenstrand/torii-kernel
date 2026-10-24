@@ -284,20 +284,18 @@ struct lang_gsaves {
 	const char *play_keys;      // Play with's
 	const char *never, *unknown, *none;  // a slot with no file; a time the clock didn't know; no backups
 	const char *note_active, *note_other, *note_play, *note_new, *note_backup, *note_kept;  // the pane's foot
-	const char *hint_play, *hint_menu, *hint_backups, *hint_new, *hint_restore, *hint_slots, *hint_cancel;
-	const char *act_play, *act_active, *act_backups, *act_rename, *act_copy, *act_export,
-		*act_delete;  // a slot's popup
+	const char *hint_play, *hint_menu, *hint_backups, *hint_new, *hint_restore, *hint_cancel;
+	const char *act_play, *act_active, *act_backups, *act_rename, *act_copy, *act_delete;  // a slot's popup
 	const char *new_empty, *new_file;  // New slot's popup (and EN_GS_COPY_OF)
 	const char *file_title;     // the .sav file browser
 	const char *empty;          // a folder with nothing to pick
 	const char *delete_text;    // under "Delete <slot>?"
 	const char *restore_title;  // the restore's question
 	const char *restore_button;
-	const char *exported;       // before the path
 	const char *no_backups;
 	const char *no_save;
 	const char *no_room;        // the page couldn't show (video memory)
-	const char *copying;        // a notice while a save is copied (a slot copy, a file, an export)
+	const char *copying;        // a notice while a save is copied (a slot copy, a slot from a file)
 	const char *last;           // SLOTSTORE_LAST
 	const char *gone_file;      // SLOTSTORE_NO_FILE
 	const char *gone_version;   // SLOTSTORE_NO_VERSION
@@ -308,11 +306,13 @@ extern const struct lang_gsaves *gl_gsaves;
 #define EN_GS_SIZE "That file isn't %lu KB, the size of this game's save."
 #define EN_GS_COPY_OF "Copy of %s"
 #define EN_GS_BACKUPS "%lu"
+// A backup made while the clock was unset, by its number
+#define EN_GS_BACKUP_N "Backup %lu"
 #define EN_GS_SAVED "%04u-%02u-%02u %02u:%02u"
 // A key past the cap says so, with the cap
 #define EN_RENAME_TOO_LONG "Names stop at %u letters."
 
-// The global save manager (screens/saves.c, Settings > Library > Saves)
+// The global save manager (screens/saves.c, Settings > Saves > Clean up saves)
 struct lang_saves {
 	const char *title;
 	const char *hint_open, *hint_relink, *hint_empty;  // A: on a save without a game; in the picker; on Empty trash
@@ -330,11 +330,11 @@ struct lang_saves {
 	const char *moving, *moving_text;
 	const char *no_library;  // the picker needs the library
 	const char *err_card, *err_source, *err_target, *err_path, *err_stopped;
-	const char *trash_empty;  // Empty trash with nothing in it
 };
 extern const struct lang_saves *gl_saves;
-// The storage card's line: the saves', backups' and trash's sizes in KB
-#define EN_SAVES_LEGEND "Saves %lu \xC2\xB7 Backups %lu \xC2\xB7 Trash %lu KB"
+// The storage card's line: the saves' and backups' sizes (the trash's is on
+// its row: all three with units don't fit 216 px)
+#define EN_SAVES_LEGEND "Saves %s \xC2\xB7 Backups %s"
 // The rows' heading with a count
 #define EN_SAVES_HEADING "%s \xC2\xB7 %lu"
 #define EN_SAVES_RENAMED "%u slots took new names\nbecause the game had them."

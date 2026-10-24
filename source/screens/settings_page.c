@@ -356,10 +356,10 @@ static s32 text_right(const struct ui_paint *p, s32 right, u32 ink, const char *
 static int paint_label(const struct ui_paint *p, u32 sec)
 {
 	static const u8 icons[SET_SECTIONS] = {
-		[SET_SEC_LOOK] = ART_ICON8_LOOK,    [SET_SEC_CLOCK] = ART_ICON8_CLOCK,
-		[SET_SEC_GAMES] = ART_ICON8_GAMES,  [SET_SEC_CART] = ART_ICON8_CART,
-		[SET_SEC_HOTKEYS] = ART_ICON8_KEYS, [SET_SEC_LIBRARY] = ART_ICON8_LIBRARY,
-		[SET_SEC_SYSTEM] = ART_ICON8_CHIP,
+		[SET_SEC_LOOK] = ART_ICON8_LOOK,       [SET_SEC_CLOCK] = ART_ICON8_CLOCK,
+		[SET_SEC_GAMES] = ART_ICON8_GAMES,     [SET_SEC_SAVES] = ART_ICON8_SAVE,
+		[SET_SEC_CART] = ART_ICON8_CART,       [SET_SEC_HOTKEYS] = ART_ICON8_KEYS,
+		[SET_SEC_LIBRARY] = ART_ICON8_LIBRARY, [SET_SEC_SYSTEM] = ART_ICON8_CHIP,
 	};
 	const struct torii_font *font = ui_theme()->body;
 	u32 skip = look.label_skip, lines = p->rh - look.card_pad;

@@ -419,13 +419,17 @@ void test_settings_visible_rows(void)
 	CHECK(!settings_visible(&v, SET_LED_IDLE));
 	CHECK_EQ(settings_section_rows(&v, SET_SEC_CART, ids), 3);
 	CHECK_EQ(ids[2], SET_LED);
-	CHECK_EQ(settings_section_rows(&v, SET_SEC_SYSTEM, ids), 2);  // LANGUAGE hidden
-	CHECK_EQ(ids[0], SET_HISTORY);
-	CHECK_EQ(ids[1], SET_LOGGING);
-	CHECK_EQ(settings_section_rows(&v, SET_SEC_LIBRARY, ids), 4);
+	CHECK_EQ(settings_section_rows(&v, SET_SEC_SYSTEM, ids), 1);  // LANGUAGE hidden
+	CHECK_EQ(ids[0], SET_LOGGING);
+	// Saves: what happens to a save, then the page that tidies them
+	CHECK_EQ(settings_section_rows(&v, SET_SEC_SAVES, ids), 3);
+	CHECK_EQ(ids[0], SET_AUTO_SAVE);
+	CHECK_EQ(ids[1], SET_HISTORY);
+	CHECK_EQ(ids[2], SET_SAVES);
+	CHECK_EQ(settings_section_rows(&v, SET_SEC_LIBRARY, ids), 3);
 	CHECK_EQ(ids[0], SET_RESCAN);
 	CHECK_EQ(ids[1], SET_IDENTIFY);
-	CHECK_EQ(ids[3], SET_SAVES);
+	CHECK_EQ(ids[2], SET_SHOW_ALL);
 	CHECK_EQ(settings_section_rows(&v, SET_SECTIONS, ids), 0);
 	CHECK(!settings_visible(&v, SET_ROWS));
 }
