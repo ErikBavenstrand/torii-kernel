@@ -4,6 +4,24 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Changed:** the GB/GBC and NES emulators are built from source with the
+  kernel (`emulators/`, pinned and patched): Jagoomba Color v0.5 as before,
+  and PocketNES moves from the 2013 build to Dwedit's 2025 source (MMC5,
+  VRC3/4/6 IRQs, mapper 118, NES 2.0 headers). The launch copies them in
+  128 KB parts and writes PocketNES's whole 48-byte header, flags at 0 where
+  stale PSRAM was (998abab).
+- **Fixed:** a GB palette picked in Jagoomba's menu stays the game's
+  (ez-flash/omega-de-kernel#12): its settings are saved on the Omega, and
+  the reset no longer puts the automatic palette back. Autosleep's setting
+  comes back with its time (998abab).
+- **Changed:** both emulators run ROM at 3,1 wait states with prefetch, as
+  GBA games do from PSRAM (they ran at the power-on 4,2 without); GBC games
+  see a GBA, as on a real GBA (Shantae, the Oracles' Advance Shop); autosleep
+  is off by default (998abab).
+- **Removed:** the unused `goomba.h` and EZ-Flash's `emusrc/` (998abab).
+
 ## v0.5.3
 
 - **Added:** Settings > Saves > Game saves lists the library's games that
