@@ -58,6 +58,7 @@ on, NES with no NES launch) as "unconfirmed" in its summary.
 | A cheat works | `hello.gba` Boot with addon (it finds `CHEAT/Hello.cht`), then L+R+START, CHEAT ON, and back to the game. Hello doesn't react to buttons; a green square in its top right corner shows the cheat at work (no square before CHEAT ON) |
 | A GB or GBC game runs | from its console's list or the SD card page; note the game's title |
 | A GB game keeps its palette | a GB (not GBC) game: L+R, Display, Palette, pick another, leave the menu, power off and on, launch it again: the picked palette is back |
+| Pokémon Crystal doesn't stutter | walk around a town a minute at the default gamma: steps are smooth (jagoombacolor#46) |
 | GB, GBC and NES games run at full speed | play a busy scene of each a minute (the emulators run ROM at 3,1 wait states with prefetch since v0.6): no stutter or slowdown the game didn't have before, and no crash |
 | A GB rumble game rumbles | Pokémon Pinball, or another MBC5 rumble game: the cart rumbles on a bumper hit |
 | A NES game runs | from the NES list or the SD card page |

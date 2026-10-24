@@ -27,6 +27,14 @@ git log, not here.
 - **Fixed:** Diagnostics' unit tests failed `asset_sd_read` on a real card,
   whose clusters are bigger than the emulated card's: the test now expects
   the seek steps the card's cluster size gives (b661254).
+- **Fixed:** NES games start on a 256-byte boundary in PSRAM: PocketNES
+  times a branch's page crossing by its ROM address, so a game off a
+  boundary ran some branches a cycle off (Dwedit/PocketNES#5) (d333227).
+- **Fixed:** Pokémon Crystal and other games stuttered in Jagoomba at the
+  default gamma: it now waits for line 164 before drawing the background
+  then, as a hardware-tested fix in EvilJagaGenius/jagoombacolor#46 does.
+  PocketNES's autosleep is off by default too, and its setting comes back
+  with its time (d333227).
 - **Changed:** both emulators run ROM at 3,1 wait states with prefetch, as
   GBA games do from PSRAM (they ran at the power-on 4,2 without); GBC games
   see a GBA, as on a real GBA (Shantae, the Oracles' Advance Shop); autosleep
