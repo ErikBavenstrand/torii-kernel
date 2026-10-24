@@ -7,7 +7,7 @@
 usage: fresh.py sync [--all] PATH...   wait until containers see recent edits
        fresh.py stamp DIR KEY FILE...  empty DIR if the build settings changed
        fresh.py track DIR OUTPUT... -- PATH...
-                                       drop objects whose inputs changed
+                                       drop objects whose inputs changed or went
        fresh.py check NAME OUTPUT... -- PATH...
                                        exit 0 if NAME can be skipped
        fresh.py record NAME -- PATH...  note that NAME was built from PATH
@@ -28,7 +28,7 @@ the result differs from the one recorded in DIR, deletes DIR's contents.
 
 track: make trusts timestamps, and a timestamp seen through the share can be
 a second old, so make could keep an object built from the old file. This hashes every file under PATH and compares with the hashes
-recorded in DIR at the last build. For each changed file it deletes the
+recorded in DIR at the last build. For each changed or deleted file it deletes the
 objects whose dependency files (.d, written by gcc -MMD) name it, and then
 the OUTPUTs (linked files), so they are rebuilt whatever the timestamps say.
 
@@ -198,6 +198,9 @@ def track(directory: str, outputs: list[str], paths: list[str]) -> int:
     old = json.loads(record.read_text()) if record.exists() else None
     if old is not None:
         changed = [name for name, digest in hashes.items() if old.get(name) != digest]
+        # A deleted file counts too: its object would stay in the folder,
+        # and the linked OUTPUTs, newer than every object left, would stay
+        changed += [name for name in old if name not in hashes]
         dropped = 0
         if changed:
             for dep in target.rglob("*.d"):
