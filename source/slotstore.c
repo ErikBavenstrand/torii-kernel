@@ -1522,63 +1522,49 @@ int slotstore_history(const char *rom_path, const char *slot, struct slotstore_v
 
 /* ---- Installing a file as the slot's ---- */
 
-// Makes src the file at dest, whole or not at all, as Save_savefile does it:
-// src becomes dest.tmp (a verified copy, or with move src itself, a version of
-// the history renamed out of it), the old dest is moved to dest.bak, dest.tmp
-// to dest, and the .bak into the history (Save_bak_retire, keeping at least
-// one version). The journal, written once dest.tmp is whole, has boot
-// recovery finish it forward (Save_install_finish). SLOTSTORE_OK or a code
-// A step of ss_install failed: a copy is undone (the .tmp goes, unless the old
-// file had moved aside), a moved version goes on (it is in no other place);
-// the journal goes once that is done
-static int install_failed(const char *dest, int move)
+// Makes src, a version of the history, the file at dest, whole or not at
+// all, as Save_savefile does it: src is renamed to dest.tmp, the old dest
+// moved to dest.bak, dest.tmp to dest, and the .bak into the history
+// (Save_bak_retire, keeping at least one version). The journal, written
+// before the first rename, has boot recovery finish it forward
+// (Save_install_finish). SLOTSTORE_OK or a code
+// A step of ss_install failed: the moved version goes on (it is in no other
+// place); the journal goes once that is done
+static int install_failed(const char *dest)
 {
-	if (move)
-		Save_install_finish(dest);
-	else
-		Save_recover(dest);
+	Save_install_finish(dest);
 	if (ss_exists(dest) == 1 && ss_exists(W->tmpf) == 0)
 		journal_clear();
 	return SLOTSTORE_CARD;
 }
 
-static int ss_install(const char *src, const char *dest, int move)
+static int ss_install(const char *src, const char *dest)
 {
 	char *tmp = W->tmpf, *bak = W->bakf;
 	if (ss_snprintf(tmp, SS_PATH, "%s.tmp", dest) >= SS_PATH ||
 	    ss_snprintf(bak, SS_PATH, "%s.bak", dest) >= SS_PATH)
 		return SLOTSTORE_PATH;
 	Save_recover(dest);
-	int r;
-	if (move) {
-		// The journal first: it names src, so a cut inside the rename
-		// (two names of one chain) drops the .tmp's name, not the version
-		if ((r = journal_write('I', dest, src, "-")))
-			return r;
-		if (f_rename(src, tmp) != FR_OK) {
-			journal_clear();
-			return SLOTSTORE_CARD;
-		}
-		cutpoint("install: version moved to tmp");
-	} else {
-		if ((r = ss_copy(src, tmp)))
-			return r;
-		cutpoint("install: tmp verified");
-		if ((r = journal_write('I', dest, "-", "-"))) {
-			f_unlink(tmp);
-			return r;
-		}
+	// The journal first: it names src, so a cut inside the rename (two
+	// names of one chain) drops the .tmp's name, not the version
+	int r = journal_write('I', dest, src, "-");
+	if (r)
+		return r;
+	if (f_rename(src, tmp) != FR_OK) {
+		journal_clear();
+		return SLOTSTORE_CARD;
 	}
+	cutpoint("install: version moved to tmp");
 	int had = ss_exists(dest);
 	if (had < 0)
-		return install_failed(dest, move);
+		return install_failed(dest);
 	if (had) {
 		if (f_rename(dest, bak) != FR_OK)
-			return install_failed(dest, move);
+			return install_failed(dest);
 		cutpoint("install: old file moved to bak");
 	}
 	if (f_rename(tmp, dest) != FR_OK)
-		return install_failed(dest, move);
+		return install_failed(dest);
 	cutpoint("install: tmp in place");
 	if (had) {
 		if (!Save_bak_retire(dest, explicit_keep()))
@@ -1614,7 +1600,7 @@ static int op_restore(const char *rom_path, const char *slot, u32 n)
 	// Renames only: the version leaves the history to be the file, and the
 	// file it replaces goes in as the newest version
 	push_floor = maxn;
-	r = ss_install(W->c, W->a, 1);
+	r = ss_install(W->c, W->a);
 	push_floor = 0;
 	if (r)
 		return r;
@@ -1629,67 +1615,6 @@ int slotstore_restore(const char *rom_path, const char *slot, u32 n)
 	int r = op_restore(rom_path, slot, n);
 	diskstat_log("slot restore", &mark);
 	return r;
-}
-
-/* ---- Import, export ---- */
-
-static int op_import(const char *rom_path, const char *slot, const char *path, u32 want)
-{
-	if (slotstore_recover() < 0)
-		return SLOTSTORE_CARD;
-	if (f_stat(path, &W->fno) != FR_OK || (W->fno.fattrib & AM_DIR))
-		return SLOTSTORE_NO_FILE;
-	if (W->fno.fsize > 0xFFFFFFu || !saveslot_import_size_ok((u32)W->fno.fsize, want))
-		return SLOTSTORE_SIZE;
-	int r = both_paths(W->a, W->b, rom_path, slot);
-	if (r)
-		return r;
-	int had = ss_exists(W->a);
-	if (had < 0)
-		return SLOTSTORE_CARD;
-	if (!had)
-		return SLOTSTORE_NO_SLOT;
-	if ((r = ss_install(path, W->a, 0)))  // the file it replaces goes into the history
-		return r;
-	tlog("slot: imported %s into %s of %s", path, slot, rom_path);
-	return SLOTSTORE_OK;
-}
-
-int slotstore_import(const char *rom_path, const char *slot, const char *path, u32 want)
-{
-	struct diskstat mark;
-	diskstat_start(&mark);
-	int r = op_import(rom_path, slot, path, want);
-	diskstat_log("slot import", &mark);
-	return r;
-}
-
-int slotstore_export(const char *rom_path, const char *slot, const char *path)
-{
-	int r = slot_path(W->a, rom_path, slot);
-	if (r)
-		return r;
-	int e = ss_exists(W->a);
-	if (e < 0)
-		return SLOTSTORE_CARD;
-	if (!e)
-		return SLOTSTORE_NO_SLOT;
-	e = ss_exists(path);
-	if (e < 0)
-		return SLOTSTORE_CARD;
-	if (e)
-		return SLOTSTORE_TAKEN;
-	if (ss_snprintf(W->c, SS_PATH, "%s.new", path) >= SS_PATH)
-		return SLOTSTORE_PATH;
-	if ((r = ss_copy(W->a, W->c)))
-		return r;
-	cutpoint("export: copy written");
-	if (f_rename(W->c, path) != FR_OK) {
-		f_unlink(W->c);
-		return SLOTSTORE_CARD;
-	}
-	cutpoint("export: copy in place");
-	return SLOTSTORE_OK;
 }
 
 /* ---- Type change ---- */

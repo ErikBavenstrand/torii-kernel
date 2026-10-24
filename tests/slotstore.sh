@@ -10,7 +10,7 @@
 #     done or not done, never half: the files, the history and the game's
 #     record agree, no journal, .bak or .ren is left, and fsck.fat finds nothing
 # One scenario per run:
-#   push, restore, import, export, create-blank, create-copy, rename,
+#   push, restore, create-blank, create-copy, rename,
 #   rename-case, delete, delete-current, retire, purge
 # Saves are 512 bytes of one character, so a listing says which is which
 # (tests/slotstore_tree.py). Runs inside the torii-emu container after
@@ -110,18 +110,6 @@ restore)
   ini Main
   required=("A 512" "B 512" "C 512")
   ;;
-import)
-  card_save A 512 ::$S/Main.sav
-  card_save I 512 ::/G/in.sav
-  ini Main
-  required=("A 512" "I 512")
-  ;;
-export)
-  card_dir ::/G
-  card_save A 512 ::$S/Main.sav
-  ini Main
-  required=("A 512")
-  ;;
 create-blank | create-copy)
   card_save A 512 ::$S/Main.sav
   ini Main
@@ -195,15 +183,6 @@ converged() {
     for t in A B C; do have "$l" $t 512 || fail "$where: $t is gone"; done
     f=$(grep -P '^torii/saves/G/Game.gba/Main.sav\t' <<<"$l" | cut -f3)
     [ "$f" = A ] || [ "$f" = C ] || fail "$where: Main.sav is $f, not A or C"
-    ;;
-  import)
-    f=$(grep -P '^torii/saves/G/Game.gba/Main.sav\t' <<<"$l" | cut -f3)
-    [ "$f" = A ] || [ "$f" = I ] || fail "$where: Main.sav is $f, not A or I"
-    have "$l" A 512 || fail "$where: A is gone"
-    have "$l" I 512 || fail "$where: I is gone"
-    ;;
-  export)
-    ! grep -qP '^G/out.sav\t' <<<"$l" || is "$l" G/out.sav A 512 || fail "$where: out.sav is not whole"
     ;;
   create-blank)
     ! grep -qP '^torii/saves/G/Game.gba/Fresh.sav\t' <<<"$l" || is "$l" torii/saves/G/Game.gba/Fresh.sav _ 512 || fail "$where: Fresh.sav is not whole"
@@ -305,8 +284,6 @@ end_state() {
     is "$l" torii/saves/G/Game.gba/Main.sav A 512 || fail "uncut: Main.sav isn't A"
     [ "$(count "$l" C 512)" = 2 ] || [ "$(count "$l" C 512)" = 1 ] || fail "uncut: C is lost"
     ;;
-  import) is "$l" torii/saves/G/Game.gba/Main.sav I 512 || fail "uncut: Main.sav isn't I" ;;
-  export) is "$l" G/out.sav A 512 || fail "uncut: no out.sav" ;;
   create-blank) is "$l" torii/saves/G/Game.gba/Fresh.sav _ 512 || fail "uncut: no Fresh.sav" ;;
   create-copy) is "$l" torii/saves/G/Game.gba/Copy.sav A 512 || fail "uncut: no Copy.sav" ;;
   rename) is "$l" torii/saves/G/Game.gba/Start.sav A 512 || fail "uncut: not renamed" ;;

@@ -53,9 +53,9 @@ enum {
 	SLOTSTORE_NO_SLOT = -4,     // there is no such slot
 	SLOTSTORE_LAST = -5,        // it is the game's only slot
 	SLOTSTORE_PATH = -6,        // a path would be too long (see above), or the ROM path is bad
-	SLOTSTORE_SIZE = -7,        // an import of a size the save type can't have
+	SLOTSTORE_SIZE = -7,        // a .sav of a size the save type can't have
 	SLOTSTORE_NO_VERSION = -8,  // the history has no version n
-	SLOTSTORE_NO_FILE = -9,     // the file to import isn't there
+	SLOTSTORE_NO_FILE = -9,     // the .sav to make a slot from isn't there
 	SLOTSTORE_FULL = -10,       // a game has SLOTSTORE_MAX_SLOTS slots already
 };
 
@@ -92,8 +92,8 @@ int slotstore_set_current(const char *rom_path, const char *slot);
 // only in case), SLOTSTORE_NO_SLOT (copy_from), SLOTSTORE_PATH, SLOTSTORE_CARD.
 int slotstore_create(const char *rom_path, const char *name, const char *copy_from, u32 blank_size, char *clean_out);
 // A new slot named name, a copy of the .sav at path (any file on the card),
-// which must be want bytes (slotstore_size_ok, as an import): an import that
-// overwrites nothing. SLOTSTORE_NO_FILE, SLOTSTORE_SIZE, and slotstore_create's.
+// which must be want bytes (slotstore_size_ok); it overwrites nothing.
+// SLOTSTORE_NO_FILE, SLOTSTORE_SIZE, and slotstore_create's.
 int slotstore_create_file(const char *rom_path, const char *name, const char *path, u32 want, char *clean_out);
 // A copy of slot named name: slotstore_create with copy_from = slot.
 int slotstore_duplicate(const char *rom_path, const char *slot, const char *name, char *clean_out);
@@ -151,17 +151,10 @@ int slotstore_history_push(const char *rom_path, const char *slot);
 // is lost and no copy of it stays. SLOTSTORE_NO_VERSION, SLOTSTORE_NO_SLOT.
 int slotstore_restore(const char *rom_path, const char *slot, u32 n);
 
-// Whether a file of size bytes can be imported for a save of want bytes (the
+// Whether a .sav of size bytes can make a slot for a save of want bytes (the
 // size the game's save type has; 0 if not known, then any size a save chip can
 // have: 512, 8192, 32768, 65536, 131072). The same as saveslot_import_size_ok.
 int slotstore_size_ok(u32 size, u32 want);
-// Makes the .sav at path (any file on the card) the slot's file; the file it
-// replaces goes through the history push. The file must be exactly want bytes
-// (slotstore_size_ok), else SLOTSTORE_SIZE; SLOTSTORE_NO_FILE if missing.
-int slotstore_import(const char *rom_path, const char *slot, const char *path, u32 want);
-// Copies the slot's file to path (any folder that exists), as a .sav someone
-// can take away. SLOTSTORE_TAKEN if path exists (nothing is overwritten).
-int slotstore_export(const char *rom_path, const char *slot, const char *path);
 
 /* ---- The save type changed ---- */
 

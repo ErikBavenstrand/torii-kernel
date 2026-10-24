@@ -1,6 +1,6 @@
 // The slot store (source/slotstore.c) on the emulated cart's card
 // (tests/assets.sh): slots made, renamed, duplicated and deleted, the history
-// pushed, pruned and restored, imports and exports, the save type changing,
+// pushed, pruned and restored, slots made from a .sav, the save type changing,
 // the trash purged, and the boot recovery of a journal a power cut left.
 // slot_scenario() is the power-cut tests' (tests/slotstore.sh): the test kernel
 // started with SELECT and START held runs the scenario the card's
@@ -370,9 +370,8 @@ static void test_restore(void)
 	CHECK_EQ(version_fill("Alt", 0, NULL), 'A');
 }
 
-static void test_import_export(void)
+static void test_create_file(void)
 {
-	u32 size = 0;
 	CHECK(put("/TSL/in.sav", 'I', 512));
 	CHECK(put("/TSL/big.sav", 'J', 1024));
 	// A new slot from a file: refused for a wrong size, a missing file or a
@@ -388,25 +387,6 @@ static void test_import_export(void)
 	CHECK(is_fill("/TSL/in.sav", 'I'));
 	CHECK_EQ(history_count("FromFile"), 0);
 	CHECK_EQ(slotstore_delete(ROM, "FromFile"), SLOTSTORE_OK);
-	CHECK_EQ(slotstore_import(ROM, "Alt", "/TSL/big.sav", 512), SLOTSTORE_SIZE);
-	CHECK_EQ(slotstore_import(ROM, "Alt", "/TSL/none.sav", 512), SLOTSTORE_NO_FILE);
-	CHECK_EQ(slotstore_import(ROM, "Nobody", "/TSL/in.sav", 512), SLOTSTORE_NO_SLOT);
-	CHECK(is_fill(SAVES "/Alt.sav", 'C'));
-	u32 before = history_count("Alt");
-	CHECK_EQ(slotstore_import(ROM, "Alt", "/TSL/in.sav", 512), SLOTSTORE_OK);
-	CHECK(is_fill(SAVES "/Alt.sav", 'I'));
-	CHECK(is_fill("/TSL/in.sav", 'I'));  // the source stays
-	CHECK_EQ(history_count("Alt"), before + 1);
-	CHECK_EQ(version_fill("Alt", 0, NULL), 'C');  // the replaced file is the newest version
-	CHECK(!there(SAVES "/Alt.sav.tmp") && !there(SAVES "/Alt.sav.bak"));
-	// Export
-	CHECK_EQ(slotstore_export(ROM, "Alt", "/TSL/out.sav"), SLOTSTORE_OK);
-	CHECK(is_fill("/TSL/out.sav", 'I'));
-	fill_of("/TSL/out.sav", &size);
-	CHECK_EQ(size, 512);
-	CHECK_EQ(slotstore_export(ROM, "Alt", "/TSL/out.sav"), SLOTSTORE_TAKEN);
-	CHECK_EQ(slotstore_export(ROM, "Nobody", "/TSL/out2.sav"), SLOTSTORE_NO_SLOT);
-	CHECK(!there("/TSL/out.sav.new"));
 }
 
 static void test_rename(void)
@@ -639,7 +619,7 @@ void test_slotstore(void)
 	test_create_and_duplicate();
 	test_history();
 	test_restore();
-	test_import_export();
+	test_create_file();
 	test_rename();
 	test_delete();
 	test_recovery();
@@ -651,7 +631,6 @@ void test_slotstore(void)
 
 #define G_ROM "/G/Game.gba"
 #define G_SAVES "/torii/saves/G/Game.gba"
-#define G_IN "/G/in.sav"
 
 // The scenario's name from the first line of /SLOT/scenario.txt
 static int scenario_is(const char *want)
@@ -681,10 +660,6 @@ void slot_scenario(void)
 		r = slotstore_push_file(G_SAVES "/Main.sav", "/torii/backups/G/Game.gba/Main", 3);
 	} else if (scenario_is("restore")) {
 		r = slotstore_restore(G_ROM, "Main", 1);
-	} else if (scenario_is("import")) {
-		r = slotstore_import(G_ROM, "Main", G_IN, 512);
-	} else if (scenario_is("export")) {
-		r = slotstore_export(G_ROM, "Main", "/G/out.sav");
 	} else if (scenario_is("create-blank")) {
 		r = slotstore_create(G_ROM, "Fresh", NULL, 512, NULL);
 	} else if (scenario_is("create-copy")) {

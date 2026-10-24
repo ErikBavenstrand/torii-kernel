@@ -24,7 +24,7 @@ jobs=(
   "tests/saves.sh sanity"
   "tests/save_integrity.sh unknown-new"
   "tests/save_integrity.sh unknown-replace"
-  "tests/slotstore.sh push restore import export create-blank create-copy"
+  "tests/slotstore.sh push restore create-blank create-copy"
   "tests/slotstore.sh rename rename-case delete delete-current retire purge"
   "tests/saveorphan.sh relink relink-clash trash empty"
   "tests/saveorphan.sh relink-split relink-clash-split"
