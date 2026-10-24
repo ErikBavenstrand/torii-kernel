@@ -158,6 +158,10 @@ From the cart's logs after the v0.5 save screens and a review round (a bug and p
 - **Play's « » boot was lost when playing from Saves**, and the two START popups offered Clean on different rules: Saves plays as Play said, and both offer default and clean for a GBA game (addons while one is on), nothing for GB, GBC and NES (they start clean).
 - **The saves page failed silently once on the cart** (BG VRAM, from the Recent page with art; not reproduced in the emulator): it says so now, its seldom-changing labels take one tile set (about 110 tiles less on plane 3), and a failed BG allocation logs the pool's blocks, so the next one can be read.
 - **Any new .sav made the next boot rebuild the whole library index** (the walk's hash covered every slot file): a game's save folder counts once, so only a game's first save (which marks it) rebuilds.
+- **UX review** (an independent agent, `docs/design/v0.5/ux-review.md`, merged in eac14cd): game lists open on the game played last that they hold, then on the row they were left on; Recent's popup has Remove (off Recent only, no question); one word per thing (Play on the NOR page, Backups kept, START menu).
+- **Open (UX): a quick favourite key** (SELECT in the lists; favouriting takes five presses): v0.4 keeps SELECT free, the owner's call.
+- **Open (UX): Play « default » doesn't say what default does** (the game's boot mode, else Settings'): showing it needs the record, a card read the popup avoids.
+- **Open (UX):** Game info's Played is blank for a game off Recent; the backups page labels a date "Age" when the clock is behind; Empty trash with nothing in it opens a message; a deep SD folder takes one B a level; Settings' hint bar shows the row's explanation rather than its keys.
 - **Open: `remove_tree` reads a trash folder again for each file** (the boot's purge): read once, unlink as it goes.
 - **Open: the library's walk log counts names.db's load and the user's pauses** in its time.
 - **Open: the save copy runs `Save_recover` three times** before writing.
