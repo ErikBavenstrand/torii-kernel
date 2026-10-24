@@ -99,3 +99,19 @@ grep -Eq "^kernel( error)?: error 8: The save's path is too long" "$cart/kernel.
 ! mdir -i "$cart/sd.img" ::/torii/saves >/dev/null 2>&1 || fail "a 253-byte name: a save folder was made"
 grep -qF "save path is over 251 bytes, the pending-save record's room" "$cart/kernel.log" || fail "a 253-byte name: not logged"
 echo "PASS: a name too long for the pending-save record says so and writes no save"
+
+# B held in a deep folder climbs a folder at a time to the card's root and
+# stays on the page there (a fresh B leaves it)
+cart=$carts/listing-climb
+rm -rf "$cart" && mkdir -p "$cart"
+mkfs.fat -C -F 32 -n LISTING "$cart/sd.img" 65536 >/dev/null
+mmd -i "$cart/sd.img" ::/A ::/A/B ::/A/B/C
+mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/A/B/C/x.gba
+# shellcheck disable=SC2046
+OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_file /A/B/C/x.gba 0 0 0 0 popup) \
+  -k @8:B -k @12:- -k @40:B -k @150:- -f 600 >"$cart/kernel.log" 2>&1
+for up in /A/B /A /; do
+  grep -qF "kernel: sdcard: up to $up" "$cart/kernel.log" || fail "B held: never up to $up: $(grep 'sdcard: up' "$cart/kernel.log")"
+done
+! grep -q 'nav: home ready' <(sed -n '/sdcard: up to \/$/,$p' "$cart/kernel.log") || fail "B held left the SD page at the root"
+echo "PASS: B held climbs to the card's root and stays on the SD page"

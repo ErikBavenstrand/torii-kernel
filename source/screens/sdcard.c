@@ -65,6 +65,7 @@ static const struct ui_card_config card = {4, 4, 4, 1, 0};
 #define COUNT_REST 8             // frames the keys rest before folders are counted
 #define COUNT_CYCLES 24000       // cycles a frame's counting step may take, and a sector read or two past it
 #define COUNT_NEAR 8             // rows either side of the cursor counted first
+#define CLIMB_FRAMES 20  // B held: frames between folders up
 #define ARG_HARD 0x10000u        // nav_defer's arg: L was held (a hard reset)
 
 _Static_assert(PSRAM_WINDOW + PSRAM_NAMES_BYTES <= PSRAM_LIBRARY_SCRATCH, "the listing reaches the library's scratch");
@@ -101,6 +102,8 @@ static struct {
 	u8 hint_note;     // what the hint bar shows: HINTS_*
 	u8 find;          // the next listing puts the cursor on the file named sd.ask (a rename's)
 	u8 renamed_partly;  // the rename left something behind: said once the page is back
+	u8 climb;           // B went up a folder and is still held: holding it goes on up
+	u8 climb_frames;    // frames it has been held since the last folder up
 	u32 counting;  // the folder being counted, SDLIST_NONE none
 	u32 counted;   // its entries so far
 	u32 count_next;  // where the counting goes on past the cursor's rows
@@ -947,8 +950,11 @@ static int sd_event(struct ui_view *v, const struct ui_event *e)
 			if (at_root()) {
 				memo_store();  // the cursor, for the next visit from home
 				nav_back();
-			} else
+			} else {
 				nav_defer(folder_up, 0);
+				sd.climb = 1;
+				sd.climb_frames = 0;
+			}
 			return 1;
 		}
 		if (pressed & INPUT_START) {
@@ -1038,6 +1044,16 @@ static void sd_poll(void)
 	if (sd.measure_left) {
 		frame_measure("sd-folder");
 		sd.measure_left--;
+	}
+	// B held climbs a folder every CLIMB_FRAMES, up to the card's root (a
+	// fresh B there leaves the page): a deep folder is one long press away
+	if (sd.climb && (ui_input()->held & INPUT_B) && !at_root()) {
+		if (++sd.climb_frames >= CLIMB_FRAMES) {
+			sd.climb_frames = 0;
+			nav_defer(folder_up, 0);
+		}
+	} else {
+		sd.climb = 0;
 	}
 	if (sd.announce && ui_settled() && ui_list_still(node(N_LIST))) {
 		sd.announce = 0;
