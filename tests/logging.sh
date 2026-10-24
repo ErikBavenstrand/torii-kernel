@@ -454,7 +454,8 @@ settings)
   # Logging: A, RIGHT RIGHT (Errors, then Info), A keeps it, B leaves; the
   # carousel then turns (LEFT), and home rests for its idle flush
   # shellcheck disable=SC2046 # nav.sh's options
-  boot $(nav_setting logging) $(nav_press A RIGHT RIGHT A B) -w "nav: home ready" -k @8:LEFT -k @12:- -k @420:-
+  # B held through the settings write, which blocks frames (a tap inside it is lost)
+  boot $(nav_setting logging) $(nav_press A RIGHT RIGHT A) -k @40:B -k @70:- -w "nav: home ready" -k @8:LEFT -k @12:- -k @420:-
   back=$(grep -n 'nav: back from settings' "$cart/kernel.log" | head -1 | cut -d: -f1)
   ready=$(grep -n 'nav: home ready' "$cart/kernel.log" | tail -1 | cut -d: -f1)
   opened=$(grep -n 'log: opened in the background' "$cart/kernel.log" | head -1 | cut -d: -f1)
