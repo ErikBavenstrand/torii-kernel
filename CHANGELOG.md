@@ -4,13 +4,17 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.5.2
 
 - **Changed:** a launch no longer erases a NOR sector for the pending-save
   record (about 0.5 s): the sector holds 128 records in slots, each launch
   programs the next erased one in place (its flag last, so a cut never leaves
   half a record pending), and the sector is erased once every 128 launches;
-  in-place writes are bounded by `kernel_nor_program_ok` (a6b5e1d).
+  in-place writes are bounded by `kernel_nor_program_ok` (a6b5e1d). A clear
+  also uses up any stray slot past the record, and the sector's erase writes
+  slot 0 flag last too. Going back to an older kernel loses a save still
+  waiting to be copied in a slot past 0: copy it first (power on once)
+  (a9b366c).
 - **Changed:** the card works with fewer, larger writes: each SD write call
   ends with the driver's 8.6 ms settle delay, so the save copy writes 8 KB a
   call, slot copies 4 KB and a new save 8 KB, and a new folder's cluster is
