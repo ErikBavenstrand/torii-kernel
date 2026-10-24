@@ -929,7 +929,7 @@ static void time_edit(u32 id)
 	ui_popup_close();
 }
 
-// Settings > Library > Saves: the manager takes the page's place, and the page
+// Settings > Saves > Clean up saves: the manager takes the page's place, and the page
 // comes back when it closes
 static void saves_open(u32 id)
 {

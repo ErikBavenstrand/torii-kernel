@@ -429,7 +429,7 @@ const char *en_info[INFO_STRINGS] = {
 				    "Off: turn Sleep on in Settings.\n",
 	[INFO_S_INGAME_END] = "# Saves\n"
 			      "The game saves to the cart. The next time Torii starts, it copies the save to the card "
-			      "(without asking with Auto save on).\n",
+			      "(it asks first, unless Save without asking is on).\n",
 	[INFO_S_CART_START] = "# The cart\n"
 			      "An EZ-Flash Omega DE. Games start from the SD card, or from its %s MB NOR, where "
 			      "Write to NOR puts them.\n",
