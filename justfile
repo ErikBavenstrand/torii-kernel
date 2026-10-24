@@ -14,11 +14,17 @@ fresh := "python3 tools/fresh.py"
 # The image fresh.py's sync checks the share with
 export FRESH_IMAGE := kernel_image
 # What each build reads; a step is skipped while these are unchanged
-kernel_inputs := "source tests/kernel Makefile image.bin tools/omega_image.py tools/nm_to_sym.py tools/build_id.py " + kernel_image
-test_kernel_inputs := "source tests/kernel Makefile tools/build_id.py " + kernel_image
+kernel_inputs := "source tests/kernel Makefile emulators/out image.bin tools/omega_image.py tools/nm_to_sym.py tools/build_id.py " + kernel_image
+test_kernel_inputs := "source tests/kernel Makefile emulators/out tools/build_id.py " + kernel_image
 emu_inputs := "emu/mgba/src emu/mgba/include emu/mgba/CMakeLists.txt emu/mgba/cmake emu/mgba-shot.c emu/build.sh docker/emu.Dockerfile"
 test_rom_outputs := "tests/roms/hello/hello.gba tests/roms/crash/crash.gba tests/roms/crash/crash.sym tests/roms/savetest/flash128.gba tests/roms/savetest/eeprom512.gba tests/roms/idle/idle.gba tests/roms/eeprom/eeprom.gba tests/roms/rumble/rumble.gba"
 kernel_image := "devkitpro/devkitarm@sha256:1acab59884288115af0e70782a9b69017a8cc6bad69542b24e8652233f215c56"
+# The built-in emulators each build with the devkitARM of their own source's
+# time (emulators/fetch.sh pins the source): r58 (GCC 12, 2022-05-31) for
+# Jagoomba Color v0.5, which newer GCC rejects, and r66 (GCC 15, 2025-07-28)
+# for PocketNES 2025, which needs GCC 14's flags
+jagoombacolor_image := "devkitpro/devkitarm@sha256:7dff610fb307a6c258a12e68aa38b365e9a1598300be32163db31645c64ccbfc"
+pocketnes_image := "devkitpro/devkitarm@sha256:a8a5fbf5336ba400fd960d20c4c4c370d9a4c56abfc0a4348e40ba9c0071fb5c"
 emu_image := "torii-emu"
 kernel_docker := "docker run --rm --platform linux/amd64 -u $(id -u):$(id -g) -v \"$PWD\":/src -w /src -e LIBGBA=/opt/devkitpro/libgba " + kernel_image
 # LC_ALL: mtools stores UTF-8 file names correctly only in a UTF-8 locale
@@ -37,13 +43,14 @@ gdb_net := if os() == "linux" { "--network host" } else { "--add-host=host.docke
 gdb_host := if os() == "linux" { "127.0.0.1" } else { "host.docker.internal" }
 
 # Build the flashable upgrade file: dist/ezkernelnew.bin
-build: _ready
+build: _ready emulators
     @mkdir -p dist
     @{{fresh}} check kernel dist/ezkernelnew.bin dist/ezkernelnew.sym ezkernelnew.elf -- {{kernel_inputs}} || {{just_executable()}} _build-kernel
 
 _build-kernel:
     {{fresh}} stamp build "{{kernel_image}}" Makefile
     {{fresh}} track build ezkernelnew.elf ezkernelnew.gba -- source tests/kernel Makefile
+    @rm -f build/emulators.o  # .incbin's files aren't in its .d
     {{kernel_docker}} make TARGET=ezkernelnew -j8
     @{{just_executable()}} _package ezkernelnew dist
     {{fresh}} record kernel -- {{kernel_inputs}}
@@ -62,6 +69,7 @@ repro: build
     set -euo pipefail
     rm -rf dist/repro && mkdir -p dist/repro
     git ls-files -co --exclude-standard source tests/kernel include Makefile > dist/repro/files.txt
+    ls emulators/out/*.gba >> dist/repro/files.txt
     docker run --rm --platform linux/amd64 -u $(id -u):$(id -g) --tmpfs /work:exec,uid=$(id -u) -v "$PWD":/src -w /src -e LIBGBA=/opt/devkitpro/libgba {{kernel_image}} tools/repro.sh dist/repro dist/repro/files.txt
     {{just_executable()}} _package dist/repro/ezkernelnew dist/repro
     status=0
@@ -193,8 +201,8 @@ lint:
     git ls-files -z '*.c' '*.h' | xargs -0 uvx clang-format@{{clang_format}} --dry-run -Werror
     uvx ruff@0.17.1 check tools tests
     uvx ruff@0.17.1 format --check tools tests
-    uvx --from shellcheck-py@0.11.0.1 shellcheck tests/*.sh tools/*.sh emu/*.sh
-    uvx --from shfmt-py@4.2.0 shfmt -d -i 2 tests/*.sh tools/*.sh emu/*.sh
+    uvx --from shellcheck-py@0.11.0.1 shellcheck tests/*.sh tools/*.sh emu/*.sh emulators/*.sh
+    uvx --from shfmt-py@4.2.0 shfmt -d -i 2 tests/*.sh tools/*.sh emu/*.sh emulators/*.sh
     uvx --from actionlint-py@1.7.12.25 actionlint .github/workflows/*.yml
 
 # Format the C files that `just lint` checks, in place
@@ -296,6 +304,7 @@ _test-kernel-build: emu-image
 _build-test-kernel:
     {{fresh}} stamp build-test "{{kernel_image}} tests/kernel" Makefile
     {{fresh}} track build-test ezkerneltest.elf ezkerneltest.gba -- source tests/kernel Makefile
+    @rm -f build-test/emulators.o
     {{kernel_docker}} make TARGET=ezkerneltest BUILD=build-test -j8
     python3 tools/build_id.py ezkerneltest.gba ezkerneltest.elf
     {{fresh}} record test-kernel -- {{test_kernel_inputs}}
@@ -398,6 +407,20 @@ _build-emu-headless:
     {{emu_docker}} emu/build.sh
     {{fresh}} record emu-headless -- {{emu_inputs}}
 
+# Fetch the built-in emulators (emulators/fetch.sh) and build any whose source changed
+emulators: _ready
+    @emulators/fetch.sh
+    @{{fresh}} check jagoombacolor emulators/out/jagoombacolor.gba -- emulators/build.sh emulators/jagoombacolor/src emulators/jagoombacolor/Makefile {{jagoombacolor_image}} || {{just_executable()}} _build-emulator jagoombacolor {{jagoombacolor_image}} "emulators/jagoombacolor/src emulators/jagoombacolor/Makefile"
+    @{{fresh}} check pocketnes emulators/out/pocketnes.gba -- emulators/build.sh emulators/pocketnes/src emulators/pocketnes/Makefile emulators/pocketnes/Makefile_mb {{pocketnes_image}} || {{just_executable()}} _build-emulator pocketnes {{pocketnes_image}} "emulators/pocketnes/src emulators/pocketnes/Makefile emulators/pocketnes/Makefile_mb"
+
+_build-emulator name image inputs:
+    docker run --rm --platform linux/amd64 -u $(id -u):$(id -g) -v "$PWD":/src -w /src {{image}} emulators/build.sh {{name}}
+    {{fresh}} record {{name}} -- emulators/build.sh {{inputs}} {{image}}
+
+# Save changes made in emulators/NAME back into emulators/patches/NAME.patch
+emulators-save-patch name:
+    emulators/save-patch.sh {{name}}
+
 # Save changes made in emu/mgba back into emu/patches
 emu-save-patch:
     emu/save-patch.sh
@@ -409,7 +432,7 @@ emu-image: _ready
 # Every recipe that runs a container comes through here: make sure the torii
 # VM runs and that containers see the latest edits.
 _ready: _vm
-    @{{fresh}} sync source Makefile image.bin tests tools emu/mgba/src emu/mgba/include emu/mgba-shot.c emu/build.sh docker
+    @{{fresh}} sync source Makefile image.bin tests tools emulators emu/mgba/src emu/mgba/include emu/mgba-shot.c emu/build.sh docker
 
 # Start the torii colima VM on macOS if it isn't running
 _vm:

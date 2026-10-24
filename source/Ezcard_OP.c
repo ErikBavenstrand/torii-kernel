@@ -780,8 +780,8 @@ void IWRAM_CODE Set_RTC_status(u16 status)
 	WAITCNT_RESTORE(waitcnt);
 }
 // --------------------------------------------------------------------
-// The cart's rumble motor, driven as EZ-Flash's Goomba (emusrc/src/mappers.s)
-// and the bundled Jagoomba drive it: 0xF1 at 0x09E20000 gives 0x08001000 to
+// The cart's rumble motor, driven as Jagoomba's Omega DE build does
+// (MBC5RAMB in its src/mappers.s): 0xF1 at 0x09E20000 gives 0x08001000 to
 // the motor, where 2 starts it and 0 stops it. Jagoomba pulses it, on then off
 // at once, each frame the game asks for rumble. The motor also needs the GPIO
 // port on (0x096A0000 bit 0), and takes the write only while the ROM page

@@ -2,6 +2,7 @@
 # binary files itself.
 * text=auto eol=lf
 
-# EZ-Flash's emulator sources and Windows scripts keep their CRLF line endings.
+# Windows scripts keep their CRLF line endings, and the emulator patches
+# carry the CRLF lines of the files they change.
 *.bat -text
-emusrc/** -text
+emulators/patches/*.patch -text

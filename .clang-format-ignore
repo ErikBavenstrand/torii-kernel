@@ -1,7 +1,6 @@
 # Files clang-format leaves alone (just lint checks the rest): vendored code
 # kept as upstream wrote it, and the fonts tools/font.py generates, which
 # tests/font_test.py compares with its output byte for byte.
-emusrc/**
 source/ff15/*
 source/engine/font_body.c
 source/engine/font_heading.c

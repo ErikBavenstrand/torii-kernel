@@ -27,7 +27,6 @@ clang-tidy source/ezkernelnew.c clang-analyzer-security.insecureAPI.strcpy: Call
 clang-tidy source/ezkernelnew.c clang-analyzer-security.insecureAPI.strcpy: Call to function 'strcpy' is insecure as it does not provide bounding of the memory buffer. Replace unbounded copy functions with analogous functions that support length arguments such as 'strlcpy'. CWE-119
 clang-tidy source/fmt.c bugprone-branch-clone: repeated branch body in conditional chain
 clang-tidy source/fmt.c bugprone-branch-clone: repeated branch body in conditional chain
-clang-tidy source/gamename.c bugprone-not-null-terminated-result: the result from calling 'memcpy' is not null-terminated
 clang-tidy source/library.c bugprone-not-null-terminated-result: the result from calling 'memcpy' is not null-terminated
 clang-tidy source/orphanplan.c bugprone-suspicious-string-compare: function 'strcmp' is called without explicitly comparing result
 clang-tidy source/reset_table.h bugprone-narrowing-conversions: narrowing conversion from constant value 4294967295 (0xFFFFFFFF) of type 'unsigned int' to signed type 'int' is implementation-defined
@@ -47,7 +46,6 @@ clang-tidy source/showcht.c bugprone-narrowing-conversions: narrowing conversion
 clang-tidy source/showcht.c bugprone-narrowing-conversions: narrowing conversion from '__size_t' (aka 'unsigned int') to signed type 'int' is implementation-defined
 clang-tidy source/showcht.c bugprone-narrowing-conversions: narrowing conversion from '__size_t' (aka 'unsigned int') to signed type 'int' is implementation-defined
 clang-tidy source/showcht.c bugprone-narrowing-conversions: narrowing conversion from '__size_t' (aka 'unsigned int') to signed type 'int' is implementation-defined
-clang-tidy source/showcht.c bugprone-unchecked-string-to-number-conversion: 'atoi' used to convert a string to an integer value, but function will not report conversion errors; consider using 'strtol' instead
 clang-tidy source/showcht.c clang-analyzer-deadcode.DeadStores: Value stored to 'is_section' is never read
 clang-tidy source/showcht.c clang-analyzer-deadcode.DeadStores: Value stored to 'is_section' is never read
 clang-tidy source/showcht.c clang-analyzer-deadcode.DeadStores: Value stored to 'is_section' is never read

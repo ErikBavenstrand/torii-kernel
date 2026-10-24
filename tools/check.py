@@ -143,7 +143,7 @@ RULES = [
     ),
     (["roms/games.example.toml"], {LINT}, "example config"),
     (
-        ["emusrc/*", "*.bat", "Link_kernel_image.exe", "ezkernelnew.bin"],
+        ["*.bat", "Link_kernel_image.exe", "ezkernelnew.bin"],
         {LINT},
         "EZ-Flash's files, not built",
     ),
@@ -227,6 +227,7 @@ RULES = [
     (["source/*.c", "source/*.h"], EVERYTHING, "kernel C"),
     (["Makefile"], EVERYTHING | {REPRO}, "kernel build flags"),
     (["source/*", "tests/kernel/*", "image.bin"], KERNEL, "kernel"),
+    (["emulators/*"], KERNEL | {REPRO}, "built-in emulators, in every kernel"),
     (
         ["emu/*", "docker/emu.Dockerfile"],
         {LINT, TEST, COMPAT},
@@ -284,21 +285,30 @@ def git(*args: str, cwd: str = ".") -> list[str]:
     return [line for line in out.stdout.splitlines() if line]
 
 
-def mgba_edited() -> bool:
-    """emu/mgba differs from the patches it was made or saved from (as emu/fetch.sh checks)."""
-    if not Path("emu/mgba").is_dir():
+def checkout_edited(checkout: str, stamp: str, binary: bool = False) -> bool:
+    """A checkout differs from the patches it was made or saved from (as emu/fetch.sh and emulators/fetch.sh check)."""
+    if not Path(checkout).is_dir():
         return False
-    subprocess.run(["git", "-C", "emu/mgba", "add", "-A"], check=True)
+    subprocess.run(["git", "-C", checkout, "add", "-A"], check=True)
     diff = subprocess.run(
-        ["git", "-C", "emu/mgba", "diff", "--cached"], capture_output=True, check=True
+        ["git", "-C", checkout, "diff", "--cached"] + (["--binary"] if binary else []),
+        capture_output=True,
+        check=True,
     ).stdout
-    stamp = Path("emu/.mgba-patches")
-    recorded = stamp.read_text().strip() if stamp.exists() else ""
+    recorded = Path(stamp).read_text().strip() if Path(stamp).exists() else ""
     return hashlib.sha256(diff).hexdigest() != recorded
 
 
 def changed_files(base: str, staged: bool) -> tuple[list[str], str]:
-    unsaved = ["emu/mgba"] if mgba_edited() else []
+    checkouts = [("emu/mgba", "emu/.mgba-patches", False)] + [
+        (f"emulators/{name}", f"emulators/.{name}-patch", True)
+        for name in ("jagoombacolor", "pocketnes")
+    ]
+    unsaved = [
+        path
+        for path, stamp, binary in checkouts
+        if checkout_edited(path, stamp, binary)
+    ]
     if staged:
         files = git("diff", "--cached", "--name-only", "--no-renames")
         return sorted(set(files + unsaved)), "staged"

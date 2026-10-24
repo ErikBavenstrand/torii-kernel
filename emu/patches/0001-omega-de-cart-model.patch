@@ -322,7 +322,7 @@ index 1d0c0dd..b77704a 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..87d86b9
+index 0000000..4bb2cf1
 --- /dev/null
 +++ b/src/gba/cart/omega.c
 @@ -0,0 +1,1562 @@
@@ -373,8 +373,8 @@ index 0000000..87d86b9
 +#define REG_PSRAM_PAGE 0x01860000
 +#define REG_ROM_PAGE 0x01880000
 +#define REG_RAM_PAGE 0x01C00000
-+// The Omega DE's rumble motor, as EZ-Flash's Goomba drives it (emusrc/src/
-+// mappers.s): 0xF1 in REG_RUMBLE, then 2 at 0x08001000 runs the motor, 0 stops
++// The Omega DE's rumble motor, as Jagoomba's Omega DE build drives it
++// (MBC5RAMB in its src/mappers.s): 0xF1 in REG_RUMBLE, then 2 at 0x08001000 runs the motor, 0 stops
 +// it. GPIO pin 3 (data bit 3, direction bit 3) drives it too, as in Drill Dozer.
 +// The cart has no motor here: the trace says what it would do.
 +#define RUMBLE_MOTOR 0x00001000

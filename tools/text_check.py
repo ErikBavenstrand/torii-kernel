@@ -1,14 +1,15 @@
 """Fail if a tracked text file is not UTF-8 with LF line endings (just lint).
 
-EZ-Flash's emulator sources (emusrc/) and Windows scripts (*.bat) keep their
-original encoding and CRLF line endings, as .gitattributes says.
+Windows scripts (*.bat) keep their original encoding and CRLF line endings,
+as .gitattributes says, and the emulator patches (emulators/patches/) carry
+the CRLF lines of the upstream files they change.
 """
 
 import subprocess
 import sys
 from pathlib import Path
 
-SKIP_PREFIXES = ("emusrc/",)
+SKIP_PREFIXES = ("emulators/patches/",)
 SKIP_SUFFIXES = (".bat",)
 
 

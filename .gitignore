@@ -33,3 +33,9 @@ tests/roms/*/*.nm
 ezkerneltest.gba
 ezkerneltest.elf
 build-test/
+
+# The built-in emulators' checkouts and builds (recreate with `just emulators`)
+emulators/jagoombacolor/
+emulators/pocketnes/
+emulators/.*-patch
+emulators/out/

@@ -31,7 +31,7 @@ Torii is a custom kernel for the EZ-Flash Omega DE, forked from EZ-Flash's offic
 
 ## Formatting
 
-- Text files are UTF-8 with LF line endings; `just lint` checks. Only `emusrc/` and `*.bat` keep EZ-Flash's encoding and CRLF.
+- Text files are UTF-8 with LF line endings; `just lint` checks. Only `*.bat` keep EZ-Flash's encoding and CRLF, and the emulator patches carry upstream's CRLF lines.
 - Run `just format` after editing C files; `just lint` fails on unformatted ones.
   It formats every C file with `.clang-format`, except the vendored ones `.clang-format-ignore` lists.
 - `.git-blame-ignore-revs` lists the commit that reformatted the official source; run `git config blame.ignoreRevsFile .git-blame-ignore-revs` once so `git blame` skips it.
@@ -62,6 +62,12 @@ Reviews: one round of at most two agents. Use a code reviewer, plus an adversari
 5. For an interactive session, start `just remote` in the background and send `tools/remote.lua` commands with `nc 127.0.0.1 8888` (`press KEYS`, `wait FRAMES`, `read ADDR LEN`, `screenshot PATH`, `save PATH`); paths are relative to the repo. Stop it with `docker rm -f torii-remote`.
 6. For SD images with exFAT or UTF-8 names (mtools can't write exFAT), use `tools/sdimg.sh` inside the `torii-emu` container, as `tests/names.sh` does.
 7. To check the cart's state, read the files in `dist/cart/` (`sram.bin`, `kernel-nor.bin`) or the SD image with `mtools` inside the `torii-emu` container.
+
+## Built-in emulators
+
+- GB and GBC games run on Jagoomba Color, NES games on PocketNES, both built into the kernel (`source/emulators.s`). Torii plays GBA, GB, GBC and NES only: no plugins.
+- `emulators/fetch.sh` pins each one's upstream commit and applies `emulators/patches/NAME.patch` into the git-ignored `emulators/NAME`; `just emulators` builds them into `emulators/out/`, each with the devkitARM of its source's time (the justfile's `*_image`), and `just build` runs it first.
+- To change one, edit `emulators/NAME` and run `just emulators-save-patch NAME`, or the change is lost on the next fetch. Mark each change with a `Torii:` comment.
 
 ## Emulated cart
 

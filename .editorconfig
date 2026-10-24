@@ -34,16 +34,16 @@ trim_trailing_whitespace = false
 indent_style = unset
 indent_size = unset
 
-# Windows scripts from EZ-Flash's official source keep CRLF
-[*.bat]
-charset = unset
-end_of_line = crlf
-
-# EZ-Flash's emulator sources mix CRLF and LF files
-[emusrc/**]
+# The emulator patches carry the CRLF lines and whitespace of upstream's files
+[emulators/patches/*.patch]
 charset = unset
 end_of_line = unset
 insert_final_newline = unset
 trim_trailing_whitespace = false
 indent_style = unset
 indent_size = unset
+
+# Windows scripts from EZ-Flash's official source keep CRLF
+[*.bat]
+charset = unset
+end_of_line = crlf

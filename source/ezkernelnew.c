@@ -43,8 +43,7 @@
 #include "progress.h"
 #include "userdata.h"
 
-#include "jagoombacolor.h"
-#include "pocketnes.h"
+#include "emulators.h"
 
 FM_NOR_FS pNorFS[MAX_NOR] EWRAM_BSS;
 
@@ -978,39 +977,32 @@ u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU)
 	vu16 page = 0;
 	SetPSRampage(page);
 
-	u32 rom_start_address = 0;
-	switch (is_EMU) {
-	case 1://gbc
-	case 2://gb
-		dmaCopy((void *)jagoombacolor_gba, pReadCache, jagoombacolor_gba_size);
-		dmaCopy((void *)pReadCache, PSRAMBase_S98, jagoombacolor_gba_size);
-		rom_start_address = jagoombacolor_gba_size;
-		break;
-	case 3://nes
-		dmaCopy((void *)pocketnes_gba, pReadCache, pocketnes_gba_size);
-		dmaCopy((void *)pReadCache, PSRAMBase_S98, pocketnes_gba_size);
-		rom_start_address = pocketnes_gba_size + 0x30;
-		break;
-	default:
-		break;
+	// Torii: the emulator (emulators.h), through pReadCache, as a DMA from
+	// cart space to cart space loses its writes; PocketNES is bigger than
+	// pReadCache. The game goes right after it, after PocketNES's header.
+	const u8 *emu = (is_EMU == 3) ? pocketnes_gba : jagoombacolor_gba;
+	u32 emu_size = (is_EMU == 3) ? pocketnes_gba_size : jagoombacolor_gba_size;
+	for (u32 done = 0; done < emu_size; done += 0x20000) {
+		u32 n = (emu_size - done < 0x20000) ? emu_size - done : 0x20000;
+		dmaCopy((void *)(emu + done), pReadCache, n);
+		dmaCopy((void *)pReadCache, PSRAMBase_S98 + done, n);
 	}
+	u32 rom_start_address = (is_EMU == 3) ? emu_size + 0x30 : emu_size;
 
 	res = f_open(&gfile, filename, FA_READ);
 	if (res == FR_OK) {
 		filesize = f_size(&gfile);
 
-		if (is_EMU == 3) {//nes pocketnes_2013_07_01
-			*(vu32 *)pReadCache = 0x45564153;
-			*((vu32 *)pReadCache + 1) = 0x0;
-			dmaCopy((void *)pReadCache, PSRAMBase_S98 + rom_start_address - 0x30, 0x8);
-			*(vu32 *)pReadCache = filesize;
-			dmaCopy((void *)pReadCache, PSRAMBase_S98 + rom_start_address - 0x10, 0x4);
-
-			*(vu32 *)pReadCache = 0x709346c0;//usr rtc
-			dmaCopy((void *)pReadCache, PSRAMBase_S98 + 0x1EA0, 0x4);
-
-		} else {
-			//use rtc, have been modify
+		if (is_EMU == 3) {
+			// Torii: PocketNES's romheader, whole: the name, the
+			// size, and flags and sprite following at 0 (the
+			// defaults). Its clock is on in its build
+			vu32 *header = (vu32 *)pReadCache;
+			for (u32 i = 0; i < 0x30 / 4; i++)
+				header[i] = 0;
+			header[0] = 0x45564153;  // "SAVE"
+			header[8] = filesize;
+			dmaCopy((void *)pReadCache, PSRAMBase_S98 + rom_start_address - 0x30, 0x30);
 		}
 
 		f_lseek(&gfile, 0x0000);

@@ -11,7 +11,8 @@ kernel. So by default one game runs per set of requirements (system, save
 chip, kernel save mode, ROM size class, clock, other hardware), preferring
 one with a key script or a starting save; the report lists the games each
 one stands for. --all runs every game. A FILTER keeps games whose code,
-system (gba, gbc, gb), save chip or file name contains it. Games marked
+system (gba, gbc, gb), save chip or file name contains it, or, written as
+system=NAME, whose system is NAME. Games marked
 `skip` in games.toml (ROM hacks, kernel plugins) never run. Each game gets a
 fresh cart and three power-ons:
 
@@ -845,7 +846,13 @@ def matches(game: dict, filters: list[str]) -> bool:
         game["file"],
         game["title"],
     ]
-    return any(f.lower() in field.lower() for f in filters for field in fields)
+    system = game.get("system", "gba")
+    return any(
+        system == f[len("system=") :]
+        if f.startswith("system=")
+        else any(f.lower() in field.lower() for field in fields)
+        for f in filters
+    )
 
 
 def print_summary(results: list[Result], run_file: Path) -> None:

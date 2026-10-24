@@ -1,0 +1,34 @@
+diff --git a/src/config.h b/src/config.h
+index 8d608fe..3d65eb9 100644
+--- a/src/config.h
++++ b/src/config.h
+@@ -8,7 +8,7 @@
+ #define DEBUG 0				//Set to 1 to have code called at the end of each instruction (such as logging)
+ 
+ //#define VERSION_NUMBER "X alpha 3"
+-#define VERSION_NUMBER "2025-4-16"
++#define VERSION_NUMBER "2025-4-16 Torii"
+ //#define VERSION_NUMBER "DO NOT RELEASE"
+ 
+ //default options
+diff --git a/src/main.c b/src/main.c
+index 6f0c3f3..72a8eaf 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -51,6 +51,7 @@ int strstr_(const char *str1, const char *str2);
+ 
+ APPEND int main()
+ {
++	*(vu16*)0x04000204 = 0x4317;	//Torii: WAITCNT, ROM 3,1 + prefetch, as GBA games run from the Omega's PSRAM
+ 	//set text_start (before moving the rom)
+ 	extern u8 __rom_end__[];
+ 	extern u8 __eheap_start[];
+@@ -99,7 +100,7 @@ APPEND void C_entry()
+ #if RTCSUPPORT
+ 	vu16 *timeregs=(u16*)0x080000c8;
+ 	*timeregs=1;
+-	if(*timeregs & 1) rtc=1;
++	rtc=1;	//Torii: always, as EZ-Flash patched its build to (the kernel turns the Omega's clock port on)
+ #endif
+ 	
+ #if !COMPY
