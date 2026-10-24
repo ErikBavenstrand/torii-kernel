@@ -7,6 +7,7 @@ void IWRAM_CODE SD_Disable(void);
 void SetSDControl(u16 control);
 u16 IWRAM_CODE SD_Response(void);
 u32 Read_SD_sectors(u32 address, u16 count, u8 *SDbuffer);
+u32 Write_SD_fill(u32 address, u16 count, const u8 *sector);
 u32 Write_SD_sectors(u32 address, u16 count, const u8 *SDbuffer);
 u16 IWRAM_CODE Read_S71NOR_ID(void);
 u16 Read_S98NOR_ID(void);

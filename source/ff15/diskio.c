@@ -12,6 +12,8 @@
 #include "../Ezcard_OP.h"
 #include "../RTC.h"
 #include "../tlog.h"
+#include "../diskstat.h"
+#include "../sdcache.h"
 /* Definitions of physical drive number for each drive */
 //#define DEV_RAM		0	/* Example: Map Ramdisk to physical drive 0 */
 //#define DEV_MMC		1	/* Example: Map MMC/SD card to physical drive 1 */
@@ -91,6 +93,7 @@ DSTATUS disk_initialize (
 		return stat;
 	}
 	return STA_NOINIT;*/
+	sdcache_clear();	/* Torii: a new mount reads the card afresh */
 	return RES_OK;
 }
 
@@ -140,11 +143,20 @@ DRESULT disk_read (
 	}
 
 	return RES_PARERR;*/
-	/* Torii: 1 when the card didn't answer (Read_SD_sectors) */
+	/* Torii: a single sector may be in the cache (sdcache.h); 1 when the
+	   card didn't answer (Read_SD_sectors) */
+	if (count == 1 && sdcache_read(sector, buff)) {
+		diskstat_total.cache_hits++;
+		return RES_OK;
+	}
+	diskstat_total.reads++;
+	diskstat_total.read_sectors += count;
 	if (Read_SD_sectors(sector, count, buff)) {
 		tlog_error("sd: read of %lu sectors at %lu failed", (unsigned long)count, (unsigned long)sector);
 		return RES_ERROR;
 	}
+	if (count == 1)
+		sdcache_fill(sector, buff);
 	return RES_OK;
 }
 
@@ -202,7 +214,10 @@ DRESULT disk_write (
 	TLOG_ASSERT((DWORD)buff < 0x08000000);
 	if ((DWORD)buff >= 0x08000000)
 		return RES_PARERR;
+	diskstat_total.writes++;
+	diskstat_total.write_sectors += count;
 	res = Write_SD_sectors(sector, count, buff) ? RES_ERROR : RES_OK;
+	sdcache_wrote(sector, count, buff, 0, res == RES_OK);
 	if (res != RES_OK)
 		tlog_error("sd: write of %lu sectors at %lu failed", (unsigned long)count, (unsigned long)sector);
 	return res;
@@ -210,6 +225,32 @@ DRESULT disk_write (
 
 #endif
 
+
+/*-----------------------------------------------------------------------*/
+/* Torii: Write count copies of one sector (a new folder's zeros)         */
+/*-----------------------------------------------------------------------*/
+
+DRESULT disk_write_fill (
+	BYTE pdrv,
+	const BYTE *buff,	/* The sector's 512 bytes, in RAM */
+	LBA_t sector,
+	UINT count
+)
+{
+	(void)pdrv;
+	TLOG_ASSERT((DWORD)buff < 0x08000000);
+	if ((DWORD)buff >= 0x08000000)
+		return RES_PARERR;
+	diskstat_total.writes++;
+	diskstat_total.write_sectors += count;
+	if (Write_SD_fill(sector, count, buff)) {
+		sdcache_wrote(sector, count, buff, 1, 0);
+		tlog_error("sd: fill of %lu sectors at %lu failed", (unsigned long)count, (unsigned long)sector);
+		return RES_ERROR;
+	}
+	sdcache_wrote(sector, count, buff, 1, 1);
+	return RES_OK;
+}
 
 /*-----------------------------------------------------------------------*/
 /* Miscellaneous Functions                                               */

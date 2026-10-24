@@ -46,6 +46,17 @@ DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count)
 	return RES_OK;
 }
 
+// The kernel's diskio.c writes a new folder's zeros with one call (ff.c's
+// dir_clear): count copies of the sector at buff
+DRESULT disk_write_fill(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count)
+{
+	for (UINT i = 0; i < count; i++) {
+		if (disk_write(pdrv, buff, sector + i, 1) != RES_OK)
+			return RES_ERROR;
+	}
+	return RES_OK;
+}
+
 DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff)
 {
 	(void)pdrv;

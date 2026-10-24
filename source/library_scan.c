@@ -9,6 +9,7 @@
 
 #include "library.h"
 #include "crc32.h"
+#include "diskstat.h"
 #include "ez_define.h"
 #include "ff.h"
 #include "gamename.h"
@@ -148,6 +149,11 @@ static struct {
 			u32 unreadable, names_len, too_long;
 			u8 names_ok;  // names.txt read whole into LIB_NAMES_TEXT
 			u32 parse_started;  // when its parse began
+			// The walk's own work, its steps but names.db's load: the
+			// time between steps (the menu, the user's pauses) isn't
+			// the walk's
+			u32 work;
+			struct diskstat disk;
 		} walk;
 	} u;
 	u8 buf[LIB_IO_BYTES] ALIGN(4);
@@ -538,6 +544,17 @@ static void walk_pop(DIR *dir)
 	lib.u.walk.path[lib.u.walk.path_len[lib.u.walk.depth]] = 0;
 }
 
+// The walk step under way (the job's): walk_count_step adds what it did so
+// far to the walk's work
+static struct diskstat step_mark;
+
+static void walk_count_step(void)
+{
+	lib.u.walk.work += cycles_since(step_mark.cycles);
+	lib.u.walk.disk.reads += diskstat_total.reads - step_mark.reads;
+	lib.u.walk.disk.read_sectors += diskstat_total.read_sectors - step_mark.read_sectors;
+}
+
 static int same_as_active(void)
 {
 	const struct lib_header *h = lib_hdr(active_slot());
@@ -553,12 +570,15 @@ static void walk_end(void)
 	// A walk that couldn't open a folder isn't whole: its games' CRC
 	// records stay in crc.txt
 	names_walk_end(!lib.u.walk.skipped && !lib.u.walk.unreadable);
-	u32 ms = ms_since(lib.started);
-	tlog("library: %s walk: %lu entries, %lu folders, %lu files, %lu games, %lu saves in %lu ms; %lu folders "
-	     "not opened, %lu unreadable, %lu names too long",
+	walk_count_step();  // this step, so far
+	diskstat_start(&step_mark);
+	u32 ms = lib.u.walk.work / LIB_CYCLES_PER_MS;
+	tlog("library: %s walk: %lu entries, %lu folders, %lu files, %lu games, %lu saves in %lu ms (%lu sectors "
+	     "read, %lu ms since it began); %lu folders not opened, %lu unreadable, %lu names too long",
 	     lib.build ? "building" : "checking", (unsigned long)lib.u.walk.entries,
 	     (unsigned long)lib.u.walk.folders_seen, (unsigned long)lib.u.walk.files, (unsigned long)lib.u.walk.games,
-	     (unsigned long)lib.u.walk.saves, (unsigned long)ms, (unsigned long)lib.u.walk.skipped,
+	     (unsigned long)lib.u.walk.saves, (unsigned long)ms, (unsigned long)lib.u.walk.disk.read_sectors,
+	     (unsigned long)ms_since(lib.started), (unsigned long)lib.u.walk.skipped,
 	     (unsigned long)lib.u.walk.unreadable, (unsigned long)lib.u.walk.too_long);
 	if (same_as_active()) {
 		tlog("library: unchanged (hash %08lX)", (unsigned long)lib.u.walk.hash);
@@ -995,9 +1015,14 @@ static int library_step(void)
 	case S_LOAD:
 		load_step();
 		return JOB_MORE;
-	case S_WALK:
+	case S_WALK: {
+		u8 own = lib.phase != W_NAMESDB;
+		diskstat_start(&step_mark);
 		walk_step();
+		if (own && lib.state == S_WALK)
+			walk_count_step();
 		return JOB_MORE;
+	}
 	case S_SORT:
 		sort_step();
 		return JOB_MORE;

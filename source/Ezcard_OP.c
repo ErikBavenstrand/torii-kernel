@@ -156,6 +156,45 @@ u32 IWRAM_CODE Write_SD_sectors(u32 address, u16 count, const u8 *SDbuffer)
 	return 0;
 }
 // --------------------------------------------------------------------
+// Torii: count sectors from address, each a copy of the 512 bytes at sector
+// (FatFs's new folder clusters, all zeros). The commands go 4 blocks at a
+// time as Write_SD_sectors' do, with its one settle delay at the end, where
+// a sector per call took the delay each time (64 for a 32 KB cluster).
+u32 IWRAM_CODE Write_SD_fill(u32 address, u16 count, const u8 *sector)
+{
+	u16 waitcnt = WAITCNT_SLOW();
+	SD_Enable();
+	SD_Read_state();
+	u16 i;
+	u16 blocks;
+	u32 res;
+	for (i = 0; i < count; i += 4) {
+		blocks = (count - i > 4) ? 4 : (count - i);
+
+		for (u16 b = 0; b < blocks; b++)
+			dmaCopy(sector, (void *)(0x9E00000 + b * 512), 512);
+		*(vu16 *)0x9fe0000 = 0xd200;
+		*(vu16 *)0x8000000 = 0x1500;
+		*(vu16 *)0x8020000 = 0xd200;
+		*(vu16 *)0x8040000 = 0x1500;
+		*(vu16 *)0x9600000 = ((address + i) & 0x0000FFFF);
+		*(vu16 *)0x9620000 = ((address + i) & 0xFFFF0000) >> 16;
+		*(vu16 *)0x9640000 = 0x8000 + blocks;
+		*(vu16 *)0x9fc0000 = 0x1500;
+
+		res = Wait_SD_Response();
+		if (res == 1) {
+			SD_Disable();
+			WAITCNT_RESTORE(waitcnt);
+			return 1;
+		}
+	}
+	delay(3000);
+	SD_Disable();
+	WAITCNT_RESTORE(waitcnt);
+	return 0;
+}
+// --------------------------------------------------------------------
 u16 IWRAM_CODE Read_S71NOR_ID(void)
 {
 	u16 ID1;

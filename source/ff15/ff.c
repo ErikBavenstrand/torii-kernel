@@ -1680,8 +1680,9 @@ static FRESULT dir_clear (	/* Returns FR_OK or FR_DISK_ERR */
 	} else
 #endif
 	{
-		ibuf = fs->win; szb = 1;	/* Use window buffer (many single-sector writes may take a time) */
-		for (n = 0; n < fs->csize && disk_write(fs->pdrv, ibuf, sect + n, szb) == RES_OK; n += szb) ;	/* Fill the cluster with 0 */
+		/* Torii: the cluster in one call of copies of the zeroed window: a
+		   call per sector took the SD driver's settle delay each time */
+		n = disk_write_fill(fs->pdrv, fs->win, sect, fs->csize) == RES_OK ? fs->csize : 0;
 	}
 	return (n == fs->csize) ? FR_OK : FR_DISK_ERR;
 }
