@@ -75,6 +75,7 @@ struct gs_state {
 	struct save_page_row rows[SAVE_PAGE_ROWS];
 	u32 versions;
 	char head[24];
+	u8 new_open;  // New slot's popup is up: the pane's heading, above it, goes
 	char values[48];
 	struct ui_hint hints[4];
 	struct ui_pop_item items[ACT_COUNT];
@@ -192,7 +193,7 @@ static void slot_pane(void *ctx, u32 row, struct save_pane *out)
 {
 	(void)ctx;
 	if (row >= gs.count) {  // New slot
-		gs_snprintf(gs.head, sizeof(gs.head), "%s", gl_slots->new_title);
+		gs_snprintf(gs.head, sizeof(gs.head), "%s", gs.new_open ? "" : gl_slots->new_title);
 		out->head = gs.head;
 		out->keys = "";
 		out->note = gl_gsaves->note_new;
@@ -512,11 +513,18 @@ static int new_slot(void)
 	gs.items[n] = (struct ui_pop_item){gl_gsaves->new_file, 0, 0};
 	gs.ids[n++] = NEW_FILE;
 	gs.popup = (struct ui_popup){gl_slots->new_title, ART_ICON8_SAVE + 1, gs.items, (u8)n, 0, 0};
-	if (!ui_popup_open(save_page_list(), save_page_hints(), &gs.popup))
+	gs.new_open = 1;
+	save_page_refresh();
+	if (!ui_popup_open(save_page_list(), save_page_hints(), &gs.popup)) {
+		gs.new_open = 0;
+		save_page_refresh();
 		return DONE_STAY;
+	}
 	tlog_debug("screen ready: game-saves-new");
 	s32 pick = ui_popup_choose();
 	ui_popup_close();
+	gs.new_open = 0;
+	save_page_refresh();
 	if (pick < 0)
 		return DONE_STAY;
 	u32 how = gs.ids[pick];
