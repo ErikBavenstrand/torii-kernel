@@ -23,6 +23,15 @@ torii_irq:
 	ldrne	r2, [r1]
 	addne	r2, r2, #1
 	strne	r2, [r1]
+	@ The keys held now join input_keys_seen (input_hw.c): a tap during a
+	@ write that blocks the menu for frames still reaches it
+	addne	r3, r0, #0x100
+	ldrneh	r3, [r3, #0x30]		@ KEYINPUT: a 0 bit is held
+	ldrne	r1, =input_keys_seen
+	ldrneh	r2, [r1]
+	mvnne	r3, r3
+	orrne	r2, r2, r3
+	strneh	r2, [r1]
 
 	ldr	r0, [sp, #20]
 	sub	r0, r0, #4		@ where the IRQ came in

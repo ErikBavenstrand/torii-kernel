@@ -88,7 +88,9 @@ void input_page_keys(InputState *s, u16 keys);
 // step (clamped to 1..3; repeats fire at most once a step).
 void input_step(InputState *s, u16 keys, u32 dt);
 
-// Reads the keys from REG_KEYINPUT and steps (kernel only, input_hw.c).
+// Reads the keys from REG_KEYINPUT and steps (kernel only, input_hw.c). A
+// key held at any VBlank since the last poll counts as held: a tap while the
+// menu was blocked comes in as a press, then a release.
 void input_poll(InputState *s, u32 dt);
 
 // The repeat rate of key at the curve's point ramp frames after its first

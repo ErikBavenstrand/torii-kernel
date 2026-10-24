@@ -454,8 +454,9 @@ settings)
   # Logging: A, RIGHT RIGHT (Errors, then Info), A keeps it, B leaves; the
   # carousel then turns (LEFT), and home rests for its idle flush
   # shellcheck disable=SC2046 # nav.sh's options
-  # B held through the settings write, which blocks frames (a tap inside it is lost)
-  boot $(nav_setting logging) $(nav_press A RIGHT RIGHT A) -k @40:B -k @70:- -w "nav: home ready" -k @8:LEFT -k @12:- -k @420:-
+  # B tapped inside the settings write, which blocks frames: the IRQ's key
+  # latch keeps the tap (it was lost before v0.5.3)
+  boot $(nav_setting logging) $(nav_press A RIGHT RIGHT A) -k @40:B -k @44:- -w "nav: home ready" -k @8:LEFT -k @12:- -k @420:-
   back=$(grep -n 'nav: back from settings' "$cart/kernel.log" | head -1 | cut -d: -f1)
   ready=$(grep -n 'nav: home ready' "$cart/kernel.log" | tail -1 | cut -d: -f1)
   opened=$(grep -n 'log: opened in the background' "$cart/kernel.log" | head -1 | cut -d: -f1)
@@ -480,9 +481,8 @@ open)
   # LOGGING set to Info on the Settings page, which B leaves for home
   to_info() {
     # shellcheck disable=SC2046 # nav.sh's options
-    # B is held for 30 frames: the settings write that A started blocks
-    # frames, and a 4-frame tap inside it is never seen
-    echo "-p 30:tlog_open_steps_test:$1 $(nav_setting logging | tr "\n" " ") $(nav_press A RIGHT RIGHT A) -k @40:B -k @70:- -w \"nav: home ready\""
+    # B tapped for 4 frames inside the settings write that A started
+    echo "-p 30:tlog_open_steps_test:$1 $(nav_setting logging | tr "\n" " ") $(nav_press A RIGHT RIGHT A) -k @40:B -k @44:- -w \"nav: home ready\""
   }
 
   # A delete meanwhile: the open holds the file it makes (FatFs keeps no
