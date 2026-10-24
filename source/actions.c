@@ -71,13 +71,21 @@ void action_nor_read(void)
 // Which slot the launch plays (screens/slot_picker.h): the picker if the game
 // has two or more, or Select is held (a one-slot game goes straight in). rom
 // is the game's save path name (gamesave.h), bytes its save's size (0: it has
-// no save, so no slots), title the picker's. 1 if the launch stops (B, or a
+// no save, so no slots), title the picker's unless action_launch_title gave
+// one. 1 if the launch stops (B, or a
 // failure shown); the menu's session is over then, as after a failed launch.
 static u8 slot_skip;
 
 void action_slot_chosen(int on)
 {
 	slot_skip = on != 0;
+}
+
+static const char *launch_title;
+
+void action_launch_title(const char *title)
+{
+	launch_title = title;
 }
 
 static int slot_choose(const char *rom, u32 bytes, const char *title)
@@ -91,7 +99,7 @@ static int slot_choose(const char *rom, u32 bytes, const char *title)
 	int force = ui_active() && (ui_input()->held & INPUT_SELECT) != 0;
 	if (!slot_picker_wanted(rom, force))
 		return 0;
-	if (slot_picker_run(rom, title, bytes) == SLOT_PICKER_LAUNCH)
+	if (slot_picker_run(rom, launch_title ? launch_title : title, bytes) == SLOT_PICKER_LAUNCH)
 		return 0;
 	tlog("launch: no slot chosen, nothing started");
 	session_end();

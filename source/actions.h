@@ -79,6 +79,10 @@ int action_game_saves(const char *path, char *rom, u32 rom_size, u32 *bytes);
 // current one); a launch uses it up. The manager clears it (0) when a launch
 // returns without starting.
 void action_slot_chosen(int on);
+// The game's name Play with shows (a list's display name) for the launches
+// from here on; NULL, as the caller sets it once the launch returns: the
+// file name, as the SD card and NOR pages list it.
+void action_launch_title(const char *title);
 // Sets a GBA game's own boot mode (ACTION_BOOT_*) in the same file, which A,
 // Play and Launch then use instead of Settings'. 1 if written.
 int action_set_boot_mode(const char *path, u32 boot_mode);

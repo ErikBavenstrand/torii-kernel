@@ -1,0 +1,16 @@
+# Play with, launched with A from Recent (a game list): its title is the game's
+# display name as the list shows it (Hello), not the file name (Hello.gba)
+#! sd-file /Hello.gba 0x20000 tests/roms/hello/hello.gba
+#! sd-file "/torii/saves/Hello.gba/Main.sav" 0x2000 /dev/null
+#! sd-file "/torii/saves/Hello.gba/Boss Rush.sav" 0x10000 /dev/null
+#! sd-file "/torii/saves/Hello.gba/game.ini" 0 tests/shots/data/slot-picker-game.ini
+# Recent, the item home faces, played Hello last: its first row. The tests'
+# hook opens lists on their first row.
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
+-w "nav: home ready"
+-k @20:A -k @24:-
+-w "nav: page recent ready"
+-k @40:A -k @44:-
+-w "screen ready: slot-picker"
+-s @30:picker.png

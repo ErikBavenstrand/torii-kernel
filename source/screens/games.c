@@ -1333,7 +1333,9 @@ static void launch(u32 how, int keep_cheats, u32 hard)
 	if (!keep_cheats)
 		cheat_menu_forget();
 	tlog("games: start %s (how %lu%s)", games.pick, (unsigned long)how, hard ? ", hard reset" : "");
+	action_launch_title(games.title);  // Play with names it as the list does
 	action_launch(games.pick, how, ACTION_SAVE_KEEP, hard);
+	action_launch_title(NULL);
 }
 
 extern TCHAR currentpath[];
@@ -1605,6 +1607,7 @@ static void play_run(u32 arg)
 	struct game g;
 	if (!up() || !row_still(i) || !game_at(i, &g) || !game_path(&g, games.pick))
 		return;
+	snprintf(games.title, sizeof(games.title), "%s", game_name(&g, games.name));
 	launch(ACTION_DEFAULT, 0, hard);
 }
 
