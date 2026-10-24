@@ -2,6 +2,7 @@
 // for every kind of format the kernel uses and a random sweep of numbers
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "../../source/fmt.h"
@@ -97,4 +98,25 @@ void test_fmt_random(void)
 			return;
 		}
 	}
+}
+
+// fmt_strtoul against the host's strtoul: its value and where it stops
+void test_fmt_strtoul(void)
+{
+	static const char *const in[] = {"0",          "12",       "  42\t",    "+7",          "-1",
+					 "ffffffff",   "FFFFFFFF", "100000000", "99999999999", "0x1f",
+					 "0X1F",       "0x",       "0xg",       "x1",          "",
+					 "  ",         "-",        "12ab",      "deadBEEF\t3", "4294967295",
+					 "4294967296", "000123",   "\n9",       "1a2b3c4d",    "7fffffff"};
+	static const int bases[] = {10, 16, 8, 2, 36};
+	for (unsigned i = 0; i < sizeof(in) / sizeof(*in); i++)
+		for (unsigned b = 0; b < sizeof(bases) / sizeof(*bases); b++) {
+			char *e1, *e2;
+			unsigned long a = fmt_strtoul(in[i], &e1, bases[b]);
+			unsigned long t = strtoul(in[i], &e2, bases[b]);
+			if (a != t || e1 != e2)
+				printf("  fmt_strtoul(\"%s\", %d): %lu at +%d, strtoul %lu at +%d\n", in[i], bases[b],
+				       a, (int)(e1 - in[i]), t, (int)(e2 - in[i]));
+			CHECK(a == t && e1 == e2);
+		}
 }

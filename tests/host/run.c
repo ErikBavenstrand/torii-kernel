@@ -67,6 +67,7 @@ static const struct {
 	{"crc32_words", test_crc32_words},
 	{"fmt_formats", test_fmt_formats},
 	{"fmt_random", test_fmt_random},
+	{"fmt_strtoul", test_fmt_strtoul},
 	{"namesdb_header", test_namesdb_header},
 	{"namesdb_lookup", test_namesdb_lookup},
 	{"names_cache_table", test_names_cache_table},

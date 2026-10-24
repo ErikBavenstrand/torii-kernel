@@ -200,3 +200,38 @@ int fmt_vsnprintf(char *out, size_t room, const char *f, va_list ap)
 		out[s.len < room ? s.len : room - 1] = 0;
 	return (int)s.len;
 }
+
+unsigned long fmt_strtoul(const char *s, char **end, int base)
+{
+	const char *at = s;
+	while (*at == ' ' || (*at >= '\t' && *at <= '\r'))
+		at++;
+	int neg = *at == '-';
+	if (*at == '-' || *at == '+')
+		at++;
+	if (base == 16 && at[0] == '0' && (at[1] | 0x20) == 'x' &&
+	    ((at[2] >= '0' && at[2] <= '9') || ((at[2] | 0x20) >= 'a' && (at[2] | 0x20) <= 'f')))
+		at += 2;
+	unsigned long v = 0, max = (unsigned long)-1;
+	int over = 0;
+	const char *digits = at;
+	for (;; at++) {
+		int d;
+		if (*at >= '0' && *at <= '9')
+			d = *at - '0';
+		else if ((*at | 0x20) >= 'a' && (*at | 0x20) <= 'z')
+			d = (*at | 0x20) - 'a' + 10;
+		else
+			break;
+		if (d >= base)
+			break;
+		if (v > (max - (unsigned long)d) / (unsigned long)base)
+			over = 1;
+		v = v * (unsigned long)base + (unsigned long)d;
+	}
+	if (end)
+		*end = (char *)(at == digits ? s : at);
+	if (over)
+		return max;
+	return neg ? -v : v;
+}

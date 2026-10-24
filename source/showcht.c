@@ -8,6 +8,7 @@
 #include <gba_video.h>
 
 #include "ezkernel.h"
+#include "fmt.h"
 #include "lang.h"
 #include "showcht.h"
 #include "tlog.h"
@@ -513,7 +514,7 @@ static u32 Change2cht_folder(u32 chtname)
 	memset(chtnamebuf, 0x00, 100);
 	sprintf(chtnamebuf, "%d%d%d%d", HexToChar(((u8 *)&chtname)[0]), HexToChar(((u8 *)&chtname)[1]),
 		HexToChar(((u8 *)&chtname)[2]), HexToChar(((u8 *)&chtname)[3]));
-	u32 num = atoi(chtnamebuf);
+	u32 num = (u32)fmt_strtoul(chtnamebuf, NULL, 10);
 	//DEBUG_printf("num =%d", num);
 	if (num < 200) {
 		folder_name = (TCHAR *)"0000";

@@ -7,6 +7,7 @@
 
 #include "namesdb.h"
 #include "crc32.h"
+#include "fmt.h"
 #include "ff.h"
 #include "library.h"
 #include "safefile.h"
@@ -907,14 +908,14 @@ static void part_read(void)
 		return;
 	u32 len = (u32)(tab - text);
 	char *end;
-	unsigned long check = strtoul(tab + 1, &end, 16);
+	unsigned long check = fmt_strtoul(tab + 1, &end, 16);
 	if (*end || check != crc32(text, len))
 		return;
 	text[len] = 0;
 	unsigned long v[4];
 	char *at = text;
 	for (u32 i = 0; i < 4; i++) {
-		v[i] = strtoul(at, &end, i == 1 || i == 2 ? 10 : 16);
+		v[i] = fmt_strtoul(at, &end, i == 1 || i == 2 ? 10 : 16);
 		if (end == at || *end != '\t')
 			return;
 		at = end + 1;

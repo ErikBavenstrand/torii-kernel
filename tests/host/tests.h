@@ -177,6 +177,7 @@ void test_library_pinned_keys(void);
 void test_crc32_words(void);
 void test_fmt_formats(void);
 void test_fmt_random(void);
+void test_fmt_strtoul(void);
 void test_namesdb_header(void);
 void test_namesdb_lookup(void);
 void test_names_cache_table(void);
