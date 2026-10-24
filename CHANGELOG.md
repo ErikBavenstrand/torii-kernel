@@ -18,6 +18,15 @@ git log, not here.
   (ez-flash/omega-de-kernel#12): its settings are saved on the Omega, and
   the reset no longer puts the automatic palette back. Autosleep's setting
   comes back with its time (998abab).
+- **Fixed:** a GB or GBC game with 32 KB of save RAM (Pokémon Yellow, Gold,
+  Silver and Crystal, among others) lost an in-game save at power-off unless
+  Jagoomba's L+R menu was opened first: Jagoomba kept that RAM in EWRAM and
+  copied it to the cart only from its menu. It now does the same a second
+  after the game's last write. 8 KB games and NES games already wrote
+  through to the cart (b661254).
+- **Fixed:** Diagnostics' unit tests failed `asset_sd_read` on a real card,
+  whose clusters are bigger than the emulated card's: the test now expects
+  the seek steps the card's cluster size gives (b661254).
 - **Changed:** both emulators run ROM at 3,1 wait states with prefetch, as
   GBA games do from PSRAM (they ran at the power-on 4,2 without); GBC games
   see a GBA, as on a real GBA (Shantae, the Oracles' Advance Shop); autosleep
