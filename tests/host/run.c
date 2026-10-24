@@ -65,6 +65,8 @@ static const struct {
 	{"gamelist_sort", test_gamelist_sort},
 	{"colour_bldy", test_colour_bldy},
 	{"crc32_words", test_crc32_words},
+	{"fmt_formats", test_fmt_formats},
+	{"fmt_random", test_fmt_random},
 	{"namesdb_header", test_namesdb_header},
 	{"namesdb_lookup", test_namesdb_lookup},
 	{"names_cache_table", test_names_cache_table},
