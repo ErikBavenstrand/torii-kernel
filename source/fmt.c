@@ -1,31 +1,52 @@
 // The kernel's printf formatting (fmt.h)
 #include "fmt.h"
 
+#include <gba_base.h>
+
 struct sink {
 	char *out;
 	size_t room;  // bytes out can take, its terminator included
 	size_t len;   // the result's length so far, written or not
 };
 
-static void put(struct sink *s, char c)
+static inline __attribute__((always_inline)) void put(struct sink *s, char c)
 {
 	if (s->len + 1 < s->room)
 		s->out[s->len] = c;
 	s->len++;
 }
 
-static void pad(struct sink *s, char c, int n)
+// n bytes of str at once
+static inline __attribute__((always_inline)) void put_n(struct sink *s, const char *str, size_t n)
+{
+	if (s->len + 1 < s->room) {
+		size_t fit = s->room - 1 - s->len;
+		size_t k = n < fit ? n : fit;
+		for (size_t i = 0; i < k; i++)
+			s->out[s->len + i] = str[i];
+	}
+	s->len += n;
+}
+
+static inline __attribute__((always_inline)) void pad(struct sink *s, char c, int n)
 {
 	for (; n > 0; n--)
 		put(s, c);
 }
 
+// Every tlog line is formatted here: about 25,000 cycles for a line of 110
+// characters from ROM (newlib's took 54,000; in IWRAM it would take 12,000
+// for 1.3 KB of it)
 int fmt_vsnprintf(char *out, size_t room, const char *f, va_list ap)
 {
 	struct sink s = {out, room, 0};
-	for (; *f; f++) {
+	while (*f) {
 		if (*f != '%') {
-			put(&s, *f);
+			// The text up to the next conversion, at once
+			const char *t = f;
+			while (*f && *f != '%')
+				f++;
+			put_n(&s, t, (size_t)(f - t));
 			continue;
 		}
 		f++;
@@ -91,10 +112,10 @@ int fmt_vsnprintf(char *out, size_t room, const char *f, va_list ap)
 			}
 			if (!left)
 				pad(&s, ' ', width - (int)n);
-			for (size_t i = 0; i < n; i++)
-				put(&s, str[i]);
+			put_n(&s, str, n);
 			if (left)
 				pad(&s, ' ', width - (int)n);
+			f++;
 			continue;
 		}
 		unsigned long long v;
@@ -129,14 +150,31 @@ int fmt_vsnprintf(char *out, size_t room, const char *f, va_list ap)
 		} else {
 			// %% and anything unknown print as themselves
 			put(&s, c);
+			f++;
 			continue;
 		}
+		// Digits from the right: 32-bit values by constant divisors (a
+		// multiply, a shift), never a 64-bit library division unless the
+		// value needs it
 		char buf[24];
 		int n = 0;
-		do {
-			buf[n++] = digits[v % base];
-			v /= base;
-		} while (v);
+		if (base == 16) {
+			do {
+				buf[n++] = digits[v & 15];
+				v >>= 4;
+			} while (v);
+		} else if (v <= 0xFFFFFFFFu) {
+			u32 w = (u32)v;
+			do {
+				buf[n++] = (char)('0' + w % 10u);
+				w /= 10u;
+			} while (w);
+		} else {
+			do {
+				buf[n++] = (char)('0' + v % 10u);
+				v /= 10u;
+			} while (v);
+		}
 		int zeros = prec > n ? prec - n : 0;
 		if (prec < 0 && zero && !left)
 			zeros = width - n - neg - (c == 'p') * 2;
@@ -156,6 +194,7 @@ int fmt_vsnprintf(char *out, size_t room, const char *f, va_list ap)
 			put(&s, buf[--n]);
 		if (left)
 			pad(&s, ' ', width - total);
+		f++;
 	}
 	if (room)
 		out[s.len < room ? s.len : room - 1] = 0;

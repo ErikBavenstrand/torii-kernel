@@ -44,6 +44,7 @@ static const struct {
 	{"text_draw", test_text_draw},
 	{"text_clear", test_text_clear},
 	{"text_cycles", test_text_cycles},
+	{"fmt_cycles", test_fmt_cycles},
 	{"diag_line_cut", test_diag_line_cut},
 	{"ui_pool_and_arenas", test_ui_pool_and_arenas},
 	{"theme_switch_loads_banks", test_theme_switch_loads_banks},

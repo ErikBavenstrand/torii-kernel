@@ -3,8 +3,9 @@
 // read 234 sectors, 9 of them different). Write-through: every write goes to
 // the card first and then updates the copies it covers, so the card always
 // holds what a power cut would find, and a copy is never newer than the card.
-// Only single-sector reads go through it; longer ones (file data, the FAT
-// hint's scan) go to the card.
+// Only reads into FatFs's window go through it (a sector at a time); file
+// data read straight into a caller's buffer, and the FAT hint's scan, go to
+// the card.
 #ifndef TORII_SDCACHE_H
 #define TORII_SDCACHE_H
 

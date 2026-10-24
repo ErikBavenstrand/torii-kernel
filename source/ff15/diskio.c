@@ -14,6 +14,8 @@
 #include "../tlog.h"
 #include "../diskstat.h"
 #include "../sdcache.h"
+
+extern FATFS EZcardFs;	/* the card's one volume (ezkernelnew.c) */
 /* Definitions of physical drive number for each drive */
 //#define DEV_RAM		0	/* Example: Map Ramdisk to physical drive 0 */
 //#define DEV_MMC		1	/* Example: Map MMC/SD card to physical drive 1 */
@@ -143,9 +145,11 @@ DRESULT disk_read (
 	}
 
 	return RES_PARERR;*/
-	/* Torii: a single sector may be in the cache (sdcache.h); 1 when the
-	   card didn't answer (Read_SD_sectors) */
-	if (count == 1 && sdcache_read(sector, buff)) {
+	/* Torii: a read into FatFs's window (a folder or FAT sector, or part of
+	   a file's) may be in the cache (sdcache.h); 1 when the card didn't
+	   answer (Read_SD_sectors) */
+	int window = buff == EZcardFs.win;	/* FatFs's own: folders, the FAT */
+	if (window && sdcache_read(sector, buff)) {
 		diskstat_total.cache_hits++;
 		return RES_OK;
 	}
@@ -155,8 +159,8 @@ DRESULT disk_read (
 		tlog_error("sd: read of %lu sectors at %lu failed", (unsigned long)count, (unsigned long)sector);
 		return RES_ERROR;
 	}
-	if (count == 1)
-		sdcache_fill(sector, buff);
+	if (window)
+		sdcache_fill(sector, buff);	/* file data read straight to its buffer isn't kept */
 	return RES_OK;
 }
 
