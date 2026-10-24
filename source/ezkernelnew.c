@@ -29,6 +29,7 @@
 #include "settings.h"
 #include "cartlog.h"
 #include "cutpoint.h"
+#include "fathint.h"
 #include "saveorphan.h"
 #include "slotstore.h"
 #include "saveslot.h"
@@ -1503,6 +1504,7 @@ int main(void)
 			ui_frame();
 	}
 	boot_mounted = torii_frames;
+	fathint_start();  // the FAT's first free cluster, while the boot's screens show
 	slotstore_recover();  // a slot rename or delete the power cut short, before any save is touched
 	saveorphan_recover();  // a relink or delete of an orphaned save the same
 	slotstore_trash_purge(NULL);  // deleted slots past their 30 days
