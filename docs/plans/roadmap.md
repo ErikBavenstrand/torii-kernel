@@ -221,7 +221,7 @@ as good as they get on the Omega DE.
 
 **Emulators**
 
-- **Done (998abab, 2026-10-25):** the items below, except the per-mapper compat entries. Every GB/GBC game in `roms/` (77) passes `just compat`, the NES homebrew test runs, and the emulated cart showed a picked palette kept over a power cycle. The emulators build reproducibly, Jagoomba with devkitARM r58 and PocketNES with r66; the kernel's ROM is 76% full (243,100 bytes free). Cart checks are in `docs/release-checklist.md` (palette, speed at 3,1 waits, GB rumble).
+- **Done (998abab, 2026-10-25):** the items below, except the per-mapper compat entries. Every GB/GBC game in `roms/` (77) passes `just compat`, the NES homebrew test runs, and the emulated cart showed a picked palette kept over a power cycle. The emulators build reproducibly, Jagoomba with devkitARM r58 and PocketNES with r66; PocketNES leaves out Go Multiboot (193df78), and the kernel's ROM is 70% full (304,244 bytes free). Cart checks are in `docs/release-checklist.md` (palette, speed at 3,1 waits, GB rumble).
 - **Built from source:** Jagoomba Color (GB/GBC) and PocketNES (NES) build from their
   upstream source at pinned commits, fetched like mGBA and patched from files in the repo,
   with the kernel's devkitARM, reproducibly. They replace the prebuilt `jagoombacolor.h`

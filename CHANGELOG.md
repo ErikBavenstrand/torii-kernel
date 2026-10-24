@@ -11,7 +11,9 @@ git log, not here.
   and PocketNES moves from the 2013 build to Dwedit's 2025 source (MMC5,
   VRC3/4/6 IRQs, mapper 118, NES 2.0 headers). The launch copies them in
   128 KB parts and writes PocketNES's whole 48-byte header, flags at 0 where
-  stale PSRAM was (998abab).
+  stale PSRAM was (998abab). PocketNES leaves out Go Multiboot, whose 60 KB
+  multiboot copy of itself Torii has no use for: it is 83 KB, smaller than
+  the 2013 build, and the kernel area is 70% full (193df78).
 - **Fixed:** a GB palette picked in Jagoomba's menu stays the game's
   (ez-flash/omega-de-kernel#12): its settings are saved on the Omega, and
   the reset no longer puts the automatic palette back. Autosleep's setting
