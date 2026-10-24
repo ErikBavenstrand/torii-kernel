@@ -557,6 +557,8 @@ static const struct lang_games en_games = {
 	.size_mb = "MB",
 	.fact_size = "Size",
 	.fact_played = "Last",
+	.played_not_recent = "Not lately",
+	.played_recently = "Recently",
 };
 
 // The rename keyboard: its keys, and why OK can't keep a name (one line

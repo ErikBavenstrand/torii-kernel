@@ -268,14 +268,25 @@ static int game_is_fav(const struct game *g)
 }
 
 // When the game at path was played, from Recent (0: not there, or the clock
-// wasn't set)
-static u32 played_time(const char *path)
+// wasn't set); *held, if given: whether Recent holds it
+static u32 played_time_of(const char *path, int *held)
 {
 	u32 n = userdata_recent_count();
-	for (u32 i = 0; i < n && i < USERDATA_RECENT_MAX; i++)
-		if (!strcmp(userdata_recent_path(i), path))
+	for (u32 i = 0; i < n && i < USERDATA_RECENT_MAX; i++) {
+		if (!strcmp(userdata_recent_path(i), path)) {
+			if (held)
+				*held = 1;
 			return userdata_recent_time(i);
+		}
+	}
+	if (held)
+		*held = 0;
 	return 0;
+}
+
+static u32 played_time(const char *path)
+{
+	return played_time_of(path, NULL);
 }
 
 static const u8 console_icons[LIB_CONSOLES] = {ART_ICON8_GBA, ART_ICON8_GBC, ART_ICON8_GB, ART_ICON8_NES};
@@ -1186,7 +1197,10 @@ static void info_values(struct ui_view *v)
 {
 	const struct lang_games *s = gl_games;
 	char ago[AGO_MAX] = "", type[48] = "";
-	userdata_ago_text(ago, sizeof(ago), played_time(games.pick));
+	int held = 0;
+	userdata_ago_text(ago, sizeof(ago), played_time_of(games.pick, &held));
+	if (!ago[0])  // never blank: off Recent, or no time to tell
+		snprintf(ago, sizeof(ago), "%s", held ? s->played_recently : s->played_not_recent);
 	if (games.info_type < ACTION_SAVE_TYPES) {
 		u32 o = (u32)snprintf(type, sizeof(type), games.info_field ? INFO_OTHER : INFO_PICKED,
 				      s->save_types[games.info_type]);

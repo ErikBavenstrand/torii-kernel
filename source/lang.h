@@ -238,6 +238,9 @@ struct lang_games {
 	const char *boot_modes[3];  // by a game's boot mode (actions.h: ACTION_BOOT_*)
 	const char *size_kb, *size_mb;
 	const char *fact_size, *fact_played;  // list with art: the facts under the box
+	// Game info's Played: a game Recent doesn't hold, and one it holds with
+	// no time (the clock wasn't set)
+	const char *played_not_recent, *played_recently;
 };
 extern const struct lang_games *gl_games;
 #define EN_GAME_DELETE "Delete %s?"
