@@ -29,4 +29,5 @@ fi
 truncate -s "$end" "$work/$name.gba"
 mkdir -p /src/emulators/out
 cp "$work/$name.gba" "/src/emulators/out/$name.gba"
+cp "$work/$name.elf" "/src/emulators/out/$name.elf" # symbols, for debugging
 echo "built emulators/out/$name.gba ($end bytes)"

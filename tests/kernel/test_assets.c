@@ -243,11 +243,13 @@ void test_asset_sd_read(void)
 	CHECK_EQ(bad, 0);
 	CHECK_EQ(ram[1000], 0);
 	// Without a map, a seek past SEEK_CLUSTERS clusters (16 of the test
-	// card's 512 bytes) walks the chain over steps: open, two seeks, a read
+	// card's 512 bytes) walks the chain over steps: open, two seeks, a read.
+	// A real card's clusters are bigger: one seek (Diagnostics)
+	u32 seek_span = (u32)EZcardFs.csize * FF_MAX_SS * 16;  // sdread.c's SEEK_CLUSTERS
 	memset(ram, 0, 0x3000);
 	sd_read_start(&reader, TEST_FILE, ram, 0x3000, 4096, JOB_OWNER_NONE);
 	sd_read_range(&reader, 9000, 1000, 0);
-	CHECK_EQ(run_jobs(10), 4);
+	CHECK_EQ(run_jobs(10), 9000 > seek_span ? 4 : 3);
 	CHECK_EQ(reader.result, SD_READ_OK);
 	bad = 0;
 	for (u32 i = 0; i < 1000; i++)

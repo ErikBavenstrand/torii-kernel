@@ -61,6 +61,7 @@ jobs=(
   "tests/menu.sh"
   "tests/scan_engine.sh"
   "tests/nes.sh"
+  "tests/gb_save.sh"
   "tests/names.sh fat32"
   "tests/names.sh exfat"
   "tests/names_db.sh"

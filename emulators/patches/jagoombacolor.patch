@@ -31,6 +31,18 @@ index 57e47d1..40a2733 100644
  	@echo $(notdir $<)
  	@$(bin2o)
  
+diff --git a/src/cart.s b/src/cart.s
+index 9304a9e..e975e84 100644
+--- a/src/cart.s
++++ b/src/cart.s
+@@ -348,6 +348,7 @@ loadcart: @called from C:  r0=rom number, r1=emuflags
+ 	ldrb_ r0,sramsize
+ 	cmp r0,#3
+ 	ldrne r1,=sram_W2
++	ldreq r1,=sram_W_torii	@Torii: saved by torii_autosave once written
+ dont_use_true_sram:
+ 	str_ r1,sramwptr
+ 	
 diff --git a/src/config.h b/src/config.h
 index 02fa1b2..d886ff2 100644
 --- a/src/config.h
@@ -96,6 +108,34 @@ index b1a1a24..33eac0b 100644
  	//this function does what boot.s used to do
  	extern u8 __rom_end__[]; //using this instead of __end__, because it's also cart compatible
  	extern u8 __eheap_start[];
+diff --git a/src/memory.s b/src/memory.s
+index 47611c0..400f1dc 100644
+--- a/src/memory.s
++++ b/src/memory.s
+@@ -17,6 +17,7 @@
+ 	global_func mem_RC0_2
+ 	global_func sram_W
+ 	global_func sram_W2
++	global_func sram_W_torii
+ 	global_func wram_W
+ 	global_func wram_W_2
+ 	global_func echo_W
+@@ -119,6 +120,15 @@ sram_W:	@sram write ($A000-$BFFF)
+ 	strb r0,[r1,addy]
+ 	mov pc,lr
+ @----------------------------------------------------------------------------
++sram_W_torii:	@Torii: sram write ($A000-$BFFF) of a 32K SRAM game, which only
++	@the menu's backup_gb_sram saves: marks it for torii_autosave (ui.c)
++@----------------------------------------------------------------------------
++	ldr_ r1,memmap_tbl+40
++	strb r0,[r1,addy]
++	ldr r1,=torii_sram_written
++	str r1,[r1]		@nonzero: written this frame
++	mov pc,lr
++@----------------------------------------------------------------------------
+ wram_W:	@wram write ($C000-$CFFF)
+ @----------------------------------------------------------------------------
+ @	ldr r1,memmap_tbl+48
 diff --git a/src/sram.c b/src/sram.c
 index 1426f12..60508af 100644
 --- a/src/sram.c
@@ -143,10 +183,23 @@ index 56f0345..eca5581 100644
  
  static __inline u32 get_sram_owner()
 diff --git a/src/timeout.s b/src/timeout.s
-index 67118de..72bd4eb 100644
+index 67118de..2b4c506 100644
 --- a/src/timeout.s
 +++ b/src/timeout.s
-@@ -599,7 +599,7 @@ _irqGBZ80_:
+@@ -35,6 +35,12 @@ line0:
+ 
+ 	@----anything from here til line0x won't get executed while rom menu is active---
+ 
++	stmfd sp!,{r0,r1}
++	ldr r2,=torii_autosave	@Torii: a 32K SRAM game's save, once it stops writing (ui.c)
++	mov lr,pc
++	bx r2
++	ldmfd sp!,{r0,r1}
++
+ @	mov r2,#REG_BASE
+ @	mov r3,#0x0110				;was 0x0310
+ @	strh r3,[r2,#REG_BLDMOD]	;stop darkened screen,OBJ blend to BG0/1
+@@ -599,7 +605,7 @@ _irqGBZ80_:
   .section .iwram.end.105, "ax", %progbits
  @----------------------------------------------------------------------------
  fiveminutes: .word 5*60*60 @fiveminutes_
@@ -156,7 +209,7 @@ index 67118de..72bd4eb 100644
  g_hackflags: .byte 0 @hackflags
  g_hackflags2: .byte 0 @hackflags2
 diff --git a/src/ui.c b/src/ui.c
-index dbe9b9c..551e38b 100644
+index dbe9b9c..cc322a1 100644
 --- a/src/ui.c
 +++ b/src/ui.c
 @@ -1,7 +1,7 @@
@@ -168,7 +221,36 @@ index dbe9b9c..551e38b 100644
  EWRAM_BSS u8 autostate=0;
  EWRAM_BSS int main_ui_selection;
  //EWRAM_BSS int selected;//selected menuitem.  used by all menus.
-@@ -233,9 +233,7 @@ void ui()
+@@ -146,6 +146,28 @@ u32 getmenuinput(int menuitems)
+ }
+ */
+ 
++// Torii: a game with 32K of SRAM keeps it in EWRAM, which only the menu's
++// backup_gb_sram copies to the cart (8K games write through, sram_W2). A
++// second after the game's last write, as after an in-game save, this does
++// the same, so a power-off after saving keeps the save without the menu.
++u32 torii_sram_written;	//set by sram_W_torii (memory.s)
++void torii_autosave(void)
++{
++	static u32 quiet;
++	if (torii_sram_written)
++	{
++		torii_sram_written=0;
++		quiet=60;
++		return;
++	}
++	if (quiet && --quiet==0)
++	{
++#if CARTSRAM
++		backup_gb_sram(1);
++#endif
++	}
++}
++
+ void ui()
+ {
+ 	int key,soundvol,tm0cnt,i;
+@@ -233,9 +255,7 @@ void ui()
  	{
  		get_saved_sram();
  	}
@@ -179,7 +261,7 @@ index dbe9b9c..551e38b 100644
  #endif
  	scrolll(2);
  	/*
-@@ -650,9 +648,7 @@ void restart()
+@@ -650,9 +670,7 @@ void restart()
  void exit_()
  {
  #if CARTSRAM
@@ -190,7 +272,7 @@ index dbe9b9c..551e38b 100644
  #endif
  	fadetowhite();
  	REG_DISPCNT=FORCE_BLANK;		//screen OFF
-@@ -723,6 +719,7 @@ void draw_palette_list()
+@@ -723,6 +741,7 @@ void draw_palette_list()
  	
  	
  	palettebank=selected;
