@@ -200,6 +200,11 @@ RULES = [
         "box art scraper: test-host runs its tests against a local server",
     ),
     (
+        ["tools/cheats.py", "tests/cheats_test.py"],
+        {LINT, TEST_HOST},
+        "cheat file writer: test-host runs its tests on a fixture card and a local server",
+    ),
+    (
         ["tools/art_pack.py", "tests/art_pack_test.py"],
         {LINT, TEST_HOST},
         "art pack builder: test-host runs its tests against a local server",

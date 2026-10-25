@@ -269,7 +269,7 @@ compat *filters: build emu-headless
     {{emu_docker}} python3 tests/games.py "$@"
 
 # Build the hardware-free kernel code with tests/host for the host, under ASan and UBSan, and run it;
-# test tools/font.py, tools/asset.py, tools/art.py, tools/art_scrape.py, tools/art_pack.py, tools/library_report.py, the palette and the upgrade file's layout
+# test tools/font.py, tools/asset.py, tools/art.py, tools/art_scrape.py, tools/cheats.py, tools/art_pack.py, tools/library_report.py, the palette and the upgrade file's layout
 test-host: emu-image
     {{emu_docker}} tests/host.sh
     @uv run -q tests/font_test.py
@@ -278,6 +278,7 @@ test-host: emu-image
     @uv run -q tests/names_db_test.py
     @uv run -q tests/art_test.py
     @uv run -q tests/art_scrape_test.py
+    @uv run -q tests/cheats_test.py
     @uv run -q tests/art_pack_test.py
     @uv run -q tests/library_report_test.py
 
@@ -376,6 +377,14 @@ art-add +args:
 [positional-arguments]
 art-scrape sd_path *args:
     uv run -q tools/art_scrape.py "$@"
+
+# Write cheat files for an SD card's GBA games from libretro-database, e.g. `just cheats /Volumes/OMEGA`:
+# /torii/cheats/<rom path without extension>.cht, matched by CRC through the No-Intro dat (dist/dats),
+# keeping the files' picks and your own codes. The cheats (CC BY-SA 4.0) are cached in the git-ignored
+# dist/cheats, never bundled. --dry-run, --offline, --refresh: see --help
+[positional-arguments]
+cheats sd_path *args:
+    uv run -q tools/cheats.py "$@"
 
 # Build the full art pack on an SD card once, e.g. `just art-pack /Volumes/OMEGA`: /torii/art.pak, box art
 # for every No-Intro GBA, GBC and GB game (NES too if the card has NES games) that libretro-thumbnails
