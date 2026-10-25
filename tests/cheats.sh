@@ -94,6 +94,28 @@ boot $(nav_launch /Hello.gba clean) -u "launch: loading" -f 4000 >"$cart/clean.t
 ! grep -q "cheats: .*picked" "$cart/clean.txt" || fail "a clean boot read the cheats"
 echo "PASS: cheats: a clean boot applies none"
 
+# A big file (500 cheats, 46 KB, GameShark codes that decrypt): read once,
+# decoded behind a progress dialog, then the screen; A answers at once
+cp "$cart/clean/sd.img" "$cart/clean/kernel-nor.bin" "$cart/"
+rm -f "$cart/sram.bin"
+python3 - "$cart/Big.cht" <<'EOF'
+import sys
+lines = ["cheats = 500", ""]
+for n in range(500):
+    lines += [f'cheat{n}_desc = "Cheat number {n}"', f'cheat{n}_code = "8C1A761B 31E2378B"', f"cheat{n}_enable = false", ""]
+open(sys.argv[1], "w").write("\n".join(lines))
+EOF
+mcopy -o -i "$cart/sd.img" "$cart/Big.cht" "::/torii/cheats/Hello.cht"
+# shellcheck disable=SC2046 # nav.sh's options
+boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
+  -w "screen ready: cheats" -k @8:A -k @12:- -w "cheats: picked cheat 0" -f 6000 >"$cart/big.txt" 2>&1 ||
+  fail "the big file's screen didn't run: $(grep -a '^kernel' "$cart/big.txt" | tail -3)"
+grep -q "screen ready: progress" "$cart/big.txt" || fail "no progress dialog while the big file decoded"
+grep -q "cheats: .*Hello.cht: 500 cheats, 0 master codes hidden" "$cart/big.txt" ||
+  fail "the big file read: $(grep -a 'cheats:' "$cart/big.txt" | head -3)"
+[ "$(grep -c 'safefile: .*Hello.cht' "$cart/big.txt")" -le 2 ] || fail "the big file was read more than once"
+echo "PASS: cheats: a file of 500 cheats is read once, decoded behind a progress dialog, and picks at once"
+
 # The pick's write-back, cut at each step: either the old picks or the new
 # are read at the next power-on, never a broken file
 cp "$cart/clean/sd.img" "$cart/clean/kernel-nor.bin" "$cart/"
