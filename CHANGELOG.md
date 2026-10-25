@@ -10,6 +10,11 @@ git log, not here.
   link in the same order everywhere: v0.6.1's release, built on CI, has a
   Jagoomba laid out differently from a local build of the same commit (both
   work). `just repro` now rebuilds both emulators from a shuffled copy (4f2cf2b2).
+- **Fixed:** NES games got no cover and no No-Intro name: the kernel took a
+  NES game's CRC over the whole file, its 16-byte iNES header too, where
+  No-Intro's CRCs (names.db, the art pack) leave it out. They leave it out
+  now, here and in `just names-update`; crc.txt's first line says so, and a
+  crc.txt without that line has its NES CRCs computed again (df975858).
 
 ## v0.6.1
 
