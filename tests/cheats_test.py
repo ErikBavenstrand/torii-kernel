@@ -223,7 +223,7 @@ class Names(unittest.TestCase):
         self.assertEqual(
             cheats.region_letters("Pokemon - Rubin-Edition (G) (V1.1)"), "D"
         )
-        self.assertEqual(cheats.region_letters("Metroid Fusion (World)"), "")
+        self.assertIn("P", cheats.region_letters("Metroid Fusion (World)"))
         self.assertEqual(cheats.revision("Pokemon - Rubin-Edition (G) (V1.1)"), 1)
         self.assertEqual(cheats.revision("Game (USA) (Rev 2)"), 2)
         self.assertEqual(cheats.revision("Game (USA)"), 0)

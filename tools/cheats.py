@@ -105,7 +105,7 @@ LANGUAGES = re.compile(
 )
 # A region's letters in GBA game codes (the 4th character), for No-Intro's
 # regions and GoodTools' letters; a list of regions goes by its first, and
-# "World" names none
+# "World", one game for every region, names them all
 REGION_LETTERS = {
     "usa": "E",
     "u": "E",
@@ -121,6 +121,7 @@ REGION_LETTERS = {
     "s": "S",
     "italy": "I",
     "i": "I",
+    "world": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
 }
 
 
