@@ -5,6 +5,6 @@
 #ifndef TORII_VERSION_H
 #define TORII_VERSION_H
 
-#define TORII_VERSION "0.6.0"
+#define TORII_VERSION "0.6.1"
 
 #endif

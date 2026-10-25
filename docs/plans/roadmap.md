@@ -215,11 +215,11 @@ as good as they get on the Omega DE.
 
 **Released as v0.6.0 (2026-10-25).** Custom GB borders were looked at and dropped (owner,
 2026-10-25): none exist per game for the games without an SGB border, which Jagoomba
-already draws for SGB games. The fixes carried below wait for a cart run (v0.6.1).
+already draws for SGB games. The fixes carried below wait for a cart run.
 
-**v0.6.1 (in progress):** 32 KB GB saves written through to the cart, as a real cart keeps them (88eebc2): v0.6.0's autosave paused games 0.12-0.15 s, often in Pokémon Picross and Puzzle Challenge (the owner: "games will stutter a lot"). Save states get 32 KB instead of 56. Checked in the emulated cart: every 32 KB game in `roms/` (24) uses the copy, a v0.6.0 save (Pokémon Yellow, record only) moves into it exactly, `tests/gb_save.sh` cuts the power 30 frames after the writes.
+**Released as v0.6.1 (2026-10-25):** 32 KB GB saves written through to the cart, as a real cart keeps them (88eebc2): v0.6.0's autosave paused games 0.12-0.15 s, often in Pokémon Picross and Puzzle Challenge (the owner: "games will stutter a lot"). Save states get 32 KB instead of 56. Checked in the emulated cart: every 32 KB game in `roms/` (24) uses the copy, a v0.6.0 save (Pokémon Yellow, record only) moves into it exactly, `tests/gb_save.sh` cuts the power 30 frames after the writes.
 
-**Fixes carried from v0.5.2 (moved 2026-10-24, open for v0.6.1):**
+**Fixes carried from v0.5.2 (moved 2026-10-24, open after v0.6.1):**
 
 - **Cart check: path walks from the root** (every open under `/torii/saves/<rom path>/` scans `GBA/` again): the cache now answers most of these; relative paths (`f_chdir`) would remove the rest, but the SD page keeps its own current folder. Measure on the cart with the `sd:` lines first.
 - **Cart check: whether the 8.6 ms settle delay is needed** after every SD write (EZ-Flash's code; the commands inside one call run back to back without it). Measure with the `sd:` lines; drop the delay, or shorten it, only if the card keeps up.
