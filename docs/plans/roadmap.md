@@ -53,7 +53,7 @@ Everything the kernel stores lives under `/torii/`. ROMs can be anywhere.
   torii.ini               settings: commented key = value, with "version ="
   layout.ini              layout version, for migrations
   saves/<rom path>/<slot>.sav
-  states/<rom path>/<slot>/<n>.state   reserved; written from v0.7
+  states/<rom path>/<slot>/<n>.state   reserved; written from v0.8
   backups/<rom path>/<slot>/<n>-<YYYYMMDD-HHMMSS>.sav
   games/<code>-<crc>.ini  per-game overrides (save type, RTC, cheats)
   art/<system>/{title,box}/<code or name>.lz
@@ -68,7 +68,7 @@ Saves live only there (decided 2026-10-23: no setting for next-to-the-ROM saves)
 
 What v0.5 built of this (`source/gamesave.c`, `gamerec.c`): a game's folder `/torii/saves/<rom path>/` holds its slot files and `game.ini`, its record (`save_type = 0-5`, `boot_mode = 0-2`, `slot = <current slot>`; plain text, missing keys are defaults). Folders are made when the first file is written (a game of unknown save type gets none until its chip differs from blank). A NOR game's saves are kept as for a ROM at `/torii/nor/<name>`. A save path over 251 bytes (the pending-save record's room) is refused at launch with a message. The per-game overrides listed above as `games/<code>-<crc>.ini` (RTC, cheats) stay for v0.7; the save type and boot mode are by path, in `game.ini`.
 
-v0.5 ships all of this at once: integrity, slots, history and both save managers are built and tested locally, then released together (decided 2026-10-22). Save states are not part of it; they come with v0.7's in-game menu.
+v0.5 ships all of this at once: integrity, slots, history and both save managers are built and tested locally, then released together (decided 2026-10-22). Save states are not part of it; they come with v0.8's in-game menu.
 
 ### Integrity
 
@@ -221,17 +221,13 @@ already draws for SGB games. The fixes carried below wait for a cart run.
 
 **Released as v0.6.2 (2026-10-25):** save slots for GB, GBC and NES games (no .sav import: a slot holds the emulator's 64 KB), NES CRCs without the iNES header so NES games get names and covers, NES saves shown to write through (`tests/nes_save.sh`), and the emulators' builds reproducible across machines (sorted file lists, `just repro` rebuilds them shuffled).
 
-**Fixes carried from v0.5.2 (moved 2026-10-24, open after v0.6.2):**
-
-- **Cart check: path walks from the root** (every open under `/torii/saves/<rom path>/` scans `GBA/` again): the cache now answers most of these; relative paths (`f_chdir`) would remove the rest, but the SD page keeps its own current folder. Measure on the cart with the `sd:` lines first.
-- **Cart check: whether the 8.6 ms settle delay is needed** after every SD write (EZ-Flash's code; the commands inside one call run back to back without it). Measure with the `sd:` lines; drop the delay, or shorten it, only if the card keeps up.
-- **Screens' EWRAM states**: each screen's state is its own EWRAM static (`games` 3.7 KB, `sd` 3.6 KB, `info` 2.7 KB, `nor` 1.4 KB, Diagnostics' `scr` 1.6 KB): a union of page states or a shared path scratch would free 5 to 8 KB. Do it if the emulator builds or the launch path need the room.
+**Fixes carried from v0.5.2:** the cart checks (path walks from the root, the 8.6 ms settle delay after SD writes) and v0.6's own (Crystal's stutter, palette, speed, GB rumble) are done (owner, 2026-10-25). The screens' EWRAM states moved to [v0.7.1](#v071-emulator-and-memory-follow-ups).
 
 **Emulators**
 
-- **Done (998abab, 2026-10-25):** the items below, except the per-mapper compat entries. Every GB/GBC game in `roms/` (77) passes `just compat`, the NES homebrew test runs, and the emulated cart showed a picked palette kept over a power cycle. The emulators build reproducibly, Jagoomba with devkitARM r58 and PocketNES with r66; PocketNES leaves out Go Multiboot (193df78), and the kernel's ROM is 70% full (304,244 bytes free). Cart checks are in `docs/release-checklist.md` (palette, speed at 3,1 waits, GB rumble).
+- **Done (998abab, 2026-10-25):** the items below, except the per-mapper compat entries (moved to v0.7.1). Every GB/GBC game in `roms/` (77) passes `just compat`, the NES homebrew test runs, and the emulated cart showed a picked palette kept over a power cycle. The emulators build reproducibly, Jagoomba with devkitARM r58 and PocketNES with r66; PocketNES leaves out Go Multiboot (193df78), and the kernel's ROM is 70% full (304,244 bytes free). Cart checks are in `docs/release-checklist.md` (palette, speed at 3,1 waits, GB rumble).
 - **Saves (cart run, 2026-10-25):** a 32 KB GB game's in-game save was lost at power-off unless Jagoomba's L+R menu ran first; Jagoomba now saves a second after the game's last write (b661254, `tests/gb_save.sh`). Diagnostics' `asset_sd_read` failed on the cart's bigger clusters (test fixed, b661254). "Save without asking" stays off by default: the prompt stays (owner, 2026-10-25).
-- **From the emulators' issue trackers (2026-10-25, d333227):** jagoombacolor#29, #51 and #30 are the 32 KB save loss (fixed in b661254); #32 and ez-flash#12 the palette (fixed); #46 and #35 Crystal's stutter (fixed, not reproducible in mGBA: check on the cart); PocketNES#5 the ROM alignment (fixed). Left: jagoombacolor#53 and #20 hi-color GBC games, #42 accuracy tests, #43 a GBC-compatible ROM run as DMG, #36 the frame-wait setting not saved, #34 the default palette choice; PocketNES#3 region not saved (taken from the NES 2.0 header in 2025 builds), #14 multiboot.
+- **From the emulators' issue trackers (2026-10-25, d333227):** jagoombacolor#29, #51 and #30 are the 32 KB save loss (fixed in b661254); #32 and ez-flash#12 the palette (fixed); #46 and #35 Crystal's stutter (fixed, cart-checked); PocketNES#5 the ROM alignment (fixed). jagoombacolor#53, #20 and #36 and PocketNES#3 moved to v0.7.1. Left: jagoombacolor#42 accuracy tests, #43 a GBC-compatible ROM run as DMG, #34 the default palette choice; PocketNES#14 multiboot.
 - **Built from source:** Jagoomba Color (GB/GBC) and PocketNES (NES) build from their
   upstream source at pinned commits, fetched like mGBA and patched from files in the repo,
   with the kernel's devkitARM, reproducibly. They replace the prebuilt `jagoombacolor.h`
@@ -251,58 +247,113 @@ already draws for SGB games. The fixes carried below wait for a cart run.
 - **Licences:** neither emulator states one; they ship inside `ezkernelnew.bin` as they do
   in EZ-Flash's kernel (owner, 2026-10-25).
 
-## v0.7 In-game menu
+## v0.6.3 LOAD fix
+
+- **LOAD with no saved state** shows a message instead of crashing: the menu's check of the
+  state's flag is commented out (`@;bne errorRTS` in `source/gba_rts_patch.s`), so it loads
+  the blank 0xFF state and jumps to 0xFFFFFFFE. The BG2 affine registers wait for v0.8's
+  tile overlay: today's menu draws on BG2.
+
+## v0.7 Cheats
+
+Cheats come before the in-game menu (owner, 2026-10-25): the menu's cheat toggles need
+per-cheat names and flags, its save-state slots wait on a cart test, and the overlay and the
+cheat interpreter share the patch area at the ROM's end, so v0.8 lays it out once for both.
+v0.7 is the kernel's side, for GBA games. The codes that matter are the real devices':
+Action Replay, GameShark and CodeBreaker (owner, 2026-10-25). Research:
+`docs/research/cheats.md`.
+
+Today Torii reads only EZ-Flash's `.cht` format: constant byte writes, at most 600, folded
+into IWRAM or EWRAM, picked again at every launch under one global Cheats setting. EZ-Flash's
+own cheat files are poor (owner), so v0.7 drops the format.
+
+1. **Decoders first:** GameShark v1/v2 (Action Replay v1/v2), Action Replay v3 (GameShark
+   SP), CodeBreaker (plain and encrypted) and VBA raw (`addr:val`), ported from mGBA's
+   decoders into a file of their own that keeps its MPL-2.0 header (Torii is Apache-2.0;
+   the MPL applies to that file only). Hardware-free and host-tested under ASan and UBSan on
+   mGBA's own test vectors (`src/gba/test/cheats.c`) and real codes. Torii keeps its own
+   model (name, on/off, RAM writes, ROM patches); decoding runs at launch.
+   - **Master codes** ("Must Be On", hook and game-ID lines) are hidden and skipped: Torii
+     hooks the IRQ itself. A cheat that mixes a hook with writes keeps its writes.
+   - **What v0.7 runs:** 8-, 16- and 32-bit constant writes (as byte writes), fills while
+     they fit, and ROM patches written once into the PSRAM image, with no cap. That is 72%
+     of libretro's GBA cheats (80% with fills). Conditionals, button activators, pointers
+     and add/or/and wait for v0.8's interpreter.
+2. **One file per game:** `/torii/cheats/<rom path>.cht` in libretro's format
+   (`cheats = N`, `cheatN_desc`, `cheatN_code`, `cheatN_enable`, lines joined by `+`),
+   moved and renamed with its game, like its saves. A libretro file dropped there by hand,
+   named after the ROM, works. The kernel never reads `/CHEAT`.
+   - **Picks:** kept in the file's `cheatN_enable` lines, rewritten power-cut safe and only
+     when a pick changes. The global Cheats setting goes: a game with no cheat picked gets
+     no cheat hook.
+3. **Cheat screen:** "Cheats" in the game's popup lists one row per cheat with a check; A
+   toggles, B saves and goes back. Every launch applies the saved picks without asking.
+   - **Greyed rows:** "needs v0.8" for interpreter codes; "too many writes" when a fill
+     would take the picked cheats past 600 writes; "can't read" for a bad cheat (only that
+     cheat is skipped, not the file); "edit to use" for placeholders such as `00??`, which
+     open the keypad with the code filled in.
+   - **Fixes from v0.3:** the screen no longer re-reads the file for each pick (the freeze
+     on big files).
+   - **In game:** the menu's single CHEAT ON/OFF stays until v0.8.
+4. **`just cheats`:** fetches libretro-database's GBA cheats (CC-BY-SA-4.0, attributed,
+   never bundled) on the PC and writes `/torii/cheats/<rom path>.cht` for each game on the
+   card. It matches a game by CRC (`crc.txt`) to its No-Intro name in the cached dats, and
+   picks the region by the ROM header's game code against the dat's serial. An update keeps
+   the file's picks and the user's own codes. It reports games without cheats and names it
+   couldn't match.
+5. **Typing codes (last; may slip to v0.7.1):** "Add code" at the end of the cheat list.
+   Hex lines are typed on a keypad; the format is detected (`8+4` digits CodeBreaker,
+   `addr:val` VBA raw, 16 digits GameShark or Action Replay v3 by mGBA's plausibility score),
+   shown and changeable. The code is named with the rename keyboard and saved into the same
+   file.
+6. **Tests:** every code type with test vectors, checked against mGBA's decoding; real codes
+   for games in `roms/`, one per format, whose writes show in the game's memory in the
+   emulated cart; one `just compat` game launched with a write cheat and a ROM-patch cheat.
+   Types that behave differently on a kernel than on the original devices, such as slowdown
+   codes, are documented, not dropped.
+7. **Code search** (narrowing RAM between in-game snapshots) comes later.
+
+## v0.7.1 Emulator and memory follow-ups
+
+Carried from v0.6 (owner, 2026-10-25):
+
+- **Compat per GB mapper:** `just compat` launches one GB/GBC game per mapper (MBC1, MBC2,
+  MBC3+clock, MBC5, MBC5+rumble).
+- **Screens' EWRAM states (optional):** each screen's state is its own EWRAM static (`games`
+  3.7 KB, `sd` 3.6 KB, `info` 2.7 KB, `nor` 1.4 KB, Diagnostics' `scr` 1.6 KB): a union of
+  page states or a shared path scratch would free 5 to 8 KB. Do it only if v0.7 or v0.8
+  needs the room.
+- **From the emulators' issue trackers:** hi-color GBC games (jagoombacolor#53, #20); the
+  frame-wait setting not saved (jagoombacolor#36); the NES region not saved (PocketNES#3;
+  2025 builds take it from the NES 2.0 header).
+
+## v0.8 In-game menu and cheat interpreter
 
 The menu that exists today is patched into each game's IRQ handler and runs from the ROM
 tail. It offers RESET, SAVE, LOAD (one real-time save), CHEAT ON and CHEAT OFF, with
-L+R+Start for reset and L+R+Select for sleep. It becomes a proper overlay:
+L+R+Start for reset and L+R+Select for sleep. It becomes a proper overlay, built together
+with the cheats' per-frame interpreter, since both live in the patch area:
 
 - **Save states:** slots for each save slot, with timestamps.
-- **Cheats:** a toggle for each cheat.
+- **Cheats:** a toggle for each cheat, on v0.7's cheats.
 - **Actions:** return to the Torii menu, reset, sleep, and a screenshot to SD.
 - **Look:** the theme's colours and font, within its memory budget.
 - **Hotkey:** configurable.
-- **Fixes it brings:** LOAD with no saved state shows a message instead of crashing (it
-  jumps to 0xFFFFFFFE today). Drawing with tiles leaves the game's BG2 affine registers
-  alone.
+- **Fixes it brings:** drawing with tiles leaves the game's BG2 affine registers alone.
 - **Test:** every `just compat` game opens and closes the menu, and the screen and game
   state have to come back unchanged.
+- **Per-frame interpreter:**
+  - **What it runs:** a small interpreter in IWRAM for conditionals, ELSE/ENDIF blocks,
+    button activators, pointer writes and add/or/and codes; plain writes, lists and slides
+    expanded into the per-frame table, with 16- and 32-bit writes.
+  - **Speed:** it has a cycle budget measured in the emulator.
+  - **Space:** it needs its own size budget. Today's patch area appended to the ROM is
+    0x2000 bytes: a 0xD04-byte handler plus 8 bytes per byte-write, which caps cheats at
+    600. Plan the overlay's and the interpreter's code and code storage together.
+  - **Hook check:** `just compat` reports games the hook misses.
 
 - **Review first (user, 2026-10-19):** before building it, review the current in-game menu and prototype the overlay. It can't run the kernel's engine in place (the game owns RAM and VRAM, and the kernel's ROM isn't mapped), so it needs a compact copy of the engine's text and theming. The prototype has to save and restore the game's screen and memory without breaking any `just compat` game. Picking cheats in game is part of it.
-
-## v0.8 Cheats
-
-Today the only cheats are constant byte writes from EZ-format `.cht` files, applied on the
-VBlank or keypad IRQ.
-
-1. **Every format, parsed at launch:**
-   - **Formats:** GameShark v1/v2, Action Replay v3, CodeBreaker and raw/VBA codes, in both
-     libretro `.cht` files and the old EZ format, using mGBA's decoders (MPL-2.0, file-level).
-   - **Plain writes, lists and slides:** expanded into the per-frame table, with 16- and
-     32-bit writes.
-   - **ROM-patch codes:** written once into the PSRAM game image, with no cap.
-   - **Master and hook codes:** not needed, because Torii already hooks the IRQ.
-2. **Per-frame interpreter:**
-   - **What it runs:** a small interpreter in IWRAM for conditionals, ELSE/ENDIF blocks,
-     button activators, pointer writes and add/or/and codes.
-   - **Speed:** it has a cycle budget measured in the emulator.
-   - **Space:** it needs its own size budget. Today's patch area appended to the ROM is
-     0x2000 bytes: a 0xD04-byte handler plus 8 bytes per byte-write, which caps cheats at
-     600. Plan the new engine's code and code storage separately from that table.
-   - **Hook check:** `just compat` reports games the hook misses.
-3. **Goal and tests:** every documented code type, each with test vectors. Types that behave
-   differently on a kernel than on the original devices, such as slowdown codes, are
-   documented, not dropped.
-4. **Typing codes on the GBA:**
-   - **Entry:** a hex keypad that detects the format as you type.
-   - **Storage:** codes are saved under "My codes" in `cheats/<code>.cht`.
-   - **Code search:** narrowing RAM between in-game snapshots comes later.
-5. **Cheat database:** not bundled. libretro's is CC-BY-SA-4.0, so a `just cheats` tool
-   fetches and converts it, with attribution.
-
-- **From v0.3:**
-  - Opening a big `.cht` file freezes the cheat screen while `Analyze_KEYVAL` runs: run it as a job with progress (`Open_cht_file`); leaving one is slow too, as `Get_CHT_val` re-reads the file for each pick (`source/showcht.c`).
-  - The parser drops spaces from cheat names ("Infinitelives"), more visible in the proportional font.
+- **Research (2026-10-25, `docs/research/ingame-menu.md`):** today's menu, the state path and prior art are reviewed. States reach the SD card only if the cart's FPGA writes the SRAM buffer back (nothing in the kernel does), so the slot design waits on a cart test: SAVE in game, power off, and check `/RTS/<game>.rts` on a PC.
 
 ## v0.9 Languages and firmware
 
@@ -332,6 +383,7 @@ Then 1.0.
 
 Small items with no version yet:
 
+- **GB, GBC and NES cheats** (owner, 2026-10-25, out of v0.7): libretro has cheat files for them (GameShark, Game Genie), but the codes would have to reach Jagoomba and PocketNES (PocketNES has its own cheat finder).
 - **Logs:**
   - Frame-timing summaries carry the log write's time, not the scroll's.
   - They are DEBUG only.
