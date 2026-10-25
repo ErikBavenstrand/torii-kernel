@@ -73,6 +73,13 @@ repro: build
     docker run --rm --platform linux/amd64 -u $(id -u):$(id -g) --tmpfs /work:exec,uid=$(id -u) -v "$PWD":/src -w /src -e LIBGBA=/opt/devkitpro/libgba {{kernel_image}} tools/repro.sh dist/repro dist/repro/files.txt
     {{just_executable()}} _package dist/repro/ezkernelnew dist/repro
     status=0
+    # The emulators too, each from a shuffled copy, with its own toolchain
+    for emulator in "jagoombacolor {{jagoombacolor_image}}" "pocketnes {{pocketnes_image}}"; do
+      read -r name image <<<"$emulator"
+      docker run --rm --platform linux/amd64 -u $(id -u):$(id -g) --tmpfs /work:exec,uid=$(id -u) -e SHUFFLE=1 -v "$PWD":/src -w /src "$image" emulators/build.sh "$name" /src/dist/repro/emulators >/dev/null
+      if cmp -s "emulators/out/$name.gba" "dist/repro/emulators/$name.gba"; then echo "PASS: emulators/out/$name.gba is the same ($(sha256sum < "emulators/out/$name.gba" | cut -c1-16))"
+      else echo "FAIL: emulators/out/$name.gba differs from dist/repro/emulators/$name.gba"; status=1; fi
+    done
     for file in dist/ezkernelnew.bin dist/ezkernelnew.sym ezkernelnew.elf; do
       copy=dist/repro/$(basename "$file")
       if cmp -s "$file" "$copy"; then echo "PASS: $file is the same ($(sha256sum < "$file" | cut -c1-16))"

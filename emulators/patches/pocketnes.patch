@@ -1,7 +1,20 @@
 diff --git a/Makefile b/Makefile
-index 5155629..61dab62 100644
+index 5155629..157d175 100644
 --- a/Makefile
 +++ b/Makefile
+@@ -101,9 +101,9 @@ export DEPSDIR	:=	$(CURDIR)/$(BUILD)
+ #---------------------------------------------------------------------------------
+ # automatically build a list of object files for our project
+ #---------------------------------------------------------------------------------
+-CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
+-CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
+-SFILES		:=	$(filter-out gba_crt0_my.s,$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))) $(foreach dir,$(MAPPERS),$(notdir $(wildcard $(dir)/*.s)))
++CFILES		:=	$(sort $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c))))
++CPPFILES	:=	$(sort $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp))))
++SFILES		:=	$(sort $(filter-out gba_crt0_my.s,$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))) $(foreach dir,$(MAPPERS),$(notdir $(wildcard $(dir)/*.s))))
+ #SFILES		:=	all.s $(foreach dir,$(MAPPERS),$(notdir $(wildcard $(dir)/*.s)))
+ #SFILES		:=	$(foreach dir,$(MAPPERS),$(notdir $(wildcard $(dir)/*.S)))
+ #SFILES		:=	all.s
 @@ -175,11 +175,8 @@ $(OUTPUT).gba	:	$(OUTPUT).elf
  
  $(OUTPUT).elf	:	$(OFILES) gba_crt0_my.o gba_cart_my.ld
@@ -16,6 +29,23 @@ index 5155629..61dab62 100644
  
  -include $(DEPENDS)
  
+diff --git a/Makefile_mb b/Makefile_mb
+index 086e3cf..e0b39f1 100644
+--- a/Makefile_mb
++++ b/Makefile_mb
+@@ -110,9 +110,9 @@ export DEPSDIR	:=	$(CURDIR)/$(BUILD)
+ #---------------------------------------------------------------------------------
+ # automatically build a list of object files for our project
+ #---------------------------------------------------------------------------------
+-CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
+-CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
+-SFILES		:=	$(filter-out gba_crt0_my.s,$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))) $(foreach dir,$(MAPPERS),$(notdir $(wildcard $(dir)/*.s)))
++CFILES		:=	$(sort $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c))))
++CPPFILES	:=	$(sort $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp))))
++SFILES		:=	$(sort $(filter-out gba_crt0_my.s,$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))) $(foreach dir,$(MAPPERS),$(notdir $(wildcard $(dir)/*.s))))
+ #SFILES		:=	all.s $(foreach dir,$(MAPPERS),$(notdir $(wildcard $(dir)/*.s)))
+ #SFILES		:=	$(foreach dir,$(MAPPERS),$(notdir $(wildcard $(dir)/*.S)))
+ #SFILES		:=	all.s
 diff --git a/src/config.h b/src/config.h
 index 8d608fe..45f49e0 100644
 --- a/src/config.h
