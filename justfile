@@ -282,6 +282,11 @@ test-host: emu-image
     @uv run -q tests/art_pack_test.py
     @uv run -q tests/library_report_test.py
 
+# Decode every cheat in a folder of libretro GBA .cht files (default dist/cheat-corpus, never
+# committed) with Torii's decoders and with mGBA's, print Torii's summary and where they differ
+cheat-corpus dir="dist/cheat-corpus": emu-headless
+    {{emu_docker}} tests/cheat_corpus.sh {{dir}}
+
 # Convert docs/design/v0.4/palette.json to C: source/ui/palette.c and palette.h
 # (committed; tests/host.sh checks they match), then `just shots-update` for the screens
 palette:
