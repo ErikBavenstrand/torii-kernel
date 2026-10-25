@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 # A GB game's save survives a power-off without Jagoomba's menu. The game
-# (tests/gb_rom.py) has 32 KB of battery RAM, which Jagoomba keeps in EWRAM,
-# and writes a marker to each of its four banks. Jagoomba's autosave
-# (Torii's patch, torii_autosave) must copy the RAM into the cart's SRAM a
-# second later, and the kernel copy that to /torii/saves at the next
-# power-on. Without the autosave the cart's copy has blank RAM (checked by
-# hand, 2026-10-25: the test fails). Runs inside the torii-emu container
-# after `just build` and `just emu-headless`.
+# (tests/gb_rom.py) writes a marker to each bank of its battery RAM at start.
+# Jagoomba writes it through to the cart's SRAM as the game writes, at SRAM
+# E000 for 8 KB and (Torii's patch, torii_raw32) 8000-FFFF for 32 KB; the
+# kernel copies the SRAM to /torii/saves at the next power-on, and the next
+# launch packs it into Jagoomba's record of the game. Runs inside the
+# torii-emu container after `just build` and `just emu-headless`.
 set -euo pipefail
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
@@ -54,12 +53,17 @@ copy_save() {
   mcopy -o -i "$cart/sd.img" ::/torii/saves/Save.gb/Main.sav "$cart/Main.sav"
 }
 
-# 32 KB, off 3 seconds after the writes: the autosave copied them to the cart's SRAM
+# 32 KB, off right after the writes: they are in the cart's SRAM at 8000, as
+# on a real cart, and on the card after the next power-on
 new_cart 32
-play 180
-marked "$cart/sram.bin" || fail "32 KB: a save written 3 seconds before the power-off isn't in the cart's SRAM"
+play 30
+python3 -c 'import sys; b = open(sys.argv[1], "rb").read(); sys.exit(0 if all(b[0x8000 + i * 0x2000] == 0x5A for i in range(4)) else 1)' "$cart/sram.bin" ||
+  fail "32 KB: the writes aren't in the cart's SRAM at 8000"
 copy_save "32 KB"
-marked "$cart/Main.sav" || fail "32 KB: /torii/saves/Save.gb/Main.sav doesn't hold the save"
+python3 -c 'import sys; b = open(sys.argv[1], "rb").read(); sys.exit(0 if all(b[0x8000 + i * 0x2000] == 0x5A for i in range(4)) else 1)' "$cart/Main.sav" ||
+  fail "32 KB: /torii/saves/Save.gb/Main.sav doesn't hold the save"
+play 180
+marked "$cart/sram.bin" || fail "32 KB: the next launch didn't find the save"
 
 # 8 KB: the writes go through to the cart's SRAM at once (sram_W2), and
 # Jagoomba packs them into the game's record at its next start
@@ -68,4 +72,4 @@ play 180
 copy_save "8 KB"
 play 180
 marked "$cart/sram.bin" || fail "8 KB: the next launch didn't find the save"
-echo "PASS: a GB game's save, 32 KB or 8 KB, survives a power-off without Jagoomba's menu"
+echo "PASS: a GB game's save, 32 KB or 8 KB, is on the cart as the game writes it and survives a power-off without Jagoomba's menu"

@@ -138,7 +138,7 @@ index b1a1a24..33eac0b 100644
  	extern u8 __rom_end__[]; //using this instead of __end__, because it's also cart compatible
  	extern u8 __eheap_start[];
 diff --git a/src/memory.s b/src/memory.s
-index 47611c0..400f1dc 100644
+index 47611c0..7987f27 100644
 --- a/src/memory.s
 +++ b/src/memory.s
 @@ -17,6 +17,7 @@
@@ -149,47 +149,177 @@ index 47611c0..400f1dc 100644
  	global_func wram_W
  	global_func wram_W_2
  	global_func echo_W
-@@ -119,6 +120,15 @@ sram_W:	@sram write ($A000-$BFFF)
+@@ -119,6 +120,26 @@ sram_W:	@sram write ($A000-$BFFF)
  	strb r0,[r1,addy]
  	mov pc,lr
  @----------------------------------------------------------------------------
-+sram_W_torii:	@Torii: sram write ($A000-$BFFF) of a 32K SRAM game, which only
-+	@the menu's backup_gb_sram saves: marks it for torii_autosave (ui.c)
++sram_W_torii:	@Torii: sram write ($A000-$BFFF) of a 32K SRAM game. With its
++	@copy in the cart's SRAM (torii_raw32, sram.c) the write goes there too,
++	@as a real cart's would; without, it's marked for torii_autosave (ui.c)
 +@----------------------------------------------------------------------------
 +	ldr_ r1,memmap_tbl+40
-+	strb r0,[r1,addy]
-+	ldr r1,=torii_sram_written
-+	str r1,[r1]		@nonzero: written this frame
++	add r1,r1,addy
++	strb r0,[r1]
++	ldr r2,=torii_raw32
++	ldrb r2,[r2]
++	cmp r2,#0
++	addne r1,r1,#0x0C000000	@XGB_SRAM 02038000.. -> 0E008000..
++	subne r1,r1,#0x00030000
++	strneb r0,[r1]
++	ldreq r1,=torii_sram_written
++	streq r1,[r1]		@nonzero: written this frame
 +	mov pc,lr
++ .if XGB_SRAM - 0x02038000
++	.error "sram_W_torii maps XGB_SRAM at 02038000 to 0E008000"
++ .endif
 +@----------------------------------------------------------------------------
  wram_W:	@wram write ($C000-$CFFF)
  @----------------------------------------------------------------------------
  @	ldr r1,memmap_tbl+48
 diff --git a/src/sram.c b/src/sram.c
-index 1426f12..60508af 100644
+index 1426f12..d98e786 100644
 --- a/src/sram.c
 +++ b/src/sram.c
-@@ -46,6 +46,7 @@ EWRAM_DATA u32 save_start = SAVE_START;
+@@ -21,6 +21,7 @@ int get_saved_sram(void)
+ 
+ #define SAVE_START_32K 0x6000
+ #define SAVE_START_64K 0xE000
++#define SAVE_START_RAW32 0x8000	//Torii: below a 32K game's RAM (torii_raw32)
+ 
+ #if SRAM_SIZE==32
+ 	//for 32k SRAM
+@@ -46,6 +47,8 @@ EWRAM_DATA u32 save_start = SAVE_START;
  
  EWRAM_BSS int totalstatesize;		//how much SRAM is used
  EWRAM_BSS u32 sram_owner=0;
++EWRAM_BSS u8 torii_raw32=0;	//Torii: a 32K SRAM game's RAM is kept at SRAM 8000-FFFF (config unused1)
 +EWRAM_BSS u8 palette_saved=0;	//Torii: the player picked the palette, so GFX_reset keeps it (config reserved3)
  
  EWRAM_BSS u8 *sram_copy = NULL;      //located at ewram_start
  EWRAM_BSS u8 *lzo_workspace = NULL;  //located at ewram_start or ewram_start + 0xE000
-@@ -1424,6 +1425,7 @@ void writeconfig()
+@@ -153,7 +156,7 @@ void flush_end_sram()
+ {
+ 	u8* sram=MEM_SRAM;
+ 	int i;
+-	int save_end = save_start + 0x2000;
++	int save_end = save_start + (torii_raw32 ? 0x8000 : 0x2000);	//Torii
+ 	for (i=save_start;i<save_end;i++)
+ 	{
+ 		sram[i]=0;
+@@ -244,6 +247,7 @@ void getsram()	//copy GBA sram to sram_copy
+ 	if(sramCopy32[0] != STATEID)	//if sram hasn't been copied already
+ 	{
+ 		probe_sram_size();  //stop NO$GBA from copying out-of-range data
++		if (torii_raw32) save_start=SAVE_START_RAW32;	//Torii
+ 		bytecopy(sramCopy, sram, save_start);	//copy everything to sram_copy
+ 		if(!(sramCopy32[0] == STATEID || sramCopy32[0] == STATEID2)) //valid gba save ram data?
+ 		{
+@@ -436,7 +440,11 @@ int updatestates(int index,int erase,int type)
+ 	
+ 	totalstatesize = newSaveEnd - sram_copy;
+ 	bytecopy(MEM_SRAM, sram_copy, totalstatesize + 8);
+-	memset8(MEM_SRAM + totalstatesize + 8, 0, save_start - (totalstatesize + 8));
++	//Torii: clear only what the records no longer use (the rest is clear
++	//already), not all of SRAM up to save_start: a 57K write took most of
++	//an autosave's time (torii_autosave)
++	if (saveEnd > newSaveEnd)
++		memset8(MEM_SRAM + (newSaveEnd - sram_copy) + 8, 0, saveEnd - newSaveEnd);
+ 	return 1;
+ 	/*
+ 	
+@@ -1013,6 +1021,8 @@ restart:
+ 	
+ 	if (called_from==1 && g_sramsize==3 ) //called from UI and 32K sram size
+ 	{
++		if (torii_raw32 && chk==sram_owner)	//Torii: as for 8K below, pushes don't write through
++			bytecopy(MEM_SRAM+save_start,XGB_SRAM,0x8000);
+ 		i=findstate(chk,SRAMSAVE,&sh);//find out where to save
+ 		if(i>=0)
+ 		{
+@@ -1097,7 +1107,7 @@ restart:
+ 		i=findstate(cfg->sram_checksum,SRAMSAVE,&sh);//find out where to save
+ 		if(i>=0)
+ 		{
+-			int save_size=0x2000;
++			int save_size=torii_raw32 ? 0x8000 : 0x2000;	//Torii
+ 
+ 			memcpy(compressed_save,sh,sizeof(stateheader));//use old info, in case the rom for this sram is gone and we can't look up its name.
+ 			lzo1x_1_compress(MEM_SRAM+save_start,save_size,compressed_save+sizeof(stateheader),&compressedsize,lzo_workspace);	//workspace needs to be 64k
+@@ -1265,9 +1275,23 @@ int get_saved_sram(void)
+ 			retval=2;
+ 		}
+ 		
++		//Torii: a 32K copy still the game's (its packing at the start failed)
++		//is newer than the record: it wins
++		if (g_sramsize==3 && torii_raw32 && sram_owner==chk)
++			bytecopy(XGB_SRAM,MEM_SRAM+save_start,0x8000);
++		//Torii: a 32K game's RAM goes to SRAM 8000-FFFF, written through as
++		//the game writes it (sram_W_torii), when the records fit below
++		if (g_sramsize==3 && (torii_raw32 || totalstatesize+8<=SAVE_START_RAW32))
++		{
++			torii_raw32=1;
++			save_start=SAVE_START_RAW32;
++			bytecopy(MEM_SRAM+save_start,XGB_SRAM,0x8000);
++			register_sram_owner();
++		}
+ 		//For 32k SRAM, don't bother storing anything in real SRAM, in fact, flush it out.
+-		if (g_sramsize==3 || g_sramsize==4)
++		else if (g_sramsize==3 || g_sramsize==4)
+ 		{
++			torii_saved_sum=torii_sram_sum();	//Torii: what torii_autosave compares with
+ 			no_sram_owner();
+ 		}
+ 		else
+@@ -1293,8 +1317,9 @@ void register_sram_owner()
+ void no_sram_owner()
+ {
+ 	sram_owner=0;
+-	writeconfig();
+ 	flush_end_sram();
++	torii_raw32=0;	//Torii: after the flush, which clears its 32K
++	writeconfig();
+ }
+ 
+ void setup_sram_after_loadstate() {
+@@ -1315,6 +1340,10 @@ void setup_sram_after_loadstate() {
+ 			//For 8KB size or less:
+ 			bytecopy(MEM_SRAM+save_start,XGB_SRAM,0x2000);		//copy gb sram to real sram
+ 		}
++		else if (torii_raw32)
++		{
++			bytecopy(MEM_SRAM+save_start,XGB_SRAM,0x8000);		//Torii: the 32K copy too
++		}
+ 		else
+ 		{
+ 			no_sram_owner();
+@@ -1322,9 +1351,9 @@ void setup_sram_after_loadstate() {
+ 		i=findstate(chk,SRAMSAVE,(stateheader**)&cfg);	//does packed SRAM for this rom exist?
+ 		if(i<0)						//if not, create it
+ 			save_new_sram(XGB_SRAM);
+-		if (g_sramsize < 3)
++		if (g_sramsize < 3 || torii_raw32)
+ 		{
+-			//For 8KB size or less:
++			//For 8KB size or less (Torii: or a 32K copy):
+ 			register_sram_owner();//register new sram owner
+ 		}
+ 		else
+@@ -1424,6 +1453,8 @@ void writeconfig()
  	}
  //	cfg->bordercolor=bcolor;					//store current border type
  	cfg->palettebank=palettebank;				//store current DMG palette
 +	cfg->reserved3=palette_saved;				//Torii: picked, not automatic
++	cfg->unused1=torii_raw32;					//Torii: the 32K copy at SRAM 8000
  	j = stime & 0x3;							//store current autosleep time
  //	j |= (gbadetect & 0x1)<<3;					//store current gbadetect setting
  	j |= (request_gb_type & 0x3)<<2;			//store current request_gb_type setting
-@@ -1451,8 +1453,13 @@ void readconfig() {
+@@ -1451,8 +1482,15 @@ void readconfig() {
  	if(i>=0) {
  //		bcolor=cfg->bordercolor;
  		palettebank=cfg->palettebank;
 +		palette_saved=cfg->reserved3;
++		torii_raw32=cfg->unused1==1;	//Torii
++		if (torii_raw32) save_start=SAVE_START_RAW32;
  		i = cfg->misc;
  		stime = i & 0x3;						//restore current autosleep time
 +		{
@@ -200,14 +330,16 @@ index 1426f12..60508af 100644
  		request_gb_type = (i & 0x0C)>>2;		//restore current request_gb_type setting
  		autostate = (i & 0x10)>>4;				//restore current autostate setting
 diff --git a/src/sram.h b/src/sram.h
-index 56f0345..eca5581 100644
+index 56f0345..735ad8a 100644
 --- a/src/sram.h
 +++ b/src/sram.h
-@@ -61,6 +61,7 @@ void setup_sram_after_loadstate(void);
+@@ -61,6 +61,9 @@ void setup_sram_after_loadstate(void);
  int find_rom_number_by_checksum(u32 sum);
  void loadstatemenu(void);
  void writeconfig(void);
 +extern u8 palette_saved;
++extern u32 torii_saved_sum;
++u32 torii_sram_sum(void);
  void readconfig(void);
  
  static __inline u32 get_sram_owner()
@@ -238,7 +370,7 @@ index 67118de..2b4c506 100644
  g_hackflags: .byte 0 @hackflags
  g_hackflags2: .byte 0 @hackflags2
 diff --git a/src/ui.c b/src/ui.c
-index dbe9b9c..cc322a1 100644
+index dbe9b9c..640a991 100644
 --- a/src/ui.c
 +++ b/src/ui.c
 @@ -1,7 +1,7 @@
@@ -250,27 +382,46 @@ index dbe9b9c..cc322a1 100644
  EWRAM_BSS u8 autostate=0;
  EWRAM_BSS int main_ui_selection;
  //EWRAM_BSS int selected;//selected menuitem.  used by all menus.
-@@ -146,6 +146,28 @@ u32 getmenuinput(int menuitems)
+@@ -146,6 +146,47 @@ u32 getmenuinput(int menuitems)
  }
  */
  
 +// Torii: a game with 32K of SRAM keeps it in EWRAM, which only the menu's
 +// backup_gb_sram copies to the cart (8K games write through, sram_W2). A
 +// second after the game's last write, as after an in-game save, this does
-+// the same, so a power-off after saving keeps the save without the menu.
++// the same, so a power-off after saving keeps the save without the menu. It
++// takes 0.12 s or more (2026-10-25, the emulated cart), so RAM a game wrote
++// the same bytes to again isn't saved again.
 +u32 torii_sram_written;	//set by sram_W_torii (memory.s)
++u32 torii_saved_sum;	//torii_sram_sum of the RAM as last loaded or saved
++u32 torii_sram_sum(void)
++{
++	const u32 *p=(const u32*)XGB_SRAM;
++	u32 h=0;
++	int i;
++	for (i=0;i<0x8000/4;i++)
++		h=h*31+p[i];
++	return h;
++}
 +void torii_autosave(void)
 +{
-+	static u32 quiet;
++	static u32 quiet,last;
 +	if (torii_sram_written)
 +	{
++		//a second's quiet; five within 30 s of the last save, for games
++		//that write as you play (Pokemon Picross wrote 26 times a minute)
 +		torii_sram_written=0;
-+		quiet=60;
++		quiet=(last && frametotal-last<30*60)?5*60:60;
 +		return;
 +	}
 +	if (quiet && --quiet==0)
 +	{
 +#if CARTSRAM
++		u32 sum=torii_sram_sum();
++		if (sum==torii_saved_sum)
++			return;
++		torii_saved_sum=sum;
++		last=frametotal|1;
 +		backup_gb_sram(1);
 +#endif
 +	}
@@ -279,7 +430,7 @@ index dbe9b9c..cc322a1 100644
  void ui()
  {
  	int key,soundvol,tm0cnt,i;
-@@ -233,9 +255,7 @@ void ui()
+@@ -233,9 +274,7 @@ void ui()
  	{
  		get_saved_sram();
  	}
@@ -290,7 +441,7 @@ index dbe9b9c..cc322a1 100644
  #endif
  	scrolll(2);
  	/*
-@@ -650,9 +670,7 @@ void restart()
+@@ -650,9 +689,7 @@ void restart()
  void exit_()
  {
  #if CARTSRAM
@@ -301,7 +452,7 @@ index dbe9b9c..cc322a1 100644
  #endif
  	fadetowhite();
  	REG_DISPCNT=FORCE_BLANK;		//screen OFF
-@@ -723,6 +741,7 @@ void draw_palette_list()
+@@ -723,6 +760,7 @@ void draw_palette_list()
  	
  	
  	palettebank=selected;
