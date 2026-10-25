@@ -2,13 +2,12 @@
 #ifndef TORII_HOST_TESTS_H
 #define TORII_HOST_TESTS_H
 
-void test_cheat_parse(void);
-void test_cheat_reads_only_len(void);
-void test_cheat_long_fields(void);
-void test_cheat_cap(void);
-void test_cheat_garbage(void);
-void test_cheat_empty_entries(void);
-void test_cheat_whitespace(void);
+void test_cheatfile_parse(void);
+void test_cheatfile_odd(void);
+void test_cheatfile_status(void);
+void test_cheatfile_keys_carry(void);
+void test_cheatfile_budget(void);
+void test_cheatfile_write_back(void);
 void test_cheatcode_mgba_vectors(void);
 void test_cheatcode_par3_types(void);
 void test_cheatcode_par3_encrypted(void);
