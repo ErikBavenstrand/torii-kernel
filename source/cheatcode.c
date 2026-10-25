@@ -1309,6 +1309,17 @@ static int plausible(u8 status, const struct cheat_op *ops, u32 n_ops)
 	return 1;
 }
 
+// Whether a decoding does more than patch the ROM: any garbage of a ROM
+// patch's shape reads as one, so a second reading must touch RAM to count
+static int touches_ram(const struct cheat_op *ops, u32 n_ops)
+{
+	u32 i;
+	for (i = 0; i < n_ops; ++i)
+		if (ops[i].type != CHEAT_OP_ROM_PATCH)
+			return 1;
+	return 0;
+}
+
 u8 cheat_decode(struct cheat_decoder *d, const char *code, u32 len, struct cheat_op *ops, u32 ops_max, u32 *n_ops)
 {
 	struct cheat_decoder work = *d, alone;
@@ -1353,7 +1364,8 @@ u8 cheat_decode(struct cheat_decoder *d, const char *code, u32 len, struct cheat
 		if (i & 2)
 			alone.gs_version = CHEAT_FMT_AUTO;
 		alone_status = decode_pass(&alone, code, len, ops, ops_max, &n_alone, &keyed);
-		if (plausible(alone_status, ops, n_alone < ops_max ? n_alone : ops_max)) {
+		if (plausible(alone_status, ops, n_alone < ops_max ? n_alone : ops_max) &&
+		    touches_ram(ops, n_alone < ops_max ? n_alone : ops_max)) {
 			u8 last = alone.last;
 			*d = work;
 			d->last = last;
