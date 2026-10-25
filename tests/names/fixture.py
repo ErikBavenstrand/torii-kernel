@@ -58,7 +58,7 @@ GAMES = [
         "Nintendo - Nintendo Entertainment System.dat",
         "Famicom Game (Japan)",
         None,
-        (7, 16400, None),
+        (7, 16384, None),
     ),
 ]
 
@@ -72,7 +72,7 @@ FILES = [
     ("/Colour.gbc", (4, 2048, None)),
     ("/Colour named GB.gb", (6, 2048, None)),
     ("/GB/Mono.gb", (5, 2048, None)),
-    ("/NES/Famicom.nes", (7, 16400, None)),
+    ("/NES/Famicom.nes", (7, 16384, None)),  # with an iNES header (INES)
 ]
 
 DATS = [
@@ -120,11 +120,15 @@ def write_dats(out=HERE):
         (out / dat).write_text("\n".join(lines))
 
 
+# A NES file's 16-byte iNES header, which No-Intro's CRCs leave out
+INES = b"NES\x1a\x01\x01" + bytes(10)
+
+
 def write_roms(out):
     for path, spec in FILES:
         p = Path(out) / path.lstrip("/")
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_bytes(rom(*spec))
+        p.write_bytes((INES if path.endswith(".nes") else b"") + rom(*spec))
 
 
 if __name__ == "__main__":

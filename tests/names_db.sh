@@ -215,6 +215,30 @@ not_logged "$cart/2.log" "names: wrote"
 no_errors "$cart/2.log"
 echo "PASS: new games get their CRCs and names in the background, Recent's first, and a later boot reads none"
 
+# A crc.txt from before v0.6.2 has NES CRCs that took in the iNES header,
+# which No-Intro's don't: its NES lines are dropped and computed again
+cart=$carts/nes-crc
+fixture_card "$cart"
+python3 - "$cart/files/torii/crc.txt" <<'PY'
+import sys
+sys.path.insert(0, "tools")
+import names_db
+
+path = sys.argv[1]
+lines = names_db.read_safe(path).split("\n")
+lines[0] = "# Torii's CRC cache: CRC32, size, date, path"
+lines = [("E3C788B0" + l[8:]) if l.endswith("/NES/Famicom.nes") else l for l in lines]
+names_db.write_safe(path, "\n".join(lines))
+PY
+mcopy -o -i "$cart/sd.img" "$cart/files/torii/crc.txt" "$cart/files/torii/crc.txt.bak" ::/torii/
+boot "$cart" "$cart/1.log" -f 3000 -u "names: wrote /torii/crc.txt"
+crc=$(python3 -c 'import sys, zlib; print("%08X" % zlib.crc32(open(sys.argv[1], "rb").read()[16:]))' "$cart/files/NES/Famicom.nes")
+logged "$cart/1.log" "names: /NES/Famicom.nes is $crc"
+crc_lines "$cart" | grep -q "^$crc	.*/NES/Famicom.nes" || fail "crc.txt doesn't hold Famicom's CRC without its header: $(crc_lines "$cart")"
+if grep -qE "^kernel: names: /GBA/.* is [0-9A-F]{8}" "$cart/1.log"; then fail "a GBA CRC was computed again"; fi
+no_errors "$cart/1.log"
+echo "PASS: a NES CRC from before v0.6.2, with the iNES header in it, is computed again without it"
+
 # A launch stops the background's CRCs (here in a 2 MB game) before
 # crc.txt took the ones done: they go to the journal (crc.new), not the
 # whole cache; the next boot reads it, goes on with the rest, and its write

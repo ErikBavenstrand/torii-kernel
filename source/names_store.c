@@ -123,6 +123,7 @@ static struct {
 	// crc.txt's load (safefile.h's rules, in steps through N.u.fil)
 	struct safefile_scan scan_main, scan_bak;
 	u8 has_main, has_bak, first_line, line_long;
+	u8 nes_ok;  // crc.txt's NES CRCs leave out the iNES header (its first line says so): else they go
 	u8 main_end;  // crc.txt is scanned to its end (its last lines may wait in N.buf)
 	u8 again;  // the cache is emptied again for the backup copy
 	u16 line_len;
@@ -421,8 +422,16 @@ static void line_end(void)
 	N.first_line = 0;
 	struct names_line l;
 	int kept = 0, text = N.line_long || (line[0] && line[0] != '#');
-	if (!N.line_long && names_parse_line(line, &l))
-		kept = names_cache_put(&N.cache, l.path, l.size, l.date, l.crc, l.flags) != NAMES_CACHE_NONE;
+	if (line[0] == '#' && strstr(line, "iNES"))
+		N.nes_ok = 1;
+	if (!N.line_long && names_parse_line(line, &l)) {
+		// A NES CRC from before v0.6.2 took in the iNES header, as No-Intro's
+		// (names.db's, the art pack's) don't: computed again
+		if (!N.nes_ok && library_console_of(l.path) == LIB_NES)
+			text = 0;
+		else
+			kept = names_cache_put(&N.cache, l.path, l.size, l.date, l.crc, l.flags) != NAMES_CACHE_NONE;
+	}
 	if (kept)
 		N.lines_read++;
 	else if (text)
@@ -460,6 +469,7 @@ static void lines_begin(void)
 	N.line_len = 0;
 	N.line_long = 0;
 	N.first_line = 1;
+	N.nes_ok = 0;
 }
 
 // A piece of the backup copy (crc.txt didn't hold): a chunk read when the
@@ -712,7 +722,9 @@ static u32 cache_line(void *ctx, u32 n, char *buf, u32 size)
 	struct line_cursor *lc = ctx;
 	if (n == 0) {
 		lc->rec = 0;
-		return (u32)snprintf(buf, size, "# Torii's CRC cache: CRC32, size, date, path\n");
+		return (u32)snprintf(buf, size,
+				     "# Torii's CRC cache: CRC32, size, date, path (a NES game's CRC leaves out its "
+				     "16-byte iNES header)\n");
 	}
 	for (; lc->rec < N.cache.count; lc->rec++) {
 		if (N.seen_ok && !was_seen(lc->rec))
@@ -1127,7 +1139,14 @@ static int identify_step(void)
 			N.step = I_NEXT;
 			return JOB_MORE;
 		}
-		N.crc = crc32_update(N.crc, N.buf, got);
+		{
+			// A NES game's CRC leaves out its 16-byte iNES header, as
+			// No-Intro's do (names.db, the art pack)
+			u32 skip = (N.read == 0 && N.console == LIB_NES && got >= 16 && !memcmp(N.buf, "NES\x1a", 4))
+					   ? 16
+					   : 0;
+			N.crc = crc32_update(N.crc, N.buf + skip, got - skip);
+		}
 		N.read += got;
 		if (got == NAMES_IO_BYTES && N.read < N.size)
 			return JOB_MORE;

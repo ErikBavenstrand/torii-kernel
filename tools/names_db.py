@@ -103,7 +103,7 @@ CACHE_POOL = (
     0xA0000  # NAMES_CACHE_POOL_BYTES: the paths, each padded to 2 bytes with its NUL
 )
 CACHE_FILE_MAX = 0x100000  # names_store.c's NAMES_CACHE_FILE_MAX
-CRC_HEADER = "# Torii's CRC cache: CRC32, size, date, path\n"
+CRC_HEADER = "# Torii's CRC cache: CRC32, size, date, path (a NES game's CRC leaves out its 16-byte iNES header)\n"
 
 # Tags of dumps a game code shouldn't name first: the retail game wins
 LESSER = re.compile(
@@ -482,8 +482,11 @@ def parse_cache(text):
     """crc.txt's records: {folded path: (crc or None, size, date or None, path)}.
     Reads v0.4.1's lines too, which had a GBA game code second (source/namesdb.h)."""
     out = {}
+    nes_ok = False  # NES CRCs leave out the iNES header (v0.6.2 on): else dropped
     for raw in text.split("\n"):  # as the kernel splits: not at U+2028 and the like
         line = raw.removesuffix("\r")
+        if line.startswith("#") and "iNES" in line:
+            nes_ok = True
         if not line or line.startswith("#"):
             continue
         parts = line.split("\t", 3)
@@ -502,6 +505,8 @@ def parse_cache(text):
             and int(size) <= 0xFFFFFFFF
             and re.fullmatch(r"-|[0-9A-Fa-f]{8}", date)
         ):
+            continue
+        if not nes_ok and path.lower().endswith(".nes"):
             continue
         out[path.lower()] = (
             None if crc == "-" else int(crc, 16),
@@ -668,10 +673,19 @@ def fat_date(path):
 
 
 def file_crc(path):
+    """A game's CRC32 and size; a NES game's CRC leaves out its 16-byte iNES
+    header, as No-Intro's do (the kernel's names_store.c does the same)."""
     crc, size = 0, 0
     with open(path, "rb") as f:
         while chunk := f.read(1 << 20):
-            crc = zlib.crc32(chunk, crc)
+            skip = (
+                16
+                if size == 0
+                and str(path).lower().endswith(".nes")
+                and chunk[:4] == b"NES\x1a"
+                else 0
+            )
+            crc = zlib.crc32(chunk[skip:], crc)
             size += len(chunk)
     return crc, size
 

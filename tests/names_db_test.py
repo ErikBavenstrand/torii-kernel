@@ -346,9 +346,35 @@ class Db(unittest.TestCase):
 
 
 class Cache(unittest.TestCase):
-    def test_lines(self):
+    def test_old_nes_lines_dropped(self):
+        # Before v0.6.2 a NES CRC took in the iNES header: without the header
+        # line that says otherwise, NES lines are dropped and computed again
         text = (
             "# Torii's CRC cache: CRC32, size, date, path\n"
+            "E3C788B0\t262160\t28E66405\t/NES/Zelda II.nes\n"
+            "5A0E6E6A\t16777216\t5A3C7B20\t/GBA/Minish Cap.gba\n"
+        )
+        self.assertEqual(list(names_db.parse_cache(text)), ["/gba/minish cap.gba"])
+
+    def test_nes_crc_without_header(self):
+        with tempfile.TemporaryDirectory() as d:
+            rom = bytes(range(256)) * 8
+            for name, data, crc in (
+                ("game.nes", b"NES\x1a" + bytes(12) + rom, zlib.crc32(rom)),
+                (
+                    "game.gb",
+                    b"NES\x1a" + bytes(12) + rom,
+                    zlib.crc32(b"NES\x1a" + bytes(12) + rom),
+                ),
+                ("raw.nes", rom, zlib.crc32(rom)),
+            ):
+                path = Path(d) / name
+                path.write_bytes(data)
+                self.assertEqual(names_db.file_crc(path), (crc, len(data)), name)
+
+    def test_lines(self):
+        text = (
+            "# Torii's CRC cache: CRC32, size, date, path (a NES game's CRC leaves out its 16-byte iNES header)\n"
             "5A0E6E6A\t16777216\t5A3C7B20\t/GBA/Minish Cap.gba\n"
             "-\t40976\t-\t/NES/Odd\tname.nes\n"
             # v0.4.1's lines, with a GBA game code second
@@ -431,7 +457,9 @@ class Card(unittest.TestCase):
         self.assertEqual(main, (self.sd / "torii" / "crc.txt.bak").read_bytes())
         self.assertIsNotNone(names_db.safe_text(main))
         self.assertTrue(
-            main.startswith(b"# Torii's CRC cache: CRC32, size, date, path\n")
+            main.startswith(
+                b"# Torii's CRC cache: CRC32, size, date, path (a NES game's CRC leaves out its 16-byte iNES header)\n"
+            )
         )
         # A run right after reads nothing again: the files keep their sizes
         # and dates

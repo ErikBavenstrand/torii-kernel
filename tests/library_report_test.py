@@ -14,7 +14,6 @@ import struct
 import sys
 import tempfile
 import unittest
-import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -107,7 +106,9 @@ class Report(unittest.TestCase):
         self.tmp.cleanup()
 
     def crc(self, card_path):
-        return zlib.crc32((self.sd / card_path.lstrip("/")).read_bytes())
+        return names_db.file_crc(self.sd / card_path.lstrip("/"))[
+            0
+        ]  # as the kernel takes it
 
     def run_tool(self, *extra, sd=None):
         out, err = io.StringIO(), io.StringIO()

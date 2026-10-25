@@ -94,7 +94,8 @@ class Server:
 
 
 def crc_of(path, sd):
-    return f"{zlib.crc32((Path(sd) / path.lstrip('/')).read_bytes()):08X}"
+    """A card file's CRC as the kernel takes it (a NES game's without its iNES header)."""
+    return f"{names_db.file_crc(Path(sd) / path.lstrip('/'))[0]:08X}"
 
 
 def library_idx(games):

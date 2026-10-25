@@ -6,5 +6,5 @@ clrmamepro (
 
 game (
 	name "Famicom Game (Japan)"
-	rom ( name "Famicom Game (Japan).nes" size 16400 crc 0C6CB870 )
+	rom ( name "Famicom Game (Japan).nes" size 16384 crc B3934ACA )
 )
