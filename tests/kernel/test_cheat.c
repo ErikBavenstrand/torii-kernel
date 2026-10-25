@@ -9,6 +9,7 @@
 #include "../../source/cheat.h"
 #include "../../source/cheatstore.h"
 #include "../../source/GBApatch.h"
+#include "../../source/engine/stage.h"
 #include "torii_test.h"
 #include "tests.h"
 
@@ -58,13 +59,15 @@ void test_menu_code_fits(void)
 #define T_ROM "/T19/Cheat Test.gba"
 #define T_CHT "/torii/cheats/T19/Cheat Test.cht"
 
+// Writes text to path through the stage (no EWRAM of its own: every kernel
+// links the tests)
 static int put(const char *path, const char *text)
 {
-	static FIL f EWRAM_BSS;
-	static u32 buf[512] EWRAM_BSS;
+	FIL f;
+	u8 *buf = stage_buffer();
 	UINT done = 0;
 	u32 len = (u32)strlen(text);
-	if (len > sizeof(buf))
+	if (len > STAGE_BYTES)
 		return 0;
 	memcpy(buf, text, len);
 	f_mkdir("/torii");
