@@ -10,7 +10,7 @@
 #include "ezkernel.h"
 #include "reset_table.h"
 #include "lang.h"
-#include "showcht.h"
+#include "cheat.h"
 #include "Ezcard_OP.h"
 #include "irqpatch.h"
 #include "progress.h"
@@ -411,14 +411,10 @@ static void Patch_RTS_Cheat(u32 *Data)
 
 	u32 cheat_offset = (u8 *)CHEAT - p_patch_start;
 
+	// Torii: the decoders checked each address (cheatcode.h): it goes in as it is
 	for (u32 ii = 0; ii < gl_cheat_count; ii++) {
-		if (pCHEAT[ii].address >= 0x40000) {
-			*(vu32 *)(patchbuffer + cheat_offset + 8 * ii) = ((pCHEAT[ii].address) & 0x7FFF) + 0x3000000;
-		} else {
-			*(vu32 *)(patchbuffer + cheat_offset + 8 * ii) = ((pCHEAT[ii].address) & 0x3FFFF) + 0x2000000;
-		}
+		*(vu32 *)(patchbuffer + cheat_offset + 8 * ii) = pCHEAT[ii].address;
 		*(vu32 *)(patchbuffer + cheat_offset + 8 * ii + 4) = pCHEAT[ii].VAL;
-		//DEBUG_printf("%x=%x", *(vu32*)(patchbuffer+cheat_offset+8*ii),*(vu32*)(patchbuffer+cheat_offset+8*ii+4));
 	}
 
 	u32 copysize = p_no_cheat_end - p_patch_start;

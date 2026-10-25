@@ -116,8 +116,8 @@ void cheatfile_parse(struct cheatfile *f, const char *text, u32 len, struct chea
 	f->len = len;
 	f->cheats = cheats;
 	for (u32 i = 0; i < max; i++)
-		cheats[i] = (struct cheatfile_cheat){CHEATFILE_NONE, 0, CHEATFILE_NONE, 0, CHEATFILE_NONE, 0, CHEATFILE_NEW,
-						     (u16)i, 0, 0, 0, 0};
+		cheats[i] = (struct cheatfile_cheat){
+			CHEATFILE_NONE, 0, CHEATFILE_NONE, 0, CHEATFILE_NONE, 0, CHEATFILE_NEW, (u16)i, 0, 0, 0, 0};
 	const char *p = text, *end = text + len;
 	if (len >= 3 && !memcmp(text, "\xEF\xBB\xBF", 3))
 		p += 3;  // a BOM from a Windows editor: kept, but not part of the first key

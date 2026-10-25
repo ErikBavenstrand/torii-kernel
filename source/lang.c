@@ -88,6 +88,7 @@ char *gl_hint_field EWRAM_BSS;
 char *gl_hint_set EWRAM_BSS;
 
 const struct lang_games *gl_games EWRAM_BSS;
+const struct lang_cheats *gl_cheats EWRAM_BSS;
 const struct lang_rename *gl_rename EWRAM_BSS;
 const struct lang_saves *gl_saves EWRAM_BSS;
 const struct lang_slots *gl_slots EWRAM_BSS;
@@ -251,7 +252,6 @@ const char *const en_set_labels[SET_ROWS] = {
 	[SET_ENGINE] = "Fast patching",
 	[SET_AUTO_SAVE] = "Save without asking",
 	[SET_RTS] = "Save states",
-	[SET_CHEATS] = "Cheats",
 	[SET_RUMBLE] = "Rumble for games",
 	[SET_MODE_B] = "Mode B",
 	[SET_LED] = "LED",
@@ -284,7 +284,6 @@ const char *const en_set_explain[SET_EXPLAINS] = {
 	[SET_ENGINE] = "Addons start faster for known games.",
 	[SET_AUTO_SAVE] = "No \"Save to SD card?\" after a game.",
 	[SET_RTS] = "Save and load from the in-game menu.",
-	[SET_CHEATS] = "Applies a game's cheat file.",
 	[SET_RUMBLE] = "Lets games use the cart's rumble.",
 	[SET_MODE_B] = "What the cart is in a DS (mode B).",
 	[SET_LED] = "The cart's light.",
@@ -303,7 +302,6 @@ const char *const en_set_explain[SET_EXPLAINS] = {
 	[SET_LOGGING] = "Writes a log to /torii/logs.",
 	[SET_LANGUAGE] = "The menu's language.",
 	[SET_EXPLAIN_RESET_STATES] = "Opens the in-game menu instead.",
-	[SET_EXPLAIN_RESET_CHEATS] = "With a cheat file: the in-game menu.",
 	[SET_EXPLAIN_START_HIDDEN] = "Not on home now: Last place instead.",
 };
 const char *const en_set_onoff[2] = {"Off", "On"};
@@ -416,7 +414,8 @@ const char *const en_info[INFO_STRINGS] = {
 				"They work in GBA games started with their addons: Boot with addon starts a game with "
 				"the ones Settings turns on, Clean boot without, and A, Play and Launch as Settings' "
 				"GBA boot mode says (or the game's Boot mode in its Game info). Settings, Hotkeys sets "
-				"them; Save states and Cheats are in Settings, Games. A game on the NOR keeps the "
+				"them; Save states is in Settings, Games, and a game's cheats in its popup's "
+				"Cheats. A game on the NOR keeps the "
 				"hotkeys it was written with.\n",
 	[INFO_S_INGAME_MENU] = "# The in-game menu\n"
 			       "Hold %s to open it: back to the menu, save or load a state, and the game's cheats.\n",
@@ -424,7 +423,7 @@ const char *const en_info[INFO_STRINGS] = {
 				"Hold %s to leave the game for the menu.\n",
 	[INFO_S_INGAME_RESET_OFF] = "# Back to menu\n"
 				    "Off: turn Back to menu on in Settings, or switch the GBA off and on.\n",
-	[INFO_S_INGAME_CHEATS] = "In a game with a cheat file, %s still opens the in-game menu, with its cheats.\n",
+	[INFO_S_INGAME_CHEATS] = "In a game with cheats picked, %s opens the in-game menu instead, with its cheats.\n",
 	[INFO_S_INGAME_SLEEP] = "# Sleep\n"
 				"Hold %s to put the game to sleep: the screen goes off. START and SELECT wake it.\n",
 	[INFO_S_INGAME_SLEEP_OFF] = "# Sleep\n"
@@ -539,7 +538,7 @@ static const struct lang_games en_games = {
 	.hint_menu = "menu",
 	.hint_letter = "letter",
 	.hint_pick = "pick",
-	.pop = {"Play", "Favourite", "Rename", "Game info", "Saves", "Remove", "Delete"},
+	.pop = {"Play", "Favourite", "Rename", "Game info", "Saves", "Cheats", "Remove", "Delete"},
 	.boots = {"default", "clean", "addons"},
 	.hint_boot = "boot",
 	.off = "off",
@@ -576,6 +575,19 @@ static const struct lang_slots en_slots = {
 	.path = "That name makes the path too long.",
 	.gone = "That slot isn't there any more.",
 };
+static const struct lang_cheats en_cheats = {
+	.hint_pick = "pick",
+	.why = {"", "Needs v0.8: conditions, buttons, pointers", "Too many writes beside the picks",
+		"Can't read this code", "Edit to use: digits to fill in"},
+	.nor = "ROM patch: not for NOR games",
+	.unnamed = "(no name)",
+	.reading = "Reading cheats",
+	.reading_text = "A big cheat file",
+	.none = "No cheats to pick in its cheat file.",
+	.gone = "Its cheat file can't be read.",
+	.save_failed = "The picks couldn't be saved.",
+};
+
 static const struct lang_gsaves en_gsaves = {
 	.title = "Saves",
 	.play_title = "Play with",
@@ -840,6 +852,7 @@ void LoadEnglish(void)
 	gl_sd_save = (char *)en_sd_save;
 	gl_sd_no_save = (char *)en_sd_no_save;
 	gl_games = &en_games;
+	gl_cheats = &en_cheats;
 	gl_rename = &en_rename;
 	gl_saves = &en_saves;
 	gl_slots = &en_slots;

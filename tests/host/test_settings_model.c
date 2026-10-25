@@ -134,7 +134,6 @@ void test_settings_defaults(void)
 		{SET_ENGINE, 1, "On"},
 		{SET_AUTO_SAVE, 0, "Off"},
 		{SET_RTS, 0, "Off"},
-		{SET_CHEATS, 0, "Off"},
 		{SET_RUMBLE, 1, "On"},
 		{SET_MODE_B, 2, "Link"},
 		{SET_LED, 1, "On"},
@@ -400,14 +399,9 @@ void test_settings_hotkeys(void)
 	settings_value_text(&v, SET_RESET_ON, text, sizeof(text));
 	CHECK(!strcmp(text, "On"));
 	CHECK_EQ(settings_get(&v, SET_RESET_ON), 0);
-	// Cheats alone do it only in a game with a cheat file: the row keeps
-	// its value
 	settings_set(&v, SET_RTS, 0);
-	settings_set(&v, SET_CHEATS, 1);
 	CHECK(!settings_reset_armed(&v));
-	CHECK(!strcmp(settings_explain(&v, SET_RESET_ON), "With a cheat file: the in-game menu."));
-	settings_value_text(&v, SET_RESET_ON, text, sizeof(text));
-	CHECK(!strcmp(text, "Off"));
+	CHECK(!strcmp(settings_explain(&v, SET_RESET_ON), "Hold the keys to leave a game."));
 }
 
 void test_settings_visible_rows(void)

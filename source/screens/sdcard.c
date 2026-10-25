@@ -675,7 +675,7 @@ static void rename_file(void)
 static int any_addon(void)
 {
 	return Read_SET_info(assress_v_reset) == 1 || Read_SET_info(assress_v_rts) == 1 ||
-	       Read_SET_info(assress_v_sleep) == 1 || Read_SET_info(assress_v_cheat) == 1;
+	       Read_SET_info(assress_v_sleep) == 1;
 }
 
 static const char *const how_words[ACTION_HOWS + 1] = {"launch", "launch with addon", "write to NOR",

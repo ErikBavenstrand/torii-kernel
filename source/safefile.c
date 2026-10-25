@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "crc32.h"
+#include "cutpoint.h"
 #include "ff.h"
 #include "tlog.h"
 
@@ -14,6 +15,11 @@ static FIL sf_file EWRAM_BSS;
 static u8 sf_chunk[CHUNK] EWRAM_BSS ALIGN(4);
 static struct safefile_scan sf_main EWRAM_BSS, sf_bak EWRAM_BSS;
 static u8 sf_failed EWRAM_BSS;  // a read failed since safefile_open began
+// The backup copy's path, and a folder on the way to it: one file is open at
+// a time, and these are too long for the stack (SAFEFILE_PATH_MAX)
+static char sf_bak_path[SAFEFILE_PATH_MAX] EWRAM_BSS;
+static char sf_dir[SAFEFILE_PATH_MAX] EWRAM_BSS;
+static u8 sf_cuts EWRAM_BSS;  // safefile_write_cut: cutpoints between the steps
 
 static struct {
 	u32 limit;  // bytes of the copy to read: up to its CRC line
@@ -80,7 +86,7 @@ static int pick(const char *path, const char *bak, u32 max)
 
 int safefile_open(const char *path, u32 max)
 {
-	char bak[SAFEFILE_PATH_MAX];
+	char *bak = sf_bak_path;
 	TLOG_ASSERT(!rd.open);
 	safefile_close();
 	if (!bak_name(bak, path))
@@ -152,6 +158,49 @@ int safefile_line(char *buf, u32 size)
 	return cut ? SAFEFILE_LONG : (int)len;
 }
 
+int safefile_read(void *buf, u32 size)
+{
+	TLOG_ASSERT(((u32)buf & 3) == 0);
+	if (!rd.open)
+		return -1;
+	u32 left = rd.limit - rd.done, have = rd.have - rd.at;
+	if (have + left > size) {
+		tlog("safefile: %lu bytes to read, over %lu", (unsigned long)(have + left), (unsigned long)size);
+		return -1;
+	}
+	memcpy(buf, sf_chunk + rd.at, have);  // what safefile_line left
+	rd.at = rd.have;
+	u32 n = have;
+	if (n == 0 && rd.done == 0 && left) {
+		// Nothing staged: the copy straight into buf, a word-aligned start
+		UINT got = 0;
+		FRESULT res = f_read(&sf_file, buf, left, &got);
+		rd.done += got;
+		if (res != FR_OK || got != left) {
+			tlog_error("safefile: a read stopped %lu bytes short", (unsigned long)(left - got));
+			sf_failed = 1;
+			return -1;
+		}
+		n = left;
+	} else {
+		while (rd.done < rd.limit) {
+			u32 want = rd.limit - rd.done < CHUNK ? rd.limit - rd.done : CHUNK;
+			UINT got = 0;
+			if (f_read(&sf_file, sf_chunk, want, &got) != FR_OK || got != want) {
+				tlog_error("safefile: a read stopped %lu bytes short",
+					   (unsigned long)(rd.limit - rd.done));
+				sf_failed = 1;
+				return -1;
+			}
+			memcpy((u8 *)buf + n, sf_chunk, got);
+			n += got;
+			rd.done += got;
+		}
+	}
+	rd.first = 0;
+	return (int)n;
+}
+
 int safefile_failed(void)
 {
 	return sf_failed;
@@ -167,8 +216,8 @@ void safefile_close(void)
 // Makes the folders on the way to the file at path
 static void make_folders(const char *path)
 {
-	char dir[SAFEFILE_PATH_MAX];
-	snprintf(dir, sizeof(dir), "%s", path);
+	char *dir = sf_dir;
+	snprintf(dir, SAFEFILE_PATH_MAX, "%s", path);
 	for (char *p = dir + 1; *p; p++) {
 		if (*p == '/') {
 			*p = 0;
@@ -209,6 +258,8 @@ static int write_copy(const char *name, safefile_fill fill, void *ctx)
 	if (ok) {
 		// tests/userdata.sh cuts the power here
 		tlog_debug("safefile: %s: %lu bytes written, sealing", name, (unsigned long)pos);
+		if (sf_cuts)
+			cutpoint("safefile: a copy's text written, not sealed");
 		n = safefile_crc_line((char *)sf_chunk, crc);
 		ok = f_write(&sf_file, sf_chunk, n, &put) == FR_OK && put == n;
 	}
@@ -219,6 +270,8 @@ static int write_copy(const char *name, safefile_fill fill, void *ctx)
 		f_truncate(&sf_file);
 	}
 	ok = (f_close(&sf_file) == FR_OK) && ok;
+	if (sf_cuts)
+		cutpoint("safefile: a copy closed");
 	if (!ok)
 		tlog_error("safefile: writing %s failed", name);
 	return ok;
@@ -226,7 +279,7 @@ static int write_copy(const char *name, safefile_fill fill, void *ctx)
 
 int safefile_write(const char *path, u32 max, safefile_fill fill, void *ctx)
 {
-	char bak[SAFEFILE_PATH_MAX];
+	char *bak = sf_bak_path;
 	TLOG_ASSERT(!rd.open);
 	safefile_close();
 	if (!bak_name(bak, path))
@@ -241,4 +294,12 @@ int safefile_write(const char *path, u32 max, safefile_fill fill, void *ctx)
 	if (!write_copy(bak_first ? bak : path, fill, ctx))
 		return 0;
 	return write_copy(bak_first ? path : bak, fill, ctx);
+}
+
+int safefile_write_cut(const char *path, u32 max, safefile_fill fill, void *ctx)
+{
+	sf_cuts = 1;
+	int ok = safefile_write(path, max, fill, ctx);
+	sf_cuts = 0;
+	return ok;
 }

@@ -25,7 +25,8 @@
 #include "NORflash_OP.h"
 #include "lang.h"
 #include "GBApatch.h"
-#include "showcht.h"
+#include "cheat.h"
+#include "cheatstore.h"
 #include "settings.h"
 #include "cartlog.h"
 #include "cutpoint.h"
@@ -884,13 +885,15 @@ void CheckLanguage(void)
 //---------------------------------------------------------------------------------
 // Torii: the BOOT WITH ADDON switches as the launches read them: 1 on, else
 // off. An erased slot reads 0xFFFF, which went into the logs ("savestate
-// 65535"), the patch's switches and a NOR game's entry
+// 65535"), the patch's switches and a NOR game's entry. Cheats are on when
+// the game's picked cheats have byte writes (cheatstore_launch, at the
+// launch's start): the cheat hook and its table.
 static void Read_addon_switches(void)
 {
 	gl_reset_on = Read_SET_info(assress_v_reset) == 1;
 	gl_rts_on = Read_SET_info(assress_v_rts) == 1;
 	gl_sleep_on = Read_SET_info(assress_v_sleep) == 1;
-	gl_cheat_on = Read_SET_info(assress_v_cheat) == 1;
+	gl_cheat_on = gl_cheat_count > 0;
 }
 //---------------------------------------------------------------------------------
 void CheckSwitch(void)
@@ -898,7 +901,7 @@ void CheckSwitch(void)
 	gl_reset_on = Read_SET_info(assress_v_reset);
 	gl_rts_on = Read_SET_info(assress_v_rts);
 	gl_sleep_on = Read_SET_info(assress_v_sleep);
-	gl_cheat_on = Read_SET_info(assress_v_cheat);
+	gl_cheat_on = 0;  // a launch's, with the game's picks (Read_addon_switches)
 	if ((gl_reset_on != 0x0) && (gl_reset_on != 0x1)) {
 		gl_reset_on = 0x0;
 	}
@@ -907,9 +910,6 @@ void CheckSwitch(void)
 	}
 	if ((gl_sleep_on != 0x0) && (gl_sleep_on != 0x1)) {
 		gl_sleep_on = 0x0;
-	}
-	if ((gl_cheat_on != 0x0) && (gl_cheat_on != 0x1)) {
-		gl_cheat_on = 0x0;
 	}
 
 	gl_engine_sel = Read_SET_info(assress_engine_sel);
@@ -1670,7 +1670,6 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 u32 Game_pick(struct game_pick *g)
 {
 	g->is_emu = Check_file_type(g->name);
-	g->havecht = 0;
 	g->save_num = g->old_save_num = 0;
 	g->boot_mode = 0;
 	if (g->is_emu == 0xff)  //can not boot
@@ -1680,7 +1679,6 @@ u32 Game_pick(struct game_pick *g)
 		return 1;
 	}
 	f_chdir(currentpath);  //can open  re list game
-	g->havecht = Check_cheat_file(g->name);
 	g->old_save_num = Check_mde_file(g->name, &g->boot_mode);
 	g->save_num = g->old_save_num;
 	return 1;
@@ -1908,6 +1906,9 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 				tlog("launch: no addon on, so no patches");
 				progress_cart_copy(FAT_table_buffer, gamefilesize, LAUNCH_COPIED);
 			}
+			// Torii: the picked cheats' ROM patches, into the game in PSRAM
+			if (gl_cheat_patches)
+				cheatstore_launch(launch_save.rom, gamefilesize);
 			progress_done(NULL);
 			//wait_btn();
 			Launch_now(0x200, key_L, "BOOT WITH ADDON");
@@ -1933,6 +1934,10 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 			break;
 		case 3:  //WRITE TO NOR ADDON
 			Read_addon_switches();
+			if (gl_cheat_patches)
+				tlog("launch: %lu ROM patches of the picked cheats left out: a NOR game has no PSRAM "
+				     "image to patch",
+				     (unsigned long)gl_cheat_patches);
 
 			f_chdir(currentpath);  //return to game folder
 			u32 needpatch = 0;

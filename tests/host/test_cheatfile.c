@@ -159,7 +159,8 @@ void test_cheatfile_odd(void)
 	CHECK_EQ(cheatfile_text_len(&file), 0);
 	free(written(16));
 
-	static const char junk[] = "\0\xff\xfe=\n\n===\ncheat\ncheat_code = 1\ncheatX_code = 2\ncheat0code = 3\n\x80\x81";
+	static const char junk[] =
+		"\0\xff\xfe=\n\n===\ncheat\ncheat_code = 1\ncheatX_code = 2\ncheat0code = 3\n\x80\x81";
 	load(junk, sizeof(junk) - 1);
 	CHECK_EQ(file.count, 0);
 

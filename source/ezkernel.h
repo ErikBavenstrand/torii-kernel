@@ -118,13 +118,12 @@ extern u32 game_total_NOR;
 struct game_pick {
 	TCHAR *name;      // its file name in currentpath (current_filename)
 	u32 is_emu;       // Check_file_type: 0 GBA, 1 GBC, 2 GB, 3 NES
-	u32 havecht;      // Check_cheat_file: 0 no cheat file
 	u8 save_num;      // the SAVE TYPE line: 0 AUTO, 1-5 a type
 	u8 old_save_num;  // what its record says
 	u8 boot_mode;     // its record's ACTION_BOOT_* (actions.h): its own boot mode
 };
-// Fills g for g->name: 0 if it isn't a game. A GBA game reads its cheat and
-// save type files; an emulated one starts only with Game_launch's line 0.
+// Fills g for g->name: 0 if it isn't a game. A GBA game reads its save type
+// record; an emulated one starts only with Game_launch's line 0.
 u32 Game_pick(struct game_pick *g);
 // The bytes of the save g starts with (the save type a launch would use, by
 // its header and record), 0 if it has none. Reads the ROM's header from
