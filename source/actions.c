@@ -244,7 +244,7 @@ int action_game_saves(const char *path, char *rom, u32 rom_size, u32 *bytes)
 		return 0;
 	struct game_pick game = {.name = current_filename};
 	int ok = 0;
-	if (Game_pick(&game) && !game.is_emu && gamesave_rom_path_in(rom, rom_size, currentpath, game.name) >= 0) {
+	if (Game_pick(&game) && gamesave_rom_path_in(rom, rom_size, currentpath, game.name) >= 0) {
 		*bytes = Game_save_bytes(&game);
 		ok = *bytes != 0;
 	}

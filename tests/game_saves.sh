@@ -19,6 +19,9 @@
 #   import-size a file of the wrong size is refused; nothing changes
 #   active      Make active changes the record only
 #   launch      A on a slot plays it, with no Play with
+#   gb-new      a GB game (Save.gb, the GB page): New slot offers Empty and a
+#               copy, no .sav file; Empty makes a blank 64 KB slot
+#   gb-launch   A on a GB game's second slot plays it with that slot
 # Runs inside the torii-emu container after `just build` and `just
 # emu-headless`, and building tests/roms/hello.
 set -euo pipefail
@@ -306,3 +309,60 @@ logged "save: $S/q.sav exists"
 not_logged "screen ready: slot-picker"
 [ "$(slot_of)" = q ] || fail "launch: the record says $(slot_of)"
 echo "PASS: game saves: A on a slot plays it without Play with"
+
+# A GB game's slots: its emulator's 64 KB of cart SRAM each
+G=/torii/saves/Save.gb
+gb_card() {
+  cart=$carts/$1
+  shift
+  rm -rf "$cart" && mkdir -p "$cart"
+  mkfs.fat -C -F 32 -n SAVES "$cart/sd.img" 65536 >/dev/null
+  python3 tests/gb_rom.py "$cart/Save.gb"
+  mcopy -i "$cart/sd.img" "$cart/Save.gb" ::/Save.gb
+  mmd -i "$cart/sd.img" ::/torii ::/torii/saves ::$G
+  for s in "$@"; do
+    python3 -c "import sys; sys.stdout.buffer.write(sys.argv[1][0].upper().encode() * 65536)" "$s" >"$cart/f.sav"
+    mcopy -i "$cart/sd.img" "$cart/f.sav" "::$G/$s.sav"
+  done
+  printf 'save_type = 0\nboot_mode = 0\nslot = %s\n' "$1" >"$cart/game.ini"
+  mcopy -i "$cart/sd.img" "$cart/game.ini" ::$G/game.ini
+}
+gb_route() {
+  local to
+  NAV_SHOWN=gb # the card has only Save.gb: home shows the GB page, not the GBA one
+  to=$(nav_game_menu gb 0)
+  ROUTE=${to#-i }
+  printf '%s\n' "$(_nav_keys 12 DOWN A)" '-w "screen ready: game-saves"' >>"$ROUTE"
+}
+gb_slot_of() { mtype -i "$cart/sd.img" ::$G/game.ini | tr -d '\r' | sed -n 's/^slot = //p'; }
+
+# gb-new: New slot has Empty and a copy of Main, and no .sav file: DOWN
+# twice wraps to Empty (two items), so A makes an empty slot q
+gb_card gb-new Main
+gb_route
+k 30 DOWN A
+scr game-saves-new
+k 20 DOWN DOWN A
+scr rename
+k 10 A
+k 24 START
+scr game-saves
+k 30 B
+run -f 900
+logged "gsaves: new q (0): 0"
+mdir -b -i "$cart/sd.img" "::$G/q.sav" >/dev/null 2>&1 || fail "gb-new: no q.sav"
+[ "$(mtype -i "$cart/sd.img" "::$G/q.sav" | wc -c)" = 65536 ] || fail "gb-new: q.sav isn't 64 KB"
+[ "$(mtype -i "$cart/sd.img" "::$G/q.sav" | head -c 1)" = $'\xff' ] || fail "gb-new: q.sav isn't blank"
+[ "$(gb_slot_of)" = Main ] || fail "gb-new: the active slot changed"
+echo "PASS: game saves: a GB game's New slot offers Empty and a copy, no .sav file, and makes a blank 64 KB slot"
+
+# gb-launch: A on q plays it with q
+gb_card gb-launch Main q
+gb_route
+k 30 DOWN A
+run -u "launch: loading" -f 2400
+logged "gsaves: active q: 0"
+logged "save: $G/q.sav exists"
+logged "launch: loading Save.gb with Jagoomba Color"
+[ "$(gb_slot_of)" = q ] || fail "gb-launch: the record says $(gb_slot_of)"
+echo "PASS: game saves: A on a GB game's second slot plays it with that slot"

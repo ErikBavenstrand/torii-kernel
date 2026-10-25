@@ -510,8 +510,12 @@ static int new_slot(void)
 		gs.items[n] = (struct ui_pop_item){gs.copy_of, 0, 0};
 		gs.ids[n++] = NEW_COPY;
 	}
-	gs.items[n] = (struct ui_pop_item){gl_gsaves->new_file, 0, 0};
-	gs.ids[n++] = NEW_FILE;
+	// A .sav file is a GBA game's save: a GB, GBC or NES slot is in its
+	// emulator's format instead
+	if (probe.icon == ART_ICON16_GBA || probe.icon == ART_ICON16_NOR) {
+		gs.items[n] = (struct ui_pop_item){gl_gsaves->new_file, 0, 0};
+		gs.ids[n++] = NEW_FILE;
+	}
 	gs.popup = (struct ui_popup){gl_slots->new_title, ART_ICON8_SAVE + 1, gs.items, (u8)n, 0, 0};
 	gs.new_open = 1;
 	save_page_refresh();
@@ -670,10 +674,17 @@ int game_saves_probe(const char *path)
 		if (!action_game_saves(path, rom, sizeof(rom), &probe.size))
 			return 0;
 	} else {
+		// A GB, GBC or NES game's slots hold its emulator's 64 KB of cart
+		// SRAM (the game's save, the emulator's settings and save states)
+		static const u16 icons[] = {[LIB_GBA] = ART_ICON16_GBA,
+					    [LIB_GBC] = ART_ICON16_GBC,
+					    [LIB_GB] = ART_ICON16_GB,
+					    [LIB_NES] = ART_ICON16_NES};
 		const char *name = strrchr(path, '/');
-		if (!name || library_console_of(name + 1) != LIB_GBA)
+		u32 console = name ? library_console_of(name + 1) : LIB_CONSOLE_NONE;
+		if (console >= sizeof(icons) / sizeof(icons[0]) || !icons[console])
 			return 0;
-		probe.icon = ART_ICON16_GBA;
+		probe.icon = icons[console];
 	}
 	memcpy(probe.path, path, strlen(path) + 1);
 	return 1;

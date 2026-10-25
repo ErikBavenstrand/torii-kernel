@@ -108,7 +108,7 @@ games-dedupe/screen 67E86C46698E404E
 games-fav/screen 5F5922C2D6F31804
 games-fav/starred 017306DC53C8BC2C
 games-fav/toggled B72B6B874A5C61BB
-games-gb/popup 73FBC530961EE51B
+games-gb/popup 1E60754161273D33
 games-gb/screen A47EFAC3B4A4039F
 games-gba/cancelled 3F6800D51BAB2786
 games-gba/closed 7C5107676E6593E0
