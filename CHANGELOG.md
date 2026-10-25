@@ -4,6 +4,13 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Fixed:** the emulators' builds list their source files sorted, so they
+  link in the same order everywhere: v0.6.1's release, built on CI, has a
+  Jagoomba laid out differently from a local build of the same commit (both
+  work). `just repro` now rebuilds both emulators from a shuffled copy (4f2cf2b2).
+
 ## v0.6.1
 
 - **Changed:** a GB or GBC game with 32 KB of save RAM keeps it in the
