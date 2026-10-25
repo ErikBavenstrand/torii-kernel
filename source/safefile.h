@@ -26,8 +26,10 @@
 
 #include "safefile_scan.h"
 
-// The longest path the module takes, ".bak" included
-#define SAFEFILE_PATH_MAX 64
+// The longest path the module takes, ".bak" included: a game's cheat file,
+// /torii/cheats/<rom path>.cht (cheatstore.h), as long as its saves' paths.
+// The module keeps its paths in EWRAM, off the stack.
+#define SAFEFILE_PATH_MAX 288
 
 // Opens the copy of path to read (SAFEFILE_MAIN, _HAND or _BAK), or returns
 // SAFEFILE_NONE with nothing open (no copy, or none that holds up). A copy
@@ -40,6 +42,11 @@ int safefile_open(const char *path, u32 max);
 #define SAFEFILE_END (-1)
 #define SAFEFILE_LONG (-2)
 int safefile_line(char *buf, u32 size);
+// The rest of the open copy's text, byte for byte (line ends, a BOM),
+// into buf (word-aligned, size bytes), without its CRC line: f_read hands
+// whole sectors to the card's DMA. Returns its length, or -1 if it is
+// longer than size or the read failed (safefile_failed says which).
+int safefile_read(void *buf, u32 size);
 void safefile_close(void);
 // 1 if reading the file since the last safefile_open failed (a card error,
 // not a missing file or a copy that doesn't hold up): what was read may be
@@ -56,5 +63,9 @@ int safefile_failed(void);
 // both copies are written.
 typedef u32 (*safefile_fill)(void *ctx, u32 pos, char *buf, u32 max);
 int safefile_write(const char *path, u32 max, safefile_fill fill, void *ctx);
+// The same, with a cutpoint (cutpoint.h) after each copy's text and after
+// each copy closes, for a power-cut sweep of the file's writes
+// (tests/cheats.sh); other callers' sweeps keep their counts.
+int safefile_write_cut(const char *path, u32 max, safefile_fill fill, void *ctx);
 
 #endif

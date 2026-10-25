@@ -1,5 +1,6 @@
-// The cheat table the in-game handler applies, and the parser that fills it
-// from .cht lines. Free of hardware access, so tests/host runs it on the host.
+// The cheat table the in-game handler applies: each entry's VAL's low byte is
+// stored at address in every interrupt while cheats are on (gba_rts_patch.s).
+// A launch fills it from the game's cheat file (cheatstore.h).
 #ifndef TORII_CHEAT_H
 #define TORII_CHEAT_H
 
@@ -16,11 +17,5 @@ typedef struct ST_entry_ {
 #define CHEAT_MAX 600
 extern ST_entry pCHEAT[CHEAT_MAX];
 extern u32 gl_cheat_count;
-
-// Parses one cheat's value, "ADDR,VV,VV;ADDR,VV", into pCHEAT: each value
-// after the first goes to the next address. Reads len bytes of line, which
-// need not end in a NUL. Only hex digits count, and entries missing an
-// address or a value are dropped, as are writes past CHEAT_MAX.
-void Parse_cheat_line(const char *line, u32 len);
 
 #endif

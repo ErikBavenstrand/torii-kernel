@@ -58,8 +58,7 @@ enum settings_id {
 	// Games
 	SET_BOOT_MODE,  // how A, Play and Launch start GBA games: enum settings_boot
 	SET_ENGINE,     // the built-in table of patch points before scanning the ROM
-	SET_RTS,        // real-time save (save states)
-	SET_CHEATS,
+	SET_RTS,        // real-time save (save states); slot 4, the old Cheats switch, is unused
 	// Saves
 	SET_AUTO_SAVE,  // a game's save copied to the card without asking
 	SET_HISTORY,    // versions of a save kept per slot: index into settings_history_keep
@@ -87,11 +86,10 @@ enum settings_id {
 };
 
 // Explanations past the rows' (gl_set_explain is indexed by row, then
-// these): SET_RESET_ON's while Save states or Cheats put the in-game menu on
-// the reset keys (GBApatch.c), and SET_START_ON's for a hidden item
+// these): SET_RESET_ON's while Save states put the in-game menu on the reset
+// keys (GBApatch.c), and SET_START_ON's for a hidden item
 enum {
 	SET_EXPLAIN_RESET_STATES = SET_ROWS,  // Save states on: the menu in every game
-	SET_EXPLAIN_RESET_CHEATS,             // Cheats alone: in a game with a cheat file
 	SET_EXPLAIN_START_HIDDEN,             // Start on's item isn't on home now
 	SET_EXPLAINS
 };

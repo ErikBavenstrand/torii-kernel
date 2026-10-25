@@ -21,7 +21,6 @@ static const struct {
 	{"nes_classics_use_eeprom", test_nes_classics_use_eeprom},
 	{"file_type", test_file_type},
 	{"file_type_short_names", test_file_type_short_names},
-	{"cheat_parse", test_cheat_parse},
 	{"cheat_cap", test_cheat_cap},
 	{"game_hardware", test_game_hardware},
 	{"clock_and_rumble_are_separate", test_clock_and_rumble_are_separate},
@@ -74,6 +73,8 @@ static const struct {
 	{"userdata_fav_store", test_userdata_fav_store},
 	// An SD file renamed: its save and its lists follow it
 	{"rename_file", test_rename_file},
+	// A game's cheat file on the card, and its picks at a launch
+	{"cheatstore", test_cheatstore},
 	{"slotstore", test_slotstore},
 	{"saveorphan", test_saveorphan},
 	// Not in Diagnostics: they use the index's PSRAM and write games to the card

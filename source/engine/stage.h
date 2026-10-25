@@ -8,8 +8,8 @@
 // jobs_run, never from an IRQ and never inside another owner's operation, so
 // the stage can overlap every other owner. One that wants to keep data in
 // pReadCache across frames that run jobs must stop the asset jobs first
-// (cover_shutdown). The cheat screen's list (pCHTbuffer) is such an owner:
-// it calls cover_cache_invalidate first and starts no jobs.
+// (cover_shutdown), or keep clear of the stage: the cheat screen's file
+// (READCACHE_CHEATS) starts past it.
 #ifndef TORII_ENGINE_STAGE_H
 #define TORII_ENGINE_STAGE_H
 

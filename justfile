@@ -263,10 +263,12 @@ _analyze-image: _ready
     @{{fresh}} check analyze-image -- docker/analyze.Dockerfile && docker image inspect torii-analyze >/dev/null 2>&1 || { docker build -q -t torii-analyze -f docker/analyze.Dockerfile docker >/dev/null && {{fresh}} record analyze-image -- docker/analyze.Dockerfile; }
 
 # Play the listed games through the kernel and write dist/compat/index.html. Filters pick
-# games by code, system, save chip or file name, e.g. `just compat gbc` or `just compat Pokemon`
+# games by code, system, save chip or file name, e.g. `just compat gbc` or `just compat Pokemon`.
+# Unfiltered, it also checks real cheat codes in their games (tests/cheat_codes.sh)
 [positional-arguments]
 compat *filters: build emu-headless
     {{emu_docker}} python3 tests/games.py "$@"
+    @if [ $# = 0 ] || [ "$*" = --all ]; then {{emu_docker}} tests/cheat_codes.sh; fi
 
 # Build the hardware-free kernel code with tests/host for the host, under ASan and UBSan, and run it;
 # test tools/font.py, tools/asset.py, tools/art.py, tools/art_scrape.py, tools/cheats.py, tools/art_pack.py, tools/library_report.py, the palette and the upgrade file's layout

@@ -57,13 +57,11 @@ void action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset);
 // What a GBA game on the SD card starts with, read from the card: its save
 // type (what its record says, 0 AUTO if none; ACTION_SAVE_TYPES for a GB,
 // GBC or NES game or a NOR: entry), its own boot mode (ACTION_BOOT_*,
-// GBApatch.h: ACTION_BOOT_DEFAULT unless Game info set one) and its cheat file
-// (Check_cheat_file's handle, 0 none). Returns 0 if path isn't a game the
-// cart starts.
+// GBApatch.h: ACTION_BOOT_DEFAULT unless Game info set one). Returns 0 if
+// path isn't a game the cart starts.
 struct action_facts {
 	u32 save_type;
 	u32 boot_mode;
-	u32 cheats;
 };
 u32 action_game_facts(const char *path, struct action_facts *out);
 // Sets a GBA game's save type (0 AUTO, 1-5 a type: ACTION_SAVE_TYPES) in

@@ -27,7 +27,8 @@
 #include "../library.h"
 #include "../namesdb.h"
 #include "../sdlist.h"
-#include "../showcht.h"
+#include "../cheatstore.h"
+#include "cheats.h"
 #include "../tlog.h"
 #include "../userdata.h"
 #include "../engine/engine.h"
@@ -128,6 +129,7 @@ static struct {
 	char pick[USERDATA_PATH_MAX] ALIGN(4);
 	char title[GAMENAME_MAX + 1];
 	char ask[GAMENAME_MAX + 16];
+	char cheats[12];  // the popup's Cheats: how many the file has
 	struct ui_pop_item items[LANG_POP_ITEMS];
 	u8 actions[LANG_POP_ITEMS];
 	struct ui_popup popup;
@@ -1327,52 +1329,34 @@ static void reshow(u32 row)
 // Starts the picked game: the menu's session ends, and nav brings the page
 // back if no game started (and the page here, if the session didn't end).
 // how: ACTION_CLEAN, ACTION_DEFAULT (the game's boot mode, else Settings'),
-// or ACTION_ADDON with the cheats picked on the cheat screen (keep) or none
-static void launch(u32 how, int keep_cheats, u32 hard)
+// or ACTION_ADDON; a launch with addons applies the game's picked cheats
+static void launch(u32 how, u32 hard)
 {
-	if (!keep_cheats)
-		cheat_menu_forget();
 	tlog("games: start %s (how %lu%s)", games.pick, (unsigned long)how, hard ? ", hard reset" : "");
 	action_launch_title(games.title);  // Play with names it as the list does
 	action_launch(games.pick, how, ACTION_SAVE_KEEP, hard);
 	action_launch_title(NULL);
 }
 
-extern TCHAR currentpath[];
-
-// Boot with addon: the cheat screen first when Cheats is on and the game
-// has a cheat file; else (or once it has no cheat in it) the addons alone
 static void boot_with_addon(u32 hard)
 {
-	struct action_facts facts;
-	if (gl_cheat_on && action_game_facts(games.pick, &facts) && facts.cheats) {
-		u32 row = ui_list_cursor(list_node());
-		static TCHAR file[GAME_NAME_MAX + 1] EWRAM_BSS;
-		static TCHAR kept[MAX_path_len] EWRAM_BSS;
-		snprintf(file, sizeof(file), "%s", file_name(games.pick));
-		// It takes the page's place in the menu's session (both don't fit)
-		ui_leave(UI_TR_DEEPER, 1);
-		while (ui_depth())
-			ui_pop();
-		// A cheat file found by game code moves currentpath to its folder
-		memcpy(kept, currentpath, sizeof(kept));
-		u32 r = Open_cht_file(file, facts.cheats, games.title, registry_items[games.item].icon16);
-		memcpy(currentpath, kept, sizeof(kept));
-		f_chdir(currentpath[0] ? currentpath : "/");
-		if (r == CHEATS_BACK) {
-			reshow(row);
-			return;
-		}
-		launch(ACTION_ADDON, r == CHEATS_PLAY, hard);  // no cheat in the file: the addons alone
-		reshow(row);
-		return;
-	}
-	launch(ACTION_ADDON, 0, hard);
+	launch(ACTION_ADDON, hard);
+}
+
+// The game's cheat screen, in the page's place in the menu's session (both
+// don't fit), then the page again at row
+static void cheats_game(u32 row)
+{
+	ui_leave(UI_TR_DEEPER, 1);
+	while (ui_depth())
+		ui_pop();
+	cheats_run(games.pick, games.title, registry_items[games.item].icon16);
+	reshow(row);
 }
 
 static int addons_off(void)
 {
-	return (gl_reset_on | gl_rts_on | gl_sleep_on | gl_cheat_on) == 0;
+	return (gl_reset_on | gl_rts_on | gl_sleep_on) == 0;
 }
 
 static void popup_add(u32 action, const char *value, u8 flags)
@@ -1457,7 +1441,7 @@ static void play_as(u32 boot, u32 hard)
 	if (boot == LANG_BOOT_ADDONS)
 		boot_with_addon(hard);
 	else
-		launch(boot == LANG_BOOT_CLEAN ? ACTION_CLEAN : ACTION_DEFAULT, 0, hard);
+		launch(boot == LANG_BOOT_CLEAN ? ACTION_CLEAN : ACTION_DEFAULT, hard);
 }
 
 // The game's saves page; playing a slot there starts the game as Play's
@@ -1508,6 +1492,10 @@ static void popup_run(u32 i)
 	popup_add(LANG_POP_PLAY, nboots > 1 ? gl_games->boots[boots[0]] : 0, nboots > 1 ? UI_POP_STEP : 0);
 	if (game_saves_probe(games.pick))
 		popup_add(LANG_POP_SAVES, 0, 0);
+	if (gba && cheatstore_read(games.pick)) {
+		snprintf(games.cheats, sizeof(games.cheats), "%lu", (unsigned long)cheatstore()->file.count);
+		popup_add(LANG_POP_CHEATS, games.cheats, 0);
+	}
 	u32 fav_item = games.popup.count;
 	popup_add(LANG_POP_FAV, fav ? gl_games->on : gl_games->off, 0);
 	if (!nor && g.rec != LIBRARY_NONE)
@@ -1587,6 +1575,9 @@ static void popup_run(u32 i)
 		case LANG_POP_SAVES:
 			saves_game(i, boots[boot]);
 			return;
+		case LANG_POP_CHEATS:
+			cheats_game(i);
+			return;
 		case LANG_POP_RENAME:
 			rename_game(i);
 			return;
@@ -1608,7 +1599,7 @@ static void play_run(u32 arg)
 	if (!up() || !row_still(i) || !game_at(i, &g) || !game_path(&g, games.pick))
 		return;
 	snprintf(games.title, sizeof(games.title), "%s", game_name(&g, games.name));
-	launch(ACTION_DEFAULT, 0, hard);
+	launch(ACTION_DEFAULT, hard);
 }
 
 // --- Keys -------------------------------------------------------------------------------

@@ -8,6 +8,8 @@
 #include "GBApatch.h"
 #include "artkey.h"
 #include "boxart.h"
+#include "cheat.h"
+#include "cheatstore.h"
 #include "gamename.h"
 #include "gamesave.h"
 #include "lang.h"
@@ -147,7 +149,8 @@ static void game_leave(void)
 }
 
 // How ACTION_DEFAULT starts game: its own boot mode, else Settings'; with
-// addons, but none on, is a clean boot (nothing to patch in)
+// addons, but none on and no cheat picked, is a clean boot (nothing to
+// patch in)
 static u32 default_how(const struct game_pick *game)
 {
 	u32 own = game->boot_mode == ACTION_BOOT_ADDONS || game->boot_mode == ACTION_BOOT_CLEAN;
@@ -155,7 +158,7 @@ static u32 default_how(const struct game_pick *game)
 		   : Read_SET_info(assress_boot_mode) == 1 ? ACTION_BOOT_CLEAN
 							   : ACTION_BOOT_ADDONS;
 	u32 any = Read_SET_info(assress_v_reset) == 1 || Read_SET_info(assress_v_rts) == 1 ||
-		  Read_SET_info(assress_v_sleep) == 1 || Read_SET_info(assress_v_cheat) == 1;
+		  Read_SET_info(assress_v_sleep) == 1 || gl_cheat_count || gl_cheat_patches;
 	tlog("launch: boot mode %s (%s)%s", mode == ACTION_BOOT_CLEAN ? "clean" : "with addons",
 	     own ? "the game's" : "Settings'", mode == ACTION_BOOT_ADDONS && !any ? ", none on" : "");
 	return mode == ACTION_BOOT_CLEAN || !any ? ACTION_CLEAN : ACTION_ADDON;
@@ -177,8 +180,18 @@ void action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset)
 
 	struct game_pick game = {.name = current_filename};
 	u32 ok = Game_pick(&game);
+	// A GBA game started with addons gets its picked cheats (cheatstore.h),
+	// read before it loads: they decide its patch's room and hook
+	gl_cheat_count = gl_cheat_patches = 0;
+	if (ok && !game.is_emu && how != ACTION_CLEAN && how != ACTION_NOR) {
+		char rom[GAMESAVE_PATH_BYTES];
+		if (gamesave_rom_path_in(rom, sizeof(rom), currentpath, game.name) >= 0)
+			cheatstore_launch(rom, 0);
+	}
 	if (ok && how == ACTION_DEFAULT)
 		how = game.is_emu ? ACTION_CLEAN : default_how(&game);
+	if (how == ACTION_CLEAN || how == ACTION_NOR)
+		gl_cheat_count = gl_cheat_patches = 0;  // a clean boot: nothing patched in
 	if (!ok) {
 		tlog("launch %s: not a game the cart starts", path_copy);
 	} else if (game.is_emu && how >= ACTION_NOR) {
@@ -216,11 +229,10 @@ u32 action_game_facts(const char *path, struct action_facts *out)
 	if (!copy_path(path) || userdata_nor_name(path_copy) || !game_enter("facts"))
 		return 0;
 	struct game_pick game = {.name = current_filename};
-	u32 ok = Game_pick(&game);  // reads the game's record and looks for a cheat file
+	u32 ok = Game_pick(&game);  // reads the game's record
 	if (ok && !game.is_emu) {
 		out->save_type = game.save_num < ACTION_SAVE_TYPES ? game.save_num : 0;
 		out->boot_mode = game.boot_mode < ACTION_BOOTS ? game.boot_mode : ACTION_BOOT_DEFAULT;
-		out->cheats = game.havecht;
 	}
 	game_leave();
 	return ok;
@@ -294,6 +306,11 @@ int action_delete_file(const char *path)
 		return 0;
 	}
 	tlog("delete: %s", path_copy);
+	// Its cheat file goes with it (its save stays, T11): the picks are of
+	// that file and no other's
+	const char *slash = strrchr(path_copy, '/');
+	if (library_console_of(slash + 1) == LIB_GBA)
+		cheatstore_delete(path_copy);
 	tlog_card_freed();
 	userdata_forget(path_copy);
 	library_forget(path_copy);
@@ -306,8 +323,9 @@ int action_delete_file(const char *path)
 // after its path (saveslot.h): its folder of slots and record under
 // /torii/saves and its history under /torii/backups, which the rename moves
 // as they are (the folder's name is the game's file name, so one rename each).
-// Its save states and
-// cheats (name_with_ext) and patch cache are in folders at the card's root,
+// Its cheat file, both copies, is
+// /torii/cheats/<its path less the extension>.cht (cheatstore.h). Its save
+// states (name_with_ext) and patch cache are in folders at the card's root,
 // and its custom box art (B22) is in /torii/art. They move with it, and the
 // save state and the rest never land on another game's: the rename is
 // refused first if one would. A move that fails puts back what
@@ -320,6 +338,7 @@ enum {
 	SIDE_DIR,     // dir and the game's path: a folder of its own (saves, history)
 	SIDE_EXT,     // name_with_ext's, ext; GBA games only
 	SIDE_ART,     // the file name and ".bin"
+	SIDE_CHEATS,  // dir and the game's path less its extension, then ext (cheatstore.h); GBA games only
 };
 #define RENAME_JOURNAL "/torii/rename.txt"
 #define RENAME_JOURNAL_MAX (2 * USERDATA_PATH_MAX + 64)  // its one line, and the CRC line
@@ -327,18 +346,23 @@ struct sidecar {
 	const char *dir;
 	u8 kind;
 	u8 cache;  // a cache the next launch makes again: one already under the new name goes
-	char ext[4];
+	u8 file;   // what it is: actions.h's ACTION_FILE_*
+	char ext[8];
 };
 #define ART_CUSTOM_DIR "/torii/art/custom"  // B22's custom art: <file name>.bin (artkey.h)
 #define ART_CUSTOM_EXT ARTKEY_EXT
-// In the order of actions.h's ACTION_FILE_*
+// The cheat file is a safe file of two copies (safefile.h): both move
 static const struct sidecar sidecars[] = {
-	{SAVESLOT_SAVES_DIR, SIDE_DIR, 0, ""}, {SAVESLOT_BACKUPS_DIR, SIDE_DIR, 0, ""},
-	{"/RTS", SIDE_EXT, 0, "rts"},          {"/CHEAT", SIDE_EXT, 0, "cht"},
-	{"/PATCH", SIDE_EXT, 1, "pat"},        {ART_CUSTOM_DIR, SIDE_ART, 0, ""},
+	{SAVESLOT_SAVES_DIR, SIDE_DIR, 0, ACTION_FILE_SAVE, ""},
+	{SAVESLOT_BACKUPS_DIR, SIDE_DIR, 0, ACTION_FILE_HISTORY, ""},
+	{"/RTS", SIDE_EXT, 0, ACTION_FILE_STATES, "rts"},
+	{CHEATS_DIR, SIDE_CHEATS, 0, ACTION_FILE_CHEATS, ".cht"},
+	{CHEATS_DIR, SIDE_CHEATS, 0, ACTION_FILE_CHEATS, ".cht.bak"},
+	{"/PATCH", SIDE_EXT, 1, ACTION_FILE_PATCH, "pat"},
+	{ART_CUSTOM_DIR, SIDE_ART, 0, ACTION_FILE_ART, ""},
 };
 #define SIDECARS (sizeof(sidecars) / sizeof(*sidecars))
-#define SIDE_ART_AT 5  // the custom art's place in sidecars
+#define SIDE_ART_AT 6  // the custom art's place in sidecars
 
 // The rename's RAM, in pReadCache (READCACHE_RENAME): what lasts while it
 // calls the names file, the user's lists and the library, which borrow
@@ -367,6 +391,12 @@ static int side_path(char *out, const struct sidecar *s, const char *name, u32 c
 	char file[GAME_NAME_MAX + 8];
 	if (s->kind == SIDE_DIR)
 		return (u32)snprintf(out, SIDE_PATH_MAX, "%s%s/%s", s->dir, RW->dir, name) < SIDE_PATH_MAX;
+	if (s->kind == SIDE_CHEATS) {
+		const char *dot = strrchr(name, '.');
+		u32 stem = dot && dot != name ? (u32)(dot - name) : (u32)strlen(name);
+		return console == LIB_GBA && (u32)snprintf(out, SIDE_PATH_MAX, "%s%s/%.*s%s", s->dir, RW->dir,
+							   (int)stem, name, s->ext) < SIDE_PATH_MAX;
+	}
 	if (s->kind == SIDE_EXT && console == LIB_GBA)
 		name_with_ext(file, name, s->ext);
 	else if (s->kind == SIDE_ART && strlen(name) + sizeof(ART_CUSTOM_EXT) <= sizeof(file))
@@ -643,7 +673,7 @@ u8 action_rename_fail_file;
 static FRESULT side_move(u32 i, const char *name, const char *to_name, u32 console)
 {
 	struct rename_work *w = RW;
-	if (action_rename_fail_file == i + 1)
+	if (action_rename_fail_file == sidecars[i].file + 1)
 		return FR_DENIED;
 	if (!side_path(w->from, &sidecars[i], name, console) || !side_path(w->to, &sidecars[i], to_name, console))
 		return FR_OK;
@@ -696,7 +726,8 @@ u32 action_rename_file(const char *path, const char *new_name)
 		for (u32 i = 0; i < SIDECARS; i++) {
 			w->has[i] = side_exists(i, w->name, console);
 			// (a game's own folders are its path's: no other game has them)
-			any |= w->has[i] && !sidecars[i].cache && sidecars[i].kind != SIDE_DIR;
+			any |= w->has[i] && !sidecars[i].cache && sidecars[i].kind != SIDE_DIR &&
+			       sidecars[i].kind != SIDE_CHEATS;
 		}
 		// A save another game shares (the same name in another folder, or
 		// a .gb and .gbc of one name) stays with it: moving it, or its save
@@ -726,7 +757,7 @@ u32 action_rename_file(const char *path, const char *new_name)
 			if (sidecars[i].cache || case_only || !side_taken(i, new_name, console))
 				continue;
 			tlog("rename %s: the %s files of the new name are there already", path, sidecars[i].dir);
-			w->taken = (u8)i;
+			w->taken = sidecars[i].file;
 			return ACTION_RENAME_SIDE_TAKEN;
 		}
 	}

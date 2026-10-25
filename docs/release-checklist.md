@@ -22,14 +22,14 @@ in `dist/logs/torii.log`.
    once, without a computer.
 3. Copy the build, the EEPROM probe and the cheat test to the card:
    `just test-roms && just sd /Volumes/OMEGA tests/roms/eeprom/eeprom.gba tests/roms/hello/hello.gba`.
-   Then make `CHEAT/Hello.cht` on the card holding these lines:
+   Then make `torii/cheats/Hello.cht` on the card holding these lines:
 
    ```
-   [Plain]
-   ON=1236,58;
+   cheats = 1
 
-   [GameInfo]
-   Name=Hello
+   cheat0_desc = "Green square"
+   cheat0_code = "02001236:58"
+   cheat0_enable = false
    ```
 
 4. Delete the probe's save folder (`torii/saves/EEPROM Probe.gba`) from the card, so the probe's 8K runs
@@ -55,7 +55,7 @@ on, NES with no NES launch) as "unconfirmed" in its summary.
 | A save state saves and loads | in the menu, SAVE; play on; open the menu again and LOAD: the game is back where you saved |
 | DEBUG reaches the log | with LOGGING on: L+R+START, DEBUG; it says DEBUG SAVED and picks RESET. Choose RESET, not power-off: the snapshot is in cart RAM, which a power-off clears. The kernel's boot logs "debug info" |
 | Sleep sleeps and wakes | Sleep on, Boot with addon, L+R+SELECT in the game: the screen goes off; the wake keys bring the game back where it was |
-| A cheat works | `hello.gba` Boot with addon (it finds `CHEAT/Hello.cht`), then L+R+START, CHEAT ON, and back to the game. Hello doesn't react to buttons; a green square in its top right corner shows the cheat at work (no square before CHEAT ON) |
+| A cheat works | `hello.gba`'s popup shows Cheats 1; on the cheat screen, A ticks Green square and B saves. Boot with addon: Hello doesn't react to buttons, and a green square in its top right corner shows the cheat at work from the start. L+R+START, CHEAT OFF takes the square away, CHEAT ON brings it back. Switched off and on, the tick is still there |
 | A GB or GBC game runs | from its console's list or the SD card page; note the game's title |
 | A GB game keeps its palette | a GB (not GBC) game: L+R, Display, Palette, pick another, leave the menu, power off and on, launch it again: the picked palette is back |
 | Pokémon Crystal doesn't stutter | walk around a town a minute at the default gamma: steps are smooth (jagoombacolor#46) |

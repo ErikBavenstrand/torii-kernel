@@ -190,13 +190,14 @@ extern char *gl_sd_save;
 extern char *gl_sd_no_save;
 
 // The game lists (screens/games.c), their popup and Game info card, and the
-// cheat screen (showcht.c)
+// cheat screen (screens/cheats.c)
 enum {
 	LANG_POP_PLAY,
 	LANG_POP_FAV,
 	LANG_POP_RENAME,
 	LANG_POP_INFO,
 	LANG_POP_SAVES,
+	LANG_POP_CHEATS,    // a GBA game with a cheat file: its cheat screen (screens/cheats.c)
 	LANG_POP_UNRECENT,  // the Recent page's Remove: off Recent, the file stays
 	LANG_POP_DELETE,
 	LANG_POP_ITEMS,
@@ -243,6 +244,19 @@ struct lang_games {
 	const char *played_not_recent, *played_recently;
 };
 extern const struct lang_games *gl_games;
+
+// The cheat screen (screens/cheats.c)
+struct lang_cheats {
+	const char *hint_pick;  // A
+	const char *why[5];     // a greyed row's reason, by cheatfile.h's CHEATFILE_WHY_* (0: none)
+	const char *nor;        // a ROM-patch cheat's note
+	const char *unnamed;    // a cheat with no desc line
+	const char *reading, *reading_text;  // the progress dialog while a big file decodes
+	const char *none;       // a file of master codes only
+	const char *gone;       // its file can't be read now
+	const char *save_failed;  // the picks couldn't be written
+};
+extern const struct lang_cheats *gl_cheats;
 #define EN_GAME_DELETE "Delete %s?"
 
 // The rename keyboard (screens/rename.c) and what a rename says

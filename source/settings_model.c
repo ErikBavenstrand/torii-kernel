@@ -19,7 +19,6 @@ const struct settings_row settings_rows[SET_ROWS] = {
 	[SET_BOOT_MODE] = {SET_SEC_GAMES, SET_CHOICE, assress_boot_mode, 0, SET_BOOT_ADDONS, SET_BOOTS, &gl_set_boots, 0},
 	[SET_ENGINE] = {SET_SEC_GAMES, SET_ONOFF, assress_engine_sel, 0, 1, 2, 0, 0},
 	[SET_RTS] = {SET_SEC_GAMES, SET_ONOFF, assress_v_rts, 0, 0, 2, 0, 0},
-	[SET_CHEATS] = {SET_SEC_GAMES, SET_ONOFF, assress_v_cheat, 0, 0, 2, 0, 0},
 	[SET_AUTO_SAVE] = {SET_SEC_SAVES, SET_ONOFF, assress_auto_save_sel, 0, 0, 2, 0, 0},
 	[SET_HISTORY] = {SET_SEC_SAVES, SET_CHOICE, assress_history, 0, SET_HISTORY_DEFAULT, SET_HISTORY_CHOICES, &gl_set_history, 0},
 	[SET_GAME_SAVES] = {SET_SEC_SAVES, SET_ACTION, SET_NO_SLOT, 0, 0, 0, 0, SET_ACTION_GAME_SAVES},
@@ -43,7 +42,7 @@ const struct settings_row settings_rows[SET_ROWS] = {
 const struct settings_section_info settings_sections[SET_SECTIONS] = {
 	[SET_SEC_LOOK] = {SET_THEME, 5},
 	[SET_SEC_CLOCK] = {SET_TIME_ROW, 4},
-	[SET_SEC_GAMES] = {SET_BOOT_MODE, 4},
+	[SET_SEC_GAMES] = {SET_BOOT_MODE, 3},
 	[SET_SEC_SAVES] = {SET_AUTO_SAVE, 4},
 	[SET_SEC_CART] = {SET_RUMBLE, 5},
 	[SET_SEC_HOTKEYS] = {SET_RESET_ON, 4},
@@ -432,8 +431,6 @@ const char *settings_explain(const struct settings_values *v, u32 id)
 {
 	if (id == SET_RESET_ON && settings_reset_armed(v))
 		return gl_set_explain[SET_EXPLAIN_RESET_STATES];
-	if (id == SET_RESET_ON && settings_get(v, SET_CHEATS))
-		return gl_set_explain[SET_EXPLAIN_RESET_CHEATS];
 	if (id == SET_START_ON) {
 		u16 code = settings_get(v, id);
 		if (code != SET_START_HOME && !start_offered(v, code))

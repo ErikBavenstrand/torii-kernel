@@ -16,9 +16,9 @@
 -k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:A -k @28:-
 -w "screen ready: settings"
 -k @8:R -k @12:- -k @20:R -k @24:- -k @32:R -k @36:-
--w "settings: row 13"
+-w "settings: row 12"
 -k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:-
--w "settings: row 16"
+-w "settings: row 15"
 -s @4:settings.png
 -k @8:A -k @12:-
 -w "screen ready: saves"

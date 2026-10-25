@@ -134,8 +134,7 @@ def build_sd(path: Path) -> None:
     """The SD card every scenario starts from."""
     stage = path.parent / "sd"
     shutil.rmtree(stage, ignore_errors=True)
-    (stage / "CHEAT").mkdir(parents=True)
-    (stage / "Games").mkdir()
+    (stage / "Games").mkdir(parents=True)
     (stage / "Long").mkdir()
     (stage / "SAVER").mkdir()
     shutil.copy("tests/roms/hello/hello.gba", stage / "Hello.gba")
@@ -151,20 +150,38 @@ def build_sd(path: Path) -> None:
     # Enough files to scroll a long way (sd-deep)
     for i in range(1, DEEP_FILES + 1):
         (stage / "Long" / f"Game {i:03d}.gba").write_bytes(bytes(64 * i))
-    (stage / "CHEAT" / "Hello.cht").write_bytes(
-        b"[Infinite lives]\r\nON=1234,56;\r\n\r\n[Max money]\r\nON=1235,57;\r\n\r\n"
-        b"[GameInfo]\r\nName=Hello\r\n"
-    )
-    # Cheat files for the cheat screen's scenarios: many cheats to scroll
+    # Cheat files in libretro's format (source/cheatfile.h), for the cheat
+    # screen: Hello's with a master code (hidden), a pick, a conditional
+    # (needs v0.8), a placeholder and a ROM patch; many cheats to scroll
     # through (cheats-many), and names too long for a row (cheats-long)
+    cheats = stage / "torii" / "cheats"
+    (cheats / "Games").mkdir(parents=True)
+    (cheats / "Hello.cht").write_bytes(
+        libretro_cht(
+            [
+                ("(M) Must Be On", "0000ABCD 0007+100F68A4 0007", False),
+                ("Infinite lives", "32001000 0063", False),
+                ("Max money", "82001002 270F", True),
+                ("Moon jump (hold A)", "74000130 03FE+32001004 0001", False),
+                ("Pick a level", "3300075C+00??", False),
+                ("Skip the intro", "08001000:46C0", False),
+            ]
+        )
+    )
     shutil.copy("tests/roms/hello/hello.gba", stage / "Games" / "Long cheat.gba")
     shutil.copy("tests/roms/hello/hello.gba", stage / "Games" / "Many cheats.gba")
-    (stage / "CHEAT" / "Many cheats.cht").write_bytes(many_cheats())
-    (stage / "CHEAT" / "Long cheat.cht").write_bytes(
-        b"[InfiniteHealthMagicAndAmmoForEveryoneInTheParty]\r\n"
-        b"OnlyWhileTheStartButtonIsHeldDownDuringBattles=1234,56;\r\n"
-        b"Always=1234,57;\r\n\r\n[Short]\r\nON=1235,58;\r\n\r\n"
-        b"[GameInfo]\r\nName=A game whose name is longer than its title bar\r\n"
+    (cheats / "Games" / "Many cheats.cht").write_bytes(many_cheats())
+    (cheats / "Games" / "Long cheat.cht").write_bytes(
+        libretro_cht(
+            [
+                (
+                    "Infinite health, magic and ammo for everyone in the party",
+                    "32001000 0063",
+                    False,
+                ),
+                ("Short", "32001001 0001", True),
+            ]
+        )
     )
     (stage / "SAVER" / "Recently play.txt").write_text(
         "/Hello.gba\n/Games/Idle.gba\n", encoding="utf-8"
@@ -188,19 +205,33 @@ def build_sd(path: Path) -> None:
     copy_tree(str(path), stage, "::")
 
 
+def libretro_cht(cheats: list[tuple[str, str, bool]]) -> bytes:
+    """A cheat file as tools/cheats.py writes one, CRLF ends as RetroArch's."""
+    lines = [f"cheats = {len(cheats)}", ""]
+    for n, (desc, code, on) in enumerate(cheats):
+        lines += [
+            f'cheat{n}_desc = "{desc}"',
+            f'cheat{n}_code = "{code}"',
+            f"cheat{n}_enable = {'true' if on else 'false'}",
+            "",
+        ]
+    return "\r\n".join(lines).encode()
+
+
 def many_cheats() -> bytes:
-    """A cheat file of 40 cheats, with one to three options each."""
+    """A cheat file of 40 cheats."""
     words = ["Infinite", "Max", "Unlock", "Walk", "Instant", "Never", "All", "Super"]
     things = ["lives", "money", "items", "through walls", "win", "lose", "maps", "jump"]
-    options = [["ON"], ["x2", "x10"], ["Slow", "Normal", "Fast"]]
-    out = []
-    for i in range(40):
-        out.append(f"[{words[i % 8]} {things[i // 5 % 8]} {i + 1}]")
-        for j, option in enumerate(options[i % 3]):
-            out.append(f"{option}={0x2000 + i:X},{j + 1:02X};")
-        out.append("")
-    out += ["[GameInfo]", "Name=Many cheats"]
-    return "\r\n".join(out).encode() + b"\r\n"
+    return libretro_cht(
+        [
+            (
+                f"{words[i % 8]} {things[i // 5 % 8]} {i + 1}",
+                f"3200{0x1000 + i:04X} 00{i:02X}",
+                i % 7 == 0,
+            )
+            for i in range(40)
+        ]
+    )
 
 
 def run(cmd: list[str]) -> None:

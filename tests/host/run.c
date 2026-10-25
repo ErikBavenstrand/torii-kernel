@@ -5,15 +5,10 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-#include "../../source/cheat.h"
 #include "../kernel/torii_test.h"
 #include "tests.h"
 
 int torii_test_failures;
-
-// The kernel defines these in source/showcht.c, which needs the hardware.
-ST_entry pCHEAT[CHEAT_MAX];
-u32 gl_cheat_count;
 
 void tlog(const char *format, ...)
 {
@@ -76,13 +71,12 @@ static const struct {
 	{"names_cache_full", test_names_cache_full},
 	{"names_lines", test_names_lines},
 	{"names_db_name", test_names_db_name},
-	{"cheat_parse", test_cheat_parse},
-	{"cheat_reads_only_len", test_cheat_reads_only_len},
-	{"cheat_long_fields", test_cheat_long_fields},
-	{"cheat_cap", test_cheat_cap},
-	{"cheat_garbage", test_cheat_garbage},
-	{"cheat_empty_entries", test_cheat_empty_entries},
-	{"cheat_whitespace", test_cheat_whitespace},
+	{"cheatfile_parse", test_cheatfile_parse},
+	{"cheatfile_odd", test_cheatfile_odd},
+	{"cheatfile_status", test_cheatfile_status},
+	{"cheatfile_keys_carry", test_cheatfile_keys_carry},
+	{"cheatfile_budget", test_cheatfile_budget},
+	{"cheatfile_write_back", test_cheatfile_write_back},
 	{"cheatcode_mgba_vectors", test_cheatcode_mgba_vectors},
 	{"cheatcode_par3_types", test_cheatcode_par3_types},
 	{"cheatcode_par3_encrypted", test_cheatcode_par3_encrypted},

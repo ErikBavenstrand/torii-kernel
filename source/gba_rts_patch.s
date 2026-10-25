@@ -132,12 +132,14 @@ check_sleep:
 	tst 		r2,r3
 	beq 		sleep_now
 	
-	@;check cheat
+	@;check cheat. Torii: the word at CheatONOFF is 1 for CHEAT OFF, anything
+	@;else on: the BIOS's soft reset clears it, so a game starts with its
+	@;picked cheats running (v0.7); the in-game menu's CHEAT OFF stops them
 	adrl 		r2,CheatONOFF
 	ldr 		r2,[r2]
 	ldr 		r2,[r2] @	
 	cmp 		r2,#1
-	bne 		nocheat
+	beq 		nocheat
 	stmfd   SP!, {r4-r6}	
 	adrl 		r5,CHEAT
 	adrl		r6,Cheat_count
@@ -992,7 +994,7 @@ pressB:
 	
 	@;===================================================		
 call_CheatON:
-	mov r3,#1
+	mov r3,#0			@;Torii: 0 on, 1 off (check cheat)
 set_Cheat:
 	ADR r2,CheatONOFF
 	ldr	r2,[r2]
@@ -1000,7 +1002,7 @@ set_Cheat:
 	b b_pressed_quit
 	@;===================================================		
 call_CheatOFF:
-	mov r3,#0
+	mov r3,#1
 	b   set_Cheat
 	@;===================================================
 	@;Torii: DEBUG. Its code (Debug_blob) is appended after the cheat table

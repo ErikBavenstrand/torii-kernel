@@ -1,11 +1,16 @@
 // pReadCache, 128 KB of EWRAM, is the kernel's scratch buffer. It holds
 // nothing between two passes of a menu loop: each owner below borrows it for
 // one operation and needs nothing in it afterwards. Its owners, by offset:
-// - [0x2000, ...): the cheat screen's parsed list, and READCACHE_CHEAT_WORK
-//   at the end, its line and value buffers (showcht.c), until it returns.
+// - READCACHE_CHEATS, 96 KB from 0x8000 to the end, clear of the stage: a
+//   game's cheat file (struct cheatstore, cheatstore.h): its text, its
+//   cheats and the decoder's work, while the cheat screen runs
+//   (screens/cheats.c, which starts no job and calls nothing else that
+//   borrows past the stage), within the game popup's count of them, and at a
+//   launch within cheatstore_launch (before the game is loaded, and again
+//   once it is in PSRAM, for its ROM patches).
 // - All of it: bulk SD, NOR, SRAM and PSRAM transfers inside one operation:
 //   starting a game (chunks, patch files, the save), writing a game to NOR,
-//   the NOR list's record, save backup and restore, GameID2cht.bin,
+//   the NOR list's record, save backup and restore,
 //   Diagnostics, and the unit tests (in Diagnostics, and at boot in a test build).
 // - READCACHE_STAGE: the engine's asset jobs (engine/stage.h), within one job
 //   step: an SD chunk on its way to PSRAM, the path being opened, box art's
@@ -92,6 +97,8 @@
 #define READCACHE_DEDUPE 0x0
 #define READCACHE_DEDUPE_SIZE 0x1000
 #define READCACHE_SHARE_SIZE 0x1000
+#define READCACHE_CHEATS 0x8000
+#define READCACHE_CHEATS_SIZE 0x18000
 
 #define MAX_NOR 0x40
 
@@ -144,7 +151,7 @@
 #define assress_v_reset 1
 #define assress_v_rts 2
 #define assress_v_sleep 3
-#define assress_v_cheat 4
+//4 was the global Cheats switch until v0.7 (a game's picks are in its cheat file now)
 #define assress_edit_sleephotkey_0 5
 #define assress_edit_sleephotkey_1 6
 #define assress_edit_sleephotkey_2 7

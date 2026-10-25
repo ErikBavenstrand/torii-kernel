@@ -79,7 +79,6 @@ extern u32 iCount2;
 // Logs which in-game code went into the ROM, where, and every patched word:
 // part of the launch record.
 void Log_patches(void);
-u32 Check_cheat_file(TCHAR *gamefilename);
 void SetTrimSize(u8 *buffer, u32 romsize, u32 iSize, u32 mode, BYTE saveMODE);
 void Patch_SpecialROM_TrimSize(void);
 // Fills the cart's table of the file's cluster runs (game_save_rts 1: the

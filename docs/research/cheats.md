@@ -46,7 +46,7 @@ Research for v0.7 (2026-10-25), before the design in `docs/plans/roadmap.md`.
 ---
 
 **Sources**
-1. [source/cheat.c, showcht.c, GBApatch.c, gba_rts_patch.s, ezkernelnew.c, tests/](../../source/showcht.c) · HEAD 2e6f038c · primary
+1. source/cheat.c, showcht.c, GBApatch.c, gba_rts_patch.s, ezkernelnew.c, tests/ (cheat.c and showcht.c went in v0.7; see them at 2e6f038c) · HEAD 2e6f038c · primary
 2. [emu/mgba/src/gba/cheats/*.c, src/core/cheats.c](../../emu/mgba/src/gba/cheats/codebreaker.c) · local checkout · primary
 3. [LICENSE](../../LICENSE) (Apache-2.0) · primary
 4. [libretro-database](https://github.com/libretro/libretro-database) (tree, README, LICENSE) · 2026-10-25 · primary

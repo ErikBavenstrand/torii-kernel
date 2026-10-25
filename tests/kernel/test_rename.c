@@ -91,6 +91,7 @@ static int has_line(const char *path, const char *line)
 // A game's folders of saves and history, under /torii for the games in T_DIR
 #define SV "/torii/saves/T18"
 #define BK "/torii/backups/T18"
+#define CH "/torii/cheats/T18"
 #define HIST "/0001-20261023-120000.sav"
 
 // The files the test makes (and whatever it renames them to), then the folders
@@ -123,9 +124,12 @@ static const char *const files[] = {
 	"/RTS/Game.rts",
 	"/RTS/New.rts",
 	"/RTS/new.rts",
-	"/CHEAT/Game.cht",
-	"/CHEAT/New.cht",
-	"/CHEAT/new.cht",
+	CH "/Game.cht",
+	CH "/Game.cht.bak",
+	CH "/New.cht",
+	CH "/New.cht.bak",
+	CH "/new.cht",
+	CH "/new.cht.bak",
 	"/PATCH/Game.pat",
 	"/PATCH/New.pat",
 	"/PATCH/new.pat",
@@ -222,7 +226,8 @@ void test_rename_file(void)
 	CHECK(put(SV "/Game.gba/game.ini", "ini"));
 	CHECK(put(BK "/Game.gba/Main" HIST, "history"));
 	CHECK(put("/RTS/Game.rts", "states"));
-	CHECK(put("/CHEAT/Game.cht", "cheats"));
+	CHECK(put(CH "/Game.cht", "cheats"));
+	CHECK(put(CH "/Game.cht.bak", "cheats backup"));
 	CHECK(put("/PATCH/Game.pat", "patch"));
 	CHECK(put("/PATCH/New.pat", "a deleted game's patch"));
 	CHECK(put("/torii/art/custom/Game.gba.bin", "art"));
@@ -264,7 +269,8 @@ void test_rename_file(void)
 	CHECK(holds(SV "/New.gba/Boss fight.sav", "boss") && holds(SV "/New.gba/game.ini", "ini"));
 	CHECK(!there(BK "/Game.gba") && holds(BK "/New.gba/Main" HIST, "history"));
 	CHECK(!there("/RTS/Game.rts") && holds("/RTS/New.rts", "states"));
-	CHECK(!there("/CHEAT/Game.cht") && holds("/CHEAT/New.cht", "cheats"));
+	CHECK(!there(CH "/Game.cht") && holds(CH "/New.cht", "cheats"));
+	CHECK(!there(CH "/Game.cht.bak") && holds(CH "/New.cht.bak", "cheats backup"));
 	CHECK(!there("/PATCH/Game.pat") && holds("/PATCH/New.pat", "patch"));  // the stale one went
 	CHECK(!there("/torii/art/custom/Game.gba.bin") && holds("/torii/art/custom/New.gba.bin", "art"));
 	CHECK(userdata_fav_has(T_DIR "/New.gba") && !userdata_fav_has(T_DIR "/Game.gba"));
