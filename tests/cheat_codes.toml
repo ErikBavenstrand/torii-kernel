@@ -1,0 +1,127 @@
+# Real cheat codes for tests/cheat_codes.sh: two or more per format the kernel decodes,
+# and two ROM patches, for games in roms/ (missing games are skipped). Picked from a
+# corpus of published codes (Almar's Guides pages, cross-checked against libretro's
+# database); "decoded" is what the code writes, as mGBA decodes it. raw_vba codes are
+# derived from a published code of the same cheat (VBA raw has no published lists).
+# ROM patches write whatever the ROM held: the test reads the patch back, it does not
+# check the game behaves (their addresses are the USA games'; roms/ holds some European).
+
+[[code]]
+game = "Metroid Fusion.gba"
+format = "codebreaker"
+desc = "Invulnerability"
+code = "33001249 0001"
+decoded = [{address = 0x03001249, width = 1, value = 0x1}]
+rom_patch = false
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/MetroidFusion/CodeBreaker/"
+confidence = "high"
+
+[[code]]
+game = "Sonic Advance.gba"
+format = "codebreaker"
+desc = "Unlimited Rings"
+code = "83004FEC 03E7"
+decoded = [{address = 0x03004FEC, width = 2, value = 0x3E7}]
+rom_patch = false
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/SonicAdvance/CodeBreaker/"
+confidence = "high"
+
+[[code]]
+game = "Mario Kart - Super Circuit.gba"
+format = "gameshark_v1"
+desc = "Have 99 Coins"
+code = "8C1A761B 31E2378B"
+decoded = [{address = 0x03003D10, width = 1, value = 0x63}]
+rom_patch = false
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/MarioKartSuperCircuit/Gameshark/"
+confidence = "high"
+
+[[code]]
+game = "Kirby & The Amazing Mirror.gba"
+format = "gameshark_v1"
+desc = "Unlimited Lives"
+code = "87650B7E 2F78AE65"
+decoded = [{address = 0x02020FE2, width = 1, value = 0x3}]
+rom_patch = false
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/KirbyandTheAmazingMirror/Gameshark/"
+confidence = "high"
+
+[[code]]
+game = "Wario Land 4.gba"
+format = "gameshark_raw"
+desc = "Unlimited Health"
+code = "03001910 00000008"
+decoded = [{address = 0x03001910, width = 1, value = 0x8}]
+rom_patch = false
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/WarioLand4/Gameshark/"
+confidence = "high"
+
+[[code]]
+game = "Pokemon - Ruby Version.gba"
+format = "gameshark_raw"
+desc = "Faster Level Up"
+code = "12024BEC 000003E8"
+decoded = [{address = 0x02024BEC, width = 2, value = 0x3E8}]
+rom_patch = false
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/PokemonRuby/Gameshark/"
+confidence = "high"
+
+[[code]]
+game = "Mario & Luigi - Superstar Saga.gba"
+format = "action_replay_v3"
+desc = "Unlimited Coins"
+code = "2B6ECB64 C1A039D3"
+decoded = [{address = 0x020048E0, width = 2, value = 0x270F}]
+rom_patch = false
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/MarioandLuigiSuperstarSaga/ActionReplay/"
+confidence = "high"
+
+[[code]]
+game = "Golden Sun.gba"
+format = "action_replay_v3"
+desc = "Eleven Rapier"
+code = "06BD95C8 FC72E44A"
+decoded = [{address = 0x02000730, width = 1, value = 0x16}]
+rom_patch = false
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/GoldenSun/ActionReplay/"
+confidence = "high"
+
+[[code]]
+game = "The Legend of Zelda - The Minish Cap.gba"
+format = "raw_vba"
+desc = "Unlimited HP"
+code = "02002AEA:A0"
+decoded = [{address = 0x02002AEA, width = 1, value = 0xA0}]
+rom_patch = false
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/ZeldaTheMinishCap/CodeBreaker/"
+confidence = "high"
+
+[[code]]
+game = "Final Fantasy Tactics Advance.gba"
+format = "raw_vba"
+desc = "Faster AP Gain"
+code = "0201F514:1188"
+decoded = [{address = 0x0201F514, width = 2, value = 0x1188}]
+rom_patch = false
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/FinalFantasyTacticsAdvance/CodeBreaker/"
+confidence = "high"
+
+[[code]]
+game = "Metroid - Zero Mission.gba"
+format = "gameshark_raw"
+desc = "One Shot Enemies"
+code = "600A0878 000046C0"
+decoded = [{address = 0x081410F0, width = 2, value = 0x46C0}]
+rom_patch = true
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/MetroidZeroMission/Gameshark/"
+confidence = "medium"
+
+[[code]]
+game = "Pokemon - FireRed Version.gba"
+format = "gameshark_raw"
+desc = "Use Bicycle Inside Buildings"
+code = "600AB948 000046C0"
+decoded = [{address = 0x08157290, width = 2, value = 0x46C0}]
+rom_patch = true
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/PokemonFireRed/Gameshark/"
+confidence = "medium"
