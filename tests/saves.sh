@@ -324,10 +324,10 @@ rename-walk)
   # another game with its save (a walk of the whole card) takes long enough
   # to say so with a progress dialog; the short walk of the plain case
   # above shows none
-  # (a cheat file is named after the game alone, so another game of its name
-  # could share it: the check walks the card; the saves are in the game's own folder)
-  mmd -i "$cart/sd.img" ::/CHEAT
-  mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/CHEAT/Test.cht
+  # (save states are named after the game alone, so another game of its name
+  # could share them: the check walks the card; the saves are in the game's own folder)
+  mmd -i "$cart/sd.img" ::/RTS
+  mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/RTS/Test.rts
   mkdir "$cart/fill"
   for i in $(seq 1 1500); do : >"$cart/fill/Filler $i.gba"; done
   mcopy -i "$cart/sd.img" -s "$cart/fill" ::/Fill
