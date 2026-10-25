@@ -103,7 +103,8 @@ int cheatstore_delete(const char *rom_path)
 	FRESULT a = f_unlink(path);
 	strcat(path, ".bak");
 	FRESULT b = f_unlink(path);
-	int gone = (a == FR_OK || a == FR_NO_FILE || a == FR_NO_PATH) && (b == FR_OK || b == FR_NO_FILE || b == FR_NO_PATH);
+	int gone = (a == FR_OK || a == FR_NO_FILE || a == FR_NO_PATH) &&
+		   (b == FR_OK || b == FR_NO_FILE || b == FR_NO_PATH);
 	if (a == FR_OK || b == FR_OK || !gone)
 		tlog("cheats: %s: deleted (FatFs %u, %u)", path, (unsigned)a, (unsigned)b);
 	return gone;
