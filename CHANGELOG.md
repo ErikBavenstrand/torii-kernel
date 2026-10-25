@@ -4,6 +4,14 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Added:** cheat decoders for GameShark v1/v2 (Action Replay v1/v2),
+  Action Replay v3 (GameShark SP), CodeBreaker (plain and keyed) and VBA raw
+  codes, ported from mGBA (MPL-2.0, `source/cheatcode.c`), with Torii's own
+  op model and its lowering to byte writes and ROM patches; not wired in yet
+  (6e4d8e1b, e3d7dcf1).
+
 ## v0.6.2
 
 - **Added:** GB, GBC and NES games have save slots, as GBA games do: Saves
