@@ -4,6 +4,21 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Changed:** a GB or GBC game with 32 KB of save RAM keeps it in the
+  cart's SRAM as it writes it, as a real cartridge does: Jagoomba writes each
+  byte through to SRAM 8000-FFFF, its own records (settings, save states)
+  move below, and the next launch packs the copy into its record. v0.6.0's
+  autosave paused the game 0.12-0.15 s a second after save writes, some
+  20 times a minute in Pokémon Picross and Puzzle Challenge (measured in the
+  emulated cart); now nothing pauses and a power-off right after a save
+  keeps it. The autosave stays for a save whose records already fill more
+  than 32 KB, skips RAM written with the same bytes, and waits five quiet
+  seconds instead of one within 30 s of its last save. Saving Jagoomba's
+  records clears only what they free, not all of SRAM: 0.13 s down to
+  0.08 s. Save states have 32 KB instead of 56 (88eebc2).
+
 ## v0.6.0
 
 - **Changed:** the GB/GBC and NES emulators are built from source with the
