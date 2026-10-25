@@ -14,7 +14,6 @@ clang-tidy source/GBApatch.c clang-analyzer-security.PointerSub: Subtraction of 
 clang-tidy source/GBApatch.c clang-analyzer-security.PointerSub: Subtraction of two pointers that do not point into the same array is undefined behavior
 clang-tidy source/GBApatch.c clang-analyzer-security.PointerSub: Subtraction of two pointers that do not point into the same array is undefined behavior
 clang-tidy source/GBApatch.c clang-analyzer-security.PointerSub: Subtraction of two pointers that do not point into the same array is undefined behavior
-clang-tidy source/cheat.c bugprone-narrowing-conversions: narrowing conversion from '__size_t' (aka 'unsigned int') to signed type 'int' is implementation-defined
 clang-tidy source/ezkernelnew.c bugprone-branch-clone: switch has 2 consecutive identical branches
 clang-tidy source/ezkernelnew.c bugprone-branch-clone: switch has 2 consecutive identical branches
 clang-tidy source/ezkernelnew.c bugprone-branch-clone: switch has 2 consecutive identical branches
@@ -42,18 +41,6 @@ clang-tidy source/saveorphan.c bugprone-assignment-in-if-condition: an assignmen
 clang-tidy source/saveorphan.c bugprone-assignment-in-if-condition: an assignment within an 'if' condition is bug-prone
 clang-tidy source/saveorphan.c bugprone-suspicious-string-compare: function 'strcmp' is called without explicitly comparing result
 clang-tidy source/saveorphan.c bugprone-suspicious-string-compare: function 'strncasecmp' is called without explicitly comparing result
-clang-tidy source/showcht.c bugprone-narrowing-conversions: narrowing conversion from '__size_t' (aka 'unsigned int') to signed type 'int' is implementation-defined
-clang-tidy source/showcht.c bugprone-narrowing-conversions: narrowing conversion from '__size_t' (aka 'unsigned int') to signed type 'int' is implementation-defined
-clang-tidy source/showcht.c bugprone-narrowing-conversions: narrowing conversion from '__size_t' (aka 'unsigned int') to signed type 'int' is implementation-defined
-clang-tidy source/showcht.c bugprone-narrowing-conversions: narrowing conversion from '__size_t' (aka 'unsigned int') to signed type 'int' is implementation-defined
-clang-tidy source/showcht.c bugprone-narrowing-conversions: narrowing conversion from '__size_t' (aka 'unsigned int') to signed type 'int' is implementation-defined
-clang-tidy source/showcht.c clang-analyzer-deadcode.DeadStores: Value stored to 'is_section' is never read
-clang-tidy source/showcht.c clang-analyzer-deadcode.DeadStores: Value stored to 'is_section' is never read
-clang-tidy source/showcht.c clang-analyzer-deadcode.DeadStores: Value stored to 'is_section' is never read
-clang-tidy source/showcht.c clang-analyzer-deadcode.DeadStores: Value stored to 'text_comment' is never read
-clang-tidy source/showcht.c clang-analyzer-deadcode.DeadStores: Value stored to 'text_comment' is never read
-clang-tidy source/showcht.c clang-analyzer-security.ArrayBound: Out of bound access to memory after the end of the region
-clang-tidy source/showcht.c clang-analyzer-security.insecureAPI.strcpy: Call to function 'strcpy' is insecure as it does not provide bounding of the memory buffer. Replace unbounded copy functions with analogous functions that support length arguments such as 'strlcpy'. CWE-119
 clang-tidy source/slotstore.c bugprone-assignment-in-if-condition: an assignment within an 'if' condition is bug-prone
 clang-tidy source/slotstore.c bugprone-assignment-in-if-condition: an assignment within an 'if' condition is bug-prone
 clang-tidy source/slotstore.c bugprone-assignment-in-if-condition: an assignment within an 'if' condition is bug-prone
@@ -100,8 +87,5 @@ cppcheck source/fathint.c constParameterCallback: Parameter 'job' can be declare
 cppcheck source/library_scan.c constParameterCallback: Parameter 'job' can be declared as pointer to const. However it seems that 'library_job' is a callback function, if 'job' is declared with const you might also need to cast function pointer(s).
 cppcheck source/names_store.c constParameterCallback: Parameter 'job' can be declared as pointer to const. However it seems that 'names_job' is a callback function, if 'job' is declared with const you might also need to cast function pointer(s).
 cppcheck source/screens/sdcard.c constParameterCallback: Parameter 'job' can be declared as pointer to const. However it seems that 'count_step' is a callback function, if 'job' is declared with const you might also need to cast function pointer(s).
-cppcheck source/showcht.c unreadVariable: Variable 'is_section' is assigned a value that is never used.
-cppcheck source/showcht.c unreadVariable: Variable 'text_comment' is assigned a value that is never used.
-cppcheck source/showcht.c unreadVariable: Variable 'text_comment' is assigned a value that is never used.
 cppcheck source/tlog.c constParameterCallback: Parameter 'job' can be declared as pointer to const. However it seems that 'open_job' is a callback function, if 'job' is declared with const you might also need to cast function pointer(s).
 cppcheck source/ui/ui_reading.c constParameterCallback: Parameter 'ctx' can be declared as pointer to const. However it seems that 'reading_count' is a callback function, if 'ctx' is declared with const you might also need to cast function pointer(s).

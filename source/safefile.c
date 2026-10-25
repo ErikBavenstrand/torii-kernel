@@ -164,8 +164,9 @@ int safefile_read(void *buf, u32 size)
 	if (!rd.open)
 		return -1;
 	u32 left = rd.limit - rd.done, have = rd.have - rd.at;
-	if (have + left > size) {
-		tlog("safefile: %lu bytes to read, over %lu", (unsigned long)(have + left), (unsigned long)size);
+	u32 total = have + left;
+	if (total > size) {
+		tlog("safefile: %lu bytes to read, over %lu", (unsigned long)total, (unsigned long)size);
 		return -1;
 	}
 	memcpy(buf, sf_chunk + rd.at, have);  // what safefile_line left

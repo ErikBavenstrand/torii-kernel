@@ -98,10 +98,11 @@ int cheatstore_write(void)
 int cheatstore_delete(const char *rom_path)
 {
 	char *path = cheatstore()->path;
-	if (cheatstore_path(path, SAFEFILE_PATH_MAX, rom_path) < 0)
+	int len = cheatstore_path(path, SAFEFILE_PATH_MAX, rom_path);
+	if (len < 0)
 		return 1;
 	FRESULT a = f_unlink(path);
-	strcat(path, ".bak");
+	memcpy(path + len, ".bak", 5);  // cheatstore_path leaves room for it
 	FRESULT b = f_unlink(path);
 	int gone = (a == FR_OK || a == FR_NO_FILE || a == FR_NO_PATH) &&
 		   (b == FR_OK || b == FR_NO_FILE || b == FR_NO_PATH);

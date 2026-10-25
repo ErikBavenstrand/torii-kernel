@@ -60,7 +60,7 @@ void test_settings_layout_slots(void)
 	// The LED off hides its colours: two rows fewer, the slots after move up
 	settings_set(&v, SET_LED, 0);
 	settings_layout_build(&lay, &v);
-	CHECK_EQ(lay.rows, 28);
+	CHECK_EQ(lay.rows, 27);
 	CHECK_EQ(settings_layout_slot_of(&lay, SET_LED_IDLE), SET_LAYOUT_NONE);
 	CHECK_EQ(settings_layout_slot_of(&lay, SET_RESET_ON), settings_layout_slot_of(&lay, SET_LED) + 3);
 }

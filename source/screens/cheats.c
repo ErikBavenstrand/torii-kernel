@@ -113,7 +113,8 @@ static void cs_show_hints(void)
 static void cs_moved(u32 to)
 {
 	cs.cursor = to;
-	snprintf(cs.counter, sizeof(cs.counter), "%lu/%lu", (unsigned long)(to + 1), (unsigned long)cs.count);
+	u32 row = to + 1;
+	snprintf(cs.counter, sizeof(cs.counter), "%lu/%lu", (unsigned long)row, (unsigned long)cs.count);
 	ui_title_set_right(cs.title, cs.counter);
 	cs_show_hints();
 }

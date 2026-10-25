@@ -174,7 +174,11 @@ def build_sd(path: Path) -> None:
     (cheats / "Games" / "Long cheat.cht").write_bytes(
         libretro_cht(
             [
-                ("Infinite health, magic and ammo for everyone in the party", "32001000 0063", False),
+                (
+                    "Infinite health, magic and ammo for everyone in the party",
+                    "32001000 0063",
+                    False,
+                ),
                 ("Short", "32001001 0001", True),
             ]
         )
@@ -220,7 +224,11 @@ def many_cheats() -> bytes:
     things = ["lives", "money", "items", "through walls", "win", "lose", "maps", "jump"]
     return libretro_cht(
         [
-            (f"{words[i % 8]} {things[i // 5 % 8]} {i + 1}", f"3200{0x1000 + i:04X} 00{i:02X}", i % 7 == 0)
+            (
+                f"{words[i % 8]} {things[i // 5 % 8]} {i + 1}",
+                f"3200{0x1000 + i:04X} 00{i:02X}",
+                i % 7 == 0,
+            )
             for i in range(40)
         ]
     )
