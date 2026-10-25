@@ -18,7 +18,8 @@ local_carts "dist/cart-cheat-codes"
 
 failed=0 passed=0 skipped=0
 # One line per game: file, then its codes as "desc|code|addr:width:value,..."
-mapfile -t games < <(python3 - <<'EOF'
+mapfile -t games < <(
+  python3 - <<'EOF'
 import tomllib
 import os
 codes = tomllib.load(open(os.environ.get("CHEAT_CODES", "tests/cheat_codes.toml"), "rb"))["code"]

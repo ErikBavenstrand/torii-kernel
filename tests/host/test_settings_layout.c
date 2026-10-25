@@ -30,9 +30,10 @@ void test_settings_layout_slots(void)
 {
 	LoadEnglish();
 	erased();
-	// Eight sections: a label, the rows, a gap each; 30 rows with the LED on
-	CHECK_EQ(lay.rows, 30);
-	CHECK_EQ(lay.count, 30 + 2 * SET_SECTIONS);
+	// Eight sections: a label, the rows, a gap each; 29 rows with the LED on
+	// (v0.7 took out the Cheats row: its slot, 4, is unused)
+	CHECK_EQ(lay.rows, 29);
+	CHECK_EQ(lay.count, 29 + 2 * SET_SECTIONS);
 	CHECK_EQ(lay.slot[0].kind, SET_SLOT_LABEL);
 	CHECK_EQ(lay.slot[1].kind, SET_SLOT_ROW);
 	CHECK_EQ(lay.slot[1].id, SET_THEME);
