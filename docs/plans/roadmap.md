@@ -219,7 +219,9 @@ already draws for SGB games. The fixes carried below wait for a cart run.
 
 **Released as v0.6.1 (2026-10-25):** 32 KB GB saves written through to the cart, as a real cart keeps them (88eebc2): v0.6.0's autosave paused games 0.12-0.15 s, often in Pokémon Picross and Puzzle Challenge (the owner: "games will stutter a lot"). Save states get 32 KB instead of 56. Checked in the emulated cart: every 32 KB game in `roms/` (24) uses the copy, a v0.6.0 save (Pokémon Yellow, record only) moves into it exactly, `tests/gb_save.sh` cuts the power 30 frames after the writes.
 
-**Fixes carried from v0.5.2 (moved 2026-10-24, open after v0.6.1):**
+**Released as v0.6.2 (2026-10-25):** save slots for GB, GBC and NES games (no .sav import: a slot holds the emulator's 64 KB), NES CRCs without the iNES header so NES games get names and covers, NES saves shown to write through (`tests/nes_save.sh`), and the emulators' builds reproducible across machines (sorted file lists, `just repro` rebuilds them shuffled).
+
+**Fixes carried from v0.5.2 (moved 2026-10-24, open after v0.6.2):**
 
 - **Cart check: path walks from the root** (every open under `/torii/saves/<rom path>/` scans `GBA/` again): the cache now answers most of these; relative paths (`f_chdir`) would remove the rest, but the SD page keeps its own current folder. Measure on the cart with the `sd:` lines first.
 - **Cart check: whether the 8.6 ms settle delay is needed** after every SD write (EZ-Flash's code; the commands inside one call run back to back without it). Measure with the `sd:` lines; drop the delay, or shorten it, only if the card keeps up.

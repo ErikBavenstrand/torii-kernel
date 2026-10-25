@@ -4,7 +4,7 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.6.2
 
 - **Added:** GB, GBC and NES games have save slots, as GBA games do: Saves
   in their START menu and in Settings > Saves > Game saves, New slot (Empty
