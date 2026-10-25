@@ -492,6 +492,17 @@ void test_cheatcode_gsa(void)
 	CHECK_EQ(decode(&d, "FFFE50E5A8AD1330"), CHEAT_OK);  // one 16-digit token
 	CHECK_OP(0, CHEAT_OP_WRITE, 1, 0x03003F62, 0xFF, 1);
 
+	// Sonic Advance's raw ROM patch, alone in its file: the detection picks a
+	// decrypted reading that doesn't read, so the raw one is taken; a second
+	// one in two lines too, and the file keeps the raw format
+	cheat_decoder_init(&d);
+	CHECK_EQ(decode(&d, "60018CFC 000046C0"), CHEAT_OK);
+	CHECK_EQ(d.gs_version, CHEAT_FMT_GSAV1_RAW);
+	CHECK_OP(0, CHEAT_OP_ROM_PATCH, 2, 0x080319F8, 0x46C0, 1);
+	cheat_decoder_init(&d);
+	CHECK_EQ(decode(&d, "60079D70 000046C0+60079D80 000046C0"), CHEAT_OK);
+	CHECK_OP(1, CHEAT_OP_ROM_PATCH, 2, 0x080F3B00, 0x46C0, 1);
+
 	// DEADFACE reseeds GameShark v1 with its own tables
 	cheat_decoder_force(&d, CHEAT_FMT_GSAV1_RAW);
 	u32 seed0 = d.gs_seeds[0];

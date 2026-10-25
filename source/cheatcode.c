@@ -1374,6 +1374,34 @@ u8 cheat_decode(struct cheat_decoder *d, const char *code, u32 len, struct cheat
 			return alone_status;
 		}
 	}
+	// The file's first GameShark cheat: the detection scores each format on
+	// its first line alone, and can pick one the cheat doesn't read in (a raw
+	// ROM patch, "60018CFC 000046C0", scores higher decrypted). The others are
+	// tried in turn; the first that reads as real sets the file's format. A
+	// raw reading may only patch the ROM, as its text says so; a decrypted
+	// one must touch RAM, as garbage of a ROM patch's shape always reads.
+	if (status != CHEAT_MASTER_ONLY && d->forced == CHEAT_FMT_AUTO && d->gs_version == CHEAT_FMT_AUTO &&
+	    work.last >= CHEAT_FMT_GSAV1 && work.last <= CHEAT_FMT_PARV3_RAW) {
+		static const u8 versions[] = {CHEAT_FMT_GSAV1, CHEAT_FMT_PARV3, CHEAT_FMT_GSAV1_RAW,
+					      CHEAT_FMT_PARV3_RAW};
+		u8 detected = work.gs_version;
+		for (i = 0; i < sizeof(versions); ++i) {
+			u32 n_alone;
+			u8 alone_status;
+			if (versions[i] == detected)
+				continue;
+			alone = *d;
+			set_gs_version(&alone, versions[i]);
+			alone_status = decode_pass(&alone, code, len, ops, ops_max, &n_alone, &keyed);
+			if (plausible(alone_status, ops, n_alone < ops_max ? n_alone : ops_max) &&
+			    (versions[i] == CHEAT_FMT_GSAV1_RAW || versions[i] == CHEAT_FMT_PARV3_RAW ||
+			     touches_ram(ops, n_alone < ops_max ? n_alone : ops_max))) {
+				*d = alone;
+				*n_ops = n_alone;
+				return alone_status;
+			}
+		}
+	}
 	// None reads: back to the file's own decoding
 	work = *d;
 	status = decode_pass(&work, code, len, ops, ops_max, n_ops, &keyed);
