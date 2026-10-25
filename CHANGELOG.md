@@ -6,6 +6,12 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** GB, GBC and NES games have save slots, as GBA games do: Saves
+  in their START menu and in Settings > Saves > Game saves, New slot (Empty
+  or a copy of one), backups, rename, delete, and Play with. A slot holds the
+  emulator's 64 KB of cart SRAM (the game's save, the emulator's settings and
+  save states), so New slot has no "from a .sav file" for them: a .sav from
+  elsewhere is the game's save alone (6e904573).
 - **Fixed:** the emulators' builds list their source files sorted, so they
   link in the same order everywhere: v0.6.1's release, built on CI, has a
   Jagoomba laid out differently from a local build of the same commit (both
