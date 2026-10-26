@@ -1378,6 +1378,13 @@ void cheat_decoder_force(struct cheat_decoder *d, u8 format)
 		set_gs_version(d, format);
 }
 
+void cheat_decoder_force_in(struct cheat_decoder *d, const struct cheat_decoder *file, u8 format)
+{
+	cheat_decoder_force(d, format);
+	if (format != CHEAT_FMT_AUTO && format == file->gs_version)
+		memcpy(d->gs_seeds, file->gs_seeds, sizeof(d->gs_seeds));
+}
+
 // Decodes code's lines with the state in work; returns a status. *keyed says
 // whether the cheat holds a CodeBreaker key line of its own. With adopt, a
 // raw CodeBreaker key line other than work's key is a new key.

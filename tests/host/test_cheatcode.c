@@ -996,6 +996,16 @@ void test_cheatcode_device(void)
 	CHECK_EQ(n_ops, 2);
 	CHECK_OP(0, CHEAT_OP_IF_EQ, 2, 0x0203AA04, 0x84F0, 1);
 	CHECK_OP(1, CHEAT_OP_WRITE, 2, 0x0203A9D4, 0x270F, 1);
+
+	// A forced format keeps the file's GameShark seeds when it is the file's
+	struct cheat_decoder file, own;
+	cheat_decoder_force(&file, CHEAT_FMT_GSAV1_RAW);
+	CHECK_EQ(decode(&file, "DEADFACE 00000102"), CHEAT_MASTER_ONLY);
+	cheat_decoder_force_in(&own, &file, CHEAT_FMT_GSAV1_RAW);
+	CHECK_EQ(own.gs_seeds[0], file.gs_seeds[0]);
+	CHECK_EQ(own.forced, CHEAT_FMT_GSAV1_RAW);
+	cheat_decoder_force_in(&own, &file, CHEAT_FMT_PARV3_RAW);
+	CHECK(own.gs_seeds[0] != file.gs_seeds[0]);
 }
 
 // Every prefix of real codes, and random bytes, decode without reading past

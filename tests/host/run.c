@@ -75,6 +75,7 @@ static const struct {
 	{"cheatfile_odd", test_cheatfile_odd},
 	{"cheatfile_status", test_cheatfile_status},
 	{"cheatfile_keys_carry", test_cheatfile_keys_carry},
+	{"cheatfile_seeds_carry", test_cheatfile_seeds_carry},
 	{"cheatfile_budget", test_cheatfile_budget},
 	{"cheatfile_patches_budget", test_cheatfile_patches_budget},
 	{"cheatfile_room_pick", test_cheatfile_room_pick},

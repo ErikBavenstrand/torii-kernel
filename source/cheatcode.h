@@ -47,6 +47,11 @@ void cheat_decoder_init(struct cheat_decoder *d);
 // unreadable.
 void cheat_decoder_force(struct cheat_decoder *d, u8 format);
 
+// cheat_decoder_force for one cheat of a file whose decoder is file: when
+// file reads GameShark codes of that format, its seeds carry over (a
+// DEADFACE line reseeds the device for every code after it).
+void cheat_decoder_force_in(struct cheat_decoder *d, const struct cheat_decoder *file, u8 format);
+
 enum cheat_op_type {
 	// width bytes of value at address, count times; after each write address
 	// grows by addr_step and value by value_step (a fill or a slide). A plain
