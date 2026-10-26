@@ -258,8 +258,10 @@ already draws for SGB games. The fixes carried below wait for a cart run.
 
 Cheats come before the in-game menu (owner, 2026-10-25): the menu's cheat toggles need
 per-cheat names and flags, its save-state slots wait on a cart test, and the overlay and the
-cheat interpreter share the patch area at the ROM's end, so v0.8 lays it out once for both.
-v0.7 is the kernel's side, for GBA games. The codes that matter are the real devices':
+cheat interpreter share the patch area at the ROM's end. v0.7 is the kernel's side, for GBA
+games, with the per-frame interpreter (moved up from v0.8, owner, 2026-10-26: every
+GameShark, Action Replay and CodeBreaker code type has to work); v0.8 fits the overlay
+beside it. The codes that matter are the real devices':
 Action Replay, GameShark and CodeBreaker (owner, 2026-10-25). Research:
 `docs/research/cheats.md`.
 
@@ -275,10 +277,22 @@ own cheat files are poor (owner), so v0.7 drops the format.
    model (name, on/off, RAM writes, ROM patches); decoding runs at launch.
    - **Master codes** ("Must Be On", hook and game-ID lines) are hidden and skipped: Torii
      hooks the IRQ itself. A cheat that mixes a hook with writes keeps its writes.
-   - **What v0.7 runs:** 8-, 16- and 32-bit constant writes (as byte writes), fills while
-     they fit, and ROM patches written once into the PSRAM image, with no cap. That is 72%
-     of libretro's GBA cheats (80% with fills). Conditionals, button activators, pointers
-     and add/or/and wait for v0.8's interpreter.
+   - **What v0.7 runs:** every type the decoders read: 8-, 16- and 32-bit writes at their
+     width (a byte store to palette, VRAM or OAM isn't a halfword one), fills and slides,
+     pointer writes, add/or/and, conditionals with ELSE/ENDIF blocks and button
+     activators, run each frame by an interpreter in the patch area; ROM patches written
+     once into the PSRAM image, with no cap. Hook codes run on the VBlank IRQ instead of
+     at their hook address; slowdown codes are documented, not run.
+   - **Per-frame interpreter:** mGBA's `mCheatRefresh` semantics; a cycle budget measured
+     in the emulator; its own size budget in the patch area (today 0x2000 bytes, a
+     0xD04-byte handler plus 8 bytes per write, capping cheats at 600), planned so v0.8's
+     overlay fits beside it. `just compat` reports games the hook misses.
+   - **Proof:** a cheat test ROM exercises every code type in every format, encrypted and
+     raw, with key presses; the same cheats run on it in mGBA's own cheat engine and through
+     Torii, and the memory has to match frame for frame. Real codes for the owner's games,
+     conditionals and activators included, run in the emulated cart.
+   - **Matching:** a cheat file is for exact dumps. Open: where cheats come from (libretro,
+     GameHacking.org exports, MiSTer's mirror of them, or a mix: owner, 2026-10-26).
 2. **One file per game:** `/torii/cheats/<rom path>.cht` in libretro's format
    (`cheats = N`, `cheatN_desc`, `cheatN_code`, `cheatN_enable`, lines joined by `+`),
    moved and renamed with its game, like its saves. A libretro file dropped there by hand,
@@ -288,13 +302,13 @@ own cheat files are poor (owner), so v0.7 drops the format.
      no cheat hook.
 3. **Cheat screen:** "Cheats" in the game's popup lists one row per cheat with a check; A
    toggles, B saves and goes back. Every launch applies the saved picks without asking.
-   - **Greyed rows:** "needs v0.8" for interpreter codes; "too many writes" when a fill
-     would take the picked cheats past 600 writes; "can't read" for a bad cheat (only that
+   - **Greyed rows:** "too many" when the picked cheats would pass the interpreter's budget; "can't read" for a bad cheat (only that
      cheat is skipped, not the file); "edit to use" for placeholders such as `00??`, which
      open the keypad with the code filled in.
    - **Fixes from v0.3:** the screen no longer re-reads the file for each pick (the freeze
      on big files).
-   - **In game:** the menu's single CHEAT ON/OFF stays until v0.8.
+   - **In game:** the menu's single CHEAT ON/OFF stays until v0.8; cheats are on from the
+     game's start.
 4. **`just cheats`:** fetches libretro-database's GBA cheats (CC-BY-SA-4.0, attributed,
    never bundled) on the PC and writes `/torii/cheats/<rom path>.cht` for each game on the
    card. It matches a game by CRC (`crc.txt`) to its No-Intro name in the cached dats, and
@@ -327,12 +341,12 @@ Carried from v0.6 (owner, 2026-10-25):
   frame-wait setting not saved (jagoombacolor#36); the NES region not saved (PocketNES#3;
   2025 builds take it from the NES 2.0 header).
 
-## v0.8 In-game menu and cheat interpreter
+## v0.8 In-game menu
 
 The menu that exists today is patched into each game's IRQ handler and runs from the ROM
 tail. It offers RESET, SAVE, LOAD (one real-time save), CHEAT ON and CHEAT OFF, with
-L+R+Start for reset and L+R+Select for sleep. It becomes a proper overlay, built together
-with the cheats' per-frame interpreter, since both live in the patch area:
+L+R+Start for reset and L+R+Select for sleep. It becomes a proper overlay, beside v0.7's
+cheat interpreter in the patch area:
 
 - **Save states:** slots for each save slot, with timestamps.
 - **Cheats:** a toggle for each cheat, on v0.7's cheats.
@@ -342,16 +356,6 @@ with the cheats' per-frame interpreter, since both live in the patch area:
 - **Fixes it brings:** drawing with tiles leaves the game's BG2 affine registers alone.
 - **Test:** every `just compat` game opens and closes the menu, and the screen and game
   state have to come back unchanged.
-- **Per-frame interpreter:**
-  - **What it runs:** a small interpreter in IWRAM for conditionals, ELSE/ENDIF blocks,
-    button activators, pointer writes and add/or/and codes; plain writes, lists and slides
-    expanded into the per-frame table, with 16- and 32-bit writes.
-  - **Speed:** it has a cycle budget measured in the emulator.
-  - **Space:** it needs its own size budget. Today's patch area appended to the ROM is
-    0x2000 bytes: a 0xD04-byte handler plus 8 bytes per byte-write, which caps cheats at
-    600. Plan the overlay's and the interpreter's code and code storage together.
-  - **Hook check:** `just compat` reports games the hook misses.
-
 - **Review first (user, 2026-10-19):** before building it, review the current in-game menu and prototype the overlay. It can't run the kernel's engine in place (the game owns RAM and VRAM, and the kernel's ROM isn't mapped), so it needs a compact copy of the engine's text and theming. The prototype has to save and restore the game's screen and memory without breaking any `just compat` game. Picking cheats in game is part of it.
 - **Research (2026-10-25, `docs/research/ingame-menu.md`):** today's menu, the state path and prior art are reviewed. States reach the SD card only if the cart's FPGA writes the SRAM buffer back (nothing in the kernel does), so the slot design waits on a cart test: SAVE in game, power off, and check `/RTS/<game>.rts` on a PC.
 
