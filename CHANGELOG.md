@@ -39,6 +39,20 @@ git log, not here.
   and the user's own codes can be edited or deleted (731d2d38, 088ea321,
   8c225b3e, e8ae242d). A card error opening a cheat file now leaves the file
   alone instead of starting a new one over it (f4a42078).
+- **Added:** a cheat file names the dump it was made for (`# for crc32 X`,
+  first in the files `just cheats` writes): the popup and a launch leave it
+  out when the CRC cache, or `crc.txt` read straight from the card before
+  the cache loads, knows the ROM as another dump, so a swapped ROM never
+  runs another build's codes; a file without the line is for any dump
+  (7c7a9bb0, 5b6a1bec).
+- **Changed:** `just cheats` takes cheats from GameHacking.org only, by exact
+  ROM CRC32: a harvester pasted into your own browser's console exports the
+  mGBA cheats of your card's dumps at the site's robots.txt pace, and the tool
+  imports its bundles from your downloads, keeps each code's device as
+  `cheatN_format`, drops unnamed and oversized sets and fits the file under
+  the kernel's cap. A light romhack whose base dump is on the card gets the
+  base's cheats, "(base game)", less ROM patches over bytes it changed
+  (b8997362, 1dc2d41c, 868f2b2c, a8d2e692).
 - **Changed:** cheat writes keep their real addresses (no longer folded into
   IWRAM or EWRAM), and ROM-patch codes are written once into the game's PSRAM
   image, with no cap (a4596285).
