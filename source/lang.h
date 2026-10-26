@@ -263,9 +263,36 @@ struct lang_cheats {
 	const char *name_title;  // the rename keyboard's title, naming a code
 	const char *edit_failed[5];  // by cheatfile.h's CHEATFILE_EDIT_* (0: the card didn't take it)
 	const char *too_long;  // a code with more lines than the keypad takes
+	const char *hint_drop, *hint_menu, *hint_all;  // A on a picked cheat, START, B while only the picked show
+	const char *add_full, *add_long;  // + Add code greyed: no number left, the file at its cap
+	const char *big;  // a cheat past the budget alone (CHEATFILE_WHY_FULL's other case)
+	// START's menu: a cheat's details, then its Edit code and Delete if it is
+	// the user's, then Turn all off and Show picked only (Show all while it is)
+	const char *menu_details, *menu_all_off, *menu_only, *menu_all;
+	const char *only_sub;  // the title's after-text while only the picked show
+	// The detail view's lines (and its title bar's after-text)
+	const char *details_sub;
+	const char *detail_set;  // after the format: cheatN_format chose it
+	const char *detail_detected;  // after the format: read from the code
+	const char *detail_unknown;  // no format read
+	const char *detail_nor;  // its ROM patches: not for NOR games
+	const char *detail_runs;  // a cheat with nothing to run each frame, only ROM patches
+	const char *detail_picked, *detail_not_picked;
 };
 extern const struct lang_cheats *gl_cheats;
 #define EN_CHEAT_DELETE "Delete %s?"
+#define EN_CHEAT_POSITION "%lu/%lu"  // the title's right: the cursor's cheat of those listed
+#define EN_CHEAT_PICKS "%lu on"  // and the picked cheats' count after it
+#define EN_CHEAT_NAME "Code %lu"  // a new code's name until the user gives one
+// A greyed row's reason with the budget's numbers (CHEATFILE_WHY_FULL, _PATCHES)
+#define EN_CHEAT_FULL "Too much: needs %lu%%, %lu%% left"
+#define EN_CHEAT_PATCHES "Too many ROM patches: %lu, %lu left"
+// The detail view's lines
+#define EN_CHEAT_FORMAT "Format: %s%s"
+#define EN_CHEAT_BUDGET "Each frame: %lu%% of the cheats' budget"
+#define EN_CHEAT_ROM "ROM patches at launch: %lu%s"
+// Leaving with picks a game that boots clean won't run
+#define EN_CHEAT_CLEAN "%lu cheats on, but this game boots clean: they run only with addons (Game info > Boot mode)."
 
 // The code keypad (screens/keypad.c)
 struct lang_keypad {

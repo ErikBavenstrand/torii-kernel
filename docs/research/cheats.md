@@ -40,7 +40,7 @@ Research for v0.7 (2026-10-25), before the design in `docs/plans/roadmap.md`.
 **Open questions**
 - ❔ DeadSkullzJr's Omega-targeted GBA database (gbatemp) and GameHacking.org: coverage and terms unread (403).
 - ❔ Jagoomba's cheat support, and whether GB/NES Game Genie or GameShark codes could reach the emulators.
-- ❔ The 31 CodeBreaker type-D codes other than the key test, and how RetroArch scopes a type-9 key across cheats.
+- ❔ How RetroArch scopes a type-9 key across cheats. (The other `D` lines in libretro's files are encrypted lines, not other `D` types; see v0.7.1 below.)
 - ❔ EnHacklopedia's device notes: real ROM-patch slot limits, and slowdown codes on a flash cart.
 
 ## What the kernel does where devices and mGBA differ (v0.7)
@@ -60,8 +60,10 @@ its frontend, or a flash cart can't do what the device did:
   dropped: every cheat runs on the VBlank IRQ instead, as mGBA runs a cheat
   without a hook at the frame's end. A game that never enables the VBlank
   IRQ runs no cheats.
-- **Slowdown codes** (Action Replay v3 `08`) are read, so their cheat reads,
-  and do nothing, as in mGBA (a TODO there).
+- **Slowdown codes** (Action Replay v3 `00000000 0800xx00`, GameShark
+  v1/v2 `80F00000 0000xxxx`) are read, so their cheat reads, and do nothing,
+  as in mGBA (a TODO there): the devices loop in their handler, and in the
+  VBlank IRQ that would cost far more than the cheats' 10% of a frame.
 - **Odd addresses:** a halfword or word op at an odd address is the CPU's
   own load and store, as mGBA's bus calls are: the load rotated, the store
   aligned down. A byte to palette or VRAM is the hardware's (both halves of
@@ -78,6 +80,80 @@ its frontend, or a flash cart can't do what the device did:
   rather than a launch applying part of a cheat. A pick whose enable line
   would take the file past 192 KB is refused too, as it couldn't be saved.
 
+## Code types where the devices and mGBA differ (v0.7.1)
+
+Torii's decoders started as mGBA's. Where mGBA and the devices disagree,
+Torii follows the devices. The sources are GBATEK's "GBA Cheat Devices" [9],
+EnHacklopedia's GBA page [10] and VBA-M's `gbaCheats.cpp` [11]. VBA-M is
+an emulator, so a reading only it gives is 🟡. `tests/host/test_cheatcode.c`
+(`cheatcode_device`) checks each one.
+
+- 🟢 **Action Replay v3 IO writes:** `C6aaaaaa 0000yyyy` writes 16 bits and
+  `C7aaaaaa yyyyyyyy` writes 32 [9][10][11]; mGBA writes 8 and 16. Another
+  `C` code (`C0`, `C2`, `C5`) is unreadable, not an IO write.
+- 🟢 **Action Replay v3 "turn off all codes"** (action bits `C0`, e.g.
+  `C8`-`FA`): codes after it are off while the condition is false [9][10].
+  GBATEK says the device spins in its handler until the condition holds;
+  Torii skips the rest of the cheat that frame instead (the other picked
+  cheats run), as a hang in the IRQ would freeze the game. `CE` ("always
+  turn off") is never true. mGBA rejects these.
+- 🟢 **Action Replay v3 end line** `00000000 00000000`: no code after it
+  runs [9][10]; mGBA ignores it. No libretro cheat has one mid-code.
+- 🟢 **Action Replay v3 empty THEN:** in mGBA's loop a conditional covering
+  no ops never tests, so `IF … ELSE … ENDIF` with nothing before the ELSE
+  ran the ELSE every frame. Torii puts a step that does nothing (a write of
+  count 0) in the empty THEN.
+- 🟢 **Action Replay v3 padding** `80000000 00000000` (needed after a 32-bit
+  slide [9]) is a code on the device, so a next-one or next-two conditional
+  counts it; it writes nothing.
+- 🟢 **Signed comparisons** (Action Replay v3 `18`-`22`, CodeBreaker `B`,
+  `C`) compare signed at the code's width [9][10][11]; mGBA zero-extends 8-
+  and 16-bit values, so its signed compare is unsigned there. VBA-M compares
+  CodeBreaker's unsigned; GBATEK says signed, and Torii follows GBATEK.
+  `cheatrun.s` shifts both sides to the top bits; `tests/kernel/cheat_ref.h`
+  does the same.
+- 🟡 **GameShark v1/v2 `E0zzxxxx`** covers the next zz *lines*: the device
+  steps through its list a line at a time, as VBA-M models it (`i += zz`)
+  [11]. GBATEK and EnHacklopedia say "codes" [9][10], which is the same for
+  every type but the type-3 list, whose address lines are lines of their
+  own. `D` (the next code) still covers a whole code.
+- 🟡 **GameShark v1/v2 conditional kinds:** `Daaaaaaa 00z0xxxx` and
+  `E0zzxxxx zaaaaaaa` test equal (0), not equal (1), at most (2) and at least
+  (3), unsigned, in VBA-M [11]; the others are unreadable. GBATEK and
+  EnHacklopedia list only kind 0; mGBA reads every kind as equal.
+- 🟡 **GameShark v1/v2 type 3** beyond the list (`3000cccc`): `3010xxyy`,
+  `3020xxyy` add or subtract a byte, `3030xxxx`, `3040xxxx` a halfword, and
+  `3050`, `3060` the next line's first word, to the word at the line's
+  second half, as VBA-M reads them [11]; others are unreadable. mGBA read
+  them all as lists (garbage).
+- 🟡 **GameShark v1/v2 button:** `80F00000 0000xxxx` (slowdown) reads and
+  does nothing [9][10]; `8a4aaaaa` writes 32 bits of 0 whatever its value,
+  which VBA-M calls the device's bug [11]. mGBA rejects both.
+- 🟡 **CodeBreaker `D` codes:** `D0000020 yyyy` runs the next code while
+  every key in yyyy is held (GBATEK: `IF [joypad] AND yyyy = 0`; VBA-M
+  reads "any key", which agrees for the one-key codes libretro has).
+  `D0000010 yyyy`, from VBA-M only, runs it unless they all are. VBA-M's
+  `D0000000` (run unless KEYINPUT equals yyyy) is too odd to trust and stays
+  unreadable, as do others. libretro's 182 `D` lines are all `D0000020`.
+- 🟢 **A second CodeBreaker key:** on the device a key line changes the
+  seeds for every code after it [9]. A libretro file may join codes made
+  under two keys, the second set starting with its own key line, raw. mGBA
+  decrypts that line with the first key, which reads it as garbage. Torii
+  takes a raw key line other than the file's as the new key when the cheat
+  has more lines, the old key reads it as nonsense and the new one doesn't.
+  The file's later cheats keep the new key. A key line alone is no
+  evidence: an encrypted code can start with 9. No libretro file has a real
+  second key, so the corpus didn't change.
+- 🟢 **DEADFACE and typed cheats:** a DEADFACE line reseeds the device for
+  every code after it. A cheat with its own `cheatN_format` (typed on the
+  keypad) now keeps the file's GameShark seeds when its format is the
+  file's; before, it got the default seeds.
+
+`just cheat-corpus` (2026-10-26) shows that only four libretro cheats
+changed, all garbage before and after. Three from FF6 and one from Pokemon
+Emerald were unreadable, and now decode to `C`-prefixed "turn off"
+conditionals at bad addresses.
+
 ---
 
 **Sources**
@@ -89,5 +165,8 @@ its frontend, or a flash cart can't do what the device did:
 6. libretro cht names against `dist/dats/Nintendo - Game Boy Advance.dat` (2026.10.07) · 2026-10-25 · secondary (own computation)
 7. EverDrive GBA PRO user manual (PDF) · 2026-04-20 · vendor
 8. gbatemp threads 509684, posts/10891810 (search snippets) · undated · forum
+9. [GBATEK, GBA Cheat Devices](https://problemkaputt.de/gbatek.htm#gbacheatdevices) · 2026-10-26 · secondary (reverse-engineered)
+10. [EnHacklopedia, Hacking GBA](https://doc.kodewerx.org/hacking_gba.html) · 2026-10-26 · secondary (community)
+11. [VBA-M, src/core/gba/gbaCheats.cpp](https://github.com/visualboyadvance-m/visualboyadvance-m/blob/master/src/core/gba/gbaCheats.cpp) · master, 2026-10-26 · secondary (emulator)
 
 *deep · 2 rounds · ~40 sources read · sonnet ×6*

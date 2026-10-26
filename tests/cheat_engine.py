@@ -313,18 +313,18 @@ def cases():
     both(f"{g}-add16", enc, raw, lambda f: [f.add(2, A + 0x10, 0x1234)])
     both(f"{g}-add32", enc, raw, lambda f: [f.add(4, A + 0x20, 0xF0000001)])
     both(
-        f"{g}-io8",
-        enc,
-        raw,
-        lambda f: [f.io(1, BG3CNT - 0x04000000, 0x45)],
-        note="C6: mGBA's decoder (and Torii's) writes 8 bits",
-    )
-    both(
         f"{g}-io16",
         enc,
         raw,
-        lambda f: [f.io(2, WININ - 0x04000000, 0x1B2D)],
-        note="C7: 16 bits as mGBA reads it",
+        lambda f: [f.io(2, BG3CNT - 0x04000000, 0x1F45)],
+        expect="differs: C6 writes 16 bits on the device (GBATEK) and in Torii; mGBA writes 8",
+    )
+    both(
+        f"{g}-io32",
+        enc,
+        raw,
+        lambda f: [f.io(4, WININ - 0x04000000, 0x3F3F1B2D)],
+        expect="differs: C7 writes 32 bits on the device (GBATEK) and in Torii; mGBA writes 16",
     )
     # Conditionals: what the counters hold at the checkpoints makes each true at some, false at others
     conds = [
@@ -346,7 +346,7 @@ def cases():
             1,
             CNT + 0x0A,
             5,
-        ),  # read zero-extended: (p & 15) - 8 is 0xFC.. or 0..
+        ),  # (p & 15) - 8 is 0xFC.. or 0..: negative, signed in Torii, zero-extended in mGBA
         ("gt16", "GT", 2, CNT + 0x08, 0x0002),
         ("and16", "AND", 2, CNT + 0x0C, 0x00C0),
         ("never", "EQ", 8, CNT + 0, 0),
@@ -361,6 +361,11 @@ def cases():
                 f.write(2, C + 0x10, 0x600D),
             ],
             effect=tag != "never",
+            expect=(
+                "differs: Torii compares signed at the width, as the devices do; mGBA zero-extends"
+                if tag in ("lt8", "gt16")
+                else None
+            ),
         )
     both(
         f"{g}-if-next2",

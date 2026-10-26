@@ -26,7 +26,8 @@
 @ The semantics are mGBA's mCheatRefresh (src/core/cheats.c), op by op: a
 @ conditional covers the next count ops (skipped when false) and, with an
 @ ELSE, the else ops after them (skipped when true), with the same index
-@ arithmetic, so even odd layouts run as there. A plain cheat runs its ops
+@ arithmetic, so even odd layouts run as there; but lt and gt compare
+@ signed at the op's width, as the devices do. A plain cheat runs its ops
 @ in order. Loads and stores are the CPU's own at their width, as mGBA's
 @ bus reads and writes are: an odd halfword or word address is the
 @ hardware's (and mGBA's) rotated load and aligned store.
@@ -272,6 +273,14 @@ cond:	subs	r3, r3, #8
 	tst	r2, #0x10
 	ldrneh	r12, [r1]
 	ldreqb	r12, [r1]
+	sub	lr, r3, #2		@ lt, gt: signed at the width, both
+	cmp	lr, #1			@ sides moved to the top bits
+	bhi	6f
+	tst	r2, #0x10
+	movne	lr, #16
+	moveq	lr, #24
+	mov	r12, r12, lsl lr
+	mov	r4, r4, lsl lr
 6:	add	pc, pc, r3, lsl #4
 	nop
 	cmp	r12, r4			@ eq

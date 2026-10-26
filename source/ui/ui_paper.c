@@ -536,14 +536,27 @@ static void hints_draw(u8 node)
 									      : (h - l->hint_chip_h) / 2;
 	text_clear(&win, 0, 0, w, (u32)n->h, ui_paper(node, UI_ROLE_NONE));
 	if (top + l->hint_chip_h <= (u32)n->h && w > 2 * margin) {
+		u32 count = st->count < l->hint_max ? st->count : l->hint_max, chips = 0;
+		if (st->text && st->note.beside && count) {
+			// The keys at the right as ever, the line left of them
+			for (u32 i = 0; i < count; i++)
+				chips += ui_key_chip(&win, 0, top, st->hints[i].key, st->hints[i].label, 0) +
+					 l->hint_gap;
+			u32 x = chips + margin < w ? w - margin - chips + l->hint_gap : margin;
+			for (u32 i = 0; i < count; i++)
+				x += ui_key_chip(&win, x, top, st->hints[i].key, st->hints[i].label, 1) + l->hint_gap;
+		}
 		if (st->text) {
-			// The line centred, after its bar if it has one
+			// The line centred (left of the keys beside it), after its bar if
+			// it has one
 			const struct torii_font *font = ui_theme()->body;
 			const struct ui_hint_note *nt = &st->note;
 			struct text_line line;
-			u32 room = w - 2 * margin, bar = nt->bar_w ? nt->bar_w + nt->bar_gap : 0u;
+			u32 room = chips + 2 * margin < w ? w - 2 * margin - chips : 8u;
+			u32 bar = nt->bar_w ? nt->bar_w + nt->bar_gap : 0u;
 			text_layout(font, st->text, strlen(st->text), room > bar + 8 ? room - bar : 8, &line);
-			u32 total = bar + line.extent, x = margin + (total < room ? (room - total) / 2 : 0);
+			u32 total = bar + line.extent;
+			u32 x = margin + (total < room && !chips ? (room - total) / 2 : 0);
 			if (nt->bar_w) {
 				u32 bh = nt->bar_h < l->hint_chip_h ? nt->bar_h : l->hint_chip_h;
 				u32 by = top + (l->hint_chip_h - bh) / 2;
@@ -557,7 +570,7 @@ static void hints_draw(u8 node)
 				       nt->ink ? nt->ink : UI_ROLE_DIM, &line);
 		} else {
 			// From the right edge in: the hints' widths first
-			u32 count = st->count < l->hint_max ? st->count : l->hint_max, total = 0;
+			u32 total = 0;
 			for (u32 i = 0; i < count; i++)
 				total += ui_key_chip(&win, 0, top, st->hints[i].key, st->hints[i].label, 0) +
 					 (i ? l->hint_gap : 0u);

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Writes a tiny NES ROM for tests/nes.sh: usage nes_rom.py OUT.nes [save]
+"""Writes a tiny NES ROM for tests/nes.sh: usage nes_rom.py OUT.nes [save] [pal]
 
 Written for Torii's tests (no third-party code), so it can live in the
 repo. NROM, 16 KB of PRG and 8 KB of blank CHR. The program waits for the
@@ -7,7 +7,8 @@ PPU to warm up, sets the backdrop colour to red ($16), turns the background
 on and loops: the screen PocketNES draws is all red once it runs the game.
 With save (tests/nes_save.sh) it has battery RAM: before the loop it writes
 $5A to $6000 if $6000 isn't $5A yet, else $A5 to $6001, so a second run
-shows that the first run's save came back.
+shows that the first run's save came back. With pal (tests/nes_region.sh)
+its header is NES 2.0's, saying the game is for PAL consoles (byte 12).
 """
 
 import struct
@@ -72,9 +73,11 @@ def program(save: bool = False) -> bytes:
 
 
 def main() -> None:
-    save = len(sys.argv) > 2 and sys.argv[2] == "save"
-    # 1 PRG, 1 CHR, NROM; battery RAM with save
-    header = b"NES\x1a" + bytes([1, 1, 0x02 if save else 0, 0]) + bytes(8)
+    save, pal = "save" in sys.argv[2:], "pal" in sys.argv[2:]
+    # 1 PRG, 1 CHR, NROM; battery RAM with save; with pal, NES 2.0 (flags 7
+    # bits 2-3 = 2) and the PAL timing (byte 12 = 1)
+    header = b"NES\x1a" + bytes([1, 1, 0x02 if save else 0, 0x08 if pal else 0])
+    header += bytes(4) + bytes([1 if pal else 0]) + bytes(3)
     with open(sys.argv[1], "wb") as f:
         f.write(header + program(save) + bytes(0x2000))
 
