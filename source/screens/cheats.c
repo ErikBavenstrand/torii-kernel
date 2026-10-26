@@ -193,6 +193,7 @@ void cheats_run(const char *rom_path, const char *title, u16 icon)
 		return;
 	}
 	cs_decode();
+	cheatstore_listed(0);  // decoded: the game popup's count from now on
 	struct cheatstore *s = cheatstore();
 	u32 hidden = 0;
 	for (u32 i = 0; i < s->file.count; i++) {

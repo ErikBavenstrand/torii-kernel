@@ -17,7 +17,7 @@ export FRESH_IMAGE := kernel_image
 kernel_inputs := "source tests/kernel Makefile emulators/out/jagoombacolor.gba emulators/out/pocketnes.gba image.bin tools/omega_image.py tools/nm_to_sym.py tools/build_id.py " + kernel_image
 test_kernel_inputs := "source tests/kernel Makefile emulators/out/jagoombacolor.gba emulators/out/pocketnes.gba tools/build_id.py " + kernel_image
 emu_inputs := "emu/mgba/src emu/mgba/include emu/mgba/CMakeLists.txt emu/mgba/cmake emu/mgba-shot.c emu/build.sh docker/emu.Dockerfile"
-test_rom_outputs := "tests/roms/hello/hello.gba tests/roms/crash/crash.gba tests/roms/crash/crash.sym tests/roms/savetest/flash128.gba tests/roms/savetest/eeprom512.gba tests/roms/idle/idle.gba tests/roms/eeprom/eeprom.gba tests/roms/rumble/rumble.gba"
+test_rom_outputs := "tests/roms/hello/hello.gba tests/roms/crash/crash.gba tests/roms/crash/crash.sym tests/roms/savetest/flash128.gba tests/roms/savetest/eeprom512.gba tests/roms/idle/idle.gba tests/roms/eeprom/eeprom.gba tests/roms/rumble/rumble.gba tests/roms/cheattest/cheattest.gba tests/roms/cheattest/cheattest.sym"
 kernel_image := "devkitpro/devkitarm@sha256:1acab59884288115af0e70782a9b69017a8cc6bad69542b24e8652233f215c56"
 # The built-in emulators each build with the devkitARM of their own source's
 # time (emulators/fetch.sh pins the source): r58 (GCC 12, 2022-05-31) for
@@ -271,7 +271,7 @@ compat *filters: build emu-headless
     @if [ $# = 0 ] || [ "$*" = --all ]; then {{emu_docker}} tests/cheat_codes.sh; fi
 
 # Build the hardware-free kernel code with tests/host for the host, under ASan and UBSan, and run it;
-# test tools/font.py, tools/asset.py, tools/art.py, tools/art_scrape.py, tools/cheats.py, tools/art_pack.py, tools/library_report.py, the palette and the upgrade file's layout
+# test tools/font.py, tools/asset.py, tools/art.py, tools/art_scrape.py, tools/cheats.py, tools/cheat_encode.py, tools/art_pack.py, tools/library_report.py, the palette and the upgrade file's layout
 test-host: emu-image
     {{emu_docker}} tests/host.sh
     @uv run -q tests/font_test.py
@@ -281,8 +281,15 @@ test-host: emu-image
     @uv run -q tests/art_test.py
     @uv run -q tests/art_scrape_test.py
     @uv run -q tests/cheats_test.py
+    @uv run -q tests/cheat_encode_test.py
     @uv run -q tests/art_pack_test.py
     @uv run -q tests/library_report_test.py
+
+# Run every cheat code type of every format on the cheat test ROM in mGBA's own cheat engine and
+# through Torii, and compare the memory (tests/cheat_engine.sh; part of `just test`).
+# CHEAT_ENGINE_STRICT=1 fails the cases still pending the interpreter; CHEAT_BUTTON_KEYS=L+R the device button's keys
+cheat-engine: build emu-headless test-roms
+    {{emu_docker}} env CHEAT_ENGINE_JOBS=8 CHEAT_ENGINE_STRICT="${CHEAT_ENGINE_STRICT:-}" CHEAT_BUTTON_KEYS="${CHEAT_BUTTON_KEYS:-}" tests/cheat_engine.sh
 
 # Decode every cheat in a folder of libretro GBA .cht files (default dist/cheat-corpus, never
 # committed) with Torii's decoders and with mGBA's, print Torii's summary and where they differ
@@ -328,8 +335,9 @@ test-roms: _ready
     @{{fresh}} check test-roms {{test_rom_outputs}} -- tests/roms source/eepromprobe.c source/eepromprobe.h source/rumbleprobe.h || {{just_executable()}} _build-test-roms
 
 _build-test-roms:
-    {{kernel_docker}} sh -c 'make -B -C tests/roms/hello && make -B -C tests/roms/idle && make -B -C tests/roms/savetest && make -B -C tests/roms/eeprom && make -B -C tests/roms/rumble && make -B -C tests/roms/crash all'
+    {{kernel_docker}} sh -c 'make -B -C tests/roms/hello && make -B -C tests/roms/idle && make -B -C tests/roms/savetest && make -B -C tests/roms/eeprom && make -B -C tests/roms/rumble && make -B -C tests/roms/crash all && make -B -C tests/roms/cheattest all'
     python3 tools/nm_to_sym.py tests/roms/crash/crash.nm tests/roms/crash/crash.sym
+    python3 tools/nm_to_sym.py tests/roms/cheattest/cheattest.nm tests/roms/cheattest/cheattest.sym
     {{fresh}} record test-roms -- tests/roms source/eepromprobe.c source/eepromprobe.h source/rumbleprobe.h
 
 # Create the emulated cart (SD image from emu/sd) if it does not exist

@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "cheat.h"
+#include "crc32.h"
 #include "ez_define.h"
 #include "Ezcard_OP.h"
 #include "ff.h"
@@ -74,6 +75,31 @@ int cheatstore_decode(u32 budget)
 		if (budget && cycles_since(start) > budget)
 			return cs->work.next >= cs->file.count;
 	return 1;
+}
+
+// The last file cheatstore_listed counted whole: its path's CRC and cheat
+// count (picks don't change what is listed), and its listed count
+static struct {
+	u32 path_crc, count, listed;
+	u8 valid;
+} listed_cache EWRAM_BSS;
+
+s32 cheatstore_listed(u32 budget)
+{
+	struct cheatstore *cs = cheatstore();
+	u32 path_crc = crc32(cs->path, (u32)strlen(cs->path));
+	if (listed_cache.valid && listed_cache.path_crc == path_crc && listed_cache.count == cs->file.count)
+		return (s32)listed_cache.listed;
+	if (!cheatstore_decode(budget))
+		return -1;
+	u32 listed = 0;
+	for (u32 i = 0; i < cs->file.count; i++)
+		listed += (u32)cheatfile_shown(&cs->cheats[i]);
+	listed_cache.path_crc = path_crc;
+	listed_cache.count = cs->file.count;
+	listed_cache.listed = listed;
+	listed_cache.valid = 1;
+	return (s32)listed;
 }
 
 int cheatstore_write(void)
