@@ -6,6 +6,8 @@ git log, not here.
 
 ## Unreleased
 
+## v0.7.0
+
 - **Added:** cheats in GameShark v1/v2 (Action Replay v1/v2), Action Replay
   v3 (GameShark SP), CodeBreaker (plain and keyed) and VBA raw codes, decoded
   by a port of mGBA's decoders (MPL-2.0, `source/cheatcode.c`) from one
@@ -56,6 +58,18 @@ git log, not here.
 - **Changed:** cheat writes keep their real addresses (no longer folded into
   IWRAM or EWRAM), and ROM-patch codes are written once into the game's PSRAM
   image, with no cap (a4596285).
+- **Changed:** cheat files up to 192 KB (from 56 KB): the text sits in PSRAM,
+  read in 1 KB parts and edited in place, and a launch keeps its picked ROM
+  patches in EWRAM instead of reading the file again over the loaded game
+  (efd00fe9). `just cheats` writes compact files (no enable line for a cheat
+  that isn't picked) that fit under the cap with room for picks (9701948f,
+  8afa1f77).
+- **Fixed (before release):** the game popup no longer reads the cheat file
+  (87 frames on a 190 KB file, now one): its count comes from a cache filled
+  when the file is decoded. A cheat whose ROM patches don't all fit is left
+  out whole, and the screen refuses such a pick, or one the file has no room
+  to save; a too-big file, another dump's file and a failed PSRAM write each
+  get their own message instead of a card error (8541f133).
 - **Removed:** the Cheats setting, Boot with addon's cheat step, `/CHEAT`,
   `GameID2cht.bin` and EZ-Flash's `.cht` format, whose cheat files are poor
   (a4596285).
