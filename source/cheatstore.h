@@ -34,8 +34,12 @@ struct cheatstore {
 	u16 rows[CHEATFILE_MAX];       // the cheat screen's: the cheat each row shows
 	u32 part[CHEATSTORE_PART / 4];  // a part read from the card (word-aligned for f_read)
 	u16 stage[CHEATSTORE_PART / 2 + 2];  // a part on its way to PSRAM, a byte each side for odd ends
+	u8 room_failed;  // a PSRAM write of the text failed since the read: never written back
 };
 struct cheatstore *cheatstore(void);
+// n bytes from src (RAM or PSRAM) to dst in PSRAM, as the text's edits write
+// it (struct cheatfile_room's put); a failed write sets room_failed.
+void cheatstore_put(char *dst, const char *src, u32 n);
 
 // The cheat file's path for the ROM at rom_path (from the root, with its
 // extension) into out (size bytes); its length, or -1 if it doesn't fit
@@ -47,49 +51,63 @@ int cheatstore_path(char *out, u32 size, const char *rom_path);
 int cheatstore_read(const char *rom_path);
 // The same for the cheat screen: CHEATSTORE_READ if the file was read
 // (cheats in it or not), CHEATSTORE_NEW if the game has none (an empty
-// file, made on cheatstore_write), CHEATSTORE_NONE if it has one that can't
-// be read (too big, a card error) or a path too long.
+// file, made on cheatstore_write); else why not, the file left alone:
+// CHEATSTORE_BIG (a copy over CHEATSTORE_FILE_MAX, or a text over
+// CHEATFILE_TEXT_MAX), CHEATSTORE_OTHER_DUMP (its "# for crc32" names a dump
+// the CRC cache knows the ROM isn't), CHEATSTORE_UNREADABLE (the card
+// couldn't read it, or PSRAM take it), CHEATSTORE_NONE (its path too long).
 enum {
 	CHEATSTORE_NONE,
 	CHEATSTORE_READ,
 	CHEATSTORE_NEW,
+	CHEATSTORE_BIG,
+	CHEATSTORE_OTHER_DUMP,
+	CHEATSTORE_UNREADABLE,
 };
 int cheatstore_open(const char *rom_path);
+// The game popup's look at the game's cheat file, never reading it: 0 if
+// the game can have none (its path too long), else 1, with *listed the
+// count the cheat screen lists if this session has counted the file as it
+// is on the card now (the same path, size and date), else -1. Only f_stat:
+// the copy the count was kept for, NAME, or NAME.bak without it.
+int cheatstore_peek(const char *rom_path, s32 *listed);
 // The decoder as it is before cheat i (the file's count: after the last),
 // decoding the file again from the first unless it has just got there
 void cheatstore_decoder_before(u32 i, struct cheat_decoder *out);
 // Decodes the read file's cheats from cheatstore()->work.next on, until
 // budget cycles have passed (0: all of them). 1 once all are decoded.
 int cheatstore_decode(u32 budget);
-// How many cheats the read file's cheat screen lists (all but master codes,
-// which only decoding tells apart): decoding from cheatstore()->work.next
-// on for up to budget cycles (0: as long as it takes), unless this session
-// has counted the file already (the last file counted, by its path and
-// cheat count). -1 if the budget ran out first.
-s32 cheatstore_listed(u32 budget);
+// Once the read file is decoded whole: how many cheats its cheat screen
+// lists (all but master codes, which only decoding tells apart), kept for
+// cheatstore_peek with the file's size and date on the card. -1 (nothing
+// kept) if some cheats aren't decoded yet.
+s32 cheatstore_listed(void);
 // The code keypad's edits (cheatfile.h's) to the read file's text in PSRAM:
-// enum cheatfile_edit. The caller decodes again and writes the file.
+// enum cheatfile_edit, CHEATFILE_EDIT_FAILED once a PSRAM write has failed.
+// The caller decodes again and writes the file.
 u32 cheatstore_add(const char *desc, const char *code, u8 format, u32 *index);
 u32 cheatstore_set_code(u32 i, const char *desc, const char *code, u8 format);
 u32 cheatstore_remove(u32 i);
 // Writes the picks back into the read file, power-cut safe, if one changed
-// or an edit (cheatfile.h's) changed its text. 1 if it is as the picks say.
+// or an edit (cheatfile.h's) changed its text. 1 if it is as the picks say;
+// 0 if not written, as when a PSRAM write of the text failed.
 int cheatstore_write(void);
 // Deletes the game's cheat file (both copies); 1 if none is left
 int cheatstore_delete(const char *rom_path);
 
 // A launch of the GBA game at rom_path: its picked cheats into the
 // interpreter's table (gl_cheat_table, cheat.h), in file order, as many as fit
-// its budget (a cheat that doesn't fit is left out whole); gl_cheat_count
-// gets the cheats that run in game and gl_cheat_patches their ROM patches'
-// count, and the first CHEATSTORE_ROM_PATCHES of those are kept in EWRAM
-// (the rest left out and logged): the game's load takes PSRAM, where the
-// text is, and all of pReadCache. With psram_bytes, the game is in PSRAM
+// its budget and the ROM patches kept (a cheat that doesn't fit either is
+// left out whole, logged: never its table part without its patches, or
+// some of its patches); gl_cheat_count gets the cheats that run in game and
+// gl_cheat_patches their ROM patches' count, at most CHEATSTORE_ROM_PATCHES,
+// kept in EWRAM: the game's load takes PSRAM, where the text is, and all of
+// pReadCache. With psram_bytes, the game is in PSRAM
 // (that many bytes) and the kept ROM patches of the same ROM's first pass are
 // written into it, nothing read again, but for any past its end or over the
 // kernel's own patches (rom_guard_hits, GBApatch.h): left out and logged. A
 // game without a cheat file, or with none picked, gets none.
-#define CHEATSTORE_ROM_PATCHES 128
+#define CHEATSTORE_ROM_PATCHES CHEATFILE_PICKED_PATCHES_MAX
 void cheatstore_launch(const char *rom_path, u32 psram_bytes);
 extern u32 gl_cheat_patches;
 

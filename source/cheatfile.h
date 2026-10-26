@@ -48,6 +48,9 @@
 #define CHEATFILE_PROG_MAX (CHEATFILE_BYTES_MAX / 4)  // a cheat's table words
 #define CHEATFILE_OPS_MAX 256      // a cheat's decoded ops
 #define CHEATFILE_PATCHES_MAX 256  // a cheat's ROM patches
+// The picked cheats' ROM patches together: what a launch keeps for the game
+// (cheatstore.h's CHEATSTORE_ROM_PATCHES), so any one legal cheat fits
+#define CHEATFILE_PICKED_PATCHES_MAX CHEATFILE_PATCHES_MAX
 #define CHEATFILE_NONE 0xFFFFFFFFu  // no such line (or cheat)
 #define CHEATFILE_VALUE_MAX 0xFFFF  // a longer value isn't read: its line counts for nothing
 
@@ -69,6 +72,8 @@ enum cheatfile_why {
 	CHEATFILE_WHY_UNREADABLE,
 	CHEATFILE_WHY_EDIT,  // a placeholder
 	CHEATFILE_WHY_CANT_RUN,
+	CHEATFILE_WHY_PATCHES,  // its ROM patches don't fit beside the picked cheats' (CHEATFILE_PICKED_PATCHES_MAX)
+	CHEATFILE_WHY_ROOM,     // its enable line would take the text past CHEATFILE_TEXT_MAX
 	CHEATFILE_WHYS
 };
 
@@ -114,6 +119,9 @@ struct cheatfile {
 	u32 cut;      // the text was over CHEATFILE_TEXT_MAX and is read cut: never write it back
 	u32 bytes;    // the picked OK cheats' table bytes
 	u32 cost;     // and cycles
+	u32 patches;  // and ROM patches
+	u32 out_len;  // cheatfile_text's length, kept as picks change
+	u16 n_added;  // the picked cheats that get an enable line at the end
 	u32 count_at;  // the "cheats = N" line's value, CHEATFILE_NONE if none
 	u16 count_len;
 	u16 next;     // the number past the highest cheatN_ key's (a new cheat's), at most max
@@ -149,8 +157,8 @@ struct cheatfile_work {
 void cheatfile_begin(struct cheatfile_work *w);
 // Decodes the next cheat, sets its status, bytes, cost and patches, and
 // returns its index; -1 once every cheat is decoded. Its table part and
-// patches stay in w until the next call (none unless it is OK). f->bytes and
-// f->cost follow.
+// patches stay in w until the next call (none unless it is OK). f->bytes,
+// f->cost and f->patches follow.
 s32 cheatfile_next(struct cheatfile *f, struct cheatfile_work *w);
 
 // Decodes one code (len bytes) with dec, as cheatfile_next decodes a
@@ -168,8 +176,11 @@ static inline int cheatfile_shown(const struct cheatfile_cheat *c)
 	return c->status != CHEATFILE_MASTER;
 }
 
-// Why A wouldn't pick cheat i now: CHEATFILE_PICKABLE if it would. A picked
-// cheat can always be dropped.
+// Why A wouldn't pick cheat i now: CHEATFILE_PICKABLE if it would. A pick
+// must fit the interpreter's budget, the ROM patches a launch keeps, and the
+// cap on the text (the enable line it changes or adds counted), so a pick
+// taken is one a launch runs whole and the card can be written with. A
+// picked cheat can always be dropped.
 u32 cheatfile_why(const struct cheatfile *f, u32 i);
 // A on cheat i: drops it if picked, else picks it if it may be. 1 if its
 // pick changed.
@@ -184,7 +195,7 @@ u32 cheatfile_picks(const struct cheatfile *f);
 // of it from byte pos into buf, 0 at its end. ctx is the cheatfile. The
 // text itself stays as read (or edited): the picks are written in each time.
 u32 cheatfile_text(void *ctx, u32 pos, char *buf, u32 max);
-// Its length
+// Its length (kept as picks change: no pass over the cheats)
 u32 cheatfile_text_len(const struct cheatfile *f);
 // After cheatfile_text was written to the card: the card has the picks
 void cheatfile_written(struct cheatfile *f);
@@ -203,6 +214,7 @@ enum cheatfile_edit {
 	CHEATFILE_EDIT_FULL,  // a new cheat's number would be CHEATFILE_MAX (or the table's end)
 	CHEATFILE_EDIT_LONG,  // the text, picks written in, would pass CHEATFILE_TEXT_MAX or the room
 	CHEATFILE_EDIT_BAD,   // no such cheat, or a code with a quote or a control character
+	CHEATFILE_EDIT_FAILED,  // the room's writes failed (cheatstore.h's PSRAM): the text can't be trusted
 };
 
 // Where the text lives, for the edits: cap bytes from base, read as plain

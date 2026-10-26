@@ -8,7 +8,7 @@
 //   (screens/cheats.c, which starts no job and calls nothing else that
 //   borrows past the stage; its code keypad, screens/keypad.c, checks codes
 //   in the decoder's work, and the rename keyboard borrows nothing), within
-//   the game popup's count of them, and at a
+//   the game popup's look at the file (its path, for an f_stat), and at a
 //   launch within cheatstore_launch's first pass, before the game is loaded
 //   (the second, once it is in PSRAM, writes the ROM patches the first kept
 //   in EWRAM: the load takes all of pReadCache).

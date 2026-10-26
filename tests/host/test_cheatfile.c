@@ -359,6 +359,103 @@ void test_cheatfile_budget(void)
 	CHECK_EQ(cheatfile_why(&file, 0), CHEATFILE_WHY_FULL);
 }
 
+// The ROM patches a launch keeps (CHEATFILE_PICKED_PATCHES_MAX): a pick that
+// would pass them is refused, so a launch never has to leave part of a cheat
+// out
+void test_cheatfile_patches_budget(void)
+{
+	static char text[16384];
+	static const u32 n[4] = {100, 100, 60, 56};
+	char *p = text;
+	for (u32 c = 0; c < 4; c++) {
+		p += sprintf(p, "cheat%u_code = \"", (unsigned)c);
+		for (u32 i = 0; i < n[c]; i++)
+			p += sprintf(p, "%s08%u%05X:4770", i ? "+" : "", (unsigned)c, (unsigned)(i * 2));
+		p += sprintf(p, "\"\n");
+	}
+	load_str(text);
+	for (u32 c = 0; c < 4; c++) {
+		CHECK_EQ(cheats[c].status, CHEATFILE_OK);
+		CHECK_EQ(cheats[c].patches, n[c]);
+	}
+	CHECK(cheatfile_toggle(&file, 0));
+	CHECK(cheatfile_toggle(&file, 1));
+	CHECK_EQ(file.patches, 200);
+	CHECK_EQ(cheatfile_why(&file, 2), CHEATFILE_WHY_PATCHES);  // 260 of 256
+	CHECK(!cheatfile_toggle(&file, 2));
+	CHECK_EQ(cheatfile_why(&file, 3), CHEATFILE_PICKABLE);  // 256 exactly
+	CHECK(cheatfile_toggle(&file, 3));
+	CHECK_EQ(file.patches, CHEATFILE_PICKED_PATCHES_MAX);
+	CHECK(cheatfile_toggle(&file, 1));  // dropped: room again
+	CHECK_EQ(file.patches, 156);
+	CHECK_EQ(cheatfile_why(&file, 2), CHEATFILE_PICKABLE);
+	// Decoded again, the running total holds
+	cheatfile_begin(&work);
+	while (cheatfile_next(&file, &work) >= 0)
+		;
+	CHECK_EQ(file.patches, 156);
+	// One cheat of the most ROM patches a cheat may have fits alone
+	CHECK_EQ(CHEATFILE_PICKED_PATCHES_MAX, CHEATFILE_PATCHES_MAX);
+}
+
+// A pick's enable line counts against the file's cap: a pick the card
+// couldn't be written with is refused up front, never accepted and lost
+void test_cheatfile_room_pick(void)
+{
+	char *t = malloc(CHEATFILE_TEXT_MAX);
+	static const char tail[] = "\ncheat0_code = \"32001000 0001\"\ncheat1_code = \"32001001 0001\"\n";
+	u32 tl = (u32)strlen(tail), line = (u32)strlen("cheat0_enable = true\n");
+	// Room for one added line and 9 bytes more
+	u32 len = CHEATFILE_TEXT_MAX - line - 9;
+	memset(t, '#', len - tl);
+	memcpy(t + len - tl, tail, tl);
+	load(t, len);
+	CHECK_EQ(file.count, 2);
+	CHECK_EQ(cheatfile_why(&file, 0), CHEATFILE_PICKABLE);
+	CHECK(cheatfile_toggle(&file, 0));
+	CHECK_EQ(cheatfile_text_len(&file), CHEATFILE_TEXT_MAX - 9);
+	CHECK_EQ(cheatfile_why(&file, 1), CHEATFILE_WHY_ROOM);
+	CHECK(!cheatfile_toggle(&file, 1));
+	char *out = written(1000);
+	free(out);
+	CHECK(cheatfile_toggle(&file, 0));  // dropped: its line goes, and the room with it
+	CHECK_EQ(cheatfile_text_len(&file), len);
+	CHECK_EQ(cheatfile_why(&file, 1), CHEATFILE_PICKABLE);
+
+	// CRLF and no line end at the end: the first added line brings one,
+	// and a pick that fills the cap to the byte is taken
+	static const char crlf[] = "\r\ncheat0_code = \"32001000 0001\"\r\ncheat1_code = \"32001001 0001\"";
+	tl = (u32)strlen(crlf);
+	len = CHEATFILE_TEXT_MAX - 2 - (u32)strlen("cheat1_enable = true\r\n");
+	memset(t, '#', len - tl);
+	memcpy(t + len - tl, crlf, tl);
+	load(t, len);
+	CHECK(file.crlf);
+	CHECK_EQ(cheatfile_why(&file, 1), CHEATFILE_PICKABLE);
+	CHECK(cheatfile_toggle(&file, 1));
+	CHECK_EQ(cheatfile_text_len(&file), CHEATFILE_TEXT_MAX);
+	out = written(333);
+	CHECK(!memcmp(out + len, "\r\ncheat1_enable = true\r\n", 24));
+	free(out);
+	CHECK_EQ(cheatfile_why(&file, 0), CHEATFILE_WHY_ROOM);
+
+	// An enable line already there: "false" to "true" takes a byte less, so
+	// a file at the cap still picks
+	static const char has[] = "\ncheat0_code = \"32001000 0001\"\ncheat0_enable = false\n";
+	tl = (u32)strlen(has);
+	memset(t, '#', CHEATFILE_TEXT_MAX - tl);
+	memcpy(t + CHEATFILE_TEXT_MAX - tl, has, tl);
+	load(t, CHEATFILE_TEXT_MAX);
+	CHECK_EQ(cheatfile_why(&file, 0), CHEATFILE_PICKABLE);
+	CHECK(cheatfile_toggle(&file, 0));
+	CHECK_EQ(cheatfile_text_len(&file), CHEATFILE_TEXT_MAX - 1);
+	out = written(4096);
+	free(out);
+	free(t);
+	free(copy);
+	copy = NULL;
+}
+
 // Only enable values change; every other byte stays, CRLF and comments too
 void test_cheatfile_write_back(void)
 {

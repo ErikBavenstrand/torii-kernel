@@ -56,6 +56,10 @@ void safefile_close(void);
 // not a missing file or a copy that doesn't hold up): what was read may be
 // short, so its caller mustn't write the file back from it.
 int safefile_failed(void);
+// 1 if, since the last safefile_open, a copy was left alone as larger than
+// its max (safefile_failed says 1 too: nothing may write over it), so a
+// caller can tell a file too big from a card error.
+int safefile_too_big(void);
 
 // Writes the text fill gives to both copies of path, making its folder if
 // needed. fill(ctx, pos, buf, max) puts up to max bytes of the text from

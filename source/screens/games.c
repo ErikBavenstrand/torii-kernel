@@ -79,9 +79,6 @@ static const struct ui_card_config card = {4, 4, 4, 1, 0};
 #define DEDUPE_RUN 8    // games that clean to one name told apart, at most
 _Static_assert(DEDUPE_RUN *USERDATA_PATH_MAX <= READCACHE_DEDUPE_SIZE, "a run's paths fit their part of pReadCache");
 #define HASH_BUCKETS 1024  // the resolver's (a power of 2)
-// The popup decodes a game's cheat file for its Cheats count this long, a
-// thirtieth of a second, at most
-#define GAMES_CHEATS_CYCLES (16780000u / 30)
 
 enum {
 	KIND_CONSOLE,
@@ -1496,20 +1493,16 @@ static void popup_run(u32 i)
 	popup_add(LANG_POP_PLAY, nboots > 1 ? gl_games->boots[boots[0]] : 0, nboots > 1 ? UI_POP_STEP : 0);
 	if (game_saves_probe(games.pick))
 		popup_add(LANG_POP_SAVES, 0, 0);
-	int cheats = gba ? cheatstore_open(games.pick) : CHEATSTORE_NONE;
-	if (cheats != CHEATSTORE_NONE) {
-		// Every GBA game on the card has Cheats, for the code keypad's Add
-		// code, but one whose cheat file can't be read (too big). Its count
-		// is what the cheat screen lists, master codes left out: a file too
-		// long to decode now gets it once the screen has; a game with no
-		// cheat file, none
-		s32 listed = -1;
-		if (cheats == CHEATSTORE_READ && cheatstore()->file.count) {
-			u32 start = cycles_now();
-			listed = cheatstore_listed(GAMES_CHEATS_CYCLES);
-			tlog_debug("cheats: popup: %ld listed, %lu cycles", (long)listed,
-				   (unsigned long)cycles_since(start));
-		}
+	// Every GBA game on the card has Cheats, for the code keypad's Add code,
+	// but one whose cheat file's path is too long; the cheat screen says why
+	// a file it can't take is left alone. The popup never reads the file
+	// (190 KB takes over a second): its count, what the cheat screen lists,
+	// is the one this session kept for the file as it is on the card, else
+	// none
+	s32 listed = -1;
+	u32 start = cycles_now();
+	if (gba && cheatstore_peek(games.pick, &listed)) {
+		tlog_debug("cheats: popup: %ld listed, %lu cycles", (long)listed, (unsigned long)cycles_since(start));
 		if (listed >= 0)
 			snprintf(games.cheats, sizeof(games.cheats), "%lu", (unsigned long)listed);
 		popup_add(LANG_POP_CHEATS, listed >= 0 ? games.cheats : 0, 0);

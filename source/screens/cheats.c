@@ -41,7 +41,7 @@
 
 static const struct ui_card_config cs_card = {4, 4, 4, 1, 0};
 _Static_assert(sizeof(((struct lang_cheats *)0)->why) / sizeof(const char *) == CHEATFILE_WHYS, "a reason for each");
-_Static_assert(sizeof(((struct lang_cheats *)0)->edit_failed) / sizeof(const char *) == CHEATFILE_EDIT_BAD + 1,
+_Static_assert(sizeof(((struct lang_cheats *)0)->edit_failed) / sizeof(const char *) == CHEATFILE_EDIT_FAILED + 1,
 	       "a line for each edit's failure");
 
 enum {
@@ -385,9 +385,9 @@ static u32 cs_code(u32 at, int fill)
 	else
 		r = cheatstore_set_code(at, fill ? NULL : cs.name, cs.code, format);
 	tlog("cheats: %s cheat %lu: %s", c ? (fill ? "filled in" : "edited") : "added", (unsigned long)idx,
-	     r == CHEATFILE_EDIT_OK ? "ok" : gl_cheats->edit_failed[r < CHEATFILE_EDIT_BAD + 1 ? r : 0]);
+	     r == CHEATFILE_EDIT_OK ? "ok" : gl_cheats->edit_failed[r < CHEATFILE_EDIT_FAILED + 1 ? r : 0]);
 	if (r != CHEATFILE_EDIT_OK) {
-		dialog_message(cs.heading, gl_cheats->edit_failed[r <= CHEATFILE_EDIT_BAD ? r : 0], DIALOG_ERROR);
+		dialog_message(cs.heading, gl_cheats->edit_failed[r <= CHEATFILE_EDIT_FAILED ? r : 0], DIALOG_ERROR);
 		return row;
 	}
 	cs_redecode();
@@ -431,7 +431,11 @@ static u32 cs_menu(u32 row)
 		tlog("cheats: deleted cheat %lu: %s", (unsigned long)at, r == CHEATFILE_EDIT_OK ? "ok" : "refused");
 		cs_leave();
 		cs_redecode();
-		cs_write();
+		if (r == CHEATFILE_EDIT_OK)
+			cs_write();
+		else
+			dialog_message(cs.heading, gl_cheats->edit_failed[r <= CHEATFILE_EDIT_FAILED ? r : 0],
+				       DIALOG_ERROR);
 		return cs_rows(at);
 	}
 }
@@ -440,12 +444,17 @@ void cheats_run(const char *rom_path, const char *title, u16 icon)
 {
 	memset(&cs, 0, sizeof(cs));
 	int opened = cheatstore_open(rom_path);
-	if (opened == CHEATSTORE_NONE) {
-		dialog_message(title, gl_cheats->gone, DIALOG_ERROR);
+	if (opened != CHEATSTORE_READ && opened != CHEATSTORE_NEW) {
+		// Why the file is left alone: never a screen without it
+		const char *why = opened == CHEATSTORE_BIG          ? gl_cheats->too_big
+				  : opened == CHEATSTORE_OTHER_DUMP ? gl_cheats->other_dump
+								    : gl_cheats->gone;
+		tlog("cheats: %s: no cheat screen (%d)", rom_path, opened);
+		dialog_message(title, why, DIALOG_ERROR);
 		return;
 	}
 	cs_decode();
-	cheatstore_listed(0);  // decoded: the game popup's count from now on
+	cheatstore_listed();  // decoded: the game popup's count from now on
 	struct cheatstore *s = cheatstore();
 	cs_rows(CHEATFILE_NONE);
 	u32 row = 0, hidden = s->file.count - (cs.count - 1);

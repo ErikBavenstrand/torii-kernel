@@ -72,7 +72,11 @@ its frontend, or a flash cart can't do what the device did:
 - **The budget:** the picked cheats together get 5 KB of table and a model
   of 28,000 cycles (10% of a frame at the BIOS's wait states); a cheat over
   either alone is "too big". Each of the 6,161 libretro GBA cheats that read
-  and lower fits alone (`just cheat-corpus`, 2026-10-26).
+  and lower fits alone (`just cheat-corpus`, 2026-10-26). Their ROM patches
+  together are 256 at most (a cheat's own limit, so any one fits), kept in
+  EWRAM across the game's load; the cheat screen refuses a pick past that
+  rather than a launch applying part of a cheat. A pick whose enable line
+  would take the file past 192 KB is refused too, as it couldn't be saved.
 
 ---
 

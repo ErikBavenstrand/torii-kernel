@@ -7,8 +7,9 @@
 #          at the interpreter's cycle cap; cheatirq-vblank enables VBlank
 #          alone. Neither may freeze, and an add-1 cheat must move its
 #          counter by exactly 1 a frame.
-#   files  A cheat file whose text is over CHEATFILE_TEXT_MAX is refused (no
-#          Cheats in the popup, none applied, the file as it was); an enable
+#   files  A cheat file whose text is over CHEATFILE_TEXT_MAX is refused (the
+#          cheat screen says it's too big, none applied, the file as it
+#          was); an enable
 #          value of 1 is a pick; deleting a game deletes its cheat files
 #          first, and renaming it moves them, each step cut in turn
 #          (tests/cutsweep.sh): no cut leaves a cheat file without its game,
@@ -91,19 +92,26 @@ files)
     printf '\n'
   } >>"$big"
   new_cart big tests/roms/hello/hello.gba Hello.gba "$big"
+  # The popup's Cheats (it never reads the file), DOWN past Saves, A: the
+  # screen's dialog says the file is too big
   # shellcheck disable=SC2046 # nav.sh's options
-  boot $(nav_game_menu gba 0) -f 1200 >"$cart/popup.txt" 2>&1 || true
-  grep -q "screen ready: game-popup" "$cart/popup.txt" || fail "no game popup: $(grep -a '^kernel' "$cart/popup.txt" | tail -3)"
+  boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
+    -w "Its cheat file is too big" -f 1600 >"$cart/popup.txt" 2>&1 ||
+    fail "no too-big dialog: $(grep -a '^kernel' "$cart/popup.txt" | tail -3)"
+  grep -q "cheats: popup: -1 listed" "$cart/popup.txt" || fail "the popup had no Cheats for the big file"
   grep -q "cheats: /torii/cheats/Hello.cht is 196613 bytes, over 196608: too big, left alone" "$cart/popup.txt" ||
     fail "the big file wasn't refused: $(grep -a 'cheats:' "$cart/popup.txt" | head -3)"
-  ! grep -q "cheats: popup:" "$cart/popup.txt" || fail "the popup offered Cheats for the big file"
+  grep -q "dialog: Hello: Its cheat file is too big: over 192 KB." "$cart/popup.txt" ||
+    fail "the screen's dialog: $(grep -a 'dialog:' "$cart/popup.txt" | tail -2)"
+  ! grep -q "kernel error: cheats" "$cart/popup.txt" || fail "the big file was taken for a card error"
+  ! grep -q "screen ready: cheats" "$cart/popup.txt" || fail "the cheat screen opened the big file"
   # shellcheck disable=SC2046 # nav.sh's options
   boot $(nav_launch /Hello.gba addon) -w "launch: starting the game" -m @120:0x0203F000:2 -f 3000 \
     >"$cart/launch.txt" 2>&1 || true
   ! grep -q "cheats: .*picked" "$cart/launch.txt" || fail "a launch applied the big file's cheats"
   ! grep -qi "mem frame [0-9]* 0203F000: ef be" "$cart/launch.txt" || fail "the big file's cheat ran"
   mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | cmp -s - "$big" || fail "the big file changed"
-  echo "PASS: cheat_safety: a cheat file over 196,608 bytes is refused: no Cheats, none applied, the file as it was"
+  echo "PASS: cheat_safety: a cheat file over 196,608 bytes is refused: the cheat screen says it's too big, none applied, the file as it was"
 
   # cheatN_enable = 1 picks
   one=$carts/one.cht

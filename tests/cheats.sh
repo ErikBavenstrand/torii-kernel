@@ -64,9 +64,11 @@ pick() {
 pick boot >"$cart/pick.txt" 2>&1 || fail "the cheat screen didn't run: $(grep -a '^kernel' "$cart/pick.txt" | tail -3)"
 grep -q "cheats: .*Hello.cht: 3 cheats, 1 master codes hidden, 1 picked" "$cart/pick.txt" ||
   fail "the screen read: $(grep -a 'cheats:' "$cart/pick.txt" | head -3)"
-# The popup's count is the screen's: the master code isn't counted
-grep -q "cheats: popup: 3 listed" "$cart/pick.txt" ||
+# The popup never reads the file: no count before the screen has counted it
+grep -q "cheats: popup: -1 listed" "$cart/pick.txt" ||
   fail "the popup counted: $(grep -a 'cheats: popup' "$cart/pick.txt" | head -1)"
+! sed '/screen ready: game-popup/q' "$cart/pick.txt" | grep -q 'safefile: .*Hello.cht\|cheats: .*Hello.cht: [0-9]* bytes' ||
+  fail "the popup read the cheat file"
 grep -q "cheats: /torii/cheats/Hello.cht: 2 picked, written" "$cart/pick.txt" ||
   fail "the pick wasn't saved: $(grep -a 'cheats:' "$cart/pick.txt" | tail -2)"
 mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht >"$cart/after.cht"
@@ -166,9 +168,9 @@ boot $(nav_launch /Hello.gba clean) -u "launch: loading" -f 4000 >"$cart/clean.t
 echo "PASS: cheats: a clean boot applies none"
 
 # A big file (500 cheats, 46 KB, GameShark codes that decrypt): the popup
-# doesn't wait for it to decode, so it shows no count; the screen reads it
-# once, decodes it behind a progress dialog, and A answers at once; B saves,
-# and back on the list the popup has the count the screen found
+# never reads it, so it shows no count; the screen reads it once, decodes it
+# behind a progress dialog, and A answers at once; B saves, and back on the
+# list the popup has the count the screen found, kept for the file as saved
 cp "$cart/clean/sd.img" "$cart/clean/kernel-nor.bin" "$cart/"
 rm -f "$cart/sram.bin"
 python3 - "$cart/Big.cht" <<'EOF'
@@ -187,8 +189,8 @@ boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -
 grep -q "screen ready: progress" "$cart/big.txt" || fail "no progress dialog while the big file decoded"
 grep -q "cheats: .*Hello.cht: 500 cheats, 0 master codes hidden" "$cart/big.txt" ||
   fail "the big file read: $(grep -a 'cheats:' "$cart/big.txt" | head -3)"
-# Until the screen's write-back: the popup's read and the screen's
-[ "$(sed '/cheats: back/q' "$cart/big.txt" | grep -c 'safefile: .*Hello.cht')" -le 2 ] ||
+# Until the screen's write-back: the screen's read alone
+[ "$(sed '/cheats: back/q' "$cart/big.txt" | grep -c 'safefile: .*Hello.cht')" -le 1 ] ||
   fail "the big file was read more than once"
 popups=$(sed -n 's/.*cheats: popup: \(-\{0,1\}[0-9]*\) listed.*/\1/p' "$cart/big.txt" | tr '\n' ' ')
 [ "$popups" = "-1 500 " ] || fail "the popup counted ${popups:-nothing}, not -1 (no count) and then 500"
@@ -239,6 +241,12 @@ for big in "600 100000" "1000 190000"; do
     fail "the $count-cheat file's screen didn't run: $(grep -a '^kernel' "$cart/huge.txt" | tail -3)"
   grep -q "cheats: .*Hello.cht: $count cheats, 0 master codes hidden, 2 picked" "$cart/huge.txt" ||
     fail "the $count-cheat file read: $(grep -a 'cheats:' "$cart/huge.txt" | head -3)"
+  # The popup doesn't read it (reading 190 KB took 75 frames): its look at
+  # the file takes far less than a frame
+  ! sed '/screen ready: game-popup/q' "$cart/huge.txt" | grep -q 'cheats: .*Hello.cht: [0-9]* bytes' ||
+    fail "the $count-cheat file's popup read it"
+  cycles=$(sed -n 's/.*cheats: popup: -1 listed, \([0-9]*\) cycles.*/\1/p' "$cart/huge.txt")
+  [ -n "$cycles" ] && [ "$cycles" -lt 100000 ] || fail "the $count-cheat file's popup took ${cycles:-?} cycles"
   grep -q "cheats: /torii/cheats/Hello.cht: 3 picked, written" "$cart/huge.txt" ||
     fail "the $count-cheat file's pick wasn't saved: $(grep -a 'cheats:' "$cart/huge.txt" | tail -2)"
   mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht >"$cart/after.cht"
@@ -486,9 +494,11 @@ add_check() {
 cut_sweep add_scenario add_check
 echo "PASS: cheats: a power cut at each of a new code's $cut_count write steps leaves the file without it or with it"
 
-# A file made by just cheats names its dump ("# for crc32 X"): the kernel
-# leaves it out, in the popup and at a launch, when the CRC cache knows the
-# ROM as another dump, and reads it when the CRC is the ROM's
+# A file made by just cheats names its dump ("# for crc32 X"): when the CRC
+# cache knows the ROM as another dump, the popup still has Cheats (it never
+# reads the file, so no count), the cheat screen says why it is left out,
+# and a launch applies none of it; when the CRC is the ROM's, the screen
+# lists it and a launch runs its pick
 crc=$(python3 -c 'import sys, zlib; print("%08X" % zlib.crc32(open(sys.argv[1], "rb").read()))' tests/roms/hello/hello.gba)
 size=$(stat -c %s tests/roms/hello/hello.gba)
 for want in DEADBEEF "$crc"; do
@@ -499,23 +509,31 @@ for want in DEADBEEF "$crc"; do
   printf '%s\n' "# for crc32 $want" 'cheats = 1' '' 'cheat0_desc = "Dump"' 'cheat0_code = "3203F070+0033"' \
     'cheat0_enable = true' >"$cart/Dump.cht"
   mcopy -o -i "$cart/sd.img" "$cart/Dump.cht" ::/torii/cheats/Hello.cht
+  if [ "$want" = "$crc" ]; then expect_line="screen ready: cheats"; else expect_line="Its cheat file is for another dump"; fi
+  # Hello's popup, DOWN past Saves to Cheats, A: the screen, or its dialog
   # shellcheck disable=SC2046 # nav.sh's options
-  boot $(nav_game_menu gba 0) -f 400 >"$cart/dump-popup.txt" 2>&1 ||
-    fail "the popup for crc32 $want didn't run: $(grep -a '^kernel' "$cart/dump-popup.txt" | tail -3)"
+  boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
+    -w "$expect_line" -f 1200 >"$cart/dump-popup.txt" 2>&1 ||
+    fail "the cheat screen for crc32 $want didn't run: $(grep -a '^kernel' "$cart/dump-popup.txt" | tail -3)"
+  grep -q "cheats: popup: -1 listed" "$cart/dump-popup.txt" ||
+    fail "the popup for crc32 $want: $(grep -a 'cheats:' "$cart/dump-popup.txt" | tail -2)"
   launch_dump -m "@240:0x0203F070:1" >"$cart/dump-launch.txt" 2>&1 ||
     fail "the launch for crc32 $want didn't run: $(grep -a '^kernel' "$cart/dump-launch.txt" | tail -3)"
   got=$(sed -n 's/^mem frame [0-9]* 0203F070: //p' "$cart/dump-launch.txt" | tr -d ' \n' | tr A-F a-f)
   left="cheats: /torii/cheats/Hello.cht is for crc32 $want, and /Hello.gba is $crc: left out"
   if [ "$want" = "$crc" ]; then
-    grep -q "cheats: popup: 1 listed" "$cart/dump-popup.txt" ||
-      fail "the popup for its own dump: $(grep -a 'cheats:' "$cart/dump-popup.txt" | tail -2)"
+    grep -q "cheats: .*Hello.cht: 1 cheats, 0 master codes hidden, 1 picked" "$cart/dump-popup.txt" ||
+      fail "the screen for its own dump: $(grep -a 'cheats:' "$cart/dump-popup.txt" | tail -2)"
     [ "$got" = 33 ] || fail "the cheat for its own dump: 0203F070 holds $got, not 33"
   else
     grep -qF "$left" "$cart/dump-popup.txt" ||
-      fail "the popup read another dump's file: $(grep -a 'cheats:\|names:' "$cart/dump-popup.txt" | tail -3)"
+      fail "the screen read another dump's file: $(grep -a 'cheats:\|names:' "$cart/dump-popup.txt" | tail -3)"
+    grep -q "dialog: Hello: Its cheat file is for another dump of the game." "$cart/dump-popup.txt" ||
+      fail "the screen's dialog: $(grep -a 'dialog:' "$cart/dump-popup.txt" | tail -2)"
+    ! grep -q "screen ready: cheats" "$cart/dump-popup.txt" || fail "the cheat screen opened another dump's file"
     grep -qF "$left" "$cart/dump-launch.txt" ||
       fail "the launch read another dump's file: $(grep -a 'cheats:\|names:' "$cart/dump-launch.txt" | tail -3)"
     [ "$got" != 33 ] || fail "another dump's cheat ran: 0203F070 holds 33"
   fi
 done
-echo "PASS: cheats: a file for another dump (# for crc32) is left out in the popup and at a launch; its own dump's runs"
+echo "PASS: cheats: a file for another dump (# for crc32): Cheats in the popup, the screen says why it's left out, a launch applies none; its own dump's runs"

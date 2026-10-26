@@ -240,6 +240,7 @@ void cheatfile_parse(struct cheatfile *f, const char *text, u32 len, struct chea
 	f->cut = cut;
 	f->text = text;
 	f->len = len;
+	f->out_len = len;  // every pick as its enable line says: written back as it is
 	f->cheats = cheats;
 	f->max = (u16)max;
 	f->count_at = CHEATFILE_NONE;
@@ -319,6 +320,7 @@ s32 cheatfile_next(struct cheatfile *f, struct cheatfile_work *w)
 	if (c->status == CHEATFILE_OK && c->picked) {
 		f->bytes -= c->bytes;  // decoded again
 		f->cost -= c->cost;
+		f->patches -= c->patches;
 	}
 	u32 n_ops;
 	u8 lowered;
@@ -338,8 +340,78 @@ s32 cheatfile_next(struct cheatfile *f, struct cheatfile_work *w)
 	if (c->status == CHEATFILE_OK && c->picked) {
 		f->bytes += c->bytes;
 		f->cost += c->cost;
+		f->patches += c->patches;
 	}
 	return (s32)i;
+}
+
+// --- The written text's length, as picks change ------------------------------
+
+static const char *const pick_text[2] = {"false", "true"};
+
+// A cheat whose enable line's value changes
+static int edited(const struct cheatfile_cheat *c)
+{
+	return c->enable != CHEATFILE_NONE && c->picked != c->was;
+}
+
+// A cheat that gets an enable line at the end
+static int added(const struct cheatfile_cheat *c)
+{
+	return c->enable == CHEATFILE_NONE && c->picked;
+}
+
+// 1 if the text doesn't end its last line: an added line starts a new one
+static int open_end(const struct cheatfile *f)
+{
+	return f->len && f->text[f->len - 1] != '\n';
+}
+
+static u32 eol_len(const struct cheatfile *f)
+{
+	return f->crlf ? 2 : 1;
+}
+
+// The bytes c's pick changes the written text by: its enable value's change,
+// or its added line (added_line's, without a break before it)
+static s32 pick_delta(const struct cheatfile *f, const struct cheatfile_cheat *c)
+{
+	if (edited(c))
+		return (s32)strlen(pick_text[c->picked]) - (s32)c->enable_len;
+	if (!added(c))
+		return 0;
+	u32 digits = 1;
+	for (u32 n = c->number; n >= 10; n /= 10)
+		digits++;
+	return (s32)(sizeof("cheat") - 1 + digits + sizeof("_enable = true") - 1 + eol_len(f));
+}
+
+// The line break before the added lines, with n of them
+static u32 added_break(const struct cheatfile *f, u32 n)
+{
+	return n && open_end(f) ? eol_len(f) : 0;
+}
+
+// The written text's length with c's pick flipped (c a cheat of f's)
+static u32 len_flipped(const struct cheatfile *f, const struct cheatfile_cheat *c)
+{
+	struct cheatfile_cheat t = *c;
+	t.picked = !t.picked;
+	u32 n = f->n_added - (u32)added(c) + (u32)added(&t);
+	return (u32)((s32)f->out_len - pick_delta(f, c) + pick_delta(f, &t) - (s32)added_break(f, f->n_added) +
+		     (s32)added_break(f, n));
+}
+
+// f->out_len and f->n_added from every cheat's pick
+static void out_sync(struct cheatfile *f)
+{
+	s32 len = (s32)f->len;
+	f->n_added = 0;
+	for (u32 i = 0; i < f->count; i++) {
+		len += pick_delta(f, &f->cheats[i]);
+		f->n_added = (u16)(f->n_added + added(&f->cheats[i]));
+	}
+	f->out_len = (u32)len + added_break(f, f->n_added);
 }
 
 u32 cheatfile_why(const struct cheatfile *f, u32 i)
@@ -351,9 +423,11 @@ u32 cheatfile_why(const struct cheatfile *f, u32 i)
 		return CHEATFILE_PICKABLE;
 	switch (c->status) {
 	case CHEATFILE_OK:
-		return f->bytes + c->bytes > CHEATFILE_BYTES_MAX || f->cost + c->cost > CHEATFILE_CYCLES_MAX
-			       ? CHEATFILE_WHY_FULL
-			       : CHEATFILE_PICKABLE;
+		if (f->bytes + c->bytes > CHEATFILE_BYTES_MAX || f->cost + c->cost > CHEATFILE_CYCLES_MAX)
+			return CHEATFILE_WHY_FULL;
+		if (f->patches + c->patches > CHEATFILE_PICKED_PATCHES_MAX)
+			return CHEATFILE_WHY_PATCHES;
+		return len_flipped(f, c) > CHEATFILE_TEXT_MAX ? CHEATFILE_WHY_ROOM : CHEATFILE_PICKABLE;
 	case CHEATFILE_BIG:
 		return CHEATFILE_WHY_FULL;
 	case CHEATFILE_PLACEHOLDER:
@@ -370,14 +444,19 @@ int cheatfile_toggle(struct cheatfile *f, u32 i)
 	if (cheatfile_why(f, i) != CHEATFILE_PICKABLE)
 		return 0;
 	struct cheatfile_cheat *c = &f->cheats[i];
+	f->out_len = len_flipped(f, c);
+	f->n_added = (u16)(f->n_added - added(c));
 	c->picked = !c->picked;
+	f->n_added = (u16)(f->n_added + added(c));
 	if (c->status == CHEATFILE_OK) {
 		if (c->picked) {
 			f->bytes += c->bytes;
 			f->cost += c->cost;
+			f->patches += c->patches;
 		} else {
 			f->bytes -= c->bytes;
 			f->cost -= c->cost;
+			f->patches -= c->patches;
 		}
 	}
 	return 1;
@@ -410,20 +489,6 @@ u32 cheatfile_picks(const struct cheatfile *f)
 
 // --- Writing back ---------------------------------------------------------------------
 
-static const char *const pick_text[2] = {"false", "true"};
-
-// A cheat whose enable line's value changes
-static int edited(const struct cheatfile_cheat *c)
-{
-	return c->enable != CHEATFILE_NONE && c->picked != c->was;
-}
-
-// A cheat that gets an enable line at the end
-static int added(const struct cheatfile_cheat *c)
-{
-	return c->enable == CHEATFILE_NONE && c->picked;
-}
-
 // The text offset of the first enable value to change at or after t; past
 // the text if none
 static u32 next_edit(const struct cheatfile *f, u32 t, u32 *cheat)
@@ -439,12 +504,6 @@ static u32 next_edit(const struct cheatfile *f, u32 t, u32 *cheat)
 	return best;
 }
 
-// 1 if the text doesn't end its last line: an added line starts a new one
-static int open_end(const struct cheatfile *f)
-{
-	return f->len && f->text[f->len - 1] != '\n';
-}
-
 // cheat i's added line into out (40 bytes), with a line break before it
 // when brk; its length
 static u32 added_line(const struct cheatfile *f, u32 i, int brk, char *out)
@@ -455,18 +514,7 @@ static u32 added_line(const struct cheatfile *f, u32 i, int brk, char *out)
 
 u32 cheatfile_text_len(const struct cheatfile *f)
 {
-	u32 len = f->len, any = 0;
-	char line[40];
-	for (u32 i = 0; i < f->count; i++) {
-		const struct cheatfile_cheat *c = &f->cheats[i];
-		if (edited(c))
-			len = len - c->enable_len + (u32)strlen(pick_text[c->picked]);
-		if (added(c)) {
-			len += added_line(f, i, !any && open_end(f), line);
-			any = 1;
-		}
-	}
-	return len;
+	return f->out_len;
 }
 
 u32 cheatfile_text(void *ctx, u32 pos, char *buf, u32 max)
@@ -563,6 +611,7 @@ static void picks_restore(struct cheatfile *f, const struct picks *p, u32 remove
 		u32 n = removed != CHEATFILE_NONE && c->number >= removed ? c->number + 1u : c->number;
 		c->picked = n < CHEATFILE_MAX && (p->bits[n >> 3] >> (n & 7)) & 1;
 	}
+	out_sync(f);
 }
 
 // The text in buf, len bytes, read again after an edit

@@ -7,6 +7,8 @@ void test_cheatfile_odd(void);
 void test_cheatfile_status(void);
 void test_cheatfile_keys_carry(void);
 void test_cheatfile_budget(void);
+void test_cheatfile_patches_budget(void);
+void test_cheatfile_room_pick(void);
 void test_cheatfile_write_back(void);
 void test_cheatfile_add(void);
 void test_cheatfile_set_code(void);

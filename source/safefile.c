@@ -15,6 +15,7 @@ static FIL sf_file EWRAM_BSS;
 static u8 sf_chunk[CHUNK] EWRAM_BSS ALIGN(4);
 static struct safefile_scan sf_main EWRAM_BSS, sf_bak EWRAM_BSS;
 static u8 sf_failed EWRAM_BSS;  // a read failed since safefile_open began
+static u8 sf_big EWRAM_BSS;     // and a copy was over its max (sf_failed too)
 // The backup copy's path, and a folder on the way to it: one file is open at
 // a time, and these are too long for the stack (SAFEFILE_PATH_MAX)
 static char sf_bak_path[SAFEFILE_PATH_MAX] EWRAM_BSS;
@@ -54,6 +55,7 @@ static int scan(const char *path, struct safefile_scan *s, u32 max)
 		     (unsigned long)max);
 		f_close(&sf_file);
 		sf_failed = 1;  // as a failed read: nothing writes over it
+		sf_big = 1;
 		return 0;
 	}
 	UINT got = 0;
@@ -76,7 +78,7 @@ static int scan(const char *path, struct safefile_scan *s, u32 max)
 // are left in sf_main and sf_bak
 static int pick(const char *path, const char *bak, u32 max)
 {
-	sf_failed = 0;
+	sf_failed = sf_big = 0;
 	int has_main = scan(path, &sf_main, max);
 	if (has_main && sf_main.valid)
 		return SAFEFILE_MAIN;  // NAME.bak doesn't matter
@@ -234,6 +236,11 @@ int safefile_read_part(void *buf, u32 size)
 int safefile_failed(void)
 {
 	return sf_failed;
+}
+
+int safefile_too_big(void)
+{
+	return sf_big;
 }
 
 void safefile_close(void)

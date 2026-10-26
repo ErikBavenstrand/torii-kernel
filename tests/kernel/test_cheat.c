@@ -82,6 +82,24 @@ static int put(const char *path, const char *text)
 	return (f_close(&f) == FR_OK) & ok;
 }
 
+// A file of size bytes at path (junk but its last byte); its FIL off the
+// test's own frame
+static __attribute__((noinline)) int put_size(const char *path, u32 size)
+{
+	FIL f;
+	UINT done = 0;
+	if (f_open(&f, path, FA_WRITE | FA_CREATE_ALWAYS) != FR_OK)
+		return 0;
+	int ok = f_lseek(&f, size - 1) == FR_OK && f_write(&f, "\n", 1, &done) == FR_OK && done == 1;
+	return (f_close(&f) == FR_OK) & ok;
+}
+
+static __attribute__((noinline)) u32 file_size(const char *path)
+{
+	FILINFO info;
+	return f_stat(path, &info) == FR_OK ? (u32)info.fsize : 0;
+}
+
 // On the emulated cart (tests/assets.sh): a cheat file's picks reach the
 // interpreter's table at their own addresses and widths, IWRAM, EWRAM and IO
 // alike, in file order; the picks are written back and read again
@@ -129,19 +147,87 @@ void test_cheatstore(void)
 	CHECK_EQ(gl_cheat_table[4], 0x03007FF0);
 	gl_cheat_count = gl_cheat_bytes = gl_cheat_patches = 0;
 
-	// A cheat of 130 ROM patches: the load takes PSRAM and pReadCache, so the
-	// first CHEATSTORE_ROM_PATCHES are kept for it in EWRAM, the rest left out
-	// (the text is made in the cheat table's room, free until the launch)
+	// ROM patches: the load takes PSRAM and pReadCache, so a launch keeps them
+	// in EWRAM, CHEATSTORE_ROM_PATCHES at most, a cheat's all or none: 200
+	// kept, then one of 100 and a RAM write left out whole (never its write
+	// without its patches, or some of them), then 10 kept. The text is made
+	// in the cheat table's room, free until the launch.
+	static const u32 sizes[3] = {200, 100, 10};
 	char *t = (char *)cheatstore()->cheats;
-	u32 n = (u32)snprintf(t, 128, "cheat0_desc = \"Patches\"\ncheat0_enable = true\ncheat0_code = \"");
-	for (u32 i = 0; i < 130; i++)
+	u32 n = 0;
+	for (u32 c = 0; c < 3; c++) {
+		n += (u32)snprintf(t + n, 128, "cheat%lu_enable = true\ncheat%lu_code = \"%s", (unsigned long)c,
+				   (unsigned long)c, c == 1 ? "02001000:01+" : "");
+		for (u32 i = 0; i < sizes[c]; i++)
+			n += (u32)snprintf(t + n, 32, "%s08%06lX:4770", i ? "+" : "",
+					   (unsigned long)(0x1000 + c * 0x1000 + i * 2));
+		n += (u32)snprintf(t + n, 8, "\"\n");
+	}
+	CHECK(put(T_CHT, t));
+	cheatstore_launch(T_ROM, 0);
+	CHECK_EQ(gl_cheat_count, 0);  // cheat 1's RAM write left out with its patches
+	CHECK_EQ(gl_cheat_patches, 210);
+	CHECK_EQ(CHEATSTORE_ROM_PATCHES, 256);
+	// One cheat of the most patches a cheat may have: kept whole
+	n = (u32)snprintf(t, 128, "cheat0_enable = true\ncheat0_code = \"");
+	for (u32 i = 0; i < CHEATFILE_PATCHES_MAX; i++)
 		n += (u32)snprintf(t + n, 32, "%s08%06lX:4770", i ? "+" : "", (unsigned long)(0x1000 + i * 2));
 	snprintf(t + n, 8, "\"\n");
 	CHECK(put(T_CHT, t));
 	cheatstore_launch(T_ROM, 0);
-	CHECK_EQ(gl_cheat_count, 0);
-	CHECK_EQ(gl_cheat_patches, CHEATSTORE_ROM_PATCHES);
+	CHECK_EQ(gl_cheat_patches, CHEATFILE_PATCHES_MAX);
 	gl_cheat_count = gl_cheat_bytes = gl_cheat_patches = 0;
+
+	// The game popup's count: kept for the file as it is on the card (its
+	// size and date), never read by the popup
+	CHECK(put(T_CHT, "cheat0_desc = \"M\"\ncheat0_code = \"0000ABCD 0007+100F68A4 0007\"\n"
+			 "cheat1_code = \"32001010+0001\"\ncheat2_code = \"32001011+0002\"\n"));
+	s32 listed;
+	CHECK(cheatstore_peek(T_ROM, &listed));
+	CHECK_EQ(listed, -1);  // not counted yet
+	CHECK_EQ(cheatstore_open(T_ROM), CHEATSTORE_READ);
+	CHECK_EQ(cheatstore_listed(), -1);  // not decoded yet
+	CHECK(cheatstore_decode(0));
+	CHECK_EQ(cheatstore_listed(), 2);  // the master code isn't listed
+	CHECK(cheatstore_peek(T_ROM, &listed));
+	CHECK_EQ(listed, 2);
+	CHECK(cheatfile_toggle(&cheatstore()->file, 1));
+	CHECK(cheatstore_write());  // a write keeps the count for the new copy
+	CHECK(cheatstore_peek(T_ROM, &listed));
+	CHECK_EQ(listed, 2);
+	CHECK(put(T_CHT, "cheat0_code = \"32001010+0001\"\n"));  // changed behind its back
+	CHECK(cheatstore_peek(T_ROM, &listed));
+	CHECK_EQ(listed, -1);
+	char *lng = (char *)stage_buffer();
+	memset(lng, 'a', 300);
+	lng[0] = '/';
+	lng[299] = 0;
+	CHECK(!cheatstore_peek(lng, &listed));  // a path too long for a cheat file: no Cheats
+
+	// A failed PSRAM write of the text: the file is never written back from
+	// it, and an edit says it failed
+	CHECK_EQ(cheatstore_open(T_ROM), CHEATSTORE_READ);
+	CHECK(cheatstore_decode(0));
+	CHECK(cheatfile_toggle(&cheatstore()->file, 0));
+	CHECK(!cheatstore()->room_failed);
+	cheatstore_put((char *)0x02000000, "ab", 2);  // off PSRAM: psram_write refuses it
+	CHECK(cheatstore()->room_failed);
+	CHECK(!cheatstore_write());
+	u32 at;
+	CHECK_EQ(cheatstore_add("N", "32001012 0003", CHEAT_FMT_AUTO, &at), CHEATFILE_EDIT_FAILED);
+	CHECK_EQ(cheatstore_open(T_ROM), CHEATSTORE_READ);  // the card's copy as it was
+	CHECK_EQ(cheatstore()->file.count, 1);
+	CHECK(!cheatstore()->cheats[0].picked);
+	CHECK(!cheatstore()->room_failed);
+
+	// A copy over the largest read is too big, not a card error: left alone
+	CHECK(put_size(T_CHT, CHEATSTORE_FILE_MAX + 1));
+	f_unlink(T_CHT ".bak");
+	CHECK_EQ(cheatstore_open(T_ROM), CHEATSTORE_BIG);
+	CHECK(!cheatstore_read(T_ROM));
+	cheatstore_launch(T_ROM, 0);
+	CHECK_EQ(gl_cheat_patches, 0);
+	CHECK_EQ(file_size(T_CHT), CHEATSTORE_FILE_MAX + 1);  // as it was
 
 	// No file: nothing
 	f_unlink(T_CHT);

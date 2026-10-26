@@ -579,12 +579,14 @@ static const struct lang_slots en_slots = {
 static const struct lang_cheats en_cheats = {
 	.hint_pick = "pick",
 	.why = {"", "Too much to run beside the picks", "Can't read this code", "Edit to use: digits to fill in",
-		"Can't run on this cart"},
+		"Can't run on this cart", "Too many ROM patches beside picks", "No room in the file"},
 	.nor = "ROM patch: not for NOR games",
 	.unnamed = "(no name)",
 	.reading = "Reading cheats",
 	.reading_text = "A big cheat file",
 	.gone = "Its cheat file can't be read.",
+	.too_big = "Its cheat file is too big: over 192 KB.",
+	.other_dump = "Its cheat file is for another dump of the game.",
 	.save_failed = "The picks couldn't be saved.",
 	.add_row = "+ Add code",
 	.hint_add = "add",
@@ -596,7 +598,8 @@ static const struct lang_cheats en_cheats = {
 	.delete_button = "Delete",
 	.name_title = "Name the code",
 	.edit_failed = {"The card didn't take the code.", "A cheat file holds 1024 cheats at most.",
-			"The cheat file would be too big.", "That code can't go in a cheat file."},
+			"The cheat file would be too big.", "That code can't go in a cheat file.",
+			"The cheat file couldn't be changed."},
 	.too_long = "Can't edit this code here: 32 lines of hex digits at most.",
 };
 

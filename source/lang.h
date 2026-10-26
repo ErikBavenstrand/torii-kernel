@@ -248,18 +248,20 @@ extern const struct lang_games *gl_games;
 // The cheat screen (screens/cheats.c)
 struct lang_cheats {
 	const char *hint_pick;  // A
-	const char *why[5];  // a greyed row's reason, by cheatfile.h's CHEATFILE_WHY_* (0: none)
+	const char *why[7];  // a greyed row's reason, by cheatfile.h's CHEATFILE_WHY_* (0: none)
 	const char *nor;  // a ROM-patch cheat's note
 	const char *unnamed;  // a cheat with no desc line
 	const char *reading, *reading_text;  // the progress dialog while a big file decodes
-	const char *gone;  // its file can't be read now
+	const char *gone;  // its file can't be read now (a card error)
+	const char *too_big;  // its file is over the 192 KB the screen reads (CHEATFILE_TEXT_MAX)
+	const char *other_dump;  // its file's "# for crc32" names another dump of the game
 	const char *save_failed;  // the picks couldn't be written
 	const char *add_row;  // the list's last row: the code keypad
 	const char *hint_add, *hint_edit, *hint_fill;  // A on Add code, SELECT on your own, A on a placeholder
 	const char *menu_edit, *menu_delete;  // SELECT's menu on a code of your own
 	const char *delete_text, *delete_button;  // its Delete's confirmation (EN_CHEAT_DELETE the title)
 	const char *name_title;  // the rename keyboard's title, naming a code
-	const char *edit_failed[4];  // by cheatfile.h's CHEATFILE_EDIT_* (0: the card didn't take it)
+	const char *edit_failed[5];  // by cheatfile.h's CHEATFILE_EDIT_* (0: the card didn't take it)
 	const char *too_long;  // a code with more lines than the keypad takes
 };
 extern const struct lang_cheats *gl_cheats;
