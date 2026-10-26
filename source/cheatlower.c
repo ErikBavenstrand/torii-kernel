@@ -179,7 +179,7 @@ static void put_op(struct out *o, const struct cheat_op *op)
 		o->cost += CHEAT_COST_SINGLE;
 		return;
 	}
-	type = prog_types[op->type];
+	type = op->type < sizeof(prog_types) ? prog_types[op->type] : CHEAT_PROG_NOP;
 	width = op->width;
 	address = op->address;
 	value = op->value;

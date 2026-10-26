@@ -48,7 +48,7 @@ Research for v0.7 (2026-10-25), before the design in `docs/plans/roadmap.md`.
 The interpreter (`source/cheatrun.s`) runs each picked cheat's ops as mGBA's
 `mCheatRefresh` runs one cheat set, once a frame on the VBlank IRQ; the
 kernel test `cheatrun_matches_mgba` checks it against a line-for-line port
-(`tests/host/cheat_ref.h`) on random cheats. Where mGBA leaves a choice to
+(`tests/kernel/cheat_ref.h`) on random cheats. Where mGBA leaves a choice to
 its frontend, or a flash cart can't do what the device did:
 
 - **The device's button** (GameShark's `8` codes, Action Replay v3's

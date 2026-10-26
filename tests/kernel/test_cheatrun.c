@@ -1,5 +1,5 @@
 // The in-game cheat interpreter (source/cheatrun.s) against mGBA's semantics
-// (tests/host/cheat_ref.h) on the CPU it runs on: random cheats of every op
+// (tests/kernel/cheat_ref.h) on the CPU it runs on: random cheats of every op
 // type, odd addresses included, run by both on the same memory; and its
 // cycles against the budget's model (cheatcode.h's CHEAT_COST_*).
 #include <string.h>
@@ -43,7 +43,7 @@ static void ref_write(u32 a, u32 w, u32 v)
 
 #define CHEAT_REF_READ ref_read
 #define CHEAT_REF_WRITE ref_write
-#include "../host/cheat_ref.h"
+#include "cheat_ref.h"
 
 // pReadCache, which the unit tests own: the memory cheats change, the
 // pointers they follow, the snapshots and the table
