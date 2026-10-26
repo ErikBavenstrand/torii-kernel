@@ -30,8 +30,9 @@ struct keypad_edit {
 int keypad_is_mark(char c);
 // The code len bytes long, as a file stores it ('+' or spaces between
 // lines, a CodeBreaker line in one or two parts), into e, the caret on its
-// first stand-in, else at the end; 0 if it has more lines than KEYPAD_LINES
-// or a part longer than KEYPAD_LINE_MAX (e is then empty)
+// first stand-in, else at the end; 0 if it has more lines than KEYPAD_LINES,
+// a part longer than KEYPAD_LINE_MAX or a character the keypad can't type
+// (e is then empty)
 int keypad_edit_init(struct keypad_edit *e, const char *code, u32 len);
 // Types c (a hex digit, in any case, or ':') at the caret: over a stand-in
 // there (the caret then on the next one, else past it), else put in. 0 if

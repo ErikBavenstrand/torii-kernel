@@ -369,7 +369,9 @@ def merge(database, old):
     codes = {c[1] for c in database}
     filled = {}
     for cheat in old:
-        if cheat[1] not in codes and not PLACEHOLDER.search(cheat[1]):
+        # The user's own codes are never a database placeholder filled in
+        user = getattr(cheat, "extra", {}).get("user", "").casefold() in ("true", "1")
+        if cheat[1] not in codes and not PLACEHOLDER.search(cheat[1]) and not user:
             filled.setdefault(cheat[0], cheat)
     out, seen, taken = [], set(), set()
     for desc, code, enabled in database:

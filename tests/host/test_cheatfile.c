@@ -721,6 +721,19 @@ void test_cheatfile_edit_limits(void)
 		 CHEATFILE_EDIT_LONG);
 	CHECK_EQ(cheatfile_set_code(&file, edit_buf, edit_cap, 0, NULL, "32001000 0002", 0), CHEATFILE_EDIT_OK);
 
+	// A code that grows past a desc that shrinks more: the code goes in
+	// first, so the buffer needs the growth before the desc gives room back
+	const char *grow = "cheat0_desc = \"AAAAAAAAAAAAAAAAAAAA\"\ncheat0_code = \"32001000 0001\"\n";
+	u32 grow_len = (u32)strlen(grow);
+	load_cap(grow, grow_len);
+	CHECK_EQ(cheatfile_set_code(&file, edit_buf, edit_cap, 0, "B", "32001000 0001+32001002 0001", 0),
+		 CHEATFILE_EDIT_LONG);
+	CHECK(!file.edited);
+	load_cap(grow, grow_len + 14);
+	CHECK_EQ(cheatfile_set_code(&file, edit_buf, edit_cap, 0, "B", "32001000 0001+32001002 0001", 0),
+		 CHEATFILE_EDIT_OK);
+	CHECK_EQ(file.len, grow_len - 5);
+
 	// The file's cap, with the picks written in
 	u32 big = CHEATFILE_TEXT_MAX + 512;
 	char *t = malloc(big);

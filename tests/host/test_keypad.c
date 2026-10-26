@@ -114,6 +114,14 @@ void test_keypad_edit(void)
 	CHECK(!keypad_edit_init(&e, many, (u32)strlen(many)));
 	CHECK_EQ(e.lines, 1);
 	CHECK(!keypad_edit_init(&e, "0200100000:12345678", 19));
+	// A byte the keypad can't type (the font has no glyph below ' ')
+	CHECK(!keypad_edit_init(&e,
+				"32001000 00\x01"
+				"1",
+				13));
+	CHECK(!keypad_edit_init(&e, "32001000 G001", 13));
+	CHECK_EQ(e.lines, 1);
+	CHECK_EQ(e.len[0], 0);
 }
 
 void test_keypad_placeholder(void)

@@ -554,7 +554,8 @@ static void put_s(struct out *o, const char *s)
 static void put_u(struct out *o, u32 v)
 {
 	char d[12];
-	put(o, d, (u32)snprintf(d, sizeof(d), "%lu", (unsigned long)v));
+	u32 n = (u32)snprintf(d, sizeof(d), "%lu", (unsigned long)v);
+	put(o, d, n);
 }
 
 // A desc as a value: no control characters, '"' as '\''
@@ -630,6 +631,20 @@ static s32 pieces_delta(const struct cheatfile *f, const struct piece *pcs, u32 
 		delta += (s32)o.n - (s32)pcs[i].del;
 	}
 	return delta;
+}
+
+// The bytes the growing pieces add: apply takes them highest first, so the
+// text can pass its final length by this much before a lower piece shrinks
+static u32 pieces_grow(const struct cheatfile *f, const struct piece *pcs, u32 n)
+{
+	u32 grow = 0;
+	for (u32 i = 0; i < n; i++) {
+		struct out o = {NULL, 0};
+		put_piece(&o, f, &pcs[i]);
+		if (o.n > pcs[i].del)
+			grow += o.n - pcs[i].del;
+	}
+	return grow;
 }
 
 // 1 if the text with delta more bytes, the picks written in, fits buf and
@@ -778,8 +793,11 @@ u32 cheatfile_set_code(struct cheatfile *f, char *buf, u32 cap, u32 i, const cha
 	pcs[k++] = (struct piece){c->code, c->code_len, PIECE_VALUE, 0, 0, 0, NULL, code, n};
 	if (desc && c->desc != CHEATFILE_NONE)
 		pcs[k++] = (struct piece){c->desc, c->desc_len, PIECE_DESC, 0, 0, 0, NULL, desc, n};
-	else if (desc)
-		pcs[k++] = (struct piece){line_start(f->text, c->code), 0, PIECE_LINE, 0, 0, 1, "desc", desc, n};
+	else if (desc) {
+		// Never before a BOM, if the code line is the file's first
+		u32 at = line_start(f->text, c->code), top = text_start(f->text, f->len);
+		pcs[k++] = (struct piece){at > top ? at : top, 0, PIECE_LINE, 0, 0, 1, "desc", desc, n};
+	}
 	// Its format line, the last if it repeats (the one a read takes)
 	u32 pos = text_start(f->text, f->len), found = 0;
 	struct kv kv, fmt = {0, 0, 0, 0, 0, 0, 0};
@@ -801,7 +819,7 @@ u32 cheatfile_set_code(struct cheatfile *f, char *buf, u32 cap, u32 i, const cha
 		u8 brk = (u8)(f->text[end - 1] != '\n');
 		pcs[k++] = (struct piece){end, 0, PIECE_LINE, brk, 0, 0, "format", cheatfile_format_names[format], n};
 	}
-	if (!fits(f, cap, pieces_delta(f, pcs, k)))
+	if (!fits(f, cap, pieces_delta(f, pcs, k)) || f->len + pieces_grow(f, pcs, k) > cap)
 		return CHEATFILE_EDIT_LONG;
 	struct picks p;
 	picks_save(f, &p);

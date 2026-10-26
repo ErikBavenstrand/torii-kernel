@@ -362,7 +362,10 @@ static u32 cs_code(u32 at, int fill)
 	char was[sizeof(cs.name)];
 	memcpy(was, cs.name, sizeof(was));
 	for (;;) {
-		if (!keypad_run(&ask, cs.code, &format))
+		int ran = keypad_run(&ask, cs.code, &format);
+		if (ran < 0)
+			dialog_message(cs.heading, gl_cheats->too_long, DIALOG_INFO);
+		if (ran <= 0)
 			return row;  // cancelled: nothing changes
 		ask.code = cs.code;  // back here from the keyboard: as typed
 		ask.code_len = (u32)strlen(cs.code);

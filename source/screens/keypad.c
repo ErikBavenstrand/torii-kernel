@@ -657,8 +657,11 @@ static void tick(struct ui_view *v)
 {
 	if (ui_top() != v || ui_transitioning())
 		return;
-	if (kp.message && !--kp.message)
-		show_hints();
+	if (kp.message) {
+		kp.message--;
+		if (!kp.message)
+			show_hints();
+	}
 	// A and B repeat while held: a digit typed again, the code deleted back
 	const InputState *in = ui_input();
 	for (u32 i = 0; i < 2 && !kp.want; i++) {
@@ -686,8 +689,8 @@ int keypad_run(const struct keypad_ask *ask, char *out, u8 *format)
 	memset(&kp, 0, sizeof(kp));
 	kp.ask = ask;
 	if (!keypad_edit_init(&kp.e, ask->code ? ask->code : "", ask->code ? ask->code_len : 0)) {
-		tlog("keypad: the code is too long to edit here");
-		return 0;
+		tlog("keypad: the code can't be edited here");
+		return -1;
 	}
 	kp.format = ask->format <= CHEAT_FMT_VBA ? ask->format : CHEAT_FMT_AUTO;
 	kp.orig = code_hash();

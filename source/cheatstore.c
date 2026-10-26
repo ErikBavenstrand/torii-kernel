@@ -43,15 +43,23 @@ int cheatstore_path(char *out, u32 size, const char *rom_path)
 	return (int)n;
 }
 
-// 1 if either copy of the cheat file at path (cheatstore()->path) is on the
-// card, though safefile_open took neither: too big, say
-static int any_copy(char *path)
+// 0 if f_stat says path is surely not on the card; a card error counts as
+// there, so a file it hid is never written over
+static int maybe_there(const char *path)
 {
 	FILINFO info;
+	FRESULT r = f_stat(path, &info);
+	return r != FR_NO_FILE && r != FR_NO_PATH;
+}
+
+// 1 if either copy of the cheat file at path (cheatstore()->path) may be on
+// the card, though safefile_open took neither: too big, say
+static int any_copy(char *path)
+{
 	u32 len = (u32)strlen(path);
-	int there = f_stat(path, &info) == FR_OK;
+	int there = maybe_there(path);
 	memcpy(path + len, ".bak", 5);  // cheatstore_path leaves room for it
-	there |= f_stat(path, &info) == FR_OK;
+	there |= maybe_there(path);
 	path[len] = 0;
 	return there;
 }
@@ -66,6 +74,11 @@ int cheatstore_open(const char *rom_path)
 		return CHEATSTORE_NONE;
 	}
 	if (safefile_open(cs->path, CHEATSTORE_FILE_MAX) == SAFEFILE_NONE) {
+		if (safefile_failed()) {
+			// A card error, not an absent file: never made anew over it
+			tlog_error("cheats: %s can't be read", cs->path);
+			return CHEATSTORE_NONE;
+		}
 		if (any_copy(cs->path)) {
 			tlog("cheats: %s is there but can't be read (over %u bytes?), left alone", cs->path,
 			     CHEATFILE_TEXT_MAX);

@@ -38,7 +38,9 @@ struct keypad_ask {
 // Runs the keypad in the menu's session (its views popped first) until
 // Save (1: the code, as a file stores it, in out, KEYPAD_CODE_MAX + 1
 // bytes, and its format in *format, CHEAT_FMT_AUTO unless SELECT set one)
-// or Cancel (0). Returns with no view up. ask->code may be out.
+// or Cancel (0), or -1 if ask->code can't be edited here (keypad_edit_init
+// refused it) and nothing was shown. Returns with no view up. ask->code may
+// be out.
 int keypad_run(const struct keypad_ask *ask, char *out, u8 *format);
 
 #endif

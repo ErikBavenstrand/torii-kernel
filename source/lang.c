@@ -597,7 +597,7 @@ static const struct lang_cheats en_cheats = {
 	.name_title = "Name the code",
 	.edit_failed = {"The card didn't take the code.", "A cheat file holds 1024 cheats at most.",
 			"The cheat file would be too big.", "That code can't go in a cheat file."},
-	.too_long = "Too long to edit here: 32 lines at most.",
+	.too_long = "Can't edit this code here: 32 lines of hex digits at most.",
 };
 
 static const struct lang_keypad en_keypad = {

@@ -308,6 +308,12 @@ class Names(unittest.TestCase):
         # A file of the database's alone merges as before: nothing filled in
         merged, own = cheats.merge([("Pick a level", "3300075C+00??", False)], [])
         self.assertEqual(merged, [("Pick a level", "3300075C+00??", False)])
+        # A code the user typed under a placeholder's name stays the user's,
+        # and the placeholder stays too
+        typed = cheats.Cheat("Pick a level", "3300075C+0007", True, {"user": "true"})
+        merged, own = cheats.merge([("Pick a level", "3300075C+00??", False)], [typed])
+        self.assertEqual(own, 1)
+        self.assertEqual(merged, [("Pick a level", "3300075C+00??", False), typed])
 
 
 class Card(unittest.TestCase):

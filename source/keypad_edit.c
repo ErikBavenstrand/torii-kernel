@@ -77,7 +77,11 @@ int keypad_edit_init(struct keypad_edit *e, const char *code, u32 len)
 		int pair = n == 8 && all_digits(code + start, 8) && (vn == 4 || vn == 8) && all_digits(code + next, vn);
 		u32 total = n + (pair ? vn : 0);
 		u32 line = e->len[0] ? e->lines : 0;
-		if (total > KEYPAD_LINE_MAX || line >= KEYPAD_LINES) {
+		int typable = 1;
+		for (u32 i = start; i < pos; i++)
+			if (!is_hex(code[i]) && !keypad_is_mark(code[i]) && code[i] != ':')
+				typable = 0;
+		if (!typable || total > KEYPAD_LINE_MAX || line >= KEYPAD_LINES) {
 			memset(e, 0, sizeof(*e));
 			e->lines = 1;
 			return 0;
