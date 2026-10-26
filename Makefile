@@ -140,6 +140,7 @@ export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
 #---------------------------------------------------------------------------------
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
+	@$(MAKE) --no-print-directory -C source/overlay OUT=$(CURDIR)/$(BUILD)/overlay
 	@$(MAKE)  BUILDDIR=`cd $(BUILD) && pwd`  --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 
 #---------------------------------------------------------------------------------
@@ -162,6 +163,11 @@ $(OUTPUT).elf	:	$(OFILES)
 $(OFILES_SOURCES) : $(HFILES)
 
 $(filter-out $(FATFS_OFILES),$(OFILES_SOURCES)) : CFLAGS += $(WARNFLAGS)
+
+# The in-game overlay (source/overlay, built first by the rule above), which
+# ingame_overlay.s embeds with .incbin
+ingame_overlay.o : $(CURDIR)/overlay/overlay.bin
+ingame_overlay.o : ASFLAGS += -Wa,-I$(CURDIR)/overlay
 
 #---------------------------------------------------------------------------------
 # The bin2o rule should be copied and modified

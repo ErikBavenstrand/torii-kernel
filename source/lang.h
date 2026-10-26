@@ -397,6 +397,13 @@ extern const struct lang_saves *gl_saves;
 #define EN_SAVES_HEADING "%s \xC2\xB7 %lu"
 #define EN_SAVES_RENAMED "%u slots took new names\nbecause the game had them."
 
+// The in-game menu's rows and its notice (source/ingame.c)
+struct lang_ingame {
+	const char *resume, *save, *load, *cheats_on, *cheats_off, *reset, *sleep, *torii, *debug;
+	const char *debug_saved;  // after a DEBUG snapshot, under the rows
+};
+extern const struct lang_ingame *gl_ingame;
+
 extern u32 gl_lang;  // index of the current language in lang_packs
 
 void LoadEnglish(void);

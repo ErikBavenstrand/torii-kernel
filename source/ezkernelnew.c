@@ -25,6 +25,7 @@
 #include "NORflash_OP.h"
 #include "lang.h"
 #include "GBApatch.h"
+#include "ingame.h"
 #include "cheat.h"
 #include "cheatstore.h"
 #include "settings.h"
@@ -1659,6 +1660,8 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 	Send_FATbuffer(FAT_table_buffer, 1);  //only RTS FAT and some parameter
 	//wait_btn();
 	gl_game_uses = Game_hardware(0, GAMECODE, 0);
+	if (pNorFS[show_offset + file_select].have_patch)
+		ingame_prepare(pfilename, gamefilesize);  // the in-game menu, in cart SRAM
 	progress_done(NULL);
 	Launch_now(pNorFS[show_offset + file_select].rompage, key_L, "NOR game");
 	while (1)
@@ -1910,6 +1913,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 			// Torii: the picked cheats' ROM patches, into the game in PSRAM
 			if (gl_cheat_patches)
 				cheatstore_launch(launch_save.rom, gamefilesize);
+			ingame_prepare(pfilename, gamefilesize);  // the in-game menu, in cart SRAM
 			progress_done(NULL);
 			//wait_btn();
 			Launch_now(0x200, key_L, "BOOT WITH ADDON");

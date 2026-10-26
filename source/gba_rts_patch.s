@@ -1,86 +1,77 @@
 @;--------------------------------------------------------------------
+@;Torii: the in-game code a BOOT WITH ADDON launch puts at the game's
+@;trimmed ROM end (Patch_RTS_Cheat in GBApatch.c): the entry code, the IRQ
+@;hook, sleep, and the stub of v0.8's in-game menu (ingame_stub), which runs
+@;the overlay the kernel keeps in cart SRAM (docs/design/v0.8/ingame-menu.md,
+@;source/ingame_abi.h). It is position-independent: it runs wherever the
+@;game's ROM ends.
 	.section   	.iwram,"ax",%progbits
-		
+
 	.global  RTS_ReplaceIRQ_start
 	.global  RTS_ReplaceIRQ_end
 	.global  RTS_Return_address_L
 	.global  RTS_Sleep_key
 	.global  RTS_Reset_key
-	@;.global  RTS_Wakeup_key
 	.global	 RTS_switch
 	.global	 Debug_switch
 	.global	 Cheat_switch
-	@;.global  ASCII
-	
+
 REG_BASE		= 0x4000000
 REG_DISPCNT		= 0x00
-REG_DISPSTAT	= 0x04
 REG_VCOUNT		= 0x06
-REG_BG0CNT		= 0x08
-REG_BG1CNT		= 0x0A
-REG_BG2CNT		= 0x0C
-REG_BG3CNT		= 0x0E
-REG_BG0HOFS		= 0x10
-REG_BG0VOFS		= 0x12
-REG_BG1HOFS		= 0x14
-REG_BG1VOFS		= 0x16
-REG_BG2HOFS		= 0x18
-REG_BG2VOFS		= 0x1A
-REG_BG3HOFS		= 0x1C
-REG_BG3VOFS		= 0x1E
-REG_WIN0H		= 0x40
-REG_WIN1H		= 0x42
-REG_WIN0V		= 0x44
-REG_WIN1V		= 0x46
-REG_WININ		= 0x48
-REG_WINOUT		= 0x4A
 REG_BLDCNT		= 0x50
 REG_BLDALPHA	= 0x52
-REG_BLDY		= 0x54
 REG_SOUND1CNT_L	= 0x60
-REG_SOUND1CNT_H	= 0x62
-REG_SOUND1CNT_X	= 0x64
-REG_SOUND2CNT_L	= 0x68
-REG_SOUND2CNT_H	= 0x6C
-REG_SOUND3CNT_L	= 0x70
-REG_SOUND3CNT_H	= 0x72
-REG_SOUND3CNT_X	= 0x74
-REG_SOUND4CNT_L	= 0x78
-REG_SOUND4CNT_H	= 0x7c
-REG_SOUNDCNT_L		= 0x80
-REG_SOUND2CNT_H		= 0x82
-REG_SOUNDCNT_X		= 0x84
-REG_SOUNDBIAS		= 0x88
-REG_WAVE_RAM0_L		= 0x90
-REG_FIFO_A_L	= 0xA0
-REG_FIFO_A_H	= 0xA2
-REG_FIFO_B_L	= 0xA4
-REG_FIFO_B_H	= 0xA6
-REG_DM0SAD		= 0xB0
-REG_DM0DAD		= 0xB4
-REG_DM0CNT_L	= 0xB8
+REG_SOUNDCNT_L	= 0x80
+REG_SOUNDCNT_H	= 0x82
+REG_SOUNDCNT_X	= 0x84
 REG_DM0CNT_H	= 0xBA
-REG_DM1SAD		= 0xBC
-REG_DM1DAD		= 0xC0
-REG_DM1CNT_L	= 0xC4
-REG_DM1CNT_H	= 0xC6
-REG_DM2SAD		= 0xC8
-REG_DM2DAD		= 0xCC
-REG_DM2CNT_L	= 0xD0
-REG_DM2CNT_H	= 0xD2
-REG_DM3SAD		= 0xD4
-REG_DM3DAD		= 0xD8
-REG_DM3CNT_L	= 0xDC
-REG_DM3CNT_H	= 0xDE
-REG_TM0D		= 0x100
-REG_TM0CNT		= 0x102
 REG_IE			= 0x200
-REG_IF			= 0x202
 REG_P1			= 0x130
-REG_P1CNT		= 0x132
 REG_WAITCNT		= 0x204
 
-@;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;	
+@;The ABI's numbers (source/ingame_abi.h)
+BK_EWRAM		= 0x20000	@;INGAME_BACKUP_EWRAM
+BK_OBJ			= 0x28000	@;INGAME_BACKUP_OBJ
+BK_OAM			= 0x2C000	@;INGAME_BACKUP_OAM
+BK_OBJ_PAL		= 0x2C400	@;INGAME_BACKUP_OBJ_PAL
+SRAM_IMAGE		= 0xB0000	@;INGAME_SRAM_IMAGE
+IMAGE_MAGIC		= 0x31564F54	@;INGAME_IMAGE_MAGIC
+EWRAM_BASE		= 0x02000000	@;INGAME_EWRAM
+WINDOW_MAX		= 0x6000	@;INGAME_WINDOW_MAX
+OBJ_VRAM		= 0x06014000	@;INGAME_OBJ_VRAM
+OBJ_MAX			= 0x4000	@;INGAME_OBJ_MAX
+ACT_RESUME		= 0		@;INGAME_ACT_*
+ACT_SAVE		= 1
+ACT_LOAD		= 2
+ACT_RESET		= 3
+ACT_SLEEP		= 4
+ACT_TORII		= 5
+ACT_DEBUG		= 6
+CAN_STATES		= 1		@;INGAME_CAN_*
+CAN_CHEATS		= 2
+CAN_DEBUG		= 4
+NOTICE_DEBUG	= 0x100
+@;SRAM copies and the overlay run at the menu's wait states: SRAM 4, WS0
+@;2/1 with prefetch (source/waitcnt.h); the cart's registers at the BIOS's
+WAITCNT_FAST	= 0x4018
+
+@;The spend area (spend_0x80): the hook keeps r4-r11, sp, lr and SPSR at
+@;0x00-0x2F, SAVE the system sp and lr at 0x30; the stub keeps these
+SP_LR			= 0x38		@;its return into the hook
+SP_SP			= 0x3C		@;the IRQ stack while the overlay runs on its own
+SP_IME			= 0x40		@;halfwords: the game's registers
+SP_WAITCNT		= 0x42
+SP_SNDL			= 0x44		@;SOUNDCNT_L, then SOUNDCNT_H: SAVE writes the pair
+SP_SNDH			= 0x46
+SP_DMA			= 0x48		@;DMA0-3 CNT_H
+SP_DISPCNT		= 0x50
+SP_BLDCNT		= 0x52
+SP_BLDALPHA		= 0x54
+SP_ACT			= 0x58		@;the overlay's answer
+SP_HDR			= 0x60		@;the image header's first 24 bytes (to 0x77)
+
+@;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	.arm
 RTS_ReplaceIRQ_start:
 	MOV             R0, #0x4000000
@@ -102,37 +93,39 @@ RTS_irq:
 	LDREQ		PC, [R0,#-0xC]			@;old_interrupt_handler
 
 	ldr 		r2,[r0,#REG_P1]
-	
+
 	@; Torii: a hotkey is the mask of its keys (settings_hotkeys), and matches when
 	@; they are all held (0 in REG_P1), whatever else is: an extra or stuck key
 	@; used to block it. HOTKEY_OFF needs all ten held, which the D-pad can't.
 	@;check ingamemenu
-	adr 		r3,RTS_Reset_key 
+	adr 		r3,RTS_Reset_key
 	ldr 		r3,[r3]
 	tst 		r2,r3
-	bne			check_sleep	
+	bne			check_sleep
 	@;----------------------
 	adrl		r12, spend_0x80
 	ldr			r12,[r12]
 	stmia		r12!,{r4-r11,sp,lr} @;0x0
 	mrs	 		r2,SPSR
 	stmia		r12!,{r2}       @;0x4
-	
-	stmfd   SP!, {LR}  			@;0x4000000,	
-	bl 			ingamemenu_now	
+
+	stmfd   SP!, {LR}  			@;0x4000000,
+	bl 			ingame_stub
 	ldmfd   SP!, {LR}
+	cmp			r1,#ACT_SLEEP		@;Torii: Sleep, picked in the menu
+	beq			sleep_now
 	ldr 		r2,[r0,#REG_P1]		@; the keys now, not the menu's r2
 	@;----------------------
 	@;check sleep
 check_sleep:
-	adr 		r3,RTS_Sleep_key 
+	adr 		r3,RTS_Sleep_key
 	ldr 		r3,[r3]
 	tst 		r2,r3
 	beq 		sleep_now
-	
+
 	@;check cheat. Torii: the word at CheatONOFF is 1 for CHEAT OFF, anything
 	@;else on: the BIOS's soft reset clears it, so a game starts with its
-	@;picked cheats running (v0.7); the in-game menu's CHEAT OFF stops them.
+	@;picked cheats running (v0.7); the in-game menu's Cheats row stops them.
 	@;They run through the interpreter (cheatrun.s) that Cheat_switch says is
 	@;at that offset from RTS_ReplaceIRQ_start: 0, no cheats.
 	@;They run once per VBlank: on the first entry that sees the VBlank IRQ
@@ -181,7 +174,7 @@ cheat_game:
 nocheat:
 	ldr 		pc,[r0,#-(0x04000000-0x03FFFFF4)] @;to normal IRQ routine
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-@;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+@;Back to Torii: the kernel's ROM page, then a soft reset into it
 reset_now:
 	adr r1,reset_code
 	adr r3,reset_end
@@ -200,7 +193,7 @@ RTS_Sleep_key:
 RTS_Reset_key:
 	.word 0x308 @;L+R+Start
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	.align	
+	.align
 	.thumb
 reset_code:
 	mov r0,#0x20
@@ -239,7 +232,7 @@ reset_code:
 	str r0,[r1]   @;#0x3FFFFFA (mirror of #0x3007FFA
 	swi 0x01
 	swi 0x00
-	.align	
+	.align
 reset_end:
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	.arm
@@ -340,28 +333,330 @@ spin3:
 	bne spin3  @<insert ytmnd cliche here>
 	@;all done!
 	ldr pc,[r0,#-(0x04000000-0x03FFFFF4)] @to IRQ routine
-	@b b_pressed_quit
 	.align
 RTS_Wakeup_key:
 	.word 0x3F3 @;start and select
 	.ltorg
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-@;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-	.arm
-@;------------------------------------------------------
-@;------------------------------------------------------
-clean_screen:
-	stmfd	sp!,{r0-r3}
-	mov		r2,#0x6000000
-	add		r3,r2,#0x12C00
+@;Torii (v0.8): the in-game menu's stub. Called from the hook on the menu
+@;key, in IRQ mode with r0 = 0x4000000 and the game's r4-r11 in the spend
+@;area. It freezes the game (IME, DMA and the sound mixer off), backs up the
+@;EWRAM window the overlay takes, OAM and the OBJ palette to cart SRAM,
+@;loads the overlay from SRAM and runs it on a stack at the window's end. Its
+@;answer (INGAME_ACT_*) decides what follows once everything is back: the
+@;game again (r1 = 0, or ACT_SLEEP for the hook's sleep), SAVE or LOAD as
+@;the old menu did them, a restart of the game, Back to Torii, or a DEBUG
+@;snapshot and the menu again. Returns r0 = 0x4000000, r4-r11 the game's.
+@;It needs the IRQ stack only for sram_copy's 28 bytes.
+ingame_stub:
+	adrl	r12,spend_0x80
+	ldr		r12,[r12]
+	str		lr,[r12,#SP_LR]
+	mov		r9,#0				@;the overlay's notices
+ingame_open:
+	mov		r11,r12				@;r11: the spend area (the overlay keeps r4-r11)
+	mov		r10,#REG_BASE		@;r10: I/O
+	add		r8,r10,#0x200
+	ldrh	r1,[r8,#8]			@;IME
+	strh	r1,[r11,#SP_IME]
+	mov		r1,#0
+	strh	r1,[r8,#8]
+	ldrh	r1,[r8,#4]			@;WAITCNT
+	strh	r1,[r11,#SP_WAITCNT]
+	ldr		r1,=WAITCNT_FAST
+	strh	r1,[r8,#4]
+	@;Sound: the mixer's outputs off. SOUNDCNT_X's master switch stays on:
+	@;turning it off resets the PSG channels, the noise after the old menu.
+	ldrh	r1,[r10,#REG_SOUNDCNT_L]
+	strh	r1,[r11,#SP_SNDL]
+	ldrh	r2,[r10,#REG_SOUNDCNT_H]
+	strh	r2,[r11,#SP_SNDH]
+	mov		r1,#0
+	strh	r1,[r10,#REG_SOUNDCNT_L]
+	bic		r2,r2,#0x3300		@;DMA sound A and B to neither side
+	bic		r2,r2,#0x8800		@;and no FIFO reset
+	strh	r2,[r10,#REG_SOUNDCNT_H]
+	@;DMA0-3: kept, then stopped
+	add		r2,r10,#REG_DM0CNT_H
+	add		r3,r11,#SP_DMA
+	mov		r4,#4
+1:	ldrh	r1,[r2]
+	strh	r1,[r3],#2
+	mov		r1,#0
+	strh	r1,[r2],#0xC
+	subs	r4,r4,#1
+	bne		1b
+	ldrh	r1,[r10,#REG_DISPCNT]
+	strh	r1,[r11,#SP_DISPCNT]
+	ldrh	r1,[r10,#REG_BLDCNT]
+	strh	r1,[r11,#SP_BLDCNT]
+	ldrh	r1,[r10,#REG_BLDALPHA]
+	strh	r1,[r11,#SP_BLDALPHA]
+	@;The overlay's header, from cart SRAM: a launch from this kernel wrote it
+	ldr		r0,=SRAM_IMAGE
+	add		r1,r11,#SP_HDR
+	mov		r2,#24
+	mov		r3,#0
+	bl		sram_copy
+	ldr		r1,[r11,#SP_HDR]
+	ldr		r2,=IMAGE_MAGIC
+	cmp		r1,r2
+	bne		ingame_none
+	ldr		r4,[r11,#SP_HDR+12]	@;window_bytes
+	ldr		r5,[r11,#SP_HDR+8]	@;image_bytes
+	cmp		r4,#WINDOW_MAX
+	bhi		ingame_none
+	cmp		r5,r4
+	bhi		ingame_none
+	cmp		r5,#32
+	blo		ingame_none
+	@;The game's EWRAM window, OAM and OBJ palette to SRAM
+	ldr		r0,=BK_EWRAM
+	mov		r1,#EWRAM_BASE
+	mov		r2,r4
+	mov		r3,#1
+	bl		sram_copy
+	ldr		r0,=BK_OAM
+	mov		r1,#0x07000000
+	mov		r2,#0x400
+	mov		r3,#1
+	bl		sram_copy
+	ldr		r0,=BK_OBJ_PAL
+	ldr		r1,=0x05000200
+	mov		r2,#0x200
+	mov		r3,#1
+	bl		sram_copy
+	@;The overlay in, and its call on its own stack at the window's end
+	ldr		r0,=SRAM_IMAGE
+	mov		r1,#EWRAM_BASE
+	mov		r2,r5
+	mov		r3,#0
+	bl		sram_copy
+	str		sp,[r11,#SP_SP]
+	add		sp,r4,#EWRAM_BASE
+	adrl	r2,RTS_switch
+	ldr		r1,[r2]
+	cmp		r1,#1
+	orreq	r9,r9,#CAN_STATES
+	ldr		r1,[r2,#Cheat_switch-RTS_switch]
+	cmp		r1,#0
+	orrne	r9,r9,#CAN_CHEATS
+	ldr		r1,[r2,#Debug_switch-RTS_switch]
+	cmp		r1,#0
+	orrne	r9,r9,#CAN_DEBUG
+	adrl	r0,sram_copy
+	stmfd	sp!,{r0,r9}			@;struct ingame_call
+	mov		r0,sp
+	ldr		r12,[r11,#SP_HDR+16]	@;the entry, Thumb
+	mov		lr,pc
+	bx		r12
+	ldr		sp,[r11,#SP_SP]
+	str		r0,[r11,#SP_ACT]
+	@;Everything back: the OBJ tiles the overlay drew over (its header says
+	@;how many), the OBJ palette, OAM, the display, then the window
+	ldr		r2,=EWRAM_BASE+20
+	ldr		r2,[r2]
+	cmp		r2,#OBJ_MAX
+	movhi	r2,#OBJ_MAX
+	ldr		r0,=BK_OBJ
+	ldr		r1,=OBJ_VRAM
+	mov		r3,#0
+	bl		sram_copy
+	ldr		r0,=BK_OBJ_PAL
+	ldr		r1,=0x05000200
+	mov		r2,#0x200
+	mov		r3,#0
+	bl		sram_copy
+	ldr		r0,=BK_OAM
+	mov		r1,#0x07000000
+	mov		r2,#0x400
+	mov		r3,#0
+	bl		sram_copy
+	ldrh	r1,[r11,#SP_BLDCNT]
+	strh	r1,[r10,#REG_BLDCNT]
+	ldrh	r1,[r11,#SP_BLDALPHA]
+	strh	r1,[r10,#REG_BLDALPHA]
+	ldrh	r1,[r11,#SP_DISPCNT]
+	strh	r1,[r10,#REG_DISPCNT]
+	ldr		r0,=BK_EWRAM
+	mov		r1,#EWRAM_BASE
+	ldr		r2,[r11,#SP_HDR+12]
+	mov		r3,#0
+	bl		sram_copy
+	b		ingame_back
+ingame_none:						@;no overlay in SRAM: back to the game
+	mov		r1,#ACT_RESUME
+	str		r1,[r11,#SP_ACT]
+ingame_back:
+	add		r8,r10,#0x200
+	mov		r1,#0
+	strh	r1,[r8,#4]			@;WAITCNT
 	mov		r0,#0
-clearLCD:
-	str		r0,[r2],#+4
-	cmp		r2,r3
-	blt		clearLCD
-	
-	ldmfd	sp!,{r0-r3}
-	bx		lr		
+	bl		SetRampage			@;the save's page again
+	ldrh	r1,[r11,#SP_WAITCNT]
+	strh	r1,[r8,#4]
+	@;Two frames' starts: the frame between them shows the game's own screen
+	bl		wait_frame
+	bl		wait_frame
+	ldr		r1,[r11,#SP_ACT]
+	cmp		r1,#ACT_SAVE
+	beq		state_save
+	cmp		r1,#ACT_LOAD
+	beq		state_load
+	cmp		r1,#ACT_RESET
+	beq		game_reset
+	cmp		r1,#ACT_TORII
+	beq		reset_now
+	cmp		r1,#ACT_DEBUG
+	beq		debug_now
+ingame_resume:						@;r10 I/O, r11 the spend area
+	bl		ingame_thaw
+	ldr		r1,[r11,#SP_ACT]
+	cmp		r1,#ACT_SLEEP
+	movne	r1,#0
+	ldr		lr,[r11,#SP_LR]
+	mov		r0,#REG_BASE
+	ldmia	r11,{r4-r11}
+	bx		lr
+
+@;The sound mixer, DMA0-3 and IME as the game had them (r10 I/O, r11 the
+@;spend area); uses r1-r4
+ingame_thaw:
+	ldrh	r1,[r11,#SP_SNDH]
+	bic		r1,r1,#0x8800
+	strh	r1,[r10,#REG_SOUNDCNT_H]
+	ldrh	r1,[r11,#SP_SNDL]
+	strh	r1,[r10,#REG_SOUNDCNT_L]
+	add		r2,r10,#REG_DM0CNT_H
+	add		r3,r11,#SP_DMA
+	mov		r4,#4
+1:	ldrh	r1,[r3],#2
+	strh	r1,[r2],#0xC
+	subs	r4,r4,#1
+	bne		1b
+	ldrh	r1,[r11,#SP_IME]
+	add		r2,r10,#0x200
+	strh	r1,[r2,#8]
+	bx		lr
+
+@;Waits for the next frame's start (VCOUNT 160); r10 I/O, uses r1
+wait_frame:
+1:	ldrh	r1,[r10,#REG_VCOUNT]
+	cmp		r1,#160
+	beq		1b
+2:	ldrh	r1,[r10,#REG_VCOUNT]
+	cmp		r1,#160
+	bne		2b
+	bx		lr
+
+@;sram_copy(sram, ram, n, to_sram): n bytes (a multiple of 4) between cart
+@;SRAM at byte offset sram and word-aligned RAM, to RAM when to_sram is 0
+@;(struct ingame_call's). SRAM is an 8-bit bus: bytes one at a time, at
+@;WAITCNT_FAST; the page register at the BIOS's wait states. Leaves the last
+@;page set. Keeps r4-r11 (AAPCS: the overlay calls it), 28 bytes of stack.
+sram_copy:
+	stmfd	sp!,{r4-r8,lr}
+	mov		r8,#REG_BASE
+	add		r8,r8,#0x200		@;r8 + 4: WAITCNT
+	ldrh	r7,[r8,#4]
+	stmfd	sp!,{r7}
+sc_chunk:
+	cmp		r2,#0
+	ble		sc_done
+	mov		r4,#0
+	strh	r4,[r8,#4]
+	ldr		r5,=0x9FE0000
+	ldr		r6,=0xD200
+	strh	r6,[r5]
+	mov		r5,#0x8000000
+	ldr		r7,=0x1500
+	strh	r7,[r5]
+	add		r5,r5,#0x20000
+	strh	r6,[r5]
+	add		r5,r5,#0x20000
+	strh	r7,[r5]
+	mov		r4,r0,lsr #12		@;the page: offset >> 12
+	ldr		r5,=0x9C00000
+	strh	r4,[r5]
+	ldr		r5,=0x9FC0000
+	strh	r7,[r5]
+	ldr		r4,=WAITCNT_FAST
+	strh	r4,[r8,#4]
+	@;This chunk: up to the 64 KB window's end
+	mov		r4,r0,lsl #20
+	mov		r4,r4,lsr #20		@;offset & 0xFFF
+	rsb		r5,r4,#0x10000
+	cmp		r5,r2
+	movgt	r5,r2
+	add		r6,r4,#0x0E000000
+	add		r0,r0,r5
+	sub		r2,r2,r5
+	cmp		r3,#0
+	bne		sc_out
+sc_in:
+	ldrb	r4,[r6],#1
+	ldrb	r7,[r6],#1
+	orr		r4,r4,r7,lsl #8
+	ldrb	r7,[r6],#1
+	orr		r4,r4,r7,lsl #16
+	ldrb	r7,[r6],#1
+	orr		r4,r4,r7,lsl #24
+	str		r4,[r1],#4
+	subs	r5,r5,#4
+	bgt		sc_in
+	b		sc_chunk
+sc_out:
+	ldr		r4,[r1],#4
+	strb	r4,[r6],#1
+	mov		r4,r4,lsr #8
+	strb	r4,[r6],#1
+	mov		r4,r4,lsr #8
+	strb	r4,[r6],#1
+	mov		r4,r4,lsr #8
+	strb	r4,[r6],#1
+	subs	r5,r5,#4
+	bgt		sc_out
+	b		sc_chunk
+sc_done:
+	ldmfd	sp!,{r7}
+	strh	r7,[r8,#4]
+	ldmfd	sp!,{r4-r8,lr}
+	bx		lr
+	.ltorg
+
+@;Reset game: the patched game from its start, without the kernel. As a
+@;launch leaves the machine (SetRompageWithHardReset): RAM and registers
+@;cleared, WAITCNT the BIOS's, then SoftReset from the cart's ROM, whose
+@;page is left on the game.
+game_reset:
+	add		r8,r10,#0x200
+	mov		r1,#0
+	strh	r1,[r8,#4]			@;WAITCNT
+	mov		r0,#0xFF			@;EWRAM, IWRAM (not its last 0x200), palette, VRAM, OAM, SIO, sound, the rest
+	swi		0x010000
+	ldr		r0,=0x03007FFA
+	mov		r1,#0
+	strb	r1,[r0]				@;0: SoftReset starts the ROM, not EWRAM
+	swi		0x000000
+
+@;DEBUG: the snapshot with the game's registers back, then the menu again
+@;with a notice
+debug_now:
+	bl		ingame_thaw
+	adrl	r0,Debug_switch
+	ldr		r0,[r0]
+	adrl	r8,RTS_ReplaceIRQ_start
+	add		r8,r8,r0
+	mov		r4,r11
+	adrl	r5,RTS_irq
+	adrl	r6,SetRampage
+	adrl	r7,WriteSram
+	mov		lr,pc
+	mov		pc,r8
+	adrl	r12,spend_0x80
+	ldr		r12,[r12]
+	mov		r9,#NOTICE_DEBUG
+	b		ingame_open
 @;------------------------------------------------------
 SetRampage:
 	ldr 	r1,=0xD200
@@ -380,17 +675,6 @@ SetRampage:
 	strh  r2,[r3]
 	bx		lr
 @;------------------------------------------------------
-@;------------------------------------------------------
-@;WriteSram_val:        @; sram address, val
-@;	STRB    R1, [R0],#1
-@;	LSR     R1, R1, #0x8
-@;	STRB    R1, [R0],#1
-@;	LSR     R1, R1, #0x8
-@;	STRB    R1, [R0],#1
-@;	LSR     R1, R1, #0x8
-@;	STRB    R1, [R0]
-@;	BX      LR
-@;------------------------------------------------------
 WriteSram: @;(u32 address, u8 *data, u32 size)
 	ADD 		R2,R2,R0
 	SUB 		R1,R1,R0
@@ -406,7 +690,7 @@ wSram_loop:
 	LSR     R3, R3, #0x8
 	STRB    R3, [R0],#1
 	LSR     R3, R3, #0x8
-	STRB    R3, [R0],#1	
+	STRB    R3, [R0],#1
 	B       wSram_loop1
 @;------------------------------------------------------
 ReadSram: @;(u32 address, u8 *data, u32 size)
@@ -432,42 +716,6 @@ rSram_loop:
 	ADDS    R0, #4
 	B       rSram_loop1
 @;------------------------------------------------------
-backup_LCD:
-	stmfd	sp!,{r0-r7,lr}
-	mov 	r0,#0x20
-	bl 		SetRampage	
-	mov 	r0,#0x0E000000
-	mov 	r1,#0x6000000
-	mov 	r2,#0x10000		@;0x12C00
-	bl 		WriteSram   	@;(u32 address, u8 *data, u32 size)
-	mov 	r0,#0x30
-	bl 		SetRampage	
-	mov 	r0,#0x0E000000
-	ldr 	r1,=0x6010000
-	ldr 	r2,=0x2C00
-	bl 		WriteSram   	@;(u32 address, u8 *data, u32 size)
-	
-	ldmfd	sp!,{r0-r7,PC}
-
-@;------------------------------------------------------
-restore_LCD:
-	stmfd	sp!,{r0-r7,lr}
-	mov 	r0,#0x20
-	bl 		SetRampage
-	mov r0,#0x0E000000
-	mov r1,#0x6000000
-	mov r2,#0x10000		@;0x12C00
-	bl  ReadSram    	@;(u32 address, u8 *data, u32 size)  
-	mov 	r0,#0x30
-	bl 		SetRampage	
-	mov r0,#0x0E000000
-	ldr r1,=0x6010000
-	ldr r2,=0x2C00
-	bl 	ReadSram   	 @;(u32 address, u8 *data, u32 size)
-
-
-	ldmfd	sp!,{r0-r7,PC}
-@;------------------------------------------------------
 restore2_IO:        @; IOaddress, offset
 	LDRB    R3, [R1]
 	LSL 		R4,R3,#0
@@ -476,404 +724,133 @@ restore2_IO:        @; IOaddress, offset
 	ORR			R4,R5
 	STRH    R4, [R0]
 	bx lr
-@;restore4_IO:        @; IOaddress, offset
-@;	LDRB    R3, [R1]
-@;	LSL 		R4,R3,#0
-@;	LDRB    R3, [R1,#1]
-@;	LSL 		R5,R3,#8
-@;	ORR			R4,R5	
-@;	LDRB    R3, [R1,#2]
-@;	LSL 		R5,R3,#16
-@;	ORR			R4,R5
-@;	LDRB    R3, [R1,#3]
-@;	LSL 		R5,R3,#24
-@;	ORR			R4,R5
-@;	STR     R4, [R0]
-@;	bx lr
-@;------------------------------------------------------
-@;------------------------------------------------------
-ingamemenu_now:
-	stmfd	sp!,{r0-r12,lr}
-	
-	mov 	r7,#0x4000000
-	add 	r1,r7,#REG_SOUND1CNT_L
-	adrl	r11, spend_0x80
-	ldr		r11,[r11]  		
-	add		r11,#0x40     @;0x3007EC0
-  
-	add   r3,r11,#0x32 	@; IO 0x60-0x90 offset 0x100-130
-loopbak:
-	ldrh  r2,[r1],#2
-	strh  r2,[r11],#2
-	cmp   r11,r3
-	bne   loopbak	
-	
-	ldrh r2,[r7,#0xBA]@;DMA0CNT_H	
-	strh  r2,[r11],#2 @;offset 0x72
-	ldrh r2,[r7,#0xC6]@;DMA1CNT_H	
-	strh  r2,[r11],#2 @;offset 0x74	
-	ldrh r2,[r7,#0xD2]@;DMA2CNT_H	
-	strh  r2,[r11],#2 @;offset 0x76
-	ldrh r2,[r7,#0xDE]@;DMA3CNT_H	
-	strh  r2,[r11],#2 @;offset 0x78	
-		
-	mov		r7,#0x4000000
-	ldrh 	r3,[r7,#REG_BLDCNT]	@;Torii: keep the game's blending, restored on exit
-	stmfd	sp!,{r3}
-	ldrh 	r3,[r7,#REG_SOUNDCNT_L]  @;san guo
-	stmfd	sp!,{r3}		
-	ldrh 	r3,[r7,#REG_SOUNDCNT_X]  @;bak
-	stmfd	sp!,{r3}		
-	
-	ldrh  r6,[r7]     @;Displaly Control
-	stmfd	sp!,{r6}
-	
-	mov 	r3,#0x0100
-	strh 	r3,[r7,#0x20]	@;Rotation/Scaling BG2P
-	strh 	r3,[r7,#0x26]			
-	mov 	r3,#0x0	
-	strh 	r3,[r7,#0x22]	
-	strh 	r3,[r7,#0x24]		
-	str 	r3,[r7,#0x28]	@;BG2X/Y
-	str 	r3,[r7,#0x2c]	
-	
-	strh 	r3,[r7,#REG_BLDCNT]	@;Torii: blending off; BLDY is write-only, so leave it
-
-	strh 	r3,[r7,#0xBA]	@;DMA0CNT_H	0086game
-	strh 	r3,[r7,#0xC6]	@;DMA1CNT_H		
-	strh 	r3,[r7,#0xD2]	@;DMA2CNT_H	
-	strh 	r3,[r7,#0xDE]	@;DMA3CNT_H	
-	ldr  	r6,=0x403 		@;MODE_3 | BG2_ENABLE
-	strh 	r6,[r7]	
-	@;mov 	r2,#0	
-	add		r12,r7,#0x200	@;Torii: IME is 0x4000208, not 208 (DMA2CNT_L)
-	strh 	r3,[r12,#8]  @;IME =0 Disable
-
-	strh 	r3,[r7,#REG_SOUNDCNT_X] @;sound off
-			
-	bl 		backup_LCD
-	bl 		clean_screen
-
-@; start
-	mov		r11,#0	
-begin_show:
-	@;Torii: the menu's lines come from menu_lines, with DEBUG's
-	bl		menu_lines
-	cmp		r11,#0
-	sublt	r11,r0,#1
-	cmp		r11,r0
-	movge	r11,#0
-	mov		r12,#0
-	
-	adrl  r8,ingameMENU
-	mov		r9,#40		 @;Y
-	mov		r10,#86    @;X	
-	
-showAll:	
-	ldrb	r0,[r8],#+1
-showMENU:
-	cmp		r0,#0
-	beq		new_line
-	mov		r1,r10
-	add		r2,r9,#0
-	cmp		r12,r11
-	ldreq		r3,=0x6A80 @;select
-	ldrne		r3,=0x7FFF 
-	bl		printchar    @; r0 ch， r1, X  ， r2, Y , r3 color
-
-	add		r10,#8
-	b			showAll
-new_line:
-	add		r9,#16
-	mov		r10,#86
-	add		r12,#1
-	bl		menu_lines
-	cmp		r12,r0
-	bge		waitSeletc
-	cmp		r12,r1
-	bne		showAll
-	adrl	r8,s_debug		@;Torii: DEBUG follows LOAD when there are no cheats
-	b			showAll
-
-@;Torii: r0 = how many lines the menu shows, r1 = DEBUG's line (r0 if it
-@;has none). RESET SAVE LOAD, then CHEATON CHEATOFF with cheats, then
-@;DEBUG with logging on (Debug_switch). Uses r2.
-menu_lines:
-	adrl	r2,Cheat_switch
-	ldr		r2,[r2]
-	cmp		r2,#0
-	movne	r1,#5
-	moveq	r1,#3
-	adrl	r2,Debug_switch
-	ldr		r2,[r2]
-	cmp		r2,#0
-	addne	r0,r1,#1
-	moveq	r0,r1
-	bx		lr
-
-waitSeletc:
-	ldr		r0,=0x3FF		@;No key press
-	ldr		r8,=0x4000130
-	ldrh	r9,[r8]
-	cmp		r9,r0
-	beq		waitSeletc	
-pressdown:
-	mov		r12,r9
-	ldrh	r9,[r8]
-	cmp		r9,r0
-	bne		pressdown
-	
-	ldr		r0,=0x3BF		;@up
-	cmp		r12,r0
-	subeq	r11,#1
-	beq		begin_show
-	ldr		r0,=0x37F		;@down
-	cmp		r12,r0
-	addeq	r11,#1
-	beq		begin_show
-	ldr		r0,=0x3FE		;@A
-	cmp		r12,r0
-	beq		A_pressed
-	ldr		r0,=0x3FD		;@B 
-	cmp		r12,r0
-	moveq	r11,#5
-	beq		b_pressed_quit
-	b		waitSeletc
-A_pressed:	
-	cmp			r11,#0 
-	beq			reset_now	
-	cmp			r11,#1	
-	beq			call_Save
-	cmp			r11,#2
-	beq			call_Load
-	bl			menu_lines
-	cmp			r11,r1
-	beq			call_Debug
-	cmp			r11,#3
-	beq			call_CheatON
-	cmp			r11,#4
-	beq			call_CheatOFF
-	@;-------------------------------------
-@;ingamemenu_exit:
-b_pressed_quit:	
-	ldmfd	sp!,{r6}
-	mov		r7,#0x4000000
-	strh 	r6,[r7] @;re Displaly Control
-	bl 		restore_LCD	
-save_exit:
-		
-	mov		r7,#0x4000000
-	mov 	r2,#1
-	add		r12,r7,#0x200	@;Torii: IME = 1
-	strh 	r2,[r12,#8]
-	
-	ldmfd	sp!,{r3}
-	strh 	r3,[r7,#REG_SOUNDCNT_X]
-	
-	ldmfd	sp!,{r3}	
-	strh 	r3,[r7,#REG_SOUNDCNT_L]  @;san guo
-	ldmfd	sp!,{r3}
-	strh 	r3,[r7,#REG_BLDCNT]	@;Torii: the game's blending
-	
-	adrl	r11, spend_0x80
-	ldr		r11,[r11]  
-	add		r0,r11,#0x40 @;0x3007EC0
-	
-	ldrh  r3,[r0],#2
-	strh 	r3,[r7,#0x60]	@;SOUND1CNT_L
-	ldrh  r3,[r0],#6
-	strh 	r3,[r7,#0x62]	@;SOUND1CNT_H
-	ldrh  r3,[r0],#8
-	strh 	r3,[r7,#0x68]	@;SOUND2CNT_L
-	ldrh  r3,[r0],#8
-	strh 	r3,[r7,#0x70]	@;SOUND3CNT_L
-	ldrh  r3,[r0],#8
-	strh 	r3,[r7,#0x78]	@;SOUND3CNT_L
-	
-	add		r11,#0x70   @;0x3007EC0+0x30
-	add 	r11,#2
-	ldrh  r3,[r11],#2
-	strh 	r3,[r7,#0xBA]	@;DMA0CNT_H
-	ldrh  r3,[r11],#2
-	strh 	r3,[r7,#0xC6]	@;DMA1CNT_H	
-	ldrh  r3,[r11],#2	
-	strh 	r3,[r7,#0xD2]	@;DMA2CNT_H	
-	ldrh  r3,[r11],#2
-	strh 	r3,[r7,#0xDE]	@;DMA3CNT_H	
-		
-	mov 	r0,#0x00
-	bl 		SetRampage		
-	
-	ldmfd	sp!,{r0-r12,PC}
-	.ltorg		
-	@;===================================================	
-call_Save:	
-	adrl	r7,RTS_switch
-	ldr		r7,[r7]
-	cmp 	r7,#1
-	bne 	errorRTS
-	
+	.ltorg
+@;===================================================
+@;SAVE, as the old menu's: the game's memory and registers into the state
+@;buffer (SRAM pages 0x40-0xAF), with everything already back but IME, DMA
+@;and the sound mixer (r11 the spend area, which goes in too). The I/O copy
+@;has DMA stopped and IME 0, as the old one had; the mixer's pair is the game's.
+state_save:
 	@;02000000-0203FFFF   WRAM - On-board Work RAM  (256 KBytes)
 	mov		r8,#0x40   @; 0x40 0x50 0x60 0x70
 	mov   r9,#0x2000000
 wram_2000000:
 	mov 	r0,r8
-	bl 		SetRampage	
+	bl 		SetRampage
 	mov 	r0,#0x0E000000
 	mov 	r1,r9
 	mov		r2,#0x10000
 	bl 		WriteSram
 	add 	r8,#0x10
 	add 	r9,#0x10000
-	cmp 	r8,#0x80	
+	cmp 	r8,#0x80
 	bne 	wram_2000000
-	
+
 	@;03000000-03007FFF   WRAM - On-chip Work RAM   (32 KBytes)
 	mov 	r0,#0x80
-	bl 		SetRampage	
+	bl 		SetRampage
 	mov r0,#0x0E000000
 	mov r1,#0x3000000
 	mov r2,#0x8000
 	bl 	WriteSram
-	
+
 	@;05000000-050003FF   BG/OBJ Palette RAM        (1 Kbyte)
 	ldr r0,=0x0E008000
 	mov r1,#0x5000000
 	mov r2,#0x400
 	bl 	WriteSram
-	
+
 	@;06000000-06017FFF   VRAM - Video RAM          (96 KBytes)
-	ldmfd	sp!,{r6}
-	ldr		r7,=0x4000000
-	strh 	r6,[r7] @;re
-	ldrh	r3,[sp,#8]		@;Torii: the game's BLDCNT, so the state holds it
-	strh	r3,[r7,#REG_BLDCNT]
-	bl 		restore_LCD		
-		
 	mov 	r0,#0x90
-	bl 		SetRampage	
+	bl 		SetRampage
 	mov r0,#0x0E000000
 	mov r1,#0x6000000
 	mov r2,#0x10000
 	bl 	WriteSram
-	
+
 	mov 	r0,#0xA0
-	bl 		SetRampage	
+	bl 		SetRampage
 	mov r0,#0x0E000000
 	ldr r1,=0x6010000
 	mov r2,#0x8000
 	bl 	WriteSram
-	
+
 	@;07000000-070003FF   OAM - OBJ Attributes      (1 Kbyte)
 	ldr r0,=0x0E008000
 	mov r1,#0x7000000
 	mov r2,#0x400
 	bl 	WriteSram
 
-	@;R4-R11
-	mrs	  r0,CPSR    @;Back up
-	adrl	r7, spend_0x80
-	ldr		r7,[r7]
-	add		r7,#0x30  @;{r4-r11,sp,lr} SPSR  0x28+4
-		
-	mov		r1, #0xDF		@; Switch to systme Mode
+	@;The system-mode sp and lr into the spend area at 0x30
+	mrs	  r0,CPSR
+	mov		r1, #0xDF		@; Switch to system Mode
 	msr		cpsr_cf, r1
 	NOP
-	mov		r6,sp
-	stmia r7!,{r6,lr}	
-	
-	msr 	cpsr_cf,r0	;@return IRQ mode	
+	mov		r2,sp
+	mov		r3,lr
+	msr 	cpsr_cf,r0	;@return IRQ mode
 	NOP
-	
+	str		r2,[r11,#0x30]
+	str		r3,[r11,#0x34]
+
 	ldr 	r0,=0x0E008400
-	adrl 	r1, spend_0x80
-	ldr		r1,[r1]
+	mov		r1,r11
 	mov 	r2,#0x80
-	bl 		WriteSram	
-	
-	@;04000000-040003FE   I/O Registers
+	bl 		WriteSram
+
+	@;04000000-040003FE   I/O Registers, with the game's sound mixer
 	ldr r0,=0x0E009000
 	mov r1,#0x4000000
-	mov r2,#0x60					@;0x0-0x60
+	mov r2,#0x400
 	bl 	WriteSram
-	
-	ldr 	r0,=0x0E009060
-	adrl 	r1, spend_0x80
-	ldr		r1,[r1] 
-	add 	r1,#0x40	
-	@;ldr 	r1,=0x2010000
-	mov 	r2,#0x30   				@;0x60-0x90
-	bl 		WriteSram		
-	
-	ldr r0,=0x0E009090
-	mov r1,#0x4000000
-	add r1,#0x90          @;0x90-0x3FE
-	mov r2,#0x370
+	ldr r0,=0x0E009000+REG_SOUNDCNT_L
+	add r1,r11,#SP_SNDL
+	mov r2,#4
 	bl 	WriteSram
-	
-	@;FLAG	
+
+	@;FLAG
 	ldr r0,=0x0E00FFF0
 	adrl r1,S_RTS_FLAG
 	mov r2,#0x10
-	bl 	WriteSram	
-		
+	bl 	WriteSram
+
+	mov 	r0,#0x00
+	bl 		SetRampage
 	mov r7,#0x50000
 delay_loop:
-	cmp			r7,#0
-	beq			save_exit	
-	nop
-	sub 		r7,#0x01
-	b				delay_loop
-	
-	b save_exit	
-	@;===================================================		
-	@;===================================================	
-call_Load:
-	@;check 	;FLAG	
-	mov 	r0,#0xA0
-	bl 		SetRampage
-	ldr 	r0,=0x0E00FFF0
-	adrl 	r1, spend_0x80  @;temp buff
-	ldr 	r1,[r1]
-	mov 	r2,#0x10
-	bl 		ReadSram	
-	
-	adrl 	r1,S_RTS_FLAG	
-	adrl 	r2, spend_0x80 @;temp buff
-	ldr 	r2,[r2]
-	mov 	r3,#0
-loop_check:
-	ldr 	r4,[r1],#4
-	ldr 	r5,[r2],#4
-	cmp 	r4,r5
-	@;bne errorRTS
-	add 	r3,#1
-	cmp 	r3,#4
-	bne 	loop_check
-	
+	subs		r7,r7,#1
+	bne			delay_loop
+	mov		r10,#REG_BASE
+	b		ingame_resume
+	.ltorg
+	@;===================================================
+@;LOAD, as the old menu's: the state buffer back into the game's memory and
+@;registers, then into the game's IRQ handler with the state's registers.
+@;The menu offers it only once a state's flag is there.
+state_load:
 	@;02000000-0203FFFF   WRAM - On-board Work RAM  (256 KBytes)
 	mov		r8,#0x40   @; 0x40 0x50 0x60 0x70
 	mov   r9,#0x2000000
 wram_2000000_Load:
 	mov 	r0,r8
-	bl 		SetRampage	
+	bl 		SetRampage
 	mov 	r0,#0x0E000000
 	mov 	r1,r9
 	mov		r2,#0x10000
 	bl 		ReadSram
 	add 	r8,#0x10
 	add 	r9,#0x10000
-	cmp 	r8,#0x80	
+	cmp 	r8,#0x80
 	bne 	wram_2000000_Load
 
 	@;03000000-03007FFF   WRAM - On-chip Work RAM   (32 KBytes)
 	mov 	r0,#0x80
-	bl 		SetRampage	
+	bl 		SetRampage
 	mov r0,#0x0E000000
 	mov r1,#0x3000000
 	mov r2,#0x8000
 	bl 	ReadSram
-	
+
 	@;05000000-050003FF   BG/OBJ Palette RAM        (1 Kbyte)
 	ldr r0,=0x0E008000
 	mov r1,#0x5000000
@@ -882,28 +859,28 @@ wram_2000000_Load:
 
 	@;06000000-06017FFF   VRAM - Video RAM          (96 KBytes)
 	mov 	r0,#0x90
-	bl 		SetRampage	
+	bl 		SetRampage
 	mov r0,#0x0E000000
 	mov r1,#0x6000000
 	mov r2,#0x10000
 	bl 	ReadSram
 	mov 	r0,#0xA0
-	bl 		SetRampage	
+	bl 		SetRampage
 	mov r0,#0x0E000000
 	ldr r1,=0x6010000
 	mov r2,#0x8000
 	bl 	ReadSram
-	
+
 	@;07000000-070003FF   OAM - OBJ Attributes      (1 Kbyte)
 	ldr r0,=0x0E008000
 	mov r1,#0x7000000
 	mov r2,#0x400
 	bl 	ReadSram
-	
+
 	@;-------------------------------------
 	mov r10,#0x4000000
 	LDR r11,=0x0E009000
-	
+
 	adr r9,register_list
 register_list_loop:
 	ldrh r2,[r9],#2
@@ -916,45 +893,31 @@ register_list_loop:
 	b 	register_list_loop
 register_list_end:
 
-	@;mov r10,#0x4000000
-	LDR r11,=0x0E008500		
-@;	add r0,r10,#0xBA  @;0x40000BA  DMA
-@;	add r1,r11,#0x32
-@;	bl  restore2_IO	
+	LDR r11,=0x0E008500
 	add r0,r10,#0xC6  @;0x40000C6
 	add r1,r11,#0x34
-	bl  restore2_IO	
-@;	add r0,r10,#0xD2  @;0x40000D2
-@;	add r1,r11,#0x36
-@;	bl  restore2_IO	
-@;	add r0,r10,#0xDE  @;0x40000DE
-@;	add r1,r11,#0x38
-@;	bl  restore2_IO	
-	
-	@;mov   r4,#0x8F
-	@;mov   r7,#0x4000000
-	@;strh 	r4,[r7,#REG_SOUNDCNT_X]
-	
+	bl  restore2_IO
+
 	ldr r0,=0x4000202   @;0x4000202
 	mov r1,#0
 	strh r1,[r0]
 	mov r1,#1			@;Torii: IME on; the state holds the menu's IME = 0
 	strh r1,[r0,#6]
-	
+
 
 	ldr 	r0,=0x0E008400
 	adrl 	r1, spend_0x80 @;temp buff
-	ldr		r1,[r1] 
+	ldr		r1,[r1]
 	mov 	r2,#0x80
-	bl 		ReadSram	
-	
+	bl 		ReadSram
+
 	mrs	  r0,CPSR
 	adrl	r7, spend_0x80
-	ldr		r7,[r7] 
+	ldr		r7,[r7]
 	add		r7,#0x28      @;SPSR offset
-	
+
 	ldmia	r7!,{r2}			@;r7=0x2C
-	msr		SPSR_cxsf,r2	@;restore SPSR_irq  
+	msr		SPSR_cxsf,r2	@;restore SPSR_irq
 
 	mov		r1, #0xDF		  @;Switch to systme Mode
 	msr		cpsr_cf, r1
@@ -962,154 +925,25 @@ register_list_end:
 	add		r7,#0x4					@;offset 0x30
 	ldmia r7!,{r13-r14}
 
-	msr 	cpsr_cf,r0	  @;restore IRQ	
+	msr 	cpsr_cf,r0	  @;restore IRQ
 	NOP
 
 	mov 	r0,#0x0
 	bl 		SetRampage
-	
+
 	@;spin until VCOUNT==160, triggers next vblank
-	mov 	r0,#0x4000000 
+	mov 	r0,#0x4000000
 spin3_load:
 	ldrh 	r1,[r0,#REG_VCOUNT]
 	cmp 	r1,#160
-	bne 	spin3_load  
-	
+	bne 	spin3_load
+
 	adrl	r12, spend_0x80
-	ldr		r12,[r12] 
+	ldr		r12,[r12]
 	ldmia r12!,{r4-r11,sp,lr}
-	
-	ldr 	pc,[r0,#-(0x04000000-0x03FFFFF4)] @;to normal IRQ routine		
 
-	@;===================================================	
-errorRTS:
-	adrl  r8,s_badRTS
-	mov		r9,#145	   @;Y
-	mov		r10,#64    @;X
-showerror:	
-	ldrb	r0,[r8],#+1
-	cmp		r0,#0x00
-	beq		enderror
-	mov		r1,r10
-	add		r2,r9,#0
-	mov	  r3,#0x1F  @;red
-	bl		printchar    @; r0 char， r1, X  ， r2, Y , r3 color
-	add		r10,#8
-	b			showerror
-enderror:	
-waitB:
-	ldr		r0,=0x3FF		@;No key press
-	ldr		r8,=0x4000130
-	ldrh	r9,[r8]
-	cmp		r9,r0
-	beq		waitB	
-pressB:
-	mov		r12,r9
-	ldrh	r9,[r8]
-	cmp		r9,r0
-	bne		pressB
-	
-	ldr		r0,=0x3FD		;@B 
-	cmp		r12,r0
-	moveq	r11,#5
-	beq		b_pressed_quit
-	b		waitB
-
-	
-	
-	@;===================================================		
-call_CheatON:
-	mov r3,#0			@;Torii: 0 on, 1 off (check cheat)
-set_Cheat:
-	ADR r2,CheatONOFF
-	ldr	r2,[r2]
-	str r3,[r2]
-	b b_pressed_quit
-	@;===================================================		
-call_CheatOFF:
-	mov r3,#1
-	b   set_Cheat
-	@;===================================================
-	@;Torii: DEBUG. Its code (Debug_blob) is appended after the cheat table
-	@;only with LOGGING on, and Debug_switch holds its offset from
-	@;RTS_ReplaceIRQ_start: so with logging off the game gets no more code.
-call_Debug:
-	adrl	r0,Debug_switch
-	ldr		r0,[r0]
-	adrl	r8,RTS_ReplaceIRQ_start
-	add		r8,r8,r0
-	adrl	r4,spend_0x80
-	ldr		r4,[r4]
-	adrl	r5,RTS_irq
-	adrl	r6,SetRampage
-	adrl	r7,WriteSram
-	mov		lr,pc
-	mov		pc,r8
-	@;Torii: say it worked, and stay in the menu with RESET picked: the
-	@;snapshot is in cart RAM, which a power-off clears, so RESET is the
-	@;way to get it logged.
-	adrl	r8,s_debug_saved
-	mov		r9,#145		@;Y
-	mov		r10,#20		@;X
-debug_saved:
-	ldrb	r0,[r8],#+1
-	cmp		r0,#0
-	moveq	r11,#0
-	beq		begin_show
-	cmp		r0,#' '
-	beq		debug_saved_space
-	mov		r1,r10
-	mov		r2,r9
-	ldr		r3,=0x03E0	@;green
-	bl		printchar
-debug_saved_space:
-	add		r10,#8
-	b		debug_saved
-
-	
-	.ltorg	
-	@;--------------
-CheatONOFF:	
-	.word	 0x03007FE0
-	@;===================================================	
-draw_plot:
-	MOV     R11, #0xF0
-	MLA     R3, R1, R11, R0
-	MOV     R3, R3,LSL#1
-	ADD     R3, R3, #0x6000000
-	STRH    R2, [R3]
-	BX			LR
-		@;===================================================	
-printchar:	@; r0 打印的字符， r1, X  ， r2, Y , r3 颜色
-	STMFD   SP!, {R8-R11,LR}
-	MOV     R8, R1
-	ADD     R6, R2, #2		@;Torii: glyphs keep rows 2-11 only
-	MOV     R9, R3
-	MOV     R10, #0x80
-	ADRL     R4, ASCII
-	SUB     R0, R0, #0x41
-	ADD     R0, R0, R0,LSL#2
-	ADD     R4, R4, R0,LSL#1	@;10 bytes a glyph
-	ADD     R7, R4, #10
-
-loc_A0DD7C:                             
-	MOV     R5, #0
-loc_A0DD80:
-	LDRB    R3, [R4]
-	ANDS    R3, R3, R10,ASR R5
-	MOVNE   R2, R9
-	MOVNE   R1, R6
-	ADDNE   R0, R5, R8
-	BLNE    draw_plot
-	ADD     R5, R5, #1
-	CMP     R5, #8
-	BNE     loc_A0DD80
-	ADD     R4, R4, #1
-	CMP     R4, R7
-	ADD     R6, R6, #1
-	BNE     loc_A0DD7C
-
-	LDMFD   SP!, {R8-R11,PC}
+	ldr 	pc,[r0,#-(0x04000000-0x03FFFFF4)] @;to normal IRQ routine
+	.ltorg
 	.align
 register_list:
 	.hword 0x0000,0x0002,0x0004,0x0008,0x000A,0x000C,0x000E,0x0048
@@ -1118,61 +952,15 @@ register_list:
 	.hword 0x0060,0x0062,0x0068,0x0070,0x0072,0x0078
 	.hword 0x0080,0x0082,0x0088                 @;0x008C,0x008E,
 	.hword 0x0090,0x0092,0x0094,0x0096,0x0098,0x009A,0x009C,0x009E
-	
+
 	.hword 0x00B8,0x00C4,0x00D0,0x00DC  @;DMA
 	.hword 0x0120,0x0122,0x0124,0x0126,0x0128,0x012A,0x012C,0x0132,0x0134
 	.hword 0x0140,0x0150,0x0154,0x0200,0x0204,0x0208,0xFF00
 	.align
-@;------------------------------------------------	
-ASCII:	@;Torii: A to V only (the menu's words use no later letter), rows 2-11
-	@;of each 16-row glyph, as the others are blank (only Q's tail isn't)
-	.byte		0x10,0x38,0x6C,0xC6,0xC6,0xFE,0xC6,0xC6,0xC6,0xC6  @; -A-
-	.byte		0xFC,0x66,0x66,0x66,0x7C,0x66,0x66,0x66,0x66,0xFC  @; -B-
-	.byte		0x3C,0x66,0xC2,0xC0,0xC0,0xC0,0xC0,0xC2,0x66,0x3C  @; -C-
-	.byte		0xF8,0x6C,0x66,0x66,0x66,0x66,0x66,0x66,0x6C,0xF8  @; -D-
-	.byte		0xFE,0x66,0x62,0x68,0x78,0x68,0x60,0x62,0x66,0xFE  @; -E-
-	.byte		0xFE,0x66,0x62,0x68,0x78,0x68,0x60,0x60,0x60,0xF0  @; -F-
-	.byte		0x3C,0x66,0xC2,0xC0,0xC0,0xDE,0xC6,0xC6,0x66,0x3A  @; -G-
-	.byte		0xC6,0xC6,0xC6,0xC6,0xFE,0xC6,0xC6,0xC6,0xC6,0xC6  @; -H-
-	.byte		0x3C,0x18,0x18,0x18,0x18,0x18,0x18,0x18,0x18,0x3C  @; -I-
-	.byte		0x1E,0x0C,0x0C,0x0C,0x0C,0x0C,0xCC,0xCC,0xCC,0x78  @; -J-
-	.byte		0xE6,0x66,0x6C,0x6C,0x78,0x78,0x6C,0x66,0x66,0xE6  @; -K-
-	.byte		0xF0,0x60,0x60,0x60,0x60,0x60,0x60,0x62,0x66,0xFE  @; -L-
-	.byte		0xC6,0xEE,0xFE,0xFE,0xD6,0xC6,0xC6,0xC6,0xC6,0xC6  @; -M-
-	.byte		0xC6,0xE6,0xF6,0xFE,0xDE,0xCE,0xC6,0xC6,0xC6,0xC6  @; -N-
-	.byte		0x38,0x6C,0xC6,0xC6,0xC6,0xC6,0xC6,0xC6,0x6C,0x38  @; -O-
-	.byte		0xFC,0x66,0x66,0x66,0x7C,0x60,0x60,0x60,0x60,0xF0  @; -P-
-	.byte		0x7C,0xC6,0xC6,0xC6,0xC6,0xC6,0xC6,0xD6,0xDE,0x7C  @; -Q-
-	.byte		0xFC,0x66,0x66,0x66,0x7C,0x6C,0x66,0x66,0x66,0xE6  @; -R-
-	.byte		0x7C,0xC6,0xC6,0x60,0x38,0x0C,0x06,0xC6,0xC6,0x7C  @; -S-
-	.byte		0x7E,0x7E,0x5A,0x18,0x18,0x18,0x18,0x18,0x18,0x3C  @; -T-
-	.byte		0xC6,0xC6,0xC6,0xC6,0xC6,0xC6,0xC6,0xC6,0xC6,0x7C  @; -U-
-	.byte		0xC6,0xC6,0xC6,0xC6,0xC6,0xC6,0xC6,0x6C,0x38,0x10  @; -V-
-
-	.align
-ingameMENU:
-s_reset:
- 	.byte  'R','E','S','E','T',0x0
-s_save:
- 	.byte  'S','A','V','E',0x0
-s_load:
- 	.byte  'L','O','A','D',0x0
-s_cheatON:
- 	.byte  'C','H','E','A','T','O','N',0x0
-s_cheatOFF:
- 	.byte  'C','H','E','A','T','O','F','F',0x0
-s_debug:
- 	.byte  'D','E','B','U','G',0x0
-s_debug_saved:		@;Torii: letters A to V and spaces only (printchar)
-	.asciz	"DEBUG SAVED  CHOOSE RESET"
-	.align	
 S_RTS_FLAG:
  	.byte  'E','Z','-','O','m','e','g','a','R','T','C','F','I','L','E','.'
-	.align	
-s_badRTS:
- 	.byte  'R','T','S','F','I','L','E','D','A','M','A','G','E','D',0x00
-	.align	
-RTS_switch: 
+	.align
+RTS_switch:
 	.word 0x00000000
 Debug_switch:		@;Torii: DEBUG's code, from RTS_ReplaceIRQ_start; 0: no DEBUG
 	.word 0x00000000
@@ -1188,8 +976,8 @@ RTS_ReplaceIRQ_end:
 @;kernel's next boot to log: struct cartlog_snapshot in source/cartlog.c
 @;has the layout. The magic goes last, so a write cut off counts as none.
 @;It reads memory and I/O only, and never selects the save chip's pages.
-@;It sits at a different place in each game, so call_Debug passes what it
-@;needs: r4 the menu's register save area (spend_0x80), r5 the hook's
+@;It sits at a different place in each game, so the stub passes what it
+@;needs: r4 the hook's register save area (spend_0x80), r5 the hook's
 @;address, r6 SetRampage, r7 WriteSram.
 	.section .text.debug_blob,"ax",%progbits
 	.arm
@@ -1198,7 +986,7 @@ RTS_ReplaceIRQ_end:
 	.global	Debug_blob_end
 Debug_blob_start:
 	stmfd	sp!,{lr}
-	mrs		r0,CPSR		@;the system-mode sp and lr, where call_Save keeps them
+	mrs		r0,CPSR		@;the system-mode sp and lr, where SAVE keeps them
 	mov		r1,#0xDF
 	msr		cpsr_cf,r1
 	nop

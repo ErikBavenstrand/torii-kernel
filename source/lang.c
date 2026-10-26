@@ -94,6 +94,7 @@ const struct lang_rename *gl_rename EWRAM_BSS;
 const struct lang_saves *gl_saves EWRAM_BSS;
 const struct lang_slots *gl_slots EWRAM_BSS;
 const struct lang_gsaves *gl_gsaves EWRAM_BSS;
+const struct lang_ingame *gl_ingame EWRAM_BSS;
 
 // Popups and confirmations (ui.h)
 char *gl_pop_choose EWRAM_BSS;
@@ -747,6 +748,20 @@ static const struct lang_saves en_saves = {
 	.err_stopped = "Two different saves share a name.\nNothing was overwritten.",
 };
 
+// The in-game menu's rows (source/ingame.c draws them for the overlay)
+static const struct lang_ingame en_ingame = {
+	.resume = "Resume",
+	.save = "Save state",
+	.load = "Load state",
+	.cheats_on = "Cheats: on",
+	.cheats_off = "Cheats: off",
+	.reset = "Reset game",
+	.sleep = "Sleep",
+	.torii = "Back to Torii",
+	.debug = "Debug snapshot",
+	.debug_saved = "Snapshot kept for the log",
+};
+
 //---------------------------------------------------------------------------------
 void LoadEnglish(void)
 {
@@ -898,6 +913,7 @@ void LoadEnglish(void)
 	gl_saves = &en_saves;
 	gl_slots = &en_slots;
 	gl_gsaves = &en_gsaves;
+	gl_ingame = &en_ingame;
 }
 //---------------------------------------------------------------------------------
 // The languages Settings offers. A new language adds its strings and a
