@@ -41,12 +41,23 @@ it. Info's Controls page lists every key.
   never its base game's.
   Settings' Game view shows a list, or a list with box art (`just art-pack`
   once, then `just art-add` for romhacks; `just art-scrape`).
-- **Cheats:** a GBA game with a cheat file, `/torii/cheats/<its path less
-  the extension>.cht` (`/GBA/Golden Sun.gba` has
-  `/torii/cheats/GBA/Golden Sun.cht`), has Cheats in its menu, with how many
-  the file holds. Its screen lists them with a tick on the picked ones: A
+- **Cheats:** every GBA game on the card has Cheats in its menu; one with
+  a cheat file, `/torii/cheats/<its path less the extension>.cht`
+  (`/GBA/Golden Sun.gba` has `/torii/cheats/GBA/Golden Sun.cht`), shows how
+  many the file holds. Its screen lists them with a tick on the picked ones: A
   picks or drops one, and B saves the picks into the file (only the
-  `cheatN_enable` lines change) and goes back. Every launch with addons
+  `cheatN_enable` lines change) and goes back. **+ Add code**, the last row,
+  opens a hex keypad: type a code's lines (L and R move between them, Line
+  starts one, `:` is for VBA's `address:value`), and the keypad shows the
+  format it reads as (8+4 digits CodeBreaker, 16 GameShark or Action Replay
+  v3 by how plausible each decoding is, `address:value` VBA) and what the
+  code does, or why it doesn't read; SELECT sets a format instead. START
+  saves it, the keyboard names it, and it goes at the end of the file
+  (made if the game had none), picked, as `cheatN_user = true`, with
+  `cheatN_format = "..."` when you set the format. SELECT on a code of your
+  own edits or deletes it; the database's can only be unpicked. A greyed
+  code with digits to fill in (`00??`) opens the keypad with them marked,
+  and saving replaces that code in place. Every launch with addons
   applies them, and the in-game menu's CHEAT OFF and CHEAT ON stop and
   restart them; a clean boot applies none. The file is in libretro's format
   (`just cheats` writes one for each game, or drop one in, named after the

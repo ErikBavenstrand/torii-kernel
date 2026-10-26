@@ -79,7 +79,7 @@ game-saves/backups AE9D90587586F622
 game-saves/new 9273169F93ACF1AE
 game-saves/options 11086025BAC0D54B
 game-saves/other 2949FCC3107B5EFD
-game-saves/popup E56D83617488D777
+game-saves/popup 77D07DB1BB6B853B
 game-saves/restore 22E46B926989455B
 game-saves/slots 04D53091D5F46A62
 game-saves-light/options 60FA4EF7B048752A
@@ -91,7 +91,7 @@ games-art/recent D6B09D15BF64F7E1
 games-art-box/gba D190CBFE3772B2F2
 games-art-dark/gba 743CC2D257F80E8A
 games-art-dark/gba-none 6DD7FD2BF9FD37DC
-games-art-popup/popup FFB6C87985AFD153
+games-art-popup/popup 567BB5B836AD1216
 games-box-switch/gb 46FF5145036E9096
 games-box-switch/gba 9F73E48DF1E05512
 games-box-switch/gba-next 86E077FAD2BA18F7
@@ -102,24 +102,24 @@ games-box-switch/frames 3-3 D4DD55491F22C7F2
 games-box-switch/frames 4-5 E3A4AD640FBC14D2
 games-box-switch/frames 6-28 9F73E48DF1E05512
 games-cheats/back DE60914D027457D0
-games-cheats/greyed EE4A2A7E1ECC67E5
-games-cheats/picked 8413DEFCB4731DD8
+games-cheats/greyed FEBA3D249E10763C
+games-cheats/picked 96B0E16F96C737A5
 games-cheats/popup 0D9F840E1438B3C6
-games-cheats/screen E933A8F0982C2E0C
+games-cheats/screen 4E0A50ED775F21E9
 games-dedupe/screen 67E86C46698E404E
 games-fav/screen 5F5922C2D6F31804
 games-fav/starred 017306DC53C8BC2C
-games-fav/toggled B72B6B874A5C61BB
+games-fav/toggled 294875E98CDCC62F
 games-gb/popup 1E60754161273D33
 games-gb/screen A47EFAC3B4A4039F
-games-gba/cancelled 3F6800D51BAB2786
+games-gba/cancelled D9DC060C8F7DBC86
 games-gba/closed 7C5107676E6593E0
 games-gba/delete 91DAB5F33422BD04
 games-gba/down 5FDFD6D57D176F66
 games-gba/info 0D8039CD687EB4F4
 games-gba/info-sram 77CB7254B0D68A20
 games-gba/letter 77E7DC56ADF4E619
-games-gba/popup 11E3BFB01C79E6CD
+games-gba/popup 0CD098FEA19D59CD
 games-gba/screen 928ED4ADD2922192
 games-gba/frames 0-0 928ED4ADD2922192
 games-gba/frames 1-1 85DC2B75DEBC640E

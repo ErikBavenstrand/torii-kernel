@@ -113,7 +113,7 @@ static inline void paint_label_text(const struct torii_font *font, const char *s
 // Draws a label with its pen at x and its line's top at y; every inked pixel
 // must fall inside the window (the look puts them there)
 static inline void paint_blit(const struct text_window *win, const struct torii_font *font, u32 x, u32 y, u32 ink,
-		 const struct paint_label *l)
+			      const struct paint_label *l)
 {
 	struct text_run run = {win->tiles, win->height * 8u, font, l->glyphs, l->count, x, y, ink & 15};
 	if (l->count)
@@ -121,8 +121,8 @@ static inline void paint_blit(const struct text_window *win, const struct torii_
 }
 
 // A label centred in [x, x + w), its line's top at y
-static inline void paint_blit_centred(const struct text_window *win, const struct torii_font *font, u32 x, u32 y, u32 w, u32 ink,
-			 const struct paint_label *l)
+static inline void paint_blit_centred(const struct text_window *win, const struct torii_font *font, u32 x, u32 y, u32 w,
+				      u32 ink, const struct paint_label *l)
 {
 	paint_blit(win, font, x + (w - l->advance + 1) / 2, y, ink, l);
 }

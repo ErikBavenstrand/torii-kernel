@@ -5,7 +5,9 @@
 //   game's cheat file (struct cheatstore, cheatstore.h): its text, its
 //   cheats and the decoder's work, while the cheat screen runs
 //   (screens/cheats.c, which starts no job and calls nothing else that
-//   borrows past the stage), within the game popup's count of them, and at a
+//   borrows past the stage; its code keypad, screens/keypad.c, checks codes
+//   in the decoder's work, and the rename keyboard borrows nothing), within
+//   the game popup's count of them, and at a
 //   launch within cheatstore_launch (before the game is loaded, and again
 //   once it is in PSRAM, for its ROM patches).
 // - All of it: bulk SD, NOR, SRAM and PSRAM transfers inside one operation:

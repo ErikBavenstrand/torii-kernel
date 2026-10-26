@@ -1,5 +1,5 @@
 # Favourites (source/screens/games.c, mockup #12) in the light theme: the
-# game popup's Favourite (after Play and Saves) toggles in place (its value turns "on" and the
+# game popup's Favourite (after Play, Saves and Cheats) toggles in place (its value turns "on" and the
 # row gets its star), for two games in the GBA list; back home, Favourites
 # shows, and its page lists them A-Z with their console marks.
 #! settings 28=1
@@ -14,18 +14,18 @@
 -k @8:DOWN -k @12:-
 -k @20:START -k @24:-
 -w "screen ready: game-popup"
--k @12:DOWN -k @16:- -k @20:DOWN -k @24:-
--k @32:A -k @36:-
--s @40:toggled.png
--k @48:B -k @52:-
--k @68:UP -k @72:-
--k @80:START -k @84:-
+-k @12:DOWN -k @16:- -k @20:DOWN -k @24:- -k @28:DOWN -k @32:-
+-k @40:A -k @44:-
+-s @60:toggled.png
+-k @64:B -k @68:-
+-k @84:UP -k @88:-
+-k @96:START -k @100:-
 -w "screen ready: game-popup"
--k @12:DOWN -k @16:- -k @20:DOWN -k @24:-
--k @32:A -k @36:-
--k @40:B -k @44:-
--s @60:starred.png
--k @66:B -k @70:-
+-k @12:DOWN -k @16:- -k @20:DOWN -k @24:- -k @28:DOWN -k @32:-
+-k @40:A -k @44:-
+-k @48:B -k @52:-
+-s @68:starred.png
+-k @74:B -k @78:-
 -w "nav: home ready"
 -k @8:LEFT -k @12:-
 -k @20:A -k @24:-

@@ -269,7 +269,8 @@ static void recheck(void)
 	keypad_check(&kp.e, kp.format, kp.ask->ctx, &cs->work, kp.scratch, &kp.check);
 	if (kp.check.status == KEYPAD_OK && kp.check.ops)
 		kp.first = cs->work.ops[0];
-	tlog_debug("keypad: %s: %s as %s", kp.scratch, kp.check.status < KEYPAD_STATUSES ? status_names[kp.check.status] : "?",
+	tlog_debug("keypad: %s: %s as %s", kp.scratch,
+		   kp.check.status < KEYPAD_STATUSES ? status_names[kp.check.status] : "?",
 		   format_name(kp.check.format));
 }
 
@@ -310,8 +311,8 @@ static void paint_line(const struct text_window *win, u32 ox, u32 i, u32 y)
 		paint_label_char(font, (u8)shown[c], &lb);
 		u32 ink = UI_ROLE_TEXT;
 		if (keypad_is_mark(shown[c])) {
-			paint_round_fill(win, x - look.mark_pad, y + 1, lb.advance + 2u * look.mark_pad, look.line_h - 1, 2,
-					 UI_ROLE_TINT);
+			paint_round_fill(win, x - look.mark_pad, y + 1, lb.advance + 2u * look.mark_pad,
+					 look.line_h - 1, 2, UI_ROLE_TINT);
 			ink = UI_ROLE_ACCENT_INK;
 		}
 		paint_blit(win, font, x, y, ink, &lb);
