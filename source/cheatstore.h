@@ -40,6 +40,12 @@ int cheatstore_read(const char *rom_path);
 // Decodes the read file's cheats from cheatstore()->work.next on, until
 // budget cycles have passed (0: all of them). 1 once all are decoded.
 int cheatstore_decode(u32 budget);
+// How many cheats the read file's cheat screen lists (all but master codes,
+// which only decoding tells apart): decoding from cheatstore()->work.next
+// on for up to budget cycles (0: as long as it takes), unless this session
+// has counted the file already (the last file counted, by its path and
+// cheat count). -1 if the budget ran out first.
+s32 cheatstore_listed(u32 budget);
 // Writes the picks back into the read file, power-cut safe, if one changed.
 // 1 if it is as the picks say.
 int cheatstore_write(void);

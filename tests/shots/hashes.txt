@@ -104,7 +104,7 @@ games-box-switch/frames 6-28 9F73E48DF1E05512
 games-cheats/back DE60914D027457D0
 games-cheats/greyed CE5738F0AA277E1F
 games-cheats/picked 4BCC49E70AB39240
-games-cheats/popup 243752EC999BD57A
+games-cheats/popup 0D9F840E1438B3C6
 games-cheats/screen 308673631F8FA4C4
 games-dedupe/screen 67E86C46698E404E
 games-fav/screen 5F5922C2D6F31804
@@ -129,7 +129,7 @@ games-gba/frames 4-5 C52B32D05EE08616
 games-gba/frames 6-12 5FDFD6D57D176F66
 games-last/kept 312810E3EAF14C10
 games-last/last 1E6044F0A7D02798
-games-last/recent-popup C6A1150E2367B61E
+games-last/recent-popup 7B46FF49A24B4136
 games-last/removed 10CE7063EB5CCE3A
 games-light/held 621380C02B053ACF
 games-light/screen 056ABFD7AB906FE1

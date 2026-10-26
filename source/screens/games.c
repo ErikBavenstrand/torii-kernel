@@ -31,6 +31,7 @@
 #include "cheats.h"
 #include "../tlog.h"
 #include "../userdata.h"
+#include "../engine/cycles.h"
 #include "../engine/engine.h"
 #include "../engine/psram.h"
 #include "../ui/art.h"
@@ -78,6 +79,9 @@ static const struct ui_card_config card = {4, 4, 4, 1, 0};
 #define DEDUPE_RUN 8    // games that clean to one name told apart, at most
 _Static_assert(DEDUPE_RUN *USERDATA_PATH_MAX <= READCACHE_DEDUPE_SIZE, "a run's paths fit their part of pReadCache");
 #define HASH_BUCKETS 1024  // the resolver's (a power of 2)
+// The popup decodes a game's cheat file for its Cheats count this long, a
+// thirtieth of a second, at most
+#define GAMES_CHEATS_CYCLES (16780000u / 30)
 
 enum {
 	KIND_CONSOLE,
@@ -129,7 +133,7 @@ static struct {
 	char pick[USERDATA_PATH_MAX] ALIGN(4);
 	char title[GAMENAME_MAX + 1];
 	char ask[GAMENAME_MAX + 16];
-	char cheats[12];  // the popup's Cheats: how many the file has
+	char cheats[12];  // the popup's Cheats: how many the cheat screen lists
 	struct ui_pop_item items[LANG_POP_ITEMS];
 	u8 actions[LANG_POP_ITEMS];
 	struct ui_popup popup;
@@ -1493,8 +1497,14 @@ static void popup_run(u32 i)
 	if (game_saves_probe(games.pick))
 		popup_add(LANG_POP_SAVES, 0, 0);
 	if (gba && cheatstore_read(games.pick)) {
-		snprintf(games.cheats, sizeof(games.cheats), "%lu", (unsigned long)cheatstore()->file.count);
-		popup_add(LANG_POP_CHEATS, games.cheats, 0);
+		// Its count is what the cheat screen lists, master codes left out:
+		// a file too long to decode now gets it once the screen has
+		u32 start = cycles_now();
+		s32 listed = cheatstore_listed(GAMES_CHEATS_CYCLES);
+		tlog_debug("cheats: popup: %ld listed, %lu cycles", (long)listed, (unsigned long)cycles_since(start));
+		if (listed >= 0)
+			snprintf(games.cheats, sizeof(games.cheats), "%lu", (unsigned long)listed);
+		popup_add(LANG_POP_CHEATS, listed >= 0 ? games.cheats : 0, 0);
 	}
 	u32 fav_item = games.popup.count;
 	popup_add(LANG_POP_FAV, fav ? gl_games->on : gl_games->off, 0);

@@ -57,6 +57,9 @@ pick() {
 pick boot >"$cart/pick.txt" 2>&1 || fail "the cheat screen didn't run: $(grep -a '^kernel' "$cart/pick.txt" | tail -3)"
 grep -q "cheats: .*Hello.cht: 3 cheats, 1 master codes hidden, 1 picked" "$cart/pick.txt" ||
   fail "the screen read: $(grep -a 'cheats:' "$cart/pick.txt" | head -3)"
+# The popup's count is the screen's: the master code isn't counted
+grep -q "cheats: popup: 3 listed" "$cart/pick.txt" ||
+  fail "the popup counted: $(grep -a 'cheats: popup' "$cart/pick.txt" | head -1)"
 grep -q "cheats: /torii/cheats/Hello.cht: 2 picked, written" "$cart/pick.txt" ||
   fail "the pick wasn't saved: $(grep -a 'cheats:' "$cart/pick.txt" | tail -2)"
 mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht >"$cart/after.cht"
@@ -94,8 +97,10 @@ boot $(nav_launch /Hello.gba clean) -u "launch: loading" -f 4000 >"$cart/clean.t
 ! grep -q "cheats: .*picked" "$cart/clean.txt" || fail "a clean boot read the cheats"
 echo "PASS: cheats: a clean boot applies none"
 
-# A big file (500 cheats, 46 KB, GameShark codes that decrypt): read once,
-# decoded behind a progress dialog, then the screen; A answers at once
+# A big file (500 cheats, 46 KB, GameShark codes that decrypt): the popup
+# doesn't wait for it to decode, so it shows no count; the screen reads it
+# once, decodes it behind a progress dialog, and A answers at once; B saves,
+# and back on the list the popup has the count the screen found
 cp "$cart/clean/sd.img" "$cart/clean/kernel-nor.bin" "$cart/"
 rm -f "$cart/sram.bin"
 python3 - "$cart/Big.cht" <<'EOF'
@@ -108,13 +113,18 @@ EOF
 mcopy -o -i "$cart/sd.img" "$cart/Big.cht" "::/torii/cheats/Hello.cht"
 # shellcheck disable=SC2046 # nav.sh's options
 boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
-  -w "screen ready: cheats" -k @8:A -k @12:- -w "cheats: picked cheat 0" -f 6000 >"$cart/big.txt" 2>&1 ||
+  -w "screen ready: cheats" -k @8:A -k @12:- -w "cheats: picked cheat 0" -k @8:B -k @12:- \
+  -w "screen ready: games" -k @8:START -k @12:- -w "screen ready: game-popup" -f 8000 >"$cart/big.txt" 2>&1 ||
   fail "the big file's screen didn't run: $(grep -a '^kernel' "$cart/big.txt" | tail -3)"
 grep -q "screen ready: progress" "$cart/big.txt" || fail "no progress dialog while the big file decoded"
 grep -q "cheats: .*Hello.cht: 500 cheats, 0 master codes hidden" "$cart/big.txt" ||
   fail "the big file read: $(grep -a 'cheats:' "$cart/big.txt" | head -3)"
-[ "$(grep -c 'safefile: .*Hello.cht' "$cart/big.txt")" -le 2 ] || fail "the big file was read more than once"
-echo "PASS: cheats: a file of 500 cheats is read once, decoded behind a progress dialog, and picks at once"
+# Until the screen's write-back: the popup's read and the screen's
+[ "$(sed '/cheats: back/q' "$cart/big.txt" | grep -c 'safefile: .*Hello.cht')" -le 2 ] ||
+  fail "the big file was read more than once"
+popups=$(sed -n 's/.*cheats: popup: \(-\{0,1\}[0-9]*\) listed.*/\1/p' "$cart/big.txt" | tr '\n' ' ')
+[ "$popups" = "-1 500 " ] || fail "the popup counted ${popups:-nothing}, not -1 (no count) and then 500"
+echo "PASS: cheats: a file of 500 cheats is read once, decoded behind a progress dialog, and picks at once; the popup counts it once the screen has"
 
 # The pick's write-back, cut at each step: either the old picks or the new
 # are read at the next power-on, never a broken file
