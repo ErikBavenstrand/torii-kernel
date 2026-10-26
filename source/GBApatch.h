@@ -82,7 +82,19 @@ extern u32 iCount2;
 // Logs which in-game code went into the ROM, where, and every patched word:
 // part of the launch record.
 void Log_patches(void);
+// Places the patch area (iTrimSize) after the ROM's data, buffer being its
+// last iSize bytes (mode 1: a NOR game's). Where a size cap pulls it back
+// onto the game's data (a 32 MB ROM, a full 16 MB EEPROM one) with cheats
+// picked, the area is cut to what the picks need; if even that would land
+// on the data, the cheats that run in game are left out (gl_cheat_on and
+// gl_cheat_count 0, logged) and the area is what it is without them.
 void SetTrimSize(u8 *buffer, u32 romsize, u32 iSize, u32 mode, BYTE saveMODE);
+// The ROM bytes this launch's patches wrote (the entry branch, the IRQ
+// hook's words, code patches) and the patch area: the picked cheats' ROM
+// patches must keep off them (cheatstore_launch). Reset at a launch's start.
+void rom_guard_reset(void);
+// 1 if [offset, offset + bytes) touches one of them
+int rom_guard_hits(u32 offset, u32 bytes);
 void Patch_SpecialROM_TrimSize(void);
 // Fills the cart's table of the file's cluster runs (game_save_rts 1: the
 // game's, 3: the RTS file's). Returns 0, 0xffffffff if the file doesn't

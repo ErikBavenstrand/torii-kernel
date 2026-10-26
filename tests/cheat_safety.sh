@@ -13,6 +13,10 @@
 #          first, and renaming it moves them, each step cut in turn
 #          (tests/cutsweep.sh): no cut leaves a cheat file without its game,
 #          or under the other name.
+#   rom    A cheat's ROM patches keep off the kernel's own (the patch area,
+#          the entry branch); a 32 MB ROM gets its cheats only where padding
+#          holds them, the patch area cut to what they need, never over its
+#          data.
 #
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and `just test-roms`.
@@ -25,7 +29,7 @@ set -euo pipefail
 # shellcheck source=tests/cutsweep.sh
 . tests/cutsweep.sh
 
-mode=${1:?usage: cheat_safety.sh irq|files}
+mode=${1:?usage: cheat_safety.sh irq|files|rom}
 local_carts "dist/cart-cheat-safety-$mode"
 
 fail() {
@@ -159,6 +163,72 @@ files)
   grep -q "cutpoint [0-9]*: rename: a cheat file moved" "$carts/cutsweep-names.log" ||
     fail "the rename logged no cheat cutpoints"
   echo "PASS: cheat_safety: renaming a game moves its cheat files: a cut at each of its $cut_count steps leaves them with the game"
+  ;;
+rom)
+  mkdir -p "$carts"
+  mem() { sed -n "s/^mem frame [0-9]* $1: //p" "$cart/run.txt" | head -1 | tr -d ' \n' | tr A-F a-f; }
+  # Hello padded with 0xFF to 64 KB puts the patch area at ROM 0xD000: a
+  # cheat whose ROM writes cover it and the entry branch (VBA raw words)
+  # gets those left out, its other patch and its RAM write kept
+  python3 - "$carts/pad.gba" <<'EOF'
+import sys
+rom = open("tests/roms/hello/hello.gba", "rb").read()
+open(sys.argv[1], "wb").write(rom + b"\xff" * (0x10000 - len(rom)))
+EOF
+  {
+    printf 'cheat0_desc = "Over the hook"\ncheat0_code = "'
+    for i in $(seq 0 15); do printf '0800D%03X:00000000+' $((i * 4)); done
+    printf '08000000:00000000+080000A0:4954+0203F000:BEEF"\ncheat0_enable = true\n'
+  } >"$carts/over.cht"
+  new_cart over "$carts/pad.gba" Hello.gba "$carts/over.cht"
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot $(nav_launch /Hello.gba addon) -w "launch: starting the game" -m @120:0x0203F000:2 \
+    -m @120:0x0800D000:4 -m @120:0x080000A0:2 -f 3000 >"$cart/run.txt" 2>&1 || true
+  grep -q "in-game code: in-game menu (RTS_ReplaceIRQ) at ROM 0000D000" "$cart/run.txt" ||
+    fail "the patch area isn't at 0xD000: $(grep -a 'in-game code' "$cart/run.txt")"
+  grep -q "cheats: cheat 0 (Over the hook): its ROM patch at 0800D000 is over the kernel's own, left out" "$cart/run.txt" ||
+    fail "no patch over the hook was refused: $(grep -a 'cheats:' "$cart/run.txt" | tail -3)"
+  grep -q "cheats: 1 ROM patches written into the game, some over the kernel's own patches left out" "$cart/run.txt" ||
+    fail "the patches logged: $(grep -a 'cheats:' "$cart/run.txt" | tail -2)"
+  [ "$(mem 0203F000)" = efbe ] || fail "the cheat didn't run: 0203F000 holds $(mem 0203F000)"
+  [ "$(mem 0800D000)" != 00000000 ] || fail "the hook's first word was overwritten"
+  [ "$(mem 080000A0)" = 5449 ] || fail "the patch off the kernel's wasn't written: $(mem 080000A0)"
+  echo "PASS: cheat_safety: a cheat's ROM patches over the patch area and the entry branch are left out, the rest applied"
+
+  # 32 MB ROMs: the patch area has no padding to go in. Data to the end:
+  # the cheats are left out, the game starts. 8 KB of padding at the end:
+  # the area is cut to what the picks need, and the data before it stays
+  printf '%s\n' 'cheat0_desc = "Beef"' 'cheat0_code = "0203F000:BEEF"' 'cheat0_enable = true' >"$carts/beef.cht"
+  for kind in full padded; do
+    python3 - "$carts/big.gba" "$kind" <<'EOF'
+import random, sys
+rom = open("tests/roms/hello/hello.gba", "rb").read()
+size, pad = 0x2000000, 0x2000 if sys.argv[2] == "padded" else 0
+data = random.Random(7).randbytes(size - len(rom) - pad)
+open(sys.argv[1], "wb").write(rom + data + b"\xff" * pad)
+EOF
+    new_cart "big-$kind" "$carts/big.gba" Hello.gba "$carts/beef.cht"
+    # shellcheck disable=SC2046 # nav.sh's options
+    boot $(nav_launch /Hello.gba addon) -w "launch: starting the game" -m @120:0x0203F000:2 \
+      -m @120:0x09FFD000:16 -m @120:0x09FFDFF0:16 -f 6000 >"$cart/run.txt" 2>&1 || true
+    grep -q "launch: starting the game" "$cart/run.txt" || fail "$kind: the game didn't start: $(grep -a '^kernel' "$cart/run.txt" | tail -3)"
+    rom_at() { od -An -tx1 -j "$1" -N 16 "$carts/big.gba" | tr -d ' \n'; }
+    if [ $kind = full ]; then
+      grep -q "launch: the ROM.s data reaches 02000000, and the cheats' .* would cover it: the cheats that run in game are left out" "$cart/run.txt" ||
+        fail "full: the cheats weren't left out: $(grep -a 'launch: the ROM\|in-game code' "$cart/run.txt")"
+      [ "$(mem 0203F000)" != efbe ] || fail "full: the cheat ran"
+      # Without cheats the menu's area is where it always was (on the data)
+      grep -q "in-game code: in-game menu (RTS_ReplaceIRQ) at ROM 01FFF000\|in-game code: reset and sleep keys (Sleep_ReplaceIRQ) at ROM 01FFFD00" "$cart/run.txt" ||
+        fail "full: the area without cheats moved: $(grep -a 'in-game code' "$cart/run.txt")"
+      [ "$(mem 09FFD000)" = "$(rom_at $((0x1FFD000)))" ] || fail "full: the data at 01FFD000 changed"
+    else
+      grep -q "launch: the ROM's data reaches 01FFE000: the patch area is cut to" "$cart/run.txt" ||
+        fail "padded: the area wasn't cut: $(grep -a 'launch: the ROM\|in-game code' "$cart/run.txt")"
+      [ "$(mem 0203F000)" = efbe ] || fail "padded: the cheat didn't run: $(mem 0203F000)"
+      [ "$(mem 09FFDFF0)" = "$(rom_at $((0x1FFDFF0)))" ] || fail "padded: the game's last data changed"
+    fi
+  done
+  echo "PASS: cheat_safety: a 32 MB ROM gets the cheats where padding holds them, and none over its data"
   ;;
 *)
   fail "no mode $mode"

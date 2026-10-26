@@ -604,14 +604,39 @@ and sleep keys, `0x1000` for the in-game menu, `0x3000` with cheats (v0.7;
 
 | Part | Bytes (v0.7) | |
 |---|---|---|
-| The hook and the menu (`RTS_ReplaceIRQ_start`..`_end`, `gba_rts_patch.s`) | `0xD48` | `Cheat_switch` holds the interpreter's offset from its start (0: no cheats), `Debug_switch` DEBUG's |
+| The hook and the menu (`RTS_ReplaceIRQ_start`..`_end`, `gba_rts_patch.s`) | `0xD6C` | `Cheat_switch` holds the interpreter's offset from its start (0: no cheats), `Debug_switch` DEBUG's |
 | The cheat interpreter (`Cheat_blob_start`..`_end`, `cheatrun.s`) | `0x474` | ARM, position-independent: PC-relative literals only |
 | The cheat table | up to `0x1400` | its layout is in `cheatrun.s` and `cheatcode.h` |
 | DEBUG's code (`Debug_blob`), with logging on | `0x180` | |
 
-That leaves `0x8C4` bytes for v0.8's overlay (`test_cheat_cap` logs it). The
+That leaves `0x8A0` bytes for v0.8's overlay (`test_cheat_cap` logs it). The
 `.pat` cache records the length its trim kept room for (word 12); a file
-from before v0.7 is scanned again for a game with cheats.
+with less room than a launch's picks need (or from before v0.7) is scanned
+again for a game with cheats.
+
+**When the ROM has no padding for it.** SetTrimSize puts the area after the
+ROM's data (its trailing run of `0x00` or `0xFF`), but caps it: a 32 MB ROM's
+at `0x2000000` minus its length, a 16 MB EEPROM game's at `0x1000000` minus
+it, and the area then lies on the game's last bytes. That is EZ-Flash's
+behaviour for the menu and the reset keys, and Torii keeps it without
+cheats (`tests/cheat_safety.sh rom` checks where it goes): such a game's
+last `0x300` or `0x1000` bytes are overwritten, which hasn't shown in a
+game yet. With cheats (v0.7), the area is cut to what the picks need (the
+menu, the interpreter and this launch's table, from the cap's end down); if
+even that reaches the data, the cheats that run in game are left out
+(logged) and the area is as it would be without them. `Patch_RTS_Cheat`
+also checks, in PSRAM, that the bytes the interpreter and table would take
+inside the file hold one padding value, and leaves the cheats out otherwise
+(a `Patch_SpecialROM_TrimSize` game's fixed place, a cached `.pat`).
+
+**The cheats' ROM patches keep off the kernel's.** Every ROM write a
+launch's patching makes (`Write` in `GBApatch.c`: the entry branch at ROM 0,
+the words in `iPatchInfo2`, code and exact-ROM patches, NES and Dragon Ball
+Z fixes) and the whole patch area are recorded (`rom_guard_hits`), and
+`cheatstore_launch` leaves out (and logs) a cheat's ROM patch that touches
+one; the cheat's other patches and its RAM ops still apply. The kernel has
+no save-type ROM patches: the cart's FPGA serves the save chip. The cheat
+screen can't tell beforehand: where the area goes is known only at launch.
 
 **The interpreter in game** runs once per VBlank (IE & IF bit 0; not the
 keypad IRQ the hook also takes), in IRQ mode with interrupts off, from the

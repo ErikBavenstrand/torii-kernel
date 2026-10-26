@@ -9,6 +9,7 @@
 #include "cutpoint.h"
 #include "ez_define.h"
 #include "Ezcard_OP.h"
+#include "GBApatch.h"
 #include "ff.h"
 #include "tlog.h"
 #include "engine/cycles.h"
@@ -175,7 +176,7 @@ void cheatstore_launch(const char *rom_path, u32 psram_bytes)
 		return;
 	struct cheatstore *cs = cheatstore();
 	struct cheatfile *f = &cs->file;
-	u32 last = 0, picks = 0, applied = 0, skipped = 0;
+	u32 last = 0, picks = 0, applied = 0, skipped = 0, guarded = 0;
 	for (u32 i = 0; i < f->count; i++)
 		if (cs->cheats[i].picked) {
 			last = i + 1;
@@ -215,6 +216,17 @@ void cheatstore_launch(const char *rom_path, u32 psram_bytes)
 				skipped++;
 				continue;
 			}
+			// Not over the kernel's own patches: the patch area (the hook,
+			// the interpreter, this table), the entry branch, the hook's words
+			if (rom_guard_hits(pt->offset, 2)) {
+				if (!guarded++ || tlog_wants(TLOG_DEBUG))
+					tlog("cheats: cheat %u (%.*s): its ROM patch at %08lX is over the kernel's "
+					     "own, "
+					     "left out",
+					     c->number, c->desc_len, f->text + c->desc,
+					     (unsigned long)(0x08000000 + pt->offset));
+				continue;
+			}
 			rom_patch(pt);
 			applied++;
 		}
@@ -224,8 +236,9 @@ void cheatstore_launch(const char *rom_path, u32 psram_bytes)
 		gl_cheat_bytes += 4;
 	}
 	if (psram_bytes)
-		tlog("cheats: %lu ROM patches written into the game%s", (unsigned long)applied,
-		     skipped ? ", some past its end left out" : "");
+		tlog("cheats: %lu ROM patches written into the game%s%s", (unsigned long)applied,
+		     skipped ? ", some past its end left out" : "",
+		     guarded ? ", some over the kernel's own patches left out" : "");
 	else
 		tlog("cheats: %s: %lu picked, %lu run in game (%lu bytes, %lu cycles a frame at most), %lu ROM "
 		     "patches",

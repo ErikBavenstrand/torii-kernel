@@ -9,9 +9,9 @@
 #include "cheatcode.h"
 
 // The patch area SetTrimSize keeps at the ROM's end when cheats run: the
-// in-game menu's code (0xD48 bytes at v0.7), the interpreter (0x474), the
+// in-game menu's code (0xD6C bytes at v0.7), the interpreter (0x474), the
 // table (at most CHEAT_TABLE_MAX, 0x1400) and, with logging on, the menu's
-// DEBUG code (0x180), which leaves 0x8C4 bytes for v0.8's overlay
+// DEBUG code (0x180), which leaves 0x8A0 bytes for v0.8's overlay
 // (test_cheat_cap logs it). A NOR game's patch must fit one 128 KB sector
 // with it (SetTrimSize).
 #define CHEAT_PATCH_LENGTH 0x3000

@@ -43,6 +43,54 @@ u32 iCount2;
 
 u32 spend_address;
 static const char *patch_kind;  //Torii: for Log_patches
+static u32 patch_room;          //Torii: the bytes at iTrimSize the patch may use
+static u32 rom_bytes;           //Torii: the game's size in PSRAM (GBApatch_PSRAM)
+
+//Torii: the ROM ranges a launch's patches wrote, for the cheats' ROM patches
+//to keep off (rom_guard_hits); past ROM_GUARDS ranges, everything is guarded
+#define ROM_GUARDS 96
+static struct {
+	u32 start, end;
+} rom_guards[ROM_GUARDS] EWRAM_BSS;
+static u32 rom_guard_count;
+static u8 rom_guard_full;
+
+void rom_guard_reset(void)
+{
+	rom_guard_count = 0;
+	rom_guard_full = 0;
+}
+
+static void rom_guard_add(u32 start, u32 bytes)
+{
+	if (!bytes)
+		return;
+	for (u32 i = 0; i < rom_guard_count; i++)
+		if (start <= rom_guards[i].end && start + bytes >= rom_guards[i].start) {  // touching: one range
+			if (start < rom_guards[i].start)
+				rom_guards[i].start = start;
+			if (start + bytes > rom_guards[i].end)
+				rom_guards[i].end = start + bytes;
+			return;
+		}
+	if (rom_guard_count >= ROM_GUARDS) {
+		rom_guard_full = 1;
+		return;
+	}
+	rom_guards[rom_guard_count].start = start;
+	rom_guards[rom_guard_count].end = start + bytes;
+	rom_guard_count++;
+}
+
+int rom_guard_hits(u32 offset, u32 bytes)
+{
+	if (rom_guard_full)
+		return 1;
+	for (u32 i = 0; i < rom_guard_count; i++)
+		if (offset < rom_guards[i].end && offset + bytes > rom_guards[i].start)
+			return 1;
+	return 0;
+}
 //------------------------------------------------------------------
 static void Write(u32 romaddress, const u8 *buffer, u32 size)
 {
@@ -55,6 +103,7 @@ static void Write(u32 romaddress, const u8 *buffer, u32 size)
 			//DEBUG_printf("NORaddress{%x}:%x %x", romaddress,size ,((vu32*)buffer)[0]);
 		}
 	} else {
+		rom_guard_add(romaddress, size);
 		u32 Address;
 		vu16 page = 0;
 		Address = romaddress;
@@ -233,12 +282,24 @@ static u32 Patch_length(void)
 	return 0x300;
 }
 //------------------------------------------------------------------
+//Torii: the bytes this launch's in-game code takes with the picked cheats:
+//the menu's code, the interpreter and their table (DEBUG's code goes in only
+//where it fits after them)
+static u32 Patch_need(void)
+{
+	u32 need = (u8 *)RTS_ReplaceIRQ_end - (u8 *)RTS_ReplaceIRQ_start;
+	if (gl_cheat_on == 1 && gl_cheat_bytes)
+		need += (u8 *)Cheat_blob_end - (u8 *)Cheat_blob_start + gl_cheat_bytes;
+	return (need + 15) & ~15u;
+}
+//------------------------------------------------------------------
 void SetTrimSize(u8 *buffer, u32 romsize, u32 iSize, u32 mode, BYTE saveMODE)
 {
 	u8 byte;
 	u32 bottom;
 	u32 top;
 	u32 alignedSize;
+	u32 data_end = 0;  //Torii: where the scan saw the ROM's data end
 
 	u32 PATCH_LENGTH = Patch_length();
 
@@ -256,6 +317,9 @@ void SetTrimSize(u8 *buffer, u32 romsize, u32 iSize, u32 mode, BYTE saveMODE)
 
 		for (u32 ii = bottom; ii >= top; ii--) {
 			if (buffer[ii] != byte || ii == top) {
+				// (only 0x00 and 0xFF pad a ROM: a run of another byte is its data)
+				data_end =
+					byte == 0x00 || byte == 0xFF ? ((romsize - 1) & 0xFFFE0000) + ii + 1 : romsize;
 				iTrimSize = ii + 4;
 				iTrimSize = iTrimSize + ((romsize - 1) & 0xFFFE0000);
 				iTrimSize = iTrimSize + (16 - (iTrimSize & 15));
@@ -300,7 +364,28 @@ void SetTrimSize(u8 *buffer, u32 romsize, u32 iSize, u32 mode, BYTE saveMODE)
 				iTrimSize = 0x2000000 - PATCH_LENGTH; //page
 		}
 	}
+	patch_room = PATCH_LENGTH;
+	u32 scanned = iTrimSize;
 	Patch_SpecialROM_TrimSize();
+	if (iTrimSize != scanned || gl_cheat_on != 1 || iTrimSize >= data_end)
+		return;
+	//Torii: a cap (32 MB, or 16 MB for EEPROM) put the patch area on the
+	//game's data: the cheats' room is cut to what they need, at the cap's end
+	u32 limit = iTrimSize + PATCH_LENGTH, need = Patch_need();
+	u32 at = (limit - need) & ~15u;
+	if (at >= data_end) {
+		tlog("launch: the ROM's data reaches %08lX: the patch area is cut to %lX bytes at %08lX",
+		     (unsigned long)data_end, (unsigned long)(limit - at), (unsigned long)at);
+		iTrimSize = at;
+		patch_room = limit - at;
+		return;
+	}
+	tlog("launch: the ROM's data reaches %08lX, and the cheats' %lX bytes from %08lX would cover it: the "
+	     "cheats that run in game are left out",
+	     (unsigned long)data_end, (unsigned long)need, (unsigned long)at);
+	gl_cheat_on = 0;
+	gl_cheat_count = gl_cheat_bytes = 0;
+	SetTrimSize(buffer, romsize, iSize, mode, saveMODE);  // as without cheats
 }
 //------------------------------------------------------------------
 static void Patch_B_address(void)
@@ -361,6 +446,29 @@ static void Patch_Reset_Sleep(u32 *Data)
 	}
 
 	Write(iTrimSize, patchbuffer, p_patch_end - p_patch_start);
+	rom_guard_add(iTrimSize, patch_room ? patch_room : Patch_length());
+}
+//------------------------------------------------------------------
+//Torii: 1 if the game's PSRAM image holds no data in [start, end): past the
+//file's end, or one padding value (0x00 or 0xFF) throughout, as a ROM is
+//padded
+static int rom_blank(u32 start, u32 end)
+{
+	if (end > rom_bytes)
+		end = rom_bytes;
+	if (start >= end)
+		return 1;
+	int blank = 1;
+	u16 pad = 0;
+	for (u32 at = start & ~1u; at < end && blank; at += 2) {
+		SetPSRampage((u16)((at >> 23) * 0x1000));
+		u16 h = *(vu16 *)((u8 *)PSRAMBase_S98 + (at & 0x7FFFFF));
+		if (at == (start & ~1u))
+			pad = h;
+		blank = h == pad && (pad == 0 || pad == 0xFFFF);
+	}
+	SetPSRampage(0);
+	return blank;
 }
 //------------------------------------------------------------------
 static void Patch_RTS_Cheat(u32 *Data)
@@ -405,14 +513,26 @@ static void Patch_RTS_Cheat(u32 *Data)
 	u32 copysize = p_patch_end - p_patch_start;
 	TLOG_ASSERT(copysize <= RTS_PATCH_LENGTH);
 	u32 cheat_at = 0;
+	u32 room = patch_room ? patch_room : Patch_length();
+	if (iTrimSize + room > 0x2000000)
+		room = 0x2000000 - iTrimSize;
 	if (gl_cheat_on == 1 && gl_cheat_bytes) {
 		u32 code = (u8 *)Cheat_blob_end - (u8 *)Cheat_blob_start;
-		TLOG_ASSERT(gl_cheat_bytes <= CHEAT_TABLE_MAX &&
-			    copysize + code + gl_cheat_bytes <= CHEAT_PATCH_LENGTH);
-		dmaCopy((void *)Cheat_blob_start, patchbuffer + copysize, code);
-		dmaCopy(gl_cheat_table, patchbuffer + copysize + code, gl_cheat_bytes);
-		cheat_at = copysize;
-		copysize += code + gl_cheat_bytes;
+		u32 end = copysize + code + gl_cheat_bytes;
+		TLOG_ASSERT(gl_cheat_bytes <= CHEAT_TABLE_MAX && end <= CHEAT_PATCH_LENGTH);
+		//Torii: never a table cut short, or over the game's data
+		if (end > room) {
+			tlog("launch: the cheats' %lX bytes don't fit the patch area's %lX: left out",
+			     (unsigned long)end, (unsigned long)room);
+		} else if (!is_NORpatch && !rom_blank(iTrimSize + copysize, iTrimSize + end)) {
+			tlog("launch: the game's data is at %08lX, where the cheats would go: left out",
+			     (unsigned long)(iTrimSize + copysize));
+		} else {
+			dmaCopy((void *)Cheat_blob_start, patchbuffer + copysize, code);
+			dmaCopy(gl_cheat_table, patchbuffer + copysize + code, gl_cheat_bytes);
+			cheat_at = copysize;
+			copysize = end;
+		}
 	}
 	*(vu32 *)(patchbuffer + ((u8 *)Cheat_switch - p_patch_start)) = cheat_at;
 
@@ -421,7 +541,7 @@ static void Patch_RTS_Cheat(u32 *Data)
 	u32 debug_size = (u8 *)Debug_blob_end - (u8 *)Debug_blob_start;
 	u32 debug_at = 0;
 	if (tlog_level != TLOG_OFF && !is_NORpatch) {  // a NOR copy would keep it with logging off
-		if (copysize + debug_size <= Patch_length() && iTrimSize + copysize + debug_size <= 0x2000000) {
+		if (copysize + debug_size <= room) {
 			dmaCopy((void *)Debug_blob_start, patchbuffer + copysize, debug_size);
 			debug_at = copysize;
 			copysize += debug_size;
@@ -437,6 +557,7 @@ static void Patch_RTS_Cheat(u32 *Data)
 	//DEBUG_printf("iTrimSize =%x %x", iTrimSize,copysize);
 
 	Write(iTrimSize, patchbuffer, copysize);
+	rom_guard_add(iTrimSize, room);
 }
 //------------------------------------------------------------------
 void GBApatch_Cleanrom(u32 *address, int filesize)//Only once
@@ -501,10 +622,10 @@ static u32 Get_spend_address(u32 *Data)
 //------------------------------------------------------------------
 void GBApatch_PSRAM(u32 *address, int filesize)//Only once
 {
-	(void)filesize;
 	windows_offset = 0;
 	is_NORpatch = 0;
 	EA_offset = address[0] & 0xFFFFFF;
+	rom_bytes = (u32)filesize;
 
 	CheckNes(address);
 	PatchNes(address);
@@ -598,6 +719,7 @@ static void GBA_patch_init(void)
 	iCount2 = 0;
 	iTrimSize = 0;
 	EA_offset = 0;
+	patch_room = 0;
 
 	w_reset_on = 0;
 	w_rts_on = 0;
@@ -627,6 +749,7 @@ static void GBA_patch_init_buffer(u32 *buffer)
 	w_sleep_on = buffer[start + 10];
 	w_cheat_on = buffer[start + 11];
 	w_patch_length = buffer[start + 12];
+	patch_room = w_patch_length;
 }
 //------------------------------------------------------------------
 u32 Check_pat(TCHAR *gamefilename)
@@ -668,10 +791,10 @@ u32 Check_pat(TCHAR *gamefilename)
 		//read patch information
 		GBA_patch_init_buffer((u32 *)pReadCache);
 
-		//Torii: and a cheat patch of this kernel's length (before v0.7, cheats
-		//kept 0x2000 bytes and no length was saved)
+		//Torii: and, with cheats, room for this launch's picks (before v0.7,
+		//cheats kept 0x2000 bytes and no length was saved)
 		if ((w_reset_on != gl_reset_on) || (w_rts_on != gl_rts_on) || (w_sleep_on != gl_sleep_on) ||
-		    (w_cheat_on != gl_cheat_on) || (gl_cheat_on == 1 && w_patch_length != Patch_length())) {
+		    (w_cheat_on != gl_cheat_on) || (gl_cheat_on == 1 && w_patch_length < Patch_need())) {
 			GBA_patch_init();
 			find_the_patfile = 0;
 		}
@@ -713,7 +836,7 @@ void Make_pat_file(TCHAR *gamefilename)
 			w_buffer[9] = gl_rts_on;
 			w_buffer[10] = gl_sleep_on;
 			w_buffer[11] = gl_cheat_on;
-			w_buffer[12] = Patch_length();  // Torii: the room iTrimSize kept
+			w_buffer[12] = patch_room;  // Torii: the room iTrimSize kept
 
 			res = f_write(&gfile, (void *)w_buffer, sizeof(w_buffer), (UINT *)&written);
 			f_close(&gfile);

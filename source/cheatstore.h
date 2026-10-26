@@ -57,7 +57,9 @@ int cheatstore_delete(const char *rom_path);
 // its budget (a cheat that doesn't fit is left out whole); gl_cheat_count
 // gets the cheats that run in game and gl_cheat_patches their ROM patches'
 // count. With psram_bytes, the game is in PSRAM
-// (that many bytes) and those ROM patches are written into it. A game
+// (that many bytes) and those ROM patches are written into it, but for any
+// over the kernel's own patches (rom_guard_hits, GBApatch.h): left out and
+// logged. A game
 // without a cheat file, or with none picked, gets none.
 void cheatstore_launch(const char *rom_path, u32 psram_bytes);
 extern u32 gl_cheat_patches;
