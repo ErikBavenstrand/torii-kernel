@@ -129,6 +129,20 @@ void test_cheatstore(void)
 	CHECK_EQ(gl_cheat_table[4], 0x03007FF0);
 	gl_cheat_count = gl_cheat_bytes = gl_cheat_patches = 0;
 
+	// A cheat of 130 ROM patches: the load takes PSRAM and pReadCache, so the
+	// first CHEATSTORE_ROM_PATCHES are kept for it in EWRAM, the rest left out
+	// (the text is made in the cheat table's room, free until the launch)
+	char *t = (char *)cheatstore()->cheats;
+	u32 n = (u32)snprintf(t, 128, "cheat0_desc = \"Patches\"\ncheat0_enable = true\ncheat0_code = \"");
+	for (u32 i = 0; i < 130; i++)
+		n += (u32)snprintf(t + n, 32, "%s08%06lX:4770", i ? "+" : "", (unsigned long)(0x1000 + i * 2));
+	snprintf(t + n, 8, "\"\n");
+	CHECK(put(T_CHT, t));
+	cheatstore_launch(T_ROM, 0);
+	CHECK_EQ(gl_cheat_count, 0);
+	CHECK_EQ(gl_cheat_patches, CHEATSTORE_ROM_PATCHES);
+	gl_cheat_count = gl_cheat_bytes = gl_cheat_patches = 0;
+
 	// No file: nothing
 	f_unlink(T_CHT);
 	f_unlink(T_CHT ".bak");

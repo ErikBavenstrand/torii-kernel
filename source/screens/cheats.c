@@ -2,11 +2,11 @@
 // the game's name and which row the cursor is on, the cheats on a card, and
 // the hint bar, which says why a greyed row can't be picked. The file, its
 // cheats and the row map stay in pReadCache (READCACHE_CHEATS, past the
-// asset jobs' stage) while the screen runs, the code keypad and the rename
-// keyboard included: it reads the file once, and A only does arithmetic on
-// what decoding found (cheatfile.h). An edit (a code added, filled in,
-// edited or deleted) changes the text in place, decodes it again and writes
-// the file at once.
+// asset jobs' stage), and its text in PSRAM (cheatstore.h), while the screen
+// runs, the code keypad and the rename keyboard included: it reads the file
+// once, and A only does arithmetic on what decoding found (cheatfile.h). An
+// edit (a code added, filled in, edited or deleted) changes the text in
+// place, decodes it again and writes the file at once.
 #include "cheats.h"
 
 #include <stdio.h>
@@ -380,11 +380,10 @@ static u32 cs_code(u32 at, int fill)
 			break;
 	}
 	u32 r, idx = at;
-	char *buf = (char *)s->text;
 	if (!c)
-		r = cheatfile_add(f, buf, sizeof(s->text), cs.name, cs.code, format, &idx);
+		r = cheatstore_add(cs.name, cs.code, format, &idx);
 	else
-		r = cheatfile_set_code(f, buf, sizeof(s->text), at, fill ? NULL : cs.name, cs.code, format);
+		r = cheatstore_set_code(at, fill ? NULL : cs.name, cs.code, format);
 	tlog("cheats: %s cheat %lu: %s", c ? (fill ? "filled in" : "edited") : "added", (unsigned long)idx,
 	     r == CHEATFILE_EDIT_OK ? "ok" : gl_cheats->edit_failed[r < CHEATFILE_EDIT_BAD + 1 ? r : 0]);
 	if (r != CHEATFILE_EDIT_OK) {
@@ -428,7 +427,7 @@ static u32 cs_menu(u32 row)
 		if (!ui_confirm(cs.hints, &ask))
 			continue;  // Cancel: back to the menu
 		ui_popup_close();
-		u32 r = cheatfile_remove(&s->file, (char *)s->text, sizeof(s->text), at);
+		u32 r = cheatstore_remove(at);
 		tlog("cheats: deleted cheat %lu: %s", (unsigned long)at, r == CHEATFILE_EDIT_OK ? "ok" : "refused");
 		cs_leave();
 		cs_redecode();

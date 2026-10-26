@@ -74,8 +74,9 @@ it. Info's Controls page lists every key.
   ROM) is too. ROM patches need the game in PSRAM: a game written to NOR
   keeps its picked cheats' codes but not their ROM patches, and a patch over
   the kernel's own code in the game is left out. An enable value of `true`
-  or `1` is a pick. A file over 56 KB (57,344 bytes) of text is left alone:
-  the game has no Cheats. A file with a NUL byte in it reads as a cut-off
+  or `1` is a pick. A file over 192 KB (196,608 bytes) of text is left alone:
+  the game has no Cheats. A launch writes at most 128 of the picked
+  cheats' ROM patches. A file with a NUL byte in it reads as a cut-off
   write, so the kernel takes its `.bak` copy or, with none, no file at all.
   The in-game menu's LOAD restores CHEAT ON or OFF as the state had it. The
   cheat file moves, renames and is deleted with its game (before the game,

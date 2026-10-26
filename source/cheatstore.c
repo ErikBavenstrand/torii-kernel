@@ -14,12 +14,18 @@
 #include "namesdb.h"
 #include "tlog.h"
 #include "engine/cycles.h"
+#include "engine/psram.h"
 
 extern u8 pReadCache[];
 
 _Static_assert(sizeof(struct cheatstore) <= READCACHE_CHEATS_SIZE, "the cheat file's share of pReadCache");
 _Static_assert(READCACHE_CHEATS + READCACHE_CHEATS_SIZE <= MAX_pReadCache_size, "READCACHE_CHEATS");
 _Static_assert(CHEATFILE_BYTES_MAX + 4 == CHEAT_TABLE_MAX, "a cheat file's budget is the table's");
+_Static_assert(CHEATFILE_TEXT_MAX <= PSRAM_CHEATS_BYTES, "the text fits its PSRAM");
+// room_put may write the byte past the room's last (as it was)
+_Static_assert(PSRAM_CHEATS_BASE + PSRAM_CHEATS_BYTES + 2 <= PSRAM_NAMES_DB_BASE, "the cheats' PSRAM ends below "
+										  "the names database");
+_Static_assert((PSRAM_CHEATS_BASE & 3) == 0, "the cheats' PSRAM is word-aligned");
 
 u32 gl_cheat_table[CHEAT_TABLE_MAX / 4] EWRAM_BSS;
 u32 gl_cheat_bytes;
@@ -29,6 +35,69 @@ u32 gl_cheat_patches;
 struct cheatstore *cheatstore(void)
 {
 	return (struct cheatstore *)(void *)(pReadCache + READCACHE_CHEATS);
+}
+
+// --- The text in PSRAM ---------------------------------------------------------------
+//
+// PSRAM takes halfword DMA from RAM (psram_write), no byte stores: a write at
+// an odd place or of an odd length takes the byte beside it along, as it is.
+
+#define CHEATS_TEXT ((char *)PSRAM_CHEATS_BASE)
+
+// n bytes from src (RAM or PSRAM, read before anything is written) to dst
+// in PSRAM, a part at a time through the stage
+static void room_put(char *dst, const char *src, u32 n)
+{
+	u8 *t = (u8 *)cheatstore()->stage;
+	while (n) {
+		u32 lead = (u32)dst & 1, c = n < CHEATSTORE_PART ? n : CHEATSTORE_PART;
+		char *at = dst - lead;
+		if (lead)
+			t[0] = (u8)at[0];
+		memcpy(t + lead, src, c);
+		u32 total = lead + c;
+		if (total & 1)
+			t[total++] = (u8)dst[c];
+		if (!psram_write(at, t, total))
+			tlog_error("cheats: a PSRAM write at %08lX failed", (unsigned long)(u32)at);
+		dst += c;
+		src += c;
+		n -= c;
+	}
+}
+
+// memmove within PSRAM: parts from the end when the bytes move up
+static void room_move(char *dst, const char *src, u32 n)
+{
+	if (dst < src) {
+		for (u32 done = 0; done < n; done += CHEATSTORE_PART)
+			room_put(dst + done, src + done, n - done < CHEATSTORE_PART ? n - done : CHEATSTORE_PART);
+		return;
+	}
+	while (n) {
+		u32 c = n < CHEATSTORE_PART ? n : CHEATSTORE_PART;
+		n -= c;
+		room_put(dst + n, src + n, c);
+	}
+}
+
+static const struct cheatfile_room psram_room = {CHEATS_TEXT, PSRAM_CHEATS_BYTES, room_put, room_move};
+
+// The open copy's text into PSRAM, a part at a time (never f_read straight
+// into PSRAM: the card's DMA isn't known to reach it); its length in *len,
+// though only CHEATFILE_TEXT_MAX bytes of it go in. 0 if a read failed.
+static int load_text(u32 *len)
+{
+	struct cheatstore *cs = cheatstore();
+	int n;
+	*len = 0;
+	psram_begin();
+	while ((n = safefile_read_part(cs->part, sizeof(cs->part))) > 0) {
+		if (*len + (u32)n <= CHEATFILE_TEXT_MAX)
+			room_put(CHEATS_TEXT + *len, (const char *)cs->part, (u32)n);
+		*len += (u32)n;
+	}
+	return n == 0;
 }
 
 int cheatstore_path(char *out, u32 size, const char *rom_path)
@@ -65,10 +134,6 @@ static int any_copy(char *path)
 	return there;
 }
 
-// Set while a launch's second pass reads the file: the game is in PSRAM by
-// then, over the CRC cache, and the first pass has checked the dump
-static u8 dump_checked EWRAM_BSS;
-
 // 0 if the file names the dump it was made for (cheatfile_rom_crc) and the
 // CRC cache (or crc.txt, before the cache is loaded) knows the ROM at
 // rom_path as another: its codes would write another build's addresses. A
@@ -79,7 +144,7 @@ static int for_this_dump(const char *rom_path, const char *text, u32 len)
 	u32 want, crc;
 	struct cheatstore *cs = cheatstore();
 	_Static_assert(sizeof(cs->cheats) >= SAFEFILE_LINE_MAX, "crc.txt's line fits the cheat table");
-	if (dump_checked || !cheatfile_rom_crc(text, len, &want) ||
+	if (!cheatfile_rom_crc(text, len, &want) ||
 	    !names_crc_now(rom_path, &crc, (char *)cs->cheats, sizeof(cs->cheats)) || crc == want)
 		return 1;
 	tlog("cheats: %s is for crc32 %08lX, and %s is %08lX: left out", cheatstore()->path, (unsigned long)want,
@@ -103,32 +168,33 @@ int cheatstore_open(const char *rom_path)
 			return CHEATSTORE_NONE;
 		}
 		if (any_copy(cs->path)) {
-			tlog("cheats: %s is there but can't be read (over %u bytes?), left alone", cs->path,
-			     CHEATFILE_TEXT_MAX);
+			tlog("cheats: %s is there but can't be read (over %lu bytes?), left alone", cs->path,
+			     (unsigned long)CHEATFILE_TEXT_MAX);
 			return CHEATSTORE_NONE;
 		}
 		// None yet: an empty file, made on the first write
-		cheatfile_parse(&cs->file, (const char *)cs->text, 0, cs->cheats, CHEATFILE_MAX);
+		cheatfile_parse(&cs->file, CHEATS_TEXT, 0, cs->cheats, CHEATFILE_MAX);
 		cheatfile_begin(&cs->work);
 		return CHEATSTORE_NEW;
 	}
-	int len = safefile_read(cs->text, sizeof(cs->text));
+	u32 len;
+	int read = load_text(&len);
 	int failed = safefile_failed();
 	safefile_close();
-	if (len < 0 || failed) {
+	if (!read || failed) {
 		tlog_error("cheats: %s can't be read", cs->path);
 		return CHEATSTORE_NONE;
 	}
-	if ((u32)len > CHEATFILE_TEXT_MAX) {
+	if (len > CHEATFILE_TEXT_MAX) {
 		// Its cheats would be read from a cut text, and the picks written
 		// back over the rest: none of it, then
-		tlog("cheats: %s is %lu bytes, over %u: too big, left alone", cs->path, (unsigned long)len,
-		     CHEATFILE_TEXT_MAX);
+		tlog("cheats: %s is %lu bytes, over %lu: too big, left alone", cs->path, (unsigned long)len,
+		     (unsigned long)CHEATFILE_TEXT_MAX);
 		return CHEATSTORE_NONE;
 	}
-	if (!for_this_dump(rom_path, (const char *)cs->text, (u32)len))
+	if (!for_this_dump(rom_path, CHEATS_TEXT, len))
 		return CHEATSTORE_NONE;
-	cheatfile_parse(&cs->file, (const char *)cs->text, (u32)len, cs->cheats, CHEATFILE_MAX);
+	cheatfile_parse(&cs->file, CHEATS_TEXT, len, cs->cheats, CHEATFILE_MAX);
 	cheatfile_begin(&cs->work);
 	if (cs->file.dropped)
 		tlog("cheats: %s: %lu cheats numbered past %u are left out", cs->path, (unsigned long)cs->file.dropped,
@@ -188,6 +254,30 @@ s32 cheatstore_listed(u32 budget)
 	return (s32)listed;
 }
 
+// The read file, for an edit: its text is the room's
+static struct cheatfile *edited_file(void)
+{
+	struct cheatfile *f = &cheatstore()->file;
+	TLOG_ASSERT(f->text == CHEATS_TEXT);
+	psram_begin();
+	return f;
+}
+
+u32 cheatstore_add(const char *desc, const char *code, u8 format, u32 *index)
+{
+	return cheatfile_add(edited_file(), &psram_room, desc, code, format, index);
+}
+
+u32 cheatstore_set_code(u32 i, const char *desc, const char *code, u8 format)
+{
+	return cheatfile_set_code(edited_file(), &psram_room, i, desc, code, format);
+}
+
+u32 cheatstore_remove(u32 i)
+{
+	return cheatfile_remove(edited_file(), &psram_room, i);
+}
+
 int cheatstore_write(void)
 {
 	struct cheatstore *cs = cheatstore();
@@ -242,20 +332,100 @@ static void rom_patch(const struct cheat_patch *p)
 static const char *const status_names[] = {"new",        "ok",          "master",        "too big",
 					   "unreadable", "placeholder", "can't run here"};
 
+// The first pass's ROM patches, for the second: the game's load takes PSRAM,
+// where the text is, and all of pReadCache. With the names of the first
+// cheats they come from, for the second pass's log.
+#define KEPT_NAMES 8
+#define KEPT_NAME_LEN 24
+#define KEPT_NO_NAME 0xFF
+static struct {
+	u32 rom;  // the ROM path's CRC32: the second pass is the same game's
+	u32 n;
+	struct cheat_patch patches[CHEATSTORE_ROM_PATCHES];
+	u16 number[CHEATSTORE_ROM_PATCHES];  // the cheat's N
+	u8 name[CHEATSTORE_ROM_PATCHES];     // its name in names, or KEPT_NO_NAME
+	u32 names_used;
+	char names[KEPT_NAMES][KEPT_NAME_LEN];
+} kept EWRAM_BSS;
+
+static u32 path_crc(const char *path)
+{
+	return crc32(path, (u32)strlen(path));
+}
+
+// Keeps cheat c's ROM patches (in w) for the second pass, as many as there
+// is room for; how many are left out
+static u32 keep_patches(const struct cheatfile *f, const struct cheatfile_cheat *c, const struct cheatfile_work *w)
+{
+	u32 dropped = 0;
+	u8 name = KEPT_NO_NAME;
+	if (w->n_patches && kept.names_used < KEPT_NAMES) {
+		name = (u8)kept.names_used++;
+		snprintf(kept.names[name], KEPT_NAME_LEN, "%.*s", c->desc != CHEATFILE_NONE ? (int)c->desc_len : 0,
+			 c->desc != CHEATFILE_NONE ? f->text + c->desc : "");
+	}
+	for (u32 p = 0; p < w->n_patches; p++) {
+		if (kept.n >= CHEATSTORE_ROM_PATCHES) {
+			dropped++;
+			continue;
+		}
+		kept.patches[kept.n] = w->patches[p];
+		kept.number[kept.n] = c->number;
+		kept.name[kept.n] = name;
+		kept.n++;
+	}
+	return dropped;
+}
+
+// The second pass: the kept ROM patches into the game in PSRAM (psram_bytes
+// of it), but for any past its end or over the kernel's own patches
+static void write_patches(const char *rom_path, u32 psram_bytes)
+{
+	u32 applied = 0, skipped = 0, guarded = 0;
+	if (kept.rom != path_crc(rom_path)) {
+		tlog_error("cheats: %s: its ROM patches weren't kept before the load: none written", rom_path);
+		return;
+	}
+	for (u32 p = 0; p < kept.n; p++) {
+		const struct cheat_patch *pt = &kept.patches[p];
+		if (pt->offset + 2 > psram_bytes) {
+			skipped++;
+			continue;
+		}
+		// Not over the kernel's own patches: the patch area (the hook, the
+		// interpreter, this table), the entry branch, the hook's words
+		if (rom_guard_hits(pt->offset, 2)) {
+			if (!guarded++ || tlog_wants(TLOG_DEBUG))
+				tlog("cheats: cheat %u (%s): its ROM patch at %08lX is over the kernel's own, left out",
+				     kept.number[p], kept.name[p] != KEPT_NO_NAME ? kept.names[kept.name[p]] : "?",
+				     (unsigned long)0x08000000 + pt->offset);
+			continue;
+		}
+		rom_patch(pt);
+		applied++;
+	}
+	tlog("cheats: %lu ROM patches written into the game%s%s", (unsigned long)applied,
+	     skipped ? ", some past its end left out" : "",
+	     guarded ? ", some over the kernel's own patches left out" : "");
+}
+
 void cheatstore_launch(const char *rom_path, u32 psram_bytes)
 {
+	if (psram_bytes) {
+		write_patches(rom_path, psram_bytes);
+		return;
+	}
 	u32 cost = CHEAT_COST_CALL;
 	gl_cheat_count = 0;
 	gl_cheat_bytes = 0;
 	gl_cheat_patches = 0;
-	dump_checked = psram_bytes != 0;
-	int read = cheatstore_read(rom_path);
-	dump_checked = 0;
-	if (!read)
+	kept.rom = path_crc(rom_path);
+	kept.n = kept.names_used = 0;
+	if (!cheatstore_read(rom_path))
 		return;
 	struct cheatstore *cs = cheatstore();
 	struct cheatfile *f = &cs->file;
-	u32 last = 0, picks = 0, applied = 0, skipped = 0, guarded = 0;
+	u32 last = 0, picks = 0, dropped = 0;
 	for (u32 i = 0; i < f->count; i++)
 		if (cs->cheats[i].picked) {
 			last = i + 1;
@@ -289,38 +459,19 @@ void cheatstore_launch(const char *rom_path, u32 psram_bytes)
 			gl_cheat_count++;
 		}
 		gl_cheat_patches += cs->work.n_patches;
-		for (u32 p = 0; psram_bytes && p < cs->work.n_patches; p++) {
-			const struct cheat_patch *pt = &cs->work.patches[p];
-			if (pt->offset + 2 > psram_bytes) {
-				skipped++;
-				continue;
-			}
-			// Not over the kernel's own patches: the patch area (the hook,
-			// the interpreter, this table), the entry branch, the hook's words
-			if (rom_guard_hits(pt->offset, 2)) {
-				if (!guarded++ || tlog_wants(TLOG_DEBUG))
-					tlog("cheats: cheat %u (%.*s): its ROM patch at %08lX is over the kernel's "
-					     "own, "
-					     "left out",
-					     c->number, c->desc_len, f->text + c->desc,
-					     (unsigned long)0x08000000 + pt->offset);
-				continue;
-			}
-			rom_patch(pt);
-			applied++;
-		}
+		dropped += keep_patches(f, c, &cs->work);
+	}
+	if (dropped) {
+		tlog("cheats: %lu ROM patches past the first %u left out", (unsigned long)dropped,
+		     (unsigned)CHEATSTORE_ROM_PATCHES);
+		gl_cheat_patches -= dropped;
 	}
 	if (gl_cheat_bytes) {
 		gl_cheat_table[gl_cheat_bytes / 4] = 0;  // the table's end
 		gl_cheat_bytes += 4;
 	}
-	if (psram_bytes)
-		tlog("cheats: %lu ROM patches written into the game%s%s", (unsigned long)applied,
-		     skipped ? ", some past its end left out" : "",
-		     guarded ? ", some over the kernel's own patches left out" : "");
-	else
-		tlog("cheats: %s: %lu picked, %lu run in game (%lu bytes, %lu cycles a frame at most), %lu ROM "
-		     "patches",
-		     cs->path, (unsigned long)picks, (unsigned long)gl_cheat_count, (unsigned long)gl_cheat_bytes,
-		     (unsigned long)(gl_cheat_count ? cost : 0), (unsigned long)gl_cheat_patches);
+	tlog("cheats: %s: %lu picked, %lu run in game (%lu bytes, %lu cycles a frame at most), %lu ROM "
+	     "patches",
+	     cs->path, (unsigned long)picks, (unsigned long)gl_cheat_count, (unsigned long)gl_cheat_bytes,
+	     (unsigned long)(gl_cheat_count ? cost : 0), (unsigned long)gl_cheat_patches);
 }

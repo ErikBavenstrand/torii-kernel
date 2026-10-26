@@ -20,7 +20,8 @@
 //	          16 KB; /torii/names.txt while Rename changes it
 //	          (gamename_store.c), PSRAM_NAMES_TEXT_BASE, 116 KB; the full
 //	          art pack's index (artpack.h, boxart.c), PSRAM_ARTPACK_BASE,
-//	          128 KB; the rest reserved, PSRAM_RESERVED_BASE
+//	          128 KB; a game's cheat file's text (cheatstore.h),
+//	          PSRAM_CHEATS_BASE, 192 KB; the rest (60 KB) reserved
 //	5 MB      /torii/names.db (namesdb.h), up to PSRAM_NAMES_DB_BYTES
 //	6.75 MB   the CRC cache's table (namesdb.h), NAMES_CACHE_BYTES
 //	7.5 MB    box art's lookups (boxart.c): the set of art files on the card
@@ -59,6 +60,11 @@
 // boxart.c asserts it ends below the names database
 #define PSRAM_ARTPACK_BASE (PSRAM_NAMES_TEXT_BASE + PSRAM_NAMES_TEXT_BYTES)
 #define PSRAM_ARTPACK_BYTES 0x20000u
+// A game's cheat file's text (cheatstore.h: CHEATFILE_TEXT_MAX), from its
+// read to the next: the cheat screen's, the game popup's, a launch's before
+// the game loads. cheatstore.c asserts it ends below the names database.
+#define PSRAM_CHEATS_BASE (PSRAM_ARTPACK_BASE + PSRAM_ARTPACK_BYTES)
+#define PSRAM_CHEATS_BYTES 0x30000u
 // Recent and the favourites (userdata_store.c), up to the cover cache
 #define PSRAM_USERDATA_BYTES 0x00080000u
 #define PSRAM_USERDATA_BASE (PSRAM_ASSET_BASE - PSRAM_USERDATA_BYTES)

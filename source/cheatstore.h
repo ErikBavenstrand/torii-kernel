@@ -4,9 +4,13 @@
 // dropped there by hand, named after the ROM, works too. It moves, is
 // renamed and is deleted with its game (actions.c).
 //
-// The file is read whole into pReadCache (READCACHE_CHEATS, ez_define.h),
-// with its cheats and the decoder's work: struct cheatstore below, which
-// lasts until another owner borrows that part of pReadCache.
+// The file's text is read whole into PSRAM (PSRAM_CHEATS_BASE,
+// engine/psram.h), in RAM-sized parts; its cheats, the decoder's work and the
+// parts on their way are in pReadCache (READCACHE_CHEATS, ez_define.h):
+// struct cheatstore below, which lasts until another owner borrows that part
+// of pReadCache. The text lasts until the next read, or a game's load over
+// PSRAM. The code keypad's edits change it in place (cheatstore_add, _set_code,
+// _remove), through PSRAM writes.
 #ifndef TORII_CHEATSTORE_H
 #define TORII_CHEATSTORE_H
 
@@ -18,14 +22,18 @@
 #define CHEATS_DIR "/torii/cheats"
 // The largest copy read: the text and its CRC line
 #define CHEATSTORE_FILE_MAX (CHEATFILE_TEXT_MAX + SAFEFILE_CRC_LINE_LEN + 2)
+// A part of the text on its way between the card and PSRAM, and between two
+// places in PSRAM
+#define CHEATSTORE_PART 1024
 
 struct cheatstore {
-	u32 text[(CHEATSTORE_FILE_MAX + 3) / 4];  // word-aligned for f_read
 	struct cheatfile file;
 	struct cheatfile_work work;
 	struct cheatfile_cheat cheats[CHEATFILE_MAX];
 	char path[SAFEFILE_PATH_MAX];  // the file's, as cheatstore_read read it
 	u16 rows[CHEATFILE_MAX];       // the cheat screen's: the cheat each row shows
+	u32 part[CHEATSTORE_PART / 4];  // a part read from the card (word-aligned for f_read)
+	u16 stage[CHEATSTORE_PART / 2 + 2];  // a part on its way to PSRAM, a byte each side for odd ends
 };
 struct cheatstore *cheatstore(void);
 
@@ -59,6 +67,11 @@ int cheatstore_decode(u32 budget);
 // has counted the file already (the last file counted, by its path and
 // cheat count). -1 if the budget ran out first.
 s32 cheatstore_listed(u32 budget);
+// The code keypad's edits (cheatfile.h's) to the read file's text in PSRAM:
+// enum cheatfile_edit. The caller decodes again and writes the file.
+u32 cheatstore_add(const char *desc, const char *code, u8 format, u32 *index);
+u32 cheatstore_set_code(u32 i, const char *desc, const char *code, u8 format);
+u32 cheatstore_remove(u32 i);
 // Writes the picks back into the read file, power-cut safe, if one changed
 // or an edit (cheatfile.h's) changed its text. 1 if it is as the picks say.
 int cheatstore_write(void);
@@ -69,11 +82,14 @@ int cheatstore_delete(const char *rom_path);
 // interpreter's table (gl_cheat_table, cheat.h), in file order, as many as fit
 // its budget (a cheat that doesn't fit is left out whole); gl_cheat_count
 // gets the cheats that run in game and gl_cheat_patches their ROM patches'
-// count. With psram_bytes, the game is in PSRAM
-// (that many bytes) and those ROM patches are written into it, but for any
-// over the kernel's own patches (rom_guard_hits, GBApatch.h): left out and
-// logged. A game
-// without a cheat file, or with none picked, gets none.
+// count, and the first CHEATSTORE_ROM_PATCHES of those are kept in EWRAM
+// (the rest left out and logged): the game's load takes PSRAM, where the
+// text is, and all of pReadCache. With psram_bytes, the game is in PSRAM
+// (that many bytes) and the kept ROM patches of the same ROM's first pass are
+// written into it, nothing read again, but for any past its end or over the
+// kernel's own patches (rom_guard_hits, GBApatch.h): left out and logged. A
+// game without a cheat file, or with none picked, gets none.
+#define CHEATSTORE_ROM_PATCHES 128
 void cheatstore_launch(const char *rom_path, u32 psram_bytes);
 extern u32 gl_cheat_patches;
 
