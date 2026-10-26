@@ -154,15 +154,15 @@ check_sleep:
 	and			r1,r1,r1,lsr #16	@;IE & IF
 	tst			r1,#1
 	beq			cheat_game
-	adrl 		r3,CheatONOFF
-	ldr 		r3,[r3]
-	ldr			r1,[r3,#4]			@;CheatRAN
+	@;r0 - 0x1C and - 0x20 are IWRAM's 0x3007FE4 (CheatRAN) and 0x3007FE0
+	@;(CheatONOFF) through its mirror, as the BIOS reaches 0x3007FFC
+	ldr			r1,[r0,#-0x1C]
 	cmp			r1,#0
 	bne			cheat_game
 	mov			r1,#1
-	str			r1,[r3,#4]
-	ldr 		r3,[r3]
-	cmp 		r3,#1
+	str			r1,[r0,#-0x1C]
+	ldr 		r1,[r0,#-0x20]
+	cmp 		r1,#1
 	beq 		cheat_game
 	adrl		r3,RTS_ReplaceIRQ_start
 	add			r3,r3,r2
@@ -173,13 +173,10 @@ cheat_game:
 	mov			lr,pc
 	ldr 		pc,[r0,#-(0x04000000-0x03FFFFF4)] @;the game's handler, as the BIOS calls it
 	mov			r0,#0x4000000
-	add			r0,r0,#0x200
-	ldrh		r1,[r0,#2]			@;IF
-	tst			r1,#1
-	adrl 		r3,CheatONOFF
-	ldr 		r3,[r3]
+	ldr			r1,[r0,#0x200]
+	tst			r1,#0x10000			@;IF's VBlank
 	moveq		r1,#0
-	streq		r1,[r3,#4]			@;VBlank acknowledged: the next one runs them
+	streq		r1,[r0,#-0x1C]		@;acknowledged: the next VBlank runs them
 	ldmfd		sp!,{pc}
 nocheat:
 	ldr 		pc,[r0,#-(0x04000000-0x03FFFFF4)] @;to normal IRQ routine
