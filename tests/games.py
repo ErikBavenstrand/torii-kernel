@@ -8,9 +8,10 @@ usage: tests/games.py [--all] [FILTER...]
 
 Games share requirements: Ruby and Sapphire need exactly the same of the
 kernel. So by default one game runs per set of requirements (system, save
-chip, kernel save mode, ROM size class, clock, other hardware), preferring
-one with a key script or a starting save; the report lists the games each
-one stands for. --all runs every game. A FILTER keeps games whose code,
+chip, kernel save mode, ROM size class, GB mapper, clock, other hardware),
+preferring one with a key script or a starting save; the report lists the
+games each one stands for. A GB mapper roms/ has no game for is named and
+skipped. --all runs every game. A FILTER keeps games whose code,
 system (gba, gbc, gb), save chip or file name contains it, or, written as
 system=NAME, whose system is NAME. Games marked
 `skip` in games.toml (ROM hacks, kernel plugins) never run. Each game gets a
@@ -780,9 +781,44 @@ def size_class(size: int) -> str:
     return "32 MB"
 
 
-def requirements(game: dict, size: int, table: dict) -> str:
+# GB cartridge types (header byte 0x147) by mapper. `just compat` runs one
+# game per mapper; it names the GB_MAPPERS_WANTED that roms/ has no game for.
+GB_MAPPER = {
+    **dict.fromkeys((0x00, 0x08, 0x09), "no mapper"),
+    **dict.fromkeys((0x01, 0x02, 0x03), "MBC1"),
+    **dict.fromkeys((0x05, 0x06), "MBC2"),
+    **dict.fromkeys((0x0B, 0x0C, 0x0D), "MMM01"),
+    **dict.fromkeys((0x0F, 0x10), "MBC3+clock"),
+    **dict.fromkeys((0x11, 0x12, 0x13), "MBC3"),
+    **dict.fromkeys((0x19, 0x1A, 0x1B), "MBC5"),
+    **dict.fromkeys((0x1C, 0x1D, 0x1E), "MBC5+rumble"),
+    0x20: "MBC6",
+    0x22: "MBC7",
+    0xFC: "Pocket Camera",
+    0xFD: "TAMA5",
+    0xFE: "HuC3",
+    0xFF: "HuC1",
+}
+GB_MAPPERS_WANTED = ("MBC1", "MBC2", "MBC3+clock", "MBC5", "MBC5+rumble")
+
+
+def gb_mapper(rom: Path | None) -> str:
+    """The mapper a GB/GBC ROM's header names (cartridge type, byte 0x147)."""
+    if rom is None:
+        return "mapper unknown"
+    with rom.open("rb") as f:
+        header = f.read(0x148)
+    if len(header) < 0x148:
+        return "mapper unknown"
+    return GB_MAPPER.get(header[0x147], f"cartridge type {header[0x147]:02X}")
+
+
+def requirements(game: dict, rom: Path | None, table: dict) -> str:
     """What the game needs of the kernel; games with the same text are alike."""
+    size = rom.stat().st_size if rom else 0
     parts = [game.get("system", "gba"), game["save"], size_class(size)]
+    if game.get("system", "gba") != "gba":
+        parts.append(gb_mapper(rom))
     if game.get("system", "gba") == "gba":
         mode = table.get(game["code"])
         parts.append(f"save mode {mode:02X}" if mode else "not in the save table")
@@ -823,7 +859,7 @@ def pick(games: list[dict], roms: dict, table: dict) -> list[tuple[dict, list[di
     for same in copies.values():
         same.sort(key=preference)
         kept = same[0]
-        groups.setdefault(requirements(kept, size(kept), table), []).append(
+        groups.setdefault(requirements(kept, roms.get(kept["sha1"]), table), []).append(
             (kept, same[1:])
         )
 
@@ -890,12 +926,17 @@ def main() -> int:
     for game, alike in chosen:
         result = Result(game)
         rom = roms.get(game["sha1"])
-        result.requirements = requirements(
-            game, rom.stat().st_size if rom else 0, table
-        )
+        result.requirements = requirements(game, rom, table)
         result.alike = [g["file"] for g in alike]
         results.append(result)
     left_out = sum(1 for g in games if g.get("skip"))
+    # One GB/GBC game per mapper: name the mappers roms/ has no game for.
+    gb_games = [g for g in wanted if g.get("system", "gba") != "gba"]
+    if gb_games and not every:
+        have = {gb_mapper(roms.get(g["sha1"])) for g in gb_games}
+        missing = [m for m in GB_MAPPERS_WANTED if m not in have]
+        if missing:
+            print(f"skipped GB mappers (no game in roms/): {', '.join(missing)}")
 
     def play(result: Result) -> None:
         key = key_of(result.game)

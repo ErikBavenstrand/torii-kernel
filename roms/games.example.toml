@@ -18,8 +18,9 @@
 #        game's code; a kernel plugin isn't a game); add it by hand
 #
 # `just compat` tests one game per set of requirements (system, save chip,
-# kernel save mode, ROM size, clock, other hardware); `just compat --all`
-# tests every game.
+# kernel save mode, ROM size, GB mapper, clock, other hardware); `just
+# compat --all` tests every game. The GB mapper comes from the ROM header's
+# cartridge type (byte 0x147); a mapper with no game listed is skipped.
 #
 # An optional starting save, roms/<file name without .gba>.sav, lets the test
 # continue a game instead of starting a new one.
