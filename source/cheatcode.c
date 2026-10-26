@@ -803,7 +803,12 @@ static void pend_done(struct dec *s, int lines)
 	u32 i = 0;
 	while (i < s->n_pend) {
 		struct pending *p = &s->pend[i];
-		if ((p->line != NONE) != lines || p->line == s->line_no || p->codes == ALL || --p->codes) {
+		if ((p->line != NONE) != lines || p->line == s->line_no || p->codes == ALL) {
+			++i;
+			continue;
+		}
+		--p->codes;
+		if (p->codes) {
 			++i;
 			continue;
 		}
