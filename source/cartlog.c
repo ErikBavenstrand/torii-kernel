@@ -9,6 +9,7 @@
 #include "build_id.h"
 #include "cartlog.h"
 #include "eepromprobe.h"
+#include "ingameprobe.h"
 #include "rumbleprobe.h"
 #include "ff.h"
 #include "tlog.h"
@@ -76,6 +77,7 @@ static union {
 	struct cartlog_snapshot snapshot;
 	struct eeprom_probe probe;
 	struct rumble_probe rumble;
+	struct ingame_probe ingame;
 } block EWRAM_BSS;
 #define crash block.crash
 _Static_assert(CARTLOG_CRASH + sizeof(struct cartlog_crash) <= CARTLOG_SNAPSHOT, "crash dump size");
@@ -83,6 +85,8 @@ _Static_assert(CARTLOG_SNAPSHOT + CARTLOG_SNAPSHOT_SIZE <= CARTLOG_EEPROM_PROBE,
 _Static_assert(sizeof(struct eeprom_probe) == 0x200, "EEPROM probe report layout");
 _Static_assert(CARTLOG_EEPROM_PROBE + sizeof(struct eeprom_probe) <= CARTLOG_RUMBLE_PROBE, "EEPROM probe size");
 _Static_assert(sizeof(struct rumble_probe) == 0x58, "rumble probe report layout");
+_Static_assert(CARTLOG_RUMBLE_PROBE + sizeof(struct rumble_probe) <= CARTLOG_INGAME_PROBE, "rumble probe size");
+_Static_assert(sizeof(struct ingame_probe) <= 0x100, "in-game probe report size");
 
 // --- Cart RAM access ----------------------------------------------------------
 
@@ -336,6 +340,53 @@ static void report_rumble_probe(void)
 	}
 }
 
+// The in-game probe ROM's report (tests/roms/ingame, v0.8 P0): what the
+// cart did in game mode, for the in-game menu
+static void report_ingame_probe(void)
+{
+	static const char *const sd[] = {
+		"not tried (no scratch file)",
+		"wrote and read back, the kernel's bytes put back",
+		"a read didn't answer",
+		"the sector didn't hold the kernel's bytes",
+		"a write didn't answer",
+		"the probe's bytes didn't read back",
+		"the kernel's bytes didn't read back after",
+	};
+	struct ingame_probe *p = &block.ingame;
+	cart_read(CARTLOG_INGAME_PROBE, p, sizeof(*p));
+	if (memcmp(p->magic, INGAME_PROBE_MAGIC, 16) != 0)
+		return;
+	cart_clear_magic(CARTLOG_INGAME_PROBE, 16);
+	tlog_force(TLOG_INFO, "in-game probe: cart SRAM pages %02X-%02X: %u of %u read back (first bad %02X)",
+		   INGAME_PROBE_FIRST_PAGE, INGAME_PROBE_LAST_PAGE, p->pages_ok, p->pages_tried, p->first_bad_page);
+	tlog_force(
+		TLOG_INFO,
+		"in-game probe: SRAM wait states read back at 4 %s, 3 %s, 2 %s, 8 cycles %s; the page register reads "
+		"%04X after 0x20, %04X after 0x55",
+		(p->sram_waits_ok & 1) ? "yes" : "no", (p->sram_waits_ok & 2) ? "yes" : "no",
+		(p->sram_waits_ok & 4) ? "yes" : "no", (p->sram_waits_ok & 8) ? "yes" : "no", p->page_readback[0],
+		p->page_readback[1]);
+	tlog_force(TLOG_INFO,
+		   "in-game probe: flash bank: offset 0 reads %02X in bank 0, %02X in bank 1, %02X in bank 1 "
+		   "after pages 0x20 and 0 (%s)",
+		   p->bank0, p->bank1, p->bank1_after,
+		   p->bank0 == p->bank1         ? "the banks look alike: no answer"
+		   : p->bank1_after == p->bank1 ? "the bank stayed"
+						: "the page register reset the bank");
+	tlog_force(TLOG_INFO, "in-game probe: PSRAM 0x08010000 read %04X, %04X after writing A55A, %04X put back (%s)",
+		   p->psram_before, p->psram_written, p->psram_after,
+		   p->psram_written == 0xA55A ? "PSRAM writes land" : "PSRAM writes don't land");
+	tlog_force(TLOG_INFO, "in-game probe: SD sector 0 %s; scratch sector %lu: %s",
+		   p->sd_mbr ? "read with its signature" : "didn't read", (unsigned long)p->scratch_lba,
+		   p->sd_scratch < sizeof(sd) / sizeof(*sd) ? sd[p->sd_scratch] : "?");
+	const u8 *on = p->rtc_on, *off = p->rtc_off;
+	tlog_force(TLOG_INFO,
+		   "in-game probe: clock with 0x096A0000 at 1: %02X-%02X-%02X %02X:%02X:%02X; at 0: %02X-%02X-%02X "
+		   "%02X:%02X:%02X",
+		   on[0], on[1], on[2], on[4], on[5], on[6], off[0], off[1], off[2], off[4], off[5], off[6]);
+}
+
 // The EEPROM probe ROM's report (tests/roms/eeprom): each step, where each
 // read's data came from, and what they add up to.
 static void report_eeprom_probe(void)
@@ -441,6 +492,7 @@ void cartlog_boot_report(void)
 	report_snapshot();
 	report_eeprom_probe();
 	report_rumble_probe();
+	report_ingame_probe();
 	if (tlog_level == TLOG_OFF)
 		return;
 

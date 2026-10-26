@@ -54,6 +54,7 @@ jobs=(
   "tests/eeprom_probe.sh 512"
   "tests/eeprom_probe.sh 8k"
   "tests/rumble_probe.sh"
+  "tests/ingame_probe.sh"
   "tests/crash.sh"
   "tests/cutpoint.sh"
   "tests/state.sh"

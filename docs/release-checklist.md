@@ -21,7 +21,7 @@ in `dist/logs/torii.log`.
    erases the cart's boot loader, safe mode's "Update loader" then works at
    once, without a computer.
 3. Copy the build, the EEPROM probe and the cheat test to the card:
-   `just test-roms && just sd /Volumes/OMEGA tests/roms/eeprom/eeprom.gba tests/roms/hello/hello.gba`.
+   `just test-roms && just sd /Volumes/OMEGA tests/roms/eeprom/eeprom.gba tests/roms/ingame/ingame.gba tests/roms/hello/hello.gba`.
    Then make `torii/cheats/Hello.cht` on the card holding these lines:
 
    ```
@@ -51,11 +51,14 @@ on, NES with no NES launch) as "unconfirmed" in its summary.
 
 | Check | How |
 |---|---|
-| The in-game menu opens | Boot with addon (the game's menu, START) with Save states on, then L+R+START in the game |
-| A save state saves and loads | in the menu, SAVE; play on; open the menu again and LOAD: the game is back where you saved |
-| DEBUG reaches the log | with LOGGING on: L+R+START, DEBUG; it says DEBUG SAVED and picks RESET. Choose RESET, not power-off: the snapshot is in cart RAM, which a power-off clears. The kernel's boot logs "debug info" |
+| The in-game menu opens | Boot with addon (the game's menu, START) with Save states on, then L+R+START in the game: the game dims under a panel at once (2 frames), its rows a frame later. B gives the game back with its screen, sound and speed as they were; try it in a game with music, a bitmap-mode game and one with scaled or rotated backgrounds (the old menu lost those) |
+| A save state saves and loads | in the menu, Save state; play on; open the menu again and Load state: the game is back where you saved. Load state is greyed until a state is saved |
+| Reset game | in the menu, Reset game: the game starts again from its title, without the kernel, and its save is untouched |
+| Back to Torii | in the menu, Back to Torii: the kernel starts, as RESET did |
+| DEBUG reaches the log | with LOGGING on: L+R+START, Debug snapshot (the last row); the menu comes back saying the snapshot is kept. Choose Back to Torii, not power-off: the snapshot is in cart RAM, which a power-off clears. The kernel's boot logs "debug info" |
+| The in-game probe | `ingame.gba` (v0.8 P0): Clean boot it once with its save type at each of SRAM, Flash 64K, Flash 128K, EEPROM 8K (Game info, Save type); for Flash 128K, first give it a save whose two 64 KB banks differ (copy a Pokémon FireRed or Emerald `.sav` into its save folder). Each run takes a few seconds; A goes back to the kernel, whose boot logs "in-game probe:" lines. See below |
 | Sleep sleeps and wakes | Sleep on, Boot with addon, L+R+SELECT in the game: the screen goes off; the wake keys bring the game back where it was |
-| A cheat works | `hello.gba`'s popup shows Cheats 1; on the cheat screen, A ticks Green square and B saves. Boot with addon: Hello doesn't react to buttons, and a green square in its top right corner shows the cheat at work from the start. L+R+START, CHEAT OFF takes the square away, CHEAT ON brings it back. Switched off and on, the tick is still there |
+| A cheat works | `hello.gba`'s popup shows Cheats 1; on the cheat screen, A ticks Green square and B saves. Boot with addon: Hello doesn't react to buttons, and a green square in its top right corner shows the cheat at work from the start. L+R+START, the Cheats row (A) says off and the square stays as it was drawn last; A again says on. Switched off and on, the tick is still there |
 | A GB or GBC game runs | from its console's list or the SD card page; note the game's title |
 | A GB game keeps its palette | a GB (not GBC) game: L+R, Display, Palette, pick another, leave the menu, power off and on, launch it again: the picked palette is back |
 | Pokémon Crystal doesn't stutter | walk around a town a minute at the default gamma: steps are smooth (jagoombacolor#46) |
@@ -98,6 +101,15 @@ four green OK lines; a 14-bit run also says "1024 BLOCKS: 8 KB" (or "WRAPS
 AT 64 BLOCKS: 512 B"). Note what each run's screen says, in particular any
 red line, then press A: the kernel's boot logs every step ("eeprom probe:")
 and its verdict.
+
+**The in-game probe** tries, in game mode, what v0.8's in-game menu may
+want there and the emulator can't tell: cart SRAM pages 0x20-0xEF, the RAM
+page register's readback, a flash 128K save's bank across page changes, a
+write to the game's PSRAM, SD reads and a write (to its own scratch file,
+`/torii/probe/sd.bin`, put back after), the clock with `0x096A0000` on and
+off, and SRAM's four wait-state settings. It puts back what it writes. Send
+the log's "in-game probe:" lines from each save type's run: they decide what
+P2's save states and screenshots can rely on.
 
 **The copy's estimate:** during a Clean boot the cart copies the game into
 PSRAM by itself, and the bar moves on an estimate from the file size

@@ -4,7 +4,11 @@
 #include <string.h>
 
 #include "Ezcard_OP.h"
+#include "cartlog.h"
 #include "charset.h"
+#include "GBApatch.h"
+#include "ff.h"
+#include "ingameprobe.h"
 #include "engine/font.h"
 #include "lang.h"
 #include "ez_define.h"
@@ -96,6 +100,35 @@ static void line_draw(struct ingame_line *l, const char *s)
 		x += g->advance;
 	}
 	l->width = (u16)(x < INGAME_TEXT_W ? x : INGAME_TEXT_W);
+}
+
+void ingame_probe_prepare(const u8 *code)
+{
+	if (memcmp(code, INGAME_PROBE_CODE, 4) != 0)
+		return;
+	// A sector of the kernel's bytes in a file of its own, for the probe to
+	// write and put back in game mode
+	u32 sector[INGAME_PROBE_SECTOR / 4];  // word-aligned for f_write
+	for (u32 i = 0; i < INGAME_PROBE_SECTOR; i++)
+		((u8 *)sector)[i] = ingame_probe_byte(i, INGAME_PROBE_SEED_KERNEL);
+	u32 lba = 0;
+	UINT wrote = 0;
+	f_mkdir("/torii/probe");
+	if (f_open(&gfile, INGAME_PROBE_FILE, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK) {
+		if (f_write(&gfile, sector, sizeof(sector), &wrote) == FR_OK && wrote == sizeof(sector) &&
+		    f_sync(&gfile) == FR_OK && gfile.obj.sclust >= 2)
+			lba = (u32)(gfile.obj.fs->database + (LBA_t)(gfile.obj.sclust - 2) * gfile.obj.fs->csize);
+		f_close(&gfile);
+	}
+	tlog("launch: the in-game probe's scratch sector: %lu", (unsigned long)lba);
+	// Its place in the report: no magic, then the sector
+	u8 in[20];
+	memset(in, 0, sizeof(in));
+	memcpy(in + 16, &lba, 4);
+	SetRampage(CARTLOG_PAGE);
+	for (u32 i = 0; i < sizeof(in); i++)
+		((vu8 *)CARTLOG_INGAME_PROBE)[i] = in[i];
+	SetRampage(0);
 }
 
 int ingame_prepare(const char *name, u32 rom_bytes)

@@ -15,6 +15,12 @@
 // what was written didn't read back (logged; the menu then won't open).
 int ingame_prepare(const char *name, u32 rom_bytes);
 
+// For the in-game probe ROM (game code INGAME_PROBE_CODE, source/ingameprobe.h)
+// only: makes its scratch file and tells it the file's sector through cart
+// RAM page 0xF0. Anything else: does nothing. Call it before the launch's
+// last SD access.
+void ingame_probe_prepare(const u8 *code);
+
 // The embedded overlay image (ingame_overlay.s)
 extern const u8 ingame_overlay[];
 extern const u32 ingame_overlay_size;

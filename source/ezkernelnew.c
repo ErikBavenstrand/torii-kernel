@@ -1821,6 +1821,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 		case 0:  //DirectPSRAM CLEAN BOOT
 			cartlog_phase(PHASE_LAUNCH, 0, pfilename);
 			tlog("launch: loading %s, CLEAN BOOT", pfilename);
+			ingame_probe_prepare(GAMECODE);  // the in-game probe ROM's scratch file
 			tlog_flush();
 
 			progress_cart_copy(FAT_table_buffer, gamefilesize, LAUNCH_COPIED);
