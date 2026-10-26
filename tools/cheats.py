@@ -20,7 +20,8 @@ the CRCs it still needs, copies it to the clipboard (macOS), opens
 gamehacking.org's GBA list and tells you how to paste it into the browser's
 console. In the page, the harvester crawls the GBA index pages it still
 needs, exports the mGBA cheats of each wanted dump, --delay seconds between
-requests (default 30, as gamehacking.org's robots.txt asks), and downloads
+requests (default 5; the site's robots.txt asks for 30, and the owner has
+GameHacking's approval for less), and downloads
 what it got as torii-gamehacking-*.json bundles (every 25 exports and at the
 end). It stops at anything that isn't the page or export it expects (a
 Cloudflare check, say). Meanwhile this tool watches your downloads folder
@@ -100,7 +101,7 @@ BUNDLE_GLOB = "torii-gamehacking-*.json"
 BUNDLE_FORMAT = "torii-gamehacking"
 GBA_PAGE = "https://gamehacking.org/system/gba"
 GAME_URL = "https://gamehacking.org/game/{}"
-DELAY = 30.0  # seconds between requests: gamehacking.org's Crawl-delay
+DELAY = 5.0  # seconds between requests (robots.txt's Crawl-delay is 30; GameHacking approved less)
 SIMILAR = 90.0  # percent of the base's blocks the same: a light hack
 BLOCK = 4096
 CHEATS_DIR = Path("torii") / "cheats"
@@ -1296,7 +1297,7 @@ def main(argv):
         "--delay",
         type=float,
         default=DELAY,
-        help=f"the harvester's seconds between requests (default {DELAY:g}, robots.txt's)",
+        help=f"the harvester's seconds between requests (default {DELAY:g}; robots.txt asks 30)",
     )
     p.add_argument(
         "--downloads",

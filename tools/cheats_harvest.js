@@ -2,7 +2,7 @@
 // in CONFIG and writes this as dist/cheats/gamehacking/harvest.js, for the
 // user to paste into the browser console on a gamehacking.org page. It runs
 // in the user's own browser session, as the user browsing: one request at a
-// time, CONFIG.delay seconds apart (robots.txt's Crawl-delay), never past a
+// time, CONFIG.delay seconds apart (just cheats --delay), never past a
 // challenge page. It crawls the GBA index pages it still needs
 // (/system/gba/all/N), exports the mGBA cheats of every dump whose CRC32 is
 // wanted, and downloads what it got as torii-gamehacking-<time>.json bundles
