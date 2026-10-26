@@ -94,10 +94,12 @@ void test_cheatfile_parse(void)
 	CHECK_EQ(cheats[1].picked, 1);
 	CHECK_EQ(cheats[1].was, 1);
 	CHECK_EQ(cheats[0].status, CHEATFILE_OK);
-	CHECK_EQ(cheats[0].writes, 2);
-	CHECK_EQ(cheats[1].writes, 4);
-	CHECK_EQ(cheats[2].writes, 1);
-	CHECK_EQ(file.writes, 4);  // the picked one's
+	CHECK_EQ(cheats[0].bytes, 12);  // a header and a halfword write
+	CHECK_EQ(cheats[1].bytes, 24);  // a header and a run of two
+	CHECK_EQ(cheats[2].bytes, 12);
+	CHECK_EQ(cheats[1].cost, CHEAT_COST_CHEAT + CHEAT_COST_RUN + 2 * CHEAT_COST_RUN_WRITE);
+	CHECK_EQ(file.bytes, 24);  // the picked one's
+	CHECK_EQ(file.cost, cheats[1].cost);
 	CHECK_EQ(cheatfile_picks(&file), 1);
 	CHECK(!cheatfile_changed(&file));
 
@@ -189,11 +191,11 @@ void test_cheatfile_odd(void)
 
 void test_cheatfile_status(void)
 {
-	// 151 32-bit writes are 604 bytes: more than a game takes
-	static char many[151 * 18 + 64];
+	// 260 writes are more ops than a cheat takes
+	static char many[260 * 18 + 64];
 	char *p = many;
 	p += sprintf(p, "cheat6_code = \"");
-	for (u32 i = 0; i < 151; i++)
+	for (u32 i = 0; i < 260; i++)
 		p += sprintf(p, "%s02001%03X:DEADBEEF", i ? "+" : "", (unsigned)(i * 4));
 	sprintf(p, "\"\n");
 	static char text[8192];
@@ -213,27 +215,29 @@ void test_cheatfile_status(void)
 	CHECK(!cheatfile_shown(&cheats[0]));
 	CHECK_EQ(cheats[1].status, CHEATFILE_PLACEHOLDER);
 	CHECK_EQ(cheatfile_why(&file, 1), CHEATFILE_WHY_EDIT);
-	CHECK_EQ(cheats[2].status, CHEATFILE_V08);
-	CHECK_EQ(cheatfile_why(&file, 2), CHEATFILE_WHY_V08);
+	CHECK_EQ(cheats[2].status, CHEATFILE_OK);  // a conditional runs (v0.7)
+	CHECK_EQ(cheats[2].bytes, 24);
+	CHECK_EQ(cheatfile_why(&file, 2), CHEATFILE_PICKABLE);
 	CHECK_EQ(cheats[3].status, CHEATFILE_UNREADABLE);
 	CHECK_EQ(cheatfile_why(&file, 3), CHEATFILE_WHY_UNREADABLE);
 	CHECK_EQ(cheats[4].status, CHEATFILE_OK);  // a hook beside writes keeps its writes
-	CHECK_EQ(cheats[4].writes, 1);
+	CHECK_EQ(cheats[4].bytes, 12);
 	CHECK_EQ(cheats[5].status, CHEATFILE_OK);
-	CHECK_EQ(cheats[5].writes, 0);
+	CHECK_EQ(cheats[5].bytes, 0);
+	CHECK_EQ(cheats[5].cost, 0);
 	CHECK_EQ(cheats[5].patches, 1);
 	CHECK_EQ(cheats[6].status, CHEATFILE_BIG);
 	CHECK_EQ(cheatfile_why(&file, 6), CHEATFILE_WHY_FULL);
 	for (u32 i = 0; i < 7; i++) {
-		int ok = i == 4 || i == 5;
+		int ok = i == 2 || i == 4 || i == 5;
 		CHECK_EQ(cheatfile_toggle(&file, i), ok);
 		CHECK_EQ(cheats[i].picked, ok);
 	}
-	CHECK_EQ(file.writes, 1);
+	CHECK_EQ(file.bytes, 36);
 	// A greyed cheat the file picks can be dropped all the same
-	load_str("cheat0_code = \"72001000 0001+32001010 0003\"\ncheat0_enable = true\n");
+	load_str("cheat0_code = \"3300075C+00??\"\ncheat0_enable = true\n");
 	CHECK_EQ(cheats[0].picked, 1);
-	CHECK_EQ(file.writes, 0);
+	CHECK_EQ(file.bytes, 0);
 	CHECK_EQ(cheatfile_toggle(&file, 0), 1);
 	CHECK_EQ(cheats[0].picked, 0);
 	CHECK_EQ(cheatfile_toggle(&file, 0), 0);
@@ -248,7 +252,7 @@ void test_cheatfile_keys_carry(void)
 		 "cheat1_desc = \"Infinite HP\"\n"
 		 "cheat1_code = \"D86098902576+777F4707DA29\"\n");
 	CHECK_EQ(cheats[0].status, CHEATFILE_MASTER);
-	CHECK_EQ(cheats[1].status, CHEATFILE_V08);  // a conditional, read with the key
+	CHECK_EQ(cheats[1].status, CHEATFILE_OK);  // a conditional, read with the key
 	cheatfile_begin(&work);
 	CHECK_EQ(cheatfile_next(&file, &work), 0);
 	CHECK_EQ(cheatfile_next(&file, &work), 1);
@@ -256,18 +260,16 @@ void test_cheatfile_keys_carry(void)
 	CHECK_EQ(work.ops[1].address, 0x0203A9D4);
 	CHECK_EQ(work.ops[1].value, 0x270F);
 
-	// The lowered writes stay in the work area after each cheat
+	// The cheat's table part stays in the work area after each cheat
 	load_str("cheat0_code = \"82001000+BEEF\"\ncheat1_code = \"08001000:4770\"\n");
 	cheatfile_begin(&work);
 	CHECK_EQ(cheatfile_next(&file, &work), 0);
-	CHECK_EQ(work.n_writes, 2);
-	CHECK_EQ(work.writes[0].address, 0x02001000);
-	CHECK_EQ(work.writes[0].value, 0xEF);
-	CHECK_EQ(work.writes[1].address, 0x02001001);
-	CHECK_EQ(work.writes[1].value, 0xBE);
+	CHECK_EQ(work.n_prog, 3);
+	CHECK_EQ(work.prog[1], 0x12001000);
+	CHECK_EQ(work.prog[2], 0xBEEF);
 	CHECK_EQ(work.n_patches, 0);
 	CHECK_EQ(cheatfile_next(&file, &work), 1);
-	CHECK_EQ(work.n_writes, 0);
+	CHECK_EQ(work.n_prog, 0);
 	CHECK_EQ(work.n_patches, 1);
 	CHECK_EQ(work.patches[0].offset, 0x1000);
 	CHECK_EQ(work.patches[0].value, 0x4770);
@@ -277,33 +279,60 @@ void test_cheatfile_keys_carry(void)
 
 void test_cheatfile_budget(void)
 {
-	// Two cheats of 300 writes each (75 32-bit writes), and one of 4
-	static char text[16384];
+	// The table's bytes: three cheats of 250 32-bit writes (2,008 bytes
+	// each), two fit; and one of 12 bytes beside them
+	static char text[32768];
 	char *p = text;
-	for (u32 c = 0; c < 2; c++) {
+	for (u32 c = 0; c < 3; c++) {
 		p += sprintf(p, "cheat%u_code = \"", (unsigned)c);
-		for (u32 i = 0; i < 75; i++)
+		for (u32 i = 0; i < 250; i++)
 			p += sprintf(p, "%s0200%u%03X:01020304", i ? "+" : "", (unsigned)c, (unsigned)(i * 4));
 		p += sprintf(p, "\"\n");
 	}
-	sprintf(p, "cheat2_code = \"03001000:01020304\"\n");
+	sprintf(p, "cheat3_code = \"03001000:01020304\"\n");
 	load_str(text);
-	CHECK_EQ(cheats[0].writes, 300);
-	CHECK_EQ(cheats[1].writes, 300);
-	CHECK_EQ(cheats[2].writes, 4);
+	CHECK_EQ(cheats[0].bytes, 2008);
+	CHECK_EQ(cheats[3].bytes, 12);
 	CHECK(cheatfile_toggle(&file, 0));
 	CHECK(cheatfile_toggle(&file, 1));
-	CHECK_EQ(file.writes, 600);
+	CHECK_EQ(file.bytes, 4016);
 	CHECK_EQ(cheatfile_why(&file, 2), CHEATFILE_WHY_FULL);
 	CHECK(!cheatfile_toggle(&file, 2));
+	CHECK_EQ(cheatfile_why(&file, 3), CHEATFILE_PICKABLE);
 	CHECK(cheatfile_toggle(&file, 0));  // dropped: room again
-	CHECK_EQ(file.writes, 300);
+	CHECK_EQ(file.bytes, 2008);
 	CHECK_EQ(cheatfile_why(&file, 2), CHEATFILE_PICKABLE);
 	CHECK(cheatfile_toggle(&file, 2));
-	CHECK_EQ(file.writes, 304);
+	CHECK_EQ(file.bytes, 4016);
 	CHECK_EQ(cheatfile_why(&file, 0), CHEATFILE_WHY_FULL);
 	CHECK(cheatfile_changed(&file));
 	CHECK_EQ(cheatfile_picks(&file), 2);
+
+	// The cycles: two cheats of 40 conditional writes each fit the bytes but
+	// not one frame's share together
+	p = text;
+	for (u32 c = 0; c < 2; c++) {
+		p += sprintf(p, "cheat%u_code = \"", (unsigned)c);
+		for (u32 i = 0; i < 40; i++)
+			p += sprintf(p, "%s72001000 0001+32001%03X 0003", i ? "+" : "", (unsigned)(i * 2));
+		p += sprintf(p, "\"\n");
+	}
+	load_str(text);
+	CHECK_EQ(cheats[0].status, CHEATFILE_OK);
+	CHECK_EQ(cheats[0].cost, CHEAT_COST_CHEAT + 40 * (CHEAT_COST_COND + CHEAT_COST_SINGLE));
+	CHECK(cheatfile_toggle(&file, 0));
+	CHECK(file.bytes + cheats[1].bytes <= CHEATFILE_BYTES_MAX);
+	CHECK_EQ(cheatfile_why(&file, 1), CHEATFILE_WHY_FULL);
+
+	// Alone past the frame's share: too big
+	p = text;
+	p += sprintf(p, "cheat0_code = \"");
+	for (u32 i = 0; i < 60; i++)
+		p += sprintf(p, "%s72001000 0001+32001%03X 0003", i ? "+" : "", (unsigned)(i * 2));
+	sprintf(p, "\"\n");
+	load_str(text);
+	CHECK_EQ(cheats[0].status, CHEATFILE_BIG);
+	CHECK_EQ(cheatfile_why(&file, 0), CHEATFILE_WHY_FULL);
 }
 
 // Only enable values change; every other byte stays, CRLF and comments too

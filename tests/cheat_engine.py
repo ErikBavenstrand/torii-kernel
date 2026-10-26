@@ -608,6 +608,16 @@ def diff(a, b, limit=6):
     return "; ".join(runs[:limit]) + more
 
 
+def without_keys(snap):
+    """A snapshot less the ROM's two copies of KEYINPUT (SNAP + 0x874, EWRAM
+    + 0x10E): a button case's Torii run holds the keys the device's button is
+    (cheatcode.h's CHEAT_BUTTON_KEYS), where mGBA's holds its own button"""
+    b = bytearray(snap)
+    b[0x874:0x876] = b"\0\0"
+    b[0x10E:0x110] = b"\0\0"
+    return bytes(b)
+
+
 def tsv(path):
     rows = {}
     if path.exists():
@@ -621,19 +631,10 @@ def tsv(path):
 def pending_reason(row):
     """Why Torii can't run a case yet, from its decoding (cheat_corpus.c's row)"""
     status, lower = row[0], row[1] if len(row) > 1 else "-"
-    ops = row[3] if len(row) > 3 else ""
     if status != "OK":
         return None
-    if lower == "NEEDS_INTERPRETER":
-        return "needs the interpreter"
-    for op in ops.split():
-        parts = op.split("/")
-        if (
-            parts[0] == "ASSIGN"
-            and int(parts[1]) > 1
-            and int(parts[2], 16) >> 24 in (5, 6, 7)
-        ):
-            return "a 16- or 32-bit write to palette, VRAM or OAM, which the byte table writes as bytes"
+    if lower == "TOO_BIG":
+        return "over the interpreter's budget"
     return None
 
 
@@ -674,6 +675,10 @@ def report(out):
             base = snapshots(out / f"{name}.base.txt")
             mg = snapshots(out / f"{name}.mgba.txt")
             to = snapshots(out / f"{name}.torii.txt")
+            if c.button:
+                mg = {cp: without_keys(v) for cp, v in mg.items()}
+                to = {cp: without_keys(v) for cp, v in to.items()}
+                base = {cp: without_keys(v) for cp, v in base.items()}
             torii_log = (
                 (out / f"{name}.torii.log").read_text(errors="replace")
                 if (out / f"{name}.torii.log").exists()

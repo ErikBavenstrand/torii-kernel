@@ -32,7 +32,11 @@
 
 #define CHEATFILE_TEXT_MAX 0xE000  // the largest file read (libretro's reach 25 KB)
 #define CHEATFILE_MAX 1024         // cheats kept, numbered 0 to CHEATFILE_MAX - 1
-#define CHEATFILE_WRITES_MAX 600   // byte writes the in-game handler takes (cheat.h's CHEAT_MAX)
+// The interpreter's budget for all picked cheats together (cheatcode.h):
+// its table's bytes (the end word left out) and cycles (its call left out)
+#define CHEATFILE_BYTES_MAX (CHEAT_TABLE_MAX - 4)
+#define CHEATFILE_CYCLES_MAX (CHEAT_CYCLES_MAX - CHEAT_COST_CALL)
+#define CHEATFILE_PROG_MAX (CHEATFILE_BYTES_MAX / 4)  // a cheat's table words
 #define CHEATFILE_OPS_MAX 256      // a cheat's decoded ops
 #define CHEATFILE_PATCHES_MAX 256  // a cheat's ROM patches
 #define CHEATFILE_NONE 0xFFFF      // no such line
@@ -40,10 +44,9 @@
 // What a cheat is, once decoded
 enum cheatfile_status {
 	CHEATFILE_NEW,          // not decoded yet
-	CHEATFILE_OK,           // its writes and ROM patches run
+	CHEATFILE_OK,           // its ops run in game, its ROM patches at launch
 	CHEATFILE_MASTER,       // master codes alone (hook, game ID, key): hidden, nothing to run
-	CHEATFILE_V08,          // conditionals, buttons, pointers, add/or/and: v0.8's interpreter
-	CHEATFILE_BIG,          // more writes (or ROM patches) than a game takes
+	CHEATFILE_BIG,          // alone past the interpreter's budget, or too many ROM patches
 	CHEATFILE_UNREADABLE,   // malformed, a code type no decoder knows, or an address off the GBA's map
 	CHEATFILE_PLACEHOLDER,  // digits for the user to fill in (00??)
 };
@@ -51,8 +54,7 @@ enum cheatfile_status {
 // Why A doesn't pick a cheat now (cheatfile_why)
 enum cheatfile_why {
 	CHEATFILE_PICKABLE,
-	CHEATFILE_WHY_V08,
-	CHEATFILE_WHY_FULL,  // its writes don't fit beside the picked cheats', or alone
+	CHEATFILE_WHY_FULL,  // it doesn't fit the budget beside the picked cheats, or alone
 	CHEATFILE_WHY_UNREADABLE,
 	CHEATFILE_WHY_EDIT,  // a placeholder
 	CHEATFILE_WHYS
@@ -67,7 +69,8 @@ struct cheatfile_cheat {
 	u8 enable_len;
 	u8 status;           // enum cheatfile_status
 	u16 number;          // its N
-	u16 writes;          // byte writes once decoded (OK only)
+	u16 bytes;           // its share of the interpreter's table once decoded (OK only)
+	u16 cost;            // its cycles a frame, at most (OK only)
 	u16 patches;         // ROM patches once decoded (OK only)
 	u8 picked;           // now
 	u8 was;              // as the file has it
@@ -92,7 +95,8 @@ struct cheatfile {
 	u32 count;
 	u32 dropped;  // cheats numbered past the table's end: left out
 	u32 crlf;     // the file's lines end in CRLF (an added line does too)
-	u32 writes;   // the picked OK cheats' byte writes
+	u32 bytes;    // the picked OK cheats' table bytes
+	u32 cost;     // and cycles
 	struct cheatfile_out out;
 };
 
@@ -102,21 +106,23 @@ struct cheatfile {
 void cheatfile_parse(struct cheatfile *f, const char *text, u32 len, struct cheatfile_cheat *cheats, u32 max);
 
 // The decoder and the buffers one cheat decodes into. After cheatfile_next,
-// writes and patches hold that cheat's lowered writes and patches.
+// prog and patches hold that cheat's part of the table and its patches.
 struct cheatfile_work {
 	struct cheat_decoder dec;
 	u32 next;  // the next cheat to decode
-	u32 n_writes, n_patches;
+	u32 n_prog, n_patches;  // prog's words, patches
+	u32 cost;
 	struct cheat_op ops[CHEATFILE_OPS_MAX];
-	struct cheat_write writes[CHEATFILE_WRITES_MAX];
+	u32 prog[CHEATFILE_PROG_MAX];
 	struct cheat_patch patches[CHEATFILE_PATCHES_MAX];
 };
 
 // Starts decoding f's cheats from the first
 void cheatfile_begin(struct cheatfile_work *w);
-// Decodes the next cheat, sets its status, writes and patches, and returns
-// its index; -1 once every cheat is decoded. Its lowered writes and patches
-// stay in w until the next call (none unless it is OK). f->writes follows.
+// Decodes the next cheat, sets its status, bytes, cost and patches, and
+// returns its index; -1 once every cheat is decoded. Its table part and
+// patches stay in w until the next call (none unless it is OK). f->bytes and
+// f->cost follow.
 s32 cheatfile_next(struct cheatfile *f, struct cheatfile_work *w);
 
 // The cheats a list shows: all but master codes

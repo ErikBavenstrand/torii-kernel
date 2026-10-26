@@ -16,9 +16,10 @@ extern u8 pReadCache[];
 
 _Static_assert(sizeof(struct cheatstore) <= READCACHE_CHEATS_SIZE, "the cheat file's share of pReadCache");
 _Static_assert(READCACHE_CHEATS + READCACHE_CHEATS_SIZE <= MAX_pReadCache_size, "READCACHE_CHEATS");
-_Static_assert(CHEATFILE_WRITES_MAX == CHEAT_MAX, "a cheat file's writes are the handler's");
+_Static_assert(CHEATFILE_BYTES_MAX + 4 == CHEAT_TABLE_MAX, "a cheat file's budget is the table's");
 
-ST_entry pCHEAT[CHEAT_MAX] EWRAM_BSS;
+u32 gl_cheat_table[CHEAT_TABLE_MAX / 4] EWRAM_BSS;
+u32 gl_cheat_bytes;
 u32 gl_cheat_count;
 u32 gl_cheat_patches;
 
@@ -147,11 +148,13 @@ static void rom_patch(const struct cheat_patch *p)
 	SetPSRampage(0);
 }
 
-static const char *const status_names[] = {"new", "ok", "master", "needs v0.8", "too big", "unreadable", "placeholder"};
+static const char *const status_names[] = {"new", "ok", "master", "too big", "unreadable", "placeholder"};
 
 void cheatstore_launch(const char *rom_path, u32 psram_bytes)
 {
+	u32 cost = CHEAT_COST_CALL;
 	gl_cheat_count = 0;
+	gl_cheat_bytes = 0;
 	gl_cheat_patches = 0;
 	if (!cheatstore_read(rom_path))
 		return;
@@ -176,14 +179,20 @@ void cheatstore_launch(const char *rom_path, u32 psram_bytes)
 			     status_names[c->status]);
 			continue;
 		}
-		if (gl_cheat_count + cs->work.n_writes > CHEAT_MAX) {
-			tlog("cheats: cheat %u (%.*s): its %lu writes don't fit beside %lu, left out", c->number,
-			     c->desc_len, f->text + c->desc, (unsigned long)cs->work.n_writes,
-			     (unsigned long)gl_cheat_count);
+		u32 bytes = cs->work.n_prog * 4;
+		if (gl_cheat_bytes + bytes > CHEATFILE_BYTES_MAX || cost + cs->work.cost > CHEAT_CYCLES_MAX) {
+			tlog("cheats: cheat %u (%.*s): its %lu bytes and %lu cycles don't fit beside %lu and %lu, left "
+			     "out",
+			     c->number, c->desc_len, f->text + c->desc, (unsigned long)bytes,
+			     (unsigned long)cs->work.cost, (unsigned long)gl_cheat_bytes, (unsigned long)cost);
 			continue;
 		}
-		for (u32 w = 0; w < cs->work.n_writes; w++)
-			pCHEAT[gl_cheat_count++] = (ST_entry){cs->work.writes[w].address, cs->work.writes[w].value};
+		if (bytes) {
+			memcpy((u8 *)gl_cheat_table + gl_cheat_bytes, cs->work.prog, bytes);
+			gl_cheat_bytes += bytes;
+			cost += cs->work.cost;
+			gl_cheat_count++;
+		}
 		gl_cheat_patches += cs->work.n_patches;
 		for (u32 p = 0; psram_bytes && p < cs->work.n_patches; p++) {
 			const struct cheat_patch *pt = &cs->work.patches[p];
@@ -195,10 +204,16 @@ void cheatstore_launch(const char *rom_path, u32 psram_bytes)
 			applied++;
 		}
 	}
+	if (gl_cheat_bytes) {
+		gl_cheat_table[gl_cheat_bytes / 4] = 0;  // the table's end
+		gl_cheat_bytes += 4;
+	}
 	if (psram_bytes)
 		tlog("cheats: %lu ROM patches written into the game%s", (unsigned long)applied,
 		     skipped ? ", some past its end left out" : "");
 	else
-		tlog("cheats: %s: %lu picked, %lu byte writes, %lu ROM patches", cs->path, (unsigned long)picks,
-		     (unsigned long)gl_cheat_count, (unsigned long)gl_cheat_patches);
+		tlog("cheats: %s: %lu picked, %lu run in game (%lu bytes, %lu cycles a frame at most), %lu ROM "
+		     "patches",
+		     cs->path, (unsigned long)picks, (unsigned long)gl_cheat_count, (unsigned long)gl_cheat_bytes,
+		     (unsigned long)(gl_cheat_count ? cost : 0), (unsigned long)gl_cheat_patches);
 }

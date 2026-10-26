@@ -34,6 +34,7 @@ u32 w_reset_on;
 u32 w_rts_on;
 u32 w_sleep_on;
 u32 w_cheat_on;
+static u32 w_patch_length;  // Torii: the patch length a .pat file kept room for
 
 SPatchInfo2 iPatchInfo2[EMax];
 u32 iCount2;
@@ -399,26 +400,21 @@ static void Patch_RTS_Cheat(u32 *Data)
 	u32 rts_switch_offset = (u8 *)RTS_switch - p_patch_start;
 	*(vu32 *)(patchbuffer + rts_switch_offset) = gl_rts_on;
 
-	//cheat
-	u8 *p_no_cheat_end = (u8 *)no_CHEAT_end;
-
-	if (gl_cheat_count > CHEAT_MAX)
-		gl_cheat_count = CHEAT_MAX;
-	TLOG_ASSERT(p_no_cheat_end - p_patch_start + gl_cheat_count * 8 <= CHEAT_PATCH_LENGTH);
-	TLOG_ASSERT(p_no_cheat_end - p_patch_start <= RTS_PATCH_LENGTH);
-	u32 cheat_count_offset = (u8 *)Cheat_count - p_patch_start;
-	*(vu32 *)(patchbuffer + cheat_count_offset) = gl_cheat_count;
-
-	u32 cheat_offset = (u8 *)CHEAT - p_patch_start;
-
-	// Torii: the decoders checked each address (cheatcode.h): it goes in as it is
-	for (u32 ii = 0; ii < gl_cheat_count; ii++) {
-		*(vu32 *)(patchbuffer + cheat_offset + 8 * ii) = pCHEAT[ii].address;
-		*(vu32 *)(patchbuffer + cheat_offset + 8 * ii + 4) = pCHEAT[ii].VAL;
+	//Torii: the cheats (v0.7): the interpreter after the menu's code, its
+	//table after it, and Cheat_switch the interpreter's offset (0: none)
+	u32 copysize = p_patch_end - p_patch_start;
+	TLOG_ASSERT(copysize <= RTS_PATCH_LENGTH);
+	u32 cheat_at = 0;
+	if (gl_cheat_on == 1 && gl_cheat_bytes) {
+		u32 code = (u8 *)Cheat_blob_end - (u8 *)Cheat_blob_start;
+		TLOG_ASSERT(gl_cheat_bytes <= CHEAT_TABLE_MAX &&
+			    copysize + code + gl_cheat_bytes <= CHEAT_PATCH_LENGTH);
+		dmaCopy((void *)Cheat_blob_start, patchbuffer + copysize, code);
+		dmaCopy(gl_cheat_table, patchbuffer + copysize + code, gl_cheat_bytes);
+		cheat_at = copysize;
+		copysize += code + gl_cheat_bytes;
 	}
-
-	u32 copysize = p_no_cheat_end - p_patch_start;
-	copysize = copysize + gl_cheat_count * 8;
+	*(vu32 *)(patchbuffer + ((u8 *)Cheat_switch - p_patch_start)) = cheat_at;
 
 	//Torii: the menu's DEBUG entry: its code goes after the cheats, only with
 	//LOGGING on and if it fits the space kept for the patch.
@@ -607,6 +603,7 @@ static void GBA_patch_init(void)
 	w_rts_on = 0;
 	w_sleep_on = 0;
 	w_cheat_on = 0;
+	w_patch_length = 0;
 
 	memset(iPatchInfo2, 0x00, sizeof(iPatchInfo2));
 }
@@ -629,6 +626,7 @@ static void GBA_patch_init_buffer(u32 *buffer)
 	w_rts_on = buffer[start + 9];
 	w_sleep_on = buffer[start + 10];
 	w_cheat_on = buffer[start + 11];
+	w_patch_length = buffer[start + 12];
 }
 //------------------------------------------------------------------
 u32 Check_pat(TCHAR *gamefilename)
@@ -670,8 +668,10 @@ u32 Check_pat(TCHAR *gamefilename)
 		//read patch information
 		GBA_patch_init_buffer((u32 *)pReadCache);
 
+		//Torii: and a cheat patch of this kernel's length (before v0.7, cheats
+		//kept 0x2000 bytes and no length was saved)
 		if ((w_reset_on != gl_reset_on) || (w_rts_on != gl_rts_on) || (w_sleep_on != gl_sleep_on) ||
-		    (w_cheat_on != gl_cheat_on)) {
+		    (w_cheat_on != gl_cheat_on) || (gl_cheat_on == 1 && w_patch_length != Patch_length())) {
 			GBA_patch_init();
 			find_the_patfile = 0;
 		}
@@ -713,6 +713,7 @@ void Make_pat_file(TCHAR *gamefilename)
 			w_buffer[9] = gl_rts_on;
 			w_buffer[10] = gl_sleep_on;
 			w_buffer[11] = gl_cheat_on;
+			w_buffer[12] = Patch_length();  // Torii: the room iTrimSize kept
 
 			res = f_write(&gfile, (void *)w_buffer, sizeof(w_buffer), (UINT *)&written);
 			f_close(&gfile);

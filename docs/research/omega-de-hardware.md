@@ -597,6 +597,36 @@ cleared and that session is lost the same way as with B.
 See [hook-coverage.md](hook-coverage.md): how the kernel hooks a game's IRQ
 for the in-game menu, and which games it misses.
 
+**The patch area** is what SetTrimSize keeps free at the game's trimmed ROM
+end, in the game's PSRAM image (or its NOR copy): `0x300` bytes for the reset
+and sleep keys, `0x1000` for the in-game menu, `0x3000` with cheats (v0.7;
+`0x2000` before). With cheats it holds, in order (`Patch_RTS_Cheat`):
+
+| Part | Bytes (v0.7) | |
+|---|---|---|
+| The hook and the menu (`RTS_ReplaceIRQ_start`..`_end`, `gba_rts_patch.s`) | `0xD48` | `Cheat_switch` holds the interpreter's offset from its start (0: no cheats), `Debug_switch` DEBUG's |
+| The cheat interpreter (`Cheat_blob_start`..`_end`, `cheatrun.s`) | `0x474` | ARM, position-independent: PC-relative literals only |
+| The cheat table | up to `0x1400` | its layout is in `cheatrun.s` and `cheatcode.h` |
+| DEBUG's code (`Debug_blob`), with logging on | `0x180` | |
+
+That leaves `0x8C4` bytes for v0.8's overlay (`test_cheat_cap` logs it). The
+`.pat` cache records the length its trim kept room for (word 12); a file
+from before v0.7 is scanned again for a game with cheats.
+
+**The interpreter in game** runs on the VBlank IRQ only (IE & IF bit 0;
+not the keypad IRQ the hook also takes), in IRQ mode with interrupts off,
+from the game's ROM in PSRAM at the game's WAITCNT, before the game's own
+handler. It uses no RAM of the game but the IRQ stack: 4 bytes the hook
+pushes and 36 the interpreter does (r4-r11, lr), beside the BIOS's 24 of
+the 160. The in-game menu's CHEAT OFF (the word at `0x03007FE0` set to 1)
+stops it. Its cycles (`tests/kernel/test_cheatrun.c`, at the BIOS's WAITCNT
+`0x0000`, the slowest a game runs at; about 60% of these at `0x4317`): a
+call with nothing to do 216; a write in a plain cheat's run about 33; a
+write of its own about 130; a fill about 19 a write of one value and 44 a
+slide; a conditional about 390; an add, or, and or pointer write about 400.
+The budget model (`CHEAT_COST_*`) stays above every measurement, and the
+picked cheats' model total is capped at 28,000 cycles, 10% of a frame.
+
 ## 7. Logging and Diagnostics
 
 The kernel logs to `/torii/logs` on the card (`source/tlog.c`) and keeps

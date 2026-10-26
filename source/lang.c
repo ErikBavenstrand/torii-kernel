@@ -577,8 +577,7 @@ static const struct lang_slots en_slots = {
 };
 static const struct lang_cheats en_cheats = {
 	.hint_pick = "pick",
-	.why = {"", "Needs v0.8: conditions, buttons, pointers", "Too many writes beside the picks",
-		"Can't read this code", "Edit to use: digits to fill in"},
+	.why = {"", "Too much to run beside the picks", "Can't read this code", "Edit to use: digits to fill in"},
 	.nor = "ROM patch: not for NOR games",
 	.unnamed = "(no name)",
 	.reading = "Reading cheats",

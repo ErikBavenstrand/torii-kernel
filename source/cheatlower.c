@@ -1,5 +1,5 @@
-// Turns decoded cheat ops (source/cheatcode.h) into what v0.7's cheat handler
-// runs: constant byte writes and ROM patches.
+// Turns decoded cheat ops (source/cheatcode.h) into what the in-game
+// interpreter (source/cheatrun.s) runs each frame, and ROM patches.
 #include <stddef.h>
 
 #include "cheatcode.h"
@@ -65,74 +65,226 @@ int cheat_op_address_ok(const struct cheat_op *op)
 	}
 }
 
-static int needs_interpreter(u8 type)
+static int is_cond(u8 type)
 {
-	return type != CHEAT_OP_WRITE && type != CHEAT_OP_ROM_PATCH;
+	return type >= CHEAT_OP_IF_EQ && type <= CHEAT_OP_IF_NEVER;
+}
+
+// What runs in game: not ROM patches, writes to the ROM, slowdown codes, or
+// ops whose count is 0 (mGBA's loop doesn't run them, conditionals included)
+static int runs(const struct cheat_op *op)
+{
+	switch (op->type) {
+	case CHEAT_OP_ROM_PATCH:
+	case CHEAT_OP_SLOWDOWN:
+		return 0;
+	case CHEAT_OP_WRITE:
+		return op->count && !is_rom(op->address);
+	default:
+		return op->count != 0;
+	}
 }
 
 struct out {
-	struct cheat_write *writes;
-	u32 writes_max, n_writes;
 	struct cheat_patch *patches;
-	u32 patches_max, n_patches, first_patch;
+	u32 patches_max, n_patches;
+	u32 *prog;
+	u32 prog_max, n;
+	u32 cost;
+	u8 status;
 };
 
-// One byte; returns a status
-static u8 put_byte(struct out *o, u32 address, u8 value)
+// One byte into the ROM
+static void put_patch_byte(struct out *o, u32 address, u8 value)
 {
-	if (is_rom(address)) {
-		u32 offset = (address - ROM_BASE) & ~1u;
-		u32 shift = (address & 1) * 8;
-		struct cheat_patch *p = o->n_patches > o->first_patch ? &o->patches[o->n_patches - 1] : NULL;
-		if (!p || p->offset != offset) {
-			if (o->n_patches >= o->patches_max)
-				return CHEAT_LOWER_TOO_MANY_PATCHES;
-			p = &o->patches[o->n_patches++];
-			p->offset = offset;
-			p->value = 0;
-			p->mask = 0;
+	u32 offset = (address - ROM_BASE) & ~1u;
+	u32 shift = (address & 1) * 8;
+	struct cheat_patch *p = o->n_patches ? &o->patches[o->n_patches - 1] : NULL;
+	if (!p || p->offset != offset) {
+		if (o->n_patches >= o->patches_max) {
+			o->status = CHEAT_LOWER_TOO_MANY_PATCHES;
+			return;
 		}
-		p->value = (u16)((p->value & ~(0xFFu << shift)) | ((u32)value << shift));
-		p->mask |= (u16)(0xFFu << shift);
-		return CHEAT_LOWER_OK;
+		p = &o->patches[o->n_patches++];
+		p->offset = offset;
+		p->value = 0;
+		p->mask = 0;
 	}
-	if (o->n_writes >= o->writes_max)
-		return CHEAT_LOWER_TOO_MANY_WRITES;
-	o->writes[o->n_writes].address = address;
-	o->writes[o->n_writes].value = value;
-	++o->n_writes;
-	return CHEAT_LOWER_OK;
+	p->value = (u16)((p->value & ~(0xFFu << shift)) | ((u32)value << shift));
+	p->mask |= (u16)(0xFFu << shift);
 }
 
-u8 cheat_lower(const struct cheat_op *ops, u32 n_ops, struct cheat_write *writes, u32 writes_max, u32 *n_writes,
+static void patches_of(struct out *o, const struct cheat_op *op)
+{
+	u32 count, address = op->address, value = op->value, k, b;
+	if (op->type == CHEAT_OP_ROM_PATCH)
+		count = 1;
+	else if (op->type == CHEAT_OP_WRITE && is_rom(op->address))
+		count = op->count;
+	else
+		return;
+	for (k = 0; k < count && o->status == CHEAT_LOWER_OK; ++k) {
+		for (b = 0; b < op->width; ++b)
+			put_patch_byte(o, address + b, (u8)(value >> (8 * b)));
+		address += (u32)op->addr_step;
+		value += (u32)op->value_step;
+	}
+}
+
+static void word(struct out *o, u32 w)
+{
+	if (o->n >= o->prog_max) {
+		o->status = CHEAT_LOWER_TOO_BIG;
+		return;
+	}
+	o->prog[o->n++] = w;
+}
+
+static u32 log2_width(u32 width)
+{
+	return width == 4 ? 2 : width == 2 ? 1 : 0;
+}
+
+static const u8 prog_types[] = {
+	[CHEAT_OP_WRITE] = CHEAT_PROG_WRITE,    [CHEAT_OP_WRITE_PTR] = CHEAT_PROG_PTR,
+	[CHEAT_OP_ADD] = CHEAT_PROG_ADD,        [CHEAT_OP_OR] = CHEAT_PROG_OR,
+	[CHEAT_OP_AND] = CHEAT_PROG_AND,        [CHEAT_OP_IF_EQ] = CHEAT_PROG_EQ,
+	[CHEAT_OP_IF_NE] = CHEAT_PROG_NE,       [CHEAT_OP_IF_LT] = CHEAT_PROG_LT,
+	[CHEAT_OP_IF_GT] = CHEAT_PROG_GT,       [CHEAT_OP_IF_ULT] = CHEAT_PROG_ULT,
+	[CHEAT_OP_IF_UGT] = CHEAT_PROG_UGT,     [CHEAT_OP_IF_AND] = CHEAT_PROG_AND_TRUE,
+	[CHEAT_OP_IF_NAND] = CHEAT_PROG_NAND,   [CHEAT_OP_IF_BUTTON] = CHEAT_PROG_NAND,
+	[CHEAT_OP_IF_NEVER] = CHEAT_PROG_NEVER,
+};
+
+// A write of its own: two words
+static int single(const struct cheat_op *op)
+{
+	return op->type == CHEAT_OP_WRITE && op->count == 1 && !is_rom(op->address);
+}
+
+// One op as it runs; nothing (a NOP) for one that doesn't
+static void put_op(struct out *o, const struct cheat_op *op)
+{
+	u32 type, width, address, value, count, k, extra[2], n_extra = 0;
+	if (!runs(op)) {
+		word(o, CHEAT_PROG_K_EXT << 28);
+		word(o, CHEAT_PROG_NOP);
+		word(o, 0);
+		o->cost += CHEAT_COST_EXT;
+		return;
+	}
+	if (single(op)) {
+		word(o, op->address | (log2_width(op->width) << 28));
+		word(o, op->value);
+		o->cost += CHEAT_COST_SINGLE;
+		return;
+	}
+	type = op->type < sizeof(prog_types) ? prog_types[op->type] : CHEAT_PROG_NOP;
+	width = op->width;
+	address = op->address;
+	value = op->value;
+	count = op->count;
+	if (op->type == CHEAT_OP_IF_BUTTON) {
+		width = 2;
+		address = CHEAT_KEYINPUT;
+		value = CHEAT_BUTTON_KEYS;
+	} else if (op->type == CHEAT_OP_IF_NEVER) {
+		address = 0;
+		width = 1;
+		value = 0;
+	}
+	if (count > CHEAT_PROG_COUNT_MAX) {
+		o->status = CHEAT_LOWER_TOO_BIG;
+		return;
+	}
+	if (is_cond(op->type)) {
+		if (op->else_count)
+			extra[n_extra++] = op->else_count;
+		o->cost += CHEAT_COST_COND;
+	} else {
+		// The steps matter past the first element; a pointer's offset always
+		int ptr = op->type == CHEAT_OP_WRITE_PTR;
+		if ((count > 1 && (op->addr_step || op->value_step)) || (ptr && op->addr_step))
+			extra[n_extra++] = (u32)op->addr_step;
+		if (count > 1 && op->value_step)
+			extra[n_extra++] = (u32)op->value_step;
+		o->cost += CHEAT_COST_EXT + (count - 1) * (op->type != CHEAT_OP_WRITE ? CHEAT_COST_GEN
+							   : op->value_step           ? CHEAT_COST_FILL
+										      : CHEAT_COST_FILL_SAME);
+	}
+	word(o, address | ((CHEAT_PROG_K_EXT + n_extra) << 28));
+	word(o, type | (log2_width(width) << 4) | (count << 16));
+	word(o, value);
+	for (k = 0; k < n_extra; ++k)
+		word(o, extra[k]);
+}
+
+u8 cheat_lower(const struct cheat_op *ops, u32 n_ops, u32 *prog, u32 prog_max, u32 *prog_words, u32 *cost,
 	       struct cheat_patch *patches, u32 patches_max, u32 *n_patches)
 {
-	struct out o = {writes, writes_max, *n_writes, patches, patches_max, *n_patches, *n_patches};
-	u32 i, k, b;
+	struct out o = {patches, patches_max, 0, prog, prog_max, 0, 0, CHEAT_LOWER_OK};
+	u32 i, j, n = 0;
+	int plain = 1, any = 0;
 
+	*prog_words = *cost = *n_patches = 0;
 	for (i = 0; i < n_ops; ++i)
 		if (!cheat_op_address_ok(&ops[i]))
 			return CHEAT_LOWER_BAD_ADDRESS;
-	for (i = 0; i < n_ops; ++i)
-		if (needs_interpreter(ops[i].type))
-			return CHEAT_LOWER_NEEDS_INTERPRETER;
-
+	if (n_ops > CHEAT_PROG_OPS_MAX)
+		return CHEAT_LOWER_TOO_BIG;
 	for (i = 0; i < n_ops; ++i) {
-		const struct cheat_op *op = &ops[i];
-		u32 count = op->type == CHEAT_OP_WRITE ? op->count : 1;
-		u32 address = op->address;
-		u32 value = op->value;
-		for (k = 0; k < count; ++k) {
-			for (b = 0; b < op->width; ++b) {
-				u8 status = put_byte(&o, address + b, (u8)(value >> (8 * b)));
-				if (status != CHEAT_LOWER_OK)
-					return status;
-			}
-			address += (u32)op->addr_step;
-			value += (u32)op->value_step;
-		}
+		patches_of(&o, &ops[i]);
+		if (is_cond(ops[i].type))
+			plain = 0;
+		if (runs(&ops[i]))
+			any = 1;
 	}
-	*n_writes = o.n_writes;
+	if (o.status != CHEAT_LOWER_OK)
+		return o.status;
+
+	if (any) {
+		word(&o, 0);  // the header, filled in below
+		o.cost += CHEAT_COST_CHEAT;
+		for (i = 0; i < n_ops && o.status == CHEAT_LOWER_OK; ++i) {
+			const struct cheat_op *op = &ops[i];
+			if (!plain) {
+				put_op(&o, op);  // every op in its place: the conditions count them
+				++n;
+				continue;
+			}
+			if (!runs(op))
+				continue;
+			// A row of writes of one width: a run
+			for (j = i; j < n_ops && single(&ops[j]) && ops[j].width == op->width; ++j)
+				;
+			if (j - i >= 2) {
+				word(&o, (CHEAT_PROG_K_RUN + log2_width(op->width)) << 28 | (j - i));
+				o.cost += CHEAT_COST_RUN;
+				for (; i < j; ++i) {
+					word(&o, ops[i].address);
+					word(&o, ops[i].value);
+					o.cost += CHEAT_COST_RUN_WRITE;
+				}
+				--i;
+			} else {
+				put_op(&o, op);
+			}
+			++n;
+		}
+		if (o.status == CHEAT_LOWER_OK && (o.n - 1) * 4 > 0xFFFF)
+			o.status = CHEAT_LOWER_TOO_BIG;  // past the header's byte count
+		if (o.status == CHEAT_LOWER_OK)
+			prog[0] = n | (plain ? CHEAT_PROG_PLAIN : 0) | ((o.n - 1) * 4) << 16;
+	}
+	if (o.status == CHEAT_LOWER_OK && o.cost > CHEAT_CYCLES_MAX - CHEAT_COST_CALL)
+		o.status = CHEAT_LOWER_TOO_BIG;
+	if (o.status != CHEAT_LOWER_OK) {
+		o.n = o.cost = o.n_patches = 0;
+		*n_patches = 0;
+		return o.status;
+	}
+	*prog_words = o.n;
+	*cost = o.cost;
 	*n_patches = o.n_patches;
 	return CHEAT_LOWER_OK;
 }

@@ -1,7 +1,7 @@
 // Cheat codes for GBA games: decoders for the real devices' formats (GameShark
 // v1/v2 and Action Replay v1/v2, Action Replay v3 and GameShark SP, CodeBreaker,
 // VBA's raw addr:value), Torii's model of what they decode to, and the pass
-// that turns what v0.7 runs into byte writes and ROM patches. Free of hardware
+// that turns it into the in-game interpreter's table and ROM patches. Free of hardware
 // access and allocation, so tests/host runs it on the host; the caller passes
 // every buffer.
 //
@@ -78,7 +78,7 @@ enum cheat_op_type {
 	// (0x08000000-based), at launch
 	CHEAT_OP_ROM_PATCH,
 	// Action Replay v3's slowdown; value holds the code's low 24 bits. Kept so
-	// a cheat that uses it reads; nothing runs it yet.
+	// a cheat that uses it reads; it does nothing, as in mGBA.
 	CHEAT_OP_SLOWDOWN,
 };
 
@@ -123,12 +123,6 @@ u8 cheat_decode(struct cheat_decoder *d, const char *code, u32 len, struct cheat
 // 0x100: their shape alone tells them apart.
 u8 cheat_detect(const char *line, u32 len, s32 *score);
 
-// One byte the cheat handler writes again and again
-struct cheat_write {
-	u32 address;
-	u8 value;
-};
-
 // Written once into the ROM at launch: the halfword at offset (from
 // 0x08000000, even) becomes (old & ~mask) | (value & mask)
 struct cheat_patch {
@@ -137,24 +131,83 @@ struct cheat_patch {
 	u16 mask;
 };
 
-enum cheat_lower_status {
-	CHEAT_LOWER_OK,
-	CHEAT_LOWER_NEEDS_INTERPRETER,  // conditional, button, pointer, add/or/and or slowdown
-	CHEAT_LOWER_TOO_MANY_WRITES,    // more than writes_max writes
-	CHEAT_LOWER_TOO_MANY_PATCHES,   // more than patches_max patches
-	CHEAT_LOWER_BAD_ADDRESS,        // an op outside the GBA's memory: likely a misread code
+// --- The interpreter's table ------------------------------------------------
+// What the in-game interpreter (source/cheatrun.s) runs each frame: per
+// cheat a header word, then its ops; a 0 word ends the table. cheatrun.s
+// describes the layout in full; these are its numbers.
+#define CHEAT_PROG_PLAIN 0x8000u   // header: no conditionals, ops run in order
+#define CHEAT_PROG_OPS_MAX 0x7FFFu // header: ops of a cheat
+#define CHEAT_PROG_K_EXT 3u        // op kinds 3-5: an op of that many words
+#define CHEAT_PROG_K_RUN 6u        // op kinds 6-8: a run of writes (plain cheats)
+#define CHEAT_PROG_COUNT_MAX 0xFFFFu  // an op's count
+
+enum cheat_prog_type {
+	CHEAT_PROG_WRITE = 0,
+	CHEAT_PROG_PTR = 1,
+	CHEAT_PROG_ADD = 2,
+	CHEAT_PROG_OR = 3,
+	CHEAT_PROG_AND = 4,
+	CHEAT_PROG_NOP = 5,
+	CHEAT_PROG_NEVER = 7,
+	CHEAT_PROG_EQ = 8,
+	CHEAT_PROG_NE = 9,
+	CHEAT_PROG_LT = 10,
+	CHEAT_PROG_GT = 11,
+	CHEAT_PROG_ULT = 12,
+	CHEAT_PROG_UGT = 13,
+	CHEAT_PROG_AND_TRUE = 14,  // true when read & value is not 0
+	CHEAT_PROG_NAND = 15,      // true when read & value is 0
 };
 
-// Turns one cheat's ops into byte writes (16- and 32-bit ones split little-
-// endian, fills expanded) and ROM patches, appended after the *n_writes and
-// *n_patches entries already there, so several cheats can share the tables.
-// Writes to the ROM (0x08000000-0x09FFFFFF) become patches; other targets keep
-// their addresses. On any status but OK, nothing is appended. An address is
-// good in EWRAM or IWRAM (mirrors too, as the hardware has them), IO, palette,
-// VRAM, OAM, the ROM's first 32 MB mapping or SRAM; other mirrors and regions
-// are bad, which catches most codes decoded with the wrong key or format.
-// Addresses are checked before anything else.
-u8 cheat_lower(const struct cheat_op *ops, u32 n_ops, struct cheat_write *writes, u32 writes_max, u32 *n_writes,
+// The device's own button (GameShark's and Action Replay's "button" codes,
+// IF_BUTTON) is these GBA keys held together: R and SELECT. A flash cart has
+// no button of its own; KEYINPUT reads 0 for a held key, so the op is
+// "if (KEYINPUT & mask) == 0", as CodeBreaker's own key codes test it.
+#define CHEAT_BUTTON_KEYS 0x0104u  // KEY_R | KEY_SELECT
+#define CHEAT_KEYINPUT 0x04000130u
+
+// The interpreter's budget. Its cycles are an upper bound, every op run
+// (conditions all true), measured on the emulated cart with the game's ROM
+// at the BIOS's default wait states, the slowest a game has
+// (tests/kernel/test_cheatrun.c checks the model against the clock).
+#define CHEAT_COST_CALL 250      // the hook's call, and the table's end
+#define CHEAT_COST_CHEAT 110     // a cheat's header
+#define CHEAT_COST_SINGLE 140    // a write of its own
+#define CHEAT_COST_RUN 150       // a run's header, in a plain cheat
+#define CHEAT_COST_RUN_WRITE 36  // a write in a run
+#define CHEAT_COST_EXT 430       // a longer op, its first element
+#define CHEAT_COST_FILL 48       // each further write of a slide (a value step)
+#define CHEAT_COST_FILL_SAME 20  // each further write of a fill of one value
+#define CHEAT_COST_GEN 200       // each further element of a pointer write, add, or, and
+#define CHEAT_COST_COND 450      // a conditional, and the walk past what it skips
+// The cap: about 10% of a frame (280,896 cycles), all picked cheats together
+#define CHEAT_CYCLES_MAX 28000
+// The table's room in the patch area, the end word included (cheat.h)
+#define CHEAT_TABLE_MAX 0x1400
+
+enum cheat_lower_status {
+	CHEAT_LOWER_OK,
+	CHEAT_LOWER_TOO_BIG,          // over prog_max words or CHEAT_CYCLES_MAX, or an op's count over 0xFFFF
+	CHEAT_LOWER_TOO_MANY_PATCHES, // more than patches_max patches
+	CHEAT_LOWER_BAD_ADDRESS,      // an op outside the GBA's memory: likely a misread code
+};
+
+// Turns one cheat's ops into its part of the interpreter's table (header
+// and ops, at most prog_max words, *prog_words of them; none when nothing
+// runs in game) with its cycles in *cost (0 if none), and ROM patches
+// (*n_patches of them). Writes to the ROM (0x08000000-0x09FFFFFF) and ROM
+// patch ops become patches (fills expanded, bytes merged into halfwords),
+// applied at launch whatever a condition says, as mGBA applies its ROM
+// patches. A cheat without conditionals runs its ops in order, writes of a
+// width in a row as one run; one with conditionals keeps every op in its
+// place (ROM patches and slowdown codes as nothing), so a condition's count
+// covers the ops it covers in mGBA. IF_BUTTON tests CHEAT_BUTTON_KEYS.
+// Slowdown codes do nothing. An address is good in EWRAM or IWRAM (mirrors
+// too, as the hardware has them), IO, palette, VRAM, OAM, the ROM's first
+// 32 MB mapping or SRAM; other mirrors and regions are bad, which catches
+// most codes decoded with the wrong key or format. Addresses are checked
+// before anything else. On any status but OK, the outputs are 0.
+u8 cheat_lower(const struct cheat_op *ops, u32 n_ops, u32 *prog, u32 prog_max, u32 *prog_words, u32 *cost,
 	       struct cheat_patch *patches, u32 patches_max, u32 *n_patches);
 
 // Whether every address op touches is good, as cheat_lower checks it: a

@@ -14,8 +14,8 @@
 # don't fail; CHEAT_ENGINE_STRICT=1 fails them too. CHEAT_ENGINE_JOBS runs that
 # many cases at once (default 1). mGBA's runs hold the cheat device's own
 # button (GameShark type 8, Action Replay v3 buttons) at some checkpoints;
-# Torii's hold the keys CHEAT_BUTTON_KEYS names (e.g. L+R) there instead,
-# none by default. Runs inside the torii-emu container after
+# Torii's hold the keys CHEAT_BUTTON_KEYS names there instead (default
+# R+SELECT, cheatcode.h's CHEAT_BUTTON_KEYS). Runs inside the torii-emu container after
 # `just build`, `just emu-headless` and `just test-roms`.
 set -euo pipefail
 
@@ -37,9 +37,15 @@ if [ "${1:-}" = --case ]; then
   mcopy -i "$cart/sd.img" $rom ::/CT.gba
   mmd -i "$cart/sd.img" ::/torii ::/torii/cheats
   mcopy -i "$cart/sd.img" "$dir/$name.cht" ::/torii/cheats/CT.cht
-  # The device's button (-B, mGBA's) as the keys CHEAT_BUTTON_KEYS names, once
-  # the interpreter gives Torii one; until then it stays up
-  sed -e "s/^-B @4:1$/-k @4:${CHEAT_BUTTON_KEYS:--}/" -e 's/^-B @4:0$/-k @4:-/' "$dir/$name.opts" >"$cart/torii.opts"
+  # The device's button (-B, mGBA's) as the keys CHEAT_BUTTON_KEYS names (R and
+  # SELECT, the interpreter's: source/cheatcode.h), held on top of each
+  # checkpoint's own keys from -B 1 until -B 0
+  awk -v button="${CHEAT_BUTTON_KEYS:-R+SELECT}" '
+    function out() { print "-k @4:" (held ? (keys == "-" ? button : keys "+" button) : keys) }
+    /^-k @4:/ { keys = substr($0, 7); out(); next }
+    /^-B @4:/ { held = substr($0, 7) == "1"; out(); next }
+    { print }
+  ' "$dir/$name.opts" >"$cart/torii.opts"
   # shellcheck disable=SC2046 # nav.sh's options
   OMEGA_DIR=$cart $shot dist/ezkernelnew.bin $(nav_launch /CT.gba addon) -w "launch: starting the game" \
     -i "$cart/torii.opts" >"$dir/$name.torii.txt" 2>"$dir/$name.torii.log" || true
