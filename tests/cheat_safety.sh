@@ -127,8 +127,9 @@ files)
   delete_check() {
     local n=$1 name=$2
     if ! there Hello.gba; then
-      ! there torii/cheats/Hello.cht && ! there torii/cheats/Hello.cht.bak ||
+      if there torii/cheats/Hello.cht || there torii/cheats/Hello.cht.bak; then
         fail "delete cut at $n ($name): the game went, a cheat file stayed"
+      fi
     fi
     [ "$n" != 0 ] || ! there Hello.gba || fail "delete: the game is still there"
     return 0
@@ -153,10 +154,12 @@ files)
     if there Helloq.gba; then to=Helloq other=Hello; else to=Hello other=Helloq; fi
     there "$to.gba" || fail "rename cut at $n ($name): no game left"
     ! there "$other.gba" || fail "rename cut at $n ($name): both names are on the card"
-    there "torii/cheats/$to.cht" && there "torii/cheats/$to.cht.bak" ||
+    if ! there "torii/cheats/$to.cht" || ! there "torii/cheats/$to.cht.bak"; then
       fail "rename cut at $n ($name): the cheat files aren't with $to.gba"
-    ! there "torii/cheats/$other.cht" && ! there "torii/cheats/$other.cht.bak" ||
+    fi
+    if there "torii/cheats/$other.cht" || there "torii/cheats/$other.cht.bak"; then
       fail "rename cut at $n ($name): a cheat file is left under $other"
+    fi
     [ "$n" != 0 ] || [ "$to" = Helloq ] || fail "rename: uncut, the game wasn't renamed"
   }
   cut_sweep rename_scenario rename_check
