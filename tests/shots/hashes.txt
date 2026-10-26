@@ -102,10 +102,10 @@ games-box-switch/frames 3-3 D4DD55491F22C7F2
 games-box-switch/frames 4-5 E3A4AD640FBC14D2
 games-box-switch/frames 6-28 9F73E48DF1E05512
 games-cheats/back DE60914D027457D0
-games-cheats/greyed CE5738F0AA277E1F
-games-cheats/picked 4BCC49E70AB39240
+games-cheats/greyed EE4A2A7E1ECC67E5
+games-cheats/picked 8413DEFCB4731DD8
 games-cheats/popup 0D9F840E1438B3C6
-games-cheats/screen 308673631F8FA4C4
+games-cheats/screen E933A8F0982C2E0C
 games-dedupe/screen 67E86C46698E404E
 games-fav/screen 5F5922C2D6F31804
 games-fav/starred 017306DC53C8BC2C
