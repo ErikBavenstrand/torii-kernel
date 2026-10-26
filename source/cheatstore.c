@@ -519,14 +519,25 @@ int cheatstore_drop(void)
 	struct cheatstore *cs = cheatstore();
 	char *path = cs->path;
 	u32 len = (u32)strlen(path);
+	// The copy a reader takes goes last, so a cut between the two leaves
+	// the file as last written, or none
+	int bak_last = safefile_reads_bak(path, CHEATSTORE_FILE_MAX);
+	FRESULT a = FR_OK, b = FR_OK;
+	if (bak_last) {
+		a = f_unlink(path);
+		if (a == FR_OK)
+			cutpoint("cheats: the emptied file deleted");
+	}
 	memcpy(path + len, ".bak", 5);  // cheatstore_path leaves room for it
-	FRESULT b = f_unlink(path);
+	b = f_unlink(path);
 	if (b == FR_OK)
 		cutpoint("cheats: the emptied file's .bak deleted");
 	path[len] = 0;
-	FRESULT a = f_unlink(path);
-	if (a == FR_OK)
-		cutpoint("cheats: the emptied file deleted");
+	if (!bak_last) {
+		a = f_unlink(path);
+		if (a == FR_OK)
+			cutpoint("cheats: the emptied file deleted");
+	}
 	int gone = (a == FR_OK || a == FR_NO_FILE || a == FR_NO_PATH) &&
 		   (b == FR_OK || b == FR_NO_FILE || b == FR_NO_PATH);
 	tlog("cheats: %s: no cheats left, deleted (FatFs %u, %u)", path, (unsigned)a, (unsigned)b);

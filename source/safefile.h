@@ -60,6 +60,9 @@ int safefile_failed(void);
 // its max (safefile_failed says 1 too: nothing may write over it), so a
 // caller can tell a file too big from a card error.
 int safefile_too_big(void);
+// 1 if a reader of path (copies up to max bytes) would take NAME.bak, so a
+// caller deleting both copies deletes the main copy first
+int safefile_reads_bak(const char *path, u32 max);
 
 // Writes the text fill gives to both copies of path, making its folder if
 // needed. fill(ctx, pos, buf, max) puts up to max bytes of the text from

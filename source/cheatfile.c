@@ -350,6 +350,8 @@ s32 cheatfile_next(struct cheatfile *f, struct cheatfile_work *w)
 		struct cheat_decoder own;
 		cheat_decoder_force_in(&own, &w->dec, c->format);
 		c->status = cheatfile_decode(w, &own, f->text + c->code, c->code_len, &n_ops, &lowered);
+		if (c->format == w->dec.gs_version)  // a DEADFACE in it reseeds the codes after it
+			memcpy(w->dec.gs_seeds, own.gs_seeds, sizeof(w->dec.gs_seeds));
 	} else {
 		c->status = cheatfile_decode(w, &w->dec, f->text + c->code, c->code_len, &n_ops, &lowered);
 	}

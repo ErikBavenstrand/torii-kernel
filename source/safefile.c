@@ -86,6 +86,13 @@ static int pick(const char *path, const char *bak, u32 max)
 	return safefile_pick(has_main ? &sf_main : NULL, has_bak ? &sf_bak : NULL);
 }
 
+int safefile_reads_bak(const char *path, u32 max)
+{
+	char *bak = sf_bak_path;
+	TLOG_ASSERT(!rd.open);
+	return bak_name(bak, path) && pick(path, bak, max) == SAFEFILE_BAK;
+}
+
 int safefile_open(const char *path, u32 max)
 {
 	char *bak = sf_bak_path;

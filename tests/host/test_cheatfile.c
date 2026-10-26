@@ -346,6 +346,23 @@ void test_cheatfile_seeds_carry(void)
 	CHECK_EQ(work.ops[0].type, CHEAT_OP_WRITE);
 	CHECK_EQ(work.ops[0].address, 0x02000012);
 	CHECK_EQ(work.ops[0].value, 0x1234);
+
+	// The other way: the DEADFACE sits in a cheat with its format, and the
+	// file's later cheats are read with its seeds
+	snprintf(text, sizeof(text),
+		 "cheat0_code = \"%s\"\n"
+		 "cheat1_code = \"%s\"\n"
+		 "cheat1_format = \"GSAv1\"\n"
+		 "cheat2_code = \"%08X %08X\"\n",
+		 master, reseed, (unsigned)b, (unsigned)w);
+	load_str(text);
+	cheatfile_begin(&work);
+	for (u32 i = 0; i < 3; i++)
+		CHECK_EQ(cheatfile_next(&file, &work), (s32)i);
+	CHECK_EQ(cheats[2].status, CHEATFILE_OK);
+	CHECK_EQ(work.ops[0].type, CHEAT_OP_WRITE);
+	CHECK_EQ(work.ops[0].address, 0x02000012);
+	CHECK_EQ(work.ops[0].value, 0x1234);
 }
 
 void test_cheatfile_budget(void)
