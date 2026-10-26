@@ -43,6 +43,37 @@ Research for v0.7 (2026-10-25), before the design in `docs/plans/roadmap.md`.
 - ❔ The 31 CodeBreaker type-D codes other than the key test, and how RetroArch scopes a type-9 key across cheats.
 - ❔ EnHacklopedia's device notes: real ROM-patch slot limits, and slowdown codes on a flash cart.
 
+## What the kernel does where devices and mGBA differ (v0.7)
+
+The interpreter (`source/cheatrun.s`) runs each picked cheat's ops as mGBA's
+`mCheatRefresh` runs one cheat set, once a frame on the VBlank IRQ; the
+kernel test `cheatrun_matches_mgba` checks it against a line-for-line port
+(`tests/host/cheat_ref.h`) on random cheats. Where mGBA leaves a choice to
+its frontend, or a flash cart can't do what the device did:
+
+- **The device's button** (GameShark's `8` codes, Action Replay v3's
+  `IF_BUTTON` writes): mGBA has one host button for them. Torii reads R and
+  SELECT held together (`CHEAT_BUTTON_KEYS`) on KEYINPUT, as CodeBreaker's
+  `D0000020` key test does with the keys in its code. Neither chord is a
+  hotkey's (L+R+START, L+R+SELECT by default).
+- **Hook codes** (GameShark `F`, Action Replay `C4`, CodeBreaker `1`) are
+  dropped: every cheat runs on the VBlank IRQ instead, as mGBA runs a cheat
+  without a hook at the frame's end. A game that never enables the VBlank
+  IRQ runs no cheats.
+- **Slowdown codes** (Action Replay v3 `08`) are read, so their cheat reads,
+  and do nothing, as in mGBA (a TODO there).
+- **Odd addresses:** a halfword or word op at an odd address is the CPU's
+  own load and store, as mGBA's bus calls are: the load rotated, the store
+  aligned down. A byte to palette or VRAM is the hardware's (both halves of
+  the halfword).
+- **ROM patches** are written once into the game's PSRAM image at launch,
+  whatever a condition covering them says (mGBA applies its ROM patches the
+  same way). A write op to the ROM becomes a patch too.
+- **The budget:** the picked cheats together get 5 KB of table and a model
+  of 28,000 cycles (10% of a frame at the BIOS's wait states); a cheat over
+  either alone is "too big". Each of the 6,161 libretro GBA cheats that read
+  and lower fits alone (`just cheat-corpus`, 2026-10-26).
+
 ---
 
 **Sources**

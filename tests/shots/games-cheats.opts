@@ -1,8 +1,8 @@
 # The cheat screen (source/screens/cheats.c) from Hello's popup's Cheats
 # (its count, 6, at the right), in the light theme: Hello's cheats under
 # the game's name, the master code hidden, Max money ticked (the file picks
-# it); on Moon jump the hint bar says it needs v0.8 and the row is greyed;
-# A on Infinite lives ticks it; B saves and goes back to the list.
+# it); on Pick a level the hint bar says it needs editing and the row is
+# greyed; A on Infinite lives ticks it; B saves and goes back to the list.
 #! settings 28=1
 # The tests' hook: lists open on their first row (else a list opens on
 # Hello, the game Recent played last)
@@ -20,12 +20,12 @@
 -k @48:A -k @52:-
 -w "screen ready: cheats"
 -s @4:screen.png
--k @8:DOWN -k @12:- -k @20:DOWN -k @24:-
--s @36:greyed.png
--k @40:UP -k @44:- -k @52:UP -k @56:-
--k @64:A -k @68:-
--s @84:picked.png
--k @92:B -k @96:-
+-k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:-
+-s @48:greyed.png
+-k @52:UP -k @56:- -k @64:UP -k @68:- -k @76:UP -k @80:-
+-k @88:A -k @92:-
+-s @108:picked.png
+-k @116:B -k @120:-
 -w "cheats: back"
 -w "screen ready: games"
 -s @8:back.png

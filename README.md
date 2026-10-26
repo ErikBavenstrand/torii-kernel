@@ -50,14 +50,17 @@ it. Info's Controls page lists every key.
   applies them, and the in-game menu's CHEAT OFF and CHEAT ON stop and
   restart them; a clean boot applies none. The file is in libretro's format
   (`just cheats` writes one for each game, or drop one in, named after the
-  ROM) with CodeBreaker, GameShark, Action Replay v3 and VBA codes: those
-  that write constant values (up to 600 bytes for the picked ones together)
-  or patch the ROM work now. Greyed rows say why they don't: codes that test
-  values, wait for a button or follow a pointer need v0.8, a code with digits
-  to fill in (`00??`) needs editing, and a pick past the 600 bytes doesn't
-  fit. ROM patches need the game in PSRAM: a game written to NOR keeps its
-  picked cheats' writes but not their ROM patches. The cheat file moves,
-  renames and is deleted with its game.
+  ROM) with CodeBreaker, GameShark, Action Replay v3 and VBA codes, and
+  every kind of code runs: writes, fills and slides, pointers, add/or/and,
+  conditions with ELSE blocks and button codes, each frame as mGBA runs them,
+  and ROM patches written into the game once at launch. The device's own
+  button (GameShark's and Action Replay's) is R and SELECT held together;
+  slowdown codes do nothing. The picked cheats share a budget, about a tenth
+  of a frame and 5 KB, and greyed rows say why a cheat can't be picked: one past
+  what is left doesn't fit, a code with digits to fill in (`00??`) needs
+  editing, and an unreadable one is left alone. ROM patches need the game in
+  PSRAM: a game written to NOR keeps its picked cheats' codes but not their
+  ROM patches. The cheat file moves, renames and is deleted with its game.
 - **SD card:** the card's folders as they are, folders first. A opens a
   folder or starts a game (L held: a hard reset), LEFT/RIGHT page, B goes
   up a folder, START opens the file's menu (Launch, Clean boot or Boot

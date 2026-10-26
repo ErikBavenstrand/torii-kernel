@@ -151,8 +151,8 @@ def build_sd(path: Path) -> None:
     for i in range(1, DEEP_FILES + 1):
         (stage / "Long" / f"Game {i:03d}.gba").write_bytes(bytes(64 * i))
     # Cheat files in libretro's format (source/cheatfile.h), for the cheat
-    # screen: Hello's with a master code (hidden), a pick, a conditional
-    # (needs v0.8), a placeholder and a ROM patch; many cheats to scroll
+    # screen: Hello's with a master code (hidden), a pick, a conditional,
+    # a placeholder (greyed) and a ROM patch; many cheats to scroll
     # through (cheats-many), and names too long for a row (cheats-long)
     cheats = stage / "torii" / "cheats"
     (cheats / "Games").mkdir(parents=True)

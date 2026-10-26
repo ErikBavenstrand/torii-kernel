@@ -84,8 +84,8 @@ static u8 rnd_width(void)
 // One random op
 static void random_op(struct cheat_op *op)
 {
-	static const u8 conds[] = {CHEAT_OP_IF_EQ,  CHEAT_OP_IF_NE,   CHEAT_OP_IF_LT,     CHEAT_OP_IF_GT,
-				   CHEAT_OP_IF_ULT, CHEAT_OP_IF_UGT,  CHEAT_OP_IF_AND,    CHEAT_OP_IF_NAND,
+	static const u8 conds[] = {CHEAT_OP_IF_EQ,    CHEAT_OP_IF_NE,    CHEAT_OP_IF_LT,  CHEAT_OP_IF_GT,
+				   CHEAT_OP_IF_ULT,   CHEAT_OP_IF_UGT,   CHEAT_OP_IF_AND, CHEAT_OP_IF_NAND,
 				   CHEAT_OP_IF_NEVER, CHEAT_OP_IF_BUTTON};
 	u32 kind = rnd(20);
 	memset(op, 0, sizeof(*op));
@@ -183,11 +183,12 @@ void test_cheatrun_matches_mgba(void)
 				for (u32 c = 0; c < cheats; c++)
 					for (u32 k = 0; k < n[c]; k++) {
 						const struct cheat_op *op = &T_OPS[c * T_CHEAT_OPS + k];
-						tlog("cheatrun: cheat %lu op %lu: type %u w %u %08lX = %08lX x%lu step %ld/%ld else %u",
+						tlog("cheatrun: cheat %lu op %lu: type %u w %u %08lX = %08lX x%lu step "
+						     "%ld/%ld else %u",
 						     (unsigned long)c, (unsigned long)k, op->type, op->width,
 						     (unsigned long)(op->address - T_DATA), (unsigned long)op->value,
-						     (unsigned long)op->count, (long)op->addr_step, (long)op->value_step,
-						     op->else_count);
+						     (unsigned long)op->count, (long)op->addr_step,
+						     (long)op->value_step, op->else_count);
 					}
 				failures++;
 				break;
@@ -288,18 +289,12 @@ static void make_ptr(struct cheat_op *op, u32 i, u32 n)
 }
 
 static const struct worst worsts[] = {
-	{"plain byte writes", 3, 200, make_write},
-	{"one write each", 60, 1, make_write},
-	{"mixed widths", 3, 150, make_mixed},
-	{"writes under a condition", 3, 150, make_cond_writes},
-	{"nested conditions", 3, 50, make_nested},
-	{"else blocks", 3, 90, make_else},
-	{"skipped by a condition", 3, 150, make_skip},
-	{"slides", 2, 1, make_fill},
-	{"constant fills", 2, 1, make_fill_const},
-	{"adds", 3, 60, make_add},
-	{"add slides", 2, 1, make_add_slide},
-	{"pointer writes", 3, 60, make_ptr},
+	{"plain byte writes", 3, 200, make_write},     {"one write each", 60, 1, make_write},
+	{"mixed widths", 3, 150, make_mixed},          {"writes under a condition", 3, 150, make_cond_writes},
+	{"nested conditions", 3, 50, make_nested},     {"else blocks", 3, 90, make_else},
+	{"skipped by a condition", 3, 150, make_skip}, {"slides", 2, 1, make_fill},
+	{"constant fills", 2, 1, make_fill_const},     {"adds", 3, 60, make_add},
+	{"add slides", 2, 1, make_add_slide},          {"pointer writes", 3, 60, make_ptr},
 };
 
 void test_cheatrun_cycles(void)

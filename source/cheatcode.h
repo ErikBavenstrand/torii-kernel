@@ -78,7 +78,7 @@ enum cheat_op_type {
 	// (0x08000000-based), at launch
 	CHEAT_OP_ROM_PATCH,
 	// Action Replay v3's slowdown; value holds the code's low 24 bits. Kept so
-	// a cheat that uses it reads; nothing runs it yet.
+	// a cheat that uses it reads; it does nothing, as in mGBA.
 	CHEAT_OP_SLOWDOWN,
 };
 
