@@ -325,9 +325,10 @@ s32 cheatfile_next(struct cheatfile *f, struct cheatfile_work *w)
 	u32 n_ops;
 	u8 lowered;
 	if (c->format != CHEAT_FMT_AUTO) {
-		// Read alone in its own format: the file's key and seeds pass it by
+		// Read alone in its own format: the file's key passes it by, its
+		// GameShark seeds don't
 		struct cheat_decoder own;
-		cheat_decoder_force(&own, c->format);
+		cheat_decoder_force_in(&own, &w->dec, c->format);
 		c->status = cheatfile_decode(w, &own, f->text + c->code, c->code_len, &n_ops, &lowered);
 	} else {
 		c->status = cheatfile_decode(w, &w->dec, f->text + c->code, c->code_len, &n_ops, &lowered);

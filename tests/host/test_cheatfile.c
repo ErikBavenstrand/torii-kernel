@@ -301,6 +301,53 @@ void test_cheatfile_keys_carry(void)
 	CHECK_EQ(cheatfile_next(&file, &work), -1);
 }
 
+// GameShark's cipher forward (cheatcode.c has the way back)
+static void gs_encrypt(u32 *op1, u32 *op2, const u32 *seeds)
+{
+	u32 sum = 0;
+	for (int i = 0; i < 32; ++i) {
+		sum += 0x9E3779B9;
+		*op1 += ((*op2 << 4) + seeds[0]) ^ (*op2 + sum) ^ ((*op2 >> 5) + seeds[1]);
+		*op2 += ((*op1 << 4) + seeds[2]) ^ (*op1 + sum) ^ ((*op1 >> 5) + seeds[3]);
+	}
+}
+
+void test_cheatfile_seeds_carry(void)
+{
+	// A GameShark file reseeded by DEADFACE, then a cheat typed in its format:
+	// the cheat is read with the file's seeds, as the device reads it
+	static const char master[] = "502F4DE9+75D4B6CA+8791F574+20D9F121";
+	struct cheat_decoder d;
+	struct cheat_op ops[4];
+	u32 n, a = 0xDEADFACE, v = 0x102, b = 0x12000012, w = 0x1234;
+	cheat_decoder_init(&d);
+	CHECK_EQ(cheat_decode(&d, master, sizeof(master) - 1, ops, 4, &n), CHEAT_MASTER_ONLY);
+	CHECK_EQ(d.gs_version, CHEAT_FMT_GSAV1);
+	gs_encrypt(&a, &v, d.gs_seeds);
+	char reseed[18];
+	snprintf(reseed, sizeof(reseed), "%08X+%08X", (unsigned)a, (unsigned)v);
+	CHECK_EQ(cheat_decode(&d, reseed, 17, ops, 4, &n), CHEAT_MASTER_ONLY);
+	gs_encrypt(&b, &w, d.gs_seeds);
+
+	char text[512];
+	snprintf(text, sizeof(text),
+		 "cheat0_code = \"%s\"\n"
+		 "cheat1_code = \"%s\"\n"
+		 "cheat2_code = \"%08X %08X\"\n"
+		 "cheat2_format = \"GSAv1\"\n"
+		 "cheat2_user = true\n",
+		 master, reseed, (unsigned)b, (unsigned)w);
+	load_str(text);
+	CHECK_EQ(cheats[1].status, CHEATFILE_MASTER);
+	CHECK_EQ(cheats[2].status, CHEATFILE_OK);
+	cheatfile_begin(&work);
+	for (u32 i = 0; i < 3; i++)
+		CHECK_EQ(cheatfile_next(&file, &work), (s32)i);
+	CHECK_EQ(work.ops[0].type, CHEAT_OP_WRITE);
+	CHECK_EQ(work.ops[0].address, 0x02000012);
+	CHECK_EQ(work.ops[0].value, 0x1234);
+}
+
 void test_cheatfile_budget(void)
 {
 	// The table's bytes: three cheats of 250 32-bit writes (2,008 bytes
