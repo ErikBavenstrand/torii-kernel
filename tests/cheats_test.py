@@ -169,7 +169,10 @@ class Mgba(unittest.TestCase):
             ],
         )
         text = cheats.format_cht(got)
-        self.assertIn('cheat0_enable = false\ncheat0_format = "PARv3"\n', text)
+        self.assertIn(
+            'cheat0_code = "11111111 22222222"\ncheat0_format = "PARv3"\n', text
+        )
+        self.assertNotIn("_enable = false", text)  # off is the default: compact
         self.assertNotIn("cheat1_format", text)
         self.assertEqual(cheats.parse_cht(text), got)
 
@@ -192,7 +195,7 @@ class Mgba(unittest.TestCase):
         self.assertEqual(gone, ["Big"])
         self.assertLessEqual(len(cheats.format_cht(kept, ["c"])), full - 100)
         # Every unpicked set goes before a picked one
-        kept, gone = cheats.fit(all_, range(5), ["c"], limit=full - 700)
+        kept, gone = cheats.fit(all_, range(5), ["c"], limit=full - 650)
         self.assertEqual(gone, ["S0", "Big", "S1", "S2"])
         kept, gone = cheats.fit(all_, range(5), ["c"], limit=full - 900)
         self.assertEqual(gone, ["S0", "Big", "Picked big", "S1", "S2"])
@@ -278,7 +281,7 @@ class Merge(unittest.TestCase):
             )
         text = cheats.format_cht(merged)
         self.assertIn(
-            'cheat3_enable = false\ncheat3_format = "GSAv1 raw"\ncheat3_user = true\n',
+            'cheat3_code = "02001000 00000063"\ncheat3_format = "GSAv1 raw"\ncheat3_user = true\n',
             text,
         )
         self.assertEqual(cheats.parse_cht(text), merged)
@@ -671,9 +674,8 @@ class Card(unittest.TestCase):
         self.fill_cache()
         self.run_tool("--only", f"{CRC['EMERALD']:08X}")
         target = self.card_file("GBA/Emerald.cht")
-        picked = target.read_text().replace(
-            "cheat0_enable = false", "cheat0_enable = true"
-        )
+        # The kernel adds a picked cheat's enable line at the end
+        picked = target.read_text() + "cheat0_enable = true\n"
         target.write_bytes(safe(picked))
         _status, out, _ = self.run_tool("--only", f"{CRC['EMERALD']:08X}")
         self.assertIn("1 GBA game: 1 unchanged", out)

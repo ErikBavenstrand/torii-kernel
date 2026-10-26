@@ -212,12 +212,13 @@ def parse_cht(text):
 
 
 def cheat_lines(n, cheat):
+    # No enable line for a cheat that isn't picked: off is the default, and
+    # the kernel adds the line when one is picked (compact: FireRed's 773
+    # cheats are 18 KB smaller)
     desc, code, enabled = cheat
-    lines = [
-        f'cheat{n}_desc = "{desc}"',
-        f'cheat{n}_code = "{code}"',
-        f"cheat{n}_enable = {'true' if enabled else 'false'}",
-    ]
+    lines = [f'cheat{n}_desc = "{desc}"', f'cheat{n}_code = "{code}"']
+    if enabled:
+        lines.append(f"cheat{n}_enable = true")
     extra = getattr(cheat, "extra", {})
     for k in KEPT_KEYS:
         if k in extra:
@@ -237,6 +238,18 @@ def format_cht(cheats, comments=()):
     for n, cheat in enumerate(cheats):
         lines += cheat_lines(n, cheat) + [""]
     return "\n".join(lines)
+
+
+def head_comments(text):
+    """The '#' lines before a file's first key line: the ones this tool writes."""
+    out = []
+    for raw in text.split("\n"):
+        line = raw.strip()
+        if line and not line.startswith("#"):
+            break
+        if line:
+            out.append(line)
+    return out
 
 
 def for_crc(text):
@@ -1017,7 +1030,11 @@ def write_game(sd, game, src, dry_run):
     text = format_cht(cheats, comments)
     if old_text is None:
         state = "written"
-    elif text == old_text:
+    elif text == old_text or (
+        cheats == old and head_comments(text) == head_comments(old_text)
+    ):
+        # The same cheats, picks and comments, laid out as the kernel left
+        # them (a pick's enable line added at the end): left as it is
         state = "unchanged"
     else:
         state = "updated"
