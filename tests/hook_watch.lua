@@ -137,6 +137,33 @@ local function skipped()
 	return skips
 end
 
+-- What the game should find after the menu. The snapshot at the menu key's
+-- frame comes a few instructions early: the game runs on until the CPU takes
+-- the VBlank IRQ (mGBA delays IRQs by a few cycles), and some games store
+-- something there. So everything the menu leaves alone comes from a
+-- snapshot taken while it is up, the game frozen, and only what it borrows
+-- from the key frame's: the EWRAM window, OBJ tiles 512 on, OAM, the OBJ
+-- palette, DISPCNT, BLDCNT, BLDALPHA and WAITCNT.
+local function reference(early, frozen, window)
+	local function mix(i, cut, borrowed_first)
+		local a, b = early[i][3], frozen[i][3]
+		return borrowed_first and a:sub(1, cut) .. b:sub(cut + 1) or b:sub(1, cut) .. a:sub(cut + 1)
+	end
+	local io = {}
+	for n, r in ipairs(IO) do
+		local from = (r == 0x00 or r == 0x50 or r == 0x52 or r == 0x204) and early or frozen
+		io[n] = from[6][3]:sub(2 * n - 1, 2 * n)
+	end
+	return {
+		{ "EWRAM", 0x02000000, mix(1, window, true) },
+		{ "IWRAM", 0x03000000, frozen[2][3] },
+		{ "palette", 0x05000000, mix(3, 0x200, false) },
+		{ "VRAM", 0x06000000, mix(4, 0x14000, false) },
+		{ "OAM", 0x07000000, early[5][3] },
+		{ "I/O", 0x04000000, table.concat(io) },
+	}
+end
+
 local function compare(after)
 	local skips = skipped()
 	local changes = {}
@@ -170,7 +197,9 @@ local function compare(after)
 	if #changes == 0 then
 		log("menu left the game as it was")
 	else
-		log("menu changed " .. table.concat(changes, ", "))
+		local spend = patchStart and emu:read32(patchStart + 0x18) or 0
+		log(string.format("menu changed %s (IRQ stack at the hook %08X, IF %04X)", table.concat(changes, ", "),
+			spend ~= 0 and emu:read32(spend + 0x20) or 0, emu:read16(0x04000202)))
 	end
 end
 
@@ -252,6 +281,13 @@ callbacks:add("frame", function()
 	if shown > 0 and not opened and keyFrame then
 		opened = true
 		log(string.format("menu shown after %d frames", frame - keyFrame))
+		-- the game frozen under the menu
+		local window = emu:read32(OVERLAY + 12)
+		before = reference(before, snapshot(), window)
+		local dir = os.getenv("HOOK_WATCH_DUMP")
+		if dir then
+			dump(dir, "before", before)
+		end
 	end
 	if shown > 1 and not texted and keyFrame then
 		texted = true
@@ -275,10 +311,6 @@ callbacks:add("frame", function()
 				-- The menu opens in this frame's VBlank IRQ, right after this
 				keyFrame = frame
 				before = snapshot()
-				local dir = os.getenv("HOOK_WATCH_DUMP")
-				if dir then
-					dump(dir, "before", before)
-				end
 			end
 			press(step[2], step[3])
 		end

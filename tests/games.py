@@ -621,6 +621,19 @@ def check_menu(result: Result, rom: Path, sd_name: str, table: dict) -> None:
             "in-game menu", "fail", "the game went back to the kernel after the menu"
         )
         return
+    # The game's memory and registers before the menu and after it
+    # (hook_watch.lua's compare(): the hook's own words aside)
+    changed = first("menu changed ")
+    if changed:
+        result.set(
+            "in-game menu",
+            "fail",
+            f"the menu didn't give the game back as it was: {changed[1][len('menu changed ') :]}",
+        )
+        return
+    shown = first("menu shown after ")
+    if shown:
+        result.metrics["menu shown"] = shown[1].split()[3] + " frames"
     after = {h for f, h in screen_hashes(out) if f > closed + 30}
     if len(after) <= 1:
         result.set(
@@ -632,7 +645,7 @@ def check_menu(result: Result, rom: Path, sd_name: str, table: dict) -> None:
     result.set(
         "in-game menu",
         "pass",
-        f"opened {opened - key_at} frames after the key; the game went on ({len(after)} screens)",
+        f"opened {opened - key_at} frames after the key, left the game as it was; the game went on ({len(after)} screens)",
     )
 
 
