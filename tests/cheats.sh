@@ -282,6 +282,28 @@ for typed in "3203F030 0077|0203F030:1|77|CodeBreaker" "D5A7153C 73B76013|0203F0
   echo "PASS: cheats: a $what code typed on the keypad ($code) is saved, picked and runs after a reboot"
 done
 
+# A code of the user's (the GameShark one just added, row 3) can be edited:
+# SELECT's menu, Edit code, the keypad with its code in (B held clears it),
+# a CodeBreaker code typed, the keyboard keeping its name; it stays in its
+# place, picked, with its new code
+cp "$cart/added.img" "$cart/sd.img"
+cp "$cart/clean/kernel-nor.bin" "$cart/"
+rm -f "$cart/sram.bin"
+# shellcheck disable=SC2046 # nav.sh's options and the keypad's keys
+boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
+  -w "screen ready: cheats" -k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:SELECT -k @48:- \
+  -w "screen ready: cheat-menu" -k @16:A -k @20:- \
+  -w "screen ready: keypad" -k @8:B -k @200:- $(python3 tests/keypad_keys.py --at 220 3203F0600011 START 2>/dev/null) \
+  -w "screen ready: rename" -k @8:START -k @12:- \
+  -w "cheats: edited" -w "screen ready: cheats" -k @8:B -k @12:- -w "cheats: back" -f 8000 >"$cart/edit.txt" 2>&1 ||
+  fail "the edit didn't run: $(grep -a '^kernel' "$cart/edit.txt" | tail -3)"
+grep -q "keypad: saved 3203F060 0011, format auto" "$cart/edit.txt" ||
+  fail "the edit's keypad saved: $(grep -a 'keypad:' "$cart/edit.txt" | tail -3)"
+[ "$(cheat_lines | tail -n 1)" = "3203F060 0011|1|true|" ] || fail "the edited code reads back as $(cheat_lines | tail -n 1)"
+mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep -q $'^cheat4_desc = "q"\r$' || fail "the edited code lost its name"
+[ "$(cheat_lines | wc -l)" = 5 ] || fail "the edit added a cheat: $(cheat_lines | tr '\n' ' ')"
+echo "PASS: cheats: a code of the user's is edited from SELECT's menu, in its place, its name kept"
+
 # A code of the user's (the GameShark one just added, row 3) can be deleted:
 # SELECT's menu, Delete, asked and answered; the file is as it was before the
 # add (but for its CRC line), the database's cheats untouched

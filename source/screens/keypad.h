@@ -11,7 +11,8 @@
 // address:value), Line (a new code line), Del, Cancel and Save.
 //
 // Keys: the d-pad moves the selection (a press wraps at the edges), A
-// presses the key, B deletes before the caret (on an empty code, leaves), L
+// presses the key, B deletes before the caret (on an empty code, leaves;
+// held, A and B repeat), L
 // and R go to the line before and after, SELECT steps the format (auto,
 // GameShark v1, its raw, Action Replay v3, its raw, CodeBreaker, VBA),
 // START saves. Save takes only a code that reads; Cancel asks first when

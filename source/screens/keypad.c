@@ -46,6 +46,7 @@ static const struct keypad_look {
 	u8 save_radius, save_inset;         // the chosen Save's ring, and its pill inside it
 	u8 func_text_dy;                    // a function key's word below its cell's top
 	u8 message;                         // frames a refusal shows in the hint area
+	u8 repeat_delay, repeat_every;      // held A and B: frames to the first repeat, then between
 } look = {
 	.card_x = 4,
 	.card_y = 26,
@@ -74,6 +75,8 @@ static const struct keypad_look {
 	.save_inset = 2,
 	.func_text_dy = 2,
 	.message = 90,
+	.repeat_delay = 16,
+	.repeat_every = 4,
 };
 
 #define VISIBLE 3  // code lines in view
@@ -135,6 +138,9 @@ static struct {
 	u8 first_node;
 	u8 done, result, want;
 	u8 message;  // frames the hint area's refusal stays
+	u8 armed;    // A (1) and B (2) pressed here: they repeat while held
+	u32 down_at[2];  // frame_count() when each went down
+	u32 repeats[2];  // and the repeats it has had
 	char scratch[KEYPAD_CODE_MAX + 1];
 	char counter[20];
 	char msg[48];
@@ -597,6 +603,10 @@ static void act(u16 key, int fresh)
 	frame_measure("keypad-key");
 }
 
+// The keys that repeat while held, on the keypad's own schedule (the
+// engine repeats only the d-pad)
+static const u16 held_keys[2] = {INPUT_A, INPUT_B};
+
 static int keypad_event(struct ui_view *v, const struct ui_event *e)
 {
 	(void)v;
@@ -607,8 +617,15 @@ static int keypad_event(struct ui_view *v, const struct ui_event *e)
 	u16 fresh = ui_input()->pressed;
 	for (u32 b = 0; b < INPUT_KEYS; b++) {
 		u16 key = (u16)(1u << b);
-		if (e->keys & key)
-			act(key, (fresh & key) != 0);
+		if (!(e->keys & key))
+			continue;
+		act(key, (fresh & key) != 0);
+		for (u32 i = 0; i < 2; i++)
+			if ((fresh & key) && key == held_keys[i]) {
+				kp.armed |= (u8)(1u << i);
+				kp.down_at[i] = frame_count();
+				kp.repeats[i] = 0;
+			}
 	}
 	return 1;
 }
@@ -642,6 +659,20 @@ static void tick(struct ui_view *v)
 		return;
 	if (kp.message && !--kp.message)
 		show_hints();
+	// A and B repeat while held: a digit typed again, the code deleted back
+	const InputState *in = ui_input();
+	for (u32 i = 0; i < 2 && !kp.want; i++) {
+		if (!(in->held & held_keys[i]))
+			kp.armed &= (u8) ~(1u << i);
+		if (!(kp.armed & (1u << i)))
+			continue;
+		u32 f = frame_count() - kp.down_at[i];
+		u32 due = f < look.repeat_delay ? 0 : 1 + (f - look.repeat_delay) / look.repeat_every;
+		if (due > kp.repeats[i]) {
+			kp.repeats[i] = due;
+			act(held_keys[i], 0);
+		}
+	}
 	u8 want = kp.want;
 	kp.want = WANT_NONE;
 	if (want == WANT_SAVE)
