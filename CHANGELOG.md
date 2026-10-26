@@ -31,6 +31,14 @@ git log, not here.
   cheats on from the game's start, and a big file read once behind a progress
   dialog instead of freezing the screen; the popup's count leaves out master
   codes (a4596285, 917111b7, 37c6827f).
+- **Added:** a code keypad: "+ Add code" ends every GBA game's cheat list,
+  and a hex keypad types GameShark, Action Replay, CodeBreaker or VBA raw
+  codes, shows the format it detected (SELECT overrides it, kept as
+  `cheatN_format`) and what the code decodes to, then names it on the rename
+  keyboard and saves it picked; placeholders (`00??`) open in it to fill in,
+  and the user's own codes can be edited or deleted (731d2d38, 088ea321,
+  8c225b3e, e8ae242d). A card error opening a cheat file now leaves the file
+  alone instead of starting a new one over it (f4a42078).
 - **Changed:** cheat writes keep their real addresses (no longer folded into
   IWRAM or EWRAM), and ROM-patch codes are written once into the game's PSRAM
   image, with no cap (a4596285).
