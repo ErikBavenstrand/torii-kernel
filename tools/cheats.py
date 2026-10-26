@@ -108,12 +108,13 @@ CHEATS_DIR = Path("torii") / "cheats"
 GBA = names_db.GBA
 
 # The kernel's limits (source/cheatfile.h; tests/cheats_test.py checks them)
-TEXT_MAX = 0xE000  # CHEATFILE_TEXT_MAX: a longer file is refused
+TEXT_MAX = 0x30000  # CHEATFILE_TEXT_MAX: a longer file is refused
 CHEATS_MAX = 1024  # CHEATFILE_MAX
 LINES_MAX = 256  # CHEATFILE_OPS_MAX: a set of more lines could never run
-# Left free under TEXT_MAX: the picks only change enable values, but codes
-# typed on the cart's keypad are added to the text
-ROOM = 1024
+# Left free under TEXT_MAX: a pick adds its enable line (unpicked cheats have
+# none), and codes typed on the cart's keypad are added to the text; 32 KB
+# covers a pick of every cheat (about 24 bytes each) and room to type
+ROOM = 0x8000
 # cheatN_format's values by enum cheat_format (source/cheatfile.c's
 # cheatfile_format_names); the first four are mGBA's GBA directives
 FORMAT_NAMES = (None, "GSAv1", "GSAv1 raw", "PARv3", "PARv3 raw", "CodeBreaker", "VBA")
