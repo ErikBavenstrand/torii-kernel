@@ -13,7 +13,9 @@ git log, not here.
   the code's width; GameShark D/E conditionals read their not-equal and
   at-most/at-least kinds and 3010-3060 are adds; E0zz counts lines; a second
   CodeBreaker key and a DEADFACE reseed carry to later cheats (13204692,
-  d9fa0cf9, b2e7d29b).
+  d9fa0cf9, b2e7d29b); a DEADFACE inside a cheat with its own format
+  reseeds the cheats after it, and deleting an emptied file deletes the
+  copy a reader takes last, so a cut leaves no broken copy (979432e5).
 - **Added:** cheat types that were unreadable: GameShark slowdown (read, not
   run, so the rest of the cheat works), Action Replay v3 "turn off codes"
   conditionals (the rest of the cheat waits on them) and CodeBreaker
