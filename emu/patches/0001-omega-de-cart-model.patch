@@ -322,10 +322,10 @@ index 1d0c0dd..b77704a 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..4bb2cf1
+index 0000000..38039ec
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1562 @@
+@@ -0,0 +1,1610 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -400,6 +400,14 @@ index 0000000..4bb2cf1
 +// lands on the real cart isn't known, so the emulator stops with this status
 +// (unless OMEGA_SD_PSRAM_WRITES=allow) rather than let it work here.
 +#define SD_PSRAM_WRITE_STATUS 77
++// In game mode, where the in-game menu runs: a write from the menu's
++// overlay that would change the PSRAM the game runs from, or any SD
++// register (games have no business there). Whether either works there
++// on the real cart is unproven (the in-game probe, tests/roms/ingame, asks),
++// so the emulator stops with these (OMEGA_GAME_PSRAM_WRITES=allow,
++// OMEGA_GAME_SD=allow let it run on) rather than let Torii's code rely on it.
++#define GAME_PSRAM_WRITE_STATUS 78
++#define GAME_SD_STATUS 79
 +// EZ-Flash's loader (DE.BIN) installs at most 3 MB of ezkernelnew.bin, in
 +// whole 64 KB sectors from the kernel's start (docs/research/omega-de-hardware.md).
 +#define LOADER_INSTALL_MAX 0x300000
@@ -691,6 +699,31 @@ index 0000000..4bb2cf1
 +	}
 +	fflush(NULL);
 +	_exit(SD_PSRAM_WRITE_STATUS);
++}
++
++// True while the CPU runs the in-game menu's overlay: its header
++// (struct ingame_image in source/ingame_abi.h) at the start of EWRAM, the
++// window it borrows, and the PC in that window.
++static bool _inOverlay(struct GBA* gba) {
++	uint32_t pc = gba->cpu->gprs[ARM_PC];
++	const uint32_t* wram = (const uint32_t*) gba->memory.wram;
++	return wram && wram[0] == 0x31564F54 && pc >= 0x02000000 && pc < 0x02006000;
++}
++
++// Stops the run with STATUS for an unproven game-mode access (above), unless
++// the environment variable ALLOW is "allow".
++static void _gameModeAccess(const char* what, uint32_t address, uint16_t value, const char* allowVar, int status) {
++	fprintf(stderr, "omega: %s IN GAME MODE at %08X (%04X); unproven on the real cart\n", what, address, value);
++	const char* allow = getenv(allowVar);
++	if (allow && !strcmp(allow, "allow")) {
++		return;
++	}
++	struct GBAOmega* omega = _cutOmega;
++	if (omega) {
++		_syncFile(omega->sramVf, omega->sram, OMEGA_SRAM_SIZE);
++	}
++	fflush(NULL);
++	_exit(status);
 +}
 +
 +
@@ -1301,6 +1334,10 @@ index 0000000..4bb2cf1
 +	if (offset != REG_SD_LBA_LO && offset != REG_SD_LBA_HI && offset != REG_SD_COUNT) {
 +		_trace(gba, "register %08X = %04X", 0x08000000 | offset, value);
 +	}
++	if (!_isKernelMode(omega) && (offset == REG_SD_CONTROL || offset == REG_BUFFER_CONTROL || offset == REG_SD_LBA_LO ||
++	                              offset == REG_SD_LBA_HI || offset == REG_SD_COUNT)) {
++		_gameModeAccess("SD REGISTER WRITTEN", 0x08000000 | offset, value, "OMEGA_GAME_SD", GAME_SD_STATUS);
++	}
 +	switch (offset) {
 +	case REG_SD_CONTROL:
 +		omega->sdControl = value;
@@ -1789,10 +1826,13 @@ index 0000000..4bb2cf1
 +		omega->unlockStep = 0;
 +		return;
 +	}
++	bool unlockWrite = false;  // a step of the register unlock, not data
 +	if (omega->unlockStep == 1 && offset == 0x00000000 && value == 0x1500) {
 +		omega->unlockStep = 2;
++		unlockWrite = true;
 +	} else if (omega->unlockStep == 2 && offset == 0x00020000 && value == 0xD200) {
 +		omega->unlockStep = 3;
++		unlockWrite = true;
 +	} else if (omega->unlockStep == 3 && offset == 0x00040000 && value == 0x1500) {
 +		omega->unlocked = true;
 +		omega->unlockStep = 0;
@@ -1816,7 +1856,15 @@ index 0000000..4bb2cf1
 +		return;
 +	}
 +	if (!_isKernelMode(omega)) {
-+		return;  // Game mode: the game's ROM is read-only.
++		// Game mode: the game's ROM is read-only here. Games write to it
++		// (probes around the GPIO port); the in-game menu's overlay must not:
++		// whether a write into the first 16 MB (below the cart's registers)
++		// that is no unlock step and not the motor's changes the PSRAM on the
++		// real cart is unproven, so one from the overlay stops the run.
++		if (!unlockWrite && offset < 0x01000000 && offset != RUMBLE_MOTOR && _inOverlay(gba)) {
++			_gameModeAccess("PSRAM WRITTEN", address, value, "OMEGA_GAME_PSRAM_WRITES", GAME_PSRAM_WRITE_STATUS);
++		}
++		return;
 +	}
 +	if (offset < PSRAM_WINDOW) {
 +		_norWrite(&omega->kernelNor, _kernelNorOffset(omega, offset), value);
