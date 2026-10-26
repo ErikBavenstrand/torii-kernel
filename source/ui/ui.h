@@ -871,6 +871,7 @@ struct ui_hint_note {
 	u8 bar_w, bar_h;  // the bar (0 wide: none): a TRACK pill, ACCENT for fill px of it
 	u8 bar_r, bar_gap;  // its ends' radius, and px between it and the text
 	u8 fill;
+	u8 beside;  // 1: the keys ui_hints_set gave stay at the right, the line left of them (a reason)
 };
 // ui_hints_text with a look (NULL: the plain line); note is copied
 void ui_hints_note(u8 node, const char *text, const struct ui_hint_note *note);

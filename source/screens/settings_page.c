@@ -676,13 +676,17 @@ static void hints_show(void)
 		ui_hints_set(h, sp.hints, 3);
 	} else if (sp.mode == MODE_CAPTURE) {
 		u32 left = settings_capture_left(&sp.cap);
-		struct ui_hint_note note = {
-			UI_ROLE_DIM, look.bar_w,   look.bar_h,
-			look.bar_r,  look.bar_gap, (u8)((left * look.bar_w + sp.cap.timeout - 1) / sp.cap.timeout)};
+		struct ui_hint_note note = {UI_ROLE_DIM,
+					    look.bar_w,
+					    look.bar_h,
+					    look.bar_r,
+					    look.bar_gap,
+					    (u8)((left * look.bar_w + sp.cap.timeout - 1) / sp.cap.timeout),
+					    0};
 		sp.bar_fill = note.fill;
 		ui_hints_note(h, gl_set_press_hint, &note);
 	} else if (sp.refused_left) {
-		struct ui_hint_note note = {UI_ROLE_DANGER, 0, 0, 0, 0, 0};
+		struct ui_hint_note note = {UI_ROLE_DANGER, 0, 0, 0, 0, 0, 0};
 		ui_hints_note(h, sp.refused, &note);
 	} else {
 		ui_hints_text(h, settings_explain(&sp.v, id));
