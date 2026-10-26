@@ -30,7 +30,11 @@ if [ "${1:-}" = --case ]; then
   shot=emu/build-linux/mgba-shot
   rom=tests/roms/cheattest/cheattest.gba
   $shot $rom -i "$dir/$name.opts" >"$dir/$name.base.txt" 2>"$dir/$name.base.log" || true
-  $shot $rom -E "$dir/$name.cht" -i "$dir/$name.opts" >"$dir/$name.mgba.txt" 2>"$dir/$name.mgba.log" || true
+  # mGBA runs the case's own codes, or where it reads them unlike the device,
+  # codes it reads as the device reads the case's (NAME.equiv.cht)
+  mcht=$dir/$name.cht
+  [ -e "$dir/$name.equiv.cht" ] && mcht=$dir/$name.equiv.cht
+  $shot $rom -E "$mcht" -i "$dir/$name.opts" >"$dir/$name.mgba.txt" 2>"$dir/$name.mgba.log" || true
   cart=$carts/$name
   rm -rf "$cart" && mkdir -p "$cart"
   mkfs.fat -C -F 32 -n CHEATS "$cart/sd.img" 65536 >/dev/null

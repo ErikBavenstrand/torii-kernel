@@ -2,7 +2,11 @@
 """The cheat test ROM's cases, for tests/cheat_engine.sh: every code type of
 every format, encrypted and raw, as a small libretro .cht each, with the keys
 each needs held, run on tests/roms/cheattest in mGBA's own cheat engine and
-through Torii, whose snapshots have to match.
+through Torii, whose snapshots have to match. The hand-made cases below come
+first; tests/cheat_matrix.py adds the type matrix (each code type at every
+width and target, many cheats to a case) and the cases where mGBA reads a code
+unlike the device, which mGBA runs as equivalent codes (NAME.equiv.cht);
+tests/cheat_fuzz.py runs random cases the same way.
 
 Usage:
   cheat_engine.py gen DIR [N/M]   write DIR/cases.txt (this shard's case
@@ -29,12 +33,17 @@ Results per case:
              byte table can't make): a failure since the interpreter
              landed; CHEAT_ENGINE_STRICT=0 only reports it
   mgba-off   mGBA's engine can't run it (says why); Torii's run is shown
+  differs (allowed), xfail, xpass
+             tests/cheat_expected.toml's [[engine]] entry for the case: an
+             intended difference, or a known bug (xpass: it no longer shows)
 Every case also checks its codes decode the same in mGBA's decoders and in
-Torii's (tools/cheat_oracle.c, tools/cheat_corpus.c: DIR/*.tsv), an
-encrypted case the same as its raw twin, and that mGBA's run differs from the
-ROM without cheats (the code does something).
+Torii's (tools/cheat_oracle.c, tools/cheat_corpus.c: DIR/*.tsv), or as a
+rule of tests/cheat_expected.toml explains, an encrypted case the same as its
+raw twin, and that mGBA's run differs from the ROM without cheats (the code
+does something). A difference names the cheats whose slots it is in.
 """
 
+import json
 import os
 import re
 import sys
@@ -42,6 +51,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
+import cheat_diff
+import cheat_matrix
 from cheat_encode import CB, GSA, PAR, VBA, Code, GSARaw, PARRaw, cht
 
 # Watched regions (main.c)
@@ -112,18 +123,31 @@ class Case:
         twin=None,
         run=True,
         effect=True,
+        cheats=None,
+        slots=None,
+        equiv=None,
     ):
         self.name, self.fmt, self.note, self.twin, self.run = name, fmt, note, twin, run
         self.effect = effect  # False: the code rightly changes nothing (a byte store to OAM, a never-true test)
         self.keys = keys or {}  # checkpoint: keys held from 4 frames after it
         self.button = button or {}  # checkpoint: 1 or 0, the device's button
         self.expect = expect  # None: decided from Torii's decoding; "mgba-off: why"; "differs: why"
+        # Where each cheat writes, [(start, end, what)], to name the cheats a
+        # difference is in
+        self.slots = slots or []
+        # Where mGBA reads the codes unlike the device: codes mGBA reads as
+        # the device reads these, [(desc, code, None)], for its run
+        self.equiv = equiv
+        if cheats is not None:
+            # Several cheats: [(desc, code text, cheatN_format or None)]
+            self.cheats = cheats
+            return
         code = Code(fmt)
         if fmt in (GSA, GSARaw, PAR, PARRaw):
             code += fmt.marker()
         for chunk in lines:
             code += chunk
-        self.code = code.text()
+        self.cheats = [(name, code.text(), None)]
 
     def opts(self):
         out = []
@@ -524,10 +548,24 @@ def cases():
             ],
         )
     )
+    out += cheat_matrix.cases(Case, sym)
     return out
 
 
 # --- gen ------------------------------------------------------------------
+
+
+def cht_file(cheats):
+    """A libretro .cht file of [(desc, code, cheatN_format or None)], every
+    cheat picked; a format line is Torii's own (mGBA's reader ignores it)"""
+    text = cht([(d, c) for d, c, _ in cheats])
+    for i, (_, _, fmt) in enumerate(cheats):
+        if fmt:
+            text = text.replace(
+                f"cheat{i}_enable = true",
+                f'cheat{i}_enable = true\ncheat{i}_format = "{fmt}"',
+            )
+    return text
 
 
 def shard(items, spec):
@@ -537,22 +575,30 @@ def shard(items, spec):
     return [c for i, c in enumerate(items) if i % m == n - 1]
 
 
-def gen(out, spec=None):
+def gen(out, spec=None, every=None):
+    """Writes the cases (all of cases(), or every) of this shard"""
     out.mkdir(parents=True, exist_ok=True)
-    every = cases()
+    every = cases() if every is None else every
     names = [c.name for c in every]
     assert len(set(names)) == len(names), "case names repeat"
     mine = shard(every, spec)
     for c in mine:
-        (out / f"{c.name}.cht").write_text(cht([(c.name, c.code)]), encoding="utf-8")
+        (out / f"{c.name}.cht").write_text(cht_file(c.cheats), encoding="utf-8")
         (out / f"{c.name}.opts").write_text(c.opts(), encoding="utf-8")
+        if c.equiv:
+            (out / f"{c.name}.equiv.cht").write_text(
+                cht_file(c.equiv), encoding="utf-8"
+            )
         if c.twin:
             twin = next(t for t in every if t.name == c.twin)
             (out / f"{twin.name}.cht").write_text(
-                cht([(twin.name, twin.code)]), encoding="utf-8"
+                cht_file(twin.cheats), encoding="utf-8"
             )
     (out / "cases.txt").write_text(
         "".join(f"{c.name}\t{int(c.run)}\n" for c in mine), encoding="utf-8"
+    )
+    (out / "meta.json").write_text(
+        json.dumps({c.name: meta(c) for c in mine}), encoding="utf-8"
     )
 
 
@@ -618,56 +664,79 @@ def without_keys(snap):
     return bytes(b)
 
 
-def tsv(path):
-    rows = {}
-    if path.exists():
-        for line in path.read_text(errors="replace").splitlines():
-            cols = line.split("\t")
-            if len(cols) >= 3:
-                rows[Path(cols[0]).stem] = cols[2:]
-    return rows
-
-
-def pending_reason(row):
-    """Why Torii can't run a case yet, from its decoding (cheat_corpus.c's row)"""
-    status, lower = row[0], row[1] if len(row) > 1 else "-"
-    if status != "OK":
-        return None
-    if lower == "TOO_BIG":
+def pending_reason(t_lower):
+    """Why Torii can't run a cheat yet, from its lowering"""
+    if t_lower == "TOO_BIG":
         return "over the interpreter's budget"
     return None
 
 
+def slot_names(c, addrs):
+    """The cheats whose slots hold addrs"""
+    out = []
+    for a in addrs:
+        for start, end, what in c.slots:
+            if start <= a < end and what not in out:
+                out.append(what)
+    return out
+
+
+def differing_addrs(a, b):
+    return [where(i) for i in range(SNAP_LEN) if a[i] != b[i]]
+
+
+def decode_notes(c, decoded, rules):
+    """(bad, notes) from each cheat's decodings: Torii's against mGBA's
+    (tools/cheat_diff.py's rules), and an encrypted case against its raw twin"""
+    bad, notes = [], []
+    mgba_off = c.expect and c.expect.startswith("mgba-off")
+    for n, (desc, _, _) in enumerate(c.cheats):
+        d = decoded.get((f"{c.name}.cht", str(n)))
+        if d is None:
+            bad.append(f"{desc}: not decoded")
+            continue
+        if d.t_status != "OK":
+            bad.append(f"{desc}: Torii decodes it {d.t_status}")
+        if mgba_off or c.equiv:
+            continue  # mGBA decodes other codes
+        v, rid = cheat_diff.verdict(d, rules)
+        if v == "mismatch":
+            bad.append(
+                f"{desc}: decoders differ: torii {cheat_diff.text(d.t_ops)} | {' '.join(d.t_patches)}"
+                f" / mgba {d.m_status} {cheat_diff.text(d.m_ops)} | {' '.join(d.m_patches)}"
+            )
+        elif v in ("allow", "xfail"):
+            notes.append(f"{desc}: decodes unlike mGBA's as {v} rule {rid} says")
+        if c.twin:
+            tw = decoded.get((f"{c.twin}.cht", str(n)))
+            if tw is None or (tw.t_ops, tw.t_patches) != (d.t_ops, d.t_patches):
+                bad.append(f"{desc}: decodes unlike its raw twin {c.twin}")
+    return bad, notes
+
+
 def report(out):
+    """Compares each case's runs (out/meta.json lists the cases gen wrote);
+    exits 1 on a failure"""
     strict = os.environ.get("CHEAT_ENGINE_STRICT", "1") != "0"
-    by_name = {c.name: c for c in cases()}
-    torii_dec, mgba_dec = tsv(out / "torii.tsv"), tsv(out / "mgba.tsv")
+    meta = json.loads((out / "meta.json").read_text(encoding="utf-8"))
+    expected = cheat_diff.load_expected()
+    rules, engine = expected["decode"], expected["engine"]
+    chts = sorted(out.glob("*.cht"))
+    decoded = {
+        (d.file, d.n): d
+        for d in cheat_diff.cheats(chts, out / "torii.tsv", out / "mgba.tsv")
+    }
     counts, failed = {}, 0
     for line in (out / "cases.txt").read_text().splitlines():
         name, run = line.split("\t")
-        c = by_name[name]
-        notes = []
-        bad = []
-        t, m = torii_dec.get(name, ["MISSING"]), mgba_dec.get(name, ["MISSING"])
-        # Decoding: mGBA's against Torii's, and an encrypted case against its raw twin
-        t_ops = t[3].strip() if len(t) > 3 else ""
-        m_ops = m[1].strip() if len(m) > 1 else ""
-        if t[0] != "OK":
-            bad.append(f"Torii decodes it {t[0]}")
+        c = Meta(meta[name])
+        bad, notes = decode_notes(c, decoded, rules)
+        reason = None
+        for n in range(len(c.cheats)):
+            d = decoded.get((f"{name}.cht", str(n)))
+            reason = reason or (d and pending_reason(d.t_lower))
         mgba_off = c.expect and c.expect.startswith("mgba-off")
-        if (
-            not mgba_off
-            and t_ops != m_ops
-            and not c.name.startswith(("gsa-list-self", "gsa-list"))
-        ):
-            bad.append(f"decoders differ: torii {t_ops} / mgba {m_ops}")
-        if c.twin:
-            tw = torii_dec.get(c.twin, ["MISSING"])
-            if (tw[3].strip() if len(tw) > 3 else "?") != t_ops:
-                bad.append(
-                    f"decodes unlike its raw twin {c.twin}: {t_ops} / {tw[3].strip() if len(tw) > 3 else '?'}"
-                )
-        reason = pending_reason(t)
+        differ = []
         if run == "0":
             result = "not run"
             notes.append(c.expect.split(": ", 1)[1] if c.expect else "")
@@ -679,10 +748,9 @@ def report(out):
                 mg = {cp: without_keys(v) for cp, v in mg.items()}
                 to = {cp: without_keys(v) for cp, v in to.items()}
                 base = {cp: without_keys(v) for cp, v in base.items()}
+            log_path = out / f"{name}.torii.log"
             torii_log = (
-                (out / f"{name}.torii.log").read_text(errors="replace")
-                if (out / f"{name}.torii.log").exists()
-                else ""
+                log_path.read_text(errors="replace") if log_path.exists() else ""
             )
             missing = [
                 cp
@@ -722,39 +790,66 @@ def report(out):
                     result = "differs"
                 if differ and result != "same":
                     cp = differ[0]
+                    who = slot_names(c, differing_addrs(mg[cp], to[cp]))
                     notes.append(
                         f"at checkpoints {differ}; at {cp}, mgba / torii: {diff(mg[cp], to[cp])}"
+                        + (f"; in {', '.join(who)}" if who else "")
                     )
                     if mgba_off:
                         notes.insert(0, c.expect.split(": ", 1)[1])
                         tb = [cp for cp in CHECKPOINTS if to[cp] != base[cp]]
                         notes.append(
-                            f"Torii's run changes {tb and diff(base[tb[0]], to[tb[0]]) or 'nothing'}"
+                            f"Torii's run changes {(tb and diff(base[tb[0]], to[tb[0]])) or 'nothing'}"
                         )
                 if reason and result == "pending":
                     notes.insert(0, reason)
-        if bad and result not in ("differs",):
-            result = "differs" if result == "same" else result
         if bad:
             notes = bad + notes
             if result != "differs (known)":
                 result = "differs"
+        # tests/cheat_expected.toml's word on the case
+        if name in engine:
+            kind, why = engine[name]
+            if kind == "allow" and result == "differs":
+                result = "differs (allowed)"
+                notes.insert(0, why)
+            elif kind == "xfail":
+                result = "xfail" if result == "differs" else "xpass"
+                notes.insert(0, f"{why}: {expected['bugs'][why]}")
         counts[result] = counts.get(result, 0) + 1
         failed += result == "differs"
-        tag = {
-            "same": "PASS",
-            "differs": "FAIL",
-            "differs (known)": "PASS",
-            "pending": "SKIP",
-            "mgba-off": "PASS",
-            "not run": "PASS",
-        }[result]
+        tag = (
+            "FAIL" if result == "differs" else "SKIP" if result == "pending" else "PASS"
+        )
         detail = "; ".join(n for n in notes if n)
         print(
-            f"{tag}: cheat_engine: {name} ({c.fmt.name}): {result}{': ' + detail if detail else ''}"
+            f"{tag}: cheat_engine: {name} ({c.fmt}): {result}{': ' + detail if detail else ''}"
         )
     print("cheat_engine: " + ", ".join(f"{n} {k}" for k, n in sorted(counts.items())))
     return 1 if failed else 0
+
+
+class Meta:
+    """What report needs of a case, as gen saved it"""
+
+    def __init__(self, d):
+        self.__dict__.update(d)
+        self.slots = [tuple(s) for s in self.slots]
+        self.button = {int(k): v for k, v in self.button.items()}
+
+
+def meta(c):
+    return {
+        "name": c.name,
+        "fmt": c.fmt.name,
+        "expect": c.expect,
+        "effect": c.effect,
+        "button": c.button,
+        "twin": c.twin,
+        "slots": c.slots,
+        "cheats": c.cheats,
+        "equiv": bool(c.equiv),
+    }
 
 
 if __name__ == "__main__":

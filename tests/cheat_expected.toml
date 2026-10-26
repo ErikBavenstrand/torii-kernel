@@ -9,11 +9,14 @@
 #   kind = "xfail": a known bug, being fixed; flip it to "allow" (or delete
 #          it) once the fix lands, and see the corpus report for what it
 #          still matches.
+# [[bug]]: a known bug, being fixed, that tests/cheats/sample/expect.tsv
+# or an [[engine]] entry names (a decode rule of kind xfail is one too).
 # [[engine]]: a case of tests/cheat_engine.py (or a saved fuzz case) whose
 # runs in Torii and in mGBA's engine may differ:
-#   kind = "allow": the difference is intended; the case passes either way
-#   kind = "xfail": a known bug; the case reports XFAIL while it differs and
-#          XPASS once it doesn't (neither fails the suite)
+#   reason = "...": the difference is intended; the case passes either way
+#   bug = "id": a known bug; the case reports xfail while it differs and
+#          xpass once it doesn't (neither fails the suite): delete the entry
+#          once the fix lands
 
 # --- Intended ---------------------------------------------------------------
 
@@ -83,9 +86,6 @@ kind = "allow"
 reason = "mGBA bug: its CodeBreaker D0000020 (key test) never sets the conditional's negativeRepeat, so it keeps whatever the cheat list's memory held, an ELSE block from nowhere; Torii's has none"
 
 # --- Known bugs, being fixed ---------------------------------------------------
-# [[bug]]: a known bug that differential decoding can't see (both decoders
-# agree, the device doesn't); tests/cheats/sample/expect.tsv and [[engine]]
-# entries name them
 
 [[bug]]
 id = "par-c6c7-width"
@@ -115,3 +115,84 @@ reason = "CodeBreaker D-type codes other than D0000020 are unreadable in Torii (
 id = "cb-second-key"
 kind = "xfail"
 reason = "A second, different CodeBreaker key line in a file: Torii doesn't adopt it, so it and later cheats decode with the first key"
+
+[[bug]]
+id = "par-empty-then-else-run"
+reason = "An Action Replay v3 block IF with an empty THEN and an ELSE: Torii runs the ELSE block while the condition holds (as mGBA's _parEndBlock reads it), the device while it doesn't"
+
+[[bug]]
+id = "deadface-format"
+reason = "A DEADFACE line in a cheat with a cheatN_format line: its seeds don't reach the file's later cheats, which then decode with the default seeds"
+
+[[bug]]
+id = "rom-write-unaligned"
+reason = "Found by the type matrix (v0.7): a VBA (or CodeBreaker) halfword or word write to an odd or half-aligned ROM address is patched byte for byte at that address; a CPU store, mGBA's ROM patches and Torii's own writes elsewhere align it down"
+
+# --- Engine cases (tests/cheat_engine.py, tests/cheat_matrix.py) -----------------
+
+[[engine]]
+case = "k-par-empty-then-else"
+bug = "par-empty-then-else-run"
+
+[[engine]]
+case = "k-par-raw-empty-then-else"
+bug = "par-empty-then-else-run"
+
+[[engine]]
+case = "k-par-c6"
+bug = "par-c6c7-width"
+
+[[engine]]
+case = "k-par-c7"
+bug = "par-c6c7-width"
+
+[[engine]]
+case = "k-par-raw-c6"
+bug = "par-c6c7-width"
+
+[[engine]]
+case = "k-par-raw-c7"
+bug = "par-c6c7-width"
+
+[[engine]]
+case = "k-par-raw-padding-next2"
+bug = "par-padding-count"
+
+[[engine]]
+case = "k-gsa-slowdown"
+bug = "gs-slowdown-unreadable"
+
+[[engine]]
+case = "k-gsa-raw-slowdown"
+bug = "gs-slowdown-unreadable"
+
+[[engine]]
+case = "k-par-deadface-format"
+bug = "deadface-format"
+
+[[engine]]
+case = "k-cb-second-key"
+bug = "cb-second-key"
+
+[[engine]]
+case = "k-vba-rom-odd"
+bug = "rom-write-unaligned"
+
+# The hand-made C6/C7 cases compare with mGBA's own 8- and 16-bit reading:
+# once Torii writes the device's widths they differ, as they should
+# (k-par-c6 and k-par-c7 check the device's widths)
+[[engine]]
+case = "par-io8"
+reason = "C6: the device writes 16 bits, mGBA 8"
+
+[[engine]]
+case = "par-io8-raw"
+reason = "C6: the device writes 16 bits, mGBA 8"
+
+[[engine]]
+case = "par-io16"
+reason = "C7: the device writes 32 bits, mGBA 16"
+
+[[engine]]
+case = "par-io16-raw"
+reason = "C7: the device writes 32 bits, mGBA 16"

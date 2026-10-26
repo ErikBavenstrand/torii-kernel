@@ -8,8 +8,9 @@ set -euo pipefail
 
 out=$1
 shift
-obj=dist/host/mgba-cheats
-# The objects are rebuilt whenever this script or a source is newer
+# The objects sit beside OUT (callers may build at once: the engine test's
+# shards) and are rebuilt whenever this script or a source is newer
+obj=$out.obj
 mkdir -p "$obj"
 srcs=(core/cheats.c gba/cheats.c gba/cheats/gameshark.c gba/cheats/parv3.c gba/cheats/codebreaker.c
   util/string.c util/table.c util/hash.c util/gbk-table.c)
