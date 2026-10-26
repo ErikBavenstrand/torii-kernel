@@ -617,16 +617,20 @@ again for a game with cheats.
 **When the ROM has no padding for it.** SetTrimSize puts the area after the
 ROM's data (its trailing run of `0x00` or `0xFF`), but caps it: a 32 MB ROM's
 at `0x2000000` minus its length, a 16 MB EEPROM game's at `0x1000000` minus
-it, and the area then lies on the game's last bytes. That is EZ-Flash's
+it, and the area may then lie on the game's last bytes. That is EZ-Flash's
 behaviour for the menu and the reset keys, and Torii keeps it without
-cheats (`tests/cheat_safety.sh rom` checks where it goes): such a game's
-last `0x300` or `0x1000` bytes are overwritten, which hasn't shown in a
-game yet. With cheats (v0.7), the area is cut to what the picks need (the
-menu, the interpreter and this launch's table, from the cap's end down); if
-even that reaches the data, the cheats that run in game are left out
-(logged) and the area is as it would be without them. `Patch_RTS_Cheat`
+cheats (`tests/cheat_safety.sh rom` checks where it goes): a 32 MB game
+whose data runs to its end has its last `0x300` or `0x1000` bytes
+overwritten, which hasn't shown in a game yet. Many 32 MB files are 16 MB
+games overdumped: past the game, each halfword holds its own address / 2
+(the open-bus value; the card's FireRed is one), which counts as padding
+like `0x0000` and `0xFFFF`, so the area there is no harm. With cheats (v0.7),
+when the capped area isn't all padding, it is cut to what the picks need
+(the menu, the interpreter and this launch's table, from the cap's end
+down) if that much is padding; else the cheats that run in game are left
+out (logged) and the area is as it would be without them. `Patch_RTS_Cheat`
 also checks, in PSRAM, that the bytes the interpreter and table would take
-inside the file hold one padding value, and leaves the cheats out otherwise
+inside the file are padding, and leaves the cheats out otherwise
 (a `Patch_SpecialROM_TrimSize` game's fixed place, a cached `.pat`).
 
 **The cheats' ROM patches keep off the kernel's.** Every ROM write a

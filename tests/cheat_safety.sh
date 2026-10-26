@@ -200,15 +200,23 @@ EOF
 
   # 32 MB ROMs: the patch area has no padding to go in. Data to the end:
   # the cheats are left out, the game starts. 8 KB of padding at the end:
-  # the area is cut to what the picks need, and the data before it stays
+  # the area is cut to what the picks need, and the data before it stays.
+  # A 16 MB game overdumped to 32 MB (open-bus fill past its end, as the
+  # card's FireRed is): the area stays where it was, the cheats run
   printf '%s\n' 'cheat0_desc = "Beef"' 'cheat0_code = "0203F000:BEEF"' 'cheat0_enable = true' >"$carts/beef.cht"
-  for kind in full padded; do
+  for kind in full padded overdump; do
     python3 - "$carts/big.gba" "$kind" <<'EOF'
-import random, sys
+import random, struct, sys
 rom = open("tests/roms/hello/hello.gba", "rb").read()
-size, pad = 0x2000000, 0x2000 if sys.argv[2] == "padded" else 0
-data = random.Random(7).randbytes(size - len(rom) - pad)
-open(sys.argv[1], "wb").write(rom + data + b"\xff" * pad)
+size, kind = 0x2000000, sys.argv[2]
+if kind == "overdump":
+    data = random.Random(7).randbytes(0x1000000 - len(rom))
+    fill = b"".join(struct.pack("<H", (a >> 1) & 0xFFFF) for a in range(0x1000000, size, 2))
+    open(sys.argv[1], "wb").write(rom + data + fill)
+else:
+    pad = 0x2000 if kind == "padded" else 0
+    data = random.Random(7).randbytes(size - len(rom) - pad)
+    open(sys.argv[1], "wb").write(rom + data + b"\xff" * pad)
 EOF
     new_cart "big-$kind" "$carts/big.gba" Hello.gba "$carts/beef.cht"
     # shellcheck disable=SC2046 # nav.sh's options
@@ -216,22 +224,31 @@ EOF
       -m @120:0x09FFD000:16 -m @120:0x09FFDFF0:16 -f 6000 >"$cart/run.txt" 2>&1 || true
     grep -q "launch: starting the game" "$cart/run.txt" || fail "$kind: the game didn't start: $(grep -a '^kernel' "$cart/run.txt" | tail -3)"
     rom_at() { od -An -tx1 -j "$1" -N 16 "$carts/big.gba" | tr -d ' \n'; }
-    if [ $kind = full ]; then
-      grep -q "launch: the ROM.s data reaches 02000000, and the cheats' .* would cover it: the cheats that run in game are left out" "$cart/run.txt" ||
-        fail "full: the cheats weren't left out: $(grep -a 'launch: the ROM\|in-game code' "$cart/run.txt")"
+    case $kind in
+    full)
+      grep -q "launch: the patch area at 01FFD000 is on the game's data, and the cheats' .* would be too: the cheats that run in game are left out" "$cart/run.txt" ||
+        fail "full: the cheats weren't left out: $(grep -a 'launch: the patch\|in-game code' "$cart/run.txt")"
       [ "$(mem 0203F000)" != efbe ] || fail "full: the cheat ran"
       # Without cheats the menu's area is where it always was (on the data)
       grep -q "in-game code: in-game menu (RTS_ReplaceIRQ) at ROM 01FFF000\|in-game code: reset and sleep keys (Sleep_ReplaceIRQ) at ROM 01FFFD00" "$cart/run.txt" ||
         fail "full: the area without cheats moved: $(grep -a 'in-game code' "$cart/run.txt")"
       [ "$(mem 09FFD000)" = "$(rom_at $((0x1FFD000)))" ] || fail "full: the data at 01FFD000 changed"
-    else
-      grep -q "launch: the ROM's data reaches 01FFE000: the patch area is cut to" "$cart/run.txt" ||
-        fail "padded: the area wasn't cut: $(grep -a 'launch: the ROM\|in-game code' "$cart/run.txt")"
+      ;;
+    padded)
+      grep -q "launch: the patch area at 01FFD000 is on the game's data: cut to" "$cart/run.txt" ||
+        fail "padded: the area wasn't cut: $(grep -a 'launch: the patch\|in-game code' "$cart/run.txt")"
       [ "$(mem 0203F000)" = efbe ] || fail "padded: the cheat didn't run: $(mem 0203F000)"
       [ "$(mem 09FFDFF0)" = "$(rom_at $((0x1FFDFF0)))" ] || fail "padded: the game's last data changed"
-    fi
+      ;;
+    overdump)
+      ! grep -q "launch: the patch area at" "$cart/run.txt" || fail "overdump: the fill was taken for data"
+      grep -q "in-game code: in-game menu (RTS_ReplaceIRQ) at ROM 01FFD000" "$cart/run.txt" ||
+        fail "overdump: the area moved: $(grep -a 'in-game code' "$cart/run.txt")"
+      [ "$(mem 0203F000)" = efbe ] || fail "overdump: the cheat didn't run: $(mem 0203F000)"
+      ;;
+    esac
   done
-  echo "PASS: cheat_safety: a 32 MB ROM gets the cheats where padding holds them, and none over its data"
+  echo "PASS: cheat_safety: a 32 MB ROM gets the cheats where padding or an overdump's fill holds them, and none over its data"
   ;;
 *)
   fail "no mode $mode"

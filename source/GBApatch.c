@@ -282,6 +282,28 @@ static u32 Patch_length(void)
 	return 0x300;
 }
 //------------------------------------------------------------------
+//Torii: 1 if the ROM's halfword h at offset at is no data: 0x0000 or 0xFFFF
+//padding, or the open-bus value an overdump past a game's end holds
+static int blank_half(u32 at, u16 h)
+{
+	return h == 0 || h == 0xFFFF || h == (u16)(at >> 1);
+}
+//Torii: 1 if the ROM holds no data in [start, end), as buffer (its iSize
+//bytes from base) shows it; past romsize counts as none, and outside the
+//buffer as data
+static int rom_bytes_blank(const u8 *buffer, u32 base, u32 iSize, u32 romsize, u32 start, u32 end)
+{
+	if (end > romsize)
+		end = romsize;
+	for (u32 at = start & ~1u; at < end; at += 2) {
+		if (at < base || at + 2 > base + iSize)
+			return 0;
+		if (!blank_half(at, (u16)(buffer[at - base] | buffer[at - base + 1] << 8)))
+			return 0;
+	}
+	return 1;
+}
+//------------------------------------------------------------------
 //Torii: the bytes this launch's in-game code takes with the picked cheats:
 //the menu's code, the interpreter and their table (DEBUG's code goes in only
 //where it fits after them)
@@ -369,20 +391,25 @@ void SetTrimSize(u8 *buffer, u32 romsize, u32 iSize, u32 mode, BYTE saveMODE)
 	Patch_SpecialROM_TrimSize();
 	if (iTrimSize != scanned || gl_cheat_on != 1 || iTrimSize >= data_end)
 		return;
-	//Torii: a cap (32 MB, or 16 MB for EEPROM) put the patch area on the
-	//game's data: the cheats' room is cut to what they need, at the cap's end
+	//Torii: a cap (32 MB, or 16 MB for EEPROM) put the patch area on what may
+	//be the game's data. Where that is padding (an overdump's open-bus fill
+	//too), it stays; else the cheats' room is cut to what they need, at the
+	//cap's end, if that much is padding
 	u32 limit = iTrimSize + PATCH_LENGTH, need = Patch_need();
+	u32 base = (romsize - 1) & 0xFFFE0000;
+	if (rom_bytes_blank(buffer, base, iSize, romsize, iTrimSize, limit))
+		return;
 	u32 at = (limit - need) & ~15u;
-	if (at >= data_end) {
-		tlog("launch: the ROM's data reaches %08lX: the patch area is cut to %lX bytes at %08lX",
-		     (unsigned long)data_end, (unsigned long)limit - at, (unsigned long)at);
+	if (rom_bytes_blank(buffer, base, iSize, romsize, at, limit)) {
+		tlog("launch: the patch area at %08lX is on the game's data: cut to %lX bytes at %08lX",
+		     (unsigned long)iTrimSize, (unsigned long)limit - at, (unsigned long)at);
 		iTrimSize = at;
 		patch_room = limit - at;
 		return;
 	}
-	tlog("launch: the ROM's data reaches %08lX, and the cheats' %lX bytes from %08lX would cover it: the "
-	     "cheats that run in game are left out",
-	     (unsigned long)data_end, (unsigned long)need, (unsigned long)at);
+	tlog("launch: the patch area at %08lX is on the game's data, and the cheats' %lX bytes from %08lX would "
+	     "be too: the cheats that run in game are left out",
+	     (unsigned long)iTrimSize, (unsigned long)need, (unsigned long)at);
 	gl_cheat_on = 0;
 	gl_cheat_count = gl_cheat_bytes = 0;
 	SetTrimSize(buffer, romsize, iSize, mode, saveMODE);  // as without cheats
@@ -450,8 +477,7 @@ static void Patch_Reset_Sleep(u32 *Data)
 }
 //------------------------------------------------------------------
 //Torii: 1 if the game's PSRAM image holds no data in [start, end): past the
-//file's end, or one padding value (0x00 or 0xFF) throughout, as a ROM is
-//padded
+//file's end, or padding throughout (blank_half)
 static int rom_blank(u32 start, u32 end)
 {
 	if (end > rom_bytes)
@@ -459,13 +485,9 @@ static int rom_blank(u32 start, u32 end)
 	if (start >= end)
 		return 1;
 	int blank = 1;
-	u16 pad = 0;
 	for (u32 at = start & ~1u; at < end && blank; at += 2) {
 		SetPSRampage((u16)((at >> 23) * 0x1000));
-		u16 h = *(vu16 *)((u8 *)PSRAMBase_S98 + (at & 0x7FFFFF));
-		if (at == (start & ~1u))
-			pad = h;
-		blank = h == pad && (pad == 0 || pad == 0xFFFF);
+		blank = blank_half(at, *(vu16 *)((u8 *)PSRAMBase_S98 + (at & 0x7FFFFF)));
 	}
 	SetPSRampage(0);
 	return blank;
