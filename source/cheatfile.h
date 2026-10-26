@@ -24,8 +24,9 @@
 // that cheat alone in one format, with cheat_decoder_force, as the code
 // keypad's override saved it; "cheatN_user = true" marks a code typed on the
 // cart, which may be edited and deleted there. The keypad's edits
-// (cheatfile_add, _set_code, _remove) change the text in place and read it
-// again.
+// (cheatfile_add, _set_code, _remove) change the text in place, through a
+// struct cheatfile_room (the card side's text is in PSRAM, which takes no
+// byte stores), and read it again.
 //
 // Every cheat is decoded with one decoder in file order, the picked ones and
 // the others alike, as a type-9 CodeBreaker key or a GameShark seed carries
@@ -38,7 +39,7 @@
 
 #include "cheatcode.h"
 
-#define CHEATFILE_TEXT_MAX 0xE000  // the largest text read (libretro's reach 25 KB); a longer file is refused
+#define CHEATFILE_TEXT_MAX 0x30000  // the largest text read (192 KB; exports reach 90 KB); a longer file is refused
 #define CHEATFILE_MAX 1024         // cheats kept, numbered 0 to CHEATFILE_MAX - 1
 // The interpreter's budget for all picked cheats together (cheatcode.h):
 // its table's bytes (the end word left out) and cycles (its call left out)
@@ -47,7 +48,8 @@
 #define CHEATFILE_PROG_MAX (CHEATFILE_BYTES_MAX / 4)  // a cheat's table words
 #define CHEATFILE_OPS_MAX 256      // a cheat's decoded ops
 #define CHEATFILE_PATCHES_MAX 256  // a cheat's ROM patches
-#define CHEATFILE_NONE 0xFFFF      // no such line
+#define CHEATFILE_NONE 0xFFFFFFFFu  // no such line (or cheat)
+#define CHEATFILE_VALUE_MAX 0xFFFF  // a longer value isn't read: its line counts for nothing
 
 // What a cheat is, once decoded
 enum cheatfile_status {
@@ -73,9 +75,10 @@ enum cheatfile_why {
 // One cheat. Spans are offsets into the text, of a line's value without its
 // quotes.
 struct cheatfile_cheat {
-	u16 desc, desc_len;  // CHEATFILE_NONE: no desc line
-	u16 code, code_len;
-	u16 enable;          // CHEATFILE_NONE: no enable line
+	u32 desc;            // CHEATFILE_NONE: no desc line
+	u32 code;
+	u32 enable;          // CHEATFILE_NONE: no enable line
+	u16 desc_len, code_len;
 	u8 enable_len;
 	u8 status;           // enum cheatfile_status
 	u16 number;          // its N
@@ -94,7 +97,7 @@ struct cheatfile_out {
 	u32 pos;    // the output's bytes given so far
 	u32 t;      // the text's bytes passed so far
 	u32 edit;   // the text offset of the next enable value to change, past the text if none
-	u16 cheat;  // the cheat whose value is being given, else CHEATFILE_NONE
+	u32 cheat;  // the cheat whose value is being given, else CHEATFILE_NONE
 	u16 added;  // the next cheat to look at for an added enable line
 	u8 k, n;    // line's bytes given, and its length
 	u8 tail;    // 0 the text, 1 and 3 the added lines (before the first, after), 2 the end
@@ -111,7 +114,8 @@ struct cheatfile {
 	u32 cut;      // the text was over CHEATFILE_TEXT_MAX and is read cut: never write it back
 	u32 bytes;    // the picked OK cheats' table bytes
 	u32 cost;     // and cycles
-	u16 count_at, count_len;  // the "cheats = N" line's value, CHEATFILE_NONE if none
+	u32 count_at;  // the "cheats = N" line's value, CHEATFILE_NONE if none
+	u16 count_len;
 	u16 next;     // the number past the highest cheatN_ key's (a new cheat's), at most max
 	u16 max;      // the table's entries
 	u8 edited;    // an edit changed the text: write it back though no pick changed
@@ -187,8 +191,8 @@ void cheatfile_written(struct cheatfile *f);
 
 // --- Edits (the code keypad's) ------------------------------------------------------
 //
-// Each changes f's text in place, in buf (f->text, cap bytes), then reads it
-// again: every cheat CHEATFILE_NEW until decoded again from the first
+// Each changes f's text in place, in room (whose base is f->text), then
+// reads it again: every cheat CHEATFILE_NEW until decoded again from the first
 // (cheatfile_begin), the picks kept as they were (not yet written), and
 // f->edited set. The count line follows the cheats' numbers ("cheats = N",
 // one added at the top if the file had none). A desc loses its control
@@ -197,8 +201,20 @@ void cheatfile_written(struct cheatfile *f);
 enum cheatfile_edit {
 	CHEATFILE_EDIT_OK,
 	CHEATFILE_EDIT_FULL,  // a new cheat's number would be CHEATFILE_MAX (or the table's end)
-	CHEATFILE_EDIT_LONG,  // the text, picks written in, would pass CHEATFILE_TEXT_MAX or cap
+	CHEATFILE_EDIT_LONG,  // the text, picks written in, would pass CHEATFILE_TEXT_MAX or the room
 	CHEATFILE_EDIT_BAD,   // no such cheat, or a code with a quote or a control character
+};
+
+// Where the text lives, for the edits: cap bytes from base, read as plain
+// memory and written only through put (n bytes from src, which may be
+// anywhere readable but not in [dst, dst + n), to dst at any alignment) and
+// move (memmove's, within the room). tests/host's are memcpy and memmove;
+// the card side's write PSRAM (cheatstore.c).
+struct cheatfile_room {
+	char *base;
+	u32 cap;
+	void (*put)(char *dst, const char *src, u32 n);
+	void (*move)(char *dst, const char *src, u32 n);
 };
 
 // The cheatN_format values, by enum cheat_format (CHEAT_FMT_AUTO: none)
@@ -208,13 +224,15 @@ extern const char *const cheatfile_format_names[CHEAT_FMT_VBA + 1];
 // desc, code ("+" between lines), cheatN_enable = false (picked once it
 // decodes, by the caller), and cheatN_format unless format is
 // CHEAT_FMT_AUTO. *index gets its index, the last.
-u32 cheatfile_add(struct cheatfile *f, char *buf, u32 cap, const char *desc, const char *code, u8 format, u32 *index);
+u32 cheatfile_add(struct cheatfile *f, const struct cheatfile_room *room, const char *desc, const char *code, u8 format,
+		  u32 *index);
 // Replaces cheat i's code and format line (none for CHEAT_FMT_AUTO), and
 // its desc unless desc is NULL; its other lines stay.
-u32 cheatfile_set_code(struct cheatfile *f, char *buf, u32 cap, u32 i, const char *desc, const char *code, u8 format);
+u32 cheatfile_set_code(struct cheatfile *f, const struct cheatfile_room *room, u32 i, const char *desc,
+		       const char *code, u8 format);
 // Removes every cheatN_ line of cheat i (and a blank line before them),
 // and numbers the cheats after it one lower, as RetroArch reads a file's
 // cheats from 0 to its count.
-u32 cheatfile_remove(struct cheatfile *f, char *buf, u32 cap, u32 i);
+u32 cheatfile_remove(struct cheatfile *f, const struct cheatfile_room *room, u32 i);
 
 #endif

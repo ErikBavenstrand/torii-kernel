@@ -12,6 +12,7 @@ void test_cheatfile_add(void);
 void test_cheatfile_set_code(void);
 void test_cheatfile_remove(void);
 void test_cheatfile_edit_limits(void);
+void test_cheatfile_big(void);
 void test_cheatfile_rom_crc(void);
 void test_keypad_edit(void);
 void test_keypad_placeholder(void);

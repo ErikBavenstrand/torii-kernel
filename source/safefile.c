@@ -202,6 +202,35 @@ int safefile_read(void *buf, u32 size)
 	return (int)n;
 }
 
+int safefile_read_part(void *buf, u32 size)
+{
+	TLOG_ASSERT(((u32)buf & 3) == 0);
+	if (!rd.open)
+		return -1;
+	u32 have = rd.have - rd.at, n;
+	rd.first = 0;
+	if (have) {
+		// What safefile_line left first
+		n = have < size ? have : size;
+		memcpy(buf, sf_chunk + rd.at, n);
+		rd.at += n;
+		return (int)n;
+	}
+	u32 left = rd.limit - rd.done;
+	n = left < size ? left : size;
+	if (!n)
+		return 0;
+	UINT got = 0;
+	FRESULT res = f_read(&sf_file, buf, n, &got);
+	rd.done += got;
+	if (res != FR_OK || got != n) {
+		tlog_error("safefile: a read stopped %lu bytes short", (unsigned long)(left - got));
+		sf_failed = 1;
+		return -1;
+	}
+	return (int)n;
+}
+
 int safefile_failed(void)
 {
 	return sf_failed;

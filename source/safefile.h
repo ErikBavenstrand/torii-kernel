@@ -47,6 +47,10 @@ int safefile_line(char *buf, u32 size);
 // whole sectors to the card's DMA. Returns its length, or -1 if it is
 // longer than size or the read failed (safefile_failed says which).
 int safefile_read(void *buf, u32 size);
+// The open copy's text in parts, as safefile_read gives it whole: up to size
+// bytes of what is left into buf (word-aligned), for a text larger than any
+// RAM buffer. Returns how many, 0 at its end, or -1 if the read failed.
+int safefile_read_part(void *buf, u32 size);
 void safefile_close(void);
 // 1 if reading the file since the last safefile_open failed (a card error,
 // not a missing file or a copy that doesn't hold up): what was read may be

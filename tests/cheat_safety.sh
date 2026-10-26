@@ -82,10 +82,10 @@ files)
   mkdir -p "$carts"
   there() { mtype -i "$cart/sd.img" "::/$1" >/dev/null 2>&1; }
   # Too big: a picked cheat first, then padding past CHEATFILE_TEXT_MAX
-  # (0xE000) by 5 bytes, which still fits safefile's read of the file
+  # (0x30000) by 5 bytes, which still fits safefile's read of the file
   big=$carts/big.cht
   printf '%s\n' 'cheat0_desc = "Beef"' 'cheat0_code = "0203F000:BEEF"' 'cheat0_enable = true' >"$big"
-  pad=$((0xE000 + 5 - $(stat -c %s "$big")))
+  pad=$((0x30000 + 5 - $(stat -c %s "$big")))
   {
     head -c $((pad - 1)) /dev/zero | tr '\0' '#'
     printf '\n'
@@ -94,7 +94,7 @@ files)
   # shellcheck disable=SC2046 # nav.sh's options
   boot $(nav_game_menu gba 0) -f 1200 >"$cart/popup.txt" 2>&1 || true
   grep -q "screen ready: game-popup" "$cart/popup.txt" || fail "no game popup: $(grep -a '^kernel' "$cart/popup.txt" | tail -3)"
-  grep -q "cheats: /torii/cheats/Hello.cht is 57349 bytes, over 57344: too big, left alone" "$cart/popup.txt" ||
+  grep -q "cheats: /torii/cheats/Hello.cht is 196613 bytes, over 196608: too big, left alone" "$cart/popup.txt" ||
     fail "the big file wasn't refused: $(grep -a 'cheats:' "$cart/popup.txt" | head -3)"
   ! grep -q "cheats: popup:" "$cart/popup.txt" || fail "the popup offered Cheats for the big file"
   # shellcheck disable=SC2046 # nav.sh's options
@@ -103,7 +103,7 @@ files)
   ! grep -q "cheats: .*picked" "$cart/launch.txt" || fail "a launch applied the big file's cheats"
   ! grep -qi "mem frame [0-9]* 0203F000: ef be" "$cart/launch.txt" || fail "the big file's cheat ran"
   mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | cmp -s - "$big" || fail "the big file changed"
-  echo "PASS: cheat_safety: a cheat file over 57,344 bytes is refused: no Cheats, none applied, the file as it was"
+  echo "PASS: cheat_safety: a cheat file over 196,608 bytes is refused: no Cheats, none applied, the file as it was"
 
   # cheatN_enable = 1 picks
   one=$carts/one.cht

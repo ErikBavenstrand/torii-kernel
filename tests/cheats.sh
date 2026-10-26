@@ -194,6 +194,119 @@ popups=$(sed -n 's/.*cheats: popup: \(-\{0,1\}[0-9]*\) listed.*/\1/p' "$cart/big
 [ "$popups" = "-1 500 " ] || fail "the popup counted ${popups:-nothing}, not -1 (no count) and then 500"
 echo "PASS: cheats: a file of 500 cheats is read once, decoded behind a progress dialog, and picks at once; the popup counts it once the screen has"
 
+# big_cht OUT COUNT BYTES [user] [from]: a file of COUNT cheats padded to
+# about BYTES (LF). Cheat k (counting from FROM, numbered from 0) writes
+# EWRAM, its desc padded; the first writes 0203F080, the last two are picked
+# in the file: a ROM patch of the header's title (080000A0) and a write to
+# 0203F084. With "user", the first is a code of the user's.
+big_cht() {
+  python3 - "$@" <<'EOF'
+import sys
+out, count, size = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+user = len(sys.argv) > 4 and sys.argv[4] == "user"
+first = int(sys.argv[5]) if len(sys.argv) > 5 else 0
+total = count + first
+
+def text(pad, start):
+    lines = [f"cheats = {total - start}", ""]
+    for num, k in enumerate(range(start, total)):
+        code = {0: "0203F080:11", total - 2: "080000A0:4954", total - 1: "0203F084:22"}.get(k, "0203F1%02X:%02X" % (k & 0x7F, k & 0xFF))
+        lines += [f'cheat{num}_desc = "Cheat {k} ' + "x" * pad + '"', f'cheat{num}_code = "{code}"',
+                  f"cheat{num}_enable = {'true' if k >= total - 2 else 'false'}"]
+        if user and k == 0:
+            lines.append(f"cheat{num}_user = true")
+        lines.append("")
+    return "\n".join(lines)
+
+# The padding of the file from cheat 0, so one from cheat FROM matches it
+t = text(max(0, (size - len(text(0, 0))) // total), first)
+assert len(t) <= 0x30000, len(t)
+open(out, "w").write(t)
+EOF
+}
+
+# Files past the old 56 KB cap and 16-bit offsets (100 KB, 600 cheats) and
+# near the new one (190 KB, 1,000 cheats): listed, the first cheat picked on
+# the screen and saved (only its enable line changes), and at a launch the
+# picks run, the ROM patch far into the file included
+for big in "600 100000" "1000 190000"; do
+  read -r count bytes <<<"$big"
+  cp "$cart/clean/sd.img" "$cart/clean/kernel-nor.bin" "$cart/"
+  rm -f "$cart/sram.bin"
+  big_cht "$cart/Huge.cht" "$count" "$bytes"
+  mcopy -o -i "$cart/sd.img" "$cart/Huge.cht" "::/torii/cheats/Hello.cht"
+  pick boot -f 12000 >"$cart/huge.txt" 2>&1 ||
+    fail "the $count-cheat file's screen didn't run: $(grep -a '^kernel' "$cart/huge.txt" | tail -3)"
+  grep -q "cheats: .*Hello.cht: $count cheats, 0 master codes hidden, 2 picked" "$cart/huge.txt" ||
+    fail "the $count-cheat file read: $(grep -a 'cheats:' "$cart/huge.txt" | head -3)"
+  grep -q "cheats: /torii/cheats/Hello.cht: 3 picked, written" "$cart/huge.txt" ||
+    fail "the $count-cheat file's pick wasn't saved: $(grep -a 'cheats:' "$cart/huge.txt" | tail -2)"
+  mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht >"$cart/after.cht"
+  sed 's/^cheat0_enable = false$/cheat0_enable = true/' "$cart/Huge.cht" >"$cart/want.cht"
+  head -c "$(stat -c %s "$cart/want.cht")" "$cart/after.cht" | cmp -s - "$cart/want.cht" ||
+    fail "the $count-cheat file's write-back changed more than the enable line: $(diff "$cart/want.cht" "$cart/after.cht" | head -5)"
+  launch_big() {
+    # shellcheck disable=SC2046 # nav.sh's options
+    boot $(nav_launch /Hello.gba addon) -w "BOOT WITH ADDON" -m @240:0x0203F080:1 -m @240:0x0203F084:1 \
+      -m @240:0x080000A0:2 -f 6000
+  }
+  launch_big >"$cart/launch.txt" 2>&1 ||
+    fail "the $count-cheat file's launch didn't run: $(grep -a '^kernel' "$cart/launch.txt" | tail -3)"
+  grep -q "cheats: /torii/cheats/Hello.cht: 3 picked, 2 run in game" "$cart/launch.txt" ||
+    fail "the $count-cheat file's launch read: $(grep -a 'cheats:' "$cart/launch.txt" | head -3)"
+  grep -q "cheats: 1 ROM patches written into the game" "$cart/launch.txt" ||
+    fail "the $count-cheat file's ROM patch wasn't written: $(grep -a 'cheats:' "$cart/launch.txt" | tail -3)"
+  bmem() { sed -n "s/^mem frame [0-9]* $1: //p" "$cart/launch.txt" | tr -d ' \n' | tr A-F a-f; }
+  [ "$(bmem 0203F080)" = 11 ] || fail "the $count-cheat file: 0203F080 holds $(bmem 0203F080), not 11"
+  [ "$(bmem 0203F084)" = 22 ] || fail "the $count-cheat file: 0203F084 holds $(bmem 0203F084), not 22"
+  [ "$(bmem 080000A0)" = 5449 ] || fail "the $count-cheat file: the ROM at 080000A0 reads $(bmem 080000A0), not 5449"
+  echo "PASS: cheats: a file of $count cheats ($(stat -c %s "$cart/Huge.cht") bytes) lists, picks, saves only its enable line, and its picks run at launch with a ROM patch"
+done
+
+# Deleting a code of the user's from a 100 KB file, cut at each step: every
+# cheat after it is numbered one lower in PSRAM, then the file is written;
+# the next power-on reads the file as it was or as the delete left it whole
+cp "$cart/clean/sd.img" "$cart/clean/kernel-nor.bin" "$cart/"
+rm -f "$cart/sram.bin"
+big_cht "$cart/Before.cht" 600 100000 user
+big_cht "$cart/After.cht" 599 100000 user 1
+mcopy -o -i "$cart/sd.img" "$cart/Before.cht" "::/torii/cheats/Hello.cht"
+del_scenario() {
+  # shellcheck disable=SC2046 # nav.sh's options
+  cut_run "$@" $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
+    -w "screen ready: cheats" -k @8:SELECT -k @12:- \
+    -w "screen ready: cheat-menu" -k @16:DOWN -k @20:- -k @28:A -k @32:- \
+    -w "screen ready: confirm" -k @8:RIGHT -k @12:- -k @20:A -k @24:- \
+    -w "cheats: deleted" -w "screen ready: cheats" -k @8:B -k @12:- -w "cheats: back" -f 12000
+}
+del_check() {
+  local n=$1 name=$2 got
+  cut_run -f 400
+  [ "$cut_status" = 0 ] || fail "delete, cut at $n ($name): the next power-on exited with $cut_status"
+  rm -rf "$carts/cutread" && mkdir -p "$carts/cutread"
+  mcopy -n -i "$cart/sd.img" ::/torii/cheats/Hello.cht "$carts/cutread/" 2>/dev/null || true
+  mcopy -n -i "$cart/sd.img" ::/torii/cheats/Hello.cht.bak "$carts/cutread/" 2>/dev/null || true
+  got=$(python3 -c '
+import sys
+sys.path.insert(0, "tools")
+import cheats
+t = cheats.read_card_file(sys.argv[1])
+for name in sys.argv[2:]:
+    if t == open(name).read():
+        print(name.rsplit("/", 1)[-1])
+        break
+else:
+    print("neither")
+' "$carts/cutread/Hello.cht" "$cart/Before.cht" "$cart/After.cht")
+  case $got in
+  Before.cht | After.cht) ;;
+  *) fail "delete, cut at $n ($name): the file reads back as neither the old nor the new" ;;
+  esac
+  [ "$n" != 0 ] || [ "$got" = After.cht ] || fail "delete, uncut: the file reads back as $got"
+}
+cut_sweep del_scenario del_check
+echo "PASS: cheats: a power cut at each of a 100 KB file's delete's $cut_count steps leaves the file as it was or with every cheat renumbered"
+
 # The pick's write-back, cut at each step: either the old picks or the new
 # are read at the next power-on, never a broken file
 cp "$cart/clean/sd.img" "$cart/clean/kernel-nor.bin" "$cart/"

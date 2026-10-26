@@ -158,7 +158,10 @@ static void parse_kv(struct cheatfile *f, const struct kv *kv, u32 max)
 	u32 n = 0, digits;
 	u32 what = cheat_key(f->text + kv->key, kv->klen, max, &n, &digits);
 	const char *s = f->text + kv->val;
-	u16 at = (u16)kv->val, len = (u16)kv->vlen;
+	u32 at = kv->val;
+	u16 len = (u16)kv->vlen;
+	if (kv->vlen > CHEATFILE_VALUE_MAX)
+		return;  // no span of ours holds it
 	if (what == KEY_COUNT) {
 		f->count_at = at;
 		f->count_len = len;
@@ -423,14 +426,14 @@ static int added(const struct cheatfile_cheat *c)
 
 // The text offset of the first enable value to change at or after t; past
 // the text if none
-static u32 next_edit(const struct cheatfile *f, u32 t, u16 *cheat)
+static u32 next_edit(const struct cheatfile *f, u32 t, u32 *cheat)
 {
 	u32 best = f->len + 1;
 	for (u32 i = 0; i < f->count; i++) {
 		const struct cheatfile_cheat *c = &f->cheats[i];
 		if (edited(c) && c->enable >= t && c->enable < best) {
 			best = c->enable;
-			*cheat = (u16)i;
+			*cheat = i;
 		}
 	}
 	return best;
@@ -569,17 +572,46 @@ static void reread(struct cheatfile *f, const char *buf, u32 len)
 	f->edited = 1;
 }
 
-// Text written into place, or only counted (p NULL)
+// Text written into place from p through the room, or only counted (room
+// NULL): staged, and put in a few calls (out_end puts the rest)
+#define OUT_STAGE 64
 struct out {
-	char *p;
-	u32 n;
+	const struct cheatfile_room *room;
+	char *p;  // where the staged bytes go
+	u32 n;    // bytes given in all
+	u32 k;    // bytes staged
+	char stage[OUT_STAGE];
 };
+
+static void out_begin(struct out *o, const struct cheatfile_room *room, char *p)
+{
+	o->room = room;
+	o->p = p;
+	o->n = o->k = 0;
+}
+
+static void out_end(struct out *o)
+{
+	if (o->room && o->k)
+		o->room->put(o->p, o->stage, o->k);
+	o->p += o->k;
+	o->k = 0;
+}
 
 static void put(struct out *o, const char *s, u32 len)
 {
-	if (o->p)
-		memcpy(o->p + o->n, s, len);
 	o->n += len;
+	if (!o->room)
+		return;
+	while (len) {
+		u32 take = OUT_STAGE - o->k < len ? OUT_STAGE - o->k : len;
+		memcpy(o->stage + o->k, s, take);
+		o->k += take;
+		s += take;
+		len -= take;
+		if (o->k == OUT_STAGE)
+			out_end(o);
+	}
 }
 
 static void put_s(struct out *o, const char *s)
@@ -662,7 +694,8 @@ static s32 pieces_delta(const struct cheatfile *f, const struct piece *pcs, u32 
 {
 	s32 delta = 0;
 	for (u32 i = 0; i < n; i++) {
-		struct out o = {NULL, 0};
+		struct out o;
+		out_begin(&o, NULL, NULL);
 		put_piece(&o, f, &pcs[i]);
 		delta += (s32)o.n - (s32)pcs[i].del;
 	}
@@ -675,7 +708,8 @@ static u32 pieces_grow(const struct cheatfile *f, const struct piece *pcs, u32 n
 {
 	u32 grow = 0;
 	for (u32 i = 0; i < n; i++) {
-		struct out o = {NULL, 0};
+		struct out o;
+		out_begin(&o, NULL, NULL);
 		put_piece(&o, f, &pcs[i]);
 		if (o.n > pcs[i].del)
 			grow += o.n - pcs[i].del;
@@ -683,8 +717,8 @@ static u32 pieces_grow(const struct cheatfile *f, const struct piece *pcs, u32 n
 	return grow;
 }
 
-// 1 if the text with delta more bytes, the picks written in, fits buf and
-// the cheat file's cap
+// 1 if the text with delta more bytes, the picks written in, fits the room
+// (cap bytes) and the cheat file's cap
 static int fits(const struct cheatfile *f, u32 cap, s32 delta)
 {
 	s32 picks = (s32)cheatfile_text_len(f) - (s32)f->len;
@@ -692,10 +726,11 @@ static int fits(const struct cheatfile *f, u32 cap, s32 delta)
 	return len >= 0 && (u32)len <= cap && out <= CHEATFILE_TEXT_MAX;
 }
 
-// Applies the pieces (none overlapping, in any order) to buf, highest first
-// so the lower ones' offsets hold; the text's new length
-static u32 apply(const struct cheatfile *f, char *buf, struct piece *pcs, u32 n)
+// Applies the pieces (none overlapping, in any order) to the room, highest
+// first so the lower ones' offsets hold; the text's new length
+static u32 apply(const struct cheatfile *f, const struct cheatfile_room *room, struct piece *pcs, u32 n)
 {
+	char *buf = room->base;
 	u32 len = f->len;
 	for (u32 i = 1; i < n; i++)
 		for (u32 j = i; j > 0 && pcs[j - 1].at < pcs[j].at; j--) {
@@ -705,12 +740,14 @@ static u32 apply(const struct cheatfile *f, char *buf, struct piece *pcs, u32 n)
 		}
 	for (u32 i = 0; i < n; i++) {
 		const struct piece *pc = &pcs[i];
-		struct out o = {NULL, 0};
+		struct out o;
+		out_begin(&o, NULL, NULL);
 		put_piece(&o, f, pc);
-		memmove(buf + pc->at + o.n, buf + pc->at + pc->del, len - pc->at - pc->del);
-		o.p = buf + pc->at;
-		o.n = 0;
+		if (o.n != pc->del && len > pc->at + pc->del)
+			room->move(buf + pc->at + o.n, buf + pc->at + pc->del, len - pc->at - pc->del);
+		out_begin(&o, room, buf + pc->at);
 		put_piece(&o, f, pc);
+		out_end(&o);
 		len = len - pc->del + o.n;
 	}
 	return len;
@@ -740,7 +777,7 @@ static u32 count_piece(const struct cheatfile *f, int add, struct piece *pc)
 }
 
 // The count line made to follow the numbers, the text read again
-static void set_count(struct cheatfile *f, char *buf, u32 cap, int add)
+static void set_count(struct cheatfile *f, const struct cheatfile_room *room, int add)
 {
 	struct piece pc;
 	if (!count_piece(f, add, &pc))
@@ -751,9 +788,9 @@ static void set_count(struct cheatfile *f, char *buf, u32 cap, int add)
 		snprintf(line, sizeof(line), "cheats = %u%s%s", (unsigned)f->next, eol, f->len ? eol : "");
 		pc.s = line;
 	}
-	if (!fits(f, cap, pieces_delta(f, &pc, 1)))
+	if (!fits(f, room->cap, pieces_delta(f, &pc, 1)))
 		return;  // an add keeps room for it (COUNT_ROOM); a read takes the file without it all the same
-	reread(f, buf, apply(f, buf, &pc, 1));
+	reread(f, room->base, apply(f, room, &pc, 1));
 }
 
 // 1 if code may go in a quoted value: no quote, no control character
@@ -767,7 +804,8 @@ static int code_ok(const char *code)
 	return 1;
 }
 
-u32 cheatfile_add(struct cheatfile *f, char *buf, u32 cap, const char *desc, const char *code, u8 format, u32 *index)
+u32 cheatfile_add(struct cheatfile *f, const struct cheatfile_room *room, const char *desc, const char *code, u8 format,
+		  u32 *index)
 {
 	if (!code_ok(code) || format > CHEAT_FMT_VBA)
 		return CHEATFILE_EDIT_BAD;
@@ -786,18 +824,17 @@ u32 cheatfile_add(struct cheatfile *f, char *buf, u32 cap, const char *desc, con
 	if (format != CHEAT_FMT_AUTO)
 		pcs[k++] = (struct piece){at, 0, PIECE_LINE, 0, 0, 0, "format", cheatfile_format_names[format], n};
 	pcs[k++] = (struct piece){at, 0, PIECE_LINE, 0, 1, 0, "user", "true", n};
-	if (!fits(f, cap, pieces_delta(f, pcs, k) + COUNT_ROOM))
+	if (!fits(f, room->cap, pieces_delta(f, pcs, k) + COUNT_ROOM))
 		return CHEATFILE_EDIT_LONG;
 	struct picks p;
 	picks_save(f, &p);
-	u32 len = f->len;
-	for (u32 i = 0; i < k; i++) {
-		struct out o = {buf + len, 0};
+	struct out o;
+	out_begin(&o, room, room->base + f->len);
+	for (u32 i = 0; i < k; i++)
 		put_piece(&o, f, &pcs[i]);
-		len += o.n;
-	}
-	reread(f, buf, len);
-	set_count(f, buf, cap, 1);
+	out_end(&o);
+	reread(f, room->base, f->len + o.n);
+	set_count(f, room, 1);
 	picks_restore(f, &p, CHEATFILE_NONE);
 	f->edited = 1;
 	*index = f->count - 1;
@@ -818,7 +855,8 @@ static u32 line_end(const char *text, u32 len, u32 at)
 	return nl ? (u32)(nl - text) + 1 : len;
 }
 
-u32 cheatfile_set_code(struct cheatfile *f, char *buf, u32 cap, u32 i, const char *desc, const char *code, u8 format)
+u32 cheatfile_set_code(struct cheatfile *f, const struct cheatfile_room *room, u32 i, const char *desc,
+		       const char *code, u8 format)
 {
 	if (i >= f->count || !code_ok(code) || format > CHEAT_FMT_VBA)
 		return CHEATFILE_EDIT_BAD;
@@ -855,27 +893,29 @@ u32 cheatfile_set_code(struct cheatfile *f, char *buf, u32 cap, u32 i, const cha
 		u8 brk = (u8)(f->text[end - 1] != '\n');
 		pcs[k++] = (struct piece){end, 0, PIECE_LINE, brk, 0, 0, "format", cheatfile_format_names[format], n};
 	}
-	if (!fits(f, cap, pieces_delta(f, pcs, k)) || f->len + pieces_grow(f, pcs, k) > cap)
+	if (!fits(f, room->cap, pieces_delta(f, pcs, k)) || f->len + pieces_grow(f, pcs, k) > room->cap)
 		return CHEATFILE_EDIT_LONG;
 	struct picks p;
 	picks_save(f, &p);
-	reread(f, buf, apply(f, buf, pcs, k));
+	reread(f, room->base, apply(f, room, pcs, k));
 	picks_restore(f, &p, CHEATFILE_NONE);
 	f->edited = 1;
 	return CHEATFILE_EDIT_OK;
 }
 
 // Moves [from, from + len) to w (w <= from); w past it
-static u32 move_to(char *buf, u32 w, u32 from, u32 len)
+static u32 move_to(const struct cheatfile_room *room, u32 w, u32 from, u32 len)
 {
-	memmove(buf + w, buf + from, len);
+	if (w != from && len)
+		room->move(room->base + w, room->base + from, len);
 	return w + len;
 }
 
-u32 cheatfile_remove(struct cheatfile *f, char *buf, u32 cap, u32 i)
+u32 cheatfile_remove(struct cheatfile *f, const struct cheatfile_room *room, u32 i)
 {
 	if (i >= f->count)
 		return CHEATFILE_EDIT_BAD;
+	const char *buf = room->base;
 	u32 n = f->cheats[i].number;
 	struct picks p;
 	picks_save(f, &p);
@@ -893,7 +933,7 @@ u32 cheatfile_remove(struct cheatfile *f, char *buf, u32 cap, u32 i)
 			continue;
 		}
 		if (held != CHEATFILE_NONE)
-			w = move_to(buf, w, held, held_len);
+			w = move_to(room, w, held, held_len);
 		held = CHEATFILE_NONE;
 		if (kv.blank) {
 			held = kv.start;
@@ -904,17 +944,17 @@ u32 cheatfile_remove(struct cheatfile *f, char *buf, u32 cap, u32 i)
 			char digits[8];
 			u32 dl = (u32)snprintf(digits, sizeof(digits), "%lu", (unsigned long)(m - 1));
 			u32 after = kv.key + 5 + d;
-			w = move_to(buf, w, kv.start, kv.key + 5 - kv.start);
-			memcpy(buf + w, digits, dl);  // over the old digits at most
-			w = move_to(buf, w + dl, after, kv.end - after);
+			w = move_to(room, w, kv.start, kv.key + 5 - kv.start);
+			room->put(room->base + w, digits, dl);  // over the old digits at most
+			w = move_to(room, w + dl, after, kv.end - after);
 		} else {
-			w = move_to(buf, w, kv.start, kv.end - kv.start);
+			w = move_to(room, w, kv.start, kv.end - kv.start);
 		}
 	}
 	if (held != CHEATFILE_NONE)
-		w = move_to(buf, w, held, held_len);
+		w = move_to(room, w, held, held_len);
 	reread(f, buf, w);
-	set_count(f, buf, cap, 0);
+	set_count(f, room, 0);
 	picks_restore(f, &p, n);
 	f->edited = 1;
 	return CHEATFILE_EDIT_OK;
