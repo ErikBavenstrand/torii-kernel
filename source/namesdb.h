@@ -234,6 +234,12 @@ const char *names_lookup(const char *path, u32 size, u32 console);
 // not names.db is there; 0 if the cache has no live record of it at that
 // size with a CRC (or isn't loaded yet).
 int names_crc(const char *path, u32 size, u32 *crc);
+// The same for the file at path as it is on the card now, before the cache
+// is loaded too (a launch at the boot): then crc.txt's line for it is read
+// straight from the card through safefile, line (line_size bytes, at least
+// SAFEFILE_LINE_MAX) its scratch. 0 if no line holds for the file's size
+// and date.
+int names_crc_now(const char *path, u32 *crc, char *line, u32 line_size);
 // The dats' version names.db was made from ("2026.10.07"), or NULL.
 const char *names_dat_version(void);
 // Settings' "Identify library": CRCs for every library game without one.

@@ -751,3 +751,33 @@ void test_cheatfile_edit_limits(void)
 	free(edit_buf);
 	edit_buf = NULL;
 }
+
+static int rom_crc(const char *text, u32 *crc)
+{
+	*crc = 0;
+	return cheatfile_rom_crc(text, (u32)strlen(text), crc);
+}
+
+void test_cheatfile_rom_crc(void)
+{
+	u32 crc;
+	CHECK(rom_crc("# for crc32 DD88761C\ncheats = 0\n", &crc));
+	CHECK_EQ(crc, 0xDD88761C);
+	// Lower case, CRLF, a BOM, spaces around, and not on the first line
+	CHECK(rom_crc("\xEF\xBB\xBF# GameHacking.org\r\n  # for crc32 84ee4776 \r\ncheats = 0\r\n", &crc));
+	CHECK_EQ(crc, 0x84EE4776);
+	// The first such line counts
+	CHECK(rom_crc("# for crc32 00000001\n# for crc32 00000002\n", &crc));
+	CHECK_EQ(crc, 1);
+	// Without the line, or a broken one: for any dump
+	CHECK(!rom_crc("cheats = 0\n", &crc));
+	CHECK(!rom_crc("# for crc32 DD88761\n", &crc));
+	CHECK(!rom_crc("# for crc32 DD88761CX\n", &crc));
+	CHECK(!rom_crc("# for crc32 DD8876G1\n", &crc));
+	CHECK(!rom_crc("#for crc32 DD88761C\n", &crc));
+	CHECK(!rom_crc("cheat0_desc = \"# for crc32 DD88761C\"\n", &crc));
+	CHECK(!rom_crc("", &crc));
+	// The end of the text ends the line
+	CHECK(cheatfile_rom_crc("# for crc32 DD88761Cjunk", 20, &crc));
+	CHECK_EQ(crc, 0xDD88761C);
+}

@@ -124,6 +124,11 @@ struct cheatfile {
 // those are read, and f->cut says so.
 void cheatfile_parse(struct cheatfile *f, const char *text, u32 len, struct cheatfile_cheat *cheats, u32 max);
 
+// The ROM the file was made for: 1 with its CRC32 in *crc if a line of the
+// len bytes of text is "# for crc32 XXXXXXXX" (just cheats writes it first;
+// the first such line counts), else 0: a file written by hand is for any dump.
+int cheatfile_rom_crc(const char *text, u32 len, u32 *crc);
+
 // The decoder and the buffers one cheat decodes into. After cheatfile_next,
 // prog and patches hold that cheat's part of the table and its patches.
 struct cheatfile_work {

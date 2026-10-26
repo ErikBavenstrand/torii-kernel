@@ -372,3 +372,37 @@ add_check() {
 }
 cut_sweep add_scenario add_check
 echo "PASS: cheats: a power cut at each of a new code's $cut_count write steps leaves the file without it or with it"
+
+# A file made by just cheats names its dump ("# for crc32 X"): the kernel
+# leaves it out, in the popup and at a launch, when the CRC cache knows the
+# ROM as another dump, and reads it when the CRC is the ROM's
+crc=$(python3 -c 'import sys, zlib; print("%08X" % zlib.crc32(open(sys.argv[1], "rb").read()))' tests/roms/hello/hello.gba)
+size=$(stat -c %s tests/roms/hello/hello.gba)
+for want in DEADBEEF "$crc"; do
+  cp "$cart/clean/sd.img" "$cart/clean/kernel-nor.bin" "$cart/"
+  rm -f "$cart/sram.bin"
+  printf '%s\t%s\t-\t/Hello.gba\n' "$crc" "$size" >"$cart/crc.txt"
+  mcopy -o -i "$cart/sd.img" "$cart/crc.txt" ::/torii/crc.txt
+  printf '%s\n' "# for crc32 $want" 'cheats = 1' '' 'cheat0_desc = "Dump"' 'cheat0_code = "3203F070+0033"' \
+    'cheat0_enable = true' >"$cart/Dump.cht"
+  mcopy -o -i "$cart/sd.img" "$cart/Dump.cht" ::/torii/cheats/Hello.cht
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot $(nav_game_menu gba 0) -f 400 >"$cart/dump-popup.txt" 2>&1 ||
+    fail "the popup for crc32 $want didn't run: $(grep -a '^kernel' "$cart/dump-popup.txt" | tail -3)"
+  launch_dump -m "@240:0x0203F070:1" >"$cart/dump-launch.txt" 2>&1 ||
+    fail "the launch for crc32 $want didn't run: $(grep -a '^kernel' "$cart/dump-launch.txt" | tail -3)"
+  got=$(sed -n 's/^mem frame [0-9]* 0203F070: //p' "$cart/dump-launch.txt" | tr -d ' \n' | tr A-F a-f)
+  left="cheats: /torii/cheats/Hello.cht is for crc32 $want, and /Hello.gba is $crc: left out"
+  if [ "$want" = "$crc" ]; then
+    grep -q "cheats: popup: 1 listed" "$cart/dump-popup.txt" ||
+      fail "the popup for its own dump: $(grep -a 'cheats:' "$cart/dump-popup.txt" | tail -2)"
+    [ "$got" = 33 ] || fail "the cheat for its own dump: 0203F070 holds $got, not 33"
+  else
+    grep -qF "$left" "$cart/dump-popup.txt" ||
+      fail "the popup read another dump's file: $(grep -a 'cheats:\|names:' "$cart/dump-popup.txt" | tail -3)"
+    grep -qF "$left" "$cart/dump-launch.txt" ||
+      fail "the launch read another dump's file: $(grep -a 'cheats:\|names:' "$cart/dump-launch.txt" | tail -3)"
+    [ "$got" != 33 ] || fail "another dump's cheat ran: 0203F070 holds 33"
+  fi
+done
+echo "PASS: cheats: a file for another dump (# for crc32) is left out in the popup and at a launch; its own dump's runs"

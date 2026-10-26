@@ -190,6 +190,42 @@ static void parse_kv(struct cheatfile *f, const struct kv *kv, u32 max)
 	}
 }
 
+int cheatfile_rom_crc(const char *text, u32 len, u32 *crc)
+{
+	static const char tag[] = "# for crc32 ";
+	const u32 tag_len = sizeof(tag) - 1;
+	u32 pos = text_start(text, len);
+	while (pos < len) {
+		const char *nl = memchr(text + pos, '\n', len - pos);
+		u32 end = nl ? (u32)(nl - text) : len;
+		u32 s = pos;
+		while (s < end && is_space(text[s]))
+			s++;
+		if (end - s >= tag_len + 8 && !memcmp(text + s, tag, tag_len)) {
+			u32 v = 0, i;
+			for (i = 0; i < 8; i++) {
+				char c = text[s + tag_len + i];
+				u32 d = c >= '0' && c <= '9'   ? (u32)(c - '0')
+					: c >= 'A' && c <= 'F' ? (u32)(c - 'A' + 10)
+					: c >= 'a' && c <= 'f' ? (u32)(c - 'a' + 10)
+							       : 16;
+				if (d == 16)
+					break;
+				v = v << 4 | d;
+			}
+			u32 rest = s + tag_len + 8;
+			while (rest < end && is_space(text[rest]))
+				rest++;
+			if (i == 8 && rest == end) {
+				*crc = v;
+				return 1;
+			}
+		}
+		pos = end + 1;
+	}
+	return 0;
+}
+
 void cheatfile_parse(struct cheatfile *f, const char *text, u32 len, struct cheatfile_cheat *cheats, u32 max)
 {
 	u32 cut = len > CHEATFILE_TEXT_MAX;

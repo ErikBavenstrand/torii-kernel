@@ -81,6 +81,7 @@ static const struct {
 	{"cheatfile_set_code", test_cheatfile_set_code},
 	{"cheatfile_remove", test_cheatfile_remove},
 	{"cheatfile_edit_limits", test_cheatfile_edit_limits},
+	{"cheatfile_rom_crc", test_cheatfile_rom_crc},
 	{"keypad_edit", test_keypad_edit},
 	{"keypad_placeholder", test_keypad_placeholder},
 	{"keypad_check", test_keypad_check},

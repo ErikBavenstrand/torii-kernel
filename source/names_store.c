@@ -706,6 +706,43 @@ int names_crc(const char *path, u32 size, u32 *crc)
 	return 1;
 }
 
+// Paths compare without ASCII case, as FAT matches names
+static int path_eq(const char *a, const char *b)
+{
+	for (;; a++, b++) {
+		char x = *a >= 'a' && *a <= 'z' ? (char)(*a - 32) : *a;
+		char y = *b >= 'a' && *b <= 'z' ? (char)(*b - 32) : *b;
+		if (x != y)
+			return 0;
+		if (!x)
+			return 1;
+	}
+}
+
+int names_crc_now(const char *path, u32 *crc, char *line, u32 line_size)
+{
+	FILINFO fi;
+	if (f_stat(path, &fi) != FR_OK)
+		return 0;
+	u32 size = (u32)fi.fsize, date = (u32)fi.fdate << 16 | fi.ftime;
+	if (N.phase == P_DONE)
+		return names_crc(path, size, crc);
+	if (line_size < SAFEFILE_LINE_MAX || safefile_open(NAMES_CACHE_FILE, NAMES_CACHE_FILE_MAX) == SAFEFILE_NONE)
+		return 0;
+	int found = 0, n;
+	while ((n = safefile_line(line, line_size)) != SAFEFILE_END) {
+		struct names_line l;
+		if (n < 0 || !names_parse_line(line, &l) || !(l.flags & NAMES_CRC) || !path_eq(l.path, path))
+			continue;
+		struct names_rec r = {0, l.size, l.date, l.crc, l.flags << 24};
+		found = names_cache_fits(&r, size, date) != NAMES_STALE;
+		*crc = l.crc;
+		break;
+	}
+	safefile_close();
+	return found;
+}
+
 const char *names_dat_version(void)
 {
 	return N.phase == P_DONE && N.db_ok ? db_header()->dat_version : NULL;

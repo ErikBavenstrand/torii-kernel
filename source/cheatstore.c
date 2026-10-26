@@ -11,6 +11,7 @@
 #include "Ezcard_OP.h"
 #include "GBApatch.h"
 #include "ff.h"
+#include "namesdb.h"
 #include "tlog.h"
 #include "engine/cycles.h"
 
@@ -64,6 +65,28 @@ static int any_copy(char *path)
 	return there;
 }
 
+// Set while a launch's second pass reads the file: the game is in PSRAM by
+// then, over the CRC cache, and the first pass has checked the dump
+static u8 dump_checked EWRAM_BSS;
+
+// 0 if the file names the dump it was made for (cheatfile_rom_crc) and the
+// CRC cache (or crc.txt, before the cache is loaded) knows the ROM at
+// rom_path as another: its codes would write another build's addresses. A
+// ROM whose CRC isn't known yet passes. The cheat table is crc.txt's line
+// buffer: cheatfile_parse fills it afresh after.
+static int for_this_dump(const char *rom_path, const char *text, u32 len)
+{
+	u32 want, crc;
+	struct cheatstore *cs = cheatstore();
+	_Static_assert(sizeof(cs->cheats) >= SAFEFILE_LINE_MAX, "crc.txt's line fits the cheat table");
+	if (dump_checked || !cheatfile_rom_crc(text, len, &want) ||
+	    !names_crc_now(rom_path, &crc, (char *)cs->cheats, sizeof(cs->cheats)) || crc == want)
+		return 1;
+	tlog("cheats: %s is for crc32 %08lX, and %s is %08lX: left out", cheatstore()->path, (unsigned long)want,
+	     rom_path, (unsigned long)crc);
+	return 0;
+}
+
 int cheatstore_open(const char *rom_path)
 {
 	struct cheatstore *cs = cheatstore();
@@ -103,6 +126,8 @@ int cheatstore_open(const char *rom_path)
 		     CHEATFILE_TEXT_MAX);
 		return CHEATSTORE_NONE;
 	}
+	if (!for_this_dump(rom_path, (const char *)cs->text, (u32)len))
+		return CHEATSTORE_NONE;
 	cheatfile_parse(&cs->file, (const char *)cs->text, (u32)len, cs->cheats, CHEATFILE_MAX);
 	cheatfile_begin(&cs->work);
 	if (cs->file.dropped)
@@ -223,7 +248,10 @@ void cheatstore_launch(const char *rom_path, u32 psram_bytes)
 	gl_cheat_count = 0;
 	gl_cheat_bytes = 0;
 	gl_cheat_patches = 0;
-	if (!cheatstore_read(rom_path))
+	dump_checked = psram_bytes != 0;
+	int read = cheatstore_read(rom_path);
+	dump_checked = 0;
+	if (!read)
 		return;
 	struct cheatstore *cs = cheatstore();
 	struct cheatfile *f = &cs->file;
