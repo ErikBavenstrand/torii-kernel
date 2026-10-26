@@ -10,8 +10,8 @@
 # must also decode alike in mGBA's decoders and Torii's.
 #
 # Usage: cheat_engine.sh [N/M]: every case, or the Nth shard of M (tests/all.sh
-# runs it as shards). Cases Torii can't run yet are reported "pending" and
-# don't fail; CHEAT_ENGINE_STRICT=1 fails them too. CHEAT_ENGINE_JOBS runs that
+# runs it as shards). A case Torii can't run ("pending") fails;
+# CHEAT_ENGINE_STRICT=0 only reports it. CHEAT_ENGINE_JOBS runs that
 # many cases at once (default 1). mGBA's runs hold the cheat device's own
 # button (GameShark type 8, Action Replay v3 buttons) at some checkpoints;
 # Torii's hold the keys CHEAT_BUTTON_KEYS names there instead (default

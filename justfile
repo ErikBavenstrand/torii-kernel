@@ -287,9 +287,9 @@ test-host: emu-image
 
 # Run every cheat code type of every format on the cheat test ROM in mGBA's own cheat engine and
 # through Torii, and compare the memory (tests/cheat_engine.sh; part of `just test`).
-# CHEAT_ENGINE_STRICT=1 fails the cases still pending the interpreter; CHEAT_BUTTON_KEYS the device button's keys (default R+SELECT)
+# CHEAT_ENGINE_STRICT=0 only reports cases Torii can't run; CHEAT_BUTTON_KEYS the device button's keys (default R+SELECT)
 cheat-engine: build emu-headless test-roms
-    {{emu_docker}} env CHEAT_ENGINE_JOBS=8 CHEAT_ENGINE_STRICT="${CHEAT_ENGINE_STRICT:-}" CHEAT_BUTTON_KEYS="${CHEAT_BUTTON_KEYS:-}" tests/cheat_engine.sh
+    {{emu_docker}} env CHEAT_ENGINE_JOBS=8 CHEAT_ENGINE_STRICT="${CHEAT_ENGINE_STRICT:-1}" CHEAT_BUTTON_KEYS="${CHEAT_BUTTON_KEYS:-}" tests/cheat_engine.sh
 
 # Decode every cheat in a folder of libretro GBA .cht files (default dist/cheat-corpus, never
 # committed) with Torii's decoders and with mGBA's, print Torii's summary and where they differ

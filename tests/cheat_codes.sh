@@ -11,8 +11,7 @@
 #
 # Codes marked interpreter (conditionals, button activators) run one at a
 # time, holding their keys from game frame 500 to the dump at 600, in both;
-# until Torii's per-frame interpreter lands, Torii not writing them is
-# reported (SKIP), not failed, unless CHEAT_ENGINE_STRICT=1. A code whose
+# Torii not writing them fails (CHEAT_ENGINE_STRICT=0 only reports it). A code whose
 # condition is on the game's own state (no keys) can't be set up here: it is
 # only reported. Games missing from roms/ are skipped.
 # Runs inside the torii-emu container after `just build` and `just
@@ -26,7 +25,7 @@ set -euo pipefail
 local_carts "dist/cart-cheat-codes"
 
 shot=emu/build-linux/mgba-shot
-strict=${CHEAT_ENGINE_STRICT:-}
+strict=${CHEAT_ENGINE_STRICT-1}
 failed=0 passed=0 skipped=0 pending=0
 # One line per game: file, then its codes as "desc|code|addr:width:value,...|interpreter|keys"
 mapfile -t games < <(
@@ -180,7 +179,7 @@ for line in "${games[@]}"; do
     elif [ -z "$tbad" ]; then
       echo "PASS: cheat_codes: $what, in Torii and in mGBA's engine"
       passed=$((passed + 1))
-    elif [ -z "$strict" ]; then
+    elif [ "$strict" = 0 ]; then
       echo "SKIP: cheat_codes: $what: pending the interpreter: Torii$tbad; $(grep -a 'cheats: cheat' "$cart/run.txt" | tail -1)"
       pending=$((pending + 1))
     else

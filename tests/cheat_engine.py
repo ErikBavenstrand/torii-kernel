@@ -26,8 +26,8 @@ Results per case:
              differ (fails the test, unless the case is pending)
   pending    Torii can't run it yet (it needs the per-frame interpreter, or
              is a 16- or 32-bit write to palette, VRAM or OAM, which the
-             byte table can't make): reported, not failed, unless
-             CHEAT_ENGINE_STRICT=1, which the interpreter's landing turns on
+             byte table can't make): a failure since the interpreter
+             landed; CHEAT_ENGINE_STRICT=0 only reports it
   mgba-off   mGBA's engine can't run it (says why); Torii's run is shown
 Every case also checks its codes decode the same in mGBA's decoders and in
 Torii's (tools/cheat_oracle.c, tools/cheat_corpus.c: DIR/*.tsv), an
@@ -639,7 +639,7 @@ def pending_reason(row):
 
 
 def report(out):
-    strict = os.environ.get("CHEAT_ENGINE_STRICT") == "1"
+    strict = os.environ.get("CHEAT_ENGINE_STRICT", "1") != "0"
     by_name = {c.name: c for c in cases()}
     torii_dec, mgba_dec = tsv(out / "torii.tsv"), tsv(out / "mgba.tsv")
     counts, failed = {}, 0

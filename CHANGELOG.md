@@ -11,6 +11,12 @@ git log, not here.
   by a port of mGBA's decoders (MPL-2.0, `source/cheatcode.c`) from one
   libretro-format file per game, `/torii/cheats/<rom path>.cht`, which moves
   and renames with its game (6e4d8e1b, e3d7dcf1, 6fe4231c, 51d987bb, a4596285).
+- **Added:** a per-frame cheat interpreter (`source/cheatrun.s`) in the
+  game's patch area: every code type the decoders read runs each VBlank with
+  mGBA's semantics (writes at their width, fills and slides, pointer writes,
+  add/or/and, conditionals with ELSE blocks, button activators on R+SELECT),
+  within a cycle budget of 10% of a frame; the patch area grows to 0x3000
+  bytes (025f8ca5, 650b03e8).
 - **Added:** a cheat screen from "Cheats" in a GBA game's popup: a tick per
   cheat, picks saved power-cut safe in the file and applied at every launch,
   cheats on from the game's start, and a big file read once behind a progress
