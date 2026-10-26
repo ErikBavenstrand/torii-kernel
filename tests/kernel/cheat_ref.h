@@ -3,7 +3,8 @@
 // (source/cheatcode.h), with Torii's choices for what mGBA leaves to the
 // frontend: IF_BUTTON reads CHEAT_BUTTON_KEYS on KEYINPUT, and ROM patches,
 // ROM writes and slowdown codes do nothing each frame (they are applied at
-// launch, or not at all). The tests compare the table cheat_lower builds,
+// launch, or not at all). Where the devices differ from mGBA, it follows
+// them: IF_LT and IF_GT compare signed at the width. The tests compare the table cheat_lower builds,
 // run by the interpreter, with this.
 //
 // The includer defines, before including it:
@@ -75,6 +76,12 @@ static inline void cheat_ref_run(const struct cheat_op *ops, u32 n)
 			case CHEAT_OP_IF_NAND:
 			case CHEAT_OP_IF_NEVER: {
 				s32 r = type == CHEAT_OP_IF_NEVER ? 0 : CHEAT_REF_READ(address, width);
+				if ((type == CHEAT_OP_IF_LT || type == CHEAT_OP_IF_GT) && width < 4) {
+					// Torii's: signed at the width, as the devices compare
+					u32 shift = 32 - 8 * width;
+					r = (s32)((u32)r << shift);
+					operand = (s32)((u32)operand << shift);
+				}
 				switch (type) {
 				case CHEAT_OP_IF_EQ:
 					condition = r == operand;
