@@ -125,3 +125,268 @@ decoded = [{address = 0x08157290, width = 2, value = 0x46C0}]
 rom_patch = true
 source = "https://almarsguides.com/retro/walkthroughs/GBA/games/PokemonFireRed/Gameshark/"
 confidence = "medium"
+
+# Codes that need the per-frame interpreter (v0.7): conditionals and button activators.
+# keys: what to hold so a KEYINPUT condition is true ("" for one on the game's own state, which
+# the test can't set up: it then only reports). Until the interpreter lands they are pending:
+# reported, not failed, unless CHEAT_ENGINE_STRICT=1. Each also runs in plain mGBA's cheat engine.
+
+[[code]]
+game = "Metroid Fusion.gba"
+format = "codebreaker"
+desc = "Moon Jump"
+code = "74000130 03FE+83001260 0040"
+decoded = [{address = 0x03001260, width = 2, value = 0x40}]
+rom_patch = false
+interpreter = true
+keys = "A"
+condition = "keys == 0x03FE (KEYINPUT)"
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/MetroidFusion/CodeBreaker/"
+confidence = "medium"
+
+[[code]]
+game = "The Legend of Zelda - The Minish Cap.gba"
+format = "gameshark_raw"
+desc = "Cucco Timer Frozen (Hold L to Unfreeze)"
+code = "601426AC 000046C0+D4000131 00000001+601426AC 00003801"
+decoded = [{address = 0x08284D58, width = 2, value = 0x46C0}, {address = 0x08284D58, width = 2, value = 0x3801}]
+rom_patch = true
+interpreter = true
+keys = ""
+condition = "if halfword at 0x04000131 == 0x0001"
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/ZeldaTheMinishCap/Gameshark/"
+confidence = "low"
+
+[[code]]
+game = "The Legend of Zelda - The Minish Cap.gba"
+format = "gameshark_raw"
+desc = "Shrink Link (L + A) Return Link to Normal Size (L + B)"
+code = "D3000FF0 00000201+1300116C 00000009+D3000FF0 00000202+1300116C 00000209+D300116C 00000309+1300116C 00000409"
+decoded = [{address = 0x0300116C, width = 2, value = 0x9}, {address = 0x0300116C, width = 2, value = 0x209}, {address = 0x0300116C, width = 2, value = 0x409}]
+rom_patch = false
+interpreter = true
+keys = ""
+condition = "if halfword at 0x03000FF0 == 0x0201"
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/ZeldaTheMinishCap/Gameshark/"
+confidence = "medium"
+
+[[code]]
+game = "The Legend of Zelda - The Minish Cap.gba"
+format = "gameshark_raw"
+desc = "Roll Through Walls"
+code = "D300116C 00000118+03001198 00000008+D3001184 00000140+03001198 00000001"
+decoded = [{address = 0x03001198, width = 1, value = 0x8}, {address = 0x03001198, width = 1, value = 0x1}]
+rom_patch = false
+interpreter = true
+keys = ""
+condition = "if halfword at 0x0300116C == 0x0118"
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/ZeldaTheMinishCap/Gameshark/"
+confidence = "medium"
+
+[[code]]
+game = "Mario Kart - Super Circuit.gba"
+format = "codebreaker"
+desc = "Turbo Mode"
+code = "74000130 03FE+33003C56 00FF"
+decoded = [{address = 0x03003C56, width = 1, value = 0xFF}]
+rom_patch = false
+interpreter = true
+keys = "A"
+condition = "keys == 0x03FE (KEYINPUT)"
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/MarioKartSuperCircuit/CodeBreaker/"
+confidence = "medium"
+
+[[code]]
+game = "Mario Kart - Super Circuit.gba"
+format = "codebreaker"
+desc = "End Race With (Select + L)"
+code = "74000130 01FB+33003BE0 0034"
+decoded = [{address = 0x03003BE0, width = 1, value = 0x34}]
+rom_patch = false
+interpreter = true
+keys = "SELECT+L"
+condition = "keys == 0x01FB (KEYINPUT)"
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/MarioKartSuperCircuit/CodeBreaker/"
+confidence = "medium"
+
+[[code]]
+game = "Mario Kart - Super Circuit.gba"
+format = "codebreaker"
+desc = "Auto Pilot On (Select + Up)"
+code = "74000130 03BB+33003BE1 00A0"
+decoded = [{address = 0x03003BE1, width = 1, value = 0xA0}]
+rom_patch = false
+interpreter = true
+keys = "SELECT+UP"
+condition = "keys == 0x03BB (KEYINPUT)"
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/MarioKartSuperCircuit/CodeBreaker/"
+confidence = "medium"
+
+[[code]]
+game = "Mario Kart - Super Circuit.gba"
+format = "codebreaker"
+desc = "Auto Pilot off (Select + Down)"
+code = "74000130 037B+33003BE1 0080"
+decoded = [{address = 0x03003BE1, width = 1, value = 0x80}]
+rom_patch = false
+interpreter = true
+keys = "SELECT+DOWN"
+condition = "keys == 0x037B (KEYINPUT)"
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/MarioKartSuperCircuit/CodeBreaker/"
+confidence = "medium"
+
+[[code]]
+game = "Pokemon - FireRed Version.gba"
+format = "codebreaker"
+desc = "Unlimited Money (Press B + Start)"
+code = "74000130 03F5+820257BC 423F+74000130 03F5+820257BE 000F"
+decoded = [{address = 0x020257BC, width = 2, value = 0x423F}, {address = 0x020257BE, width = 2, value = 0xF}]
+rom_patch = false
+interpreter = true
+keys = "B+START"
+condition = "keys == 0x03F5 (KEYINPUT)"
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/PokemonFireRed/CodeBreaker/"
+confidence = "medium"
+
+[[code]]
+game = "Pokemon - FireRed Version.gba"
+format = "codebreaker"
+desc = "Max Game Corner Coins (Press B + Left)"
+code = "74000130 03DD+8202583D 757E"
+decoded = [{address = 0x0202583D, width = 2, value = 0x757E}]
+rom_patch = false
+interpreter = true
+keys = "B+LEFT"
+condition = "keys == 0x03DD (KEYINPUT)"
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/PokemonFireRed/CodeBreaker/"
+confidence = "medium"
+
+[[code]]
+game = "Super Mario Advance 2 - Super Mario World.gba"
+format = "gameshark_v1"
+desc = "Balloon Mode Off (Press Down + L)"
+code = "330F2E6E 0B86B2D7+1AE30AC7 D2F444BE+330F2E6E 0B86B2D7+4B32670E BE23513B"
+decoded = [{address = 0x02000202, width = 2, value = 0x0}, {address = 0x0300369E, width = 2, value = 0x1}]
+rom_patch = false
+interpreter = true
+keys = "DOWN+L"
+condition = "if halfword at 0x04000130 == 0x017F"
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/SuperMarioAdvance2/Gameshark/"
+confidence = "medium"
+
+[[code]]
+game = "Super Mario Advance 2 - Super Mario World.gba"
+format = "gameshark_v1"
+desc = "Balloon Mode On (Press Up + L)"
+code = "F3E3991A 7B8DD78E+0AB0D5FA B6971B5A+648672ED F454AB85+EB015E37 441E42E3+648672ED F454AB85+7DBA3CF3 8840D58E+648672ED F454AB85+DBCF48A3 ECC08A35"
+decoded = [{address = 0x02000202, width = 2, value = 0x1}, {address = 0x0300369E, width = 2, value = 0xC0}, {address = 0x03003AFA, width = 2, value = 0x7D}, {address = 0x03003AFC, width = 2, value = 0xB}]
+rom_patch = false
+interpreter = true
+keys = "UP+L"
+condition = "if halfword at 0x04000130 == 0x01BF"
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/SuperMarioAdvance2/Gameshark/"
+confidence = "medium"
+
+[[code]]
+game = "Super Mario Advance 2 - Super Mario World.gba"
+format = "gameshark_v1"
+desc = "Invulnerability Off (Press L + A)"
+code = "95DB7079 EC3D0114+3576BADE 59A72D48+33DD0B9B B4A571C1+E0511F36 5D216685"
+decoded = [{address = 0x02000200, width = 2, value = 0x0}, {address = 0x030054D0, width = 2, value = 0xFF00}]
+rom_patch = false
+interpreter = true
+keys = "A+L"
+condition = "if halfword at 0x04000130 == 0x01FE"
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/SuperMarioAdvance2/Gameshark/"
+confidence = "medium"
+
+[[code]]
+game = "Super Mario Advance 2 - Super Mario World.gba"
+format = "gameshark_v1"
+desc = "Invulnerability On (Press L + B)"
+code = "F62DA6B5 B3C334F1+9C885DEF A657C984+7D467C19 E6E26FF7+F0A07685 B7C0BF14"
+decoded = [{address = 0x02000200, width = 2, value = 0x1}, {address = 0x030054D0, width = 2, value = 0xFFF0}]
+rom_patch = false
+interpreter = true
+keys = "B+L"
+condition = "if halfword at 0x04000130 == 0x01FD"
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/SuperMarioAdvance2/Gameshark/"
+confidence = "medium"
+
+[[code]]
+game = "Super Mario Advance 2 - Super Mario World.gba"
+format = "gameshark_v1"
+desc = "Skip Level (Select L + R)"
+code = "7D0EF08F 2C4E78EC+9D7219E7 CE97B871"
+decoded = [{address = 0x030055C8, width = 1, value = 0xFF}]
+rom_patch = false
+interpreter = true
+keys = "SELECT+R+L"
+condition = "if halfword at 0x04000130 == 0x00FB"
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/SuperMarioAdvance2/Gameshark/"
+confidence = "medium"
+
+[[code]]
+game = "Sonic Advance.gba"
+format = "gameshark_raw"
+desc = "Moon Jump"
+code = "D3005A58 00000001+13005A2A 0000FD00"
+decoded = [{address = 0x03005A2A, width = 2, value = 0xFD00}]
+rom_patch = false
+interpreter = true
+keys = ""
+condition = "if halfword at 0x03005A58 == 0x0001"
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/SonicAdvance/Gameshark/"
+confidence = "medium"
+
+[[code]]
+game = "Mario & Luigi - Superstar Saga.gba"
+format = "codebreaker"
+desc = "Stat Bonus Always +9 (Hold Select)"
+code = "74000130 03FB+33003F82 0009"
+decoded = [{address = 0x03003F82, width = 1, value = 0x9}]
+rom_patch = false
+interpreter = true
+keys = "SELECT"
+condition = "keys == 0x03FB (KEYINPUT)"
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/MarioandLuigiSuperstarSaga/CodeBreaker/"
+confidence = "medium"
+
+[[code]]
+game = "Mario & Luigi - Superstar Saga.gba"
+format = "codebreaker"
+desc = "For 9 Spirits on HooHoo Mountain (Press R+A)"
+code = "74000130 02FE+32004EFC 0009"
+decoded = [{address = 0x02004EFC, width = 1, value = 0x9}]
+rom_patch = false
+interpreter = true
+keys = "A+R"
+condition = "keys == 0x02FE (KEYINPUT)"
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/MarioandLuigiSuperstarSaga/CodeBreaker/"
+confidence = "medium"
+
+[[code]]
+game = "Mario & Luigi - Superstar Saga.gba"
+format = "gameshark_v1"
+desc = "Press L + R + A"
+code = "BE3601A0 5B587B55+93138563 F71EE777+BE3601A0 5B587B55+A92E5028 55E8ADA5+BE3601A0 5B587B55+3294B6C0 B540EF74+BE3601A0 5B587B55+DE12ACD8 037D40B9"
+decoded = [{address = 0x020048B0, width = 2, value = 0x3E7}, {address = 0x020048B8, width = 2, value = 0x3E7}, {address = 0x020048B4, width = 2, value = 0x3E7}, {address = 0x020048BC, width = 2, value = 0x3E7}]
+rom_patch = false
+interpreter = true
+keys = "A+R+L"
+condition = "if halfword at 0x04000130 == 0x00FE"
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/MarioandLuigiSuperstarSaga/Gameshark/"
+confidence = "medium"
+
+[[code]]
+game = "Mario & Luigi - Superstar Saga.gba"
+format = "gameshark_v1"
+desc = "Press L + R + A"
+code = "BE3601A0 5B587B55+682B776E 7EEF4BDC+BE3601A0 5B587B55+C4B89207 2E64F312+BE3601A0 5B587B55+2D195970 AA9BDC3E+BE3601A0 5B587B55+2D3E8A99 7B1B1462"
+decoded = [{address = 0x02004874, width = 2, value = 0x3E7}, {address = 0x0200487C, width = 2, value = 0x3E7}, {address = 0x02004878, width = 2, value = 0x3E7}, {address = 0x02004880, width = 2, value = 0x3E7}]
+rom_patch = false
+interpreter = true
+keys = "A+R+L"
+condition = "if halfword at 0x04000130 == 0x00FE"
+source = "https://almarsguides.com/retro/walkthroughs/GBA/games/MarioandLuigiSuperstarSaga/Gameshark/"
+confidence = "medium"

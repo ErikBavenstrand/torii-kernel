@@ -53,6 +53,15 @@
 //   -D DIR           write each -H frame's screen as DIR/HASH.png, unless
 //                    one is there (tests/shots.py keeps the expected frames
 //                    of animations so)
+//   -E CHEATS.cht    load a libretro-format cheat file (cheats = N,
+//                    cheatN_code, ...) into mGBA's own cheat device, every
+//                    cheat on whatever its cheatN_enable says, for a ROM run
+//                    in plain mGBA (not the kernel): the reference for
+//                    Torii's cheats (tests/cheat_engine.sh). mGBA runs them
+//                    at each frame's end, or at a master code's hook address
+//   -B FRAME:0|1     from FRAME on, the cheat device's own button (GameShark
+//                    type 8, Action Replay v3 button codes) is up (0) or
+//                    held (1), for -E's cheats
 //   -T FROM:TO       watch frames FROM to TO (as -H takes them) for tears:
 //                    a store that changes what the screen shows while lines
 //                    0-159 scan out prints a "tear:" line (see the tear
@@ -66,6 +75,7 @@
 // a crash report (registers, and code addresses found on the stack with their
 // symbols) and exits with status 3.
 #include <mgba/flags.h>
+#include <mgba/core/cheats.h>
 #include <mgba/core/core.h>
 #include <mgba/core/log.h>
 #include <mgba/core/serialize.h>
@@ -691,6 +701,8 @@ struct options {
 	struct events states;
 	struct events ranges;
 	struct events tears;
+	struct events buttons;
+	const char *cheatFile;
 	const char *outDir;
 	const char *frameDir;
 	long long epoch;
@@ -774,6 +786,12 @@ static void parse_options(struct options *opts, int argc, char **argv)
 			struct event *ev = add_event(&opts->keys, argv[++i]);
 			no_zero(ev, "-k");
 			note_frame(ev, strcmp(ev->arg, "-") != 0);
+		} else if (!strcmp(argv[i], "-E")) {
+			opts->cheatFile = argv[++i];
+		} else if (!strcmp(argv[i], "-B")) {
+			struct event *ev = add_event(&opts->buttons, argv[++i]);
+			no_zero(ev, "-B");
+			note_frame(ev, 1);
 		} else if (!strcmp(argv[i], "-S")) {
 			opts->saveOut = argv[++i];
 		} else if (!strcmp(argv[i], "-s")) {
@@ -965,6 +983,38 @@ static int save_png(const char *path, const color_t *pixels, unsigned width, uns
 	return ok;
 }
 
+// -E: the libretro .cht file's cheats in mGBA's own cheat device, every set
+// on. mGBA's reader adds the sets (at "cheats = N") before their lines, so a
+// set whose lines set a hook (a master code) never got its breakpoint: add
+// each set again now, as the libretro core's retro_cheat_set does after
+// reading a code. Prints what it read; NULL if the file doesn't read.
+static struct mCheatDevice *load_cheats(struct mCore *core, const char *path)
+{
+	struct mCheatDevice *device = core->cheatDevice(core);
+	struct VFile *vf = VFileOpen(path, O_RDONLY);
+	if (!device || !vf || !mCheatParseLibretroFile(device, vf)) {
+		fprintf(stderr, "cannot read cheats from %s\n", path);
+		if (vf) {
+			vf->close(vf);
+		}
+		return NULL;
+	}
+	vf->close(vf);
+	size_t lines = 0, patches = 0;
+	for (size_t i = 0; i < mCheatSetsSize(&device->cheats); ++i) {
+		struct mCheatSet *set = *mCheatSetsGetPointer(&device->cheats, i);
+		set->enabled = true;
+		if (set->add) {
+			set->add(set, device);
+		}
+		lines += mCheatListSize(&set->list);
+		patches += mCheatPatchListSize(&set->romPatches);
+	}
+	fprintf(stderr, "cheats: %zu sets from %s, %zu cheats, %zu ROM patches\n", mCheatSetsSize(&device->cheats),
+		path, lines, patches);
+	return device;
+}
+
 int main(int argc, char **argv)
 {
 	if (argc < 2) {
@@ -989,6 +1039,7 @@ int main(int argc, char **argv)
 	frames = last_frame(&opts.hashes, frames);
 	frames = last_frame(&opts.pokes, frames);
 	frames = last_frame(&opts.states, frames);
+	frames = last_frame(&opts.buttons, frames);
 	unsigned last_plain = frames;  // a run with -w goes on at least to here
 	until_text = opts.until;
 	cut_at = opts.cutAt;
@@ -1020,6 +1071,10 @@ int main(int argc, char **argv)
 	core->reset(core);
 	poison_ram(core);
 	crash_core = core;
+	struct mCheatDevice *cheats = opts.cheatFile ? load_cheats(core, opts.cheatFile) : NULL;
+	if (opts.cheatFile && !cheats) {
+		return 1;
+	}
 	current_frame = 1;  // lines before the first frame (from -L scripts) count as frame 1's
 #ifdef ENABLE_SCRIPTING
 	static struct mScriptContext scriptContext;
@@ -1099,6 +1154,11 @@ int main(int argc, char **argv)
 		for (size_t i = 0; i < nkeys; ++i) {
 			if (due(&keys[i], frame)) {
 				core->setKeys(core, parse_keys(keys[i].arg));
+			}
+		}
+		for (size_t i = 0; cheats && i < opts.buttons.count; ++i) {
+			if (due(&opts.buttons.list[i], frame)) {
+				mCheatPressButton(cheats, strtoul(opts.buttons.list[i].arg, NULL, 10) != 0);
 			}
 		}
 		for (size_t i = 0; i < opts.pokes.count; ++i) {
