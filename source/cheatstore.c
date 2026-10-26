@@ -357,7 +357,7 @@ void cheatstore_keep_listed(void)
 	char *out = cs->detail, *line = (char *)cs->part;
 	u32 n = (u32)snprintf(out, COUNTS_BYTES, "%08lX %lX %08lX %lX\n", (unsigned long)now.path_crc,
 			      (unsigned long)now.size, (unsigned long)now.stamp, (unsigned long)now.listed);
-	u32 kept = 1;
+	u32 lines = 1;
 	if (safefile_open(COUNTS_PATH, COUNTS_BYTES) != SAFEFILE_NONE) {
 		int len;
 		struct count_line was;
@@ -365,17 +365,17 @@ void cheatstore_keep_listed(void)
 			if (len < 0 || !count_parse(line, &was))
 				continue;
 			if (was.path_crc == now.path_crc) {
-				if (kept == 1 && !memcmp(&was, &now, sizeof(was))) {
+				if (lines == 1 && !memcmp(&was, &now, sizeof(was))) {
 					safefile_close();
 					return;  // kept already, the latest
 				}
 				continue;
 			}
-			if (kept < COUNTS_MAX && n + (u32)len + 1 < COUNTS_BYTES) {
+			if (lines < COUNTS_MAX && n + (u32)len + 1 < COUNTS_BYTES) {
 				memcpy(out + n, line, (u32)len);
 				out[n + (u32)len] = '\n';
 				n += (u32)len + 1;
-				kept++;
+				lines++;
 			}
 		}
 		int failed = safefile_failed();

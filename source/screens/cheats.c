@@ -256,7 +256,7 @@ static void cs_counter(void)
 	u32 n = 0;
 	cs.counter[0] = 0;
 	if (cs.cursor < cs.shown)
-		n = (u32)snprintf(cs.counter, sizeof(cs.counter), EN_CHEAT_POSITION, (unsigned long)(cs.cursor + 1),
+		n = (u32)snprintf(cs.counter, sizeof(cs.counter), EN_CHEAT_POSITION, (unsigned long)cs.cursor + 1,
 				  (unsigned long)cs.shown);
 	if (cs.picks && n < sizeof(cs.counter))
 		snprintf(cs.counter + n, sizeof(cs.counter) - n, "%s" EN_CHEAT_PICKS, n ? " \xC2\xB7 " : "",
@@ -457,6 +457,8 @@ static void detail_text(u32 at)
 static void cs_detail(u32 at)
 {
 	struct cheatstore *s = cheatstore();
+	if (at >= s->file.count)
+		return;
 	detail_text(at);
 	cs.reading = (struct ui_reading){s->detail,      s->detail_start,        s->detail_len,
 					 s->detail_kind, CHEATSTORE_DETAIL_ROWS, 0};
@@ -534,7 +536,7 @@ static u32 cs_rows(u32 at)
 	}
 	cs.count = cs.shown + !cs.only;
 	cs.picks = cheatfile_picks(&s->file);
-	snprintf(cs.new_name, sizeof(cs.new_name), EN_CHEAT_NAME, (unsigned long)(own + 1));
+	snprintf(cs.new_name, sizeof(cs.new_name), EN_CHEAT_NAME, (unsigned long)own + 1);
 	cs.add_why = (u8)cheatstore_can_add(cs.new_name);
 	return row != CHEATFILE_NONE ? row : (cs.shown ? cs.shown - 1 : 0);
 }
