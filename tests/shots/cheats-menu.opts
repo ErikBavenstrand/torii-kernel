@@ -1,0 +1,41 @@
+# The cheat screen's START menu (source/screens/cheats.c) on Hello's cheats,
+# in the light theme: on Skip the intro, a ROM patch, the hint bar keeps A
+# and B beside its note (rom); START opens the menu, Details first (menu);
+# Details shows its name, code, format and budget (details); B, then the
+# menu's Show picked only lists Max money alone, Picked after the title
+# (only); B shows all again on Max money, and UP past the first row wraps to
+# + Add code (wrap). UP from the first row wraps at the start too.
+#! settings 28=1
+# The tests' hook: lists open on their first row (else a list opens on
+# Hello, the game Recent played last)
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-k @8:RIGHT -k @12:- -k @20:RIGHT -k @24:- -k @32:RIGHT -k @36:-
+-k @80:START -k @84:-
+-w "screen ready: game-popup"
+-k @12:DOWN -k @16:- -k @24:DOWN -k @28:-
+-k @48:A -k @52:-
+-w "screen ready: cheats"
+-k @8:UP -k @12:- -k @20:UP -k @24:-
+-s @40:rom.png
+-k @48:START -k @52:-
+-w "screen ready: cheat-menu"
+-s @24:menu.png
+-k @32:A -k @36:-
+-w "screen ready: cheat-details"
+-s @8:details.png
+-k @16:B -k @20:-
+-w "screen ready: cheats"
+-k @8:START -k @12:-
+-w "screen ready: cheat-menu"
+-k @24:DOWN -k @28:- -k @36:DOWN -k @40:- -k @48:A -k @52:-
+-w "cheats: picked only"
+-s @40:only.png
+-k @48:B -k @52:-
+-w "cheats: all"
+-k @16:UP -k @20:- -k @32:UP -k @36:-
+-s @60:wrap.png

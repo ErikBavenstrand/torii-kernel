@@ -95,6 +95,7 @@ struct cheatfile_cheat {
 	u8 saved : 1;        // as the card has it: read, or written since (cheatfile_changed)
 	u8 own : 1;          // cheatN_user = true: typed on the cart, so it may be edited and deleted
 	u8 format : 3;       // cheatN_format's enum cheat_format, CHEAT_FMT_AUTO without one
+	u8 detected;         // once decoded: the format its first code line read in (format, if set), else AUTO
 };
 
 // Where cheatfile_text has got to, so each call goes on from the last
@@ -140,6 +141,11 @@ void cheatfile_parse(struct cheatfile *f, const char *text, u32 len, struct chea
 // len bytes of text is "# for crc32 XXXXXXXX" (just cheats writes it first;
 // the first such line counts), else 0: a file written by hand is for any dump.
 int cheatfile_rom_crc(const char *text, u32 len, u32 *crc);
+
+// 1 if f holds no cheat and nothing else worth keeping: blank lines, the
+// count line and "# for crc32" lines only (the cheat screen deletes such a
+// file once its last code is deleted)
+int cheatfile_empty(const struct cheatfile *f);
 
 // The decoder and the buffers one cheat decodes into. After cheatfile_next,
 // prog and patches hold that cheat's part of the table and its patches.
@@ -238,6 +244,13 @@ extern const char *const cheatfile_format_names[CHEAT_FMT_VBA + 1];
 // CHEAT_FMT_AUTO. *index gets its index, the last.
 u32 cheatfile_add(struct cheatfile *f, const struct cheatfile_room *room, const char *desc, const char *code, u8 format,
 		  u32 *index);
+// Whether cheatfile_add would take a new cheat named desc now, with a short
+// code (CHEATFILE_SHORT_CODE), in a room of cap bytes: CHEATFILE_EDIT_OK, or
+// why not (CHEATFILE_EDIT_FULL: no number is left; CHEATFILE_EDIT_LONG: the
+// file is at its cap), so the cheat screen refuses before anything is
+// typed. A longer code may still be refused by the add itself.
+#define CHEATFILE_SHORT_CODE "00000000 0000"
+u32 cheatfile_can_add(const struct cheatfile *f, u32 cap, const char *desc);
 // Replaces cheat i's code and format line (none for CHEAT_FMT_AUTO), and
 // its desc unless desc is NULL; its other lines stay.
 u32 cheatfile_set_code(struct cheatfile *f, const struct cheatfile_room *room, u32 i, const char *desc,
