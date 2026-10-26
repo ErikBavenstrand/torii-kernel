@@ -2,278 +2,144 @@
 # /// script
 # requires-python = ">=3.11"
 # ///
-"""Write cheat files for an SD card's GBA games from libretro-database.
+"""Write cheat files for an SD card's GBA games from GameHacking.org.
 
-usage: cheats.py SD_PATH [--dry-run] [--offline] [--refresh] [--delay S]
-                 [--cache DIR] [--dats DIR]
+usage: cheats.py SD_PATH [--gamehacking] [--import FILE...] [--only CRC,...]
+                 [--base-game] [--similar PCT] [--dry-run] [--delay S]
+                 [--downloads DIR] [--refresh] [--cache DIR]
 
 `just cheats SD_PATH` runs this. SD_PATH is the card's folder on this PC (a
-mounted card, say /Volumes/OMEGA). For every GBA game on the card (outside
-the folders the kernel hides) it:
+mounted card, say /Volumes/OMEGA). Cheats come from GameHacking.org's mGBA
+exports, matched to each GBA game on the card by its exact CRC32 (from
+/torii/crc.txt where its record holds, else computed): no title or region
+guessing.
 
-1. Takes the game's CRC32 from /torii/crc.txt where its record holds (as
-   `just art-scrape` reads it), else computes it; crc.txt isn't written.
-2. Looks the CRC up in the No-Intro GBA dat (downloaded once to dist/dats,
-   shared with `just names-update`). A game the dat doesn't list (a romhack)
-   gets cheats only if its file name is the title of the game its header's
-   code names (a patched dump), as art-scrape decides.
-3. Finds that name's file in libretro-database's cht/Nintendo - Game Boy
-   Advance: "<No-Intro name> (<code type>).cht", with "&" and "/" written as
-   "_" and the code type ("(Code Breaker)", "(Gameshark)", " Game Shark"...)
-   sometimes missing. The files for one name ("(diff)", another code type)
-   are taken together. Failing the whole name, it tries the name without its
-   language group ("(En,Fr,De)"), then the title alone (the region differs):
-   then the dat's serial of the file's name, or the region its name gives,
-   has to be the ROM header's game code (0xAC), and when that leaves no
-   single file the game is reported, not guessed.
-4. Writes /torii/cheats/<rom path without extension>.cht in libretro's
-   format (`cheats = N`, `cheatN_desc`, `cheatN_code`, `cheatN_enable`),
-   the codes byte for byte. A file already there is read as the kernel reads
-   it (source/safefile.h: NAME if its CRC line holds, NAME edited by hand,
-   else NAME.bak; '#' lines are comments). Its picks (the enable flags,
-   matched by code) are kept, and so is every cheat whose code the
-   database's file doesn't have (your own codes), after the database's.
-   The keys the cart's code keypad adds (cheatN_format, cheatN_user) stay
-   with their cheat, and a database cheat with digits to fill in (00??)
-   that was filled in on the cart keeps its place, filled in.
-   NAME is written as plain text with no CRC line (the kernel takes it as
-   edited by hand and adds the line on its next write); NAME.bak is left
-   alone, and so is a file whose cheats wouldn't change.
+Fetching (--gamehacking) happens in your own browser, never from this tool:
+it writes a harvester script, dist/cheats/gamehacking/harvest.js, holding
+the CRCs it still needs, copies it to the clipboard (macOS), opens
+gamehacking.org's GBA list and tells you how to paste it into the browser's
+console. In the page, the harvester crawls the GBA index pages it still
+needs, exports the mGBA cheats of each wanted dump, --delay seconds between
+requests (default 30, as gamehacking.org's robots.txt asks), and downloads
+what it got as torii-gamehacking-*.json bundles (every 25 exports and at the
+end). It stops at anything that isn't the page or export it expects (a
+Cloudflare check, say). Meanwhile this tool watches your downloads folder
+(--downloads, default ~/Downloads) and imports each bundle into
+dist/cheats/gamehacking (index.json and <CRC>.cheats); Ctrl-C stops waiting,
+and what was imported stays. --import FILE... imports bundles by hand.
+Without --gamehacking only that cache is used. --only CRC,... limits the
+run to those CRCs (on the card or not, for fetching).
 
-It never touches /CHEAT or EZ-Flash's files. At the end it prints the games
-whose cheats were written, updated or unchanged, the games the database has
-no cheats for, and the ones it couldn't match, with why.
+Writing a game's file, /torii/cheats/<rom path without extension>.cht:
 
-Fetching is polite: one request at a time, --delay seconds apart (default
-0.5), with a User-Agent. The file list (one request to GitHub's API) and the
-cheat files are kept in dist/cheats (git-ignored); later runs download only
-the files they lack. --refresh asks for the list again and downloads the
-files that changed; --offline uses only the cache. --dry-run changes nothing
-on the card (it may still fill the cache) and prints what it would write.
+- The source is the export whose CRC is the ROM's own, or
+  dist/cheats/custom/<CRC>.cht (a libretro file you supply), which wins.
+- Each mGBA cheat set becomes a libretro cheat. Its device directive
+  (!GSAv1, !GSAv1 raw, !PARv3, !PARv3 raw) is written as cheatN_format; a
+  set with none gets none, and the kernel detects its format. Sets with no
+  name (or only "?"), of more than 256 code lines, or the same as an earlier
+  one (device and code) are dropped, and so are the largest sets while the
+  file is over the kernel's limit (CHEATFILE_TEXT_MAX less some room).
+- The first line is "# for crc32 XXXXXXXX", the ROM the file is for (the
+  kernel refuses a file made for another dump), then where it came from.
+- An existing file (read as the kernel reads it) keeps its picks, matched
+  by code, cheatN_format and cheatN_user, placeholders filled in on the cart
+  (00??) and, after the source's cheats, every code of yours: those marked
+  cheatN_user or picked, or any the source lacks when the file wasn't
+  written by this tool. NAME is written as plain text with no CRC line, as
+  edited by hand; NAME.bak is left alone, and so is a file that wouldn't
+  change.
 
-Licence: the cheats are libretro-database's (CC BY-SA 4.0), collected from
-the web. They are downloaded to this PC at your request and written to your
-card; nothing from them is part of Torii, its repository or its releases.
+Romhacks and modified dumps (a CRC GameHacking doesn't list) get their base
+game's cheats only when the base is certain: the index's dumps whose serial
+holds the ROM header's game code (0xAC) and whose revision is its version
+byte (0xBC) must be exactly one, and that dump's ROM must be on the card.
+If at least --similar percent (default 90) of the base's 4 KB blocks are the
+same in the hack, the base's cheats are written, each named "... (base
+game)", less any ROM patch over bytes the hack changed (decoded by the
+kernel's own decoder, tools/cheat_patches.c, built with the host's cc).
+--base-game writes them for every hack whatever the similarity, and without
+the base ROM on the card drops every cheat that patches the ROM.
+
+It never touches /CHEAT or EZ-Flash's files. It reports each game: written,
+updated, unchanged, base game, no cheats on GameHacking, not fetched yet,
+hack too different, base dump not on card or ambiguous base; and every set
+it dropped, with why.
+
+The cheats are fetched on your PC, for your own card, and never bundled
+with Torii.
 """
 
 import argparse
-import hashlib
 import json
+import os
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 import time
-import urllib.error
-import urllib.parse
-import urllib.request
+import webbrowser
+from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
 import names_db
 
-SYSTEM = "Nintendo - Game Boy Advance"
-CHT_DIR = f"cht/{SYSTEM}"
-API_URL = "https://api.github.com/repos/libretro/libretro-database/contents/"
-RAW_URL = "https://raw.githubusercontent.com/libretro/libretro-database/master/"
-USER_AGENT = "torii-kernel cheats (https://github.com/ErikBavenstrand/torii-kernel)"
 CACHE = ROOT / "dist" / "cheats"
-LISTING = "listing.json"
-DELAY = 0.5  # seconds between requests
-TIMEOUT = 60
+GAMEHACKING = "gamehacking"
+CUSTOM = "custom"
+INDEX = "index.json"
+HARVEST = "harvest.js"
+HARVEST_TEMPLATE = ROOT / "tools" / "cheats_harvest.js"
+HARVEST_CONFIG = "/*TORII_CONFIG*/ null"
+BUNDLE_GLOB = "torii-gamehacking-*.json"
+BUNDLE_FORMAT = "torii-gamehacking"
+GBA_PAGE = "https://gamehacking.org/system/gba"
+GAME_URL = "https://gamehacking.org/game/{}"
+DELAY = 30.0  # seconds between requests: gamehacking.org's Crawl-delay
+SIMILAR = 90.0  # percent of the base's blocks the same: a light hack
+BLOCK = 4096
 CHEATS_DIR = Path("torii") / "cheats"
 GBA = names_db.GBA
-ATTRIBUTION = (
-    "Cheats from libretro-database (https://github.com/libretro/libretro-database), "
-    "CC BY-SA 4.0"
-)
+
+# The kernel's limits (source/cheatfile.h; tests/cheats_test.py checks them)
+TEXT_MAX = 0xE000  # CHEATFILE_TEXT_MAX: a longer file is refused
+CHEATS_MAX = 1024  # CHEATFILE_MAX
+LINES_MAX = 256  # CHEATFILE_OPS_MAX: a set of more lines could never run
+# Left free under TEXT_MAX: the picks only change enable values, but codes
+# typed on the cart's keypad are added to the text
+ROOM = 1024
+# cheatN_format's values by enum cheat_format (source/cheatfile.c's
+# cheatfile_format_names); the first four are mGBA's GBA directives
+FORMAT_NAMES = (None, "GSAv1", "GSAv1 raw", "PARv3", "PARv3 raw", "CodeBreaker", "VBA")
+DIRECTIVES = FORMAT_NAMES[1:5]
+FOR_CRC = "# for crc32 "
 
 
 class CheatsError(Exception):
     pass
 
 
-# --- Names ---------------------------------------------------------------------------
-
-# The code type libretro's file names end in (or hold): "(Code Breaker)",
-# "(CodeBreaker)", "(Gameshark)", " Game Shark", and "(diff)", a second file
-# for the same game
-CODE_TYPE = re.compile(
-    r"\s*\((?:code ?breaker|game ?shark|action replay|diff)\)"
-    r"|\s+(?:code ?breaker|game ?shark|action replay)\s*$",
-    re.IGNORECASE,
-)
-# A language group, "(En,Fr,De)" or "(En,Zh-Hant)"
-LANGUAGES = re.compile(
-    r"\s*\([A-Z][a-z](?:-[A-Za-z]+)?(?:,[A-Z][a-z](?:-[A-Za-z]+)?)*\)"
-)
-# A region's letters in GBA game codes (the 4th character), for No-Intro's
-# regions and GoodTools' letters; a list of regions goes by its first, and
-# "World", one game for every region, names them all
-REGION_LETTERS = {
-    "usa": "E",
-    "u": "E",
-    "europe": "PXYZ",
-    "e": "PXYZ",
-    "japan": "J",
-    "j": "J",
-    "germany": "D",
-    "g": "D",
-    "france": "F",
-    "f": "F",
-    "spain": "S",
-    "s": "S",
-    "italy": "I",
-    "i": "I",
-    "world": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-}
+def plural(n, word):
+    return f"{n} {word}{'' if n == 1 else 's'}"
 
 
-def strip_type(stem):
-    """A libretro file's stem without its code type: the No-Intro name."""
-    name = CODE_TYPE.sub("", stem)
-    name = re.sub(r"(?<=\S)\(", " (", name)  # "Version(USA)"
-    return " ".join(name.split())
-
-
-def key(name):
-    """A name to compare: "&", "/" and "_" alike (libretro writes the first
-    two as "_"), spaces collapsed, case folded."""
-    name = re.sub(r"[&/_]", "_", name)
-    name = re.sub(r"(?<=\S)\(", " (", name)
-    return " ".join(name.split()).casefold()
-
-
-def no_languages(name):
-    return LANGUAGES.sub("", name)
-
-
-def title(name):
-    """A name's title to compare, as names_db.title_key makes it: no groups,
-    only letters and digits ("Leaf Green" is "LeafGreen", "Tony Hawks" is
-    "Tony Hawk's")."""
-    return names_db.title_key(name)
-
-
-def region_letters(name):
-    """The game code letters of the region a name's first region group
-    gives, or ""."""
-    for group in re.findall(r"\(([^()]*)\)", name):
-        first = group.split(",")[0].strip().casefold()
-        if first in REGION_LETTERS:
-            return REGION_LETTERS[first]
-    return ""
-
-
-def revision(name):
-    """The revision a name gives, "(Rev 1)" or GoodTools' "(V1.1)": the
-    header's version byte (0xBC) it stands for; 0 for none."""
-    m = re.search(r"\(Rev (\d+)\)|\(V1\.(\d+)\)", name, re.IGNORECASE)
-    return int(m.group(1) or m.group(2)) if m else 0
-
-
-def header_info(path):
-    """A GBA game's header code (0xAC) and version byte (0xBC), or None."""
-    code = names_db.header_code(path)
-    if code is None:
-        return None
-    try:
-        with open(path, "rb") as f:
-            f.seek(0xBC)
-            version = f.read(1)
-    except OSError:
-        return None
-    return (code, version[0]) if version else None
-
-
-class Database:
-    """libretro's GBA cheat files grouped by the No-Intro name they're for,
-    and the dat's game codes by name."""
-
-    def __init__(self, files, dat_games):
-        groups = {}
-        for file in files:
-            stem = file.removesuffix(".cht")
-            name = strip_type(stem)
-            groups.setdefault(key(name), (name, []))[1].append(file)
-        self.groups = {k: (n, sorted(f)) for k, (n, f) in groups.items()}
-        self.by_nolang = {}
-        self.by_title = {}
-        for k, (name, _) in sorted(self.groups.items()):
-            self.by_nolang.setdefault(key(no_languages(name)), []).append(k)
-            self.by_title.setdefault(title(name), []).append(k)
-        self.codes = {}
-        nolang = {}
-        for name, _, serial in dat_games:
-            code = names_db.game_code(serial)
-            self.codes.setdefault(key(name), code)
-            nolang.setdefault(key(no_languages(name)), set()).add(code)
-        # A name without its languages names a code only if every game it
-        # stands for has that one
-        self.codes_nolang = {k: next(iter(c)) for k, c in nolang.items() if len(c) == 1}
-
-    def code(self, k):
-        """The dat's game code of a group's name, or None."""
-        name = self.groups[k][0]
-        code = self.codes.get(k)
-        return code or self.codes_nolang.get(key(no_languages(name)))
-
-    def fits(self, k, header):
-        """Whether a group's file is for the header's game: its game code
-        (the dat's, else its region's letter) and its revision."""
-        name = self.groups[k][0]
-        code, version = header
-        if revision(name) != version:
-            return False
-        if self.code(k) is not None:
-            return self.code(k) == code
-        return code[3] in region_letters(name)
-
-    def match(self, name, header):
-        """The group (key) for a No-Intro name, or (None, why): the files
-        for the name, else for it without languages (when one group fits),
-        else for its title, when the header settles which (fits); why is
-        None for a game the database has no cheats for. header is
-        header_info's."""
-        k = key(name)
-        if k in self.groups:
-            return k, None
-        found = self.by_nolang.get(key(no_languages(name)), [])
-        if len(found) == 1:
-            return found[0], None
-        found = found or self.by_title.get(title(name), [])
-        if not title(name) or not found:
-            return None, None
-        files = "; ".join(f for k in found for f in self.groups[k][1])
-        if header is None:
-            return None, f"no game code in its header to pick between: {files}"
-        same = [k for k in found if self.fits(k, header)]
-        if len(same) == 1:
-            return same[0], None
-        this = f"{header[0]} version {header[1]}"
-        if same:
-            return None, f"more than one file fits its game ({this}): {files}"
-        codes = "; ".join(
-            f"{self.groups[k][0]}: {self.code(k) or 'no code in the dat'}"
-            for k in found
-        )
-        return None, f"cheats only for other versions (this is {this}; {codes})"
-
-
-# --- The cheat files ---------------------------------------------------------------------
+# --- libretro cheat files (what the kernel reads) -----------------------------------------
 
 LINE = re.compile(r"^\s*([A-Za-z0-9_]+)\s*=\s*(.*?)\s*$")
 
 
 def value(raw):
     """A config value byte for byte, without the quote at each end. A quote
-    missing at one end (one of libretro's files has `Enemies Have Less HP"`)
-    isn't doubled when the file is written back."""
+    missing at one end isn't doubled when the file is written back."""
     return raw.removeprefix('"').removesuffix('"')
 
 
 # The keys Torii adds to a cheat (source/cheatfile.h), kept as they are:
-# cheatN_format, the format the code keypad's override saved (quoted), and
-# cheatN_user, a code typed on the cart (a bare bool)
+# cheatN_format, a format to decode it in (quoted), and cheatN_user, a code
+# typed on the cart (a bare bool)
 KEPT_KEYS = ("format", "user")
 BARE_KEYS = ("enable", "user")
 # A code's digits left for the user to fill in (cheatcode.c's is_mark)
@@ -303,6 +169,14 @@ class Cheat(tuple):
         return f"{base[:-1]}, {self.extra!r})" if self.extra else base
 
 
+def is_true(v):
+    return str(v).casefold() in ("true", "1")
+
+
+def user_code(cheat):
+    return is_true(getattr(cheat, "extra", {}).get("user", ""))
+
+
 def parse_cht(text):
     """A libretro cheat file's cheats, in their order: [Cheat(desc, code,
     enabled)], Torii's keys in each one's extra. '#' lines are comments; a
@@ -327,42 +201,60 @@ def parse_cht(text):
                 Cheat(
                     c.get("desc", ""),
                     c["code"],
-                    c.get("enable", "").casefold() in ("true", "1"),
+                    is_true(c.get("enable", "")),
                     {k: c[k] for k in KEPT_KEYS if k in c},
                 )
             )
     return out
 
 
-def format_cht(cheats):
-    """libretro's format, as its files are laid out; Torii's keys after a
-    cheat's enable line, as the kernel writes them."""
-    lines = [f"cheats = {len(cheats)}", ""]
+def cheat_lines(n, cheat):
+    desc, code, enabled = cheat
+    lines = [
+        f'cheat{n}_desc = "{desc}"',
+        f'cheat{n}_code = "{code}"',
+        f"cheat{n}_enable = {'true' if enabled else 'false'}",
+    ]
+    extra = getattr(cheat, "extra", {})
+    for k in KEPT_KEYS:
+        if k in extra:
+            v = extra[k]
+            lines.append(
+                f"cheat{n}_{k} = {v}" if k in BARE_KEYS else f'cheat{n}_{k} = "{v}"'
+            )
+    return lines
+
+
+def format_cht(cheats, comments=()):
+    """libretro's format, as its files are laid out, after the '#' comment
+    lines given; Torii's keys after a cheat's enable line, as the kernel
+    writes them."""
+    lines = [f"# {c}" if c else "#" for c in comments]
+    lines += [f"cheats = {len(cheats)}", ""]
     for n, cheat in enumerate(cheats):
-        desc, code, enabled = cheat
-        lines += [
-            f'cheat{n}_desc = "{desc}"',
-            f'cheat{n}_code = "{code}"',
-            f"cheat{n}_enable = {'true' if enabled else 'false'}",
-        ]
-        extra = getattr(cheat, "extra", {})
-        for k in KEPT_KEYS:
-            if k in extra:
-                v = extra[k]
-                lines.append(
-                    f"cheat{n}_{k} = {v}" if k in BARE_KEYS else f'cheat{n}_{k} = "{v}"'
-                )
-        lines.append("")
+        lines += cheat_lines(n, cheat) + [""]
     return "\n".join(lines)
 
 
-def merge(database, old):
+def for_crc(text):
+    """The CRC a file's "# for crc32 XXXXXXXX" line names (its first line
+    that isn't blank), or None."""
+    for raw in text.split("\n"):
+        line = raw.strip()
+        if line:
+            m = re.fullmatch(r"# for crc32 ([0-9A-Fa-f]{8})", line)
+            return int(m.group(1), 16) if m else None
+    return None
+
+
+def merge(database, old, keep_all=True):
     """The database's cheats with old's picks and Torii's keys (by code),
-    then old's cheats whose code the database lacks. A database cheat with
-    digits to fill in (00??) that old has filled in (the same desc, a code
-    without them, as the kernel's keypad saves it in place) is old's, in the
-    database's place. Returns (cheats, own): own counts the old cheats after
-    the database's."""
+    then old's own cheats: those the database lacks that are cheatN_user or
+    picked, or all of them with keep_all. A database cheat with digits to
+    fill in (00??) that old has filled in (the same desc, a code without
+    them, as the kernel's keypad saves it in place) is old's, in the
+    database's place. Returns (cheats, own, stale): own counts the old
+    cheats after the database's, stale those left out."""
     by_code = {}
     for cheat in old:
         by_code.setdefault(cheat[1], cheat)
@@ -370,13 +262,17 @@ def merge(database, old):
     filled = {}
     for cheat in old:
         # The user's own codes are never a database placeholder filled in
-        user = getattr(cheat, "extra", {}).get("user", "").casefold() in ("true", "1")
-        if cheat[1] not in codes and not PLACEHOLDER.search(cheat[1]) and not user:
+        if (
+            cheat[1] not in codes
+            and not PLACEHOLDER.search(cheat[1])
+            and not user_code(cheat)
+        ):
             filled.setdefault(cheat[0], cheat)
     out, seen, taken = [], set(), set()
-    for desc, code, enabled in database:
+    for cheat in database:
+        desc, code, enabled = cheat
         if code in seen:
-            continue  # the same code in two of the game's files
+            continue
         seen.add(code)
         mine = filled.get(desc) if PLACEHOLDER.search(code) else None
         if mine is not None and id(mine) not in taken:
@@ -384,12 +280,16 @@ def merge(database, old):
             out.append(mine)
             continue
         was = by_code.get(code)
+        extra = getattr(cheat, "extra", {})
         if was is not None:
-            out.append(Cheat(desc, code, was[2], getattr(was, "extra", {})))
+            out.append(
+                Cheat(desc, code, was[2], {**extra, **getattr(was, "extra", {})})
+            )
         else:
-            out.append(Cheat(desc, code, enabled))
-    own = [c for c in old if c[1] not in seen and id(c) not in taken]
-    return out + own, len(own)
+            out.append(Cheat(desc, code, enabled, extra))
+    rest = [c for c in old if c[1] not in seen and id(c) not in taken]
+    own = [c for c in rest if keep_all or c[2] or user_code(c)]
+    return out + own, len(own), len(rest) - len(own)
 
 
 def read_card_file(path):
@@ -417,125 +317,499 @@ def decode(data):
     return data.decode("utf-8", "surrogateescape")
 
 
-def write_card_file(path, text):
+def write_file(path, data):
+    path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".part")
     try:
-        tmp.write_bytes(text.encode("utf-8", "surrogateescape"))
+        tmp.write_bytes(data)
         tmp.replace(path)
     except OSError:
         tmp.unlink(missing_ok=True)
         raise
 
 
-# --- Fetching ------------------------------------------------------------------------------
+def write_card_file(path, text):
+    write_file(path, text.encode("utf-8", "surrogateescape"))
 
 
-def blob_sha(data):
-    """Git's blob SHA-1 of data, as GitHub's listing gives each file's."""
-    return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+# --- mGBA exports (GameHacking.org's) ----------------------------------------------------
 
 
-class Fetcher:
-    """libretro-database's GBA cheat files through the cache in dist/cheats,
-    one request at a time, delay seconds apart."""
+@dataclass
+class MgbaSet:
+    name: str
+    directive: str | None  # its own GS directive, as mGBA's parser reads it
+    lines: list
 
-    def __init__(self, cache, api_url, raw_url, delay, offline):
-        self.cache = Path(cache)
-        self.api_url = api_url.rstrip("/") + "/"
-        self.raw_url = raw_url.rstrip("/") + "/"
-        self.delay = delay
-        self.offline = offline
-        self.requests = 0
-        self.downloaded = 0
-        self.last = 0.0
-        self.stopped = None
-        self.listing = {}
 
-    def request(self, url, accept=None):
-        wait = self.last + self.delay - time.monotonic()
-        if wait > 0:
-            time.sleep(wait)
-        self.requests += 1
-        headers = {"User-Agent": USER_AGENT}
-        if accept:
-            headers["Accept"] = accept
-        try:
-            req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
-                return r.read()
-        finally:
-            self.last = time.monotonic()
+def parse_mgba(text):
+    """An mGBA cheat file's sets, as mGBA's mCheatParseFile reads them: '!'
+    lines are directives ("!disabled", "!reset", "!GSAv1"...) for the set
+    the next '#' line starts, '# NAME' starts a set, any other line is a
+    code line of the set (lines before the first '#' make a nameless one).
+    Each set's directive is the last of GSAv1, GSAv1 raw, PARv3 and PARv3
+    raw (mGBA's names, case and all) given since the set before. mGBA keeps
+    a directive for every later set too until "!reset"; Torii doesn't: a set
+    with none of its own is left to the kernel's detection."""
+    sets, pending, cur = [], [], None
+    for raw in text.split("\n"):
+        line = raw.strip()
+        if not line:
+            continue
+        if line[0] == "#":
+            cur = MgbaSet(line[1:].strip(), own_directive(pending), [])
+            sets.append(cur)
+            pending = []
+        elif line[0] == "!":
+            d = line[1:].strip()
+            if d.casefold() == "reset":
+                pending = []
+            elif d.casefold() != "disabled":
+                pending.append(d)
+        else:
+            if cur is None:
+                cur = MgbaSet("", own_directive(pending), [])
+                sets.append(cur)
+                pending = []
+            cur.lines.append(" ".join(line.split()))
+    return sets
 
-    def load_listing(self, refresh):
-        """{file name: blob sha} of the database's GBA cheat files."""
-        path = self.cache / LISTING
-        if path.is_file() and not refresh:
-            self.listing = json.loads(path.read_text("utf-8"))
-            return self.listing
-        if self.offline:
-            if path.is_file():
-                self.listing = json.loads(path.read_text("utf-8"))
-                return self.listing
-            raise CheatsError(f"{path} isn't there, and --offline downloads nothing")
-        url = self.api_url + urllib.parse.quote(CHT_DIR)
-        print(f"downloading the list of {CHT_DIR}", file=sys.stderr)
-        try:
-            entries = json.loads(self.request(url, "application/vnd.github+json"))
-        except (OSError, ValueError) as e:
-            raise CheatsError(f"can't download {url}: {e}") from e
-        if not isinstance(entries, list):
-            raise CheatsError(f"{url} gave no file list")
-        self.listing = {
-            e["name"]: e.get("sha", "")
-            for e in entries
-            if isinstance(e, dict)
-            and e.get("type") == "file"
-            and str(e.get("name", "")).endswith(".cht")
-        }
-        self.cache.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_name(path.name + ".part")
-        tmp.write_text(
-            json.dumps(self.listing, indent=1, sort_keys=True) + "\n", "utf-8"
+
+def own_directive(pending):
+    found = [d for d in pending if d in DIRECTIVES]
+    return found[-1] if found else None
+
+
+def clean_desc(name):
+    """A desc as the kernel's keypad writes one: no control characters, '"'
+    as "'"."""
+    return (
+        "".join(c for c in name if c >= " " and c != "\x7f").replace('"', "'").strip()
+    )
+
+
+def convert(sets, suffix=""):
+    """The libretro cheats of an export's sets, and the sets dropped:
+    ([Cheat], [(name, why)]). suffix goes after each name."""
+    out, dropped, seen = [], [], {}
+    for s in sets:
+        name = clean_desc(s.name)
+        if not name.strip("? "):
+            dropped.append((name or "(no name)", "no name"))
+            continue
+        if not s.lines:
+            dropped.append((name, "no code lines"))
+            continue
+        if len(s.lines) > LINES_MAX:
+            dropped.append((name, f"{len(s.lines)} code lines, over {LINES_MAX}"))
+            continue
+        code = "+".join(s.lines)
+        if any(c == '"' or c < " " for c in code):
+            dropped.append((name, "a quote or control character in its code"))
+            continue
+        key = (s.directive, code.upper())
+        if key in seen:
+            dropped.append((name, f"the same as {seen[key]}"))
+            continue
+        seen[key] = name
+        extra = {"format": s.directive} if s.directive else {}
+        out.append(Cheat(name + suffix, code, False, extra))
+    return out, dropped
+
+
+def fit(cheats, removable, comments, limit=TEXT_MAX - ROOM, most=CHEATS_MAX):
+    """Drops cheats until the file's text is within limit bytes and holds at
+    most `most` cheats: the largest of the removable ones (indices) that
+    aren't picked first, then picked ones. Returns (cheats, [dropped])."""
+    cheats = list(cheats)
+
+    def size(cs):
+        return len(format_cht(cs, comments).encode("utf-8", "surrogateescape"))
+
+    sizes = {
+        i: len("\n".join(cheat_lines(0, c)).encode("utf-8", "surrogateescape")) + 2
+        for i, c in enumerate(cheats)
+    }
+    order = sorted(removable, key=lambda i: (cheats[i][2], -sizes[i], i))
+    gone = set()
+    total = size(cheats)
+    for i in order:
+        if total <= limit and len(cheats) - len(gone) <= most:
+            # The estimate fits: check it on the text itself
+            total = size([c for j, c in enumerate(cheats) if j not in gone])
+            if total <= limit:
+                break
+        gone.add(i)
+        total -= sizes[i]
+    kept = [c for i, c in enumerate(cheats) if i not in gone]
+    return kept, [cheats[i][0] for i in sorted(gone)]
+
+
+# --- The cache: GameHacking.org's index and exports ----------------------------------------
+
+
+def gh_dir(cache):
+    return Path(cache) / GAMEHACKING
+
+
+def crc_hex(crc):
+    return f"{crc:08X}"
+
+
+def parse_crc(text):
+    t = text.strip().upper().removeprefix("0X")
+    if not re.fullmatch(r"[0-9A-F]{1,8}", t):
+        raise CheatsError(f"{text!r} isn't a CRC32 (8 hex digits)")
+    return int(t, 16)
+
+
+class Index:
+    """dist/cheats/gamehacking/index.json: the dumps the GBA index pages
+    list ({CRC hex: {id, name, title, serial, size, codes}}), the pages
+    crawled, the last page, and the bundles imported."""
+
+    def __init__(self, cache):
+        self.path = gh_dir(cache) / INDEX
+        data = {}
+        if self.path.is_file():
+            try:
+                data = json.loads(self.path.read_text("utf-8"))
+            except ValueError as e:
+                raise CheatsError(f"{self.path}: {e}") from e
+        self.entries = dict(data.get("entries", {}))
+        self.pages = set(data.get("pages", []))
+        self.last_page = int(data.get("last_page", -1))
+        self.imported = list(data.get("imported", []))
+
+    def complete(self):
+        """Whether every index page is crawled: a CRC it lacks isn't listed."""
+        return self.last_page >= 0 and all(
+            n in self.pages for n in range(self.last_page + 1)
         )
-        tmp.replace(path)
-        return self.listing
 
-    def path(self, file):
-        return self.cache / SYSTEM / file
+    def save(self):
+        data = {
+            "last_page": self.last_page,
+            "pages": sorted(self.pages),
+            "entries": dict(sorted(self.entries.items())),
+            "imported": self.imported,
+        }
+        write_file(self.path, (json.dumps(data, indent=1) + "\n").encode())
 
-    def get(self, file):
-        """A cheat file's text from the cache, downloading it if it's missing
-        or changed (its sha isn't the listing's); None if it can't be had."""
-        path = self.path(file)
-        if path.is_file():
-            data = path.read_bytes()
-            sha = self.listing.get(file)
-            if self.offline or self.stopped or not sha or blob_sha(data) == sha:
-                return decode(data)
-        elif self.offline or self.stopped:
-            return None
-        url = self.raw_url + urllib.parse.quote(f"{CHT_DIR}/{file}")
+    def get(self, crc):
+        return self.entries.get(crc_hex(crc))
+
+
+def export_path(cache, crc):
+    return gh_dir(cache) / f"{crc_hex(crc)}.cheats"
+
+
+def custom_path(cache, crc):
+    return Path(cache) / CUSTOM / f"{crc_hex(crc)}.cht"
+
+
+def revision(name):
+    """The revision a dump's name gives: "(Rev 1)" is 1, none 0 (the ROM
+    header's version byte). cheats_harvest.js's revision()."""
+    m = re.search(r"\(Rev (\d+)\)", name or "", re.IGNORECASE)
+    return int(m.group(1)) if m else 0
+
+
+def base_candidates(entries, code, version):
+    """The index's dumps (CRC hex) whose serial holds a ROM header's game
+    code and whose revision is its version. cheats_harvest.js's
+    baseCandidates()."""
+    out = []
+    for crc, e in entries.items():
+        serials = re.split(r"[^A-Z0-9]+", (e.get("serial") or "").upper())
+        if code.upper() in serials and revision(e.get("name")) == version:
+            out.append(crc)
+    return sorted(out)
+
+
+# The harvester's index-page parser, in Python (cheats_harvest.js's
+# parseIndexPage): the tests hold the two to one fixture
+
+
+def cell_text(html_text):
+    import html
+
+    return " ".join(html.unescape(re.sub(r"<[^>]*>", " ", html_text)).split())
+
+
+def parse_index_page(text):
+    if not re.search(r"Number of Codes", text, re.IGNORECASE) or not re.search(
+        r"<table\b", text, re.IGNORECASE
+    ):
+        return None
+    last = max((int(n) for n in re.findall(r"/system/gba/all/(\d+)", text)), default=-1)
+    rows, title = [], ""
+    for tr in re.finditer(r"<tr\b[^>]*>([\s\S]*?)</tr>", text, re.IGNORECASE):
+        th = re.search(
+            r"<th\b[^>]*\bcolspan=[\"']?8[\"']?[^>]*>([\s\S]*?)</th>",
+            tr.group(1),
+            re.IGNORECASE,
+        )
+        if th:
+            title = cell_text(th.group(1))
+            continue
+        cells = re.findall(r"<td\b[^>]*>([\s\S]*?)</td>", tr.group(1), re.IGNORECASE)
+        if len(cells) < 5:
+            continue
+        link = re.search(
+            r"<a\b[^>]*\bhref=[\"']/game/(\d+)[\"'][^>]*>([\s\S]*?)</a>",
+            cells[0],
+            re.IGNORECASE,
+        )
+        crc = cell_text(cells[3]).upper()
+        if not link or not re.fullmatch(r"[0-9A-F]{8}", crc):
+            continue
+        codes = re.match(r"\d+", cell_text(cells[4]))
+        rows.append(
+            {
+                "crc": crc,
+                "id": int(link.group(1)),
+                "name": cell_text(link.group(2)),
+                "title": title,
+                "serial": cell_text(cells[1]),
+                "size": cell_text(cells[2]),
+                "codes": int(codes.group()) if codes else 0,
+            }
+        )
+    return {"lastPage": last, "rows": rows}
+
+
+ENTRY_KEYS = ("id", "name", "title", "serial", "size", "codes")
+
+
+def import_bundle(path, cache, index):
+    """Imports a harvester bundle into the cache: its index rows, pages and
+    exports. Returns (bundle, exports written), or (None, why) for a file
+    that isn't one."""
+    try:
+        bundle = json.loads(Path(path).read_text("utf-8"))
+    except (OSError, ValueError) as e:
+        return None, f"not readable JSON ({e})"
+    if not isinstance(bundle, dict) or bundle.get("format") != BUNDLE_FORMAT:
+        return None, "not a torii-gamehacking bundle"
+    entries = bundle.get("index") or {}
+    exports = bundle.get("exports") or {}
+    if not isinstance(entries, dict) or not isinstance(exports, dict):
+        return None, "its index or exports aren't objects"
+    for key, e in entries.items():
+        crc = key.upper()
+        if (
+            re.fullmatch(r"[0-9A-F]{8}", crc)
+            and isinstance(e, dict)
+            and isinstance(e.get("id"), int)
+        ):
+            index.entries[crc] = {k: e.get(k) for k in ENTRY_KEYS}
+    index.pages |= {n for n in bundle.get("pages") or [] if isinstance(n, int)}
+    if isinstance(bundle.get("lastPage"), int):
+        index.last_page = max(index.last_page, bundle["lastPage"])
+    written = 0
+    for crc, text in sorted(exports.items()):
+        if not re.fullmatch(r"[0-9A-Fa-f]{8}", crc) or not isinstance(text, str):
+            continue
+        if text.lstrip().startswith("<"):
+            print(
+                f"cheats: {Path(path).name}: {crc.upper()} is a web page, not cheats: left out",
+                file=sys.stderr,
+            )
+            continue
+        write_file(export_path(cache, int(crc, 16)), text.encode("utf-8"))
+        written += 1
+    if bundle.get("id") and bundle["id"] not in index.imported:
+        index.imported.append(bundle["id"])
+    index.save()
+    return bundle, written
+
+
+def bundle_files(folder):
+    """{path: (size, mtime)} of the bundles in a downloads folder."""
+    out = {}
+    for p in sorted(Path(folder).glob(BUNDLE_GLOB)):
         try:
-            data = self.request(url)
-        except urllib.error.HTTPError as e:
-            if e.code == 404:
-                print(f"cheats: {url}: not there", file=sys.stderr)
-                return None
-            self.stopped = f"the server answers {e.code}: run again later"
-            return decode(path.read_bytes()) if path.is_file() else None
-        except OSError as e:
-            self.stopped = f"can't reach {self.raw_url} ({getattr(e, 'reason', e)})"
-            return decode(path.read_bytes()) if path.is_file() else None
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_name(path.name + ".part")
-        tmp.write_bytes(data)
-        tmp.replace(path)
-        self.downloaded += 1
-        return decode(data)
+            st = p.stat()
+        except OSError:
+            continue
+        out[p] = (st.st_size, st.st_mtime)
+    return out
+
+
+def watch(folder, cache, index, run_id, poll=1.0, sleep=time.sleep, rounds=None):
+    """Imports the bundles that show up in folder (any not imported yet,
+    once its size holds for a poll) until this run's last one (done)
+    arrives. Returns that bundle, or None if stopped (Ctrl-C, or after
+    `rounds` polls)."""
+    seen, sizes = set(), {}
+    n = 0
+    try:
+        while rounds is None or n < rounds:
+            n += 1
+            for path, stat in bundle_files(folder).items():
+                if (path, stat) in seen:
+                    continue
+                if sizes.get(path) != stat:
+                    sizes[path] = stat  # still being written, perhaps
+                    continue
+                seen.add((path, stat))
+                try:
+                    head = json.loads(path.read_text("utf-8"))
+                except (OSError, ValueError):
+                    continue
+                if not isinstance(head, dict) or head.get("id") in index.imported:
+                    continue
+                bundle, got = import_bundle(path, cache, index)
+                if bundle is None:
+                    print(f"cheats: {path.name}: {got}: left out", file=sys.stderr)
+                    continue
+                print(
+                    f"imported {path.name}: {plural(got, 'export')}, "
+                    f"{plural(len(bundle.get('pages') or []), 'index page')}"
+                )
+                if bundle.get("run") == run_id and bundle.get("done"):
+                    if bundle.get("stopped"):
+                        print(f"the harvester stopped: {bundle['stopped']}")
+                    return bundle
+            sleep(poll)
+    except KeyboardInterrupt:
+        print("\nstopped waiting: what was imported stays")
+    return None
+
+
+# --- Romhacks -------------------------------------------------------------------------------
+
+
+def similarity(base, hack, block=BLOCK):
+    """The share of base's blocks the same, at the same offset, in hack."""
+    n = (len(base) + block - 1) // block
+    if not n:
+        return 0.0
+    same = sum(
+        base[i : i + block] == hack[i : i + block] for i in range(0, len(base), block)
+    )
+    return same / n
+
+
+def patch_unchanged(base, hack, patch):
+    """Whether the bytes a ROM patch (offset, value, mask) writes are the
+    same in base and hack."""
+    offset, _, mask = patch
+    for k in (0, 1):
+        if (mask >> (8 * k)) & 0xFF:
+            at = offset + k
+            if at >= len(base) or at >= len(hack) or base[at] != hack[at]:
+                return False
+    return True
+
+
+PATCH_SOURCES = (
+    "tools/cheat_patches.c",
+    "source/cheatfile.c",
+    "source/cheatcode.c",
+    "source/cheatlower.c",
+)
+PATCH_DEPS = PATCH_SOURCES + (
+    "source/cheatfile.h",
+    "source/cheatcode.h",
+    "tests/host/gba_base.h",
+)
+
+
+def patch_tool():
+    """tools/cheat_patches.c built for this PC (dist/host/cheat_patches-HASH),
+    or None without a C compiler."""
+    import hashlib
+
+    h = hashlib.sha256()
+    for f in PATCH_DEPS:
+        h.update((ROOT / f).read_bytes())
+    exe = ROOT / "dist" / "host" / f"cheat_patches-{h.hexdigest()[:16]}"
+    if exe.is_file():
+        return exe
+    cc = (
+        os.environ.get("CC")
+        or shutil.which("cc")
+        or shutil.which("gcc")
+        or shutil.which("clang")
+    )
+    if not cc:
+        return None
+    exe.parent.mkdir(parents=True, exist_ok=True)
+    tmp = exe.with_name(exe.name + f".{os.getpid()}")
+    cmd = [
+        cc,
+        "-std=gnu11",
+        "-O1",
+        "-funsigned-char",
+        "-I",
+        str(ROOT / "tests" / "host"),
+        "-o",
+        str(tmp),
+    ]
+    r = subprocess.run(
+        cmd + [str(ROOT / f) for f in PATCH_SOURCES],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if r.returncode:
+        print(
+            f"cheats: can't build tools/cheat_patches.c:\n{r.stderr}", file=sys.stderr
+        )
+        tmp.unlink(missing_ok=True)
+        return None
+    tmp.replace(exe)
+    return exe
+
+
+def rom_patches(cheats):
+    """Each cheat's ROM patches [(offset, value, mask)] as the kernel decodes
+    the file they make, or None if the decoder can't be built."""
+    exe = patch_tool()
+    if exe is None:
+        return None
+    with tempfile.TemporaryDirectory() as tmp:
+        f = Path(tmp) / "base.cht"
+        f.write_bytes(format_cht(cheats).encode("utf-8", "surrogateescape"))
+        r = subprocess.run(
+            [str(exe), str(f)], capture_output=True, text=True, check=False
+        )
+    if r.returncode:
+        raise CheatsError(f"cheat_patches: {r.stderr.strip()}")
+    out = [[] for _ in cheats]
+    for line in r.stdout.splitlines():
+        fields = line.split("\t")
+        i = int(fields[0])
+        out[i] = [tuple(int(x, 16) for x in p.split("/")) for p in fields[2:]]
+    return out
 
 
 # --- The card ------------------------------------------------------------------------------
+
+
+@dataclass
+class Game:
+    card_path: str
+    file_path: str
+    crc: int
+    code: str | None  # the header's game code (0xAC)
+    version: int  # its version byte (0xBC)
+
+
+def header_info(path):
+    """A GBA game's header code (0xAC) and version byte (0xBC): (code or
+    None, version)."""
+    code = names_db.header_code(path)
+    try:
+        with open(path, "rb") as f:
+            f.seek(0xBC)
+            v = f.read(1)
+    except OSError:
+        v = b""
+    return code, (v[0] if v else 0)
 
 
 def read_crcs(sd, games):
@@ -554,11 +828,338 @@ def read_crcs(sd, games):
     return out
 
 
+def card_games(sd):
+    games = [g for g in names_db.walk_card(sd) if g[2] == GBA]
+    crcs = read_crcs(sd, games)
+    out = []
+    for card_path, file_path, _ in games:
+        code, version = header_info(file_path)
+        out.append(Game(card_path, file_path, crcs[card_path], code, version))
+    return out
+
+
 def cheat_path(sd, card_path):
     """/torii/cheats/<rom path without its extension>.cht on the card."""
     rel = card_path.lstrip("/")
     stem = rel[: rel.rindex(".")] if "." in rel.rsplit("/", 1)[-1] else rel
     return Path(sd) / CHEATS_DIR / (stem + ".cht")
+
+
+# --- What each game gets --------------------------------------------------------------------
+
+
+@dataclass
+class Source:
+    cheats: list  # [Cheat]
+    dropped: list  # [(name, why)]
+    comments: list  # the file's comment lines after "for crc32"
+    label: str  # the report's
+    detail: str
+
+
+@dataclass
+class Skip:
+    label: str
+    detail: str
+
+
+def gh_source(cache, index, crc, suffix=""):
+    """The converted cheats of a cached export, or a Skip."""
+    e = index.get(crc)
+    if e is not None and not e.get("codes"):
+        return Skip("no cheats on GameHacking", f"{crc_hex(crc)} lists no codes")
+    path = export_path(cache, crc)
+    if not path.is_file():
+        return Skip("not fetched yet", f"{crc_hex(crc)}: run with --gamehacking")
+    cheats, dropped = convert(parse_mgba(decode(path.read_bytes())), suffix)
+    if not cheats:
+        return Skip(
+            "no cheats on GameHacking",
+            f"{crc_hex(crc)}'s export has none Torii can use",
+        )
+    gid = e.get("id") if e else None
+    where = GAME_URL.format(gid) if gid else "GameHacking.org"
+    name = f"{e.get('title')} {e.get('name')}".strip() if e else crc_hex(crc)
+    return Source(
+        cheats,
+        dropped,
+        [f"Cheats from GameHacking.org: {name}, {where}"],
+        "",
+        f"from {where}",
+    )
+
+
+def resolve(game, cache, index, by_crc, args):
+    """A game's Source, or a Skip with why."""
+    crc = game.crc
+    custom = custom_path(cache, crc)
+    if custom.is_file():
+        cheats = [
+            Cheat(
+                c[0],
+                c[1],
+                False,
+                {"format": c.extra["format"]} if "format" in c.extra else {},
+            )
+            for c in parse_cht(decode(custom.read_bytes()))
+        ]
+        rel = f"{CUSTOM}/{custom.name}"
+        return Source(
+            cheats, [], [f"Cheats from {rel} (dist/cheats/{rel})"], "", f"from {rel}"
+        )
+    if index.get(crc) is not None:
+        return gh_source(cache, index, crc)
+    if not index.complete():
+        return Skip(
+            "not fetched yet",
+            "GameHacking.org's index isn't all fetched: run with --gamehacking",
+        )
+    # A CRC GameHacking doesn't list: a romhack or a modified dump
+    if game.code is None:
+        return Skip(
+            "no cheats on GameHacking",
+            f"{crc_hex(crc)} isn't listed and its header has no game code",
+        )
+    tag = f"{game.code} version {game.version}"
+    bases = base_candidates(index.entries, game.code, game.version)
+    if not bases:
+        return Skip(
+            "no cheats on GameHacking",
+            f"{crc_hex(crc)} isn't listed, nor any dump of {tag}",
+        )
+    if len(bases) > 1:
+        names = "; ".join(
+            f"{b} {index.entries[b].get('title')} {index.entries[b].get('name')}"
+            for b in bases
+        )
+        return Skip(
+            "ambiguous base", f"{crc_hex(crc)} isn't listed; {tag} could be {names}"
+        )
+    base = int(bases[0], 16)
+    src = gh_source(cache, index, base, " (base game)")
+    if isinstance(src, Skip):
+        return Skip(src.label, f"its base dump {src.detail}")
+    entry = index.entries[bases[0]]
+    base_name = f"{entry.get('title')} {entry.get('name')}".strip()
+    base_game = by_crc.get(base)
+    hack = Path(game.file_path).read_bytes()
+    if base_game is None:
+        if not args.base_game:
+            return Skip(
+                "base dump not on card",
+                f"{base_name} ({bases[0]}) is its base; put it on the card",
+            )
+        base_rom, share = None, None
+    else:
+        base_rom = Path(base_game.file_path).read_bytes()
+        share = similarity(base_rom, hack)
+        if share * 100 < args.similar and not args.base_game:
+            return Skip(
+                "hack too different",
+                f"{share:.0%} of {base_name} ({bases[0]}) is the same, under {args.similar:g}%",
+            )
+    patches = rom_patches(src.cheats)
+    if patches is None:
+        return Skip(
+            "base game",
+            "no C compiler to check its ROM patches with (tools/cheat_patches.c)",
+        )
+    kept, gone = [], 0
+    for cheat, p in zip(src.cheats, patches, strict=True):
+        if p and (
+            base_rom is None or not all(patch_unchanged(base_rom, hack, x) for x in p)
+        ):
+            gone += 1
+            src.dropped.append(
+                (
+                    cheat[0],
+                    "patches ROM bytes the hack changed"
+                    if base_rom
+                    else "patches the ROM, and the base ROM isn't on the card to check it",
+                )
+            )
+            continue
+        kept.append(cheat)
+    src.cheats = kept
+    same = f"{share:.0%} the same" if share is not None else "base ROM not on card"
+    src.label = "base game"
+    src.detail = f"light hack of {base_name} ({bases[0]}, {same}): {plural(len(kept), 'cheat')}, {plural(gone, 'ROM patch')} dropped"
+    src.comments = [
+        f"Cheats for its base game, {base_name} (crc32 {bases[0]}), from GameHacking.org: {GAME_URL.format(entry.get('id'))}"
+    ]
+    return src
+
+
+def write_game(sd, game, src, dry_run):
+    """Merges a game's Source into its card file. Returns (state, detail,
+    dropped): state written, updated or unchanged."""
+    target = cheat_path(sd, game.card_path)
+    old_text = read_card_file(target)
+    old = parse_cht(old_text) if old_text is not None else []
+    ours = old_text is not None and for_crc(old_text) is not None
+    cheats, own, stale = merge(src.cheats, old, keep_all=not ours)
+    comments = (
+        [FOR_CRC[2:] + crc_hex(game.crc)]
+        + src.comments
+        + ["Written by `just cheats`; picks and your own codes are kept."]
+    )
+    n_source = len(cheats) - own
+    removable = [i for i in range(n_source) if not user_code(cheats[i])]
+    cheats, over = fit(cheats, removable, comments)
+    dropped = list(src.dropped) + [
+        (name, "over the kernel's size limit") for name in over
+    ]
+    text = format_cht(cheats, comments)
+    if old_text is None:
+        state = "written"
+    elif text == old_text:
+        state = "unchanged"
+    else:
+        state = "updated"
+    if state != "unchanged" and not dry_run:
+        write_card_file(target, text)
+    n = n_source - len(over)
+    detail = src.detail if src.label else f"{plural(n, 'cheat')} {src.detail}"
+    if over and src.label:
+        detail += f", {len(over)} more dropped over the size limit"
+    if own:
+        detail += f", {own} of your own"
+    picked = sum(c[2] for c in cheats)
+    if picked:
+        detail += f", {picked} picked"
+    if stale:
+        detail += f", {plural(stale, 'old cheat')} the source no longer has left out"
+    if len(text.encode("utf-8", "surrogateescape")) > TEXT_MAX:
+        detail += f"; over {TEXT_MAX} bytes with your own codes alone: the kernel won't read it"
+    rel = "/" + target.relative_to(sd).as_posix()
+    return state, f"{rel}: {detail}", dropped
+
+
+# --- Fetching (in the user's browser) --------------------------------------------------------
+
+
+def wanted(games, extra_crcs, cache, index, refresh):
+    """The harvester's wanted dumps, [{crc, code, version}]: each game's own
+    CRC, or for a romhack (a CRC the complete index lacks) its base dump,
+    less what's cached, what lists no codes, and custom files."""
+    out = {}
+
+    def want(crc, code=None, version=0):
+        if refresh or not export_path(cache, crc).is_file():
+            out.setdefault(crc, {"crc": crc_hex(crc), "code": code, "version": version})
+
+    for g in games:
+        if custom_path(cache, g.crc).is_file():
+            continue
+        e = index.get(g.crc)
+        if e is not None:
+            if e.get("codes") or refresh:
+                want(g.crc)
+        elif not index.complete() or refresh:
+            want(g.crc, g.code, g.version)
+        elif g.code:
+            bases = base_candidates(index.entries, g.code, g.version)
+            if len(bases) == 1 and index.entries[bases[0]].get("codes"):
+                want(int(bases[0], 16))
+    for crc in extra_crcs:
+        if index.get(crc) is None or index.get(crc).get("codes") or refresh:
+            want(crc)
+    return list(out.values())
+
+
+def harvest_script(want, index, cache, delay, run_id, refresh):
+    """The harvester with its CONFIG filled in."""
+    config = {
+        "run": run_id,
+        "delay": delay,
+        "wanted": want,
+        "cached": []
+        if refresh
+        else sorted(p.stem for p in gh_dir(cache).glob("*.cheats")),
+        "index": {} if refresh else index.entries,
+        "pagesDone": [] if refresh else sorted(index.pages),
+        "lastPage": -1 if refresh else index.last_page,
+    }
+    template = HARVEST_TEMPLATE.read_text("utf-8")
+    if HARVEST_CONFIG not in template:
+        raise CheatsError(f"{HARVEST_TEMPLATE} has no {HARVEST_CONFIG}")
+    return template.replace(HARVEST_CONFIG, json.dumps(config, separators=(",", ":")))
+
+
+def to_clipboard(text):
+    """Copies text to the clipboard where there's a tool for it; whether it
+    did."""
+    for cmd in (["pbcopy"], ["wl-copy"], ["xclip", "-selection", "clipboard"]):
+        if shutil.which(cmd[0]):
+            try:
+                subprocess.run(cmd, input=text.encode(), check=True, timeout=10)
+                return True
+            except (OSError, subprocess.SubprocessError):
+                pass
+    return False
+
+
+def open_url(url):
+    for cmd in (["open"], ["xdg-open"]):
+        if (
+            shutil.which(cmd[0])
+            and subprocess.run(cmd + [url], check=False).returncode == 0
+        ):
+            return
+    webbrowser.open(url)
+
+
+def fetch(games, args, index):
+    want = wanted(games, args.only_extra, args.cache, index, args.refresh)
+    if not want:
+        print("GameHacking.org: nothing to fetch, every game's export is cached")
+        return
+    run_id = time.strftime("%Y%m%d-%H%M%S")
+    script = harvest_script(want, index, args.cache, args.delay, run_id, args.refresh)
+    path = gh_dir(args.cache) / HARVEST
+    write_file(path, script.encode("utf-8"))
+    pages = (
+        0
+        if index.complete()
+        else 77
+        if index.last_page < 0
+        else index.last_page + 1 - len(index.pages)
+    )
+    minutes = (len(want) + pages) * args.delay / 60
+    copied = not args.no_browser and to_clipboard(script)
+    print(
+        f"GameHacking.org: {plural(len(want), 'dump')} to export (about {minutes:.0f} minutes at {args.delay:g} s a request)."
+    )
+    print(f"The harvester is {path}{', copied to the clipboard' if copied else ''}.")
+    print(
+        f"1. In your browser, on {GBA_PAGE} (opening now), open the console: Cmd+Opt+J (Chrome; Ctrl+Shift+J elsewhere)."
+    )
+    print("2. If it asks, type: allow pasting  and press Enter.")
+    print(
+        f"3. Paste{' it' if copied else f' the contents of {path}'} and press Enter. Keep the tab open; its box shows progress."
+    )
+    print("4. Allow the site to download multiple files if the browser asks.")
+    print(
+        f"Waiting for torii-gamehacking-*.json in {args.downloads}; Ctrl-C stops waiting (the run then goes on with what was imported)."
+    )
+    if not args.no_browser:
+        open_url(GBA_PAGE)
+    watch(args.downloads, args.cache, index, run_id)
+
+
+# --- The run ----------------------------------------------------------------------------------
+
+LABELS = (
+    "written",
+    "updated",
+    "unchanged",
+    "base game",
+    "no cheats on GameHacking",
+    "not fetched yet",
+    "hack too different",
+    "base dump not on card",
+    "ambiguous base",
+)
 
 
 def run(args):
@@ -567,95 +1168,57 @@ def run(args):
         raise CheatsError(
             f"{sd} isn't a folder: give the card's folder, e.g. /Volumes/OMEGA"
         )
-    dat = names_db.CONSOLES[GBA][1]
-    text = names_db.fetch(Path(args.dats), dat, args.offline, False).read_text(
-        "utf-8", "replace"
+    args.cache = Path(args.cache)
+    only = (
+        {parse_crc(c) for c in args.only.split(",") if c.strip()} if args.only else None
     )
-    version, dat_games = names_db.parse_dat(text)
-    tables, codes, _ = names_db.make_tables([text, "", "", ""])
-
-    fetcher = Fetcher(args.cache, args.api_url, args.raw_url, args.delay, args.offline)
-    db = Database(fetcher.load_listing(args.refresh), dat_games)
-
-    games = [g for g in names_db.walk_card(sd) if g[2] == GBA]
-    crcs = read_crcs(sd, games)
-    rows = {"written": [], "updated": [], "unchanged": [], "none": [], "unmatched": []}
-    for card_path, file_path, _ in games:
-        crc = crcs[card_path]
-        header = header_info(file_path)
-        name = names_db.db_name(tables, GBA, crc)
-        if name is None and header is not None:
-            name = names_db.code_match(codes, GBA, header[0], Path(card_path).name)
-        if name is None:
-            rows["unmatched"].append(
-                (
-                    card_path,
-                    f"CRC {crc:08X} isn't in the dat (a romhack or a bad dump?)",
-                )
-            )
+    index = Index(args.cache)
+    for f in args.import_ or []:
+        bundle, got = import_bundle(f, args.cache, index)
+        if bundle is None:
+            raise CheatsError(f"{f}: {got}")
+        print(f"imported {Path(f).name}: {plural(got, 'export')}")
+    every = card_games(sd)
+    by_crc = {}
+    for g in every:
+        by_crc.setdefault(g.crc, g)
+    games = every if only is None else [g for g in every if g.crc in only]
+    args.only_extra = sorted(only - set(by_crc)) if only is not None else []
+    if args.gamehacking:
+        fetch(games, args, index)
+    rows = {k: [] for k in LABELS}
+    dropped = []
+    for game in games:
+        src = resolve(game, args.cache, index, by_crc, args)
+        if isinstance(src, Skip):
+            rows[src.label].append((game.card_path, src.detail))
             continue
-        group, why = db.match(name, header)
-        if group is None:
-            if why is None:
-                rows["none"].append((card_path, name))
-            else:
-                rows["unmatched"].append((card_path, f"{name}: {why}"))
-            continue
-        files = db.groups[group][1]
-        texts = [fetcher.get(f) for f in files]
-        if any(t is None for t in texts):
-            rows["unmatched"].append(
-                (card_path, f"{name}: {'; '.join(files)} not downloaded")
-            )
-            continue
-        database = [c for t in texts for c in parse_cht(t)]
-        target = cheat_path(sd, card_path)
-        old_text = read_card_file(target)
-        old = parse_cht(old_text) if old_text is not None else []
-        cheats, own = merge(database, old)
-        if old_text is None:
-            how = "written"
-        elif cheats == old:
-            how = "unchanged"
-        else:
-            how = "updated"
-        if how != "unchanged" and not args.dry_run:
-            write_card_file(target, format_cht(cheats))
-        picked = sum(c[2] for c in cheats)
-        n = len(cheats) - own
-        detail = f"{n} cheat{'' if n == 1 else 's'} from {'; '.join(files)}"
-        if own:
-            detail += f", {own} of your own"
-        if picked:
-            detail += f", {picked} picked"
-        rel = "/" + target.relative_to(sd).as_posix()
-        rows[how].append((card_path, f"{rel}: {detail}"))
-    report(rows, args.dry_run, fetcher, version, len(games))
+        state, detail, gone = write_game(sd, game, src, args.dry_run)
+        label = "base game" if src.label == "base game" else state
+        if label == "base game":
+            detail += f" ({'would be ' if args.dry_run and state != 'unchanged' else ''}{state})"
+        rows[label].append((game.card_path, detail))
+        dropped += [(game.card_path, name, why) for name, why in gone]
+    report(rows, dropped, args.dry_run, len(games))
 
 
-def report(rows, dry_run, fetcher, version, total):
+def report(rows, dropped, dry_run, total):
     would = "would be " if dry_run else ""
-    labels = [
-        ("written", f"{would}written"),
-        ("updated", f"{would}updated"),
-        ("unchanged", "unchanged"),
-        ("none", "without cheats in the database"),
-        ("unmatched", "not matched"),
-    ]
-    counts = ", ".join(f"{len(rows[k])} {label}" for k, label in labels)
-    print(f"{total} GBA games: {counts}")
-    for k, label in labels:
+    names = {k: (f"{would}{k}" if k in ("written", "updated") else k) for k in LABELS}
+    counts = ", ".join(f"{len(rows[k])} {names[k]}" for k in LABELS if rows[k])
+    print(f"{plural(total, 'GBA game')}: {counts or 'nothing to do'}")
+    for k in LABELS:
         if rows[k]:
-            print(f"{label}:")
+            print(f"{names[k]}:")
             for path, what in sorted(rows[k]):
                 print(f"  {path}: {what}")
+    if dropped:
+        print(f"{plural(len(dropped), 'cheat')} left out:")
+        for path, name, why in dropped:
+            print(f"  {path}: {name}: {why}")
     print(
-        f"{fetcher.requests} requests, {fetcher.downloaded} cheat files downloaded; "
-        f"dat {version or '(no version)'}"
+        "Cheats from GameHacking.org, fetched on this PC for your own card; never part of Torii."
     )
-    if fetcher.stopped:
-        print(f"cheats: stopped fetching: {fetcher.stopped}", file=sys.stderr)
-    print(ATTRIBUTION)
 
 
 def main(argv):
@@ -667,37 +1230,63 @@ def main(argv):
     )
     p.add_argument("sd_path", metavar="SD_PATH", help="the card's folder on this PC")
     p.add_argument(
+        "--gamehacking",
+        action="store_true",
+        help="fetch what's missing from GameHacking.org, through a harvester you paste into your browser",
+    )
+    p.add_argument(
+        "--import",
+        dest="import_",
+        nargs="+",
+        metavar="FILE",
+        help="import harvester bundles",
+    )
+    p.add_argument(
+        "--only",
+        metavar="CRC,...",
+        help="only these CRC32s (on the card, or any to fetch)",
+    )
+    p.add_argument(
+        "--base-game",
+        action="store_true",
+        help="give every romhack its base game's cheats, whatever the similarity",
+    )
+    p.add_argument(
+        "--similar",
+        type=float,
+        default=SIMILAR,
+        metavar="PCT",
+        help=f"percent of the base's 4 KB blocks a light hack keeps (default {SIMILAR:g})",
+    )
+    p.add_argument(
         "--dry-run",
         action="store_true",
         help="change nothing on the card, print what would change",
     )
     p.add_argument(
-        "--offline", action="store_true", help="never download: use the caches"
-    )
-    p.add_argument(
-        "--refresh",
-        action="store_true",
-        help="download the database's file list again, and the files that changed",
-    )
-    p.add_argument(
         "--delay",
         type=float,
         default=DELAY,
-        help=f"seconds between requests (default {DELAY})",
+        help=f"the harvester's seconds between requests (default {DELAY:g}, robots.txt's)",
+    )
+    p.add_argument(
+        "--downloads",
+        type=Path,
+        default=Path.home() / "Downloads",
+        help="where the browser saves the bundles (default ~/Downloads)",
+    )
+    p.add_argument(
+        "--refresh", action="store_true", help="fetch the index and the exports again"
     )
     p.add_argument(
         "--cache",
         default=str(CACHE),
-        help=f"the cheat files' cache (default {CACHE.relative_to(ROOT)})",
+        help=f"the cheats' cache (default {CACHE.relative_to(ROOT)})",
     )
-    p.add_argument(
-        "--dats",
-        default=str(names_db.DATS),
-        help=f"the dats' cache (default {names_db.DATS.relative_to(ROOT)})",
-    )
-    p.add_argument("--api-url", default=API_URL, help=argparse.SUPPRESS)
-    p.add_argument("--raw-url", default=RAW_URL, help=argparse.SUPPRESS)
+    p.add_argument("--no-browser", action="store_true", help=argparse.SUPPRESS)
     args = p.parse_args(argv)
+    if args.delay < 0 or not 0 <= args.similar <= 100:
+        p.error("--delay is 0 or more, --similar 0 to 100")
     try:
         run(args)
     except (CheatsError, names_db.NamesError) as e:

@@ -205,9 +205,15 @@ RULES = [
         "box art scraper: test-host runs its tests against a local server",
     ),
     (
-        ["tools/cheats.py", "tests/cheats_test.py"],
+        [
+            "tools/cheats.py",
+            "tools/cheats_harvest.js",
+            "tools/cheat_patches.c",
+            "tests/cheats_test.py",
+            "tests/cheats/*",
+        ],
         {LINT, TEST_HOST},
-        "cheat file writer: test-host runs its tests on a fixture card and a local server",
+        "cheat file writer, its browser harvester and patch lister: test-host runs its tests on a fixture card",
     ),
     (
         ["tools/cheat_encode.py", "tests/cheat_encode_test.py"],
