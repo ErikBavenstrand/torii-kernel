@@ -98,6 +98,7 @@ static const struct {
 	{"cheatcode_too_big", test_cheatcode_too_big},
 	{"cheatcode_detect", test_cheatcode_detect},
 	{"cheatcode_lower", test_cheatcode_lower},
+	{"cheatcode_device", test_cheatcode_device},
 	{"cheatcode_fuzz", test_cheatcode_fuzz},
 	{"text_utf8", test_text_utf8},
 	{"settings_table", test_settings_table},

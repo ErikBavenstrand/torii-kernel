@@ -63,11 +63,13 @@ enum cheat_op_type {
 	// those are skipped. When else_count is set, the else_count ops after
 	// those run only when false (Action Replay v3's ELSE). Ops are counted as
 	// laid out, ROM patches included (they run at launch whatever the
-	// condition, as in mGBA).
+	// condition, as in mGBA). A conditional covering no ops tests nothing, as
+	// in mGBA: the decoders put a step that does nothing (a write of count 0)
+	// in an empty THEN.
 	CHEAT_OP_IF_EQ,
 	CHEAT_OP_IF_NE,
-	CHEAT_OP_IF_LT,   // signed, as s32
-	CHEAT_OP_IF_GT,   // signed, as s32
+	CHEAT_OP_IF_LT,   // signed at the width, as the devices compare (mGBA zero-extends)
+	CHEAT_OP_IF_GT,   // signed at the width
 	CHEAT_OP_IF_ULT,  // unsigned
 	CHEAT_OP_IF_UGT,  // unsigned
 	CHEAT_OP_IF_AND,  // true when read & value is not 0
@@ -77,14 +79,15 @@ enum cheat_op_type {
 	// width bytes (1, 2 or 4) of value written once into the ROM at address
 	// (0x08000000-based), at launch
 	CHEAT_OP_ROM_PATCH,
-	// Action Replay v3's slowdown; value holds the code's low 24 bits. Kept so
-	// a cheat that uses it reads; it does nothing, as in mGBA.
+	// A slowdown code (Action Replay v3's, GameShark v1's on its button);
+	// value holds the code's loops. Kept so a cheat that uses it reads; it
+	// does nothing, as in mGBA.
 	CHEAT_OP_SLOWDOWN,
 };
 
 struct cheat_op {
 	u32 address;
-	u32 value;       // masked to width
+	u32 value;       // masked to width, but for an unsigned bound one past it (0x10000: GameShark's <= and >=)
 	u32 count;       // writes: how many; conditionals: ops covered when true
 	s32 addr_step;   // writes: the address step; WRITE_PTR: the pointer's offset
 	s32 value_step;  // writes: the value step
@@ -113,7 +116,10 @@ enum cheat_status {
 // line of its own whose ops fall outside the GBA's memory (cheat_op_address_ok)
 // is read again without the CodeBreaker key, or with its GameShark format
 // detected again, and that reading is kept when it fits (d->last_alone says
-// so); the file's own state carries on either way.
+// so); the file's own state carries on either way. A cheat of more than a
+// line holding a raw CodeBreaker key line other than the file's key takes it
+// as the file's new key when the old key reads the cheat as nonsense and the
+// new one doesn't.
 u8 cheat_decode(struct cheat_decoder *d, const char *code, u32 len, struct cheat_op *ops, u32 ops_max, u32 *n_ops);
 
 // The format one typed line looks like (CHEAT_FMT_AUTO for none), digit

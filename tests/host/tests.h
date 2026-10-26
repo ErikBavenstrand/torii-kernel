@@ -29,6 +29,7 @@ void test_cheatcode_shapes(void);
 void test_cheatcode_too_big(void);
 void test_cheatcode_detect(void);
 void test_cheatcode_lower(void);
+void test_cheatcode_device(void);
 void test_cheatcode_fuzz(void);
 void test_progress_permille(void);
 void test_progress_estimate(void);
