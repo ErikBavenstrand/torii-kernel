@@ -34,6 +34,7 @@
 #define CS_STEP_CYCLES (16780000u / 20)
 
 static const struct ui_card_config cs_card = {4, 4, 4, 1, 0};
+_Static_assert(sizeof(((struct lang_cheats *)0)->why) / sizeof(const char *) == CHEATFILE_WHYS, "a reason for each");
 
 enum {
 	CS_TITLE,

@@ -857,6 +857,33 @@ void test_cheatcode_lower(void)
 	CHECK_EQ(cheat_lower(in, 1, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_BAD_ADDRESS);
 	in[0] = op(CHEAT_OP_ROM_PATCH, 2, 0x02000000, 1, 1);
 	CHECK_EQ(cheat_lower(in, 1, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_BAD_ADDRESS);
+
+	// What can't run here: a ROM write in a cheat with conditionals (mGBA
+	// writes it only while they hold), an add, or or and on the ROM, at any
+	// element; a ROM patch op under a condition stays a launch-time patch
+	in[0] = op(CHEAT_OP_IF_EQ, 2, 0x02000000, 1, 1);
+	in[1] = op(CHEAT_OP_WRITE, 2, 0x08000100, 0x4770, 1);
+	CHECK_EQ(cheat_lower(in, 2, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_CANT_RUN);
+	CHECK_EQ(np, 0);
+	CHECK_EQ(nw, 0);
+	in[1] = op(CHEAT_OP_ROM_PATCH, 2, 0x08000100, 0x4770, 1);
+	CHECK_EQ(cheat_lower(in, 2, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_OK);
+	CHECK_EQ(np, 1);
+	in[1] = op(CHEAT_OP_WRITE, 2, 0x08000100, 0x4770, 0);  // count 0 runs nowhere
+	CHECK_EQ(cheat_lower(in, 2, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_OK);
+	static const u8 rmw[] = {CHEAT_OP_ADD, CHEAT_OP_OR, CHEAT_OP_AND};
+	for (i = 0; i < sizeof(rmw); ++i) {
+		in[0] = op(rmw[i], 2, 0x09000000, 1, 1);
+		CHECK_EQ(cheat_lower(in, 1, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_CANT_RUN);
+		in[0] = op(rmw[i], 2, 0x0203FFF0, 1, 4);
+		in[0].addr_step = 0x10;  // its last element past EWRAM's mirrors' end
+		CHECK_EQ(cheat_lower(in, 1, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_OK);
+		in[0].address = 0x02FFFFE0;  // and past EWRAM's region
+		CHECK_EQ(cheat_lower(in, 1, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_BAD_ADDRESS);
+	}
+	in[0] = op(CHEAT_OP_IF_EQ, 2, 0x08000100, 0x4770, 1);  // a condition reads the ROM: fine
+	in[1] = op(CHEAT_OP_WRITE, 2, 0x02000000, 1, 1);
+	CHECK_EQ(cheat_lower(in, 2, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_OK);
 }
 
 // Every prefix of real codes, and random bytes, decode without reading past

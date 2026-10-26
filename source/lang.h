@@ -248,7 +248,7 @@ extern const struct lang_games *gl_games;
 // The cheat screen (screens/cheats.c)
 struct lang_cheats {
 	const char *hint_pick;  // A
-	const char *why[4];     // a greyed row's reason, by cheatfile.h's CHEATFILE_WHY_* (0: none)
+	const char *why[5];     // a greyed row's reason, by cheatfile.h's CHEATFILE_WHY_* (0: none)
 	const char *nor;        // a ROM-patch cheat's note
 	const char *unnamed;    // a cheat with no desc line
 	const char *reading, *reading_text;  // the progress dialog while a big file decodes

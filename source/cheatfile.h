@@ -30,7 +30,7 @@
 
 #include "cheatcode.h"
 
-#define CHEATFILE_TEXT_MAX 0xE000  // the largest file read (libretro's reach 25 KB)
+#define CHEATFILE_TEXT_MAX 0xE000  // the largest text read (libretro's reach 25 KB); a longer file is refused
 #define CHEATFILE_MAX 1024         // cheats kept, numbered 0 to CHEATFILE_MAX - 1
 // The interpreter's budget for all picked cheats together (cheatcode.h):
 // its table's bytes (the end word left out) and cycles (its call left out)
@@ -49,6 +49,7 @@ enum cheatfile_status {
 	CHEATFILE_BIG,          // alone past the interpreter's budget, or too many ROM patches
 	CHEATFILE_UNREADABLE,   // malformed, a code type no decoder knows, or an address off the GBA's map
 	CHEATFILE_PLACEHOLDER,  // digits for the user to fill in (00??)
+	CHEATFILE_CANT_RUN,     // an op Torii can't run as mGBA does (cheatcode.h's CHEAT_LOWER_CANT_RUN)
 };
 
 // Why A doesn't pick a cheat now (cheatfile_why)
@@ -57,6 +58,7 @@ enum cheatfile_why {
 	CHEATFILE_WHY_FULL,  // it doesn't fit the budget beside the picked cheats, or alone
 	CHEATFILE_WHY_UNREADABLE,
 	CHEATFILE_WHY_EDIT,  // a placeholder
+	CHEATFILE_WHY_CANT_RUN,
 	CHEATFILE_WHYS
 };
 
@@ -95,6 +97,7 @@ struct cheatfile {
 	u32 count;
 	u32 dropped;  // cheats numbered past the table's end: left out
 	u32 crlf;     // the file's lines end in CRLF (an added line does too)
+	u32 cut;      // the text was over CHEATFILE_TEXT_MAX and is read cut: never write it back
 	u32 bytes;    // the picked OK cheats' table bytes
 	u32 cost;     // and cycles
 	struct cheatfile_out out;
@@ -102,7 +105,8 @@ struct cheatfile {
 
 // Reads the cheats of len bytes of text (not NUL-terminated) into cheats
 // (max entries, max at most CHEATFILE_MAX), every one CHEATFILE_NEW. text
-// must stay as it is while f is used.
+// must stay as it is while f is used. Past CHEATFILE_TEXT_MAX bytes, only
+// those are read, and f->cut says so.
 void cheatfile_parse(struct cheatfile *f, const char *text, u32 len, struct cheatfile_cheat *cheats, u32 max);
 
 // The decoder and the buffers one cheat decodes into. After cheatfile_next,

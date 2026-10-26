@@ -80,6 +80,7 @@ jobs=(
   "tests/library.sh 4/4"
   "tests/cheats.sh"
   "tests/cheat_safety.sh irq"
+  "tests/cheat_safety.sh files"
   "tests/cheat_engine.sh 1/4"
   "tests/cheat_engine.sh 2/4"
   "tests/cheat_engine.sh 3/4"

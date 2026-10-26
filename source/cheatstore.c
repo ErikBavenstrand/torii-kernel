@@ -6,6 +6,7 @@
 
 #include "cheat.h"
 #include "crc32.h"
+#include "cutpoint.h"
 #include "ez_define.h"
 #include "Ezcard_OP.h"
 #include "ff.h"
@@ -58,6 +59,13 @@ int cheatstore_read(const char *rom_path)
 		tlog_error("cheats: %s can't be read", cs->path);
 		return 0;
 	}
+	if ((u32)len > CHEATFILE_TEXT_MAX) {
+		// Its cheats would be read from a cut text, and the picks written
+		// back over the rest: none of it, then
+		tlog("cheats: %s is %lu bytes, over %u: too big, left alone", cs->path, (unsigned long)len,
+		     CHEATFILE_TEXT_MAX);
+		return 0;
+	}
 	cheatfile_parse(&cs->file, (const char *)cs->text, (u32)len, cs->cheats, CHEATFILE_MAX);
 	cheatfile_begin(&cs->work);
 	if (cs->file.dropped)
@@ -107,6 +115,8 @@ int cheatstore_write(void)
 	struct cheatstore *cs = cheatstore();
 	if (!cheatfile_changed(&cs->file))
 		return 1;
+	if (cs->file.cut)
+		return 0;  // never a text cut short (cheatstore_read refuses such a file)
 	u32 len = cheatfile_text_len(&cs->file);
 	if (len > CHEATFILE_TEXT_MAX) {
 		tlog_error("cheats: %s would be %lu bytes, over %u: not written", cs->path, (unsigned long)len,
@@ -129,8 +139,12 @@ int cheatstore_delete(const char *rom_path)
 	if (len < 0)
 		return 1;
 	FRESULT a = f_unlink(path);
+	if (a == FR_OK)
+		cutpoint("cheats: the cheat file deleted");
 	memcpy(path + len, ".bak", 5);  // cheatstore_path leaves room for it
 	FRESULT b = f_unlink(path);
+	if (b == FR_OK)
+		cutpoint("cheats: its .bak deleted");
 	int gone = (a == FR_OK || a == FR_NO_FILE || a == FR_NO_PATH) &&
 		   (b == FR_OK || b == FR_NO_FILE || b == FR_NO_PATH);
 	if (a == FR_OK || b == FR_OK || !gone)
@@ -148,7 +162,8 @@ static void rom_patch(const struct cheat_patch *p)
 	SetPSRampage(0);
 }
 
-static const char *const status_names[] = {"new", "ok", "master", "too big", "unreadable", "placeholder"};
+static const char *const status_names[] = {"new",        "ok",          "master",        "too big",
+					   "unreadable", "placeholder", "can't run here"};
 
 void cheatstore_launch(const char *rom_path, u32 psram_bytes)
 {

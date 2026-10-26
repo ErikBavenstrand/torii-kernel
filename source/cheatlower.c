@@ -50,6 +50,9 @@ int cheat_op_address_ok(const struct cheat_op *op)
 	case CHEAT_OP_WRITE_PTR:  // the pointer is read; where it points is known only in game
 		return range_ok(op->address, (unsigned long long)op->address + 3);
 	case CHEAT_OP_WRITE:
+	case CHEAT_OP_ADD:
+	case CHEAT_OP_OR:
+	case CHEAT_OP_AND:
 		if (!op->count)
 			return 1;
 		first = op->address;
@@ -68,6 +71,25 @@ int cheat_op_address_ok(const struct cheat_op *op)
 static int is_cond(u8 type)
 {
 	return type >= CHEAT_OP_IF_EQ && type <= CHEAT_OP_IF_NEVER;
+}
+
+// An op Torii can't run as mGBA does (cheat_lower's CHEAT_LOWER_CANT_RUN):
+// a write to the ROM in a cheat with conditionals, or an add, or or and on
+// the ROM. The address checks have kept each op's elements in one region.
+static int cant_run(const struct cheat_op *op, int conditional)
+{
+	if (!op->count)
+		return 0;  // runs nowhere
+	switch (op->type) {
+	case CHEAT_OP_WRITE:
+		return conditional && is_rom(op->address);
+	case CHEAT_OP_ADD:
+	case CHEAT_OP_OR:
+	case CHEAT_OP_AND:
+		return is_rom(op->address);
+	default:
+		return 0;
+	}
 }
 
 // What runs in game: not ROM patches, writes to the ROM, slowdown codes, or
@@ -232,10 +254,14 @@ u8 cheat_lower(const struct cheat_op *ops, u32 n_ops, u32 *prog, u32 prog_max, u
 			return CHEAT_LOWER_BAD_ADDRESS;
 	if (n_ops > CHEAT_PROG_OPS_MAX)
 		return CHEAT_LOWER_TOO_BIG;
-	for (i = 0; i < n_ops; ++i) {
-		patches_of(&o, &ops[i]);
+	for (i = 0; i < n_ops; ++i)
 		if (is_cond(ops[i].type))
 			plain = 0;
+	for (i = 0; i < n_ops; ++i)
+		if (cant_run(&ops[i], !plain))
+			return CHEAT_LOWER_CANT_RUN;
+	for (i = 0; i < n_ops; ++i) {
+		patches_of(&o, &ops[i]);
 		if (runs(&ops[i]))
 			any = 1;
 	}

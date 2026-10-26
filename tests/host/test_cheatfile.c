@@ -187,6 +187,25 @@ void test_cheatfile_odd(void)
 	load_str("cheat0_code = \"\"\n");
 	CHECK_EQ(file.count, 1);
 	CHECK(cheats[0].status != CHEATFILE_OK);
+
+	// RetroArch's bools: 1 is true too, 0 and anything else false
+	load_str("cheat0_code = \"32001000 0001\"\ncheat0_enable = 1\n"
+		 "cheat1_code = \"32001000 0001\"\ncheat1_enable = 0\n"
+		 "cheat2_code = \"32001000 0001\"\ncheat2_enable = 11\n");
+	CHECK_EQ(cheats[0].picked, 1);
+	CHECK_EQ(cheats[1].picked, 0);
+	CHECK_EQ(cheats[2].picked, 0);
+	CHECK(!file.cut);
+
+	// A text past CHEATFILE_TEXT_MAX is read cut, and says so
+	char *huge = malloc(CHEATFILE_TEXT_MAX + 1);
+	memset(huge, '\n', CHEATFILE_TEXT_MAX + 1);
+	load(huge, CHEATFILE_TEXT_MAX + 1);
+	CHECK(file.cut);
+	CHECK_EQ(file.len, CHEATFILE_TEXT_MAX);
+	load(huge, CHEATFILE_TEXT_MAX);
+	CHECK(!file.cut);
+	free(huge);
 }
 
 void test_cheatfile_status(void)
@@ -234,6 +253,11 @@ void test_cheatfile_status(void)
 		CHECK_EQ(cheats[i].picked, ok);
 	}
 	CHECK_EQ(file.bytes, 36);
+	// A ROM write under a condition can't run here
+	load_str("cheat0_code = \"72001000 0001+88001000 4770\"\n");
+	CHECK_EQ(cheats[0].status, CHEATFILE_CANT_RUN);
+	CHECK_EQ(cheatfile_why(&file, 0), CHEATFILE_WHY_CANT_RUN);
+	CHECK(!cheatfile_toggle(&file, 0));
 	// A greyed cheat the file picks can be dropped all the same
 	load_str("cheat0_code = \"3300075C+00??\"\ncheat0_enable = true\n");
 	CHECK_EQ(cheats[0].picked, 1);

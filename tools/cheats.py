@@ -287,7 +287,11 @@ def parse_cht(text):
         c = found[n]
         if "code" in c:
             out.append(
-                (c.get("desc", ""), c["code"], c.get("enable", "").casefold() == "true")
+                (
+                    c.get("desc", ""),
+                    c["code"],
+                    c.get("enable", "").casefold() in ("true", "1"),
+                )
             )
     return out
 

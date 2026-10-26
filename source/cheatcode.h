@@ -190,6 +190,7 @@ enum cheat_lower_status {
 	CHEAT_LOWER_TOO_BIG,          // over prog_max words or CHEAT_CYCLES_MAX, or an op's count over 0xFFFF
 	CHEAT_LOWER_TOO_MANY_PATCHES, // more than patches_max patches
 	CHEAT_LOWER_BAD_ADDRESS,      // an op outside the GBA's memory: likely a misread code
+	CHEAT_LOWER_CANT_RUN,         // a ROM write under a condition, or an add, or or and on the ROM
 };
 
 // Turns one cheat's ops into its part of the interpreter's table (header
@@ -197,8 +198,12 @@ enum cheat_lower_status {
 // runs in game) with its cycles in *cost (0 if none), and ROM patches
 // (*n_patches of them). Writes to the ROM (0x08000000-0x09FFFFFF) and ROM
 // patch ops become patches (fills expanded, bytes merged into halfwords),
-// applied at launch whatever a condition says, as mGBA applies its ROM
-// patches. A cheat without conditionals runs its ops in order, writes of a
+// applied at launch; ROM patch ops whatever a condition says, as mGBA
+// applies its ROM patches. A plain write to the ROM in a cheat with
+// conditionals can't run (CHEAT_LOWER_CANT_RUN): mGBA writes it only while
+// its condition holds, and the game's PSRAM can't be written in game. Nor
+// can an add, or or and on the ROM (0x09xxxxxx holds the cart's command
+// registers), checked at each element's address. A cheat without conditionals runs its ops in order, writes of a
 // width in a row as one run; one with conditionals keeps every op in its
 // place (ROM patches and slowdown codes as nothing), so a condition's count
 // covers the ops it covers in mGBA. IF_BUTTON tests CHEAT_BUTTON_KEYS.
@@ -211,7 +216,8 @@ u8 cheat_lower(const struct cheat_op *ops, u32 n_ops, u32 *prog, u32 prog_max, u
 	       struct cheat_patch *patches, u32 patches_max, u32 *n_patches);
 
 // Whether every address op touches is good, as cheat_lower checks it: a
-// pointer write's pointer, a fill's whole range, a ROM patch in the ROM.
+// pointer write's pointer, a fill's or a counted add's whole range, a ROM
+// patch in the ROM.
 int cheat_op_address_ok(const struct cheat_op *op);
 
 #endif

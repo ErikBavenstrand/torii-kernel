@@ -44,10 +44,13 @@ static u32 cheat_key(const char *k, u32 len, u32 max, u32 *number)
 	return KEY_OTHER;
 }
 
-// 1 if the value is "true" in any case
+// 1 if the value is "true" in any case, or "1" (RetroArch reads its bools
+// so)
 static int is_true(const char *v, u32 len)
 {
 	static const char t[] = "true";
+	if (len == 1)
+		return v[0] == '1';
 	if (len != 4)
 		return 0;
 	for (u32 i = 0; i < 4; i++)
@@ -107,11 +110,13 @@ static void parse_line(struct cheatfile *f, const char *s, const char *e, u32 ma
 
 void cheatfile_parse(struct cheatfile *f, const char *text, u32 len, struct cheatfile_cheat *cheats, u32 max)
 {
-	if (len > CHEATFILE_TEXT_MAX)
+	u32 cut = len > CHEATFILE_TEXT_MAX;
+	if (cut)
 		len = CHEATFILE_TEXT_MAX;
 	if (max > CHEATFILE_MAX)
 		max = CHEATFILE_MAX;
 	memset(f, 0, sizeof(*f));
+	f->cut = cut;
 	f->text = text;
 	f->len = len;
 	f->cheats = cheats;
@@ -171,6 +176,8 @@ static u8 status_of(struct cheatfile_work *w, const char *code, u32 len)
 	case CHEAT_LOWER_TOO_BIG:
 	case CHEAT_LOWER_TOO_MANY_PATCHES:
 		return CHEATFILE_BIG;
+	case CHEAT_LOWER_CANT_RUN:
+		return CHEATFILE_CANT_RUN;
 	default:
 		return CHEATFILE_UNREADABLE;
 	}
@@ -215,6 +222,8 @@ u32 cheatfile_why(const struct cheatfile *f, u32 i)
 		return CHEATFILE_WHY_FULL;
 	case CHEATFILE_PLACEHOLDER:
 		return CHEATFILE_WHY_EDIT;
+	case CHEATFILE_CANT_RUN:
+		return CHEATFILE_WHY_CANT_RUN;
 	default:
 		return CHEATFILE_WHY_UNREADABLE;
 	}

@@ -58,9 +58,17 @@ it. Info's Controls page lists every key.
   slowdown codes do nothing. The picked cheats share a budget, about a tenth
   of a frame and 5 KB, and greyed rows say why a cheat can't be picked: one past
   what is left doesn't fit, a code with digits to fill in (`00??`) needs
-  editing, and an unreadable one is left alone. ROM patches need the game in
-  PSRAM: a game written to NOR keeps its picked cheats' codes but not their
-  ROM patches. The cheat file moves, renames and is deleted with its game.
+  editing, an unreadable one is left alone, and one that can't run on this
+  cart (a write to the ROM under a condition, or an add, or or and on the
+  ROM) is too. ROM patches need the game in PSRAM: a game written to NOR
+  keeps its picked cheats' codes but not their ROM patches, and a patch over
+  the kernel's own code in the game is left out. An enable value of `true`
+  or `1` is a pick. A file over 56 KB (57,344 bytes) of text is left alone:
+  the game has no Cheats. A file with a NUL byte in it reads as a cut-off
+  write, so the kernel takes its `.bak` copy or, with none, no file at all.
+  The in-game menu's LOAD restores CHEAT ON or OFF as the state had it. The
+  cheat file moves, renames and is deleted with its game (before the game,
+  so a power cut never leaves it behind).
 - **SD card:** the card's folders as they are, folders first. A opens a
   folder or starts a game (L held: a hard reset), LEFT/RIGHT page, B goes
   up a folder, START opens the file's menu (Launch, Clean boot or Boot

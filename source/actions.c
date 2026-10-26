@@ -10,6 +10,7 @@
 #include "boxart.h"
 #include "cheat.h"
 #include "cheatstore.h"
+#include "cutpoint.h"
 #include "gamename.h"
 #include "gamesave.h"
 #include "lang.h"
@@ -296,6 +297,12 @@ int action_delete_file(const char *path)
 		return 0;
 	}
 	tlog_open_now();  // the file may be the log the background open holds
+	// Its cheat file goes with it (its save stays, T11): the picks are of
+	// that file and no other's. First, so a cut between leaves the game,
+	// not a cheat file another game of that name would take
+	const char *slash = strrchr(path_copy, '/');
+	if (library_console_of(slash + 1) == LIB_GBA && !cheatstore_delete(path_copy))
+		tlog("delete %s: its cheat file stays", path_copy);
 	res = f_unlink(path_copy);
 	if (res == FR_NO_FILE || res == FR_NO_PATH) {
 		// Gone already (taken off the card on a PC): it leaves the lists all
@@ -306,11 +313,6 @@ int action_delete_file(const char *path)
 		return 0;
 	}
 	tlog("delete: %s", path_copy);
-	// Its cheat file goes with it (its save stays, T11): the picks are of
-	// that file and no other's
-	const char *slash = strrchr(path_copy, '/');
-	if (library_console_of(slash + 1) == LIB_GBA)
-		cheatstore_delete(path_copy);
 	tlog_card_freed();
 	userdata_forget(path_copy);
 	library_forget(path_copy);
@@ -679,6 +681,8 @@ static FRESULT side_move(u32 i, const char *name, const char *to_name, u32 conso
 		return FR_OK;
 	FRESULT res = f_rename(w->from, w->to);
 	tlog("rename: %s to %s (FatFs %u)", w->from, w->to, (unsigned)res);
+	if (sidecars[i].kind == SIDE_CHEATS)
+		cutpoint("rename: a cheat file moved");
 	return res;
 }
 
