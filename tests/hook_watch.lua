@@ -30,24 +30,40 @@
 --                            the game's start to the menu key
 --   kernel back              the kernel's ROM is mapped again: the game
 --                            reset to the kernel
---   menu open | closed       the menu is on screen: mode 3 with BG2 only,
---                            the CPU in the menu's code
+--   menu open | closed       the menu is on screen: the overlay's header
+--                            (source/ingame_abi.h) in the EWRAM window it
+--                            borrows, saying it is shown
+--   menu shown after N frames  from the menu key's frame to the first frame
+--                            that ended with the menu's panel on screen
+--   menu text shown after N frames  and with its text too
+--   menu left the game as it was | menu changed REGION ...: the game's
+--                            memory and registers at the menu key's frame
+--                            against the first frame after the menu closed
+--                            (see compare() for what can't be compared)
+--
+-- HOOK_WATCH_DUMP=DIR also writes those two snapshots to DIR/before-NAME.bin
+-- and DIR/after-NAME.bin (tests/menu.sh).
 
 local GAME_RUN = 600  -- frames of game before the menu key
 local MENU_WAIT = 60  -- frames the menu gets to open before B
 local AFTER = 600     -- frames the game runs on after B
-local PATCH_SIZE = 0x2000  -- the largest patch area (cheats)
 
 local KEYS = { A = 0x001, B = 0x002, START = 0x008, DOWN = 0x080, R = 0x100, L = 0x200 }
 local MENU_KEY = KEYS.L | KEYS.R | KEYS.START
+
+-- The overlay's header at INGAME_EWRAM while it runs (struct ingame_image)
+local OVERLAY = 0x02000000
+local OVERLAY_MAGIC = 0x31564F54
+local OVERLAY_SHOWN = OVERLAY + 24
 
 local kernelHeader = nil
 local gameStart = nil
 local patchStart = nil
 local last = {}
 local vblank, frames = 0, 0
-local menuAt, closedAt = nil, nil
 local schedule = {}
+local before = nil
+local keyFrame, opened, texted, compared = nil, false, false, false
 
 local function log(text)
 	console:log(string.format("hook %d %s", emu:currentFrame(), text))
@@ -65,10 +81,97 @@ local function press(mask, name)
 	log("key " .. name)
 end
 
--- The menu's code, past the entry code and the hook's own key checks
--- (ingamemenu_now is 0x3B0 bytes in).
-local function inMenuCode(address)
-	return patchStart and address >= patchStart + 0x100 and address < patchStart + PATCH_SIZE
+-- 0, or 1 once the menu's panel shows, 2 once its text does too
+local function menuShown()
+	if emu:read32(OVERLAY) ~= OVERLAY_MAGIC then
+		return 0
+	end
+	return emu:read32(OVERLAY_SHOWN)
+end
+
+-- The I/O registers that read back what was written, and that the menu
+-- gives back before its frame ends (SOUNDCNT_L/H, DMA0-3 CNT_H and IME come
+-- back just after, as the game goes on: not compared)
+local IO = { 0x00, 0x08, 0x0A, 0x0C, 0x0E, 0x48, 0x4A, 0x50, 0x52, 0x60, 0x62, 0x68, 0x6C, 0x70, 0x72, 0x78, 0x7C,
+	0x84, 0x88, 0x102, 0x106, 0x10A, 0x10E, 0x132, 0x200, 0x204 }
+
+local function snapshot()
+	local io = {}
+	for _, r in ipairs(IO) do
+		io[#io + 1] = string.pack("<I2", emu:read16(0x04000000 + r))
+	end
+	return {
+		{ "EWRAM", 0x02000000, emu:readRange(0x02000000, 0x40000) },
+		{ "IWRAM", 0x03000000, emu:readRange(0x03000000, 0x8000) },
+		{ "palette", 0x05000000, emu:readRange(0x05000000, 0x400) },
+		{ "VRAM", 0x06000000, emu:readRange(0x06000000, 0x18000) },
+		{ "OAM", 0x07000000, emu:readRange(0x07000000, 0x400) },
+		{ "I/O", 0x04000000, table.concat(io) },
+	}
+end
+
+local function dump(dir, tag, snap)
+	for _, region in ipairs(snap) do
+		local f = io.open(string.format("%s/%s-%s.bin", dir, tag, region[1]:gsub("/", "")), "wb")
+		if f then
+			f:write(region[3])
+			f:close()
+		end
+	end
+end
+
+-- Byte ranges [first, last) not compared: what the hook and its stub keep in
+-- the spend area (the 0x80 bytes the patch reserves at the game's stack
+-- top), the IRQ stack under the hook (the BIOS's frame, the hook's and
+-- sram_copy's words) and the BIOS's words at 0x3007FE0-0x3007FFF.
+local function skipped()
+	local spend = patchStart and emu:read32(patchStart + 0x18) or 0
+	local skips = { { 0x03007FE0, 0x03008000 } }
+	if spend ~= 0 then
+		table.insert(skips, { spend, spend + 0x80 })
+		local sp = emu:read32(spend + 0x20)  -- the IRQ stack at the hook
+		if sp >= 0x03000000 and sp < 0x03008000 then
+			table.insert(skips, { sp - 0x40, sp + 0x18 })
+		end
+	end
+	return skips
+end
+
+local function compare(after)
+	local skips = skipped()
+	local changes = {}
+	for i, region in ipairs(before) do
+		local name, base, a, b = region[1], region[2], region[3], after[i][3]
+		if a ~= b then
+			local first, count = nil, 0
+			for off = 1, #a do
+				if a:byte(off) ~= b:byte(off) then
+					local address = base + off - 1
+					local skip = false
+					for _, s in ipairs(skips) do
+						if name ~= "I/O" and address >= s[1] and address < s[2] then
+							skip = true
+						end
+					end
+					if not skip then
+						count = count + 1
+						if name == "I/O" then
+							address = 0x04000000 + IO[(off - 1) // 2 + 1]
+						end
+						first = first or address
+					end
+				end
+			end
+			if count > 0 then
+				table.insert(changes, string.format("%s %d bytes from %08X", name, count, first))
+			end
+		end
+	end
+	if #changes == 0 then
+		log("menu left the game as it was")
+	else
+		log("menu changed " .. table.concat(changes, ", "))
+	end
 end
 
 -- Key presses relative to the game's start: {frame, mask, name}.
@@ -142,13 +245,41 @@ callbacks:add("frame", function()
 		log(string.format("vblank %d of %d", vblank, frames))
 	end
 
-	local menu = emu:read16(0x04000000) == 0x0403 and inMenuCode(emu:readRegister("pc"))
+	local shown = menuShown()
 	if frame >= menuKeyFrame then
-		report("menu", menu and "open" or "closed")
+		report("menu", shown > 0 and "open" or "closed")
+	end
+	if shown > 0 and not opened and keyFrame then
+		opened = true
+		log(string.format("menu shown after %d frames", frame - keyFrame))
+	end
+	if shown > 1 and not texted and keyFrame then
+		texted = true
+		log(string.format("menu text shown after %d frames", frame - keyFrame))
+	end
+	-- The first frame without the overlay in EWRAM after it showed: the stub
+	-- has put everything back and waits for the frame after.
+	if opened and not compared and emu:read32(OVERLAY) ~= OVERLAY_MAGIC then
+		compared = true
+		local after = snapshot()
+		local dir = os.getenv("HOOK_WATCH_DUMP")
+		if dir then
+			dump(dir, "after", after)
+		end
+		compare(after)
 	end
 
 	for _, step in ipairs(schedule) do
 		if step[1] == frame then
+			if step[2] == MENU_KEY and not keyFrame then
+				-- The menu opens in this frame's VBlank IRQ, right after this
+				keyFrame = frame
+				before = snapshot()
+				local dir = os.getenv("HOOK_WATCH_DUMP")
+				if dir then
+					dump(dir, "before", before)
+				end
+			end
 			press(step[2], step[3])
 		end
 	end

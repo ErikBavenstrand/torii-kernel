@@ -71,6 +71,8 @@
 // RAM starts filled with 0xA5 (poison_ram), as the cart's holds junk at
 // power-on.
 //
+// A BIOS Stop (SWI 3, the sleep) prints "stop at frame N"; the run goes on.
+//
 // If the CPU hits an illegal opcode or jumps to an invalid address, it prints
 // a crash report (registers, and code addresses found on the stack with their
 // symbols) and exits with status 3.
@@ -1015,6 +1017,12 @@ static struct mCheatDevice *load_cheats(struct mCore *core, const char *path)
 	return device;
 }
 
+static void note_stop(void *context)
+{
+	(void)context;
+	fprintf(stderr, "stop at frame %u\n", current_frame);
+}
+
 int main(int argc, char **argv)
 {
 	if (argc < 2) {
@@ -1071,6 +1079,10 @@ int main(int argc, char **argv)
 	core->reset(core);
 	poison_ram(core);
 	crash_core = core;
+	// BIOS Stop (SWI 3) with a wake-up IRQ enabled: the cart sleeps until
+	// one comes; here it goes on at once, and says so
+	static struct mCoreCallbacks stop_callbacks = {.sleep = note_stop};
+	core->addCoreCallbacks(core, &stop_callbacks);
 	struct mCheatDevice *cheats = opts.cheatFile ? load_cheats(core, opts.cheatFile) : NULL;
 	if (opts.cheatFile && !cheats) {
 		return 1;

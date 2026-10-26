@@ -194,24 +194,24 @@ debug)
   settings 0=0xE1E1 1=0 2=1 3=0 4=0 5=9 6=8 7=2 8=9 9=8 10=3 11=1 12=0 13=1 14=1 25=1 26=2
   boot -f 200
   cp "$cart/sram.bin" "$cart/sram-before.bin"
-  # Hello.gba, BOOT WITH ADDON; in game, L+R+START, then down to DEBUG
-  # (RESET SAVE LOAD DEBUG) and A. The menu stays, saying the snapshot is
-  # saved, with RESET picked (a power-off would clear cart RAM): A on it goes
-  # back to the kernel, whose boot logs the snapshot.
+  # Hello.gba, BOOT WITH ADDON; in game, L+R+START, then up to Debug
+  # snapshot (the last row) and A. The menu opens again, saying the snapshot
+  # is kept for the log (a power-off would clear cart RAM): up two to Back to
+  # Torii and A go back to the kernel, whose boot logs the snapshot.
   # The game starts around frame 850, once the savestate file is made.
-  # The message's first row (y 147, from x 20) shows in VRAM.
   # shellcheck disable=SC2046
-  boot $(nav_launch /Hello.gba addon at=170) -k 1200:L+R+START -k 1206:- $(keys 1240 DOWN DOWN DOWN A) \
-    -m 1300:$(printf 0x%X $((0x06000000 + (147 * 240 + 20) * 2))):400 -s 1300:"$cart/debug.png" $(keys 1320 A) -f 1700
-  grep -qi 'e0 *03' "$cart/out.log" || fail "no green message after DEBUG: $(tail -3 "$cart/out.log")"
+  boot $(nav_launch /Hello.gba addon at=170) -k 1200:L+R+START -k 1206:- $(keys 1240 UP A) \
+    -s 1300:"$cart/debug.png" $(keys 1320 UP UP A) -f 1700
+  [ "$(grep -c 'screen ready: ingame' "$cart/run.log")" = 2 ] || fail "the menu didn't open again after DEBUG"
   has "launch: IRQ hook from"
   has "launch: in-game code: in-game menu (RTS_ReplaceIRQ)"
   has "patched words"
-  # Past the save chip, the menu's screen copy and the savestate buffer
-  # (0x00000-0xAFFFF), only page 0xF0 changed (cmp counts bytes from 1).
+  # Past the save chip, the menu's backups and the savestate buffer
+  # (0x00000-0xAFFFF) and the menu the launch wrote (0xB0000-0xBFFFF), only
+  # page 0xF0 changed (cmp counts bytes from 1).
   changed=$({ cmp -l "$cart/sram-before.bin" "$cart/sram.bin" || true; } |
-    awk -v states_end=$((0xB0000)) -v ours=$((0xF0000)) -v ours_end=$((0xF2000)) \
-      '$1 - 1 >= states_end && ($1 - 1 < ours || $1 - 1 >= ours_end) { n++ } END { print n + 0 }')
+    awk -v menu_end=$((0xC0000)) -v ours=$((0xF0000)) -v ours_end=$((0xF2000)) \
+      '$1 - 1 >= menu_end && ($1 - 1 < ours || $1 - 1 >= ours_end) { n++ } END { print n + 0 }')
   [ "$changed" = 0 ] || fail "DEBUG changed $changed bytes of cart RAM outside page 0xF0"
   has "debug info from the in-game menu: "
   has "(the hook is in place)"
@@ -220,7 +220,7 @@ debug)
   card_ok
   lines_ok
   zeros_ok
-  echo "PASS: the in-game menu's DEBUG says it saved, writes only cart RAM page 0xF0, and RESET logs it"
+  echo "PASS: the in-game menu's Debug snapshot says it saved, writes only cart RAM page 0xF0, and Back to Torii logs it"
   ;;
 
 crash)
