@@ -301,6 +301,18 @@ cheat-corpus dir="dist/cheat-corpus": emu-image
     @if [ "{{dir}}" = dist/cheat-corpus ]; then tools/cheat_corpus_fetch.sh; fi
     {{emu_docker}} tests/cheat_corpus.sh "{{dir}}" "{{dir}}/report.txt"
 
+# Fuzz the cheat engines: COUNT seeded random cheat programs run in mGBA's engine and through Torii
+# (tests/cheat_fuzz.sh); failing ones are minimized and saved to tests/cheat_fuzz_cases.json, which
+# `just test` runs from then on. E.g. `just cheat-fuzz 7 200`
+cheat-fuzz seed="1" count="100": build emu-headless test-roms
+    {{emu_docker}} env CHEAT_ENGINE_JOBS="${CHEAT_ENGINE_JOBS:-8}" tests/cheat_fuzz.sh {{seed}} {{count}}
+
+# Fuzz the cheat decoders alone: COUNT random cheats of each format, addressed anywhere, decoded by
+# Torii's and mGBA's decoders and compared as `just cheat-corpus` does. E.g. `just cheat-fuzz-decode 7 5000`
+cheat-fuzz-decode seed="1" count="1000": emu-image
+    @emu/fetch.sh
+    {{emu_docker}} tests/cheat_fuzz.sh --decode {{seed}} {{count}}
+
 # Fetch libretro's GBA cheat database again into dist/cheat-corpus (for `just cheat-corpus`)
 cheat-corpus-fetch:
     tools/cheat_corpus_fetch.sh --refresh

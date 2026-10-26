@@ -87,7 +87,10 @@ class Space:
         return w, a, v & ((1 << 8 * w) - 1)
 
     @staticmethod
-    def rom_space(rom_table, rom_table2, magic, magic2):
+    def rom_space(rom_table, rom_table2, keys=True):
+        """The cheat test ROM's watched regions; keys=False leaves out tests
+        on the keys (a run that holds the device's button holds other keys
+        in Torii than in mGBA)"""
         p_values = range(4, 14)
         reads = [
             (1, CNT + 0, list(p_values)),
@@ -106,6 +109,17 @@ class Space:
             (1, W + 0x41, list(range(0x30, 0x80, 8))),
             (2, W + 0x40, [n << 8 | 0x20 for n in range(40, 112, 8)]),
             (1, IW + 0x10, []),
+            # Unaligned, and in the other watched regions: what the frame
+            # wrote there, read as each engine's bus reads it
+            (2, W + 0x41, []),
+            (4, W + 0x42, []),
+            (4, IW + 0x13, []),
+            (2, 0x05000002, []),
+            (1, 0x05000003, []),
+            (2, 0x06000004, []),
+            (4, 0x07000004, []),
+            (2, 0x0400000C, []),
+            (1, 0x0400004A, []),
         ]
         writes = [
             Region(W, 0x100),
@@ -120,11 +134,12 @@ class Space:
             Region(0x0400000C, 4, odd=False),
             Region(0x04000048, 4, odd=False),
         ]
-        rom = (
-            [rom_table + i for i in range(0, 16, 2)]
-            + [rom_table2 + i for i in range(0, 16, 2)]
-            + [magic]
-        )
+        if not keys:
+            reads = [r for r in reads if r[1] not in (KEYINPUT, CNT + 0xE)]
+        # The ROM's data tables only: a random patch to its code could crash it
+        rom = [rom_table + i for i in range(0, 16, 2)] + [
+            rom_table2 + i for i in range(0, 16, 2)
+        ]
         return Space(writes, reads, rom, pointers=[(P, 16), (P + 4, 8)])
 
     @staticmethod
@@ -161,9 +176,10 @@ class Gen:
         self.enc = FORMATS[fmt]
         self.patched = set()
 
-    # One code that is a single op in both decoders (what a conditional on
-    # the next code may cover)
-    def single(self):
+    def single(self, covered=False):
+        """One code that is one op in both decoders; covered: a conditional
+        covers it (no ROM patch then, unless intended: Torii counts a patch
+        where it lies, mGBA skips it)"""
         rng, sp, f = self.rng, self.space, self.fmt
         if f in ("gsa", "gsa-raw"):
             choices = ["write"] * 6 + ["patch"]
@@ -174,9 +190,15 @@ class Gen:
         else:
             choices = ["write"] * 4 + ["patch"]
         kind = rng.choice(choices)
+        if kind == "patch" and covered and not self.intended:
+            kind = "write"
         if kind == "patch":
             free = [a for a in sp.rom if a not in self.patched]
-            if not free or not sp.rom_writes:
+            if (
+                not free
+                or not sp.rom_writes
+                or (f.startswith("par") and len(self.patched) >= 4)
+            ):
                 kind = "write"
         e = self.enc
         if kind == "write":
@@ -203,7 +225,8 @@ class Gen:
             if f == "vba":
                 return VBA.write(2, a, v)
             if f.startswith("par"):
-                return PAR.rom_patch(rng.randrange(1, 5), a, v)
+                # Slots 1-4 in turn: the device has four
+                return PAR.rom_patch(len(self.patched) % 4 + 1, a, v)
             return e.rom_patch(a, v)
         if kind == "fill":
             w = rng.choice((1, 2))
@@ -235,98 +258,120 @@ class Gen:
         return CB.op(kind[3:].upper(), a, rnd_value(rng, 2))
 
     def codes(self, budget):
-        """Codes for one cheat, at most about budget of them"""
+        """Units for one cheat, at most about budget of them: a unit is a code, or a
+        conditional with the codes it covers (its chunks of encoder lines), which
+        tests/cheat_fuzz.py's minimizing keeps or drops whole"""
         out = []
         rng, f = self.rng, self.fmt
         while len(out) < budget:
             r = rng.random()
             if f in ("gsa", "gsa-raw"):
                 if r < 0.15:
-                    out.append(self.gsa_cond())
+                    out.append([self.gsa_cond()])
                 elif r < 0.25:
-                    out += self.gsa_range()
+                    out.append(self.gsa_range())
                 elif r < 0.32:
                     w = rng.choice((1, 2))
                     a = self.space.write_at(rng, w)
-                    out.append(GSA.button(w, a, rnd_value(rng, w)))
+                    out.append([GSA.button(w, a, rnd_value(rng, w))])
                 elif self.intended and r < 0.36:
                     out.append(
-                        GSA.write_list(
-                            rnd_value(rng, 4),
-                            [self.space.write_at(rng, 4) & ~3 for _ in range(3)],
-                        )
+                        [
+                            GSA.write_list(
+                                rnd_value(rng, 4),
+                                [self.space.write_at(rng, 4) & ~3 for _ in range(3)],
+                            )
+                        ]
                     )
                 else:
-                    out.append(self.single())
+                    out.append([self.single()])
             elif f in ("par", "par-raw"):
                 if r < 0.2:
-                    out += self.par_cond()
+                    out.append(self.par_cond())
                 elif r < 0.26:
                     w = rng.choice((1, 2, 4))
                     out.append(
-                        PAR.button(
-                            w, self.space.write_at(rng, w) & ~(w - 1), rnd_value(rng, w)
-                        )
+                        [
+                            PAR.button(
+                                w,
+                                self.space.write_at(rng, w) & ~(w - 1),
+                                rnd_value(rng, w),
+                            )
+                        ]
                     )
                 elif self.intended and r < 0.32:
                     out.append(
-                        rng.choice(
-                            [
-                                PAR.slowdown(0x100),
-                                [(0x80000000, 0)],
-                                PAR.io(1, 0xC, 0x45),
-                                PAR.io(2, 0x48, 0x1B2D),
-                            ]
-                        )
+                        [
+                            rng.choice(
+                                [
+                                    PAR.slowdown(0x100),
+                                    [(0x80000000, 0)],
+                                    PAR.io(1, 0xC, 0x45),
+                                    PAR.io(2, 0x48, 0x1B2D),
+                                ]
+                            )
+                        ]
                     )
                 else:
-                    out.append(self.single())
+                    out.append([self.single()])
             elif f.startswith("cb"):
                 if r < 0.25:
-                    out += self.cb_cond()
+                    out.append(self.cb_cond())
                 elif self.intended and r < 0.3:
                     n = rng.randrange(1, 6)
                     a = self.space.write_at(rng, 2, n + 1) & ~1
                     out.append(
-                        CB.super(a, bytes(rng.getrandbits(8) for _ in range(2 * n)))
+                        [CB.super(a, bytes(rng.getrandbits(8) for _ in range(2 * n)))]
                     )
                 else:
-                    out.append(self.single())
+                    out.append([self.single()])
             else:
-                out.append(self.single())
+                out.append([self.single()])
         return out
 
     def gsa_cond(self):
         _, a, v = self.space.read(self.rng)
         a &= ~1
-        return GSA.if_eq(a, v & 0xFFFF) + self.single()
+        return GSA.if_eq(a, v & 0xFFFF) + self.single(covered=True)
 
     def gsa_range(self):
         _, a, v = self.space.read(self.rng)
         n = self.rng.randrange(1, 4)
         return [GSA.if_eq_range(a & ~1, v & 0xFFFF, n)] + [
-            self.single() for _ in range(n)
+            self.single(covered=True) for _ in range(n)
         ]
 
-    def par_cond(self):
+    def par_cond(self, depth=0):
         rng = self.rng
         kind = rng.choice(list(PAR.COND))
         w, a, v = self.space.read(rng)
         if rng.random() < 0.05:
             w = 8
         action = rng.choice(["next", "next", "next2", "block", "block"])
+        if depth and action == "block":
+            # A block in a block ends the outer one (in mGBA as in Torii), so
+            # the outer's ELSE and ENDIF would be stray lines both reject
+            action = rng.choice(["next", "next2"])
         head = PAR.cond(kind, w, a, v, action)
         if action == "next":
-            return [head, self.single()]
+            return [head, self.single(covered=True)]
         if action == "next2":
-            return [head, self.single(), self.single()]
-        then = [
-            self.single() for _ in range(rng.randrange(0 if self.intended else 1, 4))
-        ]
-        out = [head, *then]
+            return [head, self.single(covered=True), self.single(covered=True)]
+
+        def body(n):
+            # Covered codes, now and then a conditional of their own
+            out = []
+            for _ in range(n):
+                if depth < 2 and rng.random() < 0.25:
+                    out += self.par_cond(depth + 1)
+                else:
+                    out.append(self.single(covered=True))
+            return out
+
+        out = [head, *body(rng.randrange(0 if self.intended else 1, 4))]
         if rng.random() < 0.5:
             out.append(PAR.else_())
-            out += [self.single() for _ in range(rng.randrange(1, 3))]
+            out += body(rng.randrange(1, 3))
         if not self.intended or rng.random() < 0.8:
             out.append(PAR.endif())
         return out
@@ -338,18 +383,27 @@ class Gen:
             mask = 0
             for k in keys:
                 mask |= 1 << KEYS.index(k)
-            return [CB.keys(mask), self.single()]
+            return [CB.keys(mask), self.single(covered=True)]
         kind = rng.choice(["EQ", "NE", "GT", "LT", "IFAND"])
         _, a, v = self.space.read(rng)
-        return [CB.op(kind, a & ~1, v & 0xFFFF), self.single()]
+        return [CB.op(kind, a & ~1, v & 0xFFFF), self.single(covered=True)]
 
 
-def program(rng, fmt, space, n_cheats, budget, intended=False):
-    """[(desc, code text)]: n_cheats cheats of at most about budget codes"""
+def program_units(rng, fmt, space, n_cheats, budget, intended=False):
+    """[(desc, [unit])]: n_cheats cheats of at most about budget units"""
     g = Gen(rng, fmt, space, intended)
+    return [
+        (f"{fmt} {i}", g.codes(rng.randrange(1, budget + 1))) for i in range(n_cheats)
+    ]
+
+
+def encode(fmt, cheats, rng=None, intended=False):
+    """[(desc, [unit])] as [(desc, code text)] in format fmt: the GameShark
+    formats with their marker line in each cheat, cb-enc with the key line in
+    the first and its cipher carried on (as both decoders carry it)"""
     out = []
     seeds = prev_cb = None
-    for i in range(n_cheats):
+    for i, (desc, units) in enumerate(cheats):
         enc = FORMATS[fmt]
         code = Code(enc, seeds=seeds)
         if fmt in ("gsa", "gsa-raw", "par", "par-raw"):
@@ -360,9 +414,17 @@ def program(rng, fmt, space, n_cheats, budget, intended=False):
             code.cb = prev_cb
         if intended and fmt in ("gsa", "par") and rng.random() < 0.1:
             code += enc.deadface(rng.getrandbits(16))
-        for c in g.codes(rng.randrange(1, budget + 1)):
-            code += c
+        for unit in units:
+            for chunk in unit:
+                code += chunk
         seeds = code.seeds
         prev_cb = code.cb
-        out.append((f"{fmt} {i}", code.text()))
+        out.append((desc, code.text()))
     return out
+
+
+def program(rng, fmt, space, n_cheats, budget, intended=False):
+    """[(desc, code text)]: n_cheats cheats of at most about budget units"""
+    return encode(
+        fmt, program_units(rng, fmt, space, n_cheats, budget, intended), rng, intended
+    )

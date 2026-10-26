@@ -549,15 +549,26 @@ def cases():
         )
     )
     out += cheat_matrix.cases(Case, sym)
+    from cheat_fuzz import saved_cases
+
+    out += saved_cases()
     return out
 
 
 # --- gen ------------------------------------------------------------------
 
 
+# mGBA's libretro reader (src/core/cheats.c) reads lines of up to 511
+# characters, and a longer one fails the whole file: a cheatN_code line's
+# code stays under this
+CODE_MAX = 480
+
+
 def cht_file(cheats):
     """A libretro .cht file of [(desc, code, cheatN_format or None)], every
     cheat picked; a format line is Torii's own (mGBA's reader ignores it)"""
+    for d, c, _ in cheats:
+        assert len(c) <= CODE_MAX, f"{d}: {len(c)} characters, past mGBA's line length"
     text = cht([(d, c) for d, c, _ in cheats])
     for i, (_, _, fmt) in enumerate(cheats):
         if fmt:
