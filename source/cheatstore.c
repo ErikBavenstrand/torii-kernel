@@ -224,7 +224,7 @@ void cheatstore_launch(const char *rom_path, u32 psram_bytes)
 					     "own, "
 					     "left out",
 					     c->number, c->desc_len, f->text + c->desc,
-					     (unsigned long)(0x08000000 + pt->offset));
+					     (unsigned long)0x08000000 + pt->offset);
 				continue;
 			}
 			rom_patch(pt);

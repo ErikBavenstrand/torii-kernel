@@ -287,9 +287,9 @@ static u32 Patch_length(void)
 //where it fits after them)
 static u32 Patch_need(void)
 {
-	u32 need = (u8 *)RTS_ReplaceIRQ_end - (u8 *)RTS_ReplaceIRQ_start;
+	u32 need = (u32)RTS_ReplaceIRQ_end - (u32)RTS_ReplaceIRQ_start;
 	if (gl_cheat_on == 1 && gl_cheat_bytes)
-		need += (u8 *)Cheat_blob_end - (u8 *)Cheat_blob_start + gl_cheat_bytes;
+		need += (u32)Cheat_blob_end - (u32)Cheat_blob_start + gl_cheat_bytes;
 	return (need + 15) & ~15u;
 }
 //------------------------------------------------------------------
@@ -375,7 +375,7 @@ void SetTrimSize(u8 *buffer, u32 romsize, u32 iSize, u32 mode, BYTE saveMODE)
 	u32 at = (limit - need) & ~15u;
 	if (at >= data_end) {
 		tlog("launch: the ROM's data reaches %08lX: the patch area is cut to %lX bytes at %08lX",
-		     (unsigned long)data_end, (unsigned long)(limit - at), (unsigned long)at);
+		     (unsigned long)data_end, (unsigned long)limit - at, (unsigned long)at);
 		iTrimSize = at;
 		patch_room = limit - at;
 		return;
@@ -526,7 +526,7 @@ static void Patch_RTS_Cheat(u32 *Data)
 			     (unsigned long)end, (unsigned long)room);
 		} else if (!is_NORpatch && !rom_blank(iTrimSize + copysize, iTrimSize + end)) {
 			tlog("launch: the game's data is at %08lX, where the cheats would go: left out",
-			     (unsigned long)(iTrimSize + copysize));
+			     (unsigned long)iTrimSize + copysize);
 		} else {
 			dmaCopy((void *)Cheat_blob_start, patchbuffer + copysize, code);
 			dmaCopy(gl_cheat_table, patchbuffer + copysize + code, gl_cheat_bytes);
