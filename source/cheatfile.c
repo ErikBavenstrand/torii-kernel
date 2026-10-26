@@ -201,7 +201,7 @@ int cheatfile_rom_crc(const char *text, u32 len, u32 *crc)
 		u32 s = pos;
 		while (s < end && is_space(text[s]))
 			s++;
-		if (end - s >= tag_len + 8 && !memcmp(text + s, tag, tag_len)) {
+		if (s + tag_len + 8 <= end && !memcmp(text + s, tag, tag_len)) {
 			u32 v = 0, i;
 			for (i = 0; i < 8; i++) {
 				char c = text[s + tag_len + i];
