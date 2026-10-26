@@ -111,7 +111,7 @@ class Layouts(unittest.TestCase):
         self.assertEqual(
             ce.PAR.write(1, 0x02030510, 0xF1, count=8), [(0x00230510, 0x7F1)]
         )
-        self.assertEqual(ce.PAR.io(2, 0x48, 0x1B2D), [(0xC7000048, 0x1B2D)])
+        self.assertEqual(ce.PAR.io(4, 0x48, 0x1B2D), [(0xC7000048, 0x1B2D)])
         self.assertEqual(
             ce.PAR.rom_patch(4, 0x08000894, 0xF00D), [(0, 0x1E00044A), (0xF00D, 0)]
         )
