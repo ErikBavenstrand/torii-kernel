@@ -205,6 +205,21 @@ RULES = [
         "cheat file writer: test-host runs its tests on a fixture card and a local server",
     ),
     (
+        ["tools/cheat_encode.py", "tests/cheat_encode_test.py"],
+        {LINT, TEST_HOST, TEST},
+        "cheat encoders: test-host runs their tests, tests/cheat_engine.sh makes its cases with them",
+    ),
+    (
+        ["tools/cheat_oracle.c", "tools/cheat_corpus.c"],
+        {LINT, TEST},
+        "cheat decoders' drivers: tests/cheat_engine.sh decodes its cases with them",
+    ),
+    (
+        ["tests/cheat_codes.*"],
+        {LINT, COMPAT},
+        "real cheat codes in real games, run by `just compat`",
+    ),
+    (
         ["tools/art_pack.py", "tests/art_pack_test.py"],
         {LINT, TEST_HOST},
         "art pack builder: test-host runs its tests against a local server",
