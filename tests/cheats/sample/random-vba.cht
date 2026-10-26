@@ -1,0 +1,162 @@
+cheats = 40
+
+cheat0_desc = "vba 0"
+cheat0_code = "0800024E:86C9+07000268:9A1D960A+0203D708:00000009+0600179D:5A+06007A12:26"
+cheat0_enable = true
+
+cheat1_desc = "vba 1"
+cheat1_code = "03005A4C:FFFFFFFF+0500012C:EBE99DA8+0E00B5C6:04+05000260:C5650A5F+04000398:3676+0202AF16:A69F"
+cheat1_enable = true
+
+cheat2_desc = "vba 2"
+cheat2_code = "06001BF4:000A+05000120:9CB9383A+050003C2:EF02655C+030043F4:17A0"
+cheat2_enable = true
+
+cheat3_desc = "vba 3"
+cheat3_code = "05000074:03D990BC+04000192:03E9+0400006C:51+03005194:B886B70B"
+cheat3_enable = true
+
+cheat4_desc = "vba 4"
+cheat4_code = "0203C160:E3F1+080002DA:0002+06009DE3:00+0203BBE8:47EE+0800025A:0007"
+cheat4_enable = true
+
+cheat5_desc = "vba 5"
+cheat5_code = "08000344:F998+0600B1FF:8E"
+cheat5_enable = true
+
+cheat6_desc = "vba 6"
+cheat6_code = "0400031C:17E1B971"
+cheat6_enable = true
+
+cheat7_desc = "vba 7"
+cheat7_code = "0400003C:30213D04+05000278:7D57AF7C+0800027C:E43F+0E0091D5:A1+020371A0:C0D9"
+cheat7_enable = true
+
+cheat8_desc = "vba 8"
+cheat8_code = "060007A2:7633"
+cheat8_enable = true
+
+cheat9_desc = "vba 9"
+cheat9_code = "05000238:F0D0"
+cheat9_enable = true
+
+cheat10_desc = "vba 10"
+cheat10_code = "0601614F:0000000D+08000314:0002+07000268:75FF+08000282:90AB+04000107:3B"
+cheat10_enable = true
+
+cheat11_desc = "vba 11"
+cheat11_code = "060014E8:9D02D95A"
+cheat11_enable = true
+
+cheat12_desc = "vba 12"
+cheat12_code = "0600D257:000B"
+cheat12_enable = true
+
+cheat13_desc = "vba 13"
+cheat13_code = "0202D249:B0+0E00AB91:4A+0500031C:9970CEC1"
+cheat13_enable = true
+
+cheat14_desc = "vba 14"
+cheat14_code = "0700038E:03B1+08000220:FFFF"
+cheat14_enable = true
+
+cheat15_desc = "vba 15"
+cheat15_code = "0202F1A0:FFFF+0400026E:4497+06008086:3776"
+cheat15_enable = true
+
+cheat16_desc = "vba 16"
+cheat16_code = "0800030A:000B+08000266:9DBF+0800029E:375B"
+cheat16_enable = true
+
+cheat17_desc = "vba 17"
+cheat17_code = "040000DD:83+02025E80:4B73+0E00DCC1:C2+050000C8:CE578BC8+080003C6:A118"
+cheat17_enable = true
+
+cheat18_desc = "vba 18"
+cheat18_code = "02032BDF:F0+080002B4:000B+0201C3F5:B1+040000C1:DA"
+cheat18_enable = true
+
+cheat19_desc = "vba 19"
+cheat19_code = "03005880:1C11B762+030008F4:31E200EF+070001FD:0001"
+cheat19_enable = true
+
+cheat20_desc = "vba 20"
+cheat20_code = "050003E9:DF+020167DE:05+08000238:0003"
+cheat20_enable = true
+
+cheat21_desc = "vba 21"
+cheat21_code = "02034AD8:00000000"
+cheat21_enable = true
+
+cheat22_desc = "vba 22"
+cheat22_code = "030029EF:0F"
+cheat22_enable = true
+
+cheat23_desc = "vba 23"
+cheat23_code = "08000368:1CB7+0E0063A5:DF+08000394:5CD3+040003E2:0008+0201B4FC:27D8+070000FF:1A"
+cheat23_enable = true
+
+cheat24_desc = "vba 24"
+cheat24_code = "040001B4:00000006+050001F4:6A+05000318:0E80"
+cheat24_enable = true
+
+cheat25_desc = "vba 25"
+cheat25_code = "080003D4:007C+04000174:4F652F6A+040001BC:0002"
+cheat25_enable = true
+
+cheat26_desc = "vba 26"
+cheat26_code = "06005715:51+0202D75C:103E+05000086:7204+0500037C:63+07000038:58DE4347+02033272:0007"
+cheat26_enable = true
+
+cheat27_desc = "vba 27"
+cheat27_code = "02007C3E:F9"
+cheat27_enable = true
+
+cheat28_desc = "vba 28"
+cheat28_code = "030011EF:1A+08000346:3C3E+03002FD1:18+070003B0:FFFFFFFF"
+cheat28_enable = true
+
+cheat29_desc = "vba 29"
+cheat29_code = "0500009E:68+03000C68:0000+03006936:F39E+05000318:0004"
+cheat29_enable = true
+
+cheat30_desc = "vba 30"
+cheat30_code = "060149A8:C2E1E9BF+06000E42:79C3+040003CC:8A+040001EC:FF8B23F8"
+cheat30_enable = true
+
+cheat31_desc = "vba 31"
+cheat31_code = "0700038C:60657C84+070000AC:00000007+080003BA:6AE0+04000198:0A7E099C"
+cheat31_enable = true
+
+cheat32_desc = "vba 32"
+cheat32_code = "0E0020B3:00+080003C0:0009+03006F4C:FFFFFFFF"
+cheat32_enable = true
+
+cheat33_desc = "vba 33"
+cheat33_code = "080003E2:0004+080002B2:FFFF"
+cheat33_enable = true
+
+cheat34_desc = "vba 34"
+cheat34_code = "0800025C:0006+0202CC59:43+03007C28:D5107195+0500017E:3D+08000234:EE6C"
+cheat34_enable = true
+
+cheat35_desc = "vba 35"
+cheat35_code = "070000FC:A9+050002B0:98C2+0E001ED5:FF+060081FA:33AF+07000088:753F5A05"
+cheat35_enable = true
+
+cheat36_desc = "vba 36"
+cheat36_code = "0400010C:5D+0700029A:A75F2051+06005E80:437E"
+cheat36_enable = true
+
+cheat37_desc = "vba 37"
+cheat37_code = "0700035C:00000005+0600174C:666507B7"
+cheat37_enable = true
+
+cheat38_desc = "vba 38"
+cheat38_code = "070002C6:1D+0800033E:FFFF+080003EE:75AD"
+cheat38_enable = true
+
+cheat39_desc = "vba 39"
+cheat39_code = "0E0072DD:00+050000A2:CC33+03003F4C:FFFFFFFF+03003AAA:09+0E00B0AC:03"
+cheat39_enable = true
+

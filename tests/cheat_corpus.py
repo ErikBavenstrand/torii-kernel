@@ -1,76 +1,63 @@
 #!/usr/bin/env python3
 """Compares Torii's decoding of a cheat corpus with mGBA's, for
-tests/cheat_corpus.sh.
+tests/cheat_corpus.sh: every difference is explained by a rule of
+tests/cheat_expected.toml (tools/cheat_diff.py) or is a mismatch.
 
-Usage: cheat_corpus.py TORII.tsv MGBA.tsv
+Usage: cheat_corpus.py REPORT TORII.tsv MGBA.tsv FILE.cht...
 
-Prints how many cheats agree, and each kind of difference with a few examples;
-every differing row goes to diff.tsv next to TORII.tsv.
+Writes the full report to REPORT (totals per format, cheats only one
+decoder reads, each rule's matches and the mismatches by code type, with
+examples) and prints its summary. Exits 1 on a mismatch no rule explains.
 """
 
-import collections
 import sys
 from pathlib import Path
 
-
-def rows(path):
-    out = {}
-    for line in Path(path).read_text(encoding="utf-8", errors="replace").splitlines():
-        cols = line.split("\t")
-        out[(cols[0], cols[1])] = cols[2:]
-    return out
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
+import cheat_diff
 
 
 def main():
-    torii, mgba = rows(sys.argv[1]), rows(sys.argv[2])
-    kinds = collections.Counter()
-    examples = collections.defaultdict(list)
-    diffs = []
-    for key, t in torii.items():
-        status = t[0]
-        m = mgba.get(key, ["MISSING"])
-        mine = t[3].strip() if len(t) > 3 else ""
-        theirs = m[1].strip() if len(m) > 1 else ""
-        if len(t) > 2 and t[2].endswith("-alone"):
-            kind = "Torii reads it alone, mGBA with the file state"
-        elif m[0] == "SKIP":
-            kind = (
-                "both skip"
-                if status in ("PLACEHOLDER", "UNREADABLE")
-                else f"mGBA skips, Torii {status}"
-            )
-        elif m[0] != "REJ0":
-            kind = (
-                "both reject"
-                if status == "UNREADABLE"
-                else f"mGBA rejects a line, Torii {status}"
-            )
-        elif status == "UNREADABLE":
-            kind = "Torii rejects only"
-        elif status == "MASTER_ONLY":
-            kind = (
-                "same (master only)"
-                if theirs == "|"
-                else "Torii master only, mGBA has ops"
-            )
-        elif status == "OK":
-            kind = "same" if mine == theirs else "ops differ"
-        else:
-            kind = f"Torii {status}"
-        kinds[kind] += 1
-        if not kind.startswith("same") and kind != "both skip":
-            diffs.append(
-                f"{key[0]}\t{key[1]}\t{kind}\n  torii: {status} {mine}\n  mgba:  {' '.join(m)}\n"
-            )
-            if len(examples[kind]) < 3:
-                examples[kind].append(f"{key[0]} #{key[1]}")
-    print("Torii against mGBA:")
-    for kind, count in kinds.most_common():
-        print(f"  {kind:40} {count:5}")
-        for example in examples[kind]:
-            print(f"      {example}")
-    Path(sys.argv[1]).with_name("diff.tsv").write_text("".join(diffs), encoding="utf-8")
+    if len(sys.argv) < 5:
+        sys.exit(__doc__)
+    out, torii, mgba, files = Path(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4:]
+    expected = cheat_diff.load_expected()
+    rules = expected["decode"]
+    all_cheats = list(cheat_diff.cheats(files, torii, mgba))
+    text, mismatches = cheat_diff.report(
+        all_cheats, rules, f"Torii's cheat decoders against mGBA's: {len(files)} files"
+    )
+    # The device's reading of hand-made codes, where the sample has one
+    expect = Path(files[0]).parent / "expect.tsv"
+    failed = 0
+    if expect.exists():
+        lines = cheat_diff.check_expectations(expect, torii, expected["bugs"])
+        text += "\nAs the device reads them (expect.tsv):\n" + "".join(
+            f"  {t}: {line}\n" for t, line in lines
+        )
+        for t, line in lines:
+            if t != "PASS":
+                print(f"{'FAIL' if t == 'FAIL' else 'PASS'}: cheat_corpus: {t} {line}")
+            failed += t == "FAIL"
+    out.write_text(text, encoding="utf-8")
+    summary = text.split("\nIntentional differences")[0]
+    print(summary.rstrip())
+    print(f"(full report: {out})")
+    if failed:
+        print(
+            f"FAIL: cheat_corpus: {failed} codes decode unlike the device (expect.tsv)"
+        )
+        return 1
+    if mismatches:
+        print(
+            f"FAIL: cheat_corpus: {mismatches} mismatches no rule of tests/cheat_expected.toml explains"
+        )
+        return 1
+    print(
+        f"PASS: cheat_corpus: {len(all_cheats)} cheats in {len(files)} files decode alike or as a rule explains"
+    )
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

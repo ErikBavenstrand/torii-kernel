@@ -273,6 +273,7 @@ compat *filters: build emu-headless
 # Build the hardware-free kernel code with tests/host for the host, under ASan and UBSan, and run it;
 # test tools/font.py, tools/asset.py, tools/art.py, tools/art_scrape.py, tools/cheats.py, tools/cheat_encode.py, tools/art_pack.py, tools/library_report.py, the palette and the upgrade file's layout
 test-host: emu-image
+    @emu/fetch.sh
     {{emu_docker}} tests/host.sh
     @uv run -q tests/font_test.py
     @uv run -q tests/asset_test.py
@@ -291,10 +292,18 @@ test-host: emu-image
 cheat-engine: build emu-headless test-roms
     {{emu_docker}} env CHEAT_ENGINE_JOBS=8 CHEAT_ENGINE_STRICT="${CHEAT_ENGINE_STRICT:-1}" CHEAT_BUTTON_KEYS="${CHEAT_BUTTON_KEYS:-}" tests/cheat_engine.sh
 
-# Decode every cheat in a folder of libretro GBA .cht files (default dist/cheat-corpus, never
-# committed) with Torii's decoders and with mGBA's, print Torii's summary and where they differ
-cheat-corpus dir="dist/cheat-corpus": emu-headless
-    {{emu_docker}} tests/cheat_corpus.sh {{dir}}
+# Decode every cheat of libretro's GBA cheat database (fetched into dist/cheat-corpus on first use,
+# never committed) with Torii's decoders and with mGBA's, and explain every difference by a rule of
+# tests/cheat_expected.toml; the report goes to dist/cheat-corpus/report.txt, and a difference no rule
+# explains fails. Another folder of .cht files can be given instead (its report beside them)
+cheat-corpus dir="dist/cheat-corpus": emu-image
+    @emu/fetch.sh
+    @if [ "{{dir}}" = dist/cheat-corpus ]; then tools/cheat_corpus_fetch.sh; fi
+    {{emu_docker}} tests/cheat_corpus.sh "{{dir}}" "{{dir}}/report.txt"
+
+# Fetch libretro's GBA cheat database again into dist/cheat-corpus (for `just cheat-corpus`)
+cheat-corpus-fetch:
+    tools/cheat_corpus_fetch.sh --refresh
 
 # Convert docs/design/v0.4/palette.json to C: source/ui/palette.c and palette.h
 # (committed; tests/host.sh checks they match), then `just shots-update` for the screens

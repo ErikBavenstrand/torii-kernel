@@ -1,0 +1,162 @@
+cheats = 40
+
+cheat0_desc = "cb 0"
+cheat0_code = "470002D6 9015+002A0006 0004+86017060 2D57+66007A9A 6EE2+A20000C0 00AE+220121CA 910A"
+cheat0_enable = true
+
+cheat1_desc = "cb 1"
+cheat1_code = "2700035C 555E+360170FC 0002"
+cheat1_enable = true
+
+cheat2_desc = "cb 2"
+cheat2_code = "4700012E FFFF+003B0005 0004+870003C3 657E+830071A2 1D4C"
+cheat2_enable = true
+
+cheat3_desc = "cb 3"
+cheat3_code = "330058C3 00B0+8201C068 893F"
+cheat3_enable = true
+
+cheat4_desc = "cb 4"
+cheat4_code = "86007EAD 0005+C2000180 F886+63002BA2 668B+83006CAC C700+25000056 8E1F+86015E08 A6E6"
+cheat4_enable = true
+
+cheat5_desc = "cb 5"
+cheat5_code = "3203DFA0 0000+E3000CF6 D5F3"
+cheat5_enable = true
+
+cheat6_desc = "cb 6"
+cheat6_code = "8600900C D07F+E60044AA D711+270003C6 796C+25000398 DB1C+850002B2 41CF"
+cheat6_enable = true
+
+cheat7_desc = "cb 7"
+cheat7_code = "87000202 A185+D0000020 0201+E20054DE 0006+360088E5 004D+240000A8 F26A+4400014E 000B+001E0004 0002"
+cheat7_enable = true
+
+cheat8_desc = "cb 8"
+cheat8_code = "25000224 000E+A2000140 DF42+2400000C D878+E600F79C 0A9D+360086F6 0094"
+cheat8_enable = true
+
+cheat9_desc = "cb 9"
+cheat9_code = "4400024E B59D+00130004 0004+C2000140 ACE3+46002E5E 2BCB+002F0001 0004+C20001C0 6B7A+8500035C FFFF"
+cheat9_enable = true
+
+cheat10_desc = "cb 10"
+cheat10_code = "6601153A 7B17+4700011A CFFE+000E0001 0004+6201EF44 C6EE+23002536 0002+B20001C0 2C4E+36012B8E 00C8"
+cheat10_enable = true
+
+cheat11_desc = "cb 11"
+cheat11_code = "3E000B1D 0009+E7000226 878C+A20001C0 80F9+650000C2 000C"
+cheat11_enable = true
+
+cheat12_desc = "cb 12"
+cheat12_code = "A2000140 00F5+340002F5 00FE"
+cheat12_enable = true
+
+cheat13_desc = "cb 13"
+cheat13_code = "C2000000 F6C0+E700002E EF54"
+cheat13_enable = true
+
+cheat14_desc = "cb 14"
+cheat14_code = "87000224 DF97+C20001C0 EF57+25000140 0006+A2000100 AF97+E3007CC6 FFD3"
+cheat14_enable = true
+
+cheat15_desc = "cb 15"
+cheat15_code = "370002C7 0004+650003FC 0006+B2000040 F0AE+E700008A 346F"
+cheat15_enable = true
+
+cheat16_desc = "cb 16"
+cheat16_code = "86008B44 58A3+D0000020 0001+83002AA8 7032+72000080 4C17+450000D6 A644+002B0002 0004"
+cheat16_enable = true
+
+cheat17_desc = "cb 17"
+cheat17_code = "84000048 0006+A20000C0 009E+330076A7 0000"
+cheat17_enable = true
+
+cheat18_desc = "cb 18"
+cheat18_code = "A20001C0 00DC+320146A9 0082+82027B3E 33E2+C20001C0 F7F3+6600C408 000B"
+cheat18_enable = true
+
+cheat19_desc = "cb 19"
+cheat19_code = "72000140 007C+24000170 FFFF"
+cheat19_enable = true
+
+cheat20_desc = "cb 20"
+cheat20_code = "32022592 00B3+E70001BA A1CC+F2000180 5094+45000010 100D+00140002 0002"
+cheat20_enable = true
+
+cheat21_desc = "cb 21"
+cheat21_code = "870002F8 0005+82037F26 9A98+370001BE 0043+870000E8 FFFF"
+cheat21_enable = true
+
+cheat22_desc = "cb 22"
+cheat22_code = "2202291E 0004+46008730 AD21+00390001 0002+83004B50 FFFF+E3005CEA 0C7B"
+cheat22_enable = true
+
+cheat23_desc = "cb 23"
+cheat23_code = "3600723E 004A+66015DEA 000F+3201B010 0073+4202160A E637+001D0005 0004+45000212 FAB4+00090006 0004+67000192 000B"
+cheat23_enable = true
+
+cheat24_desc = "cb 24"
+cheat24_code = "E5000154 000D"
+cheat24_enable = true
+
+cheat25_desc = "cb 25"
+cheat25_code = "2700028A 6504+85000138 FFFF+33000F7B 00DE+E700016C 0272"
+cheat25_enable = true
+
+cheat26_desc = "cb 26"
+cheat26_code = "C4000130 03FE+85000074 FFFF"
+cheat26_enable = true
+
+cheat27_desc = "cb 27"
+cheat27_code = "4500033E FFFF+00170004 0004+2201FF32 000D"
+cheat27_enable = true
+
+cheat28_desc = "cb 28"
+cheat28_code = "86004A4C EFF7+670003D4 0006+32014B7E 0002+46016280 000D+00350002 0004+8200451C FFFF"
+cheat28_enable = true
+
+cheat29_desc = "cb 29"
+cheat29_code = "3203339C 0031+34000332 00DB+4203921A 394C+00330002 0002+32035BA8 006D"
+cheat29_enable = true
+
+cheat30_desc = "cb 30"
+cheat30_code = "B2000080 CF6A+8700037E 3CC1+2600D8EE FFFF+72000180 00AB+2400023A 9235"
+cheat30_enable = true
+
+cheat31_desc = "cb 31"
+cheat31_code = "33001279 0070+240001B0 2429"
+cheat31_enable = true
+
+cheat32_desc = "cb 32"
+cheat32_code = "C2000100 09A9+240001DA FFFF+E70001A4 EC38+2700021E 0003+F2000100 BDBC+67000346 422F"
+cheat32_enable = true
+
+cheat33_desc = "cb 33"
+cheat33_code = "A2000100 3191+E700001A BE93+64000076 0D43+37000096 0069+B2000180 AC44+33007848 0029"
+cheat33_enable = true
+
+cheat34_desc = "cb 34"
+cheat34_code = "65000130 2FDD+E3003A7E 9DD0+3E003A7A 0069+4700037A 4804+00010005 0004+720000C0 00B7+84000134 6D25"
+cheat34_enable = true
+
+cheat35_desc = "cb 35"
+cheat35_code = "350001E1 0017+E500028A 5CCF"
+cheat35_enable = true
+
+cheat36_desc = "cb 36"
+cheat36_code = "D0000020 0140+6400007A A8EA+640001AE 9A72"
+cheat36_enable = true
+
+cheat37_desc = "cb 37"
+cheat37_code = "640002B6 3C3A+72000040 2CBC+840003CA CDF5+350001F3 00DF+A20000C0 DA96+470002F2 17C1+00340004 0002"
+cheat37_enable = true
+
+cheat38_desc = "cb 38"
+cheat38_code = "83002ACE 7DA1"
+cheat38_enable = true
+
+cheat39_desc = "cb 39"
+cheat39_code = "440001A2 000B+002D0001 0004+850001FC ED91"
+cheat39_enable = true
+

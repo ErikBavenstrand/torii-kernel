@@ -1,0 +1,38 @@
+cheats = 9
+
+cheat0_desc = "open block"
+cheat0_code = "5428ED92 5C664168+3CD3188F BBFAE952+DD998E12 7770C869+62B74B68 A9A44EAD"
+cheat0_enable = true
+
+cheat1_desc = "empty then, else"
+cheat1_code = "5428ED92 5C664168+641F6406 6DACF3E7+00099EEC 7CE361A4+DD998E12 7770C869+1E27D83B BBFB6923"
+cheat1_enable = true
+
+cheat2_desc = "C6"
+cheat2_code = "5428ED92 5C664168+29B2862E 7858AF3D"
+cheat2_enable = true
+
+cheat3_desc = "C7"
+cheat3_code = "5428ED92 5C664168+C39B0A05 38B48CA5"
+cheat3_enable = true
+
+cheat4_desc = "slowdown"
+cheat4_code = "5428ED92 5C664168+8BC6536D 0E1A3399+EBD45141 FF4600D5"
+cheat4_enable = true
+
+cheat5_desc = "disable"
+cheat5_code = "5428ED92 5C664168+1F5B6ADF 17DF80F2+EBD45141 FF4600D5"
+cheat5_enable = true
+
+cheat6_desc = "button covered"
+cheat6_code = "5428ED92 5C664168+01D35F51 E8EFDA90+395994DA 37EE9293+09036A90 A1E43BAA"
+cheat6_enable = true
+
+cheat7_desc = "width-8 never"
+cheat7_code = "5428ED92 5C664168+2CFC4152 5A40AA01+406AE458 48CD2D09+1E27D83B BBFB6923"
+cheat7_enable = true
+
+cheat8_desc = "nested"
+cheat8_code = "5428ED92 5C664168+89EAE8DF A20F4578+D740450D 100BF632+1A907275 5923BC40+00099EEC 7CE361A4+5C4EA9A8 72573190+1E27D83B BBFB6923"
+cheat8_enable = true
+

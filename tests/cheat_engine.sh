@@ -62,8 +62,7 @@ start=$(date +%s)
 python3 tests/cheat_engine.py gen "$dir" ${shard:+"$shard"}
 # The codes decoded by Torii's decoders and by mGBA's
 python3 tools/hostcc.py "$dir/cheat_corpus" tools/cheat_corpus.c source/cheatcode.c source/cheatlower.c
-gcc -O1 -Wall -Werror -Iemu/mgba/include -Iemu/build-linux/include -o "$dir/cheat_oracle" \
-  tools/cheat_oracle.c emu/build-linux/libmgba.a -llua5.4 -lpng -lz -lm -lpthread
+tools/mgba_cheats.sh "$dir/cheat_oracle" tools/cheat_oracle.c
 mapfile -t chts < <(find "$dir" -name '*.cht' | sort)
 "$dir/cheat_corpus" "${chts[@]}" >"$dir/torii.tsv" 2>/dev/null
 "$dir/cheat_oracle" "${chts[@]}" >"$dir/mgba.tsv"
