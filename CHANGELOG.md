@@ -17,6 +17,15 @@ git log, not here.
   add/or/and, conditionals with ELSE blocks, button activators on R+SELECT),
   within a cycle budget of 10% of a frame; the patch area grows to 0x3000
   bytes (025f8ca5, 650b03e8).
+- **Fixed (before release):** cheats run exactly once per VBlank: the hook
+  calls the game's IRQ handler and runs them again only after VBlank is
+  acknowledged, so a game that serves HBlank first can't livelock with a
+  heavy cheat set (8a0e5d6f). Cheat ROM patches never land on the in-game
+  code or the kernel's own patches, and on a ROM without room the patch area
+  shrinks to what the picks need, or the cheats are left out (3a216dff,
+  174d27d6). A cheat file over 56 KB is refused rather than cut short when a
+  pick is saved; a ROM write inside a conditional and add/or/and on ROM show
+  as "can't run on this cart"; `enable = 1` counts as a pick (5b51d980).
 - **Added:** a cheat screen from "Cheats" in a GBA game's popup: a tick per
   cheat, picks saved power-cut safe in the file and applied at every launch,
   cheats on from the game's start, and a big file read once behind a progress
