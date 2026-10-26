@@ -393,10 +393,10 @@ art-add +args:
 art-scrape sd_path *args:
     uv run -q tools/art_scrape.py "$@"
 
-# Write cheat files for an SD card's GBA games from libretro-database, e.g. `just cheats /Volumes/OMEGA`:
-# /torii/cheats/<rom path without extension>.cht, matched by CRC through the No-Intro dat (dist/dats),
-# keeping the files' picks and your own codes. The cheats (CC BY-SA 4.0) are cached in the git-ignored
-# dist/cheats, never bundled. --dry-run, --offline, --refresh: see --help
+# Write cheat files for an SD card's GBA games from GameHacking.org, e.g. `just cheats /Volumes/OMEGA`:
+# /torii/cheats/<rom path without extension>.cht, matched by exact CRC32, keeping the files' picks and
+# your own codes. --gamehacking fetches what's missing through a harvester you paste into your browser;
+# the cheats are cached in the git-ignored dist/cheats, never bundled. --only, --base-game: see --help
 [positional-arguments]
 cheats sd_path *args:
     uv run -q tools/cheats.py "$@"
