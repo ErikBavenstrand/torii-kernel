@@ -19,6 +19,14 @@
 // "cheatN_enable = true" at the end for a picked cheat that had none; every
 // other byte stays.
 //
+// Torii adds two keys of its own, which other readers ignore and
+// tools/cheats.py keeps: "cheatN_format" (cheatfile_format_names) decodes
+// that cheat alone in one format, with cheat_decoder_force, as the code
+// keypad's override saved it; "cheatN_user = true" marks a code typed on the
+// cart, which may be edited and deleted there. The keypad's edits
+// (cheatfile_add, _set_code, _remove) change the text in place and read it
+// again.
+//
 // Every cheat is decoded with one decoder in file order, the picked ones and
 // the others alike, as a type-9 CodeBreaker key or a GameShark seed carries
 // from a cheat to the next (cheatcode.h). Hardware-free, as tests/host runs it;
@@ -74,8 +82,10 @@ struct cheatfile_cheat {
 	u16 bytes;           // its share of the interpreter's table once decoded (OK only)
 	u16 cost;            // its cycles a frame, at most (OK only)
 	u16 patches;         // ROM patches once decoded (OK only)
-	u8 picked;           // now
-	u8 was;              // as the file has it
+	u8 picked : 1;       // now
+	u8 was : 1;          // as the file has it
+	u8 own : 1;          // cheatN_user = true: typed on the cart, so it may be edited and deleted
+	u8 format : 3;       // cheatN_format's enum cheat_format, CHEAT_FMT_AUTO without one
 };
 
 // Where cheatfile_text has got to, so each call goes on from the last
@@ -100,6 +110,10 @@ struct cheatfile {
 	u32 cut;      // the text was over CHEATFILE_TEXT_MAX and is read cut: never write it back
 	u32 bytes;    // the picked OK cheats' table bytes
 	u32 cost;     // and cycles
+	u16 count_at, count_len;  // the "cheats = N" line's value, CHEATFILE_NONE if none
+	u16 next;     // the number past the highest cheatN_ key's (a new cheat's), at most max
+	u16 max;      // the table's entries
+	u8 edited;    // an edit changed the text: write it back though no pick changed
 	struct cheatfile_out out;
 };
 
@@ -129,6 +143,15 @@ void cheatfile_begin(struct cheatfile_work *w);
 // f->cost follow.
 s32 cheatfile_next(struct cheatfile *f, struct cheatfile_work *w);
 
+// Decodes one code (len bytes) with dec, as cheatfile_next decodes a
+// cheat's: its enum cheatfile_status, with its ops (*ops of them, as
+// cheat_decode counts), table part and patches in w, and cheat_lower's
+// status in *lowered (CHEATFILE_NOT_LOWERED if it didn't get that far).
+// The code keypad's check of a typed code.
+#define CHEATFILE_NOT_LOWERED 0xFF
+u8 cheatfile_decode(struct cheatfile_work *w, struct cheat_decoder *dec, const char *code, u32 len, u32 *ops,
+		    u8 *lowered);
+
 // The cheats a list shows: all but master codes
 static inline int cheatfile_shown(const struct cheatfile_cheat *c)
 {
@@ -151,5 +174,37 @@ u32 cheatfile_picks(const struct cheatfile *f);
 u32 cheatfile_text(void *ctx, u32 pos, char *buf, u32 max);
 // Its length
 u32 cheatfile_text_len(const struct cheatfile *f);
+
+// --- Edits (the code keypad's) ------------------------------------------------------
+//
+// Each changes f's text in place, in buf (f->text, cap bytes), then reads it
+// again: every cheat CHEATFILE_NEW until decoded again from the first
+// (cheatfile_begin), the picks kept as they were (not yet written), and
+// f->edited set. The count line follows the cheats' numbers ("cheats = N",
+// one added at the top if the file had none). A desc loses its control
+// characters and has '"' written as '\''. New lines end as the file's do.
+
+enum cheatfile_edit {
+	CHEATFILE_EDIT_OK,
+	CHEATFILE_EDIT_FULL,  // a new cheat's number would be CHEATFILE_MAX (or the table's end)
+	CHEATFILE_EDIT_LONG,  // the text, picks written in, would pass CHEATFILE_TEXT_MAX or cap
+	CHEATFILE_EDIT_BAD,   // no such cheat, or a code with a quote or a control character
+};
+
+// The cheatN_format values, by enum cheat_format (CHEAT_FMT_AUTO: none)
+extern const char *const cheatfile_format_names[CHEAT_FMT_VBA + 1];
+
+// Appends a cheat of the user's (cheatN_user = true) after the others:
+// desc, code ("+" between lines), cheatN_enable = false (picked once it
+// decodes, by the caller), and cheatN_format unless format is
+// CHEAT_FMT_AUTO. *index gets its index, the last.
+u32 cheatfile_add(struct cheatfile *f, char *buf, u32 cap, const char *desc, const char *code, u8 format, u32 *index);
+// Replaces cheat i's code and format line (none for CHEAT_FMT_AUTO), and
+// its desc unless desc is NULL; its other lines stay.
+u32 cheatfile_set_code(struct cheatfile *f, char *buf, u32 cap, u32 i, const char *desc, const char *code, u8 format);
+// Removes every cheatN_ line of cheat i (and a blank line before them),
+// and numbers the cheats after it one lower, as RetroArch reads a file's
+// cheats from 0 to its count.
+u32 cheatfile_remove(struct cheatfile *f, char *buf, u32 cap, u32 i);
 
 #endif

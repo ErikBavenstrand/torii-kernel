@@ -33,6 +33,9 @@ the folders the kernel hides) it:
    else NAME.bak; '#' lines are comments). Its picks (the enable flags,
    matched by code) are kept, and so is every cheat whose code the
    database's file doesn't have (your own codes), after the database's.
+   The keys the cart's code keypad adds (cheatN_format, cheatN_user) stay
+   with their cheat, and a database cheat with digits to fill in (00??)
+   that was filled in on the cart keeps its place, filled in.
    NAME is written as plain text with no CRC line (the kernel takes it as
    edited by hand and adds the line on its next write); NAME.bak is left
    alone, and so is a file whose cheats wouldn't change.
@@ -268,10 +271,44 @@ def value(raw):
     return raw.removeprefix('"').removesuffix('"')
 
 
+# The keys Torii adds to a cheat (source/cheatfile.h), kept as they are:
+# cheatN_format, the format the code keypad's override saved (quoted), and
+# cheatN_user, a code typed on the cart (a bare bool)
+KEPT_KEYS = ("format", "user")
+BARE_KEYS = ("enable", "user")
+# A code's digits left for the user to fill in (cheatcode.c's is_mark)
+PLACEHOLDER = re.compile(r"[?XxYyZz]")
+
+
+class Cheat(tuple):
+    """A cheat as (desc, code, enabled), with Torii's own keys
+    (KEPT_KEYS) in .extra; equal to a plain tuple of the same three when it
+    has none."""
+
+    def __new__(cls, desc, code, enabled, extra=None):
+        cheat = super().__new__(cls, (desc, code, enabled))
+        cheat.extra = dict(extra or {})
+        return cheat
+
+    def __eq__(self, other):
+        return tuple.__eq__(self, other) and self.extra == getattr(other, "extra", {})
+
+    def __ne__(self, other):
+        return not self == other
+
+    __hash__ = tuple.__hash__
+
+    def __repr__(self):
+        base = tuple.__repr__(self)
+        return f"{base[:-1]}, {self.extra!r})" if self.extra else base
+
+
 def parse_cht(text):
-    """A libretro cheat file's cheats, in their order: [(desc, code, enabled)].
-    '#' lines are comments; a cheat without a code is dropped."""
+    """A libretro cheat file's cheats, in their order: [Cheat(desc, code,
+    enabled)], Torii's keys in each one's extra. '#' lines are comments; a
+    cheat without a code is dropped."""
     found = {}
+    keys = "|".join(("desc", "code", "enable") + KEPT_KEYS)
     for raw in text.split("\n"):
         line = raw.removesuffix("\r")
         if line.lstrip().startswith("#"):
@@ -279,7 +316,7 @@ def parse_cht(text):
         m = LINE.match(line)
         if not m:
             continue
-        k = re.fullmatch(r"cheat(\d+)_(desc|code|enable)", m.group(1))
+        k = re.fullmatch(rf"cheat(\d+)_({keys})", m.group(1))
         if k:
             found.setdefault(int(k.group(1)), {})[k.group(2)] = value(m.group(2))
     out = []
@@ -287,41 +324,69 @@ def parse_cht(text):
         c = found[n]
         if "code" in c:
             out.append(
-                (
+                Cheat(
                     c.get("desc", ""),
                     c["code"],
                     c.get("enable", "").casefold() in ("true", "1"),
+                    {k: c[k] for k in KEPT_KEYS if k in c},
                 )
             )
     return out
 
 
 def format_cht(cheats):
-    """libretro's format, as its files are laid out."""
+    """libretro's format, as its files are laid out; Torii's keys after a
+    cheat's enable line, as the kernel writes them."""
     lines = [f"cheats = {len(cheats)}", ""]
-    for n, (desc, code, enabled) in enumerate(cheats):
+    for n, cheat in enumerate(cheats):
+        desc, code, enabled = cheat
         lines += [
             f'cheat{n}_desc = "{desc}"',
             f'cheat{n}_code = "{code}"',
             f"cheat{n}_enable = {'true' if enabled else 'false'}",
-            "",
         ]
+        extra = getattr(cheat, "extra", {})
+        for k in KEPT_KEYS:
+            if k in extra:
+                v = extra[k]
+                lines.append(
+                    f"cheat{n}_{k} = {v}" if k in BARE_KEYS else f'cheat{n}_{k} = "{v}"'
+                )
+        lines.append("")
     return "\n".join(lines)
 
 
 def merge(database, old):
-    """The database's cheats with old's picks (by code), then old's cheats
-    whose code the database lacks. Returns (cheats, own): own counts the latter."""
-    picks = {}
-    for _, code, enabled in old:
-        picks.setdefault(code, enabled)
-    out, codes = [], set()
+    """The database's cheats with old's picks and Torii's keys (by code),
+    then old's cheats whose code the database lacks. A database cheat with
+    digits to fill in (00??) that old has filled in (the same desc, a code
+    without them, as the kernel's keypad saves it in place) is old's, in the
+    database's place. Returns (cheats, own): own counts the old cheats after
+    the database's."""
+    by_code = {}
+    for cheat in old:
+        by_code.setdefault(cheat[1], cheat)
+    codes = {c[1] for c in database}
+    filled = {}
+    for cheat in old:
+        if cheat[1] not in codes and not PLACEHOLDER.search(cheat[1]):
+            filled.setdefault(cheat[0], cheat)
+    out, seen, taken = [], set(), set()
     for desc, code, enabled in database:
-        if code in codes:
+        if code in seen:
             continue  # the same code in two of the game's files
-        codes.add(code)
-        out.append((desc, code, picks.get(code, enabled)))
-    own = [c for c in old if c[1] not in codes]
+        seen.add(code)
+        mine = filled.get(desc) if PLACEHOLDER.search(code) else None
+        if mine is not None and id(mine) not in taken:
+            taken.add(id(mine))
+            out.append(mine)
+            continue
+        was = by_code.get(code)
+        if was is not None:
+            out.append(Cheat(desc, code, was[2], getattr(was, "extra", {})))
+        else:
+            out.append(Cheat(desc, code, enabled))
+    own = [c for c in old if c[1] not in seen and id(c) not in taken]
     return out + own, len(own)
 
 

@@ -415,3 +415,326 @@ void test_cheatfile_write_back(void)
 	free(copy);
 	copy = NULL;
 }
+
+// --- Edits (the code keypad's) -------------------------------------------------------
+
+static char *edit_buf;
+static u32 edit_cap;
+
+// text into a buffer of cap bytes (ASan catches a write past it), read and
+// decoded
+static void load_cap(const char *text, u32 cap)
+{
+	u32 len = (u32)strlen(text);
+	free(copy);
+	copy = NULL;
+	free(edit_buf);
+	edit_cap = cap;
+	edit_buf = malloc(cap ? cap : 1);
+	memcpy(edit_buf, text, len);
+	cheatfile_parse(&file, edit_buf, len, cheats, CHEATFILE_MAX);
+	cheatfile_begin(&work);
+	while (cheatfile_next(&file, &work) >= 0)
+		;
+}
+
+static void redecode(void)
+{
+	cheatfile_begin(&work);
+	while (cheatfile_next(&file, &work) >= 0)
+		;
+}
+
+// The edited text as it is now (picks not written in)
+static int text_is(const char *want)
+{
+	int same = file.len == strlen(want) && !memcmp(file.text, want, file.len);
+	if (!same)
+		printf("text is:\n%.*s\n--- not:\n%s\n", (int)file.len, file.text, want);
+	return same;
+}
+
+// 1 if the edited text holds s
+static int text_has(const char *s)
+{
+	u32 n = (u32)strlen(s);
+	for (u32 i = 0; i + n <= file.len; i++)
+		if (!memcmp(file.text + i, s, n))
+			return 1;
+	return 0;
+}
+
+static const char *edit_span(u16 at, u16 len)
+{
+	static char out[4][256];
+	static u32 turn;
+	char *o = out[turn++ & 3];
+	if (at == CHEATFILE_NONE)
+		return "(none)";
+	snprintf(o, 256, "%.*s", (int)len, file.text + at);
+	return o;
+}
+
+void test_cheatfile_add(void)
+{
+	u32 at = 99;
+	// After the others, with a blank line; the count follows
+	load_cap("cheats = 2\n"
+		 "\n"
+		 "cheat0_desc = \"Lives\"\n"
+		 "cheat0_code = \"32001000 0009\"\n"
+		 "cheat0_enable = false\n"
+		 "\n"
+		 "cheat1_desc = \"Money\"\n"
+		 "cheat1_code = \"32001001 0009\"\n"
+		 "cheat1_enable = false\n",
+		 4096);
+	CHECK(cheatfile_toggle(&file, 1));  // a pick not saved yet stays
+	CHECK_EQ(cheatfile_add(&file, edit_buf, edit_cap, "Jump \"high\"\x01", "82001234+0063", CHEAT_FMT_AUTO, &at),
+		 CHEATFILE_EDIT_OK);
+	CHECK(text_is("cheats = 3\n"
+		      "\n"
+		      "cheat0_desc = \"Lives\"\n"
+		      "cheat0_code = \"32001000 0009\"\n"
+		      "cheat0_enable = false\n"
+		      "\n"
+		      "cheat1_desc = \"Money\"\n"
+		      "cheat1_code = \"32001001 0009\"\n"
+		      "cheat1_enable = false\n"
+		      "\n"
+		      "cheat2_desc = \"Jump 'high'\"\n"
+		      "cheat2_code = \"82001234+0063\"\n"
+		      "cheat2_enable = false\n"
+		      "cheat2_user = true\n"));
+	CHECK_EQ(at, 2);
+	CHECK_EQ(file.count, 3);
+	CHECK(file.edited);
+	CHECK_EQ(cheats[2].own, 1);
+	CHECK_EQ(cheats[1].own, 0);
+	CHECK_EQ(cheats[2].format, CHEAT_FMT_AUTO);
+	CHECK_EQ(cheats[1].picked, 1);
+	CHECK_EQ(cheats[1].was, 0);
+	CHECK_EQ(cheats[2].status, CHEATFILE_NEW);
+	redecode();
+	CHECK_EQ(cheats[2].status, CHEATFILE_OK);
+	CHECK(cheatfile_toggle(&file, 2));
+	char *out = written(9);
+	CHECK(strstr(out, "cheat1_enable = true\n") != NULL);
+	CHECK(strstr(out, "cheat2_enable = true\ncheat2_user = true\n") != NULL);
+	free(out);
+
+	// A CRLF file with no count line and no last line end, a format: the
+	// count goes at the top
+	load_cap("cheat0_code = \"32001000 0009\"\r\ncheat0_enable = true", 4096);
+	CHECK_EQ(cheatfile_add(&file, edit_buf, edit_cap, "Raw", "02001000 00000063", CHEAT_FMT_GSAV1_RAW, &at),
+		 CHEATFILE_EDIT_OK);
+	CHECK(text_is("cheats = 2\r\n"
+		      "\r\n"
+		      "cheat0_code = \"32001000 0009\"\r\n"
+		      "cheat0_enable = true\r\n"
+		      "\r\n"
+		      "cheat1_desc = \"Raw\"\r\n"
+		      "cheat1_code = \"02001000 00000063\"\r\n"
+		      "cheat1_enable = false\r\n"
+		      "cheat1_format = \"GSAv1 raw\"\r\n"
+		      "cheat1_user = true\r\n"));
+	CHECK_EQ(at, 1);
+	CHECK_EQ(cheats[0].picked, 1);
+	CHECK_EQ(cheats[1].format, CHEAT_FMT_GSAV1_RAW);
+	cheatfile_begin(&work);
+	CHECK_EQ(cheatfile_next(&file, &work), 0);
+	CHECK_EQ(cheatfile_next(&file, &work), 1);
+	CHECK_EQ(cheats[1].status, CHEATFILE_OK);  // read raw, as the key says
+	CHECK_EQ(work.ops[0].type, CHEAT_OP_WRITE);
+	CHECK_EQ(work.ops[0].address, 0x02001000);
+	CHECK_EQ(work.ops[0].value, 0x63);
+	CHECK_EQ(work.ops[0].width, 1);
+
+	// A new file: nothing yet
+	load_cap("", 512);
+	CHECK_EQ(cheatfile_add(&file, edit_buf, edit_cap, "First", "02001000:63", CHEAT_FMT_VBA, &at),
+		 CHEATFILE_EDIT_OK);
+	CHECK(text_is("cheats = 1\n"
+		      "\n"
+		      "cheat0_desc = \"First\"\n"
+		      "cheat0_code = \"02001000:63\"\n"
+		      "cheat0_enable = false\n"
+		      "cheat0_format = \"VBA\"\n"
+		      "cheat0_user = true\n"));
+	CHECK_EQ(at, 0);
+	CHECK_EQ(file.count, 1);
+
+	// The number after the highest cheatN_ key, a code-less one's too; a
+	// count that disagreed is set to it
+	load_cap("cheats = 9\ncheat0_code = \"32001000 0009\"\ncheat4_note = \"x\"\n", 512);
+	CHECK_EQ(cheatfile_add(&file, edit_buf, edit_cap, "N", "32001000 0001", CHEAT_FMT_AUTO, &at),
+		 CHEATFILE_EDIT_OK);
+	CHECK_EQ(cheats[at].number, 5);
+	CHECK(!memcmp(file.text, "cheats = 6\n", 11));
+
+	// Refused: a quote in a code, an empty one, a format past the last
+	load_cap("", 512);
+	CHECK_EQ(cheatfile_add(&file, edit_buf, edit_cap, "Q", "3200\"1000", CHEAT_FMT_AUTO, &at), CHEATFILE_EDIT_BAD);
+	CHECK_EQ(cheatfile_add(&file, edit_buf, edit_cap, "Q", "", CHEAT_FMT_AUTO, &at), CHEATFILE_EDIT_BAD);
+	CHECK_EQ(cheatfile_add(&file, edit_buf, edit_cap, "Q", "32001000 0001", 9, &at), CHEATFILE_EDIT_BAD);
+	CHECK_EQ(file.len, 0);
+	CHECK(!file.edited);
+}
+
+void test_cheatfile_set_code(void)
+{
+	// A placeholder filled in, in place: only its code changes; a format
+	// line goes after the code line, and a later AUTO takes it out
+	static const char text[] = "cheats = 2\r\n"
+				   "\r\n"
+				   "cheat0_desc = \"Pick a level\"\r\n"
+				   "cheat0_code = \"3300075C+00??\"\r\n"
+				   "cheat0_enable = false\r\n"
+				   "\r\n"
+				   "cheat1_code = \"32001001 0009\"\r\n"
+				   "cheat1_enable = true\r\n";
+	load_cap(text, 4096);
+	CHECK_EQ(cheats[0].status, CHEATFILE_PLACEHOLDER);
+	CHECK(cheatfile_toggle(&file, 1));  // dropped, not saved yet
+	CHECK_EQ(cheatfile_set_code(&file, edit_buf, edit_cap, 0, NULL, "3300075C+0003", CHEAT_FMT_AUTO),
+		 CHEATFILE_EDIT_OK);
+	CHECK(text_is("cheats = 2\r\n"
+		      "\r\n"
+		      "cheat0_desc = \"Pick a level\"\r\n"
+		      "cheat0_code = \"3300075C+0003\"\r\n"
+		      "cheat0_enable = false\r\n"
+		      "\r\n"
+		      "cheat1_code = \"32001001 0009\"\r\n"
+		      "cheat1_enable = true\r\n"));
+	CHECK_EQ(cheats[1].picked, 0);
+	CHECK_EQ(cheats[1].was, 1);
+	redecode();
+	CHECK_EQ(cheats[0].status, CHEATFILE_OK);
+	CHECK_EQ(cheats[0].own, 0);  // still the database's
+
+	CHECK_EQ(cheatfile_set_code(&file, edit_buf, edit_cap, 0, "Level 3", "02001000 00000063", CHEAT_FMT_GSAV1_RAW),
+		 CHEATFILE_EDIT_OK);
+	CHECK(text_is("cheats = 2\r\n"
+		      "\r\n"
+		      "cheat0_desc = \"Level 3\"\r\n"
+		      "cheat0_code = \"02001000 00000063\"\r\n"
+		      "cheat0_format = \"GSAv1 raw\"\r\n"
+		      "cheat0_enable = false\r\n"
+		      "\r\n"
+		      "cheat1_code = \"32001001 0009\"\r\n"
+		      "cheat1_enable = true\r\n"));
+	CHECK_EQ(cheats[0].format, CHEAT_FMT_GSAV1_RAW);
+	CHECK_EQ(cheatfile_set_code(&file, edit_buf, edit_cap, 0, NULL, "3300075C+0004", CHEAT_FMT_CODEBREAKER),
+		 CHEATFILE_EDIT_OK);
+	CHECK(!strcmp(edit_span(cheats[0].code, cheats[0].code_len), "3300075C+0004"));
+	CHECK_EQ(cheats[0].format, CHEAT_FMT_CODEBREAKER);
+	CHECK(text_has("cheat0_format = \"CodeBreaker\"\r\n"));
+	CHECK_EQ(cheatfile_set_code(&file, edit_buf, edit_cap, 0, NULL, "3300075C+0005", CHEAT_FMT_AUTO),
+		 CHEATFILE_EDIT_OK);
+	CHECK(text_is("cheats = 2\r\n"
+		      "\r\n"
+		      "cheat0_desc = \"Level 3\"\r\n"
+		      "cheat0_code = \"3300075C+0005\"\r\n"
+		      "cheat0_enable = false\r\n"
+		      "\r\n"
+		      "cheat1_code = \"32001001 0009\"\r\n"
+		      "cheat1_enable = true\r\n"));
+
+	// A cheat with no desc gets one before its code; the last line, with no
+	// end, gets one before the format line after it
+	load_cap("cheat0_code = \"32001000 0009\"", 512);
+	CHECK_EQ(cheatfile_set_code(&file, edit_buf, edit_cap, 0, "Named", "32001000 0001", CHEAT_FMT_CODEBREAKER),
+		 CHEATFILE_EDIT_OK);
+	CHECK(text_is("cheat0_desc = \"Named\"\n"
+		      "cheat0_code = \"32001000 0001\"\n"
+		      "cheat0_format = \"CodeBreaker\"\n"));
+	CHECK_EQ(cheatfile_set_code(&file, edit_buf, edit_cap, 1, NULL, "32001000 0001", 0), CHEATFILE_EDIT_BAD);
+}
+
+void test_cheatfile_remove(void)
+{
+	// Cheat 1 of 12 goes, every line of its own (an unknown key too) and the
+	// blank line before them; the ones after are numbered one lower (10 is
+	// 9 now), their picks kept; the count follows
+	static char text[4096];
+	char *p = text;
+	p += sprintf(p, "# mine\ncheats = 12\n\n");
+	for (u32 i = 0; i < 12; i++)
+		p += sprintf(p, "cheat%u_desc = \"C%u\"\ncheat%u_code = \"3200100%X 0001\"\ncheat%u_enable = %s\n%s\n",
+			     (unsigned)i, (unsigned)i, (unsigned)i, (unsigned)(i & 15), (unsigned)i,
+			     i == 11 ? "true" : "false", i == 1 ? "cheat1_note = \"gone too\"\n" : "");
+	load_cap(text, sizeof(text));
+	CHECK_EQ(file.count, 12);
+	CHECK(cheatfile_toggle(&file, 10));
+	CHECK_EQ(cheatfile_remove(&file, edit_buf, edit_cap, 1), CHEATFILE_EDIT_OK);
+	CHECK_EQ(file.count, 11);
+	CHECK(!strcmp(edit_span(cheats[1].desc, cheats[1].desc_len), "C2"));
+	CHECK_EQ(cheats[1].number, 1);
+	CHECK_EQ(cheats[9].number, 9);
+	CHECK(!strcmp(edit_span(cheats[9].desc, cheats[9].desc_len), "C10"));
+	CHECK_EQ(cheats[9].picked, 1);  // C10's pick, not saved yet
+	CHECK_EQ(cheats[9].was, 0);
+	CHECK_EQ(cheats[10].picked, 1);  // C11's, saved
+	CHECK_EQ(cheats[10].was, 1);
+	CHECK(!text_has("gone too"));
+	CHECK(!memcmp(file.text, "# mine\ncheats = 11\n\ncheat0_desc = \"C0\"\n", 39));
+	CHECK(text_has("cheat0_enable = false\n\ncheat1_desc = \"C2\"\n"));
+	CHECK(text_has("cheat9_desc = \"C10\"\ncheat9_code"));
+	CHECK(text_has("cheat10_desc = \"C11\"\n"));
+	CHECK(!text_has("cheat11_"));
+	redecode();
+	CHECK_EQ(cheats[9].status, CHEATFILE_OK);
+
+	// The last cheat, CRLF, no blank line before it and no line end after
+	load_cap("cheats = 2\r\ncheat0_code = \"32001000 0009\"\r\ncheat1_code = \"32001001 0009\"\r\ncheat1_user = "
+		 "true",
+		 512);
+	CHECK_EQ(cheats[1].own, 1);
+	CHECK_EQ(cheatfile_remove(&file, edit_buf, edit_cap, 1), CHEATFILE_EDIT_OK);
+	CHECK(text_is("cheats = 1\r\ncheat0_code = \"32001000 0009\"\r\n"));
+	// And the only one: the count says so
+	CHECK_EQ(cheatfile_remove(&file, edit_buf, edit_cap, 0), CHEATFILE_EDIT_OK);
+	CHECK(text_is("cheats = 0\r\n"));
+	CHECK_EQ(file.count, 0);
+	CHECK_EQ(cheatfile_remove(&file, edit_buf, edit_cap, 0), CHEATFILE_EDIT_BAD);
+}
+
+void test_cheatfile_edit_limits(void)
+{
+	u32 at;
+	// Cheat 1023 is the table's last: no number is left for a new one
+	load_cap("cheat1023_code = \"32001000 0001\"\n", 512);
+	CHECK_EQ(file.next, 1024);
+	CHECK_EQ(cheatfile_add(&file, edit_buf, edit_cap, "N", "32001000 0001", CHEAT_FMT_AUTO, &at),
+		 CHEATFILE_EDIT_FULL);
+	load_cap("cheat1022_code = \"32001000 0001\"\n", 512);
+	CHECK_EQ(cheatfile_add(&file, edit_buf, edit_cap, "N", "32001000 0001", CHEAT_FMT_AUTO, &at),
+		 CHEATFILE_EDIT_OK);
+	CHECK_EQ(cheats[at].number, 1023);
+
+	// The buffer's room
+	load_cap("cheat0_code = \"32001000 0001\"\n", 40);
+	CHECK_EQ(cheatfile_add(&file, edit_buf, edit_cap, "N", "32001000 0001", CHEAT_FMT_AUTO, &at),
+		 CHEATFILE_EDIT_LONG);
+	CHECK_EQ(file.len, 30);
+	CHECK_EQ(cheatfile_set_code(&file, edit_buf, edit_cap, 0, NULL, "32001000 0001+32001002 0001", 0),
+		 CHEATFILE_EDIT_LONG);
+	CHECK_EQ(cheatfile_set_code(&file, edit_buf, edit_cap, 0, NULL, "32001000 0002", 0), CHEATFILE_EDIT_OK);
+
+	// The file's cap, with the picks written in
+	u32 big = CHEATFILE_TEXT_MAX + 512;
+	char *t = malloc(big);
+	memset(t, '#', CHEATFILE_TEXT_MAX - 80);
+	t[0] = '\n';
+	snprintf(t + CHEATFILE_TEXT_MAX - 80, 81, "\ncheat0_code = \"32001000 0001\"\n");
+	load_cap(t, big);
+	CHECK_EQ(file.count, 1);
+	CHECK(cheatfile_toggle(&file, 0));  // its enable line takes 22 of the bytes left
+	CHECK(CHEATFILE_TEXT_MAX - cheatfile_text_len(&file) < 100);
+	CHECK_EQ(cheatfile_add(&file, edit_buf, edit_cap, "N", "32001000 0001", CHEAT_FMT_AUTO, &at),
+		 CHEATFILE_EDIT_LONG);
+	CHECK(!file.edited);
+	free(t);
+	free(edit_buf);
+	edit_buf = NULL;
+}

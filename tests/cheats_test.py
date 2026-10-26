@@ -263,6 +263,52 @@ class Names(unittest.TestCase):
             [("Less HP", "1234 5678", False)],
         )
 
+    def test_torii_keys(self):
+        """The keys the kernel's code keypad adds (cheatN_format, cheatN_user)
+        are read, kept through a merge and written back as the kernel writes
+        them; a placeholder the keypad filled in stays in its place."""
+        old = cheats.parse_cht(
+            "cheats = 3\r\n\r\n"
+            'cheat0_desc = "Pick a level"\r\ncheat0_code = "3300075C+0003"\r\n'
+            "cheat0_enable = true\r\n\r\n"
+            'cheat1_desc = "Typed"\r\ncheat1_code = "02001000 00000063"\r\n'
+            'cheat1_enable = false\r\ncheat1_format = "GSAv1 raw"\r\ncheat1_user = true\r\n\r\n'
+            'cheat2_desc = "Money"\r\ncheat2_code = "82000250+E0FF"\r\n'
+            'cheat2_enable = true\r\ncheat2_format = "CodeBreaker"\r\n'
+        )
+        self.assertEqual(old[1].extra, {"format": "GSAv1 raw", "user": "true"})
+        self.assertEqual(old[0].extra, {})
+        self.assertNotEqual(old[1], cheats.Cheat("Typed", "02001000 00000063", False))
+        merged, own = cheats.merge(
+            [
+                ("Infinite Money", "82000250+E0FF", False),
+                ("Pick a level", "3300075C+00??", False),
+                ("HP", "42000538+07CF", False),
+            ],
+            old,
+        )
+        self.assertEqual(own, 1)
+        self.assertEqual(
+            merged,
+            [
+                cheats.Cheat(
+                    "Infinite Money", "82000250+E0FF", True, {"format": "CodeBreaker"}
+                ),
+                old[0],
+                ("HP", "42000538+07CF", False),
+                old[1],
+            ],
+        )
+        text = cheats.format_cht(merged)
+        self.assertIn(
+            'cheat3_enable = false\ncheat3_format = "GSAv1 raw"\ncheat3_user = true\n',
+            text,
+        )
+        self.assertEqual(cheats.parse_cht(text), merged)
+        # A file of the database's alone merges as before: nothing filled in
+        merged, own = cheats.merge([("Pick a level", "3300075C+00??", False)], [])
+        self.assertEqual(merged, [("Pick a level", "3300075C+00??", False)])
+
 
 class Card(unittest.TestCase):
     def setUp(self):
