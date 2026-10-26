@@ -341,6 +341,12 @@ u32 cheatstore_remove(u32 i)
 	return edit_done(cheatfile_remove(edited_file(), &psram_room, i));
 }
 
+u32 cheatstore_can_add(const char *desc)
+{
+	struct cheatstore *cs = cheatstore();
+	return cs->room_failed ? CHEATFILE_EDIT_FAILED : cheatfile_can_add(&cs->file, psram_room.cap, desc);
+}
+
 int cheatstore_write(void)
 {
 	struct cheatstore *cs = cheatstore();
@@ -385,6 +391,29 @@ int cheatstore_delete(const char *rom_path)
 		   (b == FR_OK || b == FR_NO_FILE || b == FR_NO_PATH);
 	if (a == FR_OK || b == FR_OK || !gone)
 		tlog("cheats: %s: deleted (FatFs %u, %u)", path, (unsigned)a, (unsigned)b);
+	return gone;
+}
+
+int cheatstore_drop(void)
+{
+	struct cheatstore *cs = cheatstore();
+	char *path = cs->path;
+	u32 len = (u32)strlen(path);
+	memcpy(path + len, ".bak", 5);  // cheatstore_path leaves room for it
+	FRESULT b = f_unlink(path);
+	if (b == FR_OK)
+		cutpoint("cheats: the emptied file's .bak deleted");
+	path[len] = 0;
+	FRESULT a = f_unlink(path);
+	if (a == FR_OK)
+		cutpoint("cheats: the emptied file deleted");
+	int gone = (a == FR_OK || a == FR_NO_FILE || a == FR_NO_PATH) &&
+		   (b == FR_OK || b == FR_NO_FILE || b == FR_NO_PATH);
+	tlog("cheats: %s: no cheats left, deleted (FatFs %u, %u)", path, (unsigned)a, (unsigned)b);
+	if (gone) {
+		cheatfile_written(&cs->file);  // nothing to write: no file is what it says
+		listed_cache.valid = 0;
+	}
 	return gone;
 }
 

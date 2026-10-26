@@ -347,7 +347,7 @@ echo "PASS: cheats: a power cut at each of the write-back's $cut_count steps lea
 
 # --- Typing codes (the code keypad, source/screens/keypad.c) ---------------------------
 # A code typed on the keypad from the cheat screen's + Add code, named on the
-# rename keyboard (A types q, START keeps it) and saved as a new cheat of the
+# rename keyboard (START keeps its "Code 1") and saved as a new cheat of the
 # user's: picked, written at once, and run at the next launch. Keys from
 # tests/keypad_keys.py. add_code RUNNER CODE [MGBA-SHOT ARGS]: RUNNER is boot
 # or cut_run.
@@ -358,7 +358,7 @@ add_code() {
   "$runner" "$@" $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
     -w "screen ready: cheats" -k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:A -k @48:- \
     -w "screen ready: keypad" $(python3 tests/keypad_keys.py "$code" START 2>/dev/null) \
-    -w "screen ready: rename" -k @8:A -k @12:- -k @20:START -k @24:- \
+    -w "screen ready: rename" -k @8:START -k @12:- \
     -w "cheats: added" -w "screen ready: cheats" -k @8:B -k @12:- -w "cheats: back" -f 8000
 }
 # The cheat file as the kernel would read it, by tools/cheats.py: one line a
@@ -394,7 +394,7 @@ for typed in "3203F030 0077|0203F030:1|77|CodeBreaker" "D5A7153C 73B76013|0203F0
   cp "$cart/sd.img" "$cart/added.img"
   last=$(cheat_lines | tail -n 1)
   [ "$last" = "$code|1|true|" ] || fail "the $what code reads back as $last"
-  mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep $'^cheat4_desc = "q"\r$' >/dev/null ||
+  mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep $'^cheat4_desc = "Code 1"\r$' >/dev/null ||
     fail "the $what code's name: $(mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep -a cheat4_ | head -3)"
   launch_dump -m "@240:0x$at" >"$cart/launch.txt" 2>&1 ||
     fail "the $what code's launch didn't run: $(grep -a '^kernel' "$cart/launch.txt" | tail -3)"
@@ -421,7 +421,7 @@ boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -
 grep -q "keypad: saved 3203F060 0011, format auto" "$cart/edit.txt" ||
   fail "the edit's keypad saved: $(grep -a 'keypad:' "$cart/edit.txt" | tail -3)"
 [ "$(cheat_lines | tail -n 1)" = "3203F060 0011|1|true|" ] || fail "the edited code reads back as $(cheat_lines | tail -n 1)"
-mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep $'^cheat4_desc = "q"\r$' >/dev/null || fail "the edited code lost its name"
+mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep $'^cheat4_desc = "Code 1"\r$' >/dev/null || fail "the edited code lost its name"
 [ "$(cheat_lines | wc -l)" = 5 ] || fail "the edit added a cheat: $(cheat_lines | tr '\n' ' ')"
 echo "PASS: cheats: a code of the user's is edited from SELECT's menu, in its place, its name kept"
 
@@ -444,6 +444,57 @@ grep -q "cheats: deleted cheat 4: ok" "$cart/delete.txt" ||
 [ "$(cheat_lines)" = "$before" ] || fail "after the delete the cheats read: $(cheat_lines | tr '\n' ' ')"
 ! mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep '^cheat4_' >/dev/null || fail "cheat 4's lines are still there"
 echo "PASS: cheats: a code of the user's is deleted from SELECT's menu, the database's cheats untouched"
+
+# The last code deleted: a file of one code of the user's goes, both copies,
+# rather than staying as "cheats = 0"; cut at each step, the next power-on
+# reads the file with its code, or none
+cp "$cart/clean/sd.img" "$cart/clean/kernel-nor.bin" "$cart/"
+rm -f "$cart/sram.bin"
+printf '%s\n' 'cheats = 1' '' 'cheat0_desc = "Mine"' 'cheat0_code = "3203F090+0044"' 'cheat0_enable = true' \
+  'cheat0_user = true' >"$cart/Last.cht"
+mcopy -o -i "$cart/sd.img" "$cart/Last.cht" ::/torii/cheats/Hello.cht
+mcopy -o -i "$cart/sd.img" "$cart/Last.cht" ::/torii/cheats/Hello.cht.bak
+last_scenario() {
+  # shellcheck disable=SC2046 # nav.sh's options
+  cut_run "$@" $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
+    -w "screen ready: cheats" -k @8:SELECT -k @12:- \
+    -w "screen ready: cheat-menu" -k @16:DOWN -k @20:- -k @28:A -k @32:- \
+    -w "screen ready: confirm" -k @8:RIGHT -k @12:- -k @20:A -k @24:- \
+    -w "cheats: deleted" -w "screen ready: cheats" -k @8:B -k @12:- -w "cheats: back" -f 6000
+}
+last_check() {
+  local n=$1 name=$2 lines
+  cut_run -f 400
+  [ "$cut_status" = 0 ] || fail "last delete, cut at $n ($name): the next power-on exited with $cut_status"
+  lines=$(cheat_lines | tr '\n' ' ')
+  case $lines in
+  "3203F090+0044|1|true| " | "") ;;
+  *) fail "last delete, cut at $n ($name): the cheats read back as: $lines" ;;
+  esac
+  if [ "$n" = 0 ]; then
+    [ -z "$lines" ] || fail "last delete, uncut: the code is still there: $lines"
+    ! mdir -b -i "$cart/sd.img" ::/torii/cheats 2>/dev/null | grep -q Hello ||
+      fail "the emptied cheat file is still on the card: $(mdir -b -i "$cart/sd.img" ::/torii/cheats | tr '\n' ' ')"
+  fi
+}
+cut_sweep last_scenario last_check
+echo "PASS: cheats: deleting the last code deletes its file, both copies, and a cut at each of its $cut_count steps leaves the file or none"
+
+# A file with no number left (cheat 1023 is the table's last): + Add code
+# is greyed with why from the start, and A on it (UP wraps there) opens no
+# keypad
+cp "$cart/clean/sd.img" "$cart/clean/kernel-nor.bin" "$cart/"
+rm -f "$cart/sram.bin"
+big_cht "$cart/Full.cht" 1024 100000
+mcopy -o -i "$cart/sd.img" "$cart/Full.cht" "::/torii/cheats/Hello.cht"
+# shellcheck disable=SC2046 # nav.sh's options
+boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
+  -w "screen ready: cheats" -k @8:UP -k @12:- -k @24:A -k @28:- -k @60:B -k @64:- -w "cheats: back" -f 12000 \
+  >"$cart/full.txt" 2>&1 || fail "the full file's screen didn't run: $(grep -a '^kernel' "$cart/full.txt" | tail -3)"
+grep -q "cheats: + Add code greyed: No room: 1024 cheats at most" "$cart/full.txt" ||
+  fail "the full file's + Add code: $(grep -a 'cheats:' "$cart/full.txt" | head -3)"
+! grep -q "screen ready: keypad" "$cart/full.txt" || fail "A on a greyed + Add code opened the keypad"
+echo "PASS: cheats: a file with no number left greys + Add code up front, and A on it opens nothing"
 
 # A placeholder (Pick a level, 3203F050+00??) filled in on the keypad: the
 # stand-ins typed over, the code replaced in place, picked and run
