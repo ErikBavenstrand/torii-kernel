@@ -1,0 +1,10 @@
+# The in-game menu over Hello.gba in the light theme (as ingame, which has
+# the dark one): the theme's colours reach the overlay through the session
+# block (source/ingame.c).
+#! settings 2=1 28=1
+-w "nav: home ready"
+-P "@8:nav_test_path:/Hello.gba" -p @8:nav_test_action:0x7E000002
+-w "launch: starting the game"
+-k @300:L+R+START -k @306:-
+-w "screen ready: ingame"
+-s @1:menu.png

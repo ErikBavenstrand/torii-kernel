@@ -1,0 +1,18 @@
+# The in-game menu (v0.8's overlay, docs/design/v0.8/ingame-menu.md) over
+# Hello.gba, BOOT WITH ADDON with Save states on, in the dark theme: the game
+# dimmed and frozen under the panel, the game's name, Resume picked, Load
+# state greyed (no state saved yet) and the Cheats row (Hello's cheat file
+# picks one). DOWN slides the pill past Load state to Cheats (every frame
+# hashed); B gives the game back.
+#! settings 2=1
+-w "nav: home ready"
+-P "@8:nav_test_path:/Hello.gba" -p @8:nav_test_action:0x7E000002
+-w "launch: starting the game"
+-k @300:L+R+START -k @306:-
+-w "screen ready: ingame"
+-s @1:menu.png
+-k @20:DOWN -k @24:- -k @32:DOWN -k @36:-
+-H @21:@44
+-s @50:cheats.png
+-k @60:B -k @64:-
+-s @120:back.png
