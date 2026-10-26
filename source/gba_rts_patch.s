@@ -133,31 +133,56 @@ check_sleep:
 	@;check cheat. Torii: the word at CheatONOFF is 1 for CHEAT OFF, anything
 	@;else on: the BIOS's soft reset clears it, so a game starts with its
 	@;picked cheats running (v0.7); the in-game menu's CHEAT OFF stops them.
-	@;They run once a frame, on the VBlank IRQ (not the keypad's), through
-	@;the interpreter (cheatrun.s) that Cheat_switch says is at that offset
-	@;from RTS_ReplaceIRQ_start: 0, no cheats.
+	@;They run through the interpreter (cheatrun.s) that Cheat_switch says is
+	@;at that offset from RTS_ReplaceIRQ_start: 0, no cheats.
+	@;They run once per VBlank: on the first entry that sees the VBlank IRQ
+	@;pending and enabled (IE & IF bit 0), then not again until the game has
+	@;acknowledged it. The word after CheatONOFF (CheatRAN) says they ran; the
+	@;hook calls the game's handler as a subroutine and clears it once that
+	@;returns with IF's VBlank bit clear. A game whose handler serves one IRQ
+	@;an entry (HBlank before VBlank, as pokeemerald's does) enters again with
+	@;VBlank still pending: the cheats don't run twice, and cost that entry
+	@;nothing, so a heavy set can't keep it from reaching VBlank. A nested
+	@;entry (a handler that re-enables IRQs) keeps its state on the IRQ stack.
+	@;A clear of IWRAM over CheatRAN costs or adds one run at most.
 	adrl		r2,Cheat_switch
 	ldr			r2,[r2]
 	cmp			r2,#0
 	beq			nocheat
+	stmfd		sp!,{lr}			@;the BIOS's return
 	ldr			r1,[r0,#0x200]
 	and			r1,r1,r1,lsr #16	@;IE & IF
 	tst			r1,#1
-	beq			nocheat
+	beq			cheat_game
 	adrl 		r3,CheatONOFF
 	ldr 		r3,[r3]
+	ldr			r1,[r3,#4]			@;CheatRAN
+	cmp			r1,#0
+	bne			cheat_game
+	mov			r1,#1
+	str			r1,[r3,#4]
 	ldr 		r3,[r3]
 	cmp 		r3,#1
-	beq 		nocheat
+	beq 		cheat_game
 	adrl		r3,RTS_ReplaceIRQ_start
 	add			r3,r3,r2
-	stmfd		sp!,{lr}
 	mov			lr,pc
 	mov			pc,r3
-	ldmfd		sp!,{lr}
 	mov			r0,#0x4000000
+cheat_game:
+	mov			lr,pc
+	ldr 		pc,[r0,#-(0x04000000-0x03FFFFF4)] @;the game's handler, as the BIOS calls it
+	mov			r0,#0x4000000
+	add			r0,r0,#0x200
+	ldrh		r1,[r0,#2]			@;IF
+	tst			r1,#1
+	adrl 		r3,CheatONOFF
+	ldr 		r3,[r3]
+	moveq		r1,#0
+	streq		r1,[r3,#4]			@;VBlank acknowledged: the next one runs them
+	ldmfd		sp!,{pc}
 nocheat:
-	ldr 		pc,[r0,#-(0x04000000-0x03FFFFF4)] @;to normal IRQ routine									
+	ldr 		pc,[r0,#-(0x04000000-0x03FFFFF4)] @;to normal IRQ routine
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 reset_now:

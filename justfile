@@ -17,7 +17,7 @@ export FRESH_IMAGE := kernel_image
 kernel_inputs := "source tests/kernel Makefile emulators/out/jagoombacolor.gba emulators/out/pocketnes.gba image.bin tools/omega_image.py tools/nm_to_sym.py tools/build_id.py " + kernel_image
 test_kernel_inputs := "source tests/kernel Makefile emulators/out/jagoombacolor.gba emulators/out/pocketnes.gba tools/build_id.py " + kernel_image
 emu_inputs := "emu/mgba/src emu/mgba/include emu/mgba/CMakeLists.txt emu/mgba/cmake emu/mgba-shot.c emu/build.sh docker/emu.Dockerfile"
-test_rom_outputs := "tests/roms/hello/hello.gba tests/roms/crash/crash.gba tests/roms/crash/crash.sym tests/roms/savetest/flash128.gba tests/roms/savetest/eeprom512.gba tests/roms/idle/idle.gba tests/roms/eeprom/eeprom.gba tests/roms/rumble/rumble.gba tests/roms/cheattest/cheattest.gba tests/roms/cheattest/cheattest.sym"
+test_rom_outputs := "tests/roms/hello/hello.gba tests/roms/crash/crash.gba tests/roms/crash/crash.sym tests/roms/savetest/flash128.gba tests/roms/savetest/eeprom512.gba tests/roms/idle/idle.gba tests/roms/eeprom/eeprom.gba tests/roms/rumble/rumble.gba tests/roms/cheattest/cheattest.gba tests/roms/cheattest/cheattest.sym tests/roms/cheattest/cheatirq.gba tests/roms/cheattest/cheatirq-vblank.gba"
 kernel_image := "devkitpro/devkitarm@sha256:1acab59884288115af0e70782a9b69017a8cc6bad69542b24e8652233f215c56"
 # The built-in emulators each build with the devkitARM of their own source's
 # time (emulators/fetch.sh pins the source): r58 (GCC 12, 2022-05-31) for

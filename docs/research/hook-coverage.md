@@ -28,11 +28,12 @@ ROM as it loads (`source/GBApatch.c`):
    the patch area after the ROM's end. That code stores the hook (`RTS_irq`)
    at `0x3007FFC` and jumps to the game's real entry.
 3. On an IRQ with the VBlank (or keypad) flag set, the hook checks the keys.
-   L+R+START opens the menu (RESET / SAVE / LOAD, and cheats). On a VBlank
-   IRQ the game enables, with cheats picked and not turned off, it runs the
-   cheat interpreter (v0.7, `source/cheatrun.s`; its place in the patch area
-   is in `omega-de-hardware.md` section 6). Then it jumps to the game's
-   handler at `0x3007FF4`.
+   L+R+START opens the menu (RESET / SAVE / LOAD, and cheats). Then it
+   jumps to the game's handler at `0x3007FF4`. With cheats picked it calls
+   the handler instead, and runs the cheat interpreter (v0.7,
+   `source/cheatrun.s`) once per VBlank IRQ the game enables, before the
+   handler serves it; how, and its place in the patch area, are in
+   `omega-de-hardware.md` section 6.
 
 SAVESTATE on its own used to work differently, with an `RTS_only` patch
 where L+R+START loaded a state at once and L+R+SELECT saved one; loading with

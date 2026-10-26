@@ -613,13 +613,31 @@ That leaves `0x8C4` bytes for v0.8's overlay (`test_cheat_cap` logs it). The
 `.pat` cache records the length its trim kept room for (word 12); a file
 from before v0.7 is scanned again for a game with cheats.
 
-**The interpreter in game** runs on the VBlank IRQ only (IE & IF bit 0;
-not the keypad IRQ the hook also takes), in IRQ mode with interrupts off,
-from the game's ROM in PSRAM at the game's WAITCNT, before the game's own
-handler. It uses no RAM of the game but the IRQ stack: 4 bytes the hook
-pushes and 36 the interpreter does (r4-r11, lr), beside the BIOS's 24 of
-the 160. The in-game menu's CHEAT OFF (the word at `0x03007FE0` set to 1)
-stops it. Its cycles (`tests/kernel/test_cheatrun.c`, at the BIOS's WAITCNT
+**The interpreter in game** runs once per VBlank (IE & IF bit 0; not the
+keypad IRQ the hook also takes), in IRQ mode with interrupts off, from the
+game's ROM in PSRAM at the game's WAITCNT, before the game's own handler.
+With cheats in the patch, the hook calls the game's handler as a subroutine
+(`mov lr,pc; ldr pc,[r0,#-0xC]`, as the BIOS does) instead of jumping to it,
+and keeps one word beside CheatONOFF, `0x03007FE4` (CheatRAN, in the BIOS's
+unused `0x3007FE0`-`0x3007FEF`, which its soft reset clears): the first entry
+that sees VBlank pending runs the cheats and sets it; an entry that finds
+it set doesn't run them; and after the game's handler returns, the hook
+clears it if IF's VBlank bit is clear (acknowledged). So a handler that
+serves one IRQ an entry (the AGB SDK's `intr_main`, pokeemerald's
+`IntrMain`: HBlank and others before VBlank) enters again with VBlank
+pending and doesn't run them twice. Before, every such entry ran them: with
+HBlank on and a set costing more than a scanline, an HBlank was always
+pending again after them, VBlank was never served and the game froze
+(`tests/cheat_safety.sh irq`). Nested handlers (ones that switch to system
+mode and re-enable IRQs) save `lr_irq` and return through it, so they come
+back to the hook; a nested entry keeps its state on the IRQ stack. A game's
+IWRAM clear over CheatRAN costs or adds one run, once; a LOAD state restores
+it with the rest of IWRAM, as it does CheatONOFF. It uses no other RAM of
+the game but the IRQ stack: the BIOS's return address the hook pushes, which
+the game's handler now runs 4 bytes below, and 36 bytes the interpreter
+pushes (r4-r11, lr), beside the BIOS's 24 of the 160. Without cheats the
+hook still jumps to the game's handler, as before. The in-game menu's CHEAT
+OFF (the word at `0x03007FE0` set to 1) stops it. Its cycles (`tests/kernel/test_cheatrun.c`, at the BIOS's WAITCNT
 `0x0000`, the slowest a game runs at; about 60% of these at `0x4317`): a
 call with nothing to do 216; a write in a plain cheat's run about 33; a
 write of its own about 130; a fill about 19 a write of one value and 44 a
