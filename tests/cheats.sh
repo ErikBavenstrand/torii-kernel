@@ -273,7 +273,7 @@ for typed in "3203F030 0077|0203F030:1|77|CodeBreaker" "D5A7153C 73B76013|0203F0
   cp "$cart/sd.img" "$cart/added.img"
   last=$(cheat_lines | tail -n 1)
   [ "$last" = "$code|1|true|" ] || fail "the $what code reads back as $last"
-  mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep -q $'^cheat4_desc = "q"\r$' ||
+  mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep $'^cheat4_desc = "q"\r$' >/dev/null ||
     fail "the $what code's name: $(mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep -a cheat4_ | head -3)"
   launch_dump -m "@240:0x$at" >"$cart/launch.txt" 2>&1 ||
     fail "the $what code's launch didn't run: $(grep -a '^kernel' "$cart/launch.txt" | tail -3)"
@@ -300,7 +300,7 @@ boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -
 grep -q "keypad: saved 3203F060 0011, format auto" "$cart/edit.txt" ||
   fail "the edit's keypad saved: $(grep -a 'keypad:' "$cart/edit.txt" | tail -3)"
 [ "$(cheat_lines | tail -n 1)" = "3203F060 0011|1|true|" ] || fail "the edited code reads back as $(cheat_lines | tail -n 1)"
-mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep -q $'^cheat4_desc = "q"\r$' || fail "the edited code lost its name"
+mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep $'^cheat4_desc = "q"\r$' >/dev/null || fail "the edited code lost its name"
 [ "$(cheat_lines | wc -l)" = 5 ] || fail "the edit added a cheat: $(cheat_lines | tr '\n' ' ')"
 echo "PASS: cheats: a code of the user's is edited from SELECT's menu, in its place, its name kept"
 
@@ -321,7 +321,7 @@ boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -
 grep -q "cheats: deleted cheat 4: ok" "$cart/delete.txt" ||
   fail "the delete logged: $(grep -a 'cheats:' "$cart/delete.txt" | tail -3)"
 [ "$(cheat_lines)" = "$before" ] || fail "after the delete the cheats read: $(cheat_lines | tr '\n' ' ')"
-! mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep -q '^cheat4_' || fail "cheat 4's lines are still there"
+! mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep '^cheat4_' >/dev/null || fail "cheat 4's lines are still there"
 echo "PASS: cheats: a code of the user's is deleted from SELECT's menu, the database's cheats untouched"
 
 # A placeholder (Pick a level, 3203F050+00??) filled in on the keypad: the

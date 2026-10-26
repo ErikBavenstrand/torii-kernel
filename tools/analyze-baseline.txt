@@ -41,6 +41,7 @@ clang-tidy source/saveorphan.c bugprone-assignment-in-if-condition: an assignmen
 clang-tidy source/saveorphan.c bugprone-assignment-in-if-condition: an assignment within an 'if' condition is bug-prone
 clang-tidy source/saveorphan.c bugprone-suspicious-string-compare: function 'strcmp' is called without explicitly comparing result
 clang-tidy source/saveorphan.c bugprone-suspicious-string-compare: function 'strncasecmp' is called without explicitly comparing result
+clang-tidy source/screens/cheats.c clang-analyzer-core.NullDereference: Access to field 'count' results in a dereference of a null pointer (loaded from variable 'f')
 clang-tidy source/slotstore.c bugprone-assignment-in-if-condition: an assignment within an 'if' condition is bug-prone
 clang-tidy source/slotstore.c bugprone-assignment-in-if-condition: an assignment within an 'if' condition is bug-prone
 clang-tidy source/slotstore.c bugprone-assignment-in-if-condition: an assignment within an 'if' condition is bug-prone
