@@ -6,11 +6,22 @@ git log, not here.
 
 ## Unreleased
 
-- **Added:** cheat decoders for GameShark v1/v2 (Action Replay v1/v2),
-  Action Replay v3 (GameShark SP), CodeBreaker (plain and keyed) and VBA raw
-  codes, ported from mGBA (MPL-2.0, `source/cheatcode.c`), with Torii's own
-  op model and its lowering to byte writes and ROM patches; not wired in yet
-  (6e4d8e1b, e3d7dcf1).
+- **Added:** cheats in GameShark v1/v2 (Action Replay v1/v2), Action Replay
+  v3 (GameShark SP), CodeBreaker (plain and keyed) and VBA raw codes, decoded
+  by a port of mGBA's decoders (MPL-2.0, `source/cheatcode.c`) from one
+  libretro-format file per game, `/torii/cheats/<rom path>.cht`, which moves
+  and renames with its game (6e4d8e1b, e3d7dcf1, 6fe4231c, 51d987bb, a4596285).
+- **Added:** a cheat screen from "Cheats" in a GBA game's popup: a tick per
+  cheat, picks saved power-cut safe in the file and applied at every launch,
+  cheats on from the game's start, and a big file read once behind a progress
+  dialog instead of freezing the screen; the popup's count leaves out master
+  codes (a4596285, 917111b7, 37c6827f).
+- **Changed:** cheat writes keep their real addresses (no longer folded into
+  IWRAM or EWRAM), and ROM-patch codes are written once into the game's PSRAM
+  image, with no cap (a4596285).
+- **Removed:** the Cheats setting, Boot with addon's cheat step, `/CHEAT`,
+  `GameID2cht.bin` and EZ-Flash's `.cht` format, whose cheat files are poor
+  (a4596285).
 
 ## v0.6.2
 
