@@ -51,6 +51,12 @@ void test_text_utf8(void)
 	check_latin1("\xC5\x81\xC3\xB3"
 		     "d\xC5\xBA \xE2\x80\x94 \xE2\x80\x9Cx\xE2\x80\x9D\xE2\x80\x99",
 		     lodz, 11);
+	// Cheat names' punctuation: the euro as the currency sign, an ellipsis,
+	// a bullet, a thin space, angle quotes
+	static const u32 money[] = {0xA4, '5', '.', 0xB7, ' ', '<', '>'};
+	check_latin1("\xE2\x82\xAC"
+		     "5\xE2\x80\xA6\xE2\x80\xA2\xE2\x80\x89\xE2\x80\xB9\xE2\x80\xBA",
+		     money, 7);
 	// Other scripts and emoji: one replacement each, whatever their length
 	static const u32 other[] = {CHARSET_REPLACEMENT, CHARSET_REPLACEMENT, '.', CHARSET_REPLACEMENT};
 	check_latin1("\xE3\x83\x86\xE3\x82\xB9.\xF0\x9F\x98\x80", other, 4);
