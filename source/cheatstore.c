@@ -294,6 +294,123 @@ s32 cheatstore_listed(void)
 	return (s32)listed;
 }
 
+// --- The counts kept on the card -------------------------------------------------
+//
+// COUNTS_PATH, a safe file of a line a cheat file the cheat screen has
+// counted, the latest first: "PATHCRC SIZE DATETIME LISTED" in hex, as
+// listed_cache holds them, so the popup has the count after a power-off too.
+// A file changed since (by tools/cheats.py, say) has another size or date:
+// its line is passed over until the screen counts it again.
+
+#define COUNTS_PATH CHEATS_DIR "/counts.txt"
+#define COUNTS_MAX 32       // lines kept
+#define COUNTS_BYTES 1536   // the file's text at most (COUNTS_MAX lines of 29 bytes and more)
+_Static_assert(COUNTS_BYTES <= CHEATSTORE_DETAIL, "the counts' text is built in the detail view's buffer");
+
+struct count_line {
+	u32 path_crc, size, stamp, listed;
+};
+
+static u32 hex_field(const char **s)
+{
+	u32 v = 0, digits = 0;
+	while (**s == ' ')
+		(*s)++;
+	for (;; (*s)++, digits++) {
+		char c = **s;
+		u32 d = c >= '0' && c <= '9' ? (u32)(c - '0') : c >= 'A' && c <= 'F' ? (u32)(c - 'A' + 10) : 16;
+		if (d == 16 || digits == 8)
+			break;
+		v = v << 4 | d;
+	}
+	return digits ? v : 0xFFFFFFFFu;
+}
+
+// A line of COUNTS_PATH into *out: 0 if it isn't one
+static int count_parse(const char *line, struct count_line *out)
+{
+	const char *s = line;
+	out->path_crc = hex_field(&s);
+	out->size = hex_field(&s);
+	out->stamp = hex_field(&s);
+	out->listed = hex_field(&s);
+	return *s == 0 && out->listed <= CHEATFILE_MAX;
+}
+
+static u32 counts_len;
+
+static u32 counts_fill(void *ctx, u32 pos, char *buf, u32 max)
+{
+	u32 n = pos < counts_len ? counts_len - pos : 0;
+	n = n < max ? n : max;
+	memcpy(buf, (const char *)ctx + pos, n);
+	return n;
+}
+
+void cheatstore_keep_listed(void)
+{
+	struct cheatstore *cs = cheatstore();
+	if (!listed_cache.valid)
+		return;
+	struct count_line now = {listed_cache.path_crc, listed_cache.size,
+				 (u32)listed_cache.date << 16 | listed_cache.time, listed_cache.listed};
+	char *out = cs->detail, *line = (char *)cs->part;
+	u32 n = (u32)snprintf(out, COUNTS_BYTES, "%08lX %lX %08lX %lX\n", (unsigned long)now.path_crc,
+			      (unsigned long)now.size, (unsigned long)now.stamp, (unsigned long)now.listed);
+	u32 kept = 1;
+	if (safefile_open(COUNTS_PATH, COUNTS_BYTES) != SAFEFILE_NONE) {
+		int len;
+		struct count_line was;
+		while ((len = safefile_line(line, CHEATSTORE_PART)) != SAFEFILE_END) {
+			if (len < 0 || !count_parse(line, &was))
+				continue;
+			if (was.path_crc == now.path_crc) {
+				if (kept == 1 && !memcmp(&was, &now, sizeof(was))) {
+					safefile_close();
+					return;  // kept already, the latest
+				}
+				continue;
+			}
+			if (kept < COUNTS_MAX && n + (u32)len + 1 < COUNTS_BYTES) {
+				memcpy(out + n, line, (u32)len);
+				out[n + (u32)len] = '\n';
+				n += (u32)len + 1;
+				kept++;
+			}
+		}
+		int failed = safefile_failed();
+		safefile_close();
+		if (failed)
+			return;  // never written over what couldn't be read
+	} else if (safefile_failed()) {
+		return;
+	}
+	counts_len = n;
+	if (!safefile_write(COUNTS_PATH, COUNTS_BYTES, counts_fill, out))
+		tlog("cheats: %s not written", COUNTS_PATH);
+}
+
+// The count COUNTS_PATH keeps for the file at path (its copy's info): -1 if none
+static s32 kept_count(const char *path, const FILINFO *info)
+{
+	struct count_line want = {crc32(path, (u32)strlen(path)), (u32)info->fsize,
+				  (u32)info->fdate << 16 | info->ftime, 0},
+			  was;
+	char *line = (char *)cheatstore()->part;
+	s32 listed = -1;
+	int len;
+	if (safefile_open(COUNTS_PATH, COUNTS_BYTES) == SAFEFILE_NONE)
+		return -1;
+	while ((len = safefile_line(line, CHEATSTORE_PART)) != SAFEFILE_END)
+		if (len >= 0 && count_parse(line, &was) && was.path_crc == want.path_crc) {
+			if (was.size == want.size && was.stamp == want.stamp)
+				listed = (s32)was.listed;
+			break;  // the latest line for the path counts
+		}
+	safefile_close();
+	return listed;
+}
+
 int cheatstore_peek(const char *rom_path, s32 *listed)
 {
 	char *path = cheatstore()->path;
@@ -301,10 +418,13 @@ int cheatstore_peek(const char *rom_path, s32 *listed)
 	if (cheatstore_path(path, SAFEFILE_PATH_MAX, rom_path) < 0)
 		return 0;
 	FILINFO info;
-	if (listed_cache.valid && stat_copy(path, &info) && listed_cache.size == (u32)info.fsize &&
-	    listed_cache.date == info.fdate && listed_cache.time == info.ftime &&
-	    listed_cache.path_crc == crc32(path, (u32)strlen(path)))
+	if (!stat_copy(path, &info))
+		return 1;
+	if (listed_cache.valid && listed_cache.size == (u32)info.fsize && listed_cache.date == info.fdate &&
+	    listed_cache.time == info.ftime && listed_cache.path_crc == crc32(path, (u32)strlen(path)))
 		*listed = listed_cache.listed;
+	else
+		*listed = kept_count(path, &info);
 	return 1;
 }
 

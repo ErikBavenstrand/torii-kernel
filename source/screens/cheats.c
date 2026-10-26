@@ -859,6 +859,7 @@ void cheats_run(const char *rom_path, const char *title, u16 icon)
 	u32 picks = cheatfile_picks(&s->file);
 	tlog("cheats: back, %lu picked%s", (unsigned long)picks, changed ? ", changed" : "");
 	int saved = cheatstore_write();
+	cheatstore_keep_listed();  // the popup's count after a power-off too
 	ui_leave(UI_TR_DEEPER, -1);  // back to the caller's screen
 	while (ui_depth())
 		ui_pop();

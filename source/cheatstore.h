@@ -75,10 +75,17 @@ enum {
 int cheatstore_open(const char *rom_path);
 // The game popup's look at the game's cheat file, never reading it: 0 if
 // the game can have none (its path too long), else 1, with *listed the
-// count the cheat screen lists if this session has counted the file as it
-// is on the card now (the same path, size and date), else -1. Only f_stat:
-// the copy the count was kept for, NAME, or NAME.bak without it.
+// count the cheat screen lists if it has counted the file as it is on the
+// card now (the same path, size and date: this session, else as
+// /torii/cheats/counts.txt keeps it), else -1. An f_stat of the copy the
+// count was kept for (NAME, or NAME.bak without it), and a read of
+// counts.txt (a few hundred bytes) when this session hasn't counted it.
 int cheatstore_peek(const char *rom_path, s32 *listed);
+// Keeps the count cheatstore_listed found last in /torii/cheats/counts.txt
+// (a safe file, its latest 32 files), for the popup after a power-off;
+// nothing written if it is kept already. The cheat screen calls it as it
+// leaves. Borrows the detail view's buffer.
+void cheatstore_keep_listed(void);
 // The decoder as it is before cheat i (the file's count: after the last),
 // decoding the file again from the first unless it has just got there
 void cheatstore_decoder_before(u32 i, struct cheat_decoder *out);

@@ -79,6 +79,26 @@ head -c "$(stat -c %s "$cart/want.cht")" "$cart/after.cht" | cmp -s - "$cart/wan
 tail -n 1 "$cart/after.cht" | grep -q '^#crc32 ' || fail "the written file has no CRC line"
 echo "PASS: cheats: the cheat screen picks a cheat and saves only its enable line"
 
+# The screen keeps its count in /torii/cheats/counts.txt: after a power-off
+# the popup has it (still without reading the cheat file); once the file
+# changes on the card (by hand here), it has none until the screen counts it
+# shellcheck disable=SC2046 # nav.sh's options
+boot $(nav_game_menu gba 0) -f 3000 >"$cart/count.txt" 2>&1 || fail "the popup didn't open: $(grep -a '^kernel' "$cart/count.txt" | tail -3)"
+grep -q "cheats: popup: 3 listed" "$cart/count.txt" ||
+  fail "after a power-off the popup counted: $(grep -a 'cheats: popup' "$cart/count.txt" | head -1)"
+! grep -q 'safefile: .*Hello.cht\|cheats: .*Hello.cht: [0-9]* bytes' "$cart/count.txt" || fail "the popup read the cheat file"
+cp "$cart/sd.img" "$cart/counted.img"
+mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | sed '$d' >"$cart/edited.cht"
+printf 'cheat9_desc = "By hand"\ncheat9_code = "3203F0A0+0001"\n' >>"$cart/edited.cht"
+mcopy -o -i "$cart/sd.img" "$cart/edited.cht" ::/torii/cheats/Hello.cht
+mdel -i "$cart/sd.img" ::/torii/cheats/Hello.cht.bak 2>/dev/null || true
+# shellcheck disable=SC2046 # nav.sh's options
+boot $(nav_game_menu gba 0) -f 3000 >"$cart/count.txt" 2>&1 || fail "the popup didn't open: $(grep -a '^kernel' "$cart/count.txt" | tail -3)"
+grep -q "cheats: popup: -1 listed" "$cart/count.txt" ||
+  fail "the popup counted a changed file: $(grep -a 'cheats: popup' "$cart/count.txt" | head -1)"
+cp "$cart/counted.img" "$cart/sd.img"
+echo "PASS: cheats: the popup has the screen's count after a power-off, and none for a file changed since"
+
 # A reboot keeps the pick, and Boot with addon applies it with no question:
 # the writes reach their addresses every frame, the ROM patch is in PSRAM
 cp "$cart/sd.img" "$cart/picked.img"
