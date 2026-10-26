@@ -9,6 +9,10 @@
 # and SELECT held) and CodeBreaker's key test, pointer writes, add/or/and,
 # fills, and writes at their widths to palette and VRAM. The pick's
 # write-back survives a power cut at each of its steps (tests/cutsweep.sh).
+# Codes typed on the code keypad (source/screens/keypad.c): a CodeBreaker and
+# an encrypted GameShark code added, named, saved and run after a reboot; one
+# deleted again; a placeholder filled in, in place; a new code's save cut at
+# each step.
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and building tests/roms/hello.
 set -euo pipefail
@@ -219,3 +223,130 @@ print("none" if t is None else "".join("1" if e else "0" for _, _, e in cheats.p
 }
 cut_sweep scenario check
 echo "PASS: cheats: a power cut at each of the write-back's $cut_count steps leaves the old picks or the new"
+
+# --- Typing codes (the code keypad, source/screens/keypad.c) ---------------------------
+# A code typed on the keypad from the cheat screen's + Add code, named on the
+# rename keyboard (A types q, START keeps it) and saved as a new cheat of the
+# user's: picked, written at once, and run at the next launch. Keys from
+# tests/keypad_keys.py. add_code RUNNER CODE [MGBA-SHOT ARGS]: RUNNER is boot
+# or cut_run.
+add_code() {
+  local runner=$1 code=$2
+  shift 2
+  # shellcheck disable=SC2046 # nav.sh's options and the keypad's keys
+  "$runner" "$@" $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
+    -w "screen ready: cheats" -k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:A -k @48:- \
+    -w "screen ready: keypad" $(python3 tests/keypad_keys.py "$code" START 2>/dev/null) \
+    -w "screen ready: rename" -k @8:A -k @12:- -k @20:START -k @24:- \
+    -w "cheats: added" -w "screen ready: cheats" -k @8:B -k @12:- -w "cheats: back" -f 8000
+}
+# The cheat file as the kernel would read it, by tools/cheats.py: one line a
+# cheat, "CODE|ENABLED|USER|FORMAT"
+cheat_lines() {
+  rm -rf "$carts/cutread" && mkdir -p "$carts/cutread"
+  mcopy -n -i "$cart/sd.img" ::/torii/cheats/Hello.cht "$carts/cutread/" 2>/dev/null || true
+  mcopy -n -i "$cart/sd.img" ::/torii/cheats/Hello.cht.bak "$carts/cutread/" 2>/dev/null || true
+  python3 -c '
+import sys
+sys.path.insert(0, "tools")
+import cheats
+t = cheats.read_card_file(sys.argv[1])
+for c in cheats.parse_cht(t or ""):
+    print("|".join((c[1], str(int(c[2])), c.extra.get("user", ""), c.extra.get("format", ""))))
+' "$carts/cutread/Hello.cht"
+}
+launch_dump() {
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot $(nav_launch /Hello.gba addon) -w "BOOT WITH ADDON" "$@" -f 4000
+}
+
+for typed in "3203F030 0077|0203F030:1|77|CodeBreaker" "D5A7153C 73B76013|0203F040:2|efbe|GameShark v1"; do
+  IFS='|' read -r code at want what <<<"$typed"
+  cp "$cart/clean/sd.img" "$cart/clean/kernel-nor.bin" "$cart/"
+  rm -f "$cart/sram.bin"
+  add_code boot "${code// /}" >"$cart/add.txt" 2>&1 ||
+    fail "the keypad's $what code wasn't added: $(grep -a '^kernel' "$cart/add.txt" | tail -3)"
+  grep -q "keypad: saved $code, format auto" "$cart/add.txt" ||
+    fail "the keypad saved: $(grep -a 'keypad:' "$cart/add.txt" | tail -3)"
+  grep -q "cheats: /torii/cheats/Hello.cht: 2 picked, written" "$cart/add.txt" ||
+    fail "the $what code wasn't picked and written: $(grep -a 'cheats:' "$cart/add.txt" | tail -3)"
+  cp "$cart/sd.img" "$cart/added.img"
+  last=$(cheat_lines | tail -n 1)
+  [ "$last" = "$code|1|true|" ] || fail "the $what code reads back as $last"
+  mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep -q $'^cheat4_desc = "q"\r$' ||
+    fail "the $what code's name: $(mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep -a cheat4_ | head -3)"
+  launch_dump -m "@240:0x$at" >"$cart/launch.txt" 2>&1 ||
+    fail "the $what code's launch didn't run: $(grep -a '^kernel' "$cart/launch.txt" | tail -3)"
+  got=$(sed -n "s/^mem frame [0-9]* ${at%%:*}: //p" "$cart/launch.txt" | tr -d ' \n' | tr A-F a-f)
+  [ "$got" = "$want" ] || fail "the typed $what code: ${at%%:*} holds $got, not $want"
+  echo "PASS: cheats: a $what code typed on the keypad ($code) is saved, picked and runs after a reboot"
+done
+
+# A code of the user's (the GameShark one just added, row 3) can be deleted:
+# SELECT's menu, Delete, asked and answered; the file is as it was before the
+# add (but for its CRC line), the database's cheats untouched
+cp "$cart/added.img" "$cart/sd.img"
+cp "$cart/clean/kernel-nor.bin" "$cart/"
+rm -f "$cart/sram.bin"
+before=$(cheat_lines | head -n 4)
+# shellcheck disable=SC2046 # nav.sh's options
+boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
+  -w "screen ready: cheats" -k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:SELECT -k @48:- \
+  -w "screen ready: cheat-menu" -k @16:DOWN -k @20:- -k @28:A -k @32:- \
+  -w "screen ready: confirm" -k @8:RIGHT -k @12:- -k @20:A -k @24:- \
+  -w "cheats: deleted" -w "screen ready: cheats" -k @8:B -k @12:- -w "cheats: back" -f 6000 >"$cart/delete.txt" 2>&1 ||
+  fail "the delete didn't run: $(grep -a '^kernel' "$cart/delete.txt" | tail -3)"
+grep -q "cheats: deleted cheat 4: ok" "$cart/delete.txt" ||
+  fail "the delete logged: $(grep -a 'cheats:' "$cart/delete.txt" | tail -3)"
+[ "$(cheat_lines)" = "$before" ] || fail "after the delete the cheats read: $(cheat_lines | tr '\n' ' ')"
+! mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep -q '^cheat4_' || fail "cheat 4's lines are still there"
+echo "PASS: cheats: a code of the user's is deleted from SELECT's menu, the database's cheats untouched"
+
+# A placeholder (Pick a level, 3203F050+00??) filled in on the keypad: the
+# stand-ins typed over, the code replaced in place, picked and run
+cp "$cart/clean/sd.img" "$cart/clean/kernel-nor.bin" "$cart/"
+rm -f "$cart/sram.bin"
+printf '%s\r\n' 'cheats = 2' '' \
+  'cheat0_desc = "Pick a level"' 'cheat0_code = "3203F050+00??"' 'cheat0_enable = false' '' \
+  'cheat1_desc = "Already on"' 'cheat1_code = "3203F010+0042"' 'cheat1_enable = true' \
+  >"$cart/Fill.cht"
+mcopy -o -i "$cart/sd.img" "$cart/Fill.cht" "::/torii/cheats/Hello.cht"
+# shellcheck disable=SC2046 # nav.sh's options and the keypad's keys
+boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
+  -w "screen ready: cheats" -k @8:A -k @12:- -w "screen ready: keypad" \
+  $(python3 tests/keypad_keys.py 5A START 2>/dev/null) \
+  -w "cheats: filled in" -w "screen ready: cheats" -k @8:B -k @12:- -w "cheats: back" -f 6000 >"$cart/fill.txt" 2>&1 ||
+  fail "the placeholder's keypad didn't run: $(grep -a '^kernel' "$cart/fill.txt" | tail -3)"
+grep -q "keypad: saved 3203F050 005A, format auto" "$cart/fill.txt" ||
+  fail "the keypad saved: $(grep -a 'keypad:' "$cart/fill.txt" | tail -3)"
+mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht >"$cart/after.cht"
+sed 's/^cheat0_code = "3203F050+00??"\r$/cheat0_code = "3203F050 005A"\r/; s/^cheat0_enable = false\r$/cheat0_enable = true\r/' \
+  "$cart/Fill.cht" >"$cart/want.cht"
+head -c "$(stat -c %s "$cart/want.cht")" "$cart/after.cht" | cmp -s - "$cart/want.cht" ||
+  fail "the fill changed more than its code and pick: $(diff <(cat -A "$cart/want.cht") <(cat -A "$cart/after.cht") | head -5)"
+launch_dump -m "@240:0x0203F050:1" >"$cart/launch.txt" 2>&1 ||
+  fail "the filled-in code's launch didn't run: $(grep -a '^kernel' "$cart/launch.txt" | tail -3)"
+got=$(sed -n 's/^mem frame [0-9]* 0203F050: //p' "$cart/launch.txt" | tr -d ' \n' | tr A-F a-f)
+[ "$got" = 5a ] || fail "the filled-in code: 0203F050 holds $got, not 5a"
+echo "PASS: cheats: a placeholder filled in on the keypad is replaced in place, picked, and runs"
+
+# Saving a new code, cut at each step: the next power-on reads the file
+# without it or with it whole, never a broken one
+cp "$cart/clean/sd.img" "$cart/clean/kernel-nor.bin" "$cart/"
+rm -f "$cart/sram.bin"
+add_scenario() { add_code cut_run 3203F0300077 "$@"; }
+add_check() {
+  local n=$1 name=$2 lines
+  cut_run -f 400
+  [ "$cut_status" = 0 ] || fail "add, cut at $n ($name): the next power-on exited with $cut_status"
+  grep -q 'Torii kernel boot' "$cart/run.log" || fail "add, cut at $n ($name): no boot line"
+  lines=$(cheat_lines | tr '\n' ' ')
+  case $lines in
+  "0000ABCD 0007+100F68A4 0007|0|| 0203F000:BEEF+03006000:5A+080000A0:4954|0|| 3203F010+0042|1|| 74000130 03FE+3203F020 0001|0|| ") ;;
+  "0000ABCD 0007+100F68A4 0007|0|| 0203F000:BEEF+03006000:5A+080000A0:4954|0|| 3203F010+0042|1|| 74000130 03FE+3203F020 0001|0|| 3203F030 0077|1|true| ") ;;
+  *) fail "add, cut at $n ($name): the cheats read back as: $lines" ;;
+  esac
+  [ "$n" != 0 ] || [[ $lines == *"3203F030 0077|1|true|"* ]] || fail "add, uncut: the code isn't there: $lines"
+}
+cut_sweep add_scenario add_check
+echo "PASS: cheats: a power cut at each of a new code's $cut_count write steps leaves the file without it or with it"

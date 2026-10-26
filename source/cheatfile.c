@@ -186,7 +186,7 @@ static void parse_kv(struct cheatfile *f, const struct kv *kv, u32 max)
 	} else if (what == KEY_ENABLE && len <= 0xFF) {  // a longer value isn't an enable line we could rewrite
 		c->enable = at;
 		c->enable_len = (u8)len;
-		c->picked = c->was = is_true(s, len) != 0;
+		c->picked = c->was = c->saved = is_true(s, len) != 0;
 	}
 }
 
@@ -205,21 +205,11 @@ void cheatfile_parse(struct cheatfile *f, const char *text, u32 len, struct chea
 	f->max = (u16)max;
 	f->count_at = CHEATFILE_NONE;
 	for (u32 i = 0; i < max; i++)
-		cheats[i] = (struct cheatfile_cheat){CHEATFILE_NONE,
-						     0,
-						     CHEATFILE_NONE,
-						     0,
-						     CHEATFILE_NONE,
-						     0,
-						     CHEATFILE_NEW,
-						     (u16)i,
-						     0,
-						     0,
-						     0,
-						     0,
-						     0,
-						     0,
-						     0};
+		cheats[i] = (struct cheatfile_cheat){.desc = CHEATFILE_NONE,
+						     .code = CHEATFILE_NONE,
+						     .enable = CHEATFILE_NONE,
+						     .status = CHEATFILE_NEW,
+						     .number = (u16)i};
 	u32 pos = text_start(text, len);
 	struct kv kv;
 	int first = 1;
@@ -354,10 +344,19 @@ int cheatfile_toggle(struct cheatfile *f, u32 i)
 	return 1;
 }
 
-int cheatfile_changed(const struct cheatfile *f)
+void cheatfile_written(struct cheatfile *f)
 {
 	for (u32 i = 0; i < f->count; i++)
-		if (f->cheats[i].picked != f->cheats[i].was)
+		f->cheats[i].saved = f->cheats[i].picked;
+	f->edited = 0;
+}
+
+int cheatfile_changed(const struct cheatfile *f)
+{
+	if (f->edited)
+		return 1;
+	for (u32 i = 0; i < f->count; i++)
+		if (f->cheats[i].picked != f->cheats[i].saved)
 			return 1;
 	return 0;
 }

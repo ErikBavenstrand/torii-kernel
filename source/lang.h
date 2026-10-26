@@ -197,7 +197,7 @@ enum {
 	LANG_POP_RENAME,
 	LANG_POP_INFO,
 	LANG_POP_SAVES,
-	LANG_POP_CHEATS,    // a GBA game with a cheat file: its cheat screen (screens/cheats.c)
+	LANG_POP_CHEATS,  // a GBA game on the card: its cheat screen (screens/cheats.c), its count if it has a cheat file
 	LANG_POP_UNRECENT,  // the Recent page's Remove: off Recent, the file stays
 	LANG_POP_DELETE,
 	LANG_POP_ITEMS,
@@ -206,7 +206,7 @@ enum {
 enum {
 	LANG_BOOT_DEFAULT,  // the game's boot mode, else Settings' (A on the list)
 	LANG_BOOT_CLEAN,
-	LANG_BOOT_ADDONS,   // a GBA game with an addon on
+	LANG_BOOT_ADDONS,  // a GBA game with an addon on
 	LANG_BOOTS,
 };
 enum {
@@ -223,12 +223,12 @@ struct lang_games {
 	const char *empty;  // a list with no game (left)
 	const char *hint_play, *hint_menu, *hint_letter, *hint_pick;
 	const char *pop[LANG_POP_ITEMS];  // the game popup's items
-	const char *boots[LANG_BOOTS];    // Play's « » in a popup: how it starts (LANG_BOOT_*)
-	const char *hint_boot;            // its LEFT/RIGHT in the hint bar
+	const char *boots[LANG_BOOTS];  // Play's « » in a popup: how it starts (LANG_BOOT_*)
+	const char *hint_boot;  // its LEFT/RIGHT in the hint bar
 	const char *off, *on;  // Favourite's value
 	const char *delete_text;  // under the Delete confirmation's "Delete <name>?" (EN_GAME_DELETE)
 	const char *delete_button;
-	const char *recent_failed;     // Remove from Recent couldn't write recent.txt
+	const char *recent_failed;  // Remove from Recent couldn't write recent.txt
 	const char *save_type_failed;  // Game info's save type couldn't be written
 	const char *boot_mode_failed;  // nor its boot mode
 	const char *info_keys[LANG_INFO_KEYS];  // Game info's lines
@@ -248,15 +248,50 @@ extern const struct lang_games *gl_games;
 // The cheat screen (screens/cheats.c)
 struct lang_cheats {
 	const char *hint_pick;  // A
-	const char *why[5];     // a greyed row's reason, by cheatfile.h's CHEATFILE_WHY_* (0: none)
-	const char *nor;        // a ROM-patch cheat's note
-	const char *unnamed;    // a cheat with no desc line
+	const char *why[5];  // a greyed row's reason, by cheatfile.h's CHEATFILE_WHY_* (0: none)
+	const char *nor;  // a ROM-patch cheat's note
+	const char *unnamed;  // a cheat with no desc line
 	const char *reading, *reading_text;  // the progress dialog while a big file decodes
-	const char *none;       // a file of master codes only
-	const char *gone;       // its file can't be read now
+	const char *gone;  // its file can't be read now
 	const char *save_failed;  // the picks couldn't be written
+	const char *add_row;  // the list's last row: the code keypad
+	const char *hint_add, *hint_edit, *hint_fill;  // A on Add code, SELECT on your own, A on a placeholder
+	const char *menu_edit, *menu_delete;  // SELECT's menu on a code of your own
+	const char *delete_text, *delete_button;  // its Delete's confirmation (EN_CHEAT_DELETE the title)
+	const char *name_title;  // the rename keyboard's title, naming a code
+	const char *edit_failed[4];  // by cheatfile.h's CHEATFILE_EDIT_* (0: the card didn't take it)
+	const char *too_long;  // a code with more lines than the keypad takes
 };
 extern const struct lang_cheats *gl_cheats;
+#define EN_CHEAT_DELETE "Delete %s?"
+
+// The code keypad (screens/keypad.c)
+struct lang_keypad {
+	const char *title_add, *title_edit;  // its title bar
+	const char *hint_delete, *hint_format, *hint_save;  // B, SELECT, START
+	const char *key_line, *key_delete, *key_cancel, *key_save;  // the function row
+	const char *format_label;  // before the format: "Format"
+	const char *formats[7];  // by cheatcode.h's enum cheat_format ([0]: none yet)
+	const char *tags[7];  // a line's own, at its right ([0]: not a code line yet)
+	const char *status[9];  // the result line by keypad_edit.h's KEYPAD_* (OK's: unused)
+	const char *verbs[17];  // an op's, by cheatcode.h's enum cheat_op_type
+	const char *button;  // IF_BUTTON's line
+	const char *cant_save;  // START on a code that doesn't read
+	const char *discard, *discard_button;  // cancel with changes: the confirmation
+};
+extern const struct lang_keypad *gl_keypad;
+// The keypad's lines with numbers in them
+#define EN_KEYPAD_COUNTER "Line %lu/%lu"
+#define EN_KEYPAD_DETECTED "%s, detected"
+#define EN_KEYPAD_GUESS "%s, a guess"
+#define EN_KEYPAD_SET "%s, set with SELECT"
+#define EN_KEYPAD_OP "%s %s at %08lX"
+#define EN_KEYPAD_FILL "%s %s at %08lX, %lu times"
+#define EN_KEYPAD_IF "%s %08lX %s %s"
+#define EN_KEYPAD_MORE "%s, +%lu more"
+#define EN_KEYPAD_SHAPE "Line %lu: %lu digits; a code line has 12 or 16"
+#define EN_KEYPAD_FILL_IN "Fill in the %lu marked digits"
+#define EN_KEYPAD_WRONG "Doesn't read as %s"
 #define EN_GAME_DELETE "Delete %s?"
 
 // The rename keyboard (screens/rename.c) and what a rename says
@@ -266,9 +301,9 @@ struct lang_rename {
 	const char *key_lower, *key_upper, *key_latin, *key_space, *key_cancel, *key_ok;  // the function row
 	const char *empty, *taken, *bad, *hidden, *pending, *shared, *failed;  // OK refused
 	const char *side_taken[6];  // a file in the way, by actions.h's ACTION_FILE_*
-	const char *partly;       // renamed, but not everything followed (a dialog after)
+	const char *partly;  // renamed, but not everything followed (a dialog after)
 	const char *name_failed;  // a game's name couldn't be written (a dialog after)
-	const char *names_full;   // ... as names.txt is too large or holds too many names
+	const char *names_full;  // ... as names.txt is too large or holds too many names
 	const char *discard, *discard_button;  // Cancel with changes: the confirmation
 	const char *checking, *checking_text;  // the progress dialog while the card is checked for a shared save
 };
@@ -278,44 +313,44 @@ extern const struct lang_rename *gl_rename;
 // store's codes say
 struct lang_slots {
 	const char *new_title, *copy_title, *rename_title;  // the name prompt's title bar
-	const char *bad;      // a name with nothing usable in it
-	const char *full;     // SLOTSTORE_FULL
-	const char *failed;   // SLOTSTORE_CARD
-	const char *taken;    // SLOTSTORE_TAKEN, after the prompt
-	const char *path;     // SLOTSTORE_PATH
-	const char *gone;     // SLOTSTORE_NO_SLOT
+	const char *bad;  // a name with nothing usable in it
+	const char *full;  // SLOTSTORE_FULL
+	const char *failed;  // SLOTSTORE_CARD
+	const char *taken;  // SLOTSTORE_TAKEN, after the prompt
+	const char *path;  // SLOTSTORE_PATH
+	const char *gone;  // SLOTSTORE_NO_SLOT
 };
 extern const struct lang_slots *gl_slots;
 
 // A game's saves (screens/game_saves.c, on screens/save_page.c's page): its
 // slots, a slot's backups, and the launch's Play with
 struct lang_gsaves {
-	const char *title;          // the page's title bar, and the Start menus' entry
-	const char *play_title;     // the launch's choice of slot
+	const char *title;  // the page's title bar, and the Start menus' entry
+	const char *play_title;  // the launch's choice of slot
 	const char *backups_title;  // a slot's backups (its name on the right)
-	const char *new_row;        // the slots' last row
-	const char *active;         // the pane's tag for the active slot
-	const char *kept;           // and for a kept backup (a save type change's)
-	const char *keys;           // a slot's facts' names, "\n" between them
-	const char *backup_keys;    // a backup's
-	const char *play_keys;      // Play with's
+	const char *new_row;  // the slots' last row
+	const char *active;  // the pane's tag for the active slot
+	const char *kept;  // and for a kept backup (a save type change's)
+	const char *keys;  // a slot's facts' names, "\n" between them
+	const char *backup_keys;  // a backup's
+	const char *play_keys;  // Play with's
 	const char *never, *unknown, *none;  // a slot with no file; a time the clock didn't know; no backups
 	const char *note_active, *note_other, *note_play, *note_new, *note_backup, *note_kept;  // the pane's foot
 	const char *hint_play, *hint_menu, *hint_backups, *hint_new, *hint_restore, *hint_cancel;
 	const char *act_play, *act_active, *act_backups, *act_rename, *act_copy, *act_delete;  // a slot's popup
 	const char *new_empty, *new_file;  // New slot's popup (and EN_GS_COPY_OF)
-	const char *file_title;     // the .sav file browser
-	const char *empty;          // a folder with nothing to pick
-	const char *delete_text;    // under "Delete <slot>?"
+	const char *file_title;  // the .sav file browser
+	const char *empty;  // a folder with nothing to pick
+	const char *delete_text;  // under "Delete <slot>?"
 	const char *restore_title;  // the restore's question
 	const char *restore_button;
 	const char *no_backups;
 	const char *no_save;
-	const char *no_room;        // the page couldn't show (video memory)
-	const char *copying;        // a notice while a save is copied (a slot copy, a slot from a file)
-	const char *last;           // SLOTSTORE_LAST
-	const char *gone_file;      // SLOTSTORE_NO_FILE
-	const char *gone_version;   // SLOTSTORE_NO_VERSION
+	const char *no_room;  // the page couldn't show (video memory)
+	const char *copying;  // a notice while a save is copied (a slot copy, a slot from a file)
+	const char *last;  // SLOTSTORE_LAST
+	const char *gone_file;  // SLOTSTORE_NO_FILE
+	const char *gone_version;  // SLOTSTORE_NO_VERSION
 };
 extern const struct lang_gsaves *gl_gsaves;
 #define EN_GS_DELETE "Delete %s?"

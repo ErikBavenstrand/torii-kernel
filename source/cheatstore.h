@@ -37,6 +37,19 @@ int cheatstore_path(char *out, u32 size, const char *rom_path);
 // yet: 1 if it has one with a cheat in it. Call only where FatFs calls may
 // run.
 int cheatstore_read(const char *rom_path);
+// The same for the cheat screen: CHEATSTORE_READ if the file was read
+// (cheats in it or not), CHEATSTORE_NEW if the game has none (an empty
+// file, made on cheatstore_write), CHEATSTORE_NONE if it has one that can't
+// be read (too big, a card error) or a path too long.
+enum {
+	CHEATSTORE_NONE,
+	CHEATSTORE_READ,
+	CHEATSTORE_NEW,
+};
+int cheatstore_open(const char *rom_path);
+// The decoder as it is before cheat i (the file's count: after the last),
+// decoding the file again from the first unless it has just got there
+void cheatstore_decoder_before(u32 i, struct cheat_decoder *out);
 // Decodes the read file's cheats from cheatstore()->work.next on, until
 // budget cycles have passed (0: all of them). 1 once all are decoded.
 int cheatstore_decode(u32 budget);
@@ -46,8 +59,8 @@ int cheatstore_decode(u32 budget);
 // has counted the file already (the last file counted, by its path and
 // cheat count). -1 if the budget ran out first.
 s32 cheatstore_listed(u32 budget);
-// Writes the picks back into the read file, power-cut safe, if one changed.
-// 1 if it is as the picks say.
+// Writes the picks back into the read file, power-cut safe, if one changed
+// or an edit (cheatfile.h's) changed its text. 1 if it is as the picks say.
 int cheatstore_write(void);
 // Deletes the game's cheat file (both copies); 1 if none is left
 int cheatstore_delete(const char *rom_path);

@@ -89,6 +89,7 @@ char *gl_hint_set EWRAM_BSS;
 
 const struct lang_games *gl_games EWRAM_BSS;
 const struct lang_cheats *gl_cheats EWRAM_BSS;
+const struct lang_keypad *gl_keypad EWRAM_BSS;
 const struct lang_rename *gl_rename EWRAM_BSS;
 const struct lang_saves *gl_saves EWRAM_BSS;
 const struct lang_slots *gl_slots EWRAM_BSS;
@@ -583,9 +584,45 @@ static const struct lang_cheats en_cheats = {
 	.unnamed = "(no name)",
 	.reading = "Reading cheats",
 	.reading_text = "A big cheat file",
-	.none = "No cheats to pick in its cheat file.",
 	.gone = "Its cheat file can't be read.",
 	.save_failed = "The picks couldn't be saved.",
+	.add_row = "+ Add code",
+	.hint_add = "add",
+	.hint_edit = "edit",
+	.hint_fill = "fill in",
+	.menu_edit = "Edit code",
+	.menu_delete = "Delete",
+	.delete_text = "It goes from the cheat file.",
+	.delete_button = "Delete",
+	.name_title = "Name the code",
+	.edit_failed = {"The card didn't take the code.", "A cheat file holds 1024 cheats at most.",
+			"The cheat file would be too big.", "That code can't go in a cheat file."},
+	.too_long = "Too long to edit here: 32 lines at most.",
+};
+
+static const struct lang_keypad en_keypad = {
+	.title_add = "Add code",
+	.title_edit = "Edit code",
+	.hint_delete = "delete",
+	.hint_format = "format",
+	.hint_save = "save",
+	.key_line = "Line",
+	.key_delete = "Del",
+	.key_cancel = "Cancel",
+	.key_save = "Save",
+	.format_label = "Format",
+	.formats = {"none yet", "GameShark v1", "GameShark v1 raw", "Action Replay v3", "Action Replay v3 raw",
+		    "CodeBreaker", "VBA"},
+	.tags = {"...", "GS", "GS raw", "AR", "AR raw", "CB", "VBA"},
+	.status = {"Type 8+4 or 16 digits, or address:value", "", "", "", "",
+		   "Reads off the GBA's memory: another format?", "A master code: not needed here",
+		   "Too much for the cheats' budget", "Can't run on this cart"},
+	.verbs = {"Write", "Write via pointer", "Add", "OR", "AND", "If", "If", "If", "If", "If", "If", "If", "If", "",
+		  "Never", "Patch ROM:", "Slowdown, does nothing"},
+	.button = "While R and SELECT are held",
+	.cant_save = "Not saved: the code doesn't read yet",
+	.discard = "Discard this code?",
+	.discard_button = "Discard",
 };
 
 static const struct lang_gsaves en_gsaves = {
@@ -853,6 +890,7 @@ void LoadEnglish(void)
 	gl_sd_no_save = (char *)en_sd_no_save;
 	gl_games = &en_games;
 	gl_cheats = &en_cheats;
+	gl_keypad = &en_keypad;
 	gl_rename = &en_rename;
 	gl_saves = &en_saves;
 	gl_slots = &en_slots;

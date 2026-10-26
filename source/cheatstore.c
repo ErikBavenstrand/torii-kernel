@@ -43,29 +43,52 @@ int cheatstore_path(char *out, u32 size, const char *rom_path)
 	return (int)n;
 }
 
-int cheatstore_read(const char *rom_path)
+// 1 if either copy of the cheat file at path (cheatstore()->path) is on the
+// card, though safefile_open took neither: too big, say
+static int any_copy(char *path)
+{
+	FILINFO info;
+	u32 len = (u32)strlen(path);
+	int there = f_stat(path, &info) == FR_OK;
+	memcpy(path + len, ".bak", 5);  // cheatstore_path leaves room for it
+	there |= f_stat(path, &info) == FR_OK;
+	path[len] = 0;
+	return there;
+}
+
+int cheatstore_open(const char *rom_path)
 {
 	struct cheatstore *cs = cheatstore();
 	cs->file.count = 0;
 	cs->work.next = 0;
 	if (cheatstore_path(cs->path, sizeof(cs->path), rom_path) < 0) {
 		tlog("cheats: %s: its cheat file's path is too long", rom_path);
-		return 0;
+		return CHEATSTORE_NONE;
 	}
-	if (safefile_open(cs->path, CHEATSTORE_FILE_MAX) == SAFEFILE_NONE)
-		return 0;
+	if (safefile_open(cs->path, CHEATSTORE_FILE_MAX) == SAFEFILE_NONE) {
+		if (any_copy(cs->path)) {
+			tlog("cheats: %s is there but can't be read (over %u bytes?), left alone", cs->path,
+			     CHEATFILE_TEXT_MAX);
+			return CHEATSTORE_NONE;
+		}
+		// None yet: an empty file, made on the first write
+		cheatfile_parse(&cs->file, (const char *)cs->text, 0, cs->cheats, CHEATFILE_MAX);
+		cheatfile_begin(&cs->work);
+		return CHEATSTORE_NEW;
+	}
 	int len = safefile_read(cs->text, sizeof(cs->text));
+	int failed = safefile_failed();
 	safefile_close();
-	if (len < 0) {
+	if (len < 0 || failed) {
 		tlog_error("cheats: %s can't be read", cs->path);
-		return 0;
+		return CHEATSTORE_NONE;
 	}
 	if ((u32)len > CHEATFILE_TEXT_MAX) {
 		// Its cheats would be read from a cut text, and the picks written
 		// back over the rest: none of it, then
 		tlog("cheats: %s is %lu bytes, over %u: too big, left alone", cs->path, (unsigned long)len,
 		     CHEATFILE_TEXT_MAX);
-		return 0;
+		return CHEATSTORE_NONE;
 	}
 	cheatfile_parse(&cs->file, (const char *)cs->text, (u32)len, cs->cheats, CHEATFILE_MAX);
 	cheatfile_begin(&cs->work);
@@ -73,7 +96,23 @@ int cheatstore_read(const char *rom_path)
 		tlog("cheats: %s: %lu cheats numbered past %u are left out", cs->path, (unsigned long)cs->file.dropped,
 		     CHEATFILE_MAX);
 	tlog_debug("cheats: %s: %lu bytes, %lu cheats", cs->path, (unsigned long)len, (unsigned long)cs->file.count);
-	return cs->file.count != 0;
+	return CHEATSTORE_READ;
+}
+
+int cheatstore_read(const char *rom_path)
+{
+	return cheatstore_open(rom_path) == CHEATSTORE_READ && cheatstore()->file.count != 0;
+}
+
+void cheatstore_decoder_before(u32 i, struct cheat_decoder *out)
+{
+	struct cheatstore *cs = cheatstore();
+	if (cs->work.next != i || i == 0) {
+		cheatfile_begin(&cs->work);
+		while (cs->work.next < i && cheatfile_next(&cs->file, &cs->work) >= 0)
+			;
+	}
+	*out = cs->work.dec;
 }
 
 int cheatstore_decode(u32 budget)
@@ -128,8 +167,7 @@ int cheatstore_write(void)
 	tlog("cheats: %s: %lu picked, %s", cs->path, (unsigned long)cheatfile_picks(&cs->file),
 	     ok ? "written" : "not written");
 	if (ok)
-		for (u32 i = 0; i < cs->file.count; i++)
-			cs->cheats[i].was = cs->cheats[i].picked;
+		cheatfile_written(&cs->file);
 	return ok;
 }
 

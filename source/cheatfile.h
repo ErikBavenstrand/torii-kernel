@@ -83,7 +83,8 @@ struct cheatfile_cheat {
 	u16 cost;            // its cycles a frame, at most (OK only)
 	u16 patches;         // ROM patches once decoded (OK only)
 	u8 picked : 1;       // now
-	u8 was : 1;          // as the file has it
+	u8 was : 1;          // as the text has it (what writing back changes from)
+	u8 saved : 1;        // as the card has it: read, or written since (cheatfile_changed)
 	u8 own : 1;          // cheatN_user = true: typed on the cart, so it may be edited and deleted
 	u8 format : 3;       // cheatN_format's enum cheat_format, CHEAT_FMT_AUTO without one
 };
@@ -164,16 +165,20 @@ u32 cheatfile_why(const struct cheatfile *f, u32 i);
 // A on cheat i: drops it if picked, else picks it if it may be. 1 if its
 // pick changed.
 int cheatfile_toggle(struct cheatfile *f, u32 i);
-// 1 if a pick differs from the file's
+// 1 if a pick differs from the card's (as read, or as last written), or an
+// edit changed the text: the file needs writing
 int cheatfile_changed(const struct cheatfile *f);
 // The picked cheats' count
 u32 cheatfile_picks(const struct cheatfile *f);
 
 // The file with the picks written in, as a safefile_fill: up to max bytes
-// of it from byte pos into buf, 0 at its end. ctx is the cheatfile.
+// of it from byte pos into buf, 0 at its end. ctx is the cheatfile. The
+// text itself stays as read (or edited): the picks are written in each time.
 u32 cheatfile_text(void *ctx, u32 pos, char *buf, u32 max);
 // Its length
 u32 cheatfile_text_len(const struct cheatfile *f);
+// After cheatfile_text was written to the card: the card has the picks
+void cheatfile_written(struct cheatfile *f);
 
 // --- Edits (the code keypad's) ------------------------------------------------------
 //

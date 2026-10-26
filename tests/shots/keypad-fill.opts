@@ -1,0 +1,34 @@
+# The code keypad on Hello's Pick a level, a code with digits to fill in
+# (3300075C+00??): A on its greyed row opens the keypad with the code in,
+# the stand-ins marked and the caret on the first (1); 1 and F typed over
+# them, the code reads (2).
+#! settings 28=1
+# The tests' hook: lists open on their first row (else a list opens on
+# Hello, the game Recent played last)
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-k @8:RIGHT -k @12:- -k @20:RIGHT -k @24:- -k @32:RIGHT -k @36:-
+-k @80:START -k @84:-
+-w "screen ready: game-popup"
+-k @12:DOWN -k @16:- -k @24:DOWN -k @28:-
+-k @48:A -k @52:-
+-w "screen ready: cheats"
+-k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:-
+-k @48:A -k @52:-
+-w "screen ready: keypad"
+-s @4:fill.png
+-k @12:RIGHT -k @16:-
+-k @20:A -k @24:-
+-k @28:DOWN -k @32:-
+-k @36:RIGHT -k @40:-
+-k @44:RIGHT -k @48:-
+-k @52:RIGHT -k @56:-
+-k @60:RIGHT -k @64:-
+-k @68:RIGHT -k @72:-
+-k @76:RIGHT -k @80:-
+-k @84:A -k @88:-
+-s @100:filled.png

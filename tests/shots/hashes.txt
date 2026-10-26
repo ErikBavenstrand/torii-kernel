@@ -339,6 +339,12 @@ info-read/frames 14-14 30A49A89D757BF91
 info-read/frames 15-15 0EB1CADB6D26281C
 info-read/frames 16-16 26D5CBC998640A1D
 info-read/frames 17-22 58C6DE28040EB31D
+keypad/empty 7FD5714D72D4EFEE
+keypad/format 95AB601B14490B28
+keypad/typed 3B61A3A038562A48
+keypad/unreadable AAE970C2329D69D9
+keypad-fill/fill B4C7D146C4CF366C
+keypad-fill/filled AB00C9E777DBCE79
 nav-push-fail/error 8DA1D73368B07BC5
 nav-push-fail/page 7857C96979E6C7B0
 nor-dark/closed 0A43620B78FFDEF1

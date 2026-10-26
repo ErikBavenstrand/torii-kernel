@@ -1496,12 +1496,18 @@ static void popup_run(u32 i)
 	popup_add(LANG_POP_PLAY, nboots > 1 ? gl_games->boots[boots[0]] : 0, nboots > 1 ? UI_POP_STEP : 0);
 	if (game_saves_probe(games.pick))
 		popup_add(LANG_POP_SAVES, 0, 0);
-	if (gba && cheatstore_read(games.pick)) {
-		// Its count is what the cheat screen lists, master codes left out:
-		// a file too long to decode now gets it once the screen has
-		u32 start = cycles_now();
-		s32 listed = cheatstore_listed(GAMES_CHEATS_CYCLES);
-		tlog_debug("cheats: popup: %ld listed, %lu cycles", (long)listed, (unsigned long)cycles_since(start));
+	if (gba) {
+		// Every GBA game on the card has Cheats, for the code keypad's Add
+		// code. Its count is what the cheat screen lists, master codes left
+		// out: a file too long to decode now gets it once the screen has;
+		// a game with no cheat file, none
+		s32 listed = -1;
+		if (cheatstore_read(games.pick)) {
+			u32 start = cycles_now();
+			listed = cheatstore_listed(GAMES_CHEATS_CYCLES);
+			tlog_debug("cheats: popup: %ld listed, %lu cycles", (long)listed,
+				   (unsigned long)cycles_since(start));
+		}
 		if (listed >= 0)
 			snprintf(games.cheats, sizeof(games.cheats), "%lu", (unsigned long)listed);
 		popup_add(LANG_POP_CHEATS, listed >= 0 ? games.cheats : 0, 0);

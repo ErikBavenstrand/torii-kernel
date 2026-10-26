@@ -1,0 +1,83 @@
+# The code keypad (source/screens/keypad.c) from Hello's cheat screen's
+# + Add code, in the light theme: empty (1); a CodeBreaker line typed,
+# the format detected and what it writes (2); SELECT sets GameShark v1,
+# which the line doesn't read in (3); SELECT round to auto again, Line and
+# three digits of a second line, then L back to the first: the second
+# line isn't a code line's shape (4). Keys from tests/keypad_keys.py.
+#! settings 28=1
+# The tests' hook: lists open on their first row (else a list opens on
+# Hello, the game Recent played last)
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-k @8:RIGHT -k @12:- -k @20:RIGHT -k @24:- -k @32:RIGHT -k @36:-
+-k @80:START -k @84:-
+-w "screen ready: game-popup"
+-k @12:DOWN -k @16:- -k @24:DOWN -k @28:-
+-k @48:A -k @52:-
+-w "screen ready: cheats"
+-k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:DOWN -k @48:- -k @56:DOWN -k @60:-
+-k @72:A -k @76:-
+-w "screen ready: keypad"
+-s @4:empty.png
+-k @12:DOWN -k @16:-
+-k @20:A -k @24:-
+-k @28:UP -k @32:-
+-k @36:RIGHT -k @40:-
+-k @44:RIGHT -k @48:-
+-k @52:A -k @56:-
+-k @60:LEFT -k @64:-
+-k @68:LEFT -k @72:-
+-k @76:A -k @80:-
+-k @84:A -k @88:-
+-k @92:RIGHT -k @96:-
+-k @100:A -k @104:-
+-k @108:RIGHT -k @112:-
+-k @116:A -k @120:-
+-k @124:RIGHT -k @128:-
+-k @132:A -k @136:-
+-k @140:RIGHT -k @144:-
+-k @148:A -k @152:-
+-k @156:LEFT -k @160:-
+-k @164:LEFT -k @168:-
+-k @172:LEFT -k @176:-
+-k @180:LEFT -k @184:-
+-k @188:A -k @192:-
+-k @196:A -k @200:-
+-k @204:RIGHT -k @208:-
+-k @212:RIGHT -k @216:-
+-k @220:RIGHT -k @224:-
+-k @228:RIGHT -k @232:-
+-k @236:RIGHT -k @240:-
+-k @244:RIGHT -k @248:-
+-k @252:A -k @256:-
+-k @260:LEFT -k @264:-
+-k @268:LEFT -k @272:-
+-k @276:LEFT -k @280:-
+-k @284:A -k @288:-
+-s @300:typed.png
+-k @308:SELECT -k @312:-
+-s @324:format.png
+-k @332:SELECT -k @336:-
+-k @340:SELECT -k @344:-
+-k @348:SELECT -k @352:-
+-k @356:SELECT -k @360:-
+-k @364:SELECT -k @368:-
+-k @372:SELECT -k @376:-
+-k @380:LEFT -k @384:-
+-k @388:LEFT -k @392:-
+-k @396:DOWN -k @400:-
+-k @404:DOWN -k @408:-
+-k @412:A -k @416:-
+-k @420:UP -k @424:-
+-k @428:UP -k @432:-
+-k @436:A -k @440:-
+-k @444:RIGHT -k @448:-
+-k @452:A -k @456:-
+-k @460:RIGHT -k @464:-
+-k @468:A -k @472:-
+-k @476:L -k @480:-
+-s @492:unreadable.png
