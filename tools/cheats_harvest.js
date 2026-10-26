@@ -230,7 +230,7 @@
     const e = known[crc];
     if (stopped || !e || cached.has(crc)) return;
     cached.add(crc);
-    if (!e.codes) return; // nothing to export
+    if (e.codes === 0) return; // nothing to export
     await pace(`Export ${e.title} ${e.name}`);
     if (stopped) return;
     show(`Exporting ${crc}`, `${e.title} ${e.name}`);
@@ -270,6 +270,13 @@
   }
 
   async function run() {
+    // Dumps given with their game ID (--only CRC=ID): no need to find them
+    for (const w of wanted.values()) {
+      if (w.id && !known[w.crc]) {
+        known[w.crc] = { crc: w.crc, id: w.id, name: "", title: "", serial: "", size: "", codes: null };
+        pending.index[w.crc] = known[w.crc];
+      }
+    }
     // Dumps the cached index already lists
     for (const crc of wanted.keys()) if (known[crc]) await exportDump(crc);
     // The pages still needed: all of them while a wanted CRC is unknown

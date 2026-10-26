@@ -28,7 +28,9 @@ Cloudflare check, say). Meanwhile this tool watches your downloads folder
 dist/cheats/gamehacking (index.json and <CRC>.cheats); Ctrl-C stops waiting,
 and what was imported stays. --import FILE... imports bundles by hand.
 Without --gamehacking only that cache is used. --only CRC,... limits the
-run to those CRCs (on the card or not, for fetching).
+run to those CRCs (on the card or not, for fetching); CRC=ID, with the
+dump's GameHacking game ID (gamehacking.org/game/ID), exports it at once
+without crawling the index for it.
 
 Writing a game's file, /torii/cheats/<rom path without extension>.cht:
 
@@ -866,7 +868,7 @@ class Skip:
 def gh_source(cache, index, crc, suffix=""):
     """The converted cheats of a cached export, or a Skip."""
     e = index.get(crc)
-    if e is not None and not e.get("codes"):
+    if e is not None and e.get("codes") == 0:
         return Skip("no cheats on GameHacking", f"{crc_hex(crc)} lists no codes")
     path = export_path(cache, crc)
     if not path.is_file():
@@ -879,7 +881,9 @@ def gh_source(cache, index, crc, suffix=""):
         )
     gid = e.get("id") if e else None
     where = GAME_URL.format(gid) if gid else "GameHacking.org"
-    name = f"{e.get('title')} {e.get('name')}".strip() if e else crc_hex(crc)
+    name = (
+        f"{e.get('title') or ''} {e.get('name') or ''}".strip() if e else ""
+    ) or crc_hex(crc)
     return Source(
         cheats,
         dropped,
@@ -1038,31 +1042,37 @@ def write_game(sd, game, src, dry_run):
 # --- Fetching (in the user's browser) --------------------------------------------------------
 
 
-def wanted(games, extra_crcs, cache, index, refresh):
+def wanted(games, extra_crcs, cache, index, refresh, ids=None):
     """The harvester's wanted dumps, [{crc, code, version}]: each game's own
     CRC, or for a romhack (a CRC the complete index lacks) its base dump,
-    less what's cached, what lists no codes, and custom files."""
+    less what's cached, what lists no codes, and custom files. ids: {crc:
+    GameHacking game ID} given by hand (--only CRC=ID), so the harvester
+    exports those without looking for them in the index."""
     out = {}
+    ids = ids or {}
 
     def want(crc, code=None, version=0):
         if refresh or not export_path(cache, crc).is_file():
-            out.setdefault(crc, {"crc": crc_hex(crc), "code": code, "version": version})
+            w = {"crc": crc_hex(crc), "code": code, "version": version}
+            if crc in ids:
+                w["id"] = ids[crc]
+            out.setdefault(crc, w)
 
     for g in games:
         if custom_path(cache, g.crc).is_file():
             continue
         e = index.get(g.crc)
         if e is not None:
-            if e.get("codes") or refresh:
+            if e.get("codes") != 0 or refresh:
                 want(g.crc)
         elif not index.complete() or refresh:
             want(g.crc, g.code, g.version)
         elif g.code:
             bases = base_candidates(index.entries, g.code, g.version)
-            if len(bases) == 1 and index.entries[bases[0]].get("codes"):
+            if len(bases) == 1 and index.entries[bases[0]].get("codes") != 0:
                 want(int(bases[0], 16))
     for crc in extra_crcs:
-        if index.get(crc) is None or index.get(crc).get("codes") or refresh:
+        if index.get(crc) is None or index.get(crc).get("codes") != 0 or refresh:
             want(crc)
     return list(out.values())
 
@@ -1110,7 +1120,9 @@ def open_url(url):
 
 
 def fetch(games, args, index):
-    want = wanted(games, args.only_extra, args.cache, index, args.refresh)
+    want = wanted(
+        games, args.only_extra, args.cache, index, args.refresh, args.only_ids
+    )
     if not want:
         print("GameHacking.org: nothing to fetch, every game's export is cached")
         return
@@ -1162,6 +1174,24 @@ LABELS = (
 )
 
 
+def parse_only(text):
+    """--only's CRCs, each CRC or CRC=ID (a GameHacking game ID, the number
+    in its /game/ID address): (set of CRCs or None, {crc: ID})."""
+    if not text:
+        return None, {}
+    crcs, ids = set(), {}
+    for item in text.split(","):
+        crc, _, gid = item.strip().partition("=")
+        if not crc:
+            continue
+        crcs.add(parse_crc(crc))
+        if gid:
+            if not gid.strip().isdigit():
+                raise CheatsError(f"{item!r}: the game ID after = is a number")
+            ids[parse_crc(crc)] = int(gid)
+    return crcs, ids
+
+
 def run(args):
     sd = Path(args.sd_path)
     if not sd.is_dir():
@@ -1169,9 +1199,7 @@ def run(args):
             f"{sd} isn't a folder: give the card's folder, e.g. /Volumes/OMEGA"
         )
     args.cache = Path(args.cache)
-    only = (
-        {parse_crc(c) for c in args.only.split(",") if c.strip()} if args.only else None
-    )
+    only, args.only_ids = parse_only(args.only)
     index = Index(args.cache)
     for f in args.import_ or []:
         bundle, got = import_bundle(f, args.cache, index)
@@ -1243,8 +1271,9 @@ def main(argv):
     )
     p.add_argument(
         "--only",
-        metavar="CRC,...",
-        help="only these CRC32s (on the card, or any to fetch)",
+        metavar="CRC[=ID],...",
+        help="only these CRC32s (on the card, or any to fetch); =ID gives the GameHacking "
+        "game ID (gamehacking.org/game/ID), so the harvester needn't search the index",
     )
     p.add_argument(
         "--base-game",

@@ -844,6 +844,19 @@ class Fetching(unittest.TestCase):
                 {"crc": "12345678", "code": None, "version": 0},
             ],
         )
+        # --only CRC=ID: the game ID goes to the harvester
+        self.assertEqual(
+            cheats.parse_only("dd88761c=5633, 12345678"),
+            ({0xDD88761C, 0x12345678}, {0xDD88761C: 5633}),
+        )
+        with self.assertRaises(cheats.CheatsError):
+            cheats.parse_only("DD88761C=x")
+        self.assertEqual(
+            cheats.wanted(
+                [], [0xDD88761C], self.cache, index, False, {0xDD88761C: 5633}
+            ),
+            [{"crc": "DD88761C", "code": None, "version": 0, "id": 5633}],
+        )
         # An incomplete index: the hack's own CRC, with its header for the
         # harvester to find the base by
         index.pages = {0}
