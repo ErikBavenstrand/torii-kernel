@@ -46,10 +46,11 @@ int cheatstore_write(void);
 // Deletes the game's cheat file (both copies); 1 if none is left
 int cheatstore_delete(const char *rom_path);
 
-// A launch of the GBA game at rom_path: its picked cheats' byte writes into
-// pCHEAT (gl_cheat_count), the cheats in file order, as many as fit
-// CHEAT_MAX (a cheat that doesn't fit is left out whole); gl_cheat_patches
-// gets their ROM patches' count. With psram_bytes, the game is in PSRAM
+// A launch of the GBA game at rom_path: its picked cheats into the
+// interpreter's table (gl_cheat_table, cheat.h), in file order, as many as fit
+// its budget (a cheat that doesn't fit is left out whole); gl_cheat_count
+// gets the cheats that run in game and gl_cheat_patches their ROM patches'
+// count. With psram_bytes, the game is in PSRAM
 // (that many bytes) and those ROM patches are written into it. A game
 // without a cheat file, or with none picked, gets none.
 void cheatstore_launch(const char *rom_path, u32 psram_bytes);

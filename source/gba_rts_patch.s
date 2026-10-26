@@ -9,9 +9,7 @@
 	@;.global  RTS_Wakeup_key
 	.global	 RTS_switch
 	.global	 Debug_switch
-	.global	 Cheat_count
-	.global	 CHEAT
-	.global  no_CHEAT_end
+	.global	 Cheat_switch
 	@;.global  ASCII
 	
 REG_BASE		= 0x4000000
@@ -134,25 +132,30 @@ check_sleep:
 	
 	@;check cheat. Torii: the word at CheatONOFF is 1 for CHEAT OFF, anything
 	@;else on: the BIOS's soft reset clears it, so a game starts with its
-	@;picked cheats running (v0.7); the in-game menu's CHEAT OFF stops them
-	adrl 		r2,CheatONOFF
-	ldr 		r2,[r2]
-	ldr 		r2,[r2] @	
-	cmp 		r2,#1
-	beq 		nocheat
-	stmfd   SP!, {r4-r6}	
-	adrl 		r5,CHEAT
-	adrl		r6,Cheat_count
-	ldr			r2,[r6]
-cheat_loop:
+	@;picked cheats running (v0.7); the in-game menu's CHEAT OFF stops them.
+	@;They run once a frame, on the VBlank IRQ (not the keypad's), through
+	@;the interpreter (cheatrun.s) that Cheat_switch says is at that offset
+	@;from RTS_ReplaceIRQ_start: 0, no cheats.
+	adrl		r2,Cheat_switch
+	ldr			r2,[r2]
 	cmp			r2,#0
-	beq			cheat_loop_end	
-	ldmia   r5!,{r3-r4}
-	strb		r4,[r3]
-	sub 		r2,#0x01
-	b				cheat_loop
-cheat_loop_end:
-	ldmfd   SP!, {r4-r6}
+	beq			nocheat
+	ldr			r1,[r0,#0x200]
+	and			r1,r1,r1,lsr #16	@;IE & IF
+	tst			r1,#1
+	beq			nocheat
+	adrl 		r3,CheatONOFF
+	ldr 		r3,[r3]
+	ldr 		r3,[r3]
+	cmp 		r3,#1
+	beq 		nocheat
+	adrl		r3,RTS_ReplaceIRQ_start
+	add			r3,r3,r2
+	stmfd		sp!,{lr}
+	mov			lr,pc
+	mov			pc,r3
+	ldmfd		sp!,{lr}
+	mov			r0,#0x4000000
 nocheat:
 	ldr 		pc,[r0,#-(0x04000000-0x03FFFFF4)] @;to normal IRQ routine									
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -574,7 +577,7 @@ new_line:
 @;has none). RESET SAVE LOAD, then CHEATON CHEATOFF with cheats, then
 @;DEBUG with logging on (Debug_switch). Uses r2.
 menu_lines:
-	adrl	r2,Cheat_count
+	adrl	r2,Cheat_switch
 	ldr		r2,[r2]
 	cmp		r2,#0
 	movne	r1,#5
@@ -1151,17 +1154,14 @@ RTS_switch:
 	.word 0x00000000
 Debug_switch:		@;Torii: DEBUG's code, from RTS_ReplaceIRQ_start; 0: no DEBUG
 	.word 0x00000000
-Cheat_count:
-	.word 0x00000000	
-no_CHEAT_end:
-CHEAT:
-	.space 0x400
+Cheat_switch:		@;Torii: the cheat interpreter, from RTS_ReplaceIRQ_start; 0: no cheats
+	.word 0x00000000
 	.align
 RTS_ReplaceIRQ_end:
 
 @;------------------------------------------------------
 @;Torii: the in-game menu's DEBUG entry, appended to a game's patch after
-@;its cheat table when LOGGING is on (Patch_RTS_Cheat in GBApatch.c). It
+@;its cheat table (or the menu, without cheats) when LOGGING is on (Patch_RTS_Cheat in GBApatch.c). It
 @;writes the game's state to cart RAM, page 0xF0 at 0x1000, for the
 @;kernel's next boot to log: struct cartlog_snapshot in source/cartlog.c
 @;has the layout. The magic goes last, so a write cut off counts as none.

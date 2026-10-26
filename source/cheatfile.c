@@ -117,7 +117,7 @@ void cheatfile_parse(struct cheatfile *f, const char *text, u32 len, struct chea
 	f->cheats = cheats;
 	for (u32 i = 0; i < max; i++)
 		cheats[i] = (struct cheatfile_cheat){
-			CHEATFILE_NONE, 0, CHEATFILE_NONE, 0, CHEATFILE_NONE, 0, CHEATFILE_NEW, (u16)i, 0, 0, 0, 0};
+			CHEATFILE_NONE, 0, CHEATFILE_NONE, 0, CHEATFILE_NONE, 0, CHEATFILE_NEW, (u16)i, 0, 0, 0, 0, 0};
 	const char *p = text, *end = text + len;
 	if (len >= 3 && !memcmp(text, "\xEF\xBB\xBF", 3))
 		p += 3;  // a BOM from a Windows editor: kept, but not part of the first key
@@ -144,13 +144,13 @@ void cheatfile_begin(struct cheatfile_work *w)
 {
 	cheat_decoder_init(&w->dec);
 	w->next = 0;
-	w->n_writes = w->n_patches = 0;
+	w->n_prog = w->n_patches = w->cost = 0;
 }
 
 static u8 status_of(struct cheatfile_work *w, const char *code, u32 len)
 {
 	u32 n_ops = 0;
-	w->n_writes = w->n_patches = 0;
+	w->n_prog = w->n_patches = w->cost = 0;
 	switch (cheat_decode(&w->dec, code, len, w->ops, CHEATFILE_OPS_MAX, &n_ops)) {
 	case CHEAT_OK:
 		break;
@@ -163,14 +163,12 @@ static u8 status_of(struct cheatfile_work *w, const char *code, u32 len)
 	default:
 		return CHEATFILE_UNREADABLE;
 	}
-	u8 lowered = cheat_lower(w->ops, n_ops, w->writes, CHEATFILE_WRITES_MAX, &w->n_writes, w->patches,
+	u8 lowered = cheat_lower(w->ops, n_ops, w->prog, CHEATFILE_PROG_MAX, &w->n_prog, &w->cost, w->patches,
 				 CHEATFILE_PATCHES_MAX, &w->n_patches);
 	switch (lowered) {
 	case CHEAT_LOWER_OK:
 		return CHEATFILE_OK;
-	case CHEAT_LOWER_NEEDS_INTERPRETER:
-		return CHEATFILE_V08;
-	case CHEAT_LOWER_TOO_MANY_WRITES:
+	case CHEAT_LOWER_TOO_BIG:
 	case CHEAT_LOWER_TOO_MANY_PATCHES:
 		return CHEATFILE_BIG;
 	default:
@@ -184,15 +182,20 @@ s32 cheatfile_next(struct cheatfile *f, struct cheatfile_work *w)
 		return -1;
 	u32 i = w->next++;
 	struct cheatfile_cheat *c = &f->cheats[i];
-	if (c->status == CHEATFILE_OK && c->picked)
-		f->writes -= c->writes;  // decoded again
+	if (c->status == CHEATFILE_OK && c->picked) {
+		f->bytes -= c->bytes;  // decoded again
+		f->cost -= c->cost;
+	}
 	c->status = status_of(w, f->text + c->code, c->code_len);
 	if (c->status != CHEATFILE_OK)
-		w->n_writes = w->n_patches = 0;
-	c->writes = (u16)w->n_writes;
+		w->n_prog = w->n_patches = w->cost = 0;
+	c->bytes = (u16)(w->n_prog * 4);
+	c->cost = (u16)w->cost;
 	c->patches = (u16)w->n_patches;
-	if (c->status == CHEATFILE_OK && c->picked)
-		f->writes += c->writes;
+	if (c->status == CHEATFILE_OK && c->picked) {
+		f->bytes += c->bytes;
+		f->cost += c->cost;
+	}
 	return (s32)i;
 }
 
@@ -205,9 +208,9 @@ u32 cheatfile_why(const struct cheatfile *f, u32 i)
 		return CHEATFILE_PICKABLE;
 	switch (c->status) {
 	case CHEATFILE_OK:
-		return f->writes + c->writes > CHEATFILE_WRITES_MAX ? CHEATFILE_WHY_FULL : CHEATFILE_PICKABLE;
-	case CHEATFILE_V08:
-		return CHEATFILE_WHY_V08;
+		return f->bytes + c->bytes > CHEATFILE_BYTES_MAX || f->cost + c->cost > CHEATFILE_CYCLES_MAX
+			       ? CHEATFILE_WHY_FULL
+			       : CHEATFILE_PICKABLE;
 	case CHEATFILE_BIG:
 		return CHEATFILE_WHY_FULL;
 	case CHEATFILE_PLACEHOLDER:
@@ -224,10 +227,13 @@ int cheatfile_toggle(struct cheatfile *f, u32 i)
 	struct cheatfile_cheat *c = &f->cheats[i];
 	c->picked = !c->picked;
 	if (c->status == CHEATFILE_OK) {
-		if (c->picked)
-			f->writes += c->writes;
-		else
-			f->writes -= c->writes;
+		if (c->picked) {
+			f->bytes += c->bytes;
+			f->cost += c->cost;
+		} else {
+			f->bytes -= c->bytes;
+			f->cost -= c->cost;
+		}
 	}
 	return 1;
 }

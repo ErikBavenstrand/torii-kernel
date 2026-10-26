@@ -28,9 +28,12 @@ extern void RTS_switch(void);
 extern void Debug_switch(void);
 extern void Debug_blob_start(void);
 extern void Debug_blob_end(void);
-extern void Cheat_count(void);
-extern void CHEAT(void);
-extern void no_CHEAT_end(void);
+extern void Cheat_switch(void);
+// The cheat interpreter (cheatrun.s), copied after the menu's code; the
+// table follows it
+extern void Cheat_blob_start(void);
+extern void Cheat_blob_end(void);
+void Cheat_run(const u32 *table);
 
 extern void Fire_Emblem_0378_patch_start(void);
 extern void Fire_Emblem_0378_patch_end(void);
@@ -48,7 +51,7 @@ extern void Fire_Emblem_iQue_patch_end(void);
 extern u32 gl_cheat_count;
 
 // Bytes kept free at the ROM's end for the in-game menu's code with
-// SAVESTATE on and no cheats (RTS_ReplaceIRQ_start to no_CHEAT_end); see
+// SAVESTATE on and no cheats (RTS_ReplaceIRQ_start to RTS_ReplaceIRQ_end); see
 // SetTrimSize.
 #define RTS_PATCH_LENGTH 0x1000
 

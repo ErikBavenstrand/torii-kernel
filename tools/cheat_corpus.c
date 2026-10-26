@@ -13,19 +13,19 @@
 #include "../source/cheatcode.h"
 
 #define OPS_MAX 4096
-#define WRITES_MAX 4096
+#define PROG_MAX 0x4000  // words
 #define PATCHES_MAX 1024
 
 static struct cheat_op ops[OPS_MAX];
-static struct cheat_write writes[WRITES_MAX];
+static u32 prog[PROG_MAX];
 static struct cheat_patch patches[PATCHES_MAX];
 
 static const char *const status_names[] = {"OK", "MASTER_ONLY", "PLACEHOLDER", "UNREADABLE", "TOO_BIG"};
-static const char *const lower_names[] = {"LOWERABLE", "NEEDS_INTERPRETER", "TOO_MANY_WRITES", "TOO_MANY_PATCHES",
-					  "BAD_ADDRESS"};
+static const char *const lower_names[] = {"LOWERABLE", "TOO_BIG", "TOO_MANY_PATCHES", "BAD_ADDRESS"};
 static const char *const format_names[] = {"-", "GSAv1", "GSAv1-raw", "PARv3", "PARv3-raw", "CodeBreaker", "VBA"};
 
-static unsigned long by_status[5], by_lower[5], by_format[7], lowered_writes, lowered_patches, alone_reads;
+static unsigned long by_status[5], by_lower[4], by_format[7], lowered_bytes, lowered_cycles, lowered_patches,
+	alone_reads;
 
 static int is_cond(u8 type)
 {
@@ -83,18 +83,19 @@ static void dump(u32 n_ops)
 static void decode(struct cheat_decoder *d, const char *file, unsigned long n, const char *text, u32 len)
 {
 	char *code = malloc(len ? len : 1);
-	u32 n_ops, n_writes = 0, n_patches = 0;
+	u32 n_ops, n_prog = 0, cost = 0, n_patches = 0;
 	memcpy(code, text, len);
 	u8 status = cheat_decode(d, code, len, ops, OPS_MAX, &n_ops);
 	free(code);
 	++by_status[status];
 	printf("%s\t%lu\t%s\t", file, n, status_names[status]);
 	if (status == CHEAT_OK) {
-		u8 lower = cheat_lower(ops, n_ops, writes, WRITES_MAX, &n_writes, patches, PATCHES_MAX, &n_patches);
+		u8 lower = cheat_lower(ops, n_ops, prog, PROG_MAX, &n_prog, &cost, patches, PATCHES_MAX, &n_patches);
 		++by_lower[lower];
 		++by_format[d->last];
 		if (lower == CHEAT_LOWER_OK) {
-			lowered_writes += n_writes;
+			lowered_bytes += n_prog * 4;
+			lowered_cycles += cost;
 			lowered_patches += n_patches;
 		}
 		printf("%s\t%s%s\t", lower_names[lower], format_names[d->last], d->last_alone ? "-alone" : "");
@@ -152,9 +153,10 @@ int main(int argc, char **argv)
 	for (i = 0; i < 5; ++i)
 		fprintf(stderr, "  %-12s %5lu\n", status_names[i], by_status[i]);
 	fprintf(stderr, "OK cheats by lowering:\n");
-	for (i = 0; i < 5; ++i)
+	for (i = 0; i < 4; ++i)
 		fprintf(stderr, "  %-18s %5lu\n", lower_names[i], by_lower[i]);
-	fprintf(stderr, "  (lowered: %lu byte writes, %lu ROM patches)\n", lowered_writes, lowered_patches);
+	fprintf(stderr, "  (lowered: %lu table bytes, %lu cycles, %lu ROM patches)\n", lowered_bytes, lowered_cycles,
+		lowered_patches);
 	fprintf(stderr, "OK cheats by format:\n");
 	for (i = 1; i < 7; ++i)
 		fprintf(stderr, "  %-12s %5lu\n", format_names[i], by_format[i]);

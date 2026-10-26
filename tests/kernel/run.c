@@ -22,6 +22,8 @@ static const struct {
 	{"file_type", test_file_type},
 	{"file_type_short_names", test_file_type_short_names},
 	{"cheat_cap", test_cheat_cap},
+	{"cheatrun_matches_mgba", test_cheatrun_matches_mgba},
+	{"cheatrun_cycles", test_cheatrun_cycles},
 	{"game_hardware", test_game_hardware},
 	{"clock_and_rumble_are_separate", test_clock_and_rumble_are_separate},
 	{"settings_staged_until_changed", test_settings_staged_until_changed},

@@ -710,7 +710,7 @@ void test_cheatcode_detect(void)
 
 // ------------------------------------------------------------------------
 
-static struct cheat_write writes[16];
+static u32 prog[64];
 static struct cheat_patch patches[8];
 
 static struct cheat_op op(u8 type, u8 width, u32 address, u32 value, u32 count)
@@ -721,52 +721,85 @@ static struct cheat_op op(u8 type, u8 width, u32 address, u32 value, u32 count)
 
 void test_cheatcode_lower(void)
 {
-	struct cheat_op in[4];
-	u32 nw = 0, np = 0;
+	struct cheat_op in[6];
+	u32 nw = 0, np = 0, cost = 0, i;
 
-	// 16- and 32-bit writes split little-endian
+	// A plain cheat: writes at their widths, in order; a row of one width is
+	// a run, a lone one a write of its own
 	in[0] = op(CHEAT_OP_WRITE, 2, 0x02000010, 0xBEEF, 1);
-	in[1] = op(CHEAT_OP_WRITE, 4, 0x03000020, 0x12345678, 1);
-	CHECK_EQ(cheat_lower(in, 2, writes, 16, &nw, patches, 8, &np), CHEAT_LOWER_OK);
-	CHECK_EQ(nw, 6);
+	in[1] = op(CHEAT_OP_WRITE, 1, 0x05000001, 0x12, 1);  // a palette byte stays a byte
+	in[2] = op(CHEAT_OP_WRITE, 1, 0x05000002, 0x34, 1);
+	in[3] = op(CHEAT_OP_WRITE, 4, 0x03000020, 0x12345678, 1);
+	CHECK_EQ(cheat_lower(in, 4, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_OK);
 	CHECK_EQ(np, 0);
-	CHECK_EQ(writes[0].address, 0x02000010);
-	CHECK_EQ(writes[0].value, 0xEF);
-	CHECK_EQ(writes[1].value, 0xBE);
-	CHECK_EQ(writes[2].address, 0x03000020);
-	CHECK_EQ(writes[2].value, 0x78);
-	CHECK_EQ(writes[5].address, 0x03000023);
-	CHECK_EQ(writes[5].value, 0x12);
+	CHECK_EQ(nw, 10);
+	CHECK_EQ(prog[0], 3 | CHEAT_PROG_PLAIN | 36u << 16);
+	CHECK_EQ(prog[1], 0x12000010);
+	CHECK_EQ(prog[2], 0xBEEF);
+	CHECK_EQ(prog[3], 0x60000002);  // a run of two bytes
+	CHECK_EQ(prog[4], 0x05000001);
+	CHECK_EQ(prog[5], 0x12);
+	CHECK_EQ(prog[7], 0x34);
+	CHECK_EQ(prog[8], 0x23000020);
+	CHECK_EQ(prog[9], 0x12345678);
+	CHECK_EQ(cost, CHEAT_COST_CHEAT + 2 * CHEAT_COST_SINGLE + CHEAT_COST_RUN + 2 * CHEAT_COST_RUN_WRITE);
 
-	// Fills expand, appended after what's there; IO keeps its address
+	// A fill and a slide: one op with its count and steps
 	in[0] = op(CHEAT_OP_WRITE, 1, 0x02000100, 0x10, 3);
 	in[0].addr_step = 2;
 	in[0].value_step = 1;
-	in[1] = op(CHEAT_OP_WRITE, 1, 0x04000200, 0x80, 1);
-	CHECK_EQ(cheat_lower(in, 2, writes, 16, &nw, patches, 8, &np), CHEAT_LOWER_OK);
-	CHECK_EQ(nw, 10);
-	CHECK_EQ(writes[6].address, 0x02000100);
-	CHECK_EQ(writes[8].address, 0x02000104);
-	CHECK_EQ(writes[8].value, 0x12);
-	CHECK_EQ(writes[9].address, 0x04000200);
+	in[1] = op(CHEAT_OP_WRITE, 2, 0x04000200, 0x80, 4);  // IO keeps its address; no value step
+	CHECK_EQ(cheat_lower(in, 2, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_OK);
+	CHECK_EQ(nw, 1 + 5 + 4);
+	CHECK_EQ(prog[1], 0x52000100);  // five words
+	CHECK_EQ(prog[2], CHEAT_PROG_WRITE | 0 << 4 | 3u << 16);
+	CHECK_EQ(prog[3], 0x10);
+	CHECK_EQ(prog[4], 2);
+	CHECK_EQ(prog[5], 1);
+	CHECK_EQ(prog[6], 0x44000200);  // four
+	CHECK_EQ(prog[7], CHEAT_PROG_WRITE | 1 << 4 | 4u << 16);
+	CHECK_EQ(prog[9], 2);
+	CHECK_EQ(cost, CHEAT_COST_CHEAT + 2 * CHEAT_COST_EXT + 2 * CHEAT_COST_FILL + 3 * CHEAT_COST_FILL_SAME);
 
-	// Too many: nothing is appended
-	in[0] = op(CHEAT_OP_WRITE, 4, 0x02000000, 0, 2);
-	CHECK_EQ(cheat_lower(in, 1, writes, 16, &nw, patches, 8, &np), CHEAT_LOWER_TOO_MANY_WRITES);
-	CHECK_EQ(nw, 10);
-	in[0] = op(CHEAT_OP_WRITE, 1, 0x02000000, 0, 0xFFFFFFFF);  // a huge fill stops early
-	in[0].addr_step = 0;
-	CHECK_EQ(cheat_lower(in, 1, writes, 16, &nw, patches, 8, &np), CHEAT_LOWER_TOO_MANY_WRITES);
-	CHECK_EQ(nw, 10);
+	// Conditionals: every op in its place (a ROM patch as nothing), the
+	// button a key test, an ELSE in a fourth word
+	in[0] = op(CHEAT_OP_IF_EQ, 2, 0x02000000, 0x1234, 2);
+	in[0].else_count = 1;
+	in[1] = op(CHEAT_OP_ROM_PATCH, 2, 0x08000100, 0x4770, 1);
+	in[2] = op(CHEAT_OP_IF_BUTTON, 0, 0, 0, 1);
+	in[3] = op(CHEAT_OP_ADD, 4, 0x03000000, 5, 1);
+	in[4] = op(CHEAT_OP_WRITE_PTR, 1, 0x02000040, 7, 1);
+	in[4].addr_step = 0x10;
+	CHECK_EQ(cheat_lower(in, 5, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_OK);
+	CHECK_EQ(np, 1);
+	CHECK_EQ(patches[0].offset, 0x100);
+	CHECK_EQ(prog[0] & 0xFFFF, 5);  // indexed
+	CHECK_EQ(prog[1], 0x42000000);
+	CHECK_EQ(prog[2], CHEAT_PROG_EQ | 1 << 4 | 2u << 16);
+	CHECK_EQ(prog[3], 0x1234);
+	CHECK_EQ(prog[4], 1);
+	CHECK_EQ(prog[5], 0x30000000);  // the patch: nothing
+	CHECK_EQ(prog[6], CHEAT_PROG_NOP);
+	CHECK_EQ(prog[8], 0x30000000 | CHEAT_KEYINPUT);
+	CHECK_EQ(prog[9], CHEAT_PROG_NAND | 1 << 4 | 1u << 16);
+	CHECK_EQ(prog[10], CHEAT_BUTTON_KEYS);
+	CHECK_EQ(prog[11], 0x33000000);  // an add: three words
+	CHECK_EQ(prog[12], CHEAT_PROG_ADD | 2 << 4 | 1u << 16);
+	CHECK_EQ(prog[14], 0x42000040);  // a pointer write keeps its offset
+	CHECK_EQ(prog[17], 0x10);
+	CHECK_EQ(nw, 18);
+	CHECK_EQ(prog[0] >> 16, (nw - 1) * 4);
 
-	// ROM writes and patches become halfword patches with masks
-	nw = 0;
+	// A cheat of ROM patches alone runs nothing in game; ROM writes and
+	// patches become halfword patches with masks
 	in[0] = op(CHEAT_OP_ROM_PATCH, 2, 0x0802468A, 0x4770, 1);
 	in[1] = op(CHEAT_OP_WRITE, 1, 0x08000101, 0xAB, 1);
 	in[2] = op(CHEAT_OP_WRITE, 4, 0x08000200, 0x11223344, 1);
 	in[3] = op(CHEAT_OP_ROM_PATCH, 1, 0x08000300, 0xCD, 1);
-	CHECK_EQ(cheat_lower(in, 4, writes, 16, &nw, patches, 8, &np), CHEAT_LOWER_OK);
+	in[4] = op(CHEAT_OP_SLOWDOWN, 0, 0, 0, 1);
+	CHECK_EQ(cheat_lower(in, 5, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_OK);
 	CHECK_EQ(nw, 0);
+	CHECK_EQ(cost, 0);
 	CHECK_EQ(np, 5);
 	CHECK_EQ(patches[0].offset, 0x2468A);
 	CHECK_EQ(patches[0].value, 0x4770);
@@ -779,18 +812,36 @@ void test_cheatcode_lower(void)
 	CHECK_EQ(patches[3].offset, 0x202);
 	CHECK_EQ(patches[3].value, 0x1122);
 	CHECK_EQ(patches[4].mask, 0x00FF);
-	CHECK_EQ(cheat_lower(in, 4, writes, 16, &nw, patches, 8, &np), CHEAT_LOWER_TOO_MANY_PATCHES);
-	CHECK_EQ(np, 5);
+	CHECK_EQ(cheat_lower(in, 4, prog, 64, &nw, &cost, patches, 4, &np), CHEAT_LOWER_TOO_MANY_PATCHES);
+	CHECK_EQ(np, 0);
 
-	// What needs v0.8's interpreter
-	static const u8 interpreted[] = {CHEAT_OP_WRITE_PTR, CHEAT_OP_ADD,     CHEAT_OP_OR,        CHEAT_OP_AND,
-					 CHEAT_OP_IF_EQ,     CHEAT_OP_IF_NAND, CHEAT_OP_IF_BUTTON, CHEAT_OP_SLOWDOWN};
-	u32 i;
-	for (i = 0; i < sizeof(interpreted); ++i) {
-		in[0] = op(CHEAT_OP_WRITE, 2, 0x02000000, 1, 1);
-		in[1] = op(interpreted[i], 2, 0x02000000, 1, 1);
-		CHECK_EQ(cheat_lower(in, 2, writes, 16, &nw, patches, 8, &np), CHEAT_LOWER_NEEDS_INTERPRETER);
-	}
+	// Too big: the words, a count past 0xFFFF, the cycles
+	in[0] = op(CHEAT_OP_WRITE, 4, 0x02000000, 0, 1);
+	CHECK_EQ(cheat_lower(in, 1, prog, 2, &nw, &cost, patches, 8, &np), CHEAT_LOWER_TOO_BIG);
+	CHECK_EQ(nw, 0);
+	in[0] = op(CHEAT_OP_WRITE, 1, 0x02000000, 0, 0x10000);
+	in[0].addr_step = 0;
+	CHECK_EQ(cheat_lower(in, 1, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_TOO_BIG);
+	in[0].count = 0xFFFF;  // fits the op, not the frame
+	CHECK_EQ(cheat_lower(in, 1, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_TOO_BIG);
+	in[0].count = 500;
+	CHECK_EQ(cheat_lower(in, 1, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_OK);
+	CHECK(cost <= CHEAT_CYCLES_MAX - CHEAT_COST_CALL);
+
+	// Ops of count 0 do nothing: left out of a plain cheat, nothing in a
+	// conditional one
+	in[0] = op(CHEAT_OP_WRITE, 2, 0x02000000, 1, 0);
+	CHECK_EQ(cheat_lower(in, 1, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_OK);
+	CHECK_EQ(nw, 0);
+	in[1] = op(CHEAT_OP_IF_NE, 1, 0x02000000, 1, 0);
+	CHECK_EQ(cheat_lower(in, 2, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_OK);
+	CHECK_EQ(nw, 0);  // nothing runs: nothing at all
+	in[2] = op(CHEAT_OP_WRITE, 1, 0x02000000, 1, 1);
+	CHECK_EQ(cheat_lower(in, 3, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_OK);
+	CHECK_EQ(nw, 9);
+	CHECK_EQ(prog[2], CHEAT_PROG_NOP);
+	CHECK_EQ(prog[5], CHEAT_PROG_NOP);
+	CHECK_EQ(prog[7], 0x02000000);
 
 	// Bad addresses, checked first; RAM mirrors are good
 	static const u32 bad[] = {0x00000000, 0x01000000, 0x040003FF, 0x05000400,
@@ -798,18 +849,14 @@ void test_cheatcode_lower(void)
 	for (i = 0; i < sizeof(bad) / sizeof(bad[0]); ++i) {
 		in[0] = op(CHEAT_OP_IF_EQ, 2, 0x02000000, 1, 1);
 		in[1] = op(CHEAT_OP_WRITE, 2, bad[i], 1, 1);
-		CHECK_EQ(cheat_lower(in, 2, writes, 16, &nw, patches, 8, &np), CHEAT_LOWER_BAD_ADDRESS);
+		CHECK_EQ(cheat_lower(in, 2, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_BAD_ADDRESS);
 	}
 	in[0] = op(CHEAT_OP_WRITE, 1, 0x0203FFFF, 1, 2);  // a fill running past EWRAM's mirror end is fine
-	CHECK_EQ(cheat_lower(in, 1, writes, 16, &nw, patches, 8, &np), CHEAT_LOWER_OK);
+	CHECK_EQ(cheat_lower(in, 1, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_OK);
 	in[0] = op(CHEAT_OP_WRITE, 1, 0x02FFFFFF, 1, 2);  // past the region isn't
-	CHECK_EQ(cheat_lower(in, 1, writes, 16, &nw, patches, 8, &np), CHEAT_LOWER_BAD_ADDRESS);
+	CHECK_EQ(cheat_lower(in, 1, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_BAD_ADDRESS);
 	in[0] = op(CHEAT_OP_ROM_PATCH, 2, 0x02000000, 1, 1);
-	CHECK_EQ(cheat_lower(in, 1, writes, 16, &nw, patches, 8, &np), CHEAT_LOWER_BAD_ADDRESS);
-	in[0] = op(CHEAT_OP_WRITE, 2, 0x02000000, 1, 0);  // a fill of none writes nothing
-	nw = 0;
-	CHECK_EQ(cheat_lower(in, 1, writes, 16, &nw, patches, 8, &np), CHEAT_LOWER_OK);
-	CHECK_EQ(nw, 0);
+	CHECK_EQ(cheat_lower(in, 1, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_BAD_ADDRESS);
 }
 
 // Every prefix of real codes, and random bytes, decode without reading past
@@ -848,8 +895,8 @@ void test_cheatcode_fuzz(void)
 		if (i % 500 == 0)
 			cheat_decoder_init(&d);
 		if (cheat_decode(&d, copy, len, ops, MAX_OPS, &n) == CHEAT_OK) {
-			u32 nw = 0, np = 0;
-			cheat_lower(ops, n, writes, 16, &nw, patches, 8, &np);
+			u32 nw = 0, np = 0, cost = 0;
+			cheat_lower(ops, n, prog, 64, &nw, &cost, patches, 8, &np);
 		}
 		free(copy);
 	}

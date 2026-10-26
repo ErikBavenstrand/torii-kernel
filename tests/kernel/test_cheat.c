@@ -13,19 +13,22 @@
 #include "torii_test.h"
 #include "tests.h"
 
-// From source/gba_rts_patch.s: the in-game handler, then the cheat table.
-void RTS_ReplaceIRQ_start(void);
-void no_CHEAT_end(void);
-
 extern FATFS EZcardFs;
 
 void test_cheat_cap(void)
 {
-	// The handler and a full table fit in the patch area appended to the ROM.
-	u32 handler = (u8 *)no_CHEAT_end - (u8 *)RTS_ReplaceIRQ_start;
-	tlog("cheat handler: 0x%lX bytes, room for %lu cheats", handler, (CHEAT_PATCH_LENGTH - handler) / 8);
-	CHECK(handler + CHEAT_MAX * 8 <= CHEAT_PATCH_LENGTH);
-	CHECK_EQ(CHEATFILE_WRITES_MAX, CHEAT_MAX);
+	// The menu's code, the interpreter, a full table and DEBUG's code fit in
+	// the patch area appended to the ROM; what is left is v0.8's
+	u32 menu = (u8 *)RTS_ReplaceIRQ_end - (u8 *)RTS_ReplaceIRQ_start;
+	u32 code = (u8 *)Cheat_blob_end - (u8 *)Cheat_blob_start;
+	u32 debug = (u8 *)Debug_blob_end - (u8 *)Debug_blob_start;
+	u32 used = menu + code + CHEAT_TABLE_MAX + debug;
+	tlog("cheat patch: menu 0x%lX, interpreter 0x%lX, table 0x%X, DEBUG 0x%lX bytes: 0x%lX of 0x%X left", menu,
+	     code, CHEAT_TABLE_MAX, debug, CHEAT_PATCH_LENGTH - used, CHEAT_PATCH_LENGTH);
+	CHECK(used <= CHEAT_PATCH_LENGTH);
+	CHECK_EQ(code % 4, 0);
+	CHECK_EQ(menu % 4, 0);
+	CHECK_EQ(CHEATFILE_BYTES_MAX + 4, CHEAT_TABLE_MAX);
 
 	// A cheat file's path: the ROM's less its extension, as long as a save's
 	char path[SAFEFILE_PATH_MAX];
@@ -48,7 +51,7 @@ void test_menu_code_fits(void)
 	// The in-game menu's code, DEBUG entry included, goes in the space
 	// SetTrimSize keeps free with SAVESTATE on: past it, a 32 MB ROM's or
 	// a 16 MB EEPROM game's patch would run off the end.
-	u32 size = (u32)no_CHEAT_end - (u32)RTS_ReplaceIRQ_start;
+	u32 size = (u32)RTS_ReplaceIRQ_end - (u32)RTS_ReplaceIRQ_start;
 	u32 debug = (u32)Debug_blob_end - (u32)Debug_blob_start;
 	tlog("in-game menu code: %lu bytes, and %lu for DEBUG, of %u", (unsigned long)size, (unsigned long)debug,
 	     RTS_PATCH_LENGTH);
@@ -80,8 +83,8 @@ static int put(const char *path, const char *text)
 }
 
 // On the emulated cart (tests/assets.sh): a cheat file's picks reach the
-// cheat table at their own addresses, IWRAM, EWRAM and IO alike, in file
-// order; the picks are written back and read again
+// interpreter's table at their own addresses and widths, IWRAM, EWRAM and IO
+// alike, in file order; the picks are written back and read again
 void test_cheatstore(void)
 {
 	if (!EZcardFs.fs_type && f_mount(&EZcardFs, "", 1) != FR_OK)
@@ -100,14 +103,16 @@ void test_cheatstore(void)
 			 "cheat3_code = \"08001000:4770\"\n"
 			 "cheat3_enable = true\n"));
 	cheatstore_launch(T_ROM, 0);
-	CHECK_EQ(gl_cheat_count, 5);
-	CHECK_EQ(pCHEAT[0].address, 0x02001000);
-	CHECK_EQ(pCHEAT[0].VAL, 0xEF);
-	CHECK_EQ(pCHEAT[1].address, 0x02001001);
-	CHECK_EQ(pCHEAT[1].VAL, 0xBE);
-	CHECK_EQ(pCHEAT[2].address, 0x03007FF0);  // no longer folded into IWRAM's first 32 KB by a mask
-	CHECK_EQ(pCHEAT[2].VAL, 0xAB);
-	CHECK_EQ(pCHEAT[3].address, 0x04000050);
+	CHECK_EQ(gl_cheat_count, 2);  // the ROM patch runs at launch only
+	CHECK_EQ(gl_cheat_bytes, 12 + 20 + 4);
+	CHECK_EQ(gl_cheat_table[0], 1 | CHEAT_PROG_PLAIN | 8 << 16);
+	CHECK_EQ(gl_cheat_table[1], 0x12001000);  // a halfword write
+	CHECK_EQ(gl_cheat_table[2], 0xBEEF);
+	CHECK_EQ(gl_cheat_table[3], 2 | CHEAT_PROG_PLAIN | 16 << 16);
+	CHECK_EQ(gl_cheat_table[4], 0x03007FF0);  // no longer folded into IWRAM's first 32 KB by a mask
+	CHECK_EQ(gl_cheat_table[5], 0xAB);
+	CHECK_EQ(gl_cheat_table[6], 0x14000050);
+	CHECK_EQ(gl_cheat_table[8], 0);
 	CHECK_EQ(gl_cheat_patches, 1);
 
 	// The screen's toggle, written back: only the enable lines change
@@ -118,10 +123,11 @@ void test_cheatstore(void)
 	CHECK(cheatfile_toggle(&s->file, 1));
 	CHECK(cheatstore_write());
 	cheatstore_launch(T_ROM, 0);
-	CHECK_EQ(gl_cheat_count, 4);
-	CHECK_EQ(pCHEAT[0].address, 0x02001010);
-	CHECK_EQ(pCHEAT[1].address, 0x03007FF0);
-	gl_cheat_count = gl_cheat_patches = 0;
+	CHECK_EQ(gl_cheat_count, 2);
+	CHECK_EQ(gl_cheat_table[1], 0x02001010);
+	CHECK_EQ(gl_cheat_table[2], 0x01);
+	CHECK_EQ(gl_cheat_table[4], 0x03007FF0);
+	gl_cheat_count = gl_cheat_bytes = gl_cheat_patches = 0;
 
 	// No file: nothing
 	f_unlink(T_CHT);

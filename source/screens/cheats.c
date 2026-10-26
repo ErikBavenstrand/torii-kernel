@@ -134,9 +134,9 @@ static int cs_event(struct ui_view *v, const struct ui_event *e)
 		if (!cheatfile_toggle(&s->file, at))
 			return 1;
 		const struct cheatfile_cheat *c = &s->cheats[at];
-		tlog_debug("cheats: %s cheat %u, %lu writes picked", c->picked ? "picked" : "dropped", c->number,
-			   (unsigned long)s->file.writes);
-		// Greyed rows change as the writes picked do: every row again
+		tlog_debug("cheats: %s cheat %u, %lu bytes picked", c->picked ? "picked" : "dropped", c->number,
+			   (unsigned long)s->file.bytes);
+		// Greyed rows change as the budget left does: every row again
 		ui_list_refresh(cs.list, 0, cs.count - 1);
 		cs_show_hints();
 		return 1;
@@ -201,9 +201,9 @@ void cheats_run(const char *rom_path, const char *title, u16 icon)
 		else
 			hidden++;
 	}
-	tlog("cheats: %s: %lu cheats, %lu master codes hidden, %lu picked (%lu writes)", s->path,
+	tlog("cheats: %s: %lu cheats, %lu master codes hidden, %lu picked (%lu bytes)", s->path,
 	     (unsigned long)cs.count, (unsigned long)hidden, (unsigned long)cheatfile_picks(&s->file),
-	     (unsigned long)s->file.writes);
+	     (unsigned long)s->file.bytes);
 	if (!cs.count) {
 		dialog_message(title, gl_cheats->none, DIALOG_INFO);
 		return;
