@@ -38,8 +38,8 @@ static s32 io32(const struct ppu_frame *f, u32 half)
 // A 28-bit signed reference point (20.8 fixed point)
 static s32 ref28(const struct ppu_frame *f, u32 half)
 {
-	s32 v = io32(f, half);
-	return (s32)((u32)v << 4) >> 4;
+	s32 v = io32(f, half) & 0x0FFFFFFF;
+	return v & 0x08000000 ? v - 0x10000000 : v;
 }
 
 // --- Text BGs -----------------------------------------------------------------
@@ -358,9 +358,8 @@ void ppu_render_line(const struct ppu_frame *f, u32 y, u16 *out, struct ppu_scra
 		u16 px = c[0];
 		if (!(shown & 0x20))
 			first = second = semi = 0;
-		if (semi && second)
-			px = blend(c[0], c[1], eva, evb);
-		else if (first && effect == 1 && second)
+		if (second &&
+		    (semi || (first && effect == 1)))  // a semi-transparent sprite blends whatever BLDCNT's effect
 			px = blend(c[0], c[1], eva, evb);
 		else if (first && effect >= 2)
 			px = fade(c[0], evy, effect == 2);
