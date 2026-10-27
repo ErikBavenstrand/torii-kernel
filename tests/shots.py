@@ -337,16 +337,17 @@ def boot(name: str, sd: Path, cart: Path, out: Path, extra: list[str] = ()):
             nor_game(cart, name, int(size, 0), Path(src).read_bytes())
         elif line.startswith("#! sd-many "):
             _, _, folder, count = shlex.split(line)
-            stage = cart / "many"
-            stage.mkdir()
-            files = []
+            game = cart / "many.gba"
+            game.write_bytes(bytes(32))
+            # Through the kernel's FatFs in one mount: mcopy takes minutes
+            # for thousands of files in one folder, as it checks every name
+            # against the whole folder
+            pairs = []
             for i in range(1, int(count) + 1):
-                f = stage / f"Game {i:04d}.gba"
-                f.write_bytes(bytes(32))
-                files.append(str(f))
-            run(["mmd", "-i", str(cart / "sd.img"), f"::{folder}"])
-            run(["mcopy", "-Q", "-i", str(cart / "sd.img"), *files, f"::{folder}/"])
-            shutil.rmtree(stage)
+                pairs += [str(game), f"{folder}/Game {i:04d}.gba"]
+            run(["tools/sdimg.sh", str(cart / "sd.img"), "mkdir", folder])
+            run(["tools/sdimg.sh", str(cart / "sd.img"), "put", *pairs])
+            game.unlink()
         elif line.startswith("#! env "):
             name, _, value = line.split(maxsplit=2)[2].partition("=")
             cart_env[name] = value
