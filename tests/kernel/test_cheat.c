@@ -63,10 +63,13 @@ void test_menu_code_fits(void)
 // PATCH/'s cache (.pat): the words of a file Make_pat_file wrote for a 4 MB
 // ROM pass, and a crafted or stale one is turned down, so a launch scans the
 // ROM again instead of writing where its words say
-static u32 pat_words[EMax * 2 + 16] EWRAM_BSS;
+// pReadCache (all of it is the unit tests', ez_define.h): the words of a .pat
+extern u8 pReadCache[];
+#define pat_words ((u32 *)(void *)pReadCache)
+#define PAT_WORDS_BYTES ((EMax * 2 + 16) * 4)
 static void pat_fill(void)
 {
-	memset(pat_words, 0, sizeof(pat_words));
+	memset(pat_words, 0, PAT_WORDS_BYTES);
 	u32 *w = pat_words + EMax * 2;
 	pat_words[0] = 0x1000 / 4, pat_words[1] = 0x3007FF4;  // a patched literal
 	pat_words[2] = 0x2000 / 4, pat_words[3] = 0x3007FF4;
