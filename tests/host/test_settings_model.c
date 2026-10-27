@@ -139,7 +139,7 @@ void test_settings_defaults(void)
 		{SET_LED, 1, "On"},
 		{SET_LED_IDLE, 7, "White"},
 		{SET_LED_SD, 0, "Off"},
-		{SET_RESET_ON, 0, "Off"},
+		{SET_RESET_ON, SET_MENU_AUTO, "Auto"},
 		{SET_RESET_KEYS, 0x0308, "L+R+START"},
 		{SET_SLEEP_ON, 0, "Off"},
 		{SET_SLEEP_KEYS, 0x0304, "L+R+SELECT"},
@@ -377,7 +377,7 @@ void test_settings_hotkeys(void)
 	CHECK(!strcmp(settings_key_name(4), "RIGHT"));
 	CHECK(!strcmp(settings_key_name(10), ""));
 	// The hotkey rows' names (C5): no row renames itself any more
-	CHECK(!strcmp(settings_label(&v, SET_RESET_ON), "Back to menu"));
+	CHECK(!strcmp(settings_label(&v, SET_RESET_ON), "In-game menu"));
 	CHECK(!strcmp(settings_label(&v, SET_RESET_KEYS), "Menu keys"));
 	CHECK(!strcmp(settings_label(&v, SET_SLEEP_ON), "Sleep"));
 	CHECK(!strcmp(settings_label(&v, SET_SLEEP_KEYS), "Sleep keys"));
@@ -385,23 +385,32 @@ void test_settings_hotkeys(void)
 	CHECK(!strcmp(settings_label(&v, SET_RESET_KEYS), "Menu keys"));
 	CHECK(!strcmp(settings_label(&v, SET_SLEEP_KEYS), "Sleep keys"));
 	CHECK(!strcmp(settings_explain(&v, SET_RESET_KEYS), gl_set_explain[SET_RESET_KEYS]));
-	// Save states put the in-game menu on the menu keys in every game
-	// (GBApatch.c): Back to menu shows On, its stored value kept
+	// In-game menu (v0.8), in Back to menu's slot: its Off (and an erased
+	// slot) is Auto, its On Every game, and Off is new; Save states change
+	// nothing it shows
 	erased();
-	char text[8];
-	CHECK(!settings_reset_armed(&v));
-	CHECK(!strcmp(settings_explain(&v, SET_RESET_ON), gl_set_explain[SET_RESET_ON]));
+	char text[12];
+	settings_value_text(&v, SET_RESET_ON, text, sizeof(text));
+	CHECK(!strcmp(text, "Auto"));
+	CHECK(!strcmp(settings_explain(&v, SET_RESET_ON), "Opens with save states or cheats on."));
+	settings_set(&v, SET_RTS, 1);
+	settings_value_text(&v, SET_RESET_ON, text, sizeof(text));
+	CHECK(!strcmp(text, "Auto"));
+	settings_step(&v, SET_RESET_ON, 1);
+	CHECK_EQ(settings_get(&v, SET_RESET_ON), SET_MENU_EVERY);
+	CHECK_EQ(v.slot[assress_v_reset], 1);  // Back to menu's On
+	settings_value_text(&v, SET_RESET_ON, text, sizeof(text));
+	CHECK(!strcmp(text, "Every game"));
+	CHECK(!strcmp(settings_explain(&v, SET_RESET_ON), "Opens in every game with addons."));
+	settings_step(&v, SET_RESET_ON, 1);
+	CHECK_EQ(v.slot[assress_v_reset], SET_MENU_OFF);
 	settings_value_text(&v, SET_RESET_ON, text, sizeof(text));
 	CHECK(!strcmp(text, "Off"));
-	settings_set(&v, SET_RTS, 1);
-	CHECK(settings_reset_armed(&v));
-	CHECK(!strcmp(settings_explain(&v, SET_RESET_ON), "Opens the in-game menu instead."));
-	settings_value_text(&v, SET_RESET_ON, text, sizeof(text));
-	CHECK(!strcmp(text, "On"));
-	CHECK_EQ(settings_get(&v, SET_RESET_ON), 0);
-	settings_set(&v, SET_RTS, 0);
-	CHECK(!settings_reset_armed(&v));
-	CHECK(!strcmp(settings_explain(&v, SET_RESET_ON), "Hold the keys to leave a game."));
+	CHECK(!strcmp(settings_explain(&v, SET_RESET_ON), "Never opens. Cheats still run."));
+	settings_step(&v, SET_RESET_ON, 1);
+	CHECK_EQ(settings_get(&v, SET_RESET_ON), SET_MENU_AUTO);
+	v.slot[assress_v_reset] = 7;  // a value no kernel wrote: Auto
+	CHECK_EQ(settings_get(&v, SET_RESET_ON), SET_MENU_AUTO);
 }
 
 void test_settings_visible_rows(void)

@@ -32,6 +32,7 @@ void readcache_poison(void);
 extern u8 __attribute__((aligned(4))) GAMECODE[4];
 
 extern u16 gl_reset_on;
+extern u16 gl_menu_off;  // In-game menu Off (SET_MENU_OFF): the menu keys do nothing
 extern u16 gl_rts_on;
 extern u16 gl_sleep_on;
 extern u16 gl_cheat_on;

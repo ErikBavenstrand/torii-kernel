@@ -321,6 +321,7 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 	hint[0] = 0;
 	for (u32 i = 0; i < n; i++)
 		len += (u32)snprintf(hint + len, sizeof(hint) - len, "%s%s", i ? "+" : "", settings_key_name(keys[i]));
+	tlog("launch: in-game menu keys %s%s", hint, gl_menu_off ? ", off (In-game menu Off)" : "");
 	snprintf(hint + len, sizeof(hint) - len, "%s", t->hint);
 	const char *const text[INGAME_TEXTS] = {
 		[INGAME_TEXT_TITLE] = h->name[0] ? h->name : "Torii",

@@ -747,11 +747,6 @@ static void previews(u32 id, int ui)
 	case SET_LED_SD:
 		led_show();
 		break;
-	case SET_RTS:
-		// Save states show Back to menu as On (settings_reset_armed)
-		if (ui)
-			refresh_id(SET_RESET_ON);
-		break;
 	case SET_CLOCK_24H:
 		if (ui)
 			refresh_id(SET_TIME_ROW);
@@ -977,8 +972,6 @@ static void activate(u32 id)
 		}
 		break;
 	default:
-		if (id == SET_RESET_ON && settings_reset_armed(&sp.v))
-			break;  // On while Save states are; its explanation says why
 		sp.mode = MODE_EDIT;
 		sp.edit_id = (u8)id;
 		edit_slots(id, 0);

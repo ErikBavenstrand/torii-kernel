@@ -34,6 +34,7 @@
 #include "diskstat.h"
 #include "fathint.h"
 #include "saveorphan.h"
+#include "settings_model.h"
 #include "shotstore.h"
 #include "slotstore.h"
 #include "saveslot.h"
@@ -81,6 +82,7 @@ DIR dir;
 FIL gfile;
 
 u16 gl_reset_on;
+u16 gl_menu_off;
 u16 gl_rts_on;
 u16 gl_sleep_on;
 u16 gl_cheat_on;
@@ -892,7 +894,8 @@ void CheckLanguage(void)
 // launch's start): the cheat hook and its table.
 static void Read_addon_switches(void)
 {
-	gl_reset_on = Read_SET_info(assress_v_reset) == 1;
+	gl_reset_on = Read_SET_info(assress_v_reset) == SET_MENU_EVERY;
+	gl_menu_off = Read_SET_info(assress_v_reset) == SET_MENU_OFF;
 	gl_rts_on = Read_SET_info(assress_v_rts) == 1;
 	gl_sleep_on = Read_SET_info(assress_v_sleep) == 1;
 	gl_cheat_on = gl_cheat_count > 0;
@@ -904,6 +907,7 @@ void CheckSwitch(void)
 	gl_rts_on = Read_SET_info(assress_v_rts);
 	gl_sleep_on = Read_SET_info(assress_v_sleep);
 	gl_cheat_on = 0;  // a launch's, with the game's picks (Read_addon_switches)
+	gl_menu_off = gl_reset_on == SET_MENU_OFF;  // In-game menu Off (v0.8)
 	if ((gl_reset_on != 0x0) && (gl_reset_on != 0x1)) {
 		gl_reset_on = 0x0;
 	}

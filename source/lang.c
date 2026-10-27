@@ -72,6 +72,7 @@ char **gl_set_boots EWRAM_BSS;
 char **gl_set_history EWRAM_BSS;
 char **gl_set_starts EWRAM_BSS;
 char **gl_set_modes_b EWRAM_BSS;
+char **gl_set_menus EWRAM_BSS;
 char **gl_set_colours EWRAM_BSS;
 char **gl_set_log_levels EWRAM_BSS;
 char **gl_set_ampm EWRAM_BSS;
@@ -260,7 +261,7 @@ const char *const en_set_labels[SET_ROWS] = {
 	[SET_LED] = "LED",
 	[SET_LED_IDLE] = "LED colour",
 	[SET_LED_SD] = "SD card light",
-	[SET_RESET_ON] = "Back to menu",
+	[SET_RESET_ON] = "In-game menu",
 	[SET_RESET_KEYS] = "Menu keys",
 	[SET_SLEEP_ON] = "Sleep",
 	[SET_SLEEP_KEYS] = "Sleep keys",
@@ -292,7 +293,7 @@ const char *const en_set_explain[SET_EXPLAINS] = {
 	[SET_LED] = "The cart's light.",
 	[SET_LED_IDLE] = "The light's colour while idle.",
 	[SET_LED_SD] = "The light while the SD card works.",
-	[SET_RESET_ON] = "Hold the keys to leave a game.",
+	[SET_RESET_ON] = "Opens with save states or cheats on.",
 	[SET_RESET_KEYS] = "Held together in game. A sets them.",
 	[SET_SLEEP_ON] = "Screen off. START+SELECT wakes it.",
 	[SET_SLEEP_KEYS] = "Held together in game. A sets them.",
@@ -304,7 +305,8 @@ const char *const en_set_explain[SET_EXPLAINS] = {
 	[SET_HISTORY] = "Older saves kept, to go back to.",
 	[SET_LOGGING] = "Writes a log to /torii/logs.",
 	[SET_LANGUAGE] = "The menu's language.",
-	[SET_EXPLAIN_RESET_STATES] = "Opens the in-game menu instead.",
+	[SET_EXPLAIN_MENU_EVERY] = "Opens in every game with addons.",
+	[SET_EXPLAIN_MENU_OFF] = "Never opens. Cheats still run.",
 	[SET_EXPLAIN_START_HIDDEN] = "Not on home now: Last place instead.",
 };
 const char *const en_set_onoff[2] = {"Off", "On"};
@@ -321,6 +323,7 @@ const char *const en_set_starts[SET_STARTS] = {
 	[SET_START_SETTINGS] = "Settings", [SET_START_INFO] = "Info",
 };
 const char *const en_set_modes_b[3] = {"Rumble", "RAM", "Link"};
+const char *const en_set_menus[SET_MENUS] = {"Auto", "Every game", "Off"};
 // By value: red 4, green 2, blue 1
 const char *const en_set_colours[8] = {"Off", "Blue", "Green", "Cyan", "Red", "Magenta", "Yellow", "White"};
 const char *const en_set_log_levels[4] = {"Off", "Errors", "Info", "Debug"};
@@ -421,12 +424,14 @@ const char *const en_info[INFO_STRINGS] = {
 				"Cheats. A game on the NOR keeps the "
 				"hotkeys it was written with.\n",
 	[INFO_S_INGAME_MENU] = "# The in-game menu\n"
-			       "Hold %s to open it: back to the menu, save or load a state, and the game's cheats.\n",
-	[INFO_S_INGAME_RESET] = "# Back to menu\n"
-				"Hold %s to leave the game for the menu.\n",
-	[INFO_S_INGAME_RESET_OFF] = "# Back to menu\n"
-				    "Off: turn Back to menu on in Settings, or switch the GBA off and on.\n",
-	[INFO_S_INGAME_CHEATS] = "In a game with cheats picked, %s opens the in-game menu instead, with its cheats.\n",
+			       "Hold %s to open it: back to Torii, save or load a state, the game's cheats and a "
+			       "screenshot.\n",
+	[INFO_S_INGAME_AUTO] = "# The in-game menu\n"
+			       "Hold %s to open it in a game with save states or cheats on. Settings, Hotkeys, "
+			       "In-game menu opens it in every game.\n",
+	[INFO_S_INGAME_OFF] = "# The in-game menu\n"
+			      "Off: no menu opens in a game, and its cheats still run. Settings, Hotkeys turns it "
+			      "on.\n",
 	[INFO_S_INGAME_SLEEP] = "# Sleep\n"
 				"Hold %s to put the game to sleep: the screen goes off. START and SELECT wake it.\n",
 	[INFO_S_INGAME_SLEEP_OFF] = "# Sleep\n"
@@ -886,6 +891,7 @@ void LoadEnglish(void)
 	gl_set_history = (char **)en_set_history;
 	gl_set_starts = (char **)en_set_starts;
 	gl_set_modes_b = (char **)en_set_modes_b;
+	gl_set_menus = (char **)en_set_menus;
 	gl_set_colours = (char **)en_set_colours;
 	gl_set_log_levels = (char **)en_set_log_levels;
 	gl_set_ampm = (char **)en_set_ampm;

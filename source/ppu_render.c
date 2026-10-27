@@ -129,7 +129,8 @@ static void bg_bitmap(const struct ppu_frame *f, u32 mode, u32 y, u16 *out)
 		for (u32 x = 0; x < PPU_W; x++) {
 			u32 c = LAYER_NONE;
 			if ((s32)x < w)
-				c = mode == 4 ? (row[x] ? f->pal[row[x]] & 0x7FFF : LAYER_NONE) : rd16(row + x * 2) & 0x7FFF;
+				c = mode == 4 ? (row[x] ? f->pal[row[x]] & 0x7FFF : LAYER_NONE)
+					      : rd16(row + x * 2) & 0x7FFF;
 			out[x] = (u16)c;
 		}
 		return;

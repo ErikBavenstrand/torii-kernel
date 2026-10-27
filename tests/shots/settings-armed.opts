@@ -1,6 +1,6 @@
-# Save states on (C5): Back to menu shows On whatever it stores, its
-# explanation says the in-game menu takes the keys, and A doesn't edit it
-# (the page reached from home, R to the Hotkeys section).
+# Save states on: the In-game menu row (v0.8, Back to menu until then)
+# shows Auto and its explanation, and A edits it like any choice: RIGHT
+# gives Every game (the page reached from home, R to the Hotkeys section).
 #! settings 2=1
 -w "nav: home ready"
 -k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:A -k @28:-

@@ -28,7 +28,7 @@ const struct settings_row settings_rows[SET_ROWS] = {
 	[SET_LED] = {SET_SEC_CART, SET_ONOFF, assress_led_open_sel, 0, 1, 2, 0, 0},
 	[SET_LED_IDLE] = {SET_SEC_CART, SET_COLOUR, assress_Breathing_R, SET_WITH_LED, 7, 8, &gl_set_colours, 0},
 	[SET_LED_SD] = {SET_SEC_CART, SET_COLOUR, assress_SD_R, SET_WITH_LED, 0, 8, &gl_set_colours, 0},
-	[SET_RESET_ON] = {SET_SEC_HOTKEYS, SET_ONOFF, assress_v_reset, 0, 0, 2, 0, 0},
+	[SET_RESET_ON] = {SET_SEC_HOTKEYS, SET_CHOICE, assress_v_reset, 0, SET_MENU_AUTO, SET_MENUS, &gl_set_menus, 0},
 	[SET_RESET_KEYS] = {SET_SEC_HOTKEYS, SET_KEYS, assress_edit_rtshotkey_0, 0, 0, 0, 0, 0},
 	[SET_SLEEP_ON] = {SET_SEC_HOTKEYS, SET_ONOFF, assress_v_sleep, 0, 0, 2, 0, 0},
 	[SET_SLEEP_KEYS] = {SET_SEC_HOTKEYS, SET_KEYS, assress_edit_sleephotkey_0, 0, 0, 0, 0, 0},
@@ -416,11 +416,6 @@ const char *settings_section_name(u32 section)
 	return section < SET_SECTIONS ? gl_set_sections[section] : "";
 }
 
-int settings_reset_armed(const struct settings_values *v)
-{
-	return settings_get(v, SET_RTS) != 0;
-}
-
 const char *settings_label(const struct settings_values *v, u32 id)
 {
 	(void)v;
@@ -429,8 +424,9 @@ const char *settings_label(const struct settings_values *v, u32 id)
 
 const char *settings_explain(const struct settings_values *v, u32 id)
 {
-	if (id == SET_RESET_ON && settings_reset_armed(v))
-		return gl_set_explain[SET_EXPLAIN_RESET_STATES];
+	if (id == SET_RESET_ON && settings_get(v, id) != SET_MENU_AUTO)
+		return gl_set_explain[settings_get(v, id) == SET_MENU_EVERY ? SET_EXPLAIN_MENU_EVERY
+									    : SET_EXPLAIN_MENU_OFF];
 	if (id == SET_START_ON) {
 		u16 code = settings_get(v, id);
 		if (code != SET_START_HOME && !start_offered(v, code))
@@ -471,7 +467,7 @@ void settings_value_text(const struct settings_values *v, u32 id, char *out, u32
 		copy_text(out, size, (*r->options)[value]);
 		break;
 	case SET_ONOFF:
-		copy_text(out, size, gl_set_onoff[id == SET_RESET_ON && settings_reset_armed(v) ? 1 : value]);
+		copy_text(out, size, gl_set_onoff[value]);
 		break;
 	case SET_NUMBER:
 		if (value)

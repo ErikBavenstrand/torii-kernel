@@ -17,15 +17,15 @@ boot/frames 7-7 77D1C00667060839
 boot/frames 8-40 818B02E74B016B0D
 boot-addon/addons 9D5EA05F12ADBBF3
 boot-addon-copy/copied 834EDB23818102AF
-boot-addon-copy/fast AE223751FC57C5F7
+boot-addon-copy/fast FBE248636174EBAF
 boot-addon-copy/slow E2D938F1A5943537
-boot-addon-copy/frames 0-0 B462D36EEEAA09DB
-boot-addon-copy/frames 1-1 0FB99C4ED1E17723
-boot-addon-copy/frames 2-2 F0C05EFF2FAC10CB
-boot-addon-copy/frames 3-3 8FFCE4904A9B4E93
-boot-addon-copy/frames 4-4 D57E99F8522AC4F7
-boot-addon-copy/frames 5-5 5E84A98E27022AAF
-boot-addon-copy/frames 6-6 DD25A6D07C8CF437
+boot-addon-copy/frames 0-0 0FB99C4ED1E17723
+boot-addon-copy/frames 1-1 F0C05EFF2FAC10CB
+boot-addon-copy/frames 2-2 8FFCE4904A9B4E93
+boot-addon-copy/frames 3-3 D57E99F8522AC4F7
+boot-addon-copy/frames 4-4 5E84A98E27022AAF
+boot-addon-copy/frames 5-5 DD25A6D07C8CF437
+boot-addon-copy/frames 6-6 F260379DC897224F
 boot-copy/copied D31E83436AD1B5A9
 boot-copy/fast 64FAB574734CCC7D
 boot-copy/slow 51F957460CF08751
@@ -327,7 +327,7 @@ info/frames 7-20 96DF71E9EB3496DE
 info-about/about 67593DE57B51703D
 info-about/about-end D816CD17868D38AF
 info-about/cart B11EBBCBB761FEAF
-info-about/ingame 3B4909200AD4CB95
+info-about/ingame 190213F5143B7CBB
 info-counting/cart DF95E5933BA6B9C7
 info-no-free/about-end 89CF4007369D0219
 info-read/back F3D1D76C241AA2D2
@@ -478,10 +478,10 @@ sd-root/frames 20-20 A3B05621660A0116
 sd-root/frames 21-24 EE84177EF9E20E06
 sd-show-all/root 2B174EDFF8AE75F1
 settings/bottom 587846148171BD22
-settings/capture 18B798D4C1F37827
+settings/capture 5EBFD4FF31459955
 settings/edit 3459A6BE105111B3
 settings/fields C03B924349FA7C5D
-settings/refused 054D02E33E8B359E
+settings/refused 03E5503A7BC1E5E8
 settings/swatch 0DF5E7098544C236
 settings/top 223BB8C2C8E571AD
 settings/frames 0-1 BBFB04228A57DB69
@@ -544,19 +544,19 @@ settings/frames 77-77 409496CD8FCB9AA2
 settings/frames 78-78 1C4F23255EC515E9
 settings/frames 79-79 185D294E2D63B706
 settings/frames 80-80 EE2CB9E5418BB195
-settings/frames 81-81 FB1C10D9F8EAA407
-settings/frames 82-82 7F7DB5F320030F9B
-settings/frames 83-83 B08FECD866B94DD5
-settings/frames 84-84 2AA0736AE9664BAA
-settings/frames 85-85 024C68A1A38DC129
-settings/frames 86-86 1E690CA14DC5DAA5
-settings/frames 87-87 EE27828E18EF9167
-settings/frames 88-88 6B9EB7EA0D31AE7F
-settings/frames 89-89 538C26BCBE6EE064
-settings/frames 90-90 EC8920D35565A0D4
-settings/frames 91-91 AD8717D26E4D9C46
-settings/frames 92-92 AAB3FBAEA3AC7ED6
-settings/frames 93-93 89AF8CC5D39EA6DE
+settings/frames 81-81 B9E1FAA944B9462C
+settings/frames 82-82 AE643BB43CDDD5B8
+settings/frames 83-83 9100C6612EF28668
+settings/frames 84-84 CEDD7941A9BFDB38
+settings/frames 85-85 99B599228FFE68BF
+settings/frames 86-86 4F87AE60FB9875C3
+settings/frames 87-87 6A6966CF216308AD
+settings/frames 88-88 78F3AADD37C2825D
+settings/frames 89-89 C02F9D5437E8C8E6
+settings/frames 90-90 4C41DB60DDF3344A
+settings/frames 91-91 17FFF7BEAA43E884
+settings/frames 92-92 38D9B6C84342CAAA
+settings/frames 93-93 C1ADDA77F8324429
 settings/frames 94-94 11EF4BA94F94C6AB
 settings/frames 95-95 ED1EA0A837B7A897
 settings/frames 96-96 9CB4FF6F8F664413
@@ -565,8 +565,8 @@ settings/frames 98-98 826E716DC98DE174
 settings/frames 99-100 9F7EF5A174B65FE7
 settings/frames 101-101 3648AD91145D71EE
 settings/frames 102-233 587846148171BD22
-settings-armed/after-a B31527AF4FA8E1F3
-settings-armed/armed E6CD40EEBEEDA2CA
+settings-armed/after-a F6E0CD87A6E5175E
+settings-armed/armed BA5B6BA08A580E64
 settings-dark/back 444E5746ADB631E8
 settings-dark/cart 3756030EF13A0E4D
 settings-dark/dim 477DBFDD9F3DA704

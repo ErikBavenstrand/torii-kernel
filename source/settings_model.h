@@ -86,12 +86,25 @@ enum settings_id {
 };
 
 // Explanations past the rows' (gl_set_explain is indexed by row, then
-// these): SET_RESET_ON's while Save states put the in-game menu on the reset
-// keys (GBApatch.c), and SET_START_ON's for a hidden item
+// these): SET_RESET_ON's for Every game and Off (its row's is Auto's), and
+// SET_START_ON's for a hidden item
 enum {
-	SET_EXPLAIN_RESET_STATES = SET_ROWS,  // Save states on: the menu in every game
-	SET_EXPLAIN_START_HIDDEN,             // Start on's item isn't on home now
+	SET_EXPLAIN_MENU_EVERY = SET_ROWS,  // In-game menu: Every game
+	SET_EXPLAIN_MENU_OFF,               // In-game menu: Off
+	SET_EXPLAIN_START_HIDDEN,           // Start on's item isn't on home now
 	SET_EXPLAINS
+};
+
+// SET_RESET_ON's values, the In-game menu row (v0.8; stored in Back to
+// menu's slot, whose Off and On they keep): the menu keys open the in-game
+// menu in a game with Save states or cheats on (Auto, Back to menu's Off),
+// in every game started with addons (Every game, its On), or never (Off:
+// cheats still run, the keys do nothing; GBApatch.c)
+enum {
+	SET_MENU_AUTO = 0,
+	SET_MENU_EVERY = 1,
+	SET_MENU_OFF = 2,
+	SET_MENUS
 };
 
 // SET_START_ON's values: a code per carousel item, stored as it is. The
@@ -250,9 +263,6 @@ u32 settings_section_rows(const struct settings_values *v, u32 section, u8 *ids)
 const char *settings_section_name(u32 section);
 const char *settings_label(const struct settings_values *v, u32 id);
 const char *settings_explain(const struct settings_values *v, u32 id);
-// Save states on: their in-game menu takes the reset keys in every game
-// (GBApatch.c), so Back to menu shows On and can't be changed
-int settings_reset_armed(const struct settings_values *v);
 // A row's value in plain words: "On", "Light", "5 min", "14:32",
 // "2026-10-20", "L+R+START"; "" for an action
 void settings_value_text(const struct settings_values *v, u32 id, char *out, u32 size);

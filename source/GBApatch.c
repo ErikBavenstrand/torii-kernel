@@ -527,7 +527,8 @@ static void Patch_RTS_Cheat(u32 *Data)
 	u32 RTS_Reset_key_offset = (u8 *)RTS_Reset_key - p_patch_start;
 	u32 RTS_Sleep_key_offset = (u8 *)RTS_Sleep_key - p_patch_start;
 
-	*(vu32 *)(patchbuffer + RTS_Reset_key_offset) = RTS_reset_key_val & 0x3FF;
+	//Torii (v0.8): In-game menu Off: the menu keys open nothing, the cheats still run
+	*(vu32 *)(patchbuffer + RTS_Reset_key_offset) = gl_menu_off ? HOTKEY_OFF : RTS_reset_key_val & 0x3FF;
 	if (gl_sleep_on != 1) {
 		*(vu32 *)(patchbuffer + RTS_Sleep_key_offset) = HOTKEY_OFF;
 	} else {
@@ -672,7 +673,9 @@ void GBApatch_PSRAM(u32 *address, int filesize)//Only once
 	PatchDragonBallZ(address);
 	Patch_somegame(address);
 
-	if ((gl_rts_on == 1) || ((gl_cheat_on == 1) && (gl_cheat_count > 0))) {
+	//Torii (v0.8): In-game menu Every game (gl_reset_on) puts the menu on the
+	//menu keys too, where Back to menu left the game for the kernel
+	if ((gl_rts_on == 1) || (gl_reset_on == 1) || ((gl_cheat_on == 1) && (gl_cheat_count > 0))) {
 		spend_address = Get_spend_address(address);
 		//DEBUG_printf("spend_address =%x",spend_address);
 		Patch_RTS_Cheat(address);
@@ -736,7 +739,7 @@ void GBApatch_NOR(u32 *address, int filesize, u32 offset)
 	PatchDragonBallZ(address);
 	//Check_Fire_Emblem();
 
-	if ((gl_rts_on == 1) || ((gl_cheat_on == 1) && (gl_cheat_count > 0))) {
+	if ((gl_rts_on == 1) || (gl_reset_on == 1) || ((gl_cheat_on == 1) && (gl_cheat_count > 0))) {
 		Patch_RTS_Cheat(address);
 	} else {
 		Patch_Reset_Sleep(address);

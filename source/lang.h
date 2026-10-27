@@ -95,6 +95,7 @@ extern char **gl_set_boots;
 extern char **gl_set_history;
 extern char **gl_set_starts;
 extern char **gl_set_modes_b;
+extern char **gl_set_menus;  // In-game menu's values (SET_MENU_*)
 extern char **gl_set_colours;
 extern char **gl_set_log_levels;
 extern char **gl_set_ampm;

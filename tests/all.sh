@@ -67,6 +67,8 @@ jobs=(
   "tests/ppu_render.sh"
   "tests/screenshot.sh shot"
   "tests/screenshot.sh cut"
+  "tests/menu_keys.sh every"
+  "tests/menu_keys.sh off"
   "tests/scan_engine.sh"
   "tests/nes.sh"
   "tests/gb_save.sh"

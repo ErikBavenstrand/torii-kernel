@@ -33,9 +33,8 @@ enum info_string {
 	// In game: the start, then by what Settings has on
 	INFO_S_INGAME_START,
 	INFO_S_INGAME_MENU,    // Save states: %s opens the in-game menu
-	INFO_S_INGAME_RESET,   // %s: back to the menu
-	INFO_S_INGAME_RESET_OFF,
-	INFO_S_INGAME_CHEATS,  // Cheats without Save states: %s opens the menu in a game with cheats
+	INFO_S_INGAME_AUTO,  // %s: the menu in a game with Save states or cheats
+	INFO_S_INGAME_OFF,   // In-game menu Off
 	INFO_S_INGAME_SLEEP,   // %s: sleep
 	INFO_S_INGAME_SLEEP_OFF,
 	INFO_S_INGAME_END,

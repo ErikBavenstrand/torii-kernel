@@ -177,8 +177,8 @@ static u32 nor_used_mb(void)
 }
 
 // In game: the hotkeys as Settings has them, the way the launch patches a
-// game for them (GBApatch.c): Save states (or, in a game with cheats
-// picked, its cheats) put the in-game menu on the menu keys
+// game for them (GBApatch.c): the In-game menu row says when the menu keys
+// open the menu (Save states or a game's cheats, every game, or never)
 static void ingame_text(void)
 {
 	u16 slots[assress_max];
@@ -190,14 +190,14 @@ static void ingame_text(void)
 	settings_value_text(&v, SET_RESET_KEYS, reset, sizeof(reset));
 	settings_value_text(&v, SET_SLEEP_KEYS, sleep, sizeof(sleep));
 	u32 rts = settings_get(&v, SET_RTS);
-	u32 reset_on = settings_get(&v, SET_RESET_ON), sleep_on = settings_get(&v, SET_SLEEP_ON);
+	u32 menu = settings_get(&v, SET_RESET_ON), sleep_on = settings_get(&v, SET_SLEEP_ON);
 	put(INFO_S_INGAME_START, 0, 0, 0);
-	if (rts) {
+	if (menu == SET_MENU_OFF)
+		put(INFO_S_INGAME_OFF, 0, 0, 0);
+	else if (menu == SET_MENU_EVERY || rts)
 		put(INFO_S_INGAME_MENU, reset, 0, 0);
-	} else {
-		put(reset_on ? INFO_S_INGAME_RESET : INFO_S_INGAME_RESET_OFF, reset, 0, 0);
-		put(INFO_S_INGAME_CHEATS, reset, 0, 0);
-	}
+	else
+		put(INFO_S_INGAME_AUTO, reset, 0, 0);
 	put(sleep_on ? INFO_S_INGAME_SLEEP : INFO_S_INGAME_SLEEP_OFF, sleep, 0, 0);
 	put(INFO_S_INGAME_END, 0, 0, 0);
 }
