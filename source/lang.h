@@ -442,6 +442,7 @@ struct lang_ingame {
 	// The screenshot (v0.8 P4): its row and the footer once taken; the
 	// menu's footer, after its keys ("L+R+START" then hint)
 	const char *shot, *shot_saved, *hint;
+	const char *sleep_wakes;  // the menu's footer on its Sleep row
 };
 extern const struct lang_ingame *gl_ingame;
 

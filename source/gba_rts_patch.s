@@ -304,16 +304,17 @@ sleep_now:
 	ldr r5,[r0,#REG_P1]
 	ldrh r6,[r0,#REG_DISPCNT]
 
-	@;enable ints on Keypad, Game Pak
+	@;enable ints on Keypad only, every IRQ flag acknowledged
 	ldr r1,=0xFFFF1000
 	str r1,[r0,#REG_IE]
-	mov r1,#0xC0000000		@;interrupt on start+sel
-	@;orr r1,r1,#0x000C0000
+	@;KEYCNT: the IRQ (bit 14) when all of START and SELECT are held (AND,
+	@;bit 15). Torii: the unused bits 10-13 clear, as GBATEK has them
 	adr r2,RTS_Wakeup_key
 	ldr r2,[r2]
-	MVN R2,R2
-	lsl	r2,r2,#0x10
-	orr r1,r1,r2
+	mvn r2,r2
+	mov r2,r2,lsl #22
+	mov r2,r2,lsr #6
+	orr r1,r2,#0xC0000000
 	str r1,[r0,#REG_P1]
 	strh r0,[r0,#REG_SOUNDCNT_X]	@;sound off
 	orr r1,r6,#0x80
@@ -321,15 +322,14 @@ sleep_now:
 
 	swi 0x030000
 
-	@;Loop to wait for letting go of Sel+start
-loop:
+	@;Every key up before the game goes on. Torii: START and SELECT too
+	@;(the old loop waited only for the others, so the game saw the wake
+	@;keys: Pokémon's START menu opened on waking)
 	mov r0,#REG_BASE
+loop:
 	ldr r1,[r0,#REG_P1]
-	adr r7,RTS_Wakeup_key
-	ldr r7,[r7]
-	and r1,r1,r7
-	@;cmp r1,#0x000C
-	cmp r1,r7
+	mvn r1,r1
+	movs r1,r1,lsl #22
 	bne loop
 
 	@;VCOUNT 159, 160, 159, 160, 159 in turn
@@ -558,6 +558,17 @@ ingame_refuse:
 	mov		r2,#16
 	mov		r3,#1
 	bl		sram_copy
+	@;The screen white (forced blank: the game's own screen stays as it
+	@;is) for 10 frames with ingame_back's two, and then while the menu
+	@;keys are held, so a refusal shows (Torii: on the real cart it looked
+	@;like nothing had happened)
+	ldrh	r1,[r11,#SP_DISPCNT]
+	orr		r1,r1,#0x80
+	strh	r1,[r10,#REG_DISPCNT]
+	mov		r4,#8
+1:	bl		wait_frame
+	subs	r4,r4,#1
+	bne		1b
 	mov		r1,#ACT_RESUME
 	str		r1,[r11,#SP_ACT]
 ingame_back:
@@ -580,6 +591,16 @@ ingame_back:
 	cmp		r1,#ACT_DEBUG
 	beq		debug_now
 ingame_resume:						@;r10 I/O, r11 the spend area
+	@;The game frozen and muted until the menu keys are all up: it never
+	@;sees them (START opened Pokémon's menu after the stub's refusal),
+	@;and a key still held can't open the menu again at the next VBlank
+	adrl	r3,RTS_Reset_key
+	ldr		r3,[r3]
+1:	ldr		r2,[r10,#REG_P1]
+	bics	r2,r3,r2
+	bne		1b
+	ldrh	r1,[r11,#SP_DISPCNT]	@;the screen back after a refusal's white
+	strh	r1,[r10,#REG_DISPCNT]
 	bl		ingame_thaw
 	ldr		r1,[r11,#SP_ACT]
 	cmp		r1,#ACT_SLEEP
@@ -822,9 +843,9 @@ SetRampage:
 	strh 	r1,[r3]
 	mov 	r3,#0x8000000
 	strh  r2,[r3]
-	ldr 	r3,=0x8020000
+	add 	r3,r3,#0x20000
 	strh 	r1,[r3]
-	ldr 	r3,=0x8040000
+	add 	r3,r3,#0x20000
 	strh  r2,[r3]
 	ldr 	r3,=0x9C00000
 	strh  r0,[r3]
@@ -858,29 +879,16 @@ rSram_loop1:
 	BNE     rSram_loop
 	BX      LR
 rSram_loop:
-	LDRB    R3, [R0]
-	LSL 		R4,R3,#0
+	LDRB    R4, [R0]
 	LDRB    R3, [R0,#1]
-	LSL 		R5,R3,#8
-	ORR			R4,R5
+	ORR		R4,R4,R3,LSL #8
 	LDRB    R3, [R0,#2]
-	LSL 		R5,R3,#16
-	ORR			R4,R5
+	ORR		R4,R4,R3,LSL #16
 	LDRB    R3, [R0,#3]
-	LSL 		R5,R3,#24
-	ORR			R4,R5
+	ORR		R4,R4,R3,LSL #24
 	STR     R4, [R1,R0]
 	ADDS    R0, #4
 	B       rSram_loop1
-@;------------------------------------------------------
-restore2_IO:        @; IOaddress, offset
-	LDRB    R3, [R1]
-	LSL 		R4,R3,#0
-	LDRB    R3, [R1,#1]
-	LSL 		R5,R3,#8
-	ORR			R4,R5
-	STRH    R4, [R0]
-	bx lr
 	.ltorg
 @;===================================================
 @;SAVE, as the old menu's: the game's memory and registers into the state
@@ -1013,9 +1021,11 @@ register_list_loop:
 	cmp r2 ,#0xFF00
 	beq register_list_end
 
-	add r0,r10,r2   @;0x4000000  0x4000002 0x4000004
-	add r1,r11,r2
-	bl  restore2_IO
+	add r1,r11,r2	@;the register's two bytes from the I/O copy
+	ldrb r3,[r1]
+	ldrb r4,[r1,#1]
+	orr r3,r3,r4,lsl #8
+	strh r3,[r10,r2]
 	b 	register_list_loop
 register_list_end:
 	add		r8,r10,#0x200

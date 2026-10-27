@@ -150,7 +150,7 @@ struct ingame_shot {
 
 // --- The session block, at INGAME_SRAM_SESSION
 #define INGAME_SESSION_MAGIC 0x31535354u  // "TSS1"
-#define INGAME_SESSION_VERSION 3
+#define INGAME_SESSION_VERSION 4
 #define INGAME_NAME_BYTES 48
 #define INGAME_CHEATS 64  // the cheats the in-game list shows; the toggles' bits
 #define INGAME_PATH_BYTES 288  // a ROM's path (GAMESAVE_PATH_BYTES)
@@ -203,6 +203,7 @@ enum ingame_text {
 	// P4 and the polish
 	INGAME_TEXT_SHOT,  // the Screenshot row
 	INGAME_TEXT_SHOT_SAVED,  // the menu's footer once one is taken
+	INGAME_TEXT_SLEEP_WAKES,  // the menu's footer on the Sleep row: the keys that wake it
 	INGAME_TEXT_HINT,  // the menu's footer: the keys that close it
 	INGAME_TEXTS
 };

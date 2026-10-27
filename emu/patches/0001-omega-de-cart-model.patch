@@ -197,6 +197,20 @@ index 0000000..7b7a855
 +CXX_GUARD_END
 +
 +#endif
+diff --git a/include/mgba/internal/gba/gba.h b/include/mgba/internal/gba/gba.h
+index 206aedf..6ee69f1 100644
+--- a/include/mgba/internal/gba/gba.h
++++ b/include/mgba/internal/gba/gba.h
+@@ -108,6 +108,9 @@ struct GBA {
+ 	uint32_t idleLoop;
+ 	uint32_t lastJump;
+ 	bool haltPending;
++	// Torii: in the BIOS's Stop (SWI 3), which only a keypad, serial or
++	// Game Pak IRQ enabled in IE ends (GBATEK); a Halt ends on any
++	bool stopped;
+ 	bool cpuBlocked;
+ 	bool earlyExit;
+ 	uint32_t dmaPC;
 diff --git a/include/mgba/internal/gba/memory.h b/include/mgba/internal/gba/memory.h
 index a11c7e1..28ea10b 100644
 --- a/include/mgba/internal/gba/memory.h
@@ -2103,7 +2117,7 @@ index 5401c12..9a75d34 100644
  	bool forceSkip = gba->mbVf || (core->opts.skipBios && (gba->romVf || gba->memory.rom));
  	if (!forceSkip && (gba->romVf || gba->memory.rom) && gba->pristineRomSize >= 0xA0 && gba->biosVf) {
 diff --git a/src/gba/gba.c b/src/gba/gba.c
-index 26c2058..59c6107 100644
+index 26c2058..613b0c0 100644
 --- a/src/gba/gba.c
 +++ b/src/gba/gba.c
 @@ -132,6 +132,7 @@ static void GBAInit(void* cpu, struct mCPUComponent* component) {
@@ -2114,6 +2128,54 @@ index 26c2058..59c6107 100644
  	GBAMemoryClearAGBPrint(gba);
  	if (gba->memory.rom && !gba->isPristine) {
  		if (gba->yankedRomSize) {
+@@ -253,6 +254,7 @@ void GBAReset(struct ARMCore* cpu) {
+ 
+ 	gba->lastJump = 0;
+ 	gba->haltPending = false;
++	gba->stopped = false;
+ 	gba->idleDetectionStep = 0;
+ 	gba->idleDetectionFailures = 0;
+ 
+@@ -570,9 +572,23 @@ void GBAHalt(struct GBA* gba) {
+ 	gba->cpu->halted = 1;
+ }
+ 
++// Torii: the Stop as the hardware's (GBATEK, SWI 03h and HALTCNT): the CPU
++// sleeps until a keypad, serial or Game Pak IRQ that IE enables is flagged
++// in IF, whatever IME and CPSR's I say; any other IRQ (VBlank, a timer)
++// doesn't end it, and without one enabled nothing does. Upstream went on at
++// once, so a sleep that never wakes on the cart passed here. The video and
++// timers go on (the frames count, for mgba-shot's keys); the screen is
++// blank under the sleep's forced blank anyway.
++#define GBA_STOP_WAKE_IRQS ((1 << GBA_IRQ_GAMEPAK) | (1 << GBA_IRQ_KEYPAD) | (1 << GBA_IRQ_SIO))
++
+ void GBAStop(struct GBA* gba) {
+-	int validIrqs = (1 << GBA_IRQ_GAMEPAK) | (1 << GBA_IRQ_KEYPAD) | (1 << GBA_IRQ_SIO);
++	int validIrqs = GBA_STOP_WAKE_IRQS;
+ 	int sleep = gba->memory.io[REG_IE >> 1] & validIrqs;
++	gba->stopped = true;
++	gba->cpu->halted = 1;
++	if (gba->memory.io[REG_IE >> 1] & gba->memory.io[REG_IF >> 1] & validIrqs) {
++		GBATestIRQ(gba, 0);
++	}
+ 	size_t c;
+ 	for (c = 0; c < mCoreCallbacksListSize(&gba->coreCallbacks); ++c) {
+ 		struct mCoreCallbacks* callbacks = mCoreCallbacksListGetPointer(&gba->coreCallbacks, c);
+@@ -951,6 +967,14 @@ static void _triggerIRQ(struct mTiming* timing, void* user, uint32_t cyclesLate)
+ 	UNUSED(timing);
+ 	UNUSED(cyclesLate);
+ 	struct GBA* gba = user;
++	if (gba->stopped) {
++		// Torii: only a wake-up IRQ ends the Stop (GBAStop)
++		if (!(gba->memory.io[REG_IE >> 1] & gba->memory.io[REG_IF >> 1] & GBA_STOP_WAKE_IRQS)) {
++			return;
++		}
++		gba->stopped = false;
++		mLOG(GBA, INFO, "Stop: woken");
++	}
+ 	gba->cpu->halted = 0;
+ 	if (!(gba->memory.io[REG_IE >> 1] & gba->memory.io[REG_IF >> 1])) {
+ 		return;
 diff --git a/src/gba/io.c b/src/gba/io.c
 index 07a5cc8..5f3b325 100644
 --- a/src/gba/io.c

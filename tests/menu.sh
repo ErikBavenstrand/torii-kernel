@@ -192,9 +192,14 @@ run reset DOWN DOWN DOWN A -- -h $((key + 400)) -h $((key + 420)) -f $((key + 42
   fail "Reset game went back to the kernel"
 [ "$(awk '$1 == "hash" { print $4 }' <<<"$out" | sort -u | wc -l)" = 2 ] || fail "the game didn't run after Reset game"
 
-# Sleep: the BIOS's Stop (mgba-shot says so and goes on), then the game again
-run sleep DOWN DOWN DOWN DOWN A -- -h $((key + 400)) -h $((key + 420)) -f $((key + 420))
+# Sleep: the BIOS's Stop, which only START+SELECT ends (the emulated cart
+# sleeps as the real one does; tests/sleep.sh has the sleep keys), then the
+# game again
+run sleep DOWN DOWN DOWN DOWN A -- -k $((key + 300)):START+SELECT -k $((key + 306)):- \
+  -h $((key + 400)) -h $((key + 420)) -f $((key + 420))
 grep -q '^stop at frame' <<<"$log" || fail "Sleep didn't stop the CPU"
+woke=$(sed -n 's/^wake at frame \([0-9]*\)$/\1/p' <<<"$log")
+[ -n "$woke" ] && [ "$woke" -ge $((key + 300)) ] || fail "Sleep woke at ${woke:-no frame}, not on START+SELECT"
 [ "$(awk '$1 == "hash" { print $4 }' <<<"$out" | sort -u | wc -l)" = 2 ] || fail "the game didn't go on after Sleep"
 
 # Back to Torii: the kernel's ROM page and a reset into it
@@ -219,4 +224,4 @@ grep -q 'screen ready: ingame-cheats' <<<"$log" || fail "the Cheats row didn't o
   fail "the cheat list didn't turn the cheat on again"
 
 rm -rf "$cart"-{state,blend,extra,reset,sleep,torii,cheats}
-echo "PASS: the in-game menu opens on L+R+START (and with an extra key held) within $shown_in frames, B gives the game back as it was, and its rows save and load a state, turn the cheats off and on, reset the game, sleep and go back to Torii"
+echo "PASS: the in-game menu opens on L+R+START (and with an extra key held) within $shown_in frames, B gives the game back as it was, and its rows save and load a state, turn the cheats off and on, reset the game, sleep (START+SELECT wakes it) and go back to Torii"
