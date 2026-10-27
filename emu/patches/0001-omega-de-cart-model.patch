@@ -323,10 +323,10 @@ index 1d0c0dd..b77704a 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..5e4fa87
+index 0000000..737fb16
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1738 @@
+@@ -0,0 +1,1746 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -2043,6 +2043,14 @@ index 0000000..5e4fa87
 +		return false;
 +	}
 +	uint32_t patch = 0x08000000 + 8 + ((entry & 0xFFFFFF) << 2);
++	// Torii's entry code (RTS_ReplaceIRQ_start, Sleep_ReplaceIRQ_start)
++	// starts "mov r0, #0x4000000; adr r1, ...; str r1, [r0, #-4]": a game
++	// started without it (CLEAN BOOT) branches to its own code
++	uint32_t first = GBAOmegaRead16(gba, patch) | (uint32_t) GBAOmegaRead16(gba, patch + 2) << 16;
++	uint32_t third = GBAOmegaRead16(gba, patch + 8) | (uint32_t) GBAOmegaRead16(gba, patch + 10) << 16;
++	if (first != 0xE3A00301 || third != 0xE5001004) {
++		return false;
++	}
 +	uint32_t pc = gba->cpu->gprs[ARM_PC];
 +	return pc >= patch && pc < patch + 0x10000;
 +}

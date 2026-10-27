@@ -19,13 +19,13 @@ boot-addon/addons 9D5EA05F12ADBBF3
 boot-addon-copy/copied 834EDB23818102AF
 boot-addon-copy/fast 834EDB23818102AF
 boot-addon-copy/slow 834EDB23818102AF
-boot-addon-copy/frames 0-0 5E84A98E27022AAF
-boot-addon-copy/frames 1-1 19DCD0D3B5B1BD37
-boot-addon-copy/frames 2-2 977ABC40009AA3CF
-boot-addon-copy/frames 3-3 DE26B06BB5562CB7
-boot-addon-copy/frames 4-4 6D2F15F6D3036DAF
-boot-addon-copy/frames 5-5 F73409F0FDA642F7
-boot-addon-copy/frames 6-6 DAD31F1E4C6A2B4F
+boot-addon-copy/frames 0-0 19DCD0D3B5B1BD37
+boot-addon-copy/frames 1-1 977ABC40009AA3CF
+boot-addon-copy/frames 2-2 DE26B06BB5562CB7
+boot-addon-copy/frames 3-3 6D2F15F6D3036DAF
+boot-addon-copy/frames 4-4 F73409F0FDA642F7
+boot-addon-copy/frames 5-5 DAD31F1E4C6A2B4F
+boot-addon-copy/frames 6-6 F3F63696546A34F7
 boot-copy/copied D31E83436AD1B5A9
 boot-copy/fast D31E83436AD1B5A9
 boot-copy/slow D31E83436AD1B5A9
