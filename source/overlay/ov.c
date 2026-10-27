@@ -919,8 +919,9 @@ static void state_mark(uint32_t slot)
 }
 
 // The answer for the kernel's next boot: the last action, and with the
-// cheat list, the entries on (as launched again after Reset game: the
-// BIOS's SoftReset zeroes the toggles)
+// cheat list, the entries on (as launched again after Reset game and Load
+// state: the
+// BIOS's SoftReset and LOAD zero the toggles)
 static void answer(uint32_t act)
 {
 	struct ingame_out out;
@@ -935,8 +936,9 @@ static void answer(uint32_t act)
 	out.action = (uint16_t)act;
 	if (act == INGAME_ACT_SAVE && m.saved_slot)
 		out.pending_state = (uint16_t)m.saved_slot;
-	if (m.changed || (act == INGAME_ACT_RESET && out.cheats_changed)) {
-		const uint32_t *on = act == INGAME_ACT_RESET ? m.launched : m.on;
+	int as_launched = act == INGAME_ACT_RESET || act == INGAME_ACT_LOAD;  // both zero the toggles
+	if (m.changed || (as_launched && out.cheats_changed)) {
+		const uint32_t *on = as_launched ? m.launched : m.on;
 		out.cheat_on[0] = on[0];
 		out.cheat_on[1] = on[1];
 		out.cheats_changed = 1;

@@ -243,6 +243,12 @@ int ingame_states_launch(const char *rom_path, const char *save_slot, const char
 	u32 want = slot ? slot : statestore_newest(&states.list);
 	u32 start = torii_frames;
 	int loaded = want && statestore_load(rom_path, save_slot, want, states.rom_crc, slot != 0);
+	// The newest didn't read whole (a card's error): the next newest, and on
+	while (!loaded && !slot && want) {
+		states.list.slot[want].have = 0;  // the session's rows say empty: it can't load
+		want = statestore_newest(&states.list);
+		loaded = want && statestore_load(rom_path, save_slot, want, states.rom_crc, 0);
+	}
 	if (!loaded && slot)
 		tlog_error("states: slot %lu of %s (%s) didn't read: the game starts from its start",
 			   (unsigned long)slot, rom_path, save_slot);

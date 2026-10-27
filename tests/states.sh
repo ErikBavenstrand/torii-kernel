@@ -45,7 +45,7 @@ python3 tests/setnor.py set "$cart/kernel-nor.bin" 0=0xE1E1 1=1 2=1 3=0 4=0 5=9 
 
 # The clock: 27 Oct 2026 14:03 UTC
 export TZ=UTC
-clock=1792850580
+clock=1793109780
 
 boot() { OMEGA_DIR=$cart OMEGA_TRACE=1 emu/build-linux/mgba-shot dist/ezkernelnew.bin -c $clock "$@"; }
 
