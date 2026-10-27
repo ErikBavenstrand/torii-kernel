@@ -124,6 +124,8 @@ static void __attribute__((noinline)) Show_boot_notice(const char *line1, const 
 // slow one (a big, slow card; making the log file) says it is busy. The
 // boot calls it between its steps.
 #define BOOT_NOTICE_FRAMES 20
+#define BOOT_MOUNT_RETRIES 3
+#define BOOT_MOUNT_PAUSE 30  // frames before each retry
 static u32 boot_mounted;  // torii_frames once the card mounted
 static u8 boot_noticed;
 static void Boot_notice_check(void)
@@ -1519,7 +1521,20 @@ int main(void)
 	// the list.
 	dialog_open();
 	res = f_mount(&EZcardFs, "", 1);
+	// Torii: a card that doesn't answer gets a few more tries, SD mode off
+	// and a pause between, before the error that asks for a power-off: one
+	// left busy by a game's own SD access (the in-game probe's) may answer
+	// again, and a power-off loses cart RAM page 0xF0 (cartlog.h)
+	for (u32 retry = 1; res != FR_OK && retry <= BOOT_MOUNT_RETRIES; retry++) {
+		tlog_error("boot: the card didn't mount (%u); trying again (%lu of %u)", (unsigned)res,
+			   (unsigned long)retry, BOOT_MOUNT_RETRIES);
+		SD_Disable();
+		for (u32 f = 0; f < BOOT_MOUNT_PAUSE; f++)
+			VBlankIntrWait();
+		res = f_mount(&EZcardFs, "", 1);
+	}
 	if (res != FR_OK) {
+		cartlog_mount_failed();
 		Show_boot_notice(gl_init_error, gl_power_off, DIALOG_ERROR);
 		while (1)
 			ui_frame();
@@ -1846,6 +1861,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 			     "%lu more off for the in-game list",
 			     pfilename, gl_reset_on, gl_rts_on, gl_sleep_on, gl_cheat_on, (unsigned long)gl_cheat_picks,
 			     (unsigned long)(gl_cheat_count - gl_cheat_picks));
+			ingame_probe_prepare(GAMECODE);  // the in-game probe ROM's scratch file
 			tlog_flush();
 			if ((gl_reset_on == 1) || (gl_rts_on == 1) || (gl_sleep_on == 1) || (gl_cheat_on == 1)) {
 				// Torii (v0.8): the save states, as Boot_NOR_game's, and

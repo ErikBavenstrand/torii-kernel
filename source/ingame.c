@@ -129,14 +129,20 @@ void ingame_probe_prepare(const u8 *code)
 		f_close(&gfile);
 	}
 	tlog("launch: the in-game probe's scratch sector: %lu", (unsigned long)lba);
-	// Its place in the report: no magic, then the sector
-	u8 in[20];
+	// Its place in the report: no magic, then the sector and its check
+	u8 in[24];
+	u32 check = INGAME_PROBE_CHECK(lba);
 	memset(in, 0, sizeof(in));
 	memcpy(in + 16, &lba, 4);
+	memcpy(in + 20, &check, 4);
 	SetRampage(CARTLOG_PAGE);
 	for (u32 i = 0; i < sizeof(in); i++)
 		((vu8 *)CARTLOG_INGAME_PROBE)[i] = in[i];
+	// The last run's copy in the probe's save (loaded into cart SRAM just
+	// before) goes, so the next boot can't take it for this run's
 	SetRampage(0);
+	for (u32 i = 0; i < 16; i++)
+		CART_SRAM[INGAME_PROBE_SAVE_OFFSET + i] = 0;
 }
 
 // The in-game list's cheats (cheatstore_launch): how many it wrote to cart

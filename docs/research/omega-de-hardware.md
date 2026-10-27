@@ -720,6 +720,12 @@ real cart until the in-game probe (`tests/roms/ingame`) reports.
 `OMEGA_GAME_SRAM=drop` (writes to pages from `0x20` lost in game mode) and
 `flip-image` (a byte of the overlay image reads wrong) inject the faults
 `tests/menu_safety.sh` checks the stub refuses safely.
+The probe's first real-cart run (2026-10-27, every save type) reported
+nothing: the kernel's boot after its soft reset showed "microSD card error",
+and the power-off that took cleared page `0xF0`. Its SD test is the only
+step that touches the SD controller, so it is the suspect; the probe now
+saves its report before that test (also in its battery-backed save), runs
+it only on A, and the boot retries the mount three times.
 
 ## 7. Logging and Diagnostics
 

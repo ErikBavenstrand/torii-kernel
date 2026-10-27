@@ -61,7 +61,7 @@ on, NES with no NES launch) as "unconfirmed" in its summary.
 | Reset game | in the menu, Reset game: the game starts again from its title, without the kernel, and its save is untouched |
 | Back to Torii | in the menu, Back to Torii: the kernel starts, as RESET did |
 | DEBUG reaches the log | with LOGGING on: L+R+START, Debug snapshot (the last row); the menu comes back saying the snapshot is kept. Choose Back to Torii, not power-off: the snapshot is in cart RAM, which a power-off clears. The kernel's boot logs "debug info" |
-| The in-game probe | `ingame.gba` (v0.8 P0): Clean boot it once with its save type at each of SRAM, Flash 64K, Flash 128K, EEPROM 8K (Game info, Save type); for Flash 128K, first give it a save whose two 64 KB banks differ (copy a Pokémon FireRed or Emerald `.sav` into its save folder). Each run takes a few seconds; A goes back to the kernel, whose boot logs "in-game probe:" lines. See below |
+| The in-game probe | `ingame.gba` (v0.8 P0): Clean boot it once with its save type at each of SRAM, Flash 64K, Flash 128K, EEPROM 8K (Game info, Save type); for Flash 128K, first give it a save whose two 64 KB banks differ (copy a Pokémon FireRed or Emerald `.sav` into its save folder). Run each save type twice: first press B at "A: TRY THE SD CARD" (skip it), then A. Photograph both result pages (LEFT/RIGHT) of each run, then press A to go back to the kernel; never switch off at the probe. The kernel's boot logs "in-game probe:" lines. See below |
 | Sleep sleeps and wakes | Sleep on, Boot with addon, L+R+SELECT in the game: the screen goes off; the wake keys bring the game back where it was |
 | A cheat works | `hello.gba`'s popup shows Cheats 1; on the cheat screen, A ticks Green square and B saves. Boot with addon: Hello doesn't react to buttons, and a green square in its top right corner shows the cheat at work from the start. L+R+START, the Cheats row (A) says off and the square stays as it was drawn last; A again says on. Switched off and on, the tick is still there |
 | A GB or GBC game runs | from its console's list or the SD card page; note the game's title |
@@ -116,6 +116,19 @@ off, and SRAM's four wait-state settings. It puts back what it writes. Send
 the log's "in-game probe:" lines from each save type's run: they decide what
 the in-game menu's save states and screenshots can rely on (they use cart
 SRAM 0x40000-0xD8FFF in game mode, which only the emulator has shown so far).
+
+The probe runs the cart tests by itself, saves its report and shows page
+1/2 (CART); the SD test runs only on A there, last, as on v0.8's first run
+the kernel's next boot said "microSD card error" every time. B skips it, so
+the B run tells whether the SD test is what breaks the card. After that,
+page 2/2 (SD CARD) shows; LEFT/RIGHT switch pages. Photograph both pages:
+they are the report even if the log never gets it. Then press A, the soft
+reset back to the kernel: the report waits in cart RAM page 0xF0, which a
+power-off clears. If the kernel then says "microSD card error" (it retries
+three times first), note it, and only then switch off and on: the probe also
+keeps the report in its own save (SRAM and flash save types; the screen's
+SAVED line says whether), so the next boot still logs it ("the report from
+its save"), with how the run ended. Send the photos and the lines.
 
 **The copy's estimate:** during a Clean boot the cart copies the game into
 PSRAM by itself, and the bar moves on an estimate from the file size

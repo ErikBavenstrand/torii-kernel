@@ -43,6 +43,10 @@ void cartlog_boot_start(void);
 // mounted, then cartlog_phase(PHASE_MENU) when the menu shows.
 void cartlog_boot_report(void);
 
+// The boot found the card wouldn't mount: noted in the in-game probe's
+// report copy in its save, if one is there, as nothing else can be logged
+void cartlog_mount_failed(void);
+
 // Records where the kernel is (only with LOGGING on). game is the file being
 // launched, or NULL.
 void cartlog_phase(u32 phase, u32 detail, const char *game);
