@@ -459,13 +459,13 @@ struct lang_ingame {
 	// Save state and Screenshot rows' footer at the session's first opening
 	const char *torii_save, *first_save;
 	const char *unsaved_state;  // the menu's footer while a state saved in game waits
+	// With lang_fill's placeholders: the Screenshot row once some are taken,
+	// how many ({1}) of how many ({2}); the menu's footer while screenshots
+	// ({1}) wait for Back to Torii, alone or with a state saved in game, for
+	// one, then for more
+	const char *shot_count;
+	const char *unsaved_shots[2], *unsaved_both[2];
 };
-// The Screenshot row once some are taken: how many (%lu), of how many (%lu)
-#define EN_INGAME_SHOT_COUNT "Screenshot %lu/%lu"
-// The menu's footer while screenshots (%lu, then "s" for more than one)
-// wait for Back to Torii, alone or with a state saved in game
-#define EN_INGAME_UNSAVED_SHOTS "Not on card yet: %lu screenshot%s"
-#define EN_INGAME_UNSAVED_BOTH "Not on card yet: 1 state, %lu shot%s"
 extern const struct lang_ingame *gl_ingame;
 
 // Save states (source/statestore.c): a slot's row in game, by its number
@@ -501,6 +501,11 @@ extern const struct lang_states *gl_states;
 extern u32 gl_lang;  // index of the current language in lang_packs
 
 void LoadEnglish(void);
+
+// Copies text into out (room bytes, cut on a whole UTF-8 character and
+// ended), each {1} as a in decimal and each {2} as b: the numbered
+// placeholders v0.9's language packs use, in a pack's own order
+void lang_fill(char *out, u32 room, const char *text, u32 a, u32 b);
 
 // A language: the id SETTINGS stores, its name and what loads its strings
 typedef struct {

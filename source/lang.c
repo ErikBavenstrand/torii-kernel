@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include <string.h>
+
 #include "lang.h"
 #include "settings_model.h"
 #include "screens/info.h"
@@ -812,6 +815,9 @@ static const struct lang_ingame en_ingame = {
 	.torii_save = "Back to Torii and save",
 	.first_save = "Saved to the card on Back to Torii",
 	.unsaved_state = "Not on card yet: 1 state",
+	.shot_count = "Screenshot {1}/{2}",
+	.unsaved_shots = {"Not on card yet: {1} screenshot", "Not on card yet: {1} screenshots"},
+	.unsaved_both = {"Not on card yet: 1 state, {1} shot", "Not on card yet: 1 state, {1} shots"},
 };
 
 static const struct lang_states en_states = {
@@ -983,6 +989,34 @@ void LoadEnglish(void)
 	gl_gsaves = &en_gsaves;
 	gl_ingame = &en_ingame;
 	gl_states = &en_states;
+}
+//---------------------------------------------------------------------------------
+void lang_fill(char *out, u32 room, const char *text, u32 a, u32 b)
+{
+	if (!room)
+		return;
+	u32 at = 0;
+	while (*text) {
+		char num[11];
+		const char *piece = text;
+		u32 len = 1;
+		if (text[0] == '{' && (text[1] == '1' || text[1] == '2') && text[2] == '}') {
+			snprintf(num, sizeof(num), "%lu", (unsigned long)(text[1] == '1' ? a : b));
+			piece = num;
+			len = (u32)strlen(num);
+			text += 3;
+		} else {
+			// A whole UTF-8 character: its lead byte and continuation bytes
+			while ((text[len] & 0xC0) == 0x80)
+				len++;
+			text += len;
+		}
+		if (at + len >= room)
+			break;
+		memcpy(out + at, piece, len);
+		at += len;
+	}
+	out[at] = 0;
 }
 //---------------------------------------------------------------------------------
 // The languages Settings offers. A new language adds its strings and a

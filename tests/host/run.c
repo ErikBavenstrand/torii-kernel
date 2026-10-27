@@ -270,6 +270,7 @@ static const struct {
 	{"orphanplan_pick_name_full", test_orphanplan_pick_name_full},
 	{"orphanplan_journal", test_orphanplan_journal},
 	{"orphanplan_picker", test_orphanplan_picker},
+	{"lang_fill", test_lang_fill},
 };
 
 int main(void)

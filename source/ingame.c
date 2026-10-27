@@ -359,8 +359,7 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 		snprintf(hint, sizeof(hint), "%s%s", keys_text, t->hint);
 	char counts[INGAME_SHOTS_MAX][24];
 	for (u32 i = 0; i < INGAME_SHOTS_MAX; i++)
-		snprintf(counts[i], sizeof(counts[i]), EN_INGAME_SHOT_COUNT, (unsigned long)i + 1,
-			 (unsigned long)INGAME_SHOTS_MAX);
+		lang_fill(counts[i], sizeof(counts[i]), t->shot_count, i + 1, INGAME_SHOTS_MAX);
 	const char *text[INGAME_TEXTS] = {
 		[INGAME_TEXT_TITLE] = h->name[0] ? h->name : "Torii",
 		[INGAME_TEXT_RESUME] = t->resume,
@@ -399,9 +398,9 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 	};
 	char unsaved[2][INGAME_SHOTS_MAX][40];
 	for (u32 i = 0; i < INGAME_SHOTS_MAX; i++) {
-		const char *s = i ? "s" : "";
-		snprintf(unsaved[0][i], sizeof(unsaved[0][i]), EN_INGAME_UNSAVED_SHOTS, (unsigned long)i + 1, s);
-		snprintf(unsaved[1][i], sizeof(unsaved[1][i]), EN_INGAME_UNSAVED_BOTH, (unsigned long)i + 1, s);
+		u32 more = i > 0;
+		lang_fill(unsaved[0][i], sizeof(unsaved[0][i]), t->unsaved_shots[more], i + 1, 0);
+		lang_fill(unsaved[1][i], sizeof(unsaved[1][i]), t->unsaved_both[more], i + 1, 0);
 		text[INGAME_TEXT_SHOT_COUNT + i] = counts[i];
 		text[INGAME_TEXT_UNSAVED_SHOTS + i] = unsaved[0][i];
 		text[INGAME_TEXT_UNSAVED_BOTH + i] = unsaved[1][i];
