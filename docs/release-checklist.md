@@ -56,9 +56,11 @@ on, NES with no NES launch) as "unconfirmed" in its summary.
 | Save states reach the card | Save state into slot 2, then Back to Torii: the boot shows "Saving the save state" with a bar and `/torii/states/<rom path>/Main/2.state` is on the card. Launch the game again: Load state at once gives the saved point. The game's popup, Load state, lists the slot with its time and starts the game in it. Power off in game after a Save state: the state is lost (cart RAM past the save has no battery), never half kept |
 | Cheats in game | a game with three or four cheats (one picked): L+R+START, Cheats lists them with a box each; A turns one on and it works from the next frame, a greyed one says why at the bottom. Back to Torii: the game's Cheats screen has the new picks |
 | A screenshot | in a game's menu, Screenshot: the footer says "Saved when you return to Torii". Back to Torii: the boot shows "Saving the screenshot" ("Saving screenshots" for several, its status "1 of 3" and on) with a bar (a few seconds each), then `/torii/screenshots/<game> <date> <time>.bmp` is on the card. On a PC it shows the game's screen as it was under the menu; note how it compares (a scrolled tile screen may sit shifted, a fade or a Mode 7 road comes out wrong: those registers can't be read back). Try a bitmap game (Doom) and one with sprites over tiles |
+| A screenshot's time | in a game that has the cart's clock (Pokémon Emerald, Settings' game clock on), take a screenshot, play two more minutes, then Back to Torii: the file's time in its name is when you took it, two minutes before the filing, and the log says "screenshot: named by the clock in game". Then check the game's own clock (Emerald's, in the player's house): reading the clock from the menu mustn't have upset it. In a game without the clock the name has the filing's time, as before |
 | A screenshot survives a power cut | take a screenshot, Back to Torii, and switch off while "Saving the screenshot" and its bar show; power on: no broken `.bmp` is left in `/torii/screenshots` (the boot deletes it), and no `.writing` file |
 | A refused menu says why | if L+R+START shows a plain coloured screen instead of the menu, the stub refused it: note the colour (table below), then press B (back to Torii, which keeps the stub's record; A gives the game back, and a power-off loses the record). The boot's dialog says why, and with LOGGING on two "in-game menu:" lines give the details: send both |
 | In-game menu Off | Settings, Hotkeys, In-game menu: Off, then Boot with addon a game with a cheat picked: L+R+START does nothing and the cheat still works. Every game: the menu opens in a game with no save states or cheats. Menu keys set to another combination (say L+R+B): that one opens it, and the menu's footer names it |
+| A 32 MB game's menu | Boot with addon a 32 MB game (Mother 3, a big romhack) with a cheat picked: the menu opens and the cheat works. The log's "launch: the patch area" line says where the in-game code went: "cut to N bytes at ..." (padding before the ROM's end), or "goes over the game's last bytes" (no padding: note the game; it may misbehave near its end, as with the official kernel). Also with In-game menu on Every game and Save states off: the menu opens (before v0.9 its code was cut short there) |
 | Reset game | in the menu, Reset game: the game starts again from its title, without the kernel, and its save is untouched |
 | Back to Torii | in the menu, Back to Torii: the kernel starts, as RESET did |
 | DEBUG reaches the log | with LOGGING on: L+R+START, Debug snapshot (the last row); the menu comes back saying the snapshot is kept. Choose Back to Torii, not power-off: the snapshot is in cart RAM, which a power-off clears. The kernel's boot logs "debug info" |
@@ -98,6 +100,9 @@ do. With Logging on Debug, each of these leaves lines in the log.
 | Diagnostics from Info | Info, Diagnostics: its first page comes up, and B there comes back to Info, on its row; run it through once from there too |
 | The copy estimate | see "The copy's estimate" below: set `PROGRESS_COPY_RATE` from two or three big games |
 | The scroll's brake | let go of a held scroll at top speed: it should stop within about two rows. If it overshoots, raise `SPRING_BRAKE` (`source/ui/ui_list.c`) |
+| A big folder | the SD card page on a folder of 300+ files and one of 1,000+ subfolders: note how long it takes to open (the emulator: 0.2 s per 300 files) and whether the first frames stutter (the log's `frame-cycles` and `sd-folder` lines) |
+| Identify's time | a game's popup, Identify (or a new game's background CRC) on a 16 MB game: time it, about 1.6 s per MB estimated; the log's `names:` lines give the crc.txt write steps |
+| About's free space | on an exFAT card, Info, About the first time after power-on: how long until the free space shows |
 | Format all's time | time a real Format all on the NOR page (it erases every NOR game) and set `CHIP_ERASE_FRAMES` (`source/NORflash_OP.c`) from it; its bar is only an estimate |
 
 **The EEPROM probe** writes blocks 1–4 four different ways, reads them back
@@ -185,7 +190,10 @@ you (A yes, B no, SELECT skip; START at the first question skips them all):
 - **The screen** and **the LED:** confirmed in v0.2.1; answer them.
 - **The clock:** look at a real clock (a phone) when you answer, and note
   the real time: the log records what the cart's clock read then, so the
-  two give its drift. The menu's clock must match too.
+  two give its drift. The menu's clock must match too. The cart doesn't
+  change for summer time: an hour fast after the clocks went back (as on
+  2026-10-27) is the clock still set to summer time, not drift. Note it,
+  then set the time in Settings and answer again.
 - The "since the last run" checks from the table above.
 
 At the end, A restarts the kernel. SELECT crashes it on purpose first, to

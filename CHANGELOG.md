@@ -6,6 +6,20 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** a screenshot is named by when it was taken, not when Back to
+  Torii filed it: the menu reads the cart's clock at the shot in games that
+  have it (unless the game was mid-way through its own read), and the boot
+  uses it if it falls between the launch and now (6aa4e212).
+- **Fixed:** full 32 MB ROMs: the in-game code and cheats go in the last
+  padding before the ROM's end that holds them, not over its data, for
+  menu-only launches too; In-game menu Every game with Save states off cut
+  the menu's code short at a 32 MB ROM's end (873d6676).
+- **Fixed:** Settings' Game saves listed only the first 256 games with
+  saves; it lists them all now, up to the library's 4,096 (9af7a7fa).
+- **Changed:** the in-game menu's screenshot count and "Not on card yet"
+  footers come from the language strings, ready for v0.9's packs (a9cf916e).
+- **Changed:** the menu's pages share one block of EWRAM for their state,
+  freeing 7.6 KB for v0.9's language work (8da81fd5).
 - **Changed:** the game popup's Load state list cut "Slot N" to "S..." (its
   date filled the row): it is titled Load state now, and each row shows the
   slot's number and how long ago it was saved, as Recent does ("2h ago"),

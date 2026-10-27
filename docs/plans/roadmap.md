@@ -34,28 +34,28 @@ Each release's details are in `CHANGELOG.md`; the planning, ticket reports and r
 
 ## Before v0.9
 
-Everything still open from v0.4.3–v0.8.1, in one place. None of it blocks v0.9's code; the cart checks block the next release tag (`docs/release-checklist.md`).
+Everything still open from v0.4.3–v0.8.1, triaged 2026-10-27; what code could fix is fixed (CHANGELOG's Unreleased). None of the rest blocks v0.9's code; the cart checks block the next release tag, with their steps in `docs/release-checklist.md`.
 
-### Cart checks
+### Cart checks (the owner, on the real cart)
 
-- **v0.8 still to check on the cart:** In-game menu Off and custom menu keys; the in-game probe's verdict (`tests/roms/ingame`, Clean boot at Flash 128K, then A: cart SRAM pages `0x20`-`0xEF` in game mode).
-- **Untried since v0.2.2:** DEBUG, NES, the EEPROM probe's verdict, the clock against real time (GB/GBC and GB rumble passed v0.6's cart run).
+- **v0.8 still to check:** In-game menu Off and custom menu keys; the in-game probe's verdict (`tests/roms/ingame`, Clean boot at Flash 128K, then A: cart SRAM pages `0x20`-`0xEF` in game mode).
+- **New since v0.8.1:** a screenshot named by the clock as it was taken, and the game's own clock left right after (Pokémon Emerald); a 32 MB game's menu and cheats with the in-game code in its padding, and with In-game menu Every game and Save states off.
+- **Untried since v0.2.2:** DEBUG, NES, the EEPROM probe's verdict, the clock against real time (GB/GBC and GB rumble passed v0.6's cart run). The cart's clock read an hour fast on 2026-10-27: most likely still on summer time (the cart has no DST); the checklist's clock step says to note it and set it.
 - **Unmeasured:** the ROM copy rate (`PROGRESS_COPY_RATE`); the walk of a full card; SD folder open time (0.2 s per 300 files emulated) and the 251k-cycle frame on a folder of 1,024+ subfolders; covers from an art folder of thousands of files; Identify (about 1.6 s per MB, estimated) and crc.txt's write steps; About's first free-space read on exFAT; `CHIP_ERASE_FRAMES` from a timed Format all.
-- **Hardware unknowns:** whether an SD write right after the FPGA's ROM copy is safe; what the real BIOS does on an undefined instruction; where a DMA into PSRAM from cart space lands (`docs/research/omega-de-hardware.md`).
+- **Hardware unknowns** (each needs a probe of its own, not a checklist step): whether an SD write right after the FPGA's ROM copy is safe; what the real BIOS does on an undefined instruction; where a DMA into PSRAM from cart space lands (`docs/research/omega-de-hardware.md`).
 
-### Known limits
+### Known limits (accepted)
 
-- **In-game menu:** a screenshot's time is the filing's, not the moment it was taken (the clock in game mode waits on the probe); one screenshot a trip back to Torii (a second replaces the first); a menu with Save states and cheats has no room for the game's name; full 32 MB ROMs keep the old trim.
-- **States:** write-only display registers can't be put back in games that keep no RAM copy of them (44 compat games stay blank until the game redraws); the sound DMA's position drifts after a load; Sonic Advance and Moto Racer replace the IRQ hook, and HP Quidditch blocks the menu.
-- **Screenshots:** write-only registers (scroll, BG matrices, BLDY, window bounds) can't be dumped, so scrolled tile screens may sit shifted and fades and Mode 7 roads come out wrong.
-- **Saves:** Game saves past 256 games with saves aren't listed (logged).
-- **Emulators:** hi-colour GBC games lose mid-frame palette writes (jagoombacolor#20, #53; `docs/research/gbc-hicolor.md`). Left from the trackers: jagoombacolor#42 accuracy tests, #43 a GBC-compatible ROM run as DMG, #34 the default palette; PocketNES#14 multiboot.
+- **In-game menu:** the game's name shows above the rows only when they leave room (with Save states and cheats they don't). By design (owner, 2026-10-27): the game is on screen behind the menu. A 32 MB ROM with no padding at all before its end still gets the in-game code over its last bytes, as the official kernel did (a 32 MB ROM fills the address space; the log says so).
+- **States:** write-only display registers can't be put back in games that keep no RAM copy of them (44 compat games stay blank until the game redraws); the sound DMA's position drifts after a load (its source counter can't be read; research for 1.0: games on Nintendo's MP2000 sound engine keep the PCM buffer's position in RAM, which could re-sync DMA1 at LOAD); Sonic Advance and Moto Racer replace the IRQ hook, and HP Quidditch blocks the menu.
+- **Screenshots:** the scroll comes from the game's own RAM copy of its registers where it keeps one (pokeemerald's `gGpuRegBuffer`, Nintendo's library); without one a scrolled tile screen sits shifted, and the BG matrices, BLDY, MOSAIC and window bounds stay write-only, so fades and Mode 7 roads come out wrong. A screenshot in a game without the cart's clock, or taken while the game was reading it, is named by the filing's time.
+- **Emulators:** hi-colour GBC games lose mid-frame palette writes (jagoombacolor#20, #53): a per-line palette path in Jagoomba's renderer needs about 18 KB it doesn't have and its last DMA channel; a 1.0 project (`docs/research/gbc-hicolor.md`). Left from the trackers: jagoombacolor#42 accuracy tests, #43 a GBC-compatible ROM run as DMG, #34 the default palette; PocketNES#14 multiboot.
 
 ### Decisions for v0.9
 
-- **Memory:** EWRAM has 3,756 bytes free in the release kernel and 2,680 in the test kernel (2026-10-27), so v0.9's tables can't go there. The screens' EWRAM states (`games` 3.7 KB, `sd` 3.6 KB, `info` 2.7 KB, `nor` 1.4 KB, Diagnostics' `scr` 1.6 KB) could share a union for 5 to 8 KB if needed. ROM has 217 KB free, IWRAM 10 KB.
-- **PSRAM map:** 384 KB is left for the language tables (`source/engine/psram.h`); the owner was unsure about fixing the map.
-- **In-game strings:** the menu's strings are drawn by the kernel at launch (`lang.c`'s `gl_ingame`), so a language pack has to reach them there.
+- **PSRAM map:** 384 KB of page 0 (7.625–8 MB, `source/engine/psram.h`) is reserved for the language tables; how to split it (the active pack's strings, an extra script's font, PSRAM page 1 for CJK-size fonts) is decided when v0.9 starts (owner, 2026-10-27).
+- **Memory:** EWRAM has 11,388 bytes free in the release kernel and 10,312 in the test kernel since the pages' states share one block (2026-10-27); ROM has about 215 KB free, IWRAM 10 KB.
+- **In-game strings:** ready: every string the overlay shows comes from `gl_ingame`, drawn by the kernel at launch, with v0.9's numbered placeholders (`lang_fill`) and one/other forms where a count shows. The kernel's own dialogs about the menu (`EN_INGAME_REFUSED*`) are printf formats like the rest of `lang.h`'s `EN_*`, for v0.9's string IDs.
 - **Licences:** No-Intro's terms for a derived name table (built on the user's machine, never bundled); libretro-thumbnails has no licence grant (fetched locally, never committed); the boxes' trade dress.
 
 ## v0.9 Languages and firmware
