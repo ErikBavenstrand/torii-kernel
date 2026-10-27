@@ -154,6 +154,41 @@ changed, all garbage before and after. Three from FF6 and one from Pokemon
 Emerald were unreadable, and now decode to `C`-prefixed "turn off"
 conditionals at bad addresses.
 
+## The validation suite (v0.7.1)
+
+Three layers check Torii's cheats against mGBA's, and where mGBA reads a
+code unlike the device, against the device. `tests/cheat_expected.toml`
+lists every difference that is meant ("allow") or a known bug ("xfail",
+`[[bug]]`), with the reason; anything else fails.
+
+- **Decoding** (`tools/cheat_diff.py`): mGBA's GBA cheat decoders are built
+  for the host from `emu/mgba` (`tools/mgba_cheats.sh`, stubs and flags in
+  `tools/mgba_cheats/`) and decode the same files as Torii's. `just
+  cheat-corpus` runs libretro's database (fetched into `dist/cheat-corpus`,
+  never committed; report in `dist/cheat-corpus/report.txt`), test-host the
+  committed `tests/cheats/sample` (seeded codes from `tools/cheat_sample.py`,
+  and hand-made edges with the device's reading in `expect.tsv`), and `just
+  cheat-fuzz-decode` any number of random codes.
+- **Running** (`tests/cheat_matrix.py`, in `just test`): every code type of
+  every format at every width, into every watched region aligned and not,
+  every comparator at every width with each action, nesting, buttons, ROM
+  patches, on the cheat test ROM in both engines. Where mGBA reads a code
+  unlike the device (C6/C7, an empty THEN, signed tests narrower than a
+  word, slowdown, a second key), mGBA runs codes it reads as the device
+  reads the case's (`NAME.equiv.cht`).
+- **Fuzzing** (`just cheat-fuzz SEED COUNT`): seeded random programs of
+  valid codes, minus the shapes where Torii means to differ, run in both
+  engines with random keys; failing ones are minimized and saved to
+  `tests/cheat_fuzz_cases.json`, which `just test` runs.
+
+What it found beyond the known bugs: an unaligned VBA (or CodeBreaker)
+halfword or word write to the ROM is patched byte for byte where a CPU store
+and mGBA align it down; a DEADFACE line in a cheat with its own
+`cheatN_format` doesn't reseed the file's later cheats; mGBA's D0000020
+leaves its ELSE count uninitialized, its GameShark list reads freed memory,
+its PARv3 decoder shifts by a negative count for width-8 conditionals, and
+its libretro reader fails a whole file on a line past 511 characters.
+
 ---
 
 **Sources**

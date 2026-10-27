@@ -1,0 +1,14 @@
+cheats = 3
+
+cheat0_desc = "key 1"
+cheat0_code = "9A2B3C4D 5E6F+48A48425 F672"
+cheat0_enable = true
+
+cheat1_desc = "key 2"
+cheat1_code = "91234567 89AB+3F29E08D 019C"
+cheat1_enable = true
+
+cheat2_desc = "after key 2"
+cheat2_code = "084DEB82 51AE"
+cheat2_enable = true
+

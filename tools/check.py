@@ -206,6 +206,28 @@ RULES = [
     ),
     (
         [
+            "tools/cheat_oracle.c",
+            "tools/cheat_corpus.c",
+            "tools/cheat_diff.py",
+            "tools/cheat_gen.py",
+            "tools/cheat_sample.py",
+            "tools/cheat_corpus_fetch.sh",
+            "tools/mgba_cheats.sh",
+            "tools/mgba_cheats/*",
+            "tests/cheat_corpus.*",
+            "tests/cheat_expected.toml",
+            "tests/cheat_fuzz*",
+            "tests/cheat_engine.*",
+            "tests/cheats/sample/*",
+        ],
+        {LINT, TEST_HOST, TEST},
+        (
+            "cheat validation suite: test-host decodes tests/cheats/sample with Torii's and mGBA's decoders, "
+            "tests/cheat_engine.sh runs the type matrix and the saved fuzz cases in both engines"
+        ),
+    ),
+    (
+        [
             "tools/cheats.py",
             "tools/cheats_harvest.js",
             "tools/cheat_patches.c",
@@ -219,11 +241,6 @@ RULES = [
         ["tools/cheat_encode.py", "tests/cheat_encode_test.py"],
         {LINT, TEST_HOST, TEST},
         "cheat encoders: test-host runs their tests, tests/cheat_engine.sh makes its cases with them",
-    ),
-    (
-        ["tools/cheat_oracle.c", "tools/cheat_corpus.c"],
-        {LINT, TEST},
-        "cheat decoders' drivers: tests/cheat_engine.sh decodes its cases with them",
     ),
     (
         ["tests/cheat_codes.*"],

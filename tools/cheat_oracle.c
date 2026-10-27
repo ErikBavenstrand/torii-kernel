@@ -1,6 +1,6 @@
-// Decodes every cheat in libretro .cht files with mGBA's own decoders (linked
-// from emu/build-linux/libmgba.a), to check Torii's port against them
-// (tests/cheat_corpus.sh). Each cheat gets a cheat set of its own that takes
+// Decodes every cheat in libretro .cht files with mGBA's own decoders (built
+// from emu/mgba by tools/mgba_cheats.sh), to check Torii's port against them
+// (tests/cheat_corpus.sh, tests/cheat_engine.sh, tests/host.sh). Each cheat gets a cheat set of its own that takes
 // the previous one's properties, as mGBA's libretro reader does; its code is
 // split at '+', a piece's spaces dropped, and an 8-digit piece paired with the
 // next, then fed line by line to mGBA's autodetecting addLine.
@@ -98,8 +98,12 @@ static void decode(struct mCheatDevice *device, struct mCheatSet **prev, const c
 	int count = pieces(code, piece, 512), i, rejected = 0;
 	struct mCheatSet *set = device->createSet(device, NULL);
 	if (*prev) {
+		struct GBACheatSet *gba = (struct GBACheatSet *)set;
 		set->copyProperties(set, *prev);
-		((struct GBACheatSet *)set)->hook = NULL;  // so a hook line in each cheat is accepted
+		if (gba->hook && !--gba->hook->refs)
+			free(gba->hook);
+		gba->hook = NULL;  // so a hook line in each cheat is accepted
+		mCheatSetDeinit(*prev);
 	}
 	*prev = set;
 	printf("%s\t%lu\t", file, n);
@@ -160,6 +164,8 @@ static void read_file(struct mCheatDevice *device, const char *path)
 		*close = '\0';
 		decode(device, &prev, file, n, open + 1);
 	}
+	if (prev)
+		mCheatSetDeinit(prev);
 	fclose(f);
 }
 
@@ -181,5 +187,6 @@ int main(int argc, char **argv)
 	struct mCheatDevice *device = GBACheatDeviceCreate();
 	for (i = 1; i < argc; ++i)
 		read_file(device, argv[i]);
+	mCheatDeviceDestroy(device);
 	return 0;
 }
