@@ -12,6 +12,10 @@
 // font into the session block (struct ingame_line), and the overlay only
 // spreads its 1bpp rows into tiles. The panel shows first; its text a frame
 // later, once its tiles are backed up and drawn.
+//
+// Two pages: the menu, and the cheat list (P2), whose rows scroll under a
+// title and over a footer that says why a row can't change, or that the
+// toggles are kept as picks on Back to Torii.
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -27,6 +31,7 @@
 #define OAM ((volatile uint16_t *)0x07000000)
 #define OBJ_PAL ((volatile uint16_t *)0x05000200)
 #define OBJ_TILES ((volatile uint32_t *)INGAME_OBJ_VRAM)
+#define TOGGLES ((volatile uint32_t *)INGAME_CHEAT_TOGGLES)
 
 // mGBA's debug output (source/tlog.c); the real cart ignores these addresses
 #define REG_DEBUG_ENABLE REG16(0x04FFF780)
@@ -35,11 +40,13 @@
 
 #define KEY_A 0x001
 #define KEY_B 0x002
+#define KEY_RIGHT 0x010
+#define KEY_LEFT 0x020
 #define KEY_UP 0x040
 #define KEY_DOWN 0x080
 #define KEYS_ALL 0x3FF
 #define MENU_KEY_DEFAULT 0x308  // L+R+START
-#define REPEAT_DELAY 18  // frames UP or DOWN is held before it repeats
+#define REPEAT_DELAY 18  // frames a direction is held before it repeats
 #define REPEAT_EVERY 5
 
 // DISPCNT: OBJ on, 1D tile mapping; forced blank and the windows off
@@ -54,25 +61,36 @@ extern uint32_t __ov_bss_start[], __ov_bss_end[];
 
 #define SCREEN_W 240
 #define SCREEN_H 160
-#define PANEL_W 144
-#define PANEL_X ((SCREEN_W - PANEL_W) / 2)
 #define PANEL_PAD 8
 #define ROW_H 16
 #define TITLE_GAP 4
-#define TEXT_X (PANEL_X + 14)
 #define TEXT_TOP 2  // a line's 12 rows in a 16 px row
-#define TEXT_SPRITES 4  // 32x16 sprites a line takes at most (INGAME_TEXT_W)
-#define PILL_X (PANEL_X + 4)
-#define PILL_W (PANEL_W - 8)
-#define PILL_SPRITES 6  // two end caps and four fills
+#define TEXT_INSET 14  // the text's left edge in the panel
+#define PILL_INSET 4
+#define PILL_FILLS 7  // the pill's 32x16 middle sprites, for the widest (the cheat list's)
+#define CHECK_INSET 22  // the cheat list's check box, from the panel's right edge
+#define SLOT_SPRITES 5  // 32x16 sprites a line takes at most (INGAME_TEXT_W)
+#define SLOT_TILES (SLOT_SPRITES * 8)
+
+// The menu
+#define MENU_W 144
+// The cheat list: 6 rows between its title and its footer
+#define LIST_W 224
+#define LIST_ROWS 6
 
 // OBJ tiles from INGAME_OBJ_TILE: one block of solid tiles that every
 // filled shape shares (a 64x32 sprite's 32), the panel's corner, the pill's
-// end cap (8x16), then the lines of text, 8 tiles a 32x16 sprite
+// end cap (8x16), the check box empty and ticked, then the lines of text:
+// as many as each needs on the menu, SLOT_TILES each on the cheat list,
+// whose rows scroll
 #define TILE_SOLID 0
 #define TILE_CORNER 32
 #define TILE_CAP 33
-#define TILE_TEXT 35
+#define TILE_BOX 35
+#define TILE_TICK 36
+#define TILE_TEXT 37
+#define SLOTS_MAX 11  // the menu's title, 8 rows and notice; the list's 8
+_Static_assert(TILE_TEXT + SLOTS_MAX * SLOT_TILES <= INGAME_OBJ_MAX / 32, "the lines' tiles");
 
 // Palette banks, colour 1 of each (every tile draws with colour 1)
 #define BANK_PANEL 0
@@ -108,33 +126,47 @@ enum row_kind {
 	ROW_DEBUG,
 	ROW_KINDS
 };
-enum {
-	LINE_TITLE = ROW_KINDS,
-	LINE_NOTICE
-};
-#define LINES_MAX (ROW_KINDS + 2)
 
 static const uint8_t row_action[ROW_KINDS] = {
 	INGAME_ACT_RESUME, INGAME_ACT_SAVE,  INGAME_ACT_LOAD,  INGAME_ACT_RESUME,
 	INGAME_ACT_RESET,  INGAME_ACT_SLEEP, INGAME_ACT_TORII, INGAME_ACT_DEBUG,
 };
-static const uint8_t line_texts[ROW_KINDS + 2] = {
-	INGAME_TEXT_RESUME, INGAME_TEXT_SAVE,  INGAME_TEXT_LOAD,  INGAME_TEXT_CHEATS_ON, INGAME_TEXT_RESET,
-	INGAME_TEXT_SLEEP,  INGAME_TEXT_TORII, INGAME_TEXT_DEBUG, INGAME_TEXT_TITLE,     INGAME_TEXT_DEBUG_SAVED,
+static const uint8_t row_texts[ROW_KINDS] = {
+	INGAME_TEXT_RESUME, INGAME_TEXT_SAVE,  INGAME_TEXT_LOAD,  INGAME_TEXT_CHEATS_ON,
+	INGAME_TEXT_RESET,  INGAME_TEXT_SLEEP, INGAME_TEXT_TORII, INGAME_TEXT_DEBUG,
+};
+static const uint8_t why_texts[INGAME_WHYS] = {
+	INGAME_TEXT_KEPT,     INGAME_TEXT_WHY_ROM,  INGAME_TEXT_WHY_LOCKED,
+	INGAME_TEXT_WHY_CANT, INGAME_TEXT_WHY_ROOM, INGAME_TEXT_WHY_SLOW,
 };
 static const char state_flag[16] = {'E', 'Z', '-', 'O', 'm', 'e', 'g', 'a', 'R', 'T', 'C', 'F', 'I', 'L', 'E', '.'};
 
 // The dark theme's colours, for a session block that's missing
 static const uint16_t fallback_colours[BANKS] = {0x1063, 0x0000, 0x2D0A, 0x6F7B, 0x7E8F, 0x3DEF};
 
-struct line {
-	uint8_t kind;  // enum row_kind, or LINE_*
-	uint8_t off;  // greyed out: A does nothing and the cursor skips it
+// A line of text on screen: its sprites, tiles and place
+struct slot {
 	uint8_t y;  // its top on screen
 	uint8_t oam;  // its first text sprite
-	uint8_t sprites;  // how many
+	uint8_t max;  // sprites it may take
+	uint8_t check;  // its check box's sprite + 1, or 0 for none
 	uint16_t tile;  // its first tile, from INGAME_OBJ_TILE
 };
+
+enum page_id {
+	PAGE_MENU,
+	PAGE_CHEATS
+};
+
+// The cheat list: the kernel's entries (but their lines) and what is on
+#define LIST_FIXED 2  // "All off" and "All as launched" before the cheats
+struct cheat {
+	uint16_t cost;
+	uint8_t flags, bit;
+};
+_Static_assert(offsetof(struct ingame_cheat, flags) - offsetof(struct ingame_cheat, cost) == 6 &&
+		       offsetof(struct ingame_cheat, bit) - offsetof(struct ingame_cheat, cost) == 7,
+	       "cheats_load reads the cost, flags and bit as two words");
 
 // The session block's head (INGAME_SESSION_HEAD bytes), seen through session()
 static uint32_t session_words[INGAME_SESSION_HEAD / 4];
@@ -142,15 +174,31 @@ static uint32_t session_words[INGAME_SESSION_HEAD / 4];
 static struct {
 	const struct ingame_call *call;
 	int have_session;
-	struct line lines[LINES_MAX];
-	uint32_t count;  // lines
-	uint32_t first;  // the first menu row among them (after the title)
-	uint32_t rows;  // menu rows
-	uint32_t cursor;  // a menu row, from 0
+	uint32_t flags;  // the call's
+	// The page
+	enum page_id page;
+	struct slot slots[SLOTS_MAX];
+	uint32_t title;  // 1 if slot 0 is the title
+	uint32_t footer;  // 1 if the last slot is the footer
+	uint32_t visible;  // row slots
+	uint32_t rows;  // rows in all
+	uint32_t top;  // the row in the first row slot
+	uint32_t cursor;  // a row, from 0
 	uint32_t pill_oam;
 	int pill_y, pill_to;
 	uint32_t oam_next;
-	uint32_t tile_next;
+	uint32_t tiles_backed;  // tiles from INGAME_OBJ_TILE backed up so far
+	uint32_t tiles_end;  // the page's tiles
+	uint32_t text_shown;  // the text's sprites are shown
+	// The menu's rows (enum row_kind), and greyed ones
+	uint8_t kinds[ROW_KINDS];
+	uint8_t greyed[ROW_KINDS];
+	// The cheat list
+	uint32_t cheats;  // its entries
+	struct cheat cheat[INGAME_CHEATS];
+	uint32_t on[2];  // the entries on now, bit n for entry n
+	uint32_t launched[2];  // and at launch
+	uint32_t changed;  // a toggle changed since the menu opened
 } m;
 
 // --- Small helpers ------------------------------------------------------------
@@ -208,41 +256,22 @@ static void sram_in(uint32_t sram, void *ram, uint32_t n)
 	m.call->sram_copy(sram, ram, n, 0);
 }
 
-// --- Text ---------------------------------------------------------------------
-
-// Bits 0-7 of b to nibbles 0-7, each 0 or 1: a 1bpp row byte as a tile row
-static uint32_t spread(uint32_t b)
+static void sram_out(uint32_t sram, const void *ram, uint32_t n)
 {
-	b = (b | b << 12) & 0x000F000Fu;
-	b = (b | b << 6) & 0x03030303u;
-	return (b | b << 3) & 0x11111111u;
+	m.call->sram_copy(sram, (void *)(uintptr_t)ram, n, 1);
 }
 
-// A line's width, from its session block line
-static uint32_t text_width(uint32_t text)
+static int bit_of(const uint32_t *bits, uint32_t n)
 {
-	uint32_t word = 0;
-	if (m.have_session)
-		sram_in(INGAME_SRAM_SESSION + INGAME_SESSION_TEXT(text), &word, 4);
-	return word & 0xFFFF;
+	return (int)(bits[n >> 5] >> (n & 31) & 1);
 }
 
-// Line text from the session block into l's tiles
-static void text_draw(const struct line *l, uint32_t text)
+static void bit_set(uint32_t *bits, uint32_t n, int on)
 {
-	struct ingame_line line;
-	if (m.have_session)
-		sram_in(INGAME_SRAM_SESSION + INGAME_SESSION_TEXT(text), &line, sizeof(line));
+	if (on)
+		bits[n >> 5] |= 1u << (n & 31);
 	else
-		memset(&line, 0, sizeof(line));
-	uint32_t columns = l->sprites * 4u;
-	for (uint32_t y = 0; y < 16; y++) {
-		uint32_t row = y - TEXT_TOP;
-		for (uint32_t c = 0; c < columns; c++) {
-			uint32_t word = row < INGAME_TEXT_ROWS ? spread(line.bits[row][c]) : 0;
-			OBJ_TILES[(l->tile + (c >> 2) * 8 + (y >> 3) * 4 + (c & 3)) * 8 + (y & 7)] = word;
-		}
-	}
+		bits[n >> 5] &= ~(1u << (n & 31));
 }
 
 // --- Sprites ------------------------------------------------------------------
@@ -262,32 +291,49 @@ static void hide_all(void)
 		OAM[i * 4] = A0_HIDE;
 }
 
-// Sets the pixels of a column of tiles (8 wide, rows tall) where inside says
-static void tile_shape(uint32_t tile, uint32_t rows, int (*inside)(int, int))
+static void obj_bank(uint32_t i, uint32_t bank)
 {
-	volatile uint32_t *t = OBJ_TILES + tile * 8;
-	for (uint32_t y = 0; y < rows; y++) {
-		uint32_t word = 0;
-		for (uint32_t x = 0; x < 8; x++)
-			if (inside((int)x, (int)y))
-				word |= 1u << (x * 4);
-		t[y] = word;  // a column's tiles follow each other in 1D mapping
-	}
+	volatile uint16_t *o = OAM + i * 4 + 2;
+	*o = (uint16_t)((*o & 0x0FFF) | bank << 12);
 }
 
-// The panel's top left corner: a quarter circle of radius 6 (doubled coordinates)
-static int corner_inside(int x, int y)
+static void obj_shown(uint32_t i, int shown)
 {
-	int dx = 2 * (6 - x) - 1, dy = 2 * (6 - y) - 1;
-	return x >= 6 || y >= 6 || dx * dx + dy * dy <= 144;
+	volatile uint16_t *o = OAM + i * 4;
+	*o = (uint16_t)(shown ? *o & ~A0_HIDE : *o | A0_HIDE);
 }
 
-// The pill's left end: half a circle of radius 8
-static int cap_inside(int x, int y)
+static void obj_tile(uint32_t i, uint32_t tile)
 {
-	int dx = 2 * (8 - x) - 1, dy = 2 * (8 - y) - 1;
-	return dx * dx + dy * dy <= 256;
+	volatile uint16_t *o = OAM + i * 4 + 2;
+	*o = (uint16_t)((*o & 0xFC00) | (INGAME_OBJ_TILE + tile));
 }
+
+// Backs up the OBJ tiles from INGAME_OBJ_TILE up to tile end, those not yet,
+// and records it
+static void tiles_need(uint32_t end)
+{
+	if (end <= m.tiles_backed)
+		return;
+	uint32_t from = m.tiles_backed;
+	m.call->sram_copy(INGAME_BACKUP_OBJ + from * 32, (void *)(INGAME_OBJ_VRAM + from * 32), (end - from) * 32, 1);
+	m.tiles_backed = end;
+	ov_header.obj_bytes = end * 32;
+}
+
+// The shapes' tiles from TILE_CORNER, 4bpp in colour 1: the panel's top
+// left corner (a quarter circle of radius 6), the pill's left end (half a
+// circle of radius 8, 8x16), the check box empty (a rounded outline) and
+// ticked (filled). Tables: drawing them pixel by pixel took a third of a
+// frame from EWRAM.
+static const uint32_t shapes[] = {
+	0x11110000u, 0x11111100u, 0x11111110u, 0x11111110u, 0x11111111u, 0x11111111u, 0x11111111u, 0x11111111u,
+	0x11100000u, 0x11111000u, 0x11111100u, 0x11111110u, 0x11111110u, 0x11111111u, 0x11111111u, 0x11111111u,
+	0x11111111u, 0x11111111u, 0x11111111u, 0x11111110u, 0x11111110u, 0x11111100u, 0x11111000u, 0x11100000u,
+	0x01111110u, 0x10000001u, 0x10000001u, 0x10000001u, 0x10000001u, 0x10000001u, 0x10000001u, 0x01111110u,
+	0x01111110u, 0x11111111u, 0x11111111u, 0x11111111u, 0x11111111u, 0x11111111u, 0x11111111u, 0x01111110u,
+};
+_Static_assert(sizeof(shapes) == (TILE_TEXT - TILE_CORNER) * 32, "a tile each, the cap two");
 
 // A rectangle of solid sw x sh sprites, the last ones overlapping
 static void obj_rect(int x0, int y0, int w, int h, int sw, int sh, uint32_t shape, uint32_t size, uint32_t bank,
@@ -308,49 +354,214 @@ static void obj_rect(int x0, int y0, int w, int h, int sw, int sh, uint32_t shap
 	}
 }
 
-// --- The menu -----------------------------------------------------------------
+// --- Text ---------------------------------------------------------------------
 
-static int cheats_on(void)
+// Bits 0-7 of b to nibbles 0-7, each 0 or 1: a 1bpp row byte as a tile row
+static uint32_t spread(uint32_t b)
 {
-	return *(volatile uint32_t *)INGAME_CHEAT_ONOFF != 1;
+	b = (b | b << 12) & 0x000F000Fu;
+	b = (b | b << 6) & 0x03030303u;
+	return (b | b << 3) & 0x11111111u;
 }
 
-static uint32_t line_text(const struct line *l)
+// The line at sram (a session block offset; 0: none) into slot s's tiles,
+// and as many of its sprites shown as the line needs (once the text shows)
+static void slot_draw(const struct slot *s, uint32_t sram, uint32_t bank)
 {
-	if (l->kind == ROW_CHEATS && !cheats_on())
-		return INGAME_TEXT_CHEATS_OFF;
-	return line_texts[l->kind];
+	struct ingame_line line;
+	if (m.have_session && sram)
+		sram_in(INGAME_SRAM_SESSION + sram, &line, sizeof(line));
+	else
+		memset(&line, 0, sizeof(line));
+	uint32_t n = ((uint32_t)line.width + 31) / 32;
+	if (n > s->max)
+		n = s->max;
+	uint32_t columns = n * 4u;
+	for (uint32_t y = 0; y < 16; y++) {
+		uint32_t row = y - TEXT_TOP;
+		for (uint32_t c = 0; c < columns; c++) {
+			uint32_t word = row < INGAME_TEXT_ROWS ? spread(line.bits[row][c]) : 0;
+			OBJ_TILES[(s->tile + (c >> 2) * 8 + (y >> 3) * 4 + (c & 3)) * 8 + (y & 7)] = word;
+		}
+	}
+	for (uint32_t k = 0; k < s->max; k++) {
+		obj_bank(s->oam + k, bank);
+		obj_shown(s->oam + k, m.text_shown && k < n);
+	}
 }
 
-static uint32_t line_bank(const struct line *l)
+static uint32_t text_at(uint32_t text)
 {
-	if (l->kind == LINE_TITLE)
-		return BANK_TITLE;
-	return l->off || l->kind == LINE_NOTICE ? BANK_FAINT : BANK_TEXT;
+	return INGAME_SESSION_TEXT(text);
 }
 
-static struct line *row(uint32_t r)
+// The width of the line at sram (a session block offset)
+static uint32_t line_width(uint32_t sram)
 {
-	return &m.lines[m.first + r];
+	uint32_t word = 0;
+	if (m.have_session && sram)
+		sram_in(INGAME_SRAM_SESSION + sram, &word, 4);
+	return word & 0xFFFF;
+}
+
+// --- The cheat list -----------------------------------------------------------
+
+static uint32_t cheat_why(uint32_t e)
+{
+	return m.cheat[e].flags & INGAME_CHEAT_WHY;
+}
+
+// The cheats' cycles a frame with the entries on now (cheatcode.h's model)
+static uint32_t cheats_cost(void)
+{
+	const struct ingame_session *s = session();
+	uint32_t total = s->cheat_call + s->cheat_table * (uint32_t)s->cheat_skip;
+	for (uint32_t e = 0; e < m.cheats; e++)
+		if ((m.cheat[e].flags & INGAME_CHEAT_TABLE) && bit_of(m.on, e))
+			total += m.cheat[e].cost - (uint32_t)s->cheat_skip;
+	return total;
+}
+
+// Why entry e can't change now: its own reason, or the cycle cap for one off
+static uint32_t cheat_why_now(uint32_t e)
+{
+	uint32_t why = cheat_why(e);
+	if (why != INGAME_WHY_NONE || bit_of(m.on, e))
+		return why;
+	const struct ingame_session *s = session();
+	return cheats_cost() + m.cheat[e].cost - s->cheat_skip > s->cheat_max ? INGAME_WHY_SLOW : INGAME_WHY_NONE;
+}
+
+// The cheats' entries from the session block, and which are on: the
+// toggles the interpreter reads, against the launch
+static void cheats_load(void)
+{
+	const struct ingame_session *s = session();
+	m.cheats =
+		m.have_session && (m.flags & INGAME_CAN_CHEATS) && s->cheat_count <= INGAME_CHEATS ? s->cheat_count : 0;
+	uint32_t toggles[2] = {TOGGLES[0], TOGGLES[1]};
+	for (uint32_t e = 0; e < m.cheats; e++) {
+		struct cheat *c = &m.cheat[e];
+		uint32_t meta[2];  // cost, number; index, flags, bit
+		sram_in(INGAME_SRAM_SESSION + INGAME_SESSION_CHEAT(e) + offsetof(struct ingame_cheat, cost), meta,
+			sizeof(meta));
+		c->cost = (uint16_t)meta[0];
+		c->flags = (uint8_t)(meta[1] >> 16);
+		c->bit = (uint8_t)(meta[1] >> 24);
+		uint32_t launched = (c->flags & INGAME_CHEAT_ON) != 0;
+		bit_set(m.launched, e, (int)launched);
+		int on = (int)launched;
+		if ((c->flags & INGAME_CHEAT_TABLE) && c->bit < INGAME_CHEATS)
+			on ^= bit_of(toggles, c->bit);
+		bit_set(m.on, e, on);
+	}
+}
+
+// The toggles from what is on
+static void cheats_store(void)
+{
+	uint32_t toggles[2] = {TOGGLES[0], TOGGLES[1]};
+	for (uint32_t e = 0; e < m.cheats; e++) {
+		const struct cheat *c = &m.cheat[e];
+		if ((c->flags & INGAME_CHEAT_TABLE) && c->bit < INGAME_CHEATS)
+			bit_set(toggles, c->bit, bit_of(m.on, e) != bit_of(m.launched, e));
+	}
+	TOGGLES[0] = toggles[0];
+	TOGGLES[1] = toggles[1];
+	m.changed = 1;
+}
+
+// --- Pages --------------------------------------------------------------------
+
+// The row in slot k's place, or -1 for none
+static int slot_row(uint32_t k)
+{
+	uint32_t r = m.top + k - m.title;
+	return r < m.rows && k >= m.title && k < m.title + m.visible ? (int)r : -1;
+}
+
+static int row_greyed(uint32_t r)
+{
+	if (m.page == PAGE_MENU)
+		return m.greyed[r];
+	return r >= LIST_FIXED && cheat_why_now(r - LIST_FIXED) != INGAME_WHY_NONE;
+}
+
+// Row r's text, as a session block offset
+static uint32_t row_text(uint32_t r)
+{
+	if (m.page == PAGE_CHEATS)
+		return r == 0   ? text_at(INGAME_TEXT_ALL_OFF)
+		       : r == 1 ? text_at(INGAME_TEXT_AS_LAUNCHED)
+				: INGAME_SESSION_CHEAT(r - LIST_FIXED);
+	uint32_t kind = m.kinds[r];
+	if (kind == ROW_CHEATS)
+		return text_at(m.cheats                                        ? INGAME_TEXT_CHEATS
+			       : *(volatile uint32_t *)INGAME_CHEAT_ONOFF == 1 ? INGAME_TEXT_CHEATS_OFF
+									       : INGAME_TEXT_CHEATS_ON);
+	return text_at(row_texts[kind]);
+}
+
+// The footer's text: why the row under the cursor can't change, else that
+// the toggles are kept
+static uint32_t footer_text(void)
+{
+	uint32_t why = INGAME_WHY_NONE;
+	if (m.cursor >= LIST_FIXED)
+		why = cheat_why_now(m.cursor - LIST_FIXED);
+	return text_at(why_texts[why]);
+}
+
+// Slot k's line and check box as its row is now
+// Slot k's line now, as a session block offset (0: none)
+static uint32_t slot_text(uint32_t k)
+{
+	if (m.title && k == 0)
+		return text_at(m.page == PAGE_CHEATS ? INGAME_TEXT_CHEATS : INGAME_TEXT_TITLE);
+	if (m.footer && k == m.title + m.visible)
+		return m.page == PAGE_MENU ? text_at(INGAME_TEXT_DEBUG_SAVED) : footer_text();
+	int r = slot_row(k);
+	return r >= 0 ? row_text((uint32_t)r) : 0;
+}
+
+static void slot_update(uint32_t k)
+{
+	const struct slot *s = &m.slots[k];
+	int r = slot_row(k);
+	uint32_t bank = m.title && k == 0                      ? BANK_TITLE
+			: m.footer && k == m.title + m.visible ? BANK_FAINT
+			: r >= 0 && row_greyed((uint32_t)r)    ? BANK_FAINT
+							       : BANK_TEXT;
+	slot_draw(s, slot_text(k), bank);
+	if (s->check) {
+		uint32_t o = s->check - 1u;
+		int cheat = r >= (int)LIST_FIXED;
+		obj_shown(o, cheat && m.text_shown);
+		if (cheat) {
+			uint32_t e = (uint32_t)r - LIST_FIXED;
+			obj_tile(o, bit_of(m.on, e) ? TILE_TICK : TILE_BOX);
+			obj_bank(o, row_greyed((uint32_t)r) ? BANK_FAINT : bit_of(m.on, e) ? BANK_TITLE : BANK_TEXT);
+		}
+	}
+}
+
+static void slots_update(void)
+{
+	for (uint32_t k = 0; k < m.title + m.visible + m.footer; k++)
+		slot_update(k);
+}
+
+static int row_y(uint32_t r)
+{
+	return m.slots[m.title + r - m.top].y;
 }
 
 static void pill_place(int y)
 {
-	for (uint32_t i = 0; i < PILL_SPRITES; i++) {
+	for (uint32_t i = 0; i < 2 + PILL_FILLS; i++) {
 		volatile uint16_t *o = OAM + (m.pill_oam + i) * 4;
 		*o = (uint16_t)((*o & ~0xFFu) | ((uint32_t)y & 0xFF));
 	}
-}
-
-static uint32_t next_row(uint32_t from, int step)
-{
-	uint32_t at = from;
-	for (uint32_t i = 0; i < m.rows; i++) {
-		at = (at + m.rows + (uint32_t)step) % m.rows;
-		if (!row(at)->off)
-			return at;
-	}
-	return from;
 }
 
 static int state_saved(void)
@@ -363,85 +574,66 @@ static int state_saved(void)
 	return 1;
 }
 
-static void add_line(uint32_t kind, int off)
+static void add_row(uint32_t kind, int greyed)
 {
-	struct line *l = &m.lines[m.count++];
-	l->kind = (uint8_t)kind;
-	l->off = (uint8_t)off;
+	m.greyed[m.rows] = (uint8_t)greyed;
+	m.kinds[m.rows++] = (uint8_t)kind;
 }
 
-// Lays the menu's lines out in a panel from *top, *height tall: each line's
-// place, and as many sprites and tiles as its text needs (the cheats' row
-// the longer of its two)
-static void layout(uint32_t flags, int *top, uint32_t *height)
+static uint32_t next_row(uint32_t from, int step)
 {
-	int have_state = (flags & INGAME_CAN_STATES) && state_saved();
-	uint32_t rows = 4 + ((flags & INGAME_CAN_STATES) ? 2 : 0) + ((flags & INGAME_CAN_CHEATS) ? 1 : 0) +
-			((flags & INGAME_CAN_DEBUG) ? 1 : 0);
-	uint32_t notice = (flags & INGAME_NOTICE_DEBUG) ? 1 : 0;
-
-	// The height; the title goes when the screen can't take it
-	uint32_t h = PANEL_PAD * 2 + (rows + notice) * ROW_H;
-	int title = h + ROW_H + TITLE_GAP <= SCREEN_H - 8;
-	if (title)
-		h += ROW_H + TITLE_GAP;
-	*top = (int)(SCREEN_H - h) / 2;
-	*height = h;
-
-	if (title)
-		add_line(LINE_TITLE, 0);
-	m.first = m.count;
-	add_line(ROW_RESUME, 0);
-	if (flags & INGAME_CAN_STATES) {
-		add_line(ROW_SAVE, 0);
-		add_line(ROW_LOAD, !have_state);
+	uint32_t at = from;
+	for (uint32_t i = 0; i < m.rows; i++) {
+		at = (at + m.rows + (uint32_t)step) % m.rows;
+		if (m.page == PAGE_CHEATS || !row_greyed(at))
+			return at;
 	}
-	if (flags & INGAME_CAN_CHEATS)
-		add_line(ROW_CHEATS, 0);
-	add_line(ROW_RESET, 0);
-	add_line(ROW_SLEEP, 0);
-	add_line(ROW_TORII, 0);
-	if (flags & INGAME_CAN_DEBUG)
-		add_line(ROW_DEBUG, 0);
-	m.rows = m.count - m.first;
-	if (notice)
-		add_line(LINE_NOTICE, 0);
-
-	int y = *top + PANEL_PAD;
-	m.tile_next = TILE_TEXT;
-	for (uint32_t i = 0; i < m.count; i++) {
-		struct line *l = &m.lines[i];
-		uint32_t w = text_width(line_texts[l->kind]);
-		if (l->kind == ROW_CHEATS) {
-			uint32_t w2 = text_width(INGAME_TEXT_CHEATS_OFF);
-			w = w2 > w ? w2 : w;
-		}
-		uint32_t n = (w + 31) / 32;
-		l->sprites = (uint8_t)(n < 1 ? 1 : n > TEXT_SPRITES ? TEXT_SPRITES : n);
-		l->tile = (uint16_t)m.tile_next;
-		m.tile_next += l->sprites * 8u;
-		l->y = (uint8_t)y;
-		y += l->kind == LINE_TITLE ? ROW_H + TITLE_GAP : ROW_H;
-	}
+	return from;
 }
 
-// Backs up the OBJ tiles from INGAME_OBJ_TILE up to tile end, and records it
-static void tiles_backup(uint32_t from, uint32_t end)
-{
-	m.call->sram_copy(INGAME_BACKUP_OBJ + from * 32, (void *)(INGAME_OBJ_VRAM + from * 32), (end - from) * 32, 1);
-	ov_header.obj_bytes = end * 32;
-}
-
-// The menu without its text, its text sprites in front but hidden: the
-// cover, the panel and the pill. Shows at the next VBlank.
-static void build_panel(uint32_t flags)
+// The page's rows, then its panel without text, its text sprites in front
+// but hidden: the cover, the panel and the pill. The page's own tiles
+// backed up first. Shows at the next VBlank.
+static void build_page(enum page_id page, uint32_t cursor)
 {
 	const struct ingame_session *s = session();
-	int x0 = PANEL_X, y0;
-	uint32_t h;
-	layout(flags, &y0, &h);
-	tiles_backup(0, TILE_TEXT);
+	m.page = page;
+	m.rows = 0;
+	m.top = 0;
+	uint32_t notice = 0, panel_w;
+	if (page == PAGE_MENU) {
+		uint32_t f = m.flags;
+		int have_state = (f & INGAME_CAN_STATES) && state_saved();
+		add_row(ROW_RESUME, 0);
+		if (f & INGAME_CAN_STATES) {
+			add_row(ROW_SAVE, 0);
+			add_row(ROW_LOAD, !have_state);
+		}
+		if (f & INGAME_CAN_CHEATS)
+			add_row(ROW_CHEATS, 0);
+		add_row(ROW_RESET, 0);
+		add_row(ROW_SLEEP, 0);
+		add_row(ROW_TORII, 0);
+		if (f & INGAME_CAN_DEBUG)
+			add_row(ROW_DEBUG, 0);
+		notice = (f & INGAME_NOTICE_DEBUG) ? 1 : 0;
+		m.visible = m.rows;
+		m.footer = notice;
+		panel_w = MENU_W;
+		uint32_t h = PANEL_PAD * 2 + (m.rows + notice) * ROW_H;
+		m.title = h + ROW_H + TITLE_GAP <= SCREEN_H - 8;  // the title goes when the screen can't take it
+	} else {
+		m.rows = LIST_FIXED + m.cheats;
+		m.visible = m.rows < LIST_ROWS ? m.rows : LIST_ROWS;
+		m.title = 1;
+		m.footer = 1;
+		panel_w = LIST_W;
+	}
+	uint32_t h = PANEL_PAD * 2 + (m.title ? ROW_H + TITLE_GAP : 0) + (m.visible + m.footer) * ROW_H;
+	int x0 = (SCREEN_W - (int)panel_w) / 2, y0 = (SCREEN_H - (int)h) / 2;
+	uint32_t slots = m.title + m.visible + m.footer;
 
+	tiles_need(TILE_TEXT);
 	uint16_t colour[BANKS];
 	for (uint32_t i = 0; i < BANKS; i++)
 		colour[i] = fallback_colours[i];
@@ -454,56 +646,84 @@ static void build_panel(uint32_t flags)
 	}
 	for (uint32_t i = 0; i < BANKS; i++)
 		OBJ_PAL[i * 16 + 1] = colour[i];
-
 	volatile uint32_t *t = OBJ_TILES + TILE_SOLID * 8;
 	for (uint32_t i = 0; i < 32 * 8; i++)
 		t[i] = 0x11111111u;
-	tile_shape(TILE_CORNER, 8, corner_inside);
-	tile_shape(TILE_CAP, 16, cap_inside);
+	for (uint32_t i = 0; i < sizeof(shapes) / 4; i++)
+		t[TILE_CORNER * 8 + i] = shapes[i];
 
-	// Sprites, front to back: text (hidden until drawn), the pill, the panel, the cover
+	// Sprites, front to back: text and check boxes (hidden until drawn),
+	// the pill, the panel, the cover
+	hide_all();
 	m.oam_next = 0;
-	for (uint32_t i = 0; i < m.count; i++) {
-		struct line *l = &m.lines[i];
-		l->oam = (uint8_t)m.oam_next;
-		for (uint32_t k = 0; k < l->sprites; k++)
-			obj(TEXT_X + (int)k * 32, l->y, SHAPE_WIDE, 2, l->tile + k * 8, line_bank(l), A0_HIDE, 0);
+	int y = y0 + PANEL_PAD;
+	uint32_t tile = TILE_TEXT;
+	for (uint32_t k = 0; k < slots; k++) {
+		struct slot *sl = &m.slots[k];
+		sl->y = (uint8_t)y;
+		sl->tile = (uint16_t)tile;
+		// The menu's lines never change their text but the Cheats row's: as
+		// many sprites as the line needs, 4 at most (the panel's room)
+		uint32_t max = SLOT_SPRITES;
+		if (page == PAGE_MENU) {
+			uint32_t w = line_width(slot_text(k));
+			int r = slot_row(k);
+			if (r >= 0 && m.kinds[r] == ROW_CHEATS && !m.cheats) {  // the wider of on and off
+				uint32_t w2 = line_width(text_at(INGAME_TEXT_CHEATS_OFF));
+				uint32_t w3 = line_width(text_at(INGAME_TEXT_CHEATS_ON));
+				w = w2 > w3 ? w2 : w3;
+			}
+			max = (w + 31) / 32;
+			max = max < 1 ? 1 : max > 4 ? 4 : max;
+		}
+		sl->max = (uint8_t)max;
+		tile += max * 8;
+		sl->oam = (uint8_t)m.oam_next;
+		sl->check = 0;
+		for (uint32_t j = 0; j < sl->max; j++)
+			obj(x0 + TEXT_INSET + (int)j * 32, y, SHAPE_WIDE, 2, sl->tile + j * 8, BANK_TEXT, A0_HIDE, 0);
+		int row = k >= m.title && k < m.title + m.visible;
+		if (page == PAGE_CHEATS && row) {
+			sl->check = (uint8_t)(m.oam_next + 1);
+			obj(x0 + (int)panel_w - CHECK_INSET, y + 4, SHAPE_SQUARE, 0, TILE_BOX, BANK_TEXT, A0_HIDE, 0);
+		}
+		y += m.title && k == 0 ? ROW_H + TITLE_GAP : ROW_H;
 	}
-	m.cursor = next_row(m.rows - 1, 1);
-	m.pill_y = m.pill_to = row(m.cursor)->y;
+	m.cursor = cursor < m.rows ? cursor : 0;
+	if (page == PAGE_MENU && row_greyed(m.cursor))
+		m.cursor = next_row(m.cursor, 1);
+	if (m.cursor >= m.top + m.visible)
+		m.top = m.cursor - m.visible + 1;
+	m.pill_y = m.pill_to = row_y(m.cursor);
 	m.pill_oam = m.oam_next;
-	obj(PILL_X, m.pill_y, SHAPE_TALL, 0, TILE_CAP, BANK_PILL, 0, 0);
-	obj(PILL_X + PILL_W - 8, m.pill_y, SHAPE_TALL, 0, TILE_CAP, BANK_PILL, 0, A1_HFLIP);
-	for (int x = PILL_X + 8, k = 0; k < 4; k++, x += 32) {
-		int at = x > PILL_X + PILL_W - 8 - 32 ? PILL_X + PILL_W - 8 - 32 : x;
-		obj(at, m.pill_y, SHAPE_WIDE, 2, TILE_SOLID, BANK_PILL, 0, 0);
+	int pill_x = x0 + PILL_INSET, pill_w = (int)panel_w - 2 * PILL_INSET;
+	obj(pill_x, m.pill_y, SHAPE_TALL, 0, TILE_CAP, BANK_PILL, 0, 0);
+	obj(pill_x + pill_w - 8, m.pill_y, SHAPE_TALL, 0, TILE_CAP, BANK_PILL, 0, A1_HFLIP);
+	// The widest pill's fills, those this one doesn't need hidden
+	int fills = (pill_w - 16 + 31) / 32;
+	for (int x = pill_x + 8, k = 0; k < PILL_FILLS; k++, x += 32) {
+		int at = x > pill_x + pill_w - 8 - 32 ? pill_x + pill_w - 8 - 32 : x;
+		obj(at, m.pill_y, SHAPE_WIDE, 2, TILE_SOLID, BANK_PILL, k < fills ? 0 : A0_HIDE, 0);
 	}
-	int x1 = x0 + PANEL_W, y1 = y0 + (int)h;
+	int x1 = x0 + (int)panel_w, y1 = y0 + (int)h;
 	obj(x0, y0, SHAPE_SQUARE, 0, TILE_CORNER, BANK_PANEL, 0, 0);
 	obj(x1 - 8, y0, SHAPE_SQUARE, 0, TILE_CORNER, BANK_PANEL, 0, A1_HFLIP);
 	obj(x0, y1 - 8, SHAPE_SQUARE, 0, TILE_CORNER, BANK_PANEL, 0, A1_VFLIP);
 	obj(x1 - 8, y1 - 8, SHAPE_SQUARE, 0, TILE_CORNER, BANK_PANEL, 0, A1_HFLIP | A1_VFLIP);
-	obj_rect(x0 + 8, y0, PANEL_W - 16, 8, 32, 8, SHAPE_WIDE, 1, BANK_PANEL, 0);
-	obj_rect(x0 + 8, y1 - 8, PANEL_W - 16, 8, 32, 8, SHAPE_WIDE, 1, BANK_PANEL, 0);
-	obj_rect(x0, y0 + 8, PANEL_W, (int)h - 16, 64, 32, SHAPE_WIDE, 3, BANK_PANEL, 0);
+	obj_rect(x0 + 8, y0, (int)panel_w - 16, 8, 32, 8, SHAPE_WIDE, 1, BANK_PANEL, 0);
+	obj_rect(x0 + 8, y1 - 8, (int)panel_w - 16, 8, 32, 8, SHAPE_WIDE, 1, BANK_PANEL, 0);
+	obj_rect(x0, y0 + 8, (int)panel_w, (int)h - 16, 64, 32, SHAPE_WIDE, 3, BANK_PANEL, 0);
 	obj_rect(0, 0, SCREEN_W, SCREEN_H, 64, 32, SHAPE_WIDE, 3, BANK_DIM, A0_SEMI);
+	m.text_shown = 0;
+	m.tiles_end = tile;
 }
 
 // The text: its tiles backed up and drawn; its sprites shown at the next VBlank
 static void build_text(void)
 {
-	tiles_backup(TILE_TEXT, m.tile_next);
-	for (uint32_t i = 0; i < m.count; i++)
-		text_draw(&m.lines[i], line_text(&m.lines[i]));
-}
-
-static void text_show(void)
-{
-	for (uint32_t i = 0; i < m.count; i++) {
-		const struct line *l = &m.lines[i];
-		for (uint32_t k = 0; k < l->sprites; k++)
-			OAM[(l->oam + k) * 4] &= (uint16_t)~A0_HIDE;
-	}
+	tiles_need(m.tiles_end);
+	m.text_shown = 1;
+	slots_update();
 }
 
 // Waits until no key in mask is held
@@ -511,6 +731,53 @@ static void wait_release(uint32_t mask)
 {
 	while (keys_held() & mask)
 		vsync();
+}
+
+// Opens page at row cursor: the panel this frame, its text the next
+static void page_open(enum page_id page, uint32_t cursor)
+{
+	vsync();
+	build_page(page, cursor);
+	build_text();
+	if (page == PAGE_CHEATS)
+		debug_print("screen ready: ingame-cheats");
+}
+
+// Moves the cursor to row r, scrolling the list to show it
+static void cursor_to(uint32_t r)
+{
+	m.cursor = r;
+	uint32_t top = m.top;
+	if (r < top)
+		top = r;
+	else if (r >= top + m.visible)
+		top = r - m.visible + 1;
+	if (top != m.top) {
+		m.top = top;
+		slots_update();  // the rows' lines in their slots again
+		m.pill_y = row_y(r);  // the pill jumps with the scroll
+		pill_place(m.pill_y);
+	} else if (m.footer && m.page == PAGE_CHEATS) {
+		slot_update(m.title + m.visible);
+	}
+	m.pill_to = row_y(r);
+}
+
+// A on the cheat list's row r
+static void list_pick(uint32_t r)
+{
+	if (r == 0 || r == 1) {
+		for (uint32_t e = 0; e < m.cheats; e++)
+			if (cheat_why(e) == INGAME_WHY_NONE && (m.cheat[e].flags & INGAME_CHEAT_TABLE))
+				bit_set(m.on, e, r == 1 && bit_of(m.launched, e));
+	} else {
+		uint32_t e = r - LIST_FIXED;
+		if (cheat_why_now(e) != INGAME_WHY_NONE || !(m.cheat[e].flags & INGAME_CHEAT_TABLE))
+			return;
+		bit_set(m.on, e, !bit_of(m.on, e));
+	}
+	cheats_store();
+	slots_update();  // the greyed rows change with what is on
 }
 
 // Runs the menu until a choice; returns its INGAME_ACT_*
@@ -525,29 +792,79 @@ static uint32_t run(uint32_t menu_key)
 			pill_place(m.pill_y);
 		}
 		uint32_t keys = keys_held(), down = keys & ~prev;
-		uint32_t move = keys & (KEY_UP | KEY_DOWN);
+		uint32_t move = keys & (KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT);
 		held_for = move && (move & prev) ? held_for + 1 : 0;
 		if (held_for >= REPEAT_DELAY && (held_for - REPEAT_DELAY) % REPEAT_EVERY == 0)
 			down |= move;
 		prev = keys;
-		if ((down & KEY_B) || ((keys & menu_key) == menu_key && (down & menu_key)))
+		if ((keys & menu_key) == menu_key && (down & menu_key))
 			return INGAME_ACT_RESUME;
+		if (down & KEY_B) {
+			if (m.page == PAGE_MENU)
+				return INGAME_ACT_RESUME;
+			uint32_t back = 0;
+			for (uint32_t r = 0; r < ROW_KINDS; r++)
+				if (m.kinds[r] == ROW_CHEATS)
+					back = r;
+			page_open(PAGE_MENU, back);
+			continue;
+		}
 		if (down & (KEY_UP | KEY_DOWN)) {
-			m.cursor = next_row(m.cursor, (down & KEY_UP) ? -1 : 1);
-			m.pill_to = row(m.cursor)->y;
+			cursor_to(next_row(m.cursor, (down & KEY_UP) ? -1 : 1));
+		} else if (m.page == PAGE_CHEATS && (down & (KEY_LEFT | KEY_RIGHT))) {
+			// a page of rows at a time, stopping at the ends
+			uint32_t r = m.cursor;
+			if (down & KEY_LEFT)
+				r = r > m.visible ? r - m.visible : 0;
+			else
+				r = r + m.visible < m.rows ? r + m.visible : m.rows - 1;
+			cursor_to(r);
 		}
 		if (down & KEY_A) {
-			struct line *l = row(m.cursor);
-			if (l->off)
-				continue;
-			if (l->kind == ROW_CHEATS) {
-				*(volatile uint32_t *)INGAME_CHEAT_ONOFF = cheats_on() ? 1 : 0;
-				text_draw(l, line_text(l));
+			if (m.page == PAGE_CHEATS) {
+				list_pick(m.cursor);
 				continue;
 			}
-			return row_action[l->kind];
+			uint32_t kind = m.kinds[m.cursor];
+			if (row_greyed(m.cursor))
+				continue;
+			if (kind == ROW_CHEATS) {
+				if (m.cheats) {
+					page_open(PAGE_CHEATS, LIST_FIXED);
+				} else {
+					volatile uint32_t *onoff = (volatile uint32_t *)INGAME_CHEAT_ONOFF;
+					*onoff = *onoff == 1 ? 0 : 1;
+					slot_update(m.title + m.cursor);
+				}
+				continue;
+			}
+			return row_action[kind];
 		}
 	}
+}
+
+// The answer for the kernel's next boot: the last action, and with the
+// cheat list, the entries on (as launched again after Reset game: the
+// BIOS's SoftReset zeroes the toggles)
+static void answer(uint32_t act)
+{
+	struct ingame_out out;
+	if (!m.have_session)
+		return;
+	sram_in(INGAME_SRAM_SESSION + INGAME_SESSION_OUT, &out, sizeof(out));
+	if (out.magic != INGAME_OUT_MAGIC) {
+		memset(&out, 0, sizeof(out));
+		out.pending_state = 0xFFFF;
+		out.magic = INGAME_OUT_MAGIC;
+	}
+	out.action = (uint16_t)act;
+	if (m.changed || (act == INGAME_ACT_RESET && out.cheats_changed)) {
+		const uint32_t *on = act == INGAME_ACT_RESET ? m.launched : m.on;
+		out.cheat_on[0] = on[0];
+		out.cheat_on[1] = on[1];
+		out.cheats_changed = 1;
+	}
+	sram_out(INGAME_SRAM_SESSION + INGAME_SESSION_OUT, &out, sizeof(out));
 }
 
 uint32_t ov_entry(const struct ingame_call *call);
@@ -558,6 +875,7 @@ uint32_t ov_entry(const struct ingame_call *call)
 	for (uint32_t i = 0; i < bss_words; i++)
 		__ov_bss_start[i] = 0;
 	m.call = call;
+	m.flags = call->flags;
 	ov_header.shown = 0;
 	ov_header.obj_bytes = 0;
 	hide_all();  // the game's sprites go at once
@@ -565,8 +883,9 @@ uint32_t ov_entry(const struct ingame_call *call)
 	const struct ingame_session *s = session();
 	m.have_session = s->magic == INGAME_SESSION_MAGIC && s->version == INGAME_SESSION_VERSION;
 	uint32_t menu_key = m.have_session && s->menu_key ? s->menu_key : MENU_KEY_DEFAULT;
+	cheats_load();
 
-	build_panel(call->flags);
+	build_page(PAGE_MENU, 0);
 	uint16_t dispcnt = REG_DISPCNT;
 	vsync();
 	REG_BLDCNT = 0x3F00;  // every layer a second target: the cover blends over them
@@ -575,12 +894,12 @@ uint32_t ov_entry(const struct ingame_call *call)
 	ov_header.shown = 1;
 	build_text();
 	vsync();
-	text_show();
 	ov_header.shown = 2;
 	debug_print("screen ready: ingame");
 
 	wait_release(menu_key);
 	uint32_t act = run(menu_key);
+	answer(act);
 	wait_release(KEYS_ALL);
 	vsync();
 	hide_all();

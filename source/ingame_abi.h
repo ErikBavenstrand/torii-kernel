@@ -83,15 +83,19 @@ enum {
 
 // The word the cheat interpreter reads (source/cheatrun.s): 1 stops it
 #define INGAME_CHEAT_ONOFF 0x03007FE0
+// The per-cheat toggles (P2): 64 bits, bit n flips the table's cheat n
+// against the launch (source/cheatrun.s). In IWRAM's last 0x200 bytes, past
+// the BIOS's SVC stack (from 0x3007FE0 down) and before its words at
+// 0x3007FF0: a game's own code leaves them alone, and the BIOS's SoftReset
+// zeroes them, back to the launch's cheats.
+#define INGAME_CHEAT_TOGGLES 0x03007FE8
 
 // --- The session block, at INGAME_SRAM_SESSION
 #define INGAME_SESSION_MAGIC 0x31535354u  // "TSS1"
-#define INGAME_SESSION_VERSION 1
+#define INGAME_SESSION_VERSION 2
 #define INGAME_NAME_BYTES 48
-#define INGAME_SLOTS 8
-#define INGAME_SLOT_NAME 24
-#define INGAME_CHEATS 64
-#define INGAME_CHEAT_NAME 30
+#define INGAME_CHEATS 64  // the cheats the in-game list shows; the toggles' bits
+#define INGAME_PATH_BYTES 288  // a ROM's path (GAMESAVE_PATH_BYTES)
 #define INGAME_PALETTE 16
 
 // The palette's roles the overlay uses (enum ui_role in source/ui/ui.h; source/ingame.c checks)
@@ -107,7 +111,7 @@ enum {
 // The menu's text, drawn by the kernel (the engine's body font) so the
 // overlay needs no font: each line 1bpp, INGAME_TEXT_ROWS rows of
 // INGAME_TEXT_W pixels, bit 0 of a row's first byte its leftmost pixel
-#define INGAME_TEXT_W 128
+#define INGAME_TEXT_W 160
 #define INGAME_TEXT_ROWS 12
 enum ingame_text {
 	INGAME_TEXT_TITLE,  // the game's name, cut to fit
@@ -121,6 +125,16 @@ enum ingame_text {
 	INGAME_TEXT_TORII,
 	INGAME_TEXT_DEBUG,
 	INGAME_TEXT_DEBUG_SAVED,  // the notice after a DEBUG snapshot
+	// P2: the cheat list
+	INGAME_TEXT_CHEATS,  // the row that opens it, and its title
+	INGAME_TEXT_ALL_OFF,
+	INGAME_TEXT_AS_LAUNCHED,
+	INGAME_TEXT_KEPT,  // the list's footer: the picks are kept on Back to Torii
+	INGAME_TEXT_WHY_ROM,  // why a row is greyed (enum ingame_why)
+	INGAME_TEXT_WHY_LOCKED,
+	INGAME_TEXT_WHY_CANT,
+	INGAME_TEXT_WHY_ROOM,
+	INGAME_TEXT_WHY_SLOW,
 	INGAME_TEXTS
 };
 struct ingame_line {
@@ -129,24 +143,39 @@ struct ingame_line {
 	uint8_t bits[INGAME_TEXT_ROWS][INGAME_TEXT_W / 8];
 };
 
-struct ingame_slot {
-	char name[INGAME_SLOT_NAME];  // UTF-8, NUL-padded
+// Why a cheat's toggle can't change in game (struct ingame_cheat's flags)
+enum ingame_why {
+	INGAME_WHY_NONE,  // it can
+	INGAME_WHY_ROM,  // off: it changes the ROM, which is patched at launch only
+	INGAME_WHY_LOCKED,  // on until Back to Torii: it changes the ROM, or is past the toggles' 64
+	INGAME_WHY_CANT,  // Torii can't run it (unreadable, a placeholder, too big alone)
+	INGAME_WHY_ROOM,  // no room in the launch's table, or picked and left out at launch
+	INGAME_WHY_SLOW,  // the overlay's own: on, the cheats on would pass the cycle cap
+	INGAME_WHYS
 };
+#define INGAME_CHEAT_WHY 0x07  // flags: enum ingame_why
+#define INGAME_CHEAT_ON 0x08  // flags: on at launch (picked, and running or patched in)
+#define INGAME_CHEAT_TABLE 0x10  // flags: in the interpreter's table, its toggle bit in bit
 
+// A cheat of the in-game list (P2), the kernel's at launch
 struct ingame_cheat {
-	char name[INGAME_CHEAT_NAME];  // UTF-8, NUL-padded
-	uint16_t flags;  // later (P3)
+	struct ingame_line line;  // its name
+	uint16_t cost;  // its cycles a frame while on (cheatcode.h's model), with INGAME_CHEAT_TABLE
+	uint16_t number;  // its cheatN_ number in the file
+	uint16_t index;  // its place in the file's cheats (cheatfile.h), for Back to Torii
+	uint8_t flags;  // INGAME_CHEAT_*
+	uint8_t bit;  // its toggle (the table's cheat), with INGAME_CHEAT_TABLE
 };
 
 // The overlay's answer, for the kernel's next boot (P2 and P3 fill it)
-#define INGAME_OUT_MAGIC 0x3154554Fu  // "OUT1"
+#define INGAME_OUT_MAGIC 0x3254554Fu  // "OUT2"
 struct ingame_out {
 	uint32_t magic;  // INGAME_OUT_MAGIC once written
 	uint16_t action;  // the last INGAME_ACT_*
-	uint16_t pending_state;  // a state slot to write to SD (P2); 0xFFFF none
+	uint16_t pending_state;  // a state slot to write to SD (P3); 0xFFFF none
 	uint16_t screenshot;  // 1: a screenshot waits at INGAME_SRAM_SHOT (later)
-	uint16_t reserved;
-	uint32_t cheat_mask[2];  // the cheats on (P3), bit n for cheat n
+	uint16_t cheats_changed;  // 1 once the list changed a toggle: cheat_on holds the picks
+	uint32_t cheat_on[2];  // the listed cheats on at the last close, bit n for list entry n
 };
 
 struct ingame_session {
@@ -161,18 +190,24 @@ struct ingame_session {
 	uint16_t sleep_key;  // the sleep key, the same way
 	uint16_t rtc_status;  // the launch's 0x096A0000 value
 	uint16_t flags;  // INGAME_SLEEP_KEY_ON...
-	uint8_t slot_count;  // P2: the game's save slots
-	uint8_t slot_current;
-	uint16_t cheat_count;  // P3: the cheats
+	uint16_t reserved;
+	// P2: the cheat list; the cycles a frame are cheatcode.h's model
+	uint16_t cheat_count;  // the list's cheats (0: the old Cheats on/off row)
+	uint16_t cheat_table;  // the cheats in the interpreter's table
+	uint16_t cheat_call;  // the interpreter's call, the table's end included
+	uint16_t cheat_skip;  // a cheat of the table that is off
+	uint16_t cheat_max;  // the cap on them all
 	struct ingame_line text[INGAME_TEXTS];  // the overlay reads one at a time
-	struct ingame_slot slots[INGAME_SLOTS];
 	struct ingame_cheat cheats[INGAME_CHEATS];
+	char rom_path[INGAME_PATH_BYTES];  // the ROM's path from the card's root, for the kernel's next boot
 	struct ingame_out out;  // written by the overlay
 };
 
-// The part the overlay reads at every opening (the rest waits for P2 and P3)
+// The part the overlay reads at every opening; the lines and cheats it reads one at a time
 #define INGAME_SESSION_HEAD offsetof(struct ingame_session, text)
 #define INGAME_SESSION_TEXT(n) (offsetof(struct ingame_session, text) + (n) * sizeof(struct ingame_line))
+#define INGAME_SESSION_CHEAT(n) (offsetof(struct ingame_session, cheats) + (n) * sizeof(struct ingame_cheat))
+#define INGAME_SESSION_PATH offsetof(struct ingame_session, rom_path)
 #define INGAME_SESSION_OUT offsetof(struct ingame_session, out)
 
 _Static_assert(sizeof(struct ingame_image) == 32, "the stub reads the header's words");
@@ -185,6 +220,9 @@ _Static_assert(sizeof(void *) != 4 || sizeof(struct ingame_call) == 8, "the stub
 _Static_assert(INGAME_SESSION_HEAD % 4 == 0 && INGAME_SESSION_OUT % 4 == 0, "sram_copy takes words");
 _Static_assert(sizeof(struct ingame_out) % 4 == 0, "sram_copy takes words");
 _Static_assert(sizeof(struct ingame_line) % 4 == 0 && INGAME_SESSION_TEXT(0) % 4 == 0, "sram_copy takes words");
+_Static_assert(sizeof(struct ingame_cheat) % 4 == 0 && INGAME_SESSION_CHEAT(0) % 4 == 0, "sram_copy takes words");
+_Static_assert(INGAME_SESSION_PATH % 4 == 0 && INGAME_PATH_BYTES % 4 == 0, "sram_copy takes words");
+_Static_assert(INGAME_WHYS <= INGAME_CHEAT_WHY + 1, "a reason fits its bits");
 _Static_assert(sizeof(struct ingame_session) % 4 == 0 && sizeof(struct ingame_session) <= INGAME_SESSION_MAX,
 	       "the session block's room");
 _Static_assert(INGAME_BACKUP_EWRAM + INGAME_WINDOW_MAX <= INGAME_BACKUP_OBJ &&

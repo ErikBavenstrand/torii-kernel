@@ -779,6 +779,15 @@ static const struct lang_ingame en_ingame = {
 	.torii = "Back to Torii",
 	.debug = "Debug snapshot",
 	.debug_saved = "Snapshot kept for the log",
+	.cheats = "Cheats",
+	.all_off = "All off",
+	.as_launched = "All as launched",
+	.kept = "Kept as picks on Back to Torii",
+	.why_rom = "Patches the ROM: pick it in Torii",
+	.why_locked = "On until Back to Torii",
+	.why_cant = "Torii can't run this code",
+	.why_room = "No room in game: pick it in Torii",
+	.why_slow = "Too slow with the cheats on now",
 };
 
 //---------------------------------------------------------------------------------

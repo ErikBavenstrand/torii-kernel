@@ -79,6 +79,42 @@ write-only, so a menu on a BG can't give them back (today's BG2 affine bug).
 - Today's SAVE, LOAD and CHEAT ON/OFF keep working until P2 and P3 replace them, as entries
   backed by today's code: no regression for users.
 
+## P2: cheats in game (built)
+
+- **The list.** The menu's Cheats row opens a list of the game's cheats, each with a check
+  box, under "All off" and "All as launched"; LEFT and RIGHT page through it. Its footer
+  says why the row under the cursor can't change, else that the toggles are kept.
+- **What the kernel writes.** `cheatstore_launch` lists every pick, then other cheats in
+  file order, up to 64 (`INGAME_CHEATS`), each with its name drawn as a line, its cycles,
+  its number and index in the file and a reason it can't change (`enum ingame_why`): it
+  patches the ROM (off: pick it in Torii; on: on until Back to Torii), Torii can't run it,
+  or the table had no room. It writes them to cart SRAM before the game loads, since the
+  names are in PSRAM.
+- **The table.** The listed cheats that weren't picked go in the interpreter's table after
+  the picks, off: the "extras". They share the table's 0x1400 bytes with the picks (EWRAM
+  has no room for more), take one of the 64 toggles each, and each costs
+  `CHEAT_COST_SKIP` (100 cycles) a frame while off; extras are left out, the last first,
+  until the picks all on and the extras all off fit `CHEAT_CYCLES_MAX`. When the patch
+  area can't take them (a 32 MB ROM's cut area), the extras go first, the picks stay.
+- **The switches.** `cheatrun.s` runs cheat n unless bit n of (the launch's off mask XOR
+  the toggles at IWRAM `0x03007FE8` and `0x03007FEC`) is set. The off mask (8 bytes) sits
+  between the interpreter and the table. The toggles are past the BIOS's SVC stack and
+  before its words at `0x03007FF0`; SoftReset zeroes them, so Reset game (and a game's own
+  soft reset) brings back the cheats as launched. A cheat past the 64th always runs.
+- **Greying.** The overlay adds up the cycles of what is on (the call, every table cheat
+  at its skip cost, and the on ones at their own) and greys a cheat that would pass the cap.
+- **Back to Torii keeps the toggles as picks**, with no question: the cheat screen in
+  Torii saves on B without asking too, and a question in game would be a step between the
+  player and the game on every quit. The overlay writes the entries on to the session
+  block's answer as it closes; the kernel's next boot (`ingame_after_game`) reads the
+  cheat file again, checks each entry's number, and toggles the picks through
+  `cheatfile_toggle` (drops first), then `cheatstore_write` (power-cut safe). After Reset
+  game the answer is the launch's picks. A power-off in game loses the toggles, as cart
+  SRAM past the save does.
+- **Tests:** `tests/cheats_ingame.sh` (toggles take effect from the next frame, greyed
+  rows stay off, the file after Back to Torii, the write cut at each cutpoint),
+  `tests/kernel/test_cheatrun.c` (`test_cheatrun_off`), golden shots `ingame-cheats`.
+
 ## P0: the cart probe
 
 A probe ROM for the real cart (precedents: `source/eepromprobe.h`, `source/rumbleprobe.h`),

@@ -174,7 +174,7 @@ void test_cheatrun_matches_mgba(void)
 		memcpy((void *)T_WANT, (void *)T_DATA, T_LEN);
 		memcpy((void *)T_DATA, (void *)T_SNAP, T_LEN);
 		for (u32 frame = 0; frame < 2; frame++)
-			Cheat_run(T_PROG);
+			Cheat_run(T_PROG, 0, 0);
 		runs++;
 		for (u32 i = 0; i < T_LEN; i++)
 			if (*(vu8 *)(T_DATA + i) != *(vu8 *)(T_WANT + i)) {
@@ -308,7 +308,7 @@ void test_cheatrun_cycles(void)
 		REG_WAITCNT_CART = WAITCNT_BIOS;
 		T_PROG[0] = 0;
 		u32 start = cycles_now();
-		Cheat_run(T_PROG);
+		Cheat_run(T_PROG, 0, 0);
 		u32 took = cycles_since(start);
 		REG_WAITCNT_CART = saved;
 		REG_IME = ime;
@@ -343,7 +343,7 @@ void test_cheatrun_cycles(void)
 			u16 saved = REG_WAITCNT_CART;
 			REG_WAITCNT_CART = waits[v];
 			u32 start = cycles_now();
-			Cheat_run(T_PROG);
+			Cheat_run(T_PROG, 0, 0);
 			took[v] = cycles_since(start);
 			REG_WAITCNT_CART = saved;
 		}
@@ -357,4 +357,53 @@ void test_cheatrun_cycles(void)
 			worst_ratio = ratio;
 	}
 	tlog("cheat cycles: the model is at most %lu%% of the measured", (unsigned long)worst_ratio);
+}
+
+// The off mask (v0.8's in-game toggles): a cheat whose bit is set doesn't
+// run, a cheat past the 64th always does, and a cheat that is off costs
+// CHEAT_COST_SKIP at most
+void test_cheatrun_off(void)
+{
+	enum {
+		N = 70
+	};  // past the mask's 64
+	u32 pos = 0, n_patches;
+	set_memory();
+	for (u32 c = 0; c < N; c++) {
+		struct cheat_op op = {T_DATA + c * 4, 0xA0 + c, 1, 0, 0, 0, CHEAT_OP_WRITE, 1};
+		u32 got, cost;
+		CHECK_EQ(cheat_lower(&op, 1, T_PROG + pos, T_PROG_MAX - 1 - pos, &got, &cost, T_PATCHES, 1, &n_patches),
+			 CHEAT_LOWER_OK);
+		pos += got;
+	}
+	T_PROG[pos] = 0;
+	// Cheats 0, 33 and 63 off
+	for (u32 i = 0; i < N * 4; i += 4)
+		*(vu32 *)(T_DATA + i) = 0;
+	Cheat_run(T_PROG, 1u << 0, (1u << 1) | (1u << 31));
+	u32 wrong = 0;
+	for (u32 c = 0; c < N; c++) {
+		u32 off = c == 0 || c == 33 || c == 63;
+		wrong += *(vu8 *)(T_DATA + c * 4) != (off ? 0 : 0xA0 + c);
+	}
+	CHECK_EQ(wrong, 0);
+	// Every one off: none of the first 64 runs, the rest do
+	for (u32 i = 0; i < N * 4; i += 4)
+		*(vu32 *)(T_DATA + i) = 0;
+	u16 ime = REG_IME, saved = REG_WAITCNT_CART;
+	REG_IME = 0;
+	REG_WAITCNT_CART = WAITCNT_BIOS;
+	u32 start = cycles_now();
+	Cheat_run(T_PROG, ~0u, ~0u);
+	u32 took = cycles_since(start);
+	REG_WAITCNT_CART = saved;
+	REG_IME = ime;
+	wrong = 0;
+	for (u32 c = 0; c < N; c++)
+		wrong += *(vu8 *)(T_DATA + c * 4) != (c < 64 ? 0 : 0xA0 + c);
+	CHECK_EQ(wrong, 0);
+	u32 model = CHEAT_COST_CALL + 64 * CHEAT_COST_SKIP + (N - 64) * (CHEAT_COST_CHEAT + CHEAT_COST_SINGLE);
+	tlog("cheat cycles: 64 cheats off and %u on: %lu cycles, model %lu", N - 64, (unsigned long)took,
+	     (unsigned long)model);
+	CHECK(took <= model);
 }

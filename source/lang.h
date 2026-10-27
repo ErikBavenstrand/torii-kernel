@@ -428,6 +428,10 @@ extern const struct lang_saves *gl_saves;
 struct lang_ingame {
 	const char *resume, *save, *load, *cheats_on, *cheats_off, *reset, *sleep, *torii, *debug;
 	const char *debug_saved;  // after a DEBUG snapshot, under the rows
+	// The cheat list (v0.8 P2): its row and title, its two rows for all, its
+	// footer, and why a cheat can't change (enum ingame_why)
+	const char *cheats, *all_off, *as_launched, *kept;
+	const char *why_rom, *why_locked, *why_cant, *why_room, *why_slow;
 };
 extern const struct lang_ingame *gl_ingame;
 

@@ -1530,6 +1530,7 @@ int main(void)
 	u32 diag_keys = (~REG_KEYINPUT & 0x3FF) == DIAG_BOOT_KEYS;
 	tlog_debug("boot: keys held %03X", ~REG_KEYINPUT & 0x3FF);
 	Check_save_flag();
+	ingame_after_game();  // what the in-game menu left for the kernel
 	Boot_notice_check();
 	tlog_sd_ready(Boot_notice_check);
 	cartlog_boot_report();
@@ -1660,8 +1661,9 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 	Send_FATbuffer(FAT_table_buffer, 1);  //only RTS FAT and some parameter
 	//wait_btn();
 	gl_game_uses = Game_hardware(0, GAMECODE, 0);
+	ingame_cheats_clear();  // a NOR copy's cheats are as it was written: no list
 	if (pNorFS[show_offset + file_select].have_patch)
-		ingame_prepare(pfilename, gamefilesize);  // the in-game menu, in cart SRAM
+		ingame_prepare(pfilename, gamefilesize, launch_save.rom);  // the in-game menu, in cart SRAM
 	progress_done(NULL);
 	Launch_now(pNorFS[show_offset + file_select].rompage, key_L, "NOR game");
 	while (1)
@@ -1834,9 +1836,10 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 			Read_addon_switches();
 			rom_guard_reset();  // Torii: the patches below mark what the cheats' keep off
 			cartlog_phase(PHASE_LAUNCH, 0, pfilename);
-			tlog("launch: loading %s, BOOT WITH ADDON: reset %u, savestate %u, sleep %u, cheats %u (%lu)",
-			     pfilename, gl_reset_on, gl_rts_on, gl_sleep_on, gl_cheat_on,
-			     (unsigned long)gl_cheat_count);
+			tlog("launch: loading %s, BOOT WITH ADDON: reset %u, savestate %u, sleep %u, cheats %u (%lu), "
+			     "%lu more off for the in-game list",
+			     pfilename, gl_reset_on, gl_rts_on, gl_sleep_on, gl_cheat_on, (unsigned long)gl_cheat_picks,
+			     (unsigned long)(gl_cheat_count - gl_cheat_picks));
 			tlog_flush();
 			if ((gl_reset_on == 1) || (gl_rts_on == 1) || (gl_sleep_on == 1) || (gl_cheat_on == 1)) {
 				if (gl_rts_on == 1) {
@@ -1914,7 +1917,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 			// Torii: the picked cheats' ROM patches, into the game in PSRAM
 			if (gl_cheat_patches)
 				cheatstore_launch(launch_save.rom, gamefilesize);
-			ingame_prepare(pfilename, gamefilesize);  // the in-game menu, in cart SRAM
+			ingame_prepare(pfilename, gamefilesize, launch_save.rom);  // the in-game menu, in cart SRAM
 			progress_done(NULL);
 			//wait_btn();
 			Launch_now(0x200, key_L, "BOOT WITH ADDON");

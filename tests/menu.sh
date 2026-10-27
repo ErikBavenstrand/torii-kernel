@@ -111,7 +111,7 @@ screens=$(awk -v c="$closed" '$1 == "hash" && $3 + 0 > c + 10 { print $4 }' <<<"
 
 # The menu kept the game's EWRAM it borrows in cart SRAM from page 0x20
 # (0x20000), past the save memory, not in the game's save chip.
-window=$(sed -n 's/^kernel: launch: in-game menu in cart SRAM: .* into a \([0-9]*\)-byte EWRAM window$/\1/p' <<<"$log")
+window=$(sed -n 's/^kernel: launch: in-game menu in cart SRAM: .* into a \([0-9]*\)-byte EWRAM window;.*$/\1/p' <<<"$log")
 [ -n "$window" ] || fail "the kernel didn't put the menu in cart SRAM"
 cmp -s <(head -c "$window" "$dumps/before-EWRAM.bin") <(tail -c +$((0x20000 + 1)) "$cart/sram.bin" | head -c "$window") ||
   fail "the game's EWRAM isn't in cart SRAM page 0x20"
@@ -199,18 +199,20 @@ sed -n '/^omega [0-9]*: game started/,$p' <<<"$log" | grep -q '^omega [0-9]*: mo
   fail "Back to Torii didn't go back to the kernel"
 
 # Cheats: hello with a cheat picked (its green square's byte) has the
-# Cheats row after Load state; A turns them off (the word at 0x03007FE0 the
-# interpreter reads, 1), A again on (0)
+# Cheats row after Load state, which opens the cheat list on its cheat; A
+# turns it off (bit 0 of the toggles at 0x03007FE8 the interpreter reads, 1),
+# and in the menu opened again, on (0). tests/cheats_ingame.sh has the rest.
 printf 'cheats = 1\n\ncheat0_desc = "Green"\ncheat0_code = "02001236:58"\ncheat0_enable = true\n' >"$cart/Hello.cht"
 mmd -i "$cart-cheats/sd.img" ::/torii/cheats 2>/dev/null || true
 mcopy -o -i "$cart-cheats/sd.img" "$cart/Hello.cht" ::/torii/cheats/Hello.cht
 # shellcheck disable=SC2046 # $(keys) is a list of options
-run cheats DOWN DOWN A B -- -m $((key + 120)):0x03007FE0:4 -k $((key + 200)):L+R+START -k $((key + 206)):- \
-  $(keys $((key + 240)) DOWN DOWN A B) -m $((key + 320)):0x03007FE0:4 -f $((key + 320))
+run cheats DOWN DOWN A A B B -- -m $((key + 120)):0x03007FE8:4 -k $((key + 200)):L+R+START -k $((key + 206)):- \
+  $(keys $((key + 240)) DOWN DOWN A A B B) -m $((key + 320)):0x03007FE8:4 -f $((key + 320))
+grep -q 'screen ready: ingame-cheats' <<<"$log" || fail "the Cheats row didn't open the cheat list"
 [ "$(awk '$1 == "mem" && $3 == '$((key + 120))' { print $5 $6 $7 $8 }' <<<"$out")" = 01000000 ] ||
-  fail "the Cheats row didn't turn the cheats off ($(grep '^mem' <<<"$out" | head -1))"
+  fail "the cheat list didn't turn the cheat off ($(grep '^mem' <<<"$out" | head -1))"
 [ "$(awk '$1 == "mem" && $3 == '$((key + 320))' { print $5 $6 $7 $8 }' <<<"$out")" = 00000000 ] ||
-  fail "the Cheats row didn't turn the cheats on again"
+  fail "the cheat list didn't turn the cheat on again"
 
 rm -rf "$cart"-{state,blend,extra,reset,sleep,torii,cheats}
 echo "PASS: the in-game menu opens on L+R+START (and with an extra key held) within $shown_in frames, B gives the game back as it was, and its rows save and load a state, turn the cheats off and on, reset the game, sleep and go back to Torii"

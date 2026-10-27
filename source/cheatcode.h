@@ -188,7 +188,7 @@ enum cheat_prog_type {
 // at the BIOS's default wait states, the slowest a game has
 // (tests/kernel/test_cheatrun.c checks the model against the clock).
 #define CHEAT_COST_CALL 250      // the hook's call, and the table's end
-#define CHEAT_COST_CHEAT 110     // a cheat's header
+#define CHEAT_COST_CHEAT 130     // a cheat's header, its off bit tested
 #define CHEAT_COST_SINGLE 140    // a write of its own
 #define CHEAT_COST_RUN 150       // a run's header, in a plain cheat
 #define CHEAT_COST_RUN_WRITE 36  // a write in a run
@@ -197,6 +197,7 @@ enum cheat_prog_type {
 #define CHEAT_COST_FILL_SAME 20  // each further write of a fill of one value
 #define CHEAT_COST_GEN 200       // each further element of a pointer write, add, or, and
 #define CHEAT_COST_COND 450      // a conditional, and the walk past what it skips
+#define CHEAT_COST_SKIP 100      // a cheat the off mask skips (cheatrun.s)
 // The cap: about 10% of a frame (280,896 cycles), all picked cheats together
 #define CHEAT_CYCLES_MAX 28000
 // The table's room in the patch area, the end word included (cheat.h)

@@ -1,10 +1,20 @@
 @ The per-frame cheat interpreter (v0.7). Patch_RTS_Cheat (GBApatch.c)
 @ copies Cheat_blob_start to Cheat_blob_end into the patch area at the
-@ game's ROM end, right after the in-game menu's code, and the cheat table
-@ right after it; the hook (RTS_irq, gba_rts_patch.s) calls Cheat_blob_start
-@ on each VBlank IRQ while cheats are on. The code only reads the table and
-@ the memory the cheats name: no RAM of its own, nothing but its 36 bytes of
-@ the IRQ stack, and no kernel address (each literal is PC-relative).
+@ game's ROM end, right after the in-game menu's code, then the launch's
+@ off mask (two words) and the cheat table right after it; the hook (RTS_irq,
+@ gba_rts_patch.s) calls Cheat_blob_start on each VBlank IRQ while cheats
+@ are on. The code only reads the table, the mask, the in-game menu's
+@ toggles and the memory the cheats name: no RAM of its own, nothing but its
+@ 44 bytes of the IRQ stack, and no kernel address (each literal is
+@ PC-relative).
+@
+@ Per-cheat switches (v0.8): bit n of a 64-bit mask is the table's cheat n.
+@ The launch's off mask has the cheats in the table that weren't picked
+@ (the in-game menu can turn them on); the in-game menu's toggles at IWRAM
+@ 0x3007FE8 and 0x3007FEC (INGAME_CHEAT_TOGGLES, ingame_abi.h) flip them.
+@ A cheat runs unless its bit of (off mask XOR toggles) is set. The BIOS's
+@ SoftReset zeroes the toggles, so a game starts with its cheats as
+@ launched; a cheat past the 64th always runs.
 @
 @ The table's layout (cheatcode.h has the C side, cheat_lower writes it):
 @ cheats one after another, each a header word, then its ops; a 0 word ends
@@ -44,21 +54,37 @@
 	.global Cheat_run
 	.type Cheat_run, %function
 
-@ The hook's entry: the table follows the code
+@ The hook's entry: the off mask and the table follow the code. The
+@ toggles are read through IWRAM's mirror below 0x4000000, as the hook
+@ reaches 0x3007FFC.
 Cheat_blob_start:
 	adrl	r0, Cheat_blob_end
+	ldmia	r0!, {r1, r2}
+	mov	r3, #0x4000000
+	ldr	r12, [r3, #-0x18]	@ 0x3007FE8
+	eor	r1, r1, r12
+	ldr	r12, [r3, #-0x14]	@ 0x3007FEC
+	eor	r2, r2, r12
 	@ falls into Cheat_run
 
-@ void Cheat_run(const u32 *table): runs every cheat of the table once.
+@ void Cheat_run(const u32 *table, u32 off_lo, u32 off_hi): runs every
+@ cheat of the table once, but those whose bit of the off mask is set.
 @ Callable from C (the kernel's tests time it).
 Cheat_run:
-	stmfd	sp!, {r4-r11, lr}
+	stmfd	sp!, {r1, r2, r4-r11, lr}	@ the off mask at [sp], shifted a cheat at a time
 
 cheat_next:
 	ldr	r1, [r0], #4
 	movs	r10, r1, lsl #16	@ n << 16, the plain bit in bit 31
 	beq	cheat_done
 	add	r11, r0, r1, lsr #16
+	ldmia	sp, {r2, r3}		@ this cheat's bit out of the mask's bottom
+	movs	r3, r3, lsr #1
+	movs	r2, r2, rrx
+	stmia	sp, {r2, r3}
+	movcs	r0, r11			@ off: past it
+	bcs	cheat_next
+	movs	r10, r1, lsl #16
 	movmi	r10, #0
 	bmi	plain
 	mov	r10, r10, lsr #16
@@ -317,6 +343,7 @@ cond:	subs	r3, r3, #8
 	b	post_cond
 
 cheat_done:
+	add	sp, sp, #8
 	ldmfd	sp!, {r4-r11, lr}
 	bx	lr
 	.align 2

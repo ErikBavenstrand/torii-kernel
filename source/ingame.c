@@ -5,6 +5,8 @@
 
 #include "Ezcard_OP.h"
 #include "cartlog.h"
+#include "cheat.h"
+#include "cheatstore.h"
 #include "charset.h"
 #include "GBApatch.h"
 #include "ff.h"
@@ -63,12 +65,12 @@ static const struct torii_glyph *glyph(u32 cp)
 	return &font_body.glyphs[i];
 }
 
-// s in the body font into l from its left edge; cut to INGAME_TEXT_W
-// pixels, ending in "..." when cut
-static void line_draw(struct ingame_line *l, const char *s)
+// len bytes of UTF-8 at s in the body font into l from its left edge; cut
+// to INGAME_TEXT_W pixels, ending in "..." when cut
+static void line_draw(struct ingame_line *l, const char *s, u32 len)
 {
 	memset(l, 0, sizeof(*l));
-	u32 len = strlen(s), pos = 0, w = 0, keep = 0, cut = 0;
+	u32 pos = 0, w = 0, keep = 0, cut = 0;
 	u32 dots = 3 * glyph('.')->advance;
 	while (pos < len) {
 		u32 cp = charset_next_latin1(s, len, &pos);
@@ -131,10 +133,79 @@ void ingame_probe_prepare(const u8 *code)
 	SetRampage(0);
 }
 
-int ingame_prepare(const char *name, u32 rom_bytes)
+// The in-game list's cheats (cheatstore_launch): how many it wrote to cart
+// SRAM, and how many of them are in the interpreter's table
+static struct {
+	u16 count, table;
+} cheats;
+
+void ingame_cheats_clear(void)
 {
-	// The block's head (its fields before the slots); the rest is written as
-	// zeros, and the overlay's answer as none yet
+	cheats.count = cheats.table = 0;
+}
+
+void ingame_cheats_set(u32 count, u32 table)
+{
+	cheats.count = (u16)count;
+	cheats.table = (u16)table;
+}
+
+// struct ingame_cheat's fields after its line
+struct cheat_meta {
+	u16 cost, number, index;
+	u8 flags, bit;
+};
+_Static_assert(sizeof(struct cheat_meta) == sizeof(struct ingame_cheat) - offsetof(struct ingame_cheat, cost),
+	       "struct ingame_cheat's fields after its line");
+#define CHEAT_META(n) (INGAME_SRAM_SESSION + INGAME_SESSION_CHEAT(n) + offsetof(struct ingame_cheat, cost))
+
+// n bytes of cart SRAM at byte offset at, within one 64 KB page window, to dst
+static void sram_get(u32 at, u8 *dst, u32 n)
+{
+	SetRampage((u16)(at >> 12));
+	const vu8 *src = CART_SRAM + (at & 0xFFF);
+	for (u32 i = 0; i < n; i++)
+		dst[i] = src[i];
+}
+
+void ingame_cheat_put(u32 n, const char *name, u32 len, u32 number, u32 index, u32 flags, u32 bit, u32 cost)
+{
+	TLOG_ASSERT(n < INGAME_CHEATS);
+	struct ingame_line line;
+	line_draw(&line, name, len);
+	sram_put(INGAME_SRAM_SESSION + INGAME_SESSION_CHEAT(n), (const u8 *)&line, sizeof(line));
+	struct cheat_meta m = {(u16)cost, (u16)number, (u16)index, (u8)flags, (u8)bit};
+	sram_put(CHEAT_META(n), (const u8 *)&m, sizeof(m));
+	SetRampage(0);
+}
+
+void ingame_cheat_meta(u32 n, u32 flags, u32 bit, u32 cost)
+{
+	struct cheat_meta m;
+	sram_get(CHEAT_META(n), (u8 *)&m, sizeof(m));
+	m.flags = (u8)flags;
+	m.bit = (u8)bit;
+	m.cost = (u16)cost;
+	sram_put(CHEAT_META(n), (const u8 *)&m, sizeof(m));
+	SetRampage(0);
+}
+
+void ingame_cheats_trim(u32 table)
+{
+	for (u32 n = 0; n < cheats.count; n++) {
+		struct cheat_meta m;
+		sram_get(CHEAT_META(n), (u8 *)&m, sizeof(m));
+		if ((m.flags & INGAME_CHEAT_TABLE) && m.bit >= table)
+			ingame_cheat_meta(n, INGAME_WHY_ROOM, 0, 0);
+	}
+	cheats.table = (u16)table;
+	SetRampage(0);
+}
+
+int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
+{
+	// The block's head (its fields before the lines); the cheats are
+	// cheatstore_launch's, and the overlay's answer none yet
 	u32 words[INGAME_SESSION_HEAD / 4];
 	memset(words, 0, sizeof(words));
 	struct ingame_session *h = (struct ingame_session *)(void *)words;
@@ -158,6 +229,14 @@ int ingame_prepare(const char *name, u32 rom_bytes)
 	h->sleep_key = sleep_key & 0x3FF;
 	h->rtc_status = Game_GPIO_status();
 	h->flags = gl_sleep_on == 1 ? INGAME_SLEEP_KEY_ON : 0;
+	// The cheat list, when the table it toggles went in whole
+	if (gl_cheat_on == 1 && cheats.table == gl_cheat_count) {
+		h->cheat_count = cheats.count;
+		h->cheat_table = cheats.table;
+	}
+	h->cheat_call = CHEAT_COST_CALL;
+	h->cheat_skip = CHEAT_COST_SKIP;
+	h->cheat_max = CHEAT_CYCLES_MAX;
 
 	u32 bad = 0;
 	u32 image = ingame_overlay_size;
@@ -180,14 +259,27 @@ int ingame_prepare(const char *name, u32 rom_bytes)
 		[INGAME_TEXT_TORII] = t->torii,
 		[INGAME_TEXT_DEBUG] = t->debug,
 		[INGAME_TEXT_DEBUG_SAVED] = t->debug_saved,
+		[INGAME_TEXT_CHEATS] = t->cheats,
+		[INGAME_TEXT_ALL_OFF] = t->all_off,
+		[INGAME_TEXT_AS_LAUNCHED] = t->as_launched,
+		[INGAME_TEXT_KEPT] = t->kept,
+		[INGAME_TEXT_WHY_ROM] = t->why_rom,
+		[INGAME_TEXT_WHY_LOCKED] = t->why_locked,
+		[INGAME_TEXT_WHY_CANT] = t->why_cant,
+		[INGAME_TEXT_WHY_ROOM] = t->why_room,
+		[INGAME_TEXT_WHY_SLOW] = t->why_slow,
 	};
 	for (u32 i = 0; i < INGAME_TEXTS; i++) {
 		struct ingame_line line;
-		line_draw(&line, text[i]);
+		TLOG_ASSERT(text[i]);
+		line_draw(&line, text[i], strlen(text[i]));
 		bad += sram_put(INGAME_SRAM_SESSION + INGAME_SESSION_TEXT(i), (const u8 *)&line, sizeof(line));
 	}
-	u32 rest = INGAME_SESSION_TEXT(INGAME_TEXTS);
-	bad += sram_put(INGAME_SRAM_SESSION + rest, NULL, INGAME_SESSION_OUT - rest);
+	char path[INGAME_PATH_BYTES];
+	memset(path, 0, sizeof(path));
+	if (rom_path)
+		strncpy(path, rom_path, sizeof(path) - 1);
+	bad += sram_put(INGAME_SRAM_SESSION + INGAME_SESSION_PATH, (const u8 *)path, sizeof(path));
 	bad += sram_put(INGAME_SRAM_SESSION + INGAME_SESSION_OUT, (const u8 *)&out, sizeof(out));
 	SetRampage(0);
 	if (bad) {
@@ -196,7 +288,82 @@ int ingame_prepare(const char *name, u32 rom_bytes)
 		return -1;
 	}
 	const struct ingame_image *hdr = (const struct ingame_image *)ingame_overlay;
-	tlog("launch: in-game menu in cart SRAM: %lu bytes, %lu loaded into a %lu-byte EWRAM window",
-	     (unsigned long)image, (unsigned long)hdr->image_bytes, (unsigned long)hdr->window_bytes);
+	tlog("launch: in-game menu in cart SRAM: %lu bytes, %lu loaded into a %lu-byte EWRAM window; %u cheats "
+	     "listed",
+	     (unsigned long)image, (unsigned long)hdr->image_bytes, (unsigned long)hdr->window_bytes, h->cheat_count);
 	return 0;
+}
+
+// --- After the game: the kernel's next boot -------------------------------------
+
+// The session block's head, path and answer, if cart SRAM holds a launch's
+// (a soft reset from the game keeps it; a power cycle doesn't)
+static int session_read(struct ingame_session *h, char *path, struct ingame_out *out)
+{
+	sram_get(INGAME_SRAM_SESSION, (u8 *)h, INGAME_SESSION_HEAD);
+	sram_get(INGAME_SRAM_SESSION + INGAME_SESSION_PATH, (u8 *)path, INGAME_PATH_BYTES);
+	sram_get(INGAME_SRAM_SESSION + INGAME_SESSION_OUT, (u8 *)out, sizeof(*out));
+	SetRampage(0);
+	return h->magic == INGAME_SESSION_MAGIC && h->version == INGAME_SESSION_VERSION &&
+	       h->bytes == sizeof(struct ingame_session) && out->magic == INGAME_OUT_MAGIC && path[0] == '/' &&
+	       memchr(path, 0, INGAME_PATH_BYTES) && h->cheat_count <= INGAME_CHEATS;
+}
+
+// The cheat list's toggles as the game left them, into the cheat file's
+// picks (written power-cut safe, only if one changed)
+static void cheats_keep(const struct ingame_session *h, const char *path, const struct ingame_out *out)
+{
+	if (!cheatstore_read(path)) {
+		tlog_error("cheats: %s: no cheat file to keep the in-game picks in", path);
+		return;
+	}
+	struct cheatstore *cs = cheatstore();
+	struct cheatfile *f = &cs->file;
+	u32 last = 0;
+	for (u32 n = 0; n < h->cheat_count; n++) {
+		struct cheat_meta m;
+		sram_get(CHEAT_META(n), (u8 *)&m, sizeof(m));
+		SetRampage(0);
+		if (m.index >= f->count || cs->cheats[m.index].number != m.number) {
+			tlog_error("cheats: %s changed since the launch: the in-game picks are not kept", path);
+			return;
+		}
+		if (m.index + 1u > last)
+			last = m.index + 1u;
+	}
+	// Decoded up to the last listed: a pick has to fit as the cheat screen's do
+	while (cs->work.next < last && cheatfile_next(f, &cs->work) >= 0)
+		;
+	u32 changed = 0;
+	for (u32 pass = 0; pass < 2; pass++)  // drops first, so the picks after them fit
+		for (u32 n = 0; n < h->cheat_count; n++) {
+			struct cheat_meta m;
+			sram_get(CHEAT_META(n), (u8 *)&m, sizeof(m));
+			SetRampage(0);
+			if ((m.flags & INGAME_CHEAT_WHY) != INGAME_WHY_NONE || !(m.flags & INGAME_CHEAT_TABLE))
+				continue;
+			u32 on = out->cheat_on[n >> 5] >> (n & 31) & 1;
+			if (cs->cheats[m.index].picked != on && on == pass && cheatfile_toggle(f, m.index))
+				changed++;
+		}
+	tlog("cheats: %s: %lu picks changed in game", path, (unsigned long)changed);
+	if (changed && !cheatstore_write())
+		tlog_error("cheats: %s: the in-game picks weren't written", path);
+}
+
+void ingame_after_game(void)
+{
+	u32 words[INGAME_SESSION_HEAD / 4];  // the head alone: the whole block is 22 KB
+	const struct ingame_session *h = (const struct ingame_session *)(void *)words;
+	struct ingame_out out;
+	char path[INGAME_PATH_BYTES];
+	if (!session_read((struct ingame_session *)(void *)words, path, &out))
+		return;
+	tlog("in-game: back from %s, the menu's last %u", path, out.action);
+	if (out.cheats_changed && h->cheat_count)
+		cheats_keep(h, path, &out);
+	// Done with: the answer goes, so the next boot does nothing again
+	memset(&out, 0, sizeof(out));
+	sram_put(INGAME_SRAM_SESSION + INGAME_SESSION_OUT, (const u8 *)&out, sizeof(out));
+	SetRampage(0);
 }

@@ -1,0 +1,23 @@
+# The in-game cheat list (v0.8 P2) over Hello.gba: the menu's Cheats row
+# opens it on the first cheat. Hello's cheat file (tests/shots.py) lists
+# Infinite lives (off, in the table), Max money (picked: ticked), Moon jump
+# (off), Pick a level (a placeholder: greyed, "can't run") and Skip the
+# intro (a ROM patch: greyed, "pick it in Torii"); the master code is
+# hidden. The footer says why the row under the cursor can't change, else
+# that the toggles are kept. A turns Infinite lives on; DOWN to the
+# placeholder and the ROM patch shows their reasons, scrolling the list.
+#! settings 2=1
+-w "nav: home ready"
+-P "@8:nav_test_path:/Hello.gba" -p @8:nav_test_action:0x7E000002
+-w "launch: starting the game"
+-k @300:L+R+START -k @306:-
+-w "screen ready: ingame"
+-k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:A -k @48:-
+-w "screen ready: ingame-cheats"
+-s @4:list.png
+-k @10:A -k @14:-
+-s @24:on.png
+-k @30:DOWN -k @34:- -k @42:DOWN -k @46:- -k @54:DOWN -k @58:-
+-s @70:greyed.png
+-k @80:DOWN -k @84:-
+-s @100:rom.png

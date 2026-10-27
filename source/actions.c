@@ -159,7 +159,7 @@ static u32 default_how(const struct game_pick *game)
 		   : Read_SET_info(assress_boot_mode) == 1 ? ACTION_BOOT_CLEAN
 							   : ACTION_BOOT_ADDONS;
 	u32 any = Read_SET_info(assress_v_reset) == 1 || Read_SET_info(assress_v_rts) == 1 ||
-		  Read_SET_info(assress_v_sleep) == 1 || gl_cheat_count || gl_cheat_patches;
+		  Read_SET_info(assress_v_sleep) == 1 || gl_cheat_picks || gl_cheat_patches;
 	tlog("launch: boot mode %s (%s)%s", mode == ACTION_BOOT_CLEAN ? "clean" : "with addons",
 	     own ? "the game's" : "Settings'", mode == ACTION_BOOT_ADDONS && !any ? ", none on" : "");
 	return mode == ACTION_BOOT_CLEAN || !any ? ACTION_CLEAN : ACTION_ADDON;
@@ -183,7 +183,7 @@ void action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset)
 	u32 ok = Game_pick(&game);
 	// A GBA game started with addons gets its picked cheats (cheatstore.h),
 	// read before it loads: they decide its patch's room and hook
-	gl_cheat_count = gl_cheat_bytes = gl_cheat_patches = 0;
+	cheatstore_launch_none();
 	if (ok && !game.is_emu && how != ACTION_CLEAN && how != ACTION_NOR) {
 		char rom[GAMESAVE_PATH_BYTES];
 		if (gamesave_rom_path_in(rom, sizeof(rom), currentpath, game.name) >= 0)
@@ -192,7 +192,7 @@ void action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset)
 	if (ok && how == ACTION_DEFAULT)
 		how = game.is_emu ? ACTION_CLEAN : default_how(&game);
 	if (how == ACTION_CLEAN || how == ACTION_NOR)
-		gl_cheat_count = gl_cheat_bytes = gl_cheat_patches = 0;  // a clean boot: nothing patched in
+		cheatstore_launch_none();  // a clean boot: nothing patched in
 	if (!ok) {
 		tlog("launch %s: not a game the cart starts", path_copy);
 	} else if (game.is_emu && how >= ACTION_NOR) {

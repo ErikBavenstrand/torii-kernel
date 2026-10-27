@@ -18,8 +18,20 @@ void test_ingame_abi(void)
 	CHECK_EQ(INGAME_BACKUP_OBJ_PAL, 0x2C400u);
 	CHECK_EQ(INGAME_SRAM_IMAGE, 0xB0000u);
 	CHECK_EQ(INGAME_ACT_SLEEP, 4u);
-	// A text line: 12 rows of 128 px, and the head the overlay reads
-	CHECK_EQ(sizeof(struct ingame_line), 196u);
+	// A text line: 12 rows of 160 px, and the head the overlay reads
+	CHECK_EQ(sizeof(struct ingame_line), 244u);
+	// The cheat list (P2): an entry's fields after its line as the overlay
+	// reads them (two words from cost), the toggles past the BIOS's SVC stack
+	// and before its words at 0x3007FF0 (cheatrun.s reads them from the
+	// mirror at 0x4000000 - 0x18 and - 0x14), and a reason in its bits
+	CHECK_EQ(offsetof(struct ingame_cheat, cost), sizeof(struct ingame_line));
+	CHECK_EQ(offsetof(struct ingame_cheat, flags) - offsetof(struct ingame_cheat, cost), 6u);
+	CHECK_EQ(sizeof(struct ingame_cheat), 252u);
+	CHECK_EQ(INGAME_CHEAT_TOGGLES, 0x03007FE8u);
+	CHECK_EQ(0x04000000u - 0x18 - 0x00FF8000u, INGAME_CHEAT_TOGGLES);
+	CHECK(INGAME_CHEAT_TOGGLES + 8 <= 0x03007FF0u && INGAME_CHEAT_TOGGLES >= INGAME_CHEAT_ONOFF + 8);
+	CHECK(INGAME_WHYS - 1 <= INGAME_CHEAT_WHY);
+	CHECK(INGAME_SESSION_CHEAT(INGAME_CHEATS) <= INGAME_SESSION_PATH);
 	CHECK(INGAME_SESSION_HEAD < 256);
 	CHECK(INGAME_SESSION_TEXT(INGAME_TEXTS) <= INGAME_SESSION_OUT);
 	CHECK(sizeof(struct ingame_session) <= INGAME_SESSION_MAX);

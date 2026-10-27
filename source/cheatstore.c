@@ -11,6 +11,8 @@
 #include "Ezcard_OP.h"
 #include "GBApatch.h"
 #include "ff.h"
+#include "ingame.h"
+#include "ingame_abi.h"
 #include "namesdb.h"
 #include "tlog.h"
 #include "engine/cycles.h"
@@ -31,6 +33,9 @@ u32 gl_cheat_table[CHEAT_TABLE_MAX / 4] EWRAM_BSS;
 u32 gl_cheat_bytes;
 u32 gl_cheat_count;
 u32 gl_cheat_patches;
+u32 gl_cheat_picks;
+u32 gl_cheat_pick_bytes;
+u32 gl_cheat_off[2];
 
 struct cheatstore *cheatstore(void)
 {
@@ -633,6 +638,89 @@ static void write_patches(const char *rom_path, u32 psram_bytes)
 	     guarded ? ", some over the kernel's own patches left out" : "");
 }
 
+// The in-game list's cheats (ingame_abi.h) as the launch's pass lists them,
+// fixed up once the table is laid out
+struct listed {
+	u8 extra;  // with the extras: its place among them + 1; else 0
+	u8 flags;  // INGAME_CHEAT_*
+	u8 fix;    // its flags changed after it was written
+};
+
+// The extras: cheats listed but not picked, put in the table off so the
+// in-game list can turn them on. They wait at the table's top, the first
+// highest, until every pick is in.
+struct extras {
+	u32 n, low;  // how many, and the lowest offset they take
+	u16 bytes[INGAME_CHEATS], cost[INGAME_CHEATS];
+};
+
+void cheatstore_launch_none(void)
+{
+	gl_cheat_count = gl_cheat_bytes = gl_cheat_patches = 0;
+	gl_cheat_picks = gl_cheat_pick_bytes = 0;
+	gl_cheat_off[0] = gl_cheat_off[1] = 0;
+	ingame_cheats_clear();
+}
+
+// Keeps the first n extras: the later ones lose their place (no room)
+static void extras_keep(struct extras *x, struct listed *list, u32 listed, u32 n)
+{
+	while (x->n > n)
+		x->low += x->bytes[--x->n];
+	for (u32 e = 0; e < listed; e++)
+		if (list[e].extra > n) {
+			list[e].extra = 0;
+			list[e].flags = INGAME_WHY_ROOM;
+			list[e].fix = 1;
+		}
+}
+
+static void words_reverse(u32 *w, u32 n)
+{
+	for (u32 a = 0, b = n; a + 1 < b; a++, b--) {
+		u32 t = w[a];
+		w[a] = w[b - 1];
+		w[b - 1] = t;
+	}
+}
+
+// The extras after the picks, in file order, as many as the cycle cap takes
+// with every pick on and every extra off; the off mask; the list's entries
+// fixed up
+static void extras_place(struct extras *x, struct listed *list, u32 listed, u32 picks_cost)
+{
+	u32 keep = x->n;
+	if (gl_cheat_count + keep > INGAME_CHEATS)  // a toggle each
+		keep = gl_cheat_count < INGAME_CHEATS ? INGAME_CHEATS - gl_cheat_count : 0;
+	while (keep && picks_cost + keep * CHEAT_COST_SKIP > CHEAT_CYCLES_MAX)
+		keep--;
+	extras_keep(x, list, listed, keep);
+	// Down to the picks' end in one block (the last extra first), then in
+	// file order: the block's words reversed, then each cheat's back
+	u32 bytes = CHEATFILE_BYTES_MAX - x->low;
+	u32 *block = gl_cheat_table + gl_cheat_bytes / 4;
+	memmove(block, (u8 *)gl_cheat_table + x->low, bytes);
+	words_reverse(block, bytes / 4);
+	for (u32 k = 0, at = 0; k < x->n; at += x->bytes[k] / 4u, k++) {
+		words_reverse(block + at, x->bytes[k] / 4u);
+		u32 bit = gl_cheat_count + k;
+		gl_cheat_off[bit >> 5] |= 1u << (bit & 31);
+	}
+	for (u32 e = 0; e < listed; e++) {
+		const struct listed *l = &list[e];
+		if (l->extra)
+			ingame_cheat_meta(e, l->flags | INGAME_CHEAT_TABLE, (u8)(gl_cheat_count + l->extra - 1u),
+					  x->cost[l->extra - 1]);
+		else if (l->fix)
+			ingame_cheat_meta(e, l->flags, 0, 0);
+	}
+	if (x->n)
+		tlog("cheats: %lu more in the table for the in-game list, off (%lu bytes)", (unsigned long)x->n,
+		     (unsigned long)bytes);
+	gl_cheat_bytes += bytes;
+	gl_cheat_count += x->n;
+}
+
 void cheatstore_launch(const char *rom_path, u32 psram_bytes)
 {
 	if (psram_bytes) {
@@ -640,9 +728,7 @@ void cheatstore_launch(const char *rom_path, u32 psram_bytes)
 		return;
 	}
 	u32 cost = CHEAT_COST_CALL;
-	gl_cheat_count = 0;
-	gl_cheat_bytes = 0;
-	gl_cheat_patches = 0;
+	cheatstore_launch_none();
 	kept.rom = path_crc(rom_path);
 	kept.n = kept.names_used = 0;
 	if (!cheatstore_read(rom_path))
@@ -655,51 +741,115 @@ void cheatstore_launch(const char *rom_path, u32 psram_bytes)
 			last = i + 1;
 			picks++;
 		}
-	if (!picks)
-		return;
-	// Every cheat up to the last pick, as keys carry from cheat to cheat
+	// The in-game list: every pick, and as many other cheats as fill it, in
+	// file order
+	struct listed list[INGAME_CHEATS];
+	struct extras x;
+	u32 listed = 0, picks_seen = 0;
+	x.n = 0;
+	x.low = CHEATFILE_BYTES_MAX;
 	s32 i;
-	while ((i = cheatfile_next(f, &cs->work)) >= 0 && (u32)i < last) {
+	// Every cheat up to the last pick, as keys carry from cheat to cheat,
+	// and on until the list is full
+	while ((i = cheatfile_next(f, &cs->work)) >= 0) {
 		const struct cheatfile_cheat *c = &cs->cheats[i];
-		if (!c->picked)
-			continue;
-		if (c->status != CHEATFILE_OK) {
-			tlog("cheats: cheat %u (%.*s): %s, left out", c->number, c->desc_len, f->text + c->desc,
-			     status_names[c->status]);
-			continue;
+		picks_seen += c->picked;
+		int show = cheatfile_shown(c) && listed < INGAME_CHEATS &&
+			   (c->picked || INGAME_CHEATS - listed > picks - picks_seen);
+		u8 flags = INGAME_WHY_CANT, extra = 0;
+		u32 bit = 0, bytes = cs->work.n_prog * 4;
+		if (c->picked) {
+			if (c->status != CHEATFILE_OK) {
+				tlog("cheats: cheat %u (%.*s): %s, left out", c->number, c->desc_len, f->text + c->desc,
+				     status_names[c->status]);
+			} else if (gl_cheat_bytes + bytes > CHEATFILE_BYTES_MAX ||
+				   cost + cs->work.cost > CHEAT_CYCLES_MAX) {
+				tlog("cheats: cheat %u (%.*s): its %lu bytes and %lu cycles don't fit beside %lu and "
+				     "%lu, "
+				     "left out",
+				     c->number, c->desc_len, f->text + c->desc, (unsigned long)bytes,
+				     (unsigned long)cs->work.cost, (unsigned long)gl_cheat_bytes, (unsigned long)cost);
+				flags = INGAME_WHY_ROOM;
+			} else if (kept.n + cs->work.n_patches > CHEATSTORE_ROM_PATCHES) {
+				// Its ROM patches all kept, or the cheat left out whole:
+				// never its ops running without the patches they go with
+				tlog("cheats: cheat %u (%.*s): its %lu ROM patches don't fit beside %lu, left out",
+				     c->number, c->desc_len, f->text + c->desc, (unsigned long)cs->work.n_patches,
+				     (unsigned long)kept.n);
+				flags = INGAME_WHY_ROOM;
+			} else {
+				flags = INGAME_CHEAT_ON | (cs->work.n_patches ? INGAME_WHY_LOCKED : INGAME_WHY_NONE);
+				if (bytes) {
+					// The extras make way for a pick, the last first
+					while (x.n && gl_cheat_bytes + bytes > x.low)
+						extras_keep(&x, list, listed, x.n - 1);
+					memcpy((u8 *)gl_cheat_table + gl_cheat_bytes, cs->work.prog, bytes);
+					gl_cheat_bytes += bytes;
+					cost += cs->work.cost;
+					bit = gl_cheat_count++;
+					flags |= INGAME_CHEAT_TABLE;
+					if (bit >= INGAME_CHEATS)  // no toggle: always on
+						flags = (u8)((flags & ~INGAME_CHEAT_WHY) | INGAME_WHY_LOCKED);
+				}
+				gl_cheat_patches += cs->work.n_patches;
+				keep_patches(f, c, &cs->work);
+			}
+		} else if (show && c->status == CHEATFILE_OK) {
+			flags = INGAME_WHY_ROOM;
+			if (cs->work.n_patches) {
+				flags = INGAME_WHY_ROM;
+			} else if (bytes && x.n < INGAME_CHEATS && gl_cheat_bytes + bytes <= x.low) {
+				x.low -= bytes;
+				memcpy((u8 *)gl_cheat_table + x.low, cs->work.prog, bytes);
+				x.bytes[x.n] = (u16)bytes;
+				x.cost[x.n] = (u16)cs->work.cost;
+				extra = (u8)++x.n;
+				flags = INGAME_WHY_NONE;
+			}
 		}
-		u32 bytes = cs->work.n_prog * 4;
-		if (gl_cheat_bytes + bytes > CHEATFILE_BYTES_MAX || cost + cs->work.cost > CHEAT_CYCLES_MAX) {
-			tlog("cheats: cheat %u (%.*s): its %lu bytes and %lu cycles don't fit beside %lu and %lu, left "
-			     "out",
-			     c->number, c->desc_len, f->text + c->desc, (unsigned long)bytes,
-			     (unsigned long)cs->work.cost, (unsigned long)gl_cheat_bytes, (unsigned long)cost);
-			continue;
+		if (show) {
+			list[listed].extra = extra;
+			list[listed].flags = flags;
+			list[listed].fix = 0;
+			u32 desc = c->desc != CHEATFILE_NONE;
+			ingame_cheat_put(listed, f->text + (desc ? c->desc : c->code), desc ? c->desc_len : c->code_len,
+					 c->number, (u16)i, flags, (u8)bit,
+					 (flags & INGAME_CHEAT_TABLE) ? (u16)cs->work.cost : 0);
+			listed++;
 		}
-		// Its ROM patches all kept, or the cheat left out whole: never its
-		// ops running without the patches they go with
-		if (kept.n + cs->work.n_patches > CHEATSTORE_ROM_PATCHES) {
-			tlog("cheats: cheat %u (%.*s): its %lu ROM patches don't fit beside %lu, left out", c->number,
-			     c->desc_len, f->text + c->desc, (unsigned long)cs->work.n_patches, (unsigned long)kept.n);
-			continue;
-		}
-		if (bytes) {
-			memcpy((u8 *)gl_cheat_table + gl_cheat_bytes, cs->work.prog, bytes);
-			gl_cheat_bytes += bytes;
-			cost += cs->work.cost;
-			gl_cheat_count++;
-		}
-		gl_cheat_patches += cs->work.n_patches;
-		keep_patches(f, c, &cs->work);
+		if ((u32)i + 1 >= last && listed >= INGAME_CHEATS)
+			break;
 	}
 	if (cs->work.next >= f->count)
 		cheatstore_listed();  // decoded whole: the game popup's count, should the launch come back
+	gl_cheat_picks = gl_cheat_count;
+	gl_cheat_pick_bytes = gl_cheat_bytes;
+	u32 pick_cost = cost;
+	extras_place(&x, list, listed, cost);
 	if (gl_cheat_bytes) {
 		gl_cheat_table[gl_cheat_bytes / 4] = 0;  // the table's end
 		gl_cheat_bytes += 4;
 	}
+	ingame_cheats_set(listed, gl_cheat_count);
 	tlog("cheats: %s: %lu picked, %lu run in game (%lu bytes, %lu cycles a frame at most), %lu ROM "
-	     "patches",
-	     cs->path, (unsigned long)picks, (unsigned long)gl_cheat_count, (unsigned long)gl_cheat_bytes,
-	     (unsigned long)(gl_cheat_count ? cost : 0), (unsigned long)gl_cheat_patches);
+	     "patches; %lu listed in game, %lu in the table",
+	     cs->path, (unsigned long)picks, (unsigned long)gl_cheat_picks, (unsigned long)gl_cheat_pick_bytes,
+	     (unsigned long)(gl_cheat_picks ? pick_cost : 0), (unsigned long)gl_cheat_patches, (unsigned long)listed,
+	     (unsigned long)gl_cheat_count);
+}
+
+void cheatstore_drop_extras(void)
+{
+	if (gl_cheat_count == gl_cheat_picks)
+		return;
+	tlog("cheats: the %lu cheats off at launch left out of the table: no room",
+	     (unsigned long)(gl_cheat_count - gl_cheat_picks));
+	gl_cheat_count = gl_cheat_picks;
+	gl_cheat_bytes = gl_cheat_pick_bytes;
+	gl_cheat_off[0] = gl_cheat_off[1] = 0;
+	if (gl_cheat_bytes) {
+		gl_cheat_table[gl_cheat_bytes / 4] = 0;
+		gl_cheat_bytes += 4;
+	}
+	ingame_cheats_trim(gl_cheat_count);
 }

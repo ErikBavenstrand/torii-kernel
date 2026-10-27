@@ -130,8 +130,18 @@ int cheatstore_drop(void);
 // written into it, nothing read again, but for any past its end or over the
 // kernel's own patches (rom_guard_hits, GBApatch.h): left out and logged. A
 // game without a cheat file, or with none picked, gets none.
+// The first pass also writes the in-game list (source/ingame.h: every pick,
+// then other cheats up to INGAME_CHEATS, in file order) to cart SRAM, and
+// puts the listed cheats that weren't picked in the table after the picks,
+// off (gl_cheat_off), as many as fit its bytes, the toggles' 64 bits and the
+// cycle cap with every pick on (each off costs CHEAT_COST_SKIP).
 #define CHEATSTORE_ROM_PATCHES CHEATFILE_PICKED_PATCHES_MAX
 void cheatstore_launch(const char *rom_path, u32 psram_bytes);
 extern u32 gl_cheat_patches;
+// No cheats for this launch: the table, the patches and the in-game list
+void cheatstore_launch_none(void);
+// The table without its extras (the patch area has no room for them): the
+// in-game list's extras lose their toggles
+void cheatstore_drop_extras(void);
 
 #endif
