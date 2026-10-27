@@ -15,7 +15,10 @@ void IWRAM_CODE SetRompage(u16 page);
 void IWRAM_CODE SetbufferControl(u16 control);
 void SetPSRampage(u16 page);
 void SetRampage(u16 page);
-void IWRAM_CODE Send_FATbuffer(u32 *buffer, u32 mode);
+void IWRAM_CODE Send_FATbuffer_now(u32 *buffer, u32 mode);
+// The launch table to the FPGA (mode 0: copy the game and wait, 1: take it,
+// 2: a firmware page), checked first (fattable.h): 0 if sent, 1 if refused
+u32 Send_FATbuffer(u32 *buffer, u32 mode);
 void IWRAM_CODE SetRompageWithHardReset(u16 page, u32 bootmode);
 #define GAME_USES_CLOCK 1
 #define GAME_USES_RUMBLE 2

@@ -172,6 +172,22 @@ DRESULT disk_read (
 
 #if FF_FS_READONLY == 0
 
+/* Torii: once the volume is mounted, nothing is written outside it (the
+   partition table before it, or past its last cluster): 1 if inside */
+static int write_inside(LBA_t sector, UINT count)
+{
+	if (!EZcardFs.fs_type)
+		return 1;
+	LBA_t end = EZcardFs.database + (LBA_t)(EZcardFs.n_fatent - 2) * EZcardFs.csize;
+	int inside = sector >= EZcardFs.volbase && sector + count > sector && sector + count <= end;
+	TLOG_ASSERT(inside);
+	if (!inside)
+		tlog_error("sd: a write of %lu sectors at %lu, outside the volume (%lu to %lu), refused",
+			   (unsigned long)count, (unsigned long)sector, (unsigned long)EZcardFs.volbase,
+			   (unsigned long)end);
+	return inside;
+}
+
 DRESULT disk_write (
 	BYTE pdrv,			/* Physical drive nmuber to identify the drive */
 	const BYTE *buff,	/* Data to be written */
@@ -216,7 +232,7 @@ DRESULT disk_write (
 	/* Torii: ROM reads while SD mode is on return the cart's SD buffer, so
 	   a source in ROM would write that instead: refuse it. */
 	TLOG_ASSERT((DWORD)buff < 0x08000000);
-	if ((DWORD)buff >= 0x08000000)
+	if ((DWORD)buff >= 0x08000000 || !write_inside(sector, count))
 		return RES_PARERR;
 	diskstat_total.writes++;
 	diskstat_total.write_sectors += count;
@@ -243,7 +259,7 @@ DRESULT disk_write_fill (
 {
 	(void)pdrv;
 	TLOG_ASSERT((DWORD)buff < 0x08000000);
-	if ((DWORD)buff >= 0x08000000)
+	if ((DWORD)buff >= 0x08000000 || !write_inside(sector, count))
 		return RES_PARERR;
 	diskstat_total.writes++;
 	diskstat_total.write_sectors += count;

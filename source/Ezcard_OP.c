@@ -17,6 +17,8 @@
 #include "lang.h"
 #include "tlog.h"
 #include "waitcnt.h"
+#include "fattable.h"
+#include "rtssink.h"
 
 extern u32 FAT_table_buffer[FAT_table_size / 4] EWRAM_BSS;
 
@@ -267,7 +269,8 @@ void IWRAM_CODE SetRampage(u16 page)
 	WAITCNT_RESTORE(waitcnt);
 }
 // --------------------------------------------------------------------
-void IWRAM_CODE Send_FATbuffer(u32 *buffer, u32 mode)
+// The send itself (Send_FATbuffer checks the table first)
+void IWRAM_CODE Send_FATbuffer_now(u32 *buffer, u32 mode)
 {
 	u16 waitcnt = WAITCNT_SLOW();
 	SetbufferControl(1);
@@ -298,6 +301,21 @@ void IWRAM_CODE Send_FATbuffer(u32 *buffer, u32 mode)
 	}
 	SetbufferControl(0);
 	WAITCNT_RESTORE(waitcnt);
+}
+
+// Torii: a launch table goes only with the game's runs ended and the save-state
+// buffer's write-back pointed at /torii/rts.bin (fattable.h); mode 2 sends
+// firmware pages, which the FPGA doesn't take as a table
+u32 Send_FATbuffer(u32 *buffer, u32 mode)
+{
+	const char *why = NULL;
+	if (mode != 2 && !fat_table_safe(buffer, rts_sink_runs(), &why)) {
+		tlog_error("launch: the cart's table not sent: %s", why);
+		TLOG_ASSERT(0);
+		return 1;
+	}
+	Send_FATbuffer_now(buffer, mode);
+	return 0;
 }
 // --------------------------------------------------------------------
 #define RESET_EWRAM (1 << 0) /*!< Clear 256K on-board WRAM			*/

@@ -79,7 +79,7 @@ static IntFn vblank_handler(void)
 	return NULL;
 }
 
-void progress_cart_copy(u32 *fat, u32 bytes, u32 hi)
+u32 progress_cart_copy(u32 *fat, u32 bytes, u32 hi)
 {
 	u32 frames = bytes / PROGRESS_COPY_RATE;
 	// The step starts where the last one ends. The fill can't start at
@@ -92,13 +92,15 @@ void progress_cart_copy(u32 *fat, u32 bytes, u32 hi)
 		irqSet(IRQ_VBLANK, progress_copy_vblank);
 	}
 	u32 start = torii_frames;
-	Send_FATbuffer(fat, 0);
+	u32 refused = Send_FATbuffer(fat, 0);
 	u32 took = torii_frames - start;
 	if (hooked) {
 		irqSet(IRQ_VBLANK, before);
 		dialog_progress_drew(hook.bar.x);
 	}
 	step.lo = step.hi = (u16)(hi < PROGRESS_FULL ? hi : PROGRESS_FULL);
+	if (refused)
+		return 1;
 	if (took)
 		tlog("launch: the cart copied %lu KB in %lu frames, %lu bytes a frame (the estimate: %lu frames)",
 		     (unsigned long)(bytes >> 10), (unsigned long)took, (unsigned long)(bytes / took),
@@ -106,4 +108,5 @@ void progress_cart_copy(u32 *fat, u32 bytes, u32 hi)
 	else
 		tlog("launch: the cart copied %lu KB within a frame (the estimate: %lu frames)",
 		     (unsigned long)(bytes >> 10), (unsigned long)frames);
+	return 0;
 }

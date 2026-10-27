@@ -33,6 +33,7 @@
 #include "cutpoint.h"
 #include "diskstat.h"
 #include "fathint.h"
+#include "rtssink.h"
 #include "saveorphan.h"
 #include "settings_model.h"
 #include "shotstore.h"
@@ -1681,6 +1682,11 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 	progress_step(gl_loading_game, 0, LAUNCH_NOR_SAVE);
 
 	init_FAT_table();
+	// Torii: the state buffer's write-back goes to /torii/rts.bin (fattable.h)
+	if (!rts_sink_prepare()) {
+		Show_error_num(1);
+		return;
+	}
 
 	//boot nor game
 	pfilename = pNorFS[show_offset + file_select].filename;
@@ -1722,7 +1728,10 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 	}
 
 	FAT_table_buffer[0x1F4 / 4] = SET_PARAMETER_MODE;
-	Send_FATbuffer(FAT_table_buffer, 1);  //only RTS FAT and some parameter
+	if (Send_FATbuffer(FAT_table_buffer, 1)) {  //only RTS FAT and some parameter
+		Show_error_num(1);
+		return;
+	}
 	//wait_btn();
 	gl_game_uses = Game_hardware(0, GAMECODE, 0);
 	ingame_cheats_clear();  // a NOR copy's cheats are as it was written: no list
@@ -1797,6 +1806,14 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 	u32 have_pat = 0;
 
 	init_FAT_table();
+	// Torii: the state buffer's write-back goes to /torii/rts.bin, a file
+	// of the kernel's, at every launch (fattable.h): with nothing there the
+	// FPGA's walk ran on into the game's runs and wrote a state over the
+	// game's file (the real cart, 2026-10-27)
+	if (!rts_sink_prepare()) {
+		Show_error_num(1);
+		return 0;
+	}
 
 	//Load to PSRAM or NOR
 
@@ -1887,7 +1904,11 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 		tlog_flush();
 
 		FAT_table_buffer[0x1F4 / 4] = SET_PARAMETER_MODE;
-		Send_FATbuffer(FAT_table_buffer, 1);
+		ingame_states_none();  // no state of another game's for the cart to write back
+		if (Send_FATbuffer(FAT_table_buffer, 1)) {
+			Show_error_num(1);
+			return 0;
+		}
 
 		res = LoadEMU2PSRAM(pfilename, is_EMU);
 		if (res) {  // Torii: not started from a ROM read in part
@@ -1918,9 +1939,15 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 			cartlog_phase(PHASE_LAUNCH, 0, pfilename);
 			tlog("launch: loading %s, CLEAN BOOT", pfilename);
 			ingame_probe_prepare(GAMECODE);  // the in-game probe ROM's scratch file
+			// A state another launch left (its flag set) goes: the cart would
+			// write it back (fattable.h)
+			ingame_states_none();
 			tlog_flush();
 
-			progress_cart_copy(FAT_table_buffer, gamefilesize, LAUNCH_COPIED);
+			if (progress_cart_copy(FAT_table_buffer, gamefilesize, LAUNCH_COPIED)) {
+				Show_error_num(1);
+				return 0;
+			}
 			GBApatch_Cleanrom(PSRAMBase_S98, gamefilesize);
 			progress_done(NULL);
 			//wait_btn();
@@ -1957,7 +1984,10 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 				have_pat = Check_pat(pfilename);
 				if (have_pat == 1) {
 					tlog("launch: IRQ hook from PATCH/ (cached scan)");
-					progress_cart_copy(FAT_table_buffer, gamefilesize, LAUNCH_PATCH);
+					if (progress_cart_copy(FAT_table_buffer, gamefilesize, LAUNCH_PATCH)) {
+						Show_error_num(1);
+						return 0;
+					}
 				} else  //(have_pat==0)
 				{
 					f_chdir(currentpath);  //return to game folder
@@ -1976,7 +2006,10 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 						tlog("launch: IRQ hook from a scan of the ROM (scan engine)");
 					get_find:
 						FAT_table_buffer[0x1F4 / 4] = SET_PARAMETER_MODE;
-						Send_FATbuffer(FAT_table_buffer, 1);
+						if (Send_FATbuffer(FAT_table_buffer, 1)) {
+							Show_error_num(1);
+							return 0;
+						}
 						progress_step(NULL, LAUNCH_STATES, LAUNCH_SCAN);
 						res = Loadfile2PSRAM(pfilename);
 						if (res) {  // Torii: not started from a ROM read in part
@@ -1990,8 +2023,11 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 						res = use_internal_engine(GAMECODE, pfilename);
 						if (res == 1) {
 							tlog("launch: IRQ hook from the built-in table");
-							progress_cart_copy(FAT_table_buffer, gamefilesize,
-									   LAUNCH_PATCH);
+							if (progress_cart_copy(FAT_table_buffer, gamefilesize,
+									       LAUNCH_PATCH)) {
+								Show_error_num(1);
+								return 0;
+							}
 						} else {
 							tlog("launch: IRQ hook from a scan of the ROM (not in the "
 							     "table)");
@@ -2014,7 +2050,10 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 				Log_patches();
 			} else {  //no select switch ,CLEAN
 				tlog("launch: no addon on, so no patches");
-				progress_cart_copy(FAT_table_buffer, gamefilesize, LAUNCH_COPIED);
+				if (progress_cart_copy(FAT_table_buffer, gamefilesize, LAUNCH_COPIED)) {
+					Show_error_num(1);
+					return 0;
+				}
 			}
 			// Torii: the picked cheats' ROM patches, into the game in PSRAM
 			if (gl_cheat_patches)

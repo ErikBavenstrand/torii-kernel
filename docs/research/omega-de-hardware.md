@@ -304,6 +304,22 @@ While SD control is 3 the port returns status; `0xEEE1` means busy.
    sector]` pairs for each contiguous run (terminated by `0xFFFFFFFF`) into a
    1 KB table. Word `0x1F4/4` is a mode: 0 = load the ROM, 2 = only set
    parameters. The RTS file's table goes at `+0x300`.
+   **The FPGA writes cart SRAM's state buffer (`0x40000`-`0xAFFFF`) back to
+   the card through the runs at `+0x300`** (EZ-Flash's kernel never writes
+   `/RTS/<game>.rts` itself, yet its states reached it). On the real cart
+   (2026-10-27) a CLEAN BOOT launch sent nothing at `+0x300` (all 0, no end
+   marker) while a Pokémon Emerald state sat in the buffer with its flag;
+   after the in-game probe ran, `/ingame.gba` held the buffer's first sectors
+   (Emerald's EWRAM heap), same size and date: the walk ran past the 1 KB
+   table's end into the game's runs at 0. What starts the write-back isn't
+   known (the probe writes the first bytes of each page `0x20`-`0xEF`,
+   page `0xAF` included, and puts them back; the file held the bytes put
+   back). Since then every table names `/torii/rts.bin` (448 KB, the
+   kernel's) at `+0x300`, `Send_FATbuffer` refuses any other
+   (`source/fattable.h`), and launches clear the buffer's flag. The emulated
+   cart writes the buffer back on a page change after a game-mode write to
+   page `0xAF` while the flag is set, and stops with status 81 when its walk
+   wraps into the game's runs (`tests/ingame_probe.sh`).
 2. `Send_FATbuffer` writes the table to the port with buffer control 1, then
    sets buffer control 3. In load mode the FPGA copies the file into PSRAM and
    the port reads non-zero, then not 1, when done. The kernel spins on the

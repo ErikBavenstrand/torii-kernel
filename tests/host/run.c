@@ -123,6 +123,7 @@ static const struct {
 	{"progress_estimate", test_progress_estimate},
 	{"progress_copy", test_progress_copy},
 	{"name_with_ext", test_name_with_ext},
+	{"fattable", test_fattable},
 	{"irq_table_lookup", test_irq_table_lookup},
 	{"irq_table_rejects_blank_codes", test_irq_table_rejects_blank_codes},
 	{"irq_table_bounds", test_irq_table_bounds},

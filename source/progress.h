@@ -47,7 +47,8 @@ void progress_done(const char *status);
 // (Send_FATbuffer, mode 0) as the step from the last one's end to hi. The
 // kernel waits in IWRAM meanwhile, and a VBlank interrupt moves the bar on
 // an estimate (PROGRESS_COPY_RATE).
-void progress_cart_copy(u32 *fat, u32 bytes, u32 hi);
+// 0 once copied; 1 if Send_FATbuffer refused the table (nothing copied).
+u32 progress_cart_copy(u32 *fat, u32 bytes, u32 hi);
 // Its VBlank interrupt, in IWRAM.
 void IWRAM_CODE progress_copy_vblank(void);
 
