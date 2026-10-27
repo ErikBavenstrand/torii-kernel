@@ -83,10 +83,13 @@ int statestore_buffer(struct ingame_state_tag *tag)
 static void tag_clear(void);
 static void flag_set(int on);
 
+// The flag first: with it cleared, no write to the buffer's last page can
+// start the FPGA's write-back (fattable.h), whatever table it holds (after a
+// cold boot, none: zeros, the card's first sectors)
 void statestore_buffer_clear(void)
 {
-	tag_clear();
 	flag_set(0);
+	tag_clear();
 }
 
 static void flag_set(int on)
@@ -346,9 +349,13 @@ static int keep_slot(const char *rom_path, const char *save_slot, u32 slot)
 	}
 	if (!copy_write(path, slot, e->have ? e->seq + 1 : 1, order + 1))
 		return 0;
-	// Kept: the next boot doesn't file it again
+	// Kept: the next boot doesn't file it again. The flag goes first and
+	// stays cleared: at the boot after a cold one the FPGA's table is zeros,
+	// and a write to the buffer's page with the flag set may start its
+	// write-back (fattable.h). A launch puts a state back from its file.
 	struct ingame_state_tag tag;
 	if (statestore_buffer(&tag)) {
+		flag_set(0);
 		tag.kept = 1;
 		buffer_io(TAG_AT, (u8 *)&tag, sizeof(tag), 1);
 	}
@@ -394,6 +401,7 @@ static int import_rts(const char *rom_path, const char *save_slot, const char *r
 	flag_set(1);
 	if (!keep_slot(rom_path, save_slot, 1))
 		return 0;
+	flag_set(1);  // keep_slot cleared it; a launch's table names /torii/rts.bin
 	// Taken once: renamed, so the game's other save slots (each a folder of
 	// states of its own, empty) don't take it again at every launch. The
 	// buffers are keep_slot's, free again

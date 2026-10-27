@@ -72,7 +72,8 @@ u32 statestore_newest(const struct statestore_list *l);
 // rom_crc is the session's (ingame.h). Shows nothing.
 int statestore_load(const char *rom_path, const char *save_slot, u32 slot, u32 rom_crc, u32 autoload);
 // Files the buffer's state as slot (its tag says not kept), under a
-// progress dialog (open one first), then marks it kept. 1 if written.
+// progress dialog (open one first), then marks it kept and clears the
+// buffer's flag (statestore_buffer then says none). 1 if written.
 int statestore_keep(const char *rom_path, const char *save_slot, u32 slot);
 // Once for a game with no states for its save slot: an old /RTS/<rom
 // name>.rts (the official kernel's single state, keyed by file name) with
