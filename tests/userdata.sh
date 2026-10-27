@@ -113,6 +113,23 @@ grep -q '^kernel: launch Hello.gba: code' "$cart/1.log" || fail "Hello.gba didn'
 copies "@boot gba\n$now\t/Hello.gba\n"
 echo "PASS: a recent.txt edited by hand is read as it is and sealed by the next write"
 
+# favorites.txt edited by hand and read whole is written back with its CRC
+# line at once, so the next boot reads it as the kernel's (the cart said
+# "edited by hand" at every boot)
+new_cart favhand
+put /torii/favorites.txt '/Hello.gba\r\n'
+boot 1.log -f 200
+grep -q 'safefile: /torii/favorites.txt: edited by hand' "$cart/1.log" || fail "the hand edit wasn't read as one"
+grep -q 'userdata: favourites edited by hand: written back' "$cart/1.log" || fail "the favourites weren't written back"
+sealed '/Hello.gba\n' >"$cart/want.txt"
+for copy in favorites.txt favorites.txt.bak; do
+  mtype -i "$cart/sd.img" "::/torii/$copy" >"$cart/got.txt" 2>/dev/null || fail "$copy isn't on the card"
+  cmp -s "$cart/got.txt" "$cart/want.txt" || fail "$copy holds '$(cat "$cart/got.txt")'"
+done
+boot 2.log -f 200
+! grep -q 'favorites.txt: edited by hand' "$cart/2.log" || fail "the second boot read the favourites as edited by hand"
+echo "PASS: favorites.txt edited by hand is written back once with its CRC line"
+
 # Neither copy holds up (zeros): Recent is empty, and the next write mends it
 new_cart broken
 printf '\0\0\0\0\0\0\0\0' >"$cart/zero.txt"

@@ -65,6 +65,7 @@ static struct {
 	u8 recent_ok, fav_ok;  // read since the last userdata_invalidate
 	u8 boot_set;           // the boot position differs from the one on the card
 	u8 recent_bad, fav_bad;  // the read failed: never write the list back from it
+	u8 fav_sealed;           // a hand-edited favorites.txt was written back with its CRC line this boot
 	u32 recent_count;
 	u32 fav_count;
 	u32 fav_used;  // pool bytes
@@ -273,6 +274,8 @@ int userdata_flush(void)
 
 // --- Favourites ----------------------------------------------------------------
 
+static int fav_write(void);
+
 static void load_fav(void)
 {
 	u32 count = 0, used = 0, dropped = 0;
@@ -318,6 +321,17 @@ static void load_fav(void)
 	st.fav_version++;
 	if (from != SAFEFILE_NONE)
 		tlog("userdata: %lu favourites, %lu lines dropped", (unsigned long)count, (unsigned long)dropped);
+	// Edited by hand and read whole: written back once with its CRC line,
+	// as it reads, so the next boots read it as the kernel's own (the
+	// cart's log said "edited by hand" at every boot). Not if a line was
+	// dropped, which the user may want to mend, and once a boot, so a card
+	// that won't take the write isn't asked again
+	if (from == SAFEFILE_HAND && !st.fav_bad && !dropped && !safefile_too_big() && !st.fav_sealed) {
+		st.fav_sealed = 1;
+		memset(&W->edit, 0, sizeof(W->edit));
+		tlog("userdata: favourites edited by hand: written back with a CRC line");
+		fav_write();
+	}
 }
 
 static void ensure_fav(void)
