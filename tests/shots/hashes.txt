@@ -364,6 +364,10 @@ ingame-cheats/list F7E6CB9665FBB579
 ingame-cheats/on A7EB51D2E32590C9
 ingame-cheats/rom A3708FCB960EDC67
 ingame-light/menu 6DAB01A75168AFC9
+ingame-shots/first 2B0003A6FF47E8D9
+ingame-shots/one 8AF28A8A604042F6
+ingame-shots/second 92B9AA0225BF6E99
+ingame-shots/two 285A286D2FF81A4E
 ingame-states/load 5D51933A47F53789
 ingame-states/menu BF6A37B0B87F588E
 ingame-states/other 8F1F67CC666EF121

@@ -478,9 +478,12 @@ struct lang_states {
 	const char *not_kept;  // filing it failed
 	// A launch into a slot that doesn't read: the question's title and text
 	const char *unreadable, *start_anyway;
-	// The in-game screenshot's notice at boot, and its failure
-	const char *shot_saving, *shot_failed;
+	// Filing the in-game screenshots at boot: the progress dialog's title
+	// (several, one; its text the game, its status EN_SHOT_OF), and its failure
+	const char *shot_saving, *shot_saving_one, *shot_failed;
 };
+// The screenshot being filed (%lu) of how many (%lu)
+#define EN_SHOT_OF "%lu of %lu"
 extern const struct lang_states *gl_states;
 
 extern u32 gl_lang;  // index of the current language in lang_packs

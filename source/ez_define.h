@@ -81,8 +81,8 @@
 // - READCACHE_SHOT, all 128 KB from the start: an in-game screenshot on its
 //   way from cart SRAM to a BMP on the card (shotstore.c, struct shot_work),
 //   within shotstore_file at boot: the dump's VRAM, palettes and OAM, the
-//   renderer's lines, the file. Its notice is drawn before it starts and
-//   taken down after, so no frame runs a job step meanwhile.
+//   renderer's lines, the file. Its progress dialog draws meanwhile:
+//   no job runs at boot (it checks), so no frame runs a job step.
 // - READCACHE_ART_SHEET, 4 KB from 0x8000, clear of the stage: the test
 //   kernel's art sheet (tests/kernel/art_sheet.c), its BG map and 8x8 icon
 //   tiles, while it runs (it is all the test kernel does then).

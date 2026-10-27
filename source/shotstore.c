@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "cutpoint.h"
+#include "engine/jobs.h"
 #include "ez_define.h"
 #include "Ezcard_OP.h"
 #include "ff.h"
@@ -146,6 +147,20 @@ static int unpack(u32 at)
 	return done == 1;
 }
 
+// The progress dialog's bar: the screenshot being filed (from 0) of how many
+static u32 bar_at, bar_of;
+
+// The bar at line y of the screenshot being filed. Its frames run no job
+// step (none runs at boot; checked), so they leave pReadCache alone
+static void progress(u32 y)
+{
+	if (jobs_pending()) {
+		TLOG_ASSERT(0);
+		return;
+	}
+	dialog_progress_set(bar_at * PPU_H + y, bar_of * PPU_H, NULL);
+}
+
 // The record at at drawn into the file at w->path: a blank head, the lines,
 // the head
 static int file_write(u32 at)
@@ -176,6 +191,7 @@ static int file_write(u32 at)
 	struct ppu_frame frame = {w->vram, w->pal, w->oam, w->head.io};
 	u32 start = torii_frames, drawing = 0;
 	for (u32 y = 0; ok && y < PPU_H; y += SHOT_ROWS) {
+		progress(y);
 		u32 t0 = torii_frames;
 		for (u32 k = 0; k < SHOT_ROWS; k++) {
 			ppu_render_line(&frame, y + k, w->line, &w->scratch);
@@ -242,18 +258,34 @@ int shotstore_file(const char *game)
 {
 	struct shot_work *w = work();
 	struct ingame_shot *h = &w->head;
-	u32 at = INGAME_SRAM_SHOT, filed = 0, ok = 1, noticed = 0;
+	u32 at = INGAME_SRAM_SHOT, filed = 0, ok = 1, waiting = 0, begun = 0;
+	char status[24];
+	for (u32 k = 0; k < INGAME_SHOTS_MAX; k++) {  // how many wait, for the dialog
+		int r = record(at);
+		if (!r)
+			break;
+		waiting += r == 1;
+		at += sizeof(*h) + h->packed;
+	}
+	at = INGAME_SRAM_SHOT;
+	bar_at = 0;
+	bar_of = waiting;
 	for (u32 k = 0; k < INGAME_SHOTS_MAX && ok; k++) {
 		int r = record(at);
 		if (!r)
 			break;
 		u32 next = at + sizeof(*h) + h->packed;
 		if (r == 1) {
-			if (!noticed) {
-				dialog_notice(NULL, gl_states->shot_saving, DIALOG_INFO);
-				noticed = 1;
-				record(at);  // pReadCache again, after the notice's frames
-			}
+			snprintf(status, sizeof(status), EN_SHOT_OF, (unsigned long)bar_at + 1, (unsigned long)waiting);
+			if (!begun) {
+				dialog_progress_begin(waiting == 1 ? gl_states->shot_saving_one
+								   : gl_states->shot_saving,
+						      game[0] ? game : NULL);
+				dialog_progress_status(status);
+				begun = 1;
+			} else
+				dialog_progress_set(bar_at * PPU_H, waiting * PPU_H, status);
+			record(at);  // pReadCache again, after the dialog's frames
 			char name[INGAME_SHOT_FILE];
 			memcpy(name, h->file, sizeof(name));
 			if (name[0] && memchr(name, 0, sizeof(name)) && !strchr(name, '/'))
@@ -269,6 +301,7 @@ int shotstore_file(const char *game)
 				sram_io(at, &done, 4, 1);
 				cutpoint("screenshot: its record marked filed");
 			}
+			bar_at++;
 		}
 		filed += ok;
 		at = next;
@@ -278,8 +311,13 @@ int shotstore_file(const char *game)
 		sram_io(INGAME_SRAM_SHOT, &none, 4, 1);
 		tlog("screenshot: %lu filed", (unsigned long)filed);
 	}
-	if (noticed)
-		dialog_notice_end();
+	if (begun) {
+		if (ok) {
+			dialog_progress_set(waiting * PPU_H, waiting * PPU_H, NULL);
+			dialog_progress_status(status);  // the full bar drawn
+		}
+		dialog_progress_end();
+	}
 	if (!ok)
 		dialog_message(NULL, gl_states->shot_failed, DIALOG_ERROR);
 	return (int)ok;

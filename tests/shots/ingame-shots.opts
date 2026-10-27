@@ -1,0 +1,23 @@
+# The in-game menu's Screenshot row (v0.8 P4) over Hello.gba: the row the
+# user presses counts the screenshots taken, "Screenshot 1/5" after one and
+# "Screenshot 2/5" after a second. Back to Torii, and the next boot files
+# both under the progress dialog "Saving screenshots", its status "1 of 2"
+# and then "2 of 2", the bar filling across both.
+#! settings 2=1 14=1
+-w "nav: home ready"
+-P "@8:nav_test_path:/Hello.gba" -p @8:nav_test_action:0x7E000002
+-w "launch: starting the game"
+-k @300:L+R+START -k @306:-
+-w "screen ready: ingame"
+-k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:DOWN -k @48:- -k @56:A -k @60:-
+-w "ingame: screenshot dumped"
+-s @30:one.png
+-k @40:A -k @44:-
+-w "ingame: screenshot dumped"
+-s @30:two.png
+-k @40:DOWN -k @44:- -k @52:DOWN -k @56:- -k @64:DOWN -k @68:- -k @76:A -k @80:-
+-w "screenshot: its journal written"
+-s @30:first.png
+-w "screenshot: /torii/screenshots/"
+-s @30:second.png
+-w "home ready"

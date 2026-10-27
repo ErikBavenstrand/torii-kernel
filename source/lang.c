@@ -812,12 +812,13 @@ static const struct lang_ingame en_ingame = {
 
 static const struct lang_states en_states = {
 	.months = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"},
-	.keeping = "Keeping the save state",
+	.keeping = "Saving the save state",
 	.none = "No save states yet.\nSave one from the in-game menu.",
 	.not_kept = "The save state wasn't kept:\nthe card didn't take it.",
 	.unreadable = "This state can't be read",
 	.start_anyway = "A starts the game anyway,\nfrom its start. B goes back.",
-	.shot_saving = "Saving the screenshot",
+	.shot_saving = "Saving screenshots",
+	.shot_saving_one = "Saving the screenshot",
 	.shot_failed = "The screenshot wasn't saved:\nthe card didn't take it.",
 };
 
