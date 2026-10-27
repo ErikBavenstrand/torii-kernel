@@ -12,6 +12,17 @@ git log, not here.
   intro left the windows at 0x0, hiding the overworld). LOAD now finds the
   game's own RAM copy of its display registers, as screenshots do, and
   writes them back (c8a9e669).
+- **Fixed:** after Load state the map moved before the sprites (Emerald),
+  and loads in other scenes could crash or drift: the screen now stays on the
+  backdrop until the game's own VBlank has run on the state; IRQ flags,
+  Supervisor-mode registers and the IRQ vector are put back (32249fc2).
+- **Fixed:** LOAD runs the hook's cheats and sleep key on its first frame,
+  restores the game's WAITCNT and re-arms its sound DMA (7a2e109e, f06f39ef);
+  timer reload values are measured at SAVE and restored (e0357553; Need for
+  Speed Underground crashed).
+- **Fixed:** launching into a state loads it at the game's entry, so games
+  that clear IWRAM at start (LEGO Star Wars, GTA) no longer start without it;
+  a state from another game or a newer Torii is refused with a question (c9e26bed).
 
 ## v0.8.0
 
