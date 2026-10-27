@@ -18,6 +18,7 @@
 #include <string.h>
 
 #include "nor.h"
+#include "page_state.h"
 #include "../actions.h"
 #include "../ezkernel.h"
 #include "../gamename.h"
@@ -101,7 +102,7 @@ enum {
 #define NAME_SLOTS 4  // rows' names cleaned lately (a row draws straight after its fetch)
 #define NAME_NONE 0xFF
 
-static struct {
+struct nor_state {
 	u32 count;  // games
 	u32 sel;    // the page's cursor: a game, or count for Format all
 	u32 next_row;
@@ -130,7 +131,12 @@ static struct {
 	char pop_title[sizeof(pNorFS[0].filename)];
 	char title[sizeof(pNorFS[0].filename) + 16];
 	char text[sizeof(pNorFS[0].filename) + 64];
-} nor EWRAM_BSS;
+};
+_Static_assert(sizeof(struct nor_state) <= PAGE_STATE_BYTES, "the page's state fits the pages' block");
+// page_state under this page's name (page_state.c), typed so the compiler
+// checks its fields as an object of their own
+extern struct nor_state page_nor;
+#define nor page_nor
 
 static struct ui_spec nodes[N_NODES] EWRAM_BSS;
 
@@ -576,6 +582,7 @@ static int nor_event(struct ui_view *v, const struct ui_event *e)
 
 static struct ui_view *nor_enter(u32 item, u32 row)
 {
+	page_state_claim(PAGE_STATE_NOR);
 	(void)item;
 	// pNorFS is the game NOR's list as the boot read it, and every action
 	// that changes it reads it again (actions.h): reading it here, its two

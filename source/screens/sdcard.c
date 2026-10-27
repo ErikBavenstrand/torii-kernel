@@ -17,6 +17,7 @@
 #include <string.h>
 
 #include "sdcard.h"
+#include "page_state.h"
 #include "../actions.h"
 #include "../ezkernel.h"
 #include "../Ezcard_OP.h"
@@ -91,7 +92,7 @@ enum {
 	POP_SAVES,
 };
 
-static struct {
+struct sd_state {
 	struct sdlist list;
 	struct ui_view *view;
 	u8 first;  // the view's first node
@@ -120,9 +121,6 @@ static struct {
 	char info[320];
 	char save[GAMESAVE_PATH_BYTES];  // File info's current slot's save path
 	char back[MAX_path_len];        // the folder a failed open goes back to
-	u32 memo_hash[MEMO_FOLDERS];
-	u16 memo_cursor[MEMO_FOLDERS];
-	u8 memo_next;
 	u8 pop_ids[UI_POPUP_ITEMS];
 	u8 boots[LANG_BOOTS];  // Play's ways to start (LANG_BOOT_*), stepped
 	u8 nboots, boot;
@@ -130,7 +128,19 @@ static struct {
 	struct ui_popup popup;
 	struct ui_hint hints[3];
 	u32 icons[2][8] ALIGN(4);  // the rows' 8x8 tiles: folder (the item's ink), file (ink3)
-} sd EWRAM_BSS;
+};
+_Static_assert(sizeof(struct sd_state) <= PAGE_STATE_BYTES, "the page's state fits the pages' block");
+// page_state under this page's name (page_state.c), typed so the compiler
+// checks its fields as an object of their own
+extern struct sd_state page_sd;
+#define sd page_sd
+
+// The cursor each of the folders opened last was left on, across other pages
+static struct {
+	u32 hash[MEMO_FOLDERS];
+	u16 cursor[MEMO_FOLDERS];
+	u8 next;
+} memo EWRAM_BSS;
 
 // --- The list model --------------------------------------------------------------
 
@@ -362,14 +372,14 @@ static u32 path_hash(const char *s)
 
 static void memo_store(void)
 {
-	u32 h = path_hash(currentpath), at = sd.memo_next;
+	u32 h = path_hash(currentpath), at = memo.next;
 	for (u32 i = 0; i < MEMO_FOLDERS; i++)
-		if (sd.memo_hash[i] == h)
+		if (memo.hash[i] == h)
 			at = i;
-	if (at == sd.memo_next)
-		sd.memo_next = (u8)((sd.memo_next + 1) % MEMO_FOLDERS);
-	sd.memo_hash[at] = h;
-	sd.memo_cursor[at] = (u16)cursor();
+	if (at == memo.next)
+		memo.next = (u8)((memo.next + 1) % MEMO_FOLDERS);
+	memo.hash[at] = h;
+	memo.cursor[at] = (u16)cursor();
 }
 
 // The cursor folder path was left with, or SDLIST_NONE
@@ -377,8 +387,8 @@ static u32 memo_find(const char *path)
 {
 	u32 h = path_hash(path);
 	for (u32 i = 0; i < MEMO_FOLDERS; i++)
-		if (sd.memo_hash[i] == h)
-			return sd.memo_cursor[i];
+		if (memo.hash[i] == h)
+			return memo.cursor[i];
 	return SDLIST_NONE;
 }
 
@@ -986,6 +996,7 @@ static int sd_event(struct ui_view *v, const struct ui_event *e)
 
 static struct ui_view *sd_enter(u32 item, u32 row)
 {
+	page_state_claim(PAGE_STATE_SD);
 	(void)item;
 	sd.job = JOB_NONE;
 	sd.counting = SDLIST_NONE;

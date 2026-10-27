@@ -16,6 +16,7 @@
 #include <string.h>
 
 #include "games.h"
+#include "page_state.h"
 #include "../actions.h"
 #include "../boxart.h"
 #include "../ez_define.h"
@@ -90,7 +91,7 @@ enum {
 
 // --- State -------------------------------------------------------------------
 
-static struct {
+struct games_state {
 	u8 item;     // enum nav_item
 	u8 kind;
 	u8 console;  // a console page's LIB_*
@@ -108,11 +109,6 @@ static struct {
 	u8 cursor_crc;      // the cursor's game had a CRC as its box was picked
 	u32 ago_wait;
 	u16 recent_rec[USERDATA_RECENT_MAX];
-	// The favourites' A-Z order kept in PSRAM (build_favs): valid while
-	// fav_key is the index's generation, whether it was loaded and the
-	// favourites' version, and the words still sum to fav_sum
-	u8 fav_cached;
-	u32 fav_key[3], fav_count, fav_sum;  // each Recent game's record, LIBRARY_NONE none
 	char ago[USERDATA_RECENT_MAX][AGO_MAX];
 	char position[16];  // the title's "101/176"
 	char fact_keys[24], fact_values[32];
@@ -145,7 +141,20 @@ static struct {
 	u32 info_console;  // the game's
 	u8 info_done;
 	u32 rename_size, rename_console;  // the game Rename is about (games.pick)
-} games EWRAM_BSS;
+};
+_Static_assert(sizeof(struct games_state) <= PAGE_STATE_BYTES, "the page's state fits the pages' block");
+// page_state under this page's name (page_state.c), typed so the compiler
+// checks its fields as an object of their own
+extern struct games_state page_games;
+#define games page_games
+
+// The favourites' A-Z order kept in PSRAM (build_favs), across other pages:
+// valid while key is the index's generation, whether it was loaded and the
+// favourites' version, and the words still sum to sum
+static struct {
+	u8 cached;
+	u32 key[3], count, sum;
+} fav_cache EWRAM_BSS;
 
 // The favourites in A-Z order, while the Favourites page is up: one word
 // each, FAV_* fields (PSRAM_GAMES_BASE, written by psram_write)
@@ -702,21 +711,21 @@ static int cache_ok(void)
 {
 	u32 key[3];
 	cache_key(key);
-	return games.fav_cached && !memcmp(key, games.fav_key, sizeof(key)) &&
-	       words_sum((const u32 *)PSRAM_GAMES_BASE, games.fav_count) == games.fav_sum;
+	return fav_cache.cached && !memcmp(key, fav_cache.key, sizeof(key)) &&
+	       words_sum((const u32 *)PSRAM_GAMES_BASE, fav_cache.count) == fav_cache.sum;
 }
 
 // Writes n words as the favourites' order; 0 if PSRAM refused them
 static int cache_put(const u32 *words, u32 n)
 {
-	games.fav_cached = 0;
+	fav_cache.cached = 0;
 	psram_begin();
 	if (n && !psram_write((void *)PSRAM_GAMES_BASE, words, n * 4))
 		return 0;
-	games.fav_count = n;
-	games.fav_sum = words_sum(words, n);
-	cache_key(games.fav_key);
-	games.fav_cached = 1;
+	fav_cache.count = n;
+	fav_cache.sum = words_sum(words, n);
+	cache_key(fav_cache.key);
+	fav_cache.cached = 1;
 	return 1;
 }
 
@@ -728,7 +737,7 @@ static u32 fav_word(u32 i, u32 rec, const u32 *key)
 static void build_favs(void)
 {
 	if (cache_ok()) {
-		games.count = games.fav_count;
+		games.count = fav_cache.count;
 		tlog_debug("games: %lu favourites kept", (unsigned long)games.count);
 		return;
 	}
@@ -781,19 +790,19 @@ static void cache_changed(const char *path, u32 rec, int on, int changed, int do
 		return;  // nothing changed
 	u32 key[3];
 	cache_key(key);
-	int ok = done && games.fav_cached && now == ver + steps && key[0] == games.fav_key[0] &&
-		 key[1] == games.fav_key[1] && games.fav_key[2] == ver &&
-		 words_sum((const u32 *)PSRAM_GAMES_BASE, games.fav_count) == games.fav_sum;
-	games.fav_cached = 0;  // a failed write: sorted again next visit
+	int ok = done && fav_cache.cached && now == ver + steps && key[0] == fav_cache.key[0] &&
+		 key[1] == fav_cache.key[1] && fav_cache.key[2] == ver &&
+		 words_sum((const u32 *)PSRAM_GAMES_BASE, fav_cache.count) == fav_cache.sum;
+	fav_cache.cached = 0;  // a failed write: sorted again next visit
 	if (!ok)
 		return;
 	if (!changed) {
-		games.fav_key[2] = now;
-		games.fav_cached = 1;
+		fav_cache.key[2] = now;
+		fav_cache.cached = 1;
 		return;
 	}
 	int found;
-	u32 idx = userdata_fav_find(path, &found), n = games.fav_count;
+	u32 idx = userdata_fav_find(path, &found), n = fav_cache.count;
 	if (found != on || (on && n >= USERDATA_FAV_MAX))
 		return;
 	u32 *words = (u32 *)build_area()->next;
@@ -834,11 +843,11 @@ static void cache_changed(const char *path, u32 rec, int on, int changed, int do
 		return;
 	tlog_debug("games: favourite %s %s in place", path, on ? "in" : "out");
 	// In the emulator, checked against a whole sort
-	u32 sum = games.fav_sum, count = games.count;
-	games.fav_cached = 0;
+	u32 sum = fav_cache.sum, count = games.count;
+	fav_cache.cached = 0;
 	build_favs();
 	games.count = count;  // the page's, until it lists again
-	TLOG_ASSERT(games.fav_count == n && games.fav_sum == sum);
+	TLOG_ASSERT(fav_cache.count == n && fav_cache.sum == sum);
 }
 
 // Recent's "played" texts as the clock reads now; 1 if one changed (and
@@ -1062,6 +1071,7 @@ static const char *last_played(void)
 
 static struct ui_view *games_enter(u32 item, u32 row)
 {
+	page_state_claim(PAGE_STATE_GAMES);
 	games.item = (u8)item;
 	games.console = registry_items[item].console;
 	games.kind = item == NAV_RECENT ? KIND_RECENT : item == NAV_FAV ? KIND_FAV : KIND_CONSOLE;

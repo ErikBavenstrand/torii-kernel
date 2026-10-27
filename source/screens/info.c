@@ -10,6 +10,7 @@
 
 #include "info.h"
 #include "ff.h"
+#include "page_state.h"
 #include "../build_id.h"
 #include "../diag.h"
 #include "../ezkernel.h"
@@ -79,7 +80,7 @@ char info_build[12] EWRAM_BSS;
 
 extern FATFS EZcardFs;  // ezkernelnew.c
 
-static struct {
+struct info_state {
 	u8 first;  // the view up's first node
 	u8 page;   // the reading page up: its row + 1; 0 the rows
 	u8 open;   // A on a page's row: its row + 1, after the frame
@@ -97,7 +98,12 @@ static struct {
 	struct ui_reading reading;
 	u32 used;  // bytes of text
 	char text[INFO_TEXT_BYTES];
-} info EWRAM_BSS;
+};
+_Static_assert(sizeof(struct info_state) <= PAGE_STATE_BYTES, "the page's state fits the pages' block");
+// page_state under this page's name (page_state.c), typed so the compiler
+// checks its fields as an object of their own
+extern struct info_state page_info;
+#define info page_info
 
 static const char *str(u32 id)
 {
@@ -546,6 +552,7 @@ static void close_page(void)
 
 static struct ui_view *info_enter(u32 item, u32 row)
 {
+	page_state_claim(PAGE_STATE_INFO);
 	(void)item;
 	if (!info_version[0])
 		snprintf(info_version, sizeof(info_version), "%s", TORII_VERSION);
