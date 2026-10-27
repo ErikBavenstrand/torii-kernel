@@ -25,7 +25,7 @@ PAL = 0xC0100 - SHOT
 OAM = 0xC0500 - SHOT
 VRAM = 0xC1000 - SHOT
 BYTES = VRAM + 0x18000
-IO_AT = 16  # struct ingame_shot's io
+IO_AT = 24  # struct ingame_shot's io
 # The display registers the hardware reads back (halfword indexes): DISPCNT,
 # DISPSTAT, VCOUNT, BG0-3CNT, WININ, WINOUT, BLDCNT, BLDALPHA
 READABLE = {0x00, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x24, 0x25, 0x28, 0x29}

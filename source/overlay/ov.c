@@ -1414,7 +1414,7 @@ static void debug_take(void)
 	sram_out(INGAME_SRAM_SNAPSHOT + 0x200, (const void *)0x03007E00, 0x200);
 	ov_system_regs(words);
 	sram_out(INGAME_SRAM_SNAPSHOT + 0x400, (const void *)(words[0] & ~3u), 0x100);
-	static const char magic[16] = INGAME_SNAPSHOT_MAGIC;
+	static const char magic[16] __attribute__((aligned(4))) = INGAME_SNAPSHOT_MAGIC;  // sram_copy takes words
 	sram_out(INGAME_SRAM_SNAPSHOT, magic, 16);
 	debug_print("ingame: debug snapshot saved");
 }
