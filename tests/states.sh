@@ -152,12 +152,21 @@ keep)
   packed=$(sed -n 's/.*2.state: \([0-9]*\) bytes of 458752 packed.*/\1/p' <<<"$log")
   kept=$(sed -n 's/^kernel: states: kept slot 2 in \([0-9]*\) frames$/\1/p' <<<"$log")
   # The next launch: slot 2 is the newest, in cart SRAM: Load state at
-  # once (DOWN DOWN A: its page on slot 2, A) brings the saved frames back
+  # once (DOWN DOWN A: its page on slot 2, A) brings the saved frames back.
+  # A cold boot (the cart's table all zeros) whose kernel writes to the
+  # buffer start the cart's write-back too (OMEGA_RTS_KERNEL_WRITES): every
+  # write-back, the boot's and the launch's, lands in /torii/rts.bin
   # shellcheck disable=SC2046 # option lists
-  out=$(boot $(nav_launch /Game.gba addon) -w "launch: starting the game" \
+  out=$(OMEGA_RTS_KERNEL_WRITES=1 boot $(nav_launch /Game.gba addon) -w "launch: starting the game" \
     -k @$save:L+R+START -k @$((save + 6)):- $(keys $((save + 40)) DOWN DOWN A A) $(hashed $save) \
-    -f 9000 2>"$cart/log")
+    -f 9000 2>"$cart/log") || fail "the run stopped with status $?: $(grep -m2 'omega: ' "$cart/log")"
   log=$(cat "$cart/log")
+  range=$(sd_sectors "$cart/sd.img" /torii/rts.bin)
+  backs=$(sed -n 's/^omega: state buffer written back to sectors \([0-9]*\)-\([0-9]*\).*/\1 \2/p' <<<"$log")
+  [ -n "$backs" ] || fail "no write-back of the launch's state: the test doesn't see the table"
+  while read -r lo hi; do
+    [ "$lo" -ge "${range%-*}" ] && [ "$hi" -le "${range#*-}" ] || fail "written back to $lo-$hi, rts.bin is $range"
+  done <<<"$backs"
   grep -q 'states: slot 2 in cart SRAM from /torii/states/Game.gba/Main/2.state' <<<"$log" ||
     fail "the next launch didn't put slot 2 in cart SRAM: $(grep 'states' <<<"$log" | tail -3)"
   back=$(sed -n 's/^kernel: states: put back in \([0-9]*\) frames$/\1/p' <<<"$log")

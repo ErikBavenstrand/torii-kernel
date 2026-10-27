@@ -12,10 +12,10 @@ index 59ca1c1..1dd19c0 100644
  	EXTDATA_MAX
 diff --git a/include/mgba/internal/gba/cart/omega.h b/include/mgba/internal/gba/cart/omega.h
 new file mode 100644
-index 0000000..6eac5a1
+index 0000000..2bc0324
 --- /dev/null
 +++ b/include/mgba/internal/gba/cart/omega.h
-@@ -0,0 +1,188 @@
+@@ -0,0 +1,194 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -168,6 +168,12 @@ index 0000000..6eac5a1
 +	// A game-mode write to the state buffer's last page (0xAF, its flag's)
 +	// since the page register last showed it.
 +	bool rtsPageWritten;
++	// OMEGA_RTS_KERNEL_WRITES=1: kernel-mode writes to page 0xAF start the
++	// write-back too (what starts it on the real cart is unknown), and a
++	// table with no end marker from 0x300 is walked as the hardware would,
++	// wrapping through all of it (a cold boot's zeros: the card's first
++	// sectors), and stops the run.
++	bool rtsKernelWrites;
 +
 +	// The FPGA's version word (OMEGA_FPGA_VERSION) and, when that is set, its
 +	// config SPI flash in fpga-flash.bin, which the firmware update writes.
@@ -344,10 +350,10 @@ index 1d0c0dd..b77704a 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..05459dc
+index 0000000..06a4150
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1837 @@
+@@ -0,0 +1,1843 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -1203,11 +1209,14 @@ index 0000000..05459dc
 +			break;
 +		}
 +	}
-+	if (end == FAT_TABLE_WORDS / 2) {
-+		fprintf(stderr, "omega: state buffer write-back: no end marker in the table, nothing written\n");
-+		return;
-+	}
 +	bool wrapped = RTS_TABLE_WORD + end * 2 >= FAT_TABLE_WORDS;
++	if (end == FAT_TABLE_WORDS / 2) {
++		if (!omega->rtsKernelWrites) {
++			fprintf(stderr, "omega: state buffer write-back: no end marker in the table, nothing written\n");
++			return;
++		}
++		wrapped = true;  // every pair a run, as the walk would take them
++	}
 +	uint32_t first = 0xFFFFFFFF, last = 0;
 +	for (uint32_t sector = 0; sector < RTS_BYTES / SECTOR_SIZE; ++sector) {
 +		// The last run that starts at or before this sector
@@ -1231,6 +1240,7 @@ index 0000000..05459dc
 +	        wrapped ? ", the walk wrapped into the game's runs" : "");
 +	if (wrapped) {
 +		fprintf(stderr, "omega: STATE BUFFER WRITTEN OVER THE GAME'S FILE: the table had no state file's runs\n");
++		fflush(stderr);
 +		_exit(RTS_WRITEBACK_STATUS);
 +	}
 +}
@@ -1695,6 +1705,8 @@ index 0000000..05459dc
 +	omega->romPage = ROM_PAGE_BOOT;
 +	const char* trace = getenv("OMEGA_TRACE");
 +	omega->trace = trace && *trace && strcmp(trace, "0");
++	const char* kernelWrites = getenv("OMEGA_RTS_KERNEL_WRITES");
++	omega->rtsKernelWrites = kernelWrites && *kernelWrites && strcmp(kernelWrites, "0");
 +	const char* rate = getenv("OMEGA_COPY_RATE");
 +	omega->copyRate = rate ? strtoul(rate, NULL, 0) : 0;
 +	omega->copyEnd = 0;
@@ -2132,7 +2144,7 @@ index 0000000..05459dc
 +		return;
 +	}
 +	omega->sram[_sramOffset(omega, address)] = value;
-+	if (omega->ramPage == RTS_FLAG_PAGE && !_isKernelMode(omega) && omega->gameBooted) {
++	if (omega->ramPage == RTS_FLAG_PAGE && (omega->rtsKernelWrites || (!_isKernelMode(omega) && omega->gameBooted))) {
 +		omega->rtsPageWritten = true;
 +	}
 +}

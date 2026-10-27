@@ -257,6 +257,11 @@ fetches in SD mode.
    `0x09E00000` until it reads 0, then `SPI_Write_Disable()`.
 4. Tell the user to power off. The FPGA reloads from SPI flash on the next power-up.
 
+The mode-2 sends go through the same 1 KB buffer a launch's table does, so they leave firmware
+bytes where the FPGA keeps the table, `+0x300` included: a state-buffer write-back then would
+follow them. That is safe only because the update ends in a power cycle and the next launch
+sends a table of its own.
+
 The FPGA writes its own config SPI flash, so the GBA can never reach the flash directly.
 If an update fails, the cart is bricked. That's why EZRecovery exists.
 
@@ -320,6 +325,29 @@ While SD control is 3 the port returns status; `0xEEE1` means busy.
    cart writes the buffer back on a page change after a game-mode write to
    page `0xAF` while the flag is set, and stops with status 81 when its walk
    wraps into the game's runs (`tests/ingame_probe.sh`).
+   `OMEGA_RTS_KERNEL_WRITES=1` lets kernel-mode writes start it too and walks
+   a table with no end marker as all runs (a cold boot's zeros: the card's
+   first sectors), stopping with 81 (`tests/rtssink.sh coldboot`,
+   `tests/states.sh keep`).
+   Since v0.8 the kernel guards it from both sides. `rts_sink_prepare`
+   (`source/rtssink.h`) takes the file only when its cluster chain covers
+   exactly its clusters (a chain cut short would let the walk run on past
+   its end) and makes it again otherwise, and sends a table of its runs
+   alone before any write to the state buffer. The kernel clears the
+   buffer's flag before any other write to page `0xAF`, so after a cold
+   boot, when the FPGA's table is zeros, no write lands with the flag set.
+   A card with no room for the file and a save after it refuses every
+   launch with its own message. Still open: a FAT with crosslinked chains
+   (another file's chain running into the file's clusters) can't be seen
+   without scanning the whole FAT, so the write-back would land in both. If
+   the logs show odd file contents or launch errors, run `chkdsk` (or
+   `fsck.fat`) on the card.
+   Also open: whether the write-back after an in-game Save state and Back to
+   Torii runs while the kernel boots. No register is known that says it is
+   busy; the port's `0xEEE1` covers the kernel's own SD commands, which
+   `Read_SD_sectors` polls (about a million reads, then once more), and the
+   boot tries a mount that fails three more times, a pause between. The
+   kernel doesn't wait before its first SD command.
 2. `Send_FATbuffer` writes the table to the port with buffer control 1, then
    sets buffer control 3. In load mode the FPGA copies the file into PSRAM and
    the port reads non-zero, then not 1, when done. The kernel spins on the

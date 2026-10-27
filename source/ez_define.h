@@ -83,7 +83,12 @@
 //   within shotstore_file at boot: the dump's VRAM, palettes and OAM, the
 //   renderer's lines, the file. Its notice is drawn before it starts and
 //   taken down after, so no frame runs a job step meanwhile.
+// - READCACHE_ART_SHEET, 4 KB from 0x8000, clear of the stage: the test
+//   kernel's art sheet (tests/kernel/art_sheet.c), its BG map and 8x8 icon
+//   tiles, while it runs (it is all the test kernel does then).
 #define MAX_pReadCache_size 0x20000
+#define READCACHE_ART_SHEET 0x8000
+#define READCACHE_ART_SHEET_SIZE 0x1000
 #define READCACHE_STAGE 0x0
 #define READCACHE_STAGE_SIZE 0x8000
 #define READCACHE_SDLIST 0x10000  // sizeof(struct sdlist_scratch), to the end at most

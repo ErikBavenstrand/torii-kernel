@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Report how much of the cart and GBA memory the kernel uses, and the largest
 # symbols. Exits 1 if anything is over its limit. Runs in the devkitARM
-# container. Usage: size.sh <elf> <gba> [count]
+# container. Usage: size.sh <elf> <gba> [count] (count 0: no symbols)
 #
 # Limits: the upgrade file holds the kernel in its first 1 MB; IWRAM is 32 KB
 # with the stacks at the top (from 0x03007F00 down); EWRAM is 256 KB and
@@ -27,7 +27,9 @@ rom=$(stat -c %s "$gba")
     exit over
   }' || status=$?
 
-echo
-echo "Largest symbols (hex size, address, name):"
-"$bin"/arm-none-eabi-nm --size-sort -r -S "$elf" | awk -v n="$count" 'NR <= n { printf "  %8s  %s  %s\n", $2, $1, $4 }'
+if [ "$count" -gt 0 ]; then
+  echo
+  echo "Largest symbols (hex size, address, name):"
+  "$bin"/arm-none-eabi-nm --size-sort -r -S "$elf" | awk -v n="$count" 'NR <= n { printf "  %8s  %s  %s\n", $2, $1, $4 }'
+fi
 exit "${status:-0}"

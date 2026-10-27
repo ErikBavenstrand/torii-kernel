@@ -26,6 +26,7 @@ char *gl_error_6;
 char *gl_error_7;
 char *gl_error_8;
 char *gl_error_9;
+char *gl_error_10;
 
 char *gl_save_sav;
 char *gl_save_ing;
@@ -197,6 +198,8 @@ const char en_error_6[] = "Can't create the save state file";
 const char en_error_7[] = "The file is too fragmented. Copy it to the card again.";
 const char en_error_8[] = "The save's path is too long. Move the game to a shorter folder.";
 const char en_error_9[] = "The folder path is too long";
+const char en_error_10[] = "Torii needs 448 KB free in one piece on the card for in-game states (/torii/rts.bin). "
+			   "Free some space.";
 
 const char en_save_sav[] = "Save to SD card?";
 const char en_save_ing[] = "Saving";
@@ -848,6 +851,7 @@ void LoadEnglish(void)
 	gl_error_7 = (char *)en_error_7;
 	gl_error_8 = (char *)en_error_8;
 	gl_error_9 = (char *)en_error_9;
+	gl_error_10 = (char *)en_error_10;
 
 	gl_save_sav = (char *)en_save_sav;
 	gl_save_ing = (char *)en_save_ing;
