@@ -166,7 +166,8 @@ keep)
   echo "PASS: states keep: a state saved in game is filed at the next boot, and loads after the next launch"
 
   # An old /RTS/Game.rts with a state's flag, on a card with no states:
-  # slot 1, once
+  # slot 1, once (renamed Game.rts.imported, so another save slot's empty
+  # folder doesn't take it again), and not unpacked again after the import
   rts=$carts/Game.rts
   head -c $((0x6FFF0)) /dev/zero >"$rts"
   printf 'EZ-OmegaRTCFILE.' >>"$rts"
@@ -180,6 +181,12 @@ keep)
     taken=$(grep -c 'states: /RTS/Game.rts becomes slot 1 of /Game.gba' <<<"$log" || true)
     [ "$taken" = $((run == 1 ? 1 : 0)) ] || fail "launch $run: the old state taken $taken times"
     grep -q 'states: slot 1 in cart SRAM' <<<"$log" || fail "launch $run: the old state isn't in cart SRAM"
+    if [ $run = 1 ]; then
+      grep -q 'states: slot 1 in cart SRAM from the /RTS import' <<<"$log" || fail "the import's state was read again"
+      ! grep -q 'states: slot 1 in cart SRAM from /torii' <<<"$log" || fail "the import's state was unpacked again"
+      mtype -i "$cart/sd.img" ::/RTS/Game.rts.imported >/dev/null 2>&1 || fail "/RTS/Game.rts wasn't renamed"
+      ! mtype -i "$cart/sd.img" ::/RTS/Game.rts >/dev/null 2>&1 || fail "/RTS/Game.rts is still there"
+    fi
   done
   echo "PASS: states keep: an old /RTS state becomes slot 1, once"
   ;;

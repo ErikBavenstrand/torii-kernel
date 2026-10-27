@@ -239,11 +239,17 @@ int ingame_states_launch(const char *rom_path, const char *save_slot, const char
 	memset(states.save_slot, 0, sizeof(states.save_slot));
 	memcpy(states.save_slot, save_slot, strlen(save_slot) + 1);  // its length checked above
 	states.rom_crc = states_crc(rom_path, save_slot);
-	statestore_import_rts(rom_path, save_slot, rom_name, states.rom_crc);
+	int imported = statestore_import_rts(rom_path, save_slot, rom_name, states.rom_crc);
 	statestore_scan(rom_path, save_slot, &states.list);
 	u32 want = slot ? slot : statestore_newest(&states.list);
 	u32 start = torii_frames;
-	int loaded = want && statestore_load(rom_path, save_slot, want, states.rom_crc, slot != 0);
+	// An /RTS file just imported is in cart SRAM already, as that slot
+	struct ingame_state_tag tag;
+	int loaded = imported && !slot && want == 1 && statestore_buffer(&tag) && tag.slot == 1 &&
+		     tag.rom_crc == states.rom_crc;
+	if (loaded)
+		tlog("states: slot 1 in cart SRAM from the /RTS import");
+	loaded = loaded || (want && statestore_load(rom_path, save_slot, want, states.rom_crc, slot != 0));
 	// The newest didn't read whole (a card's error): the next newest, and on
 	while (!loaded && !slot && want) {
 		states.list.slot[want].have = 0;  // the session's rows say empty: it can't load

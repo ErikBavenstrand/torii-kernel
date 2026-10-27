@@ -355,6 +355,16 @@ static int keep_slot(const char *rom_path, const char *save_slot, u32 slot)
 	return 1;
 }
 
+// The official kernel's name for the game's state: the ROM's file name with
+// .rts for its extension (suffix: "" or ".imported", the name once taken)
+static int rts_path(char *out, u32 size, const char *rom_name, const char *suffix)
+{
+	const char *dot = strrchr(rom_name, '.');
+	int len = dot && dot != rom_name ? (int)(dot - rom_name) : (int)strlen(rom_name);
+	int n = snprintf(out, size, "/RTS/%.*s.rts%s", len, rom_name, suffix);
+	return n >= 0 && (u32)n < size;
+}
+
 static int import_rts(const char *rom_path, const char *save_slot, const char *rom_name, u32 rom_crc)
 {
 	struct statestore_list l;
@@ -362,12 +372,8 @@ static int import_rts(const char *rom_path, const char *save_slot, const char *r
 		return 0;
 	struct states_work *w = work();
 	char *path = w->path;
-	// The official kernel's name: the ROM's file name with .rts for its extension
-	const char *dot = strrchr(rom_name, '.');
-	int len = dot && dot != rom_name ? (int)(dot - rom_name) : (int)strlen(rom_name);
-	int n = snprintf(path, STATESTORE_PATH_BYTES, "/RTS/%.*s.rts", len, rom_name);
 	FIL *f = &w->fil;
-	if (n < 0 || n >= STATESTORE_PATH_BYTES || f_open(f, path, FA_READ) != FR_OK)
+	if (!rts_path(path, STATESTORE_PATH_BYTES, rom_name, "") || f_open(f, path, FA_READ) != FR_OK)
 		return 0;
 	int ok = f_size(f) == INGAME_STATE_BYTES;
 	UINT got = 0;
@@ -386,7 +392,21 @@ static int import_rts(const char *rom_path, const char *save_slot, const char *r
 	tlog("states: %s becomes slot 1 of %s", path, rom_path);
 	tag_set(1, 0, 0, rom_crc);
 	flag_set(1);
-	return keep_slot(rom_path, save_slot, 1);
+	if (!keep_slot(rom_path, save_slot, 1))
+		return 0;
+	// Taken once: renamed, so the game's other save slots (each a folder of
+	// states of its own, empty) don't take it again at every launch. The
+	// buffers are keep_slot's, free again
+	char *to = (char *)w->raw;
+	if (rts_path(path, STATESTORE_PATH_BYTES, rom_name, "") &&
+	    rts_path(to, STATESTORE_CHUNK, rom_name, ".imported")) {
+		f_unlink(to);  // an older import's
+		FRESULT fr = f_rename(path, to);
+		cutpoint("states: the RTS file renamed");
+		if (fr != FR_OK)
+			tlog_error("states: %s not renamed (FatFs %d): it is taken again", path, (int)fr);
+	}
+	return 1;
 }
 
 // At the menu's wait states (a launch runs at the BIOS's): the packing, the
