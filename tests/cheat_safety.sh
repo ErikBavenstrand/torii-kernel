@@ -209,10 +209,11 @@ EOF
   # 32 MB ROMs: the patch area has no padding to go in. Data to the end:
   # the cheats are left out, the game starts. 8 KB of padding at the end:
   # the area is cut to what the picks need, and the data before it stays.
-  # A 16 MB game overdumped to 32 MB (open-bus fill past its end, as the
+  # 8 KB of padding 64 KB before the end, data around it: the area moves
+  # into that padding, and the data at the cap stays. A 16 MB game overdumped to 32 MB (open-bus fill past its end, as the
   # card's FireRed is): the area stays where it was, the cheats run
   printf '%s\n' 'cheat0_desc = "Beef"' 'cheat0_code = "0203F000:BEEF"' 'cheat0_enable = true' >"$carts/beef.cht"
-  for kind in full padded overdump; do
+  for kind in full padded hole overdump; do
     python3 - "$carts/big.gba" "$kind" <<'EOF'
 import random, struct, sys
 rom = open("tests/roms/hello/hello.gba", "rb").read()
@@ -221,6 +222,10 @@ if kind == "overdump":
     data = random.Random(7).randbytes(0x1000000 - len(rom))
     fill = b"".join(struct.pack("<H", (a >> 1) & 0xFFFF) for a in range(0x1000000, size, 2))
     open(sys.argv[1], "wb").write(rom + data + fill)
+elif kind == "hole":
+    data = bytearray(random.Random(7).randbytes(size - len(rom)))
+    data[0x1FF0000 - len(rom):0x1FF2000 - len(rom)] = b"\xff" * 0x2000
+    open(sys.argv[1], "wb").write(rom + data)
 else:
     pad = 0x2000 if kind == "padded" else 0
     data = random.Random(7).randbytes(size - len(rom) - pad)
@@ -248,6 +253,14 @@ EOF
       [ "$(mem 0203F000)" = efbe ] || fail "padded: the cheat didn't run: $(mem 0203F000)"
       [ "$(mem 09FFDFF0)" = "$(rom_at $((0x1FFDFF0)))" ] || fail "padded: the game's last data changed"
       ;;
+    hole)
+      grep -q "launch: the patch area at 01FFD000 is on the game's data: cut to [0-9A-F]* bytes at 01FF[01][0-9A-F]*" "$cart/run.txt" ||
+        fail "hole: the area didn't move into the padding: $(grep -a 'launch: the patch\|in-game code' "$cart/run.txt")"
+      grep -q "in-game code: in-game menu (RTS_ReplaceIRQ) at ROM 01FF[01]" "$cart/run.txt" ||
+        fail "hole: the menu's code isn't in the padding: $(grep -a 'in-game code' "$cart/run.txt")"
+      [ "$(mem 0203F000)" = efbe ] || fail "hole: the cheat didn't run: $(mem 0203F000)"
+      [ "$(mem 09FFD000)" = "$(rom_at $((0x1FFD000)))" ] || fail "hole: the data at 01FFD000 changed"
+      ;;
     overdump)
       ! grep -q "launch: the patch area at" "$cart/run.txt" || fail "overdump: the fill was taken for data"
       grep -q "in-game code: in-game menu (RTS_ReplaceIRQ) at ROM 01FFD000" "$cart/run.txt" ||
@@ -256,7 +269,7 @@ EOF
       ;;
     esac
   done
-  echo "PASS: cheat_safety: a 32 MB ROM gets the cheats where padding or an overdump's fill holds them, and none over its data"
+  echo "PASS: cheat_safety: a 32 MB ROM gets the cheats where padding or an overdump's fill holds them (padding before its end too), and none over its data"
   ;;
 *)
   fail "no mode $mode"

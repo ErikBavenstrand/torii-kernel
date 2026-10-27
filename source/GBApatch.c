@@ -275,12 +275,20 @@ void IWRAM_CODE PatchInternal(u32 *Data, int iSize, u32 offset)
 	}
 }
 //------------------------------------------------------------------
+//Torii: 1 if the launch's in-game code is the menu's (RTS_ReplaceIRQ), 0 if
+//the reset and sleep keys' (Sleep_ReplaceIRQ)
+static int patch_menu(void)
+{
+	return gl_rts_on == 1 || gl_reset_on == 1 || (gl_cheat_on == 1 && gl_cheat_count > 0);
+}
 // Bytes SetTrimSize keeps free at the ROM's end for the in-game code.
 static u32 Patch_length(void)
 {
 	if (gl_cheat_on == 1)
 		return CHEAT_PATCH_LENGTH;
-	if ((gl_rts_on == 1) /* || (gl_cheat_on==1)*/)
+	//Torii: In-game menu Every game puts the menu's code in with Save states
+	//off too: 0x300 bytes cut it short at a 32 MB ROM's cap
+	if (patch_menu())
 		return RTS_PATCH_LENGTH;
 	return 0x300;
 }
@@ -307,11 +315,36 @@ static int rom_bytes_blank(const u8 *buffer, u32 base, u32 iSize, u32 romsize, u
 	return 1;
 }
 //------------------------------------------------------------------
+//Torii: the highest 16-aligned start below limit of need bytes that hold
+//no data, as buffer (its iSize bytes from base) shows them, and in *room the
+//blank bytes from it up to limit; 0 if none
+static u32 rom_hole(const u8 *buffer, u32 base, u32 iSize, u32 romsize, u32 limit, u32 need, u32 *room)
+{
+	u32 top = base + iSize < limit ? base + iSize : limit;
+	u32 run_end = limit;  // the current blank run's end (past romsize counts as blank)
+	if (top < romsize && top < limit)
+		run_end = top;
+	for (u32 at = run_end & ~1u; at >= base + 2;) {
+		at -= 2;
+		if (at < romsize && !blank_half(at, (u16)(buffer[at - base] | buffer[at - base + 1] << 8))) {
+			run_end = at;
+			continue;
+		}
+		if (run_end >= need && ((run_end - need) & ~15u) >= at) {
+			u32 start = (run_end - need) & ~15u;
+			*room = run_end - start;
+			return start;
+		}
+	}
+	return 0;
+}
 //Torii: the bytes this launch's in-game code takes with the picked cheats:
 //the menu's code, the interpreter and their table (DEBUG's code goes in only
-//where it fits after them)
+//where it fits after them); the reset and sleep keys' code without the menu
 static u32 Patch_need(void)
 {
+	if (!patch_menu())
+		return ((u32)Sleep_ReplaceIRQ_end - (u32)Sleep_ReplaceIRQ_start + 15) & ~15u;
 	u32 need = (u32)RTS_ReplaceIRQ_end - (u32)RTS_ReplaceIRQ_start;
 	if (gl_cheat_on == 1 && gl_cheat_bytes)
 		need += (u32)Cheat_blob_end - (u32)Cheat_blob_start + sizeof(gl_cheat_off) + gl_cheat_bytes;
@@ -392,33 +425,39 @@ void SetTrimSize(u8 *buffer, u32 romsize, u32 iSize, u32 mode, BYTE saveMODE)
 	patch_room = PATCH_LENGTH;
 	u32 scanned = iTrimSize;
 	Patch_SpecialROM_TrimSize();
-	if (iTrimSize != scanned || gl_cheat_on != 1 || iTrimSize >= data_end)
+	if (iTrimSize != scanned || iTrimSize >= data_end)
 		return;
 	//Torii: a cap (32 MB, or 16 MB for EEPROM) put the patch area on what may
 	//be the game's data. Where that is padding (an overdump's open-bus fill
-	//too), it stays; else the cheats' room is cut to what they need, at the
-	//cap's end, if that much is padding
-	u32 limit = iTrimSize + PATCH_LENGTH, need = Patch_need();
+	//too), it stays; else the area is cut to what the in-game code and the
+	//cheats need, in the last padding below the cap that holds them
+	u32 limit = iTrimSize + PATCH_LENGTH, need = Patch_need(), room = 0;
 	u32 base = (romsize - 1) & 0xFFFE0000;
 	if (rom_bytes_blank(buffer, base, iSize, romsize, iTrimSize, limit))
 		return;
-	u32 at = (limit - need) & ~15u;
-	if (!rom_bytes_blank(buffer, base, iSize, romsize, at, limit) && gl_cheat_count > gl_cheat_picks) {
+	u32 at = rom_hole(buffer, base, iSize, romsize, limit, need, &room);
+	if (!at && gl_cheat_on == 1 && gl_cheat_count > gl_cheat_picks) {
 		// Without the extras (the cheats off for the in-game list) the picks may fit
 		cheatstore_drop_extras();
 		need = Patch_need();
-		at = (limit - need) & ~15u;
+		at = rom_hole(buffer, base, iSize, romsize, limit, need, &room);
 	}
-	if (rom_bytes_blank(buffer, base, iSize, romsize, at, limit)) {
+	if (at) {
 		tlog("launch: the patch area at %08lX is on the game's data: cut to %lX bytes at %08lX",
-		     (unsigned long)iTrimSize, (unsigned long)limit - at, (unsigned long)at);
+		     (unsigned long)iTrimSize, (unsigned long)room, (unsigned long)at);
 		iTrimSize = at;
-		patch_room = limit - at;
+		patch_room = room;
 		return;
 	}
-	tlog("launch: the patch area at %08lX is on the game's data, and the cheats' %lX bytes from %08lX would "
-	     "be too: the cheats that run in game are left out",
-	     (unsigned long)iTrimSize, (unsigned long)need, (unsigned long)at);
+	if (gl_cheat_on != 1) {
+		tlog("launch: the patch area at %08lX is on the game's data, with no %lX bytes of padding before "
+		     "it: the in-game code goes over the game's last bytes",
+		     (unsigned long)iTrimSize, (unsigned long)need);
+		return;
+	}
+	tlog("launch: the patch area at %08lX is on the game's data, and the cheats' %lX bytes would be too: the "
+	     "cheats that run in game are left out",
+	     (unsigned long)iTrimSize, (unsigned long)need);
 	gl_cheat_on = 0;
 	gl_cheat_count = gl_cheat_bytes = 0;
 	gl_cheat_picks = gl_cheat_pick_bytes = 0;
@@ -672,7 +711,7 @@ void GBApatch_PSRAM(u32 *address, int filesize)//Only once
 
 	//Torii (v0.8): In-game menu Every game (gl_reset_on) puts the menu on the
 	//menu keys too, where Back to menu left the game for the kernel
-	if ((gl_rts_on == 1) || (gl_reset_on == 1) || ((gl_cheat_on == 1) && (gl_cheat_count > 0))) {
+	if (patch_menu()) {
 		spend_address = Get_spend_address(address);
 		//DEBUG_printf("spend_address =%x",spend_address);
 		Patch_RTS_Cheat(address);
@@ -740,7 +779,7 @@ void GBApatch_NOR(u32 *address, int filesize, u32 offset)
 	PatchDragonBallZ(address);
 	//Check_Fire_Emblem();
 
-	if ((gl_rts_on == 1) || (gl_reset_on == 1) || ((gl_cheat_on == 1) && (gl_cheat_count > 0))) {
+	if (patch_menu()) {
 		Patch_RTS_Cheat(address);
 	} else {
 		Patch_Reset_Sleep(address);
