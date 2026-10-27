@@ -326,7 +326,10 @@ struct ingame_state_tag {
 	uint8_t autoload;  // 1: the game's start loads it (a launch into the slot)
 	uint8_t reserved;
 	uint32_t rom_crc;  // the session's rom_crc: the game it is for
-	uint32_t reserved2;
+	// With kept, the data_crc of the slot's file it came from (the kernel's,
+	// at a launch): a launch whose slot's file still has it skips putting
+	// the state back. 0 otherwise.
+	uint32_t data_crc;
 };
 
 // Why a cheat's toggle can't change in game (struct ingame_cheat's flags)

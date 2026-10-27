@@ -175,6 +175,20 @@ keep)
   echo "states: slot 2 packed to $packed bytes of 458752, filed in ${kept:-?} frames, put back in ${back:-?}"
   echo "PASS: states keep: a state saved in game is filed at the next boot, and loads after the next launch"
 
+  # The launch after, as from Back to Torii (a soft reset keeps the cart RAM
+  # without a battery): slot 2 is in cart SRAM as its file has it (the tag's
+  # data_crc), so it isn't unpacked again, and Load state still brings the
+  # saved frames back
+  # shellcheck disable=SC2046 # option lists
+  out=$(OMEGA_SOFT_RESET=1 boot $(nav_launch /Game.gba addon) -w "launch: starting the game" \
+    -k @$save:L+R+START -k @$((save + 6)):- $(keys $((save + 40)) DOWN DOWN A A) $(hashed $save) \
+    -f 9000 2>"$cart/log")
+  log=$(cat "$cart/log")
+  grep -q 'states: slot 2 already in cart SRAM' <<<"$log" ||
+    fail "slot 2 was put back again: $(grep 'states' <<<"$log" | tail -3)"
+  same "$saved" "$(hashes "$out" 1)" "after Load state with the state left in cart SRAM" >/dev/null
+  echo "PASS: states keep: a launch whose slot is in cart SRAM already doesn't put it back"
+
   # An old /RTS/Game.rts with a state's flag, on a card with no states:
   # slot 1, once (renamed Game.rts.imported, so another save slot's empty
   # folder doesn't take it again), and not unpacked again after the import

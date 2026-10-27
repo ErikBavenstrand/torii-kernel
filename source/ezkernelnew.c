@@ -1942,7 +1942,8 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 			break;
 		case 1:  //PSRAM BOOT WITH ADDON
 			Read_addon_switches();
-			ingame_states_none();
+			if (gl_rts_on != 1)  // with states, ingame_states_launch keeps the buffer's if it is the slot's
+				ingame_states_none();
 			rom_guard_reset();  // Torii: the patches below mark what the cheats' keep off
 			cartlog_phase(PHASE_LAUNCH, 0, pfilename);
 			tlog("launch: loading %s, BOOT WITH ADDON: reset %u, savestate %u, sleep %u, cheats %u (%lu), "

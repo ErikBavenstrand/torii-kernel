@@ -52,6 +52,7 @@ struct statestore_slot {
 	u8 have;  // a valid head in either copy
 	u8 bak;  // the copy taken is NAME.bak
 	u32 seq, order;
+	u32 data_crc;  // the copy taken's
 	struct saveslot_stamp when;
 };
 struct statestore_list {

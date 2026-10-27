@@ -241,8 +241,10 @@ void ingame_states_none(void)
 int ingame_states_launch(const char *rom_path, const char *save_slot, const char *rom_name, u32 slot)
 {
 	states.ready = 0;
-	if (strlen(save_slot) >= sizeof(states.save_slot) || strlen(rom_path) >= INGAME_PATH_BYTES)
+	if (strlen(save_slot) >= sizeof(states.save_slot) || strlen(rom_path) >= INGAME_PATH_BYTES) {
+		statestore_buffer_clear();  // no state of another game's, as ingame_states_none
 		return !slot;  // no states: a launch that asked for none goes on
+	}
 	memset(states.save_slot, 0, sizeof(states.save_slot));
 	memcpy(states.save_slot, save_slot, strlen(save_slot) + 1);  // its length checked above
 	states.rom_crc = states_crc(rom_path, save_slot);
@@ -263,6 +265,8 @@ int ingame_states_launch(const char *rom_path, const char *save_slot, const char
 		want = statestore_newest(&states.list);
 		loaded = want && statestore_load(rom_path, save_slot, want, states.rom_crc, 0);
 	}
+	if (!loaded)
+		statestore_buffer_clear();  // whatever another launch left: the patch's entry code would act on it
 	if (!loaded && slot)
 		tlog_error("states: slot %lu of %s (%s) didn't read", (unsigned long)slot, rom_path, save_slot);
 	else if (!loaded)

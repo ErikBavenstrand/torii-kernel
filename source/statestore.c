@@ -122,7 +122,7 @@ static void tag_clear(void)
 	buffer_io(TAG_AT, (u8 *)&tag, sizeof(tag), 1);
 }
 
-static void tag_set(u32 slot, u32 kept, u32 autoload, u32 rom_crc)
+static void tag_set(u32 slot, u32 kept, u32 autoload, u32 rom_crc, u32 data_crc)
 {
 	struct ingame_state_tag tag;
 	memset(&tag, 0, sizeof(tag));
@@ -131,6 +131,7 @@ static void tag_set(u32 slot, u32 kept, u32 autoload, u32 rom_crc)
 	tag.kept = (u8)kept;
 	tag.autoload = (u8)autoload;
 	tag.rom_crc = rom_crc;
+	tag.data_crc = data_crc;
 	buffer_io(TAG_AT, (u8 *)&tag, sizeof(tag), 1);
 }
 
@@ -186,6 +187,7 @@ u32 statestore_scan(const char *rom_path, const char *save_slot, struct statesto
 				e->bak = (u8)bak;
 				e->seq = h->seq;
 				e->order = h->order;
+				e->data_crc = h->data_crc;
 				e->when = h->when;
 			}
 		}
@@ -204,7 +206,7 @@ u32 statestore_newest(const struct statestore_list *l)
 }
 
 // Unpacks the copy at path into the buffer: 1 if it read whole and its CRC holds
-static int copy_load(const char *path, u32 slot)
+static int copy_load(const char *path, u32 slot, u32 *data_crc)
 {
 	struct states_work *w = work();
 	FIL *f = &w->fil;
@@ -238,6 +240,7 @@ static int copy_load(const char *path, u32 slot)
 	}
 	f_close(f);
 	ok = ok && left == 0 && crc == h->data_crc;
+	*data_crc = crc;
 	if (!ok)
 		tlog_error("states: %s doesn't read whole", path);
 	return ok;
@@ -247,16 +250,31 @@ static int load_slot(const char *rom_path, const char *save_slot, u32 slot, u32 
 {
 	struct statestore_list l;
 	char *path = work()->path;
-	flag_set(0);
 	statestore_scan(rom_path, save_slot, &l);
-	if (slot < 1 || slot > STATESTORE_SLOTS || !l.slot[slot].have)
+	if (slot < 1 || slot > STATESTORE_SLOTS || !l.slot[slot].have) {
+		flag_set(0);
 		return 0;
+	}
+	// Already in cart SRAM: the buffer's state is this slot's file as it is
+	// (a launch put it there, and no SAVE in game replaced it since), so only
+	// its tag changes; the unpacking took about 67 frames
+	struct ingame_state_tag tag;
+	if (statestore_buffer(&tag) && tag.kept && tag.slot == slot && tag.rom_crc == rom_crc && tag.data_crc &&
+	    tag.data_crc == l.slot[slot].data_crc) {
+		tag_set(slot, 1, autoload, rom_crc, tag.data_crc);
+		flag_set(1);  // EZ-Flash's flag cleared, as after an unpacking
+		tlog("states: slot %lu already in cart SRAM%s", (unsigned long)slot,
+		     autoload ? ", loaded at the game's start" : "");
+		return 1;
+	}
+	flag_set(0);
 	// The newer copy first, then the other
 	for (u32 k = 0; k < 2; k++) {
 		u32 bak = k ? !l.slot[slot].bak : l.slot[slot].bak;
-		if (statestore_path(path, rom_path, save_slot, slot, bak) < 0 || !copy_load(path, slot))
+		u32 data_crc = 0;
+		if (statestore_path(path, rom_path, save_slot, slot, bak) < 0 || !copy_load(path, slot, &data_crc))
 			continue;
-		tag_set(slot, 1, autoload, rom_crc);
+		tag_set(slot, 1, autoload, rom_crc, data_crc);
 		flag_set(1);
 		tlog("states: slot %lu in cart SRAM from %s%s", (unsigned long)slot, path,
 		     autoload ? ", loaded at the game's start" : "");
@@ -413,7 +431,7 @@ static int import_rts(const char *rom_path, const char *save_slot, const char *r
 		return 0;
 	}
 	tlog("states: %s becomes slot 1 of %s", path, rom_path);
-	tag_set(1, 0, 0, rom_crc);
+	tag_set(1, 0, 0, rom_crc, 0);
 	flag_set(1);
 	if (!keep_slot(rom_path, save_slot, 1))
 		return 0;
