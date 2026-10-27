@@ -364,6 +364,10 @@ ingame-cheats/list F7E6CB9665FBB579
 ingame-cheats/on A7EB51D2E32590C9
 ingame-cheats/rom A3708FCB960EDC67
 ingame-light/menu 69CF73026B549A66
+ingame-states/load 7F1C5A1E6F4EE819
+ingame-states/menu EDD1F66060C86E92
+ingame-states/other CF1B13AE3B46DB31
+ingame-states/save 8FCFCED100485A28
 keypad/empty 7FD5714D72D4EFEE
 keypad/format 95AB601B14490B28
 keypad/typed 3B61A3A038562A48

@@ -198,6 +198,7 @@ enum {
 	LANG_POP_INFO,
 	LANG_POP_SAVES,
 	LANG_POP_CHEATS,  // a GBA game on the card: its cheat screen (screens/cheats.c), its count if it has a cheat file
+	LANG_POP_STATES,  // a GBA game on the card, Save states on: start it in one of its save states (v0.8)
 	LANG_POP_UNRECENT,  // the Recent page's Remove: off Recent, the file stays
 	LANG_POP_DELETE,
 	LANG_POP_ITEMS,
@@ -432,8 +433,29 @@ struct lang_ingame {
 	// footer, and why a cheat can't change (enum ingame_why)
 	const char *cheats, *all_off, *as_launched, *kept;
 	const char *why_rom, *why_locked, *why_cant, *why_room, *why_slow;
+	// The state slots' pages (v0.8 P3): their footers
+	const char *state_keep, *state_replaces, *state_load, *state_elsewhere, *state_empty;
 };
 extern const struct lang_ingame *gl_ingame;
+
+// Save states (source/statestore.c): a slot's row in game, by its number
+// (%lu), filed with the time (day, month's name, hour, minute), filed with
+// the clock unset, empty, or saved in game and not kept yet; a slot alone
+#define EN_STATE_ROW_WHEN "Slot %lu \xC2\xB7 %u %s %02u:%02u"
+#define EN_STATE_ROW_SAVED "Slot %lu \xC2\xB7 saved"
+#define EN_STATE_ROW_EMPTY "Slot %lu \xC2\xB7 empty"
+#define EN_STATE_ROW_UNKEPT "Slot %lu \xC2\xB7 not kept yet"
+#define EN_STATE_SLOT "Slot %lu"
+#define EN_STATE_WHEN "%u %s %02u:%02u"
+// The months' names for the rows; filing them at boot; the game popup's
+// Load state
+struct lang_states {
+	const char *months[12];
+	const char *keeping;  // the progress dialog's title; its text the slot (EN_STATE_SLOT)
+	const char *none;  // the popup's Load state with no state on the card
+	const char *not_kept;  // filing it failed
+};
+extern const struct lang_states *gl_states;
 
 extern u32 gl_lang;  // index of the current language in lang_packs
 

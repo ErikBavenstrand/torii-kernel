@@ -1647,14 +1647,13 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 	}
 
 	Set_64MROM_flag(pNorFS[show_offset + file_select].is_64MBrom);
+	// Torii (v0.8): the save states' slots (statestore.h), the newest in
+	// cart SRAM for the in-game menu's Load state; no FAT run table for the
+	// FPGA (the old /RTS file's write-through stays off until the cart is probed)
+	ingame_states_none();
 	if (pNorFS[show_offset + file_select].have_patch && pNorFS[show_offset + file_select].have_RTS) {
 		progress_step(NULL, LAUNCH_NOR_SAVE, PROGRESS_FULL);
-		u32 size = Check_RTS(pfilename);
-		if (size == 0) {
-			error_num = 6;
-			Show_error_num(error_num);
-			return;
-		}
+		ingame_states_launch(launch_save.rom, launch_save.rec.slot, pfilename, 0);
 	}
 
 	FAT_table_buffer[0x1F4 / 4] = SET_PARAMETER_MODE;
@@ -1834,6 +1833,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 			break;
 		case 1:  //PSRAM BOOT WITH ADDON
 			Read_addon_switches();
+			ingame_states_none();
 			rom_guard_reset();  // Torii: the patches below mark what the cheats' keep off
 			cartlog_phase(PHASE_LAUNCH, 0, pfilename);
 			tlog("launch: loading %s, BOOT WITH ADDON: reset %u, savestate %u, sleep %u, cheats %u (%lu), "
@@ -1842,14 +1842,12 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 			     (unsigned long)(gl_cheat_count - gl_cheat_picks));
 			tlog_flush();
 			if ((gl_reset_on == 1) || (gl_rts_on == 1) || (gl_sleep_on == 1) || (gl_cheat_on == 1)) {
+				// Torii (v0.8): the save states, as Boot_NOR_game's, and
+				// the slot to start in when one was asked for
 				if (gl_rts_on == 1) {
 					progress_step(NULL, LAUNCH_SAVE, LAUNCH_STATES);
-					u32 size = Check_RTS(pfilename);
-					if (size == 0) {
-						error_num = 6;
-						Show_error_num(error_num);
-						return 0;
-					}
+					ingame_states_launch(launch_save.rom, launch_save.rec.slot, pfilename,
+							     action_state_slot());
 				}
 				progress_step(NULL, LAUNCH_STATES, LAUNCH_STATES);
 				have_pat = Check_pat(pfilename);

@@ -72,6 +72,10 @@
 // - READCACHE_SHARE, 4 KB from the start: the rename's walk of the card for
 //   another game with its save (actions.c), within action_rename_file,
 //   before it calls anything else that borrows pReadCache.
+// - READCACHE_STATES, 80 KB from 0x8000, clear of the stage (its progress
+//   dialog draws): save states (statestore.c, struct states_work) on their
+//   way between cart SRAM and the card, within one statestore_* call: a
+//   chunk, it packed, the packer's hash, a path and the file.
 #define MAX_pReadCache_size 0x20000
 #define READCACHE_STAGE 0x0
 #define READCACHE_STAGE_SIZE 0x8000
@@ -104,6 +108,8 @@
 #define READCACHE_SHARE_SIZE 0x1000
 #define READCACHE_CHEATS 0x8000
 #define READCACHE_CHEATS_SIZE 0x18000
+#define READCACHE_STATES 0x8000
+#define READCACHE_STATES_SIZE 0x14000
 
 #define MAX_NOR 0x40
 

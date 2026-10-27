@@ -1,0 +1,24 @@
+# The in-game menu's save state slots (v0.8 P3) over Hello.gba with Save
+# states on: Save state opens its slots (all empty on a new card), the
+# footer saying a state is kept on Back to Torii; A saves slot 1, and the
+# menu opened again has Load state, whose page offers slot 1 alone ("not
+# kept yet": it is in cart SRAM only), the others greyed and the footer
+# saying where they load.
+#! settings 2=1
+-w "nav: home ready"
+-P "@8:nav_test_path:/Hello.gba" -p @8:nav_test_action:0x7E000002
+-w "launch: starting the game"
+-k @300:L+R+START -k @306:-
+-w "screen ready: ingame"
+-k @20:DOWN -k @24:- -k @32:A -k @36:-
+-w "screen ready: ingame-save"
+-s @4:save.png
+-k @10:A -k @14:-
+-k @100:L+R+START -k @106:-
+-w "screen ready: ingame"
+-s @4:menu.png
+-k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:A -k @48:-
+-w "screen ready: ingame-load"
+-s @4:load.png
+-k @10:DOWN -k @14:-
+-s @30:other.png

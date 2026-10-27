@@ -31,6 +31,16 @@ void ingame_cheat_meta(u32 n, u32 flags, u32 bit, u32 cost);
 void ingame_cheats_set(u32 count, u32 table);
 void ingame_cheats_trim(u32 table);
 
+// The save states (P3, statestore.h) of a GBA launch with Save states on,
+// for the game at rom_path (file name rom_name) in its save slot: an old
+// /RTS state imported as slot 1 once, then slot (or the newest, for 0) put
+// in cart SRAM's buffer, to load at the game's start if slot isn't 0; the
+// slots' rows go in the session block. 0 if slot was asked for and didn't
+// load. ingame_states_none: a launch without them (call it at a launch's
+// start).
+int ingame_states_launch(const char *rom_path, const char *save_slot, const char *rom_name, u32 slot);
+void ingame_states_none(void);
+
 // At boot, once the card is up and the pending save copied: if cart SRAM
 // holds the session of a game that came back to Torii (a soft reset keeps
 // it), acts on the overlay's answer: the cheat list's toggles become the

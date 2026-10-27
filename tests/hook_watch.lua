@@ -14,7 +14,10 @@
 --
 -- Script: GAME_RUN frames after the game starts, press START and A to get
 -- past title screens, hold the menu key, press B to leave the menu, watch
--- the game run on for AFTER frames (pressing DOWN, A, START, A), then log "hook watch done" (stop the run
+-- the game run on for AFTER frames (pressing DOWN, A, START, A), then a
+-- save state round trip (the menu's Save state into slot 1 as "key state
+-- save", Load state as "key state load", more keys after it), then log
+-- "hook watch done" (stop the run
 -- with `-u 'hook watch done'`). Other lines it logs (stderr, as
 -- "script: hook FRAME ..."):
 --
@@ -47,6 +50,11 @@
 local GAME_RUN = 600  -- frames of game before the menu key
 local MENU_WAIT = 60  -- frames the menu gets to open before B
 local AFTER = 600     -- frames the game runs on after B
+-- Then a save state round trip (v0.8 P3), the menu's Save state into slot
+-- 1 (DOWN, A, A) and, STATE_PLAY frames later, Load state (DOWN, DOWN, A,
+-- A); the game runs on for STATE_AFTER frames, keys pressed as above.
+local STATE_PLAY = 120
+local STATE_AFTER = 360
 
 local KEYS = { A = 0x001, B = 0x002, START = 0x008, DOWN = 0x080, R = 0x100, L = 0x200 }
 local MENU_KEY = KEYS.L | KEYS.R | KEYS.START
@@ -219,6 +227,22 @@ local function plan(start)
 		table.insert(schedule, { back + 120 * i, KEYS[key], key })
 		table.insert(schedule, { back + 120 * i + 6, 0, "-" })
 	end
+	-- The save state round trip, menu keys 8 frames apart
+	local function menu_keys(from, names, tag)
+		table.insert(schedule, { from, MENU_KEY, tag })
+		table.insert(schedule, { from + 6, 0, "-" })
+		for i, key in ipairs(names) do
+			table.insert(schedule, { from + 32 + 8 * i, KEYS[key], key })
+			table.insert(schedule, { from + 36 + 8 * i, 0, "-" })
+		end
+	end
+	local save = at + MENU_WAIT + AFTER - 40
+	menu_keys(save, { "DOWN", "A", "A" }, "state save")
+	menu_keys(save + STATE_PLAY, { "DOWN", "DOWN", "A", "A" }, "state load")
+	for i, key in ipairs({ "DOWN", "A", "START", "A" }) do
+		table.insert(schedule, { save + STATE_PLAY + 60 * (i + 1), KEYS[key], key })
+		table.insert(schedule, { save + STATE_PLAY + 60 * (i + 1) + 6, 0, "-" })
+	end
 end
 
 -- While the kernel has SD mode on, ROM reads return the cart's 4 KB SD
@@ -315,7 +339,7 @@ callbacks:add("frame", function()
 			press(step[2], step[3])
 		end
 	end
-	if frame == menuKeyFrame + MENU_WAIT + AFTER then
+	if frame == menuKeyFrame + MENU_WAIT + AFTER - 40 + STATE_PLAY + STATE_AFTER then
 		console:log("hook watch done")
 	end
 end)

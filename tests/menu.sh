@@ -144,15 +144,16 @@ run() {
 # The rows, the cursor on Resume: Save state, Load state (greyed until a
 # state is saved, and skipped), Reset game, Sleep, Back to Torii
 
-# A save state round trip: SAVE (down one, A), and later LOAD (down two, A).
+# A save state round trip: SAVE (down one, A: its slots, A: slot 1), and later
+# LOAD (down two, A: its slots, on slot 1, A).
 # The state holds the menu's IME = 0, so loading must turn IME back on, or
 # the game stops at its next VBlankIntrWait.
 load=$((key + 300))
 hashes=$(for f in $(seq $((load + 100)) 20 $((load + 400))); do printf -- '-h %d ' "$f"; done)
 # shellcheck disable=SC2046,SC2086 # $(keys) and $hashes are lists of options
-run state DOWN A -- -k "$load:L+R+START" -k "$((load + 6)):-" $(keys $((load + 40)) DOWN DOWN A) \
+run state DOWN A A -- -k "$load:L+R+START" -k "$((load + 6)):-" $(keys $((load + 40)) DOWN DOWN A A) \
   -m $((load + 400)):0x04000208:2 $hashes -f $((load + 400))
-[ "$(grep -c 'screen ready: ingame' <<<"$log")" = 2 ] || fail "the menu didn't open twice in the save state run"
+[ "$(grep -cx 'kernel: screen ready: ingame' <<<"$log")" = 2 ] || fail "the menu didn't open twice in the save state run"
 [ "$(awk '$1 == "mem" { print $5 $6 }' <<<"$out")" = 0100 ] || fail "IME is off after loading a state"
 [ "$(awk '$1 == "hash" { print $4 }' <<<"$out" | sort -u | wc -l)" -gt 1 ] ||
   fail "the game did not go on after loading a state"

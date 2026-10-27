@@ -20,6 +20,8 @@
 #define INGAME_SRAM_BACKUP 0x20000  // the stub's backups, below
 #define INGAME_SRAM_STATE 0x40000  // the save-state buffer (to 0xAFFFF, unchanged)
 #define INGAME_SRAM_STATE_FLAG 0xAFFF0  // "EZ-OmegaRTCFILE." once a state is saved
+#define INGAME_SRAM_STATE_TAG 0xAFFE0  // struct ingame_state_tag (P3)
+#define INGAME_STATE_BYTES 0x70000  // the buffer, tag and flag included
 #define INGAME_SRAM_IMAGE 0xB0000  // the overlay's image
 #define INGAME_IMAGE_MAX 0x8000
 #define INGAME_SRAM_SESSION 0xB8000  // struct ingame_session
@@ -96,6 +98,7 @@ enum {
 #define INGAME_NAME_BYTES 48
 #define INGAME_CHEATS 64  // the cheats the in-game list shows; the toggles' bits
 #define INGAME_PATH_BYTES 288  // a ROM's path (GAMESAVE_PATH_BYTES)
+#define INGAME_SAVE_SLOT_BYTES 100  // a save slot's name (SAVESLOT_NAME_BYTES, 97), word-rounded
 #define INGAME_PALETTE 16
 
 // The palette's roles the overlay uses (enum ui_role in source/ui/ui.h; source/ingame.c checks)
@@ -135,12 +138,35 @@ enum ingame_text {
 	INGAME_TEXT_WHY_CANT,
 	INGAME_TEXT_WHY_ROOM,
 	INGAME_TEXT_WHY_SLOW,
+	// P3: the state slots' pages' footers
+	INGAME_TEXT_STATE_KEEP,  // a save is kept on the card on Back to Torii
+	INGAME_TEXT_STATE_REPLACES,  // saving here drops the state not kept yet
+	INGAME_TEXT_STATE_LOAD,  // A loads it
+	INGAME_TEXT_STATE_ELSEWHERE,  // another slot: load it from Torii
+	INGAME_TEXT_STATE_EMPTY,  // nothing in this slot
 	INGAME_TEXTS
 };
 struct ingame_line {
 	uint16_t width;  // inked pixels from the left, at most INGAME_TEXT_W
 	uint16_t reserved;
 	uint8_t bits[INGAME_TEXT_ROWS][INGAME_TEXT_W / 8];
+};
+
+// --- Save states (P3): the buffer's slot
+// What the buffer holds, beside its flag: written by the kernel when it
+// preloads a slot (kept: it is on the card), and by the overlay before SAVE
+// (not kept: the kernel's next boot files it). The stub's entry code reads
+// autoload, at INGAME_SRAM_STATE_TAG + 6 (gba_rts_patch.s's TAG_PAGE).
+#define INGAME_STATE_TAG_MAGIC 0x31545354u  // "TST1"
+#define INGAME_STATE_SLOTS 8  // slots 1 to 8
+struct ingame_state_tag {
+	uint32_t magic;  // INGAME_STATE_TAG_MAGIC
+	uint8_t slot;  // 1 to INGAME_STATE_SLOTS
+	uint8_t kept;  // 1: on the card as it is here
+	uint8_t autoload;  // 1: the game's start loads it (a launch into the slot)
+	uint8_t reserved;
+	uint32_t rom_crc;  // the session's rom_crc: the game it is for
+	uint32_t reserved2;
 };
 
 // Why a cheat's toggle can't change in game (struct ingame_cheat's flags)
@@ -182,7 +208,7 @@ struct ingame_session {
 	uint32_t magic;  // INGAME_SESSION_MAGIC
 	uint16_t version;  // INGAME_SESSION_VERSION
 	uint16_t bytes;  // sizeof(struct ingame_session)
-	uint32_t rom_crc;  // the ROM's CRC32; 0 until P2 needs it (unknown)
+	uint32_t rom_crc;  // CRC32 of rom_path then save_slot: whose a state tag is (P3)
 	uint32_t rom_bytes;  // the ROM file's size
 	char name[INGAME_NAME_BYTES];  // the game's name (UTF-8, cut, NUL-ended)
 	uint16_t palette[INGAME_PALETTE];  // the theme's UI bank 0 (enum ui_role), RGB15
@@ -190,7 +216,8 @@ struct ingame_session {
 	uint16_t sleep_key;  // the sleep key, the same way
 	uint16_t rtc_status;  // the launch's 0x096A0000 value
 	uint16_t flags;  // INGAME_SLEEP_KEY_ON...
-	uint16_t reserved;
+	uint8_t state_slots;  // P3: INGAME_STATE_SLOTS, or 0 for the old Save and Load rows
+	uint8_t state_have;  // bit n - 1: slot n has a state on the card
 	// P2: the cheat list; the cycles a frame are cheatcode.h's model
 	uint16_t cheat_count;  // the list's cheats (0: the old Cheats on/off row)
 	uint16_t cheat_table;  // the cheats in the interpreter's table
@@ -199,6 +226,11 @@ struct ingame_session {
 	uint16_t cheat_max;  // the cap on them all
 	struct ingame_line text[INGAME_TEXTS];  // the overlay reads one at a time
 	struct ingame_cheat cheats[INGAME_CHEATS];
+	// P3: each slot's row as the card has it ("Slot 1 · 27 Oct 14:03",
+	// "Slot 2 · empty"), and with a state saved in game not kept yet
+	struct ingame_line state_kept[INGAME_STATE_SLOTS];
+	struct ingame_line state_unkept[INGAME_STATE_SLOTS];
+	char save_slot[INGAME_SAVE_SLOT_BYTES];  // the game's save slot, whose states these are
 	char rom_path[INGAME_PATH_BYTES];  // the ROM's path from the card's root, for the kernel's next boot
 	struct ingame_out out;  // written by the overlay
 };
@@ -208,6 +240,10 @@ struct ingame_session {
 #define INGAME_SESSION_TEXT(n) (offsetof(struct ingame_session, text) + (n) * sizeof(struct ingame_line))
 #define INGAME_SESSION_CHEAT(n) (offsetof(struct ingame_session, cheats) + (n) * sizeof(struct ingame_cheat))
 #define INGAME_SESSION_PATH offsetof(struct ingame_session, rom_path)
+#define INGAME_SESSION_SAVE_SLOT offsetof(struct ingame_session, save_slot)
+#define INGAME_SESSION_STATE(n, kept) \
+	(((kept) ? offsetof(struct ingame_session, state_kept) : offsetof(struct ingame_session, state_unkept)) + \
+	 ((n) - 1) * sizeof(struct ingame_line))
 #define INGAME_SESSION_OUT offsetof(struct ingame_session, out)
 
 _Static_assert(sizeof(struct ingame_image) == 32, "the stub reads the header's words");
@@ -223,6 +259,10 @@ _Static_assert(sizeof(struct ingame_line) % 4 == 0 && INGAME_SESSION_TEXT(0) % 4
 _Static_assert(sizeof(struct ingame_cheat) % 4 == 0 && INGAME_SESSION_CHEAT(0) % 4 == 0, "sram_copy takes words");
 _Static_assert(INGAME_SESSION_PATH % 4 == 0 && INGAME_PATH_BYTES % 4 == 0, "sram_copy takes words");
 _Static_assert(INGAME_WHYS <= INGAME_CHEAT_WHY + 1, "a reason fits its bits");
+_Static_assert(sizeof(struct ingame_state_tag) == 16 && offsetof(struct ingame_state_tag, autoload) == 6 &&
+		       INGAME_SRAM_STATE_TAG + 16 == INGAME_SRAM_STATE_FLAG,
+	       "the stub reads the tag's autoload byte at 0xAFFE6");
+_Static_assert(INGAME_SESSION_SAVE_SLOT % 4 == 0, "sram_copy takes words");
 _Static_assert(sizeof(struct ingame_session) % 4 == 0 && sizeof(struct ingame_session) <= INGAME_SESSION_MAX,
 	       "the session block's room");
 _Static_assert(INGAME_BACKUP_EWRAM + INGAME_WINDOW_MAX <= INGAME_BACKUP_OBJ &&

@@ -115,6 +115,45 @@ write-only, so a menu on a BG can't give them back (today's BG2 affine bug).
   rows stay off, the file after Back to Torii, the write cut at each cutpoint),
   `tests/kernel/test_cheatrun.c` (`test_cheatrun_off`), golden shots `ingame-cheats`.
 
+## P3: save states with slots, tier A (built)
+
+Tier A: the kernel files states; the FPGA's write-through of the old `/RTS` file (tier B)
+and paging spare PSRAM from the menu (tier C) stay off until the cart probe says what works.
+
+- **Slots.** Eight a save slot, `/torii/states/<rom path>/<save slot>/<n>.state`
+  (`source/statestore.c`): a 64-byte head (two CRCs, a sequence, an order across the
+  slots, the clock's stamp at filing), then the 448 KB buffer in 32 KB chunks packed in
+  the BIOS's LZ77 (`lz77_compress_fast`, a hashed greedy packer). Power-cut safe as
+  safefile's text files are, with no rename: each slot has `<n>.state` and `.bak`, a
+  write goes to the copy a reader wouldn't take, its head last; the reader takes the valid
+  copy with the higher sequence.
+- **The buffer** (cart SRAM `0x40000-0xAFFFF`, the old layout) gets a tag at `0xAFFE0`
+  (`struct ingame_state_tag`): its slot, whether the card has it, an autoload byte, and
+  the CRC of the ROM path and save slot it belongs to. SAVE writes the flag last; LOAD
+  checks it first (the old code's check was commented out).
+- **In game.** Save state and Load state open a page of the eight slots, each with its
+  time ("Slot 2 · 27 Oct 14:03"), "empty", or "not kept yet" for a state saved in game
+  that the card hasn't. Only the slot in the buffer loads in game; the others say to load
+  them from Torii. Saving into another slot replaces a state not kept yet, and the footer
+  says so first.
+- **Filing.** The kernel's next boot after Back to Torii files a state not kept yet under
+  a progress dialog, then marks it kept. A power-off loses it, as cart SRAM past the save
+  does (the menu says "not kept yet" until then).
+- **Before a launch** with Save states on, the kernel puts the newest slot in the buffer
+  (`ingame_states_launch`), so Load state works at once. An old `/RTS/<name>.rts` with a
+  state's flag becomes slot 1, once (when the save slot has no states).
+- **Load state in the game popup** (GBA list pages, Save states on) lists the slots,
+  newest first, and starts the game with addons in the one picked: the kernel sets the
+  tag's autoload byte, the patch's entry code puts a mark at IWRAM `0x3007FE4` from it,
+  and the hook loads the state at the first VBlank, clearing both (Reset game starts
+  clean). A game whose start code clears that word starts normally, the state in the
+  buffer for Load state.
+- **Speed** (emulated cart, hello): SAVE 18 frames and LOAD 24 (the stub's copies run
+  in Thumb now), filing 180 frames for 55 KB packed, putting it back before a launch 57.
+- **Tests:** `tests/states.sh` (round trip frame for frame, filing and the next launch,
+  the popup's autoload, the filing cut at each cutpoint, the `/RTS` import); compat's
+  "save state" column saves, plays and loads in every game; golden shots `ingame-states`.
+
 ## P0: the cart probe
 
 A probe ROM for the real cart (precedents: `source/eepromprobe.h`, `source/rumbleprobe.h`),

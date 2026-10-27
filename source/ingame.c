@@ -1,6 +1,7 @@
 // The kernel's side of the in-game menu: the overlay and the session block
 // into cart SRAM at each launch (ingame.h).
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "Ezcard_OP.h"
@@ -18,7 +19,11 @@
 #include "ingame.h"
 #include "ingame_abi.h"
 #include "settings_model.h"
+#include "statestore.h"
 #include "tlog.h"
+#include "ui/dialog.h"
+#include "progress.h"
+#include "crc32.h"
 #include "ui/palette.h"
 #include "ui/ui.h"
 
@@ -202,6 +207,46 @@ void ingame_cheats_trim(u32 table)
 	SetRampage(0);
 }
 
+// The launch's state slots (ingame_states_launch), for the session block
+static struct {
+	u8 ready;
+	u32 rom_crc;
+	char save_slot[INGAME_SAVE_SLOT_BYTES];
+	struct statestore_list list;
+} states;  // IWRAM: EWRAM is the tighter
+
+// What a state tag of the game's save slot carries: its paths' CRC
+static u32 states_crc(const char *rom_path, const char *save_slot)
+{
+	return crc32_update(crc32(rom_path, (u32)strlen(rom_path) + 1), save_slot, (u32)strlen(save_slot));
+}
+
+void ingame_states_none(void)
+{
+	states.ready = 0;
+}
+
+int ingame_states_launch(const char *rom_path, const char *save_slot, const char *rom_name, u32 slot)
+{
+	states.ready = 0;
+	if (strlen(save_slot) >= sizeof(states.save_slot) || strlen(rom_path) >= INGAME_PATH_BYTES)
+		return 0;
+	memset(states.save_slot, 0, sizeof(states.save_slot));
+	strcpy(states.save_slot, save_slot);
+	states.rom_crc = states_crc(rom_path, save_slot);
+	statestore_import_rts(rom_path, save_slot, rom_name, states.rom_crc);
+	statestore_scan(rom_path, save_slot, &states.list);
+	u32 want = slot ? slot : statestore_newest(&states.list);
+	u32 start = torii_frames;
+	int loaded = want && statestore_load(rom_path, save_slot, want, states.rom_crc, slot != 0);
+	if (!loaded)
+		tlog("states: %s (%s): no state in cart SRAM%s", rom_path, save_slot, want ? ", it didn't read" : "");
+	else
+		tlog("states: put back in %lu frames", (unsigned long)(torii_frames - start));
+	states.ready = 1;
+	return !slot || loaded;
+}
+
 int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 {
 	// The block's head (its fields before the lines); the cheats are
@@ -237,6 +282,14 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 	h->cheat_call = CHEAT_COST_CALL;
 	h->cheat_skip = CHEAT_COST_SKIP;
 	h->cheat_max = CHEAT_CYCLES_MAX;
+	// The state slots, when this launch put them in place
+	if (states.ready) {
+		h->state_slots = STATESTORE_SLOTS;
+		for (u32 s = 1; s <= STATESTORE_SLOTS; s++)
+			if (states.list.slot[s].have)
+				h->state_have |= (u8)(1u << (s - 1));
+		h->rom_crc = states.rom_crc;
+	}
 
 	u32 bad = 0;
 	u32 image = ingame_overlay_size;
@@ -268,6 +321,11 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 		[INGAME_TEXT_WHY_CANT] = t->why_cant,
 		[INGAME_TEXT_WHY_ROOM] = t->why_room,
 		[INGAME_TEXT_WHY_SLOW] = t->why_slow,
+		[INGAME_TEXT_STATE_KEEP] = t->state_keep,
+		[INGAME_TEXT_STATE_REPLACES] = t->state_replaces,
+		[INGAME_TEXT_STATE_LOAD] = t->state_load,
+		[INGAME_TEXT_STATE_ELSEWHERE] = t->state_elsewhere,
+		[INGAME_TEXT_STATE_EMPTY] = t->state_empty,
 	};
 	for (u32 i = 0; i < INGAME_TEXTS; i++) {
 		struct ingame_line line;
@@ -280,6 +338,21 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 	if (rom_path)
 		strncpy(path, rom_path, sizeof(path) - 1);
 	bad += sram_put(INGAME_SRAM_SESSION + INGAME_SESSION_PATH, (const u8 *)path, sizeof(path));
+	char slot_name[INGAME_SAVE_SLOT_BYTES];
+	memset(slot_name, 0, sizeof(slot_name));
+	if (states.ready) {
+		memcpy(slot_name, states.save_slot, sizeof(slot_name));
+		for (u32 s = 1; s <= STATESTORE_SLOTS; s++)
+			for (u32 kept = 0; kept < 2; kept++) {
+				char row[48];
+				struct ingame_line line;
+				statestore_row(row, sizeof(row), s, &states.list.slot[s], !kept);
+				line_draw(&line, row, strlen(row));
+				bad += sram_put(INGAME_SRAM_SESSION + INGAME_SESSION_STATE(s, kept), (const u8 *)&line,
+						sizeof(line));
+			}
+	}
+	bad += sram_put(INGAME_SRAM_SESSION + INGAME_SESSION_SAVE_SLOT, (const u8 *)slot_name, sizeof(slot_name));
 	bad += sram_put(INGAME_SRAM_SESSION + INGAME_SESSION_OUT, (const u8 *)&out, sizeof(out));
 	SetRampage(0);
 	if (bad) {
@@ -307,6 +380,38 @@ static int session_read(struct ingame_session *h, char *path, struct ingame_out 
 	return h->magic == INGAME_SESSION_MAGIC && h->version == INGAME_SESSION_VERSION &&
 	       h->bytes == sizeof(struct ingame_session) && out->magic == INGAME_OUT_MAGIC && path[0] == '/' &&
 	       memchr(path, 0, INGAME_PATH_BYTES) && h->cheat_count <= INGAME_CHEATS;
+}
+
+// A state saved in game and not kept yet (the buffer's tag), filed for the
+// session's game and save slot under a progress dialog
+static void states_after_game(const struct ingame_session *h, const char *path)
+{
+	struct ingame_state_tag tag;
+	char slot_name[INGAME_SAVE_SLOT_BYTES];
+	if (!h->state_slots || !statestore_buffer(&tag) || tag.kept || tag.slot < 1 || tag.slot > STATESTORE_SLOTS)
+		return;
+	sram_get(INGAME_SRAM_SESSION + INGAME_SESSION_SAVE_SLOT, (u8 *)slot_name, sizeof(slot_name));
+	SetRampage(0);
+	slot_name[sizeof(slot_name) - 1] = 0;
+	if (tag.rom_crc != h->rom_crc || h->rom_crc != states_crc(path, slot_name)) {
+		tlog_error("states: the state in cart SRAM isn't %s's (%s): not kept", path, slot_name);
+		return;
+	}
+	char text[24];
+	snprintf(text, sizeof(text), EN_STATE_SLOT, (unsigned long)tag.slot);
+	dialog_open();
+	dialog_progress_begin(gl_states->keeping, text);
+	progress_step(NULL, 0, PROGRESS_FULL);
+	u32 start = torii_frames;
+	int ok = statestore_keep(path, slot_name, tag.slot);
+	if (ok) {
+		tlog("states: kept slot %u in %lu frames", tag.slot, (unsigned long)(torii_frames - start));
+		progress_done(NULL);
+	}
+	dialog_progress_end();
+	if (!ok)
+		dialog_message(NULL, gl_states->not_kept, DIALOG_ERROR);
+	dialog_close();
 }
 
 // The cheat list's toggles as the game left them, into the cheat file's
@@ -360,6 +465,7 @@ void ingame_after_game(void)
 	if (!session_read((struct ingame_session *)(void *)words, path, &out))
 		return;
 	tlog("in-game: back from %s, the menu's last %u", path, out.action);
+	states_after_game(h, path);
 	if (out.cheats_changed && h->cheat_count)
 		cheats_keep(h, path, &out);
 	// Done with: the answer goes, so the next boot does nothing again

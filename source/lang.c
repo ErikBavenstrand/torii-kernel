@@ -95,6 +95,7 @@ const struct lang_saves *gl_saves EWRAM_BSS;
 const struct lang_slots *gl_slots EWRAM_BSS;
 const struct lang_gsaves *gl_gsaves EWRAM_BSS;
 const struct lang_ingame *gl_ingame EWRAM_BSS;
+const struct lang_states *gl_states EWRAM_BSS;
 
 // Popups and confirmations (ui.h)
 char *gl_pop_choose EWRAM_BSS;
@@ -540,7 +541,7 @@ static const struct lang_games en_games = {
 	.hint_menu = "menu",
 	.hint_letter = "letter",
 	.hint_pick = "pick",
-	.pop = {"Play", "Favourite", "Rename", "Game info", "Saves", "Cheats", "Remove", "Delete"},
+	.pop = {"Play", "Favourite", "Rename", "Game info", "Saves", "Cheats", "Load state", "Remove", "Delete"},
 	.boots = {"default", "clean", "addons"},
 	.hint_boot = "boot",
 	.off = "off",
@@ -788,6 +789,18 @@ static const struct lang_ingame en_ingame = {
 	.why_cant = "Torii can't run this code",
 	.why_room = "No room in game: pick it in Torii",
 	.why_slow = "Too slow with the cheats on now",
+	.state_keep = "Kept on Back to Torii",
+	.state_replaces = "Replaces the state not kept yet",
+	.state_load = "A goes back to this point",
+	.state_elsewhere = "Load it from the game in Torii",
+	.state_empty = "Nothing saved in this slot",
+};
+
+static const struct lang_states en_states = {
+	.months = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"},
+	.keeping = "Keeping the save state",
+	.none = "No save states yet.\nSave one from the in-game menu.",
+	.not_kept = "The save state wasn't kept:\nthe card didn't take it.",
 };
 
 //---------------------------------------------------------------------------------
@@ -942,6 +955,7 @@ void LoadEnglish(void)
 	gl_slots = &en_slots;
 	gl_gsaves = &en_gsaves;
 	gl_ingame = &en_ingame;
+	gl_states = &en_states;
 }
 //---------------------------------------------------------------------------------
 // The languages Settings offers. A new language adds its strings and a

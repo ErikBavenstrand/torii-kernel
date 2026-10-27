@@ -43,6 +43,9 @@ Checks, each pass, fail, untested (the run didn't get that far) or n/a:
   give the hook: how the kernel found the game's IRQ handler stores
   (built-in table or ROM scan), the IRQ vector during the game and how many
   frames had the VBlank IRQ enabled
+- save state: then the menu's Save state into slot 1, a while of play and
+  its Load state (v0.8): no crash, the game stays in game mode and goes on
+  after the load; n/a where the in-game menu is
 
 A game with a starting save (roms/<name>.sav, .esv for GB/GBC) and a key
 script (tests/games/<code>.keys) plays that script instead, saves in-game and
@@ -99,7 +102,7 @@ KERNEL_SAVE = {
     0x32: "flash64k",
     0x33: "flash64k",
 }
-CHECKS = ["boots", "save type", "clock", "save cycle", "in-game menu"]
+CHECKS = ["boots", "save type", "clock", "save cycle", "in-game menu", "save state"]
 # Launches go as the menu's pages will run them, through actions.c and the
 # menu's test hook (source/screens/nav.h, tests/nav.sh): a "hook" key pokes
 # the game's path and the action (1 CLEAN BOOT, 2 BOOT WITH ADDON), which
@@ -509,7 +512,7 @@ def check_menu(result: Result, rom: Path, sd_name: str, table: dict) -> None:
     cart = CARTS / f"{key_of(result.game)}-menu"
     menu_cart(cart, rom, sd_name)
     # Loading with patches takes about 90 frames per MB.
-    frames = 400 + (len(data) >> 20) * 150 + 1800
+    frames = 400 + (len(data) >> 20) * 150 + 2200
     hashes = [a for f in range(30, frames + 1, 30) for a in ("-h", str(f))]
     out, trace = power_on(
         cart,
@@ -611,7 +614,9 @@ def check_menu(result: Result, rom: Path, sd_name: str, table: dict) -> None:
             why = "the menu did not open"
         result.set("in-game menu", "fail", why)
         return
-    if crash:
+    state_at = next((f for f, t in events if t == "key state save"), None)
+    crash_at = int(crash[0].split()[3].rstrip(":")) if crash else None
+    if crash and (state_at is None or crash_at < state_at):
         result.set("in-game menu", "fail", f"crashed after the menu: {crash[0]}")
         return
     if closed is None:
@@ -647,6 +652,45 @@ def check_menu(result: Result, rom: Path, sd_name: str, table: dict) -> None:
         "in-game menu",
         "pass",
         f"opened {opened - key_at} frames after the key, left the game as it was; the game went on ({len(after)} screens)",
+    )
+    check_state(result, events, out, trace)
+
+
+def check_state(result: Result, events: list, out: str, trace: str) -> None:
+    """The menu's Save state into slot 1, then Load state (hook_watch.lua)."""
+    saved = next((f for f, t in events if t == "key state save"), None)
+    loaded = next((f for f, t in events if t == "key state load"), None)
+    crash = lines(trace, "crash at frame ")
+    if crash:
+        result.set(
+            "save state", "fail", f"crashed in the save state round trip: {crash[0]}"
+        )
+        return
+    if saved is None or loaded is None or "hook watch done" not in trace:
+        result.set(
+            "save state", "fail", "the run ended before the save state round trip"
+        )
+        return
+    opens = [f for f, t in events if t == "menu open" and f > saved]
+    if len(opens) < 2:
+        result.set(
+            "save state",
+            "fail",
+            f"the menu opened {len(opens)} times for Save and Load state, not 2",
+        )
+        return
+    if any(t == "kernel back" for f, t in events if f > saved):
+        result.set("save state", "fail", "the game went back to the kernel")
+        return
+    # The game after Load state: on, its screen changing with keys pressed
+    after = {h for f, h in screen_hashes(out) if f > loaded + 90}
+    if len(after) <= 1:
+        result.set("save state", "fail", "the screen did not change after Load state")
+        return
+    result.set(
+        "save state",
+        "pass",
+        f"saved, loaded, and the game went on ({len(after)} screens)",
     )
 
 
@@ -695,8 +739,16 @@ def run_game(result: Result, roms: dict, saves: dict, table: dict) -> None:
         return
     if system == "gba":
         check_menu(result, rom, sd_name, table)
+        menu, why = result.checks.get("in-game menu", ("untested", ""))
+        if result.checks.get("save state", ("untested", ""))[0] == "untested":
+            result.set(
+                "save state",
+                "n/a" if menu == "n/a" else "fail",
+                f"the in-game menu: {why}",
+            )
     else:
         result.set("in-game menu", "n/a")
+        result.set("save state", "n/a")
     if size is None:
         result.set("save cycle", "n/a")
         result.metrics["seconds"] = round(time.time() - started, 1)

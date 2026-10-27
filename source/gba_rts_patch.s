@@ -71,20 +71,54 @@ SP_BLDALPHA		= 0x54
 SP_ACT			= 0x58		@;the overlay's answer
 SP_HDR			= 0x60		@;the image header's first 24 bytes (to 0x77)
 
+@;The save-state buffer (INGAME_SRAM_STATE): the old menu's layout, which
+@;the old /RTS files have, and v0.8's tag and flag at its end
+ST_EWRAM		= 0x40000
+ST_IWRAM		= 0x80000
+ST_PAL			= 0x88000
+ST_VRAM			= 0x90000
+ST_OAM			= 0xA8000
+ST_SPEND		= 0xA8400	@;the spend area, the system sp and lr in it
+ST_IO			= 0xA9000
+ST_FLAG			= 0xAFFF0	@;INGAME_SRAM_STATE_FLAG
+TAG_PAGE		= 0xAF		@;INGAME_SRAM_STATE_TAG's page; its autoload byte at 0xFE6 in it
+AUTOLOAD		= 0x7A000000	@;at 0x3007FE4: load the state at the next VBlank
+
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	.arm
 RTS_ReplaceIRQ_start:
 	MOV             R0, #0x4000000
 	ADR             R1, RTS_irq
 	STR             R1, [R0,#-4] @; 0x3FFFFFC = RTS_irq;
-	LDR             R0, =0x12345678
-	BX              R0
+	B				autoload_entry	@;Torii (v0.8); then the game, as the old code went on
+	NOP								@;the return address and spend_0x80 where the tools look
 	.align
 RTS_Return_address_L:
-	.ltorg 			@;return address need modify
+	.word 0x12345678	@;return address need modify
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 spend_0x80:
 	.word 0x0203FE00   @; default
+@;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+@;Torii (v0.8): a launch into a save state. The kernel set the state tag's
+@;autoload byte in cart SRAM (INGAME_SRAM_STATE_TAG); the game's start puts
+@;AUTOLOAD at IWRAM 0x3007FE4 (the cheats' CheatRAN word), and the hook loads
+@;the state at the first VBlank it sees, clearing both. A Reset game finds
+@;the byte cleared. r0-r3 and lr are free at the game's start.
+autoload_entry:
+	mov		r0,#TAG_PAGE
+	bl		SetRampage
+	mov		r1,#0x0E000000
+	orr		r1,r1,#0xF00			@;the byte's place in page TAG_PAGE's window
+	orr		r1,r1,#0xE6
+	ldrb	r12,[r1]			@;SetRampage keeps r12
+	mov		r0,#0
+	bl		SetRampage
+	cmp		r12,#1
+	mov		r0,#0x4000000
+	moveq	r3,#AUTOLOAD
+	streq	r3,[r0,#-0x1C]
+	ldr		r0,RTS_Return_address_L
+	bx		r0
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 RTS_irq:
 	LDR			R1, [R0,#0x200]
@@ -92,7 +126,12 @@ RTS_irq:
 	TSTEQ		R1, #0x10000000
 	LDREQ		PC, [R0,#-0xC]			@;old_interrupt_handler
 
+	ldr			r1,[r0,#-0x1C]		@;Torii: a launch into a save state
+	cmp			r1,#AUTOLOAD
+	beq			autoload_now
+
 	ldr 		r2,[r0,#REG_P1]
+autoload_back:
 
 	@; Torii: a hotkey is the mask of its keys (settings_hotkeys), and matches when
 	@; they are all held (0 in REG_P1), whatever else is: an extra or stuck key
@@ -749,59 +788,38 @@ restore2_IO:        @; IOaddress, offset
 	.ltorg
 @;===================================================
 @;SAVE, as the old menu's: the game's memory and registers into the state
-@;buffer (SRAM pages 0x40-0xAF), with everything already back but IME, DMA
-@;and the sound mixer (r11 the spend area, which goes in too). The I/O copy
-@;has DMA stopped and IME 0, as the old one had; the mixer's pair is the game's.
+@;buffer (SRAM 0x40000-0xAFFFF, the old layout), with everything already
+@;back but IME, DMA and the sound mixer (r11 the spend area, which goes in
+@;too). The I/O copy has DMA stopped and IME 0, as the old one had; the
+@;mixer's pair is the game's. Torii (v0.8): through sram_copy's Thumb loops,
+@;twice as fast as the old byte loop; the overlay wrote the state's tag
+@;(its slot, not kept) and cleared the flag, which goes last.
 state_save:
-	@;02000000-0203FFFF   WRAM - On-board Work RAM  (256 KBytes)
-	mov		r8,#0x40   @; 0x40 0x50 0x60 0x70
-	mov   r9,#0x2000000
-wram_2000000:
-	mov 	r0,r8
-	bl 		SetRampage
-	mov 	r0,#0x0E000000
-	mov 	r1,r9
-	mov		r2,#0x10000
-	bl 		WriteSram
-	add 	r8,#0x10
-	add 	r9,#0x10000
-	cmp 	r8,#0x80
-	bne 	wram_2000000
-
-	@;03000000-03007FFF   WRAM - On-chip Work RAM   (32 KBytes)
-	mov 	r0,#0x80
-	bl 		SetRampage
-	mov r0,#0x0E000000
-	mov r1,#0x3000000
-	mov r2,#0x8000
-	bl 	WriteSram
-
-	@;05000000-050003FF   BG/OBJ Palette RAM        (1 Kbyte)
-	ldr r0,=0x0E008000
-	mov r1,#0x5000000
-	mov r2,#0x400
-	bl 	WriteSram
-
-	@;06000000-06017FFF   VRAM - Video RAM          (96 KBytes)
-	mov 	r0,#0x90
-	bl 		SetRampage
-	mov r0,#0x0E000000
-	mov r1,#0x6000000
-	mov r2,#0x10000
-	bl 	WriteSram
-
-	mov 	r0,#0xA0
-	bl 		SetRampage
-	mov r0,#0x0E000000
-	ldr r1,=0x6010000
-	mov r2,#0x8000
-	bl 	WriteSram
-
-	@;07000000-070003FF   OAM - OBJ Attributes      (1 Kbyte)
-	ldr r0,=0x0E008000
-	mov r1,#0x7000000
-	mov r2,#0x400
-	bl 	WriteSram
+	ldr		r0,=ST_EWRAM
+	mov		r1,#0x02000000
+	mov		r2,#0x40000
+	mov		r3,#1
+	bl		sram_copy
+	ldr		r0,=ST_IWRAM
+	mov		r1,#0x03000000
+	mov		r2,#0x8000
+	mov		r3,#1
+	bl		sram_copy
+	ldr		r0,=ST_PAL
+	mov		r1,#0x05000000
+	mov		r2,#0x400
+	mov		r3,#1
+	bl		sram_copy
+	ldr		r0,=ST_VRAM
+	mov		r1,#0x06000000
+	mov		r2,#0x18000
+	mov		r3,#1
+	bl		sram_copy
+	ldr		r0,=ST_OAM
+	mov		r1,#0x07000000
+	mov		r2,#0x400
+	mov		r3,#1
+	bl		sram_copy
 
 	@;The system-mode sp and lr into the spend area at 0x30
 	mrs	  r0,CPSR
@@ -814,94 +832,124 @@ wram_2000000:
 	NOP
 	str		r2,[r11,#0x30]
 	str		r3,[r11,#0x34]
-
-	ldr 	r0,=0x0E008400
+	ldr		r0,=ST_SPEND
 	mov		r1,r11
-	mov 	r2,#0x80
-	bl 		WriteSram
+	mov		r2,#0x80
+	mov		r3,#1
+	bl		sram_copy
 
 	@;04000000-040003FE   I/O Registers, with the game's sound mixer
-	ldr r0,=0x0E009000
-	mov r1,#0x4000000
-	mov r2,#0x400
-	bl 	WriteSram
-	ldr r0,=0x0E009000+REG_SOUNDCNT_L
-	add r1,r11,#SP_SNDL
-	mov r2,#4
-	bl 	WriteSram
+	ldr		r0,=ST_IO
+	mov		r1,#0x04000000
+	mov		r2,#0x400
+	mov		r3,#1
+	bl		sram_copy
+	ldr		r0,=ST_IO+REG_SOUNDCNT_L
+	add		r1,r11,#SP_SNDL
+	mov		r2,#4
+	mov		r3,#1
+	bl		sram_copy
 
-	@;FLAG
-	ldr r0,=0x0E00FFF0
-	adrl r1,S_RTS_FLAG
-	mov r2,#0x10
-	bl 	WriteSram
+	@;The flag last: a state cut short has none
+	ldr		r0,=ST_FLAG
+	adrl	r1,S_RTS_FLAG
+	mov		r2,#0x10
+	mov		r3,#1
+	bl		sram_copy
 
+	add		r8,r10,#0x200
+	mov		r1,#0
+	strh	r1,[r8,#4]			@;WAITCNT: the page register at the BIOS's
 	mov 	r0,#0x00
 	bl 		SetRampage
-	mov r7,#0x50000
-delay_loop:
-	subs		r7,r7,#1
-	bne			delay_loop
+	ldrh	r1,[r11,#SP_WAITCNT]
+	strh	r1,[r8,#4]
 	mov		r10,#REG_BASE
+	bl		wait_frame			@;the game goes on at a frame's start, as after LOAD
 	b		ingame_resume
 	.ltorg
-	@;===================================================
-@;LOAD, as the old menu's: the state buffer back into the game's memory and
-@;registers, then into the game's IRQ handler with the state's registers.
-@;The menu offers it only once a state's flag is there.
+
+@;Z set if the state buffer's flag is there (r11 the spend area: its SP_HDR
+@;words take the flag). Leaves a page set; uses r0-r7.
+state_flag_ok:
+	stmfd	sp!,{lr}
+	ldr		r0,=ST_FLAG
+	add		r1,r11,#SP_HDR
+	mov		r2,#0x10
+	mov		r3,#0
+	bl		sram_copy
+	add		r1,r11,#SP_HDR
+	adrl	r2,S_RTS_FLAG
+	mov		r4,#4
+1:	ldr		r5,[r1],#4
+	ldr		r6,[r2],#4
+	cmp		r5,r6
+	bne		2f
+	subs	r4,r4,#1
+	bne		1b
+2:	ldmfd	sp!,{lr}
+	bx		lr
+
+@;The page back at 0, at the BIOS's wait states (r10 I/O, r11 the spend
+@;area); uses r0-r3, r8
+page_zero:
+	stmfd	sp!,{lr}
+	add		r8,r10,#0x200
+	ldrh	r0,[r8,#4]
+	strh	r0,[r11,#SP_WAITCNT]
+	mov		r0,#0
+	strh	r0,[r8,#4]
+	bl		SetRampage
+	ldrh	r0,[r11,#SP_WAITCNT]
+	strh	r0,[r8,#4]
+	ldmfd	sp!,{lr}
+	bx		lr
+
+@;LOAD: the state buffer back into the game's memory and registers, then
+@;into the game's IRQ handler with the state's registers. Torii (v0.8): only
+@;with the state's flag (the old code's check was commented out, and loading
+@;a blank buffer crashed); IWRAM last, by a loop that needs no stack, as it
+@;loads the stack too.
 state_load:
-	@;02000000-0203FFFF   WRAM - On-board Work RAM  (256 KBytes)
-	mov		r8,#0x40   @; 0x40 0x50 0x60 0x70
-	mov   r9,#0x2000000
-wram_2000000_Load:
-	mov 	r0,r8
-	bl 		SetRampage
-	mov 	r0,#0x0E000000
-	mov 	r1,r9
-	mov		r2,#0x10000
-	bl 		ReadSram
-	add 	r8,#0x10
-	add 	r9,#0x10000
-	cmp 	r8,#0x80
-	bne 	wram_2000000_Load
+	bl		state_flag_ok
+	beq		state_load_go
+	bl		page_zero
+	b		ingame_resume			@;none: the game goes on
+state_load_go:
+	ldr		r0,=ST_EWRAM
+	mov		r1,#0x02000000
+	mov		r2,#0x40000
+	mov		r3,#0
+	bl		sram_copy
+	ldr		r0,=ST_PAL
+	mov		r1,#0x05000000
+	mov		r2,#0x400
+	mov		r3,#0
+	bl		sram_copy
+	ldr		r0,=ST_VRAM
+	mov		r1,#0x06000000
+	mov		r2,#0x18000
+	mov		r3,#0
+	bl		sram_copy
+	ldr		r0,=ST_OAM
+	mov		r1,#0x07000000
+	mov		r2,#0x400
+	mov		r3,#0
+	bl		sram_copy
 
 	@;03000000-03007FFF   WRAM - On-chip Work RAM   (32 KBytes)
-	mov 	r0,#0x80
+	mov 	r0,#ST_IWRAM>>12
 	bl 		SetRampage
 	mov r0,#0x0E000000
 	mov r1,#0x3000000
 	mov r2,#0x8000
 	bl 	ReadSram
 
-	@;05000000-050003FF   BG/OBJ Palette RAM        (1 Kbyte)
-	ldr r0,=0x0E008000
-	mov r1,#0x5000000
-	mov r2,#0x400
-	bl 	ReadSram
-
-	@;06000000-06017FFF   VRAM - Video RAM          (96 KBytes)
-	mov 	r0,#0x90
-	bl 		SetRampage
-	mov r0,#0x0E000000
-	mov r1,#0x6000000
-	mov r2,#0x10000
-	bl 	ReadSram
-	mov 	r0,#0xA0
-	bl 		SetRampage
-	mov r0,#0x0E000000
-	ldr r1,=0x6010000
-	mov r2,#0x8000
-	bl 	ReadSram
-
-	@;07000000-070003FF   OAM - OBJ Attributes      (1 Kbyte)
-	ldr r0,=0x0E008000
-	mov r1,#0x7000000
-	mov r2,#0x400
-	bl 	ReadSram
-
 	@;-------------------------------------
+	mov		r0,#ST_IO>>12		@;the I/O copy and the spend area's, in page 0xA9's window
+	bl		SetRampage
 	mov r10,#0x4000000
-	LDR r11,=0x0E009000
+	mov r11,#0x0E000000
 
 	adr r9,register_list
 register_list_loop:
@@ -915,19 +963,15 @@ register_list_loop:
 	b 	register_list_loop
 register_list_end:
 
-	LDR r11,=0x0E008500
-	add r0,r10,#0xC6  @;0x40000C6
-	add r1,r11,#0x34
-	bl  restore2_IO
-
 	ldr r0,=0x4000202   @;0x4000202
 	mov r1,#0
 	strh r1,[r0]
 	mov r1,#1			@;Torii: IME on; the state holds the menu's IME = 0
 	strh r1,[r0,#6]
 
-
-	ldr 	r0,=0x0E008400
+	mov		r0,#ST_SPEND>>12
+	bl		SetRampage
+	ldr 	r0,=0x0E000000+(ST_SPEND & 0xFFF)
 	adrl 	r1, spend_0x80 @;temp buff
 	ldr		r1,[r1]
 	mov 	r2,#0x80
@@ -965,6 +1009,49 @@ spin3_load:
 	ldmia r12!,{r4-r11,sp,lr}
 
 	ldr 	pc,[r0,#-(0x04000000-0x03FFFFF4)] @;to normal IRQ routine
+	.ltorg
+
+@;Torii (v0.8): the launch into a save state, at the first VBlank: the
+@;hook's registers kept as the menu's are, the autoload marks cleared, then
+@;LOAD with the game frozen as the menu freezes it. Without a state's flag
+@;the game goes on. r0 = 0x4000000.
+autoload_now:
+	mov		r1,#0
+	str		r1,[r0,#-0x1C]
+	adrl	r12,spend_0x80
+	ldr		r12,[r12]
+	stmia	r12,{r4-r11,sp,lr}
+	mrs		r2,SPSR
+	str		r2,[r12,#0x28]
+	mov		r11,r12
+	mov		r10,r0
+	stmfd	sp!,{lr}
+	bl		state_flag_ok
+	bne		autoload_none
+	mov		r0,#TAG_PAGE			@;the tag's autoload byte cleared
+	bl		SetRampage
+	mov		r1,#0x0E000000
+	orr		r1,r1,#0xF00
+	orr		r1,r1,#0xE6
+	mov		r2,#0
+	strb	r2,[r1]
+	ldmfd	sp!,{lr}
+	add		r2,r10,#0x200
+	mov		r1,#0
+	strh	r1,[r2,#8]			@;IME
+	add		r2,r10,#REG_DM0CNT_H	@;DMA0-3 stopped
+	mov		r3,#4
+1:	strh	r1,[r2],#0xC
+	subs	r3,r3,#1
+	bne		1b
+	b		state_load_go
+autoload_none:
+	bl		page_zero
+	ldmfd	sp!,{lr}
+	mov		r0,#REG_BASE
+	ldmia	r11,{r4-r11}
+	ldr		r2,[r0,#REG_P1]
+	b		autoload_back
 	.ltorg
 	.align
 register_list:

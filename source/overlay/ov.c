@@ -155,7 +155,9 @@ struct slot {
 
 enum page_id {
 	PAGE_MENU,
-	PAGE_CHEATS
+	PAGE_CHEATS,
+	PAGE_SAVE,  // the state slots (P3): SAVE into one
+	PAGE_LOAD,  // LOAD the buffer's
 };
 
 // The cheat list: the kernel's entries (but their lines) and what is on
@@ -199,6 +201,11 @@ static struct {
 	uint32_t on[2];  // the entries on now, bit n for entry n
 	uint32_t launched[2];  // and at launch
 	uint32_t changed;  // a toggle changed since the menu opened
+	// The state slots (P3): whether the session has them, and the buffer's
+	// slot (0: none for this game) and whether it is on the card
+	uint32_t states;
+	uint32_t buffer_slot, buffer_kept;
+	uint32_t saved_slot;  // a SAVE's slot, for the answer
 } m;
 
 // --- Small helpers ------------------------------------------------------------
@@ -484,12 +491,24 @@ static int row_greyed(uint32_t r)
 {
 	if (m.page == PAGE_MENU)
 		return m.greyed[r];
+	if (m.page == PAGE_SAVE)
+		return 0;
+	if (m.page == PAGE_LOAD)
+		return r + 1 != m.buffer_slot;  // only the buffer's slot loads in game
 	return r >= LIST_FIXED && cheat_why_now(r - LIST_FIXED) != INGAME_WHY_NONE;
+}
+
+// The buffer holds a state saved in game that the card hasn't
+static int buffer_unkept(void)
+{
+	return m.buffer_slot && !m.buffer_kept;
 }
 
 // Row r's text, as a session block offset
 static uint32_t row_text(uint32_t r)
 {
+	if (m.page == PAGE_SAVE || m.page == PAGE_LOAD)
+		return INGAME_SESSION_STATE(r + 1, !(r + 1 == m.buffer_slot && buffer_unkept()));
 	if (m.page == PAGE_CHEATS)
 		return r == 0   ? text_at(INGAME_TEXT_ALL_OFF)
 		       : r == 1 ? text_at(INGAME_TEXT_AS_LAUNCHED)
@@ -506,6 +525,13 @@ static uint32_t row_text(uint32_t r)
 // the toggles are kept
 static uint32_t footer_text(void)
 {
+	if (m.page == PAGE_SAVE)
+		return text_at(buffer_unkept() && m.cursor + 1 != m.buffer_slot ? INGAME_TEXT_STATE_REPLACES
+										: INGAME_TEXT_STATE_KEEP);
+	if (m.page == PAGE_LOAD)
+		return text_at(!row_greyed(m.cursor)                      ? INGAME_TEXT_STATE_LOAD
+			       : session()->state_have & (1u << m.cursor) ? INGAME_TEXT_STATE_ELSEWHERE
+									  : INGAME_TEXT_STATE_EMPTY);
 	uint32_t why = INGAME_WHY_NONE;
 	if (m.cursor >= LIST_FIXED)
 		why = cheat_why_now(m.cursor - LIST_FIXED);
@@ -517,7 +543,10 @@ static uint32_t footer_text(void)
 static uint32_t slot_text(uint32_t k)
 {
 	if (m.title && k == 0)
-		return text_at(m.page == PAGE_CHEATS ? INGAME_TEXT_CHEATS : INGAME_TEXT_TITLE);
+		return text_at(m.page == PAGE_CHEATS ? INGAME_TEXT_CHEATS
+			       : m.page == PAGE_SAVE ? INGAME_TEXT_SAVE
+			       : m.page == PAGE_LOAD ? INGAME_TEXT_LOAD
+						     : INGAME_TEXT_TITLE);
 	if (m.footer && k == m.title + m.visible)
 		return m.page == PAGE_MENU ? text_at(INGAME_TEXT_DEBUG_SAVED) : footer_text();
 	int r = slot_row(k);
@@ -585,7 +614,7 @@ static uint32_t next_row(uint32_t from, int step)
 	uint32_t at = from;
 	for (uint32_t i = 0; i < m.rows; i++) {
 		at = (at + m.rows + (uint32_t)step) % m.rows;
-		if (m.page == PAGE_CHEATS || !row_greyed(at))
+		if (m.page != PAGE_MENU || !row_greyed(at))
 			return at;
 	}
 	return from;
@@ -607,7 +636,7 @@ static void build_page(enum page_id page, uint32_t cursor)
 		add_row(ROW_RESUME, 0);
 		if (f & INGAME_CAN_STATES) {
 			add_row(ROW_SAVE, 0);
-			add_row(ROW_LOAD, !have_state);
+			add_row(ROW_LOAD, !(m.states ? m.buffer_slot != 0 : have_state));
 		}
 		if (f & INGAME_CAN_CHEATS)
 			add_row(ROW_CHEATS, 0);
@@ -622,6 +651,12 @@ static void build_page(enum page_id page, uint32_t cursor)
 		panel_w = MENU_W;
 		uint32_t h = PANEL_PAD * 2 + (m.rows + notice) * ROW_H;
 		m.title = h + ROW_H + TITLE_GAP <= SCREEN_H - 8;  // the title goes when the screen can't take it
+	} else if (page == PAGE_SAVE || page == PAGE_LOAD) {
+		m.rows = INGAME_STATE_SLOTS;
+		m.visible = LIST_ROWS;
+		m.title = 1;
+		m.footer = 1;
+		panel_w = LIST_W;
 	} else {
 		m.rows = LIST_FIXED + m.cheats;
 		m.visible = m.rows < LIST_ROWS ? m.rows : LIST_ROWS;
@@ -741,6 +776,10 @@ static void page_open(enum page_id page, uint32_t cursor)
 	build_text();
 	if (page == PAGE_CHEATS)
 		debug_print("screen ready: ingame-cheats");
+	else if (page == PAGE_SAVE)
+		debug_print("screen ready: ingame-save");
+	else if (page == PAGE_LOAD)
+		debug_print("screen ready: ingame-load");
 }
 
 // Moves the cursor to row r, scrolling the list to show it
@@ -757,7 +796,7 @@ static void cursor_to(uint32_t r)
 		slots_update();  // the rows' lines in their slots again
 		m.pill_y = row_y(r);  // the pill jumps with the scroll
 		pill_place(m.pill_y);
-	} else if (m.footer && m.page == PAGE_CHEATS) {
+	} else if (m.footer && m.page != PAGE_MENU) {
 		slot_update(m.title + m.visible);
 	}
 	m.pill_to = row_y(r);
@@ -779,6 +818,8 @@ static void list_pick(uint32_t r)
 	cheats_store();
 	slots_update();  // the greyed rows change with what is on
 }
+
+static void state_mark(uint32_t slot);
 
 // Runs the menu until a choice; returns its INGAME_ACT_*
 static uint32_t run(uint32_t menu_key)
@@ -802,16 +843,18 @@ static uint32_t run(uint32_t menu_key)
 		if (down & KEY_B) {
 			if (m.page == PAGE_MENU)
 				return INGAME_ACT_RESUME;
+			// Back to the menu, on the row that opened the page
+			uint32_t from = m.page == PAGE_SAVE ? ROW_SAVE : m.page == PAGE_LOAD ? ROW_LOAD : ROW_CHEATS;
 			uint32_t back = 0;
 			for (uint32_t r = 0; r < ROW_KINDS; r++)
-				if (m.kinds[r] == ROW_CHEATS)
+				if (m.kinds[r] == from)
 					back = r;
 			page_open(PAGE_MENU, back);
 			continue;
 		}
 		if (down & (KEY_UP | KEY_DOWN)) {
 			cursor_to(next_row(m.cursor, (down & KEY_UP) ? -1 : 1));
-		} else if (m.page == PAGE_CHEATS && (down & (KEY_LEFT | KEY_RIGHT))) {
+		} else if (m.page != PAGE_MENU && (down & (KEY_LEFT | KEY_RIGHT))) {
 			// a page of rows at a time, stopping at the ends
 			uint32_t r = m.cursor;
 			if (down & KEY_LEFT)
@@ -825,9 +868,26 @@ static uint32_t run(uint32_t menu_key)
 				list_pick(m.cursor);
 				continue;
 			}
+			if (m.page == PAGE_SAVE) {
+				state_mark(m.cursor + 1);
+				return INGAME_ACT_SAVE;
+			}
+			if (m.page == PAGE_LOAD) {
+				if (row_greyed(m.cursor))
+					continue;
+				return INGAME_ACT_LOAD;
+			}
 			uint32_t kind = m.kinds[m.cursor];
 			if (row_greyed(m.cursor))
 				continue;
+			if (m.states && kind == ROW_SAVE) {
+				page_open(PAGE_SAVE, m.buffer_slot ? m.buffer_slot - 1 : 0);
+				continue;
+			}
+			if (m.states && kind == ROW_LOAD) {
+				page_open(PAGE_LOAD, m.buffer_slot - 1);
+				continue;
+			}
 			if (kind == ROW_CHEATS) {
 				if (m.cheats) {
 					page_open(PAGE_CHEATS, LIST_FIXED);
@@ -841,6 +901,21 @@ static uint32_t run(uint32_t menu_key)
 			return row_action[kind];
 		}
 	}
+}
+
+// The buffer's tag before SAVE: slot's, not kept; its flag cleared, so a
+// SAVE cut short leaves no state (the stub writes the flag last)
+static void state_mark(uint32_t slot)
+{
+	struct ingame_state_tag tag;
+	uint32_t zeros[4] = {0, 0, 0, 0};
+	memset(&tag, 0, sizeof(tag));
+	tag.magic = INGAME_STATE_TAG_MAGIC;
+	tag.slot = (uint8_t)slot;
+	tag.rom_crc = session()->rom_crc;
+	sram_out(INGAME_SRAM_STATE_FLAG, zeros, sizeof(zeros));
+	sram_out(INGAME_SRAM_STATE_TAG, &tag, sizeof(tag));
+	m.saved_slot = slot;
 }
 
 // The answer for the kernel's next boot: the last action, and with the
@@ -858,6 +933,8 @@ static void answer(uint32_t act)
 		out.magic = INGAME_OUT_MAGIC;
 	}
 	out.action = (uint16_t)act;
+	if (act == INGAME_ACT_SAVE && m.saved_slot)
+		out.pending_state = (uint16_t)m.saved_slot;
 	if (m.changed || (act == INGAME_ACT_RESET && out.cheats_changed)) {
 		const uint32_t *on = act == INGAME_ACT_RESET ? m.launched : m.on;
 		out.cheat_on[0] = on[0];
@@ -865,6 +942,23 @@ static void answer(uint32_t act)
 		out.cheats_changed = 1;
 	}
 	sram_out(INGAME_SRAM_SESSION + INGAME_SESSION_OUT, &out, sizeof(out));
+}
+
+// The state slots, if the session has them: the buffer's slot when its
+// state is this game's (its tag's rom_crc the session's)
+static void states_load(void)
+{
+	const struct ingame_session *s = session();
+	m.states = m.have_session && (m.flags & INGAME_CAN_STATES) && s->state_slots == INGAME_STATE_SLOTS;
+	if (!m.states)
+		return;
+	struct ingame_state_tag tag;
+	sram_in(INGAME_SRAM_STATE_TAG, &tag, sizeof(tag));
+	if (state_saved() && tag.magic == INGAME_STATE_TAG_MAGIC && tag.slot >= 1 && tag.slot <= INGAME_STATE_SLOTS &&
+	    tag.rom_crc == s->rom_crc) {
+		m.buffer_slot = tag.slot;
+		m.buffer_kept = tag.kept;
+	}
 }
 
 uint32_t ov_entry(const struct ingame_call *call);
@@ -884,6 +978,7 @@ uint32_t ov_entry(const struct ingame_call *call)
 	m.have_session = s->magic == INGAME_SESSION_MAGIC && s->version == INGAME_SESSION_VERSION;
 	uint32_t menu_key = m.have_session && s->menu_key ? s->menu_key : MENU_KEY_DEFAULT;
 	cheats_load();
+	states_load();
 
 	build_page(PAGE_MENU, 0);
 	uint16_t dispcnt = REG_DISPCNT;

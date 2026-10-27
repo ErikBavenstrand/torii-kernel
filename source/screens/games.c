@@ -28,6 +28,8 @@
 #include "../namesdb.h"
 #include "../sdlist.h"
 #include "../cheatstore.h"
+#include "../gamesave.h"
+#include "../statestore.h"
 #include "cheats.h"
 #include "../tlog.h"
 #include "../userdata.h"
@@ -1457,6 +1459,71 @@ static void saves_game(u32 row, u32 boot)
 	reshow(row);
 }
 
+// Load state (v0.8): the game's save states for its current save slot, a
+// popup of them beside the row (the newest first: "Slot N" and when), then
+// the game started with addons in the one picked (its start loads it).
+// The slot picked, 0 for none; its rows on the stack, gone before a launch.
+static u32 states_pick(u32 row)
+{
+	struct gamerec rec;
+	struct statestore_list list;
+	char label[STATESTORE_SLOTS][16], when[STATESTORE_SLOTS][32];
+	struct ui_pop_item items[STATESTORE_SLOTS];
+	u8 slot[STATESTORE_SLOTS];
+	gamesave_record_read(games.pick, &rec);
+	u32 n = 0;
+	if (statestore_scan(games.pick, rec.slot, &list))
+		while (n < STATESTORE_SLOTS) {
+			u32 best = 0;
+			for (u32 t = 1; t <= STATESTORE_SLOTS; t++) {
+				int taken = 0;
+				for (u32 k = 0; k < n; k++)
+					taken |= slot[k] == t;
+				if (list.slot[t].have && !taken &&
+				    (!best || list.slot[t].order > list.slot[best].order))
+					best = t;
+			}
+			if (!best)
+				break;
+			const struct statestore_slot *e = &list.slot[best];
+			snprintf(label[n], sizeof(label[n]), EN_STATE_SLOT, (unsigned long)best);
+			if (e->when.year && e->when.month >= 1 && e->when.month <= 12)
+				snprintf(when[n], sizeof(when[n]), EN_STATE_WHEN, e->when.day,
+					 gl_states->months[e->when.month - 1], e->when.hour, e->when.min);
+			else
+				when[n][0] = 0;
+			items[n] = (struct ui_pop_item){label[n], when[n], 0};
+			slot[n++] = (u8)best;
+		}
+	tlog("states: popup: %lu for %s (%s)", (unsigned long)n, games.pick, rec.slot);
+	if (!n) {
+		dialog_message(NULL, gl_states->none, DIALOG_INFO);
+		reshow(row);
+		return 0;
+	}
+	struct ui_popup popup = {games.title, 0, items, (u8)n, 0, NULL};
+	if (!up() || !ui_popup_open(list_node(), node(N_HINTS), &popup))
+		return 0;
+	tlog_debug("screen ready: state-popup %s", games.title);
+	s32 pick = ui_popup_choose();
+	ui_popup_close();
+	return pick < 0 || (pick & (UI_POP_LEFT | UI_POP_RIGHT)) ? 0 : slot[pick];
+}
+
+static void states_game(u32 row)
+{
+	u32 slot = states_pick(row);
+	if (!slot)
+		return;
+	tlog("games: start %s in its save state slot %lu", games.pick, (unsigned long)slot);
+	action_state_slot_set(slot);
+	action_slot_chosen(1);  // the save slot whose states these are
+	boot_with_addon(0);
+	action_slot_chosen(0);  // returned: it did not start
+	action_state_slot_set(0);
+	reshow(row);
+}
+
 // The game popup for row i, run after the frame. On the Favourites page
 // its favourite's changes reach the kept order once it has closed.
 #define FAV_SETTLE() \
@@ -1507,6 +1574,8 @@ static void popup_run(u32 i)
 			snprintf(games.cheats, sizeof(games.cheats), "%lu", (unsigned long)listed);
 		popup_add(LANG_POP_CHEATS, listed >= 0 ? games.cheats : 0, 0);
 	}
+	if (gba && Read_SET_info(assress_v_rts) == 1)
+		popup_add(LANG_POP_STATES, 0, 0);
 	u32 fav_item = games.popup.count;
 	popup_add(LANG_POP_FAV, fav ? gl_games->on : gl_games->off, 0);
 	if (!nor && g.rec != LIBRARY_NONE)
@@ -1588,6 +1657,9 @@ static void popup_run(u32 i)
 			return;
 		case LANG_POP_CHEATS:
 			cheats_game(i);
+			return;
+		case LANG_POP_STATES:
+			states_game(i);
 			return;
 		case LANG_POP_RENAME:
 			rename_game(i);

@@ -32,6 +32,15 @@ void test_ingame_abi(void)
 	CHECK(INGAME_CHEAT_TOGGLES + 8 <= 0x03007FF0u && INGAME_CHEAT_TOGGLES >= INGAME_CHEAT_ONOFF + 8);
 	CHECK(INGAME_WHYS - 1 <= INGAME_CHEAT_WHY);
 	CHECK(INGAME_SESSION_CHEAT(INGAME_CHEATS) <= INGAME_SESSION_PATH);
+	// The state slots (P3): the stub's TAG_PAGE and the autoload byte's
+	// place in its window (gba_rts_patch.s), the buffer's size as the old
+	// /RTS files have it, and the slots' rows in the session block
+	CHECK_EQ(INGAME_SRAM_STATE_TAG >> 12, 0xAFu);
+	CHECK_EQ((INGAME_SRAM_STATE_TAG + offsetof(struct ingame_state_tag, autoload)) & 0xFFF, 0xFE6u);
+	CHECK_EQ(INGAME_STATE_BYTES, 0x70000u);
+	CHECK_EQ(INGAME_SRAM_STATE + INGAME_STATE_BYTES, INGAME_SRAM_IMAGE);
+	CHECK_EQ(INGAME_SESSION_STATE(2, 1) - INGAME_SESSION_STATE(1, 1), sizeof(struct ingame_line));
+	CHECK(INGAME_SESSION_STATE(INGAME_STATE_SLOTS, 0) + sizeof(struct ingame_line) <= INGAME_SESSION_SAVE_SLOT);
 	CHECK(INGAME_SESSION_HEAD < 256);
 	CHECK(INGAME_SESSION_TEXT(INGAME_TEXTS) <= INGAME_SESSION_OUT);
 	CHECK(sizeof(struct ingame_session) <= INGAME_SESSION_MAX);
