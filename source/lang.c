@@ -803,9 +803,11 @@ static const struct lang_ingame en_ingame = {
 	.state_elsewhere = "Load it from the game in Torii",
 	.state_empty = "Nothing saved in this slot",
 	.shot = "Screenshot",
-	.shot_saved = "Saved when you return to Torii",
+	.shot_saved = "Saved: kept on Back to Torii",
 	.hint = " or B: resume",
 	.sleep_wakes = "START+SELECT wakes it",
+	.shot_full = "Full: go back to Torii to keep them",
+	.state_saved = "Kept on Back to Torii; lost if off",
 };
 
 static const struct lang_states en_states = {

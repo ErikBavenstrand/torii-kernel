@@ -21,9 +21,11 @@
 #include <string.h>
 
 #include "../ingame_abi.h"
+#include "../shotpack.h"
 
 #define REG16(a) (*(volatile uint16_t *)(a))
 #define REG_DISPCNT REG16(0x04000000)
+#define DISPCNT_BLANK 0x0080  // forced blank: the LCD shows white
 #define REG_VCOUNT REG16(0x04000006)
 #define REG_BLDCNT REG16(0x04000050)
 #define REG_BLDALPHA REG16(0x04000052)
@@ -69,11 +71,13 @@ extern uint32_t __ov_bss_start[], __ov_bss_end[];
 #define PILL_INSET 4
 #define PILL_FILLS 7  // the pill's 32x16 middle sprites, for the widest (the cheat list's)
 #define CHECK_INSET 22  // the cheat list's check box, from the panel's right edge
-#define SLOT_SPRITES 5  // 32x16 sprites a line takes at most (INGAME_TEXT_W)
+#define SLOT_SPRITES 5  // 32x16 sprites a row's line takes at most: 160 px
 #define SLOT_TILES (SLOT_SPRITES * 8)
+#define WIDE_SPRITES 6  // and the menu's title and footer: INGAME_TEXT_W
+_Static_assert(WIDE_SPRITES * 32 >= INGAME_TEXT_W, "the wide lines' sprites");
 
 // The menu: wide enough for its footer's line
-#define MENU_W 176
+#define MENU_W 192
 // The cheat list: 6 rows between its title and its footer
 #define LIST_W 224
 #define LIST_ROWS 6
@@ -90,7 +94,8 @@ extern uint32_t __ov_bss_start[], __ov_bss_end[];
 #define TILE_TICK 36
 #define TILE_TEXT 37
 #define SLOTS_MAX 11  // the menu's title, 9 rows and footer; the list's 8
-_Static_assert(TILE_TEXT + SLOTS_MAX * SLOT_TILES <= INGAME_OBJ_MAX / 32, "the lines' tiles");
+_Static_assert(TILE_TEXT + 2 * WIDE_SPRITES * 8 + (SLOTS_MAX - 2) * SLOT_TILES <= INGAME_OBJ_MAX / 32,
+	       "the lines' tiles");
 
 // Palette banks, colour 1 of each (every tile draws with colour 1)
 #define BANK_PANEL 0
@@ -209,8 +214,10 @@ static struct {
 	uint32_t states;
 	uint32_t buffer_slot, buffer_kept;
 	uint32_t saved_slot;  // a SAVE's slot, for the answer
-	uint32_t shot;  // a screenshot waits for the kernel (this time or before)
-	uint32_t shot_now;  // and this opening took it
+	uint32_t shots;  // the screenshots waiting for the kernel (this time or before)
+	uint32_t shot_at;  // the next one's place in cart SRAM
+	uint32_t shot_now;  // this opening took one
+	uint32_t shot_full;  // and one more didn't fit
 	// The display's registers as the game left them (io_readable's), for a screenshot
 	uint16_t io[11];
 } m;
@@ -396,7 +403,7 @@ static void slot_draw(const struct slot *s, uint32_t sram, uint32_t bank)
 	for (uint32_t y = 0; y < 16; y++) {
 		uint32_t row = y - TEXT_TOP;
 		for (uint32_t c = 0; c < columns; c++) {
-			uint32_t word = row < INGAME_TEXT_ROWS ? spread(line.bits[row][c]) : 0;
+			uint32_t word = row < INGAME_TEXT_ROWS && c < INGAME_TEXT_W / 8 ? spread(line.bits[row][c]) : 0;
 			OBJ_TILES[(s->tile + (c >> 2) * 8 + (y >> 3) * 4 + (c & 3)) * 8 + (y & 7)] = word;
 		}
 	}
@@ -525,6 +532,8 @@ static uint32_t row_text(uint32_t r)
 		       : r == 1 ? text_at(INGAME_TEXT_AS_LAUNCHED)
 				: INGAME_SESSION_CHEAT(r - LIST_FIXED);
 	uint32_t kind = m.kinds[r];
+	if (kind == ROW_SHOT && m.shots)
+		return text_at(INGAME_TEXT_SHOT_COUNT + m.shots - 1);
 	if (kind == ROW_CHEATS)
 		return text_at(m.cheats                                        ? INGAME_TEXT_CHEATS
 			       : *(volatile uint32_t *)INGAME_CHEAT_ONOFF == 1 ? INGAME_TEXT_CHEATS_OFF
@@ -549,13 +558,22 @@ static uint32_t footer_text(void)
 	return text_at(why_texts[why]);
 }
 
-// The menu's footer: the DEBUG notice, that a screenshot waits, on the
-// Sleep row the keys that wake the game, or the keys that close the menu
+// The menu's footer: the DEBUG notice, that no screenshot more fits or one
+// was just taken, on the Sleep row the keys that wake the game, that a
+// state saved in game or screenshots wait for Back to Torii, or the keys
+// that close the menu
+static const uint8_t menu_footers[] = {
+	INGAME_TEXT_DEBUG_SAVED, INGAME_TEXT_SHOT_FULL,   INGAME_TEXT_SHOT_SAVED,
+	INGAME_TEXT_SLEEP_WAKES, INGAME_TEXT_STATE_SAVED, INGAME_TEXT_HINT,
+};
 static uint32_t menu_footer(void)
 {
 	return (m.flags & INGAME_NOTICE_DEBUG)            ? INGAME_TEXT_DEBUG_SAVED
-	       : m.shot                                   ? INGAME_TEXT_SHOT_SAVED
+	       : m.shot_full                              ? INGAME_TEXT_SHOT_FULL
+	       : m.shot_now                               ? INGAME_TEXT_SHOT_SAVED
 	       : m.rows && m.kinds[m.cursor] == ROW_SLEEP ? INGAME_TEXT_SLEEP_WAKES
+	       : m.states && buffer_unkept()              ? INGAME_TEXT_STATE_SAVED
+	       : m.shots                                  ? INGAME_TEXT_SHOT_SAVED
 							  : INGAME_TEXT_HINT;
 }
 
@@ -735,12 +753,18 @@ static void build_page(enum page_id page, uint32_t cursor)
 				uint32_t w3 = line_width(text_at(INGAME_TEXT_CHEATS_ON));
 				w = w2 > w3 ? w2 : w3;
 			}
-			if (m.footer && k == m.title + m.visible)  // the widest of its lines
-				for (uint32_t l = INGAME_TEXT_SHOT_SAVED; l <= INGAME_TEXT_HINT; l++)
-					if (line_width(text_at(l)) > w)
-						w = line_width(text_at(l));
+			if (r >= 0 && m.kinds[r] == ROW_SHOT) {  // the widest of its counts
+				uint32_t w2 = line_width(text_at(INGAME_TEXT_SHOT_COUNT + INGAME_SHOTS_MAX - 1));
+				w = w2 > w ? w2 : w;
+			}
+			uint32_t wide = (m.title && k == 0) || (m.footer && k == m.title + m.visible);
+			if (wide && k)  // the footer: the widest of its lines
+				for (uint32_t l = 0; l < sizeof(menu_footers); l++)
+					if (line_width(text_at(menu_footers[l])) > w)
+						w = line_width(text_at(menu_footers[l]));
+			uint32_t most = wide ? WIDE_SPRITES : SLOT_SPRITES;
 			max = (w + 31) / 32;
-			max = max < 1 ? 1 : max > SLOT_SPRITES ? SLOT_SPRITES : max;
+			max = max < 1 ? 1 : max > most ? most : max;
 		}
 		sl->max = (uint8_t)max;
 		tile += max * 8;
@@ -940,6 +964,8 @@ static uint32_t run(uint32_t menu_key)
 				continue;
 			}
 			if (kind == ROW_SHOT) {
+				if (m.shot_full)
+					continue;
 				shot_take();
 				if (m.footer)
 					slot_update(m.title + m.visible);
@@ -994,7 +1020,7 @@ static void answer(uint32_t act)
 	if (act == INGAME_ACT_SAVE && m.saved_slot)
 		out.pending_state = (uint16_t)m.saved_slot;
 	if (m.shot_now)
-		out.screenshot = 1;
+		out.screenshot = (uint16_t)m.shots;
 	int as_launched = act == INGAME_ACT_RESET || act == INGAME_ACT_LOAD;  // both zero the toggles
 	if (m.changed || (as_launched && out.cheats_changed)) {
 		const uint32_t *on = as_launched ? m.launched : m.on;
@@ -1022,54 +1048,175 @@ static void states_load(void)
 	}
 }
 
-// --- The screenshot (P4) -------------------------------------------------------
+// --- The screenshots (P4) ------------------------------------------------------
 
 // The display's registers the hardware reads back (halfword indexes from
 // 0x04000000): DISPCNT, DISPSTAT, VCOUNT, BG0-3CNT, WININ, WINOUT, BLDCNT,
-// BLDALPHA; the rest are write-only and stay 0 in the dump
+// BLDALPHA; the rest are write-only
 static const uint8_t io_readable[] = {0x00, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x24, 0x25, 0x28, 0x29};
 _Static_assert(sizeof(io_readable) == sizeof(m.io) / 2, "m.io holds them");
 
-// n bytes from cart SRAM at from to cart SRAM at to, through the session
-// head's words (the caller reads them again): no buffer of its own, as
-// every byte of the window costs the menu's opening time
-static void sram_move(uint32_t from, uint32_t to, uint32_t n)
+// The screenshots waiting in cart SRAM: how many, and where the next goes
+static void shots_load(void)
 {
-	const uint32_t chunk = sizeof(session_words) & ~3u;
-	for (uint32_t at = 0; at < n; at += chunk) {
-		uint32_t part = n - at < chunk ? n - at : chunk;
-		sram_in(from + at, session_words, part);
-		sram_out(to + at, session_words, part);
+	m.shots = 0;
+	m.shot_at = INGAME_SRAM_SHOT;
+	while (m.shots < INGAME_SHOTS_MAX) {
+		uint32_t head[3];  // magic, version and bytes, packed
+		sram_in(m.shot_at, head, sizeof(head));
+		if ((head[0] != INGAME_SHOT_MAGIC && head[0] != INGAME_SHOT_DONE) ||
+		    head[1] != (INGAME_SHOT_VERSION | sizeof(struct ingame_shot) << 16) || head[2] % 4 ||
+		    head[2] > INGAME_SHOT_PACKED_MAX ||
+		    m.shot_at + sizeof(struct ingame_shot) + head[2] > INGAME_SHOTS_END)
+			break;
+		m.shot_at += sizeof(struct ingame_shot) + head[2];
+		m.shots++;
 	}
 }
 
-// The game's screen as it was under the menu into INGAME_SRAM_SHOT, for the
-// kernel's next boot: VRAM and the BG palette as they are, the OBJ palette,
-// OAM and the OBJ tiles the menu drew over from the stub's backups, the
-// registers read at opening; the magic last
+// The game's copy of the display registers, which games built on
+// Nintendo's library keep in RAM and copy to them each frame (Pokémon's
+// gGpuRegBuffer): the write-only scroll is in it. A place from p to end
+// whose DISPCNT is the display's and whose BG controls are too (every
+// enabled BG's), scored by the readable registers it matches; the best
+// beyond *best, or 0
+static const volatile uint16_t *shadow_scan(const volatile uint16_t *p, const volatile uint16_t *end, uint32_t *best)
+{
+	const volatile uint16_t *found = 0;
+	const uint32_t disp = m.io[0];
+	for (end -= INGAME_SHOT_IO; p < end; p++) {
+		if (*p != disp)
+			continue;
+		uint32_t score = 0;
+		for (uint32_t b = 0; b < 4; b++)
+			if (p[4 + b] == m.io[3 + b])
+				score++;
+			else if (disp >> (8 + b) & 1)
+				score = 8;  // an enabled BG's differs
+		if (score >= 8)
+			continue;
+		score += (p[0x24] == m.io[7]) + (p[0x25] == m.io[8]) + (p[0x28] == m.io[9]) + (p[0x29] == m.io[10]);
+		if (score > *best) {
+			*best = score;
+			found = p;
+		}
+	}
+	return found;
+}
+
+// The write-only registers into io from the game's copy, if found: IWRAM
+// first, EWRAM past the window (the overlay's) if IWRAM has no copy whose
+// BG controls all match. Returns the copy's address, or 0.
+static uint32_t shadow_take(uint16_t *io)
+{
+	const uint32_t disp = m.io[0];
+	if ((disp & 7) > 2 || !(disp & 0x0F00))  // a bitmap mode, or no BG: no scroll
+		return 0;
+	uint32_t best = 0;
+	const volatile uint16_t *p =
+		shadow_scan((const volatile uint16_t *)0x03000000, (const volatile uint16_t *)0x03007E00, &best);
+	if (best < 4) {
+		const volatile uint16_t *q =
+			shadow_scan((const volatile uint16_t *)(INGAME_EWRAM + ov_header.window_bytes),
+				    (const volatile uint16_t *)0x02040000, &best);
+		p = q ? q : p;
+	}
+	if (!p)
+		return 0;
+	for (uint32_t i = 0x08; i < INGAME_SHOT_IO; i++)
+		if (i < 0x24 || i > 0x29 || i == 0x26 || i == 0x27)  // not WININ, WINOUT, BLDCNT, BLDALPHA
+			io[i] = p[i];
+	return (uint32_t)(uintptr_t)p;
+}
+
+// The packing's output, a buffer at a time into cart SRAM up to the
+// screenshots' room's end
+#define SHOT_BUF 254  // halfwords: whole words a flush, and a spare for the last one's padding
+static uint32_t shot_out;
+
+// The packing's scratch: the game's IWRAM from its start, kept in cart
+// SRAM meanwhile (INGAME_BACKUP_SHOT): the packer's table, the buffer, then
+// its ARM code (ov.ld's .fast, linked there and loaded with the image).
+// From the window, in Thumb, a screenshot took 40 frames; and every byte of
+// the window costs the menu's opening time.
+struct shot_scratch {
+	uint16_t hash[SHOTPACK_HASH];
+	uint16_t buf[SHOT_BUF + 2];
+	uint32_t code[];
+};
+extern const uint32_t __ov_fast_load[], __ov_fast_start[], __ov_fast_end[];
+_Static_assert(sizeof(struct shot_scratch) == 0xA00 && 0xA00 + 0x800 <= INGAME_BACKUP_SHOT_BYTES,
+	       "ov.ld links the code at INGAME_SHOT_IWRAM + 0xA00, 2 KB at most");
+
+static int shot_flush(struct shotpack_out *o)
+{
+	if (o->n & 1)
+		o->buf[o->n] = 0;
+	uint32_t bytes = (o->n * 2 + 3) & ~3u;
+	if (shot_out + bytes > INGAME_SHOTS_END)
+		return 0;
+	sram_out(shot_out, o->buf, bytes);
+	shot_out += bytes;
+	return 1;
+}
+
+// The game's screen as it was under the menu into the next record, for the
+// kernel's next boot. The screen goes white (forced blank: the shutter's
+// flash) while the game's OBJ tiles, OAM and OBJ palette come back from the
+// stub's backups and the palettes, OAM and VRAM are packed; the registers
+// are those read at opening, the scroll from the game's copy; the magic
+// last. Then the menu again.
 static void shot_take(void)
 {
+	if (m.shots >= INGAME_SHOTS_MAX || m.shot_at + sizeof(struct ingame_shot) + 0x1000 > INGAME_SHOTS_END) {
+		m.shot_full = 1;
+		return;
+	}
+	const uint16_t dispcnt = REG_DISPCNT;
+	REG_DISPCNT = (uint16_t)(dispcnt | DISPCNT_BLANK);
 	struct ingame_shot h;
 	memset(&h, 0, sizeof(h));
-	sram_out(INGAME_SRAM_SHOT, &h, sizeof(h));  // no magic while it is written
-	sram_out(INGAME_SHOT_PAL, (const void *)0x05000000, 0x200);
-	sram_move(INGAME_BACKUP_OBJ_PAL, INGAME_SHOT_PAL + 0x200, 0x200);
-	sram_move(INGAME_BACKUP_OAM, INGAME_SHOT_OAM, 0x400);
-	uint32_t drawn = m.tiles_backed * 32, obj_at = INGAME_OBJ_VRAM - 0x06000000;
-	sram_out(INGAME_SHOT_VRAM, (const void *)0x06000000, obj_at);
-	sram_move(INGAME_BACKUP_OBJ, INGAME_SHOT_VRAM + obj_at, drawn);
-	sram_out(INGAME_SHOT_VRAM + obj_at + drawn, (const void *)(INGAME_OBJ_VRAM + drawn),
-		 INGAME_SHOT_VRAM_BYTES - obj_at - drawn);
-	sram_in(INGAME_SRAM_SESSION, session_words, sizeof(session_words));  // after sram_move
-	h.version = 1;
+	h.version = INGAME_SHOT_VERSION;
 	h.bytes = sizeof(h);
+	h.shadow = shadow_take(h.io);
 	for (uint32_t i = 0; i < sizeof(io_readable); i++)
 		h.io[io_readable[i]] = m.io[i];
-	sram_out(INGAME_SRAM_SHOT, &h, sizeof(h));
-	h.magic = INGAME_SHOT_MAGIC;
-	sram_out(INGAME_SRAM_SHOT, &h, 4);
-	m.shot = m.shot_now = 1;
-	debug_print("ingame: screenshot dumped");
+	sram_in(INGAME_BACKUP_OBJ, (void *)INGAME_OBJ_VRAM, m.tiles_backed * 32);
+	sram_in(INGAME_BACKUP_OAM, (void *)0x07000000, 0x400);
+	sram_in(INGAME_BACKUP_OBJ_PAL, (void *)0x05000200, 0x200);
+	sram_out(m.shot_at, &h, sizeof(h));  // no magic while it is written
+	shot_out = m.shot_at + sizeof(h);
+	struct shot_scratch *k = (struct shot_scratch *)INGAME_SHOT_IWRAM;
+	const uint32_t fast = (uint32_t)(__ov_fast_end - __ov_fast_start), borrowed = sizeof(*k) + fast * 4;
+	sram_out(INGAME_BACKUP_SHOT, k, borrowed);
+	for (uint32_t i = 0; i < fast; i++)
+		k->code[i] = __ov_fast_load[i];
+	struct shotpack_out o = {k->buf, SHOT_BUF, 0, 0, shot_flush};
+	int ok = shotpack_pack((const volatile uint16_t *)0x05000000, INGAME_SHOT_PAL_HALVES, k->hash, &o) &&
+		 shotpack_pack((const volatile uint16_t *)0x07000000, INGAME_SHOT_OAM_HALVES, k->hash, &o) &&
+		 shotpack_pack((const volatile uint16_t *)0x06000000, INGAME_SHOT_VRAM_BYTES / 2, k->hash, &o) &&
+		 (!o.n || shot_flush(&o));
+	sram_in(INGAME_BACKUP_SHOT, k, borrowed);
+	if (ok) {
+		h.packed = shot_out - m.shot_at - sizeof(h);
+		uint32_t none = 0;  // the next record's place: the list ends there
+		if (shot_out + 4 <= INGAME_SHOTS_END)
+			sram_out(shot_out, &none, 4);
+		sram_out(m.shot_at, &h, sizeof(h));
+		h.magic = INGAME_SHOT_MAGIC;
+		sram_out(m.shot_at, &h, 4);
+		m.shot_at = shot_out;
+		m.shots++;
+		m.shot_now = 1;
+		debug_print(h.shadow ? "ingame: screenshot dumped, the scroll from the game's copy"
+				     : "ingame: screenshot dumped");
+	} else {
+		m.shot_full = 1;
+		debug_print("ingame: screenshot didn't fit");
+	}
+	page_open(PAGE_MENU, m.cursor);
+	vsync();
+	REG_DISPCNT = dispcnt;
 }
 
 uint32_t ov_entry(const struct ingame_call *call);
@@ -1092,11 +1239,8 @@ uint32_t ov_entry(const struct ingame_call *call)
 	uint32_t menu_key = m.have_session && s->menu_key ? s->menu_key : MENU_KEY_DEFAULT;
 	cheats_load();
 	states_load();
-	if (m.have_session) {  // a screenshot taken at an earlier opening still waits
-		struct ingame_out out;
-		sram_in(INGAME_SRAM_SESSION + INGAME_SESSION_OUT, &out, sizeof(out));
-		m.shot = out.magic == INGAME_OUT_MAGIC && out.screenshot;
-	}
+	if (m.have_session)  // screenshots taken at earlier openings still wait
+		shots_load();
 
 	build_page(PAGE_MENU, 0);
 	uint16_t dispcnt = REG_DISPCNT;

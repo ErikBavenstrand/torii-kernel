@@ -1,8 +1,9 @@
 // The in-game menu's screenshots on the card (v0.8 P4,
-// docs/design/v0.8/ingame-menu.md): the overlay dumps the game's screen to
-// cart SRAM (struct ingame_shot, source/ingame_abi.h), and the kernel's
-// next boot after the game draws it (source/ppu_render.c) into
-// /torii/screenshots/<game> <date> <time>.bmp.
+// docs/design/v0.8/ingame-menu.md): the overlay packs the game's screen
+// into cart SRAM, up to INGAME_SHOTS_MAX a session (struct ingame_shot,
+// source/ingame_abi.h; source/shotpack.h), and the kernel's next boot after
+// the game draws each (source/ppu_render.c) into
+// /torii/screenshots/<game> <date> <time>.bmp, -2, -3 and on in one second.
 //
 // Power-cut safe without a rename (FatFs's can leave two names on one
 // cluster chain): the file is written with a blank BMP head, its pixels,
@@ -23,10 +24,11 @@
 // cut left broken goes (the journal's), and the journal
 void shotstore_recover(void);
 
-// The dump in cart SRAM to the card, under a notice; game is the name the
-// file takes (the session's). Returns 1 once the file is whole (the dump's
-// magic is then cleared) or if there is no dump, 0 if the card didn't take
-// it (the dump stays, for the next boot). Borrows pReadCache whole.
+// The screenshots in cart SRAM to the card, under a notice; game is the
+// name the files take (the session's). Each filed is marked so; once all
+// are, the list is cleared. Returns 1 then or if there are none, 0 if the
+// card didn't take one (the rest stay, for the next boot). Borrows
+// pReadCache whole.
 int shotstore_file(const char *game);
 
 #endif

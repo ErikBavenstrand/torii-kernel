@@ -8,10 +8,21 @@ ENTRY(ov_entry)
 
 MEMORY {
 	window : ORIGIN = 0x02000000, LENGTH = 0x6000
+	/* The game's IWRAM a screenshot borrows for its code, after its table
+	 * and buffer (INGAME_SHOT_IWRAM, ov.c's struct shot_scratch) */
+	iwram : ORIGIN = 0x03000A00, LENGTH = 0x800
 }
 
 SECTIONS {
 	.header : { KEEP(*(.ov_header)) } > window
+	/* The screenshot's packer, ARM: run from IWRAM, loaded with the image */
+	.fast : {
+		__ov_fast_start = .;
+		*shotpack.o(.text .text.*)
+		. = ALIGN(4);
+		__ov_fast_end = .;
+	} > iwram AT> window
+	__ov_fast_load = LOADADDR(.fast);
 	.text : { *(.text .text.*) *(.glue_7) *(.glue_7t) *(.vfp11_veneer) *(.v4_bx) } > window
 	.rodata : { *(.rodata .rodata.*) } > window
 	.data : { *(.data .data.*) . = ALIGN(4); } > window

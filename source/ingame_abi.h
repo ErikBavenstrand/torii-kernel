@@ -37,13 +37,20 @@
 #define INGAME_IMAGE_MAX 0x8000
 #define INGAME_SRAM_SESSION 0xB8000  // struct ingame_session
 #define INGAME_SESSION_MAX 0x8000
-#define INGAME_SRAM_SHOT 0xC0000  // the screenshot dump (P4): struct ingame_shot, to 0xD8FFF
+#define INGAME_SRAM_SHOT 0xC0000  // the screenshots (P4): records of struct ingame_shot, below
+#define INGAME_SHOTS_END 0xF0000  // their room's end: the cart log's page follows
 
 // The backups, from INGAME_SRAM_BACKUP: all in one 64 KB page window
 #define INGAME_BACKUP_EWRAM 0x20000  // the EWRAM window, window_bytes
 #define INGAME_BACKUP_OBJ 0x28000  // OBJ tiles from INGAME_OBJ_VRAM, obj_bytes
 #define INGAME_BACKUP_OAM 0x2C000  // 1 KB
 #define INGAME_BACKUP_OBJ_PAL 0x2C400  // 512 bytes
+// The game's IWRAM from its start, while a screenshot's packing borrows it
+// for its code (ARM, from the image), table and buffer (the overlay's own
+// backup): from EWRAM it took 40 frames
+#define INGAME_BACKUP_SHOT 0x2C800
+#define INGAME_SHOT_IWRAM 0x03000000
+#define INGAME_BACKUP_SHOT_BYTES 0x1200  // the table, the buffer and up to 2 KB of code
 
 // --- The game's memory the overlay borrows
 #define INGAME_EWRAM 0x02000000  // the window's start: the overlay is linked here
@@ -168,38 +175,56 @@ enum {
 // zeroes them, back to the launch's cheats.
 #define INGAME_CHEAT_TOGGLES 0x03007FE8
 
-// --- The screenshot (P4), at INGAME_SRAM_SHOT
-// The overlay's dump of the game's screen as it was under the menu, which
-// the kernel's next boot draws (source/ppu_render.c) and writes to the card
-// as a BMP (source/ingame.c). The header, then the palettes (BG, then OBJ),
-// OAM and VRAM; the OBJ palette, OAM and the OBJ tiles the overlay drew over
-// come from the stub's backups. The magic is written last.
-#define INGAME_SHOT_MAGIC 0x31485354u  // "TSH1"
+// --- The screenshots (P4), from INGAME_SRAM_SHOT
+// The overlay's records of the game's screen as it was under the menu, one
+// after another (each 4-byte aligned), which the kernel's next boot draws
+// (source/ppu_render.c) and writes to the card as BMPs (source/shotstore.c):
+// a header, then the palettes (BG, then OBJ; 1 KB), OAM (1 KB) and VRAM
+// (96 KB), packed (source/shotpack.h) as three parts. The overlay puts the
+// game's OBJ palette, OAM and OBJ tiles back from the stub's backups before
+// it packs them. Its magic is written last; the kernel marks a record it
+// filed INGAME_SHOT_DONE, and clears the first one's magic once all are.
+#define INGAME_SHOT_MAGIC 0x32485354u  // "TSH2"
+#define INGAME_SHOT_DONE 0x44485354u  // "TSHD": on the card
+#define INGAME_SHOT_VERSION 2
+#define INGAME_SHOTS_MAX 5  // a session's at most
 #define INGAME_SHOT_IO 0x30  // halfwords of I/O from 0x04000000: the display's
 #define INGAME_SHOT_FILE 112  // the file's name, the kernel's, once picked
 struct ingame_shot {
 	uint32_t magic;  // INGAME_SHOT_MAGIC
-	uint16_t version;  // 1
+	uint16_t version;  // INGAME_SHOT_VERSION
 	uint16_t bytes;  // sizeof(struct ingame_shot)
-	uint32_t reserved[2];
+	uint32_t packed;  // the packed bytes after the header, a multiple of 4
+	// Where the overlay found the game's copy of the display registers in
+	// RAM, which gave the scroll; 0 if it found none (for the log)
+	uint32_t shadow;
 	// The display's registers as the game left them: those the hardware
-	// reads back; the write-only ones (scroll, the BG matrices, the
-	// windows, MOSAIC, BLDY) 0
+	// reads back, and the scroll from the game's copy if found; the other
+	// write-only ones (the BG matrices, the windows, MOSAIC, BLDY) 0
 	uint16_t io[INGAME_SHOT_IO];
 	// The kernel writes the name it picked here before it writes the
 	// file: a power cut gives the same name again, never a second file
 	char file[INGAME_SHOT_FILE];
 };
-#define INGAME_SHOT_PAL (INGAME_SRAM_SHOT + 0x100)  // 1 KB: BG palette, then OBJ palette
-#define INGAME_SHOT_OAM (INGAME_SRAM_SHOT + 0x500)  // 1 KB
-#define INGAME_SHOT_VRAM (INGAME_SRAM_SHOT + 0x1000)  // 96 KB
+#define INGAME_SHOT_PAL_HALVES 0x200  // the parts: the palettes, OAM, VRAM
+#define INGAME_SHOT_OAM_HALVES 0x200
 #define INGAME_SHOT_VRAM_BYTES 0x18000
-#define INGAME_SHOT_END (INGAME_SHOT_VRAM + INGAME_SHOT_VRAM_BYTES)
-#define INGAME_SHOT_BYTES (INGAME_SHOT_END - INGAME_SRAM_SHOT)  // a dump file's (tests)
+// The packed parts at most, and a record
+#define INGAME_SHOT_PACKED_MAX \
+	(2 * (2 * (INGAME_SHOT_PAL_HALVES + 1) + INGAME_SHOT_VRAM_BYTES / 2 + INGAME_SHOT_VRAM_BYTES / 2 / 0x7FFF + \
+	      1) + \
+	 4)
+// An unpacked dump (tools/ppu_shot's file, which tests/ppu_render.sh makes
+// from mGBA's memory): the header, the palettes at 0x100, OAM at 0x500 and
+// VRAM at 0x1000; offsets from the dump's start
+#define INGAME_DUMP_PAL 0x100
+#define INGAME_DUMP_OAM 0x500
+#define INGAME_DUMP_VRAM 0x1000
+#define INGAME_DUMP_BYTES (INGAME_DUMP_VRAM + INGAME_SHOT_VRAM_BYTES)
 
 // --- The session block, at INGAME_SRAM_SESSION
 #define INGAME_SESSION_MAGIC 0x31535354u  // "TSS1"
-#define INGAME_SESSION_VERSION 4
+#define INGAME_SESSION_VERSION 5
 #define INGAME_NAME_BYTES 48
 #define INGAME_CHEATS 64  // the cheats the in-game list shows; the toggles' bits
 #define INGAME_PATH_BYTES 288  // a ROM's path (GAMESAVE_PATH_BYTES)
@@ -219,7 +244,8 @@ struct ingame_shot {
 // The menu's text, drawn by the kernel (the engine's body font) so the
 // overlay needs no font: each line 1bpp, INGAME_TEXT_ROWS rows of
 // INGAME_TEXT_W pixels, bit 0 of a row's first byte its leftmost pixel
-#define INGAME_TEXT_W 160
+#define INGAME_TEXT_W 176
+#define INGAME_ROW_W 160  // the cheat list's and the state slots' rows: their lines, left of a check box
 #define INGAME_TEXT_ROWS 12
 enum ingame_text {
 	INGAME_TEXT_TITLE,  // the game's name, cut to fit
@@ -254,7 +280,10 @@ enum ingame_text {
 	INGAME_TEXT_SHOT_SAVED,  // the menu's footer once one is taken
 	INGAME_TEXT_SLEEP_WAKES,  // the menu's footer on the Sleep row: the keys that wake it
 	INGAME_TEXT_HINT,  // the menu's footer: the keys that close it
-	INGAME_TEXTS
+	INGAME_TEXT_SHOT_FULL,  // the menu's footer when no screenshot more fits
+	INGAME_TEXT_STATE_SAVED,  // the menu's footer while a state saved in game isn't kept yet
+	INGAME_TEXT_SHOT_COUNT,  // the Screenshot row once n are taken: "Screenshot n/max", n from 1
+	INGAME_TEXTS = INGAME_TEXT_SHOT_COUNT + INGAME_SHOTS_MAX
 };
 struct ingame_line {
 	uint16_t width;  // inked pixels from the left, at most INGAME_TEXT_W
@@ -309,7 +338,7 @@ struct ingame_out {
 	uint32_t magic;  // INGAME_OUT_MAGIC once written
 	uint16_t action;  // the last INGAME_ACT_*
 	uint16_t pending_state;  // a state slot to write to SD (P3); 0xFFFF none
-	uint16_t screenshot;  // 1: a screenshot waits at INGAME_SRAM_SHOT (P4)
+	uint16_t screenshot;  // the screenshots taken in the session, at INGAME_SRAM_SHOT (P4)
 	uint16_t cheats_changed;  // 1 once the list changed a toggle: cheat_on holds the picks
 	uint32_t cheat_on[2];  // the listed cheats on at the last close, bit n for list entry n
 };
@@ -387,13 +416,15 @@ _Static_assert(sizeof(struct ingame_session) % 4 == 0 && sizeof(struct ingame_se
 _Static_assert(INGAME_BACKUP_EWRAM + INGAME_WINDOW_MAX <= INGAME_BACKUP_OBJ &&
 		       INGAME_BACKUP_OBJ + INGAME_OBJ_MAX <= INGAME_BACKUP_OAM &&
 		       INGAME_BACKUP_OAM + 0x400 <= INGAME_BACKUP_OBJ_PAL &&
-		       INGAME_BACKUP_OBJ_PAL + 0x200 <= INGAME_BACKUP_EWRAM + 0x10000,
+		       INGAME_BACKUP_OBJ_PAL + 0x200 <= INGAME_BACKUP_SHOT &&
+		       INGAME_BACKUP_SHOT + INGAME_BACKUP_SHOT_BYTES <= INGAME_BACKUP_EWRAM + 0x10000,
 	       "the backups share one 64 KB page window and don't overlap");
 _Static_assert(INGAME_SRAM_IMAGE + INGAME_IMAGE_MAX <= INGAME_SRAM_SESSION, "image room");
-_Static_assert(sizeof(struct ingame_shot) <= INGAME_SHOT_PAL - INGAME_SRAM_SHOT &&
-		       sizeof(struct ingame_shot) % 4 == 0 && offsetof(struct ingame_shot, io) % 4 == 0,
+_Static_assert(sizeof(struct ingame_shot) <= INGAME_DUMP_PAL && sizeof(struct ingame_shot) % 4 == 0 &&
+		       offsetof(struct ingame_shot, io) % 4 == 0,
 	       "the screenshot's header");
-_Static_assert(INGAME_SHOT_OAM + 0x400 <= INGAME_SHOT_VRAM && INGAME_SHOT_END <= 0xD9000,
-	       "the screenshot's dump, clear of the cart log at 0xF0000");
+_Static_assert(INGAME_SRAM_SHOT + sizeof(struct ingame_shot) + INGAME_SHOT_PACKED_MAX <= INGAME_SHOTS_END &&
+		       INGAME_SHOTS_END <= 0xF0000,
+	       "a screenshot fits, clear of the cart log at 0xF0000");
 
 #endif

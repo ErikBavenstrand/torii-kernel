@@ -346,26 +346,26 @@ info-read/frames 15-15 0EB1CADB6D26281C
 info-read/frames 16-16 26D5CBC998640A1D
 info-read/frames 17-22 58C6DE28040EB31D
 ingame/back 95E628B049B4B4BB
-ingame/cheats 1D3449853DEC3B46
-ingame/menu 9BD8F5227BC01F5E
-ingame/frames 0-0 60D84BE7BC79390E
-ingame/frames 1-1 9F86F00A7A9921F6
-ingame/frames 2-2 F3B2D4E746C7EF7E
-ingame/frames 3-3 3AE6D4F4C093D926
-ingame/frames 4-11 21261FAFCB330766
-ingame/frames 12-12 AF8BDF2ECEAF97F6
-ingame/frames 13-13 EACBE7395E954FC6
-ingame/frames 14-14 535E2562B6684396
-ingame/frames 15-15 D98C0C98546DA546
-ingame/frames 16-16 19414A5468DFC4B6
-ingame/frames 17-23 1D3449853DEC3B46
+ingame/cheats FAD7274EE3C5F306
+ingame/menu 87B07917DB9CE95E
+ingame/frames 0-0 805A390F675ECB4E
+ingame/frames 1-1 144FA936FD3A43B6
+ingame/frames 2-2 151F9D0974C7735E
+ingame/frames 3-3 BEB29606CA007146
+ingame/frames 4-11 3535A5AF18C97506
+ingame/frames 12-12 7219333D849AA076
+ingame/frames 13-13 192D4BBA9DBC6DC6
+ingame/frames 14-14 CE0974E7D1A5E076
+ingame/frames 15-15 3A309ACE05E575C6
+ingame/frames 16-16 B938E6C34A2B8676
+ingame/frames 17-23 FAD7274EE3C5F306
 ingame-cheats/greyed 819ECDDAF5B7ADE8
 ingame-cheats/list F7E6CB9665FBB579
 ingame-cheats/on A7EB51D2E32590C9
 ingame-cheats/rom A3708FCB960EDC67
-ingame-light/menu 131E643EC9B59FC9
+ingame-light/menu 6DAB01A75168AFC9
 ingame-states/load 5D51933A47F53789
-ingame-states/menu E5CA91AA8D3A6D72
+ingame-states/menu BF6A37B0B87F588E
 ingame-states/other 8F1F67CC666EF121
 ingame-states/save 8FCFCED100485A28
 ingame-states/save-current FEAC292337EC4D8F

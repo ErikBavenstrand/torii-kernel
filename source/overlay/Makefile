@@ -13,7 +13,7 @@ CFLAGS := -g -Os -mthumb -mthumb-interwork -mcpu=arm7tdmi -ffreestanding -fno-st
 	-ffile-prefix-map=$(TOP)/=
 ASFLAGS := -g -mthumb-interwork -Wa,--debug-prefix-map=$(TOP)/=
 
-OBJS := $(OUT)/ov_header.o $(OUT)/ov.o
+OBJS := $(OUT)/ov_header.o $(OUT)/ov.o $(OUT)/shotpack.o
 
 $(OUT)/overlay.bin: $(OUT)/overlay.elf
 	$(PREFIX)objcopy -O binary $< $@
@@ -23,6 +23,10 @@ $(OUT)/overlay.elf: $(OBJS) $(SRC)/ov.ld
 
 $(OUT)/%.o: $(SRC)/%.c | $(OUT)
 	$(PREFIX)gcc $(CFLAGS) -c $< -o $@
+
+# The screenshots' packing, which the kernel unpacks: ARM, run from IWRAM (ov.ld)
+$(OUT)/shotpack.o: $(TOP)/source/shotpack.c $(SRC)/Makefile | $(OUT)
+	$(PREFIX)gcc $(filter-out -mthumb,$(CFLAGS)) -marm -c $< -o $@
 
 $(OUT)/%.o: $(SRC)/%.s | $(OUT)
 	$(PREFIX)gcc $(ASFLAGS) -c $< -o $@

@@ -2,7 +2,7 @@
 // host: tests/ppu_render.sh compares it with mGBA's own screen.
 //
 // usage: ppu_shot DUMP OUT.bmp
-//   DUMP is cart SRAM from INGAME_SRAM_SHOT, INGAME_SHOT_BYTES of it (the
+//   DUMP is an unpacked screenshot, INGAME_DUMP_BYTES of it (the
 //   header, palettes, OAM and VRAM; source/ingame_abi.h), as the in-game
 //   menu leaves it or as the test builds it from mGBA's memory.
 #include <stdio.h>
@@ -18,18 +18,18 @@ int main(int argc, char **argv)
 		fprintf(stderr, "usage: ppu_shot DUMP OUT.bmp\n");
 		return 2;
 	}
-	static u8 dump[INGAME_SHOT_BYTES];
+	static u8 dump[INGAME_DUMP_BYTES];
 	FILE *in = fopen(argv[1], "rb");
 	if (!in || fread(dump, 1, sizeof(dump), in) != sizeof(dump)) {
-		fprintf(stderr, "ppu_shot: %s: not %d bytes\n", argv[1], INGAME_SHOT_BYTES);
+		fprintf(stderr, "ppu_shot: %s: not %d bytes\n", argv[1], INGAME_DUMP_BYTES);
 		return 1;
 	}
 	fclose(in);
 	static u16 pal[512], oam[512], io[INGAME_SHOT_IO];
-	memcpy(pal, dump + (INGAME_SHOT_PAL - INGAME_SRAM_SHOT), sizeof(pal));
-	memcpy(oam, dump + (INGAME_SHOT_OAM - INGAME_SRAM_SHOT), sizeof(oam));
+	memcpy(pal, dump + INGAME_DUMP_PAL, sizeof(pal));
+	memcpy(oam, dump + INGAME_DUMP_OAM, sizeof(oam));
 	memcpy(io, dump + offsetof(struct ingame_shot, io), sizeof(io));
-	struct ppu_frame f = {dump + (INGAME_SHOT_VRAM - INGAME_SRAM_SHOT), pal, oam, io};
+	struct ppu_frame f = {dump + INGAME_DUMP_VRAM, pal, oam, io};
 	static struct ppu_scratch scratch;
 	static u8 bmp[PPU_BMP_BYTES];
 	u16 line[PPU_W];

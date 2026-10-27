@@ -2,12 +2,14 @@
 # The in-game menu's Screenshot (v0.8 P4) on the emulated cart, with the
 # hello ROM:
 #
-#   shot  The menu's Screenshot row dumps the screen to cart SRAM and says
-#         it is saved on the way back; Back to Torii, and the next boot
-#         writes /torii/screenshots/Game <date> <time>.bmp: a 240x160 BMP
-#         of hello's screen as the game showed it under the menu, its
-#         dimming left out (BLDY is write-only). A second boot writes no
-#         second file.
+#   shot  The menu's Screenshot row packs the screen into cart SRAM (the
+#         screen white meanwhile) and says it is kept on the way back,
+#         its row the count; five times, then a sixth says the menu is
+#         full. Back to Torii, and the next boot writes the five as
+#         /torii/screenshots/Game <date> <time>.bmp (-2 and on in one
+#         second): 240x160 BMPs of hello's screen as the game showed it
+#         under the menu, its dimming left out (BLDY is write-only). A
+#         second boot writes no more files.
 #   cut   The boot's writing cut at each cutpoint (tests/cutsweep.sh): the
 #         cut loses the dump, and the next power-on leaves one whole BMP or
 #         none (the journal's broken file deleted), never a broken one.
@@ -68,7 +70,7 @@ shots() { mdir -b -i "$cart/sd.img" ::/torii/screenshots 2>/dev/null | grep -c '
 # its white frame
 check_bmp() {
   local file
-  file=$(mdir -b -i "$cart/sd.img" ::/torii/screenshots | grep '\.bmp$')
+  file=$(mdir -b -i "$cart/sd.img" ::/torii/screenshots | grep '\.bmp$' | head -1)
   mcopy -o -i "$cart/sd.img" "$file" "$cart/shot.bmp"
   python3 - "$cart/shot.bmp" <<'PY' || fail "the BMP isn't hello's screen"
 import struct, sys
@@ -85,18 +87,29 @@ PY
 case $mode in
 shot)
   # shellcheck disable=SC2046 # option lists
-  menu_shot -s @20:"$cart/menu.png" $(keys 40 DOWN DOWN DOWN A) -w "in-game: back from /Game.gba" \
-    -f 9000 -u "home ready" >/dev/null 2>"$cart/log" || fail "the run failed: $(tail -3 "$cart/log")"
+  # Four more A, 40 frames apart (a press while one is packed is lost), a
+  # sixth that finds the menu full, then Back to Torii
+  more=()
+  for i in 1 2 3 4 5; do
+    more+=(-k @$((i * 40)):A -k @$((i * 40 + 4)):-)
+  done
+  # shellcheck disable=SC2046 # option lists
+  menu_shot -s @20:"$cart/menu.png" "${more[@]}" -s @$((5 * 40 + 20)):"$cart/full.png" \
+    $(keys $((6 * 40)) DOWN DOWN DOWN A) -w "in-game: back from /Game.gba" \
+    -f 12000 -u "home ready" >/dev/null 2>"$cart/log" || fail "the run failed: $(tail -3 "$cart/log")"
   log=$(cat "$cart/log")
   grep -q '^crash at frame' <<<"$log" && fail "crashed"
-  grep -q 'kernel: screenshot: /torii/screenshots/Game 2026-10-27 14-0[0-9]-[0-9][0-9].bmp written' <<<"$log" ||
-    fail "no BMP written: $(grep -E 'screenshot|in-game' <<<"$log" | tail -3)"
-  frames=$(sed -n 's/^kernel: screenshot: .* written in \([0-9]* frames.*\)$/\1/p' <<<"$log")
+  [ "$(grep -c 'ingame: screenshot dumped' <<<"$log")" = 5 ] || fail "$(grep -c 'ingame: screenshot dumped' <<<"$log") screenshots taken, not 5"
+  [ "$(grep -c 'kernel: screenshot: /torii/screenshots/Game 2026-10-27 14-0[0-9]-[0-9][0-9]\(-[2-5]\)\?.bmp written' <<<"$log")" = 5 ] ||
+    fail "not 5 BMPs written: $(grep -E 'screenshot|in-game' <<<"$log" | tail -3)"
+  grep -q 'kernel: screenshot: 5 filed' <<<"$log" || fail "the list wasn't cleared"
+  frames=$(sed -n 's/^kernel: screenshot: .* written in \([0-9]* frames.*\)$/\1/p' <<<"$log" | head -1)
   file=$(check_bmp)
+  [ "$(shots)" = 5 ] || fail "$(shots) files, not 5"
   # Booted again: nothing more to write
   boot -f 600 >/dev/null 2>"$cart/log"
-  grep -q 'screenshot:' "$cart/log" && fail "the next boot wrote it again"
-  [ "$(shots)" = 1 ] || fail "$(shots) files after the next boot"
+  grep -q 'screenshot:' "$cart/log" && fail "the next boot wrote them again"
+  [ "$(shots)" = 5 ] || fail "$(shots) files after the next boot"
   echo "PASS: screenshot shot: ${file##*/}, drawn and written at boot in $frames"
   ;;
 cut)
@@ -119,7 +132,7 @@ cut)
     ! mdir -a -b -i "$cart/sd.img" ::/torii/screenshots 2>/dev/null | grep -q '\.writing' ||
       fail "cut at $n ($name): the journal is left"
     case $name in
-    "screenshot: its head written and closed" | "screenshot: its journal deleted")
+    "screenshot: its head written and closed" | "screenshot: its journal deleted" | "screenshot: its record marked filed")
       [ "$count" = 1 ] || fail "cut at $n ($name): the whole BMP went"
       ;;
     esac

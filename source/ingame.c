@@ -72,8 +72,8 @@ static const struct torii_glyph *glyph(u32 cp)
 }
 
 // len bytes of UTF-8 at s in the body font into l from its left edge; cut
-// to INGAME_TEXT_W pixels, ending in "..." when cut
-static void line_draw(struct ingame_line *l, const char *s, u32 len)
+// to max_w pixels (at most INGAME_TEXT_W), ending in "..." when cut
+static void line_draw(struct ingame_line *l, const char *s, u32 len, u32 max_w)
 {
 	memset(l, 0, sizeof(*l));
 	u32 pos = 0, w = 0, keep = 0, cut = 0;
@@ -83,11 +83,11 @@ static void line_draw(struct ingame_line *l, const char *s, u32 len)
 		if (cp == CHARSET_NONE)
 			continue;
 		w += glyph(cp)->advance;
-		if (w > INGAME_TEXT_W) {
+		if (w > max_w) {
 			cut = 1;
 			break;
 		}
-		if (w + dots <= INGAME_TEXT_W)
+		if (w + dots <= max_w)
 			keep = pos;
 	}
 	u32 end = cut ? keep : len, x = 0;
@@ -102,12 +102,12 @@ static void line_draw(struct ingame_line *l, const char *s, u32 len)
 			for (u32 b = 0; b < font_body.row_bytes; b++)
 				row |= (u32)bits[r * font_body.row_bytes + b] << (8 * b);
 			for (u32 i = 0; row >> i; i++)
-				if ((row >> i & 1) && x + i < INGAME_TEXT_W)
+				if ((row >> i & 1) && x + i < max_w)
 					l->bits[g->top + r][(x + i) >> 3] |= (u8)(1u << ((x + i) & 7));
 		}
 		x += g->advance;
 	}
-	l->width = (u16)(x < INGAME_TEXT_W ? x : INGAME_TEXT_W);
+	l->width = (u16)(x < max_w ? x : max_w);
 }
 
 void ingame_probe_prepare(const u8 *code)
@@ -204,7 +204,7 @@ void ingame_cheat_put(u32 n, const char *name, u32 len, u32 number, u32 index, u
 {
 	TLOG_ASSERT(n < INGAME_CHEATS);
 	struct ingame_line line;
-	line_draw(&line, name, len);
+	line_draw(&line, name, len, INGAME_ROW_W);
 	sram_put(INGAME_SRAM_SESSION + INGAME_SESSION_CHEAT(n), (const u8 *)&line, sizeof(line));
 	struct cheat_meta m = {(u16)cost, (u16)number, (u16)index, (u8)flags, (u8)bit};
 	sram_put(CHEAT_META(n), (const u8 *)&m, sizeof(m));
@@ -361,7 +361,11 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 		len += (u32)snprintf(hint + len, sizeof(hint) - len, "%s%s", i ? "+" : "", settings_key_name(keys[i]));
 	tlog("launch: in-game menu keys %s%s", hint, gl_menu_off ? ", off (In-game menu Off)" : "");
 	snprintf(hint + len, sizeof(hint) - len, "%s", t->hint);
-	const char *const text[INGAME_TEXTS] = {
+	char counts[INGAME_SHOTS_MAX][24];
+	for (u32 i = 0; i < INGAME_SHOTS_MAX; i++)
+		snprintf(counts[i], sizeof(counts[i]), EN_INGAME_SHOT_COUNT, (unsigned long)i + 1,
+			 (unsigned long)INGAME_SHOTS_MAX);
+	const char *text[INGAME_TEXTS] = {
 		[INGAME_TEXT_TITLE] = h->name[0] ? h->name : "Torii",
 		[INGAME_TEXT_RESUME] = t->resume,
 		[INGAME_TEXT_SAVE] = t->save,
@@ -391,11 +395,15 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 		[INGAME_TEXT_SHOT_SAVED] = t->shot_saved,
 		[INGAME_TEXT_SLEEP_WAKES] = t->sleep_wakes,
 		[INGAME_TEXT_HINT] = hint,
+		[INGAME_TEXT_SHOT_FULL] = t->shot_full,
+		[INGAME_TEXT_STATE_SAVED] = t->state_saved,
 	};
+	for (u32 i = 0; i < INGAME_SHOTS_MAX; i++)
+		text[INGAME_TEXT_SHOT_COUNT + i] = counts[i];
 	for (u32 i = 0; i < INGAME_TEXTS; i++) {
 		struct ingame_line line;
 		TLOG_ASSERT(text[i]);
-		line_draw(&line, text[i], strlen(text[i]));
+		line_draw(&line, text[i], strlen(text[i]), INGAME_TEXT_W);
 		bad += sram_put(INGAME_SRAM_SESSION + INGAME_SESSION_TEXT(i), (const u8 *)&line, sizeof(line));
 		h->text_width[i] = line.width;
 	}
@@ -415,7 +423,7 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 				char row[48];
 				struct ingame_line line;
 				statestore_row(row, sizeof(row), s, &states.list.slot[s], !kept);
-				line_draw(&line, row, strlen(row));
+				line_draw(&line, row, strlen(row), INGAME_ROW_W);
 				bad += sram_put(INGAME_SRAM_SESSION + INGAME_SESSION_STATE(s, kept), (const u8 *)&line,
 						sizeof(line));
 			}
@@ -567,8 +575,9 @@ void ingame_after_game(void)
 	states_after_game(h, path);
 	if (out.cheats_changed && h->cheat_count)
 		cheats_keep(h, path, &out);
-	// A screenshot the card didn't take waits for the next boot
-	u32 shot_left = out.screenshot && !shotstore_file(h->name);
+	// Screenshots the card didn't take wait for the next boot (and are
+	// filed then even if the menu took none this time)
+	u32 shot_left = !shotstore_file(h->name);
 	// Done with: the answer goes, so the next boot does nothing again
 	memset(&out, 0, sizeof(out));
 	if (shot_left) {

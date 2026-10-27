@@ -34,7 +34,8 @@ work RAM*), so page `0x20` is offset `0x20000`.
 | `0x40000-0xAFFFF` | the save-state buffer (unchanged) |
 | `0xB0000-0xB7FFF` | the overlay's image |
 | `0xB8000-0xBFFFF` | the session block, kernel to overlay and back |
-| `0xC0000-0xD8FFF` | the screenshot dump (P4): `struct ingame_shot`, the palettes, OAM, VRAM |
+| `0x2C800-0x2D9FF` | the game's IWRAM a screenshot's packing borrows (its table, buffer and ARM code) |
+| `0xC0000-0xEFFFF` | the screenshots (P4): up to 5 records of `struct ingame_shot` and the packed palettes, OAM, VRAM |
 | `0xF0000` | the cart log (`source/cartlog.h`) |
 
 ### The ABI
@@ -184,18 +185,30 @@ and paging spare PSRAM from the menu (tier C) stay off until the cart probe says
 
 ## P4: screenshots (built)
 
-- **The row.** Screenshot, after Cheats. A dumps the game's screen to cart SRAM
-  `0xC0000-0xD8FFF` (`struct ingame_shot`, `source/ingame_abi.h`): the readable display
+- **The row.** Screenshot, after Cheats. A turns the screen white (forced blank: the
+  shutter's flash), puts the game's OBJ palette, OAM and the OBJ tiles the menu drew over
+  back from the stub's backups, and packs the palettes, OAM and VRAM
+  (`source/shotpack.c`, halfword LZ) into the next record from cart SRAM `0xC0000`
+  (`struct ingame_shot`, `source/ingame_abi.h`), the magic last; then the menu again. The
+  packer runs as ARM from the game's first 0xA00+ bytes of IWRAM, kept at `0x2C800`
+  meanwhile (from the window in Thumb it took 39 frames). About 25 frames for Emerald's
+  title (19 KB packed), 1 for hello's (128 bytes). The header has the readable display
   registers as the overlay found them at opening (DISPCNT, DISPSTAT, VCOUNT, BG0-3CNT,
-  WININ, WINOUT, BLDCNT, BLDALPHA), the BG palette and VRAM as they are, and the OBJ
-  palette, OAM and the OBJ tiles the menu drew over from the stub's backups; the magic
-  last. About 4 frames; the footer then says "Saved when you return to Torii". Another
-  replaces it. The answer's `screenshot` flag tells the kernel.
+  WININ, WINOUT, BLDCNT, BLDALPHA) and the write-only ones (scroll, BG matrices, windows,
+  MOSAIC, BLDY) from the game's own copy of the registers in RAM when it keeps one
+  (Nintendo's library and pokeemerald's `gGpuRegBuffer` do): IWRAM, then EWRAM past the
+  window, is scanned for a block whose DISPCNT and enabled BGs' controls are the
+  display's, scored by the other readable ones it matches (about 3 frames). Emerald's
+  title then draws pixel for pixel as mGBA does (9,603 pixels off without it). Up to 5 a
+  session: the row reads "Screenshot n/5", the footer "Saved: kept on Back to Torii",
+  and once no more fit "Full: go back to Torii to keep them". The answer's `screenshot`
+  counts them.
 - **At the next boot** (`ingame_after_game`, `source/shotstore.c`): under a notice, the
-  kernel copies the dump into `pReadCache` (`READCACHE_SHOT`, all of it), draws it a line at
-  a time with `source/ppu_render.c` and writes `/torii/screenshots/<game> <date> <time>.bmp`
-  (240x160, 24 bits, top-down; the clock's time at filing, a number when there is no
-  clock). About 200 frames for hello (75 drawing, the rest the card).
+  kernel unpacks each record into `pReadCache` (`READCACHE_SHOT`, all of it), draws it a
+  line at a time with `source/ppu_render.c` and writes
+  `/torii/screenshots/<game> <date> <time>.bmp` (240x160, 24 bits, top-down; the clock's
+  time at filing, -2, -3 and on in one second, a number when there is no clock), marks
+  the record filed (`INGAME_SHOT_DONE`), and clears the list once all are. About 200 frames for hello (75 drawing, the rest the card).
 - **Power cuts.** No rename (FatFs's can leave two names on one chain): a journal
   (`/torii/screenshots/.writing`) names the file, which is written with a blank BMP head,
   its lines, then its head; the journal goes last. A cut loses the dump (cart RAM past the

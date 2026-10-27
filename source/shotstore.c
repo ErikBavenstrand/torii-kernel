@@ -11,6 +11,7 @@
 #include "ingame_abi.h"
 #include "lang.h"
 #include "ppu_render.h"
+#include "shotpack.h"
 #include "saveslot.h"
 #include "slotstore.h"
 #include "statestore.h"
@@ -21,6 +22,7 @@ extern u8 pReadCache[];
 
 #define CART_SRAM ((vu8 *)0x0E000000)
 #define SHOT_ROWS 16  // lines written at a time
+#define SHOT_CHUNK 4096  // packed bytes read at a time, into rows
 #define SHOT_PATH_BYTES (sizeof(SHOTSTORE_DIR) + INGAME_SHOT_FILE + 4)
 
 // pReadCache from READCACHE_SHOT, word-aligned throughout for f_write
@@ -38,6 +40,10 @@ struct shot_work {
 _Static_assert(sizeof(struct shot_work) <= READCACHE_SHOT_SIZE, "the screenshot's share of pReadCache");
 _Static_assert(READCACHE_SHOT + READCACHE_SHOT_SIZE <= MAX_pReadCache_size, "READCACHE_SHOT");
 _Static_assert(PPU_VRAM_BYTES == INGAME_SHOT_VRAM_BYTES && PPU_IO_HALVES == INGAME_SHOT_IO, "the dump is the frame");
+_Static_assert(SHOT_CHUNK <= SHOT_ROWS * PPU_BMP_ROW &&
+		       2 * INGAME_SHOT_PAL_HALVES == sizeof(((struct shot_work *)0)->pal) &&
+		       2 * INGAME_SHOT_OAM_HALVES == sizeof(((struct shot_work *)0)->oam),
+	       "the packed parts' room");
 _Static_assert(PPU_BMP_ROW % 4 == 0 && PPU_H % SHOT_ROWS == 0, "whole word-aligned blocks of lines");
 
 static struct shot_work *work(void)
@@ -81,8 +87,8 @@ static int path_of(char *out, const char *file)
 }
 
 // The file's name: the game's, the clock's date and time (or a number with
-// no clock), a number more if taken; kept in the dump's header
-static int name_pick(const char *game)
+// no clock), -2, -3 and on if taken; kept in the record's header at at
+static int name_pick(u32 at, const char *game)
 {
 	struct shot_work *w = work();
 	struct saveslot_stamp t;
@@ -99,7 +105,7 @@ static int name_pick(const char *game)
 		if (n == 1)
 			snprintf(name, sizeof(name), "%s", base);
 		else
-			snprintf(name, sizeof(name), "%s %lu", base, (unsigned long)n);
+			snprintf(name, sizeof(name), "%s-%lu", base, (unsigned long)n);
 		if (!path_of(w->path, name))
 			return 0;
 		FRESULT r = f_stat(w->path, &info);
@@ -109,13 +115,40 @@ static int name_pick(const char *game)
 			return 0;
 	}
 	memcpy(w->head.file, name, sizeof(name));
-	sram_io(INGAME_SRAM_SHOT + offsetof(struct ingame_shot, file), w->head.file, INGAME_SHOT_FILE, 1);
+	sram_io(at + offsetof(struct ingame_shot, file), w->head.file, INGAME_SHOT_FILE, 1);
 	cutpoint("screenshot: its name kept");
 	return 1;
 }
 
-// The dump drawn into the file at w->path: a blank head, the lines, the head
-static int file_write(void)
+// The record at at unpacked into w's palettes, OAM and VRAM
+static int unpack(u32 at)
+{
+	struct shot_work *w = work();
+	struct shotpack_unpack u;
+	u.part[0] = w->pal;
+	u.halves[0] = INGAME_SHOT_PAL_HALVES;
+	u.part[1] = w->oam;
+	u.halves[1] = INGAME_SHOT_OAM_HALVES;
+	u.part[2] = (u16 *)(void *)w->vram;
+	u.halves[2] = INGAME_SHOT_VRAM_BYTES / 2;
+	u.parts = 3;
+	shotpack_unpack_start(&u);
+	u16 *in = (u16 *)(void *)w->rows;
+	u32 packed = w->head.packed;
+	int done = 0;
+	for (u32 off = 0; off < packed && done == 0; off += SHOT_CHUNK) {
+		u32 n = packed - off < SHOT_CHUNK ? packed - off : SHOT_CHUNK;
+		sram_io(at + sizeof(struct ingame_shot) + off, in, n, 0);
+		done = shotpack_unpack_feed(&u, in, n / 2);
+	}
+	if (done != 1)
+		tlog_error("screenshot: the record at %05lX doesn't unpack", (unsigned long)at);
+	return done == 1;
+}
+
+// The record at at drawn into the file at w->path: a blank head, the lines,
+// the head
+static int file_write(u32 at)
 {
 	struct shot_work *w = work();
 	FIL *f = &w->fil;
@@ -133,12 +166,13 @@ static int file_write(void)
 	cutpoint("screenshot: its journal written");
 	if (!journal || f_open(f, w->path, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK)
 		return 0;
+	if (!unpack(at)) {
+		f_close(f);
+		return 0;
+	}
 	memset(w->bmp_head, 0, sizeof(w->bmp_head));
 	int ok = f_write(f, w->bmp_head, PPU_BMP_HEAD, &put) == FR_OK && put == PPU_BMP_HEAD;
 	cutpoint("screenshot: a blank head written");
-	sram_io(INGAME_SHOT_PAL, w->pal, sizeof(w->pal), 0);
-	sram_io(INGAME_SHOT_OAM, w->oam, sizeof(w->oam), 0);
-	sram_io(INGAME_SHOT_VRAM, w->vram, sizeof(w->vram), 0);
 	struct ppu_frame frame = {w->vram, w->pal, w->oam, w->head.io};
 	u32 start = torii_frames, drawing = 0;
 	for (u32 y = 0; ok && y < PPU_H; y += SHOT_ROWS) {
@@ -161,8 +195,10 @@ static int file_write(void)
 		f_unlink(SHOTSTORE_JOURNAL);
 		cutpoint("screenshot: its journal deleted");
 	}
-	tlog("screenshot: %s %s in %lu frames (%lu drawing)", w->path, ok ? "written" : "not written",
-	     (unsigned long)(torii_frames - start), (unsigned long)drawing);
+	tlog("screenshot: %s %s in %lu frames (%lu drawing), %lu bytes packed, the scroll %s%08lX", w->path,
+	     ok ? "written" : "not written", (unsigned long)(torii_frames - start), (unsigned long)drawing,
+	     (unsigned long)w->head.packed,
+	     w->head.shadow ? "from the game's copy at " : "unknown: ", (unsigned long)w->head.shadow);
 	return ok;
 }
 
@@ -187,34 +223,64 @@ void shotstore_recover(void)
 	cutpoint("screenshot: its journal deleted");
 }
 
+// The record at at, if it is one: its header in w->head; 1 waiting, 2 on
+// the card already, 0 none
+static int record(u32 at)
+{
+	struct ingame_shot *h = &work()->head;
+	if (at + sizeof(*h) > INGAME_SHOTS_END)
+		return 0;
+	sram_io(at, h, sizeof(*h), 0);
+	if ((h->magic != INGAME_SHOT_MAGIC && h->magic != INGAME_SHOT_DONE) || h->version != INGAME_SHOT_VERSION ||
+	    h->bytes != sizeof(*h) || h->packed % 4 || h->packed > INGAME_SHOT_PACKED_MAX ||
+	    at + sizeof(*h) + h->packed > INGAME_SHOTS_END)
+		return 0;
+	return h->magic == INGAME_SHOT_MAGIC ? 1 : 2;
+}
+
 int shotstore_file(const char *game)
 {
 	struct shot_work *w = work();
 	struct ingame_shot *h = &w->head;
-	sram_io(INGAME_SRAM_SHOT, h, sizeof(*h), 0);
-	if (h->magic != INGAME_SHOT_MAGIC || h->version != 1 || h->bytes != sizeof(*h)) {
-		tlog_error("screenshot: none in cart SRAM, though the menu took one");
-		return 1;  // nothing to try again
+	u32 at = INGAME_SRAM_SHOT, filed = 0, ok = 1, noticed = 0;
+	for (u32 k = 0; k < INGAME_SHOTS_MAX && ok; k++) {
+		int r = record(at);
+		if (!r)
+			break;
+		u32 next = at + sizeof(*h) + h->packed;
+		if (r == 1) {
+			if (!noticed) {
+				dialog_notice(NULL, gl_states->shot_saving, DIALOG_INFO);
+				noticed = 1;
+				record(at);  // pReadCache again, after the notice's frames
+			}
+			char name[INGAME_SHOT_FILE];
+			memcpy(name, h->file, sizeof(name));
+			if (name[0] && memchr(name, 0, sizeof(name)) && !strchr(name, '/'))
+				ok = path_of(w->path, name);  // a name picked before a power cut
+			else
+				ok = name_pick(at, game);
+			if (ok && file_whole(w->path))
+				tlog("screenshot: %s is whole already", w->path);
+			else
+				ok = ok && file_write(at);
+			if (ok) {
+				u32 done = INGAME_SHOT_DONE;
+				sram_io(at, &done, 4, 1);
+				cutpoint("screenshot: its record marked filed");
+			}
+		}
+		filed += ok;
+		at = next;
 	}
-	dialog_notice(NULL, gl_states->shot_saving, DIALOG_INFO);
-	sram_io(INGAME_SRAM_SHOT, h, sizeof(*h), 0);  // pReadCache again, after the notice's frames
-	int ok;
-	char name[INGAME_SHOT_FILE];
-	memcpy(name, h->file, sizeof(name));
-	if (name[0] && memchr(name, 0, sizeof(name)) && !strchr(name, '/'))
-		ok = path_of(w->path, name);  // a name picked before a power cut
-	else
-		ok = name_pick(game);
-	if (ok && file_whole(w->path))
-		tlog("screenshot: %s is whole already", w->path);
-	else
-		ok = ok && file_write();
-	if (ok) {
+	if (ok && filed) {  // all on the card: the list goes
 		u32 none = 0;
 		sram_io(INGAME_SRAM_SHOT, &none, 4, 1);
+		tlog("screenshot: %lu filed", (unsigned long)filed);
 	}
-	dialog_notice_end();
+	if (noticed)
+		dialog_notice_end();
 	if (!ok)
 		dialog_message(NULL, gl_states->shot_failed, DIALOG_ERROR);
-	return ok;
+	return (int)ok;
 }

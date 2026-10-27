@@ -453,7 +453,11 @@ struct lang_ingame {
 	// menu's footer, after its keys ("L+R+START" then hint)
 	const char *shot, *shot_saved, *hint;
 	const char *sleep_wakes;  // the menu's footer on its Sleep row
+	const char *shot_full;  // the menu's footer when no screenshot more fits
+	const char *state_saved;  // the menu's footer while a state saved in game isn't kept
 };
+// The Screenshot row once some are taken: how many (%lu), of how many (%lu)
+#define EN_INGAME_SHOT_COUNT "Screenshot %lu/%lu"
 extern const struct lang_ingame *gl_ingame;
 
 // Save states (source/statestore.c): a slot's row in game, by its number
