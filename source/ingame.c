@@ -510,7 +510,7 @@ void ingame_refused_notice(void)
 	if (!cartlog_ingame_refused(&r))
 		return;
 	// The game: the session block's name, which the kernel wrote at launch
-	u32 words[INGAME_SESSION_HEAD / 4];
+	u32 words[INGAME_SESSION_HEAD / 4] = {0};
 	struct ingame_session *h = (struct ingame_session *)(void *)words;
 	sram_get(INGAME_SRAM_SESSION, (u8 *)words, sizeof(words));
 	SetRampage(0);
