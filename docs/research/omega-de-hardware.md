@@ -500,6 +500,12 @@ writes a new file's directory entry at `f_open` (size 0), and its data and
 size only at `f_sync`/`f_close` or when the buffer moves to another sector.
 `OMEGA_SD_READ_ERROR=FIRST[-LAST][:N]` makes SD reads touching those sectors
 never finish (the port stays `0xEEE1`), the first N of them or all.
+The emulated card answers at once; `OMEGA_SD_CYCLES=COMMAND[:SECTOR]` makes
+the port read busy for COMMAND cycles plus SECTOR a sector after each SD
+command, to see a job's frames with a card's latency (`Read_SD_sectors` asks
+for at most 4 sectors a command). The real card's figures aren't measured:
+names.db's load (2 KB reads) suggests about 16 cycles a byte overall, and
+v0.8's cart log had a box art listing frame of 880,000 cycles.
 
 **SD read errors.** The only failure the kernel can see is a read that never
 finishes: the port stays `0xEEE1` (busy). `Read_SD_sectors` polls about a
