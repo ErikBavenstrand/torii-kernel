@@ -110,8 +110,8 @@ write-only, so a menu on a BG can't give them back (today's BG2 affine bug).
 
 ## P2: cheats in game (built)
 
-- **The list.** The menu's Cheats row opens a list of the game's cheats, each with a check
-  box, under "All off" and "All as launched"; LEFT and RIGHT page through it. Its footer
+- **The list.** The menu's Cheats row opens a list of the game's cheats, each one on with
+  the kernel's check mark, under "All off" and "Back to my picks"; LEFT and RIGHT page through it. Its footer
   says why the row under the cursor can't change, else that the toggles are kept.
 - **What the kernel writes.** `cheatstore_launch` lists every pick, then other cheats in
   file order, up to 64 (`INGAME_CHEATS`), each with its name drawn as a line, its cycles,
