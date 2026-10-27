@@ -51,10 +51,6 @@ Everything still open from v0.4.3–v0.8.1, in one place. None of it blocks v0.9
 - **Saves:** Game saves past 256 games with saves aren't listed (logged).
 - **Emulators:** hi-colour GBC games lose mid-frame palette writes (jagoombacolor#20, #53; `docs/research/gbc-hicolor.md`). Left from the trackers: jagoombacolor#42 accuracy tests, #43 a GBC-compatible ROM run as DMG, #34 the default palette; PocketNES#14 multiboot.
 
-### Small fixes
-
-- **The popup's Load state list cuts "Slot N" to "S..."** (owner, 2026-10-27): the date beside it (`27 Oct 23:49`) takes the row's width (`states_pick` in `source/screens/games.c`). Show the slot as its number alone, or let the label keep its width before the date.
-
 ### Decisions for v0.9
 
 - **Memory:** EWRAM has 3,756 bytes free in the release kernel and 2,680 in the test kernel (2026-10-27), so v0.9's tables can't go there. The screens' EWRAM states (`games` 3.7 KB, `sd` 3.6 KB, `info` 2.7 KB, `nor` 1.4 KB, Diagnostics' `scr` 1.6 KB) could share a union for 5 to 8 KB if needed. ROM has 217 KB free, IWRAM 10 KB.
