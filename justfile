@@ -115,9 +115,12 @@ compile-commands: _ready
     python3 tools/compile_commands.py "$PWD" build=dist/dry-run-kernel.txt build-test=dist/dry-run-test.txt
     rm dist/dry-run-kernel.txt dist/dry-run-test.txt
 
-# Kernel size against the cart and GBA memory limits, and the largest symbols
-size count="12": build
+# Kernel size against the cart and GBA memory limits, and the largest symbols;
+# then the test kernel's (tests/kernel linked in), whose EWRAM wraps the same
+size count="12": build _test-kernel-build
     {{kernel_docker}} tools/size.sh ezkernelnew.elf ezkernelnew.gba {{count}}
+    @echo; echo "Test kernel:"
+    {{kernel_docker}} tools/size.sh ezkerneltest.elf ezkerneltest.gba 0
 
 # Largest stack frames and deepest call chains (a static estimate, see tools/stack.py)
 stack count="12": build

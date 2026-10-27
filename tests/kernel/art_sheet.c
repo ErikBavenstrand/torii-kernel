@@ -18,6 +18,8 @@
 #include "torii_test.h"
 #include "tests.h"
 #include "../../source/cartlog.h"
+#include "../../source/ez_define.h"
+#include "../../source/ezkernel.h"
 #include "../../source/engine/engine.h"
 #include "../../source/ui/art.h"
 
@@ -45,9 +47,16 @@
 #define SIZE_32X8 0x4000  // wide 32x8
 #define HFLIP 0x1000
 
-static u16 map[32 * 32] EWRAM_BSS ALIGN(4);
-// The 8x8 icons in two colours, then a blank tile
-static u32 icon8_tiles[2 * ART_ICON8_COUNT + 1][8] EWRAM_BSS ALIGN(4);
+// The BG map, then the 8x8 icons in two colours and a blank tile, in
+// pReadCache (READCACHE_ART_SHEET, ez_define.h): the test kernel's EWRAM has
+// no room for them
+struct sheet_buffers {
+	u16 map[32 * 32];
+	u32 icon8_tiles[2 * ART_ICON8_COUNT + 1][8];
+};
+_Static_assert(sizeof(struct sheet_buffers) <= READCACHE_ART_SHEET_SIZE, "the art sheet's buffers fit their room");
+#define map (((struct sheet_buffers *)(void *)(pReadCache + READCACHE_ART_SHEET))->map)
+#define icon8_tiles (((struct sheet_buffers *)(void *)(pReadCache + READCACHE_ART_SHEET))->icon8_tiles)
 
 static struct {
 	u8 page;
