@@ -471,7 +471,8 @@ int cartlog_ingame_refused(struct ingame_refused *r)
 static const char *ingame_refused_colour_name(const struct ingame_refused *r)
 {
 	static const char *const names[] = {"white", "blue", "red", "green", "cyan", "red", "yellow", "magenta"};
-	return names[ingame_refused_colour(r->reason, r->detail)];
+	_Static_assert(sizeof(names) / sizeof(*names) == 8, "INGAME_REFUSED_COLOURS");
+	return names[ingame_refused_colour(r->reason, r->detail) & 7];  // under 8 already
 }
 
 // The in-game menu's stub didn't open the menu (gba_rts_patch.s,
