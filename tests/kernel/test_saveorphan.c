@@ -28,11 +28,12 @@ extern FATFS EZcardFs;
 #define SCRATCH (pReadCache + 0x18000)
 static struct orphan_scan *scan(void)
 {
-	return (struct orphan_scan *)SCRATCH;  // about 4 KB
+	return (struct orphan_scan *)SCRATCH;  // about 20 KB
 }
+_Static_assert(sizeof(struct orphan_scan) <= 0x5000, "the scan fits before info()");
 static FILINFO *info(void)
 {
-	return (FILINFO *)(SCRATCH + 0x2000);
+	return (FILINFO *)(SCRATCH + 0x5000);
 }
 
 static int card(void)
@@ -161,6 +162,8 @@ static void test_scan(void)
 	CHECK(saveorphan_has(s, "/tos/LIVE.GBA"));
 	CHECK(!saveorphan_has(s, "/TOS/Gone.gba"));
 	CHECK(!saveorphan_has(s, "/torii/nor/Pseudo"));
+	for (u32 i = 1; i < s->have_count; i++)
+		CHECK(s->have[i - 1] <= s->have[i]);  // sorted, for saveorphan_has's search
 	// The ROM comes back: no longer an orphan, and listed
 	CHECK(put("/TOS/Gone.gba", 'R', 512));
 	do_scan();

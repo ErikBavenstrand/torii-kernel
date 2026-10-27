@@ -180,11 +180,45 @@ static int is_sav(const char *name)
 
 int saveorphan_has(const struct orphan_scan *s, const char *rom)
 {
-	u32 key = saveorphan_key(rom);
-	for (u32 i = 0; i < s->have_count; i++)
-		if (s->have[i] == key)
-			return 1;
-	return 0;
+	u32 key = saveorphan_key(rom), lo = 0, hi = s->have_count;
+	while (lo < hi) {
+		u32 mid = (lo + hi) / 2;
+		if (s->have[mid] < key)
+			lo = mid + 1;
+		else
+			hi = mid;
+	}
+	return lo < s->have_count && s->have[lo] == key;
+}
+
+// Sorts the n keys in have, in place: a heapsort (n log n, no memory)
+static void sort_keys(u32 *have, u32 n)
+{
+	for (u32 end = n, start = n / 2;;) {
+		if (start > 0) {
+			start--;
+		} else {
+			if (end <= 1)
+				return;
+			end--;
+			u32 t = have[0];
+			have[0] = have[end];
+			have[end] = t;
+		}
+		for (u32 at = start;;) {
+			u32 child = at * 2 + 1;
+			if (child >= end)
+				break;
+			if (child + 1 < end && have[child + 1] > have[child])
+				child++;
+			if (have[at] >= have[child])
+				break;
+			u32 t = have[at];
+			have[at] = have[child];
+			have[child] = t;
+			at = child;
+		}
+	}
 }
 
 static void add_orphan(struct orphan_scan *s, const char *rom, u32 slots, u32 bytes)
@@ -349,6 +383,7 @@ int saveorphan_scan(struct orphan_scan *s, orphan_progress_fn progress, void *ct
 	partial |= sum.partial;
 
 	s->partial = partial;
+	sort_keys(s->have, s->have_count);
 	tlog("orphan: scan: %lu games, %lu orphans (%lu more), saves %lu, history %lu, trash %lu bytes%s",
 	     (unsigned long)s->games, (unsigned long)s->count, (unsigned long)s->more, (unsigned long)s->saves_bytes,
 	     (unsigned long)s->backups_bytes, (unsigned long)s->trash_bytes, s->partial ? " (partial)" : "");

@@ -39,11 +39,11 @@
 // - READCACHE_ORPHAN, the same 16 KB: the global save manager's work area
 //   (saveorphan.c), within one saveorphan_* call, which runs no slotstore_*
 //   call inside it (they take turns). The Saves screen holds its list in EWRAM.
-// - READCACHE_SAVES, 8 KB from 0x16000, clear of the slot store's and the save
+// - READCACHE_SAVES, 36 KB from 0x16000 (to READCACHE_RENAME), clear of the slot store's and the save
 //   copy's (and past the 2 x 2 KB at READCACHE_SAVE's start): the Saves screen's
 //   state (screens/saves.c) while it runs, in a deferred action, where nothing
 //   else borrows pReadCache between its calls.
-// - READCACHE_GSAVES, the same 8 KB as READCACHE_SAVES (Game saves takes
+// - READCACHE_GSAVES, the first 6 KB of READCACHE_SAVES (Game saves takes
 //   its view down before opening a game's page, and walks the card again
 //   after): a game's saves page's state (screens/game_saves.c) while it
 //   runs, from a page's deferred action; and READCACHE_FLOW, the slot flows'
@@ -101,7 +101,7 @@
 #define READCACHE_SLOTS 0x12000
 #define READCACHE_SLOTS_SIZE 0x4000
 #define READCACHE_SAVES 0x16000
-#define READCACHE_SAVES_SIZE 0x2000
+#define READCACHE_SAVES_SIZE 0x9000
 #define READCACHE_ORPHAN READCACHE_SLOTS
 #define READCACHE_ORPHAN_SIZE READCACHE_SLOTS_SIZE
 #define READCACHE_GSAVES READCACHE_SAVES
