@@ -446,7 +446,7 @@ static void cheats_load(void)
 	const struct ingame_session *s = session();
 	m.cheats =
 		m.have_session && (m.flags & INGAME_CAN_CHEATS) && s->cheat_count <= INGAME_CHEATS ? s->cheat_count : 0;
-	uint32_t toggles[2] = {TOGGLES[0], TOGGLES[1]};
+	const uint32_t toggles[2] = {TOGGLES[0], TOGGLES[1]};
 	for (uint32_t e = 0; e < m.cheats; e++) {
 		struct cheat *c = &m.cheat[e];
 		uint32_t meta[2];  // cost, number; index, flags, bit
@@ -529,9 +529,9 @@ static uint32_t footer_text(void)
 		return text_at(buffer_unkept() && m.cursor + 1 != m.buffer_slot ? INGAME_TEXT_STATE_REPLACES
 										: INGAME_TEXT_STATE_KEEP);
 	if (m.page == PAGE_LOAD)
-		return text_at(!row_greyed(m.cursor)                      ? INGAME_TEXT_STATE_LOAD
-			       : session()->state_have & (1u << m.cursor) ? INGAME_TEXT_STATE_ELSEWHERE
-									  : INGAME_TEXT_STATE_EMPTY);
+		return text_at(!row_greyed(m.cursor)                        ? INGAME_TEXT_STATE_LOAD
+			       : (session()->state_have & (1u << m.cursor)) ? INGAME_TEXT_STATE_ELSEWHERE
+									    : INGAME_TEXT_STATE_EMPTY);
 	uint32_t why = INGAME_WHY_NONE;
 	if (m.cursor >= LIST_FIXED)
 		why = cheat_why_now(m.cursor - LIST_FIXED);
@@ -629,7 +629,7 @@ static void build_page(enum page_id page, uint32_t cursor)
 	m.page = page;
 	m.rows = 0;
 	m.top = 0;
-	uint32_t notice = 0, panel_w;
+	uint32_t panel_w;
 	if (page == PAGE_MENU) {
 		uint32_t f = m.flags;
 		int have_state = (f & INGAME_CAN_STATES) && state_saved();
@@ -645,7 +645,7 @@ static void build_page(enum page_id page, uint32_t cursor)
 		add_row(ROW_TORII, 0);
 		if (f & INGAME_CAN_DEBUG)
 			add_row(ROW_DEBUG, 0);
-		notice = (f & INGAME_NOTICE_DEBUG) ? 1 : 0;
+		uint32_t notice = (f & INGAME_NOTICE_DEBUG) ? 1 : 0;
 		m.visible = m.rows;
 		m.footer = notice;
 		panel_w = MENU_W;

@@ -682,16 +682,21 @@ def check_state(result: Result, events: list, out: str, trace: str) -> None:
     if any(t == "kernel back" for f, t in events if f > saved):
         result.set("save state", "fail", "the game went back to the kernel")
         return
-    # The game after Load state: on, its screen changing with keys pressed
-    after = {h for f, h in screen_hashes(out) if f > loaded + 90}
-    if len(after) <= 1:
-        result.set("save state", "fail", "the screen did not change after Load state")
+    # The game after Load state: back where it was saved (a screen it showed
+    # after Save state), or on, its screen changing with keys pressed (a
+    # game standing still on one screen shows the one it showed after Save)
+    hashes = screen_hashes(out)
+    after_save = {h for f, h in hashes if saved + 90 < f < loaded}
+    after = {h for f, h in hashes if f > loaded + 90}
+    if len(after) <= 1 and not after & after_save:
+        result.set(
+            "save state",
+            "fail",
+            "after Load state the screen stood still on one the game hadn't shown after Save state",
+        )
         return
-    result.set(
-        "save state",
-        "pass",
-        f"saved, loaded, and the game went on ({len(after)} screens)",
-    )
+    how = "the game went on" if len(after) > 1 else "the game back at its saved screen"
+    result.set("save state", "pass", f"saved, loaded, {how} ({len(after)} screens)")
 
 
 def run_game(result: Result, roms: dict, saves: dict, table: dict) -> None:

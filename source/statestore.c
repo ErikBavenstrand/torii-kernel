@@ -281,8 +281,8 @@ static int copy_write(char *path, u32 slot, u32 seq, u32 order)
 	u32 h_words[sizeof(struct statestore_head) / 4];
 	struct statestore_head *h = (struct statestore_head *)(void *)h_words;
 	memset(h, 0, sizeof(*h));
-	FRESULT r = FR_OK;
-	if (!make_parents(path) || (r = f_open(f, path, FA_CREATE_ALWAYS | FA_WRITE)) != FR_OK) {
+	FRESULT r = make_parents(path) ? f_open(f, path, FA_CREATE_ALWAYS | FA_WRITE) : FR_DENIED;
+	if (r != FR_OK) {
 		tlog_error("states: can't write %s (FatFs %d)", path, r);
 		return 0;
 	}

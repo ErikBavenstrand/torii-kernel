@@ -228,9 +228,11 @@ local function plan(start)
 		table.insert(schedule, { back + 120 * i + 6, 0, "-" })
 	end
 	-- The save state round trip, menu keys 8 frames apart
+	-- (the menu key held 20 frames, for a game whose VBlank IRQ is off now
+	-- and then: the menu waits for its release)
 	local function menu_keys(from, names, tag)
 		table.insert(schedule, { from, MENU_KEY, tag })
-		table.insert(schedule, { from + 6, 0, "-" })
+		table.insert(schedule, { from + 20, 0, "-" })
 		for i, key in ipairs(names) do
 			table.insert(schedule, { from + 32 + 8 * i, KEYS[key], key })
 			table.insert(schedule, { from + 36 + 8 * i, 0, "-" })

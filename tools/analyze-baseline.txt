@@ -27,7 +27,6 @@ clang-tidy source/ezkernelnew.c clang-analyzer-security.insecureAPI.strcpy: Call
 clang-tidy source/ezkernelnew.c clang-analyzer-security.insecureAPI.strcpy: Call to function 'strcpy' is insecure as it does not provide bounding of the memory buffer. Replace unbounded copy functions with analogous functions that support length arguments such as 'strlcpy'. CWE-119
 clang-tidy source/fmt.c bugprone-branch-clone: repeated branch body in conditional chain
 clang-tidy source/fmt.c bugprone-branch-clone: repeated branch body in conditional chain
-clang-tidy source/gamename.c bugprone-not-null-terminated-result: the result from calling 'memcpy' is not null-terminated
 clang-tidy source/library.c bugprone-not-null-terminated-result: the result from calling 'memcpy' is not null-terminated
 clang-tidy source/orphanplan.c bugprone-suspicious-string-compare: function 'strcmp' is called without explicitly comparing result
 clang-tidy source/reset_table.h bugprone-narrowing-conversions: narrowing conversion from constant value 4294967295 (0xFFFFFFFF) of type 'unsigned int' to signed type 'int' is implementation-defined
@@ -87,8 +86,13 @@ cppcheck source/ezkernelnew.c duplicateBreak: Consecutive return, break, continu
 cppcheck source/ezkernelnew.c unreadVariable: Variable 'filesize' is assigned a value that is never used.
 cppcheck source/ezkernelnew.c unreadVariable: Variable 'res' is assigned a value that is never used.
 cppcheck source/fathint.c constParameterCallback: Parameter 'job' can be declared as pointer to const. However it seems that 'step' is a callback function, if 'job' is declared with const you might also need to cast function pointer(s).
+cppcheck source/ingame.c unassignedVariable: Variable 'words' is not assigned a value.
+cppcheck source/ingame.c uninitvar: Uninitialized variable: h
 cppcheck source/library_scan.c constParameterCallback: Parameter 'job' can be declared as pointer to const. However it seems that 'library_job' is a callback function, if 'job' is declared with const you might also need to cast function pointer(s).
 cppcheck source/names_store.c constParameterCallback: Parameter 'job' can be declared as pointer to const. However it seems that 'names_job' is a callback function, if 'job' is declared with const you might also need to cast function pointer(s).
 cppcheck source/screens/sdcard.c constParameterCallback: Parameter 'job' can be declared as pointer to const. However it seems that 'count_step' is a callback function, if 'job' is declared with const you might also need to cast function pointer(s).
+cppcheck source/statestore.c unassignedVariable: Variable 'h_words' is not assigned a value.
+cppcheck source/statestore.c unassignedVariable: Variable 'h_words' is not assigned a value.
+cppcheck source/statestore.c unassignedVariable: Variable 'h_words' is not assigned a value.
 cppcheck source/tlog.c constParameterCallback: Parameter 'job' can be declared as pointer to const. However it seems that 'open_job' is a callback function, if 'job' is declared with const you might also need to cast function pointer(s).
 cppcheck source/ui/ui_reading.c constParameterCallback: Parameter 'ctx' can be declared as pointer to const. However it seems that 'reading_count' is a callback function, if 'ctx' is declared with const you might also need to cast function pointer(s).

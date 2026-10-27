@@ -236,7 +236,7 @@ int ingame_states_launch(const char *rom_path, const char *save_slot, const char
 	if (strlen(save_slot) >= sizeof(states.save_slot) || strlen(rom_path) >= INGAME_PATH_BYTES)
 		return 0;
 	memset(states.save_slot, 0, sizeof(states.save_slot));
-	strcpy(states.save_slot, save_slot);
+	memcpy(states.save_slot, save_slot, strlen(save_slot) + 1);  // its length checked above
 	states.rom_crc = states_crc(rom_path, save_slot);
 	statestore_import_rts(rom_path, save_slot, rom_name, states.rom_crc);
 	statestore_scan(rom_path, save_slot, &states.list);
