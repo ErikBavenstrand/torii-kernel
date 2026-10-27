@@ -1103,6 +1103,7 @@ register_list_loop:
 	strh r3,[r10,r2]
 	b 	register_list_loop
 register_list_end:
+	bl		gpu_shadow
 	add		r8,r10,#0x200
 	ldrh	r9,[r8,#4]		@;the state's; the page register at the BIOS's
 	mov		r1,#0
@@ -1158,6 +1159,62 @@ spin3_load:
 
 	ldr 	pc,[r0,#-(0x04000000-0x03FFFFF4)] @;to normal IRQ routine
 	.ltorg
+
+@;Torii: the display's write-only registers (BG scroll and affine, the
+@;windows, MOSAIC, BLDY), which no read gives the state's I/O copy, from
+@;the game's own copy of the display registers in the state's RAM: the
+@;first word-aligned 0x60 bytes in IWRAM, then EWRAM, laid out as the
+@;registers and holding the state's DISPCNT (not 0), BG0-3CNT, WININ,
+@;WINOUT, BLDCNT and BLDALPHA, as the register list just put them back
+@;(Pokémon Emerald's GPU register buffer). Without one they stay as the
+@;game had them before the load: Load state at Emerald's intro left its
+@;windows 0 by 0, so the overworld showed BG0 alone, black. r10 I/O; uses
+@;r0-r7 and r12, no stack (IRQ mode's is in the state's IWRAM).
+gpu_shadow:
+	ldrh	r2,[r10]			@;DISPCNT
+	cmp		r2,#0
+	bxeq	lr
+	ldr		r3,[r10,#0x08]		@;BG0CNT, BG1CNT
+	ldr		r4,[r10,#0x0C]		@;BG2CNT, BG3CNT
+	ldr		r5,[r10,#0x48]		@;WININ, WINOUT
+	ldr		r6,[r10,#0x50]		@;BLDCNT, BLDALPHA
+	mov		r0,#0x03000000
+	add		r1,r0,#0x8000
+	sub		r1,r1,#0x60
+	mov		r12,#0x02000000
+1:	ldrh	r7,[r0]
+	cmp		r7,r2
+	bne		2f
+	ldr		r7,[r0,#0x08]
+	cmp		r7,r3
+	ldreq	r7,[r0,#0x0C]
+	cmpeq	r7,r4
+	ldreq	r7,[r0,#0x48]
+	cmpeq	r7,r5
+	ldreq	r7,[r0,#0x50]
+	cmpeq	r7,r6
+	beq		3f
+2:	add		r0,r0,#4
+	cmp		r0,r1
+	blo		1b
+	cmp		r12,#0				@;IWRAM done: EWRAM, once
+	bxeq	lr
+	mov		r0,r12
+	add		r1,r0,#0x40000
+	sub		r1,r1,#0x60
+	mov		r12,#0
+	b		1b
+3:	mov		r1,#0x10			@;BG0HOFS to WIN1V
+4:	ldrh	r7,[r0,r1]
+	strh	r7,[r10,r1]
+	add		r1,r1,#2
+	cmp		r1,#0x48
+	blo		4b
+	ldrh	r7,[r0,#0x4C]		@;MOSAIC
+	strh	r7,[r10,#0x4C]
+	ldrh	r7,[r0,#0x54]		@;BLDY
+	strh	r7,[r10,#0x54]
+	bx		lr
 
 @;Torii (v0.8): the launch into a save state, at the first VBlank: the
 @;hook's registers kept as the menu's are, the autoload marks cleared, then

@@ -6,12 +6,12 @@
 // menu gives the dimming back. A green square in the top right corner shows
 // a cheat at work: CHEAT/Hello.cht with "ON=1236,58;" writes 0x58 to
 // EWRAM 0x02001236 each frame once the in-game menu's CHEAT is ON.
+// The display registers go through a copy in IWRAM laid out as they are,
+// as Pokémon Emerald's do: Load state takes the write-only ones (BLDY's
+// dimming here) from it (tests/states.sh shadow).
 #include <stdint.h>
 
-#define REG_DISPCNT (*(volatile uint16_t *)0x04000000)
 #define REG_DISPSTAT (*(volatile uint16_t *)0x04000004)
-#define REG_BLDCNT (*(volatile uint16_t *)0x04000050)
-#define REG_BLDY (*(volatile uint16_t *)0x04000054)
 #define REG_IE (*(volatile uint16_t *)0x04000200)
 #define REG_IF (*(volatile uint16_t *)0x04000202)
 #define REG_IME (*(volatile uint16_t *)0x04000208)
@@ -30,6 +30,15 @@ const char save_tag[] __attribute__((used)) = "SRAM_V113";
 static const uint8_t MAGIC[4] = {'O', 'M', 'R', 'X'};
 
 static volatile unsigned frames;
+
+// The display registers' copy, 0x04000000-0x0400005F
+static volatile uint16_t gpu_regs[0x30] __attribute__((aligned(4)));
+
+static void set_gpu_reg(unsigned offset, uint16_t value)
+{
+	gpu_regs[offset / 2] = value;
+	*(volatile uint16_t *)(0x04000000 + offset) = value;
+}
 
 // The BIOS calls this in ARM mode for every interrupt.
 __attribute__((target("arm"))) static void on_irq(void)
@@ -52,7 +61,9 @@ int main(void)
 		SRAM[i] = MAGIC[i];
 	SRAM[4] = boots;
 
-	REG_DISPCNT = 3 | (1 << 10);  // mode 3, BG2
+	set_gpu_reg(0x00, 3 | (1 << 10));  // DISPCNT: mode 3, BG2
+	set_gpu_reg(0x20, 0x100);          // BG2PA and BG2PD: 1, as at power-on
+	set_gpu_reg(0x26, 0x100);
 	for (int i = 0; i < 240 * 160; i++)
 		VRAM[i] = RGB(2, 6, 20);
 	// White frame marks a successful boot.
@@ -67,8 +78,8 @@ int main(void)
 		for (int y = 40; y < 120; y++)
 			for (int x = 0; x < 8; x++)
 				VRAM[y * 240 + 12 + b * 11 + x] = RGB(31, 28, 4);
-	REG_BLDCNT = (1 << 2) | (3 << 6);  // BG2, brightness decrease
-	REG_BLDY = 8;                      // half
+	set_gpu_reg(0x50, (1 << 2) | (3 << 6));  // BLDCNT: BG2, brightness decrease
+	set_gpu_reg(0x54, 8);                    // BLDY: half
 	IRQ_HANDLER = on_irq;
 	REG_DISPSTAT = 1 << 3;  // VBlank interrupt
 	REG_IE = 1;

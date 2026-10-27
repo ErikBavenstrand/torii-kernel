@@ -14,6 +14,13 @@
 #              game in the one picked: the frames after the save again.
 #   unreadable The popup's Load state on a slot whose data doesn't read
 #              asks first: B goes back, A starts the game from its start.
+#   shadow     Load state where the game's write-only display registers
+#              differ from the state's (Pokémon Emerald's intro on the real
+#              cart: its windows 0 by 0 blacked out the overworld loaded
+#              over it): BLDY poked to 0 between the save and the load, so
+#              hello's dimming is gone; the load puts it back from hello's
+#              copy of the display registers, and the frames after the save
+#              come back.
 #   cut        The filing at boot cut at each cutpoint (tests/cutsweep.sh):
 #              the next launch finds slot 2 whole or not at all, never broken.
 #
@@ -27,7 +34,7 @@ set -euo pipefail
 # shellcheck source=tests/cutsweep.sh
 . tests/cutsweep.sh
 
-mode=${1:?usage: states.sh roundtrip|keep|popup|unreadable|cut [ROM]}
+mode=${1:?usage: states.sh roundtrip|keep|popup|unreadable|shadow|cut [ROM]}
 rom=${2:-tests/roms/hello/hello.gba}
 local_carts "dist/cart-states-$mode${2:+-$(basename "$2" .gba)}"
 
@@ -141,6 +148,17 @@ roundtrip)
   start=$(awk '$1 == "omega" && $3 == "game" && $4 == "started" { print $2 + 0; exit }' <<<"$log")
   echo "states: SAVE took $(stub_frames $((start + save)) "$log") frames, LOAD $(stub_frames $((start + load)) "$log")"
   echo "PASS: states roundtrip: $run frames after Load state are those after Save state ($(basename "$rom"))"
+  ;;
+shadow)
+  # shellcheck disable=SC2046 # option lists
+  out=$(boot $(nav_launch /Game.gba addon) -w "launch: starting the game" \
+    -k @$save:L+R+START -k @$((save + 6)):- $(keys $((save + 40)) DOWN A A) $(hashed $save) \
+    -p @$((load - 20)):0x04000054:0 \
+    -k @$load:L+R+START -k @$((load + 6)):- $(keys $((load + 40)) DOWN DOWN A A) $(hashed $load) 2>"$cart/log")
+  grep -q '^crash at frame' "$cart/log" && fail "crashed"
+  grep -q 'screen ready: ingame-load' "$cart/log" || fail "no Load state page"
+  run=$(same "$(hashes "$out" 1)" "$(hashes "$out" 2)" "after Load state over another BLDY")
+  echo "PASS: states shadow: Load state puts the write-only display registers back from the game's copy of them ($run frames as after the save)"
   ;;
 keep)
   out=$(save_and_quit 1 boot 2>"$cart/log")
