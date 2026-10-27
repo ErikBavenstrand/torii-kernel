@@ -251,8 +251,7 @@ int ingame_states_launch(const char *rom_path, const char *save_slot, const char
 		loaded = want && statestore_load(rom_path, save_slot, want, states.rom_crc, 0);
 	}
 	if (!loaded && slot)
-		tlog_error("states: slot %lu of %s (%s) didn't read: the game starts from its start",
-			   (unsigned long)slot, rom_path, save_slot);
+		tlog_error("states: slot %lu of %s (%s) didn't read", (unsigned long)slot, rom_path, save_slot);
 	else if (!loaded)
 		tlog("states: %s (%s): no state in cart SRAM%s", rom_path, save_slot, want ? ", it didn't read" : "");
 	else

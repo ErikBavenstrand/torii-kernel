@@ -12,6 +12,8 @@
 #              save again. An old /RTS state becomes slot 1, once.
 #   popup      The game popup's Load state lists the slots and starts the
 #              game in the one picked: the frames after the save again.
+#   unreadable The popup's Load state on a slot whose data doesn't read
+#              asks first: B goes back, A starts the game from its start.
 #   cut        The filing at boot cut at each cutpoint (tests/cutsweep.sh):
 #              the next launch finds slot 2 whole or not at all, never broken.
 #
@@ -25,7 +27,7 @@ set -euo pipefail
 # shellcheck source=tests/cutsweep.sh
 . tests/cutsweep.sh
 
-mode=${1:?usage: states.sh roundtrip|keep|popup|cut [ROM]}
+mode=${1:?usage: states.sh roundtrip|keep|popup|unreadable|cut [ROM]}
 rom=${2:-tests/roms/hello/hello.gba}
 local_carts "dist/cart-states-$mode${2:+-$(basename "$2" .gba)}"
 
@@ -197,6 +199,33 @@ popup)
   grep -q "states: slot 3 in cart SRAM from .*, loaded at the game's start" <<<"$log" || fail "not loaded at the start"
   same "$saved" "$(hashes "$out" 1)" "the game started in slot 3" >/dev/null
   echo "PASS: states popup: the game popup's Load state starts the game in the slot picked"
+  ;;
+unreadable)
+  # Slot 3 on the card with its head whole and its data not: the popup
+  # lists it, and starting in it asks first. B: back, no launch; A: the
+  # game from its start
+  save_and_quit 2 boot >/dev/null 2>"$cart/log"
+  grep -q '3.state: .* written' "$cart/log" || fail "slot 3 wasn't filed: $(grep states "$cart/log" | tail -3)"
+  state=$carts/3.state
+  mcopy -o -i "$cart/sd.img" ::/torii/states/Game.gba/Main/3.state "$state"
+  printf '\xFF\xFF\xFF\xFF' | dd of="$state" bs=1 seek=1000 conv=notrunc status=none
+  mcopy -o -i "$cart/sd.img" "$state" ::/torii/states/Game.gba/Main/3.state
+  for key in B A; do
+    # shellcheck disable=SC2046 # option lists
+    NAV_SHOWN="recent gba" boot $(NAV_SHOWN="recent gba" nav_game_menu recent 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- \
+      -k @36:DOWN -k @40:- -k @48:A -k @52:- -w "screen ready: state-popup" -k @12:A -k @16:- \
+      -w "screen ready: dialog" -s @4:"$cart/dialog.png" -k @12:$key -k @16:- -h @200 -f 9000 >/dev/null 2>"$cart/log" ||
+      fail "$key: no question: $(grep -E 'states|launch|ready' "$cart/log" | tail -4)"
+    log=$(cat "$cart/log")
+    grep -q 'states: slot 3 of /Game.gba (Main) didn.t read' <<<"$log" || fail "$key: slot 3 read"
+    if [ $key = B ]; then
+      grep -q 'launch: Game.gba not started: its state slot 3 doesn.t read' <<<"$log" || fail "B: the launch went on"
+      grep -q 'launch: starting the game' <<<"$log" && fail "B: the game started"
+    else
+      grep -q 'launch: starting the game' <<<"$log" || fail "A: the game didn't start"
+    fi
+  done
+  echo "PASS: states unreadable: a slot that doesn't read asks before the game starts, B goes back, A starts it from its start"
   ;;
 cut)
   scenario() { save_and_quit 1 cut_run -c $clock "$@"; }

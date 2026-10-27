@@ -1852,8 +1852,16 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 				// the slot to start in when one was asked for
 				if (gl_rts_on == 1) {
 					progress_step(NULL, LAUNCH_SAVE, LAUNCH_STATES);
-					ingame_states_launch(launch_save.rom, launch_save.rec.slot, pfilename,
-							     action_state_slot());
+					// A slot the game popup's Load state picked that doesn't
+					// read: the player says whether the game starts anyway
+					if (!ingame_states_launch(launch_save.rom, launch_save.rec.slot, pfilename,
+								  action_state_slot()) &&
+					    !dialog_confirm(gl_states->unreadable, gl_states->start_anyway,
+							    DIALOG_ERROR)) {
+						tlog("launch: %s not started: its state slot %lu doesn't read",
+						     pfilename, (unsigned long)action_state_slot());
+						return 0;
+					}
 				}
 				progress_step(NULL, LAUNCH_STATES, LAUNCH_STATES);
 				have_pat = Check_pat(pfilename);

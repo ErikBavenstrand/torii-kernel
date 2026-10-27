@@ -61,6 +61,7 @@ jobs=(
   "tests/states.sh roundtrip"
   "tests/states.sh keep"
   "tests/states.sh popup"
+  "tests/states.sh unreadable"
   "tests/states.sh cut"
   "tests/settings.sh"
   "tests/menu.sh"
