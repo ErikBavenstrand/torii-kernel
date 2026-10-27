@@ -6,6 +6,13 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** Load state at a game's title or intro gave a black screen:
+  the GBA can't read back its scroll, window, mosaic and fade registers, so
+  a state couldn't hold them and the earlier scene's stayed (Emerald's
+  intro left the windows at 0x0, hiding the overworld). LOAD now finds the
+  game's own RAM copy of its display registers, as screenshots do, and
+  writes them back (c8a9e669).
+
 ## v0.8.0
 
 - **Added:** a new in-game menu (L+R+START): a sprite overlay in the
