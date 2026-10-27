@@ -63,6 +63,12 @@ git log, not here.
   no longer strands you: A gives the game back, B or holding the keys 2 s
   goes back to Torii, which says why the menu didn't open (4f524a84,
   73aaeccf).
+- **Fixed (before release, fourth cart test):** a refused menu's reason
+  was lost: the real BIOS runs its reset on the game's stack, over the
+  record's IWRAM copy; the stub moves the stack first. Each refusal reason
+  shows its own screen colour, and the record keeps the first mismatching
+  word for the log; DMA is stopped twice and a backup checked twice
+  (0e35d4e5, 374ab054).
 - **Fixed:** log lines were lost while a screen ran its own loop (keypad,
   cheats, Game info); every screen's loop now flushes, and the keypad and
   frame summaries log less (ebbf28b7). Box art shows soon after boot:
