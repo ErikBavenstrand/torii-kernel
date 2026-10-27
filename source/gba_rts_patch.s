@@ -478,9 +478,15 @@ ingame_open:
 	strh	r1,[r10,#REG_BLDALPHA]
 	ldrh	r1,[r11,#SP_DISPCNT]
 	strh	r1,[r10,#REG_DISPCNT]
+	ldr		r0,=BK_EWRAM+32		@;the header's 32 bytes last: while the
+	ldr		r1,=EWRAM_BASE+32	@;window comes back its magic says the
+	ldr		r2,[r11,#SP_HDR+12]	@;overlay is still there (hook_watch.lua)
+	sub		r2,r2,#32
+	mov		r3,#0
+	bl		sram_copy
 	ldr		r0,=BK_EWRAM
 	mov		r1,#EWRAM_BASE
-	ldr		r2,[r11,#SP_HDR+12]
+	mov		r2,#32
 	mov		r3,#0
 	bl		sram_copy
 	b		ingame_back
@@ -591,31 +597,13 @@ sc_chunk:
 	add		r6,r4,#0x0E000000
 	add		r0,r0,r5
 	sub		r2,r2,r5
+	@;The bytes themselves in Thumb: from the cart's 16-bit bus an ARM
+	@;instruction takes two fetches, and these loops run twice as fast
 	cmp		r3,#0
-	bne		sc_out
-sc_in:
-	ldrb	r4,[r6],#1
-	ldrb	r7,[r6],#1
-	orr		r4,r4,r7,lsl #8
-	ldrb	r7,[r6],#1
-	orr		r4,r4,r7,lsl #16
-	ldrb	r7,[r6],#1
-	orr		r4,r4,r7,lsl #24
-	str		r4,[r1],#4
-	subs	r5,r5,#4
-	bgt		sc_in
-	b		sc_chunk
-sc_out:
-	ldr		r4,[r1],#4
-	strb	r4,[r6],#1
-	mov		r4,r4,lsr #8
-	strb	r4,[r6],#1
-	mov		r4,r4,lsr #8
-	strb	r4,[r6],#1
-	mov		r4,r4,lsr #8
-	strb	r4,[r6],#1
-	subs	r5,r5,#4
-	bgt		sc_out
+	adreq	r12,sc_in+1
+	adrne	r12,sc_out+1
+	mov		lr,pc
+	bx		r12
 	b		sc_chunk
 sc_done:
 	ldmfd	sp!,{r7}
@@ -623,6 +611,40 @@ sc_done:
 	ldmfd	sp!,{r4-r8,lr}
 	bx		lr
 	.ltorg
+	@;r5 bytes (a multiple of 4, not 0) between RAM at r1 and SRAM at r6;
+	@;uses r4 and r7
+	.thumb
+sc_in:
+	ldrb	r4,[r6]
+	ldrb	r7,[r6,#1]
+	lsl		r7,r7,#8
+	orr		r4,r7
+	ldrb	r7,[r6,#2]
+	lsl		r7,r7,#16
+	orr		r4,r7
+	ldrb	r7,[r6,#3]
+	lsl		r7,r7,#24
+	orr		r4,r7
+	stmia	r1!,{r4}
+	add		r6,#4
+	sub		r5,#4
+	bgt		sc_in
+	bx		lr
+sc_out:
+	ldmia	r1!,{r4}
+	strb	r4,[r6]
+	lsr		r4,r4,#8
+	strb	r4,[r6,#1]
+	lsr		r4,r4,#8
+	strb	r4,[r6,#2]
+	lsr		r4,r4,#8
+	strb	r4,[r6,#3]
+	add		r6,#4
+	sub		r5,#4
+	bgt		sc_out
+	bx		lr
+	.align	2
+	.arm
 
 @;Reset game: the patched game from its start, without the kernel. As a
 @;launch leaves the machine (SetRompageWithHardReset): RAM and registers
