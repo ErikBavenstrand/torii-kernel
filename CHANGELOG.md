@@ -4,7 +4,7 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.8.1
 
 - **Fixed:** Load state at a game's title or intro gave a black screen:
   the GBA can't read back its scroll, window, mosaic and fade registers, so
