@@ -3,7 +3,8 @@
 The design for v0.8's in-game menu (roadmap, *v0.8 In-game menu*), from the review of today's
 menu in [docs/research/ingame-menu.md](../../research/ingame-menu.md). It is built in phases:
 P0 proves what the cart does in game mode, P1 replaces today's Mode 3 menu with the overlay
-and its first actions, P2 adds save-state slots and P3 per-cheat toggles.
+and its first actions, P2 adds per-cheat toggles, P3 save-state slots, P4 screenshots and P5
+the In-game menu setting.
 
 ## Architecture
 
@@ -33,7 +34,7 @@ work RAM*), so page `0x20` is offset `0x20000`.
 | `0x40000-0xAFFFF` | the save-state buffer (unchanged) |
 | `0xB0000-0xB7FFF` | the overlay's image |
 | `0xB8000-0xBFFFF` | the session block, kernel to overlay and back |
-| `0xC0000-0xD8FFF` | the screenshot dump (later) |
+| `0xC0000-0xD8FFF` | the screenshot dump (P4): `struct ingame_shot`, the palettes, OAM, VRAM |
 | `0xF0000` | the cart log (`source/cartlog.h`) |
 
 ### The ABI
@@ -43,6 +44,8 @@ work RAM*), so page `0x20` is offset `0x20000`.
 - **In:** a magic, a version, the ROM's CRC, the theme's palette (16 colours from the UI
   theme), the hotkeys, the launch's value of `0x096A0000`, the slot table and the cheat records.
 - **Out:** a pending state, a screenshot flag, the cheat mask and the action picked.
+- **The lines' widths** (`text_width`) sit in the head the overlay reads at opening, so it
+  lays out the menu without reading each line from cart SRAM.
 
 ## Drawing
 
@@ -153,6 +156,69 @@ and paging spare PSRAM from the menu (tier C) stay off until the cart probe says
 - **Tests:** `tests/states.sh` (round trip frame for frame, filing and the next launch,
   the popup's autoload, the filing cut at each cutpoint, the `/RTS` import); compat's
   "save state" column saves, plays and loads in every game; golden shots `ingame-states`.
+
+## P4: screenshots (built)
+
+- **The row.** Screenshot, after Cheats. A dumps the game's screen to cart SRAM
+  `0xC0000-0xD8FFF` (`struct ingame_shot`, `source/ingame_abi.h`): the readable display
+  registers as the overlay found them at opening (DISPCNT, DISPSTAT, VCOUNT, BG0-3CNT,
+  WININ, WINOUT, BLDCNT, BLDALPHA), the BG palette and VRAM as they are, and the OBJ
+  palette, OAM and the OBJ tiles the menu drew over from the stub's backups; the magic
+  last. About 4 frames; the footer then says "Saved when you return to Torii". Another
+  replaces it. The answer's `screenshot` flag tells the kernel.
+- **At the next boot** (`ingame_after_game`, `source/shotstore.c`): under a notice, the
+  kernel copies the dump into `pReadCache` (`READCACHE_SHOT`, all of it), draws it a line at
+  a time with `source/ppu_render.c` and writes `/torii/screenshots/<game> <date> <time>.bmp`
+  (240x160, 24 bits, top-down; the clock's time at filing, a number when there is no
+  clock). About 200 frames for hello (75 drawing, the rest the card).
+- **Power cuts.** No rename (FatFs's can leave two names on one chain): a journal
+  (`/torii/screenshots/.writing`) names the file, which is written with a blank BMP head,
+  its lines, then its head; the journal goes last. A cut loses the dump (cart RAM past the
+  save has no battery), so the next boot's `shotstore_recover` deletes a file the journal
+  names that isn't whole: the card has the screenshot whole or not at all. A write the card
+  refuses keeps the dump and its name in cart SRAM, and the answer's flag, for the next boot.
+- **The renderer** (`source/ppu_render.c`, host-built too): modes 0-5, text BGs at 4 and 8
+  bits with every map size, flips and scroll, affine BGs wrapping or not, the bitmap modes
+  through BG2's matrix (both frames), sprites plain, affine and double-size in 1D and 2D
+  mapping, OBJ priorities as the hardware's (the first in OAM at the best priority), the
+  windows (WIN0, WIN1, the OBJ window), alpha blending, semi-transparent sprites and the
+  brightness fades. Left out: mosaic and anything changed mid-frame.
+- **What can't be read back.** The BG scroll and matrices, BLDY, MOSAIC and the windows'
+  bounds are write-only, and no shadow of them is general to games (each keeps its own, or
+  none), so the dump has them as 0: a scrolled tile screen comes out shifted, an all-zero BG
+  matrix is taken as the identity (bitmap games come out whole), a fade is left out (hello's
+  dimming), and a window whose bounds read 0 covers the screen. Mode 7 roads (F-Zero, Mario
+  Kart) set their matrix each line and come out wrong whatever is dumped.
+- **Tests:** `tests/ppu_render.sh` dumps frames from mGBA (every register) and needs every
+  pixel of the renderer's BMP to match mGBA's screen at 5 bits a channel: hello (mode 3, a
+  fade), the kernel's home and SD card pages (mode 0, sprites, a window), and the games in
+  `roms/` when there (Doom and Wolfenstein 3D in mode 4, Mario Kart's title with an affine
+  BG, windows in Advance Wars and Mario Kart's menu, blending in Golden Sun, Kirby, Metroid
+  Fusion, Emerald); `tests/host/test_ppu_render.c` (flips, priorities, affine and
+  double-size sprites, blending, the BMP head); `tests/screenshot.sh shot` (the row, the
+  file, nothing written twice) and `cut` (each cutpoint).
+
+## P5: the In-game menu setting (built)
+
+- **Settings, Hotkeys, In-game menu** (Back to menu's slot, so its values carry over):
+  Auto (Back to menu's Off: the menu in a game launched with Save states or cheats on, as
+  before), Every game (its On: the menu in every game started with addons; before, the keys
+  only went back to the kernel) and Off (the menu keys do nothing; cheats still run, the
+  sleep key still works). Save states no longer force the row to show On.
+- **Menu keys** as Settings sets them reach the hook (`RTS_Reset_key`) and the overlay's
+  footer ("L+R+START or B: resume"), drawn by the kernel at launch; `tests/menu_keys.sh`
+  opens the menu on L+R+B with only Every game on, and checks Off.
+
+## Polish (from use in the emulator)
+
+- The menu's footer names its keys; the panel is 176 px wide for it. The title (the game's
+  name) shows when the rows leave room: with Save states and cheats on they don't.
+- The panel still shows 2 frames after the key and its rows 3: the stub's SRAM copies move
+  four words a pass (the overlay grew), the rows' sprites go in after the panel shows, and
+  the footer's 40 tiles a frame after the rows.
+- The Save state page shows the buffer's slot, the one Load state gives back, in the accent.
+- The game popup's Load state on a slot whose data doesn't read asks first ("This state
+  can't be read"): B goes back to the list, A starts the game from its start.
 
 ## P0: the cart probe
 

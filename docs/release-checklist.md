@@ -34,10 +34,10 @@ in `dist/logs/torii.log`.
 
 4. Delete the probe's save folder (`torii/saves/EEPROM Probe.gba`) from the card, so the probe's 8K runs
    start from a fresh 8 KB save.
-5. In Settings, turn Save states and Cheats (Games) and Back to menu and
-   Sleep (Hotkeys) on, and set Logging (System) to Debug. Each is written
-   as A confirms it, so every session below is logged and sleep and cheats
-   can be tried.
+5. In Settings, turn Save states (Games) on, In-game menu (Hotkeys) to
+   Auto, Sleep (Hotkeys) on, and set Logging (System) to Debug. Each is
+   written as A confirms it, so every session below is logged and sleep and
+   cheats can be tried.
 6. Have on the card: Pokémon Emerald (or another game with a save), a GB
    or GBC game, a NES game, and Drill Dozer for rumble if you have it.
 
@@ -52,7 +52,12 @@ on, NES with no NES launch) as "unconfirmed" in its summary.
 | Check | How |
 |---|---|
 | The in-game menu opens | Boot with addon (the game's menu, START) with Save states on, then L+R+START in the game: the game dims under a panel at once (2 frames), its rows a frame later. B gives the game back with its screen, sound and speed as they were; try it in a game with music, a bitmap-mode game and one with scaled or rotated backgrounds (the old menu lost those) |
-| A save state saves and loads | in the menu, Save state; play on; open the menu again and Load state: the game is back where you saved. Load state is greyed until a state is saved |
+| A save state saves and loads | in the menu, Save state, slot 1; play on; open the menu again and Load state, A on slot 1: the game is back where you saved. Load state is greyed until a state is saved, and the Save state page shows the slot in use in the accent |
+| Save states reach the card | Save state into slot 2, then Back to Torii: the boot shows "Keeping the save state" and `/torii/states/<rom path>/Main/2.state` is on the card. Launch the game again: Load state at once gives the saved point. The game's popup, Load state, lists the slot with its time and starts the game in it. Power off in game after a Save state: the state is lost (cart RAM past the save has no battery), never half kept |
+| Cheats in game | a game with three or four cheats (one picked): L+R+START, Cheats lists them with a box each; A turns one on and it works from the next frame, a greyed one says why at the bottom. Back to Torii: the game's Cheats screen has the new picks |
+| A screenshot | in a game's menu, Screenshot: the footer says "Saved when you return to Torii". Back to Torii: the boot shows "Saving the screenshot" (a few seconds), then `/torii/screenshots/<game> <date> <time>.bmp` is on the card. On a PC it shows the game's screen as it was under the menu; note how it compares (a scrolled tile screen may sit shifted, a fade or a Mode 7 road comes out wrong: those registers can't be read back). Try a bitmap game (Doom) and one with sprites over tiles |
+| A screenshot survives a power cut | take a screenshot, Back to Torii, and switch off while "Saving the screenshot" shows; power on: no broken `.bmp` is left in `/torii/screenshots` (the boot deletes it), and no `.writing` file |
+| In-game menu Off | Settings, Hotkeys, In-game menu: Off, then Boot with addon a game with a cheat picked: L+R+START does nothing and the cheat still works. Every game: the menu opens in a game with no save states or cheats. Menu keys set to another combination (say L+R+B): that one opens it, and the menu's footer names it |
 | Reset game | in the menu, Reset game: the game starts again from its title, without the kernel, and its save is untouched |
 | Back to Torii | in the menu, Back to Torii: the kernel starts, as RESET did |
 | DEBUG reaches the log | with LOGGING on: L+R+START, Debug snapshot (the last row); the menu comes back saying the snapshot is kept. Choose Back to Torii, not power-off: the snapshot is in cart RAM, which a power-off clears. The kernel's boot logs "debug info" |
@@ -109,7 +114,8 @@ write to the game's PSRAM, SD reads and a write (to its own scratch file,
 `/torii/probe/sd.bin`, put back after), the clock with `0x096A0000` on and
 off, and SRAM's four wait-state settings. It puts back what it writes. Send
 the log's "in-game probe:" lines from each save type's run: they decide what
-P2's save states and screenshots can rely on.
+the in-game menu's save states and screenshots can rely on (they use cart
+SRAM 0x40000-0xD8FFF in game mode, which only the emulator has shown so far).
 
 **The copy's estimate:** during a Clean boot the cart copies the game into
 PSRAM by itself, and the bar moves on an estimate from the file size
