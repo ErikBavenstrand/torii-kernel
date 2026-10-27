@@ -192,7 +192,7 @@ int ingame_prepare(const char *name, u32 rom_bytes)
 	SetRampage(0);
 	if (bad) {
 		tlog_error("launch: the in-game menu's %lu bytes in cart SRAM read back %lu different",
-			   (unsigned long)(image + sizeof(struct ingame_session)), (unsigned long)bad);
+			   (unsigned long)image + (unsigned long)sizeof(struct ingame_session), (unsigned long)bad);
 		return -1;
 	}
 	const struct ingame_image *hdr = (const struct ingame_image *)ingame_overlay;

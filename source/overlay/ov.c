@@ -192,7 +192,7 @@ static void debug_print(const char *text)
 	if (REG_DEBUG_ENABLE != 0x1DEA)
 		return;
 	uint32_t i = 0;
-	for (; text[i] && i < 255; i++)
+	for (; text[i]; i++)  // a short literal: mGBA's buffer takes 255
 		REG_DEBUG_STRING[i] = text[i];
 	REG_DEBUG_STRING[i] = 0;
 	REG_DEBUG_FLAGS = 4 | 0x100;  // debug level, send
@@ -554,8 +554,9 @@ uint32_t ov_entry(const struct ingame_call *call);
 
 uint32_t ov_entry(const struct ingame_call *call)
 {
-	for (uint32_t *p = __ov_bss_start; p < __ov_bss_end; p++)
-		*p = 0;
+	uint32_t bss_words = (uint32_t)((uintptr_t)__ov_bss_end - (uintptr_t)__ov_bss_start) / 4;
+	for (uint32_t i = 0; i < bss_words; i++)
+		__ov_bss_start[i] = 0;
 	m.call = call;
 	ov_header.shown = 0;
 	ov_header.obj_bytes = 0;

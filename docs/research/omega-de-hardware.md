@@ -365,10 +365,11 @@ at page `0x09C00000` × 4 KB:
 | Pages | Memory | Used for |
 |---|---|---|
 | `0x00`, `0x10` | FM28V100 FRAM, 128 KB | game saves |
-| `0x20`, `0x30` | S71GL064 SRAM (1 MB; its first 128 KB are unused behind the FRAM) | the in-game menu's copy of VRAM (`0x10000` + `0x2C00` bytes) |
+| `0x20`, `0x30` | S71GL064 SRAM (1 MB; its first 128 KB are unused behind the FRAM) | Torii v0.8: the in-game menu's backups while it is open (`source/ingame_abi.h`): the game's EWRAM window at `0x20000`, the OBJ tiles it draws over at `0x28000`, OAM at `0x2C000`, the OBJ palette at `0x2C400`. Before v0.8, the old menu's copy of VRAM |
 | `0x40`–`0xAF` | S71GL064 SRAM | the save-state buffer: the 0x70000-byte `RTS/<game>.rts` is loaded here at launch. VRAM, IWRAM, EWRAM, OAM, palette, IO, registers, and a flag at `0xAFFF0` |
-| `0xC0`, `0xD0` | S71GL064 SRAM | Torii: Diagnostics' pattern test (free otherwise) |
-| `0xF0` | S71GL064 SRAM | Torii: what the kernel keeps for its next boot (`source/cartlog.h`): where the session got to at `0xF0000`, a kernel crash dump at `0xF0100`, the in-game menu's DEBUG snapshot at `0xF1000`, the EEPROM probe ROM's report at `0xF1800` |
+| `0xB0`–`0xBF` | S71GL064 SRAM | Torii v0.8: the in-game menu's overlay image at `0xB0000` and the session block at `0xB8000`, written at each addon and NOR launch (`source/ingame.c`) |
+| `0xC0`, `0xD0` | S71GL064 SRAM | Torii: Diagnostics' pattern test (free otherwise); from v0.8's P2, the in-game screenshot (`0xC0000`-`0xD8FFF`) |
+| `0xF0` | S71GL064 SRAM | Torii: what the kernel keeps for its next boot (`source/cartlog.h`): where the session got to at `0xF0000`, a kernel crash dump at `0xF0100`, the in-game menu's DEBUG snapshot at `0xF1000`, the EEPROM probe ROM's report at `0xF1800`, the rumble probe's at `0xF1A00`, the in-game probe's at `0xF1B00` |
 
 Pages `0x20` and up have no battery: on the real cart they survive a soft
 reset (RESET, or the crash handler's restart) but not a power cycle
@@ -602,14 +603,17 @@ end, in the game's PSRAM image (or its NOR copy): `0x300` bytes for the reset
 and sleep keys, `0x1000` for the in-game menu, `0x3000` with cheats (v0.7;
 `0x2000` before). With cheats it holds, in order (`Patch_RTS_Cheat`):
 
-| Part | Bytes (v0.7) | |
+| Part | Bytes (v0.8) | |
 |---|---|---|
-| The hook and the menu (`RTS_ReplaceIRQ_start`..`_end`, `gba_rts_patch.s`) | `0xD6C` | `Cheat_switch` holds the interpreter's offset from its start (0: no cheats), `Debug_switch` DEBUG's |
+| The hook and the menu's stub (`RTS_ReplaceIRQ_start`..`_end`, `gba_rts_patch.s`) | `0xAFC` (`0xD6C` in v0.7, with the Mode 3 menu) | `Cheat_switch` holds the interpreter's offset from its start (0: no cheats), `Debug_switch` DEBUG's. Of it, the stub and its SRAM copier about `0x2D8`, the old menu's SAVE and LOAD (until P2) about `0x330` |
 | The cheat interpreter (`Cheat_blob_start`..`_end`, `cheatrun.s`) | `0x474` | ARM, position-independent: PC-relative literals only |
 | The cheat table | up to `0x1400` | its layout is in `cheatrun.s` and `cheatcode.h` |
 | DEBUG's code (`Debug_blob`), with logging on | `0x180` | |
 
-That leaves `0x8A0` bytes for v0.8's overlay (`test_cheat_cap` logs it). The
+v0.8's overlay itself isn't in the patch area: it lives in cart SRAM (page
+`0xB0`) and runs from the EWRAM it borrows (docs/design/v0.8/ingame-menu.md),
+so the area stays as it was and the stub left `0xB10` bytes of room
+(`test_cheat_cap` logs it). The
 `.pat` cache records the length its trim kept room for (word 12); a file
 with less room than a launch's picks need (or from before v0.7) is scanned
 again for a game with cheats.
@@ -673,6 +677,24 @@ write of its own about 130; a fill about 19 a write of one value and 44 a
 slide; a conditional about 390; an add, or, and or pointer write about 400.
 The budget model (`CHEAT_COST_*`) stays above every measurement, and the
 picked cheats' model total is capped at 28,000 cycles, 10% of a frame.
+
+**The in-game menu (v0.8)** opens from the hook as the old one did, in IRQ
+mode with IME 0. Its stub (`ingame_stub`) stops DMA0-3, mutes through
+`SOUNDCNT_L`/`H` (not `SOUNDCNT_X`, whose zeroing reset the PSG: the old
+menu's noise), backs up the EWRAM window the overlay takes (about 4 KB),
+OAM and the OBJ palette to SRAM page `0x20`, loads the overlay from page
+`0xB0` and runs it; the overlay backs up only the OBJ tiles it draws over
+(from tile 512, which bitmap modes have too) and draws with sprites alone:
+BG registers, `BLDY`, the windows and `MOSAIC` are write-only, so nothing
+that touches them could give them back. SRAM is copied a byte at a time at
+`WAITCNT` `0x4018` (SRAM 4 cycles, proven) and the cart's registers are
+written at `0x0000`. In the emulator the panel shows 2 frames after the key's
+frame and its text a frame later; the stub's copies take about 0.75 frame,
+so a faster SRAM wait state (the in-game probe's question) would help most.
+The emulated cart stops with status 78 when the overlay's own code writes
+the game's PSRAM and 79 on any SD register in game mode
+(`OMEGA_GAME_PSRAM_WRITES=allow`, `OMEGA_GAME_SD=allow`), both unproven on
+the real cart until the in-game probe (`tests/roms/ingame`) reports.
 
 ## 7. Logging and Diagnostics
 

@@ -140,6 +140,7 @@ static const struct {
 	{"log_end", test_log_end},
 	{"lz77_round_trip", test_lz77_round_trip},
 	{"lz77_compresses", test_lz77_compresses},
+	{"ingame_abi", test_ingame_abi},
 	{"nor_list_copies", test_nor_list_copies},
 	{"settings_record", test_settings_record},
 	{"kernel_nor_records", test_kernel_nor_records},

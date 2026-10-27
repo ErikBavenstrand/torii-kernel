@@ -55,6 +55,7 @@ void test_kernel_nor_records(void);
 void test_loader_check(void);
 void test_lz77_round_trip(void);
 void test_lz77_compresses(void);
+void test_ingame_abi(void);
 void test_nor_list_copies(void);
 void test_settings_record(void);
 void test_nor_mark(void);

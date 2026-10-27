@@ -181,7 +181,7 @@ _Static_assert(offsetof(struct ingame_image, window_bytes) == 12, "stub: window_
 _Static_assert(offsetof(struct ingame_image, entry) == 16, "stub: entry");
 _Static_assert(offsetof(struct ingame_image, obj_bytes) == 20, "stub: obj_bytes");
 _Static_assert(offsetof(struct ingame_image, shown) == 24, "hook_watch.lua: shown");
-_Static_assert(sizeof(struct ingame_call) == 8, "the stub builds it");
+_Static_assert(sizeof(void *) != 4 || sizeof(struct ingame_call) == 8, "the stub builds it (on the GBA)");
 _Static_assert(INGAME_SESSION_HEAD % 4 == 0 && INGAME_SESSION_OUT % 4 == 0, "sram_copy takes words");
 _Static_assert(sizeof(struct ingame_out) % 4 == 0, "sram_copy takes words");
 _Static_assert(sizeof(struct ingame_line) % 4 == 0 && INGAME_SESSION_TEXT(0) % 4 == 0, "sram_copy takes words");
