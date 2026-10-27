@@ -69,6 +69,32 @@ git log, not here.
   shows its own screen colour, and the record keeps the first mismatching
   word for the log; DMA is stopped twice and a backup checked twice
   (0e35d4e5, 374ab054).
+- **Fixed (before release, fifth cart test):** the real cart's SRAM page
+  register ignores its low bit (8 KB steps), so odd pages landed on even
+  ones and the menu's image overwrote itself; every user of cart SRAM now
+  addresses the 64 KB window's even page, and the emulated cart does the
+  same. The menu then opened in Emerald, with Save state, Load state and
+  Screenshot working on the cart (cfebcbeb).
+- **Changed:** in-game states and screenshots stay in cart memory until
+  Back to Torii saves them to the card (SD access while a game runs is
+  impossible on this cart): the menu's footer says what isn't on the card
+  yet and the row reads "Back to Torii and save" (a0cbc2fd). Up to five
+  screenshots a session, packed, each its own BMP; the scroll is taken
+  from the game's copy of its display registers, so a scrolled screen
+  comes out right; the boot saves them under a progress bar (9d6dcaa0,
+  2cd4261c). Back to Torii goes straight to black (bdd73fec). A card that
+  can't be read after a mount says so instead of showing an empty list,
+  and the in-game probe's SD test is retired (12a9274c).
+- **Changed:** the in-game code no longer takes 4 KB of the kernel's IWRAM
+  (a311071d); the DEBUG snapshot is taken by the overlay, freeing the
+  stub (d79be1ca); LOAD copies through the faster loop (92c4c5d6); a
+  relaunch after Back to Torii skips putting the state back when cart
+  memory holds it (fa6e4363); the in-game cheat list uses the kernel's ✓
+  and clearer wording (5f80dd9e); dead code removed (979c71de).
+- **Fixed (security):** a `/PATCH` cache file is checked before use: its
+  sizes and offsets must fit the ROM, and it must be for this ROM (size and
+  header CRC), so a corrupt or stale one can't make the launch copy out of
+  bounds (de1e1413, 8ce6e4c6).
 - **Fixed:** log lines were lost while a screen ran its own loop (keypad,
   cheats, Game info); every screen's loop now flushes, and the keypad and
   frame summaries log less (ebbf28b7). Box art shows soon after boot:
