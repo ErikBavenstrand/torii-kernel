@@ -38,7 +38,8 @@ Everything still open from v0.4.3–v0.8.1, in one place. None of it blocks v0.9
 
 ### Cart checks
 
-- **v0.8 and v0.8.1 on the real cart (never run):** the in-game menu opening in Pokémon Emerald (it went black before v0.8.0's stub fixes; if it stays shut while the game goes on, the stub refused, and its record survives only a soft reset); a state saved, filed on Back to Torii, and loaded in the same room, in another building and from the title screen; a screenshot opened on a PC, and one cut by a power-off; cheats toggled in game; In-game menu Off and custom menu keys; the in-game probe's verdict (`tests/roms/ingame`, Clean boot at Flash 128K, then A: cart SRAM pages `0x20`-`0xEF` in game mode).
+- **v0.8.1 on the real cart (passed, owner, 2026-10-27):** the in-game menu in Pokémon Emerald and Metroid, states saved and loaded across scenes, filed on Back to Torii and launched from the popup, screenshots filed and opened; the card's log has no errors.
+- **v0.8 still to check on the cart:** a screenshot cut by a power-off; cheats toggled in game; In-game menu Off and custom menu keys; the in-game probe's verdict (`tests/roms/ingame`, Clean boot at Flash 128K, then A: cart SRAM pages `0x20`-`0xEF` in game mode).
 - **Untried since v0.2.2:** DEBUG, GB/GBC, NES, rumble with a game, the EEPROM probe's verdict, the clock against real time.
 - **Unmeasured:** the ROM copy rate (`PROGRESS_COPY_RATE`); the walk of a full card; SD folder open time (0.2 s per 300 files emulated) and the 251k-cycle frame on a folder of 1,024+ subfolders; covers from an art folder of thousands of files; Identify (about 1.6 s per MB, estimated) and crc.txt's write steps; About's first free-space read on exFAT; `CHIP_ERASE_FRAMES` from a timed Format all.
 - **Hardware unknowns:** whether an SD write right after the FPGA's ROM copy is safe; what the real BIOS does on an undefined instruction; where a DMA into PSRAM from cart space lands (`docs/research/omega-de-hardware.md`).
