@@ -1390,6 +1390,21 @@ void cheat_decoder_force_in(struct cheat_decoder *d, const struct cheat_decoder 
 		memcpy(d->gs_seeds, file->gs_seeds, sizeof(d->gs_seeds));
 }
 
+void cheat_decoder_force_out(struct cheat_decoder *file, const struct cheat_decoder *d, const u32 *seeds_before)
+{
+	u8 format = d->forced;
+	if (format < CHEAT_FMT_GSAV1 || format > CHEAT_FMT_PARV3_RAW)
+		return;
+	if (!memcmp(d->gs_seeds, seeds_before, sizeof(d->gs_seeds)))
+		return;  // no DEADFACE in it
+	if (file->gs_version != format) {
+		if (file->gs_version != CHEAT_FMT_AUTO)
+			return;  // the file's codes are another device's
+		set_gs_version(file, format);
+	}
+	memcpy(file->gs_seeds, d->gs_seeds, sizeof(file->gs_seeds));
+}
+
 // Decodes code's lines with the state in work; returns a status. *keyed says
 // whether the cheat holds a CodeBreaker key line of its own. With adopt, a
 // raw CodeBreaker key line other than work's key is a new key.

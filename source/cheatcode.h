@@ -52,6 +52,12 @@ void cheat_decoder_force(struct cheat_decoder *d, u8 format);
 // DEADFACE line reseeds the device for every code after it).
 void cheat_decoder_force_in(struct cheat_decoder *d, const struct cheat_decoder *file, u8 format);
 
+// After d (from cheat_decoder_force_in) read a cheat: a DEADFACE in it, seen
+// as d's seeds no longer seeds_before, reseeds file's later cheats when file
+// reads codes of d's format or hasn't seen any GameShark codes yet (and then
+// reads that format from now on), as one device reads the whole file.
+void cheat_decoder_force_out(struct cheat_decoder *file, const struct cheat_decoder *d, const u32 *seeds_before);
+
 enum cheat_op_type {
 	// width bytes of value at address, count times; after each write address
 	// grows by addr_step and value by value_step (a fill or a slide). A plain

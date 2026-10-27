@@ -348,10 +348,11 @@ s32 cheatfile_next(struct cheatfile *f, struct cheatfile_work *w)
 		// Read alone in its own format: the file's key passes it by, its
 		// GameShark seeds don't
 		struct cheat_decoder own;
+		u32 seeds[4];
 		cheat_decoder_force_in(&own, &w->dec, c->format);
+		memcpy(seeds, own.gs_seeds, sizeof(seeds));
 		c->status = cheatfile_decode(w, &own, f->text + c->code, c->code_len, &n_ops, &lowered);
-		if (c->format == w->dec.gs_version)  // a DEADFACE in it reseeds the codes after it
-			memcpy(w->dec.gs_seeds, own.gs_seeds, sizeof(w->dec.gs_seeds));
+		cheat_decoder_force_out(&w->dec, &own, seeds);
 	} else {
 		c->status = cheatfile_decode(w, &w->dec, f->text + c->code, c->code_len, &n_ops, &lowered);
 	}
