@@ -332,31 +332,16 @@ loop:
 	cmp r1,r7
 	bne loop
 
-	@;spin until VCOUNT==159
+	@;VCOUNT 159, 160, 159, 160, 159 in turn
+	mov r7,#5
+	mov r3,#159
 spin2:
 	ldrh r1,[r0,#REG_VCOUNT]
-	cmp r1,#159
+	cmp r1,r3
 	bne spin2
-	@;spin until VCOUNT==160
-spin4:
-	ldrh r1,[r0,#REG_VCOUNT]
-	cmp r1,#160
-	bne spin4
-	@;spin until VCOUNT==159
-spin5:
-	ldrh r1,[r0,#REG_VCOUNT]
-	cmp r1,#159
-	bne spin5
-	@;spin until VCOUNT==160
-spin6:
-	ldrh r1,[r0,#REG_VCOUNT]
-	cmp r1,#160
-	bne spin6
-	@;spin until VCOUNT==159
-spin7:
-	ldrh r1,[r0,#REG_VCOUNT]
-	cmp r1,#159
-	bne spin7
+	eor r3,r3,#(159^160)
+	subs r7,r7,#1
+	bne spin2
 
 	@;restore interrupts
 	add r1,r0,#REG_IE
@@ -469,45 +454,14 @@ ingame_open:
 	@;The game's EWRAM window, OAM and OBJ palette to SRAM, each read back
 	@;before anything of the game's is changed: if cart SRAM didn't keep
 	@;them, the game goes on untouched (Torii: v0.8's menu on the real cart)
+	adrl	r8,bk_list
+	mov		r7,#1
+	bl		sram_list
+	adrl	r8,bk_list
+	mov		r7,#2
+	bl		sram_list
+	movs	r6,r0				@;the copy that differed
 	mov		r7,#REFUSED_BACKUP
-	ldr		r0,=BK_EWRAM
-	mov		r1,#EWRAM_BASE
-	mov		r2,r4
-	mov		r3,#1
-	bl		sram_copy
-	ldr		r0,=BK_OAM
-	mov		r1,#0x07000000
-	mov		r2,#0x400
-	mov		r3,#1
-	bl		sram_copy
-	ldr		r0,=BK_OBJ_PAL
-	ldr		r1,=0x05000200
-	mov		r2,#0x200
-	mov		r3,#1
-	bl		sram_copy
-	mov		r6,#1
-	ldr		r0,=BK_EWRAM
-	mov		r1,#EWRAM_BASE
-	mov		r2,r4
-	mov		r3,#2
-	bl		sram_copy
-	cmp		r0,#0
-	bne		ingame_refuse
-	mov		r6,#2
-	ldr		r0,=BK_OAM
-	mov		r1,#0x07000000
-	mov		r2,#0x400
-	mov		r3,#2
-	bl		sram_copy
-	cmp		r0,#0
-	bne		ingame_refuse
-	mov		r6,#3
-	ldr		r0,=BK_OBJ_PAL
-	ldr		r1,=0x05000200
-	mov		r2,#0x200
-	mov		r3,#2
-	bl		sram_copy
-	cmp		r0,#0
 	bne		ingame_refuse
 	@;The overlay in, checked against the header's check word
 	@;(ingame_image_check); a copy that doesn't check gives the window back
@@ -568,16 +522,9 @@ ingame_run:							@;and its call on its own stack at the window's end
 	ldr		r1,=OBJ_VRAM
 	mov		r3,#0
 	bl		sram_copy
-	ldr		r0,=BK_OBJ_PAL
-	ldr		r1,=0x05000200
-	mov		r2,#0x200
-	mov		r3,#0
-	bl		sram_copy
-	ldr		r0,=BK_OAM
-	mov		r1,#0x07000000
-	mov		r2,#0x400
-	mov		r3,#0
-	bl		sram_copy
+	adrl	r8,bk_list+12		@;OAM and the OBJ palette
+	mov		r7,#0
+	bl		sram_list
 	ldrh	r1,[r11,#SP_BLDCNT]
 	strh	r1,[r10,#REG_BLDCNT]
 	ldrh	r1,[r11,#SP_BLDALPHA]
@@ -614,13 +561,10 @@ ingame_refuse:
 	mov		r1,#ACT_RESUME
 	str		r1,[r11,#SP_ACT]
 ingame_back:
-	add		r8,r10,#0x200
-	mov		r1,#0
-	strh	r1,[r8,#4]			@;WAITCNT
-	mov		r0,#0
-	bl		SetRampage			@;the save's page again
-	ldrh	r1,[r11,#SP_WAITCNT]
-	strh	r1,[r8,#4]
+	ldrh	r1,[r11,#SP_WAITCNT]	@;the game's WAITCNT, then the save's page
+	add		r2,r10,#0x200		@;again (at the BIOS's, as page_zero sets it)
+	strh	r1,[r2,#4]
+	bl		page_zero
 	@;Two frames' starts: the frame between them shows the game's own screen
 	bl		wait_frame
 	bl		wait_frame
@@ -816,6 +760,27 @@ sc_cmp:								@;r3 becomes 3 at a difference
 	.align	2
 	.arm
 
+@;sram_list: sram_copy for each {sram offset, RAM, bytes} of the list at
+@;r8 (bytes 0: r4's) until a 0, in mode r7 (sram_copy's to_sram). Returns
+@;r0: 0, or in mode 2 the entry (from 1) that differed. Keeps r4, r5 and
+@;r9-r11; 4 bytes of stack and sram_copy's.
+sram_list:
+	stmfd	sp!,{lr}
+	mov		r6,#0
+1:	ldmia	r8!,{r0,r1,r2}
+	cmp		r0,#0
+	beq		2f
+	add		r6,r6,#1
+	cmp		r2,#0
+	moveq	r2,r4
+	mov		r3,r7
+	bl		sram_copy
+	cmp		r0,#0
+	movne	r0,r6
+	beq		1b
+2:	ldmfd	sp!,{lr}
+	bx		lr
+
 @;Reset game: the patched game from its start, without the kernel. As a
 @;launch leaves the machine (SetRompageWithHardReset): RAM and registers
 @;cleared, WAITCNT the BIOS's, then SoftReset from the cart's ROM, whose
@@ -926,31 +891,9 @@ restore2_IO:        @; IOaddress, offset
 @;twice as fast as the old byte loop; the overlay wrote the state's tag
 @;(its slot, not kept) and cleared the flag, which goes last.
 state_save:
-	ldr		r0,=ST_EWRAM
-	mov		r1,#0x02000000
-	mov		r2,#0x40000
-	mov		r3,#1
-	bl		sram_copy
-	ldr		r0,=ST_IWRAM
-	mov		r1,#0x03000000
-	mov		r2,#0x8000
-	mov		r3,#1
-	bl		sram_copy
-	ldr		r0,=ST_PAL
-	mov		r1,#0x05000000
-	mov		r2,#0x400
-	mov		r3,#1
-	bl		sram_copy
-	ldr		r0,=ST_VRAM
-	mov		r1,#0x06000000
-	mov		r2,#0x18000
-	mov		r3,#1
-	bl		sram_copy
-	ldr		r0,=ST_OAM
-	mov		r1,#0x07000000
-	mov		r2,#0x400
-	mov		r3,#1
-	bl		sram_copy
+	adrl	r8,st_list			@;EWRAM, IWRAM, palette, VRAM, OAM
+	mov		r7,#1
+	bl		sram_list
 
 	@;The system-mode sp and lr into the spend area at 0x30
 	mrs	  r0,CPSR
@@ -988,37 +931,21 @@ state_save:
 	mov		r3,#1
 	bl		sram_copy
 
-	add		r8,r10,#0x200
-	mov		r1,#0
-	strh	r1,[r8,#4]			@;WAITCNT: the page register at the BIOS's
-	mov 	r0,#0x00
-	bl 		SetRampage
-	ldrh	r1,[r11,#SP_WAITCNT]
-	strh	r1,[r8,#4]
-	mov		r10,#REG_BASE
+	bl		page_zero			@;the page register at the BIOS's
 	bl		wait_frame			@;the game goes on at a frame's start, as after LOAD
 	b		ingame_resume
 	.ltorg
 
-@;Z set if the state buffer's flag is there (r11 the spend area: its SP_HDR
-@;words take the flag). Leaves a page set; uses r0-r7.
+@;Z set if the state buffer's flag is there. Leaves a page set; uses r0-r3.
 state_flag_ok:
 	stmfd	sp!,{lr}
 	ldr		r0,=ST_FLAG
-	add		r1,r11,#SP_HDR
+	adrl	r1,S_RTS_FLAG
 	mov		r2,#0x10
-	mov		r3,#0
+	mov		r3,#2
 	bl		sram_copy
-	add		r1,r11,#SP_HDR
-	adrl	r2,S_RTS_FLAG
-	mov		r4,#4
-1:	ldr		r5,[r1],#4
-	ldr		r6,[r2],#4
-	cmp		r5,r6
-	bne		2f
-	subs	r4,r4,#1
-	bne		1b
-2:	ldmfd	sp!,{lr}
+	cmp		r0,#0
+	ldmfd	sp!,{lr}
 	bx		lr
 
 @;The page back at 0, at the BIOS's wait states (r10 I/O, r11 the spend
@@ -1047,24 +974,12 @@ state_load:
 	bl		page_zero
 	b		ingame_resume			@;none: the game goes on
 state_load_go:
+	adrl	r8,st_list+24		@;palette, VRAM, OAM, then EWRAM (IWRAM below)
+	mov		r7,#0
+	bl		sram_list
 	ldr		r0,=ST_EWRAM
 	mov		r1,#0x02000000
 	mov		r2,#0x40000
-	mov		r3,#0
-	bl		sram_copy
-	ldr		r0,=ST_PAL
-	mov		r1,#0x05000000
-	mov		r2,#0x400
-	mov		r3,#0
-	bl		sram_copy
-	ldr		r0,=ST_VRAM
-	mov		r1,#0x06000000
-	mov		r2,#0x18000
-	mov		r3,#0
-	bl		sram_copy
-	ldr		r0,=ST_OAM
-	mov		r1,#0x07000000
-	mov		r2,#0x400
 	mov		r3,#0
 	bl		sram_copy
 
@@ -1220,6 +1135,19 @@ register_list:
 S_RTS_FLAG:
  	.byte  'E','Z','-','O','m','e','g','a','R','T','C','F','I','L','E','.'
 	.align
+@;Lists for sram_list: {sram offset, RAM, bytes (0: r4's)}, ended by 0
+bk_list:							@;the stub's backups
+	.word	BK_EWRAM, EWRAM_BASE, 0
+	.word	BK_OAM, 0x07000000, 0x400
+	.word	BK_OBJ_PAL, 0x05000200, 0x200
+	.word	0
+st_list:							@;the state buffer, as the old menu kept it
+	.word	ST_EWRAM, 0x02000000, 0x40000
+	.word	ST_IWRAM, 0x03000000, 0x8000
+	.word	ST_PAL, 0x05000000, 0x400
+	.word	ST_VRAM, 0x06000000, 0x18000
+	.word	ST_OAM, 0x07000000, 0x400
+	.word	0
 RTS_switch:
 	.word 0x00000000
 Debug_switch:		@;Torii: DEBUG's code, from RTS_ReplaceIRQ_start; 0: no DEBUG
