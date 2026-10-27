@@ -92,7 +92,7 @@ int slotstore_set_current(const char *rom_path, const char *slot);
 // only in case), SLOTSTORE_NO_SLOT (copy_from), SLOTSTORE_PATH, SLOTSTORE_CARD.
 int slotstore_create(const char *rom_path, const char *name, const char *copy_from, u32 blank_size, char *clean_out);
 // A new slot named name, a copy of the .sav at path (any file on the card),
-// which must be want bytes (slotstore_size_ok); it overwrites nothing.
+// which must be want bytes (saveslot_import_size_ok); it overwrites nothing.
 // SLOTSTORE_NO_FILE, SLOTSTORE_SIZE, and slotstore_create's.
 int slotstore_create_file(const char *rom_path, const char *name, const char *path, u32 want, char *clean_out);
 // A copy of slot named name: slotstore_create with copy_from = slot.
@@ -150,11 +150,6 @@ int slotstore_history_push(const char *rom_path, const char *slot);
 // history first, and version n then leaves it (it is the file now), so nothing
 // is lost and no copy of it stays. SLOTSTORE_NO_VERSION, SLOTSTORE_NO_SLOT.
 int slotstore_restore(const char *rom_path, const char *slot, u32 n);
-
-// Whether a .sav of size bytes can make a slot for a save of want bytes (the
-// size the game's save type has; 0 if not known, then any size a save chip can
-// have: 512, 8192, 32768, 65536, 131072). The same as saveslot_import_size_ok.
-int slotstore_size_ok(u32 size, u32 want);
 
 /* ---- The save type changed ---- */
 

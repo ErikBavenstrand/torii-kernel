@@ -167,50 +167,6 @@ int safefile_line(char *buf, u32 size)
 	return cut ? SAFEFILE_LONG : (int)len;
 }
 
-int safefile_read(void *buf, u32 size)
-{
-	TLOG_ASSERT(((u32)buf & 3) == 0);
-	if (!rd.open)
-		return -1;
-	u32 left = rd.limit - rd.done, have = rd.have - rd.at;
-	u32 total = have + left;
-	if (total > size) {
-		tlog("safefile: %lu bytes to read, over %lu", (unsigned long)total, (unsigned long)size);
-		return -1;
-	}
-	memcpy(buf, sf_chunk + rd.at, have);  // what safefile_line left
-	rd.at = rd.have;
-	u32 n = have;
-	if (n == 0 && rd.done == 0 && left) {
-		// Nothing staged: the copy straight into buf, a word-aligned start
-		UINT got = 0;
-		FRESULT res = f_read(&sf_file, buf, left, &got);
-		rd.done += got;
-		if (res != FR_OK || got != left) {
-			tlog_error("safefile: a read stopped %lu bytes short", (unsigned long)(left - got));
-			sf_failed = 1;
-			return -1;
-		}
-		n = left;
-	} else {
-		while (rd.done < rd.limit) {
-			u32 want = rd.limit - rd.done < CHUNK ? rd.limit - rd.done : CHUNK;
-			UINT got = 0;
-			if (f_read(&sf_file, sf_chunk, want, &got) != FR_OK || got != want) {
-				tlog_error("safefile: a read stopped %lu bytes short",
-					   (unsigned long)(rd.limit - rd.done));
-				sf_failed = 1;
-				return -1;
-			}
-			memcpy((u8 *)buf + n, sf_chunk, got);
-			n += got;
-			rd.done += got;
-		}
-	}
-	rd.first = 0;
-	return (int)n;
-}
-
 int safefile_read_part(void *buf, u32 size)
 {
 	TLOG_ASSERT(((u32)buf & 3) == 0);

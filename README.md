@@ -58,8 +58,8 @@ it. Info's Controls page lists every key.
   own edits or deletes it; the database's can only be unpicked. A greyed
   code with digits to fill in (`00??`) opens the keypad with them marked,
   and saving replaces that code in place. Every launch with addons
-  applies them, and the in-game menu's CHEAT OFF and CHEAT ON stop and
-  restart them; a clean boot applies none. The file is in libretro's format
+  applies them, and the in-game menu's Cheats list turns each one off and
+  on (Back to Torii keeps those as the picks); a clean boot applies none. The file is in libretro's format
   (`just cheats` writes one for each game, or drop one in, named after the
   ROM) with CodeBreaker, GameShark, Action Replay v3 and VBA codes, and
   every kind of code runs: writes, fills and slides, pointers, add/or/and,
@@ -78,7 +78,8 @@ it. Info's Controls page lists every key.
   the game has no Cheats. A launch writes at most 128 of the picked
   cheats' ROM patches. A file with a NUL byte in it reads as a cut-off
   write, so the kernel takes its `.bak` copy or, with none, no file at all.
-  The in-game menu's LOAD restores CHEAT ON or OFF as the state had it. The
+  The in-game menu's Load state and Reset game put the cheats back to the
+  launch's picks. The
   cheat file moves, renames and is deleted with its game (before the game,
   so a power cut never leaves it behind).
 - **SD card:** the card's folders as they are, folders first. A opens a

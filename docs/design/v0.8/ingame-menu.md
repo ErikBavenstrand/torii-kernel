@@ -2,7 +2,7 @@
 
 The design for v0.8's in-game menu (roadmap, *v0.8 In-game menu*), from the review of today's
 menu in [docs/research/ingame-menu.md](../../research/ingame-menu.md). It is built in phases:
-P0 proves what the cart does in game mode, P1 replaces today's Mode 3 menu with the overlay
+P0 proves what the cart does in game mode, P1 replaces the Mode 3 menu of the time (historical: gone since P1) with the overlay
 and its first actions, P2 adds per-cheat toggles, P3 save-state slots, P4 screenshots and P5
 the In-game menu setting.
 
@@ -105,7 +105,7 @@ write-only, so a menu on a BG can't give them back (today's BG2 affine bug).
   without the kernel. Verify it on the emulated cart.
 - **Sleep.**
 - **Back to Torii:** today's `reset_now`.
-- Today's SAVE, LOAD and CHEAT ON/OFF keep working until P2 and P3 replace them, as entries
+- (Historical) The SAVE, LOAD and CHEAT ON/OFF entries of the time kept working until P2 and P3 replaced them, as entries
   backed by today's code: no regression for users.
 
 ## P2: cheats in game (built)

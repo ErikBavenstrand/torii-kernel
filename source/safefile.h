@@ -42,14 +42,11 @@ int safefile_open(const char *path, u32 max);
 #define SAFEFILE_END (-1)
 #define SAFEFILE_LONG (-2)
 int safefile_line(char *buf, u32 size);
-// The rest of the open copy's text, byte for byte (line ends, a BOM),
-// into buf (word-aligned, size bytes), without its CRC line: f_read hands
-// whole sectors to the card's DMA. Returns its length, or -1 if it is
-// longer than size or the read failed (safefile_failed says which).
-int safefile_read(void *buf, u32 size);
-// The open copy's text in parts, as safefile_read gives it whole: up to size
-// bytes of what is left into buf (word-aligned), for a text larger than any
-// RAM buffer. Returns how many, 0 at its end, or -1 if the read failed.
+// The rest of the open copy's text in parts, byte for byte (line ends, a
+// BOM), without its CRC line: up to size bytes of what is left into buf
+// (word-aligned: f_read hands whole sectors to the card's DMA), for a text
+// larger than any RAM buffer. Returns how many, 0 at its end, or -1 if the
+// read failed.
 int safefile_read_part(void *buf, u32 size);
 void safefile_close(void);
 // 1 if reading the file since the last safefile_open failed (a card error,

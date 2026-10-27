@@ -673,7 +673,7 @@ and sleep keys, `0x1000` for the in-game menu, `0x3000` with cheats (v0.7;
 
 | Part | Bytes (v0.8) | |
 |---|---|---|
-| The hook and the menu's stub (`RTS_ReplaceIRQ_start`..`_end`, `gba_rts_patch.s`) | `0xE20` (`0xD6C` in v0.7, with the Mode 3 menu) | `Cheat_switch` holds the interpreter's offset from its start (0: no cheats). Since v0.8's cleanup it is in the kernel's ROM, no longer IWRAM, as it is only copied. Of it, the stub and its SRAM copier about `0x2D8`, the old menu's SAVE and LOAD (until P2) about `0x330` |
+| The hook and the menu's stub (`RTS_ReplaceIRQ_start`..`_end`, `gba_rts_patch.s`) | `0xDF0` (`0xD6C` in v0.7, with the Mode 3 menu) | `Cheat_switch` holds the interpreter's offset from its start (0: no cheats). Since v0.8's cleanup it is in the kernel's ROM, no longer IWRAM, as it is only copied. Of it, the stub and its SRAM copier about `0x2D8`, the old menu's SAVE and LOAD (until P2) about `0x330` |
 | The cheat interpreter (`Cheat_blob_start`..`_end`, `cheatrun.s`) | `0x474` | ARM, position-independent: PC-relative literals only |
 | The cheat table | up to `0x1400` | its layout is in `cheatrun.s` and `cheatcode.h` |
 

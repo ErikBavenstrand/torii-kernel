@@ -105,11 +105,6 @@ u32 slotstore_keep(void)
 	return settings_history_keep[v < SET_HISTORY_CHOICES ? v : SET_HISTORY_DEFAULT];
 }
 
-int slotstore_size_ok(u32 size, u32 want)
-{
-	return saveslot_import_size_ok(size, want);
-}
-
 /* ---- FatFs helpers ---- */
 
 // 1 if path exists, 0 if not, -1 if the card didn't say

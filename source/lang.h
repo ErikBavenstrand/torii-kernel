@@ -404,7 +404,6 @@ extern const struct lang_gsaves *gl_gsaves;
 #define EN_GS_BACKUPS "%lu"
 // A backup made while the clock was unset, by its number
 #define EN_GS_BACKUP_N "Backup %lu"
-#define EN_GS_SAVED "%04u-%02u-%02u %02u:%02u"
 // A key past the cap says so, with the cap
 #define EN_RENAME_TOO_LONG "Names stop at %u letters."
 

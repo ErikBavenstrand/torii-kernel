@@ -4,7 +4,7 @@ Research for v0.8 (2026-10-25).
 
 ## Findings
 
-> **Answer:** Today's menu is a Mode 3 bitmap menu on BG2. It lives in a 4–8 KB blob in the game's ROM tail in PSRAM and is reached through the game's patched IRQ vector. It keeps one 448 KB state per game file name in cart SRAM pages 0x40–0xAF, which have no battery. Nothing in the kernel writes that state to SD, and it is unknown whether the FPGA does. An overlay can be built (a tile layer instead of BG2, its own font and stack, one more SRAM area to back up), but multiple slots must live on SD, and whether states survive a power-off has to be tested on the real cart first.
+> **Answer:** (Historical: written before v0.8, whose overlay menu replaced this one.) The menu then was a Mode 3 bitmap menu on BG2. It lives in a 4–8 KB blob in the game's ROM tail in PSRAM and is reached through the game's patched IRQ vector. It keeps one 448 KB state per game file name in cart SRAM pages 0x40–0xAF, which have no battery. Nothing in the kernel writes that state to SD, and it is unknown whether the FPGA does. An overlay can be built (a tile layer instead of BG2, its own font and stack, one more SRAM area to back up), but multiple slots must live on SD, and whether states survive a power-off has to be tested on the real cart first.
 > **Confidence:** 🟡 medium — the code facts are primary; how the state reaches SD is unverified and decides the slot design.
 
 **Findings**
@@ -12,7 +12,7 @@ Research for v0.8 (2026-10-25).
 - 🟢 118 of 118 commercial games pass the hook after fixes, in the emulator only. A game that never enables VBlank gets no menu [2].
 - 🟢 The patch area is 0x1000 bytes, or 0x2000 with cheats (600-cheat cap). It sits at the ROM's trimmed end and is clamped to 32 MB: a full 32 MB ROM leaves no room [3].
 - 🟢 The hotkey masks (L+R+Start for the menu, L+R+Select for sleep) are patched in from Settings. The menu can't be turned off; sleep can [1][3].
-- 🟢 The menu draws in Mode 3 on BG2 with an 8x10 font covering A–V only, in fixed colours. It backs up 0x12C00 bytes of VRAM to SRAM pages 0x20/0x30 [1][5].
+- 🟢 (Before v0.8) The menu draws in Mode 3 on BG2 with an 8x10 font covering A–V only, in fixed colours. It backs up 0x12C00 bytes of VRAM to SRAM pages 0x20/0x30 [1][5].
 - 🟢 It resets BG2PA–PD and BG2X/Y, which are write-only, and never restores them. That is the roadmap's "BG2 affine" item; a tile layer on BG0, BG1 or BG3 avoids it [1][2][6].
 - 🟢 SAVE writes EWRAM, IWRAM, palette, VRAM, OAM, IO, the registers and a flag to pages 0x40–0xAF, then busy-waits 0x50000 loops. It never touches the SD registers [1].
 - 🟢 LOAD's flag check is commented out (`@;bne errorRTS`), so an empty state (all 0xFF) is loaded: the crash [1].

@@ -79,8 +79,7 @@ static void res_log_blocks(const struct pool *pool)
 u8 res_alloc(enum res_kind kind, u16 len, u16 align, u16 lo, u16 hi, u16 tag, u8 flags)
 {
 	struct pool *pool = &pools[kind];
-	int logged = !(flags & RES_NOLOG);
-	if (logged && res_log_len == RES_LOG_CAP) {
+	if (res_log_len == RES_LOG_CAP) {
 		res_set_error("%s: the allocation log is full (%u references held through res_alloc)", pool->name,
 			      RES_LOG_CAP);
 		return RES_NONE;
@@ -96,8 +95,6 @@ u8 res_alloc(enum res_kind kind, u16 len, u16 align, u16 lo, u16 hi, u16 tag, u8
 			res_log_blocks(pool);
 		return RES_NONE;
 	}
-	if (!logged)
-		return h;
 	res_log[res_log_len].kind = (u8)kind;
 	res_log[res_log_len].handle = h;
 	res_log_len++;
@@ -117,11 +114,6 @@ int res_release(enum res_kind kind, u8 handle)
 		return pool_unref(&pools[kind], handle);
 	}
 	return 0;
-}
-
-int res_unref(enum res_kind kind, u8 handle)
-{
-	return pool_unref(&pools[kind], handle);
 }
 
 u8 res_mark(void)
