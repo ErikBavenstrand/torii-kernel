@@ -1502,6 +1502,7 @@ int main(void)
 	// A soft reset or an in-game RESET keeps the last WAITCNT; the firmware
 	// update below runs at the BIOS's, the menu after it faster (waitcnt.h).
 	REG_WAITCNT_CART = WAITCNT_BIOS;
+	cartlog_ingame_refused_carry();  // before the stack grows down to it
 	tlog_init();
 	tlog_marker("power-on or reset", 0);
 	torii_run_tests();
@@ -1566,6 +1567,7 @@ int main(void)
 	// menu itself is broken. Read once the card is up, a second into the boot.
 	u32 diag_keys = (~REG_KEYINPUT & 0x3FF) == DIAG_BOOT_KEYS;
 	tlog_debug("boot: keys held %03X", ~REG_KEYINPUT & 0x3FF);
+	ingame_refused_notice();  // before Check_save_flag clears the save type it names
 	Check_save_flag();
 	ingame_after_game();  // what the in-game menu left for the kernel
 	Boot_notice_check();

@@ -449,6 +449,22 @@ static void report_ingame_probe(void)
 		   on[0], on[1], on[2], on[4], on[5], on[6], off[0], off[1], off[2], off[4], off[5], off[6]);
 }
 
+void cartlog_ingame_refused_carry(void)
+{
+	volatile u32 *e = (volatile u32 *)INGAME_REFUSED_IWRAM;
+	if (e[0] != INGAME_REFUSED_MAGIC0 || e[1] != INGAME_REFUSED_MAGIC1)
+		return;
+	u32 r[4] = {e[0], e[1], e[2], e[3]};
+	e[0] = e[1] = 0;
+	cart_write_block(CARTLOG_INGAME_REFUSED, r, sizeof(r), 8);
+}
+
+int cartlog_ingame_refused(struct ingame_refused *r)
+{
+	cart_read(CARTLOG_INGAME_REFUSED, r, sizeof(*r));
+	return r->magic[0] == INGAME_REFUSED_MAGIC0 && r->magic[1] == INGAME_REFUSED_MAGIC1;
+}
+
 // The in-game menu's stub didn't open the menu (gba_rts_patch.s,
 // ingame_refuse) and gave the game back as it was: why, from its record
 static void report_ingame_refused(void)
@@ -461,8 +477,7 @@ static void report_ingame_refused(void)
 	};
 	static const char *const copy[] = {"", ": the EWRAM window", ": OAM", ": the OBJ palette"};
 	struct ingame_refused r;
-	cart_read(CARTLOG_INGAME_REFUSED, &r, sizeof(r));
-	if (r.magic[0] != INGAME_REFUSED_MAGIC0 || r.magic[1] != INGAME_REFUSED_MAGIC1)
+	if (!cartlog_ingame_refused(&r))
 		return;
 	cart_clear_magic(CARTLOG_INGAME_REFUSED, 8);
 	tlog_force(TLOG_ERRORS, "in-game menu: the stub didn't open it, %s%s (the game's WAITCNT %04X)",

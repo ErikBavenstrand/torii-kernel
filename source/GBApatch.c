@@ -21,6 +21,8 @@
 extern TCHAR currentpath[MAX_path_len];  // ezkernelnew.c's: the game's folder
 #include "settings_model.h"
 #include "tlog.h"
+#include "ui/palette.h"
+#include "ui/ui.h"
 
 u32 windows_offset;
 u32 is_NORpatch;
@@ -534,6 +536,11 @@ static void Patch_RTS_Cheat(u32 *Data)
 	} else {
 		*(vu32 *)(patchbuffer + RTS_Sleep_key_offset) = RTS_sleep_key_val & 0x3FF;
 	}
+
+	//Torii: the theme's accent, the screen as a refused menu goes back to Torii
+	u16 banks[UI_BANKS * 16];
+	ui_theme_banks(ui_theme_setting(), PAL_GBA, banks);
+	*(vu32 *)(patchbuffer + ((u8 *)RTS_Accent - p_patch_start)) = banks[UI_ROLE_ACCENT];
 
 	//rts switch
 	u32 rts_switch_offset = (u8 *)RTS_switch - p_patch_start;

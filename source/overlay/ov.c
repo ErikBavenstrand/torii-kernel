@@ -140,7 +140,7 @@ static const uint8_t why_texts[INGAME_WHYS] = {
 	INGAME_TEXT_KEPT,     INGAME_TEXT_WHY_ROM,  INGAME_TEXT_WHY_LOCKED,
 	INGAME_TEXT_WHY_CANT, INGAME_TEXT_WHY_ROOM, INGAME_TEXT_WHY_SLOW,
 };
-static const char state_flag[16] = {'E', 'Z', '-', 'O', 'm', 'e', 'g', 'a', 'R', 'T', 'C', 'F', 'I', 'L', 'E', '.'};
+static const char mark_bytes[16] = INGAME_STATE_MARK;
 
 // The dark theme's colours, for a session block that's missing
 static const uint16_t fallback_colours[BANKS] = {0x1063, 0x0000, 0x2D0A, 0x6F7B, 0x7E8F, 0x3DEF};
@@ -618,10 +618,10 @@ static void pill_place(int y)
 
 static int state_saved(void)
 {
-	uint8_t flag[16];
-	sram_in(INGAME_SRAM_STATE_FLAG, flag, sizeof(flag));
-	for (uint32_t i = 0; i < sizeof(flag); i++)
-		if (flag[i] != (uint8_t)state_flag[i])
+	uint8_t mark[16];
+	sram_in(INGAME_SRAM_STATE_MARK, mark, sizeof(mark));
+	for (uint32_t i = 0; i < sizeof(mark); i++)
+		if (mark[i] != (uint8_t)mark_bytes[i])
 			return 0;
 	return 1;
 }
@@ -960,8 +960,8 @@ static uint32_t run(uint32_t menu_key)
 	}
 }
 
-// The buffer's tag before SAVE: slot's, not kept; its flag cleared, so a
-// SAVE cut short leaves no state (the stub writes the flag last)
+// The buffer's tag before SAVE: slot's, not kept; its mark cleared, so a
+// SAVE cut short leaves no state (the stub writes the mark last)
 static void state_mark(uint32_t slot)
 {
 	struct ingame_state_tag tag;
@@ -970,7 +970,7 @@ static void state_mark(uint32_t slot)
 	tag.magic = INGAME_STATE_TAG_MAGIC;
 	tag.slot = (uint8_t)slot;
 	tag.rom_crc = session()->rom_crc;
-	sram_out(INGAME_SRAM_STATE_FLAG, zeros, sizeof(zeros));
+	sram_out(INGAME_SRAM_STATE_MARK, zeros, sizeof(zeros));
 	sram_out(INGAME_SRAM_STATE_TAG, &tag, sizeof(tag));
 	m.saved_slot = slot;
 }

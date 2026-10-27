@@ -12,6 +12,7 @@
 	.global  RTS_Return_address_L
 	.global  RTS_Sleep_key
 	.global  RTS_Reset_key
+	.global  RTS_Accent
 	.global	 RTS_switch
 	.global	 Debug_switch
 	.global	 Cheat_switch
@@ -92,7 +93,8 @@ ST_VRAM			= 0x90000
 ST_OAM			= 0xA8000
 ST_SPEND		= 0xA8400	@;the spend area, the system sp and lr in it
 ST_IO			= 0xA9000
-ST_FLAG			= 0xAFFF0	@;INGAME_SRAM_STATE_FLAG
+ST_FLAG			= 0xAFFD0	@;INGAME_SRAM_STATE_MARK: Torii's, never EZ-Flash's
+							@;flag at 0xAFFF0, which the FPGA's write-back watches
 TAG_PAGE		= 0xAF		@;INGAME_SRAM_STATE_TAG's page; its autoload byte at 0xFE6 in it
 AUTOLOAD		= 0x7A000000	@;at 0x3007FE4: load the state at the next VBlank
 
@@ -243,6 +245,8 @@ RTS_Sleep_key:
 	.word 0x304 @;L+R+select
 RTS_Reset_key:
 	.word 0x308 @;L+R+Start
+RTS_Accent:		@;Torii: the theme's accent (RGB15), shown as a refusal goes back to Torii
+	.word 0x001F
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	.align
 	.thumb
@@ -383,7 +387,7 @@ RTS_Wakeup_key:
 @;game again (r1 = 0, or ACT_SLEEP for the hook's sleep), SAVE or LOAD as
 @;the old menu did them, a restart of the game, Back to Torii, or a DEBUG
 @;snapshot and the menu again. Returns r0 = 0x4000000, r4-r11 the game's.
-@;It needs the IRQ stack only for sram_copy's 28 bytes.
+@;It needs the IRQ stack only for sram_copy's 44 bytes.
 ingame_stub:
 	adrl	r12,spend_0x80
 	ldr		r12,[r12]
@@ -559,17 +563,50 @@ ingame_refuse:
 	mov		r3,#1
 	bl		sram_copy
 	@;The screen white (forced blank: the game's own screen stays as it
-	@;is) for 10 frames with ingame_back's two, and then while the menu
-	@;keys are held, so a refusal shows (Torii: on the real cart it looked
-	@;like nothing had happened)
+	@;is) until a key answers, the way back to Torii that needs no cart
+	@;SRAM (Torii: Pokémon Emerald's refusal on the real cart left only a
+	@;power-off, which lost the record): A gives the game back; B, or the
+	@;menu keys held for 2 s, shows the theme's accent and resets into
+	@;Torii. A and B count only once pressed while white, so a menu key
+	@;made of them doesn't answer at once.
 	ldrh	r1,[r11,#SP_DISPCNT]
 	orr		r1,r1,#0x80
 	strh	r1,[r10,#REG_DISPCNT]
-	mov		r4,#8
+	mov		r4,#120				@;frames left of the menu keys' hold
+	ldr		r5,RTS_Reset_key
+	ldr		r6,[r10,#REG_P1]	@;the keys a frame before (0 held)
 1:	bl		wait_frame
-	subs	r4,r4,#1
+	ldr		r2,[r10,#REG_P1]
+	bic		r3,r6,r2			@;pressed since
+	mov		r6,r2
+	tst		r3,#1				@;A
+	movne	r1,#ACT_RESUME
+	bne		refuse_answer
+	tst		r3,#2				@;B
+	bne		refuse_torii
+	tst		r2,r5				@;the menu keys all held: Z
+	movne	r4,#120
+	subeqs	r4,r4,#1
 	bne		1b
-	mov		r1,#ACT_RESUME
+refuse_torii:
+	ldr		r1,RTS_Accent		@;the accent as the backdrop, nothing on it
+	mov		r2,#0x05000000
+	strh	r1,[r2]
+	strh	r2,[r10,#REG_DISPCNT]	@;0: mode 0, no layers
+	mov		r4,#20
+2:	bl		wait_frame
+	subs	r4,r4,#1
+	bne		2b
+	@;The record also in IWRAM under the BIOS's 0x200 bytes
+	@;(INGAME_REFUSED_IWRAM), which the soft reset and the kernel's start
+	@;keep: page 0xF0 may not have taken it in game mode
+	add		r1,r11,#SP_HDR
+	ldmia	r1,{r1,r2,r3,r6}
+	mov		r0,#0x03000000
+	add		r0,r0,#0x7E00
+	stmdb	r0,{r1,r2,r3,r6}
+	mov		r1,#ACT_TORII
+refuse_answer:
 	str		r1,[r11,#SP_ACT]
 ingame_back:
 	ldrh	r1,[r11,#SP_WAITCNT]	@;the game's WAITCNT, then the save's page
@@ -591,13 +628,13 @@ ingame_back:
 	cmp		r1,#ACT_DEBUG
 	beq		debug_now
 ingame_resume:						@;r10 I/O, r11 the spend area
-	@;The game frozen and muted until the menu keys are all up: it never
-	@;sees them (START opened Pokémon's menu after the stub's refusal),
-	@;and a key still held can't open the menu again at the next VBlank
-	adrl	r3,RTS_Reset_key
-	ldr		r3,[r3]
+	@;The game frozen and muted until every key is up: it never sees the
+	@;menu keys (START opened Pokémon's menu after the stub's refusal) or
+	@;the A or B that closed the menu, and a key still held can't open the
+	@;menu again at the next VBlank
 1:	ldr		r2,[r10,#REG_P1]
-	bics	r2,r3,r2
+	mvn		r2,r2
+	movs	r2,r2,lsl #22
 	bne		1b
 	ldrh	r1,[r11,#SP_DISPCNT]	@;the screen back after a refusal's white
 	strh	r1,[r10,#REG_DISPCNT]
@@ -646,7 +683,8 @@ wait_frame:
 @;WAITCNT_STUB; the page register at the BIOS's wait states, and the
 @;caller's WAITCNT back at the end. Torii: to_sram 2 compares instead, and returns r0 non-zero
 @;if SRAM differs (0 otherwise, and for the other modes). Leaves the last
-@;page set. Keeps r4-r11 (AAPCS: the overlay calls it), 28 bytes of stack.
+@;page set. Keeps r4-r11 (AAPCS: the overlay calls it) and, but in mode 2,
+@;r3 (DEBUG's code relies on it); 44 bytes of stack.
 sram_copy:
 	stmfd	sp!,{r4-r8,lr}
 	mov		r8,#REG_BASE
@@ -658,21 +696,10 @@ sc_chunk:
 	ble		sc_done
 	mov		r4,#0
 	strh	r4,[r8,#4]
-	ldr		r5,=0x9FE0000
-	ldr		r6,=0xD200
-	strh	r6,[r5]
-	mov		r5,#0x8000000
-	ldr		r7,=0x1500
-	strh	r7,[r5]
-	add		r5,r5,#0x20000
-	strh	r6,[r5]
-	add		r5,r5,#0x20000
-	strh	r7,[r5]
-	mov		r4,r0,lsr #12		@;the page: offset >> 12
-	ldr		r5,=0x9C00000
-	strh	r4,[r5]
-	ldr		r5,=0x9FC0000
-	strh	r7,[r5]
+	stmfd	sp!,{r0-r3}
+	mov		r0,r0,lsr #12		@;the page: offset >> 12
+	bl		SetRampage
+	ldmfd	sp!,{r0-r3}
 	ldr		r4,=WAITCNT_STUB
 	strh	r4,[r8,#4]
 	@;This chunk: up to the 64 KB window's end
@@ -828,7 +855,7 @@ debug_now:
 	mov		r4,r11
 	adrl	r5,RTS_irq
 	adrl	r6,SetRampage
-	adrl	r7,WriteSram
+	adrl	r7,sram_copy
 	mov		lr,pc
 	mov		pc,r8
 	adrl	r12,spend_0x80
@@ -852,24 +879,6 @@ SetRampage:
 	ldr 	r3,=0x9FC0000
 	strh  r2,[r3]
 	bx		lr
-@;------------------------------------------------------
-WriteSram: @;(u32 address, u8 *data, u32 size)
-	ADD 		R2,R2,R0
-	SUB 		R1,R1,R0
-wSram_loop1:
-	CMP     R0, R2
-	BNE     wSram_loop
-	BX      LR
-wSram_loop:
-	LDR     R3, [R1,R0]
-	STRB    R3, [R0],#1
-	LSR     R3, R3, #0x8
-	STRB    R3, [R0],#1
-	LSR     R3, R3, #0x8
-	STRB    R3, [R0],#1
-	LSR     R3, R3, #0x8
-	STRB    R3, [R0],#1
-	B       wSram_loop1
 @;------------------------------------------------------
 ReadSram: @;(u32 address, u8 *data, u32 size)
 	ADDS    R2, R2, R0
@@ -1142,8 +1151,8 @@ register_list:
 	.hword 0x0120,0x0122,0x0124,0x0126,0x0128,0x012A,0x012C,0x0132,0x0134
 	.hword 0x0140,0x0150,0x0154,0x0200,0x0204,0x0208,0xFF00
 	.align
-S_RTS_FLAG:
- 	.byte  'E','Z','-','O','m','e','g','a','R','T','C','F','I','L','E','.'
+S_RTS_FLAG:		@;INGAME_STATE_MARK
+	.ascii	"TORII-STATE-OK1."
 	.align
 @;Lists for sram_list: {sram offset, RAM, bytes (0: r4's)}, ended by 0
 bk_list:							@;the stub's backups
@@ -1176,7 +1185,7 @@ RTS_ReplaceIRQ_end:
 @;It reads memory and I/O only, and never selects the save chip's pages.
 @;It sits at a different place in each game, so the stub passes what it
 @;needs: r4 the hook's register save area (spend_0x80), r5 the hook's
-@;address, r6 SetRampage, r7 WriteSram.
+@;address, r6 SetRampage, r7 sram_copy.
 	.section .text.debug_blob,"ax",%progbits
 	.arm
 	.align 2
@@ -1206,12 +1215,14 @@ debug_blank:
 	subs	r2,r2,#1
 	bne		debug_blank
 
+	@;The rest through sram_copy (r7), to_sram 1 in r3, which it keeps;
+	@;page 0xF0's window offset 0x1000 is cart SRAM's byte 0xF1000
 	.macro	debug_copy dst, src, len
 	ldr		r0,=\dst
 	ldr		r1,=\src
 	mov		r2,#\len
 	mov		lr,pc
-	mov		pc,r7		@;WriteSram
+	mov		pc,r7		@;sram_copy
 	.endm
 	.macro	debug_copy_from dst, len	@;from r1
 	ldr		r0,=\dst
@@ -1220,25 +1231,26 @@ debug_blank:
 	mov		pc,r7
 	.endm
 
-	debug_copy 0x0E001010, 0x080000A0, 0x20		@;the ROM header from 0xA0
+	mov		r3,#1
+	debug_copy 0xF1010, 0x080000A0, 0x20		@;the ROM header from 0xA0
 	str		r5,[sp,#-4]!				@;the hook's address
 	mov		r1,sp
-	debug_copy_from 0x0E001030, 4
+	debug_copy_from 0xF1030, 4
 	add		sp,sp,#4
 	mov		r1,r4					@;r4-r11, sp, lr, SPSR, system sp and lr
-	debug_copy_from 0x0E001040, 0x40
+	debug_copy_from 0xF1040, 0x40
 	ldr		r1,[r4,#0x20]				@;the BIOS's IRQ frame: r0-r3, r12, pc + 4
 	bic		r1,r1,#3
-	debug_copy_from 0x0E001080, 0x20
-	debug_copy 0x0E0010A0, 0x03007FF0, 0x10		@;the game's handler, IRQ flags, the hook
-	debug_copy 0x0E0010C0, 0x04000000, 0x60		@;I/O 0x000-0x05F
-	debug_copy 0x0E001120, 0x04000200, 0x10		@;IE, IF, WAITCNT, IME
-	debug_copy 0x0E001200, 0x03007E00, 0x200	@;IWRAM 0x3007E00-0x3007FFF
+	debug_copy_from 0xF1080, 0x20
+	debug_copy 0xF10A0, 0x03007FF0, 0x10		@;the game's handler, IRQ flags, the hook
+	debug_copy 0xF10C0, 0x04000000, 0x60		@;I/O 0x000-0x05F
+	debug_copy 0xF1120, 0x04000200, 0x10		@;IE, IF, WAITCNT, IME
+	debug_copy 0xF1200, 0x03007E00, 0x200		@;IWRAM 0x3007E00-0x3007FFF
 	ldr		r1,[r4,#0x30]				@;the game's stack
 	bic		r1,r1,#3
-	debug_copy_from 0x0E001400, 0x100
+	debug_copy_from 0xF1400, 0x100
 	adr		r1,debug_magic
-	debug_copy_from 0x0E001000, 16			@;now the magic
+	debug_copy_from 0xF1000, 16			@;now the magic
 
 	mov		r0,#0x00
 	mov		lr,pc

@@ -12,10 +12,10 @@ index 59ca1c1..1dd19c0 100644
  	EXTDATA_MAX
 diff --git a/include/mgba/internal/gba/cart/omega.h b/include/mgba/internal/gba/cart/omega.h
 new file mode 100644
-index 0000000..2bc0324
+index 0000000..beb8713
 --- /dev/null
 +++ b/include/mgba/internal/gba/cart/omega.h
-@@ -0,0 +1,194 @@
+@@ -0,0 +1,197 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -165,9 +165,12 @@ index 0000000..2bc0324
 +	// the game's cluster runs from 0, the save-state (RTS) file's from 0x300,
 +	// which the state buffer's write-back to the card follows (omega.c).
 +	uint8_t fatTable[0x400];
-+	// A game-mode write to the state buffer's last page (0xAF, its flag's)
-+	// since the page register last showed it.
++	// A game-mode write past the save's pages (or, with rtsKernelWrites, a
++	// kernel write to the buffer's last page) since the page last changed.
 +	bool rtsPageWritten;
++	// While a write-back runs, until this time, game-mode reads of cart SRAM
++	// past the save's pages read 0xFF (the card takes the FPGA's bus)
++	uint64_t rtsBusyUntil;
 +	// OMEGA_RTS_KERNEL_WRITES=1: kernel-mode writes to page 0xAF start the
 +	// write-back too (what starts it on the real cart is unknown), and a
 +	// table with no end marker from 0x300 is walked as the hardware would,
@@ -350,10 +353,10 @@ index 1d0c0dd..b77704a 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..06a4150
+index 0000000..65b38eb
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1843 @@
+@@ -0,0 +1,1865 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -1176,15 +1179,22 @@ index 0000000..06a4150
 +// first sectors (Emerald's EWRAM heap) at its own sectors, same size and
 +// date. That launch's table had nothing at 0x300 (all 0, no end marker), and
 +// the walk went on past the 1 KB table's end into the game's runs at 0.
-+// Modelled: after a game-mode write to page 0xAF, the next page change
-+// writes the buffer back while the flag reads set, through the latched
-+// table's runs from 0x300, wrapping at its end as a 10-bit address would.
-+// What starts it on the real cart is inferred (the probe writes each page's
-+// first bytes and puts them back; the file held the bytes put back); the
-+// table it follows is what the corrupted file shows. A walk that wraps into
-+// the game's runs (a table no kernel meant) writes and then stops the run
-+// with this status.
++// Modelled: after a game-mode write to cart SRAM past the save's pages, the
++// next page change writes the buffer back while the flag reads set, and only
++// then (Torii's own mark, "TORII-STATE-OK1." at 0xAFFD0, starts nothing),
++// through the latched table's runs from 0x300, wrapping at its end as a
++// 10-bit address would. For RTS_BUSY_CYCLES after it, game-mode reads past
++// the save's pages read 0xFF, as the card's transfer would take the bus:
++// v0.8's stub, in Pokémon Emerald launched into a state with the flag set,
++// refused the menu on the real cart as its backups read back wrong, while at
++// FLASH 128K without the flag the probe's pages all read back. What starts
++// it on the real cart is inferred (the probe writes each page's first bytes
++// and puts them back; the file held the bytes put back; the stub's backups
++// write page 0x20 on); the table it follows is what the corrupted file
++// shows. A walk that wraps into the game's runs (a table no kernel meant)
++// writes and then stops the run with this status.
 +#define RTS_WRITEBACK_STATUS 81
++#define RTS_BUSY_CYCLES (16777216 / 4)  // 448 KB to the card: a guess
 +#define RTS_BUFFER 0x40000
 +#define RTS_BYTES 0x70000
 +#define RTS_FLAG 0xAFFF0
@@ -1235,6 +1245,7 @@ index 0000000..06a4150
 +		omega->sd->seek(omega->sd, (off_t) lba * SECTOR_SIZE, SEEK_SET);
 +		omega->sd->write(omega->sd, &omega->sram[RTS_BUFFER + sector * SECTOR_SIZE], SECTOR_SIZE);
 +	}
++	omega->rtsBusyUntil = mTimingGlobalTime(&gba->timing) + RTS_BUSY_CYCLES;
 +	_trace(gba, "state buffer written back to sectors %u-%u", first, last);
 +	fprintf(stderr, "omega: state buffer written back to sectors %u-%u (%u runs%s)\n", first, last, end,
 +	        wrapped ? ", the walk wrapped into the game's runs" : "");
@@ -2112,6 +2123,12 @@ index 0000000..06a4150
 +uint8_t GBAOmegaReadSRAM(struct GBA* gba, uint32_t address) {
 +	struct GBAOmega* omega = &gba->memory.omega;
 +	uint8_t value = omega->sram[_sramOffset(omega, address)];
++	if (omega->rtsBusyUntil && !_isKernelMode(omega) && omega->ramPage >= OMEGA_SAVE_PAGES) {
++		if (mTimingGlobalTime(&gba->timing) < omega->rtsBusyUntil) {
++			return 0xFF;
++		}
++		omega->rtsBusyUntil = 0;
++	}
 +	if (_gameSramFaultFor(omega) == GAME_SRAM_FAULT_FLIP_IMAGE && omega->ramPage == 0xB0 && (address & 0xFFFF) == 0x400) {
 +		value ^= 1;
 +	}
@@ -2144,7 +2161,15 @@ index 0000000..06a4150
 +		return;
 +	}
 +	omega->sram[_sramOffset(omega, address)] = value;
-+	if (omega->ramPage == RTS_FLAG_PAGE && (omega->rtsKernelWrites || (!_isKernelMode(omega) && omega->gameBooted))) {
++	// A game-mode write past the save's pages (the in-game code's: its
++	// backups, the state buffer, page 0xF0), or with OMEGA_RTS_KERNEL_WRITES
++	// a kernel write to the buffer's last page. Torii v0.8 on the real cart:
++	// Pokémon Emerald, launched into a state with the flag set, refused the
++	// menu as the stub's backups (page 0x20) read back wrong, the write-back
++	// running under them, it seems; at FLASH 128K without the flag they read
++	// back whole.
++	if ((!_isKernelMode(omega) && omega->gameBooted && omega->ramPage >= OMEGA_SAVE_PAGES) ||
++	    (omega->rtsKernelWrites && omega->ramPage == RTS_FLAG_PAGE)) {
 +		omega->rtsPageWritten = true;
 +	}
 +}

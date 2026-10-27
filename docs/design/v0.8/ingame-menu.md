@@ -76,8 +76,18 @@ write-only, so a menu on a BG can't give them back (today's BG2 affine bug).
 - **Fail safe** (after the real cart's black screen in Pokémon Emerald): read every backup
   back before changing anything of the game's, check the loaded image against the check word
   the kernel writes in its header, and treat an answer out of range as Resume. On a failure
-  the game goes on untouched and a record in page `0xF0` (`struct ingame_refused`) tells the
-  kernel's next boot why.
+  the stub writes a record to page `0xF0` (`struct ingame_refused`) and shows a white screen
+  (forced blank) with the game frozen, a way back that needs no cart SRAM: A gives the game
+  back untouched; B, or the menu keys held for 2 s, shows the theme's accent (the backdrop
+  alone, which the kernel patches into the stub as `RTS_Accent`) and goes back to Torii by the
+  Back to Torii reset. Page `0xF0` may take no writes in game mode (Pokémon Emerald on the real
+  cart left only a power-off, which lost the record anyway), so on the way back the stub also
+  puts the record in IWRAM at `0x03007DF0` (`INGAME_REFUSED_IWRAM`), under what the BIOS's
+  SoftReset clears and above what the kernel's crt0 clears; `main` moves it to page `0xF0`
+  first thing. The boot then shows a dialog once (`ingame_refused_notice`): the game, the
+  reason in plain words ("cart memory is unavailable with its Flash save", "its copy in cart
+  memory was damaged"), and that save states and cheats need the menu while the game's own
+  saves are safe; `cartlog_boot_report` logs and clears the record.
 
 ## P1: the menu
 

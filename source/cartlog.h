@@ -43,6 +43,15 @@ void cartlog_boot_start(void);
 // mounted, then cartlog_phase(PHASE_MENU) when the menu shows.
 void cartlog_boot_report(void);
 
+// The in-game menu's stub's refusal record, which it also leaves in IWRAM
+// on its way back to Torii (INGAME_REFUSED_IWRAM, source/ingame_abi.h),
+// into page 0xF0 for the boot to show and log. Call it first thing in
+// main, before the stack can grow down to it.
+void cartlog_ingame_refused_carry(void);
+// 1 and the record if page 0xF0 holds one; cartlog_boot_report clears it
+struct ingame_refused;
+int cartlog_ingame_refused(struct ingame_refused *r);
+
 // The boot found the card wouldn't mount: noted in the in-game probe's
 // report copy in its save, if one is there, as nothing else can be logged
 void cartlog_mount_failed(void);

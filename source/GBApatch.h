@@ -23,6 +23,7 @@ extern void RTS_ReplaceIRQ_end(void);
 extern void RTS_Return_address_L(void);
 extern void RTS_Sleep_key(void);
 extern void RTS_Reset_key(void);
+extern void RTS_Accent(void);
 //extern void RTS_Wakeup_key(void);
 extern void RTS_switch(void);
 extern void Debug_switch(void);

@@ -13,7 +13,7 @@
 -- literal the kernel recognised), or never enables the VBlank IRQ.
 --
 -- Script: GAME_RUN frames after the game starts, press START and A to get
--- past title screens, hold the menu key, press B to leave the menu, watch
+-- past title screens, hold the menu key, press B (HOOK_WATCH_CLOSE) to leave the menu, watch
 -- the game run on for AFTER frames (pressing DOWN, A, START, A), then a
 -- save state round trip (the menu's Save state into slot 1 as "key state
 -- save", Load state as "key state load", more keys after it), then log
@@ -58,6 +58,9 @@ local STATE_AFTER = 360
 
 local KEYS = { A = 0x001, B = 0x002, START = 0x008, DOWN = 0x080, R = 0x100, L = 0x200 }
 local MENU_KEY = KEYS.L | KEYS.R | KEYS.START
+-- The key that leaves the menu: B, or HOOK_WATCH_CLOSE (A where the stub
+-- refuses to open it: its white screen takes A back to the game, B to Torii)
+local CLOSE = os.getenv("HOOK_WATCH_CLOSE") or "B"
 
 -- The overlay's header at INGAME_EWRAM while it runs (struct ingame_image)
 local OVERLAY = 0x02000000
@@ -219,7 +222,7 @@ local function plan(start)
 		{ start + 420, KEYS.A, "A" }, { start + 426, 0, "-" },
 		{ start + 480, KEYS.START, "START" }, { start + 486, 0, "-" },
 		{ at, MENU_KEY, "L+R+START" }, { at + 6, 0, "-" },
-		{ at + MENU_WAIT, KEYS.B, "B" }, { at + MENU_WAIT + 6, 0, "-" },
+		{ at + MENU_WAIT, KEYS[CLOSE], CLOSE }, { at + MENU_WAIT + 6, 0, "-" },
 	}
 	-- Keys after the menu, so a game waiting for input changes its screen.
 	local back = at + MENU_WAIT

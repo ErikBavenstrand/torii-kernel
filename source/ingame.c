@@ -504,6 +504,37 @@ static void cheats_keep(const struct ingame_session *h, const char *path, const 
 		tlog_error("cheats: %s: the in-game picks weren't written", path);
 }
 
+void ingame_refused_notice(void)
+{
+	struct ingame_refused r;
+	if (!cartlog_ingame_refused(&r))
+		return;
+	// The game: the session block's name, which the kernel wrote at launch
+	u32 words[INGAME_SESSION_HEAD / 4];
+	struct ingame_session *h = (struct ingame_session *)(void *)words;
+	sram_get(INGAME_SRAM_SESSION, (u8 *)words, sizeof(words));
+	SetRampage(0);
+	const char *name = "the game";
+	if (h->magic == INGAME_SESSION_MAGIC && h->version == INGAME_SESSION_VERSION && h->name[0] &&
+	    memchr(h->name, 0, sizeof(h->name)))
+		name = h->name;
+	// Its save type, from the pending-save record (Check_save_flag clears it)
+	u32 type = Read_sav_info(0) == 0x11 ? Read_sav_info(SAV_INFO_TYPE) : 0;
+	const char *kind = (type & 0xF0) == 0x30 ? "Flash" : (type & 0xF0) == 0x20 ? "EEPROM" : NULL;
+	char why[64];
+	if (r.reason == INGAME_REFUSED_IMAGE)
+		snprintf(why, sizeof(why), "%s", EN_INGAME_REFUSED_IMAGE);
+	else if (kind)
+		snprintf(why, sizeof(why), EN_INGAME_REFUSED_SAVE, kind);
+	else
+		snprintf(why, sizeof(why), "%s", EN_INGAME_REFUSED_MEMORY);
+	char msg[200];
+	snprintf(msg, sizeof(msg), EN_INGAME_REFUSED, (int)charset_cut(name, 24), name, why);
+	dialog_open();  // dialog_message logs it
+	dialog_message(EN_INGAME_REFUSED_TITLE, msg, DIALOG_INFO);
+	dialog_close();
+}
+
 void ingame_after_game(void)
 {
 	u32 words[INGAME_SESSION_HEAD / 4];  // the head alone: the whole block is 22 KB

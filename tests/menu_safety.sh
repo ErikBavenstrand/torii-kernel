@@ -14,8 +14,11 @@
 # FPGA presents a flash chip, unproven either way on the real cart).
 # The stub must not open the menu and must give the game back untouched,
 # never a black screen or a hang (Pokémon Emerald on the real cart, v0.8):
-# the game goes on, its screen as before, and with flip-image the stub's
-# record (struct ingame_refused) reaches the kernel's next boot's log.
+# its screen stays white until A gives the game back, its screen as before.
+# The menu key held for 2 s instead shows the theme's accent and resets into
+# Torii, whose boot shows a dialog and logs why from the stub's record
+# (struct ingame_refused), carried in EWRAM where page 0xF0 took no writes;
+# with flip-image the record also reaches a later boot from page 0xF0.
 set -euo pipefail
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
@@ -57,12 +60,14 @@ python3 tests/setnor.py set "$cart/kernel-nor.bin" 0=0xE1E1 1=1 2=1 3=0 4=0 5=9 
 rm -rf "$cart-held"
 cp -r "$cart" "$cart-held" # the held-key run below starts from here
 
-# Power-on 2: the launch, the menu key, B (hook_watch.lua), the screen's
-# hash every frame, and the EWRAM the overlay borrows (its window, 0x1FC0
-# bytes) every 10 frames
+# Power-on 2: the launch, the menu key, B (hook_watch.lua; A on a refused
+# menu's white screen, back to the game), the screen's hash every frame, and
+# the EWRAM the overlay borrows (its window, 0x1FC0 bytes) every 10 frames
+close=B
+[ -z "$fault" ] || close=A
 ewram=$(for f in $(seq 500 10 1500); do printf -- '-m %d:0x02000000:0x1FC0 ' "$f"; done)
 # shellcheck disable=SC2046,SC2086 # $(nav_launch) and $ewram are lists of options
-out=$(OMEGA_DIR=$cart OMEGA_GAME_SRAM=$fault emu/build-linux/mgba-shot dist/ezkernelnew.bin \
+out=$(OMEGA_DIR=$cart OMEGA_GAME_SRAM=$fault HOOK_WATCH_CLOSE=$close emu/build-linux/mgba-shot dist/ezkernelnew.bin \
   $(nav_launch /Hello.gba addon save=$save at=270) -L tests/hook_watch.lua -u 'hook watch done' -f 4000 \
   -H 1:4000 $ewram 2>"$cart/log") || fail "the run stopped with status $?"
 log=$(cat "$cart/log")
@@ -97,32 +102,49 @@ before=$(ewram_at $(((key - 1) / 10 * 10)))
 after=$(ewram_at $(((key + 19) / 10 * 10)))
 [ -n "$before" ] && [ "$before" = "$after" ] || fail "the game's EWRAM window changed under the refused menu"
 
-# The menu key held for a second (the real cart, after a refusal: the stub
-# refused again every frame, the sound stuttered, and START reached the
-# game): the screen turns white (forced blank) and the game stays frozen
-# until the keys are up, then goes on as it was
-# shellcheck disable=SC2046 # $(nav_launch) is a list of options
+# The menu key held for 2 s (Pokémon Emerald on the real cart: a refusal
+# left no way back to Torii but a power-off, which lost the stub's record):
+# the screen white while held, then the theme's accent (the backdrop
+# alone), then Torii's boot with the dialog and the record's log line. A
+# pressed every 40 frames answers the boot's dialogs.
+answers=$(for f in $(seq $((key + 260)) 40 $((key + 1100))); do printf -- '-k %d:A -k %d:- ' "$f" $((f + 6)); done)
+# shellcheck disable=SC2046,SC2086 # $(nav_launch) and $answers are lists of options
 held=$(OMEGA_DIR=$cart-held OMEGA_GAME_SRAM=$fault emu/build-linux/mgba-shot dist/ezkernelnew.bin \
-  $(nav_launch /Hello.gba addon save=$save at=270) -k "$key:L+R+START" -k "$((key + 60)):-" \
-  -H $((key - 1)):$((key + 120)) -f $((key + 120)) 2>"$cart/log") || fail "the held-key run stopped with status $?"
+  $(nav_launch /Hello.gba addon save=$save at=270) -k "$key:L+R+START" -k "$((key + 130)):-" $answers \
+  -H $((key - 1)):$((key + 150)) -u "in-game menu: the stub didn't open it" -f $((key + 1100)) 2>"$cart/log") ||
+  fail "the held-key run stopped with status $?"
 log=$(cat "$cart/log")
 grep -q '^crash at frame' <<<"$log" && fail "crashed with the menu key held"
 held_at() { awk -v f="$1" '$1 == "hash" && $3 == f ":" { print $4 }' <<<"$held"; }
-white=$(awk -v a=$((key + 10)) -v b=$((key + 59)) '$1 == "hash" && $3 + 0 >= a && $3 + 0 <= b { print $4 }' <<<"$held" | sort -u)
+held_range() { awk -v a="$1" -v b="$2" '$1 == "hash" && $3 + 0 >= a && $3 + 0 <= b { print $4 }' <<<"$held" | sort -u; }
+white=$(held_range $((key + 10)) $((key + 110)))
 [ "$(wc -l <<<"$white")" = 1 ] && [ "$white" != "$(held_at $((key - 1)))" ] ||
   fail "the screen didn't stay white while the refused menu's keys were held"
-[ "$(awk -v a=$((key + 62)) '$1 == "hash" && $3 + 0 >= a { print $4 }' <<<"$held" | grep -vcx "$white")" -gt 1 ] ||
-  fail "the game didn't go on once the refused menu's keys were up"
+accent=$(held_range $((key + 126)) $((key + 138)))
+[ "$(wc -l <<<"$accent")" = 1 ] && [ "$accent" != "$white" ] ||
+  fail "the screen didn't turn to the accent after the menu keys' 2 s"
+case $fault in
+drop) why="the game's memory didn't read back from cart SRAM: the EWRAM window" said="cart memory is unavailable with its Flash save" ;;
+chip) why="no overlay image in cart SRAM" said="cart memory is unavailable with its Flash save" ;;
+*) why="the overlay image loaded from cart SRAM didn't check" said="its copy in cart memory was damaged" ;;
+esac
+grep -q "^kernel: dialog: In-game menu didn't open: Hello: $said" <<<"$log" ||
+  fail "Torii's boot didn't say why the menu didn't open: $(grep -m1 'kernel: dialog' <<<"$log")"
+grep -q "^kernel error: in-game menu: the stub didn't open it, $why" <<<"$log" ||
+  fail "Torii's boot didn't log the refusal: $(grep -m1 'in-game menu' <<<"$log")"
 
 if [ "$mode" = flip-image ]; then
-  # The stub's record in page 0xF0, read by the kernel's next boot (after a
-  # soft reset: page 0xF0 has no battery)
+  # The stub's record in page 0xF0 after the first run (A, back to the
+  # game), read by the kernel's next boot (after a soft reset: page 0xF0
+  # has no battery): the dialog, the save question, then the log line
   rec=$(od -A n -t x1 -j $((0xF1C00)) -N 10 "$cart/sram.bin" | tr -d ' \n')
   [ "$rec" = 54494e52464544310300 ] || fail "no refusal record (\"TINRFED1\", reason 3) in cart SRAM: $rec"
   boot_log=$(OMEGA_DIR=$cart OMEGA_SOFT_RESET=1 emu/build-linux/mgba-shot dist/ezkernelnew.bin \
-    -k 100:A -k 106:- -f 400 2>&1 >/dev/null) # A: the save dialog first
-  grep -q "in-game menu: the stub didn't open it, the overlay image loaded from cart SRAM didn't check" <<<"$boot_log" ||
+    -k 100:A -k 106:- -k 160:A -k 166:- -k 220:A -k 226:- -f 500 2>&1 >/dev/null)
+  grep -q "dialog: In-game menu didn't open: Hello: $said" <<<"$boot_log" ||
+    fail "the kernel's next boot didn't say why the menu didn't open"
+  grep -q "in-game menu: the stub didn't open it, $why" <<<"$boot_log" ||
     fail "the kernel's next boot didn't log the refusal"
 fi
 rm -rf "$cart-held"
-echo "PASS: with cart SRAM failing in game mode ($mode) the stub leaves the menu shut, shows white while its keys are held, and the game goes on"
+echo "PASS: with cart SRAM failing in game mode ($mode) the stub leaves the menu shut and shows white: A gives the game back, the menu keys held 2 s go back to Torii, which says why"

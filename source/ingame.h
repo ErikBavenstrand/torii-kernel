@@ -47,6 +47,13 @@ void ingame_states_none(void);
 // cheat file's picks. Then the answer is cleared.
 void ingame_after_game(void);
 
+// At boot, once the card is up and before the pending save is copied: if
+// the in-game menu's stub refused to open (its record in cart RAM page
+// 0xF0, cartlog_ingame_refused), says so in a dialog, once: the game, the
+// reason in plain words, and what it costs. cartlog_boot_report then logs
+// and clears the record.
+void ingame_refused_notice(void);
+
 // For the in-game probe ROM (game code INGAME_PROBE_CODE, source/ingameprobe.h)
 // only: makes its scratch file and tells it the file's sector through cart
 // RAM page 0xF0. Anything else: does nothing. Call it before the launch's

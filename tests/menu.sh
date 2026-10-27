@@ -160,8 +160,11 @@ run state DOWN A A -- -k "$load:L+R+START" -k "$((load + 6)):-" $(keys $((load +
 [ "$(awk '$1 == "mem" { print $5 $6 }' <<<"$out")" = 0100 ] || fail "IME is off after loading a state"
 [ "$(awk '$1 == "hash" { print $4 }' <<<"$out" | sort -u | wc -l)" -gt 1 ] ||
   fail "the game did not go on after loading a state"
-[ "$(od -A n -t x1 -j $((0xAFFF0)) -N 16 "$cart-state/sram.bin" | tr -d ' \n')" = 455a2d4f6d65676152544346494c452e ] ||
-  fail "no state's flag in cart SRAM after SAVE"
+[ "$(od -A n -c -j $((0xAFFD0)) -N 16 "$cart-state/sram.bin" | tr -d ' \n')" = TORII-STATE-OK1. ] ||
+  fail "no state's mark (INGAME_STATE_MARK) in cart SRAM after SAVE"
+# Never EZ-Flash's flag, which the FPGA's write-back watches
+[ "$(od -A n -t x1 -j $((0xAFFF0)) -N 16 "$cart-state/sram.bin" | tr -d ' \n')" != 455a2d4f6d65676152544346494c452e ] ||
+  fail "EZ-Flash's write-back flag in cart SRAM after SAVE"
 
 # Brightness: hello dims its screen once with BLDY, which is write-only, so
 # the menu must leave it alone and only blend over it. A background pixel

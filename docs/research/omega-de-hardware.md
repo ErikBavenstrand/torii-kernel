@@ -342,6 +342,24 @@ While SD control is 3 the port returns status; `0xEEE1` means busy.
    without scanning the whole FAT, so the write-back would land in both. If
    the logs show odd file contents or launch errors, run `chkdsk` (or
    `fsck.fat`) on the card.
+   **Torii never sets the flag** (since v0.8's refusal in Emerald, 2026-10-27).
+   The in-game probe at FLASH 128K (CLEAN BOOT, the flag cleared) read every
+   page `0x20`-`0xEF` back in game mode, and 24 KB of byte writes to page
+   `0x20` at 8 cycles; yet Pokémon Emerald, launched with ADDON into a state
+   the kernel had put in the buffer with EZ-Flash's flag, refused the menu:
+   the stub's backups didn't read back. Likely the stub's own writes and
+   page changes started the write-back, which ran under its reads. So the
+   flag is EZ-Flash's alone: an `/RTS` import and a slot's file have it
+   dropped on their way into the buffer, the kernel only ever clears it, and
+   Torii marks a whole state with `TORII-STATE-OK1.` at `0xAFFD0`
+   (`INGAME_SRAM_STATE_MARK`, before the tag at `0xAFFE0`), which the stub's
+   SAVE writes last and its LOAD and the launch into a state check. The
+   emulated cart arms the write-back on any game-mode write past the save's
+   pages (and, with `OMEGA_RTS_KERNEL_WRITES`, on a kernel write to page
+   `0xAF`), starts it on the next page change only while the flag reads
+   `EZ-OmegaRTCFILE.`, and reads `0xFF` from those pages for a quarter
+   second after (`tests/states.sh keep` opens the menu over a preloaded state
+   and fails on any write-back). `/torii/rts.bin` stays the table's sink.
    Also open: whether the write-back after an in-game Save state and Back to
    Torii runs while the kernel boots. No register is known that says it is
    busy; the port's `0xEEE1` covers the kernel's own SD commands, which

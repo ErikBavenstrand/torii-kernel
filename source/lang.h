@@ -51,6 +51,15 @@ extern char *gl_keep_power;    // FORMAT ALL's text, under its title
 	"one."
 #define EN_SAVE_UNSAVED "The save of %.*s isn't on the card yet. Launching loses it. Launch anyway?"
 
+// The boot's dialog after the in-game menu couldn't open (ingame.c): the
+// game's name (cut to at most 24 bytes) and why, as one of the reasons
+// below ("Flash" or "EEPROM" in the first). The dialog shows 4 lines.
+#define EN_INGAME_REFUSED_TITLE "In-game menu didn't open"
+#define EN_INGAME_REFUSED "%.*s: %s. Save states and cheats need it; the game's saves are safe."
+#define EN_INGAME_REFUSED_SAVE "cart memory is unavailable with its %s save"
+#define EN_INGAME_REFUSED_MEMORY "cart memory was unavailable"
+#define EN_INGAME_REFUSED_IMAGE "its copy in cart memory was damaged"
+
 // The firmware update's texts (Ezcard_OP.c). It runs before a language is
 // loaded, and the formats stay literals so the compiler checks them.
 #define EN_FW_TITLE "Rev.%s firmware update"

@@ -68,16 +68,28 @@ static void buffer_io(u32 at, u8 *ram, u32 n, int to_sram)
 	SetRampage(0);
 }
 
-static const char state_flag[16] = {'E', 'Z', '-', 'O', 'm', 'e', 'g', 'a', 'R', 'T', 'C', 'F', 'I', 'L', 'E', '.'};
+// EZ-Flash's flag, which an /RTS file ends in and the FPGA's write-back
+// watches; Torii's own mark says a state is whole (ingame_abi.h)
+static const char rts_flag[16] = {'E', 'Z', '-', 'O', 'm', 'e', 'g', 'a', 'R', 'T', 'C', 'F', 'I', 'L', 'E', '.'};
+static const char state_mark[16] = INGAME_STATE_MARK;
 #define TAG_AT (INGAME_SRAM_STATE_TAG - INGAME_SRAM_STATE)
-#define FLAG_AT (INGAME_SRAM_STATE_FLAG - INGAME_SRAM_STATE)
+#define MARK_AT (INGAME_SRAM_STATE_MARK - INGAME_SRAM_STATE)
+#define RTS_FLAG_AT (INGAME_SRAM_RTS_FLAG - INGAME_SRAM_STATE)
+
+// A chunk on its way into the buffer: EZ-Flash's flag never goes in (an
+// /RTS file's, an older Torii's copy's)
+static void rts_flag_drop(u8 *raw, u32 at)
+{
+	if (at + STATESTORE_CHUNK == INGAME_STATE_BYTES)
+		memset(raw + STATESTORE_CHUNK - 16, 0, 16);
+}
 
 int statestore_buffer(struct ingame_state_tag *tag)
 {
-	u8 flag[16];
+	u8 mark[16];
 	buffer_io(TAG_AT, (u8 *)tag, sizeof(*tag), 0);
-	buffer_io(FLAG_AT, flag, sizeof(flag), 0);
-	return memcmp(flag, state_flag, sizeof(flag)) == 0 && tag->magic == INGAME_STATE_TAG_MAGIC;
+	buffer_io(MARK_AT, mark, sizeof(mark), 0);
+	return memcmp(mark, state_mark, sizeof(mark)) == 0 && tag->magic == INGAME_STATE_TAG_MAGIC;
 }
 
 static void tag_clear(void);
@@ -92,14 +104,15 @@ void statestore_buffer_clear(void)
 	tag_clear();
 }
 
+// Torii's mark on or off; EZ-Flash's flag always cleared, before the mark
 static void flag_set(int on)
 {
 	u8 flag[16];
+	memset(flag, 0, sizeof(flag));
+	buffer_io(RTS_FLAG_AT, flag, sizeof(flag), 1);
 	if (on)
-		memcpy(flag, state_flag, sizeof(flag));
-	else
-		memset(flag, 0, sizeof(flag));
-	buffer_io(FLAG_AT, flag, sizeof(flag), 1);
+		memcpy(flag, state_mark, sizeof(flag));
+	buffer_io(MARK_AT, flag, sizeof(flag), 1);
 }
 
 static void tag_clear(void)
@@ -219,6 +232,7 @@ static int copy_load(const char *path, u32 slot)
 		if (!ok)
 			break;
 		LZ77UnCompWram(w->packed, w->raw);
+		rts_flag_drop(w->raw, at);
 		buffer_io(at, w->raw, STATESTORE_CHUNK, 1);
 		at += STATESTORE_CHUNK;
 	}
@@ -349,10 +363,10 @@ static int keep_slot(const char *rom_path, const char *save_slot, u32 slot)
 	}
 	if (!copy_write(path, slot, e->have ? e->seq + 1 : 1, order + 1))
 		return 0;
-	// Kept: the next boot doesn't file it again. The flag goes first and
-	// stays cleared: at the boot after a cold one the FPGA's table is zeros,
-	// and a write to the buffer's page with the flag set may start its
-	// write-back (fattable.h). A launch puts a state back from its file.
+	// Kept: the next boot doesn't file it again. The mark goes first and
+	// stays cleared (as when it was EZ-Flash's flag, which a write to the
+	// buffer's page may start the FPGA's write-back with: fattable.h). A
+	// launch puts a state back from its file.
 	struct ingame_state_tag tag;
 	if (statestore_buffer(&tag)) {
 		flag_set(0);
@@ -387,9 +401,11 @@ static int import_rts(const char *rom_path, const char *save_slot, const char *r
 	for (u32 at = 0; ok && at < INGAME_STATE_BYTES; at += STATESTORE_CHUNK) {
 		ok = f_read(f, w->raw, STATESTORE_CHUNK, &got) == FR_OK && got == STATESTORE_CHUNK;
 		if (ok && at + STATESTORE_CHUNK == INGAME_STATE_BYTES)
-			ok = memcmp(w->raw + STATESTORE_CHUNK - 16, state_flag, 16) == 0;  // a state was saved
-		if (ok)
+			ok = memcmp(w->raw + STATESTORE_CHUNK - 16, rts_flag, 16) == 0;  // a state was saved
+		if (ok) {
+			rts_flag_drop(w->raw, at);
 			buffer_io(at, w->raw, STATESTORE_CHUNK, 1);
+		}
 	}
 	f_close(f);
 	if (!ok) {

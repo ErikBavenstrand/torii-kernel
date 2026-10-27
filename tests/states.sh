@@ -153,20 +153,21 @@ keep)
   kept=$(sed -n 's/^kernel: states: kept slot 2 in \([0-9]*\) frames$/\1/p' <<<"$log")
   # The next launch: slot 2 is the newest, in cart SRAM: Load state at
   # once (DOWN DOWN A: its page on slot 2, A) brings the saved frames back.
-  # A cold boot (the cart's table all zeros) whose kernel writes to the
-  # buffer start the cart's write-back too (OMEGA_RTS_KERNEL_WRITES): every
-  # write-back, the boot's and the launch's, lands in /torii/rts.bin
+  # The state preloaded and the menu opened over it (v0.8 on the real cart:
+  # Pokémon Emerald launched into a state refused the menu, EZ-Flash's flag
+  # set in the buffer and the FPGA's write-back, it seems, under the stub's
+  # reads). Torii marks a state its own way and never sets that flag, so
+  # nothing is written back, even where kernel writes to the buffer would
+  # start it too (OMEGA_RTS_KERNEL_WRITES), and the menu opens
   # shellcheck disable=SC2046 # option lists
   out=$(OMEGA_RTS_KERNEL_WRITES=1 boot $(nav_launch /Game.gba addon) -w "launch: starting the game" \
     -k @$save:L+R+START -k @$((save + 6)):- $(keys $((save + 40)) DOWN DOWN A A) $(hashed $save) \
     -f 9000 2>"$cart/log") || fail "the run stopped with status $?: $(grep -m2 'omega: ' "$cart/log")"
   log=$(cat "$cart/log")
-  range=$(sd_sectors "$cart/sd.img" /torii/rts.bin)
-  backs=$(sed -n 's/^omega: state buffer written back to sectors \([0-9]*\)-\([0-9]*\).*/\1 \2/p' <<<"$log")
-  [ -n "$backs" ] || fail "no write-back of the launch's state: the test doesn't see the table"
-  while read -r lo hi; do
-    [ "$lo" -ge "${range%-*}" ] && [ "$hi" -le "${range#*-}" ] || fail "written back to $lo-$hi, rts.bin is $range"
-  done <<<"$backs"
+  ! grep -q '^omega: state buffer written back' <<<"$log" ||
+    fail "the state buffer was written back: EZ-Flash's flag was set ($(grep -m1 'written back' <<<"$log"))"
+  grep -q 'screen ready: ingame-load' <<<"$log" || fail "the menu didn't open over the preloaded state"
+  grep -q "in-game menu: the stub didn't open it" <<<"$log" && fail "the stub refused the menu over the preloaded state"
   grep -q 'states: slot 2 in cart SRAM from /torii/states/Game.gba/Main/2.state' <<<"$log" ||
     fail "the next launch didn't put slot 2 in cart SRAM: $(grep 'states' <<<"$log" | tail -3)"
   back=$(sed -n 's/^kernel: states: put back in \([0-9]*\) frames$/\1/p' <<<"$log")
@@ -196,6 +197,11 @@ keep)
       mtype -i "$cart/sd.img" ::/RTS/Game.rts.imported >/dev/null 2>&1 || fail "/RTS/Game.rts wasn't renamed"
       ! mtype -i "$cart/sd.img" ::/RTS/Game.rts >/dev/null 2>&1 || fail "/RTS/Game.rts is still there"
     fi
+    # The file's flag never reaches cart SRAM: Torii's mark says the state is there
+    [ "$(od -A n -t x1 -j $((0xAFFF0)) -N 16 "$cart/sram.bin" | tr -d ' \n')" = 00000000000000000000000000000000 ] ||
+      fail "launch $run: EZ-Flash's write-back flag in cart SRAM"
+    [ "$(od -A n -c -j $((0xAFFD0)) -N 16 "$cart/sram.bin" | tr -d ' \n')" = TORII-STATE-OK1. ] ||
+      fail "launch $run: no state's mark in cart SRAM"
   done
   echo "PASS: states keep: an old /RTS state becomes slot 1, once"
   ;;

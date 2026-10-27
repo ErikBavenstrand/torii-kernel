@@ -19,8 +19,19 @@
 // --- Cart SRAM (byte offsets in the cart's 1 MB; page register = offset >> 12)
 #define INGAME_SRAM_BACKUP 0x20000  // the stub's backups, below
 #define INGAME_SRAM_STATE 0x40000  // the save-state buffer (to 0xAFFFF, unchanged)
-#define INGAME_SRAM_STATE_FLAG 0xAFFF0  // "EZ-OmegaRTCFILE." once a state is saved
+// Torii's mark that the buffer holds a whole state (INGAME_STATE_MARK),
+// written last by the stub's SAVE and by the kernel once it put a state
+// there; LOAD and the launch into a state need it
+#define INGAME_SRAM_STATE_MARK 0xAFFD0
+#define INGAME_STATE_MARK "TORII-STATE-OK1."  // 16 bytes, no NUL in cart SRAM
 #define INGAME_SRAM_STATE_TAG 0xAFFE0  // struct ingame_state_tag (P3)
+// EZ-Flash's flag, "EZ-OmegaRTCFILE." at the buffer's end (an /RTS file's
+// last 16 bytes): what the FPGA's write-back of the buffer to the card
+// watches (docs/research/omega-de-hardware.md). Torii never writes it set,
+// only clears it: on the real cart (v0.8, Pokémon Emerald launched into a
+// state) the stub's verify of its backups failed with it set, likely the
+// write-back running under the stub's own cart SRAM reads.
+#define INGAME_SRAM_RTS_FLAG 0xAFFF0
 #define INGAME_STATE_BYTES 0x70000  // the buffer, tag and flag included
 #define INGAME_SRAM_IMAGE 0xB0000  // the overlay's image
 #define INGAME_IMAGE_MAX 0x8000
@@ -68,7 +79,14 @@ static inline uint32_t ingame_image_check(const uint32_t *words, uint32_t n)
 }
 
 // --- Why the stub didn't open the menu, for the kernel's next boot: in cart
-// SRAM page 0xF0 (source/cartlog.h, CARTLOG_INGAME_REFUSED), 16 bytes
+// SRAM page 0xF0 (source/cartlog.h, CARTLOG_INGAME_REFUSED), 16 bytes. The
+// stub then shows white until A (the game) or B, or the menu keys held for
+// 2 s (Back to Torii); going back, it also puts the record in IWRAM just
+// under the 0x200 bytes the BIOS's SoftReset clears, where the kernel's
+// start (crt0 clears EWRAM and IWRAM's bss only; the stack is still near
+// 0x03007F00) leaves it: page 0xF0 may not take writes in game mode (a flash
+// or EEPROM save's cart SRAM, Pokémon Emerald on the real cart).
+#define INGAME_REFUSED_IWRAM 0x03007DF0u
 #define INGAME_REFUSED_MAGIC0 0x524E4954u  // "TINR"
 #define INGAME_REFUSED_MAGIC1 0x31444546u  // "FED1"
 enum {
@@ -328,7 +346,8 @@ _Static_assert(sizeof(struct ingame_cheat) % 4 == 0 && INGAME_SESSION_CHEAT(0) %
 _Static_assert(INGAME_SESSION_PATH % 4 == 0 && INGAME_PATH_BYTES % 4 == 0, "sram_copy takes words");
 _Static_assert(INGAME_WHYS <= INGAME_CHEAT_WHY + 1, "a reason fits its bits");
 _Static_assert(sizeof(struct ingame_state_tag) == 16 && offsetof(struct ingame_state_tag, autoload) == 6 &&
-		       INGAME_SRAM_STATE_TAG + 16 == INGAME_SRAM_STATE_FLAG,
+		       INGAME_SRAM_STATE_MARK + 16 == INGAME_SRAM_STATE_TAG &&
+		       INGAME_SRAM_STATE_TAG + 16 == INGAME_SRAM_RTS_FLAG && sizeof(INGAME_STATE_MARK) == 17,
 	       "the stub reads the tag's autoload byte at 0xAFFE6");
 _Static_assert(INGAME_SESSION_SAVE_SLOT % 4 == 0, "sram_copy takes words");
 _Static_assert(sizeof(struct ingame_session) % 4 == 0 && sizeof(struct ingame_session) <= INGAME_SESSION_MAX,
