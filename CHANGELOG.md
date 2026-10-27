@@ -41,6 +41,21 @@ git log, not here.
   shows its report on screen and keeps it in its own save, runs its SD test
   last and only on A, and the boot retries a card that doesn't mount three
   times before its error (ff9d5aed).
+- **Fixed (before release, data safety):** the cart's FPGA writes the
+  in-game state buffer back to the card through the launch table's runs at
+  0x300; v0.8 left them empty, and on the second cart test the walk wrapped
+  onto the launched ROM's sectors and overwrote it. Every launch now points
+  the write-back at `/torii/rts.bin`, a 448 KB file of its own whose chain is
+  checked to cover exactly that much, sent before any state-buffer write;
+  the table is checked before it is sent and a launch refuses rather than
+  send a bad one, with its own message on a card short of room; the state
+  flag is cleared before its tag; FatFs writes are fenced to the volume; a
+  ROM whose header reads blank isn't launched (ad9da2e7..cf01e697, 50c5d75a,
+  92a59bb2, 82270ca7, 9c042797).
+- **Fixed (before release):** after waking from sleep or a refused menu,
+  the game no longer sees the keys (Pokémon opened its START menu); a
+  refused menu shows a white screen while its keys are held instead of
+  stuttering, and the menu's Sleep row says START+SELECT wakes (e1714e99).
 - **Fixed:** log lines were lost while a screen ran its own loop (keypad,
   cheats, Game info); every screen's loop now flushes, and the keypad and
   frame summaries log less (ebbf28b7). Box art shows soon after boot:
