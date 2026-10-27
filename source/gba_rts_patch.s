@@ -100,7 +100,6 @@ ST_IO			= 0xA9000
 ST_FLAG			= 0xAFFD0	@;INGAME_SRAM_STATE_MARK: Torii's, never EZ-Flash's
 							@;flag at 0xAFFF0, which the FPGA's write-back watches
 TAG_PAGE		= 0xA0		@;INGAME_SRAM_STATE_TAG's 64 KB window; its autoload byte at 0xFFE6 in it
-AUTOLOAD		= 0x7A000000	@;at 0x3007FE4: load the state at the next VBlank
 
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	.arm
@@ -118,23 +117,38 @@ spend_0x80:
 	.word 0x0203FE00   @; default
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 @;Torii (v0.8): a launch into a save state. The kernel set the state tag's
-@;autoload byte in cart SRAM (INGAME_SRAM_STATE_TAG); the game's start puts
-@;AUTOLOAD at IWRAM 0x3007FE4 (the cheats' CheatRAN word), and the hook loads
-@;the state at the first VBlank it sees, clearing both. A Reset game finds
-@;the byte cleared. r0-r3 and lr are free at the game's start.
+@;autoload byte in cart SRAM (INGAME_SRAM_STATE_TAG); the game's entry
+@;clears it and, with the state's flag there, LOADs it at once, before any
+@;of the game's code, in IRQ mode as the hook would (the state's own IRQ
+@;frame returns into the game where it was saved). v0.8.0 left a mark at
+@;0x3007FE4 for the hook's first VBlank instead, which games that clear all
+@;IWRAM at their start wiped (LEGO Star Wars, Super Monkey Ball Jr.), and
+@;loaded over the game's start-up registers. A Reset game finds the byte
+@;cleared. r0-r3 and r12 are free at the game's start, and the CPU in
+@;System mode with the BIOS's stacks.
 autoload_entry:
 	mov		r0,#TAG_PAGE
 	bl		SetRampage
 	mov		r1,#0x0E000000
 	orr		r1,r1,#0xFF00			@;the byte's place in page TAG_PAGE's window
 	orr		r1,r1,#0xE6
-	ldrb	r12,[r1]			@;SetRampage keeps r12
+	ldrb	r12,[r1]
+	cmp		r12,#1
+	bne		autoload_none
+	mov		r2,#0
+	strb	r2,[r1]
+	msr		cpsr_c,#0xD2			@;IRQ mode, IRQs off, on the BIOS's IRQ stack
+	mov		r10,#REG_BASE
+	add		r3,r10,#0x200
+	strh	r2,[r3,#8]			@;IME
+	adrl	r11,spend_0x80
+	ldr		r11,[r11]
+	bl		state_flag_ok
+	beq		state_load_go
+	msr		cpsr_c,#0x1F			@;no state: System mode again
+autoload_none:
 	mov		r0,#0
 	bl		SetRampage
-	cmp		r12,#1
-	mov		r0,#0x4000000
-	moveq	r3,#AUTOLOAD
-	streq	r3,[r0,#-0x1C]
 	ldr		r0,RTS_Return_address_L
 	bx		r0
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -144,12 +158,7 @@ RTS_irq:
 	TSTEQ		R1, #0x10000000
 	LDREQ		PC, [R0,#-0xC]			@;old_interrupt_handler
 
-	ldr			r1,[r0,#-0x1C]		@;Torii: a launch into a save state
-	cmp			r1,#AUTOLOAD
-	beq			autoload_now
-
 	ldr 		r2,[r0,#REG_P1]
-autoload_back:
 
 	@; Torii: a hotkey is the mask of its keys (settings_hotkeys), and matches when
 	@; they are all held (0 in REG_P1), whatever else is: an extra or stuck key
@@ -1293,51 +1302,6 @@ gpu_shadow:
 	strh	r7,[r10,#0x54]
 	bx		lr
 
-@;Torii (v0.8): the launch into a save state, at the first VBlank: the
-@;hook's registers kept as the menu's are, the autoload marks cleared, then
-@;LOAD with the game frozen as the menu freezes it. Without a state's flag
-@;the game goes on. r0 = 0x4000000.
-autoload_now:
-	mov		r1,#0
-	str		r1,[r0,#-0x1C]
-	adrl	r12,spend_0x80
-	ldr		r12,[r12]
-	stmia	r12,{r4-r11,sp,lr}
-	mrs		r2,SPSR
-	str		r2,[r12,#0x28]
-	mov		r11,r12
-	mov		r10,r0
-	stmfd	sp!,{lr}
-	bl		state_flag_ok
-	bne		autoload_none
-	add		r2,r10,#0x200			@;WAITCNT: the page register at the BIOS's; LOAD sets the state's
-	mov		r1,#0
-	strh	r1,[r2,#4]
-	mov		r0,#TAG_PAGE			@;the tag's autoload byte cleared
-	bl		SetRampage
-	mov		r1,#0x0E000000
-	orr		r1,r1,#0xFF00
-	orr		r1,r1,#0xE6
-	mov		r2,#0
-	strb	r2,[r1]
-	ldmfd	sp!,{lr}
-	add		r2,r10,#0x200
-	mov		r1,#0
-	strh	r1,[r2,#8]			@;IME
-	add		r2,r10,#REG_DM0CNT_H	@;DMA0-3 stopped
-	mov		r3,#4
-1:	strh	r1,[r2],#0xC
-	subs	r3,r3,#1
-	bne		1b
-	b		state_load_go
-autoload_none:
-	bl		page_zero
-	ldmfd	sp!,{lr}
-	mov		r0,#REG_BASE
-	ldmia	r11,{r4-r11}
-	ldr		r2,[r0,#REG_P1]
-	b		autoload_back
-	.ltorg
 	.align
 register_list:
 	.hword 0x0000,0x0002,0x0004,0x0008,0x000A,0x000C,0x000E,0x0048

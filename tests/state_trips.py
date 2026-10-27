@@ -79,12 +79,60 @@ def launch_hook(sd_name: str, action: int) -> list[str]:
     return ["-P", f"200:nav_test_path:/{sd_name}", "-p", f"200:nav_test_action:{0x7E000000 | action}"]
 
 
+class Load:
+    """One load's replay against its save's: the first frame whose screen
+    differs and the first whose memory digest does (None: all K matched)."""
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.screen: int | None = None
+        self.memory: int | None = None
+        self.where = ""
+        self.screen_frames = 0
+        self.video: int | None = None  # the first frame VRAM, palette, OAM or a readable display register differ
+        self.replayed = False
+
+    @property
+    def kind(self) -> str:
+        """exact; drift: the memory went otherwise first and the screen, if at
+        all, only later (the game's timing after the load: a sound DMA's place,
+        which no load can give back); display: the screen went otherwise while
+        the memory and everything of the display a CPU can read were the
+        save's (write-only display registers, scroll, windows, BLDY, that the
+        game keeps no copy of: no load can give them back); fail: otherwise
+        (the picture's memory or the game went otherwise first, or the replay
+        didn't run)."""
+        if not self.replayed:
+            return "fail"
+        if self.screen is None and self.memory is None and self.video is None:
+            return "exact"
+        first = min(x for x in (self.screen, self.memory, self.video) if x is not None)
+        if self.memory == first and (self.video is None or self.video >= first):
+            return "drift"
+        if self.screen is None and self.memory is None:
+            return "drift"  # VRAM or OAM the screen doesn't show went otherwise
+        if self.screen == first and self.memory != first and self.video != first:
+            return "display"
+        return "fail"
+
+    def text(self) -> str:
+        if not self.replayed:
+            return f"{self.name}: the replay didn't finish"
+        parts = []
+        if self.screen is not None:
+            parts.append(f"screen differs from {self.screen} frames after the load ({self.screen_frames} of {K})")
+        if self.video is not None:
+            parts.append(f"VRAM, palette, OAM or display registers from {self.video}")
+        if self.memory is not None:
+            parts.append(f"memory {self.memory} frames after, at {self.where}")
+        return f"{self.name}: {', '.join(parts)}"
+
+
 class Trips:
     """What the round trips found: one entry per load, and the run's notes."""
 
     def __init__(self) -> None:
-        self.loads: list[tuple[str, str, str]] = []  # (name, "pass" | "fail", detail)
-        self.notes: list[str] = []
+        self.loads: list[Load] = []
         self.failed = ""  # a step that couldn't run
         self.saved: dict[str, tuple[int, dict]] = {}  # name -> (frame, that run's hashes)
         self.info: list[str] = []
@@ -92,18 +140,33 @@ class Trips:
 
     @property
     def status(self) -> str:
-        if self.failed or self.mixed or any(s == "fail" for _, s, _ in self.loads):
+        if self.failed or self.mixed or any(load.kind == "fail" for load in self.loads):
             return "fail"
         return "pass" if self.loads else "untested"
+
+    def counts(self) -> dict:
+        kinds = [load.kind for load in self.loads]
+        return {k: kinds.count(k) for k in ("exact", "drift", "display", "fail")}
 
     def detail(self) -> str:
         if self.failed:
             return self.failed
-        bad = [f"{n}: {d}" for n, s, d in self.loads if s == "fail"]
+        bad = [load.text() for load in self.loads if load.kind == "fail"]
         bad += [f"{n}: {m} frames of the load showed its VRAM under other display registers" for n, m in self.mixed]
         if bad:
             return "; ".join(bad)
-        return f"{len(self.loads)} loads, each {K} frames as after its save ({', '.join(n for n, _, _ in self.loads)})"
+        c = self.counts()
+        text = f"{len(self.loads)} loads, {c['exact']} frame for frame as after the save for {K} frames"
+        drift = [load.text() for load in self.loads if load.kind == "drift"]
+        if drift:
+            text += f"; {c['drift']} went otherwise in memory first (timing: {'; '.join(drift)})"
+        display = [load.text() for load in self.loads if load.kind == "display"]
+        if display:
+            text = (
+                f"write-only display registers the game keeps no copy of: {c['display']} loads showed "
+                f"otherwise ({'; '.join(display)}); {text}"
+            )
+        return text
 
     def take(self, lines: list[str], hashes: dict, log: str) -> None:
         crash = [line for line in log.splitlines() if line.startswith("crash at frame")]
@@ -118,40 +181,28 @@ class Trips:
             elif kind == "loaded":
                 name, at = words[1], int(words[2])
                 self.info.append(f"{name} loaded: {' '.join(words[3:])}")
-                self.loads.append((name, "pending", str(at)))
+                load = Load(name)
+                self.loads.append(load)
                 if name in self.saved:
                     s_at, s_hashes = self.saved[name]
-                    diff = next(
-                        (
-                            j
-                            for j in range(K)
-                            if s_at + j not in s_hashes or s_hashes.get(s_at + j) != hashes.get(at + j)
-                        ),
-                        None,
-                    )
-                    if diff is not None:
-                        self.loads[-1] = (name, "fail", f"screen differs {diff} frames after the load")
-                        continue
-                self.loads[-1] = (name, "screen ok", "")
+                    differ = [
+                        j
+                        for j in range(K)
+                        if s_at + j not in s_hashes or s_hashes.get(s_at + j) != hashes.get(at + j)
+                    ]
+                    load.screen = differ[0] if differ else None
+                    load.screen_frames = len(differ)
             elif kind == "mixed":
                 self.mixed.append((words[1], int(words[2])))
+            elif kind == "vdiffers":
+                load = next(load for load in reversed(self.loads) if load.name == words[1])
+                load.video = int(words[2][1:])
             elif kind in ("same", "differs"):
-                name = words[1]
-                i = max(i for i, e in enumerate(self.loads) if e[0] == name)
-                screen = self.loads[i]
+                load = next(load for load in reversed(self.loads) if load.name == words[1])
+                load.replayed = True
                 if kind == "differs":
-                    j, where, count = words[2], words[3], words[4]
-                    what = f"memory differs {j[1:]} frames after the load, at {where} ({count} KB blocks)"
-                    if screen[1] == "fail":
-                        what = f"{screen[2]}, {what}"
-                    self.loads[i] = (name, "fail", what)
-                elif screen[1] == "fail":
-                    self.loads[i] = screen
-                else:
-                    self.loads[i] = (name, "pass", "")
-        for i, (name, s, d) in enumerate(self.loads):
-            if s not in ("pass", "fail"):
-                self.loads[i] = (name, "fail", "the replay didn't finish")
+                    load.memory = int(words[2][1:])
+                    load.where = f"{words[3]} ({words[4]} KB blocks)"
         if crash and not self.failed:
             self.failed = crash[0]
 

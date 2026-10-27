@@ -225,6 +225,21 @@ local function digest()
 			out[#out + 1] = h
 		end
 	end
+	-- and last, one hash of what the display reads that a CPU can read too:
+	-- palette, VRAM, OAM and the readable display registers
+	local video = E:readRange(0x05000000, 0x400) .. E:readRange(0x06000000, 0x18000) .. E:readRange(0x07000000, 0x400)
+	for _, r in ipairs({ 0x00, 0x08, 0x0A, 0x0C, 0x0E, 0x48, 0x4A, 0x50, 0x52 }) do
+		video = video .. string.pack("<I2", E:read16(0x04000000 + r))
+	end
+	video = video .. string.rep("\0", (-#video) % 128)
+	local h = 0
+	for pos = 1, #video, 128 do
+		local v = { string.unpack(UNPACK, video, pos) }
+		for i = 1, 16 do
+			h = (h ~ v[i]) * 0x100000001B3
+		end
+	end
+	out[#out + 1] = h
 	if DEBUG then
 		out.raw = table.concat(raw)
 	end
@@ -341,20 +356,25 @@ local function compare(name, got)
 		log("fail no record " .. name)
 		return
 	end
+	local video, memory
 	for j = 1, K do
 		local a, b = want[j], got[j]
 		if not a or not b then
 			log(string.format("fail %s: %d frames recorded", name, #want))
 			return
 		end
+		if a[#a] ~= b[#b] and not video then
+			video = j - 1
+		end
 		local first, count = nil, 0
-		for i = 1, #a do
+		for i = 1, #a - 1 do
 			if a[i] ~= b[i] then
 				first = first or i
 				count = count + 1
 			end
 		end
-		if first then
+		if first and not memory then
+			memory = true
 			log(string.format("differs %s +%d %08X %d blocks", name, j - 1, block_address(first), count))
 			if a.raw and b.raw then
 				local shown = {}
@@ -367,10 +387,14 @@ local function compare(name, got)
 				end
 				log("debug " .. table.concat(shown, " "))
 			end
-			return
 		end
 	end
-	log(string.format("same %s %d", name, K))
+	if video then
+		log(string.format("vdiffers %s +%d", name, video))
+	end
+	if not memory then
+		log(string.format("same %s %d", name, K))
+	end
 end
 
 -- --- Steps -------------------------------------------------------------------

@@ -727,6 +727,7 @@ def check_trips(result: Result, rom: Path, sd_name: str, start_save: Path | None
     cheats = cheat_file(rom, cart)
     t = state_trips.trips(rom, sd_name, cart, seed=1, save=start_save, cheats=cheats)
     result.metrics["state trips"] = "; ".join(t.info)
+    result.metrics["state loads"] = t.counts()
     if cheats:
         result.notes.append("state trips with its cheats from tests/cheat_codes.toml on")
     result.set("state trips", "pass" if t.status == "pass" else "fail", t.detail())
