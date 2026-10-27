@@ -803,7 +803,7 @@ static u32 pat_rom_bytes, pat_rom_crc;
 const char *pat_cache_check(const u32 *words, u32 rom_size, u32 head_crc, u32 patch_length)
 {
 	const SPatchInfo2 *info = (const SPatchInfo2 *)(const void *)words;
-	const u32 *w = words + sizeof(iPatchInfo2) / 4;
+	const u32 *w = words + EMax * 2;  // after the EMax slots
 	u32 count = w[5], trim = w[6], ea = w[7] & 0xFFFFFF, room = w[12] ? w[12] : patch_length;
 	if (!head_crc || w[13] != rom_size || w[14] != head_crc)
 		return "made for another ROM (its size or first bytes differ)";
