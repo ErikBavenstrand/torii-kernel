@@ -72,8 +72,8 @@ extern uint32_t __ov_bss_start[], __ov_bss_end[];
 #define SLOT_SPRITES 5  // 32x16 sprites a line takes at most (INGAME_TEXT_W)
 #define SLOT_TILES (SLOT_SPRITES * 8)
 
-// The menu
-#define MENU_W 144
+// The menu: wide enough for its footer's line
+#define MENU_W 176
 // The cheat list: 6 rows between its title and its footer
 #define LIST_W 224
 #define LIST_ROWS 6
@@ -89,7 +89,7 @@ extern uint32_t __ov_bss_start[], __ov_bss_end[];
 #define TILE_BOX 35
 #define TILE_TICK 36
 #define TILE_TEXT 37
-#define SLOTS_MAX 11  // the menu's title, 8 rows and notice; the list's 8
+#define SLOTS_MAX 11  // the menu's title, 9 rows and footer; the list's 8
 _Static_assert(TILE_TEXT + SLOTS_MAX * SLOT_TILES <= INGAME_OBJ_MAX / 32, "the lines' tiles");
 
 // Palette banks, colour 1 of each (every tile draws with colour 1)
@@ -120,6 +120,7 @@ enum row_kind {
 	ROW_SAVE,
 	ROW_LOAD,
 	ROW_CHEATS,
+	ROW_SHOT,
 	ROW_RESET,
 	ROW_SLEEP,
 	ROW_TORII,
@@ -128,11 +129,11 @@ enum row_kind {
 };
 
 static const uint8_t row_action[ROW_KINDS] = {
-	INGAME_ACT_RESUME, INGAME_ACT_SAVE,  INGAME_ACT_LOAD,  INGAME_ACT_RESUME,
+	INGAME_ACT_RESUME, INGAME_ACT_SAVE,  INGAME_ACT_LOAD,  INGAME_ACT_RESUME, INGAME_ACT_RESUME,
 	INGAME_ACT_RESET,  INGAME_ACT_SLEEP, INGAME_ACT_TORII, INGAME_ACT_DEBUG,
 };
 static const uint8_t row_texts[ROW_KINDS] = {
-	INGAME_TEXT_RESUME, INGAME_TEXT_SAVE,  INGAME_TEXT_LOAD,  INGAME_TEXT_CHEATS_ON,
+	INGAME_TEXT_RESUME, INGAME_TEXT_SAVE,  INGAME_TEXT_LOAD,  INGAME_TEXT_CHEATS_ON, INGAME_TEXT_SHOT,
 	INGAME_TEXT_RESET,  INGAME_TEXT_SLEEP, INGAME_TEXT_TORII, INGAME_TEXT_DEBUG,
 };
 static const uint8_t why_texts[INGAME_WHYS] = {
@@ -188,6 +189,8 @@ static struct {
 	uint32_t cursor;  // a row, from 0
 	uint32_t pill_oam;
 	int pill_y, pill_to;
+	int x0;  // the panel's left edge and width
+	uint32_t panel_w;
 	uint32_t oam_next;
 	uint32_t tiles_backed;  // tiles from INGAME_OBJ_TILE backed up so far
 	uint32_t tiles_end;  // the page's tiles
@@ -206,6 +209,10 @@ static struct {
 	uint32_t states;
 	uint32_t buffer_slot, buffer_kept;
 	uint32_t saved_slot;  // a SAVE's slot, for the answer
+	uint32_t shot;  // a screenshot waits for the kernel (this time or before)
+	uint32_t shot_now;  // and this opening took it
+	// The display's registers as the game left them (io_readable's), for a screenshot
+	uint16_t io[11];
 } m;
 
 // --- Small helpers ------------------------------------------------------------
@@ -285,6 +292,8 @@ static void bit_set(uint32_t *bits, uint32_t n, int on)
 
 static void obj(int x, int y, uint32_t shape, uint32_t size, uint32_t tile, uint32_t bank, uint32_t a0, uint32_t a1)
 {
+	if (m.oam_next >= 128)
+		return;
 	volatile uint16_t *o = OAM + m.oam_next * 4;
 	o[0] = (uint16_t)(((uint32_t)y & 0xFF) | a0 | shape << 14);
 	o[1] = (uint16_t)(((uint32_t)x & 0x1FF) | a1 | size << 14);
@@ -406,6 +415,8 @@ static uint32_t text_at(uint32_t text)
 static uint32_t line_width(uint32_t sram)
 {
 	uint32_t word = 0;
+	if (m.have_session && sram >= text_at(0) && sram < text_at(INGAME_TEXTS))
+		return session()->text_width[(sram - text_at(0)) / sizeof(struct ingame_line)];
 	if (m.have_session && sram)
 		sram_in(INGAME_SRAM_SESSION + sram, &word, 4);
 	return word & 0xFFFF;
@@ -538,7 +549,14 @@ static uint32_t footer_text(void)
 	return text_at(why_texts[why]);
 }
 
-// Slot k's line and check box as its row is now
+// The menu's footer: the DEBUG notice, that a screenshot waits, or the keys
+static uint32_t menu_footer(void)
+{
+	return (m.flags & INGAME_NOTICE_DEBUG) ? INGAME_TEXT_DEBUG_SAVED
+	       : m.shot                        ? INGAME_TEXT_SHOT_SAVED
+					       : INGAME_TEXT_HINT;
+}
+
 // Slot k's line now, as a session block offset (0: none)
 static uint32_t slot_text(uint32_t k)
 {
@@ -548,7 +566,7 @@ static uint32_t slot_text(uint32_t k)
 			       : m.page == PAGE_LOAD ? INGAME_TEXT_LOAD
 						     : INGAME_TEXT_TITLE);
 	if (m.footer && k == m.title + m.visible)
-		return m.page == PAGE_MENU ? text_at(INGAME_TEXT_DEBUG_SAVED) : footer_text();
+		return m.page == PAGE_MENU ? text_at(menu_footer()) : footer_text();
 	int r = slot_row(k);
 	return r >= 0 ? row_text((uint32_t)r) : 0;
 }
@@ -640,16 +658,20 @@ static void build_page(enum page_id page, uint32_t cursor)
 		}
 		if (f & INGAME_CAN_CHEATS)
 			add_row(ROW_CHEATS, 0);
+		if (m.have_session)
+			add_row(ROW_SHOT, 0);
 		add_row(ROW_RESET, 0);
 		add_row(ROW_SLEEP, 0);
 		add_row(ROW_TORII, 0);
 		if (f & INGAME_CAN_DEBUG)
 			add_row(ROW_DEBUG, 0);
-		uint32_t notice = (f & INGAME_NOTICE_DEBUG) ? 1 : 0;
+		// The footer (the keys, or a notice) when the screen takes it, or
+		// the DEBUG notice; then the title, room left
 		m.visible = m.rows;
-		m.footer = notice;
+		uint32_t h = PANEL_PAD * 2 + m.rows * ROW_H;
+		m.footer = (f & INGAME_NOTICE_DEBUG) || (m.have_session && h + ROW_H <= SCREEN_H);
+		h += m.footer * ROW_H;
 		panel_w = MENU_W;
-		uint32_t h = PANEL_PAD * 2 + (m.rows + notice) * ROW_H;
 		m.title = h + ROW_H + TITLE_GAP <= SCREEN_H - 8;  // the title goes when the screen can't take it
 	} else if (page == PAGE_SAVE || page == PAGE_LOAD) {
 		m.rows = INGAME_STATE_SLOTS;
@@ -708,22 +730,27 @@ static void build_page(enum page_id page, uint32_t cursor)
 				uint32_t w3 = line_width(text_at(INGAME_TEXT_CHEATS_ON));
 				w = w2 > w3 ? w2 : w3;
 			}
+			if (m.footer && k == m.title + m.visible)  // the widest of its lines
+				for (uint32_t l = INGAME_TEXT_SHOT_SAVED; l <= INGAME_TEXT_HINT; l++)
+					if (line_width(text_at(l)) > w)
+						w = line_width(text_at(l));
 			max = (w + 31) / 32;
-			max = max < 1 ? 1 : max > 4 ? 4 : max;
+			max = max < 1 ? 1 : max > SLOT_SPRITES ? SLOT_SPRITES : max;
 		}
 		sl->max = (uint8_t)max;
 		tile += max * 8;
+		// Its sprites' places in OAM, kept for build_text: the panel
+		// shows sooner without them
 		sl->oam = (uint8_t)m.oam_next;
+		m.oam_next += max;
 		sl->check = 0;
-		for (uint32_t j = 0; j < sl->max; j++)
-			obj(x0 + TEXT_INSET + (int)j * 32, y, SHAPE_WIDE, 2, sl->tile + j * 8, BANK_TEXT, A0_HIDE, 0);
 		int row = k >= m.title && k < m.title + m.visible;
-		if (page == PAGE_CHEATS && row) {
-			sl->check = (uint8_t)(m.oam_next + 1);
-			obj(x0 + (int)panel_w - CHECK_INSET, y + 4, SHAPE_SQUARE, 0, TILE_BOX, BANK_TEXT, A0_HIDE, 0);
-		}
+		if (page == PAGE_CHEATS && row)
+			sl->check = (uint8_t)(++m.oam_next);
 		y += m.title && k == 0 ? ROW_H + TITLE_GAP : ROW_H;
 	}
+	m.x0 = x0;
+	m.panel_w = panel_w;
 	m.cursor = cursor < m.rows ? cursor : 0;
 	if (page == PAGE_MENU && row_greyed(m.cursor))
 		m.cursor = next_row(m.cursor, 1);
@@ -754,11 +781,27 @@ static void build_page(enum page_id page, uint32_t cursor)
 }
 
 // The text: its tiles backed up and drawn; its sprites shown at the next VBlank
-static void build_text(void)
+// Slots from..to-1 drawn: their sprites (hidden) and check boxes in the
+// places build_page kept, their tiles backed up and drawn; shown at the
+// next VBlank
+static void build_text(uint32_t from, uint32_t to)
 {
-	tiles_need(m.tiles_end);
+	uint32_t next = m.oam_next;
+	for (uint32_t k = from; k < to; k++) {
+		const struct slot *sl = &m.slots[k];
+		m.oam_next = sl->oam;
+		for (uint32_t j = 0; j < sl->max; j++)
+			obj(m.x0 + TEXT_INSET + (int)j * 32, sl->y, SHAPE_WIDE, 2, sl->tile + j * 8, BANK_TEXT, A0_HIDE,
+			    0);
+		if (sl->check)
+			obj(m.x0 + (int)m.panel_w - CHECK_INSET, sl->y + 4, SHAPE_SQUARE, 0, TILE_BOX, BANK_TEXT,
+			    A0_HIDE, 0);
+	}
+	m.oam_next = next;
+	tiles_need(to < m.title + m.visible + m.footer ? m.slots[to].tile : m.tiles_end);
 	m.text_shown = 1;
-	slots_update();
+	for (uint32_t k = from; k < to; k++)
+		slot_update(k);
 }
 
 // Waits until no key in mask is held
@@ -773,7 +816,7 @@ static void page_open(enum page_id page, uint32_t cursor)
 {
 	vsync();
 	build_page(page, cursor);
-	build_text();
+	build_text(0, m.title + m.visible + m.footer);
 	if (page == PAGE_CHEATS)
 		debug_print("screen ready: ingame-cheats");
 	else if (page == PAGE_SAVE)
@@ -820,6 +863,7 @@ static void list_pick(uint32_t r)
 }
 
 static void state_mark(uint32_t slot);
+static void shot_take(void);
 
 // Runs the menu until a choice; returns its INGAME_ACT_*
 static uint32_t run(uint32_t menu_key)
@@ -888,6 +932,12 @@ static uint32_t run(uint32_t menu_key)
 				page_open(PAGE_LOAD, m.buffer_slot - 1);
 				continue;
 			}
+			if (kind == ROW_SHOT) {
+				shot_take();
+				if (m.footer)
+					slot_update(m.title + m.visible);
+				continue;
+			}
 			if (kind == ROW_CHEATS) {
 				if (m.cheats) {
 					page_open(PAGE_CHEATS, LIST_FIXED);
@@ -936,6 +986,8 @@ static void answer(uint32_t act)
 	out.action = (uint16_t)act;
 	if (act == INGAME_ACT_SAVE && m.saved_slot)
 		out.pending_state = (uint16_t)m.saved_slot;
+	if (m.shot_now)
+		out.screenshot = 1;
 	int as_launched = act == INGAME_ACT_RESET || act == INGAME_ACT_LOAD;  // both zero the toggles
 	if (m.changed || (as_launched && out.cheats_changed)) {
 		const uint32_t *on = as_launched ? m.launched : m.on;
@@ -963,6 +1015,56 @@ static void states_load(void)
 	}
 }
 
+// --- The screenshot (P4) -------------------------------------------------------
+
+// The display's registers the hardware reads back (halfword indexes from
+// 0x04000000): DISPCNT, DISPSTAT, VCOUNT, BG0-3CNT, WININ, WINOUT, BLDCNT,
+// BLDALPHA; the rest are write-only and stay 0 in the dump
+static const uint8_t io_readable[] = {0x00, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x24, 0x25, 0x28, 0x29};
+_Static_assert(sizeof(io_readable) == sizeof(m.io) / 2, "m.io holds them");
+
+// n bytes from cart SRAM at from to cart SRAM at to, through the session
+// head's words (the caller reads them again): no buffer of its own, as
+// every byte of the window costs the menu's opening time
+static void sram_move(uint32_t from, uint32_t to, uint32_t n)
+{
+	const uint32_t chunk = sizeof(session_words) & ~3u;
+	for (uint32_t at = 0; at < n; at += chunk) {
+		uint32_t part = n - at < chunk ? n - at : chunk;
+		sram_in(from + at, session_words, part);
+		sram_out(to + at, session_words, part);
+	}
+}
+
+// The game's screen as it was under the menu into INGAME_SRAM_SHOT, for the
+// kernel's next boot: VRAM and the BG palette as they are, the OBJ palette,
+// OAM and the OBJ tiles the menu drew over from the stub's backups, the
+// registers read at opening; the magic last
+static void shot_take(void)
+{
+	struct ingame_shot h;
+	memset(&h, 0, sizeof(h));
+	sram_out(INGAME_SRAM_SHOT, &h, sizeof(h));  // no magic while it is written
+	sram_out(INGAME_SHOT_PAL, (const void *)0x05000000, 0x200);
+	sram_move(INGAME_BACKUP_OBJ_PAL, INGAME_SHOT_PAL + 0x200, 0x200);
+	sram_move(INGAME_BACKUP_OAM, INGAME_SHOT_OAM, 0x400);
+	uint32_t drawn = m.tiles_backed * 32, obj_at = INGAME_OBJ_VRAM - 0x06000000;
+	sram_out(INGAME_SHOT_VRAM, (const void *)0x06000000, obj_at);
+	sram_move(INGAME_BACKUP_OBJ, INGAME_SHOT_VRAM + obj_at, drawn);
+	sram_out(INGAME_SHOT_VRAM + obj_at + drawn, (const void *)(INGAME_OBJ_VRAM + drawn),
+		 INGAME_SHOT_VRAM_BYTES - obj_at - drawn);
+	sram_in(INGAME_SRAM_SESSION, session_words, sizeof(session_words));  // after sram_move
+	h.version = 1;
+	h.bytes = sizeof(h);
+	for (uint32_t i = 0; i < sizeof(io_readable); i++)
+		h.io[io_readable[i]] = m.io[i];
+	sram_out(INGAME_SRAM_SHOT, &h, sizeof(h));
+	h.magic = INGAME_SHOT_MAGIC;
+	sram_out(INGAME_SRAM_SHOT, &h, 4);
+	m.shot = m.shot_now = 1;
+	debug_print("ingame: screenshot dumped");
+}
+
 uint32_t ov_entry(const struct ingame_call *call);
 
 uint32_t ov_entry(const struct ingame_call *call)
@@ -972,6 +1074,8 @@ uint32_t ov_entry(const struct ingame_call *call)
 		__ov_bss_start[i] = 0;
 	m.call = call;
 	m.flags = call->flags;
+	for (uint32_t i = 0; i < sizeof(io_readable); i++)  // before the menu changes them
+		m.io[i] = REG16(0x04000000 + io_readable[i] * 2);
 	ov_header.shown = 0;
 	ov_header.obj_bytes = 0;
 	hide_all();  // the game's sprites go at once
@@ -981,6 +1085,11 @@ uint32_t ov_entry(const struct ingame_call *call)
 	uint32_t menu_key = m.have_session && s->menu_key ? s->menu_key : MENU_KEY_DEFAULT;
 	cheats_load();
 	states_load();
+	if (m.have_session) {  // a screenshot taken at an earlier opening still waits
+		struct ingame_out out;
+		sram_in(INGAME_SRAM_SESSION + INGAME_SESSION_OUT, &out, sizeof(out));
+		m.shot = out.magic == INGAME_OUT_MAGIC && out.screenshot;
+	}
 
 	build_page(PAGE_MENU, 0);
 	uint16_t dispcnt = REG_DISPCNT;
@@ -989,9 +1098,13 @@ uint32_t ov_entry(const struct ingame_call *call)
 	REG_BLDALPHA = DIM_EVB << 8;
 	REG_DISPCNT = (uint16_t)((dispcnt & ~DISPCNT_OFF_BITS) | DISPCNT_OBJ | DISPCNT_1D);
 	ov_header.shown = 1;
-	build_text();
+	// The title and rows, then the footer a frame later: its 40 tiles to
+	// back up kept the rows from showing within a frame of the panel
+	uint32_t rows = m.title + m.visible;
+	build_text(0, rows);
 	vsync();
 	ov_header.shown = 2;
+	build_text(rows, rows + m.footer);
 	debug_print("screen ready: ingame");
 
 	wait_release(menu_key);

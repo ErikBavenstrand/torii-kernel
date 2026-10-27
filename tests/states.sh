@@ -112,7 +112,7 @@ stub_frames() {
 }
 
 # Save state into SLOT_DOWNS + 1 (DOWN on the Save page that many times),
-# then Back to Torii (Resume, Save, Load, Reset, Sleep, Torii); the frames
+# then Back to Torii (UP from Resume: the last row); the frames
 # after the save hashed
 save_and_quit() {
   local downs=() i
@@ -121,7 +121,7 @@ save_and_quit() {
   # shellcheck disable=SC2046 # option lists
   "$@" $(nav_launch /Game.gba addon) -w "launch: starting the game" \
     -k @$save:L+R+START -k @$((save + 6)):- $(keys $((save + 40)) DOWN A "${downs[@]}" A) $(hashed $save) \
-    -k @$load:L+R+START -k @$((load + 6)):- $(keys $((load + 40)) DOWN DOWN DOWN DOWN DOWN A) \
+    -k @$load:L+R+START -k @$((load + 6)):- $(keys $((load + 40)) UP A) \
     -w "in-game: back from /Game.gba" -f 9000 -u "home ready"
 }
 

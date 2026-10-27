@@ -19,6 +19,7 @@
 #include "ingame.h"
 #include "ingame_abi.h"
 #include "settings_model.h"
+#include "shotstore.h"
 #include "statestore.h"
 #include "tlog.h"
 #include "ui/dialog.h"
@@ -313,6 +314,14 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 	}
 	bad += sram_put(INGAME_SRAM_SESSION, (const u8 *)words, sizeof(words));
 	const struct lang_ingame *t = gl_ingame;
+	// The menu's footer: its keys as Settings shows them, then the hint
+	char hint[48];
+	u8 keys[3];
+	u32 n = settings_keys_list(h->menu_key, keys), len = 0;
+	hint[0] = 0;
+	for (u32 i = 0; i < n; i++)
+		len += (u32)snprintf(hint + len, sizeof(hint) - len, "%s%s", i ? "+" : "", settings_key_name(keys[i]));
+	snprintf(hint + len, sizeof(hint) - len, "%s", t->hint);
 	const char *const text[INGAME_TEXTS] = {
 		[INGAME_TEXT_TITLE] = h->name[0] ? h->name : "Torii",
 		[INGAME_TEXT_RESUME] = t->resume,
@@ -339,13 +348,19 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 		[INGAME_TEXT_STATE_LOAD] = t->state_load,
 		[INGAME_TEXT_STATE_ELSEWHERE] = t->state_elsewhere,
 		[INGAME_TEXT_STATE_EMPTY] = t->state_empty,
+		[INGAME_TEXT_SHOT] = t->shot,
+		[INGAME_TEXT_SHOT_SAVED] = t->shot_saved,
+		[INGAME_TEXT_HINT] = hint,
 	};
 	for (u32 i = 0; i < INGAME_TEXTS; i++) {
 		struct ingame_line line;
 		TLOG_ASSERT(text[i]);
 		line_draw(&line, text[i], strlen(text[i]));
 		bad += sram_put(INGAME_SRAM_SESSION + INGAME_SESSION_TEXT(i), (const u8 *)&line, sizeof(line));
+		h->text_width[i] = line.width;
 	}
+	// The head again, with the lines' widths
+	bad += sram_put(INGAME_SRAM_SESSION, (const u8 *)words, sizeof(words));
 	char path[INGAME_PATH_BYTES];
 	memset(path, 0, sizeof(path));
 	if (rom_path)
@@ -481,8 +496,15 @@ void ingame_after_game(void)
 	states_after_game(h, path);
 	if (out.cheats_changed && h->cheat_count)
 		cheats_keep(h, path, &out);
+	// A screenshot the card didn't take waits for the next boot
+	u32 shot_left = out.screenshot && !shotstore_file(h->name);
 	// Done with: the answer goes, so the next boot does nothing again
 	memset(&out, 0, sizeof(out));
+	if (shot_left) {
+		out.magic = INGAME_OUT_MAGIC;
+		out.pending_state = 0xFFFF;
+		out.screenshot = 1;
+	}
 	sram_put(INGAME_SRAM_SESSION + INGAME_SESSION_OUT, (const u8 *)&out, sizeof(out));
 	SetRampage(0);
 }

@@ -76,6 +76,11 @@
 //   dialog draws): save states (statestore.c, struct states_work) on their
 //   way between cart SRAM and the card, within one statestore_* call: a
 //   chunk, it packed, the packer's hash, a path and the file.
+// - READCACHE_SHOT, all 128 KB from the start: an in-game screenshot on its
+//   way from cart SRAM to a BMP on the card (shotstore.c, struct shot_work),
+//   within shotstore_file at boot: the dump's VRAM, palettes and OAM, the
+//   renderer's lines, the file. Its notice is drawn before it starts and
+//   taken down after, so no frame runs a job step meanwhile.
 #define MAX_pReadCache_size 0x20000
 #define READCACHE_STAGE 0x0
 #define READCACHE_STAGE_SIZE 0x8000
@@ -110,6 +115,8 @@
 #define READCACHE_CHEATS_SIZE 0x18000
 #define READCACHE_STATES 0x8000
 #define READCACHE_STATES_SIZE 0x14000
+#define READCACHE_SHOT 0x0
+#define READCACHE_SHOT_SIZE 0x20000
 
 #define MAX_NOR 0x40
 

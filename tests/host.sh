@@ -6,7 +6,7 @@ set -euo pipefail
 
 # Each file compiles once, in parallel, and is cached (tools/hostcc.py)
 python3 tools/hostcc.py dist/host/tests \
-  source/sdlist.c source/cheatfile.c source/keypad_edit.c source/cheatcode.c source/cheatlower.c source/charset.c source/irqpatch.c source/savename.c source/progress_calc.c source/logbuf.c source/lz77.c source/logcheck.c source/eepromprobe.c source/norlist.c source/setrecord.c source/bootloader.c source/crc32.c source/fmt.c source/namesdb.c source/gamename.c source/settings_model.c source/lang.c source/library.c source/artkey.c source/artpack.c source/rename_edit.c source/saveslot.c source/orphanplan.c source/gamerec.c \
+  source/sdlist.c source/cheatfile.c source/keypad_edit.c source/cheatcode.c source/cheatlower.c source/charset.c source/irqpatch.c source/savename.c source/progress_calc.c source/logbuf.c source/lz77.c source/ppu_render.c source/logcheck.c source/eepromprobe.c source/norlist.c source/setrecord.c source/bootloader.c source/crc32.c source/fmt.c source/namesdb.c source/gamename.c source/settings_model.c source/lang.c source/library.c source/artkey.c source/artpack.c source/rename_edit.c source/saveslot.c source/orphanplan.c source/gamerec.c \
   source/safefile_scan.c source/userdata.c source/screens/registry.c source/screens/carousel_ring.c source/screens/settings_layout.c \
   source/engine/motion.c source/engine/ease_lut.c source/engine/input.c \
   source/engine/pool.c source/engine/res.c source/engine/budget.c \

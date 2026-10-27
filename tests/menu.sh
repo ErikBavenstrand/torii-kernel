@@ -142,7 +142,8 @@ run() {
   return 0
 }
 # The rows, the cursor on Resume: Save state, Load state (greyed until a
-# state is saved, and skipped), Reset game, Sleep, Back to Torii
+# state is saved, and skipped), Screenshot (tests/screenshot.sh), Reset
+# game, Sleep, Back to Torii (the last: UP from Resume)
 
 # A save state round trip: SAVE (down one, A: its slots, A: slot 1), and later
 # LOAD (down two, A: its slots, on slot 1, A).
@@ -183,19 +184,19 @@ grep -q '^crash at frame' <<<"$log" && fail "crashed in the extra-key run"
 grep -q 'screen ready: ingame' <<<"$log" || fail "L+R+START with DOWN held didn't open the menu"
 
 # Reset game: the game starts again from its ROM, without the kernel, and runs
-run reset DOWN DOWN A -- -h $((key + 400)) -h $((key + 420)) -f $((key + 420))
+run reset DOWN DOWN DOWN A -- -h $((key + 400)) -h $((key + 420)) -f $((key + 420))
 [ "$(grep -c '^omega [0-9]*: game started' <<<"$log")" = 2 ] || fail "Reset game didn't start the game again"
 ! sed -n '/^omega [0-9]*: game started/,$p' <<<"$log" | grep -q '^omega [0-9]*: mode kernel' ||
   fail "Reset game went back to the kernel"
 [ "$(awk '$1 == "hash" { print $4 }' <<<"$out" | sort -u | wc -l)" = 2 ] || fail "the game didn't run after Reset game"
 
 # Sleep: the BIOS's Stop (mgba-shot says so and goes on), then the game again
-run sleep DOWN DOWN DOWN A -- -h $((key + 400)) -h $((key + 420)) -f $((key + 420))
+run sleep DOWN DOWN DOWN DOWN A -- -h $((key + 400)) -h $((key + 420)) -f $((key + 420))
 grep -q '^stop at frame' <<<"$log" || fail "Sleep didn't stop the CPU"
 [ "$(awk '$1 == "hash" { print $4 }' <<<"$out" | sort -u | wc -l)" = 2 ] || fail "the game didn't go on after Sleep"
 
 # Back to Torii: the kernel's ROM page and a reset into it
-run torii DOWN DOWN DOWN DOWN A -- -f $((key + 300))
+run torii UP A -- -f $((key + 300))
 sed -n '/^omega [0-9]*: game started/,$p' <<<"$log" | grep -q '^omega [0-9]*: mode kernel' ||
   fail "Back to Torii didn't go back to the kernel"
 

@@ -435,6 +435,9 @@ struct lang_ingame {
 	const char *why_rom, *why_locked, *why_cant, *why_room, *why_slow;
 	// The state slots' pages (v0.8 P3): their footers
 	const char *state_keep, *state_replaces, *state_load, *state_elsewhere, *state_empty;
+	// The screenshot (v0.8 P4): its row and the footer once taken; the
+	// menu's footer, after its keys ("L+R+START" then hint)
+	const char *shot, *shot_saved, *hint;
 };
 extern const struct lang_ingame *gl_ingame;
 
@@ -454,6 +457,10 @@ struct lang_states {
 	const char *keeping;  // the progress dialog's title; its text the slot (EN_STATE_SLOT)
 	const char *none;  // the popup's Load state with no state on the card
 	const char *not_kept;  // filing it failed
+	// A launch into a slot that doesn't read: the question's title and text
+	const char *unreadable, *start_anyway;
+	// The in-game screenshot's notice at boot, and its failure
+	const char *shot_saving, *shot_failed;
 };
 extern const struct lang_states *gl_states;
 

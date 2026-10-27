@@ -34,6 +34,7 @@
 #include "diskstat.h"
 #include "fathint.h"
 #include "saveorphan.h"
+#include "shotstore.h"
 #include "slotstore.h"
 #include "saveslot.h"
 #include "charset.h"
@@ -1523,6 +1524,7 @@ int main(void)
 	fathint_start();  // the FAT's first free cluster, while the boot's screens show
 	slotstore_recover();  // a slot rename or delete the power cut short, before any save is touched
 	saveorphan_recover();  // a relink or delete of an orphaned save the same
+	shotstore_recover();  // a screenshot a power cut left half written
 	slotstore_trash_purge(NULL);  // deleted slots past their 30 days
 
 	// Diagnostics also starts from these keys held at power-on, in case the

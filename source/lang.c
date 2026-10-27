@@ -794,6 +794,9 @@ static const struct lang_ingame en_ingame = {
 	.state_load = "A goes back to this point",
 	.state_elsewhere = "Load it from the game in Torii",
 	.state_empty = "Nothing saved in this slot",
+	.shot = "Screenshot",
+	.shot_saved = "Saved when you return to Torii",
+	.hint = " or B: resume",
 };
 
 static const struct lang_states en_states = {
@@ -801,6 +804,10 @@ static const struct lang_states en_states = {
 	.keeping = "Keeping the save state",
 	.none = "No save states yet.\nSave one from the in-game menu.",
 	.not_kept = "The save state wasn't kept:\nthe card didn't take it.",
+	.unreadable = "This state can't be read",
+	.start_anyway = "A starts the game anyway,\nfrom its start. B goes back.",
+	.shot_saving = "Saving the screenshot",
+	.shot_failed = "The screenshot wasn't saved:\nthe card didn't take it.",
 };
 
 //---------------------------------------------------------------------------------

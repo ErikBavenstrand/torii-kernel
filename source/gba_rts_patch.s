@@ -651,36 +651,66 @@ sc_done:
 	bx		lr
 	.ltorg
 	@;r5 bytes (a multiple of 4, not 0) between RAM at r1 and SRAM at r6;
-	@;uses r4 and r7
-	.thumb
-sc_in:
-	ldrb	r4,[r6]
-	ldrb	r7,[r6,#1]
+	@;uses r4 and r7. Four words a pass while 16 bytes are left, then a
+	@;word a pass: the loop's own instructions took a sixth of the time,
+	@;and the menu's opening is these copies (v0.8 P4)
+	.macro	sc_in_word at
+	ldrb	r4,[r6,#\at]
+	ldrb	r7,[r6,#\at+1]
 	lsl		r7,r7,#8
 	orr		r4,r7
-	ldrb	r7,[r6,#2]
+	ldrb	r7,[r6,#\at+2]
 	lsl		r7,r7,#16
 	orr		r4,r7
-	ldrb	r7,[r6,#3]
+	ldrb	r7,[r6,#\at+3]
 	lsl		r7,r7,#24
 	orr		r4,r7
 	stmia	r1!,{r4}
+	.endm
+	.macro	sc_out_word at
+	ldmia	r1!,{r4}
+	strb	r4,[r6,#\at]
+	lsr		r4,r4,#8
+	strb	r4,[r6,#\at+1]
+	lsr		r4,r4,#8
+	strb	r4,[r6,#\at+2]
+	lsr		r4,r4,#8
+	strb	r4,[r6,#\at+3]
+	.endm
+	.thumb
+sc_in:
+	cmp		r5,#16
+	blt		sc_in1
+	sc_in_word 0
+	sc_in_word 4
+	sc_in_word 8
+	sc_in_word 12
+	add		r6,#16
+	sub		r5,#16
+	bne		sc_in
+	bx		lr
+sc_in1:
+	sc_in_word 0
 	add		r6,#4
 	sub		r5,#4
-	bgt		sc_in
+	bgt		sc_in1
 	bx		lr
 sc_out:
-	ldmia	r1!,{r4}
-	strb	r4,[r6]
-	lsr		r4,r4,#8
-	strb	r4,[r6,#1]
-	lsr		r4,r4,#8
-	strb	r4,[r6,#2]
-	lsr		r4,r4,#8
-	strb	r4,[r6,#3]
+	cmp		r5,#16
+	blt		sc_out1
+	sc_out_word 0
+	sc_out_word 4
+	sc_out_word 8
+	sc_out_word 12
+	add		r6,#16
+	sub		r5,#16
+	bne		sc_out
+	bx		lr
+sc_out1:
+	sc_out_word 0
 	add		r6,#4
 	sub		r5,#4
-	bgt		sc_out
+	bgt		sc_out1
 	bx		lr
 	.align	2
 	.arm

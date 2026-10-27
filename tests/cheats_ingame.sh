@@ -126,12 +126,12 @@ toggle)
   echo "PASS: cheats_ingame toggle: the list turns a picked cheat off and others on from the next frame, and greyed rows (a ROM patch, a placeholder, past the cycle cap) stay off"
 
   # The same toggles, then B to the menu on its Cheats row and Back to Torii
-  # (past Reset game and Sleep): the kernel's boot keeps the toggles as picks
+  # (past Screenshot, Reset game and Sleep): the kernel's boot keeps the toggles as picks
   before=$(file_picks)
   # shellcheck disable=SC2046 # option lists
   boot $(nav_launch /Hello.gba addon) -w "launch: starting the game" \
     -k @$menu:L+R+START -k @$((menu + 6)):- \
-    $(keys $((menu + 16)) DOWN DOWN A) $(keys $list A DOWN A DOWN DOWN DOWN A B DOWN DOWN DOWN A) \
+    $(keys $((menu + 16)) DOWN DOWN A) $(keys $list A DOWN A DOWN DOWN DOWN A B DOWN DOWN DOWN DOWN A) \
     -w "in-game: back from /Hello.gba" -f 6000 -u "home ready" >/dev/null 2>"$cart/log"
   log=$(cat "$cart/log")
   grep -q 'cheats: /Hello.gba: 3 picks changed in game' <<<"$log" ||
@@ -159,7 +159,7 @@ cut)
     # shellcheck disable=SC2046 # option lists
     cut_run "$@" $(nav_launch /Hello.gba addon) -w "launch: starting the game" \
       -k @$menu:L+R+START -k @$((menu + 6)):- \
-      $(keys $((menu + 16)) DOWN DOWN A) $(keys $list A DOWN A DOWN DOWN DOWN A B DOWN DOWN DOWN A) \
+      $(keys $((menu + 16)) DOWN DOWN A) $(keys $list A DOWN A DOWN DOWN DOWN A B DOWN DOWN DOWN DOWN A) \
       -w "in-game: back from /Hello.gba" -f 6000 -u "home ready"
   }
   check() {
