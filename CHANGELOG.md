@@ -4,6 +4,13 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Changed:** the game popup's Load state list cut "Slot N" to "S..." (its
+  date filled the row): it is titled Load state now, and each row shows the
+  slot's number and how long ago it was saved, as Recent does ("2h ago"),
+  or its date when the clock can't tell (6ec9be8b).
+
 ## v0.8.1
 
 - **Fixed:** Load state at a game's title or intro gave a black screen:
