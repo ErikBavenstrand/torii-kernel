@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
@@ -340,6 +341,20 @@ static void report_rumble_probe(void)
 	}
 }
 
+// The in-game probe ROM's report copy in its own save (cart SRAM page 0)
+#define SAVE_COPY (0x0E000000 + INGAME_PROBE_SAVE_OFFSET)
+
+void cartlog_mount_failed(void)
+{
+	struct ingame_probe *p = &block.ingame;
+	SetRampage(0);
+	ReadSram(SAVE_COPY, (u8 *)p, sizeof(*p));
+	if (memcmp(p->magic, INGAME_PROBE_MAGIC, 16) != 0 || p->mount_failed == 0xFF)
+		return;
+	p->mount_failed++;
+	WriteSram(SAVE_COPY + offsetof(struct ingame_probe, mount_failed), &p->mount_failed, 1);
+}
+
 // The in-game probe ROM's report (tests/roms/ingame, v0.8 P0): what the
 // cart did in game mode, for the in-game menu
 static void report_ingame_probe(void)
@@ -352,12 +367,48 @@ static void report_ingame_probe(void)
 		"a write didn't answer",
 		"the probe's bytes didn't read back",
 		"the kernel's bytes didn't read back after",
+		"not run (the probe stopped in it, or the cart was off before A or B)",
+		"skipped (B)",
 	};
+	static const char *const saved[] = {"didn't read back", "byte writes (SRAM)", "flash commands"};
 	struct ingame_probe *p = &block.ingame;
+	// Page 0xF0's copy, or, when a power cycle lost it, the one in the
+	// probe's save (battery-backed); either is cleared once logged
+	int from_save = 0;
 	cart_read(CARTLOG_INGAME_PROBE, p, sizeof(*p));
-	if (memcmp(p->magic, INGAME_PROBE_MAGIC, 16) != 0)
-		return;
-	cart_clear_magic(CARTLOG_INGAME_PROBE, 16);
+	if (memcmp(p->magic, INGAME_PROBE_MAGIC, 16) != 0) {
+		ReadSram(SAVE_COPY, (u8 *)p, sizeof(*p));  // page 0 is set
+		if (memcmp(p->magic, INGAME_PROBE_MAGIC, 16) != 0)
+			return;
+		from_save = 1;
+	} else {
+		cart_clear_magic(CARTLOG_INGAME_PROBE, 16);
+	}
+	u8 save_returning = 0, save_mount_failed = 0;
+	{
+		struct ingame_probe s;
+		ReadSram(SAVE_COPY, (u8 *)&s, sizeof(s));
+		if (memcmp(s.magic, INGAME_PROBE_MAGIC, 16) == 0) {
+			save_returning = s.returning;
+			save_mount_failed = s.mount_failed;
+			static const u8 blank[16];
+			WriteSram(SAVE_COPY, (u8 *)blank, 16);
+		}
+	}
+	if (from_save)
+		tlog_force(TLOG_INFO,
+			   "in-game probe: the report from its save: cart RAM page 0xF0 lost it, so the cart was off "
+			   "since; A %s",
+			   save_returning ? "was pressed (the soft reset back to the kernel began)"
+					  : "wasn't pressed: the cart was turned off at the probe's screen");
+	else
+		tlog_force(TLOG_INFO, "in-game probe: the report from cart RAM page 0xF0 (the soft reset kept it)");
+	if (save_mount_failed)
+		tlog_force(TLOG_ERRORS, "in-game probe: %u boots since the probe found the card wouldn't mount",
+			   save_mount_failed);
+	if (!from_save)
+		tlog_force(TLOG_INFO, "in-game probe: its copy in the save: %s",
+			   p->saved < sizeof(saved) / sizeof(*saved) ? saved[p->saved] : "?");
 	tlog_force(TLOG_INFO, "in-game probe: cart SRAM pages %02X-%02X: %u of %u read back (first bad %02X)",
 		   INGAME_PROBE_FIRST_PAGE, INGAME_PROBE_LAST_PAGE, p->pages_ok, p->pages_tried, p->first_bad_page);
 	tlog_force(
@@ -378,8 +429,10 @@ static void report_ingame_probe(void)
 		   p->psram_before, p->psram_written, p->psram_after,
 		   p->psram_written == 0xA55A ? "PSRAM writes land" : "PSRAM writes don't land");
 	tlog_force(TLOG_INFO, "in-game probe: SD sector 0 %s; scratch sector %lu: %s",
-		   p->sd_mbr ? "read with its signature" : "didn't read", (unsigned long)p->scratch_lba,
-		   p->sd_scratch < sizeof(sd) / sizeof(*sd) ? sd[p->sd_scratch] : "?");
+		   p->sd_scratch >= INGAME_PROBE_SD_PENDING ? "not read"
+		   : p->sd_mbr                              ? "read with its signature"
+							    : "didn't read",
+		   (unsigned long)p->scratch_lba, p->sd_scratch < sizeof(sd) / sizeof(*sd) ? sd[p->sd_scratch] : "?");
 	const u8 *on = p->rtc_on, *off = p->rtc_off;
 	tlog_force(TLOG_INFO,
 		   "in-game probe: clock with 0x096A0000 at 1: %02X-%02X-%02X %02X:%02X:%02X; at 0: %02X-%02X-%02X "

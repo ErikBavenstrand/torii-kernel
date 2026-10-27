@@ -694,7 +694,13 @@ so a faster SRAM wait state (the in-game probe's question) would help most.
 The emulated cart stops with status 78 when the overlay's own code writes
 the game's PSRAM and 79 on any SD register in game mode
 (`OMEGA_GAME_PSRAM_WRITES=allow`, `OMEGA_GAME_SD=allow`), both unproven on
-the real cart until the in-game probe (`tests/roms/ingame`) reports.
+the real cart until the in-game probe (`tests/roms/ingame`) reports. Its
+first real-cart run (2026-10-27, every save type) reported nothing: the
+kernel's boot after its soft reset showed "microSD card error", and the
+power-off that took cleared page `0xF0`. Its SD test is the only step that
+touches the SD controller, so it is the suspect; the probe now saves its
+report before that test (also in its battery-backed save), runs it only on
+A, and the boot retries the mount three times.
 
 ## 7. Logging and Diagnostics
 
