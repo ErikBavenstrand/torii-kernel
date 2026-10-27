@@ -12,10 +12,10 @@ index 59ca1c1..1dd19c0 100644
  	EXTDATA_MAX
 diff --git a/include/mgba/internal/gba/cart/omega.h b/include/mgba/internal/gba/cart/omega.h
 new file mode 100644
-index 0000000..b5c5cc9
+index 0000000..7b7a855
 --- /dev/null
 +++ b/include/mgba/internal/gba/cart/omega.h
-@@ -0,0 +1,180 @@
+@@ -0,0 +1,181 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -192,6 +192,7 @@ index 0000000..b5c5cc9
 +// The BIOS SoftReset or HardReset ran: in game mode, the game starts.
 +void GBAOmegaBiosReset(struct GBA*);
 +void GBAOmegaWriteSRAM(struct GBA*, uint32_t address, uint8_t value);
++void GBAOmegaWaitcnt(struct GBA*, uint16_t value);
 +
 +CXX_GUARD_END
 +
@@ -322,10 +323,10 @@ index 1d0c0dd..b77704a 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..38039ec
+index 0000000..91a6f64
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1610 @@
+@@ -0,0 +1,1678 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -1899,9 +1900,41 @@ index 0000000..38039ec
 +	return (((uint32_t) omega->ramPage << 12) + (address & 0xFFFF)) & (OMEGA_SRAM_SIZE - 1);
 +}
 +
++// OMEGA_GAME_SRAM: faults injected into cart SRAM in game mode, on the pages
++// past the save memory (from OMEGA_SAVE_PAGES), where the in-game menu keeps
++// its backups and its overlay image. How the real cart's SRAM behaves there
++// under each save type is unproven (v0.8's black screen in Pokémon Emerald):
++// these let tests check that the menu's stub fails safe. "drop": writes are
++// lost (as a flash chip ignores plain writes); "flip-image": a byte of the
++// overlay image (page 0xB0's window offset 0x400) reads with bit 0 flipped.
++enum {
++	GAME_SRAM_FAULT_NONE,
++	GAME_SRAM_FAULT_DROP,
++	GAME_SRAM_FAULT_FLIP_IMAGE,
++};
++static int _gameSramFault = -1;
++
++static int _gameSramFaultFor(const struct GBAOmega* omega) {
++	if (_gameSramFault < 0) {
++		const char* fault = getenv("OMEGA_GAME_SRAM");
++		_gameSramFault = !fault                       ? GAME_SRAM_FAULT_NONE
++		    : !strcmp(fault, "drop")                  ? GAME_SRAM_FAULT_DROP
++		    : !strcmp(fault, "flip-image")            ? GAME_SRAM_FAULT_FLIP_IMAGE
++		                                              : GAME_SRAM_FAULT_NONE;
++	}
++	if (_isKernelMode(omega) || !omega->gameBooted || omega->ramPage < OMEGA_SAVE_PAGES) {
++		return GAME_SRAM_FAULT_NONE;
++	}
++	return _gameSramFault;
++}
++
 +uint8_t GBAOmegaReadSRAM(struct GBA* gba, uint32_t address) {
 +	struct GBAOmega* omega = &gba->memory.omega;
-+	return omega->sram[_sramOffset(omega, address)];
++	uint8_t value = omega->sram[_sramOffset(omega, address)];
++	if (_gameSramFaultFor(omega) == GAME_SRAM_FAULT_FLIP_IMAGE && omega->ramPage == 0xB0 && (address & 0xFFFF) == 0x400) {
++		value ^= 1;
++	}
++	return value;
 +}
 +
 +void GBAOmegaWriteSRAM(struct GBA* gba, uint32_t address, uint8_t value) {
@@ -1926,7 +1959,43 @@ index 0000000..38039ec
 +		}
 +		break;
 +	}
++	if (_gameSramFaultFor(omega) == GAME_SRAM_FAULT_DROP) {
++		return;
++	}
 +	omega->sram[_sramOffset(omega, address)] = value;
++}
++
++// In game mode, Torii's own code (the patch area's entry code, hook and
++// stub, from the target of the game's patched entry branch, and the in-game
++// overlay) runs from the game's PSRAM or NOR. Commercial games run there at
++// WS0 3/1 at the fastest; a WS0 first access of 2 cycles there is unproven on
++// the real cart (v0.8's stub set the kernel menu's 0x4018 and Pokémon
++// Emerald went black), so the emulator stops with this status when Torii's
++// code asks for it (OMEGA_GAME_FAST_ROM=allow lets it run on).
++#define GAME_FAST_ROM_STATUS 80
++
++static bool _inTorii(struct GBA* gba) {
++	if (_inOverlay(gba)) {
++		return true;
++	}
++	uint32_t entry = GBAOmegaRead16(gba, 0x08000000) | (uint32_t) GBAOmegaRead16(gba, 0x08000002) << 16;
++	if (entry >> 24 != 0xEA) {
++		return false;
++	}
++	uint32_t patch = 0x08000000 + 8 + ((entry & 0xFFFFFF) << 2);
++	uint32_t pc = gba->cpu->gprs[ARM_PC];
++	return pc >= patch && pc < patch + 0x10000;
++}
++
++void GBAOmegaWaitcnt(struct GBA* gba, uint16_t value) {
++	struct GBAOmega* omega = &gba->memory.omega;
++	if (!omega->enabled || _isKernelMode(omega) || !omega->gameBooted || ((value >> 2) & 3) != 2) {
++		return;
++	}
++	if (_inTorii(gba)) {
++		_gameModeAccess("WAITCNT WS0 2/x SET BY TORII'S CODE", 0x04000204, value, "OMEGA_GAME_FAST_ROM",
++		                GAME_FAST_ROM_STATUS);
++	}
 +}
 +
 +void GBAOmegaBiosReset(struct GBA* gba) {
@@ -1977,6 +2046,18 @@ index 26c2058..59c6107 100644
  	GBAMemoryClearAGBPrint(gba);
  	if (gba->memory.rom && !gba->isPristine) {
  		if (gba->yankedRomSize) {
+diff --git a/src/gba/io.c b/src/gba/io.c
+index 07a5cc8..5f3b325 100644
+--- a/src/gba/io.c
++++ b/src/gba/io.c
+@@ -566,6 +566,7 @@ void GBAIOWrite(struct GBA* gba, uint32_t address, uint16_t value) {
+ 		return;
+ 	case REG_WAITCNT:
+ 		value &= 0x5FFF;
++		GBAOmegaWaitcnt(gba, value);
+ 		GBAAdjustWaitstates(gba, value);
+ 		break;
+ 	case REG_IE:
 diff --git a/src/gba/memory.c b/src/gba/memory.c
 index 5bb5182..fa7ac0d 100644
 --- a/src/gba/memory.c

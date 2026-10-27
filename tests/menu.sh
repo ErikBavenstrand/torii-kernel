@@ -4,7 +4,7 @@
 # launch it with BOOT WITH ADDON (SAVESTATE and RESET on) and a FLASH 64K save
 # chip, open the in-game menu with L+R+START and leave it with B
 # (tests/hook_watch.lua). The kernel must hook the ROM's VBlank IRQ; the menu
-# must show within 2 frames (its text within 3), keep the game's EWRAM in
+# must show within 4 frames (its text within 5), keep the game's EWRAM in
 # cart SRAM page 0x20, and hand back the game's memory, registers and screen
 # as they were; the game must go on, and loading the save-state buffer into
 # cart SRAM must leave the game's save alone. Then each of the menu's rows:
@@ -87,11 +87,13 @@ closed=$(awk -v o="$opened" '$1 == "script:" && $4 == "menu" && $5 == "closed" &
 grep -q '^script: hook watch done' <<<"$log" || fail "the run ended early"
 
 # How soon it shows (the frame after the key's is the first the screen can
-# change in): the panel within 2 frames, its text within 3
+# change in): the panel within 4 frames, its text within 5. The stub copies
+# at WS0 3/1 and SRAM 8 cycles and reads its backups back first (v0.8's
+# black screen on the real cart): hello runs at the BIOS's wait states
 shown_in=$(sed -n 's/^script: hook [0-9]* menu shown after \([0-9]*\) frames$/\1/p' <<<"$log")
 text=$(sed -n 's/^script: hook [0-9]* menu text shown after \([0-9]*\) frames$/\1/p' <<<"$log")
-[ -n "$shown_in" ] && [ "$shown_in" -le 2 ] || fail "the menu took ${shown_in:-?} frames to show (2 at most)"
-[ -n "$text" ] && [ "$text" -le 3 ] || fail "the menu's text took ${text:-?} frames to show (3 at most)"
+[ -n "$shown_in" ] && [ "$shown_in" -le 4 ] || fail "the menu took ${shown_in:-?} frames to show (4 at most)"
+[ -n "$text" ] && [ "$text" -le 5 ] || fail "the menu's text took ${text:-?} frames to show (5 at most)"
 echo "in-game menu: shown after $shown_in frames, its text after $text"
 
 # The game as it was: memory (but the hook's own words), the readable

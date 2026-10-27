@@ -369,7 +369,7 @@ at page `0x09C00000` × 4 KB:
 | `0x40`–`0xAF` | S71GL064 SRAM | the save-state buffer: the 0x70000-byte `RTS/<game>.rts` is loaded here at launch. VRAM, IWRAM, EWRAM, OAM, palette, IO, registers, and a flag at `0xAFFF0` |
 | `0xB0`–`0xBF` | S71GL064 SRAM | Torii v0.8: the in-game menu's overlay image at `0xB0000` and the session block at `0xB8000`, written at each addon and NOR launch (`source/ingame.c`) |
 | `0xC0`, `0xD0` | S71GL064 SRAM | Torii: Diagnostics' pattern test (free otherwise); from v0.8's P4, the in-game screenshot (`0xC0000`-`0xD8FFF`) |
-| `0xF0` | S71GL064 SRAM | Torii: what the kernel keeps for its next boot (`source/cartlog.h`): where the session got to at `0xF0000`, a kernel crash dump at `0xF0100`, the in-game menu's DEBUG snapshot at `0xF1000`, the EEPROM probe ROM's report at `0xF1800`, the rumble probe's at `0xF1A00`, the in-game probe's at `0xF1B00` |
+| `0xF0` | S71GL064 SRAM | Torii: what the kernel keeps for its next boot (`source/cartlog.h`): where the session got to at `0xF0000`, a kernel crash dump at `0xF0100`, the in-game menu's DEBUG snapshot at `0xF1000`, the EEPROM probe ROM's report at `0xF1800`, the rumble probe's at `0xF1A00`, the in-game probe's at `0xF1B00`, the in-game menu stub's refusal record at `0xF1C00` |
 
 Pages `0x20` and up have no battery: on the real cart they survive a soft
 reset (RESET, or the crash handler's restart) but not a power cycle
@@ -687,14 +687,39 @@ OAM and the OBJ palette to SRAM page `0x20`, loads the overlay from page
 (from tile 512, which bitmap modes have too) and draws with sprites alone:
 BG registers, `BLDY`, the windows and `MOSAIC` are write-only, so nothing
 that touches them could give them back. SRAM is copied a byte at a time at
-`WAITCNT` `0x4018` (SRAM 4 cycles, proven) and the cart's registers are
-written at `0x0000`. In the emulator the panel shows 2 frames after the key's
-frame and its text a frame later; the stub's copies take about 0.75 frame,
-so a faster SRAM wait state (the in-game probe's question) would help most.
+`WAITCNT` `0x4017` (SRAM 8 cycles, ROM WS0 3/1 with prefetch) and the cart's
+registers are written at `0x0000`.
+
+**v0.8's black screen (real cart, 2026-10-27, unresolved):** Pokémon
+Emerald (16 MB, Flash 128K, the clock, one cheat) went to a black screen
+with no sound on the menu key and never came back; the emulated cart ran the
+same launch, and all 196 compat games, without fault. The old menu (v0.4.3)
+had opened in the same game on this cart (its RESET reached the kernel by a
+soft reset). What the v0.8 stub did that no proven code had: it ran its own
+code from the game's PSRAM at the kernel menu's `0x4018` (WS0 2/1, proven
+only in kernel mode; commercial games run at 3/1 at the fastest), copied
+cart SRAM at 4 cycles under a flash save type, and trusted the overlay image
+on its magic alone. Since then the stub runs at `0x4017`, reads each backup
+(EWRAM window, OAM, OBJ palette) back before it changes anything of the
+game's, checks the loaded image against a check word the kernel writes in
+its header (`ingame_image_check`), and refuses an answer it can't have given;
+on any failure it gives the game back untouched and leaves a record
+(`struct ingame_refused`, page `0xF0` at `0x1C00`) that the kernel's next
+boot logs as "in-game menu: the stub didn't open it, ...". The panel now
+shows 4 frames after the key in hello (its text 5). Which of these was the
+cause the real cart has to tell: the next test of Emerald either opens the
+menu or logs the refusal's reason (after a soft reset, as page `0xF0` has
+no battery).
+
 The emulated cart stops with status 78 when the overlay's own code writes
-the game's PSRAM and 79 on any SD register in game mode
-(`OMEGA_GAME_PSRAM_WRITES=allow`, `OMEGA_GAME_SD=allow`), both unproven on
-the real cart until the in-game probe (`tests/roms/ingame`) reports.
+the game's PSRAM, 79 on any SD register in game mode and 80 when Torii's
+code in game mode (from the patched entry branch's target, or the overlay)
+sets WS0's first access to 2 cycles (`OMEGA_GAME_PSRAM_WRITES=allow`,
+`OMEGA_GAME_SD=allow`, `OMEGA_GAME_FAST_ROM=allow`), all unproven on the
+real cart until the in-game probe (`tests/roms/ingame`) reports.
+`OMEGA_GAME_SRAM=drop` (writes to pages from `0x20` lost in game mode) and
+`flip-image` (a byte of the overlay image reads wrong) inject the faults
+`tests/menu_safety.sh` checks the stub refuses safely.
 
 ## 7. Logging and Diagnostics
 

@@ -311,6 +311,13 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 		u32 n = image - at < 0x1000 ? image - at : 0x1000;
 		bad += sram_put(INGAME_SRAM_IMAGE + at, ingame_overlay + at, n);
 	}
+	// The header again, with the check word the stub verifies the loaded image by
+	struct ingame_image hdr_out;
+	memcpy(&hdr_out, ingame_overlay, sizeof(hdr_out));
+	TLOG_ASSERT(hdr_out.image_bytes <= image && hdr_out.image_bytes >= sizeof(hdr_out));
+	hdr_out.check = ingame_image_check((const u32 *)(const void *)(ingame_overlay + sizeof(hdr_out)),
+					   (hdr_out.image_bytes - (u32)sizeof(hdr_out)) / 4);
+	bad += sram_put(INGAME_SRAM_IMAGE, (const u8 *)&hdr_out, sizeof(hdr_out));
 	bad += sram_put(INGAME_SRAM_SESSION, (const u8 *)words, sizeof(words));
 	const struct lang_ingame *t = gl_ingame;
 	// The menu's footer: its keys as Settings shows them, then the hint

@@ -9,6 +9,7 @@
 #include "build_id.h"
 #include "cartlog.h"
 #include "eepromprobe.h"
+#include "ingame_abi.h"
 #include "ingameprobe.h"
 #include "rumbleprobe.h"
 #include "ff.h"
@@ -86,7 +87,8 @@ _Static_assert(sizeof(struct eeprom_probe) == 0x200, "EEPROM probe report layout
 _Static_assert(CARTLOG_EEPROM_PROBE + sizeof(struct eeprom_probe) <= CARTLOG_RUMBLE_PROBE, "EEPROM probe size");
 _Static_assert(sizeof(struct rumble_probe) == 0x58, "rumble probe report layout");
 _Static_assert(CARTLOG_RUMBLE_PROBE + sizeof(struct rumble_probe) <= CARTLOG_INGAME_PROBE, "rumble probe size");
-_Static_assert(sizeof(struct ingame_probe) <= 0x100, "in-game probe report size");
+_Static_assert(sizeof(struct ingame_probe) <= 0x100 && CARTLOG_INGAME_PROBE + 0x100 <= CARTLOG_INGAME_REFUSED,
+	       "in-game probe report size");
 
 // --- Cart RAM access ----------------------------------------------------------
 
@@ -387,6 +389,27 @@ static void report_ingame_probe(void)
 		   on[0], on[1], on[2], on[4], on[5], on[6], off[0], off[1], off[2], off[4], off[5], off[6]);
 }
 
+// The in-game menu's stub didn't open the menu (gba_rts_patch.s,
+// ingame_refuse) and gave the game back as it was: why, from its record
+static void report_ingame_refused(void)
+{
+	static const char *const why[] = {
+		"?",
+		"no overlay image in cart SRAM",
+		"the game's memory didn't read back from cart SRAM",
+		"the overlay image loaded from cart SRAM didn't check",
+	};
+	static const char *const copy[] = {"", ": the EWRAM window", ": OAM", ": the OBJ palette"};
+	struct ingame_refused r;
+	cart_read(CARTLOG_INGAME_REFUSED, &r, sizeof(r));
+	if (r.magic[0] != INGAME_REFUSED_MAGIC0 || r.magic[1] != INGAME_REFUSED_MAGIC1)
+		return;
+	cart_clear_magic(CARTLOG_INGAME_REFUSED, 8);
+	tlog_force(TLOG_ERRORS, "in-game menu: the stub didn't open it, %s%s (the game's WAITCNT %04X)",
+		   why[r.reason < sizeof(why) / sizeof(*why) ? r.reason : 0],
+		   copy[r.detail < sizeof(copy) / sizeof(*copy) ? r.detail : 0], r.waitcnt);
+}
+
 // The EEPROM probe ROM's report (tests/roms/eeprom): each step, where each
 // read's data came from, and what they add up to.
 static void report_eeprom_probe(void)
@@ -493,6 +516,7 @@ void cartlog_boot_report(void)
 	report_eeprom_probe();
 	report_rumble_probe();
 	report_ingame_probe();
+	report_ingame_refused();
 	if (tlog_level == TLOG_OFF)
 		return;
 

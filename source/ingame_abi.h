@@ -53,7 +53,34 @@ struct ingame_image {
 	uint32_t entry;  // the Thumb entry's address, bit 0 set: u32 entry(const struct ingame_call *)
 	uint32_t obj_bytes;  // OBJ VRAM drawn over from INGAME_OBJ_VRAM, a multiple of 4
 	uint32_t shown;  // 0; 1 once the panel shows, 2 once its text does (tests/hook_watch.lua)
-	uint32_t reserved;
+	uint32_t check;  // ingame_image_check of the image after the header, the kernel's at launch
+};
+
+// The image's check word: every word of the image after its header (which
+// the overlay changes as it runs), rotated in. The stub computes it over
+// the copy it loaded and runs the overlay only if it matches.
+static inline uint32_t ingame_image_check(const uint32_t *words, uint32_t n)
+{
+	uint32_t s = 0;
+	for (uint32_t i = 0; i < n; i++)
+		s = (s << 5 | s >> 27) + words[i];
+	return s;
+}
+
+// --- Why the stub didn't open the menu, for the kernel's next boot: in cart
+// SRAM page 0xF0 (source/cartlog.h, CARTLOG_INGAME_REFUSED), 16 bytes
+#define INGAME_REFUSED_MAGIC0 0x524E4954u  // "TINR"
+#define INGAME_REFUSED_MAGIC1 0x31444546u  // "FED1"
+enum {
+	INGAME_REFUSED_NO_IMAGE = 1,  // no overlay image in cart SRAM (magic or sizes)
+	INGAME_REFUSED_BACKUP = 2,  // the game's memory didn't read back from cart SRAM
+	INGAME_REFUSED_IMAGE = 3,  // the loaded image's check word didn't match
+};
+struct ingame_refused {
+	uint32_t magic[2];  // INGAME_REFUSED_MAGIC0, MAGIC1
+	uint16_t reason;  // INGAME_REFUSED_*
+	uint16_t waitcnt;  // the game's WAITCNT when the menu key came
+	uint32_t detail;  // INGAME_REFUSED_BACKUP: which copy (1 EWRAM, 2 OAM, 3 OBJ palette); else 0
 };
 
 // --- The call: on the overlay's stack, from the stub
@@ -288,6 +315,10 @@ _Static_assert(offsetof(struct ingame_image, window_bytes) == 12, "stub: window_
 _Static_assert(offsetof(struct ingame_image, entry) == 16, "stub: entry");
 _Static_assert(offsetof(struct ingame_image, obj_bytes) == 20, "stub: obj_bytes");
 _Static_assert(offsetof(struct ingame_image, shown) == 24, "hook_watch.lua: shown");
+_Static_assert(offsetof(struct ingame_image, check) == 28, "stub: check");
+_Static_assert(sizeof(struct ingame_refused) == 16 && offsetof(struct ingame_refused, reason) == 8 &&
+		       offsetof(struct ingame_refused, waitcnt) == 10,
+	       "the stub writes the refusal record");
 _Static_assert(sizeof(void *) != 4 || sizeof(struct ingame_call) == 8, "the stub builds it (on the GBA)");
 _Static_assert(INGAME_SESSION_HEAD % 4 == 0 && INGAME_SESSION_OUT % 4 == 0, "sram_copy takes words");
 _Static_assert(sizeof(struct ingame_out) % 4 == 0, "sram_copy takes words");

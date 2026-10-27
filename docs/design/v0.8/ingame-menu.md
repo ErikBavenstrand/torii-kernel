@@ -70,7 +70,14 @@ write-only, so a menu on a BG can't give them back (today's BG2 affine bug).
   zeroing it resets the PSG, which is today's noise bug.
 - Edge-detect the keys with auto-repeat; on opening, wait for the menu key's release; on
   closing, wait until every key is released.
-- Set `WAITCNT` for the SRAM copies, and restore it.
+- Set `WAITCNT` for the SRAM copies, and restore it: `0x4017`, SRAM 8 cycles and ROM WS0 3/1
+  with prefetch, never faster than games run in game mode (the stub's own code runs from the
+  game's PSRAM).
+- **Fail safe** (after the real cart's black screen in Pokémon Emerald): read every backup
+  back before changing anything of the game's, check the loaded image against the check word
+  the kernel writes in its header, and treat an answer out of range as Resume. On a failure
+  the game goes on untouched and a record in page `0xF0` (`struct ingame_refused`) tells the
+  kernel's next boot why.
 
 ## P1: the menu
 
@@ -216,9 +223,10 @@ and paging spare PSRAM from the menu (tier C) stay off until the cart probe says
 
 - The menu's footer names its keys; the panel is 176 px wide for it. The title (the game's
   name) shows when the rows leave room: with Save states and cheats on they don't.
-- The panel still shows 2 frames after the key and its rows 3: the stub's SRAM copies move
-  four words a pass (the overlay grew), the rows' sprites go in after the panel shows, and
-  the footer's 40 tiles a frame after the rows.
+- The panel shows 4 frames after the key and its rows 5 in hello (2 and 3 before the stub
+  slowed to `0x4017` and read its backups back): the stub's SRAM copies move four words a
+  pass, the rows' sprites go in after the panel shows, and the footer's 40 tiles a frame
+  after the rows.
 - The Save state page shows the buffer's slot, the one Load state gives back, in the accent.
 - The game popup's Load state on a slot whose data doesn't read asks first ("This state
   can't be read"): B goes back to the list, A starts the game from its start.

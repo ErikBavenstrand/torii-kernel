@@ -8,9 +8,20 @@
 
 void test_ingame_abi(void)
 {
-	// gba_rts_patch.s: SP_HDR's 24 bytes hold the header up to obj_bytes
+	// gba_rts_patch.s: SP_HDR's 32 bytes hold the header, the check word last
 	CHECK_EQ(offsetof(struct ingame_image, obj_bytes) + 4, 24u);
+	CHECK_EQ(offsetof(struct ingame_image, check), 28u);
 	CHECK_EQ(sizeof(struct ingame_image), 32u);
+	// The stub's check loop: add r0,word,r0,ror #27 (a rotate left by 5)
+	const uint32_t words[3] = {1, 0x80000000u, 0x12345678u};
+	CHECK_EQ(ingame_image_check(words, 0), 0u);
+	CHECK_EQ(ingame_image_check(words, 1), 1u);
+	CHECK_EQ(ingame_image_check(words, 2), 0x80000020u);
+	CHECK_EQ(ingame_image_check(words, 3), ((0x80000020u << 5 | 0x80000020u >> 27) + 0x12345678u));
+	// The stub's refusal record: "TINR", "FED1", reason, WAITCNT, detail
+	CHECK_EQ(INGAME_REFUSED_MAGIC0, 0x524E4954u);
+	CHECK_EQ(INGAME_REFUSED_MAGIC1, 0x31444546u);
+	CHECK_EQ(INGAME_REFUSED_IMAGE, 3u);
 	CHECK_EQ(INGAME_IMAGE_MAGIC, 0x31564F54u);  // "TOV1", as the stub and hook_watch.lua have it
 	CHECK_EQ(INGAME_BACKUP_EWRAM, 0x20000u);
 	CHECK_EQ(INGAME_BACKUP_OBJ, 0x28000u);

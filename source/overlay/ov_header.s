@@ -14,5 +14,5 @@ ov_header:
 	.word	ov_entry			@ entry (Thumb: bit 0 set)
 	.word	0				@ obj_bytes
 	.word	0				@ shown
-	.word	0				@ reserved
+	.word	0				@ check: the kernel writes it (ingame_image_check)
 ov_header_end:

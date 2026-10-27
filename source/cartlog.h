@@ -19,6 +19,7 @@
 #define CARTLOG_EEPROM_PROBE 0x0E001800  // the EEPROM probe ROM's report (source/eepromprobe.h)
 #define CARTLOG_RUMBLE_PROBE 0x0E001A00  // the rumble probe ROM's report (source/rumbleprobe.h)
 #define CARTLOG_INGAME_PROBE 0x0E001B00  // the in-game probe ROM's report (source/ingameprobe.h)
+#define CARTLOG_INGAME_REFUSED 0x0E001C00  // why the in-game menu's stub didn't open it (struct ingame_refused)
 // Pages Diagnostics may write test patterns to: free SRAM past the states.
 #define CARTLOG_TEST_PAGE 0xC0
 

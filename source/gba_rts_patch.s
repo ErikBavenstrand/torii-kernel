@@ -52,9 +52,21 @@ CAN_STATES		= 1		@;INGAME_CAN_*
 CAN_CHEATS		= 2
 CAN_DEBUG		= 4
 NOTICE_DEBUG	= 0x100
-@;SRAM copies and the overlay run at the menu's wait states: SRAM 4, WS0
-@;2/1 with prefetch (source/waitcnt.h); the cart's registers at the BIOS's
-WAITCNT_FAST	= 0x4018
+@;The stub's and the overlay's wait states (Torii, after v0.8's black screen
+@;on the real cart): SRAM at 8 cycles, the slowest, as games with a flash
+@;chip read and write it; ROM (the game's PSRAM, where the stub runs) at
+@;WS0 3/1 with prefetch, as nearly every commercial game runs in game mode,
+@;never faster (v0.8 had the kernel menu's 2/1, proven in kernel mode
+@;only). The cart's registers at the BIOS's.
+WAITCNT_STUB	= 0x4017
+REFUSED_AT		= 0x1C00	@;CARTLOG_INGAME_REFUSED's offset in page 0xF0
+REFUSED_PAGE	= 0xF0
+REFUSED_MAGIC0	= 0x524E4954	@;INGAME_REFUSED_MAGIC0
+REFUSED_MAGIC1	= 0x31444546
+REFUSED_NO_IMAGE = 1		@;INGAME_REFUSED_*
+REFUSED_BACKUP	= 2
+REFUSED_IMAGE	= 3
+ACTS			= 7		@;INGAME_ACTS
 
 @;The spend area (spend_0x80): the hook keeps r4-r11, sp, lr and SPSR at
 @;0x00-0x2F, SAVE the system sp and lr at 0x30; the stub keeps these
@@ -402,7 +414,7 @@ ingame_open:
 	strh	r1,[r8,#8]
 	ldrh	r1,[r8,#4]			@;WAITCNT
 	strh	r1,[r11,#SP_WAITCNT]
-	ldr		r1,=WAITCNT_FAST
+	ldr		r1,=WAITCNT_STUB
 	strh	r1,[r8,#4]
 	@;Sound: the mixer's outputs off. SOUNDCNT_X's master switch stays on:
 	@;turning it off resets the PSG channels, the noise after the old menu.
@@ -434,22 +446,30 @@ ingame_open:
 	@;The overlay's header, from cart SRAM: a launch from this kernel wrote it
 	ldr		r0,=SRAM_IMAGE
 	add		r1,r11,#SP_HDR
-	mov		r2,#24
+	mov		r2,#32
 	mov		r3,#0
 	bl		sram_copy
+	mov		r7,#REFUSED_NO_IMAGE
+	mov		r6,#0
 	ldr		r1,[r11,#SP_HDR]
 	ldr		r2,=IMAGE_MAGIC
 	cmp		r1,r2
-	bne		ingame_none
+	bne		ingame_refuse
 	ldr		r4,[r11,#SP_HDR+12]	@;window_bytes
 	ldr		r5,[r11,#SP_HDR+8]	@;image_bytes
 	cmp		r4,#WINDOW_MAX
-	bhi		ingame_none
+	bhi		ingame_refuse
 	cmp		r5,r4
-	bhi		ingame_none
+	bhi		ingame_refuse
 	cmp		r5,#32
-	blo		ingame_none
-	@;The game's EWRAM window, OAM and OBJ palette to SRAM
+	bls		ingame_refuse
+	tst		r4,#3
+	tsteq	r5,#3
+	bne		ingame_refuse
+	@;The game's EWRAM window, OAM and OBJ palette to SRAM, each read back
+	@;before anything of the game's is changed: if cart SRAM didn't keep
+	@;them, the game goes on untouched (Torii: v0.8's menu on the real cart)
+	mov		r7,#REFUSED_BACKUP
 	ldr		r0,=BK_EWRAM
 	mov		r1,#EWRAM_BASE
 	mov		r2,r4
@@ -465,12 +485,57 @@ ingame_open:
 	mov		r2,#0x200
 	mov		r3,#1
 	bl		sram_copy
-	@;The overlay in, and its call on its own stack at the window's end
+	mov		r6,#1
+	ldr		r0,=BK_EWRAM
+	mov		r1,#EWRAM_BASE
+	mov		r2,r4
+	mov		r3,#2
+	bl		sram_copy
+	cmp		r0,#0
+	bne		ingame_refuse
+	mov		r6,#2
+	ldr		r0,=BK_OAM
+	mov		r1,#0x07000000
+	mov		r2,#0x400
+	mov		r3,#2
+	bl		sram_copy
+	cmp		r0,#0
+	bne		ingame_refuse
+	mov		r6,#3
+	ldr		r0,=BK_OBJ_PAL
+	ldr		r1,=0x05000200
+	mov		r2,#0x200
+	mov		r3,#2
+	bl		sram_copy
+	cmp		r0,#0
+	bne		ingame_refuse
+	@;The overlay in, checked against the header's check word
+	@;(ingame_image_check); a copy that doesn't check gives the window back
 	ldr		r0,=SRAM_IMAGE
 	mov		r1,#EWRAM_BASE
 	mov		r2,r5
 	mov		r3,#0
 	bl		sram_copy
+	add		r1,r5,#EWRAM_BASE		@;r1 the end, r2 a word
+	mov		r2,#EWRAM_BASE
+	add		r2,r2,#32
+	mov		r0,#0
+1:	ldr		r3,[r2],#4
+	add		r0,r3,r0,ror #27
+	cmp		r2,r1
+	blo		1b
+	ldr		r1,[r11,#SP_HDR+28]
+	cmp		r0,r1
+	beq		ingame_run
+	ldr		r0,=BK_EWRAM
+	mov		r1,#EWRAM_BASE
+	mov		r2,r4
+	mov		r3,#0
+	bl		sram_copy
+	mov		r7,#REFUSED_IMAGE
+	mov		r6,#0
+	b		ingame_refuse
+ingame_run:							@;and its call on its own stack at the window's end
 	str		sp,[r11,#SP_SP]
 	add		sp,r4,#EWRAM_BASE
 	adrl	r2,RTS_switch
@@ -490,6 +555,8 @@ ingame_open:
 	mov		lr,pc
 	bx		r12
 	ldr		sp,[r11,#SP_SP]
+	cmp		r0,#ACTS			@;an answer it can't have given: Resume
+	movhs	r0,#ACT_RESUME
 	str		r0,[r11,#SP_ACT]
 	@;Everything back: the OBJ tiles the overlay drew over (its header says
 	@;how many), the OBJ palette, OAM, the display, then the window
@@ -529,7 +596,21 @@ ingame_open:
 	mov		r3,#0
 	bl		sram_copy
 	b		ingame_back
-ingame_none:						@;no overlay in SRAM: back to the game
+@;The menu not opened (r7 the reason, r6 its detail): a record for the
+@;kernel's next boot (struct ingame_refused, in page 0xF0), then the game
+@;as it was. Its header's place in the spend area holds the record.
+ingame_refuse:
+	ldr		r1,=REFUSED_MAGIC0
+	ldr		r2,=REFUSED_MAGIC1
+	ldrh	r3,[r11,#SP_WAITCNT]
+	orr		r3,r7,r3,lsl #16
+	add		r0,r11,#SP_HDR
+	stmia	r0,{r1,r2,r3,r6}
+	ldr		r0,=(REFUSED_PAGE<<12)+REFUSED_AT
+	add		r1,r11,#SP_HDR
+	mov		r2,#16
+	mov		r3,#1
+	bl		sram_copy
 	mov		r1,#ACT_RESUME
 	str		r1,[r11,#SP_ACT]
 ingame_back:
@@ -596,8 +677,10 @@ wait_frame:
 
 @;sram_copy(sram, ram, n, to_sram): n bytes (a multiple of 4) between cart
 @;SRAM at byte offset sram and word-aligned RAM, to RAM when to_sram is 0
-@;(struct ingame_call's). SRAM is an 8-bit bus: bytes one at a time, at
-@;WAITCNT_FAST; the page register at the BIOS's wait states. Leaves the last
+@;(struct ingame_call's). SRAM is an 8-bit bus: bytes one at a time, at the
+@;WAITCNT_STUB; the page register at the BIOS's wait states, and the
+@;caller's WAITCNT back at the end. Torii: to_sram 2 compares instead, and returns r0 non-zero
+@;if SRAM differs (0 otherwise, and for the other modes). Leaves the last
 @;page set. Keeps r4-r11 (AAPCS: the overlay calls it), 28 bytes of stack.
 sram_copy:
 	stmfd	sp!,{r4-r8,lr}
@@ -625,7 +708,7 @@ sc_chunk:
 	strh	r4,[r5]
 	ldr		r5,=0x9FC0000
 	strh	r7,[r5]
-	ldr		r4,=WAITCNT_FAST
+	ldr		r4,=WAITCNT_STUB
 	strh	r4,[r8,#4]
 	@;This chunk: up to the 64 KB window's end
 	mov		r4,r0,lsl #20
@@ -638,13 +721,18 @@ sc_chunk:
 	sub		r2,r2,r5
 	@;The bytes themselves in Thumb: from the cart's 16-bit bus an ARM
 	@;instruction takes two fetches, and these loops run twice as fast
-	cmp		r3,#0
-	adreq	r12,sc_in+1
-	adrne	r12,sc_out+1
-	mov		lr,pc
+	cmp		r3,#1
+	adrlo	r12,sc_in+1
+	adreq	r12,sc_out+1
+	bls		2f
+	adrl	r12,sc_cmp+1
+2:	mov		lr,pc
 	bx		r12
 	b		sc_chunk
 sc_done:
+	cmp		r3,#3				@;sc_cmp found a difference
+	moveq	r0,#1
+	movne	r0,#0
 	ldmfd	sp!,{r7}
 	strh	r7,[r8,#4]
 	ldmfd	sp!,{r4-r8,lr}
@@ -655,6 +743,10 @@ sc_done:
 	@;word a pass: the loop's own instructions took a sixth of the time,
 	@;and the menu's opening is these copies (v0.8 P4)
 	.macro	sc_in_word at
+	sc_get_word \at
+	stmia	r1!,{r4}
+	.endm
+	.macro	sc_get_word at
 	ldrb	r4,[r6,#\at]
 	ldrb	r7,[r6,#\at+1]
 	lsl		r7,r7,#8
@@ -665,7 +757,6 @@ sc_done:
 	ldrb	r7,[r6,#\at+3]
 	lsl		r7,r7,#24
 	orr		r4,r7
-	stmia	r1!,{r4}
 	.endm
 	.macro	sc_out_word at
 	ldmia	r1!,{r4}
@@ -711,6 +802,16 @@ sc_out1:
 	add		r6,#4
 	sub		r5,#4
 	bgt		sc_out1
+	bx		lr
+sc_cmp:								@;r3 becomes 3 at a difference
+	sc_get_word 0
+	ldmia	r1!,{r7}
+	cmp		r4,r7
+	beq		1f
+	mov		r3,#3
+1:	add		r6,#4
+	sub		r5,#4
+	bgt		sc_cmp
 	bx		lr
 	.align	2
 	.arm
