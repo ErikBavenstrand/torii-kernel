@@ -46,6 +46,11 @@ Checks, each pass, fail, untested (the run didn't get that far) or n/a:
 - save state: then the menu's Save state into slot 1, a while of play and
   its Load state (v0.8): no crash, the game stays in game mode and goes on
   after the load; n/a where the in-game menu is
+- state trips: a cart of its own, seeded random play and save states
+  across scenes (tests/state_trips.py): each load must give back the
+  frames and memory that followed its save, frame for frame, in game, after
+  Reset game, Back to Torii and a launch into the slot, with real cheats on
+  where tests/cheat_codes.toml has some; n/a where the in-game menu is
 
 A game with a starting save (roms/<name>.sav, .esv for GB/GBC) and a key
 script (tests/games/<code>.keys) plays that script instead, saves in-game and
@@ -102,7 +107,7 @@ KERNEL_SAVE = {
     0x32: "flash64k",
     0x33: "flash64k",
 }
-CHECKS = ["boots", "save type", "clock", "save cycle", "in-game menu", "save state"]
+CHECKS = ["boots", "save type", "clock", "save cycle", "in-game menu", "save state", "state trips"]
 # Launches go as the menu's pages will run them, through actions.c and the
 # menu's test hook (source/screens/nav.h, tests/nav.sh): a "hook" key pokes
 # the game's path and the action (1 CLEAN BOOT, 2 BOOT WITH ADDON), which
@@ -699,6 +704,34 @@ def check_state(result: Result, events: list, out: str, trace: str) -> None:
     result.set("save state", "pass", f"saved, loaded, {how} ({len(after)} screens)")
 
 
+def cheat_file(rom: Path, cart: Path) -> Path | None:
+    """A cheat file for the game with tests/cheat_codes.toml's RAM codes, picked."""
+    codes = tomllib.loads(Path("tests/cheat_codes.toml").read_text()).get("code", [])
+    mine = [c for c in codes if c["game"] == rom.name and not c.get("rom_patch")]
+    if not mine:
+        return None
+    lines = [f"cheats = {len(mine)}"]
+    for i, c in enumerate(mine):
+        lines += [f'cheat{i}_desc = "{c["desc"]}"', f'cheat{i}_code = "{c["code"]}"', f"cheat{i}_enable = true"]
+    cart.parent.mkdir(parents=True, exist_ok=True)
+    path = cart.parent / f"{cart.name}.cht"
+    path.write_text("\n".join(lines) + "\n")
+    return path
+
+
+def check_trips(result: Result, rom: Path, sd_name: str, start_save: Path | None) -> None:
+    """Save states across scenes (tests/state_trips.py)."""
+    import state_trips  # noqa: PLC0415 - it imports this file
+
+    cart = CARTS / f"{key_of(result.game)}-trips"
+    cheats = cheat_file(rom, cart)
+    t = state_trips.trips(rom, sd_name, cart, seed=1, save=start_save, cheats=cheats)
+    result.metrics["state trips"] = "; ".join(t.info)
+    if cheats:
+        result.notes.append("state trips with its cheats from tests/cheat_codes.toml on")
+    result.set("state trips", "pass" if t.status == "pass" else "fail", t.detail())
+
+
 def run_game(result: Result, roms: dict, saves: dict, table: dict) -> None:
     g = result.game
     rom = roms.get(g["sha1"])
@@ -751,9 +784,14 @@ def run_game(result: Result, roms: dict, saves: dict, table: dict) -> None:
                 "n/a" if menu == "n/a" else "fail",
                 f"the in-game menu: {why}",
             )
+        if menu == "pass":
+            check_trips(result, rom, sd_name, start_save)
+        else:
+            result.set("state trips", "n/a" if menu == "n/a" else "fail", f"the in-game menu: {why}")
     else:
         result.set("in-game menu", "n/a")
         result.set("save state", "n/a")
+        result.set("state trips", "n/a")
     if size is None:
         result.set("save cycle", "n/a")
         result.metrics["seconds"] = round(time.time() - started, 1)
@@ -1010,7 +1048,7 @@ def main() -> int:
 
     def play(result: Result) -> None:
         key = key_of(result.game)
-        carts = [CARTS / key, CARTS / f"{key}-menu"]
+        carts = [CARTS / key, CARTS / f"{key}-menu", CARTS / f"{key}-trips"]
         for cart in carts:
             shutil.rmtree(KEPT / cart.name, ignore_errors=True)
         try:

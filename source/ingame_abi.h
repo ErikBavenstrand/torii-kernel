@@ -332,6 +332,31 @@ struct ingame_state_tag {
 	uint32_t data_crc;
 };
 
+// What the state is of (v0.8.1): which game, and the buffer's format,
+// written by the overlay before SAVE in the buffer's free room after the
+// I/O copy. The kernel loads a state from the card only into the game it
+// names (a ROM swapped at the same path has the same rom_crc) and of a
+// format it knows; a state from v0.8.0 has none, and its tag's rom_crc
+// alone says whose it is. The overlay's Load needs the same.
+#define INGAME_SRAM_STATE_INFO 0xAFF80
+#define INGAME_STATE_INFO_MAGIC 0x31495354u  // "TSI1"
+// 1: v0.8.0's layout (no format said: 0); LOAD points the IRQ vector at the
+// launch's hook and takes the display's registers in the VBlank it gives
+// the game back in. A later layout LOAD can't read gets a higher number.
+#define INGAME_STATE_FORMAT 1
+struct ingame_state_info {
+	uint32_t magic;  // INGAME_STATE_INFO_MAGIC
+	uint16_t format;  // INGAME_STATE_FORMAT
+	uint16_t bytes;  // sizeof(struct ingame_state_info)
+	char code[4];  // the ROM header's game code (0xAC)
+	uint8_t version;  // the header's version (0xBC)
+	uint8_t check;  // the header's check byte (0xBD)
+	uint16_t reserved;
+	uint32_t rom_bytes;  // the session's: the ROM file's size
+	uint32_t hook;  // the IRQ hook of the launch it was saved in (RTS_irq)
+	uint32_t reserved2[2];
+};
+
 // Why a cheat's toggle can't change in game (struct ingame_cheat's flags)
 enum ingame_why {
 	INGAME_WHY_NONE,  // it can
@@ -435,6 +460,10 @@ _Static_assert(sizeof(struct ingame_state_tag) == 16 && offsetof(struct ingame_s
 		       INGAME_SRAM_STATE_TAG + 16 == INGAME_SRAM_RTS_FLAG && sizeof(INGAME_STATE_MARK) == 17,
 	       "the stub reads the tag's autoload byte at 0xAFFE6");
 _Static_assert(INGAME_SESSION_SAVE_SLOT % 4 == 0, "sram_copy takes words");
+_Static_assert(sizeof(struct ingame_state_info) == 32 && INGAME_SRAM_STATE_INFO % 4 == 0 &&
+		       INGAME_SRAM_STATE_INFO >= INGAME_SRAM_STATE + 0x69400 &&
+		       INGAME_SRAM_STATE_INFO + sizeof(struct ingame_state_info) <= INGAME_SRAM_STATE_MARK,
+	       "the info sits after the stub's I/O copy (ST_IO + 0x400), before the mark");
 _Static_assert(sizeof(struct ingame_session) % 4 == 0 && sizeof(struct ingame_session) <= INGAME_SESSION_MAX,
 	       "the session block's room");
 _Static_assert(INGAME_BACKUP_EWRAM + INGAME_WINDOW_MAX <= INGAME_BACKUP_OBJ &&

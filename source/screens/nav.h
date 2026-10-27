@@ -99,6 +99,7 @@ enum {
 	NAV_TEST_NOR_FORMAT,  // action_nor_format()
 	NAV_TEST_HOME,        // home, facing its first item, and from then on every page opens on
 			      // its first row (tests/nav.sh's routes start there and count rows)
+	NAV_TEST_STATE,       // ACTION_ADDON into save state slot bits 8-15, as the game popup's Load state
 	NAV_TEST_ACTIONS,
 };
 extern volatile u32 nav_test_action;

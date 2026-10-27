@@ -27,7 +27,8 @@
 //                    buffer is lost). Without a cut, the run ends with
 //                    "cutpoints: M" on stderr, how many were logged
 //   -u TEXT          stop after the frame in which the kernel (or a -L
-//                    script) logs TEXT
+//                    script) logs TEXT; TEXT|OTHER stops at either, and
+//                    FIRST>THEN at THEN once FIRST came
 //   -x FRAME:PATH    after FRAME, write a save state (with the cart's state)
 //   -l PATH          load a save state before the first frame
 //   -L SCRIPT        run a Lua script (mGBA's scripting API: emu, callbacks,
@@ -466,8 +467,31 @@ static void saw_line(const char *line)
 			GBAOmegaPowerCut(crash_core->board);
 		}
 	}
-	if (until_text && strstr(line, until_text)) {
-		until_hit = 1;
+	// Alternatives apart by |; in each, parts apart by > must come in order
+	static int until_step[8];
+	int alt = 0;
+	for (const char *t = until_text; t && *t && alt < 8; ++alt) {
+		const char *bar = strchr(t, '|');
+		const char *end = bar ? bar : t + strlen(t);
+		const char *part = t;
+		for (int k = 0; k < until_step[alt] && part < end; ++k) {
+			const char *gt = memchr(part, '>', (size_t)(end - part));
+			part = gt ? gt + 1 : end;
+		}
+		if (part < end) {
+			const char *gt = memchr(part, '>', (size_t)(end - part));
+			size_t n = (size_t)((gt ? gt : end) - part);
+			for (const char *at = line; n && (at = strstr(at, part)) != NULL; ++at) {
+				if (strncmp(at, part, n) == 0) {
+					if (gt)
+						++until_step[alt];
+					else
+						until_hit = 1;
+					break;
+				}
+			}
+		}
+		t = bar ? bar + 1 : NULL;
 	}
 	if (next_wait < nwaits) {
 		if (current_frame >= wait_start() && strstr(line, waits[next_wait].text)) {

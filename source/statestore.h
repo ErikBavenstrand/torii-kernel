@@ -71,6 +71,16 @@ u32 statestore_newest(const struct statestore_list *l);
 // its flag last; with no state there (or none that reads whole), the
 // buffer's flag is cleared. 1 if the buffer holds the slot's state.
 // rom_crc is the session's (ingame.h). Shows nothing.
+// The game a launch loads states into, for statestore_load's check: its
+// header's code, version and check byte (head_known 0 when the launch
+// doesn't know the last two) and the ROM file's size
+void statestore_game(const u8 code[4], u32 version, u32 check, u32 head_known, u32 rom_bytes);
+// statestore_load's refusals: the state is another game's (or another
+// version's, or another save slot's), or of a format this kernel can't read
+#define STATESTORE_OTHER_GAME (-1)
+#define STATESTORE_NEWER (-2)
+// 1 if loaded; 0 if no copy reads whole; or a refusal above, the buffer
+// then holding no state either
 int statestore_load(const char *rom_path, const char *save_slot, u32 slot, u32 rom_crc, u32 autoload);
 // Files the buffer's state as slot (its tag says not kept), under a
 // progress dialog (open one first), then marks it kept and clears the

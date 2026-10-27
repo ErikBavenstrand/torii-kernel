@@ -30,6 +30,9 @@ extern u8 pReadCache[MAX_pReadCache_size] EWRAM_BSS;
 // instead of on a cart. On a cart it does nothing.
 void readcache_poison(void);
 extern u8 __attribute__((aligned(4))) GAMECODE[4];
+// The launch's ROM header beside its code: version (0xBC), check byte
+// (0xBD), and 1 if they were read (a NOR launch has only the code)
+extern u8 __attribute__((aligned(4))) GAMEHEAD[4];
 
 extern u16 gl_reset_on;
 extern u16 gl_menu_off;  // In-game menu Off (SET_MENU_OFF): the menu keys do nothing

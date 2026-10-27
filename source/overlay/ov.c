@@ -1043,18 +1043,39 @@ static uint32_t run(uint32_t menu_key)
 	}
 }
 
+// What a state saved now is of (struct ingame_state_info): the running
+// ROM's header, the session's ROM size, the launch's hook
+static void state_info(struct ingame_state_info *info)
+{
+	const volatile uint8_t *rom = (const volatile uint8_t *)0x08000000;
+	memset(info, 0, sizeof(*info));
+	info->magic = INGAME_STATE_INFO_MAGIC;
+	info->format = INGAME_STATE_FORMAT;
+	info->bytes = sizeof(*info);
+	for (uint32_t i = 0; i < 4; i++)
+		info->code[i] = (char)rom[0xAC + i];
+	info->version = rom[0xBC];
+	info->check = rom[0xBD];
+	info->rom_bytes = m.have_session ? session()->rom_bytes : 0;
+	info->hook = m.call->hook;
+}
+
 // The buffer's tag before SAVE: slot's, not kept; its mark cleared, so a
-// SAVE cut short leaves no state (the stub writes the mark last)
+// SAVE cut short leaves no state (the stub writes the mark last); and what
+// it is of
 static void state_mark(uint32_t slot)
 {
 	struct ingame_state_tag tag;
+	struct ingame_state_info info;
 	uint32_t zeros[4] = {0, 0, 0, 0};
 	memset(&tag, 0, sizeof(tag));
 	tag.magic = INGAME_STATE_TAG_MAGIC;
 	tag.slot = (uint8_t)slot;
 	tag.rom_crc = session()->rom_crc;
+	state_info(&info);
 	sram_out(INGAME_SRAM_STATE_MARK, zeros, sizeof(zeros));
 	sram_out(INGAME_SRAM_STATE_TAG, &tag, sizeof(tag));
+	sram_out(INGAME_SRAM_STATE_INFO, &info, sizeof(info));
 	m.saved_slot = slot;
 }
 
@@ -1097,9 +1118,18 @@ static void states_load(void)
 	if (!m.states)
 		return;
 	struct ingame_state_tag tag;
+	struct ingame_state_info info, now;
 	sram_in(INGAME_SRAM_STATE_TAG, &tag, sizeof(tag));
+	sram_in(INGAME_SRAM_STATE_INFO, &info, sizeof(info));
+	state_info(&now);
+	// The game's (v0.8.0's states have no info: their tag's rom_crc alone)
+	// and a format LOAD reads
+	int game = info.magic != INGAME_STATE_INFO_MAGIC ||
+		   (info.format <= INGAME_STATE_FORMAT && info.code[0] == now.code[0] && info.code[1] == now.code[1] &&
+		    info.code[2] == now.code[2] && info.code[3] == now.code[3] && info.version == now.version &&
+		    info.check == now.check && info.rom_bytes == now.rom_bytes);
 	if (state_saved() && tag.magic == INGAME_STATE_TAG_MAGIC && tag.slot >= 1 && tag.slot <= INGAME_STATE_SLOTS &&
-	    tag.rom_crc == s->rom_crc) {
+	    tag.rom_crc == s->rom_crc && game) {
 		m.buffer_slot = tag.slot;
 		m.buffer_kept = tag.kept;
 	}

@@ -448,6 +448,13 @@ static void test_hook(void)
 	case NAV_TEST_NOR_ADDON:
 		action_launch(nav_test_path, action - NAV_TEST_CLEAN, save ? save - 1 : ACTION_SAVE_KEEP, hard);
 		break;
+	case NAV_TEST_STATE:
+		action_state_slot_set(save);
+		action_slot_chosen(1);
+		action_launch(nav_test_path, ACTION_ADDON, ACTION_SAVE_KEEP, hard);
+		action_slot_chosen(0);  // returned: it did not start
+		action_state_slot_set(0);
+		break;
 	case NAV_TEST_DELETE:
 		action_delete_file(nav_test_path);
 		break;

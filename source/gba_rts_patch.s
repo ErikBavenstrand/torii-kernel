@@ -85,6 +85,8 @@ SP_VCOUNT		= 0x5C		@;halfwords: VCOUNT at the stub's start, the backup's tries
 SP_TRIES		= 0x5E
 SP_HDR			= 0x60		@;the image header's 32 bytes (to 0x7F); a refusal's record
 SP_MISS			= 0x70		@;sram_copy's compare: the first difference (struct ingame_refused's at)
+SP_SVC			= 0x60		@;SAVE's: SP_SVC_MAGIC, then Supervisor mode's sp, lr and SPSR
+SP_SVC_MAGIC	= 0x43565354	@;"TSVC"
 
 @;The save-state buffer (INGAME_SRAM_STATE): the old menu's layout, which
 @;the old /RTS files have, and v0.8's tag and flag at its end
@@ -989,6 +991,22 @@ state_save:
 	NOP
 	str		r2,[r11,#0x30]
 	str		r3,[r11,#0x34]
+	@;Torii: and the Supervisor mode's sp, lr and SPSR, in the header's
+	@;place (SP_HDR, free now), SP_SVC_MAGIC after them. A game is often
+	@;inside a BIOS call when its VBlank comes (VBlankIntrWait halts in it):
+	@;the IRQ returns into the BIOS, which returns from the SWI through the
+	@;Supervisor stack, its sp a banked register no RAM copy holds. A load
+	@;over another sp_svc returned to garbage: The Minish Cap launched into
+	@;a state jumped to 0
+	mrs		r0,CPSR
+	msr		cpsr_c,#0xD3		@;Supervisor, IRQs off
+	mov		r1,sp
+	mov		r2,lr
+	mrs		r3,SPSR
+	msr		cpsr_c,r0
+	ldr		r0,=SP_SVC_MAGIC
+	add		r12,r11,#SP_SVC
+	stmia	r12,{r0-r3}
 	ldr		r0,=ST_SPEND
 	mov		r1,r11
 	mov		r2,#0x80
@@ -1057,6 +1075,16 @@ state_load:
 	bl		page_zero
 	b		ingame_resume			@;none: the game goes on
 state_load_go:
+	@;Torii: the screen the backdrop alone until the game's own VBlank
+	@;handler has run on the loaded state: the display's registers go back
+	@;in the VBlank the game goes on in. Before, the screen showed the new
+	@;VRAM under the old registers for the load's frames, then the state's
+	@;OAM (from the frame before the save) under the scroll from the game's
+	@;copy (for the frame after): on the real cart Pokémon Emerald's map
+	@;moved, then its sprites.
+	mov		r1,#0
+	strh	r1,[r10,#REG_DISPCNT]
+	strh	r1,[r10,#REG_BLDCNT]
 	adrl	r8,st_list+24		@;palette, VRAM, OAM, then EWRAM (IWRAM below)
 	mov		r7,#0
 	bl		sram_list
@@ -1083,8 +1111,14 @@ state_load_go:
 	str		r2,[r1,#-0x1C]
 	str		r2,[r1,#-0x18]
 	str		r2,[r1,#-0x14]
+	@;and the IRQ vector this launch's hook: a state saved under another
+	@;launch's patch area (v0.8.0's at Pokémon Emerald's 0xFFD000, now at
+	@;0xFFF000) pointed it into the game's ROM, which restarted the game
+	adrl	r2,RTS_irq
+	str		r2,[r1,#-4]
 
-	@;-------------------------------------
+	@;The registers, the screen kept blank (DISPCNT last)
+	mov		r10,#REG_BASE
 	mov		r0,#(ST_IO>>16)<<4		@;the I/O copy, in page 0xA0's window at 0x9000
 	bl		SetRampage
 	mov r10,#0x4000000
@@ -1103,7 +1137,10 @@ register_list_loop:
 	strh r3,[r10,r2]
 	b 	register_list_loop
 register_list_end:
-	bl		gpu_shadow
+	ldrh	r11,[r10,#REG_DISPCNT]	@;the state's, shown once the frame below has run
+	mov		r1,#0
+	strh	r1,[r10,#REG_DISPCNT]
+	bl		gpu_shadow			@;its search takes Emerald about 10 frames
 	add		r8,r10,#0x200
 	ldrh	r9,[r8,#4]		@;the state's; the page register at the BIOS's
 	mov		r1,#0
@@ -1111,8 +1148,6 @@ register_list_end:
 	strh	r1,[r8,#4]
 
 	ldr r0,=0x4000202   @;0x4000202
-	mov r1,#0
-	strh r1,[r0]
 	mov r1,#1			@;Torii: IME on; the state holds the menu's IME = 0
 	strh r1,[r0,#6]
 
@@ -1140,19 +1175,40 @@ register_list_end:
 
 	msr 	cpsr_cf,r0	  @;restore IRQ
 	NOP
+	@;Supervisor mode's sp, lr and SPSR as SAVE found them (a state of
+	@;v0.8.0 has the overlay's header there, no SP_SVC_MAGIC: the game's now)
+	adrl	r7,spend_0x80
+	ldr		r7,[r7]
+	add		r7,r7,#SP_SVC
+	ldmia	r7,{r0-r3}
+	ldr		r4,=SP_SVC_MAGIC
+	cmp		r0,r4
+	mrseq	r0,CPSR
+	msreq	cpsr_c,#0xD3
+	moveq	sp,r1
+	moveq	lr,r2
+	msreq	SPSR_cxsf,r3
+	msreq	cpsr_c,r0
 
 	mov 	r0,#0x0
 	bl 		SetRampage
 	add		r8,r10,#0x200
 	strh	r9,[r8,#4]		@;the state's, once the page is back
 
-	@;spin until VCOUNT==160, triggers next vblank
+	@;A frame on the state's registers from a VBlank, the screen still
+	@;blank, every IRQ flag cleared at its start: it raises those the
+	@;state's registers ask for, as SAVE's frames did (Pokémon Emerald
+	@;launched into a state lost a VCount IRQ, its sound's VSync: the game's
+	@;start had none pending). Then the state's display, and the game goes
+	@;on in that VBlank: its handler sets its scroll and OAM before the
+	@;first frame shows
+	bl		wait_frame
+	mvn		r1,#0
+	add		r2,r10,#0x200
+	strh	r1,[r2,#2]
+	bl		wait_frame
+	strh	r11,[r10,#REG_DISPCNT]
 	mov 	r0,#0x4000000
-spin3_load:
-	ldrh 	r1,[r0,#REG_VCOUNT]
-	cmp 	r1,#160
-	bne 	spin3_load
-
 	adrl	r12, spend_0x80
 	ldr		r12,[r12]
 	ldmia r12!,{r4-r11,sp,lr}
@@ -1168,11 +1224,11 @@ spin3_load:
 @;WINOUT, BLDCNT and BLDALPHA, as the register list just put them back
 @;(Pokémon Emerald's GPU register buffer). Without one they stay as the
 @;game had them before the load: Load state at Emerald's intro left its
-@;windows 0 by 0, so the overworld showed BG0 alone, black. r10 I/O; uses
+@;windows 0 by 0, so the overworld showed BG0 alone, black. r10 I/O, r11
+@;the state's DISPCNT (the register 0 meanwhile, as the search is slow); uses
 @;r0-r7 and r12, no stack (IRQ mode's is in the state's IWRAM).
 gpu_shadow:
-	ldrh	r2,[r10]			@;DISPCNT
-	cmp		r2,#0
+	movs	r2,r11				@;the state's DISPCNT
 	bxeq	lr
 	ldr		r3,[r10,#0x08]		@;BG0CNT, BG1CNT
 	ldr		r4,[r10,#0x0C]		@;BG2CNT, BG3CNT
@@ -1272,6 +1328,7 @@ register_list:
 
 	.hword 0x00B8,0x00C4,0x00D0,0x00DC  @;DMA
 	.hword 0x0120,0x0122,0x0124,0x0126,0x0128,0x012A,0x012C,0x0132,0x0134
+	.hword 0x0102,0x0106,0x010A,0x010E
 	.hword 0x0140,0x0150,0x0154,0x0200,0x0204,0x0208,0xFF00
 	.align
 S_RTS_FLAG:		@;INGAME_STATE_MARK

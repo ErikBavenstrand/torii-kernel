@@ -246,6 +246,58 @@ static int copy_load(const char *path, u32 slot, u32 *data_crc)
 	return ok;
 }
 
+// The launch's game (statestore_game)
+static struct {
+	u8 code[4];
+	u8 version, check, head_known;
+	u32 rom_bytes;
+} game;
+
+void statestore_game(const u8 code[4], u32 version, u32 check, u32 head_known, u32 rom_bytes)
+{
+	memcpy(game.code, code, 4);
+	game.version = (u8)version;
+	game.check = (u8)check;
+	game.head_known = head_known != 0;
+	game.rom_bytes = rom_bytes;
+}
+
+#define INFO_AT (INGAME_SRAM_STATE_INFO - INGAME_SRAM_STATE)
+
+// Whether the state in the buffer (with its file's tag) is the launch's
+// game's and save slot's, in a format LOAD reads: 1, or a refusal
+// (STATESTORE_OTHER_GAME, STATESTORE_NEWER). A state with info names its
+// game; v0.8.0's have none, and their tag's rom_crc (the ROM's path and
+// save slot) alone says. Before v0.8.1 nothing was checked, and LOAD put
+// whatever the file held into the game.
+static int buffer_whose(u32 slot, u32 rom_crc)
+{
+	struct ingame_state_tag tag;
+	struct ingame_state_info info;
+	buffer_io(TAG_AT, (u8 *)&tag, sizeof(tag), 0);
+	buffer_io(INFO_AT, (u8 *)&info, sizeof(info), 0);
+	if (tag.magic != INGAME_STATE_TAG_MAGIC || tag.slot != slot || tag.rom_crc != rom_crc) {
+		tlog_error("states: slot %lu's tag is %08lX slot %u, for %08lX: another save slot's or game's",
+			   (unsigned long)slot, (unsigned long)tag.magic, tag.slot, (unsigned long)tag.rom_crc);
+		return STATESTORE_OTHER_GAME;
+	}
+	if (info.magic != INGAME_STATE_INFO_MAGIC)
+		return 1;  // v0.8.0's
+	if (info.format > INGAME_STATE_FORMAT || info.bytes != sizeof(info)) {
+		tlog_error("states: slot %lu is of format %u, this kernel's %u", (unsigned long)slot, info.format,
+			   INGAME_STATE_FORMAT);
+		return STATESTORE_NEWER;
+	}
+	if (memcmp(info.code, game.code, 4) != 0 || (game.rom_bytes && info.rom_bytes != game.rom_bytes) ||
+	    (game.head_known && (info.version != game.version || info.check != game.check))) {
+		tlog_error("states: slot %lu is of %.4s v%u (%02X), %lu bytes; the game %.4s v%u (%02X), %lu bytes",
+			   (unsigned long)slot, info.code, info.version, info.check, (unsigned long)info.rom_bytes,
+			   (const char *)game.code, game.version, game.check, (unsigned long)game.rom_bytes);
+		return STATESTORE_OTHER_GAME;
+	}
+	return 1;
+}
+
 static int load_slot(const char *rom_path, const char *save_slot, u32 slot, u32 rom_crc, u32 autoload)
 {
 	struct statestore_list l;
@@ -261,6 +313,11 @@ static int load_slot(const char *rom_path, const char *save_slot, u32 slot, u32 
 	struct ingame_state_tag tag;
 	if (statestore_buffer(&tag) && tag.kept && tag.slot == slot && tag.rom_crc == rom_crc && tag.data_crc &&
 	    tag.data_crc == l.slot[slot].data_crc) {
+		int whose = buffer_whose(slot, rom_crc);
+		if (whose != 1) {
+			statestore_buffer_clear();
+			return whose;
+		}
 		tag_set(slot, 1, autoload, rom_crc, tag.data_crc);
 		flag_set(1);  // EZ-Flash's flag cleared, as after an unpacking
 		tlog("states: slot %lu already in cart SRAM%s", (unsigned long)slot,
@@ -269,19 +326,25 @@ static int load_slot(const char *rom_path, const char *save_slot, u32 slot, u32 
 	}
 	flag_set(0);
 	// The newer copy first, then the other
+	int refused = 0;
 	for (u32 k = 0; k < 2; k++) {
 		u32 bak = k ? !l.slot[slot].bak : l.slot[slot].bak;
 		u32 data_crc = 0;
 		if (statestore_path(path, rom_path, save_slot, slot, bak) < 0 || !copy_load(path, slot, &data_crc))
 			continue;
+		int whose = buffer_whose(slot, rom_crc);
+		if (whose != 1) {
+			refused = refused ? refused : whose;
+			continue;
+		}
 		tag_set(slot, 1, autoload, rom_crc, data_crc);
 		flag_set(1);
 		tlog("states: slot %lu in cart SRAM from %s%s", (unsigned long)slot, path,
 		     autoload ? ", loaded at the game's start" : "");
 		return 1;
 	}
-	flag_set(0);  // a copy that failed its CRC left its chunks, and its flag
-	return 0;
+	statestore_buffer_clear();  // a copy that failed its CRC or its check left its chunks, and its tag
+	return refused;
 }
 
 // Makes the folders of path's parents, as mkdir -p (path is changed and

@@ -148,7 +148,7 @@ th { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap
   </div>
   <div class="panel"><table class="games">
     <thead><tr><th>Status</th><th>Game</th><th class="hide-sm">System</th><th class="hide-sm">Save</th><th class="hide-sm">Size</th>
-      <th title="boots">Boot</th><th title="save type">Type</th><th title="clock">Clock</th><th title="save cycle">Save</th><th title="in-game menu">Menu</th><th>Screens</th></tr></thead>
+      <th title="boots">Boot</th><th title="save type">Type</th><th title="clock">Clock</th><th title="save cycle">Save</th><th title="in-game menu">Menu</th><th title="save state">State</th><th title="state trips: save, play into other scenes, load, frame for frame">Trips</th><th>Screens</th></tr></thead>
     <tbody id="rows"></tbody>
   </table>
   <div class="legend"><span><i class="dot pass"></i>pass</span><span><i class="dot fail"></i>fail</span><span><i class="dot untested"></i>untested</span><span><i class="dot n/a"></i>n/a</span></div>
@@ -158,7 +158,8 @@ th { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap
 const DATA = /*DATA*/null;
 const STATUSES = ["pass", "partial", "fail", "skip"];
 const LABEL = {pass: "Passed", partial: "Partly tested", fail: "Failed", skip: "Skipped"};
-const CHECKS = ["boots", "save type", "clock", "save cycle", "in-game menu"];
+const CHECKS = ["boots", "save type", "clock", "save cycle", "in-game menu", "save state", "state trips"];
+const check = (g, c) => (g.checks || {})[c] || ["untested", ""];
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[c]);
 const mb = (n) => n ? (n / 1048576).toFixed(n < 1048576 ? 2 : 0) + " MB" : "";
@@ -209,14 +210,14 @@ $("save").innerHTML += saves.map((s) => `<option>${esc(s)}</option>`).join("");
 $("check").innerHTML += CHECKS.map((c) => `<option value="${c}">${c} failed</option>`).join("");
 
 function row(g) {
-  const dots = CHECKS.map((c) => { const [s, d] = g.checks[c]; return `<td><i class="dot ${s}" title="${esc(c)}: ${s}${d ? " — " + esc(d) : ""}"></i></td>`; }).join("");
+  const dots = CHECKS.map((c) => { const [s, d] = check(g, c); return `<td><i class="dot ${s}" title="${esc(c)}: ${s}${d ? " — " + esc(d) : ""}"></i></td>`; }).join("");
   return `<tr class="game" data-key="${g.key}"><td><span class="pill ${g.status}">${LABEL[g.status]}</span></td>
     <td><div class="title">${esc(g.title || g.file)}${(g.alike || []).length ? ` <span class="pill skip" title="${esc(g.alike.join("\n"))}">+${g.alike.length} alike</span>` : ""}</div><div class="file">${esc(g.file)} · ${esc(g.code)}</div></td>
     <td class="hide-sm">${g.system}</td><td class="hide-sm">${esc(g.save)}${g.rtc ? " · clock" : ""}</td><td class="hide-sm">${mb(g.size)}</td>
     ${dots}<td><div class="thumbs">${g.shots.map((s) => s ? `<img src="${s}" alt="">` : "").join("")}</div></td></tr>`;
 }
 function details(g) {
-  const checks = CHECKS.map((c) => `<li><i class="dot ${g.checks[c][0]}"></i> <b>${c}</b>: ${g.checks[c][0]}${g.checks[c][1] ? " — " + esc(g.checks[c][1]) : ""}</li>`).join("");
+  const checks = CHECKS.map((c) => `<li><i class="dot ${check(g, c)[0]}"></i> <b>${c}</b>: ${check(g, c)[0]}${check(g, c)[1] ? " — " + esc(check(g, c)[1]) : ""}</li>`).join("");
   const metrics = Object.entries(g.metrics).map(([k, v]) => `${esc(k)}: ${esc(k === "size" ? mb(v) : v)}`).join(" · ");
   const prev = g.previous ? `Previous result (${g.previous.time}): <span class="pill ${g.previous.status}">${LABEL[g.previous.status]}</span>` : "No earlier result.";
   return `<tr class="details"><td colspan="11">
@@ -230,9 +231,9 @@ function details(g) {
 function render() {
   const q = $("q").value.toLowerCase(), sys = $("system").value, save = $("save").value, check = $("check").value;
   const shown = DATA.games.filter((g) => (!statusFilter || g.status === statusFilter) && (!sys || g.system === sys) && (!save || g.save === save) &&
-    (!check || g.checks[check][0] === "fail") && (!q || `${g.title} ${g.file} ${g.code}`.toLowerCase().includes(q)))
+    (!check || ((g.checks || {})[check] || [])[0] === "fail") && (!q || `${g.title} ${g.file} ${g.code}`.toLowerCase().includes(q)))
     .sort((a, b) => rank[a.status] - rank[b.status] || (a.title || a.file).localeCompare(b.title || b.file));
-  $("rows").innerHTML = shown.map(row).join("") || `<tr><td colspan="11" class="empty">No games match.</td></tr>`;
+  $("rows").innerHTML = shown.map(row).join("") || `<tr><td colspan="13" class="empty">No games match.</td></tr>`;
   document.querySelectorAll("tr.game").forEach((tr) => tr.onclick = () => {
     const next = tr.nextElementSibling;
     if (next && next.classList.contains("details")) return next.remove();

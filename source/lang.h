@@ -485,7 +485,9 @@ struct lang_states {
 	const char *none;  // the popup's Load state with no state on the card
 	const char *not_kept;  // filing it failed
 	// A launch into a slot that doesn't read: the question's title and text
-	const char *unreadable, *start_anyway;
+	// (or is another game's, or another version's or save slot's; or of a
+	// newer Torii's format)
+	const char *unreadable, *other_game, *newer, *start_anyway;
 	// Filing the in-game screenshots at boot: the progress dialog's title
 	// (several, one; its text the game, its status EN_SHOT_OF), and its failure
 	const char *shot_saving, *shot_saving_one, *shot_failed;
