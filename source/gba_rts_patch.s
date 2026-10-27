@@ -5,7 +5,7 @@
 @;the overlay the kernel keeps in cart SRAM (docs/design/v0.8/ingame-menu.md,
 @;source/ingame_abi.h). It is position-independent: it runs wherever the
 @;game's ROM ends.
-	.section   	.iwram,"ax",%progbits
+	.section	.text.rts_patch,"ax",%progbits
 
 	.global  RTS_ReplaceIRQ_start
 	.global  RTS_ReplaceIRQ_end

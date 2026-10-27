@@ -3,7 +3,7 @@
 @;--------------------------------------------------------------------
 @;-                      Reset                                    -
 @;--------------------------------------------------------------------
-	.section   	.iwram,"ax",%progbits
+	.section	.text.sleep_patch,"ax",%progbits
 		
 	.global  Sleep_ReplaceIRQ_start
 	.global  Sleep_ReplaceIRQ_end
