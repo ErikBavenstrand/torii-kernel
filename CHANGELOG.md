@@ -56,6 +56,13 @@ git log, not here.
   the game no longer sees the keys (Pokémon opened its START menu); a
   refused menu shows a white screen while its keys are held instead of
   stuttering, and the menu's Sleep row says START+SELECT wakes (e1714e99).
+- **Fixed (before release, third cart test):** Emerald's menu refused
+  because a preloaded state carried the RTS flag the FPGA watches, so the
+  cart wrote the buffer back while the menu read it. Torii never sets that
+  flag now: a state is marked "TORII-STATE-OK1." of its own. A refused menu
+  no longer strands you: A gives the game back, B or holding the keys 2 s
+  goes back to Torii, which says why the menu didn't open (4f524a84,
+  73aaeccf).
 - **Fixed:** log lines were lost while a screen ran its own loop (keypad,
   cheats, Game info); every screen's loop now flushes, and the keypad and
   frame summaries log less (ebbf28b7). Box art shows soon after boot:
