@@ -99,8 +99,9 @@ void Patch_SpecialROM_TrimSize(void);
 // Fills the cart's table of the file's cluster runs (game_save_rts 1: the
 // game's, 3: the RTS file's). Returns 0, 0xffffffff if the file doesn't
 // open, or RTS_FAT_FRAGMENTED if its runs don't fit or its chain breaks.
+// sectors (if not NULL) gets the sectors the chain covers, once walked.
 #define RTS_FAT_FRAGMENTED 0xfffffffe
-u32 Check_game_RTS_FAT(TCHAR *filename, u32 game_save_rts);
+u32 Check_game_RTS_FAT(TCHAR *filename, u32 game_save_rts, u32 *sectors);
 void IWRAM_CODE PatchInternal(u32 *Data, int iSize, u32 offset);
 void Patch_SpecialROM_sleepmode(void);
 // IWRAM code must run from IWRAM while the ROM page changes, so it is never

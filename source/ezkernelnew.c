@@ -184,7 +184,7 @@ void init_FAT_table(void)
 	FAT_table_buffer[2] = 0xFFFFFFFF;
 }
 //---------------------------------------------------------------------------------
-u32 Check_game_RTS_FAT(TCHAR *filename, u32 game_save_rts)
+u32 Check_game_RTS_FAT(TCHAR *filename, u32 game_save_rts, u32 *sectors)
 {
 	u32 res;
 	//u32 ret;
@@ -269,6 +269,8 @@ u32 Check_game_RTS_FAT(TCHAR *filename, u32 game_save_rts)
 	} while (getcluster < lastest_cluster);
 	*--FAT_table_P = 0x0;
 	*--FAT_table_P = 0xffffffff;
+	if (sectors)
+		*sectors = cluster_num * (&EZcardFs)->csize;
 
 	f_close(&file);
 	return 0;
@@ -1032,8 +1034,8 @@ u32 Check_file_type(TCHAR *pfilename)
 //---------------------------------------------------------------------------------
 const char *Error_message(u8 error_num)
 {
-	const char *const messages[] = {gl_error_0, gl_error_1, gl_error_2, gl_error_3, gl_error_4,
-					gl_error_5, gl_error_6, gl_error_7, gl_error_8, gl_error_9};
+	const char *const messages[] = {gl_error_0, gl_error_1, gl_error_2, gl_error_3, gl_error_4, gl_error_5,
+					gl_error_6, gl_error_7, gl_error_8, gl_error_9, gl_error_10};
 	return error_num < sizeof(messages) / sizeof(messages[0]) ? messages[error_num] : "error?";
 }
 //---------------------------------------------------------------------------------
@@ -1651,11 +1653,6 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 	progress_step(gl_loading_game, 0, LAUNCH_NOR_SAVE);
 
 	init_FAT_table();
-	// Torii: the state buffer's write-back goes to /torii/rts.bin (fattable.h)
-	if (!rts_sink_prepare()) {
-		Show_error_num(1);
-		return;
-	}
 
 	//boot nor game
 	pfilename = pNorFS[show_offset + file_select].filename;
@@ -1672,9 +1669,14 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 	tlog_flush();
 
 	//memcpy(savfilename,pfilename,100);
-	if (gamesave_nor_path(launch_save.rom, sizeof(launch_save.rom), pfilename) < 0)
+	// Torii: the state buffer's write-back goes to /torii/rts.bin
+	// (fattable.h), sent to the cart before the buffer is written; made
+	// before the save is loaded (a refused launch leaves no save waiting),
+	// with room left for the .sav the next boot makes
+	error_num = rts_sink_prepare();
+	if (error_num == 0 && gamesave_nor_path(launch_save.rom, sizeof(launch_save.rom), pfilename) < 0)
 		error_num = 8;
-	else
+	else if (error_num == 0)
 		error_num = Process_savefile(0, launch_save.rom, gamefilesize, SAVEMODE);
 	if (error_num != 0) {
 		Show_error_num(error_num);
@@ -1775,14 +1777,6 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 	u32 have_pat = 0;
 
 	init_FAT_table();
-	// Torii: the state buffer's write-back goes to /torii/rts.bin, a file
-	// of the kernel's, at every launch (fattable.h): with nothing there the
-	// FPGA's walk ran on into the game's runs and wrote a state over the
-	// game's file (the real cart, 2026-10-27)
-	if (!rts_sink_prepare()) {
-		Show_error_num(1);
-		return 0;
-	}
 
 	//Load to PSRAM or NOR
 
@@ -1838,7 +1832,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 	// A GBA game the cart can't load fails here, before its save or Recently
 	// Played entry is written; the table is filled again below
 	if (!is_EMU) {
-		res = Check_game_RTS_FAT(pfilename, 1);
+		res = Check_game_RTS_FAT(pfilename, 1, NULL);
 		if (res != 0) {
 			Show_error_num((res == RTS_FAT_FRAGMENTED) ? 7 : 1);
 			return 0;
@@ -1851,9 +1845,18 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 		}
 
 		progress_step(gl_loading_game, 0, LAUNCH_SAVE);
-		if (gamesave_rom_path_in(launch_save.rom, sizeof(launch_save.rom), currentpath, pfilename) < 0)
+		// Torii: the state buffer's write-back goes to /torii/rts.bin, a
+		// file of the kernel's, at every launch (fattable.h): with nothing
+		// there the FPGA's walk ran on into the game's runs and wrote a
+		// state over the game's file (the real cart, 2026-10-27). Sent to
+		// the cart before the state buffer is written; made before the save
+		// is loaded (a refused launch leaves no save waiting), with room
+		// left for the .sav the next boot makes.
+		error_num = rts_sink_prepare();
+		if (error_num == 0 &&
+		    gamesave_rom_path_in(launch_save.rom, sizeof(launch_save.rom), currentpath, pfilename) < 0)
 			error_num = 8;
-		else
+		else if (error_num == 0)
 			error_num = Process_savefile(is_EMU, launch_save.rom, gamefilesize, SAVEMODE);
 		if (error_num != 0) {
 			Show_error_num(error_num);
@@ -1896,7 +1899,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 		}
 
 		f_chdir(currentpath);  //return to game folder
-		res = Check_game_RTS_FAT(pfilename, 1);  //game FAT
+		res = Check_game_RTS_FAT(pfilename, 1, NULL);  //game FAT
 		if (res != 0) {
 			error_num = (res == RTS_FAT_FRAGMENTED) ? 7 : 1;
 			Show_error_num(error_num);

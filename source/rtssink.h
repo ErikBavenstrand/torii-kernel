@@ -9,11 +9,22 @@
 
 #define RTS_SINK_FILE "/torii/rts.bin"
 
+// What rts_sink_prepare returns: 0 when ready, else the error to show
+// (Show_error_num): the card has no room for the file, or it didn't read
+#define RTS_SINK_NO_ROOM 10
+#define RTS_SINK_CARD 1
+
 // Makes the file (once: its clusters are allocated, not written), checks its
-// size and cluster chain, and writes its runs into FAT_table_buffer from
-// 0x300, keeping a copy for rts_sink_runs. Call it after init_FAT_table.
-// 1 if done; 0 if the file can't be made or read, and the launch must stop.
-int rts_sink_prepare(void);
+// size and that its cluster chain covers it exactly (else makes it again,
+// once), writes its runs into FAT_table_buffer from 0x300, keeping their
+// CRC for rts_sink_crc, and sends the FPGA a table of them alone (no game's
+// runs, parameters only), so cart SRAM's state buffer can be written from
+// then on. A file it makes leaves 128 KB free, for the .sav the boot after
+// the game makes. Call it after init_FAT_table, before the launch loads the
+// save (a refused launch leaves none waiting) or writes the state buffer.
+// 0 if done; else RTS_SINK_NO_ROOM or RTS_SINK_CARD, and the launch stops:
+// no table goes without the file's runs.
+u8 rts_sink_prepare(void);
 
 // The CRC32 of the runs rts_sink_prepare last wrote (fat_table_rts_crc), or
 // NULL when it hasn't
