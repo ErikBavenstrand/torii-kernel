@@ -80,6 +80,15 @@ int statestore_buffer(struct ingame_state_tag *tag)
 	return memcmp(flag, state_flag, sizeof(flag)) == 0 && tag->magic == INGAME_STATE_TAG_MAGIC;
 }
 
+static void tag_clear(void);
+static void flag_set(int on);
+
+void statestore_buffer_clear(void)
+{
+	tag_clear();
+	flag_set(0);
+}
+
 static void flag_set(int on)
 {
 	u8 flag[16];
@@ -88,6 +97,13 @@ static void flag_set(int on)
 	else
 		memset(flag, 0, sizeof(flag));
 	buffer_io(FLAG_AT, flag, sizeof(flag), 1);
+}
+
+static void tag_clear(void)
+{
+	struct ingame_state_tag tag;
+	memset(&tag, 0, sizeof(tag));
+	buffer_io(TAG_AT, (u8 *)&tag, sizeof(tag), 1);
 }
 
 static void tag_set(u32 slot, u32 kept, u32 autoload, u32 rom_crc)
@@ -278,7 +294,8 @@ static int copy_write(char *path, u32 slot, u32 seq, u32 order)
 		buffer_io(at, w->raw, STATESTORE_CHUNK, 0);
 		if (at + STATESTORE_CHUNK == INGAME_STATE_BYTES) {
 			// The tag as the file keeps it: kept, no autoload
-			struct ingame_state_tag *tag = (struct ingame_state_tag *)(void *)(w->raw + STATESTORE_CHUNK - 32);
+			struct ingame_state_tag *tag =
+				(struct ingame_state_tag *)(void *)(w->raw + STATESTORE_CHUNK - 32);
 			tag->kept = 1;
 			tag->autoload = 0;
 		}
@@ -411,6 +428,6 @@ void statestore_row(char *out, u32 size, u32 slot, const struct statestore_slot 
 	else if (!s->when.year || s->when.month < 1 || s->when.month > 12)
 		snprintf(out, size, EN_STATE_ROW_SAVED, (unsigned long)slot);
 	else
-		snprintf(out, size, EN_STATE_ROW_WHEN, (unsigned long)slot, s->when.day, gl_states->months[s->when.month - 1],
-			 s->when.hour, s->when.min);
+		snprintf(out, size, EN_STATE_ROW_WHEN, (unsigned long)slot, s->when.day,
+			 gl_states->months[s->when.month - 1], s->when.hour, s->when.min);
 }

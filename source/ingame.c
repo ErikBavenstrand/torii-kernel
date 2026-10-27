@@ -224,6 +224,10 @@ static u32 states_crc(const char *rom_path, const char *save_slot)
 void ingame_states_none(void)
 {
 	states.ready = 0;
+	// Whatever another launch left in the buffer (a state of another game,
+	// its autoload mark) goes: the patch's entry code and the menu's old
+	// Load row would act on it
+	statestore_buffer_clear();
 }
 
 int ingame_states_launch(const char *rom_path, const char *save_slot, const char *rom_name, u32 slot)
@@ -239,7 +243,10 @@ int ingame_states_launch(const char *rom_path, const char *save_slot, const char
 	u32 want = slot ? slot : statestore_newest(&states.list);
 	u32 start = torii_frames;
 	int loaded = want && statestore_load(rom_path, save_slot, want, states.rom_crc, slot != 0);
-	if (!loaded)
+	if (!loaded && slot)
+		tlog_error("states: slot %lu of %s (%s) didn't read: the game starts from its start",
+			   (unsigned long)slot, rom_path, save_slot);
+	else if (!loaded)
 		tlog("states: %s (%s): no state in cart SRAM%s", rom_path, save_slot, want ? ", it didn't read" : "");
 	else
 		tlog("states: put back in %lu frames", (unsigned long)(torii_frames - start));

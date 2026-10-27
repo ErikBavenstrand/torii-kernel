@@ -79,6 +79,9 @@ int statestore_keep(const char *rom_path, const char *save_slot, u32 slot);
 // a state's flag becomes slot 1, through the buffer (which it leaves
 // holding it). 1 if it did.
 int statestore_import_rts(const char *rom_path, const char *save_slot, const char *rom_name, u32 rom_crc);
+// The buffer holds no state: its tag and flag cleared (a launch that puts
+// none there, so no game loads another's, nor autoloads it)
+void statestore_buffer_clear(void);
 // The buffer's tag and flag: 1 with *tag if the buffer holds a state
 int statestore_buffer(struct ingame_state_tag *tag);
 // n bytes between cart SRAM's window at sram (its page set) and RAM, in

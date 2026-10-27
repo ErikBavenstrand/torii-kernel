@@ -938,12 +938,22 @@ state_load_go:
 	bl		sram_copy
 
 	@;03000000-03007FFF   WRAM - On-chip Work RAM   (32 KBytes)
+	mov		r1,#0
+	add		r8,r10,#0x200
+	strh	r1,[r8,#4]		@;the page register at the BIOS's
 	mov 	r0,#ST_IWRAM>>12
 	bl 		SetRampage
 	mov r0,#0x0E000000
 	mov r1,#0x3000000
 	mov r2,#0x8000
 	bl 	ReadSram
+	@;The cheats as launched: the toggles a state holds are for the table
+	@;of the launch it was saved in (and CheatRAN as at a game's start)
+	mov		r1,#0x04000000
+	mov		r2,#0
+	str		r2,[r1,#-0x1C]
+	str		r2,[r1,#-0x18]
+	str		r2,[r1,#-0x14]
 
 	@;-------------------------------------
 	mov		r0,#ST_IO>>12		@;the I/O copy and the spend area's, in page 0xA9's window
@@ -962,6 +972,11 @@ register_list_loop:
 	bl  restore2_IO
 	b 	register_list_loop
 register_list_end:
+	add		r8,r10,#0x200
+	ldrh	r9,[r8,#4]		@;the state's; the page register at the BIOS's
+	mov		r1,#0
+	add		r8,r10,#0x200
+	strh	r1,[r8,#4]
 
 	ldr r0,=0x4000202   @;0x4000202
 	mov r1,#0
@@ -996,6 +1011,8 @@ register_list_end:
 
 	mov 	r0,#0x0
 	bl 		SetRampage
+	add		r8,r10,#0x200
+	strh	r9,[r8,#4]		@;the state's, once the page is back
 
 	@;spin until VCOUNT==160, triggers next vblank
 	mov 	r0,#0x4000000
@@ -1028,6 +1045,9 @@ autoload_now:
 	stmfd	sp!,{lr}
 	bl		state_flag_ok
 	bne		autoload_none
+	add		r2,r10,#0x200			@;WAITCNT: the page register at the BIOS's; LOAD sets the state's
+	mov		r1,#0
+	strh	r1,[r2,#4]
 	mov		r0,#TAG_PAGE			@;the tag's autoload byte cleared
 	bl		SetRampage
 	mov		r1,#0x0E000000
