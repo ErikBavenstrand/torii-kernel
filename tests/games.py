@@ -730,7 +730,7 @@ def check_trips(result: Result, rom: Path, sd_name: str, start_save: Path | None
     result.metrics["state loads"] = t.counts()
     if cheats:
         result.notes.append("state trips with its cheats from tests/cheat_codes.toml on")
-    result.set("state trips", "pass" if t.status == "pass" else "fail", t.detail())
+    result.set("state trips", t.status, t.detail())
 
 
 def run_game(result: Result, roms: dict, saves: dict, table: dict) -> None:

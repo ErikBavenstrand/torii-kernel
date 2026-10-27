@@ -173,10 +173,10 @@ and paging spare PSRAM from the menu (tier C) stay off until the cart probe says
   state's flag becomes slot 1, once (when the save slot has no states).
 - **Load state in the game popup** (GBA list pages, Save states on) lists the slots,
   newest first, and starts the game with addons in the one picked: the kernel sets the
-  tag's autoload byte, the patch's entry code puts a mark at IWRAM `0x3007FE4` from it,
-  and the hook loads the state at the first VBlank, clearing both (Reset game starts
-  clean). A game whose start code clears that word starts normally, the state in the
-  buffer for Load state.
+  tag's autoload byte, and the patch's entry code clears it and loads the state at once,
+  before any of the game's code (Reset game starts clean). v0.8.0 left a mark at IWRAM
+  `0x3007FE4` for the hook's first VBlank instead, which games that clear all IWRAM at
+  their start wiped.
 - **Speed** (emulated cart, hello): SAVE 18 frames and LOAD 24 (the stub's copies run
   in Thumb now), filing 180 frames for 55 KB packed, putting it back before a launch 57.
 - **Tests:** `tests/states.sh` (round trip frame for frame, filing and the next launch,
@@ -206,13 +206,25 @@ and paging spare PSRAM from the menu (tier C) stay off until the cart probe says
   format it reads, and otherwise asks before starting the game without it ("This state is
   another game's", "This state needs a newer Torii"); in game, Load state stays greyed.
   A state from v0.8.0 has no info: its tag alone says whose it is.
+- **Timers' reload values** are write-only, but SAVE measures each running timer's: it
+  restarts it and reads its counter at once (the reload plus the read's cycles), then the
+  same with 0x8000 written, and writes the difference back (`SP_RELOAD`; Emerald's sound
+  timer reads 0xFB1A, m4a's 13379 Hz). LOAD restarts each running timer on it: a launch
+  into a state otherwise found the timers as the game's start left them (Need for Speed
+  Underground's sound timer IRQ never came, and the game crashed).
 - **What no load can give back:** the write-only registers no RAM copy holds (DMA source,
-  destination and count; timer reload values; the PSG's frequencies; the sound FIFOs'
+  destination and count; the PSG's frequencies; the sound FIFOs'
   contents and the DMA's place in the game's sample buffer; BG scroll and affine registers
-  in a game keeping no copy of them laid out as the registers). LOAD leaves DMA off (the
-  game re-arms its sound DMA within a few frames, as m4a does) and the reload values as
-  the game last wrote them, which within one game is nearly always what it wrote before
-  the save.
+  in a game keeping no copy of them laid out as the registers). LOAD turns the DMA
+  channels the game had repeating on a timing on again with the addresses the game last
+  wrote: within one game nearly always what it wrote before the save (a launch into a
+  state has the game's start's, and Need for Speed's double-buffered DMA shows a frame
+  or two otherwise). A channel restarts at its source's start, so a
+  game counting its sound DMA's IRQs (Metroid) goes on a little otherwise: the state
+  trips call that drift. The trips call a load whose screen went otherwise while all a
+  CPU can read was the save's a display load: the write-only registers above (Wario
+  Land 4's windows, Rayman 3's scroll, Super Monkey Ball Jr.'s fade), until the game
+  writes them again.
 
 ## P4: screenshots (built)
 

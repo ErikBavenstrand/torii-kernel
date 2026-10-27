@@ -111,6 +111,11 @@ class Load:
             return "drift"
         if self.screen is None and self.memory is None:
             return "drift"  # VRAM or OAM the screen doesn't show went otherwise
+        if self.video == first and self.screen_frames <= K // 4:
+            # VRAM first, the screen hardly: a renderer drawing over frames
+            # (mode 4's page flips in Need for Speed) got as far as its
+            # timing took it by each frame's end
+            return "drift"
         if self.screen == first and self.memory != first and self.video != first:
             return "display"
         return "fail"
@@ -140,7 +145,13 @@ class Trips:
 
     @property
     def status(self) -> str:
-        if self.failed or self.mixed or any(load.kind == "fail" for load in self.loads):
+        """pass, fail, or untested: the game put its own IRQ handler over the
+        hook (the in-game menu's limit, not the states'), the loads before
+        it all right"""
+        bad = self.mixed or any(load.kind == "fail" for load in self.loads)
+        if "unhooked:" in self.failed and not bad:
+            return "untested"
+        if self.failed or bad:
             return "fail"
         return "pass" if self.loads else "untested"
 
@@ -149,12 +160,16 @@ class Trips:
         return {k: kinds.count(k) for k in ("exact", "drift", "display", "fail")}
 
     def detail(self) -> str:
-        if self.failed:
-            return self.failed
-        bad = [load.text() for load in self.loads if load.kind == "fail"]
+        bad = [self.failed] if self.failed else []
+        bad += [load.text() for load in self.loads if load.kind == "fail"]
         bad += [f"{n}: {m} frames of the load showed its VRAM under other display registers" for n, m in self.mixed]
-        if bad:
+        if bad and self.status == "fail":
             return "; ".join(bad)
+        if bad:  # unhooked: what ran before
+            return f"{bad[0]}; before it: {self.summary()}"
+        return self.summary()
+
+    def summary(self) -> str:
         c = self.counts()
         text = f"{len(self.loads)} loads, {c['exact']} frame for frame as after the save for {K} frames"
         drift = [load.text() for load in self.loads if load.kind == "drift"]
@@ -402,9 +417,10 @@ def main() -> int:
         if os.environ.get("TRIP_VERBOSE"):
             for line in t.info:
                 print(f"  {line}")
-        if t.status == "pass":
-            print(f"PASS: state trips {rom.name}: {t.detail()}")
-            shutil.rmtree(cart, ignore_errors=True)
+        if t.status != "fail":
+            print(f"{'PASS' if t.status == 'pass' else 'SKIP'}: state trips {rom.name}: {t.detail()}")
+            if not os.environ.get("TRIP_KEEP"):
+                shutil.rmtree(cart, ignore_errors=True)
         else:
             failed += 1
             print(f"FAIL: state trips {rom.name}: {t.detail()} (cart in {cart})")

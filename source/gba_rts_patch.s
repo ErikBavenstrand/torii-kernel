@@ -87,6 +87,7 @@ SP_HDR			= 0x60		@;the image header's 32 bytes (to 0x7F); a refusal's record
 SP_MISS			= 0x70		@;sram_copy's compare: the first difference (struct ingame_refused's at)
 SP_SVC			= 0x60		@;SAVE's: SP_SVC_MAGIC, then Supervisor mode's sp, lr and SPSR
 SP_SVC_MAGIC	= 0x43565354	@;"TSVC"
+SP_RELOAD		= 0x70		@;SAVE's: the timers' reload values (halfwords), with SP_SVC_MAGIC
 
 @;The save-state buffer (INGAME_SRAM_STATE): the old menu's layout, which
 @;the old /RTS files have, and v0.8's tag and flag at its end
@@ -1016,6 +1017,36 @@ state_save:
 	ldr		r0,=SP_SVC_MAGIC
 	add		r12,r11,#SP_SVC
 	stmia	r12,{r0-r3}
+	@;Torii: the running timers' reload values, which no read gives: each
+	@;restarted and its counter read at once (the reload, plus the cycles
+	@;the read took), then again with 0x8000 written (0x8000 plus the same),
+	@;and the reload written back (SP_RELOAD, 0 for a timer off). A launch
+	@;into a state finds the game's timers as its start left them: Need for
+	@;Speed Underground's sound timer IRQ never came, and the game crashed
+	add		r4,r10,#0x100		@;TM0CNT_L
+	add		r5,r11,#SP_RELOAD
+	mov		r6,#4
+1:	ldrh	r7,[r4,#2]
+	ands	r0,r7,#0x80
+	beq		2f
+	bic		r8,r7,#0x80
+	strh	r8,[r4,#2]
+	strh	r7,[r4,#2]
+	ldrh	r0,[r4]
+	mov		r1,#0x8000
+	strh	r1,[r4]
+	strh	r8,[r4,#2]
+	strh	r7,[r4,#2]
+	ldrh	r1,[r4]
+	sub		r1,r1,#0x8000
+	sub		r0,r0,r1
+	strh	r0,[r4]
+	strh	r8,[r4,#2]
+	strh	r7,[r4,#2]
+2:	strh	r0,[r5],#2
+	add		r4,r4,#4
+	subs	r6,r6,#1
+	bne		1b
 	ldr		r0,=ST_SPEND
 	mov		r1,r11
 	mov		r2,#0x80
@@ -1199,7 +1230,27 @@ register_list_end:
 	moveq	lr,r2
 	msreq	SPSR_cxsf,r3
 	msreq	cpsr_c,r0
-
+	@;and the timers' reload values SAVE measured, each running timer
+	@;restarted on its own (as the register list started it on the reload
+	@;the game last wrote)
+	ldr		r0,[r7]
+	cmp		r0,r4
+	bne		3f
+	add		r1,r7,#SP_RELOAD-SP_SVC
+	add		r2,r10,#0x100
+	mov		r3,#4
+1:	ldrh	r0,[r1],#2
+	ldrh	r5,[r2,#2]
+	tst		r5,#0x80
+	beq		2f
+	strh	r0,[r2]
+	bic		r6,r5,#0x80
+	strh	r6,[r2,#2]
+	strh	r5,[r2,#2]
+2:	add		r2,r2,#4
+	subs	r3,r3,#1
+	bne		1b
+3:
 	mov 	r0,#0x0
 	bl 		SetRampage
 	add		r8,r10,#0x200

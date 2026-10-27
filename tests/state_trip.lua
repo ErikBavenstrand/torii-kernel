@@ -258,23 +258,40 @@ end
 
 -- The menu key held 20 frames, then each key pressed for 4 frames, 8 apart
 -- (hook_watch.lua's timing). False if the menu didn't open.
--- on_open runs at the first frame end with the menu up (the game frozen)
+-- on_open runs at the first frame end with the menu up (the game frozen).
+-- A game keeps its VBlank IRQ off now and then (a loading screen), when the
+-- menu can't open: the key is tried again, 60 frames apart, 8 times.
 local function menu(names, on_open)
-	E:setKeys(MENU_KEY)
 	local opened = false
-	for i = 1, 40 do
-		tick()
-		if not opened and overlay_up() then
-			opened = true
-			if on_open then
-				on_open()
+	for _ = 1, 8 do
+		E:setKeys(MENU_KEY)
+		for i = 1, 40 do
+			tick()
+			if not opened and overlay_up() then
+				opened = true
+				if on_open then
+					on_open()
+				end
+			end
+			if i == 20 then
+				E:setKeys(0)
 			end
 		end
-		if i == 20 then
-			E:setKeys(0)
+		if opened then
+			break
 		end
+		if DEBUG then
+			log(string.format("debug no menu: vector %08X IE %04X IME %04X DISPSTAT %04X pc %08X",
+				E:read32(0x03007FFC), E:read16(0x04000200), E:read16(0x04000208), E:read16(0x04000004),
+				E:readRegister("pc")))
+		end
+		frames(60)
 	end
 	if not opened then
+		local vector = E:read32(0x03007FFC)
+		if patchStart and (vector < patchStart or vector >= patchStart + PATCH_SIZE) then
+			log(string.format("fail unhooked: the game put its own IRQ handler %08X over the hook", vector))
+		end
 		return false
 	end
 	for _, name in ipairs(names) do
