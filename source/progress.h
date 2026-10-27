@@ -26,7 +26,7 @@
 // The cart's ROM copy, in bytes a frame, from which progress_cart_copy
 // estimates how long it takes: tuned on the cart (docs/release-checklist.md
 // reads it off a launch's log line "launch: the cart copied ...").
-#define PROGRESS_COPY_RATE 0x10000
+#define PROGRESS_COPY_RATE 0x2B000  // 176,128: v0.8 measured 178,481 on the cart
 // The estimate fills this share (in tenths) of the copy's step by the
 // expected time, then slows to 1/PROGRESS_COPY_SLOW of its speed, and stops
 // at the step's end until the copy is done.
