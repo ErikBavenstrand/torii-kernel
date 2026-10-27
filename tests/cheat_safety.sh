@@ -234,7 +234,7 @@ EOF
     new_cart "big-$kind" "$carts/big.gba" Hello.gba "$carts/beef.cht"
     # shellcheck disable=SC2046 # nav.sh's options
     boot $(nav_launch /Hello.gba addon) -w "launch: starting the game" -m @120:0x0203F000:2 \
-      -m @120:0x09FFD000:16 -m @120:0x09FFDFF0:16 -f 6000 >"$cart/run.txt" 2>&1 || true
+      -m @120:0x09FFD000:16 -m @120:0x09FFDFF0:16 -m @120:0x09FF2000:16 -f 6000 >"$cart/run.txt" 2>&1 || true
     grep -q "launch: starting the game" "$cart/run.txt" || fail "$kind: the game didn't start: $(grep -a '^kernel' "$cart/run.txt" | tail -3)"
     rom_at() { od -An -tx1 -j "$1" -N 16 "$carts/big.gba" | tr -d ' \n'; }
     case $kind in
@@ -260,6 +260,7 @@ EOF
         fail "hole: the menu's code isn't in the padding: $(grep -a 'in-game code' "$cart/run.txt")"
       [ "$(mem 0203F000)" = efbe ] || fail "hole: the cheat didn't run: $(mem 0203F000)"
       [ "$(mem 09FFD000)" = "$(rom_at $((0x1FFD000)))" ] || fail "hole: the data at 01FFD000 changed"
+      [ "$(mem 09FF2000)" = "$(rom_at $((0x1FF2000)))" ] || fail "hole: the data just past the padding changed"
       ;;
     overdump)
       ! grep -q "launch: the patch area at" "$cart/run.txt" || fail "overdump: the fill was taken for data"

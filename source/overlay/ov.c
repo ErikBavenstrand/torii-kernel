@@ -689,7 +689,7 @@ static void pill_place(int y)
 
 static int state_saved(void)
 {
-	uint8_t mark[16];
+	uint8_t mark[16] __attribute__((aligned(4)));  // sram_copy takes words
 	sram_in(INGAME_SRAM_STATE_MARK, mark, sizeof(mark));
 	for (uint32_t i = 0; i < sizeof(mark); i++)
 		if (mark[i] != (uint8_t)mark_bytes[i])
