@@ -17,15 +17,15 @@ boot/frames 7-7 77D1C00667060839
 boot/frames 8-40 818B02E74B016B0D
 boot-addon/addons 9D5EA05F12ADBBF3
 boot-addon-copy/copied 834EDB23818102AF
-boot-addon-copy/fast FBE248636174EBAF
+boot-addon-copy/fast AE223751FC57C5F7
 boot-addon-copy/slow E2D938F1A5943537
-boot-addon-copy/frames 0-0 0FB99C4ED1E17723
-boot-addon-copy/frames 1-1 F0C05EFF2FAC10CB
-boot-addon-copy/frames 2-2 8FFCE4904A9B4E93
-boot-addon-copy/frames 3-3 D57E99F8522AC4F7
-boot-addon-copy/frames 4-4 5E84A98E27022AAF
-boot-addon-copy/frames 5-5 DD25A6D07C8CF437
-boot-addon-copy/frames 6-6 F260379DC897224F
+boot-addon-copy/frames 0-0 B462D36EEEAA09DB
+boot-addon-copy/frames 1-1 0FB99C4ED1E17723
+boot-addon-copy/frames 2-2 F0C05EFF2FAC10CB
+boot-addon-copy/frames 3-3 8FFCE4904A9B4E93
+boot-addon-copy/frames 4-4 D57E99F8522AC4F7
+boot-addon-copy/frames 5-5 5E84A98E27022AAF
+boot-addon-copy/frames 6-6 DD25A6D07C8CF437
 boot-copy/copied D31E83436AD1B5A9
 boot-copy/fast 64FAB574734CCC7D
 boot-copy/slow 51F957460CF08751
@@ -345,7 +345,7 @@ info-read/frames 14-14 30A49A89D757BF91
 info-read/frames 15-15 0EB1CADB6D26281C
 info-read/frames 16-16 26D5CBC998640A1D
 info-read/frames 17-22 58C6DE28040EB31D
-ingame/back 2473DE025911454B
+ingame/back 95E628B049B4B4BB
 ingame/cheats 1D3449853DEC3B46
 ingame/menu 9BD8F5227BC01F5E
 ingame/frames 0-0 60D84BE7BC79390E
@@ -364,11 +364,11 @@ ingame-cheats/list F7E6CB9665FBB579
 ingame-cheats/on A7EB51D2E32590C9
 ingame-cheats/rom A3708FCB960EDC67
 ingame-light/menu 131E643EC9B59FC9
-ingame-states/load 4225CDCA2F49A7B5
+ingame-states/load 5D51933A47F53789
 ingame-states/menu E5CA91AA8D3A6D72
-ingame-states/other 3B1365D9D11D048D
+ingame-states/other 8F1F67CC666EF121
 ingame-states/save 8FCFCED100485A28
-ingame-states/save-current 2BD77CD5B52426C3
+ingame-states/save-current FEAC292337EC4D8F
 keypad/empty 7FD5714D72D4EFEE
 keypad/format 95AB601B14490B28
 keypad/typed 3B61A3A038562A48
