@@ -39,8 +39,10 @@
 #define NAMES_IO_BYTES 2048  // a read or write per step: a read's CRC takes about 35,000 cycles
 #define NAMES_CLEAR_BYTES 2048  // the cache's slots emptied per step
 #define NAMES_LOAD_BYTES 2048  // crc.txt read and scanned per step (about 45,000 cycles)
-// names.db read per step, through the stage (engine/stage.h): 8 sectors, one
-// card command, about 65,000 cycles on the cart (721 KB took 1,361 ms)
+// names.db read per step, through the stage (engine/stage.h), to a file
+// offset that is a multiple of it: 8 sectors, two card commands of 4
+// (Read_SD_sectors' most), about 65,000 cycles on the cart (721 KB took
+// 1,361 ms in 2 KB steps)
 #define NAMES_DB_BYTES 4096
 #define NAMES_LINES_CYCLES 24000  // crc.txt's lines kept per step
 #define NAMES_STEP_CYCLES 30000  // one job call's work, as the library's
@@ -281,8 +283,9 @@ static void db_step(void)
 		return;
 	}
 	u32 total = db_header()->file_bytes, n = total - N.at;
-	if (n > NAMES_DB_BYTES)
-		n = NAMES_DB_BYTES;
+	u32 to_edge = NAMES_DB_BYTES - N.at % NAMES_DB_BYTES;
+	if (n > to_edge)
+		n = to_edge;
 	u8 *chunk = stage_buffer();  // nothing in it outlives the step
 	if (f_read(&N.u.fil, chunk, n, &got) != FR_OK || got != n) {
 		db_failed("a short read");
