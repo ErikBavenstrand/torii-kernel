@@ -588,7 +588,7 @@ static const struct lang_slots en_slots = {
 };
 static const struct lang_cheats en_cheats = {
 	.hint_pick = "pick",
-	.why = {"", "Too much to run beside the picks", "Can't read this code", "Edit to use: digits to fill in",
+	.why = {"", "Too much to run beside the picks", "Can't read this code", "Fill in its digits to use it",
 		"Can't run on this cart", "Too many ROM patches beside picks", "No room in the file"},
 	.nor = "ROM patch: no NOR games",
 	.unnamed = "(no name)",
@@ -627,7 +627,7 @@ static const struct lang_cheats en_cheats = {
 	.detail_detected = ", detected",
 	.detail_unknown = "Format: not read",
 	.detail_nor = " (not for NOR games)",
-	.detail_runs = "Nothing runs each frame",
+	.detail_runs = "Runs once, at launch",
 	.detail_picked = "Picked: on at every launch with addons",
 	.detail_not_picked = "Not picked",
 };
@@ -790,8 +790,8 @@ static const struct lang_ingame en_ingame = {
 	.debug_saved = "Snapshot kept for the log",
 	.cheats = "Cheats",
 	.all_off = "All off",
-	.as_launched = "All as launched",
-	.kept = "Kept as picks on Back to Torii",
+	.as_launched = "Back to my picks",
+	.kept = "Back to Torii keeps these picks",
 	.why_rom = "Patches the ROM: pick it in Torii",
 	.why_locked = "On until Back to Torii",
 	.why_cant = "Torii can't run this code",
@@ -805,6 +805,7 @@ static const struct lang_ingame en_ingame = {
 	.shot = "Screenshot",
 	.shot_saved = "Saved: kept on Back to Torii",
 	.hint = " or B: resume",
+	.hint_choose = "A: choose, ",
 	.sleep_wakes = "START+SELECT wakes it",
 	.shot_full = "Full: go back to Torii to keep them",
 	.state_saved = "Kept on Back to Torii; lost if off",

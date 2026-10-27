@@ -449,8 +449,9 @@ struct lang_ingame {
 	// The state slots' pages (v0.8 P3): their footers
 	const char *state_keep, *state_replaces, *state_load, *state_elsewhere, *state_empty;
 	// The screenshot (v0.8 P4): its row and the footer once taken; the
-	// menu's footer, after its keys ("L+R+START" then hint)
-	const char *shot, *shot_saved, *hint;
+	// menu's footer: hint_choose, its keys ("L+R+START") then hint (without
+	// hint_choose where the whole doesn't fit)
+	const char *shot, *shot_saved, *hint, *hint_choose;
 	const char *sleep_wakes;  // the menu's footer on its Sleep row
 	const char *shot_full;  // the menu's footer when no screenshot more fits
 	const char *state_saved;  // the menu's footer while a state saved in game isn't kept

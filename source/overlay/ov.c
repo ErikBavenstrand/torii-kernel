@@ -73,7 +73,7 @@ extern uint32_t __ov_bss_start[], __ov_bss_end[];
 #define TEXT_INSET 14  // the text's left edge in the panel
 #define PILL_INSET 4
 #define PILL_FILLS 7  // the pill's 32x16 middle sprites, for the widest (the cheat list's)
-#define CHECK_INSET 22  // the cheat list's check box, from the panel's right edge
+#define CHECK_X 5  // the cheat list's check mark (the kernel's), from the panel's left edge
 #define SLOT_SPRITES 5  // 32x16 sprites a row's line takes at most: 160 px
 #define SLOT_TILES (SLOT_SPRITES * 8)
 #define WIDE_SPRITES 6  // and the menu's title and footer: INGAME_TEXT_W
@@ -87,15 +87,14 @@ _Static_assert(WIDE_SPRITES * 32 >= INGAME_TEXT_W, "the wide lines' sprites");
 
 // OBJ tiles from INGAME_OBJ_TILE: one block of solid tiles that every
 // filled shape shares (a 64x32 sprite's 32), the panel's corner, the pill's
-// end cap (8x16), the check box empty and ticked, then the lines of text:
+// end cap (8x16), the check mark, then the lines of text:
 // as many as each needs on the menu, SLOT_TILES each on the cheat list,
 // whose rows scroll
 #define TILE_SOLID 0
 #define TILE_CORNER 32
 #define TILE_CAP 33
-#define TILE_BOX 35
-#define TILE_TICK 36
-#define TILE_TEXT 37
+#define TILE_CHECK 35
+#define TILE_TEXT 36
 #define SLOTS_MAX 11  // the menu's title, 9 rows and footer; the list's 8
 _Static_assert(TILE_TEXT + 2 * WIDE_SPRITES * 8 + (SLOTS_MAX - 2) * SLOT_TILES <= INGAME_OBJ_MAX / 32,
 	       "the lines' tiles");
@@ -159,7 +158,7 @@ struct slot {
 	uint8_t y;  // its top on screen
 	uint8_t oam;  // its first text sprite
 	uint8_t max;  // sprites it may take
-	uint8_t check;  // its check box's sprite + 1, or 0 for none
+	uint8_t check;  // its check mark's sprite + 1, or 0 for none
 	uint16_t tile;  // its first tile, from INGAME_OBJ_TILE
 };
 
@@ -171,7 +170,7 @@ enum page_id {
 };
 
 // The cheat list: the kernel's entries (but their lines) and what is on
-#define LIST_FIXED 2  // "All off" and "All as launched" before the cheats
+#define LIST_FIXED 2  // "All off" and "Back to my picks" before the cheats
 struct cheat {
 	uint16_t cost;
 	uint8_t flags, bit;
@@ -331,12 +330,6 @@ static void obj_shown(uint32_t i, int shown)
 	*o = (uint16_t)(shown ? *o & ~A0_HIDE : *o | A0_HIDE);
 }
 
-static void obj_tile(uint32_t i, uint32_t tile)
-{
-	volatile uint16_t *o = OAM + i * 4 + 2;
-	*o = (uint16_t)((*o & 0xFC00) | (INGAME_OBJ_TILE + tile));
-}
-
 // Backs up the OBJ tiles from INGAME_OBJ_TILE up to tile end, those not yet,
 // and records it
 static void tiles_need(uint32_t end)
@@ -351,15 +344,43 @@ static void tiles_need(uint32_t end)
 
 // The shapes' tiles from TILE_CORNER, 4bpp in colour 1: the panel's top
 // left corner (a quarter circle of radius 6), the pill's left end (half a
-// circle of radius 8, 8x16), the check box empty (a rounded outline) and
-// ticked (filled). Tables: drawing them pixel by pixel took a third of a
-// frame from EWRAM.
+// circle of radius 8, 8x16) and the check mark of a cheat that is on (the
+// kernel's cheat screen's). Tables: drawing them pixel by pixel took a
+// third of a frame from EWRAM.
 static const uint32_t shapes[] = {
-	0x11110000u, 0x11111100u, 0x11111110u, 0x11111110u, 0x11111111u, 0x11111111u, 0x11111111u, 0x11111111u,
-	0x11100000u, 0x11111000u, 0x11111100u, 0x11111110u, 0x11111110u, 0x11111111u, 0x11111111u, 0x11111111u,
-	0x11111111u, 0x11111111u, 0x11111111u, 0x11111110u, 0x11111110u, 0x11111100u, 0x11111000u, 0x11100000u,
-	0x01111110u, 0x10000001u, 0x10000001u, 0x10000001u, 0x10000001u, 0x10000001u, 0x10000001u, 0x01111110u,
-	0x01111110u, 0x11111111u, 0x11111111u, 0x11111111u, 0x11111111u, 0x11111111u, 0x11111111u, 0x01111110u,
+	0x11110000u,
+	0x11111100u,
+	0x11111110u,
+	0x11111110u,
+	0x11111111u,
+	0x11111111u,
+	0x11111111u,
+	0x11111111u,
+	0x11100000u,
+	0x11111000u,
+	0x11111100u,
+	0x11111110u,
+	0x11111110u,
+	0x11111111u,
+	0x11111111u,
+	0x11111111u,
+	0x11111111u,
+	0x11111111u,
+	0x11111111u,
+	0x11111110u,
+	0x11111110u,
+	0x11111100u,
+	0x11111000u,
+	0x11100000u,
+	// the check mark, as the kernel's cheat screen draws it (the body font's)
+	0x00000000u,
+	0x01000000u,
+	0x01100000u,
+	0x00110001u,
+	0x00011011u,
+	0x00001110u,
+	0x00000100u,
+	0x00000000u,
 };
 _Static_assert(sizeof(shapes) == (TILE_TEXT - TILE_CORNER) * 32, "a tile each, the cap two");
 
@@ -639,13 +660,10 @@ static void slot_update(uint32_t k)
 	slot_draw(s, slot_text(k), bank);
 	if (s->check) {
 		uint32_t o = s->check - 1u;
-		int cheat = r >= (int)LIST_FIXED;
-		obj_shown(o, cheat && m.text_shown);
-		if (cheat) {
-			uint32_t e = (uint32_t)r - LIST_FIXED;
-			obj_tile(o, bit_of(m.on, e) ? TILE_TICK : TILE_BOX);
-			obj_bank(o, row_greyed((uint32_t)r) ? BANK_FAINT : bit_of(m.on, e) ? BANK_TITLE : BANK_TEXT);
-		}
+		int on = r >= (int)LIST_FIXED && bit_of(m.on, (uint32_t)r - LIST_FIXED);
+		obj_shown(o, on && m.text_shown);
+		if (on)
+			obj_bank(o, row_greyed((uint32_t)r) ? BANK_FAINT : BANK_TITLE);
 	}
 }
 
@@ -767,7 +785,7 @@ static void build_page(enum page_id page, uint32_t cursor)
 	for (uint32_t i = 0; i < sizeof(shapes) / 4; i++)
 		t[TILE_CORNER * 8 + i] = shapes[i];
 
-	// Sprites, front to back: text and check boxes (hidden until drawn),
+	// Sprites, front to back: text and check marks (hidden until drawn),
 	// the pill, the panel, the cover
 	hide_all();
 	m.oam_next = 0;
@@ -842,7 +860,7 @@ static void build_page(enum page_id page, uint32_t cursor)
 }
 
 // The text: its tiles backed up and drawn; its sprites shown at the next VBlank
-// Slots from..to-1 drawn: their sprites (hidden) and check boxes in the
+// Slots from..to-1 drawn: their sprites (hidden) and check marks in the
 // places build_page kept, their tiles backed up and drawn; shown at the
 // next VBlank
 static void build_text(uint32_t from, uint32_t to)
@@ -855,8 +873,7 @@ static void build_text(uint32_t from, uint32_t to)
 			obj(m.x0 + TEXT_INSET + (int)j * 32, sl->y, SHAPE_WIDE, 2, sl->tile + j * 8, BANK_TEXT, A0_HIDE,
 			    0);
 		if (sl->check)
-			obj(m.x0 + (int)m.panel_w - CHECK_INSET, sl->y + 4, SHAPE_SQUARE, 0, TILE_BOX, BANK_TEXT,
-			    A0_HIDE, 0);
+			obj(m.x0 + CHECK_X, sl->y + 4, SHAPE_SQUARE, 0, TILE_CHECK, BANK_TITLE, A0_HIDE, 0);
 	}
 	m.oam_next = next;
 	tiles_need(to < m.title + m.visible + m.footer ? m.slots[to].tile : m.tiles_end);

@@ -13,6 +13,7 @@
 #include "ff.h"
 #include "ingameprobe.h"
 #include "engine/font.h"
+#include "engine/text.h"
 #include "lang.h"
 #include "ez_define.h"
 #include "ezkernel.h"
@@ -337,15 +338,19 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 	bad += sram_put(INGAME_SRAM_IMAGE, (const u8 *)&hdr_out, sizeof(hdr_out));
 	bad += sram_put(INGAME_SRAM_SESSION, (const u8 *)words, sizeof(words));
 	const struct lang_ingame *t = gl_ingame;
-	// The menu's footer: its keys as Settings shows them, then the hint
-	char hint[48];
+	// The menu's footer: A's word, its keys as Settings shows them, then
+	// the hint; without A's word where that doesn't fit
+	char keys_text[32], hint[64];
 	u8 keys[3];
 	u32 n = settings_keys_list(h->menu_key, keys), len = 0;
-	hint[0] = 0;
+	keys_text[0] = 0;
 	for (u32 i = 0; i < n; i++)
-		len += (u32)snprintf(hint + len, sizeof(hint) - len, "%s%s", i ? "+" : "", settings_key_name(keys[i]));
-	tlog("launch: in-game menu keys %s%s", hint, gl_menu_off ? ", off (In-game menu Off)" : "");
-	snprintf(hint + len, sizeof(hint) - len, "%s", t->hint);
+		len += (u32)snprintf(keys_text + len, sizeof(keys_text) - len, "%s%s", i ? "+" : "",
+				     settings_key_name(keys[i]));
+	tlog("launch: in-game menu keys %s%s", keys_text, gl_menu_off ? ", off (In-game menu Off)" : "");
+	snprintf(hint, sizeof(hint), "%s%s%s", t->hint_choose, keys_text, t->hint);
+	if (text_width(&font_body, hint, (u32)strlen(hint)) > INGAME_TEXT_W)
+		snprintf(hint, sizeof(hint), "%s%s", keys_text, t->hint);
 	char counts[INGAME_SHOTS_MAX][24];
 	for (u32 i = 0; i < INGAME_SHOTS_MAX; i++)
 		snprintf(counts[i], sizeof(counts[i]), EN_INGAME_SHOT_COUNT, (unsigned long)i + 1,

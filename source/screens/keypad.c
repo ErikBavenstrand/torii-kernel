@@ -62,7 +62,7 @@ static const struct keypad_look {
 	.caret_h = 11,
 	.caret_dy = 1,
 	.info_x = 8,
-	.format_y = 66,
+	.format_y = 64,
 	.result_y = 76,
 	.label_gap = 4,
 	.grid_x = 16,

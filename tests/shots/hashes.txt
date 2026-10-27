@@ -56,7 +56,7 @@ boot-slow/frames 16-16 C06A5CEEB9ABEEEC
 boot-slow/frames 17-17 1DA9A452A082DCA0
 boot-slow/frames 18-19 7C573B18E65FE325
 cheats-clean/clean 019FE0D843B177D1
-cheats-menu/details 16664B225B18E564
+cheats-menu/details 6B45281E2E0B7848
 cheats-menu/menu ED06F892C1A0EA8B
 cheats-menu/only 650F7187008461A0
 cheats-menu/rom EA030CE26885DD21
@@ -108,7 +108,7 @@ games-box-switch/frames 3-3 D4DD55491F22C7F2
 games-box-switch/frames 4-5 E3A4AD640FBC14D2
 games-box-switch/frames 6-28 9F73E48DF1E05512
 games-cheats/back DE60914D027457D0
-games-cheats/greyed 38B4E6864EA3A553
+games-cheats/greyed 9638E56998B70962
 games-cheats/picked CB1E81B404AECA94
 games-cheats/popup 6D3246AFDB3CA9DB
 games-cheats/screen 009BC461014B2F10
@@ -360,10 +360,10 @@ ingame/frames 14-14 CE0974E7D1A5E076
 ingame/frames 15-15 3A309ACE05E575C6
 ingame/frames 16-16 B938E6C34A2B8676
 ingame/frames 17-23 FAD7274EE3C5F306
-ingame-cheats/greyed 819ECDDAF5B7ADE8
-ingame-cheats/list F7E6CB9665FBB579
-ingame-cheats/on A7EB51D2E32590C9
-ingame-cheats/rom A3708FCB960EDC67
+ingame-cheats/greyed 63489F1FDCBBE56A
+ingame-cheats/list CE7873FF14B6B5B7
+ingame-cheats/on 32224FB92C5D61EB
+ingame-cheats/rom 7FA5EE5726DEE61D
 ingame-light/menu 6DAB01A75168AFC9
 ingame-shots/first 2B0003A6FF47E8D9
 ingame-shots/one B7818279D579B476
@@ -374,13 +374,13 @@ ingame-states/menu D78F8911AEEC140E
 ingame-states/other 8F1F67CC666EF121
 ingame-states/save 8FCFCED100485A28
 ingame-states/save-current FEAC292337EC4D8F
-keypad/cleared 85367DCFB8E98849
-keypad/empty 7FD5714D72D4EFEE
-keypad/format C6129FC5DE1F8218
-keypad/typed 3B61A3A038562A48
-keypad/unreadable AAE970C2329D69D9
-keypad-fill/fill B4C7D146C4CF366C
-keypad-fill/filled AB00C9E777DBCE79
+keypad/cleared 4BACBA342F0C3A49
+keypad/empty 464BADB1E8F7A1EE
+keypad/format 8ACFAB7A19602618
+keypad/typed AF01CE0676C29C48
+keypad/unreadable 15B50BB1ADF247D9
+keypad-fill/fill 205A0EE17578966C
+keypad-fill/filled 9982D9EC52FB2679
 nav-push-fail/error 8DA1D73368B07BC5
 nav-push-fail/page 7857C96979E6C7B0
 nor-dark/closed 0A43620B78FFDEF1
