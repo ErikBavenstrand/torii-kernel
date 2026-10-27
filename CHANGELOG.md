@@ -6,6 +6,8 @@ git log, not here.
 
 ## Unreleased
 
+## v0.7.1
+
 - **Fixed:** cheat codes follow the real devices where mGBA doesn't (GBATEK,
   VBA-M): Action Replay v3 C6/C7 IO writes are 16 and 32 bits; an IF with an
   empty THEN and an ELSE no longer runs the ELSE every frame; its padding
@@ -15,7 +17,15 @@ git log, not here.
   CodeBreaker key and a DEADFACE reseed carry to later cheats (13204692,
   d9fa0cf9, b2e7d29b); a DEADFACE inside a cheat with its own format
   reseeds the cheats after it, and deleting an emptied file deletes the
-  copy a reader takes last, so a cut leaves no broken copy (979432e5).
+  copy a reader takes last, so a cut leaves no broken copy (979432e5,
+  df029857). A halfword or word ROM write to an unaligned address is
+  patched aligned down, as a CPU store is (6213f491).
+- **Added (tests):** every cheat is checked three ways: `just cheat-corpus`
+  decodes libretro's 7,017 GBA cheats with Torii's and mGBA's decoders and
+  fails on any difference no documented device rule explains; a type matrix
+  runs every op, width, format and comparator through both engines on the
+  emulated cart, frame by frame; `just cheat-fuzz` runs random programs the
+  same way and keeps failing seeds as regression cases.
 - **Added:** cheat types that were unreadable: GameShark slowdown (read, not
   run, so the rest of the cheat works), Action Replay v3 "turn off codes"
   conditionals (the rest of the cheat waits on them) and CodeBreaker
