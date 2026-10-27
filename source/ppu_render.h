@@ -8,15 +8,16 @@
 // size, flips and scroll; affine BGs (modes 1 and 2) and the bitmap modes
 // through BG2's matrix, wrapping or not; sprites, plain and affine (double
 // size too), 1D and 2D tile mapping, semi-transparent ones; priorities
-// between BGs and sprites; alpha blending and the brightness fades.
-// Left out: the windows (all layers show as DISPCNT says), mosaic, and
-// anything a game changes in the middle of a frame (HBlank effects).
+// between BGs and sprites; alpha blending and the brightness fades; the
+// windows (WIN0, WIN1 and the OBJ window). Left out: mosaic, and anything
+// a game changes in the middle of a frame (HBlank effects).
 //
 // The dump can't hold what the hardware won't read back: the BG scroll and
 // affine registers, BLDY and the windows' bounds are write-only, so the
 // overlay records them as 0. The renderer takes a scroll of 0 as it comes
 // (a scrolled tile screen shifts), an all-zero BG matrix as the identity
-// (the bitmap modes come out whole) and a BLDY of 0 as no fade.
+// (the bitmap modes come out whole), a BLDY of 0 as no fade, and a window
+// whose bounds read 0 as covering the screen.
 #ifndef TORII_PPU_RENDER_H
 #define TORII_PPU_RENDER_H
 

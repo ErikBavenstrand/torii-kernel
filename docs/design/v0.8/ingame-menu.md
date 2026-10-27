@@ -208,6 +208,9 @@ and paging spare PSRAM from the menu (tier C) stay off until the cart probe says
 - **Menu keys** as Settings sets them reach the hook (`RTS_Reset_key`) and the overlay's
   footer ("L+R+START or B: resume"), drawn by the kernel at launch; `tests/menu_keys.sh`
   opens the menu on L+R+B with only Every game on, and checks Off.
+- **NOR games** keep the In-game menu setting and keys they were written with (the patch is
+  burned in, as the old hotkeys were; Info's Hotkeys page says so): a game written under
+  Auto still opens the menu after Off is picked, until it is written again.
 
 ## Polish (from use in the emulator)
 

@@ -203,10 +203,12 @@ boot 1 -w "nav: home ready" -k @8:RIGHT -k @12:- -k @16:RIGHT -k @20:- -k @24:A 
 started "0: home-recent"
 boot 2 -w "nav: start on" -f @300
 started "0: home-gba"
-# Recent's page, A on its first game, then the Reset hotkey in the game:
+# Recent's page, A on its first game, then the menu keys in the game and
+# Back to Torii (In-game menu Every game; UP from Resume is the last row):
 # the kernel restarts facing Recent; RIGHT, rest, power-off
 boot 3 -w "nav: home ready" -k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:A -k @28:- -w "nav: page recent ready" \
-  -k @20:A -k @24:- -w "launch: starting" -k @300:L+R+START -k @330:- -w "nav: start on" -w "nav: home ready" \
+  -k @20:A -k @24:- -w "launch: starting" -k @300:L+R+START -k @330:- -w "screen ready: ingame" \
+  -k @40:UP -k @44:- -k @52:A -k @56:- -w "nav: start on" -w "nav: home ready" \
   -k @10:RIGHT -k @14:- -k @400:- -f @900
 started "0: home-gba"
 started "0: home-recent" 2

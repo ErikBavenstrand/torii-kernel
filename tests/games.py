@@ -513,7 +513,7 @@ def check_menu(result: Result, rom: Path, sd_name: str, table: dict) -> None:
     menu_cart(cart, rom, sd_name)
     # Loading with patches takes about 90 frames per MB.
     frames = 400 + (len(data) >> 20) * 150 + 2200
-    hashes = [a for f in range(30, frames + 1, 30) for a in ("-h", str(f))]
+    hashes = [a for f in range(10, frames + 1, 10) for a in ("-h", str(f))]
     out, trace = power_on(
         cart,
         launch_keys(sd_name, HOOK_ADDON, 200),

@@ -672,7 +672,7 @@ static void build_page(enum page_id page, uint32_t cursor)
 		// the DEBUG notice; then the title, room left
 		m.visible = m.rows;
 		uint32_t h = PANEL_PAD * 2 + m.rows * ROW_H;
-		m.footer = (f & INGAME_NOTICE_DEBUG) || (m.have_session && h + ROW_H <= SCREEN_H);
+		m.footer = ((f & INGAME_NOTICE_DEBUG) || m.have_session) && h + ROW_H <= SCREEN_H;
 		h += m.footer * ROW_H;
 		panel_w = MENU_W;
 		m.title = h + ROW_H + TITLE_GAP <= SCREEN_H - 8;  // the title goes when the screen can't take it

@@ -235,7 +235,7 @@ int ingame_states_launch(const char *rom_path, const char *save_slot, const char
 {
 	states.ready = 0;
 	if (strlen(save_slot) >= sizeof(states.save_slot) || strlen(rom_path) >= INGAME_PATH_BYTES)
-		return 0;
+		return !slot;  // no states: a launch that asked for none goes on
 	memset(states.save_slot, 0, sizeof(states.save_slot));
 	memcpy(states.save_slot, save_slot, strlen(save_slot) + 1);  // its length checked above
 	states.rom_crc = states_crc(rom_path, save_slot);
