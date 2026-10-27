@@ -1,18 +1,25 @@
 #!/usr/bin/env -S uv run --script
 # /// script
-# requires-python = ">=3.9"
+# requires-python = ">=3.10"
 # ///
 """Run the checks that the changed files need (`just check`).
 
-usage: check.py [--full] [--staged] [--base REF] [--dry-run]
+usage: check.py [--full] [--staged] [--base REF] [--no-cache] [--dry-run]
 
 Changed files are those that differ from where the branch left REF (main by
 default), committed or not, plus untracked ones, and emu/mgba when it has
 edits not yet saved to emu/patches (git ignores emu/mgba). With --staged,
 only the staged changes count, though the checks run on the working tree.
 Each file selects tiers by the rules below, the first rule
-that matches winning; the checks then run in a fixed order, all of them even
-after one fails, and a summary lists what failed.
+that matches winning. The tiers then run side by side, all of them even
+after one fails: lint at once, the rest after one `just` call builds what
+they need (PREPARE). Each tier's output goes to dist/.check/TIER.log and is
+printed whole when the tier ends; a summary lists what failed.
+
+A tier that passed before with the same inputs is skipped: the hash of every
+file whose rules select it (PassCache), recorded in dist/.check/passed.json
+when it passes. Re-running `just check` after committing, or after a change
+to docs only, then runs nothing again. --no-cache runs every tier.
 
 Kernel source is the default for compat: every file in source/ and
 tests/kernel/ links into the one kernel binary, so a change anywhere can break
@@ -26,9 +33,11 @@ knows runs everything.
 
 import fnmatch
 import hashlib
+import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 LINT, TEST_HOST, TEST, SIZE, REPRO, ANALYZE, COMPAT = (
@@ -47,7 +56,12 @@ EVERYTHING = {LINT, TEST, SIZE, ANALYZE, COMPAT}
 # Kernel C files that only draw menus or text and never run while a game
 # launches or saves: they skip compat (not size). Other headers never skip
 # it, as launching code includes them (only menu code includes the text
-# engine's); nor does lang.c, whose strings it uses.
+# engine's); nor does lang.c, whose strings it uses. The menu pages a player
+# opens (games, SD card, NOR, cheats, saves, settings) are here too: compat
+# launches through the tests' hook in screens/nav.c, straight into
+# actions.c, so their code never runs there; `just test` drives them.
+# Pages a launch itself can show (slot picker, slot flow, save page) and
+# headers nav.c or actions.c include are not.
 NO_COMPAT = {
     "source/artkey.c",
     "source/artkey.h",
@@ -56,6 +70,9 @@ NO_COMPAT = {
     "source/boxart.c",
     "source/boxart.h",
     "source/charset.c",
+    "source/diag_render.c",
+    "source/engine/affine.c",
+    "source/engine/affine.h",
     "source/engine/ease_lut.c",
     "source/engine/font.h",
     "source/engine/font_body.c",
@@ -77,16 +94,28 @@ NO_COMPAT = {
     "source/rename_edit.h",
     "source/screens/carousel.c",
     "source/screens/carousel_ring.c",
+    "source/screens/cheats.c",
+    "source/screens/cheats.h",
+    "source/screens/game_saves.c",
+    "source/screens/game_saves.h",
+    "source/screens/games.c",
     "source/screens/home.c",
     "source/screens/info.c",
     "source/screens/info.h",
     "source/screens/keypad.c",
     "source/screens/keypad.h",
+    "source/screens/nor.c",
     "source/screens/registry.c",
     "source/screens/rename.c",
     "source/screens/rename.h",
+    "source/screens/saves.c",
+    "source/screens/saves.h",
+    "source/screens/sdcard.c",
     "source/screens/settings_layout.c",
     "source/screens/settings_layout.h",
+    "source/screens/settings_page.c",
+    "source/screens/slot_list.c",
+    "source/screens/slot_list.h",
     "source/sdlist.c",
     "source/sdlist.h",
     "source/ui/art.c",
@@ -381,9 +410,205 @@ def changed_files(base: str, staged: bool) -> tuple[list[str], str]:
     return sorted(set(files + unsaved)), f"against {ref}, committed or not"
 
 
+# What each tier's recipe builds first. `just check` builds them all in one
+# `just` call before the tiers start, so tiers running side by side never
+# build the same thing at once; their own dependencies are then no-ops.
+PREPARE = {
+    TEST_HOST: ["emu-image"],
+    TEST: ["build", "emu-headless", "test-roms", "_test-kernel-build"],
+    SIZE: ["build", "_test-kernel-build"],
+    REPRO: ["build"],
+    ANALYZE: ["compile-commands", "_analyze-image"],
+    COMPAT: ["build", "emu-headless"],
+}
+# Tiers that need no container and none of PREPARE: they start at once,
+# alongside the preparation.
+HOST_ONLY = {LINT}
+
+
+def tree_state() -> dict[str, str]:
+    """Every file git knows or would add, with a hash of its content.
+
+    Index blobs for files the work tree hasn't changed; the rest are hashed from
+    disk by git hash-object. Edits in emu/mgba and the emulators' checkouts not
+    yet saved to their patches count as files of their own (their diff's hash),
+    and so does the list of roms/ (names, sizes, times) and roms/games.toml."""
+    state = {}
+    for line in git("ls-files", "-s"):
+        meta, path = line.split("\t", 1)
+        state[path] = meta.split()[1]
+    dirty = git("diff", "--name-only", "--no-renames") + git(
+        "ls-files", "--others", "--exclude-standard"
+    )
+    present = [f for f in dirty if Path(f).is_file()]
+    for path in set(dirty) - set(present):
+        state.pop(path, None)
+    if present:
+        hashes = subprocess.run(
+            ["git", "hash-object", "--stdin-paths"],
+            input="\n".join(present),
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.split()
+        state.update(zip(present, hashes, strict=True))
+    for checkout, binary in [
+        ("emu/mgba", False),
+        ("emulators/jagoombacolor", True),
+        ("emulators/pocketnes", True),
+    ]:
+        if Path(checkout).is_dir():
+            diff = subprocess.run(
+                ["git", "-C", checkout, "diff", "--cached"]
+                + (["--binary"] if binary else []),
+                capture_output=True,
+                check=True,
+            ).stdout
+            state[checkout + "/"] = hashlib.sha256(diff).hexdigest()
+    roms = hashlib.sha256()
+    for rom in sorted(Path("roms").glob("**/*")):
+        if rom.is_file():
+            info = rom.stat()
+            roms.update(f"{rom} {info.st_size} {info.st_mtime_ns}\n".encode())
+    state["roms/"] = roms.hexdigest()
+    return state
+
+
+class PassCache:
+    """The input hashes of tiers that passed: a tier whose inputs hash the same
+    as in a passing run is skipped.
+
+    A tier's inputs are the files whose rules select it (the rules that decide
+    whether a change needs the tier at all), with test also taking test-host's,
+    and repro and anything else every file. compat also reads roms/. The hash
+    covers the command too, so `compat` and `compat --all` pass separately."""
+
+    KEEP = 64
+
+    def __init__(self, path: Path):
+        self.path = path
+        try:
+            self.hashes = json.loads(path.read_text())
+        except (OSError, ValueError):
+            self.hashes = []
+
+    def key(self, cmd: list[str], state: dict[str, str]) -> str:
+        tier = cmd[1]
+        wanted = {tier, TEST_HOST} if tier == TEST else {tier}
+        digest = hashlib.sha256(" ".join(cmd[1:]).encode() + b"\0")
+        for path in sorted(state):
+            if path == "roms/" and tier != COMPAT:
+                continue
+            tiers = tiers_for(path.rstrip("/"))[0]
+            if tier in (LINT, TEST, SIZE, ANALYZE, COMPAT, TEST_HOST) and not (
+                tiers & wanted
+            ):
+                continue
+            digest.update(f"{path}\0{state[path]}\n".encode())
+        return digest.hexdigest()
+
+    def passed(self, key: str) -> bool:
+        return key in self.hashes
+
+    def add(self, key: str) -> None:
+        if key not in self.hashes:
+            self.hashes.append(key)
+        self.hashes = self.hashes[-self.KEEP :]
+
+    def save(self) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps(self.hashes))
+
+
+def run(plan: list[list[str]], just: str) -> dict[str, bool]:
+    """Run the plan's tiers side by side, each into its own log in
+    dist/.check, and print each log whole as its tier ends.
+
+    Host-only tiers start at once; the others after one `just` call builds
+    what they all need (PREPARE). Returns each tier's name and whether it
+    passed, in plan order."""
+    logs = Path("dist/.check")
+    logs.mkdir(parents=True, exist_ok=True)
+    names = {id(cmd): " ".join(cmd[1:]) for cmd in plan}
+    results: dict[str, bool] = {}
+    procs: dict[int, tuple[list[str], subprocess.Popen, float, Path]] = {}
+
+    def start(cmd: list[str]) -> None:
+        log = logs / (names[id(cmd)].replace(" ", "_") + ".log")
+        out = log.open("wb")
+        proc = subprocess.Popen(cmd, stdout=out, stderr=subprocess.STDOUT)
+        out.close()
+        procs[id(cmd)] = (cmd, proc, time.monotonic(), log)
+
+    def finish(key: int) -> None:
+        _, proc, began, log = procs.pop(key)
+        name = names[key]
+        ok = proc.returncode == 0
+        results[name] = ok
+        print(f"\ncheck: just {name}", flush=True)
+        sys.stdout.buffer.write(log.read_bytes())
+        print(
+            f"check: just {name}: {'passed' if ok else 'FAILED'} in {time.monotonic() - began:.0f} s",
+            flush=True,
+        )
+
+    def wait_any() -> None:
+        while True:
+            for key, (_, proc, _, _) in list(procs.items()):
+                if proc.poll() is not None:
+                    finish(key)
+                    return
+            time.sleep(0.1)
+
+    later = [cmd for cmd in plan if cmd[1] not in HOST_ONLY]
+    for cmd in plan:
+        if cmd[1] in HOST_ONLY:
+            start(cmd)
+    recipes = []
+    for cmd in later:
+        for recipe in PREPARE.get(cmd[1], []):
+            if recipe not in recipes:
+                recipes.append(recipe)
+    prepared = True
+    if recipes:
+        began = time.monotonic()
+        log = logs / "prepare.log"
+        with log.open("wb") as out:
+            prepared = (
+                subprocess.run(
+                    [just, *recipes],
+                    stdout=out,
+                    stderr=subprocess.STDOUT,
+                    check=False,
+                ).returncode
+                == 0
+            )
+        print(
+            f"check: built what the tiers need ({' '.join(recipes)}) in {time.monotonic() - began:.0f} s",
+            flush=True,
+        )
+        if not prepared:
+            sys.stdout.buffer.write(log.read_bytes())
+            print("check: the build failed, so the tiers that need it didn't run")
+            for cmd in later:
+                results[names[id(cmd)]] = False
+            later = []
+    for cmd in later:
+        start(cmd)
+    try:
+        while procs:
+            wait_any()
+    except KeyboardInterrupt:
+        for _, proc, _, _ in procs.values():
+            proc.terminate()
+        raise
+    return {names[id(cmd)]: results[names[id(cmd)]] for cmd in plan}
+
+
 def main() -> int:
     args = sys.argv[1:]
     full, staged, dry_run = "--full" in args, "--staged" in args, "--dry-run" in args
+    use_cache = "--no-cache" not in args
     base = "main"
     if "--base" in args:
         if args.index("--base") + 1 == len(args):
@@ -392,7 +617,7 @@ def main() -> int:
     unknown = [
         a
         for i, a in enumerate(args)
-        if a not in ("--full", "--staged", "--dry-run", "--base")
+        if a not in ("--full", "--staged", "--dry-run", "--no-cache", "--base")
         and not (i > 0 and args[i - 1] == "--base")
     ]
     if unknown:
@@ -429,17 +654,36 @@ def main() -> int:
     if dry_run:
         return 0
 
-    failed = []
-    for cmd in plan:
-        name = " ".join(cmd[1:])
-        print(f"\ncheck: just {name}", flush=True)
-        if subprocess.run(cmd, check=False).returncode != 0:
-            failed.append(name)
+    started = time.monotonic()
+    cache = PassCache(Path("dist/.check/passed.json"))
+    keys = {}
+    if use_cache:
+        state = tree_state()
+        for cmd in plan:
+            keys[cmd[1]] = cache.key(cmd, state)
+        cached = [cmd for cmd in plan if cache.passed(keys[cmd[1]])]
+        if cached:
+            print(
+                "check: passed before with the same inputs, so skipped: "
+                + ", ".join(" ".join(cmd[1:]) for cmd in cached)
+                + " (--no-cache runs them)"
+            )
+        plan = [cmd for cmd in plan if cmd not in cached]
+    results = run(plan, just)
+    if use_cache:
+        # A file edited while the tiers ran may not be what they checked
+        state = tree_state()
+        for cmd in plan:
+            if results[" ".join(cmd[1:])] and cache.key(cmd, state) == keys[cmd[1]]:
+                cache.add(keys[cmd[1]])
+        cache.save()
+    failed = [name for name, ok in results.items() if not ok]
+    took = f"in {time.monotonic() - started:.0f} s"
     print()
     if failed:
-        print(f"check: FAILED: {', '.join(failed)}")
+        print(f"check: FAILED: {', '.join(failed)} ({took})")
         return 1
-    print(f"check: passed: {', '.join(' '.join(cmd[1:]) for cmd in plan)}")
+    print(f"check: passed: {', '.join(results) or 'nothing left to run'} ({took})")
     return 0
 
 
