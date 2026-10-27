@@ -340,6 +340,11 @@ u16 IWRAM_CODE Game_GPIO_status(void)
 	       ((gl_game_uses & GAME_USES_RUMBLE) && gl_game_rumble);
 }
 
+u16 Game_clock_on(void)
+{
+	return (gl_game_uses & GAME_USES_CLOCK) && gl_game_clock;
+}
+
 void IWRAM_CODE SetRompageWithHardReset(u16 page, u32 bootmode)
 {
 	Set_RTC_status(Game_GPIO_status());

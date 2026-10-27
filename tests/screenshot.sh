@@ -103,6 +103,10 @@ shot)
   [ "$(grep -c 'kernel: screenshot: /torii/screenshots/Game 2026-10-27 14-0[0-9]-[0-9][0-9]\(-[2-5]\)\?.bmp written' <<<"$log")" = 5 ] ||
     fail "not 5 BMPs written: $(grep -E 'screenshot|in-game' <<<"$log" | tail -3)"
   grep -q 'kernel: screenshot: 5 filed' <<<"$log" || fail "the list wasn't cleared"
+  # Each named by the clock as it was taken (the game has the clock), not
+  # at filing: the first shot's second is before the filing's
+  [ "$(grep -c 'kernel: screenshot: named by the clock in game' <<<"$log")" = 5 ] ||
+    fail "not every screenshot named by the clock in game: $(grep -E 'screenshot|clock' <<<"$log" | head -5)"
   frames=$(sed -n 's/^kernel: screenshot: .* written in \([0-9]* frames.*\)$/\1/p' <<<"$log" | head -1)
   file=$(check_bmp)
   [ "$(shots)" = 5 ] || fail "$(shots) files, not 5"

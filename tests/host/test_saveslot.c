@@ -557,3 +557,32 @@ void test_saveslot_import_size(void)
 	CHECK(!saveslot_import_size_ok(1000, 0));
 	CHECK(!saveslot_import_size_ok(262144, 0));
 }
+
+void test_saveslot_stamp_from_rtc(void)
+{
+	struct saveslot_stamp a, b;
+	// 27 Oct 2026, a Tuesday, 14:03:09; the hour's PM flag (0x40) masked
+	const u8 t[7] = {0x26, 0x10, 0x27, 0x02, 0x54, 0x03, 0x09};
+	CHECK(saveslot_stamp_from_rtc(t, &a));
+	CHECK(a.year == 2026 && a.month == 10 && a.day == 27 && a.hour == 14 && a.min == 3 && a.sec == 9);
+	const u8 bad[][7] = {
+		{0x26, 0x13, 0x27, 0, 0x14, 0, 0},  // month 13
+		{0x26, 0x10, 0x00, 0, 0x14, 0, 0},  // day 0
+		{0x26, 0x10, 0x27, 0, 0x24, 0, 0},  // hour 24
+		{0x26, 0x10, 0x27, 0, 0x14, 0x60, 0},  // minute 60
+		{0x2A, 0x10, 0x27, 0, 0x14, 0, 0},  // not BCD
+		{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},  // a port that reads all ones
+	};
+	for (u32 i = 0; i < sizeof(bad) / sizeof(bad[0]); i++) {
+		CHECK(!saveslot_stamp_from_rtc(bad[i], &b));
+		CHECK(b.year == 0);
+	}
+	b = a;
+	CHECK(saveslot_stamp_cmp(&a, &b) == 0);
+	b.sec = 10;
+	CHECK(saveslot_stamp_cmp(&a, &b) < 0 && saveslot_stamp_cmp(&b, &a) > 0);
+	b = a;
+	b.year = 2025;
+	b.month = 12;
+	CHECK(saveslot_stamp_cmp(&b, &a) < 0);
+}

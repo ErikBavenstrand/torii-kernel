@@ -470,6 +470,45 @@ static long civil_days(const struct saveslot_stamp *t)
 	return era * 146097 + doe;
 }
 
+static int bcd_ok(u8 v)
+{
+	return (v & 0xF) <= 9 && (v >> 4) <= 9;
+}
+
+static u32 unbcd(u8 v)
+{
+	return (v & 0xFu) + (v >> 4) * 10u;
+}
+
+int saveslot_stamp_from_rtc(const u8 *t, struct saveslot_stamp *out)
+{
+	memset(out, 0, sizeof(*out));
+	u8 f[6] = {t[0], (u8)(t[1] & 0x1F), (u8)(t[2] & 0x3F), (u8)(t[4] & 0x3F), (u8)(t[5] & 0x7F), (u8)(t[6] & 0x7F)};
+	for (u32 i = 0; i < sizeof(f); i++)
+		if (!bcd_ok(f[i]))
+			return 0;
+	u32 mo = unbcd(f[1]), d = unbcd(f[2]), h = unbcd(f[3]), mi = unbcd(f[4]), s = unbcd(f[5]);
+	if (mo < 1 || mo > 12 || d < 1 || d > 31 || h > 23 || mi > 59 || s > 59)
+		return 0;
+	out->year = (u16)(2000 + unbcd(f[0]));
+	out->month = (u8)mo;
+	out->day = (u8)d;
+	out->hour = (u8)h;
+	out->min = (u8)mi;
+	out->sec = (u8)s;
+	return 1;
+}
+
+int saveslot_stamp_cmp(const struct saveslot_stamp *a, const struct saveslot_stamp *b)
+{
+	const u32 x[6] = {a->year, a->month, a->day, a->hour, a->min, a->sec};
+	const u32 y[6] = {b->year, b->month, b->day, b->hour, b->min, b->sec};
+	for (u32 i = 0; i < 6; i++)
+		if (x[i] != y[i])
+			return x[i] < y[i] ? -1 : 1;
+	return 0;
+}
+
 int saveslot_clock_plausible(const struct saveslot_stamp *now)
 {
 	return now->year >= SAVESLOT_CLOCK_FIRST_YEAR && now->year <= SAVESLOT_CLOCK_LAST_YEAR;

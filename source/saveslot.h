@@ -139,6 +139,11 @@ int saveslot_trash_expired(const struct saveslot_stamp *then, const struct saves
 #define SAVESLOT_CLOCK_FIRST_YEAR 2026
 #define SAVESLOT_CLOCK_LAST_YEAR 2060
 int saveslot_clock_plausible(const struct saveslot_stamp *now);
+// The clock's seven BCD bytes (rtc_get's: year, month, day, weekday, hour,
+// minute, second) as a stamp; 0, and *out zero, if they aren't a date and time
+int saveslot_stamp_from_rtc(const u8 *t, struct saveslot_stamp *out);
+// Below, equal or above 0 as a is before, the same second as, or after b
+int saveslot_stamp_cmp(const struct saveslot_stamp *a, const struct saveslot_stamp *b);
 // What the purge does with a trash folder dated then, at now:
 enum saveslot_trash_state {
 	SAVESLOT_TRASH_KEEP,    // not yet 30 days old, or now can't be trusted

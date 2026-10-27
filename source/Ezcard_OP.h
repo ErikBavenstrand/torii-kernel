@@ -24,6 +24,7 @@ void IWRAM_CODE SetRompageWithHardReset(u16 page, u32 bootmode);
 #define GAME_USES_RUMBLE 2
 extern u32 gl_game_uses;
 u16 IWRAM_CODE Game_GPIO_status(void);
+u16 Game_clock_on(void);  // 1 if the game launched has the cart's clock
 void ReadSram(u32 address, u8 *data, u32 size);
 void WriteSram(u32 address, u8 *data, u32 size);
 void IWRAM_CODE Save_sav_info(u16 *SAV_info_buffer, u32 buffersize);

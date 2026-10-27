@@ -30,6 +30,7 @@
 #define REG_BLDCNT REG16(0x04000050)
 #define REG_BLDALPHA REG16(0x04000052)
 #define REG_KEYINPUT REG16(0x04000130)
+#define REG_WAITCNT REG16(0x04000204)
 #define OAM ((volatile uint16_t *)0x07000000)
 #define OBJ_PAL ((volatile uint16_t *)0x05000200)
 #define OBJ_TILES ((volatile uint32_t *)INGAME_OBJ_VRAM)
@@ -1254,6 +1255,70 @@ static int shot_flush(struct shotpack_out *o)
 // stub's backups and the palettes, OAM and VRAM are packed; the registers
 // are those read at opening, the scroll from the game's copy; the magic
 // last. Then the menu again.
+// The cart's clock (the game's GPIO port at 0x080000C4, source/RTC.c's
+// protocol) into clock, as struct ingame_shot keeps it, when the game has
+// it and isn't part way through its own read: the port's chip select is
+// high from a command's first bit to its last byte. The port's three
+// registers are put back as the game left them.
+#define GPIO_DATA (*(volatile uint16_t *)0x080000C4)
+#define GPIO_DIR (*(volatile uint16_t *)0x080000C6)
+#define GPIO_READABLE (*(volatile uint16_t *)0x080000C8)
+
+static void clock_bits(uint32_t v)
+{
+	v <<= 1;
+	for (int l = 7; l >= 0; l--) {
+		uint16_t b = (uint16_t)((v >> l) & 2);
+		GPIO_DATA = b | 4;
+		GPIO_DATA = b | 4;
+		GPIO_DATA = b | 4;
+		GPIO_DATA = b | 5;
+	}
+}
+
+static void clock_take(uint8_t *clock)
+{
+	if (!(session()->flags & INGAME_CLOCK_ON))
+		return;
+	// Readable, the port reads as itself: 4 bits, and 1 at 0x080000C8;
+	// else as the ROM's bytes there
+	const uint16_t data = GPIO_DATA, dir = GPIO_DIR, readable = GPIO_READABLE;
+	const int was_readable = readable == 1 && data < 16 && dir < 16;
+	if (was_readable && (data & 4)) {
+		debug_print("ingame: the game was reading the clock: the screenshot takes the boot's time");
+		return;
+	}
+	// Its serial lines are timed by repeated writes: at the slowest wait
+	// states, as the in-game probe (tests/roms/ingame) reads it
+	const uint16_t waitcnt = REG_WAITCNT;
+	REG_WAITCNT = 0;
+	GPIO_READABLE = 1;
+	GPIO_DATA = 1;
+	GPIO_DIR = 7;
+	GPIO_DATA = 1;
+	GPIO_DATA = 5;
+	clock_bits(0x65);  // date and time
+	GPIO_DIR = 5;
+	for (uint32_t i = 0; i < 7; i++) {
+		uint32_t v = 0;
+		for (uint32_t l = 0; l < 8; l++) {
+			for (uint32_t j = 0; j < 5; j++)
+				GPIO_DATA = 4;
+			GPIO_DATA = 5;
+			v |= (GPIO_DATA & 2u) << l;
+		}
+		clock[i] = (uint8_t)(v >> 1);
+	}
+	GPIO_DATA = 1;  // chip select low: the command's end
+	clock[7] = 1;
+	if (was_readable) {
+		GPIO_DIR = dir;
+		GPIO_DATA = data;
+	}
+	GPIO_READABLE = was_readable;
+	REG_WAITCNT = waitcnt;
+}
+
 static void shot_take(void)
 {
 	if (m.shots >= INGAME_SHOTS_MAX || m.shot_at + sizeof(struct ingame_shot) + 0x1000 > INGAME_SHOTS_END) {
@@ -1267,6 +1332,7 @@ static void shot_take(void)
 	h.version = INGAME_SHOT_VERSION;
 	h.bytes = sizeof(h);
 	h.shadow = shadow_take(h.io);
+	clock_take(h.clock);
 	for (uint32_t i = 0; i < sizeof(io_readable); i++)
 		h.io[io_readable[i]] = m.io[i];
 	sram_in(INGAME_BACKUP_OBJ, (void *)INGAME_OBJ_VRAM, m.tiles_backed * 32);

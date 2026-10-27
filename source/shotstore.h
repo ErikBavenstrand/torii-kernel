@@ -29,6 +29,9 @@ void shotstore_recover(void);
 // are, the list is cleared. Returns 1 then or if there are none, 0 if the
 // card didn't take one (the rest stay, for the next boot). Borrows
 // pReadCache whole.
-int shotstore_file(const char *game);
+// launch_clock is the session's (struct ingame_session): a screenshot is
+// named by the clock as it was taken when that reads between the launch
+// and now, else by the clock now.
+int shotstore_file(const char *game, const u8 *launch_clock);
 
 #endif

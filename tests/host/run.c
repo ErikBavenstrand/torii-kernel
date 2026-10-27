@@ -271,6 +271,7 @@ static const struct {
 	{"orphanplan_journal", test_orphanplan_journal},
 	{"orphanplan_picker", test_orphanplan_picker},
 	{"lang_fill", test_lang_fill},
+	{"saveslot_stamp_from_rtc", test_saveslot_stamp_from_rtc},
 };
 
 int main(void)

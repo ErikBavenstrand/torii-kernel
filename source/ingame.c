@@ -28,6 +28,7 @@
 #include "crc32.h"
 #include "ui/palette.h"
 #include "ui/ui.h"
+#include "RTC.h"
 
 #define CART_SRAM ((vu8 *)0x0E000000)
 
@@ -310,7 +311,13 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 	h->menu_key = menu_key & 0x3FF;
 	h->sleep_key = sleep_key & 0x3FF;
 	h->rtc_status = Game_GPIO_status();
-	h->flags = (gl_sleep_on == 1 ? INGAME_SLEEP_KEY_ON : 0) | (tlog_level != TLOG_OFF ? INGAME_DEBUG_ON : 0);
+	h->flags = (gl_sleep_on == 1 ? INGAME_SLEEP_KEY_ON : 0) | (tlog_level != TLOG_OFF ? INGAME_DEBUG_ON : 0) |
+		   (Game_clock_on() ? INGAME_CLOCK_ON : 0);
+	// The clock now, for the screenshots' times (shotstore_file)
+	rtc_enable();
+	rtc_get(h->launch_clock);
+	rtc_disenable();
+	h->launch_clock[7] = 1;
 	// The cheat list, when the table it toggles went in whole
 	if (gl_cheat_on == 1 && cheats.table == gl_cheat_count) {
 		h->cheat_count = cheats.count;
@@ -582,7 +589,7 @@ void ingame_after_game(void)
 		cheats_keep(h, path, &out);
 	// Screenshots the card didn't take wait for the next boot (and are
 	// filed then even if the menu took none this time)
-	u32 shot_left = !shotstore_file(h->name);
+	u32 shot_left = !shotstore_file(h->name, h->launch_clock);
 	// Done with: the answer goes, so the next boot does nothing again
 	memset(&out, 0, sizeof(out));
 	if (shot_left) {

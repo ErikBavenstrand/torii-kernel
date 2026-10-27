@@ -244,5 +244,6 @@ void test_orphanplan_pick_name_full(void);
 void test_orphanplan_journal(void);
 void test_orphanplan_picker(void);
 void test_lang_fill(void);
+void test_saveslot_stamp_from_rtc(void);
 
 #endif

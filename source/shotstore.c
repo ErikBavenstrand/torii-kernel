@@ -87,15 +87,34 @@ static int path_of(char *out, const char *file)
 	return n > 0 && (u32)n < SHOT_PATH_BYTES;
 }
 
-// The file's name: the game's, the clock's date and time (or a number with
-// no clock), -2, -3 and on if taken; kept in the record's header at at
-static int name_pick(u32 at, const char *game)
+// When the screenshot in w->head was taken: the clock it read in game when
+// that lies between the launch and now (a clock that jumped, or a game
+// that set it, says otherwise), else now
+static void shot_time(const u8 *launch_clock, struct saveslot_stamp *t)
+{
+	struct saveslot_stamp then, launch;
+	const u8 *clock = work()->head.clock;
+	slotstore_now(t);
+	if (!t->year || !clock[7] || !launch_clock[7] || !saveslot_stamp_from_rtc(clock, &then) ||
+	    !saveslot_stamp_from_rtc(launch_clock, &launch) || saveslot_stamp_cmp(&launch, &then) > 0 ||
+	    saveslot_stamp_cmp(&then, t) > 0) {
+		if (clock[7])
+			tlog("screenshot: the clock read in game isn't between the launch and now: filed as now");
+		return;
+	}
+	*t = then;
+	tlog("screenshot: named by the clock in game, as it was taken");
+}
+
+// The file's name: the game's, the date and time it was taken (or a number
+// with no clock), -2, -3 and on if taken; kept in the record's header at at
+static int name_pick(u32 at, const char *game, const u8 *launch_clock)
 {
 	struct shot_work *w = work();
 	struct saveslot_stamp t;
 	FILINFO info;
 	char base[INGAME_SHOT_FILE - 8], name[INGAME_SHOT_FILE];  // room for a number after base
-	slotstore_now(&t);
+	shot_time(launch_clock, &t);
 	const char *g = game[0] ? game : "Screenshot";
 	if (t.year)
 		snprintf(base, sizeof(base), "%.60s %04u-%02u-%02u %02u-%02u-%02u", g, t.year, t.month, t.day, t.hour,
@@ -254,7 +273,7 @@ static int record(u32 at)
 	return h->magic == INGAME_SHOT_MAGIC ? 1 : 2;
 }
 
-int shotstore_file(const char *game)
+int shotstore_file(const char *game, const u8 *launch_clock)
 {
 	struct shot_work *w = work();
 	struct ingame_shot *h = &w->head;
@@ -291,7 +310,7 @@ int shotstore_file(const char *game)
 			if (name[0] && memchr(name, 0, sizeof(name)) && !strchr(name, '/'))
 				ok = path_of(w->path, name);  // a name picked before a power cut
 			else
-				ok = name_pick(at, game);
+				ok = name_pick(at, game, launch_clock);
 			if (ok && file_whole(w->path))
 				tlog("screenshot: %s is whole already", w->path);
 			else

@@ -197,7 +197,7 @@ enum {
 // filed INGAME_SHOT_DONE, and clears the first one's magic once all are.
 #define INGAME_SHOT_MAGIC 0x32485354u  // "TSH2"
 #define INGAME_SHOT_DONE 0x44485354u  // "TSHD": on the card
-#define INGAME_SHOT_VERSION 2
+#define INGAME_SHOT_VERSION 3
 #define INGAME_SHOTS_MAX 5  // a session's at most
 #define INGAME_SHOT_IO 0x30  // halfwords of I/O from 0x04000000: the display's
 #define INGAME_SHOT_FILE 112  // the file's name, the kernel's, once picked
@@ -209,6 +209,10 @@ struct ingame_shot {
 	// Where the overlay found the game's copy of the display registers in
 	// RAM, which gave the scroll; 0 if it found none (for the log)
 	uint32_t shadow;
+	// The clock as the screenshot was taken, its 7 BCD bytes in rtc_get's
+	// order, and clock[7] 1 once read; all 0 when the game hasn't the clock
+	// or was in the middle of reading it
+	uint8_t clock[8];
 	// The display's registers as the game left them: those the hardware
 	// reads back, and the scroll from the game's copy if found; the other
 	// write-only ones (the BG matrices, the windows, MOSAIC, BLDY) 0
@@ -235,7 +239,7 @@ struct ingame_shot {
 
 // --- The session block, at INGAME_SRAM_SESSION
 #define INGAME_SESSION_MAGIC 0x31535354u  // "TSS1"
-#define INGAME_SESSION_VERSION 6
+#define INGAME_SESSION_VERSION 7
 #define INGAME_NAME_BYTES 48
 #define INGAME_CHEATS 64  // the cheats the in-game list shows; the toggles' bits
 #define INGAME_PATH_BYTES 288  // a ROM's path (GAMESAVE_PATH_BYTES)
@@ -252,6 +256,7 @@ struct ingame_shot {
 // Session flags
 #define INGAME_SLEEP_KEY_ON (1u << 0)  // the sleep key is on in Settings
 #define INGAME_DEBUG_ON (1u << 1)  // LOGGING is on: the menu offers the DEBUG snapshot
+#define INGAME_CLOCK_ON (1u << 2)  // the game has the cart's clock: a screenshot reads it
 
 // The menu's text, drawn by the kernel (the engine's body font) so the
 // overlay needs no font: each line 1bpp, INGAME_TEXT_ROWS rows of
@@ -406,6 +411,9 @@ struct ingame_session {
 	uint16_t flags;  // INGAME_SLEEP_KEY_ON...
 	uint8_t state_slots;  // P3: INGAME_STATE_SLOTS, or 0 for the old Save and Load rows
 	uint8_t state_have;  // bit n - 1: slot n has a state on the card
+	// The clock at the launch (as struct ingame_shot's clock), which a
+	// screenshot's time must follow
+	uint8_t launch_clock[8];
 	// P2: the cheat list; the cycles a frame are cheatcode.h's model
 	uint16_t cheat_count;  // the list's cheats (0: the old Cheats on/off row)
 	uint16_t cheat_table;  // the cheats in the interpreter's table

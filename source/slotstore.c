@@ -71,32 +71,13 @@ static int __attribute__((format(printf, 3, 4))) ss_snprintf(char *dst, u32 size
 
 /* ---- The clock and the setting ---- */
 
-static int bcd_ok(u8 v)
-{
-	return (v & 0xF) <= 9 && (v >> 4) <= 9;
-}
-
 void slotstore_now(struct saveslot_stamp *out)
 {
 	u8 t[7];
-	memset(out, 0, sizeof(*out));
 	rtc_enable();
 	rtc_get(t);
 	rtc_disenable();
-	u8 f[6] = {t[0], (u8)(t[1] & 0x1F), (u8)(t[2] & 0x3F), (u8)(t[4] & 0x3F), (u8)(t[5] & 0x7F), (u8)(t[6] & 0x7F)};
-	for (u32 i = 0; i < sizeof(f); i++)
-		if (!bcd_ok(f[i]))
-			return;
-	u32 y = 2000 + UNBCD(f[0]), mo = UNBCD(f[1]), d = UNBCD(f[2]), h = UNBCD(f[3]), mi = UNBCD(f[4]),
-	    s = UNBCD(f[5]);
-	if (mo < 1 || mo > 12 || d < 1 || d > 31 || h > 23 || mi > 59 || s > 59)
-		return;
-	out->year = (u16)y;
-	out->month = (u8)mo;
-	out->day = (u8)d;
-	out->hour = (u8)h;
-	out->min = (u8)mi;
-	out->sec = (u8)s;
+	saveslot_stamp_from_rtc(t, out);
 }
 
 u32 slotstore_keep(void)
