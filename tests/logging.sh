@@ -214,14 +214,22 @@ debug)
     awk -v menu_end=$((0xC0000)) -v ours=$((0xF0000)) -v ours_end=$((0xF2000)) \
       '$1 - 1 >= menu_end && ($1 - 1 < ours || $1 - 1 >= ours_end) { n++ } END { print n + 0 }')
   [ "$changed" = 0 ] || fail "DEBUG changed $changed bytes of cart RAM outside page 0xF0"
+  # One line in the log; the snapshot in its own file, which kept the boot's
+  # own lines from being lost from the log's ring
   has "debug info from the in-game menu: "
-  has "(the hook is in place)"
-  has "debug info: IE "
+  has "; the snapshot is in /torii/logs/debug"
+  log 0 >"$cart/log.txt"
+  ! grep -qF "debug info: IE " "$cart/log.txt" || fail "the snapshot's lines went to the log"
+  snap=$(mdir -b -i "$cart/sd.img" ::/torii/logs | grep '/debug[^/]*\.txt$' | head -1)
+  [ -n "$snap" ] || fail "no /torii/logs/debug-*.txt"
+  mtype -i "$cart/sd.img" "$snap" >"$cart/debug.txt"
+  grep -qF "(the hook is in place)" "$cart/debug.txt" || fail "the snapshot's file doesn't say the hook is in place"
+  grep -qF "IE " "$cart/debug.txt" || fail "the snapshot's file has no IE line"
   blank 0xF1000 16 || [ "$(sram 0xF1000 16)" = "00000000000000000000000000000000" ] || fail "the debug info wasn't cleared"
   card_ok
   lines_ok
   zeros_ok
-  echo "PASS: the in-game menu's Debug snapshot says it saved, writes only cart RAM page 0xF0, and Back to Torii logs it"
+  echo "PASS: the in-game menu's Debug snapshot says it saved, writes only cart RAM page 0xF0, and Back to Torii writes it to ${snap##*/} with a line in the log"
   ;;
 
 crash)

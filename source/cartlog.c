@@ -1,3 +1,4 @@
+#include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
@@ -14,6 +15,8 @@
 #include "ingame_abi.h"
 #include "ingameprobe.h"
 #include "rumbleprobe.h"
+#include "saveslot.h"
+#include "slotstore.h"
 #include "ff.h"
 #include "tlog.h"
 
@@ -230,6 +233,36 @@ static int report_crash(void)
 	return 1;
 }
 
+static FIL title_file EWRAM_BSS;  // read_gb_title's, and the DEBUG snapshot's file
+static int snap_open;  // the snapshot's lines go to title_file, else to the log
+
+// A line of the DEBUG snapshot's report: into its file, else the log
+__attribute__((format(printf, 1, 2))) static void snap_line(const char *format, ...)
+{
+	static u32 line[160 / 4] EWRAM_BSS;  // word-aligned for f_write
+	char *text = (char *)line;
+	va_list args;
+	va_start(args, format);
+	int n = vsnprintf(text, sizeof(line) - 1, format, args);
+	va_end(args);
+	if (n < 0)
+		return;
+	if ((u32)n > sizeof(line) - 2)
+		n = sizeof(line) - 2;
+	if (!snap_open) {
+		tlog_force(TLOG_INFO, "debug info: %s", text);
+		return;
+	}
+	text[n++] = '\n';
+	UINT put = 0;
+	if (f_write(&title_file, text, (UINT)n, &put) != FR_OK || put != (UINT)n)
+		snap_open = 0;  // the rest to the log
+}
+
+// The DEBUG snapshot's report: its own file in /torii/logs, named by the
+// clock, and one line in the log (its many lines flooded the 4 KB ring and
+// lost the boot's own lines, v0.8 on the real cart); the log has it all
+// when the file can't be written
 static void report_snapshot(void)
 {
 	struct cartlog_snapshot *s = &block.snapshot;
@@ -238,46 +271,60 @@ static void report_snapshot(void)
 	if (memcmp(s->magic, SNAPSHOT_MAGIC, 16) != 0)
 		return;
 	cart_clear_magic(CARTLOG_SNAPSHOT, 16);
-	tlog_force(TLOG_INFO, "debug info from the in-game menu: %.12s, code %.4s, version %u, hook at %08lX",
-		   (const char *)s->header, (const char *)s->header + 0xC, s->header[0x1C], (unsigned long)s->irq_hook);
+	struct saveslot_stamp t;
+	slotstore_now(&t);
+	char path[64];
+	if (t.year)
+		snprintf(path, sizeof(path), "/torii/logs/debug-%04u-%02u-%02u-%02u%02u%02u.txt", t.year, t.month,
+			 t.day, t.hour, t.min, t.sec);
+	else
+		snprintf(path, sizeof(path), "/torii/logs/debug.txt");
+	f_mkdir("/torii");
+	f_mkdir("/torii/logs");
+	snap_open = f_open(&title_file, path, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK;
+	tlog_force(TLOG_INFO, "debug info from the in-game menu: %.12s, code %.4s, version %u, hook at %08lX%s%s",
+		   (const char *)s->header, (const char *)s->header + 0xC, s->header[0x1C], (unsigned long)s->irq_hook,
+		   snap_open ? "; the snapshot is in " : "", snap_open ? path : "");
+	snap_line("debug info from the in-game menu: %.12s, code %.4s, version %u, hook at %08lX, build %08lX",
+		  (const char *)s->header, (const char *)s->header + 0xC, s->header[0x1C], (unsigned long)s->irq_hook,
+		  (unsigned long)torii_build_id);
 	const u32 *r = s->regs;
-	tlog_force(TLOG_INFO, "debug info: r4-r7 %08lX %08lX %08lX %08lX", (unsigned long)r[0], (unsigned long)r[1],
-		   (unsigned long)r[2], (unsigned long)r[3]);
-	tlog_force(TLOG_INFO, "debug info: r8-r11 %08lX %08lX %08lX %08lX", (unsigned long)r[4], (unsigned long)r[5],
-		   (unsigned long)r[6], (unsigned long)r[7]);
-	tlog_force(TLOG_INFO, "debug info: r0-r3 %08lX %08lX %08lX %08lX r12 %08lX", (unsigned long)s->irq_frame[0],
-		   (unsigned long)s->irq_frame[1], (unsigned long)s->irq_frame[2], (unsigned long)s->irq_frame[3],
-		   (unsigned long)s->irq_frame[4]);
-	tlog_force(TLOG_INFO, "debug info: pc %08lX cpsr %08lX sp %08lX lr %08lX", (unsigned long)(s->irq_frame[5] - 4),
-		   (unsigned long)r[10], (unsigned long)r[12], (unsigned long)r[13]);
-	tlog_force(TLOG_INFO, "debug info: game IRQ handler %08lX, IRQ flags %08lX, IRQ vector %08lX (the hook is %s)",
-		   (unsigned long)s->hook[1], (unsigned long)s->hook[2], (unsigned long)s->hook[3],
-		   (s->hook[3] == s->irq_hook) ? "in place" : "gone");
+	snap_line("r4-r7 %08lX %08lX %08lX %08lX", (unsigned long)r[0], (unsigned long)r[1], (unsigned long)r[2],
+		  (unsigned long)r[3]);
+	snap_line("r8-r11 %08lX %08lX %08lX %08lX", (unsigned long)r[4], (unsigned long)r[5], (unsigned long)r[6],
+		  (unsigned long)r[7]);
+	snap_line("r0-r3 %08lX %08lX %08lX %08lX r12 %08lX", (unsigned long)s->irq_frame[0],
+		  (unsigned long)s->irq_frame[1], (unsigned long)s->irq_frame[2], (unsigned long)s->irq_frame[3],
+		  (unsigned long)s->irq_frame[4]);
+	snap_line("pc %08lX cpsr %08lX sp %08lX lr %08lX", (unsigned long)(s->irq_frame[5] - 4), (unsigned long)r[10],
+		  (unsigned long)r[12], (unsigned long)r[13]);
+	snap_line("game IRQ handler %08lX, IRQ flags %08lX, IRQ vector %08lX (the hook is %s)",
+		  (unsigned long)s->hook[1], (unsigned long)s->hook[2], (unsigned long)s->hook[3],
+		  (s->hook[3] == s->irq_hook) ? "in place" : "gone");
 	u16 io[8];
 	memcpy(io, s->io_irq, sizeof(io));
-	tlog_force(TLOG_INFO, "debug info: IE %04X IF %04X WAITCNT %04X IME %04X", io[0], io[1], io[2], io[4]);
+	snap_line("IE %04X IF %04X WAITCNT %04X IME %04X", io[0], io[1], io[2], io[4]);
 	for (u32 i = 0; i < 0x60; i += 16) {
 		const u8 *b = s->io + i;
-		tlog_force(
-			TLOG_INFO,
-			"debug info: io %03lX: %02X%02X %02X%02X %02X%02X %02X%02X %02X%02X %02X%02X %02X%02X %02X%02X",
-			(unsigned long)i, b[1], b[0], b[3], b[2], b[5], b[4], b[7], b[6], b[9], b[8], b[11], b[10],
-			b[13], b[12], b[15], b[14]);
+		snap_line("io %03lX: %02X%02X %02X%02X %02X%02X %02X%02X %02X%02X %02X%02X %02X%02X %02X%02X",
+			  (unsigned long)i, b[1], b[0], b[3], b[2], b[5], b[4], b[7], b[6], b[9], b[8], b[11], b[10],
+			  b[13], b[12], b[15], b[14]);
 	}
 	for (u32 i = 0; i < 0x200; i += 32) {
 		const u32 *w = (const u32 *)(s->iwram_top + i);
-		tlog_force(TLOG_INFO, "debug info: %08lX: %08lX %08lX %08lX %08lX %08lX %08lX %08lX %08lX",
-			   (unsigned long)0x03007E00 + i, (unsigned long)w[0], (unsigned long)w[1], (unsigned long)w[2],
-			   (unsigned long)w[3], (unsigned long)w[4], (unsigned long)w[5], (unsigned long)w[6],
-			   (unsigned long)w[7]);
+		snap_line("%08lX: %08lX %08lX %08lX %08lX %08lX %08lX %08lX %08lX", (unsigned long)0x03007E00 + i,
+			  (unsigned long)w[0], (unsigned long)w[1], (unsigned long)w[2], (unsigned long)w[3],
+			  (unsigned long)w[4], (unsigned long)w[5], (unsigned long)w[6], (unsigned long)w[7]);
 	}
 	for (u32 i = 0; i < 0x100; i += 32) {
 		const u32 *w = (const u32 *)(s->stack + i);
-		tlog_force(TLOG_INFO, "debug info: sp+%03lX: %08lX %08lX %08lX %08lX %08lX %08lX %08lX %08lX",
-			   (unsigned long)i, (unsigned long)w[0], (unsigned long)w[1], (unsigned long)w[2],
-			   (unsigned long)w[3], (unsigned long)w[4], (unsigned long)w[5], (unsigned long)w[6],
-			   (unsigned long)w[7]);
+		snap_line("sp+%03lX: %08lX %08lX %08lX %08lX %08lX %08lX %08lX %08lX", (unsigned long)i,
+			  (unsigned long)w[0], (unsigned long)w[1], (unsigned long)w[2], (unsigned long)w[3],
+			  (unsigned long)w[4], (unsigned long)w[5], (unsigned long)w[6], (unsigned long)w[7]);
 	}
+	if (snap_open && f_close(&title_file) != FR_OK)
+		tlog_force(TLOG_ERRORS, "debug info: %s wasn't closed whole", path);
+	snap_open = 0;
 	tlog_flush();
 }
 
@@ -668,7 +715,6 @@ static int is_gb_file(const char *name)
 	return dot && (!strcasecmp(dot, ".gb") || !strcasecmp(dot, ".gbc"));
 }
 
-static FIL title_file EWRAM_BSS;
 static u32 title_buf[4] EWRAM_BSS;  // word-aligned for f_read
 
 // A GB or GBC game's title, from the header at 0x134: up to 16 characters,
