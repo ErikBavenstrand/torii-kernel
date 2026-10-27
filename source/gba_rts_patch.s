@@ -959,25 +959,12 @@ SetRampage:
 	strh  r2,[r3]
 	bx		lr
 @;------------------------------------------------------
-ReadSram: @;(u32 address, u8 *data, u32 size)
-	ADDS    R2, R2, R0
-	SUBS    R1, R1, R0
-rSram_loop1:
-	CMP     R0, R2
-	BNE     rSram_loop
-	BX      LR
-rSram_loop:
-	LDRB    R4, [R0]
-	LDRB    R3, [R0,#1]
-	ORR		R4,R4,R3,LSL #8
-	LDRB    R3, [R0,#2]
-	ORR		R4,R4,R3,LSL #16
-	LDRB    R3, [R0,#3]
-	ORR		R4,R4,R3,LSL #24
-	STR     R4, [R1,R0]
-	ADDS    R0, #4
-	B       rSram_loop1
-	.ltorg
+@;r5 bytes (a multiple of 16, not 0) from SRAM at r6 to RAM at r1, in the
+@;page set, through sram_copy's Thumb loop and without a stack (LOAD's IWRAM
+@;copy loads the stack itself). Uses r1, r4-r7 and r12.
+read_sram:
+	adrl	r12,sc_in+1
+	bx		r12				@;sc_in returns to lr
 @;===================================================
 @;SAVE, as the old menu's: the game's memory and registers into the state
 @;buffer (SRAM 0x40000-0xAFFFF, the old layout), with everything already
@@ -1085,10 +1072,10 @@ state_load_go:
 	strh	r1,[r8,#4]		@;the page register at the BIOS's
 	mov 	r0,#(ST_IWRAM>>16)<<4
 	bl 		SetRampage
-	mov r0,#0x0E000000
-	mov r1,#0x3000000
-	mov r2,#0x8000
-	bl 	ReadSram
+	mov		r6,#0x0E000000
+	mov		r1,#0x3000000
+	mov		r5,#0x8000
+	bl		read_sram
 	@;The cheats as launched: the toggles a state holds are for the table
 	@;of the launch it was saved in (and CheatRAN as at a game's start)
 	mov		r1,#0x04000000
@@ -1130,11 +1117,11 @@ register_list_end:
 
 	mov		r0,#(ST_SPEND>>16)<<4
 	bl		SetRampage
-	ldr 	r0,=0x0E000000+(ST_SPEND & 0xFFFF)
-	adrl 	r1, spend_0x80 @;temp buff
+	ldr		r6,=0x0E000000+(ST_SPEND & 0xFFFF)
+	adrl	r1,spend_0x80		@;temp buff
 	ldr		r1,[r1]
-	mov 	r2,#0x80
-	bl 		ReadSram
+	mov		r5,#0x80
+	bl		read_sram
 
 	mrs	  r0,CPSR
 	adrl	r7, spend_0x80
