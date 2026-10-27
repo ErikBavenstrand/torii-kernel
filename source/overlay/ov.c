@@ -575,7 +575,10 @@ static void slot_update(uint32_t k)
 {
 	const struct slot *s = &m.slots[k];
 	int r = slot_row(k);
-	uint32_t bank = m.title && k == 0                      ? BANK_TITLE
+	// The Save state page's row for the slot in the buffer (the one Load
+	// state gives back) in the accent
+	int current = m.page == PAGE_SAVE && r >= 0 && (uint32_t)r + 1 == m.buffer_slot;
+	uint32_t bank = (m.title && k == 0) || current         ? BANK_TITLE
 			: m.footer && k == m.title + m.visible ? BANK_FAINT
 			: r >= 0 && row_greyed((uint32_t)r)    ? BANK_FAINT
 							       : BANK_TEXT;

@@ -22,3 +22,8 @@
 -s @4:load.png
 -k @10:DOWN -k @14:-
 -s @30:other.png
+# B to the menu on Load state, UP, A: the Save state page again, slot 1
+# (the buffer's, not kept yet) in the accent
+-k @40:B -k @44:- -k @52:UP -k @56:- -k @64:A -k @68:-
+-w "screen ready: ingame-save"
+-s @4:save-current.png
