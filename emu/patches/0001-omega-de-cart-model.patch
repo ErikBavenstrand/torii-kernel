@@ -12,10 +12,10 @@ index 59ca1c1..1dd19c0 100644
  	EXTDATA_MAX
 diff --git a/include/mgba/internal/gba/cart/omega.h b/include/mgba/internal/gba/cart/omega.h
 new file mode 100644
-index 0000000..7b7a855
+index 0000000..6eac5a1
 --- /dev/null
 +++ b/include/mgba/internal/gba/cart/omega.h
-@@ -0,0 +1,181 @@
+@@ -0,0 +1,188 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -161,6 +161,13 @@ index 0000000..7b7a855
 +	bool rtcTraced;
 +
 +	uint8_t port[OMEGA_PORT_SIZE];
++	// The 1 KB table the FPGA latched at the last launch (buffer control 3):
++	// the game's cluster runs from 0, the save-state (RTS) file's from 0x300,
++	// which the state buffer's write-back to the card follows (omega.c).
++	uint8_t fatTable[0x400];
++	// A game-mode write to the state buffer's last page (0xAF, its flag's)
++	// since the page register last showed it.
++	bool rtsPageWritten;
 +
 +	// The FPGA's version word (OMEGA_FPGA_VERSION) and, when that is set, its
 +	// config SPI flash in fpga-flash.bin, which the firmware update writes.
@@ -323,10 +330,10 @@ index 1d0c0dd..b77704a 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..737fb16
+index 0000000..05459dc
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1746 @@
+@@ -0,0 +1,1837 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -1137,6 +1144,93 @@ index 0000000..737fb16
 +	mLOG(GBA_OMEGA, INFO, "Loaded ROM into PSRAM from %u cluster runs", i / 2);
 +}
 +
++// --- The save-state buffer's write-back --------------------------------------
++//
++// EZ-Flash's kernel never writes a state to the card itself: it makes
++// /RTS/<game>.rts (0x70000 bytes), loads it into cart SRAM 0x40000-0xAFFFF
++// and sends its cluster runs at table offset 0x300; the in-game SAVE fills
++// the buffer and its flag ("EZ-OmegaRTCFILE." at 0xAFFF0), and the FPGA
++// writes the buffer to the file. Torii found it real the hard way: on
++// 2026-10-27 the in-game probe (CLEAN BOOT, after a Pokémon Emerald state had
++// been put in the buffer with its flag) left /ingame.gba holding the buffer's
++// first sectors (Emerald's EWRAM heap) at its own sectors, same size and
++// date. That launch's table had nothing at 0x300 (all 0, no end marker), and
++// the walk went on past the 1 KB table's end into the game's runs at 0.
++// Modelled: after a game-mode write to page 0xAF, the next page change
++// writes the buffer back while the flag reads set, through the latched
++// table's runs from 0x300, wrapping at its end as a 10-bit address would.
++// What starts it on the real cart is inferred (the probe writes each page's
++// first bytes and puts them back; the file held the bytes put back); the
++// table it follows is what the corrupted file shows. A walk that wraps into
++// the game's runs (a table no kernel meant) writes and then stops the run
++// with this status.
++#define RTS_WRITEBACK_STATUS 81
++#define RTS_BUFFER 0x40000
++#define RTS_BYTES 0x70000
++#define RTS_FLAG 0xAFFF0
++#define RTS_FLAG_PAGE 0xAF
++#define RTS_TABLE_WORD (0x300 / 4)
++#define FAT_TABLE_WORDS (0x400 / 4)
++
++static uint32_t _tableWord(const struct GBAOmega* omega, unsigned index) {
++	const uint8_t* p = &omega->fatTable[(index % FAT_TABLE_WORDS) * 4];
++	return p[0] | (p[1] << 8) | (p[2] << 16) | ((uint32_t) p[3] << 24);
++}
++
++static void _rtsWriteBack(struct GBA* gba) {
++	struct GBAOmega* omega = &gba->memory.omega;
++	if (!omega->sd || memcmp(&omega->sram[RTS_FLAG], "EZ-OmegaRTCFILE.", 16) != 0) {
++		return;
++	}
++	// The runs: [sector offset, start sector] pairs to the first 0xFFFFFFFF
++	unsigned end;
++	for (end = 0; end < FAT_TABLE_WORDS / 2; ++end) {
++		if (_tableWord(omega, RTS_TABLE_WORD + end * 2) == 0xFFFFFFFF) {
++			break;
++		}
++	}
++	if (end == FAT_TABLE_WORDS / 2) {
++		fprintf(stderr, "omega: state buffer write-back: no end marker in the table, nothing written\n");
++		return;
++	}
++	bool wrapped = RTS_TABLE_WORD + end * 2 >= FAT_TABLE_WORDS;
++	uint32_t first = 0xFFFFFFFF, last = 0;
++	for (uint32_t sector = 0; sector < RTS_BYTES / SECTOR_SIZE; ++sector) {
++		// The last run that starts at or before this sector
++		int run = -1;
++		for (unsigned i = 0; i < end; ++i) {
++			if (_tableWord(omega, RTS_TABLE_WORD + i * 2) <= sector) {
++				run = (int) i;
++			}
++		}
++		if (run < 0) {
++			continue;
++		}
++		uint32_t lba = _tableWord(omega, RTS_TABLE_WORD + run * 2 + 1) + sector - _tableWord(omega, RTS_TABLE_WORD + run * 2);
++		first = lba < first ? lba : first;
++		last = lba > last ? lba : last;
++		omega->sd->seek(omega->sd, (off_t) lba * SECTOR_SIZE, SEEK_SET);
++		omega->sd->write(omega->sd, &omega->sram[RTS_BUFFER + sector * SECTOR_SIZE], SECTOR_SIZE);
++	}
++	_trace(gba, "state buffer written back to sectors %u-%u", first, last);
++	fprintf(stderr, "omega: state buffer written back to sectors %u-%u (%u runs%s)\n", first, last, end,
++	        wrapped ? ", the walk wrapped into the game's runs" : "");
++	if (wrapped) {
++		fprintf(stderr, "omega: STATE BUFFER WRITTEN OVER THE GAME'S FILE: the table had no state file's runs\n");
++		_exit(RTS_WRITEBACK_STATUS);
++	}
++}
++
++// Every change of the cart SRAM page (the register or a flash bank command)
++static void _setRamPage(struct GBA* gba, uint16_t page) {
++	struct GBAOmega* omega = &gba->memory.omega;
++	if (omega->rtsPageWritten && page != omega->ramPage) {
++		omega->rtsPageWritten = false;
++		_rtsWriteBack(gba);
++	}
++	omega->ramPage = page;
++}
++
 +static uint16_t _portRead(struct GBA* gba, uint32_t offset) {
 +	struct GBAOmega* omega = &gba->memory.omega;
 +	if (omega->copyEnd) {
@@ -1387,6 +1481,7 @@ index 0000000..737fb16
 +	case REG_BUFFER_CONTROL:
 +		omega->bufferControl = value;
 +		if (value == 3) {
++			memcpy(omega->fatTable, omega->port, sizeof(omega->fatTable));
 +			uint32_t save = _portWord(omega, FAT_SAVE_INDEX);
 +			omega->saveMode = save >> 24;
 +			omega->saveSize = save & 0x00FFFFFF;
@@ -1443,7 +1538,7 @@ index 0000000..737fb16
 +		_remap(gba);
 +		break;
 +	case REG_RAM_PAGE:
-+		omega->ramPage = value;
++		_setRamPage(gba, value);
 +		break;
 +	default:
 +		return false;
@@ -2014,7 +2109,7 @@ index 0000000..737fb16
 +	case 3:
 +		omega->flashCmdStep = 0;
 +		if (offset == 0x0000) {
-+			omega->ramPage = value << 4;
++			_setRamPage(gba, value << 4);
 +			return;
 +		}
 +		break;
@@ -2023,6 +2118,9 @@ index 0000000..737fb16
 +		return;
 +	}
 +	omega->sram[_sramOffset(omega, address)] = value;
++	if (omega->ramPage == RTS_FLAG_PAGE && !_isKernelMode(omega) && omega->gameBooted) {
++		omega->rtsPageWritten = true;
++	}
 +}
 +
 +// In game mode, Torii's own code (the patch area's entry code, hook and

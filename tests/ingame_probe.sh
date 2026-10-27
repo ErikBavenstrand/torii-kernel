@@ -90,7 +90,41 @@ OMEGA_SD_READ_ERROR=0:2 run -f 600
 grep -q "kernel error: boot: the card didn't mount (1); trying again (1 of 3)" "$log" ||
   fail "no retry: $(grep -m3 'boot:' "$log")"
 grep -q "screen ready: home" "$log" || fail "the menu didn't come up after the retry: $(tail -3 "$log")"
-# 4. The probe at each other save type (the real cart showed a white screen
+# 4. A state left in cart SRAM's state buffer with its flag (as a Pokémon
+# Emerald launch leaves one) when the probe starts CLEAN BOOT: the probe's
+# page tests write page 0xAF, and the FPGA writes the buffer back to the card
+# through the table's state-file runs. On the real cart (2026-10-27) the
+# launch's table had none, the walk wrapped into the ROM's own runs and the
+# buffer overwrote the probe's ROM file; the kernel now clears the flag and
+# sends the runs of /torii/rts.bin, so the ROM file and every file but that
+# one stay as they were.
+mcopy -i "$cart/sd.img" tests/roms/ingame/ingame.gba ::/Flag.gba
+python3 - "$cart/sram.bin" <<'EOF'
+import sys
+p = sys.argv[1]
+b = bytearray(open(p, "rb").read())
+for i in range(0x40000, 0xAFFF0):  # a heap header's 0xA3A3, as Emerald's EWRAM starts
+    b[i] = 0xA3
+b[0xAFFF0:0xB0000] = b"EZ-OmegaRTCFILE."
+open(p, "wb").write(b)
+EOF
+mcopy -n -i "$cart/sd.img" ::/Probe.gba "$cart/before.gba"
+# OMEGA_SOFT_RESET: the buffer kept (the cart wasn't off, or kept enough)
+# shellcheck disable=SC2046
+OMEGA_SOFT_RESET=1 run $(nav_launch /Flag.gba at=180) $(k 620 B) $(k 720 A) $(k 1000 A) -f 1400
+cp "$log" "$cart/flag.log"
+grep -q "launch Flag.gba: code TIGP" "$log" || fail "not launched with a flagged state: $(tail -3 "$log")"
+! grep -q "STATE BUFFER WRITTEN OVER THE GAME'S FILE" "$log" ||
+  fail "the state buffer was written over the game's file: $(grep -m2 'omega: state buffer' "$log")"
+mcopy -n -i "$cart/sd.img" ::/Flag.gba "$cart/flag.gba"
+cmp -s "$cart/flag.gba" tests/roms/ingame/ingame.gba || fail "/Flag.gba changed on the card"
+mcopy -n -i "$cart/sd.img" ::/Probe.gba "$cart/after.gba"
+cmp -s "$cart/before.gba" "$cart/after.gba" || fail "/Probe.gba changed on the card"
+has "cart SRAM pages 20-EF: 208 of 208 read back (first bad 00)"
+# The flag went before the launch: no write-back at all
+! grep -q "omega: state buffer written back" "$log" || fail "a write-back with the flag cleared: $(grep -m1 'written back' "$log")"
+
+# 5. The probe at each other save type (the real cart showed a white screen
 # at EEPROM 8K, FLASH 64K and FLASH 128K, from a ROM whose header read
 # blank): it runs, B skips the SD test, A goes back and the report is logged.
 # Each under a name of its own, so no save of another type asks first.
