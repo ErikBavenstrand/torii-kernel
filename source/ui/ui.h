@@ -1125,6 +1125,12 @@ void ui_dim_set_minutes(u32 minutes);
 void ui_dim_set_frames(u32 frames);
 // Frames since a key was last held.
 u32 ui_idle_frames(void);
+// A function every ui_frame calls once the frame is done (NULL: none), in
+// every screen's loop and the dialogs' alike: the menu's idle log flush,
+// so a screen with a loop of its own (Game info, the keypad) loses no log
+// lines. It runs between a caller's FatFs calls, never inside one; it must
+// not call ui_frame.
+void ui_set_frame_hook(void (*fn)(void));
 // The DIM setting from the kernel NOR (settings slot assress_dim): idle
 // minutes, 1-60; 0 (off) for anything else, the erased slot included.
 u32 ui_dim_setting(void);

@@ -18,6 +18,7 @@
 #   flood   screens changing for seconds: frame-cycles go to the card as
 #           summaries
 #   hang    the log is on the card as the Settings page opens
+#   screen  a screen with a loop of its own (Rename) writes the log too
 # Every part checks the card with fsck.fat. Runs inside the torii-emu container.
 set -euo pipefail
 # shellcheck source=tests/carts.sh
@@ -541,8 +542,8 @@ open)
 
 flood)
   # Screens changed for seconds at Debug: their measured frames reach the
-  # card as summaries, not a line each, and nothing is lost (v0.3's cart
-  # test lost 107 KB of log to them)
+  # card only as summaries of names with a frame over budget, not a line
+  # each, and nothing is lost (v0.3's cart test lost 107 KB of log to them)
   new_card 65536 32
   settings 26=3 # LOGGING Debug
   # A page opened and left 16 times: the menu rests 36 frames between them,
@@ -552,7 +553,9 @@ flood)
   boot $presses -f 1600
   lines_ok
   [ "$(count "nav: open gba")" -ge 16 ] || fail "the page wasn't opened 16 times: $(count "nav: open gba")"
-  has "frame-cycles summary: ui-transition: "
+  # Summaries only of names with a frame over 280,896 cycles (none here)
+  log 0 | awk '/frame-cycles summary: / { w = $0; sub(/.*worst /, "", w); sub(/,.*/, "", w); if (w + 0 <= 280896) bad = bad $0 "\n" } END { printf "%s", bad }' >"$cart/summary.txt"
+  [ ! -s "$cart/summary.txt" ] || fail "summaries of frames within budget: $(head -3 "$cart/summary.txt")"
   [ "$(count 'frame-cycles: ')" = 0 ] || fail "frame-cycles lines on the card"
   [ "$(count 'bytes of log lost')" = 0 ] || fail "log lost"
   grep -q '^kernel: frame-cycles: ui-transition [0-9]' "$cart/kernel.log" || fail "no frame-cycles lines in mGBA's console"
@@ -562,7 +565,7 @@ flood)
   [ "$(count "nav: open gba")" = $((before + 1)) ] || fail "a few lines didn't reach the card after 5 s idle"
   lines_ok
   card_ok
-  echo "PASS: measured frames reach the card as summaries, nothing is lost, and the idle menu writes the log"
+  echo "PASS: measured frames reach the card only as summaries of frames over budget, nothing is lost, and the idle menu writes the log"
   ;;
 
 hang)
@@ -579,8 +582,23 @@ hang)
   echo "PASS: the log is on the card as the Settings page opens"
   ;;
 
+screen)
+  # A screen that runs its own loop (Rename's keyboard, over a game's menu)
+  # writes the log while it waits for a key, as home does: before v0.8 only
+  # the menu's loop flushed, so a power-off there lost what was logged since
+  new_card 65536 32
+  settings 26=3 # LOGGING Debug
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot $(nav_game_rename gba) -k @400:-
+  grep -q 'screen ready: rename' "$cart/kernel.log" || fail "Rename didn't open"
+  has "screen ready: rename"
+  lines_ok
+  card_ok
+  echo "PASS: a screen with a loop of its own writes the log while it waits"
+  ;;
+
 *)
-  echo "usage: $0 launch|debug|crash|rotate|junk|full|settings|open|flood|hang" >&2
+  echo "usage: $0 launch|debug|crash|rotate|junk|full|settings|open|flood|hang|screen" >&2
   exit 2
   ;;
 esac

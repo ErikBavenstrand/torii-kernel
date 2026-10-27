@@ -37,8 +37,9 @@ void cycles_frame(const char *name, u32 cycles)
 void cycles_summary(void)
 {
 	for (u32 i = 0; i < SUMMARY_NAMES && summary[i].name; i++)
-		tlog_debug("frame-cycles summary: %s: %lu frames, worst %lu, mean %lu", summary[i].name,
-			   (unsigned long)summary[i].frames, (unsigned long)summary[i].worst,
-			   (unsigned long)(summary[i].total / summary[i].frames));
+		if (summary[i].worst > ENGINE_FRAME_CYCLES)
+			tlog_debug("frame-cycles summary: %s: %lu frames, worst %lu, mean %lu", summary[i].name,
+				   (unsigned long)summary[i].frames, (unsigned long)summary[i].worst,
+				   (unsigned long)(summary[i].total / summary[i].frames));
 	memset(summary, 0, sizeof(summary));
 }

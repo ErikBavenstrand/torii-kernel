@@ -36,6 +36,7 @@
 #define SCREEN_MEASURE_FRAMES 3     // frames measured after a place is pushed (its hidden first draw)
 #define IDLE_FLUSH_FRAMES 30        // frames with no key held before a flush of a half-full log
 #define IDLE_FLUSH_ALL_FRAMES 300   // and before a flush of any log line, or of the boot position
+#define LOG_FLUSH_FULL (LOG_RING_SIZE * 3 / 4)  // a log this full is flushed at once, jobs or not
 
 volatile u32 nav_test_action EWRAM_BSS;
 char nav_test_path[USERDATA_PATH_MAX] EWRAM_BSS ALIGN(4);
@@ -488,14 +489,10 @@ static void clock_tick(void)
 		clock_read();
 }
 
-// Writes the log to the card while the menu waits for a key: once it fills
-// half its RAM ring, so a long stay in the menu loses no lines, and after
-// IDLE_FLUSH_ALL_FRAMES with any line waiting, so a power-off loses none.
-// The boot position goes to the card then too (Last place). A flush's SD
-// write never stalls a scroll or a transition. Once the card failed the
-// log stops trying, and while the card is full it waits for a file to be
-// deleted (tlog_card_freed)
-static void idle_flush(void)
+// Writes the boot position to the card (Last place) after
+// IDLE_FLUSH_ALL_FRAMES with no key held, from the menu's own loop only:
+// once a spell, so a card that fails isn't hammered
+static void idle_remember(void)
 {
 	u32 idle = ui_idle_frames();
 	if (idle < IDLE_FLUSH_ALL_FRAMES)
@@ -503,13 +500,34 @@ static void idle_flush(void)
 	if (nav.open || nav.back || nav.deferred || jobs_pending() || gfx_pending() || ui_transitioning())
 		return;
 	if (idle >= IDLE_FLUSH_ALL_FRAMES && !nav.boot_flush_tried && ui_settled()) {
-		nav.boot_flush_tried = 1;  // once a spell: a card that fails isn't hammered
+		nav.boot_flush_tried = 1;
 		remember();
 		userdata_flush();  // only if the place changed since recent.txt was written
 	}
+}
+
+// Writes the log to the card while a screen waits for a key, after every
+// frame of every screen's loop (ui_set_frame_hook), Game info's and the
+// keypad's too: once it fills half its RAM ring, so a long stay loses no
+// lines, and after IDLE_FLUSH_ALL_FRAMES with any line waiting, so a
+// power-off loses none. A flush's SD write never stalls a scroll or a
+// transition, nor a job, unless the ring is LOG_FLUSH_FULL full: then it
+// goes now, before lines are lost. Never under a progress dialog (a copy or
+// a launch). Once the card failed the log stops trying, and while the card
+// is full it waits for a file to be deleted (tlog_card_freed)
+static void idle_flush(void)
+{
 	u32 pending = tlog_pending();
-	if (!pending || tlog_card_failed())
+	if (!pending || tlog_card_failed() || dialog_progress_active())
 		return;
+	if (pending >= LOG_FLUSH_FULL) {
+		tlog_console("nav: full flush");  // tests/logging.sh counts them
+		tlog_flush();
+		return;
+	}
+	if (nav.open || nav.back || nav.deferred || jobs_pending() || gfx_pending() || ui_transitioning())
+		return;
+	u32 idle = ui_idle_frames();
 	if ((pending >= LOG_RING_SIZE / 2 && idle >= IDLE_FLUSH_FRAMES) || idle >= IDLE_FLUSH_ALL_FRAMES) {
 		tlog_console("nav: idle flush");  // tests/logging.sh counts them
 		tlog_flush();
@@ -533,6 +551,7 @@ void nav_run(void)
 {
 	memset(&nav, 0, sizeof(nav));
 	dialog_set_tick(clock_tick);
+	ui_set_frame_hook(idle_flush);
 	u32 start_on = read_settings();
 	clock_read();
 	userdata_load();  // both lists now, so no screen reads the card while it draws
@@ -572,6 +591,6 @@ void nav_run(void)
 		if (nav.place.open && pages[nav.place.item]->poll)
 			pages[nav.place.item]->poll();
 		library_poll();
-		idle_flush();
+		idle_remember();
 	}
 }

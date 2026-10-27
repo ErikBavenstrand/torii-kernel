@@ -692,6 +692,15 @@ u32 ui_idle_frames(void)
 	return ui.idle;
 }
 
+// ui_set_frame_hook's: kept across sessions (ui_init clears ui, not this)
+static void (*frame_hook)(void);
+static u8 in_frame_hook;
+
+void ui_set_frame_hook(void (*fn)(void))
+{
+	frame_hook = fn;
+}
+
 // Brightens the screen at once
 static void dim_off(void)
 {
@@ -2110,5 +2119,10 @@ u32 ui_frame(void)
 		regs_update();
 	}
 	frame_end();
+	if (frame_hook && !in_frame_hook) {
+		in_frame_hook = 1;
+		frame_hook();
+		in_frame_hook = 0;
+	}
 	return ui_depth();
 }

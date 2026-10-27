@@ -65,8 +65,9 @@ void cycles_report(const char *name, u32 cycles);
 // summary.
 void cycles_frame(const char *name, u32 cycles);
 // Logs, at DEBUG, each name's measured frames since the last summary
-// ("frame-cycles summary: NAME: N frames, worst W, mean M") and starts
-// again. tlog_flush calls it.
+// ("frame-cycles summary: NAME: N frames, worst W, mean M"), for the names
+// with a frame over ENGINE_FRAME_CYCLES only (the rest filled the card's
+// log with nothing to act on), and starts again. tlog_flush calls it.
 void cycles_summary(void);
 
 #endif
