@@ -56,22 +56,22 @@ def edges():
         ),
         (
             "C6",
-            code(PAR, PAR.io(1, 0x0C, 0x1F83)),
+            code(PAR, PAR.io(2, 0x0C, 0x1F83)),
             r"OK ASSIGN/2/0400000C/1F83/1/0/0 \|",
-            "par-c6c7-width",
+            None,
         ),
         (
             "C7",
-            code(PAR, PAR.io(2, 0x48, 0x1B2D3F00)),
+            code(PAR, PAR.io(4, 0x48, 0x1B2D3F00)),
             r"OK ASSIGN/4/04000048/1B2D3F00/1/0/0 \|",
-            "par-c6c7-width",
+            None,
         ),
         ("slowdown", code(PAR, PAR.slowdown(0x200), PAR.write(2, w, 3))),
         (
             "disable",
             code(PAR, [(0xC8000000 | PAR.addr(w), 1)], PAR.write(2, w, 3)),
             r"OK ",
-            "par-disable",
+            None,
         ),
         (
             "button covered",
@@ -112,7 +112,7 @@ def edges():
             ),
             # next-two covers two code lines, the padding one of them
             r"OK EQ/2/02001000/1/1/0 ASSIGN/2/02001000/7/1/0/0 ASSIGN/2/02001002/8/1/0/0 \|",
-            "par-padding-count",
+            None,
         ),
     ]
     files["edges-gsa"] = [
@@ -122,7 +122,7 @@ def edges():
             "slowdown",
             code(GSA, [(0x80F00000, 0x10)], GSA.write(2, w, 1)),
             r"OK .*ASSIGN/2/02001000/1/1/0/0 \|",
-            "gs-slowdown-unreadable",
+            None,
         ),
         ("deadface", code(GSA, GSA.deadface(0x1234), GSA.write(2, w, 0xDFDF))),
     ]
@@ -155,7 +155,7 @@ def edges():
             "after key 2",
             third.text(),
             r"OK ASSIGN/2/02001004/3333/1/0/0 \|",
-            "cb-second-key",
+            None,
         ),
     ]
     return files

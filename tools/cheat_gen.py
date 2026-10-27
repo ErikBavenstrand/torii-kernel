@@ -67,6 +67,7 @@ class Space:
     reads: list  # [(width, address, [likely values])]
     rom: list  # ROM addresses a patch may change (halfword aligned)
     pointers: list = field(default_factory=list)  # [(pointer address, room in bytes)]
+    nonneg: set = None  # (width, address) reads that stay positive (None: any)
     rom_writes: bool = True  # VBA and GameShark writes to the ROM (patches)
 
     def write_at(self, rng, width, room=1):
@@ -78,12 +79,26 @@ class Space:
             a &= ~(width - 1)
         return a
 
-    def read(self, rng):
-        w, a, likely = rng.choice(self.reads)
+    def read(self, rng, signed=0):
+        """(width, address, value) to test; signed: for a signed test of
+        that width (2 for CodeBreaker's), only reads that stay positive at
+        it and a positive value, where comparing at the width (the devices,
+        Torii) and zero-extended (mGBA) agree"""
+        pool = self.reads
+        if signed:
+            pool = [
+                r
+                for r in self.reads
+                if (r[0] == 4 and signed != 2)
+                or (r[0] == signed and (self.nonneg is None or r[:2] in self.nonneg))
+            ]
+        w, a, likely = rng.choice(pool)
         if likely and rng.random() < 0.8:
             v = rng.choice(likely)
         else:
             v = rng.getrandbits(8 * w)
+        if signed and w < 4:
+            v &= (1 << (8 * w - 1)) - 1
         return w, a, v & ((1 << 8 * w) - 1)
 
     @staticmethod
@@ -140,7 +155,16 @@ class Space:
         rom = [rom_table + i for i in range(0, 16, 2)] + [
             rom_table2 + i for i in range(0, 16, 2)
         ]
-        return Space(writes, reads, rom, pointers=[(P, 16), (P + 4, 8)])
+        nonneg = {
+            (1, CNT),
+            (2, CNT + 2),
+            (2, CNT + 0xC),
+            (2, KEYINPUT),
+            (2, CNT + 0xE),
+            (2, W + 0x40),
+            (1, W + 0x41),
+        }
+        return Space(writes, reads, rom, pointers=[(P, 16), (P + 4, 8)], nonneg=nonneg)
 
     @staticmethod
     def anywhere():
@@ -306,8 +330,8 @@ class Gen:
                                 [
                                     PAR.slowdown(0x100),
                                     [(0x80000000, 0)],
-                                    PAR.io(1, 0xC, 0x45),
-                                    PAR.io(2, 0x48, 0x1B2D),
+                                    PAR.io(2, 0xC, 0x45),
+                                    PAR.io(4, 0x48, 0x1B2D),
                                 ]
                             )
                         ]
@@ -344,7 +368,9 @@ class Gen:
     def par_cond(self, depth=0):
         rng = self.rng
         kind = rng.choice(list(PAR.COND))
-        w, a, v = self.space.read(rng)
+        w, a, v = self.space.read(
+            rng, signed=kind in ("LT", "GT") and rng.choice((1, 2, 4))
+        )
         if rng.random() < 0.05:
             w = 8
         action = rng.choice(["next", "next", "next2", "block", "block"])
@@ -385,7 +411,7 @@ class Gen:
                 mask |= 1 << KEYS.index(k)
             return [CB.keys(mask), self.single(covered=True)]
         kind = rng.choice(["EQ", "NE", "GT", "LT", "IFAND"])
-        _, a, v = self.space.read(rng)
+        _, a, v = self.space.read(rng, signed=2 if kind in ("GT", "LT") else 0)
         return [CB.op(kind, a & ~1, v & 0xFFFF), self.single(covered=True)]
 
 

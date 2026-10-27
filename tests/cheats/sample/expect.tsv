@@ -1,8 +1,8 @@
-edges-par.cht	2	OK ASSIGN/2/0400000C/1F83/1/0/0 \|	par-c6c7-width
-edges-par.cht	3	OK ASSIGN/4/04000048/1B2D3F00/1/0/0 \|	par-c6c7-width
-edges-par.cht	5	OK 	par-disable
-edges-par-raw.cht	1	OK EQ/2/02001000/1/1/0 ASSIGN/2/02001000/7/1/0/0 ASSIGN/2/02001002/8/1/0/0 \|	par-padding-count
-edges-gsa.cht	2	OK .*ASSIGN/2/02001000/1/1/0/0 \|	gs-slowdown-unreadable
+edges-par.cht	2	OK ASSIGN/2/0400000C/1F83/1/0/0 \|	-
+edges-par.cht	3	OK ASSIGN/4/04000048/1B2D3F00/1/0/0 \|	-
+edges-par.cht	5	OK 	-
+edges-par-raw.cht	1	OK EQ/2/02001000/1/1/0 ASSIGN/2/02001000/7/1/0/0 ASSIGN/2/02001002/8/1/0/0 \|	-
+edges-gsa.cht	2	OK .*ASSIGN/2/02001000/1/1/0/0 \|	-
 edges-cb-keys.cht	0	OK ASSIGN/2/02001000/1111/1/0/0 \|	-
 edges-cb-keys.cht	1	OK ASSIGN/2/02001002/2222/1/0/0 \|	-
-edges-cb-keys.cht	2	OK ASSIGN/2/02001004/3333/1/0/0 \|	cb-second-key
+edges-cb-keys.cht	2	OK ASSIGN/2/02001004/3333/1/0/0 \|	-

@@ -198,13 +198,26 @@ def cb_ops(Case, fmt_key):
 
 
 # Conditionals: per width, what to read and compare with so the test is
-# true at some checkpoints and false at others (the ROM's counters, main.c)
+# true at some checkpoints and false at others (the ROM's counters, main.c).
+# A signed test narrower than a word compares at its width in Torii, as the
+# devices do, where mGBA zero-extends: those read counters that stay
+# positive here, and the unsigned ones the negative counters; k-*-signed-*
+# check signed narrow tests against equivalent unsigned ones.
 COND_READS = {
-    1: {"EQ": (CNT, 8), "NE": (CNT, 8), "AND": (CNT, 4), "ord": (CNT + 0xA, 2)},
+    1: {
+        "EQ": (CNT, 8),
+        "NE": (CNT, 8),
+        "AND": (CNT, 4),
+        "LT": (CNT, 8),
+        "GT": (CNT, 8),
+        "ord": (CNT + 0xA, 2),
+    },
     2: {
         "EQ": (CNT + 2, 8 * 0x123),
         "NE": (CNT + 2, 8 * 0x123),
         "AND": (CNT + 0xC, 0x0180),
+        "LT": (CNT + 2, 8 * 0x123),
+        "GT": (CNT + 2, 8 * 0x123),
         "ord": (CNT + 8, 2),
     },
     4: {
@@ -407,8 +420,6 @@ def cb_conds(Case, fmt_key):
         ("NE", CNT + 2, 8 * 0x123),
         ("GT", CNT + 2, 8 * 0x123),
         ("LT", CNT + 2, 8 * 0x123),
-        ("GT", CNT + 8, 2),
-        ("LT", CNT + 8, 0xFFFE),
         ("IFAND", CNT + 0xC, 0x0180),
         ("EQ", KEYINPUT, keyinput("B")),
     ):
@@ -588,14 +599,14 @@ def known(Case, sym):
         case(
             f"k-{key}-c6",
             enc,
-            build(key, [("C6", [enc.io(1, 0x0E, 0x1F83)])]),
+            build(key, [("C6", [enc.io(2, 0x0E, 0x1F83)])]),
             build(key, [("w2", [enc.write(2, 0x0400000E, 0x1F83)])]),
             note="C6 is a 16-bit IO write on the device",
         )
         case(
             f"k-{key}-c7",
             enc,
-            build(key, [("C7", [enc.io(2, 0x48, 0x1B2D3F1E)])]),
+            build(key, [("C7", [enc.io(4, 0x48, 0x1B2D3F1E)])]),
             build(key, [("w4", [enc.write(4, 0x04000048, 0x1B2D3F1E)])]),
             note="C7 is a 32-bit IO write on the device",
         )
@@ -634,6 +645,61 @@ def known(Case, sym):
             build(key, [("write", [enc.write(2, W + 0x30, 0x5D5D)])]),
             note="a GameShark slowdown line does nothing on a flash cart; the rest runs",
         )
+    # Signed tests narrower than a word: at their width on the devices (and
+    # in Torii); mGBA zero-extends, so it runs unsigned tests on the ROM's
+    # matching positive counter instead (s8/s16 at CNT + 0xA/8 are p - 8)
+    for key, enc in (("par", PAR), ("par-raw", PARRaw)):
+        case(
+            f"k-{key}-signed-lt8",
+            enc,
+            build(
+                key,
+                [
+                    (
+                        "s8 < 2",
+                        [enc.cond("LT", 1, CNT + 0xA, 2), enc.write(2, C, 0x1111)],
+                    )
+                ],
+            ),
+            build(
+                key,
+                [("p < 10", [enc.cond("ULT", 1, CNT, 10), enc.write(2, C, 0x1111)])],
+            ),
+        )
+        case(
+            f"k-{key}-signed-gt16",
+            enc,
+            build(
+                key,
+                [
+                    (
+                        "s16 > -2",
+                        [enc.cond("GT", 2, CNT + 8, 0xFFFE), enc.write(2, C, 0x1111)],
+                    )
+                ],
+            ),
+            build(
+                key, [("p > 6", [enc.cond("UGT", 1, CNT, 6), enc.write(2, C, 0x1111)])]
+            ),
+        )
+    case(
+        "k-cb-signed",
+        CB,
+        build(
+            "cb",
+            [
+                ("s16 > 2", [CB.op("GT", CNT + 8, 2), CB.write16(C, 0x1111)]),
+                ("s16 < -2", [CB.op("LT", CNT + 8, 0xFFFE), CB.write16(C + 2, 0x2222)]),
+            ],
+        ),
+        build(
+            "cb",
+            [
+                ("p > 10", [CB.op("GT", CNT + 2, 10 * 0x123), CB.write16(C, 0x1111)]),
+                ("p < 6", [CB.op("LT", CNT + 2, 6 * 0x123), CB.write16(C + 2, 0x2222)]),
+            ],
+        ),
+    )
     # A DEADFACE line in a cheat Torii reads in its own format (cheatN_format)
     seeded = Code(PAR)
     seeded += PAR.marker()

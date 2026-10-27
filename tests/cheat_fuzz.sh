@@ -31,6 +31,8 @@ cp "$report" "dist/cheat-fuzz/$seed/report.txt"
 if [ "$status" != 0 ]; then
   mapfile -t failing < <(python3 tests/cheat_fuzz.py failing "dist/cheat-fuzz/$seed")
   if [ "${#failing[@]}" != 0 ]; then
+    # The first CHEAT_FUZZ_MINIMIZE (default 5): each takes a few dozen runs
+    failing=("${failing[@]:0:${CHEAT_FUZZ_MINIMIZE:-5}}")
     echo "cheat_fuzz: minimizing ${#failing[@]} failing programs"
     python3 tests/cheat_fuzz.py minimize "dist/cheat-fuzz/$seed" "${failing[@]}"
   fi

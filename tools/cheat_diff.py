@@ -471,7 +471,10 @@ def rule_slowdown(c):
         return False
     t = drop(c.t_ops, lambda op: op[0] != "SLOW")
     n = sum(1 for lab in c.labels if re.match(r"(PAR slowdown|GSA 8/F)", lab))
-    return c.m_rejected == n and t == c.m_ops and c.t_patches == c.m_patches
+    master = sum(1 for lab in c.labels if lab in ("GSA id", "GSA F", "CB 1", "PAR C4"))
+    return (
+        n <= c.m_rejected <= n + master and t == c.m_ops and c.t_patches == c.m_patches
+    )
 
 
 def rule_mgba_nand_else(c):
@@ -490,21 +493,20 @@ def rule_mgba_nand_else(c):
     return True
 
 
-def rule_gs_slowdown_unreadable(c):
-    return c.t_status == "UNREADABLE" and has(c, r"GSA 8/F")
-
-
 def rule_par_empty_then_else(c):
     # A block whose THEN has no ops (or only ROM patches) before its ELSE:
-    # mGBA's _parEndBlock then takes the ELSE block for the THEN
+    # mGBA's _parEndBlock then takes the ELSE block for the THEN. Torii may
+    # hold the empty THEN as a write of count 0, which does nothing
+    t_ops = drop(c.t_ops, lambda op: not (op[0] == "ASSIGN" and op[4] == "0"))
     if (
         c.t_status != "OK"
         or not c.m_clean
-        or not ops_equal_but_covers(c)
+        or strip_covers(t_ops) != strip_covers(c.m_ops)
+        or c.t_patches != c.m_patches
         or not has(c, r"PAR else")
     ):
         return False
-    for t, m in zip(c.t_ops, c.m_ops, strict=True):
+    for t, m in zip(t_ops, c.m_ops, strict=True):
         if t != m and not (
             is_cond(t) and cover(t)[0] == 0 and cover(m) == (cover(t)[1], 0)
         ):
@@ -549,7 +551,6 @@ RULES = {
     "par-io-width": rule_par_io_width,
     "slowdown": rule_slowdown,
     "mgba-nand-else": rule_mgba_nand_else,
-    "gs-slowdown-unreadable": rule_gs_slowdown_unreadable,
     "par-empty-then-else": rule_par_empty_then_else,
     "cond-covers-rom-patch": rule_cond_rom_patch,
     "par-disable": rule_par_disable,
