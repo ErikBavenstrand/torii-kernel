@@ -9,7 +9,6 @@ clang-tidy source/GBApatch.c clang-analyzer-deadcode.DeadStores: Value stored to
 clang-tidy source/GBApatch.c clang-analyzer-deadcode.DeadStores: Value stored to 'res' is never read
 clang-tidy source/GBApatch.c clang-analyzer-deadcode.DeadStores: Value stored to 'res' is never read
 clang-tidy source/GBApatch.c clang-analyzer-deadcode.DeadStores: Value stored to 'res' is never read
-clang-tidy source/GBApatch.c clang-analyzer-deadcode.DeadStores: Value stored to 'res' is never read
 clang-tidy source/GBApatch.c clang-analyzer-security.PointerSub: Subtraction of two pointers that do not point into the same array is undefined behavior
 clang-tidy source/GBApatch.c clang-analyzer-security.PointerSub: Subtraction of two pointers that do not point into the same array is undefined behavior
 clang-tidy source/GBApatch.c clang-analyzer-security.PointerSub: Subtraction of two pointers that do not point into the same array is undefined behavior
@@ -21,7 +20,6 @@ clang-tidy source/ezkernelnew.c bugprone-branch-clone: switch has 2 consecutive 
 clang-tidy source/ezkernelnew.c bugprone-narrowing-conversions: narrowing conversion from 'u32' (aka 'unsigned int') to signed type 'int' is implementation-defined
 clang-tidy source/ezkernelnew.c bugprone-narrowing-conversions: narrowing conversion from 'u32' (aka 'unsigned int') to signed type 'int' is implementation-defined
 clang-tidy source/ezkernelnew.c bugprone-narrowing-conversions: narrowing conversion from 'u32' (aka 'unsigned int') to signed type 'int' is implementation-defined
-clang-tidy source/ezkernelnew.c clang-analyzer-deadcode.DeadStores: Value stored to 'filesize' is never read
 clang-tidy source/ezkernelnew.c clang-analyzer-deadcode.DeadStores: Value stored to 'res' is never read
 clang-tidy source/ezkernelnew.c clang-analyzer-security.insecureAPI.strcpy: Call to function 'strcpy' is insecure as it does not provide bounding of the memory buffer. Replace unbounded copy functions with analogous functions that support length arguments such as 'strlcpy'. CWE-119
 clang-tidy source/ezkernelnew.c clang-analyzer-security.insecureAPI.strcpy: Call to function 'strcpy' is insecure as it does not provide bounding of the memory buffer. Replace unbounded copy functions with analogous functions that support length arguments such as 'strlcpy'. CWE-119
@@ -79,12 +77,10 @@ clang-tidy source/slotstore.c clang-analyzer-security.insecureAPI.strcpy: Call t
 cppcheck source/GBApatch.c redundantAssignment: Variable 'res' is reassigned a value before the old one has been used.
 cppcheck source/GBApatch.c redundantAssignment: Variable 'res' is reassigned a value before the old one has been used.
 cppcheck source/GBApatch.c redundantAssignment: Variable 'res' is reassigned a value before the old one has been used.
-cppcheck source/GBApatch.c redundantAssignment: Variable 'res' is reassigned a value before the old one has been used.
 cppcheck source/GBApatch.c unreadVariable: Variable 'res' is assigned a value that is never used.
 cppcheck source/boxart.c constParameterCallback: Parameter 'job' can be declared as pointer to const. However it seems that 'list_job' is a callback function, if 'job' is declared with const you might also need to cast function pointer(s).
 cppcheck source/cheatstore.c constParameterCallback: Parameter 'ctx' can be declared as pointer to const. However it seems that 'counts_fill' is a callback function, if 'ctx' is declared with const you might also need to cast function pointer(s).
 cppcheck source/ezkernelnew.c duplicateBreak: Consecutive return, break, continue, goto or throw statements are unnecessary.
-cppcheck source/ezkernelnew.c unreadVariable: Variable 'filesize' is assigned a value that is never used.
 cppcheck source/ezkernelnew.c unreadVariable: Variable 'res' is assigned a value that is never used.
 cppcheck source/fathint.c constParameterCallback: Parameter 'job' can be declared as pointer to const. However it seems that 'step' is a callback function, if 'job' is declared with const you might also need to cast function pointer(s).
 cppcheck source/ingame.c unassignedVariable: Variable 'words' is not assigned a value.
