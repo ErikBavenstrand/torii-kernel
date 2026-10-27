@@ -48,6 +48,16 @@ static void round_trip(const u8 *data, u32 n)
 	CHECK_EQ(size % 4, 0);
 	CHECK_EQ(bios_uncompress(packed, size, back, n + 1), n);
 	CHECK(memcmp(back, data, n) == 0);
+	// The fast one, as a save state's chunks use it
+	if (n <= LZ77_FAST_MAX) {
+		static u16 head[LZ77_HASH];
+		memset(back, 0xEE, n);
+		size = lz77_compress_fast(data, n, packed, head);
+		CHECK(size <= LZ77_MAX_OUT(n));
+		CHECK_EQ(size % 4, 0);
+		CHECK_EQ(bios_uncompress(packed, size, back, n + 1), n);
+		CHECK(memcmp(back, data, n) == 0);
+	}
 	free(back);
 	free(packed);
 }
@@ -68,6 +78,14 @@ void test_lz77_round_trip(void)
 	for (u32 n = 1; n < 40; n++)  // short inputs
 		round_trip(data, n);
 	free(data);
+	// A save state's chunk: 32 KB of mostly zeros, tiles and a stack
+	data = calloc(LZ77_FAST_MAX, 1);
+	for (u32 i = 0; i < 0x2000; i++)
+		data[0x1000 + i] = (u8)(i * 7 % 13 == 0 ? (u32)rand() : i % 16);
+	for (u32 i = 0x6000; i < LZ77_FAST_MAX; i += 4)
+		data[i] = (u8)rand();
+	round_trip(data, LZ77_FAST_MAX);
+	free(data);
 }
 
 void test_lz77_compresses(void)
@@ -77,4 +95,8 @@ void test_lz77_compresses(void)
 	for (u32 i = 0; i < sizeof(data); i++)
 		data[i] = i % 64;
 	CHECK(lz77_compress(data, sizeof(data), packed) < sizeof(data) / 4);
+	static u16 head[LZ77_HASH];
+	CHECK(lz77_compress_fast(data, sizeof(data), packed, head) < sizeof(data) / 4);
+	u8 zeros[4096] = {0};
+	CHECK(lz77_compress_fast(zeros, sizeof(zeros), packed, head) < sizeof(zeros) / 8);
 }

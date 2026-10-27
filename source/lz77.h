@@ -15,4 +15,12 @@
 // padded to 4 bytes as the BIOS wants.
 u32 lz77_compress(const u8 *in, u32 n, u8 *out);
 
+// The same format, fast enough for a save state's 448 KB at boot (v0.8): a
+// hash of the next 3 bytes gives one earlier place to try, and distance 2
+// (runs) is tried too; greedy, a window of the format's 4 KB. head is
+// LZ77_HASH entries of scratch, n at most LZ77_FAST_MAX (32 KB).
+#define LZ77_HASH 4096
+#define LZ77_FAST_MAX 0x8000
+u32 lz77_compress_fast(const u8 *in, u32 n, u8 *out, u16 *head);
+
 #endif
