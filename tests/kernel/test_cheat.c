@@ -60,6 +60,61 @@ void test_menu_code_fits(void)
 	CHECK(!memcmp((const void *)RTS_Refuse_colours, colours, sizeof(colours)));
 }
 
+// PATCH/'s cache (.pat): the words of a file Make_pat_file wrote for a 4 MB
+// ROM pass, and a crafted or stale one is turned down, so a launch scans the
+// ROM again instead of writing where its words say
+static u32 pat_words[EMax * 2 + 16] EWRAM_BSS;
+static void pat_fill(void)
+{
+	memset(pat_words, 0, sizeof(pat_words));
+	u32 *w = pat_words + EMax * 2;
+	pat_words[0] = 0x1000 / 4, pat_words[1] = 0x3007FF4;  // a patched literal
+	pat_words[2] = 0x2000 / 4, pat_words[3] = 0x3007FF4;
+	w[5] = 2;  // iCount2
+	w[6] = 0x3F0010;  // iTrimSize
+	w[7] = 0xEA00002E;  // the entry's branch
+	w[12] = RTS_PATCH_LENGTH;
+	w[13] = 0x400000;  // the ROM's size and head CRC
+	w[14] = 0x12345678;
+}
+void test_pat_cache(void)
+{
+	u32 *w = pat_words + EMax * 2;
+	pat_fill();
+	CHECK(pat_cache_check(pat_words, 0x400000, 0x12345678, RTS_PATCH_LENGTH) == NULL);
+	// another ROM: its size, or its first bytes
+	CHECK(pat_cache_check(pat_words, 0x400004, 0x12345678, RTS_PATCH_LENGTH) != NULL);
+	CHECK(pat_cache_check(pat_words, 0x400000, 0x12345679, RTS_PATCH_LENGTH) != NULL);
+	CHECK(pat_cache_check(pat_words, 0x400000, 0, RTS_PATCH_LENGTH) != NULL);  // the ROM didn't read
+	w[5] = EMax + 1;
+	CHECK(pat_cache_check(pat_words, 0x400000, 0x12345678, RTS_PATCH_LENGTH) != NULL);
+	pat_fill();
+	w[6] = 0x400000 + RTS_PATCH_LENGTH;  // the patch area past the ROM and its room
+	CHECK(pat_cache_check(pat_words, 0x400000, 0x12345678, RTS_PATCH_LENGTH) != NULL);
+	w[6] = 0x3F0012;  // not word-aligned
+	CHECK(pat_cache_check(pat_words, 0x400000, 0x12345678, RTS_PATCH_LENGTH) != NULL);
+	pat_fill();
+	w[12] = CHEAT_PATCH_LENGTH + 0x10;  // more room than any launch keeps
+	CHECK(pat_cache_check(pat_words, 0x400000, 0x12345678, RTS_PATCH_LENGTH) != NULL);
+	pat_fill();
+	w[6] = 0x1FFF000, w[12] = 0x2000, w[13] = 0x2000000;  // a 32 MB ROM's area past 32 MB
+	CHECK(pat_cache_check(pat_words, 0x2000000, 0x12345678, 0x2000) != NULL);
+	w[12] = 0x1000;
+	CHECK(pat_cache_check(pat_words, 0x2000000, 0x12345678, 0x1000) == NULL);
+	pat_fill();
+	pat_words[2] = 0x3F0010 / 4;  // a patched word on the patch area
+	CHECK(pat_cache_check(pat_words, 0x400000, 0x12345678, RTS_PATCH_LENGTH) != NULL);
+	pat_words[2] = 0xFFFFFFFF;  // and far past the ROM
+	CHECK(pat_cache_check(pat_words, 0x400000, 0x12345678, RTS_PATCH_LENGTH) != NULL);
+	pat_fill();
+	w[5] = 1;  // only the counted slots count
+	pat_words[2] = 0xFFFFFFFF;
+	CHECK(pat_cache_check(pat_words, 0x400000, 0x12345678, RTS_PATCH_LENGTH) == NULL);
+	pat_fill();
+	w[7] = 0xEA100000;  // the entry past the ROM's end
+	CHECK(pat_cache_check(pat_words, 0x400000, 0x12345678, RTS_PATCH_LENGTH) != NULL);
+}
+
 #define T_ROM "/T19/Cheat Test.gba"
 #define T_CHT "/torii/cheats/T19/Cheat Test.cht"
 

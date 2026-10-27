@@ -550,15 +550,20 @@ static void Patch_RTS_Cheat(u32 *Data)
 	//off mask (v0.8) and table after it, and Cheat_switch the interpreter's
 	//offset (0: none)
 	u32 copysize = p_patch_end - p_patch_start;
-	TLOG_ASSERT(copysize <= RTS_PATCH_LENGTH);
+	if (copysize > RTS_PATCH_LENGTH) {  // never: test_menu_code_fits checks
+		tlog_error("launch: the in-game code's %lX bytes pass its room", (unsigned long)copysize);
+		return;
+	}
 	u32 cheat_at = 0;
 	u32 room = patch_room ? patch_room : Patch_length();
 	if (iTrimSize + room > 0x2000000)
 		room = 0x2000000 - iTrimSize;
-	if (gl_cheat_on == 1 && gl_cheat_bytes) {
+	if (gl_cheat_on == 1 && gl_cheat_bytes > CHEAT_TABLE_MAX)  // never: cheatstore caps the table
+		tlog_error("launch: a cheat table of %lX bytes passes its room: left out",
+			   (unsigned long)gl_cheat_bytes);
+	else if (gl_cheat_on == 1 && gl_cheat_bytes) {
 		u32 code = (u8 *)Cheat_blob_end - (u8 *)Cheat_blob_start;
 		u32 end = copysize + code + sizeof(gl_cheat_off) + gl_cheat_bytes;
-		TLOG_ASSERT(gl_cheat_bytes <= CHEAT_TABLE_MAX && end <= CHEAT_PATCH_LENGTH);
 		//Torii: never a table cut short, or over the game's data; the
 		//extras (v0.8's cheats off for the in-game list) go first
 		if (gl_cheat_count > gl_cheat_picks &&
@@ -791,7 +796,32 @@ static void GBA_patch_init_buffer(u32 *buffer)
 	patch_room = w_patch_length;
 }
 //------------------------------------------------------------------
-u32 Check_pat(TCHAR *gamefilename)
+//Torii: the ROM a .pat file is for (its words 13 and 14), Check_pat's to
+//compare and Make_pat_file's to write
+static u32 pat_rom_bytes, pat_rom_crc;
+
+const char *pat_cache_check(const u32 *words, u32 rom_size, u32 head_crc, u32 patch_length)
+{
+	const SPatchInfo2 *info = (const SPatchInfo2 *)(const void *)words;
+	const u32 *w = words + sizeof(iPatchInfo2) / 4;
+	u32 count = w[5], trim = w[6], ea = w[7] & 0xFFFFFF, room = w[12] ? w[12] : patch_length;
+	if (!head_crc || w[13] != rom_size || w[14] != head_crc)
+		return "made for another ROM (its size or first bytes differ)";
+	if (count > EMax)
+		return "more patched words than it can have";
+	if (trim < 8 || trim % 4 || trim >= rom_size + patch_length)
+		return "a patch area past the ROM's end";
+	if (room > CHEAT_PATCH_LENGTH || trim + room > 0x2000000)
+		return "a patch area past 32 MB";
+	if (ea * 4 >= rom_size)
+		return "the game's entry past the ROM's end";
+	for (u32 i = 0; i < count; i++)
+		if (info[i].iOffset >= trim / 4)
+			return "a patched word past the patch area";
+	return NULL;
+}
+//------------------------------------------------------------------
+u32 Check_pat(TCHAR *gamefilename, u32 rom_size, u32 head_crc)
 {
 	UINT ret;
 	u32 find_the_patfile;
@@ -800,6 +830,8 @@ u32 Check_pat(TCHAR *gamefilename)
 
 	TCHAR patnamebuf[GAME_NAME_MAX + 1];
 	make_pat_name(patnamebuf, gamefilename);
+	pat_rom_bytes = rom_size;
+	pat_rom_crc = head_crc;
 	res = f_chdir("/PATCH");
 	if (res == FR_OK) {
 		res = f_open(&gfile, patnamebuf, FA_READ);
@@ -815,8 +847,16 @@ u32 Check_pat(TCHAR *gamefilename)
 			    (f_read(&gfile, pReadCache, patfilesize, &ret) != FR_OK || ret != patfilesize))
 				find_the_patfile = 0;
 			f_close(&gfile);
-			if (find_the_patfile && ((u32 *)pReadCache)[sizeof(iPatchInfo2) / 4 + 5] > EMax)
-				find_the_patfile = 0;//Torii: a slot count past EMax is corrupt
+			//Torii: and only one this ROM's, and whose words keep the patches in
+			//the game's image: a file another ROM's, or a crafted one, would
+			//write anywhere in PSRAM
+			const char *why = find_the_patfile ? pat_cache_check((const u32 *)pReadCache, rom_size,
+									     head_crc, Patch_length())
+							   : NULL;
+			if (why) {
+				tlog("launch: PATCH/%s not used: %s", patnamebuf, why);
+				find_the_patfile = 0;
+			}
 		} else {
 			find_the_patfile = 0;
 		}
@@ -876,6 +916,8 @@ void Make_pat_file(TCHAR *gamefilename)
 			w_buffer[10] = gl_sleep_on;
 			w_buffer[11] = gl_cheat_on;
 			w_buffer[12] = patch_room;  // Torii: the room iTrimSize kept
+			w_buffer[13] = pat_rom_bytes;  // Torii: the ROM it is for (Check_pat's)
+			w_buffer[14] = pat_rom_crc;
 
 			res = f_write(&gfile, (void *)w_buffer, sizeof(w_buffer), (UINT *)&written);
 			f_close(&gfile);

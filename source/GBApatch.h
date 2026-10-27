@@ -61,7 +61,12 @@ void Patch_somegame(u32 *Data);
 
 void GBApatch_Cleanrom_NOR(u32 *address, u32 offset);
 void GBApatch_NOR(u32 *address, int filesize, u32 offset);
-u32 Check_pat(TCHAR *gamefilename);
+// 1 if PATCH/'s cache for the game (rom_bytes long, head_crc the CRC32 of
+// its first 0x200 bytes) holds its patches; else the ROM is scanned again
+u32 Check_pat(TCHAR *gamefilename, u32 rom_size, u32 head_crc);
+// Why a .pat file's words (EMax slots, then 16 words) can't be used for this
+// ROM with patch_length bytes kept at its end, or NULL if they can
+const char *pat_cache_check(const u32 *words, u32 rom_size, u32 head_crc, u32 patch_length);
 void Make_pat_file(char *filename);
 // A GBA game's save type (0 AUTO, 1-5) and its boot mode (ACTION_BOOT_*,
 // actions.h) are in its record, game.ini in its folder of saves (gamerec.h,

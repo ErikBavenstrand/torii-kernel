@@ -28,6 +28,7 @@
 #include "ingame.h"
 #include "cheat.h"
 #include "cheatstore.h"
+#include "crc32.h"
 #include "settings.h"
 #include "cartlog.h"
 #include "cutpoint.h"
@@ -1967,7 +1968,16 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 					}
 				}
 				progress_step(NULL, LAUNCH_STATES, LAUNCH_STATES);
-				have_pat = Check_pat(pfilename);
+				// Torii: the cache is used only for this ROM: its size and
+				// the CRC of its first 0x200 bytes (pReadCache borrowed)
+				u32 head_crc = 0;
+				f_chdir(currentpath);
+				if (f_open(&gfile, pfilename, FA_READ) == FR_OK) {
+					if (f_read(&gfile, pReadCache, 0x200, (UINT *)&ret) == FR_OK && ret == 0x200)
+						head_crc = crc32(pReadCache, 0x200);
+					f_close(&gfile);
+				}
+				have_pat = Check_pat(pfilename, gamefilesize, head_crc);
 				if (have_pat == 1) {
 					tlog("launch: IRQ hook from PATCH/ (cached scan)");
 					if (progress_cart_copy(FAT_table_buffer, gamefilesize, LAUNCH_PATCH)) {

@@ -31,6 +31,7 @@ void test_nor_info_stays_in_bounds(void);
 void test_nor_write_refused_when_list_full(void);
 void test_nor_scan_keeps_interrupts(void);
 void test_menu_code_fits(void);
+void test_pat_cache(void);
 void test_build_id_matches_the_rom(void);
 void test_text_blit(void);
 void test_text_draw(void);

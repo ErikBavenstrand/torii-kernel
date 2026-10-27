@@ -33,6 +33,7 @@ static const struct {
 	{"nor_write_refused_when_list_full", test_nor_write_refused_when_list_full},
 	{"nor_scan_keeps_interrupts", test_nor_scan_keeps_interrupts},
 	{"menu_code_fits", test_menu_code_fits},
+	{"pat_cache", test_pat_cache},
 	{"build_id_matches_the_rom", test_build_id_matches_the_rom},
 	{"engine_res_alloc", test_engine_res_alloc},
 	{"engine_budget", test_engine_budget},
