@@ -32,6 +32,27 @@ git log, not here.
 - **Changed:** Settings' Back to menu becomes In-game menu: Auto (when the
   game has states or cheats), Every game, or Off (cheats still run)
   (d7707c9b).
+- **Fixed (before release, from the first cart test):** the in-game menu
+  blacked out Pokémon Emerald on the real cart. Its stub now keeps games'
+  ROM wait states (it had set the menu's faster ones in game mode), checks
+  its backups and the overlay's image against a check word before touching
+  the game, and on any failure leaves the game running and logs why at the
+  next boot; it opens in 4 frames (36802315, eafa7159). The in-game probe
+  shows its report on screen and keeps it in its own save, runs its SD test
+  last and only on A, and the boot retries a card that doesn't mount three
+  times before its error (ff9d5aed).
+- **Fixed:** log lines were lost while a screen ran its own loop (keypad,
+  cheats, Game info); every screen's loop now flushes, and the keypad and
+  frame summaries log less (ebbf28b7). Box art shows soon after boot:
+  crc.txt loads before names.db (2309357c, 05748617). The box-art listing
+  no longer takes 3 frames in one on a slow card (bc0aa59e). An `/RTS`
+  state is imported once and not unpacked twice (4daee59a). A save of
+  another chip type goes to History instead of being padded into the new
+  one, and the notice names the game (4524c3bf). The copy bar's estimate
+  matches the cart (7ad9f062); favorites.txt edited by hand is no longer
+  reported on every boot (a4ed0720).
+- **Added:** the keypad shows how many digits a line has toward a whole
+  one, and L+B clears the code (4e362a26).
 - **Added (tests):** an in-game probe ROM for the real cart
   (`tests/roms/ingame`) and emulator stops for game-mode PSRAM and SD
   writes (a6f5e5fe, ab93fc31).
