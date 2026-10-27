@@ -13,7 +13,8 @@ only the staged changes count, though the checks run on the working tree.
 Each file selects tiers by the rules below, the first rule
 that matches winning. The tiers then run side by side, all of them even
 after one fails: lint at once, the rest after one `just` call builds what
-they need (PREPARE). Each tier's output goes to dist/.check/TIER.log and is
+they need (PREPARE), with test, compat and repro, which each fill the VM,
+one after another (VM_HEAVY). Each tier's output goes to dist/.check/TIER.log and is
 printed whole when the tier ends; a summary lists what failed.
 
 A tier that passed before with the same inputs is skipped: the hash of every
@@ -424,6 +425,10 @@ PREPARE = {
 # Tiers that need no container and none of PREPARE: they start at once,
 # alongside the preparation.
 HOST_ONLY = {LINT}
+# Tiers that fill the VM's CPUs (and memory) by themselves: they run one
+# after another, beside the others. Run at once, test and compat each took
+# about 2.5 times as long as alone (about 160 emulators on 8 CPUs).
+VM_HEAVY = [TEST, COMPAT, REPRO]
 
 
 def tree_state() -> dict[str, str]:
@@ -525,8 +530,8 @@ def run(plan: list[list[str]], just: str) -> dict[str, bool]:
     dist/.check, and print each log whole as its tier ends.
 
     Host-only tiers start at once; the others after one `just` call builds
-    what they all need (PREPARE). Returns each tier's name and whether it
-    passed, in plan order."""
+    what they all need (PREPARE), the VM_HEAVY ones one at a time. Returns
+    each tier's name and whether it passed, in plan order."""
     logs = Path("dist/.check")
     logs.mkdir(parents=True, exist_ok=True)
     names = {id(cmd): " ".join(cmd[1:]) for cmd in plan}
@@ -593,10 +598,15 @@ def run(plan: list[list[str]], just: str) -> dict[str, bool]:
             for cmd in later:
                 results[names[id(cmd)]] = False
             later = []
+    lane = [cmd for cmd in later if cmd[1] in VM_HEAVY]
+    lane.sort(key=lambda cmd: VM_HEAVY.index(cmd[1]))
     for cmd in later:
-        start(cmd)
+        if cmd not in lane:
+            start(cmd)
     try:
-        while procs:
+        while procs or lane:
+            if lane and not any(c[1] in VM_HEAVY for c, *_ in procs.values()):
+                start(lane.pop(0))
             wait_any()
     except KeyboardInterrupt:
         for _, proc, _, _ in procs.values():

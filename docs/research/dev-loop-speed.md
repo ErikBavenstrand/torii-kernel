@@ -50,6 +50,55 @@ reports and screenshots still go to `dist/compat`. Measured old and new in turns
 The gain is smaller than for `just test` because game power-ons are long (2,400+ frames) and the run stays CPU-bound.
 A passing run also no longer leaves 140 MB per game in `dist/cart-games` (16 GB after `--all`).
 
+## Update 2026-10-28: `just check` from about 8 to under 4 minutes, and instant when re-run
+
+By 2026-10-27, `just check` for a one-line kernel C change ran lint, test, size, analyze and compat one after another in about 8 minutes.
+Measured in a worktree on a warm tree, `torii` VM with 8 CPUs, with another session testing in the same VM most of the time (load 4–11), so times carry about ±20 % noise.
+
+| Tier | Before, one-line edit to `source/screens/games.c` | After, alone (quiet VM) | After, inside `just check` |
+|---|---|---|---|
+| lint | 18 s | – | 28–31 s, on the Mac beside the rest |
+| test | 246 s | 96–101 s (`tests/all.sh`) | 136–143 s |
+| size | 1 s | – | 2–4 s |
+| analyze | 89 s | 28.6 s | 69–108 s, beside test |
+| compat | 142 s | 87–94 s | 80 s |
+| **`just check`** | **496 s** (sum) | | see below |
+
+`just check` after the changes:
+
+| Change | Tiers | Before | After |
+|---|---|---|---|
+| one line in `source/actions.c` (launch path) | lint, test, size, analyze, compat | 496 s | 222 s |
+| one line in `source/screens/games.c` (menu page) | lint, test, size, analyze (compat no longer) | 496 s | 150 s |
+| the same, run again (after a commit, or a docs-only edit) | none: all passed with the same inputs | 496 s | 0.5 s |
+
+Where the time went, and what changed:
+
+- **`tests/shots.py`'s `sd-many` scenarios** (most of `test`). They put 1,025 and 3,000 files in one folder with `mcopy`, which checks every new name against the whole folder:
+  one `mcopy` ran over 2 minutes, and `test` waited on it. They now go through `tools/sdimg` (the kernel's FatFs) in one mount, whose `put` takes many file pairs:
+  both scenarios take 7.5 s with the sdimg build, and their golden hashes are unchanged.
+- **`tests/all.sh` is CPU-bound.** Its 140 jobs take about 540 CPU-seconds (measured per job with bash's `time`), so on 8 CPUs it can't go much below 70 s; it takes 96–101 s.
+  The largest: `tests/shots.py` 41 s, `saveorphan.sh trash-split empty-split` 34 s, `saves.sh rename-walk` 27 s, `saveorphan.sh relink-split ...` 23 s, `cheats.sh` 22 s, `cheat_engine.sh` 15 s per shard (4), `state_trips.sh hello` 18 s, `states.sh cut` 17 s, `ppu_render.sh` 15 s.
+  The power-cut sweeps (`cut_sweep`: saveorphan, saves rename-cut, slotstore splits, states cut) take about 120 of the 540: each cutpoint boots and replays its scenario from frame 0. Starting each from a save state taken before the operation could cut most of that, but the cart's SD and NOR files sit outside mGBA's state, so that needs work of its own.
+- **`tests/cheat_codes.sh` ran its 13 games one after another** (about 60 s). Each game now runs on carts of its own, side by side: 22 s alone. `just compat` runs it beside `tests/games.py`.
+- **`tests/games.py` ended on a straggler.** After 63 s only a few games were left and the last ended at 115 s. It now records each game's seconds in the run file and starts the longest first, by the last 20 runs: 87 s with the cheat codes beside it.
+- **clang-tidy was one process over every file**, about 75 s on one core. It now runs 4 files per process, one per Mac CPU (15 s), and drops a finding (file, line, column, message) repeated in another process's output, as one process would.
+  The findings matched the single process's, except that `gamename.c`'s `memcpy` finding, which appears every time the file is analysed alone, was reported by the single process in only one of two runs. It is a false alarm ("the caller ends it") and is now in the baseline.
+- **`just test-host` ran its 10 Python test files one after another.** They now run at once beside `tests/host.sh`. `tests/art_scrape_test.py` took 12 s, nearly all `HTTPServer.shutdown()` waiting for the 0.5 s poll: its fixture server polls every 10 ms, 3.5 s.
+- **`just check` runs the tiers side by side**: lint at once on the Mac; one `just` call then builds what the others need, so none builds the same thing at the same time; size and analyze start, and test, compat and repro run one after another.
+  Run all at once, test and compat took 242 s and 276 s instead of about 100 s each: about 160 emulator processes on 8 CPUs and 8 GB.
+- **Pass cache.** A tier that passed is recorded in `dist/.check/passed.json` under a hash of its inputs: every file whose rules (`tools/check.py`) select the tier (both test and test-host's for test, every file for repro), unsaved edits in `emu/mgba` and the emulators' checkouts, and for compat the names, sizes and times of `roms/`. Files are hashed from git's index, and from disk only where the work tree differs (0.1 s for the repo).
+  A tier is recorded only if its inputs still hash the same after it ran. `--no-cache` runs everything.
+  So the second `just check` the workflow asks for, after committing a change and again after its CHANGELOG entry, runs only lint again (about 30 s): the CHANGELOG is an input of lint alone.
+- **`NO_COMPAT` grew by the menu pages a player opens**: Games, SD card, NOR, cheats, saves, settings, Diagnostics' drawing and the carousel's affine maths.
+  `tests/games.py` launches through the tests' hook in `screens/nav.c`, straight into `actions.c`, so their code never runs in compat; their only callers are other menu pages and `nav.c`'s page table, whose hooks run only for an open page.
+  Pages a launch can show itself (slot picker, slot flow, save page) and headers that `nav.c` or `actions.c` include stay out.
+
+Not done:
+
+- More CPUs for the VM. The Mac has 14 cores and `torii` takes 8; test and compat are CPU-bound, so 12 would cut them by up to a third, at the cost of the Mac's and other sessions' headroom.
+- Running compat's games and `tests/all.sh` from save states. Ruled out before for compat (boot is under 15 % of a game's frames), and the cut sweeps above need the cart files snapshotted too.
+
 ## Top five, ranked by time saved × frequency ÷ effort
 
 | # | Change | Saves | How often | Effort | Risk |
