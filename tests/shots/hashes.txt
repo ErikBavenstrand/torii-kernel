@@ -39,9 +39,8 @@ boot-copy/frames 6-6 612E4E40426AEE11
 boot-progress/screen 985A0C30AC9AC713
 boot-progress/frames 0-3 818B02E74B016B0D
 boot-progress/frames 4-7 7C573B18E65FE325
-boot-progress/frames 8-12 985A0C30AC9AC713
-boot-progress/frames 13-28 9D5EA05F12ADBBF3
-boot-progress-big/loading 34CC6C75F5874C53
+boot-progress/frames 8-28 985A0C30AC9AC713
+boot-progress-big/loading 344AD1824BC6C30B
 boot-slow/home 818B02E74B016B0D
 boot-slow/notice 1F73F83DB4B12863
 boot-slow/frames 0-1 7C573B18E65FE325
@@ -405,7 +404,7 @@ nor-page/frames 6-12 AD2FB3B0C888248F
 nor-page/frames 13-13 B30F2D6EEE33F846
 nor-page/frames 14-17 C74BE7B42C33C6E2
 nor-write/done 3B8472BCA67DAA9D
-nor-write/half C18C045DA0E5C751
+nor-write/half 9C439FA7065CE5AD
 open/back 7CB9829E643E6EDB
 open/page FB15C1A231E27AD1
 open/frames 0-1 7CB9829E643E6EDB

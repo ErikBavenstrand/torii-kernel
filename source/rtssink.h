@@ -15,7 +15,8 @@
 // 1 if done; 0 if the file can't be made or read, and the launch must stop.
 int rts_sink_prepare(void);
 
-// The runs rts_sink_prepare last wrote (FAT_TABLE_RTS_WORDS), or NULL
-const u32 *rts_sink_runs(void);
+// The CRC32 of the runs rts_sink_prepare last wrote (fat_table_rts_crc), or
+// NULL when it hasn't
+const u32 *rts_sink_crc(void);
 
 #endif

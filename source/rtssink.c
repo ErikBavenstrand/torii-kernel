@@ -11,7 +11,7 @@
 
 extern u32 FAT_table_buffer[FAT_table_size / 4];
 
-static u32 sink[FAT_TABLE_RTS_WORDS] EWRAM_BSS;
+static u32 sink_crc;
 static int sink_ok;
 
 _Static_assert(FAT_table_size == FAT_TABLE_WORDS * 4 && FAT_table_RTS_offset == FAT_TABLE_RTS_WORD * 4,
@@ -57,7 +57,7 @@ int rts_sink_prepare(void)
 		TCHAR path[] = RTS_SINK_FILE;
 		u32 res = Check_game_RTS_FAT(path, 3);
 		if (res == 0 && fat_runs(FAT_table_buffer, FAT_TABLE_RTS_WORD, FAT_TABLE_WORDS) >= 1) {
-			memcpy(sink, FAT_table_buffer + FAT_TABLE_RTS_WORD, sizeof(sink));
+			sink_crc = fat_table_rts_crc(FAT_table_buffer);
 			sink_ok = 1;
 			return 1;
 		}
@@ -66,11 +66,11 @@ int rts_sink_prepare(void)
 			   (unsigned long)res);
 		f_unlink(RTS_SINK_FILE);
 	}
-	memset(FAT_table_buffer + FAT_TABLE_RTS_WORD, 0, sizeof(sink));
+	memset(FAT_table_buffer + FAT_TABLE_RTS_WORD, 0, FAT_TABLE_RTS_WORDS * 4);
 	return 0;
 }
 
-const u32 *rts_sink_runs(void)
+const u32 *rts_sink_crc(void)
 {
-	return sink_ok ? sink : NULL;
+	return sink_ok ? &sink_crc : NULL;
 }

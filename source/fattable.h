@@ -26,10 +26,13 @@
 // offset 0, the offsets don't rise, or a run starts at the card's sector 0.
 int fat_runs(const u32 *table, u32 from, u32 to);
 
+// The CRC32 of table's words from 0x300 (the state file's runs)
+u32 fat_table_rts_crc(const u32 *table);
+
 // 1 if table (FAT_TABLE_WORDS) may go to the FPGA: the game's runs end
-// before the parameters, and the words from 0x300 are exactly sink's
-// (FAT_TABLE_RTS_WORDS, the state file's runs as last checked), at least
-// one run ending in the marker. 0 otherwise, with the reason in why.
-int fat_table_safe(const u32 *table, const u32 *sink, const char **why);
+// before the parameters, and the words from 0x300 hold at least one run
+// ending in the marker, with the CRC32 *sink_crc (as checked against the
+// state file's chain; NULL: none checked). 0 otherwise, the reason in why.
+int fat_table_safe(const u32 *table, const u32 *sink_crc, const char **why);
 
 #endif

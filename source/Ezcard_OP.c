@@ -309,7 +309,7 @@ void IWRAM_CODE Send_FATbuffer_now(u32 *buffer, u32 mode)
 u32 Send_FATbuffer(u32 *buffer, u32 mode)
 {
 	const char *why = NULL;
-	if (mode != 2 && !fat_table_safe(buffer, rts_sink_runs(), &why)) {
+	if (mode != 2 && !fat_table_safe(buffer, rts_sink_crc(), &why)) {
 		tlog_error("launch: the cart's table not sent: %s", why);
 		TLOG_ASSERT(0);
 		return 1;
