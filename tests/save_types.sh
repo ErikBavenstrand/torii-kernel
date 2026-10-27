@@ -2,7 +2,7 @@
 # Save chip test on the emulated cart: for each save type, launch the matching
 # save test ROM with that type picked in the kernel menu, power-cycle so the
 # kernel writes the save to SD, and launch again to check the save came back.
-# Usage: save_types.sh [flash128|flash64|eeprom8k|eeprom8k-short|eeprom512-shrunk|eeprom512]
+# Usage: save_types.sh [flash128|flash64|eeprom8k|eeprom8k-short|eeprom512-shrunk|eeprom8k-to-flash|eeprom512]
 # Runs inside the torii-emu container after `just build`,
 # `just emu-headless` and building tests/roms/savetest.
 set -euo pipefail
@@ -134,6 +134,36 @@ shrunk_eeprom() {
   echo "PASS: eeprom512-shrunk"
 }
 
+# An EEPROM 8K save for a game now set to Flash 64K: another chip's, so it
+# isn't padded to 64 KB (v0.8's cart did, silently) but kept in the history,
+# as a shrunk one is, with the notice naming the game as the lists do
+other_chip() {
+  local cart=$carts/save-eeprom8k-to-flash
+  rm -rf "$cart"
+  mkdir -p "$cart"
+  mkfs.fat -C -F 32 -n SAVETEST "$cart/sd.img" 65536 >/dev/null
+  mcopy -i "$cart/sd.img" tests/roms/savetest/flash64.gba ::/Test.gba
+  python3 -c 'import sys; sys.stdout.buffer.write(b"\xff" * 8 + b"OLD8K" + b"\xff" * 8179)' >"$cart/old.sav"
+  mmd -i "$cart/sd.img" ::/torii ::/torii/saves ::/torii/saves/Test.gba
+  mcopy -i "$cart/sd.img" "$cart/old.sav" ::/torii/saves/Test.gba/Main.sav
+  local log=$cart/kernel.log
+  # CLEAN BOOT with SAVE TYPE FLASH 64K; the notice waits for a key
+  # shellcheck disable=SC2046 # nav.sh's options
+  OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch /Test.gba save=4 at=270) \
+    -w "save: type change notice shown" -k @20:A -k @26:- -f 700 >/dev/null 2>"$log"
+  grep -q "save: /torii/saves/Test.gba/Main.sav is 8192 bytes, the save type 32 needs 65536" "$log" ||
+    fail "eeprom8k-to-flash: no type change in the log: $(grep 'save: ' "$log")"
+  ! grep -q "save: grew" "$log" || fail "eeprom8k-to-flash: the EEPROM save was padded to Flash's size"
+  grep -q "save: type change notice shown for Test$" "$log" ||
+    fail "eeprom8k-to-flash: the notice doesn't name the game: $(grep 'notice shown' "$log")"
+  grep -q "launch: starting the game" "$log" || fail "eeprom8k-to-flash: the game didn't start after the notice"
+  name=$(mdir -b -i "$cart/sd.img" ::/torii/backups/Test.gba/Main/ | grep -i '0001-' | head -1)
+  [ -n "$name" ] || fail "eeprom8k-to-flash: no version in the history"
+  mtype -i "$cart/sd.img" "$name" >"$cart/hist.sav"
+  cmp -s "$cart/hist.sav" "$cart/old.sav" || fail "eeprom8k-to-flash: the history's version isn't the old save"
+  echo "PASS: eeprom8k-to-flash"
+}
+
 # Save types (nav.sh's save=N): 1 SRAM, 2 EEPROM 8K, 3 EEPROM 512, 4 FLASH 64K, 5 FLASH 128K
 # With an argument, run only that case (tests/all.sh runs them in parallel).
 case ${1:-all} in
@@ -142,5 +172,6 @@ flash64 | all) run_case flash64 4 0 ;;&
 eeprom8k | all) run_case eeprom8k 2 8 ;;&
 eeprom8k-short | all) short_eeprom ;;&
 eeprom512-shrunk | all) shrunk_eeprom ;;&
+eeprom8k-to-flash | all) other_chip ;;&
 eeprom512 | all) run_case eeprom512 3 8 ;;
 esac

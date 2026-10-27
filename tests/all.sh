@@ -17,6 +17,7 @@ jobs=(
   "tests/save_types.sh eeprom512"
   "tests/save_types.sh eeprom8k-short"
   "tests/save_types.sh eeprom512-shrunk"
+  "tests/save_types.sh eeprom8k-to-flash"
   "tests/saves.sh copy"
   "tests/saves.sh record-slots"
   "tests/pending_slots.sh cut-new"
@@ -128,6 +129,7 @@ jobs=(
   "tests/logging.sh open"
   "tests/logging.sh flood"
   "tests/logging.sh hang"
+  "tests/logging.sh screen"
   "python3 tests/shots.py"
   "python3 tests/perf.py self-test"
 )

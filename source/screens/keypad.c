@@ -139,10 +139,11 @@ static struct {
 	u8 done, result, want;
 	u8 message;  // frames the hint area's refusal stays
 	u8 armed;    // A (1) and B (2) pressed here: they repeat while held
+	u8 logged_status, logged_format;  // what recheck last logged: a line only when they change
 	u32 down_at[2];  // frame_count() when each went down
 	u32 repeats[2];  // and the repeats it has had
 	char scratch[KEYPAD_CODE_MAX + 1];
-	char counter[20];
+	char counter[32];
 	char msg[48];
 	struct ui_hint hints[4];
 } kp EWRAM_BSS;
@@ -275,6 +276,12 @@ static void recheck(void)
 	keypad_check(&kp.e, kp.format, kp.ask->ctx, &cs->work, kp.scratch, &kp.check);
 	if (kp.check.status == KEYPAD_OK && kp.check.ops)
 		kp.first = cs->work.ops[0];
+	// Only when what the code reads as changes, not a line per digit: the
+	// card's log filled with them (v0.8's cart test)
+	if (kp.check.status == kp.logged_status && kp.check.format == kp.logged_format)
+		return;
+	kp.logged_status = (u8)kp.check.status;
+	kp.logged_format = (u8)kp.check.format;
 	tlog_debug("keypad: %s: %s as %s", kp.scratch,
 		   kp.check.status < KEYPAD_STATUSES ? status_names[kp.check.status] : "?",
 		   format_name(kp.check.format));
@@ -474,8 +481,16 @@ static void code_changed(void)
 	else if (kp.e.line >= kp.top + VISIBLE)
 		kp.top = (u8)(kp.e.line - VISIBLE + 1);
 	recheck();
-	snprintf(kp.counter, sizeof(kp.counter), EN_KEYPAD_COUNTER, (unsigned long)kp.e.line + 1,
-		 (unsigned long)kp.e.lines);
+	u32 expect;
+	u32 digits = keypad_edit_digits(&kp.e, kp.e.line, kp.format, &expect);
+	// The title's corner holds about 9 characters: the digits while the
+	// line is being typed, else the line
+	if (digits && digits < expect)
+		snprintf(kp.counter, sizeof(kp.counter), EN_KEYPAD_COUNTER_DIGITS, (unsigned long)digits,
+			 (unsigned long)expect);
+	else
+		snprintf(kp.counter, sizeof(kp.counter), EN_KEYPAD_COUNTER, (unsigned long)kp.e.line + 1,
+			 (unsigned long)kp.e.lines);
 	ui_title_set_right(node(N_TITLE), kp.counter);
 	ui_canvas_redraw(node(N_FIELD));
 }
@@ -533,6 +548,17 @@ static void delete_back(int fresh)
 		kp.want = WANT_CANCEL;  // an empty code: B leaves
 }
 
+// L+B: every line goes, the format stays (Cancel still asks before the
+// code it started with is lost)
+static void clear_all(void)
+{
+	if (kp.e.lines == 1 && !kp.e.len[0])
+		return;
+	keypad_edit_init(&kp.e, "", 0);
+	tlog_debug("keypad: cleared");
+	code_changed();
+}
+
 // The next format SELECT gives
 static void step_format(void)
 {
@@ -582,6 +608,11 @@ static void act(u16 key, int fresh)
 		press_key(fresh);
 		break;
 	case INPUT_B:
+		// L+B: the whole code goes (L held; its own press moved a line)
+		if (fresh && (ui_input()->held & INPUT_L)) {
+			clear_all();
+			break;
+		}
 		delete_back(fresh);
 		break;
 	case INPUT_L:
@@ -687,6 +718,7 @@ static void tick(struct ui_view *v)
 int keypad_run(const struct keypad_ask *ask, char *out, u8 *format)
 {
 	memset(&kp, 0, sizeof(kp));
+	kp.logged_status = 0xFF;  // the first check is logged
 	kp.ask = ask;
 	if (!keypad_edit_init(&kp.e, ask->code ? ask->code : "", ask->code ? ask->code_len : 0)) {
 		tlog("keypad: the code can't be edited here");
@@ -722,7 +754,8 @@ int keypad_run(const struct keypad_ask *ask, char *out, u8 *format)
 		*format = kp.format;
 		tlog("keypad: saved %s, format %s", out, format_name(kp.format));
 	} else {
-		tlog("keypad: cancelled");
+		keypad_edit_code(&kp.e, kp.scratch, sizeof(kp.scratch));
+		tlog("keypad: cancelled %s", kp.scratch);
 	}
 	return kp.result;
 }

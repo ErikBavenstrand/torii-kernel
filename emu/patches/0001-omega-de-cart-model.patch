@@ -326,7 +326,7 @@ new file mode 100644
 index 0000000..91a6f64
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1678 @@
+@@ -0,0 +1,1718 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -644,6 +644,35 @@ index 0000000..91a6f64
 +		exit(2);
 +	}
 +	_sdError.armed = true;
++}
++
++// The card's time, for tests of the kernel's frame budget: the emulated card
++// answers at once unless OMEGA_SD_CYCLES=COMMAND[:SECTOR] is set; then the
++// port reads busy (0xEEE1) for COMMAND cycles plus SECTOR a sector after each
++// read or write, as a real card's latency (the cart reads about 8,000
++// cycles a sector)
++static struct {
++	uint32_t command;
++	uint32_t sector;
++	int32_t until;  // mTimingGlobalTime's low word when the port answers again
++	bool waiting;
++} _sdTime;
++
++static void _parseSdTime(void) {
++	const char* spec = getenv("OMEGA_SD_CYCLES");
++	memset(&_sdTime, 0, sizeof(_sdTime));
++	if (!spec || !*spec) {
++		return;
++	}
++	char* end;
++	_sdTime.command = strtoul(spec, &end, 0);
++	if (*end == ':') {
++		_sdTime.sector = strtoul(end + 1, &end, 0);
++	}
++	if (end == spec || *end) {
++		fprintf(stderr, "omega: bad OMEGA_SD_CYCLES %s (COMMAND[:SECTOR])\n", spec);
++		exit(2);
++	}
 +}
 +
 +// Whether the read of count sectors at lba fails (OMEGA_SD_READ_ERROR)
@@ -1048,6 +1077,10 @@ index 0000000..91a6f64
 +	}
 +	_trace(gba, "sd %s sector %u count %u", write ? "write" : "read", omega->sdLba, sectors);
 +	_sdError.busy = !write && _sdReadFails(omega->sdLba, sectors);
++	if (_sdTime.command || _sdTime.sector) {
++		_sdTime.until = (int32_t) mTimingGlobalTime(&gba->timing) + _sdTime.command + sectors * _sdTime.sector;
++		_sdTime.waiting = true;
++	}
 +	if (_sdError.busy) {
 +		return;  // the port keeps what it held
 +	}
@@ -1118,6 +1151,12 @@ index 0000000..91a6f64
 +	}
 +	if (omega->sdControl == 3 && _sdError.busy) {
 +		return 0xEEE1;  // Still busy: the read never finishes (OMEGA_SD_READ_ERROR)
++	}
++	if (omega->sdControl == 3 && _sdTime.waiting) {
++		if ((int32_t) ((uint32_t) mTimingGlobalTime(&gba->timing) - (uint32_t) _sdTime.until) < 0) {
++			return 0xEEE1;  // Still busy: the card's time (OMEGA_SD_CYCLES)
++		}
++		_sdTime.waiting = false;
 +	}
 +	if (omega->bufferControl == 3 || omega->sdControl == 3) {
 +		return 2;  // Operation finished
@@ -1550,6 +1589,7 @@ index 0000000..91a6f64
 +	omega->copyEnd = 0;
 +	_parsePowerCut();
 +	_parseSdError();
++	_parseSdTime();
 +	_parseStuck();
 +	_cutOmega = omega;
 +	omega->enabled = true;

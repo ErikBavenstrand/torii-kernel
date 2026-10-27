@@ -42,6 +42,8 @@
 #include "diag.h"
 #include "engine/cover.h"
 #include "library.h"
+#include "engine/cycles.h"
+#include "engine/psram.h"
 #include "gamesave.h"
 #include "screens/nav.h"
 #include "progress.h"
@@ -1151,19 +1153,55 @@ static u32 Grow_savefile(TCHAR *filename, u32 size, u32 need)
 	return total;
 }
 //---------------------------------------------------------------------------------
+// Torii: the chip a save type is (its code's high nibble: 1 SRAM, 2 EEPROM, 3
+// Flash), and the one a file's size says it was written by (EEPROM up to
+// 8 KB, SRAM's 32 KB, Flash from 64 KB); 0 for neither (no save, the
+// homebrew's and the emulators' 64 KB)
+static u32 Save_chip(BYTE saveMODE)
+{
+	u32 chip = saveMODE >> 4;
+	return chip >= 1 && chip <= 3 && saveMODE != 0x10 ? chip : 0;
+}
+
+static u32 Save_chip_of_size(u32 bytes)
+{
+	return bytes <= 0x2000 ? 2 : bytes == 0x8000 ? 1 : bytes >= 0x10000 ? 3 : 0;
+}
+
+// The game's name for the save notices: its display name in the index, set
+// before the launch (Game_boot) puts the index away; else the file's name
+static char launch_display[64] EWRAM_BSS;
+// Cycles a launch's save waited for the user (the type change's notice), left
+// out of its "launch's save" time
+static u32 save_wait_cycles EWRAM_BSS;
+
+static const char *Launch_display(const char *rom_path)
+{
+	if (launch_display[0])
+		return launch_display;
+	const char *slash = strrchr(rom_path, '/');
+	return slash ? slash + 1 : rom_path;
+}
+
 // Torii: a slot file bigger than the game's save type now needs (EEPROM 8K
-// changed to 512, Flash 128K to 64K) would be cut short or half used: it is
-// never cut or converted. The file goes into the slot's history untouched,
-// the slot starts the new type from the blank chip (the caller makes it as for
-// a new game), and a notice says so once, as the file is gone afterwards. A
-// file smaller than the type is grown by Grow_savefile: its bytes stay, so
-// nothing is lost. Returns 0, or the error number to show.
+// changed to 512, Flash 128K to 64K) would be cut short or half used, and one
+// of another chip (EEPROM 8K changed to Flash 64K) would be read as that
+// chip's: it is never cut, padded or converted. The file goes into the slot's
+// history untouched, the slot starts the new type from the blank chip (the
+// caller makes it as for a new game), and a notice says so once, as the file
+// is gone afterwards. A smaller file of the same chip (EEPROM 512 to 8K) is
+// grown by Grow_savefile: its bytes stay, so nothing is lost. Returns 0, or
+// the error number to show.
 static u32 __attribute__((noinline)) Retire_oversized_save(const char *savfilename, const char *hist,
 							   const char *rom_path, BYTE saveMODE)
 {
 	FILINFO fno;
 	u32 need = Get_savefilesize(saveMODE);
-	if (f_stat(savfilename, &fno) != FR_OK || fno.fsize <= need)
+	if (f_stat(savfilename, &fno) != FR_OK || !fno.fsize)
+		return 0;
+	u32 chip = Save_chip(saveMODE), was = Save_chip_of_size((u32)fno.fsize);
+	int other_chip = fno.fsize < need && chip && was && chip != was;
+	if (fno.fsize <= need && !other_chip)
 		return 0;
 	tlog("save: %s is %lu bytes, the save type %02X needs %lu: kept in the history, the slot starts blank",
 	     savfilename, (unsigned long)fno.fsize, saveMODE, (unsigned long)need);
@@ -1172,11 +1210,14 @@ static u32 __attribute__((noinline)) Retire_oversized_save(const char *savfilena
 		tlog_error("save: %s can't go into the history (%d): the launch stops, the file stays", savfilename, r);
 		return 3;
 	}
-	tlog("save: type change notice shown");
+	const char *name = Launch_display(rom_path);
+	tlog("save: type change notice shown for %s", name);
 	char msg[260];
-	int cut = (int)charset_cut(rom_path, 60);
-	snprintf(msg, sizeof(msg), EN_SAVE_TYPE_CHANGED, cut, rom_path, (unsigned long)fno.fsize);
+	int cut = (int)charset_cut(name, 60);
+	snprintf(msg, sizeof(msg), EN_SAVE_TYPE_CHANGED, cut, name, (unsigned long)fno.fsize);
+	u32 asked = cycles_now();
 	dialog_message(NULL, msg, DIALOG_INFO);
+	save_wait_cycles += cycles_since(asked);
 	return 0;
 }
 //---------------------------------------------------------------------------------
@@ -1294,8 +1335,11 @@ static u8 Process_savefile(u32 is_EMU, const char *rom_path, u32 gamefilesize, B
 {
 	struct diskstat mark;
 	diskstat_start(&mark);
+	save_wait_cycles = 0;
 	u8 r = Process_savefile_steps(is_EMU, rom_path, gamefilesize, saveMODE);
+	mark.cycles += save_wait_cycles;  // the time the card worked, not the notice's
 	diskstat_log("launch's save", &mark);
+	launch_display[0] = 0;
 	return r;
 }
 //---------------------------------------------------------------------------------
@@ -1717,6 +1761,15 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 	u32 res;
 	u8 error_num;
 	BYTE SAVEMODE;
+	// The game's display name for the save's notices, while the index is up
+	launch_display[0] = 0;
+	if (gamesave_rom_path_in(launch_save.rom, sizeof(launch_save.rom), currentpath, pfilename) >= 0) {
+		u32 rec = library_find(launch_save.rom);
+		if (rec != LIBRARY_NONE) {
+			psram_begin();
+			snprintf(launch_display, sizeof(launch_display), "%s", library_display(rec));
+		}
+	}
 	// The launch fills PSRAM with the game: the library index and the cover
 	// cache there are gone
 	library_before_launch();

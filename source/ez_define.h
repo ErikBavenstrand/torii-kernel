@@ -19,7 +19,9 @@
 //   Diagnostics, and the unit tests (in Diagnostics, and at boot in a test build).
 // - READCACHE_STAGE: the engine's asset jobs (engine/stage.h), within one job
 //   step: an SD chunk on its way to PSRAM, the path being opened, box art's
-//   folder entry and zeros and a chunk of the art pack's index (boxart.c). Nothing in it outlives the step, and steps run only from
+//   folder entry and zeros and a chunk of the art pack's index (boxart.c),
+//   and the library job's chunk of names.db (names_store.c) on its way to
+//   PSRAM. Nothing in it outlives the step, and steps run only from
 //   jobs_run, never inside one of the operations above, so it can overlap
 //   them all. An owner that wants to keep data here across frames that run
 //   jobs must stop the asset jobs first (cover_shutdown).

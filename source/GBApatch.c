@@ -693,6 +693,10 @@ void Log_patches(void)
 	tlog("launch: in-game code: %s at ROM %08lX, game entry %08lX, stack literal %08lX",
 	     patch_kind ? patch_kind : "none", (unsigned long)iTrimSize, (unsigned long)EA_offset * 4 + 8,
 	     (unsigned long)spend_address);
+	if (!iCount2) {
+		tlog("launch: no patched words");
+		return;
+	}
 	tlog("launch: %lu patched words (offset=value):", (unsigned long)iCount2);
 	for (u32 i = 0; i < iCount2; i += 4) {
 		char words[4][20];

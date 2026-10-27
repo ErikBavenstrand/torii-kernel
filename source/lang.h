@@ -313,6 +313,9 @@ struct lang_keypad {
 extern const struct lang_keypad *gl_keypad;
 // The keypad's lines with numbers in them
 #define EN_KEYPAD_COUNTER "Line %lu/%lu"
+// Instead, while the caret's line is short of a whole line's digits: how far
+// it is ("13 of 16")
+#define EN_KEYPAD_COUNTER_DIGITS "%lu of %lu"
 #define EN_KEYPAD_DETECTED "%s, detected"
 #define EN_KEYPAD_GUESS "%s, a guess"
 #define EN_KEYPAD_SET "%s, set with SELECT"

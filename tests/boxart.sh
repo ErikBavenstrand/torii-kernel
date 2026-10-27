@@ -153,7 +153,33 @@ for name in ("games-artlist", "cover-load"):
     if n > 280896 or n > budget[name] * 1.1:
         sys.exit(1)
 EOF
-echo "PASS: a game with no art file gets its cover from the art pack"
+# With a card's latency (OMEGA_SD_CYCLES: 40,000 cycles a command, 8,000 a
+# sector) a larger index (2,000 CRCs, 16 KB) is read a card command a step,
+# each early in a frame, so no listing frame goes over (v0.8's cart had one
+# of 880,000 cycles: 4 KB at the header's odd offset, three commands). On a
+# card of 4 KB clusters, as real ones have (FatFs reads a cluster at most a
+# command; the test cards' are 512 bytes)
+slow=$carts/pack-slow
+rm -rf "$slow" && mkdir -p "$slow"
+cp "$cart/kernel-nor.bin" "$slow/"
+mkfs.fat -C -F 32 -s 8 -n BOXART "$slow/sd.img" 307200 >/dev/null
+mmd -i "$slow/sd.img" ::/torii
+mcopy -i "$slow/sd.img" tests/shots/data/art-night.bin ::/Code.gba
+mcopy -i "$slow/sd.img" tests/shots/data/art-sunset.bin ::/Zed.gba
+mcopy -i "$slow/sd.img" "$cart/crc.txt" ::/torii/crc.txt
+# shellcheck disable=SC2046 # the CRC=file pairs
+python3 tools/artpack.py write "$slow/art.pak" $(for i in $(seq 1 1999); do printf '%08X=tests/shots/data/art-night.bin ' "$i"; done) \
+  "$crc=tests/shots/data/art-sunset.bin"
+slow_id=$(id 3 "$(python3 tools/artpack.py find "$slow/art.pak" "$crc")")
+mcopy -i "$slow/sd.img" "$slow/art.pak" ::/torii/art.pak
+# shellcheck disable=SC2046 # nav.sh's options
+OMEGA_SD_CYCLES=40000:8000 OMEGA_DIR=$slow emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_game gba 1) \
+  -w "box art: cover $slow_id shown" -f 4000 >"$slow/run.log" 2>&1 || true
+grep -q "^kernel: box art: cover $slow_id shown" "$slow/run.log" || fail "no cover from the pack with a slow card"
+! grep -q "listing step" "$slow/run.log" || fail "a slow listing step: $(grep 'listing step' "$slow/run.log" | head -2)"
+worst=$(sed -n 's/^kernel: frame-cycles: games-artlist \([0-9]*\)$/\1/p' "$slow/run.log" | sort -n | tail -1)
+[ "${worst:-0}" -le 280896 ] || fail "a listing frame of $worst cycles with a slow card"
+echo "PASS: a game with no art file gets its cover from the art pack, and a slow card's listing keeps to the frame"
 
 # A pack in pieces on the card: its covers load through the link map built
 # from its clusters (a few pieces), or, past what the map holds, by

@@ -37,13 +37,21 @@
 // before it steps (it reads the card, as the library walk does)
 #define LIST_STEP_CYCLES 40000
 #define LIST_KEY_REST 8
+#define LIST_STEP_LOG_CYCLES 140000  // a step this long is logged
+// A step that reads the card starts only this early in a frame: one card
+// command can take tens of thousands of cycles (more on a slow card), and a
+// step begun near the jobs' half-frame deadline ran the frame over
+#define LIST_START_BY (ENGINE_FRAME_CYCLES / 4)
 // Frames to wait before trying again when the listing's job can't start (all
 // job slots taken); the failure logs once
 #define LIST_RETRY_FRAMES 60
 #define CLEAR_CHUNK 0x1000  // bytes of the set cleared at a time
 #define USERDATA_PATH_MAX_ALIGNED ((USERDATA_PATH_MAX + 3) & ~3u)
-// The art pack's index: read this many bytes a step (as the cover loader)
-#define PACK_CHUNK 4096
+// The art pack's index: read this many bytes a step, to a file offset that is
+// a multiple of it, so each read is one card command of 4 sectors (the most
+// Read_SD_sectors asks for at once): 4 KB at the header's odd offset took
+// three, and a frame of 880,000 cycles on the cart
+#define PACK_CHUNK 2048
 // Clusters the link map walks a call: a seek each, some 3,000 cycles from
 // ROM, so the listing's LIST_STEP_CYCLES stays near its mark
 #define PACK_LINKS 4
@@ -207,8 +215,9 @@ static void pack_step(void)
 {
 	u32 bytes = B.pack_header.entries * ARTPACK_ENTRY_BYTES;
 	u32 n = bytes - B.pack_read;
-	if (n > PACK_CHUNK)
-		n = PACK_CHUNK;
+	u32 to_edge = PACK_CHUNK - (ARTPACK_HEADER_BYTES + B.pack_read) % PACK_CHUNK;
+	if (n > to_edge)
+		n = to_edge;
 	u8 *buf = stage_buffer();
 	UINT got = 0;
 	if (f_read(&B.f.pack, buf, n, &got) != FR_OK || got != n ||
@@ -403,14 +412,28 @@ static int list_job(struct job *job)
 	// The user's frames first, and the library's walk
 	if (library_walking() || ui_idle_frames() < LIST_KEY_REST || ui_transitioning() || ui_busy())
 		return JOB_WAIT;
+	// Late in the frame: the next one (jobs_run calls the job again while
+	// the frame has time, so JOB_MORE alone didn't give a step a frame)
+	if (frame_elapsed() > LIST_START_BY)
+		return JOB_WAIT;
 	frame_measure("games-artlist");  // the frames it reads the card in, for the cycle budget
 	psram_begin();
 	u32 start = cycles_now();
 	// The pack's open (a scan of /torii) starts a frame of its own, not
 	// the end of one the folders' listing filled
-	do
+	do {
+		u32 step = cycles_now();
+		u32 was = B.list;
 		list_step_one();
-	while (B.list != LIST_DONE && B.list != LIST_OPEN_PACK && cycles_since(start) < LIST_STEP_CYCLES);
+		u32 took = cycles_since(step);
+		// A step that alone takes half a frame is logged, by its phase
+		// (v0.8's cart had a frame of 880,000 cycles in the listing)
+		if (took > LIST_STEP_LOG_CYCLES)
+			tlog_debug("box art: listing step %lu took %lu cycles", (unsigned long)was,
+				   (unsigned long)took);
+	} while (B.list != LIST_DONE && B.list != LIST_OPEN_PACK && cycles_since(start) < LIST_STEP_CYCLES);
+	if (B.list == LIST_OPEN_PACK)
+		return JOB_WAIT;  // the next frame: jobs_run would call it again in this one
 	if (B.list != LIST_DONE)
 		return JOB_MORE;
 	tlog("box art: %lu files listed in %lu frames", (unsigned long)B.set.count,

@@ -42,6 +42,21 @@ void test_keypad_edit(void)
 	CHECK_EQ(e.line, 3);
 	CHECK_EQ(e.caret, 11);
 	CHECK(!strcmp(code_of(), "82001234 0063+32001000 0001+A9873144 203A53CE+02001000:63"));
+	// The digit count toward a whole line: CodeBreaker's 12, GameShark's 16,
+	// none for VBA's
+	u32 expect = 99;
+	CHECK_EQ(keypad_edit_digits(&e, 0, CHEAT_FMT_AUTO, &expect), 12);
+	CHECK_EQ(expect, 12);
+	CHECK_EQ(keypad_edit_digits(&e, 2, CHEAT_FMT_AUTO, &expect), 16);
+	CHECK_EQ(expect, 16);
+	CHECK_EQ(keypad_edit_digits(&e, 0, CHEAT_FMT_GSAV1, &expect), 12);
+	CHECK_EQ(expect, 16);
+	CHECK_EQ(keypad_edit_digits(&e, 2, CHEAT_FMT_CODEBREAKER, &expect), 16);
+	CHECK_EQ(expect, 12);
+	CHECK_EQ(keypad_edit_digits(&e, 3, CHEAT_FMT_AUTO, &expect), 11);
+	CHECK_EQ(expect, 0);
+	CHECK_EQ(keypad_edit_digits(&e, 9, CHEAT_FMT_AUTO, &expect), 0);
+	CHECK_EQ(expect, 0);
 	char shown[KEYPAD_LINE_MAX + 2];
 	u32 caret = 99;
 	CHECK_EQ(keypad_edit_show(&e, 0, shown, &caret), 13);
