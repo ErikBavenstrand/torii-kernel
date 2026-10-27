@@ -43,7 +43,7 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-import games as G  # noqa: E402
+import games as G
 
 LUA = "tests/state_trip.lua"
 K = 120
@@ -59,24 +59,60 @@ RUN2 = "autoload:d play:600 save:3:e play:300"
 RUN3 = "autoload:e play:300 load:e"
 
 
-def run(cart: Path, sd_name: str, steps: str, extra_env: dict, launch: list[str], frames: int):
+def run(
+    cart: Path,
+    sd_name: str,
+    steps: str,
+    extra_env: dict,
+    launch: list[str],
+    frames: int,
+):
     """One power-on with the trip script; (lines the script logged, frame -> screen hash, the log)."""
     # The clock stands still: a game reading it after the load reads what it
     # read after the save (the real clock runs on, as it should)
-    args = [G.SHOT, G.KERNEL, "-C", "1793109780", "-f", str(frames), "-L", LUA, "-u", "trip done|trip torii>nav: home ready"]
+    args = [
+        G.SHOT,
+        G.KERNEL,
+        "-C",
+        "1793109780",
+        "-f",
+        str(frames),
+        "-L",
+        LUA,
+        "-u",
+        "trip done|trip torii>nav: home ready",
+    ]
     args += launch + ["-H", f"1:{frames}"] + os.environ.get("TRIP_ARGS", "").split()
-    env = dict(os.environ, TZ="UTC", OMEGA_DIR=str(cart), OMEGA_TRACE="1", TRIP_STEPS=steps, TRIP_K=str(K), **extra_env)
-    p = subprocess.run(args, env=env, capture_output=True, text=True, errors="replace", check=False)
+    env = dict(
+        os.environ,
+        TZ="UTC",
+        OMEGA_DIR=str(cart),
+        OMEGA_TRACE="1",
+        TRIP_STEPS=steps,
+        TRIP_K=str(K),
+        **extra_env,
+    )
+    p = subprocess.run(
+        args, env=env, capture_output=True, text=True, errors="replace", check=False
+    )
     if p.returncode not in (0, 3):
         raise G.Failure(f"mgba-shot failed ({p.returncode}): {p.stderr.strip()[-300:]}")
     (cart / f"log-{len(list(cart.glob('log-*')))}.txt").write_text(p.stderr)
-    hashes = {int(f): h for f, h in re.findall(r"^hash frame (\d+): (\S+)", p.stdout, re.MULTILINE)}
+    hashes = {
+        int(f): h
+        for f, h in re.findall(r"^hash frame (\d+): (\S+)", p.stdout, re.MULTILINE)
+    }
     lines = re.findall(r"^script: trip (.*)$", p.stderr, re.MULTILINE)
     return lines, hashes, p.stderr
 
 
 def launch_hook(sd_name: str, action: int) -> list[str]:
-    return ["-P", f"200:nav_test_path:/{sd_name}", "-p", f"200:nav_test_action:{0x7E000000 | action}"]
+    return [
+        "-P",
+        f"200:nav_test_path:/{sd_name}",
+        "-p",
+        f"200:nav_test_action:{0x7E000000 | action}",
+    ]
 
 
 class Load:
@@ -89,7 +125,9 @@ class Load:
         self.memory: int | None = None
         self.where = ""
         self.screen_frames = 0
-        self.video: int | None = None  # the first frame VRAM, palette, OAM or a readable display register differ
+        self.video: int | None = (
+            None  # the first frame VRAM, palette, OAM or a readable display register differ
+        )
         self.replayed = False
 
     @property
@@ -125,7 +163,9 @@ class Load:
             return f"{self.name}: the replay didn't finish"
         parts = []
         if self.screen is not None:
-            parts.append(f"screen differs from {self.screen} frames after the load ({self.screen_frames} of {K})")
+            parts.append(
+                f"screen differs from {self.screen} frames after the load ({self.screen_frames} of {K})"
+            )
         if self.video is not None:
             parts.append(f"VRAM, palette, OAM or display registers from {self.video}")
         if self.memory is not None:
@@ -139,9 +179,13 @@ class Trips:
     def __init__(self) -> None:
         self.loads: list[Load] = []
         self.failed = ""  # a step that couldn't run
-        self.saved: dict[str, tuple[int, dict]] = {}  # name -> (frame, that run's hashes)
+        self.saved: dict[
+            str, tuple[int, dict]
+        ] = {}  # name -> (frame, that run's hashes)
         self.info: list[str] = []
-        self.mixed: list[tuple[str, int]] = []  # loads that showed the state under other registers
+        self.mixed: list[
+            tuple[str, int]
+        ] = []  # loads that showed the state under other registers
 
     @property
     def status(self) -> str:
@@ -162,7 +206,10 @@ class Trips:
     def detail(self) -> str:
         bad = [self.failed] if self.failed else []
         bad += [load.text() for load in self.loads if load.kind == "fail"]
-        bad += [f"{n}: {m} frames of the load showed its VRAM under other display registers" for n, m in self.mixed]
+        bad += [
+            f"{n}: {m} frames of the load showed its VRAM under other display registers"
+            for n, m in self.mixed
+        ]
         if bad and self.status == "fail":
             return "; ".join(bad)
         if bad:  # unhooked: what ran before
@@ -203,17 +250,22 @@ class Trips:
                     differ = [
                         j
                         for j in range(K)
-                        if s_at + j not in s_hashes or s_hashes.get(s_at + j) != hashes.get(at + j)
+                        if s_at + j not in s_hashes
+                        or s_hashes.get(s_at + j) != hashes.get(at + j)
                     ]
                     load.screen = differ[0] if differ else None
                     load.screen_frames = len(differ)
             elif kind == "mixed":
                 self.mixed.append((words[1], int(words[2])))
             elif kind == "vdiffers":
-                load = next(load for load in reversed(self.loads) if load.name == words[1])
+                load = next(
+                    load for load in reversed(self.loads) if load.name == words[1]
+                )
                 load.video = int(words[2][1:])
             elif kind in ("same", "differs"):
-                load = next(load for load in reversed(self.loads) if load.name == words[1])
+                load = next(
+                    load for load in reversed(self.loads) if load.name == words[1]
+                )
                 load.replayed = True
                 if kind == "differs":
                     load.memory = int(words[2][1:])
@@ -222,7 +274,9 @@ class Trips:
             self.failed = crash[0]
 
 
-def trip_cart(cart: Path, rom: Path, sd_name: str, save: Path | None, cheats: Path | None) -> None:
+def trip_cart(
+    cart: Path, rom: Path, sd_name: str, save: Path | None, cheats: Path | None
+) -> None:
     G.menu_cart(cart, rom, sd_name)
     # and the save copied at power-on without asking (tests/states.sh)
     nor = bytearray((cart / "kernel-nor.bin").read_bytes())
@@ -231,12 +285,23 @@ def trip_cart(cart: Path, rom: Path, sd_name: str, save: Path | None, cheats: Pa
     img = str(cart / "sd.img")
     if save:
         for folder in ("torii", "torii/saves", f"torii/saves/{sd_name}"):
-            subprocess.run(["mmd", "-i", img, f"::/{folder}"], check=False, capture_output=True)
+            subprocess.run(
+                ["mmd", "-i", img, f"::/{folder}"], check=False, capture_output=True
+            )
         G.mtools("mcopy", "-o", "-i", img, str(save), f"::/{G.save_path(sd_name)}")
     if cheats:
         for folder in ("torii", "torii/cheats"):
-            subprocess.run(["mmd", "-i", img, f"::/{folder}"], check=False, capture_output=True)
-        G.mtools("mcopy", "-o", "-i", img, str(cheats), f"::/torii/cheats/{sd_name.rsplit('.', 1)[0]}.cht")
+            subprocess.run(
+                ["mmd", "-i", img, f"::/{folder}"], check=False, capture_output=True
+            )
+        G.mtools(
+            "mcopy",
+            "-o",
+            "-i",
+            img,
+            str(cheats),
+            f"::/torii/cheats/{sd_name.rsplit('.', 1)[0]}.cht",
+        )
 
 
 def trips(
@@ -247,22 +312,26 @@ def trips(
     quick: bool = False,
     save: Path | None = None,
     cheats: Path | None = None,
+    run1: str = RUN1,
 ) -> Trips:
     t = Trips()
     trip_cart(cart, rom, sd_name, save, cheats)
     load_frames = 400 + (rom.stat().st_size >> 20) * 150
     records = cart / "trip-records.txt"
     env = {"TRIP_SEED": str(seed), "TRIP_OUT": str(records)}
-    steps = RUN1 if quick else RUN1 + " torii"
+    steps = run1 if quick else run1 + " torii"
     frames = load_frames + 16000 + (3000 if not quick else 0)
-    lines, hashes, log = run(cart, sd_name, steps, env, launch_hook(sd_name, G.HOOK_ADDON), frames)
+    lines, hashes, log = run(
+        cart, sd_name, steps, env, launch_hook(sd_name, G.HOOK_ADDON), frames
+    )
     t.take(lines, hashes, log)
     if quick or t.failed:
         return t
     if "states: /torii/states" not in log or "2.state" not in log:
-        t.failed = "Back to Torii didn't file slot 2: " + "; ".join(
-            line for line in log.splitlines() if "states:" in line
-        )[-300:]
+        t.failed = (
+            "Back to Torii didn't file slot 2: "
+            + "; ".join(line for line in log.splitlines() if "states:" in line)[-300:]
+        )
         return t
     for slot, steps, bufslot in ((2, RUN2 + " torii", 2), (3, RUN3, 3)):
         env = {
@@ -303,7 +372,7 @@ def refuse(rom: Path, other: Path, cart: Path) -> list[str]:
     rom_crc); with its format made newer; and made as v0.8.0 left one (no
     info, the IRQ vector at another launch's hook, no Supervisor registers),
     which must load as it was saved."""
-    import statefile  # noqa: PLC0415
+    import statefile
 
     bad = []
     sd_name = "Game.gba"
@@ -312,27 +381,61 @@ def refuse(rom: Path, other: Path, cart: Path) -> list[str]:
     records = cart / "trip-records.txt"
     env = {"TRIP_OUT": str(records)}
     steps = "play:300 save:2:d play:120 torii"
-    lines, _, log = run(cart, sd_name, steps, env, launch_hook(sd_name, G.HOOK_ADDON), 6000)
+    lines, _, log = run(
+        cart, sd_name, steps, env, launch_hook(sd_name, G.HOOK_ADDON), 6000
+    )
     if "2.state" not in log:
         return [f"slot 2 wasn't filed: {lines}"]
     state = cart / "2.state"
-    G.mtools("mcopy", "-o", "-i", img, "::/torii/states/Game.gba/Main/2.state", str(state))
+    G.mtools(
+        "mcopy", "-o", "-i", img, "::/torii/states/Game.gba/Main/2.state", str(state)
+    )
     raw = bytearray(statefile.unpack(str(state)))
     # every launch's patch area is at the same place: the info's hook
     hook = int.from_bytes(raw[INFO + 20 : INFO + 24], "little")
 
     def refused(path: str, why: str, case: str) -> None:
         # The question the launch asks, B: not started
-        extra = ["-w", "screen ready: dialog", "-k", "@12:B", "-k", "@16:-", "-u", "not started"]
-        _, _, log = run(cart, path, "", {}, launch_hook(path, NAV_TEST_STATE | 2 << 8) + extra, 4000)
-        if f"is {why}" not in log or "not started" not in log or "launch: starting the game" in log:
-            found = [line for line in log.splitlines() if "states:" in line or "launch:" in line]
+        extra = [
+            "-w",
+            "screen ready: dialog",
+            "-k",
+            "@12:B",
+            "-k",
+            "@16:-",
+            "-u",
+            "not started",
+        ]
+        _, _, log = run(
+            cart, path, "", {}, launch_hook(path, NAV_TEST_STATE | 2 << 8) + extra, 4000
+        )
+        if (
+            f"is {why}" not in log
+            or "not started" not in log
+            or "launch: starting the game" in log
+        ):
+            found = [
+                line
+                for line in log.splitlines()
+                if "states:" in line or "launch:" in line
+            ]
             bad.append(f"{case}: not refused as {why}: {found[-3:]}")
 
     def put(data: bytes) -> None:
         state.write_bytes(data)
-        G.mtools("mcopy", "-o", "-i", img, str(state), "::/torii/states/Game.gba/Main/2.state")
-        subprocess.run(["mdel", "-i", img, "::/torii/states/Game.gba/Main/2.state.bak"], capture_output=True)
+        G.mtools(
+            "mcopy",
+            "-o",
+            "-i",
+            img,
+            str(state),
+            "::/torii/states/Game.gba/Main/2.state",
+        )
+        subprocess.run(
+            ["mdel", "-i", img, "::/torii/states/Game.gba/Main/2.state.bak"],
+            capture_output=True,
+            check=False,
+        )
 
     original = state.read_bytes()
     # Another ROM at the game's path: its rom_crc is the same, its header not
@@ -342,8 +445,12 @@ def refuse(rom: Path, other: Path, cart: Path) -> list[str]:
     # The same ROM at another path, the state copied to that path's folder
     G.mtools("mcopy", "-o", "-i", img, str(rom), "::/Copy.gba")
     for folder in ("torii/states/Copy.gba", "torii/states/Copy.gba/Main"):
-        subprocess.run(["mmd", "-i", img, f"::/{folder}"], capture_output=True)
-    G.mtools("mcopy", "-o", "-i", img, str(state), "::/torii/states/Copy.gba/Main/2.state")
+        subprocess.run(
+            ["mmd", "-i", img, f"::/{folder}"], capture_output=True, check=False
+        )
+    G.mtools(
+        "mcopy", "-o", "-i", img, str(state), "::/torii/states/Copy.gba/Main/2.state"
+    )
     refused("Copy.gba", "another game's", "another path's state")
     # A newer format
     newer = bytearray(raw)
@@ -354,7 +461,9 @@ def refuse(rom: Path, other: Path, cart: Path) -> list[str]:
     old = bytearray(raw)
     old[INFO : INFO + 4] = bytes(4)
     old[VECTOR : VECTOR + 4] = (hook - 0x2000).to_bytes(4, "little")
-    old[SPEND + 0x60 : SPEND + 0x64] = (0x31564F54).to_bytes(4, "little")  # the overlay's header
+    old[SPEND + 0x60 : SPEND + 0x64] = (0x31564F54).to_bytes(
+        4, "little"
+    )  # the overlay's header
     put(statefile.pack(str(state), bytes(old)))
     lines, _, log = run(
         cart,
@@ -372,13 +481,19 @@ def refuse(rom: Path, other: Path, cart: Path) -> list[str]:
 
 def main() -> int:
     argv = sys.argv[1:]
-    seed, quick, save, cheats, roms = 1, False, None, None, []
+    seed, quick, save, cheats, roms, run1 = 1, False, None, None, [], RUN1
     while argv:
         a = argv.pop(0)
         if a == "--refuse":
             other = Path(argv.pop(0))
             rom = Path(argv.pop(0))
-            cart = Path(os.environ.get("TRIP_CARTS") or Path(tempfile.gettempdir()) / "torii-trips") / "refuse"
+            cart = (
+                Path(
+                    os.environ.get("TRIP_CARTS")
+                    or Path(tempfile.gettempdir()) / "torii-trips"
+                )
+                / "refuse"
+            )
             shutil.rmtree(cart, ignore_errors=True)
             bad = refuse(rom, other, cart)
             for b in bad:
@@ -397,19 +512,24 @@ def main() -> int:
         elif a == "--save":
             save = Path(argv.pop(0))
         elif a == "--steps":
-            global RUN1
-            RUN1 = argv.pop(0)
+            run1 = argv.pop(0)
         elif a == "--cheats":
             cheats = Path(argv.pop(0))
         else:
             roms.append(Path(a))
     failed = 0
     for rom in roms:
-        cart = Path(os.environ.get("TRIP_CARTS") or Path(tempfile.gettempdir()) / "torii-trips") / re.sub(r"[^A-Za-z0-9]", "", rom.stem)[:20]
+        cart = (
+            Path(
+                os.environ.get("TRIP_CARTS")
+                or Path(tempfile.gettempdir()) / "torii-trips"
+            )
+            / re.sub(r"[^A-Za-z0-9]", "", rom.stem)[:20]
+        )
         shutil.rmtree(cart, ignore_errors=True)
         sd_name = "Game." + rom.suffix.lstrip(".")
         try:
-            t = trips(rom, sd_name, cart, seed, quick, save, cheats)
+            t = trips(rom, sd_name, cart, seed, quick, save, cheats, run1)
         except G.Failure as e:
             print(f"FAIL: state trips {rom.name}: {e}")
             failed += 1
@@ -418,7 +538,9 @@ def main() -> int:
             for line in t.info:
                 print(f"  {line}")
         if t.status != "fail":
-            print(f"{'PASS' if t.status == 'pass' else 'SKIP'}: state trips {rom.name}: {t.detail()}")
+            print(
+                f"{'PASS' if t.status == 'pass' else 'SKIP'}: state trips {rom.name}: {t.detail()}"
+            )
             if not os.environ.get("TRIP_KEEP"):
                 shutil.rmtree(cart, ignore_errors=True)
         else:

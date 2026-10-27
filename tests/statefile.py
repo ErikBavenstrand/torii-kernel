@@ -17,6 +17,7 @@ kernel reads whole, whatever it holds (tests/state_trips.sh).
 import struct
 import sys
 import zlib
+from pathlib import Path
 
 HEAD = 64
 CHUNK = 0x8000
@@ -57,7 +58,7 @@ def lz77_literal(data: bytes) -> bytes:
 
 
 def unpack(path: str) -> bytes:
-    data = open(path, "rb").read()
+    data = Path(path).read_bytes()
     raw = bytearray()
     pos = HEAD
     while pos < len(data):
@@ -68,7 +69,7 @@ def unpack(path: str) -> bytes:
 
 
 def pack(head_from: str, raw: bytes) -> bytes:
-    head = bytearray(open(head_from, "rb").read()[:HEAD])
+    head = bytearray(Path(head_from).read_bytes()[:HEAD])
     data = bytearray()
     for at in range(0, len(raw), CHUNK):
         part = lz77_literal(raw[at : at + CHUNK])
@@ -80,13 +81,13 @@ def pack(head_from: str, raw: bytes) -> bytes:
 
 def main() -> int:
     if len(sys.argv) >= 4 and sys.argv[1] == "unpack":
-        open(sys.argv[3], "wb").write(unpack(sys.argv[2]))
+        Path(sys.argv[3]).write_bytes(unpack(sys.argv[2]))
     elif len(sys.argv) >= 5 and sys.argv[1] == "pack":
-        raw = bytearray(open(sys.argv[3], "rb").read())
+        raw = bytearray(Path(sys.argv[3]).read_bytes())
         for patch in sys.argv[5:]:
             offset, word = patch.split("=")
             struct.pack_into("<I", raw, int(offset, 16), int(word, 16))
-        open(sys.argv[4], "wb").write(pack(sys.argv[2], bytes(raw)))
+        Path(sys.argv[4]).write_bytes(pack(sys.argv[2], bytes(raw)))
     else:
         print(__doc__)
         return 1

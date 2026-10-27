@@ -107,7 +107,15 @@ KERNEL_SAVE = {
     0x32: "flash64k",
     0x33: "flash64k",
 }
-CHECKS = ["boots", "save type", "clock", "save cycle", "in-game menu", "save state", "state trips"]
+CHECKS = [
+    "boots",
+    "save type",
+    "clock",
+    "save cycle",
+    "in-game menu",
+    "save state",
+    "state trips",
+]
 # Launches go as the menu's pages will run them, through actions.c and the
 # menu's test hook (source/screens/nav.h, tests/nav.sh): a "hook" key pokes
 # the game's path and the action (1 CLEAN BOOT, 2 BOOT WITH ADDON), which
@@ -712,16 +720,22 @@ def cheat_file(rom: Path, cart: Path) -> Path | None:
         return None
     lines = [f"cheats = {len(mine)}"]
     for i, c in enumerate(mine):
-        lines += [f'cheat{i}_desc = "{c["desc"]}"', f'cheat{i}_code = "{c["code"]}"', f"cheat{i}_enable = true"]
+        lines += [
+            f'cheat{i}_desc = "{c["desc"]}"',
+            f'cheat{i}_code = "{c["code"]}"',
+            f"cheat{i}_enable = true",
+        ]
     cart.parent.mkdir(parents=True, exist_ok=True)
     path = cart.parent / f"{cart.name}.cht"
     path.write_text("\n".join(lines) + "\n")
     return path
 
 
-def check_trips(result: Result, rom: Path, sd_name: str, start_save: Path | None) -> None:
+def check_trips(
+    result: Result, rom: Path, sd_name: str, start_save: Path | None
+) -> None:
     """Save states across scenes (tests/state_trips.py)."""
-    import state_trips  # noqa: PLC0415 - it imports this file
+    import state_trips
 
     cart = CARTS / f"{key_of(result.game)}-trips"
     cheats = cheat_file(rom, cart)
@@ -729,7 +743,9 @@ def check_trips(result: Result, rom: Path, sd_name: str, start_save: Path | None
     result.metrics["state trips"] = "; ".join(t.info)
     result.metrics["state loads"] = t.counts()
     if cheats:
-        result.notes.append("state trips with its cheats from tests/cheat_codes.toml on")
+        result.notes.append(
+            "state trips with its cheats from tests/cheat_codes.toml on"
+        )
     result.set("state trips", t.status, t.detail())
 
 
@@ -788,7 +804,11 @@ def run_game(result: Result, roms: dict, saves: dict, table: dict) -> None:
         if menu == "pass":
             check_trips(result, rom, sd_name, start_save)
         else:
-            result.set("state trips", "n/a" if menu == "n/a" else "fail", f"the in-game menu: {why}")
+            result.set(
+                "state trips",
+                "n/a" if menu == "n/a" else "fail",
+                f"the in-game menu: {why}",
+            )
     else:
         result.set("in-game menu", "n/a")
         result.set("save state", "n/a")
