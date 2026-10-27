@@ -146,7 +146,9 @@ autoload_entry:
 	ldr		r11,[r11]
 	bl		state_flag_ok
 	beq		state_load_go
-	msr		cpsr_c,#0x1F			@;no state: System mode again
+	mov		r10,#0				@;no state: the registers as SoftReset left them,
+	mov		r11,#0
+	msr		cpsr_c,#0x1F			@;System mode again
 autoload_none:
 	mov		r0,#0
 	bl		SetRampage
@@ -1272,19 +1274,20 @@ register_list_end:
 	mov 	r0,#0x4000000
 	adrl	r12, spend_0x80
 	ldr		r12,[r12]
-	@;The DMA channels the game had repeating on a timing (its sound's
-	@;FIFO DMA, HBlank and VBlank effects) on again as SAVE found them
-	@;(SP_DMA); their addresses, which no read gives, the game's last. Off,
-	@;the game ran without the sound DMA's stolen cycles until it re-armed
-	@;it, and its frames went otherwise than after SAVE (Fire Emblem)
-	add		r3,r12,#SP_DMA
-	add		r2,r0,#REG_DM0CNT_H
-	mov		r11,#4				@;the ldmia below sets it
+	@;The sound's FIFO DMA (DMA1 and DMA2 repeating on the FIFO's timing)
+	@;on again as SAVE found it (SP_DMA), to the FIFO the game last set.
+	@;Off, the game ran without its stolen cycles until it re-armed it,
+	@;and its frames went otherwise than after SAVE (Advance Wars 2). Not
+	@;the HBlank and VBlank channels: their count and addresses, which no
+	@;read gives, may be another scene's, or the boot's at a launch into a
+	@;state (a count of 0 is the most a channel moves)
+	add		r3,r12,#SP_DMA+2
+	add		r2,r0,#REG_DM0CNT_H+0xC
+	mov		r11,#2				@;the ldmia below sets it
 1:	ldrh	r1,[r3],#2
-	tst		r1,#0x8000
-	tstne	r1,#0x200
-	tstne	r1,#0x3000
-	strneh	r1,[r2]
+	and		r4,r1,#0xB200		@;enable, repeat, timing 3
+	cmp		r4,#0xB200
+	streqh	r1,[r2]
 	add		r2,r2,#0xC
 	subs	r11,r11,#1
 	bne		1b
@@ -1362,7 +1365,7 @@ register_list:
 	.hword 0x0080,0x0082,0x0088                 @;0x008C,0x008E,
 	.hword 0x0090,0x0092,0x0094,0x0096,0x0098,0x009A,0x009C,0x009E
 
-	.hword 0x00B8,0x00C4,0x00D0,0x00DC  @;DMA
+	@;(not DMA0-3CNT_L: write-only, they read 0, the most a channel moves)
 	.hword 0x0120,0x0122,0x0124,0x0126,0x0128,0x012A,0x012C,0x0132,0x0134
 	.hword 0x0102,0x0106,0x010A,0x010E
 	.hword 0x0140,0x0150,0x0154,0x0200,0x0204,0x0208,0xFF00

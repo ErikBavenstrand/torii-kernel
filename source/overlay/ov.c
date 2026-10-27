@@ -1127,7 +1127,8 @@ static void states_load(void)
 	int game = info.magic != INGAME_STATE_INFO_MAGIC ||
 		   (info.format <= INGAME_STATE_FORMAT && info.code[0] == now.code[0] && info.code[1] == now.code[1] &&
 		    info.code[2] == now.code[2] && info.code[3] == now.code[3] && info.version == now.version &&
-		    info.check == now.check && info.rom_bytes == now.rom_bytes);
+		    info.check == now.check && info.bytes == sizeof(info) &&
+		    (!now.rom_bytes || info.rom_bytes == now.rom_bytes));  // as statestore.c's buffer_whose
 	if (state_saved() && tag.magic == INGAME_STATE_TAG_MAGIC && tag.slot >= 1 && tag.slot <= INGAME_STATE_SLOTS &&
 	    tag.rom_crc == s->rom_crc && game) {
 		m.buffer_slot = tag.slot;
