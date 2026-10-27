@@ -1601,7 +1601,13 @@ int main(void)
 	game_total_NOR = GetFileListFromNor();//initialize to prevent direct writes to NOR without page turning
 	Migrate_NOR_list(game_total_NOR);
 	action_rename_recover();  // a rename the power cut short, before anything reads the card's games
-	library_boot();  // the index, or the first scan
+	if (library_boot()) {  // the index, or the first scan
+		// The card mounted but doesn't read (left unanswering, as a game
+		// mode SD access leaves it): an empty list would only mislead
+		Show_boot_notice(gl_init_error, gl_power_off, DIALOG_ERROR);
+		while (1)
+			ui_frame();
+	}
 	Boot_notice_check();
 	tlog_debug("boot: handing over %lu frames after mounting", (unsigned long)(torii_frames - boot_mounted));
 	dialog_hand_over();  // a notice fades out; the menu runs in this session

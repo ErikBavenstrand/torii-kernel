@@ -13,6 +13,7 @@
 
 struct diskstat {
 	u32 reads, read_sectors;
+	u32 read_errors;  // reads the card didn't answer
 	u32 cache_hits;  // single-sector reads the cache answered (sdcache.h)
 	u32 writes, write_sectors;
 	u32 cycles;  // cycles_now() at diskstat_start

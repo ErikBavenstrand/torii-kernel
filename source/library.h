@@ -298,8 +298,11 @@ int lib_rename_shown(u8 *slot, lib_put_fn put, u32 rec, const char *new_name, co
 // library_before_launch first; the menu loads the index again afterwards.
 
 // The boot, once the card is mounted: the index from the card, or the first
-// scan. Runs dialogs (dialog.h) only if the scan is slow.
-void library_boot(void);
+// scan. Runs dialogs (dialog.h) only if the scan is slow. Returns 1 when
+// it ends with no library and the card failed reads meanwhile (a card left
+// unanswering, as the in-game probe's SD test left it): the menu would
+// show an empty list, so the boot says the card can't be read instead.
+int library_boot(void);
 // Each pass of the menu's loop: starts the job when there is work.
 void library_poll(void);
 // Loads the index a launch dropped (or finishes loading it) at once, unless

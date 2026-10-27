@@ -129,22 +129,20 @@ that never changes is not a refusal: report it as a hang.
 **The in-game probe** tries, in game mode, what v0.8's in-game menu may
 want there and the emulator can't tell: cart SRAM pages 0x20-0xEF, the RAM
 page register's readback, a flash 128K save's bank across page changes, a
-write to the game's PSRAM, SD reads and a write (to its own scratch file,
-`/torii/probe/sd.bin`, put back after), the clock with `0x096A0000` on and
-off, and SRAM's four wait-state settings. It puts back what it writes. Send
+write to the game's PSRAM, the clock with `0x096A0000` on and off, and
+SRAM's four wait-state settings (its SD test is retired: on the real cart it
+wedged the card until a power cycle, so the report says "not run"). It puts back what it writes. Send
 the log's "in-game probe:" lines from each save type's run: they decide what
 the in-game menu's save states and screenshots can rely on (they use cart
 SRAM 0x40000-0xD8FFF in game mode, which only the emulator has shown so far).
 
 The probe runs the cart tests by itself, saves its report and shows page
-1/2 (CART); the SD test runs only on A there, last, as on v0.8's first run
-the kernel's next boot said "microSD card error" every time. B skips it, so
-the B run tells whether the SD test is what breaks the card. After that,
-page 2/2 (SD CARD) shows; LEFT/RIGHT switch pages. Photograph both pages:
+1/2 (CART); LEFT/RIGHT switch to page 2/2 (PAGE 20). Photograph both pages:
 they are the report even if the log never gets it. Then press A, the soft
 reset back to the kernel: the report waits in cart RAM page 0xF0, which a
-power-off clears. If the kernel then says "microSD card error" (it retries
-three times first), note it, and only then switch off and on: the probe also
+power-off clears. If the kernel then says "Can't read the microSD card"
+(it retries the mount three times first), note it, and only then switch off
+and on: the probe also
 keeps the report in its own save (SRAM and flash save types; the screen's
 SAVED line says whether), so the next boot still logs it ("the report from
 its save"), with how the run ended. Send the photos and the lines.

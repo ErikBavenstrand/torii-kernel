@@ -419,6 +419,7 @@ static void report_ingame_probe(void)
 		"the kernel's bytes didn't read back after",
 		"not run (the probe stopped in it, or the cart was off before A or B)",
 		"skipped (B)",
+		"not run: SD access in game mode wedges the card (retired 2026-10-27)",
 	};
 	static const char *const saved[] = {"didn't read back", "byte writes (SRAM)", "flash commands"};
 	struct ingame_probe *p = &block.ingame;
@@ -478,11 +479,15 @@ static void report_ingame_probe(void)
 	tlog_force(TLOG_INFO, "in-game probe: PSRAM 0x08010000 read %04X, %04X after writing A55A, %04X put back (%s)",
 		   p->psram_before, p->psram_written, p->psram_after,
 		   p->psram_written == 0xA55A ? "PSRAM writes land" : "PSRAM writes don't land");
-	tlog_force(TLOG_INFO, "in-game probe: SD sector 0 %s; scratch sector %lu: %s",
-		   p->sd_scratch >= INGAME_PROBE_SD_PENDING ? "not read"
-		   : p->sd_mbr                              ? "read with its signature"
-							    : "didn't read",
-		   (unsigned long)p->scratch_lba, p->sd_scratch < sizeof(sd) / sizeof(*sd) ? sd[p->sd_scratch] : "?");
+	if (p->sd_scratch == INGAME_PROBE_SD_NOT_RUN)
+		tlog_force(TLOG_INFO, "in-game probe: SD access: %s", sd[p->sd_scratch]);
+	else
+		tlog_force(TLOG_INFO, "in-game probe: SD sector 0 %s; scratch sector %lu: %s",
+			   p->sd_scratch >= INGAME_PROBE_SD_PENDING ? "not read"
+			   : p->sd_mbr                              ? "read with its signature"
+								    : "didn't read",
+			   (unsigned long)p->scratch_lba,
+			   p->sd_scratch < sizeof(sd) / sizeof(*sd) ? sd[p->sd_scratch] : "?");
 	tlog_force(TLOG_INFO,
 		   "in-game probe: page 0x20: %u of %u bytes didn't read back (byte writes at 8 cycles); with the "
 		   "flash bank switched it read %02X in bank 1, %02X in bank 0 (%s)",

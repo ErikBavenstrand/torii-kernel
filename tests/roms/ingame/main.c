@@ -6,13 +6,13 @@
 // Launch it CLEAN BOOT, once for each save type to try (SAVE TYPE in the
 // game's popup; flash 128K's bank test means something only with a save
 // whose two banks differ). It runs the cart tests by itself, saves the
-// report (page 0xF0 and its own save) and shows it; then A tries the SD
-// card, last, as it may leave the card unreadable, and B skips that. The
-// results show on two pages (LEFT and RIGHT) to photograph; A goes back to
-// the kernel. Page 0x20 is also tried as the in-game menu uses it: 24 KB
-// byte by byte at 8 wait cycles, and with the flash bank switched. What it
-// writes it puts back: cart SRAM pages 0x20 on, the
-// PSRAM halfword, and the kernel's scratch sector (INGAME_PROBE_FILE).
+// report (page 0xF0 and its own save) and shows it. The results show on two
+// pages (LEFT and RIGHT) to photograph; A goes back to the kernel. Page 0x20
+// is also tried as the in-game menu uses it: 24 KB byte by byte at 8 wait
+// cycles, and with the flash bank switched. What it writes it puts back:
+// cart SRAM pages 0x20 on and the PSRAM halfword. The SD test is retired:
+// on the real cart (2026-10-27) sector 0 didn't read in game mode and the
+// card stayed unusable until a power cycle; the report says "not run".
 #include <stdint.h>
 
 #include "../../../source/cartlog.h"
@@ -26,7 +26,6 @@
 #define REG_WAITCNT REG16(0x04000204)
 #define SCREEN ((volatile uint16_t *)0x06000000)
 #define CART_RAM ((volatile uint8_t *)0x0E000000)
-#define SD_BUFFER ((volatile uint16_t *)0x09E00000)
 #define RTC_DATA REG16(0x080000C4)
 #define RTC_RW REG16(0x080000C6)
 #define RTC_ENABLE REG16(0x080000C8)
@@ -40,7 +39,7 @@
 
 #define REPORT_OFFSET (CARTLOG_INGAME_PROBE - 0x0E000000)
 
-// Runs from IWRAM: SD mode hides the ROM, and the PSRAM test writes it
+// Runs from IWRAM: the PSRAM test writes the ROM
 #define IWRAM_FN __attribute__((section(".iwram"), long_call, noinline, target("arm")))
 
 // A cart register, behind its unlock sequence (source/Ezcard_OP.c), at the
@@ -251,125 +250,6 @@ IWRAM_FN static void test_psram(void)
 	report.psram_after = PSRAM_TEST;
 }
 
-// --- SD (source/Ezcard_OP.c's, from IWRAM) -------------------------------------
-
-static uint16_t sd_buf[INGAME_PROBE_SECTOR / 2];
-
-IWRAM_FN static int sd_wait(void)
-{
-	for (uint32_t n = 0; n < 0x100000; n++)
-		if (SD_BUFFER[0] != 0xEEE1)
-			return 0;
-	return 1;
-}
-
-IWRAM_FN static void sd_command(uint32_t lba, uint16_t count)
-{
-	REG_WAITCNT = 0;
-	REG16(0x09FE0000) = 0xD200;
-	REG16(0x08000000) = 0x1500;
-	REG16(0x08020000) = 0xD200;
-	REG16(0x08040000) = 0x1500;
-	REG16(0x09600000) = (uint16_t)lba;
-	REG16(0x09620000) = (uint16_t)(lba >> 16);
-	REG16(0x09640000) = count;
-	REG16(0x09FC0000) = 0x1500;
-}
-
-IWRAM_FN static void sd_control(uint16_t value)
-{
-	REG_WAITCNT = 0;
-	REG16(0x09FE0000) = 0xD200;
-	REG16(0x08000000) = 0x1500;
-	REG16(0x08020000) = 0xD200;
-	REG16(0x08040000) = 0x1500;
-	REG16(0x09400000) = value;
-	REG16(0x09FC0000) = 0x1500;
-}
-
-// One sector into sd_buf; 0, or 1 if the card didn't answer
-IWRAM_FN static int sd_read(uint32_t lba)
-{
-	uint16_t waitcnt = REG_WAITCNT;
-	sd_control(1);
-	sd_command(lba, 1);
-	sd_control(3);
-	int bad = sd_wait();
-	sd_control(1);
-	if (!bad)
-		for (int i = 0; i < INGAME_PROBE_SECTOR / 2; i++)
-			sd_buf[i] = SD_BUFFER[i];
-	sd_control(0);
-	REG_WAITCNT = waitcnt;
-	return bad;
-}
-
-// sd_buf to one sector; 0, or 1 if the card didn't answer
-IWRAM_FN static int sd_write(uint32_t lba)
-{
-	uint16_t waitcnt = REG_WAITCNT;
-	sd_control(1);
-	sd_control(3);
-	for (int i = 0; i < INGAME_PROBE_SECTOR / 2; i++)
-		SD_BUFFER[i] = sd_buf[i];
-	sd_command(lba, 0x8001);
-	int bad = sd_wait();
-	for (volatile int d = 0; d < 30000; d++)  // as Write_SD_sectors' settle
-		;
-	sd_control(0);
-	REG_WAITCNT = waitcnt;
-	return bad;
-}
-
-static int sd_holds(uint32_t seed)
-{
-	const uint8_t *b = (const uint8_t *)sd_buf;
-	for (uint32_t i = 0; i < INGAME_PROBE_SECTOR; i++)
-		if (b[i] != ingame_probe_byte(i, seed))
-			return 0;
-	return 1;
-}
-
-static void sd_fill(uint32_t seed)
-{
-	uint8_t *b = (uint8_t *)sd_buf;
-	for (uint32_t i = 0; i < INGAME_PROBE_SECTOR; i++)
-		b[i] = ingame_probe_byte(i, seed);
-}
-
-static void test_sd(void)
-{
-	if (!sd_read(0))
-		report.sd_mbr = ((const uint8_t *)sd_buf)[510] == 0x55 && ((const uint8_t *)sd_buf)[511] == 0xAA;
-	uint32_t lba = report.scratch_lba;
-	if (!lba || report.scratch_check != INGAME_PROBE_CHECK(lba)) {  // not prepared for this launch
-		report.sd_scratch = INGAME_PROBE_SD_UNTRIED;
-		return;
-	}
-	if (sd_read(lba)) {
-		report.sd_scratch = INGAME_PROBE_SD_READ_FAILED;
-		return;
-	}
-	if (!sd_holds(INGAME_PROBE_SEED_KERNEL)) {
-		report.sd_scratch = INGAME_PROBE_SD_NOT_KERNELS;
-		return;
-	}
-	sd_fill(INGAME_PROBE_SEED_PROBE);
-	if (sd_write(lba)) {
-		report.sd_scratch = INGAME_PROBE_SD_WRITE_FAILED;
-		return;
-	}
-	if (sd_read(lba) || !sd_holds(INGAME_PROBE_SEED_PROBE))
-		report.sd_scratch = INGAME_PROBE_SD_WRITE_LOST;
-	sd_fill(INGAME_PROBE_SEED_KERNEL);
-	if (sd_write(lba) || sd_read(lba) || !sd_holds(INGAME_PROBE_SEED_KERNEL)) {
-		report.sd_scratch = INGAME_PROBE_SD_RESTORE_LOST;
-		return;
-	}
-	if (!report.sd_scratch)
-		report.sd_scratch = INGAME_PROBE_SD_OK;
-}
-
 // --- The clock (source/RTC.c's serial protocol) --------------------------------
 
 static void rtc_cmd(int v)
@@ -446,18 +326,6 @@ static int put_report(volatile uint8_t *p)
 	for (unsigned i = 0; i < 16; i++)
 		p[i] = (uint8_t)INGAME_PROBE_MAGIC[i];
 	return report_at(p);
-}
-
-// The kernel's scratch sector and its check, from the report's place
-static void scratch_lba(void)
-{
-	uint32_t in[2] = {0, 0};
-	ram_page(CARTLOG_PAGE);
-	for (int i = 0; i < 8; i++)
-		in[i / 4] |= (uint32_t)CART_RAM[REPORT_OFFSET + 16 + i] << (8 * (i % 4));
-	ram_page(0);
-	report.scratch_lba = in[0];
-	report.scratch_check = in[1];
 }
 
 // --- The report's copy in the probe's own save -----------------------------------
@@ -586,18 +454,6 @@ static void clock_line(const char *what, const uint8_t *t)
 		}
 }
 
-static const char *const sd_words[] = {
-	"NOT TRIED: NO SECTOR GIVEN",
-	"OK, KERNELS BYTES PUT BACK",
-	"A READ DIDNT ANSWER",
-	"NOT THE KERNELS BYTES",
-	"A WRITE DIDNT ANSWER",
-	"WRITE DIDNT READ BACK",
-	"PUT BACK DIDNT READ BACK",
-	"NOT RUN YET",
-	"SKIPPED (B)",
-};
-
 static void results(void)
 {
 	char *l;
@@ -620,16 +476,8 @@ static void results(void)
 	       : report.saved == INGAME_PROBE_SAVED_FLASH ? "OK (FLASH)"
 							  : "NO");
 	at_line = 0;
-	l = line(1), put(l, "SD SECTOR 0: ");
-	put(l, report.sd_scratch >= INGAME_PROBE_SD_PENDING ? "-" : report.sd_mbr ? "READ, 55AA" : "DIDNT READ");
-	l = line(1), put(l, "SCRATCH SECTOR: ");
-	if (report.scratch_lba && report.scratch_check == INGAME_PROBE_CHECK(report.scratch_lba))
-		dec(l, report.scratch_lba);
-	else
-		put(l, "NONE");
-	l = line(1), put(l, "SD WRITE TEST:");
-	l = line(1), put(l, " "),
-	put(l, report.sd_scratch < sizeof(sd_words) / sizeof(*sd_words) ? sd_words[report.sd_scratch] : "?");
+	l = line(1), put(l, "SD: NOT RUN (IT WEDGES THE");
+	l = line(1), put(l, " CARD IN GAME MODE)");
 	l = line(1), put(l, "PAGE 20 BULK BAD: "), dec(l, report.bulk_bad), put(l, "/"), dec(l, INGAME_PROBE_BULK);
 	l = line(1), put(l, "PAGE 20 BANK 1,0: "), hex(l, report.bank_page_b1, 2), put(l, " "),
 	hex(l, report.bank_page_b0, 2);
@@ -640,7 +488,7 @@ static void results(void)
 static void show(int page, const char *const keys[3])
 {
 	clear();
-	text(4, 2, RGB(31, 31, 8), page ? "IN-GAME PROBE 2/2: SD, PAGE 20" : "IN-GAME PROBE 1/2: CART");
+	text(4, 2, RGB(31, 31, 8), page ? "IN-GAME PROBE 2/2: PAGE 20" : "IN-GAME PROBE 1/2: CART");
 	for (int i = 0; i < LINES; i++)
 		text(4, 16 + i * 11, RGB(31, 31, 31), lines[page][i]);
 	for (int i = 0; i < 3; i++)
@@ -665,7 +513,6 @@ int main(void)
 	clear();
 	text(8, 8, RGB(31, 31, 8), "TORII IN-GAME PROBE");
 	text(8, 32, RGB(31, 31, 31), "TRYING THE CART IN GAME MODE.");
-	scratch_lba();
 	test_pages();
 	test_waits();
 	test_bulk();
@@ -673,27 +520,12 @@ int main(void)
 	test_bank_page();
 	test_psram();
 	test_rtc();
-	// Saved and shown before the SD test, the one that may leave the card
-	// unreadable (or hang): what came before is safe whatever it does
-	report.sd_scratch = INGAME_PROBE_SD_PENDING;
-	save_report();
-	results();
-	static const char *const ask[3] = {"A: TRY THE SD CARD (LAST)", "B: SKIP THE SD CARD",
-					   "DONT SWITCH OFF: A OR B"};
-	show(0, ask);
-	if (wait_key(KEY_A | KEY_B) == KEY_A) {
-		clear();
-		text(8, 8, RGB(31, 31, 8), "TRYING THE SD CARD...");
-		report.sd_scratch = INGAME_PROBE_SD_UNTRIED;
-		test_sd();
-	} else {
-		report.sd_scratch = INGAME_PROBE_SD_SKIPPED;
-	}
+	report.sd_scratch = INGAME_PROBE_SD_NOT_RUN;
 	save_report();
 	results();
 	static const char *const done[3] = {"LEFT/RIGHT: THE OTHER PAGE", "A: BACK TO THE KERNEL",
 					    "DONT SWITCH OFF: PRESS A"};
-	int page = 1;
+	int page = 0;
 	for (;;) {
 		show(page, done);
 		uint16_t k = wait_key(KEY_A | KEY_LEFT | KEY_RIGHT);

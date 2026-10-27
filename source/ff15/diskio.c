@@ -156,6 +156,7 @@ DRESULT disk_read (
 	diskstat_total.reads++;
 	diskstat_total.read_sectors += count;
 	if (Read_SD_sectors(sector, count, buff)) {
+		diskstat_total.read_errors++;
 		tlog_error("sd: read of %lu sectors at %lu failed", (unsigned long)count, (unsigned long)sector);
 		return RES_ERROR;
 	}

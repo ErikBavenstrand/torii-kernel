@@ -2,8 +2,8 @@
 // The probe ROM (tests/roms/ingame) runs in game mode, where the in-game
 // menu runs, and tries what the menu may want there but no one has proven on
 // the real cart: cart SRAM pages 0x20-0xEF, the RAM page register's
-// readback, a flash 128K save's bank across page changes, a PSRAM write, SD
-// reads and writes, the clock through 0x096A0000, and SRAM's wait states.
+// readback, a flash 128K save's bank across page changes, a PSRAM write,
+// the clock through 0x096A0000, and SRAM's wait states.
 // It shows every result on its screen (to photograph), and leaves them in
 // cart RAM page 0xF0 at CARTLOG_INGAME_PROBE and in its own save at
 // INGAME_PROBE_SAVE_OFFSET; the kernel's next boot logs them
@@ -11,10 +11,11 @@
 // soft reset back to the kernel; the save is battery-backed FRAM, so the
 // report outlives a power cycle (on the real cart, v0.8's first run, the
 // kernel's boot said "microSD card error" after the probe, and the power-off
-// that took lost page 0xF0). The SD test goes last, only when A asks for it,
-// after the rest is saved. Before launching the probe the kernel makes a
-// scratch file, /torii/probe/sd.bin, and puts its first sector here for the
-// SD write test (ingame_probe_prepare, source/ingame.c).
+// that took lost page 0xF0). Its SD test is retired: on the real cart
+// (2026-10-27) sector 0 didn't read in game mode and the card stayed
+// unusable until a power cycle (docs/research/omega-de-hardware.md), so
+// SD access in game mode is out, and the report says "not run" (its SD
+// fields stay, for the layout).
 #ifndef TORII_INGAMEPROBE_H
 #define TORII_INGAMEPROBE_H
 
@@ -22,26 +23,13 @@
 
 #define INGAME_PROBE_MAGIC "TORII-INGAMEPRB1"  // 16 bytes, written last
 #define INGAME_PROBE_CODE "TIGP"  // the probe ROM's game code
-#define INGAME_PROBE_FILE "/torii/probe/sd.bin"
-#define INGAME_PROBE_SECTOR 512
 #define INGAME_PROBE_FIRST_PAGE 0x20
 #define INGAME_PROBE_LAST_PAGE 0xEF
 // The report's copy in the probe's save (cart SRAM page 0, FRAM): 4 KB in,
 // a flash save's second sector, clear of the bank test's offset 0
 #define INGAME_PROBE_SAVE_OFFSET 0x1000
-// scratch_check's value for a scratch_lba the kernel put there for this
-// launch: anything else (a launch that didn't prepare one) means no sector
-#define INGAME_PROBE_CHECK(lba) ((lba) ^ 0x7E57C0DEu)
-
-// The scratch sector's bytes as the kernel writes them, and the probe's
-static inline uint8_t ingame_probe_byte(uint32_t i, uint32_t seed)
-{
-	return (uint8_t)((i * 7 + seed) ^ (i >> 3));
-}
-#define INGAME_PROBE_SEED_KERNEL 0x5A
-#define INGAME_PROBE_SEED_PROBE 0xC3
-
-// What the SD write test saw
+// What the SD write test saw (retired: NOT_RUN since 2026-10-27; the rest
+// are older reports')
 enum {
 	INGAME_PROBE_SD_UNTRIED = 0,  // no scratch sector given
 	INGAME_PROBE_SD_OK = 1,  // read the kernel's bytes, wrote and read back the probe's, put the kernel's back
@@ -52,6 +40,7 @@ enum {
 	INGAME_PROBE_SD_RESTORE_LOST = 6,  // the kernel's bytes didn't read back after
 	INGAME_PROBE_SD_PENDING = 7,  // not run yet: the report was saved before it, and nothing after
 	INGAME_PROBE_SD_SKIPPED = 8,  // B skipped it
+	INGAME_PROBE_SD_NOT_RUN = 9,  // retired: SD access in game mode wedges the card
 };
 
 // Where the probe put the report's copy in its save
@@ -63,9 +52,9 @@ enum {
 
 struct ingame_probe {
 	char magic[16];
-	// In, from the kernel
-	uint32_t scratch_lba;  // the scratch file's first sector, 0: none
-	uint32_t scratch_check;  // INGAME_PROBE_CHECK(scratch_lba)
+	// The retired SD test's scratch sector (from the kernel), now 0
+	uint32_t scratch_lba;
+	uint32_t scratch_check;
 	// Cart SRAM pages 0x20-0xEF: 4 bytes written and read back at each 4 KB page's start
 	uint16_t pages_tried;
 	uint16_t pages_ok;

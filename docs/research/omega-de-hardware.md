@@ -429,7 +429,7 @@ at page `0x09C00000` × 4 KB:
 | `0x00`, `0x10` | FM28V100 FRAM, 128 KB | game saves |
 | `0x20`, `0x30` | S71GL064 SRAM (1 MB; its first 128 KB are unused behind the FRAM) | Torii v0.8: the in-game menu's backups while it is open (`source/ingame_abi.h`): the game's EWRAM window at `0x20000`, the OBJ tiles it draws over at `0x28000`, OAM at `0x2C000`, the OBJ palette at `0x2C400`. Before v0.8, the old menu's copy of VRAM |
 | `0x40`–`0xAF` | S71GL064 SRAM | the save-state buffer: the 0x70000-byte `RTS/<game>.rts` is loaded here at launch. VRAM, IWRAM, EWRAM, OAM, palette, IO, registers, and a flag at `0xAFFF0` |
-| `0xB0`–`0xBF` | S71GL064 SRAM | Torii v0.8: the in-game menu's overlay image at `0xB0000` and the session block at `0xB8000`, written at each addon and NOR launch (`source/ingame.c`) |
+| `0xB0`–`0xBF` | S71GL064 SRAM | Torii v0.8: the in-game menu's overlay image at `0xB0000` and the session block at `0xB6000`, written at each addon and NOR launch (`source/ingame.c`) |
 | `0xC0`, `0xD0` | S71GL064 SRAM | Torii: Diagnostics' pattern test (free otherwise); from v0.8's P4, the in-game screenshots (`0xC0000`-`0xEFFFF`) |
 | `0xF0` | S71GL064 SRAM | Torii: what the kernel keeps for its next boot (`source/cartlog.h`): where the session got to at `0xF0000`, a kernel crash dump at `0xF0100`, the in-game menu's DEBUG snapshot at `0xF1000`, the EEPROM probe ROM's report at `0xF1800`, the rumble probe's at `0xF1A00`, the in-game probe's at `0xF1B00`, the in-game menu stub's refusal record at `0xF1C00` |
 
@@ -836,6 +836,21 @@ and the stub refuses safely there. The probe now also writes 24 KB of page
 `0x20` a byte at a time at 8 cycles, as the stub does, and reads page
 `0x20` in both flash banks (Emerald leaves bank 1 on after reading its
 save's second half), so a run at FLASH 128K answers both.
+
+**SD access in game mode: impossible.** Reading sector 0 failed and the
+card stayed unusable until power-off (2026-10-27): on the real cart the
+probe's SD test couldn't read sector 0 in game mode and left the SD
+controller wedged; the kernel's boot after its soft reset showed
+"Loading..." for a long time with the card light on, then an empty game
+list, and wrote no logs. Only a power cycle brought the card back. So
+nothing reads or writes the card while a game runs: the in-game menu's
+save states and screenshots stay in cart SRAM (no battery from page `0x20`
+on: a power-off loses them) until Back to Torii, whose boot files them. The
+probe's SD test is retired (its report says "not run"), and a boot whose
+card mounts but doesn't read now ends in "Can't read the microSD card.
+Switch the console off and on." rather than an empty list
+(`tests/ingame_probe.sh` 3b). The emulated cart still stops with status 79
+on any SD register in game mode.
 
 **Sleep** (the sleep keys, or the menu's Sleep row) is the BIOS's Stop
 (SWI 3) from the hook, in IRQ mode: IE = keypad only (every IF flag

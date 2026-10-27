@@ -1105,8 +1105,9 @@ static void first_scan_progress(void)
 	dialog_progress_set(lib.progress, 1000, status);
 }
 
-void library_boot(void)
+int library_boot(void)
 {
+	const u32 errors = diskstat_total.read_errors;
 	names_boot();
 	memset(&lib, 0, sizeof(lib));
 	lib.job = JOB_NONE;
@@ -1122,7 +1123,7 @@ void library_boot(void)
 	}
 	if (lib.valid) {
 		lib.want_walk = 1;  // the job, once the menu runs
-		return;
+		return 0;
 	}
 	// The first scan and its write, before the menu: a dialog once it is
 	// slow. The write too: in the background it would wait for the menu to
@@ -1145,8 +1146,14 @@ void library_boot(void)
 	}
 	if (shown)
 		dialog_progress_end();
-	if (!lib.valid)
-		lib.want_walk = 1;  // the card failed: the menu's job tries again
+	if (lib.valid)
+		return 0;
+	lib.want_walk = 1;  // the card failed: the menu's job tries again
+	if (diskstat_total.read_errors == errors)
+		return 0;
+	tlog_error("library: none loaded or scanned, and %lu reads failed: the card doesn't answer",
+		   (unsigned long)(diskstat_total.read_errors - errors));
+	return 1;
 }
 
 void library_write_now(void)

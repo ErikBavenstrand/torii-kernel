@@ -70,11 +70,9 @@ void test_ingame_abi(void)
 	CHECK(INGAME_SESSION_HEAD < 256);
 	CHECK(INGAME_SESSION_TEXT(INGAME_TEXTS) <= INGAME_SESSION_OUT);
 	CHECK(sizeof(struct ingame_session) <= INGAME_SESSION_MAX);
-	// The probe: its report fits its 256 bytes of page 0xF0, the scratch
-	// sector's place in it is what the kernel writes (offset 16), and its
-	// bytes are tests/ingame_probe.sh's
+	// The probe: its report fits its 256 bytes of page 0xF0, and the
+	// kernel's blanking of its place (24 bytes) reaches past the magic and
+	// the retired scratch sector's fields
 	CHECK(sizeof(struct ingame_probe) <= 0x100);
-	CHECK_EQ(offsetof(struct ingame_probe, scratch_lba), 16u);
-	CHECK_EQ(ingame_probe_byte(0, INGAME_PROBE_SEED_KERNEL), 0x5Au);
-	CHECK_EQ(ingame_probe_byte(9, INGAME_PROBE_SEED_KERNEL), (uint8_t)((9 * 7 + 0x5A) ^ 1));
+	CHECK_EQ(offsetof(struct ingame_probe, scratch_check) + 4, 24u);
 }

@@ -55,9 +55,8 @@ void ingame_after_game(void);
 void ingame_refused_notice(void);
 
 // For the in-game probe ROM (game code INGAME_PROBE_CODE, source/ingameprobe.h)
-// only: makes its scratch file and tells it the file's sector through cart
-// RAM page 0xF0. Anything else: does nothing. Call it before the launch's
-// last SD access.
+// only: clears its last report from cart RAM page 0xF0 and its save.
+// Anything else: does nothing.
 void ingame_probe_prepare(const u8 *code);
 
 // After a refusal whose image didn't check: cart SRAM's image area to
