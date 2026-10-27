@@ -17,6 +17,7 @@
 #include "engine/cycles.h"
 #include "engine/jobs.h"
 #include "engine/psram.h"
+#include "engine/stage.h"
 #include "ui/ui.h"
 
 #define NAMES_CACHE_FILE "/torii/crc.txt"
@@ -38,6 +39,9 @@
 #define NAMES_IO_BYTES 2048  // a read or write per step: a read's CRC takes about 35,000 cycles
 #define NAMES_CLEAR_BYTES 2048  // the cache's slots emptied per step
 #define NAMES_LOAD_BYTES 2048  // crc.txt read and scanned per step (about 45,000 cycles)
+// names.db read per step, through the stage (engine/stage.h): 8 sectors, one
+// card command, about 65,000 cycles on the cart (721 KB took 1,361 ms)
+#define NAMES_DB_BYTES 4096
 #define NAMES_LINES_CYCLES 24000  // crc.txt's lines kept per step
 #define NAMES_STEP_CYCLES 30000  // one job call's work, as the library's
 #define NAMES_KEY_REST 30  // the job waits for the keys to rest this many frames
@@ -57,13 +61,17 @@ _Static_assert(PSRAM_NAMES_CACHE_BASE + PSRAM_NAMES_CACHE_BYTES <= PSRAM_WINDOW 
 	       "the CRC cache ends in the window");
 _Static_assert(SAFEFILE_LINE_MAX >= NAMES_PATH_MAX + 40, "a line of crc.txt fits safefile_lines");
 
+// crc.txt first, then names.db: covers are looked up by CRC (box art), and
+// crc.txt is a few KB where names.db is 700 (the cart's covers came 10 s
+// after the boot while names.db went first)
 enum {
 	P_START,  // nothing loaded
-	P_DB,  // names.db's body, a chunk a step
 	P_CLEAR,  // the cache's slots
 	P_SCAN_MAIN,  // crc.txt's CRC checked, a chunk a step
 	P_SCAN_BAK,  // and crc.txt.bak's, when crc.txt doesn't hold
 	P_READ,  // the copy that holds, read into the cache a chunk a step
+	P_DB_OPEN,  // crc.txt is loaded (names_crc answers): names.db's header
+	P_DB,  // names.db's body, a chunk a step
 	P_DONE,
 };
 
@@ -102,6 +110,7 @@ struct line_cursor {
 static struct {
 	u8 phase;
 	u8 db_ok;  // names.db is loaded
+	u8 crc_ok;  // crc.txt is loaded: names_crc answers, while names.db loads on
 	u8 cache_ok;  // crc.txt was read whole: it may be written back
 	u8 dirty;  // the cache differs from crc.txt: DIRTY_* bits
 	u8 active;  // crc.txt may be made and Recent identified: names_active
@@ -230,20 +239,21 @@ void names_boot(void)
 	N.job = JOB_NONE;
 }
 
+static void load_done(void);
+
 static void db_failed(const char *why)
 {
 	close_file();
 	tlog("names: %s not loaded (%s)", NAMESDB_FILE, why);
 	N.db_ok = 0;
-	N.phase = P_CLEAR;
-	N.at = 0;
+	load_done();
 }
 
 // names.db's header, then the body a chunk at a time, into PSRAM
 static void db_step(void)
 {
 	UINT got = 0;
-	if (N.phase == P_START) {
+	if (N.phase == P_DB_OPEN) {
 		N.started = cycles_now();
 		N.db_ok = 0;
 		FRESULT fr = f_open(&N.u.fil, NAMESDB_FILE, FA_READ);
@@ -252,8 +262,7 @@ static void db_step(void)
 				tlog("names: no %s (just names-update makes it)", NAMESDB_FILE);
 			else
 				tlog_error("names: can't open %s (FatFs error %d)", NAMESDB_FILE, fr);
-			N.phase = P_CLEAR;
-			N.at = 0;
+			load_done();
 			return;
 		}
 		N.file_open = 1;
@@ -272,13 +281,14 @@ static void db_step(void)
 		return;
 	}
 	u32 total = db_header()->file_bytes, n = total - N.at;
-	if (n > NAMES_IO_BYTES)
-		n = NAMES_IO_BYTES;
-	if (f_read(&N.u.fil, N.buf, n, &got) != FR_OK || got != n) {
+	if (n > NAMES_DB_BYTES)
+		n = NAMES_DB_BYTES;
+	u8 *chunk = stage_buffer();  // nothing in it outlives the step
+	if (f_read(&N.u.fil, chunk, n, &got) != FR_OK || got != n) {
 		db_failed("a short read");
 		return;
 	}
-	put(DB + N.at, N.buf, n);
+	put(DB + N.at, chunk, n);
 	N.at += n;
 	if (N.at < total)
 		return;
@@ -293,8 +303,7 @@ static void db_step(void)
 	     h->dat_version, (unsigned long)h->crc_count[LIB_GBA], (unsigned long)h->crc_count[LIB_GBC],
 	     (unsigned long)h->crc_count[LIB_GB], (unsigned long)h->crc_count[LIB_NES], (unsigned long)(total >> 10),
 	     (unsigned long)ms_since(N.started));
-	N.phase = P_CLEAR;
-	N.at = 0;
+	load_done();
 }
 
 // --- crc.txt, in steps -------------------------------------------------------
@@ -304,7 +313,19 @@ static void db_step(void)
 // whole file in one call, which for a large cache held the menu for seconds.
 // The line being read collects in N.lines.buf, unused until a write.
 
+// names.db is loaded, or isn't there: the load is done
 static void load_done(void)
+{
+	close_file();
+	FILINFO *fi = &N.u.fi;
+	// CRCs are kept only on a card that uses them: one with names.db, a
+	// crc.txt already (names-update's), or art (B22 looks covers up by CRC)
+	N.active = N.db_ok || N.has_main || N.has_bak || f_stat(NAMES_ART_DIR, fi) == FR_OK;
+	N.phase = P_DONE;
+}
+
+// crc.txt is read: names_crc answers from now on, and names.db is next
+static void crc_done(void)
 {
 	close_file();
 	FILINFO *fi = &N.u.fi;
@@ -316,16 +337,15 @@ static void load_done(void)
 		tlog("names: %s is read-only: not written, and Recent isn't identified", NAMES_CACHE_FILE);
 	}
 	journal_read();
-	// CRCs are kept only on a card that uses them: one with names.db, a
-	// crc.txt already (names-update's), or art (B22 looks covers up by CRC)
-	N.active = N.db_ok || N.has_main || N.has_bak || f_stat(NAMES_ART_DIR, fi) == FR_OK;
 	if (N.cache.full) {
 		N.cache_ok = 0;  // writing back would lose the lines left out
 		tlog("names: the CRC cache is full: %s isn't written back", NAMES_CACHE_FILE);
 	}
 	N.dirty = N.journal ? DIRTY_HARD : 0;  // the journal's lines go into crc.txt
 	part_read();  // written only on a card that uses CRCs, so it is there only on one
-	N.phase = P_DONE;
+	N.crc_ok = 1;
+	N.phase = P_DB_OPEN;
+	N.at = 0;
 	tlog("names: %lu files' CRCs from %s in %lu ms%s", (unsigned long)N.lines_read, NAMES_CACHE_FILE,
 	     (unsigned long)ms_since(N.started), N.cache_ok ? "" : " (it isn't written back)");
 	if (N.lines_bad)
@@ -392,7 +412,7 @@ static void read_begin(void)
 			tlog_error("names: %s: neither copy holds up: read as empty", NAMES_CACHE_FILE);
 			N.cache_ok = 0;  // never written over: their text may still be saved on a PC
 		}
-		load_done();
+		crc_done();
 		return;
 	}
 	const struct safefile_scan *sc = from == SAFEFILE_BAK ? &N.scan_bak : &N.scan_main;
@@ -400,7 +420,7 @@ static void read_begin(void)
 		tlog("names: %s: %s", NAMES_CACHE_FILE,
 		     from == SAFEFILE_BAK ? "read the backup copy" : "edited by hand: read as it is");
 	if (!open_copy(from == SAFEFILE_BAK ? NAMES_CACHE_BAK : NAMES_CACHE_FILE)) {
-		load_done();
+		crc_done();
 		return;
 	}
 	N.limit = sc->valid ? sc->body : sc->size;
@@ -496,7 +516,7 @@ static void read_chunk(void)
 		return;  // its lines next
 	if (N.line_len || N.line_long)
 		line_end();  // a last line with no newline
-	load_done();
+	crc_done();
 }
 
 // crc.txt is scanned whole, its lines kept as they come (most often it
@@ -508,7 +528,7 @@ static void main_scanned(void)
 		line_end();  // a last line with no newline
 	if (N.has_main && N.scan_main.valid) {
 		N.main_first = 0;
-		load_done();
+		crc_done();
 		return;
 	}
 	N.phase = P_SCAN_BAK;
@@ -520,7 +540,7 @@ static void bak_scanned(void)
 	if (from == SAFEFILE_HAND) {
 		tlog("names: %s: edited by hand: read as it is", NAMES_CACHE_FILE);
 		N.main_first = 0;
-		load_done();
+		crc_done();
 		return;
 	}
 	// The lines kept were crc.txt's, which doesn't hold: empty again
@@ -532,11 +552,16 @@ static void bak_scanned(void)
 int names_load_step(void)
 {
 	switch (N.phase) {
-	case P_START:
+	case P_DB_OPEN:
 	case P_DB:
 		psram_begin();
 		db_step();
-		return 0;
+		return N.phase == P_DONE;
+	case P_START:
+		N.crc_ok = 0;
+		N.at = 0;
+		N.phase = P_CLEAR;
+		// fall through
 	case P_CLEAR:
 		psram_begin();
 		if (N.at == 0) {
@@ -607,7 +632,7 @@ int names_load_step(void)
 	case P_READ:
 		psram_begin();
 		read_chunk();
-		return N.phase == P_DONE;
+		return 0;
 	default:
 		return 1;
 	}
@@ -693,7 +718,7 @@ const char *names_lookup(const char *path, u32 size, u32 console)
 
 int names_crc(const char *path, u32 size, u32 *crc)
 {
-	if (N.phase != P_DONE)
+	if (!N.crc_ok)
 		return 0;
 	u32 n = names_cache_find(&N.cache, path);
 	if (n == NAMES_CACHE_NONE)
@@ -725,7 +750,7 @@ int names_crc_now(const char *path, u32 *crc, char *line, u32 line_size)
 	if (f_stat(path, &fi) != FR_OK)
 		return 0;
 	u32 size = (u32)fi.fsize, date = (u32)fi.fdate << 16 | fi.ftime;
-	if (N.phase == P_DONE)
+	if (N.crc_ok)
 		return names_crc(path, size, crc);
 	if (line_size < SAFEFILE_LINE_MAX || safefile_open(NAMES_CACHE_FILE, NAMES_CACHE_FILE_MAX) == SAFEFILE_NONE)
 		return 0;
@@ -1505,5 +1530,6 @@ void names_before_launch(void)
 	}
 	N.phase = P_START;
 	N.db_ok = 0;
+	N.crc_ok = 0;
 	N.again = 0;  // the next load starts over
 }

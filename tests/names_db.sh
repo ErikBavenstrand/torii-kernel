@@ -109,6 +109,10 @@ logged "$cart/1.log" "names: /torii/names.db v2 from 2026.01.02: GBA 5, GBC 2, G
 logged "$cart/1.log" "names: 8 files' CRCs from /torii/crc.txt"
 logged "$cart/1.log" "library: new index: 8 games (GBA 4, GBC 1, GB 2, NES 1)"
 no_errors "$cart/1.log"
+# crc.txt is read before names.db, so covers (by CRC) needn't wait for it
+crc_at=$(grep -n "names: 8 files' CRCs from /torii/crc.txt" "$cart/1.log" | head -1 | cut -d: -f1)
+db_at=$(grep -n "names: /torii/names.db v2" "$cart/1.log" | head -1 | cut -d: -f1)
+[ "$crc_at" -lt "$db_at" ] || fail "names.db was read before crc.txt"
 # Without names, file-name order: Hack of Minish, Homebrew, Wars, zz Minish.
 # Hack of Minish, a romhack with the Minish Cap's code, keeps its file name
 want="/GBA/Wars.gba
