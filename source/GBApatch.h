@@ -64,7 +64,6 @@ void GBApatch_Cleanrom_NOR(u32 *address, u32 offset);
 void GBApatch_NOR(u32 *address, int filesize, u32 offset);
 u32 Check_pat(TCHAR *gamefilename);
 void Make_pat_file(char *filename);
-u32 Check_RTS(TCHAR *gamefilename);
 // A GBA game's save type (0 AUTO, 1-5) and its boot mode (ACTION_BOOT_*,
 // actions.h) are in its record, game.ini in its folder of saves (gamerec.h,
 // gamesave.h). gamefilename is in the folder FatFs is in.

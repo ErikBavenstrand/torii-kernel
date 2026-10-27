@@ -695,37 +695,6 @@ static void Blank_sram(u32 savesize)
 	tlog("save: blank chip loaded, %lu bytes", (unsigned long)span);
 }
 //---------------------------------------------------------------------------------
-u32 IWRAM_CODE LoadRTSfile(TCHAR *filename)
-{
-	UINT ret;
-	UINT filesize;
-	FIL file;
-	u32 page;
-
-	switch (f_open(&file, filename, FA_READ)) {
-	case FR_OK: {
-		filesize = f_size(&file);
-		if (filesize > 0x70000)
-			filesize = 0x70000;
-
-		for (page = 0x40; page < 0xB0; page += 0x10) {
-			SetRampage(page);
-			// Torii: past a short file's end, zeros, not an earlier owner's bytes
-			if (f_read(&file, pReadCache, 64 * 1024, (UINT *)&ret) != FR_OK)
-				ret = 0;
-			if (ret < 64 * 1024)
-				memset(pReadCache + ret, 0, 64 * 1024 - ret);
-			WriteSram(SRAMSaver, pReadCache, 64 * 1024);
-		}
-		f_close(&file);
-		SetRampage(0x0);
-		return 1;
-	}
-	default:
-		return false;
-	}
-}
-//---------------------------------------------------------------------------------
 static u32 SavefileWrite(TCHAR *filename, u32 savesize)
 {
 	FIL file;

@@ -935,61 +935,6 @@ u8 Make_mde_boot(TCHAR *gamefilename, u8 boot_mode)
 	return mde_write(gamefilename, 1, boot_mode);
 }
 //------------------------------------------------------------------
-u32 Check_RTS(TCHAR *gamefilename)
-{
-	//UINT  ret;
-	//u32 find_the_patfile;
-	u32 rtsfilesize;
-	u32 res;
-
-	TCHAR rtsnamebuf[GAME_NAME_MAX + 1];
-	name_with_ext(rtsnamebuf, gamefilename, "rts");
-
-	res = f_mkdir("/RTS");
-	res = f_chdir("/RTS");
-	if (res != FR_OK) {
-		return 0;
-	}
-
-	res = f_open(&gfile, rtsnamebuf, FA_OPEN_EXISTING);
-
-	if (res == FR_OK)//have a old rts file
-	{
-		rtsfilesize = f_size(&gfile);
-		f_close(&gfile);
-	} else //make a new one
-	{
-		tlog("launch: making the save state file /RTS/%s", rtsnamebuf);
-		res = f_open(&gfile, rtsnamebuf, FA_WRITE | FA_OPEN_ALWAYS);
-		if (res == FR_OK) {
-			int i;
-			unsigned int written;
-			for (i = 0; i < (0x70000) / 0x800; i++) {
-				// Filled each time: the frame progress_part may run
-				// can borrow pReadCache (ez_define.h)
-				memset(pReadCache, 0xFF, 0x200 * 4);
-				f_write(&gfile, pReadCache, 0x200 * 4, (UINT *)&written);
-				if (written != 0x200 * 4)
-					break;
-				progress_part((u32)i + 1, 0x70000 / 0x800);  // its step of the launch's bar
-			}
-			f_close(&gfile);
-
-			rtsfilesize = 0x70000;
-		} else
-			rtsfilesize = 0;
-	}
-	LoadRTSfile(rtsnamebuf);
-	if (rtsfilesize) {
-		res = Check_game_RTS_FAT(rtsnamebuf, 3);//rts FAT
-		if (res != 0) {
-			rtsfilesize = 0;
-		}
-	}
-
-	return rtsfilesize;
-}
-//------------------------------------------------------------------
 //Torii: reads the listed words from the ROM file; true if all are IRQ
 //handler literals. Another revision of a game keeps them elsewhere, and
 //patching the listed words there breaks it.

@@ -105,7 +105,6 @@ int pending_save_flush(void);
 u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU);
 
 void delay(u32 R0);
-u32 LoadRTSfile(TCHAR *filename);
 
 // The file name the launch path opens, in the folder currentpath
 // (TCHAR[MAX_path_len], declared where it is used, as other files name
