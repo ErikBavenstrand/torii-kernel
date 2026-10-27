@@ -393,6 +393,7 @@ Then 1.0.
 
 Small items with no version yet:
 
+- **One place for how a game boots** (owner, 2026-10-27): the game popup's play mode (Play « addons ») and Game info's Boot mode set the same thing in two places, which is confusing. Keep only one; it also decides whether picked cheats run, so the cheat screen's "needs Boot with addon" note should point to it.
 - **GB, GBC and NES cheats** (owner, 2026-10-25, out of v0.7): libretro has cheat files for them (GameShark, Game Genie), but the codes would have to reach Jagoomba and PocketNES (PocketNES has its own cheat finder).
 - **Logs:**
   - Frame-timing summaries carry the log write's time, not the scroll's.
