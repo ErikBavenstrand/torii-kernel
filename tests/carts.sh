@@ -81,3 +81,10 @@ else:
     print("0000")
 PY
 }
+
+# rts_sink IMAGE: puts /torii/rts.bin on the SD image, as a card's first
+# launch makes it (source/rtssink.h), so a card filled up after still launches
+rts_sink() {
+  mmd -i "$1" ::/torii 2>/dev/null || true
+  head -c 458752 /dev/zero | mcopy -o -i "$1" - ::/torii/rts.bin
+}

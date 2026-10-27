@@ -223,6 +223,7 @@ print("0\t/Hello.gba")' >"$cart/list.txt"
 sealed "$(cat "$cart/list.txt")\n" >"$cart/bak.txt"
 mcopy -i "$cart/sd.img" "$cart/bak.txt" ::/torii/recent.txt.bak
 put /torii/recent.txt ''
+rts_sink "$cart/sd.img"
 free=$(mdir -i "$cart/sd.img" :: | grep -o '[0-9 ]* bytes free' | tr -dc 0-9)
 head -c $((free - 2048)) /dev/zero >"$cart/filler.bin"
 mcopy -i "$cart/sd.img" "$cart/filler.bin" ::/filler.bin
