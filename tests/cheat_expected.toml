@@ -110,20 +110,5 @@ reason = "A second, different CodeBreaker key line in a file: Torii adopts it fo
 
 # --- Known bugs ----------------------------------------------------------------
 
-[[bug]]
-id = "deadface-format"
-reason = "A DEADFACE line in a cheat with its own cheatN_format line doesn't reseed the file's later cheats, which then decode with the seeds from before it (b2e7d29b carries the file's seeds into such a cheat, not its reseed out)"
-
-[[bug]]
-id = "rom-write-unaligned"
-reason = "Found by the type matrix: a VBA (or CodeBreaker) halfword or word write to an odd or half-aligned ROM address is patched byte for byte at that address; a CPU store, mGBA's ROM patches and Torii's own writes elsewhere align it down"
-
 # --- Engine cases (tests/cheat_engine.py, tests/cheat_matrix.py) -----------------
 
-[[engine]]
-case = "k-par-deadface-format"
-bug = "deadface-format"
-
-[[engine]]
-case = "k-vba-rom-odd"
-bug = "rom-write-unaligned"
