@@ -66,6 +66,7 @@ jobs=(
   "tests/states.sh cut"
   "tests/settings.sh"
   "tests/menu.sh"
+  "tests/sleep.sh"
   "tests/menu_safety.sh sram"
   "tests/menu_safety.sh eeprom8k"
   "tests/menu_safety.sh eeprom512"

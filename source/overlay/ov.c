@@ -549,12 +549,14 @@ static uint32_t footer_text(void)
 	return text_at(why_texts[why]);
 }
 
-// The menu's footer: the DEBUG notice, that a screenshot waits, or the keys
+// The menu's footer: the DEBUG notice, that a screenshot waits, on the
+// Sleep row the keys that wake the game, or the keys that close the menu
 static uint32_t menu_footer(void)
 {
-	return (m.flags & INGAME_NOTICE_DEBUG) ? INGAME_TEXT_DEBUG_SAVED
-	       : m.shot                        ? INGAME_TEXT_SHOT_SAVED
-					       : INGAME_TEXT_HINT;
+	return (m.flags & INGAME_NOTICE_DEBUG)            ? INGAME_TEXT_DEBUG_SAVED
+	       : m.shot                                   ? INGAME_TEXT_SHOT_SAVED
+	       : m.rows && m.kinds[m.cursor] == ROW_SLEEP ? INGAME_TEXT_SLEEP_WAKES
+							  : INGAME_TEXT_HINT;
 }
 
 // Slot k's line now, as a session block offset (0: none)
@@ -831,6 +833,8 @@ static void page_open(enum page_id page, uint32_t cursor)
 // Moves the cursor to row r, scrolling the list to show it
 static void cursor_to(uint32_t r)
 {
+	// The menu's footer changes on and off its Sleep row
+	int sleep = m.page == PAGE_MENU && (m.kinds[m.cursor] == ROW_SLEEP || m.kinds[r] == ROW_SLEEP);
 	m.cursor = r;
 	uint32_t top = m.top;
 	if (r < top)
@@ -842,7 +846,7 @@ static void cursor_to(uint32_t r)
 		slots_update();  // the rows' lines in their slots again
 		m.pill_y = row_y(r);  // the pill jumps with the scroll
 		pill_place(m.pill_y);
-	} else if (m.footer && m.page != PAGE_MENU) {
+	} else if (m.footer && (m.page != PAGE_MENU || sleep)) {
 		slot_update(m.title + m.visible);
 	}
 	m.pill_to = row_y(r);

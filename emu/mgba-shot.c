@@ -71,7 +71,10 @@
 // RAM starts filled with 0xA5 (poison_ram), as the cart's holds junk at
 // power-on.
 //
-// A BIOS Stop (SWI 3, the sleep) prints "stop at frame N"; the run goes on.
+// A BIOS Stop (SWI 3, the sleep) prints "stop at frame N". The CPU then
+// sleeps as the cart's does, until a keypad, serial or Game Pak IRQ enabled
+// in IE (a -k press that meets KEYCNT), and "wake at frame N" says when; the
+// frames go on counting meanwhile.
 //
 // If the CPU hits an illegal opcode or jumps to an invalid address, it prints
 // a crash report (registers, and code addresses found on the stack with their
@@ -1190,6 +1193,12 @@ int main(int argc, char **argv)
 		} else {
 			core->runFrame(core);
 		}
+		static bool was_stopped;
+		bool stopped = ((struct GBA *)core->board)->stopped;
+		if (was_stopped && !stopped) {
+			fprintf(stderr, "wake at frame %u\n", current_frame);
+		}
+		was_stopped = stopped;
 #ifdef ENABLE_SCRIPTING
 		if (opts.nscripts) {
 			mScriptContextTriggerCallback(&scriptContext, "frame");

@@ -54,6 +54,8 @@ fail() {
 # RESET and SAVESTATE on, sleep key L+R+SELECT, menu key L+R+START
 OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -f 100 >/dev/null 2>&1
 python3 tests/setnor.py set "$cart/kernel-nor.bin" 0=0xE1E1 1=1 2=1 3=0 4=0 5=9 6=8 7=2 8=9 9=8 10=3 11=1 12=0 13=1 25=1
+rm -rf "$cart-held"
+cp -r "$cart" "$cart-held" # the held-key run below starts from here
 
 # Power-on 2: the launch, the menu key, B (hook_watch.lua), the screen's
 # hash every frame, and the EWRAM the overlay borrows (its window, 0x1FC0
@@ -95,6 +97,23 @@ before=$(ewram_at $(((key - 1) / 10 * 10)))
 after=$(ewram_at $(((key + 19) / 10 * 10)))
 [ -n "$before" ] && [ "$before" = "$after" ] || fail "the game's EWRAM window changed under the refused menu"
 
+# The menu key held for a second (the real cart, after a refusal: the stub
+# refused again every frame, the sound stuttered, and START reached the
+# game): the screen turns white (forced blank) and the game stays frozen
+# until the keys are up, then goes on as it was
+# shellcheck disable=SC2046 # $(nav_launch) is a list of options
+held=$(OMEGA_DIR=$cart-held OMEGA_GAME_SRAM=$fault emu/build-linux/mgba-shot dist/ezkernelnew.bin \
+  $(nav_launch /Hello.gba addon save=$save at=270) -k "$key:L+R+START" -k "$((key + 60)):-" \
+  -H $((key - 1)):$((key + 120)) -f $((key + 120)) 2>"$cart/log") || fail "the held-key run stopped with status $?"
+log=$(cat "$cart/log")
+grep -q '^crash at frame' <<<"$log" && fail "crashed with the menu key held"
+held_at() { awk -v f="$1" '$1 == "hash" && $3 == f ":" { print $4 }' <<<"$held"; }
+white=$(awk -v a=$((key + 10)) -v b=$((key + 59)) '$1 == "hash" && $3 + 0 >= a && $3 + 0 <= b { print $4 }' <<<"$held" | sort -u)
+[ "$(wc -l <<<"$white")" = 1 ] && [ "$white" != "$(held_at $((key - 1)))" ] ||
+  fail "the screen didn't stay white while the refused menu's keys were held"
+[ "$(awk -v a=$((key + 62)) '$1 == "hash" && $3 + 0 >= a { print $4 }' <<<"$held" | grep -vcx "$white")" -gt 1 ] ||
+  fail "the game didn't go on once the refused menu's keys were up"
+
 if [ "$mode" = flip-image ]; then
   # The stub's record in page 0xF0, read by the kernel's next boot (after a
   # soft reset: page 0xF0 has no battery)
@@ -105,4 +124,5 @@ if [ "$mode" = flip-image ]; then
   grep -q "in-game menu: the stub didn't open it, the overlay image loaded from cart SRAM didn't check" <<<"$boot_log" ||
     fail "the kernel's next boot didn't log the refusal"
 fi
-echo "PASS: with cart SRAM failing in game mode ($mode) the stub leaves the menu shut and the game goes on"
+rm -rf "$cart-held"
+echo "PASS: with cart SRAM failing in game mode ($mode) the stub leaves the menu shut, shows white while its keys are held, and the game goes on"

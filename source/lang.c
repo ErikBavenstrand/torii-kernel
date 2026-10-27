@@ -802,6 +802,7 @@ static const struct lang_ingame en_ingame = {
 	.shot = "Screenshot",
 	.shot_saved = "Saved when you return to Torii",
 	.hint = " or B: resume",
+	.sleep_wakes = "START+SELECT wakes it",
 };
 
 static const struct lang_states en_states = {

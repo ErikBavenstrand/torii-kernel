@@ -369,6 +369,7 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 		[INGAME_TEXT_STATE_EMPTY] = t->state_empty,
 		[INGAME_TEXT_SHOT] = t->shot,
 		[INGAME_TEXT_SHOT_SAVED] = t->shot_saved,
+		[INGAME_TEXT_SLEEP_WAKES] = t->sleep_wakes,
 		[INGAME_TEXT_HINT] = hint,
 	};
 	for (u32 i = 0; i < INGAME_TEXTS; i++) {
