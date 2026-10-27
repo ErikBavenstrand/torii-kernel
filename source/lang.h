@@ -477,6 +477,8 @@ extern const struct lang_ingame *gl_ingame;
 #define EN_STATE_ROW_UNKEPT "Slot %lu \xC2\xB7 not kept yet"
 #define EN_STATE_SLOT "Slot %lu"
 #define EN_STATE_WHEN "%u %s %02u:%02u"
+// The game popup's Load state: a slot's number alone, as its date fills the row
+#define EN_STATE_POP_SLOT "%lu"
 // The months' names for the rows; filing them at boot; the game popup's
 // Load state
 struct lang_states {

@@ -1460,8 +1460,9 @@ static void saves_game(u32 row, u32 boot)
 }
 
 // Load state (v0.8): the game's save states for its current save slot, a
-// popup of them beside the row (the newest first: "Slot N" and when), then
-// the game started with addons in the one picked (its start loads it).
+// popup of them titled Load state beside the row (the newest first: the
+// slot's number and how long ago), then the game started with addons in the
+// one picked (its start loads it).
 // The slot picked, 0 for none; its rows on the stack, gone before a launch.
 static u32 states_pick(u32 row)
 {
@@ -1486,12 +1487,15 @@ static u32 states_pick(u32 row)
 			if (!best)
 				break;
 			const struct statestore_slot *e = &list.slot[best];
-			snprintf(label[n], sizeof(label[n]), EN_STATE_SLOT, (unsigned long)best);
-			if (e->when.year && e->when.month >= 1 && e->when.month <= 12)
+			snprintf(label[n], sizeof(label[n]), EN_STATE_POP_SLOT, (unsigned long)best);
+			// How long ago, as Recent says it; the date when the clock
+			// can't tell (unset, or the state is from its future)
+			u32 then = userdata_clock_time(userdata_unix_time(e->when.year, e->when.month, e->when.day,
+									  e->when.hour, e->when.min, e->when.sec));
+			userdata_ago_text(when[n], sizeof(when[n]), then);
+			if (!when[n][0] && e->when.year && e->when.month >= 1 && e->when.month <= 12)
 				snprintf(when[n], sizeof(when[n]), EN_STATE_WHEN, e->when.day,
 					 gl_states->months[e->when.month - 1], e->when.hour, e->when.min);
-			else
-				when[n][0] = 0;
 			items[n] = (struct ui_pop_item){label[n], when[n], 0};
 			slot[n++] = (u8)best;
 		}
@@ -1501,7 +1505,7 @@ static u32 states_pick(u32 row)
 		reshow(row);
 		return 0;
 	}
-	struct ui_popup popup = {games.title, 0, items, (u8)n, 0, NULL};
+	struct ui_popup popup = {gl_games->pop[LANG_POP_STATES], 0, items, (u8)n, 0, NULL};
 	if (!up() || !ui_popup_open(list_node(), node(N_HINTS), &popup))
 		return 0;
 	tlog_debug("screen ready: state-popup %s", games.title);
