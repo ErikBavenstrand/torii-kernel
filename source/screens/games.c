@@ -1497,8 +1497,8 @@ static void popup_run(u32 i)
 	// but one whose cheat file's path is too long; the cheat screen says why
 	// a file it can't take is left alone. The popup never reads the file
 	// (190 KB takes over a second): its count, what the cheat screen lists,
-	// is the one this session kept for the file as it is on the card, else
-	// none
+	// is the one the screen kept for the file as it is on the card (this
+	// session, or in counts.txt), else none
 	s32 listed = -1;
 	u32 start = cycles_now();
 	if (gba && cheatstore_peek(games.pick, &listed)) {

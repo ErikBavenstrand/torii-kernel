@@ -1,0 +1,114 @@
+# Where Torii's cheats rightly or knowingly differ from mGBA's, for the cheat
+# validation suite (tools/cheat_diff.py, tests/cheat_corpus.py,
+# tests/cheat_engine.py, tests/cheat_fuzz.py).
+#
+# [[decode]]: a rule tools/cheat_diff.py checks each cheat whose decodings
+# differ against, in this order; the first that matches explains it.
+#   kind = "allow": Torii means it (it follows the real device, or reads a
+#          code mGBA can't); the difference stays.
+#   kind = "xfail": a known bug, being fixed; flip it to "allow" (or delete
+#          it) once the fix lands, and see the corpus report for what it
+#          still matches.
+# [[bug]]: a known bug, being fixed, that tests/cheats/sample/expect.tsv
+# or an [[engine]] entry names (a decode rule of kind xfail is one too).
+# [[engine]]: a case of tests/cheat_engine.py (or a saved fuzz case) whose
+# runs in Torii and in mGBA's engine may differ:
+#   reason = "...": the difference is intended; the case passes either way
+#   bug = "id": a known bug; the case reports xfail while it differs and
+#          xpass once it doesn't (neither fails the suite): delete the entry
+#          once the fix lands
+
+# --- Intended ---------------------------------------------------------------
+
+[[decode]]
+id = "alone"
+kind = "allow"
+reason = "Torii reads a cheat with no key or seed line of its own again without the file's CodeBreaker key, or with its GameShark format detected again, when the file's state decodes it outside the GBA's memory (libretro's files mix plain and encrypted codes); mGBA keeps the file's state"
+
+[[decode]]
+id = "master-lines"
+kind = "allow"
+reason = "Torii drops master lines (hooks, game IDs, 001DC0DE markers) since it hooks the IRQ itself; mGBA rejects a second hook or a GameShark v1 game-ID line"
+
+[[decode]]
+id = "cb-super"
+kind = "allow"
+reason = "Torii decodes CodeBreaker's type 5 (super code: byte writes from the following lines); mGBA rejects it as unsupported"
+
+[[decode]]
+id = "gs-list"
+kind = "allow"
+reason = "GameShark v1's type 3 list: Torii writes its value to the listed addresses only; mGBA also writes the value at the value (taken as an address) and drops the last listed address"
+
+[[decode]]
+id = "vba-high-address"
+kind = "allow"
+reason = "Torii reads an AAAAAAAA:VVVV line whose address is past 0x0FFFFFFF as a CodeBreaker line (as libretro's files write them); mGBA takes it as a VBA write to that address"
+
+[[decode]]
+id = "par-block-open-at-end"
+kind = "allow"
+reason = "An Action Replay v3 block conditional with no ENDIF: Torii closes it at the cheat's end, so it covers the rest of the cheat; mGBA leaves it covering nothing"
+
+[[decode]]
+id = "cond-covers-multiline"
+kind = "allow"
+reason = "A conditional on the next code covers all of a multi-op code's ops in Torii (a GameShark or Action Replay button write, a GameShark list, a CodeBreaker super code); mGBA covers only its first op"
+
+[[decode]]
+id = "par-padding"
+kind = "allow"
+reason = "Torii drops Action Replay v3's '80000000 00000000' (add 0 to address 0) as padding; mGBA keeps it as an add that does nothing"
+
+[[decode]]
+id = "par-io-width"
+kind = "allow"
+reason = "Action Replay v3's C6 and C7 IO writes are 16- and 32-bit on the device; mGBA writes 8 and 16 bits"
+
+[[decode]]
+id = "slowdown"
+kind = "allow"
+reason = "Slowdown codes (Action Replay v3 08, GameShark 80F00000) read in Torii and do nothing, so the rest of the cheat runs; mGBA rejects the line"
+
+[[decode]]
+id = "par-empty-then-else"
+kind = "allow"
+reason = "An Action Replay v3 block IF whose THEN holds no op (or only ROM patches) before its ELSE: mGBA's _parEndBlock then takes the ELSE block for the THEN; on the device it runs when the condition is false"
+
+[[decode]]
+id = "cond-covers-rom-patch"
+kind = "allow"
+reason = "A conditional whose covered codes include a ROM patch: Torii counts the patch where it lies (it is applied at launch whatever the condition), as the device skips code lines; mGBA keeps patches in a list of their own, so its conditional covers the next code that isn't a patch instead"
+
+[[decode]]
+id = "mgba-nand-else"
+kind = "allow"
+reason = "mGBA bug: its CodeBreaker D0000020 (key test) never sets the conditional's negativeRepeat, so it keeps whatever the cheat list's memory held, an ELSE block from nowhere; Torii's has none"
+
+# Fixed in 6cc5c5a8: Torii now reads these as the device does, and mGBA
+# doesn't
+
+[[decode]]
+id = "par-padding-count"
+kind = "allow"
+reason = "Action Replay v3 '80000000 00000000' padding inside a conditional's cover: Torii counts the padding line as a code line, as the device does; mGBA keeps it as an add, so the counts differ once the padding is dropped"
+
+[[decode]]
+id = "par-disable"
+kind = "allow"
+reason = "Action Replay v3 DISABLE conditionals (action bits 11): Torii reads them (a false one skips the rest of the cheat); mGBA rejects them"
+
+[[decode]]
+id = "cb-d-types"
+kind = "allow"
+reason = "CodeBreaker D-type codes other than D0000020 (D0000010): Torii reads them; mGBA rejects them"
+
+[[decode]]
+id = "cb-second-key"
+kind = "allow"
+reason = "A second, different CodeBreaker key line in a file: Torii adopts it for its cheat and the later ones, as the device does; mGBA decrypts it with the first key, so the two read the rest of the file differently (13 of libretro's Mega Man Battle Network 6 cheats after such a key stay unreadable in Torii, a reading no decoder here can check)"
+
+# --- Known bugs ----------------------------------------------------------------
+
+# --- Engine cases (tests/cheat_engine.py, tests/cheat_matrix.py) -----------------
+

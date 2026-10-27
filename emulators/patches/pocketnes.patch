@@ -68,6 +68,52 @@ index 8d608fe..45f49e0 100644
  
  //Other options
  #define CHEATFINDER 1		//Enables the cheat finder
+diff --git a/src/loadcart.c b/src/loadcart.c
+index 5e635eb..6133b77 100644
+--- a/src/loadcart.c
++++ b/src/loadcart.c
+@@ -268,13 +268,39 @@ void loadcart(int rom_number, int emu_flags, int loading_state)
+ 	return;
+ }
+ 
++//Torii: a game's region (PocketNES#3): the one picked in the menu, which the
++//config keeps (torii_region), else the NES 2.0 header's (byte 12: NTSC, PAL,
++//either, Dendy), else the flags the caller passes
++APPEND static int torii_game_region(int rom_number, int emu_flags)
++{
++	static const u8 from_header[4]={0,1,0,2};
++	static const u8 flags[4]={REGION_NTSC,REGION_PAL,REGION_DENDY,REGION_OVERCLOCKED};
++	int region;
++	if (torii_region>=1 && torii_region<=4)
++	{
++		region=torii_region-1;
++	}
++	else
++	{
++		const u8 *header=findrom(rom_number)+48;
++		if ((header[7]&0x0C)!=0x08)
++			return emu_flags;
++		region=from_header[header[12]&3];
++	}
++	return (emu_flags&~0x1C)|flags[region];
++}
++
+ APPEND void loadcart2(int rom_number, int emu_flags, int loading_state)
+-{	
++{
+ 	//loading_state: 0 if called from loadstate, 1 if called from rom menu
+ //	u8 *p;
+ 	u8 *romname_p;
+ 	u8 *nesheader;
+-	
++
++	if (loading_state==1)
++	{
++		emu_flags=torii_game_region(rom_number,emu_flags);	//Torii
++	}
+ 	if (emu_flags & EMUFLAGS_PALTIMING)
+ 	{
+ 		emu_flags |= EMUFLAGS_FPS50;
 diff --git a/src/main.c b/src/main.c
 index 6f0c3f3..72a8eaf 100644
 --- a/src/main.c
@@ -112,10 +158,22 @@ index 3d26831..3e72f7b 100644
  		if (*p==nes_id)
  		{
 diff --git a/src/sram.c b/src/sram.c
-index 9814b19..cedc930 100644
+index 9814b19..3c7ffc3 100644
 --- a/src/sram.c
 +++ b/src/sram.c
-@@ -1146,6 +1146,10 @@ void readconfig() {
+@@ -1077,6 +1077,11 @@ void writeconfig()
+ 		cfg->sram_checksum=sram_owner;
+ 		configdirty=1;
+ 	}
++	if (cfg->reserved2 != (char)torii_region)	//Torii: the picked region (PocketNES#3)
++	{
++		cfg->reserved2 = torii_region;
++		configdirty=1;
++	}
+ 	if (configdirty)
+ 	{
+ 		if (config_position>=4 && config_position<save_start)
+@@ -1146,8 +1151,13 @@ void readconfig() {
  		gammavalue = (i & 0xE0)>>5;				//restore gamma value
  		i = cfg2->misc;
  		stime = i & 0x3;						//restore autosleep time
@@ -125,7 +183,10 @@ index 9814b19..cedc930 100644
 +		}
  		autostate = (i & 0x60)>>5;				//restore autostate setting
  		flicker = ((i & 0x10)^0x10)>>4;			//restore flicker setting
++		torii_region = (u8)cfg2->reserved2 <= 4 ? (u8)cfg2->reserved2 : 0;	//Torii: the picked region (PocketNES#3)
  		*cfg=*cfg2;
+ 	}
+ 	else
 diff --git a/src/timeout.s b/src/timeout.s
 index 74f8486..e3443bb 100644
 --- a/src/timeout.s
@@ -140,15 +201,36 @@ index 74f8486..e3443bb 100644
  	.byte 0
  	.byte 0
 diff --git a/src/ui.c b/src/ui.c
-index 09ce396..99673fa 100644
+index 09ce396..ef8a286 100644
 --- a/src/ui.c
 +++ b/src/ui.c
-@@ -4,7 +4,7 @@ char *strcat_(char *dest, const char *src);
+@@ -4,7 +4,8 @@ char *strcat_(char *dest, const char *src);
  
  
  EWRAM_BSS u8 autoA,autoB;				//0=off, 1=on, 2=R
 -EWRAM_BSS u8 stime=0;
 +u8 stime=3;	//Torii: autosleep off by default
++EWRAM_BSS u8 torii_region=0;	//Torii: the region picked in the menu, plus 1, kept in the config (reserved2); 0: the ROM's (PocketNES#3)
  EWRAM_BSS u8 autostate=0;
  
  //int selected;//selected menuitem.  used by all menus.
+@@ -758,6 +759,7 @@ void nextregion()
+ 	int region = GetRegion();
+ 	region = (region + 1) & 3;
+ 	SetRegion(region);
++	torii_region = region + 1;	//Torii: kept in the config, for this game's next start (PocketNES#3)
+ }
+ 
+ void cpuhacktoggle()
+diff --git a/src/ui.h b/src/ui.h
+index 76d2c85..508c4be 100644
+--- a/src/ui.h
++++ b/src/ui.h
+@@ -14,6 +14,7 @@ extern char str[32];
+ 
+ extern u8 autoA,autoB;				//0=off, 1=on, 2=R
+ extern u8 stime;
++extern u8 torii_region;	//Torii: the picked region plus 1, or 0 (PocketNES#3)
+ extern u8 autostate;
+ 
+ extern int cheatfinderstate;

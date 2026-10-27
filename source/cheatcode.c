@@ -29,6 +29,15 @@
 // files mix them); an Action Replay v3 "80000000 00000000" (add 0 to address
 // 0) is padding; "AAAAAAAA:VVVV" with an address past 0x0FFFFFFF is a
 // CodeBreaker line; conditional values are masked to their width.
+//
+// Where mGBA and the devices differ, the devices win (docs/research/cheats.md
+// lists the sources): Action Replay v3's C6 and C7 write 16 and 32 bits, its
+// "turn off all codes" conditionals and end line read, an empty THEN gets a
+// step so its ELSE waits on the condition, and its padding is a code a
+// conditional counts; GameShark v1/v2's E0 covers lines, its D and E
+// conditionals have VBA-M's kinds, its type 3 VBA-M's adds, its button has a
+// slowdown and a 32-bit write; CodeBreaker's D0000010 reads, and a second
+// key line, typed raw, becomes the key.
 #include <string.h>
 
 #include "cheatcode.h"
@@ -312,7 +321,11 @@ static int par_probability(u32 op1, u32 op2)
 			if (op1 & 0x01000000)
 				return 0;
 			break;
-		default:  // PAR3_BASE_OTHER
+		default:  // PAR3_BASE_OTHER: the hook, and IO writes of 16 (C6) or 32 bits (C7)
+			if ((op1 >> 24) == 0xC6 && (op2 & 0xFFFF0000))
+				probability -= 0x10;
+			else if ((op1 >> 24) != 0xC4 && (op1 >> 24) != 0xC6 && (op1 >> 24) != 0xC7)
+				probability -= 0x40;
 			break;
 		}
 	}
@@ -706,6 +719,7 @@ static void next_line(const char *s, u32 len, u32 *pos, struct line *l)
 enum {
 	CONT_NONE,
 	CONT_GSA_LIST,
+	CONT_GSA_ADD,
 	CONT_PAR_SLIDE,
 	CONT_PAR_BUTTON,
 	CONT_PAR_PATCH,
@@ -713,10 +727,14 @@ enum {
 	CONT_CB_SUPER
 };
 
+// A conditional waiting on the codes (or lines) it covers
 struct pending {
 	u32 op;
-	u32 codes;
+	u32 codes;  // ALL: the rest of the cheat
+	u32 line;   // by lines: the conditional's own line, else NONE
 };
+
+#define ALL 0xFFFFFFFFu
 
 struct dec {
 	struct cheat_decoder *d;
@@ -739,7 +757,10 @@ struct dec {
 
 	u8 bad;
 	u8 lines;
-	u8 keyed;  // the cheat has a key or seed line of its own
+	u8 keyed;    // the cheat has a key or seed line of its own
+	u8 adopt;    // a raw CodeBreaker key line other than the file's is a new key
+	u8 ended;    // an Action Replay v3 end line: no more codes
+	u32 line_no; // the line being decoded
 };
 
 static u32 width_mask(u32 width)
@@ -775,22 +796,36 @@ static struct cheat_op *emit(struct dec *s, u8 type, u8 width, u32 address, u32 
 	return op;
 }
 
-// A code has all its lines: conditionals waiting on it may now count their ops
-static void code_done(struct dec *s)
+// A code (lines 0) or a line (lines 1) is done: conditionals waiting on it
+// may now count their ops
+static void pend_done(struct dec *s, int lines)
 {
 	u32 i = 0;
 	while (i < s->n_pend) {
-		if (--s->pend[i].codes == 0) {
-			op_at(s, s->pend[i].op)->count = s->n - s->pend[i].op - 1;
-			s->pend[i] = s->pend[--s->n_pend];
-		} else {
+		struct pending *p = &s->pend[i];
+		if ((p->line != NONE) != lines || p->line == s->line_no || p->codes == ALL) {
 			++i;
+			continue;
 		}
+		--p->codes;
+		if (p->codes) {
+			++i;
+			continue;
+		}
+		op_at(s, p->op)->count = s->n - p->op - 1;
+		*p = s->pend[--s->n_pend];
 	}
 }
 
-// The conditional just emitted covers the next codes
-static void cover_next(struct dec *s, u32 codes)
+// A code has all its lines
+static void code_done(struct dec *s)
+{
+	pend_done(s, 0);
+}
+
+// The conditional just emitted covers the next codes (ALL: the rest of the
+// cheat), or the next lines when by_line
+static void cover(struct dec *s, u32 codes, int by_line)
 {
 	u32 at = s->n - 1;
 	code_done(s);
@@ -804,7 +839,13 @@ static void cover_next(struct dec *s, u32 codes)
 	}
 	s->pend[s->n_pend].op = at;
 	s->pend[s->n_pend].codes = codes;
+	s->pend[s->n_pend].line = by_line ? s->line_no : NONE;
 	++s->n_pend;
+}
+
+static void cover_next(struct dec *s, u32 codes)
+{
+	cover(s, codes, 0);
 }
 
 static void cont_start(struct dec *s, u8 kind, u8 width)
@@ -839,9 +880,41 @@ static void par_end_block(struct dec *s)
 // ------------------------------------------------------------------------
 // GameShark v1/v2 (GBACheatAddGameSharkRaw)
 
+// A 16-bit conditional of the D and E types, by its kind (VBA-M's reading;
+// mGBA's is equal for all): 0 equal, 1 not equal, 2 at most and 3 at least
+// (unsigned, as a bound one past the value). Returns 0 for another kind.
+static int gsa_cond(struct dec *s, u32 kind, u32 address, u32 value)
+{
+	switch (kind) {
+	case 0:
+		emit(s, CHEAT_OP_IF_EQ, 2, address, value);
+		return 1;
+	case 1:
+		emit(s, CHEAT_OP_IF_NE, 2, address, value);
+		return 1;
+	case 2:
+		emit(s, CHEAT_OP_IF_ULT, 2, address, 0)->value = value + 1;
+		return 1;
+	case 3:
+		if (value)
+			emit(s, CHEAT_OP_IF_UGT, 2, address, value - 1);
+		else  // always
+			emit(s, CHEAT_OP_IF_ULT, 2, address, 0)->value = 0x10000;
+		return 1;
+	default:
+		s->bad = 1;
+		return 0;
+	}
+}
+
 static void gsa_raw(struct dec *s, u32 op1, u32 op2)
 {
 	u32 width;
+	if (s->cont == CONT_GSA_ADD) {
+		emit(s, CHEAT_OP_ADD, 4, s->cont_addr, s->cont_value == 0x60 ? 0u - op1 : op1);
+		cont_end(s);
+		return;
+	}
 	if (s->cont == CONT_GSA_LIST) {
 		// Two addresses a line; an odd count leaves op2 unused
 		emit(s, CHEAT_OP_WRITE, 4, op1, s->cont_value);
@@ -865,13 +938,41 @@ static void gsa_raw(struct dec *s, u32 op1, u32 op2)
 		code_done(s);
 		return;
 	case 0x3:
-		if (!(op1 & 0xFFFF)) {
+		switch ((op1 >> 16) & 0xFF) {
+		case 0x00:  // a list
+			if (!(op1 & 0xFFFF)) {
+				s->bad = 1;
+				return;
+			}
+			s->cont = CONT_GSA_LIST;
+			s->cont_left = op1 & 0xFFFF;
+			s->cont_value = op2;
+			return;
+		// Adds to (subtracts from) the word at op2, as VBA-M reads them: the
+		// amount a byte, a halfword, or the next line's first half
+		case 0x10:
+			emit(s, CHEAT_OP_ADD, 4, op2 & 0x0FFFFFFF, op1 & 0xFF);
+			break;
+		case 0x20:
+			emit(s, CHEAT_OP_ADD, 4, op2 & 0x0FFFFFFF, 0u - (op1 & 0xFF));
+			break;
+		case 0x30:
+			emit(s, CHEAT_OP_ADD, 4, op2 & 0x0FFFFFFF, op1 & 0xFFFF);
+			break;
+		case 0x40:
+			emit(s, CHEAT_OP_ADD, 4, op2 & 0x0FFFFFFF, 0u - (op1 & 0xFFFF));
+			break;
+		case 0x50:
+		case 0x60:
+			s->cont = CONT_GSA_ADD;
+			s->cont_value = (op1 >> 16) & 0xFF;
+			s->cont_addr = op2 & 0x0FFFFFFF;
+			return;
+		default:
 			s->bad = 1;
 			return;
 		}
-		s->cont = CONT_GSA_LIST;
-		s->cont_left = op1 & 0xFFFF;
-		s->cont_value = op2;
+		code_done(s);
 		return;
 	case 0x6:
 		emit(s, CHEAT_OP_ROM_PATCH, 2, 0x08000000 | ((op1 & 0xFFFFFF) << 1), op2);
@@ -885,6 +986,18 @@ static void gsa_raw(struct dec *s, u32 op1, u32 op2)
 		case 0x00200000:
 			width = 2;
 			break;
+		case 0x00400000:  // 32 bits: the device writes 0 whatever the value (VBA-M)
+			width = 4;
+			op2 = 0;
+			break;
+		case 0x00F00000:  // slowdown while the button is held: read, not run
+			if (op1 != 0x80F00000) {
+				s->bad = 1;
+				return;
+			}
+			emit(s, CHEAT_OP_SLOWDOWN, 0, 0, 0)->value = op2 & 0xFFFF;
+			code_done(s);
+			return;
 		default:
 			s->bad = 1;
 			return;
@@ -899,12 +1012,12 @@ static void gsa_raw(struct dec *s, u32 op1, u32 op2)
 			gs_reseed(s->d->gs_seeds, op2, gsa1_t1, gsa1_t2);
 			return;
 		}
-		emit(s, CHEAT_OP_IF_EQ, 2, op1 & 0x0FFFFFFF, op2);
-		cover_next(s, 1);
+		if (gsa_cond(s, (op2 >> 20) & 0xF, op1 & 0x0FFFFFFF, op2 & 0xFFFF))
+			cover_next(s, 1);
 		return;
-	case 0xE:
-		emit(s, CHEAT_OP_IF_EQ, 2, op2 & 0x0FFFFFFF, op1 & 0xFFFF);
-		cover_next(s, (op1 >> 16) & 0xFF);
+	case 0xE:  // the next zz lines, as the device steps through them (VBA-M)
+		if (gsa_cond(s, op2 >> 28, op2 & 0x0FFFFFFF, op1 & 0xFFFF))
+			cover(s, (op1 >> 16) & 0xFF, 1);
 		return;
 	case 0xF:  // the hook
 		return;
@@ -925,10 +1038,6 @@ static void par_cond(struct dec *s, u32 op1, u32 op2)
 	};
 	u32 width = 1u << ((op1 & PAR3_WIDTH) >> PAR3_WIDTH_BASE);
 	u32 action = op1 & PAR3_ACTION;
-	if (action == PAR3_ACTION_DISABLE) {
-		s->bad = 1;
-		return;
-	}
 	if (width > 4)
 		emit(s, CHEAT_OP_IF_NEVER, 0, par_addr(op1), 0);
 	else
@@ -941,6 +1050,12 @@ static void par_cond(struct dec *s, u32 op1, u32 op2)
 		s->block = at;
 		return;
 	}
+	// "Turn off all codes" while false: the device spins in its handler until
+	// the condition holds (GBATEK); Torii skips the rest of the cheat instead
+	if (action == PAR3_ACTION_DISABLE) {
+		cover_next(s, ALL);
+		return;
+	}
 	cover_next(s, action == PAR3_ACTION_NEXT_TWO ? 2 : 1);
 }
 
@@ -948,7 +1063,8 @@ static void par_special(struct dec *s, u32 op2)
 {
 	u32 width;
 	switch (op2 & 0xFF000000) {
-	case 0x00000000:  // end
+	case 0x00000000:  // the end of the code list: no code after it runs
+		s->ended = 1;
 		return;
 	case 0x08000000:
 		emit(s, CHEAT_OP_SLOWDOWN, 0, 0, 0)->value = op2 & 0x00FFFFFF;
@@ -976,10 +1092,15 @@ static void par_special(struct dec *s, u32 op2)
 			par_end_block(s);
 		return;
 	case 0x60000000:  // ELSE
-		if (s->block == NONE)
+		if (s->block == NONE) {
 			s->bad = 1;
-		else
-			s->else_at = s->n;
+			return;
+		}
+		// An empty THEN gets a step that does nothing: a conditional covering
+		// no ops never tests (mGBA's loop), so its ELSE would run every frame
+		if (s->n == s->block + 1)
+			emit(s, CHEAT_OP_WRITE, 1, 0, 0)->count = 0;
+		s->else_at = s->n;
 		return;
 	case 0x80000000:
 	case 0x82000000:
@@ -1032,8 +1153,10 @@ static void par_raw(struct dec *s, u32 op1, u32 op2)
 	}
 	if (op1 >> 24 == 0xC4)  // the hook
 		return;
-	if (op1 == 0x80000000 && op2 == 0)  // adds 0 to address 0: padding
+	if (op1 == 0x80000000 && op2 == 0) {  // adds 0 to address 0: padding, still a code a conditional counts
+		code_done(s);
 		return;
+	}
 	if (op1 & PAR3_COND) {
 		par_cond(s, op1, op2);
 		return;
@@ -1071,8 +1194,12 @@ static void par_raw(struct dec *s, u32 op1, u32 op2)
 		}
 		emit(s, CHEAT_OP_ADD, width, par_addr(op1), op2);
 		break;
-	default:  // IO writes
-		width = ((op1 >> 24) & 1) + 1;
+	default:  // IO writes: C6 of 16 bits, C7 of 32 (GBATEK, VBA-M; mGBA writes 8 and 16)
+		if ((op1 & 0xFE000000) != 0xC6000000) {
+			s->bad = 1;
+			return;
+		}
+		width = op1 & 0x01000000 ? 4 : 2;
 		emit(s, CHEAT_OP_WRITE, width, 0x04000000 | (op1 & 0x00FFFFFF), op2);
 		break;
 	}
@@ -1140,6 +1267,12 @@ static void cb_line(struct dec *s, u32 op1, u16 op2)
 			s->keyed = 1;
 			return;
 		}
+		if (s->adopt && op1 >> 28 == 0x9 && s->cont == CONT_NONE) {  // another key, as typed
+			s->keyed = 1;
+			if (!cb_reseed(d, op1, op2))
+				s->bad = 1;
+			return;
+		}
 		cb_decrypt(d, &op1, &op2);
 	}
 
@@ -1190,12 +1323,15 @@ static void cb_line(struct dec *s, u32 op1, u16 op2)
 		s->cont_left = 2 * (u32)op2;
 		s->cont_addr = address;
 		return;
-	case 0xD:
-		if (address != 0x20) {
+	case 0xD:  // key tests on KEYINPUT, which reads 0 for a held key
+		if (address == 0x20)  // every key in op2 held (GBATEK)
+			emit(s, CHEAT_OP_IF_NAND, 2, CHEAT_KEYINPUT, op2);
+		else if (address == 0x10)  // not every one held (VBA-M)
+			emit(s, CHEAT_OP_IF_AND, 2, CHEAT_KEYINPUT, op2);
+		else {
 			s->bad = 1;
 			return;
 		}
-		emit(s, CHEAT_OP_IF_NAND, 2, 0x04000130, op2);  // KEYINPUT
 		cover_next(s, 1);
 		return;
 	case 0x7:
@@ -1247,10 +1383,33 @@ void cheat_decoder_force(struct cheat_decoder *d, u8 format)
 		set_gs_version(d, format);
 }
 
+void cheat_decoder_force_in(struct cheat_decoder *d, const struct cheat_decoder *file, u8 format)
+{
+	cheat_decoder_force(d, format);
+	if (format != CHEAT_FMT_AUTO && format == file->gs_version)
+		memcpy(d->gs_seeds, file->gs_seeds, sizeof(d->gs_seeds));
+}
+
+void cheat_decoder_force_out(struct cheat_decoder *file, const struct cheat_decoder *d, const u32 *seeds_before)
+{
+	u8 format = d->forced;
+	if (format < CHEAT_FMT_GSAV1 || format > CHEAT_FMT_PARV3_RAW)
+		return;
+	if (!memcmp(d->gs_seeds, seeds_before, sizeof(d->gs_seeds)))
+		return;  // no DEADFACE in it
+	if (file->gs_version != format) {
+		if (file->gs_version != CHEAT_FMT_AUTO)
+			return;  // the file's codes are another device's
+		set_gs_version(file, format);
+	}
+	memcpy(file->gs_seeds, d->gs_seeds, sizeof(file->gs_seeds));
+}
+
 // Decodes code's lines with the state in work; returns a status. *keyed says
-// whether the cheat holds a CodeBreaker key line of its own.
+// whether the cheat holds a CodeBreaker key line of its own. With adopt, a
+// raw CodeBreaker key line other than work's key is a new key.
 static u8 decode_pass(struct cheat_decoder *work, const char *code, u32 len, struct cheat_op *ops, u32 ops_max,
-		      u32 *n_ops, u8 *keyed)
+		      u32 *n_ops, u8 *keyed, u8 adopt)
 {
 	struct dec s;
 	struct line l;
@@ -1263,14 +1422,16 @@ static u8 decode_pass(struct cheat_decoder *work, const char *code, u32 len, str
 	s.ops_max = ops_max;
 	s.block = NONE;
 	s.else_at = NONE;
+	s.adopt = adopt;
 	work->last = CHEAT_FMT_AUTO;
 	work->last_alone = 0;
 	for (;;) {
 		next_line(code, len, &pos, &l);
-		if (l.kind == LINE_END)
+		if (l.kind == LINE_END || s.ended)
 			break;
 		if (s.lines < 0xFF)
 			++s.lines;
+		++s.line_no;
 		if (l.kind == LINE_CB)
 			cb_line(&s, l.op1, l.op2);
 		else if (l.kind == LINE_GS)
@@ -1279,6 +1440,7 @@ static u8 decode_pass(struct cheat_decoder *work, const char *code, u32 len, str
 			vba_line(&s, &l);
 		if (s.bad)
 			break;
+		pend_done(&s, 1);
 	}
 	if (s.cont != CONT_NONE)
 		s.bad = 1;
@@ -1325,7 +1487,7 @@ u8 cheat_decode(struct cheat_decoder *d, const char *code, u32 len, struct cheat
 	struct cheat_decoder work = *d, alone;
 	struct line l;
 	u32 pos = 0, i;
-	u8 marks = 0, keyed, status;
+	u8 marks = 0, keyed, status, new_key = 0;
 
 	*n_ops = 0;
 	// Every token must read before anything decodes
@@ -1336,13 +1498,35 @@ u8 cheat_decode(struct cheat_decoder *d, const char *code, u32 len, struct cheat
 		if (l.kind == LINE_BAD)
 			return CHEAT_UNREADABLE;
 		marks |= l.marks;
+		if (d->cb_master && l.kind == LINE_CB && l.op1 >> 28 == 0x9 &&
+		    !(l.op1 == d->cb_master && l.op2 == d->cb_key2))
+			new_key = 1;
 	}
 	if (!i)
 		return CHEAT_UNREADABLE;
 	if (marks)
 		return CHEAT_PLACEHOLDER;
 
-	status = decode_pass(&work, code, len, ops, ops_max, n_ops, &keyed);
+	status = decode_pass(&work, code, len, ops, ops_max, n_ops, &keyed, 0);
+	// A raw key line other than the file's: a file joining codes made under
+	// two keys starts the second key's codes with its key line, as typed. It
+	// is taken as the key when the file's key reads the cheat as nonsense and
+	// the new one doesn't; the file's later cheats keep it. A key line alone
+	// is no evidence: an encrypted code may look like one.
+	if (new_key && i > 1 &&
+	    !(status != CHEAT_MASTER_ONLY && plausible(status, ops, *n_ops < ops_max ? *n_ops : ops_max))) {
+		u32 n_new;
+		u8 new_status;
+		alone = *d;
+		new_status = decode_pass(&alone, code, len, ops, ops_max, &n_new, &keyed, 1);
+		if (new_status == CHEAT_MASTER_ONLY || plausible(new_status, ops, n_new < ops_max ? n_new : ops_max)) {
+			*d = alone;
+			*n_ops = n_new;
+			return new_status;
+		}
+		work = *d;
+		status = decode_pass(&work, code, len, ops, ops_max, n_ops, &keyed, 0);
+	}
 	if (keyed || plausible(status, ops, *n_ops < ops_max ? *n_ops : ops_max)) {
 		*d = work;
 		return status;
@@ -1363,7 +1547,7 @@ u8 cheat_decode(struct cheat_decoder *d, const char *code, u32 len, struct cheat
 			alone.cb_master = 0;
 		if (i & 2)
 			alone.gs_version = CHEAT_FMT_AUTO;
-		alone_status = decode_pass(&alone, code, len, ops, ops_max, &n_alone, &keyed);
+		alone_status = decode_pass(&alone, code, len, ops, ops_max, &n_alone, &keyed, 0);
 		if (plausible(alone_status, ops, n_alone < ops_max ? n_alone : ops_max) &&
 		    touches_ram(ops, n_alone < ops_max ? n_alone : ops_max)) {
 			u8 last = alone.last;
@@ -1392,7 +1576,7 @@ u8 cheat_decode(struct cheat_decoder *d, const char *code, u32 len, struct cheat
 				continue;
 			alone = *d;
 			set_gs_version(&alone, versions[i]);
-			alone_status = decode_pass(&alone, code, len, ops, ops_max, &n_alone, &keyed);
+			alone_status = decode_pass(&alone, code, len, ops, ops_max, &n_alone, &keyed, 0);
 			if (plausible(alone_status, ops, n_alone < ops_max ? n_alone : ops_max) &&
 			    (versions[i] == CHEAT_FMT_GSAV1_RAW || versions[i] == CHEAT_FMT_PARV3_RAW ||
 			     touches_ram(ops, n_alone < ops_max ? n_alone : ops_max))) {
@@ -1404,7 +1588,7 @@ u8 cheat_decode(struct cheat_decoder *d, const char *code, u32 len, struct cheat
 	}
 	// None reads: back to the file's own decoding
 	work = *d;
-	status = decode_pass(&work, code, len, ops, ops_max, n_ops, &keyed);
+	status = decode_pass(&work, code, len, ops, ops_max, n_ops, &keyed, 0);
 	*d = work;
 	return status;
 }

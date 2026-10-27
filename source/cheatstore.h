@@ -25,6 +25,9 @@
 // A part of the text on its way between the card and PSRAM, and between two
 // places in PSRAM
 #define CHEATSTORE_PART 1024
+// The cheat screen's detail view: its text and wrapped rows
+#define CHEATSTORE_DETAIL 2048
+#define CHEATSTORE_DETAIL_ROWS 64
 
 struct cheatstore {
 	struct cheatfile file;
@@ -35,6 +38,11 @@ struct cheatstore {
 	u32 part[CHEATSTORE_PART / 4];  // a part read from the card (word-aligned for f_read)
 	u16 stage[CHEATSTORE_PART / 2 + 2];  // a part on its way to PSRAM, a byte each side for odd ends
 	u8 room_failed;  // a PSRAM write of the text failed since the read: never written back
+	// The cheat screen's detail view (ui/ui_reading.h): a cheat's name, code
+	// and what decoding found
+	char detail[CHEATSTORE_DETAIL];
+	u16 detail_start[CHEATSTORE_DETAIL_ROWS];
+	u8 detail_len[CHEATSTORE_DETAIL_ROWS], detail_kind[CHEATSTORE_DETAIL_ROWS];
 };
 struct cheatstore *cheatstore(void);
 // n bytes from src (RAM or PSRAM) to dst in PSRAM, as the text's edits write
@@ -67,10 +75,17 @@ enum {
 int cheatstore_open(const char *rom_path);
 // The game popup's look at the game's cheat file, never reading it: 0 if
 // the game can have none (its path too long), else 1, with *listed the
-// count the cheat screen lists if this session has counted the file as it
-// is on the card now (the same path, size and date), else -1. Only f_stat:
-// the copy the count was kept for, NAME, or NAME.bak without it.
+// count the cheat screen lists if it has counted the file as it is on the
+// card now (the same path, size and date: this session, else as
+// /torii/cheats/counts.txt keeps it), else -1. An f_stat of the copy the
+// count was kept for (NAME, or NAME.bak without it), and a read of
+// counts.txt (a few hundred bytes) when this session hasn't counted it.
 int cheatstore_peek(const char *rom_path, s32 *listed);
+// Keeps the count cheatstore_listed found last in /torii/cheats/counts.txt
+// (a safe file, its latest 32 files), for the popup after a power-off;
+// nothing written if it is kept already. The cheat screen calls it as it
+// leaves. Borrows the detail view's buffer.
+void cheatstore_keep_listed(void);
 // The decoder as it is before cheat i (the file's count: after the last),
 // decoding the file again from the first unless it has just got there
 void cheatstore_decoder_before(u32 i, struct cheat_decoder *out);
@@ -88,12 +103,20 @@ s32 cheatstore_listed(void);
 u32 cheatstore_add(const char *desc, const char *code, u8 format, u32 *index);
 u32 cheatstore_set_code(u32 i, const char *desc, const char *code, u8 format);
 u32 cheatstore_remove(u32 i);
+// cheatfile_can_add for the read file in its PSRAM room (CHEATFILE_EDIT_FAILED
+// once a PSRAM write has failed)
+u32 cheatstore_can_add(const char *desc);
 // Writes the picks back into the read file, power-cut safe, if one changed
 // or an edit (cheatfile.h's) changed its text. 1 if it is as the picks say;
 // 0 if not written, as when a PSRAM write of the text failed.
 int cheatstore_write(void);
 // Deletes the game's cheat file (both copies); 1 if none is left
 int cheatstore_delete(const char *rom_path);
+// After an edit left the read file with no cheat and nothing else worth
+// keeping (cheatfile_empty): deletes it, both copies, the .bak first, so a
+// power cut leaves the file as last written or none; the picks count as
+// written. 1 if none is left.
+int cheatstore_drop(void);
 
 // A launch of the GBA game at rom_path: its picked cheats into the
 // interpreter's table (gl_cheat_table, cheat.h), in file order, as many as fit

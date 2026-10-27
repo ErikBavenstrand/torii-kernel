@@ -1,0 +1,18 @@
+cheats = 4
+
+cheat0_desc = "list"
+cheat0_code = "79FED3F0 CC20C247+2F44B533 6E5B5D08+8F0307BA 5A305CCB+9D728130 A122B149"
+cheat0_enable = true
+
+cheat1_desc = "button covered"
+cheat1_code = "79FED3F0 CC20C247+72701CBC F40C0141+5743B928 98F418CE"
+cheat1_enable = true
+
+cheat2_desc = "slowdown"
+cheat2_code = "79FED3F0 CC20C247+921D8A80 DB41A95F+E1ADC7F7 AFEE30CD"
+cheat2_enable = true
+
+cheat3_desc = "deadface"
+cheat3_code = "79FED3F0 CC20C247+70BDB80D 69F37FCB+CF8813AC 6F6E1AB2"
+cheat3_enable = true
+

@@ -1,0 +1,34 @@
+cheats = 8
+
+cheat0_desc = "super"
+cheat0_code = "52001000 0004+01020304 0506+07080000 0000"
+cheat0_enable = true
+
+cheat1_desc = "super covered"
+cheat1_code = "72001000 0001+52001010 0002+01020304 0000"
+cheat1_enable = true
+
+cheat2_desc = "super cut short"
+cheat2_code = "52001000 0004+01020304 0506"
+cheat2_enable = true
+
+cheat3_desc = "keys"
+cheat3_code = "D0000020 0001+82001000 0001"
+cheat3_enable = true
+
+cheat4_desc = "D other"
+cheat4_code = "D0000010 0001+82001000 0001"
+cheat4_enable = true
+
+cheat5_desc = "two hooks"
+cheat5_code = "18000100 000A+00001234 0001+18000200 000A"
+cheat5_enable = true
+
+cheat6_desc = "placeholder"
+cheat6_code = "8200100? 00XX"
+cheat6_enable = true
+
+cheat7_desc = "vba high"
+cheat7_code = "820001A8:FFFF+33000024:0002"
+cheat7_enable = true
+

@@ -119,11 +119,11 @@ static void run(void)
 			case CHEAT_OP_IF_NE:
 				cond = r != value;
 				break;
-			case CHEAT_OP_IF_LT:
-				cond = (s32)r < (s32)value;
+			case CHEAT_OP_IF_LT:  // signed at the width
+				cond = (s32)(r << (32 - 8 * op->width)) < (s32)(value << (32 - 8 * op->width));
 				break;
 			case CHEAT_OP_IF_GT:
-				cond = (s32)r > (s32)value;
+				cond = (s32)(r << (32 - 8 * op->width)) > (s32)(value << (32 - 8 * op->width));
 				break;
 			case CHEAT_OP_IF_ULT:
 				cond = r < value;
@@ -362,8 +362,8 @@ void test_cheatcode_par3_types(void)
 	CHECK_EQ(ops[1].addr_step, 4);
 	CHECK_OP(2, CHEAT_OP_ADD, 4, 0x03000108, 0x10, 1);
 	CHECK_EQ(decode_as(CHEAT_FMT_PARV3_RAW, "C6000200 00000080+C7000204 00001234"), CHEAT_OK);
-	CHECK_OP(0, CHEAT_OP_WRITE, 1, 0x04000200, 0x80, 1);
-	CHECK_OP(1, CHEAT_OP_WRITE, 2, 0x04000204, 0x1234, 1);
+	CHECK_OP(0, CHEAT_OP_WRITE, 2, 0x04000200, 0x80, 1);
+	CHECK_OP(1, CHEAT_OP_WRITE, 4, 0x04000204, 0x1234, 1);
 
 	// Four ROM patch slots take their value from the next line
 	CHECK_EQ(decode_as(CHEAT_FMT_PARV3_RAW,
@@ -381,11 +381,10 @@ void test_cheatcode_par3_types(void)
 	CHECK_EQ(decode_as(CHEAT_FMT_PARV3_RAW, "C4000100 00000000+00300000 00000005"), CHEAT_OK);
 	CHECK_EQ(n_ops, 1);
 
-	// Unreadable: ELSE or ENDIF without a block, disable-type conditionals,
-	// unknown specials, an 8-byte write, a slide missing its second line
+	// Unreadable: ELSE or ENDIF without a block, unknown specials, an 8-byte
+	// write, a slide missing its second line
 	CHECK_EQ(decode_as(CHEAT_FMT_PARV3_RAW, "00000000 40000000"), CHEAT_UNREADABLE);
 	CHECK_EQ(decode_as(CHEAT_FMT_PARV3_RAW, "00000000 60000000"), CHEAT_UNREADABLE);
-	CHECK_EQ(decode_as(CHEAT_FMT_PARV3_RAW, "C8300000 00000000+00300000 00000001"), CHEAT_UNREADABLE);
 	CHECK_EQ(decode_as(CHEAT_FMT_PARV3_RAW, "00000000 02000000"), CHEAT_UNREADABLE);
 	CHECK_EQ(decode_as(CHEAT_FMT_PARV3_RAW, "06300000 00000000"), CHEAT_UNREADABLE);
 	CHECK_EQ(decode_as(CHEAT_FMT_PARV3_RAW, "00000000 80300000"), CHEAT_UNREADABLE);
@@ -884,6 +883,129 @@ void test_cheatcode_lower(void)
 	in[0] = op(CHEAT_OP_IF_EQ, 2, 0x08000100, 0x4770, 1);  // a condition reads the ROM: fine
 	in[1] = op(CHEAT_OP_WRITE, 2, 0x02000000, 1, 1);
 	CHECK_EQ(cheat_lower(in, 2, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_OK);
+}
+
+// Where the devices (GBATEK, EnHacklopedia, VBA-M) and mGBA differ, Torii
+// follows the devices (docs/research/cheats.md)
+void test_cheatcode_device(void)
+{
+	struct cheat_decoder d;
+	u32 nw = 0, np = 0, cost = 0;
+
+	// Action Replay v3: an IF with an empty THEN runs its ELSE only when
+	// false, not every frame
+	CHECK_EQ(decode_as(CHEAT_FMT_PARV3_RAW,
+			   "8A300000 00001234+00000000 60000000+00300010 000000FF+00000000 40000000"),
+		 CHEAT_OK);
+	scenario("", "10:FF", "empty THEN, false");
+	scenario("0:34 1:12", "10:0", "empty THEN, true");
+	CHECK_EQ(cheat_lower(ops, n_ops, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_OK);
+
+	// Its IO writes: C6 of 16 bits, C7 of 32; no other C code is one
+	CHECK_EQ(decode_as(CHEAT_FMT_PARV3_RAW, "C6000200 00001234+C7000204 12345678"), CHEAT_OK);
+	CHECK_OP(0, CHEAT_OP_WRITE, 2, 0x04000200, 0x1234, 1);
+	CHECK_OP(1, CHEAT_OP_WRITE, 4, 0x04000204, 0x12345678, 1);
+	CHECK_EQ(decode_as(CHEAT_FMT_PARV3_RAW, "C0000200 00000012"), CHEAT_UNREADABLE);
+	CHECK_EQ(decode_as(CHEAT_FMT_PARV3_RAW, "C2000200 00000012"), CHEAT_UNREADABLE);
+
+	// "Turn off all codes" conditionals: when false, nothing after them runs
+	CHECK_EQ(decode_as(CHEAT_FMT_PARV3_RAW, "C8300000 00000001+00300004 00000055+00300005 00000066"), CHEAT_OK);
+	CHECK_OP(0, CHEAT_OP_IF_EQ, 1, 0x03000000, 1, 2);
+	scenario("", "4:0 5:0", "disable, false");
+	scenario("0:1", "4:55 5:66", "disable, true");
+	CHECK_EQ(decode_as(CHEAT_FMT_PARV3_RAW, "CE300000 00000000+00300004 00000055"), CHEAT_OK);  // always off
+	scenario("", "4:0", "always off");
+
+	// The padding after a 32-bit slide is a code a conditional counts
+	CHECK_EQ(decode_as(CHEAT_FMT_PARV3_RAW, "48300000 00000001+00000000 84300010+00000002 00010001+"
+						"80000000 00000000+00300004 00000055"),
+		 CHEAT_OK);
+	CHECK_EQ(n_ops, 3);
+	CHECK_EQ(ops[0].count, 1);
+	scenario("", "4:55 10:0", "padding counted");
+
+	// The end of the code list: nothing after it
+	CHECK_EQ(decode_as(CHEAT_FMT_PARV3_RAW, "00300004 00000055+00000000 00000000+00300005 00000066"), CHEAT_OK);
+	CHECK_EQ(n_ops, 1);
+
+	// Signed comparisons at the op's width: 0xFF is -1, below 1
+	CHECK_EQ(decode_as(CHEAT_FMT_PARV3_RAW, "18300000 00000001+00300004 00000055"), CHEAT_OK);
+	scenario("0:FF", "4:55", "signed byte");
+	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "C3000000 0001+33000004 0055"), CHEAT_OK);
+	scenario("0:FF 1:FF", "4:55", "signed halfword");
+	scenario("0:2", "4:0", "signed halfword, not below");
+
+	// GameShark v1/v2: slowdown on the button reads (and does nothing); a
+	// 32-bit button write writes 0
+	CHECK_EQ(decode_as(CHEAT_FMT_GSAV1_RAW, "80F00000 00000100+03000004 00000055"), CHEAT_OK);
+	CHECK_OP(0, CHEAT_OP_SLOWDOWN, 0, 0, 0x100, 1);
+	CHECK_EQ(decode_as(CHEAT_FMT_GSAV1_RAW, "83400010 12345678"), CHEAT_OK);
+	CHECK_OP(1, CHEAT_OP_WRITE, 4, 0x03000010, 0, 1);
+
+	// E0zzxxxx covers zz lines, a list's included
+	CHECK_EQ(decode_as(CHEAT_FMT_GSAV1_RAW,
+			   "E0020005 03000010+30000002 12345678+03000020 03000024+13000014 00000001"),
+		 CHEAT_OK);
+	CHECK_EQ(n_ops, 4);
+	CHECK_EQ(ops[0].count, 2);
+
+	// D and E kinds: not equal, at most, at least
+	CHECK_EQ(decode_as(CHEAT_FMT_GSAV1_RAW, "D3000000 00100005+03000004 00000055"), CHEAT_OK);
+	CHECK_EQ(ops[0].type, CHEAT_OP_IF_NE);
+	scenario("0:5", "4:0", "D not equal, equal");
+	scenario("0:6", "4:55", "D not equal");
+	CHECK_EQ(decode_as(CHEAT_FMT_GSAV1_RAW, "D3000000 00200005+03000004 00000055"), CHEAT_OK);
+	scenario("0:5", "4:55", "D at most, equal");
+	scenario("0:6", "4:0", "D at most, above");
+	CHECK_EQ(decode_as(CHEAT_FMT_GSAV1_RAW, "E0010005 33000000+03000004 00000055"), CHEAT_OK);
+	scenario("0:5", "4:55", "E at least, equal");
+	scenario("0:4", "4:0", "E at least, below");
+	CHECK_EQ(decode_as(CHEAT_FMT_GSAV1_RAW, "E0010000 33000000+03000004 00000055"), CHEAT_OK);
+	scenario("0:FF 1:FF", "4:55", "E at least 0");
+	CHECK_EQ(decode_as(CHEAT_FMT_GSAV1_RAW, "D3000000 00400005"), CHEAT_UNREADABLE);
+
+	// Type 3's adds and subtractions to a word
+	CHECK_EQ(decode_as(CHEAT_FMT_GSAV1_RAW, "30100005 03000010+30200001 03000014+30400100 03000018+"
+						"30500000 0300001C+00012345 00000000"),
+		 CHEAT_OK);
+	CHECK_EQ(n_ops, 4);
+	CHECK_OP(0, CHEAT_OP_ADD, 4, 0x03000010, 5, 1);
+	CHECK_OP(1, CHEAT_OP_ADD, 4, 0x03000014, 0xFFFFFFFF, 1);
+	CHECK_OP(2, CHEAT_OP_ADD, 4, 0x03000018, 0xFFFFFF00, 1);
+	CHECK_OP(3, CHEAT_OP_ADD, 4, 0x0300001C, 0x12345, 1);
+	CHECK_EQ(decode_as(CHEAT_FMT_GSAV1_RAW, "30700000 03000010"), CHEAT_UNREADABLE);
+
+	// CodeBreaker D0000010: the next code runs unless every key is held
+	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "D0000010 0005+33000010 0055"), CHEAT_OK);
+	CHECK_OP(0, CHEAT_OP_IF_AND, 2, CHEAT_KEYINPUT, 5, 1);
+	keyinput = 0x3FA;
+	scenario("", "10:0", "CB keys held");
+	keyinput = 0x3FB;
+	scenario("", "10:55", "CB a key up");
+	keyinput = 0x3FF;
+
+	// A second CodeBreaker key, typed raw before its codes, is the file's
+	// key from there on
+	cheat_decoder_init(&d);
+	CHECK_EQ(decode(&d, "900A8409 51B5"), CHEAT_MASTER_ONLY);
+	CHECK_EQ(d.cb_master, 0x900A8409);
+	CHECK_EQ(decode(&d, "930CFE0E61A7+D86098902576+777F4707DA29"), CHEAT_OK);
+	CHECK_OP(1, CHEAT_OP_WRITE, 2, 0x0203A9D4, 0x270F, 1);
+	CHECK_EQ(d.cb_master, 0x930CFE0E);
+	CHECK_EQ(decode(&d, "D86098902576+777F4707DA29"), CHEAT_OK);
+	CHECK_EQ(n_ops, 2);
+	CHECK_OP(0, CHEAT_OP_IF_EQ, 2, 0x0203AA04, 0x84F0, 1);
+	CHECK_OP(1, CHEAT_OP_WRITE, 2, 0x0203A9D4, 0x270F, 1);
+
+	// A forced format keeps the file's GameShark seeds when it is the file's
+	struct cheat_decoder file, own;
+	cheat_decoder_force(&file, CHEAT_FMT_GSAV1_RAW);
+	CHECK_EQ(decode(&file, "DEADFACE 00000102"), CHEAT_MASTER_ONLY);
+	cheat_decoder_force_in(&own, &file, CHEAT_FMT_GSAV1_RAW);
+	CHECK_EQ(own.gs_seeds[0], file.gs_seeds[0]);
+	CHECK_EQ(own.forced, CHEAT_FMT_GSAV1_RAW);
+	cheat_decoder_force_in(&own, &file, CHEAT_FMT_PARV3_RAW);
+	CHECK(own.gs_seeds[0] != file.gs_seeds[0]);
 }
 
 // Every prefix of real codes, and random bytes, decode without reading past

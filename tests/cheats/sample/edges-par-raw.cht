@@ -1,0 +1,10 @@
+cheats = 2
+
+cheat0_desc = "padding"
+cheat0_code = "DEADFACE 00000000+02201000 00000007+80000000 00000000+02201002 00000008"
+cheat0_enable = true
+
+cheat1_desc = "padding covered"
+cheat1_code = "DEADFACE 00000000+4A201000 00000001+02201000 00000007+80000000 00000000+02201002 00000008"
+cheat1_enable = true
+

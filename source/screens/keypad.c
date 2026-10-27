@@ -459,7 +459,7 @@ static void show_hints(void)
 // A refusal in the hint area, in danger ink, for look.message frames
 static void message(const char *text)
 {
-	static const struct ui_hint_note danger = {UI_ROLE_DANGER, 0, 0, 0, 0, 0};
+	static const struct ui_hint_note danger = {UI_ROLE_DANGER, 0, 0, 0, 0, 0, 0};
 	snprintf(kp.msg, sizeof(kp.msg), "%s", text);
 	ui_hints_note(node(N_HINTS), kp.msg, &danger);
 	kp.message = look.message;

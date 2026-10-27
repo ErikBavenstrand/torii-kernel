@@ -147,7 +147,8 @@ static void patches_of(struct out *o, const struct cheat_op *op)
 		return;
 	for (k = 0; k < count && o->status == CHEAT_LOWER_OK; ++k) {
 		for (b = 0; b < op->width; ++b)
-			put_patch_byte(o, address + b, (u8)(value >> (8 * b)));
+			// Aligned down, as a CPU store and mGBA's ROM patches are
+			put_patch_byte(o, (address & ~(u32)(op->width - 1)) + b, (u8)(value >> (8 * b)));
 		address += (u32)op->addr_step;
 		value += (u32)op->value_step;
 	}

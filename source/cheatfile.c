@@ -229,6 +229,26 @@ int cheatfile_rom_crc(const char *text, u32 len, u32 *crc)
 	return 0;
 }
 
+int cheatfile_empty(const struct cheatfile *f)
+{
+	if (f->count)
+		return 0;
+	u32 pos = text_start(f->text, f->len), crc;
+	struct kv kv;
+	while (next_kv(f->text, f->len, &pos, &kv)) {
+		if (kv.blank)
+			continue;
+		if (kv.klen) {
+			u32 n, digits;
+			if (cheat_key(f->text + kv.key, kv.klen, f->max, &n, &digits) != KEY_COUNT)
+				return 0;
+		} else if (!cheatfile_rom_crc(f->text + kv.start, kv.end - kv.start, &crc)) {
+			return 0;  // a comment of the user's, or any other line
+		}
+	}
+	return 1;
+}
+
 void cheatfile_parse(struct cheatfile *f, const char *text, u32 len, struct cheatfile_cheat *cheats, u32 max)
 {
 	u32 cut = len > CHEATFILE_TEXT_MAX;
@@ -325,13 +345,18 @@ s32 cheatfile_next(struct cheatfile *f, struct cheatfile_work *w)
 	u32 n_ops;
 	u8 lowered;
 	if (c->format != CHEAT_FMT_AUTO) {
-		// Read alone in its own format: the file's key and seeds pass it by
+		// Read alone in its own format: the file's key passes it by, its
+		// GameShark seeds don't
 		struct cheat_decoder own;
-		cheat_decoder_force(&own, c->format);
+		u32 seeds[4];
+		cheat_decoder_force_in(&own, &w->dec, c->format);
+		memcpy(seeds, own.gs_seeds, sizeof(seeds));
 		c->status = cheatfile_decode(w, &own, f->text + c->code, c->code_len, &n_ops, &lowered);
+		cheat_decoder_force_out(&w->dec, &own, seeds);
 	} else {
 		c->status = cheatfile_decode(w, &w->dec, f->text + c->code, c->code_len, &n_ops, &lowered);
 	}
+	c->detected = c->format != CHEAT_FMT_AUTO ? c->format : w->dec.last;
 	if (c->status != CHEATFILE_OK)
 		w->n_prog = w->n_patches = w->cost = 0;
 	c->bytes = (u16)(w->n_prog * 4);
@@ -853,18 +878,11 @@ static int code_ok(const char *code)
 	return 1;
 }
 
-u32 cheatfile_add(struct cheatfile *f, const struct cheatfile_room *room, const char *desc, const char *code, u8 format,
-		  u32 *index)
+// A new cheat's lines into pcs (5 at most): after a blank line (and the last
+// line's end, if it has none), in order at the end. Their count.
+static u32 add_pieces(const struct cheatfile *f, const char *desc, const char *code, u8 format, struct piece *pcs)
 {
-	if (!code_ok(code) || format > CHEAT_FMT_VBA)
-		return CHEATFILE_EDIT_BAD;
-	u32 n = f->next;
-	if (n >= f->max)
-		return CHEATFILE_EDIT_FULL;
-	// After a blank line (and the last line's end, if it has none), its
-	// lines, in order at the end
-	struct piece pcs[5];
-	u32 k = 0, at = f->len;
+	u32 k = 0, at = f->len, n = f->next;
 	int any = f->len > text_start(f->text, f->len);
 	int open = any && f->text[f->len - 1] != '\n';
 	pcs[k++] = (struct piece){at, 0, PIECE_LINE, (u8)(any + open), 0, 1, "desc", desc, n};
@@ -873,6 +891,27 @@ u32 cheatfile_add(struct cheatfile *f, const struct cheatfile_room *room, const 
 	if (format != CHEAT_FMT_AUTO)
 		pcs[k++] = (struct piece){at, 0, PIECE_LINE, 0, 0, 0, "format", cheatfile_format_names[format], n};
 	pcs[k++] = (struct piece){at, 0, PIECE_LINE, 0, 1, 0, "user", "true", n};
+	return k;
+}
+
+u32 cheatfile_can_add(const struct cheatfile *f, u32 cap, const char *desc)
+{
+	if (f->next >= f->max)
+		return CHEATFILE_EDIT_FULL;
+	struct piece pcs[5];
+	u32 k = add_pieces(f, desc, CHEATFILE_SHORT_CODE, CHEAT_FMT_AUTO, pcs);
+	return fits(f, cap, pieces_delta(f, pcs, k) + COUNT_ROOM) ? CHEATFILE_EDIT_OK : CHEATFILE_EDIT_LONG;
+}
+
+u32 cheatfile_add(struct cheatfile *f, const struct cheatfile_room *room, const char *desc, const char *code, u8 format,
+		  u32 *index)
+{
+	if (!code_ok(code) || format > CHEAT_FMT_VBA)
+		return CHEATFILE_EDIT_BAD;
+	if (f->next >= f->max)
+		return CHEATFILE_EDIT_FULL;
+	struct piece pcs[5];
+	u32 k = add_pieces(f, desc, code, format, pcs);
 	if (!fits(f, room->cap, pieces_delta(f, pcs, k) + COUNT_ROOM))
 		return CHEATFILE_EDIT_LONG;
 	struct picks p;

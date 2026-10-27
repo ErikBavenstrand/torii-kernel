@@ -394,12 +394,10 @@ class PAR:
         ]
 
     @staticmethod
-    def io(code_width, offset, value):
-        """C6 (code_width 1) or C7 (2) IO write at 0x04000000 + offset; see
-        the cases for how the decoders read the widths"""
-        return [
-            ({1: 0xC6000000, 2: 0xC7000000}[code_width] | (offset & 0xFFFFFF), value)
-        ]
+    def io(width, offset, value):
+        """C6 (width 2) or C7 (4) IO write at 0x04000000 + offset, as GBATEK
+        reads them (mGBA writes 8 and 16 bits)"""
+        return [({2: 0xC6000000, 4: 0xC7000000}[width] | (offset & 0xFFFFFF), value)]
 
     COND: ClassVar[dict] = {
         "EQ": 1,

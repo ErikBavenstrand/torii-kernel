@@ -10,7 +10,9 @@
 # must also decode alike in mGBA's decoders and Torii's.
 #
 # Usage: cheat_engine.sh [N/M]: every case, or the Nth shard of M (tests/all.sh
-# runs it as shards). A case Torii can't run ("pending") fails;
+# runs it as shards). cheat_engine.sh --fuzz SEED COUNT runs COUNT random
+# cases instead (tests/cheat_fuzz.sh); --case DIR NAME CARTS runs one case's
+# three runs, --decode DIR decodes DIR's files (for the fuzzer's minimizing). A case Torii can't run ("pending") fails;
 # CHEAT_ENGINE_STRICT=0 only reports it. CHEAT_ENGINE_JOBS runs that
 # many cases at once (default 1). mGBA's runs hold the cheat device's own
 # button (GameShark type 8, Action Replay v3 buttons) at some checkpoints;
@@ -30,7 +32,11 @@ if [ "${1:-}" = --case ]; then
   shot=emu/build-linux/mgba-shot
   rom=tests/roms/cheattest/cheattest.gba
   $shot $rom -i "$dir/$name.opts" >"$dir/$name.base.txt" 2>"$dir/$name.base.log" || true
-  $shot $rom -E "$dir/$name.cht" -i "$dir/$name.opts" >"$dir/$name.mgba.txt" 2>"$dir/$name.mgba.log" || true
+  # mGBA runs the case's own codes, or where it reads them unlike the device,
+  # codes it reads as the device reads the case's (NAME.equiv.cht)
+  mcht=$dir/$name.cht
+  [ -e "$dir/$name.equiv.cht" ] && mcht=$dir/$name.equiv.cht
+  $shot $rom -E "$mcht" -i "$dir/$name.opts" >"$dir/$name.mgba.txt" 2>"$dir/$name.mgba.log" || true
   cart=$carts/$name
   rm -rf "$cart" && mkdir -p "$cart"
   mkfs.fat -C -F 32 -n CHEATS "$cart/sd.img" 65536 >/dev/null
@@ -53,20 +59,38 @@ if [ "${1:-}" = --case ]; then
   exit 0
 fi
 
-shard=${1:-}
-local_carts "dist/cart-cheat-engine${shard:+-${shard%/*}}"
-dir=dist/cheat-engine${shard:+/${shard%/*}}
-rm -rf "$dir" && mkdir -p "$dir"
-start=$(date +%s)
+# The codes of DIR's .cht files decoded by Torii's decoders and by mGBA's
+# (DIR/torii.tsv, DIR/mgba.tsv), the decoders built into DIR once
+decode() {
+  local dir=$1
+  [ -x "$dir/cheat_corpus" ] ||
+    python3 tools/hostcc.py "$dir/cheat_corpus" tools/cheat_corpus.c source/cheatcode.c source/cheatlower.c
+  [ -x "$dir/cheat_oracle" ] || tools/mgba_cheats.sh "$dir/cheat_oracle" tools/cheat_oracle.c
+  mapfile -t chts < <(find "$dir" -maxdepth 1 -name '*.cht' | sort)
+  "$dir/cheat_corpus" "${chts[@]}" >"$dir/torii.tsv" 2>/dev/null
+  "$dir/cheat_oracle" "${chts[@]}" >"$dir/mgba.tsv"
+}
 
-python3 tests/cheat_engine.py gen "$dir" ${shard:+"$shard"}
-# The codes decoded by Torii's decoders and by mGBA's
-python3 tools/hostcc.py "$dir/cheat_corpus" tools/cheat_corpus.c source/cheatcode.c source/cheatlower.c
-gcc -O1 -Wall -Werror -Iemu/mgba/include -Iemu/build-linux/include -o "$dir/cheat_oracle" \
-  tools/cheat_oracle.c emu/build-linux/libmgba.a -llua5.4 -lpng -lz -lm -lpthread
-mapfile -t chts < <(find "$dir" -name '*.cht' | sort)
-"$dir/cheat_corpus" "${chts[@]}" >"$dir/torii.tsv" 2>/dev/null
-"$dir/cheat_oracle" "${chts[@]}" >"$dir/mgba.tsv"
+if [ "${1:-}" = --decode ]; then
+  decode "$2"
+  exit 0
+fi
+
+if [ "${1:-}" = --fuzz ]; then
+  # Random cases (tests/cheat_fuzz.py): --fuzz SEED COUNT
+  local_carts dist/cart-cheat-fuzz
+  dir=dist/cheat-fuzz/$2
+  rm -rf "$dir" && mkdir -p "$dir"
+  python3 tests/cheat_fuzz.py gen "$dir" "$2" "$3"
+else
+  shard=${1:-}
+  local_carts "dist/cart-cheat-engine${shard:+-${shard%/*}}"
+  dir=dist/cheat-engine${shard:+/${shard%/*}}
+  rm -rf "$dir" && mkdir -p "$dir"
+  python3 tests/cheat_engine.py gen "$dir" ${shard:+"$shard"}
+fi
+start=$(date +%s)
+decode "$dir"
 
 awk -F'\t' '$2 == 1 { print $1 }' "$dir/cases.txt" |
   xargs -P "${CHEAT_ENGINE_JOBS:-1}" -I{} "$0" --case "$dir" {} "$carts"

@@ -21,10 +21,10 @@ static u32 prog[PROG_MAX];
 static struct cheat_patch patches[PATCHES_MAX];
 
 static const char *const status_names[] = {"OK", "MASTER_ONLY", "PLACEHOLDER", "UNREADABLE", "TOO_BIG"};
-static const char *const lower_names[] = {"LOWERABLE", "TOO_BIG", "TOO_MANY_PATCHES", "BAD_ADDRESS"};
+static const char *const lower_names[] = {"LOWERABLE", "TOO_BIG", "TOO_MANY_PATCHES", "BAD_ADDRESS", "CANT_RUN"};
 static const char *const format_names[] = {"-", "GSAv1", "GSAv1-raw", "PARv3", "PARv3-raw", "CodeBreaker", "VBA"};
 
-static unsigned long by_status[5], by_lower[4], by_format[7], lowered_bytes, lowered_cycles, lowered_patches,
+static unsigned long by_status[5], by_lower[5], by_format[7], lowered_bytes, lowered_cycles, lowered_patches,
 	alone_reads;
 
 static int is_cond(u8 type)
@@ -153,7 +153,7 @@ int main(int argc, char **argv)
 	for (i = 0; i < 5; ++i)
 		fprintf(stderr, "  %-12s %5lu\n", status_names[i], by_status[i]);
 	fprintf(stderr, "OK cheats by lowering:\n");
-	for (i = 0; i < 4; ++i)
+	for (i = 0; i < 5; ++i)
 		fprintf(stderr, "  %-18s %5lu\n", lower_names[i], by_lower[i]);
 	fprintf(stderr, "  (lowered: %lu table bytes, %lu cycles, %lu ROM patches)\n", lowered_bytes, lowered_cycles,
 		lowered_patches);

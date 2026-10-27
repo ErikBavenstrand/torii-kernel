@@ -12,10 +12,17 @@ static const char latin_a_ascii[128] = {
 	'U', 'u', 'U', 'u', 'W', 'w', 'Y', 'y', 'Y', 'Z', 'z', 'Z', 'z', 'Z', 'z', 's', // U+0170
 };
 
-// Dashes and curly quotes, which Latin-1 lacks: their ASCII forms, or 0
-static char punctuation_of(u32 c)
+// Common punctuation Latin-1 lacks (dashes, curly quotes, spaces, the euro
+// sign...): a Latin-1 stand-in, or 0
+static u8 punctuation_of(u32 c)
 {
+	if (c >= 0x2000 && c <= 0x200A)  // en quad to hair space
+		return ' ';
 	switch (c) {
+	case 0x202F: // narrow no-break space
+	case 0x205F: // medium mathematical space
+	case 0x3000: // ideographic space
+		return ' ';
 	case 0x2010: // hyphens and dashes
 	case 0x2011:
 	case 0x2012:
@@ -33,7 +40,30 @@ static char punctuation_of(u32 c)
 	case 0x201D:
 	case 0x201E:
 	case 0x201F:
+	case 0x2033: // double prime
 		return '"';
+	case 0x2032: // prime
+		return '\'';
+	case 0x2039: // single angle quotes
+		return '<';
+	case 0x203A:
+		return '>';
+	case 0x2022: // bullets
+	case 0x2023:
+	case 0x2027:
+	case 0x2219:
+	case 0x22C5:
+		return 0xB7;  // middle dot
+	case 0x2026: // ellipsis: one glyph for one
+		return '.';
+	case 0x2044: // fraction slash
+	case 0x2215: // division slash
+		return '/';
+	case 0x20AC: // euro: the currency sign, which ISO 8859-15 replaced with it
+		return 0xA4;
+	case 0xFF5E: // fullwidth tilde
+	case 0x301C: // wave dash
+		return '~';
 	default:
 		return 0;
 	}
@@ -72,8 +102,8 @@ u32 charset_next_latin1(const char *s, u32 len, u32 *pos)
 		return c;
 	if (c < 0x180)
 		return (u8)latin_a_ascii[c - 0x100];
-	char q = punctuation_of(c);
-	return q ? (u32)(u8)q : CHARSET_REPLACEMENT;
+	u8 q = punctuation_of(c);
+	return q ? q : CHARSET_REPLACEMENT;
 }
 
 u32 charset_cut(const char *s, u32 max)

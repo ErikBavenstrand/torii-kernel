@@ -6,6 +6,36 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** cheat codes follow the real devices where mGBA doesn't (GBATEK,
+  VBA-M): Action Replay v3 C6/C7 IO writes are 16 and 32 bits; an IF with an
+  empty THEN and an ELSE no longer runs the ELSE every frame; its padding
+  and end lines count and stop as on the device; signed compares work at
+  the code's width; GameShark D/E conditionals read their not-equal and
+  at-most/at-least kinds and 3010-3060 are adds; E0zz counts lines; a second
+  CodeBreaker key and a DEADFACE reseed carry to later cheats (13204692,
+  d9fa0cf9, b2e7d29b); a DEADFACE inside a cheat with its own format
+  reseeds the cheats after it, and deleting an emptied file deletes the
+  copy a reader takes last, so a cut leaves no broken copy (979432e5).
+- **Added:** cheat types that were unreadable: GameShark slowdown (read, not
+  run, so the rest of the cheat works), Action Replay v3 "turn off codes"
+  conditionals (the rest of the cheat waits on them) and CodeBreaker
+  D0000010 (13204692).
+- **Added:** the cheat screen's START menu: Details (the full name, code
+  lines, format, budget share and why a row is greyed), Turn all off, Show
+  picked only, and Edit and Delete on your own codes. The title shows how
+  many are on, the list wraps, greyed rows say how much they need and keep
+  their key hints, a full file greys "+ Add code" up front, new codes are
+  named "Code N", and picking cheats for a game that boots clean says they
+  need Boot with addon (cd7caa0f, 51c93fef).
+- **Changed:** the popup's cheat count survives a power-off
+  (`/torii/cheats/counts.txt`, still without opening the cheat file);
+  deleting a file's last code deletes the file (d61c12dc). €, …, bullets,
+  curly primes and Unicode spaces draw Latin-1 stand-ins instead of a box
+  (1275ede2).
+- **Fixed:** Jagoomba keeps its VSync setting over a power-off
+  (jagoombacolor#36, 7d47e5e7); PocketNES takes the region from a NES 2.0
+  header and keeps one picked in its menu (PocketNES#3, 51b6aa9f).
+
 ## v0.7.0
 
 - **Added:** cheats in GameShark v1/v2 (Action Replay v1/v2), Action Replay

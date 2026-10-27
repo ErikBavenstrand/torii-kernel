@@ -55,6 +55,12 @@ boot-slow/frames 14-15 1F73F83DB4B12863
 boot-slow/frames 16-16 C06A5CEEB9ABEEEC
 boot-slow/frames 17-17 1DA9A452A082DCA0
 boot-slow/frames 18-19 7C573B18E65FE325
+cheats-clean/clean 019FE0D843B177D1
+cheats-menu/details 16664B225B18E564
+cheats-menu/menu ED06F892C1A0EA8B
+cheats-menu/only 650F7187008461A0
+cheats-menu/rom EA030CE26885DD21
+cheats-menu/wrap BE89C1D63F4620A7
 diag-back/back 96DF71E9EB3496DE
 diag-back/diag B8F9F547D9269D9B
 diag-pages/clock BAA544CE8D033053
@@ -102,10 +108,10 @@ games-box-switch/frames 3-3 D4DD55491F22C7F2
 games-box-switch/frames 4-5 E3A4AD640FBC14D2
 games-box-switch/frames 6-28 9F73E48DF1E05512
 games-cheats/back DE60914D027457D0
-games-cheats/greyed FEBA3D249E10763C
-games-cheats/picked 96B0E16F96C737A5
+games-cheats/greyed 38B4E6864EA3A553
+games-cheats/picked CB1E81B404AECA94
 games-cheats/popup 6D3246AFDB3CA9DB
-games-cheats/screen 4E0A50ED775F21E9
+games-cheats/screen 009BC461014B2F10
 games-dedupe/screen 67E86C46698E404E
 games-fav/screen 5F5922C2D6F31804
 games-fav/starred 017306DC53C8BC2C

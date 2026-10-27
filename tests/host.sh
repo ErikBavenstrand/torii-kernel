@@ -31,6 +31,13 @@ fi
 if [ "$status" = 0 ] && ! python3 tools/palette.py --check; then
   status=1
 fi
+# The committed cheat sample decodes alike in Torii's decoders and mGBA's
+# (built from emu/mgba), or as tests/cheat_expected.toml explains, and as
+# the device reads its hand-made codes (tests/cheat_corpus.sh)
+if [ "$status" = 0 ] && ! { python3 tools/cheat_sample.py --check &&
+  tests/cheat_corpus.sh tests/cheats/sample dist/cheat-sample-report.txt | grep -E '^(PASS|FAIL)'; }; then
+  status=1
+fi
 # Text is drawn in inks, never in a fill colour (ui.h's roles): an accent's
 # base, tint or ground, or the NOR bar's shades, can be too light to read
 if [ "$status" = 0 ] && grep -rnE --include='*.c' --include='*.h' '(\.|->)ink = UI_ROLE_(ACCENT|TINT|GROUND|NOR_FILL[A-Z_]*)\b' source tests/kernel; then

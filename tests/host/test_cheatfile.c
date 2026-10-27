@@ -301,6 +301,70 @@ void test_cheatfile_keys_carry(void)
 	CHECK_EQ(cheatfile_next(&file, &work), -1);
 }
 
+// GameShark's cipher forward (cheatcode.c has the way back)
+static void gs_encrypt(u32 *op1, u32 *op2, const u32 *seeds)
+{
+	u32 sum = 0;
+	for (int i = 0; i < 32; ++i) {
+		sum += 0x9E3779B9;
+		*op1 += ((*op2 << 4) + seeds[0]) ^ (*op2 + sum) ^ ((*op2 >> 5) + seeds[1]);
+		*op2 += ((*op1 << 4) + seeds[2]) ^ (*op1 + sum) ^ ((*op1 >> 5) + seeds[3]);
+	}
+}
+
+void test_cheatfile_seeds_carry(void)
+{
+	// A GameShark file reseeded by DEADFACE, then a cheat typed in its format:
+	// the cheat is read with the file's seeds, as the device reads it
+	static const char master[] = "502F4DE9+75D4B6CA+8791F574+20D9F121";
+	struct cheat_decoder d;
+	struct cheat_op ops[4];
+	u32 n, a = 0xDEADFACE, v = 0x102, b = 0x12000012, w = 0x1234;
+	cheat_decoder_init(&d);
+	CHECK_EQ(cheat_decode(&d, master, sizeof(master) - 1, ops, 4, &n), CHEAT_MASTER_ONLY);
+	CHECK_EQ(d.gs_version, CHEAT_FMT_GSAV1);
+	gs_encrypt(&a, &v, d.gs_seeds);
+	char reseed[18];
+	snprintf(reseed, sizeof(reseed), "%08X+%08X", (unsigned)a, (unsigned)v);
+	CHECK_EQ(cheat_decode(&d, reseed, 17, ops, 4, &n), CHEAT_MASTER_ONLY);
+	gs_encrypt(&b, &w, d.gs_seeds);
+
+	char text[512];
+	snprintf(text, sizeof(text),
+		 "cheat0_code = \"%s\"\n"
+		 "cheat1_code = \"%s\"\n"
+		 "cheat2_code = \"%08X %08X\"\n"
+		 "cheat2_format = \"GSAv1\"\n"
+		 "cheat2_user = true\n",
+		 master, reseed, (unsigned)b, (unsigned)w);
+	load_str(text);
+	CHECK_EQ(cheats[1].status, CHEATFILE_MASTER);
+	CHECK_EQ(cheats[2].status, CHEATFILE_OK);
+	cheatfile_begin(&work);
+	for (u32 i = 0; i < 3; i++)
+		CHECK_EQ(cheatfile_next(&file, &work), (s32)i);
+	CHECK_EQ(work.ops[0].type, CHEAT_OP_WRITE);
+	CHECK_EQ(work.ops[0].address, 0x02000012);
+	CHECK_EQ(work.ops[0].value, 0x1234);
+
+	// The other way: the DEADFACE sits in a cheat with its format, and the
+	// file's later cheats are read with its seeds
+	snprintf(text, sizeof(text),
+		 "cheat0_code = \"%s\"\n"
+		 "cheat1_code = \"%s\"\n"
+		 "cheat1_format = \"GSAv1\"\n"
+		 "cheat2_code = \"%08X %08X\"\n",
+		 master, reseed, (unsigned)b, (unsigned)w);
+	load_str(text);
+	cheatfile_begin(&work);
+	for (u32 i = 0; i < 3; i++)
+		CHECK_EQ(cheatfile_next(&file, &work), (s32)i);
+	CHECK_EQ(cheats[2].status, CHEATFILE_OK);
+	CHECK_EQ(work.ops[0].type, CHEAT_OP_WRITE);
+	CHECK_EQ(work.ops[0].address, 0x02000012);
+	CHECK_EQ(work.ops[0].value, 0x1234);
+}
+
 void test_cheatfile_budget(void)
 {
 	// The table's bytes: three cheats of 250 32-bit writes (2,008 bytes
@@ -659,6 +723,8 @@ void test_cheatfile_add(void)
 	CHECK_EQ(cheatfile_next(&file, &work), 0);
 	CHECK_EQ(cheatfile_next(&file, &work), 1);
 	CHECK_EQ(cheats[1].status, CHEATFILE_OK);  // read raw, as the key says
+	CHECK_EQ(cheats[1].detected, CHEAT_FMT_GSAV1_RAW);  // its own format, for the detail view
+	CHECK_EQ(cheats[0].detected, CHEAT_FMT_CODEBREAKER);
 	CHECK_EQ(work.ops[0].type, CHEAT_OP_WRITE);
 	CHECK_EQ(work.ops[0].address, 0x02001000);
 	CHECK_EQ(work.ops[0].value, 0x63);
@@ -805,6 +871,16 @@ void test_cheatfile_remove(void)
 	CHECK_EQ(cheatfile_remove(&file, &room, 0), CHEATFILE_EDIT_OK);
 	CHECK(text_is("cheats = 0\r\n"));
 	CHECK_EQ(file.count, 0);
+	CHECK(cheatfile_empty(&file));  // nothing left worth a file
+	load_cap("# for crc32 0123ABCD\n\ncheats = 0\n\n", 512);
+	CHECK(cheatfile_empty(&file));
+	load_cap("# my notes\ncheats = 0\n", 512);
+	CHECK(!cheatfile_empty(&file));  // the user's comment keeps it
+	load_cap("cheat3_note = \"x\"\n", 512);
+	CHECK(!cheatfile_empty(&file));
+	load_cap("cheat0_code = \"32001000 0009\"\n", 512);
+	CHECK(!cheatfile_empty(&file));
+	load_cap("", 512);
 	CHECK_EQ(cheatfile_remove(&file, &room, 0), CHEATFILE_EDIT_BAD);
 }
 
@@ -815,12 +891,16 @@ void test_cheatfile_edit_limits(void)
 	load_cap("cheat1023_code = \"32001000 0001\"\n", 512);
 	CHECK_EQ(file.next, 1024);
 	CHECK_EQ(cheatfile_add(&file, &room, "N", "32001000 0001", CHEAT_FMT_AUTO, &at), CHEATFILE_EDIT_FULL);
+	CHECK_EQ(cheatfile_can_add(&file, 512, "Code 1"), CHEATFILE_EDIT_FULL);  // told before any typing
 	load_cap("cheat1022_code = \"32001000 0001\"\n", 512);
+	CHECK_EQ(cheatfile_can_add(&file, 512, "Code 1"), CHEATFILE_EDIT_OK);
 	CHECK_EQ(cheatfile_add(&file, &room, "N", "32001000 0001", CHEAT_FMT_AUTO, &at), CHEATFILE_EDIT_OK);
 	CHECK_EQ(cheats[at].number, 1023);
 
 	// The buffer's room
 	load_cap("cheat0_code = \"32001000 0001\"\n", 40);
+	CHECK_EQ(cheatfile_can_add(&file, 40, "N"), CHEATFILE_EDIT_LONG);
+	CHECK_EQ(cheatfile_can_add(&file, 512, "N"), CHEATFILE_EDIT_OK);
 	CHECK_EQ(cheatfile_add(&file, &room, "N", "32001000 0001", CHEAT_FMT_AUTO, &at), CHEATFILE_EDIT_LONG);
 	CHECK_EQ(file.len, 30);
 	CHECK_EQ(cheatfile_set_code(&file, &room, 0, NULL, "32001000 0001+32001002 0001", 0), CHEATFILE_EDIT_LONG);
@@ -847,6 +927,7 @@ void test_cheatfile_edit_limits(void)
 	CHECK_EQ(file.count, 1);
 	CHECK(cheatfile_toggle(&file, 0));  // its enable line takes 22 of the bytes left
 	CHECK(CHEATFILE_TEXT_MAX - cheatfile_text_len(&file) < 100);
+	CHECK_EQ(cheatfile_can_add(&file, big, "Code 1"), CHEATFILE_EDIT_LONG);
 	CHECK_EQ(cheatfile_add(&file, &room, "N", "32001000 0001", CHEAT_FMT_AUTO, &at), CHEATFILE_EDIT_LONG);
 	CHECK(!file.edited);
 	free(t);

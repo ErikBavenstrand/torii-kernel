@@ -2,13 +2,14 @@
 // nothing between two passes of a menu loop: each owner below borrows it for
 // one operation and needs nothing in it afterwards. Its owners, by offset:
 // - READCACHE_CHEATS, 96 KB from 0x8000 to the end, clear of the stage: a
-//   game's cheat file (struct cheatstore, cheatstore.h, about 46 KB): its
+//   game's cheat file (struct cheatstore, cheatstore.h, about 48 KB): its
 //   cheats, the decoder's work and its text's parts on their way to and
 //   within PSRAM (the text itself is in PSRAM), while the cheat screen runs
 //   (screens/cheats.c, which starts no job and calls nothing else that
 //   borrows past the stage; its code keypad, screens/keypad.c, checks codes
 //   in the decoder's work, and the rename keyboard borrows nothing), within
-//   the game popup's look at the file (its path, for an f_stat), and at a
+//   the game popup's look at the file (its path, for an f_stat, and a line
+//   of counts.txt), and at a
 //   launch within cheatstore_launch's first pass, before the game is loaded
 //   (the second, once it is in PSRAM, writes the ROM patches the first kept
 //   in EWRAM: the load takes all of pReadCache).
