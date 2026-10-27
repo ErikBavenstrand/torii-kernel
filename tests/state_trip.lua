@@ -181,6 +181,14 @@ local function skips()
 		if sys >= 0x03000000 and sys <= 0x03008000 then
 			table.insert(list, { sys - 0xC00, sys })
 		end
+		-- and the Supervisor stack under where SAVE found it (SP_SVC, after
+		-- its magic "TSVC"), the BIOS's calls' and the stub's
+		if E:read32(spend + 0x60) == 0x43565354 then
+			local svc = E:read32(spend + 0x64)
+			if svc >= 0x03000000 and svc <= 0x03008000 then
+				table.insert(list, { svc - 0x100, svc })
+			end
+		end
 	end
 	return list
 end
@@ -275,10 +283,15 @@ end
 -- state's VRAM under other display registers
 local function resumed(limit, look)
 	local mixed = 0
+	local last_if, last_ie = 0, 0
 	for _ = 1, limit do
 		if not in_stub() then
+			if DEBUG then
+				log(string.format("debug resumed: IF %04X IE %04X at the frame before", last_if, last_ie))
+			end
 			return E:currentFrame(), mixed
 		end
+		last_if, last_ie = E:read16(0x04000202), E:read16(0x04000200)
 		if look and not overlay_up() then
 			local dispcnt = E:read16(0x04000000)
 			if dispcnt & 0x1F00 ~= 0 and dispcnt & 0x80 == 0 and bg_look() ~= look then

@@ -224,11 +224,106 @@ def trips(
     return t
 
 
+INFO = 0x6FF80  # INGAME_SRAM_STATE_INFO in the buffer
+SPEND = 0x68400  # the stub's ST_SPEND
+VECTOR = 0x47FFC  # IWRAM's 0x3007FFC
+
+
+def refuse(rom: Path, other: Path, cart: Path) -> list[str]:
+    """Load's checks of a state from the card: what failed (none: all held).
+
+    Slot 2 saved in game and filed, then launched into: with another ROM
+    (other) in the game's place; from another path's folder (another
+    rom_crc); with its format made newer; and made as v0.8.0 left one (no
+    info, the IRQ vector at another launch's hook, no Supervisor registers),
+    which must load as it was saved."""
+    import statefile  # noqa: PLC0415
+
+    bad = []
+    sd_name = "Game.gba"
+    trip_cart(cart, rom, sd_name, None, None)
+    img = str(cart / "sd.img")
+    records = cart / "trip-records.txt"
+    env = {"TRIP_OUT": str(records)}
+    steps = "play:300 save:2:d play:120 torii"
+    lines, _, log = run(cart, sd_name, steps, env, launch_hook(sd_name, G.HOOK_ADDON), 6000)
+    if "2.state" not in log:
+        return [f"slot 2 wasn't filed: {lines}"]
+    state = cart / "2.state"
+    G.mtools("mcopy", "-o", "-i", img, "::/torii/states/Game.gba/Main/2.state", str(state))
+    raw = bytearray(statefile.unpack(str(state)))
+    # every launch's patch area is at the same place: the info's hook
+    hook = int.from_bytes(raw[INFO + 20 : INFO + 24], "little")
+
+    def refused(path: str, why: str, case: str) -> None:
+        # The question the launch asks, B: not started
+        extra = ["-w", "screen ready: dialog", "-k", "@12:B", "-k", "@16:-", "-u", "not started"]
+        _, _, log = run(cart, path, "", {}, launch_hook(path, NAV_TEST_STATE | 2 << 8) + extra, 4000)
+        if f"is {why}" not in log or "not started" not in log or "launch: starting the game" in log:
+            found = [line for line in log.splitlines() if "states:" in line or "launch:" in line]
+            bad.append(f"{case}: not refused as {why}: {found[-3:]}")
+
+    def put(data: bytes) -> None:
+        state.write_bytes(data)
+        G.mtools("mcopy", "-o", "-i", img, str(state), "::/torii/states/Game.gba/Main/2.state")
+        subprocess.run(["mdel", "-i", img, "::/torii/states/Game.gba/Main/2.state.bak"], capture_output=True)
+
+    original = state.read_bytes()
+    # Another ROM at the game's path: its rom_crc is the same, its header not
+    G.mtools("mcopy", "-o", "-i", img, str(other), f"::/{sd_name}")
+    refused(sd_name, "another game's", "another ROM in its place")
+    G.mtools("mcopy", "-o", "-i", img, str(rom), f"::/{sd_name}")
+    # The same ROM at another path, the state copied to that path's folder
+    G.mtools("mcopy", "-o", "-i", img, str(rom), "::/Copy.gba")
+    for folder in ("torii/states/Copy.gba", "torii/states/Copy.gba/Main"):
+        subprocess.run(["mmd", "-i", img, f"::/{folder}"], capture_output=True)
+    G.mtools("mcopy", "-o", "-i", img, str(state), "::/torii/states/Copy.gba/Main/2.state")
+    refused("Copy.gba", "another game's", "another path's state")
+    # A newer format
+    newer = bytearray(raw)
+    newer[INFO + 4 : INFO + 8] = (99 | 32 << 16).to_bytes(4, "little")
+    put(statefile.pack(str(state), bytes(newer)))
+    refused(sd_name, "of a newer format", "a newer format")
+    # As v0.8.0 left it: loads, into the frames that followed the save
+    old = bytearray(raw)
+    old[INFO : INFO + 4] = bytes(4)
+    old[VECTOR : VECTOR + 4] = (hook - 0x2000).to_bytes(4, "little")
+    old[SPEND + 0x60 : SPEND + 0x64] = (0x31564F54).to_bytes(4, "little")  # the overlay's header
+    put(statefile.pack(str(state), bytes(old)))
+    lines, _, log = run(
+        cart,
+        sd_name,
+        "autoload:d",
+        {"TRIP_IN": str(records), "TRIP_BUFSLOT": "2"},
+        launch_hook(sd_name, NAV_TEST_STATE | 2 << 8),
+        4000,
+    )
+    if "same d 120" not in lines:
+        bad.append(f"a state as v0.8.0 left one didn't load as saved: {lines}")
+    put(original)
+    return bad
+
+
 def main() -> int:
     argv = sys.argv[1:]
     seed, quick, save, cheats, roms = 1, False, None, None, []
     while argv:
         a = argv.pop(0)
+        if a == "--refuse":
+            other = Path(argv.pop(0))
+            rom = Path(argv.pop(0))
+            cart = Path(os.environ.get("TRIP_CARTS") or Path(tempfile.gettempdir()) / "torii-trips") / "refuse"
+            shutil.rmtree(cart, ignore_errors=True)
+            bad = refuse(rom, other, cart)
+            for b in bad:
+                print(f"FAIL: state refusals: {b} (cart in {cart})")
+            if not bad:
+                print(
+                    "PASS: state refusals: a state of another ROM, path or newer format is refused; "
+                    "one as v0.8.0 left it loads"
+                )
+                shutil.rmtree(cart, ignore_errors=True)
+            return 1 if bad else 0
         if a == "--seed":
             seed = int(argv.pop(0))
         elif a == "--quick":

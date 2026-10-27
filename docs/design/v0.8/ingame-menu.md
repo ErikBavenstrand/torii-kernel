@@ -182,6 +182,37 @@ and paging spare PSRAM from the menu (tier C) stay off until the cart probe says
 - **Tests:** `tests/states.sh` (round trip frame for frame, filing and the next launch,
   the popup's autoload, the filing cut at each cutpoint, the `/RTS` import); compat's
   "save state" column saves, plays and loads in every game; golden shots `ingame-states`.
+- **Across scenes (v0.8.1).** `tests/state_trips.py` (compat's "state trips" column;
+  `tests/state_trips.sh` on the test ROMs in `just test`) plays a game with seeded random
+  keys, saves, records each frame's screen and memory digest (EWRAM and IWRAM, the hook's
+  words and the dead stack under the game's aside) while replaying keys, plays on into
+  other scenes, loads and replays the same keys: every frame from the first must match.
+  It runs in game, twice in a row, at a transition, after Reset game, and after Back to
+  Torii and a launch into the slot, with real cheats on where `tests/cheat_codes.toml` has
+  them. What it found, now in LOAD: the screen stays the backdrop alone until the game's
+  own VBlank handler has run on the state (it showed the state's VRAM under the old
+  registers for the load's frames, then OAM and scroll from different frames); the game
+  gets one frame on the state's registers with its IRQ flags cleared first (a launch into
+  a state lost Emerald's VCount IRQ); Supervisor mode's sp, lr and SPSR, which SAVE keeps
+  in the spend area's header place (`SP_SVC`), go back (a game halted in VBlankIntrWait
+  returns from the BIOS through them: The Minish Cap launched into a state jumped to 0);
+  the IRQ vector points at this launch's hook (v0.8.0's patch area for Emerald sat 8 KB
+  lower: its state restarted the game); the timers' control and the game's WAITCNT go
+  back; and the game goes on through the hook, so the cheats run in that VBlank as after
+  SAVE.
+- **What it is of.** The overlay writes `struct ingame_state_info` at SAVE (the ROM
+  header's code, version and check byte, the ROM's size, the format). The kernel loads a
+  state from the card only into that game, its save slot (the tag's `rom_crc`) and a
+  format it reads, and otherwise asks before starting the game without it ("This state is
+  another game's", "This state needs a newer Torii"); in game, Load state stays greyed.
+  A state from v0.8.0 has no info: its tag alone says whose it is.
+- **What no load can give back:** the write-only registers no RAM copy holds (DMA source,
+  destination and count; timer reload values; the PSG's frequencies; the sound FIFOs'
+  contents and the DMA's place in the game's sample buffer; BG scroll and affine registers
+  in a game keeping no copy of them laid out as the registers). LOAD leaves DMA off (the
+  game re-arms its sound DMA within a few frames, as m4a does) and the reload values as
+  the game last wrote them, which within one game is nearly always what it wrote before
+  the save.
 
 ## P4: screenshots (built)
 

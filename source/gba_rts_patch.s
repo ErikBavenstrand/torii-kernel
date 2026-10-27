@@ -1141,11 +1141,9 @@ register_list_end:
 	mov		r1,#0
 	strh	r1,[r10,#REG_DISPCNT]
 	bl		gpu_shadow			@;its search takes Emerald about 10 frames
-	add		r8,r10,#0x200
-	ldrh	r9,[r8,#4]		@;the state's; the page register at the BIOS's
 	mov		r1,#0
 	add		r8,r10,#0x200
-	strh	r1,[r8,#4]
+	strh	r1,[r8,#4]		@;the page register at the BIOS's
 
 	ldr r0,=0x4000202   @;0x4000202
 	mov r1,#1			@;Torii: IME on; the state holds the menu's IME = 0
@@ -1179,6 +1177,9 @@ register_list_end:
 	@;v0.8.0 has the overlay's header there, no SP_SVC_MAGIC: the game's now)
 	adrl	r7,spend_0x80
 	ldr		r7,[r7]
+	@;and the game's WAITCNT as SAVE found it: the I/O copy has the stub's,
+	@;as sram_copy sets it while it copies
+	ldrh	r9,[r7,#SP_WAITCNT]
 	add		r7,r7,#SP_SVC
 	ldmia	r7,{r0-r3}
 	ldr		r4,=SP_SVC_MAGIC
@@ -1211,9 +1212,29 @@ register_list_end:
 	mov 	r0,#0x4000000
 	adrl	r12, spend_0x80
 	ldr		r12,[r12]
+	@;The DMA channels the game had repeating on a timing (its sound's
+	@;FIFO DMA, HBlank and VBlank effects) on again as SAVE found them
+	@;(SP_DMA); their addresses, which no read gives, the game's last. Off,
+	@;the game ran without the sound DMA's stolen cycles until it re-armed
+	@;it, and its frames went otherwise than after SAVE (Fire Emblem)
+	add		r3,r12,#SP_DMA
+	add		r2,r0,#REG_DM0CNT_H
+	mov		r11,#4				@;the ldmia below sets it
+1:	ldrh	r1,[r3],#2
+	tst		r1,#0x8000
+	tstne	r1,#0x200
+	tstne	r1,#0x3000
+	strneh	r1,[r2]
+	add		r2,r2,#0xC
+	subs	r11,r11,#1
+	bne		1b
 	ldmia r12!,{r4-r11,sp,lr}
 
-	ldr 	pc,[r0,#-(0x04000000-0x03FFFFF4)] @;to normal IRQ routine
+	@;Torii: on through the hook, as after SAVE: the sleep key, the cheats
+	@;(as launched: CheatRAN cleared above, so they run in this VBlank, as
+	@;they did in SAVE's), then the game's IRQ handler
+	ldr		r2,[r0,#REG_P1]
+	b		check_sleep
 	.ltorg
 
 @;Torii: the display's write-only registers (BG scroll and affine, the

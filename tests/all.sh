@@ -68,6 +68,8 @@ jobs=(
   "tests/states.sh unreadable"
   "tests/states.sh shadow"
   "tests/states.sh cut"
+  "tests/state_trips.sh hello"
+  "tests/state_trips.sh refuse"
   "tests/settings.sh"
   "tests/menu.sh"
   "tests/sleep.sh"
