@@ -50,9 +50,9 @@ static void sram_io(u32 at, void *ram, u32 n, u32 to_sram)
 {
 	u8 *p = ram;
 	while (n) {
-		u32 room = 0x10000 - (at & 0xFFF), part = n < room ? n : room;
-		SetRampage((u16)(at >> 12));
-		statestore_sram_bytes(CART_SRAM + (at & 0xFFF), p, part, to_sram);
+		u32 room = 0x10000 - (at & 0xFFFF), part = n < room ? n : room;
+		SetRampage((u16)((at >> 16) << 4));  // the page register ignores its low bit
+		statestore_sram_bytes(CART_SRAM + (at & 0xFFFF), p, part, to_sram);
 		at += part;
 		p += part;
 		n -= part;

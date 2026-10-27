@@ -410,10 +410,10 @@ index 1d0c0dd..80e46af 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..65b38eb
+index 0000000..97695a9
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1865 @@
+@@ -0,0 +1,1866 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -2145,7 +2145,8 @@ index 0000000..65b38eb
 +}
 +
 +static uint32_t _sramOffset(const struct GBAOmega* omega, uint32_t address) {
-+	return (((uint32_t) omega->ramPage << 12) + (address & 0xFFFF)) & (OMEGA_SRAM_SIZE - 1);
++	// The real cart ignores the page's low bit: 8 KB steps (2026-10-27)
++	return ((((uint32_t) omega->ramPage & ~1u) << 12) + (address & 0xFFFF)) & (OMEGA_SRAM_SIZE - 1);
 +}
 +
 +// OMEGA_GAME_SRAM: faults injected into cart SRAM in game mode, on the pages
@@ -2186,7 +2187,7 @@ index 0000000..65b38eb
 +		}
 +		omega->rtsBusyUntil = 0;
 +	}
-+	if (_gameSramFaultFor(omega) == GAME_SRAM_FAULT_FLIP_IMAGE && omega->ramPage == 0xB0 && (address & 0xFFFF) == 0x400) {
++	if (_gameSramFaultFor(omega) == GAME_SRAM_FAULT_FLIP_IMAGE && _sramOffset(omega, address) == 0xB0400) {
 +		value ^= 1;
 +	}
 +	return value;
@@ -2226,7 +2227,7 @@ index 0000000..65b38eb
 +	// running under them, it seems; at FLASH 128K without the flag they read
 +	// back whole.
 +	if ((!_isKernelMode(omega) && omega->gameBooted && omega->ramPage >= OMEGA_SAVE_PAGES) ||
-+	    (omega->rtsKernelWrites && omega->ramPage == RTS_FLAG_PAGE)) {
++	    (omega->rtsKernelWrites && (_sramOffset(omega, address) >> 12) == RTS_FLAG_PAGE)) {
 +		omega->rtsPageWritten = true;
 +	}
 +}

@@ -101,7 +101,7 @@ ST_SPEND		= 0xA8400	@;the spend area, the system sp and lr in it
 ST_IO			= 0xA9000
 ST_FLAG			= 0xAFFD0	@;INGAME_SRAM_STATE_MARK: Torii's, never EZ-Flash's
 							@;flag at 0xAFFF0, which the FPGA's write-back watches
-TAG_PAGE		= 0xAF		@;INGAME_SRAM_STATE_TAG's page; its autoload byte at 0xFE6 in it
+TAG_PAGE		= 0xA0		@;INGAME_SRAM_STATE_TAG's 64 KB window; its autoload byte at 0xFFE6 in it
 AUTOLOAD		= 0x7A000000	@;at 0x3007FE4: load the state at the next VBlank
 
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -128,7 +128,7 @@ autoload_entry:
 	mov		r0,#TAG_PAGE
 	bl		SetRampage
 	mov		r1,#0x0E000000
-	orr		r1,r1,#0xF00			@;the byte's place in page TAG_PAGE's window
+	orr		r1,r1,#0xFF00			@;the byte's place in page TAG_PAGE's window
 	orr		r1,r1,#0xE6
 	ldrb	r12,[r1]			@;SetRampage keeps r12
 	mov		r0,#0
@@ -768,15 +768,18 @@ sc_chunk:
 	ble		sc_done
 	mov		r4,#0
 	strh	r4,[r8,#4]
+	@;The cart's page register ignores its low bit (8 KB steps): the page
+	@;of the 64 KB window holding the offset, and the offset in that window
+	mov		r4,r0,lsl #16
+	mov		r4,r4,lsr #16		@;offset & 0xFFFF
 	stmfd	sp!,{r0-r3}
-	mov		r0,r0,lsr #12		@;the page: offset >> 12
+	sub		r0,r0,r4
+	mov		r0,r0,lsr #12		@;the page: (offset >> 16) << 4
 	bl		SetRampage
 	ldmfd	sp!,{r0-r3}
-	ldr		r4,=WAITCNT_STUB
-	strh	r4,[r8,#4]
+	ldr		r5,=WAITCNT_STUB
+	strh	r5,[r8,#4]
 	@;This chunk: up to the 64 KB window's end
-	mov		r4,r0,lsl #20
-	mov		r4,r4,lsr #20		@;offset & 0xFFF
 	rsb		r5,r4,#0x10000
 	cmp		r5,r2
 	movgt	r5,r2
@@ -1099,7 +1102,7 @@ state_load_go:
 	mov		r1,#0
 	add		r8,r10,#0x200
 	strh	r1,[r8,#4]		@;the page register at the BIOS's
-	mov 	r0,#ST_IWRAM>>12
+	mov 	r0,#(ST_IWRAM>>16)<<4
 	bl 		SetRampage
 	mov r0,#0x0E000000
 	mov r1,#0x3000000
@@ -1114,10 +1117,10 @@ state_load_go:
 	str		r2,[r1,#-0x14]
 
 	@;-------------------------------------
-	mov		r0,#ST_IO>>12		@;the I/O copy and the spend area's, in page 0xA9's window
+	mov		r0,#(ST_IO>>16)<<4		@;the I/O copy, in page 0xA0's window at 0x9000
 	bl		SetRampage
 	mov r10,#0x4000000
-	mov r11,#0x0E000000
+	ldr r11,=0x0E000000+(ST_IO & 0xFFFF)
 
 	adr r9,register_list
 register_list_loop:
@@ -1144,9 +1147,9 @@ register_list_end:
 	mov r1,#1			@;Torii: IME on; the state holds the menu's IME = 0
 	strh r1,[r0,#6]
 
-	mov		r0,#ST_SPEND>>12
+	mov		r0,#(ST_SPEND>>16)<<4
 	bl		SetRampage
-	ldr 	r0,=0x0E000000+(ST_SPEND & 0xFFF)
+	ldr 	r0,=0x0E000000+(ST_SPEND & 0xFFFF)
 	adrl 	r1, spend_0x80 @;temp buff
 	ldr		r1,[r1]
 	mov 	r2,#0x80
@@ -1211,7 +1214,7 @@ autoload_now:
 	mov		r0,#TAG_PAGE			@;the tag's autoload byte cleared
 	bl		SetRampage
 	mov		r1,#0x0E000000
-	orr		r1,r1,#0xF00
+	orr		r1,r1,#0xFF00
 	orr		r1,r1,#0xE6
 	mov		r2,#0
 	strb	r2,[r1]

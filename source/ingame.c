@@ -39,8 +39,8 @@ _Static_assert(INGAME_ROLE_TEXT == UI_ROLE_TEXT && INGAME_ROLE_FAINT == UI_ROLE_
 // window; returns how many read back different
 static u32 sram_put(u32 at, const u8 *src, u32 n)
 {
-	SetRampage((u16)(at >> 12));
-	vu8 *dst = CART_SRAM + (at & 0xFFF);
+	SetRampage((u16)((at >> 16) << 4));  // the page register ignores its low bit
+	vu8 *dst = CART_SRAM + (at & 0xFFFF);
 	for (u32 i = 0; i < n; i++)
 		dst[i] = src ? src[i] : 0;
 	u32 bad = 0;
@@ -174,8 +174,8 @@ _Static_assert(sizeof(struct cheat_meta) == sizeof(struct ingame_cheat) - offset
 // n bytes of cart SRAM at byte offset at, within one 64 KB page window, to dst
 static void sram_get(u32 at, u8 *dst, u32 n)
 {
-	SetRampage((u16)(at >> 12));
-	const vu8 *src = CART_SRAM + (at & 0xFFF);
+	SetRampage((u16)((at >> 16) << 4));  // the page register ignores its low bit
+	const vu8 *src = CART_SRAM + (at & 0xFFFF);
 	for (u32 i = 0; i < n; i++)
 		dst[i] = src[i];
 }

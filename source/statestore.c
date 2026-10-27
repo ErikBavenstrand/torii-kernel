@@ -58,9 +58,9 @@ static void buffer_io(u32 at, u8 *ram, u32 n, int to_sram)
 {
 	while (n) {
 		u32 sram = INGAME_SRAM_STATE + at;
-		u32 room = 0x10000 - (sram & 0xFFF), part = n < room ? n : room;
-		SetRampage((u16)(sram >> 12));
-		statestore_sram_bytes(CART_SRAM + (sram & 0xFFF), ram, part, (u32)to_sram);
+		u32 room = 0x10000 - (sram & 0xFFFF), part = n < room ? n : room;
+		SetRampage((u16)((sram >> 16) << 4));  // the page register ignores its low bit
+		statestore_sram_bytes(CART_SRAM + (sram & 0xFFFF), ram, part, (u32)to_sram);
 		at += part;
 		ram += part;
 		n -= part;
