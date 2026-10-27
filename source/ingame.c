@@ -180,6 +180,26 @@ static void sram_get(u32 at, u8 *dst, u32 n)
 		dst[i] = src[i];
 }
 
+void ingame_dump_image(void)
+{
+	// What cart SRAM holds where the launch wrote the overlay's image, for
+	// a refusal whose image didn't check: compared on a PC with the build's
+	FIL file;
+	if (f_open(&file, "/torii/logs/ingame-image.bin", FA_CREATE_ALWAYS | FA_WRITE) != FR_OK)
+		return;
+	u32 part[512 / 4];  // word-aligned for f_write
+	UINT wrote = 0;
+	u32 at;
+	for (at = 0; at < INGAME_IMAGE_MAX; at += sizeof(part)) {
+		sram_get(INGAME_SRAM_IMAGE + at, (u8 *)part, sizeof(part));
+		if (f_write(&file, part, sizeof(part), &wrote) != FR_OK || wrote != sizeof(part))
+			break;
+	}
+	SetRampage(0);
+	f_close(&file);
+	tlog("in-game menu: cart SRAM's image area (%lu bytes) is in /torii/logs/ingame-image.bin", (unsigned long)at);
+}
+
 void ingame_cheat_put(u32 n, const char *name, u32 len, u32 number, u32 index, u32 flags, u32 bit, u32 cost)
 {
 	TLOG_ASSERT(n < INGAME_CHEATS);

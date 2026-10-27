@@ -60,6 +60,10 @@ void ingame_refused_notice(void);
 // last SD access.
 void ingame_probe_prepare(const u8 *code);
 
+// After a refusal whose image didn't check: cart SRAM's image area to
+// /torii/logs/ingame-image.bin
+void ingame_dump_image(void);
+
 // The embedded overlay image (ingame_overlay.s)
 extern const u8 ingame_overlay[];
 extern const u32 ingame_overlay_size;

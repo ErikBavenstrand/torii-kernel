@@ -10,6 +10,7 @@
 #include "build_id.h"
 #include "cartlog.h"
 #include "eepromprobe.h"
+#include "ingame.h"
 #include "ingame_abi.h"
 #include "ingameprobe.h"
 #include "rumbleprobe.h"
@@ -506,6 +507,8 @@ static void report_ingame_refused(void)
 		snprintf(line, sizeof(line), "the header's magic %08lX, image %lu bytes, window %lu bytes", at,
 			 expected, read);
 	tlog_force(TLOG_ERRORS, "in-game menu: %s; %u tries, VCOUNT %u at the menu key", line, r.tries, r.vcount);
+	if (r.reason == INGAME_REFUSED_IMAGE)
+		ingame_dump_image();
 }
 
 // The EEPROM probe ROM's report (tests/roms/eeprom): each step, where each
