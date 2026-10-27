@@ -9,7 +9,9 @@
 // report (page 0xF0 and its own save) and shows it; then A tries the SD
 // card, last, as it may leave the card unreadable, and B skips that. The
 // results show on two pages (LEFT and RIGHT) to photograph; A goes back to
-// the kernel. What it writes it puts back: cart SRAM pages 0x20 on, the
+// the kernel. Page 0x20 is also tried as the in-game menu uses it: 24 KB
+// byte by byte at 8 wait cycles, and with the flash bank switched. What it
+// writes it puts back: cart SRAM pages 0x20 on, the
 // PSRAM halfword, and the kernel's scratch sector (INGAME_PROBE_FILE).
 #include <stdint.h>
 
@@ -181,6 +183,61 @@ static void test_bank(void)
 	ram_page(0);
 	report.bank1_after = CART_RAM[0];
 	flash_bank(0);
+}
+
+// Page 0x20's byte at 0x200 in each flash bank (bank commands at page 0),
+// put back after
+static void test_bank_page(void)
+{
+	ram_page(0);
+	flash_bank(0);
+	ram_page(0x20);
+	uint8_t keep0 = CART_RAM[0x200];
+	CART_RAM[0x200] = 0x3C;
+	ram_page(0);
+	flash_bank(1);
+	ram_page(0x20);
+	report.bank_page_b1 = CART_RAM[0x200];
+	uint8_t keep1 = report.bank_page_b1;
+	CART_RAM[0x200] = 0xC3;
+	ram_page(0);
+	flash_bank(0);
+	ram_page(0x20);
+	report.bank_page_b0 = CART_RAM[0x200];
+	if (report.bank_page_b1 != 0x3C) {  // two bytes: bank 1's back first
+		ram_page(0);
+		flash_bank(1);
+		ram_page(0x20);
+		CART_RAM[0x200] = keep1;
+		ram_page(0);
+		flash_bank(0);
+		ram_page(0x20);
+	}
+	CART_RAM[0x200] = keep0;
+	ram_page(0);
+}
+
+// INGAME_PROBE_BULK bytes at page 0x20 as the menu's stub copies them: byte
+// writes at 8 wait cycles, then read back; put back from EWRAM after
+#define BULK_KEEP ((uint8_t *)0x02030000)  // EWRAM the probe doesn't use
+
+static void test_bulk(void)
+{
+	uint16_t waitcnt = REG_WAITCNT;
+	ram_page(0x20);
+	REG_WAITCNT = (uint16_t)(waitcnt | 3);
+	uint32_t bad = 0;
+	for (uint32_t i = 0; i < INGAME_PROBE_BULK; i++)
+		BULK_KEEP[i] = CART_RAM[i];
+	for (uint32_t i = 0; i < INGAME_PROBE_BULK; i++)
+		CART_RAM[i] = (uint8_t)(i * 13 + 7);
+	for (uint32_t i = 0; i < INGAME_PROBE_BULK; i++)
+		bad += CART_RAM[i] != (uint8_t)(i * 13 + 7);
+	for (uint32_t i = 0; i < INGAME_PROBE_BULK; i++)
+		CART_RAM[i] = BULK_KEEP[i];
+	REG_WAITCNT = waitcnt;
+	ram_page(0);
+	report.bulk_bad = (uint16_t)(bad > 0xFFFF ? 0xFFFF : bad);
 }
 
 // --- PSRAM --------------------------------------------------------------------
@@ -424,11 +481,13 @@ static void flash_wait(volatile uint8_t *p, uint8_t v)
 		;
 }
 
-static void flash_byte(unsigned at, uint8_t v)
+// Whether it took
+static int flash_byte(unsigned at, uint8_t v)
 {
 	flash_cmd(0xA0);
 	SAVE_AT[at] = v;
 	flash_wait(SAVE_AT + at, v);
+	return SAVE_AT[at] == v;
 }
 
 // SRAM takes bytes as they come; a flash save wants its 4 KB sector erased,
@@ -447,8 +506,13 @@ static void copy_to_save(void)
 	CART_RAM[0x2AAA] = 0x55;
 	SAVE_AT[0] = 0x30;
 	flash_wait(SAVE_AT, 0xFF);
+	// Each byte programmed; one that doesn't take (no flash chip there, as
+	// at an EEPROM save type) ends it, rather than every byte's wait
 	for (unsigned i = 16; i < sizeof(report); i++)
-		flash_byte(i, r[i]);
+		if (!flash_byte(i, r[i])) {
+			report.saved = INGAME_PROBE_SAVED_NOT;
+			return;
+		}
 	for (unsigned i = 0; i < 16; i++)  // the magic last
 		flash_byte(i, (uint8_t)INGAME_PROBE_MAGIC[i]);
 	report.saved = report_at(SAVE_AT) ? INGAME_PROBE_SAVED_FLASH : INGAME_PROBE_SAVED_NOT;
@@ -566,6 +630,9 @@ static void results(void)
 	l = line(1), put(l, "SD WRITE TEST:");
 	l = line(1), put(l, " "),
 	put(l, report.sd_scratch < sizeof(sd_words) / sizeof(*sd_words) ? sd_words[report.sd_scratch] : "?");
+	l = line(1), put(l, "PAGE 20 BULK BAD: "), dec(l, report.bulk_bad), put(l, "/"), dec(l, INGAME_PROBE_BULK);
+	l = line(1), put(l, "PAGE 20 BANK 1,0: "), hex(l, report.bank_page_b1, 2), put(l, " "),
+	hex(l, report.bank_page_b0, 2);
 	for (int i = at_line; i < LINES; i++)
 		line(1);
 }
@@ -573,7 +640,7 @@ static void results(void)
 static void show(int page, const char *const keys[3])
 {
 	clear();
-	text(4, 2, RGB(31, 31, 8), page ? "IN-GAME PROBE 2/2: SD CARD" : "IN-GAME PROBE 1/2: CART");
+	text(4, 2, RGB(31, 31, 8), page ? "IN-GAME PROBE 2/2: SD, PAGE 20" : "IN-GAME PROBE 1/2: CART");
 	for (int i = 0; i < LINES; i++)
 		text(4, 16 + i * 11, RGB(31, 31, 31), lines[page][i]);
 	for (int i = 0; i < 3; i++)
@@ -601,7 +668,9 @@ int main(void)
 	scratch_lba();
 	test_pages();
 	test_waits();
+	test_bulk();
 	test_bank();
+	test_bank_page();
 	test_psram();
 	test_rtc();
 	// Saved and shown before the SD test, the one that may leave the card

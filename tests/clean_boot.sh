@@ -40,3 +40,17 @@ grep -qx 'mem frame 90 04000204: 18 40' "$cart/ram.txt" || fail "WAITCNT in the 
 grep -qx 'mem frame 400 04000204: 00 00' "$cart/ram.txt" || fail "the game started with WAITCNT $(grep 'frame 400 04000204' "$cart/ram.txt")"
 
 echo "PASS: EWRAM and IWRAM are clear, and WAITCNT 0, when a game starts"
+
+# A ROM whose header reads blank (a damaged file: the in-game probe on the
+# real cart read so and the cart copied the same, a white screen) isn't
+# started, and no save is made for it. (A answers the save dialog Idle left.)
+head -c 8192 /dev/zero >"$cart/Blank.gba"
+mcopy -i "$cart/sd.img" "$cart/Blank.gba" ::/Blank.gba
+# shellcheck disable=SC2046 # nav.sh's options
+OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch /Blank.gba at=160) -k 100:A -k 106:- -f 700 \
+  2>"$cart/blank.log" >/dev/null || true
+grep -q "kernel error: launch Blank.gba: its header at 0xA0 reads blank (FatFs 0, 32 bytes read): not started" \
+  "$cart/blank.log" || fail "a blank header was launched: $(grep 'launch' "$cart/blank.log" | tail -3)"
+! grep -q "launch: starting the game" "$cart/blank.log" || fail "the blank ROM was started"
+! mdir -i "$cart/sd.img" ::/torii/saves/Blank.gba >/dev/null 2>&1 || fail "a save was made for the blank ROM"
+echo "PASS: a ROM whose header reads blank isn't started"

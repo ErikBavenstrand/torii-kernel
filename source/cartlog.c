@@ -435,6 +435,13 @@ static void report_ingame_probe(void)
 		   : p->sd_mbr                              ? "read with its signature"
 							    : "didn't read",
 		   (unsigned long)p->scratch_lba, p->sd_scratch < sizeof(sd) / sizeof(*sd) ? sd[p->sd_scratch] : "?");
+	tlog_force(TLOG_INFO,
+		   "in-game probe: page 0x20: %u of %u bytes didn't read back (byte writes at 8 cycles); with the "
+		   "flash bank switched it read %02X in bank 1, %02X in bank 0 (%s)",
+		   p->bulk_bad, INGAME_PROBE_BULK, p->bank_page_b1, p->bank_page_b0,
+		   p->bank_page_b1 == 0x3C && p->bank_page_b0 == 0xC3   ? "one byte: the bank doesn't reach it"
+		   : p->bank_page_b1 != 0x3C && p->bank_page_b0 == 0x3C ? "two bytes: the bank shifts it"
+									: "neither: see the bytes");
 	const u8 *on = p->rtc_on, *off = p->rtc_off;
 	tlog_force(TLOG_INFO,
 		   "in-game probe: clock with 0x096A0000 at 1: %02X-%02X-%02X %02X:%02X:%02X; at 0: %02X-%02X-%02X "

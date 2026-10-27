@@ -733,6 +733,26 @@ step that touches the SD controller, so it is the suspect; the probe now
 saves its report before that test (also in its battery-backed save), runs
 it only on A, and the boot retries the mount three times.
 
+Its second run (2026-10-27, CLEAN BOOT) reported at SRAM 32K: cart SRAM
+pages `0x20`-`0xEF` read back, at every SRAM wait state; the page register
+reads back as ROM data (`0008`), not the value written; the flash bank
+command works at SRAM type too and stays across page changes; **a write to
+PSRAM (`0x08010000`) doesn't land in game mode**; the clock answers only
+with `0x096A0000` at 1. At EEPROM 8K, FLASH 64K and FLASH 128K it showed a
+white screen, but those launches logged the ROM's header as blank ("title ,
+code ,"), so the cart copied a file that read as zeros: they say nothing
+about those save types. A launch whose header reads blank now stops with
+"Can't open the file" and logs FatFs's result. The emulated cart drops every
+game-mode PSRAM write, as the real one does, and stops with status 78 when
+any of Torii's in-game code (hook, stub, cheats, overlay) makes one: none
+does, so the stub's state never lived in ROM. Whether pages from `0x20` are
+plain RAM while the FPGA presents a flash or EEPROM chip is still unproven;
+`OMEGA_GAME_SRAM=chip` models the opposite (the save chip on every page)
+and the stub refuses safely there. The probe now also writes 24 KB of page
+`0x20` a byte at a time at 8 cycles, as the stub does, and reads page
+`0x20` in both flash banks (Emerald leaves bank 1 on after reading its
+save's second half), so a run at FLASH 128K answers both.
+
 ## 7. Logging and Diagnostics
 
 The kernel logs to `/torii/logs` on the card (`source/tlog.c`) and keeps

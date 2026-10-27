@@ -74,6 +74,7 @@ jobs=(
   "tests/menu_safety.sh auto"
   "tests/menu_safety.sh drop"
   "tests/menu_safety.sh flip-image"
+  "tests/menu_safety.sh chip"
   "tests/ppu_render.sh"
   "tests/screenshot.sh shot"
   "tests/screenshot.sh cut"

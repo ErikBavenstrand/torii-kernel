@@ -90,7 +90,19 @@ struct ingame_probe {
 	// only), and how many boots since found the card wouldn't mount
 	uint8_t returning;
 	uint8_t mount_failed;
+	// Page 0x20 with the flash bank switched (the in-game menu's backups
+	// there, while a flash 128K game such as Pokémon Emerald may have left
+	// bank 1 on): the byte at 0x200 read in bank 1 after 0x3C was written
+	// in bank 0, then in bank 0 after 0xC3 was written in bank 1. 3C and C3:
+	// the bank doesn't reach page 0x20; another byte, then 3C: it does
+	uint8_t bank_page_b1, bank_page_b0;
+	// The menu's own way: INGAME_PROBE_BULK bytes of a pattern written a
+	// byte at a time to page 0x20 at 8 wait cycles (across the flash
+	// command offsets 0x2AAA and 0x5555), how many didn't read back
+	uint16_t bulk_bad;
 	uint8_t spare[2];
 };
+
+#define INGAME_PROBE_BULK 0x6000
 
 #endif

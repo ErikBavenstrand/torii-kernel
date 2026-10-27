@@ -1753,6 +1753,15 @@ u32 Game_pick(struct game_pick *g)
 	return 1;
 }
 //---------------------------------------------------------------------------------
+// Whether a ROM header's bytes are all one blank value (00 or FF)
+static int rom_header_blank(const u8 *h, u32 n)
+{
+	for (u32 i = 1; i < n; i++)
+		if (h[i] != h[0])
+			return 0;
+	return h[0] == 0x00 || h[0] == 0xFF;
+}
+//---------------------------------------------------------------------------------
 // The launch itself, as the v0.3 game menu's line MENU_line did (0 CLEAN BOOT, 1
 // BOOT WITH ADDON, 2 WRITE TO NOR CLEAN, 3 WRITE TO NOR ADDON), with no
 // engine session up.
@@ -1797,9 +1806,21 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 		u8 gb_cart_type = 0;
 		u8 header[0x20];
 		f_lseek(&gfile, 0xA0);
-		if (f_read(&gfile, header, sizeof(header), (UINT *)&ret) != FR_OK || ret != sizeof(header))
+		FRESULT hres = f_read(&gfile, header, sizeof(header), (UINT *)&ret);
+		if (hres != FR_OK || ret != sizeof(header))
 			memset(header, 0, sizeof(header));
 		memcpy(GAMECODE, header + 0xC, 4);
+		// Torii: a GBA ROM whose header reads blank (all 00 or all FF) is
+		// a damaged file or a card that doesn't read: the cart would copy
+		// the same and start nothing, a white screen (the in-game probe on
+		// the real cart, 2026-10-27, at three save types after one read)
+		if (!is_EMU && rom_header_blank(header, sizeof(header))) {
+			tlog_error("launch %s: its header at 0xA0 reads blank (FatFs %u, %lu bytes read): not started",
+				   pfilename, (unsigned)hres, (unsigned long)ret);
+			f_close(&gfile);
+			Show_error_num(1);
+			return 0;
+		}
 		if (!is_EMU)
 			tlog("launch: header: title %.12s, code %.4s, maker %.2s, version %u, check %02X",
 			     (char *)header, (char *)header + 0xC, (char *)header + 0x10, header[0x1C], header[0x1D]);

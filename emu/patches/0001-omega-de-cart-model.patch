@@ -323,10 +323,10 @@ index 1d0c0dd..b77704a 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..91a6f64
+index 0000000..5e4fa87
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1718 @@
+@@ -0,0 +1,1738 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -742,6 +742,8 @@ index 0000000..91a6f64
 +
 +// Stops the run with STATUS for an unproven game-mode access (above), unless
 +// the environment variable ALLOW is "allow".
++static bool _inTorii(struct GBA* gba);
++
 +static void _gameModeAccess(const char* what, uint32_t address, uint16_t value, const char* allowVar, int status) {
 +	fprintf(stderr, "omega: %s IN GAME MODE at %08X (%04X); unproven on the real cart\n", what, address, value);
 +	const char* allow = getenv(allowVar);
@@ -1897,12 +1899,14 @@ index 0000000..91a6f64
 +		return;
 +	}
 +	if (!_isKernelMode(omega)) {
-+		// Game mode: the game's ROM is read-only here. Games write to it
-+		// (probes around the GPIO port); the in-game menu's overlay must not:
-+		// whether a write into the first 16 MB (below the cart's registers)
-+		// that is no unlock step and not the motor's changes the PSRAM on the
-+		// real cart is unproven, so one from the overlay stops the run.
-+		if (!unlockWrite && offset < 0x01000000 && offset != RUMBLE_MOTOR && _inOverlay(gba)) {
++		// Game mode: the game's ROM is read-only here, as on the real cart
++		// (the in-game probe: a write to PSRAM 0x08010000 doesn't land).
++		// Games write to it (probes around the GPIO port); Torii's own
++		// in-game code (the hook, the stub, the cheats and the overlay) must
++		// not keep anything there: a write into the first 16 MB (below the
++		// cart's registers) that is no unlock step and not the motor's stops
++		// the run when Torii's code makes it, as it would be lost on the cart.
++		if (!unlockWrite && offset < 0x01000000 && offset != RUMBLE_MOTOR && _inTorii(gba)) {
 +			_gameModeAccess("PSRAM WRITTEN", address, value, "OMEGA_GAME_PSRAM_WRITES", GAME_PSRAM_WRITE_STATUS);
 +		}
 +		return;
@@ -1933,7 +1937,22 @@ index 0000000..91a6f64
 +// save accesses (pages below OMEGA_SAVE_PAGES) go to the emulated save chip.
 +bool GBAOmegaOwnsSRAM(const struct GBA* gba) {
 +	const struct GBAOmega* omega = &gba->memory.omega;
-+	return omega->enabled && (!omega->gameSaveActive || omega->ramPage >= OMEGA_SAVE_PAGES);
++	if (!omega->enabled) {
++		return false;
++	}
++	// OMEGA_GAME_SRAM=chip: the game's save chip on every page in game mode
++	// (the page register ignored while the FPGA presents it): unproven
++	// either way on the real cart, so the in-game menu must fail safe on it
++	static int chip = -1;
++	if (chip < 0) {
++		const char* fault = getenv("OMEGA_GAME_SRAM");
++		chip = fault && !strcmp(fault, "chip");
++	}
++	if (chip && omega->gameSaveActive && omega->gameBooted && gba->memory.savedata.type != SAVEDATA_SRAM &&
++	    gba->memory.savedata.type != SAVEDATA_SRAM512) {
++		return false;
++	}
++	return !omega->gameSaveActive || omega->ramPage >= OMEGA_SAVE_PAGES;
 +}
 +
 +static uint32_t _sramOffset(const struct GBAOmega* omega, uint32_t address) {
@@ -1946,7 +1965,8 @@ index 0000000..91a6f64
 +// under each save type is unproven (v0.8's black screen in Pokémon Emerald):
 +// these let tests check that the menu's stub fails safe. "drop": writes are
 +// lost (as a flash chip ignores plain writes); "flip-image": a byte of the
-+// overlay image (page 0xB0's window offset 0x400) reads with bit 0 flipped.
++// overlay image (page 0xB0's window offset 0x400) reads with bit 0 flipped;
++// "chip" (GBAOmegaOwnsSRAM): a flash or EEPROM game's save chip on every page.
 +enum {
 +	GAME_SRAM_FAULT_NONE,
 +	GAME_SRAM_FAULT_DROP,

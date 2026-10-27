@@ -62,6 +62,7 @@ has "flash bank: "
 has "PSRAM 0x08010000 read 0000, 0000 after writing A55A, 0000 put back (PSRAM writes don't land)"
 has "SD sector 0 read with its signature; scratch sector $lba: wrote and read back, the kernel's bytes put back"
 has "clock with 0x096A0000 at 1: 26-01-01"
+has "page 0x20: 0 of 24576 bytes didn't read back (byte writes at 8 cycles); with the flash bank switched it read 3C in bank 1, C3 in bank 0 (one byte: the bank doesn't reach it)"
 # The scratch file holds the kernel's bytes again
 mcopy -n -i "$cart/sd.img" ::/torii/probe/sd.bin "$cart/scratch.bin"
 python3 -c 'import sys; sys.stdout.buffer.write(bytes(((i * 7 + 0x5A) ^ (i >> 3)) & 0xFF for i in range(512)))' >"$cart/want.bin"
@@ -89,4 +90,18 @@ OMEGA_SD_READ_ERROR=0:2 run -f 600
 grep -q "kernel error: boot: the card didn't mount (1); trying again (1 of 3)" "$log" ||
   fail "no retry: $(grep -m3 'boot:' "$log")"
 grep -q "screen ready: home" "$log" || fail "the menu didn't come up after the retry: $(tail -3 "$log")"
+# 4. The probe at each other save type (the real cart showed a white screen
+# at EEPROM 8K, FLASH 64K and FLASH 128K, from a ROM whose header read
+# blank): it runs, B skips the SD test, A goes back and the report is logged.
+# Each under a name of its own, so no save of another type asks first.
+for save in 2 3 4 5; do
+  mcopy -i "$cart/sd.img" tests/roms/ingame/ingame.gba ::/P$save.gba
+  # shellcheck disable=SC2046
+  run $(nav_launch /P$save.gba save=$save at=180) $(k 620 B) $(k 720 A) $(k 1000 A) -f 1400
+  cp "$log" "$cart/save-$save.log"
+  grep -q "launch P$save.gba: code TIGP, .* save mode" "$log" || fail "not launched at save type $save"
+  has "cart SRAM pages 20-EF: 208 of 208 read back (first bad 00)"
+  has "page 0x20: 0 of 24576 bytes didn't read back"
+done
+
 echo "PASS: in-game probe"

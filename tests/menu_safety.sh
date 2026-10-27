@@ -9,7 +9,9 @@
 #
 # tests/menu_safety.sh FAULT: the same at FLASH 128K, with cart SRAM failing
 # in game mode (OMEGA_GAME_SRAM in the cart model): drop (writes past the
-# save memory lost) or flip-image (a byte of the overlay image reads wrong).
+# save memory lost), flip-image (a byte of the overlay image reads wrong) or
+# chip (the save chip on every page: the page register ignored while the
+# FPGA presents a flash chip, unproven either way on the real cart).
 # The stub must not open the menu and must give the game back untouched,
 # never a black screen or a hang (Pokémon Emerald on the real cart, v0.8):
 # the game goes on, its screen as before, and with flip-image the stub's
@@ -30,7 +32,7 @@ eeprom8k) save=2 ;;
 eeprom512) save=3 ;;
 flash64k) save=4 ;;
 flash128k) save=5 ;;
-drop | flip-image) save=5 fault=$mode ;;
+drop | flip-image | chip) save=5 fault=$mode ;;
 *)
   echo "unknown mode $mode" >&2
   exit 2
