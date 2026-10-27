@@ -6,6 +6,8 @@ git log, not here.
 
 ## Unreleased
 
+## v0.8.0
+
 - **Added:** a new in-game menu (L+R+START): a sprite overlay in the
   theme's colours that shows in 2 frames and gives the game back byte for
   byte (memory, VRAM, OAM, palettes, registers; checked on all 196 compat
