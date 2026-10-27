@@ -1502,6 +1502,12 @@ int main(void)
 	// A soft reset or an in-game RESET keeps the last WAITCNT; the firmware
 	// update below runs at the BIOS's, the menu after it faster (waitcnt.h).
 	REG_WAITCNT_CART = WAITCNT_BIOS;
+	// Black at once: the BIOS's RegisterRamReset (Back to Torii, a refusal's
+	// way back) leaves the screen in forced blank, which the LCD shows white,
+	// and the boot's first frames (the tests, the cart log) took a fifth of a
+	// second before dialog_blank below
+	BG_PALETTE[0] = 0;
+	REG_DISPCNT = 0;
 	cartlog_ingame_refused_carry();  // before the stack grows down to it
 	tlog_init();
 	tlog_marker("power-on or reset", 0);

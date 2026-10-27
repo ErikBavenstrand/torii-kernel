@@ -288,11 +288,17 @@ reset_code:
 	strh r0,[r6]
 	strh r1,[r7]
 
-	lsl r1,r0,#11 @;#0x4000000
-	sub r1,r1,#8  @;#0x3FFFFFA
+	@;Torii: the flag at 0x3007FFA 0, so SoftReset starts the ROM (EZ-Flash's
+	@;store, from 0x8002 << 11, went to unused I/O); r7's low half is 0
+	lsr r4,r3,#1  @;#0x4000000
+	sub r1,r4,#6  @;#0x3FFFFFA (mirror of #0x3007FFA)
+	strb r7,[r1]
 	mov r0,#0xfc  @;#252 r0
-	str r0,[r1]   @;#0x3FFFFFA (mirror of #0x3007FFA
 	swi 0x01
+	@;Torii: RegisterRamReset leaves forced blank, which the LCD shows white
+	@;until the kernel's start: DISPCNT 0 instead, the cleared backdrop black
+	@;(the BIOS keeps r4-r11)
+	strh r7,[r4]
 	swi 0x00
 	.align
 reset_end:
