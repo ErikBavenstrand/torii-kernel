@@ -49,6 +49,12 @@ int keypad_edit_break(struct keypad_edit *e);
 int keypad_edit_line(struct keypad_edit *e, s32 dir);
 // The stand-ins left
 u32 keypad_edit_marks(const struct keypad_edit *e);
+// Line i's digits so far (stand-ins count: they are digits to come), and
+// into *expect the count a whole line of that shape has: 12 for CodeBreaker
+// (format, or a line of 12 digits or fewer in CHEAT_FMT_AUTO), 16 for the
+// GameShark and Action Replay ones; 0 for a VBA line (with ':'), whose
+// value's width varies
+u32 keypad_edit_digits(const struct keypad_edit *e, u32 i, u32 format, u32 *expect);
 // The code as a file stores it into out (size bytes, KEYPAD_CODE_MAX + 1
 // is room for any): the lines that aren't empty, '+' between them, a
 // CodeBreaker or GameShark line in two parts ("82001234 0063"). Its length.

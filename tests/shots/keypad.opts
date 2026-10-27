@@ -81,3 +81,6 @@
 -k @468:A -k @472:-
 -k @476:L -k @480:-
 -s @492:unreadable.png
+# L+B clears the whole code (5)
+-k @500:L -k @504:L+B -k @510:-
+-s @522:cleared.png

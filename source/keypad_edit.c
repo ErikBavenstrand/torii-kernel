@@ -197,6 +197,23 @@ u32 keypad_edit_marks(const struct keypad_edit *e)
 	return n;
 }
 
+u32 keypad_edit_digits(const struct keypad_edit *e, u32 i, u32 format, u32 *expect)
+{
+	*expect = 0;
+	if (i >= e->lines)
+		return 0;
+	u32 n = e->len[i];
+	if (memchr(e->text[i], ':', n) || format == CHEAT_FMT_VBA)
+		return n;
+	if (format == CHEAT_FMT_CODEBREAKER)
+		*expect = 12;
+	else if (format != CHEAT_FMT_AUTO)
+		*expect = 16;
+	else
+		*expect = n <= 12 ? 12 : 16;
+	return n;
+}
+
 // 1 if line i is a CodeBreaker or GameShark line typed whole: written in
 // two parts
 static int two_parts(const struct keypad_edit *e, u32 i)

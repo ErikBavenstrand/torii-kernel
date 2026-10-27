@@ -369,8 +369,9 @@ ingame-states/menu E5CA91AA8D3A6D72
 ingame-states/other 3B1365D9D11D048D
 ingame-states/save 8FCFCED100485A28
 ingame-states/save-current 2BD77CD5B52426C3
+keypad/cleared 85367DCFB8E98849
 keypad/empty 7FD5714D72D4EFEE
-keypad/format 95AB601B14490B28
+keypad/format C6129FC5DE1F8218
 keypad/typed 3B61A3A038562A48
 keypad/unreadable AAE970C2329D69D9
 keypad-fill/fill B4C7D146C4CF366C
