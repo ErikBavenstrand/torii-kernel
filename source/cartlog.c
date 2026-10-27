@@ -454,7 +454,9 @@ void cartlog_ingame_refused_carry(void)
 	volatile u32 *e = (volatile u32 *)INGAME_REFUSED_IWRAM;
 	if (e[0] != INGAME_REFUSED_MAGIC0 || e[1] != INGAME_REFUSED_MAGIC1)
 		return;
-	u32 r[4] = {e[0], e[1], e[2], e[3]};
+	u32 r[sizeof(struct ingame_refused) / 4];
+	for (u32 i = 0; i < sizeof(r) / 4; i++)
+		r[i] = e[i];
 	e[0] = e[1] = 0;
 	cart_write_block(CARTLOG_INGAME_REFUSED, r, sizeof(r), 8);
 }
@@ -465,24 +467,44 @@ int cartlog_ingame_refused(struct ingame_refused *r)
 	return r->magic[0] == INGAME_REFUSED_MAGIC0 && r->magic[1] == INGAME_REFUSED_MAGIC1;
 }
 
+// The screen's colour the stub showed for a record, in words
+static const char *ingame_refused_colour_name(const struct ingame_refused *r)
+{
+	static const char *const names[] = {"white", "blue", "red", "green", "cyan", "red", "yellow", "magenta"};
+	return names[ingame_refused_colour(r->reason, r->detail)];
+}
+
 // The in-game menu's stub didn't open the menu (gba_rts_patch.s,
 // ingame_refuse) and gave the game back as it was: why, from its record
 static void report_ingame_refused(void)
 {
-	static const char *const why[] = {
+	static const char *const why[INGAME_REFUSED_REASONS] = {
 		"?",
 		"no overlay image in cart SRAM",
 		"the game's memory didn't read back from cart SRAM",
 		"the overlay image loaded from cart SRAM didn't check",
+		"the overlay image's header has sizes it can't take",
 	};
 	static const char *const copy[] = {"", ": the EWRAM window", ": OAM", ": the OBJ palette"};
 	struct ingame_refused r;
 	if (!cartlog_ingame_refused(&r))
 		return;
 	cart_clear_magic(CARTLOG_INGAME_REFUSED, 8);
-	tlog_force(TLOG_ERRORS, "in-game menu: the stub didn't open it, %s%s (the game's WAITCNT %04X)",
-		   why[r.reason < sizeof(why) / sizeof(*why) ? r.reason : 0],
-		   copy[r.detail < sizeof(copy) / sizeof(*copy) ? r.detail : 0], r.waitcnt);
+	tlog_force(TLOG_ERRORS, "in-game menu: the stub didn't open it, %s%s (the game's WAITCNT %04X; the screen %s)",
+		   why[r.reason < INGAME_REFUSED_REASONS ? r.reason : 0],
+		   copy[r.detail < sizeof(copy) / sizeof(*copy) ? r.detail : 0], r.waitcnt,
+		   ingame_refused_colour_name(&r));
+	char line[96];
+	unsigned long at = r.at, expected = r.expected, read = r.read;
+	if (r.reason == INGAME_REFUSED_BACKUP)
+		snprintf(line, sizeof(line), "the first difference before %08lX: RAM %08lX, SRAM read %08lX", at,
+			 expected, read);
+	else if (r.reason == INGAME_REFUSED_IMAGE)
+		snprintf(line, sizeof(line), "the check word %08lX, computed %08lX", expected, read);
+	else
+		snprintf(line, sizeof(line), "the header's magic %08lX, image %lu bytes, window %lu bytes", at,
+			 expected, read);
+	tlog_force(TLOG_ERRORS, "in-game menu: %s; %u tries, VCOUNT %u at the menu key", line, r.tries, r.vcount);
 }
 
 // The EEPROM probe ROM's report (tests/roms/eeprom): each step, where each

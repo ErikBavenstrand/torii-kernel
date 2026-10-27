@@ -57,6 +57,7 @@ on, NES with no NES launch) as "unconfirmed" in its summary.
 | Cheats in game | a game with three or four cheats (one picked): L+R+START, Cheats lists them with a box each; A turns one on and it works from the next frame, a greyed one says why at the bottom. Back to Torii: the game's Cheats screen has the new picks |
 | A screenshot | in a game's menu, Screenshot: the footer says "Saved when you return to Torii". Back to Torii: the boot shows "Saving the screenshot" (a few seconds), then `/torii/screenshots/<game> <date> <time>.bmp` is on the card. On a PC it shows the game's screen as it was under the menu; note how it compares (a scrolled tile screen may sit shifted, a fade or a Mode 7 road comes out wrong: those registers can't be read back). Try a bitmap game (Doom) and one with sprites over tiles |
 | A screenshot survives a power cut | take a screenshot, Back to Torii, and switch off while "Saving the screenshot" shows; power on: no broken `.bmp` is left in `/torii/screenshots` (the boot deletes it), and no `.writing` file |
+| A refused menu says why | if L+R+START shows a plain coloured screen instead of the menu, the stub refused it: note the colour (table below), then press B (back to Torii, which keeps the stub's record; A gives the game back, and a power-off loses the record). The boot's dialog says why, and with LOGGING on two "in-game menu:" lines give the details: send both |
 | In-game menu Off | Settings, Hotkeys, In-game menu: Off, then Boot with addon a game with a cheat picked: L+R+START does nothing and the cheat still works. Every game: the menu opens in a game with no save states or cheats. Menu keys set to another combination (say L+R+B): that one opens it, and the menu's footer names it |
 | Reset game | in the menu, Reset game: the game starts again from its title, without the kernel, and its save is untouched |
 | Back to Torii | in the menu, Back to Torii: the kernel starts, as RESET did |
@@ -106,6 +107,24 @@ four green OK lines; a 14-bit run also says "1024 BLOCKS: 8 KB" (or "WRAPS
 AT 64 BLOCKS: 512 B"). Note what each run's screen says, in particular any
 red line, then press A: the kernel's boot logs every step ("eeprom probe:")
 and its verdict.
+
+**A refused in-game menu's colours.** When the stub can't open the menu
+safely it gives the game back untouched, but first shows one colour for the
+whole screen until A or B; the colour names the reason
+(`INGAME_REFUSED_COLOURS` in `source/ingame_abi.h`):
+
+| Colour | RGB15 | Why the menu didn't open |
+|---|---|---|
+| Blue | `7C00` | No overlay image in cart SRAM: its header's magic didn't read (cart SRAM unreadable, or not written at launch) |
+| Cyan | `7FE0` | The image's header read, but with sizes the stub can't take (a damaged header) |
+| Red | `001F` | The game's EWRAM window (8 KB) didn't read back from cart SRAM pages `0x20`-`0x21`, twice |
+| Yellow | `03FF` | OAM didn't read back from cart SRAM (page `0x2C`) |
+| Magenta | `7C1F` | The OBJ palette didn't read back from cart SRAM (page `0x2C`) |
+| Green | `03E0` | The overlay image loaded, but its check word didn't match (a byte read wrong) |
+
+After B the screen shows the theme's accent for a third of a second (with
+the default theme that may also be red) before Torii starts. A white screen
+that never changes is not a refusal: report it as a hang.
 
 **The in-game probe** tries, in game mode, what v0.8's in-game menu may
 want there and the emulator can't tell: cart SRAM pages 0x20-0xEF, the RAM

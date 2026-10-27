@@ -18,10 +18,25 @@ void test_ingame_abi(void)
 	CHECK_EQ(ingame_image_check(words, 1), 1u);
 	CHECK_EQ(ingame_image_check(words, 2), 0x80000020u);
 	CHECK_EQ(ingame_image_check(words, 3), ((0x80000020u << 5 | 0x80000020u >> 27) + 0x12345678u));
-	// The stub's refusal record: "TINR", "FED1", reason, WAITCNT, detail
+	// The stub's refusal record: "TINR", "FED2", reason, WAITCNT, detail,
+	// what the check saw, VCOUNT and tries; and its screen's colour by reason
 	CHECK_EQ(INGAME_REFUSED_MAGIC0, 0x524E4954u);
-	CHECK_EQ(INGAME_REFUSED_MAGIC1, 0x31444546u);
+	CHECK_EQ(INGAME_REFUSED_MAGIC1, 0x32444546u);
 	CHECK_EQ(INGAME_REFUSED_IMAGE, 3u);
+	CHECK_EQ(INGAME_REFUSED_SIZES, 4u);
+	CHECK_EQ(INGAME_REFUSED_IWRAM + sizeof(struct ingame_refused), 0x03007E00u);  // under SoftReset's 0x200
+	const uint16_t colours[] = INGAME_REFUSED_COLOURS;
+	CHECK_EQ(colours[ingame_refused_colour(INGAME_REFUSED_NO_IMAGE, 0)], 0x7C00u);
+	CHECK_EQ(colours[ingame_refused_colour(INGAME_REFUSED_BACKUP, 1)], 0x001Fu);
+	CHECK_EQ(colours[ingame_refused_colour(INGAME_REFUSED_BACKUP, 2)], 0x03FFu);
+	CHECK_EQ(colours[ingame_refused_colour(INGAME_REFUSED_BACKUP, 3)], 0x7C1Fu);
+	CHECK_EQ(colours[ingame_refused_colour(INGAME_REFUSED_IMAGE, 0)], 0x03E0u);
+	CHECK_EQ(colours[ingame_refused_colour(INGAME_REFUSED_SIZES, 0)], 0x7FE0u);
+	CHECK_EQ(ingame_refused_colour(INGAME_REFUSED_BACKUP, 9), 0u);
+	// Each a colour of its own, but EWRAM's red at 2 (never shown: BACKUP has a copy)
+	for (unsigned i = 1; i < 8; i++)
+		for (unsigned j = i + 1; j < 8; j++)
+			CHECK(i == 2 || colours[i] != colours[j]);
 	CHECK_EQ(INGAME_IMAGE_MAGIC, 0x31564F54u);  // "TOV1", as the stub and hook_watch.lua have it
 	CHECK_EQ(INGAME_BACKUP_EWRAM, 0x20000u);
 	CHECK_EQ(INGAME_BACKUP_OBJ, 0x28000u);

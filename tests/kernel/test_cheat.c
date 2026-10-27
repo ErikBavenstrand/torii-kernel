@@ -9,6 +9,7 @@
 #include "../../source/cheat.h"
 #include "../../source/cheatstore.h"
 #include "../../source/GBApatch.h"
+#include "../../source/ingame_abi.h"
 #include "../../source/engine/stage.h"
 #include "torii_test.h"
 #include "tests.h"
@@ -55,8 +56,14 @@ void test_menu_code_fits(void)
 	u32 debug = (u32)Debug_blob_end - (u32)Debug_blob_start;
 	tlog("in-game menu code: %lu bytes, and %lu for DEBUG, of %u", (unsigned long)size, (unsigned long)debug,
 	     RTS_PATCH_LENGTH);
-	CHECK(size + debug <= RTS_PATCH_LENGTH - 0x100);  // with room to spare
+	// v0.8's refusal colours and record took the 0x100 bytes kept spare
+	// (4088 of 4096 bytes); past the length, DEBUG is left out of a launch
+	// without cheats (Patch_RTS_Cheat logs it)
+	CHECK(size + debug <= RTS_PATCH_LENGTH);
 	CHECK_EQ(debug % 4, 0);
+	// The refusal's colours, as the kernel names them
+	static const u16 colours[] = INGAME_REFUSED_COLOURS;
+	CHECK(!memcmp((const void *)RTS_Refuse_colours, colours, sizeof(colours)));
 }
 
 #define T_ROM "/T19/Cheat Test.gba"

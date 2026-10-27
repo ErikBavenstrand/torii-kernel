@@ -13,6 +13,7 @@
 	.global  RTS_Sleep_key
 	.global  RTS_Reset_key
 	.global  RTS_Accent
+	.global  RTS_Refuse_colours
 	.global	 RTS_switch
 	.global	 Debug_switch
 	.global	 Cheat_switch
@@ -63,10 +64,11 @@ WAITCNT_STUB	= 0x4017
 REFUSED_AT		= 0x1C00	@;CARTLOG_INGAME_REFUSED's offset in page 0xF0
 REFUSED_PAGE	= 0xF0
 REFUSED_MAGIC0	= 0x524E4954	@;INGAME_REFUSED_MAGIC0
-REFUSED_MAGIC1	= 0x31444546
+REFUSED_MAGIC1	= 0x32444546
 REFUSED_NO_IMAGE = 1		@;INGAME_REFUSED_*
 REFUSED_BACKUP	= 2
 REFUSED_IMAGE	= 3
+REFUSED_SIZES	= 4
 ACTS			= 7		@;INGAME_ACTS
 
 @;The spend area (spend_0x80): the hook keeps r4-r11, sp, lr and SPSR at
@@ -81,8 +83,12 @@ SP_DMA			= 0x48		@;DMA0-3 CNT_H
 SP_DISPCNT		= 0x50
 SP_BLDCNT		= 0x52
 SP_BLDALPHA		= 0x54
+SP_PAL0			= 0x56		@;the backdrop colour (BG palette 0)
 SP_ACT			= 0x58		@;the overlay's answer
-SP_HDR			= 0x60		@;the image header's first 24 bytes (to 0x77)
+SP_VCOUNT		= 0x5C		@;halfwords: VCOUNT at the stub's start, the backup's tries
+SP_TRIES		= 0x5E
+SP_HDR			= 0x60		@;the image header's 32 bytes (to 0x7F); a refusal's record
+SP_MISS			= 0x70		@;sram_copy's compare: the first difference (struct ingame_refused's at)
 
 @;The save-state buffer (INGAME_SRAM_STATE): the old menu's layout, which
 @;the old /RTS files have, and v0.8's tag and flag at its end
@@ -229,6 +235,7 @@ nocheat:
 @;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 @;Back to Torii: the kernel's ROM page, then a soft reset into it
 reset_now:
+	bl safe_stacks
 	adr r1,reset_code
 	adr r3,reset_end
 	mov r2,#0x02000000
@@ -396,11 +403,14 @@ ingame_stub:
 ingame_open:
 	mov		r11,r12				@;r11: the spend area (the overlay keeps r4-r11)
 	mov		r10,#REG_BASE		@;r10: I/O
+	ldrh	r1,[r10,#REG_VCOUNT]	@;where the frame was, for a refusal's record
+	strh	r1,[r11,#SP_VCOUNT]
 	add		r8,r10,#0x200
 	ldrh	r1,[r8,#8]			@;IME
 	strh	r1,[r11,#SP_IME]
 	mov		r1,#0
 	strh	r1,[r8,#8]
+	strh	r1,[r11,#SP_TRIES]
 	ldrh	r1,[r8,#4]			@;WAITCNT
 	strh	r1,[r11,#SP_WAITCNT]
 	ldr		r1,=WAITCNT_STUB
@@ -426,12 +436,29 @@ ingame_open:
 	strh	r1,[r2],#0xC
 	subs	r4,r4,#1
 	bne		1b
+	@;and stopped again on the next scanline (Torii, after Pokémon Emerald's
+	@;refusal on the real cart, whose scanline effects run on HBlank DMA):
+	@;a transfer its timing had already started may have run past the first
+	@;stop, which nothing in mGBA models
+	ldrh	r3,[r10,#REG_VCOUNT]
+1:	ldrh	r1,[r10,#REG_VCOUNT]
+	cmp		r1,r3
+	beq		1b
+	mov		r1,#0
+	sub		r2,r2,#0x30			@;DMA0CNT_H again
+	strh	r1,[r2]
+	strh	r1,[r2,#0xC]
+	strh	r1,[r2,#0x18]
+	strh	r1,[r2,#0x24]
 	ldrh	r1,[r10,#REG_DISPCNT]
 	strh	r1,[r11,#SP_DISPCNT]
 	ldrh	r1,[r10,#REG_BLDCNT]
 	strh	r1,[r11,#SP_BLDCNT]
 	ldrh	r1,[r10,#REG_BLDALPHA]
 	strh	r1,[r11,#SP_BLDALPHA]
+	mov		r2,#0x05000000		@;the backdrop, which a refusal's screen takes
+	ldrh	r1,[r2]
+	strh	r1,[r11,#SP_PAL0]
 	@;The overlay's header, from cart SRAM: a launch from this kernel wrote it
 	ldr		r0,=SRAM_IMAGE
 	add		r1,r11,#SP_HDR
@@ -443,21 +470,27 @@ ingame_open:
 	ldr		r1,[r11,#SP_HDR]
 	ldr		r2,=IMAGE_MAGIC
 	cmp		r1,r2
-	bne		ingame_refuse
+	bne		refuse_header
+	mov		r7,#REFUSED_SIZES
 	ldr		r4,[r11,#SP_HDR+12]	@;window_bytes
 	ldr		r5,[r11,#SP_HDR+8]	@;image_bytes
 	cmp		r4,#WINDOW_MAX
-	bhi		ingame_refuse
+	bhi		refuse_header
 	cmp		r5,r4
-	bhi		ingame_refuse
+	bhi		refuse_header
 	cmp		r5,#32
-	bls		ingame_refuse
+	bls		refuse_header
 	tst		r4,#3
 	tsteq	r5,#3
-	bne		ingame_refuse
+	bne		refuse_header
 	@;The game's EWRAM window, OAM and OBJ palette to SRAM, each read back
 	@;before anything of the game's is changed: if cart SRAM didn't keep
-	@;them, the game goes on untouched (Torii: v0.8's menu on the real cart)
+	@;them, the game goes on untouched (Torii: v0.8's menu on the real cart).
+	@;Copies that don't read back are written and read once more.
+bk_try:
+	ldrh	r1,[r11,#SP_TRIES]
+	add		r1,r1,#1
+	strh	r1,[r11,#SP_TRIES]
 	adrl	r8,bk_list
 	mov		r7,#1
 	bl		sram_list
@@ -465,8 +498,13 @@ ingame_open:
 	mov		r7,#2
 	bl		sram_list
 	movs	r6,r0				@;the copy that differed
+	beq		bk_ok
+	ldrh	r1,[r11,#SP_TRIES]
+	cmp		r1,#2
+	blo		bk_try
 	mov		r7,#REFUSED_BACKUP
-	bne		ingame_refuse
+	b		ingame_refuse
+bk_ok:
 	@;The overlay in, checked against the header's check word
 	@;(ingame_image_check); a copy that doesn't check gives the window back
 	ldr		r0,=SRAM_IMAGE
@@ -485,6 +523,10 @@ ingame_open:
 	ldr		r1,[r11,#SP_HDR+28]
 	cmp		r0,r1
 	beq		ingame_run
+	str		r1,[r11,#SP_MISS+4]	@;the record's: the check word, the one computed
+	str		r0,[r11,#SP_MISS+8]
+	mov		r1,#0
+	str		r1,[r11,#SP_MISS]
 	ldr		r0,=BK_EWRAM
 	mov		r1,#EWRAM_BASE
 	mov		r2,r4
@@ -547,9 +589,16 @@ ingame_run:							@;and its call on its own stack at the window's end
 	mov		r3,#0
 	bl		sram_copy
 	b		ingame_back
-@;The menu not opened (r7 the reason, r6 its detail): a record for the
-@;kernel's next boot (struct ingame_refused, in page 0xF0), then the game
-@;as it was. Its header's place in the spend area holds the record.
+refuse_header:						@;the record's: the header's magic and sizes as read
+	ldr		r1,[r11,#SP_HDR]
+	ldr		r2,[r11,#SP_HDR+8]
+	ldr		r3,[r11,#SP_HDR+12]
+	add		r0,r11,#SP_MISS
+	stmia	r0,{r1,r2,r3}
+@;The menu not opened (r7 the reason, r6 its detail, SP_MISS what the check
+@;saw): a record for the kernel's next boot (struct ingame_refused, in page
+@;0xF0), then the game as it was. Its header's place in the spend area
+@;holds the record.
 ingame_refuse:
 	ldr		r1,=REFUSED_MAGIC0
 	ldr		r2,=REFUSED_MAGIC1
@@ -557,21 +606,32 @@ ingame_refuse:
 	orr		r3,r7,r3,lsl #16
 	add		r0,r11,#SP_HDR
 	stmia	r0,{r1,r2,r3,r6}
+	ldr		r2,[r11,#SP_VCOUNT]	@;extra: VCOUNT, the backup's tries
+	str		r2,[r11,#SP_HDR+28]
 	ldr		r0,=(REFUSED_PAGE<<12)+REFUSED_AT
 	add		r1,r11,#SP_HDR
-	mov		r2,#16
+	mov		r2,#32
 	mov		r3,#1
 	bl		sram_copy
-	@;The screen white (forced blank: the game's own screen stays as it
-	@;is) until a key answers, the way back to Torii that needs no cart
-	@;SRAM (Torii: Pokémon Emerald's refusal on the real cart left only a
-	@;power-off, which lost the record): A gives the game back; B, or the
-	@;menu keys held for 2 s, shows the theme's accent and resets into
-	@;Torii. A and B count only once pressed while white, so a menu key
-	@;made of them doesn't answer at once.
-	ldrh	r1,[r11,#SP_DISPCNT]
-	orr		r1,r1,#0x80
-	strh	r1,[r10,#REG_DISPCNT]
+	@;The screen the reason's colour (INGAME_REFUSED_COLOURS: the backdrop
+	@;alone, the game's own screen stays in VRAM as it is; Torii, so the
+	@;owner can tell why without a log) until a key answers, the way back
+	@;to Torii that needs no cart SRAM (Pokémon Emerald's refusal on the
+	@;real cart left only a power-off, which lost the record): A gives the
+	@;game back; B, or the menu keys held for 2 s, shows the theme's accent
+	@;and resets into Torii. A and B count only once pressed while it shows,
+	@;so a menu key made of them doesn't answer at once.
+	cmp		r7,#REFUSED_BACKUP	@;ingame_refused_colour
+	addeq	r1,r6,#4
+	movne	r1,r7
+	adrl	r2,RTS_Refuse_colours
+	add		r2,r2,r1,lsl #1
+	ldrh	r1,[r2]
+	mov		r2,#0x05000000
+	strh	r1,[r2]
+	mov		r1,#0
+	strh	r1,[r10,#REG_BLDCNT]		@;no fade on the backdrop
+	strh	r1,[r10,#REG_DISPCNT]		@;mode 0, no layers
 	mov		r4,#120				@;frames left of the menu keys' hold
 	ldr		r5,RTS_Reset_key
 	ldr		r6,[r10,#REG_P1]	@;the keys a frame before (0 held)
@@ -599,12 +659,13 @@ refuse_torii:
 	bne		2b
 	@;The record also in IWRAM under the BIOS's 0x200 bytes
 	@;(INGAME_REFUSED_IWRAM), which the soft reset and the kernel's start
-	@;keep: page 0xF0 may not have taken it in game mode
-	add		r1,r11,#SP_HDR
-	ldmia	r1,{r1,r2,r3,r6}
+	@;keep (reset_now moves the stacks the BIOS's SWIs use off it): page
+	@;0xF0 may not have taken it in game mode
+	add		r0,r11,#SP_HDR
+	ldmia	r0,{r1-r8}
 	mov		r0,#0x03000000
 	add		r0,r0,#0x7E00
-	stmdb	r0,{r1,r2,r3,r6}
+	stmdb	r0,{r1-r8}
 	mov		r1,#ACT_TORII
 refuse_answer:
 	str		r1,[r11,#SP_ACT]
@@ -636,8 +697,13 @@ ingame_resume:						@;r10 I/O, r11 the spend area
 	mvn		r2,r2
 	movs	r2,r2,lsl #22
 	bne		1b
-	ldrh	r1,[r11,#SP_DISPCNT]	@;the screen back after a refusal's white
+	ldrh	r1,[r11,#SP_DISPCNT]	@;the screen back after a refusal's colour
 	strh	r1,[r10,#REG_DISPCNT]
+	ldrh	r1,[r11,#SP_BLDCNT]
+	strh	r1,[r10,#REG_BLDCNT]
+	ldrh	r1,[r11,#SP_PAL0]
+	mov		r2,#0x05000000
+	strh	r1,[r2]
 	bl		ingame_thaw
 	ldr		r1,[r11,#SP_ACT]
 	cmp		r1,#ACT_SLEEP
@@ -646,6 +712,9 @@ ingame_resume:						@;r10 I/O, r11 the spend area
 	mov		r0,#REG_BASE
 	ldmia	r11,{r4-r11}
 	bx		lr
+RTS_Refuse_colours:					@;INGAME_REFUSED_COLOURS (ingame_abi.h)
+	.hword	0x7FFF,0x7C00,0x001F,0x03E0,0x7FE0,0x001F,0x03FF,0x7C1F
+	.align	2
 
 @;The sound mixer, DMA0-3 and IME as the game had them (r10 I/O, r11 the
 @;spend area); uses r1-r4
@@ -684,7 +753,8 @@ wait_frame:
 @;caller's WAITCNT back at the end. Torii: to_sram 2 compares instead, and returns r0 non-zero
 @;if SRAM differs (0 otherwise, and for the other modes). Leaves the last
 @;page set. Keeps r4-r11 (AAPCS: the overlay calls it) and, but in mode 2,
-@;r3 (DEBUG's code relies on it); 44 bytes of stack.
+@;r3 (DEBUG's code relies on it); 44 bytes of stack. Mode 2 is the stub's
+@;alone (r11 its spend area), and leaves the first difference at SP_MISS.
 sram_copy:
 	stmfd	sp!,{r4-r8,lr}
 	mov		r8,#REG_BASE
@@ -692,6 +762,8 @@ sram_copy:
 	ldrh	r7,[r8,#4]
 	stmfd	sp!,{r7}
 sc_chunk:
+	mov		r8,#REG_BASE		@;again: sc_cmp has had the spend area in it
+	add		r8,r8,#0x200
 	cmp		r2,#0
 	ble		sc_done
 	mov		r4,#0
@@ -718,6 +790,7 @@ sc_chunk:
 	adreq	r12,sc_out+1
 	bls		2f
 	adrl	r12,sc_cmp+1
+	mov		r8,r11				@;mode 2 is the stub's: r11 its spend area
 2:	mov		lr,pc
 	bx		r12
 	b		sc_chunk
@@ -795,11 +868,17 @@ sc_out1:
 	sub		r5,#4
 	bgt		sc_out1
 	bx		lr
-sc_cmp:								@;r3 becomes 3 at a difference
-	sc_get_word 0
-	ldmia	r1!,{r7}
-	cmp		r4,r7
+sc_cmp:								@;r3 becomes 3 at a difference; the
+	sc_get_word 0				@;first one's RAM address (past it), RAM
+	ldmia	r1!,{r7}			@;word and SRAM word go to the spend
+	cmp		r4,r7				@;area's SP_MISS (r8)
 	beq		1f
+	cmp		r3,#3
+	beq		1f
+	mov		r3,r8
+	str		r1,[r3,#SP_MISS]
+	str		r7,[r3,#SP_MISS+4]
+	str		r4,[r3,#SP_MISS+8]
 	mov		r3,#3
 1:	add		r6,#4
 	sub		r5,#4
@@ -834,6 +913,7 @@ sram_list:
 @;cleared, WAITCNT the BIOS's, then SoftReset from the cart's ROM, whose
 @;page is left on the game.
 game_reset:
+	bl		safe_stacks
 	add		r8,r10,#0x200
 	mov		r1,#0
 	strh	r1,[r8,#4]			@;WAITCNT
@@ -862,6 +942,21 @@ debug_now:
 	ldr		r12,[r12]
 	mov		r9,#NOTICE_DEBUG
 	b		ingame_open
+@;Torii: the System and Supervisor stacks moved to the 0x200 bytes
+@;SoftReset clears, before a SWI from IRQ mode that never returns to the
+@;game. The real BIOS's SWI handler runs the function in System mode on
+@;the caller's System stack: Emerald's, from 0x03007E40, put the frames of
+@;RegisterRamReset and SoftReset over the refusal record at 0x03007DE0
+@;(and under RegisterRamReset's IWRAM clear, for Reset game). Leaves IRQ
+@;mode with IRQs off; uses r0. (The handler's own 4 words go on the
+@;Supervisor stack, which games leave at the BIOS's 0x03007FE0.)
+safe_stacks:
+	mov		r0,#0x03000000
+	add		r0,r0,#0x7F00
+	msr		cpsr_c,#0xDF		@;System
+	mov		sp,r0
+	msr		cpsr_c,#0xD2		@;IRQ
+	bx		lr
 @;------------------------------------------------------
 SetRampage:
 	ldr 	r1,=0xD200

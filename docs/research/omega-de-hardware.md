@@ -779,6 +779,28 @@ cause the real cart has to tell: the next test of Emerald either opens the
 menu or logs the refusal's reason (after a soft reset, as page `0xF0` has
 no battery).
 
+**The refusal record lost (real cart, v0.8 at 790CC1F1, 2026-10-27):**
+Emerald refused again (white), B went back to Torii, and the boot logged
+neither the record from page `0xF0` nor the one carried in IWRAM at
+`0x03007DF0`, though page `0xF0`'s session record survived. Page `0xF0`
+not taking the stub's write is the same failure the refusal reports (cart
+SRAM writes in game mode not landing), so only the IWRAM copy could have
+told. It was lost to the BIOS: the real BIOS's SWI handler saves 4 words on
+the Supervisor stack, then switches to System mode and runs the function
+there (GBATEK, "BIOS Functions"), so RegisterRamReset and SoftReset, called
+from the stub in IRQ mode, put their frames below the game's interrupted
+System sp. Emerald's System stack starts at `0x03007E40` (its crt0's
+literal), and the hook found it at `0x03007E24`, so those frames reached the
+record 0x30 bytes below. mGBA's HLE BIOS writes nothing there; the emulated
+cart now does (the handler's r2 and lr below the caller's System sp, and
+`OMEGA_BIOS_STACK` bytes, default `0x40`, more for those two functions,
+whose real depth isn't known), which loses the record in Emerald as the cart
+did. The stub now moves the System stack to `0x03007F00` before its SWIs
+(the area SoftReset clears), the record is 32 bytes at `0x03007DE0`, and
+`tests/menu_safety.sh emerald` checks it reaches the boot. The same move
+keeps Reset game's RegisterRamReset (which clears IWRAM below `0x03007E00`)
+off its own frames in a game with a stack like Emerald's.
+
 The emulated cart stops with status 78 when the overlay's own code writes
 the game's PSRAM, 79 on any SD register in game mode and 80 when Torii's
 code in game mode (from the patched entry branch's target, or the overlay)

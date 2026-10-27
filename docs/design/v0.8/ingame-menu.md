@@ -73,21 +73,29 @@ write-only, so a menu on a BG can't give them back (today's BG2 affine bug).
 - Set `WAITCNT` for the SRAM copies, and restore it: `0x4017`, SRAM 8 cycles and ROM WS0 3/1
   with prefetch, never faster than games run in game mode (the stub's own code runs from the
   game's PSRAM).
-- **Fail safe** (after the real cart's black screen in Pokémon Emerald): read every backup
-  back before changing anything of the game's, check the loaded image against the check word
-  the kernel writes in its header, and treat an answer out of range as Resume. On a failure
-  the stub writes a record to page `0xF0` (`struct ingame_refused`) and shows a white screen
-  (forced blank) with the game frozen, a way back that needs no cart SRAM: A gives the game
-  back untouched; B, or the menu keys held for 2 s, shows the theme's accent (the backdrop
-  alone, which the kernel patches into the stub as `RTS_Accent`) and goes back to Torii by the
-  Back to Torii reset. Page `0xF0` may take no writes in game mode (Pokémon Emerald on the real
-  cart left only a power-off, which lost the record anyway), so on the way back the stub also
-  puts the record in IWRAM at `0x03007DF0` (`INGAME_REFUSED_IWRAM`), under what the BIOS's
-  SoftReset clears and above what the kernel's crt0 clears; `main` moves it to page `0xF0`
-  first thing. The boot then shows a dialog once (`ingame_refused_notice`): the game, the
-  reason in plain words ("cart memory is unavailable with its Flash save", "its copy in cart
-  memory was damaged"), and that save states and cheats need the menu while the game's own
-  saves are safe; `cartlog_boot_report` logs and clears the record.
+- **Fail safe** (after the real cart's black screen in Pokémon Emerald): stop DMA0-3, and
+  again a scanline later; read every backup back before changing anything of the game's
+  (writing and reading them once more when they differ), check the loaded image against the
+  check word the kernel writes in its header, and treat an answer out of range as Resume. On a
+  failure the stub writes a 32-byte record to page `0xF0` (`struct ingame_refused`: the
+  reason, the copy, what the check saw, such as the first word that differed and both its
+  values, the tries and VCOUNT) and shows the reason's colour (the backdrop alone, BG palette
+  0, the game's screen left in VRAM; `INGAME_REFUSED_COLOURS`, listed in
+  `docs/release-checklist.md`) with the game frozen, a way back that needs no cart SRAM: A
+  gives the game back untouched; B, or the menu keys held for 2 s, shows the theme's accent
+  (which the kernel patches into the stub as `RTS_Accent`) and goes back to Torii by the Back
+  to Torii reset. Page `0xF0` may take no writes in game mode (Pokémon Emerald on the real cart
+  left only a power-off, which lost the record anyway), so on the way back the stub also puts
+  the record in IWRAM at `0x03007DE0` (`INGAME_REFUSED_IWRAM`), under what the BIOS's SoftReset
+  clears and above what the kernel's crt0 clears; `main` moves it to page `0xF0` first thing.
+  Before its SWIs the stub moves the System stack to `0x03007F00` (`safe_stacks`): the real
+  BIOS runs a SWI's function on the caller's System stack, and Emerald's starts at
+  `0x03007E40`, so RegisterRamReset and SoftReset wrote their frames over the record (v0.8 on
+  the real cart: neither copy reached the boot). The boot then shows a dialog once
+  (`ingame_refused_notice`): the game, the reason in plain words ("cart memory is unavailable
+  with its Flash save", "its copy in cart memory was damaged"), and that save states and
+  cheats need the menu while the game's own saves are safe; `cartlog_boot_report` logs the
+  record (two lines, the second what the check saw) and clears it.
 
 ## P1: the menu
 

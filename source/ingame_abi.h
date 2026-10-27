@@ -79,27 +79,58 @@ static inline uint32_t ingame_image_check(const uint32_t *words, uint32_t n)
 }
 
 // --- Why the stub didn't open the menu, for the kernel's next boot: in cart
-// SRAM page 0xF0 (source/cartlog.h, CARTLOG_INGAME_REFUSED), 16 bytes. The
-// stub then shows white until A (the game) or B, or the menu keys held for
-// 2 s (Back to Torii); going back, it also puts the record in IWRAM just
-// under the 0x200 bytes the BIOS's SoftReset clears, where the kernel's
-// start (crt0 clears EWRAM and IWRAM's bss only; the stack is still near
-// 0x03007F00) leaves it: page 0xF0 may not take writes in game mode (a flash
-// or EEPROM save's cart SRAM, Pokémon Emerald on the real cart).
-#define INGAME_REFUSED_IWRAM 0x03007DF0u
+// SRAM page 0xF0 (source/cartlog.h, CARTLOG_INGAME_REFUSED), 32 bytes. The
+// stub then shows the reason's colour (ingame_refused_colour) until A (the
+// game) or B, or the menu keys held for 2 s (Back to Torii); going back, it
+// also puts the record in IWRAM just under the 0x200 bytes the BIOS's
+// SoftReset clears, where the kernel's start (crt0 clears EWRAM and IWRAM's
+// bss only; main's frame ends near 0x03007ED0) leaves it: page 0xF0 may not
+// take writes in game mode (a flash or EEPROM save's cart SRAM, Pokémon
+// Emerald on the real cart). Before its BIOS calls the stub moves the
+// System and Supervisor stacks to the 0x200 bytes SoftReset clears: the real
+// BIOS's SWIs run on the caller's System stack, and Emerald's (from
+// 0x03007E40) put their frames over the record (v0.8 on the real cart).
+#define INGAME_REFUSED_IWRAM 0x03007DE0u
 #define INGAME_REFUSED_MAGIC0 0x524E4954u  // "TINR"
-#define INGAME_REFUSED_MAGIC1 0x31444546u  // "FED1"
+#define INGAME_REFUSED_MAGIC1 0x32444546u  // "FED2" (FED1 had 16 bytes)
 enum {
-	INGAME_REFUSED_NO_IMAGE = 1,  // no overlay image in cart SRAM (magic or sizes)
+	INGAME_REFUSED_NO_IMAGE = 1,  // no overlay image in cart SRAM: its magic
 	INGAME_REFUSED_BACKUP = 2,  // the game's memory didn't read back from cart SRAM
 	INGAME_REFUSED_IMAGE = 3,  // the loaded image's check word didn't match
+	INGAME_REFUSED_SIZES = 4,  // the image's header has sizes the stub can't take
+	INGAME_REFUSED_REASONS = 5,
 };
 struct ingame_refused {
 	uint32_t magic[2];  // INGAME_REFUSED_MAGIC0, MAGIC1
 	uint16_t reason;  // INGAME_REFUSED_*
 	uint16_t waitcnt;  // the game's WAITCNT when the menu key came
 	uint32_t detail;  // INGAME_REFUSED_BACKUP: which copy (1 EWRAM, 2 OAM, 3 OBJ palette); else 0
+	// What the check saw. BACKUP: the RAM address just past the first word
+	// that differed, the word in RAM, the word cart SRAM read back (the last
+	// try's). NO_IMAGE and SIZES: the header's magic, image_bytes and
+	// window_bytes as read. IMAGE: at 0, the header's check word, the one
+	// computed.
+	uint32_t at, expected, read;
+	uint16_t vcount;  // VCOUNT when the stub started
+	uint16_t tries;  // the backup's tries: 2 when its retry failed too, 0 before it
 };
+// The screen's backdrop while the stub waits on a refusal (RGB15): by
+// reason, and for BACKUP by its copy (docs/release-checklist.md lists them).
+#define INGAME_REFUSED_COLOURS \
+	{0x7FFF /* white: none */, \
+	 0x7C00 /* blue: no image */, \
+	 0x001F /* red */, \
+	 0x03E0 /* green: image check */, \
+	 0x7FE0 /* cyan: header sizes */, \
+	 0x001F /* red: EWRAM */, \
+	 0x03FF /* yellow: OAM */, \
+	 0x7C1F /* magenta: OBJ palette */}
+// The colour's index for a record: its reason, or 4 + its copy for BACKUP
+static inline uint32_t ingame_refused_colour(uint32_t reason, uint32_t detail)
+{
+	uint32_t i = reason == INGAME_REFUSED_BACKUP ? 4 + detail : reason;
+	return i < 8 ? i : 0;
+}
 
 // --- The call: on the overlay's stack, from the stub
 // Flags: what the game's patch offers (the stub's switches, which a NOR copy
@@ -335,8 +366,9 @@ _Static_assert(offsetof(struct ingame_image, entry) == 16, "stub: entry");
 _Static_assert(offsetof(struct ingame_image, obj_bytes) == 20, "stub: obj_bytes");
 _Static_assert(offsetof(struct ingame_image, shown) == 24, "hook_watch.lua: shown");
 _Static_assert(offsetof(struct ingame_image, check) == 28, "stub: check");
-_Static_assert(sizeof(struct ingame_refused) == 16 && offsetof(struct ingame_refused, reason) == 8 &&
-		       offsetof(struct ingame_refused, waitcnt) == 10,
+_Static_assert(sizeof(struct ingame_refused) == 32 && offsetof(struct ingame_refused, reason) == 8 &&
+		       offsetof(struct ingame_refused, waitcnt) == 10 && offsetof(struct ingame_refused, at) == 16 &&
+		       offsetof(struct ingame_refused, vcount) == 28,
 	       "the stub writes the refusal record");
 _Static_assert(sizeof(void *) != 4 || sizeof(struct ingame_call) == 8, "the stub builds it (on the GBA)");
 _Static_assert(INGAME_SESSION_HEAD % 4 == 0 && INGAME_SESSION_OUT % 4 == 0, "sram_copy takes words");

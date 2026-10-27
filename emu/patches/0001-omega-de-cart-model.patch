@@ -305,7 +305,7 @@ index 4bf354f..fd3e023 100644
  	cheats.c
  	cheats/codebreaker.c
 diff --git a/src/gba/bios.c b/src/gba/bios.c
-index 1d0c0dd..b77704a 100644
+index 1d0c0dd..80e46af 100644
 --- a/src/gba/bios.c
 +++ b/src/gba/bios.c
 @@ -37,6 +37,9 @@ static int _mulWait(int32_t r) {
@@ -341,7 +341,64 @@ index 1d0c0dd..b77704a 100644
  static void _BgAffineSet(struct GBA* gba) {
  	struct ARMCore* cpu = gba->cpu;
  	int i = cpu->gprs[2];
-@@ -450,6 +469,9 @@ void GBASwi16(struct ARMCore* cpu, int immediate) {
+@@ -423,6 +442,45 @@ static int32_t _Sqrt(uint32_t x, uint32_t* cycles) {
+ 	return bound;
+ }
+ 
++// Torii: the real BIOS's SWI handler saves SPSR, r11, r12 and lr on the
++// supervisor stack, then switches to System mode, and everything after that
++// (its own push of r2 and lr, and the function's frames) goes on the user
++// stack, wherever the caller left it (GBATEK, "BIOS Functions"). A SWI
++// called from IRQ mode, as the in-game hook's SoftReset into Torii is, thus
++// writes below the game's interrupted System-mode sp, which the HLE BIOS
++// never did. The handler's two words are certain; how deep RegisterRamReset
++// and SoftReset go below them isn't known, so OMEGA_BIOS_STACK (bytes,
++// default 0x40) more are scribbled for those two. Below a correct sp nothing
++// lives, so this changes nothing for code that keeps its data above it.
++static void _userStackFootprint(struct GBA* gba, int immediate) {
++	struct ARMCore* cpu = gba->cpu;
++	static int extra = -1;
++	if (extra < 0) {
++		const char* env = getenv("OMEGA_BIOS_STACK");
++		extra = env ? (int) strtol(env, NULL, 0) : 0x40;
++		extra &= ~3;
++	}
++	enum PrivilegeMode mode = cpu->privilegeMode;
++	ARMSetPrivilegeMode(cpu, MODE_SYSTEM);
++	uint32_t sp = cpu->gprs[ARM_SP];
++	uint32_t lr = cpu->gprs[ARM_LR];
++	ARMSetPrivilegeMode(cpu, mode);
++	if ((sp >> 24) != 2 && (sp >> 24) != 3) {
++		return;
++	}
++	if (immediate == GBA_SWI_SOFT_RESET || immediate == GBA_SWI_REGISTER_RAM_RESET) {
++		fprintf(stderr, "bios: SWI %02X writes the user stack below %08X\n", immediate, sp);
++	}
++	cpu->memory.store32(cpu, sp - 4, lr, NULL);
++	cpu->memory.store32(cpu, sp - 8, cpu->gprs[2], NULL);
++	if (immediate == GBA_SWI_SOFT_RESET || immediate == GBA_SWI_REGISTER_RAM_RESET) {
++		int i;
++		for (i = 12; i <= 8 + extra; i += 4) {
++			cpu->memory.store32(cpu, sp - i, 0xB105DEAD, NULL);
++		}
++	}
++}
++
+ void GBASwi16(struct ARMCore* cpu, int immediate) {
+ 	struct GBA* gba = (struct GBA*) cpu->master;
+ 	mLOG(GBA_BIOS, DEBUG, "SWI: %02X r0: %08X r1: %08X r2: %08X r3: %08X",
+@@ -442,6 +500,10 @@ void GBASwi16(struct ARMCore* cpu, int immediate) {
+ 		return;
+ 	}
+ 
++	if (gba->memory.omega.enabled) {
++		_userStackFootprint(gba, immediate);
++	}
++
+ 	bool useStall = false;
+ 	switch (immediate) {
+ 	case GBA_SWI_SOFT_RESET:
+@@ -450,6 +512,9 @@ void GBASwi16(struct ARMCore* cpu, int immediate) {
  	case GBA_SWI_REGISTER_RAM_RESET:
  		_RegisterRamReset(gba);
  		break;
