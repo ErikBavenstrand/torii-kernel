@@ -20,6 +20,9 @@ git log, not here.
   footers come from the language strings, ready for v0.9's packs (a9cf916e).
 - **Changed:** the menu's pages share one block of EWRAM for their state,
   freeing 7.6 KB for v0.9's language work (8da81fd5).
+- **Fixed:** the in-game menu's Debug snapshot could go unlogged: its
+  marker was copied to cart memory from an unaligned address, losing its
+  first byte; another buffer copied the same way is aligned too (b22693f5, 15d20095).
 - **Changed:** the game popup's Load state list cut "Slot N" to "S..." (its
   date filled the row): it is titled Load state now, and each row shows the
   slot's number and how long ago it was saved, as Recent does ("2h ago"),

@@ -51,6 +51,8 @@ Everything still open from v0.4.3–v0.8.1, triaged 2026-10-27; what code could 
 - **Screenshots:** the scroll comes from the game's own RAM copy of its registers where it keeps one (pokeemerald's `gGpuRegBuffer`, Nintendo's library); without one a scrolled tile screen sits shifted, and the BG matrices, BLDY, MOSAIC and window bounds stay write-only, so fades and Mode 7 roads come out wrong. A screenshot in a game without the cart's clock, or taken while the game was reading it, is named by the filing's time.
 - **Emulators:** hi-colour GBC games lose mid-frame palette writes (jagoombacolor#20, #53): a per-line palette path in Jagoomba's renderer needs about 18 KB it doesn't have and its last DMA channel; a 1.0 project (`docs/research/gbc-hicolor.md`). Left from the trackers: jagoombacolor#42 accuracy tests, #43 a GBC-compatible ROM run as DMG, #34 the default palette; PocketNES#14 multiboot.
 
+- **From the review (2026-10-28), minor:** a 32 MB launch whose extras were dropped to fit rescans the ROM every launch (the `.pat` cache's room fits only the picks); the screenshot's clock read can't see a game's write-only clock command when the port is unreadable (Pokémon-style libraries mask IRQs around clock access); "chip select high" as mid-read assumes the port reads back its output pins, true in mGBA, unverified on the cart.
+
 ### Decisions for v0.9
 
 - **PSRAM map:** 384 KB of page 0 (7.625–8 MB, `source/engine/psram.h`) is reserved for the language tables; how to split it (the active pack's strings, an extra script's font, PSRAM page 1 for CJK-size fonts) is decided when v0.9 starts (owner, 2026-10-27).
