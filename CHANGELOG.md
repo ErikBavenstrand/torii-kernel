@@ -6,6 +6,36 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** a new in-game menu (L+R+START): a sprite overlay in the
+  theme's colours that shows in 2 frames and gives the game back byte for
+  byte (memory, VRAM, OAM, palettes, registers; checked on all 196 compat
+  games), so it no longer breaks rotated or scaled backgrounds. It runs
+  from borrowed EWRAM and lives in cart SRAM, leaving the patch area to a
+  small stub. Resume, Save state, Load state, Cheats, Screenshot, Reset game
+  (restarts the game without Torii), Sleep and Back to Torii; sound is
+  muted without the old noise on resume (3c5a7202, e6722286, 10b83f30).
+- **Added:** cheats in game: a toggle per cheat (up to 64, unpicked ones
+  too), All off and All as launched, with greyed rows saying why; Back to
+  Torii keeps the toggles as the game's picks (c708af28).
+- **Added:** save states with eight slots per save slot, with times, in
+  `/torii/states/<rom path>/<save slot>/`, filed from cart SRAM at the next
+  boot power-cut safe and packed (bb9ba50a); the newest is ready in game,
+  any slot starts from the game popup's Load state, which asks first if a
+  slot can't be read; Load state with nothing saved no longer crashes; old
+  `/RTS` states come in as slot 1 (9f579842, eabe5373, 195fb22d, 21a81da4,
+  290f4323).
+- **Added:** screenshots from the in-game menu, saved as BMP in
+  `/torii/screenshots` at the next boot by a software renderer of the
+  game's screen (modes 0-5, affine, sprites, windows, blending); scroll and
+  other write-only registers can't be read back, so a scrolled tile screen
+  comes out shifted (23b72a7e, f576c06f).
+- **Changed:** Settings' Back to menu becomes In-game menu: Auto (when the
+  game has states or cheats), Every game, or Off (cheats still run)
+  (d7707c9b).
+- **Added (tests):** an in-game probe ROM for the real cart
+  (`tests/roms/ingame`) and emulator stops for game-mode PSRAM and SD
+  writes (a6f5e5fe, ab93fc31).
+
 ## v0.7.1
 
 - **Fixed:** cheat codes follow the real devices where mGBA doesn't (GBATEK,
