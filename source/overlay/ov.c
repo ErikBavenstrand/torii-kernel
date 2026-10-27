@@ -218,6 +218,7 @@ static struct {
 	uint32_t shot_at;  // the next one's place in cart SRAM
 	uint32_t shot_now;  // this opening took one
 	uint32_t shot_full;  // and one more didn't fit
+	uint32_t first;  // 1 + the session's first opening (the overlay hasn't answered yet); 0: not read yet
 	// The display's registers as the game left them (io_readable's), for a screenshot
 	uint16_t io[11];
 } m;
@@ -399,14 +400,19 @@ static void slot_draw(const struct slot *s, uint32_t sram, uint32_t bank)
 	uint32_t n = ((uint32_t)line.width + 31) / 32;
 	if (n > s->max)
 		n = s->max;
-	uint32_t columns = n * 4u;
-	for (uint32_t y = 0; y < 16; y++) {
-		uint32_t row = y - TEXT_TOP;
-		for (uint32_t c = 0; c < columns; c++) {
-			uint32_t word = row < INGAME_TEXT_ROWS && c < INGAME_TEXT_W / 8 ? spread(line.bits[row][c]) : 0;
-			OBJ_TILES[(s->tile + (c >> 2) * 8 + (y >> 3) * 4 + (c & 3)) * 8 + (y & 7)] = word;
-		}
-	}
+	// The tiles in VRAM's order (a sprite's top four, its bottom four, each
+	// tile's 8 rows), so the words go out one after another: the opening's
+	// frames are tight
+	volatile uint32_t *dst = OBJ_TILES + s->tile * 8;
+	for (uint32_t c0 = 0; c0 < n * 4u; c0 += 4)
+		for (uint32_t y0 = 0; y0 < 16; y0 += 8)
+			for (uint32_t c = c0; c < c0 + 4; c++)
+				for (uint32_t y = y0; y < y0 + 8; y++) {
+					uint32_t row = y - TEXT_TOP;
+					*dst++ = row < INGAME_TEXT_ROWS && c < INGAME_TEXT_W / 8
+							 ? spread(line.bits[row][c])
+							 : 0;
+				}
 	for (uint32_t k = 0; k < s->max; k++) {
 		obj_bank(s->oam + k, bank);
 		obj_shown(s->oam + k, m.text_shown && k < n);
@@ -522,6 +528,16 @@ static int buffer_unkept(void)
 	return m.buffer_slot && !m.buffer_kept;
 }
 
+// What waits in cart memory for Back to Torii (a state saved in game, the
+// screenshots), as the menu's footer's text; 0 for nothing
+static uint32_t unsaved_text(void)
+{
+	uint32_t state = m.states && buffer_unkept();
+	if (!m.shots)
+		return state ? INGAME_TEXT_UNSAVED_STATE : 0;
+	return (state ? INGAME_TEXT_UNSAVED_BOTH : INGAME_TEXT_UNSAVED_SHOTS) + m.shots - 1;
+}
+
 // Row r's text, as a session block offset
 static uint32_t row_text(uint32_t r)
 {
@@ -532,6 +548,8 @@ static uint32_t row_text(uint32_t r)
 		       : r == 1 ? text_at(INGAME_TEXT_AS_LAUNCHED)
 				: INGAME_SESSION_CHEAT(r - LIST_FIXED);
 	uint32_t kind = m.kinds[r];
+	if (kind == ROW_TORII && unsaved_text())
+		return text_at(INGAME_TEXT_TORII_SAVE);
 	if (kind == ROW_SHOT && m.shots)
 		return text_at(INGAME_TEXT_SHOT_COUNT + m.shots - 1);
 	if (kind == ROW_CHEATS)
@@ -558,23 +576,35 @@ static uint32_t footer_text(void)
 	return text_at(why_texts[why]);
 }
 
+// Whether this is the session's first opening: read once it matters (the
+// opening's frames are tight)
+static int first_opening(void)
+{
+	if (!m.first && m.have_session) {
+		uint32_t magic;
+		sram_in(INGAME_SRAM_SESSION + INGAME_SESSION_OUT, &magic, 4);
+		m.first = 1 + (magic != INGAME_OUT_MAGIC);
+	}
+	return m.first == 2;
+}
+
 // The menu's footer: the DEBUG notice, that no screenshot more fits or one
-// was just taken, on the Sleep row the keys that wake the game, that a
-// state saved in game or screenshots wait for Back to Torii, or the keys
-// that close the menu
-static const uint8_t menu_footers[] = {
-	INGAME_TEXT_DEBUG_SAVED, INGAME_TEXT_SHOT_FULL,   INGAME_TEXT_SHOT_SAVED,
-	INGAME_TEXT_SLEEP_WAKES, INGAME_TEXT_STATE_SAVED, INGAME_TEXT_HINT,
-};
+// was just taken, on the Sleep row the keys that wake the game; on the
+// Save state and Screenshot rows at the session's first opening that Back
+// to Torii saves them to the card, and on the Save state row that the
+// state saved in game is lost if the console goes off first; what waits
+// for Back to Torii, or the keys that close the menu
 static uint32_t menu_footer(void)
 {
-	return (m.flags & INGAME_NOTICE_DEBUG)            ? INGAME_TEXT_DEBUG_SAVED
-	       : m.shot_full                              ? INGAME_TEXT_SHOT_FULL
-	       : m.shot_now                               ? INGAME_TEXT_SHOT_SAVED
-	       : m.rows && m.kinds[m.cursor] == ROW_SLEEP ? INGAME_TEXT_SLEEP_WAKES
-	       : m.states && buffer_unkept()              ? INGAME_TEXT_STATE_SAVED
-	       : m.shots                                  ? INGAME_TEXT_SHOT_SAVED
-							  : INGAME_TEXT_HINT;
+	uint32_t kind = m.rows ? m.kinds[m.cursor] : ROW_KINDS;
+	return (m.flags & INGAME_NOTICE_DEBUG)                             ? INGAME_TEXT_DEBUG_SAVED
+	       : m.shot_full                                               ? INGAME_TEXT_SHOT_FULL
+	       : m.shot_now                                                ? INGAME_TEXT_SHOT_SAVED
+	       : kind == ROW_SLEEP                                         ? INGAME_TEXT_SLEEP_WAKES
+	       : (kind == ROW_SAVE || kind == ROW_SHOT) && first_opening() ? INGAME_TEXT_FIRST_SAVE
+	       : kind == ROW_SAVE && m.states && buffer_unkept()           ? INGAME_TEXT_STATE_SAVED
+	       : unsaved_text()                                            ? unsaved_text()
+									   : INGAME_TEXT_HINT;
 }
 
 // Slot k's line now, as a session block offset (0: none)
@@ -673,7 +703,8 @@ static void build_page(enum page_id page, uint32_t cursor)
 	uint32_t panel_w;
 	if (page == PAGE_MENU) {
 		uint32_t f = m.flags;
-		int have_state = (f & INGAME_CAN_STATES) && state_saved();
+		int have_state =
+			(f & INGAME_CAN_STATES) && !m.states && state_saved();  // the old rows' (the slots' read it)
 		add_row(ROW_RESUME, 0);
 		if (f & INGAME_CAN_STATES) {
 			add_row(ROW_SAVE, 0);
@@ -746,7 +777,9 @@ static void build_page(enum page_id page, uint32_t cursor)
 		// many sprites as the line needs, 4 at most (the panel's room)
 		uint32_t max = SLOT_SPRITES;
 		if (page == PAGE_MENU) {
-			uint32_t w = line_width(slot_text(k));
+			uint32_t wide = (m.title && k == 0) || (m.footer && k == m.title + m.visible);
+			// the footer: its lines change with the row, the widest nearly all its room
+			uint32_t w = wide && k ? WIDE_SPRITES * 32 : line_width(slot_text(k));
 			int r = slot_row(k);
 			if (r >= 0 && m.kinds[r] == ROW_CHEATS && !m.cheats) {  // the wider of on and off
 				uint32_t w2 = line_width(text_at(INGAME_TEXT_CHEATS_OFF));
@@ -757,11 +790,6 @@ static void build_page(enum page_id page, uint32_t cursor)
 				uint32_t w2 = line_width(text_at(INGAME_TEXT_SHOT_COUNT + INGAME_SHOTS_MAX - 1));
 				w = w2 > w ? w2 : w;
 			}
-			uint32_t wide = (m.title && k == 0) || (m.footer && k == m.title + m.visible);
-			if (wide && k)  // the footer: the widest of its lines
-				for (uint32_t l = 0; l < sizeof(menu_footers); l++)
-					if (line_width(text_at(menu_footers[l])) > w)
-						w = line_width(text_at(menu_footers[l]));
 			uint32_t most = wide ? WIDE_SPRITES : SLOT_SPRITES;
 			max = (w + 31) / 32;
 			max = max < 1 ? 1 : max > most ? most : max;
@@ -857,8 +885,8 @@ static void page_open(enum page_id page, uint32_t cursor)
 // Moves the cursor to row r, scrolling the list to show it
 static void cursor_to(uint32_t r)
 {
-	// The menu's footer changes on and off its Sleep row
-	int sleep = m.page == PAGE_MENU && (m.kinds[m.cursor] == ROW_SLEEP || m.kinds[r] == ROW_SLEEP);
+	// The menu's footer changes with the row on some rows
+	uint32_t footer = m.page == PAGE_MENU ? menu_footer() : 0;
 	m.cursor = r;
 	uint32_t top = m.top;
 	if (r < top)
@@ -870,7 +898,7 @@ static void cursor_to(uint32_t r)
 		slots_update();  // the rows' lines in their slots again
 		m.pill_y = row_y(r);  // the pill jumps with the scroll
 		pill_place(m.pill_y);
-	} else if (m.footer && (m.page != PAGE_MENU || sleep)) {
+	} else if (m.footer && (m.page != PAGE_MENU || menu_footer() != footer)) {
 		slot_update(m.title + m.visible);
 	}
 	m.pill_to = row_y(r);

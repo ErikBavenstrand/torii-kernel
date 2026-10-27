@@ -34,9 +34,9 @@
 #define INGAME_SRAM_RTS_FLAG 0xAFFF0
 #define INGAME_STATE_BYTES 0x70000  // the buffer, tag and flag included
 #define INGAME_SRAM_IMAGE 0xB0000  // the overlay's image
-#define INGAME_IMAGE_MAX 0x8000
-#define INGAME_SRAM_SESSION 0xB8000  // struct ingame_session
-#define INGAME_SESSION_MAX 0x8000
+#define INGAME_IMAGE_MAX 0x6000  // the window takes no more (INGAME_WINDOW_MAX)
+#define INGAME_SRAM_SESSION 0xB6000  // struct ingame_session
+#define INGAME_SESSION_MAX 0xA000
 #define INGAME_SRAM_SHOT 0xC0000  // the screenshots (P4): records of struct ingame_shot, below
 #define INGAME_SHOTS_END 0xF0000  // their room's end: the cart log's page follows
 
@@ -224,7 +224,7 @@ struct ingame_shot {
 
 // --- The session block, at INGAME_SRAM_SESSION
 #define INGAME_SESSION_MAGIC 0x31535354u  // "TSS1"
-#define INGAME_SESSION_VERSION 5
+#define INGAME_SESSION_VERSION 6
 #define INGAME_NAME_BYTES 48
 #define INGAME_CHEATS 64  // the cheats the in-game list shows; the toggles' bits
 #define INGAME_PATH_BYTES 288  // a ROM's path (GAMESAVE_PATH_BYTES)
@@ -283,7 +283,16 @@ enum ingame_text {
 	INGAME_TEXT_SHOT_FULL,  // the menu's footer when no screenshot more fits
 	INGAME_TEXT_STATE_SAVED,  // the menu's footer while a state saved in game isn't kept yet
 	INGAME_TEXT_SHOT_COUNT,  // the Screenshot row once n are taken: "Screenshot n/max", n from 1
-	INGAME_TEXTS = INGAME_TEXT_SHOT_COUNT + INGAME_SHOTS_MAX
+	// What waits in cart memory for Back to Torii, which files it: the
+	// Back to Torii row then, the Save state and Screenshot rows' footer at
+	// the session's first opening, and the menu's footer while a state saved
+	// in game (STATE) or n screenshots (SHOTS + n - 1), or both, wait
+	INGAME_TEXT_TORII_SAVE = INGAME_TEXT_SHOT_COUNT + INGAME_SHOTS_MAX,
+	INGAME_TEXT_FIRST_SAVE,
+	INGAME_TEXT_UNSAVED_STATE,
+	INGAME_TEXT_UNSAVED_SHOTS,
+	INGAME_TEXT_UNSAVED_BOTH = INGAME_TEXT_UNSAVED_SHOTS + INGAME_SHOTS_MAX,
+	INGAME_TEXTS = INGAME_TEXT_UNSAVED_BOTH + INGAME_SHOTS_MAX
 };
 struct ingame_line {
 	uint16_t width;  // inked pixels from the left, at most INGAME_TEXT_W

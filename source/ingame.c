@@ -114,32 +114,13 @@ void ingame_probe_prepare(const u8 *code)
 {
 	if (memcmp(code, INGAME_PROBE_CODE, 4) != 0)
 		return;
-	// A sector of the kernel's bytes in a file of its own, for the probe to
-	// write and put back in game mode
-	u32 sector[INGAME_PROBE_SECTOR / 4];  // word-aligned for f_write
-	for (u32 i = 0; i < INGAME_PROBE_SECTOR; i++)
-		((u8 *)sector)[i] = ingame_probe_byte(i, INGAME_PROBE_SEED_KERNEL);
-	u32 lba = 0;
-	UINT wrote = 0;
-	f_mkdir("/torii/probe");
-	if (f_open(&gfile, INGAME_PROBE_FILE, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK) {
-		if (f_write(&gfile, sector, sizeof(sector), &wrote) == FR_OK && wrote == sizeof(sector) &&
-		    f_sync(&gfile) == FR_OK && gfile.obj.sclust >= 2)
-			lba = (u32)(gfile.obj.fs->database + (LBA_t)(gfile.obj.sclust - 2) * gfile.obj.fs->csize);
-		f_close(&gfile);
-	}
-	tlog("launch: the in-game probe's scratch sector: %lu", (unsigned long)lba);
-	// Its place in the report: no magic, then the sector and its check
-	u8 in[24];
-	u32 check = INGAME_PROBE_CHECK(lba);
-	memset(in, 0, sizeof(in));
-	memcpy(in + 16, &lba, 4);
-	memcpy(in + 20, &check, 4);
+	// The report's place blank (its SD test, which read a scratch sector
+	// from here, is retired), and the last run's copy in the probe's save
+	// (loaded into cart SRAM just before) gone, so the next boot can't take
+	// either for this run's
 	SetRampage(CARTLOG_PAGE);
-	for (u32 i = 0; i < sizeof(in); i++)
-		((vu8 *)CARTLOG_INGAME_PROBE)[i] = in[i];
-	// The last run's copy in the probe's save (loaded into cart SRAM just
-	// before) goes, so the next boot can't take it for this run's
+	for (u32 i = 0; i < 24; i++)
+		((vu8 *)CARTLOG_INGAME_PROBE)[i] = 0;
 	SetRampage(0);
 	for (u32 i = 0; i < 16; i++)
 		CART_SRAM[INGAME_PROBE_SAVE_OFFSET + i] = 0;
@@ -397,9 +378,19 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 		[INGAME_TEXT_HINT] = hint,
 		[INGAME_TEXT_SHOT_FULL] = t->shot_full,
 		[INGAME_TEXT_STATE_SAVED] = t->state_saved,
+		[INGAME_TEXT_TORII_SAVE] = t->torii_save,
+		[INGAME_TEXT_FIRST_SAVE] = t->first_save,
+		[INGAME_TEXT_UNSAVED_STATE] = t->unsaved_state,
 	};
-	for (u32 i = 0; i < INGAME_SHOTS_MAX; i++)
+	char unsaved[2][INGAME_SHOTS_MAX][40];
+	for (u32 i = 0; i < INGAME_SHOTS_MAX; i++) {
+		const char *s = i ? "s" : "";
+		snprintf(unsaved[0][i], sizeof(unsaved[0][i]), EN_INGAME_UNSAVED_SHOTS, (unsigned long)i + 1, s);
+		snprintf(unsaved[1][i], sizeof(unsaved[1][i]), EN_INGAME_UNSAVED_BOTH, (unsigned long)i + 1, s);
 		text[INGAME_TEXT_SHOT_COUNT + i] = counts[i];
+		text[INGAME_TEXT_UNSAVED_SHOTS + i] = unsaved[0][i];
+		text[INGAME_TEXT_UNSAVED_BOTH + i] = unsaved[1][i];
+	}
 	for (u32 i = 0; i < INGAME_TEXTS; i++) {
 		struct ingame_line line;
 		TLOG_ASSERT(text[i]);

@@ -50,7 +50,7 @@ every)
   python3 - "$cart/sram.bin" <<'PY' || fail "the session block's menu keys aren't L+R+B"
 import struct, sys
 sram = open(sys.argv[1], "rb").read()
-session = 0xB8000
+session = 0xB6000
 assert struct.unpack_from("<I", sram, session)[0] == 0x31535354
 menu_key = struct.unpack_from("<H", sram, session + 0x60)[0]
 assert menu_key == (1 << 9) | (1 << 8) | (1 << 1), hex(menu_key)

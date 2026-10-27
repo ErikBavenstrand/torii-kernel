@@ -40,7 +40,7 @@ SECTIONS {
 		__ov_stack_top = .;
 	} > window
 
-	ASSERT(__ov_image_end - 0x02000000 <= 0x8000, "the overlay's image passes INGAME_IMAGE_MAX")
+	ASSERT(__ov_image_end - 0x02000000 <= 0x6000, "the overlay's image passes INGAME_IMAGE_MAX")
 
 	/DISCARD/ : { *(.ARM.exidx*) *(.ARM.extab*) *(.comment) *(.note*) }
 }

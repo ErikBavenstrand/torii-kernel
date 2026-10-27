@@ -32,8 +32,8 @@ work RAM*), so page `0x20` is offset `0x20000`.
 | `0x00000-0x1FFFF` | the game's save |
 | `0x20000-0x3FFFF` | the overlay's backups: OBJ VRAM (16 KB), OAM (1 KB), OBJ palette (512 B), the EWRAM window (24 KB), registers |
 | `0x40000-0xAFFFF` | the save-state buffer (unchanged) |
-| `0xB0000-0xB7FFF` | the overlay's image |
-| `0xB8000-0xBFFFF` | the session block, kernel to overlay and back |
+| `0xB0000-0xB5FFF` | the overlay's image |
+| `0xB6000-0xBFFFF` | the session block, kernel to overlay and back |
 | `0x2C800-0x2D9FF` | the game's IWRAM a screenshot's packing borrows (its table, buffer and ARM code) |
 | `0xC0000-0xEFFFF` | the screenshots (P4): up to 5 records of `struct ingame_shot` and the packed palettes, OAM, VRAM |
 | `0xF0000` | the cart log (`source/cartlog.h`) |

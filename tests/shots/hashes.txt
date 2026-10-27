@@ -348,11 +348,12 @@ info-read/frames 17-22 58C6DE28040EB31D
 ingame/back 95E628B049B4B4BB
 ingame/cheats FAD7274EE3C5F306
 ingame/menu 87B07917DB9CE95E
-ingame/frames 0-0 805A390F675ECB4E
-ingame/frames 1-1 144FA936FD3A43B6
-ingame/frames 2-2 151F9D0974C7735E
-ingame/frames 3-3 BEB29606CA007146
-ingame/frames 4-11 3535A5AF18C97506
+ingame/frames 0-0 C3BCB74C781CF2E3
+ingame/frames 1-1 3FB1F48D8C17B82B
+ingame/frames 2-2 615C580324759B53
+ingame/frames 3-3 1E0000A77DD1379B
+ingame/frames 4-10 C77A55C75909AE5B
+ingame/frames 11-11 3535A5AF18C97506
 ingame/frames 12-12 7219333D849AA076
 ingame/frames 13-13 192D4BBA9DBC6DC6
 ingame/frames 14-14 CE0974E7D1A5E076
@@ -365,11 +366,11 @@ ingame-cheats/on A7EB51D2E32590C9
 ingame-cheats/rom A3708FCB960EDC67
 ingame-light/menu 6DAB01A75168AFC9
 ingame-shots/first 2B0003A6FF47E8D9
-ingame-shots/one 8AF28A8A604042F6
+ingame-shots/one B7818279D579B476
 ingame-shots/second 92B9AA0225BF6E99
-ingame-shots/two 285A286D2FF81A4E
+ingame-shots/two 28C72BEB254CBB0E
 ingame-states/load 5D51933A47F53789
-ingame-states/menu BF6A37B0B87F588E
+ingame-states/menu D78F8911AEEC140E
 ingame-states/other 8F1F67CC666EF121
 ingame-states/save 8FCFCED100485A28
 ingame-states/save-current FEAC292337EC4D8F

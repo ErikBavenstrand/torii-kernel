@@ -455,9 +455,17 @@ struct lang_ingame {
 	const char *sleep_wakes;  // the menu's footer on its Sleep row
 	const char *shot_full;  // the menu's footer when no screenshot more fits
 	const char *state_saved;  // the menu's footer while a state saved in game isn't kept
+	// Back to Torii files what waits in cart memory: its row then, and the
+	// Save state and Screenshot rows' footer at the session's first opening
+	const char *torii_save, *first_save;
+	const char *unsaved_state;  // the menu's footer while a state saved in game waits
 };
 // The Screenshot row once some are taken: how many (%lu), of how many (%lu)
 #define EN_INGAME_SHOT_COUNT "Screenshot %lu/%lu"
+// The menu's footer while screenshots (%lu, then "s" for more than one)
+// wait for Back to Torii, alone or with a state saved in game
+#define EN_INGAME_UNSAVED_SHOTS "Not on card yet: %lu screenshot%s"
+#define EN_INGAME_UNSAVED_BOTH "Not on card yet: 1 state, %lu shot%s"
 extern const struct lang_ingame *gl_ingame;
 
 // Save states (source/statestore.c): a slot's row in game, by its number

@@ -157,8 +157,8 @@ char *gl_sd_no_save EWRAM_BSS;
 char **gl_info EWRAM_BSS;
 
 //英文
-const char en_init_error[] = "microSD card error";
-const char en_power_off[] = "Turn the power off";
+const char en_init_error[] = "Can't read the microSD card.";
+const char en_power_off[] = "Switch the console off and on.";
 const char en_Loading[] = "Loading...";
 // The library's first scan (library_scan.c): title, text, and after a count
 const char en_library_title[] = "Library";
@@ -808,6 +808,9 @@ static const struct lang_ingame en_ingame = {
 	.sleep_wakes = "START+SELECT wakes it",
 	.shot_full = "Full: go back to Torii to keep them",
 	.state_saved = "Kept on Back to Torii; lost if off",
+	.torii_save = "Back to Torii and save",
+	.first_save = "Saved to the card on Back to Torii",
+	.unsaved_state = "Not on card yet: 1 state",
 };
 
 static const struct lang_states en_states = {
