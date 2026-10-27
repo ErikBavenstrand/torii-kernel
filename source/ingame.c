@@ -299,7 +299,7 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 	h->menu_key = menu_key & 0x3FF;
 	h->sleep_key = sleep_key & 0x3FF;
 	h->rtc_status = Game_GPIO_status();
-	h->flags = gl_sleep_on == 1 ? INGAME_SLEEP_KEY_ON : 0;
+	h->flags = (gl_sleep_on == 1 ? INGAME_SLEEP_KEY_ON : 0) | (tlog_level != TLOG_OFF ? INGAME_DEBUG_ON : 0);
 	// The cheat list, when the table it toggles went in whole
 	if (gl_cheat_on == 1 && cheats.table == gl_cheat_count) {
 		h->cheat_count = cheats.count;

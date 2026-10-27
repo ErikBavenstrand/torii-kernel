@@ -56,6 +56,9 @@
 #define DISPCNT_1D 0x0040
 #define DISPCNT_OFF_BITS 0xE080
 
+// The menu reopened after a DEBUG snapshot (m.flags): its footer says so
+#define NOTICE_DEBUG (1u << 8)
+
 extern struct ingame_image ov_header;
 extern uint32_t __ov_bss_start[], __ov_bss_end[];
 
@@ -134,8 +137,9 @@ enum row_kind {
 };
 
 static const uint8_t row_action[ROW_KINDS] = {
-	INGAME_ACT_RESUME, INGAME_ACT_SAVE,  INGAME_ACT_LOAD,  INGAME_ACT_RESUME, INGAME_ACT_RESUME,
-	INGAME_ACT_RESET,  INGAME_ACT_SLEEP, INGAME_ACT_TORII, INGAME_ACT_DEBUG,
+	INGAME_ACT_RESUME, INGAME_ACT_SAVE,   INGAME_ACT_LOAD,
+	INGAME_ACT_RESUME, INGAME_ACT_RESUME, INGAME_ACT_RESET,
+	INGAME_ACT_SLEEP,  INGAME_ACT_TORII,  INGAME_ACT_RESUME /* the overlay's own */,
 };
 static const uint8_t row_texts[ROW_KINDS] = {
 	INGAME_TEXT_RESUME, INGAME_TEXT_SAVE,  INGAME_TEXT_LOAD,  INGAME_TEXT_CHEATS_ON, INGAME_TEXT_SHOT,
@@ -597,7 +601,7 @@ static int first_opening(void)
 static uint32_t menu_footer(void)
 {
 	uint32_t kind = m.rows ? m.kinds[m.cursor] : ROW_KINDS;
-	return (m.flags & INGAME_NOTICE_DEBUG)                             ? INGAME_TEXT_DEBUG_SAVED
+	return (m.flags & NOTICE_DEBUG)                                    ? INGAME_TEXT_DEBUG_SAVED
 	       : m.shot_full                                               ? INGAME_TEXT_SHOT_FULL
 	       : m.shot_now                                                ? INGAME_TEXT_SHOT_SAVED
 	       : kind == ROW_SLEEP                                         ? INGAME_TEXT_SLEEP_WAKES
@@ -717,13 +721,13 @@ static void build_page(enum page_id page, uint32_t cursor)
 		add_row(ROW_RESET, 0);
 		add_row(ROW_SLEEP, 0);
 		add_row(ROW_TORII, 0);
-		if (f & INGAME_CAN_DEBUG)
+		if (m.have_session && (s->flags & INGAME_DEBUG_ON))
 			add_row(ROW_DEBUG, 0);
 		// The footer (the keys, or a notice) when the screen takes it, or
 		// the DEBUG notice; then the title, room left
 		m.visible = m.rows;
 		uint32_t h = PANEL_PAD * 2 + m.rows * ROW_H;
-		m.footer = ((f & INGAME_NOTICE_DEBUG) || m.have_session) && h + ROW_H <= SCREEN_H;
+		m.footer = ((f & NOTICE_DEBUG) || m.have_session) && h + ROW_H <= SCREEN_H;
 		h += m.footer * ROW_H;
 		panel_w = MENU_W;
 		m.title = h + ROW_H + TITLE_GAP <= SCREEN_H - 8;  // the title goes when the screen can't take it
@@ -923,6 +927,7 @@ static void list_pick(uint32_t r)
 
 static void state_mark(uint32_t slot);
 static void shot_take(void);
+static void debug_take(void);
 
 // Runs the menu until a choice; returns its INGAME_ACT_*
 static uint32_t run(uint32_t menu_key)
@@ -997,6 +1002,13 @@ static uint32_t run(uint32_t menu_key)
 				shot_take();
 				if (m.footer)
 					slot_update(m.title + m.visible);
+				continue;
+			}
+			if (kind == ROW_DEBUG) {
+				debug_take();
+				m.flags |= NOTICE_DEBUG;
+				page_open(PAGE_MENU, 0);
+				debug_print("screen ready: ingame");
 				continue;
 			}
 			if (kind == ROW_CHEATS) {
@@ -1245,6 +1257,52 @@ static void shot_take(void)
 	page_open(PAGE_MENU, m.cursor);
 	vsync();
 	REG_DISPCNT = dispcnt;
+}
+
+// --- The DEBUG snapshot ---------------------------------------------------------
+
+void ov_system_regs(uint32_t *out);  // ov_header.s
+
+// The game's state at the menu key into cart SRAM page 0xF0 (struct
+// cartlog_snapshot in source/cartlog.c), for the kernel's next boot to log:
+// the ROM header, the hook's address, the registers the hook kept, the
+// BIOS's IRQ frame, IWRAM's top, the I/O and the game's stack. The
+// registers the stub or the overlay changed are the game's: DISPCNT and the
+// blend from the opening's read, IME and WAITCNT from the stub's copies.
+// The magic goes last, so a write cut off counts as none.
+static void debug_take(void)
+{
+	const uint32_t *spend = m.call->spend;
+	uint32_t words[0x60 / 4];
+	memset(words, 0, 16);
+	sram_out(INGAME_SRAM_SNAPSHOT, words, 16);  // no magic while the rest is written
+	sram_out(INGAME_SRAM_SNAPSHOT + 0x10, (const void *)0x080000A0, 0x20);
+	sram_out(INGAME_SRAM_SNAPSHOT + 0x30, &m.call->hook, 4);
+	for (uint32_t i = 0; i < 0x40 / 4; i++)
+		words[i] = spend[i];
+	ov_system_regs(&words[INGAME_SPEND_SYS_SP / 4]);
+	sram_out(INGAME_SRAM_SNAPSHOT + 0x40, words, 0x40);
+	sram_out(INGAME_SRAM_SNAPSHOT + 0x80, (const void *)(spend[INGAME_SPEND_IRQ_SP / 4] & ~3u), 0x20);
+	sram_out(INGAME_SRAM_SNAPSHOT + 0xA0, (const void *)0x03007FF0, 0x10);
+	uint16_t *io = (uint16_t *)(void *)words;
+	for (uint32_t i = 0; i < 0x60 / 2; i++)
+		io[i] = REG16(0x04000000 + i * 2);
+	io[0] = m.io[0];  // DISPCNT, BLDCNT and BLDALPHA as the opening read them (io_readable's)
+	io[0x28] = m.io[9];
+	io[0x29] = m.io[10];
+	sram_out(INGAME_SRAM_SNAPSHOT + 0xC0, words, 0x60);
+	for (uint32_t i = 0; i < 0x10 / 2; i++)
+		io[i] = REG16(0x04000200 + i * 2);
+	const uint16_t *halves = (const uint16_t *)(const void *)spend;
+	io[2] = halves[INGAME_SPEND_WAITCNT / 2];
+	io[4] = halves[INGAME_SPEND_IME / 2];
+	sram_out(INGAME_SRAM_SNAPSHOT + 0x120, words, 0x10);
+	sram_out(INGAME_SRAM_SNAPSHOT + 0x200, (const void *)0x03007E00, 0x200);
+	ov_system_regs(words);
+	sram_out(INGAME_SRAM_SNAPSHOT + 0x400, (const void *)(words[0] & ~3u), 0x100);
+	static const char magic[16] = INGAME_SNAPSHOT_MAGIC;
+	sram_out(INGAME_SRAM_SNAPSHOT, magic, 16);
+	debug_print("ingame: debug snapshot saved");
 }
 
 uint32_t ov_entry(const struct ingame_call *call);

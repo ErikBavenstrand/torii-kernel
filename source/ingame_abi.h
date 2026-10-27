@@ -144,15 +144,27 @@ static inline uint32_t ingame_refused_colour(uint32_t reason, uint32_t detail)
 // keeps from when it was written)
 #define INGAME_CAN_STATES (1u << 0)  // SAVE and LOAD (RTS_switch: SAVESTATE on)
 #define INGAME_CAN_CHEATS (1u << 1)  // the cheat interpreter is in (Cheat_switch)
-#define INGAME_CAN_DEBUG (1u << 2)  // the DEBUG snapshot is in (Debug_switch)
-#define INGAME_NOTICE_DEBUG (1u << 8)  // reopened after a DEBUG snapshot: say so
 struct ingame_call {
 	// Copies n bytes (a multiple of 4) between cart SRAM at sram (a byte
 	// offset) and word-aligned RAM: to RAM when to_sram is 0. It leaves the
 	// SRAM page set; the stub puts page 0 back.
 	void (*sram_copy)(uint32_t sram, void *ram, uint32_t n, uint32_t to_sram);
-	uint32_t flags;  // INGAME_CAN_*, INGAME_NOTICE_*
+	uint32_t flags;  // INGAME_CAN_*
+	uint32_t hook;  // the hook's address (RTS_irq in the game's patch), for the DEBUG snapshot
+	// The hook's register save area (spend_0x80): the game's r4-r11, IRQ sp
+	// and lr, SPSR, then the stub's copies of the registers it changed
+	const uint32_t *spend;
 };
+// The spend area's words and halfwords the DEBUG snapshot reads (byte offsets)
+#define INGAME_SPEND_IRQ_SP 0x20  // the IRQ sp at the hook: the BIOS's frame
+#define INGAME_SPEND_SYS_SP 0x30  // where the snapshot's copy has the System sp and lr
+#define INGAME_SPEND_IME 0x40  // halfword: the game's IME (the stub's SP_IME)
+#define INGAME_SPEND_WAITCNT 0x42  // halfword: the game's WAITCNT (SP_WAITCNT)
+
+// The DEBUG snapshot (struct cartlog_snapshot in source/cartlog.c), which
+// the overlay writes to cart SRAM page 0xF0 at 0x1000, its magic last
+#define INGAME_SRAM_SNAPSHOT 0xF1000
+#define INGAME_SNAPSHOT_MAGIC "TORII-DEBUGINFO1"
 
 // What the entry returns
 enum {
@@ -162,7 +174,6 @@ enum {
 	INGAME_ACT_RESET = 3,  // restart the game (SWI 0 with the ROM page left)
 	INGAME_ACT_SLEEP = 4,
 	INGAME_ACT_TORII = 5,  // back to the kernel (today's RESET)
-	INGAME_ACT_DEBUG = 6,  // the DEBUG snapshot, then the menu again
 	INGAME_ACTS
 };
 
@@ -240,6 +251,7 @@ struct ingame_shot {
 
 // Session flags
 #define INGAME_SLEEP_KEY_ON (1u << 0)  // the sleep key is on in Settings
+#define INGAME_DEBUG_ON (1u << 1)  // LOGGING is on: the menu offers the DEBUG snapshot
 
 // The menu's text, drawn by the kernel (the engine's body font) so the
 // overlay needs no font: each line 1bpp, INGAME_TEXT_ROWS rows of
@@ -408,7 +420,7 @@ _Static_assert(sizeof(struct ingame_refused) == 32 && offsetof(struct ingame_ref
 		       offsetof(struct ingame_refused, waitcnt) == 10 && offsetof(struct ingame_refused, at) == 16 &&
 		       offsetof(struct ingame_refused, vcount) == 28,
 	       "the stub writes the refusal record");
-_Static_assert(sizeof(void *) != 4 || sizeof(struct ingame_call) == 8, "the stub builds it (on the GBA)");
+_Static_assert(sizeof(void *) != 4 || sizeof(struct ingame_call) == 16, "the stub builds it (on the GBA)");
 _Static_assert(INGAME_SESSION_HEAD % 4 == 0 && INGAME_SESSION_OUT % 4 == 0, "sram_copy takes words");
 _Static_assert(sizeof(struct ingame_out) % 4 == 0, "sram_copy takes words");
 _Static_assert(sizeof(struct ingame_line) % 4 == 0 && INGAME_SESSION_TEXT(0) % 4 == 0, "sram_copy takes words");

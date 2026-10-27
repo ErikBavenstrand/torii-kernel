@@ -31,7 +31,7 @@ volatile u32 torii_frames;
 
 #define STATE_MAGIC "TORIIST2"
 #define CRASH_MAGIC "TORIICR2"
-#define SNAPSHOT_MAGIC "TORII-DEBUGINFO1"  // gba_rts_patch.s writes it last
+#define SNAPSHOT_MAGIC INGAME_SNAPSHOT_MAGIC  // the overlay writes it last
 
 struct cartlog_state {
 	char magic[8];
@@ -57,8 +57,8 @@ struct cartlog_crash {
 	char log[CRASH_LOG_BYTES];  // the newest log lines
 };
 
-// The in-game menu's DEBUG entry (gba_rts_patch.s, debug_save), in cart RAM
-// at CARTLOG_SNAPSHOT. Its offsets are in that file too.
+// The in-game menu's DEBUG snapshot (debug_take in source/overlay/ov.c), in cart RAM
+// at CARTLOG_SNAPSHOT (INGAME_SRAM_SNAPSHOT). Its offsets are in that file too.
 struct cartlog_snapshot {
 	char magic[16];
 	u8 header[0x20];  // 0x010: the game's ROM header from 0xA0: title, code, maker, version
@@ -74,6 +74,8 @@ struct cartlog_snapshot {
 	u8 iwram_top[0x200];  // 0x200: 0x3007E00-0x3007FFF: stacks and the hook
 	u8 stack[0x100];  // 0x400: from the game's sp
 };
+_Static_assert((CARTLOG_PAGE << 12) + (CARTLOG_SNAPSHOT & 0xFFFF) == INGAME_SRAM_SNAPSHOT,
+	       "the overlay writes the snapshot where the kernel reads it");
 
 u32 crash_regs[17];
 u32 crash_stack[128] EWRAM_BSS;

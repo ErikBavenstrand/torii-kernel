@@ -673,14 +673,13 @@ and sleep keys, `0x1000` for the in-game menu, `0x3000` with cheats (v0.7;
 
 | Part | Bytes (v0.8) | |
 |---|---|---|
-| The hook and the menu's stub (`RTS_ReplaceIRQ_start`..`_end`, `gba_rts_patch.s`) | `0xAFC` (`0xD6C` in v0.7, with the Mode 3 menu) | `Cheat_switch` holds the interpreter's offset from its start (0: no cheats), `Debug_switch` DEBUG's. Of it, the stub and its SRAM copier about `0x2D8`, the old menu's SAVE and LOAD (until P2) about `0x330` |
+| The hook and the menu's stub (`RTS_ReplaceIRQ_start`..`_end`, `gba_rts_patch.s`) | `0xE20` (`0xD6C` in v0.7, with the Mode 3 menu) | `Cheat_switch` holds the interpreter's offset from its start (0: no cheats). Since v0.8's cleanup it is in the kernel's ROM, no longer IWRAM, as it is only copied. Of it, the stub and its SRAM copier about `0x2D8`, the old menu's SAVE and LOAD (until P2) about `0x330` |
 | The cheat interpreter (`Cheat_blob_start`..`_end`, `cheatrun.s`) | `0x474` | ARM, position-independent: PC-relative literals only |
 | The cheat table | up to `0x1400` | its layout is in `cheatrun.s` and `cheatcode.h` |
-| DEBUG's code (`Debug_blob`), with logging on | `0x180` | |
 
 v0.8's overlay itself isn't in the patch area: it lives in cart SRAM (page
 `0xB0`) and runs from the EWRAM it borrows (docs/design/v0.8/ingame-menu.md),
-so the area stays as it was and the stub left `0xB10` bytes of room
+as is the DEBUG snapshot since v0.8's cleanup (it was `0x184` bytes of `Debug_blob` here, with logging on), so the area stays as it was and the stub left `0xB10` bytes of room
 (`test_cheat_cap` logs it). The
 `.pat` cache records the length its trim kept room for (word 12); a file
 with less room than a launch's picks need (or from before v0.7) is scanned

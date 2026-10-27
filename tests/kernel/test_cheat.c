@@ -18,14 +18,13 @@ extern FATFS EZcardFs;
 
 void test_cheat_cap(void)
 {
-	// The menu's code, the interpreter, a full table and DEBUG's code fit in
-	// the patch area appended to the ROM; what is left is v0.8's
+	// The menu's code, the interpreter and a full table fit in the patch
+	// area appended to the ROM; what is left is v0.8's
 	u32 menu = (u8 *)RTS_ReplaceIRQ_end - (u8 *)RTS_ReplaceIRQ_start;
 	u32 code = (u8 *)Cheat_blob_end - (u8 *)Cheat_blob_start;
-	u32 debug = (u8 *)Debug_blob_end - (u8 *)Debug_blob_start;
-	u32 used = menu + code + CHEAT_TABLE_MAX + debug;
-	tlog("cheat patch: menu 0x%lX, interpreter 0x%lX, table 0x%X, DEBUG 0x%lX bytes: 0x%lX of 0x%X left", menu,
-	     code, CHEAT_TABLE_MAX, debug, CHEAT_PATCH_LENGTH - used, CHEAT_PATCH_LENGTH);
+	u32 used = menu + code + CHEAT_TABLE_MAX;
+	tlog("cheat patch: menu 0x%lX, interpreter 0x%lX, table 0x%X bytes: 0x%lX of 0x%X left", menu, code,
+	     CHEAT_TABLE_MAX, CHEAT_PATCH_LENGTH - used, CHEAT_PATCH_LENGTH);
 	CHECK(used <= CHEAT_PATCH_LENGTH);
 	CHECK_EQ(code % 4, 0);
 	CHECK_EQ(menu % 4, 0);
@@ -49,18 +48,13 @@ void test_cheat_cap(void)
 
 void test_menu_code_fits(void)
 {
-	// The in-game menu's code, DEBUG entry included, goes in the space
-	// SetTrimSize keeps free with SAVESTATE on: past it, a 32 MB ROM's or
-	// a 16 MB EEPROM game's patch would run off the end.
+	// The in-game menu's code goes in the space SetTrimSize keeps free with
+	// SAVESTATE on: past it, a 32 MB ROM's or a 16 MB EEPROM game's patch
+	// would run off the end. (The DEBUG snapshot is the overlay's since
+	// v0.8's cleanup, no longer code appended here.)
 	u32 size = (u32)RTS_ReplaceIRQ_end - (u32)RTS_ReplaceIRQ_start;
-	u32 debug = (u32)Debug_blob_end - (u32)Debug_blob_start;
-	tlog("in-game menu code: %lu bytes, and %lu for DEBUG, of %u", (unsigned long)size, (unsigned long)debug,
-	     RTS_PATCH_LENGTH);
-	// v0.8's refusal colours and record took the 0x100 bytes kept spare
-	// (4088 of 4096 bytes); past the length, DEBUG is left out of a launch
-	// without cheats (Patch_RTS_Cheat logs it)
-	CHECK(size + debug <= RTS_PATCH_LENGTH);
-	CHECK_EQ(debug % 4, 0);
+	tlog("in-game menu code: %lu bytes of %u", (unsigned long)size, RTS_PATCH_LENGTH);
+	CHECK(size <= RTS_PATCH_LENGTH);
 	// The refusal's colours, as the kernel names them
 	static const u16 colours[] = INGAME_REFUSED_COLOURS;
 	CHECK(!memcmp((const void *)RTS_Refuse_colours, colours, sizeof(colours)));

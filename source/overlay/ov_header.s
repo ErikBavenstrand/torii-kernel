@@ -16,3 +16,20 @@ ov_header:
 	.word	0				@ shown
 	.word	0				@ check: the kernel writes it (ingame_image_check)
 ov_header_end:
+
+@ ov_system_regs(out): the game's System-mode sp and lr into out[0] and out[1]
+@ (the DEBUG snapshot's, ov.c); ARM, as a mode change needs. The overlay
+@ runs in IRQ mode, which it goes back to.
+	.section .text.ov_system_regs,"ax",%progbits
+	.arm
+	.balign	4
+	.global	ov_system_regs
+	.type	ov_system_regs,%function
+ov_system_regs:
+	mrs	r1,cpsr
+	orr	r2,r1,#0x1F			@ System, IRQs as they were
+	msr	cpsr_c,r2
+	str	sp,[r0]
+	str	lr,[r0,#4]
+	msr	cpsr_c,r1
+	bx	lr

@@ -584,21 +584,6 @@ static void Patch_RTS_Cheat(u32 *Data)
 	}
 	*(vu32 *)(patchbuffer + ((u8 *)Cheat_switch - p_patch_start)) = cheat_at;
 
-	//Torii: the menu's DEBUG entry: its code goes after the cheats, only with
-	//LOGGING on and if it fits the space kept for the patch.
-	u32 debug_size = (u8 *)Debug_blob_end - (u8 *)Debug_blob_start;
-	u32 debug_at = 0;
-	if (tlog_level != TLOG_OFF && !is_NORpatch) {  // a NOR copy would keep it with logging off
-		if (copysize + debug_size <= room) {
-			dmaCopy((void *)Debug_blob_start, patchbuffer + copysize, debug_size);
-			debug_at = copysize;
-			copysize += debug_size;
-		} else {
-			tlog("launch: no room for the in-game menu's DEBUG entry");
-		}
-	}
-	*(vu32 *)(patchbuffer + ((u8 *)Debug_switch - p_patch_start)) = debug_at;
-
 	if (iTrimSize + copysize > 0x2000000) {
 		copysize = 0x2000000 - iTrimSize;
 	}

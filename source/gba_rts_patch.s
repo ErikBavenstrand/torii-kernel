@@ -15,7 +15,6 @@
 	.global  RTS_Accent
 	.global  RTS_Refuse_colours
 	.global	 RTS_switch
-	.global	 Debug_switch
 	.global	 Cheat_switch
 
 REG_BASE		= 0x4000000
@@ -49,11 +48,8 @@ ACT_LOAD		= 2
 ACT_RESET		= 3
 ACT_SLEEP		= 4
 ACT_TORII		= 5
-ACT_DEBUG		= 6
 CAN_STATES		= 1		@;INGAME_CAN_*
 CAN_CHEATS		= 2
-CAN_DEBUG		= 4
-NOTICE_DEBUG	= 0x100
 @;The stub's and the overlay's wait states (Torii, after v0.8's black screen
 @;on the real cart): SRAM at 8 cycles, the slowest, as games with a flash
 @;chip read and write it; ROM (the game's PSRAM, where the stub runs) at
@@ -69,7 +65,7 @@ REFUSED_NO_IMAGE = 1		@;INGAME_REFUSED_*
 REFUSED_BACKUP	= 2
 REFUSED_IMAGE	= 3
 REFUSED_SIZES	= 4
-ACTS			= 7		@;INGAME_ACTS
+ACTS			= 6		@;INGAME_ACTS
 
 @;The spend area (spend_0x80): the hook keeps r4-r11, sp, lr and SPSR at
 @;0x00-0x2F, SAVE the system sp and lr at 0x30; the stub keeps these
@@ -398,15 +394,14 @@ RTS_Wakeup_key:
 @;loads the overlay from SRAM and runs it on a stack at the window's end. Its
 @;answer (INGAME_ACT_*) decides what follows once everything is back: the
 @;game again (r1 = 0, or ACT_SLEEP for the hook's sleep), SAVE or LOAD as
-@;the old menu did them, a restart of the game, Back to Torii, or a DEBUG
-@;snapshot and the menu again. Returns r0 = 0x4000000, r4-r11 the game's.
+@;the old menu did them, a restart of the game or Back to Torii (the DEBUG
+@;snapshot is the overlay's own). Returns r0 = 0x4000000, r4-r11 the game's.
 @;It needs the IRQ stack only for sram_copy's 44 bytes.
 ingame_stub:
 	adrl	r12,spend_0x80
 	ldr		r12,[r12]
 	str		lr,[r12,#SP_LR]
-	mov		r9,#0				@;the overlay's notices
-ingame_open:
+	mov		r9,#0				@;the overlay's flags
 	mov		r11,r12				@;r11: the spend area (the overlay keeps r4-r11)
 	mov		r10,#REG_BASE		@;r10: I/O
 	ldrh	r1,[r10,#REG_VCOUNT]	@;where the frame was, for a refusal's record
@@ -551,11 +546,11 @@ ingame_run:							@;and its call on its own stack at the window's end
 	ldr		r1,[r2,#Cheat_switch-RTS_switch]
 	cmp		r1,#0
 	orrne	r9,r9,#CAN_CHEATS
-	ldr		r1,[r2,#Debug_switch-RTS_switch]
-	cmp		r1,#0
-	orrne	r9,r9,#CAN_DEBUG
 	adrl	r0,sram_copy
-	stmfd	sp!,{r0,r9}			@;struct ingame_call
+	mov		r1,r9
+	adrl	r2,RTS_irq
+	mov		r3,r11
+	stmfd	sp!,{r0-r3}			@;struct ingame_call
 	mov		r0,sp
 	ldr		r12,[r11,#SP_HDR+16]	@;the entry, Thumb
 	mov		lr,pc
@@ -692,8 +687,6 @@ ingame_back:
 	beq		game_reset
 	cmp		r1,#ACT_TORII
 	beq		reset_now
-	cmp		r1,#ACT_DEBUG
-	beq		debug_now
 ingame_resume:						@;r10 I/O, r11 the spend area
 	@;The game frozen and muted until every key is up: it never sees the
 	@;menu keys (START opened Pokémon's menu after the stub's refusal) or
@@ -759,7 +752,7 @@ wait_frame:
 @;caller's WAITCNT back at the end. Torii: to_sram 2 compares instead, and returns r0 non-zero
 @;if SRAM differs (0 otherwise, and for the other modes). Leaves the last
 @;page set. Keeps r4-r11 (AAPCS: the overlay calls it) and, but in mode 2,
-@;r3 (DEBUG's code relies on it); 44 bytes of stack. Mode 2 is the stub's
+@;r3; 44 bytes of stack. Mode 2 is the stub's
 @;alone (r11 its spend area), and leaves the first difference at SP_MISS.
 sram_copy:
 	stmfd	sp!,{r4-r8,lr}
@@ -933,24 +926,6 @@ game_reset:
 	strb	r1,[r0]				@;0: SoftReset starts the ROM, not EWRAM
 	swi		0x000000
 
-@;DEBUG: the snapshot with the game's registers back, then the menu again
-@;with a notice
-debug_now:
-	bl		ingame_thaw
-	adrl	r0,Debug_switch
-	ldr		r0,[r0]
-	adrl	r8,RTS_ReplaceIRQ_start
-	add		r8,r8,r0
-	mov		r4,r11
-	adrl	r5,RTS_irq
-	adrl	r6,SetRampage
-	adrl	r7,sram_copy
-	mov		lr,pc
-	mov		pc,r8
-	adrl	r12,spend_0x80
-	ldr		r12,[r12]
-	mov		r9,#NOTICE_DEBUG
-	b		ingame_open
 @;Torii: the System and Supervisor stacks moved to the 0x200 bytes
 @;SoftReset clears, before a SWI from IRQ mode that never returns to the
 @;game. The real BIOS's SWI handler runs the function in System mode on
@@ -1273,95 +1248,9 @@ st_list:							@;the state buffer, as the old menu kept it
 	.word	0
 RTS_switch:
 	.word 0x00000000
-Debug_switch:		@;Torii: DEBUG's code, from RTS_ReplaceIRQ_start; 0: no DEBUG
-	.word 0x00000000
 Cheat_switch:		@;Torii: the cheat interpreter, from RTS_ReplaceIRQ_start; 0: no cheats
 	.word 0x00000000
 	.align
 RTS_ReplaceIRQ_end:
 
-@;------------------------------------------------------
-@;Torii: the in-game menu's DEBUG entry, appended to a game's patch after
-@;its cheat table (or the menu, without cheats) when LOGGING is on (Patch_RTS_Cheat in GBApatch.c). It
-@;writes the game's state to cart RAM, page 0xF0 at 0x1000, for the
-@;kernel's next boot to log: struct cartlog_snapshot in source/cartlog.c
-@;has the layout. The magic goes last, so a write cut off counts as none.
-@;It reads memory and I/O only, and never selects the save chip's pages.
-@;It sits at a different place in each game, so the stub passes what it
-@;needs: r4 the hook's register save area (spend_0x80), r5 the hook's
-@;address, r6 SetRampage, r7 sram_copy.
-	.section .text.debug_blob,"ax",%progbits
-	.arm
-	.align 2
-	.global	Debug_blob_start
-	.global	Debug_blob_end
-Debug_blob_start:
-	stmfd	sp!,{lr}
-	mrs		r0,CPSR		@;the system-mode sp and lr, where SAVE keeps them
-	mov		r1,#0xDF
-	msr		cpsr_cf,r1
-	nop
-	mov		r2,sp
-	mov		r3,lr
-	msr		cpsr_cf,r0
-	nop
-	str		r2,[r4,#0x30]
-	str		r3,[r4,#0x34]
-
-	mov		r0,#0xF0
-	mov		lr,pc
-	mov		pc,r6		@;SetRampage
-	ldr		r0,=0x0E001000	@;no magic while the rest is written
-	mov		r1,#0
-	mov		r2,#16
-debug_blank:
-	strb	r1,[r0],#1
-	subs	r2,r2,#1
-	bne		debug_blank
-
-	@;The rest through sram_copy (r7), to_sram 1 in r3, which it keeps;
-	@;page 0xF0's window offset 0x1000 is cart SRAM's byte 0xF1000
-	.macro	debug_copy dst, src, len
-	ldr		r0,=\dst
-	ldr		r1,=\src
-	mov		r2,#\len
-	mov		lr,pc
-	mov		pc,r7		@;sram_copy
-	.endm
-	.macro	debug_copy_from dst, len	@;from r1
-	ldr		r0,=\dst
-	mov		r2,#\len
-	mov		lr,pc
-	mov		pc,r7
-	.endm
-
-	mov		r3,#1
-	debug_copy 0xF1010, 0x080000A0, 0x20		@;the ROM header from 0xA0
-	str		r5,[sp,#-4]!				@;the hook's address
-	mov		r1,sp
-	debug_copy_from 0xF1030, 4
-	add		sp,sp,#4
-	mov		r1,r4					@;r4-r11, sp, lr, SPSR, system sp and lr
-	debug_copy_from 0xF1040, 0x40
-	ldr		r1,[r4,#0x20]				@;the BIOS's IRQ frame: r0-r3, r12, pc + 4
-	bic		r1,r1,#3
-	debug_copy_from 0xF1080, 0x20
-	debug_copy 0xF10A0, 0x03007FF0, 0x10		@;the game's handler, IRQ flags, the hook
-	debug_copy 0xF10C0, 0x04000000, 0x60		@;I/O 0x000-0x05F
-	debug_copy 0xF1120, 0x04000200, 0x10		@;IE, IF, WAITCNT, IME
-	debug_copy 0xF1200, 0x03007E00, 0x200		@;IWRAM 0x3007E00-0x3007FFF
-	ldr		r1,[r4,#0x30]				@;the game's stack
-	bic		r1,r1,#3
-	debug_copy_from 0xF1400, 0x100
-	adr		r1,debug_magic
-	debug_copy_from 0xF1000, 16			@;now the magic
-
-	mov		r0,#0x00
-	mov		lr,pc
-	mov		pc,r6
-	ldmfd	sp!,{pc}
-	.ltorg
-debug_magic:
-	.byte	'T','O','R','I','I','-','D','E','B','U','G','I','N','F','O','1'
-Debug_blob_end:
    .end
