@@ -68,6 +68,12 @@
 //                    0-159 scan out prints a "tear:" line (see the tear
 //                    watch below); the run ends with "tears: N". The window
 //                    doesn't make the run longer: -T 1:99999 watches it all
+//   -R               draw every frame. By default mGBA's renderer draws only
+//                    the frames a -s, -h or -H looks at, and the frame before
+//                    each (which leaves the renderer as if every frame had
+//                    been drawn); the emulated GBA runs the same either way,
+//                    and a game runs about 40 % faster. -L, -t, -g and -T
+//                    draw every frame too
 //
 // RAM starts filled with 0xA5 (poison_ram), as the cart's holds junk at
 // power-on.
@@ -740,6 +746,7 @@ struct options {
 	const char *scripts[16];
 	size_t nscripts;
 	int realtime;
+	int drawAll;
 	const char *until;
 	unsigned long cutAt;
 	unsigned frames;
@@ -749,6 +756,27 @@ struct options {
 };
 
 static void parse_options(struct options *opts, int argc, char **argv);
+
+// Whether the renderer draws frame: a -s, -h or -H output is at it or at the
+// frame after. An output @0 or @1 after a -w not met yet could come at any
+// frame, so every frame is drawn until it is met.
+static int draws(const struct options *opts, unsigned frame)
+{
+	const struct events *outputs[] = {&opts->shots, &opts->hashes, &opts->ranges};
+	for (size_t k = 0; k < sizeof(outputs) / sizeof(*outputs); ++k) {
+		for (size_t i = 0; i < outputs[k]->count; ++i) {
+			const struct event *ev = &outputs[k]->list[i];
+			if (ev->wait >= next_wait && ev->frame <= 1) {
+				return 1;
+			}
+			unsigned start = start_frame(ev);
+			if (start && frame + 1 >= start && frame <= start + (ev->end - ev->frame)) {
+				return 1;
+			}
+		}
+	}
+	return 0;
+}
 
 static void parse_file(struct options *opts, const char *path)
 {
@@ -805,7 +833,7 @@ static void parse_file(struct options *opts, const char *path)
 static void parse_options(struct options *opts, int argc, char **argv)
 {
 	for (int i = 0; i < argc; ++i) {
-		if (i + 1 >= argc && strcmp(argv[i], "-t")) {
+		if (i + 1 >= argc && strcmp(argv[i], "-t") && strcmp(argv[i], "-R")) {
 			fprintf(stderr, "missing value for %s\n", argv[i]);
 			exit(2);
 		}
@@ -882,6 +910,8 @@ static void parse_options(struct options *opts, int argc, char **argv)
 			opts->frameDir = argv[++i];
 		} else if (!strcmp(argv[i], "-t")) {
 			opts->realtime = 1;
+		} else if (!strcmp(argv[i], "-R")) {
+			opts->drawAll = 1;
 		} else if (!strcmp(argv[i], "-L") && opts->nscripts < 16) {
 			opts->scripts[opts->nscripts++] = argv[++i];
 		} else if (!strcmp(argv[i], "-l")) {
@@ -1187,6 +1217,8 @@ int main(int argc, char **argv)
 	}
 
 	int status = 0;
+	int draw_all = opts.drawAll || opts.nscripts || opts.realtime || opts.gdbPort || opts.tears.count;
+	struct GBAVideo *video = &((struct GBA *)core->board)->video;
 	unsigned frame;
 	for (frame = 1; frame <= frames; ++frame) {
 		current_frame = frame;
@@ -1209,6 +1241,8 @@ int main(int argc, char **argv)
 		for (size_t i = 0; i < opts.tears.count; ++i) {
 			tear_on |= in_range(&opts.tears.list[i], frame);
 		}
+		// mGBA's frame skip: the counter is checked before each line is drawn
+		video->frameskipCounter = draw_all || draws(&opts, frame) ? 0 : 1;
 		if (debugger) {
 			mDebuggerRunFrame(debugger);
 			if (debugger->state == DEBUGGER_SHUTDOWN) {
