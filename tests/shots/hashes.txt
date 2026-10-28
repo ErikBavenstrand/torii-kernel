@@ -821,9 +821,9 @@ sv-settings/frames 44-44 08874C6D5C0C2A6A
 sv-settings/frames 45-45 5BB50D6919B8C5B9
 sv-settings/frames 46-46 E82202D10959B6EE
 sv-settings/frames 47-47 FA8DA4F7E21C666E
-sv-settings/frames 48-48 6F52E7120D51FE8A
-sv-settings/frames 49-49 0FD3754EC915AF45
-sv-settings/frames 50-50 656B2F39096E7329
+sv-settings/frames 48-48 7E93991C1A02DA9A
+sv-settings/frames 49-49 96773F288140EE0D
+sv-settings/frames 50-50 A75EAF98CAA552A1
 sv-settings/frames 51-51 8245F9248864C5F2
 sv-settings/frames 52-52 64644A478D6732D7
 sv-settings/frames 53-53 B0AB05145345D094
