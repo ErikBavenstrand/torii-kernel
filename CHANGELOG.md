@@ -10,7 +10,7 @@ git log, not here.
   `lang/en.ini` by id, and a pack in `/torii/lang` (built from a
   translation's `.ini`) replaces it, with its own date and number formats;
   Settings' Language row, shown now, switches the menu at once. A stale or
-  damaged pack, or a string one lacks, shows English (5441fefe, bcc34910).
+  damaged pack, or a string one lacks, shows English (5441fefe, bcc34910, dfa46579, 88b605b5).
 
 ## v0.8.4
 
