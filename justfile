@@ -114,7 +114,8 @@ logs path *args:
 # (devkitPro's headers go to dist/devkitpro; .clangd adapts the flags for clang)
 compile-commands: _ready
     mkdir -p dist build build-test
-    {{kernel_docker}} sh -c 'make TARGET=ezkernelnew -B -n > dist/dry-run-kernel.txt && make TARGET=ezkerneltest BUILD=build-test -B -n > dist/dry-run-test.txt && cd /opt && cp -r --parents devkitpro/libgba/include devkitpro/devkitARM/arm-none-eabi/include /src/dist/'
+    # The overlay for real first: a dry run doesn't build it, and its .incbin needs it
+    {{kernel_docker}} sh -c 'make --no-print-directory -C source/overlay OUT=/src/build/overlay >/dev/null && make --no-print-directory -C source/overlay OUT=/src/build-test/overlay >/dev/null && make TARGET=ezkernelnew -B -n > dist/dry-run-kernel.txt && make TARGET=ezkerneltest BUILD=build-test -B -n > dist/dry-run-test.txt && cd /opt && cp -r --parents devkitpro/libgba/include devkitpro/devkitARM/arm-none-eabi/include /src/dist/'
     python3 tools/compile_commands.py "$PWD" build=dist/dry-run-kernel.txt build-test=dist/dry-run-test.txt
     rm dist/dry-run-kernel.txt dist/dry-run-test.txt
 
