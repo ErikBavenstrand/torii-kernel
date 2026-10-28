@@ -63,11 +63,23 @@ extern char *gl_keep_power;    // FORMAT ALL's text, under its title
 // The firmware update's texts (Ezcard_OP.c). It runs before a language is
 // loaded, and the formats stay literals so the compiler checks them.
 #define EN_FW_TITLE "Rev.%s firmware update"
+#define EN_FW_CHECKING "Checking the new firmware..."
 #define EN_FW_CRC_ERROR "The firmware in the kernel is damaged (CRC32).\nPress [B] to go back."
-#define EN_FW_QUESTION "Installed: V%02d\nNew: V%02d\nPress [A] to update\nPress [B] to cancel"
+#define EN_FW_WARNING \
+	"Installed: V%02d, new: V%02d\nA power cut can leave the cart unbootable: use fresh batteries or a " \
+	"plugged-in " \
+	"console."
+#define EN_FW_HOLD "To update, hold L+R+A\nfor two seconds.\nPress [B] to cancel."
 #define EN_FW_UPDATING "Updating V%02d to V%02d.\nDon't turn the power off."
 #define EN_FW_PROGRESS "Updating... %lu%%"
 #define EN_FW_DONE "Done. Turn the power off."
+// About's cart line (screens/info.c), INFO_S_ABOUT_CART's two %s: a board
+// the update's allowlist names (fpga_board.h) gets its revision's name and
+// the firmware's version with the raw word; any other word, this name and
+// the word alone
+#define EN_FW_ABOUT_FIRMWARE "%u (%04X)"
+#define EN_FW_ABOUT_UNKNOWN "Unknown board"
+#define EN_FW_ABOUT_WORD "word %04X"
 
 // The menu's items (screens/registry.h) and what they hold ("1 game", then
 // a number and "games"), and the hint bar's labels

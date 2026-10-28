@@ -76,6 +76,13 @@ void dialog_message(const char *title, const char *text, u32 kind);
 // "B cancel" and "A OK" key chips.
 int dialog_confirm(const char *title, const char *text, u32 kind);
 
+// Asks for keys held together for frames frames, as a progress dialog
+// whose bar fills while they are: 1 once it is full, 0 if B is pressed or
+// the keys are let go before it is (it waits for B's release). Keys
+// already held when it shows count only once let go and held again, so
+// no press made before it can start what it guards. Its view is "hold".
+int dialog_hold(const char *title, const char *text, u16 keys, u32 frames);
+
 // A notice: a message with no keys, which stays up while the caller works
 // (the boot's "Loading...") until dialog_notice_end. Showing another while
 // one is up replaces it. Messages, questions and a progress dialog shown

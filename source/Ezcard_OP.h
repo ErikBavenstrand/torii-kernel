@@ -70,5 +70,8 @@ void IWRAM_CODE SPI_Disable(void);
 void IWRAM_CODE SetSPIWrite(u16 control);
 void IWRAM_CODE SPI_Write_Enable(void);
 void IWRAM_CODE SPI_Write_Disable(void);
-void IWRAM_CODE FW_update(u16 DEcard_FW_readver, u16 FW_built_in_ver, void *FWbinaddress, u32 FWsize, u32 build_crc32,
-			  u32 FW_wirte_address);
+// rev: the board's revision letter in the title, from the allowlist
+void IWRAM_CODE FW_update(u16 DEcard_FW_readver, const char *rev, u16 FW_built_in_ver, void *FWbinaddress, u32 FWsize,
+			  u32 build_crc32, u32 FW_wirte_address);
+// How long L+R+A is held to start the update: two seconds
+#define FW_HOLD_FRAMES 120

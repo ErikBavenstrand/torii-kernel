@@ -23,6 +23,7 @@
 #include "ez_define.h"
 #include "ezkernel.h"
 #include "Ezcard_OP.h"
+#include "fpga_board.h"
 #include "bootloader.h"
 #include "build_id.h"
 #include "RTC.h"
@@ -509,8 +510,11 @@ static void step_info(void)
 {
 	step("the cart");
 	u16 fpga = Read_FPGA_ver();
-	say(WHITE, "FPGA firmware %u (%s)", fpga & 0xFF,
-	    ((fpga & 0xF000) == 0xA000 || (fpga & 0xF000) == 0xB000) ? "LX16, Rev.B" : "LX9, Rev.A");
+	// The board only when the firmware update's allowlist knows it
+	if (fpga_board(fpga) == FPGA_BOARD_LX16)
+		say(WHITE, "FPGA word %04X: firmware %u, LX16, Rev.B", (unsigned)fpga, (unsigned)fpga_firmware(fpga));
+	else
+		say(WHITE, "FPGA word %04X: unknown board, no updates", (unsigned)fpga);
 	tlog("diag: FPGA version register %04X", fpga);
 	say(WHITE, "kernel NOR id %04X, game NOR id %04X", Read_S71NOR_ID(), Read_S98NOR_ID());
 	say(WHITE, "WAITCNT %04X in the menu, 0000 in games", REG_WAITCNT_IO);

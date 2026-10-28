@@ -138,6 +138,7 @@ jobs=(
   "tests/loader_safety.sh 3/4"
   "tests/loader_safety.sh 4/4"
   "tests/fw_update.sh"
+  "tests/fw_update.sh sweep"
   "tests/logging.sh launch"
   "tests/logging.sh debug"
   "tests/logging.sh crash"

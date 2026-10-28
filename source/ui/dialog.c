@@ -56,6 +56,7 @@ enum {
 	USE_CONFIRM,
 	USE_PROGRESS,
 	USE_NOTICE,
+	USE_HOLD,  // a progress dialog's look, on dlg.message
 };
 
 static const struct ui_label_config title_label = {"", UI_FONT_HEADING, UI_ALIGN_CENTER, 0, 0};
@@ -169,6 +170,12 @@ static const struct ui_view_spec notice_error_view = {.name = "notice",
 						      .focus = UI_NONE,
 						      .flags = UI_VIEW_MODAL,
 						      .event = dialog_event};
+static const struct ui_view_spec hold_view = {.name = "hold",
+					      .nodes = progress_nodes,
+					      .count = N_COUNT,
+					      .focus = UI_NONE,
+					      .flags = UI_VIEW_MODAL,
+					      .event = dialog_event};
 static const struct ui_view_spec progress_view = {.name = "progress",
 						  .nodes = progress_nodes,
 						  .count = N_COUNT,
@@ -390,11 +397,13 @@ static void settle(const struct shown *s, u32 frames)
 static int show(struct shown *s, u32 use, const char *title, const char *text, u32 kind)
 {
 	copy(s->title, sizeof(s->title), title);
-	wrap(s->text, sizeof(s->text), text ? text : "", use == USE_PROGRESS ? PROGRESS_LINES : TEXT_LINES);
+	int bar = use == USE_PROGRESS || use == USE_HOLD;
+	wrap(s->text, sizeof(s->text), text ? text : "", bar ? PROGRESS_LINES : TEXT_LINES);
 	s->status[0] = 0;
 	s->keys = 0;
 	s->use = (u8)use;
 	const struct ui_view_spec *spec = use == USE_PROGRESS ? &progress_view
+					  : use == USE_HOLD   ? &hold_view
 					  : use == USE_NOTICE
 						  ? (kind == DIALOG_ERROR ? &notice_error_view : &notice_view)
 					  : kind == DIALOG_ERROR ? &error_view
@@ -414,7 +423,7 @@ static int show(struct shown *s, u32 use, const char *title, const char *text, u
 	u8 first = s->view->first;
 	ui_label_set((u8)(first + N_TITLE), s->title);
 	ui_label_set((u8)(first + N_TEXT), s->text);
-	if (use == USE_PROGRESS) {
+	if (bar) {
 		ui_label_set((u8)(first + N_FOOT), s->status);
 	} else if (use == USE_CONFIRM) {
 		s->hints[0] = (struct ui_hint){"B", gl_hint_cancel};
@@ -494,6 +503,51 @@ int dialog_confirm(const char *title, const char *text, u32 kind)
 	log_dialog(title, text, yes ? "A, yes" : "B, no");
 	dialog_close();
 	return yes;
+}
+
+int dialog_hold(const char *title, const char *text, u16 keys, u32 frames)
+{
+	const char *answer = "B, no";
+	int held = 0;
+	dialog_open();
+	if (show(&dlg.message, USE_HOLD, title, text, DIALOG_INFO)) {
+		u8 bar = (u8)(dlg.message.view->first + N_BAR);
+		int armed = 0, holding = 0;
+		u32 start = 0;
+		for (;;) {
+			tick();
+			ui_frame();
+			if (dlg.message.keys & KEY_B) {
+				wait_key(&dlg.message, KEY_B, 1);
+				break;
+			}
+			int all = (ui_input()->held & keys) == keys;
+			if (!all) {
+				if (holding) {
+					answer = "let go early";
+					break;
+				}
+				armed = 1;
+			} else if (armed && !holding) {
+				holding = 1;
+				start = torii_frames;
+			}
+			if (holding) {
+				u32 n = torii_frames - start;
+				ui_progress_set(bar, n < frames ? n : frames, frames);
+				if (n >= frames) {
+					answer = "held";
+					held = 1;
+					settle(&dlg.message, 2);  // the full bar shows
+					break;
+				}
+			}
+		}
+		hide(&dlg.message);
+	}
+	log_dialog(title, text, answer);
+	dialog_close();
+	return held;
 }
 
 // --- Notices -----------------------------------------------------------------

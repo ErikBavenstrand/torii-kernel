@@ -124,6 +124,7 @@ static const struct {
 	{"progress_copy", test_progress_copy},
 	{"name_with_ext", test_name_with_ext},
 	{"fattable", test_fattable},
+	{"fpgaboard", test_fpgaboard},
 	{"irq_table_lookup", test_irq_table_lookup},
 	{"irq_table_rejects_blank_codes", test_irq_table_rejects_blank_codes},
 	{"irq_table_bounds", test_irq_table_bounds},

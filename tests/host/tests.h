@@ -37,6 +37,7 @@ void test_progress_estimate(void);
 void test_progress_copy(void);
 void test_name_with_ext(void);
 void test_fattable(void);
+void test_fpgaboard(void);
 void test_irq_table_lookup(void);
 void test_irq_table_rejects_blank_codes(void);
 void test_irq_table_bounds(void);

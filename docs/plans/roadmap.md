@@ -124,7 +124,6 @@ Small items with no version yet:
   - The kernel install fills the last sector's tail with 0xFF, where the real loader writes stale bytes.
   - `OMEGA_FPGA_VERSION` isn't validated.
 - **Engine:** `ui_show` on a parent doesn't hide its children (`source/ui/ui_core.c`); U+00AD draws as a visible hyphen (`font_body.c`).
-- **Firmware update:** the screen is blank during its CRC check (`FW_update`, `source/Ezcard_OP.c`).
 - **Font tests:**
   - `tools/font_preview.py` needs network for the candidates.
   - `tests/font_test.py` compiles with the host `cc`, not devkitARM.
