@@ -114,7 +114,7 @@ d = open(sys.argv[1], 'rb').read()
 print(sum(1 for i in range(0x790200, 0x790400, 2) if d[i:i+2] != b'\xff\xff'))" "$cart/kernel-nor.bin")
   [ "$progs" -gt 2 ] || fail "the record took only $progs programs"
   for n in 1 2 3 $((progs / 2)) $((progs - 1)) "$progs"; do
-    rm -rf "$cart" && cp -a "$cart.start" "$cart"
+    cart_restore "$cart.start" "$cart"
     # The programs before this launch's record (the launch's own other NOR
     # writes are outside the sector, so the count is the record's)
     status=0
@@ -144,7 +144,7 @@ cut-clear)
   setup
   cp -a "$cart" "$cart.start"
   for n in 1 2 3 10; do
-    rm -rf "$cart" && cp -a "$cart.start" "$cart"
+    cart_restore "$cart.start" "$cart"
     status=0
     OMEGA_POWER_CUT=kernel:program:$n@0x790000 OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin \
       -k 100:A -k 106:- -f 800 >/dev/null 2>"$cart/run.log" || status=$?

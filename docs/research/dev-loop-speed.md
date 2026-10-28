@@ -126,6 +126,45 @@ Measured with another session's tests in the same VM, so the times vary by about
 - Not done: compat could be selected the same way (record which functions its games run, and skip it when none changed), in place of the hand-kept `NO_COMPAT` list.
   Carts on tmpfs failed: 140 jobs' 64 MB NOR files filled it.
 
+## Update 2026-10-28 (later): cheaper power-cut sweeps, no fsync in the tests
+
+The note above guessed that the cut sweeps' cost was replaying each scenario from boot. Measured, it isn't: an emulated frame costs about 0.1 ms, a `saveorphan` scenario run stops at frame 76 with its first cutpoint at frame 17, so a save state taken before the operation would save under 2 ms a run.
+What each cut cost was the cart's files:
+
+- **Restoring the cart.** `cut_sweep` and the SD-write loops reset the cart with `rm -rf; cp -a` before every cut: 140 MB, 64 MB of it the game NOR that no sweep writes. When the starting state had no `game-nor.bin`, the model made it again (64 MB of `0xFF`) on every run.
+  Per cut, in a loop on the container's disk: 57 ms with the whole copy, 12 ms copying back only the SD image, SRAM and kernel NOR, 5.5 ms for the run alone.
+- **fsync.** The cart model syncs its four files at every power-off and power cut (`msync`, `fsync`, and the unmap's `MS_SYNC`), which writes the fresh copies to the VM's disk. With fsync and msync stubbed out, `trash-split` took 18 s instead of 23 s and `delete-split` 18 s instead of 29 s, for the same CPU time: the rest was waiting on the disk.
+
+Changes:
+
+- `OMEGA_NO_SYNC=1` (set by `tests/all.sh`) leaves the cart's files to the page cache: no fsync or msync when a run ends or the power is cut. Another process reads them the same. Left unset (`just run`, `just play`, scripts run alone), the files still reach the disk.
+- At power-on the model installs the kernel and blanks SRAM's unbacked pages only where a 4 KB page differs, so a file a run doesn't otherwise write keeps its modification time.
+- `cart_restore FROM TO` (`tests/carts.sh`) copies back only the files whose size or time differ, and `cut_sweep` puts blank NOR and SRAM files (`cart_blank`) in the starting state. The sweeps in `cutsweep.sh`, `saveorphan.sh`, `slotstore.sh`, `saves.sh` and `pending_slots.sh` use it.
+  Checked once with every restore followed by a `cmp` of each file left in place against the start: 769 restores across the 26 cut jobs, no difference.
+- `saves.sh rename-walk` put its 1,500 files with `mcopy` (27 s, as for `sd-many`); it now uses `tools/sdimg`: 28 s to 2 s.
+
+Measured with `tests/all.sh` alone in the `torii` VM (8 CPUs), each job wrapped in bash's `time`, one run each on a quiet VM:
+
+| | Before | After |
+|---|---|---|
+| `tests/all.sh` wall time | 111 s | 75 s |
+| CPU, all jobs | 522 s (370 user, 152 sys) | 466 s (335 user, 130 sys) |
+| `saves.sh rename-walk` | 28.4 s | 2.2 s |
+| the 26 jobs with power-cut sweeps | 195 s | 170 s |
+| `saveorphan.sh trash-split empty-split` | 33.5 s | 26.9 s |
+| `saveorphan.sh relink-split relink-clash-split` | 22.3 s | 18.4 s |
+| `saves.sh rename-cut`, `-split`, `-case` | 22.5 s | 17.2 s |
+| `slotstore.sh delete-split` | 11.4 s | 9.1 s |
+
+Alone, the gain per sweep is larger: `trash-split` 14.5 to 9.7 CPU-s (23 s to 10 s), `delete-split` 11.1 to 6.3 CPU-s (29 s to 6.5 s). Under the full run's load, per-job CPU times grow and the copies' share shrinks.
+
+The sweeps still catch a broken order: with `trash_steps` (`source/saveorphan.c`) deleting the journal right after moving the saves, `saveorphan.sh trash` and `trash-split` fail at cut 7 ("Boss's history is nowhere"), as the old harness does; with the journal written after the steps, at cut 1.
+
+What is left in the sweeps: about 30 ms per emulator run, mostly the recovery boots' fixed 400 frames (`-f 400`), of which the cart is idle after `nav: home ready` (frame 25-95); stopping there would save roughly another 20 CPU-s but would no longer run whatever a later kernel does after the menu is up. Then the checks' listings (`mcopy -s`, Python, `fsck.fat`), about 15 ms per cut.
+`states.sh cut` (17 s) is the one sweep where emulation dominates: each run boots, launches a game and files a state (0.6 s). Resuming from a save state would need `mgba-shot` to restore its `-w`/`-u` progress and held keys too.
+
+When measuring per job, note that a wrapper like `( t=$( { time JOB; } 2>&1 ); echo ... ) &` returns `echo`'s status: `tests/all.sh` then reports success whatever the jobs did, so count the PASS and FAIL lines.
+
 ## Top five, ranked by time saved × frequency ÷ effort
 
 | # | Change | Saves | How often | Effort | Risk |

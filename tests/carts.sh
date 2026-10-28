@@ -29,6 +29,42 @@ _carts_exit() {
   exit "$status"
 }
 
+# cart_restore FROM TO: makes the cart folder TO a copy of FROM again, as
+# `rm -rf TO; cp -a FROM TO` does, but leaves alone the files whose size and
+# modification time are FROM's. With OMEGA_NO_SYNC (tests/all.sh), a run
+# changes a file's time only by writing it (the cart model writes only pages
+# that change), so a power-cut sweep copies back the SD image and what the run
+# wrote, not the 64 MB game NOR each time.
+cart_restore() {
+  local from=$1 to=$2 name stamp
+  local -A tocopy=()
+  mkdir -p "$to"
+  while IFS=$'\t' read -r name stamp; do
+    tocopy[$name]=$stamp
+  done < <(find "$from" -mindepth 1 -maxdepth 1 -printf '%f\t%y %s %T@\n')
+  while IFS=$'\t' read -r name stamp; do
+    if [ "${stamp%% *}" = f ] && [ "${tocopy[$name]-}" = "$stamp" ]; then
+      unset "tocopy[$name]"
+    else
+      rm -rf "${to:?}/$name"
+    fi
+  done < <(find "$to" -mindepth 1 -maxdepth 1 -printf '%f\t%y %s %T@\n')
+  for name in "${!tocopy[@]}"; do
+    cp -a "$from/$name" "$to/$name"
+  done
+}
+
+# cart_blank DIR: puts in the cart folder DIR the kernel NOR, game NOR and SRAM
+# files it lacks, as the cart model makes them (all 0xFF), so runs restored by
+# cart_restore don't each make the 64 MB game NOR again
+cart_blank() {
+  local file size
+  for file in game-nor.bin:67108864 kernel-nor.bin:8388608 sram.bin:1048576; do
+    size=${file#*:} file=$1/${file%:*}
+    [ -e "$file" ] || head -c "$size" /dev/zero | tr '\0' '\377' >"$file"
+  done
+}
+
 # shard_init [N/M]: with N/M (a script's argument), the script runs only every
 # Mth of its cases, from the Nth (N from 1), so tests/all.sh can run a long
 # script as M jobs; without it, all of them. shard_case: whether the next

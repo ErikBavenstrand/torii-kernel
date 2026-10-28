@@ -11,6 +11,9 @@
 # status; tools/testmap.py reads them, so `just check` runs only the jobs a
 # change touches.
 set -uo pipefail
+# The carts live on the container's disk and only these jobs read them: the
+# cart model leaves its files to the page cache (no fsync at each power-off)
+export OMEGA_NO_SYNC=1
 
 jobs=(
   "tests/kernel.sh"

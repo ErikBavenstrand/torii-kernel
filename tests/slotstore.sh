@@ -304,15 +304,13 @@ msg="$cut_count cuts"
 if [ "$base" != "$part" ]; then
   # A cut before each SD write of the scenario, counted from the cart trace
   # (some land inside an f_rename)
-  rm -rf "$cart"
-  cp -a "$carts/cutsweep-start" "$cart"
+  cart_restore "$carts/cutsweep-start" "$cart"
   OMEGA_TRACE=1 scenario
   first=$(sed -n '1,/SLOT SCENARIO START/p' "$cart/run.log" | grep -c '^omega [0-9]*: sd write' || true)
   total=$(grep -c '^omega [0-9]*: sd write' "$cart/run.log" || true)
   [ "$total" -gt "$first" ] || fail "the scenario made no SD writes"
   for n in $(seq $((first + 1)) "$total"); do
-    rm -rf "$cart"
-    cp -a "$carts/cutsweep-start" "$cart"
+    cart_restore "$carts/cutsweep-start" "$cart"
     OMEGA_POWER_CUT=sd:write:$n scenario
     [ "$cut_status" = 75 ] || fail "no power cut before SD write $n (exit $cut_status)"
     check "w$n" "before SD write $n"
