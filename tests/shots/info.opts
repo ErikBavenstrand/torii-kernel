@@ -1,6 +1,6 @@
 # The Info page (source/screens/info.c, mockup #21) in the light theme: LEFT
 # on home goes round the end to Info, A opens it. Its rows on two cards
-# (the four reading pages, then Diagnostics), each with its 8x8 icon and
+# (the six reading pages, then Diagnostics), each with its 8x8 icon and
 # what it holds, and the position at the right. DOWN from About steps over
 # the gap between the cards to Diagnostics (the pill's slide hashed every
 # frame); UP comes back. Version and build ID are pinned so the screens
@@ -12,10 +12,10 @@
 -k @8:LEFT -k @12:- -k @16:A -k @20:-
 -w "screen ready: info"
 -s @1:rows.png
--k @8:DOWN -k @12:- -k @16:DOWN -k @20:- -k @24:DOWN -k @28:-
--s @50:about.png
--k @56:DOWN -k @60:-
--H @56:@76
--s @80:diag.png
--k @88:UP -k @92:-
--s @112:back-up.png
+-k @8:DOWN -k @12:- -k @16:DOWN -k @20:- -k @24:DOWN -k @28:- -k @32:DOWN -k @36:- -k @40:DOWN -k @44:-
+-s @66:about.png
+-k @72:DOWN -k @76:-
+-H @72:@92
+-s @96:diag.png
+-k @104:UP -k @108:-
+-s @128:back-up.png

@@ -96,22 +96,22 @@ echo "PASS: a route to a path of 246 bytes, its folder starting with #, waits fo
 # up from its row
 new_cart info
 cp -r "$cart" "$carts/info-new"
-for page in controls ingame cart about diag; do
+for page in controls ingame saves cheats help about diag; do
   rm -rf "$cart" && cp -r "$carts/info-new" "$cart"
   # shellcheck disable=SC2046 # nav.sh's options
   boot "info-$page" $(nav_info_page $page)
   [ $page = diag ] || logged "info: info-$page,"
 done
-! nav_info_page help >/dev/null 2>"$cart/err.txt" || fail "nav_info_page help didn't fail"
+! nav_info_page cart >/dev/null 2>"$cart/err.txt" || fail "nav_info_page cart didn't fail"
 echo "PASS: tests/nav.sh reaches each Info page and Diagnostics from Info"
 
 # Last place on a reading page is the Info item, never the page or its row:
 # the boot after faces Info on home
 rm -rf "$cart" && cp -r "$carts/info-new" "$cart"
 # shellcheck disable=SC2046
-boot info-last $(nav_info_page cart) -k @400:- -f 900
+boot info-last $(nav_info_page saves) -k @400:- -f 900
 mtype -i "$cart/sd.img" ::/torii/recent.txt | grep -qx '@boot info' ||
-  fail "recent.txt's boot position on Your cart: $(mtype -i "$cart/sd.img" ::/torii/recent.txt | head -1)"
+  fail "recent.txt's boot position on Saves: $(mtype -i "$cart/sd.img" ::/torii/recent.txt | head -1)"
 boot info-last-2 -w "nav: home ready" -f 300
 logged "nav: start on 0: home-info"
 echo "PASS: Last place on an Info page comes back as home facing Info"

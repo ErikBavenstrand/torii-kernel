@@ -1,8 +1,8 @@
-# Info's Your cart while the library's index loads again after a launch
+# Info's About while the library's index loads again after a launch
 # that started no game (CLEAN BOOT, through the tests' hook, of a game in
 # too many pieces, as dialog-fragmented; 3,000 games make the index large
 # enough to take a while): the games' counts say they are still being
-# counted.
+# counted (its second screenful).
 #! sd-many /Many 3000
 #! sd-fragmented /Frag.gba 0x100000 62 tests/roms/hello/hello.gba
 #! expect-error error 7:
@@ -13,6 +13,7 @@
 -w "nav: home ready"
 -k @1:LEFT -k @5:- -k @9:A -k @13:-
 -w "screen ready: info"
--k @1:DOWN -k @5:- -k @9:DOWN -k @13:- -k @17:A -k @21:-
--w "screen ready: info-cart"
--s @1:cart.png
+-k @1:DOWN -k @5:- -k @9:DOWN -k @13:- -k @17:DOWN -k @21:- -k @25:DOWN -k @29:- -k @33:DOWN -k @37:- -k @45:A -k @49:-
+-w "screen ready: info-about"
+-k @8:R -k @12:-
+-s @30:about-2.png

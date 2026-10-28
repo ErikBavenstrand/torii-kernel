@@ -94,7 +94,8 @@ it. Info's Controls page lists every key.
   Library, System). A changes the selected value in place and A again
   keeps and saves it (B puts it back), L/R jump between sections. Look has
   the light and dark themes.
-- **Info:** Controls, In game (the hotkeys), Your cart, About, and
+- **Info:** Controls, In game (the hotkeys and the in-game menu), Saves,
+  Cheats, Questions, About (the cart, the card, the credits), and
   Diagnostics.
 
 At power-on the carousel faces the item you were last on, such as GBA.

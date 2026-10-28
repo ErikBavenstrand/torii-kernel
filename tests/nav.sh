@@ -367,15 +367,17 @@ nav_setting() {
 nav_press() { _nav_file "$(_nav_keys 8 "$@")"; }
 
 # nav_info_page PAGE: from power-on to one of the Info page's rows opened
-# (source/screens/info.c), waiting there: controls, ingame, cart or about
-# (a reading page), or diag (Diagnostics' first page)
+# (source/screens/info.c), waiting there: controls, ingame, saves, cheats,
+# help or about (a reading page), or diag (Diagnostics' first page)
 nav_info_page() {
   local page=${1:-} downs=() wait
   case $page in
   controls) ;;
   ingame) downs=(DOWN) ;;
-  cart) downs=(DOWN DOWN) ;;
-  about) downs=(DOWN DOWN DOWN) ;;
+  saves) downs=(DOWN DOWN) ;;
+  cheats) downs=(DOWN DOWN DOWN) ;;
+  help) downs=(DOWN DOWN DOWN DOWN) ;;
+  about) downs=(DOWN DOWN DOWN DOWN DOWN) ;;
   diag) downs=(UP) ;;
   *)
     _nav_fail "no Info page $page"

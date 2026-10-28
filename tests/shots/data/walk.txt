@@ -111,7 +111,15 @@
 -k @8:B -k @12:-
 -w "screen ready: info"
 -k @8:DOWN -k @12:- -k @20:A -k @24:-
--w "screen ready: info-cart"
+-w "screen ready: info-saves"
+-k @8:B -k @12:-
+-w "screen ready: info"
+-k @8:DOWN -k @12:- -k @20:A -k @24:-
+-w "screen ready: info-cheats"
+-k @8:B -k @12:-
+-w "screen ready: info"
+-k @8:DOWN -k @12:- -k @20:A -k @24:-
+-w "screen ready: info-help"
 -k @8:B -k @12:-
 -w "screen ready: info"
 -k @8:DOWN -k @12:- -k @20:A -k @24:-

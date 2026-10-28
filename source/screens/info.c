@@ -32,16 +32,14 @@
 // --- Look, px (spec.md's grid; mockups #21 and #22) ----------------------------
 #define TITLE_H 24       // the title bar's rectangle: whole tiles under its line
 #define HINTS_H 16
-#define MENU_CARD_Y 16   // the four pages' card (its rectangle; its body 4 px in)
-#define MENU_CARD_H 72
-#define DIAG_CARD_Y 88   // Diagnostics' card under it, one row
-#define DIAG_CARD_H 24
+#define MENU_CARD_Y 16   // the six pages' card (its rectangle; its body 4 px in)
+#define MENU_CARD_H 96
+#define DIAG_CARD_Y 112  // Diagnostics' card under it, one row
+#define DIAG_CARD_H 32
 #define MENU_X 8         // the rows: 14 px, across both cards
 #define MENU_Y 24
 #define MENU_W 224
-#define MENU_H \
-	88        // 6 rows of 14 px (whole tiles: the 4 px left over stay blank): the
-			 // four pages, the gap between the cards, Diagnostics
+#define MENU_H 112       // 8 rows of 14 px: the six pages, the gap between the cards, Diagnostics
 #define MENU_PAD 4       // the 8x8 icon's inset in its row
 #define MENU_DETAIL_W 120  // what a row holds ("hotkeys while playing")
 #define MENU_ICON_ROLE UI_ROLE_ACCENT_INK  // the rows' 8x8 icons, in the item's ink
@@ -58,15 +56,17 @@ static const struct ui_card_config read_card = {4, 4, 4, 4, 0};
 
 #define OPEN_MEASURE_FRAMES 3  // frames measured after a reading page is pushed (its hidden first draw)
 #define NOR_MB 64              // the game NOR (NORflash_OP.c's NOR_GAME_SIZE)
-#define INFO_TEXT_BYTES 2048   // a reading page's text, filled in
-#define INFO_ROWS 96           // its rows, wrapped
+#define INFO_TEXT_BYTES 2560   // a reading page's text, filled in
+#define INFO_ROWS 112          // its rows, wrapped
 
 // The rows, in the list: the gap is a blank row between the two cards that
 // the cursor steps over
 enum {
 	R_CONTROLS,
 	R_INGAME,
-	R_CART,
+	R_SAVES,
+	R_CHEATS,
+	R_HELP,
 	R_ABOUT,
 	R_GAP,
 	R_DIAG,
@@ -88,7 +88,6 @@ struct info_state {
 	u8 row;    // the rows' cursor (R_*)
 	u8 measure_left;
 	char position[12];
-	char cart_detail[32];
 	char about_detail[32];
 	struct ui_hint hints[3];
 	u32 icons[R_ITEMS][8];
@@ -208,51 +207,25 @@ static void ingame_text(void)
 	put(INFO_S_INGAME_END, 0, 0, 0);
 }
 
-// Your cart: what the card, the NOR and the lists hold
-static void cart_text(void)
-{
-	char a[24], b[24], c[24];
-	number(a, sizeof(a), NOR_MB);
-	put(INFO_S_CART_START, a, 0, 0);
-	put(INFO_S_CART_GAMES, 0, 0, 0);
-	if (library_ready()) {
-		static const u8 consoles[] = {NAV_GBA, NAV_GBC, NAV_GB, NAV_NES};
-		for (u32 i = 0; i < sizeof(consoles); i++) {
-			u32 n = library_count(registry_items[consoles[i]].console);
-			nav_count_words(b, sizeof(b), n, gl_count_game, gl_count_games);
-			put(INFO_S_CART_CONSOLE, nav_item_name(consoles[i]), b, 0);
-		}
-		nav_count_words(a, sizeof(a), library_total_files(), gl_count_file, gl_count_files);
-		put(INFO_S_CART_FILES, a, 0, 0);
-	} else {
-		put(INFO_S_CART_COUNTING, 0, 0, 0);  // the index loads again after a launch, or the first scan runs
-	}
-	if (game_total_NOR) {
-		nav_count_words(a, sizeof(a), game_total_NOR, gl_count_game, gl_count_games);
-		number(b, sizeof(b), nor_used_mb());
-		number(c, sizeof(c), NOR_MB);
-		put(INFO_S_CART_NOR, a, b, c);
-	} else {
-		put(INFO_S_CART_NOR_EMPTY, 0, 0, 0);
-	}
-	number(a, sizeof(a), userdata_fav_count());
-	number(b, sizeof(b), userdata_recent_count());
-	number(c, sizeof(c), USERDATA_RECENT_MAX);
-	put(INFO_S_CART_LISTS, a, b, c);
-	put(INFO_S_CART_END, 0, 0, 0);
-}
-
-// About: Torii's version and build, the cart's revision and firmware, the
-// card, and the credits. Reads the card (its free space), so it runs
-// between frames
+// About: Torii's version and build, the cart's revision, firmware and NOR,
+// the card, what it and the lists hold, and the credits. Reads the card (its
+// free space), so it runs between frames
 static void about_text(void)
 {
 	put(INFO_S_ABOUT_TORII, info_version, info_build, 0);
 	u16 fpga = Read_FPGA_ver();
 	u32 lx16 = (fpga & 0xF000) == 0xA000 || (fpga & 0xF000) == 0xB000;  // as Check_FW_update tells them
-	char a[24], b[24];
+	char a[24], b[24], c[24];
 	number(a, sizeof(a), fpga & 0xFF);
 	put(INFO_S_ABOUT_CART, str(lx16 ? INFO_S_ABOUT_REV_B : INFO_S_ABOUT_REV_A), a, 0);
+	if (game_total_NOR) {
+		nav_count_words(a, sizeof(a), game_total_NOR, gl_count_game, gl_count_games);
+		number(b, sizeof(b), nor_used_mb());
+		number(c, sizeof(c), NOR_MB);
+		put(INFO_S_ABOUT_NOR, a, b, c);
+	} else {
+		put(INFO_S_ABOUT_NOR_EMPTY, 0, 0, 0);
+	}
 	// The free space: exFAT's comes from its bitmap (a few hundred sectors at
 	// most), FAT's from FSInfo. A FAT card without a valid FSInfo count
 	// would make f_getfree read the whole FAT, seconds on a big card, so its
@@ -276,6 +249,24 @@ static void about_text(void)
 		tlog_error("info: the card's free space didn't read");
 		put(INFO_S_ABOUT_CARD_UNKNOWN, 0, 0, 0);
 	}
+	put(INFO_S_ABOUT_GAMES, 0, 0, 0);
+	if (library_ready()) {
+		static const u8 consoles[] = {NAV_GBA, NAV_GBC, NAV_GB, NAV_NES};
+		for (u32 i = 0; i < sizeof(consoles); i++) {
+			u32 n = library_count(registry_items[consoles[i]].console);
+			nav_count_words(b, sizeof(b), n, gl_count_game, gl_count_games);
+			put(INFO_S_ABOUT_CONSOLE, nav_item_name(consoles[i]), b, 0);
+		}
+		nav_count_words(a, sizeof(a), library_total_files(), gl_count_file, gl_count_files);
+		put(INFO_S_ABOUT_FILES, a, 0, 0);
+	} else {
+		put(INFO_S_ABOUT_COUNTING, 0, 0, 0);  // the index loads again after a launch, or the first scan runs
+	}
+	number(a, sizeof(a), userdata_fav_count());
+	number(b, sizeof(b), userdata_recent_count());
+	number(c, sizeof(c), USERDATA_RECENT_MAX);
+	put(INFO_S_ABOUT_LISTS, a, b, c);
+	put(INFO_S_ABOUT_FOLDERS, 0, 0, 0);
 	put(INFO_S_ABOUT_CREDITS, 0, 0, 0);
 	FILINFO names;
 	if (f_stat(NAMESDB_FILE, &names) == FR_OK)
@@ -294,8 +285,14 @@ static void page_text(u32 row)
 	case R_INGAME:
 		ingame_text();
 		break;
-	case R_CART:
-		cart_text();
+	case R_SAVES:
+		put(INFO_S_SAVES_TEXT, 0, 0, 0);
+		break;
+	case R_CHEATS:
+		put(INFO_S_CHEATS_TEXT, 0, 0, 0);
+		break;
+	case R_HELP:
+		put(INFO_S_HELP_TEXT, 0, 0, 0);
 		break;
 	default:
 		about_text();
@@ -329,9 +326,7 @@ static int menu_fetch(void *ctx, u32 i, struct ui_item *out)
 	}
 	u32 n = row_item(i);
 	out->text = str(INFO_S_CONTROLS + n);
-	out->detail = i == R_CART    ? info.cart_detail
-		      : i == R_ABOUT ? info.about_detail
-				     : str(INFO_S_CONTROLS_DETAIL + n);
+	out->detail = i == R_ABOUT ? info.about_detail : str(INFO_S_CONTROLS_DETAIL + n);
 	out->icon = info.icons[n];
 	return UI_ITEM_READY;
 }
@@ -466,10 +461,8 @@ static int read_event(struct ui_view *v, const struct ui_event *e);
 // One view a page, so each logs its own "screen ready: info-..."
 #define READ_VIEW(name) {(name), read_nodes, P_NODES, P_LIST, 0, read_event}
 static const struct ui_view_spec read_views[R_PAGES] = {
-	READ_VIEW("info-controls"),
-	READ_VIEW("info-ingame"),
-	READ_VIEW("info-cart"),
-	READ_VIEW("info-about"),
+	READ_VIEW("info-controls"), READ_VIEW("info-ingame"), READ_VIEW("info-saves"),
+	READ_VIEW("info-cheats"),   READ_VIEW("info-help"),   READ_VIEW("info-about"),
 };
 
 // "1/3": the screenful the top row is in, the last at the last scroll
@@ -558,12 +551,9 @@ static struct ui_view *info_enter(u32 item, u32 row)
 		snprintf(info_version, sizeof(info_version), "%s", TORII_VERSION);
 	if (!info_build[0])
 		snprintf(info_build, sizeof(info_build), "%08lX", (unsigned long)torii_build_id);
-	char mb[16];
-	number(mb, sizeof(mb), NOR_MB);
-	fill(info.cart_detail, 0, sizeof(info.cart_detail), str(INFO_S_CART_DETAIL), mb, 0, 0);
 	fill(info.about_detail, 0, sizeof(info.about_detail), str(INFO_S_ABOUT_DETAIL), info_version, 0, 0);
-	static const u8 icons[R_ITEMS] = {ART_ICON8_KEYS, ART_ICON8_GAMES, ART_ICON8_CART, ART_ICON8_INFO,
-					  ART_ICON8_SYSTEM};
+	static const u8 icons[R_ITEMS] = {ART_ICON8_KEYS, ART_ICON8_GAMES, ART_ICON8_SAVE,  ART_ICON8_CHIP,
+					  ART_ICON8_INFO, ART_ICON8_CART,  ART_ICON8_SYSTEM};
 	for (u32 i = 0; i < R_ITEMS; i++)
 		art_icon8_tile(icons[i], MENU_ICON_ROLE, info.icons[i]);
 	info.page = info.open = info.close = 0;

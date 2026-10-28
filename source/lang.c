@@ -370,12 +370,16 @@ const char en_pop_cancel_button[] = "Cancel";
 const char *const en_info[INFO_STRINGS] = {
 	[INFO_S_CONTROLS] = "Controls",
 	[INFO_S_INGAME] = "In game",
-	[INFO_S_CART] = "Your cart",
+	[INFO_S_SAVES] = "Saves",
+	[INFO_S_CHEATS] = "Cheats",
+	[INFO_S_HELP] = "Questions",
 	[INFO_S_ABOUT] = "About",
 	[INFO_S_DIAG] = "Diagnostics",
 	[INFO_S_CONTROLS_DETAIL] = "buttons, page by page",
-	[INFO_S_INGAME_DETAIL] = "hotkeys while playing",
-	[INFO_S_CART_DETAIL] = "Omega DE, %s MB NOR",
+	[INFO_S_INGAME_DETAIL] = "hotkeys and the menu",
+	[INFO_S_SAVES_DETAIL] = "slots, backups, states",
+	[INFO_S_CHEATS_DETAIL] = "picking and typing codes",
+	[INFO_S_HELP_DETAIL] = "when something's wrong",
 	[INFO_S_ABOUT_DETAIL] = "Torii v%s",
 	[INFO_S_DIAG_DETAIL] = "run the checks",
 	[INFO_S_SCROLL] = "scroll",
@@ -387,19 +391,21 @@ const char *const en_info[INFO_STRINGS] = {
 		"B\tback, towards the carousel\n"
 		"# Game lists\n" LR "\tthe next or previous letter (A-Z lists)\n"
 		"A\tplay the game\n"
-		"START\tthe game's menu\n"
+		"START\tthe game's menu: Play, Saves, Cheats, Load state, Favourite, Rename, Game info, Delete\n"
 		"In its Game info, ^v picks a GBA game's save type or boot mode, and " LR " changes it.\n"
+		"# Starting a game\n"
+		"A\tGBA games start as Settings' GBA boot mode says, or as their Game info's Boot mode does\n" LR
+		"\ton Play in the game's menu: Default, With addons or Clean\n"
+		"L\thold it as you press A, or as you pick Play: the game starts with the GBA's boot screen.\n"
+		"SELECT\thold it as you press A to pick the save slot (a game with two or more asks every time)\n"
 		"# SD card\n"
 		"A\topen the folder, or start the game\n"
-		"START\tthe file's menu\n" LR "\tpage up, page down\n"
+		"START\tthe file's menu: Play, Write to NOR, Saves, Favourite, Rename, File info, Delete\n" LR
+		"\tpage up, page down\n"
 		"B\tup a folder; at the top, back to the carousel\n"
 		"# NOR\n"
 		"A\tstart the game\n"
 		"START\tthe game's menu\n"
-		"# Starting a game\n"
-		"A\tGBA games start as Settings' GBA boot mode says, or as their Game info's Boot mode does\n"
-		"L\thold it as you press A, or as you pick a way to start in the game's menu: the game "
-		"starts with the GBA's boot screen.\n"
 		"# Settings\n"
 		"L R\tthe previous or next section\n"
 		"A\tchange the value: " LR " picks, A keeps it, B puts it back\n"
@@ -422,19 +428,93 @@ const char *const en_info[INFO_STRINGS] = {
 		"# At power-on\n"
 		"Home faces the item you were last on, or the one Settings' Start on picks.\n"
 		"Hold L, R and SELECT as you switch on to run Diagnostics, even when the menu won't start.",
-	[INFO_S_INGAME_START] = "# Hotkeys\n"
-				"They work in GBA games started with their addons: Boot with addon starts a game with "
-				"the ones Settings turns on, Clean boot without, and A, Play and Launch as Settings' "
-				"GBA boot mode says (or the game's Boot mode in its Game info). Settings, Hotkeys sets "
-				"them; Save states is in Settings, Games, and a game's cheats in its popup's "
-				"Cheats. A game on the NOR keeps the "
-				"hotkeys it was written with.\n",
+	[INFO_S_SAVES_TEXT] =
+		"# Where saves go\n"
+		"A game saves to the cart. The next time Torii starts, it copies the save to /torii/saves on the card: "
+		"it asks first, unless Settings, Saves, Save without asking is on. Start another game before that and "
+		"Torii warns you that the save would be lost.\n"
+		"# Slots\n"
+		"A game can keep up to 16 saves, its slots; the first is Main. Saves in its menu lists them:\n"
+		"A\tplay the slot; it becomes the active one, the one Play uses\n"
+		"START\tPlay, Make active, Backups, Rename, Copy to new slot, Delete\n"
+		"\xC2\xBB\tits backups\n"
+		"+ New slot starts one empty, as a copy of the active one, or from a .sav file (GBA games). A game "
+		"with two or more slots asks which to play each time it starts.\n"
+		"# Backups\n"
+		"When a save is copied to the card, the one before it is kept as a backup: as many as Settings, Saves, "
+		"Backups kept says. A on a backup restores it, and the save it replaces is kept too. When a game's "
+		"save "
+		"type changes, its old save is kept for good.\n"
+		"# Deleted saves\n"
+		"A deleted slot waits in /torii/trash for 30 days. Settings, Saves, Clean up saves finds saves whose "
+		"game is gone (move them to a game or delete them) and empties the trash; Game saves lists every game "
+		"with saves.\n"
+		"# Save states\n"
+		"Settings, Games, Save states turns them on for GBA games. Save state in the in-game menu keeps the "
+		"game as it is, and Back to Torii writes it to /torii/states: 8 states for each save slot. Load state "
+		"in a game's menu lists them, newest first, and starts the game in the one you pick.\n"
+		"A state stays in the cart until Back to Torii: switch off before that and it is lost (the game's own "
+		"save isn't).\n"
+		"# GB, GBC and NES games\n"
+		"Their slots hold the emulator's memory: the game's save, its settings and its own save states.",
+	[INFO_S_CHEATS_TEXT] =
+		"# Cheat files\n"
+		"A GBA game's cheats are in /torii/cheats, in a file named as the game, in libretro's .cht format. "
+		"Torii's cheats tool writes them on a PC from GameHacking.org, or you can add your own. Cheats in a "
+		"game's menu lists them.\n"
+		"# The list\n"
+		"A\tpick or drop a cheat; one with blanks opens the keypad to fill them in\n"
+		"START\tDetails, Edit code, Delete, Turn all off, Show picked only\n"
+		"SELECT\tedit or delete a code you typed\n" LR "\tpage up, page down\n"
+		"+ Add code types a new code and names it. A greyed cheat says why it can't run.\n"
+		"# The keypad\n"
+		"^v " LR "\tmove over the keys\n"
+		"A\ttype the key\n"
+		"B\tdelete a digit; L and B clear the code\n"
+		"L R\tthe previous or next line\n"
+		"SELECT\tthe code's format\n"
+		"START\tsave it\n"
+		"It takes GameShark, Action Replay and CodeBreaker codes, and VBA's address:value.\n"
+		"# When they run\n"
+		"Picked cheats run from the game's first frame when it starts with addons; a clean start runs none. "
+		"Cheats that patch the ROM don't run in NOR games.\n"
+		"In game, Cheats in the in-game menu turns them on and off, and Back to Torii keeps what you changed "
+		"as the game's picks.",
+	[INFO_S_HELP_TEXT] =
+		"# The in-game menu doesn't open\n"
+		"It opens only in GBA games started with addons, and as Settings, Hotkeys, In-game menu says: Auto "
+		"opens it only with save states on or cheats picked. A game on the NOR keeps the hotkeys it was "
+		"written with. If the menu couldn't go in, Torii says why at the next start.\n"
+		"# A save isn't on the card\n"
+		"Torii copies it the next time it starts, after you play. B to Save to SD card? leaves it in the cart "
+		"only, and a card that refused it is tried again at the next start.\n"
+		"# A save state or screenshot is gone\n"
+		"They stay in the cart until Back to Torii: switching off first loses them. The game's own save is "
+		"safe.\n"
+		"# Cheats do nothing\n"
+		"They run only when the game starts with addons: see Settings, Games, GBA boot mode, and the game's "
+		"Boot mode in its Game info.\n"
+		"# A game won't start\n"
+		"A file in too many pieces: copy it to the card again. A path too long for its save: move the game to "
+		"a shorter folder. A ROM over 32 MB: write it to the NOR.\n"
+		"# A name or cover is missing\n"
+		"Torii looks new games up by their CRC in /torii/names.db, and their covers in /torii/art and "
+		"/torii/art.pak, on its own. Settings, Library, Identify library looks every game up again.\n"
+		"# Something else\n"
+		"Run Diagnostics below, or hold L, R and SELECT as you switch on. Settings, System, Logging writes a "
+		"log to /torii/logs to send with a report.",
+	[INFO_S_INGAME_START] =
+		"# Hotkeys\n"
+		"They work in GBA games started with addons: as Settings, Games, GBA boot mode says, "
+		"as the game's Boot mode in its Game info does, or as Play in its menu picks. Settings, "
+		"Hotkeys sets them. A game on the NOR keeps the hotkeys it was written with.\n",
 	[INFO_S_INGAME_MENU] = "# The in-game menu\n"
-			       "Hold %s to open it: back to Torii, save or load a state, the game's cheats and a "
-			       "screenshot.\n",
+			       "Hold %s to open it: Resume, Save state, Load state, Cheats, Screenshot, Reset game, "
+			       "Sleep and Back to Torii. ^v moves, A picks, and B or the keys again resume the game.\n",
 	[INFO_S_INGAME_AUTO] = "# The in-game menu\n"
-			       "Hold %s to open it in a game with save states or cheats on. Settings, Hotkeys, "
-			       "In-game menu opens it in every game.\n",
+			       "Hold %s to open it in a game with save states or cheats on: Resume, the states, "
+			       "Cheats, Screenshot, Reset game, Sleep and Back to Torii. Settings, Hotkeys, In-game "
+			       "menu opens it in every game.\n",
 	[INFO_S_INGAME_OFF] = "# The in-game menu\n"
 			      "Off: no menu opens in a game, and its cheats still run. Settings, Hotkeys turns it "
 			      "on.\n",
@@ -442,25 +522,20 @@ const char *const en_info[INFO_STRINGS] = {
 				"Hold %s to put the game to sleep: the screen goes off. START and SELECT wake it.\n",
 	[INFO_S_INGAME_SLEEP_OFF] = "# Sleep\n"
 				    "Off: turn Sleep on in Settings.\n",
-	[INFO_S_INGAME_END] = "# Saves\n"
-			      "The game saves to the cart. The next time Torii starts, it copies the save to the card "
-			      "(it asks first, unless Save without asking is on).\n",
-	[INFO_S_CART_START] = "# The cart\n"
-			      "An EZ-Flash Omega DE. Games start from the SD card, or from its %s MB NOR, where "
-			      "Write to NOR puts them.\n",
-	[INFO_S_CART_GAMES] = "# Games on the card\n",
-	[INFO_S_CART_CONSOLE] = "%s: %s\n",
-	[INFO_S_CART_FILES] = "%s on the card, games or not\n",
-	[INFO_S_CART_COUNTING] = "Still counting them: open this page again in a moment.\n",
-	[INFO_S_CART_NOR] = "# On the NOR\n"
-			    "%s, %s MB of %s MB used\n",
-	[INFO_S_CART_NOR_EMPTY] = "# On the NOR\n"
-				  "No games. Write to NOR in a file's menu on the SD card page copies one there.\n",
-	[INFO_S_CART_LISTS] = "# Your lists\n"
-			      "Favourites: %s\n"
-			      "Recent: %s, of the last %s played\n",
-	[INFO_S_CART_END] = "# Torii's folders\n"
-			    "/torii keeps the game list, your lists, names, logs and saves.\n",
+	[INFO_S_INGAME_END] =
+		"# Save states and screenshots\n"
+		"Save state and Screenshot (up to 5) keep them in the cart; Back to Torii writes them to the card, "
+		"the screenshots to /torii/screenshots as BMP files. Switching off before that loses them. Load state "
+		"loads the state not yet written; the others load from the game's menu in Torii.\n"
+		"# Cheats\n"
+		"Cheats turns the game's picked cheats on and off; Back to Torii keeps what you changed.\n"
+		"# Saves\n"
+		"The game saves to the cart. The next time Torii starts, it copies the save to the card "
+		"(it asks first, unless Save without asking is on).\n"
+		"# GB, GBC and NES games\n"
+		"They run in the built-in Jagoomba Color (GB, GBC) and PocketNES (NES). Hold L and R together for the "
+		"emulator's own menu: save states, the palette and more. Torii's hotkeys, menu and cheats are for GBA "
+		"games.\n",
 	[INFO_S_ABOUT_TORII] = "# Torii\n"
 			       "Version %s, build %s\n"
 			       "A custom kernel for the EZ-Flash Omega DE, built on EZ-Flash's open source kernel "
@@ -469,13 +544,30 @@ const char *const en_info[INFO_STRINGS] = {
 			      "%s, FPGA firmware %s\n",
 	[INFO_S_ABOUT_REV_A] = "Revision A (LX9)",
 	[INFO_S_ABOUT_REV_B] = "Revision B (LX16)",
+	[INFO_S_ABOUT_NOR] = "NOR: %s, %s MB of %s MB used\n",
+	[INFO_S_ABOUT_NOR_EMPTY] =
+		"NOR: no games. Write to NOR in a file's menu on the SD card page copies one there.\n",
 	[INFO_S_ABOUT_CARD] = "# The SD card\n"
 			      "%s, %s free, %s\n",
 	[INFO_S_ABOUT_CARD_NO_FREE] = "# The SD card\n"
 				      "%s, %s; its free space isn't recorded on the card.\n",
 	[INFO_S_ABOUT_CARD_UNKNOWN] = "# The SD card\n"
 				      "Its size didn't read.\n",
+	[INFO_S_ABOUT_GAMES] = "# Games on the card\n",
+	[INFO_S_ABOUT_CONSOLE] = "%s: %s\n",
+	[INFO_S_ABOUT_FILES] = "%s on the card, games or not\n",
+	[INFO_S_ABOUT_COUNTING] = "Still counting them: open this page again in a moment.\n",
+	[INFO_S_ABOUT_LISTS] = "# Your lists\n"
+			       "Favourites: %s\n"
+			       "Recent: %s, of the last %s played\n",
+	[INFO_S_ABOUT_FOLDERS] = "# Torii's folder\n"
+				 "/torii keeps saves, backups and the trash, states and screenshots, cheats, covers, "
+				 "names, the game list, your lists and logs. Keep it when you move to a new card.\n",
 	[INFO_S_ABOUT_CREDITS] = "# Credits\n"
+				 "GB and GBC: Jagoomba Color by EvilJagaGenius, after Dwedit's Goomba Color and "
+				 "FluBBa's Goomba.\n"
+				 "NES: PocketNES by Dwedit, after Loopy and FluBBa.\n"
+				 "Cheat decoders: ported from mGBA by Jeffrey Pfau, under the MPL 2.0.\n"
 				 "Fonts: Galmuri by Lee Minseo, under the SIL Open Font License 1.1.\n"
 				 "Console pictures: drawn on KyleBing's retro game console icons, CC BY 4.0.\n",
 	[INFO_S_ABOUT_NAMES] = "Game names: No-Intro's, from libretro-database, CC BY-SA 4.0.\n",
