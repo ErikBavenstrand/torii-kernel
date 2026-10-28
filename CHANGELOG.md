@@ -14,6 +14,9 @@ git log, not here.
   for L+R+A held two seconds; B cancels either. About and Diagnostics show the
   raw version word and name only allowlisted boards; a notice shows during the
   CRC check, which left the screen blank (b72337f5).
+- **Fixed:** a question's B now wins when pressed with A or before A is let
+  go, and the update's hold screen cancels on B held from before it showed;
+  the update also reads the version word twice and skips on a mismatch (56fe3768).
 
 ## v0.8.4
 
