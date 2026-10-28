@@ -10,7 +10,8 @@ git log, not here.
   `lang/en.ini` by id, and a pack in `/torii/lang` (built from a
   translation's `.ini`) replaces it, with its own date and number formats;
   Settings' Language row, shown now, switches the menu at once. A stale or
-  damaged pack, or a string one lacks, shows English (5441fefe, bcc34910, dfa46579, 88b605b5).
+  damaged pack, or a string one lacks, shows English (5441fefe, bcc34910, dfa46579, 88b605b5); the firmware
+  update's screens too, in English as they run before a pack loads (2da9f788).
 - **Fixed:** the FPGA firmware update can't brick an unknown board: it writes
   only to an LX16 (version word `0xA`/`0xB`) on older firmware. Any other word,
   LX9 included until a Rev.A is measured, writes and shows nothing and is logged
