@@ -177,6 +177,17 @@ timing or a real game's saves. Do these on the cart with Logging on Debug.
 | The long-path refusal | a ROM in a folder tree whose save path passes 251 bytes: the launch refuses with the path-too-long message, nothing written |
 | Save-type change | change a game's save type from EEPROM 8K to 512 in Game info: the old file goes to history, the notice shows once |
 
+### The v0.9 languages
+
+Unzip the release's `torii-lang.zip` onto the card's root first (it puts
+`sv.lng` in `/torii/lang`).
+
+| Check | How |
+|---|---|
+| Swedish on the cart | Settings, System, Language: pick Svenska with A. Settings comes back in Swedish at once, then home; the log has `lang: sv`. Walk home, a game list and its popup, Saves, Info and the in-game menu of a GBA game started with addons: every text Swedish, none cut in a way the emulator's goldens (`tests/shots/sv-*`) don't show, å, ä and ö drawn |
+| After a power cycle | switch off and on: the menu starts in Swedish |
+| Back to English | Language, English: Settings comes back in English. Set it back before the Diagnostics run, so its report reads the same as every other |
+
 ## In Diagnostics
 
 Diagnostics checks the cart by itself (unit tests, clock, PSRAM, NOR, the

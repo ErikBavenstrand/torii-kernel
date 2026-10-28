@@ -1,0 +1,16 @@
+# dialog-overflow.opts in Swedish (v0.9): lang/sv.ini's pack set in Settings (slot 0, its
+# id 0x564E), so every string the scenario shows is Swedish, at its width.
+#! settings 0=22094
+#! sd-file /torii/lang/sv.lng 0 dist/lang/sv.lng
+# The error dialog for a game too big to start from the SD card
+# (en_file_overflow, the longest dialog text with en_error_7): CLEAN BOOT,
+# through the menu's test hook, of a GBA game just over 32 MB (Hello.gba
+# padded). B closes it, and home comes back.
+#! sd-file /Big.gba 0x2000004 tests/roms/hello/hello.gba
+-w "nav: home ready"
+-P "@8:nav_test_path:/Big.gba" -p @8:nav_test_action:0x7E000001
+-w "screen ready: dialog"
+-s @1:dialog.png
+-k @10:B -k @14:-
+-w "nav: home ready"
+-s @1:home.png

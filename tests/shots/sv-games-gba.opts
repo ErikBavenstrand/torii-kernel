@@ -1,0 +1,46 @@
+# games-gba.opts in Swedish (v0.9): lang/sv.ini's pack set in Settings (slot 0, its
+# id 0x564E), so every string the scenario shows is Swedish, at its width.
+#! settings 0=22094
+#! sd-file /torii/lang/sv.lng 0 dist/lang/sv.lng
+# The GBA page (source/screens/games.c) in the dark theme: the card's GBA
+# games A-Z with their sizes, the title's position and the hint bar (#6).
+# DOWN moves the pill a row (hashed every frame of its slide); RIGHT jumps
+# to the next letter with the letter card (#8); START opens the game popup
+# beside the row (#9), whose Delete (its last item, after Rename and Game
+# info) asks first (#10); Cancel goes back to
+# the popup, and Game info shows the game's page, where RIGHT changes its
+# save type, written as B goes back to the list. Games 002 and 004 have
+# saves: the save mark beside their sizes.
+#! sd-file "/torii/saves/Long/Game 002.gba/Main.sav" 0x2000 /dev/null
+#! sd-file "/torii/saves/Long/Game 004.gba/Main.sav" 0x2000 /dev/null
+# The tests' hook: lists open on their first row (else a list opens on
+# Hello, the game Recent played last)
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-s @2:screen.png
+-k @8:DOWN -k @12:-
+-H @8:@20
+-s @24:down.png
+-k @30:RIGHT -k @34:-
+-s @38:letter.png
+-k @80:START -k @84:-
+-w "screen ready: game-popup"
+-s @8:popup.png
+-k @12:UP -k @16:-
+-k @64:A -k @68:-
+-s @80:delete.png
+-k @88:B -k @92:-
+-s @108:cancelled.png
+-k @112:UP -k @116:-
+-k @124:A -k @128:-
+-w "screen ready: game-info"
+-s @20:info.png
+-k @24:RIGHT -k @28:-
+-s @36:info-sram.png
+-k @44:B -k @48:-
+-w "save type of"
+-s @30:closed.png

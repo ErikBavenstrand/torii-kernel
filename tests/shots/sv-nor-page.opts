@@ -1,0 +1,35 @@
+# nor-page.opts in Swedish (v0.9): lang/sv.ini's pack set in Settings (slot 0, its
+# id 0x564E), so every string the scenario shows is Swedish, at its width.
+#! settings 0=22094
+#! sd-file /torii/lang/sv.lng 0 dist/lang/sv.lng
+# The NOR page (source/screens/nor.c; mockups #16 and #17) in light: three
+# games an older kernel wrote (16, 8 and 16 MB), the storage line over a bar
+# of each game's share, the games card and Format all. DOWN moves the pill
+# to Metroid Fusion (its slide hashed); START opens its popup (Launch, Game
+# info, Delete), B closes it; DOWN DOWN reach Format all, whose card lifts
+# in the tint; A asks (Cancel preselected, the count and the 4 minutes), and
+# B cancels.
+#! settings 28=1
+#! nor-game "Pokemon Emerald (USA).gba" 0x1000000 tests/roms/hello/hello.gba
+#! nor-game "Metroid Fusion (USA).gba" 0x800000 tests/roms/hello/hello.gba
+#! nor-game "Minish Cap.gba" 0x1000000 tests/roms/hello/hello.gba
+-w "nav: home ready"
+-k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:LEFT -k @28:- -k @32:A -k @36:-
+-w "nav: page nor ready"
+-s @1:page.png
+-k @8:DOWN -k @12:-
+-H @8:@20
+-s @24:down.png
+-k @30:START -k @34:-
+-w "screen ready: popup"
+-s @8:popup.png
+-k @12:B -k @16:-
+-k @40:DOWN -k @44:- -k @52:DOWN -k @56:-
+-w "nor: row format"
+-H @0:@4
+-s @8:format.png
+-k @12:A -k @16:-
+-w "screen ready: confirm"
+-s @8:confirm.png
+-k @12:B -k @16:-
+-s @30:cancelled.png

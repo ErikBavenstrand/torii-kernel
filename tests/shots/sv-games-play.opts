@@ -1,0 +1,15 @@
+# The game popup's Play row in Swedish (v0.9): its label beside each way
+# the game starts (normal, then rent as « » changes it) in the popup's width.
+#! settings 0=22094
+#! sd-file /torii/lang/sv.lng 0 dist/lang/sv.lng
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-k @8:START -k @12:-
+-w "screen ready: game-popup"
+-s @8:default.png
+-k @12:RIGHT -k @16:-
+-s @28:next.png

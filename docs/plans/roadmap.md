@@ -65,7 +65,7 @@ Everything still open from v0.4.3–v0.8.1, triaged 2026-10-27; what code could 
 Decided with the owner on 2026-10-28. The work is split three ways: **strings and packs**, then **Swedish and the release** once that has merged, and alongside both, **firmware safety**.
 
 - **Languages:** English and Swedish. The owner checks Swedish.
-- **Strings** (done on `claude/v09-strings-c52085`; Swedish's `lang/sv.ini` and the release zip are next):
+- **Strings** (done on `claude/v09-strings-c52085`; Swedish and the release zip done on `claude/v09-swedish-fc5217`):
   - Every UI string has an ID. `lang/en.ini` is the source of truth.
   - `just lang` generates `source/lang_ids.h` and the English table from it. Both are committed and never edited by hand, and a test fails when they are stale, the same way the fonts work.
   - Code reads a string with `S(STR_...)`.
@@ -79,8 +79,9 @@ Decided with the owner on 2026-10-28. The work is split three ways: **strings an
   - **Formats:** each pack carries its own date and number formats in `[format]` (`date = {day} {month}` with `[month]`'s names, `date_numeric` for the saves page's `10-23`, the decimal and thousands separators). The 12/24-hour clock stays a setting, and Settings' date and File info's change date stay `2026-10-28`.
   - **Launches:** a game fills PSRAM, the pack too, before the in-game menu's texts are drawn. The launch's sections of en.ini (`[meta]`'s `launch`, 8 KB at most per pack) go to the list row cache's room first, which no list uses during a launch; the menu loads the pack again if the launch comes back.
 - **Switching:** Settings' Language row lists English plus the packs on the card (up to 7, by their header's name). Picking a language with A takes effect at once: the setting is written, the pack loads, the row cache clears, and Settings comes back drawn in it, then the carousel (`tests/shots/lang-switch.opts`, on the pseudo-locale).
-- **From the strings' review (2026-10-28), open:** switching from one pack straight to another rewrites the pack in place in PSRAM, so a text pointer a screen kept from before (a hint, a popup value) could show the new pack's bytes at the old offset until Settings' reshow rebuilds it; untested, as only English and the pseudo-locale exist. Two packs on the card and a switch between them, watched through the fade, would settle it.
-- **Left for the Swedish session:** `lang/sv.ini` (its `[format]`: decimal comma, `{day} {month}`, a no-break space for thousands); the release's `torii-lang.zip` of `dist/lang/*.lng` (not the pseudo-locale); widths checked on screen, as packs that run long are cut with "...".
+- **Pack to pack:** switching from one pack straight to another rewrites the pack in place in PSRAM, which the strings' review (2026-10-28) left open, as a kept text pointer could show the new pack's bytes. Settled: `tests/shots/lang-packs.opts` goes English -> en-XA -> Swedish -> English with every frame of the fade hashed, and each frame is whole.
+- **Swedish:** `lang/sv.ini`, drafted by Claude and checked by the owner: day-first dates (`28 okt`, `28/10`), a decimal comma, a no-break space for thousands. One term each: sparfil, snabbsparning, plats, backup, fusk, favorit, skärmbild. Every screen was run in Swedish and the texts that were cut shortened; the `tests/shots/sv-*` goldens keep 19 scenarios in Swedish.
+- **Release:** `just build` writes `dist/torii-lang.zip` (the packs but en-XA, as `torii/lang/<code>.lng`, sorted and dated 1980; `just repro` compares it), CI uploads it beside `ezkernelnew.bin`, and the release attaches it, with an install step in its notes.
 - **Placeholders:** numbered (`{1} of {2}`) and checked against English at build time. Plurals are avoided by wording, or written as `.one`/`.other` variants.
 - **Scripts:** Latin-1 only. Other scripts come in 1.0 as extra font files, in the remaining 320 KB of the reserve. PSRAM page 1 stays untouched.
 - **Firmware updater:**

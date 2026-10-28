@@ -105,6 +105,27 @@ item you were last on. A library index of the card's games (`/torii/library.idx`
 is rebuilt in the background when the card changes; `/torii` also keeps
 `recent.txt`, `favorites.txt` and the logs.
 
+## Languages
+
+The menu speaks English and Swedish. To switch, get `torii-lang.zip` from the
+same release as the kernel, unzip it onto the root of the SD card (it puts the
+packs in `/torii/lang`), and pick a language in Settings, System, Language: the
+menu changes at once. A pack from another release may not match the kernel's
+strings; the kernel then leaves it out and stays in English.
+
+To translate Torii into another language that Latin-1 covers:
+
+1. Copy `lang/en.ini` to `lang/<code>.ini` (`de`, `pt-BR`...), and set its
+   `[meta]` `code` to that code and `name` to the language's own name for itself.
+2. Translate each text after its `=`, keeping `{1}`-`{9}`, `\n`, `\t` and the
+   `.one`/`.other` pairs; `tools/lang.py`'s top explains the format, and
+   `lang/sv.ini` is a finished example. Set `[format]`'s separators and date
+   order, and `[month]`'s names. A key you leave out shows in English.
+3. Run `just lang` (or `just build`): it checks the file against English and
+   writes `dist/lang/<code>.lng`. Copy that to `/torii/lang` on the card, or
+   run `just play` with it in the emulated card's `/torii/lang`, and look
+   at each screen: a text that runs longer than English's is cut with "...".
+
 ## Setup
 
 - Docker and [just](https://github.com/casey/just). On macOS, install
