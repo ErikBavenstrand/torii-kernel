@@ -867,6 +867,9 @@ static void edit_end(int keep)
 	hints_show();
 }
 
+_Static_assert(STR_SET_KEYS_SOFT_RESET - STR_SET_KEYS_COUNT == SET_KEYS_SOFT_RESET - SET_KEYS_COUNT,
+	       "the refusals in settings_set_keys' order");
+
 static void refuse(u32 why, u32 id)
 {
 	if (why == SET_KEYS_TAKEN)
@@ -875,8 +878,6 @@ static void refuse(u32 why, u32 id)
 	else
 		snprintf(sp.refused, sizeof(sp.refused), "%s",
 			 why && why <= SET_KEYS_SOFT_RESET ? S(STR_SET_KEYS_COUNT + why - SET_KEYS_COUNT) : "");
-	_Static_assert(STR_SET_KEYS_SOFT_RESET - STR_SET_KEYS_COUNT == SET_KEYS_SOFT_RESET - SET_KEYS_COUNT,
-		       "the refusals in settings_set_keys' order");
 	sp.refused_left = look.refusal;
 	tlog_debug("settings: keys refused: %s", sp.refused);
 }
