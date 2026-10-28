@@ -81,7 +81,9 @@ repro: build
       if cmp -s "emulators/out/$name.gba" "dist/repro/emulators/$name.gba"; then echo "PASS: emulators/out/$name.gba is the same ($(sha256sum < "emulators/out/$name.gba" | cut -c1-16))"
       else echo "FAIL: emulators/out/$name.gba differs from dist/repro/emulators/$name.gba"; status=1; fi
     done
-    for file in dist/ezkernelnew.bin dist/ezkernelnew.sym ezkernelnew.elf; do
+    # The language packs' zip, made again (tools/lang.py: sorted, dated 1980)
+    python3 tools/lang.py packs -o dist/repro/lang --zip dist/repro/torii-lang.zip
+    for file in dist/ezkernelnew.bin dist/ezkernelnew.sym ezkernelnew.elf dist/torii-lang.zip; do
       copy=dist/repro/$(basename "$file")
       if cmp -s "$file" "$copy"; then echo "PASS: $file is the same ($(sha256sum < "$file" | cut -c1-16))"
       else echo "FAIL: $file differs from $copy"; status=1; fi
@@ -364,7 +366,8 @@ font:
 
 # Turn lang/en.ini into source/lang_ids.h and source/lang_en.c (committed;
 # tests/lang_test.py checks they match), and every lang/<code>.ini, and the
-# test pseudo-locale, into dist/lang/<code>.lng (`just build` makes those too)
+# test pseudo-locale, into dist/lang/<code>.lng, and the release's packs into
+# dist/torii-lang.zip (`just build` makes those too)
 lang:
     python3 tools/lang.py sources
     python3 tools/lang.py packs

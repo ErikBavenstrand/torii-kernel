@@ -3,9 +3,11 @@
 
 usage: lang.py sources [--check]        source/lang_ids.h and source/lang_en.c
        lang.py pack SRC.ini -o OUT.lng  one language pack
-       lang.py packs [-o DIR]           every lang/<code>.ini but English, and
+       lang.py packs [-o DIR] [--zip Z] every lang/<code>.ini but English, and
                                         the test pseudo-locale (en-XA), to DIR
-                                        (default dist/lang)
+                                        (default dist/lang); the release's
+                                        packs, without en-XA, to the zip Z
+                                        (default dist/torii-lang.zip)
        lang.py pseudo -o OUT.ini        the pseudo-locale's text: English with
                                         accented letters and its own formats
 
@@ -50,8 +52,10 @@ A pack is at most 64 KB (PACK_MAX): the room it has in PSRAM. Every
 placeholder and every .one/.other pair must match English's, checked here.
 """
 
+import io
 import re
 import sys
+import zipfile
 import zlib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -464,6 +468,31 @@ def pseudo(en: Lang) -> str:
     return "\n".join(out) + "\n"
 
 
+# The release's torii-lang.zip: unzipped onto the card's root, its packs land
+# in /torii/lang. Its entries sorted, dated 1980 and stored, so the same packs
+# make the same bytes (`just repro`)
+ZIP_DATE = (1980, 1, 1, 0, 0, 0)
+
+
+def release_zip(packs: dict[str, bytes]) -> bytes:
+    """packs: each code's pack, the pseudo-locale left out."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as z:
+        for name in ("torii/", "torii/lang/"):
+            info = zipfile.ZipInfo(name, ZIP_DATE)
+            info.external_attr = (0o40755 << 16) | 0x10
+            info.create_system = 3
+            z.writestr(info, b"")
+        for code in sorted(packs):
+            if code == PSEUDO_CODE:
+                continue
+            info = zipfile.ZipInfo(f"torii/lang/{code}.lng", ZIP_DATE)
+            info.external_attr = 0o100644 << 16
+            info.create_system = 3
+            z.writestr(info, packs[code])
+    return buf.getvalue()
+
+
 def load(path: Path) -> Lang:
     return parse(path.read_text(encoding="utf-8"), path)
 
@@ -516,7 +545,13 @@ def main(argv: list[str]) -> int:
                 load(p) for p in sorted((ROOT / "lang").glob("*.ini")) if p.stem != "en"
             ]
             langs.append(parse(pseudo(en), Path(f"{PSEUDO_CODE}.ini")))
+            zip_path = (
+                Path(argv[argv.index("--zip") + 1])
+                if "--zip" in argv
+                else ROOT / "dist" / "torii-lang.zip"
+            )
             ids = {ENGLISH_ID: "en"}
+            packs = {}
             for lang in langs:
                 check_pack(lang, en)
                 code = lang.meta["code"]
@@ -524,10 +559,13 @@ def main(argv: list[str]) -> int:
                 if i in ids:
                     raise LangError(f"{lang.path}: its id {i:04X} is {ids[i]}'s too")
                 ids[i] = code
-                data = pack(lang, en)
+                data = packs[code] = pack(lang, en)
                 target = out / f"{code}.lng"
                 if not target.exists() or target.read_bytes() != data:
                     target.write_bytes(data)
+            data = release_zip(packs)
+            if not zip_path.exists() or zip_path.read_bytes() != data:
+                zip_path.write_bytes(data)
             return 0
         if cmd == "pseudo":
             Path(argv[argv.index("-o") + 1]).write_text(pseudo(en), encoding="utf-8")
