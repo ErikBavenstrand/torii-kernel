@@ -232,7 +232,8 @@ u32 lang_fill_args(char *out, u32 room, const char *text, u32 argc, const struct
 	u32 at = 0;
 	const char *run = text;
 	while (*text) {
-		if (text[0] == '{' && text[1] >= '1' && text[1] <= '9' && text[2] == '}' && (u32)(text[1] - '1') < argc) {
+		if (text[0] == '{' && text[1] >= '1' && text[1] <= '9' && text[2] == '}' &&
+		    (u32)(text[1] - '1') < argc) {
 			put(out, room, &at, run, (u32)(text - run));
 			put_arg(out, room, &at, &args[text[1] - '1']);
 			text += 3;
@@ -283,7 +284,8 @@ u32 lang_date(char *out, u32 room, u32 day, u32 month)
 {
 	char d[4];
 	d[digits(d, day % 100, 10, 0)] = 0;
-	return fill_date(out, room, S(STR_FORMAT_DATE), d, month >= 1 && month <= 12 ? S(STR_MONTH_JAN + month - 1) : "");
+	return fill_date(out, room, S(STR_FORMAT_DATE), d,
+			 month >= 1 && month <= 12 ? S(STR_MONTH_JAN + month - 1) : "");
 }
 
 u32 lang_date_numeric(char *out, u32 room, u32 day, u32 month)

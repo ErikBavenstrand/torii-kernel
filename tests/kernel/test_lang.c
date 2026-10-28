@@ -109,10 +109,15 @@ void test_lang_packs(void)
 	lang_poll();
 	CHECK(!strcmp(S(STR_ITEM_RECENT), "Senaste"));
 	CHECK(!strcmp(S(STR_LAUNCH_PATCHING), "Patchar spelet"));
-	// A list that wants the row cache back first takes the launch's strings
-	// away (English), and the menu's poll loads the pack again
+	// The launch's dialogs start an engine session, which clears the row
+	// cache: the strings stay. Something that wants the room back (another
+	// borrower here, a list in the menu) takes them away first (English),
+	// and the menu's poll loads the pack again
 	lang_before_launch();
 	ui_list_cache_clear();
+	CHECK(!strcmp(S(STR_LAUNCH_PATCHING), "Patchar spelet"));
+	ui_list_cache_lend(NULL);
+	ui_list_cache_reclaim();
 	CHECK(!strcmp(S(STR_LAUNCH_PATCHING), "Patching the game"));
 	lang_poll();
 	CHECK(!strcmp(S(STR_LAUNCH_PATCHING), "Patchar spelet"));

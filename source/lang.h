@@ -56,9 +56,11 @@ struct lang_arg {
 // ended), each {N} as args[N - 1] (a placeholder with no argument stays as
 // it is). Returns the bytes written, without the NUL.
 u32 lang_fill_args(char *out, u32 room, const char *text, u32 argc, const struct lang_arg *args);
-#define LANG_ARGS(...)                                                                          \
-	(u32)(sizeof((const struct lang_arg[]){__VA_ARGS__}) / sizeof(struct lang_arg)), \
-		(const struct lang_arg[]){__VA_ARGS__}
+#define LANG_ARGS(...) \
+	(u32)(sizeof((const struct lang_arg[]){__VA_ARGS__}) / sizeof(struct lang_arg)), (const struct lang_arg[]) \
+	{ \
+		__VA_ARGS__ \
+	}
 #define lang_fill(out, room, text, ...) lang_fill_args((out), (room), (text), LANG_ARGS(__VA_ARGS__))
 // lang_fill with the string id names
 #define SF(out, room, id, ...) lang_fill_args((out), (room), S(id), LANG_ARGS(__VA_ARGS__))
@@ -120,11 +122,11 @@ enum {
 #define LANG_NAME_BYTES 24
 enum lang_pack_check {
 	LANG_PACK_OK,
-	LANG_PACK_SHORT,    // smaller than its header and offsets, or its size field
-	LANG_PACK_MAGIC,    // not a pack
-	LANG_PACK_STALE,    // another format, count or set of keys: built for another Torii
-	LANG_PACK_CRC,      // damaged
-	LANG_PACK_BAD,      // an offset past its strings, or strings with no end
+	LANG_PACK_SHORT,  // smaller than its header and offsets, or its size field
+	LANG_PACK_MAGIC,  // not a pack
+	LANG_PACK_STALE,  // another format, count or set of keys: built for another Torii
+	LANG_PACK_CRC,  // damaged
+	LANG_PACK_BAD,  // an offset past its strings, or strings with no end
 	LANG_PACK_CHECKS
 };
 // Whether bytes at pack (a whole pack file, its first 64 bytes at least)

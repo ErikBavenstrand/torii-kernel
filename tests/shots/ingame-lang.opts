@@ -1,0 +1,15 @@
+# The in-game menu in a language pack (v0.9): a game fills PSRAM, the pack
+# with it, before the kernel draws the overlay's texts, so the launch keeps
+# its strings in RAM (lang_before_launch). As ingame.opts, on Hello padded
+# to 8 MB (its load reaches the pack at 7.625 MB), with the pseudo-locale
+# (tools/lang.py, `just build`) set in Settings (slot 0, its id 0x53C4):
+# every row and the footer accented.
+#! settings 2=1 0=21444
+#! sd-file /torii/lang/en-XA.lng 0 dist/lang/en-XA.lng
+#! sd-file /Hello8.gba 0x800000 tests/roms/hello/hello.gba
+-w "nav: home ready"
+-P "@8:nav_test_path:/Hello8.gba" -p @8:nav_test_action:0x7E000002
+-w "launch: starting the game"
+-k @300:L+R+START -k @306:-
+-w "screen ready: ingame"
+-s @1:menu.png

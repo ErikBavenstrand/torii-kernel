@@ -70,7 +70,8 @@ static void find_packs(void)
 	u8 *head = (u8 *)head_words;
 	while (f_readdir(&dir, &fi) == FR_OK && fi.fname[0]) {
 		u32 len = (u32)strlen(fi.fname);
-		if (fi.fattrib & AM_DIR || len < 5 || len > LANG_CODE_BYTES + 3 || strcmp(fi.fname + len - 4, ".lng") != 0)
+		if (fi.fattrib & AM_DIR || len < 5 || len > LANG_CODE_BYTES + 3 ||
+		    strcmp(fi.fname + len - 4, ".lng") != 0)
 			continue;
 		char code[LANG_CODE_BYTES], name[LANG_NAME_BYTES];
 		if (!read_header(fi.fname, head, code))

@@ -344,8 +344,9 @@ void ui_item_set(u32 item);
 void ui_theme_switch(const struct ui_theme *theme);
 // Lends the lists' row cache's room (ROW_CACHE_BYTES, word-aligned) to a
 // launch (lang_before_launch), its rows forgotten. The next list that
-// wants the cache first calls back, after which the room is the lists'
-// again; ui_list_cache_reclaim takes it back with no call.
+// wants the cache (not ui_list_cache_clear, which keeps it lent) first
+// calls back, after which the room is the lists' again;
+// ui_list_cache_reclaim takes it back with no call.
 void *ui_list_cache_lend(void (*back)(void));
 // Forgets every row the lists keep drawn (a theme or a language change)
 void ui_list_cache_clear(void);

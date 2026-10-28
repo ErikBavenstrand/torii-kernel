@@ -209,7 +209,10 @@ static struct row_cache *row_cache(void)
 
 void ui_list_cache_clear(void)
 {
-	row_cache_clear(row_cache());
+	// Lent, the cache holds nothing to forget, and the borrower keeps the
+	// room: ui_init clears it as a launch's dialogs start
+	if (!cache_lent)
+		row_cache_clear(row_cache());
 	cache_clears++;
 }
 

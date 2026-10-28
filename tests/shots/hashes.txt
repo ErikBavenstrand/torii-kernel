@@ -367,6 +367,7 @@ ingame-cheats/greyed 63489F1FDCBBE56A
 ingame-cheats/list CE7873FF14B6B5B7
 ingame-cheats/on 32224FB92C5D61EB
 ingame-cheats/rom 7FA5EE5726DEE61D
+ingame-lang/menu 678FA53B58EAA64C
 ingame-light/menu 6DAB01A75168AFC9
 ingame-shots/first 2B0003A6FF47E8D9
 ingame-shots/one B7818279D579B476
