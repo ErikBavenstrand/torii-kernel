@@ -29,14 +29,14 @@ void test_gamelist_size(void)
 	};
 	for (u32 i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
 		char out[16];
-		gamelist_size(out, sizeof(out), cases[i].bytes, "KB", "MB");
+		gamelist_size(out, sizeof(out), cases[i].bytes);
 		if (strcmp(out, cases[i].text))
 			tlog_error("FAIL %lu bytes: \"%s\", expected \"%s\"", (unsigned long)cases[i].bytes, out,
 				   cases[i].text);
 		CHECK(!strcmp(out, cases[i].text));
 	}
 	char small[4];
-	gamelist_size(small, sizeof(small), 16 * 1024 * 1024, "KB", "MB");
+	gamelist_size(small, sizeof(small), 16 * 1024 * 1024);
 	CHECK_EQ(strlen(small), 3);  // cut to fit, still ended
 }
 

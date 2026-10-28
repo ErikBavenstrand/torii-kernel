@@ -49,8 +49,8 @@ static void session_end(void)
 
 static void error(u8 error_num)
 {
-	const char *msg = Error_message(error_num);
-	tlog_error("error %u: %s", error_num, msg);
+	const char *msg = Error_message(error_num, 0);
+	tlog_error("error %u: %s", error_num, Error_message(error_num, 1));
 	tlog_flush();
 	dialog_message(NULL, msg, DIALOG_ERROR);
 }
@@ -612,7 +612,7 @@ static u32 share_walk(const char *path, const char *save, const char *save2)
 			// short one (a small card) shows nothing
 			u32 total = library_records() + 1;
 			if (!shown && cycles_since(start) > SHARE_DIALOG_CYCLES) {
-				dialog_progress_begin(gl_rename->checking, gl_rename->checking_text);
+				dialog_progress_begin(S(STR_RENAME_CHECKING), S(STR_RENAME_CHECKING_TEXT));
 				shown = 1;
 			}
 			if (shown)

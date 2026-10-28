@@ -91,8 +91,8 @@ struct ui_view *home_enter(const u8 *items, u32 count, u32 facing)
 	entries(items, count);
 	home.facing = items[facing < count ? facing : 0];
 	carousel_set((u8)(v->first + N_CAROUSEL), home.entries, home.count, facing);
-	home.hints[0] = (struct ui_hint){"\xC2\xAB\xC2\xBB", gl_hint_turn};  // «»
-	home.hints[1] = (struct ui_hint){"A", gl_hint_open};
+	home.hints[0] = (struct ui_hint){"\xC2\xAB\xC2\xBB", S(STR_HINT_TURN)};  // «»
+	home.hints[1] = (struct ui_hint){"A", S(STR_HINT_OPEN)};
 	ui_hints_set((u8)(v->first + N_HINTS), home.hints, 2);
 	ui_title_set_right((u8)(v->first + N_TITLE), nav_clock());
 	return v;

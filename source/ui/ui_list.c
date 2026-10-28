@@ -191,8 +191,17 @@ static u32 cache_arena[ROW_CACHE_BYTES / 4] EWRAM_BSS ALIGN(4);
 static struct row_cache cache EWRAM_BSS;
 static u32 cache_clears EWRAM_BSS;  // ui_list_cache_clear calls
 
+static void (*cache_lent)(void) EWRAM_BSS;  // ui_list_cache_lend's caller, while it has the room
+
 static struct row_cache *row_cache(void)
 {
+	if (cache_lent) {
+		// The borrower lets go first: its bytes are gone from here on
+		void (*back)(void) = cache_lent;
+		cache_lent = NULL;
+		back();
+		row_cache_clear(&cache);
+	}
 	if (!cache.arena)
 		row_cache_init(&cache, cache_arena, ROW_CACHE_BYTES / 4);
 	return &cache;
@@ -200,8 +209,26 @@ static struct row_cache *row_cache(void)
 
 void ui_list_cache_clear(void)
 {
-	row_cache_clear(row_cache());
+	// Lent, the cache holds nothing to forget, and the borrower keeps the
+	// room: ui_init clears it as a launch's dialogs start
+	if (!cache_lent)
+		row_cache_clear(row_cache());
 	cache_clears++;
+}
+
+void *ui_list_cache_lend(void (*back)(void))
+{
+	row_cache_clear(row_cache());  // every row forgotten
+	cache_lent = back;
+	return cache_arena;
+}
+
+void ui_list_cache_reclaim(void)
+{
+	if (cache_lent) {
+		cache_lent = NULL;
+		row_cache_clear(&cache);
+	}
 }
 
 // A row's draw took cycles: the budget's estimate of the next is the

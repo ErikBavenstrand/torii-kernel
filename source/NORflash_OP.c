@@ -108,8 +108,9 @@ void Chip_Erase(void)
 		// Torii: the time so far and an estimate on FormatNor's progress
 		// dialog (it was a count, drawn on the menu, with the clock)
 		u32 t = torii_frames - start;
-		snprintf(msg, sizeof(msg), "%s %lu:%02lu", gl_erasing, (unsigned long)(t / 3600),
-			 (unsigned long)(t / 60 % 60));
+		char time[12];
+		snprintf(time, sizeof(time), "%lu:%02lu", (unsigned long)(t / 3600), (unsigned long)(t / 60 % 60));
+		SF(msg, sizeof(msg), STR_SAVE_ERASING_TIME, LS(time));
 		dialog_progress_set(progress_estimate(t, CHIP_ERASE_FRAMES), PROGRESS_FULL, msg);
 
 		VBlankIntrWait();
@@ -126,13 +127,13 @@ void Chip_Erase(void)
 // Torii: the erase shows on a progress dialog (source/ui/dialog.h)
 void FormatNor(void)
 {
-	dialog_progress_begin(gl_format_title, gl_keep_power);
-	progress_step(gl_erasing, 0, PROGRESS_FULL);
+	dialog_progress_begin(S(STR_SAVE_FORMAT_TITLE), S(STR_SAVE_KEEP_POWER));
+	progress_step(S(STR_SAVE_ERASING), 0, PROGRESS_FULL);
 	Chip_Erase();
 	memset(pNorFS, 00, sizeof(FM_NOR_FS) * MAX_NOR);
 	game_total_NOR = 0;
 	Save_NOR_list(0);  // Torii: the boot no longer saves an empty list
-	progress_done(gl_done);
+	progress_done(S(STR_LAUNCH_DONE));
 	dialog_progress_end();
 }
 //---------------------------------------------------------------
@@ -649,7 +650,7 @@ static u32 Loadfile2NOR_slow(TCHAR *filename, u32 NORaddress, u16 have_patch, u8
 
 		dmaCopy(&tmpNorFS, &pNorFS[game_total_NOR], sizeof(FM_NOR_FS));
 		Save_NOR_list(game_total_NOR + 1);  // if it fails, the mark lists the game
-		progress_done(gl_done);
+		progress_done(S(STR_LAUNCH_DONE));
 		return 0;
 	} else {
 #ifdef DEBUG

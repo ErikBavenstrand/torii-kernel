@@ -426,11 +426,11 @@ static int show(struct shown *s, u32 use, const char *title, const char *text, u
 	if (bar) {
 		ui_label_set((u8)(first + N_FOOT), s->status);
 	} else if (use == USE_CONFIRM) {
-		s->hints[0] = (struct ui_hint){"B", gl_hint_cancel};
-		s->hints[1] = (struct ui_hint){"A", gl_hint_ok};
+		s->hints[0] = (struct ui_hint){"B", S(STR_HINT_CANCEL)};
+		s->hints[1] = (struct ui_hint){"A", S(STR_HINT_OK)};
 		ui_hints_set((u8)(first + N_FOOT), s->hints, 2);
 	} else if (use == USE_MESSAGE) {
-		s->hints[0] = (struct ui_hint){"A", gl_hint_ok};
+		s->hints[0] = (struct ui_hint){"A", S(STR_HINT_OK)};
 		ui_hints_set((u8)(first + N_FOOT), s->hints, 1);
 	}
 	return 1;

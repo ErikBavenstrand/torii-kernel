@@ -295,10 +295,10 @@ int shotstore_file(const char *game, const u8 *launch_clock)
 			break;
 		u32 next = at + sizeof(*h) + h->packed;
 		if (r == 1) {
-			snprintf(status, sizeof(status), EN_SHOT_OF, (unsigned long)bar_at + 1, (unsigned long)waiting);
+			SF(status, sizeof(status), STR_STATE_SHOT_OF, LN(bar_at + 1), LN(waiting));
 			if (!begun) {
-				dialog_progress_begin(waiting == 1 ? gl_states->shot_saving_one
-								   : gl_states->shot_saving,
+				dialog_progress_begin(waiting == 1 ? S(STR_STATE_SHOT_SAVING_ONE)
+								   : S(STR_STATE_SHOT_SAVING),
 						      game[0] ? game : NULL);
 				dialog_progress_status(status);
 				begun = 1;
@@ -338,6 +338,6 @@ int shotstore_file(const char *game, const u8 *launch_clock)
 		dialog_progress_end();
 	}
 	if (!ok)
-		dialog_message(NULL, gl_states->shot_failed, DIALOG_ERROR);
+		dialog_message(NULL, S(STR_STATE_SHOT_FAILED), DIALOG_ERROR);
 	return (int)ok;
 }

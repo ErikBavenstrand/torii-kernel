@@ -7,36 +7,36 @@
 
 // clang-format off
 const struct settings_row settings_rows[SET_ROWS] = {
-	[SET_THEME] = {SET_SEC_LOOK, SET_CHOICE, assress_theme, 0, 0, 2, &gl_set_themes, 0},
-	[SET_GAME_VIEW] = {SET_SEC_LOOK, SET_CHOICE, assress_game_view, 0, 0, 2, &gl_set_views, 0},
+	[SET_THEME] = {SET_SEC_LOOK, SET_CHOICE, assress_theme, 0, 0, 2, STR_SET_VALUE_DARK, 0},
+	[SET_GAME_VIEW] = {SET_SEC_LOOK, SET_CHOICE, assress_game_view, 0, 0, 2, STR_SET_VALUE_LIST, 0},
 	[SET_BOX_ART] = {SET_SEC_LOOK, SET_ONOFF, assress_box_art, 0, 1, 2, 0, 0},
-	[SET_START_ON] = {SET_SEC_LOOK, SET_CHOICE, assress_start_on, 0, SET_START_LAST, SET_STARTS, &gl_set_starts, 0},
+	[SET_START_ON] = {SET_SEC_LOOK, SET_CHOICE, assress_start_on, 0, SET_START_LAST, SET_STARTS, STR_SET_VALUE_START_LAST, 0},
 	[SET_DIM] = {SET_SEC_LOOK, SET_NUMBER, assress_dim, 0, 0, 60, 0, 0},
 	[SET_TIME_ROW] = {SET_SEC_CLOCK, SET_TIME, SET_NO_SLOT, 0, 0, 0, 0, 0},
 	[SET_DATE_ROW] = {SET_SEC_CLOCK, SET_DATE, SET_NO_SLOT, 0, 0, 0, 0, 0},
 	[SET_CLOCK_24H] = {SET_SEC_CLOCK, SET_ONOFF, assress_clock_24h, 0, 1, 2, 0, 0},
 	[SET_GAME_CLOCK] = {SET_SEC_CLOCK, SET_ONOFF, assress_game_clock, 0, 1, 2, 0, 0},
-	[SET_BOOT_MODE] = {SET_SEC_GAMES, SET_CHOICE, assress_boot_mode, 0, SET_BOOT_ADDONS, SET_BOOTS, &gl_set_boots, 0},
+	[SET_BOOT_MODE] = {SET_SEC_GAMES, SET_CHOICE, assress_boot_mode, 0, SET_BOOT_ADDONS, SET_BOOTS, STR_SET_VALUE_BOOT_ADDONS, 0},
 	[SET_ENGINE] = {SET_SEC_GAMES, SET_ONOFF, assress_engine_sel, 0, 1, 2, 0, 0},
 	[SET_RTS] = {SET_SEC_GAMES, SET_ONOFF, assress_v_rts, 0, 0, 2, 0, 0},
 	[SET_AUTO_SAVE] = {SET_SEC_SAVES, SET_ONOFF, assress_auto_save_sel, 0, 0, 2, 0, 0},
-	[SET_HISTORY] = {SET_SEC_SAVES, SET_CHOICE, assress_history, 0, SET_HISTORY_DEFAULT, SET_HISTORY_CHOICES, &gl_set_history, 0},
+	[SET_HISTORY] = {SET_SEC_SAVES, SET_CHOICE, assress_history, 0, SET_HISTORY_DEFAULT, SET_HISTORY_CHOICES, STR_SET_VALUE_HISTORY_OFF, 0},
 	[SET_GAME_SAVES] = {SET_SEC_SAVES, SET_ACTION, SET_NO_SLOT, 0, 0, 0, 0, SET_ACTION_GAME_SAVES},
 	[SET_SAVES] = {SET_SEC_SAVES, SET_ACTION, SET_NO_SLOT, 0, 0, 0, 0, SET_ACTION_SAVES},
 	[SET_RUMBLE] = {SET_SEC_CART, SET_ONOFF, assress_game_rumble, 0, 1, 2, 0, 0},
-	[SET_MODE_B] = {SET_SEC_CART, SET_CHOICE, assress_ModeB_INIT, 0, 2, 3, &gl_set_modes_b, 0},
+	[SET_MODE_B] = {SET_SEC_CART, SET_CHOICE, assress_ModeB_INIT, 0, 2, 3, STR_SET_VALUE_MODE_B_RUMBLE, 0},
 	[SET_LED] = {SET_SEC_CART, SET_ONOFF, assress_led_open_sel, 0, 1, 2, 0, 0},
-	[SET_LED_IDLE] = {SET_SEC_CART, SET_COLOUR, assress_Breathing_R, SET_WITH_LED, 7, 8, &gl_set_colours, 0},
-	[SET_LED_SD] = {SET_SEC_CART, SET_COLOUR, assress_SD_R, SET_WITH_LED, 0, 8, &gl_set_colours, 0},
-	[SET_RESET_ON] = {SET_SEC_HOTKEYS, SET_CHOICE, assress_v_reset, 0, SET_MENU_AUTO, SET_MENUS, &gl_set_menus, 0},
+	[SET_LED_IDLE] = {SET_SEC_CART, SET_COLOUR, assress_Breathing_R, SET_WITH_LED, 7, 8, STR_SET_VALUE_COLOUR_OFF, 0},
+	[SET_LED_SD] = {SET_SEC_CART, SET_COLOUR, assress_SD_R, SET_WITH_LED, 0, 8, STR_SET_VALUE_COLOUR_OFF, 0},
+	[SET_RESET_ON] = {SET_SEC_HOTKEYS, SET_CHOICE, assress_v_reset, 0, SET_MENU_AUTO, SET_MENUS, STR_SET_VALUE_MENU_AUTO, 0},
 	[SET_RESET_KEYS] = {SET_SEC_HOTKEYS, SET_KEYS, assress_edit_rtshotkey_0, 0, 0, 0, 0, 0},
 	[SET_SLEEP_ON] = {SET_SEC_HOTKEYS, SET_ONOFF, assress_v_sleep, 0, 0, 2, 0, 0},
 	[SET_SLEEP_KEYS] = {SET_SEC_HOTKEYS, SET_KEYS, assress_edit_sleephotkey_0, 0, 0, 0, 0, 0},
 	[SET_RESCAN] = {SET_SEC_LIBRARY, SET_ACTION, SET_NO_SLOT, 0, 0, 0, 0, SET_ACTION_RESCAN},
 	[SET_IDENTIFY] = {SET_SEC_LIBRARY, SET_ACTION, SET_NO_SLOT, 0, 0, 0, 0, SET_ACTION_IDENTIFY},
 	[SET_SHOW_ALL] = {SET_SEC_LIBRARY, SET_ONOFF, assress_show_all, 0, 0, 2, 0, 0},
-	[SET_LOGGING] = {SET_SEC_SYSTEM, SET_CHOICE, assress_logging, 0, 0, 4, &gl_set_log_levels, 0},
-	[SET_LANGUAGE] = {SET_SEC_SYSTEM, SET_CHOICE, assress_language, SET_HIDDEN, 0, 0, 0, 0},
+	[SET_LOGGING] = {SET_SEC_SYSTEM, SET_CHOICE, assress_logging, 0, 0, 4, STR_SET_VALUE_LOG_OFF, 0},
+	[SET_LANGUAGE] = {SET_SEC_SYSTEM, SET_CHOICE, assress_language, 0, 0, 0, 0, 0},
 };
 
 const struct settings_section_info settings_sections[SET_SECTIONS] = {
@@ -50,6 +50,16 @@ const struct settings_section_info settings_sections[SET_SECTIONS] = {
 	[SET_SEC_SYSTEM] = {SET_LOGGING, 2},
 };
 // clang-format on
+
+// The strings' ids follow the enums they're indexed by (lang/en.ini)
+_Static_assert(STR_SET_LABEL_LANGUAGE - STR_SET_LABEL_THEME == SET_LANGUAGE, "set.label in settings_id's order");
+_Static_assert(STR_SET_EXPLAIN_START_HIDDEN - STR_SET_EXPLAIN_THEME == SET_EXPLAIN_START_HIDDEN,
+	       "set.explain in settings_id's order");
+_Static_assert(STR_SET_SECTION_SYSTEM - STR_SET_SECTION_LOOK == SET_SEC_SYSTEM, "set.section in order");
+_Static_assert(STR_SET_VALUE_START_INFO - STR_SET_VALUE_START_LAST == SET_START_INFO, "Start on's values in order");
+_Static_assert(STR_SET_VALUE_BOOT_CLEAN - STR_SET_VALUE_BOOT_ADDONS == SET_BOOT_CLEAN, "boot modes in order");
+_Static_assert(STR_SET_VALUE_MENU_OFF - STR_SET_VALUE_MENU_AUTO == SET_MENU_OFF, "In-game menu's values in order");
+_Static_assert(STR_SET_VALUE_HISTORY_20 - STR_SET_VALUE_HISTORY_OFF == SET_HISTORY_CHOICES - 1, "Backups kept's");
 
 // The hotkeys as the in-game patches read them (GBApatch.c's defaults):
 // three KEYINPUT bits, a slot past 9 standing for its default's
@@ -112,10 +122,7 @@ static const u8 *keys_default_of(u32 id)
 
 static u32 language_index(u16 stored)
 {
-	for (u32 i = 0; i < lang_pack_count; i++)
-		if (lang_packs[i].id == stored)
-			return i;
-	return 0;
+	return lang_index_of(stored);
 }
 
 // A row's value from slots (v->slot or v->loaded)
@@ -161,7 +168,7 @@ static int holds(const struct settings_row *r, u32 id, u16 value)
 {
 	switch (r->kind) {
 	case SET_CHOICE:
-		return value < (id == SET_LANGUAGE ? lang_pack_count : r->count);
+		return value < (id == SET_LANGUAGE ? lang_count() : r->count);
 	case SET_NUMBER:
 		return value <= r->count;
 	case SET_ONOFF:
@@ -203,7 +210,7 @@ static void store(struct settings_values *v, u32 id, u16 value)
 			s[i] = (value >> (2 - i)) & 1;
 		break;
 	case SET_CHOICE:
-		*s = id == SET_LANGUAGE ? lang_packs[value].id : value;
+		*s = id == SET_LANGUAGE ? lang_choice(value)->id : value;
 		break;
 	default:
 		*s = value;
@@ -270,7 +277,7 @@ void settings_step(struct settings_values *v, u32 id, int dir)
 	} else {
 		u32 n = r->kind == SET_ONOFF    ? 2
 			: r->kind == SET_COLOUR ? 8
-			: id == SET_LANGUAGE    ? lang_pack_count
+			: id == SET_LANGUAGE    ? lang_count()
 						: r->count;
 		if (n == 0)
 			return;
@@ -413,26 +420,26 @@ u32 settings_section_rows(const struct settings_values *v, u32 section, u8 *ids)
 
 const char *settings_section_name(u32 section)
 {
-	return section < SET_SECTIONS ? gl_set_sections[section] : "";
+	return section < SET_SECTIONS ? S(STR_SET_SECTION_LOOK + section) : "";
 }
 
 const char *settings_label(const struct settings_values *v, u32 id)
 {
 	(void)v;
-	return id < SET_ROWS ? gl_set_labels[id] : "";
+	return id < SET_ROWS ? S(STR_SET_LABEL_THEME + id) : "";
 }
 
 const char *settings_explain(const struct settings_values *v, u32 id)
 {
 	if (id == SET_RESET_ON && settings_get(v, id) != SET_MENU_AUTO)
-		return gl_set_explain[settings_get(v, id) == SET_MENU_EVERY ? SET_EXPLAIN_MENU_EVERY
-									    : SET_EXPLAIN_MENU_OFF];
+		return S(STR_SET_EXPLAIN_THEME +
+			 (settings_get(v, id) == SET_MENU_EVERY ? SET_EXPLAIN_MENU_EVERY : SET_EXPLAIN_MENU_OFF));
 	if (id == SET_START_ON) {
 		u16 code = settings_get(v, id);
 		if (code != SET_START_HOME && !start_offered(v, code))
-			return gl_set_explain[SET_EXPLAIN_START_HIDDEN];
+			return S(STR_SET_EXPLAIN_THEME + SET_EXPLAIN_START_HIDDEN);
 	}
-	return id < SET_ROWS ? gl_set_explain[id] : "";
+	return id < SET_ROWS ? S(STR_SET_EXPLAIN_THEME + id) : "";
 }
 
 int settings_clock_24h(const struct settings_values *v)
@@ -461,19 +468,19 @@ void settings_value_text(const struct settings_values *v, u32 id, char *out, u32
 	u16 value = settings_get(v, id);
 	switch (r->kind) {
 	case SET_CHOICE:
-		copy_text(out, size, id == SET_LANGUAGE ? lang_packs[value].name : (*r->options)[value]);
+		copy_text(out, size, id == SET_LANGUAGE ? lang_choice(value)->name : S(r->options + value));
 		break;
 	case SET_COLOUR:
-		copy_text(out, size, (*r->options)[value]);
+		copy_text(out, size, S(r->options + value));
 		break;
 	case SET_ONOFF:
-		copy_text(out, size, gl_set_onoff[value]);
+		copy_text(out, size, S(STR_SET_VALUE_OFF + value));
 		break;
 	case SET_NUMBER:
 		if (value)
-			snprintf(out, size, "%u %s", (unsigned)value, gl_set_minutes);
+			SF(out, size, STR_SET_VALUE_MINUTES, LN(value));
 		else
-			copy_text(out, size, gl_set_onoff[0]);
+			copy_text(out, size, S(STR_SET_VALUE_OFF));
 		break;
 	case SET_TIME:
 		settings_format_time(out, size, v->clock.hour, v->clock.minute, settings_clock_24h(v));
@@ -504,7 +511,7 @@ void settings_format_time(char *out, u32 size, u32 hour, u32 minute, int h24)
 		snprintf(out, size, "%02u:%02u", (unsigned)hour, (unsigned)minute);
 	else
 		snprintf(out, size, "%u:%02u %s", (unsigned)(hour % 12 ? hour % 12 : 12), (unsigned)minute,
-			 gl_set_ampm[hour >= 12]);
+			 S(STR_SET_VALUE_AM + (hour >= 12)));
 }
 
 void settings_format_date(char *out, u32 size, const struct settings_clock *c)
@@ -652,7 +659,7 @@ void settings_editor_text(const struct settings_editor *e, u32 pos, char *out, u
 		snprintf(out, size, "%02u", (unsigned)c->minute);
 		break;
 	case SET_FIELD_AMPM:
-		snprintf(out, size, "%s", gl_set_ampm[c->hour >= 12]);
+		snprintf(out, size, "%s", S(STR_SET_VALUE_AM + (c->hour >= 12)));
 		break;
 	case SET_FIELD_YEAR:
 		snprintf(out, size, "%04u", (unsigned)c->year);

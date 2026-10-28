@@ -859,7 +859,7 @@ void IWRAM_CODE Set_64MROM_flag(u16 flag)
 }
 // --------------------------------------------------------------------
 // Torii: the screens are dialogs on the engine, in one session of their own
-// (ui/dialog.h), with texts from lang.h (EN_FW_*); the CRC check, the SPI writes and
+// (ui/dialog.h), with texts from lang/en.ini's [firmware], in English: no pack is loaded yet; the CRC check, the SPI writes and
 // their order are the official ones. Two screens come before a write: the
 // versions with a warning about power cuts (A goes on), then L+R+A held for
 // two seconds; B on either, or the hold let go early, cancels and the boot
@@ -873,33 +873,33 @@ void IWRAM_CODE FW_update(u16 DEcard_FW_readver, const char *rev, u16 FW_built_i
 	char msg[160];
 	char status[24];
 
-	sprintf(title, EN_FW_TITLE, rev);
+	SF(title, sizeof(title), STR_FIRMWARE_TITLE, LS(rev));
 	dialog_open();
 
 	// A notice while the CRC check reads the image (about half a second)
-	dialog_notice(title, EN_FW_CHECKING, DIALOG_INFO);
+	dialog_notice(title, S(STR_FIRMWARE_CHECKING), DIALOG_INFO);
 	u32 get_crc32 = crc32(FWbinaddress, FWsize);
 	dialog_notice_end();
 
 	if (get_crc32 != build_crc32) {
 		tlog_error("firmware: the kernel's V%02d image fails its CRC32 (%08lX, not %08lX): not written",
 			   FW_built_in_ver, (unsigned long)get_crc32, (unsigned long)build_crc32);
-		dialog_message(title, EN_FW_CRC_ERROR, DIALOG_ERROR);
+		dialog_message(title, S(STR_FIRMWARE_CRC_ERROR), DIALOG_ERROR);
 		dialog_close();
 		return;
 	}
 
 	// No key hint: the language isn't loaded yet, and the text names the keys
-	sprintf(msg, EN_FW_WARNING, DEcard_FW_readver & 0xFF, FW_built_in_ver);
+	SF(msg, sizeof(msg), STR_FIRMWARE_WARNING, LZ(DEcard_FW_readver & 0xFF, 2), LZ(FW_built_in_ver, 2));
 	if (dialog_confirm(title, msg, DIALOG_INFO) &&
-	    dialog_hold(title, EN_FW_HOLD, KEY_L | KEY_R | KEY_A, FW_HOLD_FRAMES)) {
+	    dialog_hold(title, S(STR_FIRMWARE_HOLD), KEY_L | KEY_R | KEY_A, FW_HOLD_FRAMES)) {
 		tlog("firmware: writing V%02d over V%02d", FW_built_in_ver, DEcard_FW_readver & 0xFF);
 		SPI_Write_Disable();
-		sprintf(msg, EN_FW_UPDATING, DEcard_FW_readver & 0xFF, FW_built_in_ver);
+		SF(msg, sizeof(msg), STR_FIRMWARE_UPDATING, LZ(DEcard_FW_readver & 0xFF, 2), LZ(FW_built_in_ver, 2));
 		dialog_progress_begin(title, msg);
 
 		for (offset = 0x0000; offset < FWsize; offset += 256) {
-			sprintf(status, EN_FW_PROGRESS, (offset * 100 / FWsize + 1));
+			SF(status, sizeof(status), STR_FIRMWARE_PROGRESS, LN(offset * 100 / FWsize + 1));
 			dialog_progress_set(offset, FWsize, status);  // drawn a few times a second
 
 			FAT_table_buffer[0] = (FW_wirte_address + offset);//omega DE 0x80000
@@ -918,7 +918,7 @@ void IWRAM_CODE FW_update(u16 DEcard_FW_readver, const char *rev, u16 FW_built_i
 			//break;
 		}
 		dialog_progress_set(FWsize, FWsize, NULL);
-		dialog_progress_status(EN_FW_DONE);
+		dialog_progress_status(S(STR_FIRMWARE_DONE));
 		tlog("firmware: updated to V%02d, waiting for the power-off", FW_built_in_ver);
 
 		while (1)

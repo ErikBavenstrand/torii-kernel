@@ -48,8 +48,9 @@
 #define CS_TOGGLE_FRAMES 3
 
 static const struct ui_card_config cs_card = {4, 4, 4, 1, 0};
-_Static_assert(sizeof(((struct lang_cheats *)0)->why) / sizeof(const char *) == CHEATFILE_WHYS, "a reason for each");
-_Static_assert(sizeof(((struct lang_cheats *)0)->edit_failed) / sizeof(const char *) == CHEATFILE_EDIT_FAILED + 1,
+_Static_assert(STR_CHEATS_WHY_ROOM - STR_CHEATS_WHY_FULL == CHEATFILE_WHY_ROOM - CHEATFILE_WHY_FULL,
+	       "a reason for each");
+_Static_assert(STR_CHEATS_EDIT_BROKEN - STR_CHEATS_EDIT_FAILED == CHEATFILE_EDIT_FAILED,
 	       "a line for each edit's failure");
 
 enum {
@@ -131,8 +132,8 @@ static const char *cheat_name(const struct cheatfile_cheat *c, u32 *len)
 		*len = c->desc_len;
 		return cheatstore()->file.text + c->desc;
 	}
-	*len = (u32)strlen(gl_cheats->unnamed);
-	return gl_cheats->unnamed;
+	*len = (u32)strlen(S(STR_CHEATS_UNNAMED));
+	return S(STR_CHEATS_UNNAMED);
 }
 
 static int cs_fetch(void *ctx, u32 i, struct ui_item *out)
@@ -143,7 +144,7 @@ static int cs_fetch(void *ctx, u32 i, struct ui_item *out)
 	struct cheatstore *s = cheatstore();
 	const struct cheatfile_cheat *c = row_cheat(i);
 	if (!c) {
-		out->text = gl_cheats->add_row;
+		out->text = S(STR_CHEATS_ADD_ROW);
 		out->ink = cs.add_why == CHEATFILE_EDIT_OK ? UI_ROLE_ACCENT_INK : UI_ROLE_DIM;
 		return UI_ITEM_READY;
 	}
@@ -183,33 +184,33 @@ static const char *cs_reason(const struct cheatfile_cheat *c, u32 why)
 	const struct cheatfile *f = &cheatstore()->file;
 	if (why == CHEATFILE_WHY_FULL) {
 		if (c->status != CHEATFILE_OK)
-			return gl_cheats->big;
+			return S(STR_CHEATS_BIG);
 		// The part of the budget that is short: bytes, else cycles
 		int bytes = f->bytes + c->bytes > CHEATFILE_BYTES_MAX;
 		u32 need = bytes ? percent(c->bytes, CHEATFILE_BYTES_MAX) : percent(c->cost, CHEATFILE_CYCLES_MAX);
 		u32 used = bytes ? percent(f->bytes, CHEATFILE_BYTES_MAX) : percent(f->cost, CHEATFILE_CYCLES_MAX);
-		snprintf(cs.reason, sizeof(cs.reason), EN_CHEAT_FULL, (unsigned long)need,
-			 (unsigned long)(used < 100 ? 100 - used : 0));
+		SF(cs.reason, sizeof(cs.reason), STR_CHEATS_FULL, LN(need), LN(used < 100 ? 100 - used : 0));
 		return cs.reason;
 	}
 	if (why == CHEATFILE_WHY_PATCHES) {
 		u32 left = f->patches < CHEATFILE_PICKED_PATCHES_MAX ? CHEATFILE_PICKED_PATCHES_MAX - f->patches : 0;
-		snprintf(cs.reason, sizeof(cs.reason), EN_CHEAT_PATCHES, (unsigned long)c->patches,
-			 (unsigned long)left);
+		SF(cs.reason, sizeof(cs.reason), STR_CHEATS_PATCHES, LN(c->patches), LN(left));
 		return cs.reason;
 	}
-	return why < CHEATFILE_WHYS ? gl_cheats->why[why] : NULL;
+	if (why >= CHEATFILE_WHYS)
+		return NULL;
+	return why ? S(STR_CHEATS_WHY_FULL + why - CHEATFILE_WHY_FULL) : "";
 }
 
 static const char *add_reason(void)
 {
 	switch (cs.add_why) {
 	case CHEATFILE_EDIT_FULL:
-		return gl_cheats->add_full;
+		return S(STR_CHEATS_ADD_FULL);
 	case CHEATFILE_EDIT_LONG:
-		return gl_cheats->add_long;
+		return S(STR_CHEATS_ADD_LONG);
 	default:
-		return gl_cheats->edit_failed[cs.add_why <= CHEATFILE_EDIT_FAILED ? cs.add_why : 0];
+		return S(STR_CHEATS_EDIT_FAILED + (cs.add_why <= CHEATFILE_EDIT_FAILED ? cs.add_why : 0));
 	}
 }
 
@@ -227,23 +228,24 @@ static void cs_show_hints(void)
 		return;
 	if (!c) {
 		if (cs.add_why == CHEATFILE_EDIT_OK)
-			cs.keys[n++] = (struct ui_hint){"A", gl_cheats->hint_add};
+			cs.keys[n++] = (struct ui_hint){"A", S(STR_CHEATS_HINT_ADD)};
 		else
 			note = add_reason();
 	} else {
 		u32 why = cheatfile_why(&s->file, s->rows[cs.cursor]);
 		if (why == CHEATFILE_PICKABLE)
-			cs.keys[n++] = (struct ui_hint){"A", c->picked ? gl_cheats->hint_drop : gl_cheats->hint_pick};
+			cs.keys[n++] =
+				(struct ui_hint){"A", c->picked ? S(STR_CHEATS_HINT_DROP) : S(STR_CHEATS_HINT_PICK)};
 		else if (why == CHEATFILE_WHY_EDIT)
-			cs.keys[n++] = (struct ui_hint){"A", gl_cheats->hint_fill};
+			cs.keys[n++] = (struct ui_hint){"A", S(STR_CHEATS_HINT_FILL)};
 		if (why != CHEATFILE_PICKABLE)
 			note = cs_reason(c, why);
 		else if (c->status == CHEATFILE_OK && c->patches)
-			note = gl_cheats->nor;
+			note = S(STR_CHEATS_NOR);
 	}
 	if (!note)
-		cs.keys[n++] = (struct ui_hint){"START", gl_cheats->hint_menu};
-	cs.keys[n++] = (struct ui_hint){"B", cs.only ? gl_cheats->hint_all : gl_hint_back};
+		cs.keys[n++] = (struct ui_hint){"START", S(STR_CHEATS_HINT_MENU)};
+	cs.keys[n++] = (struct ui_hint){"B", cs.only ? S(STR_CHEATS_HINT_ALL) : S(STR_HINT_BACK)};
 	ui_hints_set(cs.hints, cs.keys, n);
 	if (note)
 		ui_hints_note(cs.hints, note, &beside);
@@ -256,11 +258,13 @@ static void cs_counter(void)
 	u32 n = 0;
 	cs.counter[0] = 0;
 	if (cs.cursor < cs.shown)
-		n = (u32)snprintf(cs.counter, sizeof(cs.counter), EN_CHEAT_POSITION, (unsigned long)cs.cursor + 1,
-				  (unsigned long)cs.shown);
-	if (cs.picks && n < sizeof(cs.counter))
-		snprintf(cs.counter + n, sizeof(cs.counter) - n, "%s" EN_CHEAT_PICKS, n ? " \xC2\xB7 " : "",
-			 (unsigned long)cs.picks);
+		n = SF(cs.counter, sizeof(cs.counter), STR_CHEATS_POSITION, LN(cs.cursor + 1), LN(cs.shown));
+	if (cs.picks && n + 1 < sizeof(cs.counter)) {
+		if (n)
+			n += (u32)snprintf(cs.counter + n, sizeof(cs.counter) - n, " \xC2\xB7 ");
+		if (n < sizeof(cs.counter))
+			SF(cs.counter + n, sizeof(cs.counter) - n, STR_CHEATS_PICKS, LN(cs.picks));
+	}
 	ui_title_set_right(cs.title, cs.counter);
 }
 
@@ -427,21 +431,21 @@ static void detail_text(u32 at)
 		}
 	detail_add(&n, "\n", 1);
 	if (c->detected != CHEAT_FMT_AUTO && c->detected <= CHEAT_FMT_VBA) {
-		snprintf(line, sizeof(line), EN_CHEAT_FORMAT, gl_keypad->formats[c->detected],
-			 c->format != CHEAT_FMT_AUTO ? gl_cheats->detail_set : gl_cheats->detail_detected);
+		SF(line, sizeof(line), STR_CHEATS_FORMAT, LS(S(STR_KEYPAD_FORMAT_NONE + c->detected)),
+		   LS(c->format != CHEAT_FMT_AUTO ? S(STR_CHEATS_DETAIL_SET) : S(STR_CHEATS_DETAIL_DETECTED)));
 		detail_line(&n, line);
 	} else {
-		detail_line(&n, gl_cheats->detail_unknown);
+		detail_line(&n, S(STR_CHEATS_DETAIL_UNKNOWN));
 	}
 	if (c->status == CHEATFILE_OK) {
 		if (c->bytes) {
-			snprintf(line, sizeof(line), EN_CHEAT_BUDGET, (unsigned long)share(c->bytes, c->cost));
+			SF(line, sizeof(line), STR_CHEATS_BUDGET, LN(share(c->bytes, c->cost)));
 			detail_line(&n, line);
 		} else {
-			detail_line(&n, gl_cheats->detail_runs);
+			detail_line(&n, S(STR_CHEATS_DETAIL_RUNS));
 		}
 		if (c->patches) {
-			snprintf(line, sizeof(line), EN_CHEAT_ROM, (unsigned long)c->patches, gl_cheats->detail_nor);
+			SF(line, sizeof(line), STR_CHEATS_ROM, LN(c->patches), LS(S(STR_CHEATS_DETAIL_NOR)));
 			detail_line(&n, line);
 		}
 	}
@@ -449,7 +453,7 @@ static void detail_text(u32 at)
 	const char *reason = why != CHEATFILE_PICKABLE ? cs_reason(c, why) : NULL;
 	if (reason)
 		detail_line(&n, reason);
-	detail_line(&n, c->picked ? gl_cheats->detail_picked : gl_cheats->detail_not_picked);
+	detail_line(&n, c->picked ? S(STR_CHEATS_DETAIL_PICKED) : S(STR_CHEATS_DETAIL_NOT_PICKED));
 }
 
 // The detail view of cheat at in the cheat view's place, until B; then
@@ -474,8 +478,8 @@ static void cs_detail(u32 at)
 	u8 title = (u8)(v->first + CS_TITLE);
 	ui_title_set(title, cs.heading);
 	ui_title_icon_set(title, cs.icon);
-	ui_title_set_sub(title, gl_cheats->details_sub);
-	cs.keys[0] = (struct ui_hint){"B", gl_hint_back};
+	ui_title_set_sub(title, S(STR_CHEATS_DETAILS_SUB));
+	cs.keys[0] = (struct ui_hint){"B", S(STR_HINT_BACK)};
 	ui_hints_set((u8)(v->first + CS_HINTS), cs.keys, 1);
 	tlog_debug("cheats: details of cheat %lu, %lu rows", (unsigned long)at, (unsigned long)cs.reading.count);
 	cs.close = 0;
@@ -495,7 +499,7 @@ static void cs_decode(void)
 	struct cheatstore *s = cheatstore();
 	if (cheatstore_decode(CS_QUIET_CYCLES))
 		return;
-	dialog_progress_begin(gl_cheats->reading, gl_cheats->reading_text);
+	dialog_progress_begin(S(STR_CHEATS_READING), S(STR_CHEATS_READING_TEXT));
 	do
 		dialog_progress_set(s->work.next, s->file.count, NULL);
 	while (!cheatstore_decode(CS_STEP_CYCLES));
@@ -536,7 +540,7 @@ static u32 cs_rows(u32 at)
 	}
 	cs.count = cs.shown + !cs.only;
 	cs.picks = cheatfile_picks(&s->file);
-	snprintf(cs.new_name, sizeof(cs.new_name), EN_CHEAT_NAME, (unsigned long)own + 1);
+	SF(cs.new_name, sizeof(cs.new_name), STR_CHEATS_NAME, LN(own + 1));
 	cs.add_why = (u8)cheatstore_can_add(cs.new_name);
 	return row != CHEATFILE_NONE ? row : (cs.shown ? cs.shown - 1 : 0);
 }
@@ -556,7 +560,7 @@ static int cs_show(u32 row)
 	ui_title_set(cs.title, cs.heading);
 	ui_title_icon_set(cs.title, cs.icon);
 	if (cs.only)
-		ui_title_set_sub(cs.title, gl_cheats->only_sub);
+		ui_title_set_sub(cs.title, S(STR_CHEATS_ONLY_SUB));
 	row = row < cs.count ? row : cs.count - 1;
 	ui_list_set_cursor(cs.list, row);
 	cs_moved(row);
@@ -575,7 +579,7 @@ static void cs_set_only(int only)
 		row = cs.count - 1;  // from + Add code: back on it
 	tlog_debug("cheats: %s, %lu rows", cs.only ? "picked only" : "all", (unsigned long)cs.count);
 	ui_list_reset(cs.list, row);
-	ui_title_set_sub(cs.title, cs.only ? gl_cheats->only_sub : NULL);
+	ui_title_set_sub(cs.title, cs.only ? S(STR_CHEATS_ONLY_SUB) : NULL);
 	cs_moved(row);
 }
 
@@ -609,7 +613,7 @@ static void pick_new(u32 at)
 static void cs_write(void)
 {
 	if (!cheatstore_write())
-		dialog_message(cs.heading, gl_cheats->save_failed, DIALOG_ERROR);
+		dialog_message(cs.heading, S(STR_CHEATS_SAVE_FAILED), DIALOG_ERROR);
 }
 
 // The keypad for a new code (at CHEATFILE_NONE), cheat at's placeholder
@@ -622,15 +626,15 @@ static u32 cs_code(u32 at, int fill)
 	struct cheatfile *f = &s->file;
 	const struct cheatfile_cheat *c = at != CHEATFILE_NONE ? &s->cheats[at] : NULL;
 	u32 row = cs.act_row;
-	struct keypad_ask ask = {cs.icon, c ? gl_keypad->title_edit : gl_keypad->title_add, NULL, 0, CHEAT_FMT_AUTO,
-				 NULL};
+	struct keypad_ask ask = {
+		cs.icon, c ? S(STR_KEYPAD_TITLE_EDIT) : S(STR_KEYPAD_TITLE_ADD), NULL, 0, CHEAT_FMT_AUTO, NULL};
 	struct cheat_decoder ctx;
 	cheatstore_decoder_before(c ? at : f->count, &ctx);
 	ask.ctx = &ctx;
 	snprintf(cs.name, sizeof(cs.name), "%s", cs.new_name);
 	if (c) {
 		if (c->code_len > KEYPAD_CODE_MAX) {
-			dialog_message(cs.heading, gl_cheats->too_long, DIALOG_INFO);
+			dialog_message(cs.heading, S(STR_CHEATS_TOO_LONG), DIALOG_INFO);
 			return row;
 		}
 		memcpy(cs.code, f->text + c->code, c->code_len);
@@ -648,7 +652,7 @@ static u32 cs_code(u32 at, int fill)
 	for (;;) {
 		int ran = keypad_run(&ask, cs.code, &format);
 		if (ran < 0)
-			dialog_message(cs.heading, gl_cheats->too_long, DIALOG_INFO);
+			dialog_message(cs.heading, S(STR_CHEATS_TOO_LONG), DIALOG_INFO);
 		if (ran <= 0)
 			return row;  // cancelled: nothing changes
 		ask.code = cs.code;  // back here from the keyboard: as typed
@@ -660,7 +664,7 @@ static u32 cs_code(u32 at, int fill)
 		// new one its "Code N"; Cancel goes back to the keypad, the code
 		// as typed
 		const struct rename_ask name = {
-			cs.icon, was, NULL, RENAME_GAME_MAX, 0, name_submit, 0, gl_cheats->name_title, 1};
+			cs.icon, was, NULL, RENAME_GAME_MAX, 0, name_submit, 0, S(STR_CHEATS_NAME_TITLE), 1};
 		if (rename_run(&name))
 			break;
 	}
@@ -671,8 +675,9 @@ static u32 cs_code(u32 at, int fill)
 		r = cheatstore_set_code(at, fill ? NULL : cs.name, cs.code, format);
 	const char *how = c ? (fill ? "filled in" : "edited") : "added";
 	if (r != CHEATFILE_EDIT_OK) {
-		tlog("cheats: %s: refused: %s", how, gl_cheats->edit_failed[r <= CHEATFILE_EDIT_FAILED ? r : 0]);
-		dialog_message(cs.heading, gl_cheats->edit_failed[r <= CHEATFILE_EDIT_FAILED ? r : 0], DIALOG_ERROR);
+		u32 text = STR_CHEATS_EDIT_FAILED + (r <= CHEATFILE_EDIT_FAILED ? r : 0);
+		tlog("cheats: %s: refused: %s", how, lang_en[text]);
+		dialog_message(cs.heading, S(text), DIALOG_ERROR);
 		return row;
 	}
 	tlog("cheats: %s cheat %lu: ok", how, (unsigned long)idx);
@@ -692,7 +697,8 @@ static u32 cs_delete(u32 at)
 	cs_leave();
 	cs_redecode();
 	if (r != CHEATFILE_EDIT_OK)
-		dialog_message(cs.heading, gl_cheats->edit_failed[r <= CHEATFILE_EDIT_FAILED ? r : 0], DIALOG_ERROR);
+		dialog_message(cs.heading, S(STR_CHEATS_EDIT_FAILED + (r <= CHEATFILE_EDIT_FAILED ? r : 0)),
+			       DIALOG_ERROR);
 	else if (!cheatfile_empty(&s->file) || !cheatstore_drop())
 		cs_write();
 	return cs_rows(at);
@@ -729,22 +735,22 @@ static u32 cs_menu(u32 row, int full)
 	}
 	if (c && full) {
 		cs.item_ids[n] = MENU_DETAILS;
-		cs.items[n++] = (struct ui_pop_item){gl_cheats->menu_details, 0, 0};
+		cs.items[n++] = (struct ui_pop_item){S(STR_CHEATS_MENU_DETAILS), 0, 0};
 	}
 	if (c && c->own) {
 		cs.item_ids[n] = MENU_EDIT;
-		cs.items[n++] = (struct ui_pop_item){gl_cheats->menu_edit, 0, 0};
+		cs.items[n++] = (struct ui_pop_item){S(STR_CHEATS_MENU_EDIT), 0, 0};
 	}
 	if (full) {
 		cs.item_ids[n] = MENU_ALL_OFF;
-		cs.items[n++] = (struct ui_pop_item){gl_cheats->menu_all_off, 0, (u8)(cs.picks ? 0 : UI_POP_DIM)};
+		cs.items[n++] = (struct ui_pop_item){S(STR_CHEATS_MENU_ALL_OFF), 0, (u8)(cs.picks ? 0 : UI_POP_DIM)};
 		cs.item_ids[n] = MENU_ONLY;
-		cs.items[n++] = (struct ui_pop_item){cs.only ? gl_cheats->menu_all : gl_cheats->menu_only, 0,
+		cs.items[n++] = (struct ui_pop_item){cs.only ? S(STR_CHEATS_MENU_ALL) : S(STR_CHEATS_MENU_ONLY), 0,
 						     (u8)(cs.picks || cs.only ? 0 : UI_POP_DIM)};
 	}
 	if (c && c->own) {
 		cs.item_ids[n] = MENU_DELETE;
-		cs.items[n++] = (struct ui_pop_item){gl_cheats->menu_delete, 0, UI_POP_DANGER};
+		cs.items[n++] = (struct ui_pop_item){S(STR_CHEATS_MENU_DELETE), 0, UI_POP_DANGER};
 	}
 	if (!n)
 		return CHEATFILE_NONE;
@@ -778,8 +784,8 @@ static u32 cs_menu(u32 row, int full)
 			cs_set_only(!cs.only);
 			return CHEATFILE_NONE;
 		default: {
-			snprintf(cs.ask, sizeof(cs.ask), EN_CHEAT_DELETE, cs.pop_title);
-			struct ui_confirm ask = {cs.ask, gl_cheats->delete_text, gl_cheats->delete_button, 1};
+			SF(cs.ask, sizeof(cs.ask), STR_CHEATS_DELETE_ASK, LS(cs.pop_title));
+			struct ui_confirm ask = {cs.ask, S(STR_CHEATS_DELETE_TEXT), S(STR_CHEATS_DELETE_BUTTON), 1};
 			if (!ui_confirm(cs.hints, &ask))
 				continue;  // Cancel: back to the menu
 			ui_popup_close();
@@ -808,9 +814,9 @@ void cheats_run(const char *rom_path, const char *title, u16 icon)
 	int opened = cheatstore_open(rom_path);
 	if (opened != CHEATSTORE_READ && opened != CHEATSTORE_NEW) {
 		// Why the file is left alone: never a screen without it
-		const char *why = opened == CHEATSTORE_BIG          ? gl_cheats->too_big
-				  : opened == CHEATSTORE_OTHER_DUMP ? gl_cheats->other_dump
-								    : gl_cheats->gone;
+		const char *why = opened == CHEATSTORE_BIG          ? S(STR_CHEATS_TOO_BIG)
+				  : opened == CHEATSTORE_OTHER_DUMP ? S(STR_CHEATS_OTHER_DUMP)
+								    : S(STR_CHEATS_GONE);
 		tlog("cheats: %s: no cheat screen (%d)", rom_path, opened);
 		dialog_message(title, why, DIALOG_ERROR);
 		return;
@@ -866,11 +872,11 @@ void cheats_run(const char *rom_path, const char *title, u16 icon)
 	while (ui_depth())
 		ui_pop();
 	if (!saved) {
-		dialog_message(cs.heading, gl_cheats->save_failed, DIALOG_ERROR);
+		dialog_message(cs.heading, S(STR_CHEATS_SAVE_FAILED), DIALOG_ERROR);
 	} else if (picks && cs.picked && boots_clean(rom_path)) {
 		// Picks that won't run: said once, as the user leaves with them
 		tlog("cheats: %lu picked, and the game boots clean", (unsigned long)picks);
-		snprintf(cs.ask, sizeof(cs.ask), EN_CHEAT_CLEAN, (unsigned long)picks);
+		SF(cs.ask, sizeof(cs.ask), STR_CHEATS_CLEAN, LN(picks));
 		dialog_message(cs.heading, cs.ask, DIALOG_INFO);
 	}
 }

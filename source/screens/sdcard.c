@@ -164,7 +164,7 @@ static int model_fetch(void *ctx, u32 i, struct ui_item *out)
 	out->text = sdlist_name(r);
 	if (sdlist_is_dir(r)) {
 		out->icon = sd.icons[0];
-		sdlist_count_text(sd.detail, sizeof(sd.detail), r->count, gl_sd_item, gl_sd_items, gl_sd_items_none);
+		sdlist_count_text(sd.detail, sizeof(sd.detail), r->count);
 	} else {
 		out->icon = sd.icons[1];
 		sdlist_size_text(sd.detail, sizeof(sd.detail), r->size);
@@ -243,7 +243,7 @@ static const char *position_text(u32 at)
 	}
 	sdlist_number(a, sizeof(a), at < n ? at + 1 : n);
 	sdlist_number(b, sizeof(b), n);
-	snprintf(sd.position, sizeof(sd.position), "%s/%s", a, b);
+	SF(sd.position, sizeof(sd.position), STR_NAV_POSITION, LS(a), LS(b));
 	return sd.position;
 }
 
@@ -252,11 +252,11 @@ static const char *position_text(u32 at)
 static void show_folder(void)
 {
 	int root = at_root();
-	ui_title_set(node(N_TITLE), root ? gl_item_sd : "");
+	ui_title_set(node(N_TITLE), root ? S(STR_ITEM_SD) : "");
 	snprintf(sd.pills, sizeof(sd.pills), "SD%s", root ? "" : currentpath);
 	ui_path_set(node(N_PATH), sd.pills);
 	ui_show(node(N_PATH), !root);
-	ui_label_set(node(N_NOTE), entries() ? "" : gl_sd_empty);  // a label hidden would cut a hole in the card
+	ui_label_set(node(N_NOTE), entries() ? "" : S(STR_SD_EMPTY));  // a label hidden would cut a hole in the card
 }
 
 // The hint bar: the keys; only B in an empty folder (A and START do
@@ -349,7 +349,7 @@ static int list_folder(void)
 	char n[12];
 	u32 files = entries() - sd.list.folders, by_files = files >= SDLIST_MAX || sd.list.folders < SDLIST_MAX;
 	sdlist_number(n, sizeof(n), by_files ? files : sd.list.folders);
-	snprintf(sd.note, sizeof(sd.note), "%s %s %s", gl_sd_first, n, by_files ? gl_count_files : gl_sd_folders);
+	SF(sd.note, sizeof(sd.note), by_files ? STR_SD_FIRST_FILES : STR_SD_FIRST_FOLDERS, LS(n));
 	sd.count_next = 0;
 	u32 ms = cycles_since(start) / (ENGINE_FRAME_CYCLES * 60u / 1000u);
 	tlog_debug("sdcard: listed %s: %lu folders, %lu files%s (%lu ms)", currentpath, (unsigned long)sd.list.folders,
@@ -515,8 +515,8 @@ static void relist(u32 at)
 
 static void error(u8 num)
 {
-	const char *msg = Error_message(num);
-	tlog_error("error %u: %s", num, msg);
+	const char *msg = Error_message(num, 0);
+	tlog_error("error %u: %s", num, Error_message(num, 1));
 	dialog_message(NULL, msg, DIALOG_ERROR);
 }
 
@@ -594,7 +594,7 @@ static const char *rename_submit(void *ctx, const char *stem)
 	const char *dot = strrchr(sd.name, '.');
 	const char *ext = dot && dot != sd.name ? dot : "";
 	if ((u32)snprintf(sd.ask, sizeof(sd.ask), "%s%s", stem, ext) > GAME_NAME_MAX)
-		return gl_rename->bad;
+		return S(STR_RENAME_BAD);
 	tlog_debug("sdcard: rename %s to %s", sd.full, sd.ask);
 	switch (action_rename_file(sd.full, sd.ask)) {
 	case ACTION_RENAMED:
@@ -603,19 +603,19 @@ static const char *rename_submit(void *ctx, const char *stem)
 		sd.renamed_partly = 1;
 		return NULL;
 	case ACTION_RENAME_TAKEN:
-		return gl_rename->taken;
+		return S(STR_RENAME_TAKEN);
 	case ACTION_RENAME_BAD:
-		return gl_rename->bad;
+		return S(STR_RENAME_BAD);
 	case ACTION_RENAME_HIDDEN:
-		return gl_rename->hidden;
+		return S(STR_RENAME_HIDDEN);
 	case ACTION_RENAME_SIDE_TAKEN:
-		return gl_rename->side_taken[action_rename_taken() % ACTION_FILES];
+		return S(STR_RENAME_SIDE_SAVE + action_rename_taken() % ACTION_FILES);
 	case ACTION_RENAME_PENDING:
-		return gl_rename->pending;
+		return S(STR_RENAME_PENDING);
 	case ACTION_RENAME_SHARED:
-		return gl_rename->shared;
+		return S(STR_RENAME_SHARED);
 	default:
-		return gl_rename->failed;
+		return S(STR_RENAME_FAILED);
 	}
 }
 
@@ -675,7 +675,7 @@ static void rename_file(void)
 		return;
 	}
 	if (sd.renamed_partly)
-		dialog_message(NULL, gl_rename->partly, DIALOG_ERROR);
+		dialog_message(NULL, S(STR_RENAME_PARTLY), DIALOG_ERROR);
 }
 
 // --- Actions ----------------------------------------------------------------------
@@ -717,26 +717,28 @@ static void info(u32 i)
 	const struct sdlist_rec *r = sdlist_at(&sd.list, i);
 	char *p = sd.info, *end = sd.info + sizeof(sd.info);
 	u32 console = sdlist_console(r);
-	const char *const consoles[LIB_CONSOLES] = {gl_item_gba, gl_item_gbc, gl_item_gb, gl_item_nes};
+	const char *const consoles[LIB_CONSOLES] = {S(STR_ITEM_GBA), S(STR_ITEM_GBC), S(STR_ITEM_GB), S(STR_ITEM_NES)};
 	if (sdlist_is_dir(r))
-		p = put_text(p, end, "%s", gl_sd_kind_folder);
+		p = put_text(p, end, "%s", S(STR_SD_KIND_FOLDER));
 	else if (console < LIB_CONSOLES)
-		p = put_text(p, end, "%s %s", consoles[console], gl_sd_kind_game);
+		p += SF(p, (u32)(end - p), STR_SD_KIND_GAME, LS(consoles[console]));
 	else
-		p = put_text(p, end, "%s", gl_sd_kind_file);
+		p = put_text(p, end, "%s", S(STR_SD_KIND_FILE));
 	char a[24], b[16];
 	if (sdlist_is_dir(r)) {
-		sdlist_count_text(a, sizeof(a), r->count, gl_sd_item, gl_sd_items, gl_sd_items_none);
+		sdlist_count_text(a, sizeof(a), r->count);
 		if (a[0] && p < end)
 			p = put_text(p, end, "\n%s", a);
 	} else if (p < end) {
 		sdlist_size_text(a, sizeof(a), r->size);
 		sdlist_number(b, sizeof(b), r->size);
-		p = put_text(p, end, "\n%s (%s %s)", a, b, gl_sd_bytes);
+		char bytes[32];
+		SF(bytes, sizeof(bytes), STR_SD_BYTES, LS(b));
+		p = put_text(p, end, "\n%s (%s)", a, bytes);
 	}
 	if (p < end && f_stat(sd.full, &fileinfo) == FR_OK && fileinfo.fdate) {
 		unsigned d = fileinfo.fdate, t = fileinfo.ftime;
-		p = put_text(p, end, "\n%s %04u-%02u-%02u %02u:%02u", gl_sd_changed, (d >> 9) + 1980, (d >> 5) & 15,
+		p = put_text(p, end, "\n%s %04u-%02u-%02u %02u:%02u", S(STR_SD_CHANGED), (d >> 9) + 1980, (d >> 5) & 15,
 			     d & 31, t >> 11, (t >> 5) & 63);
 	}
 	if (p < end && console < LIB_CONSOLES) {
@@ -744,9 +746,9 @@ static void info(u32 i)
 		gamesave_record_read(sd.full, &rec);
 		if (gamesave_current_path(sd.save, sizeof(sd.save), sd.full, &rec) > 0 &&
 		    f_stat(sd.save, &fileinfo) == FR_OK)
-			snprintf(p, (size_t)(end - p), "\n%s: %s", gl_sd_save, rec.slot);
+			snprintf(p, (size_t)(end - p), "\n%s: %s", S(STR_SD_SAVE), rec.slot);
 		else
-			snprintf(p, (size_t)(end - p), "\n%s", gl_sd_no_save);
+			snprintf(p, (size_t)(end - p), "\n%s", S(STR_SD_NO_SAVE));
 	}
 	dialog_message(sd.name, sd.info, DIALOG_INFO);
 }
@@ -757,7 +759,7 @@ static int delete_file(u32 i)
 {
 	tlog_debug("sdcard: delete %s", sd.full);
 	if (!action_delete_file(sd.full)) {
-		dialog_message(NULL, gl_sd_delete_failed, DIALOG_ERROR);
+		dialog_message(NULL, S(STR_SD_DELETE_FAILED), DIALOG_ERROR);
 		return 0;
 	}
 	list_folder();
@@ -775,7 +777,7 @@ static void pop_add(u32 id, const char *text, u8 flags)
 
 static const char *fav_text(void)
 {
-	return userdata_fav_has(sd.full) ? gl_sd_fav_remove : gl_sd_fav_add;
+	return userdata_fav_has(sd.full) ? S(STR_SD_FAV_REMOVE) : S(STR_SD_FAV_ADD);
 }
 
 // START (or A on a file the cart can't start): the entry's popup
@@ -813,9 +815,9 @@ static int file_popup_open(u32 i)
 				     sd.pop_items,
 				     0,
 				     0,
-				     gl_games->hint_boot};
+				     S(STR_GAMES_HINT_BOOT)};
 	if (sdlist_is_dir(r)) {
-		pop_add(POP_OPEN, gl_sd_open, 0);
+		pop_add(POP_OPEN, S(STR_SD_OPEN), 0);
 	} else if (console != LIB_CONSOLE_NONE) {
 		// Play: a GBA game's start steps with LEFT/RIGHT (its own way,
 		// clean, and with addons while one is on); Write to NOR writes it
@@ -828,21 +830,21 @@ static int file_popup_open(u32 i)
 			if (any_addon())
 				sd.boots[sd.nboots++] = LANG_BOOT_ADDONS;
 		}
-		pop_add(POP_LAUNCH, gl_sd_launch, sd.nboots > 1 ? UI_POP_STEP : 0);
+		pop_add(POP_LAUNCH, S(STR_SD_LAUNCH), sd.nboots > 1 ? UI_POP_STEP : 0);
 		if (sd.nboots > 1)
-			sd.pop_items[0].value = gl_games->boots[LANG_BOOT_DEFAULT];
+			sd.pop_items[0].value = S(STR_GAMES_BOOT_DEFAULT);
 		if (console == LIB_GBA) {  // only GBA games go to the game NOR, and have slots
-			pop_add(POP_NOR, gl_sd_nor, 0);
+			pop_add(POP_NOR, S(STR_SD_NOR), 0);
 			if (game_saves_probe(sd.full))
-				pop_add(POP_SAVES, gl_gsaves->title, 0);
+				pop_add(POP_SAVES, S(STR_GSAVES_TITLE), 0);
 		}
 		pop_add(POP_FAV, fav_text(), 0);
 	}
 	if (!sdlist_is_dir(r))
-		pop_add(POP_RENAME, gl_rename->title, 0);
-	pop_add(POP_INFO, gl_sd_info, 0);
+		pop_add(POP_RENAME, S(STR_RENAME_TITLE), 0);
+	pop_add(POP_INFO, S(STR_SD_INFO), 0);
 	if (!sdlist_is_dir(r))
-		pop_add(POP_DELETE, gl_sd_delete, UI_POP_DANGER);
+		pop_add(POP_DELETE, S(STR_SD_DELETE), UI_POP_DANGER);
 	if (!ui_popup_open(l, node(N_HINTS), &sd.popup))
 		return 0;
 	tlog_debug("sdcard: popup %s", sd.full);
@@ -859,7 +861,7 @@ static void file_popup_run(u32 i)
 			return;  // B: it has closed
 		if (pick & (UI_POP_LEFT | UI_POP_RIGHT)) {  // Play's way to start
 			sd.boot = (u8)((sd.boot + (pick & UI_POP_LEFT ? sd.nboots - 1u : 1u)) % sd.nboots);
-			sd.pop_items[0].value = gl_games->boots[sd.boots[sd.boot]];
+			sd.pop_items[0].value = S(STR_GAMES_BOOT_DEFAULT + sd.boots[sd.boot]);
 			ui_popup_changed(0);
 			continue;
 		}
@@ -870,7 +872,7 @@ static void file_popup_run(u32 i)
 			tlog_debug("sdcard: favourite %s %s", sd.full, on ? "on" : "off");
 			if (!userdata_fav_set(sd.full, on)) {
 				ui_popup_close();
-				dialog_message(NULL, gl_sd_fav_failed, DIALOG_ERROR);
+				dialog_message(NULL, S(STR_SD_FAV_FAILED), DIALOG_ERROR);
 				return;
 			}
 			sd.pop_items[pick].text = fav_text();
@@ -878,9 +880,9 @@ static void file_popup_run(u32 i)
 			continue;  // it stays up
 		}
 		if (id == POP_DELETE) {
-			snprintf(sd.ask, sizeof(sd.ask), "%s %s?", gl_sd_delete_ask, sd.name);
-			struct ui_confirm ask = {sd.ask, console != LIB_CONSOLE_NONE ? gl_sd_delete_save : NULL,
-						 gl_sd_delete, 1};
+			SF(sd.ask, sizeof(sd.ask), STR_SD_DELETE_ASK, LS(sd.name));
+			struct ui_confirm ask = {sd.ask, console != LIB_CONSOLE_NONE ? S(STR_SD_DELETE_SAVE) : NULL,
+						 S(STR_SD_DELETE), 1};
 			if (!ui_confirm(node(N_HINTS), &ask))
 				continue;  // Cancel: back to the popup
 			ui_popup_close();
@@ -1009,9 +1011,9 @@ static struct ui_view *sd_enter(u32 item, u32 row)
 		return 0;
 	sd.view = v;
 	sd.first = v->first;
-	sd.hints[0] = (struct ui_hint){"A", gl_hint_open};
-	sd.hints[1] = (struct ui_hint){"START", gl_hint_menu};
-	sd.hints[2] = (struct ui_hint){"B", gl_hint_back};
+	sd.hints[0] = (struct ui_hint){"A", S(STR_HINT_OPEN)};
+	sd.hints[1] = (struct ui_hint){"START", S(STR_HINT_MENU)};
+	sd.hints[2] = (struct ui_hint){"B", S(STR_HINT_BACK)};
 	sd.hint_note = HINTS_NONE;  // hint_for sets the bar
 	// The cursor the folder was left with (from home, or back from a
 	// launch that didn't start); else the place's row (Last place, at the

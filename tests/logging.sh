@@ -528,7 +528,7 @@ open)
   rm -rf "$cart" && mkdir -p "$cart" && new_card 65536 32
   # shellcheck disable=SC2046
   eval boot "$(to_info 1)" $(nav_press A) -w \"nav: page settings ready\" \
-    $(nav_press UP A LEFT LEFT A B) -w \"settings: LOGGING is off\" -k @60:-
+    $(nav_press UP UP A LEFT LEFT A B) -w \"settings: LOGGING is off\" -k @60:-
   grep -q 'log: LOGGING is off: the open stops' "$cart/kernel.log" || fail "the open didn't stop"
   ! mdir -i "$cart/sd.img" ::/torii/logs >/dev/null 2>&1 || fail "the open went on with LOGGING off"
   card_ok

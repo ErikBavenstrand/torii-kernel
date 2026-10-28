@@ -53,7 +53,6 @@ static void check_fits(const char *what, const char *s, u32 max)
 
 void test_settings_table(void)
 {
-	LoadEnglish();
 	erased();
 	u32 next = 0;
 	u8 used[assress_max] = {0};
@@ -85,15 +84,15 @@ void test_settings_table(void)
 		}
 	}
 	for (u32 id = SET_ROWS; id < SET_EXPLAINS; id++) {  // explanations alone
-		check_fits("explanation", gl_set_explain[id], EXPLAIN_W);
-		CHECK(strlen(gl_set_explain[id]) <= EXPLAIN_CHARS);
+		check_fits("explanation", S(STR_SET_EXPLAIN_THEME + id), EXPLAIN_W);
+		CHECK(strlen(S(STR_SET_EXPLAIN_THEME + id)) <= EXPLAIN_CHARS);
 	}
-	// The new slots (from 30), and LANGUAGE hidden until v0.9
+	// The new slots (from 30), and LANGUAGE shown (v0.9)
 	CHECK_EQ(settings_rows[SET_CLOCK_24H].slot, 30);
 	CHECK_EQ(settings_rows[SET_GAME_VIEW].slot, 31);
 	CHECK_EQ(settings_rows[SET_START_ON].slot, 32);
 	CHECK_EQ(settings_rows[SET_SHOW_ALL].slot, 33);
-	CHECK(!settings_visible(&v, SET_LANGUAGE));
+	CHECK(settings_visible(&v, SET_LANGUAGE));
 	CHECK_EQ(settings_rows[SET_RESCAN].action, SET_ACTION_RESCAN);
 	CHECK_EQ(settings_rows[SET_IDENTIFY].action, SET_ACTION_IDENTIFY);
 	CHECK_EQ(settings_rows[SET_SAVES].action, SET_ACTION_SAVES);
@@ -103,7 +102,7 @@ void test_settings_table(void)
 		const struct settings_row *r = &settings_rows[id];
 		if (r->kind != SET_CHOICE && r->kind != SET_COLOUR && r->kind != SET_ONOFF)
 			continue;
-		u32 n = id == SET_LANGUAGE ? lang_pack_count : r->count;
+		u32 n = id == SET_LANGUAGE ? lang_count() : r->count;
 		for (u16 value = 0; value < n; value++) {
 			char text[32];
 			settings_set(&v, id, value);
@@ -117,7 +116,6 @@ void test_settings_table(void)
 
 void test_settings_defaults(void)
 {
-	LoadEnglish();
 	erased();
 	static const struct {
 		u8 id;
@@ -150,7 +148,7 @@ void test_settings_defaults(void)
 		{SET_SAVES, 0, ""},
 		{SET_HISTORY, SET_HISTORY_DEFAULT, "5"},
 		{SET_LOGGING, 0, "Off"},
-		{SET_LANGUAGE, 0, "ENGLISH"},
+		{SET_LANGUAGE, 0, "English"},
 	};
 	for (u32 i = 0; i < sizeof(want) / sizeof(want[0]); i++) {
 		CHECK_EQ(settings_get(&v, want[i].id), want[i].value);
@@ -193,7 +191,6 @@ void test_settings_defaults(void)
 
 void test_settings_staged_values(void)
 {
-	LoadEnglish();
 	erased();
 	// A change and back leaves the slots as loaded: nothing to write
 	settings_step(&v, SET_THEME, 1);
@@ -274,7 +271,7 @@ void test_settings_staged_values(void)
 	settings_set(&v, SET_DIM, 61);
 	settings_set(&v, SET_LED_IDLE, 8);
 	settings_set(&v, SET_START_ON, SET_STARTS);
-	settings_set(&v, SET_LANGUAGE, (u16)lang_pack_count);
+	settings_set(&v, SET_LANGUAGE, (u16)lang_count());
 	settings_set(&v, SET_TIME_ROW, 1);
 	settings_set(&v, SET_RESCAN, 1);
 	settings_set(&v, SET_RESET_KEYS, 0x0003);  // keys go through settings_set_keys
@@ -302,14 +299,13 @@ void test_settings_staged_values(void)
 	v.slot[assress_language] = v.loaded[assress_language] = 0;  // an unknown id reads as the first
 	settings_set(&v, SET_LANGUAGE, 0);
 	CHECK_EQ(v.slot[assress_language], 0);
-	v.slot[assress_language] = lang_packs[0].id;
+	v.slot[assress_language] = lang_choice(0)->id;
 	settings_set(&v, SET_LANGUAGE, 0);
 	CHECK_EQ(v.slot[assress_language], 0);  // back as loaded
 }
 
 void test_settings_hotkeys(void)
 {
-	LoadEnglish();
 	erased();
 	const u16 A = 1 << 0, B = 1 << 1, SELECT = 1 << 2, START = 1 << 3, UP = 1 << 6, R = 1 << 8, L = 1 << 9;
 	CHECK_EQ(settings_set_keys(&v, SET_RESET_KEYS, L | R | B), SET_KEYS_OK);
@@ -384,7 +380,7 @@ void test_settings_hotkeys(void)
 	settings_set(&v, SET_RTS, 1);
 	CHECK(!strcmp(settings_label(&v, SET_RESET_KEYS), "Menu keys"));
 	CHECK(!strcmp(settings_label(&v, SET_SLEEP_KEYS), "Sleep keys"));
-	CHECK(!strcmp(settings_explain(&v, SET_RESET_KEYS), gl_set_explain[SET_RESET_KEYS]));
+	CHECK(!strcmp(settings_explain(&v, SET_RESET_KEYS), S(STR_SET_EXPLAIN_RESET_KEYS)));
 	// In-game menu (v0.8), in Back to menu's slot: its Off (and an erased
 	// slot) is Auto, its On Every game, and Off is new; Save states change
 	// nothing it shows
@@ -415,7 +411,6 @@ void test_settings_hotkeys(void)
 
 void test_settings_visible_rows(void)
 {
-	LoadEnglish();
 	erased();
 	u8 ids[SET_CARD_ROWS];
 	CHECK_EQ(settings_section_rows(&v, SET_SEC_CART, ids), 5);
@@ -424,8 +419,9 @@ void test_settings_visible_rows(void)
 	CHECK(!settings_visible(&v, SET_LED_IDLE));
 	CHECK_EQ(settings_section_rows(&v, SET_SEC_CART, ids), 3);
 	CHECK_EQ(ids[2], SET_LED);
-	CHECK_EQ(settings_section_rows(&v, SET_SEC_SYSTEM, ids), 1);  // LANGUAGE hidden
+	CHECK_EQ(settings_section_rows(&v, SET_SEC_SYSTEM, ids), 2);
 	CHECK_EQ(ids[0], SET_LOGGING);
+	CHECK_EQ(ids[1], SET_LANGUAGE);
 	// Saves: what happens to a save, then the games' saves, then the page
 	// that tidies them
 	CHECK_EQ(settings_section_rows(&v, SET_SEC_SAVES, ids), 4);
@@ -454,7 +450,6 @@ static void check_time(u32 hour, u32 minute, int h24, const char *expected)
 
 void test_settings_clock_format(void)
 {
-	LoadEnglish();
 	check_time(0, 0, 1, "00:00");
 	check_time(0, 0, 0, "12:00 AM");  // midnight
 	check_time(0, 59, 0, "12:59 AM");
@@ -538,7 +533,6 @@ static void check_field(const struct settings_editor *e, u32 pos, const char *ex
 
 void test_settings_clock_editor(void)
 {
-	LoadEnglish();
 	struct settings_editor e;
 	const struct settings_clock now = {2024, 1, 31, 23, 0, 41};
 

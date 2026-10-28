@@ -827,11 +827,11 @@ static void popup_hints(void)
 	u32 n = 0, step = (m->items[pp.cursor].flags & UI_POP_STEP) && m->step_hint;
 	if (step == (r->hint_count == 4) && r->hint_count)
 		return;  // as it is
-	r->hint[n++] = (struct ui_hint){KEY_UPDOWN, gl_pop_choose};
+	r->hint[n++] = (struct ui_hint){KEY_UPDOWN, S(STR_POP_CHOOSE)};
 	if (step)
 		r->hint[n++] = (struct ui_hint){KEY_LEFTRIGHT, m->step_hint};
-	r->hint[n++] = (struct ui_hint){"A", gl_pop_ok};
-	r->hint[n++] = (struct ui_hint){"B", gl_pop_close};
+	r->hint[n++] = (struct ui_hint){"A", S(STR_POP_OK)};
+	r->hint[n++] = (struct ui_hint){"B", S(STR_POP_CLOSE)};
 	r->hint_count = (u8)n;
 	if (r->hinted)
 		ui_hints_set(r->hints, r->hint, n);
@@ -1135,7 +1135,7 @@ static void confirm_render(u8 node, const struct pen *p)
 			ink = danger ? UI_ROLE_DANGER : UI_ROLE_TEXT;
 		}
 		pen_text(p, font, bx + 2, by + (bh - (s32)font->line_height) / 2, (u32)(bw - 4), ink,
-			 b ? c->action : gl_pop_cancel_button, PEN_CENTRE);
+			 b ? c->action : S(STR_POP_CANCEL_BUTTON), PEN_CENTRE);
 	}
 }
 
@@ -1405,9 +1405,9 @@ int ui_confirm(u8 hints, const struct ui_confirm *confirm)
 		tlog_error("confirm: %s", ui_error());
 		return 0;
 	}
-	pp.conf.hint[0] = (struct ui_hint){KEY_LEFTRIGHT, gl_pop_choose};
-	pp.conf.hint[1] = (struct ui_hint){"A", gl_pop_ok};
-	pp.conf.hint[2] = (struct ui_hint){"B", gl_pop_cancel};
+	pp.conf.hint[0] = (struct ui_hint){KEY_LEFTRIGHT, S(STR_POP_CHOOSE)};
+	pp.conf.hint[1] = (struct ui_hint){"A", S(STR_POP_OK)};
+	pp.conf.hint[2] = (struct ui_hint){"B", S(STR_POP_CANCEL)};
 	pp.conf.hint_count = 3;
 	pp.conf.drawn_frame = 0;
 	run_start(&pp.conf, v, hints);

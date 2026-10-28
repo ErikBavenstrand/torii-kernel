@@ -420,7 +420,7 @@ static u32 swatch_layout(u32 id, s32 *xs, u8 *cs)
 		}
 		return 8;
 	}
-	xs[0] = look.value_r - (s32)extent(gl_set_colours[c]) - look.swatch_text_gap - look.swatch_w;
+	xs[0] = look.value_r - (s32)extent(S(STR_SET_VALUE_COLOUR_OFF + c)) - look.swatch_text_gap - look.swatch_w;
 	cs[0] = (u8)c;
 	return 1;
 }
@@ -450,7 +450,7 @@ static s32 paint_value(const struct ui_paint *p, u32 id, s32 right, u32 ink)
 	switch (r->kind) {
 	case SET_ACTION: {
 		if (id == SET_RESCAN && sp.scanning)
-			return text_right(p, right, ink, gl_set_scanning);
+			return text_right(p, right, ink, S(STR_SET_SCANNING));
 		if (id == SET_IDENTIFY && sp.identify_done != IDENTIFY_IDLE)
 			return text_right(p, right, ink, sp.progress);
 		// A chevron, chevron_gap in from the edge
@@ -467,7 +467,7 @@ static s32 paint_value(const struct ui_paint *p, u32 id, s32 right, u32 ink)
 			text_at(p, at, 16, UI_ROLE_ACCENT_INK, MARK_R);
 			at -= look.mark_gap;
 			at = sp.cap.held ? paint_chips(p, at, sp.cap.held, 1)
-					 : text_right(p, at, UI_ROLE_TEXT, gl_set_press);
+					 : text_right(p, at, UI_ROLE_TEXT, S(STR_SET_PRESS));
 			return text_right(p, at - look.mark_gap, UI_ROLE_ACCENT_INK, MARK_L);
 		}
 		return paint_chips(p, right, settings_get(&sp.v, id), 0);
@@ -477,7 +477,7 @@ static s32 paint_value(const struct ui_paint *p, u32 id, s32 right, u32 ink)
 		u32 n = swatch_layout(id, xs, cs), c = settings_get(&sp.v, id);
 		if (n == 1) {
 			paint_swatch(p, xs[0], c, 0);
-			text_right(p, right, ink, gl_set_colours[c]);
+			text_right(p, right, ink, S(STR_SET_VALUE_COLOUR_OFF + c));
 			return xs[0];
 		}
 		for (u32 i = 0; i < n; i++)
@@ -666,13 +666,14 @@ static void hints_show(void)
 	u8 h = node(N_HINTS);
 	u32 id = cursor_id();
 	if (sp.saving) {
-		ui_hints_text(h, gl_set_saving);
+		ui_hints_text(h, S(STR_SET_SAVING));
 	} else if (sp.mode == MODE_EDIT) {
-		const char *change =
-			settings_rows[id].kind == SET_COLOUR ? gl_set_colours[settings_get(&sp.v, id)] : gl_hint_change;
+		const char *change = settings_rows[id].kind == SET_COLOUR
+					     ? S(STR_SET_VALUE_COLOUR_OFF + settings_get(&sp.v, id))
+					     : S(STR_HINT_CHANGE);
 		sp.hints[0] = (struct ui_hint){KEY_LEFTRIGHT, change};
-		sp.hints[1] = (struct ui_hint){"A", gl_hint_done};
-		sp.hints[2] = (struct ui_hint){"B", gl_hint_cancel};
+		sp.hints[1] = (struct ui_hint){"A", S(STR_HINT_DONE)};
+		sp.hints[2] = (struct ui_hint){"B", S(STR_HINT_CANCEL)};
 		ui_hints_set(h, sp.hints, 3);
 	} else if (sp.mode == MODE_CAPTURE) {
 		u32 left = settings_capture_left(&sp.cap);
@@ -684,7 +685,7 @@ static void hints_show(void)
 					    (u8)((left * look.bar_w + sp.cap.timeout - 1) / sp.cap.timeout),
 					    0};
 		sp.bar_fill = note.fill;
-		ui_hints_note(h, gl_set_press_hint, &note);
+		ui_hints_note(h, S(STR_SET_PRESS_HINT), &note);
 	} else if (sp.refused_left) {
 		struct ui_hint_note note = {UI_ROLE_DANGER, 0, 0, 0, 0, 0, 0};
 		ui_hints_note(h, sp.refused, &note);
@@ -696,8 +697,7 @@ static void hints_show(void)
 // The title's position, "5/24"
 static void position_show(void)
 {
-	snprintf(sp.pos, sizeof(sp.pos), "%lu/%lu", (unsigned long)settings_layout_position(&sp.lay, sp.cursor),
-		 (unsigned long)sp.lay.rows);
+	SF(sp.pos, sizeof(sp.pos), STR_NAV_POSITION, LN(settings_layout_position(&sp.lay, sp.cursor)), LN(sp.lay.rows));
 	ui_title_set_right(node(N_TITLE), sp.pos);
 }
 
@@ -788,7 +788,7 @@ static void save_now(void)
 	if (done == SET_COMMIT_FAILED) {
 		// The old values stay on the NOR, these staged: the next confirm,
 		// or leaving, tries again (loaded still differs)
-		snprintf(sp.refused, sizeof(sp.refused), "%s", gl_set_save_failed);
+		snprintf(sp.refused, sizeof(sp.refused), "%s", S(STR_SET_SAVE_FAILED));
 		sp.refused_left = look.refusal;
 		sp.unsaved = 1;
 		tlog_error("settings: not saved, tried again at the next confirm or on leaving");
@@ -841,12 +841,24 @@ static void edit_slots(u32 id, int back)
 		memcpy(sp.edit_from, &sp.v.slot[r->slot], n * sizeof(u16));
 }
 
+// Language, kept: it takes effect at once. The page leaves (written now,
+// settings_commit loads the language: CheckLanguage) and comes back drawn
+// in it, as home does next
+static void language_apply(u32 arg)
+{
+	(void)arg;
+	settings_page.leave();
+	nav_reshow();
+}
+
 static void edit_end(int keep)
 {
 	u32 id = sp.edit_id;
 	sp.mode = MODE_BROWSE;
 	if (keep) {
 		save_soon();
+		if (id == SET_LANGUAGE && sp.saving)
+			nav_defer(language_apply, 0);
 	} else {
 		edit_slots(id, 1);
 		previews(id, 1);
@@ -855,13 +867,17 @@ static void edit_end(int keep)
 	hints_show();
 }
 
+_Static_assert(STR_SET_KEYS_SOFT_RESET - STR_SET_KEYS_COUNT == SET_KEYS_SOFT_RESET - SET_KEYS_COUNT,
+	       "the refusals in settings_set_keys' order");
+
 static void refuse(u32 why, u32 id)
 {
 	if (why == SET_KEYS_TAKEN)
-		snprintf(sp.refused, sizeof(sp.refused), "%s %s.", gl_set_refused[why],
-			 settings_label(&sp.v, id == SET_SLEEP_KEYS ? SET_RESET_KEYS : SET_SLEEP_KEYS));
+		SF(sp.refused, sizeof(sp.refused), STR_SET_KEYS_TAKEN,
+		   LS(settings_label(&sp.v, id == SET_SLEEP_KEYS ? SET_RESET_KEYS : SET_SLEEP_KEYS)));
 	else
-		snprintf(sp.refused, sizeof(sp.refused), "%s", why <= SET_KEYS_SOFT_RESET ? gl_set_refused[why] : "");
+		snprintf(sp.refused, sizeof(sp.refused), "%s",
+			 why && why <= SET_KEYS_SOFT_RESET ? S(STR_SET_KEYS_COUNT + why - SET_KEYS_COUNT) : "");
 	sp.refused_left = look.refusal;
 	tlog_debug("settings: keys refused: %s", sp.refused);
 }
@@ -901,10 +917,10 @@ static void time_edit(u32 id)
 	f->sep[1] = kind == SET_DATE ? "-" : " ";
 	fields_text();
 	struct ui_hint *keys = sp.field_keys;
-	keys[0] = (struct ui_hint){KEY_UPDOWN, gl_hint_change};
-	keys[1] = (struct ui_hint){KEY_LEFTRIGHT, gl_hint_field};
-	keys[2] = (struct ui_hint){"A", gl_hint_set};
-	keys[3] = (struct ui_hint){"B", gl_hint_cancel};
+	keys[0] = (struct ui_hint){KEY_UPDOWN, S(STR_HINT_CHANGE)};
+	keys[1] = (struct ui_hint){KEY_LEFTRIGHT, S(STR_HINT_FIELD)};
+	keys[2] = (struct ui_hint){"A", S(STR_HINT_SET)};
+	keys[3] = (struct ui_hint){"B", S(STR_HINT_CANCEL)};
 	if (!ui_fields_open(node(N_LIST), node(N_HINTS), f, keys, 4))
 		return;
 	for (;;) {
@@ -1140,8 +1156,7 @@ static void settings_poll(void)
 		u32 done = 0, total = 0, now = names_identifying(&done, &total) ? done : IDENTIFY_IDLE;
 		if (now != sp.identify_done) {
 			sp.identify_done = now;
-			snprintf(sp.progress, sizeof(sp.progress), "%lu/%lu", (unsigned long)done,
-				 (unsigned long)total);
+			SF(sp.progress, sizeof(sp.progress), STR_SET_PROGRESS, LN(done), LN(total));
 			refresh_id(SET_IDENTIFY);
 		}
 	}

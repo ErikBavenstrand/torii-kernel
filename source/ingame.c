@@ -350,9 +350,8 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 					   (hdr_out.image_bytes - (u32)sizeof(hdr_out)) / 4);
 	bad += sram_put(INGAME_SRAM_IMAGE, (const u8 *)&hdr_out, sizeof(hdr_out));
 	bad += sram_put(INGAME_SRAM_SESSION, (const u8 *)words, sizeof(words));
-	const struct lang_ingame *t = gl_ingame;
-	// The menu's footer: A's word, its keys as Settings shows them, then
-	// the hint; without A's word where that doesn't fit
+	// The menu's footer: its keys as Settings shows them in A's hint;
+	// without A's word where that doesn't fit
 	char keys_text[32], hint[64];
 	u8 keys[3];
 	u32 n = settings_keys_list(h->menu_key, keys), len = 0;
@@ -361,53 +360,56 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 		len += (u32)snprintf(keys_text + len, sizeof(keys_text) - len, "%s%s", i ? "+" : "",
 				     settings_key_name(keys[i]));
 	tlog("launch: in-game menu keys %s%s", keys_text, gl_menu_off ? ", off (In-game menu Off)" : "");
-	snprintf(hint, sizeof(hint), "%s%s%s", t->hint_choose, keys_text, t->hint);
+	SF(hint, sizeof(hint), STR_INGAME_HINT, LS(keys_text));
 	if (text_width(&font_body, hint, (u32)strlen(hint)) > INGAME_TEXT_W)
-		snprintf(hint, sizeof(hint), "%s%s", keys_text, t->hint);
+		SF(hint, sizeof(hint), STR_INGAME_HINT_SHORT, LS(keys_text));
 	char counts[INGAME_SHOTS_MAX][24];
 	for (u32 i = 0; i < INGAME_SHOTS_MAX; i++)
-		lang_fill(counts[i], sizeof(counts[i]), t->shot_count, i + 1, INGAME_SHOTS_MAX);
-	const char *text[INGAME_TEXTS] = {
-		[INGAME_TEXT_TITLE] = h->name[0] ? h->name : "Torii",
-		[INGAME_TEXT_RESUME] = t->resume,
-		[INGAME_TEXT_SAVE] = t->save,
-		[INGAME_TEXT_LOAD] = t->load,
-		[INGAME_TEXT_CHEATS_ON] = t->cheats_on,
-		[INGAME_TEXT_CHEATS_OFF] = t->cheats_off,
-		[INGAME_TEXT_RESET] = t->reset,
-		[INGAME_TEXT_SLEEP] = t->sleep,
-		[INGAME_TEXT_TORII] = t->torii,
-		[INGAME_TEXT_DEBUG] = t->debug,
-		[INGAME_TEXT_DEBUG_SAVED] = t->debug_saved,
-		[INGAME_TEXT_CHEATS] = t->cheats,
-		[INGAME_TEXT_ALL_OFF] = t->all_off,
-		[INGAME_TEXT_AS_LAUNCHED] = t->as_launched,
-		[INGAME_TEXT_KEPT] = t->kept,
-		[INGAME_TEXT_WHY_ROM] = t->why_rom,
-		[INGAME_TEXT_WHY_LOCKED] = t->why_locked,
-		[INGAME_TEXT_WHY_CANT] = t->why_cant,
-		[INGAME_TEXT_WHY_ROOM] = t->why_room,
-		[INGAME_TEXT_WHY_SLOW] = t->why_slow,
-		[INGAME_TEXT_STATE_KEEP] = t->state_keep,
-		[INGAME_TEXT_STATE_REPLACES] = t->state_replaces,
-		[INGAME_TEXT_STATE_LOAD] = t->state_load,
-		[INGAME_TEXT_STATE_ELSEWHERE] = t->state_elsewhere,
-		[INGAME_TEXT_STATE_EMPTY] = t->state_empty,
-		[INGAME_TEXT_SHOT] = t->shot,
-		[INGAME_TEXT_SHOT_SAVED] = t->shot_saved,
-		[INGAME_TEXT_SLEEP_WAKES] = t->sleep_wakes,
-		[INGAME_TEXT_HINT] = hint,
-		[INGAME_TEXT_SHOT_FULL] = t->shot_full,
-		[INGAME_TEXT_STATE_SAVED] = t->state_saved,
-		[INGAME_TEXT_TORII_SAVE] = t->torii_save,
-		[INGAME_TEXT_FIRST_SAVE] = t->first_save,
-		[INGAME_TEXT_UNSAVED_STATE] = t->unsaved_state,
+		SF(counts[i], sizeof(counts[i]), STR_INGAME_SHOT_COUNT, LN(i + 1), LN(INGAME_SHOTS_MAX));
+	// The lines by their ingame_abi.h index: the strings', then those built here
+	static const u16 ids[INGAME_TEXTS] = {
+		[INGAME_TEXT_RESUME] = STR_INGAME_RESUME,
+		[INGAME_TEXT_SAVE] = STR_INGAME_SAVE,
+		[INGAME_TEXT_LOAD] = STR_INGAME_LOAD,
+		[INGAME_TEXT_CHEATS_ON] = STR_INGAME_CHEATS_ON,
+		[INGAME_TEXT_CHEATS_OFF] = STR_INGAME_CHEATS_OFF,
+		[INGAME_TEXT_RESET] = STR_INGAME_RESET,
+		[INGAME_TEXT_SLEEP] = STR_INGAME_SLEEP,
+		[INGAME_TEXT_TORII] = STR_INGAME_TORII,
+		[INGAME_TEXT_DEBUG] = STR_INGAME_DEBUG,
+		[INGAME_TEXT_DEBUG_SAVED] = STR_INGAME_DEBUG_SAVED,
+		[INGAME_TEXT_CHEATS] = STR_INGAME_CHEATS,
+		[INGAME_TEXT_ALL_OFF] = STR_INGAME_ALL_OFF,
+		[INGAME_TEXT_AS_LAUNCHED] = STR_INGAME_AS_LAUNCHED,
+		[INGAME_TEXT_KEPT] = STR_INGAME_KEPT,
+		[INGAME_TEXT_WHY_ROM] = STR_INGAME_WHY_ROM,
+		[INGAME_TEXT_WHY_LOCKED] = STR_INGAME_WHY_LOCKED,
+		[INGAME_TEXT_WHY_CANT] = STR_INGAME_WHY_CANT,
+		[INGAME_TEXT_WHY_ROOM] = STR_INGAME_WHY_ROOM,
+		[INGAME_TEXT_WHY_SLOW] = STR_INGAME_WHY_SLOW,
+		[INGAME_TEXT_STATE_KEEP] = STR_INGAME_STATE_KEEP,
+		[INGAME_TEXT_STATE_REPLACES] = STR_INGAME_STATE_REPLACES,
+		[INGAME_TEXT_STATE_LOAD] = STR_INGAME_STATE_LOAD,
+		[INGAME_TEXT_STATE_ELSEWHERE] = STR_INGAME_STATE_ELSEWHERE,
+		[INGAME_TEXT_STATE_EMPTY] = STR_INGAME_STATE_EMPTY,
+		[INGAME_TEXT_SHOT] = STR_INGAME_SHOT,
+		[INGAME_TEXT_SHOT_SAVED] = STR_INGAME_SHOT_SAVED,
+		[INGAME_TEXT_SLEEP_WAKES] = STR_INGAME_SLEEP_WAKES,
+		[INGAME_TEXT_SHOT_FULL] = STR_INGAME_SHOT_FULL,
+		[INGAME_TEXT_STATE_SAVED] = STR_INGAME_STATE_SAVED,
+		[INGAME_TEXT_TORII_SAVE] = STR_INGAME_TORII_SAVE,
+		[INGAME_TEXT_FIRST_SAVE] = STR_INGAME_FIRST_SAVE,
+		[INGAME_TEXT_UNSAVED_STATE] = STR_INGAME_UNSAVED_STATE,
 	};
+	const char *text[INGAME_TEXTS];
+	for (u32 i = 0; i < INGAME_TEXTS; i++)
+		text[i] = ids[i] ? S(ids[i]) : NULL;
+	text[INGAME_TEXT_TITLE] = h->name[0] ? h->name : S(STR_INGAME_UNTITLED);
+	text[INGAME_TEXT_HINT] = hint;
 	char unsaved[2][INGAME_SHOTS_MAX][40];
 	for (u32 i = 0; i < INGAME_SHOTS_MAX; i++) {
-		u32 more = i > 0;
-		lang_fill(unsaved[0][i], sizeof(unsaved[0][i]), t->unsaved_shots[more], i + 1, 0);
-		lang_fill(unsaved[1][i], sizeof(unsaved[1][i]), t->unsaved_both[more], i + 1, 0);
+		SF(unsaved[0][i], sizeof(unsaved[0][i]), STR_N(STR_INGAME_UNSAVED_SHOTS, i + 1), LN(i + 1));
+		SF(unsaved[1][i], sizeof(unsaved[1][i]), STR_N(STR_INGAME_UNSAVED_BOTH, i + 1), LN(i + 1));
 		text[INGAME_TEXT_SHOT_COUNT + i] = counts[i];
 		text[INGAME_TEXT_UNSAVED_SHOTS + i] = unsaved[0][i];
 		text[INGAME_TEXT_UNSAVED_BOTH + i] = unsaved[1][i];
@@ -486,9 +488,9 @@ static void states_after_game(const struct ingame_session *h, const char *path)
 		return;
 	}
 	char text[24];
-	snprintf(text, sizeof(text), EN_STATE_SLOT, (unsigned long)tag.slot);
+	SF(text, sizeof(text), STR_STATE_SLOT, LN(tag.slot));
 	dialog_open();
-	dialog_progress_begin(gl_states->keeping, text);
+	dialog_progress_begin(S(STR_STATE_KEEPING), text);
 	progress_step(NULL, 0, PROGRESS_FULL);
 	u32 start = torii_frames;
 	int ok = statestore_keep(path, slot_name, tag.slot);
@@ -498,7 +500,7 @@ static void states_after_game(const struct ingame_session *h, const char *path)
 	}
 	dialog_progress_end();
 	if (!ok)
-		dialog_message(NULL, gl_states->not_kept, DIALOG_ERROR);
+		dialog_message(NULL, S(STR_STATE_NOT_KEPT), DIALOG_ERROR);
 	dialog_close();
 }
 
@@ -554,7 +556,7 @@ void ingame_refused_notice(void)
 	struct ingame_session *h = (struct ingame_session *)(void *)words;
 	sram_get(INGAME_SRAM_SESSION, (u8 *)words, sizeof(words));
 	SetRampage(0);
-	const char *name = "the game";
+	const char *name = S(STR_INGAME_REFUSED_GAME);
 	if (h->magic == INGAME_SESSION_MAGIC && h->version == INGAME_SESSION_VERSION && h->name[0] &&
 	    memchr(h->name, 0, sizeof(h->name)))
 		name = h->name;
@@ -563,15 +565,15 @@ void ingame_refused_notice(void)
 	const char *kind = (type & 0xF0) == 0x30 ? "Flash" : (type & 0xF0) == 0x20 ? "EEPROM" : NULL;
 	char why[64];
 	if (r.reason == INGAME_REFUSED_IMAGE)
-		snprintf(why, sizeof(why), "%s", EN_INGAME_REFUSED_IMAGE);
+		snprintf(why, sizeof(why), "%s", S(STR_INGAME_REFUSED_IMAGE));
 	else if (kind)
-		snprintf(why, sizeof(why), EN_INGAME_REFUSED_SAVE, kind);
+		SF(why, sizeof(why), STR_INGAME_REFUSED_SAVE, LS(kind));
 	else
-		snprintf(why, sizeof(why), "%s", EN_INGAME_REFUSED_MEMORY);
+		snprintf(why, sizeof(why), "%s", S(STR_INGAME_REFUSED_MEMORY));
 	char msg[200];
-	snprintf(msg, sizeof(msg), EN_INGAME_REFUSED, (int)charset_cut(name, 24), name, why);
+	SF(msg, sizeof(msg), STR_INGAME_REFUSED, LCUT(name, 24), LS(why));
 	dialog_open();  // dialog_message logs it
-	dialog_message(EN_INGAME_REFUSED_TITLE, msg, DIALOG_INFO);
+	dialog_message(S(STR_INGAME_REFUSED_TITLE), msg, DIALOG_INFO);
 	dialog_close();
 }
 

@@ -74,10 +74,10 @@ static struct {
 const char *nav_item_name(u32 item)
 {
 	const char *const names[NAV_ITEMS] = {
-		[NAV_RECENT] = gl_item_recent, [NAV_FAV] = gl_item_fav, [NAV_GBA] = gl_item_gba,
-		[NAV_GBC] = gl_item_gbc,       [NAV_GB] = gl_item_gb,   [NAV_NES] = gl_item_nes,
-		[NAV_SD] = gl_item_sd,         [NAV_NOR] = gl_item_nor, [NAV_SET] = gl_item_settings,
-		[NAV_INFO] = gl_item_info,
+		[NAV_RECENT] = S(STR_ITEM_RECENT), [NAV_FAV] = S(STR_ITEM_FAV), [NAV_GBA] = S(STR_ITEM_GBA),
+		[NAV_GBC] = S(STR_ITEM_GBC),       [NAV_GB] = S(STR_ITEM_GB),   [NAV_NES] = S(STR_ITEM_NES),
+		[NAV_SD] = S(STR_ITEM_SD),         [NAV_NOR] = S(STR_ITEM_NOR), [NAV_SET] = S(STR_ITEM_SETTINGS),
+		[NAV_INFO] = S(STR_ITEM_INFO),
 	};
 	return item < NAV_ITEMS ? names[item] : "";
 }
@@ -97,20 +97,12 @@ u16 nav_start_shown(void)
 	return registry_start_shown(nav.shown, nav.shown_count);
 }
 
-void nav_count_words(char *out, u32 size, u32 n, const char *one, const char *many)
+void nav_count_words(char *out, u32 size, u32 n, u32 id)
 {
-	if (n == 1 && one) {
-		snprintf(out, size, "%s", one);
-		return;
-	}
-	char digits[16];
-	u32 len = (u32)snprintf(digits, sizeof(digits), "%lu", (unsigned long)n), o = 0;
-	for (u32 i = 0; i < len && o + 2 < size; i++) {
-		if (i && (len - i) % 3 == 0)
-			out[o++] = ',';
-		out[o++] = digits[i];
-	}
-	snprintf(out + o, size - o, "%s%s", many ? " " : "", many ? many : "");
+	if (id)
+		SF(out, size, STR_N(id, n), LG(n));
+	else
+		lang_number(out, size, n);
 }
 
 // What each item holds, and which items show (registry_shown)
@@ -133,13 +125,13 @@ static void count_items(void)
 	for (u32 i = 0; i < NAV_ITEMS; i++) {
 		char *t = nav.count_text[i];
 		if (i == NAV_SD)
-			nav_count_words(t, sizeof(nav.count_text[i]), c[i], gl_count_file, gl_count_files);
+			nav_count_words(t, sizeof(nav.count_text[i]), c[i], STR_COUNT_FILES);
 		else if (i == NAV_SET)
-			snprintf(t, sizeof(nav.count_text[i]), "%s", gl_count_page);
+			snprintf(t, sizeof(nav.count_text[i]), "%s", S(STR_COUNT_PAGE));
 		else if (i == NAV_INFO)
 			t[0] = 0;
 		else
-			nav_count_words(t, sizeof(nav.count_text[i]), c[i], gl_count_game, gl_count_games);
+			nav_count_words(t, sizeof(nav.count_text[i]), c[i], STR_COUNT_GAMES);
 	}
 	nav.shown_count = (u8)registry_shown(c, nav.shown);
 	nav.lib_generation = library_generation();
@@ -308,7 +300,7 @@ static void show(const struct registry_place *p, u32 kind, s32 way)
 		tlog_error("nav: %s", ui_error());
 		TLOG_ASSERT(tries == 0);  // a fresh session should have room
 		ui_enter(UI_TR_LEAVE, 0);
-		dialog_message(NULL, gl_list_failed, DIALOG_ERROR);
+		dialog_message(NULL, S(STR_NAV_LIST_FAILED), DIALOG_ERROR);
 		engine_leave();
 		engine_enter();
 	}
@@ -424,6 +416,7 @@ static void run_deferred(void)
 	readcache_poison();  // nothing is in it between two actions
 	ui_wipe_finish();    // an action may block: the theme wipe ends first
 	fn(nav.deferred_arg);
+	lang_poll();  // a launch that came back: its language again, before the page draws
 	after_action();
 }
 
@@ -475,6 +468,7 @@ static void test_hook(void)
 			nav.place = (struct registry_place){nav.shown[0], 0, 0};
 		nav.place.open = 0;
 		nav.reshow = 1;  // "nav: home ready" again, once it faces the first item
+		lang_poll();  // as run_deferred: a launch that came back
 		after_action();
 		return;
 	default:
@@ -482,6 +476,7 @@ static void test_hook(void)
 		break;
 	}
 	nav.reshow = nav.place.open;  // a page shows what the action changed
+	lang_poll();  // as run_deferred: a launch that came back
 	after_action();
 }
 
@@ -598,6 +593,7 @@ void nav_run(void)
 		if (nav.place.open && pages[nav.place.item]->poll)
 			pages[nav.place.item]->poll();
 		library_poll();
+		lang_poll();
 		idle_remember();
 	}
 }

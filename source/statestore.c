@@ -547,12 +547,15 @@ int statestore_import_rts(const char *rom_path, const char *save_slot, const cha
 void statestore_row(char *out, u32 size, u32 slot, const struct statestore_slot *s, int unkept)
 {
 	if (unkept)
-		snprintf(out, size, EN_STATE_ROW_UNKEPT, (unsigned long)slot);
+		SF(out, size, STR_STATE_ROW_UNKEPT, LN(slot));
 	else if (!s || !s->have)
-		snprintf(out, size, EN_STATE_ROW_EMPTY, (unsigned long)slot);
+		SF(out, size, STR_STATE_ROW_EMPTY, LN(slot));
 	else if (!s->when.year || s->when.month < 1 || s->when.month > 12)
-		snprintf(out, size, EN_STATE_ROW_SAVED, (unsigned long)slot);
-	else
-		snprintf(out, size, EN_STATE_ROW_WHEN, (unsigned long)slot, s->when.day,
-			 gl_states->months[s->when.month - 1], s->when.hour, s->when.min);
+		SF(out, size, STR_STATE_ROW_SAVED, LN(slot));
+	else {
+		char date[24], time[8];
+		lang_date(date, sizeof(date), s->when.day, s->when.month);
+		snprintf(time, sizeof(time), "%02u:%02u", (unsigned)s->when.hour % 100, (unsigned)s->when.min % 100);
+		SF(out, size, STR_STATE_ROW_WHEN, LN(slot), LS(date), LS(time));
+	}
 }

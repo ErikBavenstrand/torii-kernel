@@ -104,7 +104,7 @@ struct saves {
 };
 _Static_assert(sizeof(struct saves) <= READCACHE_SAVES_SIZE, "the Saves screen's state fits READCACHE_SAVES");
 
-#define S ((struct saves *)(pReadCache + READCACHE_SAVES))
+#define SV ((struct saves *)(pReadCache + READCACHE_SAVES))
 
 static u32 main_rows(const struct saves *s)
 {
@@ -113,7 +113,7 @@ static u32 main_rows(const struct saves *s)
 
 static void size_text(char *out, u32 size, u32 bytes)
 {
-	gamelist_size(out, size, bytes, gl_games->size_kb, gl_games->size_mb);
+	gamelist_size(out, size, bytes);
 }
 
 static const char *base_of(const char *path)
@@ -179,7 +179,7 @@ static int model_fetch(void *ctx, u32 i, struct ui_item *out)
 	const struct orphan_scan *sc = &s->scan;
 	if (i == sc->count) {  // Empty trash, the trash's size beside it
 		size_text(s->detail, sizeof(s->detail), sc->trash_bytes);
-		out->text = gl_saves->empty_trash;
+		out->text = S(STR_SAVES_EMPTY_TRASH);
 		out->ink = sc->trash_files ? UI_ROLE_DANGER : UI_ROLE_FAINT;
 		out->detail = s->detail;
 		return UI_ITEM_READY;
@@ -187,7 +187,7 @@ static int model_fetch(void *ctx, u32 i, struct ui_item *out)
 	if (i > sc->count)
 		return UI_ITEM_PENDING;
 	snprintf(s->row, sizeof(s->row), "%s", saveorphan_path(sc, i));
-	nav_count_words(s->detail, sizeof(s->detail), sc->slots[i], gl_saves->slots[0], gl_saves->slots[1]);
+	nav_count_words(s->detail, sizeof(s->detail), sc->slots[i], STR_SAVES_SLOTS);
 	out->text = s->row;
 	out->detail = s->detail;
 	return UI_ITEM_READY;
@@ -264,13 +264,13 @@ static void show_keys(struct saves *s)
 {
 	u32 n = 0;
 	int trash = s->mode == M_MAIN && s->cursor == s->scan.count;
-	const char *a = s->mode == M_PICK    ? gl_saves->hint_relink
-			: s->mode == M_GAMES ? gl_saves->hint_games
-			: trash              ? gl_saves->hint_empty
-					     : gl_saves->hint_open;
+	const char *a = s->mode == M_PICK    ? S(STR_SAVES_HINT_RELINK)
+			: s->mode == M_GAMES ? S(STR_SAVES_HINT_GAMES)
+			: trash              ? S(STR_SAVES_HINT_EMPTY)
+					     : S(STR_SAVES_HINT_OPEN);
 	if (!trash || s->scan.trash_files)
 		s->keys[n++] = (struct ui_hint){"A", a};
-	s->keys[n++] = (struct ui_hint){"B", gl_hint_back};
+	s->keys[n++] = (struct ui_hint){"B", S(STR_HINT_BACK)};
 	ui_hints_set(s->hints, s->keys, n);
 }
 
@@ -279,23 +279,23 @@ static void show_figures(struct saves *s)
 {
 	const struct orphan_scan *sc = &s->scan;
 	if (s->mode == M_PICK) {
-		ui_title_set(s->title, gl_saves->pick_title);
+		ui_title_set(s->title, S(STR_SAVES_PICK_TITLE));
 		ui_title_set_right(s->title, base_of(s->from));
 		return;
 	}
 	if (s->mode == M_GAMES) {
-		ui_title_set(s->title, gl_saves->games_title);
-		nav_count_words(s->right, sizeof(s->right), s->games_n, gl_saves->games[0], gl_saves->games[1]);
+		ui_title_set(s->title, S(STR_SAVES_GAMES_TITLE));
+		nav_count_words(s->right, sizeof(s->right), s->games_n, STR_SAVES_GAMES);
 		ui_title_set_right(s->title, s->right);
 		return;
 	}
-	ui_title_set(s->title, gl_saves->title);
+	ui_title_set(s->title, S(STR_SAVES_TITLE));
 	size_text(s->right, sizeof(s->right), sc->saves_bytes + sc->backups_bytes + sc->trash_bytes);
 	ui_title_set_right(s->title, s->right);
 	char saves[16], backups[16];
 	size_text(saves, sizeof(saves), sc->saves_bytes);
 	size_text(backups, sizeof(backups), sc->backups_bytes);
-	snprintf(s->line, sizeof(s->line), EN_SAVES_LEGEND, saves, backups);
+	SF(s->line, sizeof(s->line), STR_SAVES_LEGEND, LS(saves), LS(backups));
 	ui_label_set((u8)(s->first + M_LINE), s->line);
 	// Two shades, as the line above names two figures; the trash's size is
 	// on its own row (Empty trash)
@@ -305,9 +305,9 @@ static void show_figures(struct saves *s)
 	ui_storage_set((u8)(s->first + M_BAR), s->parts, 2, total ? total : 1);
 	u32 n = sc->count + sc->more;
 	if (n)
-		snprintf(s->head, sizeof(s->head), EN_SAVES_HEADING, gl_saves->heading, (unsigned long)n);
+		SF(s->head, sizeof(s->head), STR_SAVES_HEADING_COUNT, LN(n));
 	else
-		snprintf(s->head, sizeof(s->head), "%s", gl_saves->none);
+		snprintf(s->head, sizeof(s->head), "%s", S(STR_SAVES_NONE));
 	ui_label_set((u8)(s->first + M_HEAD), s->head);
 }
 
@@ -338,16 +338,16 @@ static int show(struct saves *s, u32 cursor)
 static void progress(void *ctx, u32 phase, u32 entries)
 {
 	struct saves *s = ctx;
-	snprintf(s->status, sizeof(s->status), "%s \xC2\xB7 %u", gl_saves->phase[phase < ORPHAN_PHASES ? phase : 0],
-		 (unsigned)entries);
+	SF(s->status, sizeof(s->status), STR_SAVES_PHASE,
+	   LS(S(STR_SAVES_PHASE_SAVES + (phase < ORPHAN_PHASES ? phase : 0))), LN(entries));
 	dialog_progress_set(phase, ORPHAN_PHASES, s->status);
 }
 
 // ORPHAN_OK, or ORPHAN_CARD when the card didn't answer
 static int scan(struct saves *s)
 {
-	dialog_progress_begin(gl_saves->scanning, gl_saves->scanning_text);
-	dialog_progress_status(gl_saves->phase[0]);
+	dialog_progress_begin(S(STR_SAVES_SCANNING), S(STR_SAVES_SCANNING_TEXT));
+	dialog_progress_status(S(STR_SAVES_PHASE_SAVES));
 	int r = saveorphan_scan(&s->scan, progress, s);
 	dialog_progress_end();
 	return r;
@@ -391,15 +391,15 @@ static const char *error_text(int r)
 {
 	switch (r) {
 	case ORPHAN_NO_SOURCE:
-		return gl_saves->err_source;
+		return S(STR_SAVES_ERR_SOURCE);
 	case ORPHAN_NO_TARGET:
-		return gl_saves->err_target;
+		return S(STR_SAVES_ERR_TARGET);
 	case ORPHAN_PATH:
-		return gl_saves->err_path;
+		return S(STR_SAVES_ERR_PATH);
 	case ORPHAN_STOPPED:
-		return gl_saves->err_stopped;
+		return S(STR_SAVES_ERR_STOPPED);
 	default:
-		return gl_saves->err_card;
+		return S(STR_SAVES_ERR_CARD);
 	}
 }
 
@@ -411,7 +411,7 @@ static void enter_pick(struct saves *s, u32 o)
 	const u8 *slot = library_or_null();
 	u32 total = slot ? library_games(slot) : 0;
 	if (!total) {
-		dialog_message(NULL, gl_saves->no_library, DIALOG_ERROR);
+		dialog_message(NULL, S(STR_SAVES_NO_LIBRARY), DIALOG_ERROR);
 		return;
 	}
 	snprintf(s->from, sizeof(s->from), "%s", saveorphan_path(&s->scan, o));
@@ -448,7 +448,7 @@ static void do_delete(struct saves *s, u32 o)
 {
 	char path[SAVESLOT_ROM_PATH_MAX + 2];
 	snprintf(path, sizeof(path), "%s", saveorphan_path(&s->scan, o));
-	dialog_notice(gl_saves->moving, gl_saves->moving_text, DIALOG_INFO);
+	dialog_notice(S(STR_SAVES_MOVING), S(STR_SAVES_MOVING_TEXT), DIALOG_INFO);
 	int r = saveorphan_trash(path);
 	dialog_notice_end();
 	if (r)
@@ -460,10 +460,9 @@ static void do_delete(struct saves *s, u32 o)
 
 static void orphan_menu(struct saves *s, u32 o)
 {
-	const struct lang_saves *g = gl_saves;
 	snprintf(s->ask, sizeof(s->ask), "%s", saveorphan_path(&s->scan, o));
-	s->items[0] = (struct ui_pop_item){g->pop_relink, 0, 0};
-	s->items[1] = (struct ui_pop_item){g->pop_delete, 0, UI_POP_DANGER};
+	s->items[0] = (struct ui_pop_item){S(STR_SAVES_POP_RELINK), 0, 0};
+	s->items[1] = (struct ui_pop_item){S(STR_SAVES_POP_DELETE), 0, UI_POP_DANGER};
 	s->popup = (struct ui_popup){base_of(s->ask), ART_ICON8_FOLDER + 1, s->items, 2, 0, 0};
 	if (!ui_popup_open(s->list, s->hints, &s->popup))
 		return;
@@ -477,7 +476,8 @@ static void orphan_menu(struct saves *s, u32 o)
 			enter_pick(s, o);
 			return;
 		}
-		struct ui_confirm ask = {g->ask_delete, g->ask_delete_text, g->ask_delete_button, 1};
+		struct ui_confirm ask = {S(STR_SAVES_ASK_DELETE), S(STR_SAVES_ASK_DELETE_TEXT),
+					 S(STR_SAVES_ASK_DELETE_BUTTON), 1};
 		if (!ui_confirm(s->hints, &ask))
 			continue;
 		ui_popup_close();
@@ -490,10 +490,10 @@ static void empty_trash(struct saves *s)
 {
 	if (!s->scan.trash_files)
 		return;
-	struct ui_confirm ask = {gl_saves->ask_empty, gl_saves->ask_empty_text, gl_saves->ask_empty_button, 1};
+	struct ui_confirm ask = {S(STR_SAVES_ASK_EMPTY), S(STR_SAVES_ASK_EMPTY_TEXT), S(STR_SAVES_ASK_EMPTY_BUTTON), 1};
 	if (!ui_confirm(s->hints, &ask))
 		return;
-	dialog_notice(gl_saves->emptying, gl_saves->emptying_text, DIALOG_INFO);
+	dialog_notice(S(STR_SAVES_EMPTYING), S(STR_SAVES_EMPTYING_TEXT), DIALOG_INFO);
 	u32 removed = 0;
 	int r = saveorphan_trash_empty(NULL, NULL, &removed);
 	dialog_notice_end();
@@ -516,10 +516,10 @@ static void pick_choose(struct saves *s, u32 row)
 	u32 rec = lib_order(slot)[orphanpick_pos(&s->pick, row)];
 	if (!lib_path(slot, rec, s->target, sizeof(s->target)))
 		return;
-	struct ui_confirm ask = {gl_saves->ask_relink, base_of(s->target), gl_saves->ask_relink_button, 0};
+	struct ui_confirm ask = {S(STR_SAVES_ASK_RELINK), base_of(s->target), S(STR_SAVES_ASK_RELINK_BUTTON), 0};
 	if (!ui_confirm(s->hints, &ask))
 		return;
-	dialog_notice(gl_saves->moving, gl_saves->moving_text, DIALOG_INFO);
+	dialog_notice(S(STR_SAVES_MOVING), S(STR_SAVES_MOVING_TEXT), DIALOG_INFO);
 	u32 renamed = 0;
 	int r = saveorphan_relink(s->from, s->target, &renamed);
 	dialog_notice_end();
@@ -529,7 +529,7 @@ static void pick_choose(struct saves *s, u32 row)
 		orphan_gone(s, s->pick_orphan, 0);
 		if (renamed) {
 			char text[96];
-			snprintf(text, sizeof(text), EN_SAVES_RENAMED, (unsigned)renamed);
+			SF(text, sizeof(text), STR_SAVES_RENAMED, LN(renamed));
 			dialog_message(NULL, text, DIALOG_INFO);
 		}
 	}
@@ -547,7 +547,7 @@ static int build_games(struct saves *s)
 	library_load_now();
 	const u8 *slot = library_or_null();
 	if (!slot) {
-		dialog_message(NULL, gl_saves->no_library, DIALOG_ERROR);
+		dialog_message(NULL, S(STR_SAVES_NO_LIBRARY), DIALOG_ERROR);
 		return 0;
 	}
 	u32 total = library_games(slot);
@@ -567,14 +567,14 @@ static int games_scan(struct saves *s)
 	memset(s, 0, sizeof(*s));
 	s->mode = M_GAMES;
 	if (scan(s) != ORPHAN_OK) {
-		dialog_message(NULL, gl_saves->err_card, DIALOG_ERROR);
+		dialog_message(NULL, S(STR_SAVES_ERR_CARD), DIALOG_ERROR);
 		return 0;
 	}
 	if (!build_games(s))
 		return 0;
 	if (!s->games_n) {
 		// A walk cut short (a card error part way) may have missed them
-		dialog_message(NULL, s->scan.partial ? gl_saves->err_card : gl_saves->games_none,
+		dialog_message(NULL, s->scan.partial ? S(STR_SAVES_ERR_CARD) : S(STR_SAVES_GAMES_NONE),
 			       s->scan.partial ? DIALOG_ERROR : DIALOG_INFO);
 		return 0;
 	}
@@ -604,7 +604,7 @@ static int open_game(struct saves *s, u32 row)
 	if (!game_saves_probe(path)) {
 		// A record (game.ini) without a slot, or another game's key
 		tlog("saves: %s has no saves to manage", path);
-		dialog_message(NULL, gl_gsaves->no_save, DIALOG_INFO);
+		dialog_message(NULL, S(STR_GSAVES_NO_SAVE), DIALOG_INFO);
 		return 1;
 	}
 	tlog("saves: game saves of %s", path);
@@ -675,7 +675,7 @@ static void run(struct saves *s)
 
 void saves_run(void)
 {
-	struct saves *s = S;
+	struct saves *s = SV;
 	if (!pending_save_flush())  // a save still on the chip first
 		return;
 	memset(s, 0, sizeof(*s));
@@ -692,7 +692,7 @@ void saves_run(void)
 
 void saves_games_run(void)
 {
-	struct saves *s = S;
+	struct saves *s = SV;
 	if (!pending_save_flush())
 		return;
 	if (!games_scan(s))  // over the page that opened it

@@ -1,6 +1,7 @@
 // The user's lists, the hardware-free half: parsing, edits and the "played
 // ago" text (userdata.h).
 #include "userdata.h"
+#include "lang.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -340,6 +341,14 @@ u32 userdata_clock_time(u32 t)
 	return t < USERDATA_CLOCK_FROM ? 0 : t;
 }
 
+struct userdata_ago_words userdata_ago_words_now(void)
+{
+	return (struct userdata_ago_words){S(STR_AGO_NOW),       S(STR_AGO_MINUTES), S(STR_AGO_HOURS),
+					   S(STR_AGO_YESTERDAY), S(STR_AGO_DAYS),    S(STR_AGO_WEEK),
+					   S(STR_AGO_WEEKS),     S(STR_AGO_MONTH),   S(STR_AGO_MONTHS),
+					   S(STR_AGO_YEAR),      S(STR_AGO_YEARS)};
+}
+
 void userdata_ago(char *out, u32 size, u32 then, u32 now, const struct userdata_ago_words *w)
 {
 	const u32 hour = 3600, day = 24 * hour;
@@ -376,5 +385,5 @@ void userdata_ago(char *out, u32 size, u32 then, u32 now, const struct userdata_
 	if (whole)
 		snprintf(out, size, "%s", whole);
 	else
-		snprintf(out, size, "%lu%s", (unsigned long)n, after);
+		lang_fill(out, size, after, LN(n));
 }

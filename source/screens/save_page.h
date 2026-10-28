@@ -66,9 +66,9 @@ void save_page_refresh(void);
 u8 save_page_list(void);
 u8 save_page_hints(void);
 // How long ago unix time t was, in the menu's words ("2 days"); with the
-// clock unset now, its date ("10-23"); "unknown" (gl_gsaves) for no time
+// clock unset now, its date ("10-23"); "unknown" (gsaves.unknown) for no time
 void save_page_ago(char *out, u32 room, u32 t);
-// t's month, day, hour and minute ("10-23 18:30")
+// t's month, day, hour and minute ("10-23 18:30"), as the language writes them
 void save_page_when(char *out, u32 room, u32 t);
 // Closes the page (it goes out); nothing shows after
 void save_page_close(void);

@@ -123,14 +123,14 @@ int sdlist_compare(const struct sdlist_rec *a, const struct sdlist_rec *b);
 
 // --- Texts ------------------------------------------------------------------
 
-// n with a comma every three digits ("1,204") into out (size bytes)
+// n with the language's thousands separator ("1,204") into out (size bytes)
 void sdlist_number(char *out, u32 size, u32 n);
 // A file's size as the page shows it: "300 B", "3 KB", "1.5 MB", "16 MB"
 // (1,024 to the next unit; one decimal under 10 when it isn't whole,
 // rounded down)
 void sdlist_size_text(char *out, u32 size, u32 bytes);
 // A folder's count: "" uncounted (or failed), then one ("1 item"), many ("176 items",
-// "1,024+ items" for SDLIST_COUNT_MORE) or none ("empty")
-void sdlist_count_text(char *out, u32 size, u32 count, const char *one, const char *many, const char *none);
+// "1,024+ items" for SDLIST_COUNT_MORE) or none ("empty"): lang/en.ini's sd.items
+void sdlist_count_text(char *out, u32 size, u32 count);
 
 #endif

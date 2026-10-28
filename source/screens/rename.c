@@ -272,7 +272,6 @@ static void func_word(const struct text_window *win, u32 x, u32 y, u32 w, const 
 static void paint_funcs(const struct text_window *win, u32 ox, u32 oy, int clear)
 {
 	const struct torii_font *font = ui_theme()->body;
-	const struct lang_rename *L = gl_rename;
 	u32 chosen = kb.sel.row == RENAME_FUNC_ROW ? rename_func_at(kb.sel.col) : RENAME_FUNCS;
 	u32 y = look.grid_y + RENAME_FUNC_ROW * look.pitch - oy, h = look.pitch, in = look.key_inset;
 	if (clear)
@@ -285,7 +284,7 @@ static void paint_funcs(const struct text_window *win, u32 ox, u32 oy, int clear
 			if (on)
 				paint_round_fill(win, x, y, w, h, look.ok_radius, UI_ROLE_TEXT);
 			paint_round_fill(win, x + i, y + i, w - 2 * i, h - 2 * i, look.key_radius, UI_ROLE_ACCENT);
-			func_word(win, x, y, w, L->key_ok, UI_ROLE_ACCENT_TEXT);
+			func_word(win, x, y, w, S(STR_RENAME_KEY_OK), UI_ROLE_ACCENT_TEXT);
 			continue;
 		}
 		int open = k == RENAME_KEY_LATIN && kb.page == RENAME_PAGE_LATIN;
@@ -297,7 +296,7 @@ static void paint_funcs(const struct text_window *win, u32 ox, u32 oy, int clear
 		case RENAME_KEY_SHIFT: {
 			// The arrow, filled while upper case is on, and the case
 			struct paint_label lb, mark;
-			paint_label_text(font, kb.upper ? L->key_upper : L->key_lower, &lb);
+			paint_label_text(font, kb.upper ? S(STR_RENAME_KEY_UPPER) : S(STR_RENAME_KEY_LOWER), &lb);
 			paint_label_glyph(&marks, kb.upper ? MARK_SHIFT_ON : MARK_SHIFT, &mark);
 			u32 gw = marks.glyphs[mark.glyphs[0]].width;
 			u32 gx = x + (w - (gw + look.shift_gap + lb.advance) + 1) / 2;
@@ -307,10 +306,10 @@ static void paint_funcs(const struct text_window *win, u32 ox, u32 oy, int clear
 			break;
 		}
 		case RENAME_KEY_LATIN:
-			func_word(win, x, y, w, L->key_latin, open ? UI_ROLE_TEXT : UI_ROLE_DIM);
+			func_word(win, x, y, w, S(STR_RENAME_KEY_LATIN), open ? UI_ROLE_TEXT : UI_ROLE_DIM);
 			break;
 		case RENAME_KEY_SPACE:
-			func_word(win, x, y, w, L->key_space, UI_ROLE_DIM);
+			func_word(win, x, y, w, S(STR_RENAME_KEY_SPACE), UI_ROLE_DIM);
 			break;
 		case RENAME_KEY_DELETE: {
 			const struct torii_glyph *g = &marks.glyphs[MARK_DELETE];
@@ -321,7 +320,7 @@ static void paint_funcs(const struct text_window *win, u32 ox, u32 oy, int clear
 			break;
 		}
 		default:
-			func_word(win, x, y, w, L->key_cancel, UI_ROLE_DIM);
+			func_word(win, x, y, w, S(STR_RENAME_KEY_CANCEL), UI_ROLE_DIM);
 			break;
 		}
 	}
@@ -398,11 +397,10 @@ static void keys_changed(void)
 
 static void show_hints(void)
 {
-	const struct lang_rename *L = gl_rename;
-	kb.hints[0] = (struct ui_hint){"A", L->hint_type};
-	kb.hints[1] = (struct ui_hint){"B", L->hint_delete};
-	kb.hints[2] = (struct ui_hint){"SELECT", L->hint_case};
-	kb.hints[3] = (struct ui_hint){"START", L->hint_ok};
+	kb.hints[0] = (struct ui_hint){"A", S(STR_RENAME_HINT_TYPE)};
+	kb.hints[1] = (struct ui_hint){"B", S(STR_RENAME_HINT_DELETE)};
+	kb.hints[2] = (struct ui_hint){"SELECT", S(STR_RENAME_HINT_CASE)};
+	kb.hints[3] = (struct ui_hint){"START", S(STR_RENAME_HINT_OK)};
 	ui_hints_set(node(N_HINTS), kb.hints, 4);
 }
 
@@ -422,7 +420,7 @@ static void type(u32 c)
 	int word_start = kb.e.caret == 0 || kb.e.text[kb.e.caret - 1] == ' ';
 	if (!rename_edit_type(&kb.e, c)) {
 		char text[sizeof(kb.msg)];
-		snprintf(text, sizeof(text), EN_RENAME_TOO_LONG, kb.e.max);
+		SF(text, sizeof(text), STR_RENAME_TOO_LONG, LN(kb.e.max));
 		message(text);
 		kb.counter_off = look.counter_blink;
 		field_changed();
@@ -585,10 +583,10 @@ static void ok(void)
 	}
 	field_changed();
 	if (!n) {
-		message(gl_rename->empty);
+		message(S(STR_RENAME_EMPTY));
 	} else if (rename_edit_chars(&kb.e) > kb.e.max) {
 		char text[sizeof(kb.msg)];
-		snprintf(text, sizeof(text), EN_RENAME_TOO_LONG, kb.e.max);
+		SF(text, sizeof(text), STR_RENAME_TOO_LONG, LN(kb.e.max));
 		message(text);
 	} else if (unchanged() && !kb.ask->suggested) {
 		kb.done = 1;  // nothing to keep
@@ -604,7 +602,7 @@ static void ok(void)
 static void cancel(void)
 {
 	if (!unchanged()) {
-		const struct ui_confirm ask = {gl_rename->discard, NULL, gl_rename->discard_button, 1};
+		const struct ui_confirm ask = {S(STR_RENAME_DISCARD), NULL, S(STR_RENAME_DISCARD_BUTTON), 1};
 		if (!ui_confirm(node(N_HINTS), &ask))
 			return;
 	}
@@ -659,7 +657,7 @@ int rename_run(const struct rename_ask *ask)
 		return 0;
 	}
 	kb.first = v->first;
-	ui_title_set(node(N_TITLE), ask->title ? ask->title : gl_rename->title);
+	ui_title_set(node(N_TITLE), ask->title ? ask->title : S(STR_RENAME_TITLE));
 	ui_title_icon_set(node(N_TITLE), ask->icon16);
 	show_hints();
 	field_changed();

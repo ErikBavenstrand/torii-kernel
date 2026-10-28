@@ -22,13 +22,6 @@
 #include "../ui/paint.h"
 #include "../ui/ui.h"
 
-_Static_assert(sizeof(((struct lang_keypad *)0)->status) / sizeof(const char *) == KEYPAD_STATUSES,
-	       "a line for each status");
-_Static_assert(sizeof(((struct lang_keypad *)0)->verbs) / sizeof(const char *) == CHEAT_OP_SLOWDOWN + 1,
-	       "a verb for each op");
-_Static_assert(sizeof(((struct lang_keypad *)0)->formats) / sizeof(const char *) == CHEAT_FMT_VBA + 1,
-	       "a name for each format");
-
 // --- Look (screen px) -------------------------------------------------------------
 static const struct keypad_look {
 	u8 card_x, card_y, card_w, card_h;  // the code's card
@@ -172,21 +165,46 @@ static void value_text(const struct cheat_op *op, char *out, u32 size)
 	snprintf(out, size, "%0*lX", digits, (unsigned long)op->value);
 }
 
+// An op's verb ("Write", "If")
+static const char *verb_of(u32 type)
+{
+	if (type <= CHEAT_OP_AND)
+		return S(STR_KEYPAD_VERB_WRITE + type - CHEAT_OP_WRITE);
+	switch (type) {
+	case CHEAT_OP_IF_NEVER:
+		return S(STR_KEYPAD_VERB_NEVER);
+	case CHEAT_OP_ROM_PATCH:
+		return S(STR_KEYPAD_VERB_PATCH);
+	case CHEAT_OP_SLOWDOWN:
+		return S(STR_KEYPAD_VERB_SLOWDOWN);
+	case CHEAT_OP_IF_BUTTON:
+		return "";
+	default:
+		return type >= CHEAT_OP_IF_EQ && type <= CHEAT_OP_IF_NAND ? S(STR_KEYPAD_VERB_IF) : "";
+	}
+}
+
+_Static_assert(STR_KEYPAD_VERB_AND - STR_KEYPAD_VERB_WRITE == CHEAT_OP_AND - CHEAT_OP_WRITE, "keypad's verbs in order");
+_Static_assert(STR_KEYPAD_FORMAT_VBA - STR_KEYPAD_FORMAT_NONE == CHEAT_FMT_VBA, "keypad's formats in order");
+_Static_assert(STR_KEYPAD_TAG_VBA - STR_KEYPAD_TAG_NONE == CHEAT_FMT_VBA, "keypad's tags in order");
+_Static_assert(STR_KEYPAD_STATUS_CANT_RUN - STR_KEYPAD_STATUS_ADDRESS == KEYPAD_CANT_RUN - KEYPAD_ADDRESS,
+	       "keypad's results in order");
+
 // The code's first op in words
 static void describe_op(const struct cheat_op *op, char *out, u32 size)
 {
 	static const char *const symbols[] = {"=", "!=", "<", ">", "<", ">", "&", "&!"};
-	const struct lang_keypad *L = gl_keypad;
 	char value[12];
 	value_text(op, value, sizeof(value));
-	const char *verb = op->type <= CHEAT_OP_SLOWDOWN ? L->verbs[op->type] : "";
-	unsigned long at = (unsigned long)op->address;
+	const char *verb = verb_of(op->type);
+	char at[12];
+	lang_fill(at, sizeof(at), "{1}", LX(op->address, 8));
 	switch (op->type) {
 	case CHEAT_OP_WRITE:
 		if (op->count > 1)
-			snprintf(out, size, EN_KEYPAD_FILL, verb, value, at, (unsigned long)op->count);
+			SF(out, size, STR_KEYPAD_FILL, LS(verb), LS(value), LS(at), LN(op->count));
 		else
-			snprintf(out, size, EN_KEYPAD_OP, verb, value, at);
+			SF(out, size, STR_KEYPAD_OP, LS(verb), LS(value), LS(at));
 		break;
 	case CHEAT_OP_IF_EQ:
 	case CHEAT_OP_IF_NE:
@@ -196,17 +214,17 @@ static void describe_op(const struct cheat_op *op, char *out, u32 size)
 	case CHEAT_OP_IF_UGT:
 	case CHEAT_OP_IF_AND:
 	case CHEAT_OP_IF_NAND:
-		snprintf(out, size, EN_KEYPAD_IF, verb, at, symbols[op->type - CHEAT_OP_IF_EQ], value);
+		SF(out, size, STR_KEYPAD_IF, LS(verb), LS(at), LS(symbols[op->type - CHEAT_OP_IF_EQ]), LS(value));
 		break;
 	case CHEAT_OP_IF_BUTTON:
-		snprintf(out, size, "%s", L->button);
+		snprintf(out, size, "%s", S(STR_KEYPAD_BUTTON));
 		break;
 	case CHEAT_OP_IF_NEVER:
 	case CHEAT_OP_SLOWDOWN:
 		snprintf(out, size, "%s", verb);
 		break;
 	default:  // pointer writes, add, or, and, ROM patches
-		snprintf(out, size, EN_KEYPAD_OP, verb, value, at);
+		SF(out, size, STR_KEYPAD_OP, LS(verb), LS(value), LS(at));
 		break;
 	}
 }
@@ -214,32 +232,35 @@ static void describe_op(const struct cheat_op *op, char *out, u32 size)
 // The result line, and its ink
 static u32 result_text(char *out, u32 size)
 {
-	const struct lang_keypad *L = gl_keypad;
 	const struct keypad_check *c = &kp.check;
 	switch (c->status) {
 	case KEYPAD_OK: {
 		char op[56];
 		describe_op(&kp.first, op, sizeof(op));
 		if (c->ops > 1)
-			snprintf(out, size, EN_KEYPAD_MORE, op, (unsigned long)(c->ops - 1));
+			SF(out, size, STR_KEYPAD_MORE, LS(op), LN(c->ops - 1));
 		else
 			snprintf(out, size, "%s", op);
 		return UI_ROLE_TEXT;
 	}
 	case KEYPAD_SHAPE:
-		snprintf(out, size, EN_KEYPAD_SHAPE, (unsigned long)c->line + 1, (unsigned long)kp.e.len[c->line]);
+		SF(out, size, STR_KEYPAD_SHAPE, LN(c->line + 1), LN(kp.e.len[c->line]));
 		return c->line == kp.e.line ? UI_ROLE_DIM : UI_ROLE_DANGER;  // the line being typed: not done yet
 	case KEYPAD_FILL:
-		snprintf(out, size, EN_KEYPAD_FILL_IN, (unsigned long)keypad_edit_marks(&kp.e));
+		SF(out, size, STR_KEYPAD_FILL_IN, LN(keypad_edit_marks(&kp.e)));
 		return UI_ROLE_DIM;
 	case KEYPAD_WRONG:
-		snprintf(out, size, EN_KEYPAD_WRONG, L->formats[c->format <= CHEAT_FMT_VBA ? c->format : 0]);
+		SF(out, size, STR_KEYPAD_WRONG,
+		   LS(S(STR_KEYPAD_FORMAT_NONE + (c->format <= CHEAT_FMT_VBA ? c->format : 0))));
 		return UI_ROLE_DANGER;
 	case KEYPAD_EMPTY:
-		snprintf(out, size, "%s", L->status[KEYPAD_EMPTY]);
+		snprintf(out, size, "%s", S(STR_KEYPAD_STATUS_EMPTY));
 		return UI_ROLE_DIM;
 	default:
-		snprintf(out, size, "%s", c->status < KEYPAD_STATUSES ? L->status[c->status] : "");
+		snprintf(out, size, "%s",
+			 c->status >= KEYPAD_ADDRESS && c->status < KEYPAD_STATUSES
+				 ? S(STR_KEYPAD_STATUS_ADDRESS + c->status - KEYPAD_ADDRESS)
+				 : "");
 		return UI_ROLE_DANGER;
 	}
 }
@@ -247,16 +268,15 @@ static u32 result_text(char *out, u32 size)
 // The format's line: SELECT's, else as detected
 static void format_text(char *out, u32 size)
 {
-	const struct lang_keypad *L = gl_keypad;
 	u32 f = kp.check.format <= CHEAT_FMT_VBA ? kp.check.format : 0;
 	if (kp.format != CHEAT_FMT_AUTO)
-		snprintf(out, size, EN_KEYPAD_SET, L->formats[kp.format]);
+		SF(out, size, STR_KEYPAD_SET, LS(S(STR_KEYPAD_FORMAT_NONE + kp.format)));
 	else if (f == CHEAT_FMT_AUTO)
-		snprintf(out, size, "%s", L->formats[0]);
+		snprintf(out, size, "%s", S(STR_KEYPAD_FORMAT_NONE));
 	else if (f <= CHEAT_FMT_PARV3_RAW && kp.check.score < 0x100)
-		snprintf(out, size, EN_KEYPAD_GUESS, L->formats[f]);  // by the plausibility score
+		SF(out, size, STR_KEYPAD_GUESS, LS(S(STR_KEYPAD_FORMAT_NONE + f)));  // by the plausibility score
 	else
-		snprintf(out, size, EN_KEYPAD_DETECTED, L->formats[f]);
+		SF(out, size, STR_KEYPAD_DETECTED, LS(S(STR_KEYPAD_FORMAT_NONE + f)));
 }
 
 // A format's name in the log: the file's, or "auto"
@@ -293,7 +313,7 @@ static void recheck(void)
 static const char *line_tag(u32 i)
 {
 	u8 shape = cheat_detect(kp.e.text[i], kp.e.len[i], NULL);
-	return gl_keypad->tags[shape <= CHEAT_FMT_VBA ? shape : 0];
+	return S(STR_KEYPAD_TAG_NONE + (shape <= CHEAT_FMT_VBA ? shape : 0));
 }
 
 // Text from x with its line's top at y, clipped to right; where it ended
@@ -357,7 +377,7 @@ static void paint_field(void *ctx, u8 nd, const struct text_window *win, u32 set
 	u32 info = look.format_y - oy, right = 240 - look.info_x - ox;
 	text_clear(win, 0, info, 240, FIELD_Y + FIELD_H - look.format_y, 0);
 	char text[80];
-	u32 x = words(win, look.info_x - ox, info, right, UI_ROLE_DIM, gl_keypad->format_label);
+	u32 x = words(win, look.info_x - ox, info, right, UI_ROLE_DIM, S(STR_KEYPAD_FORMAT_LABEL));
 	format_text(text, sizeof(text));
 	words(win, x + look.label_gap, info, right, UI_ROLE_TEXT, text);
 	u32 ink = result_text(text, sizeof(text));
@@ -377,7 +397,6 @@ static void paint_keys(void *ctx, u8 nd, const struct text_window *win, u32 set,
 {
 	(void)ctx;
 	(void)set;
-	const struct lang_keypad *L = gl_keypad;
 	const struct torii_font *heading = ui_theme()->heading;
 	u32 ox = (u32)ui_node(nd)->x, oy = (u32)ui_node(nd)->y, in = look.key_inset;
 	if (!fresh)
@@ -402,7 +421,7 @@ static void paint_keys(void *ctx, u8 nd, const struct text_window *win, u32 set,
 			if (on)
 				paint_round_fill(win, x, y, w, h, look.save_radius, UI_ROLE_TEXT);
 			paint_round_fill(win, x + i, y + i, w - 2 * i, h - 2 * i, look.key_radius, UI_ROLE_ACCENT);
-			key_word(win, x, y, w, L->key_save, UI_ROLE_ACCENT_TEXT);
+			key_word(win, x, y, w, S(STR_KEYPAD_KEY_SAVE), UI_ROLE_ACCENT_TEXT);
 			continue;
 		}
 		paint_round_fill(win, x + in, y + in, w - 2 * in, h - 2 * in, look.key_radius,
@@ -413,9 +432,9 @@ static void paint_keys(void *ctx, u8 nd, const struct text_window *win, u32 set,
 			paint_blit_centred(win, heading, x, y, w, UI_ROLE_TEXT, &lb);
 		} else {
 			key_word(win, x, y, w,
-				 k == KEY_LINE     ? L->key_line
-				 : k == KEY_DELETE ? L->key_delete
-						   : L->key_cancel,
+				 k == KEY_LINE     ? S(STR_KEYPAD_KEY_LINE)
+				 : k == KEY_DELETE ? S(STR_KEYPAD_KEY_DELETE)
+						   : S(STR_KEYPAD_KEY_CANCEL),
 				 UI_ROLE_DIM);
 		}
 	}
@@ -455,11 +474,10 @@ static const struct ui_view_spec view = {"keypad", nodes, N_NODES, UI_NONE, 0, k
 
 static void show_hints(void)
 {
-	const struct lang_keypad *L = gl_keypad;
 	// A types: the keys say so; four chips don't fit
-	kp.hints[0] = (struct ui_hint){"B", L->hint_delete};
-	kp.hints[1] = (struct ui_hint){"SELECT", L->hint_format};
-	kp.hints[2] = (struct ui_hint){"START", L->hint_save};
+	kp.hints[0] = (struct ui_hint){"B", S(STR_KEYPAD_HINT_DELETE)};
+	kp.hints[1] = (struct ui_hint){"SELECT", S(STR_KEYPAD_HINT_FORMAT)};
+	kp.hints[2] = (struct ui_hint){"START", S(STR_KEYPAD_HINT_SAVE)};
 	ui_hints_set(node(N_HINTS), kp.hints, 3);
 }
 
@@ -486,11 +504,9 @@ static void code_changed(void)
 	// The title's corner holds about 9 characters: the digits while the
 	// line is being typed, else the line
 	if (digits && digits < expect)
-		snprintf(kp.counter, sizeof(kp.counter), EN_KEYPAD_COUNTER_DIGITS, (unsigned long)digits,
-			 (unsigned long)expect);
+		SF(kp.counter, sizeof(kp.counter), STR_KEYPAD_COUNTER_DIGITS, LN(digits), LN(expect));
 	else
-		snprintf(kp.counter, sizeof(kp.counter), EN_KEYPAD_COUNTER, (unsigned long)kp.e.line + 1,
-			 (unsigned long)kp.e.lines);
+		SF(kp.counter, sizeof(kp.counter), STR_KEYPAD_COUNTER, LN(kp.e.line + 1), LN(kp.e.lines));
 	ui_title_set_right(node(N_TITLE), kp.counter);
 	ui_canvas_redraw(node(N_FIELD));
 }
@@ -666,7 +682,7 @@ static int keypad_event(struct ui_view *v, const struct ui_event *e)
 static void save(void)
 {
 	if (kp.check.status != KEYPAD_OK) {
-		message(gl_keypad->cant_save);
+		message(S(STR_KEYPAD_CANT_SAVE));
 		return;
 	}
 	kp.done = kp.result = 1;
@@ -675,7 +691,7 @@ static void save(void)
 static void cancel(void)
 {
 	if (code_hash() != kp.orig) {
-		const struct ui_confirm ask = {gl_keypad->discard, NULL, gl_keypad->discard_button, 1};
+		const struct ui_confirm ask = {S(STR_KEYPAD_DISCARD), NULL, S(STR_KEYPAD_DISCARD_BUTTON), 1};
 		if (!ui_confirm(node(N_HINTS), &ask))
 			return;
 	}

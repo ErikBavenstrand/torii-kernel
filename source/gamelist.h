@@ -8,9 +8,9 @@
 
 // bytes as a row's size, into out (size bytes): "256 KB" under a megabyte
 // (rounded up, so a small file never reads "0 KB"), "1.5 MB" under 10 MB
-// when it isn't whole, else whole megabytes rounded ("16 MB"). kb and mb
-// are the units ("KB", "MB").
-void gamelist_size(char *out, u32 size, u32 bytes, const char *kb, const char *mb);
+// when it isn't whole, else whole megabytes rounded ("16 MB"), in the
+// language's units and decimal separator.
+void gamelist_size(char *out, u32 size, u32 bytes);
 
 // The order of items a and b (<0, 0, >0)
 typedef int (*gamelist_cmp)(void *ctx, u32 a, u32 b);

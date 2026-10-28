@@ -6,7 +6,7 @@
 // passes NULL, keeping the status, and its caller logs it.
 //
 //	dialog_progress_begin(name, NULL);      // the game's name as the title
-//	progress_step(gl_loading_game, 0, 50);  // the status now, the bar at 0%
+//	progress_step(S(STR_LAUNCH_LOADING_GAME), 0, 50);  // the status now, the bar at 0%
 //	(check the save)
 //	progress_step(NULL, 50, 100);           // the bar at 5%, the same status
 //	tlog("launch: ...");                    // (a quick step: only logged)

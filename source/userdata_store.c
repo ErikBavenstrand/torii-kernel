@@ -576,7 +576,8 @@ u32 userdata_now(void)
 
 void userdata_ago_text(char *out, u32 size, u32 then)
 {
-	userdata_ago(out, size, then, then ? userdata_now() : 0, &gl_ago);
+	struct userdata_ago_words w = userdata_ago_words_now();
+	userdata_ago(out, size, then, then ? userdata_now() : 0, &w);
 }
 
 void userdata_test_paths(const char *recent, const char *fav, const char *old_recent)

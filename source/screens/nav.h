@@ -70,9 +70,9 @@ void nav_reshow(void);
 // "1,204 files", "one page"; "" for Info)
 const char *nav_item_name(u32 item);
 const char *nav_item_count(u32 item);
-// n with thousands separators ("1,204"), then many ("1,204 files"), or one
-// for 1 ("1 file"); NULL one or many: the number alone
-void nav_count_words(char *out, u32 size, u32 n, const char *one, const char *many);
+// n with thousands separators, in a count's text: id is a .one key's
+// (STR_COUNT_FILES: "1 file", "1,204 files"); 0: the number alone
+void nav_count_words(char *out, u32 size, u32 n, u32 id);
 // The clock as the title bar shows it ("14:32", "2:32 PM"; "" while it
 // isn't set)
 const char *nav_clock(void);
