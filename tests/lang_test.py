@@ -11,6 +11,7 @@ import contextlib
 import io
 import sys
 import unittest
+import zipfile
 import zlib
 from pathlib import Path
 
@@ -80,6 +81,11 @@ class Committed(unittest.TestCase):
             with self.subTest(path.name):
                 pack = lang.pack(lang.load(path), en)
                 self.assertLessEqual(len(pack), lang.PACK_MAX)
+
+    def test_swedish_is_whole(self):
+        # v0.9 ships Swedish: every string translated, none falling back
+        en = lang.load_english()
+        self.assertEqual(lang.check_pack(lang.load(ROOT / "lang" / "sv.ini"), en), [])
 
     def test_pseudo_locale_builds(self):
         en = lang.load_english()
@@ -227,6 +233,20 @@ class Pack(unittest.TestCase):
         en = english()
         more = parse(ENGLISH + "new = New\n")
         self.assertNotEqual(lang.key_hash(en), lang.key_hash(more))
+
+    def test_release_zip(self):
+        # Unzips onto the card's root; the same packs make the same bytes
+        packs = {"sv": b"sv pack", lang.PSEUDO_CODE: b"pseudo", "de": b"de pack"}
+        data = lang.release_zip(packs)
+        self.assertEqual(data, lang.release_zip(dict(reversed(packs.items()))))
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            self.assertEqual(
+                z.namelist(),
+                ["torii/", "torii/lang/", "torii/lang/de.lng", "torii/lang/sv.lng"],
+            )
+            self.assertEqual(z.read("torii/lang/sv.lng"), b"sv pack")
+            for info in z.infolist():
+                self.assertEqual(info.date_time, lang.ZIP_DATE)
 
     def test_code_ids(self):
         # source/lang.c's lang_code_id gives the same (tests/host/test_lang.c)
