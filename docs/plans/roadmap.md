@@ -31,111 +31,143 @@ Each release's details are in `CHANGELOG.md`; the planning, ticket reports and r
 - **v0.7 Cheats (v0.7.0–v0.7.1):** GameShark, Action Replay and CodeBreaker decoders (ported from mGBA) and a per-frame interpreter for every code type; one libretro-format file per game in `/torii/cheats/<rom path>.cht` with power-cut-safe picks; the cheat screen with a code keypad and Details; `just cheats` from GameHacking.org; device-accurate rules checked against libretro's 7,017 cheats, a type matrix and a fuzzer. Also Jagoomba's VSync and PocketNES's region kept, and `just compat` running one GB/GBC game per mapper.
 - **v0.8 In-game menu:** a sprite overlay from borrowed EWRAM that gives the game back byte for byte (Resume, Save state, Load state, Cheats, Screenshot, Reset game, Sleep, Back to Torii); eight state slots per save slot, filed from cart SRAM to `/torii/states` on Back to Torii's boot; per-cheat toggles in game; screenshots rendered to BMP at the next boot by a software PPU; Settings' In-game menu (Auto, Every game, Off). States and screenshots stay in unbattered cart SRAM until Back to Torii (owner, 2026-10-27); SD access in game mode wedges the card.
 - **v0.8.1 Save states across scenes:** LOAD puts back the display registers from the game's own RAM copy, holds the backdrop until the game's VBlank has run, and restores IRQ flags, Supervisor-mode registers, the IRQ vector, timer reloads, WAITCNT and the sound FIFO DMA; cheats run on its first frame; a launch into a state loads it at the game's entry; a state from another game or a newer Torii is refused with a question. `tests/state_trips.sh` and the compat "state trips" column. Cart-tested 2026-10-27 (owner): the menu opens in Pokémon Emerald and Metroid, states save and load across scenes, file on Back to Torii and launch from the popup, and screenshots file and open on a PC, and cheats toggle in game; the card's log has no errors.
+- **v0.8.2–v0.8.4:** a screenshot named by when it was taken; full 32 MB ROMs with the in-game code and cheats in their padding; Game saves past 256 games; the pages' states in one EWRAM block; Info's six reading pages (Controls, In game, Saves, Cheats, Questions, About).
+- **v0.9 Languages and firmware (v0.9.0, 2026-10-28):**
+  - **Strings:** every UI string has an ID from `lang/en.ini` (`S(STR_...)`, `{1}` placeholders, `.one`/`.other` forms).
+  - **Packs:** `.lng` packs from `/torii/lang` load into 64 KB of PSRAM, with English in ROM as the fallback. Settings' Language row switches live.
+  - **Swedish:** `lang/sv.ini`, with its own date and number formats. The release attaches `torii-lang.zip`, which holds the bare `.lng` files.
+  - **Firmware updater:** writes only to an allowlisted LX16 cart on older firmware, after a power-cut warning and an L+R+A hold. LX9 and unknown boards are never written, and About shows the raw version word.
+  - **Design notes:** the decisions are in git history up to 3edfc929 (PSRAM split: 64 KB for the active pack, 320 KB held for a script font; page 1 untouched).
 
-## Before v0.9
+## Before 1.0: the v0.9.x patches
 
-Everything still open from v0.4.3–v0.8.1, triaged 2026-10-27; what code could fix is fixed (CHANGELOG's Unreleased). None of the rest blocks v0.9's code; the cart checks block the next release tag, with their steps in `docs/release-checklist.md`.
+Everything still open after v0.9.0, swept on 2026-10-28 from this roadmap, the code's TODOs, `docs/design`, `docs/research`, the release checklist, `tools/analyze-baseline.txt` and the v0.9 sessions' hand-over notes.
 
-### Cart checks (the owner, on the real cart)
+1.0 is tagged when every patch below has shipped and a full pass of `docs/release-checklist.md` on the real cart finds nothing new. Items marked **(1.0?)** were planned as 1.0 projects; the owner decides whether each one must ship before 1.0 or can come after it.
 
-- **v0.8 still to check:** In-game menu Off and custom menu keys; the in-game probe's verdict (`tests/roms/ingame`, Clean boot at Flash 128K, then A: cart SRAM pages `0x20`-`0xEF` in game mode).
-- **New since v0.8.1:** a screenshot named by the clock as it was taken, and the game's own clock left right after (Pokémon Emerald); a 32 MB game's menu and cheats with the in-game code in its padding, and with In-game menu Every game and Save states off.
-- **Untried since v0.2.2:** DEBUG, NES, the EEPROM probe's verdict, the clock against real time (GB/GBC and GB rumble passed v0.6's cart run). The cart's clock read an hour fast on 2026-10-27: most likely still on summer time (the cart has no DST); the checklist's clock step says to note it and set it.
-- **Unmeasured:** the ROM copy rate (`PROGRESS_COPY_RATE`); the walk of a full card; SD folder open time (0.2 s per 300 files emulated) and the 251k-cycle frame on a folder of 1,024+ subfolders; covers from an art folder of thousands of files; Identify (about 1.6 s per MB, estimated) and crc.txt's write steps; About's first free-space read on exFAT; `CHIP_ERASE_FRAMES` from a timed Format all.
-- **Hardware unknowns** (each needs a probe of its own, not a checklist step): whether an SD write right after the FPGA's ROM copy is safe; what the real BIOS does on an undefined instruction; where a DMA into PSRAM from cart space lands (`docs/research/omega-de-hardware.md`).
+### v0.9.1 Fixes
 
-### Known limits (accepted)
+Code fixes that the emulator can test, plus the leftovers from v0.9.
 
-- **In-game menu:** the game's name shows above the rows only when they leave room (with Save states and cheats they don't). By design (owner, 2026-10-27): the game is on screen behind the menu. A 32 MB ROM with no padding at all before its end still gets the in-game code over its last bytes, as the official kernel did (a 32 MB ROM fills the address space; the log says so).
-- **States:** write-only display registers can't be put back in games that keep no RAM copy of them (44 compat games stay blank until the game redraws); the sound DMA's position drifts after a load (its source counter can't be read; research for 1.0: games on Nintendo's MP2000 sound engine keep the PCM buffer's position in RAM, which could re-sync DMA1 at LOAD); Sonic Advance and Moto Racer replace the IRQ hook, and HP Quidditch blocks the menu.
-- **Screenshots:** the scroll comes from the game's own RAM copy of its registers where it keeps one (pokeemerald's `gGpuRegBuffer`, Nintendo's library); without one a scrolled tile screen sits shifted, and the BG matrices, BLDY, MOSAIC and window bounds stay write-only, so fades and Mode 7 roads come out wrong. A screenshot in a game without the cart's clock, or taken while the game was reading it, is named by the filing's time.
-- **Emulators:** hi-colour GBC games lose mid-frame palette writes (jagoombacolor#20, #53): a per-line palette path in Jagoomba's renderer needs about 18 KB it doesn't have and its last DMA channel; a 1.0 project (`docs/research/gbc-hicolor.md`). Left from the trackers: jagoombacolor#42 accuracy tests, #43 a GBC-compatible ROM run as DMG, #34 the default palette; PocketNES#14 multiboot.
+- **Bugs to confirm and fix:**
+  - `PSRAM_Write` (`source/GBApatch.c:120`, the inherited `todo 还要处理psram page`) sets the PSRAM page once. A patch write that crosses an 8 MB boundary lands on the wrong page.
+  - `Read_SD_sectors` always returns 0, so FatFs never sees a failed read, and the "card read failed" paths are untested (`docs/design/engine.md`). Return the real status, then test those paths with an emulated read error.
+  - The analyzer findings that may be real bugs (`tools/analyze-baseline.txt`). Triage each one, fix it or note why it's a false alarm:
+    - a NullDereference in `source/screens/cheats.c`;
+    - ArrayBound in `source/cheatfile.c`;
+    - `m.kinds[m.rows++]` against `ROW_KINDS` in `source/overlay/ov.c`;
+    - uninitvar and unassignedVariable in `source/ingame.c` and `source/statestore.c`;
+    - shiftNegativeLHS in `source/ppu_render.c`.
+  - A NOR game keeps the In-game menu setting it was written with, so it still opens the menu after Off until it is rewritten (`docs/design/v0.8/ingame-menu.md`).
+  - A 32 MB launch whose extras were dropped to fit rescans the ROM on every launch: the `.pat` cache only has room for the picks.
+- **Languages:**
+  - A pack's stale check hashes only English's key names. Hash each key's placeholders too, so a pack whose `{N}` no longer match is refused.
+  - `torii-lang.zip` and each `.lng` should name the release they were built for, and Settings or the log should say when a pack is from another release.
+  - The letter jump in game lists knows only A–Z. Games starting with Å, Ä, Ö (and the rest of Latin-1) file under "#"; they should go with their own letter, or with its base letter.
+  - Test a text pointer that another screen keeps across a pack switch. Only Settings' own redraw is covered today.
+  - `INFO_S_ABOUT_REV_A` and `STR_INFO_ABOUT_REV_A` have been unused since the firmware allowlist.
+  - The owner's corrections to the Swedish terms. The texts shortened for width to check are `rename.key_space` "Blank", `gsaves.keys` "Backup", `games.fact_size`/`fact_played` "Strl"/"Sist", `ingame.unsaved_both` and `gsaves.act_copy` "Kopiera".
+- **Small fixes:**
+  - The save log line still says `"Save sav?"`; change it together with `tests/saves.sh`.
+  - Diagnostics says "3 seconds passed in about 2.2".
+  - Crash dumps name stale stack words that point into read-only data (`t_model+0x2628`; `source/cartlog.c`, `tools/logs.py`).
+  - `ui_show` on a parent doesn't hide its children (`source/ui/ui_core.c`).
+  - U+00AD draws as a visible hyphen.
+  - New slot's pane heading peeks above its popup.
+- **Release checklist:**
+  - Add the v0.9 firmware steps: the warning, the L+R+A hold, B cancelling on both screens, and the raw version word in About and Diagnostics.
+  - Fix the stale save rows. "History" is now Backups kept on the Saves card, and "relink" is now Clean up saves and "Move to a game".
 
-- **From the review (2026-10-28), minor:** a 32 MB launch whose extras were dropped to fit rescans the ROM every launch (the `.pat` cache's room fits only the picks); the screenshot's clock read can't see a game's write-only clock command when the port is unreadable (Pokémon-style libraries mask IRQs around clock access); "chip select high" as mid-read assumes the port reads back its output pins, true in mGBA, unverified on the cart.
+### v0.9.2 Menus
 
-### Decisions for v0.9
+The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-review.md`) and the owner's asks.
 
-- **PSRAM map:** 384 KB of page 0 (7.625–8 MB, `source/engine/psram.h`) is reserved for the language tables: 64 KB for the active pack, and 320 KB held for a 1.0 script font (decided 2026-10-28, see v0.9).
-- **Memory:** EWRAM has 11,388 bytes free in the release kernel and 10,312 in the test kernel since the pages' states share one block (2026-10-27); ROM has about 215 KB free, IWRAM 10 KB.
-- **In-game strings:** ready: every string the overlay shows comes from `gl_ingame`, drawn by the kernel at launch, with v0.9's numbered placeholders (`lang_fill`) and one/other forms where a count shows. The kernel's own dialogs about the menu (`EN_INGAME_REFUSED*`) are printf formats like the rest of `lang.h`'s `EN_*`, for v0.9's string IDs.
-- **Licences:** No-Intro's terms for a derived name table (built on the user's machine, never bundled); libretro-thumbnails has no licence grant (fetched locally, never committed); the boxes' trade dress.
+- **Screenshots per game** (owner, 2026-10-27): a "Screenshots" entry in the game's popup, next to Saves, opens that game's shots from `/torii/screenshots`. A built-in viewer shows a BMP full screen and steps through the shots with LEFT and RIGHT. The SD card page opens any `.bmp` in the same viewer.
+- **One place for how a game boots** (owner, 2026-10-27): the popup's Play « addons » and Game info's Boot mode set the same thing. Keep only one, and point the cheat screen's "needs Boot with addon" note to it.
+- "Play « default »" shows which boot mode it resolves to. The games and SD pages offer the stepper under the same rules.
+- A quick favourite key (SELECT) in game lists. Favouriting takes five presses today.
+- One key back to home from a deep SD folder. Today it takes one B per level.
+- Game info's Played is blank for a game that has dropped off Recent.
+- Play with's title shows the file name, not the display name.
+- The storage bar's three shades need a legend.
 
-## v0.9 Languages and firmware
+### v0.9.3 In game
 
-Decided with the owner on 2026-10-28. The work is split three ways: **strings and packs**, then **Swedish and the release** once that has merged, and alongside both, **firmware safety**.
+- **Menu speed:** the target is the menu visible within 2 frames; it measures 4 frames to the panel and 5 to the rows (`ingame-menu.md`).
+- **Hook coverage:** the exact-ROM hook patches cover only the EU builds of GTA Advance, Super Monkey Ball Jr., LEGO Star Wars II and Tomb Raider: Legend. Add the other regions (`docs/research/hook-coverage.md`).
+- **Sleep:** Pokémon Emerald's sleep stayed black on the real cart, and START+SELECT didn't wake it. It could be the real BIOS or the cart during Stop (`omega-de-hardware.md`); find out on the cart first.
+- **Sound after LOAD (1.0?):** games on Nintendo's MP2000 engine keep the PCM buffer's position in RAM, which could re-sync DMA1 at LOAD.
+- **States that survive a power-off (1.0?, research):** point the FPGA's `/RTS` write-back of cart SRAM at a per-game file. Watch out: with a crosslinked FAT the write-back would land in both files.
 
-- **Languages:** English and Swedish. The owner checks Swedish.
-- **Strings** (done on `claude/v09-strings-c52085`; Swedish and the release zip done on `claude/v09-swedish-fc5217`):
-  - Every UI string has an ID. `lang/en.ini` is the source of truth.
-  - `just lang` generates `source/lang_ids.h` and the English table from it. Both are committed and never edited by hand, and a test fails when they are stale, the same way the fonts work.
-  - Code reads a string with `S(STR_...)`.
-  - The `gl_*` globals, the per-screen structs and the `EN_*` printf formats all go.
-  - Diagnostics' checklist and the SD logs stay in English and get no IDs, so bug reports read the same in any language. Diagnostics' title and the row that opens it are translated.
-- **Language packs:**
-  - **Authoring:** translators edit `lang/<code>.ini` as text.
-  - **Build:** the build compiles each file into a binary pack (`.lng`, Rockbox-style), whose version header rejects stale packs. Each pack has a font field that stays empty until 1.0.
-  - **Location:** packs live on the card in `/torii/lang/`. English is compiled in as the fallback. The release attaches `torii-lang.zip`.
-  - **Lookup:** the active pack's header, offset table and strings sit in PSRAM: 64 KB at the start of page 0's language reserve (`source/engine/psram.h`). A pack over that size fails the build. English is read from ROM and uses none of the reserve.
-  - **Formats:** each pack carries its own date and number formats in `[format]` (`date = {day} {month}` with `[month]`'s names, `date_numeric` for the saves page's `10-23`, the decimal and thousands separators). The 12/24-hour clock stays a setting, and Settings' date and File info's change date stay `2026-10-28`.
-  - **Launches:** a game fills PSRAM, the pack too, before the in-game menu's texts are drawn. The launch's sections of en.ini (`[meta]`'s `launch`, 8 KB at most per pack) go to the list row cache's room first, which no list uses during a launch; the menu loads the pack again if the launch comes back.
-- **Switching:** Settings' Language row lists English plus the packs on the card (up to 7, by their header's name). Picking a language with A takes effect at once: the setting is written, the pack loads, the row cache clears, and Settings comes back drawn in it, then the carousel (`tests/shots/lang-switch.opts`, on the pseudo-locale).
-- **Pack to pack:** switching from one pack straight to another rewrites the pack in place in PSRAM, which the strings' review (2026-10-28) left open, as a kept text pointer could show the new pack's bytes. Settled: `tests/shots/lang-packs.opts` goes English -> en-XA -> Swedish -> English with every frame of the fade hashed; every fourth frame was looked at and is whole. It covers Settings' own reshow only: a pointer another screen keeps across a switch is untested.
-- **Swedish:** `lang/sv.ini`, drafted by Claude and checked by the owner: day-first dates (`28 okt`, `28/10`), a decimal comma, a no-break space for thousands. One term each: sparfil, snabbsparning, plats, backup, fusk, favorit, skärmbild. Every screen was run in Swedish and the texts that were cut shortened; the `tests/shots/sv-*` goldens keep 19 scenarios in Swedish.
-- **Release:** `just build` writes `dist/torii-lang.zip` (the packs but en-XA, as bare `<code>.lng` files with no folders, sorted and dated 1980; `just repro` compares it), CI uploads it beside `ezkernelnew.bin`, and the release attaches it, with an install step in its notes.
-- **From the Swedish review (2026-10-28), open:**
-  - A pack's stale check hashes English's key names only: a later release that changes a text's meaning or placeholders under the same key still loads an old pack, and a `{2}` the code doesn't fill prints as is. Either hash each key's placeholders too, or rename a key whenever its placeholders change.
-  - `torii-lang.zip` has no version marker. (Its layout is settled: the owner chose bare `.lng` files over `torii/lang/`, which Finder's drag could let replace the card's `/torii`.)
-  - The letter jump («» in game lists) knows A-Z only: a game starting with Å, Ä or Ö files under "#".
-  - Swedish texts shortened for width, for the owner's check: `rename.key_space` "Blank", `gsaves.keys` "Backup" (singular), `games.fact_size`/`fact_played` "Strl"/"Sist", `ingame.unsaved_both` "1 sparning, {1} bild", `gsaves.act_copy` "Kopiera".
-- **Placeholders:** numbered (`{1} of {2}`) and checked against English at build time. Plurals are avoided by wording, or written as `.one`/`.other` variants.
-- **Scripts:** Latin-1 only. Other scripts come in 1.0 as extra font files, in the remaining 320 KB of the reserve. PSRAM page 1 stays untouched.
-- **Firmware updater:**
-  - **Images:** the official images (LX16 V07, LX9 V05), unchanged.
-  - **Allowlist:** an update is written only to a cart whose FPGA version word is on the allowlist (LX16: high nibble `0xA`/`0xB`) and whose firmware is older than ours. Today the kernel treats any word it doesn't recognise as LX9, so an EZODE-B or any other unknown board could be offered the wrong image and bricked. With the allowlist, any other word writes nothing and logs the raw value.
-  - **LX9:** the kernel never writes LX9 firmware until a real Rev.A word has been measured. About and Diagnostics show the raw version word instead of guessing "Rev.A".
-  - **Starting an update:** two screens. The first shows the versions and a warning: a power cut can leave the cart unbootable, so use fresh batteries or a plugged-in console. The second asks you to hold L+R+A for two seconds. B cancels on either screen.
-  - **Tests:** `tests/fw_update.sh` covers every case, including that every word outside the allowlist writes nothing.
+### v0.9.4 Fonts and scripts
 
-## After v0.9
+- **(1.0?) Scripts beyond Latin-1:** a font file named in the pack's font field, loaded into the 320 KB held in PSRAM, plus a `charset` path past Latin-1. Glyphs outside Latin-1 draw a replacement box today.
+- Kerning.
+- Galmuri9's Ç ç ¡ ¿ µ lose a tail pixel at 12 px.
+- Per-glyph row sizes would save about 1.5 KB of ROM (`tools/font.py`).
 
-- **Screenshots per game (owner, 2026-10-27):** a "Screenshots" entry in the game's popup, next to Saves, opening that game's screenshots from `/torii/screenshots`; a viewer built into the kernel that shows a BMP full screen and steps through the game's shots with LEFT and RIGHT. The SD card page opens a `.bmp` in the same viewer.
+### v0.9.5 Emulators and cheats
 
-Then 1.0.
+- **(1.0?) Hi-colour GBC:** these games lose mid-frame palette writes (jagoombacolor#20, #53). A per-line palette path in Jagoomba needs about 18 KB and its last DMA channel (`docs/research/gbc-hicolor.md`).
+- **(1.0?) GB, GBC and NES cheats** (owner, 2026-10-25): libretro's GameShark and Game Genie files, with the codes passed to Jagoomba and PocketNES (PocketNES has its own cheat finder).
+- From the trackers: jagoombacolor#42 accuracy tests, #43 a GBC-compatible ROM run as DMG, #34 the default palette; PocketNES#14 multiboot.
 
-- **Fonts:**
-  - Glyphs outside Latin-1 draw a replacement box today.
-  - There is no kerning.
-  - Galmuri9's Ç ç ¡ ¿ µ lose a tail pixel at 12 px.
-  - Per-glyph row sizes would save about 1.5 KB of ROM (`tools/font.py`).
+### Tooling, alongside any patch
 
-## Backlog
+- **Static analysis gating:** CI's static analysis is advisory (`continue-on-error`), so a new finding never fails CI. Once v0.9.1 has triaged the baseline (98 findings: 75 from clang-tidy and 23 from cppcheck, mostly style in `slotstore.c`, `GBApatch.c`, `saveorphan.c` and `ezkernelnew.c`), make it gate.
+- **compat selection:** choose compat runs by the functions each game runs, as `test` already does, in place of the hand-kept `NO_COMPAT` (`docs/research/dev-loop-speed.md`).
+- **Logs:** frame-timing summaries carry the log write's time, not the scroll's. They're DEBUG only, their table holds 8 names, and on a nearly full buffer they can push out older lines (`source/engine/cycles.c`, `tlog_flush`).
+- **Emulator:** the kernel install fills the last sector's tail with 0xFF where the real loader writes stale bytes, and `OMEGA_FPGA_VERSION` isn't validated.
+- **Font tests:** `tools/font_preview.py` needs the network for its candidates, and `tests/font_test.py` compiles with the host `cc`, not devkitARM.
 
-Small items with no version yet:
+### Cart checks (the owner, before every tag)
 
-- **In-game states and screenshots that survive a power-off** (research, owner, 2026-10-27): v0.8 files them only on Back to Torii, as SD access in game mode wedges the card. The FPGA writes cart SRAM's state buffer back to a file on its own (the `/RTS` path, `docs/research/omega-de-hardware.md`); pointing that write-back at a per-game file could keep a state saved in game through a power-off.
-- **One place for how a game boots** (owner, 2026-10-27): the game popup's play mode (Play « addons ») and Game info's Boot mode set the same thing in two places, which is confusing. Keep only one; it also decides whether picked cheats run, so the cheat screen's "needs Boot with addon" note should point to it.
-- **GB, GBC and NES cheats** (owner, 2026-10-25, out of v0.7): libretro has cheat files for them (GameShark, Game Genie), but the codes would have to reach Jagoomba and PocketNES (PocketNES has its own cheat finder).
-- **Logs:**
-  - Frame-timing summaries carry the log write's time, not the scroll's.
-  - They are DEBUG only.
-  - Their table holds 8 names.
-  - On a nearly full buffer they can push out older lines (`source/engine/cycles.c`, `tlog_flush`).
-- **Crash dumps** name stale stack words that point into read-only data (`t_model+0x2628`) (`source/cartlog.c`, `tools/logs.py`).
-- **Diagnostics wording:** "3 seconds passed in about 2.2".
-- **Lost at power-off:** the session record in cart RAM page `0xF0` doesn't survive a power cycle (hardware). Keep it somewhere battery-backed if wanted.
-- **Logs:** the save log line still says `"Save sav?"`; change it together with `tests/saves.sh`.
-- **Latent risks:**
-  - The second half of `Save_savefile` runs frames with SRAM page 0x10 selected.
-  - `FRAM_save_op` runs frames with a file open.
-  - Both are safe today and commented.
-- **Release file:** EZ-Flash's loader installs only the first 3 MB of `ezkernelnew.bin`; `tools/omega_image.py` enforces it.
-- **Emulator:**
-  - The kernel install fills the last sector's tail with 0xFF, where the real loader writes stale bytes.
-  - `OMEGA_FPGA_VERSION` isn't validated.
-- **Engine:** `ui_show` on a parent doesn't hide its children (`source/ui/ui_core.c`); U+00AD draws as a visible hyphen (`font_body.c`).
-- **Font tests:**
-  - `tools/font_preview.py` needs network for the candidates.
-  - `tests/font_test.py` compiles with the host `cc`, not devkitARM.
+The steps are in `docs/release-checklist.md`.
+
+- **New in v0.9:** Swedish from `torii-lang.zip`; the firmware screens on an up-to-date cart (none should show); About's raw version word. Record the raw word, so the allowlist can be narrowed.
+- **v0.8 still to check:**
+  - In-game menu Off, and custom menu keys.
+  - The in-game probe's verdict (`tests/roms/ingame`, Clean boot at Flash 128K, then A).
+  - A screenshot named by the clock as it was taken, with the game's clock left right afterwards (Pokémon Emerald).
+  - A 32 MB game's menu and cheats.
+- **Untried since v0.2.2:** DEBUG, NES, the EEPROM probe's verdict, and the clock against real time. The clock read an hour fast on 2026-10-27, most likely still on summer time, since the cart has no DST.
+- **Unmeasured:**
+  - The ROM copy rate (`PROGRESS_COPY_RATE`).
+  - The walk of a full card, and the single-sector SD command cost.
+  - SD folder open time, and the 251k-cycle frame on a folder of 1,024+ subfolders.
+  - Covers from an art folder of thousands of files.
+  - Identify, and crc.txt's write steps.
+  - About's first free-space read on exFAT.
+  - `CHIP_ERASE_FRAMES` from a timed Format all.
+
+### Research (doesn't block 1.0 unless a finding does)
+
+- **Hardware probes** (`docs/research/omega-de-hardware.md`):
+  - Is an SD write right after the FPGA's ROM copy safe?
+  - What does the real BIOS do on an undefined instruction? The crash handler can't catch a crash that turns IRQs off or loops inside the kernel.
+  - Where does a DMA into PSRAM from cart space land?
+  - WAITCNT `0x4018` for control-register writes, SD, NOR and the RTC.
+  - HBlank DMA into palette RAM at the theme wipe's edge, and mid-frame mode switching.
+  - The open register questions: the `0x09E00000` status values, `0x096C0000` auto-save, Mode B's slot, the frames at minor `0x17`, what `0x09700000` changes in the ROM map, and how the unlock sequence is checked.
+  - A blue EZODE-B's raw version word and NOR IDs, if an owner of one can read them.
+- **Unverified:** "chip select high" as mid-read assumes the RTC port reads back its output pins. That holds in mGBA but hasn't been checked on the cart.
+- **Licences and terms:** No-Intro's terms for a derived name table (built on the user's machine, never bundled); libretro-thumbnails has no licence grant (fetched locally, never committed); the boxes' trade dress; OpenVGDB, GameTDB, DeadSkullzJr's database and GameHacking.org terms; libtonc's licence; FluBBa's and Dwedit's redistribution terms (only if more consoles come).
+- **Saves:** should a launch ask for a slot at all (`docs/design/v0.5/saves.md`)?
+
+### Known limits (accepted, no work planned)
+
+- **In-game menu:**
+  - The game's name shows above the rows only when they leave room. That's by design: the game is on screen behind the menu.
+  - A 32 MB ROM with no padding gets the in-game code over its last bytes, as the official kernel did.
+  - The screenshot's clock read can't see a game's write-only clock command when the port is unreadable.
+- **States:**
+  - Write-only display registers can't be put back in games that keep no RAM copy of them; 44 compat games stay blank until the game redraws.
+  - Sonic Advance and Moto Racer replace the IRQ hook, and HP Quidditch blocks the menu. These are compat's three known failures.
+- **Screenshots:** without the game's RAM copy of its registers, a scrolled tile screen sits shifted. The BG matrices, BLDY, MOSAIC and window bounds can't be read back, so fades and Mode 7 roads come out wrong. A shot taken without the cart's clock is named by the filing's time.
+- **Hardware:**
+  - The session record in cart RAM page `0xF0` doesn't survive a power cycle.
+  - EZ-Flash's loader installs only the first 3 MB of `ezkernelnew.bin` (`tools/omega_image.py` enforces it).
+  - `Save_savefile`'s second half runs frames with SRAM page 0x10 selected, and `FRAM_save_op` runs frames with a file open. Both are safe today and commented.
 
 ## Process
 
