@@ -235,16 +235,13 @@ class Pack(unittest.TestCase):
         self.assertNotEqual(lang.key_hash(en), lang.key_hash(more))
 
     def test_release_zip(self):
-        # Unzips onto the card's root; the same packs make the same bytes
+        # The packs alone, no folders; the same packs make the same bytes
         packs = {"sv": b"sv pack", lang.PSEUDO_CODE: b"pseudo", "de": b"de pack"}
         data = lang.release_zip(packs)
         self.assertEqual(data, lang.release_zip(dict(reversed(packs.items()))))
         with zipfile.ZipFile(io.BytesIO(data)) as z:
-            self.assertEqual(
-                z.namelist(),
-                ["torii/", "torii/lang/", "torii/lang/de.lng", "torii/lang/sv.lng"],
-            )
-            self.assertEqual(z.read("torii/lang/sv.lng"), b"sv pack")
+            self.assertEqual(z.namelist(), ["de.lng", "sv.lng"])
+            self.assertEqual(z.read("sv.lng"), b"sv pack")
             for info in z.infolist():
                 self.assertEqual(info.date_time, lang.ZIP_DATE)
 

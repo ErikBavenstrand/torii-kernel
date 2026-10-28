@@ -8,10 +8,9 @@ cat <<'NOTES'
 
 1. Copy `ezkernelnew.bin` to the root of the EZ-Flash Omega DE's SD card.
 2. Put the card in the cart, hold R and switch the GBA on, then confirm the update.
-3. For the menu in another language, copy the `.lng` files in `torii-lang.zip`
-   into `/torii/lang` on the card (on a Mac, don't let Finder replace the card's
-   `/torii` folder, which holds your saves) and pick one in Settings, System,
-   Language.
+3. For the menu in another language, unzip `torii-lang.zip`, copy its `.lng`
+   files into `/torii/lang` on the card (make the folder if it isn't there),
+   and pick one in Settings, System, Language.
 
 If the update stops with `Bad NOR ID`, the cart's kernel NOR is a uniform-sector
 S29GL064A (ID `0x220C`), and EZ-Flash's loader installs no kernel on it, Torii's

@@ -468,9 +468,11 @@ def pseudo(en: Lang) -> str:
     return "\n".join(out) + "\n"
 
 
-# The release's torii-lang.zip: unzipped onto the card's root, its packs land
-# in /torii/lang. Its entries sorted, dated 1980 and stored, so the same packs
-# make the same bytes (`just repro`)
+# The release's torii-lang.zip: the .lng files alone, with no folders, so
+# nothing in it can stand in for the card's /torii (Finder offers to replace a
+# dragged folder, saves and all); the user copies them into /torii/lang. Its
+# entries sorted, dated 1980 and stored, so the same packs make the same bytes
+# (`just repro`)
 ZIP_DATE = (1980, 1, 1, 0, 0, 0)
 
 
@@ -478,15 +480,10 @@ def release_zip(packs: dict[str, bytes]) -> bytes:
     """packs: each code's pack, the pseudo-locale left out."""
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as z:
-        for name in ("torii/", "torii/lang/"):
-            info = zipfile.ZipInfo(name, ZIP_DATE)
-            info.external_attr = (0o40755 << 16) | 0x10
-            info.create_system = 3
-            z.writestr(info, b"")
         for code in sorted(packs):
             if code == PSEUDO_CODE:
                 continue
-            info = zipfile.ZipInfo(f"torii/lang/{code}.lng", ZIP_DATE)
+            info = zipfile.ZipInfo(f"{code}.lng", ZIP_DATE)
             info.external_attr = 0o100644 << 16
             info.create_system = 3
             z.writestr(info, packs[code])

@@ -179,8 +179,8 @@ timing or a real game's saves. Do these on the cart with Logging on Debug.
 
 ### The v0.9 languages
 
-Copy `sv.lng` from the release's `torii-lang.zip` into the card's
-`/torii/lang` first (never let Finder replace the card's `/torii`).
+Copy `sv.lng` from the release's `torii-lang.zip` (it holds only the `.lng`
+files) into the card's `/torii/lang` first.
 
 | Check | How |
 |---|---|
