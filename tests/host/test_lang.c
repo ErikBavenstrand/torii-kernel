@@ -103,7 +103,8 @@ void test_lang_pack(void)
 	u32 size = lang_test_pack(pack, sizeof(pack_words), "sv", "Svenska", strings, 4);
 	CHECK(size > LANG_HEADER);
 	CHECK_EQ(lang_pack_check(pack, size), LANG_PACK_OK);
-	CHECK_EQ(lang_pack_check(pack, LANG_HEADER), LANG_PACK_OK);  // the header alone
+	CHECK_EQ(lang_pack_check_header(pack), LANG_PACK_OK);  // the header alone
+	CHECK_EQ(lang_pack_check(pack, LANG_HEADER), LANG_PACK_SHORT);  // a file of the header alone
 	char code[LANG_CODE_BYTES], name[LANG_NAME_BYTES];
 	lang_pack_code(pack, code);
 	lang_pack_name(pack, name);
@@ -133,7 +134,7 @@ void test_lang_pack(void)
 	pack[0] = 'T';
 	lang_test_put32(pack + 8, LANG_KEY_HASH ^ 1);  // built for other keys
 	CHECK_EQ(lang_pack_check(pack, size), LANG_PACK_STALE);
-	CHECK_EQ(lang_pack_check(pack, LANG_HEADER), LANG_PACK_STALE);
+	CHECK_EQ(lang_pack_check_header(pack), LANG_PACK_STALE);
 	lang_test_put32(pack + 8, LANG_KEY_HASH);
 	lang_test_put16(pack + 4, LANG_FORMAT + 1);  // another format
 	CHECK_EQ(lang_pack_check(pack, size), LANG_PACK_STALE);
@@ -154,7 +155,7 @@ void test_lang_pack(void)
 	// A size past a pack's room in PSRAM
 	size = lang_test_pack(pack, sizeof(pack_words), "sv", "Svenska", strings, 1);
 	lang_test_put32(pack + 12, LANG_PACK_MAX + 2);
-	CHECK_EQ(lang_pack_check(pack, LANG_HEADER), LANG_PACK_BAD);
+	CHECK_EQ(lang_pack_check_header(pack), LANG_PACK_BAD);
 }
 
 void test_lang_launch(void)

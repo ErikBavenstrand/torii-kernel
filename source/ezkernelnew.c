@@ -1029,17 +1029,20 @@ u32 Check_file_type(TCHAR *pfilename)
 	return library_console_of(pfilename);
 }
 //---------------------------------------------------------------------------------
-const char *Error_message(u8 error_num)
+const char *Error_message(u8 error_num, int english)
 {
 	// By number: error.folder's first (lang/en.ini)
-	return error_num <= STR_ERROR_RTS_SPACE - STR_ERROR_FOLDER ? S(STR_ERROR_FOLDER + error_num) : "error?";
+	if (error_num > STR_ERROR_RTS_SPACE - STR_ERROR_FOLDER)
+		return "error?";
+	u32 id = STR_ERROR_FOLDER + error_num;
+	return english ? lang_en[id] : S(id);
 }
 //---------------------------------------------------------------------------------
 static void Show_error_num(u8 error_num)
 {
-	const char *msg = Error_message(error_num);
+	const char *msg = Error_message(error_num, 0);
 
-	tlog_error("error %u: %s", error_num, msg);
+	tlog_error("error %u: %s", error_num, Error_message(error_num, 1));
 	tlog_flush();
 	dialog_message(NULL, msg, DIALOG_ERROR);
 }

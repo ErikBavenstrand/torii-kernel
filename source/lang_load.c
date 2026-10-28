@@ -45,7 +45,7 @@ static int read_header(const char *file, u8 head[LANG_HEADER], char code[LANG_CO
 		tlog_error("lang: %s didn't read", path);
 		return 0;
 	}
-	u32 why = lang_pack_check(head, LANG_HEADER);
+	u32 why = lang_pack_check_header(head);
 	if (why != LANG_PACK_OK) {
 		tlog_error("lang: %s left out: %s", path, lang_pack_check_names[why]);
 		return 0;

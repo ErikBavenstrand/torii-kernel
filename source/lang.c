@@ -41,7 +41,7 @@ const char *const lang_pack_check_names[LANG_PACK_CHECKS] = {
 	"ok", "too short", "not a pack", "for another Torii (stale)", "damaged (CRC)", "an offset past its strings",
 };
 
-u32 lang_pack_check(const u8 *pack, u32 bytes)
+static u32 check(const u8 *pack, u32 bytes, int header_only)
 {
 	if (bytes < LANG_HEADER)
 		return LANG_PACK_SHORT;
@@ -52,7 +52,7 @@ u32 lang_pack_check(const u8 *pack, u32 bytes)
 		return LANG_PACK_STALE;
 	if (size > LANG_PACK_MAX || pool != LANG_HEADER + 2 * count || size <= pool)
 		return LANG_PACK_BAD;
-	if (bytes == LANG_HEADER)
+	if (bytes == LANG_HEADER && header_only)
 		return LANG_PACK_OK;
 	if (bytes != size)
 		return LANG_PACK_SHORT;
@@ -71,6 +71,16 @@ u32 lang_pack_check(const u8 *pack, u32 bytes)
 		if (rd16(pack + LANG_HEADER + 2 * i) >= pool_bytes)
 			return LANG_PACK_BAD;
 	return LANG_PACK_OK;
+}
+
+u32 lang_pack_check(const u8 *pack, u32 bytes)
+{
+	return check(pack, bytes, 0);
+}
+
+u32 lang_pack_check_header(const u8 *pack)
+{
+	return check(pack, LANG_HEADER, 1);
 }
 
 static void copy_field(char *out, const u8 *in, u32 bytes)

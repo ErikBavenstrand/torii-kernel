@@ -45,8 +45,9 @@ void CheckSwitch(void);
 u32 Game_hardware(u32 is_EMU, const u8 *gamecode, u8 gb_cart_type);
 // The game NOR list's game named name, or game_total_NOR if none.
 u32 NOR_game_named(const char *name);
-// The text of error error_num (gl_error_*), as Show_error_num shows it.
-const char *Error_message(u8 error_num);
+// The text of error error_num (lang/en.ini's [error]), as Show_error_num
+// shows it, in the menu's language, or English for the log (english)
+const char *Error_message(u8 error_num, int english);
 u8 Check_saveMODE(u8 gamecode[]);
 u8 Get_saveMODE(u8 Save_num, u32 gamefilesize);
 u32 Check_file_type(TCHAR *pfilename);

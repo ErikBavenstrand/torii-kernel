@@ -515,8 +515,8 @@ static void relist(u32 at)
 
 static void error(u8 num)
 {
-	const char *msg = Error_message(num);
-	tlog_error("error %u: %s", num, msg);
+	const char *msg = Error_message(num, 0);
+	tlog_error("error %u: %s", num, Error_message(num, 1));
 	dialog_message(NULL, msg, DIALOG_ERROR);
 }
 

@@ -49,8 +49,8 @@ static void session_end(void)
 
 static void error(u8 error_num)
 {
-	const char *msg = Error_message(error_num);
-	tlog_error("error %u: %s", error_num, msg);
+	const char *msg = Error_message(error_num, 0);
+	tlog_error("error %u: %s", error_num, Error_message(error_num, 1));
 	tlog_flush();
 	dialog_message(NULL, msg, DIALOG_ERROR);
 }

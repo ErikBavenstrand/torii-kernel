@@ -129,10 +129,12 @@ enum lang_pack_check {
 	LANG_PACK_BAD,  // an offset past its strings, or strings with no end
 	LANG_PACK_CHECKS
 };
-// Whether bytes at pack (a whole pack file, its first 64 bytes at least)
-// are a pack this kernel takes: LANG_PACK_OK, or why not. With only the
-// header there (bytes = LANG_HEADER), checks the header alone.
+// Whether bytes at pack (a whole pack file) are a pack this kernel takes:
+// LANG_PACK_OK, or why not
 u32 lang_pack_check(const u8 *pack, u32 bytes);
+// The same for its first LANG_HEADER bytes alone (a listing): its size,
+// CRC and offsets wait for lang_pack_check
+u32 lang_pack_check_header(const u8 *pack);
 extern const char *const lang_pack_check_names[LANG_PACK_CHECKS];
 // The pack's code ("sv") and name ("Svenska"), NUL-ended, from its header
 void lang_pack_code(const u8 *pack, char out[LANG_CODE_BYTES]);
