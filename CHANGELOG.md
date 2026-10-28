@@ -4,6 +4,12 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## v0.8.3
+
+- **Changed:** nothing in the kernel but its version; this release carries
+  faster checks (`just check` runs only the tests a change touches) and
+  faster power-cut sweeps in the tooling (c4039c16, 19473b46).
+
 ## v0.8.2
 
 - **Changed:** a screenshot is named by when it was taken, not when Back to
