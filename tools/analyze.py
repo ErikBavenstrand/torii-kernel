@@ -5,6 +5,7 @@
 """Run the advisory static analysis and compare it with its baseline.
 
 usage: analyze.py files                 C files to analyze, one per line
+       analyze.py tidy                  for each, its cache key and the file (clang-tidy's)
        analyze.py project OUT            compile_commands.json for those files
        analyze.py gcc DIR                shell script running GCC's -fanalyzer
        analyze.py check DIR BASELINE     fail on findings not in BASELINE
@@ -23,8 +24,15 @@ messages of parallel runs can't interleave. The end marker follows only when
 every run succeeded. A finding is the tool, file, check and message,
 without line numbers, so edits elsewhere in a file don't make old findings
 look new. The baseline lists each finding as often as it occurs.
+
+Each file's GCC and clang-tidy output is kept in dist/analyze/cache under a
+hash of what it depends on: the tool's command, the file and every header
+its dependency file (build/NAME.d, from `just build`) lists, and the
+analysis's own configuration. A file none of that changed for reuses its
+output instead of running the tool again.
 """
 
+import hashlib
 import json
 import re
 import shlex
@@ -56,6 +64,33 @@ def commands():
             and rel.endswith(".c")
         ):
             yield rel, entry
+
+
+CACHE = ROOT / "dist/analyze/cache"
+# What every file's analysis depends on besides its own sources
+CONFIG = ["justfile", ".clang-tidy", "tools/analyze.py"]
+
+
+def cache_key(tool: str, rel: str, entry) -> str:
+    """A hash of what the tool's output for rel depends on, or "" (don't cache)
+    without a dependency file."""
+    deps = ROOT / "build" / (Path(rel).stem + ".d")
+    if not deps.exists():
+        return ""
+    digest = hashlib.sha256(f"{tool}\0{json.dumps(entry['arguments'])}\0".encode())
+    paths = {rel, *CONFIG}
+    for word in deps.read_text().split():
+        if word.endswith(":") or word == "\\":
+            continue
+        if word.startswith("/src/"):
+            paths.add(word[len("/src/") :])  # the build container's path
+    for path in sorted(paths):
+        try:
+            data = (ROOT / path).read_bytes()
+        except OSError:
+            return ""
+        digest.update(f"{path}\0".encode() + hashlib.sha256(data).digest())
+    return digest.hexdigest()
 
 
 def relative(path: str) -> str:
@@ -91,6 +126,10 @@ def main() -> int:
     if command == "files":
         for rel, _entry in commands():
             print(rel)
+    elif command == "tidy":
+        for rel, entry in commands():
+            print(cache_key("clang-tidy", rel, entry) or "none")
+            print(rel)
     elif command == "project":
         out = [entry for _rel, entry in commands()]
         Path(sys.argv[2]).write_text(json.dumps(out, indent=1) + "\n")
@@ -101,8 +140,9 @@ def main() -> int:
         print("set -e")
         print(f'd="$PWD"/{shlex.quote(sys.argv[2])}')
         print('rm -rf "$d" && mkdir -p "$d"')
+        print(f"mkdir -p {shlex.quote(str(CACHE / 'gcc'))}")
         count = 0
-        for _rel, entry in commands():
+        for rel, entry in commands():
             args = [a for a in entry["arguments"] if a not in DROPPED]
             source = args[args.index("-c") + 1]
             args = [
@@ -114,9 +154,16 @@ def main() -> int:
                 "-o",
                 "/dev/null",
             ]
+            key = cache_key("gcc", rel, entry)
+            cached = shlex.quote(str(CACHE / "gcc" / f"{key}.txt")) if key else ""
             print(f"cat > \"$d\"/{count:03}.sh <<'EOF'")
-            print('exec > "${0%.sh}.txt" 2>&1')
-            print(f"cd {shlex.quote(entry['directory'])} && exec {shlex.join(args)}")
+            print('out="${0%.sh}.txt"')
+            print('exec > "$out" 2>&1')
+            if cached:
+                print(f"[ -f {cached} ] && exec cat {cached}")
+            print(f"cd {shlex.quote(entry['directory'])} && {shlex.join(args)} || exit")
+            if cached:
+                print(f'cp "$out" {cached}.$$ && mv {cached}.$$ {cached}')
             print("EOF")
             count += 1
         print("set +e")

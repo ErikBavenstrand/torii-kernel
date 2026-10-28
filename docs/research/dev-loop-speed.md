@@ -99,6 +99,33 @@ Not done:
 - More CPUs for the VM. The Mac has 14 cores and `torii` takes 8; test and compat are CPU-bound, so 12 would cut them by up to a third, at the cost of the Mac's and other sessions' headroom.
 - Running compat's games and `tests/all.sh` from save states. Ruled out before for compat (boot is under 15 % of a game's frames), and the cut sweeps above need the cart files snapshotted too.
 
+## Update 2026-10-28, later: run only what a change touches
+
+After the first update, `just check` still took 2.5–4 minutes for a one-line kernel change: `tests/all.sh` alone is about 540 CPU-seconds on the VM's 8 CPUs.
+Running all of it every time can't get much below 2 minutes, so `just check` now runs only the tests a change can affect, and `just check --full` (before merge) runs everything.
+
+| One-line edit to `source/screens/info.c` | Before | After |
+|---|---|---|
+| test | 136–194 s (every job) | 14 s (6 of 221 jobs) |
+| analyze | 42–77 s | 5–7 s (that file again, the rest cached) |
+| lint | 25 s | 4–7 s |
+| size | 1 s | 1 s |
+| **`just check`** (no tools/ change, so no repro) | about 150 s | about 20 s |
+
+Measured with another session's tests in the same VM, so the times vary by about ±20 %. A change on the launch path still runs compat (about 80 s).
+
+- **Test selection** (`tools/testmap.py`, `TestJobs` in `tools/check.py`). Every test run records the kernel code each job executes: mgba-shot marks each halfword the CPU executes (TORII_COVERAGE, a hook in mGBA's CPU loop that costs nothing when off), and `tests/all.sh` keeps each job's marks apart.
+  Each golden scenario is a job of its own.
+  A job runs again only when a function it executed changed, when its script or the files every job reads (the harness: test helpers, test ROMs, the emulator, tools) changed, or when it never passed.
+  A function's fingerprint comes from the object files: its bytes, with each relocated word replaced by what it points to (a function's name; a variable's name and, for constant data, its content, recursively). So moving code changes nothing, while a change to a header, an inlined function, a string or a table changes every function that uses it.
+  A one-line change in a function changed the fingerprints of only that function and the one it was inlined into. Over the 2,592 functions, the median function is run by 9 jobs; the boot path (about a quarter of them) is run by nearly all, so changes there still run nearly everything.
+  What selection can't see is layout: data that moves can break code that didn't change (an overflow that now hits something else). `just check --full` runs every job for that, before merge.
+- **Analyze caches per file.** GCC's `-fanalyzer` and clang-tidy outputs are kept in `dist/analyze/cache` under a hash of the file, every header its `.d` file lists, its command and the analysis's configuration; cppcheck uses its own `--cppcheck-build-dir`, and runs with `-j`. Warm: 31 s to 5 s. A planted null dereference was still reported.
+- **shellcheck ran on one core** (17 s of lint's 18 s). It now runs one file per process with `-x` (following sourced files, as one process did when given them all): lint takes 4 s.
+- **mgba-shot draws only the frames it shows.** mGBA's renderer now runs only for frames a `-s`, `-h` or `-H` reads, and the frame before each (`-R` draws every one). A homebrew GBA ROM ran 39 % faster (20,000 frames: 5.2 to 3.2 s); `tests/all.sh` used about 7 % less user CPU, as the menu's frames are cheap. Every golden hash still matches.
+- Not done: compat could be selected the same way (record which functions its games run, and skip it when none changed), in place of the hand-kept `NO_COMPAT` list.
+  Carts on tmpfs failed: 140 jobs' 64 MB NOR files filled it.
+
 ## Top five, ranked by time saved × frequency ÷ effort
 
 | # | Change | Saves | How often | Effort | Risk |

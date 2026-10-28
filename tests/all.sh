@@ -3,6 +3,13 @@
 # Exits 1 if any failed. Runs inside the torii-emu container (see `just test`).
 # The longest scripts run as shards (N/M: every Mth case from the Nth), so
 # none of them sets the wall time alone.
+#
+# tests/all.sh --list prints the jobs, one per line. TORII_JOBS (jobs as
+# --list prints them, one per line) runs only those. With TORII_COVERAGE_DIR,
+# job N's runs record the kernel code they execute in DIR/N (mgba-shot's
+# TORII_COVERAGE), with DIR/N/job naming the job and DIR/N/status its exit
+# status; tools/testmap.py reads them, so `just check` runs only the jobs a
+# change touches.
 set -uo pipefail
 
 jobs=(
@@ -143,10 +150,53 @@ jobs=(
   "python3 tests/perf.py self-test"
 )
 
+if [ "${1:-}" = --list ]; then
+  printf '%s\n' "${jobs[@]}"
+  exit 0
+fi
+if [ -n "${TORII_COVERAGE_DIR:-}" ]; then
+  TORII_COVERAGE_DIR=$(realpath -m "$TORII_COVERAGE_DIR")
+fi
+if [ -n "${TORII_JOBS:-}" ]; then
+  wanted=()
+  for job in "${jobs[@]}"; do
+    grep -qxF -- "$job" <<<"$TORII_JOBS" && wanted+=("$job")
+  done
+  jobs=("${wanted[@]}")
+fi
+
+run_job() {
+  if [ -z "${TORII_COVERAGE_DIR:-}" ]; then
+    $1
+    return
+  fi
+  # The runs write to the container's disk; their files are merged, one
+  # per kernel, into DIR/N
+  local dir=$TORII_COVERAGE_DIR/$2 runs=${TMPDIR:-/tmp}/torii-coverage/$2
+  rm -rf "$dir" "$runs"
+  mkdir -p "$dir" "$runs"
+  echo "$1" >"$dir/job"
+  TORII_COVERAGE=$runs $1
+  local status=$?
+  python3 - "$runs" "$dir" <<'PY'
+import pathlib, sys
+merged, size = {}, 0
+for run in pathlib.Path(sys.argv[1]).iterdir():
+    crc, bits = run.name.split("-")[0], run.read_bytes()
+    size = len(bits)
+    merged[crc] = merged.get(crc, 0) | int.from_bytes(bits, "little")
+for crc, bits in merged.items():
+    (pathlib.Path(sys.argv[2]) / f"{crc}.cov").write_bytes(bits.to_bytes(size, "little"))
+PY
+  rm -rf "$runs"
+  echo "$status" >"$dir/status"
+  return "$status"
+}
+
 logs=$(mktemp -d)
 pids=()
 for i in "${!jobs[@]}"; do
-  ${jobs[$i]} >"$logs/$i" 2>&1 &
+  run_job "${jobs[$i]}" "$i" >"$logs/$i" 2>&1 &
   pids+=($!)
 done
 

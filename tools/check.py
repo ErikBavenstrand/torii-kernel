@@ -28,7 +28,15 @@ launching (EWRAM data, IWRAM code and the stack share tight limits, which
 `just size` checks). Only the files in NO_COMPAT skip compat. A path no rule
 knows runs everything.
 
---full is the before-merge tier: compat becomes `compat --all`.
+`just test` runs only the jobs of tests/all.sh that the change touches
+(TestJobs): every run records the kernel functions each job executes, and a
+job runs again only when one of them, its own script or the files every job
+reads (the harness) changed since it last passed, or when it never passed.
+tools/testmap.py explains the fingerprints that say a function changed.
+
+--full is the before-merge tier: compat becomes `compat --all`, and test
+runs every job (a change can also break code it didn't touch, by moving
+data).
 --dry-run prints the plan without running it.
 """
 
@@ -160,7 +168,11 @@ RULES = [
         "repository settings",
     ),
     ([".clang-format", ".clang-format-ignore", ".clangd"], {LINT}, "C formatting"),
-    (["ruff.toml", "tools/text_check.py", "tools/check.py"], {LINT}, "lint tooling"),
+    (
+        ["ruff.toml", "tools/text_check.py", "tools/check.py", "tools/testmap.py"],
+        {LINT},
+        "lint and check tooling",
+    ),
     (
         ["tools/release_notes.sh", "tools/logs.py", "tools/stack.py", "tools/size.sh"],
         {LINT},
@@ -419,7 +431,7 @@ PREPARE = {
     TEST: ["build", "emu-headless", "test-roms", "_test-kernel-build"],
     SIZE: ["build", "_test-kernel-build"],
     REPRO: ["build"],
-    ANALYZE: ["compile-commands", "_analyze-image"],
+    ANALYZE: ["build", "compile-commands", "_analyze-image"],
     COMPAT: ["build", "emu-headless"],
 }
 # Tiers that need no container and none of PREPARE: they start at once,
@@ -525,7 +537,136 @@ class PassCache:
         self.path.write_text(json.dumps(self.hashes))
 
 
-def run(plan: list[list[str]], just: str) -> dict[str, bool]:
+# Files that reach the test jobs only through the kernel's code and data,
+# which the jobs' recorded functions cover
+THROUGH_KERNEL = ["source/*", "tests/kernel/*", "assets/ui/*"]
+
+
+class TestJobs:
+    """Which jobs `just test` runs, recording each job's kernel functions as
+    it goes (read by tools/testmap.py into dist/.check/testmap.json).
+
+    The jobs are tests/all.sh's (TORII_JOBS, TORII_COVERAGE_DIR) and, apart,
+    each of tests/shots.py's scenarios, as shots:NAME (TORII_SHOTS,
+    TORII_SHOTS_COVERAGE)."""
+
+    MAP = "dist/.check/testmap.json"
+    COVERAGE = "dist/.check/coverage"
+    HARNESS = "dist/.check/harness.json"
+    SHOTS_JOB = "python3 tests/shots.py"
+    SHOTS_FILES = ("tests/shots.py", "tests/perf.py", "tests/perf/*")
+    # Every scenario's expected screens: each counts its own lines (harness)
+    SHOTS_SHARED = ("tests/shots/hashes.txt", "tests/shots/png/*")
+
+    def __init__(self, full: bool):
+        self.full = full
+
+    @classmethod
+    def own_files(cls, job: str) -> list[str]:
+        """The files of a job's own: its script, and files named after it."""
+        if job.startswith("shots:"):
+            return [*cls.SHOTS_FILES, f"tests/shots/{job[6:]}.opts"]
+        script = next(word for word in job.split() if word.startswith("tests/"))
+        stem = Path(script).stem
+        return [script, f"tests/{stem}.*", f"tests/{stem}/*"]
+
+    def harness(self, jobs: list[str]) -> dict[str, str]:
+        """Per job, a hash of the files it reads other than through the
+        kernel: its own, and those every job reads."""
+        state = tree_state()
+        common = hashlib.sha256()
+        own = {job: hashlib.sha256() for job in jobs}
+        for path in sorted(state):
+            name = path.rstrip("/")
+            if name == "roms" or TEST not in tiers_for(name)[0]:
+                continue
+            if any(
+                fnmatch.fnmatchcase(name, p)
+                for p in [*THROUGH_KERNEL, *self.SHOTS_SHARED]
+            ):
+                continue
+            entry = f"{path}\0{state[path]}\n".encode()
+            owners = [
+                job
+                for job in jobs
+                if any(fnmatch.fnmatchcase(name, p) for p in self.own_files(job))
+            ]
+            for job in owners:
+                own[job].update(entry)
+            if not owners:
+                common.update(entry)
+        expected = Path("tests/shots/hashes.txt").read_text().splitlines()
+        for job in jobs:
+            if job.startswith("shots:"):
+                own[job].update(
+                    "\n".join(
+                        line for line in expected if line.startswith(job[6:] + "/")
+                    ).encode()
+                )
+        return {
+            job: hashlib.sha256(common.digest() + own[job].digest()).hexdigest()
+            for job in jobs
+        }
+
+    def env(self) -> dict[str, str]:
+        """Pick the jobs, once the kernels are built (their objects give the fingerprints)."""
+        jobs = subprocess.run(
+            ["bash", "tests/all.sh", "--list"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.splitlines()
+        if self.SHOTS_JOB in jobs:
+            jobs.remove(self.SHOTS_JOB)
+            jobs += [
+                f"shots:{p.stem}" for p in sorted(Path("tests/shots").glob("*.opts"))
+            ]
+        Path(self.HARNESS).parent.mkdir(parents=True, exist_ok=True)
+        Path(self.HARNESS).write_text(json.dumps(self.harness(jobs)))
+        if self.full:
+            chosen, why = jobs, ""
+        else:
+            picked = subprocess.run(
+                [sys.executable, "tools/testmap.py", "select", self.MAP, self.HARNESS],
+                input="\n".join(jobs),
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            chosen, why = picked.stdout.splitlines(), picked.stderr
+        print(
+            f"check: test runs {len(chosen)} of {len(jobs)} jobs (tests/all.sh's, and tests/shots.py's scenarios)",
+            flush=True,
+        )
+        print(why, end="", flush=True)
+        subprocess.run(["rm", "-rf", self.COVERAGE], check=True)
+        shots = [job[6:] for job in chosen if job.startswith("shots:")]
+        scripts = [job for job in chosen if not job.startswith("shots:")]
+        if shots:
+            scripts.append(self.SHOTS_JOB)
+        return {
+            "TORII_JOBS": "\n".join(scripts) or "-",  # "-": none
+            "TORII_COVERAGE_DIR": self.COVERAGE,
+            "TORII_SHOTS": "" if self.full else " ".join(shots),
+            "TORII_SHOTS_COVERAGE": f"{self.COVERAGE}/shots",
+        }
+
+    def record(self) -> None:
+        if Path(self.COVERAGE).is_dir():
+            subprocess.run(
+                [
+                    sys.executable,
+                    "tools/testmap.py",
+                    "record",
+                    self.MAP,
+                    self.COVERAGE,
+                    self.HARNESS,
+                ],
+                check=False,
+            )
+
+
+def run(plan: list[list[str]], just: str, test_jobs: TestJobs) -> dict[str, bool]:
     """Run the plan's tiers side by side, each into its own log in
     dist/.check, and print each log whole as its tier ends.
 
@@ -540,15 +681,18 @@ def run(plan: list[list[str]], just: str) -> dict[str, bool]:
 
     def start(cmd: list[str]) -> None:
         log = logs / (names[id(cmd)].replace(" ", "_") + ".log")
+        env = {**os.environ, **test_jobs.env()} if cmd[1] == TEST else None
         out = log.open("wb")
-        proc = subprocess.Popen(cmd, stdout=out, stderr=subprocess.STDOUT)
+        proc = subprocess.Popen(cmd, stdout=out, stderr=subprocess.STDOUT, env=env)
         out.close()
         procs[id(cmd)] = (cmd, proc, time.monotonic(), log)
 
     def finish(key: int) -> None:
-        _, proc, began, log = procs.pop(key)
+        cmd, proc, began, log = procs.pop(key)
         name = names[key]
         ok = proc.returncode == 0
+        if cmd[1] == TEST:
+            test_jobs.record()
         results[name] = ok
         print(f"\ncheck: just {name}", flush=True)
         sys.stdout.buffer.write(log.read_bytes())
@@ -679,7 +823,7 @@ def main() -> int:
                 + " (--no-cache runs them)"
             )
         plan = [cmd for cmd in plan if cmd not in cached]
-    results = run(plan, just)
+    results = run(plan, just, TestJobs(full))
     if use_cache:
         # A file edited while the tiers ran may not be what they checked
         state = tree_state()

@@ -105,11 +105,14 @@
 #endif
 
 #include <ctype.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <time.h>
 #include <unistd.h>
+#include <zlib.h>
 
 struct event {
 	unsigned frame;  // or, after a -w, the offset from the frame it was met
@@ -182,6 +185,63 @@ static const char *symbolize(uint32_t address)
 	}
 	snprintf(out, sizeof(out), " (%s+0x%X)", best->name, address - best->address);
 	return out;
+}
+
+// --- Test coverage (TORII_COVERAGE) ----------------------------------------
+//
+// With TORII_COVERAGE=DIR, the run marks the kernel code it executes in a
+// file of its own in DIR, named after the CRC-32 of the ROM file run (so the
+// test kernel's runs read with its symbols): one bit per halfword of the kernel's 1 MB at
+// 0x08000000 (only while a kernel ROM page is mapped), then one per halfword
+// of IWRAM. The file is mapped shared, so a power cut's _exit keeps it.
+// tools/testmap.py reads the files: which test runs which kernel function.
+
+#define COVER_ROM_BITS (0x100000 / 2)
+#define COVER_BYTES ((COVER_ROM_BITS + 0x8000 / 2) / 8)
+static uint8_t *cover_bits;
+static struct GBA *cover_gba;
+
+static void cover(struct ARMCore *cpu, uint32_t address)
+{
+	(void)cpu;
+	uint32_t bit;
+	if (address >> 24 == 0x03) {
+		bit = COVER_ROM_BITS + ((address & 0x7FFF) >> 1);
+	} else if (address - 0x08000000 < 0x100000 && cover_gba->memory.omega.romPage & 0x8000) {
+		bit = (address - 0x08000000) >> 1;
+	} else {
+		return;
+	}
+	cover_bits[bit >> 3] |= 1 << (bit & 7);
+}
+
+static void cover_start(struct mCore *core, const char *dir, const char *rom)
+{
+	uLong crc = crc32(0, NULL, 0);
+	FILE *f = fopen(rom, "rb");
+	unsigned char chunk[65536];
+	size_t n;
+	while (f && (n = fread(chunk, 1, sizeof(chunk), f)) > 0) {
+		crc = crc32(crc, chunk, (uInt)n);
+	}
+	if (f) {
+		fclose(f);
+	}
+	char path[1024];
+	snprintf(path, sizeof(path), "%s/%08lX-XXXXXX", dir, (unsigned long)crc);
+	int fd = mkstemp(path);
+	if (fd < 0 || ftruncate(fd, COVER_BYTES)) {
+		fprintf(stderr, "cannot write coverage in %s\n", dir);
+		exit(1);
+	}
+	cover_bits = mmap(NULL, COVER_BYTES, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	close(fd);
+	if (cover_bits == MAP_FAILED) {
+		fprintf(stderr, "cannot map %s\n", path);
+		exit(1);
+	}
+	cover_gba = core->board;
+	((struct ARMCore *)core->cpu)->coverage = cover;
 }
 
 // --- Tear watch (-T) -------------------------------------------------------
@@ -1135,6 +1195,9 @@ int main(int argc, char **argv)
 	}
 	core->reset(core);
 	poison_ram(core);
+	if (getenv("TORII_COVERAGE")) {
+		cover_start(core, getenv("TORII_COVERAGE"), argv[1]);
+	}
 	crash_core = core;
 	// BIOS Stop (SWI 3) with a wake-up IRQ enabled: the cart sleeps until
 	// one comes; here it goes on at once, and says so
