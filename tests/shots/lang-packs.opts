@@ -3,8 +3,9 @@
 # Language row goes English -> en-XA -> Swedish -> English. Each switch
 # loads the next pack over the last in PSRAM while Settings fades out, so a
 # text still drawn from the pack before would show garbled: the fade from
-# en-XA to Swedish is hashed every frame, and each switch comes back to
-# Settings drawn whole in the new language, then home in English.
+# en-XA to Swedish is hashed every frame from the switch on, and each
+# switch comes back to Settings drawn whole in the new language, then home
+# in English.
 #! sd-file /torii/lang/en-XA.lng 0 dist/lang/en-XA.lng
 #! sd-file /torii/lang/sv.lng 0 dist/lang/sv.lng
 -w "nav: home ready"
@@ -24,8 +25,8 @@
 -w "settings: row 29 set to"
 -s @8:picked.png
 -k @12:A -k @16:-
--H @12:@40
 -w "lang: sv"
+-H @1:@24
 -w "screen ready: settings"
 -s @8:swedish.png
 -k @12:A -k @16:- -k @24:LEFT -k @28:-

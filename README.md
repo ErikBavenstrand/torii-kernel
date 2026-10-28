@@ -110,8 +110,11 @@ is rebuilt in the background when the card changes; `/torii` also keeps
 The menu speaks English and Swedish. To switch, get `torii-lang.zip` from the
 same release as the kernel, unzip it onto the root of the SD card (it puts the
 packs in `/torii/lang`), and pick a language in Settings, System, Language: the
-menu changes at once. A pack from another release may not match the kernel's
-strings; the kernel then leaves it out and stays in English.
+menu changes at once. Merge its `torii` folder with the card's: on a Mac, don't
+drag it onto the card, where Finder offers to replace the card's `/torii`, with
+your saves in it; copy the `.lng` files into `/torii/lang` instead. Use the
+packs of the kernel's own release: one whose strings differ from the kernel's
+is left out (English shows), but one only reworded since may read wrong.
 
 To translate Torii into another language that Latin-1 covers:
 

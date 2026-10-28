@@ -390,16 +390,16 @@ lang-packs/home 97F8D1DFA6418E84
 lang-packs/picked DCCDA257A16A114E
 lang-packs/pseudo 41175DB67584285A
 lang-packs/swedish 4F56ABA70DEE2876
-lang-packs/frames 0-3 DCCDA257A16A114E
-lang-packs/frames 4-4 F7F9D2248A504484
-lang-packs/frames 5-7 7B90E77090ED8325
-lang-packs/frames 8-8 DF7EB3ECB9CCA977
-lang-packs/frames 9-9 9CC3BF2266957469
-lang-packs/frames 10-10 FEDCB6CE665F445E
-lang-packs/frames 11-11 3EEE96B0FE268C71
-lang-packs/frames 12-12 3DFADED22C01F5F6
-lang-packs/frames 13-25 4F56ABA70DEE2876
-lang-packs/frames 26-28 51B3E6C76CE7575A
+lang-packs/frames 0-0 DCCDA257A16A114E
+lang-packs/frames 1-1 F7F9D2248A504484
+lang-packs/frames 2-4 7B90E77090ED8325
+lang-packs/frames 5-5 DF7EB3ECB9CCA977
+lang-packs/frames 6-6 9CC3BF2266957469
+lang-packs/frames 7-7 FEDCB6CE665F445E
+lang-packs/frames 8-8 3EEE96B0FE268C71
+lang-packs/frames 9-9 3DFADED22C01F5F6
+lang-packs/frames 10-22 4F56ABA70DEE2876
+lang-packs/frames 23-23 51B3E6C76CE7575A
 lang-switch/home D452F2ABDE388F84
 lang-switch/picked 9805239941F1BA95
 lang-switch/switched 41175DB67584285A
@@ -703,7 +703,7 @@ sv-info-read/back BFCB27E24D54148B
 sv-info-read/controls C40A3328210C2C42
 sv-info-read/last 866172C5712F0C05
 sv-info-read/last-down 5433BEBC8CD8C023
-sv-info-read/scrolled 1BD911CE812688D8
+sv-info-read/scrolled 80CCED26961285C4
 sv-info-read/frames 0-1 BFCB27E24D54148B
 sv-info-read/frames 2-2 F0A2CB4762B185B5
 sv-info-read/frames 3-3 B6593388AE0E7033
