@@ -56,11 +56,13 @@ jobs:
       # Rebuilds from a shuffled copy of the source in another folder
       - name: Check the build is reproducible
         run: just repro
-      - name: Upload ezkernelnew.bin
+      - name: Upload ezkernelnew.bin and the language packs
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ezkernelnew
-          path: dist/ezkernelnew.bin
+          path: |
+            dist/ezkernelnew.bin
+            dist/torii-lang.zip
           if-no-files-found: error
 
   test:

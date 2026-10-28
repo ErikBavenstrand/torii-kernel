@@ -6,6 +6,10 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** Swedish. The release attaches `torii-lang.zip`; with its
+  `sv.lng` copied into `/torii/lang` on the card, Settings, System, Language
+  switches to Svenska (983e2842, 19250625, 2cbb0223). Diagnostics' cycle
+  budget takes the Swedish screens' longer texts (7f63f16e).
 - **Added:** language packs. Every string the menu shows comes from
   `lang/en.ini` by id, and a pack in `/torii/lang` (built from a
   translation's `.ini`) replaces it, with its own date and number formats;

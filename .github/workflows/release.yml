@@ -1,6 +1,7 @@
 # Publishes a GitHub Release when a version tag (v0.1.0, ...) is pushed: the
 # kernel is built, checked to be reproducible and tested, then ezkernelnew.bin
-# is attached with install steps and the newest CHANGELOG.md section as notes
+# and torii-lang.zip (the language packs, tools/lang.py) are attached with
+# install steps and the newest CHANGELOG.md section as notes
 # (tools/release_notes.sh), and with ezkernelnew.sym and ezkernelnew.elf, which
 # `just logs --tag` and gdb read for crash dumps from this build.
 name: Release
@@ -42,6 +43,7 @@ jobs:
           path: |
             dist/ezkernelnew.bin
             dist/ezkernelnew.sym
+            dist/torii-lang.zip
             ezkernelnew.elf
           if-no-files-found: error
 
@@ -64,6 +66,7 @@ jobs:
         with:
           files: |
             dist/ezkernelnew.bin
+            dist/torii-lang.zip
             dist/ezkernelnew.sym
             ezkernelnew.elf
           body_path: release-notes.md

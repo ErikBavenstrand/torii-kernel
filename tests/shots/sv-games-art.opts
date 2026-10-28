@@ -1,0 +1,40 @@
+# games-art.opts in Swedish (v0.9): lang/sv.ini's pack set in Settings (slot 0, its
+# id 0x564E), so every string the scenario shows is Swedish, at its width.
+#! settings 0=22094
+#! sd-file /torii/lang/sv.lng 0 dist/lang/sv.lng
+# The list with art (Settings' game view, slot 31), in the light theme: the
+# GBA page (mockup #7) with box art. Its first game has custom art
+# (/torii/art/custom/<file name>.bin), which loads once the cursor rests and
+# the boot's library walk is done; the next game has none: the placeholder
+# box in the console's colour at once. Then letter jumps back past A to
+# Sea.gba, the last game, whose
+# CRC (from crc.txt) has matched art. Then Recent (#24), whose rows lead
+# with their console marks and whose games have no art, with the scenarios'
+# unset clock: no time played.
+#! settings 28=1 31=1
+#! sd-file "/torii/art/custom/A name too long to fit on its row.gba.bin" 0 tests/shots/data/art-sunset.bin
+#! sd-file /Sea.gba 0 tests/shots/data/art-night.bin
+#! sd-file /torii/art/4D148840.bin 0 tests/shots/data/art-night.bin
+#! sd-file /torii/crc.txt 0 tests/shots/data/art-crc.txt
+# The tests' hook: lists open on their first row (else the GBA list opens
+# on Hello, the game Recent played last)
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-w "box art: cover BE104D91 shown"
+-s @2:gba.png
+-k @2:DOWN -k @6:-
+-s @10:gba-none.png
+-k @14:LEFT -k @18:-
+-k @26:LEFT -k @30:-
+-w "box art: cover 082F1A0F shown"
+-s @60:gba-crc.png
+-k @66:B -k @70:-
+-w "nav: home ready"
+-k @8:LEFT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page recent ready"
+-s @2:recent.png

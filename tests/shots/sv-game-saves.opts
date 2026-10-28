@@ -1,0 +1,54 @@
+# game-saves.opts in Swedish (v0.9): lang/sv.ini's pack set in Settings (slot 0, its
+# id 0x564E), so every string the scenario shows is Swedish, at its width.
+#! settings 0=22094
+#! sd-file /torii/lang/sv.lng 0 dist/lang/sv.lng
+# A game's saves (source/screens/game_saves.c on screens/save_page.c; design
+# docs/design/v0.5/saves-variants.md, direction B), dark theme: the game's
+# Start menu with Saves second (popup.png); the slots on the left, the active
+# one marked, and its facts on the right (slots.png); the next slot's
+# (other.png); RIGHT into the active slot's backups (backups.png) and A's
+# restore question (restore.png); START's popup for a slot (options.png);
+# and New slot's choices (new.png).
+#! sd-file "/torii/saves/Long/A name too long to fit on its row.gba/Main.sav" 0x10000 /dev/null
+#! sd-file "/torii/saves/Long/A name too long to fit on its row.gba/Boss Rush.sav" 0x10000 /dev/null
+#! sd-file "/torii/saves/Long/A name too long to fit on its row.gba/game.ini" 0 tests/shots/data/game-saves-game.ini
+#! sd-file "/torii/backups/Long/A name too long to fit on its row.gba/Main/0001-00000000-000000.sav" 0x10000 /dev/null
+#! sd-file "/torii/backups/Long/A name too long to fit on its row.gba/Main/0002-20261022-183005.sav" 0x10000 /dev/null
+#! sd-file "/torii/backups/Long/A name too long to fit on its row.gba/Main/0003-20261023-091542.sav" 0x10000 /dev/null
+#! sd-file "/Long/Emerald.sav" 0x10000 /dev/null
+#! sd-file "/Long/Backups/Zelda.sav" 0x10000 /dev/null
+# The tests' hook: lists open on their first row (else the GBA list opens
+# on Hello, the game Recent played last)
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-k @30:START -k @34:-
+-w "screen ready: game-popup"
+-s @8:popup.png
+-k @12:DOWN -k @16:-
+-k @28:A -k @32:-
+-w "screen ready: game-saves"
+-s @30:slots.png
+-k @34:DOWN -k @38:-
+-s @50:other.png
+-k @54:UP -k @58:-
+-k @70:RIGHT -k @74:-
+-w "screen ready: game-saves-backups"
+-s @30:backups.png
+-k @34:A -k @38:-
+-w "screen ready: confirm"
+-s @30:restore.png
+-k @34:B -k @38:-
+-k @70:B -k @74:-
+-w "screen ready: game-saves"
+-k @30:START -k @34:-
+-w "screen ready: game-saves-slot"
+-s @30:options.png
+-k @34:B -k @38:-
+-k @60:DOWN -k @64:- -k @72:DOWN -k @76:-
+-k @90:A -k @94:-
+-w "screen ready: game-saves-new"
+-s @30:new.png

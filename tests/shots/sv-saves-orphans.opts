@@ -1,0 +1,47 @@
+# saves-orphans.opts in Swedish (v0.9): lang/sv.ini's pack set in Settings (slot 0, its
+# id 0x564E), so every string the scenario shows is Swedish, at its width.
+#! settings 0=22094
+#! sd-file /torii/lang/sv.lng 0 dist/lang/sv.lng
+# Settings > Saves > Clean up saves (source/screens/saves.c; direction B) in
+# the dark theme: a card with what the saves, their backups and the trash use
+# (a bar and a line of sizes), then two saves without a game (folders whose
+# game is gone) and Empty trash as rows. Empty trash asks first; Cancel leaves
+# the trash as it is. A on a save without a game opens its popup (Move to
+# a game, Delete); Move lists the library's games, the ones with its file
+# name first; B goes back.
+#! sd-file "/torii/saves/Old/Hello.gba/Main.sav" 0x8000 /dev/null
+#! sd-file "/torii/saves/Old/Hello.gba/Boss fight.sav" 0x8000 /dev/null
+#! sd-file "/torii/saves/Old/Hello.gba/game.ini" 0x40 /dev/null
+#! sd-file "/torii/backups/Old/Hello.gba/Main/0001-20260101-000000.sav" 0x8000 /dev/null
+#! sd-file "/torii/saves/Gone/Pocket.gb/Main.sav" 0x2000 /dev/null
+#! sd-file "/torii/saves/Games/Idle.gba/Main.sav" 0x2000 /dev/null
+#! sd-file "/torii/trash/20260101-000000-1/GBA/Old.gba/Main.sav" 0x4000 /dev/null
+-w "nav: home ready"
+-k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:A -k @28:-
+-w "screen ready: settings"
+-k @8:R -k @12:- -k @20:R -k @24:- -k @32:R -k @36:-
+-w "settings: row 12"
+-k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:-
+-w "settings: row 15"
+-s @4:settings.png
+-k @8:A -k @12:-
+-w "screen ready: saves"
+-s @4:list.png
+-k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @44:A -k @48:-
+-s @60:empty-confirm.png
+-k @70:B -k @74:-
+-k @90:UP -k @94:- -k @102:UP -k @106:-
+-s @130:orphan.png
+-k @134:A -k @138:-
+-w "saves: popup"
+-s @10:popup.png
+-k @20:A -k @24:-
+-w "saves: picker"
+-s @30:picker.png
+-k @40:DOWN -k @44:- -k @52:DOWN -k @56:- -k @64:DOWN -k @68:-
+-s @84:picker-down.png
+-k @90:A -k @94:-
+-s @120:relink-confirm.png
+-k @130:B -k @134:-
+-k @150:B -k @154:-
+-s @180:back.png

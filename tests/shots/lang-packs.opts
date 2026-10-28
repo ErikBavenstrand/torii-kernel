@@ -1,0 +1,42 @@
+# Switching straight from one language pack to another (v0.9): with the
+# pseudo-locale (en-XA, accented English) and Swedish on the card, Settings'
+# Language row goes English -> en-XA -> Swedish -> English. Each switch
+# loads the next pack over the last in PSRAM while Settings fades out, so a
+# text still drawn from the pack before would show garbled: the fade from
+# en-XA to Swedish is hashed every frame from the switch on, and each
+# switch comes back to Settings drawn whole in the new language, then home
+# in English.
+#! sd-file /torii/lang/en-XA.lng 0 dist/lang/en-XA.lng
+#! sd-file /torii/lang/sv.lng 0 dist/lang/sv.lng
+-w "nav: home ready"
+-k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:A -k @28:-
+-w "screen ready: settings"
+-k @8:L -k @12:-
+-w "settings: row 28"
+-k @8:DOWN -k @12:-
+-w "settings: row 29"
+-k @8:A -k @12:- -k @20:RIGHT -k @24:-
+-w "settings: row 29 set to"
+-k @12:A -k @16:-
+-w "lang: en-XA"
+-w "screen ready: settings"
+-s @8:pseudo.png
+-k @12:A -k @16:- -k @24:RIGHT -k @28:-
+-w "settings: row 29 set to"
+-s @8:picked.png
+-k @12:A -k @16:-
+-w "lang: sv"
+-H @1:@24
+-w "screen ready: settings"
+-s @8:swedish.png
+-k @12:A -k @16:- -k @24:LEFT -k @28:-
+-w "settings: row 29 set to"
+-k @8:LEFT -k @12:-
+-w "settings: row 29 set to"
+-k @12:A -k @16:-
+-w "lang: English"
+-w "screen ready: settings"
+-s @8:english.png
+-k @12:B -k @16:-
+-w "nav: home ready"
+-s @8:home.png

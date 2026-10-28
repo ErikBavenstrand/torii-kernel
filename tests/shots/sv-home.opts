@@ -1,0 +1,24 @@
+# home.opts in Swedish (v0.9): lang/sv.ini's pack set in Settings (slot 0, its
+# id 0x564E), so every string the scenario shows is Swedish, at its width.
+#! settings 0=22094
+#! sd-file /torii/lang/sv.lng 0 dist/lang/sv.lng
+# Home (source/screens/home.c; the carousel, source/screens/carousel.c) in
+# the light theme with the clock set (12:34 at the right): the default
+# card's items (Recent from its v0.3 list, GBA's games, SD card, NOR,
+# Settings, Info) with Recent at the front, as at boot (#1). RIGHT turns to
+# Game Boy Advance (#2), every frame of the step hashed (#4); three LEFTs go
+# back round the end past Info to Settings (#3), two more to SD card (#23).
+#! settings 28=1
+-C 1792586096
+-w "nav: home ready"
+-s @1:recent.png
+-k @8:RIGHT -k @12:-
+-H @8:@20
+-w "home: facing gba"
+-s @1:gba.png
+-k @8:LEFT -k @12:- -k @24:LEFT -k @28:- -k @40:LEFT -k @44:-
+-w "home: facing settings"
+-s @1:settings.png
+-k @8:LEFT -k @12:- -k @24:LEFT -k @28:-
+-w "home: facing sd"
+-s @1:sd.png

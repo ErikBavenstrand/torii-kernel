@@ -1,0 +1,19 @@
+# slot-picker.opts in Swedish (v0.9): lang/sv.ini's pack set in Settings (slot 0, its
+# id 0x564E), so every string the scenario shows is Swedish, at its width.
+#! settings 0=22094
+#! sd-file /torii/lang/sv.lng 0 dist/lang/sv.lng
+# The launch's Play with (source/screens/slot_picker.c on the save page), dark
+# theme: a game with three slots (Main, Boss Rush, Pacifist) asks on every
+# launch, the active slot (Boss Rush, from game.ini) chosen, its facts beside.
+# The launch goes through the menu's test hook (tests/nav.sh).
+#! sd-file /Hello.gba 0x20000 tests/roms/hello/hello.gba
+#! sd-file "/torii/saves/Hello.gba/Main.sav" 0x2000 /dev/null
+#! sd-file "/torii/saves/Hello.gba/Boss Rush.sav" 0x10000 /dev/null
+#! sd-file "/torii/saves/Hello.gba/Pacifist.sav" 0x2000 /dev/null
+#! sd-file "/torii/saves/Hello.gba/game.ini" 0 tests/shots/data/slot-picker-game.ini
+-w "nav: home ready"
+-P "@8:nav_test_path:/Hello.gba" -p @8:nav_test_action:0x7E000001
+-w "screen ready: slot-picker"
+-s @30:picker.png
+-k @40:DOWN -k @44:-
+-s @70:picker-down.png

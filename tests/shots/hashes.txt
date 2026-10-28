@@ -385,6 +385,21 @@ keypad/typed AF01CE0676C29C48
 keypad/unreadable 15B50BB1ADF247D9
 keypad-fill/fill 205A0EE17578966C
 keypad-fill/filled 9982D9EC52FB2679
+lang-packs/english 55752251BD12CD4A
+lang-packs/home 97F8D1DFA6418E84
+lang-packs/picked DCCDA257A16A114E
+lang-packs/pseudo 41175DB67584285A
+lang-packs/swedish 4F56ABA70DEE2876
+lang-packs/frames 0-0 DCCDA257A16A114E
+lang-packs/frames 1-1 F7F9D2248A504484
+lang-packs/frames 2-4 7B90E77090ED8325
+lang-packs/frames 5-5 DF7EB3ECB9CCA977
+lang-packs/frames 6-6 9CC3BF2266957469
+lang-packs/frames 7-7 FEDCB6CE665F445E
+lang-packs/frames 8-8 3EEE96B0FE268C71
+lang-packs/frames 9-9 3DFADED22C01F5F6
+lang-packs/frames 10-22 4F56ABA70DEE2876
+lang-packs/frames 23-23 51B3E6C76CE7575A
 lang-switch/home D452F2ABDE388F84
 lang-switch/picked 9805239941F1BA95
 lang-switch/switched 41175DB67584285A
@@ -627,6 +642,243 @@ slot-picker/picker F2B4477AA79C47BF
 slot-picker/picker-down 9673CADB7316FE61
 slot-picker-light/picker E78F04DF444B1F8D
 slot-picker-list/picker 9111134E5D665F59
+sv-cheats-menu/details 55743A4C2CF67254
+sv-cheats-menu/menu 0ADEA4D421F16263
+sv-cheats-menu/only 18E079FE4B2FBC9F
+sv-cheats-menu/rom 17F1B0BB55D96BBD
+sv-cheats-menu/wrap B17B173E18D7F404
+sv-dialog-overflow/dialog 867E6E658CDE0E48
+sv-dialog-overflow/home C68D6010BD741B53
+sv-game-saves/backups 12C0B650E6B5199E
+sv-game-saves/new 784B6B331CCC4820
+sv-game-saves/options D27A43251ED7B0B3
+sv-game-saves/other 386C6BADAD8A721D
+sv-game-saves/popup 2C214582A639C2E7
+sv-game-saves/restore 494720EB7F4DA07B
+sv-game-saves/slots A442299FA32AD077
+sv-games-art/gba 8A322E856040EAEB
+sv-games-art/gba-crc A7C39B893F61CBA4
+sv-games-art/gba-none 86137A257E214459
+sv-games-art/recent B2DE93CF70035B9D
+sv-games-gba/cancelled 081F88A7907D8302
+sv-games-gba/closed 574D4D64B9505124
+sv-games-gba/delete 23F9DB32BE4C434E
+sv-games-gba/down 6E175C8757ABC7CA
+sv-games-gba/info 82B1CA1A85E5CB19
+sv-games-gba/info-sram 6A52485BA443DADD
+sv-games-gba/letter 72687815643AA8D5
+sv-games-gba/popup 7A5A2F5EB33FB101
+sv-games-gba/screen 1F1C05A558B8E446
+sv-games-gba/frames 0-0 1F1C05A558B8E446
+sv-games-gba/frames 1-1 F91E01EC99F36F92
+sv-games-gba/frames 2-2 1A3C954FAF84A6B2
+sv-games-gba/frames 3-3 BDD4FBFC8B168D5A
+sv-games-gba/frames 4-5 7F84B1B4938502BA
+sv-games-gba/frames 6-12 6E175C8757ABC7CA
+sv-games-play/default 2C214582A639C2E7
+sv-games-play/next B1D3B10AEB57B679
+sv-home/gba 0B2C673E7DF2D87B
+sv-home/recent C494216E14388E8F
+sv-home/sd E11E7F51E16DB2C7
+sv-home/settings 4CA4B78C2AB509B4
+sv-home/frames 0-0 C494216E14388E8F
+sv-home/frames 1-1 B6FF4621ECDA1629
+sv-home/frames 2-2 A4CCA2C8F62190A2
+sv-home/frames 3-3 5DEFC38690CA8263
+sv-home/frames 4-4 B7CE12A4D651FF82
+sv-home/frames 5-5 7699D748DC90EC0E
+sv-home/frames 6-6 1C93C4B6389FA66B
+sv-home/frames 7-7 F13C27181335FC8C
+sv-home/frames 8-8 93144CC6E7F0A48A
+sv-home/frames 9-9 4697C423C322F92D
+sv-home/frames 10-12 0B2C673E7DF2D87B
+sv-info-about/about 5D08D94DF26F5978
+sv-info-about/about-2 725C9630DD4601E4
+sv-info-about/about-end D71F05D7CB63FC50
+sv-info-about/cheats 9CCC4E07BFE89EE0
+sv-info-about/help 3BC7CD2B37E2A5C4
+sv-info-about/ingame FCC34D964CD80ABA
+sv-info-about/saves 02B258CE41672BE6
+sv-info-read/back BFCB27E24D54148B
+sv-info-read/controls C40A3328210C2C42
+sv-info-read/last 866172C5712F0C05
+sv-info-read/last-down 5433BEBC8CD8C023
+sv-info-read/scrolled 80CCED26961285C4
+sv-info-read/frames 0-1 BFCB27E24D54148B
+sv-info-read/frames 2-2 F0A2CB4762B185B5
+sv-info-read/frames 3-3 B6593388AE0E7033
+sv-info-read/frames 4-13 47778893E1D42B25
+sv-info-read/frames 14-14 9AB36A81812C344D
+sv-info-read/frames 15-15 7FD139D2B34F48AC
+sv-info-read/frames 16-16 BC5479627E442E21
+sv-info-read/frames 17-17 EF92F8F4C5111C88
+sv-info-read/frames 18-18 A45932F70D549CC2
+sv-info-read/frames 19-22 C40A3328210C2C42
+sv-ingame/back 95E628B049B4B4BB
+sv-ingame/cheats 7987822347B68CAE
+sv-ingame/menu 57D18CD5F8C3A7F6
+sv-ingame/frames 0-0 EDFE645B9EC49393
+sv-ingame/frames 1-1 78E0A8C36A23FF63
+sv-ingame/frames 2-2 5C5B380683025913
+sv-ingame/frames 3-3 2564AC6E4938A01B
+sv-ingame/frames 4-10 C4BBA028433FE773
+sv-ingame/frames 11-11 37CDB64060FC9606
+sv-ingame/frames 12-12 EF14C71DD6E5044E
+sv-ingame/frames 13-13 600B0904CCD678FE
+sv-ingame/frames 14-14 E2EA554F23333186
+sv-ingame/frames 15-15 9CE5BB36AE567DDE
+sv-ingame/frames 16-16 A589469AC6940226
+sv-ingame/frames 17-23 7987822347B68CAE
+sv-ingame-states/load 05E9AF68A3A41529
+sv-ingame-states/menu C02A68E79EE834B3
+sv-ingame-states/other BE5FA8B5BD25CBE4
+sv-ingame-states/save A9E3E147238C2BFC
+sv-ingame-states/save-current 937EFC1E567CDAF3
+sv-keypad/cleared 145F5B0DEDB8A54F
+sv-keypad/empty F8205C382D582A58
+sv-keypad/format 003966920301557D
+sv-keypad/typed C7BAF2772164A0B4
+sv-keypad/unreadable 8386D137EACA837E
+sv-nor-page/cancelled FFD4D455248EA544
+sv-nor-page/confirm 8A42E7C39560A34B
+sv-nor-page/down 7AC98F55F169EDF6
+sv-nor-page/format FFD4D455248EA544
+sv-nor-page/page B481A848A82468B3
+sv-nor-page/popup FD3829AFC1477F27
+sv-nor-page/frames 0-0 B481A848A82468B3
+sv-nor-page/frames 1-1 BEDC074C95728EC3
+sv-nor-page/frames 2-2 237594C63AF91F26
+sv-nor-page/frames 3-3 9EFC04B393BFEAC7
+sv-nor-page/frames 4-5 62FE69EEB9A06DF6
+sv-nor-page/frames 6-12 7AC98F55F169EDF6
+sv-nor-page/frames 13-13 10414FE0F3F7B12B
+sv-nor-page/frames 14-17 FFD4D455248EA544
+sv-rename/full 80B1C9557D713AEA
+sv-rename/latin 73D23D2C2D919015
+sv-rename/prefilled 2F61128190A476DB
+sv-rename/shifted 067D454AFB503B70
+sv-saves-games/back 4BF900F19344296D
+sv-saves-games/down 4BF900F19344296D
+sv-saves-games/game CF235D9A2A7D2EE3
+sv-saves-games/list EAE3F87A2FEADFEF
+sv-saves-games/settings CEA90400BCB99C5E
+sv-saves-games/settings-again B0D5095DCC1D095A
+sv-saves-orphans/back 7B14D22C8262E931
+sv-saves-orphans/empty-confirm 8F55C01D4F50E4DA
+sv-saves-orphans/list 7B14D22C8262E931
+sv-saves-orphans/orphan 7B14D22C8262E931
+sv-saves-orphans/picker 3BA957C1701B3E0B
+sv-saves-orphans/picker-down 66A3088EB198B41D
+sv-saves-orphans/popup 093E2DC42B271FD4
+sv-saves-orphans/relink-confirm C29D38C277A747E4
+sv-saves-orphans/settings 880D086277836E91
+sv-sd-root/back A5F64F90FAAD8419
+sv-sd-root/confirm ED71525770E04E5C
+sv-sd-root/file-info FC513F8F793118C8
+sv-sd-root/folder E9E57D8E12310012
+sv-sd-root/popup 2160E7DAC9C7BC9E
+sv-sd-root/root 02713C7FD4DF2B9D
+sv-sd-root/frames 0-13 71A318F9E84A5781
+sv-sd-root/frames 14-14 DEDB07AF9A3F7DC6
+sv-sd-root/frames 15-15 CE3FD0A583CEE53E
+sv-sd-root/frames 16-16 279DF61A04E4EAC0
+sv-sd-root/frames 17-17 D60E08D6B46C62C2
+sv-sd-root/frames 18-18 12B736F4E49983EA
+sv-sd-root/frames 19-19 4A942BCFAD004BCE
+sv-sd-root/frames 20-20 BD07B3F3E16596A2
+sv-sd-root/frames 21-24 E9E57D8E12310012
+sv-settings/bottom 3562CE6439C8DC32
+sv-settings/capture F117654BD7930A98
+sv-settings/edit F41BD0A83BB3C542
+sv-settings/fields B7386E6390E6727C
+sv-settings/refused 8E2CEF06681229ED
+sv-settings/swatch 5AE75A919303DFA8
+sv-settings/top AE22257C86E25C57
+sv-settings/frames 0-1 426407B4648E3341
+sv-settings/frames 2-2 D9809EDEBA15F831
+sv-settings/frames 3-3 1AF0FCD71325E7C6
+sv-settings/frames 4-4 52B62AA1D102C9D5
+sv-settings/frames 5-5 3470BBCCD274D59C
+sv-settings/frames 6-6 957ECC165538493F
+sv-settings/frames 7-12 060306C5357F8C1B
+sv-settings/frames 13-13 AE22257C86E25C57
+sv-settings/frames 14-14 ADAA590495020AB7
+sv-settings/frames 15-15 5D3C4F4DC237CC2C
+sv-settings/frames 16-28 E607BE8E3E2BB530
+sv-settings/frames 29-29 2C3CFA7BDF7022CD
+sv-settings/frames 30-30 D27E72CF50FB9625
+sv-settings/frames 31-32 12E0311A79842841
+sv-settings/frames 33-33 3D80FDEA37C8046C
+sv-settings/frames 34-34 D4890AE918857DCC
+sv-settings/frames 35-36 E40D669450D4041B
+sv-settings/frames 37-37 A9C583C06F17162F
+sv-settings/frames 38-38 6C40940936FDB898
+sv-settings/frames 39-40 EA71896CCD495EBF
+sv-settings/frames 41-41 77462352A2F32786
+sv-settings/frames 42-42 230789E4E5B1F06B
+sv-settings/frames 43-43 18CDFBE537C57ADE
+sv-settings/frames 44-44 08874C6D5C0C2A6A
+sv-settings/frames 45-45 5BB50D6919B8C5B9
+sv-settings/frames 46-46 E82202D10959B6EE
+sv-settings/frames 47-47 FA8DA4F7E21C666E
+sv-settings/frames 48-48 7E93991C1A02DA9A
+sv-settings/frames 49-49 96773F288140EE0D
+sv-settings/frames 50-50 A75EAF98CAA552A1
+sv-settings/frames 51-51 8245F9248864C5F2
+sv-settings/frames 52-52 64644A478D6732D7
+sv-settings/frames 53-53 B0AB05145345D094
+sv-settings/frames 54-54 E06E53A3D75DEC9F
+sv-settings/frames 55-55 69DEA1632D2F3BAA
+sv-settings/frames 56-56 E9B14187540CA479
+sv-settings/frames 57-57 3C3E316029220FE9
+sv-settings/frames 58-58 91666201248C9F21
+sv-settings/frames 59-59 848D2AADB0E069CF
+sv-settings/frames 60-60 310401174AF4880D
+sv-settings/frames 61-61 F99BF119CAAD7666
+sv-settings/frames 62-62 72793487B87BF275
+sv-settings/frames 63-63 E7F94CD3DF86CBCB
+sv-settings/frames 64-64 0153E014F569CE27
+sv-settings/frames 65-65 EB8EB4DF4A72355C
+sv-settings/frames 66-66 48F753AC514ADA1D
+sv-settings/frames 67-67 E797AB87F24B2D11
+sv-settings/frames 68-68 7326F21943E2E610
+sv-settings/frames 69-69 55BBE42CA73A553C
+sv-settings/frames 70-70 B0BD0412484E8EFC
+sv-settings/frames 71-71 0E5F7ADEAA9D4C93
+sv-settings/frames 72-72 C46AF5D959647B82
+sv-settings/frames 73-73 F280F6884F4DAD42
+sv-settings/frames 74-74 757BB503F65653DE
+sv-settings/frames 75-75 55F4696EE1156A9A
+sv-settings/frames 76-76 FB44C80E4F911C2A
+sv-settings/frames 77-77 EEA761A6F974DAC5
+sv-settings/frames 78-78 AB34AF715BF5FDE5
+sv-settings/frames 79-79 4EADA40492A0CF15
+sv-settings/frames 80-80 71B7E49C744587F1
+sv-settings/frames 81-81 8FD22DED893AE48D
+sv-settings/frames 82-82 A7C331F287FBD8F2
+sv-settings/frames 83-83 C29F775212405813
+sv-settings/frames 84-84 9C0E6239F3031983
+sv-settings/frames 85-85 7D9468C410228C2D
+sv-settings/frames 86-86 305D26CFF835070F
+sv-settings/frames 87-87 F3F38D3B492C1E18
+sv-settings/frames 88-88 BE2D7F652F46FC00
+sv-settings/frames 89-89 397925A51F8F6943
+sv-settings/frames 90-90 A82CA3FFCD452E72
+sv-settings/frames 91-91 021CA0B13C4C9B53
+sv-settings/frames 92-92 0D836F7EE879E22D
+sv-settings/frames 93-93 CE851773A2F56F3D
+sv-settings/frames 94-94 ACF9C24E315A5208
+sv-settings/frames 95-95 36C8BE9575CDDB58
+sv-settings/frames 96-96 75CBCF461A0D61CE
+sv-settings/frames 97-97 923290408D42452E
+sv-settings/frames 98-98 A945C0AAF86994AE
+sv-settings/frames 99-99 1CDC627B129996A5
+sv-settings/frames 100-100 EC796A68D5EF0F30
+sv-settings/frames 101-101 3F748F0F1C4B426A
+sv-settings/frames 102-102 DEF9A060492B9A52
+sv-settings/frames 103-233 3562CE6439C8DC32
+sv-slot-picker/picker 15CD6AEB1D37F47A
+sv-slot-picker/picker-down F12257F08C1CBC04
 ui-dialog/closed 942FEA8E68027B47
 ui-dialog/dialog 1EC3EDCC05C5D114
 ui-dialog/frames 0-0 942FEA8E68027B47

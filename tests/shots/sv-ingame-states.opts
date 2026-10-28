@@ -1,0 +1,33 @@
+# ingame-states.opts in Swedish (v0.9): lang/sv.ini's pack set in Settings (slot 0, its
+# id 0x564E), so every string the scenario shows is Swedish, at its width.
+#! settings 0=22094
+#! sd-file /torii/lang/sv.lng 0 dist/lang/sv.lng
+# The in-game menu's save state slots (v0.8 P3) over Hello.gba with Save
+# states on: Save state opens its slots (all empty on a new card), the
+# footer saying a state is kept on Back to Torii; A saves slot 1, and the
+# menu opened again has Load state, whose page offers slot 1 alone ("not
+# kept yet": it is in cart SRAM only), the others greyed and the footer
+# saying where they load.
+#! settings 2=1
+-w "nav: home ready"
+-P "@8:nav_test_path:/Hello.gba" -p @8:nav_test_action:0x7E000002
+-w "launch: starting the game"
+-k @300:L+R+START -k @306:-
+-w "screen ready: ingame"
+-k @20:DOWN -k @24:- -k @32:A -k @36:-
+-w "screen ready: ingame-save"
+-s @4:save.png
+-k @10:A -k @14:-
+-k @100:L+R+START -k @106:-
+-w "screen ready: ingame"
+-s @4:menu.png
+-k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:A -k @48:-
+-w "screen ready: ingame-load"
+-s @4:load.png
+-k @10:DOWN -k @14:-
+-s @30:other.png
+# B to the menu on Load state, UP, A: the Save state page again, slot 1
+# (the buffer's, not kept yet) in the accent
+-k @40:B -k @44:- -k @52:UP -k @56:- -k @64:A -k @68:-
+-w "screen ready: ingame-save"
+-s @4:save-current.png
