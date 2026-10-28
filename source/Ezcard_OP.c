@@ -18,6 +18,7 @@
 #include "tlog.h"
 #include "waitcnt.h"
 #include "fattable.h"
+#include "fpga_board.h"
 #include "rtssink.h"
 
 extern u32 FAT_table_buffer[FAT_table_size / 4] EWRAM_BSS;
@@ -859,31 +860,40 @@ void IWRAM_CODE Set_64MROM_flag(u16 flag)
 // --------------------------------------------------------------------
 // Torii: the screens are dialogs on the engine, in one session of their own
 // (ui/dialog.h), with texts from lang.h (EN_FW_*); the CRC check, the SPI writes and
-// their order are the official ones. Keys act on release, not on the press.
-void IWRAM_CODE FW_update(u16 DEcard_FW_readver, u16 FW_built_in_ver, void *FWbinaddress, u32 FWsize, u32 build_crc32,
-			  u32 FW_wirte_address)
+// their order are the official ones. Two screens come before a write: the
+// versions with a warning about power cuts (A goes on), then L+R+A held for
+// two seconds; B on either, or the hold let go early, cancels and the boot
+// goes on. Keys act on release, not on the press, so one A never writes.
+void IWRAM_CODE FW_update(u16 DEcard_FW_readver, const char *rev, u16 FW_built_in_ver, void *FWbinaddress, u32 FWsize,
+			  u32 build_crc32, u32 FW_wirte_address)
 {
 	vu16 busy;
 	vu32 offset;
 	char title[32];
-	char msg[128];
+	char msg[160];
 	char status[24];
 
-	sprintf(title, EN_FW_TITLE, ((DEcard_FW_readver & 0xA000) == 0xA000) ? "B" : "A");
+	sprintf(title, EN_FW_TITLE, rev);
 	dialog_open();
 
+	// A notice while the CRC check reads the image (about half a second)
+	dialog_notice(title, EN_FW_CHECKING, DIALOG_INFO);
 	u32 get_crc32 = crc32(FWbinaddress, FWsize);
-	//DEBUG_printf("get_crc32 %x ",get_crc32);
+	dialog_notice_end();
 
 	if (get_crc32 != build_crc32) {
+		tlog_error("firmware: the kernel's V%02d image fails its CRC32 (%08lX, not %08lX): not written",
+			   FW_built_in_ver, (unsigned long)get_crc32, (unsigned long)build_crc32);
 		dialog_message(title, EN_FW_CRC_ERROR, DIALOG_ERROR);
 		dialog_close();
 		return;
 	}
 
 	// No key hint: the language isn't loaded yet, and the text names the keys
-	sprintf(msg, EN_FW_QUESTION, DEcard_FW_readver & 0xFF, FW_built_in_ver);
-	if (dialog_confirm(title, msg, DIALOG_INFO)) {
+	sprintf(msg, EN_FW_WARNING, DEcard_FW_readver & 0xFF, FW_built_in_ver);
+	if (dialog_confirm(title, msg, DIALOG_INFO) &&
+	    dialog_hold(title, EN_FW_HOLD, KEY_L | KEY_R | KEY_A, FW_HOLD_FRAMES)) {
+		tlog("firmware: writing V%02d over V%02d", FW_built_in_ver, DEcard_FW_readver & 0xFF);
 		SPI_Write_Disable();
 		sprintf(msg, EN_FW_UPDATING, DEcard_FW_readver & 0xFF, FW_built_in_ver);
 		dialog_progress_begin(title, msg);
@@ -914,24 +924,43 @@ void IWRAM_CODE FW_update(u16 DEcard_FW_readver, u16 FW_built_in_ver, void *FWbi
 		while (1)
 			ui_frame();
 	}
+	tlog("firmware: update cancelled, V%02d kept", DEcard_FW_readver & 0xFF);
 	dialog_close();
 }
 // --------------------------------------------------------------------
+// Torii: writes only to a board on the allowlist (fpga_board.h): an LX16
+// whose firmware is older than the kernel's. Any other word writes nothing
+// and shows nothing; it is logged. EZ-Flash's source took every word it
+// didn't know as LX9; the LX9 path stays, unreachable until a real Rev.A's
+// word is measured and allowlisted.
 void IWRAM_CODE Check_FW_update(/*u16 Current_FW_ver,u16 Built_in_ver*/)
 {
 	u16 DEcard_FW_readver = Read_FPGA_ver();
-	u16 DEcard_FW_ver = DEcard_FW_readver & 0x00FF;
+	u16 DEcard_FW_ver = fpga_firmware(DEcard_FW_readver);
+	u16 again = Read_FPGA_ver();
 
-	if ((DEcard_FW_readver & 0xF000) == 0xB000 ||
-	    (DEcard_FW_readver & 0xF000) == 0xA000) { //lx16  note that, 0xA000 is initially,fix here
-		if (DEcard_FW_ver < LX16_FW_built_in_ver) {
-			FW_update(DEcard_FW_readver, LX16_FW_built_in_ver, LX16_newomega_top_bin_address,
+	// Two reads that differ: a noisy bus, so no board is known
+	if (again != DEcard_FW_readver) {
+		tlog("firmware: FPGA version word read as %04X, then %04X: no update", DEcard_FW_readver, again);
+		return;
+	}
+	switch (fpga_board(DEcard_FW_readver)) {
+	case FPGA_BOARD_LX16:
+		tlog("firmware: FPGA version word %04X, LX16 on V%02d, the kernel has V%02d", DEcard_FW_readver,
+		     DEcard_FW_ver, LX16_FW_built_in_ver);
+		if (fpga_update_due(DEcard_FW_readver, LX16_FW_built_in_ver)) {
+			FW_update(DEcard_FW_readver, "B", LX16_FW_built_in_ver, LX16_newomega_top_bin_address,
 				  LX16_newomega_top_bin_size, LX16_FW_crc32, LX16_wirte_address);
 		}
-	} else {//lx9
-		if (DEcard_FW_ver < LX9_FW_built_in_ver) {
-			FW_update(DEcard_FW_readver, LX9_FW_built_in_ver, LX9_newomega_top_bin_address,
+		break;
+	case FPGA_BOARD_LX9:  // never: no Rev.A word is on the allowlist yet
+		if (fpga_update_due(DEcard_FW_readver, LX9_FW_built_in_ver)) {
+			FW_update(DEcard_FW_readver, "A", LX9_FW_built_in_ver, LX9_newomega_top_bin_address,
 				  LX9_newomega_top_bin_size, LX9_FW_crc32, LX9_wirte_address);
 		}
+		break;
+	default:
+		tlog("firmware: FPGA version word %04X isn't a known board: no update", DEcard_FW_readver);
+		break;
 	}
 }

@@ -324,7 +324,7 @@ info/frames 3-3 B8B0BA21F0E9300F
 info/frames 4-4 7A3AAC4645B1F42A
 info/frames 5-6 E5D4052E4933CA3B
 info/frames 7-20 2B0A73E1C030510B
-info-about/about FAAFFED7F8035B9F
+info-about/about FD38FEA4E7DD3B19
 info-about/about-2 B2BB5362EC400E99
 info-about/about-end 958CA4E7A2A59D25
 info-about/cheats 7DAD25B8EAB0EE3F

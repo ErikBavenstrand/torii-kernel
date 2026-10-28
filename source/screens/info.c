@@ -15,6 +15,7 @@
 #include "../diag.h"
 #include "../ezkernel.h"
 #include "../Ezcard_OP.h"
+#include "../fpga_board.h"
 #include "../lang.h"
 #include "../library.h"
 #include "../namesdb.h"
@@ -213,11 +214,16 @@ static void ingame_text(void)
 static void about_text(void)
 {
 	put(INFO_S_ABOUT_TORII, info_version, info_build, 0);
+	// The board only when the update's allowlist knows it, and the raw word
 	u16 fpga = Read_FPGA_ver();
-	u32 lx16 = (fpga & 0xF000) == 0xA000 || (fpga & 0xF000) == 0xB000;  // as Check_FW_update tells them
 	char a[24], b[24], c[24];
-	number(a, sizeof(a), fpga & 0xFF);
-	put(INFO_S_ABOUT_CART, str(lx16 ? INFO_S_ABOUT_REV_B : INFO_S_ABOUT_REV_A), a, 0);
+	if (fpga_board(fpga) == FPGA_BOARD_LX16) {
+		snprintf(a, sizeof(a), EN_FW_ABOUT_FIRMWARE, (unsigned)fpga_firmware(fpga), (unsigned)fpga);
+		put(INFO_S_ABOUT_CART, str(INFO_S_ABOUT_REV_B), a, 0);
+	} else {
+		snprintf(a, sizeof(a), EN_FW_ABOUT_WORD, (unsigned)fpga);
+		put(INFO_S_ABOUT_CART, EN_FW_ABOUT_UNKNOWN, a, 0);
+	}
 	if (game_total_NOR) {
 		nav_count_words(a, sizeof(a), game_total_NOR, gl_count_game, gl_count_games);
 		number(b, sizeof(b), nor_used_mb());
