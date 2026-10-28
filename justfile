@@ -28,7 +28,7 @@ pocketnes_image := "devkitpro/devkitarm@sha256:a8a5fbf5336ba400fd960d20c4c4c370d
 emu_image := "torii-emu"
 kernel_docker := "docker run --rm --platform linux/amd64 -u $(id -u):$(id -g) -v \"$PWD\":/src -w /src -e LIBGBA=/opt/devkitpro/libgba " + kernel_image
 # LC_ALL: mtools stores UTF-8 file names correctly only in a UTF-8 locale
-emu_docker := "docker run --rm -u $(id -u):$(id -g) -e LC_ALL=C.UTF-8 -v \"$PWD\":/src " + emu_image
+emu_docker := "docker run --rm -u $(id -u):$(id -g) -e LC_ALL=C.UTF-8 -e TORII_JOBS -e TORII_COVERAGE_DIR -e TORII_SHOTS -e TORII_SHOTS_COVERAGE -v \"$PWD\":/src " + emu_image
 # C formatter for `just lint` and `just format`; .clang-format-ignore lists the files it skips
 clang_format := "23.1.2"
 # Advisory analysis for `just analyze` (cppcheck is pinned in docker/analyze.Dockerfile)
@@ -211,7 +211,8 @@ lint:
     git ls-files -z '*.c' '*.h' | xargs -0 uvx clang-format@{{clang_format}} --dry-run -Werror
     uvx ruff@0.17.1 check tools tests
     uvx ruff@0.17.1 format --check tools tests
-    uvx --from shellcheck-py@0.11.0.1 shellcheck tests/*.sh tools/*.sh emu/*.sh emulators/*.sh
+    # One file per process (-x: following what it sources), one process per CPU: in one process, about 17 s
+    printf "%s\0" tests/*.sh tools/*.sh emu/*.sh emulators/*.sh | xargs -0 -P "$(getconf _NPROCESSORS_ONLN)" -n 1 uvx --from shellcheck-py@0.11.0.1 shellcheck -x
     uvx --from shfmt-py@4.2.0 shfmt -d -i 2 tests/*.sh tools/*.sh emu/*.sh emulators/*.sh
     uvx --from actionlint-py@1.7.12.25 actionlint .github/workflows/*.yml
 
@@ -233,25 +234,32 @@ analyze-baseline: _analyze-run
 cppcheck_flags := "--include=tests/host/gba_base.h --platform=unix32 --enable=warning,style,performance,portability --inline-suppr --suppress=missingIncludeSystem --suppress=variableScope --suppress=constParameterPointer --suppress=constVariablePointer --suppress='invalidPrintfArgType_*' --suppress=arithOperationsOnVoidPointer --template='{file}:{line}: {severity}: {id}: {message}'"
 
 # The three tools run at once, each into its own file, and GCC one process per
-# source file (tools/analyze.py gcc). clang-tidy stays one process: per file, it
-# would repeat a header's findings once per file it is included from.
+# source file (tools/analyze.py gcc). clang-tidy runs a few files per process,
+# one process per host CPU, each into its own file: run apart, two processes
+# would both report a header's finding, so a finding (file, line, column and
+# message) repeated in another process's output is dropped, as one process would.
 # The repo is mounted at its own path, so compile_commands.json's paths work in containers.
-_analyze-run: compile-commands _analyze-image
+_analyze-run: build compile-commands _analyze-image
     #!/usr/bin/env bash
     set -uo pipefail
     trap 'kill $(jobs -p) 2>/dev/null' INT TERM
     mkdir -p dist/analyze
     rm -f dist/analyze/cppcheck.txt dist/analyze/clang-tidy.txt dist/analyze/gcc.txt
     python3 tools/analyze.py project dist/analyze/project.json || exit 1
-    docker run --rm -u $(id -u):$(id -g) -v "$PWD":"$PWD" -w "$PWD" torii-analyze cppcheck -q --project=dist/analyze/project.json {{cppcheck_flags}} 2> dist/analyze/cppcheck.txt &
+    docker run --rm -u $(id -u):$(id -g) -v "$PWD":"$PWD" -w "$PWD" torii-analyze sh -c 'mkdir -p dist/analyze/cppcheck-build && exec cppcheck -q -j "$(nproc)" --cppcheck-build-dir=dist/analyze/cppcheck-build "$@"' sh --project=dist/analyze/project.json {{cppcheck_flags}} 2> dist/analyze/cppcheck.txt &
     cppcheck=$!
-    python3 tools/analyze.py files | xargs uvx clang-tidy@{{clang_tidy}} -p . --quiet > dist/analyze/clang-tidy.txt 2>/dev/null &
+    rm -rf dist/analyze/tidy && mkdir -p dist/analyze/tidy
+    mkdir -p dist/analyze/cache/clang-tidy
+    # Per file, reusing its output while nothing it reads changed (tools/analyze.py)
+    python3 tools/analyze.py tidy | xargs -P "$(getconf _NPROCESSORS_ONLN)" -n 2 sh -c 'out=dist/analyze/tidy/$$.txt cached=dist/analyze/cache/clang-tidy/$0.txt; if [ "$0" != none ] && [ -f "$cached" ]; then cp "$cached" "$out"; else uvx clang-tidy@{{clang_tidy}} -p . --quiet "$1" > "$out" 2>/dev/null || exit; [ "$0" = none ] || { cp "$out" "$cached.$$" && mv "$cached.$$" "$cached"; }; fi' &
     tidy=$!
     python3 tools/analyze.py gcc dist/analyze/gcc | docker run --rm -i --platform linux/amd64 -u $(id -u):$(id -g) -v "$PWD":"$PWD" -w "$PWD" {{kernel_image}} sh > dist/analyze/gcc.txt 2>&1 &
     gcc=$!
     failed=0
     wait $cppcheck || { echo "cppcheck failed:"; tail -n 20 dist/analyze/cppcheck.txt; failed=1; }
-    wait $tidy || { echo "clang-tidy failed:"; grep -A3 ' error: ' dist/analyze/clang-tidy.txt | head -n 20; failed=1; }
+    wait $tidy; tidy_status=$?
+    cat dist/analyze/tidy/*.txt | awk '!/^[^ ]+:[0-9]+:[0-9]+: (warning|error): / || !seen[$0]++' > dist/analyze/clang-tidy.txt
+    [ $tidy_status = 0 ] || { echo "clang-tidy failed:"; grep -A3 ' error: ' dist/analyze/clang-tidy.txt | head -n 20; failed=1; }
     wait $gcc || { echo "gcc -fanalyzer failed:"; tail -n 20 dist/analyze/gcc.txt; failed=1; }
     wc -l dist/analyze/cppcheck.txt dist/analyze/clang-tidy.txt dist/analyze/gcc.txt | sed '$d'
     exit $failed
@@ -267,27 +275,49 @@ _analyze-image: _ready
 
 # Play the listed games through the kernel and write dist/compat/index.html. Filters pick
 # games by code, system, save chip or file name, e.g. `just compat gbc` or `just compat Pokemon`.
-# Unfiltered, it also checks real cheat codes in their games (tests/cheat_codes.sh)
+# Unfiltered, it also checks real cheat codes in their games (tests/cheat_codes.sh), alongside:
+# its output follows the games'
 [positional-arguments]
 compat *filters: build emu-headless
-    {{emu_docker}} python3 tests/games.py "$@"
-    @if [ $# = 0 ] || [ "$*" = --all ]; then {{emu_docker}} tests/cheat_codes.sh; fi
+    #!/usr/bin/env bash
+    set -uo pipefail
+    cheats=
+    if [ $# = 0 ] || [ "$*" = --all ]; then
+      cheats=$(mktemp)
+      trap 'kill $(jobs -p) 2>/dev/null; rm -f "$cheats"' EXIT
+      {{emu_docker}} tests/cheat_codes.sh >"$cheats" 2>&1 &
+    fi
+    {{emu_docker}} python3 tests/games.py "$@"; status=$?
+    if [ -n "$cheats" ]; then
+      wait $! || status=1
+      cat "$cheats"
+    fi
+    exit $status
 
 # Build the hardware-free kernel code with tests/host for the host, under ASan and UBSan, and run it;
-# test tools/font.py, tools/asset.py, tools/art.py, tools/art_scrape.py, tools/cheats.py, tools/cheat_encode.py, tools/art_pack.py, tools/library_report.py, the palette and the upgrade file's layout
+# test tools/font.py, tools/asset.py, tools/art.py, tools/art_scrape.py, tools/cheats.py, tools/cheat_encode.py, tools/art_pack.py, tools/library_report.py, the palette and the upgrade file's layout.
+# They all run at once, each into its own log, printed in order.
 test-host: emu-image
-    @emu/fetch.sh
-    {{emu_docker}} tests/host.sh
-    @uv run -q tests/font_test.py
-    @uv run -q tests/asset_test.py
-    @uv run -q tests/image_test.py
-    @uv run -q tests/names_db_test.py
-    @uv run -q tests/art_test.py
-    @uv run -q tests/art_scrape_test.py
-    @uv run -q tests/cheats_test.py
-    @uv run -q tests/cheat_encode_test.py
-    @uv run -q tests/art_pack_test.py
-    @uv run -q tests/library_report_test.py
+    #!/usr/bin/env bash
+    set -uo pipefail
+    emu/fetch.sh
+    logs=$(mktemp -d)
+    trap 'kill $(jobs -p) 2>/dev/null; rm -rf "$logs"' EXIT
+    jobs=("{{emu_docker}} tests/host.sh")
+    for test in font asset image names_db art art_scrape cheats cheat_encode art_pack library_report; do
+      jobs+=("uv run -q tests/${test}_test.py")
+    done
+    pids=()
+    for i in "${!jobs[@]}"; do
+      eval "${jobs[$i]}" >"$logs/$i" 2>&1 &
+      pids+=($!)
+    done
+    failed=0
+    for i in "${!jobs[@]}"; do
+      wait "${pids[$i]}" || { failed=1; echo "FAIL: ${jobs[$i]}"; }
+      cat "$logs/$i"
+    done
+    exit $failed
 
 # Run every cheat code type of every format on the cheat test ROM in mGBA's own cheat engine and
 # through Torii, and compare the memory (tests/cheat_engine.sh; part of `just test`).

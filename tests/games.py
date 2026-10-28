@@ -355,6 +355,7 @@ class Result:
         self.trace_tail = ""
         self.requirements = ""
         self.alike: list[str] = []
+        self.seconds = 0.0
 
     def set(self, check: str, status: str, detail: str = "") -> None:
         self.checks[check] = [status, detail]
@@ -389,6 +390,7 @@ class Result:
             "trace": self.trace_tail,
             "requirements": self.requirements,
             "alike": self.alike,
+            "seconds": round(self.seconds, 1),
         }
 
 
@@ -1020,6 +1022,20 @@ def matches(game: dict, filters: list[str]) -> bool:
     )
 
 
+def earlier_seconds() -> dict[str, float]:
+    """Each game's time in the newest of the last 20 runs that played it."""
+    took: dict[str, float] = {}
+    for run in sorted((REPORT / "runs").glob("*.json"))[-20:]:
+        try:
+            games = json.loads(run.read_text()).get("games", [])
+        except ValueError:
+            continue
+        for game in games:
+            if game.get("seconds"):
+                took[game["key"]] = game["seconds"]
+    return took
+
+
 def print_summary(results: list[Result], run_file: Path) -> None:
     counts = {
         s: sum(r.status == s for r in results)
@@ -1068,6 +1084,7 @@ def main() -> int:
             print(f"skipped GB mappers (no game in roms/): {', '.join(missing)}")
 
     def play(result: Result) -> None:
+        began = time.monotonic()
         key = key_of(result.game)
         carts = [CARTS / key, CARTS / f"{key}-menu", CARTS / f"{key}-trips"]
         for cart in carts:
@@ -1087,13 +1104,18 @@ def main() -> int:
             if cart.exists() and result.status == "fail":
                 shutil.copytree(cart, KEPT / cart.name)
             shutil.rmtree(cart, ignore_errors=True)
+        result.seconds = time.monotonic() - began
         print(
             f"{result.status:7} {result.game['file'][:60]}", file=sys.stderr, flush=True
         )
 
-    # Each game has its own cart, so they run side by side.
+    # Each game has its own cart, so they run side by side, the longest
+    # first (by the earlier runs' times), so no long game starts last and
+    # runs on alone at the end.
+    took = earlier_seconds()
+    order = sorted(results, key=lambda r: -took.get(key_of(r.game), float("inf")))
     with ThreadPoolExecutor(max_workers=os.cpu_count() or 4) as pool:
-        list(pool.map(play, results))
+        list(pool.map(play, order))
 
     runs = REPORT / "runs"
     runs.mkdir(parents=True, exist_ok=True)

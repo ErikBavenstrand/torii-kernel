@@ -26,7 +26,6 @@ local_carts "dist/cart-cheat-codes"
 
 shot=emu/build-linux/mgba-shot
 strict=${CHEAT_ENGINE_STRICT-1}
-failed=0 passed=0 skipped=0 pending=0
 # One line per game: file, then its codes as "desc|code|addr:width:value,...|interpreter|keys"
 mapfile -t games < <(
   python3 - <<'EOF'
@@ -98,15 +97,17 @@ dumps() {
   done
 }
 
-for line in "${games[@]}"; do
-  IFS=$'\t' read -r -a f <<<"$line"
+# play_game N LINE: one game's codes (LINE from the list above), on carts of
+# its own, so the games run side by side
+play_game() {
+  local f game group writes_all all tdumps mdumps tkeys mkeys hotkey what
+  IFS=$'\t' read -r -a f <<<"$2"
   game=${f[0]}
   if [ ! -f "roms/$game" ]; then
     echo "SKIP: cheat_codes: $game isn't in roms/"
-    skipped=$((skipped + 1))
-    continue
+    return
   fi
-  cart=$carts/game
+  local cart=$carts/game$1 cht=$carts/Game$1.cht
   # The constant codes together, as before; each interpreter code on its own
   group=() writes_all=()
   for ((i = 1; i < ${#f[@]}; i++)); do
@@ -117,8 +118,8 @@ for line in "${games[@]}"; do
     fi
   done
   if [ ${#group[@]} -gt 0 ]; then
-    cht "${group[@]}" >"$carts/Game.cht"
-    card "$game" "$carts/Game.cht"
+    cht "${group[@]}" >"$cht"
+    card "$game" "$cht"
     all=$(
       IFS=,
       echo "${writes_all[*]}"
@@ -128,10 +129,9 @@ for line in "${games[@]}"; do
     # shellcheck disable=SC2046 # nav.sh's options
     OMEGA_DIR=$cart $shot dist/ezkernelnew.bin $(nav_launch /Game.gba addon) \
       -w "launch: starting the game" "${tdumps[@]}" -f 6000 >"$cart/run.txt" 2>&1 || true
-    $shot "roms/$game" -E "$carts/Game.cht" "${mdumps[@]}" >"$cart/mgba.txt" 2>&1 || true
+    $shot "roms/$game" -E "$cht" "${mdumps[@]}" >"$cart/mgba.txt" 2>&1 || true
     if ! grep -q "launch: starting the game" "$cart/run.txt"; then
       echo "FAIL: cheat_codes: $game didn't start: $(grep -a '^kernel' "$cart/run.txt" | tail -2)"
-      failed=$((failed + 1))
     else
       for ((i = 1; i < ${#f[@]}; i++)); do
         IFS='|' read -r desc code writes interp _ <<<"${f[$i]}"
@@ -139,10 +139,8 @@ for line in "${games[@]}"; do
         check "$writes" "$cart/run.txt" "$cart/mgba.txt"
         if [ -z "$tbad$mbad" ]; then
           echo "PASS: cheat_codes: $game: $desc ($code), in Torii and in mGBA's engine"
-          passed=$((passed + 1))
         else
           echo "FAIL: cheat_codes: $game: $desc ($code):${tbad:+ Torii$tbad;}${mbad:+ mGBA engine$mbad;} $(grep -a 'cheats:' "$cart/run.txt" | tail -2 | tr '\n' ' ')"
-          failed=$((failed + 1))
         fi
       done
     fi
@@ -150,8 +148,8 @@ for line in "${games[@]}"; do
   for ((i = 1; i < ${#f[@]}; i++)); do
     IFS='|' read -r desc code writes interp keys <<<"${f[$i]}"
     [ "$interp" = 1 ] || continue
-    cht "$desc" "$code" >"$carts/Game.cht"
-    card "$game" "$carts/Game.cht"
+    cht "$desc" "$code" >"$cht"
+    card "$game" "$cht"
     mapfile -t tdumps < <(dumps "$writes" @)
     mapfile -t mdumps < <(dumps "$writes" "")
     tkeys=() mkeys=()
@@ -162,7 +160,7 @@ for line in "${games[@]}"; do
     # shellcheck disable=SC2046 # nav.sh's options
     OMEGA_DIR=$cart $shot dist/ezkernelnew.bin $(nav_launch /Game.gba addon) \
       -w "launch: starting the game" "${tkeys[@]}" "${tdumps[@]}" -f 6000 >"$cart/run.txt" 2>&1 || true
-    $shot "roms/$game" -E "$carts/Game.cht" "${mkeys[@]}" "${mdumps[@]}" >"$cart/mgba.txt" 2>&1 || true
+    $shot "roms/$game" -E "$cht" "${mkeys[@]}" "${mdumps[@]}" >"$cart/mgba.txt" 2>&1 || true
     check "$writes" "$cart/run.txt" "$cart/mgba.txt"
     hotkey=
     case "+$keys+" in *+L+*) case "+$keys+" in *+R+*) case "+$keys+" in *+SELECT+* | *+START+*)
@@ -172,21 +170,33 @@ for line in "${games[@]}"; do
     what="$game: $desc ($code), keys ${keys:-none}$hotkey"
     if [ -z "$keys" ]; then
       echo "SKIP: cheat_codes: $what: its condition is on the game's state, not set up here; Torii:${tbad:- writes} / mGBA engine:${mbad:- writes}"
-      skipped=$((skipped + 1))
     elif [ -n "$mbad" ]; then
       echo "FAIL: cheat_codes: $what: mGBA's engine doesn't show it:$mbad; Torii:${tbad:- writes}"
-      failed=$((failed + 1))
     elif [ -z "$tbad" ]; then
       echo "PASS: cheat_codes: $what, in Torii and in mGBA's engine"
-      passed=$((passed + 1))
     elif [ "$strict" = 0 ]; then
       echo "SKIP: cheat_codes: $what: pending the interpreter: Torii$tbad; $(grep -a 'cheats: cheat' "$cart/run.txt" | tail -1)"
-      pending=$((pending + 1))
     else
       echo "FAIL: cheat_codes: $what: Torii$tbad; $(grep -a 'cheats:' "$cart/run.txt" | tail -2 | tr '\n' ' ')"
-      failed=$((failed + 1))
     fi
   done
+}
+
+logs=$(mktemp -d)
+pids=()
+for i in "${!games[@]}"; do
+  play_game "$i" "${games[$i]}" >"$logs/$i" 2>&1 &
+  pids+=($!)
 done
+for i in "${!games[@]}"; do
+  wait "${pids[$i]}" || echo "FAIL: cheat_codes: ${games[$i]%%$'\t'*}: the runner stopped"
+  cat "$logs/$i"
+done >"$logs/all"
+cat "$logs/all"
+passed=$(grep -c '^PASS' "$logs/all" || true)
+failed=$(grep -c '^FAIL' "$logs/all" || true)
+pending=$(grep -c '^SKIP: .*pending the interpreter' "$logs/all" || true)
+skipped=$(($(grep -c '^SKIP' "$logs/all" || true) - pending))
+rm -rf "$logs"
 echo "cheat_codes: $passed passed, $failed failed, $pending pending the interpreter, $skipped skipped"
 [ "$failed" = 0 ]

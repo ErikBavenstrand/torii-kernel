@@ -82,7 +82,10 @@ class Server:
 
         self.httpd = http.server.HTTPServer(("127.0.0.1", 0), Handler)
         self.url = f"http://127.0.0.1:{self.httpd.server_address[1]}/"
-        self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
+        # A short poll, as shutdown() waits for the next one (0.5 s by default)
+        self.thread = threading.Thread(
+            target=self.httpd.serve_forever, args=(0.01,), daemon=True
+        )
         self.thread.start()
 
     def paths(self):

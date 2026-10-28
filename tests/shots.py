@@ -88,6 +88,16 @@ FRAMES = Path("dist/shots-frames")
 # virtiofs mount (tests/carts.sh)
 CARTS = Path(tempfile.gettempdir()) / "torii-shots-carts"
 SHOT = "emu/build-linux/mgba-shot"
+# With TORII_SHOTS_COVERAGE=DIR, each scenario's runs record the kernel code
+# they execute in DIR/NAME (mgba-shot's TORII_COVERAGE), with DIR/NAME/job
+# naming it shots:NAME and DIR/NAME/status the run's exit status, for
+# tools/testmap.py; TORII_SHOTS (names, space-separated) runs only those
+# scenarios. `just check` sets both, to run the scenarios a change touches.
+COVERAGE = (
+    Path(os.environ["TORII_SHOTS_COVERAGE"]).resolve()
+    if os.environ.get("TORII_SHOTS_COVERAGE")
+    else None
+)
 KERNEL = "dist/ezkernelnew.bin"
 TEST_KERNEL = "ezkerneltest.gba"
 # 2026-01-01 12:34:56 UTC: the clock stands still there in every scenario
@@ -270,6 +280,7 @@ def runs_of(hashes: list[str]) -> list[tuple[int, int, str]]:
 def boot(name: str, sd: Path, cart: Path, out: Path, extra: list[str] = ()):
     """Runs scenario name on a new cart, writing its key frames to out."""
     opts = SHOTS / f"{name}.opts"
+    covered = COVERAGE / name if COVERAGE else None  # (the loop below reuses name)
     shutil.rmtree(cart, ignore_errors=True)
     cart.mkdir(parents=True)
     shutil.copy(sd, cart / "sd.img")
@@ -337,16 +348,17 @@ def boot(name: str, sd: Path, cart: Path, out: Path, extra: list[str] = ()):
             nor_game(cart, name, int(size, 0), Path(src).read_bytes())
         elif line.startswith("#! sd-many "):
             _, _, folder, count = shlex.split(line)
-            stage = cart / "many"
-            stage.mkdir()
-            files = []
+            game = cart / "many.gba"
+            game.write_bytes(bytes(32))
+            # Through the kernel's FatFs in one mount: mcopy takes minutes
+            # for thousands of files in one folder, as it checks every name
+            # against the whole folder
+            pairs = []
             for i in range(1, int(count) + 1):
-                f = stage / f"Game {i:04d}.gba"
-                f.write_bytes(bytes(32))
-                files.append(str(f))
-            run(["mmd", "-i", str(cart / "sd.img"), f"::{folder}"])
-            run(["mcopy", "-Q", "-i", str(cart / "sd.img"), *files, f"::{folder}/"])
-            shutil.rmtree(stage)
+                pairs += [str(game), f"{folder}/Game {i:04d}.gba"]
+            run(["tools/sdimg.sh", str(cart / "sd.img"), "mkdir", folder])
+            run(["tools/sdimg.sh", str(cart / "sd.img"), "put", *pairs])
+            game.unlink()
         elif line.startswith("#! env "):
             name, _, value = line.split(maxsplit=2)[2].partition("=")
             cart_env[name] = value
@@ -368,6 +380,11 @@ def boot(name: str, sd: Path, cart: Path, out: Path, extra: list[str] = ()):
     env = dict(os.environ, OMEGA_DIR=str(cart), TZ="UTC")
     env.pop("OMEGA_TRACE", None)
     env.update(cart_env)
+    if covered:
+        # This scenario's kernel code, apart (see main)
+        env["TORII_COVERAGE"] = str(covered)
+        covered.mkdir(parents=True, exist_ok=True)
+        (covered / "job").write_text(f"shots:{covered.name}\n")
     FRAMES.mkdir(parents=True, exist_ok=True)
     cmd = [SHOT, kernel, "-C", str(EPOCH), "-O", str(out), "-D", str(FRAMES)]
     cmd += ["-i", str(opts), *extra]
@@ -704,7 +721,10 @@ def main() -> int:
     if any(a.startswith("-") for a in args):
         sys.exit(__doc__)
     every = sorted(p.stem for p in SHOTS.glob("*.opts"))
-    names = args or every
+    # `just check` picks the scenarios a change touches (tools/check.py)
+    picked = os.environ.get("TORII_SHOTS", "").split()
+    names = args or picked or every
+    partial = bool(args or picked)
     missing = [n for n in names if n not in every]
     if missing:
         sys.exit(f"shots: no scenario {', '.join(missing)} in {SHOTS}")
@@ -737,12 +757,12 @@ def main() -> int:
         update(results, read_manifest(), set(names), set(every))
         return 0
     if mode == "--update-perf":
-        perf.update(cycles, perf.BUDGET, partial=bool(args))
+        perf.update(cycles, perf.BUDGET, partial=partial)
         return 0
 
     status = 0
     want = read_manifest()
-    if not args:
+    if not partial:
         known = set(every)
         orphans = sorted({k.split("/")[0] for k in want} - known)
         if orphans:
@@ -760,7 +780,7 @@ def main() -> int:
         print(
             f"PASS: golden shots: {len(results)} scenarios, {total} hashes match tests/shots/hashes.txt"
         )
-    problems = perf.check(cycles, perf.read_budget(perf.BUDGET), partial=bool(args))
+    problems = perf.check(cycles, perf.read_budget(perf.BUDGET), partial=partial)
     problems += perf.header_problems(perf.read_budget(perf.BUDGET))
     for p in problems:
         print(f"FAIL: perf: {p}")
@@ -768,6 +788,10 @@ def main() -> int:
         status = 1
     else:
         print(f"PASS: cycle budget: {perf.summary(cycles)}")
+    if COVERAGE:
+        # A failed run records no scenario as passed, so all of them run again
+        for name in names:
+            (COVERAGE / name / "status").write_text(f"{status}\n")
     return status
 
 

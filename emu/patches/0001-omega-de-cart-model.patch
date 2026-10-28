@@ -10,6 +10,20 @@ index 59ca1c1..1dd19c0 100644
  	EXTDATA_META_TIME = 0x101,
  	EXTDATA_META_CREATOR = 0x102,
  	EXTDATA_MAX
+diff --git a/include/mgba/internal/arm/arm.h b/include/mgba/internal/arm/arm.h
+index f9eeafd..3298744 100644
+--- a/include/mgba/internal/arm/arm.h
++++ b/include/mgba/internal/arm/arm.h
+@@ -184,6 +184,9 @@ struct ARMCore {
+ 
+ 	size_t numComponents;
+ 	struct mCPUComponent** components;
++
++	// Torii: called before each instruction when set, with its address (mgba-shot's test coverage)
++	void (*coverage)(struct ARMCore* cpu, uint32_t address);
+ };
+ #undef ARM_REGISTER_FILE
+ 
 diff --git a/include/mgba/internal/gba/cart/omega.h b/include/mgba/internal/gba/cart/omega.h
 new file mode 100644
 index 0000000..beb8713
@@ -247,6 +261,30 @@ index a11c7e1..28ea10b 100644
  	struct GBACartEReader ereader;
  	size_t romSize;
  	uint32_t romMask;
+diff --git a/src/arm/arm.c b/src/arm/arm.c
+index 37dfe72..2b38bfb 100644
+--- a/src/arm/arm.c
++++ b/src/arm/arm.c
+@@ -198,6 +198,9 @@ static const uint16_t conditionLut[16] = {
+ };
+ 
+ static inline void ARMStep(struct ARMCore* cpu) {
++	if (UNLIKELY(cpu->coverage)) {
++		cpu->coverage(cpu, cpu->gprs[ARM_PC] - 2 * WORD_SIZE_ARM);
++	}
+ 	uint32_t opcode = cpu->prefetch[0];
+ 	cpu->prefetch[0] = cpu->prefetch[1];
+ 	cpu->gprs[ARM_PC] += WORD_SIZE_ARM;
+@@ -217,6 +220,9 @@ static inline void ARMStep(struct ARMCore* cpu) {
+ }
+ 
+ static inline void ThumbStep(struct ARMCore* cpu) {
++	if (UNLIKELY(cpu->coverage)) {
++		cpu->coverage(cpu, cpu->gprs[ARM_PC] - 2 * WORD_SIZE_THUMB);
++	}
+ 	uint32_t opcode = cpu->prefetch[0];
+ 	cpu->prefetch[0] = cpu->prefetch[1];
+ 	cpu->gprs[ARM_PC] += WORD_SIZE_THUMB;
 diff --git a/src/core/serialize.c b/src/core/serialize.c
 index 19b3225..67ff6e5 100644
 --- a/src/core/serialize.c

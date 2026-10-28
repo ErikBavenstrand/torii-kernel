@@ -4,7 +4,7 @@
 //
 //   sdimg IMG mkfs fat16|fat32|exfat MEGABYTES
 //   sdimg IMG mkdir PATH
-//   sdimg IMG put LOCAL_FILE PATH
+//   sdimg IMG put LOCAL_FILE PATH [LOCAL_FILE PATH]...  (one mount for them all)
 //   sdimg IMG put-fragmented LOCAL_FILE PATH RUNS  (in RUNS runs of clusters)
 //   sdimg IMG get PATH LOCAL_FILE
 //   sdimg IMG ls PATH
@@ -210,8 +210,10 @@ int main(int argc, char **argv)
 	if (strcmp(cmd, "mkdir") == 0 && argc == 4) {
 		res = f_mkdir(argv[3]);
 		status = (res == FR_OK || res == FR_EXIST) ? 0 : fail("f_mkdir", res);
-	} else if (strcmp(cmd, "put") == 0 && argc == 5) {
-		status = put(argv[3], argv[4]);
+	} else if (strcmp(cmd, "put") == 0 && argc >= 5 && argc % 2 == 1) {
+		status = 0;
+		for (int i = 3; i < argc && status == 0; i += 2)
+			status = put(argv[i], argv[i + 1]);
 	} else if (strcmp(cmd, "put-fragmented") == 0 && argc == 6) {
 		status = put_fragmented(argv[3], argv[4], atol(argv[5]), &fs);
 	} else if (strcmp(cmd, "get") == 0 && argc == 5) {
