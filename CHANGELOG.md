@@ -4,6 +4,14 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Added:** language packs. Every string the menu shows comes from
+  `lang/en.ini` by id, and a pack in `/torii/lang` (built from a
+  translation's `.ini`) replaces it, with its own date and number formats;
+  Settings' Language row, shown now, switches the menu at once. A stale or
+  damaged pack, or a string one lacks, shows English (5441fefe).
+
 ## v0.8.4
 
 - **Changed:** Info has six reading pages: Controls, In game, and new Saves,
