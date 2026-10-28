@@ -55,26 +55,37 @@ Everything still open from v0.4.3–v0.8.1, triaged 2026-10-27; what code could 
 
 ### Decisions for v0.9
 
-- **PSRAM map:** 384 KB of page 0 (7.625–8 MB, `source/engine/psram.h`) is reserved for the language tables; how to split it (the active pack's strings, an extra script's font, PSRAM page 1 for CJK-size fonts) is decided when v0.9 starts (owner, 2026-10-27).
+- **PSRAM map:** 384 KB of page 0 (7.625–8 MB, `source/engine/psram.h`) is reserved for the language tables: 64 KB for the active pack, and 320 KB held for a 1.0 script font (decided 2026-10-28, see v0.9).
 - **Memory:** EWRAM has 11,388 bytes free in the release kernel and 10,312 in the test kernel since the pages' states share one block (2026-10-27); ROM has about 215 KB free, IWRAM 10 KB.
 - **In-game strings:** ready: every string the overlay shows comes from `gl_ingame`, drawn by the kernel at launch, with v0.9's numbered placeholders (`lang_fill`) and one/other forms where a count shows. The kernel's own dialogs about the menu (`EN_INGAME_REFUSED*`) are printf formats like the rest of `lang.h`'s `EN_*`, for v0.9's string IDs.
 - **Licences:** No-Intro's terms for a derived name table (built on the user's machine, never bundled); libretro-thumbnails has no licence grant (fetched locally, never committed); the boxes' trade dress.
 
 ## v0.9 Languages and firmware
 
-- **Strings:** every UI string has an ID, with English in `lang/en.ini` compiled in as the
-  fallback.
+Decided with the owner on 2026-10-28. The work is split three ways: **strings and packs**, then **Swedish and the release** once that has merged, and alongside both, **firmware safety**.
+
+- **Languages:** English and Swedish. The owner checks Swedish.
+- **Strings:**
+  - Every UI string has an ID. `lang/en.ini` is the source of truth.
+  - `just lang` generates `source/lang_ids.h` and the English table from it. Both are committed and never edited by hand, and a test fails when they are stale, the same way the fonts work.
+  - Code reads a string with `S(STR_...)`.
+  - The `gl_*` globals, the per-screen structs and the `EN_*` printf formats all go.
+  - Diagnostics' checklist and the SD logs stay in English and get no IDs, so bug reports read the same in any language. Diagnostics' title and the row that opens it are translated.
 - **Language packs:**
   - **Authoring:** translators edit `lang/<code>.ini` as text.
-  - **Build:** the build compiles each file into a binary pack (`.lng`, Rockbox-style), whose
-    version header rejects stale packs.
-  - **Lookup:** an offset table in PSRAM, with English used for any string a pack lacks.
-- **Placeholders:** numbered (`{1} of {2}`) and checked against English at build time. Plurals
-  are avoided by wording, or written as `.one`/`.other` variants.
-- **Scripts:** Latin-1 first. Other scripts come as extra font files.
-- **Firmware updater:** kept, behind a confirmation screen and a battery warning. It only
-  runs when the embedded firmware is newer than the cart's. It is tested in the emulator, and
-  it refuses EZODE-B carts.
+  - **Build:** the build compiles each file into a binary pack (`.lng`, Rockbox-style), whose version header rejects stale packs. Each pack has a font field that stays empty until 1.0.
+  - **Location:** packs live on the card in `/torii/lang/`. English is compiled in as the fallback. The release attaches `torii-lang.zip`.
+  - **Lookup:** the active pack's header, offset table and strings sit in PSRAM: 64 KB at the start of page 0's language reserve (`source/engine/psram.h`). A pack over that size fails the build. English is read from ROM and uses none of the reserve.
+  - **Formats:** each pack carries its own date and number formats (`date.short = {day} {month}`, a decimal comma, and so on). The 12/24-hour clock stays a setting.
+- **Switching:** Settings' Language row lists English plus the packs on the card. Picking a language takes effect at once: the pack loads, the row cache clears, and the carousel and Settings are rebuilt, as a theme switch does.
+- **Placeholders:** numbered (`{1} of {2}`) and checked against English at build time. Plurals are avoided by wording, or written as `.one`/`.other` variants.
+- **Scripts:** Latin-1 only. Other scripts come in 1.0 as extra font files, in the remaining 320 KB of the reserve. PSRAM page 1 stays untouched.
+- **Firmware updater:**
+  - **Images:** the official images (LX16 V07, LX9 V05), unchanged.
+  - **Allowlist:** an update is written only to a cart whose FPGA version word is on the allowlist (LX16: high nibble `0xA`/`0xB`) and whose firmware is older than ours. Today the kernel treats any word it doesn't recognise as LX9, so an EZODE-B or any other unknown board could be offered the wrong image and bricked. With the allowlist, any other word writes nothing and logs the raw value.
+  - **LX9:** the kernel never writes LX9 firmware until a real Rev.A word has been measured. About and Diagnostics show the raw version word instead of guessing "Rev.A".
+  - **Starting an update:** two screens. The first shows the versions and a warning: a power cut can leave the cart unbootable, so use fresh batteries or a plugged-in console. The second asks you to hold L+R+A for two seconds. B cancels on either screen.
+  - **Tests:** `tests/fw_update.sh` covers every case, including that every word outside the allowlist writes nothing.
 
 ## After v0.9
 
