@@ -78,7 +78,7 @@ static struct {
 	u8 ink[DIAG_LINES];
 	u32 count;  // lines on this page
 	char title[48];
-	char word[16];  // "DIAGNOSTICS" in the menu's language, copied as it starts (the checks stay English)
+	char word[24];  // "DIAGNOSTICS" in the menu's language, copied as it starts (the checks stay English)
 	struct ui_view *view;
 	u16 keys;  // fired since wait_key started listening
 	u32 pumped;  // torii_frames when say last ran a frame
@@ -1124,7 +1124,7 @@ static u32 crash_loop[1] EWRAM_BSS;
 void Diagnostics(void)
 {
 	memset(&scr, 0, sizeof(scr));
-	snprintf(scr.word, sizeof(scr.word), "%s", S(STR_DIAG_TITLE));
+	lang_fill(scr.word, sizeof(scr.word), "{1}", LS(S(STR_DIAG_TITLE)));  // cut on a whole character
 	screen_title("start?");
 	screen_open(0);
 	say(WHITE, "Diagnostics tests the cart and writes");

@@ -468,6 +468,7 @@ static void test_hook(void)
 			nav.place = (struct registry_place){nav.shown[0], 0, 0};
 		nav.place.open = 0;
 		nav.reshow = 1;  // "nav: home ready" again, once it faces the first item
+		lang_poll();  // as run_deferred: a launch that came back
 		after_action();
 		return;
 	default:
@@ -475,6 +476,7 @@ static void test_hook(void)
 		break;
 	}
 	nav.reshow = nav.place.open;  // a page shows what the action changed
+	lang_poll();  // as run_deferred: a launch that came back
 	after_action();
 }
 
