@@ -3,22 +3,22 @@
 #include <string.h>
 
 #include "gamelist.h"
+#include "lang.h"
 
 #define KB 1024u
 #define MB (1024u * 1024u)
 
-void gamelist_size(char *out, u32 size, u32 bytes, const char *kb, const char *mb)
+void gamelist_size(char *out, u32 size, u32 bytes)
 {
 	if (bytes < MB) {
-		snprintf(out, size, "%lu %s", (unsigned long)((bytes + KB - 1) / KB), kb);
+		SF(out, size, STR_SIZE_KB, LN((bytes + KB - 1) / KB));
 		return;
 	}
 	u32 tenths = (bytes / KB * 10u + KB / 2) / KB;  // megabytes in tenths, rounded
 	if (tenths < 100 && tenths % 10)
-		snprintf(out, size, "%lu.%lu %s", (unsigned long)(tenths / 10), (unsigned long)(tenths % 10), mb);
+		SF(out, size, STR_SIZE_MB, LT(tenths));
 	else
-		snprintf(out, size, "%lu %s", (unsigned long)((bytes / KB + KB / 2) / KB),
-			 mb);  // whole, from the bytes
+		SF(out, size, STR_SIZE_MB, LN((bytes / KB + KB / 2) / KB));  // whole, from the bytes
 }
 
 void gamelist_sort(u16 *items, u16 *tmp, u32 n, gamelist_cmp cmp, void *ctx)

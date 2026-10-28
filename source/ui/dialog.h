@@ -20,16 +20,16 @@
 // calls, so a question followed by a progress dialog doesn't flash black
 // between them. They nest; the last close ends the session.
 //
-//	if (dialog_confirm(gl_save_sav, name, DIALOG_INFO)) {  // A: 1, B: 0
-//		dialog_progress_begin(gl_saving, name);
-//		dialog_progress_status(gl_save_ing);              // drawn at once
+//	if (dialog_confirm(S(STR_SAVE_ASK), name, DIALOG_INFO)) {  // A: 1, B: 0
+//		dialog_progress_begin(S(STR_SAVE_TITLE), name);
+//		dialog_progress_status(S(STR_SAVE_SAVING));              // drawn at once
 //		for (each block) {
 //			dialog_progress_set(done, total, status_text);  // a few times a second
 //			...
 //		}
 //		dialog_progress_end();
 //	}
-//	dialog_message(NULL, gl_error_1, DIALOG_ERROR);       // B closes it
+//	dialog_message(NULL, S(STR_ERROR_FILE), DIALOG_ERROR);       // B closes it
 //
 // Text: title in the heading font (NULL: none), text in the body font,
 // centred, with "\n" between lines; a line too wide wraps (at a space if

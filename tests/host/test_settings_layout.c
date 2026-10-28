@@ -28,12 +28,11 @@ static void erased(void)
 
 void test_settings_layout_slots(void)
 {
-	LoadEnglish();
 	erased();
-	// Eight sections: a label, the rows, a gap each; 29 rows with the LED on
-	// (v0.7 took out the Cheats row: its slot, 4, is unused)
-	CHECK_EQ(lay.rows, 29);
-	CHECK_EQ(lay.count, 29 + 2 * SET_SECTIONS);
+	// Eight sections: a label, the rows, a gap each; 30 rows with the LED on
+	// (v0.7 took out the Cheats row: its slot, 4, is unused; v0.9 shows Language)
+	CHECK_EQ(lay.rows, 30);
+	CHECK_EQ(lay.count, 30 + 2 * SET_SECTIONS);
 	CHECK_EQ(lay.slot[0].kind, SET_SLOT_LABEL);
 	CHECK_EQ(lay.slot[1].kind, SET_SLOT_ROW);
 	CHECK_EQ(lay.slot[1].id, SET_THEME);
@@ -56,30 +55,30 @@ void test_settings_layout_slots(void)
 		CHECK_EQ(settings_layout_position(&lay, s), id + 1);
 		id++;
 	}
-	CHECK_EQ(id, SET_LOGGING + 1);  // Language hidden
-	CHECK_EQ(settings_layout_slot_of(&lay, SET_LANGUAGE), SET_LAYOUT_NONE);
+	CHECK_EQ(id, SET_LANGUAGE + 1);  // Language last
 	// The LED off hides its colours: two rows fewer, the slots after move up
 	settings_set(&v, SET_LED, 0);
 	settings_layout_build(&lay, &v);
-	CHECK_EQ(lay.rows, 27);
+	CHECK_EQ(lay.rows, 28);
 	CHECK_EQ(settings_layout_slot_of(&lay, SET_LED_IDLE), SET_LAYOUT_NONE);
 	CHECK_EQ(settings_layout_slot_of(&lay, SET_RESET_ON), settings_layout_slot_of(&lay, SET_LED) + 3);
 }
 
 void test_settings_layout_moves(void)
 {
-	LoadEnglish();
 	erased();
 	u32 theme = settings_layout_slot_of(&lay, SET_THEME), dim = settings_layout_slot_of(&lay, SET_DIM);
 	u32 time = settings_layout_slot_of(&lay, SET_TIME_ROW), logging = settings_layout_slot_of(&lay, SET_LOGGING);
+	u32 language = settings_layout_slot_of(&lay, SET_LANGUAGE);
 	// UP and DOWN skip the labels and gaps; an end wraps only on a fresh press
 	CHECK_EQ(settings_layout_step(&lay, theme, 1, 0), theme + 1);
 	CHECK_EQ(settings_layout_step(&lay, dim, 1, 0), time);
 	CHECK_EQ(settings_layout_step(&lay, time, -1, 0), dim);
 	CHECK_EQ(settings_layout_step(&lay, theme, -1, 0), theme);
-	CHECK_EQ(settings_layout_step(&lay, theme, -1, 1), logging);
-	CHECK_EQ(settings_layout_step(&lay, logging, 1, 0), logging);
-	CHECK_EQ(settings_layout_step(&lay, logging, 1, 1), theme);
+	CHECK_EQ(settings_layout_step(&lay, theme, -1, 1), language);
+	CHECK_EQ(settings_layout_step(&lay, logging, 1, 0), language);
+	CHECK_EQ(settings_layout_step(&lay, language, 1, 0), language);
+	CHECK_EQ(settings_layout_step(&lay, language, 1, 1), theme);
 	// L and R: a section's first row, back to its own first, wrapping
 	CHECK_EQ(settings_layout_section(&lay, theme, 1), time);
 	CHECK_EQ(settings_layout_section(&lay, dim, -1), theme);
@@ -89,7 +88,7 @@ void test_settings_layout_moves(void)
 	// A slot that isn't a row: the next row
 	CHECK_EQ(settings_layout_row_at(&lay, 0), theme);
 	CHECK_EQ(settings_layout_row_at(&lay, dim + 1), time);
-	CHECK_EQ(settings_layout_row_at(&lay, lay.count - 1), logging);
+	CHECK_EQ(settings_layout_row_at(&lay, lay.count - 1), language);
 }
 
 // steps c through frames frames of held, returning the last answer

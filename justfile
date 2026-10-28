@@ -45,6 +45,7 @@ gdb_host := if os() == "linux" { "127.0.0.1" } else { "host.docker.internal" }
 # Build the flashable upgrade file: dist/ezkernelnew.bin
 build: _ready emulators
     @mkdir -p dist
+    @python3 tools/lang.py packs
     @{{fresh}} check kernel dist/ezkernelnew.bin dist/ezkernelnew.sym ezkernelnew.elf -- {{kernel_inputs}} || {{just_executable()}} _build-kernel
 
 _build-kernel:
@@ -304,7 +305,7 @@ test-host: emu-image
     logs=$(mktemp -d)
     trap 'kill $(jobs -p) 2>/dev/null; rm -rf "$logs"' EXIT
     jobs=("{{emu_docker}} tests/host.sh")
-    for test in font asset image names_db art art_scrape cheats cheat_encode art_pack library_report; do
+    for test in font asset lang image names_db art art_scrape cheats cheat_encode art_pack library_report; do
       jobs+=("uv run -q tests/${test}_test.py")
     done
     pids=()
@@ -360,6 +361,13 @@ palette:
 font:
     uv run -q tools/font.py assets/fonts/galmuri/Galmuri9.bdf --name body --line-height 12 --squeeze --clip -o source/engine/font_body
     uv run -q tools/font.py assets/fonts/galmuri/Galmuri11-Bold.bdf --name heading --line-height 16 --squeeze --clip -o source/engine/font_heading
+
+# Turn lang/en.ini into source/lang_ids.h and source/lang_en.c (committed;
+# tests/lang_test.py checks they match), and every lang/<code>.ini, and the
+# test pseudo-locale, into dist/lang/<code>.lng (`just build` makes those too)
+lang:
+    python3 tools/lang.py sources
+    python3 tools/lang.py packs
 
 # Convert the menu's art in assets/ui (icons, carousel objects, shadows, the placeholder boxes) to C:
 # source/ui/art_data.c and art_ids.h (committed; tests/asset_test.py checks they match)

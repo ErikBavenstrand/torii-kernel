@@ -115,7 +115,7 @@ static u32 test_values(u32 id)
 		return COUNT(test_dims);
 	if (r->kind == SET_KEYS)
 		return COUNT(test_combos);
-	return id == SET_LANGUAGE ? lang_pack_count : r->count;
+	return id == SET_LANGUAGE ? lang_count() : r->count;
 }
 
 static u16 test_value(u32 id, u32 i)

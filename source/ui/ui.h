@@ -342,6 +342,14 @@ void ui_item_set(u32 item);
 // session, it is ui_theme_set. Any screen change or ui_theme_set ends a wipe
 // at once on its new theme.
 void ui_theme_switch(const struct ui_theme *theme);
+// Lends the lists' row cache's room (ROW_CACHE_BYTES, word-aligned) to a
+// launch (lang_before_launch), its rows forgotten. The next list that
+// wants the cache first calls back, after which the room is the lists'
+// again; ui_list_cache_reclaim takes it back with no call.
+void *ui_list_cache_lend(void (*back)(void));
+// Forgets every row the lists keep drawn (a theme or a language change)
+void ui_list_cache_clear(void);
+void ui_list_cache_reclaim(void);
 // Ends a wipe at once on the theme it was going to, and runs a frame that
 // commits that: call it before blocking work (a NOR write, a dialog), which
 // would hold the wipe's edge where it is. Nothing if none runs.

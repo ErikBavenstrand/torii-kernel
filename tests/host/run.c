@@ -271,6 +271,10 @@ static const struct {
 	{"orphanplan_journal", test_orphanplan_journal},
 	{"orphanplan_picker", test_orphanplan_picker},
 	{"lang_fill", test_lang_fill},
+	{"lang_dates", test_lang_dates},
+	{"lang_pack", test_lang_pack},
+	{"lang_launch", test_lang_launch},
+	{"lang_list", test_lang_list},
 	{"saveslot_stamp_from_rtc", test_saveslot_stamp_from_rtc},
 };
 

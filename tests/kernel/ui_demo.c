@@ -657,7 +657,6 @@ static void show(u32 s)
 void ui_demo(void)
 {
 	REG_WAITCNT_CART = WAITCNT_MENU;  // as the menu runs
-	LoadEnglish();                    // the popups' strings
 	irqInit();
 	cartlog_install();
 	engine_init();

@@ -1101,7 +1101,7 @@ static void first_scan_progress(void)
 	if (value < lib.progress)
 		value = lib.progress;  // folders found later never move the bar back
 	lib.progress = value > 1000 ? 1000 : value;
-	snprintf(status, sizeof(status), "%lu %s", (unsigned long)lib.u.walk.games, gl_library_found);
+	SF(status, sizeof(status), STR_LIBRARY_FOUND, LN(lib.u.walk.games));
 	dialog_progress_set(lib.progress, 1000, status);
 }
 
@@ -1136,7 +1136,7 @@ int library_boot(void)
 		if (lib.state == S_IDLE && lib.want_write && lib.valid)
 			write_begin();
 		if (!shown && torii_frames - frames > LIB_PROGRESS_FRAMES) {
-			dialog_progress_begin(gl_library_title, gl_library_scanning);
+			dialog_progress_begin(S(STR_LIBRARY_TITLE), S(STR_LIBRARY_SCANNING));
 			shown = 1;
 		}
 		if (shown && torii_frames != frames) {
@@ -1174,7 +1174,7 @@ void library_before_launch(void)
 		if (lib.state != S_WRITE)
 			write_begin();
 		psram_begin();
-		dialog_progress_begin(gl_library_title, gl_library_saving);
+		dialog_progress_begin(S(STR_LIBRARY_TITLE), S(STR_LIBRARY_SAVING));
 		while (lib.state == S_WRITE) {
 			library_step();
 			if (lib.state == S_WRITE && lib.phase != X_START)

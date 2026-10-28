@@ -104,9 +104,11 @@ _Static_assert(sizeof(struct info_state) <= PAGE_STATE_BYTES, "the page's state 
 extern struct info_state page_info;
 #define info page_info
 
+_Static_assert(STR_INFO_ABOUT_NAMES - STR_INFO_CONTROLS == INFO_S_ABOUT_NAMES, "[info] in enum info_string's order");
+
 static const char *str(u32 id)
 {
-	return id < INFO_STRINGS ? gl_info[id] : "";
+	return id < INFO_STRINGS ? S(STR_INFO_CONTROLS + id) : "";
 }
 
 // A row's item number (0-4: the position, Last place) and back
@@ -122,31 +124,12 @@ static u32 item_row(u32 item)
 
 // --- Texts ----------------------------------------------------------------------
 
-// tmpl into out at at, each "%s" in it the next of a, b, c ("" past them);
-// returns the text's new length. Strings come from lang.c, so there is no
-// printf format here a translation could get wrong.
+// tmpl into out at at, each {N} in it the Nth of a, b, c ("" for none);
+// returns the text's new length
 static u32 fill(char *out, u32 at, u32 size, const char *tmpl, const char *a, const char *b, const char *c)
 {
-	const char *args[3] = {a, b, c};
-	u32 n = 0, room = size - 1, cut = 0;
-	for (const char *s = tmpl; *s; s++) {
-		if (s[0] == '%' && s[1] == 's') {
-			const char *arg = n < 3 && args[n] ? args[n] : "";
-			n++;
-			s++;
-			for (; *arg; arg++)
-				if (at < room)
-					out[at++] = *arg;
-				else
-					cut = 1;
-		} else if (at < room) {
-			out[at++] = *s;
-		} else {
-			cut = 1;
-		}
-	}
-	TLOG_ASSERT(!cut);  // it all fitted
-	out[at] = 0;
+	at += lang_fill(out + at, size - at, tmpl, LS(a), LS(b), LS(c));
+	TLOG_ASSERT(at + 1 < size);  // it all fitted
 	return at;
 }
 
@@ -158,7 +141,7 @@ static void put(u32 id, const char *a, const char *b, const char *c)
 
 static void number(char *out, u32 size, u32 n)
 {
-	nav_count_words(out, size, n, 0, 0);
+	nav_count_words(out, size, n, 0);
 }
 
 // Bytes as "29.7 GB" or "512 MB"
@@ -167,9 +150,9 @@ static void size_words(char *out, u32 size, unsigned long long bytes)
 	unsigned long long mb = bytes >> 20;
 	if (mb >= 1024) {
 		unsigned long long tenths = (bytes * 10) >> 30;
-		snprintf(out, size, "%lu.%lu GB", (unsigned long)(tenths / 10), (unsigned long)(tenths % 10));
+		SF(out, size, STR_SIZE_GB, LT(tenths));
 	} else {
-		snprintf(out, size, "%lu MB", (unsigned long)mb);
+		SF(out, size, STR_SIZE_MB, LN(mb));
 	}
 }
 
@@ -219,7 +202,7 @@ static void about_text(void)
 	number(a, sizeof(a), fpga & 0xFF);
 	put(INFO_S_ABOUT_CART, str(lx16 ? INFO_S_ABOUT_REV_B : INFO_S_ABOUT_REV_A), a, 0);
 	if (game_total_NOR) {
-		nav_count_words(a, sizeof(a), game_total_NOR, gl_count_game, gl_count_games);
+		nav_count_words(a, sizeof(a), game_total_NOR, STR_COUNT_GAMES);
 		number(b, sizeof(b), nor_used_mb());
 		number(c, sizeof(c), NOR_MB);
 		put(INFO_S_ABOUT_NOR, a, b, c);
@@ -254,10 +237,10 @@ static void about_text(void)
 		static const u8 consoles[] = {NAV_GBA, NAV_GBC, NAV_GB, NAV_NES};
 		for (u32 i = 0; i < sizeof(consoles); i++) {
 			u32 n = library_count(registry_items[consoles[i]].console);
-			nav_count_words(b, sizeof(b), n, gl_count_game, gl_count_games);
+			nav_count_words(b, sizeof(b), n, STR_COUNT_GAMES);
 			put(INFO_S_ABOUT_CONSOLE, nav_item_name(consoles[i]), b, 0);
 		}
-		nav_count_words(a, sizeof(a), library_total_files(), gl_count_file, gl_count_files);
+		nav_count_words(a, sizeof(a), library_total_files(), STR_COUNT_FILES);
 		put(INFO_S_ABOUT_FILES, a, 0, 0);
 	} else {
 		put(INFO_S_ABOUT_COUNTING, 0, 0, 0);  // the index loads again after a launch, or the first scan runs
@@ -360,8 +343,7 @@ static const struct ui_view_spec menu_view = {"info", menu_nodes, M_NODES, M_LIS
 
 static void menu_position(void)
 {
-	snprintf(info.position, sizeof(info.position), "%lu/%lu", (unsigned long)row_item(info.row) + 1,
-		 (unsigned long)R_ITEMS);
+	SF(info.position, sizeof(info.position), STR_NAV_POSITION, LN(row_item(info.row) + 1), LN(R_ITEMS));
 	ui_title_set_right((u8)(info.first + M_TITLE), info.position);
 }
 
@@ -423,9 +405,9 @@ static struct ui_view *push_menu(u32 row)
 	info.first = v->first;
 	info.row = (u8)(row < R_COUNT && row != R_GAP ? row : R_CONTROLS);
 	ui_title_set((u8)(v->first + M_TITLE), nav_item_name(NAV_INFO));
-	info.hints[0] = (struct ui_hint){"A", gl_hint_open};
-	info.hints[1] = (struct ui_hint){"^v", gl_hint_move};
-	info.hints[2] = (struct ui_hint){"B", gl_hint_back};
+	info.hints[0] = (struct ui_hint){"A", S(STR_HINT_OPEN)};
+	info.hints[1] = (struct ui_hint){"^v", S(STR_HINT_MOVE)};
+	info.hints[2] = (struct ui_hint){"B", S(STR_HINT_BACK)};
 	ui_hints_set((u8)(v->first + M_HINTS), info.hints, 3);
 	ui_list_reset((u8)(v->first + M_LIST), info.row);
 	menu_position();
@@ -471,7 +453,7 @@ static void read_position(u32 top)
 	u32 rows = info.reading.count, shown = READ_H / ui_theme()->look.list_pitch;
 	u32 pages = rows > shown ? (rows + shown - 1) / shown : 1;
 	u32 at = rows <= shown || top + shown >= rows ? pages : top / shown + 1;
-	snprintf(info.position, sizeof(info.position), "%lu/%lu", (unsigned long)at, (unsigned long)pages);
+	SF(info.position, sizeof(info.position), STR_NAV_POSITION, LN(at), LN(pages));
 	ui_title_set_right((u8)(info.first + P_TITLE), info.position);
 }
 
@@ -518,7 +500,7 @@ static void open_page(u32 row)
 	ui_title_set((u8)(v->first + P_TITLE), str(INFO_S_CONTROLS + row));
 	ui_title_set_sub((u8)(v->first + P_TITLE), nav_item_name(NAV_INFO));
 	info.hints[0] = (struct ui_hint){"^v", str(INFO_S_SCROLL)};
-	info.hints[1] = (struct ui_hint){"B", gl_hint_back};
+	info.hints[1] = (struct ui_hint){"B", S(STR_HINT_BACK)};
 	ui_hints_set((u8)(v->first + P_HINTS), info.hints, 2);
 	read_position(0);
 	tlog_debug("info: %s, %lu rows", read_views[row].name, (unsigned long)info.reading.count);

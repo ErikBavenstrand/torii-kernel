@@ -73,7 +73,6 @@ u32 game_total_NOR;
 
 u32 gl_currentpage;
 u32 gl_norOffset;
-u32 gl_lang;
 u16 gl_engine_sel;
 
 u16 gl_game_clock;
@@ -140,7 +139,7 @@ static void Boot_notice_check(void)
 		return;
 	boot_noticed = 1;
 	tlog_debug("boot: still busy %lu frames after mounting", (unsigned long)(torii_frames - boot_mounted));
-	dialog_notice(NULL, gl_Loading, DIALOG_INFO);
+	dialog_notice(NULL, S(STR_BOOT_LOADING), DIALOG_INFO);
 }
 //---------------------------------------------------------------------------------
 //------------------------------------------------------------------
@@ -854,16 +853,11 @@ u32 IWRAM_CODE Loadfile2PSRAM(TCHAR *filename)
 //---------------------------------------------------------------------------------
 void CheckLanguage(void)
 {
-	u16 id = Read_SET_info(assress_language);
-	u32 i;
-
-	// An unknown id, such as a dropped language's, gets the first language
-	gl_lang = 0;
-	for (i = 0; i < lang_pack_count; i++) {
-		if (lang_packs[i].id == id)
-			gl_lang = i;
-	}
-	lang_packs[gl_lang].load();
+	// The language Settings stores, from the packs lang_boot found (none
+	// before the card mounts): one Settings changed loads now
+	u32 i = lang_index_of(Read_SET_info(assress_language));
+	if (i != lang_current())
+		lang_switch(i);
 }
 //---------------------------------------------------------------------------------
 // Torii: the BOOT WITH ADDON switches as the launches read them: 1 on, else
@@ -1037,9 +1031,8 @@ u32 Check_file_type(TCHAR *pfilename)
 //---------------------------------------------------------------------------------
 const char *Error_message(u8 error_num)
 {
-	const char *const messages[] = {gl_error_0, gl_error_1, gl_error_2, gl_error_3, gl_error_4, gl_error_5,
-					gl_error_6, gl_error_7, gl_error_8, gl_error_9, gl_error_10};
-	return error_num < sizeof(messages) / sizeof(messages[0]) ? messages[error_num] : "error?";
+	// By number: error.folder's first (lang/en.ini)
+	return error_num <= STR_ERROR_RTS_SPACE - STR_ERROR_FOLDER ? S(STR_ERROR_FOLDER + error_num) : "error?";
 }
 //---------------------------------------------------------------------------------
 static void Show_error_num(u8 error_num)
@@ -1188,8 +1181,7 @@ static u32 __attribute__((noinline)) Retire_oversized_save(const char *savfilena
 	const char *name = Launch_display(rom_path);
 	tlog("save: type change notice shown for %s", name);
 	char msg[260];
-	int cut = (int)charset_cut(name, 60);
-	snprintf(msg, sizeof(msg), EN_SAVE_TYPE_CHANGED, cut, name, (unsigned long)fno.fsize);
+	SF(msg, sizeof(msg), STR_LAUNCH_SAVE_TYPE_CHANGED, LCUT(name, 60), LN(fno.fsize));
 	u32 asked = cycles_now();
 	dialog_message(NULL, msg, DIALOG_INFO);
 	save_wait_cycles += cycles_since(asked);
@@ -1384,8 +1376,7 @@ static u32 pending_save_copy(u32 size)
 	u32 check = Save_check(name, size);
 	if (check == SAVE_MISMATCH) {
 		char msg[200];
-		int cut = (int)charset_cut(name, 80);
-		snprintf(msg, sizeof(msg), EN_SAVE_MISMATCH, cut, name);
+		SF(msg, sizeof(msg), STR_LAUNCH_SAVE_MISMATCH, LCUT(name, 80));
 		if (!dialog_confirm(NULL, msg, DIALOG_ERROR)) {
 			tlog("save: the chip doesn't look like %s: B, the file stays", name);
 			return SAVE_NOTHING;
@@ -1394,14 +1385,14 @@ static u32 pending_save_copy(u32 size)
 	} else if (check != SAVE_WRITE) {
 		return check;
 	}
-	dialog_progress_begin(gl_saving, name);
-	progress_step(gl_save_ing, 0, PROGRESS_FULL);
+	dialog_progress_begin(S(STR_SAVE_TITLE), name);
+	progress_step(S(STR_SAVE_SAVING), 0, PROGRESS_FULL);
 	struct diskstat mark;
 	diskstat_start(&mark);
 	u32 saved = Save_savefile(name, size, pending_hist_dir());
 	diskstat_log("save copy", &mark);
 	if (saved == SAVE_WRITTEN)
-		progress_done(gl_done);
+		progress_done(S(STR_LAUNCH_DONE));
 	dialog_progress_end();
 	return saved;
 }
@@ -1417,7 +1408,7 @@ static void Check_save_flag(void)
 	u16 savetype = Read_sav_info(SAV_INFO_TYPE);
 	TCHAR *name = (TCHAR *)SAV_info_buffer;
 	dialog_open();
-	int save = gl_auto_save_sel || dialog_confirm(gl_save_sav, name, DIALOG_INFO);
+	int save = gl_auto_save_sel || dialog_confirm(S(STR_SAVE_ASK), name, DIALOG_INFO);
 	tlog(saved_how, name, (unsigned long)savefilesize, savetype,
 	     gl_auto_save_sel ? "auto"
 	     : save           ? "A, save"
@@ -1470,8 +1461,7 @@ static int pending_save_settle(void)
 	int go = 1;
 	if (pending_save_copy(size) == SAVE_FAILED) {
 		char msg[160];
-		int cut = (int)charset_cut(name, 80);
-		snprintf(msg, sizeof(msg), EN_SAVE_UNSAVED, cut, name);
+		SF(msg, sizeof(msg), STR_LAUNCH_SAVE_UNSAVED, LCUT(name, 80));
 		go = dialog_confirm(NULL, msg, DIALOG_ERROR);
 		tlog("save: %s isn't on the card: %s", name, go ? "A, launch anyway, it is lost" : "B, kept");
 	}
@@ -1561,11 +1551,12 @@ int main(void)
 	}
 	if (res != FR_OK) {
 		cartlog_mount_failed();
-		Show_boot_notice(gl_init_error, gl_power_off, DIALOG_ERROR);
+		Show_boot_notice(S(STR_BOOT_CARD_ERROR), S(STR_BOOT_POWER_OFF), DIALOG_ERROR);
 		while (1)
 			ui_frame();
 	}
 	boot_mounted = torii_frames;
+	lang_boot();  // the language pack, before anything the boot shows from here
 	fathint_start();  // the FAT's first free cluster, while the boot's screens show
 	slotstore_recover();  // a slot rename or delete the power cut short, before any save is touched
 	saveorphan_recover();  // a relink or delete of an orphaned save the same
@@ -1607,7 +1598,7 @@ int main(void)
 	if (library_boot()) {  // the index, or the first scan
 		// The card mounted but doesn't read (left unanswering, as a game
 		// mode SD access leaves it): an empty list would only mislead
-		Show_boot_notice(gl_init_error, gl_power_off, DIALOG_ERROR);
+		Show_boot_notice(S(STR_BOOT_CARD_ERROR), S(STR_BOOT_POWER_OFF), DIALOG_ERROR);
 		while (1)
 			ui_frame();
 	}
@@ -1655,6 +1646,7 @@ enum {
 static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 {
 	library_before_launch();
+	lang_before_launch();  // the launch's strings out of PSRAM's way
 	cover_cache_invalidate();  // before the save files are touched, as boot_game does
 	//TCHAR savfilename[100];
 	TCHAR *pfilename;
@@ -1667,7 +1659,7 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 	REG_WAITCNT_CART = WAITCNT_MENU;
 	dialog_progress_begin(pNorFS[show_offset + file_select].filename, NULL);
 	REG_WAITCNT_CART = WAITCNT_BIOS;
-	progress_step(gl_loading_game, 0, LAUNCH_NOR_SAVE);
+	progress_step(S(STR_LAUNCH_LOADING_GAME), 0, LAUNCH_NOR_SAVE);
 
 	init_FAT_table();
 
@@ -1778,8 +1770,10 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 		}
 	}
 	// The launch fills PSRAM with the game: the library index and the cover
-	// cache there are gone
+	// cache there are gone, and the language pack: its launch's strings
+	// wait in RAM
 	library_before_launch();
+	lang_before_launch();
 	cover_cache_invalidate();
 	// The launch's progress, until the game starts (Game_launch ends it
 	// otherwise): the game's name, and the bar over every step below. It
@@ -1861,11 +1855,11 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 	}
 	if (MENU_line < 2) {  //work for psram
 		if (gamefilesize > 0x2000000) {
-			dialog_message(NULL, gl_file_overflow, DIALOG_ERROR);
+			dialog_message(NULL, S(STR_LAUNCH_FILE_OVERFLOW), DIALOG_ERROR);
 			return 0;
 		}
 
-		progress_step(gl_loading_game, 0, LAUNCH_SAVE);
+		progress_step(S(STR_LAUNCH_LOADING_GAME), 0, LAUNCH_SAVE);
 		// Torii: the state buffer's write-back goes to /torii/rts.bin, a
 		// file of the kernel's, at every launch (fattable.h): with nothing
 		// there the FPGA's walk ran on into the game's runs and wrote a
@@ -1969,10 +1963,10 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 					int st = ingame_states_launch(launch_save.rom, launch_save.rec.slot, pfilename,
 								      action_state_slot(), gamefilesize);
 					if (st != 1 &&
-					    !dialog_confirm(st == STATESTORE_OTHER_GAME ? gl_states->other_game
-							    : st == STATESTORE_NEWER    ? gl_states->newer
-											: gl_states->unreadable,
-							    gl_states->start_anyway, DIALOG_ERROR)) {
+					    !dialog_confirm(st == STATESTORE_OTHER_GAME ? S(STR_STATE_OTHER_GAME)
+							    : st == STATESTORE_NEWER    ? S(STR_STATE_NEWER)
+											: S(STR_STATE_UNREADABLE),
+							    S(STR_STATE_START_ANYWAY), DIALOG_ERROR)) {
 						tlog("launch: %s not started: its state slot %lu %s", pfilename,
 						     (unsigned long)action_state_slot(),
 						     st == STATESTORE_OTHER_GAME ? "is another game's"
@@ -2051,7 +2045,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 					tlog("launch: %lu code patches for this game's IRQ setup",
 					     (unsigned long)(iCount2 - found));
 				found = iCount2;
-				progress_step(gl_patching, LAUNCH_PATCH, PROGRESS_FULL);
+				progress_step(S(STR_LAUNCH_PATCHING), LAUNCH_PATCH, PROGRESS_FULL);
 				Apply_rom_patches();  //Torii: exact-ROM patches, SD launches only
 				if (iCount2 > found)
 					tlog("launch: exact-ROM patch for %.4s (irqpatch.c rom_patches)",
@@ -2075,7 +2069,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 			break;
 		case 2:  //WRITE TO NOR CLEAN
 			f_chdir(currentpath);  //return to game folder
-			progress_step(gl_writing, 0, PROGRESS_FULL);  // the whole bar
+			progress_step(S(STR_LAUNCH_WRITING), 0, PROGRESS_FULL);  // the whole bar
 			res = Loadfile2NOR(pfilename, gl_norOffset, 0x0, SAVEMODE);
 			if (res == 0)  //ok
 			{
@@ -2085,7 +2079,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 				}
 				return 2;
 			} else if (res == 2) {
-				dialog_message(NULL, gl_NOR_full, DIALOG_ERROR);  //"NOR FULL!"
+				dialog_message(NULL, S(STR_LAUNCH_NOR_FULL), DIALOG_ERROR);  //"NOR FULL!"
 				return 1;
 			} else {  // Torii: the file or the NOR failed; the game isn't listed
 				Show_error_num(1);
@@ -2120,7 +2114,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 				}
 				needpatch = 1;
 			}
-			progress_step(gl_writing, 0, PROGRESS_FULL);  // the whole bar
+			progress_step(S(STR_LAUNCH_WRITING), 0, PROGRESS_FULL);  // the whole bar
 			res = Loadfile2NOR(pfilename, gl_norOffset, needpatch, SAVEMODE);
 			//wait_btn();
 			if (res == 0) {
@@ -2130,7 +2124,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 				}
 				return 2;
 			} else if (res == 2) {
-				dialog_message(NULL, gl_NOR_full, DIALOG_ERROR);  //"NOR FULL!"
+				dialog_message(NULL, S(STR_LAUNCH_NOR_FULL), DIALOG_ERROR);  //"NOR FULL!"
 				return 0;
 			} else {  // Torii: the file or the NOR failed; the game isn't listed
 				Show_error_num(1);

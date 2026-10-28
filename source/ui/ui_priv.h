@@ -166,7 +166,6 @@ struct text_window;
 // or "": none); returns the px it takes, drawn (draw 1) or not.
 u32 ui_key_chip(const struct text_window *win, u32 x, u32 top, const char *key, const char *label, int draw);
 // Forgets the rows lists keep drawn in the row cache (a theme change).
-void ui_list_cache_clear(void);
 
 // The current font for UI_FONT_*.
 const struct torii_font *ui_font(u32 which);

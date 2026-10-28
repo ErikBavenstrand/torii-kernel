@@ -28,6 +28,7 @@
 #include "RTC.h"
 #include "cartlog.h"
 #include "diag.h"
+#include "lang.h"
 #include "diag_priv.h"
 #include "logbuf.h"
 #include "logcheck.h"
@@ -77,6 +78,7 @@ static struct {
 	u8 ink[DIAG_LINES];
 	u32 count;  // lines on this page
 	char title[48];
+	char word[16];  // "DIAGNOSTICS" in the menu's language, copied as it starts (the checks stay English)
 	struct ui_view *view;
 	u16 keys;  // fired since wait_key started listening
 	u32 pumped;  // torii_frames when say last ran a frame
@@ -232,7 +234,7 @@ static void screen_open(int again)
 // at the next frame Diagnostics runs, brings the title in with the new ones
 static void screen_title(const char *title)
 {
-	snprintf(scr.title, sizeof(scr.title), "DIAGNOSTICS: %s", title);
+	snprintf(scr.title, sizeof(scr.title), "%s: %s", scr.word, title);
 	scr.count = 0;
 	if (!scr.view)
 		return;
@@ -1122,6 +1124,7 @@ static u32 crash_loop[1] EWRAM_BSS;
 void Diagnostics(void)
 {
 	memset(&scr, 0, sizeof(scr));
+	snprintf(scr.word, sizeof(scr.word), "%s", S(STR_DIAG_TITLE));
 	screen_title("start?");
 	screen_open(0);
 	say(WHITE, "Diagnostics tests the cart and writes");

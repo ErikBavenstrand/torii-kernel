@@ -47,18 +47,18 @@ static void pane(void *ctx, u32 row, struct save_pane *out)
 	const struct slotstore_slot *s = &sp.slots[row];
 	save_page_ago(sp.values, sizeof(sp.values), s->saved);
 	out->head = s->name;
-	out->tag = strcmp(s->name, sp.current) ? NULL : gl_gsaves->active;
-	out->keys = gl_gsaves->play_keys;
+	out->tag = strcmp(s->name, sp.current) ? NULL : S(STR_GSAVES_ACTIVE);
+	out->keys = S(STR_GSAVES_PLAY_KEYS);
 	out->values = sp.values;
-	out->note = gl_gsaves->note_play;
+	out->note = S(STR_GSAVES_NOTE_PLAY);
 }
 
 static void hints(void *ctx, u32 row, const struct ui_hint **keys, u32 *count)
 {
 	(void)ctx;
 	(void)row;
-	sp.hints[0] = (struct ui_hint){"A", gl_gsaves->hint_play};
-	sp.hints[1] = (struct ui_hint){"B", gl_gsaves->hint_cancel};
+	sp.hints[0] = (struct ui_hint){"A", S(STR_GSAVES_HINT_PLAY)};
+	sp.hints[1] = (struct ui_hint){"B", S(STR_GSAVES_HINT_CANCEL)};
 	*keys = sp.hints;
 	*count = 2;
 }
@@ -94,9 +94,9 @@ int slot_picker_run(const char *rom_path, const char *title, u32 blank_size)
 	}
 	sp.page = (struct save_page){"slot-picker",
 				     ART_ICON16_GBA,
-				     gl_gsaves->play_title,
+				     S(STR_GSAVES_PLAY_TITLE),
 				     title,
-				     gl_gsaves->play_keys,
+				     S(STR_GSAVES_PLAY_KEYS),
 				     sp.rows,
 				     sp.count,
 				     at,

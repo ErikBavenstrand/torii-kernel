@@ -10,5 +10,7 @@ tests/kernel/asset_data.c
 source/ui/art_data.c
 source/ui/art_ids.h
 source/perf_budget.h
+source/lang_ids.h
+source/lang_en.c
 source/ui/palette.c
 source/ui/palette.h

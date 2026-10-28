@@ -81,7 +81,7 @@ enum settings_id {
 	SET_SHOW_ALL,  // the SD card page shows hidden files
 	// System
 	SET_LOGGING,   // TLOG_OFF to TLOG_DEBUG (tlog.h)
-	SET_LANGUAGE,  // an index into lang_packs; hidden until v0.9
+	SET_LANGUAGE,  // an index into the languages (lang_choice), stored as its id
 	SET_ROWS
 };
 
@@ -156,7 +156,7 @@ enum settings_action {
 };
 
 // Row flags
-#define SET_HIDDEN 1   // not shown (LANGUAGE until v0.9)
+#define SET_HIDDEN 1   // not shown
 #define SET_WITH_LED 2  // shown only while SET_LED is on
 
 #define SET_NO_SLOT 0xFF
@@ -171,10 +171,10 @@ struct settings_row {
 	// The value an erased or unknown slot reads as; SET_COLOUR: its bits,
 	// SET_KEYS: unused (settings_keys_default)
 	u16 def;
-	// SET_CHOICE: options (the language's: lang_pack_count); SET_NUMBER: the
+	// SET_CHOICE: options (the language's: lang_count); SET_NUMBER: the
 	// highest value; SET_ONOFF, SET_COLOUR: 2 and 8
 	u16 count;
-	char ***options;  // SET_CHOICE's names (lang.c); NULL for the language's
+	u16 options;  // SET_CHOICE's, SET_COLOUR's names: the first's string id (lang.h); 0 for the language's
 	u8 action;        // SET_ACTION: enum settings_action
 };
 

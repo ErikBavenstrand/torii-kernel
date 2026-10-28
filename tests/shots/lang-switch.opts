@@ -1,0 +1,23 @@
+# Language packs (v0.9): Settings' Language row offers English and the
+# packs on the card, and picking one switches the menu at once: Settings
+# comes back drawn in it, then home. The pack is tools/lang.py's
+# pseudo-locale (accented English, with its own number and date formats),
+# which `just build` makes.
+#! sd-file /torii/lang/en-XA.lng 0 dist/lang/en-XA.lng
+-w "nav: home ready"
+-k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:A -k @28:-
+-w "screen ready: settings"
+-k @8:L -k @12:-
+-w "settings: row 28"
+-k @8:DOWN -k @12:-
+-w "settings: row 29"
+-k @8:A -k @12:- -k @20:RIGHT -k @24:-
+-w "settings: row 29 set to"
+-s @8:picked.png
+-k @12:A -k @16:-
+-w "lang: en-XA"
+-w "screen ready: settings"
+-s @8:switched.png
+-k @12:B -k @16:-
+-w "nav: home ready"
+-s @8:home.png

@@ -37,17 +37,17 @@ const char *slot_flow_error_text(int code)
 {
 	switch (code) {
 	case SLOTSTORE_TAKEN:
-		return gl_slots->taken;
+		return S(STR_SLOTS_TAKEN);
 	case SLOTSTORE_NAME:
-		return gl_slots->bad;
+		return S(STR_SLOTS_BAD);
 	case SLOTSTORE_PATH:
-		return gl_slots->path;
+		return S(STR_SLOTS_PATH);
 	case SLOTSTORE_NO_SLOT:
-		return gl_slots->gone;
+		return S(STR_SLOTS_GONE);
 	case SLOTSTORE_FULL:
-		return gl_slots->full;
+		return S(STR_SLOTS_FULL);
 	default:
-		return gl_slots->failed;
+		return S(STR_SLOTS_FAILED);
 	}
 }
 
@@ -62,13 +62,13 @@ static const char *name_submit(void *ctx, const char *name)
 {
 	(void)ctx;
 	if (!saveslot_clean_name(fl.clean, name))
-		return gl_slots->bad;
+		return S(STR_SLOTS_BAD);
 	int n = slot_flow_slots(fl.rom, 0);
 	if (n < 0)
-		return gl_slots->failed;
+		return S(STR_SLOTS_FAILED);
 	for (int i = 0; i < n; i++) {
 		if (saveslot_names_equal(fl.slots[i].name, fl.clean) && !(fl.own && !strcmp(fl.slots[i].name, fl.own)))
-			return gl_slots->taken;
+			return S(STR_SLOTS_TAKEN);
 	}
 	memcpy(fl.out, fl.clean, sizeof(fl.out));
 	return NULL;
@@ -92,7 +92,7 @@ int slot_flow_rename(const char *rom, const char *slot, char *renamed)
 {
 	char own[SAVESLOT_NAME_BYTES], name[SAVESLOT_NAME_BYTES];
 	snprintf(own, sizeof(own), "%s", slot);
-	if (slot_flow_name_prompt(rom, gl_slots->rename_title, own, own, name) != SLOT_FLOW_DONE)
+	if (slot_flow_name_prompt(rom, S(STR_SLOTS_RENAME_TITLE), own, own, name) != SLOT_FLOW_DONE)
 		return SLOT_FLOW_CANCEL;
 	char clean[SAVESLOT_NAME_BYTES];
 	int r = slotstore_rename(rom, own, name, clean);

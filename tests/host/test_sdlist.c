@@ -233,17 +233,17 @@ void test_sdlist_texts(void)
 	CHECK(!strcmp(out, "1,234,567"));
 	sdlist_number(out, 4, 1234567);  // cut, never past the buffer
 	CHECK(strlen(out) < 4);
-	sdlist_count_text(out, sizeof(out), SDLIST_COUNT_UNKNOWN, "1 item", "items", "empty");
+	sdlist_count_text(out, sizeof(out), SDLIST_COUNT_UNKNOWN);
 	CHECK(!strcmp(out, ""));
-	sdlist_count_text(out, sizeof(out), SDLIST_COUNT_FAILED, "1 item", "items", "empty");
+	sdlist_count_text(out, sizeof(out), SDLIST_COUNT_FAILED);
 	CHECK(!strcmp(out, ""));
-	sdlist_count_text(out, sizeof(out), 0, "1 item", "items", "empty");
+	sdlist_count_text(out, sizeof(out), 0);
 	CHECK(!strcmp(out, "empty"));
-	sdlist_count_text(out, sizeof(out), 1, "1 item", "items", "empty");
+	sdlist_count_text(out, sizeof(out), 1);
 	CHECK(!strcmp(out, "1 item"));
-	sdlist_count_text(out, sizeof(out), 1024, "1 item", "items", "empty");
+	sdlist_count_text(out, sizeof(out), 1024);
 	CHECK(!strcmp(out, "1,024 items"));
-	sdlist_count_text(out, sizeof(out), SDLIST_COUNT_MORE, "1 item", "items", "empty");
+	sdlist_count_text(out, sizeof(out), SDLIST_COUNT_MORE);
 	CHECK(!strcmp(out, "1,024+ items"));
 }
 

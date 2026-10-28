@@ -1,5 +1,6 @@
 // See sdlist.h. Hardware-free: tests/host builds it.
 #include "sdlist.h"
+#include "lang.h"
 
 #include <stddef.h>
 #include <stdio.h>
@@ -155,51 +156,38 @@ void sdlist_set_count(struct sdlist *l, u32 i, u32 count)
 
 void sdlist_number(char *out, u32 size, u32 n)
 {
-	if (!size)
-		return;
-	char digits[12];
-	u32 len = (u32)snprintf(digits, sizeof(digits), "%lu", (unsigned long)n), o = 0;
-	for (u32 i = 0; i < len && o + 1 < size; i++) {
-		if (i && (len - i) % 3 == 0) {
-			if (o + 2 >= size)
-				break;
-			out[o++] = ',';
-		}
-		out[o++] = digits[i];
-	}
-	out[o] = 0;
+	lang_number(out, size, n);
 }
 
 void sdlist_size_text(char *out, u32 size, u32 bytes)
 {
-	static const char *const units[] = {"B", "KB", "MB", "GB"};
 	u32 unit = 0, whole = bytes, tenths = 0;
-	while (whole >= 1024 && unit + 1 < sizeof(units) / sizeof(units[0])) {
+	while (whole >= 1024 && unit < STR_SIZE_GB - STR_SIZE_B) {
 		u32 rest = whole % 1024;
 		whole /= 1024;
 		tenths = rest * 10 / 1024;
 		unit++;
 	}
 	if (unit && whole < 10 && tenths)
-		snprintf(out, size, "%lu.%lu %s", (unsigned long)whole, (unsigned long)tenths, units[unit]);
+		SF(out, size, STR_SIZE_B + unit, LT(whole * 10 + tenths));
 	else
-		snprintf(out, size, "%lu %s", (unsigned long)whole, units[unit]);
+		SF(out, size, STR_SIZE_B + unit, LN(whole));
 }
 
-void sdlist_count_text(char *out, u32 size, u32 count, const char *one, const char *many, const char *none)
+void sdlist_count_text(char *out, u32 size, u32 count)
 {
 	if (!size)
 		return;
 	if (count == SDLIST_COUNT_UNKNOWN || count == SDLIST_COUNT_FAILED) {
 		out[0] = 0;
 	} else if (count == 0) {
-		snprintf(out, size, "%s", none);
-	} else if (count == 1) {
-		snprintf(out, size, "%s", one);
+		snprintf(out, size, "%s", S(STR_SD_ITEMS_NONE));
 	} else {
 		char n[16];
 		int more = count == SDLIST_COUNT_MORE;
-		sdlist_number(n, sizeof(n), more ? SDLIST_MAX : count);
-		snprintf(out, size, "%s%s %s", n, more ? "+" : "", many);
+		u32 len = lang_number(n, sizeof(n) - 1, more ? SDLIST_MAX : count);
+		if (more)
+			n[len++] = '+', n[len] = 0;
+		SF(out, size, STR_N(STR_SD_ITEMS, count), LS(n));
 	}
 }

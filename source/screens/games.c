@@ -335,8 +335,7 @@ static int model_fetch(void *ctx, u32 i, struct ui_item *out)
 	if (games.kind == KIND_RECENT) {
 		out->detail = games.ago[i];
 	} else if (g.rec != LIBRARY_NONE) {
-		gamelist_size(games.detail, sizeof(games.detail), library_size(g.rec), gl_games->size_kb,
-			      gl_games->size_mb);
+		gamelist_size(games.detail, sizeof(games.detail), library_size(g.rec));
 		out->detail = games.detail;
 	}
 	return UI_ITEM_READY;
@@ -860,7 +859,8 @@ static int ago_update(void)
 	for (u32 i = 0; i < games.count; i++) {
 		char text[AGO_MAX];
 		u32 then = userdata_recent_time(i);
-		userdata_ago(text, sizeof(text), then, then ? now : 0, &gl_ago);
+		struct userdata_ago_words w = userdata_ago_words_now();
+		userdata_ago(text, sizeof(text), then, then ? now : 0, &w);
 		if (strcmp(text, games.ago[i]) != 0) {
 			memcpy(games.ago[i], text, sizeof(text));
 			changed = 1;
@@ -900,8 +900,7 @@ static void show_cap_note(void);
 static void show_position(void)
 {
 	if (games.count)
-		snprintf(games.position, sizeof(games.position), "%lu/%lu", (unsigned long)games.cursor + 1,
-			 (unsigned long)games.count);
+		SF(games.position, sizeof(games.position), STR_NAV_POSITION, LN(games.cursor + 1), LN(games.count));
 	else
 		games.position[0] = 0;
 	ui_title_set_right(node(N_TITLE), games.position);
@@ -940,13 +939,13 @@ static void show_facts(void)
 		boxart_select(games.cursor, g.console < LIB_CONSOLES ? console_box[g.console] : ART_BOX_OTHER);
 		char size[AGO_MAX] = "", ago[AGO_MAX] = "";
 		if (g.rec != LIBRARY_NONE)
-			gamelist_size(size, sizeof(size), library_size(g.rec), gl_games->size_kb, gl_games->size_mb);
+			gamelist_size(size, sizeof(size), library_size(g.rec));
 		if (games.kind == KIND_RECENT)
 			memcpy(ago, games.ago[games.cursor], sizeof(ago));
 		else if (game_path(&g, games.path))
 			userdata_ago_text(ago, sizeof(ago), played_time(games.path));
-		snprintf(games.fact_keys, sizeof(games.fact_keys), "%s\n%s", gl_games->fact_size,
-			 gl_games->fact_played);
+		snprintf(games.fact_keys, sizeof(games.fact_keys), "%s\n%s", S(STR_GAMES_FACT_SIZE),
+			 S(STR_GAMES_FACT_PLAYED));
 		snprintf(games.fact_values, sizeof(games.fact_values), "%s\n%s", size, ago);
 	} else {
 		boxart_select(games.cursor, ART_BOX_OTHER);  // no game: the plain placeholder
@@ -958,11 +957,11 @@ static void show_facts(void)
 static void show_hints(void)
 {
 	u32 n = 0;
-	games.hints[n++] = (struct ui_hint){"A", gl_games->hint_play};
-	games.hints[n++] = (struct ui_hint){"START", gl_games->hint_menu};
+	games.hints[n++] = (struct ui_hint){"A", S(STR_GAMES_HINT_PLAY)};
+	games.hints[n++] = (struct ui_hint){"START", S(STR_GAMES_HINT_MENU)};
 	if (games.az)
-		games.hints[n++] = (struct ui_hint){"\xC2\xAB\xC2\xBB", gl_games->hint_letter};
-	games.hints[n++] = (struct ui_hint){"B", gl_hint_back};
+		games.hints[n++] = (struct ui_hint){"\xC2\xAB\xC2\xBB", S(STR_GAMES_HINT_LETTER)};
+	games.hints[n++] = (struct ui_hint){"B", S(STR_HINT_BACK)};
 	games.hint_count = (u8)n;
 	games.cap_note = 0;
 	ui_hints_set(node(N_HINTS), games.hints, n);
@@ -983,7 +982,7 @@ static void show_cap_note(void)
 	}
 	char n[12];
 	sdlist_number(n, sizeof(n), LIBRARY_GAMES_MAX);
-	snprintf(games.cap_text, sizeof(games.cap_text), "%s %s %s", gl_sd_first, n, gl_count_games);
+	SF(games.cap_text, sizeof(games.cap_text), STR_GAMES_FIRST, LS(n));
 	ui_hints_text(node(N_HINTS), games.cap_text);
 	tlog_debug("games: %s", games.cap_text);  // tests/library.sh
 }
@@ -992,7 +991,7 @@ static void show_cap_note(void)
 // after a launch)
 static const char *note_text(void)
 {
-	return games.count || games.unloaded ? "" : gl_games->empty;
+	return games.count || games.unloaded ? "" : S(STR_GAMES_EMPTY);
 }
 
 // After the list changed under the page: it lists again from cursor
@@ -1205,30 +1204,35 @@ static const struct ui_view_spec info_view = {"game-info", info_nodes, I_NODES, 
 
 #define INFO_PICKED "\xC2\xAB %s \xC2\xBB\n"  // the line LEFT/RIGHT change
 #define INFO_OTHER "%s\n"
-_Static_assert(sizeof(((struct lang_games *)0)->boot_modes) / sizeof(char *) == ACTION_BOOTS, "a name per boot mode");
+_Static_assert(STR_GAMES_MODE_CLEAN - STR_GAMES_MODE_DEFAULT == ACTION_BOOT_CLEAN, "a name per boot mode, in order");
+_Static_assert(STR_GAMES_SAVE_FLASH_128K - STR_GAMES_SAVE_AUTO == ACTION_SAVE_TYPES - 1,
+	       "a name per save type, in order");
+_Static_assert(STR_GAMES_POP_DELETE - STR_GAMES_POP_PLAY == LANG_POP_DELETE, "the popup's items in LANG_POP_*'s order");
+_Static_assert(STR_GAMES_BOOT_ADDONS - STR_GAMES_BOOT_DEFAULT == LANG_BOOT_ADDONS, "Play's « » in LANG_BOOT_*'s order");
+_Static_assert(STR_GAMES_INFO_HARD_RESET - STR_GAMES_INFO_CONSOLE == LANG_INFO_HARD_RESET, "Game info's keys in order");
+_Static_assert(STR_GAMES_CONSOLE_NES - STR_GAMES_CONSOLE_GBA == LIB_NES, "the consoles in LIB_*'s order");
 
 // The values' lines, the picked one's between « »
 static void info_values(struct ui_view *v)
 {
-	const struct lang_games *s = gl_games;
 	char ago[AGO_MAX] = "", type[48] = "";
 	int held = 0;
 	userdata_ago_text(ago, sizeof(ago), played_time_of(games.pick, &held));
 	if (!ago[0])  // never blank: off Recent, or no time to tell
-		snprintf(ago, sizeof(ago), "%s", held ? s->played_recently : s->played_not_recent);
+		snprintf(ago, sizeof(ago), "%s", held ? S(STR_GAMES_PLAYED_RECENTLY) : S(STR_GAMES_PLAYED_NOT_RECENT));
 	if (games.info_type < ACTION_SAVE_TYPES) {
 		u32 o = (u32)snprintf(type, sizeof(type), games.info_field ? INFO_OTHER : INFO_PICKED,
-				      s->save_types[games.info_type]);
+				      S(STR_GAMES_SAVE_AUTO + games.info_type));
 		if (o >= sizeof(type))
 			o = sizeof(type) - 1;  // cut short: the second line goes nowhere
 		snprintf(type + o, sizeof(type) - o, games.info_field ? INFO_PICKED : INFO_OTHER,
-			 s->boot_modes[games.info_boot]);
+			 S(STR_GAMES_MODE_DEFAULT + games.info_boot));
 	}
 	const char *nor = userdata_nor_name(games.pick), *slash = strrchr(games.pick, '/');
-	int folder_len = nor ? (int)strlen(s->nor) : slash == games.pick ? 1 : (int)(slash - games.pick);
+	int folder_len = nor ? (int)strlen(S(STR_GAMES_NOR)) : slash == games.pick ? 1 : (int)(slash - games.pick);
 	snprintf(games.info_values, sizeof(games.info_values), "%s\n%s\n%.*s\n%s\n%s%s",
-		 games.info_console < LIB_CONSOLES ? s->consoles[games.info_console] : "", games.info_size, folder_len,
-		 nor ? s->nor : games.pick, ago, type, s->hard_reset);
+		 games.info_console < LIB_CONSOLES ? S(STR_GAMES_CONSOLE_GBA + games.info_console) : "",
+		 games.info_size, folder_len, nor ? S(STR_GAMES_NOR) : games.pick, ago, type, S(STR_GAMES_HARD_RESET));
 	ui_label_set((u8)(v->first + I_VALUES), games.info_values);
 }
 
@@ -1271,15 +1275,13 @@ static void game_info(const struct game *g)
 	// Now: the index may change while the page shows
 	games.info_size[0] = 0;
 	if (g->rec != LIBRARY_NONE)
-		gamelist_size(games.info_size, sizeof(games.info_size), library_size(g->rec), gl_games->size_kb,
-			      gl_games->size_mb);
+		gamelist_size(games.info_size, sizeof(games.info_size), library_size(g->rec));
 	games.info_done = 0;
 	ui_leave(UI_TR_DEEPER, 1);
 	while (ui_depth())
 		ui_pop();
 	struct ui_view *v = ui_push(&info_view, &games);
 	if (v) {
-		const struct lang_games *s = gl_games;
 		ui_title_set((u8)(v->first + I_TITLE), games.title);
 		ui_title_icon_set((u8)(v->first + I_TITLE), registry_items[games.item].icon16);
 		u32 o = 0;
@@ -1287,15 +1289,15 @@ static void game_info(const struct game *g)
 			if ((k != LANG_INFO_SAVE_TYPE && k != LANG_INFO_BOOT_MODE) ||
 			    games.info_type < ACTION_SAVE_TYPES)
 				o += (u32)snprintf(games.info_keys + o, sizeof(games.info_keys) - o, "%s%s",
-						   o ? "\n" : "", s->info_keys[k]);
+						   o ? "\n" : "", S(STR_GAMES_INFO_CONSOLE + k));
 		ui_label_set((u8)(v->first + I_KEYS), games.info_keys);
 		info_values(v);
 		u32 n = 0;
 		if (games.info_type < ACTION_SAVE_TYPES) {
-			games.info_hints[n++] = (struct ui_hint){"^v", gl_hint_move};
-			games.info_hints[n++] = (struct ui_hint){"\xC2\xAB\xC2\xBB", gl_hint_change};
+			games.info_hints[n++] = (struct ui_hint){"^v", S(STR_HINT_MOVE)};
+			games.info_hints[n++] = (struct ui_hint){"\xC2\xAB\xC2\xBB", S(STR_HINT_CHANGE)};
 		}
-		games.info_hints[n++] = (struct ui_hint){"B", gl_hint_back};
+		games.info_hints[n++] = (struct ui_hint){"B", S(STR_HINT_BACK)};
 		ui_hints_set((u8)(v->first + I_HINTS), games.info_hints, n);
 		u32 gen = library_generation();
 		while (!games.info_done && ui_depth()) {
@@ -1320,7 +1322,8 @@ static void game_info(const struct game *g)
 	int type_ok = games.info_type == facts.save_type || action_set_save_type(games.pick, games.info_type);
 	int boot_ok = games.info_boot == facts.boot_mode || action_set_boot_mode(games.pick, games.info_boot);
 	if (!type_ok || !boot_ok)
-		dialog_message(NULL, type_ok ? gl_games->boot_mode_failed : gl_games->save_type_failed, DIALOG_ERROR);
+		dialog_message(NULL, type_ok ? S(STR_GAMES_BOOT_MODE_FAILED) : S(STR_GAMES_SAVE_TYPE_FAILED),
+			       DIALOG_ERROR);
 	reshow(pick_row(row));  // its row in a new index
 }
 
@@ -1375,7 +1378,7 @@ static int addons_off(void)
 static void popup_add(u32 action, const char *value, u8 flags)
 {
 	u32 n = games.popup.count;
-	games.items[n] = (struct ui_pop_item){gl_games->pop[action], value, flags};
+	games.items[n] = (struct ui_pop_item){S(STR_GAMES_POP_PLAY + action), value, flags};
 	games.actions[n] = (u8)action;
 	games.popup.count = (u8)(n + 1);
 }
@@ -1407,7 +1410,7 @@ static const char *rename_submit(void *ctx, const char *name)
 		gamename_clean(games.name, games.pick);
 	int own = strcmp(name, games.name) == 0;
 	if (!gamename_store_set(games.pick, own ? NULL : name))
-		return gamename_store_full() ? gl_rename->names_full : gl_rename->name_failed;
+		return gamename_store_full() ? S(STR_RENAME_NAMES_FULL) : S(STR_RENAME_NAME_FAILED);
 	library_named(games.pick, own ? NULL : name);  // its row moves to its new place at once
 	return NULL;
 }
@@ -1497,25 +1500,29 @@ static u32 states_pick(u32 row)
 			if (!best)
 				break;
 			const struct statestore_slot *e = &list.slot[best];
-			snprintf(label[n], sizeof(label[n]), EN_STATE_POP_SLOT, (unsigned long)best);
+			snprintf(label[n], sizeof(label[n]), "%lu", (unsigned long)best);  // its date fills the row
 			// How long ago, as Recent says it; the date when the clock
 			// can't tell (unset, or the state is from its future)
 			u32 then = userdata_clock_time(userdata_unix_time(e->when.year, e->when.month, e->when.day,
 									  e->when.hour, e->when.min, e->when.sec));
 			userdata_ago_text(when[n], sizeof(when[n]), then);
-			if (!when[n][0] && e->when.year && e->when.month >= 1 && e->when.month <= 12)
-				snprintf(when[n], sizeof(when[n]), EN_STATE_WHEN, e->when.day,
-					 gl_states->months[e->when.month - 1], e->when.hour, e->when.min);
+			if (!when[n][0] && e->when.year && e->when.month >= 1 && e->when.month <= 12) {
+				char date[24], time[8];
+				lang_date(date, sizeof(date), e->when.day, e->when.month);
+				snprintf(time, sizeof(time), "%02u:%02u", (unsigned)e->when.hour % 100,
+					 (unsigned)e->when.min % 100);
+				SF(when[n], sizeof(when[n]), STR_STATE_WHEN, LS(date), LS(time));
+			}
 			items[n] = (struct ui_pop_item){label[n], when[n], 0};
 			slot[n++] = (u8)best;
 		}
 	tlog("states: popup: %lu for %s (%s)", (unsigned long)n, games.pick, rec.slot);
 	if (!n) {
-		dialog_message(NULL, gl_states->none, DIALOG_INFO);
+		dialog_message(NULL, S(STR_STATE_NONE), DIALOG_INFO);
 		reshow(row);
 		return 0;
 	}
-	struct ui_popup popup = {gl_games->pop[LANG_POP_STATES], 0, items, (u8)n, 0, NULL};
+	struct ui_popup popup = {S(STR_GAMES_POP_STATES), 0, items, (u8)n, 0, NULL};
 	if (!up() || !ui_popup_open(list_node(), node(N_HINTS), &popup))
 		return 0;
 	tlog_debug("screen ready: state-popup %s", games.title);
@@ -1560,7 +1567,7 @@ static void popup_run(u32 i)
 	int gba = !nor && g.console == LIB_GBA;
 	games.popup = (struct ui_popup){games.title, (u8)(g.console < LIB_CONSOLES ? console_icons[g.console] + 1 : 0),
 					games.items, 0,
-					0,           gl_games->hint_boot};
+					0,           S(STR_GAMES_HINT_BOOT)};
 	// Play: how it starts steps with LEFT/RIGHT (a GBA game: its own way,
 	// clean, or with addons when one is on); A plays
 	u8 boots[LANG_BOOTS];
@@ -1571,7 +1578,7 @@ static void popup_run(u32 i)
 		if (!addons_off())
 			boots[nboots++] = LANG_BOOT_ADDONS;
 	}
-	popup_add(LANG_POP_PLAY, nboots > 1 ? gl_games->boots[boots[0]] : 0, nboots > 1 ? UI_POP_STEP : 0);
+	popup_add(LANG_POP_PLAY, nboots > 1 ? S(STR_GAMES_BOOT_DEFAULT + boots[0]) : 0, nboots > 1 ? UI_POP_STEP : 0);
 	if (game_saves_probe(games.pick))
 		popup_add(LANG_POP_SAVES, 0, 0);
 	// Every GBA game on the card has Cheats, for the code keypad's Add code,
@@ -1591,7 +1598,7 @@ static void popup_run(u32 i)
 	if (gba && Read_SET_info(assress_v_rts) == 1)
 		popup_add(LANG_POP_STATES, 0, 0);
 	u32 fav_item = games.popup.count;
-	popup_add(LANG_POP_FAV, fav ? gl_games->on : gl_games->off, 0);
+	popup_add(LANG_POP_FAV, fav ? S(STR_GAMES_ON) : S(STR_GAMES_OFF), 0);
 	if (!nor && g.rec != LIBRARY_NONE)
 		popup_add(LANG_POP_RENAME, 0, 0);  // a name in names.txt, for games the lists name
 	popup_add(LANG_POP_INFO, 0, 0);
@@ -1608,7 +1615,7 @@ static void popup_run(u32 i)
 			break;
 		if (pick & (UI_POP_LEFT | UI_POP_RIGHT)) {  // Play's way to start
 			boot = (boot + (pick & UI_POP_LEFT ? nboots - 1 : 1)) % nboots;
-			games.items[0].value = gl_games->boots[boots[boot]];
+			games.items[0].value = S(STR_GAMES_BOOT_DEFAULT + boots[boot]);
 			ui_popup_changed(0);
 			continue;
 		}
@@ -1626,15 +1633,15 @@ static void popup_run(u32 i)
 			} else {
 				cache_changed(games.pick, g.rec, fav, 1, done, ver, 1);
 			}
-			games.items[fav_item].value = fav ? gl_games->on : gl_games->off;
+			games.items[fav_item].value = fav ? S(STR_GAMES_ON) : S(STR_GAMES_OFF);
 			ui_popup_changed(fav_item);
 			if (games.kind != KIND_FAV)
 				ui_list_refresh(list, i, i);  // its star
 			continue;
 		}
 		if (action == LANG_POP_DELETE) {
-			snprintf(games.ask, sizeof(games.ask), EN_GAME_DELETE, games.title);
-			struct ui_confirm ask = {games.ask, gl_games->delete_text, gl_games->delete_button, 1};
+			SF(games.ask, sizeof(games.ask), STR_GAMES_DELETE_ASK, LS(games.title));
+			struct ui_confirm ask = {games.ask, S(STR_GAMES_DELETE_TEXT), S(STR_GAMES_DELETE_BUTTON), 1};
 			if (!ui_confirm(hints, &ask))
 				continue;  // Cancel: back to the popup
 			ui_popup_close();
@@ -1642,7 +1649,7 @@ static void popup_run(u32 i)
 			if (action_delete_file(games.pick))
 				relist(i, NULL);
 			else
-				dialog_message(NULL, gl_sd_delete_failed, DIALOG_ERROR);
+				dialog_message(NULL, S(STR_SD_DELETE_FAILED), DIALOG_ERROR);
 			return;
 		}
 		ui_popup_close();
@@ -1652,7 +1659,7 @@ static void popup_run(u32 i)
 			if (userdata_recent_forget(games.pick))
 				relist(i, NULL);
 			else
-				dialog_message(NULL, gl_games->recent_failed, DIALOG_ERROR);
+				dialog_message(NULL, S(STR_GAMES_RECENT_FAILED), DIALOG_ERROR);
 			return;
 		}
 		// A favourite dropped leaves the Favourites page before a launch

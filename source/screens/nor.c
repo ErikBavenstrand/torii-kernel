@@ -147,9 +147,9 @@ static struct ui_spec nodes[N_NODES] EWRAM_BSS;
 static void size_text(char *out, u32 size, u32 bytes)
 {
 	if (bytes >= MB)
-		snprintf(out, size, "%lu %s", (unsigned long)((bytes + MB / 2) / MB), gl_size_mb);
+		SF(out, size, STR_SIZE_MB, LN((bytes + MB / 2) / MB));
 	else
-		snprintf(out, size, "%lu %s", (unsigned long)((bytes + KB / 2) / KB), gl_size_kb);
+		SF(out, size, STR_SIZE_KB, LN((bytes + KB / 2) / KB));
 }
 
 // The storage line: used rounded up and free rounded down, so they add up
@@ -159,17 +159,17 @@ static void storage_text(u32 used)
 	u32 room = used < NOR_TOTAL ? NOR_TOTAL - used : 0;
 	char n[16];
 	if (used >= MB)
-		snprintf(n, sizeof(n), "%lu %s", (unsigned long)((NOR_TOTAL - room / MB * MB) / MB), gl_size_mb);
+		SF(n, sizeof(n), STR_SIZE_MB, LN((NOR_TOTAL - room / MB * MB) / MB));
 	else if (used)
-		snprintf(n, sizeof(n), "%lu %s", (unsigned long)((used + KB - 1) / KB), gl_size_kb);
+		SF(n, sizeof(n), STR_SIZE_KB, LN((used + KB - 1) / KB));
 	else
-		snprintf(n, sizeof(n), "0 %s", gl_size_mb);
-	snprintf(nor.used, sizeof(nor.used), "%s %s", n, gl_nor_used);
+		SF(n, sizeof(n), STR_SIZE_MB, LN(0));
+	SF(nor.used, sizeof(nor.used), STR_NOR_USED, LS(n));
 	if (room >= MB || !room)
-		snprintf(n, sizeof(n), "%lu %s", (unsigned long)(room / MB), gl_size_mb);
+		SF(n, sizeof(n), STR_SIZE_MB, LN(room / MB));
 	else
-		snprintf(n, sizeof(n), "%lu %s", (unsigned long)(room / KB), gl_size_kb);
-	snprintf(nor.free, sizeof(nor.free), "%s %s %lu", n, gl_nor_free_of, (unsigned long)(NOR_TOTAL / MB));
+		SF(n, sizeof(n), STR_SIZE_KB, LN(room / KB));
+	SF(nor.free, sizeof(nor.free), STR_NOR_FREE_OF, LS(n), LN(NOR_TOTAL / MB));
 }
 
 // The games' records in the library, found by file name (one pass over it)
@@ -227,19 +227,19 @@ static const char *save_type_name(u8 savemode)
 {
 	switch (savemode) {
 	case 0x00:
-		return gl_nor_saves[NOR_SAVE_NONE];
+		return S(STR_NOR_SAVE_NONE);
 	case 0x21:
-		return gl_nor_saves[NOR_SAVE_EEPROM_512];
+		return S(STR_NOR_SAVE_EEPROM_512);
 	case 0x22:
 	case 0x23:
-		return gl_nor_saves[NOR_SAVE_EEPROM_8K];
+		return S(STR_NOR_SAVE_EEPROM_8K);
 	case 0x31:
-		return gl_nor_saves[NOR_SAVE_FLASH_128K];
+		return S(STR_NOR_SAVE_FLASH_128K);
 	case 0x32:
 	case 0x33:
-		return gl_nor_saves[NOR_SAVE_FLASH_64K];
+		return S(STR_NOR_SAVE_FLASH_64K);
 	default:  // 0x11, and homebrew's 0x10 and unknown types, which get 64 KB of SRAM
-		return gl_nor_saves[NOR_SAVE_SRAM];
+		return S(STR_NOR_SAVE_SRAM);
 	}
 }
 
@@ -348,8 +348,7 @@ static void hints_show(void)
 
 static void position_show(void)
 {
-	snprintf(nor.position, sizeof(nor.position), "%lu/%lu", (unsigned long)nor.sel + 1,
-		 (unsigned long)nor.count + 1);
+	SF(nor.position, sizeof(nor.position), STR_NAV_POSITION, LN(nor.sel + 1), LN(nor.count + 1));
 	ui_title_set_right(at(N_TITLE), nor.position);
 }
 
@@ -412,7 +411,7 @@ static void info(u32 game)
 	int n = snprintf(nor.text, sizeof(nor.text), "%s\n%s \xC2\xB7 %s", e->filename, size,
 			 save_type_name(e->savemode));
 	if (e->have_RTS && n > 0 && (u32)n < sizeof(nor.text))
-		snprintf(nor.text + n, sizeof(nor.text) - (u32)n, "\n%s", gl_nor_states);
+		snprintf(nor.text + n, sizeof(nor.text) - (u32)n, "\n%s", S(STR_NOR_STATES));
 	snprintf(nor.title, sizeof(nor.title), "%s", nor.name[name_slot(game)]);
 	dialog_message(nor.title, nor.text, DIALOG_INFO);
 }
@@ -428,13 +427,13 @@ static void delete_latest(u32 game)
 	if (game + 1 != game_total_NOR || strncmp(name, pNorFS[game].filename, sizeof(name)) != 0) {
 		tlog_error("nor: delete %lu: the NOR's list changed (%lu games): nothing deleted", (unsigned long)game,
 			   (unsigned long)game_total_NOR);
-		dialog_message(NULL, gl_nor_changed, DIALOG_ERROR);
+		dialog_message(NULL, S(STR_NOR_CHANGED), DIALOG_ERROR);
 		nor.next_row = game;
 		nor.next_row_set = 1;
 		nav_reshow();
 		return;
 	}
-	dialog_notice(NULL, gl_nor_deleting, DIALOG_INFO);
+	dialog_notice(NULL, S(STR_NOR_DELETING), DIALOG_INFO);
 	int deleted = action_nor_delete();
 	dialog_notice_end();
 	// On the game before it, or Format all if none is left
@@ -474,15 +473,15 @@ static void popup(u32 game)
 	snprintf(path, sizeof(path), USERDATA_NOR "%s", pNorFS[game].filename);
 	u32 n = 0;
 	nor.ids[n] = POP_LAUNCH;
-	nor.items[n++] = (struct ui_pop_item){gl_games->pop[LANG_POP_PLAY], 0, 0};
+	nor.items[n++] = (struct ui_pop_item){S(STR_GAMES_POP_PLAY), 0, 0};
 	nor.ids[n] = POP_INFO;
-	nor.items[n++] = (struct ui_pop_item){gl_nor_info, 0, 0};
+	nor.items[n++] = (struct ui_pop_item){S(STR_NOR_INFO), 0, 0};
 	if (game_saves_probe(path)) {
 		nor.ids[n] = POP_SAVES;
-		nor.items[n++] = (struct ui_pop_item){gl_gsaves->title, 0, 0};
+		nor.items[n++] = (struct ui_pop_item){S(STR_GSAVES_TITLE), 0, 0};
 	}
 	nor.ids[n] = POP_DELETE;
-	nor.items[n++] = (struct ui_pop_item){gl_nor_delete, 0, UI_POP_DANGER};
+	nor.items[n++] = (struct ui_pop_item){S(STR_NOR_DELETE), 0, UI_POP_DANGER};
 	nor.menu = (struct ui_popup){nor.pop_title, ART_ICON8_NOR + 1, nor.items, (u8)n, 0, 0};
 	if (!ui_popup_open(at(N_LIST), at(N_HINTS), &nor.menu))
 		return;
@@ -510,11 +509,11 @@ static void popup(u32 game)
 		if (game + 1 != nor.count) {
 			// The NOR keeps its games back to back: only the last one goes
 			ui_popup_close();
-			dialog_message(NULL, gl_nor_latest_only, DIALOG_INFO);
+			dialog_message(NULL, S(STR_NOR_LATEST_ONLY), DIALOG_INFO);
 			return;
 		}
-		snprintf(nor.title, sizeof(nor.title), "%s %s?", gl_nor_delete, nor.pop_title);
-		struct ui_confirm ask = {nor.title, gl_nor_delete_text, gl_nor_delete, 1};
+		SF(nor.title, sizeof(nor.title), STR_NOR_DELETE_ASK, LS(nor.pop_title));
+		struct ui_confirm ask = {nor.title, S(STR_NOR_DELETE_TEXT), S(STR_NOR_DELETE), 1};
 		if (ui_confirm(at(N_HINTS), &ask)) {
 			ui_popup_close();
 			delete_latest(game);
@@ -528,14 +527,11 @@ static void popup(u32 game)
 static void format(u32 arg)
 {
 	(void)arg;
-	if (nor.count == 1)
-		snprintf(nor.text, sizeof(nor.text), "%s %s", gl_nor_format_one, gl_nor_format_time);
-	else if (nor.count)
-		snprintf(nor.text, sizeof(nor.text), "%lu %s %s", (unsigned long)nor.count, gl_nor_format_many,
-			 gl_nor_format_time);
+	if (nor.count)
+		SF(nor.text, sizeof(nor.text), STR_N(STR_NOR_FORMAT_GAMES, nor.count), LN(nor.count));
 	else
-		snprintf(nor.text, sizeof(nor.text), "%s", gl_nor_format_takes);
-	struct ui_confirm ask = {gl_nor_format_ask, nor.text, gl_nor_format_button, 1};
+		snprintf(nor.text, sizeof(nor.text), "%s", S(STR_NOR_FORMAT_TAKES));
+	struct ui_confirm ask = {S(STR_NOR_FORMAT_ASK), nor.text, S(STR_NOR_FORMAT_BUTTON), 1};
 	if (!ui_confirm(at(N_HINTS), &ask)) {
 		tlog("nor: format: cancelled");
 		return;
@@ -606,19 +602,19 @@ static struct ui_view *nor_enter(u32 item, u32 row)
 	if (!v)
 		return 0;
 	nor.first = v->first;
-	ui_title_set(at(N_TITLE), gl_item_nor);
+	ui_title_set(at(N_TITLE), S(STR_ITEM_NOR));
 	position_show();
 	ui_label_set(at(N_USED), nor.used);
 	ui_label_set(at(N_FREE), nor.free);
 	ui_storage_set(at(N_BAR), nor.parts, nor.count, NOR_TOTAL);
-	ui_label_set(at(N_NOTE), nor.count ? "" : gl_nor_empty);
-	ui_label_set(at(N_FORMAT_TEXT), gl_nor_format);
-	ui_label_set(at(N_FORMAT_DETAIL), gl_nor_format_detail);
-	nor.hints_game[0] = (struct ui_hint){"A", gl_games->hint_play};
-	nor.hints_game[1] = (struct ui_hint){"START", gl_hint_menu};
-	nor.hints_game[2] = (struct ui_hint){"B", gl_hint_back};
-	nor.hints_format[0] = (struct ui_hint){"A", gl_hint_format};
-	nor.hints_format[1] = (struct ui_hint){"B", gl_hint_back};
+	ui_label_set(at(N_NOTE), nor.count ? "" : S(STR_NOR_EMPTY));
+	ui_label_set(at(N_FORMAT_TEXT), S(STR_NOR_FORMAT));
+	ui_label_set(at(N_FORMAT_DETAIL), S(STR_NOR_FORMAT_DETAIL));
+	nor.hints_game[0] = (struct ui_hint){"A", S(STR_GAMES_HINT_PLAY)};
+	nor.hints_game[1] = (struct ui_hint){"START", S(STR_HINT_MENU)};
+	nor.hints_game[2] = (struct ui_hint){"B", S(STR_HINT_BACK)};
+	nor.hints_format[0] = (struct ui_hint){"A", S(STR_HINT_FORMAT)};
+	nor.hints_format[1] = (struct ui_hint){"B", S(STR_HINT_BACK)};
 	hints_show();
 	if (nor.count) {
 		ui_list_reset(at(N_LIST), nor.sel < nor.count ? nor.sel : nor.count - 1);

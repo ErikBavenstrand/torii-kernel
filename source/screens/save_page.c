@@ -259,29 +259,39 @@ void save_page_close(void)
 		ui_pop();
 }
 
-void save_page_when(char *out, u32 room, u32 t)
+// Unix time t's month and day, and its time of day in seconds
+static u32 civil(u32 t, u32 *month, u32 *day)
 {
 	// Days to a civil date (Howard Hinnant's civil_from_days)
 	u32 days = t / 86400u, secs = t % 86400u;
 	s32 z = (s32)days + 719468, era = z / 146097;
 	u32 doe = (u32)(z - era * 146097), yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
 	u32 doy = doe - (365 * yoe + yoe / 4 - yoe / 100), mp = (5 * doy + 2) / 153;
-	u32 d = doy - (153 * mp + 2) / 5 + 1, m = mp < 10 ? mp + 3 : mp - 9;
-	snprintf(out, room, "%02lu-%02lu %02lu:%02lu", (unsigned long)m, (unsigned long)d, (unsigned long)(secs / 3600),
-		 (unsigned long)(secs / 60 % 60));
+	*day = doy - (153 * mp + 2) / 5 + 1;
+	*month = mp < 10 ? mp + 3 : mp - 9;
+	return secs;
+}
+
+void save_page_when(char *out, u32 room, u32 t)
+{
+	u32 m, d, secs = civil(t, &m, &d);
+	char date[16], time[12];
+	lang_date_numeric(date, sizeof(date), d, m);
+	snprintf(time, sizeof(time), "%02lu:%02lu", (unsigned long)(secs / 3600 % 24), (unsigned long)(secs / 60 % 60));
+	SF(out, room, STR_GSAVES_WHEN, LS(date), LS(time));
 }
 
 void save_page_ago(char *out, u32 room, u32 t)
 {
 	out[0] = 0;
 	if (!t) {
-		snprintf(out, room, "%s", gl_gsaves->unknown);
+		snprintf(out, room, "%s", S(STR_GSAVES_UNKNOWN));
 		return;
 	}
 	userdata_ago_text(out, room, t);
 	if (!out[0]) {
-		save_page_when(out, room, t);
-		if (room > 5)
-			out[5] = 0;  // "MM-DD"
+		u32 m, d;
+		civil(t, &m, &d);
+		lang_date_numeric(out, room, d, m);
 	}
 }

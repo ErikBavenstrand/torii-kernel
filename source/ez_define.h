@@ -86,7 +86,12 @@
 // - READCACHE_ART_SHEET, 4 KB from 0x8000, clear of the stage: the test
 //   kernel's art sheet (tests/kernel/art_sheet.c), its BG map and 8x8 icon
 //   tiles, while it runs (it is all the test kernel does then).
+// - READCACHE_LANG, 64 KB from 0x8000, clear of the stage: a language pack
+//   on its way from the card to PSRAM (lang_load.c), checked whole there,
+//   within lang_switch.
 #define MAX_pReadCache_size 0x20000
+#define READCACHE_LANG 0x8000
+#define READCACHE_LANG_SIZE 0x10000
 #define READCACHE_ART_SHEET 0x8000
 #define READCACHE_ART_SHEET_SIZE 0x1000
 #define READCACHE_STAGE 0x0

@@ -302,8 +302,8 @@ void test_userdata_clock(void)
 
 void test_userdata_ago(void)
 {
-	static const struct userdata_ago_words w = {"just now", "m ago",   "h ago",   "yesterday", " days", "1 week",
-						    " weeks",   "1 month", " months", "1 year",    " years"};
+	// English's words (lang/en.ini)
+	const struct userdata_ago_words w = userdata_ago_words_now();
 	const u32 now = 1800000000u, m = 60, h = 3600, d = 86400;
 	static const struct {
 		u32 ago;

@@ -130,21 +130,23 @@ u32 userdata_sort(u32 *list, u32 count, userdata_str str);
 u32 userdata_unix_time(u32 year, u32 month, u32 day, u32 hour, u32 minute, u32 second);
 u32 userdata_clock_time(u32 t);
 
-// "Played ago" words (lang.c's gl_ago): whole texts, or the words after a
-// number (minutes "m ago" makes "5m ago")
+// "Played ago" words (lang/en.ini's [ago], userdata_ago_words_now): whole
+// texts, or texts with the number as {1} (minutes "{1}m ago" makes "5m ago")
 struct userdata_ago_words {
 	const char *now;        // whole
-	const char *minutes;    // after a number
-	const char *hours;      // after a number
+	const char *minutes;    // with {1}
+	const char *hours;      // with {1}
 	const char *yesterday;  // whole
-	const char *days;       // after a number
+	const char *days;       // with {1}
 	const char *week;       // whole: one week
-	const char *weeks;      // after a number
+	const char *weeks;      // with {1}
 	const char *month;      // whole: one month
-	const char *months;     // after a number
+	const char *months;     // with {1}
 	const char *year;       // whole: one year
-	const char *years;      // after a number
+	const char *years;      // with {1}
 };
+// The words in the language in use
+struct userdata_ago_words userdata_ago_words_now(void);
 // How long ago then was at now, into out: "just now", "5m ago", "2h ago",
 // "yesterday", "3 days", "1 week", "3 weeks", "1 month", "2 years"; empty
 // when either time is 0 (the clock wasn't set) or then is after now.

@@ -612,7 +612,7 @@ static u32 share_walk(const char *path, const char *save, const char *save2)
 			// short one (a small card) shows nothing
 			u32 total = library_records() + 1;
 			if (!shown && cycles_since(start) > SHARE_DIALOG_CYCLES) {
-				dialog_progress_begin(gl_rename->checking, gl_rename->checking_text);
+				dialog_progress_begin(S(STR_RENAME_CHECKING), S(STR_RENAME_CHECKING_TEXT));
 				shown = 1;
 			}
 			if (shown)
