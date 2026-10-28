@@ -72,15 +72,6 @@ u32 lang_number(char *out, u32 room, u32 n);
 u32 lang_date(char *out, u32 room, u32 day, u32 month);
 u32 lang_date_numeric(char *out, u32 room, u32 day, u32 month);
 
-// The firmware update's texts (Ezcard_OP.c): printf formats for now, as
-// the firmware work changes them (they become ids once it lands)
-#define EN_FW_TITLE "Rev.%s firmware update"
-#define EN_FW_CRC_ERROR "The firmware in the kernel is damaged (CRC32).\nPress [B] to go back."
-#define EN_FW_QUESTION "Installed: V%02d\nNew: V%02d\nPress [A] to update\nPress [B] to cancel"
-#define EN_FW_UPDATING "Updating V%02d to V%02d.\nDon't turn the power off."
-#define EN_FW_PROGRESS "Updating... %lu%%"
-#define EN_FW_DONE "Done. Turn the power off."
-
 // The game popup's items (screens/games.c), in [games]' pop_* order
 enum {
 	LANG_POP_PLAY,

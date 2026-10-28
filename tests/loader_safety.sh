@@ -12,7 +12,7 @@
 # saves (settings_commit), the
 # pending-save record and its clearing, WRITE TO NOR, delete latest (and the
 # boot's list save after one cut off),
-# FORMAT ALL, Diagnostics, power cuts in the middle of those writes and the boot after
+# FORMAT ALL, Diagnostics, the FPGA firmware update, power cuts in the middle of those writes and the boot after
 # them, and the same writes on the other kernel NOR chip (S29GL064A, buffered
 # programming). After each power-on the loader must be byte-identical, and
 # each case checks that its write really happened. All cases run; the script
@@ -255,6 +255,17 @@ EOF
     boot -k 200:A -k 204:- -f 1500
     logged "nor: wrote an empty pending-save record"
     pass "the pending-save record, written and cleared"
+  fi
+
+  # The FPGA firmware update (Check_FW_update) writes only the FPGA's config
+  # flash, through the FPGA, never the kernel NOR: an older LX16 cart takes it
+  # (the warning's A, then L+R+A held two seconds)
+  if shard_case; then
+    new_cart fw-update
+    OMEGA_FPGA_VERSION=B006 boot -f 3000 -w "screen ready: dialog" -k @8:A -k @14:- -w "screen ready: hold" \
+      -k @8:L+R+A -k @138:- -u "firmware: updated"
+    logged "firmware: updated to V07"
+    pass "the FPGA firmware update"
   fi
 
   if shard_case; then

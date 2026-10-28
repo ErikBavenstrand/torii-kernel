@@ -249,8 +249,9 @@ fetches in SD mode.
 
 ### FPGA firmware update protocol
 
-1. `Read_FPGA_ver()`: high nibble `0xA`/`0xB` = LX16 (Rev.B), anything else = LX9 (Rev.A).
-   Low byte = firmware version.
+1. `Read_FPGA_ver()`: high nibble `0xA`/`0xB` = LX16 (Rev.B), anything else = LX9 (Rev.A),
+   in EZ-Flash's source. Low byte = firmware version. Torii writes only to boards on its
+   allowlist instead (below).
 2. If the version is lower than the built-in one, CRC32 the embedded bitstream.
 3. For each 256 B page: buffer = `[u32 flash_addr][256 B data]` → `Send_FATbuffer(…, 2)`
    (write to `0x09E00000` with buffer control 1), then `SPI_Write_Enable()`, poll
@@ -270,6 +271,27 @@ so the update also writes the image's next `0x44` (LX9) or `0x60` (LX16) bytes; 
 layout keeps the official ones there. The emulated cart answers `Read_FPGA_ver` with
 `OMEGA_FPGA_VERSION` (default `B007`) and, when that is set, keeps the FPGA's flash in
 `fpga-flash.bin` (2 MB), written a page per `SPI_Write_Enable` (`tests/fw_update.sh`).
+
+**Torii's allowlist (v0.9, `source/fpga_board.c`).** EZ-Flash's rule sends the LX9 image to
+every word it doesn't know, so a board it never knew (the blue EZODE-B, or a bus that reads
+`0xFFFF`) would be written the wrong bitstream and bricked. Torii writes firmware only to a
+word on the allowlist: high nibble `0xA` or `0xB` (LX16), with a firmware byte below the
+kernel's (7). Any other word writes nothing, shows nothing, and is logged as
+`firmware: FPGA version word XXXX isn't a known board`. About shows "Unknown board" with the
+raw word, Diagnostics "unknown board, no updates".
+
+**The measured-word gap.** The only real cart measured is a black EZODE board, LX16 Rev.B on
+firmware 7 (2026-10-18, *Measured on the real cart* below); the raw word wasn't recorded, and
+the emulator's default `B007` assumes nibble `0xB`. No Rev.A (LX9) word has been measured,
+so LX9 is off the allowlist: its image and update path stay in the kernel, unreachable, until
+a real Rev.A's word (from Diagnostics' `diag: FPGA version register` log line, or About) is
+measured and added. The same goes for any other board, such as the EZODE-B.
+
+Before writing, the update shows the versions with a warning about power cuts (A goes on),
+then asks for L+R+A held for two seconds (`dialog_hold`); B on either screen, or the hold let
+go early, cancels and the boot goes on. `tests/fw_update.sh sweep` boots 115 version words
+(every high nibble, low bytes around the thresholds) and checks that only older LX16 ones
+reach the update's screens.
 
 ## 4. Memory map and game launch
 

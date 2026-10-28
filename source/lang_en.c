@@ -337,6 +337,17 @@ const char *const lang_en[STR_COUNT] = {
 	"# Torii's folder\n/torii keeps saves, backups and the trash, states and screenshots, cheats, covers, names, the game list, your lists and logs. Keep it when you move to a new card.\n",  // info.about_folders
 	"# Credits\nGB and GBC: Jagoomba Color by EvilJagaGenius, after Dwedit's Goomba Color and FluBBa's Goomba.\nNES: PocketNES by Dwedit, after Loopy and FluBBa.\nCheat decoders: ported from mGBA by Jeffrey Pfau, under the MPL 2.0.\nFonts: Galmuri by Lee Minseo, under the SIL Open Font License 1.1.\nConsole pictures: drawn on KyleBing's retro game console icons, CC BY 4.0.\n",  // info.about_credits
 	"Game names: No-Intro's, from libretro-database, CC BY-SA 4.0.\n",  // info.about_names
+	"{1} ({2})",  // info.about_firmware
+	"Unknown board",  // info.about_unknown
+	"word {1}",  // info.about_word
+	"Rev.{1} firmware update",  // firmware.title
+	"Checking the new firmware...",  // firmware.checking
+	"The firmware in the kernel is damaged (CRC32).\nPress [B] to go back.",  // firmware.crc_error
+	"Installed: V{1}, new: V{2}\nA power cut can leave the cart unbootable: use fresh batteries or a plugged-in console.",  // firmware.warning
+	"To update, hold L+R+A\nfor two seconds.\nPress [B] to cancel.",  // firmware.hold
+	"Updating V{1} to V{2}.\nDon't turn the power off.",  // firmware.updating
+	"Updating... {1}%",  // firmware.progress
+	"Done. Turn the power off.",  // firmware.done
 	"DIAGNOSTICS",  // diag.title
 	"{1} used",  // nor.used
 	"{1} free of {2}",  // nor.free_of

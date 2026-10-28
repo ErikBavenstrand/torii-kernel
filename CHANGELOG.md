@@ -11,6 +11,17 @@ git log, not here.
   translation's `.ini`) replaces it, with its own date and number formats;
   Settings' Language row, shown now, switches the menu at once. A stale or
   damaged pack, or a string one lacks, shows English (5441fefe, bcc34910, dfa46579, 88b605b5).
+- **Fixed:** the FPGA firmware update can't brick an unknown board: it writes
+  only to an LX16 (version word `0xA`/`0xB`) on older firmware. Any other word,
+  LX9 included until a Rev.A is measured, writes and shows nothing and is logged
+  (b72337f5).
+- **Changed:** before writing, the update shows a power-cut warning, then asks
+  for L+R+A held two seconds; B cancels either. About and Diagnostics show the
+  raw version word and name only allowlisted boards; a notice shows during the
+  CRC check, which left the screen blank (b72337f5).
+- **Fixed:** a question's B now wins when pressed with A or before A is let
+  go, and the update's hold screen cancels on B held from before it showed;
+  the update also reads the version word twice and skips on a mismatch (56fe3768).
 
 ## v0.8.4
 
