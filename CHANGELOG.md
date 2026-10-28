@@ -4,7 +4,7 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.8.4
 
 - **Changed:** Info has six reading pages: Controls, In game, and new Saves,
   Cheats and Questions pages, with Your cart folded into About. The texts
