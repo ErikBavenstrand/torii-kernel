@@ -73,12 +73,13 @@ void dialog_blank(void);
 // Shows text until A or B is pressed and let go, with an "A OK" key chip.
 void dialog_message(const char *title, const char *text, u32 kind);
 // Asks a yes/no question: A (1) or B (0), once the key is released, with
-// "B cancel" and "A OK" key chips.
+// "B cancel" and "A OK" key chips. B pressed with A, or before A is let
+// go, makes it a no.
 int dialog_confirm(const char *title, const char *text, u32 kind);
 
 // Asks for keys held together for frames frames, as a progress dialog
 // whose bar fills while they are: 1 once it is full, 0 if B is pressed or
-// the keys are let go before it is (it waits for B's release). Keys
+// held (even from before it showed) or the keys are let go before it is (it waits for B's release). Keys
 // already held when it shows count only once let go and held again, so
 // no press made before it can start what it guards. Its view is "hold".
 int dialog_hold(const char *title, const char *text, u16 keys, u32 frames);

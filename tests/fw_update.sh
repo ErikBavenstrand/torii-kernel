@@ -48,6 +48,7 @@ written() { [ -n "$(tr -d '\377' <"$cart/fpga-flash.bin" 2>/dev/null | head -c 1
 if [ "${1:-}" = sweep ]; then
   # sweep_word WORD: boot a cart with that version word up to the update's
   # first screen or past the firmware check; prints a FAIL line if any
+  # shellcheck disable=SC2329 # run through xargs
   sweep_word() {
     local word=$1 case=sweep-$1 cart=$root/sweep-$1 offered=0
     mkdir -p "$cart"
@@ -171,6 +172,27 @@ run cancel-holding B006 "$kernel" "${to_hold[@]}" -k @8:L+R+A -k @40:L+R+A+B -k 
 grep -q "$hold: B, no" "$cart/log.txt" || bad "no hold answered B"
 cancelled
 
+# B held from the warning (pressed while A was down) into the hold: no, on
+# the warning already
+run b-under-a B006 "$kernel" -k @8:A -k @12:A+B -k @14:B -k @40:L+R+A+B -k @200:-
+grep -q "$warning: B, no" "$cart/log.txt" || bad "B pressed under A didn't cancel the warning"
+cancelled
+
+# A and B together on the warning: no
+run a-and-b B006 "$kernel" -k @8:A+B -k @14:- -k @40:L+R+A -k @200:-
+grep -q "$warning: B, no" "$cart/log.txt" || bad "A+B was taken as yes"
+cancelled
+
+# B held into the hold screen, then L+R+A with it: cancels
+run b-held B006 "$kernel" -k @8:A -k @12:- -k @13:B -w "screen ready: hold" -k @8:L+R+A+B -k @200:-
+grep -q "$hold: B, no" "$cart/log.txt" || bad "B held didn't cancel the hold"
+cancelled
+
+# L let go for one frame halfway cancels
+run partial B006 "$kernel" "${to_hold[@]}" -k @8:L+R+A -k @68:R+A -k @69:L+R+A -k @200:-
+grep -q "$hold: let go early" "$cart/log.txt" || bad "L let go didn't cancel"
+cancelled
+
 # L+R+A let go after one second cancels
 run early B006 "$kernel" "${to_hold[@]}" -k @8:L+R+A -k @68:-
 grep -q "$hold: let go early" "$cart/log.txt" || bad "the early release didn't cancel"
@@ -217,5 +239,5 @@ grep -q "firmware: FPGA version word 0004 isn't a known board: no update" "$root
   { case=lx9 && bad "the word wasn't logged"; }
 
 [ $failed = 0 ] &&
-  echo "PASS: FPGA firmware update (LX16 written after the warning and the hold; B on both screens, the hold let go early, A alone; CRC error; up to date, LX9, unknown)"
+  echo "PASS: FPGA firmware update (LX16 written after the warning and the hold; B on both screens, with A or held into the hold, the hold let go early or partly, A alone; CRC error; up to date, LX9, unknown)"
 exit $failed

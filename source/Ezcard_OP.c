@@ -937,7 +937,13 @@ void IWRAM_CODE Check_FW_update(/*u16 Current_FW_ver,u16 Built_in_ver*/)
 {
 	u16 DEcard_FW_readver = Read_FPGA_ver();
 	u16 DEcard_FW_ver = fpga_firmware(DEcard_FW_readver);
+	u16 again = Read_FPGA_ver();
 
+	// Two reads that differ: a noisy bus, so no board is known
+	if (again != DEcard_FW_readver) {
+		tlog("firmware: FPGA version word read as %04X, then %04X: no update", DEcard_FW_readver, again);
+		return;
+	}
 	switch (fpga_board(DEcard_FW_readver)) {
 	case FPGA_BOARD_LX16:
 		tlog("firmware: FPGA version word %04X, LX16 on V%02d, the kernel has V%02d", DEcard_FW_readver,

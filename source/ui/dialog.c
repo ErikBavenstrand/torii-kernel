@@ -497,7 +497,8 @@ int dialog_confirm(const char *title, const char *text, u32 kind)
 	int yes = 0;
 	dialog_open();
 	if (show(&dlg.message, USE_CONFIRM, title, text, kind)) {
-		yes = (wait_key(&dlg.message, KEY_A | KEY_B, 1) & KEY_A) != 0;
+		// B wins: pressed with A, or while A is down, it's a no
+		yes = (wait_key(&dlg.message, KEY_A | KEY_B, 1) & KEY_A) && !(dlg.message.keys & KEY_B);
 		hide(&dlg.message);
 	}
 	log_dialog(title, text, yes ? "A, yes" : "B, no");
@@ -517,8 +518,11 @@ int dialog_hold(const char *title, const char *text, u16 keys, u32 frames)
 		for (;;) {
 			tick();
 			ui_frame();
-			if (dlg.message.keys & KEY_B) {
-				wait_key(&dlg.message, KEY_B, 1);
+			if ((dlg.message.keys | ui_input()->held) & KEY_B) {  // pressed, or held
+				while (ui_input()->held & KEY_B) {  // let go
+					tick();
+					ui_frame();
+				}
 				break;
 			}
 			int all = (ui_input()->held & keys) == keys;
