@@ -10,7 +10,8 @@
 #      mgba-shot as `cut_run [-X N] ARGS...`, so the cut option goes in.
 #   2. A first run without a cut, from a copy of the starting state, counts
 #      the cutpoints M ("cutpoints: M" in the run's stderr). M = 0 fails.
-#   3. For N = 1..M the cart is reset to the starting state and the scenario
+#   3. For N = 1..M the cart is reset to the starting state (cart_restore,
+#      which copies back only the files a run changed) and the scenario
 #      runs with -X N; the run must stop with status 75, right after the
 #      Nth cutpoint's log line.
 #   4. CHECK_FN N NAME is called with $cart as the cut left it, before any
@@ -46,6 +47,7 @@ _cut_fail() {
 
 cut_sweep() {
   local scenario=$1 check=$2 start=$carts/cutsweep-start n m name
+  cart_blank "$cart"
   rm -rf "$start"
   cp -a "$cart" "$start"
   "$scenario"
@@ -55,8 +57,7 @@ cut_sweep() {
   cp "$cart/run.log" "$carts/cutsweep-names.log"
   "$check" 0 end
   for n in $(seq 1 "$m"); do
-    rm -rf "$cart"
-    cp -a "$start" "$cart"
+    cart_restore "$start" "$cart"
     "$scenario" -X "$n"
     [ "$cut_status" = 75 ] || _cut_fail "the cut at cutpoint $n of $m ended with status $cut_status, not 75"
     cp "$cart/run.log" "$cart/cut-$n.log"

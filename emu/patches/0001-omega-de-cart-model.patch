@@ -410,10 +410,10 @@ index 1d0c0dd..80e46af 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..97695a9
+index 0000000..e947ded
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1866 @@
+@@ -0,0 +1,1904 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -434,6 +434,9 @@ index 0000000..97695a9
 +#include <stdio.h>
 +#include <unistd.h>
 +#include <stdlib.h>
++#ifdef _POSIX_MAPPED_FILES
++#include <sys/mman.h>
++#endif
 +
 +mLOG_DEFINE_CATEGORY(GBA_OMEGA, "GBA Omega DE", "gba.omega");
 +
@@ -549,6 +552,12 @@ index 0000000..97695a9
 +
 +// --- Backing files ---------------------------------------------------------
 +
++// OMEGA_NO_SYNC=1 leaves the cart's files to the page cache: no fsync or
++// msync when the run ends or the power is cut, which another process reads
++// the same. For carts on a disk only the tests use (tests/all.sh sets it);
++// left unset, the files reach the disk, as a host on virtiofs needs.
++static bool _noSync;
++
 +static uint8_t* _mapFile(struct VFile** vfOut, const char* dir, const char* name, size_t size, uint8_t fill) {
 +	char path[PATH_MAX];
 +	snprintf(path, sizeof(path), "%s" PATH_SEP "%s", dir, name);
@@ -576,7 +585,13 @@ index 0000000..97695a9
 +
 +static void _unmapFile(struct VFile** vf, uint8_t** data, size_t size) {
 +	if (*vf) {
-+		if (*data) {
++		if (*data && _noSync) {
++#ifdef _POSIX_MAPPED_FILES
++			munmap(*data, size);  // the VFile's unmap would msync
++#else
++			(*vf)->unmap(*vf, *data, size);
++#endif
++		} else if (*data) {
 +			(*vf)->sync(*vf, *data, size);
 +			(*vf)->unmap(*vf, *data, size);
 +		}
@@ -642,7 +657,7 @@ index 0000000..97695a9
 +}
 +
 +static void _syncFile(struct VFile* vf, uint8_t* data, size_t size) {
-+	if (vf && data) {
++	if (vf && data && !_noSync) {
 +		vf->sync(vf, data, size);
 +	}
 +}
@@ -652,7 +667,7 @@ index 0000000..97695a9
 +	_syncFile(omega->kernelNor.vf, omega->kernelNor.data, OMEGA_KERNEL_NOR_SIZE);
 +	_syncFile(omega->gameNor.vf, omega->gameNor.data, OMEGA_GAME_NOR_SIZE);
 +	_syncFile(omega->sramVf, omega->sram, OMEGA_SRAM_SIZE);
-+	if (omega->sd) {
++	if (omega->sd && !_noSync) {
 +		omega->sd->sync(omega->sd, NULL, 0);
 +	}
 +	fflush(NULL);
@@ -1667,6 +1682,27 @@ index 0000000..97695a9
 +	loader[0xBD] = -(sum + 0x19);
 +}
 +
++// Power-on writes to the cart's files change only the 4 KB pages that differ,
++// so a file the run otherwise leaves alone keeps its modification time
++// (tests/carts.sh's cart_restore copies back only the files a run changed).
++#define STORE_PAGE 0x1000
++static void _store(uint8_t* data, const uint8_t* from, size_t size) {
++	for (size_t at = 0; at < size; at += STORE_PAGE) {
++		size_t length = size - at < STORE_PAGE ? size - at : STORE_PAGE;
++		if (memcmp(&data[at], &from[at], length)) {
++			memcpy(&data[at], &from[at], length);
++		}
++	}
++}
++
++static void _fill(uint8_t* data, uint8_t value, size_t size) {
++	static uint8_t page[STORE_PAGE];
++	memset(page, value, sizeof(page));
++	for (size_t at = 0; at < size; at += STORE_PAGE) {
++		_store(&data[at], page, size - at < STORE_PAGE ? size - at : STORE_PAGE);
++	}
++}
++
 +void GBAOmegaInit(struct GBAOmega* omega) {
 +	memset(omega, 0, sizeof(*omega));
 +}
@@ -1678,6 +1714,8 @@ index 0000000..97695a9
 +		return false;
 +	}
 +
++	const char* noSync = getenv("OMEGA_NO_SYNC");
++	_noSync = noSync && *noSync && strcmp(noSync, "0");
 +	omega->kernelNor.data = _mapFile(&omega->kernelNor.vf, dir, "kernel-nor.bin", OMEGA_KERNEL_NOR_SIZE, 0xFF);
 +	omega->gameNor.data = _mapFile(&omega->gameNor.vf, dir, "game-nor.bin", OMEGA_GAME_NOR_SIZE, 0xFF);
 +	omega->sram = _mapFile(&omega->sramVf, dir, "sram.bin", OMEGA_SRAM_SIZE, 0xFF);
@@ -1696,7 +1734,7 @@ index 0000000..97695a9
 +	memset(omega->port, 0xFF, OMEGA_PORT_SIZE);
 +	const char* softReset = getenv("OMEGA_SOFT_RESET");
 +	if (!softReset || !*softReset || !strcmp(softReset, "0")) {
-+		memset(&omega->sram[OMEGA_SAVE_PAGES << 12], 0xFF, OMEGA_SRAM_SIZE - (OMEGA_SAVE_PAGES << 12));
++		_fill(&omega->sram[OMEGA_SAVE_PAGES << 12], 0xFF, OMEGA_SRAM_SIZE - (OMEGA_SAVE_PAGES << 12));
 +	}
 +	omega->kernelNor.size = OMEGA_KERNEL_NOR_SIZE;
 +	omega->kernelNor.chipOffset = KERNEL_CHIP_KERNEL;
@@ -1750,8 +1788,8 @@ index 0000000..97695a9
 +		kernelSize = LOADER_INSTALL_MAX;
 +	}
 +	size_t installed = (kernelSize + LOADER_INSTALL_SECTOR - 1) & ~(size_t) (LOADER_INSTALL_SECTOR - 1);
-+	memset(omega->kernelNor.data, 0xFF, installed);
-+	memcpy(omega->kernelNor.data, gba->memory.rom, kernelSize);
++	_store(omega->kernelNor.data, (const uint8_t*) gba->memory.rom, kernelSize);
++	_fill(&omega->kernelNor.data[kernelSize], 0xFF, installed - kernelSize);
 +	omega->fpgaVersion = FPGA_VERSION;
 +	const char* fpga = getenv("OMEGA_FPGA_VERSION");
 +	if (fpga && *fpga) {

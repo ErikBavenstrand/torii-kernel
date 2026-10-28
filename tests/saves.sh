@@ -185,7 +185,7 @@ rename-cut | rename-cut-split)
     done
   fi
   rm -rf "$carts/cut-start-$part"
-  cp -r "$cart" "$carts/cut-start-$part"
+  cp -a "$cart" "$carts/cut-start-$part"
   : >"$carts/aliases-$part.txt"
   # The rename through the keys, as rename's power-on 3; the SD writes
   # before it and its own, counted from the cart trace
@@ -199,7 +199,7 @@ rename-cut | rename-cut-split)
   [ "$writes" -ge 6 ] || fail "the rename made only $writes SD writes"
   results=""
   for n in $(seq 1 "$writes"); do
-    rm -rf "$cart" && cp -r "$carts/cut-start-$part" "$cart"
+    cart_restore "$carts/cut-start-$part" "$cart"
     status=0
     # shellcheck disable=SC2086 # nav.sh's options
     OMEGA_POWER_CUT=sd:write:$((first + n)) OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin \
@@ -253,7 +253,7 @@ rename-cut-case)
     mcopy -i "$cart/sd.img" "$cart/pad.txt" "::/torii/saves/PAD$i.TXT"
   done
   rm -rf "$carts/cut-start-$part"
-  cp -r "$cart" "$carts/cut-start-$part"
+  cp -a "$cart" "$carts/cut-start-$part"
   : >"$carts/aliases-$part.txt"
   rename_keys=$(nav_file /Test.gba 0)
   case_keys=(-k @12:UP -k @16:- -k @20:UP -k @24:- -k @28:UP -k @32:- -k @40:A -k @44:- -w "screen ready: rename"
@@ -266,7 +266,7 @@ rename-cut-case)
   writes=$(sed -n '/safefile: writing \/torii\/rename.txt/,/rename: kept/p' "$cart/run.log" | grep -c '^omega [0-9]*: sd write' || true)
   [ "$writes" -ge 6 ] || fail "the rename made only $writes SD writes"
   for n in $(seq 1 "$writes"); do
-    rm -rf "$cart" && cp -r "$carts/cut-start-$part" "$cart"
+    cart_restore "$carts/cut-start-$part" "$cart"
     status=0
     # shellcheck disable=SC2086 # nav.sh's options
     OMEGA_POWER_CUT=sd:write:$((first + n)) OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin \
@@ -328,9 +328,13 @@ rename-walk)
   # could share them: the check walks the card; the saves are in the game's own folder)
   mmd -i "$cart/sd.img" ::/RTS
   mcopy -i "$cart/sd.img" tests/roms/hello/hello.gba ::/RTS/Test.rts
-  mkdir "$cart/fill"
-  for i in $(seq 1 1500); do : >"$cart/fill/Filler $i.gba"; done
-  mcopy -i "$cart/sd.img" -s "$cart/fill" ::/Fill
+  # (through the kernel's FatFs in one mount: mcopy checks each name against
+  # the whole folder, which takes half a minute)
+  : >"$cart/fill.gba"
+  pairs=()
+  for i in $(seq 1 1500); do pairs+=("$cart/fill.gba" "/Fill/Filler $i.gba"); done
+  tools/sdimg.sh "$cart/sd.img" mkdir /Fill
+  tools/sdimg.sh "$cart/sd.img" put "${pairs[@]}"
   # shellcheck disable=SC2046 # nav.sh's options
   boot $(nav_file /Test.gba 1) -k @12:UP -k @16:- -k @20:UP -k @24:- -k @28:UP -k @32:- -k @40:A -k @44:- \
     -w "screen ready: rename" -k @10:A -k @14:- -k @24:START -k @28:- \
