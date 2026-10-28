@@ -4,7 +4,7 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.9.0
 
 - **Added:** Swedish. The release attaches `torii-lang.zip`; with its
   `sv.lng` copied into `/torii/lang` on the card, Settings, System, Language
