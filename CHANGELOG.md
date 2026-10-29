@@ -17,6 +17,8 @@ git log, not here.
 - **Added:** SELECT's menu on any cheat from a cheat database has Rename;
   `just cheats` keeps the name when it writes the file again. A game with a
   name of your own has Original name in its popup, which drops it (6632e0b1).
+  A quote in a renamed cheat's name is written as an apostrophe, as an
+  edited one's is (1e681486).
 - **Changed:** the message for a cheat file too big to read no longer says
   192 KB, which windowed files go past (58ac043e).
 

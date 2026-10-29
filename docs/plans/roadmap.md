@@ -110,6 +110,8 @@ The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-re
 
 - **(1.0?) Hi-colour GBC:** these games lose mid-frame palette writes (jagoombacolor#20, #53). A per-line palette path in Jagoomba needs about 18 KB and its last DMA channel (`docs/research/gbc-hicolor.md`).
 - **(1.0?) GB, GBC and NES cheats** (owner, 2026-10-25): libretro's GameShark and Game Genie files, with the codes passed to Jagoomba and PocketNES (PocketNES has its own cheat finder).
+- **Cheats, left from the windowed files (2026-10-29):** `edit_full` and `add_full` still say a file holds 1,024 cheats, true now only of one window; a renamed database cheat whose code GameHacking later re-encodes takes the database's name again (names are matched by code); a hand-written `cheatN_renamed = false` after the code line keeps winning over Rename's line.
+- **On-cart art (owner, 2026-10-29: manage on the cart where no network is needed):** the cart can't set, remove or reset a game's box art; a romhack's art needs `just art-add` on a PC.
 - From the trackers: jagoombacolor#42 accuracy tests, #43 a GBC-compatible ROM run as DMG, #34 the default palette; PocketNES#14 multiboot.
 
 ### Tooling, alongside any patch
