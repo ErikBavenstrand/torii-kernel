@@ -14,6 +14,11 @@ git log, not here.
   or are master codes are greyed with the reason instead of hidden; any cheat
   can be deleted, and Settings' Clean up cheats removes the greyed ones.
   Conditional cheats may use up to about 23% of a frame (47d5b5f2).
+- **Added:** SELECT's menu on any cheat from a cheat database has Rename;
+  `just cheats` keeps the name when it writes the file again. A game with a
+  name of your own has Original name in its popup, which drops it (6632e0b1).
+- **Changed:** the message for a cheat file too big to read no longer says
+  192 KB, which windowed files go past (58ac043e).
 
 ## v0.9.0
 
