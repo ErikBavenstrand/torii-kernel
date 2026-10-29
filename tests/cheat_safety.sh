@@ -101,7 +101,7 @@ files)
   grep -q "cheats: popup: -1 listed" "$cart/popup.txt" || fail "the popup had no Cheats for the big file"
   grep -q "cheats: /torii/cheats/Hello.cht is 196613 bytes, over 196608: too big, left alone" "$cart/popup.txt" ||
     fail "the big file wasn't refused: $(grep -a 'cheats:' "$cart/popup.txt" | head -3)"
-  grep -q "dialog: Hello: Its cheat file is too big: over 192 KB." "$cart/popup.txt" ||
+  grep -q "dialog: Hello: Its cheat file is too big to read." "$cart/popup.txt" ||
     fail "the screen's dialog: $(grep -a 'dialog:' "$cart/popup.txt" | tail -2)"
   ! grep -q "kernel error: cheats" "$cart/popup.txt" || fail "the big file was taken for a card error"
   ! grep -q "screen ready: cheats" "$cart/popup.txt" || fail "the cheat screen opened the big file"

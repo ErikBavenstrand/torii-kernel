@@ -476,7 +476,7 @@ const char *const lang_en[STR_COUNT] = {
 	"Reading cheats",  // cheats.reading
 	"A big cheat file",  // cheats.reading_text
 	"Its cheat file can't be read.",  // cheats.gone
-	"Its cheat file is too big: over 192 KB.",  // cheats.too_big
+	"Its cheat file is too big to read.",  // cheats.too_big
 	"Its cheat file is for another dump of the game.",  // cheats.other_dump
 	"The picks couldn't be saved.",  // cheats.save_failed
 	"+ Add code",  // cheats.add_row
