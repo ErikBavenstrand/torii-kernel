@@ -53,4 +53,17 @@ void boxart_poll(void);
 // The card's art changed (a custom art file renamed, B18): lists it again.
 void boxart_forget(void);
 
+// The game popup's Box art row: the game at path's custom art file, and
+// changing it. BOXART_CUSTOM_HIDDEN writes an empty file, which shows the
+// placeholder whatever art the game has; BOXART_CUSTOM_NONE removes the
+// file (own art or a hiding), so its matched art shows again. 1 if done;
+// the art is listed again either way.
+enum {
+	BOXART_CUSTOM_NONE,
+	BOXART_CUSTOM_OWN,
+	BOXART_CUSTOM_HIDDEN,
+};
+u32 boxart_custom(const char *path);
+int boxart_set_custom(const char *path, u32 to);
+
 #endif

@@ -1110,10 +1110,25 @@ u32 cheatfile_rename(struct cheatfile *f, const struct cheatfile_room *room, u32
 		pcs[k++] = (struct piece){at > first ? at : first, 0, PIECE_LINE, 0, 0, 1, "desc", desc, n};
 	}
 	if (!c->own && !c->renamed) {
-		// After its code line (a line end first if that is the last, without one)
-		u32 end = line_end(f->text, f->len, c->code);
-		u8 brk = (u8)(f->text[end - 1] != '\n');
-		pcs[k++] = (struct piece){end, 0, PIECE_LINE, brk, 1, 0, "renamed", "true", n};
+		// A renamed line saying false (the last, the one a read takes) says
+		// true; else one goes after its code line (a line end first if that
+		// is the last, without one)
+		u32 pos = text_start(f->text, f->len), found = 0;
+		struct kv kv, was = {0, 0, 0, 0, 0, 0, 0};
+		while (next_kv(f->text, f->len, &pos, &kv)) {
+			u32 m = 0, d;
+			if (kv.klen && cheat_key(f->text + kv.key, kv.klen, top(f), &m, &d) == KEY_RENAMED && m == n) {
+				was = kv;
+				found = 1;
+			}
+		}
+		if (found) {
+			pcs[k++] = (struct piece){was.val, was.vlen, PIECE_VALUE, 0, 0, 0, NULL, "true", n};
+		} else {
+			u32 end = line_end(f->text, f->len, c->code);
+			u8 brk = (u8)(f->text[end - 1] != '\n');
+			pcs[k++] = (struct piece){end, 0, PIECE_LINE, brk, 1, 0, "renamed", "true", n};
+		}
 	}
 	if (!fits(f, room->cap, pieces_delta(f, pcs, k)) || f->len + pieces_grow(f, pcs, k) > room->cap)
 		return CHEATFILE_EDIT_LONG;

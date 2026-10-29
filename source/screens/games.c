@@ -1470,6 +1470,16 @@ static void unname_game(u32 row)
 	}
 }
 
+// The Box art row: hides the game's art (an empty custom art file), or
+// removes its own art or the hiding (BOXART_CUSTOM_*, as the row found it)
+static void art_game(u32 row, u32 was)
+{
+	ui_popup_close();
+	if (!boxart_set_custom(games.pick, was == BOXART_CUSTOM_NONE ? BOXART_CUSTOM_HIDDEN : BOXART_CUSTOM_NONE))
+		dialog_message(games.title, S(STR_GAMES_ART_FAILED), DIALOG_ERROR);
+	reshow(row);
+}
+
 static void boot_with_addon(u32 hard);
 
 // Starts the picked game the way Play's « » says (LANG_BOOT_*)
@@ -1620,7 +1630,17 @@ static void popup_run(u32 i)
 		popup_add(LANG_POP_STATES, 0, 0);
 	u32 fav_item = games.popup.count;
 	popup_add(LANG_POP_FAV, fav ? S(STR_GAMES_ON) : S(STR_GAMES_OFF), 0);
-	// Original name before Rename, so Rename stays third from the bottom
+	// Box art (List + art: where it shows), Original name before Rename,
+	// so Rename stays third from the bottom
+	u32 art = BOXART_CUSTOM_NONE, art_item = LANG_POP_ITEMS;
+	if (games.art && !nor && g.rec != LIBRARY_NONE) {
+		art = boxart_custom(games.pick);
+		art_item = games.popup.count;
+		popup_add(LANG_POP_ART, 0, 0);
+		if (art != BOXART_CUSTOM_NONE)
+			games.items[art_item].text =
+				S(art == BOXART_CUSTOM_HIDDEN ? STR_GAMES_ART_SHOW : STR_GAMES_ART_REMOVE);
+	}
 	if (!nor && g.rec != LIBRARY_NONE && (library_flags(g.rec) & LIB_F_CUSTOM))
 		popup_add(LANG_POP_UNNAME, 0, 0);
 	if (!nor && g.rec != LIBRARY_NONE)
@@ -1689,7 +1709,7 @@ static void popup_run(u32 i)
 		// A favourite dropped leaves the Favourites page before a launch
 		// that may come back (Game info and Rename list the page again)
 		if (fav != fav_was && games.kind == KIND_FAV && action != LANG_POP_INFO && action != LANG_POP_RENAME &&
-		    action != LANG_POP_UNNAME)
+		    action != LANG_POP_UNNAME && action != LANG_POP_ART)
 			relist(i, NULL);
 		switch (action) {
 		case LANG_POP_PLAY:
@@ -1712,6 +1732,9 @@ static void popup_run(u32 i)
 			return;
 		case LANG_POP_UNNAME:
 			unname_game(i);
+			return;
+		case LANG_POP_ART:
+			art_game(i, art);
 			return;
 		default:
 			return;

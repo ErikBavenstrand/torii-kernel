@@ -414,12 +414,16 @@ const char *const lang_en[STR_COUNT] = {
 	"Favourite",  // games.pop_fav
 	"Rename",  // games.pop_rename
 	"Original name",  // games.pop_unname
+	"Hide box art",  // games.pop_art
 	"Game info",  // games.pop_info
 	"Saves",  // games.pop_saves
 	"Cheats",  // games.pop_cheats
 	"Load state",  // games.pop_states
 	"Remove",  // games.pop_unrecent
 	"Delete",  // games.pop_delete
+	"Show box art",  // games.art_show
+	"Remove own art",  // games.art_remove
+	"The card didn't take the change.",  // games.art_failed
 	"default",  // games.boot_default
 	"clean",  // games.boot_clean
 	"addons",  // games.boot_addons
@@ -493,7 +497,7 @@ const char *const lang_en[STR_COUNT] = {
 	"Name the code",  // cheats.name_title
 	"Code {1}",  // cheats.name
 	"The card didn't take the code.",  // cheats.edit_failed
-	"A cheat file holds 1024 cheats at most.",  // cheats.edit_full
+	"The cheat file has no room for another cheat.",  // cheats.edit_full
 	"The cheat file would be too big.",  // cheats.edit_long
 	"That code can't go in a cheat file.",  // cheats.edit_bad
 	"The cheat file couldn't be changed.",  // cheats.edit_broken
@@ -501,8 +505,8 @@ const char *const lang_en[STR_COUNT] = {
 	"drop",  // cheats.hint_drop
 	"menu",  // cheats.hint_menu
 	"all",  // cheats.hint_all
-	"No room: 1024 cheats at most",  // cheats.add_full
-	"No room: the file is at 192 KB",  // cheats.add_long
+	"No room: the file is full",  // cheats.add_full
+	"No room: the file is full",  // cheats.add_long
 	"Too big to run, even alone",  // cheats.big
 	"Details",  // cheats.menu_details
 	"Turn all off",  // cheats.menu_all_off

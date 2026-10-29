@@ -533,7 +533,7 @@ mcopy -o -i "$cart/sd.img" "$cart/Full.cht" "::/torii/cheats/Hello.cht"
 boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
   -w "screen ready: cheats" -k @8:UP -k @12:- -k @24:A -k @28:- -k @60:B -k @64:- -w "cheats: back" -f 12000 \
   >"$cart/full.txt" 2>&1 || fail "the full file's screen didn't run: $(grep -a '^kernel' "$cart/full.txt" | tail -3)"
-grep -q "cheats: + Add code greyed: No room: 1024 cheats at most" "$cart/full.txt" ||
+grep -q "cheats: + Add code greyed: No room: the file is full" "$cart/full.txt" ||
   fail "the full file's + Add code: $(grep -a 'cheats:' "$cart/full.txt" | head -3)"
 ! grep -q "screen ready: keypad" "$cart/full.txt" || fail "A on a greyed + Add code opened the keypad"
 echo "PASS: cheats: a file with no number left greys + Add code up front, and A on it opens nothing"

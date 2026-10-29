@@ -1237,4 +1237,17 @@ void test_cheatfile_rename(void)
 	// is: as an apostrophe, the value's quotes whole
 	CHECK_EQ(cheatfile_rename(&file, &room, 1, "Max \"HP\""), CHEATFILE_EDIT_OK);
 	CHECK(text_has("cheat1_desc = \"Max 'HP'\"\n"));
+	// A renamed line saying false says true, rather than one more line
+	load_cap("cheat0_desc = \"A\"\n"
+		 "cheat0_code = \"32001000 0009\"\n"
+		 "cheat0_enable = true\n"
+		 "cheat0_renamed = false\n",
+		 4096);
+	CHECK_EQ(cheats[0].renamed, 0);
+	CHECK_EQ(cheatfile_rename(&file, &room, 0, "B"), CHEATFILE_EDIT_OK);
+	CHECK(text_is("cheat0_desc = \"B\"\n"
+		      "cheat0_code = \"32001000 0009\"\n"
+		      "cheat0_enable = true\n"
+		      "cheat0_renamed = true\n"));
+	CHECK_EQ(cheats[0].renamed, 1);
 }

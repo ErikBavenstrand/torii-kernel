@@ -297,7 +297,8 @@ def fills(placeholder, code):
 
 def merge(database, old, keep_all=True):
     """The database's cheats with old's picks and Torii's keys (by code),
-    and old's name for one renamed on the cart (cheatN_renamed), then old's own cheats: those the database lacks that are cheatN_user or
+    and old's name for one renamed on the cart (cheatN_renamed), then
+    old's own cheats: those the database lacks that are cheatN_user or
     picked, or all of them with keep_all. A database cheat with digits to
     fill in (00??) that old has filled in (the same desc, a code without
     them, as the kernel's keypad saves it in place) is old's, in the
@@ -985,10 +986,10 @@ def index_picks(text):
 def carry_picks(database, old, hashes):
     """The database's cheats picked where a pick of the old file, or of its
     old index (hashes), runs the same program (the kernel's hash): a pick
-    outlives its code being written decrypted. The old picks so carried
+    outlives its code being written decrypted. A name given on the cart
+    (cheatN_renamed) is carried the same way. The old cheats so carried
     leave old when their code changed, else merge would keep them as the
-    user's own. Returns
-    (database, old)."""
+    user's own. Returns (database, old)."""
     got = decode_cheats(database)
     if got is None:
         return database, old
@@ -1005,17 +1006,33 @@ def carry_picks(database, old, hashes):
     for c, g in zip(old, og or [], strict=False):
         if c[2] and g[1]:
             picked.add(g[1])
-    have = {g[1] for g in got if g[1]}
     codes = {c[1] for c in database}
-    out = [
-        Cheat(c[0], c[1], True, c.extra) if not c[2] and g[1] and g[1] in picked else c
-        for c, g in zip(database, got, strict=True)
-    ]
+    names = {}
+    for c, g in zip(old, og or [], strict=False):
+        extra = getattr(c, "extra", {})
+        if g[1] and c[1] not in codes and is_true(extra.get("renamed", "")):
+            names.setdefault(g[1], c[0])
+    have = {g[1] for g in got if g[1]}
+    out = []
+    for c, g in zip(database, got, strict=True):
+        h, cheat = g[1], c
+        if h and h in names:
+            cheat = Cheat(
+                names[h], cheat[1], cheat[2], {**cheat.extra, "renamed": "true"}
+            )
+        if not cheat[2] and h and h in picked:
+            cheat = Cheat(cheat[0], cheat[1], True, cheat.extra)
+        out.append(cheat)
     if og:
         old = [
             c
             for c, g in zip(old, og, strict=True)
-            if not (c[2] and g[1] in have and c[1] not in codes and not user_code(c))
+            if not (
+                (c[2] or g[1] in names)
+                and g[1] in have
+                and c[1] not in codes
+                and not user_code(c)
+            )
         ]
     return out, old
 

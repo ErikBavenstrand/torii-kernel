@@ -1073,6 +1073,13 @@ class Romhack(unittest.TestCase):
         self.assertFalse(got[0][2])
         got, _ = cheats.carry_picks(new, [], cheats.index_picks(index))
         self.assertFalse(got[0][2])  # the index's pick is another program
+        # A name given on the cart carries by program too, and the old cheat
+        # leaves old (else merge would keep it as the user's)
+        old = [cheats.Cheat("My lives", "02001000:0063", False, {"renamed": "true"})]
+        got, rest = cheats.carry_picks(new, old, None)
+        self.assertEqual(got[0][0], "My lives")
+        self.assertTrue(cheats.is_true(got[0].extra["renamed"]))
+        self.assertEqual(rest, [])
 
     def test_sift_in_parts(self):
         """A list past one file's limits is read in parts as one: a cheat

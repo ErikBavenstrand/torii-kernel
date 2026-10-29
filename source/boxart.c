@@ -336,7 +336,7 @@ static int list_entry(int custom)
 	if (custom) {
 		u32 len = artkey_custom_len(fi->fname);
 		if (len)
-			add(ARTKEY_CUSTOM, artkey_name(fi->fname, len));
+			add(fi->fsize ? ARTKEY_CUSTOM : ARTKEY_HIDDEN, artkey_name(fi->fname, len));
 	} else {
 		u32 kind = artkey_parse(fi->fname, &key);
 		if (kind != ARTKEY_NONE)
@@ -494,6 +494,8 @@ static u32 lookup(const char *path, u32 size, struct want *w)
 		w->id = artkey_id(ARTKEY_CUSTOM, w->key);
 		if (artset_has(SET_BASE, w->id))
 			return w->id;
+		if (artset_has(SET_BASE, artkey_id(ARTKEY_HIDDEN, w->key)))
+			return 0;  // hidden: the placeholder
 	}
 	// Matched art by CRC only: a romhack shares its base game's code
 	u32 crc;
@@ -783,4 +785,49 @@ void boxart_forget(void)
 		job_cancel(B.job);
 	B.list = LIST_NONE;
 	B.signature = 0;
+}
+
+// --- The popup's Box art row -----------------------------------------------------------
+
+// The custom art file's path for the game at path (its file name and ".bin")
+static int custom_path(char *out, u32 size, const char *path)
+{
+	const char *name = strrchr(path, '/');
+	name = name ? name + 1 : path;
+	return (u32)snprintf(out, size, CUSTOM_DIR "/%s" ARTKEY_EXT, name) < size;
+}
+
+u32 boxart_custom(const char *path)
+{
+	char file[USERDATA_PATH_MAX + 24];
+	FILINFO fi;
+	if (!custom_path(file, sizeof(file), path) || f_stat(file, &fi) != FR_OK || (fi.fattrib & AM_DIR))
+		return BOXART_CUSTOM_NONE;
+	return fi.fsize ? BOXART_CUSTOM_OWN : BOXART_CUSTOM_HIDDEN;
+}
+
+int boxart_set_custom(const char *path, u32 to)
+{
+	char file[USERDATA_PATH_MAX + 24];
+	if (!custom_path(file, sizeof(file), path))
+		return 0;
+	// The listing stops, its file closed: its FIL writes the empty file
+	boxart_forget();
+	close_dir();
+	int ok;
+	if (to == BOXART_CUSTOM_HIDDEN) {
+		// An empty file: f_mkdir of a folder there already fails, harmlessly
+		f_mkdir(ART_DIR);
+		f_mkdir(CUSTOM_DIR);
+		FIL *f = &B.f.pack;
+		ok = f_open(f, file, FA_WRITE | FA_CREATE_NEW) == FR_OK;
+		if (ok)
+			ok = f_close(f) == FR_OK;
+	} else {
+		FRESULT r = f_unlink(file);
+		ok = r == FR_OK || r == FR_NO_FILE;
+	}
+	tlog("box art: %s: %s%s", path, to == BOXART_CUSTOM_HIDDEN ? "hidden" : "own art or hiding removed",
+	     ok ? "" : ": failed");
+	return ok;
 }

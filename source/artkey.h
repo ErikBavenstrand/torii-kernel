@@ -7,7 +7,8 @@
 //	                                 8 hex digits (B23's scraper writes it)
 //	/torii/art/custom/<name>.bin     custom art by the game's file name,
 //	                                 extension included ("Foo (USA).gba.bin",
-//	                                 `just art-add`)
+//	                                 `just art-add`); an empty one hides
+//	                                 the game's art (the popup's Hide box art)
 //
 // Names match without ASCII case, as FAT does. Each file is one id: a hash
 // of its kind and key, never 0, so the cover cache (engine/cover.h) holds a
@@ -28,6 +29,7 @@ enum {
 	ARTKEY_CUSTOM,
 	ARTKEY_CRC,
 	ARTKEY_PACK,  // an image of the art pack (artpack.h), its number the key
+	ARTKEY_HIDDEN,  // an empty custom art file: the game shows the placeholder, whatever art it has
 };
 
 // The kind of a file name in /torii/art (ARTKEY_CRC) with its key, the

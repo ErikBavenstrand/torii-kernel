@@ -321,3 +321,37 @@ boot "$cart/4.log" $(nav_to gba) -f 900
 grep -q "nav: page gba ready" "$cart/4.log" || fail "the GBA page didn't open"
 ! grep -q "box art:" "$cart/4.log" || fail "box art ran while off: $(grep 'box art' "$cart/4.log" | head -2)"
 echo "PASS: with Box art off the card's art isn't read"
+
+# The game popup's box art row (List + art): Hide box art writes an empty
+# custom art file, after which the game keeps the placeholder though its
+# matched art is there; the row then says Show box art, which removes the
+# file, and the art shows again. With art of its own the row says Remove
+# own art, which removes that file.
+new_cart hide
+printf '%s\tAWRE\t3248\t-\t/Code.gba\n' "$code_crc" >"$cart/crc.txt"
+mcopy -i "$cart/sd.img" "$cart/crc.txt" ::/torii/crc.txt
+mmd -i "$cart/sd.img" ::/torii/art
+mcopy -i "$cart/sd.img" tests/shots/data/art-night.bin "::/torii/art/$code_crc.bin"
+art_row() { # log: Code.gba's popup, UP to the box art row (Delete, Info, Rename, then it), A
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot "$1" $(nav_game_menu gba 0) -k @12:UP -k @16:- -k @24:UP -k @28:- -k @36:UP -k @40:- -k @48:UP -k @52:- \
+    -k @64:A -k @68:- -w "box art: /Code.gba:" -f 3000
+}
+art_row "$cart/h1.log"
+grep -q "^kernel: box art: /Code.gba: hidden$" "$cart/h1.log" || fail "Hide box art: $(grep 'box art' "$cart/h1.log" | tail -2)"
+[ "$(mtype -i "$cart/sd.img" ::/torii/art/custom/Code.gba.bin | wc -c)" = 0 ] || fail "no empty custom art file"
+# shellcheck disable=SC2046 # nav.sh's options
+boot "$cart/h2.log" $(nav_to gba) -f 1500
+grep -q "box art: 2 files listed" "$cart/h2.log" || fail "the art wasn't listed: $(grep "files listed" "$cart/h2.log")"
+! grep -q "box art: cover $code shown" "$cart/h2.log" || fail "the hidden game's art still shows"
+art_row "$cart/h3.log"
+grep -q "^kernel: box art: /Code.gba: own art or hiding removed$" "$cart/h3.log" || fail "Show box art: $(grep 'box art' "$cart/h3.log" | tail -2)"
+! mdir -i "$cart/sd.img" ::/torii/art/custom/Code.gba.bin >/dev/null 2>&1 || fail "the empty file stayed"
+# shellcheck disable=SC2046 # nav.sh's options
+boot "$cart/h4.log" $(nav_to gba) -w "box art: cover $code shown" -f 3000
+grep -q "box art: cover $code shown" "$cart/h4.log" || fail "the art didn't show again"
+mcopy -i "$cart/sd.img" tests/shots/data/art-sunset.bin ::/torii/art/custom/Code.gba.bin
+art_row "$cart/h5.log"
+grep -q "^kernel: box art: /Code.gba: own art or hiding removed$" "$cart/h5.log" || fail "Remove own art: $(grep 'box art' "$cart/h5.log" | tail -2)"
+! mdir -i "$cart/sd.img" ::/torii/art/custom/Code.gba.bin >/dev/null 2>&1 || fail "the own art stayed"
+echo "PASS: the popup hides a game's box art, shows it again, and removes art of its own"
