@@ -242,6 +242,10 @@ def main(argv=None):
             print(f"error: {e}", file=sys.stderr)
             code = -1
         results.append((step.name, "done" if code == 0 else f"failed (status {code})"))
+    if not args.dry_run and sys.platform == "darwin":
+        # macOS keeps a file's extended attributes on a FAT card as ._ files
+        # beside it (the kernel skips them, but they clutter the card)
+        subprocess.run(["dot_clean", "-m", str(sd)], check=False)
     print("\nAll steps:")
     print(f"  games: {len(copies.copied)} {would}, {len(copies.kept)} already there")
     for name, outcome in results:
