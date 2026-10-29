@@ -4,6 +4,17 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Added:** cheat files past one read (up to 4 MB, such as Final Fantasy
+  Tactics Advance's 14,000 cheats) open in windows of 250 through a `.cdx`
+  index beside them, read as the cursor nears them; picks live in the index,
+  and a file changed under it is indexed anew with its picks kept (47d5b5f2).
+- **Changed:** cheats the kernel can't run, that do nothing, repeat another
+  or are master codes are greyed with the reason instead of hidden; any cheat
+  can be deleted, and Settings' Clean up cheats removes the greyed ones.
+  Conditional cheats may use up to about 23% of a frame (47d5b5f2).
+
 ## v0.9.0
 
 - **Added:** Swedish. The release attaches `torii-lang.zip`; with its
