@@ -466,6 +466,27 @@ grep -q "cheats: deleted cheat 4: ok" "$cart/delete.txt" ||
 ! mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep '^cheat4_' >/dev/null || fail "cheat 4's lines are still there"
 echo "PASS: cheats: a code of the user's is deleted from SELECT's menu, the database's cheats untouched"
 
+# A database cheat (the first that can be picked, cheat 1) renamed: SELECT's menu, Rename, "q" typed after
+# its name, START; its desc changes and a renamed line keeps it from `just
+# cheats`, its code and pick as they were
+cp "$cart/added.img" "$cart/sd.img"
+cp "$cart/clean/kernel-nor.bin" "$cart/"
+rm -f "$cart/sram.bin"
+before=$(cheat_lines)
+# shellcheck disable=SC2046 # nav.sh's options
+boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
+  -w "screen ready: cheats" -k @8:SELECT -k @12:- \
+  -w "screen ready: cheat-menu" -k @16:A -k @20:- \
+  -w "screen ready: rename" -k @10:A -k @14:- -k @24:START -k @28:- \
+  -w "cheats: renamed" -w "screen ready: cheats" -k @8:B -k @12:- -w "cheats: back" -f 6000 >"$cart/rename.txt" 2>&1 ||
+  fail "the rename didn't run: $(grep -a '^kernel' "$cart/rename.txt" | tail -3)"
+grep -q "cheats: renamed cheat 1: ok" "$cart/rename.txt" ||
+  fail "the rename logged: $(grep -a 'cheats:' "$cart/rename.txt" | tail -3)"
+mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep -q $'^cheat1_desc = ".*q"\r$' || fail "cheat 1's name didn't change"
+mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep -q $'^cheat1_renamed = true\r$' || fail "cheat 1 has no renamed line"
+[ "$(cheat_lines)" = "$before" ] || fail "after the rename the cheats read: $(cheat_lines | tr '\n' ' ')"
+echo "PASS: cheats: a database cheat is renamed from SELECT's menu, marked so \`just cheats\` keeps the name"
+
 # The last code deleted: a file of one code of the user's goes, both copies,
 # rather than staying as "cheats = 0"; cut at each step, the next power-on
 # reads the file with its code, or none

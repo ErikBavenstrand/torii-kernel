@@ -256,6 +256,28 @@ class Merge(unittest.TestCase):
             [("Less HP", "1234 5678", False)],
         )
 
+    def test_renamed_kept(self):
+        """A database cheat renamed on the cart (cheatN_renamed) keeps its
+        name through a merge, and its renamed line; one not renamed takes
+        the database's name."""
+        old = cheats.parse_cht(
+            'cheat0_desc = "My money"\ncheat0_code = "82000250+E0FF"\n'
+            "cheat0_renamed = true\ncheat0_enable = true\n"
+            'cheat1_desc = "Old HP"\ncheat1_code = "42000538+07CF"\n'
+        )
+        database = [
+            ("Infinite Money", "82000250+E0FF", False),
+            ("HP", "42000538+07CF", False),
+        ]
+        merged, own, _ = cheats.merge(database, old)
+        self.assertEqual(own, 0)
+        self.assertEqual(merged[0][:3], ("My money", "82000250+E0FF", True))
+        self.assertTrue(cheats.is_true(merged[0].extra["renamed"]))
+        self.assertEqual(merged[1], ("HP", "42000538+07CF", False))
+        text = cheats.format_cht(merged)
+        self.assertIn("cheat0_renamed = true\n", text)
+        self.assertEqual(cheats.parse_cht(text), merged)
+
     def test_torii_keys(self):
         """cheatN_format and cheatN_user are kept through a merge, the
         user's format over the source's; a placeholder the keypad filled in

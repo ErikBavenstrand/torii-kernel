@@ -1192,3 +1192,45 @@ void test_cheatfile_remove_many(void)
 	u8 none[CHEATFILE_MAX / 8] = {0};
 	CHECK_EQ(cheatfile_remove_many(&file, &room, none), 0);
 }
+
+// Rename: a database cheat's desc replaced and a renamed line added once; a
+// cheat with no desc gets one; the user's own code gets no renamed line
+void test_cheatfile_rename(void)
+{
+	load_cap("cheats = 3\n"
+		 "\n"
+		 "cheat0_desc = \"Max HP\"\n"
+		 "cheat0_code = \"32001000 0009\"\n"
+		 "cheat0_enable = true\n"
+		 "\n"
+		 "cheat1_code = \"32001002 0009\"\n"
+		 "\n"
+		 "cheat2_desc = \"Mine\"\n"
+		 "cheat2_code = \"32001004 0009\"\n"
+		 "cheat2_user = true\n",
+		 4096);
+	CHECK_EQ(cheatfile_rename(&file, &room, 0, "Lots of HP"), CHEATFILE_EDIT_OK);
+	CHECK_EQ(cheats[0].renamed, 1);
+	CHECK_EQ(cheats[0].picked, 1);
+	CHECK_EQ(cheatfile_rename(&file, &room, 0, "HP"), CHEATFILE_EDIT_OK);
+	CHECK_EQ(cheatfile_rename(&file, &room, 1, "Money"), CHEATFILE_EDIT_OK);
+	CHECK_EQ(cheatfile_rename(&file, &room, 2, "Still mine"), CHEATFILE_EDIT_OK);
+	CHECK_EQ(cheatfile_rename(&file, &room, 0, ""), CHEATFILE_EDIT_BAD);
+	CHECK_EQ(cheatfile_rename(&file, &room, 3, "No such"), CHEATFILE_EDIT_BAD);
+	CHECK(text_is("cheats = 3\n"
+		      "\n"
+		      "cheat0_desc = \"HP\"\n"
+		      "cheat0_code = \"32001000 0009\"\n"
+		      "cheat0_renamed = true\n"
+		      "cheat0_enable = true\n"
+		      "\n"
+		      "cheat1_desc = \"Money\"\n"
+		      "cheat1_code = \"32001002 0009\"\n"
+		      "cheat1_renamed = true\n"
+		      "\n"
+		      "cheat2_desc = \"Still mine\"\n"
+		      "cheat2_code = \"32001004 0009\"\n"
+		      "cheat2_user = true\n"));
+	CHECK_EQ(cheats[1].renamed, 1);
+	CHECK_EQ(cheats[2].renamed, 0);
+}

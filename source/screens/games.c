@@ -1449,6 +1449,27 @@ static void rename_game(u32 row)
 	}
 }
 
+// Original name: the game's own name goes from names.txt, so the lists
+// show its No-Intro or file name again
+static void unname_game(u32 row)
+{
+	ui_popup_close();
+	if (!gamename_store_set(games.pick, NULL)) {
+		dialog_message(games.title, S(STR_RENAME_NAME_FAILED), DIALOG_ERROR);
+		reshow(row);
+		return;
+	}
+	tlog("games: %s: its own name dropped", games.pick);
+	library_named(games.pick, NULL);
+	reshow(row);
+	if (up()) {
+		games.cursor = pick_row(row);
+		ui_list_set_cursor(list_node(), games.cursor);
+		show_position();
+		show_facts();
+	}
+}
+
 static void boot_with_addon(u32 hard);
 
 // Starts the picked game the way Play's « » says (LANG_BOOT_*)
@@ -1599,6 +1620,9 @@ static void popup_run(u32 i)
 		popup_add(LANG_POP_STATES, 0, 0);
 	u32 fav_item = games.popup.count;
 	popup_add(LANG_POP_FAV, fav ? S(STR_GAMES_ON) : S(STR_GAMES_OFF), 0);
+	// Original name before Rename, so Rename stays third from the bottom
+	if (!nor && g.rec != LIBRARY_NONE && (library_flags(g.rec) & LIB_F_CUSTOM))
+		popup_add(LANG_POP_UNNAME, 0, 0);
 	if (!nor && g.rec != LIBRARY_NONE)
 		popup_add(LANG_POP_RENAME, 0, 0);  // a name in names.txt, for games the lists name
 	popup_add(LANG_POP_INFO, 0, 0);
@@ -1664,7 +1688,8 @@ static void popup_run(u32 i)
 		}
 		// A favourite dropped leaves the Favourites page before a launch
 		// that may come back (Game info and Rename list the page again)
-		if (fav != fav_was && games.kind == KIND_FAV && action != LANG_POP_INFO && action != LANG_POP_RENAME)
+		if (fav != fav_was && games.kind == KIND_FAV && action != LANG_POP_INFO && action != LANG_POP_RENAME &&
+		    action != LANG_POP_UNNAME)
 			relist(i, NULL);
 		switch (action) {
 		case LANG_POP_PLAY:
@@ -1684,6 +1709,9 @@ static void popup_run(u32 i)
 			return;
 		case LANG_POP_RENAME:
 			rename_game(i);
+			return;
+		case LANG_POP_UNNAME:
+			unname_game(i);
 			return;
 		default:
 			return;

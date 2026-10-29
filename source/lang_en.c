@@ -413,6 +413,7 @@ const char *const lang_en[STR_COUNT] = {
 	"Play",  // games.pop_play
 	"Favourite",  // games.pop_fav
 	"Rename",  // games.pop_rename
+	"Original name",  // games.pop_unname
 	"Game info",  // games.pop_info
 	"Saves",  // games.pop_saves
 	"Cheats",  // games.pop_cheats
@@ -483,6 +484,8 @@ const char *const lang_en[STR_COUNT] = {
 	"edit",  // cheats.hint_edit
 	"fill in",  // cheats.hint_fill
 	"Edit code",  // cheats.menu_edit
+	"Rename",  // cheats.menu_rename
+	"Rename the cheat",  // cheats.rename_title
 	"Delete",  // cheats.menu_delete
 	"Delete {1}?",  // cheats.delete_ask
 	"It goes from the cheat file.",  // cheats.delete_text

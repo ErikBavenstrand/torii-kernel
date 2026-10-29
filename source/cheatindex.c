@@ -28,7 +28,8 @@ int cheatindex_cut_line(struct cheatindex_cut *c, const char *l, u32 len, u32 li
 		return CHEATINDEX_LINE;
 	if (len - i > 7 && !memcmp(l + i + 1, "enable", 6) && !cheatfile_line_key(l, len, &n, &on))
 		return CHEATINDEX_LINE;
-	int code = len - i > 5 && !memcmp(l + i + 1, "code", 4) && (l[i + 5] == ' ' || l[i + 5] == '=' || l[i + 5] == '\t');
+	int code = len - i > 5 && !memcmp(l + i + 1, "code", 4) &&
+		   (l[i + 5] == ' ' || l[i + 5] == '=' || l[i + 5] == '\t');
 	if (n >= CHEATINDEX_NUMBER_MAX)
 		return CHEATINDEX_BAD;
 	if (c->number != 0xFFFFFFFFu && n < c->number) {
@@ -141,8 +142,9 @@ static int get_state(const char **s, const char *end, struct cheat_decoder *d)
 	u32 key2;
 	memset(d, 0, sizeof(*d));
 	if (!get_hex(s, end, small, 4) || !get_hex(s, end, d->cb_table, sizeof(d->cb_table)) ||
-	    !get_words(s, end, &key2, 1) || !get_words(s, end, d->gs_seeds, 4) || !get_words(s, end, &d->cb_master, 1) ||
-	    !get_words(s, end, d->cb_seeds, 4) || !get_words(s, end, &d->cb_rng, 1))
+	    !get_words(s, end, &key2, 1) || !get_words(s, end, d->gs_seeds, 4) ||
+	    !get_words(s, end, &d->cb_master, 1) || !get_words(s, end, d->cb_seeds, 4) ||
+	    !get_words(s, end, &d->cb_rng, 1))
 		return 0;
 	d->forced = small[0];
 	d->gs_version = small[1];

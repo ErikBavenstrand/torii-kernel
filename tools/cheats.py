@@ -164,10 +164,11 @@ def value(raw):
 
 
 # The keys Torii adds to a cheat (source/cheatfile.h), kept as they are:
-# cheatN_format, a format to decode it in (quoted), and cheatN_user, a code
-# typed on the cart (a bare bool)
-KEPT_KEYS = ("format", "user")
-BARE_KEYS = ("enable", "user")
+# cheatN_format, a format to decode it in (quoted), cheatN_user, a code
+# typed on the cart, and cheatN_renamed, a database cheat named on the cart
+# (bare bools)
+KEPT_KEYS = ("format", "user", "renamed")
+BARE_KEYS = ("enable", "user", "renamed")
 # A code's digits left for the user to fill in (cheatcode.c's is_mark)
 PLACEHOLDER = re.compile(r"[?XxYyZz]")
 
@@ -288,7 +289,7 @@ def for_crc(text):
 
 def merge(database, old, keep_all=True):
     """The database's cheats with old's picks and Torii's keys (by code),
-    then old's own cheats: those the database lacks that are cheatN_user or
+    and old's name for one renamed on the cart (cheatN_renamed), then old's own cheats: those the database lacks that are cheatN_user or
     picked, or all of them with keep_all. A database cheat with digits to
     fill in (00??) that old has filled in (the same desc, a code without
     them, as the kernel's keypad saves it in place) is old's, in the
@@ -321,9 +322,9 @@ def merge(database, old, keep_all=True):
         was = by_code.get(code)
         extra = getattr(cheat, "extra", {})
         if was is not None:
-            out.append(
-                Cheat(desc, code, was[2], {**extra, **getattr(was, "extra", {})})
-            )
+            kept = getattr(was, "extra", {})
+            name = was[0] if is_true(kept.get("renamed", "")) else desc
+            out.append(Cheat(name, code, was[2], {**extra, **kept}))
         else:
             out.append(Cheat(desc, code, enabled, extra))
     rest = [c for c in old if c[1] not in seen and id(c) not in taken]

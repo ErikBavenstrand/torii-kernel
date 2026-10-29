@@ -101,6 +101,7 @@ struct cheatfile_cheat {
 	u8 saved : 1;        // as the card has it: read, or written since (cheatfile_changed)
 	u8 own : 1;          // cheatN_user = true: typed on the cart, so it may be edited and deleted
 	u8 format : 3;       // cheatN_format's enum cheat_format, CHEAT_FMT_AUTO without one
+	u8 renamed : 1;      // cheatN_renamed = true: named on the cart, a name `just cheats` keeps
 	u8 detected;         // once decoded: the format its first code line read in (format, if set), else AUTO
 };
 
@@ -286,6 +287,10 @@ u32 cheatfile_can_add(const struct cheatfile *f, u32 cap, const char *desc);
 // its desc unless desc is NULL; its other lines stay.
 u32 cheatfile_set_code(struct cheatfile *f, const struct cheatfile_room *room, u32 i, const char *desc,
 		       const char *code, u8 format);
+// Names cheat i desc: its desc line replaced (or added), and, for a cheat
+// not the user's own, a cheatN_renamed line so `just cheats` keeps the name
+// when it writes the file again.
+u32 cheatfile_rename(struct cheatfile *f, const struct cheatfile_room *room, u32 i, const char *desc);
 // Removes every cheatN_ line of cheat i (and a blank line before them),
 // and numbers the cheats after it one lower, as RetroArch reads a file's
 // cheats from 0 to its count.

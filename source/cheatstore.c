@@ -1426,6 +1426,11 @@ u32 cheatstore_set_code(u32 i, const char *desc, const char *code, u8 format)
 	return edit_done(cheatfile_set_code(edited_file(), the_room(), i, desc, code, format));
 }
 
+u32 cheatstore_rename(u32 i, const char *desc)
+{
+	return edit_done(cheatfile_rename(edited_file(), the_room(), i, desc));
+}
+
 u32 cheatstore_remove(u32 i)
 {
 	return edit_done(cheatfile_remove(edited_file(), the_room(), i));

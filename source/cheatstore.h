@@ -211,6 +211,7 @@ s32 cheatstore_listed(void);
 // The caller decodes again and writes the file.
 u32 cheatstore_add(const char *desc, const char *code, u8 format, u32 *index);
 u32 cheatstore_set_code(u32 i, const char *desc, const char *code, u8 format);
+u32 cheatstore_rename(u32 i, const char *desc);
 u32 cheatstore_remove(u32 i);
 // cheatfile_can_add for the read file in its PSRAM room (CHEATFILE_EDIT_FAILED
 // once a PSRAM write has failed)

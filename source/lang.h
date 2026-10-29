@@ -77,6 +77,7 @@ enum {
 	LANG_POP_PLAY,
 	LANG_POP_FAV,
 	LANG_POP_RENAME,
+	LANG_POP_UNNAME,  // a game with a name of its own: back to its file's or No-Intro's
 	LANG_POP_INFO,
 	LANG_POP_SAVES,
 	LANG_POP_CHEATS,  // a GBA game on the card: its cheat screen (screens/cheats.c), its count if it has a cheat file

@@ -15,6 +15,7 @@
 #      can't keep the name
 #   6. the SD card page's Rename of a game with a custom name: the name
 #      follows, and the index shows it at once
+#   7. the game popup's Original name drops that name again
 # The save that follows an SD file's rename is tests/saves.sh rename's.
 # Runs inside the torii-emu container after `just build`, `just
 # emu-headless` and building tests/roms/hello.
@@ -125,3 +126,12 @@ logged "rename: /Hello.gba to Helloq.gba"
 logged "library: /Hello.gba is Helloq.gba now, shown as Custom Hello"
 names | grep -q $'^/Helloq.gba\tCustom Hello$' || fail "the custom name didn't follow the file: $(names)"
 echo "PASS: rename: a game's custom name follows its SD rename and shows at once"
+
+# 7: the game popup's Original name (above Rename for a game with a name of
+# its own): the name goes from names.txt, and the row shows the file's name
+# shellcheck disable=SC2046 # nav.sh's options
+boot $(nav_game_menu gba 0) -k @12:UP -k @16:- -k @20:UP -k @24:- -k @28:UP -k @32:- -k @36:UP -k @40:- \
+  -k @48:A -k @52:- -w "its own name dropped" -f 2400
+logged "games: /Helloq.gba: its own name dropped"
+! names | grep -q 'Helloq' || fail "names.txt still has the name: $(names)"
+echo "PASS: rename: Original name drops a game's own name"

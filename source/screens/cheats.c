@@ -82,6 +82,7 @@ enum {
 enum {
 	MENU_DETAILS,
 	MENU_EDIT,
+	MENU_RENAME,
 	MENU_DELETE,
 	MENU_ALL_OFF,
 	MENU_ONLY,
@@ -777,6 +778,31 @@ static u32 cs_code(u32 at, int fill)
 	return cs_rows(idx);
 }
 
+// The rename keyboard for cheat at's name, then the edit and the file
+// written. The row to show after.
+static u32 cs_rename(u32 at)
+{
+	u32 row = cs.act_row, len;
+	const char *now = cheat_name(&cheatstore()->cheats[at], &len);
+	snprintf(cs.name, sizeof(cs.name), "%.*s", (int)len, now);
+	char was[sizeof(cs.name)];
+	memcpy(was, cs.name, sizeof(was));
+	const struct rename_ask name = {
+		cs.icon, was, NULL, RENAME_GAME_MAX, 0, name_submit, 0, S(STR_CHEATS_RENAME_TITLE), 0};
+	if (!rename_run(&name))
+		return row;  // cancelled, or the name as it was
+	u32 r = cheatstore_rename(at, cs.name);
+	tlog("cheats: renamed cheat %lu: %s", (unsigned long)at, r == CHEATFILE_EDIT_OK ? "ok" : "refused");
+	if (r != CHEATFILE_EDIT_OK) {
+		dialog_message(cs.heading, S(STR_CHEATS_EDIT_FAILED + (r <= CHEATFILE_EDIT_FAILED ? r : 0)),
+			       DIALOG_ERROR);
+		return row;
+	}
+	cs_redecode();
+	cs_write();
+	return cs_rows(at);
+}
+
 // Deletes cheat at (asked first by the caller), and the file with it if
 // nothing worth keeping is left. The row to show after.
 static u32 cs_delete(u32 at)
@@ -896,6 +922,9 @@ static u32 cs_menu(u32 row, int full)
 	if (c && c->own) {
 		cs.item_ids[n] = MENU_EDIT;
 		cs.items[n++] = (struct ui_pop_item){S(STR_CHEATS_MENU_EDIT), 0, 0};
+	} else if (c) {
+		cs.item_ids[n] = MENU_RENAME;
+		cs.items[n++] = (struct ui_pop_item){S(STR_CHEATS_MENU_RENAME), 0, 0};
 	}
 	if (full) {
 		cs.item_ids[n] = MENU_ALL_OFF;
@@ -927,6 +956,10 @@ static u32 cs_menu(u32 row, int full)
 			ui_popup_close();
 			cs_leave();
 			return cs_code(at, 0);
+		case MENU_RENAME:
+			ui_popup_close();
+			cs_leave();
+			return cs_rename(at);
 		case MENU_ALL_OFF:
 			if (!cs.picks)
 				continue;  // greyed: nothing to turn off

@@ -77,6 +77,7 @@ static const struct {
 	{"cheatfile_junk", test_cheatfile_junk},
 	{"cheatfile_part", test_cheatfile_part},
 	{"cheatfile_remove_many", test_cheatfile_remove_many},
+	{"cheatfile_rename", test_cheatfile_rename},
 	{"cheatindex_cut", test_cheatindex_cut},
 	{"cheatindex_lines", test_cheatindex_lines},
 	{"cheatfile_keys_carry", test_cheatfile_keys_carry},

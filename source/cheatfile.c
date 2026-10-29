@@ -20,6 +20,7 @@ enum {
 	KEY_ENABLE,
 	KEY_FORMAT,
 	KEY_USER,
+	KEY_RENAMED,
 	KEY_CHEAT,  // another cheatN_ key: kept, and numbered with its cheat
 	KEY_COUNT,  // "cheats"
 	KEY_OTHER,
@@ -58,6 +59,8 @@ static u32 cheat_key(const char *k, u32 len, u32 max, u32 *number, u32 *digits)
 		return KEY_FORMAT;
 	if (wl == 4 && !memcmp(what, "user", 4))
 		return KEY_USER;
+	if (wl == 7 && !memcmp(what, "renamed", 7))
+		return KEY_RENAMED;
 	return KEY_CHEAT;
 }
 
@@ -207,6 +210,8 @@ static void parse_kv(struct cheatfile *f, const struct kv *kv)
 		c->format = format_of(s, len) & 7;
 	} else if (what == KEY_USER) {
 		c->own = is_true(s, len) != 0;
+	} else if (what == KEY_RENAMED) {
+		c->renamed = is_true(s, len) != 0;
 	} else if (what == KEY_ENABLE && len <= 0xFF) {  // a longer value isn't an enable line we could rewrite
 		c->enable = at;
 		c->enable_len = (u8)len;
@@ -1089,6 +1094,35 @@ static u32 move_to(const struct cheatfile_room *room, u32 w, u32 from, u32 len)
 	if (w != from && len)
 		room->move(room->base + w, room->base + from, len);
 	return w + len;
+}
+
+u32 cheatfile_rename(struct cheatfile *f, const struct cheatfile_room *room, u32 i, const char *desc)
+{
+	if (i >= f->count || !*desc)
+		return CHEATFILE_EDIT_BAD;
+	const struct cheatfile_cheat *c = &f->cheats[i];
+	u32 n = c->number, k = 0;
+	struct piece pcs[2];
+	if (c->desc != CHEATFILE_NONE) {
+		pcs[k++] = (struct piece){c->desc, c->desc_len, PIECE_VALUE, 0, 0, 0, NULL, desc, n};
+	} else {
+		u32 at = line_start(f->text, c->code), first = text_start(f->text, f->len);
+		pcs[k++] = (struct piece){at > first ? at : first, 0, PIECE_LINE, 0, 0, 1, "desc", desc, n};
+	}
+	if (!c->own && !c->renamed) {
+		// After its code line (a line end first if that is the last, without one)
+		u32 end = line_end(f->text, f->len, c->code);
+		u8 brk = (u8)(f->text[end - 1] != '\n');
+		pcs[k++] = (struct piece){end, 0, PIECE_LINE, brk, 1, 0, "renamed", "true", n};
+	}
+	if (!fits(f, room->cap, pieces_delta(f, pcs, k)) || f->len + pieces_grow(f, pcs, k) > room->cap)
+		return CHEATFILE_EDIT_LONG;
+	struct picks p;
+	picks_save(f, &p);
+	reread(f, room->base, apply(f, room, pcs, k));
+	picks_restore(f, &p, CHEATFILE_NONE);
+	f->edited = 1;
+	return CHEATFILE_EDIT_OK;
 }
 
 u32 cheatfile_remove(struct cheatfile *f, const struct cheatfile_room *room, u32 i)
