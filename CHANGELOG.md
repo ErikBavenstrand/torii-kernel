@@ -4,6 +4,13 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Changed:** every progress bar (launches, NOR writes and erase, saving
+  screenshots, the scans, cheat files, the firmware update and its hold)
+  shows its percentage right of the status line, drawn by the copy's VBlank
+  interrupt too while the cart copies a game, so it never stalls (1f11edc8).
+
 ## v0.9.1
 
 - **Added:** cheat files past one read (up to 4 MB, such as Final Fantasy
