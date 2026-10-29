@@ -299,7 +299,7 @@ compat *filters: build emu-headless
     exit $status
 
 # Build the hardware-free kernel code with tests/host for the host, under ASan and UBSan, and run it;
-# test tools/font.py, tools/asset.py, tools/art.py, tools/art_scrape.py, tools/cheats.py, tools/cheat_encode.py, tools/art_pack.py, tools/library_report.py, the palette and the upgrade file's layout.
+# test tools/font.py, tools/asset.py, tools/art.py, tools/art_scrape.py, tools/cheats.py, tools/cheat_encode.py, tools/art_pack.py, tools/library_report.py, tools/card.py, the palette and the upgrade file's layout.
 # They all run at once, each into its own log, printed in order.
 test-host: emu-image
     #!/usr/bin/env bash
@@ -308,7 +308,7 @@ test-host: emu-image
     logs=$(mktemp -d)
     trap 'kill $(jobs -p) 2>/dev/null; rm -rf "$logs"' EXIT
     jobs=("{{emu_docker}} tests/host.sh")
-    for test in font asset lang image names_db art art_scrape cheats cheat_encode art_pack library_report; do
+    for test in font asset lang image names_db art art_scrape cheats cheat_encode art_pack library_report card; do
       jobs+=("uv run -q tests/${test}_test.py")
     done
     pids=()
@@ -427,6 +427,14 @@ _cart-copy mode +files:
     rm -rf dist/.cart-add && mkdir -p dist/.cart-add && shift && cp "$@" dist/.cart-add/
     {{fresh}} sync --all dist/.cart-add
     {{emu_docker}} tools/cart_copy.sh {{mode}} {{cart}}/sd.img dist/.cart-add/*; status=$?; rm -rf dist/.cart-add; exit $status
+
+# Set up an SD card's games in one step, e.g. `just card /Volumes/OMEGA ~/Games/*.gba`: copies the games
+# given (files or folders) to the card, then names them, converts your pictures in /torii/art/custom-src,
+# fetches box art, writes cheat files from the cached cheats and reports what's missing. Each step is one
+# of the recipes below. --to, --offline, --no-art, --no-cheats, --fetch-cheats, --dry-run: see --help
+[positional-arguments]
+card sd_path *args:
+    uv run -q tools/card.py "$@"
 
 # Write the game names database to an SD card, e.g. `just names-update /Volumes/OMEGA`: /torii/names.db
 # from the No-Intro dats of libretro-database (CC BY-SA 4.0; downloaded once to the git-ignored

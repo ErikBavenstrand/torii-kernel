@@ -300,6 +300,11 @@ RULES = [
         "library report: test-host runs its tests on a fixture card",
     ),
     (
+        ["tools/card.py", "tests/card_test.py"],
+        {LINT, TEST_HOST},
+        "one-step card setup: test-host runs its tests on a fixture card",
+    ),
+    (
         ["tools/artpack.py"],
         {LINT, TEST_HOST, TEST},
         "art pack format: test-host checks it, tests/boxart.sh writes packs with it",
