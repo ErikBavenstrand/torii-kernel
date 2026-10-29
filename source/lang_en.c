@@ -7,6 +7,7 @@ const char *const lang_en[STR_COUNT] = {
 	",",  // format.thousands
 	"{day} {month}",  // format.date
 	"{month}-{day}",  // format.date_numeric
+	"{1}%",  // format.percent
 	"Jan",  // month.jan
 	"Feb",  // month.feb
 	"Mar",  // month.mar
@@ -354,7 +355,7 @@ const char *const lang_en[STR_COUNT] = {
 	"Installed: V{1}, new: V{2}\nA power cut can leave the cart unbootable: use fresh batteries or a plugged-in console.",  // firmware.warning
 	"To update, hold L+R+A\nfor two seconds.\nPress [B] to cancel.",  // firmware.hold
 	"Updating V{1} to V{2}.\nDon't turn the power off.",  // firmware.updating
-	"Updating... {1}%",  // firmware.progress
+	"Updating...",  // firmware.progress
 	"Done. Turn the power off.",  // firmware.done
 	"DIAGNOSTICS",  // diag.title
 	"{1} used",  // nor.used

@@ -15,33 +15,33 @@ boot/frames 5-5 9E3041FCB03C5A7E
 boot/frames 6-6 FB6798CB055C944C
 boot/frames 7-7 77D1C00667060839
 boot/frames 8-40 818B02E74B016B0D
-boot-addon/addons 9D5EA05F12ADBBF3
-boot-addon-copy/copied 834EDB23818102AF
-boot-addon-copy/fast 834EDB23818102AF
-boot-addon-copy/slow 834EDB23818102AF
-boot-addon-copy/frames 0-0 19DCD0D3B5B1BD37
-boot-addon-copy/frames 1-1 977ABC40009AA3CF
-boot-addon-copy/frames 2-2 DE26B06BB5562CB7
-boot-addon-copy/frames 3-3 6D2F15F6D3036DAF
-boot-addon-copy/frames 4-4 F73409F0FDA642F7
-boot-addon-copy/frames 5-5 DAD31F1E4C6A2B4F
-boot-addon-copy/frames 6-6 F3F63696546A34F7
-boot-copy/copied D31E83436AD1B5A9
-boot-copy/fast D31E83436AD1B5A9
-boot-copy/slow D31E83436AD1B5A9
-boot-copy/frames 0-0 E6A74096F4645551
-boot-copy/frames 1-1 C6C207CE1BE52149
-boot-copy/frames 2-2 74AEDC8B95E6D3ED
-boot-copy/frames 3-3 31E0665EA6343411
-boot-copy/frames 4-4 725289D6AEA634E5
-boot-copy/frames 5-5 6744C02BE265A6FD
-boot-copy/frames 6-6 612E4E40426AEE11
-boot-progress/screen 985A0C30AC9AC713
+boot-addon/addons 9A14D8E465FC7235
+boot-addon-copy/copied 140D57CC291C1559
+boot-addon-copy/fast 140D57CC291C1559
+boot-addon-copy/slow 140D57CC291C1559
+boot-addon-copy/frames 0-0 B4C35B115AA3BBC1
+boot-addon-copy/frames 1-1 C503FA8B8DCF717F
+boot-addon-copy/frames 2-2 ECFD3476BDE0B867
+boot-addon-copy/frames 3-3 536D58CC0623431F
+boot-addon-copy/frames 4-4 CB45F9C4D2858CF7
+boot-addon-copy/frames 5-5 57134331F10F1599
+boot-addon-copy/frames 6-6 DF0291EA4B373D21
+boot-copy/copied 5831D299A12EBA89
+boot-copy/fast 5831D299A12EBA89
+boot-copy/slow 5831D299A12EBA89
+boot-copy/frames 0-0 90FCFD467DCF72F1
+boot-copy/frames 1-1 CB59B8623B30832F
+boot-copy/frames 2-2 E668E695D92E95ED
+boot-copy/frames 3-3 36093DD084410261
+boot-copy/frames 4-4 EBE441A7A637D665
+boot-copy/frames 5-5 911F34BDC8A8BD9B
+boot-copy/frames 6-6 B73860CEFDC15027
+boot-progress/screen 1E6FEAB339E9BCB5
 boot-progress/frames 0-3 818B02E74B016B0D
 boot-progress/frames 4-7 7C573B18E65FE325
-boot-progress/frames 8-12 985A0C30AC9AC713
-boot-progress/frames 13-28 9D5EA05F12ADBBF3
-boot-progress-big/loading 45A0C248566EFD67
+boot-progress/frames 8-12 1E6FEAB339E9BCB5
+boot-progress/frames 13-28 9A14D8E465FC7235
+boot-progress-big/loading D044E752E0E95747
 boot-slow/home 818B02E74B016B0D
 boot-slow/notice 1F73F83DB4B12863
 boot-slow/frames 0-1 7C573B18E65FE325
@@ -50,7 +50,7 @@ boot-slow/frames 3-3 445D896853B3F16C
 boot-slow/frames 4-4 E7B01CDFFB02B41A
 boot-slow/frames 5-5 B0A7C155298FF964
 boot-slow/frames 6-12 1F73F83DB4B12863
-boot-slow/frames 13-13 49A1856F17D23E0D
+boot-slow/frames 13-13 E9FD9536A251FBBB
 boot-slow/frames 14-15 1F73F83DB4B12863
 boot-slow/frames 16-16 C06A5CEEB9ABEEEC
 boot-slow/frames 17-17 1DA9A452A082DCA0
@@ -369,9 +369,9 @@ ingame-cheats/on 32224FB92C5D61EB
 ingame-cheats/rom 7FA5EE5726DEE61D
 ingame-lang/menu 678FA53B58EAA64C
 ingame-light/menu 6DAB01A75168AFC9
-ingame-shots/first 2B0003A6FF47E8D9
+ingame-shots/first 5DFED4399519A099
 ingame-shots/one B7818279D579B476
-ingame-shots/second 92B9AA0225BF6E99
+ingame-shots/second 1A08CDCA30DED899
 ingame-shots/two 28C72BEB254CBB0E
 ingame-states/load 5D51933A47F53789
 ingame-states/menu D78F8911AEEC140E
@@ -431,8 +431,8 @@ nor-page/frames 4-5 9719C340FF6BF84F
 nor-page/frames 6-12 AD2FB3B0C888248F
 nor-page/frames 13-13 B30F2D6EEE33F846
 nor-page/frames 14-17 C74BE7B42C33C6E2
-nor-write/done 3B8472BCA67DAA9D
-nor-write/half C18C045DA0E5C751
+nor-write/done 58F918AB08D55E8B
+nor-write/half C9B47BDB395643D1
 open/back 7CB9829E643E6EDB
 open/page FB15C1A231E27AD1
 open/frames 0-1 7CB9829E643E6EDB

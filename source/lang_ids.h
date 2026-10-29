@@ -4,7 +4,7 @@
 #define TORII_LANG_IDS_H
 
 #define LANG_FORMAT 1
-#define LANG_KEY_HASH 0xB6B5EED3u
+#define LANG_KEY_HASH 0x56CA5A3Fu
 #define LANG_PACK_MAX 0x10000u
 #define LANG_LAUNCH_MAX 0x2000u
 #define LANG_ENGLISH_ID 0xE1E1u
@@ -14,6 +14,7 @@ enum lang_id {
 	STR_FORMAT_THOUSANDS,
 	STR_FORMAT_DATE,
 	STR_FORMAT_DATE_NUMERIC,
+	STR_FORMAT_PERCENT,
 	STR_MONTH_JAN,
 	STR_MONTH_FEB,
 	STR_MONTH_MAR,
@@ -728,6 +729,6 @@ enum lang_id {
 };
 
 // The ids below this are the launch's (lang_before_launch)
-#define STR_LAUNCH_END 111
+#define STR_LAUNCH_END 112
 
 #endif

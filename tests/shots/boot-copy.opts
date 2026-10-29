@@ -3,7 +3,8 @@
 # card shows the game's name and "Loading the game", and during the copy a
 # VBlank interrupt moves the bar on the kernel's estimate (64 frames at
 # PROGRESS_COPY_RATE, source/progress.h), a frame at a time, fast to 90% of
-# the copy's share, then slower, never past its end. It draws in VBlank:
+# the copy's share, then slower, never past its end, the percentage
+# beside it counting with it (progress_percent_paint). It draws in VBlank:
 # no tears. The launch goes through the menu's test hook (tests/nav.sh).
 #! sd-file "/Big Adventure - The Longest Subtitle (Europe) (En,Fr,De).gba" 0x400000 tests/roms/hello/hello.gba
 #! env OMEGA_COPY_RATE=0x8000

@@ -871,7 +871,6 @@ void IWRAM_CODE FW_update(u16 DEcard_FW_readver, const char *rev, u16 FW_built_i
 	vu32 offset;
 	char title[32];
 	char msg[160];
-	char status[24];
 
 	SF(title, sizeof(title), STR_FIRMWARE_TITLE, LS(rev));
 	dialog_open();
@@ -899,8 +898,8 @@ void IWRAM_CODE FW_update(u16 DEcard_FW_readver, const char *rev, u16 FW_built_i
 		dialog_progress_begin(title, msg);
 
 		for (offset = 0x0000; offset < FWsize; offset += 256) {
-			SF(status, sizeof(status), STR_FIRMWARE_PROGRESS, LN(offset * 100 / FWsize + 1));
-			dialog_progress_set(offset, FWsize, status);  // drawn a few times a second
+			// drawn a few times a second, the percentage beside the bar
+			dialog_progress_set(offset, FWsize, S(STR_FIRMWARE_PROGRESS));
 
 			FAT_table_buffer[0] = (FW_wirte_address + offset);//omega DE 0x80000
 

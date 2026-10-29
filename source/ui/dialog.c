@@ -31,6 +31,7 @@
 #define BAR_H 8
 #define FOOT_Y 72         // the key chips, or the progress dialog's status line
 #define FOOT_H 16
+#define PERCENT_W 40      // the percentage, right of the status line ("100 %")
 // A floating card: a hairline round it and its shadow a pixel below
 static const struct ui_card_config card = {0, 0, 0, 1, UI_CARD_EDGE};
 
@@ -40,6 +41,7 @@ static const struct ui_card_config card = {0, 0, 0, 1, UI_CARD_EDGE};
 #define TEXT_LINES 4      // a message's or question's text (48 px)
 #define PROGRESS_LINES 3  // a progress dialog's, above its bar (40 px)
 #define HINTS_MAX 2
+#define PERCENT_MAX 12
 
 enum {
 	N_CARD,
@@ -47,6 +49,7 @@ enum {
 	N_TEXT,
 	N_FOOT,  // the key chips, or a progress dialog's status line
 	N_BAR,   // a progress dialog's only
+	N_PERCENT,  // a progress dialog's: how much of the bar is filled
 	N_COUNT
 };
 
@@ -61,7 +64,8 @@ enum {
 
 static const struct ui_label_config title_label = {"", UI_FONT_HEADING, UI_ALIGN_CENTER, 0, 0};
 static const struct ui_label_config text_label = {"", UI_FONT_BODY, UI_ALIGN_CENTER, 0, 0};
-static const struct ui_label_config status_label = {"", UI_FONT_BODY, UI_ALIGN_CENTER, 0, 0};
+static const struct ui_label_config status_label = {"", UI_FONT_BODY, UI_ALIGN_LEFT, 0, 0};
+static const struct ui_label_config percent_label = {"", UI_FONT_BODY, UI_ALIGN_RIGHT, 0, 0};
 static const struct ui_hints_config no_hints = {0, 0};
 
 // Everything on plane 0 (overlay and dialog text), so the screen under it
@@ -129,7 +133,7 @@ static const struct ui_spec progress_nodes[N_COUNT] = {
 		    .paper = UI_ROLE_FLOAT,
 		    .x = TEXT_X,
 		    .y = FOOT_Y,
-		    .w = TEXT_X,
+		    .w = TEXT_X + PERCENT_W,
 		    .h = FOOT_H,
 		    .data = &status_label},
 	[N_BAR] = {.kind = UI_PROGRESS,
@@ -142,6 +146,17 @@ static const struct ui_spec progress_nodes[N_COUNT] = {
 		   .y = BAR_Y,
 		   .w = TEXT_X,
 		   .h = BAR_H},
+	[N_PERCENT] = {.kind = UI_LABEL,
+		       .id = 6,
+		       .parent = N_CARD,
+		       .plane = 0,
+		       .anchor = UI_RIGHT,
+		       .paper = UI_ROLE_FLOAT,
+		       .x = TEXT_X,
+		       .y = FOOT_Y,
+		       .w = PERCENT_W,
+		       .h = FOOT_H,
+		       .data = &percent_label},
 };
 
 static int dialog_event(struct ui_view *view, const struct ui_event *e);
@@ -191,6 +206,8 @@ struct shown {
 	char title[TITLE_MAX];
 	char text[TEXT_MAX];
 	char status[STATUS_MAX];  // a progress dialog's
+	char percent[PERCENT_MAX];  // and its percentage
+	u8 percent_now;  // the one it shows
 	struct ui_hint hints[HINTS_MAX];  // a message's or question's key chips
 };
 
@@ -392,6 +409,18 @@ static void settle(const struct shown *s, u32 frames)
 	dlg.last_pump = torii_frames;
 }
 
+// Shows value of max as a percentage beside s's bar (whole percents, 100 only
+// when full)
+static void set_percent(struct shown *s, u32 value, u32 max)
+{
+	u32 p = max ? (value >= max ? 100 : (u32)((unsigned long long)value * 100 / max)) : 0;
+	if (s->percent[0] && p == s->percent_now)
+		return;
+	s->percent_now = (u8)p;
+	SF(s->percent, sizeof(s->percent), STR_FORMAT_PERCENT, LN(p));
+	ui_label_set((u8)(s->view->first + N_PERCENT), s->percent);
+}
+
 // Pushes the dialog view for s with its texts; 0 if it can't. A message
 // shows an OK chip, a question a cancel chip and an OK chip
 static int show(struct shown *s, u32 use, const char *title, const char *text, u32 kind)
@@ -400,6 +429,7 @@ static int show(struct shown *s, u32 use, const char *title, const char *text, u
 	int bar = use == USE_PROGRESS || use == USE_HOLD;
 	wrap(s->text, sizeof(s->text), text ? text : "", bar ? PROGRESS_LINES : TEXT_LINES);
 	s->status[0] = 0;
+	s->percent[0] = 0;
 	s->keys = 0;
 	s->use = (u8)use;
 	const struct ui_view_spec *spec = use == USE_PROGRESS ? &progress_view
@@ -425,6 +455,7 @@ static int show(struct shown *s, u32 use, const char *title, const char *text, u
 	ui_label_set((u8)(first + N_TEXT), s->text);
 	if (bar) {
 		ui_label_set((u8)(first + N_FOOT), s->status);
+		set_percent(s, 0, 0);
 	} else if (use == USE_CONFIRM) {
 		s->hints[0] = (struct ui_hint){"B", S(STR_HINT_CANCEL)};
 		s->hints[1] = (struct ui_hint){"A", S(STR_HINT_OK)};
@@ -539,6 +570,7 @@ int dialog_hold(const char *title, const char *text, u16 keys, u32 frames)
 			if (holding) {
 				u32 n = torii_frames - start;
 				ui_progress_set(bar, n < frames ? n : frames, frames);
+				set_percent(&dlg.message, n, frames);
 				if (n >= frames) {
 					answer = "held";
 					held = 1;
@@ -614,8 +646,10 @@ static void apply(void)
 	u8 first = dlg.progress.view->first;
 	if (dlg.status_changed)
 		ui_label_set((u8)(first + N_FOOT), dlg.progress.status);
-	if (dlg.bar_changed)
+	if (dlg.bar_changed) {
 		ui_progress_set((u8)(first + N_BAR), dlg.value, dlg.max);
+		set_percent(&dlg.progress, dlg.value, dlg.max);
+	}
 	dlg.status_changed = dlg.bar_changed = 0;
 }
 
@@ -666,6 +700,22 @@ void dialog_progress_drew(u32 x)
 {
 	if (dialog_progress_active())
 		ui_progress_drew((u8)(dlg.progress.view->first + N_BAR), x);
+}
+
+int dialog_percent_pixels(struct ui_label_pixels *out, u32 *now)
+{
+	*now = dlg.progress.percent_now;
+	return dialog_progress_active() && dlg.progress.percent[0] &&
+	       ui_label_pixels((u8)(dlg.progress.view->first + N_PERCENT), out);
+}
+
+void dialog_percent_drew(u32 percent)
+{
+	if (!dialog_progress_active() || percent == dlg.progress.percent_now)
+		return;
+	dlg.progress.percent_now = (u8)percent;
+	SF(dlg.progress.percent, sizeof(dlg.progress.percent), STR_FORMAT_PERCENT, LN(percent));
+	ui_label_set((u8)(dlg.progress.view->first + N_PERCENT), dlg.progress.percent);
 }
 
 void dialog_progress_end(void)

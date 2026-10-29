@@ -91,7 +91,8 @@ int dialog_hold(const char *title, const char *text, u16 keys, u32 frames);
 void dialog_notice(const char *title, const char *text, u32 kind);
 void dialog_notice_end(void);
 
-// A progress dialog: title and text above, a status line and a bar below.
+// A progress dialog: title and text above, a bar below, and under it a
+// status line with the bar's percentage at its right.
 // It stays up, with no keys, until dialog_progress_end; the work runs in
 // between, and the calls below draw it. Messages and questions shown
 // meanwhile go on top of it.
@@ -118,6 +119,13 @@ struct ui_bar_pixels;
 int dialog_progress_pixels(u32 value, struct ui_bar_pixels *out);
 // That fill now ends at column x: the bar goes on from there.
 void dialog_progress_drew(u32 x);
+// The percentage beside the bar, for the same interrupt: its label's
+// pixels (ui_label_pixels) and the percentage it shows in *now, 0 if it
+// isn't drawn
+struct ui_label_pixels;
+int dialog_percent_pixels(struct ui_label_pixels *out, u32 *now);
+// That interrupt now shows percent there: the dialog goes on from it.
+void dialog_percent_drew(u32 percent);
 
 #define DIALOG_PROGRESS_FRAMES 12
 

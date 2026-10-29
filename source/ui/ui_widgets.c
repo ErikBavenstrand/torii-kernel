@@ -164,6 +164,27 @@ void ui_label_set(u8 node, const char *text)
 	ui_dirty(node, 0xFF);
 }
 
+int ui_label_pixels(u8 node, struct ui_label_pixels *out)
+{
+	const struct label_state *st = ui_node_state(node);
+	const struct ui_node *n = ui_node(node);
+	if ((n->flags & (UI_N_HIDDEN | UI_N_DRAWN | UI_N_DIRTY)) != UI_N_DRAWN ||
+	    ui_map_busy(node, (u32)n->y / 8, (u32)n->h / 8))
+		return 0;
+	const struct ui_label_config *c = label_config(node);
+	u32 line = ui_font(c->font)->line_height, w = (u32)n->w, h = (u32)n->h;
+	struct text_window win = window_of(node, st->first[st->cur]);
+	out->tiles = win.tiles;
+	out->column_words = (u32)win.height * 8;
+	out->w = w;
+	out->h = h;
+	out->ink = ui_ink(node, UI_ROLE_TEXT);
+	out->paper = ui_paper(node, UI_ROLE_NONE);
+	out->top = line < h ? (h - line) / 2 : 0;
+	out->right = c->align == UI_ALIGN_CENTER ? w : w - ui_theme()->pad;
+	return 1;
+}
+
 static const struct ui_ops label_ops = {sizeof(struct label_state), label_measure, label_init, 0, 0, label_draw};
 
 // --- Panel ----------------------------------------------------------------
@@ -413,6 +434,7 @@ int ui_progress_pixels(u8 node, u32 value, u32 max, struct ui_bar_pixels *out)
 	out->ink = ui_ink(node, UI_ROLE_ACCENT);
 	out->x = st->drawn1;
 	out->px = bar_px((u32)n->w, value, max);
+	out->width = (u32)n->w;
 	return 1;
 }
 

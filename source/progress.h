@@ -51,6 +51,9 @@ void progress_done(const char *status);
 u32 progress_cart_copy(u32 *fat, u32 bytes, u32 hi);
 // Its VBlank interrupt, in IWRAM.
 void IWRAM_CODE progress_copy_vblank(void);
+// Draws percent into the progress dialog's percentage from that interrupt,
+// with the glyphs progress_cart_copy readied (progress.c)
+void IWRAM_CODE progress_percent_paint(u32 percent);
 
 // lo + (hi - lo) * done / total, clamped to [lo, hi] (hi when total is 0),
 // without overflowing for any u32 sizes.

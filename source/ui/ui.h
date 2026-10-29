@@ -890,16 +890,26 @@ void ui_storage_set(u8 node, const u32 *parts, u32 count, u32 total);
 // while the kernel waits in IWRAM (progress.c, during the cart's ROM copy):
 // pixel (x, y) is nibble x % 8 of word tiles[x / 8 * column_words + y],
 // and the fill is rows [top, top + rows) in palette index ink. x is where
-// the fill ends now; px the column value of max would fill to.
+// the fill ends now; px the column value of max would fill to, of width.
 struct ui_bar_pixels {
 	vu32 *tiles;
-	u32 column_words, top, rows, ink, x, px;
+	u32 column_words, top, rows, ink, x, px, width;
 };
 // 0 if the bar isn't drawn as ui_progress_set last set it.
 int ui_progress_pixels(u8 node, u32 value, u32 max, struct ui_bar_pixels *out);
 // The fill now ends at column x (drawn by that code): the widget goes on
 // from there.
 void ui_progress_drew(u8 node, u32 x);
+// A drawn one-line label's pixels, for the same code (the percentage beside
+// the bar): its shown tiles, laid out as ui_bar_pixels's, its size in px,
+// its ink and paper, the line's top, and where the text's right end goes
+// (a right-aligned label's).
+struct ui_label_pixels {
+	vu32 *tiles;
+	u32 column_words, w, h, ink, paper, top, right;
+};
+// 0 if the label isn't drawn as ui_label_set last set it.
+int ui_label_pixels(u8 node, struct ui_label_pixels *out);
 // The list's model changed (a new folder): the cursor goes to cursor and
 // the list redraws as a page change.
 void ui_list_reset(u8 node, u32 cursor);
