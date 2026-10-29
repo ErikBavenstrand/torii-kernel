@@ -287,6 +287,14 @@ def for_crc(text):
     return None
 
 
+def fills(placeholder, code):
+    """Whether code is placeholder with its digits to fill in (00??) filled:
+    the same length, every other character the same."""
+    return len(code) == len(placeholder) and all(
+        PLACEHOLDER.match(p) or p == c for p, c in zip(placeholder, code, strict=True)
+    )
+
+
 def merge(database, old, keep_all=True):
     """The database's cheats with old's picks and Torii's keys (by code),
     and old's name for one renamed on the cart (cheatN_renamed), then old's own cheats: those the database lacks that are cheatN_user or
@@ -314,7 +322,19 @@ def merge(database, old, keep_all=True):
         if code in seen:
             continue
         seen.add(code)
-        mine = filled.get(desc) if PLACEHOLDER.search(code) else None
+        mine = None
+        if PLACEHOLDER.search(code):
+            # By name, or, once renamed on the cart, by the code's other digits
+            mine = filled.get(desc)
+            if mine is None or id(mine) in taken:
+                mine = next(
+                    (
+                        c
+                        for c in filled.values()
+                        if id(c) not in taken and fills(code, c[1])
+                    ),
+                    None,
+                )
         if mine is not None and id(mine) not in taken:
             taken.add(id(mine))
             out.append(mine)

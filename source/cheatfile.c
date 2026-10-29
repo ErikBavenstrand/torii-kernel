@@ -1104,7 +1104,7 @@ u32 cheatfile_rename(struct cheatfile *f, const struct cheatfile_room *room, u32
 	u32 n = c->number, k = 0;
 	struct piece pcs[2];
 	if (c->desc != CHEATFILE_NONE) {
-		pcs[k++] = (struct piece){c->desc, c->desc_len, PIECE_VALUE, 0, 0, 0, NULL, desc, n};
+		pcs[k++] = (struct piece){c->desc, c->desc_len, PIECE_DESC, 0, 0, 0, NULL, desc, n};
 	} else {
 		u32 at = line_start(f->text, c->code), first = text_start(f->text, f->len);
 		pcs[k++] = (struct piece){at > first ? at : first, 0, PIECE_LINE, 0, 0, 1, "desc", desc, n};

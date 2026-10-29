@@ -778,12 +778,12 @@ static u32 cs_code(u32 at, int fill)
 	return cs_rows(idx);
 }
 
-// The rename keyboard for cheat at's name, then the edit and the file
-// written. The row to show after.
-static u32 cs_rename(u32 at)
+// The rename keyboard for cheat c's name (at in the table), then the edit
+// and the file written. The row to show after.
+static u32 cs_rename(const struct cheatfile_cheat *c, u32 at)
 {
 	u32 row = cs.act_row, len;
-	const char *now = cheat_name(&cheatstore()->cheats[at], &len);
+	const char *now = cheat_name(c, &len);
 	snprintf(cs.name, sizeof(cs.name), "%.*s", (int)len, now);
 	char was[sizeof(cs.name)];
 	memcpy(was, cs.name, sizeof(was));
@@ -959,7 +959,7 @@ static u32 cs_menu(u32 row, int full)
 		case MENU_RENAME:
 			ui_popup_close();
 			cs_leave();
-			return cs_rename(at);
+			return cs_rename(c, at);
 		case MENU_ALL_OFF:
 			if (!cs.picks)
 				continue;  // greyed: nothing to turn off

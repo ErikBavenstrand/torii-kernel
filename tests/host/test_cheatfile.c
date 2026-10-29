@@ -1233,4 +1233,8 @@ void test_cheatfile_rename(void)
 		      "cheat2_user = true\n"));
 	CHECK_EQ(cheats[1].renamed, 1);
 	CHECK_EQ(cheats[2].renamed, 0);
+	// A quote in the name (kept from a hand-edited desc) is written as a desc
+	// is: as an apostrophe, the value's quotes whole
+	CHECK_EQ(cheatfile_rename(&file, &room, 1, "Max \"HP\""), CHEATFILE_EDIT_OK);
+	CHECK(text_has("cheat1_desc = \"Max 'HP'\"\n"));
 }

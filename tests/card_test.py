@@ -46,6 +46,8 @@ class Card(unittest.TestCase):
             card.check_card(self.src)
         with self.assertRaises(card.CardError):
             card.check_card(self.root / "missing")
+        with self.assertRaises(card.CardError):
+            card.check_card(Path("/"), new_card=True)
 
     def test_copy(self):
         """Games go with their folder; other files, hidden folders and ._
@@ -79,6 +81,9 @@ class Card(unittest.TestCase):
         self.assertTrue((self.sd / "GBA" / "Game.gba").is_file())
         with self.assertRaises(card.CardError):
             card.copy_games(self.sd, [self.src / "nope.gba"])
+        with self.assertRaises(card.CardError):
+            card.copy_games(self.sd, [self.src / "Game.gba"], "../out")
+        self.assertFalse((self.root / "out").exists())
 
     def plan(self, *argv):
         args = argparse.Namespace(
@@ -129,7 +134,7 @@ class Card(unittest.TestCase):
         err = io.StringIO()
         with contextlib.redirect_stderr(err):
             self.assertEqual(card.main([str(self.src)]), 1)
-        self.assertIn("not an SD card's folder", err.getvalue())
+        self.assertIn("not a Torii card", err.getvalue())
 
 
 if __name__ == "__main__":

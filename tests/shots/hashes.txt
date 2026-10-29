@@ -57,7 +57,7 @@ boot-slow/frames 17-17 1DA9A452A082DCA0
 boot-slow/frames 18-19 7C573B18E65FE325
 cheats-clean/clean 019FE0D843B177D1
 cheats-menu/details 6B45281E2E0B7848
-cheats-menu/menu 58D93BDF424FFB71
+cheats-menu/menu A76E3A62C3557A61
 cheats-menu/only 650F7187008461A0
 cheats-menu/rom 47CBF2B38D7DE304
 cheats-menu/wrap F6A9501280C10CDF
@@ -645,7 +645,7 @@ slot-picker/picker-down 9673CADB7316FE61
 slot-picker-light/picker E78F04DF444B1F8D
 slot-picker-list/picker 9111134E5D665F59
 sv-cheats-menu/details 55743A4C2CF67254
-sv-cheats-menu/menu 691ADFD827BB4904
+sv-cheats-menu/menu 10D7A0CBFF51FA7C
 sv-cheats-menu/only 18E079FE4B2FBC9F
 sv-cheats-menu/rom 19CF29B61F551638
 sv-cheats-menu/wrap E9BF5616FBAE6B29

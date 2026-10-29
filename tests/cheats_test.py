@@ -277,6 +277,16 @@ class Merge(unittest.TestCase):
         text = cheats.format_cht(merged)
         self.assertIn("cheat0_renamed = true\n", text)
         self.assertEqual(cheats.parse_cht(text), merged)
+        # A placeholder filled in on the cart, then renamed: matched by its
+        # code's other digits, it stays filled in and named
+        old = cheats.parse_cht(
+            'cheat0_desc = "Cash"\ncheat0_code = "02001510:0063"\ncheat0_renamed = true\n'
+        )
+        merged, own, stale = cheats.merge(
+            [("Max money", "0200??10:0063", False)], old, keep_all=False
+        )
+        self.assertEqual((own, stale), (0, 0))
+        self.assertEqual(merged[0][:2], ("Cash", "02001510:0063"))
 
     def test_torii_keys(self):
         """cheatN_format and cheatN_user are kept through a merge, the

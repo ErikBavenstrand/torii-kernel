@@ -6,10 +6,12 @@
 names, box art and cheats.
 
 usage: card.py SD_PATH [GAME_OR_FOLDER...] [--to FOLDER] [--offline]
-               [--no-art] [--no-cheats] [--fetch-cheats] [--dry-run]
+               [--no-art] [--no-cheats] [--fetch-cheats] [--new-card]
+               [--dry-run]
 
 `just card SD_PATH [GAMES...]` runs this. SD_PATH is the card's folder on
-this PC (a mounted card, say /Volumes/OMEGA). In order, it:
+this PC (a mounted card, say /Volumes/OMEGA) with the kernel or /torii on
+it (--new-card takes a card's root with neither). In order, it:
 
 1. Copies each game given (.gba, .gbc, .gb, .nes; a folder's games with its
    folders) to the card: to its root, or to --to FOLDER on it. A game the
@@ -54,20 +56,20 @@ class CardError(Exception):
     pass
 
 
-def check_card(sd):
-    """sd as a card's folder: a mounted volume's root, or a folder that
-    already holds the kernel or /torii, so a typo can't fill some other
-    folder with games."""
+def check_card(sd, new_card=False):
+    """sd as a card's folder: one that holds the kernel or /torii, or, with
+    new_card, any mounted volume's root but the system's, so a typo can't
+    fill some other folder or disk with games."""
     if not sd.is_dir():
         raise CardError(f"{sd}: no such folder (the card's, such as /Volumes/OMEGA)")
-    if not (
-        os.path.ismount(sd)
-        or (sd / "torii").is_dir()
-        or (sd / "ezkernelnew.bin").is_file()
-    ):
-        raise CardError(
-            f"{sd}: not an SD card's folder (no /torii and no ezkernelnew.bin on it, and not a mounted card)"
-        )
+    if (sd / "torii").is_dir() or (sd / "ezkernelnew.bin").is_file():
+        return
+    if new_card and os.path.ismount(sd) and sd.resolve() != Path("/"):
+        return
+    raise CardError(
+        f"{sd}: not a Torii card (no /torii and no ezkernelnew.bin on it); "
+        "copy the kernel to it first, or give --new-card for a card's root"
+    )
 
 
 def is_game(path):
@@ -105,6 +107,8 @@ def copy_games(sd, sources, to=None, dry_run=False):
     card would keep as ._ files the kernel lists as games."""
     done = Copies()
     base = sd / to.strip("/") if to else sd
+    if not base.resolve().is_relative_to(sd.resolve()):
+        raise CardError(f"--to {to}: not a folder on the card")
     for given in sources:
         source = Path(given).expanduser()
         if not source.exists():
@@ -121,8 +125,14 @@ def copy_games(sd, sources, to=None, dry_run=False):
             if not dry_run:
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 part = dest.with_name(dest.name + ".part")
-                shutil.copyfile(f, part)
-                os.replace(part, dest)
+                try:
+                    shutil.copyfile(f, part)
+                    os.replace(part, dest)
+                except OSError:
+                    part.unlink(
+                        missing_ok=True
+                    )  # a full card: nothing half-copied left
+                    raise
             done.copied.append(shown)
     return done
 
@@ -193,13 +203,20 @@ def main(argv=None):
         help="fetch missing cheats from GameHacking.org first",
     )
     p.add_argument(
+        "--new-card",
+        action="store_true",
+        help="take a mounted card with nothing of Torii's on it yet",
+    )
+    p.add_argument(
         "--dry-run", action="store_true", help="show what would happen, change nothing"
     )
     args = p.parse_args(argv)
     sd = args.sd.expanduser()
     try:
-        check_card(sd)
+        check_card(sd, args.new_card)
         copies = copy_games(sd, args.games, args.to, args.dry_run)
+        if not args.dry_run:
+            (sd / ART_SOURCE).mkdir(parents=True, exist_ok=True)
     except (CardError, OSError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
@@ -210,8 +227,6 @@ def main(argv=None):
         print(f"already on the card, left alone: {g}")
     for s in copies.skipped:
         print(f"no games in: {s}")
-    if not args.dry_run:
-        (sd / ART_SOURCE).mkdir(parents=True, exist_ok=True)
     results = []
     for step in steps(sd, args):
         if step.argv is None:
