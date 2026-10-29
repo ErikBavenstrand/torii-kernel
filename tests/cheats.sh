@@ -62,7 +62,7 @@ pick() {
 }
 
 pick boot >"$cart/pick.txt" 2>&1 || fail "the cheat screen didn't run: $(grep -a '^kernel' "$cart/pick.txt" | tail -3)"
-grep -q "cheats: .*Hello.cht: 3 cheats, 1 master codes hidden, 1 picked" "$cart/pick.txt" ||
+grep -q "cheats: .*Hello.cht: 4 cheats, 1 greyed, 1 picked" "$cart/pick.txt" ||
   fail "the screen read: $(grep -a 'cheats:' "$cart/pick.txt" | head -3)"
 # The popup never reads the file: no count before the screen has counted it
 grep -q "cheats: popup: -1 listed" "$cart/pick.txt" ||
@@ -84,7 +84,7 @@ echo "PASS: cheats: the cheat screen picks a cheat and saves only its enable lin
 # changes on the card (by hand here), it has none until the screen counts it
 # shellcheck disable=SC2046 # nav.sh's options
 boot $(nav_game_menu gba 0) -f 3000 >"$cart/count.txt" 2>&1 || fail "the popup didn't open: $(grep -a '^kernel' "$cart/count.txt" | tail -3)"
-grep -q "cheats: popup: 3 listed" "$cart/count.txt" ||
+grep -q "cheats: popup: 4 listed" "$cart/count.txt" ||
   fail "after a power-off the popup counted: $(grep -a 'cheats: popup' "$cart/count.txt" | head -1)"
 ! grep -q 'safefile: .*Hello.cht\|cheats: .*Hello.cht: [0-9]* bytes' "$cart/count.txt" || fail "the popup read the cheat file"
 cp "$cart/sd.img" "$cart/counted.img"
@@ -187,9 +187,10 @@ boot $(nav_launch /Hello.gba clean) -u "launch: loading" -f 4000 >"$cart/clean.t
 ! grep -q "cheats: .*picked" "$cart/clean.txt" || fail "a clean boot read the cheats"
 echo "PASS: cheats: a clean boot applies none"
 
-# A big file (500 cheats, 46 KB, GameShark codes that decrypt): the popup
-# never reads it, so it shows no count; the screen reads it once, decodes it
-# behind a progress dialog, and A answers at once; B saves, and back on the
+# A big file (500 cheats, 46 KB, GameShark codes that decrypt, all one code:
+# the 499 after the first greyed as the same): the popup
+# never reads it, so it shows no count; the screen reads it once, shows it
+# at once (decoding it a slice a frame, no progress dialog), and A answers at once; B saves, and back on the
 # list the popup has the count the screen found, kept for the file as saved
 cp "$cart/clean/sd.img" "$cart/clean/kernel-nor.bin" "$cart/"
 rm -f "$cart/sram.bin"
@@ -206,15 +207,15 @@ boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -
   -w "screen ready: cheats" -k @8:A -k @12:- -w "cheats: picked cheat 0" -k @8:B -k @12:- \
   -w "screen ready: games" -k @8:START -k @12:- -w "screen ready: game-popup" -f 8000 >"$cart/big.txt" 2>&1 ||
   fail "the big file's screen didn't run: $(grep -a '^kernel' "$cart/big.txt" | tail -3)"
-grep -q "screen ready: progress" "$cart/big.txt" || fail "no progress dialog while the big file decoded"
-grep -q "cheats: .*Hello.cht: 500 cheats, 0 master codes hidden" "$cart/big.txt" ||
+! grep -q "screen ready: progress" "$cart/big.txt" || fail "a progress dialog while the big file decoded"
+grep -q "cheats: .*Hello.cht: 500 cheats, [0-9]* greyed" "$cart/big.txt" ||
   fail "the big file read: $(grep -a 'cheats:' "$cart/big.txt" | head -3)"
 # Until the screen's write-back: the screen's read alone
 [ "$(sed '/cheats: back/q' "$cart/big.txt" | grep -c 'safefile: .*Hello.cht')" -le 1 ] ||
   fail "the big file was read more than once"
 popups=$(sed -n 's/.*cheats: popup: \(-\{0,1\}[0-9]*\) listed.*/\1/p' "$cart/big.txt" | tr '\n' ' ')
 [ "$popups" = "-1 500 " ] || fail "the popup counted ${popups:-nothing}, not -1 (no count) and then 500"
-echo "PASS: cheats: a file of 500 cheats is read once, decoded behind a progress dialog, and picks at once; the popup counts it once the screen has"
+echo "PASS: cheats: a file of 500 cheats is read once, shown at once and decoded as it shows, and picks at once; the popup counts it once the screen has"
 
 # big_cht OUT COUNT BYTES [user] [from]: a file of COUNT cheats padded to
 # about BYTES (LF). Cheat k (counting from FROM, numbered from 0) writes
@@ -259,7 +260,7 @@ for big in "600 100000" "1000 190000"; do
   mcopy -o -i "$cart/sd.img" "$cart/Huge.cht" "::/torii/cheats/Hello.cht"
   pick boot -f 12000 >"$cart/huge.txt" 2>&1 ||
     fail "the $count-cheat file's screen didn't run: $(grep -a '^kernel' "$cart/huge.txt" | tail -3)"
-  grep -q "cheats: .*Hello.cht: $count cheats, 0 master codes hidden, 2 picked" "$cart/huge.txt" ||
+  grep -q "cheats: .*Hello.cht: $count cheats, [0-9]* greyed, 2 picked" "$cart/huge.txt" ||
     fail "the $count-cheat file read: $(grep -a 'cheats:' "$cart/huge.txt" | head -3)"
   # The popup doesn't read it (reading 190 KB took 75 frames): its look at
   # the file takes far less than a frame
@@ -593,7 +594,7 @@ for want in DEADBEEF "$crc"; do
   got=$(sed -n 's/^mem frame [0-9]* 0203F070: //p' "$cart/dump-launch.txt" | tr -d ' \n' | tr A-F a-f)
   left="cheats: /torii/cheats/Hello.cht is for crc32 $want, and /Hello.gba is $crc: left out"
   if [ "$want" = "$crc" ]; then
-    grep -q "cheats: .*Hello.cht: 1 cheats, 0 master codes hidden, 1 picked" "$cart/dump-popup.txt" ||
+    grep -q "cheats: .*Hello.cht: 1 cheats, 0 greyed, 1 picked" "$cart/dump-popup.txt" ||
       fail "the screen for its own dump: $(grep -a 'cheats:' "$cart/dump-popup.txt" | tail -2)"
     [ "$got" = 33 ] || fail "the cheat for its own dump: 0203F070 holds $got, not 33"
   else

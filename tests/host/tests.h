@@ -5,6 +5,11 @@
 void test_cheatfile_parse(void);
 void test_cheatfile_odd(void);
 void test_cheatfile_status(void);
+void test_cheatfile_junk(void);
+void test_cheatfile_part(void);
+void test_cheatfile_remove_many(void);
+void test_cheatindex_cut(void);
+void test_cheatindex_lines(void);
 void test_cheatfile_keys_carry(void);
 void test_cheatfile_seeds_carry(void);
 void test_cheatfile_budget(void);

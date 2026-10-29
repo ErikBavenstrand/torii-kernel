@@ -41,15 +41,20 @@
 #define CS_LIST_H 112  // 8 rows of 14 px
 #define CS_LIST_PAD 4
 #define CS_HINTS_H 16
-// Decoding a file this long (a quarter second) gets a progress dialog
-#define CS_QUIET_CYCLES (16780000u / 4)
-#define CS_STEP_CYCLES (16780000u / 20)
+// Decoding: the first rows at once as the list shows (about two frames),
+// then the rest a quarter of a frame each frame, so the list never waits.
+// Past it, a larger file's next and previous windows are read ahead, a
+// part each frame.
+#define CS_FIRST_CYCLES (16780000u / 30)
+#define CS_SLICE_CYCLES (16780000u / 240)
+#define CS_AHEAD_BYTES 1024
 // Frames measured after a pick (the rows redraw over the next ones)
 #define CS_TOGGLE_FRAMES 3
 
 static const struct ui_card_config cs_card = {4, 4, 4, 1, 0};
-_Static_assert(STR_CHEATS_WHY_ROOM - STR_CHEATS_WHY_FULL == CHEATFILE_WHY_ROOM - CHEATFILE_WHY_FULL,
+_Static_assert(STR_CHEATS_WHY_MASTER - STR_CHEATS_WHY_FULL == CHEATFILE_WHY_MASTER - CHEATFILE_WHY_FULL,
 	       "a reason for each");
+_Static_assert(CHEATFILE_WHY_MASTER + 1 == CHEATFILE_WHYS, "the reasons' last");
 _Static_assert(STR_CHEATS_EDIT_BROKEN - STR_CHEATS_EDIT_FAILED == CHEATFILE_EDIT_FAILED,
 	       "a line for each edit's failure");
 
@@ -70,6 +75,7 @@ enum {
 	ACT_FILL,   // A on a placeholder: the keypad, the code filled in
 	ACT_MENU,   // SELECT on a code of the user's: Edit code, Delete
 	ACT_START,  // START: the menu
+	ACT_WINDOW,  // the cursor went past a larger file's window: the next one (cs.back: the one before)
 };
 
 // The menus' items: SELECT's has Edit code and Delete only
@@ -95,6 +101,8 @@ static struct {
 	u8 picked;   // a cheat was picked on this visit: the boot mode is checked on leaving
 	u8 measure;  // frames left to measure as "cheats-toggle"
 	u8 close;    // B on the detail view
+	u8 back;     // ACT_WINDOW goes to the window before
+	u8 progressing;  // cs_progress's dialog is up
 	u16 icon;
 	u32 act_row;
 	char counter[32];
@@ -151,12 +159,13 @@ static int cs_fetch(void *ctx, u32 i, struct ui_item *out)
 	u32 len;
 	out->text = cheat_name(c, &len);
 	out->len = (u16)len;
-	int greyed = cheatfile_why(&s->file, s->rows[i]) != CHEATFILE_PICKABLE;
+	// Not decoded yet: as one that can be picked, until the background has it
+	int greyed = c->status != CHEATFILE_NEW && cheatfile_why(&s->file, s->rows[i]) != CHEATFILE_PICKABLE;
 	if (greyed)
 		out->ink = UI_ROLE_DIM;
 	if (c->picked) {
 		out->mark = ART_ICON8_TICK + 1;
-		out->mark_ink = c->status == CHEATFILE_OK ? 0 : UI_ROLE_DIM;
+		out->mark_ink = c->status == CHEATFILE_OK || c->status == CHEATFILE_NEW ? 0 : UI_ROLE_DIM;
 	}
 	return UI_ITEM_READY;
 }
@@ -186,14 +195,16 @@ static const char *cs_reason(const struct cheatfile_cheat *c, u32 why)
 		if (c->status != CHEATFILE_OK)
 			return S(STR_CHEATS_BIG);
 		// The part of the budget that is short: bytes, else cycles
-		int bytes = f->bytes + c->bytes > CHEATFILE_BYTES_MAX;
+		int bytes = f->bytes + f->more_bytes + c->bytes > CHEATFILE_BYTES_MAX;
 		u32 need = bytes ? percent(c->bytes, CHEATFILE_BYTES_MAX) : percent(c->cost, CHEATFILE_CYCLES_MAX);
-		u32 used = bytes ? percent(f->bytes, CHEATFILE_BYTES_MAX) : percent(f->cost, CHEATFILE_CYCLES_MAX);
+		u32 used = bytes ? percent(f->bytes + f->more_bytes, CHEATFILE_BYTES_MAX)
+				 : percent(f->cost + f->more_cost, CHEATFILE_CYCLES_MAX);
 		SF(cs.reason, sizeof(cs.reason), STR_CHEATS_FULL, LN(need), LN(used < 100 ? 100 - used : 0));
 		return cs.reason;
 	}
 	if (why == CHEATFILE_WHY_PATCHES) {
-		u32 left = f->patches < CHEATFILE_PICKED_PATCHES_MAX ? CHEATFILE_PICKED_PATCHES_MAX - f->patches : 0;
+		u32 all = f->patches + f->more_patches;
+		u32 left = all < CHEATFILE_PICKED_PATCHES_MAX ? CHEATFILE_PICKED_PATCHES_MAX - all : 0;
 		SF(cs.reason, sizeof(cs.reason), STR_CHEATS_PATCHES, LN(c->patches), LN(left));
 		return cs.reason;
 	}
@@ -232,7 +243,8 @@ static void cs_show_hints(void)
 		else
 			note = add_reason();
 	} else {
-		u32 why = cheatfile_why(&s->file, s->rows[cs.cursor]);
+		// Not decoded yet: as a cheat that can be picked (most are)
+		u32 why = c->status == CHEATFILE_NEW ? CHEATFILE_PICKABLE : cheatfile_why(&s->file, s->rows[cs.cursor]);
 		if (why == CHEATFILE_PICKABLE)
 			cs.keys[n++] =
 				(struct ui_hint){"A", c->picked ? S(STR_CHEATS_HINT_DROP) : S(STR_CHEATS_HINT_PICK)};
@@ -257,8 +269,21 @@ static void cs_counter(void)
 {
 	u32 n = 0;
 	cs.counter[0] = 0;
+	// A larger file's place counts the windows before this one
+	u32 before = 0, all = cs.shown;
+	if (cheatstore_windows()) {
+		u32 k = cheatstore_window();
+		if (cs.only) {
+			for (u32 j = 0; j < k; j++)
+				before += cheatstore_window_picks(j);
+			all = cs.picks;
+		} else {
+			before = cheatstore_window_start(k);
+			all = cheatstore_window_start(cheatstore_windows());
+		}
+	}
 	if (cs.cursor < cs.shown)
-		n = SF(cs.counter, sizeof(cs.counter), STR_CHEATS_POSITION, LN(cs.cursor + 1), LN(cs.shown));
+		n = SF(cs.counter, sizeof(cs.counter), STR_CHEATS_POSITION, LN(before + cs.cursor + 1), LN(all));
 	if (cs.picks && n + 1 < sizeof(cs.counter)) {
 		if (n)
 			n += (u32)snprintf(cs.counter + n, sizeof(cs.counter) - n, " \xC2\xB7 ");
@@ -279,8 +304,7 @@ static void cs_moved(u32 to)
 // left does), the count, + Add code's room, the hints
 static void cs_picks_changed(void)
 {
-	struct cheatstore *s = cheatstore();
-	cs.picks = cheatfile_picks(&s->file);
+	cs.picks = cheatstore_picks();
 	cs.add_why = (u8)cheatstore_can_add(cs.new_name);
 	ui_list_refresh(cs.list, 0, cs.count - 1);
 	cs_moved(cs.cursor);
@@ -294,6 +318,20 @@ static int cs_event(struct ui_view *v, const struct ui_event *e)
 	const InputState *in = ui_input();
 	switch (e->type) {
 	case UI_EV_CURSOR:
+		// Past a larger file's window, either end: the list wrapped in it.
+		// The cursor stays, and the screen's loop goes to the next window.
+		if (cheatstore_windows() > 1 && !cs.act) {
+			// Which way the key went: a wrap moves the other way
+			u16 fire = ui_input()->fire;
+			int down = (fire & (INPUT_DOWN | INPUT_R)) && e->index < cs.cursor;
+			int up = (fire & (INPUT_UP | INPUT_L)) && e->index > cs.cursor;
+			if (down || up) {
+				cs.back = (u8)up;
+				cs.act = ACT_WINDOW;
+				ui_list_set_cursor(cs.list, cs.cursor);
+				return 1;
+			}
+		}
 		cs_moved(e->index);
 		frame_measure("cheats-move");
 		return 1;
@@ -310,12 +348,13 @@ static int cs_event(struct ui_view *v, const struct ui_event *e)
 			return 1;  // greyed: the hint bar says why
 		}
 		u32 at = s->rows[e->index];
+		cheatstore_decode_to(at);  // A on a row the background hasn't got to
 		if (!c->picked && cheatfile_why(&s->file, at) == CHEATFILE_WHY_EDIT) {
 			cs.act = ACT_FILL;  // a placeholder: the keypad fills it in
 			cs.act_row = e->index;
 			return 1;
 		}
-		if (!cheatfile_toggle(&s->file, at))
+		if (!cheatstore_toggle(at))
 			return 1;
 		cs.picked |= c->picked;
 		tlog_debug("cheats: %s cheat %u, %lu bytes picked", c->picked ? "picked" : "dropped", c->number,
@@ -335,7 +374,7 @@ static int cs_event(struct ui_view *v, const struct ui_event *e)
 		}
 		if ((e->keys & INPUT_SELECT) && (in->pressed & INPUT_SELECT) && !cs.act) {
 			const struct cheatfile_cheat *c = row_cheat(cs.cursor);
-			if (c && c->own) {
+			if (c) {
 				cs.act = ACT_MENU;
 				cs.act_row = cs.cursor;
 			}
@@ -463,6 +502,7 @@ static void cs_detail(u32 at)
 	struct cheatstore *s = cheatstore();
 	if (at >= s->file.count)
 		return;
+	cheatstore_decode_to(at);
 	detail_text(at);
 	cs.reading = (struct ui_reading){s->detail,      s->detail_start,        s->detail_len,
 					 s->detail_kind, CHEATSTORE_DETAIL_ROWS, 0};
@@ -496,25 +536,51 @@ static void cs_detail(u32 at)
 // doesn't look frozen
 static void cs_decode(void)
 {
+	cheatstore_decode(CS_FIRST_CYCLES);  // the rest as the list shows (cs_background)
+}
+
+// Each frame the list shows: the window's cheats decoded on, their rows drawn
+// again as they are; once all are, a larger file's next and previous
+// windows read ahead into their slots, so going to either is at once
+// The window's cheats decoded so far
+static u32 cs_decoded(void)
+{
+	return cheatstore()->work.next;
+}
+
+static void cs_background(void)
+{
 	struct cheatstore *s = cheatstore();
-	if (cheatstore_decode(CS_QUIET_CYCLES))
+	if (cs_decoded() < s->file.count) {
+		u32 from = cs_decoded();
+		cheatstore_decode(CS_SLICE_CYCLES);
+		u32 to = cs_decoded();
+		if (cs.only)
+			ui_list_refresh(cs.list, 0, cs.shown ? cs.shown - 1 : 0);
+		else if (from < cs.shown)
+			ui_list_refresh(cs.list, from, (to < cs.shown ? to : cs.shown) - 1);
+		if (cs.cursor >= from && cs.cursor < to)
+			cs_show_hints();
+		if (to >= s->file.count) {
+			cheatstore_listed();  // decoded: the game popup's count from now on
+			cs.add_why = (u8)cheatstore_can_add(cs.new_name);
+		}
 		return;
-	dialog_progress_begin(S(STR_CHEATS_READING), S(STR_CHEATS_READING_TEXT));
-	do
-		dialog_progress_set(s->work.next, s->file.count, NULL);
-	while (!cheatstore_decode(CS_STEP_CYCLES));
-	dialog_progress_end();
+	}
+	u32 n = cheatstore_windows(), k = cheatstore_window();
+	if (n > 1 && cheatstore_ahead((k + 1) % n, CS_AHEAD_BYTES))
+		cheatstore_ahead((k + n - 1) % n, CS_AHEAD_BYTES);
 }
 
 // After an edit: every cheat decoded again from the first (keys and seeds
 // carry), the picks' budget with them
 static void cs_redecode(void)
 {
-	cheatfile_begin(&cheatstore()->work);
+	cheatstore_begin();
 	cs_decode();
 }
 
-// The rows: every cheat but master codes (only the picked ones while
+// The rows: every cheat (only the picked ones while
 // cs.only, and all again if none is), then "+ Add code" (not while
 // cs.only); the picks' count, a new code's name and whether one may be
 // added. The row cheat at shows, or the last cheat's.
@@ -526,8 +592,8 @@ static u32 cs_rows(u32 at)
 		cs.shown = 0;
 		for (u32 i = 0; i < s->file.count; i++) {
 			const struct cheatfile_cheat *c = &s->cheats[i];
-			own += cheatfile_shown(c) && c->own;
-			if (cheatfile_shown(c) && (!cs.only || c->picked)) {
+			own += c->own;
+			if (!cs.only || c->picked) {
 				if (i == at)
 					row = cs.shown;
 				s->rows[cs.shown++] = (u16)i;
@@ -538,11 +604,23 @@ static u32 cs_rows(u32 at)
 		cs.only = 0;
 		own = 0;
 	}
-	cs.count = cs.shown + !cs.only;
-	cs.picks = cheatfile_picks(&s->file);
+	// + Add code ends the file: a larger one's last window
+	u32 last = !cheatstore_windows() || cheatstore_window() + 1 == cheatstore_windows();
+	cs.count = cs.shown + (!cs.only && last);
+	cs.picks = cheatstore_picks();
 	SF(cs.new_name, sizeof(cs.new_name), STR_CHEATS_NAME, LN(own + 1));
 	cs.add_why = (u8)cheatstore_can_add(cs.new_name);
 	return row != CHEATFILE_NONE ? row : (cs.shown ? cs.shown - 1 : 0);
+}
+
+// 1 if A does something on cheat i: picks or drops it, or fills in its
+// digits (one not decoded yet counts: most do)
+static int cs_actable(u32 i)
+{
+	if (cheatstore()->cheats[i].status == CHEATFILE_NEW)
+		return 1;
+	u32 why = cheatfile_why(&cheatstore()->file, i);
+	return why == CHEATFILE_PICKABLE || why == CHEATFILE_WHY_EDIT;
 }
 
 // The screen's view, the cursor on row
@@ -567,11 +645,23 @@ static int cs_show(u32 row)
 	return 1;
 }
 
+static int cs_window(u32 k, u32 row);
+
 // Only the picked cheats, or all again, in the view as it is: the cursor
-// stays on its cheat if that still shows
+// stays on its cheat if that still shows. A larger file whose window shows
+// no pick goes to the first window that has one.
 static void cs_set_only(int only)
 {
 	struct cheatstore *s = cheatstore();
+	if (only && cheatstore_windows() && !cheatfile_picks(&s->file)) {
+		for (u32 k = 0; k < cheatstore_windows(); k++)
+			if (cheatstore_window_picks(k) && k != cheatstore_window()) {
+				cs.only = 1;
+				ui_title_set_sub(cs.title, S(STR_CHEATS_ONLY_SUB));
+				cs_window(k, 0);
+				return;
+			}
+	}
 	u32 at = row_cheat(cs.cursor) ? s->rows[cs.cursor] : CHEATFILE_NONE;
 	cs.only = (u8)only;
 	u32 row = cs_rows(at);
@@ -604,7 +694,7 @@ static void pick_new(u32 at)
 {
 	struct cheatstore *s = cheatstore();
 	if (at < s->file.count && !s->cheats[at].picked && cheatfile_why(&s->file, at) == CHEATFILE_PICKABLE) {
-		cheatfile_toggle(&s->file, at);
+		cheatstore_toggle(at);
 		cs.picked = 1;
 	}
 }
@@ -704,22 +794,88 @@ static u32 cs_delete(u32 at)
 	return cs_rows(at);
 }
 
-// Turns every picked cheat off
+// A progress dialog for decoding a larger file's windows, up once one is
+// needed (cheatstore_progress_fn)
+static void cs_progress(u32 done, u32 total)
+{
+	if (!cs.progressing) {
+		dialog_progress_begin(S(STR_CHEATS_READING), S(STR_CHEATS_READING_TEXT));
+		cs.progressing = 1;
+	}
+	dialog_progress_set(done, total, NULL);
+}
+
+static void cs_progress_end(void)
+{
+	if (cs.progressing)
+		dialog_progress_end();
+	cs.progressing = 0;
+}
+
+// A larger file's window k on the screen, the cursor on row (CHEATFILE_NONE:
+// its last), decoded; 0 if it couldn't be read
+static int cs_window(u32 k, u32 row)
+{
+	u32 from = cheatstore_window();
+	int ok = cheatstore_window_go(k);
+	cs_progress_end();
+	if (!ok) {
+		// The file changed on the card since its index: the index is gone,
+		// so the next visit reads the file anew
+		tlog_error("cheats: window %lu couldn't be read", (unsigned long)k + 1);
+		dialog_message(cs.heading, S(STR_CHEATS_GONE), DIALOG_ERROR);
+		cheatstore_window_go(from);
+	}
+	cs_decode();
+	cs_rows(CHEATFILE_NONE);
+	if (row == CHEATFILE_NONE || row >= cs.count)
+		row = cs.count ? cs.count - 1 : 0;
+	tlog_debug("cheats: window %lu of %lu, %lu rows", (unsigned long)cheatstore_window() + 1,
+		   (unsigned long)cheatstore_windows(), (unsigned long)cs.count);
+	ui_list_reset(cs.list, row);
+	cs_moved(row);
+	return ok;
+}
+
+// The cursor went past the window's end (back: its start): the next window
+// (the one before), round the file's ends, past windows with no picks while
+// only the picked show. Each starts from its index's decoder, so any is a
+// read away (or none, read ahead already).
+static void cs_window_step(int back)
+{
+	u32 n = cheatstore_windows(), k = cheatstore_window();
+	do
+		k = back ? (k + n - 1) % n : (k + 1) % n;
+	while (cs.only && k != cheatstore_window() && !cheatstore_window_picks(k));
+	cs_window(k, back ? CHEATFILE_NONE : 0);
+}
+
+// Turns every picked cheat off, a larger file's in every window
 static void cs_all_off(void)
 {
 	struct cheatstore *s = cheatstore();
-	for (u32 i = 0; i < s->file.count; i++)
-		if (s->cheats[i].picked)
-			cheatfile_toggle(&s->file, i);
+	if (cheatstore_windows()) {
+		u32 row = cs.cursor;
+		cheatstore_all_off();
+		tlog("cheats: all turned off");
+		cs.only = 0;
+		cs_decode();
+		row = cs_rows(row < cs.shown ? s->rows[row] : CHEATFILE_NONE);
+		ui_list_reset(cs.list, row);
+		ui_title_set_sub(cs.title, NULL);
+		cs_moved(row);
+		return;
+	}
+	cheatstore_all_off();
 	tlog("cheats: all turned off");
 	if (cs.only)
 		cs_set_only(0);
 	cs_picks_changed();
 }
 
-// START's menu on row (full: Details, the user's code's Edit code and
-// Delete, Turn all off, Show picked only) or SELECT's on a code of the
-// user's (Edit code, Delete). The row to show after, or CHEATFILE_NONE to
+// START's menu on row (full: Details, the user's code's Edit code, Turn
+// all off, Show picked only, Delete) or SELECT's on a cheat (the user's
+// code's Edit code, Delete). The row to show after, or CHEATFILE_NONE to
 // stay on the view.
 static u32 cs_menu(u32 row, int full)
 {
@@ -748,7 +904,7 @@ static u32 cs_menu(u32 row, int full)
 		cs.items[n++] = (struct ui_pop_item){cs.only ? S(STR_CHEATS_MENU_ALL) : S(STR_CHEATS_MENU_ONLY), 0,
 						     (u8)(cs.picks || cs.only ? 0 : UI_POP_DIM)};
 	}
-	if (c && c->own) {
+	if (c) {
 		cs.item_ids[n] = MENU_DELETE;
 		cs.items[n++] = (struct ui_pop_item){S(STR_CHEATS_MENU_DELETE), 0, UI_POP_DANGER};
 	}
@@ -811,12 +967,15 @@ static int boots_clean(const char *rom_path)
 void cheats_run(const char *rom_path, const char *title, u16 icon)
 {
 	memset(&cs, 0, sizeof(cs));
+	cheatstore_progress(cs_progress);  // a larger file read whole the first time
 	int opened = cheatstore_open(rom_path);
+	cs_progress_end();
 	if (opened != CHEATSTORE_READ && opened != CHEATSTORE_NEW) {
 		// Why the file is left alone: never a screen without it
 		const char *why = opened == CHEATSTORE_BIG          ? S(STR_CHEATS_TOO_BIG)
 				  : opened == CHEATSTORE_OTHER_DUMP ? S(STR_CHEATS_OTHER_DUMP)
 								    : S(STR_CHEATS_GONE);
+		cheatstore_progress(NULL);
 		tlog("cheats: %s: no cheat screen (%d)", rom_path, opened);
 		dialog_message(title, why, DIALOG_ERROR);
 		return;
@@ -825,9 +984,18 @@ void cheats_run(const char *rom_path, const char *title, u16 icon)
 	cheatstore_listed();  // decoded: the game popup's count from now on
 	struct cheatstore *s = cheatstore();
 	cs_rows(CHEATFILE_NONE);
-	u32 row = 0, hidden = s->file.count - cs.shown;
-	tlog("cheats: %s: %lu cheats, %lu master codes hidden, %lu picked (%lu bytes)%s", s->path,
-	     (unsigned long)cs.shown, (unsigned long)hidden, (unsigned long)cs.picks, (unsigned long)s->file.bytes,
+	// The cursor starts on the first cheat A does something on (a pick, or
+	// a placeholder's digits), past the master codes a file starts with
+	u32 row = 0, greyed = 0;
+	for (u32 r = 0; r < cs.shown; r++)
+		greyed += s->cheats[s->rows[r]].status != CHEATFILE_NEW &&
+			  cheatfile_why(&s->file, s->rows[r]) != CHEATFILE_PICKABLE;
+	while (row < cs.shown && !cs_actable(s->rows[row]))
+		row++;
+	if (row == cs.shown)
+		row = 0;
+	tlog("cheats: %s: %lu cheats, %lu greyed, %lu picked (%lu bytes)%s", s->path, (unsigned long)cs.shown,
+	     (unsigned long)greyed, (unsigned long)cs.picks, (unsigned long)s->file.bytes,
 	     opened == CHEATSTORE_NEW ? ", no file yet" : "");
 	if (cs.add_why != CHEATFILE_EDIT_OK)
 		tlog("cheats: + Add code greyed: %s", add_reason());
@@ -843,6 +1011,13 @@ void cheats_run(const char *rom_path, const char *title, u16 icon)
 				cs.measure--;
 			}
 			ui_frame();
+			cs_background();
+			// A window of one row: the list has nowhere to move, so says nothing
+			if (cheatstore_windows() > 1 && cs.count == 1 && !cs.act && ui_depth() &&
+			    (ui_input()->fire & (INPUT_UP | INPUT_DOWN))) {
+				cs.back = (ui_input()->fire & INPUT_UP) != 0;
+				cs.act = ACT_WINDOW;
+			}
 			if (cs.b_down && (ui_input()->released & INPUT_B)) {
 				cs.b_down = 0;
 				if (cs.only)
@@ -850,6 +1025,10 @@ void cheats_run(const char *rom_path, const char *title, u16 icon)
 				else
 					cs.act = ACT_BACK;
 			}
+		}
+		if (cs.act == ACT_WINDOW) {
+			cs_window_step(cs.back);
+			continue;
 		}
 		if (cs.act == ACT_MENU || cs.act == ACT_START) {
 			u32 to = cs_menu(cs.act_row, cs.act == ACT_START);
@@ -867,6 +1046,8 @@ void cheats_run(const char *rom_path, const char *title, u16 icon)
 	u32 picks = cheatfile_picks(&s->file);
 	tlog("cheats: back, %lu picked%s", (unsigned long)picks, changed ? ", changed" : "");
 	int saved = cheatstore_write();
+	cs_progress_end();
+	cheatstore_progress(NULL);
 	cheatstore_keep_listed();  // the popup's count after a power-off too
 	ui_leave(UI_TR_DEEPER, -1);  // back to the caller's screen
 	while (ui_depth())

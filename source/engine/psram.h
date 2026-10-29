@@ -29,6 +29,10 @@
 //	7.625 MB  the language pack in use (lang_load.c), PSRAM_LANG_BASE, 64 KB;
 //	          the rest to 8 MB (320 KB) held for 1.0's script fonts
 //
+// Page 1, while the menu runs, holds a larger cheat file's windows
+// (cheatstore.h, CHEATSTORE_SLOT_PAGE), selected only within the calls that
+// copy them; Diagnostics' tests use page 3.
+//
 // A game launch fills PSRAM with the game, so everything here is lost then:
 // the launch calls cover_cache_invalidate first.
 //

@@ -765,7 +765,9 @@ call with nothing to do 216; a write in a plain cheat's run about 33; a
 write of its own about 130; a fill about 19 a write of one value and 44 a
 slide; a conditional about 390; an add, or, and or pointer write about 400.
 The budget model (`CHEAT_COST_*`) stays above every measurement, and the
-picked cheats' model total is capped at 28,000 cycles, 10% of a frame.
+picked cheats' model total is capped at 28,000 cycles, 10% of a frame, for
+what runs every frame, and at 64,000 (about 23%) counting work a condition
+guards (`CHEAT_LOAD`).
 
 **The in-game menu (v0.8)** opens from the hook as the old one did, in IRQ
 mode with IME 0. Its stub (`ingame_stub`) stops DMA0-3, mutes through

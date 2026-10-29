@@ -2,7 +2,7 @@
 // nothing between two passes of a menu loop: each owner below borrows it for
 // one operation and needs nothing in it afterwards. Its owners, by offset:
 // - READCACHE_CHEATS, 96 KB from 0x8000 to the end, clear of the stage: a
-//   game's cheat file (struct cheatstore, cheatstore.h, about 48 KB): its
+//   game's cheat file (struct cheatstore, cheatstore.h, about 76 KB): its
 //   cheats, the decoder's work and its text's parts on their way to and
 //   within PSRAM (the text itself is in PSRAM), while the cheat screen runs
 //   (screens/cheats.c, which starts no job and calls nothing else that

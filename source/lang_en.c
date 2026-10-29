@@ -200,6 +200,7 @@ const char *const lang_en[STR_COUNT] = {
 	"Sleep keys",  // set.label.sleep_keys
 	"Rescan library",  // set.label.rescan
 	"Identify library",  // set.label.identify
+	"Clean up cheats",  // set.label.clean_cheats
 	"Show all files",  // set.label.show_all
 	"Logging",  // set.label.logging
 	"Language",  // set.label.language
@@ -230,6 +231,7 @@ const char *const lang_en[STR_COUNT] = {
 	"Held together in game. A sets them.",  // set.explain.sleep_keys
 	"Looks for games on the card again.",  // set.explain.rescan
 	"Looks up each game in names.db.",  // set.explain.identify
+	"Removes cheats that can't work.",  // set.explain.clean_cheats
 	"The SD card page shows hidden files.",  // set.explain.show_all
 	"Writes a log to /torii/logs.",  // set.explain.logging
 	"The menu's language.",  // set.explain.language
@@ -294,6 +296,12 @@ const char *const lang_en[STR_COUNT] = {
 	"Already used by {1}.",  // set.keys_taken
 	"START+SELECT wakes a sleeping game.",  // set.keys_wake
 	"Games reset on A+B+START+SELECT.",  // set.keys_soft_reset
+	"Clean up cheats?",  // set.clean_ask
+	"Greyed cheats are removed from every cheat file. Codes you typed stay.",  // set.clean_text
+	"Cleaning up cheats",  // set.clean_title
+	"Every cheat file is clean.",  // set.clean_none
+	"{1} cheats removed from {2} files.",  // set.clean_done
+	"{1} files couldn't be cleaned.",  // set.clean_failed
 	"Controls",  // info.controls
 	"In game",  // info.ingame
 	"Saves",  // info.saves
@@ -457,6 +465,9 @@ const char *const lang_en[STR_COUNT] = {
 	"Can't run on this cart",  // cheats.why_cant_run
 	"Too many ROM patches beside picks",  // cheats.why_patches
 	"No room in the file",  // cheats.why_room
+	"Does nothing: no writes",  // cheats.why_nothing
+	"Same as a cheat above",  // cheats.why_same
+	"Master code for the codes below",  // cheats.why_master
 	"Too much: needs {1}%, {2}% left",  // cheats.full
 	"Too many ROM patches: {1}, {2} left",  // cheats.patches
 	"ROM patch: no NOR games",  // cheats.nor

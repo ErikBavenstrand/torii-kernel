@@ -29,6 +29,7 @@
 #include "settings_page.h"
 #include "settings_layout.h"
 #include "../Ezcard_OP.h"
+#include "../cheatstore.h"
 #include "../lang.h"
 #include "../library.h"
 #include "../namesdb.h"
@@ -40,6 +41,7 @@
 #include "../engine/res.h"
 #include "../engine/text.h"
 #include "../ui/art_ids.h"
+#include "../ui/dialog.h"
 #include "../ui/ui.h"
 
 // --- Look (mockups-b16-b18.md, "Settings page"), px and frames ----------------
@@ -957,6 +959,35 @@ static void saves_open(u32 id)
 	nav_reshow();
 }
 
+static void clean_progress(u32 done, u32 total)
+{
+	dialog_progress_set(done, total, NULL);
+}
+
+// Clean up cheats: asked first, the cheat files cleaned behind a progress
+// dialog, what it did said after
+static void clean_cheats(u32 id)
+{
+	(void)id;
+	if (!dialog_confirm(S(STR_SET_CLEAN_ASK), S(STR_SET_CLEAN_TEXT), DIALOG_INFO))
+		return;
+	struct cheatstore_sum sum;
+	dialog_progress_begin(S(STR_SET_CLEAN_TITLE), NULL);
+	cheatstore_clean_all(clean_progress, &sum);
+	dialog_progress_end();
+	char text[128];
+	u32 n = 0;
+	if (sum.removed)
+		n = SF(text, sizeof(text), STR_SET_CLEAN_DONE, LN(sum.removed), LN(sum.cleaned));
+	else
+		n = (u32)snprintf(text, sizeof(text), "%s", S(STR_SET_CLEAN_NONE));
+	if (sum.failed && n + 2 < sizeof(text)) {
+		text[n++] = '\n';
+		SF(text + n, sizeof(text) - n, STR_SET_CLEAN_FAILED, LN(sum.failed));
+	}
+	dialog_message(S(STR_SET_LABEL_CLEAN_CHEATS), text, sum.failed ? DIALOG_ERROR : DIALOG_INFO);
+}
+
 static void activate(u32 id)
 {
 	const struct settings_row *r = &settings_rows[id];
@@ -985,6 +1016,9 @@ static void activate(u32 id)
 			sp.identify_wait = 0;  // its progress at once
 		} else if (r->action == SET_ACTION_SAVES || r->action == SET_ACTION_GAME_SAVES) {
 			nav_defer(saves_open, id);
+		} else if (r->action == SET_ACTION_CLEAN_CHEATS) {
+			tlog("settings: clean up cheats");
+			nav_defer(clean_cheats, id);
 		}
 		break;
 	default:

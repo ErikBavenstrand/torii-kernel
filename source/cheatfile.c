@@ -152,11 +152,32 @@ static int next_kv(const char *text, u32 len, u32 *pos, struct kv *kv)
 	return 1;
 }
 
+int cheatfile_line_key(const char *line, u32 len, u32 *number, int *on)
+{
+	u32 pos = 0, n = 0, digits;
+	struct kv kv;
+	*on = 0;
+	if (!next_kv(line, len, &pos, &kv) || !kv.klen)
+		return 0;
+	u32 what = cheat_key(line + kv.key, kv.klen, 0x10000, &n, &digits);
+	if (what > KEY_CHEAT || n >= 0x10000)
+		return 0;
+	*number = n;
+	*on = what == KEY_ENABLE && is_true(line + kv.val, kv.vlen);
+	return 1;
+}
+
+// The number past the last the table takes
+static u32 top(const struct cheatfile *f)
+{
+	return (u32)f->base + f->max;
+}
+
 // A KEY = VALUE line, into the table by number
-static void parse_kv(struct cheatfile *f, const struct kv *kv, u32 max)
+static void parse_kv(struct cheatfile *f, const struct kv *kv)
 {
 	u32 n = 0, digits;
-	u32 what = cheat_key(f->text + kv->key, kv->klen, max, &n, &digits);
+	u32 what = cheat_key(f->text + kv->key, kv->klen, top(f), &n, &digits);
 	const char *s = f->text + kv->val;
 	u32 at = kv->val;
 	u16 len = (u16)kv->vlen;
@@ -169,13 +190,13 @@ static void parse_kv(struct cheatfile *f, const struct kv *kv, u32 max)
 	}
 	if (what == KEY_OTHER)
 		return;
-	if (n >= max) {
+	if (n < f->base || n >= top(f)) {
 		f->dropped += what == KEY_CODE;
 		return;
 	}
 	if (n >= f->next)
 		f->next = (u16)(n + 1);
-	struct cheatfile_cheat *c = &f->cheats[n];
+	struct cheatfile_cheat *c = &f->cheats[n - f->base];
 	if (what == KEY_DESC) {
 		c->desc = at;
 		c->desc_len = len;
@@ -240,7 +261,7 @@ int cheatfile_empty(const struct cheatfile *f)
 			continue;
 		if (kv.klen) {
 			u32 n, digits;
-			if (cheat_key(f->text + kv.key, kv.klen, f->max, &n, &digits) != KEY_COUNT)
+			if (cheat_key(f->text + kv.key, kv.klen, top(f), &n, &digits) != KEY_COUNT)
 				return 0;
 		} else if (!cheatfile_rom_crc(f->text + kv.start, kv.end - kv.start, &crc)) {
 			return 0;  // a comment of the user's, or any other line
@@ -250,6 +271,12 @@ int cheatfile_empty(const struct cheatfile *f)
 }
 
 void cheatfile_parse(struct cheatfile *f, const char *text, u32 len, struct cheatfile_cheat *cheats, u32 max)
+{
+	cheatfile_parse_part(f, text, len, cheats, max, 0, 0);
+}
+
+void cheatfile_parse_part(struct cheatfile *f, const char *text, u32 len, struct cheatfile_cheat *cheats, u32 max,
+			  u32 base, int part)
 {
 	u32 cut = len > CHEATFILE_TEXT_MAX;
 	if (cut)
@@ -263,13 +290,16 @@ void cheatfile_parse(struct cheatfile *f, const char *text, u32 len, struct chea
 	f->out_len = len;  // every pick as its enable line says: written back as it is
 	f->cheats = cheats;
 	f->max = (u16)max;
+	f->base = (u16)base;
+	f->part = (u8)(part != 0);
+	f->next = (u16)base;
 	f->count_at = CHEATFILE_NONE;
 	for (u32 i = 0; i < max; i++)
 		cheats[i] = (struct cheatfile_cheat){.desc = CHEATFILE_NONE,
 						     .code = CHEATFILE_NONE,
 						     .enable = CHEATFILE_NONE,
 						     .status = CHEATFILE_NEW,
-						     .number = (u16)i};
+						     .number = (u16)(base + i)};
 	u32 pos = text_start(text, len);
 	struct kv kv;
 	int first = 1;
@@ -279,7 +309,7 @@ void cheatfile_parse(struct cheatfile *f, const char *text, u32 len, struct chea
 			first = 0;
 		}
 		if (kv.klen)
-			parse_kv(f, &kv, max);
+			parse_kv(f, &kv);
 	}
 	// The cheats with a code, in their numbers' order
 	u32 n = 0;
@@ -294,6 +324,43 @@ void cheatfile_begin(struct cheatfile_work *w)
 	cheat_decoder_init(&w->dec);
 	w->next = 0;
 	w->n_prog = w->n_patches = w->cost = 0;
+	memset(w->seen, 0, sizeof(w->seen));
+}
+
+// FNV-1a of the n words at p, on from h
+static u32 hash_words(u32 h, const u32 *p, u32 n)
+{
+	for (u32 i = 0; i < n; i++)
+		for (u32 b = 0; b < 32; b += 8)
+			h = (h ^ ((p[i] >> b) & 0xFF)) * 16777619u;
+	return h;
+}
+
+// The hash of w's table part and patches (an OK cheat's): never 0
+static u32 program_hash(const struct cheatfile_work *w)
+{
+	_Static_assert(sizeof(struct cheat_patch) % 4 == 0, "patches hash as words");
+	u32 h = hash_words(2166136261u, &w->n_prog, 1);
+	h = hash_words(h, w->prog, w->n_prog);
+	h = hash_words(h, (const u32 *)(const void *)w->patches, w->n_patches * (u32)sizeof(struct cheat_patch) / 4);
+	return h ? h : 1;
+}
+
+// 1 if hash h (an OK cheat's) is an earlier OK cheat's of this pass; else it
+// is recorded. A full set records nothing more.
+static int seen_before(struct cheatfile_work *w, u32 h)
+{
+	_Static_assert((CHEATFILE_SEEN_SLOTS & (CHEATFILE_SEEN_SLOTS - 1)) == 0, "a power of 2");
+	for (u32 k = 0, s = h; k < CHEATFILE_SEEN_SLOTS; k++, s++) {
+		u32 *slot = &w->seen[s & (CHEATFILE_SEEN_SLOTS - 1)];
+		if (*slot == h)
+			return 1;
+		if (!*slot) {
+			*slot = h;
+			return 0;
+		}
+	}
+	return 0;
 }
 
 u8 cheatfile_decode(struct cheatfile_work *w, struct cheat_decoder *dec, const char *code, u32 len, u32 *ops,
@@ -357,6 +424,11 @@ s32 cheatfile_next(struct cheatfile *f, struct cheatfile_work *w)
 		c->status = cheatfile_decode(w, &w->dec, f->text + c->code, c->code_len, &n_ops, &lowered);
 	}
 	c->detected = c->format != CHEAT_FMT_AUTO ? c->format : w->dec.last;
+	c->hash = c->status == CHEATFILE_OK ? program_hash(w) : 0;
+	if (c->status == CHEATFILE_OK && !cheat_has_effect(w->ops, n_ops))
+		c->status = CHEATFILE_NOTHING;
+	else if (c->status == CHEATFILE_OK && seen_before(w, c->hash))
+		c->status = CHEATFILE_SAME;
 	if (c->status != CHEATFILE_OK)
 		w->n_prog = w->n_patches = w->cost = 0;
 	c->bytes = (u16)(w->n_prog * 4);
@@ -439,6 +511,15 @@ static void out_sync(struct cheatfile *f)
 	f->out_len = (u32)len + added_break(f, f->n_added);
 }
 
+void cheatfile_picks_from(struct cheatfile *f, int (*on)(void *ctx, u32 number), void *ctx)
+{
+	for (u32 i = 0; i < f->count; i++) {
+		struct cheatfile_cheat *c = &f->cheats[i];
+		c->picked = c->saved = on(ctx, c->number) != 0;
+	}
+	out_sync(f);
+}
+
 u32 cheatfile_why(const struct cheatfile *f, u32 i)
 {
 	if (i >= f->count)
@@ -448,9 +529,10 @@ u32 cheatfile_why(const struct cheatfile *f, u32 i)
 		return CHEATFILE_PICKABLE;
 	switch (c->status) {
 	case CHEATFILE_OK:
-		if (f->bytes + c->bytes > CHEATFILE_BYTES_MAX || f->cost + c->cost > CHEATFILE_CYCLES_MAX)
+		if (f->bytes + f->more_bytes + c->bytes > CHEATFILE_BYTES_MAX ||
+		    f->cost + f->more_cost + c->cost > CHEATFILE_CYCLES_MAX)
 			return CHEATFILE_WHY_FULL;
-		if (f->patches + c->patches > CHEATFILE_PICKED_PATCHES_MAX)
+		if (f->patches + f->more_patches + c->patches > CHEATFILE_PICKED_PATCHES_MAX)
 			return CHEATFILE_WHY_PATCHES;
 		return len_flipped(f, c) > CHEATFILE_TEXT_MAX ? CHEATFILE_WHY_ROOM : CHEATFILE_PICKABLE;
 	case CHEATFILE_BIG:
@@ -459,6 +541,12 @@ u32 cheatfile_why(const struct cheatfile *f, u32 i)
 		return CHEATFILE_WHY_EDIT;
 	case CHEATFILE_CANT_RUN:
 		return CHEATFILE_WHY_CANT_RUN;
+	case CHEATFILE_NOTHING:
+		return CHEATFILE_WHY_NOTHING;
+	case CHEATFILE_SAME:
+		return CHEATFILE_WHY_SAME;
+	case CHEATFILE_MASTER:
+		return CHEATFILE_WHY_MASTER;
 	default:
 		return CHEATFILE_WHY_UNREADABLE;
 	}
@@ -623,8 +711,10 @@ static void picks_save(const struct cheatfile *f, struct picks *p)
 {
 	memset(p, 0, sizeof(*p));
 	for (u32 i = 0; i < f->count; i++)
-		if (f->cheats[i].picked)
-			p->bits[f->cheats[i].number >> 3] |= (u8)(1u << (f->cheats[i].number & 7));
+		if (f->cheats[i].picked) {
+			u32 n = f->cheats[i].number - f->base;
+			p->bits[n >> 3] |= (u8)(1u << (n & 7));
+		}
 }
 
 // After a read again: each cheat's pick as it was, cheat number removed
@@ -633,7 +723,7 @@ static void picks_restore(struct cheatfile *f, const struct picks *p, u32 remove
 {
 	for (u32 i = 0; i < f->count; i++) {
 		struct cheatfile_cheat *c = &f->cheats[i];
-		u32 n = removed != CHEATFILE_NONE && c->number >= removed ? c->number + 1u : c->number;
+		u32 n = (removed != CHEATFILE_NONE && c->number >= removed ? c->number + 1u : c->number) - f->base;
 		c->picked = n < CHEATFILE_MAX && (p->bits[n >> 3] >> (n & 7)) & 1;
 	}
 	out_sync(f);
@@ -642,7 +732,7 @@ static void picks_restore(struct cheatfile *f, const struct picks *p, u32 remove
 // The text in buf, len bytes, read again after an edit
 static void reread(struct cheatfile *f, const char *buf, u32 len)
 {
-	cheatfile_parse(f, buf, len, f->cheats, f->max);
+	cheatfile_parse_part(f, buf, len, f->cheats, f->max, f->base, f->part);
 	f->edited = 1;
 }
 
@@ -832,6 +922,8 @@ static u32 apply(const struct cheatfile *f, const struct cheatfile_room *room, s
 static u32 count_piece(const struct cheatfile *f, int add, struct piece *pc)
 {
 	*pc = (struct piece){0, 0, PIECE_COUNT, 0, 0, 0, NULL, NULL, f->next};
+	if (f->part)
+		return 0;  // the whole file's count: a window can't tell it
 	if (f->count_at != CHEATFILE_NONE) {
 		u32 v = 0, i;
 		for (i = 0; i < f->count_len && f->text[f->count_at + i] >= '0' && f->text[f->count_at + i] <= '9'; i++)
@@ -896,7 +988,7 @@ static u32 add_pieces(const struct cheatfile *f, const char *desc, const char *c
 
 u32 cheatfile_can_add(const struct cheatfile *f, u32 cap, const char *desc)
 {
-	if (f->next >= f->max)
+	if (f->next >= top(f))
 		return CHEATFILE_EDIT_FULL;
 	struct piece pcs[5];
 	u32 k = add_pieces(f, desc, CHEATFILE_SHORT_CODE, CHEAT_FMT_AUTO, pcs);
@@ -908,7 +1000,7 @@ u32 cheatfile_add(struct cheatfile *f, const struct cheatfile_room *room, const 
 {
 	if (!code_ok(code) || format > CHEAT_FMT_VBA)
 		return CHEATFILE_EDIT_BAD;
-	if (f->next >= f->max)
+	if (f->next >= top(f))
 		return CHEATFILE_EDIT_FULL;
 	struct piece pcs[5];
 	u32 k = add_pieces(f, desc, code, format, pcs);
@@ -957,15 +1049,15 @@ u32 cheatfile_set_code(struct cheatfile *f, const struct cheatfile_room *room, u
 		pcs[k++] = (struct piece){c->desc, c->desc_len, PIECE_DESC, 0, 0, 0, NULL, desc, n};
 	else if (desc) {
 		// Never before a BOM, if the code line is the file's first
-		u32 at = line_start(f->text, c->code), top = text_start(f->text, f->len);
-		pcs[k++] = (struct piece){at > top ? at : top, 0, PIECE_LINE, 0, 0, 1, "desc", desc, n};
+		u32 at = line_start(f->text, c->code), first = text_start(f->text, f->len);
+		pcs[k++] = (struct piece){at > first ? at : first, 0, PIECE_LINE, 0, 0, 1, "desc", desc, n};
 	}
 	// Its format line, the last if it repeats (the one a read takes)
 	u32 pos = text_start(f->text, f->len), found = 0;
 	struct kv kv, fmt = {0, 0, 0, 0, 0, 0, 0};
 	while (next_kv(f->text, f->len, &pos, &kv)) {
 		u32 m = 0, d;
-		if (kv.klen && cheat_key(f->text + kv.key, kv.klen, f->max, &m, &d) == KEY_FORMAT && m == n) {
+		if (kv.klen && cheat_key(f->text + kv.key, kv.klen, top(f), &m, &d) == KEY_FORMAT && m == n) {
 			fmt = kv;
 			found = 1;
 		}
@@ -1014,8 +1106,8 @@ u32 cheatfile_remove(struct cheatfile *f, const struct cheatfile_room *room, u32
 	u32 held = CHEATFILE_NONE, held_len = 0;  // a blank line not moved yet
 	struct kv kv;
 	while (next_kv(buf, len, &pos, &kv)) {
-		u32 m = 0, d = 0, what = kv.klen ? cheat_key(buf + kv.key, kv.klen, f->max, &m, &d) : KEY_OTHER;
-		int cheat_line = what <= KEY_CHEAT && m < f->max;
+		u32 m = 0, d = 0, what = kv.klen ? cheat_key(buf + kv.key, kv.klen, top(f), &m, &d) : KEY_OTHER;
+		int cheat_line = what <= KEY_CHEAT && m >= f->base && m < top(f);
 		if (cheat_line && m == n) {
 			held = CHEATFILE_NONE;
 			continue;
@@ -1046,4 +1138,76 @@ u32 cheatfile_remove(struct cheatfile *f, const struct cheatfile_room *room, u32
 	picks_restore(f, &p, n);
 	f->edited = 1;
 	return CHEATFILE_EDIT_OK;
+}
+
+// How many entries before entry i drop says go
+static u32 dropped_below(const u8 *drop, u32 i)
+{
+	u32 n = 0;
+	for (u32 b = 0; b < i; b++)
+		n += (drop[b >> 3] >> (b & 7)) & 1;
+	return n;
+}
+
+u32 cheatfile_remove_many(struct cheatfile *f, const struct cheatfile_room *room, const u8 *drop)
+{
+	const char *buf = room->base;
+	// The picks of the cheats that stay, in their order (renumbering keeps it)
+	u8 kept[CHEATFILE_MAX / 8];
+	u32 k = 0, gone = 0;
+	memset(kept, 0, sizeof(kept));
+	for (u32 i = 0; i < f->count; i++) {
+		u32 e = f->cheats[i].number - f->base;
+		if ((drop[e >> 3] >> (e & 7)) & 1) {
+			gone++;
+			continue;
+		}
+		kept[k >> 3] |= (u8)(f->cheats[i].picked << (k & 7));
+		k++;
+	}
+	if (!gone)
+		return 0;
+	// One pass, as cheatfile_remove's: the dropped cheats' lines go, each
+	// with a blank line just before one; the rest are numbered lower by the
+	// dropped ones before them
+	u32 len = f->len, pos = text_start(buf, len), w = pos;
+	u32 held = CHEATFILE_NONE, held_len = 0;
+	struct kv kv;
+	while (next_kv(buf, len, &pos, &kv)) {
+		u32 m = 0, d = 0, what = kv.klen ? cheat_key(buf + kv.key, kv.klen, top(f), &m, &d) : KEY_OTHER;
+		int cheat_line = what <= KEY_CHEAT && m >= f->base && m < top(f);
+		u32 e = cheat_line ? m - f->base : 0;
+		if (cheat_line && ((drop[e >> 3] >> (e & 7)) & 1)) {
+			held = CHEATFILE_NONE;
+			continue;
+		}
+		if (held != CHEATFILE_NONE)
+			w = move_to(room, w, held, held_len);
+		held = CHEATFILE_NONE;
+		if (kv.blank) {
+			held = kv.start;
+			held_len = kv.end - kv.start;
+			continue;
+		}
+		u32 below = cheat_line ? dropped_below(drop, e) : 0;
+		if (below) {
+			char digits[8];
+			u32 dl = (u32)snprintf(digits, sizeof(digits), "%lu", (unsigned long)(m - below));
+			u32 after = kv.key + 5 + d;
+			w = move_to(room, w, kv.start, kv.key + 5 - kv.start);
+			room->put(room->base + w, digits, dl);  // over the old digits at most
+			w = move_to(room, w + dl, after, kv.end - after);
+		} else {
+			w = move_to(room, w, kv.start, kv.end - kv.start);
+		}
+	}
+	if (held != CHEATFILE_NONE)
+		w = move_to(room, w, held, held_len);
+	reread(f, buf, w);
+	set_count(f, room, 0);
+	for (u32 i = 0; i < f->count; i++)
+		f->cheats[i].picked = i < k && ((kept[i >> 3] >> (i & 7)) & 1);
+	out_sync(f);
+	f->edited = 1;
+	return gone;
 }

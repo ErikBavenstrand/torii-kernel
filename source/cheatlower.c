@@ -73,6 +73,26 @@ static int is_cond(u8 type)
 	return type >= CHEAT_OP_IF_EQ && type <= CHEAT_OP_IF_NEVER;
 }
 
+int cheat_has_effect(const struct cheat_op *ops, u32 n_ops)
+{
+	for (u32 i = 0; i < n_ops; ++i)
+		switch (ops[i].type) {
+		case CHEAT_OP_ROM_PATCH:
+			return 1;
+		case CHEAT_OP_WRITE:
+		case CHEAT_OP_WRITE_PTR:
+		case CHEAT_OP_ADD:
+		case CHEAT_OP_OR:
+		case CHEAT_OP_AND:
+			if (ops[i].count)
+				return 1;
+			break;
+		default:
+			break;
+		}
+	return 0;
+}
+
 // An op Torii can't run as mGBA does (cheat_lower's CHEAT_LOWER_CANT_RUN):
 // a write to the ROM in a cheat with conditionals, or an add, or or and on
 // the ROM. The address checks have kept each op's elements in one region.
@@ -246,7 +266,7 @@ u8 cheat_lower(const struct cheat_op *ops, u32 n_ops, u32 *prog, u32 prog_max, u
 	       struct cheat_patch *patches, u32 patches_max, u32 *n_patches)
 {
 	struct out o = {patches, patches_max, 0, prog, prog_max, 0, 0, CHEAT_LOWER_OK};
-	u32 i, j, n = 0;
+	u32 i, j, n = 0, guarded = 0, walked = 0, until = 0;
 	int plain = 1, any = 0;
 
 	*prog_words = *cost = *n_patches = 0;
@@ -275,7 +295,16 @@ u8 cheat_lower(const struct cheat_op *ops, u32 n_ops, u32 *prog, u32 prog_max, u
 		for (i = 0; i < n_ops && o.status == CHEAT_LOWER_OK; ++i) {
 			const struct cheat_op *op = &ops[i];
 			if (!plain) {
+				// Ops a conditional without an ELSE covers run only while
+				// it holds: guarded. With an ELSE, one branch always runs.
+				u32 before = o.cost;
 				put_op(&o, op);  // every op in its place: the conditions count them
+				if (i < until) {
+					guarded += o.cost - before;
+					walked += CHEAT_COST_WALK;  // passed over while the condition fails
+				}
+				if (is_cond(op->type) && !op->else_count && i + 1 + op->count > until)
+					until = i + 1 + op->count;
 				++n;
 				continue;
 			}
@@ -303,8 +332,16 @@ u8 cheat_lower(const struct cheat_op *ops, u32 n_ops, u32 *prog, u32 prog_max, u
 		if (o.status == CHEAT_LOWER_OK)
 			prog[0] = n | (plain ? CHEAT_PROG_PLAIN : 0) | ((o.n - 1) * 4) << 16;
 	}
-	if (o.status == CHEAT_LOWER_OK && o.cost > CHEAT_CYCLES_MAX - CHEAT_COST_CALL)
-		o.status = CHEAT_LOWER_TOO_BIG;
+	if (o.status == CHEAT_LOWER_OK) {
+		// Its load, past which it can't run beside the call alone
+		u32 always = o.cost - guarded + walked;
+		if (always > CHEAT_CYCLES_MAX || o.cost > CHEAT_CYCLES_GATED_MAX)
+			o.status = CHEAT_LOWER_TOO_BIG;
+		else if (CHEAT_LOAD(always) > o.cost)
+			o.cost = CHEAT_LOAD(always);
+		if (o.cost > CHEAT_LOAD_MAX - CHEAT_LOAD(CHEAT_COST_CALL))
+			o.status = CHEAT_LOWER_TOO_BIG;
+	}
 	if (o.status != CHEAT_LOWER_OK) {
 		o.n = o.cost = o.n_patches = 0;
 		*n_patches = 0;

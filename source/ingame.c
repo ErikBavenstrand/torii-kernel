@@ -323,9 +323,9 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 		h->cheat_count = cheats.count;
 		h->cheat_table = cheats.table;
 	}
-	h->cheat_call = CHEAT_COST_CALL;
-	h->cheat_skip = CHEAT_COST_SKIP;
-	h->cheat_max = CHEAT_CYCLES_MAX;
+	h->cheat_call = CHEAT_LOAD(CHEAT_COST_CALL);
+	h->cheat_skip = CHEAT_LOAD(CHEAT_COST_SKIP);
+	h->cheat_max = CHEAT_LOAD_MAX;
 	// The state slots, when this launch put them in place
 	if (states.ready) {
 		h->state_slots = STATESTORE_SLOTS;
@@ -504,12 +504,57 @@ static void states_after_game(const struct ingame_session *h, const char *path)
 	dialog_close();
 }
 
+// cheats_keep for a larger file (cheatstore.h): each window that has listed
+// cheats in turn, its index the cheat's place in the whole file
+static void cheats_keep_windows(const struct ingame_session *h, const char *path, const struct ingame_out *out)
+{
+	struct cheatstore *cs = cheatstore();
+	struct cheatfile *f = &cs->file;
+	u32 changed = 0;
+	for (u32 pass = 0; pass < 2; pass++)  // drops first, so the picks after them fit
+		for (u32 k = 0; k < cheatstore_windows(); k++) {
+			u32 start = cheatstore_window_start(k), went = 0;
+			for (u32 n = 0; n < h->cheat_count; n++) {
+				struct cheat_meta m;
+				sram_get(CHEAT_META(n), (u8 *)&m, sizeof(m));
+				SetRampage(0);
+				if (m.index < start || m.index >= cheatstore_window_start(k + 1))
+					continue;
+				if (!went) {
+					if (!cheatstore_window_go(k))
+						return;
+					cheatstore_decode(0);
+					went = 1;
+				}
+				u32 i = m.index - start;
+				if (i >= f->count || cs->cheats[i].number != m.number) {
+					tlog_error(
+						"cheats: %s changed since the launch: the in-game picks are not kept",
+						path);
+					return;
+				}
+				if ((m.flags & INGAME_CHEAT_WHY) != INGAME_WHY_NONE || !(m.flags & INGAME_CHEAT_TABLE))
+					continue;
+				u32 on = out->cheat_on[n >> 5] >> (n & 31) & 1;
+				if (cs->cheats[i].picked != on && on == pass && cheatstore_toggle(i))
+					changed++;
+			}
+		}
+	tlog("cheats: %s: %lu picks changed in game", path, (unsigned long)changed);
+	if (changed && !cheatstore_write())
+		tlog_error("cheats: %s: the in-game picks weren't written", path);
+}
+
 // The cheat list's toggles as the game left them, into the cheat file's
 // picks (written power-cut safe, only if one changed)
 static void cheats_keep(const struct ingame_session *h, const char *path, const struct ingame_out *out)
 {
 	if (!cheatstore_read(path)) {
 		tlog_error("cheats: %s: no cheat file to keep the in-game picks in", path);
+		return;
+	}
+	if (cheatstore_windows()) {
+		cheats_keep_windows(h, path, out);
 		return;
 	}
 	struct cheatstore *cs = cheatstore();

@@ -29,10 +29,11 @@ static void erased(void)
 void test_settings_layout_slots(void)
 {
 	erased();
-	// Eight sections: a label, the rows, a gap each; 30 rows with the LED on
-	// (v0.7 took out the Cheats row: its slot, 4, is unused; v0.9 shows Language)
-	CHECK_EQ(lay.rows, 30);
-	CHECK_EQ(lay.count, 30 + 2 * SET_SECTIONS);
+	// Eight sections: a label, the rows, a gap each; 31 rows with the LED on
+	// (v0.7 took out the Cheats row: its slot, 4, is unused; v0.9 shows
+	// Language; Clean up cheats came after)
+	CHECK_EQ(lay.rows, 31);
+	CHECK_EQ(lay.count, 31 + 2 * SET_SECTIONS);
 	CHECK_EQ(lay.slot[0].kind, SET_SLOT_LABEL);
 	CHECK_EQ(lay.slot[1].kind, SET_SLOT_ROW);
 	CHECK_EQ(lay.slot[1].id, SET_THEME);
@@ -59,7 +60,7 @@ void test_settings_layout_slots(void)
 	// The LED off hides its colours: two rows fewer, the slots after move up
 	settings_set(&v, SET_LED, 0);
 	settings_layout_build(&lay, &v);
-	CHECK_EQ(lay.rows, 28);
+	CHECK_EQ(lay.rows, 29);
 	CHECK_EQ(settings_layout_slot_of(&lay, SET_LED_IDLE), SET_LAYOUT_NONE);
 	CHECK_EQ(settings_layout_slot_of(&lay, SET_RESET_ON), settings_layout_slot_of(&lay, SET_LED) + 3);
 }

@@ -254,15 +254,14 @@ void test_cheatstore(void)
 	CHECK(cheatstore_peek(T_ROM, &listed));
 	CHECK_EQ(listed, -1);  // not counted yet
 	CHECK_EQ(cheatstore_open(T_ROM), CHEATSTORE_READ);
-	CHECK_EQ(cheatstore_listed(), -1);  // not decoded yet
+	CHECK_EQ(cheatstore_listed(), 3);  // every cheat, the master code greyed: known once parsed
 	CHECK(cheatstore_decode(0));
-	CHECK_EQ(cheatstore_listed(), 2);  // the master code isn't listed
 	CHECK(cheatstore_peek(T_ROM, &listed));
-	CHECK_EQ(listed, 2);
+	CHECK_EQ(listed, 3);
 	CHECK(cheatfile_toggle(&cheatstore()->file, 1));
 	CHECK(cheatstore_write());  // a write keeps the count for the new copy
 	CHECK(cheatstore_peek(T_ROM, &listed));
-	CHECK_EQ(listed, 2);
+	CHECK_EQ(listed, 3);
 	CHECK(put(T_CHT, "cheat0_code = \"32001010+0001\"\n"));  // changed behind its back
 	CHECK(cheatstore_peek(T_ROM, &listed));
 	CHECK_EQ(listed, -1);
@@ -304,4 +303,62 @@ void test_cheatstore(void)
 	CHECK_EQ(gl_cheat_count, 0);
 	CHECK(!cheatstore_read(T_ROM));
 	f_unlink("/torii/cheats/T19");
+}
+
+// The cheat file's i-th cheat's desc is want
+static int desc_is(u32 i, const char *want)
+{
+	const struct cheatfile *f = &cheatstore()->file;
+	const struct cheatfile_cheat *c = &cheatstore()->cheats[i];
+	return i < f->count && c->desc != CHEATFILE_NONE && c->desc_len == strlen(want) &&
+	       !memcmp(f->text + c->desc, want, c->desc_len);
+}
+
+// Settings' Clean up cheats on the emulated cart: greyed cheats go, master
+// codes too unless a code after reads otherwise without them, codes typed on
+// the cart stay; a file with nothing left is deleted
+void test_cheatstore_clean(void)
+{
+	// A key the encrypted code after it needs: kept with it
+	CHECK(put(T_CHT, "cheat0_desc = \"M\"\ncheat0_code = \"930CFE0E61A7+5E4E1F94523A+DB3A64369A43\"\n"
+			 "cheat1_desc = \"HP\"\ncheat1_code = \"D86098902576+777F4707DA29\"\n"
+			 "cheat2_desc = \"Junk\"\ncheat2_code = \"ZZZZ\"\n"
+			 "cheat3_desc = \"Typed\"\ncheat3_code = \"ZZZZ\"\ncheat3_user = true\n"
+			 "cheat4_desc = \"Nothing\"\ncheat4_code = \"72001000 0001\"\n"));
+	CHECK_EQ(cheatstore_clean(T_CHT), 2);
+	CHECK_EQ(cheatstore_open(T_ROM), CHEATSTORE_READ);
+	CHECK_EQ(cheatstore()->file.count, 3);
+	CHECK(desc_is(0, "M"));
+	CHECK(desc_is(1, "HP"));
+	CHECK(desc_is(2, "Typed"));
+	CHECK_EQ(cheatstore()->cheats[2].number, 2);
+	cheatstore_decode(0);
+	CHECK_EQ(cheatstore()->cheats[1].status, CHEATFILE_OK);
+	CHECK_EQ(cheatstore_clean(T_CHT), 0);  // clean already: left as it is
+
+	// No code needs the master code: it goes too, the picks stay
+	CHECK(put(T_CHT, "cheat0_desc = \"M\"\ncheat0_code = \"0000ABCD 0007+100F68A4 0007\"\n"
+			 "cheat1_desc = \"A\"\ncheat1_code = \"32001010+0001\"\ncheat1_enable = true\n"
+			 "cheat2_desc = \"A again\"\ncheat2_code = \"32001010+0001\"\n"));
+	CHECK_EQ(cheatstore_clean(T_CHT), 2);
+	CHECK_EQ(cheatstore_open(T_ROM), CHEATSTORE_READ);
+	CHECK_EQ(cheatstore()->file.count, 1);
+	CHECK(desc_is(0, "A"));
+	CHECK_EQ(cheatstore()->cheats[0].number, 0);
+	CHECK_EQ(cheatstore()->cheats[0].picked, 1);
+
+	// Nothing left: the file goes
+	CHECK(put(T_CHT, "cheat0_desc = \"Junk\"\ncheat0_code = \"ZZZZ\"\n"));
+	CHECK_EQ(cheatstore_clean(T_CHT), 1);
+	CHECK_EQ(file_size(T_CHT), 0);
+
+	// Every cheat file under /torii/cheats
+	CHECK(put(T_CHT, "cheat0_code = \"ZZZZ\"\ncheat1_code = \"32001010+0001\"\n"));
+	struct cheatstore_sum sum;
+	cheatstore_clean_all(NULL, &sum);
+	CHECK(sum.files >= 1);
+	CHECK_EQ(sum.removed, 1);
+	CHECK_EQ(sum.cleaned, 1);
+	CHECK_EQ(sum.failed, 0);
+	cheatstore_delete(T_ROM);
 }

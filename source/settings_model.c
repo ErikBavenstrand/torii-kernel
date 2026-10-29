@@ -34,6 +34,7 @@ const struct settings_row settings_rows[SET_ROWS] = {
 	[SET_SLEEP_KEYS] = {SET_SEC_HOTKEYS, SET_KEYS, assress_edit_sleephotkey_0, 0, 0, 0, 0, 0},
 	[SET_RESCAN] = {SET_SEC_LIBRARY, SET_ACTION, SET_NO_SLOT, 0, 0, 0, 0, SET_ACTION_RESCAN},
 	[SET_IDENTIFY] = {SET_SEC_LIBRARY, SET_ACTION, SET_NO_SLOT, 0, 0, 0, 0, SET_ACTION_IDENTIFY},
+	[SET_CLEAN_CHEATS] = {SET_SEC_LIBRARY, SET_ACTION, SET_NO_SLOT, 0, 0, 0, 0, SET_ACTION_CLEAN_CHEATS},
 	[SET_SHOW_ALL] = {SET_SEC_LIBRARY, SET_ONOFF, assress_show_all, 0, 0, 2, 0, 0},
 	[SET_LOGGING] = {SET_SEC_SYSTEM, SET_CHOICE, assress_logging, 0, 0, 4, STR_SET_VALUE_LOG_OFF, 0},
 	[SET_LANGUAGE] = {SET_SEC_SYSTEM, SET_CHOICE, assress_language, 0, 0, 0, 0, 0},
@@ -46,7 +47,7 @@ const struct settings_section_info settings_sections[SET_SECTIONS] = {
 	[SET_SEC_SAVES] = {SET_AUTO_SAVE, 4},
 	[SET_SEC_CART] = {SET_RUMBLE, 5},
 	[SET_SEC_HOTKEYS] = {SET_RESET_ON, 4},
-	[SET_SEC_LIBRARY] = {SET_RESCAN, 3},
+	[SET_SEC_LIBRARY] = {SET_RESCAN, 4},
 	[SET_SEC_SYSTEM] = {SET_LOGGING, 2},
 };
 // clang-format on

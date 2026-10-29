@@ -1207,6 +1207,26 @@ static void par_raw(struct dec *s, u32 op1, u32 op2)
 }
 
 // GBACheatAddGameShark, GBACheatAddProActionReplay and the autodetection
+#ifdef CHEAT_RAW_LINES
+struct cheat_raw cheat_raw;
+
+static void raw_add(u8 format, u32 op1, u32 op2)
+{
+	if (cheat_raw.n < CHEAT_RAW_MAX)
+		cheat_raw.line[cheat_raw.n] = (typeof(cheat_raw.line[0])){format, 0, op1, op2};
+	cheat_raw.n++;
+}
+
+static void raw_drop(void)
+{
+	if (cheat_raw.n && cheat_raw.n <= CHEAT_RAW_MAX)
+		cheat_raw.line[cheat_raw.n - 1].drop = 1;
+}
+#else
+#define raw_add(format, op1, op2) ((void)0)
+#define raw_drop() ((void)0)
+#endif
+
 static void gs_line(struct dec *s, u32 op1, u32 op2)
 {
 	struct cheat_decoder *d = s->d;
@@ -1221,6 +1241,9 @@ static void gs_line(struct dec *s, u32 op1, u32 op2)
 		d->last = d->gs_version;
 	if (d->gs_version == CHEAT_FMT_GSAV1 || d->gs_version == CHEAT_FMT_PARV3)
 		gs_decrypt(&op1, &op2, d->gs_seeds);
+	raw_add(d->gs_version <= CHEAT_FMT_GSAV1_RAW ? CHEAT_FMT_GSAV1_RAW : CHEAT_FMT_PARV3_RAW, op1, op2);
+	if (op1 == DEADFACE)
+		raw_drop();  // a seed line (gsa_raw, par_raw): what it sets is decrypted already
 	if (d->gs_version <= CHEAT_FMT_GSAV1_RAW)
 		gsa_raw(s, op1, op2);
 	else
@@ -1265,16 +1288,21 @@ static void cb_line(struct dec *s, u32 op1, u16 op2)
 	if (d->cb_master) {
 		if (op1 == d->cb_master && op2 == d->cb_key2) {  // the key again
 			s->keyed = 1;
+			raw_add(CHEAT_FMT_CODEBREAKER, op1, op2);
+			raw_drop();
 			return;
 		}
 		if (s->adopt && op1 >> 28 == 0x9 && s->cont == CONT_NONE) {  // another key, as typed
 			s->keyed = 1;
+			raw_add(CHEAT_FMT_CODEBREAKER, op1, op2);
+			raw_drop();
 			if (!cb_reseed(d, op1, op2))
 				s->bad = 1;
 			return;
 		}
 		cb_decrypt(d, &op1, &op2);
 	}
+	raw_add(CHEAT_FMT_CODEBREAKER, op1, op2);
 
 	switch (s->cont) {
 	case CONT_CB_FILL:
@@ -1303,6 +1331,7 @@ static void cb_line(struct dec *s, u32 op1, u16 op2)
 		return;
 	case 0x9:
 		s->keyed = 1;
+		raw_drop();  // the key: the lines after it are decrypted already
 		if (!cb_reseed(d, op1, op2))
 			s->bad = 1;
 		return;
@@ -1353,6 +1382,7 @@ static void cb_line(struct dec *s, u32 op1, u16 op2)
 static void vba_line(struct dec *s, const struct line *l)
 {
 	struct cheat_decoder *d = s->d;
+	raw_add(CHEAT_FMT_VBA, 0, 0);  // never encrypted: a cheat with one stays as written
 	if (d->forced != CHEAT_FMT_AUTO && d->forced != CHEAT_FMT_VBA) {
 		s->bad = 1;
 		return;
@@ -1417,6 +1447,9 @@ static u8 decode_pass(struct cheat_decoder *work, const char *code, u32 len, str
 	u32 i;
 
 	memset(&s, 0, sizeof(s));
+#ifdef CHEAT_RAW_LINES
+	cheat_raw.n = 0;  // the last pass's lines are the decoding kept
+#endif
 	s.d = work;
 	s.ops = ops;
 	s.ops_max = ops_max;
@@ -1490,6 +1523,9 @@ u8 cheat_decode(struct cheat_decoder *d, const char *code, u32 len, struct cheat
 	u8 marks = 0, keyed, status, new_key = 0;
 
 	*n_ops = 0;
+#ifdef CHEAT_RAW_LINES
+	cheat_raw.n = 0;  // a cheat that returns before any pass has no lines
+#endif
 	// Every token must read before anything decodes
 	for (i = 0;; ++i) {
 		next_line(code, len, &pos, &l);

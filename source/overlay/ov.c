@@ -468,7 +468,7 @@ static uint32_t cheat_why(uint32_t e)
 	return m.cheat[e].flags & INGAME_CHEAT_WHY;
 }
 
-// The cheats' cycles a frame with the entries on now (cheatcode.h's model)
+// The cheats' load with the entries on now (cheatcode.h's CHEAT_LOAD model)
 static uint32_t cheats_cost(void)
 {
 	const struct ingame_session *s = session();

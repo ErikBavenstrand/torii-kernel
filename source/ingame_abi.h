@@ -414,7 +414,7 @@ struct ingame_session {
 	// The clock at the launch (as struct ingame_shot's clock), which a
 	// screenshot's time must follow
 	uint8_t launch_clock[8];
-	// P2: the cheat list; the cycles a frame are cheatcode.h's model
+	// P2: the cheat list; costs are cheatcode.h's loads (CHEAT_LOAD)
 	uint16_t cheat_count;  // the list's cheats (0: the old Cheats on/off row)
 	uint16_t cheat_table;  // the cheats in the interpreter's table
 	uint16_t cheat_call;  // the interpreter's call, the table's end included

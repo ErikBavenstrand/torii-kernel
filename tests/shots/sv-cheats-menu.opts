@@ -24,9 +24,9 @@
 -k @12:DOWN -k @16:- -k @24:DOWN -k @28:-
 -k @48:A -k @52:-
 -w "screen ready: cheats"
--k @8:UP -k @12:- -k @20:UP -k @24:-
--s @40:rom.png
--k @48:START -k @52:-
+-k @8:UP -k @12:- -k @20:UP -k @24:- -k @32:UP -k @36:-
+-s @52:rom.png
+-k @60:START -k @64:-
 -w "screen ready: cheat-menu"
 -s @24:menu.png
 -k @32:A -k @36:-

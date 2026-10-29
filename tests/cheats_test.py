@@ -80,6 +80,19 @@ class Kernel(unittest.TestCase):
             cheats.LINES_MAX,
         )
 
+    def test_window_limits(self):
+        """The window limits the tool fits big files to are the kernel's."""
+        ix = (ROOT / "source" / "cheatindex.h").read_text()
+        st = (ROOT / "source" / "cheatstore.h").read_text()
+        for text, name, value in (
+            (ix, "CHEATINDEX_CHEATS", cheats.WINDOW_CHEATS),
+            (ix, "CHEATINDEX_BYTES", cheats.WINDOW_BYTES),
+            (st, "CHEATSTORE_WINDOWS", cheats.WINDOWS),
+        ):
+            got = re.search(rf"#define {name} (0x[0-9A-Fa-f]+|\d+)\n", text).group(1)
+            self.assertEqual(int(got, 0), value, name)
+        self.assertIn(f'#define CHEATINDEX_EXT "{cheats.INDEX_EXT}"', ix)
+
     def test_format_names(self):
         c = (ROOT / "source" / "cheatfile.c").read_text()
         body = re.search(r"cheatfile_format_names\[[^]]*\] = \{([^}]*)\}", c).group(1)
@@ -95,14 +108,14 @@ class Mgba(unittest.TestCase):
         """Each set's own directive, as mGBA's parser takes it; one with
         none gets none (mGBA would carry the last one over)."""
         sets = cheats.parse_mgba(
-            "!disabled\n!GSAv1\n# A\n11111111 22222222\n\n"
-            "!disabled\n!GSAv1 raw\n# B\n11111111 22222222\n"
-            "!enabled\n!PARv3\n# C\n33333333 44444444\n55555555 66666666\n"
+            "!disabled\n!GSAv1\n# A\n2B5117B8 1AC6855D\n\n"
+            "!disabled\n!GSAv1 raw\n# B\n2B5117B8 1AC6855D\n"
+            "!enabled\n!PARv3\n# C\nDDBBB9BA 3DA8ACBA\n55555555 66666666\n"
             "!PARv3 raw\n#D\n77777777 88888888\n"
             "!disabled\n# E\n82001000 0063\n"
             "!parv3\n# F\n02001000:12\n"
-            "!PARv3\n!GSAv1\n# G\n11111111 22222222\n"
-            "!PARv3\n!reset\n# H\n11111111 22222222\n"
+            "!PARv3\n!GSAv1\n# G\n2B5117B8 1AC6855D\n"
+            "!PARv3\n!reset\n# H\n2B5117B8 1AC6855D\n"
         )
         self.assertEqual(
             [(s.name, s.directive) for s in sets],
@@ -117,7 +130,7 @@ class Mgba(unittest.TestCase):
                 ("H", None),
             ],
         )
-        self.assertEqual(sets[2].lines, ["33333333 44444444", "55555555 66666666"])
+        self.assertEqual(sets[2].lines, ["DDBBB9BA 3DA8ACBA", "55555555 66666666"])
 
     def test_lines_before_a_name(self):
         sets = cheats.parse_mgba("  02001000:12  \n# Named\n02001001:34\n")
@@ -133,14 +146,14 @@ class Mgba(unittest.TestCase):
         ok = [f"{0x02000000 + i:08X}:01" for i in range(cheats.LINES_MAX)]
         sets = cheats.parse_mgba(
             mgba(
-                ('Max "Money"', "PARv3", ["11111111 22222222"]),
+                ('Max "Money"', "PARv3", ["2B5117B8 1AC6855D"]),
                 ("???", None, ["02001000:12"]),
                 ("", None, ["02001001:12"]),
-                ("? ?", "GSAv1", ["11111111 22222222"]),
+                ("? ?", "GSAv1", ["2B5117B8 1AC6855D"]),
                 ("Nature", None, big),
                 ("Long but fine", None, ok),
-                ("Money again", "PARv3", ["11111111  22222222"]),
-                ("Money as GS", "GSAv1", ["11111111 22222222"]),
+                ("Money again", "PARv3", ["2B5117B8  1AC6855D"]),
+                ("Money as GS", "GSAv1", ["2B5117B8 1AC6855D"]),
                 ("Two lines", None, ["82001000 0063", "82001002 0063"]),
             )
         )
@@ -149,11 +162,11 @@ class Mgba(unittest.TestCase):
             got,
             [
                 cheats.Cheat(
-                    "Max 'Money'", "11111111 22222222", False, {"format": "PARv3"}
+                    "Max 'Money'", "2B5117B8 1AC6855D", False, {"format": "PARv3"}
                 ),
                 cheats.Cheat("Long but fine", "+".join(ok), False),
                 cheats.Cheat(
-                    "Money as GS", "11111111 22222222", False, {"format": "GSAv1"}
+                    "Money as GS", "2B5117B8 1AC6855D", False, {"format": "GSAv1"}
                 ),
                 cheats.Cheat("Two lines", "82001000 0063+82001002 0063", False),
             ],
@@ -170,7 +183,7 @@ class Mgba(unittest.TestCase):
         )
         text = cheats.format_cht(got)
         self.assertIn(
-            'cheat0_code = "11111111 22222222"\ncheat0_format = "PARv3"\n', text
+            'cheat0_code = "2B5117B8 1AC6855D"\ncheat0_format = "PARv3"\n', text
         )
         self.assertNotIn("_enable = false", text)  # off is the default: compact
         self.assertNotIn("cheat1_format", text)
@@ -408,14 +421,14 @@ INDEX = {
 }
 
 FIRERED_EXPORT = mgba(
-    ("Master Ball", "PARv3", ["11111111 22222222"]),
+    ("Master Ball", "PARv3", ["2B5117B8 1AC6855D"]),
     ("Money", None, ["02025840:99"]),
     ("Patch in the changed block", None, ["08002100:1234"]),
     ("Patch outside it", None, ["08000400:1234"]),
     ("???", None, ["02000000:01"]),
-    ("Master Ball", "PARv3", ["11111111 22222222"]),
+    ("Master Ball", "PARv3", ["2B5117B8 1AC6855D"]),
 )
-EMERALD_EXPORT = mgba(("Rare Candy", "GSAv1", ["33333333 44444444"]))
+EMERALD_EXPORT = mgba(("Rare Candy", "GSAv1", ["DDBBB9BA 3DA8ACBA"]))
 SAPPHIRE_EXPORT = mgba(
     ("Shiny", None, ["02001000:01"]), ("Patch", None, ["08000400:1234"])
 )
@@ -494,12 +507,15 @@ class Card(unittest.TestCase):
         self.assertEqual(
             [(c[0], c.extra.get("format")) for c in got],
             [
-                ("Master Ball", "PARv3"),
+                ("Master Ball", "PARv3 raw"),  # decrypted (decrypt)
                 ("Money", None),
                 ("Patch in the changed block", None),
                 ("Patch outside it", None),
             ],
         )
+        self.assertEqual(
+            got[0][1], "02225840 00000001"
+        )  # PARv3 raw: a halfword write of 1
         self.assertIn(
             "/GBA/FireRed.gba: /torii/cheats/GBA/FireRed.cht: 4 cheats from", out
         )
@@ -946,6 +962,97 @@ class Romhack(unittest.TestCase):
         self.assertFalse(
             cheats.patch_unchanged(FIRERED, FIRERED[:0x400], (0x400, 0x12, 0x00FF))
         )
+
+    def test_sift(self):
+        """sift drops what the kernel would grey, keeping master codes and
+        the first of cheats alike."""
+        kept, dropped = cheats.sift(
+            [
+                cheats.Cheat("Lives", "32001010 0003", False),
+                cheats.Cheat("Nothing", "72001000 0001", False),
+                cheats.Cheat("Lives again", "32001010 0003", False),
+                cheats.Cheat("Garbage", "ZZZZ", False),
+                cheats.Cheat("Fill in", "3300075C+00??", False),
+                cheats.Cheat("Patch", "08001000:1234", False),
+            ]
+        )
+        self.assertEqual([c[0] for c in kept], ["Lives", "Fill in", "Patch"])
+        self.assertEqual(
+            dropped,
+            [
+                ("Nothing", "does nothing"),
+                ("Lives again", "does what an earlier cheat does"),
+                ("Garbage", "the kernel can't read it"),
+            ],
+        )
+
+    def test_decrypt(self):
+        """A code encrypted under a master code's CodeBreaker key is written
+        plain, the master code dropped: it decodes alone as it did."""
+        out, n, dropped = cheats.decrypt(
+            [
+                cheats.Cheat(
+                    "(M) Must Be On", "930CFE0E61A7+5E4E1F94523A+DB3A64369A43", False
+                ),
+                cheats.Cheat("Infinite HP", "D86098902576+777F4707DA29", True),
+            ]
+        )
+        self.assertEqual(n, 1)
+        self.assertEqual([c[0] for c in out], ["Infinite HP"])
+        self.assertEqual(out[0].extra.get("format"), "CodeBreaker")
+        self.assertTrue(out[0][2])  # the pick stays
+        self.assertNotEqual(out[0][1], "D86098902576+777F4707DA29")
+        self.assertEqual(
+            [why for _, why in dropped],
+            ["a master code: not needed once the codes are decrypted"],
+        )
+        alone = cheats.decode_cheats(out)
+        self.assertEqual(alone[0][0], cheats.ST_OK)
+
+    def test_index_and_picks_by_hash(self):
+        """A file past one read gets the kernel's index; a pick of the old
+        file carries to the new by what it does, its code written anew."""
+        many = [
+            cheats.Cheat(f"W{i}", f"{0x02000000 + 2 * i:08X}:0001", i == 7)
+            for i in range(cheats.CHEATS_MAX + 10)
+        ]
+        text = cheats.format_cht(many)
+        index = cheats.index_text(text)
+        self.assertIsNotNone(index)
+        lines = index.splitlines()
+        self.assertEqual(lines[0], "torii-cheat-index 1")
+        self.assertEqual(lines[1], f"file {len(text):X}")
+        windows = [line for line in lines if line.startswith("w ")]
+        self.assertEqual(len(windows), -(-len(many) // cheats.WINDOW_CHEATS))
+        self.assertEqual(windows[0].split()[1], "0")
+        self.assertEqual(
+            int(windows[1].split()[3], 16), cheats.WINDOW_CHEATS
+        )  # its first cheat's number
+        picks = [line for line in lines if line.startswith("p ")]
+        self.assertEqual([p.split()[1] for p in picks], ["7"])
+        # The same write as a VBA code and as CodeBreaker: the pick carries
+        old = [cheats.Cheat("Lives", "02001000:0063", True)]
+        new = [cheats.Cheat("Lives", "82001000 0063", False)]
+        got, rest = cheats.carry_picks(new, old, None)
+        self.assertTrue(got[0][2])
+        self.assertEqual(rest, [])
+        # With an index, its picks are the file's: the text's stale pick isn't
+        got, rest = cheats.carry_picks(new, old, set())
+        self.assertFalse(got[0][2])
+        got, _ = cheats.carry_picks(new, [], cheats.index_picks(index))
+        self.assertFalse(got[0][2])  # the index's pick is another program
+
+    def test_sift_in_parts(self):
+        """A list past one file's limits is read in parts as one: a cheat
+        alike across the parts is still a duplicate."""
+        many = [
+            cheats.Cheat(f"W{i}", f"{0x02000000 + 2 * i:08X}:0001", False)
+            for i in range(cheats.PART_CHEATS + 5)
+        ]
+        many.append(cheats.Cheat("W0 again", "02000000:0001", False))
+        kept, dropped = cheats.sift(many)
+        self.assertEqual(len(kept), cheats.PART_CHEATS + 5)
+        self.assertEqual(dropped, [("W0 again", "does what an earlier cheat does")])
 
     def test_rom_patches(self):
         """The kernel's decoder (tools/cheat_patches.c) finds the patches."""

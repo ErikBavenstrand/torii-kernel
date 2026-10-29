@@ -41,8 +41,20 @@ Writing a game's file, /torii/cheats/<rom path without extension>.cht:
   (!GSAv1, !GSAv1 raw, !PARv3, !PARv3 raw) is written as cheatN_format; a
   set with none gets none, and the kernel detects its format. Sets with no
   name (or only "?"), of more than 256 code lines, or the same as an earlier
-  one (device and code) are dropped, and so are the largest sets while the
-  file is over the kernel's limit (CHEATFILE_TEXT_MAX less some room).
+  one (device and code) are dropped, then those the kernel would grey
+  (sift), and the largest sets while the file is over the kernel's limit:
+  a file past CHEATFILE_TEXT_MAX or CHEATFILE_MAX cheats is read in
+  windows (source/cheatstore.h), so up to BIG_CHEATS cheats and BIG_BYTES
+  bytes. An older kernel (v0.9 and before) refuses a file over 192 KB.
+- Every encrypted code is written decrypted (decrypt: GameShark and Action
+  Replay codes raw, CodeBreaker ones plain, key and seed lines left out),
+  and the master codes go: Torii hooks the game itself, so with nothing
+  encrypted they do nothing. A file past the kernel's one read gets its
+  index beside it, <rom path less extension>.cdx (source/cheatindex.h),
+  which the kernel reads it in windows by; a smaller file's old index goes.
+- Picks carry over by what the cheat does (its program's hash), from the old
+  file's enable lines and its old index (where the kernel keeps a larger
+  file's picks), so a pick outlives its code being written anew.
 - The first line is "# for crc32 XXXXXXXX", the ROM the file is for (the
   kernel refuses a file made for another dump), then where it came from.
 - An existing file (read as the kernel reads it) keeps its picks, matched
@@ -115,6 +127,16 @@ LINES_MAX = 256  # CHEATFILE_OPS_MAX: a set of more lines could never run
 # none), and codes typed on the cart's keypad are added to the text; 32 KB
 # covers a pick of every cheat (about 24 bytes each) and room to type
 ROOM = 0x8000
+# A larger file's windows (source/cheatindex.h, cheatstore.h): one closes at
+# WINDOW_CHEATS cheats or WINDOW_BYTES bytes, at most WINDOWS of them; a
+# file is fit to BIG_CHEATS and BIG_BYTES, and fewer while its index (which
+# tools/cheat_patches.c --index cuts as the kernel does) needs more windows
+WINDOW_CHEATS = 250  # CHEATINDEX_CHEATS
+WINDOW_BYTES = 0xA000  # CHEATINDEX_BYTES
+WINDOWS = 64  # CHEATSTORE_WINDOWS
+BIG_CHEATS = 15000
+BIG_BYTES = 0x240000
+INDEX_EXT = ".cdx"  # CHEATINDEX_EXT: a larger file's index, beside it
 # cheatN_format's values by enum cheat_format (source/cheatfile.c's
 # cheatfile_format_names); the first four are mGBA's GBA directives
 FORMAT_NAMES = (None, "GSAv1", "GSAv1 raw", "PARv3", "PARv3 raw", "CodeBreaker", "VBA")
@@ -435,7 +457,7 @@ def convert(sets, suffix=""):
     return out, dropped
 
 
-def fit(cheats, removable, comments, limit=TEXT_MAX - ROOM, most=CHEATS_MAX):
+def fit(cheats, removable, comments, limit=BIG_BYTES, most=BIG_CHEATS):
     """Drops cheats until the file's text is within limit bytes and holds at
     most `most` cheats: the largest of the removable ones (indices) that
     aren't picked first, then picked ones. Returns (cheats, [dropped])."""
@@ -727,10 +749,14 @@ PATCH_SOURCES = (
     "source/cheatfile.c",
     "source/cheatcode.c",
     "source/cheatlower.c",
+    "source/cheatindex.c",
+    "source/crc32.c",
 )
 PATCH_DEPS = PATCH_SOURCES + (
     "source/cheatfile.h",
     "source/cheatcode.h",
+    "source/cheatindex.h",
+    "source/crc32.h",
     "tests/host/gba_base.h",
 )
 
@@ -761,6 +787,7 @@ def patch_tool():
         "-std=gnu11",
         "-O1",
         "-funsigned-char",
+        "-DCHEAT_RAW_LINES",
         "-I",
         str(ROOT / "tests" / "host"),
         "-o",
@@ -782,26 +809,238 @@ def patch_tool():
     return exe
 
 
-def rom_patches(cheats):
-    """Each cheat's ROM patches [(offset, value, mask)] as the kernel decodes
-    the file they make, or None if the decoder can't be built."""
+# The kernel's enum cheatfile_status (source/cheatfile.h), as cheat_patches prints it
+(
+    ST_OK,
+    ST_MASTER,
+    ST_BIG,
+    ST_UNREADABLE,
+    ST_PLACEHOLDER,
+    ST_CANT_RUN,
+    ST_NOTHING,
+    ST_SAME,
+) = range(1, 9)
+# Why sift drops a cheat of each status the kernel would grey
+SIFTED = {
+    ST_BIG: "too big to run",
+    ST_UNREADABLE: "the kernel can't read it",
+    ST_CANT_RUN: "can't run on the cart",
+    ST_NOTHING: "does nothing",
+    ST_SAME: "does what an earlier cheat does",
+}
+PART_CHEATS = 1000  # a part's cheats when cheat_patches reads a list in parts
+PART_BYTES = 180000  # and its text at most, under CHEATFILE_TEXT_MAX
+
+
+def parts(cheats):
+    """cheats split into runs that each make a file the kernel reads whole:
+    [(start, end)]."""
+    out, start = [], 0
+    while start < len(cheats):
+        end = min(start + PART_CHEATS, len(cheats))
+        while (
+            end - start > 1
+            and len(format_cht(cheats[start:end]).encode("utf-8", "surrogateescape"))
+            > PART_BYTES
+        ):
+            end = start + max(1, (end - start) * 3 // 4)
+        out.append((start, end))
+        start = end
+    return out
+
+
+def decode_cheats(cheats, raw=False):
+    """Each cheat's (status, hash, patches, plain) as the kernel decodes the
+    list in order (tools/cheat_patches.c, in parts past one file's limits),
+    or None if the decoder can't be built. patches are [(offset, value,
+    mask)]; plain, with raw, is the cheat decrypted (format, code) or None
+    where it can't be written plain."""
+    exe = patch_tool()
+    if exe is None:
+        return None
+    if not cheats:
+        return []
+    spans = parts(cheats)
+    with tempfile.TemporaryDirectory() as tmp:
+        files = []
+        for k, (start, end) in enumerate(spans):
+            f = Path(tmp) / f"part{k}.cht"
+            f.write_bytes(
+                format_cht(cheats[start:end]).encode("utf-8", "surrogateescape")
+            )
+            files.append(str(f))
+        args = [str(exe), *(["--raw"] if raw else []), *files]
+        r = subprocess.run(args, capture_output=True, text=True, check=False)
+    if r.returncode:
+        raise CheatsError(f"cheat_patches: {r.stderr.strip()}")
+    out = [(ST_UNREADABLE, 0, [], None) for _ in cheats]
+    last = None
+    for line in r.stdout.splitlines():
+        fields = line.split("\t")
+        if fields[0] == "R":
+            if last is not None and fields[1] != "-" and len(fields) > 2 and fields[2]:
+                st, h, p, _ = out[last]
+                out[last] = (st, h, p, (fields[1], fields[2]))
+            continue
+        i = spans[int(fields[0])][0] + int(fields[1])
+        last = i
+        out[i] = (
+            int(fields[2]),
+            int(fields[3], 16),
+            [tuple(int(x, 16) for x in p.split("/")) for p in fields[4:]],
+            None,
+        )
+    return out
+
+
+def decrypt(cheats):
+    """cheats with every encrypted code written decrypted, as the kernel
+    reads it (tools/cheat_patches.c --raw): GameShark and Action Replay
+    codes in their raw form, CodeBreaker ones plain, key and seed lines left
+    out. Master codes go: once nothing is encrypted, Torii has no use for
+    them (it hooks the game itself). Each cheat must read alone as it did
+    with the keys before it: one that doesn't goes too. Returns (cheats,
+    how many were rewritten, [(name, why)])."""
+    got = decode_cheats(cheats, raw=True)
+    if got is None:
+        return cheats, 0, []
+    plain, was, dropped = [], [], []
+    for c, (st, h, _, raw) in zip(cheats, got, strict=True):
+        p = raw if st == ST_OK else None  # only a cheat that reads is written anew
+        if st == ST_MASTER:
+            dropped.append(
+                (c[0], "a master code: not needed once the codes are decrypted")
+            )
+            continue
+        new = c
+        if p is not None and (p[1] != c[1] or p[0] != c.extra.get("format")):
+            new = Cheat(c[0], p[1], c[2], {**c.extra, "format": p[0]})
+        plain.append(new)
+        was.append((st, h))
+    again = decode_cheats(plain)
+    out, n = [], 0
+    for c, w, h, orig in zip(
+        plain,
+        was,
+        again,
+        (c for c, g in zip(cheats, got, strict=True) if g[0] != ST_MASTER),
+        strict=True,
+    ):
+        if w != (h[0], h[1]):
+            dropped.append((c[0], "reads otherwise without its master code's key"))
+            continue
+        out.append(c)
+        n += c is not orig
+    return out, n, dropped
+
+
+def index_text(text):
+    """The index the kernel would build for a cheat file's text
+    (source/cheatindex.h, by tools/cheat_patches.c --index), or None: no C
+    compiler, or its cheats need more windows than the kernel has."""
     exe = patch_tool()
     if exe is None:
         return None
     with tempfile.TemporaryDirectory() as tmp:
-        f = Path(tmp) / "base.cht"
-        f.write_bytes(format_cht(cheats).encode("utf-8", "surrogateescape"))
+        f = Path(tmp) / "file.cht"
+        f.write_bytes(text.encode("utf-8", "surrogateescape"))
         r = subprocess.run(
-            [str(exe), str(f)], capture_output=True, text=True, check=False
+            [str(exe), "--index", str(f)], capture_output=True, text=True, check=False
         )
-    if r.returncode:
-        raise CheatsError(f"cheat_patches: {r.stderr.strip()}")
-    out = [[] for _ in cheats]
-    for line in r.stdout.splitlines():
-        fields = line.split("\t")
-        i = int(fields[0])
-        out[i] = [tuple(int(x, 16) for x in p.split("/")) for p in fields[2:]]
+    return r.stdout if r.returncode == 0 else None
+
+
+def index_picks(text):
+    """The program hashes of an index's picks (its "p" lines)"""
+    out = set()
+    for line in (text or "").splitlines():
+        f = line.split()
+        if len(f) >= 3 and f[0] == "p" and re.fullmatch(r"[0-9A-Fa-f]{1,8}", f[2]):
+            out.add(int(f[2], 16))
+    out.discard(0)
     return out
+
+
+def carry_picks(database, old, hashes):
+    """The database's cheats picked where a pick of the old file, or of its
+    old index (hashes), runs the same program (the kernel's hash): a pick
+    outlives its code being written decrypted. The old picks so carried
+    leave old when their code changed, else merge would keep them as the
+    user's own. Returns
+    (database, old)."""
+    got = decode_cheats(database)
+    if got is None:
+        return database, old
+    # An old index's picks are the file's (hashes; None without one): an
+    # un-pick lives only there, the text's enable lines as the file was
+    # written. With none, the text's.
+    og = decode_cheats(old) if old else []
+    if hashes is not None and og:
+        old = [
+            Cheat(c[0], c[1], bool(g[1]) and g[1] in hashes, getattr(c, "extra", {}))
+            for c, g in zip(old, og, strict=True)
+        ]
+    picked = set(hashes or ())
+    for c, g in zip(old, og or [], strict=False):
+        if c[2] and g[1]:
+            picked.add(g[1])
+    have = {g[1] for g in got if g[1]}
+    codes = {c[1] for c in database}
+    out = [
+        Cheat(c[0], c[1], True, c.extra) if not c[2] and g[1] and g[1] in picked else c
+        for c, g in zip(database, got, strict=True)
+    ]
+    if og:
+        old = [
+            c
+            for c, g in zip(old, og, strict=True)
+            if not (c[2] and g[1] in have and c[1] not in codes and not user_code(c))
+        ]
+    return out, old
+
+
+def rom_patches(cheats):
+    """Each cheat's ROM patches [(offset, value, mask)] as the kernel decodes
+    the file they make, or None if the decoder can't be built."""
+    got = decode_cheats(cheats)
+    return None if got is None else [p for _, _, p, _ in got]
+
+
+def sift(cheats, keep=lambda cheat: False):
+    """cheats less those the kernel would grey: unreadable, too big, can't
+    run, doing nothing, or doing what an earlier one does (master codes stay:
+    their keys decode the cheats after them; so do those keep says to).
+    Dropping a cheat can change how later ones decode (a key in it), so the
+    rest are decoded again and any whose reading changed goes too, until
+    none does (each round drops one at least, so it ends). Returns (kept,
+    [(name, why)]), or (cheats, []) without a C compiler."""
+    got = decode_cheats(cheats)
+    if got is None:
+        return cheats, []
+    drop = [g[0] in SIFTED and not keep(c) for c, g in zip(cheats, got, strict=True)]
+    dropped = [
+        (c[0], SIFTED[g[0]]) for c, g, d in zip(cheats, got, drop, strict=True) if d
+    ]
+    kept = [(c, g) for c, g, d in zip(cheats, got, drop, strict=True) if not d]
+    while True:
+        again = decode_cheats([c for c, _ in kept])
+        changed = {
+            i
+            for i, ((c, g), h) in enumerate(zip(kept, again, strict=True))
+            if g[:2] != h[:2] and not keep(c)
+        }
+        if not changed:
+            break
+        dropped += [
+            (kept[i][0][0], "decodes otherwise once the junk is gone")
+            for i in sorted(changed)
+        ]
+        kept = [
+            (c, h)
+            for i, ((c, _), h) in enumerate(zip(kept, again, strict=True))
+            if i not in changed
+        ]
+    return [c for c, _ in kept], dropped
 
 
 # --- The card ------------------------------------------------------------------------------
@@ -889,6 +1128,10 @@ def gh_source(cache, index, crc, suffix=""):
     if not path.is_file():
         return Skip("not fetched yet", f"{crc_hex(crc)}: run with --gamehacking")
     cheats, dropped = convert(parse_mgba(decode(path.read_bytes())), suffix)
+    cheats, _, gone = decrypt(cheats)
+    dropped += gone
+    cheats, sifted = sift(cheats)
+    dropped += sifted
     if not cheats:
         return Skip(
             "no cheats on GameHacking",
@@ -1013,21 +1256,47 @@ def write_game(sd, game, src, dry_run):
     """Merges a game's Source into its card file. Returns (state, detail,
     dropped): state written, updated or unchanged."""
     target = cheat_path(sd, game.card_path)
+    index = target.with_suffix(INDEX_EXT)
     old_text = read_card_file(target)
     old = parse_cht(old_text) if old_text is not None else []
     ours = old_text is not None and for_crc(old_text) is not None
-    cheats, own, stale = merge(src.cheats, old, keep_all=not ours)
+    old_index = read_card_file(index)
+    database, old = carry_picks(
+        src.cheats, old, index_picks(old_index) if old_index is not None else None
+    )
+    cheats, own, stale = merge(database, old, keep_all=not ours)
     comments = (
         [FOR_CRC[2:] + crc_hex(game.crc)]
         + src.comments
         + ["Written by `just cheats`; picks and your own codes are kept."]
     )
     n_source = len(cheats) - own
-    removable = [i for i in range(n_source) if not user_code(cheats[i])]
-    cheats, over = fit(cheats, removable, comments)
+    # Master codes stay: their keys decode the cheats after them
+    got = decode_cheats(cheats)
+    keys = {i for i, g in enumerate(got or []) if g[0] == ST_MASTER}
+    removable = [
+        i for i in range(n_source) if not user_code(cheats[i]) and i not in keys
+    ]
+    most = BIG_CHEATS
+    while True:
+        fitted, over = fit(cheats, removable, comments, most=most)
+        text = format_cht(fitted, comments)
+        big = (
+            len(text.encode("utf-8", "surrogateescape")) > TEXT_MAX
+            or len(fitted) > CHEATS_MAX
+        )
+        new_index = index_text(text) if big else None
+        if not big or new_index is not None or most < CHEATS_MAX:
+            break
+        most = most * 9 // 10  # more windows than the kernel has: fewer cheats
+    cheats = fitted
     dropped = list(src.dropped) + [
         (name, "over the kernel's size limit") for name in over
     ]
+    if over:
+        # A cheat the fit dropped may have held a key the later ones need
+        cheats, broke = sift(cheats, keep=user_code)
+        dropped += broke
     text = format_cht(cheats, comments)
     if old_text is None:
         state = "written"
@@ -1041,6 +1310,18 @@ def write_game(sd, game, src, dry_run):
         state = "updated"
     if state != "unchanged" and not dry_run:
         write_card_file(target, text)
+    # A larger file's index beside it (the kernel reads it in windows by
+    # it), written with the file, so it is the bytes on the card's; a file
+    # left as it is keeps the index the kernel keeps. A file small enough to
+    # read whole needs none, so an old one goes.
+    if not dry_run:
+        if new_index is not None:
+            if state != "unchanged":
+                write_card_file(index, new_index)
+        else:
+            for stale_index in (index, index.with_name(index.name + ".bak")):
+                if stale_index.exists():
+                    stale_index.unlink()
     n = n_source - len(over)
     detail = src.detail if src.label else f"{plural(n, 'cheat')} {src.detail}"
     if over and src.label:
@@ -1052,8 +1333,8 @@ def write_game(sd, game, src, dry_run):
         detail += f", {picked} picked"
     if stale:
         detail += f", {plural(stale, 'old cheat')} the source no longer has left out"
-    if len(text.encode("utf-8", "surrogateescape")) > TEXT_MAX:
-        detail += f"; over {TEXT_MAX} bytes with your own codes alone: the kernel won't read it"
+    if len(text.encode("utf-8", "surrogateescape")) > BIG_BYTES:
+        detail += f"; over {BIG_BYTES} bytes with your own codes alone: the kernel won't read it"
     rel = "/" + target.relative_to(sd).as_posix()
     return state, f"{rel}: {detail}", dropped
 

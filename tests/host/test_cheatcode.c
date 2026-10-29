@@ -741,7 +741,8 @@ void test_cheatcode_lower(void)
 	CHECK_EQ(prog[7], 0x34);
 	CHECK_EQ(prog[8], 0x23000020);
 	CHECK_EQ(prog[9], 0x12345678);
-	CHECK_EQ(cost, CHEAT_COST_CHEAT + 2 * CHEAT_COST_SINGLE + CHEAT_COST_RUN + 2 * CHEAT_COST_RUN_WRITE);
+	CHECK_EQ(cost, CHEAT_LOAD(CHEAT_COST_CHEAT + 2 * CHEAT_COST_SINGLE + CHEAT_COST_RUN +
+				  2 * CHEAT_COST_RUN_WRITE));  // all of it always runs
 
 	// A fill and a slide: one op with its count and steps
 	in[0] = op(CHEAT_OP_WRITE, 1, 0x02000100, 0x10, 3);
@@ -758,7 +759,8 @@ void test_cheatcode_lower(void)
 	CHECK_EQ(prog[6], 0x44000200);  // four
 	CHECK_EQ(prog[7], CHEAT_PROG_WRITE | 1 << 4 | 4u << 16);
 	CHECK_EQ(prog[9], 2);
-	CHECK_EQ(cost, CHEAT_COST_CHEAT + 2 * CHEAT_COST_EXT + 2 * CHEAT_COST_FILL + 3 * CHEAT_COST_FILL_SAME);
+	CHECK_EQ(cost, CHEAT_LOAD(CHEAT_COST_CHEAT + 2 * CHEAT_COST_EXT + 2 * CHEAT_COST_FILL +
+				  3 * CHEAT_COST_FILL_SAME));  // all of it always runs
 
 	// Conditionals: every op in its place (a ROM patch as nothing), the
 	// button a key test, an ELSE in a fourth word
@@ -825,7 +827,22 @@ void test_cheatcode_lower(void)
 	CHECK_EQ(cheat_lower(in, 1, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_TOO_BIG);
 	in[0].count = 500;
 	CHECK_EQ(cheat_lower(in, 1, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_OK);
-	CHECK(cost <= CHEAT_CYCLES_MAX - CHEAT_COST_CALL);
+	CHECK(cost <= CHEAT_LOAD_MAX - CHEAT_LOAD(CHEAT_COST_CALL));
+
+	// The load: what a conditional without an ELSE covers counts once, the
+	// rest scaled; with an ELSE one branch always runs, so all of it is scaled
+	in[0] = op(CHEAT_OP_IF_EQ, 2, 0x02000000, 1, 1);
+	in[1] = op(CHEAT_OP_WRITE, 1, 0x02000100, 0, 1000);
+	in[1].addr_step = 1;
+	CHECK_EQ(cheat_lower(in, 2, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_OK);
+	u32 guarded = CHEAT_COST_EXT + 999 * CHEAT_COST_FILL_SAME;
+	u32 always = CHEAT_COST_CHEAT + CHEAT_COST_COND, walk = CHEAT_COST_WALK;  // the fill walked past
+	u32 worst = always + guarded;
+	CHECK_EQ(cost, CHEAT_LOAD(always + walk) > worst ? CHEAT_LOAD(always + walk) : worst);
+	in[0].else_count = 1;
+	in[2] = op(CHEAT_OP_WRITE, 1, 0x02000200, 0, 1);
+	CHECK_EQ(cheat_lower(in, 3, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_OK);
+	CHECK_EQ(cost, CHEAT_LOAD(always + guarded + CHEAT_COST_SINGLE));
 
 	// Ops of count 0 do nothing: left out of a plain cheat, nothing in a
 	// conditional one

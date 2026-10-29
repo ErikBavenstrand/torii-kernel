@@ -8,11 +8,11 @@
 -k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:A -k @28:-
 -w "screen ready: settings"
 -k @8:L -k @12:-
--w "settings: row 28"
--k @8:DOWN -k @12:-
 -w "settings: row 29"
+-k @8:DOWN -k @12:-
+-w "settings: row 30"
 -k @8:A -k @12:- -k @20:RIGHT -k @24:-
--w "settings: row 29 set to"
+-w "settings: row 30 set to"
 -s @8:picked.png
 -k @12:A -k @16:-
 -w "lang: en-XA"

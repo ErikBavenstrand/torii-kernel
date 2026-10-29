@@ -97,7 +97,7 @@ void test_cheatfile_parse(void)
 	CHECK_EQ(cheats[0].bytes, 12);  // a header and a halfword write
 	CHECK_EQ(cheats[1].bytes, 24);  // a header and a run of two
 	CHECK_EQ(cheats[2].bytes, 12);
-	CHECK_EQ(cheats[1].cost, CHEAT_COST_CHEAT + CHEAT_COST_RUN + 2 * CHEAT_COST_RUN_WRITE);
+	CHECK_EQ(cheats[1].cost, CHEAT_LOAD(CHEAT_COST_CHEAT + CHEAT_COST_RUN + 2 * CHEAT_COST_RUN_WRITE));
 	CHECK_EQ(file.bytes, 24);  // the picked one's
 	CHECK_EQ(file.cost, cheats[1].cost);
 	CHECK_EQ(cheatfile_picks(&file), 1);
@@ -267,6 +267,45 @@ void test_cheatfile_status(void)
 	CHECK_EQ(cheatfile_toggle(&file, 0), 0);
 }
 
+// A cheat that changes nothing, or does what an earlier one does, reads but
+// shows greyed with its reason and can't be picked; a picked one can be
+// dropped
+void test_cheatfile_junk(void)
+{
+	load_str("cheat0_code = \"32001010 0003\"\n"
+		 "cheat1_code = \"72001000 0001\"\n"  // a condition over nothing
+		 "cheat2_code = \"32001010 0003\"\n"  // cheat 0 again
+		 "cheat3_code = \"72001000 0001+32001010 0003\"\n"  // cheat 0's write, under a condition
+		 "cheat4_code = \"ZZZZ\"\n"
+		 "cheat5_code = \"32001010 0003\"\n"
+		 "cheat5_enable = true\n"
+		 "cheat6_code = \"88001000 4770\"\n");  // a ROM patch
+	CHECK_EQ(file.count, 7);
+	CHECK_EQ(cheats[0].status, CHEATFILE_OK);
+	CHECK_EQ(cheats[1].status, CHEATFILE_NOTHING);
+	CHECK(cheatfile_shown(&cheats[1]));
+	CHECK_EQ(cheatfile_why(&file, 1), CHEATFILE_WHY_NOTHING);
+	CHECK(!cheatfile_toggle(&file, 1));
+	CHECK_EQ(cheats[2].status, CHEATFILE_SAME);
+	CHECK(cheatfile_shown(&cheats[2]));
+	CHECK_EQ(cheatfile_why(&file, 2), CHEATFILE_WHY_SAME);
+	CHECK_EQ(cheats[2].bytes, 0);
+	CHECK_EQ(cheats[3].status, CHEATFILE_OK);
+	CHECK_EQ(cheats[4].status, CHEATFILE_UNREADABLE);
+	CHECK(cheatfile_shown(&cheats[4]));
+	CHECK_EQ(cheats[5].status, CHEATFILE_SAME);
+	CHECK_EQ(file.bytes, 0);  // a picked duplicate runs nothing
+	CHECK(cheatfile_toggle(&file, 5));  // but can be dropped
+	CHECK_EQ(cheats[5].picked, 0);
+	CHECK_EQ(cheats[6].status, CHEATFILE_OK);
+	// A second pass finds the same
+	cheatfile_begin(&work);
+	while (cheatfile_next(&file, &work) >= 0)
+		;
+	CHECK_EQ(cheats[0].status, CHEATFILE_OK);
+	CHECK_EQ(cheats[2].status, CHEATFILE_SAME);
+}
+
 // The decoder runs over every cheat in file order: a CodeBreaker key in a
 // cheat no one picks still decrypts the cheats after it
 void test_cheatfile_keys_carry(void)
@@ -402,12 +441,14 @@ void test_cheatfile_budget(void)
 	for (u32 c = 0; c < 2; c++) {
 		p += sprintf(p, "cheat%u_code = \"", (unsigned)c);
 		for (u32 i = 0; i < 40; i++)
-			p += sprintf(p, "%s72001000 0001+32001%03X 0003", i ? "+" : "", (unsigned)(i * 2));
+			p += sprintf(p, "%s72001000 0001+32001%03X 0003", i ? "+" : "", (unsigned)(c * 0x100 + i * 2));
 		p += sprintf(p, "\"\n");
 	}
 	load_str(text);
 	CHECK_EQ(cheats[0].status, CHEATFILE_OK);
-	CHECK_EQ(cheats[0].cost, CHEAT_COST_CHEAT + 40 * (CHEAT_COST_COND + CHEAT_COST_SINGLE));
+	// The conditions always run, the writes they guard only while they hold:
+	// the load is the conditions', scaled
+	CHECK_EQ(cheats[0].cost, CHEAT_LOAD(CHEAT_COST_CHEAT + 40 * (CHEAT_COST_COND + CHEAT_COST_WALK)));
 	CHECK(cheatfile_toggle(&file, 0));
 	CHECK(file.bytes + cheats[1].bytes <= CHEATFILE_BYTES_MAX);
 	CHECK_EQ(cheatfile_why(&file, 1), CHEATFILE_WHY_FULL);
@@ -415,12 +456,23 @@ void test_cheatfile_budget(void)
 	// Alone past the frame's share: too big
 	p = text;
 	p += sprintf(p, "cheat0_code = \"");
-	for (u32 i = 0; i < 60; i++)
+	for (u32 i = 0; i < 63; i++)
 		p += sprintf(p, "%s72001000 0001+32001%03X 0003", i ? "+" : "", (unsigned)(i * 2));
 	sprintf(p, "\"\n");
 	load_str(text);
 	CHECK_EQ(cheats[0].status, CHEATFILE_BIG);
 	CHECK_EQ(cheatfile_why(&file, 0), CHEATFILE_WHY_FULL);
+
+	// Heavy work a button guards may take the gated cap (Harvest Moon's
+	// "Till Whole Field": 2152 halfwords while Select+L are held); the
+	// same fill unguarded is too big
+	load_str("cheat0_code = \"74000130 01FB+420057F8 0002+00000868 0002\"\n"
+		 "cheat1_code = \"420057F8 0002+00000868 0002\"\n");
+	CHECK_EQ(cheats[0].status, CHEATFILE_OK);
+	CHECK(cheats[0].cost > CHEAT_CYCLES_MAX);
+	CHECK(cheats[0].cost <= CHEATFILE_CYCLES_MAX);
+	CHECK_EQ(cheatfile_why(&file, 0), CHEATFILE_PICKABLE);
+	CHECK_EQ(cheats[1].status, CHEATFILE_BIG);
 }
 
 // The ROM patches a launch keeps (CHEATFILE_PICKED_PATCHES_MAX): a pick that
@@ -1029,4 +1081,114 @@ void test_cheatfile_rom_crc(void)
 	// The end of the text ends the line
 	CHECK(cheatfile_rom_crc("# for crc32 DD88761Cjunk", 20, &crc));
 	CHECK_EQ(crc, 0xDD88761C);
+}
+
+// A window of a larger file (cheatstore.h): its cheats keep their numbers,
+// table entries counting from its base; a pick, an add, a remove and an
+// edit work there as in a whole file, but its count line stays as it is
+void test_cheatfile_part(void)
+{
+	u32 at = 99;
+	load_cap("cheat5000_desc = \"A\"\n"
+		 "cheat5000_code = \"32001000 0009\"\n"
+		 "cheat5000_enable = true\n"
+		 "\n"
+		 "cheat5001_desc = \"B\"\n"
+		 "cheat5001_code = \"32001001 0009\"\n"
+		 "cheat5001_enable = false\n"
+		 "\n"
+		 "cheat5002_desc = \"C\"\n"
+		 "cheat5002_code = \"32001002 0009\"\n"
+		 "cheat5002_enable = false\n"
+		 "cheat7_code = \"32001003 0009\"\n",  // not this window's: dropped
+		 4096);
+	cheatfile_parse_part(&file, edit_buf, file.len, cheats, CHEATFILE_MAX, 5000, 1);
+	redecode();
+	CHECK_EQ(file.count, 3);
+	CHECK_EQ(file.dropped, 1);
+	CHECK_EQ(cheats[0].number, 5000);
+	CHECK_EQ(cheats[2].number, 5002);
+	CHECK_EQ(file.next, 5003);
+	CHECK_EQ(cheats[0].picked, 1);
+	CHECK_EQ(cheats[1].status, CHEATFILE_OK);
+	CHECK(cheatfile_toggle(&file, 2));
+	CHECK_EQ(cheatfile_add(&file, &room, "D", "32001004 0009", CHEAT_FMT_AUTO, &at), CHEATFILE_EDIT_OK);
+	CHECK_EQ(at, 3);
+	CHECK_EQ(cheats[3].number, 5003);
+	CHECK(!text_has("cheats ="));  // no count line added to a window
+	CHECK_EQ(cheats[2].picked, 1);  // the pick kept over the read again
+	CHECK_EQ(cheatfile_remove(&file, &room, 1), CHEATFILE_EDIT_OK);
+	CHECK_EQ(file.count, 3);
+	CHECK_EQ(cheats[1].number, 5001);  // C, numbered one lower
+	CHECK(!strcmp(edit_span(cheats[1].desc, cheats[1].desc_len), "C"));
+	CHECK_EQ(cheats[0].picked, 1);
+	CHECK_EQ(cheats[1].picked, 1);
+	CHECK(text_has("cheat5002_code = \"32001004 0009\""));
+	// The first window's count line, which counts the whole file, stays
+	load_cap("cheats = 9000\n\ncheat0_code = \"32001000 0009\"\n", 4096);
+	cheatfile_parse_part(&file, edit_buf, file.len, cheats, CHEATFILE_MAX, 0, 1);
+	CHECK_EQ(cheatfile_add(&file, &room, "E", "32001005 0009", CHEAT_FMT_AUTO, &at), CHEATFILE_EDIT_OK);
+	CHECK(text_has("cheats = 9000\n"));
+
+	// A line at a time, as the windowed reader sees them
+	u32 n = 0;
+	int on = 0;
+	CHECK(cheatfile_line_key("cheat12345_enable = true", 24, &n, &on));
+	CHECK_EQ(n, 12345);
+	CHECK(on);
+	CHECK(cheatfile_line_key("  cheat3_code = \"x\"", 19, &n, &on));
+	CHECK_EQ(n, 3);
+	CHECK(!on);
+	CHECK(cheatfile_line_key("cheat4_note = x", 15, &n, &on));
+	CHECK(!cheatfile_line_key("cheats = 4", 10, &n, &on));
+	CHECK(!cheatfile_line_key("# cheat5_code = x", 17, &n, &on));
+	CHECK(!cheatfile_line_key("", 0, &n, &on));
+}
+
+// Several cheats removed in one pass: their lines go, with a blank line
+// before each, the rest numbered to close the gaps, every pick kept
+void test_cheatfile_remove_many(void)
+{
+	load_cap("cheats = 5\n"
+		 "\n"
+		 "cheat0_desc = \"A\"\n"
+		 "cheat0_code = \"32001000 0009\"\n"
+		 "cheat0_enable = true\n"
+		 "\n"
+		 "cheat1_desc = \"B\"\n"
+		 "cheat1_code = \"ZZZZ\"\n"
+		 "\n"
+		 "cheat2_desc = \"C\"\n"
+		 "cheat2_code = \"32001002 0009\"\n"
+		 "\n"
+		 "cheat3_desc = \"D\"\n"
+		 "cheat3_code = \"72001000 0001\"\n"
+		 "\n"
+		 "cheat4_desc = \"E\"\n"
+		 "cheat4_code = \"32001004 0009\"\n"
+		 "cheat4_enable = true\n",
+		 4096);
+	CHECK(cheatfile_toggle(&file, 2));  // a pick not saved yet stays too
+	u8 drop[CHEATFILE_MAX / 8] = {0};
+	drop[0] = 1 << 1 | 1 << 3;
+	CHECK_EQ(cheatfile_remove_many(&file, &room, drop), 2);
+	CHECK(text_is("cheats = 3\n"
+		      "\n"
+		      "cheat0_desc = \"A\"\n"
+		      "cheat0_code = \"32001000 0009\"\n"
+		      "cheat0_enable = true\n"
+		      "\n"
+		      "cheat1_desc = \"C\"\n"
+		      "cheat1_code = \"32001002 0009\"\n"
+		      "\n"
+		      "cheat2_desc = \"E\"\n"
+		      "cheat2_code = \"32001004 0009\"\n"
+		      "cheat2_enable = true\n"));
+	CHECK_EQ(file.count, 3);
+	CHECK_EQ(cheats[0].picked, 1);
+	CHECK_EQ(cheats[1].picked, 1);
+	CHECK_EQ(cheats[2].picked, 1);
+	CHECK(cheatfile_changed(&file));
+	u8 none[CHEATFILE_MAX / 8] = {0};
+	CHECK_EQ(cheatfile_remove_many(&file, &room, none), 0);
 }

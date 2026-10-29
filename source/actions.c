@@ -366,18 +366,21 @@ struct sidecar {
 };
 #define ART_CUSTOM_DIR "/torii/art/custom"  // B22's custom art: <file name>.bin (artkey.h)
 #define ART_CUSTOM_EXT ARTKEY_EXT
-// The cheat file is a safe file of two copies (safefile.h): both move
+// The cheat file is a safe file of two copies (safefile.h): both move, and
+// a larger file's index's two
 static const struct sidecar sidecars[] = {
 	{SAVESLOT_SAVES_DIR, SIDE_DIR, 0, ACTION_FILE_SAVE, ""},
 	{SAVESLOT_BACKUPS_DIR, SIDE_DIR, 0, ACTION_FILE_HISTORY, ""},
 	{"/RTS", SIDE_EXT, 0, ACTION_FILE_STATES, "rts"},
 	{CHEATS_DIR, SIDE_CHEATS, 0, ACTION_FILE_CHEATS, ".cht"},
 	{CHEATS_DIR, SIDE_CHEATS, 0, ACTION_FILE_CHEATS, ".cht.bak"},
+	{CHEATS_DIR, SIDE_CHEATS, 0, ACTION_FILE_CHEATS, CHEATINDEX_EXT},  // a larger file's index (cheatindex.h)
+	{CHEATS_DIR, SIDE_CHEATS, 0, ACTION_FILE_CHEATS, CHEATINDEX_EXT ".bak"},
 	{"/PATCH", SIDE_EXT, 1, ACTION_FILE_PATCH, "pat"},
 	{ART_CUSTOM_DIR, SIDE_ART, 0, ACTION_FILE_ART, ""},
 };
 #define SIDECARS (sizeof(sidecars) / sizeof(*sidecars))
-#define SIDE_ART_AT 6  // the custom art's place in sidecars
+#define SIDE_ART_AT 8  // the custom art's place in sidecars
 
 // The rename's RAM, in pReadCache (READCACHE_RENAME): what lasts while it
 // calls the names file, the user's lists and the library, which borrow

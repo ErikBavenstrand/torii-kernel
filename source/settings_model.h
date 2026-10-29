@@ -78,6 +78,7 @@ enum settings_id {
 	// Library
 	SET_RESCAN,
 	SET_IDENTIFY,  // CRCs for the names database (namesdb.h)
+	SET_CLEAN_CHEATS,  // removes the greyed cheats from every cheat file (cheatstore_clean)
 	SET_SHOW_ALL,  // the SD card page shows hidden files
 	// System
 	SET_LOGGING,   // TLOG_OFF to TLOG_DEBUG (tlog.h)
@@ -153,6 +154,7 @@ enum settings_action {
 	SET_ACTION_IDENTIFY,  // names_identify: Identify library
 	SET_ACTION_SAVES,     // the Saves screen
 	SET_ACTION_GAME_SAVES,  // its Game saves list
+	SET_ACTION_CLEAN_CHEATS,  // cheatstore_clean on every cheat file
 };
 
 // Row flags

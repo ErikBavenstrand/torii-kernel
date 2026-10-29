@@ -72,13 +72,49 @@ its frontend, or a flash cart can't do what the device did:
   whatever a condition covering them says (mGBA applies its ROM patches the
   same way). A write op to the ROM becomes a patch too.
 - **The budget:** the picked cheats together get 5 KB of table and a model
-  of 28,000 cycles (10% of a frame at the BIOS's wait states); a cheat over
-  either alone is "too big". Each of the 6,161 libretro GBA cheats that read
+  of 28,000 cycles (10% of a frame at the BIOS's wait states) for what runs
+  every frame, and 64,000 (about 23%, inside VBlank's 30%) counting what a
+  conditional without an ELSE guards, which runs only while it holds (a
+  button, say). Both caps are one number per cheat, its load
+  (`CHEAT_LOAD`, `cheatcode.h`); a cheat over either alone is "too big". Each of the 6,161 libretro GBA cheats that read
   and lower fits alone (`just cheat-corpus`, 2026-10-26). Their ROM patches
   together are 256 at most (a cheat's own limit, so any one fits), kept in
   EWRAM across the game's load; the cheat screen refuses a pick past that
   rather than a launch applying part of a cheat. A pick whose enable line
-  would take the file past 192 KB is refused too, as it couldn't be saved.
+  would take a window of the file past 192 KB is refused too, as it
+  couldn't be saved. A false conditional's walk past the ops it guards
+  counts as always run (`CHEAT_COST_WALK` an op).
+- **Greyed, never hidden (v0.9.x):** the cheat screen lists every cheat. One
+  that can't be picked shows greyed with its reason: unreadable, too big,
+  can't run here, a master code (its key or seed sets up the codes after
+  it), one that changes nothing (only conditions, `CHEATFILE_NOTHING`), or
+  one whose lowered table part and patches an earlier cheat of the file
+  already has (`CHEATFILE_SAME`, by hash). Any cheat can be deleted. Settings'
+  Clean up cheats removes the greyed ones from every cheat file
+  (`cheatstore_clean`), master codes too, but only where every cheat that
+  stays reads as before; codes typed on the cart stay.
+- **Larger files (v0.9.x):** a file over 192 KB or 1,024 cheats is read in
+  windows of about 250 cheats or 40 KB (`cheatindex.h`), through its
+  index, `<game>.cdx` beside it: each window's place, CRC, cheat count and
+  the decoder at its first cheat, and the picks with what each takes of the
+  budget. An open reads the index and the first window; the cheat screen
+  shows a window at once and decodes it a slice a frame, and reads the next
+  and previous windows ahead into PSRAM page 1 between frames, so crossing
+  is at once. A pick saves the index alone; an edit or Settings' clean-up
+  writes the file whole. An index that doesn't fit (the file's size, or a
+  window's CRC) makes the kernel read the file whole once and index it,
+  picks carried by hash. In the emulator, GameHacking's FFTA list (14,343
+  cheats, 1.46 MB, 58 windows) opens by its index in 34 frames.
+- **Decrypted codes (v0.9.x):** `tools/cheats.py` writes every encrypted
+  code decrypted (GameShark and Action Replay codes raw, CodeBreaker codes
+  plain, key and seed lines left out; `CHEAT_RAW_LINES` in `cheatcode.c`
+  records them on the host), checks each decodes alone as before, and drops
+  the master codes: Torii hooks the game itself, so once nothing is
+  encrypted it has no use for them. Of GameHacking's 53,238 sets for the
+  card's games, 52,125 were rewritten and 2 lost (they needed a key their
+  format can't carry). It writes a larger file's index too
+  (`tools/cheat_patches.c --index`), and carries picks over by program hash,
+  so a pick outlives its code being written anew.
 
 ## Code types where the devices and mGBA differ (v0.7.1)
 

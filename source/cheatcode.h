@@ -198,8 +198,20 @@ enum cheat_prog_type {
 #define CHEAT_COST_GEN 200       // each further element of a pointer write, add, or, and
 #define CHEAT_COST_COND 450      // a conditional, and the walk past what it skips
 #define CHEAT_COST_SKIP 100      // a cheat the off mask skips (cheatrun.s)
-// The cap: about 10% of a frame (280,896 cycles), all picked cheats together
+#define CHEAT_COST_WALK 20       // each op a false conditional walks past
+// The caps, all picked cheats together: about 10% of a frame (280,896
+// cycles) for what runs every frame, and about 23% with every condition
+// true, inside VBlank's 30%: work a condition (a button, say) guards may
+// take the more
 #define CHEAT_CYCLES_MAX 28000
+#define CHEAT_CYCLES_GATED_MAX 64000
+// Both caps in one number, a cheat's load: max(its cycles that run whatever
+// the conditions say, scaled so CHEAT_CYCLES_MAX is CHEAT_LOAD_MAX, and
+// its cycles with every condition true). Loads that fit CHEAT_LOAD_MAX
+// together fit both caps. Cycles that always run (the call, a skipped
+// cheat) count as CHEAT_LOAD(cycles).
+#define CHEAT_LOAD_MAX CHEAT_CYCLES_GATED_MAX
+#define CHEAT_LOAD(cycles) (((cycles) * (u32)CHEAT_LOAD_MAX + CHEAT_CYCLES_MAX - 1) / CHEAT_CYCLES_MAX)
 // The table's room in the patch area, the end word included (cheat.h)
 #define CHEAT_TABLE_MAX 0x1400
 
@@ -213,7 +225,9 @@ enum cheat_lower_status {
 
 // Turns one cheat's ops into its part of the interpreter's table (header
 // and ops, at most prog_max words, *prog_words of them; none when nothing
-// runs in game) with its cycles in *cost (0 if none), and ROM patches
+// runs in game) with its load in *cost (CHEAT_LOAD_MAX; 0 if none): what a
+// conditional without an ELSE covers counts as guarded, the rest as always
+// run. And its ROM patches
 // (*n_patches of them). Writes to the ROM (0x08000000-0x09FFFFFF) and ROM
 // patch ops become patches (fills expanded, bytes merged into halfwords),
 // applied at launch; ROM patch ops whatever a condition says, as mGBA
@@ -237,5 +251,28 @@ u8 cheat_lower(const struct cheat_op *ops, u32 n_ops, u32 *prog, u32 prog_max, u
 // pointer write's pointer, a fill's or a counted add's whole range, a ROM
 // patch in the ROM.
 int cheat_op_address_ok(const struct cheat_op *op);
+
+// Whether ops change anything: a write (a ROM write is a patch), pointer
+// write, add, or or and of some count, or a ROM patch. Conditionals and
+// slowdown codes alone do nothing.
+int cheat_has_effect(const struct cheat_op *ops, u32 n_ops);
+
+#ifdef CHEAT_RAW_LINES
+// For tools on the host only (tools/cheat_patches.c builds with it): each
+// line of the decoding cheat_decode kept, as it read it, decrypted. format
+// is the line's as written plain (CHEAT_FMT_GSAV1_RAW or _PARV3_RAW for a
+// GameShark line, CHEAT_FMT_CODEBREAKER, or CHEAT_FMT_VBA for one it can't
+// write); drop marks a line that only sets a key or seed. Written plain in
+// order, less the dropped, the lines decode as the cheat did with no key.
+#define CHEAT_RAW_MAX 512
+struct cheat_raw {
+	u32 n;
+	struct {
+		u8 format, drop;
+		u32 op1, op2;
+	} line[CHEAT_RAW_MAX];
+};
+extern struct cheat_raw cheat_raw;
+#endif
 
 #endif
