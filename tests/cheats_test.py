@@ -996,8 +996,8 @@ class Romhack(unittest.TestCase):
         )
 
     def test_sift(self):
-        """sift drops what the kernel would grey, keeping master codes and
-        the first of cheats alike."""
+        """sift drops what the kernel would grey, keeping the first of
+        cheats alike."""
         kept, dropped = cheats.sift(
             [
                 cheats.Cheat("Lives", "32001010 0003", False),
@@ -1017,6 +1017,22 @@ class Romhack(unittest.TestCase):
                 ("Garbage", "the kernel can't read it"),
             ],
         )
+
+    def test_sift_master_codes(self):
+        """A master code goes, as Settings' Clean up cheats removes it, unless
+        a cheat after it reads otherwise without its key: then it stays."""
+        master = cheats.Cheat(
+            "(M) Must Be On", "930CFE0E61A7+5E4E1F94523A+DB3A64369A43", False
+        )
+        kept, dropped = cheats.sift(
+            [master, cheats.Cheat("Lives", "32001010 0003", False)]
+        )
+        self.assertEqual([c[0] for c in kept], ["Lives"])
+        self.assertEqual(dropped, [("(M) Must Be On", "a master code")])
+        encrypted = cheats.Cheat("Infinite HP", "D86098902576+777F4707DA29", False)
+        kept, dropped = cheats.sift([master, encrypted])
+        self.assertEqual([c[0] for c in kept], ["(M) Must Be On", "Infinite HP"])
+        self.assertEqual(dropped, [])
 
     def test_decrypt(self):
         """A code encrypted under a master code's CodeBreaker key is written
@@ -1092,6 +1108,19 @@ class Romhack(unittest.TestCase):
         kept, dropped = cheats.sift(many)
         self.assertEqual(len(kept), cheats.PART_CHEATS + 5)
         self.assertEqual(dropped, [("W0 again", "does what an earlier cheat does")])
+        # Past the decoder's table of cheats seen (CHEATFILE_SEEN_SLOTS), and
+        # in another part than its first: the kernel's windows may hold both
+        many = [
+            cheats.Cheat(f"W{i}", f"{0x02000000 + 2 * i:08X}:0001", False)
+            for i in range(2 * cheats.CHEATS_MAX + 100)
+        ]
+        late = 2 * cheats.CHEATS_MAX + 50
+        many.append(
+            cheats.Cheat("Late again", f"{0x02000000 + 2 * late:08X}:0001", False)
+        )
+        kept, dropped = cheats.sift(many)
+        self.assertEqual(len(kept), 2 * cheats.CHEATS_MAX + 100)
+        self.assertEqual(dropped, [("Late again", "does what an earlier cheat does")])
 
     def test_rom_patches(self):
         """The kernel's decoder (tools/cheat_patches.c) finds the patches."""

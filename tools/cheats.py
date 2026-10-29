@@ -912,6 +912,17 @@ def decode_cheats(cheats, raw=False):
             [tuple(int(x, 16) for x in p.split("/")) for p in fields[4:]],
             None,
         )
+    if len(spans) > 1:
+        # The kernel greys a cheat that runs what an earlier one of its
+        # window runs; these parts aren't its windows, and the decoder's
+        # table of cheats seen fills at CHEATFILE_SEEN_SLOTS: one that
+        # repeats any earlier cheat counts as the same, so no window finds one
+        seen = set()
+        for i, (st, h, p, plain) in enumerate(out):
+            if st == ST_OK and h in seen:
+                out[i] = (ST_SAME, h, p, plain)
+            elif st == ST_OK:
+                seen.add(h)
     return out
 
 
@@ -1046,18 +1057,30 @@ def rom_patches(cheats):
 
 def sift(cheats, keep=lambda cheat: False):
     """cheats less those the kernel would grey: unreadable, too big, can't
-    run, doing nothing, or doing what an earlier one does (master codes stay:
-    their keys decode the cheats after them; so do those keep says to).
-    Dropping a cheat can change how later ones decode (a key in it), so the
-    rest are decoded again and any whose reading changed goes too, until
-    none does (each round drops one at least, so it ends). Returns (kept,
-    [(name, why)]), or (cheats, []) without a C compiler."""
+    run, doing nothing, doing what an earlier one does, and master codes (a
+    code can read as one only once the codes before it are decrypted), but
+    those keep says to. As Settings' Clean up cheats does (cheatstore_clean),
+    the master codes stay if the rest read otherwise without them: their
+    keys decode the cheats after them. Dropping a cheat can change how later
+    ones decode (a key in it), so the rest are decoded again and any whose
+    reading changed goes too, until none does (each round drops one at
+    least, so it ends). Returns (kept, [(name, why)]), or (cheats, [])
+    without a C compiler."""
     got = decode_cheats(cheats)
     if got is None:
         return cheats, []
-    drop = [g[0] in SIFTED and not keep(c) for c, g in zip(cheats, got, strict=True)]
+    masters = sift_round(cheats, got, keep, {**SIFTED, ST_MASTER: "a master code"})
+    if masters is not None:
+        return masters
+    return sift_round(cheats, got, keep, SIFTED, strict=False)
+
+
+def sift_round(cheats, got, keep, why, strict=True):
+    """sift with the statuses in why dropped: (kept, dropped), or None if
+    strict and a cheat left reads otherwise once they are gone."""
+    drop = [g[0] in why and not keep(c) for c, g in zip(cheats, got, strict=True)]
     dropped = [
-        (c[0], SIFTED[g[0]]) for c, g, d in zip(cheats, got, drop, strict=True) if d
+        (c[0], why[g[0]]) for c, g, d in zip(cheats, got, drop, strict=True) if d
     ]
     kept = [(c, g) for c, g, d in zip(cheats, got, drop, strict=True) if not d]
     while True:
@@ -1069,6 +1092,8 @@ def sift(cheats, keep=lambda cheat: False):
         }
         if not changed:
             break
+        if strict:
+            return None
         dropped += [
             (kept[i][0][0], "decodes otherwise once the junk is gone")
             for i in sorted(changed)
