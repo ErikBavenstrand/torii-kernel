@@ -19,6 +19,12 @@ git log, not here.
   name of your own has Original name in its popup, which drops it (6632e0b1).
   A quote in a renamed cheat's name is written as an apostrophe, as an
   edited one's is (1e681486).
+- **Added:** in the List + art view, a game's popup has Hide box art, which
+  keeps a wrong cover off it (an empty file in `/torii/art/custom`), then
+  Show box art; a game with art of its own gets Remove own art (49e9ea39).
+- **Changed:** the messages for a full cheat file no longer say 1,024
+  cheats or 192 KB; Rename turns a `cheatN_renamed = false` line true
+  (49e9ea39).
 - **Changed:** the message for a cheat file too big to read no longer says
   192 KB, which windowed files go past (58ac043e).
 
