@@ -129,6 +129,7 @@ struct games_state {
 	char title[GAMENAME_MAX + 1];
 	char ask[GAMENAME_MAX + 16];
 	char cheats[12];  // the popup's Cheats: how many the cheat screen lists
+	char boot_default[32];  // Play's « default », with the way it resolves to
 	struct ui_pop_item items[LANG_POP_ITEMS];
 	u8 actions[LANG_POP_ITEMS];
 	struct ui_popup popup;
@@ -1375,6 +1376,30 @@ static int addons_off(void)
 	return (gl_reset_on | gl_rts_on | gl_sleep_on) == 0;
 }
 
+// Play's « » text for boot (LANG_BOOT_*): default names the way it starts
+// the game, its own boot mode else Settings', when that is known (with no
+// addon on, cheats picked still start it with addons: plain default)
+static const char *boot_text(u32 boot)
+{
+	return boot == LANG_BOOT_DEFAULT && games.boot_default[0] ? games.boot_default
+								  : S(STR_GAMES_BOOT_DEFAULT + boot);
+}
+
+static void boot_default_resolve(const char *path)
+{
+	games.boot_default[0] = 0;
+	struct action_facts facts;
+	if (!action_game_facts(path, &facts))
+		return;
+	u32 mode = facts.boot_mode == ACTION_BOOT_ADDONS || facts.boot_mode == ACTION_BOOT_CLEAN ? facts.boot_mode
+		   : Read_SET_info(assress_boot_mode) == 1                                       ? ACTION_BOOT_CLEAN
+												 : ACTION_BOOT_ADDONS;
+	if (mode == ACTION_BOOT_ADDONS && addons_off())
+		return;
+	SF(games.boot_default, sizeof(games.boot_default), STR_GAMES_BOOT_DEFAULT_AS,
+	   LS(S(mode == ACTION_BOOT_CLEAN ? STR_GAMES_BOOT_CLEAN : STR_GAMES_BOOT_ADDONS)));
+}
+
 static void popup_add(u32 action, const char *value, u8 flags)
 {
 	u32 n = games.popup.count;
@@ -1604,12 +1629,14 @@ static void popup_run(u32 i)
 	u8 boots[LANG_BOOTS];
 	u32 nboots = 0, boot = 0;
 	boots[nboots++] = LANG_BOOT_DEFAULT;
+	games.boot_default[0] = 0;
 	if (gba) {
 		boots[nboots++] = LANG_BOOT_CLEAN;
 		if (!addons_off())
 			boots[nboots++] = LANG_BOOT_ADDONS;
+		boot_default_resolve(games.pick);
 	}
-	popup_add(LANG_POP_PLAY, nboots > 1 ? S(STR_GAMES_BOOT_DEFAULT + boots[0]) : 0, nboots > 1 ? UI_POP_STEP : 0);
+	popup_add(LANG_POP_PLAY, nboots > 1 ? boot_text(boots[0]) : 0, nboots > 1 ? UI_POP_STEP : 0);
 	if (game_saves_probe(games.pick))
 		popup_add(LANG_POP_SAVES, 0, 0);
 	// Every GBA game on the card has Cheats, for the code keypad's Add code,
@@ -1659,7 +1686,7 @@ static void popup_run(u32 i)
 			break;
 		if (pick & (UI_POP_LEFT | UI_POP_RIGHT)) {  // Play's way to start
 			boot = (boot + (pick & UI_POP_LEFT ? nboots - 1 : 1)) % nboots;
-			games.items[0].value = S(STR_GAMES_BOOT_DEFAULT + boots[boot]);
+			games.items[0].value = boot_text(boots[boot]);
 			ui_popup_changed(0);
 			continue;
 		}
@@ -1747,6 +1774,28 @@ static void popup_run(u32 i)
 }
 
 // A on a row (L held: a hard reset), run after the frame
+// R on a row: the game in or out of Favourites at once (on the Favourites
+// page its row goes)
+static void fav_quick(u32 i)
+{
+	struct game g;
+	if (!up() || !row_still(i) || !game_at(i, &g) || !game_path(&g, games.pick))
+		return;
+	u32 ver = userdata_fav_version();
+	int fav = userdata_fav_has(games.pick);
+	int done = userdata_fav_set(games.pick, !fav);
+	if (done)
+		fav = !fav;
+	tlog("games: R: %s %s favourites%s", games.pick, fav ? "in" : "out of", done ? "" : " (not written)");
+	cache_changed(games.pick, g.rec, fav, 1, done, ver, 1);
+	if (!done)
+		dialog_message(NULL, S(STR_SD_FAV_FAILED), DIALOG_ERROR);
+	else if (games.kind == KIND_FAV)
+		relist(i, NULL);
+	else
+		ui_list_refresh(list_node(), i, i);  // its star
+}
+
 static void play_run(u32 arg)
 {
 	u32 i = arg & 0xFFFF, hard = arg >> 16;
@@ -1804,11 +1853,16 @@ static int page_event(struct ui_view *v, const struct ui_event *e)
 			}
 			return 1;
 		}
+		if ((e->keys & in->pressed & INPUT_R) && games.count && !ui_list_paging(list_node())) {
+			games.defer_generation = library_generation();
+			nav_defer(fav_quick, ui_list_cursor(list_node()));
+			return 1;
+		}
 		if ((e->keys & (INPUT_LEFT | INPUT_RIGHT)) && games.az && games.count) {
 			letter_jump_key(e->keys);
 			return 1;
 		}
-		return 1;  // SELECT and the rest do nothing (T8)
+		return 1;  // SELECT and the rest do nothing (T8; SELECT held with A picks a slot)
 	default:
 		return 0;
 	}

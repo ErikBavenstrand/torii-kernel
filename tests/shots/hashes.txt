@@ -144,6 +144,7 @@ games-dedupe/screen 67E86C46698E404E
 games-fav/screen 5F5922C2D6F31804
 games-fav/starred 017306DC53C8BC2C
 games-fav/toggled 294875E98CDCC62F
+games-fav-r/star 248B19FC66C146EF
 games-gb/popup 1E60754161273D33
 games-gb/screen A47EFAC3B4A4039F
 games-gba/cancelled D9DC060C8F7DBC86
@@ -362,20 +363,20 @@ info-about/saves 02471FDB9F0539CB
 info-counting/about-2 CDE48FAA1AE60BFD
 info-no-free/about-end 743A01B090C6A64F
 info-read/back 4B4024DC43FBFF8F
-info-read/controls 605CB814D417D5BE
-info-read/last F8358F939A318739
-info-read/last-down 57F5B0E79AF20239
-info-read/scrolled B3F6D6E66C913EFC
+info-read/controls 085FB729B4B5C0D4
+info-read/last EFE0B9E1AD3E3DC1
+info-read/last-down F5F00A48FFCD5AC7
+info-read/scrolled 962D6F5D207EBCF6
 info-read/frames 0-1 4B4024DC43FBFF8F
 info-read/frames 2-2 3C57BBFA20BD5E6D
 info-read/frames 3-3 FCCA6286462A8F2B
 info-read/frames 4-12 47778893E1D42B25
-info-read/frames 13-13 3D6E9C19FE19A4E6
-info-read/frames 14-14 08CB48F373B91D07
-info-read/frames 15-15 B13F468921BF6209
-info-read/frames 16-16 3DE0B6F280865869
-info-read/frames 17-17 B2E8005C4120E23E
-info-read/frames 18-22 605CB814D417D5BE
+info-read/frames 13-13 E3CD26BB27BB8B63
+info-read/frames 14-14 D1C9374F4927272E
+info-read/frames 15-15 28ADBF228F1A600F
+info-read/frames 16-16 5B2E365C0D66A459
+info-read/frames 17-17 5E20A6CD0C45D254
+info-read/frames 18-22 085FB729B4B5C0D4
 ingame/back 95E628B049B4B4BB
 ingame/cheats FAD7274EE3C5F306
 ingame/menu 87B07917DB9CE95E
@@ -768,8 +769,8 @@ sv-info-about/ingame FCC34D964CD80ABA
 sv-info-about/saves 02B258CE41672BE6
 sv-info-read/back BFCB27E24D54148B
 sv-info-read/controls C40A3328210C2C42
-sv-info-read/last 866172C5712F0C05
-sv-info-read/last-down 5433BEBC8CD8C023
+sv-info-read/last 28677DD95742C3E7
+sv-info-read/last-down 3ED8F4B6D85DB8A7
 sv-info-read/scrolled 80CCED26961285C4
 sv-info-read/frames 0-1 BFCB27E24D54148B
 sv-info-read/frames 2-2 F0A2CB4762B185B5
