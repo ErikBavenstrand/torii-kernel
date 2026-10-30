@@ -145,7 +145,11 @@ alike. Lines that map onto a device's op decode to that op;
 only what no device has becomes `CHEAT_OP_KEYED`, one interpreter op
 (`cheatrun.s` type 6, five words) whose flags say which of its target and
 key are pointers. Such codes run only in Torii and AnyGBA; mGBA and
-RetroArch read them as unreadable lines. `tools/cheat_encode.py`'s `VBA`
+RetroArch read them as unreadable lines. The code keypad types them too
+(v0.9.5): the key between Line and Del shows a row of `[ ] + ^ |` in the
+digits' place (typing `[`, `+` or `|` turns it back), a line holds 48
+characters and the caret's scrolls, and a key's pointer that ends a line
+before another is saved with `+0`. `tools/cheat_encode.py`'s `VBA`
 writes them.
 
 ## Code types where the devices and mGBA differ (v0.7.1)

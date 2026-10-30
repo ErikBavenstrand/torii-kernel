@@ -18,6 +18,21 @@ static int is_sep(char c)
 	return c == '+' || c == ' ' || c == '\t' || c == '\r' || c == '\n';
 }
 
+// AnyGBA's characters in a raw line ('+' within one is a pointer's offset's)
+static int is_raw(char c)
+{
+	return c == '[' || c == ']' || c == '^' || c == '|';
+}
+
+// 1 if line i holds more than digits: VBA's ':' or AnyGBA's characters
+static int is_raw_line(const struct keypad_edit *e, u32 i)
+{
+	for (u32 c = 0; c < e->len[i]; c++)
+		if (e->text[i][c] == ':' || is_raw(e->text[i][c]))
+			return 1;
+	return 0;
+}
+
 // A part's characters, hex digits and stand-ins (':' not counted)
 static int all_digits(const char *p, u32 n)
 {
@@ -54,10 +69,15 @@ static int caret_to_mark(struct keypad_edit *e, u32 col)
 	return 0;
 }
 
+int keypad_edit_key(char c)
+{
+	return is_hex(c) || c == ':' || c == '+' || is_raw(c);
+}
+
 int keypad_edit_typable(const char *code, u32 len)
 {
 	for (u32 i = 0; i < len; i++)
-		if (!is_sep(code[i]) && !is_hex(code[i]) && !keypad_is_mark(code[i]) && code[i] != ':')
+		if (!is_sep(code[i]) && !keypad_edit_key(code[i]) && !keypad_is_mark(code[i]))
 			return 0;
 	return 1;
 }
@@ -73,7 +93,8 @@ int keypad_edit_init(struct keypad_edit *e, const char *code, u32 len)
 		if (pos == len)
 			break;
 		u32 start = pos;
-		while (pos < len && !is_sep(code[pos]))
+		// To the line's end: a '+' after a pointer's ']' is its own
+		while (pos < len && (!is_sep(code[pos]) || cheat_plus_joins(code + start, len - start, pos - start)))
 			pos++;
 		u32 n = pos - start;
 		// An address's 8 digits and a value of 4 or 8 after them: one line
@@ -87,7 +108,7 @@ int keypad_edit_init(struct keypad_edit *e, const char *code, u32 len)
 		u32 line = e->len[0] ? e->lines : 0;
 		int typable = 1;
 		for (u32 i = start; i < pos; i++)
-			if (!is_hex(code[i]) && !keypad_is_mark(code[i]) && code[i] != ':')
+			if (!keypad_edit_key(code[i]) && !keypad_is_mark(code[i]))
 				typable = 0;
 		if (!typable || total > KEYPAD_LINE_MAX || line >= KEYPAD_LINES) {
 			memset(e, 0, sizeof(*e));
@@ -112,12 +133,14 @@ int keypad_edit_init(struct keypad_edit *e, const char *code, u32 len)
 
 int keypad_edit_type(struct keypad_edit *e, char c)
 {
-	if (!is_hex(c) && c != ':')
+	if (!keypad_edit_key(c))
 		return 0;
 	c = upper(c);
 	u32 l = e->line;
 	char *t = e->text[l];
-	if (e->caret < e->len[l] && keypad_is_mark(t[e->caret])) {
+	if (c == '+' && (!e->caret || t[e->caret - 1] != ']'))
+		return 0;  // a '+' in a line is a pointer's offset's; Line starts another
+	if (is_hex(c) && e->caret < e->len[l] && keypad_is_mark(t[e->caret])) {
 		t[e->caret] = c;
 		// On to the next stand-in, on a later line too
 		if (caret_to_mark(e, e->caret + 1u))
@@ -211,7 +234,7 @@ u32 keypad_edit_digits(const struct keypad_edit *e, u32 i, u32 format, u32 *expe
 	if (i >= e->lines)
 		return 0;
 	u32 n = e->len[i];
-	if (memchr(e->text[i], ':', n) || format == CHEAT_FMT_VBA)
+	if (is_raw_line(e, i) || format == CHEAT_FMT_VBA)
 		return n;
 	if (format == CHEAT_FMT_CODEBREAKER)
 		*expect = 12;
@@ -237,7 +260,13 @@ u32 keypad_edit_code(const struct keypad_edit *e, char *out, u32 size)
 	for (u32 i = 0; i < e->lines; i++) {
 		if (!e->len[i])
 			continue;
-		u32 need = e->len[i] + (n ? 1u : 0) + (two_parts(e, i) ? 1u : 0);
+		// A key's pointer ending the line, a line after it: "+0", or the
+		// '+' between them would be its offset's
+		int more = 0;
+		for (u32 k = i + 1; k < e->lines; k++)
+			more |= e->len[k] != 0;
+		int zero = more && e->text[i][e->len[i] - 1] == ']' && memchr(e->text[i], '^', e->len[i]);
+		u32 need = e->len[i] + (n ? 1u : 0) + (two_parts(e, i) ? 1u : 0) + (zero ? 2u : 0);
 		if (n + need + 1 > size)
 			break;
 		if (n)
@@ -247,6 +276,10 @@ u32 keypad_edit_code(const struct keypad_edit *e, char *out, u32 size)
 				out[n++] = ' ';
 			out[n++] = e->text[i][c];
 		}
+		if (zero) {
+			out[n++] = '+';
+			out[n++] = '0';
+		}
 	}
 	out[n] = 0;
 	return n;
@@ -255,7 +288,7 @@ u32 keypad_edit_code(const struct keypad_edit *e, char *out, u32 size)
 u32 keypad_edit_show(const struct keypad_edit *e, u32 i, char *out, u32 *caret)
 {
 	u32 n = 0;
-	int spaced = !memchr(e->text[i], ':', e->len[i]);
+	int spaced = !is_raw_line(e, i);
 	for (u32 c = 0; c <= e->len[i]; c++) {
 		if (c == 8 && spaced && e->len[i] > 8)
 			out[n++] = ' ';

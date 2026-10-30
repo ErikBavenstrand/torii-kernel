@@ -531,7 +531,7 @@ const char *const lang_en[STR_COUNT] = {
 	"That code can't go in a cheat file.",  // cheats.edit_bad
 	"The cheat file couldn't be changed.",  // cheats.edit_broken
 	"Can't edit this code here: 32 lines of hex digits at most.",  // cheats.too_long
-	"Can't edit this code here: the keypad types only hex digits and ':'.",  // cheats.untypable
+	"Can't edit this code here: the keypad can't type some of its characters.",  // cheats.untypable
 	"drop",  // cheats.hint_drop
 	"menu",  // cheats.hint_menu
 	"all",  // cheats.hint_all
@@ -591,6 +591,8 @@ const char *const lang_en[STR_COUNT] = {
 	"Del",  // keypad.key_delete
 	"Cancel",  // keypad.key_cancel
 	"Save",  // keypad.key_save
+	"[]^",  // keypad.key_symbols
+	"0-F",  // keypad.key_digits
 	"Format",  // keypad.format_label
 	"none yet",  // keypad.format_none
 	"GameShark v1",  // keypad.format_gsav1
@@ -621,8 +623,10 @@ const char *const lang_en[STR_COUNT] = {
 	"Never",  // keypad.verb_never
 	"Patch ROM:",  // keypad.verb_patch
 	"Slowdown, does nothing",  // keypad.verb_slowdown
+	"Encrypt",  // keypad.verb_keyed
 	"While R and SELECT are held",  // keypad.button
 	"Not saved: the code doesn't read yet",  // keypad.cant_save
+	"'+' goes after a pointer's ']' only",  // keypad.plus
 	"Discard this code?",  // keypad.discard
 	"Discard",  // keypad.discard_button
 	"Line {1}/{2}",  // keypad.counter

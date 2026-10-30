@@ -1,0 +1,192 @@
+# keypad-raw.opts in Swedish: lang/sv.ini's pack set in Settings (slot 0, its id
+# 0x564E), so every string the scenario shows is Swedish, at its width.
+# The code keypad typing AnyGBA's raw extensions (source/screens/keypad.c,
+# docs/research/cheats.md), from Hello's cheat screen's + Add code, in the
+# light theme: the key between Line and Del shows the symbol row in the
+# digits' place ('[' and '+' turn it back); a keyed line typed, too long for
+# the card, scrolled to keep the caret in view, read as VBA and what it
+# writes (typed); the symbol key again: the symbol row (symbols). Keys from
+# tests/keypad_keys.py.
+#! settings 28=1
+#! settings 0=22094
+#! sd-file /torii/lang/sv.lng 0 dist/lang/sv.lng
+# The tests' hook: lists open on their first row (else a list opens on
+# Hello, the game Recent played last)
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-k @8:RIGHT -k @12:- -k @20:RIGHT -k @24:- -k @32:RIGHT -k @36:-
+-k @80:START -k @84:-
+-w "screen ready: game-popup"
+-k @12:DOWN -k @16:- -k @24:DOWN -k @28:-
+-k @48:A -k @52:-
+-w "screen ready: cheats"
+-k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:DOWN -k @48:- -k @56:DOWN -k @60:-
+-k @72:A -k @76:-
+-w "screen ready: keypad"
+-k @12:RIGHT -k @16:-
+-k @20:RIGHT -k @24:-
+-k @28:DOWN -k @32:-
+-k @36:DOWN -k @40:-
+-k @44:A -k @48:-
+-k @52:UP -k @56:-
+-k @60:LEFT -k @64:-
+-k @68:LEFT -k @72:-
+-k @76:A -k @80:-
+-k @84:A -k @88:-
+-k @92:RIGHT -k @96:-
+-k @100:RIGHT -k @104:-
+-k @108:RIGHT -k @112:-
+-k @116:A -k @120:-
+-k @124:LEFT -k @128:-
+-k @132:LEFT -k @136:-
+-k @140:LEFT -k @144:-
+-k @148:A -k @152:-
+-k @156:A -k @160:-
+-k @164:RIGHT -k @168:-
+-k @172:RIGHT -k @176:-
+-k @180:RIGHT -k @184:-
+-k @188:RIGHT -k @192:-
+-k @196:RIGHT -k @200:-
+-k @204:A -k @208:-
+-k @212:DOWN -k @216:-
+-k @220:A -k @224:-
+-k @228:LEFT -k @232:-
+-k @236:LEFT -k @240:-
+-k @244:LEFT -k @248:-
+-k @252:LEFT -k @256:-
+-k @260:LEFT -k @264:-
+-k @268:A -k @272:-
+-k @276:RIGHT -k @280:-
+-k @284:RIGHT -k @288:-
+-k @292:RIGHT -k @296:-
+-k @300:RIGHT -k @304:-
+-k @308:A -k @312:-
+-k @316:LEFT -k @320:-
+-k @324:LEFT -k @328:-
+-k @332:DOWN -k @336:-
+-k @340:A -k @344:-
+-k @348:UP -k @352:-
+-k @356:LEFT -k @360:-
+-k @364:A -k @368:-
+-k @372:RIGHT -k @376:-
+-k @380:A -k @384:-
+-k @388:LEFT -k @392:-
+-k @396:LEFT -k @400:-
+-k @404:A -k @408:-
+-k @412:RIGHT -k @416:-
+-k @420:RIGHT -k @424:-
+-k @428:RIGHT -k @432:-
+-k @436:RIGHT -k @440:-
+-k @444:A -k @448:-
+-k @452:DOWN -k @456:-
+-k @460:LEFT -k @464:-
+-k @468:LEFT -k @472:-
+-k @476:LEFT -k @480:-
+-k @484:A -k @488:-
+-k @492:UP -k @496:-
+-k @500:LEFT -k @504:-
+-k @508:A -k @512:-
+-k @516:DOWN -k @520:-
+-k @524:DOWN -k @528:-
+-k @532:A -k @536:-
+-k @540:UP -k @544:-
+-k @548:UP -k @552:-
+-k @556:A -k @560:-
+-k @564:A -k @568:-
+-k @572:A -k @576:-
+-k @580:DOWN -k @584:-
+-k @588:RIGHT -k @592:-
+-k @596:RIGHT -k @600:-
+-k @604:RIGHT -k @608:-
+-k @612:RIGHT -k @616:-
+-k @620:RIGHT -k @624:-
+-k @628:RIGHT -k @632:-
+-k @636:RIGHT -k @640:-
+-k @644:A -k @648:-
+-k @652:UP -k @656:-
+-k @660:LEFT -k @664:-
+-k @668:LEFT -k @672:-
+-k @676:LEFT -k @680:-
+-k @684:A -k @688:-
+-k @692:LEFT -k @696:-
+-k @700:LEFT -k @704:-
+-k @708:A -k @712:-
+-k @716:RIGHT -k @720:-
+-k @724:A -k @728:-
+-k @732:DOWN -k @736:-
+-k @740:RIGHT -k @744:-
+-k @748:RIGHT -k @752:-
+-k @756:RIGHT -k @760:-
+-k @764:RIGHT -k @768:-
+-k @772:A -k @776:-
+-k @780:LEFT -k @784:-
+-k @788:LEFT -k @792:-
+-k @796:LEFT -k @800:-
+-k @804:LEFT -k @808:-
+-k @812:LEFT -k @816:-
+-k @820:DOWN -k @824:-
+-k @828:A -k @832:-
+-k @836:UP -k @840:-
+-k @844:RIGHT -k @848:-
+-k @852:A -k @856:-
+-k @860:LEFT -k @864:-
+-k @868:LEFT -k @872:-
+-k @876:LEFT -k @880:-
+-k @884:A -k @888:-
+-k @892:A -k @896:-
+-k @900:RIGHT -k @904:-
+-k @908:RIGHT -k @912:-
+-k @916:RIGHT -k @920:-
+-k @924:A -k @928:-
+-k @932:LEFT -k @936:-
+-k @940:LEFT -k @944:-
+-k @948:LEFT -k @952:-
+-k @956:A -k @960:-
+-k @964:A -k @968:-
+-k @972:RIGHT -k @976:-
+-k @980:RIGHT -k @984:-
+-k @988:RIGHT -k @992:-
+-k @996:RIGHT -k @1000:-
+-k @1004:RIGHT -k @1008:-
+-k @1012:A -k @1016:-
+-k @1020:DOWN -k @1024:-
+-k @1028:A -k @1032:-
+-k @1036:LEFT -k @1040:-
+-k @1044:LEFT -k @1048:-
+-k @1052:LEFT -k @1056:-
+-k @1060:LEFT -k @1064:-
+-k @1068:A -k @1072:-
+-k @1076:UP -k @1080:-
+-k @1084:LEFT -k @1088:-
+-k @1092:A -k @1096:-
+-k @1100:RIGHT -k @1104:-
+-k @1108:RIGHT -k @1112:-
+-k @1116:DOWN -k @1120:-
+-k @1124:DOWN -k @1128:-
+-k @1132:A -k @1136:-
+-k @1140:UP -k @1144:-
+-k @1148:LEFT -k @1152:-
+-k @1156:A -k @1160:-
+-k @1164:RIGHT -k @1168:-
+-k @1172:A -k @1176:-
+-k @1180:LEFT -k @1184:-
+-k @1188:LEFT -k @1192:-
+-k @1196:A -k @1200:-
+-k @1204:A -k @1208:-
+-k @1212:DOWN -k @1216:-
+-k @1220:RIGHT -k @1224:-
+-k @1228:RIGHT -k @1232:-
+-k @1236:A -k @1240:-
+-k @1244:RIGHT -k @1248:-
+-k @1252:RIGHT -k @1256:-
+-k @1260:A -k @1264:-
+-s @1276:typed.png
+-k @1284:LEFT -k @1288:-
+-k @1292:LEFT -k @1296:-
+-k @1300:DOWN -k @1304:-
+-k @1308:A -k @1312:-
+-s @1324:symbols.png

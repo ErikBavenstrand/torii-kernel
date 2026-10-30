@@ -3,7 +3,8 @@
 # user's with keyed lines, a pointer write, an OR and a key pointer with no
 # offset before the next line (list); SELECT: its page, a code line each,
 # '^' and '|' spaced out and a long line wrapped before its key (guide);
-# START, Edit: the keypad can't type '[', '^' or '|', and says so (edit).
+# START, Edit: the keypad, a line each, the key pointer before the next
+# line given its "+0" (edit).
 #! settings 28=1
 #! sd-file /torii/cheats/Hello.cht 0 tests/shots/data/raw-ext.cht
 # The tests' hook: lists open on their first row (else a list opens on
@@ -29,4 +30,5 @@
 -k @8:START -k @12:-
 -w "screen ready: cheat-menu"
 -k @24:DOWN -k @28:- -k @40:A -k @44:-
--s @80:edit.png
+-w "screen ready: keypad"
+-s @4:edit.png

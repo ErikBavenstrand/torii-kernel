@@ -27,7 +27,7 @@ static const struct {
 	{"games-artlist", 180404},
 	{"games-move", 104363},
 	{"info-page", 245642},
-	{"keypad-key", 157334},
+	{"keypad-key", 176241},
 	{"letter-show", 182285},
 	{"nav-screen", 242701},
 	{"nor-move", 96128},

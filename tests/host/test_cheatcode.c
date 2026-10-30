@@ -658,9 +658,9 @@ void test_cheatcode_raw_ext(void)
 	CHECK_OP(0, CHEAT_OP_KEYED, 2, 0x02001000, 0x1234, 1);
 	CHECK_EQ(ops[0].key, 0x02001004);
 	CHECK_EQ(ops[0].flags, CHEAT_KEYED_KEY);
-	// Stand-ins only in plain lines: the keypad can't type these to fill them in
-	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "[03005D8C]+0490:00XX"), CHEAT_UNREADABLE);
-	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "02001000:12^[03005D90]+00XX"), CHEAT_UNREADABLE);
+	// Stand-ins, for the keypad to fill in
+	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "[03005D8C]+0490:00XX"), CHEAT_PLACEHOLDER);
+	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "02001000:12^[03005D90]+00XX"), CHEAT_PLACEHOLDER);
 	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "02001000:00XX"), CHEAT_PLACEHOLDER);
 	static const char *const bad[] = {
 		"[0300D8C]+1:12",       "[03005D8C]+:12",      "[03005D8C]+123456789:12",  "[03005D8C+1:12",

@@ -97,11 +97,13 @@ void test_keypad_edit(void)
 	CHECK_EQ(e.lines, 1);
 	CHECK_EQ(e.caret, 12);
 	// A line's cap, and the lines' cap
-	type_s("12345");
+	while (e.len[0] < KEYPAD_LINE_MAX)
+		CHECK(keypad_edit_type(&e, '1'));
 	CHECK(!keypad_edit_type(&e, '6'));
 	CHECK_EQ(e.len[0], KEYPAD_LINE_MAX);
-	// A join that wouldn't fit
-	CHECK(keypad_edit_init(&e, "02001000:12345678+1234?", 23));
+	// A join that wouldn't fit: 48 characters and a stand-in left
+	static const char join[] = "[03005D8C]+00000490:000F423F^[03005D90]+000000AC+1234?";
+	CHECK(keypad_edit_init(&e, join, sizeof(join) - 1));
 	CHECK_EQ(e.line, 1);
 	CHECK_EQ(e.caret, 4);
 	for (u32 i = 0; i < 4; i++)
@@ -128,18 +130,20 @@ void test_keypad_edit(void)
 		p += sprintf(p, "%s32001000 0001", i ? "+" : "");
 	CHECK(!keypad_edit_init(&e, many, (u32)strlen(many)));
 	CHECK_EQ(e.lines, 1);
-	CHECK(!keypad_edit_init(&e, "0200100000:12345678", 19));
+	static const char wide[] = "[03005D8C]+00000490:000F423F^[03005D90]+000000AC0";  // 49
+	CHECK(!keypad_edit_init(&e, wide, sizeof(wide) - 1));
 	// A byte the keypad can't type (the font has no glyph below ' ')
 	CHECK(!keypad_edit_init(&e,
 				"32001000 00\x01"
 				"1",
 				13));
 	CHECK(!keypad_edit_init(&e, "32001000 G001", 13));
-	// AnyGBA's raw extensions: not the keypad's to type
+	// AnyGBA's raw extensions: the keypad's to type too
 	CHECK(keypad_edit_typable("02001000:12+32001000 00??", 25));
-	CHECK(!keypad_edit_typable("[03005D8C]+0490:0063", 20));
-	CHECK(!keypad_edit_typable("02001000:12^02001004", 20));
-	CHECK(!keypad_edit_typable("02001000|80", 11));
+	CHECK(keypad_edit_typable("[03005D8C]+0490:0063", 20));
+	CHECK(keypad_edit_typable("02001000:12^02001004", 20));
+	CHECK(keypad_edit_typable("02001000|80", 11));
+	CHECK(!keypad_edit_typable("02001000:12&02001004", 20));
 	CHECK_EQ(e.lines, 1);
 	CHECK_EQ(e.len[0], 0);
 }
@@ -255,4 +259,56 @@ void test_keypad_check(void)
 	keypad_check(&e, CHEAT_FMT_AUTO, &ctx, &work, scratch, &c);
 	CHECK_EQ(c.status, KEYPAD_OK);
 	CHECK_EQ(c.format, CHEAT_FMT_GSAV1_RAW);
+}
+
+// AnyGBA's raw lines: a pointer's '+' stays in its line, read and written
+// back; '+' typed only after a ']'; a key's pointer ending a line before
+// another gets "+0"; the line shown and counted as a VBA line's
+void test_keypad_raw_ext(void)
+{
+	static char out[KEYPAD_CODE_MAX + 1];
+	static const char code[] = "[03005D8C]+0490:000F423F^[03005D90]+00AC+[03005D8C]+137C|80+02001000:12";
+	CHECK(keypad_edit_init(&e, code, sizeof(code) - 1));
+	CHECK_EQ(e.lines, 3);
+	CHECK(!strcmp(e.text[0], "[03005D8C]+0490:000F423F^[03005D90]+00AC"));
+	CHECK(!strcmp(e.text[1], "[03005D8C]+137C|80"));
+	CHECK_EQ(keypad_edit_code(&e, out, sizeof(out)), sizeof(code) - 1);
+	CHECK(!strcmp(out, code));
+	u32 expect, caret;
+	CHECK_EQ(keypad_edit_digits(&e, 1, CHEAT_FMT_AUTO, &expect), 18);
+	CHECK_EQ(expect, 0);
+	char shown[KEYPAD_LINE_MAX + 2];
+	CHECK_EQ(keypad_edit_show(&e, 1, shown, &caret), 18);  // no space after 8 characters
+	CHECK(!strcmp(shown, "[03005D8C]+137C|80"));
+
+	// Typed: '+' only after ']'
+	CHECK(keypad_edit_init(&e, "", 0));
+	const char *typed = "[03005D8C]+0490:0063^[03005D90]";
+	for (const char *p = typed; *p; p++)
+		CHECK(keypad_edit_type(&e, *p));
+	CHECK(keypad_edit_type(&e, '+'));  // after ']': taken
+	CHECK(keypad_edit_delete(&e));
+	CHECK(keypad_edit_break(&e));
+	CHECK(!keypad_edit_type(&e, '+'));  // a line's start
+	for (const char *p = "02001000:34"; *p; p++)
+		CHECK(keypad_edit_type(&e, *p));
+	CHECK(!keypad_edit_type(&e, '+'));  // after a digit
+	CHECK(!keypad_edit_type(&e, '&'));
+	// The key's pointer ends line 1: "+0", so the next line stays its own
+	keypad_edit_code(&e, out, sizeof(out));
+	CHECK(!strcmp(out, "[03005D8C]+0490:0063^[03005D90]+0+02001000:34"));
+	struct cheat_decoder d;
+	static struct cheat_op ops[4];
+	u32 n;
+	cheat_decoder_init(&d);
+	CHECK_EQ(cheat_decode(&d, out, (u32)strlen(out), ops, 4, &n), CHEAT_OK);
+	CHECK_EQ(n, 2);
+
+	// A whole line of the longest shape fits; past it, no
+	CHECK(keypad_edit_init(&e, "", 0));
+	const char *longest = "[03005D8C]+00000490:000F423F^[03005D90]+000000AC";
+	for (const char *p = longest; *p; p++)
+		CHECK(keypad_edit_type(&e, *p));
+	CHECK_EQ(e.len[0], KEYPAD_LINE_MAX);
+	CHECK(!keypad_edit_type(&e, '0'));
 }

@@ -622,33 +622,21 @@ static int digits(const char *p, u32 n, u8 *marks)
 	return (int)n;
 }
 
-// Whether the '+' at code[i], after a ']', joins its line: a target's offset
-// always (key 0), a key's (key 1: the line so far holds its ':' or '|')
-// when its digits end the line
-static int plus_joins_here(const char *code, u32 len, u32 i, int key)
+int cheat_plus_joins(const char *line, u32 len, u32 i)
 {
 	u32 j;
-	if (!key)
-		return 1;
-	for (j = i + 1; j < len && (hex_digit(code[j]) >= 0 || is_mark(code[j])); ++j)
-		;
-	return j > i + 1 && (j == len || is_sep(code[j]));
-}
-
-int cheat_plus_joins(const char *code, u32 len, u32 i)
-{
 	int key = 0;
-	if (i >= len || code[i] != '+' || i == 0 || code[i - 1] != ']')
+	if (i >= len || line[i] != '+' || i == 0 || line[i - 1] != ']')
 		return 0;
-	// Lines from the start: only they tell where this one begins
-	for (u32 j = 0; j < i; ++j) {
-		if (code[j] == ':' || code[j] == '|')
+	for (j = 0; j < i; ++j)
+		if (line[j] == ':' || line[j] == '|')
 			key = 1;
-		else if (is_sep(code[j]) &&
-			 !(code[j] == '+' && j > 0 && code[j - 1] == ']' && plus_joins_here(code, len, j, key)))
-			key = 0;  // a new line
-	}
-	return plus_joins_here(code, len, i, key);
+	if (!key)
+		return 1;  // a target's offset: its ':' or '|' follows
+	// A key's: its digits end the line
+	for (j = i + 1; j < len && (hex_digit(line[j]) >= 0 || is_mark(line[j])); ++j)
+		;
+	return j > i + 1 && (j == len || is_sep(line[j]));
 }
 
 static void next_token(const char *s, u32 len, u32 *pos, struct token *t)
@@ -665,7 +653,7 @@ static void next_token(const char *s, u32 len, u32 *pos, struct token *t)
 		return;
 	}
 	u32 start = i;
-	while (i < len && (!is_sep(s[i]) || cheat_plus_joins(s, len, i)))
+	while (i < len && (!is_sep(s[i]) || cheat_plus_joins(s + start, len - start, i - start)))
 		++i;
 	*pos = i;
 	t->len = i - start;
@@ -746,7 +734,7 @@ static int raw_line(const char *p, u32 len, struct line *l)
 	l->op2 = hex_value(p + at, vlen);
 	at += vlen;
 	if (at == len)
-		return !(l->marks && l->flags);  // the keypad fills in only AAAAAAAA:VV
+		return 1;
 	if (l->flags & CHEAT_KEYED_OR)
 		return 0;  // AnyGBA's | takes no key
 	++at;
@@ -754,7 +742,7 @@ static int raw_line(const char *p, u32 len, struct line *l)
 	if (!k || at + k != len)
 		return 0;
 	l->flags |= CHEAT_KEYED_KEY | (kptr ? CHEAT_KEYED_KEY_PTR : 0);
-	return !l->marks;  // stand-ins: the keypad can't type the line to fill them in
+	return 1;
 }
 
 static void next_line(const char *s, u32 len, u32 *pos, struct line *l)

@@ -155,11 +155,12 @@ enum cheat_status {
 // new one doesn't.
 u8 cheat_decode(struct cheat_decoder *d, const char *code, u32 len, struct cheat_op *ops, u32 ops_max, u32 *n_ops);
 
-// Whether the '+' at code[i] is part of a line, not between lines: a
-// pointer's offset ([PPPPPPPP]+O, AnyGBA's), a target's always, a key's
-// when its digits end the line. Everything that splits a code into lines
-// asks this.
-int cheat_plus_joins(const char *code, u32 len, u32 i);
+// Whether the '+' at line[i] is part of the line that starts at line (len
+// bytes from there to the code's end), not between lines: a pointer's
+// offset ([PPPPPPPP]+O, AnyGBA's), a target's always, a key's when its
+// digits end the line. Everything that splits a code into lines asks this,
+// a line at a time.
+int cheat_plus_joins(const char *line, u32 len, u32 i);
 
 // The format one typed line looks like (CHEAT_FMT_AUTO for none), digit
 // stand-ins counted as digits. A 16-digit line gets the likeliest of the four

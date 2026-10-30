@@ -48,7 +48,8 @@ it. Info's Controls page lists every key.
   picks or drops one, and B saves the picks into the file (only the
   `cheatN_enable` lines change) and goes back. **+ Add code**, the last row,
   opens a hex keypad: type a code's lines (L and R move between them, Line
-  starts one, `:` is for VBA's `address:value`), and the keypad shows the
+  starts one, `:` is for VBA's `address:value`, and the key between Line and
+  Del shows AnyGBA's `[ ] + ^ |`), and the keypad shows the
   format it reads as (8+4 digits CodeBreaker, 16 GameShark or Action Replay
   v3 by how plausible each decoding is, `address:value` VBA) and what the
   code does, or why it doesn't read; SELECT sets a format instead. START

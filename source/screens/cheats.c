@@ -774,7 +774,8 @@ static void detail_text(u32 at)
 	// The code: lines between its '+'s, but a pointer's offset's
 	const char *code = f->text + c->code;
 	for (u32 i = 0, from = 0; i <= c->code_len; i++)
-		if (i == c->code_len || (code[i] == '+' && !cheat_plus_joins(code, c->code_len, i))) {
+		if (i == c->code_len ||
+		    (code[i] == '+' && !cheat_plus_joins(code + from, c->code_len - from, i - from))) {
 			code_line(&n, code + from, i - from);
 			from = i + 1;
 		}
