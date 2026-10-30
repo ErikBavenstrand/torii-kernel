@@ -4,6 +4,15 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## v0.9.4
+
+- **Added:** cheat files' raw lines (VBA's `address:value`) read AnyGBA's
+  extensions: `[pointer]+offset` targets, `value^key` to write a value
+  encrypted with a game's own key, and `target|value` to set bits. Pokémon's
+  money and bag counts can be set without a master code (26e18859).
+- **Changed:** a cheat's Guide page spaces out `^` and `|` in its code, and
+  Edit on a code the keypad can't type says so (26e18859).
+
 ## v0.9.3
 
 - **Added:** in the in-game Cheats list, SELECT on a cheat that is off runs
