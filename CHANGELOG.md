@@ -14,6 +14,9 @@ git log, not here.
 - **Changed:** the game's stack sits 32 bytes lower for the found cheats'
   live block, and the in-game menu loads its screenshot, DEBUG and search
   code only when used, so it opens copying less than before (7b5f6228).
+- **Fixed:** found cheats the card didn't take wait for the next boot, as
+  intended (the boot's answer was cleared, so they were lost); a cheat kept
+  on now, then kept again, is filed picked (8d9f3c03).
 - **Added:** R in a game list makes the game a favourite or not at once,
   its star shown (on Favourites its row goes); Info's Controls says so
   (d00ed28e).

@@ -358,7 +358,7 @@ info-about/about-2 B2BB5362EC400E99
 info-about/about-end 958CA4E7A2A59D25
 info-about/cheats 7DAD25B8EAB0EE3F
 info-about/help 4BC6CDF3580262CD
-info-about/ingame 8A6D7ED33268C157
+info-about/ingame 81E1319CA00321FB
 info-about/saves 02471FDB9F0539CB
 info-counting/about-2 CDE48FAA1AE60BFD
 info-no-free/about-end 743A01B090C6A64F
@@ -773,7 +773,7 @@ sv-info-about/about-2 725C9630DD4601E4
 sv-info-about/about-end D71F05D7CB63FC50
 sv-info-about/cheats 9CCC4E07BFE89EE0
 sv-info-about/help 3BC7CD2B37E2A5C4
-sv-info-about/ingame FCC34D964CD80ABA
+sv-info-about/ingame 9D93AC2914BFD47A
 sv-info-about/saves 02B258CE41672BE6
 sv-info-read/back BFCB27E24D54148B
 sv-info-read/controls C40A3328210C2C42

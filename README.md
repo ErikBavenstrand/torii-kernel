@@ -83,7 +83,12 @@ it. Info's Controls page lists every key.
   cheats' ROM patches. A file with a NUL byte in it reads as a cut-off
   write, so the kernel takes its `.bak` copy or, with none, no file at all.
   The in-game menu's Load state and Reset game put the cheats back to the
-  launch's picks. The
+  launch's picks. Its Cheat search finds a game's value (lives, money)
+  as an Action Replay's code finder does: it remembers the game's memory,
+  narrows it down by what the value did (went up, went down, changed, the
+  same, or equals a number) at 8, 16 or 32 bits, and keeps the one found as
+  a cheat, on at once; Back to Torii adds it to the cheat file as "Found"
+  and its address. The
   cheat file moves, renames and is deleted with its game (before the game,
   so a power cut never leaves it behind).
 - **SD card:** the card's folders as they are, folders first. A opens a
