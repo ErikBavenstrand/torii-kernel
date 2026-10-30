@@ -23,8 +23,9 @@
 // ("-" and nothing for one that can't be: a VBA line, or formats mixed), so
 // it decodes the same with no key (cheatcode.h's struct cheat_raw). With
 // --ops, after each a line "O" per op it decoded to (cheatcode.h's struct
-// cheat_op): type, width, address, value, count, addr_step, value_step and
-// else_count, in hex, for tools that tell what cheats do.
+// cheat_op): type, width, address, value, count, addr_step, value_step,
+// else_count, key, key_offset and flags, in hex, for tools that tell what
+// cheats do.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -88,9 +89,10 @@ static void print_ops(void)
 {
 	for (u32 i = 0; i < CHEATFILE_OPS_MAX && work.ops[i].type != OP_UNUSED; i++) {
 		const struct cheat_op *o = &work.ops[i];
-		printf("O\t%X\t%X\t%X\t%X\t%X\t%X\t%X\t%X\n", (unsigned)o->type, (unsigned)o->width,
+		printf("O\t%X\t%X\t%X\t%X\t%X\t%X\t%X\t%X\t%X\t%X\t%X\n", (unsigned)o->type, (unsigned)o->width,
 		       (unsigned)o->address, (unsigned)o->value, (unsigned)o->count, (unsigned)o->addr_step,
-		       (unsigned)o->value_step, (unsigned)o->else_count);
+		       (unsigned)o->value_step, (unsigned)o->else_count, (unsigned)o->key, (unsigned)o->key_offset,
+		       (unsigned)o->flags);
 	}
 }
 

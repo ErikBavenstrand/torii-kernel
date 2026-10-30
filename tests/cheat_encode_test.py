@@ -136,6 +136,15 @@ class Layouts(unittest.TestCase):
         vba = ce.Code(ce.VBA)
         vba += ce.VBA.write(2, 0x02030022, 0xBEEF)
         self.assertEqual(vba.text(), "02030022:BEEF")
+        sb1, sb2 = ce.VBA.ref(0x03005D8C, 0x490), ce.VBA.ref(0x03005D90, 0xAC)
+        ext = ce.Code(ce.VBA)
+        ext += ce.VBA.keyed(4, sb1, 999999, sb2)
+        ext += ce.VBA.or_(1, ce.VBA.ref(0x03005D8C, 0x137C), 0x80)
+        ext += ce.VBA.keyed(2, ce.VBA.ref(0x02001000), 0x63)
+        self.assertEqual(
+            ext.text(),
+            "[03005D8C]+0490:000F423F^[03005D90]+00AC+[03005D8C]+137C|80+02001000:0063",
+        )
         self.assertIn("cheat0_enable = true\n", ce.cht([("x", "02030022:BEEF")]))
 
 

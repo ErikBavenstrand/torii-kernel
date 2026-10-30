@@ -106,6 +106,19 @@ static void run(void)
 			wr(address, op->width, rd(address, op->width) & value);
 			conditional = 0;
 			break;
+		case CHEAT_OP_KEYED:
+			if (op->flags & CHEAT_KEYED_TARGET_PTR)
+				address = rd(address, 4);
+			address += op->addr_step;
+			if (op->flags & CHEAT_KEYED_KEY)
+				value ^= rd((op->flags & CHEAT_KEYED_KEY_PTR ? rd(op->key, 4) : op->key) +
+						    op->key_offset,
+					    op->width);
+			if (op->flags & CHEAT_KEYED_OR)
+				value |= rd(address, op->width);
+			wr(address, op->width, value);
+			conditional = 0;
+			break;
 		case CHEAT_OP_ROM_PATCH:
 		case CHEAT_OP_SLOWDOWN:
 			conditional = 0;
@@ -613,6 +626,93 @@ void test_cheatcode_vba(void)
 	CHECK_OP(1, CHEAT_OP_WRITE, 1, 0x03000024, 0x02, 1);
 }
 
+// AnyGBA's raw extensions: a pointer target ([P]+O), a key to XOR the
+// value with (^), and OR (|); pointer writes and plain ORs as the devices'
+// own ops, the rest keyed
+void test_cheatcode_raw_ext(void)
+{
+	const u8 both = CHEAT_KEYED_TARGET_PTR | CHEAT_KEYED_KEY_PTR | CHEAT_KEYED_KEY;
+	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "[03005D8C]+0490:000F423F^[03005D90]+00AC"), CHEAT_OK);
+	CHECK_EQ(n_ops, 1);
+	CHECK_OP(0, CHEAT_OP_KEYED, 4, 0x03005D8C, 0x000F423F, 1);
+	CHECK_EQ(ops[0].addr_step, 0x490);
+	CHECK_EQ(ops[0].key, 0x03005D90);
+	CHECK_EQ(ops[0].key_offset, 0xAC);
+	CHECK_EQ(ops[0].flags, both);
+	// Lines joined by '+', as libretro's files keep them: the '+' after a ']' is the offset's
+	CHECK_EQ(decode_as(CHEAT_FMT_VBA, "[03005D8C]+0564:0044+[03005D8C]+0566:0063^[03005D90]+00AC"), CHEAT_OK);
+	CHECK_EQ(n_ops, 2);
+	CHECK_OP(0, CHEAT_OP_WRITE_PTR, 2, 0x03005D8C, 0x44, 1);
+	CHECK_EQ(ops[0].addr_step, 0x564);
+	CHECK_OP(1, CHEAT_OP_KEYED, 2, 0x03005D8C, 0x63, 1);
+	CHECK_EQ(ops[1].flags, both);
+	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "[03005D8C]+137C|80"), CHEAT_OK);
+	CHECK_OP(0, CHEAT_OP_KEYED, 1, 0x03005D8C, 0x80, 1);
+	CHECK_EQ(ops[0].flags, CHEAT_KEYED_TARGET_PTR | CHEAT_KEYED_OR);
+	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "02001000|80"), CHEAT_OK);
+	CHECK_OP(0, CHEAT_OP_OR, 1, 0x02001000, 0x80, 1);
+	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "[03005D8C]:1234"), CHEAT_OK);
+	CHECK_OP(0, CHEAT_OP_WRITE_PTR, 2, 0x03005D8C, 0x1234, 1);
+	CHECK_EQ(ops[0].addr_step, 0);
+	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "02001000:1234^02001004"), CHEAT_OK);
+	CHECK_OP(0, CHEAT_OP_KEYED, 2, 0x02001000, 0x1234, 1);
+	CHECK_EQ(ops[0].key, 0x02001004);
+	CHECK_EQ(ops[0].flags, CHEAT_KEYED_KEY);
+	// Stand-ins only in plain lines: the keypad can't type these to fill them in
+	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "[03005D8C]+0490:00XX"), CHEAT_UNREADABLE);
+	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "02001000:12^[03005D90]+00XX"), CHEAT_UNREADABLE);
+	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "02001000:00XX"), CHEAT_PLACEHOLDER);
+	static const char *const bad[] = {
+		"[0300D8C]+1:12",       "[03005D8C]+:12",      "[03005D8C]+123456789:12",  "[03005D8C+1:12",
+		"02001000|80^02001004", "02001000:12^",        "02001000:12^[03005D90]+G", "02001000:123",
+		"[03005D8C]+0490",      "02001000:12^0200100",
+	};
+	for (u32 i = 0; i < sizeof(bad) / sizeof(bad[0]); i++)
+		CHECK_EQ(decode_as(CHEAT_FMT_AUTO, bad[i]), CHEAT_UNREADABLE);
+	// A trailing '+' separates nothing, as elsewhere
+	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "02001000:12^[03005D90]+"), CHEAT_OK);
+	CHECK_EQ(ops[0].key_offset, 0);
+	// A key's offset ends its line; a key pointer without one leaves the next line whole
+	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "02001000:12^[03005D90]+02001004:34"), CHEAT_OK);
+	CHECK_EQ(n_ops, 2);
+	CHECK_EQ(ops[0].key_offset, 0);
+	CHECK_OP(1, CHEAT_OP_WRITE, 1, 0x02001004, 0x34, 1);
+	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "02001000:12^[03005D90]+AC+02001004:34"), CHEAT_OK);
+	CHECK_EQ(n_ops, 2);
+	CHECK_EQ(ops[0].key_offset, 0xAC);
+	// A key pointer with no offset, then a pointer target: the next line's
+	// ']'+ is its own target's, whatever the line before held
+	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "02000000:01^[03005D90]+[03005D8C]+0490:0063"), CHEAT_OK);
+	CHECK_EQ(n_ops, 2);
+	CHECK_EQ(ops[0].key_offset, 0);
+	CHECK_OP(1, CHEAT_OP_WRITE_PTR, 2, 0x03005D8C, 0x63, 1);
+	CHECK_EQ(ops[1].addr_step, 0x490);
+	{
+		static const char code[] = "[03005D8C]+0490:12^[03005D90]+00AC+02001004:34";
+		u32 n = sizeof(code) - 1;
+		CHECK(cheat_plus_joins(code, n, 10));   // the target's offset
+		CHECK(cheat_plus_joins(code, n, 29));   // the key's
+		CHECK(!cheat_plus_joins(code, n, 34));  // between lines
+	}
+	// Device formats take none of it
+	CHECK_EQ(decode_as(CHEAT_FMT_CODEBREAKER, "[03005D8C]+0490:12"), CHEAT_UNREADABLE);
+
+	// What it does: the value XORed with the key's bytes at the width, through both pointers
+	memset(iwram, 0, sizeof(iwram));
+	wr(0x03000100, 4, 0x03000200);
+	wr(0x03000104, 4, 0x03000300);
+	wr(0x030003AC, 4, 0x12345678);
+	wr(0x03000220, 1, 0x0F);
+	CHECK_EQ(decode_as(CHEAT_FMT_AUTO,
+			   "[03000100]+0010:000F423F^[03000104]+00AC+[03000100]+0014:0063^[03000104]+AC+"
+			   "[03000100]+20|80"),
+		 CHEAT_OK);
+	run();
+	CHECK_EQ(rd(0x03000210, 4), 0x000F423Fu ^ 0x12345678u);
+	CHECK_EQ(rd(0x03000214, 4), 0x0063u ^ 0x5678u);
+	CHECK_EQ(rd(0x03000220, 1), 0x8F);
+}
+
 // Line shapes, separators, stand-ins and malformed text
 void test_cheatcode_shapes(void)
 {
@@ -695,6 +795,7 @@ void test_cheatcode_detect(void)
 	CHECK_EQ(score, 0x100);
 	CHECK_EQ(cheat_detect("820010001234", 12, NULL), CHEAT_FMT_CODEBREAKER);
 	CHECK_EQ(cheat_detect("02001000:12", 11, &score), CHEAT_FMT_VBA);
+	CHECK_EQ(cheat_detect("[03005D8C]+137C|80", 18, &score), CHEAT_FMT_VBA);
 	CHECK_EQ(cheat_detect("03001234 000000AB", 17, &score), CHEAT_FMT_GSAV1_RAW);
 	CHECK(score > 0);
 	CHECK_EQ(cheat_detect("00300000 00000078", 17, NULL), CHEAT_FMT_PARV3_RAW);
@@ -714,7 +815,12 @@ static struct cheat_patch patches[8];
 
 static struct cheat_op op(u8 type, u8 width, u32 address, u32 value, u32 count)
 {
-	struct cheat_op o = {address, value, count, (s32)width, 0, 0, type, width};
+	struct cheat_op o = {.address = address,
+			     .value = value,
+			     .count = count,
+			     .addr_step = (s32)width,
+			     .type = type,
+			     .width = width};
 	return o;
 }
 
@@ -900,6 +1006,33 @@ void test_cheatcode_lower(void)
 	in[0] = op(CHEAT_OP_IF_EQ, 2, 0x08000100, 0x4770, 1);  // a condition reads the ROM: fine
 	in[1] = op(CHEAT_OP_WRITE, 2, 0x02000000, 1, 1);
 	CHECK_EQ(cheat_lower(in, 2, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_OK);
+}
+
+// A keyed write: five words (K 5), its flags and key offset in the info
+// word, the target's offset and the key's address after the value
+void test_cheatcode_lower_keyed(void)
+{
+	u32 nw = 0, np = 0, cost = 0;
+	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "[03005D8C]+0490:000F423F^[03005D90]+00AC"), CHEAT_OK);
+	CHECK_EQ(cheat_lower(ops, n_ops, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_OK);
+	CHECK_EQ(nw, 6);
+	CHECK_EQ(prog[0], 1 | CHEAT_PROG_PLAIN | 20u << 16);
+	CHECK_EQ(prog[1], 0x53005D8C);
+	CHECK_EQ(prog[2], CHEAT_PROG_KEYED | 2 << 4 |
+				  (u32)(CHEAT_KEYED_TARGET_PTR | CHEAT_KEYED_KEY_PTR | CHEAT_KEYED_KEY)
+					  << CHEAT_PROG_KEYED_SHIFT |
+				  0xACu << 16);
+	CHECK_EQ(prog[3], 0x000F423F);
+	CHECK_EQ(prog[4], 0x490);
+	CHECK_EQ(prog[5], 0x03005D90);
+	CHECK_EQ(cost, CHEAT_LOAD(CHEAT_COST_CHEAT + CHEAT_COST_KEYED));
+	// The pointers are read in game; the ROM can't be a direct target
+	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "08001000:12^02000000"), CHEAT_OK);
+	CHECK_EQ(cheat_lower(ops, n_ops, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_CANT_RUN);
+	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "02000000:12^01000000"), CHEAT_OK);
+	CHECK_EQ(cheat_lower(ops, n_ops, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_BAD_ADDRESS);
+	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "[01000000]+10:12"), CHEAT_OK);
+	CHECK_EQ(cheat_lower(ops, n_ops, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_BAD_ADDRESS);
 }
 
 // Where the devices (GBATEK, EnHacklopedia, VBA-M) and mGBA differ, Torii

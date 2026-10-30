@@ -107,6 +107,8 @@ static const struct {
 	{"cheatcode_gsa", test_cheatcode_gsa},
 	{"cheatcode_codebreaker", test_cheatcode_codebreaker},
 	{"cheatcode_vba", test_cheatcode_vba},
+	{"cheatcode_raw_ext", test_cheatcode_raw_ext},
+	{"cheatcode_lower_keyed", test_cheatcode_lower_keyed},
 	{"cheatcode_shapes", test_cheatcode_shapes},
 	{"cheatcode_too_big", test_cheatcode_too_big},
 	{"cheatcode_detect", test_cheatcode_detect},

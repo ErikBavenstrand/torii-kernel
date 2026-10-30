@@ -61,7 +61,10 @@ it. Info's Controls page lists every key.
   applies them, and the in-game menu's Cheats list turns each one off and
   on (Back to Torii keeps those as the picks); a clean boot applies none. The file is in libretro's format
   (`just cheats` writes one for each game, or drop one in, named after the
-  ROM) with CodeBreaker, GameShark, Action Replay v3 and VBA codes, and
+  ROM) with CodeBreaker, GameShark, Action Replay v3 and VBA codes (with
+  [AnyGBA](https://github.com/hoanglt1223/anygba)'s raw extensions: a
+  pointer target `[P]+O:V`, `V^KEY` to XOR the value with a game's own key,
+  `TARGET|V` to set bits), and
   every kind of code runs: writes, fills and slides, pointers, add/or/and,
   conditions with ELSE blocks and button codes, each frame as mGBA runs them,
   and ROM patches written into the game once at launch. The device's own

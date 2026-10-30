@@ -44,8 +44,13 @@
 @     K 6, 7, 8  in plain cheats only: bits 0-27 are N, and N pairs of words
 @                (address, value) follow: N writes of 1, 2 or 4 bytes
 @   types: 0 write (fill, slide), 1 pointer write, 2 add, 3 or, 4 and,
-@          5 nothing, 7 never, 8 eq, 9 ne, 10 lt, 11 gt (signed), 12 ult,
-@          13 ugt, 14 and (true when not 0), 15 nand (true when 0)
+@          5 nothing, 6 keyed, 7 never, 8 eq, 9 ne, 10 lt, 11 gt (signed),
+@          12 ult, 13 ugt, 14 and (true when not 0), 15 nand (true when 0)
+@   keyed (v0.9.4, K 5, one element): info bits 6-9 its flags (CHEAT_KEYED_*: the
+@          target through a pointer, the key through a pointer, a key, OR)
+@          and 16-31 the key's offset; word 3 the target's offset, word 4
+@          the key's address (or its pointer's). The value, XORed with the
+@          key's bytes at the width, is written at the target or OR-ed in.
 @
 @ The semantics are mGBA's mCheatRefresh (src/core/cheats.c), op by op: a
 @ conditional covers the next count ops (skipped when false) and, with an
@@ -280,6 +285,8 @@ ext:
 	mov	r9, r2, lsr #16		@ the count
 	cmp	r3, #7
 	bhs	cond
+	cmp	r3, #6
+	beq	keyed
 	cmp	r3, #5
 	beq	ext_done
 	cmp	r3, #0
@@ -381,6 +388,39 @@ cond:	subs	r3, r3, #8
 	moveq	r3, #1
 	movne	r3, #0
 	b	post_cond
+
+@ A keyed write: r1 its address, r4 the value, r5 the target's offset, r12
+@ the key's address, r9 its offset; loads and stores at the width
+	.macro	load_w dst, at
+	tst	r2, #0x20
+	ldrne	\dst, [\at]
+	bne	7f
+	tst	r2, #0x10
+	ldrneh	\dst, [\at]
+	ldreqb	\dst, [\at]
+7:
+	.endm
+keyed:	tst	r2, #0x40		@ the target through a pointer
+	ldrne	r1, [r1]
+	add	r1, r1, r5
+	tst	r2, #0x100		@ a key: the value XOR its bytes
+	beq	8f
+	tst	r2, #0x80		@ the key through a pointer
+	ldrne	r12, [r12]
+	add	r12, r12, r9
+	load_w	lr, r12
+	eor	r4, r4, lr
+8:	tst	r2, #0x200		@ OR: into the target's bits
+	beq	9f
+	load_w	lr, r1
+	orr	r4, r4, lr
+9:	tst	r2, #0x20
+	strne	r4, [r1]
+	bne	ext_done
+	tst	r2, #0x10
+	strneh	r4, [r1]
+	streqb	r4, [r1]
+	b	ext_done
 
 cheat_done:
 	add	sp, sp, #12

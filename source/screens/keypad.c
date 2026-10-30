@@ -179,6 +179,8 @@ static const char *verb_of(u32 type)
 		return S(STR_KEYPAD_VERB_SLOWDOWN);
 	case CHEAT_OP_IF_BUTTON:
 		return "";
+	case CHEAT_OP_KEYED:  // the raw format's extensions, which the keypad can't type
+		return S(STR_KEYPAD_VERB_WRITE);
 	default:
 		return type >= CHEAT_OP_IF_EQ && type <= CHEAT_OP_IF_NAND ? S(STR_KEYPAD_VERB_IF) : "";
 	}
@@ -223,7 +225,7 @@ static void describe_op(const struct cheat_op *op, char *out, u32 size)
 	case CHEAT_OP_SLOWDOWN:
 		snprintf(out, size, "%s", verb);
 		break;
-	default:  // pointer writes, add, or, and, ROM patches
+	default:  // pointer writes, add, or, and, keyed writes, ROM patches
 		SF(out, size, STR_KEYPAD_OP, LS(verb), LS(value), LS(at));
 		break;
 	}

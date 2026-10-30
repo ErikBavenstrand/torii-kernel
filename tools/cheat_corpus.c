@@ -50,8 +50,9 @@ static u32 mask(u32 width)
 // tools/cheat_oracle.c prints them
 static void dump(u32 n_ops)
 {
-	static const char *const names[] = {"ASSIGN", "IND", "ADD",   "OR",   "AND",    "EQ",    "NE",    "LT",  "GT",
-					    "ULT",    "UGT", "IFAND", "NAND", "BUTTON", "NEVER", "PATCH", "SLOW"};
+	static const char *const names[] = {"ASSIGN", "IND",    "ADD",   "OR",    "AND",  "EQ",
+					    "NE",     "LT",     "GT",    "ULT",   "UGT",  "IFAND",
+					    "NAND",   "BUTTON", "NEVER", "PATCH", "SLOW", "KEYED"};
 	u32 i;
 	for (i = 0; i < n_ops; ++i) {
 		const struct cheat_op *op = &ops[i];
@@ -73,6 +74,8 @@ static void dump(u32 n_ops)
 		s32 voff = rep > 1 ? op->value_step : 0;
 		printf(" %s/%u/%08X/%X/%u/%d/%d", names[op->type], op->width, op->address, op->value & mask(op->width),
 		       rep, (int)aoff, (int)voff);
+		if (op->type == CHEAT_OP_KEYED)  // Torii's own: mGBA has none to match
+			printf("/%d/%08X/%X/%X", (int)op->addr_step, op->key, op->key_offset, op->flags);
 	}
 	printf(" |");
 	for (i = 0; i < n_ops; ++i)

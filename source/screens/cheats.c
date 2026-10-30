@@ -695,6 +695,22 @@ static void detail_line(u32 *n, const char *s)
 	detail_add(n, "\n", 1);
 }
 
+// A code line: AnyGBA's '^' and '|' spaced out, which the font's '|' needs
+// to read apart from '1', and kept with what follows (a no-break space), so
+// a long line wraps before its key and the wrapped part starts with '^'
+static void code_line(u32 *n, const char *s, u32 len)
+{
+	u32 from = 0;
+	for (u32 i = 0; i < len; i++)
+		if (s[i] == '^' || s[i] == '|') {
+			detail_add(n, s + from, i - from);
+			detail_add(n, s[i] == '^' ? " ^\xC2\xA0" : " |\xC2\xA0", 4);
+			from = i + 1;
+		}
+	detail_add(n, s + from, len - from);
+	detail_add(n, "\n", 1);
+}
+
 // Cheat at's guide, its lines as the page's own: a tab as a space, and a
 // line that starts "# " kept from reading as a heading (a no-break space)
 static void guide_add(u32 *n, u32 at)
@@ -755,12 +771,11 @@ static void detail_text(u32 at)
 		cs.rule_at = (u16)n;
 		detail_add(&n, "\n", 1);
 	}
-	// The code: lines between its '+'s
+	// The code: lines between its '+'s, but a pointer's offset's
 	const char *code = f->text + c->code;
 	for (u32 i = 0, from = 0; i <= c->code_len; i++)
-		if (i == c->code_len || code[i] == '+') {
-			detail_add(&n, code + from, i - from);
-			detail_add(&n, "\n", 1);
+		if (i == c->code_len || (code[i] == '+' && !cheat_plus_joins(code, c->code_len, i))) {
+			code_line(&n, code + from, i - from);
 			from = i + 1;
 		}
 	detail_add(&n, "\n", 1);
@@ -1116,6 +1131,10 @@ static u32 cs_code(u32 at, int fill)
 	ask.ctx = &ctx;
 	snprintf(cs.name, sizeof(cs.name), "%s", cs.new_name);
 	if (c) {
+		if (!keypad_edit_typable(f->text + c->code, c->code_len)) {
+			dialog_message(cs.heading, S(STR_CHEATS_UNTYPABLE), DIALOG_INFO);
+			return row;
+		}
 		if (c->code_len > KEYPAD_CODE_MAX) {
 			dialog_message(cs.heading, S(STR_CHEATS_TOO_LONG), DIALOG_INFO);
 			return row;

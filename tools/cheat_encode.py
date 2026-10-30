@@ -15,7 +15,8 @@ lines after it, as the devices read them:
 
 Formats: GSA (GameShark v1/v2, Action Replay v1/v2) and PAR (Action Replay
 v3, GameShark SP), each encrypted or raw; CB (CodeBreaker, plain or after a
-type-9 key line encrypted); VBA (raw "AAAAAAAA:VVVV"). tests/cheat_encode_test.py
+type-9 key line encrypted); VBA (raw "AAAAAAAA:VVVV", with AnyGBA's
+extensions: a pointer target, a key to XOR with, OR). tests/cheat_encode_test.py
 checks them; tests/cheat_engine.sh checks every case's codes decode as meant
 with mGBA's own decoders (tools/cheat_oracle.c) and with Torii's
 (tools/cheat_corpus.c).
@@ -576,6 +577,25 @@ class VBA:
     def write(width, address, value):
         return [(address, value & (1 << 8 * width) - 1, width)]
 
+    # AnyGBA's raw extensions (source/cheatcode.h's CHEAT_OP_KEYED), which
+    # only Torii and AnyGBA read: lines written whole
+
+    @staticmethod
+    def ref(address, offset=None):
+        """An address, or with an offset the u32 at address plus it: [P]+O"""
+        return f"{address:08X}" if offset is None else f"[{address:08X}]+{offset:04X}"
+
+    @staticmethod
+    def keyed(width, target, value, key=None):
+        """value (XORed with the width bytes at key, a ref) written at target (a ref)"""
+        line = f"{target}:{value & (1 << 8 * width) - 1:0{width * 2}X}"
+        return [line + f"^{key}" if key else line]
+
+    @staticmethod
+    def or_(width, target, value):
+        """value's bits set at target (a ref), the others kept"""
+        return [f"{target}|{value & (1 << 8 * width) - 1:0{width * 2}X}"]
+
 
 class Code:
     """One cheat's code lines in one format, encrypted as they're added"""
@@ -593,7 +613,9 @@ class Code:
 
     def add(self, line):
         fmt = self.fmt
-        if fmt is VBA:
+        if fmt is VBA and isinstance(line, str):
+            self.lines.append(line)
+        elif fmt is VBA:
             address, value, width = line
             self.lines.append(f"{address:08X}:{value:0{width * 2}X}")
         elif fmt is CB:

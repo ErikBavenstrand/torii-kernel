@@ -66,6 +66,23 @@ static inline void cheat_ref_run(const struct cheat_op *ops, u32 n)
 				value = CHEAT_REF_READ(address, width) | operand;
 				performAssignment = 1;
 				break;
+			case CHEAT_OP_KEYED: {  // Torii's (AnyGBA's raw extensions): not mGBA's
+				u32 key = cheat->key;
+				if (cheat->flags & CHEAT_KEYED_TARGET_PTR)
+					address = (u32)CHEAT_REF_READ(address, 4);
+				address += (u32)cheat->addr_step;
+				value = operand;
+				if (cheat->flags & CHEAT_KEYED_KEY) {
+					if (cheat->flags & CHEAT_KEYED_KEY_PTR)
+						key = (u32)CHEAT_REF_READ(key, 4);
+					value ^= CHEAT_REF_READ(key + cheat->key_offset, width);
+				}
+				if (cheat->flags & CHEAT_KEYED_OR)
+					value |= CHEAT_REF_READ(address, width);
+				CHEAT_REF_WRITE(address, width, (u32)value);
+				operationsRemaining = 1;  // once, past the step below
+				break;
+			}
 			case CHEAT_OP_IF_EQ:
 			case CHEAT_OP_IF_NE:
 			case CHEAT_OP_IF_LT:

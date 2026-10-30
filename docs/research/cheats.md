@@ -116,6 +116,38 @@ its frontend, or a flash cart can't do what the device did:
   (`tools/cheat_patches.c --index`), and carries picks over by program hash,
   so a pick outlives its code being written anew.
 
+## AnyGBA's raw extensions (v0.9.4)
+
+No device can write a value that depends on memory other than its target:
+the Action Replay's pointer write (`[P]+O = V`), the GameShark's add, or and
+and, and CodeBreaker's conditionals all use constants. Pokémon's third
+generation keeps money, coins and bag counts XORed with a key in its save,
+which it moves about in memory, so device codes either zero the key (which
+scrambles every other encrypted value until the game rewrites it) or miss.
+AnyGBA (a GBA static recompiler, 2026) reads VBA's raw lines with three
+extensions, and its curated Emerald list uses them; Torii reads the same
+syntax, in the VBA format:
+
+| Line | Op | As a device code |
+| --- | --- | --- |
+| `AAAAAAAA:V` | WRITE (ROM_PATCH in the ROM) | any device's write |
+| `[PPPPPPPP]+O:V` | WRITE_PTR | Action Replay v3's pointer write |
+| `AAAAAAAA\|V` | OR | GameShark's or |
+| `[PPPPPPPP]+O\|V` | KEYED, OR through a pointer | none |
+| `TARGET:V^KEY` | KEYED, V XORed with the key's bytes | none |
+
+A target or key is an address (8 digits) or `[P]` with an optional `+O` (1
+to 8 digits; the key's at most FFFF). V has 2, 4 or 8 digits, its width.
+A '+' after a `]` belongs to the offset (a key's only when its digits end
+the line), so lines still join with '+' in libretro's files;
+`cheat_plus_joins` decides it for the decoder and the cheat's detail page
+alike. Lines that map onto a device's op decode to that op;
+only what no device has becomes `CHEAT_OP_KEYED`, one interpreter op
+(`cheatrun.s` type 6, five words) whose flags say which of its target and
+key are pointers. Such codes run only in Torii and AnyGBA; mGBA and
+RetroArch read them as unreadable lines. `tools/cheat_encode.py`'s `VBA`
+writes them.
+
 ## Code types where the devices and mGBA differ (v0.7.1)
 
 Torii's decoders started as mGBA's. Where mGBA and the devices disagree,

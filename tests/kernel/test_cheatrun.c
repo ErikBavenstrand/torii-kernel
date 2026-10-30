@@ -41,6 +41,17 @@ static void ref_write(u32 a, u32 w, u32 v)
 		*(vu32 *)(a & ~3u) = v;
 }
 
+// An op from its fields in struct cheat_op's order, the keyed ones 0
+#define OP(a, v, n, as, vs, e, t, w) \
+	((struct cheat_op){.address = (a), \
+			   .value = (v), \
+			   .count = (n), \
+			   .addr_step = (as), \
+			   .value_step = (vs), \
+			   .else_count = (e), \
+			   .type = (t), \
+			   .width = (w)})
+
 #define CHEAT_REF_READ ref_read
 #define CHEAT_REF_WRITE ref_write
 #include "cheat_ref.h"
@@ -87,7 +98,7 @@ static void random_op(struct cheat_op *op)
 	static const u8 conds[] = {CHEAT_OP_IF_EQ,    CHEAT_OP_IF_NE,    CHEAT_OP_IF_LT,  CHEAT_OP_IF_GT,
 				   CHEAT_OP_IF_ULT,   CHEAT_OP_IF_UGT,   CHEAT_OP_IF_AND, CHEAT_OP_IF_NAND,
 				   CHEAT_OP_IF_NEVER, CHEAT_OP_IF_BUTTON};
-	u32 kind = rnd(20);
+	u32 kind = rnd(22);
 	memset(op, 0, sizeof(*op));
 	op->width = rnd_width();
 	op->address = T_DATA + 0x40 + rnd(T_DATA_LEN - 0x80);
@@ -121,6 +132,17 @@ static void random_op(struct cheat_op *op)
 			op->address = 0;
 			op->value = 0;
 		}
+	} else if (kind >= 20) {
+		op->type = CHEAT_OP_KEYED;
+		op->flags = (u8)rnd(16);
+		if (op->flags & CHEAT_KEYED_TARGET_PTR) {
+			op->address = T_PTRS + 4 * rnd(4);
+			op->addr_step = (s32)rnd(33) - 16;
+		}
+		op->key =
+			op->flags & CHEAT_KEYED_KEY_PTR ? T_PTRS + 4 * rnd(4) : T_DATA + 0x40 + rnd(T_DATA_LEN - 0x80);
+		if (op->flags & CHEAT_KEYED_KEY_PTR)
+			op->key_offset = (u16)rnd(0x40);
 	} else if (kind < 19) {
 		op->type = CHEAT_OP_ROM_PATCH;
 		op->width = 2;
@@ -184,11 +206,12 @@ void test_cheatrun_matches_mgba(void)
 					for (u32 k = 0; k < n[c]; k++) {
 						const struct cheat_op *op = &T_OPS[c * T_CHEAT_OPS + k];
 						tlog("cheatrun: cheat %lu op %lu: type %u w %u %08lX = %08lX x%lu step "
-						     "%ld/%ld else %u",
+						     "%ld/%ld else %u key %08lX+%u flags %u",
 						     (unsigned long)c, (unsigned long)k, op->type, op->width,
 						     (unsigned long)(op->address - T_DATA), (unsigned long)op->value,
 						     (unsigned long)op->count, (long)op->addr_step,
-						     (long)op->value_step, op->else_count);
+						     (long)op->value_step, op->else_count, (unsigned long)op->key,
+						     op->key_offset, op->flags);
 					}
 				failures++;
 				break;
@@ -210,21 +233,21 @@ struct worst {
 static void make_write(struct cheat_op *op, u32 i, u32 n)
 {
 	(void)n;
-	*op = (struct cheat_op){T_DATA + (i & 0xFF) * 4, i, 1, 0, 0, 0, CHEAT_OP_WRITE, 1};
+	*op = OP(T_DATA + (i & 0xFF) * 4, i, 1, 0, 0, 0, CHEAT_OP_WRITE, 1);
 }
 
 // A write of each width in turn: no runs
 static void make_mixed(struct cheat_op *op, u32 i, u32 n)
 {
 	(void)n;
-	*op = (struct cheat_op){T_DATA + (i & 0xFF) * 4, i, 1, 0, 0, 0, CHEAT_OP_WRITE, (u8)(1u << (i % 3))};
+	*op = OP(T_DATA + (i & 0xFF) * 4, i, 1, 0, 0, 0, CHEAT_OP_WRITE, (u8)(1u << (i % 3)));
 }
 
 // A condition that holds, then writes it covers
 static void make_cond_writes(struct cheat_op *op, u32 i, u32 n)
 {
 	if (i == 0)
-		*op = (struct cheat_op){T_DATA, 0, n - 1, 0, 0, 0, CHEAT_OP_IF_NAND, 4};  // x & 0 is 0: true
+		*op = OP(T_DATA, 0, n - 1, 0, 0, 0, CHEAT_OP_IF_NAND, 4);  // x & 0 is 0: true
 	else
 		make_write(op, i, n);
 }
@@ -232,7 +255,7 @@ static void make_cond_writes(struct cheat_op *op, u32 i, u32 n)
 // Conditions each covering the rest, all true
 static void make_nested(struct cheat_op *op, u32 i, u32 n)
 {
-	*op = (struct cheat_op){T_DATA, 0, n - 1 - i, 0, 0, 0, CHEAT_OP_IF_NAND, 4};
+	*op = OP(T_DATA, 0, n - 1 - i, 0, 0, 0, CHEAT_OP_IF_NAND, 4);
 	if (i == n - 1)
 		make_write(op, i, n);
 }
@@ -241,7 +264,7 @@ static void make_nested(struct cheat_op *op, u32 i, u32 n)
 static void make_else(struct cheat_op *op, u32 i, u32 n)
 {
 	if (i % 3 == 0 && i + 2 < n)
-		*op = (struct cheat_op){T_DATA, 0, 1, 0, 0, 1, CHEAT_OP_IF_NAND, 4};
+		*op = OP(T_DATA, 0, 1, 0, 0, 1, CHEAT_OP_IF_NAND, 4);
 	else
 		make_write(op, i, n);
 }
@@ -250,7 +273,7 @@ static void make_else(struct cheat_op *op, u32 i, u32 n)
 static void make_skip(struct cheat_op *op, u32 i, u32 n)
 {
 	if (i == 0)
-		*op = (struct cheat_op){T_DATA, 0, n - 2, 0, 0, 0, CHEAT_OP_IF_NEVER, 0};  // the last op runs
+		*op = OP(T_DATA, 0, n - 2, 0, 0, 0, CHEAT_OP_IF_NEVER, 0);  // the last op runs
 	else
 		make_write(op, i, n);
 }
@@ -259,33 +282,43 @@ static void make_fill(struct cheat_op *op, u32 i, u32 n)
 {
 	(void)i;
 	(void)n;
-	*op = (struct cheat_op){T_DATA, 0x1234, 400, 2, 1, 0, CHEAT_OP_WRITE, 2};
+	*op = OP(T_DATA, 0x1234, 400, 2, 1, 0, CHEAT_OP_WRITE, 2);
 }
 
 static void make_fill_const(struct cheat_op *op, u32 i, u32 n)
 {
 	(void)i;
 	(void)n;
-	*op = (struct cheat_op){T_DATA, 0x63, 400, 1, 0, 0, CHEAT_OP_WRITE, 1};
+	*op = OP(T_DATA, 0x63, 400, 1, 0, 0, CHEAT_OP_WRITE, 1);
 }
 
 static void make_add(struct cheat_op *op, u32 i, u32 n)
 {
 	(void)n;
-	*op = (struct cheat_op){T_DATA + (i & 0xFF) * 4, 1, 1, 0, 0, 0, CHEAT_OP_ADD, 4};
+	*op = OP(T_DATA + (i & 0xFF) * 4, 1, 1, 0, 0, 0, CHEAT_OP_ADD, 4);
 }
 
 static void make_add_slide(struct cheat_op *op, u32 i, u32 n)
 {
 	(void)i;
 	(void)n;
-	*op = (struct cheat_op){T_DATA, 1, 100, 4, 0, 0, CHEAT_OP_ADD, 4};
+	*op = OP(T_DATA, 1, 100, 4, 0, 0, CHEAT_OP_ADD, 4);
 }
 
 static void make_ptr(struct cheat_op *op, u32 i, u32 n)
 {
 	(void)n;
-	*op = (struct cheat_op){T_PTRS, i, 1, 4, 0, 0, CHEAT_OP_WRITE_PTR, 2};
+	*op = OP(T_PTRS, i, 1, 4, 0, 0, CHEAT_OP_WRITE_PTR, 2);
+}
+
+// Through a pointer, its value XORed with a key through another, OR-ed in
+static void make_keyed(struct cheat_op *op, u32 i, u32 n)
+{
+	(void)n;
+	*op = OP(T_PTRS, i, 1, 4, 0, 0, CHEAT_OP_KEYED, 4);
+	op->key = T_PTRS + 4;
+	op->key_offset = 8;
+	op->flags = CHEAT_KEYED_TARGET_PTR | CHEAT_KEYED_KEY_PTR | CHEAT_KEYED_KEY | CHEAT_KEYED_OR;
 }
 
 static const struct worst worsts[] = {
@@ -295,6 +328,7 @@ static const struct worst worsts[] = {
 	{"skipped by a condition", 3, 150, make_skip}, {"slides", 2, 1, make_fill},
 	{"constant fills", 2, 1, make_fill_const},     {"adds", 3, 60, make_add},
 	{"add slides", 2, 1, make_add_slide},          {"pointer writes", 3, 60, make_ptr},
+	{"keyed writes", 3, 40, make_keyed},
 };
 
 void test_cheatrun_cycles(void)
@@ -370,7 +404,7 @@ void test_cheatrun_off(void)
 	u32 pos = 0, n_patches;
 	set_memory();
 	for (u32 c = 0; c < N; c++) {
-		struct cheat_op op = {T_DATA + c * 4, 0xA0 + c, 1, 0, 0, 0, CHEAT_OP_WRITE, 1};
+		struct cheat_op op = OP(T_DATA + c * 4, 0xA0 + c, 1, 0, 0, 0, CHEAT_OP_WRITE, 1);
 		u32 got, cost;
 		CHECK_EQ(cheat_lower(&op, 1, T_PROG + pos, T_PROG_MAX - 1 - pos, &got, &cost, T_PATCHES, 1, &n_patches),
 			 CHEAT_LOWER_OK);
@@ -415,13 +449,12 @@ void test_cheatrun_once(void)
 	const u32 keys = T_DATA + 0x200, now = T_DATA + 0x204;  // stand-ins for KEYINPUT and the keys before
 	struct cheat_op ops[3][3] = {
 		// Hold A: the gate, then the write
-		{{keys, 1, 1, 0, 0, 0, CHEAT_OP_IF_NAND, 2}, {T_DATA + 0x100, 0x55, 1, 0, 0, 0, CHEAT_OP_WRITE, 1}},
+		{OP(keys, 1, 1, 0, 0, 0, CHEAT_OP_IF_NAND, 2), OP(T_DATA + 0x100, 0x55, 1, 0, 0, 0, CHEAT_OP_WRITE, 1)},
 		// Always: a plain write
-		{{T_DATA + 0x104, 0x66, 1, 0, 0, 0, CHEAT_OP_WRITE, 1}},
+		{OP(T_DATA + 0x104, 0x66, 1, 0, 0, 0, CHEAT_OP_WRITE, 1)},
 		// Press A: two gate ops, then the write
-		{{now, 1, 2, 0, 0, 0, CHEAT_OP_IF_NAND, 2},
-		 {keys, 1, 1, 0, 0, 0, CHEAT_OP_IF_AND, 2},
-		 {T_DATA + 0x108, 0x77, 1, 0, 0, 0, CHEAT_OP_WRITE, 1}},
+		{OP(now, 1, 2, 0, 0, 0, CHEAT_OP_IF_NAND, 2), OP(keys, 1, 1, 0, 0, 0, CHEAT_OP_IF_AND, 2),
+		 OP(T_DATA + 0x108, 0x77, 1, 0, 0, 0, CHEAT_OP_WRITE, 1)},
 	};
 	const u32 n_ops[3] = {2, 1, 3}, gate[3] = {1, 0, 2}, at[3] = {0x100, 0x104, 0x108};
 	const u8 value[3] = {0x55, 0x66, 0x77};

@@ -374,13 +374,15 @@ static u32 shape_hash(const struct cheat_op *ops, u32 n)
 	for (u32 i = 0; i < n; i++) {
 		const struct cheat_op *op = &ops[i];
 		int cond = op->type >= CHEAT_OP_IF_EQ && op->type <= CHEAT_OP_IF_NEVER;
-		u32 words[6] = {op->address,
+		u32 words[8] = {op->address,
 				cond ? op->value : 0,
 				op->count,
 				(u32)op->addr_step,
 				(u32)op->else_count << 16 | (u32)op->type << 8 | op->width,
-				(u32)op->value_step};
-		h = hash_words(h, words, 6);
+				(u32)op->value_step,
+				op->key,
+				(u32)op->key_offset << 8 | op->flags};
+		h = hash_words(h, words, 8);
 	}
 	return h ? h : 1;
 }

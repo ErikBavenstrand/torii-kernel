@@ -560,8 +560,12 @@ struct line {
 	u8 kind;
 	u8 marks;  // digit stand-ins seen
 	u8 width;  // VBA: the value's bytes
-	u32 op1;   // VBA: the address
+	u8 flags;  // VBA: CHEAT_KEYED_* (AnyGBA's extensions)
+	u32 op1;   // VBA: the address, or the target's pointer's
 	u32 op2;   // VBA: the value
+	u32 off;   // VBA: the target's offset from its pointer
+	u32 key;   // VBA: the key's address, or its pointer's
+	u32 key_off;  // VBA: the key's offset from its pointer
 };
 
 struct token {
@@ -618,6 +622,35 @@ static int digits(const char *p, u32 n, u8 *marks)
 	return (int)n;
 }
 
+// Whether the '+' at code[i], after a ']', joins its line: a target's offset
+// always (key 0), a key's (key 1: the line so far holds its ':' or '|')
+// when its digits end the line
+static int plus_joins_here(const char *code, u32 len, u32 i, int key)
+{
+	u32 j;
+	if (!key)
+		return 1;
+	for (j = i + 1; j < len && (hex_digit(code[j]) >= 0 || is_mark(code[j])); ++j)
+		;
+	return j > i + 1 && (j == len || is_sep(code[j]));
+}
+
+int cheat_plus_joins(const char *code, u32 len, u32 i)
+{
+	int key = 0;
+	if (i >= len || code[i] != '+' || i == 0 || code[i - 1] != ']')
+		return 0;
+	// Lines from the start: only they tell where this one begins
+	for (u32 j = 0; j < i; ++j) {
+		if (code[j] == ':' || code[j] == '|')
+			key = 1;
+		else if (is_sep(code[j]) &&
+			 !(code[j] == '+' && j > 0 && code[j - 1] == ']' && plus_joins_here(code, len, j, key)))
+			key = 0;  // a new line
+	}
+	return plus_joins_here(code, len, i, key);
+}
+
 static void next_token(const char *s, u32 len, u32 *pos, struct token *t)
 {
 	u32 i = *pos;
@@ -632,18 +665,16 @@ static void next_token(const char *s, u32 len, u32 *pos, struct token *t)
 		return;
 	}
 	u32 start = i;
-	while (i < len && !is_sep(s[i]))
+	while (i < len && (!is_sep(s[i]) || cheat_plus_joins(s, len, i)))
 		++i;
 	*pos = i;
 	t->len = i - start;
 	t->kind = TOK_BAD;
-	if (t->len > 8 && t->p[8] == ':') {
-		u32 vlen = t->len - 9;
-		if ((vlen == 2 || vlen == 4 || vlen == 8) && digits(t->p, 8, &t->marks) >= 0 &&
-		    digits(t->p + 9, vlen, &t->marks) >= 0)
-			t->kind = TOK_VBA;
-		return;
-	}
+	for (u32 k = 0; k < t->len; ++k)
+		if (t->p[k] == ':' || t->p[k] == '|' || t->p[k] == '[') {
+			t->kind = TOK_VBA;  // next_line reads it whole
+			return;
+		}
 	if (digits(t->p, t->len, &t->marks) < 0)
 		return;
 	switch (t->len) {
@@ -662,6 +693,68 @@ static void next_token(const char *s, u32 len, u32 *pos, struct token *t)
 	default:
 		break;
 	}
+}
+
+// An address, or a pointer and its offset ([PPPPPPPP] or [PPPPPPPP]+O, O of
+// 1 to 8 digits), at p: the bytes it takes, 0 if none
+static u32 raw_ref(const char *p, u32 len, u32 *address, u32 *off, int *ptr, u8 *marks)
+{
+	u32 n;
+	*off = 0;
+	*ptr = len > 0 && p[0] == '[';
+	if (!*ptr) {
+		if (len < 8 || digits(p, 8, marks) < 0)
+			return 0;
+		*address = hex_value(p, 8);
+		return 8;
+	}
+	if (len < 10 || p[9] != ']' || digits(p + 1, 8, marks) < 0)
+		return 0;
+	*address = hex_value(p + 1, 8);
+	if (len == 10 || p[10] != '+')
+		return 10;
+	for (n = 0; 11 + n < len && n < 9 && (hex_digit(p[11 + n]) >= 0 || is_mark(p[11 + n])); ++n)
+		;
+	if (n == 0 || n > 8)
+		return 0;
+	digits(p + 11, n, marks);
+	*off = hex_value(p + 11, n);
+	return 11 + n;
+}
+
+// A raw line: VBA's AAAAAAAA:VALUE (2, 4 or 8 digits), with AnyGBA's
+// extensions: the target a pointer ([P]+O), VALUE^KEY (the key an address
+// or a pointer) and TARGET|VALUE. Sets l's fields; 0 if malformed.
+static int raw_line(const char *p, u32 len, struct line *l)
+{
+	u32 at, vlen, k;
+	int ptr, kptr;
+	l->flags = 0;
+	at = raw_ref(p, len, &l->op1, &l->off, &ptr, &l->marks);
+	if (!at || at >= len || (p[at] != ':' && p[at] != '|'))
+		return 0;
+	if (ptr)
+		l->flags |= CHEAT_KEYED_TARGET_PTR;
+	if (p[at] == '|')
+		l->flags |= CHEAT_KEYED_OR;
+	++at;
+	for (vlen = 0; at + vlen < len && p[at + vlen] != '^'; ++vlen)
+		;
+	if ((vlen != 2 && vlen != 4 && vlen != 8) || digits(p + at, vlen, &l->marks) < 0)
+		return 0;
+	l->width = (u8)(vlen / 2);
+	l->op2 = hex_value(p + at, vlen);
+	at += vlen;
+	if (at == len)
+		return !(l->marks && l->flags);  // the keypad fills in only AAAAAAAA:VV
+	if (l->flags & CHEAT_KEYED_OR)
+		return 0;  // AnyGBA's | takes no key
+	++at;
+	k = raw_ref(p + at, len - at, &l->key, &l->key_off, &kptr, &l->marks);
+	if (!k || at + k != len)
+		return 0;
+	l->flags |= CHEAT_KEYED_KEY | (kptr ? CHEAT_KEYED_KEY_PTR : 0);
+	return !l->marks;  // stand-ins: the keypad can't type the line to fill them in
 }
 
 static void next_line(const char *s, u32 len, u32 *pos, struct line *l)
@@ -684,12 +777,11 @@ static void next_line(const char *s, u32 len, u32 *pos, struct line *l)
 		l->op2 = hex_value(t.p + 8, 8);
 		return;
 	case TOK_VBA:
+		if (!raw_line(t.p, t.len, l))
+			break;
 		l->kind = LINE_VBA;
-		l->op1 = hex_value(t.p, 8);
-		l->width = (t.len - 9) / 2;
-		l->op2 = hex_value(t.p + 9, t.len - 9);
 		// No GBA address is that high: a CodeBreaker line typed with a ':'
-		if (l->op1 >> 28 && l->width == 2)
+		if (l->op1 >> 28 && l->width == 2 && !l->flags)
 			l->kind = LINE_CB;
 		return;
 	case TOK_H8:
@@ -793,6 +885,9 @@ static struct cheat_op *emit(struct dec *s, u8 type, u8 width, u32 address, u32 
 	op->addr_step = 0;
 	op->value_step = 0;
 	op->else_count = 0;
+	op->key = 0;
+	op->key_offset = 0;
+	op->flags = 0;
 	return op;
 }
 
@@ -1393,10 +1488,23 @@ static void vba_line(struct dec *s, const struct line *l)
 		s->bad = 1;
 		return;
 	}
-	if (l->op1 < 0x08000000 || l->op1 >= 0x0E000000)
+	if (l->flags == CHEAT_KEYED_OR) {
+		emit(s, CHEAT_OP_OR, l->width, l->op1, l->op2);
+	} else if (l->flags == CHEAT_KEYED_TARGET_PTR) {
+		emit(s, CHEAT_OP_WRITE_PTR, l->width, l->op1, l->op2)->addr_step = (s32)l->off;
+	} else if (l->flags) {
+		struct cheat_op *op = emit(s, CHEAT_OP_KEYED, l->width, l->op1, l->op2);
+		op->addr_step = (s32)l->off;
+		op->key = l->key;
+		op->flags = l->flags;
+		if (l->key_off > 0xFFFF)
+			s->bad = 1;
+		op->key_offset = (u16)l->key_off;
+	} else if (l->op1 < 0x08000000 || l->op1 >= 0x0E000000) {
 		emit(s, CHEAT_OP_WRITE, l->width, l->op1, l->op2);
-	else
+	} else {
 		emit(s, CHEAT_OP_ROM_PATCH, l->width, l->op1, l->op2);
+	}
 	code_done(s);
 }
 

@@ -49,6 +49,16 @@ int cheat_op_address_ok(const struct cheat_op *op)
 		return is_rom(op->address) && range_ok(op->address, (unsigned long long)op->address + op->width - 1);
 	case CHEAT_OP_WRITE_PTR:  // the pointer is read; where it points is known only in game
 		return range_ok(op->address, (unsigned long long)op->address + 3);
+	case CHEAT_OP_KEYED:
+		if (!range_ok(op->address, (unsigned long long)op->address +
+						   (op->flags & CHEAT_KEYED_TARGET_PTR ? 3 : op->width - 1)))
+			return 0;
+		if (!(op->flags & CHEAT_KEYED_KEY))
+			return 1;
+		if (op->flags & CHEAT_KEYED_KEY_PTR)
+			return range_ok(op->key, (unsigned long long)op->key + 3);
+		return range_ok((unsigned long long)op->key + op->key_offset,
+				(unsigned long long)op->key + op->key_offset + op->width - 1);
 	case CHEAT_OP_WRITE:
 	case CHEAT_OP_ADD:
 	case CHEAT_OP_OR:
@@ -84,6 +94,7 @@ int cheat_has_effect(const struct cheat_op *ops, u32 n_ops)
 		case CHEAT_OP_ADD:
 		case CHEAT_OP_OR:
 		case CHEAT_OP_AND:
+		case CHEAT_OP_KEYED:
 			if (ops[i].count)
 				return 1;
 			break;
@@ -107,6 +118,8 @@ static int cant_run(const struct cheat_op *op, int conditional)
 	case CHEAT_OP_OR:
 	case CHEAT_OP_AND:
 		return is_rom(op->address);
+	case CHEAT_OP_KEYED:  // where a pointer points is known only in game
+		return !(op->flags & CHEAT_KEYED_TARGET_PTR) && is_rom(op->address);
 	default:
 		return 0;
 	}
@@ -220,6 +233,17 @@ static void put_op(struct out *o, const struct cheat_op *op)
 		word(o, op->address | (log2_width(op->width) << 28));
 		word(o, op->value);
 		o->cost += CHEAT_COST_SINGLE;
+		return;
+	}
+	if (op->type == CHEAT_OP_KEYED) {
+		// Once: the info word's count bits hold the key's offset
+		word(o, op->address | ((CHEAT_PROG_K_EXT + 2) << 28));
+		word(o, CHEAT_PROG_KEYED | (log2_width(op->width) << 4) | ((u32)op->flags << CHEAT_PROG_KEYED_SHIFT) |
+				((u32)op->key_offset << 16));
+		word(o, op->value);
+		word(o, (u32)op->addr_step);
+		word(o, op->key);
+		o->cost += CHEAT_COST_KEYED;
 		return;
 	}
 	type = op->type < sizeof(prog_types) ? prog_types[op->type] : CHEAT_PROG_NOP;

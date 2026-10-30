@@ -1,0 +1,8 @@
+cheats = 2
+
+cheat0_desc = "Money 999999"
+cheat0_code = "[03005D8C]+0490:000F423F^[03005D90]+00AC+[03005D8C]+0494:0063^[03005D90]+00AC+[03005D8C]+137C|80+02000000:01^[03005D90]+[03005D8C]+0498:0063"
+cheat0_user = true
+
+cheat1_desc = "Plain"
+cheat1_code = "02001000:12"

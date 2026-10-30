@@ -38,6 +38,8 @@ void test_cheatcode_par3_encrypted(void);
 void test_cheatcode_gsa(void);
 void test_cheatcode_codebreaker(void);
 void test_cheatcode_vba(void);
+void test_cheatcode_raw_ext(void);
+void test_cheatcode_lower_keyed(void);
 void test_cheatcode_shapes(void);
 void test_cheatcode_too_big(void);
 void test_cheatcode_detect(void);

@@ -34,6 +34,10 @@ int keypad_is_mark(char c);
 // a part longer than KEYPAD_LINE_MAX or a character the keypad can't type
 // (e is then empty)
 int keypad_edit_init(struct keypad_edit *e, const char *code, u32 len);
+
+// Whether the keypad types every character of code: hex digits, stand-ins,
+// ':' and separators (not AnyGBA's '[', ']', '^' and '|', say)
+int keypad_edit_typable(const char *code, u32 len);
 // Types c (a hex digit, in any case, or ':') at the caret: over a stand-in
 // there (the caret then on the next one, else past it), else put in. 0 if
 // the line is full or c isn't one of those.

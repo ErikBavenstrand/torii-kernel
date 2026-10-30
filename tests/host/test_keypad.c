@@ -135,6 +135,11 @@ void test_keypad_edit(void)
 				"1",
 				13));
 	CHECK(!keypad_edit_init(&e, "32001000 G001", 13));
+	// AnyGBA's raw extensions: not the keypad's to type
+	CHECK(keypad_edit_typable("02001000:12+32001000 00??", 25));
+	CHECK(!keypad_edit_typable("[03005D8C]+0490:0063", 20));
+	CHECK(!keypad_edit_typable("02001000:12^02001004", 20));
+	CHECK(!keypad_edit_typable("02001000|80", 11));
 	CHECK_EQ(e.lines, 1);
 	CHECK_EQ(e.len[0], 0);
 }

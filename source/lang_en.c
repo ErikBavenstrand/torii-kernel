@@ -531,6 +531,7 @@ const char *const lang_en[STR_COUNT] = {
 	"That code can't go in a cheat file.",  // cheats.edit_bad
 	"The cheat file couldn't be changed.",  // cheats.edit_broken
 	"Can't edit this code here: 32 lines of hex digits at most.",  // cheats.too_long
+	"Can't edit this code here: the keypad types only hex digits and ':'.",  // cheats.untypable
 	"drop",  // cheats.hint_drop
 	"menu",  // cheats.hint_menu
 	"all",  // cheats.hint_all

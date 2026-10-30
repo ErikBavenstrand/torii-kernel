@@ -83,6 +83,9 @@ cheats-menu/menu 95CF9667E38C9925
 cheats-menu/only 05E23B2B8F23C4FE
 cheats-menu/rom 681DCB19779A2691
 cheats-menu/wrap 472200F8C0308F92
+cheats-raw/edit 2D9C3708DCFEE6B7
+cheats-raw/guide 7C59F5E1A1E68DFA
+cheats-raw/list 92DE992F4F172EB2
 cheats-ungated/page D99E85A7FD0E8A04
 cheats-ungated/press 62E6EFD2243B269D
 cheats-ungated/still 62E6EFD2243B269D
@@ -702,6 +705,9 @@ sv-cheats-menu/menu EC52BEA080F17E21
 sv-cheats-menu/only 24A4DA517779632D
 sv-cheats-menu/rom CCA31A5DF98D21FD
 sv-cheats-menu/wrap CF98BA0ACCAFBA1C
+sv-cheats-raw/edit F9CEED4E26E2DD47
+sv-cheats-raw/guide 34BA47D64184D47A
+sv-cheats-raw/list 5D6CD390C8F98572
 sv-cheats-ungated/page 5AAE280DBAEB134B
 sv-cheats-ungated/press 096E83DD2D8A6BC7
 sv-cheats-ungated/still 096E83DD2D8A6BC7

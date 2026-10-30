@@ -1,6 +1,7 @@
 // Cheat codes for GBA games: decoders for the real devices' formats (GameShark
 // v1/v2 and Action Replay v1/v2, Action Replay v3 and GameShark SP, CodeBreaker,
-// VBA's raw addr:value), Torii's model of what they decode to, and the pass
+// VBA's raw addr:value with AnyGBA's extensions), Torii's model of what
+// they decode to, and the pass
 // that turns it into the in-game interpreter's table and ROM patches. Free of hardware
 // access and allocation, so tests/host runs it on the host; the caller passes
 // every buffer.
@@ -20,7 +21,11 @@ enum cheat_format {
 	CHEAT_FMT_PARV3 = 3,      // Action Replay v3, GameShark SP, encrypted
 	CHEAT_FMT_PARV3_RAW = 4,  // the same, unencrypted
 	CHEAT_FMT_CODEBREAKER = 5,  // plain, or encrypted after a type-9 key line
-	CHEAT_FMT_VBA = 6,        // AAAAAAAA:VV, :VVVV or :VVVVVVVV
+	// AAAAAAAA:VV, :VVVV or :VVVVVVVV; and AnyGBA's raw extensions, which no
+	// device has: [PPPPPPPP]+O for a target through a pointer, VALUE^KEY
+	// (KEY an address or a pointer) to XOR the value with what's there, and
+	// TARGET|VALUE to set bits (CHEAT_OP_KEYED)
+	CHEAT_FMT_VBA = 6,
 };
 
 // What one file's cheats share, carried from each cheat to the next as mGBA's
@@ -94,17 +99,34 @@ enum cheat_op_type {
 	// value holds the code's loops. Kept so a cheat that uses it reads; it
 	// does nothing, as in mGBA.
 	CHEAT_OP_SLOWDOWN,
+	// AnyGBA's raw extensions (the VBA format's [P]+O, ^ and |): width bytes
+	// of value, XORed with the width bytes at the key when there is one
+	// (CHEAT_KEYED_KEY), written at the target, or OR-ed into it
+	// (CHEAT_KEYED_OR). The target is address, or (CHEAT_KEYED_TARGET_PTR)
+	// the u32 at address, plus addr_step; the key is key, or
+	// (CHEAT_KEYED_KEY_PTR) the u32 at key, plus key_offset. One element
+	// each frame (count is 1; no fill): for save data a game keeps encrypted
+	// with a key of its own and moves about (Pokémon's money and bag counts).
+	CHEAT_OP_KEYED,
 };
+
+#define CHEAT_KEYED_TARGET_PTR 1u
+#define CHEAT_KEYED_KEY_PTR 2u
+#define CHEAT_KEYED_KEY 4u
+#define CHEAT_KEYED_OR 8u
 
 struct cheat_op {
 	u32 address;
 	u32 value;       // masked to width, but for an unsigned bound one past it (0x10000: GameShark's <= and >=)
 	u32 count;       // writes: how many; conditionals: ops covered when true
-	s32 addr_step;   // writes: the address step; WRITE_PTR: the pointer's offset
+	s32 addr_step;   // writes: the address step; WRITE_PTR and KEYED: the pointer's offset
 	s32 value_step;  // writes: the value step
 	u16 else_count;  // conditionals: the ELSE block's ops
 	u8 type;         // enum cheat_op_type
 	u8 width;        // 1, 2 or 4 (0 for IF_BUTTON, IF_NEVER and SLOWDOWN)
+	u32 key;         // KEYED: the key's address, or its pointer's
+	u16 key_offset;  // KEYED: the key's offset (the raw format's is at most FFFF)
+	u8 flags;        // KEYED: CHEAT_KEYED_*
 };
 
 enum cheat_status {
@@ -132,6 +154,12 @@ enum cheat_status {
 // as the file's new key when the old key reads the cheat as nonsense and the
 // new one doesn't.
 u8 cheat_decode(struct cheat_decoder *d, const char *code, u32 len, struct cheat_op *ops, u32 ops_max, u32 *n_ops);
+
+// Whether the '+' at code[i] is part of a line, not between lines: a
+// pointer's offset ([PPPPPPPP]+O, AnyGBA's), a target's always, a key's
+// when its digits end the line. Everything that splits a code into lines
+// asks this.
+int cheat_plus_joins(const char *code, u32 len, u32 i);
 
 // The format one typed line looks like (CHEAT_FMT_AUTO for none), digit
 // stand-ins counted as digits. A 16-digit line gets the likeliest of the four
@@ -161,6 +189,7 @@ struct cheat_patch {
 #define CHEAT_PROG_K_EXT 3u        // op kinds 3-5: an op of that many words
 #define CHEAT_PROG_K_RUN 6u        // op kinds 6-8: a run of writes (plain cheats)
 #define CHEAT_PROG_COUNT_MAX 0xFFFFu  // an op's count
+#define CHEAT_PROG_KEYED_SHIFT 6      // a keyed op's CHEAT_KEYED_* in its info word
 
 enum cheat_prog_type {
 	CHEAT_PROG_WRITE = 0,
@@ -169,6 +198,7 @@ enum cheat_prog_type {
 	CHEAT_PROG_OR = 3,
 	CHEAT_PROG_AND = 4,
 	CHEAT_PROG_NOP = 5,
+	CHEAT_PROG_KEYED = 6,  // CHEAT_OP_KEYED: its flags at info bit CHEAT_PROG_KEYED_SHIFT
 	CHEAT_PROG_NEVER = 7,
 	CHEAT_PROG_EQ = 8,
 	CHEAT_PROG_NE = 9,
@@ -207,6 +237,7 @@ enum cheat_prog_type {
 #define CHEAT_COST_FILL 48       // each further write of a slide (a value step)
 #define CHEAT_COST_FILL_SAME 20  // each further write of a fill of one value
 #define CHEAT_COST_GEN 200       // each further element of a pointer write, add, or, and
+#define CHEAT_COST_KEYED 520     // a keyed write (its two pointers, key and OR)
 #define CHEAT_COST_COND 450      // a conditional, and the walk past what it skips
 #define CHEAT_COST_SKIP 105      // a cheat the off mask skips (cheatrun.s)
 #define CHEAT_COST_WALK 20       // each op a false conditional walks past

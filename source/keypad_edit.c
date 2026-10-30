@@ -54,6 +54,14 @@ static int caret_to_mark(struct keypad_edit *e, u32 col)
 	return 0;
 }
 
+int keypad_edit_typable(const char *code, u32 len)
+{
+	for (u32 i = 0; i < len; i++)
+		if (!is_sep(code[i]) && !is_hex(code[i]) && !keypad_is_mark(code[i]) && code[i] != ':')
+			return 0;
+	return 1;
+}
+
 int keypad_edit_init(struct keypad_edit *e, const char *code, u32 len)
 {
 	memset(e, 0, sizeof(*e));
