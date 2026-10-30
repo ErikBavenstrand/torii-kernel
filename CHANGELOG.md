@@ -4,6 +4,15 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Added:** R in a game list makes the game a favourite or not at once,
+  its star shown (on Favourites its row goes); Info's Controls says so
+  (d00ed28e).
+- **Changed:** a GBA game's Play « default » names how default starts it,
+  "default: clean" or "default: addons", from its own boot mode or
+  Settings' (d00ed28e).
+
 ## v0.9.6
 
 - **Fixed:** a patch write that crosses an 8 MB boundary of PSRAM goes on
