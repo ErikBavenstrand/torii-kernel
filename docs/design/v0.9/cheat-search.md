@@ -36,6 +36,7 @@ screenshots. So the search **borrows the save-state buffer**:
 | `0x80000-0x87DFF` | IWRAM to `0x03007E00` as last compared |
 | `0x88000-0x90FBF` | the candidates: a bit per element (36,800 bytes at 8 bits, half at 16, a quarter at 32) |
 | `0x91000` | `struct ingame_search`, its magic last |
+| `0x92000-0x9AFBF` | the candidates before the last pass, for Undo |
 
 The buffer's tag, mark and info (`0xAFF80-0xAFFFF`) are left alone except
 that starting a search zeroes the mark and the tag's magic: Load state then
@@ -141,7 +142,12 @@ Its page:
 - **No search:** Size (8, 16 or 32 bits; A cycles it) and Start search. The
   footer: what Start does, or why it can't.
 - **A search:** Same as before, Changed, Went up, Went down, Equals N, Show
-  them (greyed until 1-32 are left), New search. The footer shows how many are
+  them (greyed until 1-32 are left), Undo the last, New search. Each filter
+  first copies the candidates to `INGAME_SRAM_SEARCH_UNDO` (`0x92000`, at
+  most 36,800 bytes; about 10 frames at 8 bits), so a filter picked by
+  mistake doesn't end the search: Undo puts them back (once). The snapshot
+  keeps the undone pass's values, so the next filter compares against those
+  (in a chunk the pass emptied, against the values before it). The footer shows how many are
   left ("1,204 left"), or "None left" or "Searching...".
 - **Equals N** edits N in place: A starts the edit with the cursor on the
   last digit, LEFT and RIGHT pick a digit, UP and DOWN change it, A searches,
@@ -216,7 +222,7 @@ Rename one on the Cheats page.
 ## Not done
 
 - Searching VRAM, palette or OAM (values are rarely kept there).
-- Signed compares, "changed by N", undo of a pass.
+- Signed compares, "changed by N", more than one level of Undo.
 - Naming a found cheat in game (no keyboard in the overlay): rename it in
   Torii.
 

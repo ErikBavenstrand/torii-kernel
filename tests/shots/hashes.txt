@@ -413,6 +413,7 @@ ingame-search/kept 8043C9AEA707BE52
 ingame-search/list 72D72D1ADC8A3B76
 ingame-search/pick 5C01CC47D2F8D962
 ingame-search/started FA85D5E19506A037
+ingame-search/undo 404FAA9C5236ABAC
 ingame-shots/first 5DFED4399519A099
 ingame-shots/one B7818279D579B476
 ingame-shots/second 1A08CDCA30DED899
@@ -824,6 +825,7 @@ sv-ingame-search/kept 27A874B67AC3922B
 sv-ingame-search/list 8F7A110B8D7135C6
 sv-ingame-search/pick B7C461E2155D727F
 sv-ingame-search/started D429DAD235D25313
+sv-ingame-search/undo F1C3652C607FB76F
 sv-ingame-states/load 05E9AF68A3A41529
 sv-ingame-states/menu C02A68E79EE834B3
 sv-ingame-states/other BE5FA8B5BD25CBE4

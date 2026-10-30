@@ -4,7 +4,8 @@
 # RAM and offers the filters, the footer the candidates left (started);
 # Equals edits its number in place, a digit underlined (edit), and A
 # searches (equals). In game A loses a life; back in the search, Equals 4
-# leaves the lives (four), which Show them lists (list) with their value;
+# leaves the lives (four); below Show them, Undo the last can take the
+# filter back (undo); Show them lists the lives (list) with their value;
 # A opens one (pick), and Keep it, set it now keeps it (kept).
 #! settings 2=1
 #! sd-file /searchtest.gba 0 tests/roms/searchtest/searchtest.gba
@@ -37,7 +38,9 @@
 -k @58:A -k @62:- -k @70:DOWN -k @74:- -k @82:A -k @86:-
 -w "left"
 -s @6:four.png
--k @12:DOWN -k @16:- -k @24:A -k @28:-
+-k @12:DOWN -k @16:- -k @24:DOWN -k @28:-
+-s @40:undo.png
+-k @46:UP -k @50:- -k @58:A -k @62:-
 -w "screen ready: ingame-search-list"
 -s @4:list.png
 -k @10:A -k @14:-

@@ -45,6 +45,7 @@
 #define INGAME_SRAM_SEARCH_SNAP 0x40000
 #define INGAME_SRAM_SEARCH_BITS 0x88000
 #define INGAME_SRAM_SEARCH 0x91000
+#define INGAME_SRAM_SEARCH_UNDO 0x92000  // the candidates before the last pass, for Undo
 // The cheats the search found, for Back to Torii to file: struct
 // ingame_found, in the backups' page window after the screenshot's backup
 #define INGAME_SRAM_FOUND 0x2E000
@@ -68,11 +69,13 @@
 struct ingame_search {
 	uint32_t magic;  // INGAME_SEARCH_MAGIC once the snapshot is whole
 	uint8_t size;  // an element's bytes: 1, 2 or 4
-	uint8_t reserved[3];
+	uint8_t undo;  // 1: INGAME_SRAM_SEARCH_UNDO holds the candidates before the last pass
+	uint8_t reserved[2];
 	uint32_t left;  // the candidates left
 	uint32_t passes;  // the filters applied since the start
 	uint32_t value;  // the Equals row's number, as last edited
 	uint32_t launch_id;  // the session's: a search of an earlier launch is none
+	uint32_t undo_left;  // with undo, the candidates left before the last pass
 };
 
 #define INGAME_FOUND_MAGIC 0x31444E46u  // "FND1"
@@ -391,6 +394,7 @@ enum ingame_text {
 	INGAME_TEXT_SEARCH_EQUALS_AFTER,
 	INGAME_TEXT_SEARCH_SHOW,
 	INGAME_TEXT_SEARCH_NEW,
+	INGAME_TEXT_SEARCH_UNDO,
 	INGAME_TEXT_SEARCH_LEFT,  // the footer: "{n} left"
 	INGAME_TEXT_SEARCH_LEFT_AFTER,
 	INGAME_TEXT_SEARCH_NONE,
@@ -643,7 +647,8 @@ _Static_assert(sizeof(struct ingame_search) % 4 == 0 && sizeof(struct ingame_fou
 _Static_assert(INGAME_SRAM_SEARCH_SNAP == INGAME_SRAM_STATE &&
 		       INGAME_SRAM_SEARCH_SNAP + 0x47E00 <= INGAME_SRAM_SEARCH_BITS &&
 		       INGAME_SRAM_SEARCH_BITS + 36800 <= INGAME_SRAM_SEARCH &&
-		       INGAME_SRAM_SEARCH + sizeof(struct ingame_search) <= INGAME_SRAM_STATE_INFO,
+		       INGAME_SRAM_SEARCH + sizeof(struct ingame_search) <= INGAME_SRAM_SEARCH_UNDO &&
+		       INGAME_SRAM_SEARCH_UNDO + 36800 <= INGAME_SRAM_STATE_INFO,
 	       "the search in the save-state buffer, clear of its info, mark and tag");
 _Static_assert(INGAME_SRAM_FOUND >= INGAME_BACKUP_SHOT + INGAME_BACKUP_SHOT_BYTES &&
 		       INGAME_SRAM_FOUND + sizeof(struct ingame_found) <= INGAME_SRAM_WIDE,

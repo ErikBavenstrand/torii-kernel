@@ -215,6 +215,7 @@ enum {
 	SR_DOWN,
 	SR_EQUALS,
 	SR_SHOW,
+	SR_UNDO,
 	SR_NEW,
 	SR_ROWS
 };
@@ -1220,7 +1221,7 @@ static void list_pick(uint32_t r)
 // two frames. EXT code and data are linked there (ov.ld's .ext); the rest
 // may call it only while it is loaded (a search page is open).
 #define EXT __attribute__((section(".ext.text"), noinline))
-#define EXT_DATA __attribute__((section(".ext.data")))
+#define EXT_DATA __attribute__((section(".ext.data"), aligned(4)))  // sram_copy takes words
 extern uint32_t __ov_ext_start[], __ov_ext_end[];
 extern const uint32_t __ov_ext_load[];
 // The ARM code run from IWRAM (the screenshot's packer, the search's
@@ -1259,10 +1260,12 @@ static uint32_t window_end(void)
 }
 
 EXT_DATA static uint32_t search_found[INGAME_SEARCH_LIST];  // the list's candidates' addresses
+EXT_DATA static uint32_t search_buf[CHUNK / 4];  // the list's and Undo's reads of the candidates
 // The log's lines, out of the window
 EXT_DATA static char log_pass[] = "search: pass in ", log_frames[] = " frames",
 		     log_search[] = "search: ", log_left[] = " left", log_started[] = "search: started",
-		     log_kept[] = "search: kept a cheat", log_kept_on[] = "search: kept a cheat, on";
+		     log_kept[] = "search: kept a cheat", log_kept_on[] = "search: kept a cheat, on",
+		     log_undone[] = "search: undone, ";
 EXT_DATA static struct ingame_line spare;  // a line's second part, off the stack (the window's stack is small)
 EXT_DATA static struct ingame_glyph glyphs[INGAME_GLYPHS];  // read as the search opens
 
@@ -1586,6 +1589,7 @@ EXT static void search_start(void)
 	m.search.size = (uint8_t)(1u << m.search_size);
 	m.search.passes = 0;
 	m.search.value = 0;
+	m.search.undo = 0;
 	m.search.launch_id = session()->launch_id;
 	search_pass(1, 0, 0);
 	m.search.magic = INGAME_SEARCH_MAGIC;
@@ -1600,9 +1604,25 @@ static void search_drop(void)
 	search_save();
 }
 
+// The candidates' bits from one place in cart SRAM to another (whole words)
+EXT static void bits_copy(uint32_t from, uint32_t to)
+{
+	const uint32_t total = (cheatsearch_bits_bytes(m.search.size) + 3) & ~3u;
+	for (uint32_t at = 0; at < total; at += CHUNK) {
+		uint32_t n = total - at < CHUNK ? total - at : CHUNK;
+		sram_in(from + at, search_buf, n);
+		sram_out(to + at, search_buf, n);
+	}
+}
+
 EXT static void search_filter(uint32_t op, uint32_t value)
 {
 	search_busy(1);
+	// The candidates as they are, for Undo (a filter picked by mistake
+	// would otherwise end the search)
+	bits_copy(INGAME_SRAM_SEARCH_BITS, INGAME_SRAM_SEARCH_UNDO);
+	m.search.undo = 1;
+	m.search.undo_left = m.search.left;
 	search_pass(0, op, value);
 	m.search.passes++;
 	search_save();
@@ -1610,16 +1630,31 @@ EXT static void search_filter(uint32_t op, uint32_t value)
 	slots_update();  // the rows greyed or not with what is left
 }
 
+// Undo: the candidates as before the last pass. The snapshot keeps the
+// pass's values, so the next filter compares with them (in a chunk the pass
+// emptied, with the values before it)
+EXT static void search_undo(void)
+{
+	search_busy(1);
+	bits_copy(INGAME_SRAM_SEARCH_UNDO, INGAME_SRAM_SEARCH_BITS);
+	m.search.left = m.search.undo_left;
+	m.search.undo = 0;
+	m.search.passes--;
+	search_save();
+	m.busy = 0;
+	debug_number(log_undone, m.search.left, log_left);
+	slots_update();
+}
+
 // The candidates, all of them (at most INGAME_SEARCH_LIST), into the list
 EXT static void search_list(void)
 {
-	EXT_DATA static uint32_t chunk_now[CHUNK / 4];
 	uint32_t size = m.search.size, total = cheatsearch_bits_bytes(size);
 	m.list_n = 0;
 	for (uint32_t at = 0; at < total && m.list_n < INGAME_SEARCH_LIST; at += CHUNK) {
 		uint32_t n = total - at < CHUNK ? (total - at + 3) & ~3u : CHUNK;
-		const uint8_t *b = (const uint8_t *)chunk_now;
-		sram_in(INGAME_SRAM_SEARCH_BITS + at, chunk_now, n);
+		const uint8_t *b = (const uint8_t *)search_buf;
+		sram_in(INGAME_SRAM_SEARCH_BITS + at, search_buf, n);
 		for (uint32_t i = 0; i < n && m.list_n < INGAME_SEARCH_LIST; i++)
 			for (uint32_t k = 0; k < 8 && b[i] >> k; k++)
 				if (b[i] >> k & 1 && ((at + i) * 8 + k) * size < CHEATSEARCH_BYTES &&
@@ -1655,7 +1690,8 @@ EXT static int search_greyed(uint32_t r)
 		if (!searching())
 			return r == SR_START && m.states && buffer_unkept();
 		return (r <= SR_EQUALS && !m.search.left) ||
-		       (r == SR_SHOW && !(m.search.left && m.search.left <= INGAME_SEARCH_LIST));
+		       (r == SR_SHOW && !(m.search.left && m.search.left <= INGAME_SEARCH_LIST)) ||
+		       (r == SR_UNDO && !m.search.undo);
 	}
 	if (m.page == PAGE_PICK)
 		return (r != PR_VALUE && m.found >= INGAME_FOUND_MAX) || (r == PR_KEEP_ON && live_full());
@@ -1669,6 +1705,7 @@ EXT static uint32_t search_row_text(uint32_t r)
 	if (m.page == PAGE_SEARCH)
 		return text_at(r <= SR_EQUALS ? INGAME_TEXT_SEARCH_SAME + r
 			       : r == SR_SHOW ? INGAME_TEXT_SEARCH_SHOW
+			       : r == SR_UNDO ? INGAME_TEXT_SEARCH_UNDO
 					      : INGAME_TEXT_SEARCH_NEW);
 	if (m.page == PAGE_PICK)
 		return text_at(r == PR_VALUE  ? INGAME_TEXT_SEARCH_VALUE
@@ -1834,6 +1871,8 @@ EXT static void search_a(uint32_t r)
 		else if (r == SR_SHOW) {
 			search_list();
 			page_open(PAGE_LIST, 0);
+		} else if (r == SR_UNDO) {
+			search_undo();
 		} else {
 			search_drop();
 			page_open(PAGE_SEARCH, SR_START);

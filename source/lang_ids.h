@@ -4,7 +4,7 @@
 #define TORII_LANG_IDS_H
 
 #define LANG_FORMAT 2
-#define LANG_KEY_HASH 0x67AB9414u
+#define LANG_KEY_HASH 0x05DAED11u
 #define LANG_PACK_MAX 0x10000u
 #define LANG_LAUNCH_MAX 0x2000u
 #define LANG_ENGLISH_ID 0xE1E1u
@@ -136,6 +136,7 @@ enum lang_id {
 	STR_INGAME_SEARCH_EQUALS,
 	STR_INGAME_SEARCH_SHOW,
 	STR_INGAME_SEARCH_NEW,
+	STR_INGAME_SEARCH_UNDO,
 	STR_INGAME_SEARCH_LEFT,
 	STR_INGAME_SEARCH_NONE,
 	STR_INGAME_SEARCH_BUSY,
@@ -818,6 +819,6 @@ enum lang_id {
 };
 
 // The ids below this are the launch's (lang_before_launch)
-#define STR_LAUNCH_END 170
+#define STR_LAUNCH_END 171
 
 #endif

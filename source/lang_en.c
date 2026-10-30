@@ -129,6 +129,7 @@ const char *const lang_en[STR_COUNT] = {
 	"Equals {1}",  // ingame.search_equals
 	"Show them",  // ingame.search_show
 	"New search",  // ingame.search_new
+	"Undo the last",  // ingame.search_undo
 	"{1} left",  // ingame.search_left
 	"None left: start a new search",  // ingame.search_none
 	"Searching...",  // ingame.search_busy
