@@ -11,11 +11,11 @@ git log, not here.
   screenshots full screen, newest first: LEFT/RIGHT step, the date and
   "3 of 12" show until A or 2 seconds hide them, START deletes one. Shots
   are matched by their file names' game name, so every shot since v0.8
-  shows (5564deb0).
+  shows (5564deb0, b0bb36eb).
 - **Added:** the SD card page lists `.bmp` files and opens them in the same
   viewer (A, or View in their popup), stepping through the folder's;
   any uncompressed BMP shows, centred or shrunk to fit, in up to 176
-  colours; RLE and other kinds say they can't show (5564deb0, b0bb36eb).
+  colours; RLE and other kinds say they can't show (5564deb0).
 - **Added:** R in a game list makes the game a favourite or not at once,
   its star shown (on Favourites its row goes); Info's Controls says so
   (d00ed28e).
