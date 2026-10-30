@@ -112,7 +112,7 @@ static struct file bmp_make(u32 w, u32 h, u32 bpp, u32 comp, const u32 *masks, u
 struct decoded {
 	struct pic_info info;
 	struct pic_scratch s;
-	u16 table[PIC_TABLE_HALVES];
+	u8 table[PIC_TABLE_BYTES];
 	u8 tiles[PIC_TILES_BYTES];
 	u16 pal[PIC_COLOURS];
 	u32 colours;
@@ -124,8 +124,25 @@ static struct decoded *decode(struct file *f)
 	struct decoded *d = calloc(1, sizeof(*d));
 	struct pic_src src = {t_read, t_put, t_get, f, f->size};
 	d->head = pic_head(&src, &d->s, &d->info);
-	d->result = d->head == PIC_OK ? pic_decode(&src, &d->info, d->table, &d->s, d->tiles, d->pal, &d->colours)
+	d->result = d->head == PIC_OK ? pic_decode(&src, &d->info, &d->s, d->table, d->tiles, d->pal, &d->colours)
 				      : d->head;
+	return d;
+}
+
+// The same decode in steps of lines lines, as the viewer's read-ahead runs it
+static struct decoded *decode_steps(struct file *f, u32 lines, u32 *steps)
+{
+	struct decoded *d = calloc(1, sizeof(*d));
+	struct pic_src src = {t_read, t_put, t_get, f, f->size};
+	struct pic_dec dec;
+	d->result = pic_begin(&dec, &src, &d->s, d->table, d->tiles, d->pal);
+	*steps = 0;
+	while (d->result == PIC_OK && (d->result = pic_step(&dec, lines)) == PIC_MORE) {
+		d->result = PIC_OK;
+		++*steps;
+	}
+	d->info = dec.info;
+	d->colours = dec.colours;
 	return d;
 }
 
@@ -250,25 +267,54 @@ static void test_picture_median_cut(void)
 	free(f.bytes);
 }
 
+// A 4-bit cell: red, green, blue
+static u32 cellof(u32 r, u32 g, u32 b)
+{
+	return r | g << 4 | b << 8;
+}
+
 static void test_picture_median_cut_boxes(void)
 {
-	static u16 table[PIC_TABLE_HALVES];
+	static u16 counts[PIC_CELLS];
+	static u8 index[PIC_CELLS];
 	static struct pic_box box[PIC_COLOURS];
-	u32 slice[32];
-	u16 pal[PIC_COLOURS], list[2] = {(u16)rgb15(1, 2, 3), (u16)rgb15(30, 20, 10)};
-	memset(table, 0, sizeof(table));
-	// Two colours: two boxes, each its colour exactly
-	table[rgb15(1, 2, 3)] = 10;
-	table[rgb15(30, 20, 10)] = 5;
-	CHECK_EQ(pic_median_cut(table, list, 2, box, slice, PIC_COLOURS, pal), 2u);
-	CHECK(pal[table[rgb15(1, 2, 3)]] == rgb15(1, 2, 3));
-	CHECK(pal[table[rgb15(30, 20, 10)]] == rgb15(30, 20, 10));
+	u32 slice[16];
+	u16 pal[PIC_COLOURS], list[2] = {(u16)cellof(1, 2, 3), (u16)cellof(14, 10, 5)};
+	memset(counts, 0, sizeof(counts));
+	// Two cells: two boxes, each its cell's middle (5 bits: 2v + 1)
+	counts[cellof(1, 2, 3)] = 10;
+	counts[cellof(14, 10, 5)] = 5;
+	CHECK_EQ(pic_median_cut(counts, list, 2, box, slice, PIC_COLOURS, pal, index), 2u);
+	CHECK(pal[index[cellof(1, 2, 3)]] == rgb15(3, 5, 7));
+	CHECK(pal[index[cellof(14, 10, 5)]] == rgb15(29, 21, 11));
+	CHECK_EQ(index[cellof(0, 0, 0)], PIC_NO_BOX);  // outside both
 	// One: one box
-	memset(table, 0, sizeof(table));
-	table[rgb15(5, 5, 5)] = 1;
-	list[0] = (u16)rgb15(5, 5, 5);
-	CHECK_EQ(pic_median_cut(table, list, 1, box, slice, 4, pal), 1u);
-	CHECK_EQ(pal[0], rgb15(5, 5, 5));
+	memset(counts, 0, sizeof(counts));
+	counts[cellof(5, 5, 5)] = 1;
+	list[0] = (u16)cellof(5, 5, 5);
+	CHECK_EQ(pic_median_cut(counts, list, 1, box, slice, 4, pal, index), 1u);
+	CHECK_EQ(pal[0], rgb15(11, 11, 11));
+}
+
+// Steps of any size make the same picture as one decode
+static void test_picture_steps(void)
+{
+	u32 (*const kinds[])(u32, u32) = {px_few, px_many};
+	for (u32 k = 0; k < 2; k++) {
+		struct file f = bmp_make(240, 160, 24, 0, NULL, 0, NULL, 0, kinds[k]);
+		struct decoded *one = decode(&f);
+		u32 steps;
+		struct decoded *some = decode_steps(&f, 7, &steps);
+		CHECK_EQ(one->result, PIC_OK);
+		CHECK_EQ(some->result, PIC_OK);
+		CHECK(steps > 20);
+		CHECK_EQ(one->colours, some->colours);
+		CHECK(!memcmp(one->tiles, some->tiles, sizeof(one->tiles)));
+		CHECK(!memcmp(one->pal, some->pal, one->colours * 2));
+		free(one);
+		free(some);
+		free(f.bytes);
+	}
 }
 
 static u32 px_index(u32 x, u32 y)
@@ -390,7 +436,7 @@ static void test_picture_fit(void)
 	CHECK_EQ(d->result, PIC_OK);
 	CHECK_EQ(d->info.out_h, 160u);
 	CHECK_EQ(d->info.out_w, 8u);
-	CHECK(f.reads <= 2 + 160);
+	CHECK(f.reads <= 3 + 160);  // the header twice (the test reads it too), the colours, the rows
 	free(d);
 	free(f.bytes);
 }
@@ -501,6 +547,7 @@ void test_picture(void)
 	test_picture_median_cut();
 	test_picture_median_cut_mid();
 	test_picture_median_cut_boxes();
+	test_picture_steps();
 	test_picture_indexed();
 	test_picture_masks();
 	test_picture_fit();

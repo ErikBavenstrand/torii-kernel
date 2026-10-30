@@ -16,7 +16,7 @@ So the names already say whose a shot is, and the viewer matches by them; nothin
 What that means:
 
 - A game's SD file and its NOR copy share their shots, as they share the stem; so do two files of one name in different folders, or with different extensions (`Tetris.gb`, `Tetris.gbc`). That is a feature for the NOR copy and harmless for the rest.
-- Renaming a game's file leaves its shots under the old stem: they no longer show in its popup, and still do on the SD card page. A rename could carry them along (a follow-up).
+- Renaming a game's file (the SD card page's Rename) moves its shots to the new stem, each keeping its date and number (`shotlist_rename`, from `action_rename_file` after the game's sidecars). One whose new name is taken stays under the old stem. The names are gathered in batches of 8 before any moves, so no rename happens under `f_readdir`.
 - Names past 47 bytes match on the cut stem, as they were filed.
 
 ## Finding them fast
@@ -43,7 +43,8 @@ The engine has no bitmap mode, and mode 3 would need the whole of BG VRAM plus t
 
 - A new widget, `UI_PICTURE`: 30 x 20 8bpp tiles (600 tiles, 38,400 bytes) on its own plane, every tile its own, in row order. A view with one sets its plane's 8bpp bit in BGCNT (`ui_view.bpp8`, as lists set `tall`). The viewer puts it on plane 1, whose character block 1 reaches 48 KB; the overlay goes in front of it on plane 0, which the delete confirmation takes while it is up.
 - Colours: an 8bpp tile's pixel n is BG colour n. The UI owns banks 0-2 (colours 0-47), and a confirmation over the picture takes two banks of its own (`confirm_init`), so the picture gets banks 3-13: **176 colours**, colours 48-223.
-- **Quantising** (`source/picture.c`, host-tested). The file is read once: each line is converted to RGB15, kept in PSRAM page 2, and written as tiles in the colours met so far (a 32K-entry table, RGB15 to index + 1). A GBA screen is RGB15, and most frames use fewer than 176 colours, so that is usually all. A picture with more (blending, a fade, a photo) is counted again from the kept lines at 4 bits a channel (at most 4,096 colours, listed where the tiles go until they are written), cut into 176 boxes by median cut (the box with the most pixels times its longest side is split at its colours' median, along that side), each box's colour its pixels' mean, and its kept lines written again. Counting at 4 bits keeps the cut quick (it measured 5-6 M cycles on 2,900 colours at 5 bits); it costs a 5-bit step only where a picture has more than 176 colours. No dithering: GBA art is flat colour, where dithering only adds noise.
+- **Quantising** (`source/picture.c`, host-tested). The file is read once: each line is converted to RGB15, kept in PSRAM page 2, and written as tiles in the colours met so far (a 32 KB table, RGB15 to index + 1). A GBA screen is RGB15, and most frames use fewer than 176 colours, so that is usually all. A picture with more (blending, a fade, a photo) is counted again from the kept lines by 4-bit cells (at most 4,096, listed where the tiles go until they are written; the table holds their counts and then each one's box), cut into 176 boxes by median cut (the box with the most pixels times its longest side is split at its cells' median, along that side), each box's colour its pixels' mean (a cell's middle in 5 bits, 2v + 0.5), and its kept lines written again. Counting at 4 bits keeps the cut quick (it measured 5-6 M cycles on 2,900 colours at 5 bits).
+- **Dithering**: a picture with 1,024 cells or more (`PIC_DITHER_CELLS`) is photo-like, and its smooth gradients would band in 176 colours, so its lines go through Bayer's 4 x 4 ordered dither: each channel moves by -2 to +1 of 5 bits (about a cell's width) before its cell's box is looked up. Every box's whole volume is given to it first, so a moved colour finds a box; one outside every box takes its own. A game's frame, even with fades and blending, has far fewer cells: GBA art is flat colour, where dithering would only add noise.
 - RGB15 from 8 bits is the top 5 bits, which inverts `ppu_bmp_row`'s expansion: a Torii shot's colours come back exactly as the game drew them.
 
 ## BMP files
@@ -51,12 +52,12 @@ The engine has no bitmap mode, and mode 3 would need the whole of BG VRAM plus t
 `picture.c` reads the header and the rows through a read callback (the kernel's is FatFs; the host tests' a buffer):
 
 - Taken: `BITMAPINFOHEADER` and its later versions (40, 52, 56, 108, 124 bytes), 1, 4, 8, 16, 24 and 32 bits a pixel, uncompressed (`BI_RGB`) or with bit masks (`BI_BITFIELDS`, any contiguous masks), top-down or bottom-up.
-- Refused, the picture black and the overlay saying why in place of the date (it stays up): "Can't show this kind of picture" (`STR_SHOTS_UNSUPPORTED`) for RLE and JPEG/PNG-in-BMP, OS/2 headers, more than 8,192 pixels a side, rows over the read buffer (16 KB: 5,461 pixels at 24 bits); "Not a picture, or damaged" (`STR_SHOTS_BROKEN`) for a file that isn't a BMP or ends early.
-- Sizes: 240 x 160 shows as it is; a smaller picture is centred on black; a larger one is shrunk to fit, keeping its shape, by nearest sampling (a 480 x 320 mGBA capture shows whole at half size, a 256 x 192 one at 213 x 160). Only the rows it samples are read (row by row when it skips rows, in 16 KB runs otherwise).
+- Refused, the picture black and the overlay saying why in place of the date (it stays up): "Can't show this kind of picture" (`STR_SHOTS_UNSUPPORTED`) for RLE and JPEG/PNG-in-BMP, OS/2 headers, more than 8,192 pixels a side, rows over the read buffer (12 KB: 4,096 pixels at 24 bits); "Not a picture, or damaged" (`STR_SHOTS_BROKEN`) for a file that isn't a BMP or ends early.
+- Sizes: 240 x 160 shows as it is; a smaller picture is centred on black; a larger one is shrunk to fit, keeping its shape, by nearest sampling (a 480 x 320 mGBA capture shows whole at half size, a 256 x 192 one at 213 x 160). Only the rows it samples are read (row by row when it skips rows, in 12 KB runs otherwise).
 
 ## Memory
 
-- `pReadCache`, `READCACHE_SHOTS` (all 128 KB within one decode, the rest while the viewer runs): within a decode, the colour table (64 KB, from 0, over the stage: no job step runs inside the call); while the viewer runs, from `0x10000`, its state: the tiles (38,400 bytes, read by the VRAM queue after the call), the palette, the list's order and sort keys, the read buffer and the `FIL`. The viewer starts no job and runs no listing.
+- `pReadCache`, `READCACHE_SHOTS`, while the viewer runs: the decoder's table (32 KB) from `0x8000`, clear of the stage, as the read-ahead's steps run between frames other jobs' steps; from `0x10000`, its state: the tiles (38,400 bytes, read by the VRAM queue after the call), the palette, the read buffer, the `FIL`, the list's order and the read-ahead's decode; and from 0, over the stage, the list's names and dates within the list's read only. A delete borrows the start (the user's lists, from `0x8000`) within its call: the read-ahead stops first.
 - PSRAM page 2, selected only inside the viewer's and the count table's calls, never across a FatFs call (page 0 stays the window's otherwise): the cache of 32 decoded pictures (tiles and palette) from 0, the picture being decoded as RGB15 lines (75 KB) from `0x140000`, the list's names (256 bytes each, up to 1,024: a game with more lists its first 1,024 in the folder's order) from `0x200000`, and the count table (up to 2,048 games, 8,192 shots) from `0x300000`.
 - EWRAM: 16 bytes more for the pages' shared state (the popups' count texts and their one more item).
 
@@ -64,9 +65,11 @@ The engine has no bitmap mode, and mode 3 would need the whole of BG VRAM plus t
 
 A step decodes inside one call, with no frame drawn, so the old picture stays until the new one is ready; then the picture's banks go black, its tiles go through the VRAM queue (its cap raised to 40 KB a VBlank while they land, so one or two frames), and the new colours come in once they have landed. The step's time is logged (`shots: NAME: ... in N frames`).
 
-Decoded pictures stay in a cache of 32 in PSRAM page 2. Resting on a picture for 12 frames (no key held) decodes the next one the way the last step went into it (`shots: ahead:`), so the usual look-then-step shows at once: a picture from the cache costs a PSRAM copy (about 150,000 cycles, half a frame). A key pressed during that decode waits for it.
+Decoded pictures stay in a cache of 32 in PSRAM page 2. Resting on a picture for 12 frames (no key held) starts the **read-ahead**: a job (`ahead_step`) that decodes the next one the way the last step went, a few lines a step between frames (`pic_begin`, `pic_step`), then puts it in the cache 8 KB a step. Keys never wait on it. A step to the picture it is decoding takes its decode over and finishes it (`the read-ahead's decode goes on`); a step to one it has decoded takes it at once; a step anywhere else stops it. So the usual look-then-step shows at once: a picture from the cache costs a PSRAM copy (about 150,000 cycles, half a frame).
 
-The hot loops (a 24-bit row to RGB15, counting, mapping to tiles, the median cut's passes) are ARM code in IWRAM (`PIC_HOT`, 1.3 KB: 6,628 bytes stay free in the test kernel); the rest runs from ROM.
+Every part of a decode is bounded a step: 2 lines of the file (with a 12 KB read at most), 2 lines counted or mapped, 512 cells of the median cut's work (each split resumes where it stopped: its slices, then its partition, which adds each cell to its half's sums as it goes), a few boxes' colours or volumes. The job's frames stay within the jobs' frame deadline (`shots-ahead`, 226,454 cycles at most).
+
+The hot loops (a 24-bit row to RGB15, counting, mapping to tiles with or without dither, the median cut's slices, partition and volumes) are ARM code in IWRAM (`PIC_HOT`, 1.6 KB: 5,748 bytes stay free in the test kernel, 7,488 in the kernel); the rest runs from ROM.
 
 ## Strings
 
@@ -86,17 +89,13 @@ The emulator, on the goldens' card (`shots-game`, `shots-sd`), each picture's fi
 
 | Picture | Colours | Cycles | Frames |
 | --- | --- | --- | --- |
-| 240 x 160, 24 bits (a Torii shot) | 16, exact | 2.57 M | 10 |
-| 240 x 160, 24 bits, smooth gradients in every channel (the worst case) | 2,881 at 4 bits, cut to 176 | 8.54 M | 31 |
-| 64 x 48, 4 bits, centred | 16, exact | 1.48 M | 6 |
+| 240 x 160, 24 bits (a Torii shot) | 16, exact | 2.74 M | 10 |
+| 240 x 160, 24 bits, smooth gradients in every channel (the worst case) | 2,881 cells, cut to 176, dithered | 11.6 M | 42 |
+| 64 x 48, 4 bits, centred | 16, exact | 1.57 M | 6 |
 | any, from the cache | | 0.15 M | 1 |
 
-Of a Torii shot's 2.57 M: the SD reads about 0.7 M, the rows' conversion 0.7 M, the tiles 0.8 M, keeping the lines in PSRAM 0.23 M, clearing the table 0.1 M. On the cart the SD reads 115 KB at 1,710 KB/s (67 ms, about 1.1 M cycles), so a new shot takes about 11 frames there, and a cached or read-ahead one about one. The worst case is a photo-like picture; a GBA frame with fades and blending has far fewer 4-bit colours.
+Of a Torii shot's 2.74 M: the SD reads about 0.7 M, the rows' conversion 0.7 M, the tiles 0.8 M, keeping the lines in PSRAM 0.23 M, clearing the table 0.1 M. On the cart the SD reads 115 KB at 1,710 KB/s (67 ms, about 1.1 M cycles), so a new shot takes about 11 frames there, and a cached or read-ahead one about one. The worst case is a photo-like picture; a GBA frame with fades and blending has far fewer 4-bit colours.
 
-Frames while the viewer runs: `shots-show` (a picture landing) 90,291 cycles, `shots-overlay` (the strip in or out) 98,971.
+Frames while the viewer runs: `shots-show` (a picture landing) 90,291 cycles, `shots-overlay` (the strip in or out) 98,971, `shots-ahead` (the read-ahead's) 226,454.
 
-## Follow-ups
-
-- A rename of a game's file could rename its shots along (their stem).
-- The read-ahead blocks keys while it runs (up to its picture's decode); a decode split into job steps would not, at the cost of keeping the table and the stage apart across frames.
-- Pictures past 176 colours band where a picture has smooth gradients; ordered dithering would hide it for photos, at a cost per pixel.
+The worst case read ahead runs about 70 frames of job steps, unseen. Read ahead, any picture shows in about one frame.

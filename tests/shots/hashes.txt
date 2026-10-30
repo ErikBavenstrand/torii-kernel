@@ -675,11 +675,12 @@ settings-dark/frames 37-37 A037C0FC820F7052
 settings-dark/frames 38-38 CA541704684BDBF5
 settings-dark/frames 39-45 8DC21F50A4966475
 settings-start-hidden/row 0CAAE9ACBBE3D16E
+shots-ahead/next 9B121D3112278DED
 shots-game/back 1E6044F0A7D02798
 shots-game/bare CEC52ECD02655E0C
 shots-game/delete E1516E8C0FFF62F4
 shots-game/first 0B42A6524702DD73
-shots-game/many EEE25CFB5CFD5E3D
+shots-game/many 62B0D0BC3104F629
 shots-game/popup DB76763EC08597E0
 shots-game/small 3DE58173DCD470B7
 shots-sd/back 2A7C6CC3F2E549BD

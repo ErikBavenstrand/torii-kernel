@@ -197,7 +197,7 @@ u32 shotlist_rename(const char *old_name, const char *new_name)
 			if ((w->info.fattrib & AM_DIR) || strlen(w->info.fname) >= sizeof(w->name[0]) ||
 			    !shotname_match(w->info.fname, w->old_stem, &when) || seen++ < stuck)
 				continue;
-			strcpy(w->name[n++], w->info.fname);
+			memcpy(w->name[n++], w->info.fname, strlen(w->info.fname) + 1);  // it fits: checked above
 		}
 		f_closedir(&w->dir);
 		if (!n)

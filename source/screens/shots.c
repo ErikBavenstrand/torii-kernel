@@ -16,6 +16,7 @@
 #include "../engine/cycles.h"
 #include "../engine/frame.h"
 #include "../engine/gfx.h"
+#include "../engine/jobs.h"
 #include "../engine/psram.h"
 #include "../ui/dialog.h"
 #include "../ui/ui.h"
@@ -84,6 +85,16 @@ struct sv_state {
 	u8 failed;  // the picture shown didn't decode: the overlay says why, and stays
 	u8 back;  // the last step went to the one before
 	u8 nodes;  // the view's first node
+	// The read-ahead (a job): the decode under way, of the list's picture
+	// ahead, from ahead_path, into pic; its file open in fil
+	struct pic_dec dec;
+	struct pic_src src;
+	u32 ahead;
+	u8 job, open;
+	u8 adopt;  // a load takes the read-ahead's decode over
+	u8 keeping;  // the read-ahead has decoded its picture, and is putting it in the cache
+	u32 kept;  // bytes of it there
+	char ahead_path[MAX_path_len + SV_NAME_BYTES];
 	char dir[MAX_path_len];
 	char stem[SHOTNAME_STEM_BYTES];
 	char name[SV_NAME_BYTES];
@@ -91,9 +102,11 @@ struct sv_state {
 	char when[64], pos[32];
 };
 _Static_assert(READCACHE_SHOTS_STATE + sizeof(struct sv_state) <= MAX_pReadCache_size, "the viewer's state");
-_Static_assert(READCACHE_SHOTS + PIC_TABLE_HALVES * 2 <= READCACHE_SHOTS_STATE, "the decoder's table");
+_Static_assert(READCACHE_SHOTS_TABLE + PIC_TABLE_BYTES <= READCACHE_SHOTS_STATE &&
+		       READCACHE_SHOTS_TABLE >= READCACHE_STAGE + READCACHE_STAGE_SIZE,
+	       "the decoder's table, clear of the stage: the read-ahead's steps run between frames");
 
-// Within the list's read, from READCACHE_SHOTS, over the decoder's table
+// Within the list's read, from READCACHE_SHOTS, over the stage
 struct sv_list_work {
 	DIR dir;
 	FILINFO info;
@@ -112,9 +125,9 @@ static struct sv_list_work *list_work(void)
 	return (struct sv_list_work *)(void *)(pReadCache + READCACHE_SHOTS);
 }
 
-static u16 *table(void)
+static u8 *table(void)
 {
-	return (u16 *)(void *)(pReadCache + READCACHE_SHOTS);
+	return pReadCache + READCACHE_SHOTS_TABLE;
 }
 
 static u8 *page2(u32 offset)
@@ -235,13 +248,13 @@ static void get_line(void *ctx, u32 y, u16 *line)
 	SetPSRampage(PSRAM_ASSET_PAGE);
 }
 
-// The list's picture at: its name into s->name, its path into s->path
-static void name_path(u32 at)
+// The list's picture at: its name into name, its path into path
+static void name_path(u32 at, char *name, char *path)
 {
 	struct sv_state *s = sv();
-	name_get(s->order[at], s->name);
+	name_get(s->order[at], name);
 	u32 dl = (u32)strlen(s->dir);
-	snprintf(s->path, sizeof(s->path), "%s%s%s", s->dir, dl && s->dir[dl - 1] == '/' ? "" : "/", s->name);
+	snprintf(path, sizeof(s->path), "%s%s%s", s->dir, dl && s->dir[dl - 1] == '/' ? "" : "/", name);
 }
 
 // 1 if the list's picture at is in the cache
@@ -251,29 +264,141 @@ static int cached(u32 at)
 	return sv()->tag[k % SV_SLOTS] == k + 1;
 }
 
+// s->pic into the cache, as the list's picture at
+// bytes more of s->pic into the cache from s->kept, as the list's
+// picture at; 1 once it is all there
+static int keep_some(u32 at, u32 bytes)
+{
+	struct sv_state *s = sv();
+	u32 k = s->order[at], c = k % SV_SLOTS, n = sizeof(s->pic) - s->kept;
+	n = n < bytes ? n : bytes;
+	if (!s->kept)
+		s->tag[c] = 0;  // half written, it holds nothing
+	SetPSRampage(SHOTLIST_PAGE);
+	int ok = psram_write(page2(SHOTLIST_CACHE_OFFSET + c * SV_SLOT_BYTES) + s->kept, (const u8 *)&s->pic + s->kept,
+			     n);
+	SetPSRampage(PSRAM_ASSET_PAGE);
+	s->kept = ok ? s->kept + n : sizeof(s->pic) + 1;
+	if (s->kept < sizeof(s->pic))
+		return 0;
+	if (s->kept == sizeof(s->pic))
+		s->tag[c] = (u16)(k + 1);
+	s->kept = 0;
+	return 1;
+}
+
+static void keep(u32 at)
+{
+	sv()->kept = 0;
+	keep_some(at, sizeof(struct sv_slot));
+}
+
+// Opens path and starts decoding it into s->pic (s->dec)
+static int dec_begin(const char *path)
+{
+	struct sv_state *s = sv();
+	if (f_open(&s->fil, path, FA_READ) != FR_OK)
+		return PIC_BROKEN;
+	s->open = 1;
+	s->src = (struct pic_src){read_fil, put_line, get_line, &s->fil, (u32)f_size(&s->fil)};
+	return pic_begin(&s->dec, &s->src, &s->scratch, table(), s->pic.tiles, s->pic.pal);
+}
+
+static void dec_close(void)
+{
+	struct sv_state *s = sv();
+	if (s->open)
+		f_close(&s->fil);
+	s->open = 0;
+}
+
+// The read-ahead's steps: the picture at s->ahead decoded a few lines at a
+// time, between frames, into the cache
+#define AHEAD_LINES 2
+#define AHEAD_KEEP_BYTES 0x2000
+static int ahead_step(struct job *job)
+{
+	struct sv_state *s = sv();
+	int r;
+	frame_measure("shots-ahead");
+	if (job->state == JOB_CANCEL) {
+		if (!s->adopt)
+			dec_close();
+		return JOB_DONE;
+	}
+	if (job->state == 2)  // decoded: into the cache, a piece a step
+		return keep_some(s->ahead, AHEAD_KEEP_BYTES) ? JOB_DONE : JOB_MORE;
+	if (job->state == 0) {
+		job->state = 1;
+		r = dec_begin(s->ahead_path);
+		if (r == PIC_OK)
+			return JOB_MORE;
+	} else {
+		r = pic_step(&s->dec, AHEAD_LINES);
+	}
+	if (r == PIC_MORE)
+		return JOB_MORE;
+	dec_close();
+	s->pic.colours = s->dec.colours;
+	if (r != PIC_OK)
+		return JOB_DONE;
+	tlog("shots: ahead: %s, %lu colours%s", s->ahead_path, (unsigned long)s->pic.colours,
+	     s->dec.info.exact ? ""
+	     : s->dec.dither   ? " (cut, dithered)"
+			       : " (cut)");
+	job->state = 2;
+	s->kept = 0;
+	s->keeping = 1;
+	return JOB_MORE;
+}
+
+static void ahead_stop(void)
+{
+	struct sv_state *s = sv();
+	if (job_running(s->job))
+		job_cancel(s->job);
+	s->job = JOB_NONE;
+}
+
 // The list's picture at into s->pic, and into the cache; name_path(at)
-// first. PIC_OK, or why it doesn't show (s->pic then black)
+// first. PIC_OK, or why it doesn't show (s->pic then black). A read-ahead
+// of it goes on here to its end; one of another stops.
 static int load(u32 at)
 {
 	struct sv_state *s = sv();
 	u32 k = s->order[at], c = k % SV_SLOTS, start = cycles_now();
-	struct sv_slot *slot = (struct sv_slot *)(void *)page2(SHOTLIST_CACHE_OFFSET + c * SV_SLOT_BYTES);
+	int r = PIC_OK, adopted = 0;
+	if (job_running(s->job) && s->ahead == at && s->keeping) {
+		while (!keep_some(at, sizeof(struct sv_slot)))  // decoded already: the rest kept now
+			;
+		s->adopt = 1;
+		job_cancel(s->job);
+		s->adopt = 0;
+		s->job = JOB_NONE;
+		tlog("shots: %s: the read-ahead's picture", s->name);
+		return PIC_OK;
+	}
+	if (job_running(s->job) && s->ahead == at && s->open) {
+		s->adopt = 1;  // its decode is this one's: the job ends, its file stays open
+		job_cancel(s->job);
+		s->adopt = 0;
+		adopted = 1;
+		tlog("shots: %s: the read-ahead's decode goes on", s->name);
+	}
+	ahead_stop();
 	if (s->tag[c] == k + 1) {
 		SetPSRampage(SHOTLIST_PAGE);
-		memcpy(&s->pic, slot, sizeof(s->pic));
+		memcpy(&s->pic, page2(SHOTLIST_CACHE_OFFSET + c * SV_SLOT_BYTES), sizeof(s->pic));
 		SetPSRampage(PSRAM_ASSET_PAGE);
 		tlog("shots: %s from the cache in %lu cycles", s->name, (unsigned long)cycles_since(start));
 		return PIC_OK;
 	}
-	struct pic_info info;
-	int r = PIC_BROKEN;
-	if (f_open(&s->fil, s->path, FA_READ) == FR_OK) {
-		struct pic_src src = {read_fil, put_line, get_line, &s->fil, (u32)f_size(&s->fil)};
-		r = pic_head(&src, &s->scratch, &info);
-		if (r == PIC_OK)
-			r = pic_decode(&src, &info, table(), &s->scratch, s->pic.tiles, s->pic.pal, &s->pic.colours);
-		f_close(&s->fil);
-	}
+	if (!adopted)
+		r = dec_begin(s->path);
+	while (r == PIC_OK && (r = pic_step(&s->dec, PIC_H)) == PIC_MORE)
+		r = PIC_OK;
+	dec_close();
+	s->pic.colours = s->dec.colours;
 	u32 cycles = cycles_since(start);
 	if (r != PIC_OK) {
 		tlog("shots: %s: %s", s->path, r == PIC_UNSUPPORTED ? "a kind it doesn't show" : "not a picture");
@@ -282,13 +407,14 @@ static int load(u32 at)
 		s->pic.colours = 1;
 		return r;
 	}
-	tlog("shots: %s: %lux%lu, %u bits, %lu colours%s, in %lu frames (%lu cycles)", s->name, (unsigned long)info.w,
-	     (unsigned long)info.h, info.bpp, (unsigned long)s->pic.colours, info.exact ? "" : " (cut)",
+	const struct pic_info *info = &s->dec.info;
+	tlog("shots: %s: %lux%lu, %u bits, %lu colours%s, in %lu frames (%lu cycles)", s->name, (unsigned long)info->w,
+	     (unsigned long)info->h, info->bpp, (unsigned long)s->pic.colours,
+	     info->exact     ? ""
+	     : s->dec.dither ? " (cut, dithered)"
+			     : " (cut)",
 	     (unsigned long)cycles / ENGINE_FRAME_CYCLES + 1u, (unsigned long)cycles);
-	SetPSRampage(SHOTLIST_PAGE);
-	if (psram_write(slot, &s->pic, sizeof(s->pic)))
-		s->tag[c] = (u16)(k + 1);
-	SetPSRampage(PSRAM_ASSET_PAGE);
+	keep(at);
 	return PIC_OK;
 }
 
@@ -329,7 +455,7 @@ static void show(void)
 {
 	static const u16 black[PIC_COLOURS] = {0};
 	struct sv_state *s = sv();
-	name_path(s->at);
+	name_path(s->at, s->name, s->path);
 	int r = load(s->at);
 	when_text(r);
 	s->failed = r != PIC_OK;
@@ -371,10 +497,11 @@ static void poll(void)
 		s->prefetched = 1;
 		u32 next = (s->at + (s->back ? s->count - 1 : 1)) % s->count;
 		if (!cached(next)) {
-			name_path(next);
-			tlog("shots: ahead:");
-			load(next);
-			name_path(s->at);
+			char name[SV_NAME_BYTES];
+			name_path(next, name, s->ahead_path);
+			s->ahead = next;
+			s->keeping = 0;
+			s->job = job_start(ahead_step, NULL, ui_owner(ui_view_at(ui_depth() - 1)));
 		}
 	}
 }
@@ -432,6 +559,7 @@ static int delete_shown(void)
 	struct ui_confirm ask = {S(STR_SHOTS_DELETE_ASK), S(STR_SHOTS_DELETE_TEXT), S(STR_SHOTS_DELETE), 1};
 	if (!ui_confirm(UI_NONE, &ask))
 		return 1;
+	ahead_stop();  // the delete borrows pReadCache where the decode's table is
 	if (!action_delete_file(s->path)) {
 		dialog_message(NULL, S(STR_SHOTS_DELETE_FAILED), DIALOG_ERROR);
 		return 1;
@@ -479,6 +607,7 @@ static void run(void)
 			break;
 		}
 	}
+	ahead_stop();
 	gfx_commit_max_bytes = GFX_COMMIT_BYTES;
 	ui_leave(UI_TR_DEEPER, -1);  // back to the caller's screen
 	while (ui_depth())
@@ -493,6 +622,7 @@ static void begin(const char *dir)
 		ui_pop();
 	struct sv_state *s = sv();
 	memset(s, 0, sizeof(*s));
+	s->job = JOB_NONE;
 	snprintf(s->dir, sizeof(s->dir), "%s", dir);
 }
 

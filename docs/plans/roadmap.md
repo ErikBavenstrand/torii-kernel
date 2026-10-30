@@ -61,7 +61,6 @@ Code fixes that the emulator can test, plus the leftovers from v0.9.
 
 The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-review.md`) and the owner's asks.
 
-- Screenshots (`docs/design/v0.9/shot-viewer.md`, Follow-ups): a game's rename could carry its shots along; the read-ahead could run as job steps so keys never wait on it.
 - The SD page's popup offers Play's « » stepper under the games pages' rules, and names default's way as they do.
 - **One place for how a game boots** (owner, 2026-10-27): the popup's Play « addons » and Game info's Boot mode set the same thing. Keep only one, and point the cheat screen's "needs Boot with addon" note to it.
 

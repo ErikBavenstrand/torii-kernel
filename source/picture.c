@@ -213,9 +213,15 @@ static u8 *tile_row(u8 *tiles, u32 y)
 	return tiles + (y >> 3) * (PIC_W / 8) * 64 + (y & 7) * 8;
 }
 
+// RGB15 as its 4-bit cell, the cut's colour: blue, green, red from the top
+static inline __attribute__((always_inline)) u32 cell(u32 c)
+{
+	return (c >> 1 & 15) | (c >> 2 & 0xF0) | (c >> 3 & 0xF00);
+}
+
 // A line as the colours met so far (table: each one's index + 1); a run
 // of one colour looks it up once
-int PIC_HOT pic_emit_exact(const u16 *line, u16 *table, u8 *row, u16 *palette, u32 *colours)
+int PIC_HOT pic_emit_exact(const u16 *line, u8 *table, u8 *row, u16 *palette, u32 *colours)
 {
 	u32 n = *colours, last = 0x10000, index = 0;
 	for (u32 tx = 0; tx < PIC_W / 8; tx++, row += 64)
@@ -232,7 +238,7 @@ int PIC_HOT pic_emit_exact(const u16 *line, u16 *table, u8 *row, u16 *palette, u
 						}
 						palette[n] = (u16)c;
 						t = ++n;
-						table[c] = (u16)t;
+						table[c] = (u8)t;
 					}
 					last = c;
 					index = PIC_FIRST_COLOUR - 1 + t;
@@ -245,168 +251,329 @@ int PIC_HOT pic_emit_exact(const u16 *line, u16 *table, u8 *row, u16 *palette, u
 	return 1;
 }
 
-// A line through the table's indices, likewise
-void PIC_HOT pic_emit_map(const u16 *line, const u16 *table, u8 *row, u32 mask)
+// A line through the cells' boxes (index), likewise
+void PIC_HOT pic_emit_map(const u16 *line, const u8 *index, u8 *row)
 {
-	u32 last = 0x10000, index = 0;
+	u32 last = 0x10000, i = 0;
 	for (u32 tx = 0; tx < PIC_W / 8; tx++, row += 64)
 		for (u32 k = 0; k < 2; k++) {
 			u32 w = 0;
 			for (u32 b = 0; b < 32; b += 8) {
-				u32 c = *line++ & mask;
+				u32 c = *line++;
 				if (c != last) {
 					last = c;
-					index = PIC_FIRST_COLOUR + table[c];
+					i = PIC_FIRST_COLOUR + index[cell(c)];
 				}
-				w |= index << b;
+				w |= i << b;
 			}
 			((u32 *)(void *)row)[k] = w;
 		}
 }
 
-u32 PIC_HOT pic_emit_count(const u16 *line, u16 *table, u16 *list, u32 n, u32 max, u32 mask)
+// A line through the boxes, each channel first moved by Bayer's 4 x 4
+// threshold at its pixel (-2 to +1 of 5 bits: about a 4-bit cell's width)
+void PIC_HOT pic_emit_dither(const u16 *line, const u8 *index, u8 *row, u32 y)
+{
+	static const u8 order[16] = {0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5};
+	for (u32 tx = 0; tx < PIC_W / 8; tx++, row += 64)
+		for (u32 k = 0; k < 2; k++) {
+			u32 w = 0;
+			for (u32 b = 0; b < 4; b++) {
+				u32 x = tx * 8 + k * 4 + b, c = *line++;
+				s32 d = order[(y & 3) * 4 + (x & 3)] / 4 - 2;
+				s32 r = (s32)(c & 31) + d, g = (s32)(c >> 5 & 31) + d, bl = (s32)(c >> 10) + d;
+				r = r < 0 ? 0 : r > 31 ? 31 : r;
+				g = g < 0 ? 0 : g > 31 ? 31 : g;
+				bl = bl < 0 ? 0 : bl > 31 ? 31 : bl;
+				u32 i = index[cell((u32)(r | g << 5 | bl << 10))];
+				if (i == PIC_NO_BOX)
+					i = index[cell(c)];  // past every box: undithered
+				w |= (PIC_FIRST_COLOUR + i) << (8 * b);
+			}
+			((u32 *)(void *)row)[k] = w;
+		}
+}
+
+u32 PIC_HOT pic_emit_count(const u16 *line, u16 *counts, u16 *list, u32 n)
 {
 	for (u32 x = 0; x < PIC_W;) {
-		u32 c = line[x] & mask, run = 1;
-		for (x++; x < PIC_W && (line[x] & mask) == c; x++)
+		u32 c = cell(line[x]), run = 1;
+		for (x++; x < PIC_W && cell(line[x]) == c; x++)
 			run++;
-		if (!table[c]) {
-			if (n == max)
-				return max + 1;
-			list[n++] = (u16)c;
-		}
-		table[c] = (u16)(table[c] + run);  // at most PIC_W * PIC_H pixels: no overflow
+		if (!counts[c])
+			list[n++] = (u16)c;  // 4,096 cells at most: the list's room
+		counts[c] = (u16)(counts[c] + run);  // at most PIC_W * PIC_H pixels: no overflow
 	}
 	return n;
 }
 
-// The file read once: each line converted, kept, and written as tiles in
-// the colours met so far until there are more than PIC_COLOURS (then
-// *colours is past it); PIC_OK or PIC_BROKEN
-static int read_pass(const struct pic_src *src, const struct pic_info *info, struct pic_scratch *s, u16 *table,
-		     u8 *tiles, u16 *palette, u32 *colours)
+// The colour table's parts once the exact pass is over: the cells' pixel
+// counts, then each cell's box
+static u16 *counts(struct pic_dec *d)
 {
-	u16 line[PIC_W];  // on the stack: IWRAM, quicker than pReadCache's EWRAM
-	memset(line, 0, sizeof(line));
-	u32 more = 0;
-	// The black above and below a picture less tall than the screen
-	for (u32 y = 0; y < PIC_H; y++)
-		if (y < info->y0 || y >= info->y0 + info->out_h) {
-			more = more || !pic_emit_exact(line, table, tile_row(tiles, y), palette, colours);
-			if (!src->put(src->ctx, y, line))
-				return PIC_BROKEN;
-		}
-	// The rows in the file's order, so its reads run forward
-	u32 step = (info->h << 16) / info->out_h;
-	s->rows = 0;
-	for (u32 k = 0; k < info->out_h; k++) {
-		u32 oy = info->top_down ? k : info->out_h - 1 - k;
-		u32 sy = (step / 2 + oy * step) >> 16;
-		const u8 *row = file_row(src, info, s, info->top_down ? sy : info->h - 1 - sy);
-		if (!row)
-			return PIC_BROKEN;
-		row_rgb15(info, s, row, line + info->x0);
-		more = more || !pic_emit_exact(line, table, tile_row(tiles, info->y0 + oy), palette, colours);
-		if (!src->put(src->ctx, info->y0 + oy, line))
-			return PIC_BROKEN;
-	}
-	*colours += more;
-	return PIC_OK;
+	return (u16 *)(void *)d->table;
 }
 
-// The kept lines counted into the table, each colour listed; past max, max + 1
-static u32 count_pass(const struct pic_src *src, u16 *table, u16 *list, u32 max, u32 mask)
+static u8 *boxes(struct pic_dec *d)
 {
-	u16 line[PIC_W];
-	u32 n = 0;
-	memset(table, 0, PIC_TABLE_HALVES * 2);
-	for (u32 y = 0; y < PIC_H && n <= max; y++) {
-		src->get(src->ctx, y, line);
-		n = pic_emit_count(line, table, list, n, max, mask);
-	}
-	return n;
+	return d->table + PIC_CELLS * 2;
 }
 
-int pic_decode(const struct pic_src *src, struct pic_info *info, u16 *table, struct pic_scratch *s, u8 *tiles,
-	       u16 *palette, u32 *colours)
+// The colours are listed where the tiles go, until the map writes them
+static u16 *list(struct pic_dec *d)
 {
-	if (info->pal_n) {
+	return (u16 *)(void *)d->tiles;
+}
+
+_Static_assert(PIC_CELLS * 3 <= PIC_TABLE_BYTES && PIC_CELLS * 2 <= PIC_TILES_BYTES, "the cut's room");
+
+int pic_begin(struct pic_dec *d, const struct pic_src *src, struct pic_scratch *s, u8 *table, u8 *tiles, u16 *palette)
+{
+	memset(d, 0, sizeof(*d));
+	d->src = src;
+	d->s = s;
+	d->table = table;
+	d->tiles = tiles;
+	d->palette = palette;
+	int r = pic_head(src, s, &d->info);
+	if (r != PIC_OK)
+		return r;
+	if (d->info.pal_n) {
 		u8 *p = s->buf;
-		if (!src->read(src->ctx, info->pal_at, p, info->pal_n * 4))
+		if (!src->read(src->ctx, d->info.pal_at, p, d->info.pal_n * 4))
 			return PIC_BROKEN;
-		for (u32 i = 0; i < info->pal_n; i++, p += 4)
+		for (u32 i = 0; i < d->info.pal_n; i++, p += 4)
 			s->pal[i] = (u16)(p[2] >> 3 | (p[1] >> 3) << 5 | (p[0] >> 3) << 10);
 	}
-	memset(table, 0, PIC_TABLE_HALVES * 2);
-	*colours = 0;
-	int r = read_pass(src, info, s, table, tiles, palette, colours);
-	info->exact = *colours <= PIC_COLOURS;
-	if (r != PIC_OK || info->exact)
-		return r;
-	// More: counted from the kept lines at 4 bits a channel (4,096 colours
-	// at most, so the cut stays quick), their colours listed where the
-	// tiles go
-	u16 *list = (u16 *)(void *)tiles, line[PIC_W];
-	u32 mask = 0x7BDE, listed = count_pass(src, table, list, PIC_LIST_MAX, mask);
-	*colours = pic_median_cut(table, list, listed, s->box, s->slice, PIC_COLOURS, palette);
-	for (u32 y = 0; y < PIC_H; y++) {
-		src->get(src->ctx, y, line);
-		pic_emit_map(line, table, tile_row(tiles, y), mask);
-	}
+	memset(table, 0, PIC_TABLE_BYTES);
+	s->rows = 0;
+	d->info.exact = 1;
 	return PIC_OK;
+}
+
+// Line k of the read (the black lines above and below a picture less tall
+// than the screen first, then its rows in the file's order, so its reads
+// run forward) into line, at the screen line it returns; ~0u if a read failed
+static u32 read_line(struct pic_dec *d, u32 k, u16 *line)
+{
+	const struct pic_info *info = &d->info;
+	u32 black = PIC_H - info->out_h;
+	memset(line, 0, PIC_W * 2);
+	if (k < black)
+		return k < info->y0 ? k : k + info->out_h;
+	k -= black;
+	u32 oy = info->top_down ? k : info->out_h - 1 - k;
+	u32 step = (info->h << 16) / info->out_h, sy = (step / 2 + oy * step) >> 16;
+	const u8 *row = file_row(d->src, info, d->s, info->top_down ? sy : info->h - 1 - sy);
+	if (!row)
+		return ~0u;
+	row_rgb15(info, d->s, row, line + info->x0);
+	return info->y0 + oy;
+}
+
+int pic_step(struct pic_dec *d, u32 lines)
+{
+	const struct pic_src *src = d->src;
+	u16 line[PIC_W];  // on the stack: IWRAM, quicker than pReadCache's EWRAM
+	switch (d->phase) {
+	case PIC_PHASE_READ:
+		// Each line converted, kept, and written as tiles in the colours met so far
+		for (; lines && d->at < PIC_H; lines--, d->at++) {
+			u32 y = read_line(d, d->at, line);
+			if (y == ~0u || !src->put(src->ctx, y, line))
+				return PIC_BROKEN;
+			if (d->info.exact &&
+			    !pic_emit_exact(line, d->table, tile_row(d->tiles, y), d->palette, &d->colours))
+				d->info.exact = 0;
+		}
+		if (d->at < PIC_H)
+			return PIC_MORE;
+		if (d->info.exact)
+			return PIC_OK;
+		// More than PIC_COLOURS: counted from the kept lines by 4-bit cells
+		memset(d->table, 0, PIC_CELLS * 2);
+		d->phase = PIC_PHASE_COUNT;
+		d->at = 0;
+		return PIC_MORE;
+	case PIC_PHASE_COUNT:
+		for (; lines && d->at < PIC_H; lines--, d->at++) {
+			src->get(src->ctx, d->at, line);
+			d->listed = pic_emit_count(line, counts(d), list(d), d->listed);
+		}
+		if (d->at < PIC_H)
+			return PIC_MORE;
+		pic_cut_begin(&d->cut, d->s->box, d->listed);
+		d->phase = PIC_PHASE_CUT;
+		d->at = 0;
+		return PIC_MORE;
+	case PIC_PHASE_CUT:
+		// About PIC_CUT_CELLS cells' work a line; then the boxes' colours,
+		// a few a step (at: the next box + 1)
+		if (!d->at) {
+			if (!pic_cut_work(&d->cut, d->s->box, counts(d), list(d), d->s->slice, PIC_COLOURS,
+					  lines * PIC_CUT_CELLS)) {
+				memset(boxes(d), PIC_NO_BOX, PIC_CELLS);
+				d->at = 1;
+			}
+			return PIC_MORE;
+		}
+		d->colours = d->cut.boxes;
+		for (u32 n = lines / 4 + 1; n && d->at <= d->colours; n--, d->at++)
+			pic_cut_box(d->s->box, list(d), d->at - 1, d->palette, boxes(d));
+		if (d->at <= d->colours)
+			return PIC_MORE;
+		// Photo-like pictures are dithered: their smooth gradients would band
+		d->dither = d->listed >= PIC_DITHER_CELLS;
+		d->phase = d->dither ? PIC_PHASE_FILL : PIC_PHASE_MAP;
+		d->at = 0;
+		return PIC_MORE;
+	case PIC_PHASE_FILL:
+		// Each box's whole volume, so a dithered colour finds one: a few a step
+		for (u32 n = lines / 4 + 1; n && d->at < d->colours; n--, d->at++)
+			pic_box_fill(&d->s->box[d->at], boxes(d), d->at);
+		if (d->at < d->colours)
+			return PIC_MORE;
+		d->phase = PIC_PHASE_MAP;
+		d->at = 0;
+		return PIC_MORE;
+	case PIC_PHASE_MAP:
+		for (; lines && d->at < PIC_H; lines--, d->at++) {
+			src->get(src->ctx, d->at, line);
+			if (d->dither)
+				pic_emit_dither(line, boxes(d), tile_row(d->tiles, d->at), d->at);
+			else
+				pic_emit_map(line, boxes(d), tile_row(d->tiles, d->at));
+		}
+		return d->at < PIC_H ? PIC_MORE : PIC_OK;
+	default:
+		return PIC_BROKEN;
+	}
+}
+
+int pic_decode(const struct pic_src *src, struct pic_info *info, struct pic_scratch *s, u8 *table, u8 *tiles,
+	       u16 *palette, u32 *colours)
+{
+	struct pic_dec d;
+	int r = pic_begin(&d, src, s, table, tiles, palette);
+	while (r == PIC_OK && (r = pic_step(&d, PIC_H)) == PIC_MORE)
+		r = PIC_OK;
+	*info = d.info;
+	*colours = d.colours;
+	return r;
 }
 
 // --- Median cut ---------------------------------------------------------------
 
-void PIC_HOT pic_box_slices(const u16 *list, const struct pic_box *b, u32 axis, u32 *slice)
+#define PIC_CUT_PICK_COST 64  // a pick's work, as cells looked at (its look at every box)
+
+// A cell's channel: 0 red, 1 green, 2 blue
+static inline __attribute__((always_inline)) u32 chan(u32 c, u32 axis)
 {
-	u32 shift = 5 * axis;
-	for (u32 k = 0; k < 32; k++)
-		slice[k] = 0;
-	for (u32 i = b->start; i < b->end; i++)
-		slice[list[i] >> shift & 31]++;
+	return c >> (4 * axis) & 15;
 }
 
-u32 PIC_HOT pic_box_part(u16 *list, u32 i, u32 j, u32 shift, u32 cut)
+// An empty box's sums and bounds, to add cells to
+static void box_clear(struct pic_box *b)
 {
-	while (i < j) {
-		if ((list[i] >> shift & 31) <= cut) {
-			i++;
-		} else {
-			u16 t = list[--j];
-			list[j] = list[i];
-			list[i] = t;
-		}
+	b->count = 0;
+	for (u32 c = 0; c < 3; c++) {
+		b->sum[c] = 0;
+		b->lo[c] = 15;
+		b->hi[c] = 0;
 	}
+}
+
+// A box's sums and bounds, in registers while cells are added to it
+struct acc {
+	u32 n, r, g, b;  // pixels, and their channels' sums
+	u32 r0, r1, g0, g1, b0, b1;  // bounds
+};
+
+static void acc_load(struct acc *a, const struct pic_box *b)
+{
+	*a = (struct acc){b->count, b->sum[0], b->sum[1], b->sum[2], b->lo[0],
+			  b->hi[0], b->lo[1],  b->hi[1],  b->lo[2],  b->hi[2]};
+}
+
+static void acc_store(const struct acc *a, struct pic_box *b)
+{
+	b->count = a->n;
+	b->sum[0] = a->r;
+	b->sum[1] = a->g;
+	b->sum[2] = a->b;
+	b->lo[0] = (u8)a->r0;
+	b->hi[0] = (u8)a->r1;
+	b->lo[1] = (u8)a->g0;
+	b->hi[1] = (u8)a->g1;
+	b->lo[2] = (u8)a->b0;
+	b->hi[2] = (u8)a->b1;
+}
+
+// Cell c's n pixels into a, each channel apart (a loop over them keeps the
+// sums in memory)
+static inline __attribute__((always_inline)) void acc_add(struct acc *a, u32 c, u32 n)
+{
+	u32 r = c & 15, g = c >> 4 & 15, b = c >> 8;
+	a->n += n;
+	a->r += n * r;
+	a->g += n * g;
+	a->b += n * b;
+	if (r < a->r0)
+		a->r0 = r;
+	if (r > a->r1)
+		a->r1 = r;
+	if (g < a->g0)
+		a->g0 = g;
+	if (g > a->g1)
+		a->g1 = g;
+	if (b < a->b0)
+		a->b0 = b;
+	if (b > a->b1)
+		a->b1 = b;
+}
+
+u32 PIC_HOT pic_box_slices(const u16 *list, u32 i, u32 end, u32 axis, u32 *slice, u32 budget)
+{
+	for (; i < end && budget; i++, budget--)
+		slice[chan(list[i], axis)]++;
 	return i;
 }
 
-void PIC_HOT pic_box_stats(const u16 *table, const u16 *list, struct pic_box *b)
+u32 PIC_HOT pic_box_part(const u16 *counts, u16 *list, u32 *i, u32 *j, u32 axis, u32 cut, struct pic_box *lo,
+			 struct pic_box *hi, u32 budget)
 {
-	u32 count = 0, sum[3] = {0, 0, 0};
-	u32 lr = 31, lg = 31, lb = 31, hr = 0, hg = 0, hb = 0;
-	for (u32 i = b->start; i < b->end; i++) {
-		u32 c = list[i], n = table[c], r = c & 31, g = c >> 5 & 31, bl = c >> 10;
-		count += n;
-		sum[0] += n * r;
-		sum[1] += n * g;
-		sum[2] += n * bl;
-		lr = r < lr ? r : lr;
-		hr = r > hr ? r : hr;
-		lg = g < lg ? g : lg;
-		hg = g > hg ? g : hg;
-		lb = bl < lb ? bl : lb;
-		hb = bl > hb ? bl : hb;
+	u32 a = *i, b = *j;
+	struct acc l, h;
+	acc_load(&l, lo);
+	acc_load(&h, hi);
+	for (; a < b && budget; budget--) {
+		u32 c = list[a];
+		if (chan(c, axis) <= cut) {
+			acc_add(&l, c, counts[c]);
+			a++;
+		} else {
+			u32 t = list[--b];
+			list[b] = (u16)c;
+			list[a] = (u16)t;
+			acc_add(&h, c, counts[c]);
+		}
 	}
-	b->count = count;
-	b->lo[0] = (u8)lr;
-	b->lo[1] = (u8)lg;
-	b->lo[2] = (u8)lb;
-	b->hi[0] = (u8)hr;
-	b->hi[1] = (u8)hg;
-	b->hi[2] = (u8)hb;
-	for (u32 c = 0; c < 3; c++)
-		b->sum[c] = sum[c];
+	acc_store(&l, lo);
+	acc_store(&h, hi);
+	*i = a;
+	*j = b;
+	return a == b;
+}
+
+void PIC_HOT pic_box_fill(const struct pic_box *b, u8 *index, u32 i)
+{
+	for (u32 bl = b->lo[2]; bl <= b->hi[2]; bl++)
+		for (u32 g = b->lo[1]; g <= b->hi[1]; g++) {
+			u8 *p = index + (bl << 8 | g << 4);
+			for (u32 r = b->lo[0]; r <= b->hi[0]; r++)
+				if (p[r] == PIC_NO_BOX)
+					p[r] = (u8)i;
+		}
 }
 
 // Its longest side's channel, and the side's length in *side
@@ -420,7 +587,7 @@ static u32 box_axis(const struct pic_box *b, u32 *side)
 	return axis;
 }
 
-// Which box splits next: the most pixels times the longest side (0: one colour)
+// Which box splits next: the most pixels times the longest side (0: one cell)
 static void box_score(struct pic_box *b)
 {
 	u32 side;
@@ -428,54 +595,116 @@ static void box_score(struct pic_box *b)
 	b->score = b->count * side;
 }
 
-// Splits b at its colours' median along its longest side into b and out:
-// its colours partitioned in place, those below the cut first
-static void box_split(const u16 *table, u16 *list, struct pic_box *b, struct pic_box *out, u32 *slice)
+void pic_cut_begin(struct pic_cut *cut, struct pic_box *box, u32 listed)
 {
-	u32 side, axis = box_axis(b, &side);
-	pic_box_slices(list, b, axis, slice);
-	// The first cut with half the colours before it; never past the last
-	// slice but one, so both halves keep colours
-	u32 cut = b->lo[axis], below = slice[cut];
-	while (cut + 1 < b->hi[axis] && cut + 1 < 32 && 2 * below < (u32)(b->end - b->start))
-		below += slice[++cut];
-	u32 i = pic_box_part(list, b->start, b->end, 5 * axis, cut);
-	*out = *b;
-	out->start = (u16)i;
-	b->end = (u16)i;
-	pic_box_stats(table, list, b);
-	pic_box_stats(table, list, out);
-	box_score(b);
-	box_score(out);
+	memset(cut, 0, sizeof(*cut));
+	memset(&box[0], 0, sizeof(box[0]));
+	box_clear(&box[0]);
+	box[0].end = (u16)listed;
+	box_clear(&box[0]);
+	box_clear(&box[1]);
+	// The first box's sums and bounds come first, in pic_cut_work's steps
+	cut->sub = PIC_CUT_FIRST;
+	cut->i = 0;
+	cut->j = listed;
+	cut->boxes = listed ? 1 : 0;
 }
 
-u32 pic_median_cut(u16 *table, u16 *list, u32 listed, struct pic_box *box, u32 *slice, u32 max, u16 *palette)
+int pic_cut_work(struct pic_cut *cut, struct pic_box *box, const u16 *counts, u16 *list, u32 *slice, u32 max,
+		 u32 budget)
 {
-	memset(&box[0], 0, sizeof(box[0]));
-	box[0].end = (u16)listed;
-	pic_box_stats(table, list, &box[0]);
-	box_score(&box[0]);
-	u32 n = listed ? 1 : 0;
-	while (n && n < max) {
-		u32 best = n, score = 0;
-		for (u32 i = 0; i < n; i++)
-			if (box[i].score > score) {
-				score = box[i].score;
-				best = i;
-			}
-		if (best == n)
-			break;  // every box is one colour
-		box_split(table, list, &box[best], &box[n], slice);
-		n++;
+	while (budget) {
+		if (cut->sub == PIC_CUT_FIRST) {
+			// Every cell at most 15 along red: a partition that moves none
+			u32 i = cut->i;
+			u32 done = pic_box_part(counts, list, &cut->i, &cut->j, 0, 15, &box[0], &box[1], budget);
+			budget -= cut->i - i;
+			if (!done)
+				return 1;
+			box_score(&box[0]);
+			cut->sub = PIC_CUT_PICK;
+			continue;
+		}
+		if (cut->sub == PIC_CUT_PICK) {
+			// The box to split, if any is left to
+			u32 best = cut->boxes, score = 0;
+			for (u32 i = 0; i < cut->boxes; i++)
+				if (box[i].score > score) {
+					score = box[i].score;
+					best = i;
+				}
+			if (best == cut->boxes || cut->boxes >= max)
+				return 0;  // every box is one cell, or there are enough
+			u32 side;
+			cut->best = (u16)best;
+			cut->axis = (u8)box_axis(&box[best], &side);
+			cut->i = box[best].start;
+			memset(slice, 0, 16 * sizeof(*slice));
+			cut->sub = PIC_CUT_SLICES;
+			budget = budget > PIC_CUT_PICK_COST ? budget - PIC_CUT_PICK_COST : 1;  // the pick's own work
+		}
+		struct pic_box *b = &box[cut->best], *out = &box[cut->boxes];
+		if (cut->sub == PIC_CUT_SLICES) {
+			u32 to = pic_box_slices(list, cut->i, b->end, cut->axis, slice, budget);
+			budget -= to - cut->i;
+			cut->i = to;
+			if (to < b->end)
+				return 1;
+			// At its cells' median along its longest side: the first cut
+			// with half of them before it, never past the last slice but
+			// one, so both halves keep cells
+			u32 axis = cut->axis, c = b->lo[axis], below = slice[c];
+			while (c + 1 < b->hi[axis] && c + 1 < 16 && 2 * below < (u32)(b->end - b->start))
+				below += slice[++c];
+			cut->cut = c;
+			cut->i = b->start;
+			cut->j = b->end;
+			*out = *b;
+			box_clear(b);
+			box_clear(out);
+			cut->sub = PIC_CUT_PART;
+		}
+		// Its cells split in place, each half's sums and bounds as they go
+		u32 i = cut->i, j = cut->j;
+		u32 done = pic_box_part(counts, list, &cut->i, &cut->j, cut->axis, cut->cut, b, out, budget);
+		budget -= (cut->i - i) + (j - cut->j);  // a cell each
+		if (!done)
+			return 1;
+		out->start = (u16)cut->i;
+		b->end = (u16)cut->i;
+		box_score(b);
+		box_score(out);
+		cut->boxes++;
+		cut->sub = PIC_CUT_PICK;
 	}
-	for (u32 i = 0; i < n; i++) {
-		struct pic_box *b = &box[i];
-		u32 c[3];
-		for (u32 k = 0; k < 3; k++)
-			c[k] = b->count ? (b->sum[k] + b->count / 2) / b->count : 0;
-		palette[i] = (u16)(c[0] | c[1] << 5 | c[2] << 10);
-		for (u32 k = b->start; k < b->end; k++)
-			table[list[k]] = (u16)i;
+	return 1;
+}
+
+void pic_cut_box(const struct pic_box *box, const u16 *list, u32 i, u16 *palette, u8 *index)
+{
+	const struct pic_box *b = &box[i];
+	// A cell's 5-bit colours are 2v and 2v + 1: their middle, 2v + 0.5
+	u32 c[3];
+	for (u32 k = 0; k < 3; k++) {
+		c[k] = b->count ? (2 * b->sum[k] + b->count) / b->count : 0;
+		c[k] = c[k] > 31 ? 31 : c[k];
 	}
-	return n;
+	palette[i] = (u16)(c[0] | c[1] << 5 | c[2] << 10);
+	for (u32 k = b->start; k < b->end; k++)
+		index[list[k]] = (u8)i;
+}
+
+u32 pic_median_cut(u16 *counts, u16 *list, u32 listed, struct pic_box *box, u32 *slice, u32 max, u16 *palette,
+		   u8 *index)
+{
+	struct pic_cut cut;
+	pic_cut_begin(&cut, box, listed);
+	while (pic_cut_work(&cut, box, counts, list, slice, max, ~0u))
+		;
+	memset(index, PIC_NO_BOX, PIC_CELLS);
+	for (u32 i = 0; i < cut.boxes; i++)
+		pic_cut_box(box, list, i, palette, index);
+	for (u32 i = 0; i < cut.boxes; i++)
+		pic_box_fill(&box[i], index, i);
+	return cut.boxes;
 }

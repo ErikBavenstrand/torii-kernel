@@ -42,6 +42,7 @@ static const struct {
 	{"settings-edit", 135797},
 	{"settings-move", 151098},
 	{"settings-scroll", 158200},
+	{"shots-ahead", 226454},
 	{"shots-overlay", 98971},
 	{"shots-show", 90291},
 	{"text-clear-row", 1644},
