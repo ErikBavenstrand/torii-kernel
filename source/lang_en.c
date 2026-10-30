@@ -134,7 +134,7 @@ const char *const lang_en[STR_COUNT] = {
 	"Searching...",  // ingame.search_busy
 	"Remembers every value: then play",  // ingame.search_hint
 	"Load state then needs Torii",  // ingame.search_drops
-	"Back to Torii keeps your state first",  // ingame.search_state_first
+	"Go back to Torii first",  // ingame.search_state_first
 	"Narrow it down to 32 first",  // ingame.search_few
 	"Left/Right, Up/Down, then A",  // ingame.search_edit
 	"Value: {1}",  // ingame.search_value

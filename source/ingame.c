@@ -694,34 +694,39 @@ static void cheats_keep(const struct ingame_session *h, const char *path, const 
 // The cheats the in-game search found (struct ingame_found), added to the
 // game's cheat file as codes of the user's ("Found 02030100", VBA raw), the
 // ones turned on in game picked; written power-cut safe, once. Kept in cart
-// SRAM for the next boot if the card didn't take them.
-static void found_after_game(const char *path)
+// SRAM if the card didn't take them: 1 then, for the next boot to try again
+static int found_after_game(const char *path)
 {
 	struct ingame_found found;
 	sram_get(INGAME_SRAM_FOUND, (u8 *)&found, sizeof(found));
 	SetRampage(0);
 	if (found.magic != INGAME_FOUND_MAGIC || !found.count)
-		return;
+		return 0;
 	u32 n = found.count <= INGAME_FOUND_MAX ? found.count : INGAME_FOUND_MAX;
 	int r = cheatstore_open(path);
 	if (r != CHEATSTORE_READ && r != CHEATSTORE_NEW) {
-		tlog_error("cheats: %s: the cheat file can't take the %lu found in game (%d)", path, (unsigned long)n,
-			   r);
-		return;
+		tlog_error("cheats: %s: the cheat file can't take the %lu found in game (%d): they wait", path,
+			   (unsigned long)n, r);
+		return 1;
 	}
 	if (cheatstore_windows() && !cheatstore_window_go(cheatstore_windows() - 1)) {
 		tlog_error("cheats: %s: its last window didn't read: the found cheats wait", path);
-		return;
+		return 1;
 	}
-	u32 added = 0, idx[INGAME_FOUND_MAX];
+	u32 added = 0, idx[INGAME_FOUND_MAX], on[INGAME_FOUND_MAX];
 	for (u32 i = 0; i < n; i++) {
 		const struct ingame_found_cheat *c = &found.cheat[i];
 		idx[i] = CHEATFILE_NONE;
 		// One cheat an address: the last kept of it (the same code twice
-		// would be greyed as doing what the first does)
+		// would be greyed as doing what the first does), picked if any
+		// keep of it turned it on (it ran on in game)
 		u32 later = 0;
-		for (u32 j = i + 1; j < n; j++)
-			later |= found.cheat[j].address == c->address && found.cheat[j].size == c->size;
+		on[i] = 0;
+		for (u32 j = 0; j < n; j++)
+			if (found.cheat[j].address == c->address && found.cheat[j].size == c->size) {
+				later |= j > i;
+				on[i] |= found.cheat[j].flags & INGAME_FOUND_ON;
+			}
 		if (later)
 			continue;
 		char addr[12], name[40], code[24];
@@ -734,27 +739,30 @@ static void found_after_game(const char *path)
 		else
 			snprintf(code, sizeof(code), "%s:%08lX", addr, (unsigned long)c->value);
 		u32 e = cheatstore_add(name, code, CHEAT_FMT_VBA, &idx[i]);
-		tlog("cheats: %s: found in game, %s %s: %s", path, code, (c->flags & INGAME_FOUND_ON) ? "on" : "off",
+		tlog("cheats: %s: found in game, %s %s: %s", path, code, on[i] ? "on" : "off",
 		     e == CHEATFILE_EDIT_OK ? "added" : "refused");
 		added += e == CHEATFILE_EDIT_OK;
 		if (e != CHEATFILE_EDIT_OK)
 			idx[i] = CHEATFILE_NONE;
 	}
-	if (!added)
-		return;
-	cheatstore_begin();
-	cheatstore_decode(0);
-	for (u32 i = 0; i < n; i++)
-		if ((found.cheat[i].flags & INGAME_FOUND_ON) && idx[i] != CHEATFILE_NONE &&
-		    idx[i] < cheatstore()->file.count && !cheatstore()->cheats[idx[i]].picked)
+	if (!added)  // all refused (the file full): trying again won't help
+		n = 0;
+	if (added) {
+		cheatstore_begin();
+		cheatstore_decode(0);
+	}
+	for (u32 i = 0; i < n && added; i++)
+		if (on[i] && idx[i] != CHEATFILE_NONE && idx[i] < cheatstore()->file.count &&
+		    !cheatstore()->cheats[idx[i]].picked)
 			cheatstore_toggle(idx[i]);
-	if (!cheatstore_write()) {
+	if (added && !cheatstore_write()) {
 		tlog_error("cheats: %s: the found cheats weren't written: they wait for the next boot", path);
-		return;
+		return 1;
 	}
 	u32 none[2] = {0, 0};
 	sram_put(INGAME_SRAM_FOUND, (const u8 *)none, sizeof(none));
 	SetRampage(0);
+	return 0;
 }
 
 void ingame_refused_notice(void)
@@ -800,16 +808,17 @@ void ingame_after_game(void)
 	states_after_game(h, path);
 	if (out.cheats_changed && h->cheat_count)
 		cheats_keep(h, path, &out);
-	found_after_game(path);
+	u32 found_left = found_after_game(path);
 	// Screenshots the card didn't take wait for the next boot (and are
 	// filed then even if the menu took none this time)
 	u32 shot_left = !shotstore_file(h->name, h->launch_clock);
 	// Done with: the answer goes, so the next boot does nothing again
 	memset(&out, 0, sizeof(out));
-	if (shot_left) {
+	// Screenshots or found cheats the card didn't take: the next boot again
+	if (shot_left || found_left) {
 		out.magic = INGAME_OUT_MAGIC;
 		out.pending_state = 0xFFFF;
-		out.screenshot = 1;
+		out.screenshot = (u16)shot_left;
 	}
 	sram_put(INGAME_SRAM_SESSION + INGAME_SESSION_OUT, (const u8 *)&out, sizeof(out));
 	SetRampage(0);

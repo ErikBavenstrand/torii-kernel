@@ -1686,6 +1686,8 @@ EXT static uint32_t search_footer(void)
 		t = INGAME_TEXT_SEARCH_BUSY;
 	else if (m.edit)
 		t = INGAME_TEXT_SEARCH_EDIT;
+	else if (m.page == PAGE_PICK && m.found >= INGAME_FOUND_MAX)  // before the notice of the keep that filled it
+		t = INGAME_TEXT_SEARCH_FOUND_FULL;
 	else if (m.notice)
 		t = m.notice;
 	else if (m.page == PAGE_LIST)
@@ -1695,8 +1697,6 @@ EXT static uint32_t search_footer(void)
 		    : buffer_unkept()                 ? INGAME_TEXT_SEARCH_STATE_FIRST
 		    : m.buffer_slot                   ? INGAME_TEXT_SEARCH_DROPS
 						      : INGAME_TEXT_SEARCH_HINT;
-	else if (m.page == PAGE_PICK && m.found >= INGAME_FOUND_MAX)
-		t = INGAME_TEXT_SEARCH_FOUND_FULL;
 	else if (m.page == PAGE_PICK && m.cursor == PR_KEEP_ON && live_full())
 		t = INGAME_TEXT_SEARCH_LIVE_FULL;
 	else if (!m.search.left)

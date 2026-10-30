@@ -17,6 +17,11 @@
 # the game's cheat file as "Found ADDRESS" with ADDRESS:09, picked. Each
 # pass's time is logged ("search: pass in N frames").
 #
+# cut:  set's run, the power cut at each cutpoint (tests/cutsweep.sh), the
+#       filing's write among them. Cart SRAM past the save has no battery,
+#       so the found cheat is lost with a cut: the next launch reads the
+#       cheat file without it, or with it whole and picked.
+#
 # Runs inside the torii-emu container after `just build`, `just emu-headless`.
 set -euo pipefail
 # shellcheck source=tests/carts.sh
@@ -24,7 +29,9 @@ set -euo pipefail
 # shellcheck source=tests/nav.sh
 . tests/nav.sh
 
-mode=${1:?usage: search.sh live|set}
+mode=${1:?usage: search.sh live|set|cut}
+flow=$mode  # the keys' and the card's: cut runs set's
+[ "$mode" = cut ] && flow="set"
 local_carts "dist/cart-search-$mode"
 
 fail() {
@@ -38,7 +45,7 @@ mkdir -p "$cart"
 mkfs.fat -C -F 32 -n SEARCH "$cart/sd.img" 65536 >/dev/null
 mcopy -i "$cart/sd.img" tests/roms/searchtest/searchtest.gba ::/searchtest.gba
 mmd -i "$cart/sd.img" ::/torii ::/torii/cheats
-if [ "$mode" = live ]; then
+if [ "$flow" = live ]; then
   cht=$carts/searchtest.cht
   printf '%s\n' 'cheats = 1' 'cheat0_desc = "Marker"' 'cheat0_code = "0203F000:01"' 'cheat0_enable = true' >"$cht"
   mcopy -i "$cart/sd.img" "$cht" ::/torii/cheats/searchtest.cht
@@ -67,7 +74,7 @@ wait_for() { args+=(-w "$1"); }
 to_search() {
   wait_for "screen ready: ingame"
   keys 20 DOWN DOWN A
-  if [ "$mode" = live ]; then
+  if [ "$flow" = live ]; then
     wait_for "screen ready: ingame-cheats"
     keys 10 UP A
   fi
@@ -77,7 +84,7 @@ to_search() {
 # From the search page back to the game: B to the cheat list, then the
 # menu, then the game (no list: the menu, then the game)
 back_out() {
-  if [ "$mode" = live ]; then keys "$1" B B B; else keys "$1" B B; fi
+  if [ "$flow" = live ]; then keys "$1" B B B; else keys "$1" B B; fi
 }
 
 # shellcheck disable=SC2207 # nav_launch prints options
@@ -112,6 +119,29 @@ args+=(-k @260:L+R+START -k @266:-)
 wait_for "screen ready: ingame"
 keys 20 DOWN DOWN DOWN DOWN DOWN DOWN A
 wait_for "found in game"
+if [ "$mode" = cut ]; then
+  # shellcheck source=tests/cutsweep.sh
+  . tests/cutsweep.sh
+  scenario() { cut_run "$@" "${args[@]}" -f 8000 -u "home ready"; }
+  check() {
+    local n=$1 name=$2 picks
+    # The cut's power-off: cart SRAM past the save (from page 0x20) gone
+    python3 -c "import sys; p = sys.argv[1]; d = bytearray(open(p, 'rb').read()); d[0x20000:] = bytes(len(d) - 0x20000); open(p, 'wb').write(d)" "$cart/sram.bin"
+    # shellcheck disable=SC2046 # option lists
+    cut_run $(nav_launch /searchtest.gba addon) -f 3000 -u "launch: starting"
+    grep -q '^crash at frame' "$cart/run.log" && fail "cut at $n ($name): the next power-on crashed"
+    picks=$(sed -n 's/^kernel: cheats: .*searchtest.cht: \([0-9]*\) picked.*/\1/p' "$cart/run.log" | head -1)
+    case $n:$picks in
+    0:1 | [1-9]*:1 | [1-9]*:0 | [1-9]*:) ;;
+    *) fail "cut at $n ($name): the next launch read ${picks:-no} picks: $(grep 'cheats:' "$cart/run.log" | head -3)" ;;
+    esac
+    return 0
+  }
+  cut_sweep scenario check
+  echo "PASS: search cut: the found cheat's filing survives a cut at each of the run's $cut_count cutpoints"
+  exit 0
+fi
+
 file=$(mktemp)
 boot "${args[@]}" -f 8000 >/dev/null 2>"$cart/log" || true
 log=$(cat "$cart/log")
@@ -125,7 +155,7 @@ grep -q 'search: kept a cheat, on' <<<"$log" || fail "nothing kept: $(grep -E 's
 # The lives after the keep: 9, then with two presses of A, held at 9 (live)
 # or 8 and 7 (set once)
 after=$(sed -n '/search: kept a cheat/,/screen ready: ingame$/p' <<<"$log" | sed -n 's/^kernel: searchtest: lives //p' | uniq | tr '\n' ' ')
-case $mode in
+case $flow in
 live) [ "$after" = "9 " ] || fail "the lives after keeping 9 on now: $after" ;;
 set) [ "$after" = "9 8 7 " ] || fail "the lives after setting 9 once: $after" ;;
 esac
