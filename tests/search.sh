@@ -30,7 +30,7 @@ set -euo pipefail
 . tests/nav.sh
 
 mode=${1:?usage: search.sh live|set|cut}
-flow=$mode  # the keys' and the card's: cut runs set's
+flow=$mode # the keys' and the card's: cut runs set's
 [ "$mode" = cut ] && flow="set"
 local_carts "dist/cart-search-$mode"
 
@@ -122,7 +122,9 @@ wait_for "found in game"
 if [ "$mode" = cut ]; then
   # shellcheck source=tests/cutsweep.sh
   . tests/cutsweep.sh
+  # shellcheck disable=SC2329 # cut_sweep calls it, as it does check
   scenario() { cut_run "$@" "${args[@]}" -f 8000 -u "home ready"; }
+  # shellcheck disable=SC2329
   check() {
     local n=$1 name=$2 picks
     # The cut's power-off: cart SRAM past the save (from page 0x20) gone
