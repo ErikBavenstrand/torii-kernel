@@ -122,7 +122,8 @@ void test_cheatkeys_derive(void)
 	// Other conditions on KEYINPUT, and ones that need nothing held, aren't read
 	struct cheat_op ops[2];
 	memset(ops, 0, sizeof(ops));
-	ops[0] = (struct cheat_op){.address = 0x04000130, .value = 0x3FB, .count = 1, .type = CHEAT_OP_IF_NE, .width = 2};
+	ops[0] = (struct cheat_op){
+		.address = 0x04000130, .value = 0x3FB, .count = 1, .type = CHEAT_OP_IF_NE, .width = 2};
 	ops[1] = (struct cheat_op){.address = 0x02001000, .value = 1, .count = 1, .type = CHEAT_OP_WRITE, .width = 1};
 	CHECK_EQ(cheatkeys_derive(ops, 2, 0, 1), 0);
 	ops[0].type = CHEAT_OP_IF_EQ;
@@ -131,7 +132,8 @@ void test_cheatkeys_derive(void)
 	ops[0].value = 0x3FE;
 	ops[0].else_count = 1;
 	CHECK_EQ(cheatkeys_derive(ops, 2, 0, 1), 0);
-	ops[0] = (struct cheat_op){.address = 0x04000131, .value = 0x02, .count = 1, .type = CHEAT_OP_IF_NAND, .width = 1};
+	ops[0] = (struct cheat_op){
+		.address = 0x04000131, .value = 0x02, .count = 1, .type = CHEAT_OP_IF_NAND, .width = 1};
 	CHECK_EQ(cheatkeys_derive(ops, 2, 0, 1), CHEATKEYS(CHEATKEYS_HOLD, KEY_L));
 	ops[0].type = CHEAT_OP_IF_EQ;
 	CHECK_EQ(cheatkeys_derive(ops, 2, 0, 1), 0);
