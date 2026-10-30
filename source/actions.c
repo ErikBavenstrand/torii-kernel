@@ -816,6 +816,8 @@ u32 action_rename_file(const char *path, const char *new_name)
 		journal_clear();
 		return ACTION_RENAME_FAILED;
 	}
+	if (console != LIB_CONSOLE_NONE)
+		shotlist_rename(w->name, new_name);  // its screenshots follow it, as far as they can
 	if (console != LIB_CONSOLE_NONE && w->has[SIDE_ART_AT])
 		boxart_forget();  // its listing of the card's art follows
 	u32 partly = !gamename_store_move(path, w->new_path);

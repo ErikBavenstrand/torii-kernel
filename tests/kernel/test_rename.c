@@ -95,7 +95,17 @@ static int has_line(const char *path, const char *line)
 #define HIST "/0001-20261023-120000.sav"
 
 // The files the test makes (and whatever it renames them to), then the folders
+#define SH "/torii/screenshots"
 static const char *const files[] = {
+	SH "/Game 2026-10-28 14-03-22.bmp",
+	SH "/Game-2.bmp",
+	SH "/Game 2 2026-10-28 14-03-22.bmp",
+	SH "/Game 2026-10-29 10-00-00.bmp",
+	SH "/New 2026-10-28 14-03-22.bmp",
+	SH "/New-2.bmp",
+	SH "/New 2026-10-29 10-00-00.bmp",
+	SH "/new 2026-10-28 14-03-22.bmp",
+	SH "/new-2.bmp",
 	T_DIR "/Fwd2.gba",
 	SV "/Fwd.gba/Main.sav",
 	SV "/Fwd2.gba/Main.sav",
@@ -232,6 +242,13 @@ void test_rename_file(void)
 	CHECK(put("/PATCH/New.pat", "a deleted game's patch"));
 	CHECK(put("/torii/art/custom/Game.gba.bin", "art"));
 	CHECK(put(T_DIR "/Other.gba", "other"));
+	// Its screenshots, another game's that starts alike, and one whose new
+	// name is taken
+	CHECK(put(SH "/Game 2026-10-28 14-03-22.bmp", "shot"));
+	CHECK(put(SH "/Game-2.bmp", "shot with no clock"));
+	CHECK(put(SH "/Game 2 2026-10-28 14-03-22.bmp", "Game 2's shot"));
+	CHECK(put(SH "/Game 2026-10-29 10-00-00.bmp", "shot in the way"));
+	CHECK(put(SH "/New 2026-10-29 10-00-00.bmp", "a deleted game's shot"));
 	CHECK(put(SV "/Busy.gba/Main.sav", "another game's save"));
 	CHECK(gamename_store_set(T_DIR "/Game.gba", "My Game"));
 	CHECK(userdata_fav_set(T_DIR "/Game.gba", 1));
@@ -273,6 +290,11 @@ void test_rename_file(void)
 	CHECK(!there(CH "/Game.cht.bak") && holds(CH "/New.cht.bak", "cheats backup"));
 	CHECK(!there("/PATCH/Game.pat") && holds("/PATCH/New.pat", "patch"));  // the stale one went
 	CHECK(!there("/torii/art/custom/Game.gba.bin") && holds("/torii/art/custom/New.gba.bin", "art"));
+	CHECK(!there(SH "/Game 2026-10-28 14-03-22.bmp") && holds(SH "/New 2026-10-28 14-03-22.bmp", "shot"));
+	CHECK(!there(SH "/Game-2.bmp") && holds(SH "/New-2.bmp", "shot with no clock"));
+	CHECK(holds(SH "/Game 2 2026-10-28 14-03-22.bmp", "Game 2's shot"));
+	CHECK(holds(SH "/Game 2026-10-29 10-00-00.bmp", "shot in the way"));  // its new name is taken
+	CHECK(holds(SH "/New 2026-10-29 10-00-00.bmp", "a deleted game's shot"));
 	CHECK(userdata_fav_has(T_DIR "/New.gba") && !userdata_fav_has(T_DIR "/Game.gba"));
 	CHECK(!strcmp(userdata_recent_path(0), T_DIR "/New.gba"));
 	CHECK(has_line(GAMENAME_FILE, T_DIR "/New.gba\tMy Game\n"));
@@ -288,6 +310,7 @@ void test_rename_file(void)
 	static FILINFO fi EWRAM_BSS;
 	CHECK(f_stat(SV "/new.gba", &fi) == FR_OK && !strcmp(fi.fname, "new.gba"));
 	CHECK(holds(BK "/new.gba/Main" HIST, "history"));
+	CHECK(f_stat(SH "/new-2.bmp", &fi) == FR_OK && !strcmp(fi.fname, "new-2.bmp"));
 	CHECK(userdata_fav_has(T_DIR "/new.gba"));
 	// The same name: nothing to do
 	CHECK_EQ(action_rename_file(T_DIR "/new.gba", "new.gba"), ACTION_RENAMED);

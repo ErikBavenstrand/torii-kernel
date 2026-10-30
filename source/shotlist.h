@@ -36,4 +36,10 @@ void shotlist_forget(void);
 // A file at path is deleted or renamed: shotlist_forget if it is in the folder
 void shotlist_changed(const char *path);
 
+// A game's file renamed from old_name to new_name (file names, no folder):
+// its shots move to the new name's stem, each keeping its date. A shot
+// whose new name is taken stays. Returns the shots moved. Borrows
+// pReadCache from READCACHE_SHOTS_MOVE within the call.
+u32 shotlist_rename(const char *old_name, const char *new_name);
+
 #endif

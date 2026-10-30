@@ -1,6 +1,7 @@
 // A game's screenshots on the card (shotlist.h).
 #include "shotlist.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #include "Ezcard_OP.h"
@@ -163,4 +164,63 @@ void shotlist_changed(const char *path)
 		if ((path[i] | 0x20) != (SHOTLIST_DIR[i] | 0x20))
 			return;
 	shotlist_forget();
+}
+
+#define MOVE_BATCH 8  // names gathered before they move: none moves under f_readdir
+
+// pReadCache from READCACHE_SHOTS_MOVE, within shotlist_rename
+struct move_work {
+	DIR dir;
+	FILINFO info;
+	char old_stem[SHOTNAME_STEM_BYTES], new_stem[SHOTNAME_STEM_BYTES];
+	char name[MOVE_BATCH][SHOTNAME_STEM_BYTES + 32];  // a shot's: its stem, its suffix, .bmp
+	char from[sizeof(SHOTLIST_DIR) + SHOTNAME_STEM_BYTES + 32];
+	char to[sizeof(SHOTLIST_DIR) + SHOTNAME_STEM_BYTES + 32];
+};
+_Static_assert(sizeof(struct move_work) <= READCACHE_SHOTS_MOVE_SIZE, "the move's share of pReadCache");
+
+u32 shotlist_rename(const char *old_name, const char *new_name)
+{
+	struct move_work *w = (struct move_work *)(void *)(pReadCache + READCACHE_SHOTS_MOVE);
+	shotname_stem(w->old_stem, sizeof(w->old_stem), old_name);
+	shotname_stem(w->new_stem, sizeof(w->new_stem), new_name);
+	if (!w->old_stem[0] || !w->new_stem[0] || !strcmp(w->old_stem, w->new_stem))
+		return 0;
+	u32 moved = 0, stuck = 0, old_len = (u32)strlen(w->old_stem);
+	for (;;) {
+		// A batch of the old stem's shots, past the ones that wouldn't move
+		u32 n = 0, seen = 0;
+		if (f_opendir(&w->dir, SHOTLIST_DIR) != FR_OK)
+			break;
+		while (n < MOVE_BATCH && f_readdir(&w->dir, &w->info) == FR_OK && w->info.fname[0]) {
+			struct shotname_when when;
+			if ((w->info.fattrib & AM_DIR) || strlen(w->info.fname) >= sizeof(w->name[0]) ||
+			    !shotname_match(w->info.fname, w->old_stem, &when) || seen++ < stuck)
+				continue;
+			strcpy(w->name[n++], w->info.fname);
+		}
+		f_closedir(&w->dir);
+		if (!n)
+			break;
+		for (u32 i = 0; i < n; i++) {
+			// On the stack: GCC can't tell the parts of pReadCache apart
+			char name[sizeof(w->name[0])], stem[sizeof(w->new_stem)];
+			memcpy(name, w->name[i], sizeof(name));
+			memcpy(stem, w->new_stem, sizeof(stem));
+			snprintf(w->from, sizeof(w->from), SHOTLIST_DIR "/%s", name);
+			snprintf(w->to, sizeof(w->to), SHOTLIST_DIR "/%s%s", stem, name + old_len);
+			FRESULT r = f_rename(w->from, w->to);
+			if (r == FR_OK) {
+				moved++;
+			} else {
+				stuck++;
+				tlog("shots: %s stays (FatFs %u)", w->from, (unsigned)r);
+			}
+		}
+	}
+	if (moved) {
+		shotlist_forget();
+		tlog("shots: %lu moved from %s to %s", (unsigned long)moved, w->old_stem, w->new_stem);
+	}
+	return moved;
 }
