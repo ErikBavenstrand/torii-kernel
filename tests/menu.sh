@@ -144,7 +144,8 @@ run() {
   return 0
 }
 # The rows, the cursor on Resume: Save state, Load state (greyed until a
-# state is saved, and skipped), Screenshot (tests/screenshot.sh), Reset
+# state is saved, and skipped), Cheat search (hello has no cheat list:
+# tests/search.sh), Screenshot (tests/screenshot.sh), Reset
 # game, Sleep, Back to Torii (the last: UP from Resume)
 
 # A save state round trip: SAVE (down one, A: its slots, A: slot 1), and later
@@ -189,7 +190,7 @@ grep -q '^crash at frame' <<<"$log" && fail "crashed in the extra-key run"
 grep -q 'screen ready: ingame' <<<"$log" || fail "L+R+START with DOWN held didn't open the menu"
 
 # Reset game: the game starts again from its ROM, without the kernel, and runs
-run reset DOWN DOWN DOWN A -- -h $((key + 400)) -h $((key + 420)) -f $((key + 420))
+run reset DOWN DOWN DOWN DOWN A -- -h $((key + 400)) -h $((key + 420)) -f $((key + 420))
 [ "$(grep -c '^omega [0-9]*: game started' <<<"$log")" = 2 ] || fail "Reset game didn't start the game again"
 ! sed -n '/^omega [0-9]*: game started/,$p' <<<"$log" | grep -q '^omega [0-9]*: mode kernel' ||
   fail "Reset game went back to the kernel"
@@ -198,7 +199,7 @@ run reset DOWN DOWN DOWN A -- -h $((key + 400)) -h $((key + 420)) -f $((key + 42
 # Sleep: the BIOS's Stop, which only START+SELECT ends (the emulated cart
 # sleeps as the real one does; tests/sleep.sh has the sleep keys), then the
 # game again
-run sleep DOWN DOWN DOWN DOWN A -- -k $((key + 300)):START+SELECT -k $((key + 306)):- \
+run sleep DOWN DOWN DOWN DOWN DOWN A -- -k $((key + 300)):START+SELECT -k $((key + 306)):- \
   -h $((key + 400)) -h $((key + 420)) -f $((key + 420))
 grep -q '^stop at frame' <<<"$log" || fail "Sleep didn't stop the CPU"
 woke=$(sed -n 's/^wake at frame \([0-9]*\)$/\1/p' <<<"$log")

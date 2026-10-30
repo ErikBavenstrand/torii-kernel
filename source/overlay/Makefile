@@ -13,7 +13,7 @@ CFLAGS := -g -Os -mthumb -mthumb-interwork -mcpu=arm7tdmi -ffreestanding -fno-st
 	-ffile-prefix-map=$(TOP)/=
 ASFLAGS := -g -mthumb-interwork -Wa,--debug-prefix-map=$(TOP)/=
 
-OBJS := $(OUT)/ov_header.o $(OUT)/ov.o $(OUT)/shotpack.o
+OBJS := $(OUT)/ov_header.o $(OUT)/ov.o $(OUT)/shotpack.o $(OUT)/cheatsearch.o
 
 $(OUT)/overlay.bin: $(OUT)/overlay.elf
 	$(PREFIX)objcopy -O binary $< $@
@@ -26,6 +26,10 @@ $(OUT)/%.o: $(SRC)/%.c | $(OUT)
 
 # The screenshots' packing, which the kernel unpacks: ARM, run from IWRAM (ov.ld)
 $(OUT)/shotpack.o: $(TOP)/source/shotpack.c $(SRC)/Makefile | $(OUT)
+	$(PREFIX)gcc $(filter-out -mthumb,$(CFLAGS)) -marm -c $< -o $@
+
+# The cheat search's compare (v0.9): ARM, its pass run from IWRAM (ov.ld)
+$(OUT)/cheatsearch.o: $(TOP)/source/cheatsearch.c $(SRC)/Makefile | $(OUT)
 	$(PREFIX)gcc $(filter-out -mthumb,$(CFLAGS)) -marm -c $< -o $@
 
 $(OUT)/%.o: $(SRC)/%.s | $(OUT)

@@ -127,6 +127,8 @@ jobs=(
   "tests/cheats_ingame.sh toggle"
   "tests/cheats_ingame.sh cut"
   "tests/cheats_ingame.sh once"
+  "tests/search.sh live"
+  "tests/search.sh set"
   "tests/cheat_engine.sh 1/4"
   "tests/cheat_engine.sh 2/4"
   "tests/cheat_engine.sh 3/4"

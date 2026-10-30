@@ -30,6 +30,11 @@ extern void Cheat_switch(void);
 // table follows it
 extern void Cheat_blob_start(void);
 extern void Cheat_blob_end(void);
+// The live block's address in the interpreter (cheatrun.s), the kernel's at launch
+extern void Cheat_live(void);
+// Where this launch's live block is (ingame_abi.h): 0 when it has none (no
+// interpreter, or no spend area found), and before any launch patched
+extern u32 cheat_live_at;
 // Runs the table once, but the cheats whose bit of the off mask is set
 void Cheat_run(const u32 *table, u32 off_lo, u32 off_hi, u32 once);
 

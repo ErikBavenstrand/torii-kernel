@@ -57,11 +57,11 @@ keys() {
 }
 
 # The menu at @400 from the game's start: Resume, Save state, Load state
-# (greyed: no state), Screenshot; then the rest of TAIL's keys
+# (greyed: no state), Cheat search, Screenshot; then the rest of TAIL's keys
 menu_shot() {
   # shellcheck disable=SC2046 # option lists
   boot $(nav_launch /Game.gba addon) -w "launch: starting the game" \
-    -k @400:L+R+START -k @406:- $(keys 440 DOWN DOWN A) -w "ingame: screenshot dumped" "$@"
+    -k @400:L+R+START -k @406:- $(keys 440 DOWN DOWN DOWN A) -w "ingame: screenshot dumped" "$@"
 }
 
 shots() { mdir -b -i "$cart/sd.img" ::/torii/screenshots 2>/dev/null | grep -c '\.bmp$' || true; }

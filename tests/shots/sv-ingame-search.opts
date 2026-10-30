@@ -1,0 +1,52 @@
+# ingame-search.opts in Swedish: lang/sv.ini's pack set in Settings (slot 0,
+# its id 0x564E), the search's lines and numbers at their widths (the
+# thousands separator a space).
+#! settings 0=22094
+#! sd-file /torii/lang/sv.lng 0 dist/lang/sv.lng
+# The in-game cheat search (v0.9, docs/design/v0.9/cheat-search.md) over
+# tests/roms/searchtest, which has no cheat file: the menu's own Cheat
+# search row opens the page, its size and Start (idle); Start remembers the
+# RAM and offers the filters, the footer the candidates left (started);
+# Equals edits its number in place, a digit underlined (edit), and A
+# searches (equals). In game A loses a life; back in the search, Equals 4
+# leaves the lives (four), which Show them lists (list) with their value;
+# A opens one (pick), and Keep it, set it now keeps it (kept).
+#! settings 2=1
+#! sd-file /searchtest.gba 0 tests/roms/searchtest/searchtest.gba
+-w "nav: home ready"
+-P "@8:nav_test_path:/searchtest.gba" -p @8:nav_test_action:0x7E000002
+-w "launch: starting the game"
+-k @300:L+R+START -k @306:-
+-w "screen ready: ingame"
+-k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:A -k @48:-
+-w "screen ready: ingame-search"
+-s @4:idle.png
+-k @10:A -k @14:-
+-w "search: started"
+-w "screen ready: ingame-search"
+-s @4:started.png
+-k @10:DOWN -k @14:- -k @22:DOWN -k @26:- -k @34:DOWN -k @38:- -k @46:DOWN -k @50:-
+-k @58:A -k @62:-
+-k @70:UP -k @74:- -k @82:UP -k @86:- -k @94:UP -k @98:- -k @106:UP -k @110:- -k @118:UP -k @122:-
+-s @130:edit.png
+-k @136:A -k @140:-
+-w "left"
+-s @6:equals.png
+-k @12:B -k @16:- -k @40:B -k @44:-
+-k @100:A -k @104:-
+-k @160:L+R+START -k @166:-
+-w "screen ready: ingame"
+-k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:A -k @48:-
+-w "screen ready: ingame-search"
+-k @10:DOWN -k @14:- -k @22:DOWN -k @26:- -k @34:DOWN -k @38:- -k @46:DOWN -k @50:-
+-k @58:A -k @62:- -k @70:DOWN -k @74:- -k @82:A -k @86:-
+-w "left"
+-s @6:four.png
+-k @12:DOWN -k @16:- -k @24:A -k @28:-
+-w "screen ready: ingame-search-list"
+-s @4:list.png
+-k @10:A -k @14:-
+-w "screen ready: ingame-search-pick"
+-s @4:pick.png
+-k @10:A -k @14:-
+-s @36:kept.png

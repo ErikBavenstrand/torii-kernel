@@ -5,8 +5,8 @@
 @ Cheat_blob_start on each VBlank IRQ while cheats are on. The code only
 @ reads the table, the in-game menu's toggles and the memory the cheats
 @ name, and writes those and its two halfwords of keys (below): no other
-@ RAM of its own, nothing but its 48 bytes of the IRQ stack, and no kernel
-@ address (each literal is PC-relative).
+@ RAM of its own (but the live block's, below), nothing but 48 bytes of the
+@ IRQ stack at most, and no kernel address (each literal is PC-relative).
 @
 @ Per-cheat switches (v0.8): bit n of a 64-bit mask is the table's cheat n.
 @ The table holds only the picks (v0.10: no more extras, off at launch, for
@@ -61,6 +61,15 @@
 @ bus reads and writes are: an odd halfword or word address is the
 @ hardware's (and mGBA's) rotated load and aligned store.
 @
+@ The live block (v0.9, the in-game cheat search): Cheat_live is the address
+@ of INGAME_LIVE_BYTES of RAM after the hook's spend area (ingame_abi.h),
+@ which the kernel patches in at launch (0: none). Before the table, each
+@ of its INGAME_LIVE_PAIRS (address, value) pairs is written, at the width
+@ in the address's top bits (0 byte, 1 halfword, 2 word), when its check
+@ word matches (ingame_live_check) and the address is in EWRAM or IWRAM: a
+@ found cheat the player turned on in game, until the next launch's table
+@ has it.
+@
 @ Registers: r0 the op pointer, r6 the index of the op at r0, r7 endLoc,
 @ r8 elseLoc (0: none), r10 the cheat's ops (0 in a plain cheat), r11 its
 @ end; r1-r5, r9, r12 and lr are scratch.
@@ -76,6 +85,41 @@
 @ The hook's entry: the table follows the code. IWRAM's words are reached
 @ through its mirror below 0x4000000, as the hook reaches 0x3007FFC.
 Cheat_blob_start:
+	ldr	r12, Cheat_live
+	cmp	r12, #0
+	beq	live_done
+	stmfd	sp!, {r4-r8}		@ 20 bytes, gone before Cheat_run takes its 48
+	ldmia	r12!, {r0-r6}		@ the check, then three pairs
+	ldr	r7, Cheat_live_magic
+	eor	r7, r7, r1
+	eor	r7, r7, r2, ror #7
+	eor	r7, r7, r3, ror #13
+	eor	r7, r7, r4, ror #19
+	eor	r7, r7, r5, ror #23
+	eor	r7, r7, r6, ror #29
+	cmp	r7, r0
+	bne	live_out
+	sub	r12, r12, #24		@ the first pair
+	mov	r8, #3			@ INGAME_LIVE_PAIRS
+live_pair:
+	ldmia	r12!, {r0, r1}
+	mov	r2, r0, lsr #28		@ its width
+	bic	r0, r0, #0xF0000000
+	mov	r3, r0, lsr #24
+	cmp	r3, #2			@ EWRAM or IWRAM only (0: a pair not used)
+	cmpne	r3, #3
+	bne	live_next
+	cmp	r2, #1
+	strltb	r1, [r0]
+	streqh	r1, [r0]
+	cmp	r2, #2
+	streq	r1, [r0]
+live_next:
+	subs	r8, r8, #1
+	bne	live_pair
+live_out:
+	ldmfd	sp!, {r4-r8}
+live_done:
 	mov	r3, #0x4000000
 	ldr	r12, [r3, #0x130]	@ KEYINPUT (and KEYCNT above it)
 	ldrh	r1, [r3, #-0x1E]	@ 0x3007FE2: the keys at the run before
@@ -427,6 +471,11 @@ cheat_done:
 	ldmfd	sp!, {r4-r11, lr}
 	bx	lr
 	.align 2
+	.global Cheat_live
+Cheat_live:
+	.word	0			@ the live block's address, the kernel's at launch
+Cheat_live_magic:
+	.word	0x45564C54		@ INGAME_LIVE_MAGIC
 Cheat_blob_end:
 	.size Cheat_run, Cheat_blob_end - Cheat_run
 	.end

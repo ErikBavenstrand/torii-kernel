@@ -75,6 +75,7 @@ void test_loader_check(void);
 void test_lz77_round_trip(void);
 void test_lz77_compresses(void);
 void test_shotpack(void);
+void test_cheatsearch(void);
 void test_ingame_abi(void);
 void test_ppu_render_text(void);
 void test_ppu_render_sprites(void);

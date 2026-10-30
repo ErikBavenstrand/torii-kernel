@@ -117,6 +117,36 @@ const char *const lang_en[STR_COUNT] = {
 	"cart memory was unavailable",  // ingame.refused_memory
 	"its copy in cart memory was damaged",  // ingame.refused_image
 	"the game",  // ingame.refused_game
+	"Cheat search",  // ingame.search
+	"Size: 8 bits",  // ingame.search_size8
+	"Size: 16 bits",  // ingame.search_size16
+	"Size: 32 bits",  // ingame.search_size32
+	"Start search",  // ingame.search_start
+	"Same as before",  // ingame.search_same
+	"Changed",  // ingame.search_changed
+	"Went up",  // ingame.search_up
+	"Went down",  // ingame.search_down
+	"Equals {1}",  // ingame.search_equals
+	"Show them",  // ingame.search_show
+	"New search",  // ingame.search_new
+	"{1} left",  // ingame.search_left
+	"None left: start a new search",  // ingame.search_none
+	"Searching...",  // ingame.search_busy
+	"Remembers every value: then play",  // ingame.search_hint
+	"Load state then needs Torii",  // ingame.search_drops
+	"Back to Torii keeps your state first",  // ingame.search_state_first
+	"Narrow it down to 32 first",  // ingame.search_few
+	"Left/Right, Up/Down, then A",  // ingame.search_edit
+	"Value: {1}",  // ingame.search_value
+	"Keep it",  // ingame.search_keep
+	"Keep it, on now",  // ingame.search_keep_on
+	"Keep it, set it now",  // ingame.search_keep_set
+	"Kept: filed on Back to Torii",  // ingame.search_kept
+	"Three on now at most: just keep it",  // ingame.search_live_full
+	"16 kept: go back to Torii first",  // ingame.search_found_full
+	"A: make it a cheat",  // ingame.search_pick
+	"Saving a state ends the search",  // ingame.search_save_ends
+	"Not on card yet: found cheats",  // ingame.unsaved_found
 	"Always on",  // activation.always
 	"Hold {1}",  // activation.hold
 	"Press {1}",  // activation.press
@@ -493,6 +523,7 @@ const char *const lang_en[STR_COUNT] = {
 	"Recently",  // games.played_recently
 	"Showing the first {1} games",  // games.first
 	"pick",  // cheats.hint_pick
+	"Found {1}",  // cheats.found_name
 	"Too much to run beside the picks",  // cheats.why_full
 	"Can't read this code",  // cheats.why_unreadable
 	"Fill in its digits to use it",  // cheats.why_edit
