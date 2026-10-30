@@ -17,6 +17,9 @@ git log, not here.
 - **Fixed:** found cheats the card didn't take wait for the next boot, as
   intended (the boot's answer was cleared, so they were lost); a cheat kept
   on now, then kept again, is filed picked (8d9f3c03).
+- **Added:** the cheat search's Undo the last takes back the last filter,
+  so one picked by mistake doesn't end the search (it costs a filter about
+  10 frames more) (e7e81331).
 - **Added:** R in a game list makes the game a favourite or not at once,
   its star shown (on Favourites its row goes); Info's Controls says so
   (d00ed28e).
