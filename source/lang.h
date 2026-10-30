@@ -81,6 +81,7 @@ enum {
 	LANG_POP_ART,     // List + art's games: hide its box art, show it again, or remove its own (boxart.h)
 	LANG_POP_INFO,
 	LANG_POP_SAVES,
+	LANG_POP_SHOTS,  // a game with screenshots: the viewer (screens/shots.c), its count
 	LANG_POP_CHEATS,  // a GBA game on the card: its cheat screen (screens/cheats.c), its count if it has a cheat file
 	LANG_POP_STATES,  // a GBA game on the card, Save states on: start it in one of its save states (v0.8)
 	LANG_POP_UNRECENT,  // the Recent page's Remove: off Recent, the file stays

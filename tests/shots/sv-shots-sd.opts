@@ -1,0 +1,16 @@
+# The viewer's refusal and its delete question in Swedish (v0.9.2), from the
+# SD card page: an RLE file (rle.png) and START's question (delete.png).
+#! settings 0=22094
+#! sd-file /torii/lang/sv.lng 0 dist/lang/sv.lng
+#! sd-file "/Pictures/rle.bmp" 0 tests/shots/data/rle.bmp
+-w "nav: home ready"
+-k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:LEFT -k @28:- -k @32:LEFT -k @36:- -k @40:A -k @44:-
+-w "sdcard: counted /"
+-k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:A -k @36:-
+-w "sdcard: ready /Pictures"
+-k @12:A -k @16:-
+-w "screen ready: shot-picture 1"
+-s @2:rle.png
+-k @8:START -k @12:-
+-w "screen ready: confirm"
+-s @30:delete.png

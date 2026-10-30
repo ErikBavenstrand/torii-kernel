@@ -1,0 +1,40 @@
+# The SD card page's pictures in the screenshot viewer (source/screens/shots.c):
+# .bmp files list without Show all files (folder.png). A on one opens it,
+# stepping through the folder's .bmp files in the page's order: a 24-bit
+# picture with no shot's name shows its file name (holiday.png); RIGHT, an
+# RLE file says it can't show that kind (rle.png); RIGHT, a small one,
+# centred (small.png). START, then A on Delete, deletes it: the viewer
+# shows the one before, now 2 of 2 (deleted.png), and B goes back to the
+# page, the file gone from it (back.png). START on a picture opens its popup,
+# View first (popup.png).
+#! sd-file "/Pictures/Holiday.bmp" 0 tests/shots/data/shot-scene.bmp
+#! sd-file "/Pictures/rle.bmp" 0 tests/shots/data/rle.bmp
+#! sd-file "/Pictures/small.bmp" 0 tests/shots/data/small.bmp
+#! sd-file "/Pictures/notes.txt" 0 /dev/null
+-w "nav: home ready"
+-k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:LEFT -k @28:- -k @32:LEFT -k @36:- -k @40:A -k @44:-
+-w "sdcard: counted /"
+-k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:A -k @36:-
+-w "sdcard: ready /Pictures"
+-s @8:folder.png
+-k @12:A -k @16:-
+-w "screen ready: shot-picture 1"
+-s @2:holiday.png
+-k @8:RIGHT -k @12:-
+-w "screen ready: shot-picture 2"
+-s @2:rle.png
+-k @8:RIGHT -k @12:-
+-w "screen ready: shot-picture 3"
+-s @2:small.png
+-k @8:START -k @12:-
+-w "screen ready: confirm"
+-k @30:RIGHT -k @34:-
+-k @46:A -k @50:-
+-w "screen ready: shot-picture 2"
+-s @2:deleted.png
+-k @8:B -k @12:-
+-w "sdcard: ready /Pictures"
+-s @30:back.png
+-k @34:START -k @38:-
+-w "sdcard: popup"
+-s @12:popup.png

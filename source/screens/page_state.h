@@ -15,7 +15,7 @@
 
 #include <gba_base.h>
 
-#define PAGE_STATE_BYTES 0xF00
+#define PAGE_STATE_BYTES 0xF10
 
 enum page_state_owner {
 	PAGE_STATE_NONE,

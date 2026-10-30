@@ -578,6 +578,74 @@ static void scrollbar_draw(u8 node)
 static const struct ui_ops scrollbar_ops = {
 	sizeof(struct scrollbar_state), scrollbar_measure, scrollbar_init, 0, scrollbar_update, scrollbar_draw};
 
+// --- Picture --------------------------------------------------------------
+
+struct picture_state {
+	u16 first;
+	u8 tiles;
+	u8 banks;
+};
+
+static u32 picture_tiles(u8 node)
+{
+	const struct ui_node *n = ui_node(node);
+	return (u32)(n->w / 8) * (u32)(n->h / 8);
+}
+
+static int picture_measure(u8 node, struct engine_budget *need)
+{
+	need->bg_banks = (u8)(need->bg_banks + UI_PICTURE_BANKS);
+	need->bg_tiles = (u16)(need->bg_tiles + 2 * picture_tiles(node));  // 8bpp: two units a tile
+	return 1;
+}
+
+static int picture_init(u8 node)
+{
+	struct picture_state *st = ui_node_state(node);
+	u32 plane = ui_node_spec(node)->plane, cb = ui_plane_cb(plane), count = picture_tiles(node);
+	st->tiles = res_bg_tiles((u16)count, 1, (u8)cb, 0);
+	if (st->tiles == RES_NONE)
+		return 0;
+	st->first = res_bg_tile_index(st->tiles, 1, (u8)cb);
+	st->banks = res_palette(RES_BG_PAL, UI_PICTURE_BANKS, 0);
+	if (st->banks == RES_NONE || res_start(RES_BG_PAL, st->banks) != UI_BANKS) {
+		ui_set_error("view %s: a picture needs BG banks %d-%d", ui_node_view(node)->spec->name, UI_BANKS,
+			     UI_BANKS + UI_PICTURE_BANKS - 1);
+		return 0;
+	}
+	ui_node_view(node)->bpp8 |= (u8)(1u << plane);
+	return gfx_queue_fill(res_bg_addr(st->tiles), 0, count * 64);
+}
+
+static void picture_draw(u8 node)
+{
+	const struct picture_state *st = ui_node_state(node);
+	const struct ui_node *n = ui_node(node);
+	if (n->flags & UI_N_HIDDEN) {
+		if (!ui_map_fill(node, 0))
+			ui_dirty(node, 0xFF);
+		return;
+	}
+	u32 tx = (u32)n->x / 8, ty = (u32)n->y / 8, w = (u32)n->w / 8, h = (u32)n->h / 8;
+	u16 *rows = ui_map_rows(node, ty, h);
+	if (!rows) {
+		ui_dirty(node, 0xFF);
+		return;
+	}
+	for (u32 y = 0; y < h; y++)
+		for (u32 x = 0; x < w; x++)
+			rows[y * 32 + tx + x] = (u16)(st->first + y * w + x);
+}
+
+int ui_picture_show(u8 node, const void *tiles)
+{
+	const struct picture_state *st = ui_node_state(node);
+	return st->tiles != RES_NONE && gfx_queue_copy(res_bg_addr(st->tiles), tiles, picture_tiles(node) * 64);
+}
+
+static const struct ui_ops picture_ops = {
+	sizeof(struct picture_state), picture_measure, picture_init, 0, 0, picture_draw};
+
 // --- Every kind ---------------------------------------------------------
 
 const struct ui_ops *const ui_kind_ops[UI_KINDS] = {
@@ -586,5 +654,5 @@ const struct ui_ops *const ui_kind_ops[UI_KINDS] = {
 	[UI_CARD] = &ui_card_ops,       [UI_TITLE] = &ui_title_ops,      [UI_HINTS] = &ui_hints_ops,
 	[UI_PATH] = &ui_path_ops,       [UI_STORAGE] = &ui_storage_ops,  [UI_POPUP] = &ui_popup_ops,
 	[UI_CONFIRM] = &ui_confirm_ops, [UI_LETTER] = &ui_letter_ops,    [UI_CAROUSEL] = &ui_carousel_ops,
-	[UI_CANVAS] = &ui_canvas_ops,
+	[UI_CANVAS] = &ui_canvas_ops,   [UI_PICTURE] = &picture_ops,
 };

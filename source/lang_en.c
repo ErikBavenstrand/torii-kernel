@@ -422,6 +422,7 @@ const char *const lang_en[STR_COUNT] = {
 	"Remove from favourites",  // sd.fav_remove
 	"Delete",  // sd.delete
 	"File info",  // sd.info
+	"View",  // sd.view
 	"Delete {1}?",  // sd.delete_ask
 	"The save stays.",  // sd.delete_save
 	"Can't delete the file",  // sd.delete_failed
@@ -433,6 +434,15 @@ const char *const lang_en[STR_COUNT] = {
 	"Changed",  // sd.changed
 	"Save",  // sd.save
 	"No save yet",  // sd.no_save
+	"{1} of {2}",  // shots.position
+	"{1} {2}",  // shots.when
+	"Delete this screenshot?",  // shots.delete_ask
+	"The file goes from the card.",  // shots.delete_text
+	"Delete",  // shots.delete
+	"Can't delete the file",  // shots.delete_failed
+	"Can't show this kind of picture",  // shots.unsupported
+	"Not a picture, or damaged",  // shots.broken
+	"No screenshots here",  // shots.none
 	"No games here",  // games.empty
 	"play",  // games.hint_play
 	"menu",  // games.hint_menu
@@ -445,6 +455,7 @@ const char *const lang_en[STR_COUNT] = {
 	"Hide box art",  // games.pop_art
 	"Game info",  // games.pop_info
 	"Saves",  // games.pop_saves
+	"Screenshots",  // games.pop_shots
 	"Cheats",  // games.pop_cheats
 	"Load state",  // games.pop_states
 	"Remove",  // games.pop_unrecent

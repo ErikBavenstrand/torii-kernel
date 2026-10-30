@@ -89,7 +89,23 @@
 // - READCACHE_LANG, 64 KB from 0x8000, clear of the stage: a language pack
 //   on its way from the card to PSRAM (lang_load.c), checked whole there,
 //   within lang_switch.
+// - READCACHE_SHOTS_LIST, 64 KB from 0x8000, clear of the stage: the game
+//   popup's look at /torii/screenshots (shotlist.c, struct list_work), within
+//   shotlist_count: the folder's entries and their counts on their way to
+//   PSRAM page 2.
+// - READCACHE_SHOTS, all 128 KB: the screenshot viewer (screens/shots.c)
+//   while it runs, which starts no job and calls nothing else that borrows
+//   past the stage. Its state (struct sv_state: the picture's tiles, which the
+//   VRAM queue reads after the call that made them, its colours, the list's
+//   order) from READCACHE_SHOTS_STATE to the end; the decoder's colour table
+//   (picture.h), from the start over the stage, only within one decode, as
+//   no job step runs inside it; and the list's names and dates on their way
+//   to PSRAM page 2, likewise, as the list is read.
 #define MAX_pReadCache_size 0x20000
+#define READCACHE_SHOTS_LIST 0x8000
+#define READCACHE_SHOTS_LIST_SIZE 0x10000
+#define READCACHE_SHOTS 0x0
+#define READCACHE_SHOTS_STATE 0x10000
 #define READCACHE_LANG 0x8000
 #define READCACHE_LANG_SIZE 0x10000
 #define READCACHE_ART_SHEET 0x8000

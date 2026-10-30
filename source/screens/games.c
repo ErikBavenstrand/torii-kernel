@@ -30,8 +30,10 @@
 #include "../sdlist.h"
 #include "../cheatstore.h"
 #include "../gamesave.h"
+#include "../shotlist.h"
 #include "../statestore.h"
 #include "cheats.h"
+#include "shots.h"
 #include "../tlog.h"
 #include "../userdata.h"
 #include "../engine/cycles.h"
@@ -129,6 +131,7 @@ struct games_state {
 	char title[GAMENAME_MAX + 1];
 	char ask[GAMENAME_MAX + 16];
 	char cheats[12];  // the popup's Cheats: how many the cheat screen lists
+	char shots[8];  // the popup's Screenshots: how many the game has (SV_MAX at most)
 	char boot_default[32];  // Play's « default », with the way it resolves to
 	struct ui_pop_item items[LANG_POP_ITEMS];
 	u8 actions[LANG_POP_ITEMS];
@@ -1639,6 +1642,11 @@ static void popup_run(u32 i)
 	popup_add(LANG_POP_PLAY, nboots > 1 ? boot_text(boots[0]) : 0, nboots > 1 ? UI_POP_STEP : 0);
 	if (game_saves_probe(games.pick))
 		popup_add(LANG_POP_SAVES, 0, 0);
+	u32 shots = shotlist_count(games.pick);
+	if (shots) {
+		snprintf(games.shots, sizeof(games.shots), "%u", (unsigned)(shots % 100000));
+		popup_add(LANG_POP_SHOTS, games.shots, 0);
+	}
 	// Every GBA game on the card has Cheats, for the code keypad's Add code,
 	// but one whose cheat file's path is too long; the cheat screen says why
 	// a file it can't take is left alone. The popup never reads the file
@@ -1750,6 +1758,10 @@ static void popup_run(u32 i)
 			return;
 		case LANG_POP_CHEATS:
 			cheats_game(i);
+			return;
+		case LANG_POP_SHOTS:
+			shots_run_game(games.pick);  // in the page's place, as the cheat screen
+			reshow(i);
 			return;
 		case LANG_POP_STATES:
 			states_game(i);
