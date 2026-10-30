@@ -4,7 +4,7 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.9.3
 
 - **Added:** in the in-game Cheats list, SELECT on a cheat that is off runs
   it once as the game resumes (something it gives, say), past its Hold or
