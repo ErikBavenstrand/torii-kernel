@@ -165,6 +165,7 @@ struct row_ctx {
 	u32 pad;       // the inset from a row's edges
 	u32 x;         // where a row's name starts: pad, or after the icon column
 	u32 clip;      // the name's width
+	u32 detail_w;  // the config's detail_w
 	int icon8;     // UI_LIST_ICON8
 	u16 flags;     // the config's UI_LIST_*
 	u32 paper, ink;
@@ -931,9 +932,18 @@ static void row_icon8(const struct text_window *win, u32 x, u32 y, const u32 *ic
 }
 
 // Pixels item's name may use of clip, the row's: less its badge's room
-static u32 item_clip(u32 clip, const struct ui_item *item)
+// The name's width on a row: clip, less its badge's, and less what its
+// detail takes past the detail_w px the list keeps for one (a detail wider
+// than that, or one on a list that keeps none: the name gives way to it)
+static u32 item_clip(u32 clip, const struct ui_item *item, u32 detail_w)
 {
-	u32 badge = item->badge ? 8u + ui_theme()->look.row_badge_gap : 0;
+	const struct ui_look *l = &ui_theme()->look;
+	u32 badge = item->badge ? 8u + l->row_badge_gap : 0;
+	if (item->detail && *item->detail) {
+		u32 dw = text_width(ui_theme()->body, item->detail, strlen(item->detail)) + l->row_dot_gap;
+		if (dw > detail_w)
+			badge += dw - detail_w;
+	}
 	return clip > badge + 8 ? clip - badge : 8;
 }
 
@@ -964,7 +974,7 @@ static void marquee_tick(u8 node, struct list_state *st, u32 dt)
 		}
 		u32 len = item.len ? item.len : strlen(item.text);
 		st->mq_width = (u16)text_width(t->body, item.text, len);
-		st->mq_clip = (u16)item_clip(text_clip(node, st), &item);
+		st->mq_clip = (u16)item_clip(text_clip(node, st), &item, config(node)->detail_w);
 		if (st->mq_width <= st->mq_clip) {
 			st->mq = MQ_OFF;
 			return;
@@ -1183,6 +1193,7 @@ static void row_ctx_init(u8 node, const struct list_state *st, struct row_ctx *r
 	rc->icon8 = (config(node)->flags & UI_LIST_ICON8) != 0;
 	rc->flags = config(node)->flags;
 	rc->clip = text_clip(node, st);
+	rc->detail_w = config(node)->detail_w;
 	rc->paper = ui_paper(node, UI_ROLE_NONE);
 	rc->ink = ui_ink(node, UI_ROLE_TEXT);
 	rc->sel = st->opaque && !st->plain ? sel : UI_ITEM_NONE;
@@ -1262,7 +1273,8 @@ static int draw_row(const struct list_state *st, const struct row_ctx *rc, const
 	if (rc->flags & UI_LIST_TRACK)
 		last_sig = item_hash(&item);
 	u32 len = item.len ? item.len : strlen(item.text);
-	u32 ink = item.ink ? item.ink : rc->ink, y = y0 + rc->y, tx = x0 + rc->x, clip = item_clip(rc->clip, &item);
+	u32 ink = item.ink ? item.ink : rc->ink, y = y0 + rc->y, tx = x0 + rc->x,
+	    clip = item_clip(rc->clip, &item, rc->detail_w);
 	const struct ui_look *look = &ui_theme()->look;
 	u32 icon_y = y + (font->line_height > 8 ? (font->line_height - 8) / 2 : 0), badge_x;
 	if (item.key) {

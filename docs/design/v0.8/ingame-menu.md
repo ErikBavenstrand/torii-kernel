@@ -35,6 +35,7 @@ work RAM*), so page `0x20` is offset `0x20000`.
 | `0xB0000-0xB5FFF` | the overlay's image |
 | `0xB6000-0xBFFFF` | the session block, kernel to overlay and back |
 | `0x2C800-0x2D9FF` | the game's IWRAM a screenshot's packing borrows (its table, buffer and ARM code) |
+| `0x30000-0x3C0FF` | the cheat list's names whole, for the highlighted row's marquee (v0.10, `struct ingame_wide`) |
 | `0xC0000-0xEFFFF` | the screenshots (P4): up to 5 records of `struct ingame_shot` and the packed palettes, OAM, VRAM |
 | `0xF0000` | the cart log (`source/cartlog.h`) |
 

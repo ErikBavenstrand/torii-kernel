@@ -13,9 +13,12 @@
 // spreads its 1bpp rows into tiles. The panel shows first; its text a frame
 // later, once its tiles are backed up and drawn.
 //
-// Two pages: the menu, and the cheat list (P2), whose rows scroll under a
-// title and over a footer that says why a row can't change, or that the
-// toggles are kept as picks on Back to Torii.
+// Two pages: the menu, and the cheat list (P2) of the picks, whose rows
+// scroll under a title and over a footer that says why a row can't change,
+// else how the cheat is activated ("Hold L+SELECT"), or that the toggles are
+// kept as picks on Back to Torii. The highlighted row's name scrolls
+// sideways when it is cut (a marquee, drawn from its whole line the kernel
+// wrote at INGAME_SRAM_WIDE).
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -51,6 +54,15 @@
 #define MENU_KEY_DEFAULT 0x308  // L+R+START
 #define REPEAT_DELAY 18  // frames a direction is held before it repeats
 #define REPEAT_EVERY 5
+// The marquee, in frames and pixels: the kernel's lists' (ui_theme.c's
+// marquee_delay, _pause and _gap, at its speed of a pixel a frame)
+#define MQ_DELAY 45
+#define MQ_PAUSE 60
+#define MQ_GAP 8
+
+// The last VBlank line the opening still shows the panel in (VBlank runs
+// to line 227)
+#define VBLANK_LATE 215
 
 // DISPCNT: OBJ on, 1D tile mapping; forced blank and the windows off
 #define DISPCNT_OBJ 0x1000
@@ -177,8 +189,16 @@ struct cheat {
 	uint8_t flags, bit;
 };
 _Static_assert(offsetof(struct ingame_cheat, flags) - offsetof(struct ingame_cheat, cost) == 6 &&
-		       offsetof(struct ingame_cheat, bit) - offsetof(struct ingame_cheat, cost) == 7,
-	       "cheats_load reads the cost, flags and bit as two words");
+		       offsetof(struct ingame_cheat, bit) - offsetof(struct ingame_cheat, cost) == 7 &&
+		       offsetof(struct ingame_cheat, act) - offsetof(struct ingame_cheat, cost) == 8,
+	       "cheats_load reads the cost, flags and bit as two words, footer_text the act as a third");
+
+enum mq_state {
+	MQ_OFF,  // the row shows its cut line
+	MQ_WAIT,  // that, until mq_wait runs out
+	MQ_RUN,  // a step of the whole line, mq_px from its start
+	MQ_END,  // the last step, until mq_wait runs out
+};
 
 // The session block's head (INGAME_SESSION_HEAD bytes), seen through session()
 static uint32_t session_words[INGAME_SESSION_HEAD / 4];
@@ -213,6 +233,9 @@ static struct {
 	uint32_t on[2];  // the entries on now, bit n for entry n
 	uint32_t launched[2];  // and at launch
 	uint32_t changed;  // a toggle changed since the menu opened
+	// The marquee of the cursor's cheat: its whole line's width
+	enum mq_state mq;
+	uint32_t mq_wait, mq_px, mq_width;
 	// The state slots (P3): whether the session has them, and the buffer's
 	// slot (0: none for this game) and whether it is on the card
 	uint32_t states;
@@ -414,16 +437,11 @@ static uint32_t spread(uint32_t b)
 	return (b | b << 3) & 0x11111111u;
 }
 
-// The line at sram (a session block offset; 0: none) into slot s's tiles,
-// and as many of its sprites shown as the line needs (once the text shows)
-static void slot_draw(const struct slot *s, uint32_t sram, uint32_t bank)
+// A line into slot s's tiles, and as many of its sprites shown as the line
+// needs (once the text shows)
+static void line_tiles(const struct slot *s, const struct ingame_line *line, uint32_t bank)
 {
-	struct ingame_line line;
-	if (m.have_session && sram)
-		sram_in(INGAME_SRAM_SESSION + sram, &line, sizeof(line));
-	else
-		memset(&line, 0, sizeof(line));
-	uint32_t n = ((uint32_t)line.width + 31) / 32;
+	uint32_t n = ((uint32_t)line->width + 31) / 32;
 	if (n > s->max)
 		n = s->max;
 	// The tiles in VRAM's order (a sprite's top four, its bottom four, each
@@ -436,13 +454,51 @@ static void slot_draw(const struct slot *s, uint32_t sram, uint32_t bank)
 				for (uint32_t y = y0; y < y0 + 8; y++) {
 					uint32_t row = y - TEXT_TOP;
 					*dst++ = row < INGAME_TEXT_ROWS && c < INGAME_TEXT_W / 8
-							 ? spread(line.bits[row][c])
+							 ? spread(line->bits[row][c])
 							 : 0;
 				}
 	for (uint32_t k = 0; k < s->max; k++) {
 		obj_bank(s->oam + k, bank);
 		obj_shown(s->oam + k, m.text_shown && k < n);
 	}
+}
+
+// The line at sram (a session block offset; 0: none) into slot s's tiles
+static void slot_draw(const struct slot *s, uint32_t sram, uint32_t bank)
+{
+	struct ingame_line line;
+	if (m.have_session && sram)
+		sram_in(INGAME_SRAM_SESSION + sram, &line, sizeof(line));
+	else
+		memset(&line, 0, sizeof(line));
+	line_tiles(s, &line, bank);
+}
+
+// The bytes of a whole line's row a marquee step reads: from a word
+// boundary, a line's bytes and the one after them
+#define MQ_ROW_WORDS 7
+_Static_assert(MQ_ROW_WORDS * 4 >= 3 + INGAME_TEXT_W / 8 + 1, "a step's row: a line's bytes and the one after");
+
+// A marquee step into slot s's tiles: entry e's whole line (INGAME_SRAM_WIDE)
+// from pixel px on, as a line of the row's width. Its rows are read from
+// cart SRAM a step at a time: the window the stub backs up has no room to
+// spare for a copy (the menu showed a frame later with one).
+static void slot_draw_wide(const struct slot *s, uint32_t e, uint32_t px, uint32_t bank)
+{
+	struct ingame_line line;
+	uint32_t from = (px >> 3) & ~3u, n = INGAME_WIDE_W / 8 - from, at = (px >> 3) - from;
+	n = n < MQ_ROW_WORDS * 4 ? n : MQ_ROW_WORDS * 4;
+	line.width = INGAME_ROW_W;
+	for (uint32_t row = 0; row < INGAME_TEXT_ROWS; row++) {
+		uint32_t words[MQ_ROW_WORDS] = {0};
+		const uint8_t *bytes = (const uint8_t *)words;
+		sram_in(INGAME_SRAM_WIDE + e * sizeof(struct ingame_wide) + offsetof(struct ingame_wide, bits) +
+				row * (INGAME_WIDE_W / 8) + from,
+			words, n);
+		for (uint32_t c = 0; c < INGAME_TEXT_W / 8; c++)
+			line.bits[row][c] = (uint8_t)((bytes[at + c] | (uint32_t)bytes[at + c + 1] << 8) >> (px & 7));
+	}
+	line_tiles(s, &line, bank);
 }
 
 static uint32_t text_at(uint32_t text)
@@ -580,7 +636,7 @@ static uint32_t row_text(uint32_t r)
 		return text_at(INGAME_TEXT_SHOT_COUNT + m.shots - 1);
 	if (kind == ROW_CHEATS)
 		return text_at(m.cheats                                        ? INGAME_TEXT_CHEATS
-			       : *(volatile uint32_t *)INGAME_CHEAT_ONOFF == 1 ? INGAME_TEXT_CHEATS_OFF
+			       : *(volatile uint16_t *)INGAME_CHEAT_ONOFF == 1 ? INGAME_TEXT_CHEATS_OFF
 									       : INGAME_TEXT_CHEATS_ON);
 	return text_at(row_texts[kind]);
 }
@@ -596,9 +652,19 @@ static uint32_t footer_text(void)
 		return text_at(!row_greyed(m.cursor)                        ? INGAME_TEXT_STATE_LOAD
 			       : (session()->state_have & (1u << m.cursor)) ? INGAME_TEXT_STATE_ELSEWHERE
 									    : INGAME_TEXT_STATE_EMPTY);
+	// A cheat's reason it can't change, else its activation's sentence
 	uint32_t why = INGAME_WHY_NONE;
-	if (m.cursor >= LIST_FIXED)
-		why = cheat_why_now(m.cursor - LIST_FIXED);
+	if (m.cursor >= LIST_FIXED) {
+		uint32_t e = m.cursor - LIST_FIXED;
+		why = cheat_why_now(e);
+		uint32_t act = 0;  // its act byte, read when it shows (a word: sram_copy's)
+		if (why == INGAME_WHY_NONE && m.have_session)
+			sram_in(INGAME_SRAM_SESSION + INGAME_SESSION_CHEAT(e) + offsetof(struct ingame_cheat, act),
+				&act, 4);
+		act &= 0xFF;
+		if (act && act <= INGAME_ACT_LINES)
+			return INGAME_SESSION_ACT(act - 1);
+	}
 	return text_at(why_texts[why]);
 }
 
@@ -658,7 +724,10 @@ static void slot_update(uint32_t k)
 			: m.footer && k == m.title + m.visible ? BANK_FAINT
 			: r >= 0 && row_greyed((uint32_t)r)    ? BANK_FAINT
 							       : BANK_TEXT;
-	slot_draw(s, slot_text(k), bank);
+	if ((m.mq == MQ_RUN || m.mq == MQ_END) && r >= 0 && (uint32_t)r == m.cursor)
+		slot_draw_wide(s, m.cursor - LIST_FIXED, m.mq_px, bank);
+	else
+		slot_draw(s, slot_text(k), bank);
 	if (s->check) {
 		uint32_t o = s->check - 1u;
 		int on = r >= (int)LIST_FIXED && bit_of(m.on, (uint32_t)r - LIST_FIXED);
@@ -816,7 +885,8 @@ static void build_page(enum page_id page, uint32_t cursor)
 			uint32_t most = wide ? WIDE_SPRITES : SLOT_SPRITES;
 			max = (w + 31) / 32;
 			max = max < 1 ? 1 : max > most ? most : max;
-		}
+		} else if (m.footer && k == m.title + m.visible)
+			max = WIDE_SPRITES;  // the list's footer: a line of the menu's width (an activation's sentence)
 		sl->max = (uint8_t)max;
 		tile += max * 8;
 		// Its sprites' places in OAM, kept for build_text: the panel
@@ -890,12 +960,16 @@ static void wait_release(uint32_t mask)
 		vsync();
 }
 
+static void marquee_start(void);
+
 // Opens page at row cursor: the panel this frame, its text the next
 static void page_open(enum page_id page, uint32_t cursor)
 {
 	vsync();
+	m.mq = MQ_OFF;
 	build_page(page, cursor);
 	build_text(0, m.title + m.visible + m.footer);
+	marquee_start();
 	if (page == PAGE_CHEATS)
 		debug_print("screen ready: ingame-cheats");
 	else if (page == PAGE_SAVE)
@@ -904,11 +978,79 @@ static void page_open(enum page_id page, uint32_t cursor)
 		debug_print("screen ready: ingame-load");
 }
 
+// The cursor's row's slot, or -1 when it isn't shown
+static int cursor_slot(void)
+{
+	return m.cursor >= m.top && m.cursor < m.top + m.visible ? (int)(m.title + m.cursor - m.top) : -1;
+}
+
+// The marquee off; the slot that shows a step of it (to draw again), or -1
+static int marquee_stop(void)
+{
+	int k = m.mq == MQ_RUN || m.mq == MQ_END ? cursor_slot() : -1;
+	m.mq = MQ_OFF;
+	return k;
+}
+
+// The marquee from its start for the cursor's row: it waits if the row's
+// cheat's name is cut, else stays off
+static void marquee_start(void)
+{
+	m.mq = MQ_OFF;
+	m.mq_px = 0;
+	m.mq_wait = MQ_DELAY;
+	if (m.page == PAGE_CHEATS && m.cursor >= LIST_FIXED &&
+	    (m.cheat[m.cursor - LIST_FIXED].flags & INGAME_CHEAT_CUT))
+		m.mq = MQ_WAIT;
+}
+
+// A frame of the marquee
+static void marquee_tick(void)
+{
+	if (m.mq == MQ_OFF || !m.text_shown)
+		return;
+	if (m.mq_wait) {
+		m.mq_wait--;
+		return;
+	}
+	int k = cursor_slot();
+	if (k < 0)
+		return;
+	if (m.mq == MQ_END) {  // back to the cut line, which waits again
+		m.mq = MQ_WAIT;
+		m.mq_px = 0;
+		m.mq_wait = MQ_DELAY;
+		slot_update((uint32_t)k);
+		return;
+	}
+	if (m.mq == MQ_WAIT) {
+		uint32_t head = 0;
+		sram_in(INGAME_SRAM_WIDE + (m.cursor - LIST_FIXED) * sizeof(struct ingame_wide), &head, 4);
+		m.mq_width = head & 0xFFFF;
+		if (m.mq_width <= INGAME_ROW_W || m.mq_width > INGAME_WIDE_W) {
+			m.mq = MQ_OFF;
+			return;
+		}
+		m.mq = MQ_RUN;
+		m.mq_px = 0;
+	} else {
+		m.mq_px++;
+	}
+	if (m.mq_px + INGAME_ROW_W >= m.mq_width + MQ_GAP) {
+		m.mq = MQ_END;
+		m.mq_wait = MQ_PAUSE;
+	}
+	slot_update((uint32_t)k);
+}
+
 // Moves the cursor to row r, scrolling the list to show it
 static void cursor_to(uint32_t r)
 {
 	// The menu's footer changes with the row on some rows
 	uint32_t footer = m.page == PAGE_MENU ? menu_footer() : 0;
+	int was = marquee_stop();
+	if (was >= 0)
+		slot_update((uint32_t)was);  // the row it left, cut again
 	m.cursor = r;
 	uint32_t top = m.top;
 	if (r < top)
@@ -924,6 +1066,7 @@ static void cursor_to(uint32_t r)
 		slot_update(m.title + m.visible);
 	}
 	m.pill_to = row_y(r);
+	marquee_start();
 }
 
 // A on the cheat list's row r
@@ -958,6 +1101,7 @@ static uint32_t run(uint32_t menu_key)
 			m.pill_y += step ? step : (m.pill_to > m.pill_y ? 1 : -1);
 			pill_place(m.pill_y);
 		}
+		marquee_tick();
 		uint32_t keys = keys_held(), down = keys & ~prev;
 		uint32_t move = keys & (KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT);
 		held_for = move && (move & prev) ? held_for + 1 : 0;
@@ -1033,7 +1177,7 @@ static uint32_t run(uint32_t menu_key)
 				if (m.cheats) {
 					page_open(PAGE_CHEATS, LIST_FIXED);
 				} else {
-					volatile uint32_t *onoff = (volatile uint32_t *)INGAME_CHEAT_ONOFF;
+					volatile uint16_t *onoff = (volatile uint16_t *)INGAME_CHEAT_ONOFF;
 					*onoff = *onoff == 1 ? 0 : 1;
 					slot_update(m.title + m.cursor);
 				}
@@ -1444,7 +1588,11 @@ uint32_t ov_entry(const struct ingame_call *call)
 
 	build_page(PAGE_MENU, 0);
 	uint16_t dispcnt = REG_DISPCNT;
-	vsync();
+	// The panel at the next VBlank, or in this one if it has lines left:
+	// the stub's copies end anywhere in the frame, and waiting out a VBlank
+	// already begun cost the opening a frame
+	if (REG_VCOUNT < SCREEN_H || REG_VCOUNT > VBLANK_LATE)
+		vsync();
 	REG_BLDCNT = 0x3F00;  // every layer a second target: the cover blends over them
 	REG_BLDALPHA = DIM_EVB << 8;
 	REG_DISPCNT = (uint16_t)((dispcnt & ~DISPCNT_OFF_BITS) | DISPCNT_OBJ | DISPCNT_1D);

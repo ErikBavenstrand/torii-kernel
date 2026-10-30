@@ -48,7 +48,7 @@
 // places in PSRAM; and what one read from the card takes
 #define CHEATSTORE_PART 1024
 #define CHEATSTORE_CHUNK 4096
-// The cheat screen's detail view: its text and wrapped rows
+// The cheat screen's Guide page: its text and wrapped rows
 #define CHEATSTORE_DETAIL 2048
 #define CHEATSTORE_DETAIL_ROWS 64
 // A larger file's windows: at most CHEATSTORE_WINDOWS, each in a slot of
@@ -117,7 +117,7 @@ struct cheatstore {
 	// cheatstore_clean's: each staying cheat's status and hash, as read before
 	u32 sig[CHEATFILE_MAX];
 	struct cheatstore_walk walk;  // cheatstore_clean_all's
-	// The cheat screen's detail view (ui/ui_reading.h): a cheat's name, code
+	// The cheat screen's Guide page (ui/ui_reading.h): a cheat's name, activation, guide, code
 	// and what decoding found
 	char detail[CHEATSTORE_DETAIL];
 	u16 detail_start[CHEATSTORE_DETAIL_ROWS];
@@ -206,12 +206,14 @@ void cheatstore_decode_to(u32 i);
 // that can't be picked greyed: known once it is parsed), kept for
 // cheatstore_peek with the file's size and date on the card
 s32 cheatstore_listed(void);
-// The code keypad's edits (cheatfile.h's) to the read file's text in PSRAM:
+// The code keypad's and the Cheats page's edits (cheatfile.h's) to the read file's text in PSRAM:
 // enum cheatfile_edit, CHEATFILE_EDIT_FAILED once a PSRAM write has failed.
 // The caller decodes again and writes the file.
 u32 cheatstore_add(const char *desc, const char *code, u8 format, u32 *index);
 u32 cheatstore_set_code(u32 i, const char *desc, const char *code, u8 format);
 u32 cheatstore_rename(u32 i, const char *desc);
+u32 cheatstore_set_keys(u32 i, u16 keys);
+u32 cheatstore_set_guide(u32 i, const char *guide);
 u32 cheatstore_remove(u32 i);
 // cheatfile_can_add for the read file in its PSRAM room (CHEATFILE_EDIT_FAILED
 // once a PSRAM write has failed)
@@ -266,18 +268,13 @@ int cheatstore_drop(void);
 // written into it, nothing read again, but for any past its end or over the
 // kernel's own patches (rom_guard_hits, GBApatch.h): left out and logged. A
 // game without a cheat file, or with none picked, gets none.
-// The first pass also writes the in-game list (source/ingame.h: every pick,
-// then other cheats up to INGAME_CHEATS, in file order) to cart SRAM, and
-// puts the listed cheats that weren't picked in the table after the picks,
-// off (gl_cheat_off), as many as fit its bytes, the toggles' 64 bits and the
-// load cap with every pick on (each off costs CHEAT_LOAD(CHEAT_COST_SKIP)).
+// The first pass also writes the in-game list (source/ingame.h: the picks
+// shown, up to INGAME_CHEATS, in file order, each with its activation) to
+// cart SRAM.
 #define CHEATSTORE_ROM_PATCHES CHEATFILE_PICKED_PATCHES_MAX
 void cheatstore_launch(const char *rom_path, u32 psram_bytes);
 extern u32 gl_cheat_patches;
 // No cheats for this launch: the table, the patches and the in-game list
 void cheatstore_launch_none(void);
-// The table without its extras (the patch area has no room for them): the
-// in-game list's extras lose their toggles
-void cheatstore_drop_extras(void);
 
 #endif

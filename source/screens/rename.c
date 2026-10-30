@@ -30,18 +30,20 @@ static const struct rename_look {
 	u8 clip_gap;                            // between the name's clip and the counter
 	u8 caret_w, caret_h, caret_dy;          // the caret, below the line's top
 	u8 caret_gap;                           // px the text after it moves right
-	u8 grid_x, grid_y;                      // the first key cell
-	u8 col_w, pitch;                        // a cell
+	u8 grid_x;                              // the first key cell's left (grids: its top)
+	u8 col_w;                               // a cell's width
 	u8 key_inset, key_radius;               // a key's pill in its cell
 	u8 ok_radius;                           // the chosen OK's ring
 	u8 ok_inset;                            // and its pill inside the ring
-	u8 func_text_dy;                        // a function key's word below its cell's top
-	u8 shift_dy, shift_gap;                 // the shift arrow below the cell's top; arrow to word
+	u8 shift_gap;                           // the shift arrow to its word
 	u8 blink;                               // frames the caret shows, then hides
 	u8 counter_blink;                       // frames the counter hides when a key is refused
 	u8 message;                             // frames a refusal shows in the hint area
 	u8 grid_delay, grid_every;              // held d-pad and A: first repeat, then every
 	u8 edit_delay, edit_every;              // held B, L and R
+	// A text of lines (rename_ask.lines): its field's card and text, its
+	// lines' pitch and how many show, its scroll mark's column
+	u8 lines_field_h, lines_text_x, lines_text_y, lines_right, lines_shown, lines_mark_x;
 } look = {
 	.field_x = 4,
 	.field_y = 21,
@@ -60,15 +62,11 @@ static const struct rename_look {
 	.caret_dy = 1,
 	.caret_gap = 2,
 	.grid_x = 15,
-	.grid_y = 47,
 	.col_w = 21,
-	.pitch = 18,
 	.key_inset = 1,
 	.key_radius = 3,
 	.ok_radius = 4,
 	.ok_inset = 2,
-	.func_text_dy = 3,
-	.shift_dy = 5,
 	.shift_gap = 3,
 	.blink = 30,
 	.counter_blink = 6,
@@ -77,6 +75,25 @@ static const struct rename_look {
 	.grid_every = 6,
 	.edit_delay = 16,
 	.edit_every = 4,
+	.lines_field_h = 28,
+	.lines_text_x = 10,
+	.lines_text_y = 23,
+	.lines_right = 228,
+	.lines_shown = 2,
+	.lines_mark_x = 231,
+};
+
+// The keys' grid in each layout: its top, a cell's height, and where a
+// cell's letter, a function key's word and the shift arrow sit in it (a
+// text of lines' grid is a little shorter, under its two-line field)
+struct grid_look {
+	u8 y, pitch;
+	s8 letter_dy;
+	u8 func_text_dy, shift_dy;
+};
+static const struct grid_look grids[2] = {
+	{47, 18, 0, 3, 5},
+	{56, 16, -1, 2, 4},
 };
 
 // The layout's rectangles (whole tiles)
@@ -97,13 +114,16 @@ enum {
 	MARK_SHIFT,
 	MARK_SHIFT_ON,
 	MARK_DELETE,
+	MARK_ENTER,
 };
 static const u16 mark_bits[] ALIGN(4) = {
 	0x08,  0x14,  0x22,  0x63,  0x22,  0x22,  0x3E,                 // shift
 	0x08,  0x1C,  0x3E,  0x7F,  0x3E,  0x3E,  0x3E,                 // shift on
 	0x7F8, 0x804, 0x912, 0x8A1, 0x841, 0x8A1, 0x912, 0x804, 0x7F8,  // delete
+	0x100, 0x100, 0x104, 0x106, 0x1FF, 0x006, 0x004,                // enter
 };
-static const struct torii_glyph mark_glyphs[] = {{0, 8, 0, 7, 7}, {14, 8, 0, 7, 7}, {28, 13, 0, 9, 12}};
+static const struct torii_glyph mark_glyphs[] = {
+	{0, 8, 0, 7, 7}, {14, 8, 0, 7, 7}, {28, 13, 0, 9, 12}, {46, 11, 0, 7, 9}};
 static const struct torii_font marks = {mark_glyphs, (const uint8_t *)mark_bits, 9, 0, 2, 12};
 
 // --- State ---------------------------------------------------------------------
@@ -132,6 +152,8 @@ static struct {
 	u8 caret_on;
 	u8 counter_off;  // frames the counter stays hidden
 	u8 message;      // frames the hint area's refusal stays
+	u8 top;          // a text of lines: the first line the field shows
+	const struct grid_look *grid;  // the keys' grid's look
 	u16 armed;       // repeat keys whose press the page took
 	u32 down_at[REPEATS];   // frame_count() when each went down
 	u16 held_was[REPEATS];  // and its held frames at the last look
@@ -190,6 +212,8 @@ static u32 char_len(const char *s, u32 at, u32 len)
 	return n;
 }
 
+static void paint_field_lines(const struct text_window *win, u32 ox, u32 oy, int fresh);
+
 // The field: its card and chips once a set, then the name's line each time
 static void paint_field(void *ctx, u8 nd, const struct text_window *win, u32 set, int fresh)
 {
@@ -198,6 +222,10 @@ static void paint_field(void *ctx, u8 nd, const struct text_window *win, u32 set
 	const struct ui_theme *t = ui_theme();
 	const struct torii_font *font = t->body;
 	u32 ox = (u32)ui_node(nd)->x, oy = (u32)ui_node(nd)->y;
+	if (kb.ask->lines) {
+		paint_field_lines(win, ox, oy, fresh);
+		return;
+	}
 	if (fresh) {
 		paint_card_fill(win, look.field_x - ox, look.field_y - oy, look.field_w, look.field_h,
 				t->look.card_radius, t->look.shadow_offset, UI_ROLE_PANEL);
@@ -243,21 +271,107 @@ static void paint_field(void *ctx, u8 nd, const struct text_window *win, u32 set
 		text_draw(win, font, x, y, right - x, UI_ROLE_FAINT, ext, strlen(ext));
 }
 
+// --- A text of lines' field ------------------------------------------------------
+
+#define LINES_MAX 64  // lines a text of lines wraps into (255 bytes of line breaks fill more: cut)
+
+// Where each line of s (len bytes) starts, wrapped to width px in font: at a
+// line break, else after the last space that fits (inside a word longer
+// than a line); returns the lines (at least one)
+static u32 wrap_lines(const struct torii_font *font, const char *s, u32 len, u32 width, u16 *starts)
+{
+	u32 n = 1, pos = 0, x = 0, space = 0;  // space: where a break after the line's last space goes, 0 none
+	starts[0] = 0;
+	while (pos < len && n < LINES_MAX) {
+		if (s[pos] == '\n') {
+			starts[n++] = (u16)++pos;
+			x = 0;
+			space = 0;
+			continue;
+		}
+		u32 at = pos;
+		int g = text_next_glyph(s, len, &pos);
+		u32 adv = g >= 0 ? font->glyphs[g].advance : 0;
+		if (x + adv > width && at > starts[n - 1]) {
+			u32 brk = space > starts[n - 1] ? space : at;
+			starts[n++] = (u16)brk;
+			x = text_width(font, s + brk, pos - brk);
+			space = s[at] == ' ' ? pos : 0;
+			continue;
+		}
+		x += adv;
+		if (s[at] == ' ')
+			space = pos;
+	}
+	return n;
+}
+
+// The field of a text of lines: its card once a set, then look.lines_shown
+// lines of the text wrapped, scrolled to keep the caret's line in view, and
+// a faint mark at the right of where they are in it
+static void paint_field_lines(const struct text_window *win, u32 ox, u32 oy, int fresh)
+{
+	const struct ui_theme *t = ui_theme();
+	const struct torii_font *font = t->body;
+	if (fresh)
+		paint_card_fill(win, look.field_x - ox, look.field_y - oy, look.field_w, look.lines_field_h,
+				t->look.card_radius, t->look.shadow_offset, UI_ROLE_PANEL);
+	u32 x0 = look.lines_text_x - ox, y0 = look.lines_text_y - oy, lh = font->line_height;
+	u32 shown = look.lines_shown, width = look.lines_right - look.lines_text_x;
+	text_clear(win, x0, y0, look.lines_mark_x + 2 - look.lines_text_x, shown * lh, UI_ROLE_PANEL);
+	u16 starts[LINES_MAX];
+	const char *s = kb.e.text;
+	u32 len = kb.e.len, n = wrap_lines(font, s, len, width - look.caret_gap, starts), at = 0;
+	while (at + 1 < n && starts[at + 1] <= kb.e.caret)
+		at++;
+	if (at < kb.top)
+		kb.top = (u8)at;
+	if (at >= kb.top + shown)
+		kb.top = (u8)(at + 1 - shown);
+	if (kb.top + shown > n)
+		kb.top = (u8)(n > shown ? n - shown : 0);
+	for (u32 i = kb.top; i < n && i < kb.top + shown; i++) {
+		u32 from = starts[i], to = i + 1 < n ? starts[i + 1] : len, y = y0 + (i - kb.top) * lh;
+		if (to > from && s[to - 1] == '\n')
+			to--;
+		if (i != at) {
+			text_draw(win, font, x0, y, width, UI_ROLE_TEXT, s + from, to - from);
+			continue;
+		}
+		// The caret's line: the text after the caret moved right of it
+		u32 caret = kb.e.caret < to ? kb.e.caret : to;
+		u32 x = caret > from ? text_draw(win, font, x0, y, width, UI_ROLE_TEXT, s + from, caret - from) : x0;
+		if (kb.caret_on)
+			paint_fill(win, x, y + look.caret_dy, look.caret_w, look.caret_h, UI_ROLE_ACCENT);
+		x += look.caret_gap;
+		if (to > caret)
+			text_draw(win, font, x, y, x0 + width > x ? x0 + width - x : 1, UI_ROLE_TEXT, s + caret,
+				  to - caret);
+	}
+	// Where the lines shown are in the text: a short bar in the field's
+	// right margin, the whole height when all show
+	if (n > shown) {
+		u32 h = shown * lh, bar = h * shown / n, y = y0 + (h - bar) * kb.top / (n - shown);
+		paint_fill(win, look.lines_mark_x - ox, y, 2, bar, UI_ROLE_TRACK);
+	}
+}
+
 // Character key (r, c), its cell cleared first unless the grid was
 // (transparent: the card shows)
 static void paint_cell(const struct text_window *win, u32 ox, u32 oy, u32 r, u32 c, int clear)
 {
 	const struct torii_font *font = ui_theme()->heading;
-	u32 x = look.grid_x + c * look.col_w - ox, y = look.grid_y + r * look.pitch - oy, in = look.key_inset;
+	u32 x = look.grid_x + c * look.col_w - ox, y = kb.grid->y + r * kb.grid->pitch - oy, in = look.key_inset;
 	if (clear)
-		paint_fill(win, x, y, look.col_w, look.pitch, 0);
+		paint_fill(win, x, y, look.col_w, kb.grid->pitch, 0);
 	if (kb.sel.row == r && kb.sel.col == c)
-		paint_round_fill(win, x + in, y + in, look.col_w - 2 * in, look.pitch - 2 * in, look.key_radius,
+		paint_round_fill(win, x + in, y + in, look.col_w - 2 * in, kb.grid->pitch - 2 * in, look.key_radius,
 				 UI_ROLE_TINT);
 	struct paint_label lb;
 	u32 ch = rename_key(kb.page, kb.upper, r, c);
 	paint_label_char(font, ch, &lb);
-	paint_blit_centred(win, font, x, y, look.col_w, rename_is_letter(ch) ? UI_ROLE_TEXT : UI_ROLE_DIM, &lb);
+	paint_blit_centred(win, font, x, (u32)((s32)y + kb.grid->letter_dy), look.col_w,
+			   rename_is_letter(ch) ? UI_ROLE_TEXT : UI_ROLE_DIM, &lb);
 }
 
 // A function key's word centred in its cell, func_text_dy below its top
@@ -265,7 +379,7 @@ static void func_word(const struct text_window *win, u32 x, u32 y, u32 w, const 
 {
 	struct paint_label lb;
 	paint_label_text(ui_theme()->body, word, &lb);
-	paint_blit_centred(win, ui_theme()->body, x, y + look.func_text_dy, w, role, &lb);
+	paint_blit_centred(win, ui_theme()->body, x, y + kb.grid->func_text_dy, w, role, &lb);
 }
 
 // The function row: paper keys, OK solid in the item's colour
@@ -273,12 +387,14 @@ static void paint_funcs(const struct text_window *win, u32 ox, u32 oy, int clear
 {
 	const struct torii_font *font = ui_theme()->body;
 	u32 chosen = kb.sel.row == RENAME_FUNC_ROW ? rename_func_at(kb.sel.col) : RENAME_FUNCS;
-	u32 y = look.grid_y + RENAME_FUNC_ROW * look.pitch - oy, h = look.pitch, in = look.key_inset;
+	u32 y = kb.grid->y + RENAME_FUNC_ROW * kb.grid->pitch - oy, h = kb.grid->pitch, in = look.key_inset;
 	if (clear)
 		text_clear(win, look.grid_x - ox, y, RENAME_COLS * look.col_w, h, 0);
 	for (u32 k = 0; k < RENAME_FUNCS; k++) {
 		u32 x = look.grid_x + rename_func_col(k) * look.col_w - ox, w = rename_func_span[k] * look.col_w;
 		int on = k == chosen;
+		if (!w)
+			continue;  // not in this layout
 		if (k == RENAME_KEY_OK) {
 			u32 i = on ? look.ok_inset : in;
 			if (on)
@@ -301,8 +417,8 @@ static void paint_funcs(const struct text_window *win, u32 ox, u32 oy, int clear
 			u32 gw = marks.glyphs[mark.glyphs[0]].width;
 			u32 gx = x + (w - (gw + look.shift_gap + lb.advance) + 1) / 2;
 			u32 role = kb.upper ? UI_ROLE_TEXT : UI_ROLE_DIM;
-			paint_blit(win, &marks, gx, y + look.shift_dy, role, &mark);
-			paint_blit(win, font, gx + gw + look.shift_gap, y + look.func_text_dy, role, &lb);
+			paint_blit(win, &marks, gx, y + kb.grid->shift_dy, role, &mark);
+			paint_blit(win, font, gx + gw + look.shift_gap, y + kb.grid->func_text_dy, role, &lb);
 			break;
 		}
 		case RENAME_KEY_LATIN:
@@ -311,10 +427,12 @@ static void paint_funcs(const struct text_window *win, u32 ox, u32 oy, int clear
 		case RENAME_KEY_SPACE:
 			func_word(win, x, y, w, S(STR_RENAME_KEY_SPACE), UI_ROLE_DIM);
 			break;
+		case RENAME_KEY_ENTER:
 		case RENAME_KEY_DELETE: {
-			const struct torii_glyph *g = &marks.glyphs[MARK_DELETE];
+			u32 id = k == RENAME_KEY_ENTER ? MARK_ENTER : MARK_DELETE;
+			const struct torii_glyph *g = &marks.glyphs[id];
 			struct paint_label mark;
-			paint_label_glyph(&marks, MARK_DELETE, &mark);
+			paint_label_glyph(&marks, id, &mark);
 			paint_blit(win, &marks, x + (w - g->width + 1) / 2, y + (h - g->rows) / 2 + 1, UI_ROLE_DIM,
 				   &mark);
 			break;
@@ -335,8 +453,8 @@ static void paint_keys(void *ctx, u8 n, const struct text_window *win, u32 set, 
 	struct drawn *d = &kb.drawn[set & 1];
 	int all = fresh || d->page != kb.page || d->upper != kb.upper;
 	if (all && !fresh)
-		text_clear(win, look.grid_x - ox, look.grid_y - oy, RENAME_COLS * look.col_w,
-			   RENAME_CHAR_ROWS * look.pitch, 0);
+		text_clear(win, look.grid_x - ox, kb.grid->y - oy, RENAME_COLS * look.col_w,
+			   RENAME_CHAR_ROWS * kb.grid->pitch, 0);
 	for (u32 r = 0; r < RENAME_CHAR_ROWS; r++)
 		for (u32 c = 0; c < RENAME_COLS; c++)
 			if (all || (r == d->sel.row && c == d->sel.col) || (r == kb.sel.row && c == kb.sel.col))
@@ -377,14 +495,35 @@ static const struct ui_spec nodes[N_NODES] = {
 	[N_KEYS] = {UI_CANVAS, 5, UI_NONE, 1, UI_LEFT, 0, 0, 0, KEYS_X, KEYS_Y, KEYS_W, KEYS_H, &keys_canvas},
 };
 
+// A text of lines': a two-line field over a grid a little shorter (grids[1])
+#define LINES_FIELD_H 40
+#define LINES_KEYS_Y 56
+#define LINES_KEYS_H 88
+#define LINES_CARD_Y 48
+#define LINES_CARD_H 96
+#define LINES_FIELD_CYCLES 70000
+static const struct ui_card_config lines_card = {4, 4, 4, 3, 0};  // body 4..236 x 52..141
+static const struct ui_canvas_config lines_canvas = {paint_field, LINES_FIELD_CYCLES};
+static const struct ui_spec lines_nodes[N_NODES] = {
+	[N_TITLE] = {UI_TITLE, 1, UI_NONE, 3, UI_HFILL, 0, 0, 0, 0, 0, 0, TITLE_H, &title_config},
+	[N_HINTS] = {UI_HINTS, 2, UI_NONE, 3, UI_HFILL | UI_BOTTOM, 0, 0, 0, 0, 0, 0, HINTS_H, &no_hints},
+	[N_CARD] = {UI_CARD, 3, UI_NONE, 2, UI_HFILL, 0, 0, 0, 0, LINES_CARD_Y, 0, LINES_CARD_H, &lines_card},
+	[N_FIELD] = {UI_CANVAS, 4, UI_NONE, 1, UI_HFILL, 0, 0, 0, 0, FIELD_Y, 0, LINES_FIELD_H, &lines_canvas},
+	[N_KEYS] = {UI_CANVAS, 5, UI_NONE, 1, UI_LEFT, 0, 0, 0, KEYS_X, LINES_KEYS_Y, KEYS_W, LINES_KEYS_H,
+		    &keys_canvas},
+};
+
 static int rename_event(struct ui_view *v, const struct ui_event *e);
 static const struct ui_view_spec view = {"rename", nodes, N_NODES, UI_NONE, 0, rename_event};
+static const struct ui_view_spec lines_view = {"rename", lines_nodes, N_NODES, UI_NONE, 0, rename_event};
 
 // --- Changes ---------------------------------------------------------------------
 
 static void field_changed(void)
 {
 	snprintf(kb.counter, sizeof(kb.counter), "%lu/%u", (unsigned long)rename_edit_chars(&kb.e), kb.e.max);
+	if (kb.ask->lines)
+		ui_title_set_right(node(N_TITLE), kb.counter);  // the field has no room for it
 	kb.blink = 0;  // the caret shows at once after any key
 	kb.caret_on = 1;
 	ui_canvas_redraw(node(N_FIELD));
@@ -466,6 +605,9 @@ static void press_key(int fresh)
 		break;
 	case RENAME_KEY_SPACE:
 		type(' ');
+		break;
+	case RENAME_KEY_ENTER:
+		type('\n');
 		break;
 	case RENAME_KEY_DELETE:
 		delete_back(0);
@@ -576,13 +718,14 @@ static void repeat(void)
 // then the page's submit
 static void ok(void)
 {
-	u32 n = rename_edit_result(&kb.e, kb.e.text, kb.ask->file);
+	u32 n = rename_edit_result(&kb.e, kb.e.text,
+				   (kb.ask->file ? RENAME_FILE : 0u) | (kb.ask->lines ? RENAME_LINES : 0u));
 	if (n != kb.e.len) {
 		kb.e.len = (u16)n;
 		kb.e.caret = (u16)n;
 	}
 	field_changed();
-	if (!n) {
+	if (!n && !kb.ask->lines) {
 		message(S(STR_RENAME_EMPTY));
 	} else if (rename_edit_chars(&kb.e) > kb.e.max) {
 		char text[sizeof(kb.msg)];
@@ -644,14 +787,17 @@ int rename_run(const struct rename_ask *ask)
 	memset(&kb, 0, sizeof(kb));
 	kb.ask = ask;
 	rename_edit_init(&kb.e, ask->name, ask->max);
+	kb.e.bytes = ask->lines != 0;  // a text of lines is a .cht value (a guide): its cap is the file's bytes
 	kb.orig_len = kb.e.len;
 	kb.orig_hash = name_hash(kb.e.text, kb.e.len);
 	kb.sel.row = 1;  // on q
 	kb.caret_on = 1;
+	kb.grid = &grids[ask->lines != 0];
+	rename_layout((ask->file ? RENAME_FILE : 0u) | (ask->lines ? RENAME_LINES : 0u));
 	ui_leave(UI_TR_DEEPER, 1);
 	while (ui_depth())
 		ui_pop();
-	struct ui_view *v = ui_push(&view, &kb);
+	struct ui_view *v = ui_push(ask->lines ? &lines_view : &view, &kb);
 	if (!v) {
 		tlog_error("rename: %s", ui_error());
 		return 0;

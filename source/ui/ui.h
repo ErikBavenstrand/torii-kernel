@@ -871,6 +871,10 @@ void ui_title_set_sub(u8 node, const char *text);
 // it can't (no room: the old icon stays)
 int ui_title_icon_set(u8 node, u32 icon);
 void ui_hints_set(u8 node, const struct ui_hint *hints, u32 count);
+// The px the hint bar takes for count hints, with a note beside them
+// (ui_hints_note's beside; NULL none), its margins included: more than the
+// bar's width, and the note is cut
+u32 ui_hints_width(const struct ui_hint *hints, u32 count, const char *note);
 void ui_hints_text(u8 node, const char *text);  // centred; NULL: back to the chips
 // The text line's look (ui_hints_note): its ink, and a short bar before it
 // (the Settings page's countdown while it waits for a hotkey), the two

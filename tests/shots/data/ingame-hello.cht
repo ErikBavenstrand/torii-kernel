@@ -1,0 +1,39 @@
+cheats = 9
+
+cheat0_desc = "(M) Must Be On"
+cheat0_code = "0000ABCD 0007+100F68A4 0007"
+cheat0_enable = false
+
+cheat1_desc = "Infinite lives"
+cheat1_code = "32001000 0063"
+cheat1_enable = true
+
+cheat2_desc = "Super speed while L and SELECT are held down, in every level"
+cheat2_code = "32001008 0001"
+cheat2_enable = true
+cheat2_keys = "hold L+Select"
+
+cheat3_desc = "Moon jump"
+cheat3_code = "74000130 03FE+32001004 0001"
+cheat3_enable = true
+
+cheat4_desc = "Not picked"
+cheat4_code = "3200100E 0001"
+cheat4_enable = false
+
+cheat5_desc = "Warp to the start"
+cheat5_code = "3200100C 0001"
+cheat5_enable = true
+cheat5_keys = "press Select+Up"
+
+cheat6_desc = "A or B"
+cheat6_code = "74000130 03FE+32001010 0001+74000130 03FD+32001012 0001"
+cheat6_enable = true
+
+cheat7_desc = "Skip the intro"
+cheat7_code = "08001000:46C0"
+cheat7_enable = true
+
+cheat8_desc = "Pick a level"
+cheat8_code = "3300075C+00??"
+cheat8_enable = true

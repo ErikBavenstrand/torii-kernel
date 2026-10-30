@@ -80,8 +80,8 @@ int slot_flow_name_prompt(const char *rom, const char *title, const char *initia
 	fl.own = own;
 	fl.out[0] = 0;
 	// A new slot's name from a file is a suggestion: OK keeps it as it is
-	const struct rename_ask ask = {ART_ICON16_TORII, initial, NULL,  SAVESLOT_NAME_CHARS,     1,
-				       name_submit,      0,       title, (u8)(!own && initial[0])};
+	const struct rename_ask ask = {ART_ICON16_TORII, initial, NULL,  SAVESLOT_NAME_CHARS,      1,
+				       name_submit,      0,       title, (u8)(!own && initial[0]), 0};
 	if (!rename_run(&ask) || !fl.out[0])
 		return SLOT_FLOW_CANCEL;
 	memcpy(out, fl.out, SAVESLOT_NAME_BYTES);

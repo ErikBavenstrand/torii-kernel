@@ -21,6 +21,8 @@ enum {
 	KEY_FORMAT,
 	KEY_USER,
 	KEY_RENAMED,
+	KEY_KEYS,
+	KEY_GUIDE,
 	KEY_CHEAT,  // another cheatN_ key: kept, and numbered with its cheat
 	KEY_COUNT,  // "cheats"
 	KEY_OTHER,
@@ -30,7 +32,8 @@ const char *const cheatfile_format_names[CHEAT_FMT_VBA + 1] = {
 	NULL, "GSAv1", "GSAv1 raw", "PARv3", "PARv3 raw", "CodeBreaker", "VBA",
 };
 
-// A key "cheatN_desc", "_code", "_enable", "_format", "_user" or another
+// A key "cheatN_desc", "_code", "_enable", "_format", "_user", "_renamed",
+// "_keys", "_guide" or another
 // "cheatN_" one: which, with N in *number (0 to max - 1, else max) and its
 // digits' count in *digits; KEY_COUNT for "cheats", KEY_OTHER for any other
 // key
@@ -61,6 +64,10 @@ static u32 cheat_key(const char *k, u32 len, u32 max, u32 *number, u32 *digits)
 		return KEY_USER;
 	if (wl == 7 && !memcmp(what, "renamed", 7))
 		return KEY_RENAMED;
+	if (wl == 4 && !memcmp(what, "keys", 4))
+		return KEY_KEYS;
+	if (wl == 5 && !memcmp(what, "guide", 5))
+		return KEY_GUIDE;
 	return KEY_CHEAT;
 }
 
@@ -212,6 +219,10 @@ static void parse_kv(struct cheatfile *f, const struct kv *kv)
 		c->own = is_true(s, len) != 0;
 	} else if (what == KEY_RENAMED) {
 		c->renamed = is_true(s, len) != 0;
+	} else if (what == KEY_KEYS) {
+		c->keys = cheatkeys_parse(s, len);
+	} else if (what == KEY_GUIDE) {
+		c->guide = len <= CHEATFILE_GUIDE_LEN_MAX ? at << CHEATFILE_GUIDE_LEN_BITS | len : CHEATFILE_NONE;
 	} else if (what == KEY_ENABLE && len <= 0xFF) {  // a longer value isn't an enable line we could rewrite
 		c->enable = at;
 		c->enable_len = (u8)len;
@@ -303,6 +314,7 @@ void cheatfile_parse_part(struct cheatfile *f, const char *text, u32 len, struct
 		cheats[i] = (struct cheatfile_cheat){.desc = CHEATFILE_NONE,
 						     .code = CHEATFILE_NONE,
 						     .enable = CHEATFILE_NONE,
+						     .guide = CHEATFILE_NONE,
 						     .status = CHEATFILE_NEW,
 						     .number = (u16)(base + i)};
 	u32 pos = text_start(text, len);
@@ -403,6 +415,51 @@ u8 cheatfile_decode(struct cheatfile_work *w, struct cheat_decoder *dec, const c
 	}
 }
 
+// Cheat c's ops (n of them, lowered OK into w, act what they imply) gated
+// by its cheatN_keys when those say Hold or Press and the code doesn't
+// already: Hold puts its ops under one conditional, its buttons all held
+// (KEYINPUT & buttons == 0, as CodeBreaker's key test); Press under two, on
+// the interpreter's snapshots of the keys (cheatrun.s), its buttons all held
+// now and not all at the run before, so it runs once a press. Lowered
+// again; if that fails (it grows too big) it stays as it was. Returns 0 if
+// code that runs in game can't be gated, whatever its line says: it patches
+// the ROM too (a ROM write can't wait on a condition), there is no room for
+// the ops, or lowering failed; else 1.
+static int gate(struct cheatfile_work *w, u32 n, u16 keys, u16 act)
+{
+	if (act == CHEATKEYS_AT_LAUNCH || !w->n_prog)
+		return 1;  // nothing runs in game: set at launch, or nothing at all
+	if (w->n_patches || n + 2 > CHEATFILE_OPS_MAX)
+		return 0;
+	u32 mode = cheatkeys_mode(keys), g = mode == CHEATKEYS_PRESS ? 2 : 1;
+	if ((mode != CHEATKEYS_HOLD && mode != CHEATKEYS_PRESS) || !cheatkeys_valid(keys) ||
+	    (mode == CHEATKEYS_HOLD && keys == act))
+		return 1;
+	memmove(w->ops + g, w->ops, n * sizeof(w->ops[0]));
+	memset(w->ops, 0, g * sizeof(w->ops[0]));
+	u32 buttons = cheatkeys_buttons(keys);
+	w->ops[0].type = CHEAT_OP_IF_NAND;
+	w->ops[0].width = 2;
+	w->ops[0].value = buttons;
+	w->ops[0].count = n + g - 1;
+	w->ops[0].address = mode == CHEATKEYS_PRESS ? CHEAT_KEYS_NOW : CHEAT_KEYINPUT;
+	if (mode == CHEATKEYS_PRESS) {
+		w->ops[1].type = CHEAT_OP_IF_AND;
+		w->ops[1].width = 2;
+		w->ops[1].value = buttons;
+		w->ops[1].count = n;
+		w->ops[1].address = CHEAT_KEYS_BEFORE;
+	}
+	u8 lowered = cheat_lower(w->ops, n + g, w->prog, CHEATFILE_PROG_MAX, &w->n_prog, &w->cost, w->patches,
+				 CHEATFILE_PATCHES_MAX, &w->n_patches);
+	memmove(w->ops, w->ops + g, n * sizeof(w->ops[0]));
+	if (lowered == CHEAT_LOWER_OK)
+		return 1;
+	cheat_lower(w->ops, n, w->prog, CHEATFILE_PROG_MAX, &w->n_prog, &w->cost, w->patches, CHEATFILE_PATCHES_MAX,
+		    &w->n_patches);
+	return 0;
+}
+
 s32 cheatfile_next(struct cheatfile *f, struct cheatfile_work *w)
 {
 	if (w->next >= f->count)
@@ -429,11 +486,15 @@ s32 cheatfile_next(struct cheatfile *f, struct cheatfile_work *w)
 		c->status = cheatfile_decode(w, &w->dec, f->text + c->code, c->code_len, &n_ops, &lowered);
 	}
 	c->detected = c->format != CHEAT_FMT_AUTO ? c->format : w->dec.last;
+	u16 act = c->status == CHEATFILE_OK ? cheatkeys_derive(w->ops, n_ops, w->n_patches != 0, w->n_prog != 0) : 0;
+	if (c->status == CHEATFILE_OK && !gate(w, n_ops, c->keys, act))
+		act |= CHEATFILE_ACT_UNGATED;
 	c->hash = c->status == CHEATFILE_OK ? program_hash(w) : 0;
 	if (c->status == CHEATFILE_OK && !cheat_has_effect(w->ops, n_ops))
 		c->status = CHEATFILE_NOTHING;
 	else if (c->status == CHEATFILE_OK && seen_before(w, c->hash))
 		c->status = CHEATFILE_SAME;
+	c->act = c->status == CHEATFILE_OK || c->status == CHEATFILE_SAME ? act : 0;
 	if (c->status != CHEATFILE_OK)
 		w->n_prog = w->n_patches = w->cost = 0;
 	c->bytes = (u16)(w->n_prog * 4);
@@ -445,6 +506,133 @@ s32 cheatfile_next(struct cheatfile *f, struct cheatfile_work *w)
 		f->patches += c->patches;
 	}
 	return (s32)i;
+}
+
+// --- Activation (cheatkeys.h) ------------------------------------------------
+
+// The buttons' names in the file, by enum cheatkeys_button
+static const char *const key_words[CHEATKEYS_BUTTON_COUNT] = {
+	"L", "R", "Select", "Start", "A", "B", "Up", "Down", "Left", "Right",
+};
+// The modes' words, by enum cheatkeys_mode (NONE has none)
+static const char *const mode_words[CHEATKEYS_MODES] = {NULL, "always", "hold", "press", "launch"};
+
+// 1 if the len bytes at s are word, in any case
+static int word_is(const char *s, u32 len, const char *word)
+{
+	if (strlen(word) != len)
+		return 0;
+	for (u32 i = 0; i < len; i++) {
+		char a = s[i], b = word[i];
+		if (a >= 'A' && a <= 'Z')
+			a = (char)(a + 32);
+		if (b >= 'A' && b <= 'Z')
+			b = (char)(b + 32);
+		if (a != b)
+			return 0;
+	}
+	return 1;
+}
+
+u16 cheatkeys_parse(const char *s, u32 len)
+{
+	u32 i = 0, mode = CHEATKEYS_NONE, held = 0;
+	while (i < len && is_space(s[i]))
+		i++;
+	u32 w = i;
+	while (i < len && !is_space(s[i]) && s[i] != '+')
+		i++;
+	for (u32 m = CHEATKEYS_ALWAYS; m < CHEATKEYS_MODES; m++)
+		if (word_is(s + w, i - w, mode_words[m]))
+			mode = m;
+	if (mode == CHEATKEYS_NONE)
+		return 0;
+	int buttons = mode == CHEATKEYS_HOLD || mode == CHEATKEYS_PRESS;
+	if (buttons && (i == len || !is_space(s[i])))
+		return 0;  // "hold" alone, or "hold+L"
+	// The buttons: each a word, '+' between, spaces around either
+	for (int want = buttons; want;) {
+		while (i < len && is_space(s[i]))
+			i++;
+		w = i;
+		while (i < len && !is_space(s[i]) && s[i] != '+')
+			i++;
+		u32 b = 0;
+		while (b < CHEATKEYS_BUTTON_COUNT && !word_is(s + w, i - w, key_words[b]))
+			b++;
+		if (b == CHEATKEYS_BUTTON_COUNT)
+			return 0;
+		held |= cheatkeys_bit(b);
+		while (i < len && is_space(s[i]))
+			i++;
+		want = i < len && s[i] == '+';
+		i += (u32)want;
+	}
+	while (i < len && is_space(s[i]))
+		i++;
+	return i == len ? CHEATKEYS(mode, held) : 0;
+}
+
+u32 cheatkeys_format(u16 v, char *out, u32 size)
+{
+	if (!size)
+		return 0;
+	out[0] = 0;
+	if (!v || !cheatkeys_valid(v))
+		return 0;
+	u32 n = (u32)snprintf(out, size, "%s", mode_words[cheatkeys_mode(v)]);
+	const char *sep = " ";
+	for (u32 b = 0; b < CHEATKEYS_BUTTON_COUNT && n < size; b++)
+		if (v & cheatkeys_bit(b)) {
+			n += (u32)snprintf(out + n, size - n, "%s%s", sep, key_words[b]);
+			sep = "+";
+		}
+	return n < size ? n : size - 1;
+}
+
+// The buttons a condition on KEYINPUT needs held: 1 with them in *held, 0
+// for a condition that isn't on KEYINPUT, -1 for one on KEYINPUT that
+// cheatkeys_derive can't read
+static int key_condition(const struct cheat_op *op, u32 *held)
+{
+	if (op->type == CHEAT_OP_IF_BUTTON) {
+		*held = CHEAT_BUTTON_KEYS;
+		return op->else_count ? -1 : 1;
+	}
+	if (op->type < CHEAT_OP_IF_EQ || op->type > CHEAT_OP_IF_NEVER || !op->width)
+		return 0;
+	u32 lo = op->address, hi = op->address + op->width;
+	if (hi <= CHEAT_KEYINPUT || lo >= CHEAT_KEYINPUT + 2)
+		return 0;
+	if (op->else_count)
+		return -1;
+	if (op->type == CHEAT_OP_IF_EQ && op->address == CHEAT_KEYINPUT && op->width == 2)
+		*held = ~op->value & CHEATKEYS_BUTTONS;
+	else if (op->type == CHEAT_OP_IF_NAND && op->address == CHEAT_KEYINPUT)
+		*held = op->value & CHEATKEYS_BUTTONS;
+	else if (op->type == CHEAT_OP_IF_NAND && op->address == CHEAT_KEYINPUT + 1 && op->width == 1)
+		*held = op->value << 8 & CHEATKEYS_BUTTONS;
+	else
+		return -1;
+	return *held ? 1 : -1;
+}
+
+u16 cheatkeys_derive(const struct cheat_op *ops, u32 n, int has_patches, int runs_in_game)
+{
+	u32 combo = 0;
+	for (u32 i = 0; i < n; i++) {
+		u32 held = 0;
+		int k = key_condition(&ops[i], &held);
+		if (k < 0 || (k > 0 && combo && held != combo))
+			return 0;
+		if (k > 0)
+			combo = held;
+	}
+	if (combo)
+		return CHEATKEYS(CHEATKEYS_HOLD, combo);
+	if (runs_in_game)
+		return CHEATKEYS_ALWAYS_ON;
+	return has_patches ? CHEATKEYS_AT_LAUNCH : 0;
 }
 
 // --- The written text's length, as picks change ------------------------------
@@ -1138,6 +1326,139 @@ u32 cheatfile_rename(struct cheatfile *f, const struct cheatfile_room *room, u32
 	picks_restore(f, &p, CHEATFILE_NONE);
 	f->edited = 1;
 	return CHEATFILE_EDIT_OK;
+}
+
+// The most lines of one key of a cheat an edit replaces or removes: past
+// them, a repeat stays (a file written by hand with more is refused)
+#define SAME_KEY_MAX 8
+
+// Cheat number n's lines of key what (KEY_KEYS or KEY_GUIDE) into kvs, in
+// order; how many (SAME_KEY_MAX + 1 if more)
+static u32 key_lines(const struct cheatfile *f, u32 n, u32 what, struct kv *kvs)
+{
+	u32 pos = text_start(f->text, f->len), found = 0;
+	struct kv kv;
+	while (next_kv(f->text, f->len, &pos, &kv)) {
+		u32 m = 0, d;
+		if (kv.klen && cheat_key(f->text + kv.key, kv.klen, top(f), &m, &d) == what && m == n) {
+			if (found == SAME_KEY_MAX)
+				return SAME_KEY_MAX + 1;
+			kvs[found++] = kv;
+		}
+	}
+	return found;
+}
+
+// Sets cheat i's lines of key what (named key) to value (NULL removes
+// them): the last one's value replaced and the others removed, or a line
+// added after its code line
+static u32 set_key_line(struct cheatfile *f, const struct cheatfile_room *room, u32 i, u32 what, const char *key,
+			const char *value)
+{
+	if (i >= f->count)
+		return CHEATFILE_EDIT_BAD;
+	const struct cheatfile_cheat *c = &f->cheats[i];
+	u32 n = c->number, k = 0;
+	struct kv kvs[SAME_KEY_MAX];
+	struct piece pcs[SAME_KEY_MAX + 1];
+	u32 found = key_lines(f, n, what, kvs);
+	if (found > SAME_KEY_MAX)
+		return CHEATFILE_EDIT_BAD;
+	if (!value && !found)
+		return CHEATFILE_EDIT_OK;  // nothing to remove
+	for (u32 j = 0; j < found; j++) {
+		if (value && j == found - 1)
+			pcs[k++] = (struct piece){kvs[j].val, kvs[j].vlen, PIECE_VALUE, 0, 0, 0, NULL, value, n};
+		else
+			pcs[k++] = (struct piece){
+				kvs[j].start, kvs[j].end - kvs[j].start, PIECE_NONE, 0, 0, 0, NULL, NULL, n};
+	}
+	if (value && !found) {
+		// After its code line (a line end first if that is the last, without one)
+		u32 end = line_end(f->text, f->len, c->code);
+		u8 brk = (u8)(f->text[end - 1] != '\n');
+		pcs[k++] = (struct piece){end, 0, PIECE_LINE, brk, 0, 0, key, value, n};
+	}
+	if (!fits(f, room->cap, pieces_delta(f, pcs, k)) || f->len + pieces_grow(f, pcs, k) > room->cap)
+		return CHEATFILE_EDIT_LONG;
+	struct picks p;
+	picks_save(f, &p);
+	reread(f, room->base, apply(f, room, pcs, k));
+	picks_restore(f, &p, CHEATFILE_NONE);
+	f->edited = 1;
+	return CHEATFILE_EDIT_OK;
+}
+
+u32 cheatfile_set_keys(struct cheatfile *f, const struct cheatfile_room *room, u32 i, u16 keys)
+{
+	char text[CHEATKEYS_TEXT_MAX];
+	if (!cheatkeys_valid(keys))
+		return CHEATFILE_EDIT_BAD;
+	cheatkeys_format(keys, text, sizeof(text));
+	return set_key_line(f, room, i, KEY_KEYS, "keys", keys ? text : NULL);
+}
+
+// The bytes of the UTF-8 character starting with byte c (1 for a stray
+// continuation byte)
+static u32 utf8_len(u8 c)
+{
+	return c >= 0xF0 ? 4 : c >= 0xE0 ? 3 : c >= 0xC0 ? 2 : 1;
+}
+
+u32 cheatfile_set_guide(struct cheatfile *f, const struct cheatfile_room *room, u32 i, const char *guide)
+{
+	char value[CHEATFILE_GUIDE_MAX + 1];
+	u32 n = 0;
+	for (const char *s = guide; *s;) {
+		if (*s == '\n' || (u8)*s < 0x20 || *s == 0x7F) {
+			// A line break as "\n"; any other control character dropped
+			if (*s++ == '\n') {
+				if (n + 2 > CHEATFILE_GUIDE_MAX)
+					break;
+				value[n++] = '\\';
+				value[n++] = 'n';
+			}
+			continue;
+		}
+		u32 cl = utf8_len((u8)*s), j = 1;
+		while (j < cl && s[j])
+			j++;
+		if (j < cl || n + cl > CHEATFILE_GUIDE_MAX)
+			break;  // a character cut short at the string's end, or past the cap
+		for (j = 0; j < cl; j++, s++)
+			value[n++] = *s == '"' ? '\'' : *s;
+	}
+	value[n] = 0;
+	return set_key_line(f, room, i, KEY_GUIDE, "guide", n ? value : NULL);
+}
+
+u32 cheatfile_guide(const struct cheatfile *f, u32 i, char *out, u32 size)
+{
+	if (!size)
+		return 0;
+	out[0] = 0;
+	if (i >= f->count || f->cheats[i].guide == CHEATFILE_NONE)
+		return 0;
+	const char *g = f->text + cheatfile_guide_at(&f->cheats[i]);
+	u32 len = cheatfile_guide_len(&f->cheats[i]), n = 0;
+	for (u32 r = 0; r < len;) {
+		if (g[r] == '\\' && r + 1 < len && g[r + 1] == 'n') {
+			if (n + 1 >= size)
+				break;
+			out[n++] = '\n';
+			r += 2;
+			continue;
+		}
+		u32 cl = utf8_len((u8)g[r]);
+		if (cl > len - r)
+			cl = len - r;
+		if (n + cl >= size)
+			break;
+		for (u32 j = 0; j < cl; j++)
+			out[n++] = g[r++];
+	}
+	out[n] = 0;
+	return n;
 }
 
 u32 cheatfile_remove(struct cheatfile *f, const struct cheatfile_room *room, u32 i)

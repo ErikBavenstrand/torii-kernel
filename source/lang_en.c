@@ -115,6 +115,32 @@ const char *const lang_en[STR_COUNT] = {
 	"cart memory was unavailable",  // ingame.refused_memory
 	"its copy in cart memory was damaged",  // ingame.refused_image
 	"the game",  // ingame.refused_game
+	"Always on",  // activation.always
+	"Hold {1}",  // activation.hold
+	"Press {1}",  // activation.press
+	"Set when the game starts",  // activation.launch
+	"L",  // button.l
+	"R",  // button.r
+	"SELECT",  // button.select
+	"START",  // button.start
+	"A",  // button.a
+	"B",  // button.b
+	"Up",  // button.up
+	"Down",  // button.down
+	"Left",  // button.left
+	"Right",  // button.right
+	"+",  // button.join
+	"{1}+{2}",  // button.more
+	"L",  // button.short.l
+	"R",  // button.short.r
+	"SEL",  // button.short.select
+	"START",  // button.short.start
+	"A",  // button.short.a
+	"B",  // button.short.b
+	"Up",  // button.short.up
+	"Down",  // button.short.down
+	"Left",  // button.short.left
+	"Right",  // button.short.right
 	"Can't read the microSD card.",  // boot.card_error
 	"Switch the console off and on.",  // boot.power_off
 	"Loading...",  // boot.loading
@@ -506,17 +532,39 @@ const char *const lang_en[STR_COUNT] = {
 	"drop",  // cheats.hint_drop
 	"menu",  // cheats.hint_menu
 	"all",  // cheats.hint_all
+	"guide",  // cheats.hint_guide
+	"Buttons",  // cheats.menu_buttons
+	"Edit guide",  // cheats.menu_edit_guide
+	"Guide",  // cheats.guide_title
+	"Too long for the file: {1} bytes at most",  // cheats.guide_long
+	"Buttons",  // cheats.buttons_sub
+	"Always on",  // cheats.buttons_always
+	"Hold",  // cheats.buttons_hold
+	"Press",  // cheats.buttons_press
+	"From the code",  // cheats.buttons_code
+	"Press buttons...",  // cheats.buttons_waiting
+	"not known",  // cheats.buttons_unknown
+	"At launch",  // cheats.buttons_launch
+	"On the whole time the game runs.",  // cheats.explain_always
+	"On while its buttons are held.",  // cheats.explain_hold
+	"Each press of its buttons sets it off.",  // cheats.explain_press
+	"As its code says.",  // cheats.explain_code
+	"It patches the game as it starts.",  // cheats.explain_locked
+	"It patches the game: no Hold or Press.",  // cheats.explain_ungated
+	"Hold the buttons, then let go.",  // cheats.explain_capture
+	"{1} opens the in-game menu.",  // cheats.taken_menu
+	"{1} puts the game to sleep.",  // cheats.taken_sleep
 	"No room: the file is full",  // cheats.add_full
 	"No room: the file is full",  // cheats.add_long
 	"Too big to run, even alone",  // cheats.big
-	"Details",  // cheats.menu_details
+	"Guide",  // cheats.menu_guide
 	"Turn all off",  // cheats.menu_all_off
 	"Show picked only",  // cheats.menu_only
 	"Show all",  // cheats.menu_all
 	"Picked",  // cheats.only_sub
 	"{1}/{2}",  // cheats.position
 	"{1} on",  // cheats.picks
-	"Details",  // cheats.details_sub
+	"Guide",  // cheats.guide_sub
 	"Format: {1}{2}",  // cheats.format
 	", set in the file",  // cheats.detail_set
 	", detected",  // cheats.detail_detected

@@ -8,6 +8,11 @@
 // QWERTY grid with digits on top, a Latin-1 page, and a function row:
 // Shift, àé&, Space, delete, Cancel and OK.
 //
+// A text of lines (rename_ask.lines, a cheat's guide) has a two-line field
+// that scrolls with the caret over a slightly shorter grid, Enter beside
+// Space, and keys for prose: , . ? ' beside the letters, : / ! and the
+// rest on the Latin-1 page. A name that isn't a file's has : ? / there too.
+//
 // Keys: the d-pad moves the selection (a press wraps at the edges, a held
 // key repeats and stops there), A types or runs the key, B deletes before
 // the caret, L and R move the caret, SELECT is Shift, START is OK. Cancel
@@ -34,6 +39,11 @@ struct rename_ask {
 	void *ctx;
 	const char *title;  // the title bar; NULL: "Rename"
 	u8 suggested;       // name is a suggestion (a new slot's): OK keeps it unchanged too
+	// A text of lines (a cheat's guide): a taller field that wraps it over
+	// two lines and scrolls to keep the caret's in view, an Enter key that
+	// types a line break, the counter in the title bar; OK keeps line breaks
+	// (not at the ends) and an empty text too (submit gets "")
+	u8 lines;
 };
 
 // Shows the keyboard until OK keeps a name (1) or it is cancelled, or the

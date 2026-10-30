@@ -134,6 +134,16 @@ void test_settings_capture(void)
 	CHECK_EQ(hold(&c, B | L, 20), SET_CAPTURE_WAIT);
 	CHECK_EQ(hold(&c, 0, 1), SET_CAPTURE_DONE);
 	CHECK_EQ(c.best, B | L);
+	// With b_ok (a cheat's buttons), B alone held is an answer; a tap still cancels
+	settings_capture_start(&c, 0, 18, 300);
+	c.b_ok = 1;
+	CHECK_EQ(hold(&c, B, 40), SET_CAPTURE_WAIT);
+	CHECK_EQ(hold(&c, 0, 1), SET_CAPTURE_DONE);
+	CHECK_EQ(c.best, B);
+	settings_capture_start(&c, 0, 18, 300);
+	c.b_ok = 1;
+	CHECK_EQ(hold(&c, B, 2), SET_CAPTURE_WAIT);
+	CHECK_EQ(hold(&c, 0, 1), SET_CAPTURE_CANCEL);
 	// The answer let go and B pressed on the same frame: the answer stands,
 	// and B is a press of its own (the page's, after)
 	settings_capture_start(&c, 0, 18, 300);

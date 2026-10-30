@@ -22,14 +22,12 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path);
 // loads (cart SRAM keeps it; the game takes PSRAM, where the names are):
 // none listed yet; list entry n (name: len bytes of UTF-8; its cheatN_
 // number and its index in the file, its INGAME_CHEAT_* flags, toggle bit and
-// cycles); entry n's flags, bit and cycles again; how many are listed and
-// in the table; and the table cut to its first table cheats (the extras
-// left out: they lose their toggles).
+// cycles, and its activation, cheatkeys.h: the list's footer shows its
+// sentence); how many are listed and in the table. A name cut in its row
+// goes whole to INGAME_SRAM_WIDE too, for the row's marquee.
 void ingame_cheats_clear(void);
-void ingame_cheat_put(u32 n, const char *name, u32 len, u32 number, u32 index, u32 flags, u32 bit, u32 cost);
-void ingame_cheat_meta(u32 n, u32 flags, u32 bit, u32 cost);
+void ingame_cheat_put(u32 n, const char *name, u32 len, u32 number, u32 index, u32 flags, u32 bit, u32 cost, u16 act);
 void ingame_cheats_set(u32 count, u32 table);
-void ingame_cheats_trim(u32 table);
 
 // The save states (P3, statestore.h) of a GBA launch with Save states on,
 // for the game at rom_path (file name rom_name) in its save slot: an old

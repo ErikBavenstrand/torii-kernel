@@ -1,0 +1,52 @@
+# The cheat screen's activations and guides (source/screens/cheats.c,
+# docs/plans/cheat-guides.md) on a Hello.cht with guides and a keys line,
+# in the light theme: Infinite lives, always on, has every key in the hint
+# bar (list); Moon jump's code holds A: its row's tag and its sentence
+# beside the keys (hold); SELECT opens its Guide page, the sentence in a
+# box over its guide, a divider, then the code (guide); Infinite lives'
+# long guide (long), scrolled to its details (scrolled); Skip the intro, a
+# ROM patch with no guide: the box over its details (none); its Buttons
+# page, locked: it is set at launch whatever is chosen (locked).
+#! settings 28=1
+#! sd-file /torii/cheats/Hello.cht 0 tests/shots/data/guide-hello.cht
+# The tests' hook: lists open on their first row (else a list opens on
+# Hello, the game Recent played last)
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-k @8:RIGHT -k @12:- -k @20:RIGHT -k @24:- -k @32:RIGHT -k @36:-
+-k @80:START -k @84:-
+-w "screen ready: game-popup"
+-k @12:DOWN -k @16:- -k @24:DOWN -k @28:-
+-k @48:A -k @52:-
+-w "screen ready: cheats"
+-s @16:list.png
+-k @20:DOWN -k @24:- -k @32:DOWN -k @36:-
+-s @52:hold.png
+-k @60:SELECT -k @64:-
+-w "screen ready: cheat-guide"
+-s @8:guide.png
+-k @16:B -k @20:-
+-w "screen ready: cheats"
+-k @8:UP -k @12:- -k @20:UP -k @24:-
+-k @36:SELECT -k @40:-
+-w "screen ready: cheat-guide"
+-s @8:long.png
+-k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @40:DOWN -k @44:- -k @52:DOWN -k @56:- -k @64:DOWN -k @68:-
+-s @84:scrolled.png
+-k @92:B -k @96:-
+-w "screen ready: cheats"
+-k @8:UP -k @12:- -k @20:UP -k @24:- -k @32:UP -k @36:-
+-k @48:SELECT -k @52:-
+-w "screen ready: cheat-guide"
+-s @8:none.png
+-k @16:B -k @20:-
+-w "screen ready: cheats"
+-k @8:START -k @12:-
+-w "screen ready: cheat-menu"
+-k @24:DOWN -k @28:- -k @36:DOWN -k @40:- -k @52:A -k @56:-
+-w "screen ready: cheat-buttons"
+-s @8:locked.png

@@ -55,12 +55,31 @@ boot-slow/frames 14-15 1F73F83DB4B12863
 boot-slow/frames 16-16 C06A5CEEB9ABEEEC
 boot-slow/frames 17-17 1DA9A452A082DCA0
 boot-slow/frames 18-19 7C573B18E65FE325
+cheats-buttons/capture CDA1647545BE8D80
+cheats-buttons/edited 4B05CE2D8B8A40AC
+cheats-buttons/keyboard 7F5A8B04F8A6B186
+cheats-buttons/list 4BD23F65C25A2489
+cheats-buttons/menu 2F6D2FC810E82A0B
+cheats-buttons/page A31E9068549202E3
+cheats-buttons/refused E05FAD4B0322FDDF
+cheats-buttons/set 029ED032F71CA94E
+cheats-buttons/typed 2055F65136C59CF3
 cheats-clean/clean 019FE0D843B177D1
-cheats-menu/details 6B45281E2E0B7848
-cheats-menu/menu A76E3A62C3557A61
-cheats-menu/only 650F7187008461A0
-cheats-menu/rom 47CBF2B38D7DE304
-cheats-menu/wrap F6A9501280C10CDF
+cheats-guide/guide CE182AA655AA59E8
+cheats-guide/hold 5318EB7741794DA9
+cheats-guide/list 78428A6DB6AFEC7B
+cheats-guide/locked 11967E354FE47D5B
+cheats-guide/long F67CDF7C192E72EE
+cheats-guide/none 7799300E82ED757C
+cheats-guide/scrolled 4766A5C61BDC701F
+cheats-menu/guide 7799300E82ED757C
+cheats-menu/menu 95CF9667E38C9925
+cheats-menu/only 05E23B2B8F23C4FE
+cheats-menu/rom 681DCB19779A2691
+cheats-menu/wrap 472200F8C0308F92
+cheats-ungated/page D99E85A7FD0E8A04
+cheats-ungated/press 62E6EFD2243B269D
+cheats-ungated/still 62E6EFD2243B269D
 diag-back/back 2B0A73E1C030510B
 diag-back/diag B8F9F547D9269D9B
 diag-pages/clock BAA544CE8D033053
@@ -108,10 +127,10 @@ games-box-switch/frames 3-3 D4DD55491F22C7F2
 games-box-switch/frames 4-5 E3A4AD640FBC14D2
 games-box-switch/frames 6-28 9F73E48DF1E05512
 games-cheats/back DE60914D027457D0
-games-cheats/greyed 21F8CB97ACFD0CBA
-games-cheats/picked 2F2C627C37F93BE9
+games-cheats/greyed 7AE0B8CE56326CAF
+games-cheats/picked A8DFE5FDBBFB8F2E
 games-cheats/popup 6D3246AFDB3CA9DB
-games-cheats/screen 902993C73FAEF615
+games-cheats/screen D285AAF8356ABEA2
 games-dedupe/screen 67E86C46698E404E
 games-fav/screen 5F5922C2D6F31804
 games-fav/starred 017306DC53C8BC2C
@@ -363,10 +382,16 @@ ingame/frames 14-14 CE0974E7D1A5E076
 ingame/frames 15-15 3A309ACE05E575C6
 ingame/frames 16-16 B938E6C34A2B8676
 ingame/frames 17-23 FAD7274EE3C5F306
-ingame-cheats/greyed 63489F1FDCBBE56A
-ingame-cheats/list CE7873FF14B6B5B7
-ingame-cheats/on 32224FB92C5D61EB
-ingame-cheats/rom 7FA5EE5726DEE61D
+ingame-cheats/always 057B94FC48F46076
+ingame-cheats/cant 403023B9830DF5FB
+ingame-cheats/cut 14C7D41C13CDAD03
+ingame-cheats/end 61A4A3E085180301
+ingame-cheats/hold 00A754083203866B
+ingame-cheats/locked 3393F7FD17CCE860
+ingame-cheats/marquee 6682231FA2F4A51B
+ingame-cheats/off 9139B21440C132DA
+ingame-cheats/press C33388E9DAEBF77A
+ingame-cheats/unknown 610EDB1F66D141BC
 ingame-lang/menu 678FA53B58EAA64C
 ingame-light/menu 6DAB01A75168AFC9
 ingame-shots/first 5DFED4399519A099
@@ -390,16 +415,15 @@ lang-packs/home 97F8D1DFA6418E84
 lang-packs/picked 8D897020252DBBCF
 lang-packs/pseudo 7536EAA04A8B3CA7
 lang-packs/swedish BB860AF1331F091B
-lang-packs/frames 0-0 8D897020252DBBCF
-lang-packs/frames 1-1 8B188BFE84173C4D
-lang-packs/frames 2-4 7B90E77090ED8325
-lang-packs/frames 5-5 79528197029A7A4C
-lang-packs/frames 6-6 8C41608A9D6CE6C7
-lang-packs/frames 7-7 1EA41BD49C54CC55
-lang-packs/frames 8-8 ED29EF713585097A
-lang-packs/frames 9-9 F943FF8C4FC1031B
-lang-packs/frames 10-22 BB860AF1331F091B
-lang-packs/frames 23-23 FBD1E289DE166F4B
+lang-packs/frames 0-0 8B188BFE84173C4D
+lang-packs/frames 1-3 7B90E77090ED8325
+lang-packs/frames 4-4 79528197029A7A4C
+lang-packs/frames 5-5 8C41608A9D6CE6C7
+lang-packs/frames 6-6 1EA41BD49C54CC55
+lang-packs/frames 7-7 ED29EF713585097A
+lang-packs/frames 8-8 F943FF8C4FC1031B
+lang-packs/frames 9-21 BB860AF1331F091B
+lang-packs/frames 22-23 FBD1E289DE166F4B
 lang-switch/home D452F2ABDE388F84
 lang-switch/picked 40DECE2F74CC2234
 lang-switch/switched 7536EAA04A8B3CA7
@@ -644,11 +668,30 @@ slot-picker/picker F2B4477AA79C47BF
 slot-picker/picker-down 9673CADB7316FE61
 slot-picker-light/picker E78F04DF444B1F8D
 slot-picker-list/picker 9111134E5D665F59
-sv-cheats-menu/details 55743A4C2CF67254
-sv-cheats-menu/menu 10D7A0CBFF51FA7C
-sv-cheats-menu/only 18E079FE4B2FBC9F
-sv-cheats-menu/rom 19CF29B61F551638
-sv-cheats-menu/wrap E9BF5616FBAE6B29
+sv-cheats-buttons/capture 69AF0C8485E75D3E
+sv-cheats-buttons/edited E6103656DE802342
+sv-cheats-buttons/keyboard 9CF6A251B5C34C78
+sv-cheats-buttons/list 35E1AF0FF18EDBC0
+sv-cheats-buttons/menu 4988AF0308416393
+sv-cheats-buttons/page FEF0895D8D95D490
+sv-cheats-buttons/refused C5A11FF796825BE0
+sv-cheats-buttons/set B1EBDA80D6BF9E18
+sv-cheats-buttons/typed D071861B190AF645
+sv-cheats-guide/guide 334D11A7E9F04510
+sv-cheats-guide/hold 6DF563FEE39E46C9
+sv-cheats-guide/list 10E914BAEE577D22
+sv-cheats-guide/locked DAD64314E94A4CB4
+sv-cheats-guide/long D225CF46E55363A2
+sv-cheats-guide/none 8D79DB392C2C6B16
+sv-cheats-guide/scrolled F09E90767E5992F5
+sv-cheats-menu/guide 8D79DB392C2C6B16
+sv-cheats-menu/menu EC52BEA080F17E21
+sv-cheats-menu/only 24A4DA517779632D
+sv-cheats-menu/rom CCA31A5DF98D21FD
+sv-cheats-menu/wrap CF98BA0ACCAFBA1C
+sv-cheats-ungated/page 5AAE280DBAEB134B
+sv-cheats-ungated/press 096E83DD2D8A6BC7
+sv-cheats-ungated/still 096E83DD2D8A6BC7
 sv-dialog-overflow/dialog 867E6E658CDE0E48
 sv-dialog-overflow/home C68D6010BD741B53
 sv-game-saves/backups 12C0B650E6B5199E
@@ -731,6 +774,16 @@ sv-ingame/frames 14-14 E2EA554F23333186
 sv-ingame/frames 15-15 9CE5BB36AE567DDE
 sv-ingame/frames 16-16 A589469AC6940226
 sv-ingame/frames 17-23 7987822347B68CAE
+sv-ingame-cheats/always FCF88B296062952C
+sv-ingame-cheats/cant DC8ADB4B7E995172
+sv-ingame-cheats/cut 1A4A7F74A139E449
+sv-ingame-cheats/end ADFC3CCB61107E37
+sv-ingame-cheats/hold E659CEB4B9684241
+sv-ingame-cheats/locked 524D944308507AA5
+sv-ingame-cheats/marquee AB6EF7141E7B15C1
+sv-ingame-cheats/off A654FEEABE0FF3A8
+sv-ingame-cheats/press DE179DC7AF5A0009
+sv-ingame-cheats/unknown 0FB20286E7B63800
 sv-ingame-states/load 05E9AF68A3A41529
 sv-ingame-states/menu C02A68E79EE834B3
 sv-ingame-states/other BE5FA8B5BD25CBE4

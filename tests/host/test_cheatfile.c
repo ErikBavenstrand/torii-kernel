@@ -1251,3 +1251,216 @@ void test_cheatfile_rename(void)
 		      "cheat0_renamed = true\n"));
 	CHECK_EQ(cheats[0].renamed, 1);
 }
+
+// cheatN_keys and cheatN_guide: read, implied by the code, set and cleared
+void test_cheatfile_keys_guide(void)
+{
+	char g[300];
+	load_cap("cheats = 3\n"
+		 "\n"
+		 "cheat0_desc = \"Warp\"\n"
+		 "cheat0_code = \"74000130 03FB+32001000 0063\"\n"
+		 "cheat0_enable = true\n"
+		 "cheat0_keys = \"Hold l\"\n"
+		 "cheat0_guide = \"Walk through a door.\\nLet go of L.\"\n"
+		 "\n"
+		 "cheat1_desc = \"Money\"\n"
+		 "cheat1_code = \"32001002 0009\"\n"
+		 "cheat1_keys = \"hold nothing\"\n"
+		 "\n"
+		 "cheat2_desc = \"Patch\"\n"
+		 "cheat2_code = \"08001000:4770\"\n"
+		 "cheat2_format = \"VBA\"\n",
+		 4096);
+	CHECK_EQ(file.count, 3);
+	CHECK_EQ(cheats[0].keys, CHEATKEYS(CHEATKEYS_HOLD, 0x200));
+	CHECK_EQ(cheats[0].act, CHEATKEYS(CHEATKEYS_HOLD, 0x004));
+	CHECK_EQ(cheatfile_activation(&cheats[0]), CHEATKEYS(CHEATKEYS_HOLD, 0x200));
+	CHECK(!strcmp(edit_span(cheatfile_guide_at(&cheats[0]), cheatfile_guide_len(&cheats[0])),
+		      "Walk through a door.\\nLet go of L."));
+	CHECK_EQ(cheatfile_guide(&file, 0, g, sizeof(g)), 33);
+	CHECK(!strcmp(g, "Walk through a door.\nLet go of L."));
+	CHECK_EQ(cheatfile_guide(&file, 0, g, 6), 5);  // bounded
+	CHECK(!strcmp(g, "Walk "));
+	CHECK_EQ(cheats[1].keys, 0);  // not a value: not set
+	CHECK_EQ(cheats[1].act, CHEATKEYS_ALWAYS_ON);
+	CHECK_EQ(cheatfile_activation(&cheats[1]), CHEATKEYS_ALWAYS_ON);
+	CHECK_EQ(cheats[1].guide, CHEATFILE_NONE);
+	CHECK_EQ(cheatfile_guide(&file, 1, g, sizeof(g)), 0);
+	CHECK(!strcmp(g, ""));
+	CHECK_EQ(cheats[2].act, CHEATKEYS_AT_LAUNCH);
+
+	// Set (a line added after the code line), replaced, cleared; picks kept
+	CHECK_EQ(cheatfile_set_keys(&file, &room, 1, CHEATKEYS(CHEATKEYS_PRESS, 0x044)), CHEATFILE_EDIT_OK);
+	CHECK(file.edited);
+	CHECK_EQ(cheats[0].picked, 1);
+	CHECK_EQ(cheats[1].keys, CHEATKEYS(CHEATKEYS_PRESS, 0x044));
+	CHECK(text_has("cheat1_keys = \"press Select+Up\"\n"));
+	CHECK(!text_has("hold nothing"));
+	CHECK_EQ(cheatfile_set_keys(&file, &room, 0, CHEATKEYS_ALWAYS_ON), CHEATFILE_EDIT_OK);
+	CHECK_EQ(cheatfile_set_keys(&file, &room, 2, CHEATKEYS_AT_LAUNCH), CHEATFILE_EDIT_OK);
+	CHECK_EQ(cheatfile_set_guide(&file, &room, 1, "Max \"money\"\nfor\tall"), CHEATFILE_EDIT_OK);
+	CHECK_EQ(cheatfile_set_guide(&file, &room, 0, ""), CHEATFILE_EDIT_OK);
+	CHECK_EQ(cheatfile_set_keys(&file, &room, 1, CHEATKEYS(CHEATKEYS_HOLD, 0)), CHEATFILE_EDIT_BAD);
+	CHECK_EQ(cheatfile_set_keys(&file, &room, 3, CHEATKEYS_ALWAYS_ON), CHEATFILE_EDIT_BAD);
+	CHECK_EQ(cheatfile_set_guide(&file, &room, 3, "x"), CHEATFILE_EDIT_BAD);
+	CHECK(text_is("cheats = 3\n"
+		      "\n"
+		      "cheat0_desc = \"Warp\"\n"
+		      "cheat0_code = \"74000130 03FB+32001000 0063\"\n"
+		      "cheat0_enable = true\n"
+		      "cheat0_keys = \"always\"\n"
+		      "\n"
+		      "cheat1_desc = \"Money\"\n"
+		      "cheat1_code = \"32001002 0009\"\n"
+		      "cheat1_guide = \"Max 'money'\\nforall\"\n"
+		      "cheat1_keys = \"press Select+Up\"\n"
+		      "\n"
+		      "cheat2_desc = \"Patch\"\n"
+		      "cheat2_code = \"08001000:4770\"\n"
+		      "cheat2_keys = \"launch\"\n"
+		      "cheat2_format = \"VBA\"\n"));
+	CHECK_EQ(cheats[0].picked, 1);
+	CHECK_EQ(cheats[1].picked, 0);
+	CHECK_EQ(cheats[0].act, 0);  // not decoded again yet
+	redecode();
+	CHECK_EQ(cheats[0].act, CHEATKEYS(CHEATKEYS_HOLD, 0x004));
+	CHECK_EQ(cheatfile_guide(&file, 1, g, sizeof(g)), 18);
+	CHECK(!strcmp(g, "Max 'money'\nforall"));
+	// Clearing removes the line; clearing what isn't there changes nothing
+	CHECK_EQ(cheatfile_set_keys(&file, &room, 0, 0), CHEATFILE_EDIT_OK);
+	CHECK_EQ(cheatfile_set_guide(&file, &room, 1, "\n\x01"), CHEATFILE_EDIT_OK);  // only "\n": kept
+	CHECK(text_has("cheat1_guide = \"\\n\"\n"));
+	CHECK_EQ(cheatfile_set_guide(&file, &room, 1, "\x01\x02"), CHEATFILE_EDIT_OK);  // empty once sanitised
+	CHECK(!text_has("guide"));
+	CHECK(!text_has("cheat0_keys"));
+	CHECK_EQ(cheats[0].keys, 0);
+	CHECK_EQ(cheatfile_activation(&cheats[0]), 0);  // until decoded again
+	file.edited = 0;
+	CHECK_EQ(cheatfile_set_keys(&file, &room, 0, 0), CHEATFILE_EDIT_OK);
+	CHECK(!file.edited);
+
+	// Repeated lines: the last counts and is replaced, the others go
+	load_cap("cheat0_code = \"32001000 0009\"\r\n"
+		 "cheat0_keys = \"hold A\"\r\n"
+		 "cheat0_guide = \"one\"\r\n"
+		 "cheat0_keys = \"hold B\"\r\n"
+		 "cheat0_enable = true\r\n"
+		 "cheat0_guide = \"two\"",
+		 4096);
+	CHECK_EQ(cheats[0].keys, CHEATKEYS(CHEATKEYS_HOLD, 0x002));
+	CHECK(!strcmp(edit_span(cheatfile_guide_at(&cheats[0]), cheatfile_guide_len(&cheats[0])), "two"));
+	CHECK_EQ(cheatfile_set_keys(&file, &room, 0, CHEATKEYS(CHEATKEYS_HOLD, 0x300)), CHEATFILE_EDIT_OK);
+	CHECK_EQ(cheatfile_set_guide(&file, &room, 0, "three"), CHEATFILE_EDIT_OK);
+	CHECK(text_is("cheat0_code = \"32001000 0009\"\r\n"
+		      "cheat0_keys = \"hold L+R\"\r\n"
+		      "cheat0_enable = true\r\n"
+		      "cheat0_guide = \"three\""));
+	CHECK_EQ(cheats[0].picked, 1);
+	CHECK_EQ(cheatfile_set_guide(&file, &room, 0, ""), CHEATFILE_EDIT_OK);
+	CHECK_EQ(cheatfile_set_keys(&file, &room, 0, 0), CHEATFILE_EDIT_OK);
+	CHECK(text_is("cheat0_code = \"32001000 0009\"\r\n"
+		      "cheat0_enable = true\r\n"));
+	// CRLF kept on an added line; a last code line without an end gets one
+	load_cap("cheat0_code = \"32001000 0009\"\r\ncheat0_enable = true\r\n", 4096);
+	CHECK_EQ(cheatfile_set_guide(&file, &room, 0, "Hi"), CHEATFILE_EDIT_OK);
+	CHECK(text_is("cheat0_code = \"32001000 0009\"\r\ncheat0_guide = \"Hi\"\r\ncheat0_enable = true\r\n"));
+	load_cap("cheat0_code = \"32001000 0009\"", 4096);
+	CHECK_EQ(cheatfile_set_keys(&file, &room, 0, CHEATKEYS(CHEATKEYS_HOLD, 0x001)), CHEATFILE_EDIT_OK);
+	CHECK(text_is("cheat0_code = \"32001000 0009\"\ncheat0_keys = \"hold A\"\n"));
+	CHECK_EQ(cheats[0].keys, CHEATKEYS(CHEATKEYS_HOLD, 0x001));
+
+	// The cap: 250 bytes, cut on a whole character
+	char longer[400];
+	memset(longer, 'a', 249);
+	strcpy(longer + 249, "\xC3\xA9tail");  // é would end at byte 251
+	CHECK_EQ(cheatfile_set_guide(&file, &room, 0, longer), CHEATFILE_EDIT_OK);
+	CHECK_EQ(cheatfile_guide_len(&cheats[0]), 249);
+	memset(longer, 'b', 248);
+	strcpy(longer + 248, "\xC3\xA9tail");
+	CHECK_EQ(cheatfile_set_guide(&file, &room, 0, longer), CHEATFILE_EDIT_OK);
+	CHECK_EQ(cheatfile_guide_len(&cheats[0]), 250);
+	CHECK_EQ(cheatfile_guide(&file, 0, g, 250), 248);  // the é doesn't fit 249 bytes
+	CHECK_EQ(cheatfile_guide(&file, 0, g, sizeof(g)), 250);
+	memset(longer, 'c', 249);
+	strcpy(longer + 249, "\nx");  // "\n" would end at byte 251
+	CHECK_EQ(cheatfile_set_guide(&file, &room, 0, longer), CHEATFILE_EDIT_OK);
+	CHECK_EQ(cheatfile_guide_len(&cheats[0]), 249);
+	// A value longer than a span holds isn't read
+	{
+		static char big[CHEATFILE_GUIDE_LEN_MAX + 128];
+		u32 n = (u32)snprintf(big, sizeof(big), "cheat0_code = \"32001000 0009\"\ncheat0_guide = \"");
+		memset(big + n, 'g', CHEATFILE_GUIDE_LEN_MAX + 1);
+		strcpy(big + n + CHEATFILE_GUIDE_LEN_MAX + 1, "\"\n");
+		load_cap(big, sizeof(big));
+		CHECK_EQ(cheats[0].guide, CHEATFILE_NONE);
+	}
+	// Too long for the room
+	load_cap("cheat0_code = \"32001000 0009\"\n", 40);
+	CHECK_EQ(cheatfile_set_guide(&file, &room, 0, "A guide too long for the room"), CHEATFILE_EDIT_LONG);
+	CHECK(text_is("cheat0_code = \"32001000 0009\"\n"));
+}
+
+// A cheat's cheatN_keys gate its table part (cheatfile.c's gate): Hold
+// under a key test on KEYINPUT, Press under two on the interpreter's keys
+// (now held, before not); none where the code says the same Hold, for a
+// ROM patch, or where a condition can't go (a plain ROM write: as it was)
+void test_cheatfile_keys_gate(void)
+{
+	load_str("cheat0_code = \"82001000+BEEF\"\ncheat0_keys = \"hold L\"\n"
+		 "cheat1_code = \"82001002+BEEF\"\ncheat1_keys = \"press L+R\"\n"
+		 "cheat2_code = \"74000130 03FE+3203F020 0001\"\ncheat2_keys = \"hold A\"\n"
+		 "cheat3_code = \"08001000:4770\"\ncheat3_keys = \"press A\"\n"
+		 "cheat4_code = \"32001004 0001+38001000 0012\"\ncheat4_keys = \"hold B\"\n"
+		 "cheat5_code = \"82001006+BEEF\"\n");
+	cheatfile_begin(&work);
+	CHECK_EQ(cheatfile_next(&file, &work), 0);
+	CHECK_EQ(cheats[0].status, CHEATFILE_OK);
+	CHECK_EQ(cheats[0].act, CHEATKEYS_ALWAYS_ON);  // what the code says, ungated
+	CHECK_EQ(cheatfile_activation(&cheats[0]), CHEATKEYS(CHEATKEYS_HOLD, 0x200));
+	CHECK_EQ(work.n_prog, 6);
+	CHECK_EQ(work.prog[0], 2 | (5 * 4) << 16);  // two ops, not plain
+	CHECK_EQ(work.prog[1], (CHEAT_PROG_K_EXT << 28) | CHEAT_KEYINPUT);
+	CHECK_EQ(work.prog[2], CHEAT_PROG_NAND | 1 << 4 | 1 << 16);  // a halfword, over the write
+	CHECK_EQ(work.prog[3], 0x200);
+	CHECK_EQ(work.prog[4], 0x12001000);
+	CHECK_EQ(work.ops[0].type, CHEAT_OP_WRITE);  // the ops as decoded again
+	CHECK_EQ(cheatfile_next(&file, &work), 1);
+	CHECK_EQ(cheats[1].status, CHEATFILE_OK);
+	CHECK_EQ(work.n_prog, 9);
+	CHECK_EQ(work.prog[0], 3 | (8 * 4) << 16);
+	CHECK_EQ(work.prog[1], (CHEAT_PROG_K_EXT << 28) | CHEAT_KEYS_NOW);
+	CHECK_EQ(work.prog[2], CHEAT_PROG_NAND | 1 << 4 | 2 << 16);  // over the next condition and the write
+	CHECK_EQ(work.prog[3], 0x300);
+	CHECK_EQ(work.prog[4], (CHEAT_PROG_K_EXT << 28) | CHEAT_KEYS_BEFORE);
+	CHECK_EQ(work.prog[5], CHEAT_PROG_AND_TRUE | 1 << 4 | 1 << 16);
+	CHECK_EQ(work.prog[6], 0x300);
+	CHECK_EQ(work.prog[7], 0x12001002);
+	u32 gated_cost = work.cost;
+	CHECK_EQ(cheatfile_next(&file, &work), 2);
+	CHECK_EQ(cheats[2].act, CHEATKEYS(CHEATKEYS_HOLD, 0x001));
+	CHECK_EQ(work.n_prog, 1 + 3 + 2);  // its own key test alone
+	CHECK_EQ(cheatfile_next(&file, &work), 3);
+	CHECK_EQ(cheats[3].act, CHEATKEYS_AT_LAUNCH);
+	CHECK_EQ(cheatfile_activation(&cheats[3]), CHEATKEYS_AT_LAUNCH);
+	CHECK_EQ(work.n_prog, 0);
+	CHECK_EQ(cheatfile_next(&file, &work), 4);
+	CHECK_EQ(cheats[4].status, CHEATFILE_OK);  // ungated: a ROM write can't go under a condition
+	CHECK(cheatfile_ungated(&cheats[4]));
+	CHECK_EQ(cheatfile_activation(&cheats[4]), CHEATKEYS_ALWAYS_ON);  // what it does, not its line
+	CHECK(!cheatfile_ungated(&cheats[0]));
+	CHECK(work.prog[0] & CHEAT_PROG_PLAIN);
+	CHECK_EQ(work.n_patches, 1);
+	CHECK_EQ(cheatfile_next(&file, &work), 5);
+	CHECK_EQ(work.n_prog, 3);  // no keys: plain
+	CHECK(work.cost < gated_cost);
+	CHECK_EQ(cheatfile_next(&file, &work), -1);
+	// A line the code can't keep gives way to the code once decoded: "launch"
+	// on one that runs in game, Always on one that waits on its own buttons
+	load_str("cheat0_code = \"82001000+BEEF\"\ncheat0_keys = \"launch\"\n"
+		 "cheat1_code = \"74000130 03FE+3203F020 0001\"\ncheat1_keys = \"always\"\n");
+	CHECK_EQ(cheatfile_activation(&cheats[0]), CHEATKEYS_ALWAYS_ON);
+	CHECK_EQ(cheatfile_activation(&cheats[1]), CHEATKEYS(CHEATKEYS_HOLD, 0x001));
+	cheats[0].act = 0;  // as before it is decoded: the line
+	CHECK_EQ(cheatfile_activation(&cheats[0]), CHEATKEYS_AT_LAUNCH);
+}

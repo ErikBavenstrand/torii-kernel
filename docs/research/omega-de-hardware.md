@@ -449,7 +449,7 @@ at page `0x09C00000` × 4 KB:
 | Pages | Memory | Used for |
 |---|---|---|
 | `0x00`, `0x10` | FM28V100 FRAM, 128 KB | game saves |
-| `0x20`, `0x30` | S71GL064 SRAM (1 MB; its first 128 KB are unused behind the FRAM) | Torii v0.8: the in-game menu's backups while it is open (`source/ingame_abi.h`): the game's EWRAM window at `0x20000`, the OBJ tiles it draws over at `0x28000`, OAM at `0x2C000`, the OBJ palette at `0x2C400`. Before v0.8, the old menu's copy of VRAM |
+| `0x20`, `0x30` | S71GL064 SRAM (1 MB; its first 128 KB are unused behind the FRAM) | Torii v0.8: the in-game menu's backups while it is open (`source/ingame_abi.h`): the game's EWRAM window at `0x20000`, the OBJ tiles it draws over at `0x28000`, OAM at `0x2C000`, the OBJ palette at `0x2C400`; from v0.10 the in-game cheat list's whole names (its marquee) at `0x30000`, written at launch. Before v0.8, the old menu's copy of VRAM |
 | `0x40`–`0xAF` | S71GL064 SRAM | the save-state buffer: the 0x70000-byte `RTS/<game>.rts` is loaded here at launch. VRAM, IWRAM, EWRAM, OAM, palette, IO, registers, and a flag at `0xAFFF0` |
 | `0xB0`–`0xBF` | S71GL064 SRAM | Torii v0.8: the in-game menu's overlay image at `0xB0000` and the session block at `0xB6000`, written at each addon and NOR launch (`source/ingame.c`) |
 | `0xC0`, `0xD0` | S71GL064 SRAM | Torii: Diagnostics' pattern test (free otherwise); from v0.8's P4, the in-game screenshots (`0xC0000`-`0xEFFFF`) |

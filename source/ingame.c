@@ -7,6 +7,7 @@
 #include "Ezcard_OP.h"
 #include "cartlog.h"
 #include "cheat.h"
+#include "cheatkeys.h"
 #include "cheatstore.h"
 #include "charset.h"
 #include "GBApatch.h"
@@ -73,11 +74,14 @@ static const struct torii_glyph *glyph(u32 cp)
 	return &font_body.glyphs[i];
 }
 
-// len bytes of UTF-8 at s in the body font into l from its left edge; cut
-// to max_w pixels (at most INGAME_TEXT_W), ending in "..." when cut
-static void line_draw(struct ingame_line *l, const char *s, u32 len, u32 max_w)
+// len bytes of UTF-8 at s in the body font into the INGAME_TEXT_ROWS rows of
+// row_bytes at out from their left edge; cut to max_w pixels (at most
+// row_bytes * 8), ending in "..." when cut. The pixels inked; 1 in *was_cut
+// if it was. Byte by byte, so out may be cart SRAM.
+static u32 bits_draw(vu8 *out, u32 row_bytes, const char *s, u32 len, u32 max_w, u32 *was_cut)
 {
-	memset(l, 0, sizeof(*l));
+	for (u32 i = 0; i < INGAME_TEXT_ROWS * row_bytes; i++)
+		out[i] = 0;
 	u32 pos = 0, w = 0, keep = 0, cut = 0;
 	u32 dots = 3 * glyph('.')->advance;
 	while (pos < len) {
@@ -105,11 +109,21 @@ static void line_draw(struct ingame_line *l, const char *s, u32 len, u32 max_w)
 				row |= (u32)bits[r * font_body.row_bytes + b] << (8 * b);
 			for (u32 i = 0; row >> i; i++)
 				if ((row >> i & 1) && x + i < max_w)
-					l->bits[g->top + r][(x + i) >> 3] |= (u8)(1u << ((x + i) & 7));
+					out[(g->top + r) * row_bytes + ((x + i) >> 3)] |= (u8)(1u << ((x + i) & 7));
 		}
 		x += g->advance;
 	}
-	l->width = (u16)(x < max_w ? x : max_w);
+	*was_cut = cut;
+	return x < max_w ? x : max_w;
+}
+
+// As bits_draw, into a line of the menu (max_w at most INGAME_TEXT_W); 1 if cut
+static u32 line_draw(struct ingame_line *l, const char *s, u32 len, u32 max_w)
+{
+	u32 cut;
+	memset(l, 0, sizeof(*l));
+	l->width = (u16)bits_draw((vu8 *)&l->bits[0][0], sizeof(l->bits[0]), s, len, max_w, &cut);
+	return cut;
 }
 
 void ingame_probe_prepare(const u8 *code)
@@ -132,11 +146,13 @@ void ingame_probe_prepare(const u8 *code)
 // SRAM, and how many of them are in the interpreter's table
 static struct {
 	u16 count, table;
+	u16 acts;  // the activation sentences written (session's act_text)
+	u16 act[INGAME_ACT_LINES];  // their values (cheatkeys.h)
 } cheats;
 
 void ingame_cheats_clear(void)
 {
-	cheats.count = cheats.table = 0;
+	cheats.count = cheats.table = cheats.acts = 0;
 }
 
 void ingame_cheats_set(u32 count, u32 table)
@@ -148,7 +164,7 @@ void ingame_cheats_set(u32 count, u32 table)
 // struct ingame_cheat's fields after its line
 struct cheat_meta {
 	u16 cost, number, index;
-	u8 flags, bit;
+	u8 flags, bit, act, reserved[3];
 };
 _Static_assert(sizeof(struct cheat_meta) == sizeof(struct ingame_cheat) - offsetof(struct ingame_cheat, cost),
 	       "struct ingame_cheat's fields after its line");
@@ -183,37 +199,44 @@ void ingame_dump_image(void)
 	tlog("in-game menu: cart SRAM's image area (%lu bytes) is in /torii/logs/ingame-image.bin", (unsigned long)at);
 }
 
-void ingame_cheat_put(u32 n, const char *name, u32 len, u32 number, u32 index, u32 flags, u32 bit, u32 cost)
+// The session's line for activation act (cheatkeys.h): its index + 1 in
+// act_text, written the first time; 0 for none (0, or no line left)
+static u32 act_line(u16 act)
+{
+	if (!cheatkeys_valid(act) || cheatkeys_mode(act) == CHEATKEYS_NONE)
+		return 0;
+	for (u32 k = 0; k < cheats.acts; k++)
+		if (cheats.act[k] == act)
+			return k + 1;
+	if (cheats.acts >= INGAME_ACT_LINES)
+		return 0;
+	char text[64];
+	struct ingame_line line;
+	cheatkeys_sentence(act, text, sizeof(text));
+	line_draw(&line, text, strlen(text), INGAME_TEXT_W);
+	sram_put(INGAME_SRAM_SESSION + INGAME_SESSION_ACT(cheats.acts), (const u8 *)&line, sizeof(line));
+	cheats.act[cheats.acts++] = act;
+	return cheats.acts;
+}
+
+void ingame_cheat_put(u32 n, const char *name, u32 len, u32 number, u32 index, u32 flags, u32 bit, u32 cost, u16 act)
 {
 	TLOG_ASSERT(n < INGAME_CHEATS);
 	struct ingame_line line;
-	line_draw(&line, name, len, INGAME_ROW_W);
-	sram_put(INGAME_SRAM_SESSION + INGAME_SESSION_CHEAT(n), (const u8 *)&line, sizeof(line));
-	struct cheat_meta m = {(u16)cost, (u16)number, (u16)index, (u8)flags, (u8)bit};
-	sram_put(CHEAT_META(n), (const u8 *)&m, sizeof(m));
-	SetRampage(0);
-}
-
-void ingame_cheat_meta(u32 n, u32 flags, u32 bit, u32 cost)
-{
-	struct cheat_meta m;
-	sram_get(CHEAT_META(n), (u8 *)&m, sizeof(m));
-	m.flags = (u8)flags;
-	m.bit = (u8)bit;
-	m.cost = (u16)cost;
-	sram_put(CHEAT_META(n), (const u8 *)&m, sizeof(m));
-	SetRampage(0);
-}
-
-void ingame_cheats_trim(u32 table)
-{
-	for (u32 n = 0; n < cheats.count; n++) {
-		struct cheat_meta m;
-		sram_get(CHEAT_META(n), (u8 *)&m, sizeof(m));
-		if ((m.flags & INGAME_CHEAT_TABLE) && m.bit >= table)
-			ingame_cheat_meta(n, INGAME_WHY_ROOM, 0, 0);
+	if (line_draw(&line, name, len, INGAME_ROW_W)) {
+		// Cut: whole for the marquee, as far as its room goes, drawn
+		// straight into cart SRAM (no RAM to spare for its 772 bytes)
+		u32 at = INGAME_SRAM_WIDE + n * (u32)sizeof(struct ingame_wide), cut;
+		SetRampage((u16)((at >> 16) << 4));
+		u32 width = bits_draw(CART_SRAM + (at & 0xFFFF) + offsetof(struct ingame_wide, bits), INGAME_WIDE_W / 8,
+				      name, len, INGAME_WIDE_W, &cut);
+		u8 head[4] = {(u8)width, (u8)(width >> 8), 0, 0};  // its width and reserved, little-endian
+		sram_put(at, head, sizeof(head));
+		flags |= INGAME_CHEAT_CUT;
 	}
-	cheats.table = (u16)table;
+	sram_put(INGAME_SRAM_SESSION + INGAME_SESSION_CHEAT(n), (const u8 *)&line, sizeof(line));
+	struct cheat_meta m = {(u16)cost, (u16)number, (u16)index, (u8)flags, (u8)bit, (u8)act_line(act), {0}};
+	sram_put(CHEAT_META(n), (const u8 *)&m, sizeof(m));
 	SetRampage(0);
 }
 

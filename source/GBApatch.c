@@ -347,7 +347,7 @@ static u32 Patch_need(void)
 		return ((u32)Sleep_ReplaceIRQ_end - (u32)Sleep_ReplaceIRQ_start + 15) & ~15u;
 	u32 need = (u32)RTS_ReplaceIRQ_end - (u32)RTS_ReplaceIRQ_start;
 	if (gl_cheat_on == 1 && gl_cheat_bytes)
-		need += (u32)Cheat_blob_end - (u32)Cheat_blob_start + sizeof(gl_cheat_off) + gl_cheat_bytes;
+		need += (u32)Cheat_blob_end - (u32)Cheat_blob_start + gl_cheat_bytes;
 	return (need + 15) & ~15u;
 }
 //------------------------------------------------------------------
@@ -436,12 +436,6 @@ void SetTrimSize(u8 *buffer, u32 romsize, u32 iSize, u32 mode, BYTE saveMODE)
 	if (rom_bytes_blank(buffer, base, iSize, romsize, iTrimSize, limit))
 		return;
 	u32 at = rom_hole(buffer, base, iSize, romsize, limit, need, &room);
-	if (!at && gl_cheat_on == 1 && gl_cheat_count > gl_cheat_picks) {
-		// Without the extras (the cheats off for the in-game list) the picks may fit
-		cheatstore_drop_extras();
-		need = Patch_need();
-		at = rom_hole(buffer, base, iSize, romsize, limit, need, &room);
-	}
 	if (at) {
 		tlog("launch: the patch area at %08lX is on the game's data: cut to %lX bytes at %08lX",
 		     (unsigned long)iTrimSize, (unsigned long)room, (unsigned long)at);
@@ -460,7 +454,6 @@ void SetTrimSize(u8 *buffer, u32 romsize, u32 iSize, u32 mode, BYTE saveMODE)
 	     (unsigned long)iTrimSize, (unsigned long)need);
 	gl_cheat_on = 0;
 	gl_cheat_count = gl_cheat_bytes = 0;
-	gl_cheat_picks = gl_cheat_pick_bytes = 0;
 	SetTrimSize(buffer, romsize, iSize, mode, saveMODE);  // as without cheats
 }
 //------------------------------------------------------------------
@@ -602,17 +595,9 @@ static void Patch_RTS_Cheat(u32 *Data)
 			   (unsigned long)gl_cheat_bytes);
 	else if (gl_cheat_on == 1 && gl_cheat_bytes) {
 		u32 code = (u8 *)Cheat_blob_end - (u8 *)Cheat_blob_start;
-		u32 end = copysize + code + sizeof(gl_cheat_off) + gl_cheat_bytes;
-		//Torii: never a table cut short, or over the game's data; the
-		//extras (v0.8's cheats off for the in-game list) go first
-		if (gl_cheat_count > gl_cheat_picks &&
-		    (end > room || (!is_NORpatch && !rom_blank(iTrimSize + copysize, iTrimSize + end)))) {
-			cheatstore_drop_extras();
-			end = copysize + code + sizeof(gl_cheat_off) + gl_cheat_bytes;
-		}
-		if (!gl_cheat_bytes) {
-			tlog("launch: no cheats picked, and no room for the in-game list's");
-		} else if (end > room) {
+		u32 end = copysize + code + gl_cheat_bytes;
+		//Torii: never a table cut short, or over the game's data
+		if (end > room) {
 			tlog("launch: the cheats' %lX bytes don't fit the patch area's %lX: left out",
 			     (unsigned long)end, (unsigned long)room);
 		} else if (!is_NORpatch && !rom_blank(iTrimSize + copysize, iTrimSize + end)) {
@@ -620,8 +605,7 @@ static void Patch_RTS_Cheat(u32 *Data)
 			     (unsigned long)iTrimSize + copysize);
 		} else {
 			dmaCopy((void *)Cheat_blob_start, patchbuffer + copysize, code);
-			dmaCopy(gl_cheat_off, patchbuffer + copysize + code, sizeof(gl_cheat_off));
-			dmaCopy(gl_cheat_table, patchbuffer + copysize + code + sizeof(gl_cheat_off), gl_cheat_bytes);
+			dmaCopy(gl_cheat_table, patchbuffer + copysize + code, gl_cheat_bytes);
 			cheat_at = copysize;
 			copysize = end;
 		}

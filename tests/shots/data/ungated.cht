@@ -1,0 +1,6 @@
+cheats = 1
+
+cheat0_desc = "Fast text"
+cheat0_code = "32001004 0001+38001000 0012"
+cheat0_enable = false
+cheat0_keys = "hold B"

@@ -1,0 +1,29 @@
+cheats = 6
+
+cheat0_desc = "(M) Must Be On"
+cheat0_code = "0000ABCD 0007+100F68A4 0007"
+cheat0_enable = false
+
+cheat1_desc = "Infinite lives"
+cheat1_code = "32001000 0063"
+cheat1_enable = false
+cheat1_guide = "Your lives stay at 99 however often you fall.\nTurn it off before the last boss: its door counts your lives and stays shut while the count is impossible. Saving with it on keeps 99 in the save, which is safe."
+
+cheat2_desc = "Max money"
+cheat2_code = "82001002 270F"
+cheat2_enable = true
+cheat2_keys = "press Select+Up"
+cheat2_guide = "Fills your wallet to 9,999 each time you press the buttons."
+
+cheat3_desc = "Moon jump (hold A)"
+cheat3_code = "74000130 03FE+32001004 0001"
+cheat3_enable = false
+cheat3_guide = "Hold A in the air to float up. Let go to fall back down."
+
+cheat4_desc = "Pick a level"
+cheat4_code = "3300075C+00??"
+cheat4_enable = false
+
+cheat5_desc = "Skip the intro"
+cheat5_code = "08001000:46C0"
+cheat5_enable = false

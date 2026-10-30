@@ -13,11 +13,19 @@
 // keyboard for its name ("Code N" unless changed), and the code goes into
 // the file as the user's (made on this first save for a game that had
 // none); it is greyed, with why, when the file has no room. A on a greyed
-// code with digits to fill in opens the keypad with it; SELECT on a code of
-// the user's opens Edit code and Delete. START's menu has Details (the
-// cheat's name, code, format and budget, read-only), those two on a code of
-// the user's, Turn all off and Show picked only (B shows all again). Each
-// edit is written at once; deleting the last code deletes the file too.
+// code with digits to fill in opens the keypad with it.
+//
+// Each row shows how its cheat is activated (docs/plans/cheat-guides.md):
+// a Hold or Press cheat's first button as a dim tag at its right, and the
+// cursor's cheat's sentence ("Hold L+SELECT") on the hint bar. SELECT opens
+// a cheat's Guide page: its name, its activation (or why it is greyed) in a
+// tinted box, its guide, then its code, format and budget, read-only.
+// START's menu has Guide, Rename (Edit code on a code of the user's),
+// Buttons (Always on, Hold, Press or From the code; Hold and Press capture
+// the buttons as Settings' hotkeys do), Edit guide (the rename keyboard's
+// text of lines), Turn all off, Show picked only (B shows all again) and
+// Delete. Each edit is written at once; deleting the last code deletes the
+// file too.
 #ifndef TORII_SCREENS_CHEATS_H
 #define TORII_SCREENS_CHEATS_H
 

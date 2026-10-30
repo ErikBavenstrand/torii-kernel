@@ -1,0 +1,61 @@
+# The cheat screen's edits of an activation and a guide (source/screens/
+# cheats.c, docs/plans/cheat-guides.md) on a Hello.cht with guides, in the
+# light theme: START on Moon jump opens the menu, Guide first, Buttons and
+# Edit guide after Rename (menu); Buttons shows From the code ticked, its
+# code's Hold A beside it (page); A on Press, L+R+START held: refused, as
+# it opens the in-game menu (refused); A again, L and SELECT held: their
+# chips as they count (capture); let go, Press ticked with them (set); B
+# writes it, the row's tag and sentence change (list); Edit guide opens
+# the keyboard with the guide in a field of lines (keyboard); Enter and
+# "no" typed after it (typed); START keeps it and SELECT shows it (edited).
+#! settings 28=1
+#! sd-file /torii/cheats/Hello.cht 0 tests/shots/data/guide-hello.cht
+# The tests' hook: lists open on their first row (else a list opens on
+# Hello, the game Recent played last)
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-k @8:RIGHT -k @12:- -k @20:RIGHT -k @24:- -k @32:RIGHT -k @36:-
+-k @80:START -k @84:-
+-w "screen ready: game-popup"
+-k @12:DOWN -k @16:- -k @24:DOWN -k @28:-
+-k @48:A -k @52:-
+-w "screen ready: cheats"
+-k @20:DOWN -k @24:- -k @32:DOWN -k @36:-
+-k @52:START -k @56:-
+-w "screen ready: cheat-menu"
+-s @24:menu.png
+-k @32:DOWN -k @36:- -k @44:DOWN -k @48:- -k @60:A -k @64:-
+-w "screen ready: cheat-buttons"
+-s @8:page.png
+-k @16:UP -k @20:- -k @32:A -k @36:-
+-k @56:L+R+START -k @96:-
+-s @112:refused.png
+-k @132:A -k @136:-
+-k @156:L+SELECT -k @196:-
+-s @188:capture.png
+-s @210:set.png
+-k @220:B -k @224:-
+-w "cheats: buttons of cheat 3: press L+Select: ok"
+-w "screen ready: cheats"
+-s @8:list.png
+-k @16:START -k @20:-
+-w "screen ready: cheat-menu"
+-k @32:DOWN -k @36:- -k @44:DOWN -k @48:- -k @56:DOWN -k @60:- -k @72:A -k @76:-
+-w "screen ready: rename"
+-s @8:keyboard.png
+-k @16:UP -k @20:- -k @28:UP -k @32:- -k @40:RIGHT -k @44:- -k @52:RIGHT -k @56:- -k @64:RIGHT -k @68:-
+-k @80:A -k @84:-
+-k @96:UP -k @100:- -k @112:A -k @116:-
+-k @128:UP -k @132:- -k @144:UP -k @148:- -k @160:RIGHT -k @164:- -k @172:RIGHT -k @176:- -k @184:RIGHT -k @188:-
+-k @200:A -k @204:-
+-s @220:typed.png
+-k @228:START -k @232:-
+-w "cheats: guide of cheat 3 set: ok"
+-w "screen ready: cheats"
+-k @8:SELECT -k @12:-
+-w "screen ready: cheat-guide"
+-s @8:edited.png

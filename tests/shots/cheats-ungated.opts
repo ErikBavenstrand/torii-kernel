@@ -1,0 +1,30 @@
+# The Buttons page (source/screens/cheats.c) for a cheat that patches the
+# ROM and runs in game, whose file says "hold B": its code can't wait on
+# buttons (CHEATFILE_ACT_UNGATED), so Hold and Press are greyed and From the
+# code is ticked, Always on beside it (page); on Press the bar says why
+# (press), and A there changes nothing (still).
+#! settings 28=1
+#! sd-file /torii/cheats/Hello.cht 0 tests/shots/data/ungated.cht
+# The tests' hook: lists open on their first row (else a list opens on
+# Hello, the game Recent played last)
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-k @8:RIGHT -k @12:- -k @20:RIGHT -k @24:- -k @32:RIGHT -k @36:-
+-k @80:START -k @84:-
+-w "screen ready: game-popup"
+-k @12:DOWN -k @16:- -k @24:DOWN -k @28:-
+-k @48:A -k @52:-
+-w "screen ready: cheats"
+-k @20:START -k @24:-
+-w "screen ready: cheat-menu"
+-k @32:DOWN -k @36:- -k @44:DOWN -k @48:- -k @60:A -k @64:-
+-w "screen ready: cheat-buttons"
+-s @8:page.png
+-k @16:UP -k @20:-
+-s @32:press.png
+-k @40:A -k @44:-
+-s @64:still.png

@@ -1,0 +1,41 @@
+# ingame-cheats.opts in Swedish: lang/sv.ini's pack set in Settings (slot 0,
+# its id 0x564E), the activations' sentences and the marquee at their widths.
+#! settings 0=22094
+#! sd-file /torii/lang/sv.lng 0 dist/lang/sv.lng
+# The in-game cheat list (v0.8 P2, docs/plans/cheat-guides.md) over
+# Hello.gba with tests/shots/data/ingame-hello.cht: only the picks are
+# listed (the master code and Not picked aren't), the first cheat under the
+# cursor. The footer shows the cursor's cheat's activation, unless it can't
+# change: Infinite lives is always on (always); A turns it off (off); DOWN
+# to the long name, cut with "..." (cut), which scrolls sideways once the
+# cursor rests (marquee) to its end, where it pauses (end); Moon jump's code
+# holds A (hold); Warp's keys line says press (press); A or B's code holds
+# two combinations: no sentence, the toggles' note (unknown); Skip the
+# intro patches the ROM and Pick a level is a placeholder: their reasons
+# win (locked, cant).
+#! settings 2=1
+#! sd-file /torii/cheats/Hello.cht 0 tests/shots/data/ingame-hello.cht
+-w "nav: home ready"
+-P "@8:nav_test_path:/Hello.gba" -p @8:nav_test_action:0x7E000002
+-w "launch: starting the game"
+-k @300:L+R+START -k @306:-
+-w "screen ready: ingame"
+-k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:A -k @48:-
+-w "screen ready: ingame-cheats"
+-s @4:always.png
+-k @10:A -k @14:-
+-s @24:off.png
+-k @30:DOWN -k @34:-
+-s @44:cut.png
+-s @120:marquee.png
+-s @250:end.png
+-k @300:DOWN -k @304:-
+-s @314:hold.png
+-k @320:DOWN -k @324:-
+-s @334:press.png
+-k @340:DOWN -k @344:-
+-s @354:unknown.png
+-k @360:DOWN -k @364:-
+-s @374:locked.png
+-k @380:DOWN -k @384:-
+-s @394:cant.png

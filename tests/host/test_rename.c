@@ -70,6 +70,28 @@ void test_rename_edit(void)
 	CHECK(!strcmp(e.text, "ab c"));
 	rename_edit_init(&e, "   ", 60);
 	CHECK_EQ(rename_edit_result(&e, out, 1), 0);
+
+	// A text of lines: a line break types, and OK keeps it inside the text
+	// (not at its ends); a name drops it as any control character
+	rename_edit_init(&e, "a", 60);
+	CHECK(rename_edit_type(&e, '\n') && rename_edit_type(&e, 'b') && rename_edit_type(&e, '\n'));
+	CHECK(!rename_edit_type(&e, '\t'));
+	CHECK_EQ(rename_edit_result(&e, out, RENAME_LINES), 3);
+	CHECK(!strcmp(out, "a\nb"));
+	CHECK_EQ(rename_edit_result(&e, out, 0), 2);
+	CHECK(!strcmp(out, "ab"));
+	rename_edit_init(&e, " \n \n", 60);
+	CHECK_EQ(rename_edit_result(&e, out, RENAME_LINES), 0);
+	// A guide counts the bytes its .cht value takes: é 2, a line break 2 ("\n")
+	rename_edit_init(&e, "", 6);
+	e.bytes = 1;
+	CHECK(rename_edit_type(&e, 'a') && rename_edit_type(&e, 0xE9) && rename_edit_type(&e, '\n'));
+	CHECK_EQ(rename_edit_chars(&e), 5);
+	CHECK(!rename_edit_type(&e, 0xE9));  // 7 would pass the cap
+	CHECK(!rename_edit_type(&e, '\n'));
+	CHECK(rename_edit_type(&e, 'b'));
+	CHECK_EQ(rename_edit_chars(&e), 6);
+	CHECK(!rename_edit_type(&e, 'c'));
 }
 
 void test_rename_keys(void)
@@ -89,6 +111,24 @@ void test_rename_keys(void)
 					u32 k = rename_key(p, up, r, c);
 					CHECK(k >= 0x20 && !strchr("\\/:*?\"<>|", (int)k) && k != 0xD7 && k != 0xF7);
 				}
+	// Another name has : ? / too; a text of lines , . ? ' beside the
+	// letters and a sentence's marks; the file name's keys come back after
+	rename_layout(0);
+	CHECK_EQ(rename_key(RENAME_PAGE_LATIN, 1, 3, 4), ':');
+	CHECK_EQ(rename_key(RENAME_PAGE_ABC, 0, 3, 9), '\'');
+	rename_layout(RENAME_LINES);
+	CHECK_EQ(rename_key(RENAME_PAGE_ABC, 0, 3, 7), ',');
+	CHECK_EQ(rename_key(RENAME_PAGE_ABC, 1, 3, 9), '?');
+	CHECK_EQ(rename_key(RENAME_PAGE_ABC, 0, 2, 9), '\'');
+	CHECK_EQ(rename_key(RENAME_PAGE_LATIN, 0, 3, 3), ':');
+	CHECK_EQ(rename_key(RENAME_PAGE_LATIN, 0, 3, 6), '/');
+	for (u32 p = 0; p < RENAME_PAGES; p++)
+		for (int up = 0; up < 2; up++)
+			for (u32 r = 0; r < RENAME_CHAR_ROWS; r++)
+				for (u32 c = 0; c < RENAME_COLS; c++)
+					CHECK(rename_key(p, up, r, c) >= 0x20);
+	rename_layout(RENAME_FILE);
+	CHECK_EQ(rename_key(RENAME_PAGE_LATIN, 1, 3, 4), '[');
 	CHECK(rename_is_letter('a') && rename_is_letter(0xDF) && !rename_is_letter('1') && !rename_is_letter(0xD7));
 	// The function row spans the ten columns
 	u32 cols = 0;
@@ -99,6 +139,17 @@ void test_rename_keys(void)
 	CHECK_EQ(rename_func_at(6), RENAME_KEY_DELETE);
 	CHECK_EQ(rename_func_at(9), RENAME_KEY_OK);
 	CHECK_EQ(rename_func_col(RENAME_KEY_CANCEL), 7);
+	// A text of lines' row: Enter after Space, still ten columns
+	rename_layout(RENAME_LINES);
+	cols = 0;
+	for (u32 k = 0; k < RENAME_FUNCS; k++)
+		cols += rename_func_span[k];
+	CHECK_EQ(cols, RENAME_COLS);
+	CHECK_EQ(rename_func_at(5), RENAME_KEY_ENTER);
+	CHECK_EQ(rename_func_at(6), RENAME_KEY_DELETE);
+	CHECK_EQ(rename_func_col(RENAME_KEY_ENTER), 5);
+	rename_layout(RENAME_FILE);
+	CHECK_EQ(rename_func_at(5), RENAME_KEY_SPACE);  // a name's has no Enter
 }
 
 void test_rename_selection(void)
@@ -125,4 +176,12 @@ void test_rename_selection(void)
 	CHECK(!rename_sel_move(&s, RIGHT, 0) && rename_func_at(s.col) == RENAME_KEY_OK);
 	CHECK(rename_sel_move(&s, RIGHT, 1) && rename_func_at(s.col) == RENAME_KEY_SHIFT);
 	CHECK(rename_sel_move(&s, LEFT, 1) && rename_func_at(s.col) == RENAME_KEY_OK && s.col == 9);
+	// A name's row passes over Enter, which it hasn't; a text of lines' stops on it
+	s = (struct rename_sel){RENAME_FUNC_ROW, 4};
+	CHECK(rename_sel_move(&s, RIGHT, 1) && rename_func_at(s.col) == RENAME_KEY_DELETE);
+	CHECK(rename_sel_move(&s, LEFT, 1) && rename_func_at(s.col) == RENAME_KEY_SPACE);
+	rename_layout(RENAME_LINES);
+	CHECK(rename_sel_move(&s, RIGHT, 1) && rename_func_at(s.col) == RENAME_KEY_ENTER && s.col == 5);
+	CHECK(rename_sel_move(&s, RIGHT, 0) && rename_func_at(s.col) == RENAME_KEY_DELETE);
+	rename_layout(RENAME_FILE);
 }

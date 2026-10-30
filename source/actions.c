@@ -172,7 +172,7 @@ static u32 default_how(const struct game_pick *game)
 		   : Read_SET_info(assress_boot_mode) == 1 ? ACTION_BOOT_CLEAN
 							   : ACTION_BOOT_ADDONS;
 	u32 any = Read_SET_info(assress_v_reset) == 1 || Read_SET_info(assress_v_rts) == 1 ||
-		  Read_SET_info(assress_v_sleep) == 1 || gl_cheat_picks || gl_cheat_patches;
+		  Read_SET_info(assress_v_sleep) == 1 || gl_cheat_count || gl_cheat_patches;
 	tlog("launch: boot mode %s (%s)%s", mode == ACTION_BOOT_CLEAN ? "clean" : "with addons",
 	     own ? "the game's" : "Settings'", mode == ACTION_BOOT_ADDONS && !any ? ", none on" : "");
 	return mode == ACTION_BOOT_CLEAN || !any ? ACTION_CLEAN : ACTION_ADDON;

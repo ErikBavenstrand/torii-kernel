@@ -21,7 +21,10 @@
 // "R", its format's name (cheatfile_format_names) and its code as the lines
 // it decoded from, decrypted and written plain, key and seed lines left out
 // ("-" and nothing for one that can't be: a VBA line, or formats mixed), so
-// it decodes the same with no key (cheatcode.h's struct cheat_raw).
+// it decodes the same with no key (cheatcode.h's struct cheat_raw). With
+// --ops, after each a line "O" per op it decoded to (cheatcode.h's struct
+// cheat_op): type, width, address, value, count, addr_step, value_step and
+// else_count, in hex, for tools that tell what cheats do.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -75,6 +78,20 @@ static void print_raw(void)
 			       (unsigned)cheat_raw.line[i].op2);
 	}
 	putchar('\n');
+}
+
+// The ops the last cheat decoded to: decoders fill w->ops from the start,
+// so those whose type isn't the mark left before decoding
+#define OP_UNUSED 0xFF
+
+static void print_ops(void)
+{
+	for (u32 i = 0; i < CHEATFILE_OPS_MAX && work.ops[i].type != OP_UNUSED; i++) {
+		const struct cheat_op *o = &work.ops[i];
+		printf("O\t%X\t%X\t%X\t%X\t%X\t%X\t%X\t%X\n", (unsigned)o->type, (unsigned)o->width,
+		       (unsigned)o->address, (unsigned)o->value, (unsigned)o->count, (unsigned)o->addr_step,
+		       (unsigned)o->value_step, (unsigned)o->else_count);
+	}
 }
 
 // --index: the file's index on stdout; 0 if it can't be cut into windows
@@ -156,13 +173,22 @@ int main(int argc, char **argv)
 		}
 		return 0;
 	}
-	int raw = argc > 1 && !strcmp(argv[1], "--raw");
-	if (argc < 2 + raw) {
-		fprintf(stderr, "usage: cheat_patches [--raw] FILE.cht...\n");
+	int raw = 0, ops = 0;
+	for (; 1 + raw + ops < argc;) {
+		if (!strcmp(argv[1 + raw + ops], "--raw") && !raw)
+			raw = 1;
+		else if (!strcmp(argv[1 + raw + ops], "--ops") && !ops)
+			ops = 1;
+		else
+			break;
+	}
+	int flags = raw + ops;
+	if (argc < 2 + flags) {
+		fprintf(stderr, "usage: cheat_patches [--raw] [--ops] FILE.cht...\n");
 		return 2;
 	}
 	cheatfile_begin(&work);
-	for (int a = 1 + raw; a < argc; a++) {
+	for (int a = 1 + flags; a < argc; a++) {
 		FILE *f = fopen(argv[a], "rb");
 		long len;
 		if (!f || fseek(f, 0, SEEK_END) || (len = ftell(f)) < 0 || fseek(f, 0, SEEK_SET)) {
@@ -182,7 +208,12 @@ int main(int argc, char **argv)
 		}
 		work.next = 0;  // this file's first cheat, the decoder as the last left it
 		s32 i;
-		while ((i = cheatfile_next(&file, &work)) >= 0) {
+		for (;;) {
+			if (ops)
+				for (u32 k = 0; k < CHEATFILE_OPS_MAX; k++)
+					work.ops[k].type = OP_UNUSED;
+			if ((i = cheatfile_next(&file, &work)) < 0)
+				break;
 			u32 h = 0;
 			if (cheats[i].status == CHEATFILE_OK) {
 				h = hash_words(2166136261u, &work.n_prog, 1);
@@ -190,13 +221,15 @@ int main(int argc, char **argv)
 				h = hash_words(h, (const u32 *)(const void *)work.patches,
 					       work.n_patches * (u32)sizeof(struct cheat_patch) / 4);
 			}
-			printf("%d\t%ld\t%u\t%08X", a - 1 - raw, (long)i, (unsigned)cheats[i].status, (unsigned)h);
+			printf("%d\t%ld\t%u\t%08X", a - 1 - flags, (long)i, (unsigned)cheats[i].status, (unsigned)h);
 			for (u32 p = 0; cheats[i].status == CHEATFILE_OK && p < work.n_patches; ++p)
 				printf("\t%X/%X/%X", (unsigned)work.patches[p].offset, (unsigned)work.patches[p].value,
 				       (unsigned)work.patches[p].mask);
 			putchar('\n');
 			if (raw)
 				print_raw();
+			if (ops)
+				print_ops();
 		}
 		free(text);
 	}

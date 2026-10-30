@@ -1,6 +1,7 @@
 // The in-game menu's ABI (source/ingame_abi.h) and the in-game probe's
 // report (source/ingameprobe.h): the numbers the stub in gba_rts_patch.s, the
 // overlay, the probe ROM and the tests copy by hand.
+#include "../../source/cheatcode.h"
 #include "../../source/ingame_abi.h"
 #include "../../source/ingameprobe.h"
 #include "../kernel/torii_test.h"
@@ -52,8 +53,21 @@ void test_ingame_abi(void)
 	// mirror at 0x4000000 - 0x18 and - 0x14), and a reason in its bits
 	CHECK_EQ(offsetof(struct ingame_cheat, cost), sizeof(struct ingame_line));
 	CHECK_EQ(offsetof(struct ingame_cheat, flags) - offsetof(struct ingame_cheat, cost), 6u);
-	CHECK_EQ(sizeof(struct ingame_cheat), 276u);
+	CHECK_EQ(offsetof(struct ingame_cheat, act) - offsetof(struct ingame_cheat, cost), 8u);
+	CHECK_EQ(sizeof(struct ingame_cheat), 280u);
 	CHECK_EQ(INGAME_CHEAT_TOGGLES, 0x03007FE8u);
+	// The interpreter's keys (cheatcode.h, cheatrun.s): the halfword after
+	// the hook's on/off halfword, and CheatRAN's high half, through the
+	// mirror at 0x4000000 - 0x1E and - 0x1A
+	CHECK_EQ(CHEAT_KEYS_NOW, INGAME_CHEAT_ONOFF + 2);
+	CHECK_EQ(CHEAT_KEYS_BEFORE, INGAME_CHEAT_ONOFF + 6);
+	CHECK_EQ(0x04000000u - 0x1E - 0x00FF8000u, CHEAT_KEYS_NOW);
+	CHECK_EQ(0x04000000u - 0x1A - 0x00FF8000u, CHEAT_KEYS_BEFORE);
+	// The activation lines and the whole names (the marquee): their room
+	CHECK(INGAME_SESSION_ACT(INGAME_ACT_LINES) <= INGAME_SESSION_STATE(1, 1));
+	CHECK_EQ(sizeof(struct ingame_wide), 4u + INGAME_TEXT_ROWS * INGAME_WIDE_W / 8);
+	CHECK(INGAME_SRAM_WIDE + INGAME_CHEATS * sizeof(struct ingame_wide) <= INGAME_SRAM_STATE);
+	CHECK(INGAME_ACT_LINES < 256);  // an entry's act byte
 	CHECK_EQ(0x04000000u - 0x18 - 0x00FF8000u, INGAME_CHEAT_TOGGLES);
 	CHECK(INGAME_CHEAT_TOGGLES + 8 <= 0x03007FF0u && INGAME_CHEAT_TOGGLES >= INGAME_CHEAT_ONOFF + 8);
 	CHECK(INGAME_WHYS - 1 <= INGAME_CHEAT_WHY);

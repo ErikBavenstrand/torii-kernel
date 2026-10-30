@@ -1949,10 +1949,9 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 				ingame_states_none();
 			rom_guard_reset();  // Torii: the patches below mark what the cheats' keep off
 			cartlog_phase(PHASE_LAUNCH, 0, pfilename);
-			tlog("launch: loading %s, BOOT WITH ADDON: reset %u, savestate %u, sleep %u, cheats %u (%lu), "
-			     "%lu more off for the in-game list",
-			     pfilename, gl_reset_on, gl_rts_on, gl_sleep_on, gl_cheat_on, (unsigned long)gl_cheat_picks,
-			     (unsigned long)(gl_cheat_count - gl_cheat_picks));
+			tlog("launch: loading %s, BOOT WITH ADDON: reset %u, savestate %u, sleep %u, cheats %u (%lu)",
+			     pfilename, gl_reset_on, gl_rts_on, gl_sleep_on, gl_cheat_on,
+			     (unsigned long)gl_cheat_count);
 			ingame_probe_prepare(GAMECODE);  // the in-game probe ROM's scratch file
 			tlog_flush();
 			if ((gl_reset_on == 1) || (gl_rts_on == 1) || (gl_sleep_on == 1) || (gl_cheat_on == 1)) {

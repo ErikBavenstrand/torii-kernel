@@ -180,14 +180,10 @@ void test_cheatstore(void)
 			 "cheat3_code = \"08001000:4770\"\n"
 			 "cheat3_enable = true\n"));
 	cheatstore_launch(T_ROM, 0);
-	// The picks, and the cheat not picked after them, off, for the in-game
-	// list (v0.8); the ROM patch runs at launch only
-	CHECK_EQ(gl_cheat_picks, 2);
-	CHECK_EQ(gl_cheat_count, 3);
-	CHECK_EQ(gl_cheat_pick_bytes, 12 + 20);
-	CHECK_EQ(gl_cheat_bytes, 12 + 20 + 12 + 4);
-	CHECK_EQ(gl_cheat_off[0], 1u << 2);
-	CHECK_EQ(gl_cheat_off[1], 0);
+	// The picks alone (v0.10: no cheat not picked for the in-game list); the
+	// ROM patch runs at launch only
+	CHECK_EQ(gl_cheat_count, 2);
+	CHECK_EQ(gl_cheat_bytes, 12 + 20 + 4);
 	CHECK_EQ(gl_cheat_table[0], 1 | CHEAT_PROG_PLAIN | 8 << 16);
 	CHECK_EQ(gl_cheat_table[1], 0x12001000);  // a halfword write
 	CHECK_EQ(gl_cheat_table[2], 0xBEEF);
@@ -195,9 +191,7 @@ void test_cheatstore(void)
 	CHECK_EQ(gl_cheat_table[4], 0x03007FF0);  // no longer folded into IWRAM's first 32 KB by a mask
 	CHECK_EQ(gl_cheat_table[5], 0xAB);
 	CHECK_EQ(gl_cheat_table[6], 0x14000050);
-	CHECK_EQ(gl_cheat_table[8], 1 | CHEAT_PROG_PLAIN | 8 << 16);  // the extra
-	CHECK_EQ(gl_cheat_table[9], 0x02001010);
-	CHECK_EQ(gl_cheat_table[11], 0);
+	CHECK_EQ(gl_cheat_table[8], 0);  // the table's end
 	CHECK_EQ(gl_cheat_patches, 1);
 
 	// The screen's toggle, written back: only the enable lines change
@@ -208,8 +202,7 @@ void test_cheatstore(void)
 	CHECK(cheatfile_toggle(&s->file, 1));
 	CHECK(cheatstore_write());
 	cheatstore_launch(T_ROM, 0);
-	CHECK_EQ(gl_cheat_picks, 2);
-	CHECK_EQ(gl_cheat_count, 3);  // the EWRAM write now the extra
+	CHECK_EQ(gl_cheat_count, 2);  // the EWRAM write no longer in
 	CHECK_EQ(gl_cheat_table[1], 0x02001010);
 	CHECK_EQ(gl_cheat_table[2], 0x01);
 	CHECK_EQ(gl_cheat_table[4], 0x03007FF0);

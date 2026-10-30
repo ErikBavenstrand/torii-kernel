@@ -19,11 +19,14 @@
 // "cheatN_enable = true" at the end for a picked cheat that had none; every
 // other byte stays.
 //
-// Torii adds two keys of its own, which other readers ignore and
+// Torii adds keys of its own, which other readers ignore and
 // tools/cheats.py keeps: "cheatN_format" (cheatfile_format_names) decodes
 // that cheat alone in one format, with cheat_decoder_force, as the code
 // keypad's override saved it; "cheatN_user = true" marks a code typed on the
-// cart, which may be edited and deleted there. The keypad's edits
+// cart, which may be edited and deleted there. "cheatN_keys" says how the cheat is
+// activated ("hold L+Select", cheatkeys.h) and "cheatN_guide" what it does
+// and how to use it (free text, "\n" a paragraph break), both set on the
+// cart (cheatfile_set_keys, _set_guide). The keypad's edits
 // (cheatfile_add, _set_code, _remove) change the text in place, through a
 // struct cheatfile_room (the card side's text is in PSRAM, which takes no
 // byte stores), and read it again.
@@ -38,6 +41,7 @@
 #include <gba_base.h>
 
 #include "cheatcode.h"
+#include "cheatkeys.h"
 
 #define CHEATFILE_TEXT_MAX 0x30000  // the largest text read (192 KB; exports reach 90 KB); a longer file is refused
 #define CHEATFILE_MAX 1024         // cheats kept, numbered 0 to CHEATFILE_MAX - 1
@@ -88,6 +92,7 @@ struct cheatfile_cheat {
 	u32 desc;            // CHEATFILE_NONE: no desc line
 	u32 code;
 	u32 enable;          // CHEATFILE_NONE: no enable line
+	u32 guide;           // cheatN_guide's value (the last line's) packed: cheatfile_guide_at, _len
 	u16 desc_len, code_len;
 	u8 enable_len;
 	u8 status;           // enum cheatfile_status
@@ -95,6 +100,7 @@ struct cheatfile_cheat {
 	u16 bytes;           // its share of the interpreter's table once decoded (OK only)
 	u16 cost;            // its cycles a frame, at most (OK only)
 	u16 patches;         // ROM patches once decoded (OK only)
+	u16 keys;            // cheatN_keys' value (cheatkeys.h), 0: no line or not a value
 	u32 hash;            // its table part's and patches' hash once decoded (OK only; else 0)
 	u8 picked : 1;       // now
 	u8 was : 1;          // as the text has it (what writing back changes from)
@@ -103,7 +109,64 @@ struct cheatfile_cheat {
 	u8 format : 3;       // cheatN_format's enum cheat_format, CHEAT_FMT_AUTO without one
 	u8 renamed : 1;      // cheatN_renamed = true: named on the cart, a name `just cheats` keeps
 	u8 detected;         // once decoded: the format its first code line read in (format, if set), else AUTO
+	u16 act;             // once decoded (OK or SAME): the activation its code implies (cheatkeys_derive),
+			     // with CHEATFILE_ACT_UNGATED; else 0
 };
+
+// In a cheat's act: its code can't wait on buttons (it patches the ROM, or
+// has no room for the condition), so a Hold or Press line isn't kept
+#define CHEATFILE_ACT_UNGATED 0x8000u
+_Static_assert(!(CHEATFILE_ACT_UNGATED & (CHEATKEYS_BUTTONS | CHEATKEYS_MODE_MASK)), "a free bit of the value");
+
+// A guide's span, packed in a word to keep the table small (cheatstore.h
+// holds CHEATFILE_MAX of them): its text offset (below 2^18, past
+// CHEATFILE_TEXT_MAX) above its length (a longer value isn't read: no guide)
+#define CHEATFILE_GUIDE_LEN_BITS 14
+#define CHEATFILE_GUIDE_LEN_MAX ((1u << CHEATFILE_GUIDE_LEN_BITS) - 1)
+_Static_assert(CHEATFILE_TEXT_MAX <= 1u << (32 - CHEATFILE_GUIDE_LEN_BITS), "a guide's offset fits its bits");
+
+// Cheat c's guide value's text offset, CHEATFILE_NONE without one; and its
+// bytes (raw: "\n" for a line break, cheatfile_guide unescapes)
+static inline u32 cheatfile_guide_at(const struct cheatfile_cheat *c)
+{
+	return c->guide == CHEATFILE_NONE ? CHEATFILE_NONE : c->guide >> CHEATFILE_GUIDE_LEN_BITS;
+}
+
+static inline u32 cheatfile_guide_len(const struct cheatfile_cheat *c)
+{
+	return c->guide == CHEATFILE_NONE ? 0 : c->guide & CHEATFILE_GUIDE_LEN_MAX;
+}
+
+// What cheat c's code implies once decoded (cheatkeys.h), 0 before or if it can't tell
+static inline u16 cheatfile_derived(const struct cheatfile_cheat *c)
+{
+	return (u16)(c->act & ~CHEATFILE_ACT_UNGATED);
+}
+
+// 1 if cheat c, decoded, can't take a Hold or Press line (CHEATFILE_ACT_UNGATED)
+static inline int cheatfile_ungated(const struct cheatfile_cheat *c)
+{
+	return (c->act & CHEATFILE_ACT_UNGATED) != 0;
+}
+
+// How cheat c is activated (cheatkeys.h): its cheatN_keys line's, else what
+// its code implies once decoded; 0 if neither says. Once decoded, a line the
+// code can't keep gives way to the code: a cheat that only patches the ROM
+// is set at launch; Hold or Press on one that can't wait on buttons, Always
+// on one whose code waits on some, and "launch" on one that runs in game
+// show what the code does.
+static inline u16 cheatfile_activation(const struct cheatfile_cheat *c)
+{
+	u16 code = cheatfile_derived(c);
+	u32 mode = cheatkeys_mode(c->keys), own = cheatkeys_mode(code);
+	if (code == CHEATKEYS_AT_LAUNCH || !c->keys)
+		return code;
+	if (c->act && ((mode == CHEATKEYS_LAUNCH) ||
+		       ((mode == CHEATKEYS_HOLD || mode == CHEATKEYS_PRESS) && cheatfile_ungated(c)) ||
+		       (mode == CHEATKEYS_ALWAYS && (own == CHEATKEYS_HOLD || own == CHEATKEYS_PRESS))))
+		return code;
+	return c->keys;
+}
 
 // Where cheatfile_text has got to, so each call goes on from the last
 struct cheatfile_out {
@@ -291,6 +354,21 @@ u32 cheatfile_set_code(struct cheatfile *f, const struct cheatfile_room *room, u
 // not the user's own, a cheatN_renamed line so `just cheats` keeps the name
 // when it writes the file again.
 u32 cheatfile_rename(struct cheatfile *f, const struct cheatfile_room *room, u32 i, const char *desc);
+// Sets cheat i's cheatN_keys to keys (cheatkeys.h), its last such line's
+// value replaced, or a line added after its code line; keys 0 removes every
+// such line (the activation then comes from the code). CHEATFILE_EDIT_BAD
+// for an invalid keys.
+u32 cheatfile_set_keys(struct cheatfile *f, const struct cheatfile_room *room, u32 i, u16 keys);
+// Sets cheat i's cheatN_guide to guide (UTF-8, NUL-ended), as cheatfile_set_keys
+// sets its keys: a real line break is written as "\n", control characters
+// dropped, '"' written as '\'', and the value cut to CHEATFILE_GUIDE_MAX bytes on
+// a whole character. A guide empty after that removes every such line.
+#define CHEATFILE_GUIDE_MAX 250
+u32 cheatfile_set_guide(struct cheatfile *f, const struct cheatfile_room *room, u32 i, const char *guide);
+// Cheat i's guide for showing: each "\n" in it a line break, cut to size - 1
+// bytes on a whole character and ended (size 0 writes nothing). Its bytes;
+// 0 and "" without one.
+u32 cheatfile_guide(const struct cheatfile *f, u32 i, char *out, u32 size);
 // Removes every cheatN_ line of cheat i (and a blank line before them),
 // and numbers the cheats after it one lower, as RetroArch reads a file's
 // cheats from 0 to its count.

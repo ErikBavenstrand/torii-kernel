@@ -33,9 +33,6 @@ u32 gl_cheat_table[CHEAT_TABLE_MAX / 4] EWRAM_BSS;
 u32 gl_cheat_bytes;
 u32 gl_cheat_count;
 u32 gl_cheat_patches;
-u32 gl_cheat_picks;
-u32 gl_cheat_pick_bytes;
-u32 gl_cheat_off[2];
 
 struct cheatstore *cheatstore(void)
 {
@@ -1431,6 +1428,16 @@ u32 cheatstore_rename(u32 i, const char *desc)
 	return edit_done(cheatfile_rename(edited_file(), the_room(), i, desc));
 }
 
+u32 cheatstore_set_keys(u32 i, u16 keys)
+{
+	return edit_done(cheatfile_set_keys(edited_file(), the_room(), i, keys));
+}
+
+u32 cheatstore_set_guide(u32 i, const char *guide)
+{
+	return edit_done(cheatfile_set_guide(edited_file(), the_room(), i, guide));
+}
+
 u32 cheatstore_remove(u32 i)
 {
 	return edit_done(cheatfile_remove(edited_file(), the_room(), i));
@@ -1683,87 +1690,10 @@ static void write_patches(const char *rom_path, u32 psram_bytes)
 	     guarded ? ", some over the kernel's own patches left out" : "");
 }
 
-// The in-game list's cheats (ingame_abi.h) as the launch's pass lists them,
-// fixed up once the table is laid out
-struct listed {
-	u8 extra;  // with the extras: its place among them + 1; else 0
-	u8 flags;  // INGAME_CHEAT_*
-	u8 fix;  // its flags changed after it was written
-};
-
-// The extras: cheats listed but not picked, put in the table off so the
-// in-game list can turn them on. They wait at the table's top, the first
-// highest, until every pick is in.
-struct extras {
-	u32 n, low;  // how many, and the lowest offset they take
-	u16 bytes[INGAME_CHEATS], cost[INGAME_CHEATS];
-};
-
 void cheatstore_launch_none(void)
 {
 	gl_cheat_count = gl_cheat_bytes = gl_cheat_patches = 0;
-	gl_cheat_picks = gl_cheat_pick_bytes = 0;
-	gl_cheat_off[0] = gl_cheat_off[1] = 0;
 	ingame_cheats_clear();
-}
-
-// Keeps the first n extras: the later ones lose their place (no room)
-static void extras_keep(struct extras *x, struct listed *list, u32 listed, u32 n)
-{
-	while (x->n > n)
-		x->low += x->bytes[--x->n];
-	for (u32 e = 0; e < listed; e++)
-		if (list[e].extra > n) {
-			list[e].extra = 0;
-			list[e].flags = INGAME_WHY_ROOM;
-			list[e].fix = 1;
-		}
-}
-
-static void words_reverse(u32 *w, u32 n)
-{
-	for (u32 a = 0, b = n; a + 1 < b; a++, b--) {
-		u32 t = w[a];
-		w[a] = w[b - 1];
-		w[b - 1] = t;
-	}
-}
-
-// The extras after the picks, in file order, as many as the cycle cap takes
-// with every pick on and every extra off; the off mask; the list's entries
-// fixed up
-static void extras_place(struct extras *x, struct listed *list, u32 listed, u32 picks_cost)
-{
-	u32 keep = x->n;
-	if (gl_cheat_count + keep > INGAME_CHEATS)  // a toggle each
-		keep = gl_cheat_count < INGAME_CHEATS ? INGAME_CHEATS - gl_cheat_count : 0;
-	while (keep && picks_cost + keep * CHEAT_LOAD(CHEAT_COST_SKIP) > CHEAT_LOAD_MAX)
-		keep--;
-	extras_keep(x, list, listed, keep);
-	// Down to the picks' end in one block (the last extra first), then in
-	// file order: the block's words reversed, then each cheat's back
-	u32 bytes = CHEATFILE_BYTES_MAX - x->low;
-	u32 *block = gl_cheat_table + gl_cheat_bytes / 4;
-	memmove(block, (u8 *)gl_cheat_table + x->low, bytes);
-	words_reverse(block, bytes / 4);
-	for (u32 k = 0, at = 0; k < x->n; at += x->bytes[k] / 4u, k++) {
-		words_reverse(block + at, x->bytes[k] / 4u);
-		u32 bit = gl_cheat_count + k;
-		gl_cheat_off[bit >> 5] |= 1u << (bit & 31);
-	}
-	for (u32 e = 0; e < listed; e++) {
-		const struct listed *l = &list[e];
-		if (l->extra)
-			ingame_cheat_meta(e, l->flags | INGAME_CHEAT_TABLE, (u8)(gl_cheat_count + l->extra - 1u),
-					  x->cost[l->extra - 1]);
-		else if (l->fix)
-			ingame_cheat_meta(e, l->flags, 0, 0);
-	}
-	if (x->n)
-		tlog("cheats: %lu more in the table for the in-game list, off (%lu bytes)", (unsigned long)x->n,
-		     (unsigned long)bytes);
-	gl_cheat_bytes += bytes;
-	gl_cheat_count += x->n;
 }
 
 void cheatstore_launch(const char *rom_path, u32 psram_bytes)
@@ -1784,30 +1714,23 @@ void cheatstore_launch(const char *rom_path, u32 psram_bytes)
 	for (u32 j = 0; j < cs->n_picks && cs->windows; j++)
 		if (window_of(cs->picks[j].number) > last_window)
 			last_window = window_of(cs->picks[j].number);
-	// The in-game list: every pick, and as many other cheats as fill it, in
-	// file order
-	struct listed list[INGAME_CHEATS];
-	struct extras x;
-	u32 listed = 0, picks_seen = 0;
-	x.n = 0;
-	x.low = CHEATFILE_BYTES_MAX;
+	// The in-game list: the picks (v0.10: only they), in file order
+	u32 listed = 0;
 	s32 i;
-	// Every cheat up to the last pick, as keys carry from cheat to cheat,
-	// and on until the list is full; a larger file's windows in turn, the
-	// decoder carrying from each to the next. start: the window's first
-	// cheat's place in the file (the in-game list's index).
+	// Every cheat up to the last pick, as keys carry from cheat to cheat; a
+	// larger file's windows with picks in turn, the decoder carrying from
+	// each to the next. start: the window's first cheat's place in the file
+	// (the in-game list's index).
 	for (u32 k = 0, start = 0;;) {
 		u32 last = 0;  // past the window's last pick
 		for (u32 n = 0; n < f->count; n++)
 			if (cs->cheats[n].picked)
 				last = n + 1;
-		int full = 0;
+		int done = 0;
 		while ((i = cheatfile_next(f, &cs->work)) >= 0) {
 			const struct cheatfile_cheat *c = &cs->cheats[i];
-			picks_seen += c->picked;
-			int show = cheatfile_shown(c) && listed < INGAME_CHEATS &&
-				   (c->picked || INGAME_CHEATS - listed > picks - picks_seen);
-			u8 flags = INGAME_WHY_CANT, extra = 0;
+			int show = c->picked && cheatfile_shown(c) && listed < INGAME_CHEATS;
+			u8 flags = INGAME_WHY_CANT;
 			u32 bit = 0, bytes = cs->work.n_prog * 4;
 			if (c->picked) {
 				if (c->status != CHEATFILE_OK) {
@@ -1835,9 +1758,6 @@ void cheatstore_launch(const char *rom_path, u32 psram_bytes)
 					flags = INGAME_CHEAT_ON |
 						(cs->work.n_patches ? INGAME_WHY_LOCKED : INGAME_WHY_NONE);
 					if (bytes) {
-						// The extras make way for a pick, the last first
-						while (x.n && gl_cheat_bytes + bytes > x.low)
-							extras_keep(&x, list, listed, x.n - 1);
 						memcpy((u8 *)gl_cheat_table + gl_cheat_bytes, cs->work.prog, bytes);
 						gl_cheat_bytes += bytes;
 						cost += cs->work.cost;
@@ -1849,42 +1769,28 @@ void cheatstore_launch(const char *rom_path, u32 psram_bytes)
 					gl_cheat_patches += cs->work.n_patches;
 					keep_patches(f, c, &cs->work);
 				}
-			} else if (show && c->status == CHEATFILE_OK) {
-				flags = INGAME_WHY_ROOM;
-				if (cs->work.n_patches) {
-					flags = INGAME_WHY_ROM;
-				} else if (bytes && x.n < INGAME_CHEATS && gl_cheat_bytes + bytes <= x.low) {
-					x.low -= bytes;
-					memcpy((u8 *)gl_cheat_table + x.low, cs->work.prog, bytes);
-					x.bytes[x.n] = (u16)bytes;
-					x.cost[x.n] = (u16)cs->work.cost;
-					extra = (u8)++x.n;
-					flags = INGAME_WHY_NONE;
-				}
 			}
 			if (show) {
-				list[listed].extra = extra;
-				list[listed].flags = flags;
-				list[listed].fix = 0;
 				u32 desc = c->desc != CHEATFILE_NONE;
 				ingame_cheat_put(listed, f->text + (desc ? c->desc : c->code),
 						 desc ? c->desc_len : c->code_len, c->number, (u16)(start + (u32)i),
-						 flags, (u8)bit, (flags & INGAME_CHEAT_TABLE) ? (u16)cs->work.cost : 0);
+						 flags, (u8)bit, (flags & INGAME_CHEAT_TABLE) ? (u16)cs->work.cost : 0,
+						 cheatfile_activation(c));
 				listed++;
 			}
-			if ((k > last_window || (k == last_window && (u32)i + 1 >= last)) && listed >= INGAME_CHEATS) {
-				full = 1;
+			if (k >= last_window && (u32)i + 1 >= last) {
+				done = 1;
 				break;
 			}
 		}
-		if (full || !cs->windows)
+		if (done || !cs->windows)
 			break;
-		// The next window with picks, or any while the list has room: each
-		// decodes from its index's state, so the ones between are passed by
+		// The next window with picks: each decodes from its index's state,
+		// so the ones between are passed by
 		do
 			++k;
-		while (k < cs->windows && listed >= INGAME_CHEATS && !window_has_picks(k));
-		if (k >= cs->windows || (k > last_window && listed >= INGAME_CHEATS))
+		while (k < cs->windows && !window_has_picks(k));
+		if (k >= cs->windows)
 			break;
 		start = cheatstore_window_start(k);
 		if (!window_read(k)) {
@@ -1895,34 +1801,15 @@ void cheatstore_launch(const char *rom_path, u32 psram_bytes)
 	}
 	if (cs->work.next >= f->count)
 		cheatstore_listed();  // decoded whole: the game popup's count, should the launch come back
-	gl_cheat_picks = gl_cheat_count;
-	gl_cheat_pick_bytes = gl_cheat_bytes;
-	u32 pick_cost = cost;
-	extras_place(&x, list, listed, cost);
+	u32 pick_bytes = gl_cheat_bytes;
 	if (gl_cheat_bytes) {
 		gl_cheat_table[gl_cheat_bytes / 4] = 0;  // the table's end
 		gl_cheat_bytes += 4;
 	}
 	ingame_cheats_set(listed, gl_cheat_count);
 	tlog("cheats: %s: %lu picked, %lu run in game (%lu bytes, load %lu of %u), %lu ROM "
-	     "patches; %lu listed in game, %lu in the table",
-	     cs->path, (unsigned long)picks, (unsigned long)gl_cheat_picks, (unsigned long)gl_cheat_pick_bytes,
-	     (unsigned long)(gl_cheat_picks ? pick_cost : 0), CHEAT_LOAD_MAX, (unsigned long)gl_cheat_patches,
-	     (unsigned long)listed, (unsigned long)gl_cheat_count);
-}
-
-void cheatstore_drop_extras(void)
-{
-	if (gl_cheat_count == gl_cheat_picks)
-		return;
-	tlog("cheats: the %lu cheats off at launch left out of the table: no room",
-	     (unsigned long)(gl_cheat_count - gl_cheat_picks));
-	gl_cheat_count = gl_cheat_picks;
-	gl_cheat_bytes = gl_cheat_pick_bytes;
-	gl_cheat_off[0] = gl_cheat_off[1] = 0;
-	if (gl_cheat_bytes) {
-		gl_cheat_table[gl_cheat_bytes / 4] = 0;
-		gl_cheat_bytes += 4;
-	}
-	ingame_cheats_trim(gl_cheat_count);
+	     "patches; %lu listed in game",
+	     cs->path, (unsigned long)picks, (unsigned long)gl_cheat_count, (unsigned long)pick_bytes,
+	     (unsigned long)(gl_cheat_count ? cost : 0), CHEAT_LOAD_MAX, (unsigned long)gl_cheat_patches,
+	     (unsigned long)listed);
 }

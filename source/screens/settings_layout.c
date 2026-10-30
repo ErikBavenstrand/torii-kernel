@@ -110,7 +110,7 @@ u32 settings_capture_step(struct settings_capture *c, u16 held, u32 dt)
 		// rolled over (one held as the answer's go) are still the hold
 		c->after = k;
 		c->held = 0;
-		return c->best == KEY_B ? SET_CAPTURE_CANCEL : SET_CAPTURE_DONE;
+		return c->best == KEY_B && !c->b_ok ? SET_CAPTURE_CANCEL : SET_CAPTURE_DONE;
 	}
 	c->seen |= k;
 	if (k != c->run) {
@@ -129,8 +129,9 @@ u32 settings_capture_step(struct settings_capture *c, u16 held, u32 dt)
 		return SET_CAPTURE_WAIT;
 	if (c->seen) {
 		// Every key up: the set held longest, unless that was B alone
+		// (and b_ok isn't set)
 		if (c->best)
-			return c->best == KEY_B ? SET_CAPTURE_CANCEL : SET_CAPTURE_DONE;
+			return c->best == KEY_B && !c->b_ok ? SET_CAPTURE_CANCEL : SET_CAPTURE_DONE;
 		if (c->seen == KEY_B)
 			return SET_CAPTURE_CANCEL;
 		c->seen = 0;  // a tap too short to count: it waits on

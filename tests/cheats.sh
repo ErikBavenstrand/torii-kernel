@@ -180,6 +180,43 @@ want 2 0203F300 aa "the device button, R and SELECT held"
 want 3 0203F400 77 "CodeBreaker's key test, A held"
 echo "PASS: cheats: every op type runs in game: conditions and ELSE, the button and key test, pointers, add/or/and, slides, palette and VRAM"
 
+# Activation from cheatN_keys (v0.10, docs/plans/cheat-guides.md): a cheat
+# whose keys say Hold L adds 1 to its counter only while L is held; one
+# whose keys say Press R adds 1 once a press, however long R is held
+cp "$cart/clean/sd.img" "$cart/sd.img"
+cp "$cart/clean/kernel-nor.bin" "$cart/"
+rm -f "$cart/sram.bin"
+printf '%s\n' 'cheats = 2' \
+  'cheat0_desc = "Hold L"' 'cheat0_code = "E203F600 0001"' 'cheat0_enable = true' 'cheat0_keys = "hold L"' \
+  'cheat1_desc = "Press R"' 'cheat1_code = "E203F602 0001"' 'cheat1_enable = true' 'cheat1_keys = "press R"' \
+  >"$cart/Hello.cht"
+mcopy -o -i "$cart/sd.img" "$cart/Hello.cht" "::/torii/cheats/Hello.cht"
+# Before any key (@290), R held for 40 frames (@350), R pressed again
+# (@380), L held for 20 frames (@430)
+dumps=()
+for f in 290 350 380 430; do
+  dumps+=(-m "@$f:0x0203F600:4")
+done
+# shellcheck disable=SC2046 # nav.sh's options
+boot $(nav_launch /Hello.gba addon) -w "BOOT WITH ADDON" "${dumps[@]}" -k @300:R -k @340:- -k @360:R -k @364:- \
+  -k @400:L -k @420:- -f 4000 >"$cart/keys.txt" 2>&1 || fail "the keys' launch didn't run: $(grep -a '^kernel' "$cart/keys.txt" | tail -3)"
+grep -q "cheats: .*Hello.cht: 2 picked, 2 run in game" "$cart/keys.txt" ||
+  fail "the keys' launch read: $(grep -a 'cheats:' "$cart/keys.txt" | head -3)"
+# counter N HALF: dump N's halfword (0: Hold L's, 1: Press R's), in decimal
+counter() {
+  local v
+  v=$(sed -n 's/^mem frame [0-9]* 0203F600: //p' "$cart/keys.txt" | sed -n "$1p" | tr -d ' \n')
+  echo $((16#${v:$(($2 * 4 + 2)):2}${v:$(($2 * 4)):2}))
+}
+[ "$(counter 1 0)" = 0 ] && [ "$(counter 1 1)" = 0 ] || fail "a cheat ran with no keys held: $(counter 1 0), $(counter 1 1)"
+[ "$(counter 2 1)" = 1 ] || fail "Press R ran $(counter 2 1) times for one press held 40 frames"
+[ "$(counter 2 0)" = 0 ] || fail "Hold L ran without L: $(counter 2 0)"
+[ "$(counter 3 1)" = 2 ] || fail "Press R ran $(counter 3 1) times for two presses"
+held=$(counter 4 0)
+[ "$held" -ge 18 ] && [ "$held" -le 22 ] || fail "Hold L ran $held times for 20 frames held"
+[ "$(counter 4 1)" = 2 ] || fail "Press R ran without R: $(counter 4 1)"
+echo "PASS: cheats: a cheat's keys line in game: Hold runs while its buttons are held, Press once a press"
+
 # A clean boot applies none
 cp "$cart/picked.img" "$cart/sd.img"
 # shellcheck disable=SC2046 # nav.sh's options
@@ -303,8 +340,8 @@ mcopy -o -i "$cart/sd.img" "$cart/Before.cht" "::/torii/cheats/Hello.cht"
 del_scenario() {
   # shellcheck disable=SC2046 # nav.sh's options
   cut_run "$@" $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
-    -w "screen ready: cheats" -k @8:SELECT -k @12:- \
-    -w "screen ready: cheat-menu" -k @16:DOWN -k @20:- -k @28:A -k @32:- \
+    -w "screen ready: cheats" -k @8:START -k @12:- \
+    -w "screen ready: cheat-menu" -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @40:DOWN -k @44:- -k @52:DOWN -k @56:- -k @64:DOWN -k @68:- -k @76:DOWN -k @80:- -k @88:A -k @92:- \
     -w "screen ready: confirm" -k @8:RIGHT -k @12:- -k @20:A -k @24:- \
     -w "cheats: deleted" -w "screen ready: cheats" -k @8:B -k @12:- -w "cheats: back" -f 12000
 }
@@ -425,7 +462,7 @@ for typed in "3203F030 0077|0203F030:1|77|CodeBreaker" "D5A7153C 73B76013|0203F0
 done
 
 # A code of the user's (the GameShark one just added, row 3) can be edited:
-# SELECT's menu, Edit code, the keypad with its code in (B held clears it),
+# START's menu, Edit code, the keypad with its code in (B held clears it),
 # a CodeBreaker code typed, the keyboard keeping its name; it stays in its
 # place, picked, with its new code
 cp "$cart/added.img" "$cart/sd.img"
@@ -433,8 +470,8 @@ cp "$cart/clean/kernel-nor.bin" "$cart/"
 rm -f "$cart/sram.bin"
 # shellcheck disable=SC2046 # nav.sh's options and the keypad's keys
 boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
-  -w "screen ready: cheats" -k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:SELECT -k @48:- \
-  -w "screen ready: cheat-menu" -k @16:A -k @20:- \
+  -w "screen ready: cheats" -k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:START -k @48:- \
+  -w "screen ready: cheat-menu" -k @16:DOWN -k @20:- -k @28:A -k @32:- \
   -w "screen ready: keypad" -k @8:B -k @200:- $(python3 tests/keypad_keys.py --at 220 3203F0600011 START 2>/dev/null) \
   -w "screen ready: rename" -k @8:START -k @12:- \
   -w "cheats: edited" -w "screen ready: cheats" -k @8:B -k @12:- -w "cheats: back" -f 8000 >"$cart/edit.txt" 2>&1 ||
@@ -444,10 +481,10 @@ grep -q "keypad: saved 3203F060 0011, format auto" "$cart/edit.txt" ||
 [ "$(cheat_lines | tail -n 1)" = "3203F060 0011|1|true|" ] || fail "the edited code reads back as $(cheat_lines | tail -n 1)"
 mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep $'^cheat4_desc = "Code 1"\r$' >/dev/null || fail "the edited code lost its name"
 [ "$(cheat_lines | wc -l)" = 5 ] || fail "the edit added a cheat: $(cheat_lines | tr '\n' ' ')"
-echo "PASS: cheats: a code of the user's is edited from SELECT's menu, in its place, its name kept"
+echo "PASS: cheats: a code of the user's is edited from START's menu, in its place, its name kept"
 
 # A code of the user's (the GameShark one just added, row 3) can be deleted:
-# SELECT's menu, Delete, asked and answered; the file is as it was before the
+# START's menu, Delete, asked and answered; the file is as it was before the
 # add (but for its CRC line), the database's cheats untouched
 cp "$cart/added.img" "$cart/sd.img"
 cp "$cart/clean/kernel-nor.bin" "$cart/"
@@ -455,8 +492,8 @@ rm -f "$cart/sram.bin"
 before=$(cheat_lines | head -n 4)
 # shellcheck disable=SC2046 # nav.sh's options
 boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
-  -w "screen ready: cheats" -k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:SELECT -k @48:- \
-  -w "screen ready: cheat-menu" -k @16:DOWN -k @20:- -k @28:A -k @32:- \
+  -w "screen ready: cheats" -k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:START -k @48:- \
+  -w "screen ready: cheat-menu" -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @40:DOWN -k @44:- -k @52:DOWN -k @56:- -k @64:DOWN -k @68:- -k @76:DOWN -k @80:- -k @88:A -k @92:- \
   -w "screen ready: confirm" -k @8:RIGHT -k @12:- -k @20:A -k @24:- \
   -w "cheats: deleted" -w "screen ready: cheats" -k @8:B -k @12:- -w "cheats: back" -f 6000 >"$cart/delete.txt" 2>&1 ||
   fail "the delete didn't run: $(grep -a '^kernel' "$cart/delete.txt" | tail -3)"
@@ -464,9 +501,9 @@ grep -q "cheats: deleted cheat 4: ok" "$cart/delete.txt" ||
   fail "the delete logged: $(grep -a 'cheats:' "$cart/delete.txt" | tail -3)"
 [ "$(cheat_lines)" = "$before" ] || fail "after the delete the cheats read: $(cheat_lines | tr '\n' ' ')"
 ! mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep '^cheat4_' >/dev/null || fail "cheat 4's lines are still there"
-echo "PASS: cheats: a code of the user's is deleted from SELECT's menu, the database's cheats untouched"
+echo "PASS: cheats: a code of the user's is deleted from START's menu, the database's cheats untouched"
 
-# A database cheat (the first that can be picked, cheat 1) renamed: SELECT's menu, Rename, "q" typed after
+# A database cheat (the first that can be picked, cheat 1) renamed: START's menu, Rename, "q" typed after
 # its name, START; its desc changes and a renamed line keeps it from `just
 # cheats`, its code and pick as they were
 cp "$cart/added.img" "$cart/sd.img"
@@ -475,8 +512,8 @@ rm -f "$cart/sram.bin"
 before=$(cheat_lines)
 # shellcheck disable=SC2046 # nav.sh's options
 boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
-  -w "screen ready: cheats" -k @8:SELECT -k @12:- \
-  -w "screen ready: cheat-menu" -k @16:A -k @20:- \
+  -w "screen ready: cheats" -k @8:START -k @12:- \
+  -w "screen ready: cheat-menu" -k @16:DOWN -k @20:- -k @28:A -k @32:- \
   -w "screen ready: rename" -k @10:A -k @14:- -k @24:START -k @28:- \
   -w "cheats: renamed" -w "screen ready: cheats" -k @8:B -k @12:- -w "cheats: back" -f 6000 >"$cart/rename.txt" 2>&1 ||
   fail "the rename didn't run: $(grep -a '^kernel' "$cart/rename.txt" | tail -3)"
@@ -485,7 +522,82 @@ grep -q "cheats: renamed cheat 1: ok" "$cart/rename.txt" ||
 mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep -q $'^cheat1_desc = ".*q"\r$' || fail "cheat 1's name didn't change"
 mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep -q $'^cheat1_renamed = true\r$' || fail "cheat 1 has no renamed line"
 [ "$(cheat_lines)" = "$before" ] || fail "after the rename the cheats read: $(cheat_lines | tr '\n' ' ')"
-echo "PASS: cheats: a database cheat is renamed from SELECT's menu, marked so \`just cheats\` keeps the name"
+echo "PASS: cheats: a database cheat is renamed from START's menu, marked so \`just cheats\` keeps the name"
+
+# --- Activations and guides (docs/plans/cheat-guides.md) -------------------------
+# cheat_file: the card's Hello.cht, CRs dropped
+cheat_file() { mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | tr -d '\r'; }
+# The cheat screen on Hello's cheats, the cursor on cheat 1, then KEYS...,
+# then B leaves it: cheat_run LOG KEYS...
+cheat_run() {
+  local log=$1
+  shift
+  # shellcheck disable=SC2046 # nav.sh's options
+  boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
+    -w "screen ready: cheats" "$@" -k @8:B -k @12:- -w "cheats: back" -f 8000 >"$log" 2>&1 ||
+    fail "$(basename "$log" .txt) didn't run: $(grep -a '^kernel' "$log" | tail -3)"
+}
+cp "$cart/added.img" "$cart/sd.img"
+cp "$cart/clean/kernel-nor.bin" "$cart/"
+rm -f "$cart/sram.bin"
+
+# SELECT opens a cheat's Guide page, which scrolls; B goes back to the list
+cheat_run "$cart/guide.txt" -k @8:SELECT -k @12:- -w "screen ready: cheat-guide" \
+  -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @44:B -k @48:- -w "screen ready: cheats"
+grep -q "cheats: guide of cheat 1, " "$cart/guide.txt" ||
+  fail "SELECT didn't open the guide: $(grep -a 'cheats:' "$cart/guide.txt" | tail -3)"
+echo "PASS: cheats: SELECT opens a cheat's Guide page, and B comes back"
+
+# Buttons: Hold, L and R held a moment then let go, is written as the cheat's
+# keys line (cheat 2, the row under the cursor's: its code only writes RAM);
+# the row shows its tag. From the code then removes the line.
+cheat_run "$cart/hold.txt" -k @8:DOWN -k @12:- -k @24:START -k @28:- -w "screen ready: cheat-menu" \
+  -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @44:A -k @48:- -w "screen ready: cheat-buttons" \
+  -k @16:UP -k @20:- -k @28:UP -k @32:- -k @44:A -k @48:- -k @64:L+R -k @104:- \
+  -w "cheats: buttons captured" -k @16:B -k @20:- -w "screen ready: cheats"
+grep -q "cheats: buttons of cheat 2: hold L+R: ok" "$cart/hold.txt" ||
+  fail "Hold wasn't set: $(grep -a 'cheats:' "$cart/hold.txt" | tail -3)"
+cheat_file | grep -qx 'cheat2_keys = "hold L+R"' || fail "cheat 2's keys line: $(cheat_file | grep cheat2_)"
+[ "$(cheat_lines | wc -l)" = 5 ] || fail "setting buttons changed the cheats: $(cheat_lines | tr '\n' ' ')"
+echo "PASS: cheats: Buttons captures a held combination and writes it as the cheat's keys line"
+cheat_run "$cart/code.txt" -k @8:DOWN -k @12:- -k @24:START -k @28:- -w "screen ready: cheat-menu" \
+  -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @44:A -k @48:- -w "screen ready: cheat-buttons" \
+  -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @44:A -k @48:- -k @60:B -k @64:- -w "screen ready: cheats"
+grep -q "cheats: buttons of cheat 2: from the code: ok" "$cart/code.txt" ||
+  fail "From the code wasn't set: $(grep -a 'cheats:' "$cart/code.txt" | tail -3)"
+! cheat_file | grep -q '^cheat2_keys' || fail "From the code left a keys line: $(cheat_file | grep cheat2_)"
+echo "PASS: cheats: Buttons' From the code removes the cheat's keys line"
+# Cheat 1 patches the ROM too, so it can't wait on buttons: A on Hold
+# starts no capture, and B leaves the file as it was
+cheat_run "$cart/ungated.txt" -k @8:START -k @12:- -w "screen ready: cheat-menu" \
+  -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @44:A -k @48:- -w "screen ready: cheat-buttons" \
+  -k @16:UP -k @20:- -k @28:UP -k @32:- -k @44:A -k @48:- -k @64:L+R -k @104:- -k @130:B -k @134:- \
+  -w "screen ready: cheats"
+! grep -q "cheats: buttons captured\|cheats: buttons of cheat 1:" "$cart/ungated.txt" ||
+  fail "Hold was set on a cheat that patches the ROM: $(grep -a 'cheats:' "$cart/ungated.txt" | tail -3)"
+! cheat_file | grep -q '^cheat1_keys' || fail "cheat 1 got a keys line: $(cheat_file | grep cheat1_)"
+echo "PASS: cheats: Buttons keeps Hold off a cheat that patches the ROM"
+
+# Edit guide: the keyboard of lines, q, Enter (the function row's fourth
+# key) and n typed, START; the file's guide line holds them with "\n". Then
+# deleted to nothing, the guide line goes.
+cheat_run "$cart/guide-edit.txt" -k @8:START -k @12:- -w "screen ready: cheat-menu" \
+  -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @40:DOWN -k @44:- -k @56:A -k @60:- -w "screen ready: rename" \
+  -k @8:A -k @12:- -k @24:UP -k @28:- -k @36:UP -k @40:- -k @48:RIGHT -k @52:- -k @60:RIGHT -k @64:- \
+  -k @72:RIGHT -k @76:- -k @88:A -k @92:- -k @104:UP -k @108:- -k @120:A -k @124:- -k @136:START -k @140:- \
+  -w "screen ready: cheats"
+grep -q "cheats: guide of cheat 1 set: ok" "$cart/guide-edit.txt" ||
+  fail "the guide wasn't set: $(grep -a 'cheats:' "$cart/guide-edit.txt" | tail -3)"
+cheat_file | grep -qx 'cheat1_guide = "q\\nn"' || fail "cheat 1's guide line: $(cheat_file | grep cheat1_)"
+echo "PASS: cheats: Edit guide's keyboard of lines writes the guide, its line break written escaped"
+cheat_run "$cart/guide-rm.txt" -k @8:START -k @12:- -w "screen ready: cheat-menu" \
+  -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @40:DOWN -k @44:- -k @56:A -k @60:- -w "screen ready: rename" \
+  -k @8:B -k @12:- -k @20:B -k @24:- -k @32:B -k @36:- -k @48:START -k @52:- -w "screen ready: cheats"
+grep -q "cheats: guide of cheat 1 removed: ok" "$cart/guide-rm.txt" ||
+  fail "the guide wasn't removed: $(grep -a 'cheats:' "$cart/guide-rm.txt" | tail -3)"
+! cheat_file | grep -q '^cheat1_guide' || fail "an empty guide left its line: $(cheat_file | grep cheat1_)"
+[ "$(cheat_lines | wc -l)" = 5 ] || fail "the guide's edits changed the cheats: $(cheat_lines | tr '\n' ' ')"
+echo "PASS: cheats: an emptied guide removes the cheat's guide line"
 
 # The last code deleted: a file of one code of the user's goes, both copies,
 # rather than staying as "cheats = 0"; cut at each step, the next power-on
@@ -499,8 +611,8 @@ mcopy -o -i "$cart/sd.img" "$cart/Last.cht" ::/torii/cheats/Hello.cht.bak
 last_scenario() {
   # shellcheck disable=SC2046 # nav.sh's options
   cut_run "$@" $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
-    -w "screen ready: cheats" -k @8:SELECT -k @12:- \
-    -w "screen ready: cheat-menu" -k @16:DOWN -k @20:- -k @28:A -k @32:- \
+    -w "screen ready: cheats" -k @8:START -k @12:- \
+    -w "screen ready: cheat-menu" -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @40:DOWN -k @44:- -k @52:DOWN -k @56:- -k @64:DOWN -k @68:- -k @76:DOWN -k @80:- -k @88:A -k @92:- \
     -w "screen ready: confirm" -k @8:RIGHT -k @12:- -k @20:A -k @24:- \
     -w "cheats: deleted" -w "screen ready: cheats" -k @8:B -k @12:- -w "cheats: back" -f 6000
 }

@@ -177,7 +177,10 @@ enum {
 	INGAME_ACTS
 };
 
-// The word the cheat interpreter reads (source/cheatrun.s): 1 stops it
+// The halfword the hook reads before the cheat interpreter (source/cheatrun.s):
+// 1 stops it. The halfword after it is the interpreter's (CHEAT_KEYS_NOW in
+// cheatcode.h: the keys at its run), as is CheatRAN's high half (the word
+// after: CHEAT_KEYS_BEFORE) during a run.
 #define INGAME_CHEAT_ONOFF 0x03007FE0
 // The per-cheat toggles (P2): 64 bits, bit n flips the table's cheat n
 // against the launch (source/cheatrun.s). In IWRAM's last 0x200 bytes, past
@@ -239,9 +242,10 @@ struct ingame_shot {
 
 // --- The session block, at INGAME_SRAM_SESSION
 #define INGAME_SESSION_MAGIC 0x31535354u  // "TSS1"
-#define INGAME_SESSION_VERSION 7
+#define INGAME_SESSION_VERSION 8
 #define INGAME_NAME_BYTES 48
-#define INGAME_CHEATS 64  // the cheats the in-game list shows; the toggles' bits
+#define INGAME_CHEATS 64  // the picks the in-game list shows; the toggles' bits
+#define INGAME_ACT_LINES 16  // the cheats' distinct activation sentences the list's footer shows
 #define INGAME_PATH_BYTES 288  // a ROM's path (GAMESAVE_PATH_BYTES)
 #define INGAME_SAVE_SLOT_BYTES 100  // a save slot's name (SAVESLOT_NAME_BYTES, 97), word-rounded
 #define INGAME_PALETTE 16
@@ -375,6 +379,7 @@ enum ingame_why {
 #define INGAME_CHEAT_WHY 0x07  // flags: enum ingame_why
 #define INGAME_CHEAT_ON 0x08  // flags: on at launch (picked, and running or patched in)
 #define INGAME_CHEAT_TABLE 0x10  // flags: in the interpreter's table, its toggle bit in bit
+#define INGAME_CHEAT_CUT 0x20  // flags: its name is cut in its row: whole at INGAME_SRAM_WIDE (the marquee)
 
 // A cheat of the in-game list (P2), the kernel's at launch
 struct ingame_cheat {
@@ -384,6 +389,23 @@ struct ingame_cheat {
 	uint16_t index;  // its place in the file's cheats (cheatfile.h), for Back to Torii
 	uint8_t flags;  // INGAME_CHEAT_*
 	uint8_t bit;  // its toggle (the table's cheat), with INGAME_CHEAT_TABLE
+	// Its activation's sentence (cheatkeys.h): act_text[act - 1]; 0 for
+	// none (not known, or past INGAME_ACT_LINES distinct ones)
+	uint8_t act;
+	uint8_t reserved[3];
+};
+
+// A cheat's name whole, for the marquee of its highlighted row (one with
+// INGAME_CHEAT_CUT): as struct ingame_line, but INGAME_WIDE_W pixels wide
+// (a longer name ends in "..." there). Entry n's at INGAME_SRAM_WIDE + n *
+// sizeof(struct ingame_wide), in cart SRAM's page 0x30 (free since v0.8:
+// the stub's backups end at 0x2DA00).
+#define INGAME_SRAM_WIDE 0x30000
+#define INGAME_WIDE_W 512
+struct ingame_wide {
+	uint16_t width;  // inked pixels from the left, at most INGAME_WIDE_W
+	uint16_t reserved;
+	uint8_t bits[INGAME_TEXT_ROWS][INGAME_WIDE_W / 8];
 };
 
 // The overlay's answer, for the kernel's next boot (P2 and P3 fill it)
@@ -425,6 +447,8 @@ struct ingame_session {
 	uint16_t text_width[(INGAME_TEXTS + 1) & ~1];
 	struct ingame_line text[INGAME_TEXTS];  // the overlay reads one at a time
 	struct ingame_cheat cheats[INGAME_CHEATS];
+	// The cheats' activation sentences ("Hold L+SELECT"), each once
+	struct ingame_line act_text[INGAME_ACT_LINES];
 	// P3: each slot's row as the card has it ("Slot 1 · 27 Oct 14:03",
 	// "Slot 2 · empty"), and with a state saved in game not kept yet
 	struct ingame_line state_kept[INGAME_STATE_SLOTS];
@@ -438,6 +462,7 @@ struct ingame_session {
 #define INGAME_SESSION_HEAD offsetof(struct ingame_session, text)
 #define INGAME_SESSION_TEXT(n) (offsetof(struct ingame_session, text) + (n) * sizeof(struct ingame_line))
 #define INGAME_SESSION_CHEAT(n) (offsetof(struct ingame_session, cheats) + (n) * sizeof(struct ingame_cheat))
+#define INGAME_SESSION_ACT(n) (offsetof(struct ingame_session, act_text) + (n) * sizeof(struct ingame_line))
 #define INGAME_SESSION_PATH offsetof(struct ingame_session, rom_path)
 #define INGAME_SESSION_SAVE_SLOT offsetof(struct ingame_session, save_slot)
 #define INGAME_SESSION_STATE(n, kept) \
@@ -461,6 +486,11 @@ _Static_assert(INGAME_SESSION_HEAD % 4 == 0 && INGAME_SESSION_OUT % 4 == 0, "sra
 _Static_assert(sizeof(struct ingame_out) % 4 == 0, "sram_copy takes words");
 _Static_assert(sizeof(struct ingame_line) % 4 == 0 && INGAME_SESSION_TEXT(0) % 4 == 0, "sram_copy takes words");
 _Static_assert(sizeof(struct ingame_cheat) % 4 == 0 && INGAME_SESSION_CHEAT(0) % 4 == 0, "sram_copy takes words");
+_Static_assert(INGAME_SESSION_ACT(0) % 4 == 0 && sizeof(struct ingame_wide) % 4 == 0, "sram_copy takes words");
+_Static_assert(INGAME_SRAM_WIDE >= INGAME_BACKUP_SHOT + INGAME_BACKUP_SHOT_BYTES &&
+		       INGAME_SRAM_WIDE + INGAME_CHEATS * sizeof(struct ingame_wide) <= INGAME_SRAM_STATE &&
+		       INGAME_SRAM_WIDE % 0x10000 == 0,
+	       "the whole names: after the backups, before the state buffer, in one 64 KB page window");
 _Static_assert(INGAME_SESSION_PATH % 4 == 0 && INGAME_PATH_BYTES % 4 == 0, "sram_copy takes words");
 _Static_assert(INGAME_WHYS <= INGAME_CHEAT_WHY + 1, "a reason fits its bits");
 _Static_assert(sizeof(struct ingame_state_tag) == 16 && offsetof(struct ingame_state_tag, autoload) == 6 &&

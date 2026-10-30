@@ -583,6 +583,21 @@ static void hints_draw(u8 node)
 		ui_dirty(node, 0xFF);
 }
 
+u32 ui_hints_width(const struct ui_hint *hints, u32 count, const char *note)
+{
+	const struct ui_look *l = look();
+	static const struct text_window none = {0, 32, 2};  // measured only: never drawn into
+	u32 w = 2u * l->margin;
+	count = count < l->hint_max ? count : l->hint_max;
+	for (u32 i = 0; i < count; i++)
+		w += ui_key_chip(&none, 0, 0, hints[i].key, hints[i].label, 0) + l->hint_gap;
+	if (note && *note)
+		w += text_width(ui_theme()->body, note, strlen(note));
+	else if (count)
+		w -= l->hint_gap;
+	return w;
+}
+
 void ui_hints_set(u8 node, const struct ui_hint *hints, u32 count)
 {
 	struct hints_state *st = ui_node_state(node);

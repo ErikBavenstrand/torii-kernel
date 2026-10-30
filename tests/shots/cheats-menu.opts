@@ -1,8 +1,8 @@
 # The cheat screen's START menu (source/screens/cheats.c) on Hello's cheats,
 # in the light theme: on Skip the intro, a ROM patch, the hint bar keeps A
-# and B beside its note (rom); START opens the menu, Details first (menu);
-# Details shows its name, code, format and budget (details); B, then the
-# menu's Show picked only lists Max money alone, Picked after the title
+# and B beside its note (rom); START opens the menu, Guide first (menu);
+# Guide shows its name, its activation, code, format and budget (guide);
+# B, then the menu's Show picked only lists Max money alone, Picked after the title
 # (only); B shows all again on Max money, and UP past the first row wraps to
 # + Add code (wrap). UP from the first row wraps at the start too.
 #! settings 28=1
@@ -26,13 +26,13 @@
 -w "screen ready: cheat-menu"
 -s @24:menu.png
 -k @32:A -k @36:-
--w "screen ready: cheat-details"
--s @8:details.png
+-w "screen ready: cheat-guide"
+-s @8:guide.png
 -k @16:B -k @20:-
 -w "screen ready: cheats"
 -k @8:START -k @12:-
 -w "screen ready: cheat-menu"
--k @24:DOWN -k @28:- -k @36:DOWN -k @40:- -k @48:DOWN -k @52:- -k @60:A -k @64:-
+-k @24:DOWN -k @28:- -k @36:DOWN -k @40:- -k @48:DOWN -k @52:- -k @60:DOWN -k @64:- -k @72:DOWN -k @76:- -k @84:A -k @88:-
 -w "cheats: picked only"
 -s @40:only.png
 -k @48:B -k @52:-

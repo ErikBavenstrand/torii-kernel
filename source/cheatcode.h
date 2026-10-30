@@ -182,6 +182,13 @@ enum cheat_prog_type {
 // "if (KEYINPUT & mask) == 0", as CodeBreaker's own key codes test it.
 #define CHEAT_BUTTON_KEYS 0x0104u  // KEY_R | KEY_SELECT
 #define CHEAT_KEYINPUT 0x04000130u
+// The keys as the interpreter saw them (KEYINPUT's bits, 0 for held), which
+// a cheat's Press gate tests (cheatfile.c): at its run, a halfword in IWRAM
+// the BIOS's SoftReset clears (beside the in-game menu's words, ingame_abi.h),
+// and at the run before, which the run puts in CheatRAN's high halfword
+// (gba_rts_patch.s) for its own length. cheatrun.s writes both.
+#define CHEAT_KEYS_NOW 0x03007FE2u
+#define CHEAT_KEYS_BEFORE 0x03007FE6u
 
 // The interpreter's budget. Its cycles are an upper bound, every op run
 // (conditions all true), measured on the emulated cart with the game's ROM

@@ -1,20 +1,27 @@
 @ The per-frame cheat interpreter (v0.7). Patch_RTS_Cheat (GBApatch.c)
 @ copies Cheat_blob_start to Cheat_blob_end into the patch area at the
-@ game's ROM end, right after the in-game menu's code, then the launch's
-@ off mask (two words) and the cheat table right after it; the hook (RTS_irq,
-@ gba_rts_patch.s) calls Cheat_blob_start on each VBlank IRQ while cheats
-@ are on. The code only reads the table, the mask, the in-game menu's
-@ toggles and the memory the cheats name: no RAM of its own, nothing but its
-@ 44 bytes of the IRQ stack, and no kernel address (each literal is
-@ PC-relative).
+@ game's ROM end, right after the in-game menu's code, then the cheat
+@ table right after it; the hook (RTS_irq, gba_rts_patch.s) calls
+@ Cheat_blob_start on each VBlank IRQ while cheats are on. The code only
+@ reads the table, the in-game menu's toggles and the memory the cheats
+@ name, and writes those and its two halfwords of keys (below): no other
+@ RAM of its own, nothing but its 44 bytes of the IRQ stack, and no kernel
+@ address (each literal is PC-relative).
 @
 @ Per-cheat switches (v0.8): bit n of a 64-bit mask is the table's cheat n.
-@ The launch's off mask has the cheats in the table that weren't picked
-@ (the in-game menu can turn them on); the in-game menu's toggles at IWRAM
-@ 0x3007FE8 and 0x3007FEC (INGAME_CHEAT_TOGGLES, ingame_abi.h) flip them.
-@ A cheat runs unless its bit of (off mask XOR toggles) is set. The BIOS's
-@ SoftReset zeroes the toggles, so a game starts with its cheats as
-@ launched; a cheat past the 64th always runs.
+@ The table holds only the picks (v0.10: no more extras, off at launch, for
+@ the in-game list); the in-game menu's toggles at IWRAM 0x3007FE8 and
+@ 0x3007FEC (INGAME_CHEAT_TOGGLES, ingame_abi.h) are the mask: a cheat runs
+@ unless its bit is set. The BIOS's SoftReset zeroes the toggles, so a game
+@ starts with its cheats as launched; a cheat past the 64th always runs.
+@
+@ The keys (v0.10): each run first puts KEYINPUT in the halfword at
+@ 0x3007FE2 (CHEAT_KEYS_NOW, cheatcode.h) and what it held, the keys at the
+@ run before, in 0x3007FE6 (CHEAT_KEYS_BEFORE: CheatRAN's high half, which
+@ the hook set to 1 just before and clears after). A cheat set to Press
+@ (its cheatN_keys) starts with two conditionals on them, its buttons all
+@ held now and not all before (cheatfile.c), so it runs once a press; the
+@ conditions read one snapshot, so no press falls between them.
 @
 @ The table's layout (cheatcode.h has the C side, cheat_lower writes it):
 @ cheats one after another, each a header word, then its ops; a 0 word ends
@@ -54,17 +61,17 @@
 	.global Cheat_run
 	.type Cheat_run, %function
 
-@ The hook's entry: the off mask and the table follow the code. The
-@ toggles are read through IWRAM's mirror below 0x4000000, as the hook
-@ reaches 0x3007FFC.
+@ The hook's entry: the table follows the code. IWRAM's words are reached
+@ through its mirror below 0x4000000, as the hook reaches 0x3007FFC.
 Cheat_blob_start:
-	adrl	r0, Cheat_blob_end
-	ldmia	r0!, {r1, r2}
 	mov	r3, #0x4000000
-	ldr	r12, [r3, #-0x18]	@ 0x3007FE8
-	eor	r1, r1, r12
-	ldr	r12, [r3, #-0x14]	@ 0x3007FEC
-	eor	r2, r2, r12
+	ldr	r12, [r3, #0x130]	@ KEYINPUT (and KEYCNT above it)
+	ldrh	r1, [r3, #-0x1E]	@ 0x3007FE2: the keys at the run before
+	strh	r12, [r3, #-0x1E]
+	strh	r1, [r3, #-0x1A]	@ 0x3007FE6
+	ldr	r1, [r3, #-0x18]	@ the toggles, 0x3007FE8
+	ldr	r2, [r3, #-0x14]	@ 0x3007FEC
+	adrl	r0, Cheat_blob_end
 	@ falls into Cheat_run
 
 @ void Cheat_run(const u32 *table, u32 off_lo, u32 off_hi): runs every
