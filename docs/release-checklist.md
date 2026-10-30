@@ -167,15 +167,28 @@ timing or a real game's saves. Do these on the cart with Logging on Debug.
 
 | Check | How |
 |---|---|
-| A real save, safely copied | play a game that saves (Pokemon, Golden Sun), save in game, Back to menu or power off, power on: "Save sav?" then the copy; `/torii/saves/<rom path>/Main.sav` exists, no `.tmp` or `.bak` beside it, the log shows the verify |
+| A real save, safely copied | play a game that saves (Pokemon, Golden Sun), save in game, Back to menu or power off, power on: "Save to SD card?" then the copy; `/torii/saves/<rom path>/Main.sav` exists, no `.tmp` or `.bak` beside it, the log shows the verify |
 | Power cut during the copy | on the copy's progress bar pull power (a spare card): after the next boot the old save or the new one loads, never a short or blank file, and the retry runs |
-| History | save twice with different progress: History (Settings, System) at 5 keeps the older versions under `/torii/backups/<rom path>/Main/`; History Off keeps none |
+| Backups kept | save twice with different progress: Settings, Saves, Backups kept at 5 keeps the older versions under `/torii/backups/<rom path>/Main/`; Off keeps none |
 | A second slot | Select held with A on a game: New slot, name it, Blank; play, save; the first slot's file is untouched; the next launch shows the picker with the last slot preselected |
-| The per-game manager | START on the game, Saves: rename, duplicate, delete (the file is in `/torii/trash`), history restore (the old current save is in history), export then import a `.sav` |
-| Orphans | move a ROM on a PC, then Settings, Library, Saves: the old path is listed as an orphan; relink it to the moved ROM and the save loads in game |
+| The per-game manager | START on the game, Saves: Rename, Copy to new slot, Delete (the file is in `/torii/trash`), a slot's Backups, A on one restores it (the save it replaced is kept as a backup), New slot From a .sav file |
+| Orphans | move a ROM on a PC, then Settings, Saves, Clean up saves: the old path is listed; Move to a game puts it with the moved ROM, and the save loads in game |
 | Space used | the Saves screen's totals match `du` of `/torii/saves`, `/torii/backups`, `/torii/trash` within a few KB |
 | The long-path refusal | a ROM in a folder tree whose save path passes 251 bytes: the launch refuses with the path-too-long message, nothing written |
-| Save-type change | change a game's save type from EEPROM 8K to 512 in Game info: the old file goes to history, the notice shows once |
+| Save-type change | change a game's save type from EEPROM 8K to 512 in Game info: the old file is kept as a backup for good, the notice shows once |
+
+### The v0.9 firmware update
+
+The update writes only to an allowlisted LX16 cart on older firmware. On an
+up-to-date cart none of its screens should show; to see them, only a cart
+on older firmware will do (never an unknown board).
+
+| Check | How |
+|---|---|
+| Up to date | power on: no firmware screen; the log has `firmware: FPGA version word ..., LX16 on V.., the kernel has V..` with the cart's V at least the kernel's |
+| The raw word | Info, About and Diagnostics' first page show the raw version word (`0x...`); note it down for the allowlist |
+| The warning (older firmware only) | the power-cut warning shows first; B cancels it and the menu starts |
+| The hold (older firmware only) | A on the warning asks for L+R+A held two seconds; letting go early starts over, B cancels, and B held from the warning doesn't confirm it |
 
 ### The v0.9 languages
 

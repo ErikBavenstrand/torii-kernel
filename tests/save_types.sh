@@ -121,7 +121,7 @@ shrunk_eeprom() {
   name=$(mdir -b -i "$cart/sd.img" ::/torii/backups/Test.gba/Main/ | grep -i '0001-' | head -1)
   mtype -i "$cart/sd.img" "$name" >"$hist"
   cmp -s "$hist" "$cart/old.sav" || fail "eeprom512-shrunk: the history's version isn't the old save"
-  # A second power-on (A at "Save sav?" copies the game's save, the old blank
+  # A second power-on (A at "Save to SD card?" copies the game's save, the old blank
   # file going into the history) and launch: the file fits, no notice
   : >"$log"
   # shellcheck disable=SC2046 # nav.sh's options

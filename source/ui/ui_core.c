@@ -115,13 +115,26 @@ void ui_dirty(u8 index, u8 bits)
 	ui_wake();
 }
 
+// Node index hidden or not as it and its parents say, and its children
+static void show_tree(u8 index)
+{
+	struct ui_node *n = &nodes[index];
+	u8 hidden = (n->flags & UI_N_SELF_HIDDEN) || (n->parent != UI_NONE && (nodes[n->parent].flags & UI_N_HIDDEN))
+			    ? UI_N_HIDDEN
+			    : 0;
+	if ((n->flags & UI_N_HIDDEN) == hidden)
+		return;
+	n->flags = (u8)((n->flags & ~UI_N_HIDDEN) | hidden);
+	ui_dirty(index, 0xFF);
+	for (u8 c = n->child; c != UI_NONE; c = nodes[c].next)
+		show_tree(c);
+}
+
 void ui_show(u8 index, int shown)
 {
-	u8 hidden = shown ? 0 : UI_N_HIDDEN;
-	if ((nodes[index].flags & UI_N_HIDDEN) == hidden)
-		return;
-	nodes[index].flags = (u8)((nodes[index].flags & ~UI_N_HIDDEN) | hidden);
-	ui_dirty(index, 0xFF);
+	u8 self = shown ? 0 : UI_N_SELF_HIDDEN;
+	nodes[index].flags = (u8)((nodes[index].flags & ~UI_N_SELF_HIDDEN) | self);
+	show_tree(index);
 }
 
 u8 ui_ink(u8 node, u8 def)
@@ -236,6 +249,8 @@ static int place_nodes(struct ui_view *v)
 		offset = (u16)(offset + ((ui_kind_ops[s->kind]->state_size + 3u) & ~3u));
 		ui_layout(s, node->parent == UI_NONE ? 0 : &nodes[node->parent], node);
 		if (s->flags & UI_HIDDEN)
+			node->flags |= UI_N_SELF_HIDDEN | UI_N_HIDDEN;
+		if (node->parent != UI_NONE && (nodes[node->parent].flags & UI_N_HIDDEN))
 			node->flags |= UI_N_HIDDEN;
 		if ((node->x | node->y | node->w | node->h) & 7 || node->w <= 0 || node->h <= 0 || node->x < 0 ||
 		    node->y < 0 || node->x + node->w > SCREEN_W || node->y + node->h > SCREEN_H) {

@@ -43,7 +43,7 @@ run() {
 has() { grep -qF "in-game probe: $1" "$log" || fail "no line '$1': $(grep 'in-game probe' "$log" | head -12)"; }
 
 # 1. CLEAN BOOT of Probe.gba: its cart tests run by themselves; A goes
-# back to the kernel, and A at its "Save sav?" lets the boot go on to the
+# back to the kernel, and A at its "Save to SD card?" lets the boot go on to the
 # report.
 # shellcheck disable=SC2046
 run $(nav_launch /Probe.gba at=180) -s 600:"$shots/1-cart.png" $(k 620 A) $(k 1000 A) \

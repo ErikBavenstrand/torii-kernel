@@ -107,19 +107,14 @@ static void Write(u32 romaddress, const u8 *buffer, u32 size)
 		}
 	} else {
 		rom_guard_add(romaddress, size);
-		u32 Address;
-		vu16 page = 0;
-		Address = romaddress;
-		while (Address >= 0x800000) {
-			Address -= 0x800000;
-			page += 0x1000;
+		// Torii: a write that crosses an 8 MB page goes on in the next one
+		// (the official kernel set the page once, the todo it left here)
+		for (x = 0; x < size / 2; x++) {
+			u32 at = romaddress + x * 2;
+			if (!x || !(at & 0x7FFFFF))
+				SetPSRampage((u16)((at >> 23) << 12));
+			((vu16 *)(PSRAMBase_S98 + (at & 0x7FFFFF)))[0] = ((const vu16 *)buffer)[x];
 		}
-		SetPSRampage(page);
-
-		for (x = 0; x < size / 2; x++)
-			((vu16 *)(PSRAMBase_S98 + Address))[x] = ((vu16 *)buffer)[x];//todo 还要处理psram page
-
-		//DEBUG_printf("address{%x}:%x %x %x %x", romaddress,page,Address,size ,((vu32*)buffer)[0]);
 		SetPSRampage(0);
 	}
 }

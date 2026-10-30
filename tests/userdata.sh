@@ -231,7 +231,7 @@ mcopy -i "$cart/sd.img" "$cart/filler.bin" ::/filler.bin
 boot 1.log -C $now $(nav_launch /Hello.gba at=190) -f 450
 grep -q 'safefile: writing /torii/recent.txt failed' "$cart/1.log" || fail "the write didn't run out of room"
 [ "$(mtype -i "$cart/sd.img" ::/torii/recent.txt | wc -c)" = 0 ] || fail "the failed copy isn't empty"
-# B at "Save sav?"; the menu reads Recent as it starts
+# B at "Save to SD card?"; the menu reads Recent as it starts
 boot 2.log -k 100:B -k 104:- -f 300
 grep -q 'userdata: Recent: 32 games from /torii/recent.txt' "$cart/2.log" ||
   fail "after the full card, Recent has: $(grep 'userdata: Recent' "$cart/2.log")"

@@ -89,10 +89,10 @@ first_launch() {
   [ "$(pending)" = 0011 ] || fail "no pending-save record after the launch"
 }
 
-# Power-on 2: A at "Save sav?" copies the save to the card.
+# Power-on 2: A at "Save to SD card?" copies the save to the card.
 first_copy() {
   boot -k 100:A -k 106:- -s 300:"$shots/2-menu.png" -f 800
-  logged "save: \"Save sav?\" for $savep, 131072 bytes, save type 31: A, save"
+  logged "save: \"Save to SD card?\" for $savep, 131072 bytes, save type 31: A, save"
   logged "save: wrote $savep, 131072 bytes, verified"
   logged "nor: wrote an empty pending-save record, 512 bytes"
   [ "$(save_record)" = 4f4d525801 ] || fail "the save has $(save_record), expected the first boot record"
@@ -145,7 +145,7 @@ read-error)
   ! grep -qF 'nor: wrote the pending-save record' "$cart/run.log" || fail "a pending-save record was written"
   [ "$(pending)" = 0000 ] || fail "the pending-save record is set"
   boot -k 100:A -k 106:- -f 800
-  ! grep -qF 'Save sav?' "$cart/run.log" || fail "the next power-on asked to copy the save"
+  ! grep -qF 'Save to SD card?' "$cart/run.log" || fail "the next power-on asked to copy the save"
   mtype -i "$cart/sd.img" ::/torii/saves/Test.gba/Main.sav | cmp -s - "$cart/kept.sav" || fail "Test.sav changed"
   echo "PASS: saves read-error: a save the card can't read stops the launch, and nothing is copied over it"
   ;;
@@ -350,13 +350,13 @@ rename-walk)
 copy)
   first_launch
   first_copy
-  # Power-on 3: the game again, then B at "Save sav?".
+  # Power-on 3: the game again, then B at "Save to SD card?".
   # shellcheck disable=SC2046 # nav.sh's options
   boot $(nav_launch /Test.gba at=180) -f 600
   logged "save: /torii/saves/Test.gba/Main.sav exists, 131072 bytes, save type 31"
   logged "save: loaded /torii/saves/Test.gba/Main.sav into cart SRAM, 131072 bytes"
   boot -k 100:B -k 106:- -f 300
-  logged 'save: "Save sav?" for /torii/saves/Test.gba/Main.sav, 131072 bytes, save type 31: B, not saved'
+  logged 'save: "Save to SD card?" for /torii/saves/Test.gba/Main.sav, 131072 bytes, save type 31: B, not saved'
   [ "$(save_record)" = 4f4d525801 ] || fail "B changed the save"
   [ "$(pending)" = 0000 ] || fail "B left the pending-save record"
   fsck.fat -n "$cart/sd.img" >/dev/null || fail "fsck.fat found errors"
@@ -376,11 +376,11 @@ full)
   free=$(mdir -i "$cart/sd.img" ::/ | sed -n 's/^ *\([0-9 ]*\) bytes free.*/\1/p' | tr -d ' ')
   head -c $((free - 65536)) /dev/urandom >"$cart/filler.bin"
   mcopy -i "$cart/sd.img" "$cart/filler.bin" ::/Filler.gba
-  # Power-on 4: A at "Save sav?"; the copy runs out of room, and an error
+  # Power-on 4: A at "Save to SD card?"; the copy runs out of room, and an error
   # dialog says so, not "Done" (v0.3.2); B closes it.
   boot -k 100:A -k 106:- -w "error 3: Can't write the save" -s @20:"$shots/4-error.png" -k @30:B -k @34:- \
     -w "nav: home ready"
-  logged 'save: "Save sav?" for /torii/saves/Test.gba/Main.sav, 131072 bytes, save type 31: A, save'
+  logged 'save: "Save to SD card?" for /torii/saves/Test.gba/Main.sav, 131072 bytes, save type 31: A, save'
   logged_error "save: writing /torii/saves/Test.gba/Main.sav.tmp: "
   grep -qE "kernel error: save: writing /torii/saves/Test.gba/Main.sav.tmp: [0-9]+ of 131072 bytes written" "$cart/run.log" ||
     fail "the error doesn't say how much was written"
@@ -442,13 +442,13 @@ full)
   logged "launch: loading Other.gba, CLEAN BOOT"
   logged "launch: starting the game"
   mtype -i "$cart/sd.img" ::/torii/saves/Test.gba/Main.sav >"$cart/lost.sav"
-  # Power-on 6a: the record now names Other.gba: A at "Save sav?" copies
+  # Power-on 6a: the record now names Other.gba: A at "Save to SD card?" copies
   # cart SRAM to Other.sav, and Test.sav stays as it was (before v0.3.2 the
   # record still named Test.sav, which got the other game's save).
   boot -k 100:A -k 106:- -w "nav: home ready"
-  logged 'save: "Save sav?" for /torii/saves/Other.gba/Main.sav'
+  logged 'save: "Save to SD card?" for /torii/saves/Other.gba/Main.sav'
   logged "save: the chip is blank (all FF), /torii/saves/Other.gba/Main.sav stays as it is" # hello.gba never saves
-  ! grep -q '"Save sav?" for /torii/saves/Test.gba/Main.sav' "$cart/run.log" || fail "the record still named Test.sav"
+  ! grep -q '"Save to SD card?" for /torii/saves/Test.gba/Main.sav' "$cart/run.log" || fail "the record still named Test.sav"
   mtype -i "$cart/sd.img" ::/torii/saves/Test.gba/Main.sav | cmp -s - "$cart/lost.sav" || fail "Test.sav changed after A launched another game"
   [ "$(pending)" = 0000 ] || fail "the pending-save record is still set after Other.sav's copy"
   mtype -i "$cart/sd.img" ::/Filler.gba | cmp -s - "$cart/filler.bin" || fail "the other file changed"
@@ -559,9 +559,9 @@ nearly-full)
   free=$(mdir -i "$cart/sd.img" ::/ | sed -n 's/^ *\([0-9 ]*\) bytes free.*/\1/p' | tr -d ' ')
   head -c $((free - 131072)) /dev/urandom >"$cart/filler.bin"
   mcopy -i "$cart/sd.img" "$cart/filler.bin" ::/FILLER.BIN
-  # Power-on 4: A at "Save sav?"; the copy fills the card.
+  # Power-on 4: A at "Save to SD card?"; the copy fills the card.
   boot -k 100:A -k 106:- -s 116:"$shots/4-progress.png" -f 400
-  logged 'save: "Save sav?" for /torii/saves/Test.gba/Main.sav, 131072 bytes, save type 31: A, save'
+  logged 'save: "Save to SD card?" for /torii/saves/Test.gba/Main.sav, 131072 bytes, save type 31: A, save'
   grep -q "^kernel: screen ready: progress" "$cart/run.log" || fail "no progress dialog for the copy"
   logged "save: wrote /torii/saves/Test.gba/Main.sav, 131072 bytes, verified"
   grep -q "^kernel error:" "$cart/run.log" && fail "errors: $(grep '^kernel error:' "$cart/run.log" | head -3)"

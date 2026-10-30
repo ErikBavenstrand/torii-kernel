@@ -98,6 +98,8 @@ u32 charset_next_latin1(const char *s, u32 len, u32 *pos)
 		c = (c << 6) | (p[*pos] & 0x3F);
 		(*pos)++;
 	}
+	if (c == 0xAD)
+		return CHARSET_NONE;  // a soft hyphen: where a word may break, never drawn
 	if (c < 0x100)
 		return c;
 	if (c < 0x180)

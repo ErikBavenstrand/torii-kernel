@@ -99,6 +99,14 @@ void lang_pack_name(const u8 *pack, char out[LANG_NAME_BYTES])
 	copy_field(out, pack + 20 + LANG_CODE_BYTES, LANG_NAME_BYTES);
 }
 
+void lang_pack_release(const u8 *pack, char out[LANG_RELEASE_BYTES])
+{
+	if (memcmp(pack, "TLNG", 4) == 0 && rd16(pack + 4) >= 2)
+		copy_field(out, pack + 64, LANG_RELEASE_BYTES);
+	else
+		out[0] = 0;
+}
+
 void lang_use(const u8 *pack)
 {
 	lang.launch = 0;

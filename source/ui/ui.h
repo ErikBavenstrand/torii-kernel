@@ -689,10 +689,11 @@ struct ui_node {
 
 // ui_node.flags
 enum {
-	UI_N_HIDDEN = 1,
+	UI_N_HIDDEN = 1,  // not drawn: hidden itself, or a parent is
 	UI_N_FOCUS = 2,
 	UI_N_DIRTY = 4,   // draw it
 	UI_N_DRAWN = 8,   // drawn at least once
+	UI_N_SELF_HIDDEN = 16,  // hidden itself (UI_HIDDEN, ui_show)
 };
 
 struct ui_view {
@@ -837,6 +838,8 @@ struct ui_view *ui_node_view(u8 index);
 void *ui_node_state(u8 index);
 // Marks a node for drawing (and wakes the frame).
 void ui_dirty(u8 index, u8 bits);
+// Shows or hides a node, and with it its children (one hidden itself stays
+// hidden)
 void ui_show(u8 index, int shown);
 // Moves the view's focus (UI_EV_BLUR, then UI_EV_FOCUS).
 void ui_focus(u8 index);

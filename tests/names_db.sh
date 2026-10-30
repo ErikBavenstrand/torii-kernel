@@ -262,7 +262,7 @@ logged "$cart/1.log" "names: wrote 1 CRCs to /torii/crc.new"
 not_logged "$cart/1.log" "names: wrote /torii/crc.txt"
 not_logged "$cart/1.log" "names: /GBA/Big.gba is"
 # (The game cut off is kept in crc.part and read on: tests/kernel/test_names.c, stepped by hand)
-boot "$cart" "$cart/2.log" -k 100:A -k 106:- -f 6000 -u "names: wrote /torii/crc.txt" # A: "Save sav?"
+boot "$cart" "$cart/2.log" -k 100:A -k 106:- -f 6000 -u "names: wrote /torii/crc.txt" # A: "Save to SD card?"
 logged "$cart/2.log" "names: 1 CRCs from /torii/crc.new"
 logged "$cart/2.log" "names: identified 8 of 8 new games"
 logged "$cart/2.log" "names: wrote /torii/crc.txt"

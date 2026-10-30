@@ -110,9 +110,10 @@ enum {
 // --- Packs ------------------------------------------------------------------
 
 // A pack's header (tools/lang.py: its format); offsets follow it
-#define LANG_HEADER 64
+#define LANG_HEADER 80
 #define LANG_CODE_BYTES 8
 #define LANG_NAME_BYTES 24
+#define LANG_RELEASE_BYTES 16
 enum lang_pack_check {
 	LANG_PACK_OK,
 	LANG_PACK_SHORT,  // smaller than its header and offsets, or its size field
@@ -132,6 +133,9 @@ extern const char *const lang_pack_check_names[LANG_PACK_CHECKS];
 // The pack's code ("sv") and name ("Svenska"), NUL-ended, from its header
 void lang_pack_code(const u8 *pack, char out[LANG_CODE_BYTES]);
 void lang_pack_name(const u8 *pack, char out[LANG_NAME_BYTES]);
+// The Torii the pack was built with ("0.9.6"), from its header; empty for a
+// pack of a format before the field
+void lang_pack_release(const u8 *pack, char out[LANG_RELEASE_BYTES]);
 
 // Strings from now on come from pack (checked whole by lang_pack_check),
 // wherever it is (PSRAM, RAM): S reads it in place. NULL: English.

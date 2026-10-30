@@ -50,33 +50,12 @@ Everything still open after v0.9.0, swept on 2026-10-28 from this roadmap, the c
 Code fixes that the emulator can test, plus the leftovers from v0.9.
 
 - **Bugs to confirm and fix:**
-  - `PSRAM_Write` (`source/GBApatch.c:120`, the inherited `todo 还要处理psram page`) sets the PSRAM page once. A patch write that crosses an 8 MB boundary lands on the wrong page.
-  - `Read_SD_sectors` always returns 0, so FatFs never sees a failed read, and the "card read failed" paths are untested (`docs/design/engine.md`). Return the real status, then test those paths with an emulated read error.
-  - The analyzer findings that may be real bugs (`tools/analyze-baseline.txt`). Triage each one, fix it or note why it's a false alarm:
-    - a NullDereference in `source/screens/cheats.c`;
-    - ArrayBound in `source/cheatfile.c`;
-    - `m.kinds[m.rows++]` against `ROW_KINDS` in `source/overlay/ov.c`;
-    - uninitvar and unassignedVariable in `source/ingame.c` and `source/statestore.c`;
-    - shiftNegativeLHS in `source/ppu_render.c`.
+  - `Read_SD_sectors` now returns 1 when the card never answers, but the "card read failed" paths are still untested (`docs/design/engine.md`): test them with an emulated read error.
   - A NOR game keeps the In-game menu setting it was written with, so it still opens the menu after Off until it is rewritten (`docs/design/v0.8/ingame-menu.md`).
   - A 32 MB launch whose extras were dropped to fit rescans the ROM on every launch: the `.pat` cache only has room for the picks.
 - **Languages:**
-  - A pack's stale check hashes only English's key names. Hash each key's placeholders too, so a pack whose `{N}` no longer match is refused.
-  - `torii-lang.zip` and each `.lng` should name the release they were built for, and Settings or the log should say when a pack is from another release.
-  - The letter jump in game lists knows only A–Z. Games starting with Å, Ä, Ö (and the rest of Latin-1) file under "#"; they should go with their own letter, or with its base letter.
   - Test a text pointer that another screen keeps across a pack switch. Only Settings' own redraw is covered today.
-  - `INFO_S_ABOUT_REV_A` and `STR_INFO_ABOUT_REV_A` have been unused since the firmware allowlist.
   - The owner's corrections to the Swedish terms. The texts shortened for width to check are `rename.key_space` "Blank", `gsaves.keys` "Backup", `games.fact_size`/`fact_played` "Strl"/"Sist", `ingame.unsaved_both` and `gsaves.act_copy` "Kopiera".
-- **Small fixes:**
-  - The save log line still says `"Save sav?"`; change it together with `tests/saves.sh`.
-  - Diagnostics says "3 seconds passed in about 2.2".
-  - Crash dumps name stale stack words that point into read-only data (`t_model+0x2628`; `source/cartlog.c`, `tools/logs.py`).
-  - `ui_show` on a parent doesn't hide its children (`source/ui/ui_core.c`).
-  - U+00AD draws as a visible hyphen.
-  - New slot's pane heading peeks above its popup.
-- **Release checklist:**
-  - Add the v0.9 firmware steps: the warning, the L+R+A hold, B cancelling on both screens, and the raw version word in About and Diagnostics.
-  - Fix the stale save rows. "History" is now Backups kept on the Saves card, and "relink" is now Clean up saves and "Move to a game".
 
 ### v0.9.2 Menus
 
@@ -85,11 +64,7 @@ The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-re
 - **Screenshots per game** (owner, 2026-10-27): a "Screenshots" entry in the game's popup, next to Saves, opens that game's shots from `/torii/screenshots`. A built-in viewer shows a BMP full screen and steps through the shots with LEFT and RIGHT. The SD card page opens any `.bmp` in the same viewer.
 - **One place for how a game boots** (owner, 2026-10-27): the popup's Play « addons » and Game info's Boot mode set the same thing. Keep only one, and point the cheat screen's "needs Boot with addon" note to it.
 - "Play « default »" shows which boot mode it resolves to. The games and SD pages offer the stepper under the same rules.
-- A quick favourite key (SELECT) in game lists. Favouriting takes five presses today.
-- One key back to home from a deep SD folder. Today it takes one B per level.
-- Game info's Played is blank for a game that has dropped off Recent.
-- Play with's title shows the file name, not the display name.
-- The storage bar's three shades need a legend.
+- A quick favourite key in game lists (favouriting takes five presses). Not SELECT: SELECT held with A picks the save slot, and the v0.5 review kept SELECT free. The owner picks the key.
 
 ### v0.9.3 In game
 
@@ -115,7 +90,7 @@ The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-re
 
 ### Tooling, alongside any patch
 
-- **Static analysis gating:** CI's static analysis is advisory (`continue-on-error`), so a new finding never fails CI. Once v0.9.1 has triaged the baseline (98 findings: 75 from clang-tidy and 23 from cppcheck, mostly style in `slotstore.c`, `GBApatch.c`, `saveorphan.c` and `ezkernelnew.c`), make it gate.
+- **Static analysis gating:** CI's static analysis is advisory (`continue-on-error`), so a new finding never fails CI. The findings that looked like bugs were triaged in v0.9.6 and are false alarms: `cheats.c`'s NullDereference (`cheatstore()` is never NULL), `cheatfile.c`'s ArrayBound (a 1-bit index), `ingame.c` and `statestore.c` (buffers filled through a cast pointer), `ppu_render.c`'s shift (GCC's arithmetic shift) and `ov.c`'s pointer subtraction (linker symbols); `ov.c`'s `add_row` got a bound anyway. Once the rest of the baseline is triaged (98 findings: 75 from clang-tidy and 23 from cppcheck, mostly style in `slotstore.c`, `GBApatch.c`, `saveorphan.c` and `ezkernelnew.c`), make it gate.
 - **compat selection:** choose compat runs by the functions each game runs, as `test` already does, in place of the hand-kept `NO_COMPAT` (`docs/research/dev-loop-speed.md`).
 - **Logs:** frame-timing summaries carry the log write's time, not the scroll's. They're DEBUG only, their table holds 8 names, and on a nearly full buffer they can push out older lines (`source/engine/cycles.c`, `tlog_flush`).
 - **Emulator:** the kernel install fills the last sector's tail with 0xFF where the real loader writes stale bytes, and `OMEGA_FPGA_VERSION` isn't validated.

@@ -10,7 +10,7 @@
 #   - the replaced save is never lost: it is Main.sav, or in its .bak, or a
 #     version of the slot's history (/torii/backups/Hello.gba/Main), made before
 #     the swap so a cut at any step keeps it, and a retried copy adds none twice
-#   - a power-on that answers B at "Save sav?" (no copy) still recovers: a whole
+#   - a power-on that answers B at "Save to SD card?" (no copy) still recovers: a whole
 #     save (old or new), no .tmp or .bak
 #   - one that answers A ends with the new save, no .tmp or .bak, the record
 #     cleared, and a clean fsck
@@ -147,7 +147,7 @@ check() {
   else
     [ "$(pending)" = 0011 ] || fail "cut at $n ($name): the record is $(pending), not set"
   fi
-  # B at "Save sav?" on a copy of the cart: the recovery still happens
+  # B at "Save to SD card?" on a copy of the cart: the recovery still happens
   rm -rf "$b"
   cp -a "$cart" "$b"
   cart=$b

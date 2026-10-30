@@ -15,6 +15,8 @@ void test_letter_of(void)
 	CHECK_EQ(letter_of("Zelda"), LETTER_Z);
 	CHECK_EQ(letter_of("\xC3\x89lite"), LETTER_A + ('E' - 'A'));  // É folds to E
 	CHECK_EQ(letter_of("\xC3\x9F"), LETTER_A + ('S' - 'A'));       // ß folds to ss
+	CHECK_EQ(letter_of("\xC3\x85ngest"), LETTER_A);            // Å goes with A
+	CHECK_EQ(letter_of("\xC3\x96stersund"), LETTER_A + ('O' - 'A'));  // Ö with O
 	CHECK_EQ(letter_of("007"), LETTER_HASH_LOW);
 	CHECK_EQ(letter_of("!Bang"), LETTER_HASH_LOW);
 	CHECK_EQ(letter_of(""), LETTER_HASH_LOW);

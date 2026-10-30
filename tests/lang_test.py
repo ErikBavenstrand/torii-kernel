@@ -202,6 +202,7 @@ class Pack(unittest.TestCase):
         self.assertEqual(data[20:28].rstrip(b"\0"), b"sv")
         self.assertEqual(data[28:52].rstrip(b"\0"), b"Svenska")
         self.assertEqual((u32(52), u32(56)), (0, 0))  # no font until 1.0
+        self.assertEqual(data[64:80].rstrip(b"\0").decode(), lang.release())
         pool = u32(60)
         self.assertEqual(pool, lang.HEADER + 2 * len(en.keys))
         self.assertEqual(data[pool], 0)
@@ -233,6 +234,16 @@ class Pack(unittest.TestCase):
         en = english()
         more = parse(ENGLISH + "new = New\n")
         self.assertNotEqual(lang.key_hash(en), lang.key_hash(more))
+
+    def test_stale_placeholders(self):
+        # The same keys filling in other values: a pack built before is stale
+        en = english()
+        swapped = parse(
+            ENGLISH.replace("both = {1} of {2}", "both = {1} of {2} in {3}")
+        )
+        self.assertNotEqual(lang.key_hash(en), lang.key_hash(swapped))
+        same = parse(ENGLISH.replace("both = {1} of {2}", "both = {2}: {1}"))
+        self.assertEqual(lang.key_hash(en), lang.key_hash(same))
 
     def test_release_zip(self):
         # The packs alone, no folders; the same packs make the same bytes

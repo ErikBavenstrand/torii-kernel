@@ -9,6 +9,7 @@
 #include "Ezcard_OP.h"
 #include "ff15/ff.h"
 #include "tlog.h"
+#include "version.h"
 #include "engine/psram.h"
 #include "ui/rowcache.h"
 #include "ui/ui.h"
@@ -46,8 +47,11 @@ static int read_header(const char *file, u8 head[LANG_HEADER], char code[LANG_CO
 		return 0;
 	}
 	u32 why = lang_pack_check_header(head);
+	char release[LANG_RELEASE_BYTES];
+	lang_pack_release(head, release);
 	if (why != LANG_PACK_OK) {
-		tlog_error("lang: %s left out: %s", path, lang_pack_check_names[why]);
+		tlog_error("lang: %s left out: %s%s%s", path, lang_pack_check_names[why],
+			   release[0] ? ", built for " : "", release);
 		return 0;
 	}
 	lang_pack_code(head, code);
@@ -77,10 +81,14 @@ static void find_packs(void)
 		if (!read_header(fi.fname, head, code))
 			continue;
 		lang_pack_name(head, name);
-		if (lang_list_add(code, name))
-			tlog("lang: %s (%s) on the card", code, name);
-		else
+		char release[LANG_RELEASE_BYTES];
+		lang_pack_release(head, release);
+		if (!lang_list_add(code, name))
 			tlog_error("lang: %s left out: the list is full, or has its id", code);
+		else if (strcmp(release, TORII_VERSION) != 0)
+			tlog("lang: %s (%s) on the card, built for %s", code, name, release);
+		else
+			tlog("lang: %s (%s) on the card", code, name);
 	}
 	f_closedir(&dir);
 }

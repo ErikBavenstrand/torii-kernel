@@ -36,7 +36,7 @@ run_case() {
   mkfs.fat -C -F 32 -n EEPROM "$cart/sd.img" 65536 >/dev/null
   mcopy -i "$cart/sd.img" tests/roms/eeprom/eeprom.gba ::/Probe.gba
   # CLEAN BOOT of Probe.gba with its save type; pick the width, then A goes
-  # back to the kernel, whose boot logs the report. A at its "Save sav?"
+  # back to the kernel, whose boot logs the report. A at its "Save to SD card?"
   # keeps the probe's EEPROM.
   # shellcheck disable=SC2046
   OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch /Probe.gba "save=$save" at=230) \

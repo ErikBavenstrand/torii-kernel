@@ -78,6 +78,7 @@ _Static_assert((CARTLOG_PAGE << 12) + (CARTLOG_SNAPSHOT & 0xFFFF) == INGAME_SRAM
 	       "the overlay writes the snapshot where the kernel reads it");
 
 u32 crash_regs[17];
+extern const char __text_end[];  // the linker's: the end of the ROM's code
 u32 crash_stack[128] EWRAM_BSS;
 // The crash dump, the debug info or the EEPROM probe's report, one at a time.
 static union {
@@ -211,8 +212,9 @@ static int report_crash(void)
 	tlog_flush();  // in parts: the whole report may not fit the ring
 	for (u32 i = 0; i < crash.stack_words; i++) {
 		u32 w = crash.stack[i];
-		// Words that may be return addresses into the kernel; just logs names them.
-		if ((w >= 0x08000000 && w < 0x08100000) || (w >= 0x03000000 && w < 0x03008000))
+		// Words that may be return addresses into the kernel's code (not
+		// its read-only data past __text_end); just logs names them.
+		if ((w >= 0x08000000 && w < (u32)__text_end) || (w >= 0x03000000 && w < 0x03008000))
 			tlog_force(TLOG_ERRORS, "crash: stack %08lX: %08lX", (unsigned long)(crash.stack_base + 4 * i),
 				   (unsigned long)w);
 	}

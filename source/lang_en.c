@@ -359,7 +359,6 @@ const char *const lang_en[STR_COUNT] = {
 	"# Save states and screenshots\nSave state and Screenshot (up to 5) keep them in the cart; Back to Torii writes them to the card, the screenshots to /torii/screenshots as BMP files. Switching off before that loses them. Load state loads the state not yet written; the others load from the game's menu in Torii.\n# Cheats\nCheats turns the game's picked cheats on and off; Back to Torii keeps what you changed.\n# Saves\nThe game saves to the cart. The next time Torii starts, it copies the save to the card (it asks first, unless Save without asking is on).\n# GB, GBC and NES games\nThey run in the built-in Jagoomba Color (GB, GBC) and PocketNES (NES). Hold L and R together for the emulator's own menu: save states, the palette and more. Torii's hotkeys, menu and cheats are for GBA games.\n",  // info.ingame_end
 	"# Torii\nVersion {1}, build {2}\nA custom kernel for the EZ-Flash Omega DE, built on EZ-Flash's open source kernel 1.06. Not made by EZ-Flash.\n",  // info.about_torii
 	"# The cart\n{1}, FPGA firmware {2}\n",  // info.about_cart
-	"Revision A (LX9)",  // info.about_rev_a
 	"Revision B (LX16)",  // info.about_rev_b
 	"NOR: {1}, {2} MB of {3} MB used\n",  // info.about_nor
 	"NOR: no games. Write to NOR in a file's menu on the SD card page copies one there.\n",  // info.about_nor_empty

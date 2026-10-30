@@ -1407,7 +1407,7 @@ static void Check_save_flag(void)
 		return;
 	// Torii: the answer is logged. The question and the saving are
 	// dialogs on the engine (source/ui/dialog.h)
-	static const char saved_how[] = "save: \"Save sav?\" for %s, %lu bytes, save type %02X: %s";
+	static const char saved_how[] = "save: \"Save to SD card?\" for %s, %lu bytes, save type %02X: %s";
 	u16 savetype = Read_sav_info(SAV_INFO_TYPE);
 	TCHAR *name = (TCHAR *)SAV_info_buffer;
 	dialog_open();

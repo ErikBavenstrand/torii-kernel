@@ -784,6 +784,8 @@ static int state_saved(void)
 
 static void add_row(uint32_t kind, int greyed)
 {
+	if (m.rows >= ROW_KINDS)
+		return;  // each kind once: never
 	m.greyed[m.rows] = (uint8_t)greyed;
 	m.kinds[m.rows++] = (uint8_t)kind;
 }

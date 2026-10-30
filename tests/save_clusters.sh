@@ -87,7 +87,7 @@ clean_card "after the first copy"
 boot $(nav_launch /Test.gba at=250) -f 600
 
 # Power-on 4, the second copy, cut at each cutpoint; the next power-on
-# (A at "Save sav?" if it asks again) must leave the newer save whole
+# (A at "Save to SD card?" if it asks again) must leave the newer save whole
 scenario() { cut_run -k 100:A -k 106:- -f 800 "$@"; }
 check() {
   local n=$1 name=$2 r

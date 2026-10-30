@@ -38,14 +38,16 @@ lang_before_launch). Those sections come first in en.ini.
 A pack (.lng), little-endian:
   0   "TLNG"
   4   u16 format version (FORMAT), u16 the strings' count
-  8   u32 CRC32 of English's keys in order: a pack built against other keys
-      is stale, and the kernel takes none of it (Rockbox's version check)
+  8   u32 CRC32 of English's keys in order, each with its placeholders: a
+      pack built against other keys, or keys that fill in other values, is
+      stale, and the kernel takes none of it (Rockbox's version check)
   12  u32 the pack's bytes
   16  u32 CRC32 of the bytes from 20 on
   20  char code[8], char name[24], NUL-padded
   52  u32 font offset, u32 font bytes: 0 until 1.0's script fonts
-  60  u32 the string pool's offset (64 + 2 x count)
-  64  u16 offsets[count]: each string's place in the pool, 0 for one the
+  60  u32 the string pool's offset (80 + 2 x count)
+  64  char release[16]: the Torii it was built with (TORII_VERSION), NUL-padded
+  80  u16 offsets[count]: each string's place in the pool, 0 for one the
       pack doesn't have (the pool starts with a NUL)
   then the pool: the strings, each ended by a NUL
 A pack is at most 64 KB (PACK_MAX): the room it has in PSRAM. Every
@@ -65,15 +67,17 @@ ENGLISH = ROOT / "lang" / "en.ini"
 IDS_H = ROOT / "source" / "lang_ids.h"
 EN_C = ROOT / "source" / "lang_en.c"
 
-FORMAT = 1
+FORMAT = 2
 MAGIC = b"TLNG"
-HEADER = 64
+HEADER = 80
 PACK_MAX = 0x10000
 # What lang_before_launch copies into the row cache's room (ui_list.c):
 # a launch's sections' offsets and strings
 LAUNCH_MAX = 0x2000
 CODE_BYTES = 8
 NAME_BYTES = 24
+RELEASE_BYTES = 16
+VERSION_H = ROOT / "source" / "version.h"
 ENGLISH_ID = 0xE1E1  # Settings' id for English, as older kernels stored it
 PSEUDO_CODE = "en-XA"
 
@@ -284,7 +288,15 @@ def ident(key: str) -> str:
 
 
 def key_hash(en: Lang) -> int:
-    return zlib.crc32("\n".join(en.keys).encode()) & 0xFFFFFFFF
+    lines = (f"{k} {' '.join(sorted(placeholders(en.text[k])))}" for k in en.keys)
+    return zlib.crc32("\n".join(lines).encode()) & 0xFFFFFFFF
+
+
+def release() -> str:
+    m = re.search(r'#define TORII_VERSION "([^"]+)"', VERSION_H.read_text())
+    if not m or len(m.group(1)) >= RELEASE_BYTES:
+        raise LangError(f"{VERSION_H}: no TORII_VERSION shorter than {RELEASE_BYTES}")
+    return m.group(1)
 
 
 def code_id(code: str) -> int:
@@ -406,6 +418,7 @@ def pack(lang: Lang, en: Lang) -> bytes:
     body += lang.meta["name"].encode().ljust(NAME_BYTES, b"\0")
     body += le32(0) + le32(0)  # the font: none until 1.0
     body += le32(pool_at)
+    body += release().encode().ljust(RELEASE_BYTES, b"\0")
     body += b"".join(le16(o) for o in offsets)
     body += pool
     if len(body) % 2:

@@ -48,8 +48,7 @@ enum info_string {
 	// About
 	INFO_S_ABOUT_TORII,  // %s: the version, %s: the build ID
 	INFO_S_ABOUT_CART,   // %s: the revision, %s: the FPGA firmware
-	INFO_S_ABOUT_REV_A,  // the revisions' names
-	INFO_S_ABOUT_REV_B,
+	INFO_S_ABOUT_REV_B,  // the revision's name
 	INFO_S_ABOUT_NOR,       // %s: its games ("3 games"), %s MB used, %s MB in all
 	INFO_S_ABOUT_NOR_EMPTY,
 	INFO_S_ABOUT_CARD,   // %s: its size, %s: free, %s: its file system

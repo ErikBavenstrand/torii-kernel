@@ -85,7 +85,7 @@ setup() {
   logged "nor: wrote the pending-save record, 512 bytes"
   [ "$(pending)" = 0011 ] || fail "no pending-save record after the first launch"
 }
-# A at "Save sav?"
+# A at "Save to SD card?"
 copy() { boot -k 100:A -k 106:- -f 800; }
 copied() {
   logged "save: wrote $savep, 131072 bytes, verified"
@@ -127,7 +127,7 @@ print(sum(1 for i in range(0x790200, 0x790400, 2) if d[i:i+2] != b'\xff\xff'))" 
     # The next power-on asks nothing; the next launch takes slot 2, and its
     # save copies to Test's file
     boot -k 100:A -k 106:- -f 400
-    ! grep -qF 'Save sav?' "$cart/run.log" || fail "cut $n of $progs: the next power-on asked to copy a save"
+    ! grep -qF 'Save to SD card?' "$cart/run.log" || fail "cut $n of $progs: the next power-on asked to copy a save"
     # Cut before its first program, slot 1 is still erased and taken
     want=2
     [ "$n" != 1 ] || want=1
@@ -160,7 +160,7 @@ cut-clear)
     if [ "$n" = 1 ]; then
       logged "save: the chip is identical to $savep, nothing to copy"
       [ "$(pending)" = 0000 ] || fail "cut 1: the record is still set after the second power-on"
-    else ! grep -qF 'Save sav?' "$cart/run.log" || fail "cut $n: asked again"; fi
+    else ! grep -qF 'Save to SD card?' "$cart/run.log" || fail "cut $n: asked again"; fi
     launch
     logged "nor: the pending-save record in slot 1"
     copy && copied
@@ -178,7 +178,7 @@ r = record("/torii/saves/Other.gba/Main.sav")
 d[B + 0x200 + 2:B + 0x200 + 0x80] = r[2:0x80]'
   [ "$(slot_flag 1)" = ffff ] && [ "$(pending)" = 0000 ] || fail "the half slot reads as pending"
   boot -k 100:A -k 106:- -f 400
-  ! grep -qF 'Save sav?' "$cart/run.log" || fail "a half-programmed slot asked to copy a save"
+  ! grep -qF 'Save to SD card?' "$cart/run.log" || fail "a half-programmed slot asked to copy a save"
   launch
   logged "nor: the pending-save record in slot 2"
   [ "$(slot_flag 1)" = 0000 ] || fail "the half slot wasn't used up"

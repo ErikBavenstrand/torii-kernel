@@ -676,6 +676,7 @@ settings-dark/frames 39-45 8DC21F50A4966475
 settings-start-hidden/row 0CAAE9ACBBE3D16E
 slot-new-name/empty 12645B2E2358B52B
 slot-new-name/typed 12645B2E2358B52B
+slot-new-popup/popup 3153AA40029E6635
 slot-picker/picker F2B4477AA79C47BF
 slot-picker/picker-down 9673CADB7316FE61
 slot-picker-light/picker E78F04DF444B1F8D

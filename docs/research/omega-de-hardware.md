@@ -476,7 +476,7 @@ set, in kernel mode too; the kernel sets it to 1 at boot.
 
 **Verified with a commercial game:** Pokémon Emerald (`BPEE`, 16 MB, Flash
 128K, RTC) runs the whole cycle on the emulated cart, launched from SD: new
-game, in-game save, power-cycle with the kernel's "Save sav?" prompt writing
+game, in-game save, power-cycle with the kernel's "Save to SD card?" prompt writing
 `/torii/saves/Emerald.gba/Main.sav` (identical to the first 128 KB of cart SRAM), and
 Continue on the next launch. The game's save sits in cart SRAM as plain
 bytes in Emerald's own layout (4 KB sections, signature `0x08012025`); the
@@ -673,7 +673,7 @@ and the GL064A, and fails on v0.2.1 and v0.2.2.
 
 ## 5. Save prompt behaviour
 
-On power-on, if a game ran since the last save, the kernel asks "Save sav?".
+On power-on, if a game ran since the last save, the kernel asks "Save to SD card?".
 A copies cart SRAM to the game's save file (`/torii/saves/<rom path>/Main.sav`). B (CANCEL) discards that session:
 the pending flag is cleared without writing, and the next launch loads the
 existing `.sav` back into SRAM. This is intended, and lets you throw away a

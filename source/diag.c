@@ -576,12 +576,22 @@ static int bcd_ok(u8 v, u8 max)
 static void step_rtc(void)
 {
 	step("clock");
-	u8 a[7], b[7];
+	u8 a[7], b[7], t[7];
 	rtc_enable();
-	rtc_get(a);
+	rtc_get(t);
 	rtc_disenable();
 	say(WHITE, "measuring the clock for two seconds...");
-	pause_frames(130);  // a bit over two seconds
+	// From a second's tick (a stopped clock gives up after one), so two
+	// seconds read as 2, not 2 or 3
+	for (u32 f = 0; f < 70; f++) {
+		pause_frames(1);
+		rtc_enable();
+		rtc_get(a);
+		rtc_disenable();
+		if (a[6] != t[6])
+			break;
+	}
+	pause_frames(124);  // two seconds and a frame or two
 	rtc_enable();
 	rtc_get(b);
 	rtc_disenable();
@@ -592,12 +602,12 @@ static void step_rtc(void)
 		    bcd_ok(a[4] & 0x3F, 23) && bcd_ok(a[5], 59) && bcd_ok(a[6], 59);
 	u32 s1 = UNBCD(a[6]) + 60 * UNBCD(a[5]), s2 = UNBCD(b[6]) + 60 * UNBCD(b[5]);
 	u32 passed = (s2 + 3600 - s1) % 3600;
-	say(WHITE, "%lu seconds passed in about 2.2", (unsigned long)passed);
+	say(WHITE, "%lu seconds passed in 2", (unsigned long)passed);
 	result(valid, "clock reads a valid date");
 	if (passed == 0 && tlog_in_emulator())
 		say(GREY, "clock runs: the emulator can't tell");
 	else
-		result(passed >= 1 && passed <= 4, "clock runs");
+		result(passed >= 1 && passed <= 3, "clock runs");
 	pause_frames(60);
 }
 

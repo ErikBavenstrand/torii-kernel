@@ -25,7 +25,7 @@ mcopy -i "$cart/sd.img" tests/roms/rumble/rumble.gba ::/Probe.gba
 
 # CLEAN BOOT of Probe.gba. Then each try: A runs it (60 frames), and the
 # answers are A (yes), B (no), SELECT (skip), A. A goes back to the kernel,
-# and A at its "Save sav?" lets the boot go on to the report.
+# and A at its "Save to SD card?" lets the boot go on to the report.
 k() { printf -- '-k %d:%s -k %d:- ' "$1" "$2" $(($1 + 4)); }
 # shellcheck disable=SC2046
 OMEGA_DIR=$cart OMEGA_TRACE=1 emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch /Probe.gba at=180) \

@@ -109,6 +109,13 @@ void test_lang_pack(void)
 	lang_pack_code(pack, code);
 	lang_pack_name(pack, name);
 	CHECK(!strcmp(code, "sv") && !strcmp(name, "Svenska"));
+	char release[LANG_RELEASE_BYTES];
+	lang_pack_release(pack, release);
+	CHECK(!strcmp(release, "9.9.9"));
+	lang_test_put16(pack + 4, 1);  // a pack from before the field
+	lang_pack_release(pack, release);
+	CHECK(!release[0]);
+	lang_test_put16(pack + 4, LANG_FORMAT);
 	// Its strings, and English for one it lacks
 	lang_use(pack);
 	CHECK(lang_using_pack());

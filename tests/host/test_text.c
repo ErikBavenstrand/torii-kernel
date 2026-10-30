@@ -107,6 +107,9 @@ void test_text_width(void)
 		 g[G('A')].advance);  // a stray byte adds nothing
 	CHECK_EQ(width(&font_heading, "A"), font_heading.glyphs[G('A')].advance);
 	CHECK(width(&font_heading, "MENU") > width(&font_body, "MENU"));
+	CHECK_EQ(width(&font_body, "ab\xC2\xAD"
+				   "cd"),
+		 width(&font_body, "abcd"));  // a soft hyphen draws nothing
 
 	// What text_blit and TEXT_MAX_GLYPHS rely on: 2 byte rows, glyphs no
 	// wider than 16 px, and no advance under 2 px

@@ -12,7 +12,7 @@
 // Extended-A letters lose their accents, dashes and curly quotes become
 // ASCII, and anything else, or a broken sequence, is CHARSET_REPLACEMENT.
 // CHARSET_NONE for a stray continuation byte, such as where a cut name
-// starts mid-character.
+// starts mid-character, and for a soft hyphen (U+00AD).
 u32 charset_next_latin1(const char *s, u32 len, u32 *pos);
 // How many bytes of the NUL-terminated s to keep for at most max: all of it
 // if it fits, else max or fewer, cut where a character starts.

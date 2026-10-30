@@ -41,6 +41,7 @@ static inline u32 lang_test_pack(u8 *out, u32 room, const char *code, const char
 	strncpy((char *)out + 20, code, LANG_CODE_BYTES - 1);
 	strncpy((char *)out + 20 + LANG_CODE_BYTES, name, LANG_NAME_BYTES - 1);
 	lang_test_put32(out + 60, pool);
+	strncpy((char *)out + 64, "9.9.9", LANG_RELEASE_BYTES - 1);
 	for (u32 i = 0; i < n; i++) {
 		u32 len = (u32)strlen(strings[i].text) + 1;
 		if (pool + at + len > room)

@@ -66,7 +66,7 @@ grep -qF "kernel: launch: IRQ hook from a scan of the ROM (scan engine)" "$cart/
 mdir -i "$cart/sd.img" ::/PATCH/Hello.pat >/dev/null 2>&1 || fail "the scan wasn't written to PATCH/Hello.pat"
 echo "PASS: BOOT WITH ADDON with the scan engine scans the ROM, hooks the game and writes PATCH/Hello.pat"
 
-# Power-on 2: copy the save (A at "Save sav?"), then BOOT WITH ADDON again.
+# Power-on 2: copy the save (A at "Save to SD card?"), then BOOT WITH ADDON again.
 # shellcheck disable=SC2046 # nav.sh's options
 watch $(keys 100 A) $(nav_launch /Hello.gba addon at=410)
 grep -qF "kernel: launch: IRQ hook from PATCH/ (cached scan)" "$cart/run.log" ||

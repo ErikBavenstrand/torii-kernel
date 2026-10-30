@@ -44,7 +44,7 @@ grep -q "^kernel: launch: boot mode with addons (Settings')" "$cart/1.log" ||
 grep -q '^kernel: launch: loading Other.gba' "$cart/1.log" || fail "Other.gba didn't load: $(grep '^kernel: launch' "$cart/1.log" | tail -2)"
 echo "PASS: L held doesn't page a game list, and L+A starts the selected row with a hard reset"
 
-# Power-on 2, 30 s later on a running clock: A at "Save sav?", then
+# Power-on 2, 30 s later on a running clock: A at "Save to SD card?", then
 # Recent's first row is Hello, played "just now"; a minute on it says "1m
 # ago" (the page refreshes the text as it changes)
 # (the menu starts facing the item it was left on, GBA: LEFT to Recent)

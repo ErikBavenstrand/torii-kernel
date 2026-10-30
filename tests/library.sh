@@ -307,7 +307,7 @@ if shard_case; then
   # shellcheck disable=SC2046
   boot "$cart" "$cart/3.log" $(nav_launch /Zelda.gb at=150) -f 400
   logged "$cart/3.log" "launch: starting the game"
-  # (B at "Save sav?", which the game left)
+  # (B at "Save to SD card?", which the game left)
   boot "$cart" "$cart/4.log" -k 100:B -k 106:- -f 400
   logged "$cart/4.log" "library: loaded 2 games"
   no_errors "$cart/4.log"
