@@ -16,6 +16,11 @@ git log, not here.
   viewer (A, or View in their popup), stepping through the folder's;
   any uncompressed BMP shows, centred or shrunk to fit, in up to 176
   colours; RLE and other kinds say they can't show (5564deb0).
+- **Added:** renaming a game's file on the SD card page moves its
+  screenshots to the new name, each keeping its date (9a7685dc).
+- **Changed:** the viewer reads the next picture ahead between frames, so
+  keys never wait for it, and photo-like pictures (1,024 or more 4-bit
+  colours) are dithered so their gradients don't band (27233a5c).
 - **Added:** R in a game list makes the game a favourite or not at once,
   its star shown (on Favourites its row goes); Info's Controls says so
   (d00ed28e).
