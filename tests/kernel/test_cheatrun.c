@@ -174,7 +174,7 @@ void test_cheatrun_matches_mgba(void)
 		memcpy((void *)T_WANT, (void *)T_DATA, T_LEN);
 		memcpy((void *)T_DATA, (void *)T_SNAP, T_LEN);
 		for (u32 frame = 0; frame < 2; frame++)
-			Cheat_run(T_PROG, 0, 0);
+			Cheat_run(T_PROG, 0, 0, 0);
 		runs++;
 		for (u32 i = 0; i < T_LEN; i++)
 			if (*(vu8 *)(T_DATA + i) != *(vu8 *)(T_WANT + i)) {
@@ -308,7 +308,7 @@ void test_cheatrun_cycles(void)
 		REG_WAITCNT_CART = WAITCNT_BIOS;
 		T_PROG[0] = 0;
 		u32 start = cycles_now();
-		Cheat_run(T_PROG, 0, 0);
+		Cheat_run(T_PROG, 0, 0, 0);
 		u32 took = cycles_since(start);
 		REG_WAITCNT_CART = saved;
 		REG_IME = ime;
@@ -343,7 +343,7 @@ void test_cheatrun_cycles(void)
 			u16 saved = REG_WAITCNT_CART;
 			REG_WAITCNT_CART = waits[v];
 			u32 start = cycles_now();
-			Cheat_run(T_PROG, 0, 0);
+			Cheat_run(T_PROG, 0, 0, 0);
 			took[v] = cycles_since(start);
 			REG_WAITCNT_CART = saved;
 		}
@@ -380,7 +380,7 @@ void test_cheatrun_off(void)
 	// Cheats 0, 33 and 63 off
 	for (u32 i = 0; i < N * 4; i += 4)
 		*(vu32 *)(T_DATA + i) = 0;
-	Cheat_run(T_PROG, 1u << 0, (1u << 1) | (1u << 31));
+	Cheat_run(T_PROG, 1u << 0, (1u << 1) | (1u << 31), 0);
 	u32 wrong = 0;
 	for (u32 c = 0; c < N; c++) {
 		u32 off = c == 0 || c == 33 || c == 63;
@@ -394,7 +394,7 @@ void test_cheatrun_off(void)
 	REG_IME = 0;
 	REG_WAITCNT_CART = WAITCNT_BIOS;
 	u32 start = cycles_now();
-	Cheat_run(T_PROG, ~0u, ~0u);
+	Cheat_run(T_PROG, ~0u, ~0u, 0);
 	u32 took = cycles_since(start);
 	REG_WAITCNT_CART = saved;
 	REG_IME = ime;
@@ -406,4 +406,51 @@ void test_cheatrun_off(void)
 	tlog("cheat cycles: 64 cheats off and %u on: %lu cycles, model %lu", N - 64, (unsigned long)took,
 	     (unsigned long)model);
 	CHECK(took <= model);
+}
+
+// Run once (the in-game menu's SELECT): the cheat runs whatever its off bit,
+// past its gate's ops (the header's CHEAT_PROG_GATE), and no other with it
+void test_cheatrun_once(void)
+{
+	const u32 keys = T_DATA + 0x200, now = T_DATA + 0x204;  // stand-ins for KEYINPUT and the keys before
+	struct cheat_op ops[3][3] = {
+		// Hold A: the gate, then the write
+		{{keys, 1, 1, 0, 0, 0, CHEAT_OP_IF_NAND, 2}, {T_DATA + 0x100, 0x55, 1, 0, 0, 0, CHEAT_OP_WRITE, 1}},
+		// Always: a plain write
+		{{T_DATA + 0x104, 0x66, 1, 0, 0, 0, CHEAT_OP_WRITE, 1}},
+		// Press A: two gate ops, then the write
+		{{now, 1, 2, 0, 0, 0, CHEAT_OP_IF_NAND, 2},
+		 {keys, 1, 1, 0, 0, 0, CHEAT_OP_IF_AND, 2},
+		 {T_DATA + 0x108, 0x77, 1, 0, 0, 0, CHEAT_OP_WRITE, 1}},
+	};
+	const u32 n_ops[3] = {2, 1, 3}, gate[3] = {1, 0, 2}, at[3] = {0x100, 0x104, 0x108};
+	const u8 value[3] = {0x55, 0x66, 0x77};
+	u32 pos = 0, n_patches;
+	set_memory();
+	for (u32 c = 0; c < 3; c++) {
+		u32 got, cost;
+		CHECK_EQ(cheat_lower(ops[c], n_ops[c], T_PROG + pos, T_PROG_MAX - 1 - pos, &got, &cost, T_PATCHES, 1,
+				     &n_patches),
+			 CHEAT_LOWER_OK);
+		T_PROG[pos] |= gate[c] << CHEAT_PROG_GATE_SHIFT;
+		pos += got;
+	}
+	T_PROG[pos] = 0;
+	*(vu16 *)keys = 1;  // A not held, now or before
+	*(vu16 *)now = 1;
+	// once 0, all on: the gates hold their cheats back
+	for (u32 i = 0; i < 3; i++)
+		*(vu8 *)(T_DATA + at[i]) = 0;
+	Cheat_run(T_PROG, 0, 0, 0);
+	CHECK_EQ(*(vu8 *)(T_DATA + 0x100), 0);
+	CHECK_EQ(*(vu8 *)(T_DATA + 0x104), 0x66);
+	CHECK_EQ(*(vu8 *)(T_DATA + 0x108), 0);
+	// Each one alone, all off: only it, past its gate
+	for (u32 c = 0; c < 3; c++) {
+		for (u32 i = 0; i < 3; i++)
+			*(vu8 *)(T_DATA + at[i]) = 0;
+		Cheat_run(T_PROG, ~0u, ~0u, c + 1);
+		for (u32 i = 0; i < 3; i++)
+			CHECK_EQ(*(vu8 *)(T_DATA + at[i]), i == c ? value[i] : 0);
+	}
 }

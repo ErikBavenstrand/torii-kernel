@@ -88,6 +88,8 @@ const char *const lang_en[STR_COUNT] = {
 	"Torii can't run this code",  // ingame.why_cant
 	"No room in game: pick it in Torii",  // ingame.why_room
 	"Too slow with the cheats on now",  // ingame.why_slow
+	"SELECT: run it once",  // ingame.once_hint
+	"Runs once as the game resumes",  // ingame.once_queued
 	"Kept on Back to Torii",  // ingame.state_keep
 	"Replaces the state not kept yet",  // ingame.state_replaces
 	"A goes back to this point",  // ingame.state_load
@@ -562,6 +564,9 @@ const char *const lang_en[STR_COUNT] = {
 	"Show picked only",  // cheats.menu_only
 	"Show all",  // cheats.menu_all
 	"Picked",  // cheats.only_sub
+	"{1} choice",  // cheats.choices.one
+	"{1} choices",  // cheats.choices.other
+	"Pick one",  // cheats.choices_sub
 	"{1}/{2}",  // cheats.position
 	"{1} on",  // cheats.picks
 	"Guide",  // cheats.guide_sub

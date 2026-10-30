@@ -108,7 +108,11 @@ struct cheatfile_cheat {
 	u8 own : 1;          // cheatN_user = true: typed on the cart, so it may be edited and deleted
 	u8 format : 3;       // cheatN_format's enum cheat_format, CHEAT_FMT_AUTO without one
 	u8 renamed : 1;      // cheatN_renamed = true: named on the cart, a name `just cheats` keeps
-	u8 detected;         // once decoded: the format its first code line read in (format, if set), else AUTO
+	u8 detected : 4;     // once decoded: the format its first code line read in (format, if set), else AUTO
+	// Once decoded: OK, as the cheat before it is, with the same shape
+	// (cheatfile_next): its variant, with other values written to the same
+	// places, so a pick of one stands for the run (cheatfile_group)
+	u8 variant : 1;
 	u16 act;             // once decoded (OK or SAME): the activation its code implies (cheatkeys_derive),
 			     // with CHEATFILE_ACT_UNGATED; else 0
 };
@@ -166,6 +170,15 @@ static inline u16 cheatfile_activation(const struct cheatfile_cheat *c)
 		       (mode == CHEATKEYS_ALWAYS && (own == CHEATKEYS_HOLD || own == CHEATKEYS_PRESS))))
 		return code;
 	return c->keys;
+}
+
+// 1 if cheat c, decoded, can run once in game (the in-game menu's SELECT):
+// its code waits on no buttons of its own and runs in game, so only a Hold
+// or Press line's gate, which a run once steps past, can hold it back
+static inline int cheatfile_runs_once(const struct cheatfile_cheat *c)
+{
+	return c->status == CHEATFILE_OK && cheatkeys_mode(cheatfile_derived(c)) == CHEATKEYS_ALWAYS &&
+	       !cheatfile_ungated(c);
 }
 
 // Where cheatfile_text has got to, so each call goes on from the last
@@ -244,6 +257,8 @@ struct cheatfile_work {
 	// The hashes of the OK cheats' tables and patches decoded so far, open
 	// addressed (0 empty): a later cheat with one of them is CHEATFILE_SAME
 	u32 seen[CHEATFILE_SEEN_SLOTS];
+	// The cheat decoded last, and its shape (0 unless OK): a variant's test
+	u32 last, last_shape;
 	struct cheat_op ops[CHEATFILE_OPS_MAX];
 	u32 prog[CHEATFILE_PROG_MAX];
 	struct cheat_patch patches[CHEATFILE_PATCHES_MAX];
@@ -291,6 +306,19 @@ int cheatfile_toggle(struct cheatfile *f, u32 i);
 int cheatfile_changed(const struct cheatfile *f);
 // The picked cheats' count
 u32 cheatfile_picks(const struct cheatfile *f);
+
+// Variants (cheatfile_cheat.variant): cheat i's run of them, from the first
+// (returned) to *end (past the last); one cheat alone is a run of 1. Only
+// decoded cheats are known to be variants.
+u32 cheatfile_group(const struct cheatfile *f, u32 i, u32 *end);
+// A run's name: the bytes its cheats' names share, up to the end of a word,
+// without the separators after it ("Wild Pokemon" of "Wild Pokemon -
+// Bulbasaur" and "Wild Pokemon - Ivysaur"); 0 if under 3. *own: the bytes
+// they share, past which each name's own part starts, 0 without a name.
+u32 cheatfile_group_name(const struct cheatfile *f, u32 start, u32 end, u32 *own);
+// Where a name of len bytes has its own part ("Bulbasaur"), past the own
+// bytes it shares and the marks after them; 0 (the whole name) if nothing is left
+u32 cheatfile_own_part(const char *name, u32 len, u32 own);
 
 // The file with the picks written in, as a safefile_fill: up to max bytes
 // of it from byte pos into buf, 0 at its end. ctx is the cheatfile. The

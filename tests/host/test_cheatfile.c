@@ -1404,7 +1404,8 @@ void test_cheatfile_keys_guide(void)
 // A cheat's cheatN_keys gate its table part (cheatfile.c's gate): Hold
 // under a key test on KEYINPUT, Press under two on the interpreter's keys
 // (now held, before not); none where the code says the same Hold, for a
-// ROM patch, or where a condition can't go (a plain ROM write: as it was)
+// ROM patch, or where a condition can't go (a plain ROM write: as it was).
+// The header counts the gate's ops, which a run once steps past.
 void test_cheatfile_keys_gate(void)
 {
 	load_str("cheat0_code = \"82001000+BEEF\"\ncheat0_keys = \"hold L\"\n"
@@ -1419,7 +1420,8 @@ void test_cheatfile_keys_gate(void)
 	CHECK_EQ(cheats[0].act, CHEATKEYS_ALWAYS_ON);  // what the code says, ungated
 	CHECK_EQ(cheatfile_activation(&cheats[0]), CHEATKEYS(CHEATKEYS_HOLD, 0x200));
 	CHECK_EQ(work.n_prog, 6);
-	CHECK_EQ(work.prog[0], 2 | (5 * 4) << 16);  // two ops, not plain
+	CHECK_EQ(work.prog[0], 2 | 1 << CHEAT_PROG_GATE_SHIFT | (5 * 4) << 16);  // two ops, not plain, one the gate's
+	CHECK(cheatfile_runs_once(&cheats[0]));
 	CHECK_EQ(work.prog[1], (CHEAT_PROG_K_EXT << 28) | CHEAT_KEYINPUT);
 	CHECK_EQ(work.prog[2], CHEAT_PROG_NAND | 1 << 4 | 1 << 16);  // a halfword, over the write
 	CHECK_EQ(work.prog[3], 0x200);
@@ -1428,7 +1430,8 @@ void test_cheatfile_keys_gate(void)
 	CHECK_EQ(cheatfile_next(&file, &work), 1);
 	CHECK_EQ(cheats[1].status, CHEATFILE_OK);
 	CHECK_EQ(work.n_prog, 9);
-	CHECK_EQ(work.prog[0], 3 | (8 * 4) << 16);
+	CHECK_EQ(work.prog[0], 3 | 2 << CHEAT_PROG_GATE_SHIFT | (8 * 4) << 16);
+	CHECK(cheatfile_runs_once(&cheats[1]));
 	CHECK_EQ(work.prog[1], (CHEAT_PROG_K_EXT << 28) | CHEAT_KEYS_NOW);
 	CHECK_EQ(work.prog[2], CHEAT_PROG_NAND | 1 << 4 | 2 << 16);  // over the next condition and the write
 	CHECK_EQ(work.prog[3], 0x300);
@@ -1440,19 +1443,24 @@ void test_cheatfile_keys_gate(void)
 	CHECK_EQ(cheatfile_next(&file, &work), 2);
 	CHECK_EQ(cheats[2].act, CHEATKEYS(CHEATKEYS_HOLD, 0x001));
 	CHECK_EQ(work.n_prog, 1 + 3 + 2);  // its own key test alone
+	CHECK(!(work.prog[0] & CHEAT_PROG_GATE));
+	CHECK(!cheatfile_runs_once(&cheats[2]));  // it waits on its own buttons
 	CHECK_EQ(cheatfile_next(&file, &work), 3);
 	CHECK_EQ(cheats[3].act, CHEATKEYS_AT_LAUNCH);
 	CHECK_EQ(cheatfile_activation(&cheats[3]), CHEATKEYS_AT_LAUNCH);
+	CHECK(!cheatfile_runs_once(&cheats[3]));  // nothing runs in game
 	CHECK_EQ(work.n_prog, 0);
 	CHECK_EQ(cheatfile_next(&file, &work), 4);
 	CHECK_EQ(cheats[4].status, CHEATFILE_OK);  // ungated: a ROM write can't go under a condition
 	CHECK(cheatfile_ungated(&cheats[4]));
 	CHECK_EQ(cheatfile_activation(&cheats[4]), CHEATKEYS_ALWAYS_ON);  // what it does, not its line
 	CHECK(!cheatfile_ungated(&cheats[0]));
+	CHECK(!cheatfile_runs_once(&cheats[4]));
 	CHECK(work.prog[0] & CHEAT_PROG_PLAIN);
 	CHECK_EQ(work.n_patches, 1);
 	CHECK_EQ(cheatfile_next(&file, &work), 5);
 	CHECK_EQ(work.n_prog, 3);  // no keys: plain
+	CHECK(cheatfile_runs_once(&cheats[5]));
 	CHECK(work.cost < gated_cost);
 	CHECK_EQ(cheatfile_next(&file, &work), -1);
 	// A line the code can't keep gives way to the code once decoded: "launch"
@@ -1463,4 +1471,47 @@ void test_cheatfile_keys_gate(void)
 	CHECK_EQ(cheatfile_activation(&cheats[1]), CHEATKEYS(CHEATKEYS_HOLD, 0x001));
 	cheats[0].act = 0;  // as before it is decoded: the line
 	CHECK_EQ(cheatfile_activation(&cheats[0]), CHEATKEYS_AT_LAUNCH);
+}
+
+// Variants: adjacent OK cheats of one shape (the same places written, other
+// values) make a run, named by what their names share up to a word
+void test_cheatfile_variants(void)
+{
+	load_str("cheat0_desc = \"Wild Pokemon - Bulbasaur\"\ncheat0_code = \"32001000 0001\"\n"
+		 "cheat1_desc = \"Wild Pokemon - Ivysaur\"\ncheat1_code = \"32001000 0002\"\n"
+		 "cheat2_desc = \"Wild Pokemon - Venusaur\"\ncheat2_code = \"32001000 0003\"\n"
+		 "cheat3_desc = \"Max money\"\ncheat3_code = \"82001004+FFFF\"\n"
+		 "cheat4_desc = \"No money\"\ncheat4_code = \"82001004+0000\"\n"
+		 "cheat5_desc = \"Infinite HP\"\ncheat5_code = \"32001008 0063\"\n"
+		 "cheat6_desc = \"Wild Pokemon - Mew\"\ncheat6_code = \"32001000 0004\"\n"
+		 "cheat7_desc = \"Hold A\"\ncheat7_code = \"74000130 03FE+32001010 0001\"\n"
+		 "cheat8_desc = \"Hold B\"\ncheat8_code = \"74000130 03FD+32001010 0001\"\n"
+		 "cheat9_desc = \"Money 999999\"\ncheat9_code = \"8200100C+9999\"\n"
+		 "cheat10_desc = \"Money\"\ncheat10_code = \"8200100C+0000\"\n"
+		 "cheat11_desc = \"Pokemon 001 Bulbasaur\"\ncheat11_code = \"32001014 0001\"\n"
+		 "cheat12_desc = \"Pokemon 002 Ivysaur\"\ncheat12_code = \"32001014 0002\"\n");
+	const u8 variant[] = {0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1};
+	CHECK_EQ(file.count, sizeof(variant));
+	for (u32 i = 0; i < sizeof(variant); i++) {
+		CHECK_EQ(cheats[i].status, CHEATFILE_OK);
+		CHECK_EQ(cheats[i].variant, variant[i]);
+	}
+	u32 end, own;
+	CHECK_EQ(cheatfile_group(&file, 1, &end), 0);
+	CHECK_EQ(end, 3);
+	CHECK_EQ(cheatfile_group_name(&file, 0, 3, &own), 12);  // "Wild Pokemon"
+	CHECK_EQ(cheatfile_own_part(desc(1), cheats[1].desc_len, own), 15);  // "Ivysaur"
+	CHECK_EQ(cheatfile_group(&file, 4, &end), 3);
+	CHECK_EQ(end, 5);
+	CHECK_EQ(cheatfile_group_name(&file, 3, 5, &own), 0);  // nothing shared
+	CHECK_EQ(cheatfile_group(&file, 5, &end), 5);  // alone
+	CHECK_EQ(end, 6);
+	CHECK_EQ(cheatfile_group(&file, 6, &end), 6);  // not beside its kind
+	CHECK_EQ(end, 7);
+	CHECK_EQ(cheatfile_group(&file, 8, &end), 8);  // conditions on other keys: not variants
+	CHECK_EQ(cheatfile_group_name(&file, 9, 11, &own), 5);  // "Money", one name the whole of it
+	CHECK_EQ(cheatfile_own_part(desc(10), cheats[10].desc_len, own), 0);
+	CHECK_EQ(cheatfile_own_part(desc(9), cheats[9].desc_len, own), 6);
+	CHECK_EQ(cheatfile_group_name(&file, 11, 13, &own), 7);  // "Pokemon": back to a word's end
+	CHECK_EQ(cheatfile_own_part(desc(12), cheats[12].desc_len, own), 8);  // "002 Ivysaur"
 }

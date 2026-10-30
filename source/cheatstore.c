@@ -466,6 +466,41 @@ int cheatstore_toggle(u32 i)
 	return 1;
 }
 
+u32 cheatstore_run(u32 i, u32 *end)
+{
+	struct cheatstore *cs = cheatstore();
+	cheatstore_decode_to(i);
+	u32 start = cheatfile_group(&cs->file, i, end);
+	// A cheat not decoded yet isn't known to be a variant: on until one isn't
+	while (*end < cs->file.count && cs->cheats[*end].status == CHEATFILE_NEW) {
+		cheatstore_decode_to(*end);
+		start = cheatfile_group(&cs->file, i, end);
+	}
+	return start;
+}
+
+int cheatstore_toggle_one(u32 i)
+{
+	struct cheatstore *cs = cheatstore();
+	u32 end, start = cheatstore_run(i, &end);
+	if (cs->cheats[i].picked || end - start < 2)
+		return cheatstore_toggle(i);
+	u16 dropped[8];
+	u32 n = 0;
+	for (u32 k = start; k < end; k++)
+		if (k != i && cs->cheats[k].picked && n++ >= 8)
+			return cheatstore_toggle(i);  // more than can be put back: as a plain pick
+	n = 0;
+	for (u32 k = start; k < end; k++)
+		if (k != i && cs->cheats[k].picked && cheatstore_toggle(k))
+			dropped[n++] = (u16)k;
+	if (cheatstore_toggle(i))
+		return 1;
+	for (u32 k = 0; k < n; k++)
+		cheatstore_toggle(dropped[k]);
+	return 0;
+}
+
 int cheatstore_all_off(void)
 {
 	struct cheatstore *cs = cheatstore();
@@ -1765,6 +1800,8 @@ void cheatstore_launch(const char *rom_path, u32 psram_bytes)
 						flags |= INGAME_CHEAT_TABLE;
 						if (bit >= INGAME_CHEATS)  // no toggle: always on
 							flags = (u8)((flags & ~INGAME_CHEAT_WHY) | INGAME_WHY_LOCKED);
+						else if (!(flags & INGAME_CHEAT_WHY) && cheatfile_runs_once(c))
+							flags |= INGAME_CHEAT_RUN_ONCE;
 					}
 					gl_cheat_patches += cs->work.n_patches;
 					keep_patches(f, c, &cs->work);

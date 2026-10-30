@@ -15,6 +15,7 @@ void test_cheatstore_clean(void);
 void test_cheatrun_matches_mgba(void);
 void test_cheatrun_cycles(void);
 void test_cheatrun_off(void);
+void test_cheatrun_once(void);
 void test_game_hardware(void);
 void test_clock_and_rumble_are_separate(void);
 void test_settings_model_round_trip(void);

@@ -16,7 +16,8 @@
 // Two pages: the menu, and the cheat list (P2) of the picks, whose rows
 // scroll under a title and over a footer that says why a row can't change,
 // else how the cheat is activated ("Hold L+SELECT"), or that the toggles are
-// kept as picks on Back to Torii. The highlighted row's name scrolls
+// kept as picks on Back to Torii. SELECT on a cheat that is off asks for it
+// to run once as the game resumes (INGAME_CHEAT_ONCE). The highlighted row's name scrolls
 // sideways when it is cut (a marquee, drawn from its whole line the kernel
 // wrote at INGAME_SRAM_WIDE).
 #include <stddef.h>
@@ -46,6 +47,7 @@
 
 #define KEY_A 0x001
 #define KEY_B 0x002
+#define KEY_SELECT 0x004
 #define KEY_RIGHT 0x010
 #define KEY_LEFT 0x020
 #define KEY_UP 0x040
@@ -233,6 +235,7 @@ static struct {
 	uint32_t on[2];  // the entries on now, bit n for entry n
 	uint32_t launched[2];  // and at launch
 	uint32_t changed;  // a toggle changed since the menu opened
+	uint32_t once;  // the entry SELECT asked to run once, + 1; 0: none
 	// The marquee of the cursor's cheat: its whole line's width
 	enum mq_state mq;
 	uint32_t mq_wait, mq_px, mq_width;
@@ -545,6 +548,15 @@ static uint32_t cheat_why_now(uint32_t e)
 	return cheats_cost() + m.cheat[e].cost - s->cheat_skip > s->cheat_max ? INGAME_WHY_SLOW : INGAME_WHY_NONE;
 }
 
+// 1 if entry e can run once now (SELECT): off, its code waits on no buttons
+// of its own, and A could turn it on (one too slow beside those on shows why)
+static int cheat_once_ok(uint32_t e)
+{
+	const struct cheat *c = &m.cheat[e];
+	return (c->flags & INGAME_CHEAT_RUN_ONCE) && (c->flags & INGAME_CHEAT_TABLE) && c->bit < INGAME_CHEATS &&
+	       cheat_why_now(e) == INGAME_WHY_NONE && !bit_of(m.on, e);
+}
+
 // The cheats' entries from the session block, and which are on: the
 // toggles the interpreter reads, against the launch
 static void cheats_load(void)
@@ -635,9 +647,9 @@ static uint32_t row_text(uint32_t r)
 	if (kind == ROW_SHOT && m.shots)
 		return text_at(INGAME_TEXT_SHOT_COUNT + m.shots - 1);
 	if (kind == ROW_CHEATS)
-		return text_at(m.cheats                                        ? INGAME_TEXT_CHEATS
-			       : *(volatile uint16_t *)INGAME_CHEAT_ONOFF == 1 ? INGAME_TEXT_CHEATS_OFF
-									       : INGAME_TEXT_CHEATS_ON);
+		return text_at(m.cheats                                       ? INGAME_TEXT_CHEATS
+			       : *(volatile uint8_t *)INGAME_CHEAT_ONOFF == 1 ? INGAME_TEXT_CHEATS_OFF
+									      : INGAME_TEXT_CHEATS_ON);
 	return text_at(row_texts[kind]);
 }
 
@@ -656,6 +668,10 @@ static uint32_t footer_text(void)
 	uint32_t why = INGAME_WHY_NONE;
 	if (m.cursor >= LIST_FIXED) {
 		uint32_t e = m.cursor - LIST_FIXED;
+		if (m.once == e + 1)
+			return text_at(INGAME_TEXT_ONCE_QUEUED);
+		if (cheat_once_ok(e))
+			return text_at(INGAME_TEXT_ONCE_HINT);
 		why = cheat_why_now(e);
 		uint32_t act = 0;  // its act byte, read when it shows (a word: sram_copy's)
 		if (why == INGAME_WHY_NONE && m.have_session)
@@ -1082,6 +1098,8 @@ static void list_pick(uint32_t r)
 			return;
 		bit_set(m.on, e, !bit_of(m.on, e));
 	}
+	if (m.once && !cheat_once_ok(m.once - 1))
+		m.once = 0;  // on now: it runs anyway
 	cheats_store();
 	slots_update();  // the greyed rows change with what is on
 }
@@ -1133,6 +1151,14 @@ static uint32_t run(uint32_t menu_key)
 				r = r + m.visible < m.rows ? r + m.visible : m.rows - 1;
 			cursor_to(r);
 		}
+		if ((down & KEY_SELECT) && m.page == PAGE_CHEATS && m.cursor >= LIST_FIXED &&
+		    cheat_once_ok(m.cursor - LIST_FIXED)) {
+			uint32_t e = m.cursor - LIST_FIXED;
+			m.once = m.once == e + 1 ? 0 : e + 1;
+			if (m.footer)
+				slot_update(m.title + m.visible);
+			continue;
+		}
 		if (down & KEY_A) {
 			if (m.page == PAGE_CHEATS) {
 				list_pick(m.cursor);
@@ -1177,7 +1203,7 @@ static uint32_t run(uint32_t menu_key)
 				if (m.cheats) {
 					page_open(PAGE_CHEATS, LIST_FIXED);
 				} else {
-					volatile uint16_t *onoff = (volatile uint16_t *)INGAME_CHEAT_ONOFF;
+					volatile uint8_t *onoff = (volatile uint8_t *)INGAME_CHEAT_ONOFF;
 					*onoff = *onoff == 1 ? 0 : 1;
 					slot_update(m.title + m.cursor);
 				}
@@ -1608,6 +1634,12 @@ uint32_t ov_entry(const struct ingame_call *call)
 
 	wait_release(menu_key);
 	uint32_t act = run(menu_key);
+	// Run once as the game goes on (not into a state saved now, which would
+	// run it again at each load)
+	if (m.once && (act == INGAME_ACT_RESUME || act == INGAME_ACT_SLEEP))
+		*(volatile uint8_t *)INGAME_CHEAT_ONCE = (uint8_t)(m.cheat[m.once - 1].bit + 1);
+	else if (act == INGAME_ACT_SAVE)
+		*(volatile uint8_t *)INGAME_CHEAT_ONCE = 0;  // one the game hasn't taken yet isn't saved
 	answer(act);
 	wait_release(KEYS_ALL);
 	vsync();

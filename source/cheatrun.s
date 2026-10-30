@@ -5,7 +5,7 @@
 @ Cheat_blob_start on each VBlank IRQ while cheats are on. The code only
 @ reads the table, the in-game menu's toggles and the memory the cheats
 @ name, and writes those and its two halfwords of keys (below): no other
-@ RAM of its own, nothing but its 44 bytes of the IRQ stack, and no kernel
+@ RAM of its own, nothing but its 48 bytes of the IRQ stack, and no kernel
 @ address (each literal is PC-relative).
 @
 @ Per-cheat switches (v0.8): bit n of a 64-bit mask is the table's cheat n.
@@ -23,11 +23,18 @@
 @ held now and not all before (cheatfile.c), so it runs once a press; the
 @ conditions read one snapshot, so no press falls between them.
 @
+@ Run once (v0.10): the byte after CheatONOFF, 0x3007FE1 (INGAME_CHEAT_ONCE),
+@ is a table cheat's number + 1 that the in-game menu asks to run once. The
+@ run takes it (clears it) and runs that cheat even if its toggle is off,
+@ past its gate's ops.
+@
 @ The table's layout (cheatcode.h has the C side, cheat_lower writes it):
 @ cheats one after another, each a header word, then its ops; a 0 word ends
 @ the table.
-@   header: bits 0-14 the ops (n), bit 15 "plain" (no conditionals), bits
-@           16-31 the bytes of ops after the header
+@   header: bits 0-12 the ops (n), bits 13-14 the gate's ops at its start
+@           (a Hold or Press line's conditions, which a run once skips),
+@           bit 15 "plain" (no conditionals), bits 16-31 the bytes of ops
+@           after the header
 @   op word 0: bits 0-27 the address, bits 28-31 the kind K:
 @     K 0, 1, 2  a write of 1, 2 or 4 bytes; word 1 the value (8 bytes)
 @     K 3, 4, 5  an op of K words: word 1 the info (bits 0-3 the type, 4-5
@@ -69,35 +76,61 @@ Cheat_blob_start:
 	ldrh	r1, [r3, #-0x1E]	@ 0x3007FE2: the keys at the run before
 	strh	r12, [r3, #-0x1E]
 	strh	r1, [r3, #-0x1A]	@ 0x3007FE6
+	ldrb	r12, [r3, #-0x1F]	@ 0x3007FE1: a cheat to run once, + 1
+	cmp	r12, #0
+	movne	r1, #0
+	strneb	r1, [r3, #-0x1F]	@ taken
 	ldr	r1, [r3, #-0x18]	@ the toggles, 0x3007FE8
 	ldr	r2, [r3, #-0x14]	@ 0x3007FEC
+	mov	r3, r12
 	adrl	r0, Cheat_blob_end
 	@ falls into Cheat_run
 
-@ void Cheat_run(const u32 *table, u32 off_lo, u32 off_hi): runs every
-@ cheat of the table once, but those whose bit of the off mask is set.
+@ void Cheat_run(const u32 *table, u32 off_lo, u32 off_hi, u32 once): runs
+@ every cheat of the table once, but those whose bit of the off mask is
+@ set; and cheat once - 1 (once 0: none) whatever its bit, past its gate's
+@ ops (the header's CHEAT_PROG_GATE: a Hold or Press line's conditions).
 @ Callable from C (the kernel's tests time it).
 Cheat_run:
-	stmfd	sp!, {r1, r2, r4-r11, lr}	@ the off mask at [sp], shifted a cheat at a time
+	stmfd	sp!, {r1-r11, lr}	@ the off mask at [sp], shifted a cheat at a time; once's countdown
+	subs	r12, r3, #1		@ the cheat to run once: its off bit cleared
+	bmi	cheat_next
+	mov	lr, #1
+	cmp	r12, #32
+	ldrlo	r4, [sp]
+	biclo	r4, r4, lr, lsl r12
+	strlo	r4, [sp]
+	subhs	r12, r12, #32
+	ldrhs	r4, [sp, #4]
+	bichs	r4, r4, lr, lsl r12
+	strhs	r4, [sp, #4]
 
 cheat_next:
 	ldr	r1, [r0], #4
 	movs	r10, r1, lsl #16	@ n << 16, the plain bit in bit 31
 	beq	cheat_done
 	add	r11, r0, r1, lsr #16
-	ldmia	sp, {r2, r3}		@ this cheat's bit out of the mask's bottom
+	ldmia	sp, {r2, r3, r12}	@ this cheat's bit out of the mask's bottom
 	movs	r3, r3, lsr #1
 	movs	r2, r2, rrx
-	stmia	sp, {r2, r3}
+	sub	r12, r12, #1		@ 0: the cheat to run once
+	stmia	sp, {r2, r3, r12}
 	movcs	r0, r11			@ off: past it
 	bcs	cheat_next
 	movs	r10, r1, lsl #16
 	movmi	r10, #0
 	bmi	plain
-	mov	r10, r10, lsr #16
+	mov	r10, r1, lsl #19	@ n, without the gate's bits
+	mov	r10, r10, lsr #19
 	mov	r6, #0
 	mov	r7, #0
 	mov	r8, #0
+	cmp	r12, #0
+	bne	op_loop
+	ands	r1, r1, #0x6000		@ run once: past the gate's ops
+	beq	op_loop
+	mov	r1, r1, lsr #13
+	b	walk
 
 @ --- a cheat with conditionals: one op at a time, by index ----------------
 op_loop:
@@ -350,7 +383,7 @@ cond:	subs	r3, r3, #8
 	b	post_cond
 
 cheat_done:
-	add	sp, sp, #8
+	add	sp, sp, #12
 	ldmfd	sp!, {r4-r11, lr}
 	bx	lr
 	.align 2

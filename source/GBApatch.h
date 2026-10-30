@@ -31,7 +31,7 @@ extern void Cheat_switch(void);
 extern void Cheat_blob_start(void);
 extern void Cheat_blob_end(void);
 // Runs the table once, but the cheats whose bit of the off mask is set
-void Cheat_run(const u32 *table, u32 off_lo, u32 off_hi);
+void Cheat_run(const u32 *table, u32 off_lo, u32 off_hi, u32 once);
 
 extern void Fire_Emblem_0378_patch_start(void);
 extern void Fire_Emblem_0378_patch_end(void);

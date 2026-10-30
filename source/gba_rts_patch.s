@@ -192,7 +192,7 @@ check_sleep:
 	tst 		r2,r3
 	beq 		sleep_now
 
-	@;check cheat. Torii: the halfword at CheatONOFF is 1 for CHEAT OFF, anything
+	@;check cheat. Torii: the byte at CheatONOFF is 1 for CHEAT OFF, anything
 	@;else on: the BIOS's soft reset clears it, so a game starts with its
 	@;picked cheats running (v0.7); the in-game menu's Cheats row stops them.
 	@;They run through the interpreter (cheatrun.s) that Cheat_switch says is
@@ -223,7 +223,7 @@ check_sleep:
 	bne			cheat_game
 	mov			r1,#1
 	str			r1,[r0,#-0x1C]
-	ldrh 		r1,[r0,#-0x20]	@;a halfword: the cheats' keys follow it (cheatrun.s)
+	ldrb 		r1,[r0,#-0x20]	@;its low byte: Run once's byte and the keys follow it (cheatrun.s)
 	cmp 		r1,#1
 	beq 		cheat_game
 	adrl		r3,RTS_ReplaceIRQ_start

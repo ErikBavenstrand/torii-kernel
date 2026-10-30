@@ -341,6 +341,8 @@ void cheatfile_begin(struct cheatfile_work *w)
 	cheat_decoder_init(&w->dec);
 	w->next = 0;
 	w->n_prog = w->n_patches = w->cost = 0;
+	w->last = CHEATFILE_NONE;
+	w->last_shape = 0;
 	memset(w->seen, 0, sizeof(w->seen));
 }
 
@@ -360,6 +362,26 @@ static u32 program_hash(const struct cheatfile_work *w)
 	u32 h = hash_words(2166136261u, &w->n_prog, 1);
 	h = hash_words(h, w->prog, w->n_prog);
 	h = hash_words(h, (const u32 *)(const void *)w->patches, w->n_patches * (u32)sizeof(struct cheat_patch) / 4);
+	return h ? h : 1;
+}
+
+// What n decoded ops do with the values they write left out: where and how
+// they write, and what their conditions test. Two cheats of one shape write
+// other values to the same places: variants of one thing.
+static u32 shape_hash(const struct cheat_op *ops, u32 n)
+{
+	u32 h = hash_words(2166136261u, &n, 1);
+	for (u32 i = 0; i < n; i++) {
+		const struct cheat_op *op = &ops[i];
+		int cond = op->type >= CHEAT_OP_IF_EQ && op->type <= CHEAT_OP_IF_NEVER;
+		u32 words[6] = {op->address,
+				cond ? op->value : 0,
+				op->count,
+				(u32)op->addr_step,
+				(u32)op->else_count << 16 | (u32)op->type << 8 | op->width,
+				(u32)op->value_step};
+		h = hash_words(h, words, 6);
+	}
 	return h ? h : 1;
 }
 
@@ -453,8 +475,10 @@ static int gate(struct cheatfile_work *w, u32 n, u16 keys, u16 act)
 	u8 lowered = cheat_lower(w->ops, n + g, w->prog, CHEATFILE_PROG_MAX, &w->n_prog, &w->cost, w->patches,
 				 CHEATFILE_PATCHES_MAX, &w->n_patches);
 	memmove(w->ops, w->ops + g, n * sizeof(w->ops[0]));
-	if (lowered == CHEAT_LOWER_OK)
+	if (lowered == CHEAT_LOWER_OK) {
+		w->prog[0] |= g << CHEAT_PROG_GATE_SHIFT;  // a run once steps past them
 		return 1;
+	}
 	cheat_lower(w->ops, n, w->prog, CHEATFILE_PROG_MAX, &w->n_prog, &w->cost, w->patches, CHEATFILE_PATCHES_MAX,
 		    &w->n_patches);
 	return 0;
@@ -495,6 +519,10 @@ s32 cheatfile_next(struct cheatfile *f, struct cheatfile_work *w)
 	else if (c->status == CHEATFILE_OK && seen_before(w, c->hash))
 		c->status = CHEATFILE_SAME;
 	c->act = c->status == CHEATFILE_OK || c->status == CHEATFILE_SAME ? act : 0;
+	u32 shape = c->status == CHEATFILE_OK ? shape_hash(w->ops, n_ops) : 0;
+	c->variant = shape && w->last + 1 == i && shape == w->last_shape;
+	w->last = i;
+	w->last_shape = shape;
 	if (c->status != CHEATFILE_OK)
 		w->n_prog = w->n_patches = w->cost = 0;
 	c->bytes = (u16)(w->n_prog * 4);
@@ -506,6 +534,70 @@ s32 cheatfile_next(struct cheatfile *f, struct cheatfile_work *w)
 		f->patches += c->patches;
 	}
 	return (s32)i;
+}
+
+// --- Variants ------------------------------------------------------------------
+
+u32 cheatfile_group(const struct cheatfile *f, u32 i, u32 *end)
+{
+	u32 start = i, k = i + 1;
+	while (start > 0 && f->cheats[start].variant)
+		start--;
+	while (k < f->count && f->cheats[k].variant)
+		k++;
+	*end = k;
+	return start;
+}
+
+// 1 if c ends a word in a cheat's name: a space or a mark that joins a name
+// to its variant's part
+static int name_break(char c)
+{
+	return c == ' ' || c == '-' || c == ':' || c == '=' || c == '|' || c == ',' || c == '/' || c == '(' || c == '[';
+}
+
+u32 cheatfile_group_name(const struct cheatfile *f, u32 start, u32 end, u32 *own)
+{
+	*own = 0;
+	const struct cheatfile_cheat *first = &f->cheats[start];
+	if (first->desc == CHEATFILE_NONE)
+		return 0;
+	const char *a = f->text + first->desc;
+	u32 n = first->desc_len;
+	for (u32 i = start + 1; i < end && n; i++) {
+		const struct cheatfile_cheat *c = &f->cheats[i];
+		if (c->desc == CHEATFILE_NONE)
+			return 0;
+		const char *b = f->text + c->desc;
+		u32 k = 0;
+		while (k < n && k < c->desc_len && a[k] == b[k])
+			k++;
+		n = k;
+	}
+	// Back to a word's end: every name ends there, or goes on past a break
+	int whole = 1;
+	for (u32 i = start; i < end && whole; i++) {
+		const struct cheatfile_cheat *c = &f->cheats[i];
+		whole = c->desc_len == n || name_break(f->text[c->desc + n]);
+	}
+	if (!whole)
+		while (n && !name_break(a[n - 1]))
+			n--;
+	u32 part = n;
+	while (n && (name_break(a[n - 1]) || a[n - 1] == ')' || a[n - 1] == ']'))
+		n--;
+	if (n < 3)
+		return 0;
+	*own = part;
+	return n;
+}
+
+u32 cheatfile_own_part(const char *name, u32 len, u32 own)
+{
+	u32 k = own < len ? own : len;
+	while (k < len && name_break(name[k]) && name[k] != '(' && name[k] != '[')
+		k++;
+	return k < len ? k : 0;  // nothing of its own: the whole name
 }
 
 // --- Activation (cheatkeys.h) ------------------------------------------------

@@ -131,6 +131,13 @@ write-only, so a menu on a BG can't give them back (today's BG2 affine bug).
   between the interpreter and the table. The toggles are past the BIOS's SVC stack and
   before its words at `0x03007FF0`; SoftReset zeroes them, so Reset game (and a game's own
   soft reset) brings back the cheats as launched. A cheat past the 64th always runs.
+- **Run once (v0.10).** SELECT on a cheat that is off and whose code waits on no buttons of
+  its own (`INGAME_CHEAT_RUN_ONCE`) asks for it to run once: on Resume or Sleep the overlay
+  writes its table number + 1 to `0x03007FE1` (`INGAME_CHEAT_ONCE`, the byte after
+  CheatONOFF's, which the hook now tests alone). The interpreter's next run clears the byte
+  and runs that cheat whatever its toggle, past its Hold or Press gate (the header's
+  `CHEAT_PROG_GATE` counts the gate's ops). Not on Save state: the state would carry the
+  request and run it again at each load. A NOR copy written before v0.10 ignores the byte.
 - **Greying.** The overlay adds up the cycles of what is on (the call, every table cheat
   at its skip cost, and the on ones at their own) and greys a cheat that would pass the cap.
 - **Back to Torii keeps the toggles as picks**, with no question: the cheat screen in

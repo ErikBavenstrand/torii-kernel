@@ -17,6 +17,9 @@
 # cut:    that boot's write cut at each cutpoint (tests/cutsweep.sh): the
 #         file is the old picks or the new ones, and the next boot ends with
 #         the new.
+# once:   Count frames off, then SELECT (run once) and back to the game: the
+#         counter goes up by one and stays, and the interpreter has taken
+#         the request (0x3007FE1 back to 0).
 #
 # Runs inside the torii-emu container after `just build`, `just emu-headless`.
 set -euo pipefail
@@ -27,7 +30,7 @@ set -euo pipefail
 # shellcheck source=tests/cutsweep.sh
 . tests/cutsweep.sh
 
-mode=${1:?usage: cheats_ingame.sh toggle|cut}
+mode=${1:?usage: cheats_ingame.sh toggle|cut|once}
 local_carts "dist/cart-cheats-ingame-$mode"
 
 fail() {
@@ -144,6 +147,30 @@ toggle)
   [ "$(awk '$1 == "mem" && $4 == "0203F010:" { print $6 $5 }' <<<"$out" | sort -u | wc -l)" = 1 ] ||
     fail "Beef ran next launch"
   echo "PASS: cheats_ingame toggle: Back to Torii keeps the toggles as the file's picks, and the next launch runs as they say"
+  ;;
+once)
+  # The menu, Cheats, A (Count frames off), SELECT (run it once), B, B
+  done_at=$((list + 8 * 4 + 30))
+  # shellcheck disable=SC2046 # option lists
+  out=$(boot $(nav_launch /Hello.gba addon) -w "launch: starting the game" \
+    -k @$menu:L+R+START -k @$((menu + 6)):- \
+    $(keys $((menu + 16)) DOWN DOWN A) $(keys $list A SELECT B B) \
+    -m @$((list + 4)):0x0203F000:2 -m @$((done_at + 20)):0x0203F000:2 -m @$((done_at + 60)):0x0203F000:2 \
+    -m @$((done_at + 60)):0x03007FE0:2 -f 3000 2>"$cart/log")
+  log=$(cat "$cart/log")
+  grep -q '^crash at frame' <<<"$log" && fail "crashed"
+  grep -q 'screen ready: ingame-cheats' <<<"$log" || fail "the cheat list didn't open"
+  # The dumps in frame order (their frames print as counted from the start)
+  counts=$(awk '$1 == "mem" && $4 == "0203F000:" { print $6 $5 }' <<<"$out")
+  in_menu=$(sed -n 1p <<<"$counts")
+  after=$(sed -n 2p <<<"$counts")
+  later=$(sed -n 3p <<<"$counts")
+  [ -n "$in_menu" ] && [ -n "$after" ] || fail "no counter dumps: $(head -c 300 <<<"$out")"
+  [ $((16#$after)) = $((16#$in_menu + 1)) ] || fail "the counter went from $in_menu to $after, not up by one"
+  [ "$later" = "$after" ] || fail "the counter ran on after its run once ($after, then $later)"
+  onoff=$(awk '$1 == "mem" && $4 == "03007FE0:" { print $6 $5 }' <<<"$out")
+  [ "$onoff" = 0000 ] || fail "CheatONOFF and the run once byte read $onoff, not 0000"
+  echo "PASS: cheats_ingame once: SELECT on a cheat that is off runs it once as the game resumes"
   ;;
 cut)
   # The game, the toggles, Back to Torii: the boot's write of the picks cut

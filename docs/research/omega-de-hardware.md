@@ -756,10 +756,12 @@ back to the hook; a nested entry keeps its state on the IRQ stack. A game's
 IWRAM clear over CheatRAN costs or adds one run, once; a LOAD state restores
 it with the rest of IWRAM, as it does CheatONOFF. It uses no other RAM of
 the game but the IRQ stack: the BIOS's return address the hook pushes, which
-the game's handler now runs 4 bytes below, and 36 bytes the interpreter
-pushes (r4-r11, lr), beside the BIOS's 24 of the 160. Without cheats the
-hook still jumps to the game's handler, as before. The in-game menu's CHEAT
-OFF (the word at `0x03007FE0` set to 1) stops it. Its cycles (`tests/kernel/test_cheatrun.c`, at the BIOS's WAITCNT
+the game's handler now runs 4 bytes below, and 48 bytes the interpreter
+pushes (r1-r11, lr; 36 before v0.10's run once), beside the BIOS's 24 of
+the 160. Without cheats the hook still jumps to the game's handler, as
+before. The in-game menu's CHEAT OFF (the byte at `0x03007FE0` set to 1;
+a halfword before v0.10) stops it; the byte after it is the in-game menu's
+run once request (`INGAME_CHEAT_ONCE`), which the next run takes. Its cycles (`tests/kernel/test_cheatrun.c`, at the BIOS's WAITCNT
 `0x0000`, the slowest a game runs at; about 60% of these at `0x4317`): a
 call with nothing to do 216; a write in a plain cheat's run about 33; a
 write of its own about 130; a fill about 19 a write of one value and 44 a

@@ -243,6 +243,12 @@ int cheatstore_window_go(u32 k);
 // A pick or drop of cheat i of the text read now (cheatfile_toggle), a
 // larger file's pick list kept with it: 1 if its pick changed
 int cheatstore_toggle(u32 i);
+// Cheat i's run of variants (cheatfile_group), decoded on through its end
+// first: from the first (returned) to *end
+u32 cheatstore_run(u32 i, u32 *end);
+// The same as cheatstore_toggle, but a pick drops the picked variants of
+// cheat i's run: one at a time. If i doesn't fit even so, they stay.
+int cheatstore_toggle_one(u32 i);
 // Turns every pick off, in every window; the window read now stays
 int cheatstore_all_off(void);
 // Reads window k of a larger file ahead into its slot, bytes at most a

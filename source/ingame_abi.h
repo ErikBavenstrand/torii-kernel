@@ -182,6 +182,10 @@ enum {
 // cheatcode.h: the keys at its run), as is CheatRAN's high half (the word
 // after: CHEAT_KEYS_BEFORE) during a run.
 #define INGAME_CHEAT_ONOFF 0x03007FE0
+// Run once (v0.10): the byte after CheatONOFF's (the hook tests only its low
+// byte) is a table cheat's toggle bit + 1, which the interpreter's next run
+// takes, running that cheat once past its gate (source/cheatrun.s); 0: none
+#define INGAME_CHEAT_ONCE 0x03007FE1
 // The per-cheat toggles (P2): 64 bits, bit n flips the table's cheat n
 // against the launch (source/cheatrun.s). In IWRAM's last 0x200 bytes, past
 // the BIOS's SVC stack (from 0x3007FE0 down) and before its words at
@@ -242,7 +246,7 @@ struct ingame_shot {
 
 // --- The session block, at INGAME_SRAM_SESSION
 #define INGAME_SESSION_MAGIC 0x31535354u  // "TSS1"
-#define INGAME_SESSION_VERSION 8
+#define INGAME_SESSION_VERSION 9
 #define INGAME_NAME_BYTES 48
 #define INGAME_CHEATS 64  // the picks the in-game list shows; the toggles' bits
 #define INGAME_ACT_LINES 16  // the cheats' distinct activation sentences the list's footer shows
@@ -290,6 +294,8 @@ enum ingame_text {
 	INGAME_TEXT_WHY_CANT,
 	INGAME_TEXT_WHY_ROOM,
 	INGAME_TEXT_WHY_SLOW,
+	INGAME_TEXT_ONCE_HINT,  // the footer on a cheat that can run once: SELECT does it
+	INGAME_TEXT_ONCE_QUEUED,  // and once SELECT asked for it
 	// P3: the state slots' pages' footers
 	INGAME_TEXT_STATE_KEEP,  // a save is kept on the card on Back to Torii
 	INGAME_TEXT_STATE_REPLACES,  // saving here drops the state not kept yet
@@ -380,6 +386,8 @@ enum ingame_why {
 #define INGAME_CHEAT_ON 0x08  // flags: on at launch (picked, and running or patched in)
 #define INGAME_CHEAT_TABLE 0x10  // flags: in the interpreter's table, its toggle bit in bit
 #define INGAME_CHEAT_CUT 0x20  // flags: its name is cut in its row: whole at INGAME_SRAM_WIDE (the marquee)
+#define INGAME_CHEAT_RUN_ONCE \
+	0x40  // flags: in the table, and its code waits on no buttons of its own: SELECT runs it once
 
 // A cheat of the in-game list (P2), the kernel's at launch
 struct ingame_cheat {

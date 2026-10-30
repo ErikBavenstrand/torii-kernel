@@ -64,6 +64,12 @@ cheats-buttons/page A31E9068549202E3
 cheats-buttons/refused E05FAD4B0322FDDF
 cheats-buttons/set 029ED032F71CA94E
 cheats-buttons/typed 2055F65136C59CF3
+cheats-choices/back 9E1CA94F1BE7C2A7
+cheats-choices/choices 573F36AF355BCA70
+cheats-choices/list 288DFC0304F33E7B
+cheats-choices/picked 66B7A33EC24D41DA
+cheats-choices/pickone 7B5C3EDC8BE3B26A
+cheats-choices/run B3D3627FCAF779E5
 cheats-clean/clean 019FE0D843B177D1
 cheats-guide/guide CE182AA655AA59E8
 cheats-guide/hold 5318EB7741794DA9
@@ -389,8 +395,9 @@ ingame-cheats/end 61A4A3E085180301
 ingame-cheats/hold 00A754083203866B
 ingame-cheats/locked 3393F7FD17CCE860
 ingame-cheats/marquee 6682231FA2F4A51B
-ingame-cheats/off 9139B21440C132DA
+ingame-cheats/off 7E827F908F6F55D7
 ingame-cheats/press C33388E9DAEBF77A
+ingame-cheats/queued ADA32BA7E9BC611E
 ingame-cheats/unknown 610EDB1F66D141BC
 ingame-lang/menu 678FA53B58EAA64C
 ingame-light/menu 6DAB01A75168AFC9
@@ -677,6 +684,12 @@ sv-cheats-buttons/page FEF0895D8D95D490
 sv-cheats-buttons/refused C5A11FF796825BE0
 sv-cheats-buttons/set B1EBDA80D6BF9E18
 sv-cheats-buttons/typed D071861B190AF645
+sv-cheats-choices/back 900D6D642FE96E4F
+sv-cheats-choices/choices 87C4ABFA713A4BB3
+sv-cheats-choices/list CDC36044AA8B4F57
+sv-cheats-choices/picked E5FC372DF4D35DA1
+sv-cheats-choices/pickone AF4CBB8E7F11ECA5
+sv-cheats-choices/run 02C602A65C4F4889
 sv-cheats-guide/guide 334D11A7E9F04510
 sv-cheats-guide/hold 6DF563FEE39E46C9
 sv-cheats-guide/list 10E914BAEE577D22
@@ -781,8 +794,9 @@ sv-ingame-cheats/end ADFC3CCB61107E37
 sv-ingame-cheats/hold E659CEB4B9684241
 sv-ingame-cheats/locked 524D944308507AA5
 sv-ingame-cheats/marquee AB6EF7141E7B15C1
-sv-ingame-cheats/off A654FEEABE0FF3A8
+sv-ingame-cheats/off F495C15C41E2F65C
 sv-ingame-cheats/press DE179DC7AF5A0009
+sv-ingame-cheats/queued 6A1900236D63FE14
 sv-ingame-cheats/unknown 0FB20286E7B63800
 sv-ingame-states/load 05E9AF68A3A41529
 sv-ingame-states/menu C02A68E79EE834B3

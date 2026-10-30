@@ -153,7 +153,11 @@ struct cheat_patch {
 // cheat a header word, then its ops; a 0 word ends the table. cheatrun.s
 // describes the layout in full; these are its numbers.
 #define CHEAT_PROG_PLAIN 0x8000u   // header: no conditionals, ops run in order
-#define CHEAT_PROG_OPS_MAX 0x7FFFu // header: ops of a cheat
+#define CHEAT_PROG_OPS_MAX 0x1FFFu // header: ops of a cheat
+// header: the gate's ops at the cheat's start (cheatfile.c: a Hold or Press
+// line's conditions, 1 or 2), which a run once steps past
+#define CHEAT_PROG_GATE_SHIFT 13
+#define CHEAT_PROG_GATE (3u << CHEAT_PROG_GATE_SHIFT)
 #define CHEAT_PROG_K_EXT 3u        // op kinds 3-5: an op of that many words
 #define CHEAT_PROG_K_RUN 6u        // op kinds 6-8: a run of writes (plain cheats)
 #define CHEAT_PROG_COUNT_MAX 0xFFFFu  // an op's count
@@ -194,7 +198,7 @@ enum cheat_prog_type {
 // (conditions all true), measured on the emulated cart with the game's ROM
 // at the BIOS's default wait states, the slowest a game has
 // (tests/kernel/test_cheatrun.c checks the model against the clock).
-#define CHEAT_COST_CALL 250      // the hook's call, and the table's end
+#define CHEAT_COST_CALL 300      // the hook's call (with the run once byte), and the table's end
 #define CHEAT_COST_CHEAT 130     // a cheat's header, its off bit tested
 #define CHEAT_COST_SINGLE 140    // a write of its own
 #define CHEAT_COST_RUN 150       // a run's header, in a plain cheat
@@ -204,7 +208,7 @@ enum cheat_prog_type {
 #define CHEAT_COST_FILL_SAME 20  // each further write of a fill of one value
 #define CHEAT_COST_GEN 200       // each further element of a pointer write, add, or, and
 #define CHEAT_COST_COND 450      // a conditional, and the walk past what it skips
-#define CHEAT_COST_SKIP 100      // a cheat the off mask skips (cheatrun.s)
+#define CHEAT_COST_SKIP 105      // a cheat the off mask skips (cheatrun.s)
 #define CHEAT_COST_WALK 20       // each op a false conditional walks past
 // The caps, all picked cheats together: about 10% of a frame (280,896
 // cycles) for what runs every frame, and about 23% with every condition

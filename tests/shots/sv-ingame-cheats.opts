@@ -6,7 +6,8 @@
 # Hello.gba with tests/shots/data/ingame-hello.cht: only the picks are
 # listed (the master code and Not picked aren't), the first cheat under the
 # cursor. The footer shows the cursor's cheat's activation, unless it can't
-# change: Infinite lives is always on (always); A turns it off (off); DOWN
+# change: Infinite lives is always on (always); A turns it off, which
+# offers SELECT to run it once (off), and SELECT asks for it (queued); DOWN
 # to the long name, cut with "..." (cut), which scrolls sideways once the
 # cursor rests (marquee) to its end, where it pauses (end); Moon jump's code
 # holds A (hold); Warp's keys line says press (press); A or B's code holds
@@ -25,17 +26,19 @@
 -s @4:always.png
 -k @10:A -k @14:-
 -s @24:off.png
--k @30:DOWN -k @34:-
--s @44:cut.png
--s @120:marquee.png
--s @250:end.png
--k @300:DOWN -k @304:-
--s @314:hold.png
--k @320:DOWN -k @324:-
--s @334:press.png
--k @340:DOWN -k @344:-
--s @354:unknown.png
--k @360:DOWN -k @364:-
--s @374:locked.png
--k @380:DOWN -k @384:-
--s @394:cant.png
+-k @28:SELECT -k @32:-
+-s @40:queued.png
+-k @46:DOWN -k @50:-
+-s @60:cut.png
+-s @136:marquee.png
+-s @266:end.png
+-k @316:DOWN -k @320:-
+-s @330:hold.png
+-k @336:DOWN -k @340:-
+-s @350:press.png
+-k @356:DOWN -k @360:-
+-s @370:unknown.png
+-k @376:DOWN -k @380:-
+-s @390:locked.png
+-k @396:DOWN -k @400:-
+-s @410:cant.png

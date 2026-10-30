@@ -1,0 +1,40 @@
+# cheats-choices.opts in Swedish: lang/sv.ini's pack set in Settings (slot 0, its id
+# 0x564E), so every string the scenario shows is Swedish, at its width.
+# Runs of variants on the Cheats screen (source/screens/cheats.c,
+# docs/plans/cheat-variants-run-once.md) over tests/shots/data/choices.cht:
+# the four "Wild Pokemon - ..." cheats fold into one row named by what their
+# names share, its pick's own part at its right, and Max money and No money
+# into one named by its first, with its count (list); on the run's row A
+# opens it (run); its choices by their own parts, the cursor on the pick,
+# the run's name in the title (choices); A on another picks it and drops
+# the old pick (picked); B back on the run's row, its new pick at its right
+# (back); the money run opened: "Pick one" in the title (pickone).
+#! settings 28=1
+#! settings 0=22094
+#! sd-file /torii/lang/sv.lng 0 dist/lang/sv.lng
+#! sd-file /torii/cheats/Hello.cht 0 tests/shots/data/choices.cht
+# The tests' hook: lists open on their first row (else a list opens on
+# Hello, the game Recent played last)
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-k @8:RIGHT -k @12:- -k @20:RIGHT -k @24:- -k @32:RIGHT -k @36:-
+-k @80:START -k @84:-
+-w "screen ready: game-popup"
+-k @12:DOWN -k @16:- -k @24:DOWN -k @28:-
+-k @48:A -k @52:-
+-w "screen ready: cheats"
+-s @8:list.png
+-k @16:DOWN -k @20:-
+-s @32:run.png
+-k @40:A -k @44:-
+-s @64:choices.png
+-k @72:DOWN -k @76:- -k @84:A -k @88:-
+-s @104:picked.png
+-k @112:B -k @118:-
+-s @140:back.png
+-k @148:DOWN -k @152:- -k @160:A -k @164:-
+-s @188:pickone.png
