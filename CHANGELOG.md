@@ -4,6 +4,18 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Added:** in the in-game Cheats list, SELECT on a cheat that is off runs
+  it once as the game resumes (something it gives, say), past its Hold or
+  Press buttons (82bcd334).
+- **Added:** on the Cheats screen, adjacent cheats that write the same places
+  with other values fold into one row named by what their names share; A
+  opens its choices, and picking one drops the run's other pick (82bcd334).
+- **Changed:** the interpreter's call and skipped cheats cost a little more
+  in its budget, so a cheat that only just fitted may now be too big
+  (82bcd334).
+
 ## v0.9.2
 
 - **Added:** each cheat can have a guide and an activation: always on,
