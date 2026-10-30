@@ -62,9 +62,8 @@ Code fixes that the emulator can test, plus the leftovers from v0.9.
 The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-review.md`) and the owner's asks.
 
 - **Screenshots per game** (owner, 2026-10-27): a "Screenshots" entry in the game's popup, next to Saves, opens that game's shots from `/torii/screenshots`. A built-in viewer shows a BMP full screen and steps through the shots with LEFT and RIGHT. The SD card page opens any `.bmp` in the same viewer.
+- The SD page's popup offers Play's « » stepper under the games pages' rules, and names default's way as they do.
 - **One place for how a game boots** (owner, 2026-10-27): the popup's Play « addons » and Game info's Boot mode set the same thing. Keep only one, and point the cheat screen's "needs Boot with addon" note to it.
-- "Play « default »" shows which boot mode it resolves to. The games and SD pages offer the stepper under the same rules.
-- A quick favourite key in game lists (favouriting takes five presses). Not SELECT: SELECT held with A picks the save slot, and the v0.5 review kept SELECT free. The owner picks the key.
 
 ### v0.9.3 In game
 
