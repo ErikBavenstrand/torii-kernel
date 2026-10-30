@@ -129,7 +129,7 @@ struct nor_state {
 	// The popup and its questions
 	struct ui_pop_item items[5];
 	u8 ids[5];
-	char shots[8];  // the popup's Screenshots: how many the game has (SV_MAX at most)
+	char shots[8];  // the popup's Screenshots: how many the game has (SHOTLIST_FILES_MAX at most)
 	struct ui_popup menu;
 	char pop_title[sizeof(pNorFS[0].filename)];
 	char title[sizeof(pNorFS[0].filename) + 16];

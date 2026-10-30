@@ -5,8 +5,8 @@
 //
 // The table lives in PSRAM page 2 (SHOTLIST_PAGE), selected only inside
 // these calls and the viewer's (screens/shots.c), with a magic and a CRC:
-// a launch that fills PSRAM breaks them, and the next popup reads the
-// folder again. Borrows pReadCache from READCACHE_SHOTS_LIST within a call.
+// a launch that fills page 2 breaks them, and filing new screenshots at
+// boot forgets it (shotstore.c); the next popup reads the folder again. Borrows pReadCache from READCACHE_SHOTS_LIST within a call.
 #ifndef TORII_SHOTLIST_H
 #define TORII_SHOTLIST_H
 

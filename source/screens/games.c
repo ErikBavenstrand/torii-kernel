@@ -131,7 +131,7 @@ struct games_state {
 	char title[GAMENAME_MAX + 1];
 	char ask[GAMENAME_MAX + 16];
 	char cheats[12];  // the popup's Cheats: how many the cheat screen lists
-	char shots[8];  // the popup's Screenshots: how many the game has (SV_MAX at most)
+	char shots[8];  // the popup's Screenshots: how many the game has (SHOTLIST_FILES_MAX at most)
 	char boot_default[32];  // Play's « default », with the way it resolves to
 	struct ui_pop_item items[LANG_POP_ITEMS];
 	u8 actions[LANG_POP_ITEMS];

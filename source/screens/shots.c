@@ -151,12 +151,14 @@ static void list_game(void)
 		for (;;) {
 			if (f_readdir(&w->dir, &w->info) != FR_OK || !w->info.fname[0])
 				break;
-			if ((w->info.fattrib & AM_DIR) || !shotname_match(w->info.fname, s->stem, &w->when[n]))
+			struct shotname_when when;
+			if ((w->info.fattrib & AM_DIR) || !shotname_match(w->info.fname, s->stem, &when))
 				continue;
 			if (n == SV_MAX) {
 				more++;
 				continue;
 			}
+			w->when[n] = when;
 			memset(w->name, 0, sizeof(w->name));
 			memcpy(w->name, w->info.fname, strnlen(w->info.fname, SV_NAME_BYTES - 1));
 			if (!name_put(n, w->name))
