@@ -4,8 +4,18 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.9.2
 
+- **Added:** each cheat can have a guide and an activation: always on,
+  while buttons are held, toggled by a press, or once at launch. The Cheats
+  screen shows them on a Guide page and sets them on a Buttons page, with a
+  keyboard for the guide; files keep them as `cheatN_guide` and
+  `cheatN_keys` (d59b7bd5).
+- **Added:** the in-game Cheats list shows only the picks, each with its
+  activation, and scrolls a name too long for its row (d59b7bd5).
+- **Changed:** a cheat that patches the ROM can't wait for buttons, so its
+  Hold and Press are greyed with the reason, and a keys line its code can't
+  follow gives way to what the code does (d59b7bd5).
 - **Changed:** every progress bar (launches, NOR writes and erase, saving
   screenshots, the scans, cheat files, the firmware update and its hold)
   shows its percentage right of the status line, drawn by the copy's VBlank
