@@ -280,6 +280,17 @@ local function menu(names, on_open)
 		if opened then
 			break
 		end
+		-- A game asleep by its own choice (its pause menu's Sleep: SWI Stop,
+		-- woken by the keypad IRQ) runs no VBlank for the hook: its wake
+		-- keys, KEYCNT's, wake it
+		local keycnt = E:read16(0x04000132)
+		if E:read16(0x04000200) & 0x1000 ~= 0 and keycnt & 0x4000 ~= 0 and keycnt & 0x3FF ~= 0 then
+			log(string.format("woke the game from its own sleep: keys %03X", keycnt & 0x3FF))
+			E:setKeys(keycnt & 0x3FF)
+			frames(10)
+			E:setKeys(0)
+			frames(30)
+		end
 		if DEBUG then
 			log(string.format("debug no menu: vector %08X IE %04X IME %04X DISPSTAT %04X pc %08X",
 				E:read32(0x03007FFC), E:read16(0x04000200), E:read16(0x04000208), E:read16(0x04000004),
