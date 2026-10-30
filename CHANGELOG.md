@@ -15,7 +15,7 @@ git log, not here.
 - **Added:** the SD card page lists `.bmp` files and opens them in the same
   viewer (A, or View in their popup), stepping through the folder's;
   any uncompressed BMP shows, centred or shrunk to fit, in up to 176
-  colours; RLE and other kinds say they can't show (5564deb0).
+  colours; RLE and other kinds say they can't show (5564deb0, b0bb36eb).
 - **Added:** R in a game list makes the game a favourite or not at once,
   its star shown (on Favourites its row goes); Info's Controls says so
   (d00ed28e).
