@@ -6,6 +6,14 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** a cheat search in the in-game menu (its own row, or on the
+  Cheats page): it remembers the game's RAM, narrows it down by same,
+  changed, went up, went down or equals a typed number (8, 16 or 32 bits),
+  lists the last 32 and keeps one as a cheat, on at once, which Back to
+  Torii files as "Found ADDRESS" (7b5f6228).
+- **Changed:** the game's stack sits 32 bytes lower for the found cheats'
+  live block, and the in-game menu loads its screenshot, DEBUG and search
+  code only when used, so it opens copying less than before (7b5f6228).
 - **Added:** R in a game list makes the game a favourite or not at once,
   its star shown (on Favourites its row goes); Info's Controls says so
   (d00ed28e).
