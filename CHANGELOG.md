@@ -4,6 +4,23 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Fixed:** a patch write that crosses an 8 MB boundary of PSRAM goes on
+  in the next page, not over the first one's start (the official kernel's
+  open todo) (de1a12ab).
+- **Changed:** language packs name the Torii they were built for, which the
+  log shows when it isn't this one, and a pack whose strings fill in other
+  values than English's is refused as stale. Packs from v0.9.5 and before
+  must be replaced with this release's `torii-lang.zip` (de1a12ab).
+- **Fixed:** a soft hyphen (U+00AD) in a name draws nothing, not a hyphen;
+  hiding a screen element hides what is inside it too (de1a12ab).
+- **Fixed:** crash dumps name only stack words that point into the kernel's
+  code, not its read-only data; Diagnostics' clock check measures from a
+  second's tick and says "2 seconds passed in 2" (de1a12ab).
+- **Changed:** the save question's log line reads `save: "Save to SD card?"`,
+  as the question does (de1a12ab).
+
 ## v0.9.5
 
 - **Added:** the code keypad types AnyGBA's raw lines: a key between Line
