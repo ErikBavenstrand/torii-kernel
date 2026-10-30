@@ -4,6 +4,17 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## v0.9.5
+
+- **Added:** the code keypad types AnyGBA's raw lines: a key between Line
+  and Del shows `[ ] + ^ |` in the digits' place, a line holds 48
+  characters and scrolls with the caret, and a key's pointer that ends a
+  line before another is saved with `+0` (92e11740).
+- **Changed:** symbols draw dimmer than digits in the keypad, so `|` reads
+  apart from `1`; the function row's Line key is one cell wide (92e11740).
+- **Fixed:** raw lines with digits to fill in (`00XX`) can be filled in
+  again, and Edit's refusal names the real reason (92e11740).
+
 ## v0.9.4
 
 - **Added:** cheat files' raw lines (VBA's `address:value`) read AnyGBA's
