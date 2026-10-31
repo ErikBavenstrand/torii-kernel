@@ -3,9 +3,9 @@
 // of it the last pass kept, and the numbers the overlay draws and edits.
 // Hardware-free: the overlay and the host tests build it.
 //
-// An element is an aligned unit of 1, 2 or 4 bytes, little-endian, compared
-// unsigned or signed (two's complement). The candidates are a bit per
-// element, element i at bit i & 7 of byte i >> 3.
+// An element is an aligned unit of 1, 2 or 4 bytes, little-endian, read as
+// a number one of three ways (enum cheatsearch_mode). The candidates are a
+// bit per element, element i at bit i & 7 of byte i >> 3.
 #ifndef TORII_CHEATSEARCH_H
 #define TORII_CHEATSEARCH_H
 
@@ -34,6 +34,15 @@ enum cheatsearch_op {
 	CHEATSEARCH_LESS,  // now < a
 	CHEATSEARCH_BETWEEN,  // a <= now <= b
 	CHEATSEARCH_OPS
+};
+
+// How an element is a number: unsigned, signed (two's complement), or BCD,
+// two decimal digits a byte (a score's 1234 as 0x1234), which an element
+// with a nibble past 9 isn't
+enum cheatsearch_mode {
+	CHEATSEARCH_UNSIGNED,
+	CHEATSEARCH_SIGNED,
+	CHEATSEARCH_BCD,
 };
 
 // Whether op compares with an earlier value of the element
@@ -79,11 +88,22 @@ static inline int32_t cheatsearch_signed(uint32_t value, uint32_t size)
 // A filter over a chunk of n bytes (a multiple of 8 * size: whole bytes of
 // bits), every buffer word-aligned: each candidate in bits whose element of
 // now fails op is dropped. prev holds the earlier values the relative
-// filters compare with; work is n bytes of scratch. Signed (sign 1)
-// compares as two's complement; By wraps either way. The candidates left.
+// filters compare with; work is n bytes of scratch. mode is an enum
+// cheatsearch_mode: signed compares as two's complement, BCD as the
+// decimal numbers the digits make (a or b, in decimal), dropping elements
+// that aren't BCD; By wraps at the size either way. The candidates left.
 // The caller keeps now as the next pass's earlier values.
 uint32_t cheatsearch_chunk(const uint8_t *now, const uint8_t *prev, uint8_t *work, uint8_t *bits, uint32_t n,
-			   uint32_t size, uint32_t op, uint32_t sign, uint32_t a, uint32_t b);
+			   uint32_t size, uint32_t op, uint32_t mode, uint32_t a, uint32_t b);
+
+// Drops from bits the candidates whose element of in (n bytes, word-
+// aligned) isn't BCD
+void cheatsearch_bcd_drop(const uint8_t *in, uint8_t *bits, uint32_t n, uint32_t size);
+
+// BCD: the number value's digits make into *out, 1; 0 if it isn't BCD
+int cheatsearch_from_bcd(uint32_t value, uint32_t size, uint32_t *out);
+// number (at most the size's digits) as BCD
+uint32_t cheatsearch_to_bcd(uint32_t number, uint32_t size);
 
 // cheatsearch_chunk's compare (the overlay runs it from IWRAM): each
 // candidate whose element of now against before's has an outcome (EQ, LT,
@@ -101,13 +121,17 @@ void cheatsearch_shift(uint8_t *out, const uint8_t *in, uint32_t n, uint32_t siz
 // The candidates in bytes of bits
 uint32_t cheatsearch_count(const uint8_t *bits, uint32_t bytes);
 
-// The decimal digits a value of size bytes is edited in: 3, 5 or 10
-uint32_t cheatsearch_digits(uint32_t size);
+// The decimal digits a number of size bytes is edited in: 3, 5 or 10; BCD's
+// 2, 4 or 8
+uint32_t cheatsearch_digits(uint32_t size, uint32_t mode);
+
+// The largest number of size bytes in mode (signed: its largest positive)
+uint32_t cheatsearch_largest(uint32_t size, uint32_t mode);
 
 // The places a number is edited in: its digits, after a sign when signed
-static inline uint32_t cheatsearch_places(uint32_t size, uint32_t sign)
+static inline uint32_t cheatsearch_places(uint32_t size, uint32_t mode)
 {
-	return cheatsearch_digits(size) + (sign != 0);
+	return cheatsearch_digits(size, mode) + (mode == CHEATSEARCH_SIGNED);
 }
 
 // value's decimal digits into out, the most significant first, padded with
@@ -119,7 +143,7 @@ void cheatsearch_decimal(uint32_t value, uint8_t *out, uint32_t n);
 // largest the size takes becomes 0 in that digit going up, the largest
 // going down. Signed, place 0 is the sign, which UP and DOWN flip (-128
 // becomes 127), and the digits are the number's without its sign, up to
-// 127 (32767, ...) or 128 negative.
-uint32_t cheatsearch_edit(uint32_t value, uint32_t size, uint32_t sign, uint32_t place, int step);
+// 127 (32767, ...) or 128 negative. BCD's numbers go to 99 (9999, ...).
+uint32_t cheatsearch_edit(uint32_t value, uint32_t size, uint32_t mode, uint32_t place, int step);
 
 #endif

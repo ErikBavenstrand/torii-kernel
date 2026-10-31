@@ -137,6 +137,14 @@ const char *const lang_en[STR_COUNT] = {
 	"Negative numbers: off",  // ingame.search_signed_off
 	"Negative numbers: on",  // ingame.search_signed_on
 	"The first scan's values weren't kept",  // ingame.search_first_lost
+	"Stored as: plain numbers",  // ingame.search_format_plain
+	"Stored as: BCD (scores)",  // ingame.search_format_bcd
+	"Find pointers to it",  // ingame.search_ptr_find
+	"Check the pointers found",  // ingame.search_ptr_check
+	"Pointers to it",  // ingame.search_pointers
+	"{1} found",  // ingame.search_ptr_found
+	"Many: let it move, find it, check",  // ingame.search_ptr_many
+	"None found",  // ingame.search_ptr_none
 	"Show them",  // ingame.search_show
 	"New search",  // ingame.search_new
 	"Undo the last",  // ingame.search_undo
@@ -397,7 +405,7 @@ const char *const lang_en[STR_COUNT] = {
 	"# The in-game menu\nOff: no menu opens in a game, and its cheats still run. Settings, Hotkeys turns it on.\n",  // info.ingame_off
 	"# Sleep\nHold {1} to put the game to sleep: the screen goes off. START and SELECT wake it.\n",  // info.ingame_sleep
 	"# Sleep\nOff: turn Sleep on in Settings.\n",  // info.ingame_sleep_off
-	"# Save states and screenshots\nSave state and Screenshot (up to 5) keep them in the cart; Back to Torii writes them to the card, the screenshots to /torii/screenshots as BMP files. Switching off before that loses them. Load state loads the state not yet written; the others load from the game's menu in Torii.\n# Cheats\nCheats turns the game's picked cheats on and off; Back to Torii keeps what you changed.\n# Cheat search\nFinds a value of the game's, such as its lives, to make a cheat of. Start search remembers the game's memory; play until the value changes, open the menu again and pick what it did: Went down, Went up, Changed, Same as before, Down by or Up by an amount, or Equals, More than, Less than or From one number to another. Negative numbers on compares them as signed, and Compare with the first scan compares with the values Start remembered. Undo the last takes back a filter. Repeat until a few are left, then Show them, pick one, set its value and keep it. On now holds it from the next frame. Back to Torii adds it to the game's cheats as \"Found\" and its address; rename it there. The search uses the save state memory: a state not yet on the card has to go there first, and saving a state ends the search.\n# Saves\nThe game saves to the cart. The next time Torii starts, it copies the save to the card (it asks first, unless Save without asking is on).\n# GB, GBC and NES games\nThey run in the built-in Jagoomba Color (GB, GBC) and PocketNES (NES). Hold L and R together for the emulator's own menu: save states, the palette and more. Torii's hotkeys, menu and cheats are for GBA games.\n",  // info.ingame_end
+	"# Save states and screenshots\nSave state and Screenshot (up to 5) keep them in the cart; Back to Torii writes them to the card, the screenshots to /torii/screenshots as BMP files. Switching off before that loses them. Load state loads the state not yet written; the others load from the game's menu in Torii.\n# Cheats\nCheats turns the game's picked cheats on and off; Back to Torii keeps what you changed.\n# Cheat search\nFinds a value of the game's, such as its lives, to make a cheat of. Start search remembers the game's memory; play until the value changes, then pick what it did (Went down, Up by 25, Equals 3, ...). Repeat until a few are left, Show them, pick one, set its value and keep it: on now, and among the game's cheats as \"Found\" after Back to Torii. Its rows also take negative numbers, BCD scores, the first scan, and pointers to a value that moves. It uses the save state memory: a state not yet on the card goes there first.\n# Saves\nThe game saves to the cart. The next time Torii starts, it copies the save to the card (it asks first, unless Save without asking is on).\n# GB, GBC and NES games\nThey run in the built-in Jagoomba Color (GB, GBC) and PocketNES (NES). Hold L and R together for the emulator's own menu: save states, the palette and more. Torii's hotkeys, menu and cheats are for GBA games.\n",  // info.ingame_end
 	"# Torii\nVersion {1}, build {2}\nA custom kernel for the EZ-Flash Omega DE, built on EZ-Flash's open source kernel 1.06. Not made by EZ-Flash.\n",  // info.about_torii
 	"# The cart\n{1}, FPGA firmware {2}\n",  // info.about_cart
 	"Revision B (LX16)",  // info.about_rev_b

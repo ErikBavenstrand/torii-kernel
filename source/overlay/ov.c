@@ -200,6 +200,7 @@ enum page_id {
 	PAGE_SEARCH,
 	PAGE_LIST,
 	PAGE_PICK,
+	PAGE_PTRS,  // the pointer scan's pointers to a candidate (v0.9.7)
 };
 
 // The search page's rows, before a search and during one
@@ -214,6 +215,7 @@ enum {
 	SR_UNDO,
 	SR_AGAINST,  // the relative filters against the last scan or the first
 	SR_SIGNED,  // negative numbers off or on
+	SR_FORMAT,  // plain numbers or BCD
 	SR_NEW,
 	SR_ROWS
 };
@@ -229,6 +231,8 @@ enum {
 	PR_VALUE,
 	PR_KEEP,
 	PR_KEEP_ON,
+	PR_PTR_FIND,  // the pointer scan (v0.9.7)
+	PR_PTR_CHECK,
 	PR_ROWS
 };
 
@@ -307,7 +311,8 @@ static struct {
 	uint32_t live;  // the live block's address; 0: found cheats are set once instead
 	uint32_t found;  // the found cheats waiting in cart SRAM
 	uint32_t edit, edit_place, edit_value;  // a number being edited (edit 1): its place, its value
-	uint32_t edit_sign, edit_stage;  // it is signed; Between's second number (stage 1)
+	uint32_t edit_mode, edit_stage;  // its enum cheatsearch_mode; Between's second number (stage 1)
+	uint32_t ptrs, ptr_rows;  // the pointer scan's pointers kept, and those its page lists
 	uint32_t busy;  // a pass runs: the footer says so
 	uint32_t notice;  // a search page's footer until the page changes (a text), 0 none
 	uint32_t list_n;  // the candidates the list shows (search_found)
@@ -798,6 +803,7 @@ static uint32_t slot_text(uint32_t k)
 {
 	if (m.title && k == 0)
 		return text_at(m.page == PAGE_CHEATS   ? INGAME_TEXT_CHEATS
+			       : m.page == PAGE_PTRS   ? INGAME_TEXT_SEARCH_POINTERS
 			       : m.page >= PAGE_SEARCH ? INGAME_TEXT_SEARCH
 			       : m.page == PAGE_SAVE   ? INGAME_TEXT_SAVE
 			       : m.page == PAGE_LOAD   ? INGAME_TEXT_LOAD
@@ -937,7 +943,8 @@ static void build_page(enum page_id page, uint32_t cursor)
 		m.footer = 1;
 		panel_w = LIST_W;
 	} else if (page >= PAGE_SEARCH) {
-		m.rows = page == PAGE_LIST   ? m.list_n
+		m.rows = page == PAGE_PTRS   ? m.ptr_rows
+			 : page == PAGE_LIST ? m.list_n
 			 : page == PAGE_PICK ? PR_ROWS
 			 : m.search.magic    ? SR_ROWS
 					     : SR_IDLE_ROWS;
@@ -1104,6 +1111,8 @@ static void page_open(enum page_id page, uint32_t cursor)
 		debug_print("screen ready: ingame-search-list");
 	else if (page == PAGE_PICK)
 		debug_print("screen ready: ingame-search-pick");
+	else if (page == PAGE_PTRS)
+		debug_print("screen ready: ingame-search-pointers");
 }
 
 // The cursor's row's slot, or -1 when it isn't shown
@@ -1266,11 +1275,14 @@ static uint32_t window_end(void)
 
 EXT_DATA static uint32_t search_found[INGAME_SEARCH_LIST];  // the list's candidates' addresses
 EXT_DATA static uint32_t search_buf[CHUNK / 4];  // the list's and Undo's reads of the candidates
+EXT_DATA static struct ingame_pointer ptr_list[INGAME_SEARCH_LIST];  // the pointers page's rows
 // The log's lines, out of the window
 EXT_DATA static char log_pass[] = "search: pass in ", log_frames[] = " frames",
 		     log_search[] = "search: ", log_left[] = " left", log_started[] = "search: started",
 		     log_kept[] = "search: kept a cheat", log_kept_on[] = "search: kept a cheat, on",
-		     log_undone[] = "search: undone, ";
+		     log_undone[] = "search: undone, ", log_ptr_found[] = "search: pointers found: ",
+		     log_ptr_checked[] = "search: pointers checked: ", log_ptrs[] = "",
+		     log_kept_ptr[] = "search: kept a cheat through a pointer";
 EXT_DATA static struct ingame_line spare;  // a line's second part, off the stack (the window's stack is small)
 EXT_DATA static struct ingame_glyph glyphs[INGAME_GLYPHS];  // read as the search opens
 
@@ -1361,22 +1373,46 @@ EXT static uint32_t hex_put(struct ingame_line *l, uint32_t x, uint32_t value)
 // value of size bytes from x, signed (a minus before a negative) when sign;
 // edited (editing), all its places with mark underlined: a signed one's
 // sign first, plus or minus
-EXT static uint32_t value_put(struct ingame_line *l, uint32_t x, uint32_t value, uint32_t size, uint32_t sign,
+EXT static uint32_t value_put(struct ingame_line *l, uint32_t x, uint32_t value, uint32_t size, uint32_t mode,
 			      int editing, uint32_t mark)
 {
-	uint32_t n = editing ? cheatsearch_digits(size) : 0;
+	uint32_t n = editing ? cheatsearch_digits(size, mode) : 0;
 	value &= cheatsearch_max(size);
-	if (!sign)
+	if (mode != CHEATSEARCH_SIGNED)
 		return number_put(l, x, value, n, 0, editing ? mark : NOT_MARKED);
 	int32_t v = cheatsearch_signed(value, size);
 	if (v < 0 || editing)
 		x = glyph_put(l, x, v < 0 ? INGAME_GLYPH_MINUS : INGAME_GLYPH_PLUS, editing && mark == 0);
 	return number_put(l, x, v < 0 ? 0u - (uint32_t)v : (uint32_t)v, n, 0, editing ? mark - 1 : NOT_MARKED);
 }
-// Text t's line with a number in its place: t's text, the number, then
+
+// How the search reads numbers now (enum cheatsearch_mode)
+EXT static uint32_t search_mode(void)
+{
+	return m.search.bcd ? CHEATSEARCH_BCD : m.search.sign ? CHEATSEARCH_SIGNED : CHEATSEARCH_UNSIGNED;
+}
+
+// The mode a filter's number is edited in: By's an amount, never signed
+EXT static uint32_t number_mode(uint32_t op)
+{
+	uint32_t mode = search_mode();
+	return op < CHEATSEARCH_EQUALS && mode == CHEATSEARCH_SIGNED ? CHEATSEARCH_UNSIGNED : mode;
+}
+
+// An element as the search reads it, as a number from x: BCD's digits, or
+// the bytes in hex where they aren't BCD
+EXT static uint32_t element_put(struct ingame_line *l, uint32_t x, uint32_t raw, uint32_t size)
+{
+	uint32_t v;
+	if (!m.search.bcd)
+		return value_put(l, x, raw, size, search_mode(), 0, NOT_MARKED);
+	if (cheatsearch_from_bcd(raw, size, &v))
+		return number_put(l, x, v, 0, 0, NOT_MARKED);
+	for (int sh = 8 * (int)size - 4; sh >= 0; sh -= 4)
+		x = glyph_put(l, x, raw >> sh & 15, 0);
+	return x;
+}  // Text t's line with a number in its place: t's text, the number, then
 // t + 1's (the text after it)
-// Text t's line with numbers in their places: t's text, the first number,
-// t + 1's (Between's: the second number, then t + 2's)
 EXT static void line_number(struct ingame_line *l, uint32_t t, uint32_t value, uint32_t n, int sep, uint32_t mark)
 {
 	line_read(t, l);
@@ -1390,14 +1426,14 @@ EXT static void line_number(struct ingame_line *l, uint32_t t, uint32_t value, u
 EXT static void line_filter(struct ingame_line *l, uint32_t op, int editing)
 {
 	const uint32_t size = m.search.size, t = op_text[op];
-	const uint32_t sign = op >= CHEATSEARCH_EQUALS && m.search.sign;  // By's are amounts
+	const uint32_t mode = number_mode(op);
 	const int lo = editing && m.edit_stage == 0, hi = editing && m.edit_stage == 1;
 	line_read(t, l);
-	uint32_t x = value_put(l, l->width, lo ? m.edit_value : m.search.value[op], size, sign, lo, m.edit_place);
+	uint32_t x = value_put(l, l->width, lo ? m.edit_value : m.search.value[op], size, mode, lo, m.edit_place);
 	if (op == CHEATSEARCH_BETWEEN) {
 		line_read(t + 1, &spare);
 		line_or(l, &spare, x);
-		x = value_put(l, l->width, hi ? m.edit_value : m.search.value_hi, size, sign, hi, m.edit_place);
+		x = value_put(l, l->width, hi ? m.edit_value : m.search.value_hi, size, mode, hi, m.edit_place);
 		line_read(t + 2, &spare);
 	} else {
 		line_read(t + 1, &spare);
@@ -1523,6 +1559,9 @@ EXT static void debug_number(const char *text, uint32_t n, const char *after)
 static void search_load(void)
 {
 	sram_in(INGAME_SRAM_SEARCH, &m.search, sizeof(m.search));
+	// The size Start takes: this launch's last search's
+	if (m.have_session && m.search.launch_id == session()->launch_id)
+		m.search_size = m.search.size == 4 ? 2 : m.search.size == 2 ? 1 : 0;
 	// A search of this launch's, which no state saved since has overwritten
 	if (m.search.magic != INGAME_SEARCH_MAGIC || !m.have_session || m.search.launch_id != session()->launch_id ||
 	    (m.search.size != 1 && m.search.size != 2 && m.search.size != 4) || state_saved())
@@ -1530,6 +1569,8 @@ static void search_load(void)
 	uint32_t head[2];
 	sram_in(INGAME_SRAM_FOUND, head, sizeof(head));
 	m.found = head[0] == INGAME_FOUND_MAGIC && (head[1] & 0xFFFF) <= INGAME_FOUND_MAX ? head[1] & 0xFFFF : 0;
+	sram_in(INGAME_SRAM_POINTERS, head, sizeof(head));  // the pointer scan's, for Check
+	m.ptrs = head[0] == INGAME_POINTERS_MAGIC && (head[1] & 0xFFFF) <= INGAME_POINTERS_MAX ? head[1] & 0xFFFF : 0;
 	uint32_t live = m.have_session ? session()->live_at : 0;
 	m.live =
 		(m.flags & INGAME_CAN_CHEATS) && live && live == (uint32_t)(uintptr_t)m.call->spend + INGAME_SPEND_BYTES
@@ -1606,19 +1647,25 @@ EXT static int first_keep(uint32_t *wpos, uint32_t *wn)
 	const uint32_t size = m.search.size;
 	const uint8_t *b = (const uint8_t *)k->bits, *v = (const uint8_t *)k->before;
 	uint8_t *out = (uint8_t *)k->out;
-	for (uint32_t e = 0; e < CHUNK / size; e++) {
-		if (!(b[e >> 3] >> (e & 7) & 1))
-			continue;
-		if (*wpos + *wn + size > INGAME_SEARCH_FIRST_BYTES)
-			return 0;
-		for (uint32_t i = 0; i < size; i++)
-			out[(*wn)++] = v[e * size + i];
-		if (*wn == CHUNK) {
-			sram_out(INGAME_SRAM_SEARCH_FIRST + *wpos, k->out, CHUNK);
-			*wpos += CHUNK;
-			*wn = 0;
+	uint32_t pos = *wpos, nb = *wn;
+	for (uint32_t i = 0; i < CHUNK / size / 8; i++) {  // most bytes of bits are 0 after the first filter
+		for (uint32_t bb = b[i], l = 0; bb; bb >>= 1, l++) {
+			if (!(bb & 1))
+				continue;
+			if (pos + nb + size > INGAME_SEARCH_FIRST_BYTES)
+				return 0;
+			const uint8_t *from = v + (i * 8 + l) * size;
+			for (uint32_t q = 0; q < size; q++)
+				out[nb++] = from[q];
+			if (nb == CHUNK) {
+				sram_out(INGAME_SRAM_SEARCH_FIRST + pos, k->out, CHUNK);
+				pos += CHUNK;
+				nb = 0;
+			}
 		}
 	}
+	*wpos = pos;
+	*wn = nb;
 	return 1;
 }
 
@@ -1653,7 +1700,7 @@ EXT static void search_pass(int start, uint32_t op)
 				first_chunk(at, any, &fptr);
 			if (!any)
 				continue;
-			if (!use_first && (relative || keep_first))
+			if (!use_first && relative)
 				sram_in(INGAME_SRAM_SEARCH_SNAP + at, chunk_before, CHUNK);
 		}
 		ram_read(at, chunk_now, CHUNK);
@@ -1661,10 +1708,13 @@ EXT static void search_pass(int start, uint32_t op)
 		if (!start) {
 			kept = cheatsearch_chunk((const uint8_t *)chunk_now, (const uint8_t *)chunk_before,
 						 (uint8_t *)k->work, (uint8_t *)chunk_bits, CHUNK, size, op,
-						 m.search.sign, m.search.value[op], m.search.value_hi);
+						 search_mode(), m.search.value[op], m.search.value_hi);
 			left += kept;
-			if (keep_first && !lost)
+			if (keep_first && !lost && kept) {  // the first scan's values: the snapshot's
+				if (!relative)
+					sram_in(INGAME_SRAM_SEARCH_SNAP + at, chunk_before, CHUNK);
 				lost = !first_keep(&wpos, &wn);
+			}
 		}
 		// The snapshot only where candidates are left: the rest is never read again
 		if (kept)
@@ -1713,6 +1763,11 @@ EXT static void search_start(void)
 	m.search.undo = 0;
 	m.search.first = INGAME_FIRST_SNAPSHOT;
 	m.search.against = 0;
+	if (m.search.launch_id != session()->launch_id) {  // a new search keeps this launch's last one's
+		m.search.sign = 0;
+		m.search.bcd = 0;
+	}
+	m.search.reserved = 0;
 	m.search.launch_id = session()->launch_id;
 	search_pass(1, 0);
 	m.search.magic = INGAME_SEARCH_MAGIC;
@@ -1778,17 +1833,113 @@ EXT static void search_list(void)
 	}
 }
 
+// The value a kept cheat writes: the pick page's number, as BCD's digits
+// when the search reads them
+EXT static uint32_t keep_value(void)
+{
+	uint32_t size = m.search.size;
+	return (m.search.bcd ? cheatsearch_to_bcd(m.pick_value, size) : m.pick_value) & cheatsearch_max(size);
+}
+
+// A found cheat's record after the others, then the head
+EXT static void found_add(const struct ingame_found_cheat *c)
+{
+	sram_out(INGAME_SRAM_FOUND + offsetof(struct ingame_found, cheat) + m.found * sizeof(*c), c, sizeof(*c));
+	uint32_t head[2] = {INGAME_FOUND_MAGIC, m.found + 1};
+	sram_out(INGAME_SRAM_FOUND, head, sizeof(head));
+	m.found++;
+}
+
+// The pointer scan (v0.9.7): every word of the game's RAM that points at
+// most INGAME_POINTER_REACH bytes below target (the window's and the
+// extension's from their backup), with its offset; or, check, of those kept
+// before (for the value as it was found then), those that point the same
+// way at target now. Into cart SRAM (struct ingame_pointers); the first
+// INGAME_SEARCH_LIST read back for the page.
+EXT static void pointers_scan(uint32_t target, int check)
+{
+	struct ingame_pointer batch[16];
+	uint32_t head[4], n = 0, full = 0, at_out = 0;
+	sram_in(INGAME_SRAM_POINTERS, head, sizeof(head));
+	uint32_t had = check && head[0] == INGAME_POINTERS_MAGIC ? head[1] & 0xFFFF : 0;
+	if (check) {  // in place: what is kept never passes what is read
+		for (uint32_t i = 0; i < had; i += 16) {
+			uint32_t k = had - i < 16 ? had - i : 16;
+			sram_in(INGAME_SRAM_POINTERS + offsetof(struct ingame_pointers, p) + i * sizeof(batch[0]),
+				batch, k * sizeof(batch[0]));
+			for (uint32_t j = 0; j < k; j++)
+				if (value_read(batch[j].at, 4) + batch[j].offset == target) {
+					sram_out(INGAME_SRAM_POINTERS + offsetof(struct ingame_pointers, p) +
+							 n * sizeof(batch[0]),
+						 &batch[j], sizeof(batch[0]));
+					n++;
+				}
+		}
+		full = head[1] >> 16;
+	} else {
+		for (uint32_t at = 0; at < CHEATSEARCH_BYTES && !full; at += CHUNK) {
+			ram_read(at, search_buf, CHUNK);
+			for (uint32_t i = 0; i < CHUNK / 4; i++) {
+				uint32_t w = search_buf[i], region = w >> 24;
+				if ((region != 2 && region != 3) || w > target || target - w >= INGAME_POINTER_REACH)
+					continue;
+				if (n >= INGAME_POINTERS_MAX) {
+					full = 1;
+					break;
+				}
+				batch[at_out].at = cheatsearch_address(at + i * 4);
+				batch[at_out].offset = target - w;
+				if (++at_out == 16) {
+					sram_out(INGAME_SRAM_POINTERS + offsetof(struct ingame_pointers, p) +
+							 (n + 1 - at_out) * sizeof(batch[0]),
+						 batch, sizeof(batch));
+					at_out = 0;
+				}
+				n++;
+			}
+		}
+		if (at_out)
+			sram_out(INGAME_SRAM_POINTERS + offsetof(struct ingame_pointers, p) +
+					 (n - at_out) * sizeof(batch[0]),
+				 batch, at_out * sizeof(batch[0]));
+	}
+	head[0] = INGAME_POINTERS_MAGIC;
+	head[1] = n | full << 16;
+	head[2] = target;
+	head[3] = 0;
+	sram_out(INGAME_SRAM_POINTERS, head, sizeof(head));
+	m.ptrs = n + full;  // more than the page lists when it didn't all fit
+	m.ptr_rows = n < INGAME_SEARCH_LIST ? n : INGAME_SEARCH_LIST;
+	sram_in(INGAME_SRAM_POINTERS + offsetof(struct ingame_pointers, p), ptr_list, m.ptr_rows * sizeof(ptr_list[0]));
+	debug_number(check ? log_ptr_checked : log_ptr_found, n, log_ptrs);
+}
+
+// Keeps the picked candidate through the pointer on the pointers page's
+// row r: [pointer]+offset, picked and set once now (the live block takes
+// plain addresses only)
+EXT static void search_keep_ptr(uint32_t r)
+{
+	if (m.found >= INGAME_FOUND_MAX || r >= m.ptr_rows)
+		return;
+	const struct ingame_pointer *p = &ptr_list[r];
+	uint32_t size = m.search.size, value = keep_value();
+	struct ingame_found_cheat c = {p->at, value, (uint8_t)size, INGAME_FOUND_ON | INGAME_FOUND_POINTER,
+				       (uint16_t)p->offset};
+	found_add(&c);
+	value_write(value_read(p->at, 4) + p->offset, size, value);
+	m.notice = INGAME_TEXT_SEARCH_KEPT;
+	debug_print(log_kept_ptr);
+	slots_update();
+}
+
 // Keeps the picked candidate as a found cheat (on: and on now)
 EXT static void search_keep(int on)
 {
 	if (m.found >= INGAME_FOUND_MAX || m.pick >= m.list_n || (on && live_full()))
 		return;
-	uint32_t addr = search_found[m.pick], size = m.search.size, value = m.pick_value & cheatsearch_max(size);
+	uint32_t addr = search_found[m.pick], size = m.search.size, value = keep_value();
 	struct ingame_found_cheat c = {addr, value, (uint8_t)size, (uint8_t)(on ? INGAME_FOUND_ON : 0), 0};
-	sram_out(INGAME_SRAM_FOUND + offsetof(struct ingame_found, cheat) + m.found * sizeof(c), &c, sizeof(c));
-	uint32_t head[2] = {INGAME_FOUND_MAGIC, m.found + 1};
-	sram_out(INGAME_SRAM_FOUND, head, sizeof(head));
-	m.found++;
+	found_add(&c);
 	if (on) {
 		if (m.live)
 			live_add(addr, size, value);
@@ -1806,10 +1957,14 @@ EXT static int search_greyed(uint32_t r)
 			return r == SR_START && m.states && buffer_unkept();
 		return (r < CHEATSEARCH_OPS && !m.search.left) ||
 		       (r == SR_SHOW && !(m.search.left && m.search.left <= INGAME_SEARCH_LIST)) ||
-		       (r == SR_UNDO && !m.search.undo) || (r == SR_AGAINST && m.search.first == INGAME_FIRST_LOST);
+		       (r == SR_UNDO && !m.search.undo) || (r == SR_AGAINST && m.search.first == INGAME_FIRST_LOST) ||
+		       (r == SR_SIGNED && m.search.bcd);
 	}
 	if (m.page == PAGE_PICK)
-		return (r != PR_VALUE && m.found >= INGAME_FOUND_MAX) || (r == PR_KEEP_ON && live_full());
+		return ((r == PR_KEEP || r == PR_KEEP_ON) && m.found >= INGAME_FOUND_MAX) ||
+		       (r == PR_KEEP_ON && live_full()) || (r == PR_PTR_CHECK && !m.ptrs);
+	if (m.page == PAGE_PTRS)
+		return m.found >= INGAME_FOUND_MAX;
 	return 0;
 }
 EXT static uint32_t search_row_text(uint32_t r)
@@ -1822,12 +1977,15 @@ EXT static uint32_t search_row_text(uint32_t r)
 			       : r == SR_UNDO      ? INGAME_TEXT_SEARCH_UNDO
 			       : r == SR_AGAINST   ? INGAME_TEXT_SEARCH_AGAINST + (m.search.against != 0)
 			       : r == SR_SIGNED    ? INGAME_TEXT_SEARCH_SIGNED + (m.search.sign != 0)
+			       : r == SR_FORMAT    ? INGAME_TEXT_SEARCH_FORMAT + (m.search.bcd != 0)
 						   : INGAME_TEXT_SEARCH_NEW);
 	if (m.page == PAGE_PICK)
-		return text_at(r == PR_VALUE  ? INGAME_TEXT_SEARCH_VALUE
-			       : r == PR_KEEP ? INGAME_TEXT_SEARCH_KEEP
-			       : m.live       ? INGAME_TEXT_SEARCH_KEEP_ON
-					      : INGAME_TEXT_SEARCH_KEEP_SET);
+		return text_at(r == PR_VALUE       ? INGAME_TEXT_SEARCH_VALUE
+			       : r == PR_PTR_FIND  ? INGAME_TEXT_SEARCH_PTR_FIND
+			       : r == PR_PTR_CHECK ? INGAME_TEXT_SEARCH_PTR_CHECK
+			       : r == PR_KEEP      ? INGAME_TEXT_SEARCH_KEEP
+			       : m.live            ? INGAME_TEXT_SEARCH_KEEP_ON
+						   : INGAME_TEXT_SEARCH_KEEP_SET);
 	return 0;
 }
 // The search pages' footer, a text; 0 for the candidates left ("1,204 left")
@@ -1844,6 +2002,8 @@ EXT static uint32_t search_footer(void)
 		t = m.notice;
 	else if (m.page == PAGE_LIST)
 		t = INGAME_TEXT_SEARCH_PICK;
+	else if (m.page == PAGE_PTRS)
+		t = !m.ptrs ? INGAME_TEXT_SEARCH_PTR_NONE : m.ptrs > m.ptr_rows ? INGAME_TEXT_SEARCH_PTR_MANY : 0;
 	else if (m.page == PAGE_SEARCH && !searching())
 		t = m.cursor != SR_START || !m.states ? INGAME_TEXT_SEARCH_HINT
 		    : buffer_unkept()                 ? INGAME_TEXT_SEARCH_STATE_FIRST
@@ -1851,7 +2011,7 @@ EXT static uint32_t search_footer(void)
 						      : INGAME_TEXT_SEARCH_HINT;
 	else if (m.page == PAGE_PICK && m.cursor == PR_KEEP_ON && live_full())
 		t = INGAME_TEXT_SEARCH_LIVE_FULL;
-	else if (!m.search.left)
+	else if (m.page != PAGE_PTRS && !m.search.left)
 		t = INGAME_TEXT_SEARCH_NONE;
 	else if (m.page == PAGE_SEARCH && m.cursor == SR_SHOW && m.search.left > INGAME_SEARCH_LIST)
 		t = INGAME_TEXT_SEARCH_FEW;
@@ -1867,6 +2027,8 @@ EXT static int slot_compose(uint32_t k, struct ingame_line *l)
 		return 0;
 	memset(l, 0, sizeof(*l));
 	if (m.title && k == 0) {
+		if (m.page == PAGE_PTRS)
+			return 0;  // its title's text
 		if (m.page != PAGE_PICK || m.pick >= m.list_n)
 			return 0;
 		hex_put(l, 0, search_found[m.pick]);
@@ -1875,7 +2037,10 @@ EXT static int slot_compose(uint32_t k, struct ingame_line *l)
 	if (m.footer && k == m.title + m.visible) {
 		if (search_footer())
 			return 0;
-		line_number(l, INGAME_TEXT_SEARCH_LEFT, m.search.left, 0, 1, NOT_MARKED);
+		if (m.page == PAGE_PTRS)
+			line_number(l, INGAME_TEXT_SEARCH_PTR_FOUND, m.ptrs, 0, 1, NOT_MARKED);
+		else
+			line_number(l, INGAME_TEXT_SEARCH_LEFT, m.search.left, 0, 1, NOT_MARKED);
 		return 1;
 	}
 	int r = slot_row(k);
@@ -1888,8 +2053,8 @@ EXT static int slot_compose(uint32_t k, struct ingame_line *l)
 	}
 	if (m.page == PAGE_PICK && r == PR_VALUE) {
 		line_read(INGAME_TEXT_SEARCH_VALUE, l);
-		uint32_t x = value_put(l, l->width, editing ? m.edit_value : m.pick_value, size, m.search.sign,
-				       (int)editing, m.edit_place);
+		uint32_t x = value_put(l, l->width, editing ? m.edit_value : m.pick_value, size,
+				       number_mode(CHEATSEARCH_EQUALS), (int)editing, m.edit_place);
 		line_read(INGAME_TEXT_SEARCH_VALUE_AFTER, &spare);
 		if (spare.width)
 			line_or(l, &spare, x);
@@ -1897,7 +2062,17 @@ EXT static int slot_compose(uint32_t k, struct ingame_line *l)
 	}
 	if (m.page == PAGE_LIST) {
 		uint32_t addr = search_found[r], x = hex_put(l, 0, addr);
-		value_put(l, x + LIST_GAP, value_read(addr, size), size, m.search.sign, 0, NOT_MARKED);
+		element_put(l, x + LIST_GAP, value_read(addr, size), size);
+		return 1;
+	}
+	if (m.page == PAGE_PTRS) {  // [pointer]+offset
+		const struct ingame_pointer *p = &ptr_list[r];
+		uint32_t x = glyph_put(l, 0, INGAME_GLYPH_OPEN, 0);
+		x = hex_put(l, x, p->at);
+		x = glyph_put(l, x, INGAME_GLYPH_CLOSE, 0);
+		x = glyph_put(l, x, INGAME_GLYPH_PLUS, 0);
+		for (int sh = 12; sh >= 0; sh -= 4)
+			x = glyph_put(l, x, p->offset >> sh & 15, 0);
 		return 1;
 	}
 	return 0;
@@ -1945,7 +2120,7 @@ static void search_open(enum page_id from)
 // A number edit's keys (down): the digit, its value, A done (1), B cancelled (-1)
 EXT static int edit_keys(uint32_t down)
 {
-	uint32_t n = cheatsearch_places(m.search.size, m.edit_sign);
+	uint32_t n = cheatsearch_places(m.search.size, m.edit_mode);
 	if (down & KEY_B) {
 		m.edit = 0;
 		return -1;
@@ -1959,22 +2134,24 @@ EXT static int edit_keys(uint32_t down)
 	if ((down & KEY_RIGHT) && m.edit_place + 1 < n)
 		m.edit_place++;
 	if (down & (KEY_UP | KEY_DOWN))
-		m.edit_value = cheatsearch_edit(m.edit_value, m.search.size, m.edit_sign, m.edit_place,
+		m.edit_value = cheatsearch_edit(m.edit_value, m.search.size, m.edit_mode, m.edit_place,
 						(down & KEY_UP) ? 1 : -1);
 	return 0;
 }
 // A number's edit, on its last digit; signed numbers have a sign's place
 // first
-EXT static void edit_begin(uint32_t value, uint32_t sign, uint32_t stage)
+EXT static void edit_begin(uint32_t value, uint32_t mode, uint32_t stage)
 {
+	const uint32_t top = cheatsearch_largest(m.search.size, mode);
 	m.edit = 1;
-	m.edit_sign = sign;
+	m.edit_mode = mode;
 	m.edit_stage = stage;
 	m.edit_value = value & cheatsearch_max(m.search.size);
-	m.edit_place = cheatsearch_places(m.search.size, sign) - 1;
+	if (mode != CHEATSEARCH_SIGNED && m.edit_value > top)
+		m.edit_value = top;
+	m.edit_place = cheatsearch_places(m.search.size, mode) - 1;
 	slots_update();
-}
-// A on the search pages' row r
+}  // A on the search pages' row r
 EXT static void search_a(uint32_t r)
 {
 	if (search_greyed(r))
@@ -1991,12 +2168,14 @@ EXT static void search_a(uint32_t r)
 		if (r < CHEATSEARCH_UP_BY) {
 			search_filter(r);
 		} else if (r < CHEATSEARCH_OPS) {  // its number first; By's an amount, never signed
-			edit_begin(m.search.value[r], r >= CHEATSEARCH_EQUALS && m.search.sign, 0);
-		} else if (r == SR_AGAINST || r == SR_SIGNED) {
+			edit_begin(m.search.value[r], number_mode(r), 0);
+		} else if (r == SR_AGAINST || r == SR_SIGNED || r == SR_FORMAT) {
 			if (r == SR_AGAINST)
 				m.search.against ^= 1;
-			else
+			else if (r == SR_SIGNED)
 				m.search.sign ^= 1;
+			else
+				m.search.bcd ^= 1;
 			search_save();
 			slots_update();
 		} else if (r == SR_SHOW) {
@@ -2011,9 +2190,23 @@ EXT static void search_a(uint32_t r)
 	} else if (m.page == PAGE_LIST) {
 		m.pick = r;
 		m.pick_value = value_read(search_found[r], m.search.size);
+		if (m.search.bcd && !cheatsearch_from_bcd(m.pick_value, m.search.size, &m.pick_value))
+			m.pick_value = 0;  // as a number: BCD's digits
 		page_open(PAGE_PICK, PR_KEEP);
+	} else if (m.page == PAGE_PTRS) {
+		search_keep_ptr(r);
 	} else if (r == PR_VALUE) {
-		edit_begin(m.pick_value, m.search.sign, 0);
+		edit_begin(m.pick_value, number_mode(CHEATSEARCH_EQUALS), 0);
+	} else if (r == PR_PTR_FIND || r == PR_PTR_CHECK) {
+		search_busy(1);
+		pointers_scan(search_found[m.pick], r == PR_PTR_CHECK);
+		m.busy = 0;
+		if (m.ptr_rows) {
+			page_open(PAGE_PTRS, 0);
+		} else {  // none: no page to show
+			m.notice = INGAME_TEXT_SEARCH_PTR_NONE;
+			slots_update();
+		}
 	} else {
 		search_keep(r == PR_KEEP_ON);
 	}
@@ -2027,7 +2220,7 @@ EXT static void edit_done(void)
 		uint32_t op = m.cursor;
 		if (op == CHEATSEARCH_BETWEEN && m.edit_stage == 0) {  // its upper next
 			m.search.value[op] = m.edit_value;
-			edit_begin(m.search.value_hi, m.edit_sign, 1);
+			edit_begin(m.search.value_hi, m.edit_mode, 1);
 			return;
 		}
 		if (op == CHEATSEARCH_BETWEEN)
@@ -2043,7 +2236,9 @@ EXT static void edit_done(void)
 // B on a search page: back where it was opened from
 EXT static void search_back(void)
 {
-	if (m.page == PAGE_PICK) {
+	if (m.page == PAGE_PTRS) {
+		page_open(PAGE_PICK, PR_PTR_FIND);
+	} else if (m.page == PAGE_PICK) {
 		page_open(PAGE_LIST, m.pick);
 	} else if (m.page == PAGE_LIST) {
 		page_open(PAGE_SEARCH, SR_SHOW);

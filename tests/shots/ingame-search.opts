@@ -5,10 +5,12 @@
 # Equals edits its number in place, a digit underlined (edit), and A
 # searches (equals). In game A loses a life; back in the search, Equals 4
 # leaves the lives (four); below Show them, Undo the last can take the
-# filter back (undo), and Negative numbers turns on (signed), From's two
-# numbers then edited with a sign (between); Show them lists the lives
+# filter back (undo), and Negative numbers turns on (signed); Stored as
+# BCD greys it (bcd), and goes back to plain; From's two numbers then
+# edited with a sign (between); Show them lists the lives
 # (list) with their value;
-# A opens one (pick), and Keep it, set it now keeps it (kept).
+# A opens one (pick), and Keep it, set it now keeps it (kept); Find
+# pointers to it finds none near the lives (pointers).
 #! settings 2=1
 #! sd-file /searchtest.gba 0 tests/roms/searchtest/searchtest.gba
 -w "nav: home ready"
@@ -41,9 +43,12 @@
 -s @80:undo.png
 -k @86:DOWN -k @90:- -k @98:DOWN -k @102:- -k @110:A -k @114:-
 -s @130:signed.png
--k @136:UP -k @140:- -k @148:UP -k @152:- -k @160:UP -k @164:- -k @172:UP -k @176:- -k @184:A -k @188:- -k @196:UP -k @200:-
--s @216:between.png
--k @222:B -k @226:- -k @234:DOWN -k @238:- -k @246:A -k @250:-
+-k @136:DOWN -k @140:- -k @148:A -k @152:-
+-s @168:bcd.png
+-k @174:A -k @178:- -k @186:UP -k @190:- -k @198:UP -k @202:- -k @210:UP -k @214:- -k @222:UP -k @226:-
+-k @234:UP -k @238:- -k @246:A -k @250:- -k @258:UP -k @262:-
+-s @278:between.png
+-k @284:B -k @288:- -k @296:DOWN -k @300:- -k @308:A -k @312:-
 -w "screen ready: ingame-search-list"
 -s @4:list.png
 -k @10:A -k @14:-
@@ -51,3 +56,5 @@
 -s @4:pick.png
 -k @10:A -k @14:-
 -s @36:kept.png
+-k @42:DOWN -k @46:- -k @54:DOWN -k @58:- -k @66:A -k @70:-
+-s @140:pointers.png

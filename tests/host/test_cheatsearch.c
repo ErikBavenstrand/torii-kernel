@@ -163,10 +163,18 @@ static void test_numbers(void)
 	CHECK(memcmp(d, big, 10) == 0);
 	cheatsearch_decimal(7, d, 3);
 	CHECK(d[0] == 0 && d[1] == 0 && d[2] == 7);
-	CHECK_EQ(cheatsearch_digits(1), 3);
-	CHECK_EQ(cheatsearch_digits(2), 5);
-	CHECK_EQ(cheatsearch_digits(4), 10);
-	CHECK_EQ(cheatsearch_places(1, 1), 4);
+	CHECK_EQ(cheatsearch_digits(1, CHEATSEARCH_UNSIGNED), 3);
+	CHECK_EQ(cheatsearch_digits(2, CHEATSEARCH_SIGNED), 5);
+	CHECK_EQ(cheatsearch_digits(4, CHEATSEARCH_UNSIGNED), 10);
+	CHECK_EQ(cheatsearch_digits(4, CHEATSEARCH_BCD), 8);
+	CHECK_EQ(cheatsearch_places(1, CHEATSEARCH_SIGNED), 4);
+	CHECK_EQ(cheatsearch_largest(2, CHEATSEARCH_BCD), 9999);
+	CHECK_EQ(cheatsearch_largest(1, CHEATSEARCH_SIGNED), 127);
+	// BCD's editor: 2 digits a byte, up to 99
+	CHECK_EQ(cheatsearch_edit(95, 1, CHEATSEARCH_BCD, 0, 1), 5);  // 105 passes 99: the digit to 0
+	CHECK_EQ(cheatsearch_edit(5, 1, CHEATSEARCH_BCD, 0, -1), 95);
+	CHECK_EQ(cheatsearch_edit(200, 1, CHEATSEARCH_BCD, 1, 1), 90);  // out of range: 99 first, then 9 to 0
+	CHECK_EQ(cheatsearch_edit(9999, 2, CHEATSEARCH_BCD, 3, 1), 9990);
 
 	CHECK_EQ(cheatsearch_edit(0, 1, 0, 2, 1), 1);
 	CHECK_EQ(cheatsearch_edit(9, 1, 0, 2, 1), 0);  // the digit wraps
@@ -192,8 +200,46 @@ static void test_numbers(void)
 	CHECK_EQ(cheatsearch_edit(0x80000000u, 4, 1, 0, 1), 0x7FFFFFFFu);
 }
 
+// BCD: a score of 1234 as 0x1234; an element with a nibble past 9 isn't
+// one, and no filter keeps it
+static void test_bcd(void)
+{
+	uint32_t v = 0;
+	CHECK(cheatsearch_from_bcd(0x1234, 2, &v) && v == 1234);
+	CHECK(!cheatsearch_from_bcd(0x12A4, 2, &v));
+	CHECK(cheatsearch_from_bcd(0x99999999u, 4, &v) && v == 99999999u);
+	CHECK_EQ(cheatsearch_to_bcd(1234, 2), 0x1234);
+	CHECK_EQ(cheatsearch_to_bcd(7, 1), 0x07);
+	memset(t_now, 0, sizeof(t_now));
+	memset(t_before, 0, sizeof(t_before));
+	t_put(t_before, 2, 2, 0x0995);  // 995 to 1000: up by 5
+	t_put(t_now, 2, 2, 0x1000);
+	t_put(t_now, 4, 2, 0x00FA);  // not BCD
+	t_put(t_now, 6, 2, 0x1000);  // 1000, as it was 0: up by 1000
+	CHECK_EQ(t_pass(2, CHEATSEARCH_UP_BY, CHEATSEARCH_BCD, 5, 0), 1);
+	CHECK(t_bit(1));
+	CHECK_EQ(t_pass(2, CHEATSEARCH_EQUALS, CHEATSEARCH_BCD, 1000, 0), 2);
+	CHECK(t_bit(1) && t_bit(3));
+	CHECK_EQ(t_pass(2, CHEATSEARCH_CHANGED, CHEATSEARCH_BCD, 0, 0), 2);  // 0xFA isn't a number: dropped
+	CHECK(!t_bit(2));
+	CHECK_EQ(t_pass(2, CHEATSEARCH_MORE, CHEATSEARCH_BCD, 999, 0), 2);
+	CHECK_EQ(t_pass(2, CHEATSEARCH_LESS, CHEATSEARCH_BCD, 1, 0), T_BYTES / 2 - 3);  // the zeros
+	// Down by past 0, or up by past 9999: none
+	CHECK_EQ(t_pass(2, CHEATSEARCH_DOWN_BY, CHEATSEARCH_BCD, 1, 0), 0);
+	t_put(t_before, 2, 2, 0x9999);
+	CHECK_EQ(t_pass(2, CHEATSEARCH_UP_BY, CHEATSEARCH_BCD, 1, 0), 0);
+	// 8-bit: 0x99 is 99, 0x9A isn't BCD
+	memset(t_now, 0, sizeof(t_now));
+	t_put(t_now, 5, 1, 0x99);
+	t_put(t_now, 6, 1, 0x9A);
+	CHECK_EQ(t_pass(1, CHEATSEARCH_MORE, CHEATSEARCH_BCD, 98, 0), 1);
+	CHECK(t_bit(5));
+	CHECK_EQ(t_pass(1, CHEATSEARCH_EQUALS, CHEATSEARCH_BCD, 100, 0), 1);  // past 99: 99
+}
+
 void test_cheatsearch(void)
 {
+	test_bcd();
 	test_filters();
 	test_narrowing();
 	test_run();

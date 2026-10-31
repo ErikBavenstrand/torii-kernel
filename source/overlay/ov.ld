@@ -38,7 +38,7 @@ SECTIONS {
 	.ext __ov_stack_top : AT(__ov_image_end) {
 		__ov_ext_start = .;
 		*(.ext.text)
-		*cheatsearch.o(.text .text.cheatsearch_digits .text.cheatsearch_decimal .text.cheatsearch_edit .text.edit_digits .text.cheatsearch_fill .text.cheatsearch_shift .text.cheatsearch_chunk .text.cheatsearch_get .text.cheatsearch_count)
+		*cheatsearch.o(.text .text.cheatsearch_digits .text.cheatsearch_decimal .text.cheatsearch_edit .text.edit_digits .text.cheatsearch_fill .text.cheatsearch_shift .text.cheatsearch_chunk .text.cheatsearch_get .text.cheatsearch_count .text.cheatsearch_largest .text.cheatsearch_from_bcd .text.cheatsearch_to_bcd .text.bcd_shift)
 		*(.ext.data)
 		. = ALIGN(4);
 		__ov_ext_end = .;
@@ -50,7 +50,7 @@ SECTIONS {
 	.fastext : AT(__ov_ext_load + SIZEOF(.ext)) {
 		__ov_fastext_start = .;
 		*shotpack.o(.text .text.*)
-		*cheatsearch.o(.text.cheatsearch_narrow)
+		*cheatsearch.o(.text.cheatsearch_narrow .text.cheatsearch_bcd_drop)
 		. = ALIGN(4);
 		__ov_fastext_end = .;
 	} > iwram

@@ -88,7 +88,8 @@ it. Info's Controls page lists every key.
   narrows it down by what the value did (went up or down, by an amount or
   not, changed, the same, equals, more or less than a number, or from one
   number to another; signed or not; against the last scan or the first) at
-  8, 16 or 32 bits, with an undo, and keeps the one found as
+  8, 16 or 32 bits, BCD scores too, with an undo; a pointer scan follows
+  a value that moves in memory, and keeps the one found as
   a cheat, on at once; Back to Torii adds it to the cheat file as "Found"
   and its address. The
   cheat file moves, renames and is deleted with its game (before the game,
