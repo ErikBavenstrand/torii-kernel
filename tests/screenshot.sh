@@ -133,7 +133,7 @@ cut)
     [ "$count" -le 1 ] || fail "cut at $n ($name): $count BMPs after the next boot"
     [ "$n" != 0 ] || [ "$count" = 1 ] || fail "uncut: no BMP"
     [ "$count" = 0 ] || check_bmp >/dev/null
-    ! mdir -a -b -i "$cart/sd.img" ::/torii/screenshots 2>/dev/null | grep -q '\.writing' ||
+    ! mdir -a -b -i "$cart/sd.img" ::/torii/screenshots 2>/dev/null | grep '\.writing' >/dev/null ||
       fail "cut at $n ($name): the journal is left"
     case $name in
     "screenshot: its head written and closed" | "screenshot: its journal deleted" | "screenshot: its record marked filed")

@@ -62,14 +62,14 @@ boot $(nav_game_rename gba 0) -k @10:A -k @14:- -k @24:START -k @28:- -w "rename
   -s @40:"$shots/1-list.png" -f 2400
 logged "rename: from Hello"
 logged 'names: /Hello.gba is "Helloq"'
-names | grep -q $'^/Hello.gba\tHelloq$' || fail "names.txt doesn't have the name: $(names)"
+names | grep $'^/Hello.gba\tHelloq$' >/dev/null || fail "names.txt doesn't have the name: $(names)"
 
 # 2: its own name again
 # shellcheck disable=SC2046 # nav.sh's options
 boot $(nav_game_rename gba 0) -k @10:B -k @14:- -k @24:START -k @28:- -w "rename: kept" -f 2400
 logged "rename: from Helloq"
 logged "names: /Hello.gba is its own name again"
-! names | grep -q 'Hello' || fail "names.txt still has the name: $(names)"
+! names | grep 'Hello' >/dev/null || fail "names.txt still has the name: $(names)"
 
 # 3: Cancel after a change asks; Discard leaves everything as it was
 # shellcheck disable=SC2046 # nav.sh's options
@@ -109,7 +109,7 @@ OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_game_rename
 [ "$(grep -c '^kernel error: library: /torii/names.txt is [0-9]* bytes, over' "$cart/run.log")" = 1 ] ||
   fail "the walk didn't say once that names.txt is too large"
 logged "rename: from Hello"
-names | grep -q $'^/Hello.gba\tBig$' || fail "names.txt changed"
+names | grep $'^/Hello.gba\tBig$' >/dev/null || fail "names.txt changed"
 echo "PASS: rename: a names.txt too large to read is logged once and Rename says so"
 
 # 6: the SD card page's Rename of a game with a custom name: the name
@@ -124,7 +124,7 @@ boot $(nav_file /Hello.gba 0) -k @12:UP -k @16:- -k @20:UP -k @24:- -k @28:UP -k
   -w "screen ready: rename" -k @10:A -k @14:- -k @24:START -k @28:- -w "rename: kept" -f 2400
 logged "rename: /Hello.gba to Helloq.gba"
 logged "library: /Hello.gba is Helloq.gba now, shown as Custom Hello"
-names | grep -q $'^/Helloq.gba\tCustom Hello$' || fail "the custom name didn't follow the file: $(names)"
+names | grep $'^/Helloq.gba\tCustom Hello$' >/dev/null || fail "the custom name didn't follow the file: $(names)"
 echo "PASS: rename: a game's custom name follows its SD rename and shows at once"
 
 # 7: the game popup's Original name (above Rename for a game with a name of
@@ -133,5 +133,5 @@ echo "PASS: rename: a game's custom name follows its SD rename and shows at once
 boot $(nav_game_menu gba 0) -k @12:UP -k @16:- -k @20:UP -k @24:- -k @28:UP -k @32:- -k @36:UP -k @40:- \
   -k @48:A -k @52:- -w "its own name dropped" -f 2400
 logged "games: /Helloq.gba: its own name dropped"
-! names | grep -q 'Helloq' || fail "names.txt still has the name: $(names)"
+! names | grep 'Helloq' >/dev/null || fail "names.txt still has the name: $(names)"
 echo "PASS: rename: Original name drops a game's own name"

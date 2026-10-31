@@ -100,7 +100,7 @@ NAV_SHOWN=gba
 boot "$cart/1.log" $(nav_game_menu gba 0) -k @12:UP -k @16:- -k @24:UP -k @28:- -k @36:A -k @40:- \
   -w "screen ready: game-info" -k @20:RIGHT -k @24:- -k @36:B -k @40:- -w "save type of" -f 1500
 grep -q '^kernel: save type of /A.gba: 1 (0)' "$cart/1.log" || fail "the save type wasn't kept: $(grep '^kernel: save type' "$cart/1.log")"
-mdir -b -i "$cart/sd.img" ::/torii/saves/A.gba | grep -q 'game.ini' || fail "no /torii/saves/A.gba/game.ini"
+mdir -b -i "$cart/sd.img" ::/torii/saves/A.gba | grep 'game.ini' >/dev/null || fail "no /torii/saves/A.gba/game.ini"
 echo "PASS: Game info's save type is kept in the game's record, its folder made when missing"
 
 # The boot mode (Settings' GBA boot mode, a game's own in Game info): kept

@@ -120,7 +120,7 @@ cmp -s <(head -c "$window" "$dumps/before-EWRAM.bin") <(tail -c +$((0x20000 + 1)
 
 # The save came back intact through the save-state buffer load. (The flash
 # chip ignores the ROM's plain SRAM writes, so this boot isn't counted.)
-od -A n -t x1 -N 5 "$cart/sram.bin" | tr -d ' \n' | grep -q '4f4d525801' ||
+od -A n -t x1 -N 5 "$cart/sram.bin" | tr -d ' \n' | grep '4f4d525801' >/dev/null ||
   fail "the game's save did not survive the addon launch (SRAM $(od -A n -t x1 -N 5 "$cart/sram.bin"))"
 
 # run COPY KEYS... [-- MGBA-SHOT OPTIONS]: the same launch on a copy of the
@@ -192,7 +192,7 @@ grep -q 'screen ready: ingame' <<<"$log" || fail "L+R+START with DOWN held didn'
 # Reset game: the game starts again from its ROM, without the kernel, and runs
 run reset DOWN DOWN DOWN DOWN A -- -h $((key + 400)) -h $((key + 420)) -f $((key + 420))
 [ "$(grep -c '^omega [0-9]*: game started' <<<"$log")" = 2 ] || fail "Reset game didn't start the game again"
-! sed -n '/^omega [0-9]*: game started/,$p' <<<"$log" | grep -q '^omega [0-9]*: mode kernel' ||
+! sed -n '/^omega [0-9]*: game started/,$p' <<<"$log" | grep '^omega [0-9]*: mode kernel' >/dev/null ||
   fail "Reset game went back to the kernel"
 [ "$(awk '$1 == "hash" { print $4 }' <<<"$out" | sort -u | wc -l)" = 2 ] || fail "the game didn't run after Reset game"
 
@@ -208,7 +208,7 @@ woke=$(sed -n 's/^wake at frame \([0-9]*\)$/\1/p' <<<"$log")
 
 # Back to Torii: the kernel's ROM page and a reset into it
 run torii UP A -- -f $((key + 300))
-sed -n '/^omega [0-9]*: game started/,$p' <<<"$log" | grep -q '^omega [0-9]*: mode kernel' ||
+sed -n '/^omega [0-9]*: game started/,$p' <<<"$log" | grep '^omega [0-9]*: mode kernel' >/dev/null ||
   fail "Back to Torii didn't go back to the kernel"
 
 # Cheats: hello with a cheat picked (its green square's byte) has the

@@ -141,7 +141,7 @@ cmp -s "$cart/edited.cht" "$cart/clean.cht" && fail "the edit didn't change the 
 mcopy -o -i "$cart/sd.img" "$cart/edited.cht" ::/torii/cheats/Hello.cht
 cheat_screen -k @8:UP -k @12:- -w "isn't as its index says" -f 30000 >"$cart/changed.txt" 2>&1 ||
   fail "the changed file's window wasn't caught: $(grep -a 'cheats' "$cart/changed.txt" | tail -3)"
-mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cdx | grep -q '^file 0$' || fail "the stale index wasn't set aside"
+mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cdx | grep '^file 0$' >/dev/null || fail "the stale index wasn't set aside"
 cp "$cart/nor-before.bin" "$cart/kernel-nor.bin"
 rm -f "$cart/sram.bin"
 cheat_screen -k @8:B -k @12:- -w "cheats: back" -f 30000 >"$cart/reindexed.txt" 2>&1 ||

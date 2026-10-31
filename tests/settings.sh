@@ -78,7 +78,7 @@ writes() { grep -c 'nor: wrote the settings' "$cart/visit.log" || true; }
 visit auto-save A RIGHT A
 [ "$(writes)" = 1 ] || fail "a save wrote the settings $(writes) times"
 # ... before the page is left: the write comes before the B
-grep -n 'nor: wrote the settings\|nav: back from settings' "$cart/visit.log" | head -1 | grep -q 'nor: wrote' ||
+grep -n 'nor: wrote the settings\|nav: back from settings' "$cart/visit.log" | head -1 | grep 'nor: wrote' >/dev/null ||
   fail "the save waited for the page to close"
 [ "$(slots 14 1)" = 0001 ] || fail "Auto save not saved: $(slots 14 1)"
 [ "$(slots 0 14)" = "$(ffff 14)" ] || fail "slots 0-13 changed: $(slots 0 14)"
@@ -141,7 +141,7 @@ OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_setting the
   $(_nav_file '-k @8:A -k @10:- -k @14:RIGHT -k @16:- -k @18:A -k @19:- -k @20:B -k @21:-') \
   -w "nav: home ready" -f 400 >"$cart/visit.log" 2>&1 || fail "B after a theme confirm: $(tail -3 "$cart/visit.log")"
 [ "$(writes)" = 1 ] || fail "B after a theme confirm wrote the settings $(writes) times"
-grep -n 'nor: wrote the settings\|nav: back from settings' "$cart/visit.log" | head -1 | grep -q 'nor: wrote' ||
+grep -n 'nor: wrote the settings\|nav: back from settings' "$cart/visit.log" | head -1 | grep 'nor: wrote' >/dev/null ||
   fail "the write ran on the way out"
 [ "$(slots 28 1)" = 0001 ] || fail "Theme not saved before leaving: $(slots 28 1)"
 # A write that fails (a NOR word that won't program, OMEGA_NOR_STUCK; a new

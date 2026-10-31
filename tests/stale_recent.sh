@@ -40,7 +40,7 @@ run_case() {
   OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch "/Games/$name" at=130) \
     -s 300:"$shots/error.png" -f 300 >"$log" 2>&1 || fail "$name: the emulator failed: $(tail -3 "$log")"
   grep -qF "launch $name: can't open it" "$log" || fail "$name: no error logged: $(grep '^kernel: ' "$log" | tail -3)"
-  if mdir -b -i "$cart/sd.img" ::/SAVER | grep -qv 'Recently play.txt'; then
+  if mdir -b -i "$cart/sd.img" ::/SAVER | grep -v 'Recently play.txt' >/dev/null; then
     fail "$name: the kernel wrote to /SAVER: $(mdir -b -i "$cart/sd.img" ::/SAVER | tr '\n' ' ')"
   fi
   # The entry comes off the list; the others stay (v0.3.2: it stayed)
@@ -158,7 +158,7 @@ grep -q '^kernel: nor: writing Hello.gba at 00000000, patched 1' "$cart/1-write.
 OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_nor_launch 0 at=130) -f 500 >"$cart/2-boot.log" 2>&1
 grep -q '^kernel: launch: loading Hello.gba from NOR at .*, patched 1, savestates 0$' "$cart/2-boot.log" ||
   fail "the NOR launch logged: $(grep '^kernel: launch: loading' "$cart/2-boot.log")"
-if mdir -b -i "$cart/sd.img" ::/RTS 2>/dev/null | grep -q .; then
+if mdir -b -i "$cart/sd.img" ::/RTS 2>/dev/null | grep . >/dev/null; then
   fail "the NOR launch with SAVESTATE off made a state file"
 fi
 recent=$(recent_list "$cart")

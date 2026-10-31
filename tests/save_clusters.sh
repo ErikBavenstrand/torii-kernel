@@ -96,7 +96,7 @@ check() {
   [ "$r" = 4f4d525802 ] || fail "cut $n ($name): the save holds $r after the next power-on"
   [ "$(pending_flag "$cart/kernel-nor.bin")" = 0000 ] || fail "cut $n ($name): the record still waits"
   clean_card "cut $n ($name)"
-  ! mdir -i "$cart/sd.img" -b ::/torii/saves/Test.gba | grep -qE '\.(tmp|bak)$' || fail "cut $n ($name): a .tmp or .bak is left"
+  ! mdir -i "$cart/sd.img" -b ::/torii/saves/Test.gba | grep -E '\.(tmp|bak)$' >/dev/null || fail "cut $n ($name): a .tmp or .bak is left"
 }
 cut_sweep scenario check
 echo "PASS: save-clusters $part: new folders read empty, and the copy survives a cut at each cutpoint"

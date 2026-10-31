@@ -67,7 +67,7 @@ grep -q "cheats: .*Hello.cht: 4 cheats, 1 greyed, 1 picked" "$cart/pick.txt" ||
 # The popup never reads the file: no count before the screen has counted it
 grep -q "cheats: popup: -1 listed" "$cart/pick.txt" ||
   fail "the popup counted: $(grep -a 'cheats: popup' "$cart/pick.txt" | head -1)"
-! sed '/screen ready: game-popup/q' "$cart/pick.txt" | grep -q 'safefile: .*Hello.cht\|cheats: .*Hello.cht: [0-9]* bytes' ||
+! sed '/screen ready: game-popup/q' "$cart/pick.txt" | grep 'safefile: .*Hello.cht\|cheats: .*Hello.cht: [0-9]* bytes' >/dev/null ||
   fail "the popup read the cheat file"
 grep -q "cheats: /torii/cheats/Hello.cht: 2 picked, written" "$cart/pick.txt" ||
   fail "the pick wasn't saved: $(grep -a 'cheats:' "$cart/pick.txt" | tail -2)"
@@ -76,7 +76,7 @@ mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht >"$cart/after.cht"
 sed 's/^cheat1_enable = false\r$/cheat1_enable = true\r/' "$cart/Hello.cht" >"$cart/want.cht"
 head -c "$(stat -c %s "$cart/want.cht")" "$cart/after.cht" | cmp -s - "$cart/want.cht" ||
   fail "the write-back changed more than the enable line: $(diff <(cat -A "$cart/want.cht") <(cat -A "$cart/after.cht") | head -5)"
-tail -n 1 "$cart/after.cht" | grep -q '^#crc32 ' || fail "the written file has no CRC line"
+tail -n 1 "$cart/after.cht" | grep '^#crc32 ' >/dev/null || fail "the written file has no CRC line"
 echo "PASS: cheats: the cheat screen picks a cheat and saves only its enable line"
 
 # The screen keeps its count in /torii/cheats/counts.txt: after a power-off
@@ -301,7 +301,7 @@ for big in "600 100000" "1000 190000"; do
     fail "the $count-cheat file read: $(grep -a 'cheats:' "$cart/huge.txt" | head -3)"
   # The popup doesn't read it (reading 190 KB took 75 frames): its look at
   # the file takes far less than a frame
-  ! sed '/screen ready: game-popup/q' "$cart/huge.txt" | grep -q 'cheats: .*Hello.cht: [0-9]* bytes' ||
+  ! sed '/screen ready: game-popup/q' "$cart/huge.txt" | grep 'cheats: .*Hello.cht: [0-9]* bytes' >/dev/null ||
     fail "the $count-cheat file's popup read it"
   cycles=$(sed -n 's/.*cheats: popup: -1 listed, \([0-9]*\) cycles.*/\1/p' "$cart/huge.txt")
   [ -n "$cycles" ] && [ "$cycles" -lt 100000 ] || fail "the $count-cheat file's popup took ${cycles:-?} cycles"
@@ -519,8 +519,8 @@ boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -
   fail "the rename didn't run: $(grep -a '^kernel' "$cart/rename.txt" | tail -3)"
 grep -q "cheats: renamed cheat 1: ok" "$cart/rename.txt" ||
   fail "the rename logged: $(grep -a 'cheats:' "$cart/rename.txt" | tail -3)"
-mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep -q $'^cheat1_desc = ".*q"\r$' || fail "cheat 1's name didn't change"
-mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep -q $'^cheat1_renamed = true\r$' || fail "cheat 1 has no renamed line"
+mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep $'^cheat1_desc = ".*q"\r$' >/dev/null || fail "cheat 1's name didn't change"
+mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep $'^cheat1_renamed = true\r$' >/dev/null || fail "cheat 1 has no renamed line"
 [ "$(cheat_lines)" = "$before" ] || fail "after the rename the cheats read: $(cheat_lines | tr '\n' ' ')"
 echo "PASS: cheats: a database cheat is renamed from START's menu, marked so \`just cheats\` keeps the name"
 
@@ -557,7 +557,7 @@ cheat_run "$cart/hold.txt" -k @8:DOWN -k @12:- -k @24:START -k @28:- -w "screen 
   -w "cheats: buttons captured" -k @16:B -k @20:- -w "screen ready: cheats"
 grep -q "cheats: buttons of cheat 2: hold L+R: ok" "$cart/hold.txt" ||
   fail "Hold wasn't set: $(grep -a 'cheats:' "$cart/hold.txt" | tail -3)"
-cheat_file | grep -qx 'cheat2_keys = "hold L+R"' || fail "cheat 2's keys line: $(cheat_file | grep cheat2_)"
+cheat_file | grep -x 'cheat2_keys = "hold L+R"' >/dev/null || fail "cheat 2's keys line: $(cheat_file | grep cheat2_)"
 [ "$(cheat_lines | wc -l)" = 5 ] || fail "setting buttons changed the cheats: $(cheat_lines | tr '\n' ' ')"
 echo "PASS: cheats: Buttons captures a held combination and writes it as the cheat's keys line"
 cheat_run "$cart/code.txt" -k @8:DOWN -k @12:- -k @24:START -k @28:- -w "screen ready: cheat-menu" \
@@ -565,7 +565,7 @@ cheat_run "$cart/code.txt" -k @8:DOWN -k @12:- -k @24:START -k @28:- -w "screen 
   -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @44:A -k @48:- -k @60:B -k @64:- -w "screen ready: cheats"
 grep -q "cheats: buttons of cheat 2: from the code: ok" "$cart/code.txt" ||
   fail "From the code wasn't set: $(grep -a 'cheats:' "$cart/code.txt" | tail -3)"
-! cheat_file | grep -q '^cheat2_keys' || fail "From the code left a keys line: $(cheat_file | grep cheat2_)"
+! cheat_file | grep '^cheat2_keys' >/dev/null || fail "From the code left a keys line: $(cheat_file | grep cheat2_)"
 echo "PASS: cheats: Buttons' From the code removes the cheat's keys line"
 # Cheat 1 patches the ROM too, so it can't wait on buttons: A on Hold
 # starts no capture, and B leaves the file as it was
@@ -575,7 +575,7 @@ cheat_run "$cart/ungated.txt" -k @8:START -k @12:- -w "screen ready: cheat-menu"
   -w "screen ready: cheats"
 ! grep -q "cheats: buttons captured\|cheats: buttons of cheat 1:" "$cart/ungated.txt" ||
   fail "Hold was set on a cheat that patches the ROM: $(grep -a 'cheats:' "$cart/ungated.txt" | tail -3)"
-! cheat_file | grep -q '^cheat1_keys' || fail "cheat 1 got a keys line: $(cheat_file | grep cheat1_)"
+! cheat_file | grep '^cheat1_keys' >/dev/null || fail "cheat 1 got a keys line: $(cheat_file | grep cheat1_)"
 echo "PASS: cheats: Buttons keeps Hold off a cheat that patches the ROM"
 
 # Edit guide: the keyboard of lines, q, Enter (the function row's fourth
@@ -588,14 +588,14 @@ cheat_run "$cart/guide-edit.txt" -k @8:START -k @12:- -w "screen ready: cheat-me
   -w "screen ready: cheats"
 grep -q "cheats: guide of cheat 1 set: ok" "$cart/guide-edit.txt" ||
   fail "the guide wasn't set: $(grep -a 'cheats:' "$cart/guide-edit.txt" | tail -3)"
-cheat_file | grep -qx 'cheat1_guide = "q\\nn"' || fail "cheat 1's guide line: $(cheat_file | grep cheat1_)"
+cheat_file | grep -x 'cheat1_guide = "q\\nn"' >/dev/null || fail "cheat 1's guide line: $(cheat_file | grep cheat1_)"
 echo "PASS: cheats: Edit guide's keyboard of lines writes the guide, its line break written escaped"
 cheat_run "$cart/guide-rm.txt" -k @8:START -k @12:- -w "screen ready: cheat-menu" \
   -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @40:DOWN -k @44:- -k @56:A -k @60:- -w "screen ready: rename" \
   -k @8:B -k @12:- -k @20:B -k @24:- -k @32:B -k @36:- -k @48:START -k @52:- -w "screen ready: cheats"
 grep -q "cheats: guide of cheat 1 removed: ok" "$cart/guide-rm.txt" ||
   fail "the guide wasn't removed: $(grep -a 'cheats:' "$cart/guide-rm.txt" | tail -3)"
-! cheat_file | grep -q '^cheat1_guide' || fail "an empty guide left its line: $(cheat_file | grep cheat1_)"
+! cheat_file | grep '^cheat1_guide' >/dev/null || fail "an empty guide left its line: $(cheat_file | grep cheat1_)"
 [ "$(cheat_lines | wc -l)" = 5 ] || fail "the guide's edits changed the cheats: $(cheat_lines | tr '\n' ' ')"
 echo "PASS: cheats: an emptied guide removes the cheat's guide line"
 
@@ -627,7 +627,7 @@ last_check() {
   esac
   if [ "$n" = 0 ]; then
     [ -z "$lines" ] || fail "last delete, uncut: the code is still there: $lines"
-    ! mdir -b -i "$cart/sd.img" ::/torii/cheats 2>/dev/null | grep -q Hello ||
+    ! mdir -b -i "$cart/sd.img" ::/torii/cheats 2>/dev/null | grep Hello >/dev/null ||
       fail "the emptied cheat file is still on the card: $(mdir -b -i "$cart/sd.img" ::/torii/cheats | tr '\n' ' ')"
   fi
 }

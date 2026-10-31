@@ -55,7 +55,7 @@ hist_has_old() {
   done < <(hist_versions)
   echo "$n"
 }
-leftovers() { mdir -i "$cart/sd.img" ::/torii/saves/Hello.gba/ 2>/dev/null | grep -qiE 'tmp|bak'; }
+leftovers() { mdir -i "$cart/sd.img" ::/torii/saves/Hello.gba/ 2>/dev/null | grep -iE 'tmp|bak' >/dev/null; }
 
 # Starting state: the game launched (so the pending-save record is set), then
 # its save changed in the chip.

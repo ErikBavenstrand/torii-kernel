@@ -116,7 +116,7 @@ shrunk_eeprom() {
   [ "$(stat -c %s "$sav")" = 512 ] || fail "eeprom512-shrunk: Main.sav is $(stat -c %s "$sav") bytes, not 512"
   ! cmp -s "$sav" <(head -c 512 "$cart/old.sav") || fail "eeprom512-shrunk: the new save is the old one cut short"
   # The old file, untouched, is the history's first version
-  mdir -i "$cart/sd.img" ::/torii/backups/Test.gba/Main/ 2>/dev/null | grep -qi '0001-' || fail "eeprom512-shrunk: no version in the history"
+  mdir -i "$cart/sd.img" ::/torii/backups/Test.gba/Main/ 2>/dev/null | grep -i '0001-' >/dev/null || fail "eeprom512-shrunk: no version in the history"
   local name
   name=$(mdir -b -i "$cart/sd.img" ::/torii/backups/Test.gba/Main/ | grep -i '0001-' | head -1)
   mtype -i "$cart/sd.img" "$name" >"$hist"

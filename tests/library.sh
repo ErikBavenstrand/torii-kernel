@@ -108,7 +108,7 @@ if shard_case; then
   no_errors "$cart/1.log"
   [ "$(index "$cart")" = "$nested_expected" ] || fail "the index lists:
 $(index "$cart")"
-  index "$cart" --header | grep -qx "flags 0" || fail "the index says truncated"
+  index "$cart" --header | grep -x "flags 0" >/dev/null || fail "the index says truncated"
   echo "PASS: the first boot indexes nested folders A-Z per console, skips hidden and too-deep ones, and finds saves"
 
   # Power-on 2: loaded, the walk finds nothing new and writes nothing. The
@@ -197,7 +197,7 @@ if shard_case; then
   logged "$cart/4.log" "library: the card changed: building a new index"
   logged "$cart/4.log" "library: wrote /torii/library.bak (generation 2)"
   no_errors "$cart/4.log"
-  index "$cart" --header | grep -qx "records 10" || fail "after the cut write: $(index "$cart" --header | tr '\n' ' ')"
+  index "$cart" --header | grep -x "records 10" >/dev/null || fail "after the cut write: $(index "$cart" --header | tr '\n' ' ')"
   echo "PASS: a write cut short leaves the older file, which the boot loads"
 
   # The same files on another card (another volume serial): its index
@@ -211,9 +211,9 @@ if shard_case; then
   boot "$cart" "$cart/4.log" -f 300
   logged "$cart/4.log" "library: the index is another card's"
   logged "$cart/4.log" "library: new index: 1 games (GBA 1, GBC 0, GB 0, NES 0)"
-  grep -E "kernel: (library: new index|screen ready: home)" "$cart/4.log" | head -1 | grep -q "new index" ||
+  grep -E "kernel: (library: new index|screen ready: home)" "$cart/4.log" | head -1 | grep "new index" >/dev/null ||
     fail "the menu came up before the new index"
-  index "$cart" --header | grep -qx "volume_serial 12345678" || fail "the new index has another serial"
+  index "$cart" --header | grep -x "volume_serial 12345678" >/dev/null || fail "the new index has another serial"
   echo "PASS: another card's index is built again before the menu"
 fi
 
@@ -276,9 +276,9 @@ if shard_case; then
     -w "delete: /GBA/RPG/Golden Sun.gba" -u "library: wrote" -f 2000
   logged "$cart/2.log" "delete: /GBA/RPG/Golden Sun.gba"
   no_errors "$cart/2.log"
-  index "$cart" | grep -q "Golden Sun" && fail "the index still lists Golden Sun:
+  index "$cart" | grep "Golden Sun" >/dev/null && fail "the index still lists Golden Sun:
 $(index "$cart")"
-  mdir -b -i "$cart/sd.img" ::/GBA/RPG | grep -q "Golden Sun.gba" && fail "Golden Sun.gba is still on the card"
+  mdir -b -i "$cart/sd.img" ::/GBA/RPG | grep "Golden Sun.gba" >/dev/null && fail "Golden Sun.gba is still on the card"
   mtype -i "$cart/sd.img" "::/torii/saves/GBA/RPG/Golden Sun.gba/Main.sav" | cmp -s - "$game" || fail "Golden Sun's save didn't stay as it was"
   favs=$(mtype -i "$cart/sd.img" ::/torii/favorites.txt | grep '^/' | tr '\n' ' ')
   [ "$favs" = "/Tetris.gb " ] || fail "after the delete, the favourites are '$favs'"

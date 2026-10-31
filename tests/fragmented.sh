@@ -39,14 +39,14 @@ run_case() {
 }
 
 run_case boots fat32 61
-od -A n -t x1 -N 5 "$carts/fragmented-boots/sram.bin" | tr -d ' \n' | grep -q '4f4d525801' ||
+od -A n -t x1 -N 5 "$carts/fragmented-boots/sram.bin" | tr -d ' \n' | grep '4f4d525801' >/dev/null ||
   fail "a game in 61 pieces did not boot"
 echo "PASS: a game in 61 pieces boots"
 
 run_case refused fat32 62
 grep -qF "AGAME.GBA has more runs of clusters than the cart's table holds" "$carts/fragmented-refused/kernel.log" ||
   fail "a game in 62 pieces was not refused: $(grep '^kernel: ' "$carts/fragmented-refused/kernel.log" | tail -3)"
-if od -A n -t x1 -N 5 "$carts/fragmented-refused/sram.bin" | tr -d ' \n' | grep -q '4f4d5258'; then
+if od -A n -t x1 -N 5 "$carts/fragmented-refused/sram.bin" | tr -d ' \n' | grep '4f4d5258' >/dev/null; then
   fail "a game in 62 pieces booted"
 fi
 mdir -i "$carts/fragmented-refused/sd.img" ::/torii/saves >/dev/null 2>&1 &&
@@ -56,6 +56,6 @@ echo "PASS: a game in 62 pieces shows an error"
 # FAT16 chains can end in any of 0xFFF8-0xFFFF; the kernel stopped only at
 # 0xFFFF and looped forever on the others
 run_case fat16-eoc fat16 3
-od -A n -t x1 -N 5 "$carts/fragmented-fat16-eoc/sram.bin" | tr -d ' \n' | grep -q '4f4d525801' ||
+od -A n -t x1 -N 5 "$carts/fragmented-fat16-eoc/sram.bin" | tr -d ' \n' | grep '4f4d525801' >/dev/null ||
   fail "a game on FAT16 whose chain ends in 0xFFF8 did not boot"
 echo "PASS: a game on FAT16 whose chain ends in 0xFFF8 boots"

@@ -123,7 +123,7 @@ want="/GBA/Wars.gba
 $(gba_order "$cart")"
 # Every record has its file's date (names-update's, which the walk checked)
 [ "$(crc_lines "$cart" | wc -l)" = 8 ] || fail "crc.txt holds $(crc_lines "$cart")"
-if crc_lines "$cart" | awk -F'\t' '$3 == "-"' | grep -q .; then
+if crc_lines "$cart" | awk -F'\t' '$3 == "-"' | grep . >/dev/null; then
   fail "records without a date: $(crc_lines "$cart")"
 fi
 echo "PASS: names-update's names.db and crc.txt name the games by CRC, not a romhack by its game code, and the index sorts by them"
@@ -208,7 +208,7 @@ logged "$cart/1.log" "library: wrote /torii/library.bak (generation 2)"
 [ "$(grep -oE '^kernel: names: /[^ ]+ is [0-9A-F]{8}' "$cart/1.log" | head -2 | cut -d' ' -f3 | tr '\n' ' ')" = \
   "/GBA/Wars.gba /NES/Famicom.nes " ] || fail "Recent's games weren't first: $(grep -E '^kernel: names: /' "$cart/1.log")"
 [ "$(crc_lines "$cart" | wc -l)" = 8 ] || fail "crc.txt holds $(crc_lines "$cart")"
-crc_lines "$cart" | grep -q '/GBA/Hack of Minish.gba' || fail "crc.txt has no record of the romhack"
+crc_lines "$cart" | grep '/GBA/Hack of Minish.gba' >/dev/null || fail "crc.txt has no record of the romhack"
 [ "$(gba_order "$cart" | head -1)" = /GBA/Wars.gba ] || fail "Wars isn't first: $(gba_order "$cart")"
 no_errors "$cart/1.log"
 boot "$cart" "$cart/2.log" -f 900 -u "library: unchanged"
@@ -238,7 +238,7 @@ mcopy -o -i "$cart/sd.img" "$cart/files/torii/crc.txt" "$cart/files/torii/crc.tx
 boot "$cart" "$cart/1.log" -f 3000 -u "names: wrote /torii/crc.txt"
 crc=$(python3 -c 'import sys, zlib; print("%08X" % zlib.crc32(open(sys.argv[1], "rb").read()[16:]))' "$cart/files/NES/Famicom.nes")
 logged "$cart/1.log" "names: /NES/Famicom.nes is $crc"
-crc_lines "$cart" | grep -q "^$crc	.*/NES/Famicom.nes" || fail "crc.txt doesn't hold Famicom's CRC without its header: $(crc_lines "$cart")"
+crc_lines "$cart" | grep "^$crc	.*/NES/Famicom.nes" >/dev/null || fail "crc.txt doesn't hold Famicom's CRC without its header: $(crc_lines "$cart")"
 if grep -qE "^kernel: names: /GBA/.* is [0-9A-F]{8}" "$cart/1.log"; then fail "a GBA CRC was computed again"; fi
 no_errors "$cart/1.log"
 echo "PASS: a NES CRC from before v0.6.2, with the iNES header in it, is computed again without it"

@@ -40,7 +40,7 @@ grep -q '^kernel: screen ready: home' "$cart/boot.log" || fail "the boot didn't 
 # Power-on 1: CLEAN BOOT of Hello.gba.
 # shellcheck disable=SC2046 # nav.sh's options
 boot $(nav_launch /Hello.gba) -s 400:$shots/1-game.png
-od -A n -t x1 -N 5 "$cart/sram.bin" | tr -d ' \n' | grep -q '4f4d525801' ||
+od -A n -t x1 -N 5 "$cart/sram.bin" | tr -d ' \n' | grep '4f4d525801' >/dev/null ||
   fail "game did not write its first boot to SRAM"
 
 # Power-on 2: the kernel asks to copy SRAM to torii/saves/Hello.gba/Main.sav; confirm with A.
@@ -50,7 +50,7 @@ boot -s 90:$shots/2-prompt.png -k 100:A -k 106:- -s 300:$shots/2-menu.png
 # Power-on 3: launch it again.
 # shellcheck disable=SC2046 # nav.sh's options
 boot $(nav_launch /Hello.gba) -s 500:$shots/3-game.png
-od -A n -t x1 -N 5 "$cart/sram.bin" | tr -d ' \n' | grep -q '4f4d525802' ||
+od -A n -t x1 -N 5 "$cart/sram.bin" | tr -d ' \n' | grep '4f4d525802' >/dev/null ||
   fail "save was not loaded back into SRAM on the next launch"
 
 echo "PASS: boot from SD, SRAM save, write-back to SD and reload all work"

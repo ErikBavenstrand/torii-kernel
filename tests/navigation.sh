@@ -110,7 +110,7 @@ echo "PASS: tests/nav.sh reaches each Info page and Diagnostics from Info"
 rm -rf "$cart" && cp -r "$carts/info-new" "$cart"
 # shellcheck disable=SC2046
 boot info-last $(nav_info_page saves) -k @400:- -f 900
-mtype -i "$cart/sd.img" ::/torii/recent.txt | grep -qx '@boot info' ||
+mtype -i "$cart/sd.img" ::/torii/recent.txt | grep -x '@boot info' >/dev/null ||
   fail "recent.txt's boot position on Saves: $(mtype -i "$cart/sd.img" ::/torii/recent.txt | head -1)"
 boot info-last-2 -w "nav: home ready" -f 300
 logged "nav: start on 0: home-info"
@@ -193,7 +193,7 @@ echo "PASS: Last place comes back as home facing the item last faced, older kern
 
 # Start on through power cycles and games (D1), with Auto save on (no
 # question at power-on after a game) and the Reset hotkey on (L+R+START)
-started() { grep -o "nav: start on .*" "$log" | sed -n "${2:-1}p" | grep -qxF "nav: start on $1" || fail "$(basename "$log") didn't start on $1: $(grep -o 'nav: start on.*' "$log" | tr '\n' ' ')"; }
+started() { grep -o "nav: start on .*" "$log" | sed -n "${2:-1}p" | grep -xF "nav: start on $1" >/dev/null || fail "$(basename "$log") didn't start on $1: $(grep -o 'nav: start on.*' "$log" | tr '\n' ' ')"; }
 new_cart cycle
 setting 14 1
 setting 1 1
@@ -258,7 +258,7 @@ new_cart delete
 boot 1 $(nav_delete /Zelda.gb at=60) -f 400
 logged "delete: /Zelda.gb"
 logged "home: 6 items"
-! mtype -i "$cart/sd.img" ::/torii/favorites.txt | grep -q Zelda || fail "Zelda.gb is still a favourite"
+! mtype -i "$cart/sd.img" ::/torii/favorites.txt | grep Zelda >/dev/null || fail "Zelda.gb is still a favourite"
 boot 2 -w "nav: home ready" -f 300
 ! grep -q "library: new index" "$log" || fail "the boot after the delete rebuilt the index"
 echo "PASS: a deleted game leaves home, the favourites and the library index at once"

@@ -239,9 +239,9 @@ run -f 800
 logged "gsaves: restore Main version 2: 0"
 [ "$(letter $S/Main.sav)" = C ] || fail "backups: Main is $(letter $S/Main.sav), not C"
 h=$(hist Main)
-echo "$h" | grep -q "^0003-" || fail "backups: the old save isn't version 3: $h"
-echo "$h" | grep -q "^0001-20260101-120000" || fail "backups: version 1 is gone: $h"
-! echo "$h" | grep -q "^0002-" || fail "backups: version 2 stayed in the backups: $h"
+echo "$h" | grep "^0003-" >/dev/null || fail "backups: the old save isn't version 3: $h"
+echo "$h" | grep "^0001-20260101-120000" >/dev/null || fail "backups: version 1 is gone: $h"
+! echo "$h" | grep "^0002-" >/dev/null || fail "backups: version 2 stayed in the backups: $h"
 echo "PASS: game saves: Backups restores one, the old save becomes the newest backup"
 
 # import: /Z.sav as a new slot (the browser starts in the ROM's folder, the
