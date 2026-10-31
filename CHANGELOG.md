@@ -4,6 +4,12 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Added:** cheat folders: a file's `cheatN_folder = "Items"` folds
+  adjacent cheats into one row on the Cheats screen, which A opens; choice
+  groups fold inside it, and any number of its cheats can be on (6b51eec2).
+
 ## v0.9.10
 
 - **Added:** the cheat search reads BCD scores (Stored as: BCD, 1234 kept
