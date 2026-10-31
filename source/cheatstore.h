@@ -268,8 +268,9 @@ int cheatstore_drop(void);
 // left out whole, logged: never its table part without its patches, or
 // some of its patches); gl_cheat_count gets the cheats that run in game and
 // gl_cheat_patches their ROM patches' count, at most CHEATSTORE_ROM_PATCHES,
-// kept in EWRAM: the game's load takes PSRAM, where the text is, and all of
-// pReadCache. With psram_bytes, the game is in PSRAM
+// kept in cart SRAM page 0xF0 (cartlog.h's CARTLOG_CHEAT_PATCHES): the
+// game's load takes PSRAM, where the text is, and all of pReadCache, and
+// EWRAM has no room for them. With psram_bytes, the game is in PSRAM
 // (that many bytes) and the kept ROM patches of the same ROM's first pass are
 // written into it, nothing read again, but for any past its end or over the
 // kernel's own patches (rom_guard_hits, GBApatch.h): left out and logged. A

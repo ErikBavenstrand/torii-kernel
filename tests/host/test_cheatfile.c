@@ -480,38 +480,37 @@ void test_cheatfile_budget(void)
 // out
 void test_cheatfile_patches_budget(void)
 {
-	static char text[16384];
-	static const u32 n[4] = {100, 100, 60, 56};
+	static char text[40000];
+	static const u32 n[10] = {256, 256, 256, 256, 256, 256, 256, 250, 10, 6};
 	char *p = text;
-	for (u32 c = 0; c < 4; c++) {
+	for (u32 c = 0; c < 10; c++) {
 		p += sprintf(p, "cheat%u_code = \"", (unsigned)c);
 		for (u32 i = 0; i < n[c]; i++)
 			p += sprintf(p, "%s08%u%05X:4770", i ? "+" : "", (unsigned)c, (unsigned)(i * 2));
 		p += sprintf(p, "\"\n");
 	}
 	load_str(text);
-	for (u32 c = 0; c < 4; c++) {
+	for (u32 c = 0; c < 10; c++) {
 		CHECK_EQ(cheats[c].status, CHEATFILE_OK);
 		CHECK_EQ(cheats[c].patches, n[c]);
 	}
-	CHECK(cheatfile_toggle(&file, 0));
-	CHECK(cheatfile_toggle(&file, 1));
-	CHECK_EQ(file.patches, 200);
-	CHECK_EQ(cheatfile_why(&file, 2), CHEATFILE_WHY_PATCHES);  // 260 of 256
-	CHECK(!cheatfile_toggle(&file, 2));
-	CHECK_EQ(cheatfile_why(&file, 3), CHEATFILE_PICKABLE);  // 256 exactly
-	CHECK(cheatfile_toggle(&file, 3));
+	for (u32 c = 0; c < 8; c++)
+		CHECK(cheatfile_toggle(&file, c));
+	CHECK_EQ(file.patches, 2042);
+	CHECK_EQ(cheatfile_why(&file, 8), CHEATFILE_WHY_PATCHES);  // 2,052 of 2,048
+	CHECK(!cheatfile_toggle(&file, 8));
+	CHECK_EQ(cheatfile_why(&file, 9), CHEATFILE_PICKABLE);  // 2,048 exactly
+	CHECK(cheatfile_toggle(&file, 9));
 	CHECK_EQ(file.patches, CHEATFILE_PICKED_PATCHES_MAX);
 	CHECK(cheatfile_toggle(&file, 1));  // dropped: room again
-	CHECK_EQ(file.patches, 156);
-	CHECK_EQ(cheatfile_why(&file, 2), CHEATFILE_PICKABLE);
+	CHECK_EQ(file.patches, 1792);
+	CHECK_EQ(cheatfile_why(&file, 8), CHEATFILE_PICKABLE);
 	// Decoded again, the running total holds
 	cheatfile_begin(&work);
 	while (cheatfile_next(&file, &work) >= 0)
 		;
-	CHECK_EQ(file.patches, 156);
-	// One cheat of the most ROM patches a cheat may have fits alone
-	CHECK_EQ(CHEATFILE_PICKED_PATCHES_MAX, CHEATFILE_PATCHES_MAX);
+	CHECK_EQ(file.patches, 1792);
+	CHECK_EQ(CHEATFILE_PICKED_PATCHES_MAX, 2048);
 }
 
 // A pick's enable line counts against the file's cap: a pick the card

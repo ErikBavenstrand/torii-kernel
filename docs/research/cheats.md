@@ -77,9 +77,17 @@ its frontend, or a flash cart can't do what the device did:
   conditional without an ELSE guards, which runs only while it holds (a
   button, say). Both caps are one number per cheat, its load
   (`CHEAT_LOAD`, `cheatcode.h`); a cheat over either alone is "too big". Each of the 6,161 libretro GBA cheats that read
-  and lower fits alone (`just cheat-corpus`, 2026-10-26). Their ROM patches
-  together are 256 at most (a cheat's own limit, so any one fits), kept in
-  EWRAM across the game's load; the cheat screen refuses a pick past that
+  and lower fits alone (`just cheat-corpus`, 2026-10-26). ROM patches
+  cost nothing in game and take no place in the table (v0.10): in a cheat
+  with conditionals, a conditional's counts leave out the patches it covers,
+  so it covers the same ops; one stays as a step that does nothing where a
+  conditional covers only patches, so it still tests. A cheat has 256 ROM
+  patches at most (its decoded ops are 256 at most too, and an Action
+  Replay v3 patch is an op: the decoder's work fills pReadCache's cheat
+  share); the picked cheats together 2,048 halfwords (4 KB), kept in cart
+  SRAM page `0xF0` across the game's load (24 KB at `0xF2000`; EWRAM has no
+  room) and written into the game in about 2.2 M cycles (130 ms, the
+  emulated cart, 2,048 of them); the cheat screen refuses a pick past that
   rather than a launch applying part of a cheat. A pick whose enable line
   would take a window of the file past 192 KB is refused too, as it
   couldn't be saved. A false conditional's walk past the ops it guards
