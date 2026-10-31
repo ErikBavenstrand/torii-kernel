@@ -25,7 +25,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
-from cheat_encode import CB, VBA, Code, PARRaw as AR  # noqa: E402
+from cheat_encode import CB, VBA, Code
+from cheat_encode import PARRaw as AR
 
 DATA = json.loads(
     (Path(__file__).with_name("emerald.json")).read_text(encoding="utf-8")
@@ -89,32 +90,33 @@ def text(s):
 
 # --- Script assembler ---------------------------------------------------------
 
-OP = dict(
-    end=0x02,
-    goto=0x05,
-    goto_if=0x06,
-    callstd=0x09,
-    setvar=0x16,
-    setorcopyvar=0x1A,
-    compare=0x21,
-    callnative=0x23,
-    special=0x25,
-    waitstate=0x27,
-    setflag=0x29,
-    clearflag=0x2A,
-    warp=0x39,
-    waitmessage=0x66,
-    message=0x67,
-    closemessage=0x68,
-    lockall=0x69,
-    releaseall=0x6B,
-    waitbuttonpress=0x6D,
-    multichoice=0x6F,
-    givemon=0x79,
-    giveegg=0x7A,
-    bufferspeciesname=0x7D,
-    pokemart=0x86,
-)
+OP = {
+    "end": 0x02,
+    "goto": 0x05,
+    "goto_if": 0x06,
+    "callstd": 0x09,
+    "setvar": 0x16,
+    "setorcopyvar": 0x1A,
+    "compare": 0x21,
+    "callnative": 0x23,
+    "special": 0x25,
+    "waitstate": 0x27,
+    "setflag": 0x29,
+    "clearflag": 0x2A,
+    "warp": 0x39,
+    "waitmessage": 0x66,
+    "message": 0x67,
+    "closemessage": 0x68,
+    "lockall": 0x69,
+    "releaseall": 0x6B,
+    "waitbuttonpress": 0x6D,
+    "checkitem": 0x47,
+    "multichoice": 0x6F,
+    "givemon": 0x79,
+    "giveegg": 0x7A,
+    "bufferspeciesname": 0x7D,
+    "pokemart": 0x86,
+}
 VAR_RESULT, VAR_8000, VAR_8001, VAR_8004, VAR_8005 = (
     0x800D,
     0x8000,
@@ -122,12 +124,12 @@ VAR_RESULT, VAR_8000, VAR_8001, VAR_8004, VAR_8005 = (
     0x8004,
     0x8005,
 )
-SPECIAL = dict(
-    HealPlayerParty=1,
-    ChooseMonForMoveRelearner=223,
-    TeachMoveRelearnerMove=228,
-    IsSelectedMonEgg=331,
-)
+SPECIAL = {
+    "HealPlayerParty": 1,
+    "ChooseMonForMoveRelearner": 223,
+    "TeachMoveRelearnerMove": 228,
+    "IsSelectedMonEgg": 331,
+}
 PC_SCRIPT = (
     0x08271D9B  # EventScript_PC past its turn-on effect (GameHacking's "Access PC")
 )
@@ -195,6 +197,7 @@ class Blob:
         self.cmd("message", ("p", label))
         self.cmd("waitmessage")
         self.cmd("waitbuttonpress")
+        self.cmd("closemessage")
 
 
 class Menus:
@@ -281,7 +284,18 @@ def trigger(code, blocks):
 
 
 def keys(*names):
-    bit = dict(A=0, B=1, SELECT=2, START=3, RIGHT=4, LEFT=5, UP=6, DOWN=7, R=8, L=9)
+    bit = {
+        "A": 0,
+        "B": 1,
+        "SELECT": 2,
+        "START": 3,
+        "RIGHT": 4,
+        "LEFT": 5,
+        "UP": 6,
+        "DOWN": 7,
+        "R": 8,
+        "L": 9,
+    }
     v = 0x3FF
     for n in names:
         v &= ~(1 << bit[n])
@@ -293,6 +307,27 @@ def rom_code(patches, code=None):
     for k, (a, v) in enumerate(patches):
         code += AR.rom_patch(k % 4 + 1, a, v)
     return code
+
+
+class Mixed:
+    """A cheat whose ROM data is VBA lines (a word a line) and whose trigger is
+    Action Replay v3: no cheatN_format line, as each line's shape says its format"""
+
+    fmt = None
+
+    def __init__(self, patches, trigger_code):
+        lines, have = [], dict(patches)
+        for a in sorted(have):
+            if a not in have:
+                continue
+            if a % 4 == 0 and a + 2 in have:
+                lines.append(f"{a:08X}:{have.pop(a + 2) << 16 | have.pop(a):08X}")
+            else:
+                lines.append(f"{a:08X}:{have.pop(a):04X}")
+        self.lines, self.trigger = lines, trigger_code
+
+    def text(self):
+        return "+".join(self.lines) + "+" + self.trigger.text()
 
 
 def words(pairs):
@@ -308,20 +343,87 @@ def words(pairs):
 # --- The menus ---------------------------------------------------------------
 
 MART = {
-    "MEDICINE": "POTION SUPER_POTION HYPER_POTION MAX_POTION FULL_RESTORE REVIVE MAX_REVIVE ANTIDOTE "
-    "PARALYZE_HEAL AWAKENING BURN_HEAL ICE_HEAL FULL_HEAL ETHER MAX_ETHER ELIXIR MAX_ELIXIR SACRED_ASH "
-    "BERRY_JUICE FRESH_WATER SODA_POP LEMONADE MOOMOO_MILK ENERGY_POWDER ENERGY_ROOT HEAL_POWDER "
-    "REVIVAL_HERB LAVA_COOKIE GUARD_SPEC DIRE_HIT X_ATTACK X_DEFEND X_SPEED X_ACCURACY X_SPECIAL REPEL "
-    "SUPER_REPEL MAX_REPEL ESCAPE_ROPE POKE_DOLL FLUFFY_TAIL".split(),
-    "BALLS": "POKE_BALL GREAT_BALL ULTRA_BALL MASTER_BALL SAFARI_BALL NET_BALL DIVE_BALL NEST_BALL "
-    "REPEAT_BALL TIMER_BALL LUXURY_BALL PREMIER_BALL".split(),
-    "TRAINING": "RARE_CANDY PP_UP PP_MAX HP_UP PROTEIN IRON CARBOS CALCIUM ZINC".split(),
+    "MEDICINE": [
+        "POTION",
+        "SUPER_POTION",
+        "HYPER_POTION",
+        "MAX_POTION",
+        "FULL_RESTORE",
+        "REVIVE",
+        "MAX_REVIVE",
+        "ANTIDOTE",
+        "PARALYZE_HEAL",
+        "AWAKENING",
+        "BURN_HEAL",
+        "ICE_HEAL",
+        "FULL_HEAL",
+        "ETHER",
+        "MAX_ETHER",
+        "ELIXIR",
+        "MAX_ELIXIR",
+        "SACRED_ASH",
+        "BERRY_JUICE",
+        "FRESH_WATER",
+        "SODA_POP",
+        "LEMONADE",
+        "MOOMOO_MILK",
+        "ENERGY_POWDER",
+        "ENERGY_ROOT",
+        "HEAL_POWDER",
+        "REVIVAL_HERB",
+        "LAVA_COOKIE",
+        "GUARD_SPEC",
+        "DIRE_HIT",
+        "X_ATTACK",
+        "X_DEFEND",
+        "X_SPEED",
+        "X_ACCURACY",
+        "X_SPECIAL",
+        "REPEL",
+        "SUPER_REPEL",
+        "MAX_REPEL",
+        "ESCAPE_ROPE",
+        "POKE_DOLL",
+        "FLUFFY_TAIL",
+    ],
+    "BALLS": [
+        "POKE_BALL",
+        "GREAT_BALL",
+        "ULTRA_BALL",
+        "MASTER_BALL",
+        "SAFARI_BALL",
+        "NET_BALL",
+        "DIVE_BALL",
+        "NEST_BALL",
+        "REPEAT_BALL",
+        "TIMER_BALL",
+        "LUXURY_BALL",
+        "PREMIER_BALL",
+    ],
+    "TRAINING": [
+        "RARE_CANDY",
+        "PP_UP",
+        "PP_MAX",
+        "HP_UP",
+        "PROTEIN",
+        "IRON",
+        "CARBOS",
+        "CALCIUM",
+        "ZINC",
+    ],
     "TMS & HMS": [
         k
         for k, v in sorted(DATA["items"].items(), key=lambda x: x[1][0])
         if v[3] == "TM_HM"
     ],
-    "HELD ITEMS": "SUN_STONE MOON_STONE FIRE_STONE THUNDER_STONE WATER_STONE LEAF_STONE".split()
+    "HELD ITEMS": [
+        "SUN_STONE",
+        "MOON_STONE",
+        "FIRE_STONE",
+        "THUNDER_STONE",
+        "WATER_STONE",
+        "LEAF_STONE",
+    ]
     + [
         k
         for k, v in sorted(DATA["items"].items(), key=lambda x: x[1][0])
@@ -332,8 +434,22 @@ MART = {
         for k, v in sorted(DATA["items"].items(), key=lambda x: x[1][0])
         if v[3] == "BERRIES"
     ],
-    "VALUABLES": "TINY_MUSHROOM BIG_MUSHROOM PEARL BIG_PEARL STARDUST STAR_PIECE NUGGET HEART_SCALE "
-    "RED_SHARD BLUE_SHARD YELLOW_SHARD GREEN_SHARD SHOAL_SALT SHOAL_SHELL".split(),
+    "VALUABLES": [
+        "TINY_MUSHROOM",
+        "BIG_MUSHROOM",
+        "PEARL",
+        "BIG_PEARL",
+        "STARDUST",
+        "STAR_PIECE",
+        "NUGGET",
+        "HEART_SCALE",
+        "RED_SHARD",
+        "BLUE_SHARD",
+        "YELLOW_SHARD",
+        "GREEN_SHARD",
+        "SHOAL_SALT",
+        "SHOAL_SHELL",
+    ],
 }
 TICKETS = [  # name, item, the ferry flag its event sets (FLAG_ENABLE_SHIP_*)
     ("EON TICKET", "EON_TICKET", 0x8B3),
@@ -366,10 +482,15 @@ def item_menu():
     for i, (_, item, flag) in enumerate(TICKETS):
         s.label("tk" + str(i))
         s.cmd("setflag", ("h", flag))
+        s.cmd("checkitem", ("h", ITEM[item]), ("h", 1))
+        s.when(VAR_RESULT, 1, "have")  # one is enough: the flag is what opens the ferry
         s.cmd("setorcopyvar", ("h", VAR_8000), ("h", ITEM[item]))
         s.cmd("setorcopyvar", ("h", VAR_8001), ("h", 1))
         s.cmd("callstd", ("b", 0))  # STD_OBTAIN_ITEM: "Obtained the EON TICKET!"
         s.goto("tickets")
+    s.label("have")
+    s.say(m.t("You have it, and the ferry will take you."))
+    s.goto("tickets")
     s.align(2)
     for i, items in enumerate(MART.values()):
         s.label("list" + str(i))
@@ -587,10 +708,33 @@ def field_menu():
 
 # --- The cheats --------------------------------------------------------------
 
-NATURES = (
-    "Hardy Lonely Brave Adamant Naughty Bold Docile Relaxed Impish Lax Timid Hasty Serious Jolly "
-    "Naive Modest Mild Quiet Bashful Rash Calm Gentle Sassy Careful Quirky"
-).split()
+NATURES = [
+    "Hardy",
+    "Lonely",
+    "Brave",
+    "Adamant",
+    "Naughty",
+    "Bold",
+    "Docile",
+    "Relaxed",
+    "Impish",
+    "Lax",
+    "Timid",
+    "Hasty",
+    "Serious",
+    "Jolly",
+    "Naive",
+    "Modest",
+    "Mild",
+    "Quiet",
+    "Bashful",
+    "Rash",
+    "Calm",
+    "Gentle",
+    "Sassy",
+    "Careful",
+    "Quirky",
+]
 LAUNCH = "Set when the game starts: pick it on the Cheats screen before you play."
 
 
@@ -677,8 +821,9 @@ def cheats():
 
     # The menus (D9, D15-D23)
     items, items_at = item_menu()
-    code = rom_code(items)
+    code = Code(AR)
     trigger(code, [(keys("L", "R", "B"), items_at)])
+    code = Mixed(items, code)
     out.append(
         Cheat(
             "Menus",
@@ -690,7 +835,7 @@ def cheats():
         )
     )
     field, at = field_menu()
-    code = rom_code(field)
+    code = Code(AR)
     trigger(
         code,
         [
@@ -701,6 +846,7 @@ def cheats():
             (keys("L", "R", "RIGHT"), at["moves"]),
         ],
     )
+    code = Mixed(field, code)
     out.append(
         Cheat(
             "Menus",
@@ -764,7 +910,8 @@ def cheats():
             "Pokémon",
             f"Nature: {nature}",
             rom_code([(0x08067EAE, 0x2500 | n)]),
-            f"New wild, gift and egg Pokémon are {nature}. " + LAUNCH,
+            f"New wild, gift and egg Pokémon are {nature}. Shiny and Wild gender pick the personality themselves and win over it. "
+            + LAUNCH,
             "launch",
         )
     for name, v in (("Male", 0x21FF), ("Female", 0x2100)):
@@ -923,7 +1070,7 @@ def cheats():
     add(
         "Overworld",
         "Walk through walls (hold R)",
-        rom_code(walls()),
+        vba(*Mixed(walls(), None).lines),
         "Hold R to walk through walls, people and water edges. Let go on normal ground; if you're stuck, hold R "
         "and walk back. " + LAUNCH,
         "launch",
@@ -1002,15 +1149,20 @@ def walls():
     return [
         (0x08002170 + i, int.from_bytes(stub[i : i + 2], "little"))
         for i in range(0, len(stub), 2)
-    ] + [(0x0808B0C0, 0xF777), (0x0808B0C2, 0xF856)]
+    ] + [(0x0808B0C0 + i, int.from_bytes(hook[i : i + 2], "little")) for i in (0, 2)]
 
 
 def main():
+    """With --emulators: the copy for mGBA and RetroArch, without the cheats
+    only Torii runs (the menus, whose code lines pass mGBA's 512 characters
+    and fail the whole file there, and the keyed money and coins)"""
+    emulators = "--emulators" in sys.argv[1:]
     cs = cheats()
-    lines = [
-        "# Torii's golden cheats for Pokemon - Emerald Version (USA, Europe), CRC32 1F1C08FB.",
-        "# Made by tools/golden/emerald.py; chosen and tested as docs/research/cheats-emerald-curation.md says.",
-        "# Install: /torii/cheats/<the ROM's path>.cht on the card, e.g. /torii/cheats/Pokemon - Emerald.gba.cht",
+    if emulators:
+        cs = [
+            c for c in cs if not (isinstance(c.code, Mixed) or "Torii only" in c.guide)
+        ]
+    lines = [  # no comments: mGBA reads a file only while every line starts with "cheat"
         f"cheats = {len(cs)}",
         "",
     ]
@@ -1018,7 +1170,8 @@ def main():
     for i, c in enumerate(cs):
         lines.append(f'cheat{i}_desc = "{c.name}"')
         lines.append(f'cheat{i}_code = "{c.code.text()}"')
-        lines.append(f'cheat{i}_format = "{fmt[c.code.fmt]}"')
+        if c.code.fmt:
+            lines.append(f'cheat{i}_format = "{fmt[c.code.fmt]}"')
         lines.append(f'cheat{i}_folder = "{c.folder}"')
         if c.keys:
             lines.append(f'cheat{i}_keys = "{c.keys}"')
