@@ -4,7 +4,7 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.9.9
 
 - **Added:** the cheat search's filters Up by and Down by an amount, More
   than, Less than and From one number to another; Negative numbers, which
