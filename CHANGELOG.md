@@ -14,6 +14,10 @@ git log, not here.
   after it, so a long game name no longer hides it; picking a choice goes
   back to its row; a folder that is one choice group opens straight to it
   and shows its pick; a folder with cheats on is ticked (dc61506b).
+- **Changed:** rows that open a list or page (cheat folders and choices, SD
+  card folders, Game saves' games and folders, Info's rows) end in an arrow;
+  a cheat folder's title shows a folder icon; a cut title, popup title or
+  page heading scrolls to its end, as a list's cut name does (01c3d073).
 
 ## v0.9.10
 
