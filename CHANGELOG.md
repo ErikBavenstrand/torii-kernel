@@ -27,9 +27,12 @@ git log, not here.
   changed, went up, went down or equals a typed number (8, 16 or 32 bits),
   lists the last 32 and keeps one as a cheat, on at once, which Back to
   Torii files as "Found ADDRESS" (7b5f6228).
-- **Changed:** the game's stack sits 32 bytes lower for the found cheats'
-  live block, and the in-game menu loads its screenshot, DEBUG and search
+- **Changed:** the in-game menu loads its screenshot, DEBUG and search
   code only when used, so it opens copying less than before (7b5f6228).
+  A game whose stack starts at the BIOS's default (0x03007F00) has it 32
+  bytes lower for the found cheats' live block; others keep it where it was
+  and set a found cheat once, as Street Fighter Alpha 3 crashed with it
+  lower (7b5f6228, 977c7823).
 - **Fixed:** found cheats the card didn't take wait for the next boot, as
   intended (the boot's answer was cleared, so they were lost); a cheat kept
   on now, then kept again, is filed picked (8d9f3c03).

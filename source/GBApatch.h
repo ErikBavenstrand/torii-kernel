@@ -35,6 +35,13 @@ extern void Cheat_live(void);
 // Where this launch's live block is (ingame_abi.h): 0 when it has none (no
 // interpreter, or no spend area found), and before any launch patched
 extern u32 cheat_live_at;
+// The game's stack literal (its crt0's "ldr sp" after setting System mode)
+// lowered for the in-game menu's spend area, and the live block's 32 bytes
+// more when the top is SPEND_LIVE_TOP (spend_live 1); the spend area's
+// address, or 0 if none was found. Data is the ROM's start.
+#define SPEND_LIVE_TOP 0x03007F00u
+extern u32 spend_live;
+u32 Get_spend_address(u32 *Data);
 // Runs the table once, but the cheats whose bit of the off mask is set
 void Cheat_run(const u32 *table, u32 off_lo, u32 off_hi, u32 once);
 

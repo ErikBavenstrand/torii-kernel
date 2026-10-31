@@ -71,7 +71,7 @@ The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-re
 - **Sleep:** Pokémon Emerald's sleep stayed black on the real cart, and START+SELECT didn't wake it. It could be the real BIOS or the cart during Stop (`omega-de-hardware.md`); find out on the cart first.
 - **Sound after LOAD (1.0?):** games on Nintendo's MP2000 engine keep the PCM buffer's position in RAM, which could re-sync DMA1 at LOAD.
 - **Cheat search (built on `claude/cheat-search-5360ad`, not merged; [design](../design/v0.9/cheat-search.md)):** an in-game RAM finder that keeps what it finds as cheats. Reviewed 2026-10-31 (a code reviewer and an adversarial tester in the emulator). Fixed from the review: found cheats whose filing failed weren't retried, a cheat kept on and then kept again was filed unpicked, and two footers. Open:
-  - **Contestable decisions:** it borrows the save-state buffer (no other cart SRAM has 288 KB), so a state not yet on the card blocks it and saving a state ends it; every game's stack is 32 bytes lower for the live block, which compat passes; the Cheat search row is on the Cheats page when the game has a cheat list (the menu has room for nine rows); the menu's lines past the seventh draw a frame later, with the footer.
+  - **Contestable decisions:** it borrows the save-state buffer (no other cart SRAM has 288 KB), so a state not yet on the card blocks it and saving a state ends it; a game whose stack top is the BIOS's default (`0x03007F00`) gets its stack 32 bytes lower for the live block, others none (Street Fighter Alpha 3, top `0x03007EC0`, crashed with it: "on now" sets the value once there); the Cheat search row is on the Cheats page when the game has a cheat list (the menu has room for nine rows); the menu's lines past the seventh draw a frame later, with the footer.
   - **Not done:** naming a found cheat in game (the overlay has no font or keyboard: rename it on the Cheats page); signed compares, "changed by N" and more than one Undo; VRAM, palette and OAM searches.
   - **Untested:** a card write that fails while filing (the records wait for the next boot); a 32-bit search with large values and 16 different addresses kept, in the emulator.
 - **States that survive a power-off (1.0?, research):** point the FPGA's `/RTS` write-back of cart SRAM at a per-game file. Watch out: with a crosslinked FAT the write-back would land in both files.
@@ -102,7 +102,7 @@ The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-re
 
 The steps are in `docs/release-checklist.md`.
 
-- **Cheat search, before it ships:** a search in a game with a flash save and one with an EEPROM save (Pokémon Emerald's lives or money); "on now" holding a value; the found cheat filed on Back to Torii; a screenshot after a search in the same menu (the overlay's on-demand code); that games still boot and save with their stack 32 bytes lower.
+- **Cheat search, before it ships:** a search in a game with a flash save and one with an EEPROM save (Pokémon Emerald's lives or money); "on now" holding a value; the found cheat filed on Back to Torii; a screenshot after a search in the same menu (the overlay's on-demand code); that games with the default stack top still boot and save with it 32 bytes lower.
 - **New in v0.9:** Swedish from `torii-lang.zip`; the firmware screens on an up-to-date cart (none should show); About's raw version word. Record the raw word, so the allowlist can be narrowed.
 - **v0.8 still to check:**
   - In-game menu Off, and custom menu keys.

@@ -46,6 +46,41 @@ void test_cheat_cap(void)
 	CHECK(cheatstore_path(path, sizeof(path), rom) > 0);
 }
 
+// A crt0's System-mode stack set up, as Get_spend_address finds it: mov
+// r0,#0x1F; msr cpsr_fc,r0; ldr sp,[pc,#8] (the literal at word 6), and a
+// second ldr sp of the same literal's value (a game reloading its top,
+// Crash Nitro Kart's case)
+static u32 spend_rom(u32 *rom, u32 top)
+{
+	memset(rom, 0, 32 * 4);
+	rom[0] = 0xE3A0001F;
+	rom[1] = 0xE129F000;
+	rom[2] = 0xE59FD000 | 8;
+	rom[6] = top;
+	rom[3] = 0xE59FD000 | 20;  // its literal at word 10
+	rom[10] = top;
+	return Get_spend_address(rom);
+}
+
+// The spend area takes 0x80 bytes under the game's stack top, and the
+// cheat search's live block 0x20 more only under the BIOS's default top:
+// Street Fighter Alpha 3 (top 0x03007EC0) crashed with them (v0.9)
+void test_spend_lowering(void)
+{
+	static u32 rom[32];
+	CHECK_EQ(spend_rom(rom, SPEND_LIVE_TOP), SPEND_LIVE_TOP - INGAME_SPEND_BYTES - INGAME_LIVE_BYTES);
+	CHECK_EQ(spend_live, 1);
+	CHECK_EQ(rom[6], SPEND_LIVE_TOP - INGAME_SPEND_BYTES - INGAME_LIVE_BYTES);
+	CHECK_EQ(rom[10], rom[6]);
+	CHECK_EQ(spend_rom(rom, 0x03007EC0), 0x03007EC0 - INGAME_SPEND_BYTES);
+	CHECK_EQ(spend_live, 0);
+	CHECK_EQ(rom[10], 0x03007EC0 - INGAME_SPEND_BYTES);
+	CHECK_EQ(spend_rom(rom, 0x0203FFFC), 0x0203FFFC - INGAME_SPEND_BYTES);
+	CHECK_EQ(spend_live, 0);
+	CHECK_EQ(spend_rom(rom, 0x03007E00), 0);  // a top too low: none
+	CHECK_EQ(spend_live, 0);
+}
+
 void test_menu_code_fits(void)
 {
 	// The in-game menu's code goes in the space SetTrimSize keeps free with

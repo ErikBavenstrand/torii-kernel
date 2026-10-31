@@ -47,6 +47,7 @@ u32 iCount2;
 
 u32 spend_address;
 u32 cheat_live_at;
+u32 spend_live;
 static const char *patch_kind;  //Torii: for Log_patches
 static u32 patch_room;          //Torii: the bytes at iTrimSize the patch may use
 static u32 rom_bytes;           //Torii: the game's size in PSRAM (GBApatch_PSRAM)
@@ -605,7 +606,7 @@ static void Patch_RTS_Cheat(u32 *Data)
 			dmaCopy((void *)Cheat_blob_start, patchbuffer + copysize, code);
 			dmaCopy(gl_cheat_table, patchbuffer + copysize + code, gl_cheat_bytes);
 			//Torii (v0.9): the live block after the spend area, if there is one
-			if (spend_address)
+			if (spend_address && spend_live)
 				cheat_live_at = spend_address + INGAME_SPEND_BYTES;
 			*(vu32 *)(patchbuffer + copysize + ((u8 *)Cheat_live - (u8 *)Cheat_blob_start)) = cheat_live_at;
 			cheat_at = copysize;
@@ -634,9 +635,10 @@ void GBApatch_Cleanrom(u32 *address, int filesize)//Only once
 	//Check_Fire_Emblem();
 }
 //------------------------------------------------------------------
-static u32 Get_spend_address(u32 *Data)
+u32 Get_spend_address(u32 *Data)
 {
 	u32 ii;
+	spend_live = 0;
 	u32 offset;
 	u32 updown;
 
@@ -664,12 +666,17 @@ static u32 Get_spend_address(u32 *Data)
 	else
 		address = 0;
 
-	//Torii (v0.9): the spend area, then the cheat search's live block
-	//(ingame_abi.h), between the game's stack and its old top
-	const u32 lower = INGAME_SPEND_BYTES + INGAME_LIVE_BYTES;
 	if ((Data[address / 4] > 0x03007E80) /*|| (Data[address/4] == 0x03007E00)*/ ||
 	    (Data[address / 4] == 0x0203FFFC)) {
 		u32 top = Data[address / 4];
+		//Torii (v0.9): the spend area, then the cheat search's live block
+		//(ingame_abi.h), between the game's stack and its old top; the
+		//live block only under the BIOS's default top, 0x03007F00, where
+		//every game compat runs has room. Its 32 bytes more of stack
+		//crashed Street Fighter Alpha 3, whose top is 0x03007EC0: other
+		//tops keep v0.9.6's lowering, and their found cheats are set once.
+		spend_live = top == SPEND_LIVE_TOP;
+		const u32 lower = INGAME_SPEND_BYTES + (spend_live ? INGAME_LIVE_BYTES : 0);
 		Data[address / 4] = top - lower;
 		//Torii: a later "ldr sp,[pc,#n]" of the same stack top would put the
 		//stack back over the in-game menu's save area (Crash Nitro Kart reloads
