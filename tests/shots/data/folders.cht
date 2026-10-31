@@ -1,0 +1,69 @@
+cheats = 14
+
+cheat0_desc = "Infinite HP"
+cheat0_code = "32001000 0063"
+cheat0_enable = false
+
+cheat1_desc = "Items: Master Ball ×99"
+cheat1_code = "32001010 0063"
+cheat1_enable = false
+cheat1_folder = "Items"
+
+cheat2_desc = "Items: Item ×99 - Rare Candy"
+cheat2_code = "32001004 0044"
+cheat2_enable = true
+cheat2_folder = "Items"
+
+cheat3_desc = "Items: Item ×99 - PP Up"
+cheat3_code = "32001004 0045"
+cheat3_enable = false
+cheat3_folder = "Items"
+
+cheat4_desc = "Items: Item ×99 - Nugget"
+cheat4_code = "32001004 0056"
+cheat4_enable = false
+cheat4_folder = "Items"
+
+cheat5_desc = "Items: Infinite money"
+cheat5_code = "82001008+FFFF"
+cheat5_enable = false
+cheat5_folder = "Items"
+
+cheat6_desc = "Wild: Shiny"
+cheat6_code = "3200100C 0001"
+cheat6_enable = false
+cheat6_folder = "Wild"
+
+cheat7_desc = "Wild: Level 100"
+cheat7_code = "32001014 0064"
+cheat7_enable = false
+cheat7_folder = "Wild"
+
+cheat8_desc = "Wild: Mew"
+cheat8_code = "32001016 0097"
+cheat8_enable = false
+cheat8_folder = "Wild"
+
+cheat9_desc = "Starter: Treecko"
+cheat9_code = "3200101C 0115"
+cheat9_enable = false
+cheat9_folder = "Starter"
+
+cheat10_desc = "Starter: Torchic"
+cheat10_code = "3200101C 0118"
+cheat10_enable = false
+cheat10_folder = "Starter"
+
+cheat11_desc = "Starter: Mudkip"
+cheat11_code = "3200101C 0121"
+cheat11_enable = false
+cheat11_folder = "Starter"
+
+cheat12_desc = "Legendaries & Mythicals: Latios"
+cheat12_code = "3200101E 0001"
+cheat12_enable = false
+cheat12_folder = "Legendaries & Mythicals"
+
+cheat13_desc = "Walk through walls"
+cheat13_code = "32001018 0001"
+cheat13_enable = false

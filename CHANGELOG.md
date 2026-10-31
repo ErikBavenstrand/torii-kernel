@@ -4,6 +4,31 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Added:** cheat folders: a file's `cheatN_folder = "Items"` folds
+  adjacent cheats into one row on the Cheats screen, which A opens; choice
+  groups fold inside it, and any number of its cheats can be on (6b51eec2).
+- **Changed:** the Cheats screen's title names where you are (a folder, a
+  choice group, Picked, the Guide or Buttons page), the place one up faint
+  after it, so a long game name no longer hides it; picking a choice goes
+  back to its row; a folder that is one choice group opens straight to it
+  and shows its pick; a folder with cheats on is ticked (dc61506b).
+- **Changed:** rows that open a list or page (cheat folders and choices, SD
+  card folders, Game saves' games and folders, Info's rows) end in an arrow;
+  a cheat folder's title shows a folder icon; a cut title, popup title or
+  page heading scrolls to its end, as a list's cut name does (01c3d073).
+- **Fixed:** a hint-bar line too long for the bar (a greyed cheat's reason,
+  mostly in Swedish) scrolls instead of being cut; the Cheats screen no
+  longer starts past a folder whose first cheat is greyed (58987af4).
+- **Changed:** ROM patches cost nothing in game: a cheat with conditionals
+  kept each as a step that does nothing, so many ROM patches and a key test
+  were refused as too big; now a conditional's counts leave them out and it
+  covers the same ops as on the device (b83ce966).
+- **Changed:** the picked cheats' ROM patches together go from 256 to 2,048
+  halfwords (4 KB), kept in cart SRAM between a launch's passes rather than
+  EWRAM, which gains 2.8 KB; a cheat still has 256 at most (bc724f0c).
+
 ## v0.9.10
 
 - **Added:** the cheat search reads BCD scores (Stored as: BCD, 1234 kept

@@ -18,6 +18,7 @@ struct slot_list_row {
 	const char *text;    // UTF-8, copied by pointer: it must outlive the call
 	const char *detail;  // right-aligned, faint (a size); NULL none
 	u8 mark;             // ART_ICON8_* + 1 before the text; 0 none
+	u8 more;             // 1: A opens it (a folder): a chevron at the right (ui_item.more)
 };
 
 struct slot_list {

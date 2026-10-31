@@ -95,7 +95,7 @@ static const struct ui_hints_config hints_config = {0, 0};
 static const struct ui_card_config lcard = {4, 0, 4, 4, 0};
 static const struct ui_card_config rcard = {0, 0, 4, 4, 0};
 static const struct ui_scrollbar_config bar = {N_LIST};
-static const struct ui_label_config head_label = {"", UI_FONT_HEADING, UI_ALIGN_LEFT, UI_LABEL_SWAP, 0};
+static const struct ui_label_config head_label = {"", UI_FONT_HEADING, UI_ALIGN_LEFT, UI_LABEL_MARQUEE, 0};
 // One tile set for the texts that change seldom (the tag, the keys, the
 // note): plane 3's tiles are the title's and hints' too
 static const struct ui_label_config tag_label = {"", UI_FONT_BODY, UI_ALIGN_LEFT, 0, 0};

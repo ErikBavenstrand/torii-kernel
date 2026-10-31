@@ -92,13 +92,16 @@ static u8 rnd_width(void)
 	return widths[rnd(3)];
 }
 
+// 1 in patch_odds ops a ROM patch, on top of random_op's own (0: none)
+static u32 patch_odds;
+
 // One random op
 static void random_op(struct cheat_op *op)
 {
 	static const u8 conds[] = {CHEAT_OP_IF_EQ,    CHEAT_OP_IF_NE,    CHEAT_OP_IF_LT,  CHEAT_OP_IF_GT,
 				   CHEAT_OP_IF_ULT,   CHEAT_OP_IF_UGT,   CHEAT_OP_IF_AND, CHEAT_OP_IF_NAND,
 				   CHEAT_OP_IF_NEVER, CHEAT_OP_IF_BUTTON};
-	u32 kind = rnd(22);
+	u32 kind = patch_odds && !rnd(patch_odds) ? 18 : rnd(22);
 	memset(op, 0, sizeof(*op));
 	op->width = rnd_width();
 	op->address = T_DATA + 0x40 + rnd(T_DATA_LEN - 0x80);
@@ -164,10 +167,10 @@ static void set_memory(void)
 	*(vu32 *)(T_PTRS + 12) = T_DATA + 0x2F3;
 }
 
-void test_cheatrun_matches_mgba(void)
+static void matches_mgba(u32 seed, u32 sets)
 {
-	u32 failures = 0, runs = 0, words = 0, n_patches, sets = 300;
-	rng = 0x7019C0DE;
+	u32 failures = 0, runs = 0, words = 0, n_patches;
+	rng = seed;
 	for (u32 set = 0; set < sets && failures < 3; set++) {
 		u32 cheats = 1 + rnd(4), n[4], pos = 0;
 		set_memory();
@@ -220,6 +223,21 @@ void test_cheatrun_matches_mgba(void)
 	tlog("cheatrun: %lu random cheat sets (%lu table words) ran as mGBA's", (unsigned long)runs,
 	     (unsigned long)words);
 	CHECK_EQ(failures, 0);
+}
+
+void test_cheatrun_matches_mgba(void)
+{
+	patch_odds = 0;
+	matches_mgba(0x7019C0DE, 300);
+}
+
+// ROM patches take no place in the table (cheat_lower): with many of them
+// inside conditionals' reach, the conditionals still cover what mGBA's do
+void test_cheatrun_rom_patches(void)
+{
+	patch_odds = 2;
+	matches_mgba(0x0BADC0DE, 150);
+	patch_odds = 0;
 }
 
 // --- Cycles -----------------------------------------------------------------

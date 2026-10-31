@@ -629,6 +629,8 @@ const char *const lang_en[STR_COUNT] = {
 	"{1} choice",  // cheats.choices.one
 	"{1} choices",  // cheats.choices.other
 	"Pick one",  // cheats.choices_sub
+	"{1} cheat",  // cheats.folder.one
+	"{1} cheats",  // cheats.folder.other
 	"{1}/{2}",  // cheats.position
 	"{1} on",  // cheats.picks
 	"Guide",  // cheats.guide_sub

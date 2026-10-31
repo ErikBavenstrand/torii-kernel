@@ -23,6 +23,7 @@ static const struct {
 	{"file_type_short_names", test_file_type_short_names},
 	{"cheat_cap", test_cheat_cap},
 	{"cheatrun_matches_mgba", test_cheatrun_matches_mgba},
+	{"cheatrun_rom_patches", test_cheatrun_rom_patches},
 	{"cheatrun_cycles", test_cheatrun_cycles},
 	{"cheatrun_off", test_cheatrun_off},
 	{"cheatrun_once", test_cheatrun_once},

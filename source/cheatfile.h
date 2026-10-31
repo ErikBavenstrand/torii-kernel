@@ -26,7 +26,8 @@
 // cart, which may be edited and deleted there. "cheatN_keys" says how the cheat is
 // activated ("hold L+Select", cheatkeys.h) and "cheatN_guide" what it does
 // and how to use it (free text, "\n" a paragraph break), both set on the
-// cart (cheatfile_set_keys, _set_guide). The keypad's edits
+// cart (cheatfile_set_keys, _set_guide). "cheatN_folder" is the heading the
+// cheat shows under (cheatfile_folder): set in the file only. The keypad's edits
 // (cheatfile_add, _set_code, _remove) change the text in place, through a
 // struct cheatfile_room (the card side's text is in PSRAM, which takes no
 // byte stores), and read it again.
@@ -51,10 +52,14 @@
 #define CHEATFILE_CYCLES_MAX (CHEAT_LOAD_MAX - CHEAT_LOAD(CHEAT_COST_CALL))
 #define CHEATFILE_PROG_MAX (CHEATFILE_BYTES_MAX / 4)  // a cheat's table words
 #define CHEATFILE_OPS_MAX 256      // a cheat's decoded ops
-#define CHEATFILE_PATCHES_MAX 256  // a cheat's ROM patches
+// A cheat's ROM patches: the decoder's work (struct cheatfile_work) lives in
+// pReadCache's cheat share, which has no room for more (and its ops cap an
+// Action Replay v3 cheat, a ROM patch an op, a little lower)
+#define CHEATFILE_PATCHES_MAX 256
 // The picked cheats' ROM patches together: what a launch keeps for the game
-// (cheatstore.h's CHEATSTORE_ROM_PATCHES), so any one legal cheat fits
-#define CHEATFILE_PICKED_PATCHES_MAX CHEATFILE_PATCHES_MAX
+// (cheatstore.h's CHEATSTORE_ROM_PATCHES, in cart SRAM), 4 KB of ROM data
+#define CHEATFILE_PICKED_PATCHES_MAX 2048
+_Static_assert(CHEATFILE_PICKED_PATCHES_MAX >= CHEATFILE_PATCHES_MAX, "any one legal cheat fits");
 #define CHEATFILE_NONE 0xFFFFFFFFu  // no such line (or cheat)
 #define CHEATFILE_VALUE_MAX 0xFFFF  // a longer value isn't read: its line counts for nothing
 
@@ -99,7 +104,8 @@ struct cheatfile_cheat {
 	u16 number;          // its N
 	u16 bytes;           // its share of the interpreter's table once decoded (OK only)
 	u16 cost;            // its cycles a frame, at most (OK only)
-	u16 patches;         // ROM patches once decoded (OK only)
+	u16 patches : 9;     // ROM patches once decoded (OK only; at most CHEATFILE_PATCHES_MAX)
+	u16 folder : 7;      // cheatN_folder's (the last line's): its entry in the file's folders + 1, 0 none
 	u16 keys;            // cheatN_keys' value (cheatkeys.h), 0: no line or not a value
 	u32 hash;            // its table part's and patches' hash once decoded (OK only; else 0)
 	u8 picked : 1;       // now
@@ -140,6 +146,18 @@ static inline u32 cheatfile_guide_len(const struct cheatfile_cheat *c)
 {
 	return c->guide == CHEATFILE_NONE ? 0 : c->guide & CHEATFILE_GUIDE_LEN_MAX;
 }
+
+_Static_assert(CHEATFILE_PATCHES_MAX < 1u << 9, "a cheat's patches fit their bits");
+
+// A folder's name (cheatN_folder's value) is 1 to CHEATFILE_FOLDER_MAX
+// bytes of UTF-8 with no control character; any other leaves the cheat in
+// no folder. A text's names, each once, are its folders (struct cheatfile):
+// past CHEATFILE_FOLDERS of them, a cheat with another name is in none.
+#define CHEATFILE_FOLDER_MAX 24
+#define CHEATFILE_FOLDERS 127
+#define CHEATFILE_FOLDER_LEN_BITS 5
+_Static_assert(CHEATFILE_FOLDER_MAX < 1u << CHEATFILE_FOLDER_LEN_BITS, "a folder's length fits its bits");
+_Static_assert(CHEATFILE_FOLDERS < 1u << 7, "a folder's entry + 1 fits a cheat's bits");
 
 // What cheat c's code implies once decoded (cheatkeys.h), 0 before or if it can't tell
 static inline u16 cheatfile_derived(const struct cheatfile_cheat *c)
@@ -216,6 +234,8 @@ struct cheatfile {
 	u16 base;     // the first number the table takes: cheat N is entry N - base (0 but in a window)
 	u8 part;      // a window of a larger file: its count line (in the first) is left alone
 	u8 edited;    // an edit changed the text: write it back though no pick changed
+	u8 n_folders;
+	u32 folders[CHEATFILE_FOLDERS];  // the folders' names: text offset above length (CHEATFILE_FOLDER_LEN_BITS)
 	struct cheatfile_out out;
 };
 
@@ -328,6 +348,23 @@ u32 cheatfile_text(void *ctx, u32 pos, char *buf, u32 max);
 u32 cheatfile_text_len(const struct cheatfile *f);
 // After cheatfile_text was written to the card: the card has the picks
 void cheatfile_written(struct cheatfile *f);
+
+// Folders (cheatN_folder): cheat i's run of adjacent cheats with the same
+// folder, from the first (returned) to *end (past the last); one with no
+// folder is a run of 1. Known from the parse: no decoding needed. A run of
+// variants never crosses a folder's edge.
+u32 cheatfile_folder(const struct cheatfile *f, u32 i, u32 *end);
+// 1 if cheats a and b are in the same folder, or both in none
+static inline int cheatfile_same_folder(const struct cheatfile *f, u32 a, u32 b)
+{
+	return f->cheats[a].folder == f->cheats[b].folder;
+}
+// Cheat c's folder's name, its bytes in *len; NULL (and 0) in none
+const char *cheatfile_folder_name(const struct cheatfile *f, const struct cheatfile_cheat *c, u32 *len);
+// Where a name of len bytes shown in a folder of flen bytes starts: past
+// the folder's name and the marks after it ("Items: Master Ball" in Items is
+// "Master Ball"); 0 (the whole name) if it doesn't start so, or nothing is left
+u32 cheatfile_folder_part(const char *name, u32 len, const char *folder, u32 flen);
 
 // --- Edits (the code keypad's) ------------------------------------------------------
 //

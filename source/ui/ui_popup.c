@@ -329,6 +329,19 @@ static void pen_text(const struct pen *p, const struct torii_font *font, s32 x, 
 		text_draw_line(p->win, font, (u32)x, (u32)(y - p->line0), ink, &line);
 }
 
+// The same, from skip px of the text on: whole glyphs, no "..." (a
+// scrolled title)
+static void pen_text_from(const struct pen *p, const struct torii_font *font, s32 x, s32 y, u32 clip, u32 ink,
+			  const char *s, u32 skip)
+{
+	if (!s || !*s || !clip || x < 0 || y < p->ya || y + font->line_height > p->yb)
+		return;
+	struct text_line line;
+	u32 lead;
+	text_layout_window(font, s, strlen(s), skip, clip, &line, &lead);
+	text_draw_line(p->win, font, (u32)x + lead, (u32)(y - p->line0), ink, &line);
+}
+
 static void pen_icon8(const struct pen *p, s32 x, s32 y, u32 id, u32 ink)
 {
 	if (x >= 0 && y >= p->ya && y + 8 <= p->yb)
@@ -495,6 +508,11 @@ static struct {
 	u8 rows;      // items it shows
 	u8 titled;    // it shows its title (it has one, and room for it)
 	u16 redraw;   // rows to draw again, a bit each (row 0: the first shown)
+	// A title too long for the card scrolls, as a list's cut name does
+	// (the theme's marquee_*): TQ_*, px scrolled, frames to wait, and its
+	// line to draw again
+	u8 tq, tq_acc, tq_redraw;
+	u16 tq_px, tq_wait;
 	// The confirmation
 	const struct ui_confirm *ask;
 	u8 sel;            // 0 Cancel, 1 the action
@@ -730,8 +748,12 @@ static void popup_render(u8 node, const struct pen *p)
 				  m->icon8 - 1u, UI_ROLE_ACCENT_INK);
 			tx = look.pop_title_x;
 		}
-		pen_text(p, font, x + tx, y + look.pop_title_y, (u32)(w - tx - look.pop_rule_in), UI_ROLE_TEXT,
-			 m->title, PEN_LEFT);
+		if (pp.tq_px)
+			pen_text_from(p, font, x + tx, y + look.pop_title_y, (u32)(w - tx - look.pop_rule_in),
+				      UI_ROLE_TEXT, m->title, pp.tq_px);
+		else
+			pen_text(p, font, x + tx, y + look.pop_title_y, (u32)(w - tx - look.pop_rule_in), UI_ROLE_TEXT,
+				 m->title, PEN_LEFT);
 		pen_fill(p, x + look.pop_rule_in, y + look.pop_rule_y, w - 2 * look.pop_rule_in, 1, UI_ROLE_BORDER);
 	}
 	int scrolls = m->count > pp.rows;
@@ -885,11 +907,66 @@ static int popup_event(u8 node, const struct ui_event *e)
 	return 1;  // nothing reaches the page meanwhile
 }
 
+enum {
+	TQ_WAIT,  // resting at its place
+	TQ_RUN,
+	TQ_END,
+	TQ_OFF,  // not cut, or no title
+};
+
+// The title's marquee step, once the card is open and on top (as
+// marquee_tick in ui_list.c)
+static void title_tick(u8 node, u32 dt)
+{
+	const struct ui_theme *t = ui_theme();
+	if (pp.tq == TQ_OFF || !pp.menu || !pp.titled || pp.pop.dir || ui_node_view(node) != ui_top())
+		return;
+	if (pp.tq_wait > dt) {
+		pp.tq_wait = (u16)(pp.tq_wait - dt);
+		ui_wake();
+		return;
+	}
+	pp.tq_wait = 0;
+	u32 tx = pp.menu->icon8 ? look.pop_title_x : look.pop_text_x;
+	u32 room = look.pop_w > tx + look.pop_rule_in ? look.pop_w - tx - look.pop_rule_in : 0;
+	u32 width = text_width(t->body, pp.menu->title, strlen(pp.menu->title));
+	if (pp.tq == TQ_WAIT) {
+		if (width <= room) {
+			pp.tq = TQ_OFF;
+			return;
+		}
+		pp.tq = TQ_RUN;
+		pp.tq_px = 0;
+		pp.tq_acc = 0;
+	} else if (pp.tq == TQ_RUN) {
+		u32 speed = t->marquee_speed > 60 ? 60 : t->marquee_speed ? t->marquee_speed : 1;
+		u32 acc = pp.tq_acc + speed * dt;
+		if (acc >= 60) {
+			pp.tq_px = (u16)(pp.tq_px + acc / 60);
+			pp.tq_redraw = 1;
+			ui_dirty(node, 1);
+		}
+		pp.tq_acc = (u8)(acc % 60);
+		if (pp.tq_px + room >= width + t->marquee_gap) {
+			pp.tq = TQ_END;
+			pp.tq_wait = t->marquee_pause;
+		}
+	} else {
+		pp.tq = TQ_WAIT;  // back at its place, to wait again
+		pp.tq_px = 0;
+		pp.tq_wait = t->marquee_delay;
+		pp.tq_redraw = 1;
+		ui_dirty(node, 1);
+	}
+	ui_wake();
+}
+
 static void popup_update(u8 node, u32 dt)
 {
 	struct run *r = &pp.pop;
 	if (!r->view || node != r->node || r->view != ui_node_view(node) || !ui_node_shown(node))
 		return;
+	title_tick(node, dt);
 	int moving = r->dir != 0;
 	// Rows a draw left for lack of band room (a scroll redraws them all):
 	// a draw can't keep its own node dirty, so the update asks again
@@ -926,6 +1003,14 @@ static void popup_draw(u8 node)
 			ui_dirty(node, 1);
 		}
 		return;
+	}
+	if (pp.tq_redraw && pp.titled && pp.menu) {
+		// The title's line, scrolled on
+		s32 a = pp.top + look.pop_title_y - ui_node(node)->y;
+		if (canvas_band(node, &st->c, a, a + (s32)ui_theme()->body->line_height, popup_render))
+			pp.tq_redraw = 0;
+		else
+			ui_dirty(node, 1);
 	}
 	for (u32 row = 0; row < pp.rows; row++) {
 		if (!(pp.redraw >> row & 1))
@@ -999,6 +1084,10 @@ int ui_popup_open(u8 list, u8 hints, const struct ui_popup *popup)
 	}
 	pp.menu = popup;
 	pp.fields = 0;
+	pp.tq = TQ_WAIT;
+	pp.tq_px = 0;
+	pp.tq_redraw = 0;
+	pp.tq_wait = ui_theme()->marquee_delay;
 	pp.cursor = popup->cursor < popup->count ? popup->cursor : 0;
 	pp.rows = (u8)(popup->count < UI_POPUP_ROWS ? popup->count : UI_POPUP_ROWS);
 	pp.first = (u8)(pp.cursor >= pp.rows ? pp.cursor - pp.rows + 1 : 0);

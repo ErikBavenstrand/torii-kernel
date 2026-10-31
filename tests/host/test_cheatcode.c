@@ -4,6 +4,7 @@
 // interpreter below that follows mGBA's mCheatRefresh, so they check what the
 // ops mean, not only their fields. Encrypted vectors are real codes from
 // libretro's database whose decoding matched mGBA's (just cheat-corpus).
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -868,8 +869,9 @@ void test_cheatcode_lower(void)
 	CHECK_EQ(cost, CHEAT_LOAD(CHEAT_COST_CHEAT + 2 * CHEAT_COST_EXT + 2 * CHEAT_COST_FILL +
 				  3 * CHEAT_COST_FILL_SAME));  // all of it always runs
 
-	// Conditionals: every op in its place (a ROM patch as nothing), the
-	// button a key test, an ELSE in a fourth word
+	// Conditionals: every op in its place but the ROM patch, which the
+	// conditional's count leaves out; the button a key test, an ELSE in a
+	// fourth word
 	in[0] = op(CHEAT_OP_IF_EQ, 2, 0x02000000, 0x1234, 2);
 	in[0].else_count = 1;
 	in[1] = op(CHEAT_OP_ROM_PATCH, 2, 0x08000100, 0x4770, 1);
@@ -880,21 +882,19 @@ void test_cheatcode_lower(void)
 	CHECK_EQ(cheat_lower(in, 5, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_OK);
 	CHECK_EQ(np, 1);
 	CHECK_EQ(patches[0].offset, 0x100);
-	CHECK_EQ(prog[0] & 0xFFFF, 5);  // indexed
+	CHECK_EQ(prog[0] & 0xFFFF, 4);  // indexed
 	CHECK_EQ(prog[1], 0x42000000);
-	CHECK_EQ(prog[2], CHEAT_PROG_EQ | 1 << 4 | 2u << 16);
+	CHECK_EQ(prog[2], CHEAT_PROG_EQ | 1 << 4 | 1u << 16);  // covers the button alone
 	CHECK_EQ(prog[3], 0x1234);
 	CHECK_EQ(prog[4], 1);
-	CHECK_EQ(prog[5], 0x30000000);  // the patch: nothing
-	CHECK_EQ(prog[6], CHEAT_PROG_NOP);
-	CHECK_EQ(prog[8], 0x30000000 | CHEAT_KEYINPUT);
-	CHECK_EQ(prog[9], CHEAT_PROG_NAND | 1 << 4 | 1u << 16);
-	CHECK_EQ(prog[10], CHEAT_BUTTON_KEYS);
-	CHECK_EQ(prog[11], 0x33000000);  // an add: three words
-	CHECK_EQ(prog[12], CHEAT_PROG_ADD | 2 << 4 | 1u << 16);
-	CHECK_EQ(prog[14], 0x42000040);  // a pointer write keeps its offset
-	CHECK_EQ(prog[17], 0x10);
-	CHECK_EQ(nw, 18);
+	CHECK_EQ(prog[5], 0x30000000 | CHEAT_KEYINPUT);
+	CHECK_EQ(prog[6], CHEAT_PROG_NAND | 1 << 4 | 1u << 16);
+	CHECK_EQ(prog[7], CHEAT_BUTTON_KEYS);
+	CHECK_EQ(prog[8], 0x33000000);  // an add: three words
+	CHECK_EQ(prog[9], CHEAT_PROG_ADD | 2 << 4 | 1u << 16);
+	CHECK_EQ(prog[11], 0x42000040);  // a pointer write keeps its offset
+	CHECK_EQ(prog[14], 0x10);
+	CHECK_EQ(nw, 15);
 	CHECK_EQ(prog[0] >> 16, (nw - 1) * 4);
 
 	// A cheat of ROM patches alone runs nothing in game; ROM writes and
@@ -1037,6 +1037,135 @@ void test_cheatcode_lower_keyed(void)
 
 // Where the devices (GBATEK, EnHacklopedia, VBA-M) and mGBA differ, Torii
 // follows the devices (docs/research/cheats.md)
+// Lowers in and want (the same cheat with its ROM patches left out and its
+// counts of them) and checks the tables and loads match, and that in has
+// patches ROM patches
+static void check_same_table(const struct cheat_op *in, u32 n, const struct cheat_op *want, u32 wn, u32 patches_n)
+{
+	static u32 a[256], b[256];
+	static struct cheat_patch pa[256], pb[8];
+	u32 an, bn, ac, bc, ap, bp;
+	CHECK_EQ(cheat_lower(in, n, a, 256, &an, &ac, pa, 256, &ap), CHEAT_LOWER_OK);
+	CHECK_EQ(cheat_lower(want, wn, b, 256, &bn, &bc, pb, 8, &bp), CHEAT_LOWER_OK);
+	CHECK_EQ(ap, patches_n);
+	CHECK_EQ(an, bn);
+	CHECK_EQ(ac, bc);
+	CHECK_EQ(memcmp(a, b, an * 4), 0);
+}
+
+// ROM patches cost nothing in game: a conditional's counts leave them out,
+// so it covers the same ops it did
+void test_cheatcode_lower_rom_patches(void)
+{
+	static struct cheat_op in[300], want[8];
+	u32 n = 0;
+
+	// Many patches, then a key-gated trigger: what fit before as two cheats
+	for (; n < 240; n++)
+		in[n] = op(CHEAT_OP_ROM_PATCH, 2, 0x08F00000 + 2 * n, n, 1);
+	in[n++] = op(CHEAT_OP_IF_EQ, 2, CHEAT_KEYINPUT, 0x2F4, 2);
+	in[n++] = op(CHEAT_OP_IF_NE, 1, 0x02000010, 3, 1);
+	in[n++] = op(CHEAT_OP_WRITE, 1, 0x02000010, 3, 1);
+	want[0] = in[240];
+	want[1] = in[241];
+	want[2] = in[242];
+	check_same_table(in, n, want, 3, 240);
+
+	// Patches inside a conditional's reach: its counts leave them out
+	n = 0;
+	in[n++] = op(CHEAT_OP_IF_EQ, 2, 0x02000000, 1, 3);  // a patch, a write, a patch
+	in[0].else_count = 3;  // a patch, a write, a patch
+	in[n++] = op(CHEAT_OP_ROM_PATCH, 2, 0x08000100, 1, 1);
+	in[n++] = op(CHEAT_OP_WRITE, 1, 0x02000010, 3, 1);
+	in[n++] = op(CHEAT_OP_ROM_PATCH, 2, 0x08000102, 1, 1);
+	in[n++] = op(CHEAT_OP_ROM_PATCH, 2, 0x08000104, 1, 1);
+	in[n++] = op(CHEAT_OP_WRITE, 1, 0x02000011, 4, 1);
+	in[n++] = op(CHEAT_OP_ROM_PATCH, 2, 0x08000106, 1, 1);
+	in[n++] = op(CHEAT_OP_WRITE, 1, 0x02000012, 5, 1);  // past both
+	want[0] = in[0];
+	want[0].count = 1;
+	want[0].else_count = 1;
+	want[1] = in[2];
+	want[2] = in[5];
+	want[3] = in[7];
+	check_same_table(in, n, want, 4, 4);
+
+	// A conditional covering only patches keeps one, as nothing, so it
+	// still tests: an ELSE after it runs only while it is false
+	n = 0;
+	in[n++] = op(CHEAT_OP_IF_EQ, 2, 0x02000000, 1, 2);
+	in[0].else_count = 1;
+	in[n++] = op(CHEAT_OP_ROM_PATCH, 2, 0x08000100, 1, 1);
+	in[n++] = op(CHEAT_OP_ROM_PATCH, 2, 0x08000102, 1, 1);
+	in[n++] = op(CHEAT_OP_WRITE, 1, 0x02000010, 3, 1);
+	want[0] = in[0];
+	want[0].count = 1;
+	want[1] = op(CHEAT_OP_WRITE, 1, 0, 0, 0);  // a step that does nothing
+	want[2] = in[3];
+	check_same_table(in, n, want, 3, 2);
+
+	// Nested: the inner conditional covers a patch alone, the outer covers it
+	// and a write
+	n = 0;
+	in[n++] = op(CHEAT_OP_IF_EQ, 2, 0x02000000, 1, 4);
+	in[n++] = op(CHEAT_OP_IF_NE, 2, 0x02000002, 1, 1);
+	in[n++] = op(CHEAT_OP_ROM_PATCH, 2, 0x08000100, 1, 1);
+	in[n++] = op(CHEAT_OP_ROM_PATCH, 2, 0x08000102, 1, 1);
+	in[n++] = op(CHEAT_OP_WRITE, 1, 0x02000010, 3, 1);
+	want[0] = in[0];
+	want[0].count = 3;
+	want[1] = in[1];
+	want[2] = op(CHEAT_OP_WRITE, 1, 0, 0, 0);
+	want[3] = in[4];
+	check_same_table(in, n, want, 4, 2);
+
+	// Before, each patch was a step of the table: this one was too big
+	n = 0;
+	for (; n < 200; n++)
+		in[n] = op(CHEAT_OP_ROM_PATCH, 2, 0x08F00000 + 2 * n, n, 1);
+	in[n++] = op(CHEAT_OP_IF_BUTTON, 0, 0, 0, 1);
+	in[n++] = op(CHEAT_OP_WRITE, 2, 0x02000000, 1, 1);
+	u32 nw, cost, np;
+	static struct cheat_patch many[256];
+	CHECK_EQ(cheat_lower(in, n, prog, 64, &nw, &cost, many, 256, &np), CHEAT_LOWER_OK);
+	CHECK_EQ(np, 200);
+	CHECK_EQ(nw, 1 + 3 + 2);
+}
+
+// An Action Replay v3 cheat as the device lays it out: its ROM patch lines
+// count where they lie (a block's ops, "next code"), and the table leaves
+// them out
+void test_cheatcode_par3_patch_counts(void)
+{
+	static char text[8192];
+	static struct cheat_op got[300];
+	struct cheat_decoder d;
+	u32 len = 0, n, i;
+	for (i = 0; i < 100; i++)
+		len += (u32)snprintf(text + len, sizeof(text) - len, "00000000 18%06X+0000%04X 00000000+",
+				     (unsigned)(0x780000 + i), (unsigned)i);
+	// IF [KEYINPUT] == 2F4 (the next code), a write
+	len += (u32)snprintf(text + len, sizeof(text) - len, "0A400130 000002F4+02224000 00001234+");
+	// IF [02024010] == 5 (a block): a patch, a write, a patch, ENDIF
+	len += (u32)snprintf(text + len, sizeof(text) - len,
+			     "88224010 00000005+00000000 18780100+00004770 00000000+00224020 00000007+"
+			     "00000000 18780101+00004771 00000000+00000000 40000000+");
+	// IF [02024010] == 6 (the next code): a patch, then a write it doesn't cover
+	len += (u32)snprintf(text + len, sizeof(text) - len,
+			     "08224010 00000006+00000000 18780102+00004772 00000000+00224021 00000008");
+	cheat_decoder_force(&d, CHEAT_FMT_PARV3_RAW);
+	CHECK_EQ(cheat_decode(&d, text, len, got, 300, &n), CHEAT_OK);
+	CHECK_EQ(n, 100 + 2 + 4 + 3);
+	CHECK_EQ(got[100].type, CHEAT_OP_IF_EQ);
+	CHECK_EQ(got[100].count, 1);
+	CHECK_EQ(got[102].count, 3);  // as laid out: patches included
+	CHECK_EQ(got[106].count, 1);  // the patch alone
+	struct cheat_op want[7] = {got[100], got[101], got[102], got[104], got[106], op(CHEAT_OP_WRITE, 1, 0, 0, 0),
+				   got[108]};
+	want[2].count = 1;
+	check_same_table(got, n, want, 7, 100 + 3);
+}
+
 void test_cheatcode_device(void)
 {
 	struct cheat_decoder d;

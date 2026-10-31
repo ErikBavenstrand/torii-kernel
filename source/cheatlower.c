@@ -286,6 +286,34 @@ static void put_op(struct out *o, const struct cheat_op *op)
 		word(o, extra[k]);
 }
 
+// ROM patches take no place in the table: they are applied at launch, and
+// a conditional's counts skip them (cheat_lower). One stays, as a step that
+// does nothing, where it is the first op a conditional covers and every op
+// that conditional covers is a ROM patch: a conditional covering no ops
+// tests nothing (an ELSE after it would run every frame).
+static int kept(const struct cheat_op *ops, u32 n_ops, u32 i)
+{
+	const struct cheat_op *cond = i ? &ops[i - 1] : NULL;
+	u32 j;
+	if (ops[i].type != CHEAT_OP_ROM_PATCH)
+		return 1;
+	if (!cond || !is_cond(cond->type) || !cond->count)
+		return 0;
+	for (j = i; j < n_ops && j < i + cond->count; ++j)
+		if (ops[j].type != CHEAT_OP_ROM_PATCH)
+			return 0;
+	return 1;
+}
+
+// The ops of [from, from + count) the table keeps
+static u32 kept_in(const struct cheat_op *ops, u32 n_ops, u32 from, u32 count)
+{
+	u32 n = 0;
+	for (u32 j = from; j < n_ops && j - from < count; ++j)
+		n += (u32)kept(ops, n_ops, j);
+	return n;
+}
+
 u8 cheat_lower(const struct cheat_op *ops, u32 n_ops, u32 *prog, u32 prog_max, u32 *prog_words, u32 *cost,
 	       struct cheat_patch *patches, u32 patches_max, u32 *n_patches)
 {
@@ -321,8 +349,16 @@ u8 cheat_lower(const struct cheat_op *ops, u32 n_ops, u32 *prog, u32 prog_max, u
 			if (!plain) {
 				// Ops a conditional without an ELSE covers run only while
 				// it holds: guarded. With an ELSE, one branch always runs.
+				// A conditional's counts are of the ops the table keeps
+				struct cheat_op c = *op;
 				u32 before = o.cost;
-				put_op(&o, op);  // every op in its place: the conditions count them
+				if (!kept(ops, n_ops, i))
+					continue;
+				if (is_cond(op->type)) {
+					c.count = kept_in(ops, n_ops, i + 1, op->count);
+					c.else_count = (u16)kept_in(ops, n_ops, i + 1 + op->count, op->else_count);
+				}
+				put_op(&o, &c);
 				if (i < until) {
 					guarded += o.cost - before;
 					walked += CHEAT_COST_WALK;  // passed over while the condition fails

@@ -296,12 +296,25 @@ enum {
 	TITLE_RIGHT = 2,
 };
 
+// A heading (and its after-text) too long for its room scrolls, as a list's
+// cut name does (ui_theme's marquee_*): after marquee_delay frames it moves
+// left to its end, rests marquee_pause frames, and starts over from its place
+enum {
+	TQ_WAIT,  // resting at its place
+	TQ_RUN,
+	TQ_END,
+	TQ_OFF,  // not cut: still until the text changes
+};
+
 struct title_state {
 	struct paint heading, right;
 	const char *text, *right_text, *sub;
 	u16 icon_tile;  // ART_NONE: no icon
 	u8 icon_bank;
 	s16 shift;  // px the heading is drawn right of its place (ui_title_offset)
+	u32 seen;   // the heading's and after-text's hash: the marquee starts over when it changes
+	u16 mq_px, mq_wait;
+	u8 mq, mq_acc;
 };
 
 static const struct ui_title_config *title_config(u8 node)
@@ -333,6 +346,8 @@ static int title_measure(u8 node, struct engine_budget *need)
 	return measure_tiles(node, need, 2 * (hw + rw));
 }
 
+static void title_seen(struct title_state *st);
+
 static int title_init(u8 node)
 {
 	struct title_state *st = ui_node_state(node);
@@ -344,6 +359,8 @@ static int title_init(u8 node)
 	st->text = c->text ? c->text : "";
 	st->right_text = c->right;
 	st->sub = 0;
+	st->seen = 0;
+	title_seen(st);
 	st->icon_tile = ART_NONE;
 	if (c->icon != UI_TITLE_NO_ICON) {
 		st->icon_tile = art_load_icon16(c->icon, &st->icon_bank);
@@ -356,9 +373,78 @@ static int title_init(u8 node)
 	return 1;
 }
 
+// The heading's and its after-text's width, as drawn
+static u32 title_width(const struct title_state *st)
+{
+	const struct ui_theme *t = ui_theme();
+	u32 w = text_width(t->heading, st->text, strlen(st->text));
+	if (st->sub && *st->sub)
+		w += t->look.title_sub_gap + text_width(t->body, st->sub, strlen(st->sub));
+	return w;
+}
+
+// The marquee's step: frames counted down, then px moved at the theme's speed
+static void title_marquee(u8 node, struct title_state *st, u32 dt)
+{
+	const struct ui_theme *t = ui_theme();
+	u32 room = st->heading.tw * 8u > t->look.title_text_x ? st->heading.tw * 8u - t->look.title_text_x : 0;
+	if (st->mq == TQ_OFF || st->shift || ui_node_view(node) != ui_top() || !room)
+		return;  // not cut, sliding in, or under a popup: held where it is
+	if (st->mq_wait > dt) {
+		st->mq_wait = (u16)(st->mq_wait - dt);
+		ui_wake();
+		return;
+	}
+	st->mq_wait = 0;
+	u32 width = title_width(st);
+	if (st->mq == TQ_WAIT) {
+		if (width <= room) {
+			st->mq = TQ_OFF;
+			return;
+		}
+		st->mq = TQ_RUN;
+		st->mq_px = 0;
+		st->mq_acc = 0;
+	} else if (st->mq == TQ_RUN) {
+		u32 speed = t->marquee_speed > 60 ? 60 : t->marquee_speed ? t->marquee_speed : 1;
+		u32 acc = st->mq_acc + speed * dt;
+		if (acc >= 60) {
+			st->mq_px = (u16)(st->mq_px + acc / 60);
+			ui_dirty(node, TITLE_HEADING);
+		}
+		st->mq_acc = (u8)(acc % 60);
+		if (st->mq_px + room >= width + t->marquee_gap) {
+			st->mq = TQ_END;
+			st->mq_wait = t->marquee_pause;
+		}
+	} else {
+		st->mq = TQ_WAIT;  // back at its place, to wait again
+		st->mq_px = 0;
+		st->mq_wait = t->marquee_delay;
+		ui_dirty(node, TITLE_HEADING);
+	}
+	ui_wake();
+}
+
+// A changed heading or after-text: the marquee starts over from its place
+static void title_seen(struct title_state *st)
+{
+	u32 h = 5381;
+	for (const char *p = st->text; *p; p++)
+		h = h * 33 ^ (u8)*p;
+	for (const char *p = st->sub ? st->sub : ""; *p; p++)
+		h = h * 33 ^ (u8)*p;
+	h ^= st->sub ? 1 : 0;
+	if (h == st->seen)
+		return;
+	st->seen = h;
+	st->mq = TQ_WAIT;
+	st->mq_px = 0;
+	st->mq_wait = ui_theme()->marquee_delay;
+}
+
 static void title_update(u8 node, u32 dt)
 {
-	(void)dt;
 	struct title_state *st = ui_node_state(node);
 	const struct ui_node *n = ui_node(node);
 	const struct ui_view *v = ui_node_view(node);
@@ -368,6 +454,8 @@ static void title_update(u8 node, u32 dt)
 		st->shift = (s16)shift;  // the heading drawn there, this frame
 		ui_dirty(node, TITLE_HEADING);
 	}
+	if (st->heading.tw && !(n->flags & UI_N_HIDDEN))
+		title_marquee(node, st, dt);
 	if (st->icon_tile == ART_NONE || (n->flags & UI_N_HIDDEN) || !ui_node_shown(node) || !ui_plane_owned(node))
 		return;
 	s32 x = n->x + ui_view_dx(v) + shift + look()->title_icon_x, y = n->y + dy + look()->title_icon_y;
@@ -417,7 +505,7 @@ static void title_draw(u8 node)
 			ui_dirty(node, todo);  // the last flip hasn't landed: both next frame
 			return;
 		}
-		s32 x = (s32)l->title_text_x - st->heading.tx * 8 + st->shift, ww = st->heading.tw * 8;
+		s32 x = (s32)l->title_text_x - st->heading.tx * 8 + st->shift - st->mq_px, ww = st->heading.tw * 8;
 		text_clear(&win, 0, 0, (u32)ww, h, paper);
 		if (l->title_text_y + t->heading->line_height <= h && x < ww) {
 			x = slid_text(&win, t->heading, x, l->title_text_y, ui_ink(node, UI_ROLE_TEXT), st->text);
@@ -426,6 +514,8 @@ static void title_draw(u8 node)
 			s32 sx = x + l->title_sub_gap, sy = l->title_text_y + t->heading->baseline - b->baseline;
 			if (st->sub && sx < ww && (u32)sy + b->line_height <= h)
 				slid_text(&win, b, sx, (u32)sy, UI_ROLE_FAINT, st->sub);
+			if (st->mq_px)  // scrolled: cut at its place, under the icon's sprite
+				text_clear(&win, 0, 0, l->title_text_x, h, paper);
 		}
 		if (!paint_end(node, &st->heading, set, UI_BANK_NORMAL)) {
 			ui_dirty(node, todo);  // the flip next frame, with the right-hand text's
@@ -454,6 +544,7 @@ void ui_title_set(u8 node, const char *text)
 {
 	struct title_state *st = ui_node_state(node);
 	st->text = text ? text : "";
+	title_seen(st);
 	ui_dirty(node, TITLE_HEADING);
 }
 
@@ -461,6 +552,7 @@ void ui_title_set_sub(u8 node, const char *text)
 {
 	struct title_state *st = ui_node_state(node);
 	st->sub = text;
+	title_seen(st);
 	ui_dirty(node, TITLE_HEADING);
 }
 
@@ -495,6 +587,12 @@ struct hints_state {
 	const char *text;  // in place of the chips, NULL none
 	u8 count;
 	struct ui_hint_note note;  // the text's look
+	// A line too long for its room scrolls, as the title's heading does
+	// (TQ_*): the line's hash, its width and room as last drawn, px
+	// scrolled, frames to wait
+	u32 seen;
+	u16 mq_width, mq_room, mq_px, mq_wait;
+	u8 mq, mq_acc;
 };
 
 static int hints_measure(u8 node, struct engine_budget *need)
@@ -554,7 +652,13 @@ static void hints_draw(u8 node)
 			struct text_line line;
 			u32 room = chips + 2 * margin < w ? w - 2 * margin - chips : 8u;
 			u32 bar = nt->bar_w ? nt->bar_w + nt->bar_gap : 0u;
-			text_layout(font, st->text, strlen(st->text), room > bar + 8 ? room - bar : 8, &line);
+			u32 clip = room > bar + 8 ? room - bar : 8, lead = 0;
+			st->mq_room = (u16)clip;
+			st->mq_width = (u16)text_width(font, st->text, strlen(st->text));
+			if (st->mq_px)  // scrolled: from mq_px on, whole glyphs, no "..."
+				text_layout_window(font, st->text, strlen(st->text), st->mq_px, clip, &line, &lead);
+			else
+				text_layout(font, st->text, strlen(st->text), clip, &line);
 			u32 total = bar + line.extent;
 			u32 x = margin + (total < room && !chips ? (room - total) / 2 : 0);
 			if (nt->bar_w) {
@@ -566,7 +670,7 @@ static void hints_draw(u8 node)
 						  x + (nt->fill < nt->bar_w ? nt->fill : nt->bar_w));
 				x += bar;
 			}
-			text_draw_line(&win, font, x, text_top(font, top, l->hint_chip_h),
+			text_draw_line(&win, font, x + lead, text_top(font, top, l->hint_chip_h),
 				       nt->ink ? nt->ink : UI_ROLE_DIM, &line);
 		} else {
 			// From the right edge in: the hints' widths first
@@ -612,9 +716,61 @@ void ui_hints_text(u8 node, const char *text)
 	ui_hints_note(node, text, 0);
 }
 
+// The line's marquee step (as title_marquee): only a line cut in its room
+static void hints_update(u8 node, u32 dt)
+{
+	struct hints_state *st = ui_node_state(node);
+	const struct ui_theme *t = ui_theme();
+	if (!st->text || st->mq == TQ_OFF || !st->mq_room || (ui_node(node)->flags & UI_N_HIDDEN) ||
+	    ui_node_view(node) != ui_top())
+		return;
+	if (st->mq_wait > dt) {
+		st->mq_wait = (u16)(st->mq_wait - dt);
+		ui_wake();
+		return;
+	}
+	st->mq_wait = 0;
+	if (st->mq == TQ_WAIT) {
+		if (st->mq_width <= st->mq_room) {
+			st->mq = TQ_OFF;
+			return;
+		}
+		st->mq = TQ_RUN;
+		st->mq_px = 0;
+		st->mq_acc = 0;
+	} else if (st->mq == TQ_RUN) {
+		u32 speed = t->marquee_speed > 60 ? 60 : t->marquee_speed ? t->marquee_speed : 1;
+		u32 acc = st->mq_acc + speed * dt;
+		if (acc >= 60) {
+			st->mq_px = (u16)(st->mq_px + acc / 60);
+			ui_dirty(node, 0xFF);
+		}
+		st->mq_acc = (u8)(acc % 60);
+		if (st->mq_px + st->mq_room >= (u32)st->mq_width + t->marquee_gap) {
+			st->mq = TQ_END;
+			st->mq_wait = t->marquee_pause;
+		}
+	} else {
+		st->mq = TQ_WAIT;
+		st->mq_px = 0;
+		st->mq_wait = t->marquee_delay;
+		ui_dirty(node, 0xFF);
+	}
+	ui_wake();
+}
+
 void ui_hints_note(u8 node, const char *text, const struct ui_hint_note *note)
 {
 	struct hints_state *st = ui_node_state(node);
+	u32 h = 5381;
+	for (const char *p = text ? text : ""; *p; p++)
+		h = h * 33 ^ (u8)*p;
+	if (h != st->seen || text != st->text) {
+		st->seen = h;  // a new line starts at its place
+		st->mq = TQ_WAIT;
+		st->mq_px = 0;
+		st->mq_wait = ui_theme()->marquee_delay;
+	}
 	st->text = text;
 	if (note)
 		st->note = *note;
@@ -632,7 +788,7 @@ void ui_hints_get(u8 node, const struct ui_hint **hints, u32 *count, const char 
 	*note = st->note;
 }
 
-const struct ui_ops ui_hints_ops = {sizeof(struct hints_state), hints_measure, hints_init, 0, 0, hints_draw};
+const struct ui_ops ui_hints_ops = {sizeof(struct hints_state), hints_measure, hints_init, 0, hints_update, hints_draw};
 
 // --- Path pills -------------------------------------------------------------------
 
