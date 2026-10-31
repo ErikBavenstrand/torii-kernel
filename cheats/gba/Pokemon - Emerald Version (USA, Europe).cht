@@ -3661,11 +3661,11 @@ cheat457_guide = "A wild Pokémon on almost every step in grass, caves and water
 cheat457_enable = false
 
 cheat458_desc = "Overworld: Fly to any town"
-cheat458_code = "72002DD4 0A74+32002DEA 0002"
-cheat458_format = "CodeBreaker"
+cheat458_code = "00000000 18091F28+00002102 00000000"
+cheat458_format = "PARv3 raw"
 cheat458_folder = "Overworld"
-cheat458_keys = "always"
-cheat458_guide = "On the Fly map every town can be picked, visited or not."
+cheat458_keys = "launch"
+cheat458_guide = "On the Fly map every town can be picked, visited or not. Set when the game starts: pick it on the Cheats screen before you play."
 cheat458_enable = false
 
 cheat459_desc = "Overworld: Free Day Care"
@@ -3673,7 +3673,7 @@ cheat459_code = "820375E2 0000"
 cheat459_format = "CodeBreaker"
 cheat459_folder = "Overworld"
 cheat459_keys = "always"
-cheat459_guide = "The Day Care takes no money to give your Pokémon back."
+cheat459_guide = "The Day Care takes no money to give your Pokémon back. The lady still names the price; it isn't taken."
 cheat459_enable = false
 
 cheat460_desc = "Overworld: Walk through walls (hold R)"

@@ -300,7 +300,16 @@ On the emulated cart with the real ROM (CRC32 `1F1C08FB`) and a 100% save (Proje
 | Quick contests, Max contest score | a Normal Cool contest: results after the first round, first place with full stars; without them, still in the appeals |
 | The emulators copy | mGBA reads all 465 cheats (all on at once) |
 
-Not verified headlessly, to check on the real cart: Skip trainer battles (every trainer in the save is beaten), Fly to any town (every town visited), Free Day Care, Field moves without badges (all badges owned), No species limit at the Battle Tower, Infinite Safari Zone (needs entering by the gate), Max friendship (applies at the next change), and the event islands' ferry with a ticket on a save without them. On the real cart also: the menus' launch with about 2,500 ROM patches (Torii estimates 260 ms more).
+| Skip trainer battles | Route 102's Rick, his defeat flag cleared: he challenges in the control; with it the player walks past |
+| Fly to any town | GameHacking's RAM code didn't work on this ROM (the Fly map's state isn't where it writes); rebuilt as one ROM patch of `GetMapsecType` (a town not visited is "can fly"): with every visited flag cleared, Littleroot can be flown to, the control can't |
+| Free Day Care | taking a Pokémon back: ₽100 taken in the control, none with it (the lady still names the price; the guide says so) |
+| Field moves without badges | badges cleared: Fly from the party menu says "can't be used until a new BADGE" in the control, opens the Fly map with it |
+| No species limit at the Battle Tower | a Mewtwo in the party: "NOT ABLE" in the control, "ABLE" with it (Open Level) |
+| Infinite Safari Zone | entered by the gate: steps 494 after walking in the control, 500 with it, 30 balls |
+| Max friendship | a Treecko (70) walked: 72 in the control, 255 with it |
+| Eon Ticket from the shop | on a save without it (flag and ticket cleared): the Lilycove ferry accepts it ("a tiny spit of an island far in the south") |
+
+Screenshots of all of these: `dist/eg/gallery-*.png` (not committed). Still for the real cart: the menus' launch with about 2,500 ROM patches (Torii estimates 260 ms more), and every cheat at a real game's speed.
 
 ## Kernel changes this needed
 

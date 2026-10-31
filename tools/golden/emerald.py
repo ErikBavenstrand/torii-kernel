@@ -1058,14 +1058,17 @@ def cheats():
     add(
         "Overworld",
         "Fly to any town",
-        cb(CB.op("EQ", 0x02002DD4, 0x0A74), CB.write8(0x02002DEA, 2)),
-        "On the Fly map every town can be picked, visited or not.",
+        rom_code(
+            [(0x08123E50, 0x2102)]
+        ),  # GetMapsecType: a town not visited is CITY_CANFLY too
+        "On the Fly map every town can be picked, visited or not. " + LAUNCH,
+        "launch",
     )
     add(
         "Overworld",
         "Free Day Care",
         cb(CB.write16(0x020375E2, 0)),
-        "The Day Care takes no money to give your Pokémon back.",
+        "The Day Care takes no money to give your Pokémon back. The lady still names the price; it isn't taken.",
     )
     add(
         "Overworld",
