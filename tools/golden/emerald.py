@@ -931,6 +931,20 @@ def cheats(emulators=False):
             + LAUNCH,
             "launch",
         )
+    add(  # PokemonUseItemEffects' two EV checks: 100 a stat becomes 255; the 510 total stays
+        "Pokémon",
+        "Vitamins up to 255 EVs",
+        rom_code(
+            [
+                (a + d, v)
+                for a in (0x0806C468, 0x0806CA54)
+                for d, v in ((0, 0x2BFE), (8, 0x29FF), (14, 0x30FF))
+            ]
+        ),
+        "Vitamins (HP Up, Protein...) work until a stat has 255 EVs, not 100, within the game's 510 in all. "
+        "Lower them with the EV berries. " + LAUNCH,
+        "launch",
+    )
     add(
         "Pokémon",
         "Pokérus when caught",
@@ -1157,16 +1171,14 @@ def personality(setting, value):
     """The personality routine (tools/golden/pid.s) and its hook in CreateBoxMon,
     the same in each Pokémon cheat that uses it, and this cheat's own switch"""
     stub = Path(__file__).with_name("pid.bin").read_bytes()
-    hook = Path(__file__).with_name("pidhook.bin").read_bytes()
+    off = 0x080021A4 - (0x08067C74 + 4)  # bl pid, then 8 nops, where the OT ID was read
+    hook = (0xF000 | (off >> 12) & 0x7FF, 0xF800 | (off >> 1) & 0x7FF) + (0x46C0,) * 8
     return (
         [
             (0x080021A4 + i, int.from_bytes(stub[i : i + 2], "little"))
             for i in range(0, len(stub), 2)
         ]
-        + [
-            (0x08067C74 + i, int.from_bytes(hook[i : i + 2], "little"))
-            for i in range(0, len(hook), 2)
-        ]
+        + [(0x08067C74 + 2 * i, h) for i, h in enumerate(hook)]
         + [(0x08F1F000 + setting, value)]
     )
 

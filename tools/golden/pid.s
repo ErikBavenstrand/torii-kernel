@@ -7,7 +7,8 @@
 @ switch in free ROM, 0xFFFF (unpatched) meaning off:
 @   SETTINGS+0 shiny: 1   +2 nature: 0-24   +4 gender byte: 0x00 female, 0xFF male
 @ Lives over Unused_AdjustBgMosaic after the walls stub (walls.s).
-@ Build: as -mcpu=arm7tdmi pid.s -o pid.o && ld -T pid.ld pid.o -o pid.elf
+@ Build: as -mcpu=arm7tdmi pid.s -o pid.o && ld -T pid.ld pid.o -o pid.elf && objcopy -O binary -j .stub pid.elf pid.bin
+@ (emerald.py writes the hook, a bl and 8 nops, itself)
 	.thumb
 	.equ	SETTINGS, 0x08F1F000
 	.section .stub, "ax"

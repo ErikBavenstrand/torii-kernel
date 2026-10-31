@@ -263,7 +263,7 @@ Every cheat we have (GameHacking, plus libretro's three of its own), grouped. "P
 | --- | --- |
 | Money | Max money, Max coins (Torii's keyed lines), Max Battle Points, Everything costs 1 |
 | Menus | Item shop (L+R+B): Marts of Medicine, Balls, Training, TMs & HMs, Held items, Berries, Valuables at game prices, and the four event tickets free with their ferry flags. Field menu (L+R+A): PC, Heal, Warp (16 towns, 17 dungeons, 5 islands), Legends (respawn 11), Gifts (Hoenn and Johto starters, Beldum, Castform, Lileep, Anorith, Wynaut egg), Moves (relearner), Unlock (badges, Frontier symbols, Pokédex); L+R+Up heals, +Down PC, +Left warp, +Right moves |
-| Pokémon | All new Pokémon shiny, Perfect IVs, Max friendship, Max EVs, Nature (25), Gender (2), Pokérus when caught, Eggs hatch fast |
+| Pokémon | All new Pokémon shiny, Perfect IVs, Max friendship, Max EVs, Vitamins up to 255 EVs, Nature (25), Gender (2), Pokérus when caught, Eggs hatch fast |
 | Battle | One-hit KO, Infinite HP, Infinite PP, Skip trainer battles, EXP x2/x3/x5/x10/x255, EXP for the whole party, Every ball catches |
 | Wild | Species (386), Level 5-100 (20), No wild encounters, Encounter every step |
 | Overworld | Fly to any town, Free Day Care, Walk through walls (hold R), Field moves without badges, Gym leaders ready for a rematch, No species limit at the Battle Tower |
@@ -291,6 +291,7 @@ On the emulated cart with the real ROM (CRC32 `1F1C08FB`) and a 100% save (Proje
 | Shiny, Nature, Gender | one routine (`tools/golden/pid.s`) picks a personality with all three: shiny + Adamant + female + Perfect IVs gave a shiny female Adamant Ralts with IVs all 31; shiny + Modest and Jolly alone right too; the control a random Lonely one |
 | EXP x10, EXP for the whole party, Infinite PP, One-hit KO | against a control battle: the lead +50 EXP and 1 PP used; with them every party Pokémon +80 (50 shared by six, x10), no PP used, one hit |
 | Max EVs | HP EVs 58 to 81: the 510 total filled |
+| Vitamins | Protein on 103 Attack EVs: "It won't have any effect" in the control; raised to 113 with it; four Proteins: 126, stopping at the game's 510 in all (the owner keeps the real limits: 255 a stat, 510 in all). `PokemonUseItemEffects`' two 100-a-stat checks patched |
 | Infinite HP | 209/209 through a Lv 100 Machamp's attacks; without it, fainted |
 | Every ball catches, Pokérus | a full-HP Lv 100 Ralts caught with one Great Ball, Pokérus set |
 | Walk through walls | blocked without R; through the Pokémon Center counter with R |
