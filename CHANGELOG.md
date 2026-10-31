@@ -6,6 +6,11 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** the cheat search's filters Up by and Down by an amount, More
+  than, Less than and From one number to another; Negative numbers, which
+  compares them signed and shows and takes them with a sign; and Compare
+  with the first scan, for the values Start remembered (kept when up to
+  49,024 bytes of them are left after the first filter) (435c10b8).
 - **Added:** a cheat search in the in-game menu (its own row, or on the
   Cheats page): it remembers the game's RAM, narrows it down by same,
   changed, went up, went down or equals a typed number (8, 16 or 32 bits),
