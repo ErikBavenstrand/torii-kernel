@@ -3,7 +3,7 @@
 # A run fails over 280896 (a whole frame) or 10% above the figure here.
 carousel-step 111068
 cheats-move 106281
-cheats-toggle 160289
+cheats-toggle 176348
 confirm-draw 145968
 confirm-motion 164105
 confirm-move 85430

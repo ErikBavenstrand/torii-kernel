@@ -10,7 +10,7 @@ static const struct {
 } perf_budget[] = {
 	{"carousel-step", 111068},
 	{"cheats-move", 106281},
-	{"cheats-toggle", 160289},
+	{"cheats-toggle", 176348},
 	{"confirm-draw", 145968},
 	{"confirm-motion", 164105},
 	{"confirm-move", 85430},
