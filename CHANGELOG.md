@@ -41,20 +41,6 @@ git log, not here.
 - **Fixed:** a hint-bar line too long for the bar (a greyed cheat's reason,
   mostly in Swedish) scrolls instead of being cut; the Cheats screen no
   longer starts past a folder whose first cheat is greyed (58987af4).
-- **Changed:** ROM patches cost nothing in game: a cheat with conditionals
-  kept each as a step that does nothing, so many ROM patches and a key test
-  were refused as too big; now a conditional's counts leave them out and it
-  covers the same ops as on the device (b83ce966).
-- **Changed:** the picked cheats' ROM patches together go from 256 to 2,048
-  halfwords (4 KB), kept in cart SRAM between a launch's passes rather than
-  EWRAM, which gains 2.8 KB; a cheat still has 256 at most (bc724f0c).
-- **Changed:** a cheat may have 2,048 ROM patches (4 KB) and a code of up
-  to 128 KB, and the picked cheats 4,096 (8 KB): patch lines are decoded
-  straight into the cheat's patches, kept in PSRAM, instead of one 32-byte
-  op each, so a menu written into free ROM fits one cheat (cbd4aa71).
-- **Fixed:** a cheat whose raw line ORs or writes through a pointer without
-  a key (`[03005D8C]+137C|80`) no longer reads as unreadable on the cart:
-  the line took the last line's key, or stack garbage (399cbbd8).
 
 ## v0.9.10
 
