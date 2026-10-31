@@ -1,4 +1,4 @@
-cheats = 13
+cheats = 14
 
 cheat0_desc = "Infinite HP"
 cheat0_code = "32001000 0063"
@@ -59,6 +59,11 @@ cheat11_code = "3200101C 0121"
 cheat11_enable = false
 cheat11_folder = "Starter"
 
-cheat12_desc = "Walk through walls"
-cheat12_code = "32001018 0001"
+cheat12_desc = "Legendaries & Mythicals: Latios"
+cheat12_code = "3200101E 0001"
 cheat12_enable = false
+cheat12_folder = "Legendaries & Mythicals"
+
+cheat13_desc = "Walk through walls"
+cheat13_code = "32001018 0001"
+cheat13_enable = false

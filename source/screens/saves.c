@@ -166,6 +166,7 @@ static int fetch_game(struct saves *s, u32 i, struct ui_item *out)
 	if (!slot || i >= s->games_n || s->generation != library_generation())
 		return UI_ITEM_PENDING;
 	out->text = lib_display(slot, lib_order(slot)[s->games[i]]);
+	out->more = 1;  // A opens its saves
 	return UI_ITEM_READY;
 }
 
@@ -231,7 +232,8 @@ static const struct ui_spec pick_nodes[N_COUNT] = {
 };
 
 static const struct ui_label_config line_label = {"", UI_FONT_BODY, UI_ALIGN_LEFT, UI_LABEL_SWAP, 0};
-static const struct ui_label_config head_label = {"", UI_FONT_BODY, UI_ALIGN_LEFT, UI_LABEL_SWAP, ART_ICON8_FOLDER + 1};
+static const struct ui_label_config head_label = {"", UI_FONT_BODY, UI_ALIGN_LEFT, UI_LABEL_MARQUEE,
+						  ART_ICON8_FOLDER + 1};
 static const struct ui_scrollbar_config main_bar = {M_LIST};
 static const struct ui_list_config main_list = {&model, UI_ROW_PITCH_LIST, UI_LIST_MARQUEE, DETAIL_W, LIST_PAD};
 

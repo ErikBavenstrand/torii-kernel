@@ -90,6 +90,24 @@ place one up.
 
 Dialogs and START's menu keep the game's name.
 
+## Arrows, the folder icon and scrolling text (2026-10-31)
+
+- **The arrow:** a row that opens a list or page has Settings' action
+  chevron (3x5, now the theme's `chevron_*`) at its right, its detail left
+  of it (`ui_item.more`): a cheat folder or choice row, an SD card folder,
+  a folder in Game saves' file picker, a game in Game saves, and Info's
+  rows. Rows whose A plays, picks, toggles or opens a menu have none.
+- **The folder icon:** inside a folder (and a choice group in one) the
+  title's 16x16 icon is a folder (`icons16/folder.png`, in the torii
+  icon's palette bank) in place of the game's.
+- **Scrolling:** a list's selected row already scrolled its cut name. Now a
+  title's heading and after-text, a popup's title, and a label marked
+  `UI_LABEL_MARQUEE` (the Buttons page's cheat name, a save page's heading,
+  the Saves screen's path) scroll the same way when cut: after the theme's
+  `marquee_delay` they move to their end, rest, and start over. Held still
+  under a popup or while sliding in. Not done: a confirmation's centred
+  title (it wraps), and the hint bar's note.
+
 ## Choices close on a pick
 
 Picking one of a choice group's choices goes back to the group's row, its

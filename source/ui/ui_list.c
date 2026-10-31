@@ -939,11 +939,11 @@ static u32 item_clip(u32 clip, const struct ui_item *item, u32 detail_w)
 {
 	const struct ui_look *l = &ui_theme()->look;
 	u32 badge = item->badge ? 8u + l->row_badge_gap : 0;
-	if (item->detail && *item->detail) {
-		u32 dw = text_width(ui_theme()->body, item->detail, strlen(item->detail)) + l->row_dot_gap;
-		if (dw > detail_w)
-			badge += dw - detail_w;
-	}
+	u32 dw = item->more ? (u32)l->chevron_gap + l->chevron_w + l->row_dot_gap : 0;
+	if (item->detail && *item->detail)
+		dw += text_width(ui_theme()->body, item->detail, strlen(item->detail)) + l->row_dot_gap;
+	if (dw > detail_w)
+		badge += dw - detail_w;
 	return clip > badge + 8 ? clip - badge : 8;
 }
 
@@ -1202,12 +1202,12 @@ static void row_ctx_init(u8 node, const struct list_state *st, struct row_ctx *r
 // The detail, right-aligned in the row, its window starting x0 px left of
 // the row (line is scratch); returns where its text starts
 static u32 draw_detail(const struct text_window *win, const struct row_ctx *rc, u32 x0, u32 y, const char *detail,
-		       struct text_line *line)
+		       struct text_line *line, u32 inset)
 {
 	text_layout(rc->font, detail, strlen(detail), rc->w, line);
-	if (line->truncated || line->advance + rc->pad >= rc->w)
-		return x0 + rc->w - rc->pad;
-	u32 x = x0 + rc->w + 1 - rc->pad - line->advance;
+	if (line->truncated || line->advance + rc->pad + inset >= rc->w)
+		return x0 + rc->w - rc->pad - inset;
+	u32 x = x0 + rc->w + 1 - rc->pad - inset - line->advance;
 	text_draw_line(win, rc->font, x, y, UI_ROLE_DIM, line);
 	return x;
 }
@@ -1320,9 +1320,21 @@ static int draw_row(const struct list_state *st, const struct row_ctx *rc, const
 	if (item.badge)
 		ui_icon8(win, badge_x + look->row_badge_gap, icon_y, item.badge - 1u,
 			 item.badge_ink ? item.badge_ink : UI_ROLE_ACCENT_INK);
-	u32 detail_x = x0 + rc->w - rc->pad;
+	// A row that opens something: the chevron at the value edge, the detail
+	// left of it
+	u32 inset = 0;
+	if (item.more) {
+		u32 cx = x0 + rc->w + 1 - rc->pad - look->chevron_gap - look->chevron_w;
+		u32 cy = y0 + (rc->rh > look->chevron_h ? (rc->rh - look->chevron_h) / 2 : 0);
+		for (u32 i = 0; i < look->chevron_h; i++) {
+			u32 dx = i < look->chevron_h / 2u ? i : look->chevron_h - 1u - i;
+			text_clear(win, cx + dx, cy + i, 1, 1, UI_ROLE_DIM);
+		}
+		inset = look->chevron_gap + look->chevron_w + look->row_dot_gap;
+	}
+	u32 detail_x = x0 + rc->w - rc->pad - inset;
 	if (item.detail)
-		detail_x = draw_detail(win, rc, x0, y, item.detail, &line) - look->row_dot_gap;
+		detail_x = draw_detail(win, rc, x0, y, item.detail, &line, inset) - look->row_dot_gap;
 	if (item.dot)
 		ui_icon8(win, detail_x - 8u, icon_y, item.dot - 1u, item.dot_ink ? item.dot_ink : UI_ROLE_DIM);
 	return 1;
@@ -1357,7 +1369,7 @@ static u32 item_hash(const struct ui_item *item)
 	// The small fields and the icon, in two words
 	u32 a = item->ink | item->key_len << 8 | item->mark << 16 | item->mark_ink << 24;
 	u32 b = item->badge | item->badge_ink << 8 | item->dot << 16 | item->dot_ink << 24;
-	return (((h * 33) ^ a) * 33 ^ b) * 33 ^ (u32)(size_t)item->icon;
+	return ((((h * 33) ^ a) * 33 ^ b) * 33 ^ (u32)(size_t)item->icon) * 33 ^ item->more;
 }
 
 static u32 item_sig(const struct row_ctx *rc, const struct list_state *st, u32 r)

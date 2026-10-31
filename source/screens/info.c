@@ -317,6 +317,7 @@ static int menu_fetch(void *ctx, u32 i, struct ui_item *out)
 	out->text = str(INFO_S_CONTROLS + n);
 	out->detail = i == R_ABOUT ? info.about_detail : str(INFO_S_CONTROLS_DETAIL + n);
 	out->icon = info.icons[n];
+	out->more = 1;  // each opens its page
 	return UI_ITEM_READY;
 }
 

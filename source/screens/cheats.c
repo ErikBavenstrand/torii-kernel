@@ -323,6 +323,7 @@ static int cs_fetch(void *ctx, u32 i, struct ui_item *out)
 		out->text = cheatfile_folder_name(&s->file, c, &len);
 		out->len = (u16)len;
 		out->mark = ART_ICON8_FOLDER + 1;
+		out->more = 1;
 		out->detail = cs.detail;
 		if (on) {
 			out->dot = ART_ICON8_TICK + 1;  // ticked, as a picked cheat is
@@ -349,6 +350,7 @@ static int cs_fetch(void *ctx, u32 i, struct ui_item *out)
 		u32 own, pick = group_pick(start, end);
 		u32 name = cheatfile_group_name(&s->file, start, end, &own);
 		const struct cheatfile_cheat *shown = &s->cheats[pick != CHEATFILE_NONE && !name ? pick : start];
+		out->more = 1;
 		out->text = cheat_name(shown, &len);
 		out->len = (u16)(name ? name : len);
 		u32 skip = in_folder(shown, out->text, out->len);  // in its folder: past the folder's name
@@ -1131,7 +1133,6 @@ static int cs_show(u32 row)
 	cs.title = (u8)(v->first + CS_TITLE);
 	cs.hints = (u8)(v->first + CS_HINTS);
 	cs.b_down = 0;
-	ui_title_icon_set(cs.title, cs.icon);
 	cs_retitle();
 	row = row < cs.count ? row : cs.count - 1;
 	ui_list_set_cursor(cs.list, row);
@@ -1164,6 +1165,9 @@ static void cs_retitle(void)
 	const char *up, *place = cs_place(&up);
 	ui_title_set(cs.title, place);
 	ui_title_set_sub(cs.title, up);
+	// In a folder, the folder's icon; else the game's
+	if (!ui_title_icon_set(cs.title, cs.folder != CHEATFILE_NONE ? ART_ICON16_FOLDER : cs.icon))
+		tlog_error("cheats: no room for the title's icon");
 }
 
 // A page's title (the Guide, Buttons): its name, the list's place faint after it
@@ -1697,7 +1701,7 @@ static int bp_event(struct ui_view *v, const struct ui_event *e)
 
 static const struct ui_list_model bp_model = {bp_count, bp_fetch, 0, bp_paint, 0};
 static const struct ui_list_config bp_list = {&bp_model, BP_ROW_H, UI_LIST_DRAWN_PILL, 0, CS_LIST_PAD};
-static const struct ui_label_config bp_name = {"", UI_FONT_BODY, UI_ALIGN_LEFT, 0, ART_ICON8_KEYS + 1};
+static const struct ui_label_config bp_name = {"", UI_FONT_BODY, UI_ALIGN_LEFT, UI_LABEL_MARQUEE, ART_ICON8_KEYS + 1};
 
 enum {
 	BP_N_TITLE,

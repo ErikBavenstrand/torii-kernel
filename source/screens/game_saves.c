@@ -437,15 +437,16 @@ static int pick_file(char *out)
 		}
 		u32 up = strcmp(cwd, "/") != 0, count = 0, at = 0;
 		if (up)
-			gs.u.f.rows[count++] = (struct slot_list_row){"..", 0, ART_ICON8_FOLDER + 1};
+			gs.u.f.rows[count++] = (struct slot_list_row){"..", 0, ART_ICON8_FOLDER + 1, 0};
 		for (int i = 0; i < n && count < FILE_ENTRIES + 1; i++, count++) {
 			gs.u.f.rows[count] = (struct slot_list_row){
-				gs.u.f.names[i], 0, (u8)((gs.u.f.dirs[i] ? ART_ICON8_FOLDER : ART_ICON8_FILE) + 1)};
+				gs.u.f.names[i], 0, (u8)((gs.u.f.dirs[i] ? ART_ICON8_FOLDER : ART_ICON8_FILE) + 1),
+				(u8)(gs.u.f.dirs[i] != 0)};
 			if (left[0] && !strcmp(left, gs.u.f.names[i]))
 				at = count;
 		}
 		if (count == 0)
-			gs.u.f.rows[count++] = (struct slot_list_row){S(STR_GSAVES_EMPTY), 0, 0};
+			gs.u.f.rows[count++] = (struct slot_list_row){S(STR_GSAVES_EMPTY), 0, 0, 0};
 		const struct slot_list list = {
 			"game-saves-files", S(STR_GSAVES_FILE_TITLE), cwd, gs.u.f.rows, count, at, hints, 2, 0};
 		u32 row;

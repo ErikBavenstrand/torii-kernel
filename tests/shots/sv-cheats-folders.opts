@@ -11,7 +11,9 @@
 # folder (infolder), B again on Items' row, "2 on" (back). The title names
 # where the list is, the place one up faint after it. Starter, one run of
 # variants, opens straight to its choices (direct); A on Torchic picks it
-# and goes back to the top, Torchic at Starter's right (chosen).
+# and goes back to the top, Torchic at Starter's right (chosen). A folder
+# whose name is too long for the title: cut at first (long), then scrolled
+# to its end once the cursor has rested (scrolled).
 #! settings 28=1
 #! settings 0=22094
 #! sd-file /torii/lang/sv.lng 0 dist/lang/sv.lng
@@ -46,3 +48,6 @@
 -s @272:direct.png
 -k @280:DOWN -k @284:- -k @292:A -k @296:-
 -s @320:chosen.png
+-k @328:DOWN -k @332:- -k @340:A -k @344:-
+-s @364:long.png
+-s @480:scrolled.png

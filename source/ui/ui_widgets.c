@@ -47,7 +47,17 @@ struct label_state {
 	u16 first[2];
 	u8 tiles[2];
 	u8 cur;   // the set the map shows
-	u8 sets;  // 1, or 2 with UI_LABEL_SWAP
+	u8 sets;  // 1, or 2 with UI_LABEL_SWAP or UI_LABEL_MARQUEE
+	// UI_LABEL_MARQUEE's: as a list's (LQ_*), px scrolled, frames to wait
+	u8 mq, mq_acc;
+	u16 mq_px, mq_wait;
+};
+
+enum {
+	LQ_WAIT,  // resting at its place
+	LQ_RUN,
+	LQ_END,
+	LQ_OFF,  // not cut, or not a marquee: still until the text changes
 };
 
 static const struct ui_label_config *label_config(u8 node)
@@ -59,7 +69,7 @@ static const struct ui_label_config *label_config(u8 node)
 
 static int label_measure(u8 node, struct engine_budget *need)
 {
-	return measure_window(node, need, (label_config(node)->flags & UI_LABEL_SWAP) ? 2 : 1);
+	return measure_window(node, need, (label_config(node)->flags & (UI_LABEL_SWAP | UI_LABEL_MARQUEE)) ? 2 : 1);
 }
 
 static int label_init(u8 node)
@@ -67,7 +77,12 @@ static int label_init(u8 node)
 	struct label_state *st = ui_node_state(node);
 	const struct ui_label_config *c = label_config(node);
 	st->text = c->text ? c->text : "";
-	st->sets = (c->flags & UI_LABEL_SWAP) ? 2 : 1;
+	st->sets = (c->flags & (UI_LABEL_SWAP | UI_LABEL_MARQUEE)) ? 2 : 1;
+	st->mq = LQ_OFF;
+	if (c->flags & UI_LABEL_MARQUEE) {
+		st->mq = LQ_WAIT;
+		st->mq_wait = ui_theme()->marquee_delay;
+	}
 	const struct ui_node *n = ui_node(node);
 	for (u32 i = 0; i < st->sets; i++) {
 		st->tiles[i] = ui_tiles(node, (u32)(n->w / 8) * (u32)(n->h / 8), 0, &st->first[i]);
@@ -131,7 +146,15 @@ static void label_draw(u8 node)
 		pad += used;
 		clip = clip > used ? clip - used : 0;
 	}
-	while (y + font->line_height <= h) {
+	if (st->mq_px && lines == 1 && y + font->line_height <= h) {
+		// Scrolled: the glyphs from mq_px on, whole ones, no "..."
+		struct text_line line;
+		u32 lead;
+		text_layout_window(font, s, (u32)strlen(s), st->mq_px, clip, &line, &lead);
+		text_draw_line(&win, font, pad + lead, y, ink, &line);
+		s = "";
+	}
+	while (*s && y + font->line_height <= h) {
 		u32 len = 0;
 		while (s[len] && s[len] != '\n')
 			len++;
@@ -160,8 +183,63 @@ static void label_draw(u8 node)
 void ui_label_set(u8 node, const char *text)
 {
 	struct label_state *st = ui_node_state(node);
-	st->text = text ? text : "";
+	text = text ? text : "";
+	if ((label_config(node)->flags & UI_LABEL_MARQUEE) && (text != st->text || st->mq == LQ_OFF)) {
+		st->mq = LQ_WAIT;  // a new text starts at its place
+		st->mq_px = 0;
+		st->mq_wait = ui_theme()->marquee_delay;
+	}
+	st->text = text;
 	ui_dirty(node, 0xFF);
+}
+
+// UI_LABEL_MARQUEE's step: as a list's cut name (marquee_tick in ui_list.c)
+static void label_update(u8 node, u32 dt)
+{
+	struct label_state *st = ui_node_state(node);
+	const struct ui_node *n = ui_node(node);
+	if (st->mq == LQ_OFF || (n->flags & UI_N_HIDDEN) || ui_node_view(node) != ui_top())
+		return;  // under a popup or a dialog: held where it is
+	const struct ui_theme *t = ui_theme();
+	if (st->mq_wait > dt) {
+		st->mq_wait = (u16)(st->mq_wait - dt);
+		ui_wake();
+		return;
+	}
+	st->mq_wait = 0;
+	const struct ui_label_config *c = label_config(node);
+	const struct torii_font *font = ui_font(c->font);
+	u32 room = (u32)n->w > 2u * t->pad ? (u32)n->w - 2u * t->pad : 0;
+	if (c->icon8)
+		room = room > 8u + t->look.section_icon_gap ? room - 8u - t->look.section_icon_gap : 0;
+	u32 width = strchr(st->text, '\n') ? 0 : text_width(font, st->text, (u32)strlen(st->text));
+	if (st->mq == LQ_WAIT) {
+		if (c->align != UI_ALIGN_LEFT || width <= room) {
+			st->mq = LQ_OFF;
+			return;
+		}
+		st->mq = LQ_RUN;
+		st->mq_px = 0;
+		st->mq_acc = 0;
+	} else if (st->mq == LQ_RUN) {
+		u32 speed = t->marquee_speed > 60 ? 60 : t->marquee_speed ? t->marquee_speed : 1;
+		u32 acc = st->mq_acc + speed * dt;
+		if (acc >= 60) {
+			st->mq_px = (u16)(st->mq_px + acc / 60);
+			ui_dirty(node, 0xFF);
+		}
+		st->mq_acc = (u8)(acc % 60);
+		if (st->mq_px + room >= width + t->marquee_gap) {
+			st->mq = LQ_END;
+			st->mq_wait = t->marquee_pause;
+		}
+	} else {
+		st->mq = LQ_WAIT;  // back at its place, to wait again
+		st->mq_px = 0;
+		st->mq_wait = t->marquee_delay;
+		ui_dirty(node, 0xFF);
+	}
+	ui_wake();
 }
 
 int ui_label_pixels(u8 node, struct ui_label_pixels *out)
@@ -185,7 +263,8 @@ int ui_label_pixels(u8 node, struct ui_label_pixels *out)
 	return 1;
 }
 
-static const struct ui_ops label_ops = {sizeof(struct label_state), label_measure, label_init, 0, 0, label_draw};
+static const struct ui_ops label_ops = {
+	sizeof(struct label_state), label_measure, label_init, 0, label_update, label_draw};
 
 // --- Panel ----------------------------------------------------------------
 

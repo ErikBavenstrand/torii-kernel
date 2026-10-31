@@ -63,6 +63,7 @@ static int model_fetch(void *ctx, u32 i, struct ui_item *out)
 	out->text = sl.list->rows[i].text;
 	out->detail = sl.list->rows[i].detail;
 	out->mark = sl.list->rows[i].mark;
+	out->more = sl.list->rows[i].more;
 	return UI_ITEM_READY;
 }
 

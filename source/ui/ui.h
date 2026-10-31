@@ -188,6 +188,10 @@ struct ui_look {
 	u8 row_mark_gap;    // a list row's mark (ui_item.mark) to its text
 	u8 row_badge_gap;   // its text to its badge (a favourite's star)
 	u8 row_dot_gap;     // its save mark (ui_item.dot) to its detail
+	// A row that opens something (ui_item.more, Settings' actions): a
+	// chevron this far in from the value edge, and its size; its detail
+	// ends row_dot_gap left of it
+	u8 chevron_gap, chevron_w, chevron_h;
 	u8 hint_y;          // the hint bar's key chips
 	u8 hint_chip_h;
 	u8 hint_chip_radius;
@@ -461,6 +465,9 @@ enum {
 };
 enum {
 	UI_LABEL_SWAP = 1,  // two tile sets: text changes in place without tearing
+	// One left-aligned line too long for its width scrolls, as a list's cut
+	// name does (the theme's marquee_*); two tile sets, as UI_LABEL_SWAP
+	UI_LABEL_MARQUEE = 2,
 };
 
 // A label: one or more lines ("\n"), clipped with "..." to its width. ink
@@ -503,6 +510,7 @@ struct ui_item {
 	u8 mark, mark_ink;
 	u8 badge, badge_ink;
 	u8 dot, dot_ink;
+	u8 more;  // 1: A opens a list or page (a folder, a choice, a section): a chevron at the right, past the detail
 };
 
 enum {
@@ -525,10 +533,10 @@ struct ui_paint {
 // Where the list is on screen this frame, for its sprites
 // (ui_list_model.objs): row r's top is top + r * rh - scroll
 struct ui_list_objs {
-	s32 x, top;   // the viewport's left and top, screen px
-	s32 scroll;   // content px at the viewport's top
-	u32 h, rh;    // the viewport's height, a row's height
-	u16 attr0;    // attr0 bits the sprites take (semi-transparent while the page fades)
+	s32 x, top;  // the viewport's left and top, screen px
+	s32 scroll;  // content px at the viewport's top
+	u32 h, rh;  // the viewport's height, a row's height
+	u16 attr0;  // attr0 bits the sprites take (semi-transparent while the page fades)
 };
 
 // Where a list's rows come from. count and fetch run in draw; fetch must
@@ -551,26 +559,26 @@ struct ui_list_model {
 };
 
 enum {
-	UI_LIST_WRAP = 1,     // the cursor wraps at the ends (input.h's rules)
+	UI_LIST_WRAP = 1,  // the cursor wraps at the ends (input.h's rules)
 	UI_LIST_MARQUEE = 2,  // the selected row's name scrolls if it is cut
-	UI_LIST_FIXED = 8,    // list: never more items than whole rows fit, so it never scrolls
-			      // and needs no spare row slots (a menu in a dialog); more are cut
-	UI_LIST_PLAIN = 16,   // no row shows as selected (a log): the cursor only scrolls
+	UI_LIST_FIXED = 8,  // list: never more items than whole rows fit, so it never scrolls
+	// and needs no spare row slots (a menu in a dialog); more are cut
+	UI_LIST_PLAIN = 16,  // no row shows as selected (a log): the cursor only scrolls
 	UI_LIST_SCROLL = 32,  // the cursor is the top row: UP and DOWN scroll a row (a
-			      // reading view, with PLAIN), up to the last page
-	UI_LIST_ICON8 = 64,   // list: an 8x8 item.icon at the row's pad, the name after it
-			      // and the look's section_icon_gap (the Info page's rows)
+	// reading view, with PLAIN), up to the last page
+	UI_LIST_ICON8 = 64,  // list: an 8x8 item.icon at the row's pad, the name after it
+	// and the look's section_icon_gap (the Info page's rows)
 	UI_LIST_DRAWN_PILL = 128,  // with no paper: the selection drawn into the selected row (by
-				   // the model's paint, or the list's pill), as on a list with
-				   // one, not a sprite pill behind it (rows painted opaque)
-	UI_LIST_MARKS = 256,       // list: rows keep a column for item.mark before the text
-	UI_LIST_CONSOLES = 512,    // list: rows draw in UI_BANK_CONSOLES (the console inks and
-				   // the favourites' ink for marks; no item accent)
+	// the model's paint, or the list's pill), as on a list with
+	// one, not a sprite pill behind it (rows painted opaque)
+	UI_LIST_MARKS = 256,  // list: rows keep a column for item.mark before the text
+	UI_LIST_CONSOLES = 512,  // list: rows draw in UI_BANK_CONSOLES (the console inks and
+	// the favourites' ink for marks; no item accent)
 	UI_LIST_NO_SHOULDERS = 1024,  // L and R don't page: held, L picks a hard reset with A
 	UI_LIST_ALERT = 2048,  // list: rows draw in UI_BANK_ALERT (danger, NOR's amber and
-			       // success for their text; no item accent)
+	// success for their text; no item accent)
 	UI_LIST_TRACK = 4096,  // list: keeps a hash of each row's item as drawn, for
-			       // ui_list_refresh_changed (a little time a row drawn)
+	// ui_list_refresh_changed (a little time a row drawn)
 };
 #define UI_LIST_ICON8_W 8
 
@@ -581,21 +589,21 @@ enum {
 // on it, the selected one with the pill under its text (a menu on a panel).
 struct ui_list_config {
 	const struct ui_list_model *model;
-	u8 row_h;     // px, 8 to 32; 0: the theme's row_h; UI_ROW_PITCH_*: the look's
-	u16 flags;    // UI_LIST_*
+	u8 row_h;  // px, 8 to 32; 0: the theme's row_h; UI_ROW_PITCH_*: the look's
+	u16 flags;  // UI_LIST_*
 	u8 detail_w;  // list: px kept for the detail at the right
-	u8 pad;       // the text's inset from a row's edges; 0: the theme's pad
+	u8 pad;  // the text's inset from a row's edges; 0: the theme's pad
 };
-#define UI_ROW_PITCH_LIST 0xFF      // row_h: the look's list_pitch (14 px)
+#define UI_ROW_PITCH_LIST 0xFF  // row_h: the look's list_pitch (14 px)
 #define UI_ROW_PITCH_SETTINGS 0xFE  // row_h: the look's settings_pitch (12 px)
 
 // An image from 4bpp tiles in ROM. With a tag, views share its tiles and
 // palette (and a view pushed again finds them loaded); with none (0), they
 // are its own, and ui_image_show may put others there (box art).
 struct ui_image_config {
-	const u32 *tiles;     // w x h tiles in row order
-	const u16 *palette;   // 16 colours in a bank of its own; NULL: the theme's bank 0
-	u16 tag;              // 0: not shared
+	const u32 *tiles;  // w x h tiles in row order
+	const u16 *palette;  // 16 colours in a bank of its own; NULL: the theme's bank 0
+	u16 tag;  // 0: not shared
 };
 
 // A vertical scroll bar showing a list's position: a 1 px track in the
@@ -633,9 +641,9 @@ struct ui_card_config {
 // (two tile sets each).
 #define UI_TITLE_NO_ICON 0xFFFF
 struct ui_title_config {
-	const char *text;   // the heading; ui_title_set replaces it
+	const char *text;  // the heading; ui_title_set replaces it
 	const char *right;  // ui_title_set_right replaces it; NULL none
-	u16 icon;           // ART_ICON16_* (ui/art_ids.h), UI_TITLE_NO_ICON none
+	u16 icon;  // ART_ICON16_* (ui/art_ids.h), UI_TITLE_NO_ICON none
 };
 
 // The hint bar: up to the look's hint_max key chips with their labels, from
@@ -643,7 +651,7 @@ struct ui_title_config {
 // text in their place (the selected row's explanation, T25). Changes swap
 // whole tile sets, so they never tear.
 struct ui_hint {
-	const char *key;    // the chip's text: "A", "START", "«»"
+	const char *key;  // the chip's text: "A", "START", "«»"
 	const char *label;  // what it does: "play"
 };
 struct ui_hints_config {
@@ -673,7 +681,7 @@ struct ui_hints_config {
 struct ui_canvas_config {
 	void (*paint)(void *ctx, u8 node, const struct text_window *win, u32 set, int fresh);
 	u32 cycles;  // about what a whole paint costs: one that doesn't fit the frame's
-		     // budget waits for the next frame (a first draw then takes two)
+	// budget waits for the next frame (a first draw then takes two)
 };
 // Asks for a repaint in the next draw (several calls before it, one paint)
 void ui_canvas_redraw(u8 node);
@@ -696,60 +704,60 @@ int ui_picture_show(u8 node, const void *tiles);
 
 struct ui_node {
 	s16 x, y, w, h;  // on screen, after anchors
-	u8 view;         // its view's depth in the stack
+	u8 view;  // its view's depth in the stack
 	u8 parent, child, next;  // pool indices, UI_NONE
-	u8 flags;        // UI_N_*
-	u8 dirty;        // the kind's dirty bits
-	u16 state;       // offset of its state in the arena
+	u8 flags;  // UI_N_*
+	u8 dirty;  // the kind's dirty bits
+	u16 state;  // offset of its state in the arena
 };
 
 // ui_node.flags
 enum {
 	UI_N_HIDDEN = 1,  // not drawn: hidden itself, or a parent is
 	UI_N_FOCUS = 2,
-	UI_N_DIRTY = 4,   // draw it
-	UI_N_DRAWN = 8,   // drawn at least once
+	UI_N_DIRTY = 4,  // draw it
+	UI_N_DRAWN = 8,  // drawn at least once
 	UI_N_SELF_HIDDEN = 16,  // hidden itself (UI_HIDDEN, ui_show)
 };
 
 struct ui_view {
 	const struct ui_view_spec *spec;
 	void *ctx;
-	u16 arena;        // its first byte in the arena
+	u16 arena;  // its first byte in the arena
 	u8 first, count;  // its nodes in the pool
-	u8 focus;         // pool index, UI_NONE
-	u8 res_mark;      // res_mark() when pushed
-	u8 planes;        // bit p: it shows plane p
-	u8 flags;         // UI_V_*
+	u8 focus;  // pool index, UI_NONE
+	u8 res_mark;  // res_mark() when pushed
+	u8 planes;  // bit p: it shows plane p
+	u8 flags;  // UI_V_*
 	u8 maps[UI_PLANES];  // res handles of its maps, RES_NONE if unused
-	s16 offset;       // px it is drawn below its place (a dialog sliding, a transition)
-	u16 open;         // a modal view: how far it has opened, 0-UI_OPEN (slide)
-	u16 open_blend;   // and its fade and the dim under it, 0-UI_OPEN
-	s8 opening;       // 1 opening, -1 closing (ui_close), 0 still
-	u8 front;         // with UI_V_OBJS: planes in front of its sprites (bit p)
-	u8 tall;          // planes whose map is 32 x 64 tiles (a list's, bit p)
-	u8 bpp8;          // planes of 8bpp tiles (a picture's, bit p)
+	s16 offset;  // px it is drawn below its place (a dialog sliding, a transition)
+	u16 open;  // a modal view: how far it has opened, 0-UI_OPEN (slide)
+	u16 open_blend;  // and its fade and the dim under it, 0-UI_OPEN
+	s8 opening;  // 1 opening, -1 closing (ui_close), 0 still
+	u8 front;  // with UI_V_OBJS: planes in front of its sprites (bit p)
+	u8 tall;  // planes whose map is 32 x 64 tiles (a list's, bit p)
+	u8 bpp8;  // planes of 8bpp tiles (a picture's, bit p)
 };
 #define UI_OPEN 256
 
 // ui_view.flags
 enum {
-	UI_V_SHOWN = 1,   // its first draw is done and its planes are on
-	UI_V_READY = 2,   // "screen ready" logged
+	UI_V_SHOWN = 1,  // its first draw is done and its planes are on
+	UI_V_READY = 2,  // "screen ready" logged
 	UI_V_CLEARED = 4,  // its maps were cleared for the first draw
-	UI_V_ANIM = 8,     // a modal view that opens and closes with motion
-	UI_V_OBJS = 16,    // it shows sprites (a list's pill): its planes in front of
-			   // them take a better priority than the rest (ui_obj_add)
+	UI_V_ANIM = 8,  // a modal view that opens and closes with motion
+	UI_V_OBJS = 16,  // it shows sprites (a list's pill): its planes in front of
+	// them take a better priority than the rest (ui_obj_add)
 };
 
 // --- Events -------------------------------------------------------------------
 
 enum ui_event_type {
-	UI_EV_KEYS,      // keys fired this frame (input.h): .keys
+	UI_EV_KEYS,  // keys fired this frame (input.h): .keys
 	UI_EV_ACTIVATE,  // A on a list item: .index
-	UI_EV_CURSOR,    // a list's cursor moved: .index
-	UI_EV_FOCUS,     // the node got focus
-	UI_EV_BLUR,      // the node lost focus
+	UI_EV_CURSOR,  // a list's cursor moved: .index
+	UI_EV_FOCUS,  // the node got focus
+	UI_EV_BLUR,  // the node lost focus
 };
 
 struct ui_event {
@@ -826,11 +834,11 @@ void ui_enter(u32 kind, s32 dir);
 // carousel draws it (screens/carousel.h fills it). For the next ui_leave
 // with either kind; without one, they are plain fades.
 struct ui_zoom {
-	u8 sprite;        // ART_SPRITE_*: its tiles
-	s16 cx, cy;       // the centre of its 64x64 box on screen
-	u16 scale;        // its scale there, 256ths (the zoom's start, or the close's end)
-	u16 anchor;       // the texel row the zoom keeps in place (its drawn part's middle)
-	u16 sky;          // the backdrop round it, which the open tints to the paper
+	u8 sprite;  // ART_SPRITE_*: its tiles
+	s16 cx, cy;  // the centre of its 64x64 box on screen
+	u16 scale;  // its scale there, 256ths (the zoom's start, or the close's end)
+	u16 anchor;  // the texel row the zoom keeps in place (its drawn part's middle)
+	u16 sky;  // the backdrop round it, which the open tints to the paper
 	u16 colours[16];  // its palette bank, unfogged
 };
 void ui_zoom_set(const struct ui_zoom *zoom);
@@ -900,7 +908,7 @@ void ui_hints_text(u8 node, const char *text);  // centred; NULL: back to the ch
 // (the Settings page's countdown while it waits for a hotkey), the two
 // centred together
 struct ui_hint_note {
-	u8 ink;           // the text's role, 0: DIM
+	u8 ink;  // the text's role, 0: DIM
 	u8 bar_w, bar_h;  // the bar (0 wide: none): a TRACK pill, ACCENT for fill px of it
 	u8 bar_r, bar_gap;  // its ends' radius, and px between it and the text
 	u8 fill;
@@ -1052,23 +1060,23 @@ int ui_obj_add(u8 node, u16 attr0, u16 attr1, u16 attr2);
 #define UI_POPUP_ROWS 7
 enum {
 	UI_POP_DANGER = 1,  // ui_pop_item.flags: in danger ink (Delete, Format), and last
-	UI_POP_DIM = 2,     // greyed out (ink3): nothing to do now; A still picks it
-	UI_POP_STEP = 4,    // LEFT/RIGHT step its value (shown « value » while chosen):
-			    // ui_popup_choose returns the item | UI_POP_LEFT or UI_POP_RIGHT
+	UI_POP_DIM = 2,  // greyed out (ink3): nothing to do now; A still picks it
+	UI_POP_STEP = 4,  // LEFT/RIGHT step its value (shown « value » while chosen):
+	// ui_popup_choose returns the item | UI_POP_LEFT or UI_POP_RIGHT
 };
 #define UI_POP_LEFT 0x100
 #define UI_POP_RIGHT 0x200
 struct ui_pop_item {
 	const char *text;
 	const char *value;  // right-aligned in the item's ink ("on"); NULL none
-	u8 flags;           // UI_POP_*
+	u8 flags;  // UI_POP_*
 };
 // The popup's contents, kept by pointer while it is up
 struct ui_popup {
 	const char *title;  // its heading (the game's name), cut to fit; NULL none
-	u8 icon8;           // an 8x8 icon before the title, in the item's ink: ART_ICON8_* + 1; 0 none
+	u8 icon8;  // an 8x8 icon before the title, in the item's ink: ART_ICON8_* + 1; 0 none
 	const struct ui_pop_item *items;
-	u8 count;   // 1 to UI_POPUP_ITEMS
+	u8 count;  // 1 to UI_POPUP_ITEMS
 	u8 cursor;  // the item chosen first (the primary action: 0)
 	const char *step_hint;  // the hint bar's word for LEFT/RIGHT on a UI_POP_STEP item
 };
@@ -1106,8 +1114,8 @@ void ui_popup_close(void);
 #define UI_FIELDS_MAX 3
 struct ui_fields {
 	const char *title;
-	u8 icon8;   // ART_ICON8_* + 1, 0 none
-	u8 count;   // 1 to UI_FIELDS_MAX
+	u8 icon8;  // ART_ICON8_* + 1, 0 none
+	u8 count;  // 1 to UI_FIELDS_MAX
 	u8 active;  // the field in the box
 	const char *text[UI_FIELDS_MAX];
 	const char *sep[UI_FIELDS_MAX - 1];  // between fields, in FAINT
@@ -1123,10 +1131,10 @@ u16 ui_fields_key(void (*between)(void));
 void ui_fields_changed(void);
 
 struct ui_confirm {
-	const char *title;   // one line: "Delete Metroid Fusion?"
-	const char *text;    // one line under it, in ink3: "The save stays."; NULL none
+	const char *title;  // one line: "Delete Metroid Fusion?"
+	const char *text;  // one line under it, in ink3: "The save stays."; NULL none
 	const char *action;  // the right-hand button: "Delete"
-	u8 danger;           // 1: the action destroys something (danger ink)
+	u8 danger;  // 1: the action destroys something (danger ink)
 };
 // Asks for a confirmation: 1 if the action was chosen, 0 for Cancel or B
 // (or if it can't open, logged). It has closed when the call returns.

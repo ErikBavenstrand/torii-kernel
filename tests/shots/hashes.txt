@@ -4,7 +4,7 @@
 # that all hash the same.
 art-sheet/boxes-dark F231C4B3F8B57800
 art-sheet/boxes-light 75BB77F3C9402917
-art-sheet/icons D63833A5E1EAA5C0
+art-sheet/icons F5A7B87F668CB999
 art-sheet/sprites1 251BEEB4DCEA16AC
 art-sheet/sprites2 456A349A1C29F1C0
 boot/screen 818B02E74B016B0D
@@ -64,21 +64,23 @@ cheats-buttons/page 5679804BC154D1A3
 cheats-buttons/refused D22DEA711BD1BD9F
 cheats-buttons/set 0374991C42C1440E
 cheats-buttons/typed 2055F65136C59CF3
-cheats-choices/back EFFF35C291088E31
+cheats-choices/back 8A3164916206C116
 cheats-choices/choices B33A65E89915EBC2
-cheats-choices/list 288DFC0304F33E7B
-cheats-choices/picked 9E1CA94F1BE7C2A7
+cheats-choices/list D63A3D849224EA8F
+cheats-choices/picked 0B6D26DB96184104
 cheats-choices/pickone 52762342367B135A
-cheats-choices/run B3D3627FCAF779E5
+cheats-choices/run 3B56EAC032DAC81E
 cheats-clean/clean 019FE0D843B177D1
-cheats-folders/back CB859CD6CFDB90E9
-cheats-folders/choices 770A0FC175CC6672
-cheats-folders/chosen 5D3CE857CB23E1A4
-cheats-folders/direct 9BBC77C8208D7C98
-cheats-folders/folder 05B8A0770E94827D
-cheats-folders/infolder 41DA9ABAA2DD1644
-cheats-folders/list 0281C2B7F9D5D845
-cheats-folders/picked DC01EBE137B44AA9
+cheats-folders/back A59C538B881FD0FA
+cheats-folders/choices 97CB4184F457F65E
+cheats-folders/chosen EF3079346A0D5F0F
+cheats-folders/direct C1E966237324172C
+cheats-folders/folder 7C3059DA4FD2BFF0
+cheats-folders/infolder 2197C200395B70FA
+cheats-folders/list A6E23ABD4A9C7246
+cheats-folders/long CB10DC238C1970BE
+cheats-folders/picked 86ACE8CD7F3CF82C
+cheats-folders/scrolled 68F64852F1B40952
 cheats-guide/guide 999DD7E01A169F64
 cheats-guide/hold 5318EB7741794DA9
 cheats-guide/list 78428A6DB6AFEC7B
@@ -97,7 +99,7 @@ cheats-raw/list 92DE992F4F172EB2
 cheats-ungated/page 7925192D5F5B7844
 cheats-ungated/press F4C8C140DE4A185D
 cheats-ungated/still F4C8C140DE4A185D
-diag-back/back 2B0A73E1C030510B
+diag-back/back D61FE540933194E3
 diag-back/diag B8F9F547D9269D9B
 diag-pages/clock BAA544CE8D033053
 diag-pages/eeprom D9F2B92149C63653
@@ -151,7 +153,7 @@ games-cheats/screen D285AAF8356ABEA2
 games-dedupe/screen 67E86C46698E404E
 games-fav/screen 5F5922C2D6F31804
 games-fav/starred 017306DC53C8BC2C
-games-fav/toggled 294875E98CDCC62F
+games-fav/toggled 7F2A13A6E2C0CA4D
 games-fav-r/star 248B19FC66C146EF
 games-gb/popup 1E60754161273D33
 games-gb/screen A47EFAC3B4A4039F
@@ -350,17 +352,17 @@ home-held/frames 83-83 FB23BF03A6E39D61
 home-held/frames 84-84 FDC1F4BEE41BC9CE
 home-held/frames 85-102 FA1E464A824D7D2B
 home-start-on/screen 818B02E74B016B0D
-info/about EC8C2411BC55833A
-info/back-up EC8C2411BC55833A
-info/diag 2B0A73E1C030510B
-info/rows 4B4024DC43FBFF8F
-info/frames 0-0 EC8C2411BC55833A
-info/frames 1-1 4A2BAAFB9FCAB08E
-info/frames 2-2 DD9FA87F50AE6DFE
-info/frames 3-3 B8B0BA21F0E9300F
-info/frames 4-4 7A3AAC4645B1F42A
-info/frames 5-6 E5D4052E4933CA3B
-info/frames 7-20 2B0A73E1C030510B
+info/about D6C61EB950648EC2
+info/back-up D6C61EB950648EC2
+info/diag D61FE540933194E3
+info/rows 4A3C36AFF8C9015F
+info/frames 0-0 D6C61EB950648EC2
+info/frames 1-1 787B8581EC3D1457
+info/frames 2-2 54BA9DC80363E78F
+info/frames 3-3 EE69F6B488A8D9E6
+info/frames 4-4 4B513BC0EB750322
+info/frames 5-6 E2EF7EB155B84AA3
+info/frames 7-20 D61FE540933194E3
 info-about/about FD38FEA4E7DD3B19
 info-about/about-2 B2BB5362EC400E99
 info-about/about-end 958CA4E7A2A59D25
@@ -370,14 +372,14 @@ info-about/ingame 81E1319CA00321FB
 info-about/saves 02471FDB9F0539CB
 info-counting/about-2 CDE48FAA1AE60BFD
 info-no-free/about-end 743A01B090C6A64F
-info-read/back 4B4024DC43FBFF8F
+info-read/back 4A3C36AFF8C9015F
 info-read/controls 085FB729B4B5C0D4
 info-read/last EFE0B9E1AD3E3DC1
 info-read/last-down F5F00A48FFCD5AC7
 info-read/scrolled 962D6F5D207EBCF6
-info-read/frames 0-1 4B4024DC43FBFF8F
-info-read/frames 2-2 3C57BBFA20BD5E6D
-info-read/frames 3-3 FCCA6286462A8F2B
+info-read/frames 0-1 4A3C36AFF8C9015F
+info-read/frames 2-2 AA292E3D79669121
+info-read/frames 3-3 BB853F93BE07CCE4
 info-read/frames 4-12 47778893E1D42B25
 info-read/frames 13-13 E3CD26BB27BB8B63
 info-read/frames 14-14 D1C9374F4927272E
@@ -522,10 +524,10 @@ rename/latin 307B33D0767DC9EF
 rename/prefilled 1017306268906A3D
 rename/shifted FBDD010AC1E7FCF2
 rename-dark/prefilled 1747112F0822FB93
-saves-games/back DAD6D5C0D03EBBB6
-saves-games/down DAD6D5C0D03EBBB6
+saves-games/back 4103BFE65B80097C
+saves-games/down 4103BFE65B80097C
 saves-games/game 0CF946C5F02E4E71
-saves-games/list 89006E3656EA7E08
+saves-games/list 334CD668F7F83626
 saves-games/settings 2855558557939FF1
 saves-games/settings-again D42817E319F0E3B5
 saves-none/back 6FD766E9918C91F5
@@ -539,31 +541,31 @@ saves-orphans/picker-down 5BC2C5A48DA65656
 saves-orphans/popup 9BE41776246FECB0
 saves-orphans/relink-confirm 64765D53F2508709
 saves-orphans/settings 556316DBE670462E
-sd-confirm-tall/again 7430370C14E2916C
-sd-confirm-tall/back F3F99ED2A3A095B8
-sd-confirm-tall/confirm 68FFE3FC5F8C3BC1
-sd-confirm-tall/popup 7430370C14E2916C
+sd-confirm-tall/again 1FC30D30652EB214
+sd-confirm-tall/back 9B58314A2C71BD30
+sd-confirm-tall/confirm AA98D891D91A2B35
+sd-confirm-tall/popup 1FC30D30652EB214
 sd-dark/folder 6BBE1F91FDB75B4E
-sd-dark/root FE17A3117D75D4CA
+sd-dark/root 27DE7F36FF5317D1
 sd-empty/empty 4FBA4DEC6BFBD4AA
 sd-many/end 009F0545412ADE2B
-sd-many/root A39A3451E972870F
-sd-root/back 95ACAE0E789BC8F0
+sd-many/root 6E81C6EF7B1A262F
+sd-root/back 13494FC2613F2BBD
 sd-root/confirm E79A2798444115F5
 sd-root/file-info 1D6589D91811BE54
 sd-root/folder EE84177EF9E20E06
 sd-root/popup A6E4DD27CD7ABFCF
-sd-root/root 0C9BAACB94E30E68
-sd-root/frames 0-13 0605E1973BDFD660
-sd-root/frames 14-14 1E846C821B6ED326
-sd-root/frames 15-15 A0F136AA451C84CD
-sd-root/frames 16-16 A16BE6BF33C77F02
+sd-root/root 66D9EF9ECDB9F295
+sd-root/frames 0-13 A631F775F98D658D
+sd-root/frames 14-14 B8B2CACF4F82DA7C
+sd-root/frames 15-15 4F83D6128AF52AC9
+sd-root/frames 16-16 A3CF81CED192DEF4
 sd-root/frames 17-17 057F5E890E1CE836
 sd-root/frames 18-18 77FF67C5CAC2B1DE
 sd-root/frames 19-19 A2C46D299D4933C2
 sd-root/frames 20-20 A3B05621660A0116
 sd-root/frames 21-24 EE84177EF9E20E06
-sd-show-all/root 5B4E4D0DF0304FE1
+sd-show-all/root 91E7F1F38162CF14
 settings/bottom 3D629D8B9ADFD2E3
 settings/capture 362DB1C96A591BAC
 settings/edit 3CEFE148C558105E
@@ -727,20 +729,22 @@ sv-cheats-buttons/page 03A4C09A59066A98
 sv-cheats-buttons/refused 70A6380723807EF8
 sv-cheats-buttons/set B7BF0D8B374AE490
 sv-cheats-buttons/typed D071861B190AF645
-sv-cheats-choices/back 95BF21994AE91C7E
+sv-cheats-choices/back 0CE64E9B92825B41
 sv-cheats-choices/choices 4205AD79DCC50025
-sv-cheats-choices/list CDC36044AA8B4F57
-sv-cheats-choices/picked 900D6D642FE96E4F
+sv-cheats-choices/list 37F0FA8D14E7CE43
+sv-cheats-choices/picked F52D657BA4AEAE48
 sv-cheats-choices/pickone 905337148BE85B15
-sv-cheats-choices/run 02C602A65C4F4889
-sv-cheats-folders/back 68072873A723BAA3
-sv-cheats-folders/choices 59430D3531BB4569
-sv-cheats-folders/chosen 372AC9ADD1AA0B0C
-sv-cheats-folders/direct 227654E213AD2D55
-sv-cheats-folders/folder AD7AD6F0594735F8
-sv-cheats-folders/infolder 5B9E64536B882A75
-sv-cheats-folders/list 4E03A76DB46BC60F
-sv-cheats-folders/picked 20F0263866938C16
+sv-cheats-choices/run 250696DA2E06E75E
+sv-cheats-folders/back 4C8452A7D24208A5
+sv-cheats-folders/choices E3252ED3DD7345DD
+sv-cheats-folders/chosen AF7109AB53C93C8E
+sv-cheats-folders/direct F11AEC42866B8EA1
+sv-cheats-folders/folder 9116BF76B149388D
+sv-cheats-folders/infolder A7C2022E0501DBDF
+sv-cheats-folders/list C5BD70E2BDCB2019
+sv-cheats-folders/long D69652B4CEFAD5AF
+sv-cheats-folders/picked 8ACD52D360CEB69B
+sv-cheats-folders/scrolled 5DF473A62B5849EF
 sv-cheats-guide/guide 72CADAC82EE6D19C
 sv-cheats-guide/hold 6DF563FEE39E46C9
 sv-cheats-guide/list 10E914BAEE577D22
@@ -811,14 +815,14 @@ sv-info-about/cheats 9CCC4E07BFE89EE0
 sv-info-about/help 3BC7CD2B37E2A5C4
 sv-info-about/ingame DDB28EBFE4F83070
 sv-info-about/saves 02B258CE41672BE6
-sv-info-read/back BFCB27E24D54148B
+sv-info-read/back D9FE3C4E2FFE1B23
 sv-info-read/controls C40A3328210C2C42
 sv-info-read/last 28677DD95742C3E7
 sv-info-read/last-down 3ED8F4B6D85DB8A7
 sv-info-read/scrolled 80CCED26961285C4
-sv-info-read/frames 0-1 BFCB27E24D54148B
-sv-info-read/frames 2-2 F0A2CB4762B185B5
-sv-info-read/frames 3-3 B6593388AE0E7033
+sv-info-read/frames 0-1 D9FE3C4E2FFE1B23
+sv-info-read/frames 2-2 129B3E8217360A31
+sv-info-read/frames 3-3 CB428F8E36F812E4
 sv-info-read/frames 4-13 47778893E1D42B25
 sv-info-read/frames 14-14 9AB36A81812C344D
 sv-info-read/frames 15-15 7FD139D2B34F48AC
@@ -895,10 +899,10 @@ sv-rename/full 80B1C9557D713AEA
 sv-rename/latin 73D23D2C2D919015
 sv-rename/prefilled 2F61128190A476DB
 sv-rename/shifted 067D454AFB503B70
-sv-saves-games/back 4BF900F19344296D
-sv-saves-games/down 4BF900F19344296D
+sv-saves-games/back B8680E2627A93B73
+sv-saves-games/down B8680E2627A93B73
 sv-saves-games/game CF235D9A2A7D2EE3
-sv-saves-games/list EAE3F87A2FEADFEF
+sv-saves-games/list C22515AFFAE224ED
 sv-saves-games/settings 7B2A019FF9A7894F
 sv-saves-games/settings-again 0670F3D78514D29F
 sv-saves-orphans/back 7B14D22C8262E931
@@ -910,16 +914,16 @@ sv-saves-orphans/picker-down 66A3088EB198B41D
 sv-saves-orphans/popup 093E2DC42B271FD4
 sv-saves-orphans/relink-confirm C29D38C277A747E4
 sv-saves-orphans/settings 0856C9958C12BB44
-sv-sd-root/back A5F64F90FAAD8419
+sv-sd-root/back C83546DD0AB93B6C
 sv-sd-root/confirm ED71525770E04E5C
 sv-sd-root/file-info FC513F8F793118C8
 sv-sd-root/folder E9E57D8E12310012
 sv-sd-root/popup 2160E7DAC9C7BC9E
-sv-sd-root/root 02713C7FD4DF2B9D
-sv-sd-root/frames 0-13 71A318F9E84A5781
-sv-sd-root/frames 14-14 DEDB07AF9A3F7DC6
-sv-sd-root/frames 15-15 CE3FD0A583CEE53E
-sv-sd-root/frames 16-16 279DF61A04E4EAC0
+sv-sd-root/root AC5E545FBCB82818
+sv-sd-root/frames 0-13 7244182F01CA8F8C
+sv-sd-root/frames 14-14 107CB9662B3792D8
+sv-sd-root/frames 15-15 6BEA9291750B956A
+sv-sd-root/frames 16-16 39C329643960C142
 sv-sd-root/frames 17-17 D60E08D6B46C62C2
 sv-sd-root/frames 18-18 12B736F4E49983EA
 sv-sd-root/frames 19-19 4A942BCFAD004BCE
@@ -1266,18 +1270,18 @@ ui-popup/frames 89-89 FC8098310BB6A716
 ui-popup/frames 90-90 319B6EEA3AABD031
 ui-popup/frames 91-91 6B6C646D669C3B44
 ui-popup/frames 92-100 3721024997134B08
-ui-popup-scroll/scrolled 074A6DEB477F96D1
+ui-popup-scroll/scrolled 92F3C9B49368054B
 ui-popup-scroll/stepped 98D91EA919F865A4
 ui-popup-scroll/top EB64287CE0868E10
-ui-popup-scroll/wrapped 6BC68EB514CB1876
-ui-popup-scroll/frames 0-0 E05BD4BD8B446417
-ui-popup-scroll/frames 1-1 BD58E396347556DC
-ui-popup-scroll/frames 2-2 0274555CF6687B7C
-ui-popup-scroll/frames 3-3 A5EB2B711435AF8C
-ui-popup-scroll/frames 4-4 0FEFFFA72A0ACBE4
-ui-popup-scroll/frames 5-5 3E9E86EC1FCD02EF
-ui-popup-scroll/frames 6-6 E2B66B8A8CAF861F
-ui-popup-scroll/frames 7-12 074A6DEB477F96D1
+ui-popup-scroll/wrapped BAEB457CD1F891F8
+ui-popup-scroll/frames 0-0 35237CCB87F6055D
+ui-popup-scroll/frames 1-1 B6F1D42A0927AE7E
+ui-popup-scroll/frames 2-2 53F2F325C5067C66
+ui-popup-scroll/frames 3-3 DFE06E59EDC5C65E
+ui-popup-scroll/frames 4-4 DE834C9A2C652B1E
+ui-popup-scroll/frames 5-5 F362D835998CAB5D
+ui-popup-scroll/frames 6-6 940CCD7637C3E35D
+ui-popup-scroll/frames 7-12 92F3C9B49368054B
 ui-theme/awake D9A31419E2536F43
 ui-theme/dimmed A09935EB7E4618BC
 ui-theme/light 6907E551DCA443BC

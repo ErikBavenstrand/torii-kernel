@@ -48,6 +48,9 @@
 		.row_mark_gap = 4, \
 		.row_badge_gap = 3, \
 		.row_dot_gap = 4, \
+		.chevron_gap = 4, \
+		.chevron_w = 3, \
+		.chevron_h = 5, \
 		.hint_y = 147, \
 		.hint_chip_h = 10, \
 		.hint_chip_radius = 3, \

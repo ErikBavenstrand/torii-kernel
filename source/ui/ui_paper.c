@@ -296,12 +296,25 @@ enum {
 	TITLE_RIGHT = 2,
 };
 
+// A heading (and its after-text) too long for its room scrolls, as a list's
+// cut name does (ui_theme's marquee_*): after marquee_delay frames it moves
+// left to its end, rests marquee_pause frames, and starts over from its place
+enum {
+	TQ_WAIT,  // resting at its place
+	TQ_RUN,
+	TQ_END,
+	TQ_OFF,  // not cut: still until the text changes
+};
+
 struct title_state {
 	struct paint heading, right;
 	const char *text, *right_text, *sub;
 	u16 icon_tile;  // ART_NONE: no icon
 	u8 icon_bank;
 	s16 shift;  // px the heading is drawn right of its place (ui_title_offset)
+	u32 seen;   // the heading's and after-text's hash: the marquee starts over when it changes
+	u16 mq_px, mq_wait;
+	u8 mq, mq_acc;
 };
 
 static const struct ui_title_config *title_config(u8 node)
@@ -333,6 +346,8 @@ static int title_measure(u8 node, struct engine_budget *need)
 	return measure_tiles(node, need, 2 * (hw + rw));
 }
 
+static void title_seen(struct title_state *st);
+
 static int title_init(u8 node)
 {
 	struct title_state *st = ui_node_state(node);
@@ -344,6 +359,8 @@ static int title_init(u8 node)
 	st->text = c->text ? c->text : "";
 	st->right_text = c->right;
 	st->sub = 0;
+	st->seen = 0;
+	title_seen(st);
 	st->icon_tile = ART_NONE;
 	if (c->icon != UI_TITLE_NO_ICON) {
 		st->icon_tile = art_load_icon16(c->icon, &st->icon_bank);
@@ -356,9 +373,78 @@ static int title_init(u8 node)
 	return 1;
 }
 
+// The heading's and its after-text's width, as drawn
+static u32 title_width(const struct title_state *st)
+{
+	const struct ui_theme *t = ui_theme();
+	u32 w = text_width(t->heading, st->text, strlen(st->text));
+	if (st->sub && *st->sub)
+		w += t->look.title_sub_gap + text_width(t->body, st->sub, strlen(st->sub));
+	return w;
+}
+
+// The marquee's step: frames counted down, then px moved at the theme's speed
+static void title_marquee(u8 node, struct title_state *st, u32 dt)
+{
+	const struct ui_theme *t = ui_theme();
+	u32 room = st->heading.tw * 8u > t->look.title_text_x ? st->heading.tw * 8u - t->look.title_text_x : 0;
+	if (st->mq == TQ_OFF || st->shift || ui_node_view(node) != ui_top() || !room)
+		return;  // not cut, sliding in, or under a popup: held where it is
+	if (st->mq_wait > dt) {
+		st->mq_wait = (u16)(st->mq_wait - dt);
+		ui_wake();
+		return;
+	}
+	st->mq_wait = 0;
+	u32 width = title_width(st);
+	if (st->mq == TQ_WAIT) {
+		if (width <= room) {
+			st->mq = TQ_OFF;
+			return;
+		}
+		st->mq = TQ_RUN;
+		st->mq_px = 0;
+		st->mq_acc = 0;
+	} else if (st->mq == TQ_RUN) {
+		u32 speed = t->marquee_speed > 60 ? 60 : t->marquee_speed ? t->marquee_speed : 1;
+		u32 acc = st->mq_acc + speed * dt;
+		if (acc >= 60) {
+			st->mq_px = (u16)(st->mq_px + acc / 60);
+			ui_dirty(node, TITLE_HEADING);
+		}
+		st->mq_acc = (u8)(acc % 60);
+		if (st->mq_px + room >= width + t->marquee_gap) {
+			st->mq = TQ_END;
+			st->mq_wait = t->marquee_pause;
+		}
+	} else {
+		st->mq = TQ_WAIT;  // back at its place, to wait again
+		st->mq_px = 0;
+		st->mq_wait = t->marquee_delay;
+		ui_dirty(node, TITLE_HEADING);
+	}
+	ui_wake();
+}
+
+// A changed heading or after-text: the marquee starts over from its place
+static void title_seen(struct title_state *st)
+{
+	u32 h = 5381;
+	for (const char *p = st->text; *p; p++)
+		h = h * 33 ^ (u8)*p;
+	for (const char *p = st->sub ? st->sub : ""; *p; p++)
+		h = h * 33 ^ (u8)*p;
+	h ^= st->sub ? 1 : 0;
+	if (h == st->seen)
+		return;
+	st->seen = h;
+	st->mq = TQ_WAIT;
+	st->mq_px = 0;
+	st->mq_wait = ui_theme()->marquee_delay;
+}
+
 static void title_update(u8 node, u32 dt)
 {
-	(void)dt;
 	struct title_state *st = ui_node_state(node);
 	const struct ui_node *n = ui_node(node);
 	const struct ui_view *v = ui_node_view(node);
@@ -368,6 +454,8 @@ static void title_update(u8 node, u32 dt)
 		st->shift = (s16)shift;  // the heading drawn there, this frame
 		ui_dirty(node, TITLE_HEADING);
 	}
+	if (st->heading.tw && !(n->flags & UI_N_HIDDEN))
+		title_marquee(node, st, dt);
 	if (st->icon_tile == ART_NONE || (n->flags & UI_N_HIDDEN) || !ui_node_shown(node) || !ui_plane_owned(node))
 		return;
 	s32 x = n->x + ui_view_dx(v) + shift + look()->title_icon_x, y = n->y + dy + look()->title_icon_y;
@@ -417,7 +505,7 @@ static void title_draw(u8 node)
 			ui_dirty(node, todo);  // the last flip hasn't landed: both next frame
 			return;
 		}
-		s32 x = (s32)l->title_text_x - st->heading.tx * 8 + st->shift, ww = st->heading.tw * 8;
+		s32 x = (s32)l->title_text_x - st->heading.tx * 8 + st->shift - st->mq_px, ww = st->heading.tw * 8;
 		text_clear(&win, 0, 0, (u32)ww, h, paper);
 		if (l->title_text_y + t->heading->line_height <= h && x < ww) {
 			x = slid_text(&win, t->heading, x, l->title_text_y, ui_ink(node, UI_ROLE_TEXT), st->text);
@@ -426,6 +514,8 @@ static void title_draw(u8 node)
 			s32 sx = x + l->title_sub_gap, sy = l->title_text_y + t->heading->baseline - b->baseline;
 			if (st->sub && sx < ww && (u32)sy + b->line_height <= h)
 				slid_text(&win, b, sx, (u32)sy, UI_ROLE_FAINT, st->sub);
+			if (st->mq_px)  // scrolled: cut at its place, under the icon's sprite
+				text_clear(&win, 0, 0, l->title_text_x, h, paper);
 		}
 		if (!paint_end(node, &st->heading, set, UI_BANK_NORMAL)) {
 			ui_dirty(node, todo);  // the flip next frame, with the right-hand text's
@@ -454,6 +544,7 @@ void ui_title_set(u8 node, const char *text)
 {
 	struct title_state *st = ui_node_state(node);
 	st->text = text ? text : "";
+	title_seen(st);
 	ui_dirty(node, TITLE_HEADING);
 }
 
@@ -461,6 +552,7 @@ void ui_title_set_sub(u8 node, const char *text)
 {
 	struct title_state *st = ui_node_state(node);
 	st->sub = text;
+	title_seen(st);
 	ui_dirty(node, TITLE_HEADING);
 }
 

@@ -167,6 +167,7 @@ static int model_fetch(void *ctx, u32 i, struct ui_item *out)
 	out->text = sdlist_name(r);
 	if (sdlist_is_dir(r)) {
 		out->icon = sd.icons[0];
+		out->more = 1;  // A opens it
 		sdlist_count_text(sd.detail, sizeof(sd.detail), r->count);
 	} else {
 		out->icon = sd.icons[1];

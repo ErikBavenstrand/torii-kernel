@@ -39,7 +39,7 @@ icon16_banks = [
 	["info", "nes"],
 	["nor", "recent"],
 	["sd", "set"],
-	["torii"],
+	["torii", "folder"],
 ]
 
 # The placeholder boxes' colours in the dark theme: each light colour here

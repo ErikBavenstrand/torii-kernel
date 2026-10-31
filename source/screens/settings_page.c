@@ -73,8 +73,6 @@ static const struct settings_look {
 	u8 swatch_w, swatch_h, swatch_r;  // an LED colour's swatch
 	u8 swatch_gap;       // between swatches while edited
 	u8 swatch_text_gap;  // between a swatch and its colour's name
-	u8 chevron_gap;      // an action's chevron, this far in from the value edge
-	u8 chevron_w, chevron_h;
 	u8 bar_w, bar_h, bar_r, bar_gap;  // the capture's countdown in the hint bar
 	u8 hold;             // frames a hotkey's keys are held to count
 	u16 capture_wait;    // frames with nothing pressed before a capture gives up
@@ -103,9 +101,6 @@ static const struct settings_look {
 	.swatch_r = 2,
 	.swatch_gap = 2,
 	.swatch_text_gap = 4,
-	.chevron_gap = 4,
-	.chevron_w = 3,
-	.chevron_h = 5,
 	.bar_w = 40,
 	.bar_h = 3,
 	.bar_r = 1,
@@ -455,10 +450,11 @@ static s32 paint_value(const struct ui_paint *p, u32 id, s32 right, u32 ink)
 			return text_right(p, right, ink, S(STR_SET_SCANNING));
 		if (id == SET_IDENTIFY && sp.identify_done != IDENTIFY_IDLE)
 			return text_right(p, right, ink, sp.progress);
-		// A chevron, chevron_gap in from the edge
-		s32 x = right - look.chevron_gap - look.chevron_w, y = ((s32)p->rh - look.chevron_h) / 2;
-		for (s32 i = 0; i < look.chevron_h; i++) {
-			s32 dx = i < look.chevron_h / 2 ? i : look.chevron_h - 1 - i;
+		// A chevron, the theme's (ui_look.chevron_*), as a list row that opens has
+		const struct ui_look *l = &ui_theme()->look;
+		s32 x = right - l->chevron_gap - l->chevron_w, y = ((s32)p->rh - l->chevron_h) / 2;
+		for (s32 i = 0; i < l->chevron_h; i++) {
+			s32 dx = i < l->chevron_h / 2 ? i : l->chevron_h - 1 - i;
 			fill(p, x + dx, (u32)(y + i), 1, 1, ink);
 		}
 		return x;
