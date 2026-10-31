@@ -4,9 +4,10 @@
 # names share, its pick's own part at its right, and Max money and No money
 # into one named by its first, with its count (list); on the run's row A
 # opens it (run); its choices by their own parts, the cursor on the pick,
-# the run's name in the title (choices); A on another picks it and drops
-# the old pick (picked); B back on the run's row, its new pick at its right
-# (back); the money run opened: "Pick one" in the title (pickone).
+# the run's name in the title, the game's faint after it (choices); A on
+# another picks it, drops the old pick and goes back to the run's row, its
+# new pick at its right (picked); the money run opened: "Pick one" in the
+# title (pickone); B back on its row, nothing picked (back).
 #! settings 28=1
 #! sd-file /torii/cheats/Hello.cht 0 tests/shots/data/choices.cht
 # The tests' hook: lists open on their first row (else a list opens on
@@ -30,7 +31,7 @@
 -s @64:choices.png
 -k @72:DOWN -k @76:- -k @84:A -k @88:-
 -s @104:picked.png
--k @112:B -k @118:-
--s @140:back.png
--k @148:DOWN -k @152:- -k @160:A -k @164:-
--s @188:pickone.png
+-k @112:DOWN -k @116:- -k @124:A -k @128:-
+-s @152:pickone.png
+-k @160:B -k @166:-
+-s @188:back.png

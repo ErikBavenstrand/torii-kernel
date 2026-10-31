@@ -6,7 +6,10 @@
 # Item x99 variants folded into one choice row, the folder's name in the
 # title (folder); A picks Master Ball beside Rare Candy (picked); A on the
 # choice row opens its choices within the folder (choices); B back in the
-# folder (infolder), B again on Items' row, "2 on" (back).
+# folder (infolder), B again on Items' row, "2 on" (back). The title names
+# where the list is, the place one up faint after it. Starter, one run of
+# variants, opens straight to its choices (direct); A on Torchic picks it
+# and goes back to the top, Torchic at Starter's right (chosen).
 #! settings 28=1
 #! sd-file /torii/cheats/Hello.cht 0 tests/shots/data/folders.cht
 # The tests' hook: lists open on their first row (else a list opens on
@@ -35,3 +38,7 @@
 -s @176:infolder.png
 -k @184:B -k @190:-
 -s @212:back.png
+-k @220:DOWN -k @224:- -k @232:DOWN -k @236:- -k @244:A -k @248:-
+-s @272:direct.png
+-k @280:DOWN -k @284:- -k @292:A -k @296:-
+-s @320:chosen.png

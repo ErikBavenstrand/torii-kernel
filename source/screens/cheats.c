@@ -104,6 +104,7 @@ enum {
 	ACT_WINDOW,  // the cursor went past a larger file's window: the next one (cs.back: the one before)
 	ACT_GROUP,   // A on a run of variants' row: its choices
 	ACT_FOLDER,  // A on a folder's row: its cheats
+	ACT_CHOSEN,  // A picked one of a run's choices: back to the run's row
 };
 
 // START's menu's items
@@ -149,6 +150,7 @@ static struct {
 	// The folder whose cheats show (its first cheat), and past its last;
 	// CHEATFILE_NONE: the top. A run of variants opens within it.
 	u32 folder, folder_end;
+	u8 direct;  // the folder is one run of variants, opened straight to its choices: B leaves both
 	char folder_sub[CHEATFILE_FOLDER_MAX + 1];  // the title's after-text while it shows
 	// The run of variants whose choices show (its first cheat), and past its
 	// last; CHEATFILE_NONE: every cheat. own: the bytes their names share.
@@ -235,12 +237,18 @@ static void name_copy(char *out, u32 size, const char *name, u32 n)
 static const char *cheat_name(const struct cheatfile_cheat *c, u32 *len);
 
 // Where a name (len bytes) of cheat c starts once shown in its folder: past
-// the folder's name it starts with ("Items: Master Ball"), 0 at the top
-static u32 in_folder(const struct cheatfile_cheat *c, const char *name, u32 len)
+// the folder's name it starts with ("Items: Master Ball"); 0 in none
+static u32 folder_part(const struct cheatfile_cheat *c, const char *name, u32 len)
 {
 	u32 flen;
 	const char *folder = cheatfile_folder_name(&cheatstore()->file, c, &flen);
-	return cs.folder != CHEATFILE_NONE && folder ? cheatfile_folder_part(name, len, folder, flen) : 0;
+	return folder ? cheatfile_folder_part(name, len, folder, flen) : 0;
+}
+
+// The same, while a folder shows (0 elsewhere: the whole name)
+static u32 in_folder(const struct cheatfile_cheat *c, const char *name, u32 len)
+{
+	return cs.folder != CHEATFILE_NONE ? folder_part(c, name, len) : 0;
 }
 
 // The run's name for the title (its shared bytes, past its folder's name,
@@ -307,16 +315,32 @@ static int cs_fetch(void *ctx, u32 i, struct ui_item *out)
 	u32 len, start, end;
 	if (row_folder(i, &start, &end)) {
 		// A folder: its name, a folder's mark, and how many of its cheats
-		// are on (else how many it has) at the right
-		u32 on = picks_in(start, end);
+		// are on (else how many it has) at the right; one that is a run of
+		// variants (once decoded) shows as a run's row does: its pick, else
+		// its choices' count
+		u32 on = picks_in(start, end), run_end, own;
+		int run = end - start >= 2 && cheatfile_group(&s->file, start, &run_end) == start && run_end == end;
 		out->text = cheatfile_folder_name(&s->file, c, &len);
 		out->len = (u16)len;
 		out->mark = ART_ICON8_FOLDER + 1;
-		if (on)
-			SF(cs.detail, sizeof(cs.detail), STR_CHEATS_PICKS, LN(on));
-		else
-			SF(cs.detail, sizeof(cs.detail), STR_N(STR_CHEATS_FOLDER, end - start), LN(end - start));
 		out->detail = cs.detail;
+		if (on) {
+			out->dot = ART_ICON8_TICK + 1;  // ticked, as a picked cheat is
+			out->dot_ink = UI_ROLE_ACCENT_INK;
+		}
+		if (run && on) {
+			u32 pick = group_pick(start, end), n;
+			const char *p = cheat_name(&s->cheats[pick], &n);
+			u32 k = cheatfile_group_name(&s->file, start, end, &own) ? cheatfile_own_part(p, n, own)
+										 : folder_part(&s->cheats[pick], p, n);
+			name_copy(cs.detail, sizeof(cs.detail), p + k, n - k);
+		} else if (run) {
+			SF(cs.detail, sizeof(cs.detail), STR_N(STR_CHEATS_CHOICES, end - start), LN(end - start));
+		} else if (on) {
+			SF(cs.detail, sizeof(cs.detail), STR_CHEATS_PICKS, LN(on));
+		} else {
+			SF(cs.detail, sizeof(cs.detail), STR_N(STR_CHEATS_FOLDER, end - start), LN(end - start));
+		}
 		return UI_ITEM_READY;
 	}
 	if (row_group(i, &start, &end)) {
@@ -606,6 +630,8 @@ static int cs_event(struct ui_view *v, const struct ui_event *e)
 		tlog_debug("cheats: %s cheat %u, %lu bytes picked", c->picked ? "picked" : "dropped", c->number,
 			   (unsigned long)s->file.bytes);
 		cs_picks_changed();
+		if (cs.group != CHEATFILE_NONE && c->picked)
+			cs.act = ACT_CHOSEN;  // one of a run's: chosen, as a menu's item is
 		return 1;
 	}
 	case UI_EV_KEYS:
@@ -896,6 +922,8 @@ static void wrap_part(u32 from, u32 to, u32 width)
 
 // The Guide page of cheat at in the cheat view's place, until B; then
 // nothing shows (the caller shows the cheat view again)
+static void page_title(u8 title, const char *name);
+
 static void cs_guide(u32 at)
 {
 	struct cheatstore *s = cheatstore();
@@ -923,9 +951,7 @@ static void cs_guide(u32 at)
 		return;
 	}
 	u8 title = (u8)(v->first + CS_TITLE);
-	ui_title_set(title, cs.heading);
-	ui_title_icon_set(title, cs.icon);
-	ui_title_set_sub(title, S(STR_CHEATS_GUIDE_SUB));
+	page_title(title, S(STR_CHEATS_GUIDE_SUB));
 	cs.keys[0] = (struct ui_hint){"B", S(STR_HINT_BACK)};
 	ui_hints_set((u8)(v->first + CS_HINTS), cs.keys, 1);
 	tlog_debug("cheats: guide of cheat %lu, %lu rows", (unsigned long)at, (unsigned long)cs.reading.count);
@@ -1021,6 +1047,7 @@ static u32 cs_rows(u32 at)
 		const char *name = s->file.count ? cheatfile_folder_name(&s->file, &s->cheats[first], &len) : NULL;
 		if (!name || len != strlen(cs.folder_sub) || memcmp(name, cs.folder_sub, len) != 0) {
 			cs.folder = cs.group = CHEATFILE_NONE;
+			cs.direct = 0;
 		} else {
 			cs.folder = cheatfile_folder(&s->file, first, &cs.folder_end);
 		}
@@ -1029,10 +1056,14 @@ static u32 cs_rows(u32 at)
 		u32 first = cs.group < s->file.count ? cs.group : s->file.count - 1;
 		cs.group = cheatstore_run(first, &cs.group_end);  // decoded again after an edit
 		if (cs.group_end - cs.group < 2 ||
-		    (cs.folder != CHEATFILE_NONE && (cs.group < cs.folder || cs.group_end > cs.folder_end)))
+		    (cs.folder != CHEATFILE_NONE && (cs.group < cs.folder || cs.group_end > cs.folder_end))) {
 			cs.group = CHEATFILE_NONE;  // an edit left it no run (in its folder)
-		else
+			if (cs.direct)
+				cs.folder = CHEATFILE_NONE;  // nor a folder to stay in: it opened straight to the run
+			cs.direct = 0;
+		} else {
 			group_names(cs.group, cs.group_end);
+		}
 	}
 	cs.folded = 0;
 	for (;;) {
@@ -1086,7 +1117,7 @@ static int cs_actable(u32 i)
 	return why == CHEATFILE_PICKABLE || why == CHEATFILE_WHY_EDIT;
 }
 
-static void cs_title_sub(void);
+static void cs_retitle(void);
 
 // The screen's view, the cursor on row
 static int cs_show(u32 row)
@@ -1100,9 +1131,8 @@ static int cs_show(u32 row)
 	cs.title = (u8)(v->first + CS_TITLE);
 	cs.hints = (u8)(v->first + CS_HINTS);
 	cs.b_down = 0;
-	ui_title_set(cs.title, cs.heading);
 	ui_title_icon_set(cs.title, cs.icon);
-	cs_title_sub();
+	cs_retitle();
 	row = row < cs.count ? row : cs.count - 1;
 	ui_list_set_cursor(cs.list, row);
 	cs_moved(row);
@@ -1111,14 +1141,38 @@ static int cs_show(u32 row)
 
 static int cs_window(u32 k, u32 row);
 
-// The title's after-text: the run's name while its choices show, the
-// folder's while its cheats do, "Picked" while only the picks do
-static void cs_title_sub(void)
+// Where the list is, as the title names it: the run's name while its
+// choices show, the folder's while its cheats do, "Picked" while only the
+// picks do, else the game's; and the place one up (faint after it, as Info's
+// pages have), NULL at the top. A long game name would cut the after-text
+// off, so the place, the part that changes, is the heading.
+static const char *cs_place(const char **up)
 {
-	ui_title_set_sub(cs.title, cs.group != CHEATFILE_NONE    ? cs.group_sub
-				   : cs.folder != CHEATFILE_NONE ? cs.folder_sub
-				   : cs.only                     ? S(STR_CHEATS_ONLY_SUB)
-								 : NULL);
+	*up = cs.folder != CHEATFILE_NONE && cs.group != CHEATFILE_NONE && !cs.direct ? cs.folder_sub : cs.heading;
+	if (cs.group != CHEATFILE_NONE)
+		return cs.group_sub;
+	if (cs.folder != CHEATFILE_NONE)
+		return cs.folder_sub;
+	if (cs.only)
+		return S(STR_CHEATS_ONLY_SUB);
+	*up = NULL;
+	return cs.heading;
+}
+
+static void cs_retitle(void)
+{
+	const char *up, *place = cs_place(&up);
+	ui_title_set(cs.title, place);
+	ui_title_set_sub(cs.title, up);
+}
+
+// A page's title (the Guide, Buttons): its name, the list's place faint after it
+static void page_title(u8 title, const char *name)
+{
+	const char *up;
+	ui_title_set(title, name);
+	ui_title_icon_set(title, cs.icon);
+	ui_title_set_sub(title, cs_place(&up));
 }
 
 // A run of variants' choices in the view (the cursor on its pick, else its
@@ -1137,30 +1191,50 @@ static void cs_group(u32 start)
 	tlog_debug("cheats: %s, %lu rows", cs.group != CHEATFILE_NONE ? "a run's choices" : "all",
 		   (unsigned long)cs.count);
 	ui_list_reset(cs.list, row);
-	cs_title_sub();
+	cs_retitle();
 	cs_moved(row);
 }
 
 // A folder's cheats in the view (the cursor on its first), or the top again
-// on its row (start CHEATFILE_NONE)
+// on its row (start CHEATFILE_NONE). A folder that is one run of variants
+// opens straight to its choices.
 static void cs_folder(u32 start)
 {
 	u32 at = cs.folder, end;
 	if (start != CHEATFILE_NONE) {
 		struct cheatstore *s = cheatstore();
-		u32 len;
+		u32 len, run_end;
 		const char *name = cheatfile_folder_name(&s->file, &s->cheats[start], &len);
 		name_copy(cs.folder_sub, sizeof(cs.folder_sub), name, len);
 		at = start = cheatfile_folder(&s->file, start, &end);
+		if (end - start >= 2 && cheatstore_run(start, &run_end) == start && run_end == end) {
+			cs.folder = start;
+			cs.direct = 1;
+			cs_group(start);
+			return;
+		}
 	}
 	cs.folder = start;
 	cs.group = CHEATFILE_NONE;
+	cs.direct = 0;
 	u32 row = cs_rows(at);
 	tlog_debug("cheats: %s, %lu rows", cs.folder != CHEATFILE_NONE ? "a folder's cheats" : "all",
 		   (unsigned long)cs.count);
 	ui_list_reset(cs.list, row);
-	cs_title_sub();
+	cs_retitle();
 	cs_moved(row);
+}
+
+// Out of a run's choices: to its row, or the top for a folder opened
+// straight to them
+static void cs_group_leave(void)
+{
+	if (cs.direct) {
+		cs.group = CHEATFILE_NONE;
+		cs_folder(CHEATFILE_NONE);
+	} else {
+		cs_group(CHEATFILE_NONE);
+	}
 }
 
 // Only the picked cheats, or all again, in the view as it is: the cursor
@@ -1173,21 +1247,23 @@ static void cs_set_only(int only)
 		for (u32 k = 0; k < cheatstore_windows(); k++)
 			if (cheatstore_window_picks(k) && k != cheatstore_window()) {
 				cs.group = cs.folder = CHEATFILE_NONE;
+				cs.direct = 0;
 				cs.only = 1;
-				ui_title_set_sub(cs.title, S(STR_CHEATS_ONLY_SUB));
+				cs_retitle();
 				cs_window(k, 0);
 				return;
 			}
 	}
 	u32 at = row_cheat(cs.cursor) ? s->rows[cs.cursor] : CHEATFILE_NONE;
 	cs.group = cs.folder = CHEATFILE_NONE;
+	cs.direct = 0;
 	cs.only = (u8)only;
 	u32 row = cs_rows(at);
 	if (at == CHEATFILE_NONE && !cs.only)
 		row = cs.count - 1;  // from + Add code: back on it
 	tlog_debug("cheats: %s, %lu rows", cs.only ? "picked only" : "all", (unsigned long)cs.count);
 	ui_list_reset(cs.list, row);
-	cs_title_sub();
+	cs_retitle();
 	cs_moved(row);
 }
 
@@ -1412,7 +1488,7 @@ static void cs_all_off(void)
 		cs_decode();
 		row = cs_rows(row < cs.shown ? s->rows[row] : CHEATFILE_NONE);
 		ui_list_reset(cs.list, row);
-		cs_title_sub();
+		cs_retitle();
 		cs_moved(row);
 		return;
 	}
@@ -1779,9 +1855,7 @@ static u32 cs_buttons(u32 at)
 	cs.bp.list = (u8)(v->first + BP_N_LIST);
 	cs.bp.hints = (u8)(v->first + BP_N_HINTS);
 	cs.bp.name = (u8)(v->first + BP_N_NAME);
-	ui_title_set(title, cs.heading);
-	ui_title_icon_set(title, cs.icon);
-	ui_title_set_sub(title, S(STR_CHEATS_BUTTONS_SUB));
+	page_title(title, S(STR_CHEATS_BUTTONS_SUB));
 	ui_label_set(cs.bp.name, cs.pop_title);
 	ui_list_set_cursor(cs.bp.list, cs.bp.row);
 	bp_hints();
@@ -1988,7 +2062,7 @@ void cheats_run(const char *rom_path, const char *title, u16 icon)
 			if (cs.b_down && (ui_input()->released & INPUT_B)) {
 				cs.b_down = 0;
 				if (cs.group != CHEATFILE_NONE)
-					cs_group(CHEATFILE_NONE);  // B leaves a run's choices first
+					cs_group_leave();  // B leaves a run's choices first
 				else if (cs.folder != CHEATFILE_NONE)
 					cs_folder(CHEATFILE_NONE);  // then a folder
 				else if (cs.only)
@@ -2007,6 +2081,10 @@ void cheats_run(const char *rom_path, const char *title, u16 icon)
 		}
 		if (cs.act == ACT_FOLDER) {
 			cs_folder(s->rows[cs.act_row]);
+			continue;
+		}
+		if (cs.act == ACT_CHOSEN) {
+			cs_group_leave();
 			continue;
 		}
 		if (cs.act == ACT_GUIDE) {

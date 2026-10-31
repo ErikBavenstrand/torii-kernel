@@ -41,20 +41,27 @@ same folder when their entries are equal.
 - **The row:** at the top, a folder shows as one row with the folder mark,
   named by the folder. Its right-hand detail is how many of its cheats are
   on ("2 on", the title's own words), else how many it holds ("3 cheats").
-- **Opening it:** A opens the folder: the list shows its cheats, the title's
-  subtitle is the folder's name, and B goes back to the folder's row. Its
-  cheats show without the folder's prefix: a name that starts with the
-  folder's name followed by a separator (": ", " - ") shows from past them
-  ("Master Ball ×99"); a name that doesn't, or would be left empty, shows
-  whole.
+- **Opening it:** A opens the folder: the list shows its cheats, the title
+  is the folder's name (see "The title" below), and B goes back to the
+  folder's row. Its cheats show without the folder's prefix: a name that
+  starts with the folder's name followed by a separator (": ", " - ")
+  shows from past them ("Master Ball ×99"); a name that doesn't, or would
+  be left empty, shows whole.
 - **Any number on:** inside a folder each cheat is picked on its own, as at
   the top. Only a choice group keeps one at a time.
+- **A folder that is one choice group** (every cheat in it one run of
+  variants, "Starter: Treecko", "Starter: Torchic"...) shows as a choice row
+  does once decoded: its pick at the right ("✓ Torchic"), else "3 choices".
+  A opens its choices straight away, and B (or a pick) goes back to the top:
+  a folder holding one row would be a step for nothing.
 - **Choice groups nest:** inside a folder its runs of variants fold into
   choice rows, as at the top, named without the folder's prefix
   ("Item ×99"). A opens one; B goes back to the folder, then to the top.
   A run of variants never crosses a folder's edge (`cheatfile_next` checks
   that the cheat before is in the same folder), so a group is always wholly
   inside one folder or wholly outside.
+- **A folder's state:** "2 on" has a tick before it, as a picked cheat
+  has, so what is on shows from the top.
 - **On a folder row:** SELECT does nothing, START's menu has only the
   list's items, and the hint bar shows "Open", as on a choice row.
   "+ Add code" shows at the top only.
@@ -63,6 +70,32 @@ same folder when their entries are equal.
 - The in-game menu doesn't change: it lists the picks only. A possible
   follow-up is to show a pick's folder there, or to group the in-game list
   by folder; not done here.
+
+## The title (UX review, 2026-10-31)
+
+The title bar gives the heading and its faint after-text 151 px together.
+With the game's name as the heading, a long one ("Pokémon Emerald")
+left room for "Items" but cut "Legendaries" or a choice group's name off,
+so a level down you couldn't see where you were. The cheat screens now
+follow Info's pages: the heading is where you are, the faint after-text the
+place one up.
+
+| View | Heading | Faint |
+| --- | --- | --- |
+| The top | the game | none |
+| A folder | its name | the game |
+| A choice group | its name ("Pick one" if none) | its folder, else the game (also for a folder opened straight to it) |
+| Picked | Picked | the game |
+| Guide, Buttons | the page | the list's heading |
+
+Dialogs and START's menu keep the game's name.
+
+## Choices close on a pick
+
+Picking one of a choice group's choices goes back to the group's row, its
+new pick at its right, as a menu closes on its item: one press less, and
+the pick shows where it will be seen. Dropping the picked one (A on it)
+stays, so another can be picked. See `cheat-variants-run-once.md`.
 
 ## Larger files
 

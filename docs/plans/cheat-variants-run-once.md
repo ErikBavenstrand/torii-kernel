@@ -22,11 +22,15 @@ buries everything else.
   name. Its right-hand detail is the picked member's own part ("Pikachu"),
   else the count ("400 choices"). Ticked when a member is picked.
 - **Opening it:** A opens the group: the list shows only its members, each by
-  its own part of the name, the title's subtitle is the group's name, and B
+  its own part of the name, the title is the group's name, and B
   goes back to the group's row. The members act as any cheat: A, SELECT,
   START.
 - **One at a time:** picking a member drops the group's picked member. If the
   new one doesn't fit the budget, the old pick stays.
+- **A pick closes it** (2026-10-31): picking a member goes back to the
+  group's row, its new pick at its right; dropping one stays. The title is
+  the group's name, the game's (or its folder's, `cheat-folders.md`) faint
+  after it.
 - **On a group row:** SELECT does nothing, and START's menu has only the
   list's items (All off, Only picked). The hint bar shows "Open".
 - **Only picked** lists the picks one by one, as before: no groups.
