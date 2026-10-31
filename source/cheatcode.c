@@ -822,6 +822,7 @@ struct dec {
 	u32 ops_max;
 	u32 n;  // every op decoded, stored or not
 	struct cheat_op sink;  // where ops past ops_max go
+	struct cheat_patches *ps;  // a split reading's ROM patches (cheat_decode_split), else NULL
 
 	u8 cont;  // the multi-line code the next line continues
 	u8 cont_width;
@@ -877,6 +878,20 @@ static struct cheat_op *emit(struct dec *s, u8 type, u8 width, u32 address, u32 
 	op->key_offset = 0;
 	op->flags = 0;
 	return op;
+}
+
+// A ROM patch line: an op, or in a split reading a patch, but for one
+// outside the ROM, which stays an op for the address checks to refuse
+static void rom_patch(struct dec *s, u8 width, u32 address, u32 value)
+{
+	if (s->ps) {
+		struct cheat_op probe = {.address = address, .count = 1, .type = CHEAT_OP_ROM_PATCH, .width = width};
+		if (cheat_op_address_ok(&probe)) {
+			cheat_patches_add(s->ps, address, width, value & width_mask(width));  // full: too big
+			return;
+		}
+	}
+	emit(s, CHEAT_OP_ROM_PATCH, width, address, value);
 }
 
 // A code (lines 0) or a line (lines 1) is done: conditionals waiting on it
@@ -1058,7 +1073,7 @@ static void gsa_raw(struct dec *s, u32 op1, u32 op2)
 		code_done(s);
 		return;
 	case 0x6:
-		emit(s, CHEAT_OP_ROM_PATCH, 2, 0x08000000 | ((op1 & 0xFFFFFF) << 1), op2);
+		rom_patch(s, 2, 0x08000000 | ((op1 & 0xFFFFFF) << 1), op2);
 		code_done(s);
 		return;
 	case 0x8:
@@ -1165,7 +1180,11 @@ static void par_special(struct dec *s, u32 op2)
 	case 0x1A000000:
 	case 0x1C000000:
 	case 0x1E000000:
-		emit(s, CHEAT_OP_ROM_PATCH, 2, 0x08000000 | ((op2 & 0xFFFFFF) << 1), 0);
+		// Its value is the next line's
+		if (s->ps)
+			s->cont_addr = 0x08000000 | ((op2 & 0xFFFFFF) << 1);
+		else
+			emit(s, CHEAT_OP_ROM_PATCH, 2, 0x08000000 | ((op2 & 0xFFFFFF) << 1), 0);
 		cont_start(s, CONT_PAR_PATCH, 2);
 		return;
 	case 0x40000000:  // ENDIF
@@ -1204,7 +1223,10 @@ static void par_raw(struct dec *s, u32 op1, u32 op2)
 	u32 width;
 	switch (s->cont) {
 	case CONT_PAR_PATCH:
-		op_at(s, s->cont_op)->value = op1 & 0xFFFF;
+		if (s->ps)
+			rom_patch(s, 2, s->cont_addr, op1 & 0xFFFF);
+		else
+			op_at(s, s->cont_op)->value = op1 & 0xFFFF;
 		cont_end(s);
 		return;
 	case CONT_PAR_BUTTON:
@@ -1491,7 +1513,7 @@ static void vba_line(struct dec *s, const struct line *l)
 	} else if (l->op1 < 0x08000000 || l->op1 >= 0x0E000000) {
 		emit(s, CHEAT_OP_WRITE, l->width, l->op1, l->op2);
 	} else {
-		emit(s, CHEAT_OP_ROM_PATCH, l->width, l->op1, l->op2);
+		rom_patch(s, l->width, l->op1, l->op2);
 	}
 	code_done(s);
 }
@@ -1535,7 +1557,7 @@ void cheat_decoder_force_out(struct cheat_decoder *file, const struct cheat_deco
 // whether the cheat holds a CodeBreaker key line of its own. With adopt, a
 // raw CodeBreaker key line other than work's key is a new key.
 static u8 decode_pass(struct cheat_decoder *work, const char *code, u32 len, struct cheat_op *ops, u32 ops_max,
-		      u32 *n_ops, u8 *keyed, u8 adopt)
+		      u32 *n_ops, struct cheat_patches *ps, u8 *keyed, u8 adopt)
 {
 	struct dec s;
 	struct line l;
@@ -1549,6 +1571,9 @@ static u8 decode_pass(struct cheat_decoder *work, const char *code, u32 len, str
 	s.d = work;
 	s.ops = ops;
 	s.ops_max = ops_max;
+	s.ps = ps;
+	if (ps)
+		ps->n = ps->full = 0;
 	s.block = NONE;
 	s.else_at = NONE;
 	s.adopt = adopt;
@@ -1581,11 +1606,13 @@ static u8 decode_pass(struct cheat_decoder *work, const char *code, u32 len, str
 	*n_ops = s.n;
 	if (s.bad) {
 		*n_ops = 0;
+		if (ps)
+			ps->n = 0;
 		return CHEAT_UNREADABLE;
 	}
-	if (!s.n)
+	if (!s.n && !(ps && ps->n))
 		return CHEAT_MASTER_ONLY;
-	return s.n > ops_max ? CHEAT_TOO_BIG : CHEAT_OK;
+	return s.n > ops_max || (ps && ps->full) ? CHEAT_TOO_BIG : CHEAT_OK;
 }
 
 // Whether a decoding looks real: it reads, and every op is in the GBA's memory
@@ -1613,12 +1640,20 @@ static int touches_ram(const struct cheat_op *ops, u32 n_ops)
 
 u8 cheat_decode(struct cheat_decoder *d, const char *code, u32 len, struct cheat_op *ops, u32 ops_max, u32 *n_ops)
 {
+	return cheat_decode_split(d, code, len, ops, ops_max, n_ops, NULL);
+}
+
+u8 cheat_decode_split(struct cheat_decoder *d, const char *code, u32 len, struct cheat_op *ops, u32 ops_max, u32 *n_ops,
+		      struct cheat_patches *ps)
+{
 	struct cheat_decoder work = *d, alone;
 	struct line l;
 	u32 pos = 0, i;
 	u8 marks = 0, keyed, status, new_key = 0;
 
 	*n_ops = 0;
+	if (ps)
+		ps->n = ps->full = 0;
 #ifdef CHEAT_RAW_LINES
 	cheat_raw.n = 0;  // a cheat that returns before any pass has no lines
 #endif
@@ -1639,7 +1674,7 @@ u8 cheat_decode(struct cheat_decoder *d, const char *code, u32 len, struct cheat
 	if (marks)
 		return CHEAT_PLACEHOLDER;
 
-	status = decode_pass(&work, code, len, ops, ops_max, n_ops, &keyed, 0);
+	status = decode_pass(&work, code, len, ops, ops_max, n_ops, ps, &keyed, 0);
 	// A raw key line other than the file's: a file joining codes made under
 	// two keys starts the second key's codes with its key line, as typed. It
 	// is taken as the key when the file's key reads the cheat as nonsense and
@@ -1650,14 +1685,14 @@ u8 cheat_decode(struct cheat_decoder *d, const char *code, u32 len, struct cheat
 		u32 n_new;
 		u8 new_status;
 		alone = *d;
-		new_status = decode_pass(&alone, code, len, ops, ops_max, &n_new, &keyed, 1);
+		new_status = decode_pass(&alone, code, len, ops, ops_max, &n_new, ps, &keyed, 1);
 		if (new_status == CHEAT_MASTER_ONLY || plausible(new_status, ops, n_new < ops_max ? n_new : ops_max)) {
 			*d = alone;
 			*n_ops = n_new;
 			return new_status;
 		}
 		work = *d;
-		status = decode_pass(&work, code, len, ops, ops_max, n_ops, &keyed, 0);
+		status = decode_pass(&work, code, len, ops, ops_max, n_ops, ps, &keyed, 0);
 	}
 	if (keyed || plausible(status, ops, *n_ops < ops_max ? *n_ops : ops_max)) {
 		*d = work;
@@ -1679,7 +1714,7 @@ u8 cheat_decode(struct cheat_decoder *d, const char *code, u32 len, struct cheat
 			alone.cb_master = 0;
 		if (i & 2)
 			alone.gs_version = CHEAT_FMT_AUTO;
-		alone_status = decode_pass(&alone, code, len, ops, ops_max, &n_alone, &keyed, 0);
+		alone_status = decode_pass(&alone, code, len, ops, ops_max, &n_alone, ps, &keyed, 0);
 		if (plausible(alone_status, ops, n_alone < ops_max ? n_alone : ops_max) &&
 		    touches_ram(ops, n_alone < ops_max ? n_alone : ops_max)) {
 			u8 last = alone.last;
@@ -1708,7 +1743,7 @@ u8 cheat_decode(struct cheat_decoder *d, const char *code, u32 len, struct cheat
 				continue;
 			alone = *d;
 			set_gs_version(&alone, versions[i]);
-			alone_status = decode_pass(&alone, code, len, ops, ops_max, &n_alone, &keyed, 0);
+			alone_status = decode_pass(&alone, code, len, ops, ops_max, &n_alone, ps, &keyed, 0);
 			if (plausible(alone_status, ops, n_alone < ops_max ? n_alone : ops_max) &&
 			    (versions[i] == CHEAT_FMT_GSAV1_RAW || versions[i] == CHEAT_FMT_PARV3_RAW ||
 			     touches_ram(ops, n_alone < ops_max ? n_alone : ops_max))) {
@@ -1720,7 +1755,7 @@ u8 cheat_decode(struct cheat_decoder *d, const char *code, u32 len, struct cheat
 	}
 	// None reads: back to the file's own decoding
 	work = *d;
-	status = decode_pass(&work, code, len, ops, ops_max, n_ops, &keyed, 0);
+	status = decode_pass(&work, code, len, ops, ops_max, n_ops, ps, &keyed, 0);
 	*d = work;
 	return status;
 }

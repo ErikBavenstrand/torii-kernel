@@ -35,8 +35,25 @@ u32 gl_cheat_bytes;
 u32 gl_cheat_count;
 u32 gl_cheat_patches;
 
+_Static_assert(CHEATFILE_PATCHES_MAX * sizeof(struct cheat_patch) <= PSRAM_CHEAT_PATCHES_BYTES,
+	       "a cheat's ROM patches fit their PSRAM");
+_Static_assert(PSRAM_CHEAT_PATCHES_BASE + PSRAM_CHEAT_PATCHES_BYTES <= PSRAM_NAMES_DB_BASE,
+	       "a cheat's ROM patches end below the names database");
+
+// A decoding cheat's patch, into PSRAM (which takes no byte stores)
+static void put_patch(struct cheat_patch *dst, const struct cheat_patch *src)
+{
+	static u8 failed;
+	if (psram_write(dst, src, sizeof(*src)) || failed)
+		return;
+	failed = 1;
+	tlog_error("cheats: a ROM patch's PSRAM write at %08lX failed", (unsigned long)(u32)dst);
+}
+
 struct cheatstore *cheatstore(void)
 {
+	// Whoever decodes takes the store first: the patches go to PSRAM
+	cheatfile_patch_room((struct cheat_patch *)PSRAM_CHEAT_PATCHES_BASE, put_patch);
 	return (struct cheatstore *)(void *)(pReadCache + READCACHE_CHEATS);
 }
 
@@ -1846,8 +1863,9 @@ void cheatstore_launch(const char *rom_path, u32 psram_bytes)
 			if (show) {
 				u32 desc = c->desc != CHEATFILE_NONE;
 				ingame_cheat_put(listed, f->text + (desc ? c->desc : c->code),
-						 desc ? c->desc_len : c->code_len, c->number, (u16)(start + (u32)i),
-						 flags, (u8)bit, (flags & INGAME_CHEAT_TABLE) ? (u16)cs->work.cost : 0,
+						 desc ? c->desc_len : cheatfile_code_len(c), c->number,
+						 (u16)(start + (u32)i), flags, (u8)bit,
+						 (flags & INGAME_CHEAT_TABLE) ? (u16)cs->work.cost : 0,
 						 cheatfile_activation(c));
 				listed++;
 			}

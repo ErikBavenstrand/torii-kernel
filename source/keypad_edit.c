@@ -339,6 +339,7 @@ void keypad_check(const struct keypad_edit *e, u8 format, const struct cheat_dec
 		cheat_decoder_init(&dec);
 	u8 lowered;
 	u8 status = cheatfile_decode(w, &dec, scratch, len, &out->ops, &lowered);
+	out->patches = w->n_patches;  // decoded outside the ops
 	if (format == CHEAT_FMT_AUTO && dec.last != CHEAT_FMT_AUTO)
 		out->format = dec.last;  // as it decoded: a GameShark format by the file's seeds, say
 	switch (status) {

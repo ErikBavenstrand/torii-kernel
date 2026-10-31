@@ -1104,8 +1104,9 @@ void test_cheatcode_lower_rom_patches(void)
 	want[2] = in[3];
 	check_same_table(in, n, want, 3, 2);
 
-	// Nested: the inner conditional covers a patch alone, the outer covers it
-	// and a write
+	// Without an ELSE, a conditional covering only patches covers nothing:
+	// it tests nothing, and nothing waits on it. Nested: the inner covers a
+	// patch alone, the outer it and a write.
 	n = 0;
 	in[n++] = op(CHEAT_OP_IF_EQ, 2, 0x02000000, 1, 4);
 	in[n++] = op(CHEAT_OP_IF_NE, 2, 0x02000002, 1, 1);
@@ -1113,11 +1114,11 @@ void test_cheatcode_lower_rom_patches(void)
 	in[n++] = op(CHEAT_OP_ROM_PATCH, 2, 0x08000102, 1, 1);
 	in[n++] = op(CHEAT_OP_WRITE, 1, 0x02000010, 3, 1);
 	want[0] = in[0];
-	want[0].count = 3;
+	want[0].count = 2;
 	want[1] = in[1];
-	want[2] = op(CHEAT_OP_WRITE, 1, 0, 0, 0);
-	want[3] = in[4];
-	check_same_table(in, n, want, 4, 2);
+	want[1].count = 0;
+	want[2] = in[4];
+	check_same_table(in, n, want, 3, 2);
 
 	// Before, each patch was a step of the table: this one was too big
 	n = 0;
@@ -1160,10 +1161,10 @@ void test_cheatcode_par3_patch_counts(void)
 	CHECK_EQ(got[100].count, 1);
 	CHECK_EQ(got[102].count, 3);  // as laid out: patches included
 	CHECK_EQ(got[106].count, 1);  // the patch alone
-	struct cheat_op want[7] = {got[100], got[101], got[102], got[104], got[106], op(CHEAT_OP_WRITE, 1, 0, 0, 0),
-				   got[108]};
+	struct cheat_op want[6] = {got[100], got[101], got[102], got[104], got[106], got[108]};
 	want[2].count = 1;
-	check_same_table(got, n, want, 7, 100 + 3);
+	want[4].count = 0;  // covers nothing: tests nothing
+	check_same_table(got, n, want, 6, 100 + 3);
 }
 
 void test_cheatcode_device(void)
