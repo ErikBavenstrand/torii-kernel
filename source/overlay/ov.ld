@@ -38,7 +38,7 @@ SECTIONS {
 	.ext __ov_stack_top : AT(__ov_image_end) {
 		__ov_ext_start = .;
 		*(.ext.text)
-		*cheatsearch.o(.text .text.cheatsearch_digits .text.cheatsearch_decimal .text.cheatsearch_edit .text.cheatsearch_fill .text.cheatsearch_get .text.cheatsearch_count)
+		*cheatsearch.o(.text .text.cheatsearch_digits .text.cheatsearch_decimal .text.cheatsearch_edit .text.edit_digits .text.cheatsearch_fill .text.cheatsearch_shift .text.cheatsearch_chunk .text.cheatsearch_get .text.cheatsearch_count)
 		*(.ext.data)
 		. = ALIGN(4);
 		__ov_ext_end = .;

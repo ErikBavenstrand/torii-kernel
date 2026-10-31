@@ -10,7 +10,9 @@
 # Equals edits its number in place, a digit underlined (edit), and A
 # searches (equals). In game A loses a life; back in the search, Equals 4
 # leaves the lives (four); below Show them, Undo the last can take the
-# filter back (undo); Show them lists the lives (list) with their value;
+# filter back (undo), and Negative numbers turns on (signed), From's two
+# numbers then edited with a sign (between); Show them lists the lives
+# (list) with their value;
 # A opens one (pick), and Keep it, set it now keeps it (kept).
 #! settings 2=1
 #! sd-file /searchtest.gba 0 tests/roms/searchtest/searchtest.gba
@@ -26,11 +28,9 @@
 -w "search: started"
 -w "screen ready: ingame-search"
 -s @4:started.png
--k @10:DOWN -k @14:- -k @22:DOWN -k @26:- -k @34:DOWN -k @38:- -k @46:DOWN -k @50:-
--k @58:A -k @62:-
--k @70:UP -k @74:- -k @82:UP -k @86:- -k @94:UP -k @98:- -k @106:UP -k @110:- -k @118:UP -k @122:-
--s @130:edit.png
--k @136:A -k @140:-
+-k @10:DOWN -k @14:- -k @22:DOWN -k @26:- -k @34:DOWN -k @38:- -k @46:DOWN -k @50:- -k @58:DOWN -k @62:- -k @70:DOWN -k @74:- -k @82:A -k @86:- -k @94:UP -k @98:- -k @106:UP -k @110:- -k @118:UP -k @122:- -k @130:UP -k @134:- -k @142:UP -k @146:-
+-s @162:edit.png
+-k @168:A -k @172:-
 -w "left"
 -s @6:equals.png
 -k @12:B -k @16:- -k @40:B -k @44:-
@@ -39,13 +39,16 @@
 -w "screen ready: ingame"
 -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:A -k @48:-
 -w "screen ready: ingame-search"
--k @10:DOWN -k @14:- -k @22:DOWN -k @26:- -k @34:DOWN -k @38:- -k @46:DOWN -k @50:-
--k @58:A -k @62:- -k @70:DOWN -k @74:- -k @82:A -k @86:-
+-k @10:DOWN -k @14:- -k @22:DOWN -k @26:- -k @34:DOWN -k @38:- -k @46:DOWN -k @50:- -k @58:DOWN -k @62:- -k @70:DOWN -k @74:- -k @82:A -k @86:- -k @94:DOWN -k @98:- -k @106:A -k @110:-
 -w "left"
 -s @6:four.png
--k @12:DOWN -k @16:- -k @24:DOWN -k @28:-
--s @40:undo.png
--k @46:UP -k @50:- -k @58:A -k @62:-
+-k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @36:DOWN -k @40:- -k @48:DOWN -k @52:- -k @60:DOWN -k @64:-
+-s @80:undo.png
+-k @86:DOWN -k @90:- -k @98:DOWN -k @102:- -k @110:A -k @114:-
+-s @130:signed.png
+-k @136:UP -k @140:- -k @148:UP -k @152:- -k @160:UP -k @164:- -k @172:UP -k @176:- -k @184:A -k @188:- -k @196:UP -k @200:-
+-s @216:between.png
+-k @222:B -k @226:- -k @234:DOWN -k @238:- -k @246:A -k @250:-
 -w "screen ready: ingame-search-list"
 -s @4:list.png
 -k @10:A -k @14:-
