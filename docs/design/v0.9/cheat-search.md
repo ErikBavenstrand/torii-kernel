@@ -69,9 +69,14 @@ then the count. Back to Torii (`ingame_after_game`) files them.
 The cheat interpreter's table is in the patch area at the ROM's end, in
 PSRAM, which can't be written in game. A found cheat runs every frame this
 session through a **live block** of RAM the hook owns: 28 bytes after the
-hook's spend area. `Get_spend_address` now lowers the game's stack top by
-`0xA0` instead of `0x80`: the spend area keeps the first `0x80`, the live
-block takes `0x80-0x9B`. It holds a check word and three (address, value)
+hook's spend area. Where the game's stack top is the BIOS's default,
+`0x03007F00`, `Get_spend_address` lowers it by `0xA0` instead of `0x80`:
+the spend area keeps the first `0x80`, the live block takes `0x80-0x9B`.
+Other tops keep v0.9.6's `0x80` and get no live block (set once instead):
+the 32 bytes more crashed Street Fighter Alpha 3 (top `0x03007EC0`) in
+`compat --all`, and the spend area's words are all the stub's during the
+menu (it reads its header copy after the overlay returns), so there is no
+other room. `test_spend_lowering` (tests/kernel) keeps both cases. It holds a check word and three (address, value)
 pairs; an address's top four bits are its width as the table's ops have it
 (0 byte, 1 halfword, 2 word), 0 is an empty pair.
 
@@ -245,5 +250,5 @@ same 8 wait states the stub sets, so the numbers should hold.
   bytes (the lines' buffers kept to one a call).
 - **Not tested on the real cart:** the whole feature; in particular that
   the live block's 32 bytes below the old stack top stay the hook's in every
-  game, and that IWRAM borrowed for the compare goes back (it does for the
+  game with the default top, and that IWRAM borrowed for the compare goes back (it does for the
   screenshots, the same code path).
