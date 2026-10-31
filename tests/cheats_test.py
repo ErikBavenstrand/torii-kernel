@@ -23,9 +23,7 @@ from typing import ClassVar
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
-# The local cheats/ folder of curated files would make ruff sort this
-# module as first-party here and third-party in CI
-import cheats  # noqa: I001
+import cheats
 import names_db
 
 FIXTURE = ROOT / "tests" / "cheats" / "gamehacking_gba_50.html"
