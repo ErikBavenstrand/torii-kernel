@@ -16,7 +16,7 @@ So the names already say whose a shot is, and the viewer matches by them; nothin
 What that means:
 
 - A game's SD file and its NOR copy share their shots, as they share the stem; so do two files of one name in different folders, or with different extensions (`Tetris.gb`, `Tetris.gbc`). That is a feature for the NOR copy and harmless for the rest.
-- Renaming a game's file (the SD card page's Rename) moves its shots to the new stem, each keeping its date and number (`shotlist_rename`, from `action_rename_file` after the game's sidecars). One whose new name is taken stays under the old stem. The names are gathered in batches of 8 before any moves, so no rename happens under `f_readdir`.
+- Renaming a game's file (the SD card page's Rename) moves its shots to the new stem, each keeping its date and number (`shotlist_rename`, from `action_rename_file` after the game's sidecars). One whose new name is taken stays under the old stem. Nothing moves when the shots are shared: when another game in the index (or a NOR copy of the file) has the old stem, or one already has the new stem. The names are gathered in batches of 8 before any moves, so no rename happens under `f_readdir`; each batch reads the folder again, so a game with hundreds of shots takes a moment. The moves aren't journalled: a power cut leaves some shots under each name, none lost.
 - Names past 47 bytes match on the cut stem, as they were filed.
 
 ## Finding them fast
@@ -67,7 +67,7 @@ A step decodes inside one call, with no frame drawn, so the old picture stays un
 
 Decoded pictures stay in a cache of 32 in PSRAM page 2. Resting on a picture for 12 frames (no key held) starts the **read-ahead**: a job (`ahead_step`) that decodes the next one the way the last step went, a few lines a step between frames (`pic_begin`, `pic_step`), then puts it in the cache 8 KB a step. Keys never wait on it. A step to the picture it is decoding takes its decode over and finishes it (`the read-ahead's decode goes on`); a step to one it has decoded takes it at once; a step anywhere else stops it. So the usual look-then-step shows at once: a picture from the cache costs a PSRAM copy (about 150,000 cycles, half a frame).
 
-Every part of a decode is bounded a step: 2 lines of the file (with a 12 KB read at most), 2 lines counted or mapped, 512 cells of the median cut's work (each split resumes where it stopped: its slices, then its partition, which adds each cell to its half's sums as it goes), a few boxes' colours or volumes. The job's frames stay within the jobs' frame deadline (`shots-ahead`, 226,454 cycles at most).
+Every part of a decode is bounded a step: opening the file, then its header; 2 lines of the file (with a 4 KB read at most), 2 lines counted or mapped, 512 cells of the median cut's work (each split resumes where it stopped: its slices, then its partition, which adds each cell to its half's sums as it goes), a few boxes' colours or volumes. The job's frames stay within the jobs' frame deadline (`shots-ahead`, 226,454 cycles at most).
 
 The hot loops (a 24-bit row to RGB15, counting, mapping to tiles with or without dither, the median cut's slices, partition and volumes) are ARM code in IWRAM (`PIC_HOT`, 1.6 KB: 5,748 bytes stay free in the test kernel, 7,488 in the kernel); the rest runs from ROM.
 

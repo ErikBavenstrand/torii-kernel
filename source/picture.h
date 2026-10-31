@@ -76,6 +76,7 @@ struct pic_scratch {
 	struct pic_box box[PIC_COLOURS];
 	u32 slice[16];
 	u32 first, rows;  // the file rows in buf
+	u32 read_max;  // bytes a read of rows takes at most (whole rows, one at least); 0: PIC_BUF_BYTES
 	u8 buf[PIC_BUF_BYTES] __attribute__((aligned(4)));
 };
 

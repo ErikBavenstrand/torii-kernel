@@ -92,6 +92,7 @@ struct sv_state {
 	u32 ahead;
 	u8 job, open;
 	u8 adopt;  // a load takes the read-ahead's decode over
+	u8 started;  // the read-ahead's decode has begun (its file open, its header read)
 	u8 keeping;  // the read-ahead has decoded its picture, and is putting it in the cache
 	u32 kept;  // bytes of it there
 	char ahead_path[MAX_path_len + SV_NAME_BYTES];
@@ -294,14 +295,30 @@ static void keep(u32 at)
 }
 
 // Opens path and starts decoding it into s->pic (s->dec)
-static int dec_begin(const char *path)
+// Opens path for a decode into s->pic (s->dec); 0 if it doesn't open
+static int dec_open(const char *path)
 {
 	struct sv_state *s = sv();
 	if (f_open(&s->fil, path, FA_READ) != FR_OK)
-		return PIC_BROKEN;
+		return 0;
 	s->open = 1;
 	s->src = (struct pic_src){read_fil, put_line, get_line, &s->fil, (u32)f_size(&s->fil)};
-	return pic_begin(&s->dec, &s->src, &s->scratch, table(), s->pic.tiles, s->pic.pal);
+	return 1;
+}
+
+// Starts the decode of the file open: PIC_OK, or why not. read_max: the
+// largest read of rows (0: the read buffer's)
+static int dec_start(u32 read_max)
+{
+	struct sv_state *s = sv();
+	int r = pic_begin(&s->dec, &s->src, &s->scratch, table(), s->pic.tiles, s->pic.pal);
+	s->scratch.read_max = read_max;
+	return r;
+}
+
+static int dec_begin(const char *path)
+{
+	return dec_open(path) ? dec_start(0) : PIC_BROKEN;
 }
 
 static void dec_close(void)
@@ -316,6 +333,7 @@ static void dec_close(void)
 // time, between frames, into the cache
 #define AHEAD_LINES 2
 #define AHEAD_KEEP_BYTES 0x2000
+#define AHEAD_READ_BYTES 0x1000  // a step's read of the file, as jobs.h asks (2-8 KB)
 static int ahead_step(struct job *job)
 {
 	struct sv_state *s = sv();
@@ -324,13 +342,25 @@ static int ahead_step(struct job *job)
 	if (job->state == JOB_CANCEL) {
 		if (!s->adopt)
 			dec_close();
+		s->job = JOB_NONE;  // its id may be another job's later
 		return JOB_DONE;
 	}
-	if (job->state == 2)  // decoded: into the cache, a piece a step
-		return keep_some(s->ahead, AHEAD_KEEP_BYTES) ? JOB_DONE : JOB_MORE;
+	if (job->state == 3) {  // decoded: into the cache, a piece a step
+		if (!keep_some(s->ahead, AHEAD_KEEP_BYTES))
+			return JOB_MORE;
+		s->job = JOB_NONE;
+		return JOB_DONE;
+	}
+	// The file opened, then its header read, each a step of its own
 	if (job->state == 0) {
 		job->state = 1;
-		r = dec_begin(s->ahead_path);
+		if (dec_open(s->ahead_path))
+			return JOB_MORE;
+		r = PIC_BROKEN;
+	} else if (job->state == 1) {
+		job->state = 2;
+		r = dec_start(AHEAD_READ_BYTES);
+		s->started = r == PIC_OK;
 		if (r == PIC_OK)
 			return JOB_MORE;
 	} else {
@@ -340,13 +370,15 @@ static int ahead_step(struct job *job)
 		return JOB_MORE;
 	dec_close();
 	s->pic.colours = s->dec.colours;
-	if (r != PIC_OK)
+	if (r != PIC_OK) {
+		s->job = JOB_NONE;
 		return JOB_DONE;
+	}
 	tlog("shots: ahead: %s, %lu colours%s", s->ahead_path, (unsigned long)s->pic.colours,
 	     s->dec.info.exact ? ""
 	     : s->dec.dither   ? " (cut, dithered)"
 			       : " (cut)");
-	job->state = 2;
+	job->state = 3;
 	s->kept = 0;
 	s->keeping = 1;
 	return JOB_MORE;
@@ -378,7 +410,7 @@ static int load(u32 at)
 		tlog("shots: %s: the read-ahead's picture", s->name);
 		return PIC_OK;
 	}
-	if (job_running(s->job) && s->ahead == at && s->open) {
+	if (job_running(s->job) && s->ahead == at && s->open && s->started) {
 		s->adopt = 1;  // its decode is this one's: the job ends, its file stays open
 		job_cancel(s->job);
 		s->adopt = 0;
@@ -501,6 +533,7 @@ static void poll(void)
 			name_path(next, name, s->ahead_path);
 			s->ahead = next;
 			s->keeping = 0;
+			s->started = 0;
 			s->job = job_start(ahead_step, NULL, ui_owner(ui_view_at(ui_depth() - 1)));
 		}
 	}

@@ -133,7 +133,8 @@ static const u8 *file_row(const struct pic_src *src, const struct pic_info *info
 		return s->buf + (fr - s->first) * info->row_bytes;
 	u32 n = 1;
 	if (info->h < 2 * info->out_h) {
-		n = PIC_BUF_BYTES / info->row_bytes;
+		n = (s->read_max ? s->read_max : PIC_BUF_BYTES) / info->row_bytes;
+		n += !n;  // a row wider than read_max: the one row
 		if (n > info->h - fr)
 			n = info->h - fr;
 	}

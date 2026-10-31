@@ -7,7 +7,9 @@
 #include "Ezcard_OP.h"
 #include "crc32.h"
 #include "ez_define.h"
+#include "ezkernel.h"
 #include "ff.h"
+#include "library.h"
 #include "tlog.h"
 #include "userdata.h"
 #include "engine/cycles.h"
@@ -179,6 +181,21 @@ struct move_work {
 };
 _Static_assert(sizeof(struct move_work) <= READCACHE_SHOTS_MOVE_SIZE, "the move's share of pReadCache");
 
+// Games in the index (and on the game NOR, by its file name) whose stem
+// is stem: their screenshots are shared
+static u32 stem_games(const char *stem, const char *name)
+{
+	char other[SHOTNAME_STEM_BYTES];
+	u32 n = 0;
+	for (u32 rec = 0; rec < library_records(); rec++) {
+		if (library_flags(rec) & LIB_F_GONE)
+			continue;
+		shotname_stem(other, sizeof(other), library_name(rec));  // the name is in PSRAM: read only
+		n += !strcmp(other, stem);
+	}
+	return n + (NOR_game_named(name) < game_total_NOR);
+}
+
 u32 shotlist_rename(const char *old_name, const char *new_name)
 {
 	struct move_work *w = (struct move_work *)(void *)(pReadCache + READCACHE_SHOTS_MOVE);
@@ -186,6 +203,14 @@ u32 shotlist_rename(const char *old_name, const char *new_name)
 	shotname_stem(w->new_stem, sizeof(w->new_stem), new_name);
 	if (!w->old_stem[0] || !w->new_stem[0] || !strcmp(w->old_stem, w->new_stem))
 		return 0;
+	// Shared with another game (another extension or folder, a NOR copy), or
+	// the new name's taken by one: the shots are theirs too, and stay
+	u32 sharing = stem_games(w->old_stem, old_name), taking = stem_games(w->new_stem, new_name);
+	if (sharing > 1 || taking) {
+		tlog("shots: %s's stay: %lu games share it, %lu have %s", w->old_stem, (unsigned long)sharing,
+		     (unsigned long)taking, w->new_stem);
+		return 0;
+	}
 	u32 moved = 0, stuck = 0, old_len = (u32)strlen(w->old_stem);
 	for (;;) {
 		// A batch of the old stem's shots, past the ones that wouldn't move
@@ -195,7 +220,8 @@ u32 shotlist_rename(const char *old_name, const char *new_name)
 		while (n < MOVE_BATCH && f_readdir(&w->dir, &w->info) == FR_OK && w->info.fname[0]) {
 			struct shotname_when when;
 			if ((w->info.fattrib & AM_DIR) || strlen(w->info.fname) >= sizeof(w->name[0]) ||
-			    !shotname_match(w->info.fname, w->old_stem, &when) || seen++ < stuck)
+			    !shotname_match(w->info.fname, w->old_stem, &when) ||
+			    shotname_match(w->info.fname, w->new_stem, &when) || seen++ < stuck)
 				continue;
 			memcpy(w->name[n++], w->info.fname, strlen(w->info.fname) + 1);  // it fits: checked above
 		}
