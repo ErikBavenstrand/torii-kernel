@@ -84,6 +84,7 @@ static const struct {
 	{"cheatfile_seeds_carry", test_cheatfile_seeds_carry},
 	{"cheatfile_budget", test_cheatfile_budget},
 	{"cheatfile_patches_budget", test_cheatfile_patches_budget},
+	{"cheatfile_long_code", test_cheatfile_long_code},
 	{"cheatfile_room_pick", test_cheatfile_room_pick},
 	{"cheatfile_write_back", test_cheatfile_write_back},
 	{"cheatfile_add", test_cheatfile_add},

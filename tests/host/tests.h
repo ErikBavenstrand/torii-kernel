@@ -15,6 +15,7 @@ void test_cheatfile_keys_carry(void);
 void test_cheatfile_seeds_carry(void);
 void test_cheatfile_budget(void);
 void test_cheatfile_patches_budget(void);
+void test_cheatfile_long_code(void);
 void test_cheatfile_room_pick(void);
 void test_cheatfile_write_back(void);
 void test_cheatfile_add(void);

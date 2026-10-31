@@ -264,8 +264,8 @@ static u32 result_text(char *out, u32 size)
 	case KEYPAD_OK: {
 		char op[56];
 		describe_op(&kp.first, op, sizeof(op));
-		if (c->ops > 1)
-			SF(out, size, STR_KEYPAD_MORE, LS(op), LN(c->ops - 1));
+		if (c->ops + c->patches > 1)
+			SF(out, size, STR_KEYPAD_MORE, LS(op), LN(c->ops + c->patches - 1));
 		else
 			snprintf(out, size, "%s", op);
 		return UI_ROLE_TEXT;
@@ -321,8 +321,18 @@ static void recheck(void)
 {
 	struct cheatstore *cs = cheatstore();
 	keypad_check(&kp.e, kp.format, kp.ask->ctx, &cs->work, kp.scratch, &kp.check);
-	if (kp.check.status == KEYPAD_OK && kp.check.ops)
+	if (kp.check.status == KEYPAD_OK && kp.check.ops) {
 		kp.first = cs->work.ops[0];
+	} else if (kp.check.status == KEYPAD_OK && kp.check.patches) {
+		// A code of ROM patches alone: its first, as the op it was typed as
+		const struct cheat_patch *p = &cs->work.patches[0];
+		memset(&kp.first, 0, sizeof(kp.first));
+		kp.first.type = CHEAT_OP_ROM_PATCH;
+		kp.first.count = 1;
+		kp.first.width = p->mask == 0xFFFF ? 2 : 1;
+		kp.first.address = 0x08000000 + p->offset + (p->mask == 0xFF00);
+		kp.first.value = p->mask == 0xFF00 ? (u32)p->value >> 8 : p->value & p->mask;
+	}
 	// Only when what the code reads as changes, not a line per digit: the
 	// card's log filled with them (v0.8's cart test)
 	if (kp.check.status == kp.logged_status && kp.check.format == kp.logged_format)

@@ -78,16 +78,28 @@ its frontend, or a flash cart can't do what the device did:
   button, say). Both caps are one number per cheat, its load
   (`CHEAT_LOAD`, `cheatcode.h`); a cheat over either alone is "too big". Each of the 6,161 libretro GBA cheats that read
   and lower fits alone (`just cheat-corpus`, 2026-10-26). ROM patches
-  cost nothing in game and take no place in the table (v0.10): in a cheat
-  with conditionals, a conditional's counts leave out the patches it covers,
-  so it covers the same ops; one stays as a step that does nothing where a
-  conditional covers only patches, so it still tests. A cheat has 256 ROM
-  patches at most (its decoded ops are 256 at most too, and an Action
-  Replay v3 patch is an op: the decoder's work fills pReadCache's cheat
-  share); the picked cheats together 2,048 halfwords (4 KB), kept in cart
-  SRAM page `0xF0` across the game's load (24 KB at `0xF2000`; EWRAM has no
-  room) and written into the game in about 2.2 M cycles (130 ms, the
-  emulated cart, 2,048 of them); the cheat screen refuses a pick past that
+  cost nothing in game and take no place in the table (v0.10): the kernel
+  decodes a ROM patch line (Action Replay v3's and GameShark v1's patch
+  codes, the VBA format's ROM lines) straight into the cheat's patches,
+  not its ops (`cheat_decode_split`), so a conditional's counts are of the
+  ops that run, as the device steps past a patch code; a block whose THEN
+  holds only patches gets the step that does nothing an empty THEN gets, so
+  its ELSE still waits on the condition. `cheat_decode` keeps the patches
+  as ops for the tools and the comparison with mGBA, and `cheat_lower`
+  leaves them out the same way; `tools/cheat_corpus.c` checks both
+  readings give the same table, load and patches (libretro's 7,017 cheats
+  and 140,000 random codes, 2026-10-31: the same, but where a plain
+  cheat's patch line parted a row of writes, which is now one run). A cheat
+  has 2,048 ROM patches at most (4 KB), decoded into PSRAM next to the
+  text (`PSRAM_CHEAT_PATCHES_BASE`, 16 KB; pReadCache has no room); its
+  code may be up to 128 KB (`CHEATFILE_CODE_MAX`: 2,048 Action Replay
+  patch codes take 74 KB), where any other value stops at 64 KB. The
+  picked cheats together have 4,096 (8 KB), kept in cart SRAM page `0xF0`
+  across the game's load (48 KB at `0xF2000`; EWRAM has no room) and
+  written into the game in about 4.4 M cycles (260 ms on the emulated
+  cart). Decoding is about 9,000 cycles a code line on the cart, so a cheat
+  of 2,048 patch lines takes about a second to decode, at the cheat screen
+  and at a launch. The cheat screen refuses a pick past the picked total
   rather than a launch applying part of a cheat. A pick whose enable line
   would take a window of the file past 192 KB is refused too, as it
   couldn't be saved. A false conditional's walk past the ops it guards

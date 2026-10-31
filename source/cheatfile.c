@@ -231,7 +231,7 @@ static void parse_kv(struct cheatfile *f, const struct kv *kv)
 	const char *s = f->text + kv->val;
 	u32 at = kv->val;
 	u16 len = (u16)kv->vlen;
-	if (kv->vlen > CHEATFILE_VALUE_MAX)
+	if (kv->vlen > (what == KEY_CODE ? CHEATFILE_CODE_MAX : CHEATFILE_VALUE_MAX))
 		return;  // no span of ours holds it
 	if (what == KEY_COUNT) {
 		f->count_at = at;
@@ -253,6 +253,7 @@ static void parse_kv(struct cheatfile *f, const struct kv *kv)
 	} else if (what == KEY_CODE) {
 		c->code = at;
 		c->code_len = len;
+		c->code_hi = (kv->vlen >> 16) & 1;
 	} else if (what == KEY_FORMAT) {
 		c->format = format_of(s, len) & 7;
 	} else if (what == KEY_USER) {
@@ -379,8 +380,34 @@ void cheatfile_parse_part(struct cheatfile *f, const char *text, u32 len, struct
 	f->count = n;
 }
 
+#ifdef TORII_HOST_GBA_BASE_H
+// On the host (tests, tools): plain memory of its own until one is set
+static struct cheat_patch host_room[CHEATFILE_PATCHES_MAX];
+#define FIRST_ROOM host_room
+#else
+#define FIRST_ROOM NULL
+#endif
+static struct {
+	struct cheat_patch *at;
+	void (*put)(struct cheat_patch *dst, const struct cheat_patch *src);
+} patch_room = {FIRST_ROOM, NULL};
+
+void cheatfile_patch_room(struct cheat_patch *at, void (*put)(struct cheat_patch *dst, const struct cheat_patch *src))
+{
+	patch_room.at = at;
+	patch_room.put = put;
+}
+
+// The patch room, empty
+static struct cheat_patches room_patches(void)
+{
+	struct cheat_patches ps = {patch_room.at, CHEATFILE_PATCHES_MAX, 0, patch_room.put, 0};
+	return ps;
+}
+
 void cheatfile_begin(struct cheatfile_work *w)
 {
+	w->patches = patch_room.at;
 	cheat_decoder_init(&w->dec);
 	w->next = 0;
 	w->n_prog = w->n_patches = w->cost = 0;
@@ -408,12 +435,17 @@ static u32 program_hash(const struct cheatfile_work *w)
 	return h ? h : 1;
 }
 
-// What n decoded ops do with the values they write left out: where and how
-// they write, and what their conditions test. Two cheats of one shape write
-// other values to the same places: variants of one thing.
-static u32 shape_hash(const struct cheat_op *ops, u32 n)
+// What n decoded ops and w's ROM patches do with the values they write left
+// out: where and how they write, and what their conditions test. Two cheats
+// of one shape write other values to the same places: variants of one thing.
+static u32 shape_hash(const struct cheatfile_work *w, u32 n)
 {
+	const struct cheat_op *ops = w->ops;
 	u32 h = hash_words(2166136261u, &n, 1);
+	for (u32 i = 0; i < w->n_patches; i++) {
+		u32 where[2] = {w->patches[i].offset, w->patches[i].mask};
+		h = hash_words(h, where, 2);
+	}
 	for (u32 i = 0; i < n; i++) {
 		const struct cheat_op *op = &ops[i];
 		int cond = op->type >= CHEAT_OP_IF_EQ && op->type <= CHEAT_OP_IF_NEVER;
@@ -451,9 +483,11 @@ u8 cheatfile_decode(struct cheatfile_work *w, struct cheat_decoder *dec, const c
 		    u8 *lowered)
 {
 	u32 n_ops = 0;
+	struct cheat_patches ps = room_patches();
 	w->n_prog = w->n_patches = w->cost = 0;
+	w->patches = ps.at;
 	*lowered = CHEATFILE_NOT_LOWERED;
-	u8 decoded = cheat_decode(dec, code, len, w->ops, CHEATFILE_OPS_MAX, &n_ops);
+	u8 decoded = cheat_decode_split(dec, code, len, w->ops, CHEATFILE_OPS_MAX, &n_ops, &ps);
 	*ops = n_ops;
 	switch (decoded) {
 	case CHEAT_OK:
@@ -467,8 +501,8 @@ u8 cheatfile_decode(struct cheatfile_work *w, struct cheat_decoder *dec, const c
 	default:
 		return CHEATFILE_UNREADABLE;
 	}
-	*lowered = cheat_lower(w->ops, n_ops, w->prog, CHEATFILE_PROG_MAX, &w->n_prog, &w->cost, w->patches,
-			       CHEATFILE_PATCHES_MAX, &w->n_patches);
+	*lowered = cheat_lower_onto(w->ops, n_ops, w->prog, CHEATFILE_PROG_MAX, &w->n_prog, &w->cost, &ps);
+	w->n_patches = ps.n;
 	switch (*lowered) {
 	case CHEAT_LOWER_OK:
 		return CHEATFILE_OK;
@@ -517,15 +551,15 @@ static int gate(struct cheatfile_work *w, u32 n, u16 keys, u16 act)
 		w->ops[1].count = n;
 		w->ops[1].address = CHEAT_KEYS_BEFORE;
 	}
-	u8 lowered = cheat_lower(w->ops, n + g, w->prog, CHEATFILE_PROG_MAX, &w->n_prog, &w->cost, w->patches,
-				 CHEATFILE_PATCHES_MAX, &w->n_patches);
+	struct cheat_patches ps = room_patches();  // none: it has none
+	u8 lowered = cheat_lower_onto(w->ops, n + g, w->prog, CHEATFILE_PROG_MAX, &w->n_prog, &w->cost, &ps);
 	memmove(w->ops, w->ops + g, n * sizeof(w->ops[0]));
 	if (lowered == CHEAT_LOWER_OK) {
 		w->prog[0] |= g << CHEAT_PROG_GATE_SHIFT;  // a run once steps past them
 		return 1;
 	}
-	cheat_lower(w->ops, n, w->prog, CHEATFILE_PROG_MAX, &w->n_prog, &w->cost, w->patches, CHEATFILE_PATCHES_MAX,
-		    &w->n_patches);
+	ps = room_patches();
+	cheat_lower_onto(w->ops, n, w->prog, CHEATFILE_PROG_MAX, &w->n_prog, &w->cost, &ps);
 	return 0;
 }
 
@@ -549,22 +583,22 @@ s32 cheatfile_next(struct cheatfile *f, struct cheatfile_work *w)
 		u32 seeds[4];
 		cheat_decoder_force_in(&own, &w->dec, c->format);
 		memcpy(seeds, own.gs_seeds, sizeof(seeds));
-		c->status = cheatfile_decode(w, &own, f->text + c->code, c->code_len, &n_ops, &lowered);
+		c->status = cheatfile_decode(w, &own, f->text + c->code, cheatfile_code_len(c), &n_ops, &lowered);
 		cheat_decoder_force_out(&w->dec, &own, seeds);
 	} else {
-		c->status = cheatfile_decode(w, &w->dec, f->text + c->code, c->code_len, &n_ops, &lowered);
+		c->status = cheatfile_decode(w, &w->dec, f->text + c->code, cheatfile_code_len(c), &n_ops, &lowered);
 	}
 	c->detected = c->format != CHEAT_FMT_AUTO ? c->format : w->dec.last;
 	u16 act = c->status == CHEATFILE_OK ? cheatkeys_derive(w->ops, n_ops, w->n_patches != 0, w->n_prog != 0) : 0;
 	if (c->status == CHEATFILE_OK && !gate(w, n_ops, c->keys, act))
 		act |= CHEATFILE_ACT_UNGATED;
 	c->hash = c->status == CHEATFILE_OK ? program_hash(w) : 0;
-	if (c->status == CHEATFILE_OK && !cheat_has_effect(w->ops, n_ops))
+	if (c->status == CHEATFILE_OK && !cheat_has_effect(w->ops, n_ops) && !w->n_patches)
 		c->status = CHEATFILE_NOTHING;
 	else if (c->status == CHEATFILE_OK && seen_before(w, c->hash))
 		c->status = CHEATFILE_SAME;
 	c->act = c->status == CHEATFILE_OK || c->status == CHEATFILE_SAME ? act : 0;
-	u32 shape = c->status == CHEATFILE_OK ? shape_hash(w->ops, n_ops) : 0;
+	u32 shape = c->status == CHEATFILE_OK ? shape_hash(w, n_ops) : 0;
 	c->variant = shape && w->last + 1 == i && shape == w->last_shape && cheatfile_same_folder(f, i - 1, i);
 	w->last = i;
 	w->last_shape = shape;
@@ -1406,7 +1440,7 @@ u32 cheatfile_set_code(struct cheatfile *f, const struct cheatfile_room *room, u
 	u32 n = c->number;
 	struct piece pcs[3];
 	u32 k = 0;
-	pcs[k++] = (struct piece){c->code, c->code_len, PIECE_VALUE, 0, 0, 0, NULL, code, n};
+	pcs[k++] = (struct piece){c->code, cheatfile_code_len(c), PIECE_VALUE, 0, 0, 0, NULL, code, n};
 	if (desc && c->desc != CHEATFILE_NONE)
 		pcs[k++] = (struct piece){c->desc, c->desc_len, PIECE_DESC, 0, 0, 0, NULL, desc, n};
 	else if (desc) {
