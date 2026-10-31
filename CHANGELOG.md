@@ -9,6 +9,11 @@ git log, not here.
 - **Added:** cheat folders: a file's `cheatN_folder = "Items"` folds
   adjacent cheats into one row on the Cheats screen, which A opens; choice
   groups fold inside it, and any number of its cheats can be on (6b51eec2).
+- **Changed:** the Cheats screen's title names where you are (a folder, a
+  choice group, Picked, the Guide or Buttons page), the place one up faint
+  after it, so a long game name no longer hides it; picking a choice goes
+  back to its row; a folder that is one choice group opens straight to it
+  and shows its pick; a folder with cheats on is ticked (dc61506b).
 
 ## v0.9.10
 
