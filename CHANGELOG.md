@@ -4,6 +4,12 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## v0.9.8
+
+- **Changed:** no kernel changes beside the version: this release follows a
+  fix to the tests, whose checks could fail under load (07a575b9). The
+  kernel is v0.9.7's.
+
 ## v0.9.7
 
 - **Added:** Screenshots in a game's popup (games pages, Recent,
