@@ -630,6 +630,15 @@ void test_cheatcode_vba(void)
 // AnyGBA's raw extensions: a pointer target ([P]+O), a key to XOR the
 // value with (^), and OR (|); pointer writes and plain ORs as the devices'
 // own ops, the rest keyed
+// The stack below this frame full of non-zero bytes, as the cart's is
+// (no zeroed frames there): what a decoding reads uninitialized is garbage
+static __attribute__((noinline)) void dirty_stack(void)
+{
+	volatile u8 junk[4096];
+	for (u32 i = 0; i < sizeof(junk); i++)
+		junk[i] = 0xA5;
+}
+
 void test_cheatcode_raw_ext(void)
 {
 	const u8 both = CHEAT_KEYED_TARGET_PTR | CHEAT_KEYED_KEY_PTR | CHEAT_KEYED_KEY;
@@ -650,6 +659,22 @@ void test_cheatcode_raw_ext(void)
 	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "[03005D8C]+137C|80"), CHEAT_OK);
 	CHECK_OP(0, CHEAT_OP_KEYED, 1, 0x03005D8C, 0x80, 1);
 	CHECK_EQ(ops[0].flags, CHEAT_KEYED_TARGET_PTR | CHEAT_KEYED_OR);
+	// A line without a ^KEY has no key, whatever the line before had (the
+	// cart's stack held the last line's, or garbage: a key offset past
+	// 0xFFFF made the cheat unreadable)
+	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "[03005D8C]+0490:000F423F^[03005D90]+00AC+[03005D8C]+137C|80"), CHEAT_OK);
+	CHECK_EQ(n_ops, 2);
+	CHECK_OP(1, CHEAT_OP_KEYED, 1, 0x03005D8C, 0x80, 1);
+	CHECK_EQ(ops[1].flags, CHEAT_KEYED_TARGET_PTR | CHEAT_KEYED_OR);
+	CHECK_EQ(ops[1].key, 0);
+	CHECK_EQ(ops[1].key_offset, 0);
+	dirty_stack();
+	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "[03005D8C]+137C|80"), CHEAT_OK);
+	CHECK_EQ(ops[0].key, 0);
+	CHECK_EQ(ops[0].key_offset, 0);
+	dirty_stack();
+	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "[03005D8C]+0490:000F423F+[03005D8C]+137C|80"), CHEAT_OK);
+	CHECK_EQ(ops[1].key_offset, 0);
 	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "02001000|80"), CHEAT_OK);
 	CHECK_OP(0, CHEAT_OP_OR, 1, 0x02001000, 0x80, 1);
 	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "[03005D8C]:1234"), CHEAT_OK);
