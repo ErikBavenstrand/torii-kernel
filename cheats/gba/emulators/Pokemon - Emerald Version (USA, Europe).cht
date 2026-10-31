@@ -21,7 +21,7 @@ cheat2_code = "00000000 18033E3A+00008951 00000000+00000000 1A033E3B+00008990 00
 cheat2_format = "PARv3 raw"
 cheat2_folder = "Pokémon"
 cheat2_keys = "launch"
-cheat2_guide = "Every Pokémon you get is shiny: wild, gifts, eggs. Caught ones stay shiny. Set when the game starts: pick it on the Cheats screen before you play."
+cheat2_guide = "Every Pokémon you get is shiny: wild, gifts, eggs. Caught ones stay shiny. Works with Nature and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat2_enable = false
 
 cheat3_desc = "Pokémon: Perfect IVs"
@@ -53,7 +53,7 @@ cheat6_code = "00000000 18033F57+00002500 00000000"
 cheat6_format = "PARv3 raw"
 cheat6_folder = "Pokémon"
 cheat6_keys = "launch"
-cheat6_guide = "New wild, gift and egg Pokémon are Hardy. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat6_guide = "New wild, gift and egg Pokémon are Hardy. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat6_enable = false
 
 cheat7_desc = "Pokémon: Nature: Lonely"
@@ -61,7 +61,7 @@ cheat7_code = "00000000 18033F57+00002501 00000000"
 cheat7_format = "PARv3 raw"
 cheat7_folder = "Pokémon"
 cheat7_keys = "launch"
-cheat7_guide = "New wild, gift and egg Pokémon are Lonely. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat7_guide = "New wild, gift and egg Pokémon are Lonely. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat7_enable = false
 
 cheat8_desc = "Pokémon: Nature: Brave"
@@ -69,7 +69,7 @@ cheat8_code = "00000000 18033F57+00002502 00000000"
 cheat8_format = "PARv3 raw"
 cheat8_folder = "Pokémon"
 cheat8_keys = "launch"
-cheat8_guide = "New wild, gift and egg Pokémon are Brave. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat8_guide = "New wild, gift and egg Pokémon are Brave. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat8_enable = false
 
 cheat9_desc = "Pokémon: Nature: Adamant"
@@ -77,7 +77,7 @@ cheat9_code = "00000000 18033F57+00002503 00000000"
 cheat9_format = "PARv3 raw"
 cheat9_folder = "Pokémon"
 cheat9_keys = "launch"
-cheat9_guide = "New wild, gift and egg Pokémon are Adamant. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat9_guide = "New wild, gift and egg Pokémon are Adamant. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat9_enable = false
 
 cheat10_desc = "Pokémon: Nature: Naughty"
@@ -85,7 +85,7 @@ cheat10_code = "00000000 18033F57+00002504 00000000"
 cheat10_format = "PARv3 raw"
 cheat10_folder = "Pokémon"
 cheat10_keys = "launch"
-cheat10_guide = "New wild, gift and egg Pokémon are Naughty. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat10_guide = "New wild, gift and egg Pokémon are Naughty. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat10_enable = false
 
 cheat11_desc = "Pokémon: Nature: Bold"
@@ -93,7 +93,7 @@ cheat11_code = "00000000 18033F57+00002505 00000000"
 cheat11_format = "PARv3 raw"
 cheat11_folder = "Pokémon"
 cheat11_keys = "launch"
-cheat11_guide = "New wild, gift and egg Pokémon are Bold. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat11_guide = "New wild, gift and egg Pokémon are Bold. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat11_enable = false
 
 cheat12_desc = "Pokémon: Nature: Docile"
@@ -101,7 +101,7 @@ cheat12_code = "00000000 18033F57+00002506 00000000"
 cheat12_format = "PARv3 raw"
 cheat12_folder = "Pokémon"
 cheat12_keys = "launch"
-cheat12_guide = "New wild, gift and egg Pokémon are Docile. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat12_guide = "New wild, gift and egg Pokémon are Docile. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat12_enable = false
 
 cheat13_desc = "Pokémon: Nature: Relaxed"
@@ -109,7 +109,7 @@ cheat13_code = "00000000 18033F57+00002507 00000000"
 cheat13_format = "PARv3 raw"
 cheat13_folder = "Pokémon"
 cheat13_keys = "launch"
-cheat13_guide = "New wild, gift and egg Pokémon are Relaxed. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat13_guide = "New wild, gift and egg Pokémon are Relaxed. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat13_enable = false
 
 cheat14_desc = "Pokémon: Nature: Impish"
@@ -117,7 +117,7 @@ cheat14_code = "00000000 18033F57+00002508 00000000"
 cheat14_format = "PARv3 raw"
 cheat14_folder = "Pokémon"
 cheat14_keys = "launch"
-cheat14_guide = "New wild, gift and egg Pokémon are Impish. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat14_guide = "New wild, gift and egg Pokémon are Impish. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat14_enable = false
 
 cheat15_desc = "Pokémon: Nature: Lax"
@@ -125,7 +125,7 @@ cheat15_code = "00000000 18033F57+00002509 00000000"
 cheat15_format = "PARv3 raw"
 cheat15_folder = "Pokémon"
 cheat15_keys = "launch"
-cheat15_guide = "New wild, gift and egg Pokémon are Lax. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat15_guide = "New wild, gift and egg Pokémon are Lax. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat15_enable = false
 
 cheat16_desc = "Pokémon: Nature: Timid"
@@ -133,7 +133,7 @@ cheat16_code = "00000000 18033F57+0000250A 00000000"
 cheat16_format = "PARv3 raw"
 cheat16_folder = "Pokémon"
 cheat16_keys = "launch"
-cheat16_guide = "New wild, gift and egg Pokémon are Timid. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat16_guide = "New wild, gift and egg Pokémon are Timid. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat16_enable = false
 
 cheat17_desc = "Pokémon: Nature: Hasty"
@@ -141,7 +141,7 @@ cheat17_code = "00000000 18033F57+0000250B 00000000"
 cheat17_format = "PARv3 raw"
 cheat17_folder = "Pokémon"
 cheat17_keys = "launch"
-cheat17_guide = "New wild, gift and egg Pokémon are Hasty. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat17_guide = "New wild, gift and egg Pokémon are Hasty. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat17_enable = false
 
 cheat18_desc = "Pokémon: Nature: Serious"
@@ -149,7 +149,7 @@ cheat18_code = "00000000 18033F57+0000250C 00000000"
 cheat18_format = "PARv3 raw"
 cheat18_folder = "Pokémon"
 cheat18_keys = "launch"
-cheat18_guide = "New wild, gift and egg Pokémon are Serious. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat18_guide = "New wild, gift and egg Pokémon are Serious. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat18_enable = false
 
 cheat19_desc = "Pokémon: Nature: Jolly"
@@ -157,7 +157,7 @@ cheat19_code = "00000000 18033F57+0000250D 00000000"
 cheat19_format = "PARv3 raw"
 cheat19_folder = "Pokémon"
 cheat19_keys = "launch"
-cheat19_guide = "New wild, gift and egg Pokémon are Jolly. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat19_guide = "New wild, gift and egg Pokémon are Jolly. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat19_enable = false
 
 cheat20_desc = "Pokémon: Nature: Naive"
@@ -165,7 +165,7 @@ cheat20_code = "00000000 18033F57+0000250E 00000000"
 cheat20_format = "PARv3 raw"
 cheat20_folder = "Pokémon"
 cheat20_keys = "launch"
-cheat20_guide = "New wild, gift and egg Pokémon are Naive. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat20_guide = "New wild, gift and egg Pokémon are Naive. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat20_enable = false
 
 cheat21_desc = "Pokémon: Nature: Modest"
@@ -173,7 +173,7 @@ cheat21_code = "00000000 18033F57+0000250F 00000000"
 cheat21_format = "PARv3 raw"
 cheat21_folder = "Pokémon"
 cheat21_keys = "launch"
-cheat21_guide = "New wild, gift and egg Pokémon are Modest. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat21_guide = "New wild, gift and egg Pokémon are Modest. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat21_enable = false
 
 cheat22_desc = "Pokémon: Nature: Mild"
@@ -181,7 +181,7 @@ cheat22_code = "00000000 18033F57+00002510 00000000"
 cheat22_format = "PARv3 raw"
 cheat22_folder = "Pokémon"
 cheat22_keys = "launch"
-cheat22_guide = "New wild, gift and egg Pokémon are Mild. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat22_guide = "New wild, gift and egg Pokémon are Mild. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat22_enable = false
 
 cheat23_desc = "Pokémon: Nature: Quiet"
@@ -189,7 +189,7 @@ cheat23_code = "00000000 18033F57+00002511 00000000"
 cheat23_format = "PARv3 raw"
 cheat23_folder = "Pokémon"
 cheat23_keys = "launch"
-cheat23_guide = "New wild, gift and egg Pokémon are Quiet. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat23_guide = "New wild, gift and egg Pokémon are Quiet. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat23_enable = false
 
 cheat24_desc = "Pokémon: Nature: Bashful"
@@ -197,7 +197,7 @@ cheat24_code = "00000000 18033F57+00002512 00000000"
 cheat24_format = "PARv3 raw"
 cheat24_folder = "Pokémon"
 cheat24_keys = "launch"
-cheat24_guide = "New wild, gift and egg Pokémon are Bashful. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat24_guide = "New wild, gift and egg Pokémon are Bashful. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat24_enable = false
 
 cheat25_desc = "Pokémon: Nature: Rash"
@@ -205,7 +205,7 @@ cheat25_code = "00000000 18033F57+00002513 00000000"
 cheat25_format = "PARv3 raw"
 cheat25_folder = "Pokémon"
 cheat25_keys = "launch"
-cheat25_guide = "New wild, gift and egg Pokémon are Rash. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat25_guide = "New wild, gift and egg Pokémon are Rash. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat25_enable = false
 
 cheat26_desc = "Pokémon: Nature: Calm"
@@ -213,7 +213,7 @@ cheat26_code = "00000000 18033F57+00002514 00000000"
 cheat26_format = "PARv3 raw"
 cheat26_folder = "Pokémon"
 cheat26_keys = "launch"
-cheat26_guide = "New wild, gift and egg Pokémon are Calm. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat26_guide = "New wild, gift and egg Pokémon are Calm. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat26_enable = false
 
 cheat27_desc = "Pokémon: Nature: Gentle"
@@ -221,7 +221,7 @@ cheat27_code = "00000000 18033F57+00002515 00000000"
 cheat27_format = "PARv3 raw"
 cheat27_folder = "Pokémon"
 cheat27_keys = "launch"
-cheat27_guide = "New wild, gift and egg Pokémon are Gentle. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat27_guide = "New wild, gift and egg Pokémon are Gentle. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat27_enable = false
 
 cheat28_desc = "Pokémon: Nature: Sassy"
@@ -229,7 +229,7 @@ cheat28_code = "00000000 18033F57+00002516 00000000"
 cheat28_format = "PARv3 raw"
 cheat28_folder = "Pokémon"
 cheat28_keys = "launch"
-cheat28_guide = "New wild, gift and egg Pokémon are Sassy. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat28_guide = "New wild, gift and egg Pokémon are Sassy. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat28_enable = false
 
 cheat29_desc = "Pokémon: Nature: Careful"
@@ -237,7 +237,7 @@ cheat29_code = "00000000 18033F57+00002517 00000000"
 cheat29_format = "PARv3 raw"
 cheat29_folder = "Pokémon"
 cheat29_keys = "launch"
-cheat29_guide = "New wild, gift and egg Pokémon are Careful. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat29_guide = "New wild, gift and egg Pokémon are Careful. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat29_enable = false
 
 cheat30_desc = "Pokémon: Nature: Quirky"
@@ -245,23 +245,23 @@ cheat30_code = "00000000 18033F57+00002518 00000000"
 cheat30_format = "PARv3 raw"
 cheat30_folder = "Pokémon"
 cheat30_keys = "launch"
-cheat30_guide = "New wild, gift and egg Pokémon are Quirky. Shiny and Wild gender pick the personality themselves and win over it. Set when the game starts: pick it on the Cheats screen before you play."
+cheat30_guide = "New wild, gift and egg Pokémon are Quirky. Works with Shiny and Gender. Set when the game starts: pick it on the Cheats screen before you play."
 cheat30_enable = false
 
-cheat31_desc = "Pokémon: Wild gender: Male"
+cheat31_desc = "Pokémon: Gender: Male"
 cheat31_code = "00000000 180357BC+000021FF 00000000"
 cheat31_format = "PARv3 raw"
 cheat31_folder = "Pokémon"
 cheat31_keys = "launch"
-cheat31_guide = "Wild Pokémon that can be either are male. Set when the game starts: pick it on the Cheats screen before you play."
+cheat31_guide = "New wild, gift and egg Pokémon that can be either are male. Works with Shiny and Nature. Set when the game starts: pick it on the Cheats screen before you play."
 cheat31_enable = false
 
-cheat32_desc = "Pokémon: Wild gender: Female"
+cheat32_desc = "Pokémon: Gender: Female"
 cheat32_code = "00000000 180357BC+00002100 00000000"
 cheat32_format = "PARv3 raw"
 cheat32_folder = "Pokémon"
 cheat32_keys = "launch"
-cheat32_guide = "Wild Pokémon that can be either are female. Set when the game starts: pick it on the Cheats screen before you play."
+cheat32_guide = "New wild, gift and egg Pokémon that can be either are female. Works with Shiny and Nature. Set when the game starts: pick it on the Cheats screen before you play."
 cheat32_enable = false
 
 cheat33_desc = "Pokémon: Pokérus when caught"

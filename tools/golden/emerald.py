@@ -783,7 +783,9 @@ def ar(*parts):
     return code
 
 
-def cheats():
+def cheats(emulators=False):
+    """emulators: the copy for mGBA and RetroArch, whose 512-character lines
+    take only the short patches (the old shiny, nature and gender ones)"""
     out = []
 
     def add(folder, name, code, guide, keys="always"):
@@ -862,7 +864,9 @@ def cheats():
     add(
         "Pokémon",
         "All new Pokémon shiny",
-        rom_code(
+        vba(*Mixed(personality(0, 1), None).lines)
+        if not emulators
+        else rom_code(
             words(
                 [
                     (0x08067C74, 0x89908951),
@@ -873,7 +877,7 @@ def cheats():
                 ]
             )
         ),
-        "Every Pokémon you get is shiny: wild, gifts, eggs. Caught ones stay shiny. "
+        "Every Pokémon you get is shiny: wild, gifts, eggs. Caught ones stay shiny. Works with Nature and Gender. "
         + LAUNCH,
         "launch",
     )
@@ -909,17 +913,22 @@ def cheats():
         add(
             "Pokémon",
             f"Nature: {nature}",
-            rom_code([(0x08067EAE, 0x2500 | n)]),
-            f"New wild, gift and egg Pokémon are {nature}. Shiny and Wild gender pick the personality themselves and win over it. "
+            vba(*Mixed(personality(2, n), None).lines)
+            if not emulators
+            else rom_code([(0x08067EAE, 0x2500 | n)]),
+            f"New wild, gift and egg Pokémon are {nature}. Works with Shiny and Gender. "
             + LAUNCH,
             "launch",
         )
-    for name, v in (("Male", 0x21FF), ("Female", 0x2100)):
+    for name, v in (("Male", 0xFF), ("Female", 0x00)):
         add(
             "Pokémon",
-            f"Wild gender: {name}",
-            rom_code([(0x0806AF78, v)]),
-            f"Wild Pokémon that can be either are {name.lower()}. " + LAUNCH,
+            f"Gender: {name}",
+            vba(*Mixed(personality(4, v), None).lines)
+            if not emulators
+            else rom_code([(0x0806AF78, {0xFF: 0x21FF, 0x00: 0x2100}[v])]),
+            f"New wild, gift and egg Pokémon that can be either are {name.lower()}. Works with Shiny and Nature. "
+            + LAUNCH,
             "launch",
         )
     add(
@@ -1144,6 +1153,24 @@ def cheats():
     return out
 
 
+def personality(setting, value):
+    """The personality routine (tools/golden/pid.s) and its hook in CreateBoxMon,
+    the same in each Pokémon cheat that uses it, and this cheat's own switch"""
+    stub = Path(__file__).with_name("pid.bin").read_bytes()
+    hook = Path(__file__).with_name("pidhook.bin").read_bytes()
+    return (
+        [
+            (0x080021A4 + i, int.from_bytes(stub[i : i + 2], "little"))
+            for i in range(0, len(stub), 2)
+        ]
+        + [
+            (0x08067C74 + i, int.from_bytes(hook[i : i + 2], "little"))
+            for i in range(0, len(hook), 2)
+        ]
+        + [(0x08F1F000 + setting, value)]
+    )
+
+
 def walls():
     """Hold R to pass walls: tools/golden/walls.s, over Unused_AdjustBgMosaic,
     called from CheckForObjectEventCollision in place of CheckCollision"""
@@ -1160,7 +1187,7 @@ def main():
     only Torii runs (the menus, whose code lines pass mGBA's 512 characters
     and fail the whole file there, and the keyed money and coins)"""
     emulators = "--emulators" in sys.argv[1:]
-    cs = cheats()
+    cs = cheats(emulators)
     if emulators:
         cs = [
             c for c in cs if not (isinstance(c.code, Mixed) or "Torii only" in c.guide)
