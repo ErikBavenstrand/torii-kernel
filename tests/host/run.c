@@ -115,6 +115,8 @@ static const struct {
 	{"cheatcode_too_big", test_cheatcode_too_big},
 	{"cheatcode_detect", test_cheatcode_detect},
 	{"cheatcode_lower", test_cheatcode_lower},
+	{"cheatcode_lower_rom_patches", test_cheatcode_lower_rom_patches},
+	{"cheatcode_par3_patch_counts", test_cheatcode_par3_patch_counts},
 	{"cheatcode_device", test_cheatcode_device},
 	{"cheatcode_fuzz", test_cheatcode_fuzz},
 	{"text_utf8", test_text_utf8},

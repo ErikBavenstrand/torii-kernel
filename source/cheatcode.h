@@ -279,9 +279,11 @@ enum cheat_lower_status {
 // its condition holds, and the game's PSRAM can't be written in game. Nor
 // can an add, or or and on the ROM (0x09xxxxxx holds the cart's command
 // registers), checked at each element's address. A cheat without conditionals runs its ops in order, writes of a
-// width in a row as one run; one with conditionals keeps every op in its
-// place (ROM patches and slowdown codes as nothing), so a condition's count
-// covers the ops it covers in mGBA. IF_BUTTON tests CHEAT_BUTTON_KEYS.
+// width in a row as one run; one with conditionals keeps every other op in
+// its place (slowdown codes as nothing), so a condition's count covers the
+// ops it covers in mGBA. ROM patches take no place and cost nothing: a
+// condition's counts leave out those it covers, but for one kept as nothing
+// where a condition covers only ROM patches (so it still tests). IF_BUTTON tests CHEAT_BUTTON_KEYS.
 // Slowdown codes do nothing. An address is good in EWRAM or IWRAM (mirrors
 // too, as the hardware has them), IO, palette, VRAM, OAM, the ROM's first
 // 32 MB mapping or SRAM; other mirrors and regions are bad, which catches
