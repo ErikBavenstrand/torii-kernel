@@ -13,6 +13,7 @@ void test_cheat_cap(void);
 void test_cheatstore(void);
 void test_cheatstore_clean(void);
 void test_cheatrun_matches_mgba(void);
+void test_cheatrun_rom_patches(void);
 void test_cheatrun_cycles(void);
 void test_cheatrun_off(void);
 void test_cheatrun_once(void);
