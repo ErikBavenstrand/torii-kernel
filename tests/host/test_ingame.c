@@ -82,7 +82,7 @@ void test_ingame_abi(void)
 	CHECK_EQ(INGAME_SESSION_STATE(2, 1) - INGAME_SESSION_STATE(1, 1), sizeof(struct ingame_line));
 	CHECK(INGAME_SESSION_STATE(INGAME_STATE_SLOTS, 0) + sizeof(struct ingame_line) <= INGAME_SESSION_SAVE_SLOT);
 	CHECK(INGAME_SESSION_HEAD < 256);
-	CHECK(INGAME_SESSION_TEXT(INGAME_TEXTS) <= INGAME_SESSION_OUT);
+	CHECK(INGAME_SESSION_TEXT(INGAME_TEXT_SEARCH) <= INGAME_SESSION_OUT);
 	CHECK(sizeof(struct ingame_session) <= INGAME_SESSION_MAX);
 	// The probe: its report fits its 256 bytes of page 0xF0, and the
 	// kernel's blanking of its place (24 bytes) reaches past the magic and

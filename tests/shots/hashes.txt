@@ -358,7 +358,7 @@ info-about/about-2 B2BB5362EC400E99
 info-about/about-end 958CA4E7A2A59D25
 info-about/cheats 7DAD25B8EAB0EE3F
 info-about/help 4BC6CDF3580262CD
-info-about/ingame 8A6D7ED33268C157
+info-about/ingame 81E1319CA00321FB
 info-about/saves 02471FDB9F0539CB
 info-counting/about-2 CDE48FAA1AE60BFD
 info-no-free/about-end 743A01B090C6A64F
@@ -392,19 +392,28 @@ ingame/frames 14-14 CE0974E7D1A5E076
 ingame/frames 15-15 3A309ACE05E575C6
 ingame/frames 16-16 B938E6C34A2B8676
 ingame/frames 17-23 FAD7274EE3C5F306
-ingame-cheats/always 057B94FC48F46076
+ingame-cheats/always 4604A1DE545F40D8
 ingame-cheats/cant 403023B9830DF5FB
-ingame-cheats/cut 14C7D41C13CDAD03
-ingame-cheats/end 61A4A3E085180301
-ingame-cheats/hold 00A754083203866B
+ingame-cheats/cut ADC6281136B7723D
+ingame-cheats/end 2C819A00A955BC0F
+ingame-cheats/hold BDF0CC7D8ED128B5
 ingame-cheats/locked 3393F7FD17CCE860
-ingame-cheats/marquee 6682231FA2F4A51B
-ingame-cheats/off 7E827F908F6F55D7
-ingame-cheats/press C33388E9DAEBF77A
-ingame-cheats/queued ADA32BA7E9BC611E
-ingame-cheats/unknown 610EDB1F66D141BC
-ingame-lang/menu 678FA53B58EAA64C
+ingame-cheats/marquee 3CAABD9028F475D5
+ingame-cheats/off 479ADDF24A2429A1
+ingame-cheats/press 1D6669A31A3511FA
+ingame-cheats/queued CD3A4D5CF9A3E960
+ingame-cheats/unknown 174CAB81EE3B0A36
+ingame-lang/menu D1990409BB6EF964
 ingame-light/menu 6DAB01A75168AFC9
+ingame-search/edit 9B8D610CE6B7CC66
+ingame-search/equals 2BBDF1AA9CA9A9CC
+ingame-search/four 8BEAB49FD955294E
+ingame-search/idle 8BD8F1897FD9D11F
+ingame-search/kept 8043C9AEA707BE52
+ingame-search/list 72D72D1ADC8A3B76
+ingame-search/pick 5C01CC47D2F8D962
+ingame-search/started FA85D5E19506A037
+ingame-search/undo 404FAA9C5236ABAC
 ingame-shots/first 5DFED4399519A099
 ingame-shots/one B7818279D579B476
 ingame-shots/second 1A08CDCA30DED899
@@ -780,7 +789,7 @@ sv-info-about/about-2 725C9630DD4601E4
 sv-info-about/about-end D71F05D7CB63FC50
 sv-info-about/cheats 9CCC4E07BFE89EE0
 sv-info-about/help 3BC7CD2B37E2A5C4
-sv-info-about/ingame FCC34D964CD80ABA
+sv-info-about/ingame 9D93AC2914BFD47A
 sv-info-about/saves 02B258CE41672BE6
 sv-info-read/back BFCB27E24D54148B
 sv-info-read/controls C40A3328210C2C42
@@ -812,17 +821,26 @@ sv-ingame/frames 14-14 E2EA554F23333186
 sv-ingame/frames 15-15 9CE5BB36AE567DDE
 sv-ingame/frames 16-16 A589469AC6940226
 sv-ingame/frames 17-23 7987822347B68CAE
-sv-ingame-cheats/always FCF88B296062952C
+sv-ingame-cheats/always 1C6C03524C579FBE
 sv-ingame-cheats/cant DC8ADB4B7E995172
-sv-ingame-cheats/cut 1A4A7F74A139E449
-sv-ingame-cheats/end ADFC3CCB61107E37
-sv-ingame-cheats/hold E659CEB4B9684241
+sv-ingame-cheats/cut A8E9DEF8D995EC1B
+sv-ingame-cheats/end 1E0DBFD9140B3A5D
+sv-ingame-cheats/hold 380449FAC084B6D3
 sv-ingame-cheats/locked 524D944308507AA5
-sv-ingame-cheats/marquee AB6EF7141E7B15C1
-sv-ingame-cheats/off F495C15C41E2F65C
-sv-ingame-cheats/press DE179DC7AF5A0009
-sv-ingame-cheats/queued 6A1900236D63FE14
-sv-ingame-cheats/unknown 0FB20286E7B63800
+sv-ingame-cheats/marquee 2FAFDA2A1AF1A9F3
+sv-ingame-cheats/off 8274FEBABEC00B2E
+sv-ingame-cheats/press ABFC9C260480FC17
+sv-ingame-cheats/queued DD8DC433AFE18476
+sv-ingame-cheats/unknown D19C60D3EB841766
+sv-ingame-search/edit A3CDABE423B4F1E3
+sv-ingame-search/equals EA404875198D5BBF
+sv-ingame-search/four 912A7F51CD26F46D
+sv-ingame-search/idle 1B8F54F81D4F562F
+sv-ingame-search/kept 27A874B67AC3922B
+sv-ingame-search/list 8F7A110B8D7135C6
+sv-ingame-search/pick B7C461E2155D727F
+sv-ingame-search/started D429DAD235D25313
+sv-ingame-search/undo F1C3652C607FB76F
 sv-ingame-states/load 05E9AF68A3A41529
 sv-ingame-states/menu C02A68E79EE834B3
 sv-ingame-states/other BE5FA8B5BD25CBE4

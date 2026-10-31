@@ -38,6 +38,17 @@
 #define INGAME_SRAM_SESSION 0xB6000  // struct ingame_session
 #define INGAME_SESSION_MAX 0xA000
 #define INGAME_SRAM_SHOT 0xC0000  // the screenshots (P4): records of struct ingame_shot, below
+// The cheat search (v0.9, docs/design/v0.9/cheat-search.md) borrows the
+// save-state buffer: the searched RAM as last compared (EWRAM, then IWRAM
+// to 0x03007E00: source/cheatsearch.h's run), the candidates a bit per
+// element, and struct ingame_search, its magic last
+#define INGAME_SRAM_SEARCH_SNAP 0x40000
+#define INGAME_SRAM_SEARCH_BITS 0x88000
+#define INGAME_SRAM_SEARCH 0x91000
+#define INGAME_SRAM_SEARCH_UNDO 0x92000  // the candidates before the last pass, for Undo
+// The cheats the search found, for Back to Torii to file: struct
+// ingame_found, in the backups' page window after the screenshot's backup
+#define INGAME_SRAM_FOUND 0x2E000
 #define INGAME_SHOTS_END 0xF0000  // their room's end: the cart log's page follows
 
 // The backups, from INGAME_SRAM_BACKUP: all in one 64 KB page window
@@ -51,6 +62,57 @@
 #define INGAME_BACKUP_SHOT 0x2C800
 #define INGAME_SHOT_IWRAM 0x03000000
 #define INGAME_BACKUP_SHOT_BYTES 0x1200  // the table, the buffer and up to 2 KB of code
+
+// --- The cheat search (v0.9)
+#define INGAME_SEARCH_MAGIC 0x31524553u  // "SER1"
+#define INGAME_SEARCH_LIST 32  // candidates the list shows: Show them is greyed above
+struct ingame_search {
+	uint32_t magic;  // INGAME_SEARCH_MAGIC once the snapshot is whole
+	uint8_t size;  // an element's bytes: 1, 2 or 4
+	uint8_t undo;  // 1: INGAME_SRAM_SEARCH_UNDO holds the candidates before the last pass
+	uint8_t reserved[2];
+	uint32_t left;  // the candidates left
+	uint32_t passes;  // the filters applied since the start
+	uint32_t value;  // the Equals row's number, as last edited
+	uint32_t launch_id;  // the session's: a search of an earlier launch is none
+	uint32_t undo_left;  // with undo, the candidates left before the last pass
+};
+
+#define INGAME_FOUND_MAGIC 0x31444E46u  // "FND1"
+#define INGAME_FOUND_MAX 16
+#define INGAME_FOUND_ON 0x01  // flags: picked, and on now (live) or set once in game
+struct ingame_found_cheat {
+	uint32_t address;  // in EWRAM or IWRAM
+	uint32_t value;  // cut to size
+	uint8_t size;  // 1, 2 or 4
+	uint8_t flags;  // INGAME_FOUND_*
+	uint16_t reserved;
+};
+struct ingame_found {
+	uint32_t magic;  // INGAME_FOUND_MAGIC; the overlay writes a record, then this head
+	uint16_t count;  // records filled
+	uint16_t reserved;
+	struct ingame_found_cheat cheat[INGAME_FOUND_MAX];
+};
+
+// The live block: constant writes the cheat interpreter (cheatrun.s) makes
+// every frame before its table, so a found cheat runs from the next frame.
+// After the hook's spend area, at the game's old stack top - INGAME_LIVE_BYTES
+// (Get_spend_address lowers the stack by INGAME_SPEND_BYTES + INGAME_LIVE_BYTES);
+// the kernel patches its address into the interpreter (Cheat_live) and the
+// session (live_at). Words: the check, then INGAME_LIVE_PAIRS of (address
+// with its width in bits 28-31 as the table's write ops have it, value); an
+// address 0 is a pair not used. The interpreter writes nothing unless the
+// check matches, and only into EWRAM and IWRAM.
+#define INGAME_SPEND_BYTES 0x80
+#define INGAME_LIVE_BYTES 0x20
+#define INGAME_LIVE_PAIRS 3
+#define INGAME_LIVE_MAGIC 0x45564C54u  // "TLVE"
+static inline uint32_t ingame_live_check(const uint32_t *pairs)
+{
+	return INGAME_LIVE_MAGIC ^ pairs[0] ^ (pairs[1] >> 7 | pairs[1] << 25) ^ (pairs[2] >> 13 | pairs[2] << 19) ^
+	       (pairs[3] >> 19 | pairs[3] << 13) ^ (pairs[4] >> 23 | pairs[4] << 9) ^ (pairs[5] >> 29 | pairs[5] << 3);
+}
 
 // --- The game's memory the overlay borrows
 #define INGAME_EWRAM 0x02000000  // the window's start: the overlay is linked here
@@ -246,7 +308,7 @@ struct ingame_shot {
 
 // --- The session block, at INGAME_SRAM_SESSION
 #define INGAME_SESSION_MAGIC 0x31535354u  // "TSS1"
-#define INGAME_SESSION_VERSION 9
+#define INGAME_SESSION_VERSION 10
 #define INGAME_NAME_BYTES 48
 #define INGAME_CHEATS 64  // the picks the in-game list shows; the toggles' bits
 #define INGAME_ACT_LINES 16  // the cheats' distinct activation sentences the list's footer shows
@@ -319,7 +381,52 @@ enum ingame_text {
 	INGAME_TEXT_UNSAVED_STATE,
 	INGAME_TEXT_UNSAVED_SHOTS,
 	INGAME_TEXT_UNSAVED_BOTH = INGAME_TEXT_UNSAVED_SHOTS + INGAME_SHOTS_MAX,
-	INGAME_TEXTS = INGAME_TEXT_UNSAVED_BOTH + INGAME_SHOTS_MAX
+	// The cheat search (v0.9). A line whose text has a number in it comes
+	// as two, the text before the number and after it (_AFTER)
+	INGAME_TEXT_SEARCH = INGAME_TEXT_UNSAVED_BOTH + INGAME_SHOTS_MAX,  // the menu's row and the page's title
+	INGAME_TEXT_SEARCH_SIZE,  // "Size: 8 bits", then 16 and 32
+	INGAME_TEXT_SEARCH_START = INGAME_TEXT_SEARCH_SIZE + 3,
+	INGAME_TEXT_SEARCH_SAME,  // the filters, in enum cheatsearch_op's order
+	INGAME_TEXT_SEARCH_CHANGED,
+	INGAME_TEXT_SEARCH_UP,
+	INGAME_TEXT_SEARCH_DOWN,
+	INGAME_TEXT_SEARCH_EQUALS,  // "Equals " before the number
+	INGAME_TEXT_SEARCH_EQUALS_AFTER,
+	INGAME_TEXT_SEARCH_SHOW,
+	INGAME_TEXT_SEARCH_NEW,
+	INGAME_TEXT_SEARCH_UNDO,
+	INGAME_TEXT_SEARCH_LEFT,  // the footer: "{n} left"
+	INGAME_TEXT_SEARCH_LEFT_AFTER,
+	INGAME_TEXT_SEARCH_NONE,
+	INGAME_TEXT_SEARCH_BUSY,
+	INGAME_TEXT_SEARCH_HINT,  // the footer on Start and Size
+	INGAME_TEXT_SEARCH_DROPS,  // on Start, with a kept state in the buffer
+	INGAME_TEXT_SEARCH_STATE_FIRST,  // on Start, with a state not kept yet
+	INGAME_TEXT_SEARCH_FEW,  // on Show them while too many are left
+	INGAME_TEXT_SEARCH_EDIT,  // while a number is edited
+	INGAME_TEXT_SEARCH_VALUE,  // a candidate's page: "Value: " before the number
+	INGAME_TEXT_SEARCH_VALUE_AFTER,
+	INGAME_TEXT_SEARCH_KEEP,
+	INGAME_TEXT_SEARCH_KEEP_ON,  // with the live block
+	INGAME_TEXT_SEARCH_KEEP_SET,  // without: set once as the game resumes
+	INGAME_TEXT_SEARCH_KEPT,
+	INGAME_TEXT_SEARCH_LIVE_FULL,
+	INGAME_TEXT_SEARCH_FOUND_FULL,
+	INGAME_TEXT_SEARCH_PICK,  // the list's footer
+	INGAME_TEXT_SEARCH_SAVE_ENDS,  // the Save state row's footer while a search runs
+	INGAME_TEXT_UNSAVED_FOUND,  // the menu's footer while found cheats wait
+	INGAME_TEXTS
+};
+_Static_assert(INGAME_TEXT_SEARCH_SAME + 4 == INGAME_TEXT_SEARCH_EQUALS, "the filters' rows in cheatsearch_op's order");
+
+// The glyphs the overlay draws numbers with (the kernel's body font): 0-9,
+// A-F, then the thousands separator (none: width 0), at INGAME_SRAM_GLYPHS
+#define INGAME_GLYPHS 17
+#define INGAME_GLYPH_THOUSANDS 16
+struct ingame_glyph {
+	uint8_t width;  // its advance, at most 8
+	uint8_t reserved[3];
+	uint8_t rows[INGAME_TEXT_ROWS];  // bit 0 its leftmost pixel
 };
 struct ingame_line {
 	uint16_t width;  // inked pixels from the left, at most INGAME_TEXT_W
@@ -450,10 +557,17 @@ struct ingame_session {
 	uint16_t cheat_call;  // the interpreter's call, the table's end included
 	uint16_t cheat_skip;  // a cheat of the table that is off
 	uint16_t cheat_max;  // the cap on them all
+	// The cheat search (v0.9): the live block's address (0: none, set once
+	// instead)
+	uint32_t live_at;
+	uint32_t launch_id;  // differs at each launch: a search is this launch's only (struct ingame_search)
+	// The check word (ingame_image_check) of the image's bytes past
+	// image_bytes: the search's code, which the overlay loads itself
+	uint32_t ext_check;
 	// Each text line's width (struct ingame_line's), so the overlay lays
 	// out the menu without reading the lines from cart SRAM
-	uint16_t text_width[(INGAME_TEXTS + 1) & ~1];
-	struct ingame_line text[INGAME_TEXTS];  // the overlay reads one at a time
+	uint16_t text_width[(INGAME_TEXT_SEARCH + 1) & ~1];  // the search's lines' are in their lines
+	struct ingame_line text[INGAME_TEXT_SEARCH];  // the overlay reads one at a time; the rest at INGAME_SRAM_TEXTS
 	struct ingame_cheat cheats[INGAME_CHEATS];
 	// The cheats' activation sentences ("Hold L+SELECT"), each once
 	struct ingame_line act_text[INGAME_ACT_LINES];
@@ -469,6 +583,14 @@ struct ingame_session {
 // The part the overlay reads at every opening; the lines and cheats it reads one at a time
 #define INGAME_SESSION_HEAD offsetof(struct ingame_session, text)
 #define INGAME_SESSION_TEXT(n) (offsetof(struct ingame_session, text) + (n) * sizeof(struct ingame_line))
+// Text n's line in cart SRAM: the session block's, and from the cheat
+// search's (v0.9) on, the block after the whole names, which the session
+// block has no room for
+#define INGAME_SRAM_TEXTS 0x3C400
+#define INGAME_SRAM_GLYPHS 0x3F000  // struct ingame_glyph[INGAME_GLYPHS]
+#define INGAME_TEXT_SRAM(n) \
+	((n) < INGAME_TEXT_SEARCH ? INGAME_SRAM_SESSION + INGAME_SESSION_TEXT(n) \
+				  : INGAME_SRAM_TEXTS + ((n) - INGAME_TEXT_SEARCH) * sizeof(struct ingame_line))
 #define INGAME_SESSION_CHEAT(n) (offsetof(struct ingame_session, cheats) + (n) * sizeof(struct ingame_cheat))
 #define INGAME_SESSION_ACT(n) (offsetof(struct ingame_session, act_text) + (n) * sizeof(struct ingame_line))
 #define INGAME_SESSION_PATH offsetof(struct ingame_session, rom_path)
@@ -519,6 +641,26 @@ _Static_assert(INGAME_BACKUP_EWRAM + INGAME_WINDOW_MAX <= INGAME_BACKUP_OBJ &&
 		       INGAME_BACKUP_SHOT + INGAME_BACKUP_SHOT_BYTES <= INGAME_BACKUP_EWRAM + 0x10000,
 	       "the backups share one 64 KB page window and don't overlap");
 _Static_assert(INGAME_SRAM_IMAGE + INGAME_IMAGE_MAX <= INGAME_SRAM_SESSION, "image room");
+_Static_assert(sizeof(struct ingame_search) % 4 == 0 && sizeof(struct ingame_found) % 4 == 0 &&
+		       sizeof(struct ingame_found_cheat) == 12 && sizeof(struct ingame_glyph) == 16,
+	       "sram_copy takes words");
+_Static_assert(INGAME_SRAM_SEARCH_SNAP == INGAME_SRAM_STATE &&
+		       INGAME_SRAM_SEARCH_SNAP + 0x47E00 <= INGAME_SRAM_SEARCH_BITS &&
+		       INGAME_SRAM_SEARCH_BITS + 36800 <= INGAME_SRAM_SEARCH &&
+		       INGAME_SRAM_SEARCH + sizeof(struct ingame_search) <= INGAME_SRAM_SEARCH_UNDO &&
+		       INGAME_SRAM_SEARCH_UNDO + 36800 <= INGAME_SRAM_STATE_INFO,
+	       "the search in the save-state buffer, clear of its info, mark and tag");
+_Static_assert(INGAME_SRAM_FOUND >= INGAME_BACKUP_SHOT + INGAME_BACKUP_SHOT_BYTES &&
+		       INGAME_SRAM_FOUND + sizeof(struct ingame_found) <= INGAME_SRAM_WIDE,
+	       "the found cheats after the backups, before the whole names");
+_Static_assert(4 + INGAME_LIVE_PAIRS * 8 <= INGAME_LIVE_BYTES, "the live block's words");
+_Static_assert(INGAME_SRAM_TEXTS >= INGAME_SRAM_WIDE + INGAME_CHEATS * sizeof(struct ingame_wide) &&
+		       INGAME_TEXT_SRAM(INGAME_TEXTS) <= INGAME_SRAM_STATE &&
+		       INGAME_TEXT_SRAM(INGAME_TEXTS) <= (INGAME_SRAM_TEXTS & ~0xFFFFu) + 0x10000,
+	       "the search's lines after the whole names, before the state buffer, in their 64 KB page window");
+_Static_assert(INGAME_TEXT_SRAM(INGAME_TEXTS) <= INGAME_SRAM_GLYPHS &&
+		       INGAME_SRAM_GLYPHS + INGAME_GLYPHS * sizeof(struct ingame_glyph) <= INGAME_SRAM_STATE,
+	       "the glyphs after the search's lines");
 _Static_assert(sizeof(struct ingame_shot) <= INGAME_DUMP_PAL && sizeof(struct ingame_shot) % 4 == 0 &&
 		       offsetof(struct ingame_shot, io) % 4 == 0,
 	       "the screenshot's header");

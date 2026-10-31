@@ -35,7 +35,10 @@ work RAM*), so page `0x20` is offset `0x20000`.
 | `0xB0000-0xB5FFF` | the overlay's image |
 | `0xB6000-0xBFFFF` | the session block, kernel to overlay and back |
 | `0x2C800-0x2D9FF` | the game's IWRAM a screenshot's packing borrows (its table, buffer and ARM code) |
+| `0x2E000-0x2E0CF` | the cheats the cheat search found, for Back to Torii (v0.9, `struct ingame_found`) |
 | `0x30000-0x3C0FF` | the cheat list's names whole, for the highlighted row's marquee (v0.10, `struct ingame_wide`) |
+| `0x3C400-0x3F10F` | the cheat search's lines and number glyphs (v0.9: the session block has no room) |
+| `0x40000-0x91FFF` | while a cheat search runs, in the save-state buffer: its snapshot, candidates and head ([v0.9/cheat-search.md](../v0.9/cheat-search.md)) |
 | `0xC0000-0xEFFFF` | the screenshots (P4): up to 5 records of `struct ingame_shot` and the packed palettes, OAM, VRAM |
 | `0xF0000` | the cart log (`source/cartlog.h`) |
 

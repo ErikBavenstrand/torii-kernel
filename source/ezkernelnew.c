@@ -1719,6 +1719,7 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 	//wait_btn();
 	gl_game_uses = Game_hardware(0, GAMECODE, 0);
 	ingame_cheats_clear();  // a NOR copy's cheats are as it was written: no list
+	cheat_live_at = 0;  // and its patch: no live block the session knows of
 	if (pNorFS[show_offset + file_select].have_patch)
 		ingame_prepare(pfilename, gamefilesize, launch_save.rom);  // the in-game menu, in cart SRAM
 	progress_done(NULL);

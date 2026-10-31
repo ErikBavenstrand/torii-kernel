@@ -17,6 +17,7 @@
 #include "progress.h"
 #include "savename.h"
 #include "gamesave.h"
+#include "ingame_abi.h"
 
 extern TCHAR currentpath[MAX_path_len];  // ezkernelnew.c's: the game's folder
 #include "settings_model.h"
@@ -45,6 +46,7 @@ u32 iCount2;
 #define sizeofa(array) (sizeof(array) / sizeof(array[0]))
 
 u32 spend_address;
+u32 cheat_live_at;
 static const char *patch_kind;  //Torii: for Log_patches
 static u32 patch_room;          //Torii: the bytes at iTrimSize the patch may use
 static u32 rom_bytes;           //Torii: the game's size in PSRAM (GBApatch_PSRAM)
@@ -582,6 +584,7 @@ static void Patch_RTS_Cheat(u32 *Data)
 		return;
 	}
 	u32 cheat_at = 0;
+	cheat_live_at = 0;
 	u32 room = patch_room ? patch_room : Patch_length();
 	if (iTrimSize + room > 0x2000000)
 		room = 0x2000000 - iTrimSize;
@@ -601,6 +604,10 @@ static void Patch_RTS_Cheat(u32 *Data)
 		} else {
 			dmaCopy((void *)Cheat_blob_start, patchbuffer + copysize, code);
 			dmaCopy(gl_cheat_table, patchbuffer + copysize + code, gl_cheat_bytes);
+			//Torii (v0.9): the live block after the spend area, if there is one
+			if (spend_address)
+				cheat_live_at = spend_address + INGAME_SPEND_BYTES;
+			*(vu32 *)(patchbuffer + copysize + ((u8 *)Cheat_live - (u8 *)Cheat_blob_start)) = cheat_live_at;
 			cheat_at = copysize;
 			copysize = end;
 		}
@@ -657,10 +664,13 @@ static u32 Get_spend_address(u32 *Data)
 	else
 		address = 0;
 
+	//Torii (v0.9): the spend area, then the cheat search's live block
+	//(ingame_abi.h), between the game's stack and its old top
+	const u32 lower = INGAME_SPEND_BYTES + INGAME_LIVE_BYTES;
 	if ((Data[address / 4] > 0x03007E80) /*|| (Data[address/4] == 0x03007E00)*/ ||
 	    (Data[address / 4] == 0x0203FFFC)) {
 		u32 top = Data[address / 4];
-		Data[address / 4] = top - 0x80;
+		Data[address / 4] = top - lower;
 		//Torii: a later "ldr sp,[pc,#n]" of the same stack top would put the
 		//stack back over the in-game menu's save area (Crash Nitro Kart reloads
 		//it after a RAM reset), so lower those too.
@@ -668,7 +678,7 @@ static u32 Get_spend_address(u32 *Data)
 			if ((Data[k] & 0xFFFFF000) == 0xE59FD000) {
 				u32 lit = k * 4 + 8 + (Data[k] & 0xFFF);
 				if (Data[lit / 4] == top)
-					Data[lit / 4] = top - 0x80;
+					Data[lit / 4] = top - lower;
 			}
 		}
 		return (Data[address / 4]);

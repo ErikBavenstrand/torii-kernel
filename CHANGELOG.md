@@ -22,6 +22,20 @@ git log, not here.
 - **Changed:** the viewer reads the next picture ahead between frames, so
   keys never wait for it, and photo-like pictures (1,024 or more 4-bit
   colours) are dithered so their gradients don't band (27233a5c, 6f2af1c8).
+- **Added:** a cheat search in the in-game menu (its own row, or on the
+  Cheats page): it remembers the game's RAM, narrows it down by same,
+  changed, went up, went down or equals a typed number (8, 16 or 32 bits),
+  lists the last 32 and keeps one as a cheat, on at once, which Back to
+  Torii files as "Found ADDRESS" (7b5f6228).
+- **Changed:** the game's stack sits 32 bytes lower for the found cheats'
+  live block, and the in-game menu loads its screenshot, DEBUG and search
+  code only when used, so it opens copying less than before (7b5f6228).
+- **Fixed:** found cheats the card didn't take wait for the next boot, as
+  intended (the boot's answer was cleared, so they were lost); a cheat kept
+  on now, then kept again, is filed picked (8d9f3c03).
+- **Added:** the cheat search's Undo the last takes back the last filter,
+  so one picked by mistake doesn't end the search (it costs a filter about
+  10 frames more) (e7e81331).
 - **Added:** R in a game list makes the game a favourite or not at once,
   its star shown (on Favourites its row goes); Info's Controls says so
   (d00ed28e).

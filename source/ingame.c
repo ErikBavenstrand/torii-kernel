@@ -111,6 +111,29 @@ static u32 line_draw(struct ingame_line *l, const char *s, u32 len, u32 max_w)
 	return cut;
 }
 
+// The cheat search's number glyphs (struct ingame_glyph): 0-9, A-F and the
+// thousands separator, in the body font
+static void glyphs_draw(struct ingame_glyph *g)
+{
+	static const char hex[] = "0123456789ABCDEF";
+	memset(g, 0, INGAME_GLYPHS * sizeof(*g));
+	for (u32 i = 0; i < INGAME_GLYPHS; i++) {
+		const char *s = i < 16 ? &hex[i] : S(STR_FORMAT_THOUSANDS);
+		u32 cut, len = i < 16 ? 1 : (u32)strlen(s);
+		g[i].width = (u8)bits_draw((vu8 *)g[i].rows, 1, s, len, 8, &cut);
+	}
+}
+
+// A text with "{1}" in it, as the text before it and after it (each cut to
+// size bytes); one without has it all before
+static void text_split(const char *t, char *before, char *after, u32 size)
+{
+	const char *at = strstr(t, "{1}");
+	u32 n = at ? (u32)(at - t) : (u32)strlen(t);
+	snprintf(before, size, "%.*s", (int)n, t);
+	snprintf(after, size, "%s", at ? at + 3 : "");
+}
+
 void ingame_probe_prepare(const u8 *code)
 {
 	if (memcmp(code, INGAME_PROBE_CODE, 4) != 0)
@@ -333,6 +356,11 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 		h->cheat_count = cheats.count;
 		h->cheat_table = cheats.table;
 	}
+	// The cheat search's (v0.9): the live block, when this launch's patch has
+	// the interpreter, and an id the search keeps to know it is this launch's
+	h->live_at = cheat_live_at;
+	u32 now = torii_frames;
+	h->launch_id = crc32_update(crc32(&now, sizeof(now)), h->launch_clock, sizeof(h->launch_clock));
 	h->cheat_call = CHEAT_LOAD(CHEAT_COST_CALL);
 	h->cheat_skip = CHEAT_LOAD(CHEAT_COST_SKIP);
 	h->cheat_max = CHEAT_LOAD_MAX;
@@ -359,6 +387,8 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 	hdr_out.check = ingame_image_check((const u32 *)(const void *)(ingame_overlay + sizeof(hdr_out)),
 					   (hdr_out.image_bytes - (u32)sizeof(hdr_out)) / 4);
 	bad += sram_put(INGAME_SRAM_IMAGE, (const u8 *)&hdr_out, sizeof(hdr_out));
+	h->ext_check = ingame_image_check((const u32 *)(const void *)(ingame_overlay + hdr_out.image_bytes),
+					  (image - hdr_out.image_bytes) / 4);
 	bad += sram_put(INGAME_SRAM_SESSION, (const u8 *)words, sizeof(words));
 	// The menu's footer: its keys as Settings shows them in A's hint;
 	// without A's word where that doesn't fit
@@ -412,6 +442,34 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 		[INGAME_TEXT_TORII_SAVE] = STR_INGAME_TORII_SAVE,
 		[INGAME_TEXT_FIRST_SAVE] = STR_INGAME_FIRST_SAVE,
 		[INGAME_TEXT_UNSAVED_STATE] = STR_INGAME_UNSAVED_STATE,
+		[INGAME_TEXT_SEARCH] = STR_INGAME_SEARCH,
+		[INGAME_TEXT_SEARCH_SIZE] = STR_INGAME_SEARCH_SIZE8,
+		[INGAME_TEXT_SEARCH_SIZE + 1] = STR_INGAME_SEARCH_SIZE16,
+		[INGAME_TEXT_SEARCH_SIZE + 2] = STR_INGAME_SEARCH_SIZE32,
+		[INGAME_TEXT_SEARCH_START] = STR_INGAME_SEARCH_START,
+		[INGAME_TEXT_SEARCH_SAME] = STR_INGAME_SEARCH_SAME,
+		[INGAME_TEXT_SEARCH_CHANGED] = STR_INGAME_SEARCH_CHANGED,
+		[INGAME_TEXT_SEARCH_UP] = STR_INGAME_SEARCH_UP,
+		[INGAME_TEXT_SEARCH_DOWN] = STR_INGAME_SEARCH_DOWN,
+		[INGAME_TEXT_SEARCH_SHOW] = STR_INGAME_SEARCH_SHOW,
+		[INGAME_TEXT_SEARCH_NEW] = STR_INGAME_SEARCH_NEW,
+		[INGAME_TEXT_SEARCH_UNDO] = STR_INGAME_SEARCH_UNDO,
+		[INGAME_TEXT_SEARCH_NONE] = STR_INGAME_SEARCH_NONE,
+		[INGAME_TEXT_SEARCH_BUSY] = STR_INGAME_SEARCH_BUSY,
+		[INGAME_TEXT_SEARCH_HINT] = STR_INGAME_SEARCH_HINT,
+		[INGAME_TEXT_SEARCH_DROPS] = STR_INGAME_SEARCH_DROPS,
+		[INGAME_TEXT_SEARCH_STATE_FIRST] = STR_INGAME_SEARCH_STATE_FIRST,
+		[INGAME_TEXT_SEARCH_FEW] = STR_INGAME_SEARCH_FEW,
+		[INGAME_TEXT_SEARCH_EDIT] = STR_INGAME_SEARCH_EDIT,
+		[INGAME_TEXT_SEARCH_KEEP] = STR_INGAME_SEARCH_KEEP,
+		[INGAME_TEXT_SEARCH_KEEP_ON] = STR_INGAME_SEARCH_KEEP_ON,
+		[INGAME_TEXT_SEARCH_KEEP_SET] = STR_INGAME_SEARCH_KEEP_SET,
+		[INGAME_TEXT_SEARCH_KEPT] = STR_INGAME_SEARCH_KEPT,
+		[INGAME_TEXT_SEARCH_LIVE_FULL] = STR_INGAME_SEARCH_LIVE_FULL,
+		[INGAME_TEXT_SEARCH_FOUND_FULL] = STR_INGAME_SEARCH_FOUND_FULL,
+		[INGAME_TEXT_SEARCH_PICK] = STR_INGAME_SEARCH_PICK,
+		[INGAME_TEXT_SEARCH_SAVE_ENDS] = STR_INGAME_SEARCH_SAVE_ENDS,
+		[INGAME_TEXT_UNSAVED_FOUND] = STR_INGAME_UNSAVED_FOUND,
 	};
 	const char *text[INGAME_TEXTS];
 	for (u32 i = 0; i < INGAME_TEXTS; i++)
@@ -426,13 +484,29 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 		text[INGAME_TEXT_UNSAVED_SHOTS + i] = unsaved[0][i];
 		text[INGAME_TEXT_UNSAVED_BOTH + i] = unsaved[1][i];
 	}
+	// The search's lines with a number in them: the text before it and after
+	static const u16 split_ids[][2] = {
+		{STR_INGAME_SEARCH_EQUALS, INGAME_TEXT_SEARCH_EQUALS},
+		{STR_INGAME_SEARCH_LEFT, INGAME_TEXT_SEARCH_LEFT},
+		{STR_INGAME_SEARCH_VALUE, INGAME_TEXT_SEARCH_VALUE},
+	};
+	char split[sizeof(split_ids) / sizeof(split_ids[0])][2][48];
+	for (u32 i = 0; i < sizeof(split_ids) / sizeof(split_ids[0]); i++) {
+		text_split(S(split_ids[i][0]), split[i][0], split[i][1], sizeof(split[i][0]));
+		text[split_ids[i][1]] = split[i][0];
+		text[split_ids[i][1] + 1] = split[i][1];
+	}
 	for (u32 i = 0; i < INGAME_TEXTS; i++) {
 		struct ingame_line line;
 		TLOG_ASSERT(text[i]);
 		line_draw(&line, text[i], strlen(text[i]), INGAME_TEXT_W);
-		bad += sram_put(INGAME_SRAM_SESSION + INGAME_SESSION_TEXT(i), (const u8 *)&line, sizeof(line));
-		h->text_width[i] = line.width;
+		bad += sram_put(INGAME_TEXT_SRAM(i), (const u8 *)&line, sizeof(line));
+		if (i < INGAME_TEXT_SEARCH)
+			h->text_width[i] = line.width;
 	}
+	struct ingame_glyph glyphs[INGAME_GLYPHS];
+	glyphs_draw(glyphs);
+	bad += sram_put(INGAME_SRAM_GLYPHS, (const u8 *)glyphs, sizeof(glyphs));
 	// The head again, with the lines' widths
 	bad += sram_put(INGAME_SRAM_SESSION, (const u8 *)words, sizeof(words));
 	char path[INGAME_PATH_BYTES];
@@ -456,6 +530,8 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 	}
 	bad += sram_put(INGAME_SRAM_SESSION + INGAME_SESSION_SAVE_SLOT, (const u8 *)slot_name, sizeof(slot_name));
 	bad += sram_put(INGAME_SRAM_SESSION + INGAME_SESSION_OUT, (const u8 *)&out, sizeof(out));
+	// No cheats found yet (the last session's were filed at the boot after it)
+	bad += sram_put(INGAME_SRAM_FOUND, NULL, 8);
 	SetRampage(0);
 	if (bad) {
 		tlog_error("launch: the in-game menu's %lu bytes in cart SRAM read back %lu different",
@@ -603,6 +679,80 @@ static void cheats_keep(const struct ingame_session *h, const char *path, const 
 		tlog_error("cheats: %s: the in-game picks weren't written", path);
 }
 
+// The cheats the in-game search found (struct ingame_found), added to the
+// game's cheat file as codes of the user's ("Found 02030100", VBA raw), the
+// ones turned on in game picked; written power-cut safe, once. Kept in cart
+// SRAM if the card didn't take them: 1 then, for the next boot to try again
+static int found_after_game(const char *path)
+{
+	struct ingame_found found;
+	sram_get(INGAME_SRAM_FOUND, (u8 *)&found, sizeof(found));
+	SetRampage(0);
+	if (found.magic != INGAME_FOUND_MAGIC || !found.count)
+		return 0;
+	u32 n = found.count <= INGAME_FOUND_MAX ? found.count : INGAME_FOUND_MAX;
+	int r = cheatstore_open(path);
+	if (r != CHEATSTORE_READ && r != CHEATSTORE_NEW) {
+		tlog_error("cheats: %s: the cheat file can't take the %lu found in game (%d): they wait", path,
+			   (unsigned long)n, r);
+		return 1;
+	}
+	if (cheatstore_windows() && !cheatstore_window_go(cheatstore_windows() - 1)) {
+		tlog_error("cheats: %s: its last window didn't read: the found cheats wait", path);
+		return 1;
+	}
+	u32 added = 0, idx[INGAME_FOUND_MAX], on[INGAME_FOUND_MAX];
+	for (u32 i = 0; i < n; i++) {
+		const struct ingame_found_cheat *c = &found.cheat[i];
+		idx[i] = CHEATFILE_NONE;
+		// One cheat an address: the last kept of it (the same code twice
+		// would be greyed as doing what the first does), picked if any
+		// keep of it turned it on (it ran on in game)
+		u32 later = 0;
+		on[i] = 0;
+		for (u32 j = 0; j < n; j++)
+			if (found.cheat[j].address == c->address && found.cheat[j].size == c->size) {
+				later |= j > i;
+				on[i] |= found.cheat[j].flags & INGAME_FOUND_ON;
+			}
+		if (later)
+			continue;
+		char addr[12], name[40], code[24];
+		snprintf(addr, sizeof(addr), "%08lX", (unsigned long)c->address);
+		SF(name, sizeof(name), STR_CHEATS_FOUND_NAME, LS(addr));
+		if (c->size == 1)
+			snprintf(code, sizeof(code), "%s:%02lX", addr, (unsigned long)(c->value & 0xFF));
+		else if (c->size == 2)
+			snprintf(code, sizeof(code), "%s:%04lX", addr, (unsigned long)(c->value & 0xFFFF));
+		else
+			snprintf(code, sizeof(code), "%s:%08lX", addr, (unsigned long)c->value);
+		u32 e = cheatstore_add(name, code, CHEAT_FMT_VBA, &idx[i]);
+		tlog("cheats: %s: found in game, %s %s: %s", path, code, on[i] ? "on" : "off",
+		     e == CHEATFILE_EDIT_OK ? "added" : "refused");
+		added += e == CHEATFILE_EDIT_OK;
+		if (e != CHEATFILE_EDIT_OK)
+			idx[i] = CHEATFILE_NONE;
+	}
+	if (!added)  // all refused (the file full): trying again won't help
+		n = 0;
+	if (added) {
+		cheatstore_begin();
+		cheatstore_decode(0);
+	}
+	for (u32 i = 0; i < n && added; i++)
+		if (on[i] && idx[i] != CHEATFILE_NONE && idx[i] < cheatstore()->file.count &&
+		    !cheatstore()->cheats[idx[i]].picked)
+			cheatstore_toggle(idx[i]);
+	if (added && !cheatstore_write()) {
+		tlog_error("cheats: %s: the found cheats weren't written: they wait for the next boot", path);
+		return 1;
+	}
+	u32 none[2] = {0, 0};
+	sram_put(INGAME_SRAM_FOUND, (const u8 *)none, sizeof(none));
+	SetRampage(0);
+	return 0;
+}
+
 void ingame_refused_notice(void)
 {
 	struct ingame_refused r;
@@ -646,15 +796,17 @@ void ingame_after_game(void)
 	states_after_game(h, path);
 	if (out.cheats_changed && h->cheat_count)
 		cheats_keep(h, path, &out);
+	u32 found_left = found_after_game(path);
 	// Screenshots the card didn't take wait for the next boot (and are
 	// filed then even if the menu took none this time)
 	u32 shot_left = !shotstore_file(h->name, h->launch_clock);
 	// Done with: the answer goes, so the next boot does nothing again
 	memset(&out, 0, sizeof(out));
-	if (shot_left) {
+	// Screenshots or found cheats the card didn't take: the next boot again
+	if (shot_left || found_left) {
 		out.magic = INGAME_OUT_MAGIC;
 		out.pending_state = 0xFFFF;
-		out.screenshot = 1;
+		out.screenshot = (u16)shot_left;
 	}
 	sram_put(INGAME_SRAM_SESSION + INGAME_SESSION_OUT, (const u8 *)&out, sizeof(out));
 	SetRampage(0);

@@ -15,15 +15,7 @@ MEMORY {
 
 SECTIONS {
 	.header : { KEEP(*(.ov_header)) } > window
-	/* The screenshot's packer, ARM: run from IWRAM, loaded with the image */
-	.fast : {
-		__ov_fast_start = .;
-		*shotpack.o(.text .text.*)
-		. = ALIGN(4);
-		__ov_fast_end = .;
-	} > iwram AT> window
-	__ov_fast_load = LOADADDR(.fast);
-	.text : { *(.text .text.*) *(.glue_7) *(.glue_7t) *(.vfp11_veneer) *(.v4_bx) } > window
+	.text : { EXCLUDE_FILE(*cheatsearch.o *shotpack.o) *(.text .text.*) *(.glue_7) *(.glue_7t) *(.vfp11_veneer) *(.v4_bx) } > window
 	.rodata : { *(.rodata .rodata.*) } > window
 	.data : { *(.data .data.*) . = ALIGN(4); } > window
 	__ov_image_end = .;
@@ -40,7 +32,33 @@ SECTIONS {
 		__ov_stack_top = .;
 	} > window
 
-	ASSERT(__ov_image_end - 0x02000000 <= 0x6000, "the overlay's image passes INGAME_IMAGE_MAX")
+	/* The cheat search's extension (ov.c's EXT): after the window, which it
+	 * extends while loaded, and after the image in the file, which the stub
+	 * doesn't load: the overlay loads it itself */
+	.ext __ov_stack_top : AT(__ov_image_end) {
+		__ov_ext_start = .;
+		*(.ext.text)
+		*cheatsearch.o(.text .text.cheatsearch_digits .text.cheatsearch_decimal .text.cheatsearch_edit .text.cheatsearch_fill .text.cheatsearch_get .text.cheatsearch_count)
+		*(.ext.data)
+		. = ALIGN(4);
+		__ov_ext_end = .;
+	}
+	__ov_ext_load = LOADADDR(.ext);
+	/* The screenshot's packer and the cheat search's compare, ARM: run from
+	 * the IWRAM they borrow (ov.c's iwram_borrow), their bytes after the
+	 * extension's in the image */
+	.fastext : AT(__ov_ext_load + SIZEOF(.ext)) {
+		__ov_fastext_start = .;
+		*shotpack.o(.text .text.*)
+		*cheatsearch.o(.text.cheatsearch_narrow)
+		. = ALIGN(4);
+		__ov_fastext_end = .;
+	} > iwram
+	__ov_fastext_load = LOADADDR(.fastext);
+
+	ASSERT(__ov_fastext_load + SIZEOF(.fastext) - 0x02000000 <= 0x6000, "the overlay's image passes INGAME_IMAGE_MAX")
+	ASSERT(__ov_fastext_end - 0x03000000 <= 0x1200, "the IWRAM a pass borrows passes INGAME_BACKUP_SHOT_BYTES")
+	ASSERT(__ov_ext_end - 0x02000000 <= 0x6000, "the window and the extension pass INGAME_WINDOW_MAX")
 
 	/DISCARD/ : { *(.ARM.exidx*) *(.ARM.extab*) *(.comment) *(.note*) }
 }
