@@ -18,6 +18,9 @@ git log, not here.
   card folders, Game saves' games and folders, Info's rows) end in an arrow;
   a cheat folder's title shows a folder icon; a cut title, popup title or
   page heading scrolls to its end, as a list's cut name does (01c3d073).
+- **Fixed:** a hint-bar line too long for the bar (a greyed cheat's reason,
+  mostly in Swedish) scrolls instead of being cut; the Cheats screen no
+  longer starts past a folder whose first cheat is greyed (58987af4).
 
 ## v0.9.10
 
