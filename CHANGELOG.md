@@ -4,7 +4,7 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.9.12
 
 - **Changed:** ROM patches cost nothing in game: a cheat with conditionals
   kept each as a step that does nothing, so many ROM patches and a key test
