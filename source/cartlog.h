@@ -23,7 +23,7 @@
 // A launch's ROM patches of the picked cheats, from its first pass to its
 // second (cheatstore_launch): not for the next boot, but in no one's way
 #define CARTLOG_CHEAT_PATCHES 0x0E002000
-#define CARTLOG_CHEAT_PATCHES_SIZE 0x6000
+#define CARTLOG_CHEAT_PATCHES_SIZE 0xC000
 // Pages Diagnostics may write test patterns to: free SRAM past the states.
 #define CARTLOG_TEST_PAGE 0xC0
 
