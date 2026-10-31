@@ -257,17 +257,17 @@ Every cheat we have (GameHacking, plus libretro's three of its own), grouped. "P
 
 ## The golden set
 
-`cheats/gba/Pokemon - Emerald Version (USA, Europe).cht`, built by `tools/golden/emerald.py` from pret's pokeemerald (its addresses and symbol file for this ROM; item and species tables in `tools/golden/emerald.json`). 469 cheats in 8 folders (`cheatN_folder`), each with a guide and a buttons line; the 386 species, 20 levels, 25 natures and 5 EXP rates are choice groups.
+`cheats/gba/Pokemon - Emerald Version (USA, Europe).cht`, built by `tools/golden/emerald.py` from pret's pokeemerald (its addresses and symbol file for this ROM; item and species tables in `tools/golden/emerald.json`). 477 cheats in 8 folders (`cheatN_folder`), each with a guide and a buttons line; the 386 species, 20 levels, 25 natures and 5 EXP rates are choice groups.
 
 | Folder | Cheats |
 | --- | --- |
-| Menus | Item shop (L+R+B): Marts of Medicine, Balls, Training, TMs & HMs, Held items, Berries, Valuables at game prices, and the four event tickets free with their ferry flags. Field menu (L+R+A): PC, Heal, Warp (16 towns, 17 dungeons, 5 islands), Legends (respawn 11), Gifts (Hoenn and Johto starters, Beldum, Castform, Lileep, Anorith, Wynaut egg), Moves (relearner), Unlock (badges, Frontier symbols, Pokédex); L+R+Up heals, +Down PC, +Left warp, +Right moves |
+| Menus | Item shop (L+R+B): Marts of Medicine, Balls, Training, TMs & HMs, Held items, Berries, Valuables and Decorations (Lilycove's counter, all 120) at game prices, and the four event tickets free with their ferry flags. Field menu (L+R+A): PC, Heal, Warp (16 towns, 17 dungeons, 5 islands), Legends (respawn 11), Gifts (Hoenn and Johto starters, Beldum, Castform, Lileep, Anorith, Wynaut egg), Moves (relearner), Unlock (badges, Frontier symbols, Pokédex); L+R+Up heals, +Down PC, +Left warp, +Right moves |
 | Money | Max money, Max coins (Torii's keyed lines), Max Battle Points, Shopping costs 1 |
-| Pokémon | Shiny, Perfect IVs, Max friendship, Max EVs, Vitamins up to 255, Nature (25), Gender (2), Pokérus when caught, Eggs hatch fast |
-| Battle | One-hit KO, Infinite HP, Infinite PP, No trainer challenges, EXP x2/x3/x5/x10/x255, EXP shared with the party, Every ball catches |
+| Pokémon | Shiny, Perfect IVs, Max friendship, Max EVs, Vitamins up to 255, Nature (25), Gender (2), Pokérus when caught, Eggs hatch fast, Everstone always passes nature, Day Care eggs fast |
+| Battle | One-hit KO, Infinite HP, Infinite PP, No trainer challenges, EXP x2/x3/x5/x10/x255, EXP shared with the party, Every ball catches, Pokémon always obey |
 | Wild | Species (386), Level 5-100 (20), No wild encounters, Encounter every step |
-| Overworld | Fly to any town, Free Day Care, Walk through walls (hold R), Field moves without badges, Gym leader rematches, Any Pokémon in the Battle Tower |
-| Minigames | Endless Safari Zone, Level 80 Pokéblock, Quick contests, Max contest score, Full Soot Sack |
+| Overworld | Instant text, Run and bike anywhere, Mirage Island always there, Fly to any town, Free Day Care, Walk through walls (hold R), Field moves without badges, Gym leader rematches, Any Pokémon in the Frontier |
+| Minigames | Endless Safari Zone, Safari Pokémon never flee, Level 80 Pokéblock, Quick contests, Max contest score, Full Soot Sack |
 
 How they're built (D1, D7): CodeBreaker for RAM writes, Action Replay v3 raw for ROM patches and save-block pointer writes, Torii's raw lines only for money and coins (XORed with the save's key). No master codes, nothing encrypted. Nothing writes an item slot: items come from the game's own Mart and "Obtained" scripts, so nothing in the bag or PC is overwritten (D9, D10). The menus are game scripts, strings and menu tables written into the ROM's free space (from `0x08F00000`) at launch, on Emerald's unused multichoice menus, started by a RAM trigger only while the player is free to move; walk-through-walls, the Pokédex and the new Pokémon's personality are small Thumb routines (`tools/golden/walls.s` and `pid.s`, over the unused `Unused_AdjustBgMosaic`, and `dex.s`). Shiny, Nature and Gender share `pid.s`: each cheat carries the same routine and hook in `CreateBoxMon` (wild, gift and egg Pokémon, not trainers') and sets only its own switch in free ROM (`0x08F1F000`), so any of them work together; AnyGBA's shiny patch and the old nature and gender patches each set the personality alone and undid the others.
 
@@ -277,7 +277,7 @@ How they're built (D1, D7): CodeBreaker for RAM writes, Action Replay v3 raw for
 
 Copy the file to the card as `/torii/cheats/<the ROM's path without its extension>.cht`: for `/Pokemon - Emerald.gba`, `/torii/cheats/Pokemon - Emerald.cht`; for `/GBA/Pokemon - Emerald.gba`, `/torii/cheats/GBA/Pokemon - Emerald.cht`. Copy it by hand rather than through `just cheats`: `tools/cheats.py` leaves out cheats of over 256 lines, which drops the menus. Then pick cheats on the game's Cheats screen before playing: every cheat that patches the game (the menus, the Pokémon, battle and wild ROM cheats) is set at launch and can't be switched in game; the RAM ones can, from the in-game menu (L+R+START).
 
-Needs Torii with cheat folders and the larger ROM-patch limits (2,048 a cheat, 4,096 picked; branch `claude/rom-patch-limits-a52fb3`). The first open of the file indexes it in about 7 seconds (469 cheats, 6 windows); later opens read the index.
+Needs Torii with cheat folders and the larger ROM-patch limits (2,048 a cheat, 4,096 picked; branch `claude/rom-patch-limits-a52fb3`). The first open of the file indexes it in about 7 seconds (477 cheats); later opens read the index.
 
 ## Tests
 
@@ -304,9 +304,17 @@ On the emulated cart with the real ROM (CRC32 `1F1C08FB`) and a 100% save (Proje
 | Fly to any town | GameHacking's RAM code didn't work on this ROM (the Fly map's state isn't where it writes); rebuilt as one ROM patch of `GetMapsecType` (a town not visited is "can fly"): with every visited flag cleared, Littleroot can be flown to, the control can't |
 | Free Day Care | taking a Pokémon back: ₽100 taken in the control, none with it (the lady still names the price; the guide says so) |
 | Field moves without badges | badges cleared: Fly from the party menu says "can't be used until a new BADGE" in the control, opens the Fly map with it |
-| Any Pokémon in the Battle Tower | a Mewtwo in the party: "NOT ABLE" in the control, "ABLE" with it (Open Level) |
+| Any Pokémon in the Frontier | a Mewtwo in the party: "NOT ABLE" in the control, "ABLE" with it (Open Level) |
 | Endless Safari Zone | entered by the gate: steps 494 after walking in the control, 500 with it, 30 balls |
 | Max friendship | a Treecko (70) walked: 72 in the control, 255 with it |
+| Instant text | the field menu's Heal message: whole 3 frames after A, the control 3 letters; battle messages whole too. A delay of 0 in `sTextSpeedFrameDelays` (the first try) drew the text before the box cleared it, so nothing showed; the cheat instead loops `RenderFont` over the message and copies the window every call |
+| Run and bike anywhere | in the Pokémon Center: B held moves the camera 4 tiles in 32 frames (2 in the control); SELECT mounts the Mach Bike (the control: "there's a time and place") |
+| Mirage Island always there | warped to Route 130 (52, 11), the berry tree's spot: the island with the cheat, open sea without |
+| Safari Pokémon never flee | Safari mode, a wild Oddish, Go Near every turn: fled after the first in the control, stayed 12 turns with it (same RNG) |
+| Pokémon always obey | badges cleared and the player's trainer ID changed, so the party counts as traded: Splashdown "began to nap" in the control, used Rock Tomb every turn with it |
+| Day Care eggs fast, Everstone always passes nature | a female (Adamant, holding an Everstone) and a male Swampert written into the Day Care, 32 steps at three timings: no egg in the control; an egg every time with Day Care eggs fast, natures 19, 3, 3; with the Everstone cheat too, 3, 3, 3 |
+| Decorations (shop) | the category opens Lilycove's counter: all 120 with prices down to the Registeel Doll; a Heavy Desk ₽6,000, "I'll send it to your home PC" |
+| Heal and Moves (field menu), fixed | the special ids were one too high (`gSpecials` counts from 0), so Heal ran `SetCableClubWarp` and Moves the Move Deleter's screen, which looks like the relearner's. Fixed: HP 1 back to 209; "Teach which move to Splashdown?" |
 | Eon Ticket from the shop | on a save without it (flag and ticket cleared): the Lilycove ferry accepts it ("a tiny spit of an island far in the south") |
 
 Screenshots of all of these: `dist/eg/gallery-*.png` (not committed). Still for the real cart: the menus' launch with about 2,500 ROM patches (Torii estimates 260 ms more), and every cheat at a real game's speed.
@@ -320,6 +328,8 @@ Screenshots of all of these: `dist/eg/gallery-*.png` (not committed). Still for 
 ## The decisions (2026-10-31)
 
 D1 device formats where they do the same; Torii's raw lines only for XOR. D2 every group the owner's call. D3 a downloaded 100% save. D4 pickers as choice groups, and headings (D5 `cheatN_folder`, D6 built in its own session). D8 max money, coins, BP, ₽1 prices. D9 one shop on a combo, categories inside. D11 tickets with their flags. D12 no pocket fills. D14 game prices, the price cheat makes everything ₽1. D15 one combo per menu, game-native menus. D16 menu data as ROM patches. D17 L+R+B. D18-D19, D50 the kernel's limits lifted so each menu is one cheat. D20 the item menu holds items only; D21-D22 eight categories, no key items. D23 the field menu, L+R+A plus arrows (D44). D24 all new Pokémon shiny. D25 perfect IVs, friendship, nature, gender, Pokérus, max EVs. D26 Pokédex (later the field menu's Unlock, D49), fast eggs. D27 no max stats or starter scripts; gifts in the field menu. D28 one-hit KO, infinite HP and PP, skip trainers. D29 the EXP multiplier and EXP for all. D30 every ball catches. D31 Safari. D32-D34 species, level, encounters. D35, D39 fly anywhere, free Day Care, walls on R. D36-D37 badges (later Unlock), field moves without badges. D38, D45 legends and gifts (with the Johto starters) in the field menu. D40, D46 warps there, paged. D41, D47 rematches: the gym leaders' rematch flags. D42 no species limit at the Tower, symbols (later Unlock). D43 Pokéblock, contests, Soot Sack. D48 the `raw_line` fix.
+
+More cheats (D51-D60, 2026-10-31, from `research-emerald-more-cheats.md`): D51 one group at a time, each shown working on the emulated cart or dropped. D52 instant text, run and bike anywhere; no walk speed, intro skip, Endless Repel (No wild encounters covers it) or battle animations (the game's option). D53 Mirage Island always and Safari Pokémon never flee, apart from Endless Safari Zone; no other hunting cheats. D54 the Tower cheat renamed for the whole Frontier, no other Frontier cheats. D55 Everstone always and Day Care eggs fast; no egg from any pair. D56 Pokémon always obey; no trainer IVs, +6 stats or catching trainers' Pokémon. D57 no item cheats (TMs, lottery, tide, selling). D58 decorations in the item shop, nothing new in the field menu. D59 no hard mode. D60 folders as in the table above.
 
 
 ## Names and guides (2026-10-31)

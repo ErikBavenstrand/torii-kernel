@@ -116,6 +116,7 @@ OP = {
     "giveegg": 0x7A,
     "bufferspeciesname": 0x7D,
     "pokemart": 0x86,
+    "pokemartdecoration": 0x87,
 }
 VAR_RESULT, VAR_8000, VAR_8001, VAR_8004, VAR_8005 = (
     0x800D,
@@ -124,11 +125,11 @@ VAR_RESULT, VAR_8000, VAR_8001, VAR_8004, VAR_8005 = (
     0x8004,
     0x8005,
 )
-SPECIAL = {
-    "HealPlayerParty": 1,
-    "ChooseMonForMoveRelearner": 223,
-    "TeachMoveRelearnerMove": 228,
-    "IsSelectedMonEgg": 331,
+SPECIAL = {  # indexes into gSpecials (0x081DBA64), counted from 0
+    "HealPlayerParty": 0,
+    "ChooseMonForMoveRelearner": 222,
+    "TeachMoveRelearnerMove": 227,
+    "IsSelectedMonEgg": 330,
 }
 PC_SCRIPT = (
     0x08271D9B  # EventScript_PC past its turn-on effect (GameHacking's "Access PC")
@@ -451,6 +452,7 @@ MART = {
         "SHOAL_SHELL",
     ],
 }
+NUM_DECORATIONS = 120  # DECOR_SMALL_DESK (1) to DECOR_REGISTEEL_DOLL
 TICKETS = [  # name, item, the ferry flag its event sets (FLAG_ENABLE_SHIP_*)
     ("EON TICKET", "EON_TICKET", 0x8B3),
     ("AURORA TICKET", "AURORA_TICKET", 0x8D5),
@@ -466,7 +468,8 @@ def item_menu():
     s.cmd("lockall")
     m.menu(
         "cats",
-        [(c, "mart" + str(i)) for i, c in enumerate(MART)] + [("TICKETS", "tickets")],
+        [(c, "mart" + str(i)) for i, c in enumerate(MART)]
+        + [("DECORATIONS", "decor"), ("TICKETS", "tickets")],
         "done",
     )
     s.label("done")
@@ -476,6 +479,9 @@ def item_menu():
         s.label("mart" + str(i))
         s.cmd("pokemart", ("p", "list" + str(i)))
         s.goto("cats")
+    s.label("decor")  # Lilycove's decoration counter, with every decoration
+    s.cmd("pokemartdecoration", ("p", "decorations"))
+    s.goto("cats")
     m.menu(
         "tickets", [(n, "tk" + str(i)) for i, (n, _, _) in enumerate(TICKETS)], "cats"
     )
@@ -497,6 +503,10 @@ def item_menu():
         for it in items:
             s.h(ITEM[it])
         s.h(0)
+    s.label("decorations")
+    for d in range(1, NUM_DECORATIONS + 1):
+        s.h(d)
+    s.h(0)  # DECOR_NONE
     return m.blob(), s.addr("main")
 
 
@@ -798,7 +808,7 @@ def cheats():
             "Menus",
             "Menus: Item shop (L+R+B)",
             code,
-            "L+R+B opens a shop of every item at game prices; the event tickets are free. B goes back. "
+            "L+R+B opens a shop of every item and decoration at game prices; the event tickets are free. B goes back. "
             "Pick before you play.",
             None,
         )
@@ -933,6 +943,24 @@ def cheats():
         ar(AR.write_ptr(1, SB1, 0xFE, 0x314C)),
         "Eggs hatch after a few dozen steps.",
     )
+    add(
+        "Pokémon",
+        "Everstone always passes nature",
+        rom_code(
+            [(0x080700FC, 0xE004)]
+        ),  # GetParentToInheritNature: skip the coin flip
+        "A Day Care parent holding an Everstone always passes its nature to the egg.",
+        "launch",
+    )
+    add(
+        "Pokémon",
+        "Day Care eggs fast",
+        rom_code(
+            [(0x08070B0C, 0x46C0)]
+        ),  # TryProduceOrHatchEgg: roll every step, not every 256th
+        "The Day Care rolls for an egg on every step instead of every 256th. Parents must still get along.",
+        "launch",
+    )
 
     # Battle (D28-D30)
     add(
@@ -1011,6 +1039,13 @@ def cheats():
         "Every ball you throw at a wild Pokémon catches it.",
         "launch",
     )
+    add(
+        "Battle",
+        "Pokémon always obey",
+        rom_code(words([(0x08045CBC, 0x47702000)])),  # IsMonDisobedient returns 0
+        "Traded and event Pokémon obey you whatever your badges.",
+        "launch",
+    )
 
     # Wild (D32-D34)
     for sid, name in DATA["species"]:
@@ -1048,7 +1083,31 @@ def cheats():
         "launch",
     )
 
-    # Overworld (D35-D39, D42, D47)
+    # Overworld (D35-D39, D42, D47, D52-D54, D60)
+    add(
+        "Overworld",
+        "Instant text",
+        rom_code(instant_text()),
+        "Messages appear at once instead of a letter at a time, at every text speed.",
+        "launch",
+    )
+    add(
+        "Overworld",
+        "Run and bike anywhere",
+        rom_code(
+            [(0x0811A1EC, 0x46C0)]  # IsRunningDisallowed: the map's running rule
+            + words([(0x08085474, 0x47702001)])  # Overworld_IsBikingAllowed returns 1
+        ),
+        "Run and ride your bike indoors and in caves. Fortree's bridges still need walking.",
+        "launch",
+    )
+    add(
+        "Overworld",
+        "Mirage Island always there",
+        rom_code(words([(0x0813793C, 0x47702001)])),  # IsMirageIslandPresent returns 1
+        "Mirage Island shows up off Route 130 every day, whatever your party.",
+        "launch",
+    )
     add(
         "Overworld",
         "Fly to any town",
@@ -1086,9 +1145,9 @@ def cheats():
     )
     add(
         "Overworld",
-        "Any Pokémon in the Battle Tower",
+        "Any Pokémon in the Frontier",
         rom_code([(0x081A3F44, 0x42A8), (0x081B8648, 0x46C0)]),
-        "Legendaries and any other Pokémon may enter the Battle Tower.",
+        "Legendaries and any other Pokémon may enter every Battle Frontier facility.",
         "launch",
     )
 
@@ -1098,6 +1157,13 @@ def cheats():
         "Endless Safari Zone",
         cb(CB.write8(0x0203A04C, 30), CB.write16(0x0203A04E, 500)),
         "In the Safari Zone you keep 30 balls and 500 steps.",
+    )
+    add(
+        "Minigames",
+        "Safari Pokémon never flee",
+        rom_code([(0x0813334E, 0xE011)]),  # Cmd_if_random_safari_flee: never jump
+        "Pokémon in the Safari Zone never run away.",
+        "launch",
     )
     block, slot = (
         SB1,
@@ -1149,6 +1215,27 @@ def personality(setting, value):
         + [(0x08067C74 + 2 * i, h) for i, h in enumerate(hook)]
         + [(0x08F1F000 + setting, value)]
     )
+
+
+def instant_text():
+    """Every text speed prints a message up to its next pause in one frame.
+    sTextSpeedFrameDelays all 1 (the printer's delay is then 0, as at FAST);
+    RenderFont keeps going on RENDER_PRINT as on RENDER_REPEAT; RunTextPrinters
+    copies the window to VRAM after every call, not only after RENDER_PRINT.
+    (A delay of 0 instead draws the text before the box clears it.)"""
+    off = 0x08003658 - (0x080047A4 + 4)  # bl CopyWindowToVram
+    return [
+        (0x0860F094, 0x0101),
+        (0x08004836, 0x07C1),  # RenderFont: lsls r1, r0, #31; beq: loop on 0 and 2
+        (0x080047A0, 0x7828),  # ldrb r0, [r5]: the window
+        (0x080047A2, 0x2102),  # movs r1, #COPYWIN_GFX
+        (0x080047A4, 0xF000 | (off >> 12) & 0x7FF),
+        (0x080047A6, 0xF800 | (off >> 1) & 0x7FF),
+        (0x080047A8, 0x2C01),  # cmp r4, #RENDER_FINISH
+        (0x080047AA, 0xD01B),  # beq: the printer is done
+        (0x080047AC, 0xE004),  # b: RENDER_UPDATE runs the callback
+        (0x080047AE, 0x46C0),
+    ]
 
 
 def walls():
