@@ -71,6 +71,12 @@ cheats-choices/picked 66B7A33EC24D41DA
 cheats-choices/pickone 7B5C3EDC8BE3B26A
 cheats-choices/run B3D3627FCAF779E5
 cheats-clean/clean 019FE0D843B177D1
+cheats-folders/back BA9972CA03707796
+cheats-folders/choices 03D9D02865AFEC74
+cheats-folders/folder B8FEA322D65ADAEB
+cheats-folders/infolder 99F1B189DCCA2632
+cheats-folders/list 47A4681F595B2E22
+cheats-folders/picked EB946D58180F6B27
 cheats-guide/guide CE182AA655AA59E8
 cheats-guide/hold 5318EB7741794DA9
 cheats-guide/list 78428A6DB6AFEC7B
@@ -725,6 +731,12 @@ sv-cheats-choices/list CDC36044AA8B4F57
 sv-cheats-choices/picked E5FC372DF4D35DA1
 sv-cheats-choices/pickone AF4CBB8E7F11ECA5
 sv-cheats-choices/run 02C602A65C4F4889
+sv-cheats-folders/back E699E7C8E8F45E61
+sv-cheats-folders/choices A1486ECFDE039CAF
+sv-cheats-folders/folder 830AD0911B66F7FE
+sv-cheats-folders/infolder 41E4A5ECF48CAC93
+sv-cheats-folders/list DD79991844DB1E25
+sv-cheats-folders/picked EF1A01C84F398F9C
 sv-cheats-guide/guide 334D11A7E9F04510
 sv-cheats-guide/hold 6DF563FEE39E46C9
 sv-cheats-guide/list 10E914BAEE577D22

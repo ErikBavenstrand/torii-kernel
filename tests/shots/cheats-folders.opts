@@ -1,0 +1,37 @@
+# Folders on the Cheats screen (source/screens/cheats.c,
+# docs/plans/cheat-folders.md) over tests/shots/data/folders.cht: the Items
+# and Wild cheats fold into one row each, named by their folder, how many
+# are on (Items) or how many it holds (Wild) at the right; the cursor on
+# Items (list); A opens it: its cheats without the "Items: " prefix, the
+# Item x99 variants folded into one choice row, the folder's name in the
+# title (folder); A picks Master Ball beside Rare Candy (picked); A on the
+# choice row opens its choices within the folder (choices); B back in the
+# folder (infolder), B again on Items' row, "2 on" (back).
+#! settings 28=1
+#! sd-file /torii/cheats/Hello.cht 0 tests/shots/data/folders.cht
+# The tests' hook: lists open on their first row (else a list opens on
+# Hello, the game Recent played last)
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-k @8:RIGHT -k @12:- -k @20:RIGHT -k @24:- -k @32:RIGHT -k @36:-
+-k @80:START -k @84:-
+-w "screen ready: game-popup"
+-k @12:DOWN -k @16:- -k @24:DOWN -k @28:-
+-k @48:A -k @52:-
+-w "screen ready: cheats"
+-k @16:DOWN -k @20:-
+-s @32:list.png
+-k @40:A -k @44:-
+-s @64:folder.png
+-k @72:A -k @76:-
+-s @92:picked.png
+-k @100:DOWN -k @104:- -k @112:A -k @116:-
+-s @140:choices.png
+-k @148:B -k @154:-
+-s @176:infolder.png
+-k @184:B -k @190:-
+-s @212:back.png

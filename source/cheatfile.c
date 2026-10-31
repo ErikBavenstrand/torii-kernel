@@ -23,6 +23,7 @@ enum {
 	KEY_RENAMED,
 	KEY_KEYS,
 	KEY_GUIDE,
+	KEY_FOLDER,
 	KEY_CHEAT,  // another cheatN_ key: kept, and numbered with its cheat
 	KEY_COUNT,  // "cheats"
 	KEY_OTHER,
@@ -33,7 +34,7 @@ const char *const cheatfile_format_names[CHEAT_FMT_VBA + 1] = {
 };
 
 // A key "cheatN_desc", "_code", "_enable", "_format", "_user", "_renamed",
-// "_keys", "_guide" or another
+// "_keys", "_guide", "_folder" or another
 // "cheatN_" one: which, with N in *number (0 to max - 1, else max) and its
 // digits' count in *digits; KEY_COUNT for "cheats", KEY_OTHER for any other
 // key
@@ -68,6 +69,8 @@ static u32 cheat_key(const char *k, u32 len, u32 max, u32 *number, u32 *digits)
 		return KEY_KEYS;
 	if (wl == 5 && !memcmp(what, "guide", 5))
 		return KEY_GUIDE;
+	if (wl == 6 && !memcmp(what, "folder", 6))
+		return KEY_FOLDER;
 	return KEY_CHEAT;
 }
 
@@ -177,6 +180,43 @@ int cheatfile_line_key(const char *line, u32 len, u32 *number, int *on)
 	return 1;
 }
 
+// 1 if the len bytes at s are whole UTF-8 characters with no control
+// character: a folder's name to show
+static int folder_ok(const char *s, u32 len)
+{
+	for (u32 i = 0; i < len;) {
+		u8 c = (u8)s[i];
+		u32 cl = c < 0x80                ? 1
+			 : c >= 0xC2 && c < 0xE0 ? 2
+			 : c >= 0xE0 && c < 0xF0 ? 3
+			 : c >= 0xF0 && c < 0xF5 ? 4
+						 : 0;
+		if (!cl || i + cl > len || c < 0x20 || c == 0x7F)
+			return 0;
+		for (u32 j = 1; j < cl; j++)
+			if (((u8)s[i + j] & 0xC0) != 0x80)
+				return 0;
+		i += cl;
+	}
+	return 1;
+}
+
+// The folder named by the len bytes at text offset at: its entry + 1,
+// added if new; 0 if the table is full
+static u32 folder_entry(struct cheatfile *f, u32 at, u32 len)
+{
+	for (u32 k = 0; k < f->n_folders; k++) {
+		u32 e = f->folders[k];
+		if ((e & ((1u << CHEATFILE_FOLDER_LEN_BITS) - 1)) == len &&
+		    !memcmp(f->text + (e >> CHEATFILE_FOLDER_LEN_BITS), f->text + at, len))
+			return k + 1;
+	}
+	if (f->n_folders >= CHEATFILE_FOLDERS)
+		return 0;
+	f->folders[f->n_folders] = at << CHEATFILE_FOLDER_LEN_BITS | len;
+	return ++f->n_folders;
+}
+
 // The number past the last the table takes
 static u32 top(const struct cheatfile *f)
 {
@@ -223,6 +263,9 @@ static void parse_kv(struct cheatfile *f, const struct kv *kv)
 		c->keys = cheatkeys_parse(s, len);
 	} else if (what == KEY_GUIDE) {
 		c->guide = len <= CHEATFILE_GUIDE_LEN_MAX ? at << CHEATFILE_GUIDE_LEN_BITS | len : CHEATFILE_NONE;
+	} else if (what == KEY_FOLDER) {
+		c->folder =
+			len && len <= CHEATFILE_FOLDER_MAX && folder_ok(s, len) ? folder_entry(f, at, len) & 0x7F : 0;
 	} else if (what == KEY_ENABLE && len <= 0xFF) {  // a longer value isn't an enable line we could rewrite
 		c->enable = at;
 		c->enable_len = (u8)len;
@@ -522,7 +565,7 @@ s32 cheatfile_next(struct cheatfile *f, struct cheatfile_work *w)
 		c->status = CHEATFILE_SAME;
 	c->act = c->status == CHEATFILE_OK || c->status == CHEATFILE_SAME ? act : 0;
 	u32 shape = c->status == CHEATFILE_OK ? shape_hash(w->ops, n_ops) : 0;
-	c->variant = shape && w->last + 1 == i && shape == w->last_shape;
+	c->variant = shape && w->last + 1 == i && shape == w->last_shape && cheatfile_same_folder(f, i - 1, i);
 	w->last = i;
 	w->last_shape = shape;
 	if (c->status != CHEATFILE_OK)
@@ -600,6 +643,38 @@ u32 cheatfile_own_part(const char *name, u32 len, u32 own)
 	while (k < len && name_break(name[k]) && name[k] != '(' && name[k] != '[')
 		k++;
 	return k < len ? k : 0;  // nothing of its own: the whole name
+}
+
+// --- Folders -------------------------------------------------------------------
+
+const char *cheatfile_folder_name(const struct cheatfile *f, const struct cheatfile_cheat *c, u32 *len)
+{
+	*len = 0;
+	if (!c->folder || c->folder > f->n_folders)
+		return NULL;
+	u32 e = f->folders[c->folder - 1];
+	*len = e & ((1u << CHEATFILE_FOLDER_LEN_BITS) - 1);
+	return f->text + (e >> CHEATFILE_FOLDER_LEN_BITS);
+}
+
+u32 cheatfile_folder(const struct cheatfile *f, u32 i, u32 *end)
+{
+	u32 start = i, k = i + 1;
+	if (f->cheats[i].folder) {
+		while (start > 0 && cheatfile_same_folder(f, start - 1, i))
+			start--;
+		while (k < f->count && cheatfile_same_folder(f, k, i))
+			k++;
+	}
+	*end = k;
+	return start;
+}
+
+u32 cheatfile_folder_part(const char *name, u32 len, const char *folder, u32 flen)
+{
+	if (!flen || len <= flen || memcmp(name, folder, flen) != 0 || !name_break(name[flen]))
+		return 0;  // "Items" doesn't start "Itemsets: ..."
+	return cheatfile_own_part(name, len, flen);
 }
 
 // --- Activation (cheatkeys.h) ------------------------------------------------

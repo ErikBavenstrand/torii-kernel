@@ -1515,3 +1515,73 @@ void test_cheatfile_variants(void)
 	CHECK_EQ(cheatfile_group_name(&file, 11, 13, &own), 7);  // "Pokemon": back to a word's end
 	CHECK_EQ(cheatfile_own_part(desc(12), cheats[12].desc_len, own), 8);  // "002 Ivysaur"
 }
+
+// Folders (cheatN_folder): adjacent cheats with the same value make a run,
+// known from the parse; an invalid value is no folder; a run of variants
+// stops at a folder's edge; a member's name loses the folder's prefix; a
+// remove numbers the folder line with its cheat
+void test_cheatfile_folders(void)
+{
+	load_cap("cheat0_desc = \"Lives\"\ncheat0_code = \"32001000 0009\"\n"
+		 "cheat1_desc = \"Items: Master Ball\"\ncheat1_code = \"32001004 0001\"\ncheat1_folder = \"Items\"\n"
+		 "cheat2_desc = \"Items: Rare Candy\"\ncheat2_code = \"32001004 0002\"\ncheat2_folder = Items\n"
+		 "cheat3_desc = \"Wild: Mew\"\ncheat3_code = \"32001004 0003\"\ncheat3_folder = \"Wild\"\n"
+		 "cheat4_desc = \"Wild: Mewtwo\"\ncheat4_code = \"32001004 0004\"\ncheat4_folder = \"Wild\"\n"
+		 "cheat5_desc = \"Bad\"\ncheat5_code = \"32001008 0001\"\ncheat5_folder = \"a\x01\"\n"
+		 "cheat6_desc = \"Cut\"\ncheat6_code = \"32001008 0002\"\ncheat6_folder = \"\xC3\"\n"
+		 "cheat7_desc = \"Long\"\ncheat7_code = \"32001008 0003\"\n"
+		 "cheat7_folder = \"1234567890123456789012345\"\n"
+		 "cheat8_desc = \"Empty\"\ncheat8_code = \"3200100C 0001\"\ncheat8_folder = \"\"\n"
+		 "cheat9_desc = \"\xC3\xA5r\"\ncheat9_code = \"32001010 0001\"\n"
+		 "cheat9_folder = \"\xC3\x85r 12345678901234567890\"\n",
+		 4096);
+	CHECK_EQ(file.count, 10);
+	u32 len;
+	CHECK_EQ(cheats[0].folder, 0);
+	CHECK(cheatfile_folder_name(&file, &cheats[0], &len) == NULL && !len);
+	const char *name = cheatfile_folder_name(&file, &cheats[1], &len);
+	CHECK(name && !strcmp(edit_span((u32)(name - file.text), len), "Items"));
+	CHECK_EQ(cheats[2].folder, cheats[1].folder);  // quoted or not, one name
+	for (u32 i = 5; i <= 8; i++)
+		CHECK_EQ(cheats[i].folder, 0);  // a control character, a cut character, too long, empty
+	CHECK(cheatfile_folder_name(&file, &cheats[9], &len) != NULL);
+	CHECK_EQ(len, CHEATFILE_FOLDER_MAX);  // 24 bytes, 23 characters
+	CHECK_EQ(file.n_folders, 3);
+	u32 end;
+	CHECK_EQ(cheatfile_folder(&file, 0, &end), 0);
+	CHECK_EQ(end, 1);
+	CHECK_EQ(cheatfile_folder(&file, 2, &end), 1);
+	CHECK_EQ(end, 3);
+	CHECK_EQ(cheatfile_folder(&file, 3, &end), 3);
+	CHECK_EQ(end, 5);
+	CHECK(cheatfile_same_folder(&file, 5, 6));  // none and none
+	CHECK(!cheatfile_same_folder(&file, 0, 1));
+	// Cheats 1 to 4 have one shape: two runs, one per folder
+	CHECK(!cheats[1].variant && cheats[2].variant && !cheats[3].variant && cheats[4].variant);
+	CHECK_EQ(cheatfile_group(&file, 2, &end), 1);
+	CHECK_EQ(end, 3);
+	CHECK(!cheats[5].variant);  // beside a folder's cheat, out of it
+	CHECK_EQ(cheatfile_folder_part("Items: Rare Candy", 17, "Items", 5), 7);
+	CHECK_EQ(cheatfile_folder_part("Items - Rare Candy", 18, "Items", 5), 8);
+	CHECK_EQ(cheatfile_folder_part("Itemset", 7, "Items", 5), 0);  // not at a word's end
+	CHECK_EQ(cheatfile_folder_part("Rare Candy", 10, "Items", 5), 0);  // no prefix
+	CHECK_EQ(cheatfile_folder_part("Items:", 6, "Items", 5), 0);  // nothing left
+	CHECK_EQ(cheatfile_folder_part("Items", 5, "Items", 5), 0);
+	// A remove: the folder lines after it follow their cheats' numbers
+	CHECK_EQ(cheatfile_remove(&file, &room, 0), CHEATFILE_EDIT_OK);
+	redecode();
+	CHECK(text_has("cheat0_folder = \"Items\"\n"));
+	CHECK(text_has("cheat1_folder = Items\n"));
+	CHECK_EQ(cheatfile_folder(&file, 0, &end), 0);
+	CHECK_EQ(end, 2);
+	// Past CHEATFILE_FOLDERS names, a cheat with another is in none
+	static char many[16384];
+	char *p = many;
+	for (u32 i = 0; i <= CHEATFILE_FOLDERS; i++)
+		p += sprintf(p, "cheat%u_code = \"3200100%X 0001\"\ncheat%u_folder = \"F%u\"\n", (unsigned)i,
+			     (unsigned)(i & 15), (unsigned)i, (unsigned)i);
+	load_str(many);
+	CHECK_EQ(file.n_folders, CHEATFILE_FOLDERS);
+	CHECK_EQ(cheats[CHEATFILE_FOLDERS - 1].folder, CHEATFILE_FOLDERS);
+	CHECK_EQ(cheats[CHEATFILE_FOLDERS].folder, 0);
+}

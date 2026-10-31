@@ -24,6 +24,7 @@ void test_cheatfile_edit_limits(void);
 void test_cheatfile_big(void);
 void test_cheatfile_rom_crc(void);
 void test_cheatfile_keys_guide(void);
+void test_cheatfile_folders(void);
 void test_cheatfile_keys_gate(void);
 void test_cheatfile_variants(void);
 void test_cheatkeys_parse(void);

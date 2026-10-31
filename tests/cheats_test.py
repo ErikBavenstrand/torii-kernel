@@ -288,6 +288,29 @@ class Merge(unittest.TestCase):
         self.assertEqual((own, stale), (0, 0))
         self.assertEqual(merged[0][:2], ("Cash", "02001510:0063"))
 
+    def test_folder_kept(self):
+        """cheatN_folder is read, written after the cheat's other lines and
+        kept through a merge: the database's folder over the card's, the
+        card's when the database gives none."""
+        old = cheats.parse_cht(
+            'cheat0_desc = "Items: Master Ball"\ncheat0_code = "32001000 0063"\n'
+            'cheat0_folder = "Items"\ncheat0_enable = true\n'
+            'cheat1_desc = "HP"\ncheat1_code = "32001004 0063"\ncheat1_folder = "Old"\n'
+        )
+        self.assertEqual(old[0].extra, {"folder": "Items"})
+        database = [
+            cheats.Cheat("Items: Master Ball", "32001000 0063", False),
+            cheats.Cheat("Battle: HP", "32001004 0063", False, {"folder": "Battle"}),
+        ]
+        merged, own, _ = cheats.merge(database, old)
+        self.assertEqual(own, 0)
+        self.assertEqual(merged[0].extra, {"folder": "Items"})
+        self.assertTrue(merged[0][2])
+        self.assertEqual(merged[1].extra, {"folder": "Battle"})
+        text = cheats.format_cht(merged)
+        self.assertIn('cheat1_folder = "Battle"\n', text)
+        self.assertEqual(cheats.parse_cht(text), merged)
+
     def test_torii_keys(self):
         """cheatN_format and cheatN_user are kept through a merge, the
         user's format over the source's; a placeholder the keypad filled in

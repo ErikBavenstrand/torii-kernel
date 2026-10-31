@@ -166,8 +166,10 @@ def value(raw):
 # The keys Torii adds to a cheat (source/cheatfile.h), kept as they are:
 # cheatN_format, a format to decode it in (quoted), cheatN_user, a code
 # typed on the cart, and cheatN_renamed, a database cheat named on the cart
-# (bare bools)
-KEPT_KEYS = ("format", "user", "renamed")
+# (bare bools); cheatN_folder, the heading the Cheats screen shows it under
+# (quoted; set in the file, never on the cart, so a merge takes the
+# database's when it has one)
+KEPT_KEYS = ("format", "user", "renamed", "folder")
 BARE_KEYS = ("enable", "user", "renamed")
 # A code's digits left for the user to fill in (cheatcode.c's is_mark)
 PLACEHOLDER = re.compile(r"[?XxYyZz]")
@@ -345,7 +347,10 @@ def merge(database, old, keep_all=True):
         if was is not None:
             kept = getattr(was, "extra", {})
             name = was[0] if is_true(kept.get("renamed", "")) else desc
-            out.append(Cheat(name, code, was[2], {**extra, **kept}))
+            mine = {**extra, **kept}
+            if "folder" in extra:
+                mine["folder"] = extra["folder"]
+            out.append(Cheat(name, code, was[2], mine))
         else:
             out.append(Cheat(desc, code, enabled, extra))
     rest = [c for c in old if c[1] not in seen and id(c) not in taken]
